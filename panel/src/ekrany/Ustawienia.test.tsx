@@ -37,6 +37,11 @@ vi.mock("../api/rozmowy", async () => {
     usePokrycieSygnatur: () => ({
       data: { pozycji: 0, bezSygnatury: 0, trafia: 0, sygnatur: 0, pudla: [], zdublowane: [] },
     }),
+    usePokrycieWiedzy: () => ({
+      data: { kartotek: 3200, zOpisem: 1400, zIdentyfikatorem: 460, identyfikatorow: 1900, identyfikatorowRecznych: 0,
+        modeleZOpisu: { nowych: 37, przerobionych: 0, odrzuconych: 0 },
+        zastosowania: { zatwierdzonych: 0, negatywnych: 0, propozycji: 0 }, fts: { dostepne: false, wpisow: 0 } },
+    }),
   };
 });
 
@@ -48,6 +53,9 @@ describe("Ustawienia obsługi", () => {
     expect(screen.getByText("Stan integracji")).toBeInTheDocument();
     expect(screen.getByText("Połączenie Allegro")).toBeInTheDocument();
     expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
+    /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
+    expect(screen.getByText("Wiedza z opisów kartotek")).toBeInTheDocument();
+    expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
   });
 
   it("SKRZYNKA już jej nie renderuje, ale alarm na niej ZOSTAJE", () => {

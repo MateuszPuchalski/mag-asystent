@@ -1,4 +1,6 @@
-import type { PowodNegatywny, RodzajDowodu, StatusDoboru, StatusRozmowy } from "../api/typy";
+import type {
+  PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru, StatusRozmowy, ZrodloPropozycji,
+} from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -70,3 +72,20 @@ export const NAZWA_DOWODU: Record<RodzajDowodu, string> = {
 export const DOWODY_DO_WYBORU: RodzajDowodu[] = [
   "producent", "katalog_dostawcy", "pomiar_wlasny", "sprzedaz_weryfikacja", "decyzja_biura",
 ];
+
+/* Skąd propozycja (E2/E3). Surowy klucz `opis` na ekranie mówił tyle, co nic. */
+export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
+  dobor: "z zatwierdzonego doboru",
+  pomiar: "z pomiaru hali",
+  reczne: "wpis ręczny",
+  opis: "z opisu kartoteki",
+  copilot: "propozycja Copilota",
+};
+
+export const NAZWA_RODZAJU_IDENTYFIKATORA: Record<RodzajIdentyfikatora, string> = {
+  oem: "OEM",
+  nr_oryg: "nr oryginału",
+  katalog_obcy: "katalog obcy",
+  stare_sku: "stare SKU",
+};
+export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] = ["oem", "nr_oryg", "katalog_obcy", "stare_sku"];

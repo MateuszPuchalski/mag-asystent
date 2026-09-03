@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
 import type { NowaPropozycja as NowaPropozycjaTyp, PowodNegatywny, RodzajDowodu } from "../api/typy";
-import { useModele } from "../api/wiedza";
 import { Pole, Przycisk } from "../ui";
+import { PolaModelu, type DaneModelu } from "./PolaModelu";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { DOWODY_DO_WYBORU, NAZWA_DOWODU, NAZWA_POWODU } from "../skrzynka/statusy";
 
@@ -18,18 +18,14 @@ export function NowaPropozycja({ trwa, blad, onWyslij }: {
   onWyslij: (p: NowaPropozycjaTyp) => void;
 }) {
   const [towar, setTowar] = useState<Towar | null>(null);
-  const [rodzaj, setRodzaj] = useState<"maszyna" | "silnik">("maszyna");
-  const [marka, setMarka] = useState("");
-  const [nazwa, setNazwa] = useState("");
-  const [wariant, setWariant] = useState("");
+  const [model, setModel] = useState<DaneModelu>({ rodzaj: "maszyna", marka: "", nazwa: "", wariant: "" });
+  const { rodzaj, marka, nazwa, wariant } = model;
   const [polaryzacja, setPolaryzacja] = useState<"pasuje" | "nie_pasuje">("pasuje");
   const [powod, setPowod] = useState<PowodNegatywny>("niewlasciwy_rozstaw");
   const [rodzajDowodu, setRodzajDowodu] = useState<RodzajDowodu>("katalog_dostawcy");
   const [tresc, setTresc] = useState("");
   const [link, setLink] = useState("");
   const [komentarz, setKomentarz] = useState("");
-  const modele = useModele(`${marka} ${nazwa}`);
-
   const gotowe = Boolean(towar && marka.trim() && nazwa.trim() && tresc.trim());
 
   return <form className="space-y-3" aria-label="Nowa propozycja"
@@ -49,26 +45,7 @@ export function NowaPropozycja({ trwa, blad, onWyslij }: {
       <Wyszukiwarka wybrany={towar} onWybierz={setTowar} etykieta="Wskazana przez Ciebie" />
     </div>
 
-    <div className="grid gap-2 md:grid-cols-4">
-      <label className="text-xs font-bold text-slate-600">Rodzaj
-        <select className="field mt-1" aria-label="Rodzaj urządzenia" value={rodzaj}
-          onChange={(e) => setRodzaj(e.target.value as "maszyna" | "silnik")}>
-          <option value="maszyna">maszyna</option><option value="silnik">silnik</option></select></label>
-      <label className="text-xs font-bold text-slate-600">Marka
-        <Pole className="mt-1" aria-label="Marka" value={marka} list="modele-marka" placeholder="NAC"
-          onChange={(e) => setMarka(e.target.value)} /></label>
-      <label className="text-xs font-bold text-slate-600">Model
-        <Pole className="mt-1" aria-label="Model" value={nazwa} list="modele-nazwa" placeholder="LS 46-450"
-          onChange={(e) => setNazwa(e.target.value)} /></label>
-      <label className="text-xs font-bold text-slate-600">Wariant
-        <Pole className="mt-1" aria-label="Wariant" value={wariant} placeholder="HS"
-          onChange={(e) => setWariant(e.target.value)} /></label>
-    </div>
-    {/* Podpowiedzi z bazy: jedna kosiarka = jeden wiersz, więc pisownia z pierwszego wpisu wygrywa. */}
-    <datalist id="modele-marka">{[...new Set(modele.data?.modele.map((m) => m.marka) ?? [])].map((m) => <option key={m} value={m} />)}</datalist>
-    <datalist id="modele-nazwa">{(modele.data?.modele ?? []).map((m) => <option key={m.id} value={m.nazwa}>{m.etykieta}</option>)}</datalist>
-    {modele.data && modele.data.modele.length > 0 && <p className="text-[11px] text-slate-500">
-      Znane modele: {modele.data.modele.map((m) => m.etykieta).join(" · ")}</p>}
+    <PolaModelu dane={model} onZmiana={setModel} />
 
     <div className="flex flex-wrap items-center gap-3">
       <label className="flex items-center gap-1 text-sm">

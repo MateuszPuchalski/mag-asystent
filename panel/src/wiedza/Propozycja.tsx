@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Check, X as Krzyzyk } from "lucide-react";
 import type { Zastosowanie } from "../api/typy";
 import { Pole, Przycisk, czas } from "../ui";
+import { NAZWA_ZRODLA } from "../skrzynka/statusy";
 
 /**
  * Karta propozycji w kolejce wiedzy (E2). Niesie to, po czym biuro rozstrzyga:
@@ -33,7 +34,7 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
         ? "bg-red-100 text-ranga-zle" : "bg-emerald-100 text-emerald-800"}`}>
         {negatyw ? "nie pasuje" : "pasuje"}</span>
       <span className="ml-auto text-xs text-slate-500">
-        {z.zaproponowal} · {czas(z.zaproponowanoAt)} · źródło: {z.zrodlo}</span>
+        {z.zaproponowal} · {czas(z.zaproponowanoAt)} · {NAZWA_ZRODLA[z.zrodlo]}</span>
     </div>
     {z.zdaniePowodu && <p className="mt-1 text-sm text-red-900">{z.zdaniePowodu}</p>}
     {z.komentarz && <p className="mt-1 text-sm text-slate-700">{z.komentarz}</p>}

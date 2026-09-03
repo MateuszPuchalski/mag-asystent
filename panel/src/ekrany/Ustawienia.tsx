@@ -1,9 +1,10 @@
 import React from "react";
 import { Settings } from "lucide-react";
-import { usePokrycieSygnatur, useZdrowie } from "../api/rozmowy";
+import { usePokrycieSygnatur, usePokrycieWiedzy, useZdrowie } from "../api/rozmowy";
 import { Karta } from "../ui";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
+import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 
 /* ── Ustawienia obsługi klienta (0.168.0) ────────────────────────────────────
    Decyzja właściciela: stan integracji schodzi ze Skrzynki za zębatkę.
@@ -26,6 +27,7 @@ import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 export function Ustawienia() {
   const zdrowie = useZdrowie();
   const sygnatury = usePokrycieSygnatur();
+  const wiedza = usePokrycieWiedzy();
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -38,5 +40,6 @@ export function Ustawienia() {
 
     <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     <PokrycieSygnatur dane={sygnatury.data} />
+    <PokrycieWiedzy dane={wiedza.data} />
   </div>;
 }

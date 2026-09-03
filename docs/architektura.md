@@ -59,7 +59,7 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 ┌──────────▼──────────────────────────────────────────────────┐
 │ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
 │                                                              │
-│  SQLite (node:sqlite, WAL) — 50 tabel:                       │
+│  SQLite (node:sqlite, WAL) — 52 tabele + indeks FTS5:        │
 │    delivery + delivery_line   rozkładanie faktur zakupu      │
 │    delivery_note              notatki biura do dostawy       │
 │    problem, ean_conflict      wyjątki                        │
@@ -73,6 +73,8 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 │    conversation + message     rozmowy z klientem             │
 │    conversation_draft, _comment, _event, _assignment, _mention│
 │    outbox                     kolejka odpowiedzi do Allegro  │
+│    towar_identyfikator        numery OEM z opisów (E3)       │
+│    model_z_opisu, towar_fts   sekcje „Modele:”, pełny tekst  │
 │    zwrot_klienta + _pozycja   zwroty klienckie (0.150.0)     │
 │    zwrot_zdarzenie            oś zwrotu                      │
 │    allegro_token              parowanie konta Allegro        │
@@ -268,7 +270,10 @@ w starym `wertis.env`, po prostu go skasuj — dziś nic go nie czyta.
 
 Serwer **nie odpytuje MSSQL przy każdym skanie**. Importer kopiuje kartoteki,
 stany i dokumenty do lokalnych tabel `sgt_*` przy starcie, co `MSSQL_SYNC_MS`
-(domyślnie 60 s) i na żądanie (`POST /api/admin/resync`).
+(domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Po każdym imporcie
+(i po seedzie) `services/po-imporcie.ts` odbudowuje pochodne opisów:
+identyfikatory, sekcje „Modele:” i indeks FTS5 — poza transakcją importu,
+każdą w osobnym try/catch.
 
 Powód jest praktyczny: baza Subiekta stoi na tej samej maszynie co Subiekt,
 z którego korzysta biuro. Odpytywanie jej z częstotliwością skanów obciążałoby

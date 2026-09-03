@@ -1,9 +1,13 @@
 import React, { useState } from "react";
-import type { RodzajDowodu, Zastosowanie } from "../api/typy";
-import { useDodajDowod, useWiedzaTowaru, useWycofajZastosowanie } from "../api/wiedza";
+import type { RodzajDowodu, RodzajIdentyfikatora, Zastosowanie } from "../api/typy";
+import {
+  useDodajDowod, useDodajIdentyfikator, useIdentyfikatory, useWiedzaTowaru, useWycofajZastosowanie,
+} from "../api/wiedza";
 import { Pole, Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import { DOWODY_DO_WYBORU, NAZWA_DOWODU } from "../skrzynka/statusy";
+import {
+  DOWODY_DO_WYBORU, NAZWA_DOWODU, NAZWA_RODZAJU_IDENTYFIKATORA, RODZAJE_IDENTYFIKATORA,
+} from "../skrzynka/statusy";
 
 /**
  * „Sprawdź kartotekę": co wiemy o części — potwierdzone, negatywne i to, co
@@ -22,7 +26,40 @@ export function WiedzaTowaru() {
       <Sekcja tytul="Nie pasuje do" lista={wiedza.data.negatywne} pusto="brak negatywnych dopasowań" negatyw />
       <Sekcja tytul="Czeka w kolejce" lista={wiedza.data.propozycje} pusto="nic nie czeka" tylkoOdczyt />
     </>}
+    {towar && <Identyfikatory twId={towar.id} />}
   </div>;
+}
+
+/**
+ * Identyfikatory części (E3): z opisu po imporcie (przebudowa je odtwarza)
+ * albo ręczne z katalogu, którego w opisie nie ma (przebudowa je omija).
+ * Duplikat serwer odbija 409 — ta sama wartość po zwinięciu spacji i wielkości liter.
+ */
+function Identyfikatory({ twId }: { twId: number }) {
+  const lista = useIdentyfikatory(twId);
+  const dodaj = useDodajIdentyfikator();
+  const [rodzaj, setRodzaj] = useState<RodzajIdentyfikatora>("oem");
+  const [wartosc, setWartosc] = useState("");
+  return <section aria-label="Identyfikatory">
+    <b className="text-xs uppercase tracking-wide text-slate-500">Identyfikatory</b>
+    {lista.data && lista.data.length === 0 && <p className="text-sm text-slate-500">brak identyfikatorów w opisie</p>}
+    {lista.data && lista.data.length > 0 && <ul className="mt-1 flex flex-wrap gap-1">
+      {lista.data.map((i) => <li key={i.id} title={`${i.nazwaRodzaju} · ${i.zrodlo === "opis" ? "z opisu" : `ręcznie: ${i.dodal}`}`}
+        className={`rounded px-1.5 py-0.5 font-mono text-xs ${i.zrodlo === "reczne" ? "bg-amber-50 text-amber-900" : "bg-slate-100 text-slate-800"}`}>
+        <span className="mr-1 text-[10px] font-semibold text-slate-500">{i.nazwaRodzaju}</span>{i.wartosc}</li>)}
+    </ul>}
+    <div className="mt-2 flex flex-wrap items-end gap-2">
+      <select className="field w-auto" aria-label="Rodzaj identyfikatora" value={rodzaj}
+        onChange={(e) => setRodzaj(e.target.value as RodzajIdentyfikatora)}>
+        {RODZAJE_IDENTYFIKATORA.map((r) => <option key={r} value={r}>{NAZWA_RODZAJU_IDENTYFIKATORA[r]}</option>)}</select>
+      <Pole className="flex-1" aria-label="Wartość identyfikatora" value={wartosc} placeholder="np. 532 16 56-30"
+        onChange={(e) => setWartosc(e.target.value)} />
+      <Przycisk className="text-xs" disabled={dodaj.isPending || wartosc.trim().length < 4}
+        onClick={() => dodaj.mutate({ twId, rodzaj, wartosc: wartosc.trim() }, { onSuccess: () => setWartosc("") })}>
+        Dodaj identyfikator</Przycisk>
+    </div>
+    {dodaj.error && <p className="mt-1 text-xs text-red-700">{(dodaj.error as Error).message}</p>}
+  </section>;
 }
 
 function Sekcja({ tytul, lista, pusto, negatyw = false, tylkoOdczyt = false }: {

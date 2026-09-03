@@ -41,11 +41,11 @@ const PUSTE: KandydaciDoboru = {
   drogi: [
     { droga: "symbol", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu" },
     { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN" },
-    { droga: "oem", sprawdzona: false, wynikow: 0, powod: "etap E3" },
+    { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM" },
     { droga: "zastosowanie", sprawdzona: false, wynikow: 0, powod: "etap E2" },
     { droga: "oferta", sprawdzona: false, wynikow: 0, powod: "rozmowa nie jest powiązana z ofertą" },
     { droga: "zamiennik", sprawdzona: false, wynikow: 0, powod: "bez kartoteki oferty" },
-    { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "etap E3" },
+    { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał nazwy części ani maszyny" },
     { droga: "wyszukiwarka", sprawdzona: false, wynikow: 0, powod: "wybór ręczny" },
   ],
 };
@@ -216,5 +216,24 @@ describe("zakładka doboru", () => {
     rerender(<Dobor dobor={dobor()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
     expect(screen.getByText(/w kolejce wiedzy/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zaproponuj jako dowód/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("kandydat bez kartoteki (E3)", () => {
+  it("numer OEM bez wiersza w kartotece stoi na liście bez stanu i BEZ Wybierz", async () => {
+    /* Decyzja właściciela (makieta Dobor.dc.html): „nie mamy tego u siebie" to
+       odpowiedź dla klienta. Wybierz ukryty, bo `twId: null` w wyborze znaczy „zdejmij". */
+    kandydaci.mockReturnValue({ data: {
+      ...Z_KANDYDATAMI,
+      kandydaci: [...Z_KANDYDATAMI.kandydaci,
+        { nr: 3, twId: null, symbol: "OEM 118550127/0", nazwa: "identyfikator bez wiersza w kartotece", stan: null,
+          droga: "oem", pewnosc: "wymaga_danych", ostrzezenia: [],
+          zrodlo: "numer z danych wejściowych — nie ma go w żadnym opisie kartoteki" }],
+    }, isLoading: false, error: null });
+    pokaz(dobor({ status: "candidates_found", dane: { ...dobor().dane, oem: "118550127/0" } }));
+    expect(screen.getByText("OEM 118550127/0")).toBeInTheDocument();
+    expect(screen.getByText("brak w kartotece")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Wybierz/ })).toHaveLength(2);
+    expect(screen.getByText(/nie ma go w żadnym opisie/)).toBeInTheDocument();
   });
 });

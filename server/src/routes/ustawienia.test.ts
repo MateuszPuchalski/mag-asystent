@@ -77,6 +77,24 @@ test("biuro dostaje liczby, nie sam procent", async () => {
   assert.deepEqual(body.pudla, [], "nic nie pudłuje, bo symbol stoi w kartotece");
 });
 
+test("pokrycie wiedzy (E3) to liczby dla biura, bez zapisu i bez hali", async () => {
+  let r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy" });
+  assert.equal(r.statusCode, 401);
+  r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy", headers: login("magazynier") });
+  assert.equal(r.statusCode, 403);
+  const zdarzen = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
+  const przed = zdarzen();
+  r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy", headers: login("biuro") });
+  assert.equal(r.statusCode, 200, r.body);
+  const body = r.json<{ kartotek: number; identyfikatorow: number; fts: { dostepne: boolean; wpisow: number };
+    modeleZOpisu: { nowych: number } }>();
+  assert.equal(typeof body.kartotek, "number");
+  assert.equal(typeof body.identyfikatorow, "number");
+  assert.equal(typeof body.modeleZOpisu.nowych, "number");
+  assert.equal(body.fts.dostepne, true, "node:sqlite testów ma FTS5");
+  assert.equal(zdarzen(), przed);
+});
+
 test("ZERO TRAS ZAPISU i to jest umowa", async () => {
   /* Ta sama umowa co licznik `method:` w `biuro.test.ts` i licznik POST-ów
      w `zwroty.test.ts`: ustawienia obsługi opisują TŁO pracy. Gdy kiedyś

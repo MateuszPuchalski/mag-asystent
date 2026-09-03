@@ -5,6 +5,7 @@ import { config } from "../config.js";
 import { WZORZEC_UUID_TSQL, uuidZTekstu, wyrazenieUuid } from "./subiekt.uuid.js";
 import { numerKosza } from "../services/przyjecia.js";
 import { symbolTypu } from "./typy-dokumentow.js";
+import { poImporcie } from "../services/po-imporcie.js";
 
 /**
  * PRODUKCJA / edu — odczyt z bazy MSSQL Subiekta GT (spec §6, D2).
@@ -842,6 +843,10 @@ export async function importFromMssql(): Promise<ImportStats> {
     }
   });
   apply();
+  /* Pochodne opisów (identyfikatory, sekcje „Modele:", indeks pełnotekstowy)
+     POZA transakcją importu: import ma zostać atomowy i krótki, a pęknięta
+     przebudowa nie ma prawa cofnąć świeżej kartoteki (patrz `po-imporcie.ts`). */
+  poImporcie(d);
 
   lastImport = {
     towary: towary.length,

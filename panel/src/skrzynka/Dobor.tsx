@@ -216,16 +216,22 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
           wejściowe albo wskaż kartotekę z wyszukiwarki.</p>}
       <ul className="mt-2 space-y-2">
         {kandydaci.data?.kandydaci.map((k) => {
-          const wybrany = dobor.wybrany?.twId === k.twId;
-          return <li key={k.twId} className={`rounded-lg border p-2 ${wybrany
-            ? "border-wertis-amber bg-amber-50" : "border-slate-200"}`}>
+          /* Kandydat bez kartoteki (E3): numer OEM, którego nie ma w żadnym
+             opisie. Nie ma stanu i nie ma Wybierz — `twId: null` w wyborze
+             znaczy „zdejmij", więc przycisk zrobiłby odwrotność obietnicy. */
+          const bezKartoteki = k.twId === null;
+          const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
+          return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
+            ? "border-wertis-amber bg-amber-50" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
             <div className="flex items-center gap-2">
               <span className="grid h-5 w-5 place-items-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">{k.nr}</span>
               <b className="font-mono text-xs">{k.symbol}</b>
               <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
                 {PEWNOSC[k.pewnosc].etykieta}</span>
-              <span className={`ml-auto text-[11px] ${k.stan <= 0 ? "font-bold text-ranga-zle" : "text-slate-500"}`}>
-                dostępne {k.stan}</span>
+              {k.stan === null
+                ? <span className="ml-auto text-[11px] font-bold text-slate-500">brak w kartotece</span>
+                : <span className={`ml-auto text-[11px] ${k.stan <= 0 ? "font-bold text-ranga-zle" : "text-slate-500"}`}>
+                    dostępne {k.stan}</span>}
             </div>
             <p className="mt-1 text-xs text-slate-700">{k.nazwa}</p>
             <p className="mt-1 text-[11px] text-slate-500">
@@ -233,7 +239,7 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
               {" "}{k.zrodlo}</p>
             {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
               <AlertTriangle size={12} />{o}</p>)}
-            {!wybrany && <button type="button" disabled={wybierz.isPending}
+            {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
               onClick={() => wybierzTowar(k.twId, k.droga)}
               className="mt-1.5 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
               <Check size={12} />Wybierz</button>}

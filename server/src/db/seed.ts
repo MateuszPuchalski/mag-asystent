@@ -4,6 +4,7 @@ import { db, nowIso, transaction } from "./db.js";
 import { config } from "../config.js";
 import { etykietyDostaw } from "../adapters/subiekt.seeded.js";
 import { createUser, HASLO_MIN, userByLogin } from "../services/users.js";
+import { poImporcie } from "../services/po-imporcie.js";
 
 /**
  * Zasila read-model sgt_* prawdziwymi danymi z server/seed/products.json
@@ -159,6 +160,8 @@ function seed() {
   });
   insertAll(rows);
   console.log(`[seed] towary=${rows.length}, na MGP=${mgpProducts.length}, bez lokalizacji=${noLocProducts.length}`);
+  /* Seed to też „import": pochodne opisów powstają tak samo jak po Subiekcie. */
+  poImporcie(d);
 
   // ── syntetyczne dokumenty FZ/PZ (deterministyczne, bez losowości) ────────
   const insDok = d.prepare(

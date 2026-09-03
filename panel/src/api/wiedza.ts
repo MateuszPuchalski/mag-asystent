@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
-import type { ModelUrzadzenia, NowaPropozycja, PowodNegatywny, RodzajDowodu, Zastosowanie } from "./typy";
+import type {
+  Identyfikator, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora,
+  Zastosowanie,
+} from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
    Hooki w OSOBNYM pliku od `rozmowy.ts`, bo strażnik adresów w testach tras
@@ -13,6 +16,8 @@ export const kluczeWiedzy = {
   kolejka: ["wiedza", "kolejka"] as const,
   modele: (q: string) => ["wiedza", "modele", q] as const,
   towar: (twId: number) => ["wiedza", "towar", twId] as const,
+  zOpisow: ["wiedza", "z-opisow"] as const,
+  identyfikatory: (twId: number) => ["wiedza", "identyfikatory", twId] as const,
 };
 
 /**
@@ -49,6 +54,8 @@ export function useWiedzaTowaru(twId: number | null) {
    otwartej rozmowy: zatwierdzone zastosowanie jest od razu szczeblem doboru. */
 function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: kluczeWiedzy.kolejka });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.zOpisow });
+  qc.invalidateQueries({ queryKey: ["wiedza", "identyfikatory"] });
   qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
@@ -94,6 +101,55 @@ export function useDodajDowod() {
         method: "POST", body: JSON.stringify({ rodzaj: v.rodzaj, tresc: v.tresc, link: v.link ?? null }),
       }),
     onSettled: () => poWiedzy(qc),
+  });
+}
+
+/* ── E3: sekcje „Modele:" z opisów i identyfikatory ─────────────────────────
+   Lista z opisów zmienia się tylko po imporcie i po decyzji człowieka, więc
+   minuta świeżości wystarczy; licznik na zakładce bierze się z tej samej
+   odpowiedzi. */
+export function useModeleZOpisow() {
+  return useQuery({
+    queryKey: kluczeWiedzy.zOpisow,
+    queryFn: () => api<{ wiersze: ModelZOpisu[]; liczba: number }>(`/api/obsluga/wiedza/z-opisow`),
+    staleTime: 60_000,
+  });
+}
+
+export function usePrzerobModelZOpisu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; model: NowaPropozycja["model"] }) =>
+      api<Zastosowanie>(`/api/obsluga/wiedza/z-opisow/${v.id}/przerob`, {
+        method: "POST", body: JSON.stringify({ model: v.model }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useOdrzucModelZOpisu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<ModelZOpisu>(`/api/obsluga/wiedza/z-opisow/${v.id}/odrzuc`, { method: "POST", body: "{}" }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useIdentyfikatory(twId: number | null) {
+  return useQuery({
+    queryKey: kluczeWiedzy.identyfikatory(twId ?? 0),
+    queryFn: () => api<Identyfikator[]>(`/api/obsluga/wiedza/identyfikatory/${twId}`),
+    enabled: twId !== null,
+  });
+}
+
+export function useDodajIdentyfikator() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { twId: number; rodzaj: RodzajIdentyfikatora; wartosc: string }) =>
+      api<Identyfikator>(`/api/obsluga/wiedza/identyfikatory`, { method: "POST", body: JSON.stringify(v) }),
+    onSettled: (_d, _e, v) => poWiedzy(qc, v.twId),
   });
 }
 

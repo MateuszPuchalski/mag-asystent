@@ -462,6 +462,41 @@ export function migrate(database: DatabaseSync) {
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
+  tabelaFts(database);
+}
+
+/* ── Indeks pełnotekstowy kartotek (etap E3) ────────────────────────────────
+   Tabela wirtualna FTS5, contentless (`content=''`): wiersze to same tokeny
+   z `rowid = tw_id`. Zewnętrzna treść na `sgt_towar` wymagałaby triggerów na
+   tabeli, którą import z Subiekta WYCINA co `MSSQL_SYNC_MS` — indeks
+   przebudowuje się po imporcie w `services/po-imporcie.ts`, nie triggerami.
+
+   W try/catch, bo FTS5 zależy od flag builda SQLite w Node. Instalacja bez
+   niego STARTUJE: szczebel pełnotekstowy melduje się jako niedostępny,
+   a raport pokrycia to pokazuje. `unicode61 remove_diacritics 2` zdejmuje
+   ogonki po stronie SQLite; treść i tak wchodzi przez `zloz()`, żeby JS
+   i SQL trzymały jedną prawdę normalizacji (patrz `tekst.ts`). */
+let ftsStan: "ok" | "niedostepne" | "nieznane" = "nieznane";
+
+function tabelaFts(database: DatabaseSync): void {
+  try {
+    database.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS towar_fts
+      USING fts5(symbol, nazwa, opis, content='', tokenize='unicode61 remove_diacritics 2')`);
+    ftsStan = "ok";
+  } catch (e) {
+    ftsStan = "niedostepne";
+    console.warn(`[db] FTS5 niedostępne — szczebel pełnotekstowy doboru wyłączony: ${(e as Error).message}`);
+  }
+}
+
+/** Czy ta instalacja ma FTS5. `false` także PRZED migracją — odczyt bez indeksu to brak indeksu. */
+export function ftsDostepne(): boolean {
+  return ftsStan === "ok";
+}
+
+/** Wyłącznie dla testów: udawanie instalacji bez FTS5. */
+export function udawajBrakFts(brak: boolean): void {
+  ftsStan = brak ? "niedostepne" : "ok";
 }
 
 /**

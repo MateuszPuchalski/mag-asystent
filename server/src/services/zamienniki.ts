@@ -1,3 +1,5 @@
+import { DRABINA, oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
+
 /* ── Zamienniki wyczytane z opisu kartoteki ─────────────────────────────────
    Opis (`tw_Opis`) to pole swobodne, wypełniane ręcznie przez lata. Symbol
    zamiennika stoi po „Zamiennik:", „Zamiennie:", „Zastępuje:", „ZAM:",
@@ -36,31 +38,13 @@
  * filtra wstępnego, czyli innej części niż ta kartoteka; ogólna reguła końca
  * sekcji i tak go traktuje jako granicę.
  */
+
+/* Granica sekcji (`KONIEC_SEKCJI`) i drabina separatorów mieszkają od E3
+   w `opis-sekcje.ts` — parser identyfikatorów dzieli te same opisy tymi
+   samymi regułami. */
+
 const ETYKIETA =
   /\b(?:zamienni[a-ząćęłńóśźż]*|zamienne\s+na|zast[ęe]puje|odpowiednik[a-ząćęłńóśźż]*)\s*:?\s*|\bZAM\s*:\s*/gi;
-
-/**
- * Koniec listy = pierwsze generyczne „Słowo:", a NIE lista znanych etykiet.
- *
- * Whitelista (`OEM:`, `Modele:`, `W zestawie:`) wyglądała rozsądnie i wpuszczała
- * prozę: `Nr. oryg.: GND-33`, `STIHL: 017`, `HUSQVARNA: 40`, `Odpowiednik
- * oryginału o numerze: 597338`. Na karcie `W24-0807` dawała 19 śmieci zamiast
- * zera. Reguła ogólna ucina je wszystkie naraz i nie wymaga dopisywania każdej
- * nowej marki, którą ktoś kiedyś wklepie w opis.
- */
-const KONIEC_SEKCJI =
-  /(?<=^|\s)[A-Za-z0-9ĄĆĘŁŃÓŚŹŻąćęłńóśźż.][A-Za-z0-9ĄĆĘŁŃÓŚŹŻąćęłńóśźż. ]{0,24}:/;
-
-/**
- * Drabina podziału — od separatora najpewniejszego do najbardziej wątpliwego.
- * Na każdym szczeblu najpierw próbujemy CAŁEGO kawałka, dopiero potem dzielimy
- * (maximal munch), bo separatory występują WEWNĄTRZ prawdziwych symboli:
- * `FTC199/FTC206`, `10680/1` (ukośnik), `OLEJ-MIX-0,5L` (przecinek),
- * `DBR A-7540444`, `LT 4S3` (spacja). Naiwny `split` mieli je na sieczkę.
- *
- * `+` nie ma tu wcale i to jest decyzja, nie przeoczenie — patrz `rozbierz`.
- */
-const DRABINA = [/\s*\/\/\s*/, /\s*[,;|\\]\s*/, /\s*\/\s*/, /\s+/];
 
 /**
  * Kształt numeru katalogowego — filtr WYŁĄCZNIE dla listy obcych.
@@ -95,33 +79,6 @@ const MIN_TRAFIEN_BEZ_ETYKIETY = 2;
 /** Kandydat w trybie bez etykiety: kształt numeru i przynajmniej jedna cyfra. */
 const NUMEROWY = /^(?=[^]*\d)[A-Za-z0-9][A-Za-z0-9.\-*+/,]{2,23}$/;
 
-/** Obcina przyklejoną interpunkcję, zostawiając znaki obecne w symbolach. */
-function oczysc(token: string): string {
-  return token.trim().replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9*+]+$/, "");
-}
-
-/**
- * Kawałki opisu będące listą zamienników — po etykiecie, do najbliższego
- * „Słowo:" albo do końca opisu.
- */
-function segmenty(desc: string): string[] {
-  const out: string[] = [];
-  // regex z flagą /g jest stanowy — własna kopia na każde wywołanie
-  const etykieta = new RegExp(ETYKIETA.source, ETYKIETA.flags);
-  let m: RegExpExecArray | null;
-  while ((m = etykieta.exec(desc)) !== null) {
-    if (m[0].length === 0) {
-      etykieta.lastIndex++;
-      continue;
-    }
-    const reszta = desc.slice(m.index + m[0].length);
-    const koniec = KONIEC_SEKCJI.exec(reszta);
-    const seg = koniec ? reszta.slice(0, koniec.index) : reszta;
-    if (seg.trim()) out.push(seg);
-  }
-  return out;
-}
-
 /**
  * Segmenty do rozbioru wraz z trybem, w jakim powstały.
  *
@@ -129,7 +86,7 @@ function segmenty(desc: string): string[] {
  * i nie podpisał jej" — wtedy obowiązują zawężenia z `TRYB_DOMYSLNY`.
  */
 function segmentyZTrybem(desc: string): { segmenty: string[]; zEtykiety: boolean } {
-  const zEtykiet = segmenty(desc);
+  const zEtykiet = segmentyPoEtykiecie(desc, ETYKIETA);
   if (zEtykiet.length > 0) return { segmenty: zEtykiet, zEtykiety: true };
   if (!desc.includes("//")) return { segmenty: [], zEtykiety: false };
   return { segmenty: [desc], zEtykiety: false };

@@ -1,25 +1,28 @@
 import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
-import { useKolejkaWiedzy, useRozstrzygnijZastosowanie, useZaproponujZastosowanie } from "../api/wiedza";
+import { useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijZastosowanie, useZaproponujZastosowanie } from "../api/wiedza";
 import { Blad, Karta, Pusto, Zakladki } from "../ui";
 import { Propozycja } from "../wiedza/Propozycja";
 import { NowaPropozycja } from "../wiedza/NowaPropozycja";
 import { WiedzaTowaru } from "../wiedza/WiedzaTowaru";
+import { ZOpisow } from "../wiedza/ZOpisow";
 
 /* Baza wiedzy zastosowań (§12, etap E2).
 
-   Trzy widoki jednego ekranu: KOLEJKA propozycji do rozstrzygnięcia (z doboru,
+   Cztery widoki jednego ekranu: KOLEJKA propozycji do rozstrzygnięcia (z doboru,
    z pomiaru, ręcznych), NOWA PROPOZYCJA dla wiedzy z katalogów i z głowy
-   właściciela oraz SPRAWDŹ KARTOTEKĘ — co wiemy o części.
+   właściciela, SPRAWDŹ KARTOTEKĘ — co wiemy o części, oraz od E3 Z OPISÓW —
+   sekcje „Modele:" z opisów kartotek, które człowiek zamienia na propozycje.
 
    Zatwierdza każdy z biura, także autor — decyzja właściciela. Automat nigdy:
    propozycja z zatwierdzonego doboru ląduje TU, nie w wiedzy.
 
    Otwarcie ekranu niczego nie zapisuje — „zero zapisu przy patrzeniu". */
-type Widok = "kolejka" | "nowa" | "kartoteka";
+type Widok = "kolejka" | "nowa" | "kartoteka" | "z-opisow";
 
 export function Wiedza() {
   const kolejka = useKolejkaWiedzy();
+  const zOpisow = useModeleZOpisow();
   const rozstrzygnij = useRozstrzygnijZastosowanie();
   const zaproponuj = useZaproponujZastosowanie();
   const [widok, setWidok] = useState<Widok>("kolejka");
@@ -41,6 +44,7 @@ export function Wiedza() {
         { klucz: "kolejka", etykieta: "Kolejka" },
         { klucz: "nowa", etykieta: "Nowa propozycja" },
         { klucz: "kartoteka", etykieta: "Sprawdź kartotekę" },
+        { klucz: "z-opisow", etykieta: zOpisow.data?.liczba ? `Z opisów (${zOpisow.data.liczba})` : "Z opisów" },
       ]} />
       <div className="p-4">
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
@@ -68,6 +72,7 @@ export function Wiedza() {
         </>}
 
         {widok === "kartoteka" && <WiedzaTowaru />}
+        {widok === "z-opisow" && <ZOpisow />}
       </div>
     </Karta>
   </div>;
