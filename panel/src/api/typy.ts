@@ -458,6 +458,10 @@ export interface Zwrot {
   orderId: string | null;
   utworzono: string;
   paczkaAt: string | null;
+  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */
+  dostarczonoAt: string | null;
+  /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
+  przesylkaStatus: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
   terminAt: string;

@@ -1300,6 +1300,39 @@ zauważa różnicę; 2 — lista otwiera się na żądanie, jak potrącenie; 5 �
 różnicę, nie całe zamówienie; 6 — brak pola tekstowego jest ograniczeniem
 zamiast komunikatu o błędzie.
 
+### 25a.16. Kiedy paczka do nas dotarła (0.187.0)
+
+Właściciel zobaczył w panelu sprzedawcy Allegro datę doręczenia zwrotu
+i zapytał, czemu nasz panel jej nie pokazuje. Odpowiedź była wstydliwa: bo
+napisałem, że Allegro jej nie podaje, a podaje.
+
+**Skąd wzięła się nieprawda.** Obiekt `CustomerReturn` i jego `parcels[]` mają
+wyłącznie `createdAt`, czyli moment NADANIA przez klienta. Z tego jednego
+schematu wyszedł wniosek o całym API — i przez trzy wydania panel pisał
+„Allegro nie podaje daty doręczenia do nas".
+
+Czas doręczenia podaje osobna końcówka: `GET /order/carriers/{id}/tracking`.
+Każdy wpis historii niesie `occurredAt`, a wśród kodów jest `DELIVERED`.
+
+**Numeru listu dalej nie zapisujemy** (polityka 0.163.0) i nie trzeba.
+Synchronizacja ma go w ręku podczas przebiegu, więc pyta tracking od razu
+i zapisuje sam WYNIK: moment doręczenia i kod statusu.
+
+**Pytamy tylko o paczki w drodze.** Zwrot z zapisaną datą nie jest pytany
+drugi raz — data się nie zmieni, a każde żądanie kosztuje u Allegro.
+
+**`status` zwrotu tego nie załatwia**, choć ma wartość `DELIVERED`. Sonda
+pokazuje, czym to pole bywa naprawdę: `COMMISSION_REFUNDED` w 95 przypadkach
+na 100. Stan prowizji nadpisuje stan przesyłki.
+
+**Sygnał „brak dowodu" liczy się odtąd z DORĘCZENIA, nie z nadania.** Do
+0.186.0 gasł, gdy klient nadał paczkę — więc zwrot doręczony i ten jadący od
+tygodnia wyglądały w kolejce identycznie. Gdy trackingu nie ma, zostaje dawne
+kryterium: lepszy sygnał z daty nadania niż jego brak.
+
+Ekran mówi też, gdy przesyłka ma kłopot: awizo, problem, powrót do nadawcy.
+Kod spoza listy pokazuje się surowy — jak przy przewoźniku.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1400,6 +1433,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
+| Data doręczenia paczki zwrotnej | **działa** od 0.187.0 | `services/allegro-tracking.ts`, `zwrot_klienta.dostarczono_at` |
 | Produkt dopisany do zwrotu przez biuro | **działa** od 0.184.0 | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |

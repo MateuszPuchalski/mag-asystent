@@ -33,7 +33,7 @@ const ZAMOWIENIE: Zamowienie = {
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "REF-1", orderId: "ord-1",
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z",
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null,
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
@@ -291,13 +291,34 @@ describe("Dowody", () => {
     expect(screen.getByText("nie wiadomo")).toBeInTheDocument();
   });
 
-  it("data paczki to data NADANIA przez klienta, nie powrotu do nas", () => {
-    /* Do 0.167.0 ekran pisał przy niej „Wróciła" i to była nieprawda:
-       Allegro nie podaje w obiekcie zwrotu daty doręczenia wcale. */
-    render(zKlientem(<Dowody zwrot={zwrot()} />));
+  it("data paczki to data NADANIA, a doręczenie ma własną datę", () => {
+    /* Dwie nieprawdy po kolei. Do 0.167.0 ekran pisał przy dacie nadania
+       „Wróciła". Do 0.186.0 pisał „Allegro nie podaje daty doręczenia do nas"
+       — a podaje, w `/order/carriers/{id}/tracking`. */
+    render(zKlientem(<Dowody zwrot={zwrot({
+      dostarczonoAt: "2026-08-24T10:41:00Z", przesylkaStatus: "DELIVERED" })} />));
     expect(screen.getByText(/Nadana przez klienta/)).toBeInTheDocument();
-    expect(screen.getByText(/nie podaje daty doręczenia/)).toBeInTheDocument();
+    expect(screen.getByText(/Doręczona do nas/)).toBeInTheDocument();
+    expect(screen.queryByText(/nie podaje daty doręczenia/)).toBeNull();
     expect(screen.queryByText(/Wróciła/)).toBeNull();
+  });
+
+  it("paczka w drodze mówi o sobie kodem przewoźnika po polsku", () => {
+    /* „Jeszcze nie dotarła" to inna informacja niż „awizo": pierwsza mówi
+       czekaj, druga — że klient ma problem z doręczeniem. */
+    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot({
+      przesylkaStatus: "IN_TRANSIT" })} />));
+    expect(screen.getByText(/W drodze do nas/)).toBeInTheDocument();
+
+    rerender(zKlientem(<Dowody zwrot={zwrot({ przesylkaStatus: "NOTICE_LEFT" })} />));
+    expect(screen.getByText(/Awizo/)).toBeInTheDocument();
+  });
+
+  it("nieznany kod przewoźnika pokazuje się SUROWY, nie znika", () => {
+    /* Ta sama zasada co przy `carrierId`: lista nie jest zamknięta, a sonda
+       złapała już wartość spoza specyfikacji. */
+    render(zKlientem(<Dowody zwrot={zwrot({ przesylkaStatus: "COS_NOWEGO" })} />));
+    expect(screen.getByText(/COS_NOWEGO/)).toBeInTheDocument();
   });
 
   it("wiadomości o zakupie prowadzą do skrzynki, a ich brak mówi o sobie", () => {

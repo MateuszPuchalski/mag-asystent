@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało czternaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało piętnaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -19,6 +19,10 @@ nieaktualny, bo schemat leżał już w repo od 0.151.0.
 W 0.174.0 doszedł jeden, razem z read-modelem sprzedaży: nie wiadomo, czy
 integracja tej firmy wypełnia `dok_NrPelnyOryg` i czym. Pomyłka daje pustą
 listę pewnych trafień, a nie złe dane.
+
+W 0.187.0 doszedł jeden, przy trackingu przesyłki zwrotnej: końcówka
+`/order/carriers/{id}/tracking` jest w dokumentacji opisana przy przesyłkach
+ZAMÓWIENIA, a my pytamy o przesyłkę zwrotną. Odmowa degraduje, nie przerywa.
 
 Rozkład dzisiejszy: siedem pozycji dotyczy Subiekta GT, sześć mapowania
 Allegro. Z tych drugich cztery to końcówki ZAPISU, których sonda nie dosięgnie,

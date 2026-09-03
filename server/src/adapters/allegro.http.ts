@@ -119,6 +119,32 @@ export function urlOfertSprzedawcy(apiUrl: string, ids: readonly string[]): stri
 }
 
 /**
+ * Historia statusów przesyłki u przewoźnika (0.187.0).
+ *
+ * `GET /order/carriers/{carrierId}/tracking?waybill=…`. To JEDYNE miejsce
+ * w całym API, które podaje CZAS doręczenia: obiekt zwrotu go nie ma, a jego
+ * `parcels[]` niesie tylko datę nadania. Do 0.186.0 panel twierdził wprost,
+ * że „Allegro nie podaje daty doręczenia do nas" — nieprawda wzięta ze zbyt
+ * wąskiego czytania jednego schematu.
+ *
+ * Dwadzieścia numerów na żądanie, bo tyle dopuszcza `maxItems` w specyfikacji.
+ * Limit jest tu regułą poprawności, nie oszczędnością: dłuższa lista wraca
+ * błędem 400, więc partię tnie WOŁAJĄCY, a nie ten builder.
+ */
+export const TRACKING_NA_ZADANIE = 20;
+
+export function urlTrackingu(
+  apiUrl: string, carrierId: string, waybille: readonly string[],
+): string {
+  if (waybille.length > TRACKING_NA_ZADANIE) {
+    throw new Error(
+      `Tracking przyjmuje najwyżej ${TRACKING_NA_ZADANIE} numerów, dostał ${waybille.length}.`);
+  }
+  const filtr = waybille.map((w) => `waybill=${encodeURIComponent(w)}`).join("&");
+  return `${apiUrl}/order/carriers/${encodeURIComponent(carrierId)}/tracking?${filtr}`;
+}
+
+/**
  * Szczegół jednego zwrotu (`/order/customer-returns/{id}`, Accept beta.v1).
  *
  * Lista oddaje już komplet pól zwrotu, więc ta końcówka NIE jest potrzebna

@@ -135,7 +135,8 @@ test("zwrot bez pozycji zostaje przy ocenie, a nie przeskakuje do kwoty", () => 
 
 test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
   const w = (o: Record<string, unknown>) => sygnalyZwrotu({
-    kubelek: "decyzja", dni: 10, paczkaAt: "2026-08-30T00:00:00Z", rejectionCode: null, ...o,
+    kubelek: "decyzja", dni: 10, paczkaAt: "2026-08-30T00:00:00Z",
+    dostarczonoAt: null, przesylkaStatus: null, rejectionCode: null, ...o,
   } as Parameters<typeof sygnalyZwrotu>[0]);
   assert.deepEqual(w({}), [], "zwrot w terminie z paczką nie żąda niczego");
   assert.deepEqual(w({ dni: 3 }), ["termin"], "trzy dni to już próg");
@@ -145,6 +146,21 @@ test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
   /* Stan końcowy nie ma terminu do pilnowania — czerwień na zamkniętych
      uczyłaby operatora przewijać czerwone wiersze. */
   assert.deepEqual(w({ kubelek: "zamkniety", dni: -30, paczkaAt: null }), []);
+
+  /* ── Dowodem jest DORĘCZENIE, nie nadanie (0.187.0) ──────────────────────
+     Do 0.186.0 sygnał gasł, gdy klient nadał paczkę. Zwrot doręczony i ten
+     jadący od tygodnia wyglądały w kolejce identycznie, a to jest różnica
+     między „mam towar" a „czekam na towar". */
+  assert.deepEqual(w({ przesylkaStatus: "IN_TRANSIT" }), ["brak_dowodu"],
+    "paczka w drodze to nie paczka u nas");
+  assert.deepEqual(w({ przesylkaStatus: "NOTICE_LEFT" }), ["brak_dowodu"],
+    "awizo tym bardziej");
+  assert.deepEqual(w({ przesylkaStatus: "DELIVERED", dostarczonoAt: "2026-08-31T09:00:00Z" }), [],
+    "doręczona gasi sygnał");
+  /* Bez trackingu zostaje dawne kryterium: lepszy sygnał z daty nadania niż
+     jego brak. Przewoźnik bywa nieznany, a Allegro nie zawsze odpowie. */
+  assert.deepEqual(w({ przesylkaStatus: null, dostarczonoAt: null }), [],
+    "brak trackingu → data nadania jak dawniej");
 });
 
 test("suma pozycji mnoży cenę przez ilość i zostaje w groszach", () => {

@@ -34,6 +34,67 @@ historii nie przepisujemy.
 ---
 
 
+## 0.187.0 — 3 września 2026
+
+**Przy zwrocie widać, kiedy paczka do nas dotarła.** Właściciel zobaczył tę
+datę we własnym panelu sprzedawcy Allegro i zapytał, czemu u nas jej nie ma.
+
+### Odpowiedź była wstydliwa: bo napisałem, że Allegro jej nie podaje
+
+Obiekt `CustomerReturn` i jego `parcels[]` mają wyłącznie `createdAt`, czyli
+moment NADANIA przez klienta. Z tego jednego schematu wyszedł wniosek o CAŁYM
+API — i przez trzy wydania panel pisał wprost „Allegro nie podaje daty
+doręczenia do nas". Nieprawda.
+
+Czas doręczenia podaje osobna końcówka:
+
+    GET /order/carriers/{carrierId}/tracking?waybill=…
+
+Każdy wpis historii niesie `occurredAt` („actual shipment status change time"),
+a wśród ośmiu kodów jest `DELIVERED`. Jedno wywołanie bierze do dwudziestu
+numerów listu.
+
+### Numeru listu dalej nie zapisujemy
+
+Polityka z 0.163.0 zostaje nienaruszona i nie trzeba jej ruszać.
+Synchronizacja ma numer w ręku podczas przebiegu, więc pyta tracking od razu
+i zapisuje WYŁĄCZNIE wynik: moment doręczenia i kod statusu. Numer żyje przez
+jedno żądanie.
+
+Pytamy tylko o paczki w drodze — decyzja właściciela. Zwrot z zapisaną datą
+nie jest pytany drugi raz. Partie idą po przewoźniku, po dwadzieścia numerów.
+
+### Dwie pomyłki w dokumentacji, obie znalezione przy okazji
+
+**Sonda była odczytana ODWROTNIE.** `docs/allegro-ksztalt.md` twierdził, że
+`waybill` „jest pusty w 88 z 94 rekordów" — a kolumna nosi nagłówek `niepuste`.
+Numer jest WYPEŁNIONY w 88 na 94, czyli prawie zawsze, gdy zwrot ma paczkę.
+Ta pomyłka kazałaby uznać całą drogę za bezużyteczną.
+
+**`status` zwrotu nie odpowiada na pytanie o doręczenie**, choć ma wartość
+`DELIVERED`. Sonda pokazuje, czym to pole bywa naprawdę: `COMMISSION_REFUNDED`
+×95, `COMMISSION_REFUND_CLAIMED` ×3, `DELIVERED` ×2. Stan prowizji nadpisuje
+stan przesyłki — z tego samego powodu kolejka nie routuje po nim od 0.164.0.
+
+### Sygnał „brak dowodu" liczy się odtąd z DORĘCZENIA
+
+Do 0.186.0 gasł, gdy klient nadał paczkę. Zwrot doręczony i ten jadący od
+tygodnia wyglądały w kolejce identycznie, a to jest różnica między „mam towar"
+a „czekam na towar". Gdy trackingu nie ma — przewoźnik nie odpowiada, numeru
+brak — zostaje dawne kryterium: lepszy sygnał z daty nadania niż jego brak.
+
+Ekran mówi też, gdy przesyłka ma kłopot: awizo, problem, powrót do nadawcy.
+Kod spoza listy pokazuje się surowy, jak przy przewoźniku.
+
+### Reszta
+
+Odpytanie trackingu idzie PO transakcji zapisu, bo wychodzi do sieci: otwarta
+transakcja SQLite na czas żądania HTTP blokowałaby workera. Awaria przewoźnika
+degraduje — zwroty i tak wchodzą, data dojdzie przy następnym takcie.
+
+Dziewięć nowych testów serwisu i trzy panelu. Trzy panelowe padają bez
+poprawki; jeden z nich zastąpił test, który utrwalał tamto nieprawdziwe zdanie.
+
 ## 0.186.0 — 3 września 2026
 
 **Identyfikatory z opisów i pełny tekst (§11.2, etap E3).** Dobór miał od E1

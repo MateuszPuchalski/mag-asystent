@@ -247,6 +247,10 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_przez", "TEXT");
+  /* Doręczenie paczki zwrotnej (0.187.0). Data z trackingu przewoźnika, nie
+     z obiektu zwrotu — ten podaje wyłącznie moment nadania. */
+  addColumn("zwrot_klienta", "dostarczono_at", "TEXT");
+  addColumn("zwrot_klienta", "przesylka_status", "TEXT");
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
   /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy

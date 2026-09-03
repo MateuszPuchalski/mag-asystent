@@ -308,12 +308,30 @@ kolumna jest bez `CHECK`, a panel buduje filtr z tego, co przyjechało.
 słownie, a sonda zaobserwowała jedenaście. Panel tłumaczy dziś wszystkie
 siedemnaście, a kod spoza listy pokazuje surowy.
 
-**Daty doręczenia zwrotu do nas obiekt zwrotu nie niesie wcale.** `parcels[]`
-ma wyłącznie `createdAt`, czyli moment utworzenia paczki przez klienta — i tak
-się to nazywa na ekranie od 0.169.0. Jest droga pośrednia przez
-`GET /order/carriers/{carrierId}/tracking` (`code = DELIVERED` i `occurredAt`),
-ale `[WERYFIKUJ]`: końcówka jest opisana dla przesyłek ZAMÓWIENIA, `carrierId`
-bywa `UNKNOWN`, a `waybill` na liście zwrotów jest pusty w 88 z 94 rekordów.
+**Obiekt zwrotu nie niesie daty doręczenia — ale API ją podaje.** `parcels[]`
+ma wyłącznie `createdAt`, czyli moment utworzenia paczki przez klienta, i tak
+się to nazywa na ekranie od 0.169.0. Czasu doręczenia szuka się gdzie indziej:
+
+    GET /order/carriers/{carrierId}/tracking?waybill=…
+
+Każdy wpis historii niesie `occurredAt` („actual shipment status change time"),
+a wśród ośmiu kodów jest `DELIVERED`. Jedno wywołanie bierze do dwudziestu
+numerów. Od 0.187.0 pyta o to synchronizacja zwrotów.
+
+**Poprzednia wersja tego akapitu odczytała sondę ODWROTNIE.** Twierdziła, że
+`waybill` „jest pusty w 88 z 94 rekordów" — a kolumna nosi nagłówek `niepuste`.
+Numer jest więc WYPEŁNIONY w 88 przypadkach na 94, czyli prawie zawsze, gdy
+zwrot ma w ogóle paczkę. Ta pomyłka kazałaby uznać całą drogę za bezużyteczną.
+
+**`status` NIE odpowiada na pytanie o doręczenie**, choć ma wartość `DELIVERED`
+na liście. Sonda pokazuje, czym to pole naprawdę bywa: `COMMISSION_REFUNDED`
+×95, `COMMISSION_REFUND_CLAIMED` ×3, `DELIVERED` ×2. Stan prowizji nadpisuje
+stan przesyłki, więc po tym polu nie da się poznać, czy karton u nas jest.
+Z tego samego powodu kolejka bramek nie routuje po nim od 0.164.0.
+
+`[WERYFIKUJ]` zostaje przy jednym: końcówka trackingu jest w dokumentacji
+opisana przy przesyłkach ZAMÓWIENIA, a my pytamy o przesyłkę ZWROTNĄ. Odmowa
+albo pusta historia degraduje — data dojdzie przy następnym takcie.
 
 ### Czego NIE mapujemy i dlaczego
 
