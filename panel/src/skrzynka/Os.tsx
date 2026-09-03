@@ -1,7 +1,7 @@
 import React from "react";
-import { ArrowRight, Lock, Paperclip } from "lucide-react";
+import { ArrowRight, Lock, Paperclip, Ruler, Send, User } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
-import { Przycisk } from "../ui";
+import { Przycisk, czas } from "../ui";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -33,10 +33,30 @@ function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
   </ul>;
 }
 
-/* §10.3: każdy rodzaj wpisu ma wyglądać inaczej. Dziś rodzaje są dwa —
-   wiadomość kanału i wynik z hali. Komentarze, zdarzenia systemowe i wpisy
-   wysyłki dochodzą w kolejnych etapach i mają tu DOŁOŻYĆ gałąź, a nie
-   przepisać tę. Barwy idą z tokenów `os.*`, nie z klas Tailwinda wprost. */
+/* §10.3: każdy rodzaj wpisu ma wyglądać inaczej. Komentarze, zdarzenia
+   systemowe i wpisy wysyłki dochodzą w kolejnych etapach i mają tu DOŁOŻYĆ
+   gałąź, a nie przepisać tę. Barwy idą z tokenów `os.*`, nie z klas Tailwinda
+   wprost.
+
+   ── CZTERY CECHY, NIE JEDNA (0.192.0) ──────────────────────────────────────
+   Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart CZTEREMA
+   cechami naraz — tłem, ramką, IKONĄ i WCIĘCIEM — plus podpisem rodzaju
+   („Klient · Allegro", „Odpowiedź firmy") we własnej barwie. Komentarz tłumaczący
+   tokeny w `tailwind.config.js` mówi to samo od początku.
+
+   Front doszedł do jednej cechy z czterech. Wiadomość klienta ma tło #ffffff,
+   nasza odpowiedź #f8fafc, obie tę samą ramkę — na ekranie to jest RÓŻNICA
+   NIEWIDOCZNA. Wychodziło z tego, że jedynym wyraźnym wpisem osi była notatka
+   wewnętrzna, czyli rzecz, której klient w ogóle nie zobaczy, a najsłabszym —
+   podział „kto to powiedział", czyli oś sporu w każdej rozmowie.
+
+   Wcięcia idą wprost z makiety: klient odsunięty od PRAWEJ, my od LEWEJ.
+   Dwie strony rozmowy stoją po dwóch stronach kolumny i widać to, zanim
+   zdąży się przeczytać podpis.
+
+   Godzina wpisu doszła przy okazji: `at` jechał w kontrakcie od początku,
+   a oś go nie pokazywała wcale — czytało się rozmowę bez wiedzy, czy między
+   pytaniem a odpowiedzią minęła minuta, czy trzy dni. */
 export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu }: {
   wpisy: WpisOsi[];
   zrodloPomiaru: number | null;
@@ -59,7 +79,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
       /* §6.4: komentarz ma być WIZUALNIE ODRÓŻNIONY od wiadomości klienta.
          Inna barwa to za mało — kłódka i podpis mówią wprost, że klient tego
          nie widzi, bo to jedyna rzecz, o którą tu naprawdę chodzi. */
-      ? <article key={w.id} className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3">
+      ? <article key={w.id} className="ml-6 rounded-lg border border-dashed border-amber-300 bg-amber-50 p-3">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-800">
             <Lock size={12} />NOTATKA WEWNĘTRZNA · {w.autor}
             {w.wzmianki?.length ? <span className="font-normal">
@@ -68,8 +88,9 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
         </article>
       : w.rodzaj === "wynik_zadania"
-      ? <article key={w.id} className="rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
-          <div className="text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu · {w.autor}</div>
+      ? <article key={w.id} className="ml-6 rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase text-ranga-ok">
+            <Ruler size={12} />Wynik z magazynu · {w.autor}</div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
           {/* Wynik nie staje się odpowiedzią sam — do szkicu trafia wyłącznie
               na jawne kliknięcie agenta. */}
@@ -77,9 +98,17 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             Wstaw wynik do szkicu</Przycisk>
         </article>
       : <article key={w.id} className={`rounded-lg border p-3 ${w.odKlienta
-          ? "border-os-klient-ramka bg-os-klient" : "border-os-firma-ramka bg-os-firma"}`}>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          ? "mr-10 border-os-klient-ramka bg-os-klient"
+          : "ml-10 border-os-firma-ramka bg-os-firma"}`}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+            {/* Podpis RODZAJU przed nazwiskiem: „kto to powiedział" czyta się
+                przed „jak się nazywa". Login kupującego i tak nic nie mówi. */}
+            <span className={`flex items-center gap-1 font-bold uppercase tracking-wide ${
+              w.odKlienta ? "text-amber-700" : "text-slate-600"}`}>
+              {w.odKlienta ? <User size={12} /> : <Send size={12} />}
+              {w.odKlienta ? "Klient · Allegro" : "Odpowiedź firmy"}</span>
             <b>{w.autor}</b>
+            <span className="text-slate-400">{czas(w.at)}</span>
             {/* Nazwa przy ofercie jest Z ZAMÓWIENIA (§4.3) — mail Allegro
                 „Wiadomość dotyczy" pokazuje tytuł, goły numer kazał agentowi
                 szukać towaru drugi raz. Zamówienie skracamy: UUID w całości

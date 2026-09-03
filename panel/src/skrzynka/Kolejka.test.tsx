@@ -23,7 +23,9 @@ describe("Kolejka", () => {
     render(<Kolejka rozmowy={[]} stan={STAN} wybranaId={null} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByText(/Brak rozmów/)).toBeInTheDocument();
-    expect(screen.getByText(/Ostatnia synchronizacja/)).toBeInTheDocument();
+    /* Od 0.192.0 data stoi PODPISEM pod tytułem kolumny, a nie własnym pasmem
+       — pasm sterujących nad listą było pięć. Zdanie ma zostać, nie pasmo. */
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
   });
 
   it("liczba błędów synchronizacji jest widoczna, gdy jest niezerowa", () => {
@@ -229,8 +231,11 @@ describe("kategorie Copilota w kolejce", () => {
     ];
     pokaz(lista);
     const wiersze = screen.getAllByRole("button", { name: /Klient/ });
-    expect(wiersze.map((w) => w.textContent?.slice(0, 8)))
-      .toEqual(["Klient 1", "Klient 2", "Klient 3"]);
+    /* Login zszedł w 0.192.0 pod treść pytania, więc kolejności nie da się
+       czytać z początku napisu — czytamy ją z tego, KTÓRY login jest w KTÓRYM
+       wierszu. Sprawdzana rzecz jest ta sama: kolejność zostaje. */
+    expect(wiersze.map((w, i) => w.textContent?.includes(`Klient ${i + 1}`)))
+      .toEqual([true, true, true]);
     /* Nazwa kategorii pada DWA RAZY — na wierszu i w liczniku nad kubełkami —
        więc szukamy jej tam, gdzie ma znaczyć „ta rozmowa jest o tym". */
     expect(wiersze[1].textContent).toContain("Dostępność");

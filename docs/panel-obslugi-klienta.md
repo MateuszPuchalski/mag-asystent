@@ -414,6 +414,21 @@ wybrał obie drogi naraz — ręczna flaga przebija automatyczną kolejność. F
 jest ręczna, bo bez terminu odpowiedzi automat wyliczyłby z niej tylko „stare",
 a reklamacja z zegarem ustawowym nie wyprzedziłaby zwykłego pytania.
 
+**Treść pytania jest w wierszu PIERWSZA (0.192.0).** Do 0.191.1 najgrubszym
+drukiem stał login kupującego, a pytanie leżało pod nim, mniejsze i szare.
+Login Allegro nie mówi nic — „Kupujący 44300444" to nie jest osoba, którą się
+zna. Triaż robi się po treści, więc login zszedł do podpisu obok czasu.
+
+Nad treścią zostają plakietki, bo odpowiadają na pytanie zadawane PRZED
+czytaniem: czy tę rozmowę w ogóle brać. Czas oczekiwania stoi w prawym rogu
+tej samej linii — razem z PILNE tworzy jedyną parę sygnałów, po której układa
+się kolejność pracy. Nieprzeczytana wiadomość to KROPKA, nie słowo: „NOWE"
+obok plakietki „NOWA" mówiło dwa różne fakty jednym wyrazem.
+
+**Data synchronizacji jest podpisem, nie pasmem (0.192.0).** Pasm sterujących
+nad listą było pięć i zjadały ćwierć wysokości kolumny. Tę samą datę niesie
+pigułka w pasku górnym, na każdym ekranie panelu.
+
 **Fragment to ostatnia wiadomość KLIENTA, z jej datą (0.167.0).** Do 0.165.0
 wiersz brał ostatnią wiadomość jakąkolwiek, więc autoodpowiedź konta Allegro
 zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie napisał,
@@ -426,6 +441,19 @@ Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmian
 przypisania, zmianę statusu, utworzenie zadania, przejęcie przez magazyniera,
 wynik magazyniera oraz przygotowanie i wysłanie odpowiedzi. Każdy rodzaj
 zdarzenia wygląda inaczej.
+
+**„Wygląda inaczej" znaczy CZTERY CECHY (0.192.0).** Makieta rozróżnia karty
+tłem, ramką, ikoną i wcięciem, a do tego podpisuje rodzaj: „Klient · Allegro",
+„Odpowiedź firmy". Front do 0.191.1 miał jedną cechę z czterech — tło #ffffff
+kontra #f8fafc przy tej samej ramce. Różnica niewidoczna na ekranie.
+
+Wychodziło z tego, że najwyraźniejszym wpisem osi była notatka wewnętrzna,
+czyli rzecz, której klient nie zobaczy. Najsłabszym — podział „kto to
+powiedział". Wcięcia idą z makiety: klient odsunięty od prawej, firma od lewej.
+
+**Wpis niesie godzinę.** Pole `at` jechało w kontrakcie od początku, a oś go
+nie pokazywała. Bez godziny nie widać, czy między pytaniem a odpowiedzią
+minęła minuta, czy trzy dni.
 
 ### 10.4. Edytor odpowiedzi
 
