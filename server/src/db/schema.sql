@@ -1121,6 +1121,32 @@ CREATE TABLE IF NOT EXISTS message_attachment (
 CREATE INDEX IF NOT EXISTS ix_message_attachment_wiadomosc
   ON message_attachment(message_id);
 
+-- ── Załącznik CZEKAJĄCY na wysyłkę (0.195.0) ────────────────────────────────
+-- `message_attachment` opisuje pliki, które PRZYSZŁY; ta tabela — te, które
+-- dopiero pójdą. Dwie tabele, bo to dwa różne byty: tamten wisi przy istniejącej
+-- wiadomości, ten przy szkicu, którego wiadomością jeszcze nie ma.
+--
+-- Stoi przy ROZMOWIE, nie w pamięci przeglądarki, z tego samego powodu co
+-- `conversation_draft`: szkic jest współdzielony z zespołem (§6.4), więc kolega
+-- ma widzieć nie tylko tekst, ale i to, co do niego dołączono. Odświeżenie
+-- karty nie ma prawa zgubić pliku, który poszedł już do Allegro.
+--
+-- `allegro_id` to identyfikator z DEKLARACJI — jego wgranie już się odbyło,
+-- więc wysyłka wiadomości tylko go cytuje.
+CREATE TABLE IF NOT EXISTS wysylka_zalacznik (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  allegro_id      TEXT NOT NULL,
+  nazwa           TEXT NOT NULL,
+  typ             TEXT NOT NULL,
+  rozmiar         INTEGER NOT NULL,
+  dodal_user_id   INTEGER REFERENCES app_user(user_id),
+  dodano_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (conversation_id, allegro_id)
+);
+CREATE INDEX IF NOT EXISTS ix_wysylka_zalacznik_rozmowa
+  ON wysylka_zalacznik(conversation_id);
+
 CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   cursor_at TEXT,

@@ -22,6 +22,7 @@ export const klucze = {
   sygnatury: ["sygnatury"] as const,
   pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
   towar: (twId: number) => ["towar", twId] as const,
+  zalaczniki: (id: number) => ["zalaczniki", id] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
   wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
 };
@@ -152,6 +153,52 @@ export function usePrzejmij() {
 
 /* Szkic jest współdzielony, więc zapis jest jawny i niesie wersję. Cicha
    autozapisywarka gubiłaby cudzą pracę przy dwóch agentach na jednej sprawie. */
+/* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
+   Plik idzie do Allegro OD RAZU przy dodaniu, nie przy wysyłce: odmowę typu
+   albo rozmiaru agent ma zobaczyć, gdy jeszcze da się wybrać inny plik.
+   Serwer trzyma potem sam numer deklaracji, bajtów u siebie nie zostawia.
+
+   Lista jest osobnym zapytaniem, a nie polem `useRozmowa`: tamten odczyt
+   odświeża się przy KAŻDYM zdarzeniu szyny, a załączniki zmieniają się
+   wyłącznie wtedy, gdy ktoś je doda albo zdejmie.                          */
+export interface ZalacznikSzkicu {
+  id: number;
+  allegroId: string;
+  nazwa: string;
+  typ: string;
+  rozmiar: number;
+  dodal: string | null;
+}
+
+export function useZalaczniki(id: number | null) {
+  return useQuery({
+    queryKey: klucze.zalaczniki(id ?? 0),
+    queryFn: () => api<{ zalaczniki: ZalacznikSzkicu[] }>(`/api/conversations/${id}/zalaczniki`),
+    enabled: id !== null,
+  });
+}
+
+export function useDodajZalacznik() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; nazwa: string; typ: string; dane: string }) =>
+      api<ZalacznikSzkicu>(`/api/conversations/${v.id}/zalaczniki`, {
+        method: "POST",
+        body: JSON.stringify({ nazwa: v.nazwa, typ: v.typ, dane: v.dane }),
+      }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.zalaczniki(v.id) }),
+  });
+}
+
+export function useUsunZalacznik() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zalacznikId: number }) =>
+      api(`/api/conversations/${v.id}/zalaczniki/${v.zalacznikId}`, { method: "DELETE" }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.zalaczniki(v.id) }),
+  });
+}
+
 export function useZapiszSzkic() {
   const qc = useQueryClient();
   return useMutation({
@@ -333,6 +380,9 @@ export function useWyslij() {
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      /* Serwer KONSUMUJE załączniki przy udanej wysyłce (znikają razem ze
+         szkicem), więc lista na ekranie jest po niej nieaktualna. */
+      qc.invalidateQueries({ queryKey: klucze.zalaczniki(v.id) });
     },
   });
 }

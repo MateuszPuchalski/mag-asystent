@@ -7,6 +7,7 @@ import {
   usePrzekaz, useRozmowa, useSprawy, useZalozSprawe,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
+  useDodajZalacznik, useUsunZalacznik, useZalaczniki,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
@@ -43,6 +44,9 @@ export function Skrzynka() {
   const wyslij = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
+  const zalaczniki = useZalaczniki(wybranaId);
+  const dodajZalacznik = useDodajZalacznik();
+  const usunZalacznik = useUsunZalacznik();
 
   const status = useUstawStatus();
   const priorytet = useUstawPriorytet();
@@ -70,6 +74,7 @@ export function Skrzynka() {
   const [bladSynchronizacji, setBladSynchronizacji] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWysylki, setBladWysylki] = useState("");
+  const [bladZalacznika, setBladZalacznika] = useState("");
   const [bladStatusu, setBladStatusu] = useState("");
   const [bladSprawy, setBladSprawy] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
@@ -225,6 +230,30 @@ export function Skrzynka() {
         .map((u) => ({ userId: u.userId, name: u.name }))}
       wzmianki={wzmianki}
       onWzmianki={setWzmianki}
+      zalaczniki={zalaczniki.data?.zalaczniki ?? []}
+      dodajeZalacznik={dodajZalacznik.isPending}
+      bladZalacznika={bladZalacznika}
+      /* Plik czytamy TU, nie w komponencie: `Zalaczniki.tsx` jest czysty, jak
+         cały katalog `skrzynka/`, a base64 to sprawa klienta HTTP. */
+      onDodajZalacznik={(plik) => {
+        setBladZalacznika("");
+        void plik.arrayBuffer().then((bufor) => {
+          if (!wybranaId) return;
+          /* `btoa` na wielkim napisie ze `String.fromCharCode(...tablica)`
+             przepełnia stos przy kilkuset kilobajtach — stąd porcje. */
+          const bajty = new Uint8Array(bufor);
+          let napis = "";
+          for (let i = 0; i < bajty.length; i += 8192) {
+            napis += String.fromCharCode(...bajty.subarray(i, i + 8192));
+          }
+          dodajZalacznik.mutate(
+            { id: wybranaId, nazwa: plik.name, typ: plik.type, dane: btoa(napis) },
+            { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) });
+        });
+      }}
+      onUsunZalacznik={(id) => wybranaId && usunZalacznik.mutate(
+        { id: wybranaId, zalacznikId: id },
+        { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) })}
       onSzkic={(v) => { setSzkic(v); zglosPisanie(); }}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;

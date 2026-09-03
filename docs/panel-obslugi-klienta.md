@@ -338,6 +338,28 @@ ponownego zatwierdzenia.
 **Po niejednoznacznym timeoucie nie ponawiamy wysyłki automatycznie.** System
 najpierw synchronizuje wątek i sprawdza, czy odpowiedź już tam jest.
 
+**Odpowiedź OZNACZA WĄTEK JAKO PRZECZYTANY w Allegro (0.195.0).** Do 0.194.1
+tego kroku nie było wcale, więc wątek załatwiony w panelu zostawał
+nieprzeczytany w Centrum Wiadomości. Im lepiej działał panel, tym bardziej
+kłamał licznik po tamtej stronie.
+
+Znacznik idzie PO wysyłce i tylko po udanej. Nie idzie przy otwarciu rozmowy:
+„zero zapisu przy patrzeniu" obowiązuje także zapisy do cudzego systemu,
+a przeczytana ma znaczyć „odpisaliśmy", nie „ktoś zajrzał". Odmowa oznaczenia
+nie wywraca wysyłki — wiadomość jest już u klienta, więc porażka idzie do
+audytu i tam zostaje.
+
+**Odpowiedź może nieść ZAŁĄCZNIKI (0.195.0).** Przy pytaniach o części zdjęcie
+bywa całą odpowiedzią. Plik idzie do Allegro przy DODANIU, nie przy wysyłce:
+odmowę typu albo rozmiaru agent ma zobaczyć wtedy, gdy jeszcze da się wybrać
+inny. Identyfikatory wchodzą do klucza idempotencji — bez tego „ten sam tekst
+z innym zdjęciem" trafiałby na strażnika dubletu, a zdjęcie po cichu nie
+poszłoby do klienta.
+
+Załączniki wiszą przy ROZMOWIE, nie w przeglądarce, bo szkic jest
+współdzielony z zespołem (§6.4). Po udanej wysyłce znikają razem ze szkicem;
+po nieudanej zostają.
+
 ## 9. Synchronizacja
 
 Synchronizację wykonuje proces serwera, nie przeglądarka. Pobiera stronę
@@ -425,6 +447,12 @@ tej samej linii — razem z PILNE tworzy jedyną parę sygnałów, po której uk
 się kolejność pracy. Nieprzeczytana wiadomość to KROPKA, nie słowo: „NOWE"
 obok plakietki „NOWA" mówiło dwa różne fakty jednym wyrazem.
 
+**Kolejka ma wyszukiwanie (0.195.0).** Kubełek mówi „czyje to", kategoria
+„o czym to", a pytania „czy TA rozmowa gdzieś tu jest" nie zadawał nikt, bo
+nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
+prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
+frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
+
 **Data synchronizacji jest podpisem, nie pasmem (0.193.0).** Pasm sterujących
 nad listą było pięć i zjadały ćwierć wysokości kolumny. Tę samą datę niesie
 pigułka w pasku górnym, na każdym ekranie panelu.
@@ -462,6 +490,12 @@ pole oraz własny przycisk. W trybie komentarza przycisk wysyłki nie istnieje
 w drzewie — wyłączony da się kliknąć, gdy stan rozjedzie się o ułamek sekundy;
 nieistniejącego nie da się nigdy. Osobne pola znaczą też, że przełączenie
 trybu nie przenosi notatki do szkicu, który idzie do klienta.
+
+**Załączniki tylko w trybie odpowiedzi (0.195.0).** Komentarz wewnętrzny
+nigdzie nie wychodzi, więc dołączony do niego plik nie miałby dokąd pójść,
+a przycisk obok notatki sugerowałby, że ma. Pasek pokazuje nazwę, rozmiar
+i autora — szkic jest wspólny, więc plik kolegi ma wyglądać inaczej niż własny.
+Przy cudzej rozmowie pasek jest wyłączony, tak samo jak szkic.
 
 Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie odpowiedź,
 a kolega ma prawo dopisać „to ten sam klient co wczoraj" bez przejmowania
@@ -1673,7 +1707,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
 | Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
-| Załączniki wiadomości | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
+| Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
+| Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
+| Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
+| Wyszukiwanie w kolejce rozmów | **działa** od 0.195.0 | filtr w pamięci ekranu, `skrzynka/Kolejka.tsx` — login, treść, prowadzący |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |
 | Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |

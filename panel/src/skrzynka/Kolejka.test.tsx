@@ -277,3 +277,56 @@ describe("kategorie Copilota w kolejce", () => {
     expect(screen.getByText("Dostępność")).toBeInTheDocument();
   });
 });
+
+/* ── Szukanie w kolejce (0.195.0) ────────────────────────────────────────────
+   Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
+   mówi „czyje to", kategoria „o czym to", a pytania „czy TA rozmowa gdzieś tu
+   jest" nie zadawał nikt, bo nie było jak.                                  */
+describe("Szukanie w kolejce", () => {
+  const lista = [
+    rozmowa({ id: 1, klient: "mirek352810", ostatniaWiadomosc: "Czy pasuje szarpak do NAC?" }),
+    rozmowa({ id: 2, klient: "Kosecka_Ola", ostatniaWiadomosc: "Kiedy wyjdzie przesyłka?",
+      wlasciciel: "M. Wójcik", wlascicielId: 9 }),
+  ];
+  const pokaz = () => render(<Kolejka rozmowy={lista} stan={STAN} wybranaId={null}
+    laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+  const pole = () => screen.getByRole("textbox", { name: /Szukaj w rozmowach/ });
+
+  it("zawęża po loginie klienta", async () => {
+    pokaz();
+    await userEvent.type(pole(), "mirek");
+    expect(screen.getByText("mirek352810")).toBeInTheDocument();
+    expect(screen.queryByText("Kosecka_Ola")).toBeNull();
+  });
+
+  it("zawęża po TREŚCI, bo loginu nikt nie pamięta", async () => {
+    pokaz();
+    await userEvent.type(pole(), "przesyłka");
+    expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
+    expect(screen.queryByText("mirek352810")).toBeNull();
+  });
+
+  it("zawęża po prowadzącym, bo o to pyta się na głos", async () => {
+    pokaz();
+    await userEvent.type(pole(), "wójcik");
+    expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
+    expect(screen.queryByText("mirek352810")).toBeNull();
+  });
+
+  it("brak trafień CYTUJE frazę — literówkę widać dopiero wtedy", async () => {
+    pokaz();
+    await userEvent.type(pole(), "kosiarka elektryczna");
+    expect(screen.getByText(/Nic nie pasuje do „kosiarka elektryczna"/)).toBeInTheDocument();
+    /* Zdanie o pustym kubełku byłoby tu nieprawdą: rozmowy są, tylko sito je
+       zasłania. */
+    expect(screen.queryByText(/Ten kubełek jest pusty/)).toBeNull();
+  });
+
+  it("wyczyszczenie przywraca całą listę", async () => {
+    pokaz();
+    await userEvent.type(pole(), "mirek");
+    await userEvent.click(screen.getByRole("button", { name: /Wyczyść szukanie/ }));
+    expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
+    expect(screen.getByText("mirek352810")).toBeInTheDocument();
+  });
+});

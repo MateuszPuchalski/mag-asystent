@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { AlarmClock, Eye, Inbox, RefreshCw, Ruler, UserCheck, Wrench } from "lucide-react";
+import {
+  AlarmClock, Eye, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+} from "lucide-react";
 import type { Kategoria, Rozmowa, StanCopilota, StanSkrzynki, WynikPartii } from "../api/typy";
 import { Plakietka, czas } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
@@ -79,9 +81,26 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      tego w jedną listę zmusiłoby agenta do wyboru między dwoma pytaniami,
      na które odpowiada naraz. */
   const [kategoria, setKategoria] = useState<Kategoria | null>(null);
+  /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
+     Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
+     mówi „czyje to", kategoria „o czym to", a pytania „czy TA rozmowa gdzieś
+     tu jest" nie zadawał nikt — bo nie było jak. „Klient pisał o tym miesiąc
+     temu" znaczyło przewijanie listy.
+
+     Filtr liczy się W PAMIĘCI EKRANU, bez debounce'u i bez ruchu do serwera —
+     lista i tak przyjeżdża w całości, ten sam wzorzec co przy kubełkach. */
+  const [fraza, setFraza] = useState("");
+  const szukane = fraza.trim().toLowerCase();
   const wKubelkuTeraz = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
-  const widoczne = kategoria === null ? wKubelkuTeraz
+  const poKategorii = kategoria === null ? wKubelkuTeraz
     : wKubelkuTeraz.filter((r) => r.kopilot?.kategoria === kategoria);
+  /* Szukamy po LOGINIE i po TREŚCI. Login, bo tak się wraca do znanej sprawy;
+     treść, bo tak się szuka sprawy, której loginu nikt nie pamięta. Właściciel
+     rozmowy dochodzi trzeci: „co ma Ola" jest pytaniem zadawanym na głos. */
+  const widoczne = szukane === "" ? poKategorii : poKategorii.filter((r) =>
+    r.klient.toLowerCase().includes(szukane)
+    || r.ostatniaWiadomosc.toLowerCase().includes(szukane)
+    || (r.wlasciciel ?? "").toLowerCase().includes(szukane));
 
   /* Skład kubełka JEDNYM SPOJRZENIEM (dekalog ergonomii, punkt 1: informacja
      w miejscu, gdzie zapada decyzja). Liczniki liczą się z tego, co widać —
@@ -127,6 +146,19 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         {k.etykieta} <span className="font-normal">
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
     </div>
+    {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
+        wejście, a szuka się w środku tego, co się wybrało. */}
+    <div className="relative shrink-0 border-b px-2 py-2">
+      <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+      <input value={fraza} onChange={(e) => setFraza(e.target.value)}
+        aria-label="Szukaj w rozmowach"
+        placeholder="Szukaj: login, treść, prowadzący"
+        className="field w-full py-1 pl-7 pr-7 text-sm" />
+      {fraza !== "" && <button type="button" onClick={() => setFraza("")}
+        aria-label="Wyczyść szukanie"
+        className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+        <X size={14} /></button>}
+    </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
       onRozpoznaj={onRozpoznaj} />
@@ -157,10 +189,18 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       {/* Pusty KUBEŁEK to co innego niż pusty FILTR. „Zajrzyj do Wszystkie"
           przy włączonym filtrze kategorii wysłałoby agenta w złą stronę —
           rozmowy są, tylko sito je zasłania. */}
-      {!laduje && rozmowy.length > 0 && !widoczne.length && kategoria !== null &&
+      {/* Pusty WYNIK SZUKANIA to co innego niż pusty kubełek i niż pusty filtr:
+          rozmowy są, tylko żadna nie pasuje do frazy. Zdanie mówi frazę, bo
+          literówki w polu wyszukiwania widać dopiero wtedy, gdy się je zacytuje. */}
+      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane !== "" &&
+        <p className="p-4 text-sm text-slate-500">
+          Nic nie pasuje do „{fraza.trim()}" w tym kubełku.{" "}
+          <button type="button" className="underline" onClick={() => setFraza("")}>
+            Wyczyść szukanie</button></p>}
+      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria !== null &&
         <p className="p-4 text-sm text-slate-500">
           Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</p>}
-      {!laduje && rozmowy.length > 0 && !widoczne.length && kategoria === null &&
+      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria === null &&
         <p className="p-4 text-sm text-slate-500">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</p>}
       {widoczne.map((r) => <button key={r.id} onClick={() => onWybierz(r.id)}
         aria-current={wybranaId === r.id}

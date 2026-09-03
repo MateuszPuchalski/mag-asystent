@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { allegroTryb } from "../adapters/allegro.js";
 import { db, transaction } from "../db/db.js";
 import { ConversationConflict, zmienStatus } from "./conversations.js";
 import { publishConversationEvent, trzymajacy } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
-import { wyslijDoAllegro, type WyslijDoAllegro } from "./allegro-wysylka.js";
+import {
+  oznaczPrzeczytanyWAllegro, wyslijDoAllegro,
+  type OznaczPrzeczytany, type WyslijDoAllegro,
+} from "./allegro-wysylka.js";
+import { zalacznikiRozmowy } from "./zalaczniki-wysylki.js";
 
 export interface ZadanieWysylki {
   conversationId: number;
@@ -18,9 +23,14 @@ export interface ZadanieWysylki {
   mimoObecnosci?: boolean;
   database?: DatabaseSync;
   wyslij?: WyslijDoAllegro;
+  /** Znacznik „przeczytane" w Allegro. Wstrzykiwany, żeby test nie szedł w sieć. */
+  oznaczPrzeczytany?: OznaczPrzeczytany;
 }
 
 export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed";
+
+/** Znacznik „nie ma czego oznaczać" — tryb dev. Nie jest błędem i nie idzie do audytu. */
+class PomijamOznaczenie extends Error {}
 
 /**
  * Klucz idempotencji wylicza SERWER, nie klient.
@@ -30,8 +40,16 @@ export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed
  * wiadomości i treści jest identyczny dla tego samego zamiaru — a inny, gdy
  * agent poprawił choć jedno słowo.
  */
-export function kluczIdempotencji(conversationId: number, lastMessageId: number | null, body: string) {
-  const skrot = createHash("sha256").update(body).digest("hex").slice(0, 4);
+export function kluczIdempotencji(
+  conversationId: number, lastMessageId: number | null, body: string, zalaczniki: string[] = [],
+) {
+  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA (0.195.0). Bez nich „ten sam tekst z innym
+     zdjęciem" miałby klucz identyczny z wysyłką sprzed chwili, a strażnik
+     dubletu oddałby stan tamtej próby zamiast wysłać poprawiony komplet —
+     czyli zdjęcie po cichu nie poszłoby do klienta. Kolejność sortowana, bo
+     ta sama para plików dodana odwrotnie to ten sam zamiar. */
+  const material = zalaczniki.length === 0 ? body : `${body}\u0000${[...zalaczniki].sort().join(",")}`;
+  const skrot = createHash("sha256").update(material).digest("hex").slice(0, 4);
   return `snd-${conversationId}-${lastMessageId ?? 0}-${skrot}`;
 }
 
@@ -145,11 +163,20 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     throw new ConversationConflict("Klient dopisał wiadomość — wysyłka wymaga zatwierdzenia", {
       lastMessageId: k.lastMessageId,
       nowaWiadomosc: nowa ? { id: nowa.id, tresc: nowa.body, at: nowa.sent_at } : null,
-      kluczIdempotencji: kluczIdempotencji(z.conversationId, k.lastMessageId, tresc),
+      kluczIdempotencji: kluczIdempotencji(
+        z.conversationId, k.lastMessageId, tresc, zalacznikiRozmowy(database, z.conversationId)
+          .map((a) => a.allegroId)),
     });
   }
 
-  const klucz = kluczIdempotencji(z.conversationId, k.lastMessageId, tresc);
+  /* Załączniki bierzemy Z BAZY, nie z żądania panelu: leżą przy rozmowie od
+     chwili wgrania do Allegro (`wysylka_zalacznik`), a szkic jest współdzielony
+     — plik dołożony przez kolegę ma pójść z odpowiedzią tak samo jak jego
+     zdanie w treści. Panel nie ma czego przysyłać, więc nie ma czego zgubić. */
+  const zalaczniki = zalacznikiRozmowy(database, z.conversationId);
+  const idZalacznikow = zalaczniki.map((a) => a.allegroId);
+
+  const klucz = kluczIdempotencji(z.conversationId, k.lastMessageId, tresc, idZalacznikow);
   const juz = database.prepare("SELECT id, status, external_message_id FROM outbox WHERE idempotency_key=?")
     .get(klucz) as { id: number; status: StatusWysylki; external_message_id: string | null } | undefined;
 
@@ -180,12 +207,13 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       k.lastMessageId, z.autor.id).lastInsertRowid);
 
   logEvent("rozmowa_wysylka_proba", z.autor.name, null,
-    { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz, znakow: tresc.length },
+    { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz, znakow: tresc.length,
+      zalacznikow: idZalacznikow.length },
     undefined, database);
 
   let wynik;
   try {
-    wynik = await wyslij(k.externalConversationId, tresc);
+    wynik = await wyslij(k.externalConversationId, tresc, idZalacznikow);
   } catch (e) {
     const status: StatusWysylki = niejednoznaczny(e) ? "send_uncertain" : "send_failed";
     const komunikat = e instanceof Error ? e.message : String(e);
@@ -197,7 +225,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     throw e;
   }
 
-  return transaction(database, () => {
+  const wynikWysylki = transaction(database, () => {
     /* Wiersz `message` powstaje TYLKO z numerem od Allegro. Bez numeru
        synchronizacja przyniosłaby tę samą wiadomość jeszcze raz i na osi
        stanęłyby dwie — a §8.4 zabrania, żeby wiersz wracał z nowym numerem. */
@@ -224,6 +252,10 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */
     database.prepare("DELETE FROM conversation_draft WHERE conversation_id=?").run(z.conversationId);
+    /* Załączniki znikają razem ze szkicem i z tego samego powodu: poszły już
+       do klienta, więc wiszące dalej przy rozmowie doklejałyby się do KAŻDEJ
+       następnej odpowiedzi. */
+    database.prepare("DELETE FROM wysylka_zalacznik WHERE conversation_id=?").run(z.conversationId);
 
     /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7, 0.158.0). Piłka jest po
        stronie klienta i kolejka ma to pokazywać sama — status wymagający
@@ -248,10 +280,48 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,
-        externalMessageId: wynik.externalMessageId, znakow: tresc.length }, undefined, database);
+        externalMessageId: wynik.externalMessageId, znakow: tresc.length,
+        zalacznikow: idZalacznikow.length }, undefined, database);
 
     publishConversationEvent("message.created", z.conversationId, { outboxId });
     return { outboxId, status: "sent" as StatusWysylki, kluczIdempotencji: klucz,
       externalMessageId: wynik.externalMessageId };
   })();
+
+  /* ── Wątek przeczytany PO wysyłce (0.195.0) ────────────────────────────────
+     Do 0.194.1 odpowiedź wysłana z panelu zostawiała wątek NIEPRZECZYTANY
+     w Centrum Wiadomości Allegro. Im lepiej działał panel, tym bardziej kłamał
+     licznik po tamtej stronie: czerwona plakietka przy sprawach załatwionych,
+     a po niej nie sposób poznać, co jeszcze czeka.
+
+     TU, a nie przy otwarciu rozmowy: „zero zapisu przy patrzeniu" obowiązuje
+     także zapisy do cudzego systemu. Przeczytana znaczy „odpisaliśmy", nie
+     „ktoś zajrzał" — a zajrzeć potrafi dwóch agentów naraz.
+
+     POZA transakcją i po niej, jak każda sieć w tym pliku. Błąd NIE wywraca
+     wysyłki: wiadomość jest już u klienta, więc odmowa oznaczenia to
+     niedogodność, nie utrata pracy. Idzie do audytu i tam zostaje. */
+  if (wynikWysylki.status === "sent") {
+    /* W trybie `dev` nie ma dokąd tego wysłać, a testy tras i serwisów mają
+       NIE strzelać do Allegro — ta sama reguła, przez którą tickery stoją
+       wyłącznie w `main()`. Wstrzyknięta funkcja bije tryb, bo test wysyłki
+       chce sprawdzić właśnie to wywołanie. */
+    const oznacz = z.oznaczPrzeczytany
+      ?? (allegroTryb() === "http" ? oznaczPrzeczytanyWAllegro : null);
+    try {
+      if (!oznacz) throw new PomijamOznaczenie();
+      await oznacz(k.externalConversationId);
+      /* Lokalna flaga schodzi od razu, nie za kwadrans: kolejka odświeża się
+         przy tym zdarzeniu, a synchronizacja przyniosłaby to samo dopiero
+         przy najbliższym przebiegu. */
+      database.prepare("UPDATE conversation SET unread=0 WHERE id=?").run(z.conversationId);
+    } catch (e) {
+      if (e instanceof PomijamOznaczenie) return wynikWysylki;
+      logEvent("rozmowa_przeczytana_blad", z.autor.name, null,
+        { conversationId: z.conversationId, outboxId: wynikWysylki.outboxId,
+          blad: e instanceof Error ? e.message : String(e) }, undefined, database);
+    }
+  }
+
+  return wynikWysylki;
 }

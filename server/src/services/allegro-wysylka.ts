@@ -1,4 +1,7 @@
-import { urlWiadomosci, zapytajAllegro } from "../adapters/allegro.http.js";
+import {
+  urlDeklaracjiZalacznika, urlPrzeczytaniaWatku, urlWgraniaZalacznika, urlWiadomosci,
+  zapytajAllegro,
+} from "../adapters/allegro.http.js";
 import { config } from "../config.js";
 
 /**
@@ -7,7 +10,8 @@ import { config } from "../config.js";
  * Kształt pochodzi ze specyfikacji Allegro i jest opisany w sekcji „Wysyłka"
  * w `docs/allegro-ksztalt.md`. `POST /messaging/threads/{id}/messages`
  * przyjmuje `{ text, attachments? }` i oddaje obiekt wiadomości z polem `id`.
- * Załączników nie wysyłamy, więc pola na nie nie budujemy.
+ * Od 0.195.0 wysyłamy też załączniki — pole `attachments` w `NewMessageInThread`
+ * to lista `{ id }`, a identyfikatory pochodzą z dwukrokowego wgrania niżej.
  *
  * DO 0.150.0 TA FUNKCJA NIOSŁA `[WERYFIKUJ]`: ciało powstało z pamięci, bo
  * `developer.allegro.pl` był niedostępny ze środowiska, w którym pisano kod,
@@ -26,7 +30,9 @@ import { config } from "../config.js";
  */
 export interface WyslanaWiadomosc { externalMessageId: string | null }
 
-export type WyslijDoAllegro = (threadId: string, tresc: string) => Promise<WyslanaWiadomosc>;
+export type WyslijDoAllegro = (
+  threadId: string, tresc: string, zalaczniki?: string[],
+) => Promise<WyslanaWiadomosc>;
 
 /**
  * Numer wiadomości z odpowiedzi Allegro.
@@ -45,10 +51,72 @@ export function numerWiadomosci(odpowiedz: unknown): string | null {
   return id == null ? null : String(id);
 }
 
-export const wyslijDoAllegro: WyslijDoAllegro = async (threadId, tresc) => {
+export const wyslijDoAllegro: WyslijDoAllegro = async (threadId, tresc, zalaczniki = []) => {
   const odp = await zapytajAllegro(urlWiadomosci(config.allegro.apiUrl, threadId), {
     metoda: "POST",
-    body: { text: tresc },
+    /* Pola `attachments` NIE wysyłamy pustego. Schemat dopuszcza `nullable`,
+       ale wiadomość bez załączników ma wyglądać dokładnie tak, jak wyglądała
+       przez cztery wydania — nowa funkcja nie zmienia kształtu żądań, które
+       jej nie używają. */
+    body: zalaczniki.length === 0
+      ? { text: tresc }
+      : { text: tresc, attachments: zalaczniki.map((id) => ({ id })) },
   });
   return { externalMessageId: numerWiadomosci(odp) };
+};
+
+/* ── Wątek przeczytany (0.195.0) ─────────────────────────────────────────────
+   Odpowiedź wysłana z panelu ZOSTAWIAŁA wątek nieprzeczytany w Centrum
+   Wiadomości Allegro. Skutek był taki, że im lepiej działał panel, tym
+   bardziej kłamał licznik u właściciela: czerwona plakietka przy sprawach
+   dawno załatwionych, a po niej nie da się poznać, co jeszcze czeka.
+
+   Stoi PO wysyłce i nie ma prawa jej wywrócić: wiadomość już poszła do
+   klienta, a nieoznaczony wątek to niedogodność, nie utrata pracy. Dlatego
+   wołający łapie błąd i zapisuje go w audycie, zamiast oddawać agentowi
+   „nie udało się wysłać" przy odpowiedzi, która wyszła.                      */
+export type OznaczPrzeczytany = (threadId: string) => Promise<void>;
+
+export const oznaczPrzeczytanyWAllegro: OznaczPrzeczytany = async (threadId) => {
+  /* `ThreadReadFlag` żąda pola `read` — bez niego Allegro oddaje 422
+     „missing flag in the request body", co wprost stoi w specyfikacji. */
+  await zapytajAllegro(urlPrzeczytaniaWatku(config.allegro.apiUrl, threadId), {
+    metoda: "PUT",
+    body: { read: true },
+  });
+};
+
+/* ── Załącznik: deklaracja, potem binaria (0.195.0) ──────────────────────────
+   Allegro dzieli wgranie na DWA żądania i nie da się tego skrócić:
+   `POST /messaging/message-attachments` z `{ filename, size }` oddaje `{ id }`,
+   a dopiero `PUT /messaging/message-attachments/{id}` niesie bajty. Rozmiar
+   podaje się z góry, więc kłamstwo w deklaracji Allegro wyłapie samo.        */
+
+/** Największy plik wg `NewAttachmentDeclaration.size` — `maximum: 5242880`. */
+export const LIMIT_ZALACZNIKA = 5 * 1024 * 1024;
+
+/** Typy z `requestBody` wgrania. Innych specyfikacja NIE wymienia. */
+export const TYPY_ZALACZNIKA = [
+  "image/png", "image/gif", "image/bmp", "image/tiff", "image/jpeg", "application/pdf",
+] as const;
+
+export type WgrajZalacznik = (
+  nazwa: string, typ: string, dane: Uint8Array,
+) => Promise<{ id: string }>;
+
+export const wgrajZalacznikDoAllegro: WgrajZalacznik = async (nazwa, typ, dane) => {
+  const deklaracja = await zapytajAllegro(urlDeklaracjiZalacznika(config.allegro.apiUrl), {
+    metoda: "POST",
+    body: { filename: nazwa, size: dane.byteLength },
+  }) as { id?: unknown } | null;
+  const id = deklaracja?.id == null ? null : String(deklaracja.id);
+  if (!id) throw new Error("Allegro nie oddało numeru deklaracji załącznika");
+
+  /* Binaria idą TĄ SAMĄ deklaracją, więc rozmiar musi się zgadzać co do bajtu
+     z tym, co poszło wyżej — stąd jedna zmienna na dane, nie dwie ścieżki. */
+  await zapytajAllegro(urlWgraniaZalacznika(config.allegro.apiUrl, id), {
+    metoda: "PUT",
+    plik: { dane, typ },
+  });
+  return { id };
 };

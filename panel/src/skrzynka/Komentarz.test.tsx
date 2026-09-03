@@ -19,6 +19,9 @@ const props = {
   komentarz: "", onKomentarz: vi.fn(), onDodajKomentarz: vi.fn(),
   komentuje: false, agenci: [{ userId: 7, name: "Ala" }], wzmianki: [] as number[],
   onWzmianki: vi.fn(),
+  zalaczniki: [] as import("../api/rozmowy").ZalacznikSzkicu[],
+  dodajeZalacznik: false, bladZalacznika: "",
+  onDodajZalacznik: vi.fn(), onUsunZalacznik: vi.fn(),
 };
 
 const edytor = (n: Partial<typeof props> = {}) => render(<Edytor {...props} {...n} />);

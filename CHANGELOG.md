@@ -34,6 +34,63 @@ historii nie przepisujemy.
 ---
 
 
+## 0.195.0 — 3 września 2026
+
+**Trzy braki w skrzynce pytań, wskazane przy przeglądzie panelu.** Wszystkie
+trzy dotyczą tego, co agent robi z pytaniem klienta, i wszystkie trzy kończyły
+się wyjściem do panelu Allegro.
+
+### Odpowiedź zostawiała wątek nieprzeczytany w Allegro
+
+Specyfikacja ma `PUT /messaging/threads/{threadId}/read` od zawsze. W całym
+serwerze nie było ani jednego wywołania — używaliśmy wyłącznie listy wątków
+i wysyłki wiadomości.
+
+Sprawa załatwiona w WERTIS zostawała więc **nieprzeczytana** w Centrum
+Wiadomości Allegro. Im lepiej działał panel, tym bardziej kłamał tamten
+licznik: czerwona plakietka przy sprawach dawno zamkniętych, a po niej nie
+sposób poznać, co jeszcze czeka.
+
+Znacznik idzie po UDANEJ wysyłce i tylko po niej. Nie idzie przy otwarciu
+rozmowy: „zero zapisu przy patrzeniu" obowiązuje także zapisy do cudzego
+systemu, a przeczytana ma znaczyć „odpisaliśmy", nie „ktoś zajrzał". Odmowa
+oznaczenia nie wywraca wysyłki — wiadomość jest już u klienta, więc porażka
+idzie do audytu, a nie na ekran jako „nie udało się wysłać".
+
+### Do odpowiedzi nie dało się dołączyć pliku
+
+Odczyt załączników działał od 0.155.0, wysyłka nie istniała wcale. Przy
+pytaniach o części zdjęcie bywa całą odpowiedzią: „ten gwint, nie tamten"
+pokazuje się szybciej, niż opisuje. Agent szedł po to do panelu Allegro,
+czyli tam, skąd panel miał go zabrać.
+
+Allegro wgrywa załącznik dwoma żądaniami: deklaracja `{ filename, size }`
+oddaje numer, dopiero drugie niesie bajty. **Plik leci do Allegro przy
+DODANIU**, nie przy WYŚLIJ — odmowę typu albo rozmiaru widać wtedy, gdy
+jeszcze da się wybrać inny plik.
+
+Załączniki wiszą przy rozmowie, nie w przeglądarce: szkic jest współdzielony
+z zespołem, więc kolega widzi i tekst, i pliki, a odświeżenie karty niczego
+nie gubi. Po udanej wysyłce znikają razem ze szkicem; po nieudanej zostają.
+
+Identyfikatory weszły do klucza idempotencji. Bez tego „ten sam tekst z innym
+zdjęciem" trafiłby na strażnika dubletu, a zdjęcie po cichu nie poszłoby do
+klienta.
+
+Nasz próg to 4 MB przy 5 MB Allegro. Plik jedzie do serwera base64 w JSON,
+czyli rośnie o jedną trzecią, a limit ciała całego API stoi na 6 MB.
+Podniesienie tamtego progu dla jednej funkcji otworzyłoby każdą trasę.
+
+### Kolejka nie miała wyszukiwania
+
+Zwroty mają je od 0.165.0. W skrzynce kubełek mówił „czyje to", kategoria
+„o czym to", a pytania „czy TA rozmowa gdzieś tu jest" nie zadawał nikt, bo
+nie było jak. „Klient pisał o tym miesiąc temu" znaczyło przewijanie listy.
+
+Pole zawęża po loginie, po treści ostatniej wiadomości i po prowadzącym.
+Liczy się w pamięci ekranu, bez ruchu do serwera. Pusty wynik cytuje frazę
+i nie udaje pustego kubełka — to dwa różne zdania.
+
 ## 0.194.1 — 3 września 2026
 
 **[wymaga działania] Poprawione nazwy checków w instrukcji reguły.** Wydanie

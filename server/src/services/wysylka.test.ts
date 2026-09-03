@@ -359,3 +359,129 @@ test("własny uchwyt nie blokuje własnej odpowiedzi", async () => {
   });
   assert.equal(w.status, "sent");
 });
+
+/* ── Wątek przeczytany po wysyłce (0.195.0) ──────────────────────────────────
+   Do 0.194.1 odpowiedź z panelu zostawiała wątek NIEPRZECZYTANY w Centrum
+   Wiadomości Allegro. Im lepiej działał panel, tym bardziej kłamał licznik po
+   tamtej stronie: czerwona plakietka przy sprawach dawno załatwionych.      */
+
+test("udana wysyłka oznacza wątek jako przeczytany — numerem z Allegro", async () => {
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  const oznaczone: string[] = [];
+
+  await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+    oznaczPrzeczytany: async (id) => { oznaczone.push(id); },
+  });
+
+  assert.deepEqual(oznaczone, ["t-4821"], "idzie identyfikator WĄTKU, nie nasze id rozmowy");
+  const c = d.prepare("SELECT unread FROM conversation WHERE id=?").get(rozmowa) as { unread: number };
+  assert.equal(Number(c.unread), 0, "lokalna flaga schodzi od razu, nie za kwadrans");
+});
+
+test("odmowa oznaczenia NIE wywraca wysłanej odpowiedzi", async () => {
+  /* Wiadomość jest już u klienta. Oddanie agentowi „nie udało się wysłać"
+     byłoby zdaniem nieprawdziwym i kazałoby wysłać drugi raz. */
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+    oznaczPrzeczytany: async () => { throw new Error("403 z Allegro"); },
+  });
+
+  assert.equal(w.status, "sent");
+  assert.equal(zdarzenia(d, "rozmowa_przeczytana_blad").length, 1, "porażka idzie do audytu");
+});
+
+test("nieudana wysyłka nie oznacza niczego jako przeczytane", async () => {
+  /* Nieprzeczytany wątek to jedyna rzecz, po której widać, że pytanie czeka. */
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  let oznaczen = 0;
+
+  await assert.rejects(() => wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async () => { throw new Error("500 z Allegro"); },
+    oznaczPrzeczytany: async () => { oznaczen += 1; },
+  }));
+
+  assert.equal(oznaczen, 0);
+});
+
+/* ── Załączniki przy odpowiedzi (0.195.0) ────────────────────────────────── */
+
+/** Załącznik już wgrany do Allegro, czekający przy szkicu. */
+const zalacznik = (d: DatabaseSync, rozmowa: number, allegroId: string, nazwa = "gwint.jpg") =>
+  d.prepare(`INSERT INTO wysylka_zalacznik(conversation_id,allegro_id,nazwa,typ,rozmiar)
+    VALUES (?,?,?,'image/jpeg',1024)`).run(rozmowa, allegroId, nazwa);
+
+test("załączniki czekające przy rozmowie idą z odpowiedzią", async () => {
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  zalacznik(d, rozmowa, "att-1");
+  zalacznik(d, rozmowa, "att-2", "tabliczka.png");
+  let poszly: string[] | undefined;
+
+  await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Ten gwint.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async (_id, _t, z) => { poszly = z; return { externalMessageId: "m-1" }; },
+    oznaczPrzeczytany: async () => {},
+  });
+
+  assert.deepEqual(poszly, ["att-1", "att-2"]);
+});
+
+test("po udanej wysyłce załączniki znikają razem ze szkicem", async () => {
+  /* Wiszące dalej doklejałyby się do KAŻDEJ następnej odpowiedzi. */
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  zalacznik(d, rozmowa, "att-1");
+
+  await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Ten gwint.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+    oznaczPrzeczytany: async () => {},
+  });
+
+  const ile = d.prepare("SELECT count(*) n FROM wysylka_zalacznik WHERE conversation_id=?")
+    .get(rozmowa) as { n: number };
+  assert.equal(Number(ile.n), 0);
+});
+
+test("nieudana wysyłka ZOSTAWIA załączniki — praca agenta nie przepada", async () => {
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  zalacznik(d, rozmowa, "att-1");
+
+  await assert.rejects(() => wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Ten gwint.",
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async () => { throw new Error("500 z Allegro"); },
+  }));
+
+  const ile = d.prepare("SELECT count(*) n FROM wysylka_zalacznik WHERE conversation_id=?")
+    .get(rozmowa) as { n: number };
+  assert.equal(Number(ile.n), 1);
+});
+
+test("ten sam tekst z INNYM załącznikiem ma inny klucz idempotencji", () => {
+  /* Bez tego strażnik dubletu oddałby stan poprzedniej próby, a zdjęcie po
+     cichu nie poszłoby do klienta. */
+  const bez = kluczIdempotencji(1, 10, "Ten gwint.");
+  const zJednym = kluczIdempotencji(1, 10, "Ten gwint.", ["att-1"]);
+  const zDrugim = kluczIdempotencji(1, 10, "Ten gwint.", ["att-2"]);
+  assert.notEqual(bez, zJednym);
+  assert.notEqual(zJednym, zDrugim);
+});
+
+test("kolejność załączników nie zmienia klucza — to ten sam zamiar", () => {
+  assert.equal(
+    kluczIdempotencji(1, 10, "Ten gwint.", ["att-1", "att-2"]),
+    kluczIdempotencji(1, 10, "Ten gwint.", ["att-2", "att-1"]));
+});
