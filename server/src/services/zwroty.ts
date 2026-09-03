@@ -785,12 +785,17 @@ export function zarejestrujNieodebrana(
 
   return transaction(database, () => {
     database.prepare(`INSERT INTO zwrot_klienta
-      (channel_account_id,external_id,order_id,created_at,paczka_at,zrodlo,waybill,notatka,synced_at)
-      VALUES (?,?,?,?,?,'nieodebrana',?,?,?)`).run(
+      (channel_account_id,external_id,order_id,created_at,paczka_at,dostarczono_at,
+       zrodlo,waybill,notatka,synced_at)
+      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?)`).run(
       konto.id, external, orderId, at,
       /* Paczka JEST u nas — inaczej nie byłoby czego rejestrować. To jedyny
-         zwrot, przy którym datę powrotu znamy na pewno. */
-      at, waybill, (dane.notatka ?? "").trim() || null, at);
+         zwrot, przy którym datę powrotu znamy na pewno, więc `dostarczono_at`
+         wpisuje się od razu zamiast czekać na tracking, którego tu nie ma:
+         przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
+         samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
+         na biurku operatora. */
+      at, at, waybill, (dane.notatka ?? "").trim() || null, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
       .get(konto.id, external) as { id: number }).id);

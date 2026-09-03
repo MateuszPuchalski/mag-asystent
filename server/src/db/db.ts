@@ -251,6 +251,16 @@ export function migrate(database: DatabaseSync) {
      z obiektu zwrotu — ten podaje wyłącznie moment nadania. */
   addColumn("zwrot_klienta", "dostarczono_at", "TEXT");
   addColumn("zwrot_klienta", "przesylka_status", "TEXT");
+  /* Paczka nieodebrana LEŻY U NAS w chwili rejestracji — biuro wpisuje ją
+     dopiero wtedy, gdy trzyma karton w ręku (0.172.0). Trackingu dla niej nie
+     ma i nie będzie: przewoźnika nie znamy, a Allegro takiego zwrotu nie zna
+     wcale. Dlatego data powrotu jest tu równa dacie rejestracji — to niezmiennik,
+     a nie jednorazowa łatka, więc stoi w migracji i przy każdym starcie
+     domyka wiersze, którym jej brakuje. Bez niego panel pytał „czy dotarła"
+     o karton stojący na biurku operatora. */
+  database.exec(`UPDATE zwrot_klienta SET dostarczono_at = paczka_at
+                  WHERE zrodlo = 'nieodebrana' AND dostarczono_at IS NULL
+                    AND paczka_at IS NOT NULL`);
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
   /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy

@@ -288,10 +288,14 @@ zwrotach.
 
 Synchronizator dlatego czyta LISTĘ i po szczegół nie sięga: dokłada jedno
 wywołanie na zwrot, a nie dokłada ani jednego pola. Wyjątek jest jeden —
-`parcels[].waybill` bywa `null` na liście (88 z 94), a w szczególe było
-niepuste w dziesięciu na dziesięć. Numeru listu i tak nie zapisujemy, więc
-różnica nie zmienia dziś niczego; gdyby kiedyś zaczęła, to jest miejsce,
-w którym szczegół daje więcej.
+`parcels[].waybill` bywa na liście pusty, w 6 rekordach z 94, a w szczególe był
+niepusty w dziesięciu na dziesięć. Do 0.187.0 stało tu, że pusty jest w 88
+z 94 — czyli odwrotnie, niż mówi sonda. Poprawka 0.187.0 zdjęła tę samą
+pomyłkę o dwie sekcje niżej i TEGO zdania nie ruszyła.
+
+Różnica dotyczy dziś sześciu paczek: bez numeru listu nie ma o co zapytać
+przewoźnika, więc te zwroty zostają bez daty doręczenia. To jest miejsce,
+w którym szczegół dałby więcej.
 
 ### Co zaczęliśmy mapować w 0.169.0
 
@@ -317,6 +321,13 @@ się to nazywa na ekranie od 0.169.0. Czasu doręczenia szuka się gdzie indziej
 Każdy wpis historii niesie `occurredAt` („actual shipment status change time"),
 a wśród ośmiu kodów jest `DELIVERED`. Jedno wywołanie bierze do dwudziestu
 numerów. Od 0.187.0 pyta o to synchronizacja zwrotów.
+
+**Numer do zapytania bierze się z LĄDOWISKA, nie ze świeżo pobranej strony.**
+To wynika wprost z kursora opisanego wyżej: `from` oddaje zwroty utworzone PO
+podanym, więc raz zobaczony zwrot na listę nie wraca. Pytanie o tracking
+wyłącznie tego, co właśnie przyszło, dotyczyłoby więc zawsze zwrotów sprzed
+chwili — a te nie są doręczone. Pierwsza wersja poprawki tak właśnie działała
+i nie zapisała ani jednej daty.
 
 **Poprzednia wersja tego akapitu odczytała sondę ODWROTNIE.** Twierdziła, że
 `waybill` „jest pusty w 88 z 94 rekordów" — a kolumna nosi nagłówek `niepuste`.

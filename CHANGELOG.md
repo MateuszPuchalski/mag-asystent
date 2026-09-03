@@ -34,6 +34,52 @@ historii nie przepisujemy.
 ---
 
 
+## 0.188.0 — 3 września 2026
+
+**Data doręczenia zwrotu naprawdę się pojawia.**
+
+0.187.0 zapowiedziało ją i nie dowiozło. Właściciel zobaczył to tego samego
+dnia: „pokazuje przy każdej paczce zwrotnej że do nas nie dotarła mimo że
+w panelu allegro jest data".
+
+### Dlaczego nie działało
+
+Lista paczek do odpytania powstawała z tego, co WŁAŚNIE przyszło z Allegro.
+Synchronizacja chodzi jednak kursorem: `from` w `getCustomerReturns` znaczy
+„zwroty utworzone PO tym zwrocie", więc raz zobaczony zwrot nigdy nie wraca na
+listę. Pytaliśmy zatem o tracking wyłącznie zwrotów zgłoszonych przed chwilą,
+a zwrot zgłoszony przed chwilą nie jest doręczony. Kolumna `dostarczono_at`
+nie zapełniła się ani razu.
+
+Teraz lista powstaje z BAZY: paczki w drodze wybiera zapytanie po
+`zwrot_klienta`, a numer listu czyta z kopii odpowiedzi Allegro. Polityka
+0.163.0 zostaje bez zmian — numeru nadal nie zapisujemy przy zwrocie.
+
+Testy tego nie złapały, bo sprawdzały serwis trackingu w izolacji. Nowy
+strażnik stoi na SZWIE: przebieg z pustą stroną zwrotów ma i tak zapytać
+o paczkę w drodze.
+
+### Ekran przestaje zgadywać
+
+Gdy przewoźnik nie podał nic, panel pisze „Nie wiadomo, czy dotarła", a nie
+„Jeszcze do nas nie dotarła". To była trzecia z rzędu nieprawda w tej sekcji:
+zdanie twierdzące stawiane bez podstawy. Paczka leżąca w magazynie od trzech
+dni wyglądała identycznie jak zaginiona.
+
+### Paczka nieodebrana ma datę powrotu z definicji
+
+Biuro rejestruje ją, trzymając karton w ręku (0.172.0), więc `dostarczono_at`
+wpisuje się od razu. Trackingu dla niej nie ma: przewoźnika nie znamy, a
+Allegro tego zwrotu nie zna wcale. Wiersze sprzed poprawki domyka migracja.
+Ekran nie pisze przy niej „nadana przez klienta" — klient jej właśnie nie
+odebrał i niczego nie nadawał.
+
+### Sprzeczność w dokumentacji
+
+`docs/allegro-ksztalt.md` mówił w jednej sekcji, że `waybill` jest pusty w 88
+rekordach z 94, a dwie sekcje niżej — że wypełniony w 88 z 94. Prawdziwe jest
+drugie. Poprawka 0.187.0 zdjęła pomyłkę tylko w jednym miejscu.
+
 ## 0.187.0 — 3 września 2026
 
 **Przy zwrocie widać, kiedy paczka do nas dotarła.** Właściciel zobaczył tę

@@ -165,11 +165,10 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
     const najnowszy = zebrane.reduce<Zwrot | null>(
       (a, z) => (!a || (z.createdAt ?? "") > (a.createdAt ?? "") ? z : a), null);
 
-    let doSprawdzenia: DoSprawdzenia[] = [];
+    let konto = 0;
     transaction(database, () => {
-      const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
+      konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
       for (const zwrot of zebrane) zapisz(database, zwrot, konto, at);
-      doSprawdzenia = paczkiDoSprawdzenia(database, zebrane, konto);
 
       /* `error_count` ZERUJE SIĘ na sukcesie — ta sama poprawka co w skrzynce
          w 0.147.0. Licznik, który tylko rośnie, po tygodniu mówi wyłącznie
@@ -189,7 +188,7 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
     /* Tracking idzie PO transakcji, bo wychodzi do sieci: trzymanie otwartej
        transakcji SQLite na czas żądania HTTP blokowałoby drugi proces (worker)
        na tyle, ile trwa najwolniejszy przewoźnik. */
-    await uzupelnijDoreczenia(database, doSprawdzenia,
+    await uzupelnijDoreczenia(database, paczkiDoSprawdzenia(database, konto),
       { query: deps.query, apiUrl });
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
@@ -207,34 +206,71 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
 }
 
 /**
- * Które paczki warto odpytać u przewoźnika (0.187.0).
+ * Ile paczek pytamy w jednym przebiegu.
+ *
+ * Dwadzieścia numerów mieści się w jednym żądaniu, więc dwieście to dziesięć
+ * wywołań na takt — dużo mniej, niż kosztuje samo pobranie strony zwrotów.
+ * Próg istnieje na wypadek pierwszego przebiegu po wdrożeniu, gdy w drodze
+ * jest cała zaległość naraz.
+ */
+export const TRACKING_NA_PRZEBIEG = 200;
+
+/**
+ * Które paczki warto odpytać u przewoźnika (0.187.0, naprawione w 0.188.0).
+ *
+ * ── Dlaczego to czyta BAZĘ, a nie świeżo pobranej strony ──────────────────
+ * Do 0.188.0 ta lista powstawała z `zebrane`, czyli z tego, co właśnie
+ * przyszło z Allegro. To nie mogło działać i nie działało ani razu.
+ * Synchronizacja chodzi po KURSORZE: `from` w `getCustomerReturns` znaczy
+ * „zwroty utworzone PO tym zwrocie", więc raz zobaczony zwrot nigdy nie
+ * wraca na listę. Pytaliśmy zatem o tracking wyłącznie tych zwrotów, które
+ * powstały przed chwilą — a zwrot zgłoszony przed chwilą nie jest doręczony.
+ * Kolumna `dostarczono_at` nie zapełniła się więc nigdy i panel przy każdej
+ * paczce mówił, że nie dotarła. Właściciel zobaczył to od razu.
+ *
+ * ── Numeru listu dalej nie zapisujemy (polityka 0.163.0) ──────────────────
+ * I nadal nie trzeba: numer leży w kopii odpowiedzi Allegro
+ * (`allegro_zwrot.surowe_json`) i stamtąd go czytamy, tym samym `json_each`,
+ * co szukanie zwrotu po naklejce. `zwrot_klienta` kolumny na numer nie ma
+ * i nie dostaje.
  *
  * TYLKO TE W DRODZE — decyzja właściciela. Zwrot z zapisaną datą doręczenia
  * nie jest pytany drugi raz: data się nie zmieni, a każde żądanie to koszt
  * u Allegro. Zamknięte i odrzucone odpadają razem z nimi.
  *
- * Numer listu bierzemy Z ODPOWIEDZI, nie z bazy — w bazie go nie ma i nie
- * będzie (polityka 0.163.0). Dlatego ta lista powstaje tutaj, w przebiegu
- * synchronizacji, i żyje do końca wywołania.
+ * NAJNOWSZE PIERWSZE, gdy zaległość nie mieści się w progu. Odwrotny porządek
+ * oddawałby budżet paczkom, które stoją nierozstrzygnięte od miesięcy i
+ * pewnie już nigdy nie dojadą — a nowe czekałyby za nimi w nieskończoność.
  */
-function paczkiDoSprawdzenia(
-  database: Db, zwroty: Zwrot[], konto: number,
+export function paczkiDoSprawdzenia(
+  database: Db, konto: number, limit = TRACKING_NA_PRZEBIEG,
 ): DoSprawdzenia[] {
+  const wiersze = database.prepare(`
+    SELECT z.id AS zwrot_id,
+           json_extract(p.value, '$.carrierId') AS carrier_id,
+           json_extract(p.value, '$.waybill')   AS waybill
+      FROM zwrot_klienta z
+      JOIN allegro_zwrot a ON a.id = z.external_id,
+           json_each(json_extract(a.surowe_json, '$.parcels')) p
+     WHERE z.channel_account_id = ?
+       AND z.dostarczono_at IS NULL
+       AND z.zamkniety_at IS NULL
+       AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+       AND json_extract(p.value, '$.waybill')   IS NOT NULL
+       AND json_extract(p.value, '$.carrierId') IS NOT NULL
+     ORDER BY z.created_at DESC, z.id DESC, p.key ASC`)
+    .all(konto) as Array<{ zwrot_id: number; carrier_id: string; waybill: string }>;
+
+  /* Jedna paczka na zwrot — PIERWSZA z kompletem danych, jak przed zmianą.
+     `ORDER BY p.key` daje porządek tablicy z odpowiedzi Allegro, więc „pierwsza"
+     znaczy to samo, co znaczyło przy czytaniu `parcels[]` w pamięci. */
   const wynik: DoSprawdzenia[] = [];
-  for (const z of zwroty) {
-    /* Pierwsza paczka z KOMPLETEM danych: bez numeru albo bez przewoźnika
-       tracking nie ma o co zapytać. */
-    const paczka = (z.parcels ?? []).find((p) => p.waybill && p.carrierId);
-    if (!paczka?.waybill || !paczka.carrierId) continue;
-
-    const w = database.prepare(`SELECT id, dostarczono_at, zamkniety_at, werdykt
-      FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?`)
-      .get(konto, z.id) as
-      { id: number; dostarczono_at: string | null; zamkniety_at: string | null;
-        werdykt: string | null } | undefined;
-    if (!w || w.dostarczono_at || w.zamkniety_at || w.werdykt === "odrzucony") continue;
-
-    wynik.push({ zwrotId: Number(w.id), carrierId: paczka.carrierId, waybill: paczka.waybill });
+  const juz = new Set<number>();
+  for (const w of wiersze) {
+    if (juz.has(w.zwrot_id)) continue;
+    juz.add(w.zwrot_id);
+    wynik.push({ zwrotId: Number(w.zwrot_id), carrierId: w.carrier_id, waybill: w.waybill });
+    if (wynik.length >= limit) break;
   }
   return wynik;
 }

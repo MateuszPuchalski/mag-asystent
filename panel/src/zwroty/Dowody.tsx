@@ -232,18 +232,28 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           się wiedzieć. */}
       {zwrot.paczkaAt
         ? <>
-            <p>Nadana przez klienta {czas(zwrot.paczkaAt)}.</p>
+            {/* Paczka nieodebrana nie została NADANA PRZEZ KLIENTA — wróciła
+                sama od przewoźnika, a `paczka_at` jest przy niej datą, w której
+                biuro wpisało ją do kolejki. Do 0.188.0 stało tu zdanie
+                o kliencie, który tej paczki właśnie nigdy nie nadał. */}
+            <p>{zwrot.zrodlo === "nieodebrana"
+              ? <>Wróciła nieodebrana, zapisana {czas(zwrot.paczkaAt)}.</>
+              : <>Nadana przez klienta {czas(zwrot.paczkaAt)}.</>}</p>
             {zwrot.dostarczonoAt
               ? <p className="mt-1 font-semibold text-ranga-ok">
                   Doręczona do nas {czas(zwrot.dostarczonoAt)}.</p>
-              : <p className="mt-1 font-semibold text-ranga-uwaga">
-                  {PRZESYLKA[zwrot.przesylkaStatus ?? ""]
-                    ?? "Jeszcze do nas nie dotarła."}</p>}
-            {/* Kod przewoźnika surowo, gdy go nie znamy — ta sama zasada co
-                przy `carrierId`: lista nie jest zamknięta. */}
-            {zwrot.przesylkaStatus && !PRZESYLKA[zwrot.przesylkaStatus] &&
-              <p className="mt-1 text-xs text-slate-500">
-                Przewoźnik mówi: {zwrot.przesylkaStatus}.</p>}
+              : zwrot.przesylkaStatus
+                ? <p className="mt-1 font-semibold text-ranga-uwaga">
+                    {PRZESYLKA[zwrot.przesylkaStatus]
+                      ?? `Przewoźnik mówi: ${zwrot.przesylkaStatus}.`}</p>
+                /* BRAK WIEDZY MÓWI O SOBIE, a nie udaje wiedzy (0.188.0).
+                   Stało tu „Jeszcze do nas nie dotarła" — zdanie twierdzące,
+                   którego nie mieliśmy z czego postawić, bo przewoźnik po
+                   prostu jeszcze nic nie powiedział. Ten sam błąd co dwa razy
+                   wcześniej w tej sekcji: ekran orzekał zamiast przyznać, że
+                   nie wie. */
+                : <p className="mt-1 font-semibold text-ranga-uwaga">
+                    Nie wiadomo, czy dotarła — przewoźnik nic jeszcze nie podał.</p>}
           </>
         : <p className="font-semibold text-ranga-uwaga">
             Klient nie nadał jeszcze paczki, a termin biegnie.</p>}
