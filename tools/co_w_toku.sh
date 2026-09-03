@@ -53,6 +53,49 @@ zdalna=$(git show origin/main:package.json 2>/dev/null | wersja)
 lokalna=$([ -f package.json ] && wersja < package.json)
 echo "Wersja: main ${zdalna:-?}, lokalnie ${lokalna:-?}"
 
+# ── Świeżość zależności (0.193.1) ────────────────────────────────────────────
+# `node_modules` starsze niż `package.json` UDAJE ZEPSUTE REPO. Kosztowało to
+# już cały przebieg: `npm test` pokazał 290 porażek na czystym `main`, bo
+# pakiet dołożony w międzyczasie nie był zainstalowany. Fałszywa awaria jest
+# droższa od prawdziwej — przy prawdziwej wiadomo przynajmniej, czego szukać.
+#
+# Sprawdzamy ISTNIENIE katalogu pakietu, nie zgodność wersji. Brak jest
+# jednoznaczny i kosztuje jedno `stat` na zależność; rozjazd wersji łapie
+# i tak `npm ci` przy instalacji, więc dublowanie go tutaj nic nie wnosi.
+echo
+if ! command -v node >/dev/null 2>&1; then
+  echo "Zależności: nie wiem — brak node w PATH."
+elif [ ! -d node_modules ]; then
+  echo "Zależności: BRAK node_modules — uruchom 'npm ci'."
+else
+  # Node, a nie `sed` po JSON-ie: lista zależności to struktura, a nie tekst,
+  # i w tym repo node jest z definicji. Skrypt milczy przy każdym błędzie —
+  # start sesji nie ma prawa paść przez sprawdzenie informacyjne.
+  brak=$(node -e '
+    const fs = require("fs"), p = require("path");
+    const zPliku = (f) => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } };
+    const korzen = zPliku("package.json");
+    if (!korzen) process.exit(0);
+    const brak = new Set();
+    for (const m of ["."].concat(korzen.workspaces || [])) {
+      const pj = zPliku(p.join(m, "package.json"));
+      if (!pj) continue;
+      for (const n of Object.keys({ ...pj.dependencies, ...pj.devDependencies })) {
+        // Pakiet ze workspace npm dowiązuje do korzenia, więc obie ścieżki liczą sie tak samo.
+        if (fs.existsSync(p.join("node_modules", n))) continue;
+        if (fs.existsSync(p.join(m, "node_modules", n))) continue;
+        brak.add(n);
+      }
+    }
+    const lista = [...brak];
+    if (lista.length) console.log(lista.slice(0, 5).join(" ") + (lista.length > 5 ? " (+" + (lista.length - 5) + ")" : ""));
+  ' 2>/dev/null)
+  if [ -n "$brak" ]; then
+    echo "UWAGA: zależności nieaktualne — brakuje: $brak"
+    echo "       uruchom 'npm ci', inaczej testy pokażą awarie, których nie ma"
+  fi
+fi
+
 # ── Otwarte PR-y (0.174.1) ───────────────────────────────────────────────────
 # Gałąź z commitami spoza `main` mówi „ktoś tu pracuje". Otwarty PR mówi więcej:
 # ktoś to ZAMYKA i zaraz zajmie numer wydania. Do 0.174.0 skrypt kończył się

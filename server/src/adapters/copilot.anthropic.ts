@@ -78,6 +78,19 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
       /* Klasyfikacja to kilka słów. Duży limit kosztowałby tyle samo, ale
          wydłużałby najgorszy przypadek przy odpowiedzi, która się rozgada. */
       max_tokens: 256,
+      /* Punkt cache'owania, który DZIŚ NIE DZIAŁA i to jest świadome (0.193.1).
+         Minimalny prefiks wchodzący do cache'u to 512-4096 tokenów zależnie od
+         modelu, a `INSTRUKCJA` ma 943 znaki, czyli około 380 tokenów. API nie
+         zgłasza tego błędem: po prostu nie cache'uje, a `cache_read_input_tokens`
+         zostaje zerem. Sprawdzisz to bez zgadywania — księga zapisuje odczyty
+         w `copilot-koszt.ts`.
+
+         Znacznik ZOSTAJE, zamiast zniknąć, bo nic nie kosztuje, a instrukcja
+         rośnie z każdą kategorią. Skasowany oznaczałby, że przy przekroczeniu
+         progu cache po cichu NIE zadziała, i nikt się nie dowie dlaczego.
+         Dociąganie treści na siłę, żeby próg przeskoczyć, byłoby płaceniem
+         tokenami za zniżkę na tokenach — kolejne kategorie i przykłady mają
+         wejść tu wtedy, gdy poprawiają trafność, nie gdy poprawiają rachunek. */
       system: [{ type: "text", text: INSTRUKCJA, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Najniższy wysiłek: to nie jest trudne zadanie, a wysiłek jest
