@@ -14,13 +14,7 @@ name: Instalator
 on:
   push:
     branches: [main]
-    paths:
-      - "instalator/**"
-      - ".github/workflows/instalator.yml"
   pull_request:
-    paths:
-      - "instalator/**"
-      - ".github/workflows/instalator.yml"
   release:
     types: [published]
 
@@ -42,13 +36,37 @@ jobs:
       run:
         shell: powershell
     steps:
+      # Pełna historia: `git diff` z gałęzią bazową potrzebuje
+      # wspólnego przodka, a domyślny płytki klon go nie ma.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Zakres liczymy TYLKO dla PR-a. Przy `push` na `main` i przy wydaniu
+      # sprawdzamy zawsze wszystko: tam stoi to, co jedzie do ludzi.
+      - name: Zakres zmian
+        id: zakres
+        # Jawny `bash`: to zadanie ma `defaults.run.shell: powershell`, a ten
+        # krok jest skryptem powłoki POSIX. Bez tej linii PowerShell dostałby
+        # `[ ... ]` i `>>` i wywrócił bramkę na każdym PR-ze instalatora.
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if printf '%s\n' "$zmiany" | grep -qE '^(instalator/|\.github/workflows/instalator\.yml)'; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dotyczy=false" >> "$GITHUB_OUTPUT"
+            echo "Zmiany nie dotyczą obszaru: instalator Windows. Bramka zielona bez pracy."
+          fi
 
       # UTF-8 bez BOM Windows PowerShell 5.1 czyta jako ANSI — polskie znaki
       # w komunikatach instalatora zamieniłyby się wtedy w krzaki na ekranie
       # osoby, która ma tę instalację przeprowadzić. Wychodzi to dopiero na
       # Windowsie, więc pilnujemy tego tutaj.
       - name: Kodowanie plików (UTF-8 z BOM)
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           $bledy = 0
           Get-ChildItem instalator\*.ps1 | ForEach-Object {
@@ -62,6 +80,7 @@ jobs:
           Write-Host "Wszystkie skrypty maja UTF-8 BOM."
 
       - name: Kontrola skladni
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           $bledy = 0
           Get-ChildItem instalator\*.ps1 | ForEach-Object {
@@ -81,11 +100,13 @@ jobs:
       # PRZED przebiegiem próbnym, bo są tańsze i konkretniejsze — i dlatego,
       # że -DryRun tej klasy błędów nie widzi (patrz komentarz niżej).
       - name: Testy instalatora
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\instalator\testy.ps1
 
       # Scalanie sprawdza przy okazji, czy znaczniki MODULY-* nadal są na
       # miejscu i czy scalony plik się parsuje. Kopiuje też URUCHOM.cmd.
       - name: Scalenie do jednego pliku
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\instalator\build.ps1 -Wyjscie dist\WERTIS-Instalator.ps1
 
       # Przebieg próbny idzie na SCALONYM pliku, a nie na źródłach — to jest
@@ -97,20 +118,24 @@ jobs:
       # i jest tu pomijany. Tak przeszła awaria z 27.07 (`New-Item` na
       # korzeniu dysku). Tę klasę błędów łapie krok „Testy instalatora".
       - name: Przebieg probny (-DryRun)
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Katalog "$env:RUNNER_TEMP\wertis-proba"
 
       - name: Przebieg probny instancji dev (-Dev -DryRun)
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Dev -Katalog "$env:RUNNER_TEMP\wertis-dev-proba" -Port 3002
 
       # Bramka -Dev MUSI odmowic na porcie produkcji — takze w przebiegu
       # probnym, bo to pomylka konfiguracji, nie krok wykonawczy.
       - name: Bramka -Dev odmawia portu 3001
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           .\dist\WERTIS-Instalator.ps1 -DryRun -Dev -Katalog "$env:RUNNER_TEMP\wertis-dev-zle"
           if ($LASTEXITCODE -eq 0) { throw "-Dev na porcie 3001 mial odmowic" }
           exit 0
 
       - name: Przebieg probny wariantu demo
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Demo -Katalog "$env:RUNNER_TEMP\wertis-demo"
 
       # Gałąź deinstalacji ma WŁASNY przebieg sterowania i kończy się `exit 0`
@@ -118,6 +143,7 @@ jobs:
       # Katalog celowo wskazuje na nieistniejącą ścieżkę: to jest ten wariant,
       # w którym plan musi ODMÓWIC kasowania, a usługi i tak zejść.
       - name: Przebieg probny deinstalacji (-Odinstaluj -DryRun)
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: .\dist\WERTIS-Instalator.ps1 -DryRun -Odinstaluj -Katalog "$env:RUNNER_TEMP\wertis-nieistnieje"
 
       # Wariant, w którym plan ZGADZA SIĘ na kasowanie — a to jedyna droga do
@@ -130,6 +156,7 @@ jobs:
       # Testy jednostkowe podają listę atrapą i tej klasy błędu nie zobaczą.
       # Nic tu nie ginie — Stop-Process siedzi za `Test-DryRun`.
       - name: Przebieg probny deinstalacji na podrobionej instalacji
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           $k = "$env:RUNNER_TEMP\wertis-do-kasowania"
           New-Item -ItemType Directory -Force -Path "$k\server" | Out-Null
@@ -143,6 +170,7 @@ jobs:
       # do nssm.cc), a wpisanie jej z pamięci dałoby weryfikację POZORNĄ.
       # Ten krok liczy ją na maszynie, która ten adres widzi.
       - name: Suma kontrolna NSSM
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           # `continue-on-error` tu NIE MA i to jest celowe: z wpisaną sumą ten
           # krok ma ZATRZYMAĆ budowę przy niezgodności, inaczej strażnik jest
@@ -173,6 +201,7 @@ jobs:
           }
 
       - name: Budowa .exe
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           Install-Module -Name ps2exe -Force -Scope CurrentUser -AllowClobber
           Import-Module ps2exe
@@ -183,6 +212,7 @@ jobs:
           if (-not (Test-Path dist\WERTIS-Instalator.exe)) { throw "ps2exe nie wyprodukowal pliku .exe" }
 
       - name: Artefakt
+        if: steps.zakres.outputs.dotyczy == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: wertis-instalator
@@ -195,7 +225,7 @@ jobs:
       # gdy polityka firmy albo antywirus go zablokuje, .ps1 jest drogą
       # wyjścia, a nie awaryjnym półśrodkiem (to dokładnie ten sam kod).
       - name: Dolaczenie do wydania
-        if: github.event_name == 'release'
+        if: steps.zakres.outputs.dotyczy == 'true' && (github.event_name == 'release')
         run: gh release upload "$env:GITHUB_REF_NAME" dist\WERTIS-Instalator.exe dist\WERTIS-Instalator.ps1 dist\URUCHOM.cmd --clobber
         env:
           GH_TOKEN: ${{ github.token }}
