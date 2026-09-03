@@ -1090,7 +1090,15 @@ export function zapiszKwote(
     /* Koszt dostawy bierze się z ZAMÓWIENIA, nie ze zwrotu: Allegro nie
        przysyła go przy zwrocie. Dociągamy zamówienia od 0.152.0 i dopiero to
        zdjęło blokadę opisaną przy `sumaPozycji`. Brak zamówienia znaczy zero,
-       bo nie ma czego oddać — a nie „oddaj nieznaną kwotę". */
+       bo nie ma czego oddać — a nie „oddaj nieznaną kwotę".
+
+       KTÓRĄ dostawę oddajemy — decyzja właściciela z 3 września 2026. Tę,
+       którą klient WYBRAŁ i za którą zapłacił, czyli `dostawa_grosze`
+       z zamówienia. Pytanie było realne, bo ustawa pozwala oddać MNIEJ:
+       gdy klient wybrał opcję droższą niż najtańsza zwykła, sprzedawca nie
+       musi dopłacać różnicy. Oddajemy więcej i to jest wybór, nie
+       przeoczenie — tak samo rozlicza to Allegro, a liczenie najtańszej
+       opcji wymagałoby cennika oferty, którego przy zwrocie nie mamy. */
     const dostawa = wybor.dostawa
       ? Number((database.prepare(`SELECT k.dostawa_grosze AS d FROM zamowienie_klienta k
           JOIN zwrot_klienta z ON z.order_id = k.external_id
