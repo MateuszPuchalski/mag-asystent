@@ -18,7 +18,7 @@ export const Pole = ({ className = "", ...p }: React.InputHTMLAttributes<HTMLInp
   <input className={`field ${className}`} {...p} />;
 
 /** Plakietka statusu — barwy z tokenów, żeby §7 miało jedno źródło. */
-const STATUS: Record<string, string> = {
+export const KLASA_STATUSU: Record<string, string> = {
   "new": "bg-stan-new text-stan-new-tekst",
   "open": "bg-stan-open text-stan-open-tekst",
   "waiting_for_customer": "bg-stan-klient text-stan-klient-tekst",
@@ -31,7 +31,7 @@ const STATUS: Record<string, string> = {
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>
   <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
-    STATUS[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
+    KLASA_STATUSU[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
 
 /**
  * Zakładki jednej kolumny (0.180.0).

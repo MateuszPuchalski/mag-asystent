@@ -36,3 +36,38 @@ describe("Powiązanie wiadomości na osi", () => {
     expect(screen.queryByText(/zamówienie/)).toBeNull();
   });
 });
+
+/* ── Kto to powiedział (0.193.0) ─────────────────────────────────────────────
+   Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart czterema
+   cechami — tłem, ramką, ikoną i wcięciem — plus podpisem rodzaju. Front
+   doszedł do jednej: tło #ffffff kontra #f8fafc, przy tej samej ramce.
+   Na ekranie wiadomość klienta i nasza odpowiedź wyglądały identycznie.     */
+describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
+  const wpis = (n: Partial<WpisOsi> = {}): WpisOsi => ({
+    id: "msg-1", rodzaj: "wiadomosc", autor: "kupujacy_7", odKlienta: true,
+    tresc: "Ta sztuka pasuje?", at: "2026-09-01T10:00:00Z", ofertaId: null, ...n,
+  });
+  const os = (wpisy: WpisOsi[]) => render(<Os wpisy={wpisy} zrodloPomiaru={null}
+    mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
+
+  it("wiadomość klienta i nasza odpowiedź mają RÓŻNE podpisy rodzaju", () => {
+    os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
+    expect(screen.getByText("Klient · Allegro")).toBeInTheDocument();
+    expect(screen.getByText("Odpowiedź firmy")).toBeInTheDocument();
+  });
+
+  it("obie strony rozmowy stoją po dwóch stronach kolumny", () => {
+    /* Wcięcie z makiety: klient odsunięty od PRAWEJ, my od LEWEJ. To ta cecha
+       działa, zanim wzrok dojdzie do podpisu. */
+    const { container } = os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
+    const karty = container.querySelectorAll("article");
+    expect(karty[0].className).toMatch(/\bmr-10\b/);
+    expect(karty[1].className).toMatch(/\bml-10\b/);
+  });
+
+  it("wpis niesie godzinę — bez niej nie widać, ile trwała cisza", () => {
+    /* `at` jechał w kontrakcie od początku, a oś go nie pokazywała wcale. */
+    os([wpis()]);
+    expect(screen.getByText(/10:00|11:00|12:00/)).toBeInTheDocument();
+  });
+});
