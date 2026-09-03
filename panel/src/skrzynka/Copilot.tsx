@@ -106,9 +106,13 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
         a nie obietnicą, że to już wszystko. */}
     {nadmiar > 0 && <span className="text-slate-500">
       pozostanie {nadmiar} — limit partii to {stan.maxPartia}</span>}
-    {/* Przerwana partia to NIE błąd: część wyników jest zapisana i zapłacona. */}
+    {/* PRZERWANA PARTIA POKAZUJE OBIE POŁOWY, i to jest cała racja zwracania
+        200 zamiast błędu. Do 0.191.0 zdanie o przerwie WYPIERAŁO podsumowanie,
+        więc po limicie w połowie czternastu agent nie wiedział, że osiem jest
+        już rozpoznanych — a to za nie zapłaciliśmy. Człowiek, który nie wie,
+        co się udało, klika jeszcze raz i płaci drugi raz. */}
     {wynik?.przerwane && <span className="font-semibold text-amber-800">{wynik.przerwane}</span>}
-    {wynik && !wynik.przerwane && <span className="text-slate-600">{podsumowanie(wynik)}</span>}
+    {wynik && <span className="text-slate-600">{podsumowanie(wynik)}</span>}
     {blad && <span className="font-semibold text-ranga-zle">{blad}</span>}
   </div>;
 }
