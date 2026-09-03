@@ -414,7 +414,7 @@ wybrał obie drogi naraz — ręczna flaga przebija automatyczną kolejność. F
 jest ręczna, bo bez terminu odpowiedzi automat wyliczyłby z niej tylko „stare",
 a reklamacja z zegarem ustawowym nie wyprzedziłaby zwykłego pytania.
 
-**Treść pytania jest w wierszu PIERWSZA (0.192.0).** Do 0.191.1 najgrubszym
+**Treść pytania jest w wierszu PIERWSZA (0.193.0).** Do 0.192.0 najgrubszym
 drukiem stał login kupującego, a pytanie leżało pod nim, mniejsze i szare.
 Login Allegro nie mówi nic — „Kupujący 44300444" to nie jest osoba, którą się
 zna. Triaż robi się po treści, więc login zszedł do podpisu obok czasu.
@@ -425,7 +425,7 @@ tej samej linii — razem z PILNE tworzy jedyną parę sygnałów, po której uk
 się kolejność pracy. Nieprzeczytana wiadomość to KROPKA, nie słowo: „NOWE"
 obok plakietki „NOWA" mówiło dwa różne fakty jednym wyrazem.
 
-**Data synchronizacji jest podpisem, nie pasmem (0.192.0).** Pasm sterujących
+**Data synchronizacji jest podpisem, nie pasmem (0.193.0).** Pasm sterujących
 nad listą było pięć i zjadały ćwierć wysokości kolumny. Tę samą datę niesie
 pigułka w pasku górnym, na każdym ekranie panelu.
 
@@ -442,9 +442,9 @@ przypisania, zmianę statusu, utworzenie zadania, przejęcie przez magazyniera,
 wynik magazyniera oraz przygotowanie i wysłanie odpowiedzi. Każdy rodzaj
 zdarzenia wygląda inaczej.
 
-**„Wygląda inaczej" znaczy CZTERY CECHY (0.192.0).** Makieta rozróżnia karty
+**„Wygląda inaczej" znaczy CZTERY CECHY (0.193.0).** Makieta rozróżnia karty
 tłem, ramką, ikoną i wcięciem, a do tego podpisuje rodzaj: „Klient · Allegro",
-„Odpowiedź firmy". Front do 0.191.1 miał jedną cechę z czterech — tło #ffffff
+„Odpowiedź firmy". Front do 0.192.0 miał jedną cechę z czterech — tło #ffffff
 kontra #f8fafc przy tej samej ramce. Różnica niewidoczna na ekranie.
 
 Wychodziło z tego, że najwyraźniejszym wpisem osi była notatka wewnętrzna,
@@ -1508,6 +1508,50 @@ i oświadczenie wobec kupującego wyglądają na formularzu tak samo.
 **Obie trasy stoją za `autoryzuj`.** To jedyne miejsca w tej aplikacji, które
 ruszają cudze pieniądze na zewnątrz, więc obok bramki roli dostają wpis
 `privileged` z nazwą operacji.
+
+### 25a.17. Koszyk zwrotów i dokument MM (0.193.0)
+
+Właściciel opisał obieg, który biuro robi ręką od lat:
+
+> „gdy agent zasiada do zwrotów, to otwiera pustą MM i dodaje kolejno
+> przedmioty ze zwrotów; gdy koszyk się zapełni, zamyka MM i tak w kółko"
+
+Panel jest teraz tą pustą MM. Numer dokumentu wraca z Subiekta, więc kartka
+z liczbą pisaną odręcznie przestaje być potrzebna.
+
+**Dokłada OCENA, nie osobny przycisk.** Naciśnięcie „Na stan", które operator
+i tak wykonuje przy towarze, JEST dołożeniem do koszyka. Osobny przycisk
+kazałby powiedzieć dwa razy to samo — dekalog ergonomii, punkt 5. To zarazem
+odpowiedź na pytanie o prędkość decyzji: najszybsza jest ta, której nie
+podejmuje się dwa razy.
+
+**Do koszyka wchodzi wyłącznie „na stan"** — decyzja właściciela. Utylizacja
+ma zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą
+stronę. Przecena zostaje na razie poza tą ścieżką.
+
+**Koszyk jest jeden na operatora** — druga decyzja właściciela. Fizyczny kosz
+stoi przy jednym biurku, więc dwie osoby przy zwrotach nie mieszają towaru
+w jednym dokumencie.
+
+**Pozycja bez kartoteki na dokument nie wejdzie** i ekran mówi to wprost.
+MM przesuwa stany kartotek, a nie nazwy. Ocena zapisuje się mimo to, bo jest
+faktem o towarze; cicha strata kończyłaby się kartonem na hali z towarem
+spoza dokumentu.
+
+**Domknięcie zamyka kosz OD RAZU, a numer dochodzi później.** Hala ma wtedy
+co rozkładać, nie czekając na Subiekta. Kolektor bierze kosz tą samą drogą co
+kosze z dokumentu — po statusie, bez zmian po swojej stronie.
+
+**Dlaczego to wraca dopiero teraz.** Ścieżka koszyków istniała i wypadła
+w 0.17.0 z jednym twardym powodem: *„domknięcie koszyka kolejkuje MM,
+a dokumentów MM na produkcji nie da się dziś wystawić"*. Ten powód wygasł —
+worker Sfery ma prawdziwe `CreateMM`. Schemat `kosz` czekał bez zmian: status
+`otwarty` nosi w komentarzu zdanie „biuro dokłada zwroty", które przez rok nie
+miało kto wykonać.
+
+Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy ona SUROWYCH
+zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem — przez
+Sferę, tak samo jak korekta zwrotu.
 
 ### 25a.8. Czego panel nie wie
 

@@ -37,7 +37,7 @@ describe("Powiązanie wiadomości na osi", () => {
   });
 });
 
-/* ── Kto to powiedział (0.192.0) ─────────────────────────────────────────────
+/* ── Kto to powiedział (0.193.0) ─────────────────────────────────────────────
    Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart czterema
    cechami — tłem, ramką, ikoną i wcięciem — plus podpisem rodzaju. Front
    doszedł do jednej: tło #ffffff kontra #f8fafc, przy tej samej ramce.

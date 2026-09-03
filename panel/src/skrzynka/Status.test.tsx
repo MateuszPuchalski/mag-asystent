@@ -91,8 +91,8 @@ describe("ręczna flaga „pilne”", () => {
   });
 });
 
-/* ── Stan raz, nie dwa (0.192.0) ─────────────────────────────────────────────
-   Do 0.191.1 pasek statusu rysował plakietkę ze stanem, a obok pole wyboru
+/* ── Stan raz, nie dwa (0.193.0) ─────────────────────────────────────────────
+   Do 0.192.0 pasek statusu rysował plakietkę ze stanem, a obok pole wyboru
    z TĄ SAMĄ wartością: jedno pasmo nagłówka mówiło „OTWARTA" dwukrotnie.
    §7 żąda, żeby nagłówek pokazywał stan zawsze — pokazuje, w rzeczy, którą
    się go zmienia.                                                            */

@@ -23,7 +23,7 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
   const [odkladanie, setOdkladanie] = useState(false);
   const [termin, setTermin] = useState("");
 
-  /* Bez `w-full` (0.192.0): pasek statusu łamał wiersz nagłówka ZAWSZE,
+  /* Bez `w-full` (0.193.0): pasek statusu łamał wiersz nagłówka ZAWSZE,
      także wtedy, gdy miejsce było. Nagłówek rozmowy zajmował przez to dwa
      pasma zamiast jednego, a pytanie klienta zaczynało się niżej. Zawinięcie
      zostaje — przy wąskiej kolumnie ma się złamać. */
@@ -49,7 +49,7 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
       <Flame size={13} />{rozmowa.priorytet === "pilny" ? "PILNE" : "Oznacz jako pilne"}
     </button>
 
-    {/* STATUS RAZ, NIE DWA (0.192.0). Do 0.191.1 stała tu plakietka ze stanem,
+    {/* STATUS RAZ, NIE DWA (0.193.0). Do 0.192.0 stała tu plakietka ze stanem,
         a obok niej pole wyboru z tą samą wartością — jedno pasmo nagłówka
         mówiło „OTWARTA" dwukrotnie. Barwa przeniosła się na samo pole: §7 żąda,
         żeby nagłówek pokazywał stan ZAWSZE, i pokazuje — tyle że w rzeczy,

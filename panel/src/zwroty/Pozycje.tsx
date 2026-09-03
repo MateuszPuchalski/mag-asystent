@@ -228,7 +228,18 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               </Przycisk>))}
           </div>}
           {p.ocena && <p className="mt-2 text-xs font-bold text-ranga-ok">
-            Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</p>}
+            Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}
+            {p.ocena === "stan" && p.wKoszyku && <span className="ml-1 font-normal text-slate-500">
+              · w koszyku zwrotów</span>}</p>}
+          {/* CICHA STRATA JEST TU NAJGORSZYM WYJŚCIEM (0.192.0). Ocena „na
+              stan" dokłada pozycję do koszyka, czyli na dokument MM — ale MM
+              przesuwa stany KARTOTEK, więc pozycja bez kartoteki wejść nie
+              może. Ocena zapisuje się mimo to, bo jest faktem o towarze.
+              Bez tego zdania karton pojechałby na halę z towarem, którego nie
+              ma na żadnym papierze, a magazynier zobaczyłby to dopiero przy
+              rozkładaniu. */}
+          {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 text-xs font-semibold text-ranga-uwaga">
+            Nie weszła do koszyka — bez kartoteki nie ma czego wpisać na MM.</p>}
 
           {/* Potrącenie proponuje się TAM, gdzie zapada decyzja o pieniądzach,
               czyli przy wycenie. Zapisane widać wszędzie, bo to fakt o pozycji

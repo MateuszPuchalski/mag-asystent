@@ -457,6 +457,13 @@ export function migrate(database: DatabaseSync) {
      wszystkiego. Kolumny nullowalne: brak znacznika znaczy „nie anulowano". */
   addColumn("kosz", "anulowano_at", "TEXT");
   addColumn("kosz", "anulowano_przez", "TEXT");
+  /* Zadanie MM MAG→ZWROTY, kolejkowane przy domknięciu koszyka składanego
+     w panelu (0.192.0). `kosz_pozycja.mm_queue_id` to co INNEGO: tamto jest
+     przesunięciem powrotnym ZWROTY→MAG dla jednej rozłożonej pozycji. */
+  addColumn("kosz", "mm_queue_id", "INTEGER REFERENCES sfera_queue(id)");
+  /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
+     Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
+  addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
   przebudujIndeksKoduKosza(database);
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */

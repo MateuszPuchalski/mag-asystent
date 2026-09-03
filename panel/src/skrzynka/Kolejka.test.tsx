@@ -23,7 +23,7 @@ describe("Kolejka", () => {
     render(<Kolejka rozmowy={[]} stan={STAN} wybranaId={null} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.getByText(/Brak rozmów/)).toBeInTheDocument();
-    /* Od 0.192.0 data stoi PODPISEM pod tytułem kolumny, a nie własnym pasmem
+    /* Od 0.193.0 data stoi PODPISEM pod tytułem kolumny, a nie własnym pasmem
        — pasm sterujących nad listą było pięć. Zdanie ma zostać, nie pasmo. */
     expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
   });
@@ -231,7 +231,7 @@ describe("kategorie Copilota w kolejce", () => {
     ];
     pokaz(lista);
     const wiersze = screen.getAllByRole("button", { name: /Klient/ });
-    /* Login zszedł w 0.192.0 pod treść pytania, więc kolejności nie da się
+    /* Login zszedł w 0.193.0 pod treść pytania, więc kolejności nie da się
        czytać z początku napisu — czytamy ją z tego, KTÓRY login jest w KTÓRYM
        wierszu. Sprawdzana rzecz jest ta sama: kolejność zostaje. */
     expect(wiersze.map((w, i) => w.textContent?.includes(`Klient ${i + 1}`)))

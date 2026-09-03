@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.192.0 — 3 września 2026
+## 0.193.0 — 3 września 2026
 
 **Hierarchia informacji w skrzynce pytań.** Właściciel powiedział wprost, że
 ekran nie ustawia treści w kolejności ważności. Zrzut ekranu pokazał sześć
@@ -80,6 +80,58 @@ stało obok plakietki „NOWA" i mówiło dwa różne fakty jednym wyrazem.
 Data synchronizacji zeszła z własnego pasma do podpisu pod tytułem kolumny.
 Pasm sterujących nad listą było pięć i zjadały ćwierć jej wysokości, a tę samą
 datę niesie pigułka w pasku górnym, na każdym ekranie panelu.
+
+## 0.192.0 — 3 września 2026
+
+**Koszyk zwrotów wraca — tym razem z wejściem.** Właściciel opisał obieg,
+który biuro robi ręką od lat: „gdy agent zasiada do zwrotów, to otwiera pustą
+MM i dodaje kolejno przedmioty ze zwrotów; gdy koszyk się zapełni, zamyka MM
+i tak w kółko". Panel jest teraz tą pustą MM.
+
+### Dokłada ocena, nie przycisk
+
+Naciśnięcie „Na stan", które operator i tak wykonuje przy towarze, JEST
+dołożeniem do koszyka. Osobnego ruchu nie ma i osobnej trasy też — dekalog
+ergonomii, punkt 5. To zarazem odpowiedź na pytanie o prędkość decyzji przy
+zwrotach: najszybsza jest ta, której nie podejmuje się dwa razy.
+
+Domknięcie kolejkuje dokument MM z magazynu głównego na regał zwrotów.
+Numer wraca z Subiekta, więc kartka z liczbą pisaną odręcznie przestaje być
+potrzebna. Kosz zamyka się OD RAZU, nie po powrocie numeru: hala ma co
+rozkładać, nie czekając na Subiekta.
+
+Kolektor nie wymaga zmian. Bierze kosz tą samą drogą co kosze z dokumentu.
+
+### Dwie decyzje właściciela
+
+Do koszyka wchodzi **wyłącznie towar oceniony „na stan"**. Utylizacja ma zejść
+ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą stronę.
+
+Otwarty koszyk jest **jeden na operatora**. Fizyczny kosz stoi przy jednym
+biurku, więc dwie osoby przy zwrotach nie mieszają towaru w jednym dokumencie.
+
+### Pozycja bez kartoteki mówi o sobie
+
+MM przesuwa stany kartotek, a nie nazwy, więc pozycja bez kartoteki na
+dokument nie wejdzie. Ocena zapisuje się mimo to, bo jest faktem o towarze,
+a ekran pisze wprost, czego nie zrobił. Cicha strata kończyłaby się kartonem
+na hali z towarem spoza dokumentu.
+
+### Dlaczego to wraca dopiero teraz
+
+Ścieżka koszyków istniała i wypadła w 0.17.0 z jednym twardym powodem:
+„domknięcie koszyka kolejkuje MM, a dokumentów MM na produkcji nie da się dziś
+wystawić". Ten powód wygasł — worker Sfery ma prawdziwe `CreateMM`. Schemat
+`kosz` czekał bez zmian: status `otwarty` nosi w komentarzu zdanie „biuro
+dokłada zwroty", które przez rok nie miało kto wykonać.
+
+Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy SUROWYCH zapisów
+do bazy Subiekta, a dokumenty idą przez Sferę — tak samo jak korekta zwrotu.
+
+### Liczby
+
+Tras POST przy zwrotach jest osiemnaście; osiemnasta domyka koszyk. Licznik
+w `routes/zwroty.test.ts` jest umową i podnosi się razem z uzasadnieniem.
 
 ## 0.191.1 — 3 września 2026
 

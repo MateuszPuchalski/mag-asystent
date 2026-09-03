@@ -38,7 +38,7 @@ function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
    gałąź, a nie przepisać tę. Barwy idą z tokenów `os.*`, nie z klas Tailwinda
    wprost.
 
-   ── CZTERY CECHY, NIE JEDNA (0.192.0) ──────────────────────────────────────
+   ── CZTERY CECHY, NIE JEDNA (0.193.0) ──────────────────────────────────────
    Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje kart CZTEREMA
    cechami naraz — tłem, ramką, IKONĄ i WCIĘCIEM — plus podpisem rodzaju
    („Klient · Allegro", „Odpowiedź firmy") we własnej barwie. Komentarz tłumaczący

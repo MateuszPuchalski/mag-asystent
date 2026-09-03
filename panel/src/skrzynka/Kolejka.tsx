@@ -96,7 +96,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
         węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
         blok z bazą 0 — kurczy się do zera. Wzorzec z kolumn zwrotów. */}
-    {/* JEDNO PASMO ZAMIAST DWÓCH (0.192.0). Data synchronizacji stała we
+    {/* JEDNO PASMO ZAMIAST DWÓCH (0.193.0). Data synchronizacji stała we
         WŁASNYM pasku pod nagłówkiem, a pigułka „Synchronizacja 18:29 · 0 błędów"
         niesie tę samą rzecz w pasku górnym, na każdym ekranie panelu. Pięć
         pasm sterujących nad pierwszym wierszem zjadało ćwierć wysokości
@@ -166,8 +166,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         aria-current={wybranaId === r.id}
         className={`block w-full border-b p-4 text-left hover:bg-slate-50 ${
           wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
-        {/* ── CO CZYTA SIĘ PIERWSZE (0.192.0) ────────────────────────────
-            Do 0.191.1 najgrubszym drukiem w wierszu stał LOGIN KUPUJĄCEGO,
+        {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0) ────────────────────────────
+            Do 0.192.0 najgrubszym drukiem w wierszu stał LOGIN KUPUJĄCEGO,
             a pytanie leżało pod nim, mniejsze i szare. Login Allegro nie mówi
             nic — „Kupujący 44300444" to nie jest osoba, którą się zna. Triaż
             robi się po TREŚCI, więc treść dostała pierwszy plan, a login zszedł
@@ -182,7 +182,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           {r.priorytet === "pilny" &&
             <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
               PILNE</span>}
-          {/* KROPKA, NIE SŁOWO (0.192.0). Stało tu „NOWE", a obok, w plakietce
+          {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
               statusu, „NOWA" — dwa różne fakty jednym wyrazem. „Nowa" znaczy
               „sprawy nikt nie tknął", „nowe" znaczyło „Allegro trzyma wątek
               jako nieodczytany". Czytało się to jak powtórzenie, a przy okazji
