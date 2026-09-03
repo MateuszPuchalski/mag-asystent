@@ -12,7 +12,7 @@ import type { PozycjaZwrotu } from "../api/typy";
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, zrodlo: "allegro", offerId: "of-1", nazwa: "Szarpak", ilosc: 2, cenaGrosze: 5000,
-  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, url: null,
+  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null,
   potracenieGrosze: null, potraceniePowod: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,

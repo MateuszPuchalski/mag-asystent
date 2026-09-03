@@ -15,7 +15,7 @@ import type { PozycjaZwrotu, Zamowienie, Zwrot } from "../api/typy";
 const POZYCJA: PozycjaZwrotu = {
   id: 1, zrodlo: "allegro", offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-  url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
+  wKoszyku: false, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
       prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
 };
@@ -43,7 +43,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   rejectionCode: null, wersja: 1,
   pozycje: [{ id: 1, zrodlo: "allegro", offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
-    url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
+    wKoszyku: false, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
       prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null } }],
   ...n,

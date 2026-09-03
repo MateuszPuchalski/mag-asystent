@@ -460,6 +460,8 @@ export interface PozycjaZwrotu {
   waluta: string;
   powod: string | null;
   powodKomentarz: string | null;
+  /** Czy pozycja leży już w koszyku zwrotów, czyli na dokumencie MM. */
+  wKoszyku: boolean;
   ocena: string | null;
   url: string | null;
   twId: number | null;
@@ -660,3 +662,20 @@ export type StanZwrotuPieniedzy = {
   oddane: { id: string | null; status: string | null; kiedy: string | null } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
 };
+
+/**
+ * Otwarty koszyk zwrotów operatora.
+ *
+ * Odpowiednik pustej MM, którą biuro zakłada w Subiekcie, zasiadając do
+ * zwrotów: dokłada się do niej pozycja po pozycji, a domknięcie wystawia
+ * dokument na regał zwrotów.
+ */
+export interface KoszZwrotow {
+  id: number;
+  /** Kod z przedrostkiem `Z-`; numery bez niego należą do koszy z Subiekta. */
+  kod: string;
+  pozycji: number;
+  sztuk: number;
+  otwartyOd: string;
+  pozycje: Array<{ symbol: string; nazwa: string; ilosc: number }>;
+}

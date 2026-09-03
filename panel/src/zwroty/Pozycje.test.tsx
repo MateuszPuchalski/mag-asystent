@@ -14,7 +14,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, zrodlo: "allegro", offerId: "of-1", nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
-  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, url: null,
+  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
     prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
@@ -277,3 +277,23 @@ describe("Pozycja dopisana przez biuro", () => {
     expect(onZdejmij).toHaveBeenCalledWith(12);
   });
 });
+
+  it("pozycja „na stan\" BEZ KARTOTEKI mówi, że nie weszła do koszyka", () => {
+    /* Cicha strata jest tu najgorszym wyjściem (0.192.0). Ocena „na stan"
+       dokłada pozycję na dokument MM, ale MM przesuwa stany KARTOTEK — bez
+       kartoteki nie ma czego wpisać. Bez tego zdania karton pojechałby na halę
+       z towarem, którego nie ma na żadnym papierze. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
+    ] }));
+    expect(screen.getByText(/Nie weszła do koszyka/)).toBeInTheDocument();
+  });
+
+  it("pozycja, która do koszyka weszła, mówi o tym przy ocenie", () => {
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
+    ] }));
+    expect(screen.getByText(/w koszyku zwrotów/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nie weszła do koszyka/)).toBeNull();
+  });
+

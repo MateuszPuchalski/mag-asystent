@@ -15,6 +15,7 @@ import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
+import { Koszyk } from "../zwroty/Koszyk";
 import { useSkaner } from "../skaner";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
@@ -273,6 +274,7 @@ export function Zwroty() {
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
+    <Koszyk />
     <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,

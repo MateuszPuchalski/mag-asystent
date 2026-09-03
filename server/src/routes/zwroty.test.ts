@@ -163,7 +163,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają siedemnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
+test("zwroty mają osiemnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -227,14 +227,26 @@ test("zwroty mają siedemnaście tras POST, a trzy z nich wychodzą do Allegro",
      gdzie końcówka jej NIE MA. `commandId` powstaje raz na zwrot i wraca ten
      sam przy ponowieniu, bo sieć zerwana po wysłaniu żądania, a przed
      odpowiedzią, jest scenariuszem normalnym. Nowy identyfikator przy drugiej
-     próbie oddałby pieniądze dwa razy. */
+     próbie oddałby pieniądze dwa razy.
+
+     OSIEMNASTA DOMYKA KOSZYK ZWROTÓW (0.192.0) i kolejkuje dokument MM
+     z magazynu głównego na regał zwrotów. Jedyna trasa zwrotów, po której
+     powstaje dokument w Subiekcie — przez Sferę, tą samą drogą co korekta.
+
+     DOKŁADANIA DO KOSZYKA TRASY NIE MA i to jest decyzja, nie brak: dokłada
+     ocena „na stan", którą operator i tak naciska. Osobna trasa kazałaby
+     powiedzieć dwa razy to samo, a licznik urósłby o dwa zamiast o jeden.
+
+     Stoi za samym `odmowa()`, bez `autoryzuj()`: przesunięcie towaru między
+     własnymi magazynami to praca, którą biuro wykonuje codziennie, i różni
+     się od oddania pieniędzy na zewnątrz tym, że nic nie opuszcza firmy. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 17, `tras POST jest ${posty.length}, a umowa mówi o siedemnastu`);
+  assert.equal(posty.length, 18, `tras POST jest ${posty.length}, a umowa mówi o osiemnastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",

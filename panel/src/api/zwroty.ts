@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -10,6 +10,7 @@ import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, StanZ
 export const kluczeZwrotow = {
   kolejka: ["zwroty"] as const,
   zwrot: (id: number) => ["zwrot", id] as const,
+  kosz: ["zwroty", "kosz"] as const,
 };
 
 export function useZwroty() {
@@ -91,9 +92,44 @@ export function useOcena() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { pozycjaId: number; ocena: "stan" | "przecena" | "utylizacja"; wersja: number }) =>
-      api<{ wersja: number }>(`/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
+      api<{ wersja: number; koszyk: number | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
         { method: "POST", body: JSON.stringify({ ocena: v.ocena, wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    /* Ocena „na stan" dokłada pozycję do koszyka zwrotów, więc odświeża też
+       jego pasek — inaczej licznik na ekranie stałby w miejscu, a operator
+       nie wiedziałby, ile już zebrał (0.192.0). */
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
+  });
+}
+
+/** Co leży w otwartym koszyku zwrotów tego operatora (0.192.0). */
+export function useKosz() {
+  return useQuery({
+    queryKey: kluczeZwrotow.kosz,
+    queryFn: () => api<{ kosz: KoszZwrotow | null }>("/api/obsluga/zwroty/kosz"),
+  });
+}
+
+/**
+ * Domknięcie koszyka: kolejkuje MM z magazynu głównego na regał zwrotów.
+ *
+ * Odświeża TAKŻE kolejkę zwrotów, bo domknięcie zmienia stan pozycji
+ * (`wKoszyku`) w każdym zwrocie, z którego coś do kosza wpadło.
+ */
+export function useZamknijKosz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (koszId: number) =>
+      api<{ koszId: number; kod: string; pozycji: number; queueId: number }>(
+        "/api/obsluga/zwroty/kosz/zamknij",
+        { method: "POST", body: JSON.stringify({ koszId }) }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
   });
 }
 
