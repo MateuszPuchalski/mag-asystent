@@ -28,6 +28,7 @@ import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
 import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
+import { copilotRoutes } from "./routes/copilot.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
@@ -317,6 +318,7 @@ export async function buildApp() {
   await app.register(zadaniaTerenoweRoutes);
   await app.register(panelObslugiRoutes);
   await app.register(skrzynkaRoutes);
+  await app.register(copilotRoutes);
   await app.register(zwrotyRoutes);
   await app.register(ustawieniaRoutes);
   await app.register(wiedzaRoutes);

@@ -45,6 +45,15 @@ vi.mock("../api/rozmowy", async () => {
   };
 });
 
+/* Czwarta karta (etap F). Copilot WYŁĄCZONY, bo to jest stan domyślny wdrożenia
+   i ten ekran ma się w nim otwierać — karta pomiaru wtedy milczy, a nie
+   pokazuje tabeli zer, którą łatwo wziąć za „model nic nie trafia". */
+vi.mock("../api/copilot", () => ({
+  useCopilot: () => ({ data: { wlaczony: false, powod: "Copilot jest wyłączony.",
+    model: "claude-opus-5", maxPartia: 20 } }),
+  usePomiarCopilota: () => ({ data: undefined }),
+}));
+
 const { Ustawienia } = await import("./Ustawienia");
 
 describe("Ustawienia obsługi", () => {
@@ -56,6 +65,8 @@ describe("Ustawienia obsługi", () => {
     /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
     expect(screen.getByText("Wiedza z opisów kartotek")).toBeInTheDocument();
     expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
+    /* Wyłączony Copilot nie zostawia po sobie pustej karty na ekranie. */
+    expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).not.toBeInTheDocument();
   });
 
   it("SKRZYNKA już jej nie renderuje, ale alarm na niej ZOSTAJE", () => {

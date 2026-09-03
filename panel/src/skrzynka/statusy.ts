@@ -1,5 +1,6 @@
 import type {
-  PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru, StatusRozmowy, ZrodloPropozycji,
+  Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
+  StatusRozmowy, ZrodloPropozycji,
 } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
@@ -45,6 +46,33 @@ export const DO_WYBORU_DOBORU: StatusDoboru[] = [
   "not_started", "missing_information", "searching", "candidates_found",
   "requires_expert", "confirmed", "rejected", "not_applicable",
 ];
+
+/* KATEGORIE Copilota (§14, etap F). Ta sama zasada, co przy `NAZWA_DOBORU`:
+   `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy dojdzie siódma kategoria
+   bez nazwy dla człowieka. To jest test sam w sobie i dlatego kategoria nie
+   dostała `CHECK`-a w bazie — słownik ma rosnąć tanio, ale nie po cichu.
+
+   Dwa kosze mają RÓŻNE nazwy, bo mówią o różnych naprawach: „Inne" znaczy
+   „słownik jest za krótki", „Nie wiadomo" — „przeczytaj sam". */
+export const NAZWA_KATEGORII: Record<Kategoria, string> = {
+  dobor: "Dobór",
+  dostepnosc: "Dostępność",
+  wysylka: "Wysyłka",
+  zwrot: "Zwrot",
+  reklamacja: "Reklamacja",
+  dokumenty: "Dokumenty",
+  inne: "Inne",
+  nie_wiadomo: "Nie wiadomo",
+};
+
+/* Pewność NIE jest procentem i ekran nie ma prawa udawać, że jest. Model
+   podaje własne oszacowanie, a jedyna liczba, której tu ufamy, to trafność
+   z pomiaru — ta stoi za zębatką, nie na wierszu kolejki. */
+export const NAZWA_PEWNOSCI: Record<Pewnosc, string> = {
+  wysoka: "pewne",
+  srednia: "prawdopodobne",
+  niska: "zgadywane",
+};
 
 /* Baza wiedzy (E2): powody negatywne §11.4 i rodzaje dowodów §11.3 — nazwy
    do FORMULARZY. Zdania przy gotowych wpisach pisze serwer, panel ich nie

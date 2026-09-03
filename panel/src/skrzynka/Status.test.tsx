@@ -10,7 +10,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started", ...n,
+  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+  kopilot: null, ...n,
 });
 
 describe("Status rozmowy", () => {

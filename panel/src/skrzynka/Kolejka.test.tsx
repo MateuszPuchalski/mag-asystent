@@ -10,7 +10,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started", ...n,
+  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+  kopilot: null, ...n,
 });
 
 const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
@@ -206,5 +207,68 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
       stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText("Nie dotyczy")).not.toBeInTheDocument();
     expect(screen.queryByText("Nierozpoczęty")).not.toBeInTheDocument();
+  });
+});
+
+/* ── Kategorie Copilota w kolejce (§14, etap F) ──────────────────────────────
+   Najważniejszy z tych testów jest pierwszy: KOLEJNOŚĆ SIĘ NIE ZMIENIA.
+   Serwer pilnuje tego w `skrzynka.test.ts` po stronie zapytania, tu pilnujemy
+   tego po stronie ekranu — bo filtr, licznik i plakietka to trzy okazje, żeby
+   niechcący przestawić listę pod ręką agenta.                                */
+describe("kategorie Copilota w kolejce", () => {
+  const zKategoria = (id: number, kategoria: Rozmowa["kopilot"]) =>
+    rozmowa({ id, klient: `Klient ${id}`, kopilot: kategoria });
+  const kop = (kategoria: string, n: Record<string, unknown> = {}) =>
+    ({ kategoria, pewnosc: "wysoka", nieaktualna: false, ocena: null, ...n }) as Rozmowa["kopilot"];
+
+  it("plakietka staje na wierszu, a kolejność zostaje TA SAMA", () => {
+    const lista = [
+      zKategoria(1, null),
+      zKategoria(2, kop("dostepnosc")),
+      zKategoria(3, kop("reklamacja")),
+    ];
+    pokaz(lista);
+    const wiersze = screen.getAllByRole("button", { name: /Klient/ });
+    expect(wiersze.map((w) => w.textContent?.slice(0, 8)))
+      .toEqual(["Klient 1", "Klient 2", "Klient 3"]);
+    /* Nazwa kategorii pada DWA RAZY — na wierszu i w liczniku nad kubełkami —
+       więc szukamy jej tam, gdzie ma znaczyć „ta rozmowa jest o tym". */
+    expect(wiersze[1].textContent).toContain("Dostępność");
+    expect(wiersze[2].textContent).toContain("Reklamacja");
+    expect(wiersze[0].textContent).not.toContain("Dostępność");
+  });
+
+  it("pasek liczników pokazuje SKŁAD kubełka, a klik w licznik filtruje", async () => {
+    pokaz([
+      zKategoria(1, kop("dostepnosc")),
+      zKategoria(2, kop("dostepnosc")),
+      zKategoria(3, kop("reklamacja")),
+    ]);
+    const licznik = screen.getByRole("button", { name: /Dostępność 2/ });
+    await userEvent.click(licznik);
+    expect(licznik.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("Klient 1")).toBeInTheDocument();
+    expect(screen.queryByText("Klient 3")).not.toBeInTheDocument();
+  });
+
+  it("pusty FILTR nie udaje pustego kubełka", async () => {
+    /* „Zajrzyj do Wszystkie" przy włączonym filtrze wysłałoby agenta w złą
+       stronę: rozmowy są, tylko sito je zasłania. */
+    pokaz([
+      zKategoria(1, kop("dostepnosc")),
+      { ...zKategoria(2, kop("reklamacja")), wlascicielId: 9, wlasciciel: "Kolega" },
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: /Reklamacja 1/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Nieprzypisane/ }));
+    expect(screen.getByText(/Nic w kategorii/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ten kubełek jest pusty/)).not.toBeInTheDocument();
+  });
+
+  it("etykieta ze starszej wiadomości NIE liczy się do składu skrzynki", () => {
+    /* Licznik ma mówić, co w skrzynce JEST — a etykieta po dopisku klienta
+       opisuje pytanie, którego klient już nie zadaje. */
+    pokaz([zKategoria(1, kop("dostepnosc", { nieaktualna: true }))]);
+    expect(screen.queryByRole("button", { name: /Dostępność 1/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Dostępność")).toBeInTheDocument();
   });
 });
