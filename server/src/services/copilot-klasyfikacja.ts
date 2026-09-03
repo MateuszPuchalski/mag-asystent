@@ -3,7 +3,10 @@ import { db as defaultDb, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { zamaskuj, zostalyDaneOsobowe, type TrescBezpieczna } from "./copilot-maskowanie.js";
 import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
-import { BladKluczaCopilota, BladLimituCopilota } from "../adapters/copilot.js";
+import {
+  BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
+  BladPrzeciazeniaCopilota,
+} from "../adapters/copilot.js";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
 
@@ -149,17 +152,24 @@ export async function sklasyfikujRozmowy(
       odp = await nadaj(tresc);
     } catch (e) {
       const powod = (e as Error).message;
-      zapiszBlad(database, rozmowaId, powod, kto, teraz);
+      /* Do księgi idzie ŚLAD (typ, status, identyfikator żądania), a na ekran
+         zdanie. Gdy śladu nie ma, wpisujemy zdanie — pusta rubryka w księdze
+         byłaby gorsza niż zdanie nie na swoim miejscu. */
+      const slad = (e as { slad?: string }).slad || powod;
+      zapiszBlad(database, rozmowaId, slad, kto, teraz);
       wynik.bledy.push({ rozmowaId, powod });
-      /* Limit i klucz zatrzymują CAŁĄ partię. Przy limicie ponowienia nie ma
-         (doktryna `takt.ts`), a dwadzieścia prób z tym samym złym kluczem to
-         dwadzieścia śladów w logu i zero informacji ponad tę z pierwszej. */
+      /* CZTERY POWODY ZATRZYMUJĄ CAŁĄ PARTIĘ i wszystkie cztery są tym samym
+         argumentem: opisują stan DOSTAWCY, a nie tej jednej rozmowy, więc
+         następna dostałaby identyczną odpowiedź. Ponowienia nie ma (doktryna
+         `takt.ts`), a dwadzieścia prób w ten sam mur to dwadzieścia śladów
+         w księdze i zero informacji ponad tę z pierwszej próby. */
       if (e instanceof BladLimituCopilota) {
         const za = e.poIluMs ? ` Spróbuj za ${Math.ceil(e.poIluMs / 60000)} min.` : "";
         wynik.przerwane = `Dostawca poprosił o przerwę.${za}`;
         break;
       }
-      if (e instanceof BladKluczaCopilota) {
+      if (e instanceof BladKluczaCopilota || e instanceof BladPrzeciazeniaCopilota
+        || e instanceof BladLacznosciCopilota) {
         wynik.przerwane = e.message;
         break;
       }

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { retryAfterMs } from "./allegro.js";
 import {
-  BladKluczaCopilota, BladLimituCopilota, BladOdpowiedziCopilota,
+  BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
+  BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "./copilot.js";
 import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
@@ -143,14 +144,49 @@ function naNasz(e: unknown): Error {
       "Anthropic odrzuciło klucz (401) — sprawdź ANTHROPIC_API_KEY w wertis.env " +
       "i zrestartuj usługę.");
   }
-  if (e instanceof Anthropic.APIError) {
-    return new BladOdpowiedziCopilota(
-      `Anthropic odpowiedziało ${e.status ?? "?"}: ${String(e.message).slice(0, 200)}`,
-      e.status ?? 0);
+  /* PRZED `APIError`, bo `APIConnectionError` PO NIEJ DZIEDZICZY. Do 0.191.0
+     gałąź o braku internetu stała na końcu funkcji i była nieosiągalna: zerwana
+     sieć meldowała się jako „Anthropic odpowiedziało ?", czyli twierdziła, że
+     dostawca odpowiedział — a on nie został nawet zapytany. Kolejność
+     `instanceof` jest tu logiką, nie stylem. */
+  if (e instanceof Anthropic.APIConnectionError) {
+    return new BladLacznosciCopilota(
+      "Nie ma połączenia z Anthropic — sprawdź internet i zaporę na serwerze. "
+      + "Nic nie wyszło na zewnątrz.",
+      `polaczenie: ${e.message}`);
   }
+
+  if (e instanceof Anthropic.APIError) {
+    /* Ślad do KSIĘGI, nie na ekran. `requestID` (tak, wielbłądem — SDK nazywa
+       je inaczej niż nagłówek `request-id`) to jedyna rzecz, po której dostawca
+       odszuka konkretne żądanie. Na ekranie byłby trzydziestoznakowym szumem. */
+    const slad = `${e.type ?? "?"} ${e.status ?? "?"}`
+      + (e.requestID ? ` ${e.requestID}` : "");
+
+    /* PRZECIĄŻENIE TO STAN DOSTAWCY, NIE TEJ ROZMOWY — i dlatego zatrzyma
+       partię. Rozpoznajemy je po `type`, bo ono mówi wprost; `status >= 500`
+       zostaje jako sieć bezpieczeństwa na resztę awarii po tamtej stronie.
+       Żadna z nich nie jest winą treści, którą wysłaliśmy, więc następna
+       rozmowa dostałaby dokładnie tę samą odpowiedź. */
+    if (e.type === "overloaded_error" || (e.status ?? 0) >= 500) {
+      return new BladPrzeciazeniaCopilota(
+        `Anthropic jest chwilowo przeciążone (${e.status ?? "?"}). `
+        + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
+        e.status ?? 0, slad);
+    }
+    /* Surowej odpowiedzi dostawcy na ekran NIE PUSZCZAMY. Do 0.191.0 szło tam
+       `529 {"type":"error",…}` — agent czytał zrzut JSON-a zamiast zdania. */
+    return new BladOdpowiedziCopilota(
+      `Anthropic odrzuciło żądanie (${e.status ?? "?"}). To nie jest wina tej `
+      + "rozmowy — zajrzyj do pomiaru Copilota za zębatką.",
+      e.status ?? 0, slad);
+  }
+  /* Cokolwiek, co nie jest błędem SDK — nasza pomyłka po drodze. Nazywamy to
+     wprost, zamiast zwalać na dostawcę, który tu nawet nie wystąpił. */
+  const tekst = e instanceof Error ? e.message : String(e);
   return new BladOdpowiedziCopilota(
-    `Brak połączenia z Anthropic — sprawdź internet na serwerze. ` +
-    `(${e instanceof Error ? e.message : String(e)})`, 0);
+    "Copilot wywrócił się przed wysyłką — to usterka po naszej stronie.",
+    0, `wewnetrzny: ${tekst.slice(0, 200)}`);
 }
 
 /* Nagłówki błędu SDK bywają `Headers`, bywają zwykłym obiektem — czytamy

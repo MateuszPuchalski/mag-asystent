@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.191.1 — 3 września 2026
+
+**Przeciążenie dostawcy nie bije dwadzieścia razy w ten sam mur.** Pierwsze
+kliknięcie „Rozpoznaj" na produkcji dostało od Anthropic `529 overloaded_error`.
+Ścieżka zadziałała w całości — poszło zamaskowane, wróciła prawdziwa odpowiedź
+API, księga zapisała nieudaną próbę — ale obsługa tej odpowiedzi była zła na
+trzy sposoby.
+
+PIERWSZY: 529 lądowało w koszu „wszystko inne", więc partia leciała dalej.
+Przy dwudziestu rozmowach to sześćdziesiąt daremnych prób (SDK ponawia dwa
+razy), dwadzieścia wierszy w księdze i zero informacji ponad tę z pierwszej.
+Dokładnie ten argument zatrzymywał już partię przy złym kluczu. Przeciążenie
+dostało własną klasę i zatrzymuje partię tak samo, bo opisuje stan DOSTAWCY,
+nie tej rozmowy — następna dostałaby identyczną odpowiedź.
+
+DRUGI: ekran nazywał to „1 bez rozstrzygnięcia", czyli zwalał winę na sąd
+modelu. Model nie został nawet zapytany. Teraz idzie zdanie mówiące, co zrobić,
+a surowa odpowiedź JSON dostawcy nie trafia ani na ekran, ani do księgi —
+w księdze stoi typ błędu, status i identyfikator żądania.
+
+TRZECI, znaleziony przy pisaniu testu mapowania: `APIConnectionError`
+DZIEDZICZY po `APIError`, więc gałąź o braku internetu stała niżej i była
+nieosiągalna. Zerwane łącze meldowało się jako „Anthropic odpowiedziało ?" —
+twierdziło, że dostawca odpowiedział, choć nie został zapytany. Kolejność
+`instanceof` jest tu logiką, nie stylem, i pilnuje jej test.
+
+Przy okazji ekran przestał gubić połowę wyniku: przerwana partia pokazuje
+zdanie o przerwie RAZEM z liczbą rozpoznanych rozmów. Bez tej liczby człowiek
+nie wie, że osiem z czternastu jest już zapłaconych, klika ponownie i płaci
+drugi raz — a właśnie po to trasa oddaje 200, a nie błąd.
+
+Nowe testy: sześć na mapowanie błędów SDK (budowane fabryką `APIError.generate`,
+nie ręcznie — inaczej testowałyby nasze wyobrażenie o SDK), dwa na zatrzymanie
+partii i rozdział „zdanie na ekran, ślad do księgi", dwa na panel.
+
 ## 0.191.0 — 3 września 2026
 
 **Etap F ruszył: Copilot rozpoznaje, o co pyta klient.** Pierwsza rzecz z §14.1

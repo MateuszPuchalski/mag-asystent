@@ -77,13 +77,33 @@ describe("pasek Copilota nad kolejką", () => {
     expect(screen.getByText(/pozostanie 3/)).toBeTruthy();
   });
 
-  it("partia przerwana limitem dostawcy pokazuje zdanie, nie znika bez śladu", () => {
+  it("partia przerwana pokazuje OBIE połowy: przerwę i to, co już zapłacone", () => {
     render(<PasekCopilota stan={WLACZONY} kandydaci={[]} onRozpoznaj={vi.fn()}
       wynik={{
         sklasyfikowane: 8, pominiete: [], bledy: [], przerwane: "Dostawca poprosił o przerwę.",
         zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0, kosztUsd: 0 },
       }} />);
     expect(screen.getByText("Dostawca poprosił o przerwę.")).toBeTruthy();
+    /* Do 0.191.0 zdanie o przerwie wypierało podsumowanie. Człowiek, który nie
+       wie, że osiem jest już rozpoznanych, kliknie ponownie i zapłaci drugi
+       raz — a właśnie po to trasa oddaje 200, a nie błąd. */
+    expect(screen.getByText(/Rozpoznano 8/)).toBeTruthy();
+  });
+
+  it("przeciążenie dostawcy nazywa dostawcę, a nie sąd modelu", () => {
+    render(<PasekCopilota stan={WLACZONY} kandydaci={[]} onRozpoznaj={vi.fn()}
+      wynik={{
+        sklasyfikowane: 0, pominiete: [],
+        bledy: [{ rozmowaId: 4977, powod: "przeciążone" }],
+        przerwane: "Anthropic jest chwilowo przeciążone (529). "
+          + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
+        zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0, kosztUsd: 0 },
+      }} />);
+    /* Żywe trafienie na 0.191.0: 529 lądowało w `bledy` bez `przerwane`, więc
+       jedyne, co ekran mówił, to „1 bez rozstrzygnięcia" — zdanie o modelu,
+       który się nie zdecydował. Model nie został nawet zapytany. */
+    expect(screen.getByText(/przeciążone/)).toBeTruthy();
+    expect(screen.getByText(/spróbuj za chwilę/)).toBeTruthy();
   });
 });
 

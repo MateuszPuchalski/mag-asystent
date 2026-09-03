@@ -7,7 +7,9 @@ import {
   KATEGORIE, ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
   type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "./copilot-klasyfikacja.js";
-import { BladKluczaCopilota, BladLimituCopilota } from "../adapters/copilot.js";
+import {
+  BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota,
+} from "../adapters/copilot.js";
 
 /* ── Copilot: klasyfikacja wiadomości (§14, etap F) ──────────────────────────
    Testy pilnują czterech rzeczy, po których poznaje się, że wolno to wypuścić:
@@ -292,4 +294,57 @@ test("pomiar liczy udział cache — zero w całej partii znaczy, że prefiks ni
   const p = pomiarCopilota(d);
   assert.ok(p.udzialCache !== null && p.udzialCache > 0,
     "bez tej liczby nie da się z danych powiedzieć, czy cache w ogóle się włączył");
+});
+
+/* ── Przeciążenie dostawcy (529), po żywym trafieniu na 0.191.0 ──────────────
+   Pierwsze kliknięcie na produkcji zwróciło `overloaded_error`. Ścieżka
+   zadziałała w całości — poszło zamaskowane, wróciła prawdziwa odpowiedź API,
+   księga zapisała nieudaną próbę — ale partia POLECIAŁABY DALEJ w ten sam mur,
+   a ekran nazwałby to „bez rozstrzygnięcia", czyli zwaliłby winę na sąd
+   modelu zamiast powiedzieć, że dostawca nie odpowiedział.                   */
+
+test("przeciążenie dostawcy zatrzymuje partię, zamiast bić w ten sam mur", async () => {
+  const d = stanowisko();
+  const ids = [rozmowa(d, "a"), rozmowa(d, "b"), rozmowa(d, "c")];
+
+  let wolane = 0;
+  const w = await sklasyfikujRozmowy(d, ids, KTO, async () => {
+    wolane += 1;
+    throw new BladPrzeciazeniaCopilota(
+      "Anthropic jest chwilowo przeciążone (529). "
+      + "Nic nie zostało policzone ani opłacone — spróbuj za chwilę.",
+      529, "overloaded_error 529 req_011Ce");
+  });
+
+  assert.equal(wolane, 1, "529 opisuje stan DOSTAWCY, więc druga rozmowa nie ma po co lecieć");
+  assert.equal(w.sklasyfikowane, 0);
+  assert.match(String(w.przerwane), /przeciążone/,
+    "ekran ma powiedzieć, że to dostawca, a nie że model nie rozstrzygnął");
+  assert.equal(w.bledy.length, 1, "w księgę i w podsumowanie idzie JEDNA nieudana próba");
+
+  /* Dwie pozostałe rozmowy mają zostać nietknięte: bez wiersza klasyfikacji
+     i bez wiersza w księdze. Inaczej „reszta czeka" byłoby kłamstwem. */
+  const wKsiedze = d.prepare("SELECT count(*) n FROM copilot_wywolanie").get() as { n: number };
+  assert.equal(wKsiedze.n, 1);
+  const sklasyfikowanych = d.prepare("SELECT count(*) n FROM klasyfikacja_rozmowy")
+    .get() as { n: number };
+  assert.equal(sklasyfikowanych.n, 0);
+});
+
+test("do księgi idzie ślad dostawcy, na ekran zdanie — nie odwrotnie", async () => {
+  const d = stanowisko();
+  const id = rozmowa(d, "gdzie paczka");
+
+  const w = await sklasyfikujRozmowy(d, [id], KTO, async () => {
+    throw new BladPrzeciazeniaCopilota(
+      "Anthropic jest chwilowo przeciążone (529).", 529, "overloaded_error 529 req_011Ce");
+  });
+
+  /* Rozdział jest po to, żeby agent czytał zdanie, a diagnostyk identyfikator.
+     Do 0.191.0 oba miejsca dostawały ten sam zrzut JSON-a od dostawcy. */
+  const k = d.prepare("SELECT blad FROM copilot_wywolanie").get() as { blad: string };
+  assert.match(k.blad, /req_011Ce/, "księga ma nieść identyfikator żądania");
+  assert.doesNotMatch(String(w.przerwane), /req_011Ce/,
+    "ekran ma nieść zdanie, a nie trzydziestoznakowy identyfikator");
+  assert.doesNotMatch(String(w.przerwane), /[{}]/, "żadnego surowego JSON-a na ekranie");
 });

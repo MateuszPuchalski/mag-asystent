@@ -693,9 +693,17 @@ bo one kosztują i nie dają odpowiedzi. Trafność mierzy werdykt człowieka
 (`ocena`) przy plakietce w otwartej rozmowie. Podsumowanie za zębatką zawsze
 podaje `n` i liczbę nieocenionych.
 
-Limit dostawcy zatrzymuje partię czysto: wcześniejsze wyniki zostają, trasa
-oddaje 200 z wypełnionym polem `przerwane`. Zły klucz zatrzymuje ją od razu.
-Ponowień nie ma, bo tickera nie ma i limit obsługuje człowiek.
+Partię zatrzymują CZTERY POWODY, wszystkie opisujące stan dostawcy albo
+łącza, a nie tej jednej rozmowy: limit (429), zły klucz (401), przeciążenie
+(529 i inne 5xx) oraz brak połączenia. Następna rozmowa dostałaby identyczną
+odpowiedź, więc partia staje po pierwszej próbie. Wcześniejsze wyniki zostają,
+a trasa oddaje 200 z wypełnionym polem `przerwane` — ekran pokazuje wtedy
+zdanie o przerwie RAZEM z liczbą już rozpoznanych rozmów.
+
+Ponowień sami nie dokładamy: SDK dostawcy ponawia 5xx dwa razy, więc błąd,
+który do nas dotarł, przeżył już trzy podejścia. Na ekran idzie zdanie mówiące,
+co zrobić; identyfikator żądania i typ błędu trafiają do księgi
+`copilot_wywolanie`, nie na ekran.
 
 Copilot jest **wyłączony domyślnie**, a brak klucza nie zatrzymuje startu.
 Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
