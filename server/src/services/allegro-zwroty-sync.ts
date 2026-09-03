@@ -318,11 +318,18 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   }
 
   /* Pozycja, której Allegro już nie oddaje, znika — ale dopiero teraz i tylko
-     ona. Zwrot potrafi stracić pozycję, gdy klient wycofa część zgłoszenia. */
+     ona. Zwrot potrafi stracić pozycję, gdy klient wycofa część zgłoszenia.
+
+     `zrodlo='allegro'` jest tu WARUNKIEM POPRAWNOŚCI, nie filtrem na zapas
+     (0.184.0). Pozycji dopisanej przez biuro Allegro nie zna i nigdy nie
+     odda, więc bez tego warunku każdy takt kasowałby ją razem z oceną hali
+     i zaznaczeniem do kwoty. Po cichu: nic nie wygląda na zepsute, dopóki
+     ktoś nie policzy pieniędzy. */
   const zostaja = widziane.length
     ? ` AND klucz NOT IN (${widziane.map(() => "?").join(",")})`
     : "";
   database.prepare(
-    `DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id=?${zostaja}`
+    `DELETE FROM zwrot_klienta_pozycja
+     WHERE zwrot_id=? AND zrodlo='allegro'${zostaja}`
   ).run(id, ...widziane);
 }

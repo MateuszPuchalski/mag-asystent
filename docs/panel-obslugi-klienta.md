@@ -1225,6 +1225,41 @@ przeżyć własne źródło. Wchodzi też do eksportu CSV, osobną kolumną.
 
 Zdjęcie powiązania to droga wyjścia z pomyłki, nie brak funkcji (§25a.5).
 
+### 25a.15. Produkt, którego klient nie zgłosił (0.184.0)
+
+Klient zgłasza jedną rzecz, a odsyła dwie. To nie jest wypadek przy pracy:
+formularz zwrotu wypełnia się na ekranie, a paczkę pakuje przy stole — i wtedy
+dokłada się to, co też nie pasowało.
+
+**Regulamin Allegro tej zgodności nie wymaga.** Liczy się TERMINOWE
+oświadczenie o odstąpieniu, nie zgodność przesyłki ze zgłoszeniem; opóźnienie
+samej wysyłki odstąpienia nie unieważnia. Pieniądze i tak trzeba oddać, więc
+biuro musi mieć czym zapisać to, co naprawdę przyszło.
+
+**Produkt wybiera się Z ZAMÓWIENIA, nie z pola tekstowego.** Klient może
+odesłać wyłącznie to, co kupił, więc lista zamówienia jest granicą naturalną.
+Przy okazji pozycja przynosi cenę i walutę, więc kwota do oddania dalej liczy
+się z faktów — §25a.3 zostaje nienaruszone.
+
+**Lista jest RÓŻNICĄ zamówienia i zwrotu.** Pozycje już zgłoszone kazałyby
+porównywać dwie listy oczami. Gdy różnicy nie ma, nie ma też przycisku.
+
+**Dopisana pozycja jest oznaczona jako zapis biura** (`zrodlo='biuro'`) i to
+oznaczenie pracuje w dwie strony. Na ekranie mówi, że to wybór człowieka, a nie
+zgłoszenie klienta (§4.3). W bazie CHRONI: synchronizacja kasuje pozycje,
+których Allegro już nie oddaje, i skasowałaby też dopisaną — razem z oceną hali
+i zaznaczeniem do kwoty. Po cichu, bo nic nie wygląda na zepsute, dopóki ktoś
+nie policzy pieniędzy.
+
+Zdjąć da się wyłącznie pozycję biura (§25a.5). Zgłoszona przez klienta wróciłaby
+przy najbliższym takcie, więc przycisk obiecywałby skutek, którego nie ma.
+
+**Zastosowany dekalog ergonomii** (`docs/ergonomia-magazynu.md`, punkty
+obowiązujące biuro): 1 — przycisk stoi pod listą produktów, bo tam operator
+zauważa różnicę; 2 — lista otwiera się na żądanie, jak potrącenie; 5 — pokazuje
+różnicę, nie całe zamówienie; 6 — brak pola tekstowego jest ograniczeniem
+zamiast komunikatu o błędzie.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1321,6 +1356,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
+| Produkt dopisany do zwrotu przez biuro | **działa** od 0.184.0 | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
@@ -1348,5 +1384,5 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
-| Anulowanie wniosku o rabat | **projekt** | `DELETE` istnieje w specyfikacji, przycisku jeszcze nie ma |
+| Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

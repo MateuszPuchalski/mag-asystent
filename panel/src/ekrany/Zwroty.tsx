@@ -6,8 +6,9 @@ import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pozycje } from "../zwroty/Pozycje";
 import {
-  useCofnijKorekte, useFaktura, useKorekta, useKwota, useNieodebrana, useOcena,
-  usePotracenie, useWerdykt, useZglosRabat, useZwrot,
+  useCofnijKorekte, useDopiszPozycje, useFaktura, useKorekta, useKwota,
+  useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
+  useZglosRabat, useZwrot,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
@@ -91,6 +92,9 @@ export function Zwroty() {
   const potracenie = usePotracenie();
   const nieodebrana = useNieodebrana();
   const faktura = useFaktura();
+  const dopisz = useDopiszPozycje();
+  const zdejmij = useZdejmijPozycje();
+  const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
   const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
@@ -386,6 +390,18 @@ export function Zwroty() {
                   setBladRabatu("");
                   rabat.mutate({ pozycjaId },
                     { onError: (e) => setBladRabatu((e as Error).message) });
+                }}
+                doDopisania={szczegol.data?.doDopisania ?? []}
+                bladDopisania={bladDopisania}
+                onDopisz={(zamPozycjaId) => {
+                  setBladDopisania("");
+                  dopisz.mutate({ id: zwrot.id, zamPozycjaId, wersja: zwrot.wersja },
+                    { onError: (e) => setBladDopisania((e as Error).message) });
+                }}
+                onZdejmij={(pozycjaId) => {
+                  setBladDopisania("");
+                  zdejmij.mutate({ id: zwrot.id, pozycjaId, wersja: zwrot.wersja },
+                    { onError: (e) => setBladDopisania((e as Error).message) });
                 }} />
             </div>
           </>}
