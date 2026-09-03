@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -24,7 +24,7 @@ export function useZwrot(id: number | null) {
     queryKey: kluczeZwrotow.zwrot(id ?? 0),
     queryFn: () => api<{
       zwrot: Zwrot; os: WpisOsiZwrotu[]; kandydaciFaktury: KandydatFaktury[];
-      doDopisania: DoDopisania[];
+      doDopisania: DoDopisania[]; pieniadze: StanZwrotuPieniedzy;
     }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,
@@ -285,6 +285,48 @@ export function useZdejmijPozycje() {
     mutationFn: (v: { id: number; pozycjaId: number; wersja: number }) =>
       api<{ wersja: number }>(`/api/obsluga/zwroty/pozycje/${v.pozycjaId}/zdejmij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/* ── Zwrot pieniędzy i odmowa (0.189.0) ──────────────────────────────────────
+   Pierwsze wyjście tego panelu po CUDZE PIENIĄDZE. Stąd trzy różnice
+   względem sąsiednich mutacji.
+
+   KWOTY NIE MA W CIELE. Serwer bierze tę, którą sam policzył z zaznaczenia;
+   panel podający liczbę pozwoliłby oddać dowolną kwotę żądaniem z pominięciem
+   ekranu (ta sama decyzja co przy `useKwota`).
+
+   PONOWIENIE JEST BEZPIECZNE po stronie serwera (`commandId`), ale przycisk
+   i tak blokuje się na czas żądania: dwa kliknięcia to dwa żądania, a drugie
+   dostałoby 409 i wyglądałoby jak awaria.
+
+   UNIEWAŻNIAMY TEŻ SZCZEGÓŁ, nie samą kolejkę — po oddaniu pieniędzy zmienia
+   się dokładnie ten ekran, na który patrzy operator. */
+
+export function useZwrocPieniadze() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ refundId: string; status: string | null; wersja: number }>(
+        `/api/obsluga/zwroty/${v.id}/pieniadze`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+export function useOdmowPlatnosci() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; kod: string; powod: string | null; wersja: number }) =>
+      api<{ kod: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/odmowa-platnosci`,
+        { method: "POST", body: JSON.stringify({ kod: v.kod, powod: v.powod, wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });

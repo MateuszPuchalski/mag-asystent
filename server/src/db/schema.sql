@@ -1131,6 +1131,29 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- Ile z kwoty to DOSTAWA. Osobno od sumy, bo bez tego nie da się odtworzyć,
   -- czy operator ją oddał, czy tylko pozycje wyszły akurat na tyle samo.
   kwota_dostawa_grosze INTEGER,
+  -- ── Zapis do Allegro (0.189.0) ─────────────────────────────────────────
+  -- Do 0.189.0 panel zapisywał WYŁĄCZNIE fakt, że ktoś oddał pieniądze ręcznie
+  -- w panelu Allegro. Te kolumny opisują nasz własny zapis przez API.
+  --
+  -- `zwrot_pieniedzy_command_id` powstaje RAZ na zwrot i nie zmienia się przy
+  -- ponowieniu. To jest cała idempotencja tej końcówki: Allegro obiecuje, że
+  -- żądanie z tym samym `commandId` nie odda pieniędzy drugi raz. Nowy
+  -- identyfikator przy każdej próbie zamieniłby ponowienie po zerwanej sieci
+  -- w drugi przelew.
+  zwrot_pieniedzy_command_id TEXT,
+  -- Numer zwrotu płatności oddany przez Allegro (`RefundDetails.id`) i status,
+  -- który przy nim przyszedł. Puste przy próbie, która nie doszła.
+  zwrot_pieniedzy_id TEXT,
+  zwrot_pieniedzy_status TEXT,
+  zwrot_pieniedzy_at TEXT, zwrot_pieniedzy_przez TEXT,
+  zwrot_pieniedzy_user_id INTEGER REFERENCES app_user(user_id),
+  -- Odmowa zwrotu pieniędzy WYSŁANA PRZEZ NAS. Osobno od `rejection_code`,
+  -- które przyjeżdża z Allegro: pochodzenie decyzji jest tu informacją, tak
+  -- samo jak przy werdykcie.
+  odmowa_kod TEXT,
+  odmowa_powod TEXT,
+  odmowa_at TEXT, odmowa_przez TEXT,
+  odmowa_user_id INTEGER REFERENCES app_user(user_id),
   kwota_at TEXT, kwota_przez TEXT,
   -- Oś czasu zwrotu PO STRONIE ALLEGRO (0.164.0) — nie mylić z `werdykt`
   -- ani `zamkniety_at`, które są naszymi decyzjami. Jedenaście wartości
@@ -1425,6 +1448,12 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   -- `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać pieniądze.
   platnosc_typ TEXT,
   platnosc_at TEXT,
+  -- Identyfikator płatności (0.189.0). `POST /payments/refunds` żąda go
+  -- WPROST (`payment.id` w `required` schematu `InitializeRefund`), a bez
+  -- niego oddanie pieniędzy przez API nie ma jak powstać. Formularz zakupowy
+  -- niósł go od zawsze (`CheckoutFormPaymentReference.id`) — mapowanie brało
+  -- z tego obiektu wyłącznie typ i moment.
+  platnosc_id TEXT,
   -- Czy kupujący zażądał faktury. SAMA FLAGA — dane firmy z `invoice.address`
   -- niosą ulicę i miasto, a adresy nie przechodzą przez mapowanie.
   faktura_zadana INTEGER,

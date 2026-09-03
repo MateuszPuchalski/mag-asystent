@@ -2,6 +2,7 @@ import React from "react";
 import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
+import type { Obecnosc } from "../api/zdarzenia";
 import { Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
 import { Edytor } from "./Edytor";
@@ -9,6 +10,7 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { Sprawa } from "./Sprawa";
+import { Obecni } from "./Obecni";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -27,6 +29,8 @@ export function brakPowiazania(os: WpisOsi[]): boolean {
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
   mojeId: number | null;
+  /** Kto jeszcze siedzi przy tej rozmowie — stan chwilowy z szyny zdarzeń. */
+  obecni: Obecnosc[];
   nowaWiadomosc: boolean;
   szkic: string;
   zapisuje: boolean;
@@ -106,6 +110,10 @@ export function Rozmowa(p: {
         onZmien={p.onZmienStatus}
         onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />
     </header>
+
+    {/* Obecność IDZIE PRZED sprawą: „ktoś tu już siedzi" zmienia decyzję
+        o pisaniu odpowiedzi, a sprawa zmienia tylko sposób czytania. */}
+    <Obecni obecni={p.obecni} mojeId={p.mojeId} />
 
     {/* Sprawa stoi POD nagłówkiem, nad wszystkim innym: „to ten sam problem
         co w tamtej rozmowie" zmienia sposób czytania całej reszty ekranu. */}

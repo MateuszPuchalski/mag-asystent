@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
+import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
@@ -11,7 +12,10 @@ import {
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
-import { zglosRabat } from "../adapters/allegro.http.js";
+import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
+import {
+  odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zwrocPieniadze, ZwrotPieniedzyConflict,
+} from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { zwiazPewne } from "../services/sygnatury.js";
 import { kandydaciFaktury, wskazFakture, zwiazFakturyPewne } from "../services/faktury.js";
@@ -284,6 +288,52 @@ export async function zwrotyRoutes(app: FastifyInstance) {
 
      Z tego samego powodu nie ma tu `logEvent`: wpis z kodem w dzienniku byłby
      dokładnie tym zapisem, którego unikamy, a bez kodu nie niósłby nic. */
+  /* ── ZWROT PIENIĘDZY I ODMOWA (0.189.0) ────────────────────────────────
+     Druga i trzecia trasa tego pliku wychodząca do Allegro — i pierwsza,
+     która rusza PIENIĄDZE. Stąd dwie różnice względem reszty:
+
+     `autoryzuj()` obok `odmowa()`: oddanie cudzych pieniędzy to operacja
+     uprzywilejowana, a nie zwykła praca biura jak wskazanie kartoteki.
+
+     Kwoty NIE MA W CIELE ŻĄDANIA i to jest ta sama decyzja, co przy
+     `zapiszKwote` (0.156.0): gdyby panel podawał liczbę, dałoby się oddać
+     dowolną kwotę żądaniem z pominięciem ekranu. Serwer bierze tę, którą sam
+     policzył z zaznaczenia. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/pieniadze", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const w = autoryzuj(sesjaZadania()!.user, "zwrot_pieniedzy");
+      if (!w.ok) return reply.code(403).send({ error: w.powod });
+      try {
+        return await zwrocPieniadze(db(), Number(req.params.id), Number(req.body?.wersja),
+          kto(), (ciało) => zwrocPlatnosc(config.allegro.apiUrl, ciało));
+      } catch (e) {
+        if (e instanceof ZwrotPieniedzyConflict) {
+          return reply.code(409).send({ error: e.message });
+        }
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  app.post<{ Params: { id: string }; Body: { kod?: string; powod?: string; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/odmowa-platnosci", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const w = autoryzuj(sesjaZadania()!.user, "zwrot_pieniedzy");
+      if (!w.ok) return reply.code(403).send({ error: w.powod });
+      try {
+        return await odmowZwrotuPieniedzy(db(), Number(req.params.id), req.body?.kod ?? "",
+          req.body?.powod ?? null, Number(req.body?.wersja), kto(),
+          (zwrotId, kod, powod) => wyslijOdmowe(config.allegro.apiUrl, zwrotId, kod, powod));
+      } catch (e) {
+        if (e instanceof ZwrotPieniedzyConflict) {
+          return reply.code(409).send({ error: e.message });
+        }
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
   app.post<{ Body: { kod?: string } }>("/api/obsluga/zwroty/skan", async (req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
@@ -352,6 +402,12 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const kandydaci = zwrot.faktura.dokId === null ? kandydaciFaktury(id, db()) : [];
     return {
       zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci,
+      /* Stan zapisu do Allegro (0.189.0). Liczy go SERWER, bo to on zna
+         przeszkody: brak identyfikatora płatności, pobranie, brak kwoty.
+         Panel powtarzający tę regułę rozjechałby się z nią przy pierwszej
+         zmianie — a rozjazd znaczyłby tu przycisk obiecujący pracę, której
+         serwer nie przyjmie. */
+      pieniadze: stanZwrotuPieniedzy(db(), id),
       /* Czego jeszcze z tego zamówienia nie ma w zwrocie. Liczone tutaj,
          a nie w kolejce: lista jest potrzebna dopiero przy otwartym zwrocie. */
       doDopisania: doDopisania(id, db()),

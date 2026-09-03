@@ -275,6 +275,32 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK(faktura_zrodlo IN ('numer','reczne'))");
   addColumn("zwrot_klienta", "faktura_at", "TEXT");
   addColumn("zwrot_klienta", "faktura_przez", "TEXT");
+  /* ── Zapis do Allegro: zwrot pieniędzy i odmowa (0.189.0) ────────────────
+     Do 0.189.0 z tego systemu wychodziła do Allegro wiadomość do klienta
+     i wniosek o rabat. Pieniądze oddawał człowiek w panelu Allegro, a panel
+     zapisywał sam FAKT — czyli kończył pracę tam, gdzie §25 obiecuje nie
+     zaglądać.
+
+     `zwrot_pieniedzy_command_id` powstaje RAZ na zwrot. Allegro daje przy tej
+     końcówce idempotencję po `commandId` i to jest jedyne zabezpieczenie przed
+     drugim przelewem, gdy sieć zerwie się po wysłaniu żądania, a przed
+     odpowiedzią. Nowy identyfikator przy ponowieniu zamieniłby ostrożność
+     w podwójny zwrot cudzych pieniędzy.
+
+     `platnosc_id` idzie do `zamowienie_klienta`, bo tam jest jego źródło:
+     `payment.id` z formularza zakupowego. Zwrot go nie niesie. */
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_command_id", "TEXT");
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_id", "TEXT");
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_status", "TEXT");
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_at", "TEXT");
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_przez", "TEXT");
+  addColumn("zwrot_klienta", "zwrot_pieniedzy_user_id", "INTEGER");
+  addColumn("zwrot_klienta", "odmowa_kod", "TEXT");
+  addColumn("zwrot_klienta", "odmowa_powod", "TEXT");
+  addColumn("zwrot_klienta", "odmowa_at", "TEXT");
+  addColumn("zwrot_klienta", "odmowa_przez", "TEXT");
+  addColumn("zwrot_klienta", "odmowa_user_id", "INTEGER");
+  addColumn("zamowienie_klienta", "platnosc_id", "TEXT");
   /* Forma płatności i żądanie faktury (0.169.0). Przy zwrocie to nie
      ciekawostka: `CASH_ON_DELIVERY` znaczy, że nie ma karty, na którą oddać
      pieniądze, a `faktura_zadana` mówi, czy do zwrotu trzeba korekty faktury,

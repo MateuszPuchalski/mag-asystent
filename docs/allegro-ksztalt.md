@@ -399,22 +399,48 @@ Trzy końcówki zapisu wchodzą dopiero w 0.151.0. Ich kształt notujemy tutaj
 z tej samej kopii specyfikacji, żeby nie odtwarzać go z pamięci później.
 
 `[WERYFIKUJ]` `POST /order/customer-returns/{id}/rejection` przyjmuje obiekt
-`rejection` z polem `code` i opcjonalnym `reason`. Dozwolone kody:
-`REFUND_REJECTED` (wymaga `reason`), `NEW_ITEM_SENT`, `ITEM_FIXED`
-i `MISSING_PART_SENT`. Nazwa końcówki mówi o odmowie ZWROTU PIENIĘDZY,
-a nie o odrzuceniu samego zwrotu — panel ma to nazywać tak samo.
+`rejection` z polem `code` i opcjonalnym `reason`. Nazwa końcówki mówi
+o odmowie ZWROTU PIENIĘDZY, a nie o odrzuceniu samego zwrotu — panel nazywa to
+tak samo (przycisk ODMÓW WYPŁATY).
 
-`[WERYFIKUJ]` `POST /payments/refunds` przyjmuje `payment.id`, `reason`
-oraz opcjonalne `lineItems`, `delivery`, `overpaid`, `surcharges`,
+**Kodów jest SIEDEM, nie cztery.** Do 0.189.0 stały tu tylko `REFUND_REJECTED`,
+`NEW_ITEM_SENT`, `ITEM_FIXED` i `MISSING_PART_SENT`; schemat
+`CustomerReturnRefundRejectionRequest` wymienia jeszcze `ITEM_MISMATCH`,
+`BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`. Wymagany jest sam `code`; `reason`
+staje się obowiązkowy przy `REFUND_REJECTED` i ma `maxLength: 250`.
+
+Końcówka deklaruje WYŁĄCZNIE `application/vnd.allegro.beta.v1+json` i jest
+oznaczona `[BETA]` — inaczej niż zwrot pieniędzy, który bierze `public.v1`.
+Uprawnienie: `allegro:api:orders:write`.
+
+`[WERYFIKUJ]` `POST /payments/refunds` (schemat `InitializeRefund`) ma CZTERY
+pola wymagane: `payment`, `order`, `commandId` i `reason`. Opcjonalne są
+`lineItems`, `deposits`, `delivery`, `overpaid`, `surcharges`,
 `additionalServices` i `sellerComment`. Pozycja `lineItems[]` ma `id`, `type`
-(`QUANTITY` albo `AMOUNT`), `quantity` i `value`. Wartości `reason` z kopii:
-`REFUND`, `COMPLAINT`, `PRODUCT_NOT_AVAILABLE`, `PAID_VALUE_TOO_LOW`.
+(`QUANTITY` albo `AMOUNT`), `quantity` i `value`.
 
-`[WERYFIKUJ]` Pola `commandId` i `order.id` w tym samym żądaniu. Ogłoszenie
-Allegro mówi, że od 15 grudnia 2025 są WYMAGANE, a kopia specyfikacji ich nie
-ma. `commandId` to identyfikator UUID zapewniający idempotencję — czyli
-gotowe miejsce na klucz z kolejki `outbox`. Do sprawdzenia przed pierwszym
-zwrotem pieniędzy.
+Wartości `reason` jest SIEDEM: `REFUND`, `COMPLAINT`, `PRODUCT_NOT_AVAILABLE`,
+`PAID_VALUE_TOO_LOW`, `OVERPAID`, `CANCELLED_BY_BUYER` i `NOT_COLLECTED`.
+Panel wysyła stale `REFUND` — pozostałe opisują sytuacje, których ekran zwrotu
+nie obsługuje, a menu z siedmioma powodami kazałoby wybierać przy każdym
+zwrocie coś, co ma zawsze tę samą odpowiedź.
+
+Uprawnienie to `allegro:api:payments:write` i jest INNE niż przy rabacie.
+Wersja zasobu: `public.v1`. Odpowiedź (`RefundDetails`) niesie `id`, `payment`,
+`reason`, `status`, `createdAt` i `totalValue`.
+
+`[WERYFIKUJ]` Zachowanie idempotencji `commandId` na żywym koncie. Do 0.189.0
+stało tu, że kopia specyfikacji nie ma `commandId` ani `order` — NIEPRAWDA:
+oba stoją w `required` schematu `InitializeRefund`, zgodnie z ogłoszeniem
+Allegro o zmianie z 15 grudnia 2025. Zdanie zestarzało się przy odświeżeniu
+kopii i nikt go nie przeczytał ponownie.
+
+Otwarte zostaje to, czego z pliku wyczytać się nie da: czy powtórzone żądanie
+z tym samym `commandId` naprawdę NIE oddaje pieniędzy drugi raz. Od 0.189.0
+identyfikator powstaje raz na zwrot i wraca ten sam przy ponowieniu
+(`zwrot_klienta.zwrot_pieniedzy_command_id`), więc pierwszy ponowiony zwrot
+odpowie na to pytanie. Do tego czasu obowiązuje ostrożność: nasz własny
+strażnik nie wypuszcza drugiego żądania po udanym pierwszym.
 
 `[WERYFIKUJ]` `POST /order/refund-claims` — kształt ŻĄDANIA jest znany
 ze schematu (`RefundClaimRequest`, patrz sekcja niżej), ale nie przeszedł

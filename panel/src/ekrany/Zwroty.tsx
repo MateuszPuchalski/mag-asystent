@@ -4,11 +4,12 @@ import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
+import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
 import {
   useCofnijKorekte, useDopiszPozycje, useFaktura, useKorekta, useKwota,
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
-  useZglosRabat, useZwrot,
+  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
@@ -89,6 +90,8 @@ export function Zwroty() {
   const korekta = useKorekta();
   const cofnijKorekte = useCofnijKorekte();
   const rabat = useZglosRabat();
+  const pieniadze = useZwrocPieniadze();
+  const odmowaPlatnosci = useOdmowPlatnosci();
   const potracenie = usePotracenie();
   const nieodebrana = useNieodebrana();
   const faktura = useFaktura();
@@ -96,6 +99,7 @@ export function Zwroty() {
   const zdejmij = useZdejmijPozycje();
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
+  const [bladPieniedzy, setBladPieniedzy] = useState("");
   const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || potracenie.isPending;
@@ -377,6 +381,23 @@ export function Zwroty() {
                 korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja })}
               onCofnijKorekte={() =>
                 cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
+            {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
+                ostatni krok tej pracy i ma być tam, gdzie operator właśnie
+                patrzy, a nie o kolumnę dalej. */}
+            {szczegol.data?.pieniadze && <Pieniadze
+              stan={szczegol.data.pieniadze}
+              trwa={pieniadze.isPending || odmowaPlatnosci.isPending}
+              blad={bladPieniedzy}
+              onZwroc={() => {
+                setBladPieniedzy("");
+                pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }}
+              onOdmow={(kod, powod) => {
+                setBladPieniedzy("");
+                odmowaPlatnosci.mutate({ id: zwrot.id, kod, powod, wersja: zwrot.wersja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }} />}
             <div className="min-h-0 flex-1 overflow-y-auto">
               <Pozycje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}

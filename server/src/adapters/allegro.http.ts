@@ -256,6 +256,14 @@ export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
      zła instrukcja jest gorsza niż jej brak, bo wysyła człowieka po coś,
      co ma, i każe sparować konto ponownie bez skutku. */
   if (metoda !== "GET" && url.includes("/order/")) return "allegro:api:orders:write";
+  /* Płatności mają WŁASNE uprawnienie i to jest ta sama lekcja, co przy
+     opiniach w 0.155.0: bez tej gałęzi zwrot pieniędzy wpadał w domyślne
+     `orders:read`, a odmowa 403 kazałaby dodać uprawnienie, które konto już
+     ma. Zwrot pieniędzy żąda `payments:write` — innego niż cokolwiek, co ta
+     aplikacja miała do 0.189.0. */
+  if (url.includes("/payments/")) {
+    return metoda === "GET" ? "allegro:api:payments:read" : "allegro:api:payments:write";
+  }
   if (url.includes("/messaging/")) return "allegro:api:messaging";
   /* `product-offers` PRZED `offers`: pierwszy wzorzec zawiera drugi jako
      podciąg tylko przy odwrotnej kolejności sprawdzania, ale oba i tak
@@ -457,6 +465,50 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
  * Uprawnienie to `allegro:api:orders:write`, inne niż przy odczycie; pilnuje
  * tego `scopeDlaUrl` z metodą, żeby odmowa 403 nazwała właściwe.
  */
+/**
+ * Zwrot pieniędzy kupującemu — `POST /payments/refunds` (0.189.0).
+ *
+ * Ciało układa `services/zwrot-pieniedzy.ts`; tutaj jest samo wyjście do
+ * sieci. Cztery pola stoją w `required` schematu `InitializeRefund`:
+ * `payment`, `order`, `commandId` i `reason` — i wszystkie cztery muszą tu
+ * dojechać, bo braku żadnego z nich nie da się nadrobić po stronie Allegro.
+ *
+ * `commandId` NIE POWSTAJE TUTAJ. Gdyby powstawał, każde ponowienie po
+ * zerwanej sieci dostawałoby nowy identyfikator, czyli drugi przelew zamiast
+ * powtórzenia tego samego. Identyfikator żyje przy zwrocie w bazie.
+ *
+ * Uprawnienie: `allegro:api:payments:write` — inne niż `orders:write` przy
+ * rabacie i inne niż wszystko, co ta aplikacja miała wcześniej.
+ */
+export async function zwrocPlatnosc(
+  apiUrl: string, ciało: Record<string, unknown>,
+): Promise<{ id?: string; status?: string } | null> {
+  return await zapytajAllegro(`${apiUrl}/payments/refunds`, {
+    metoda: "POST", body: ciało,
+  }) as { id?: string; status?: string } | null;
+}
+
+/**
+ * Odmowa zwrotu pieniędzy — `POST /order/customer-returns/{id}/rejection`.
+ *
+ * NAZWA MÓWI O ODMOWIE ZWROTU PIENIĘDZY, nie o odrzuceniu samego zwrotu, i
+ * panel nazywa to tak samo. Kupujący dalej ma zwrot; my odmawiamy wypłaty
+ * i podajemy powód.
+ *
+ * Końcówka jest w specyfikacji oznaczona `[BETA]` i deklaruje WYŁĄCZNIE
+ * `application/vnd.allegro.beta.v1+json` — inaczej niż zwrot pieniędzy, który
+ * bierze `public.v1`. Nagłówek negocjuje `zapytajAllegro`, więc nie ma tu
+ * wpisanej wersji: ta sama nauka `Accept` obsługuje obie rodziny.
+ */
+export async function odmowZwrotuPieniedzy(
+  apiUrl: string, zwrotId: string, kod: string, powod: string | null,
+): Promise<unknown | null> {
+  return await zapytajAllegro(
+    `${apiUrl}/order/customer-returns/${encodeURIComponent(zwrotId)}/rejection`,
+    { metoda: "POST", body: { rejection: powod ? { code: kod, reason: powod } : { code: kod } } },
+  );
+}
+
 export async function zglosRabat(
   apiUrl: string, lineItemId: string, ilosc: number,
 ): Promise<{ id?: string } | null> {

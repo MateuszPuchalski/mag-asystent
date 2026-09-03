@@ -18,8 +18,12 @@ import type { Towar } from "../wyszukiwarka";
  * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
  * TRZY zakładki, nie pięć z makiety. „Dobór" doszła w etapie E1, gdy dostała
- * byt (`dobor_rozmowy`). „Klient" i „Wiedza" nadal nie mają skąd wziąć danych
- * (E2 i F z §24). Zakładka, która zawsze mówi „wkrótce", uczy nie klikać.
+ * byt (`dobor_rozmowy`). Zakładka, która zawsze mówi „wkrótce", uczy nie klikać.
+ *
+ * „Wiedza" ma źródło od E2 (`/api/obsluga/wiedza/*`) i mimo to nie wraca tutaj:
+ * dowody wybranej kartoteki stoją już w zakładce „Dobór", a druga zakładka
+ * z tą samą treścią kazałaby zgadywać, w której szukać. „Klient" nadal nie ma
+ * bytu — historii maszyn kupującego nie trzyma żadna tabela.
  *
  * Dwa zwrotne uchwyty idą ze `Skrzynka.tsx`, gdzie leży szkic i formularz
  * pomiaru: zakładka doboru wstawia zdanie do szkicu i podstawia kartotekę
@@ -56,7 +60,8 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
       </>}
 
       {widok === "towar" && (oferta
-        ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
+        ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
+            onWstawDoSzkicu={onWstawDoSzkicu} />
         /* Bez numeru oferty nie ma z czego wywieść kartoteki. Ekran mówi to
            wprost, zamiast pokazywać pustą sekcję. */
         : <p className="flex items-start gap-2 p-4 text-sm text-slate-500">

@@ -23,7 +23,12 @@ import { Powiekszenie } from "../towar/Powiekszenie";
  * z Subiekta, a podpis przy kartotece mówi, czy stoi za nią SKU z Allegro,
  * czy decyzja człowieka.
  */
-export function TowarRozmowy({ oferta, rozmowaId }: { oferta: OfertaRozmowy; rozmowaId: number }) {
+export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
+  oferta: OfertaRozmowy;
+  rozmowaId: number;
+  /** Wstawka do szkicu. Opcjonalna: blok bywa też oglądany bez edytora obok. */
+  onWstawDoSzkicu?: (tresc: string) => void;
+}) {
   const [szukam, setSzukam] = useState(false);
   const [powiekszone, setPowiekszone] = useState(false);
   const zapisz = useWskazKartoteke();
@@ -76,7 +81,16 @@ export function TowarRozmowy({ oferta, rozmowaId }: { oferta: OfertaRozmowy; roz
 
           {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
           {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
-          {karta.data && <StanTowaru karta={karta.data} />}
+          {karta.data && <>
+            <StanTowaru karta={karta.data} />
+            {/* Przycisk stoi POD tabelą, nie nad nią: agent najpierw sprawdza,
+                czy to ta kartoteka, a dopiero potem przepisuje ją do odpowiedzi.
+                Nad tabelą zapraszałby do wstawienia czegoś nieprzeczytanego. */}
+            {onWstawDoSzkicu && <button type="button"
+              onClick={() => onWstawDoSzkicu(parametryDoSzkicu(karta.data!))}
+              className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+              Wstaw parametry do szkicu</button>}
+          </>}
 
           {powiekszone && <Powiekszenie twId={potwierdzona} nazwa={karta.data?.name ?? ""}
             symbol={k.symbol ?? ""} zamknij={() => setPowiekszone(false)} />}
@@ -118,6 +132,37 @@ export function TowarRozmowy({ oferta, rozmowaId }: { oferta: OfertaRozmowy; roz
  * pytanie klienta — stan bez odjętych rezerwacji obiecuje towar, który jest
  * już czyjś.
  */
+/**
+ * Parametry towaru jako tekst do szkicu (§10.4, makieta `Main.dc.html`).
+ *
+ * SZKIC IDZIE DO KLIENTA i to jest cała trudność tej funkcji. Blok Subiekta
+ * pokazuje na ekranie sześć wierszy, ale trzy z nich są WEWNĘTRZNE: półka,
+ * rezerwacje i rozbicie na magazyny. Adres regału w odpowiedzi do kupującego
+ * nie znaczy dla niego nic, a mówi obcemu, jak zbudowany jest nasz magazyn.
+ * Wstawka bierze więc tożsamość towaru i dostępność — czyli to, po co klient
+ * napisał — i ani jednego pola więcej.
+ *
+ * Zdanie układa PANEL, nie serwer, i to jest różnica względem doboru (§14.3):
+ * tam zdanie niesie TWIERDZENIE o pasowaniu i musi cytować dowód, więc pisze
+ * je serwer. Tu nie ma twierdzenia — są wartości pól kartoteki, przepisane
+ * jeden do jednego z tego, co agent ma przed oczami.
+ *
+ * Brak stanu mówi „brak na stanie", nie „0 szt.". Zero w tabeli czyta agent,
+ * a zdanie czyta klient — i „0 szt." brzmi jak awaria systemu, nie jak
+ * odpowiedź. Terminu dostawy wstawka NIE obiecuje, bo go nie zna.
+ */
+export function parametryDoSzkicu(karta: KartaTowaru): string {
+  const jednostka = karta.unit ?? "szt.";
+  const linie = [`${karta.name} (symbol ${karta.sym})`];
+  if (karta.ean) linie.push(`EAN: ${karta.ean}`);
+  const numery = (karta.identyfikatory ?? []).map((i) => i.wartosc);
+  if (numery.length > 0) linie.push(`Numery: ${numery.join(", ")}`);
+  linie.push(karta.mag.avail > 0
+    ? `Dostępność: ${karta.mag.avail} ${jednostka}`
+    : "Dostępność: brak na stanie");
+  return linie.join("\n");
+}
+
 function StanTowaru({ karta }: { karta: KartaTowaru }) {
   const wiersze: Array<[string, string]> = [
     ["Stan", `${karta.mag.stan} ${karta.unit ?? "szt."}`],
