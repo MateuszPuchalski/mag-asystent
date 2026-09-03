@@ -136,7 +136,7 @@ function naModel(w: Record<string, unknown>): ModelUrzadzenia {
  * Kto rozstrzyga: WYŁĄCZNIE konto z rolą biura. Sprawdzane PRZED zapisem —
  * to jest „automat nie zatwierdza" w kształcie kodu, nie w dyscyplinie.
  */
-function czlowiekZBiura(database: DatabaseSync, userId: number): string {
+export function czlowiekZBiura(database: DatabaseSync, userId: number): string {
   const u = database.prepare("SELECT name, role FROM app_user WHERE user_id=?").get(userId) as
     { name: string; role: string } | undefined;
   if (!u || !["biuro", "admin"].includes(u.role)) {

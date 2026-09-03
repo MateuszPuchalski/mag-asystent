@@ -6,6 +6,7 @@ import type { ProductCard, StockView, Zamienniki } from "../types.js";
 import { parseLocs } from "../locs.js";
 import { pendingLocChanges } from "./locations.js";
 import { kandydaciZamiennikow, podzielZamienniki } from "./zamienniki.js";
+import { identyfikatoryTowaru } from "./identyfikatory.js";
 import { magazynyTowaru } from "./magazyny.js";
 import { nierozlozoneZDostaw } from "./dostawy-towaru.js";
 import { zamowioneUDostawcy } from "./zamowienia-towaru.js";
@@ -194,6 +195,7 @@ export function buildProductCard(
        treścią — najpierw „jest, ale nierozłożone", potem „nie ma, zamówione". */
     zamowione: zamowioneUDostawcy(twId),
     zamienniki: zamiennikiZOpisu(adapter, t.opis ?? "", t.symbol),
+    identyfikatory: identyfikatoryTowaru(twId).map((i) => ({ rodzaj: i.rodzaj, wartosc: i.wartosc, zrodlo: i.zrodlo })),
     /* O(1) z cache'u kandydatów — karta odświeża się co 2 s i nie ma prawa
        uruchamiać agregacji zbiórek. `undefined` gdy nie ma nic do powiedzenia,
        więc pole w JSON-ie po prostu znika. */

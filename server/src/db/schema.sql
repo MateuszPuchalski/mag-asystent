@@ -317,6 +317,61 @@ CREATE TABLE IF NOT EXISTS dowod_zastosowania (
 );
 CREATE INDEX IF NOT EXISTS ix_dowod_zastosowania ON dowod_zastosowania(zastosowanie_id);
 
+-- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────
+-- Parser zamienników od 0.61.0 wycina z opisów kartotek tokeny, które NIE są
+-- naszymi symbolami — numery OEM i katalogi obcych producentów — i wyrzuca
+-- je. Ta tabela je zatrzymuje, żeby numer z pytania klienta trafiał
+-- w kartotekę w drugą stronę: numer → towar. Przy odczycie byłby to skan
+-- 2255 opisów regexem na każde pytanie.
+--
+-- To TABELA POCHODNA: wiersze `zrodlo='opis'` powstają przy przebudowie po
+-- każdym imporcie z Subiekta i giną przy następnej. Wpisy `reczne` (biuro
+-- dopisało numer z katalogu) przebudowa omija. Bez klucza obcego do
+-- `sgt_towar` — import odtwarza read-model (blizna 0.154.0).
+CREATE TABLE IF NOT EXISTS towar_identyfikator (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_id           INTEGER NOT NULL,
+  tw_symbol       TEXT NOT NULL,
+  -- `katalog_obcy` nie ma parsera — to rezerwa dla wpisu ręcznego. CHECK
+  -- zamknięty od razu, bo rozszerzenie to przebudowa tabeli (blizna 0.135.0).
+  rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku')),
+  wartosc         TEXT NOT NULL,
+  -- `zwin(wartosc)`: `532 16 56-30`, `5321656-30` i `532165630` to jeden numer.
+  wartosc_norm    TEXT NOT NULL,
+  zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne')),
+  dodal           TEXT NOT NULL,
+  dodal_user_id   INTEGER REFERENCES app_user(user_id),
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (tw_id, rodzaj, wartosc_norm)
+);
+CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
+CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+
+-- Sekcje „Modele:" z opisów kartotek do PRZEROBIENIA przez człowieka.
+-- Decyzja właściciela: automat nie zgaduje marki z `FS450` ani `236; 240`.
+-- Jedna sekcja = jeden wiersz (`FS350 FS400 FS450` to jedna decyzja, nie
+-- trzy). `INSERT OR IGNORE` po `(tw_id, tekst_norm)` sprawia, że odrzucony
+-- i przerobiony wiersz nie wraca po przebudowie.
+CREATE TABLE IF NOT EXISTS model_z_opisu (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_id               INTEGER NOT NULL,
+  tw_symbol           TEXT NOT NULL,
+  tekst               TEXT NOT NULL,
+  tekst_norm          TEXT NOT NULL,
+  stan                TEXT NOT NULL DEFAULT 'nowy' CHECK (stan IN ('nowy','przerobiony','odrzucony')),
+  zastosowanie_id     INTEGER REFERENCES zastosowanie(id) ON DELETE SET NULL,
+  rozstrzygnal        TEXT,
+  rozstrzygnal_user_id INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at   TEXT,
+  at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (tw_id, tekst_norm)
+);
+CREATE INDEX IF NOT EXISTS ix_model_z_opisu_stan ON model_z_opisu(stan, at);
+
+-- Indeks pełnotekstowy `towar_fts` (FTS5) NIE stoi w tym pliku: `db()` wykonuje
+-- schemat bez try/catch, a FTS5 zależy od flag builda SQLite w Node. Tabelę
+-- wirtualną zakłada `migrate()` w try/catch i wystawia `ftsDostepne()`.
+
 CREATE TABLE IF NOT EXISTS conversation_event (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,

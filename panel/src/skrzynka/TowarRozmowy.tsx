@@ -125,6 +125,8 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
     ["Dostępny", `${karta.mag.avail} ${karta.unit ?? "szt."}`],
     ["Lokalizacja", karta.locs.length ? karta.locs.join(" · ") : "brak"],
     ["EAN", karta.ean || "brak"],
+    /* Identyfikatory z opisu (E3): to, po czym klient pyta, gdy nie zna naszego symbolu. */
+    ["Identyfikatory", karta.identyfikatory?.length ? karta.identyfikatory.map((i) => i.wartosc).join(" · ") : "brak"],
   ];
   return <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
     {wiersze.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">

@@ -75,7 +75,9 @@ obie **zanim** ruszy praca na prawdziwych danych.
 - [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`).
   Serwer używa wbudowanego `node:sqlite`, którego starsze wersje nie mają;
   w zamian **nie kompiluje już żadnego modułu natywnego**, więc `npm ci`
-  nie potrzebuje build tools,
+  nie potrzebuje build tools. Pełny tekst w panelu obsługi (0.186.0) używa
+  FTS5 wbudowanego w `node:sqlite` Node 22. Bez FTS5 serwer wstaje, a szczebel
+  „pełny tekst" w doborze jest pomijany z powodem,
 - [Git](https://git-scm.com) — instalator daje też **Git Bash**, w którym
   wykonuje się polecenia z tej instrukcji (albo WSL, jeśli wolisz),
 - [NSSM](https://nssm.cc) do rejestracji usług (pojedynczy `nssm.exe`),
@@ -1847,6 +1849,16 @@ sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
   (Chrome → DevTools → Application → Service workers → Unregister). Aplikację
   **zainstalowaną** jako osobne okno odinstaluj w przeglądarce
   (Chrome → Ustawienia → Aplikacje).
+
+### Aktualizacja do 0.186.0 — identyfikatory z opisów i pełny tekst
+
+Nic do zrobienia ręką. Migracja dokłada dwie tabele i indeks FTS5 sama.
+Pierwszy start po aktualizacji buduje identyfikatory z opisów kartotek
+i indeks pełnotekstowy — na pełnej kartotece trwa to poniżej sekundy.
+Potem przebudowa idzie po każdym imporcie z Subiekta, poza jego transakcją.
+Czas każdej przebudowy stoi w dzienniku zdarzeń (`read_model_po_imporcie`).
+Karta „Wiedza z opisów kartotek" w ustawieniach obsługi pokazuje, ile
+kartotek dostało identyfikatory i czy FTS5 stoi.
 
 ### Aplikacja nie wstaje: pętla restartów NSSM (0.174.2)
 

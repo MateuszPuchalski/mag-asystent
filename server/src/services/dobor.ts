@@ -44,8 +44,9 @@ export const DROGI_DOBORU = [
   "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "oem", "pelnotekst",
 ] as const;
 export type DrogaDoboru = (typeof DROGI_DOBORU)[number];
-/* `zastosowanie` doszło w E2 razem z bazą wiedzy; `oem` i `pelnotekst` czekają na E3. */
-const DROGI_Z_NADAWCA: DrogaDoboru[] = ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie"];
+/* Od E3 każda droga z §11.2 ma nadawcę; lista zostaje jako strażnik przed
+   drogą spoza słownika (np. „semantyka" z etapu F, której jeszcze nie ma). */
+const DROGI_Z_NADAWCA: DrogaDoboru[] = [...DROGI_DOBORU];
 
 /* Zdanie źródła dla szkicu (§14.3): panel go nie układa, bo druga kopia tej
    listy rozjechałaby się przy pierwszej nowej drodze. */

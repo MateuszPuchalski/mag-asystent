@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PowodNegatywny,
+  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
+  PowodNegatywny,
   Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
@@ -19,6 +20,7 @@ export const klucze = {
   wzmianki: ["wzmianki"] as const,
   sprawy: ["sprawy"] as const,
   sygnatury: ["sygnatury"] as const,
+  pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
   towar: (twId: number) => ["towar", twId] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
   wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
@@ -422,6 +424,15 @@ export function usePokrycieSygnatur() {
   return useQuery({
     queryKey: klucze.sygnatury,
     queryFn: () => api<PokrycieSygnatur>("/api/obsluga/sygnatury"),
+    staleTime: 60_000,
+  });
+}
+
+/** Pokrycie wiedzy z opisów (E3) — ten sam rytm, co sygnatury: zmienia się po imporcie. */
+export function usePokrycieWiedzy() {
+  return useQuery({
+    queryKey: klucze.pokrycieWiedzy,
+    queryFn: () => api<PokrycieWiedzy>("/api/obsluga/pokrycie-wiedzy"),
     staleTime: 60_000,
   });
 }

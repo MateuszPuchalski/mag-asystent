@@ -2,13 +2,17 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import {
   dodajDowod, kolejkaPropozycji, rozstrzygnijZastosowanie, szukajModeli, WiedzaConflict,
-  wycofajZastosowanie, zaproponujZastosowanie, zastosowaniaTowaru, type NowaPropozycja,
+  wycofajZastosowanie, zaproponujZastosowanie, zastosowaniaTowaru, type DaneModelu, type NowaPropozycja,
 } from "../services/wiedza.js";
+import {
+  dodajIdentyfikator, identyfikatoryTowaru, listaModeliZOpisow, odrzucModelZOpisu, przerobModelZOpisu,
+} from "../services/identyfikatory.js";
 
-/* ── Trasy bazy wiedzy (§12, etap E2) ────────────────────────────────────────
-   CZTERY ZAPISY: propozycja, rozstrzygnięcie, wycofanie, dowód. Każdy idzie
-   przez serwis, który sprawdza konto biura PRZED zapisem — trasa nie ma
-   własnej listy ról poza bramką odczytu.
+/* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
+   SIEDEM ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2) oraz
+   przerobienie i odrzucenie sekcji „Modele:" z opisu i ręczny identyfikator
+   (E3). Każdy idzie przez serwis, który sprawdza konto biura PRZED zapisem —
+   trasa nie ma własnej listy ról poza bramką odczytu.
 
    Adres `wiedza/*`, nie `dopasowania/*` z §16: `dopasowanie` to nazwa
    spalona w bazie i nie ożywiamy jej nawet w URL-u.
@@ -83,5 +87,40 @@ export async function wiedzaRoutes(app: FastifyInstance) {
           rodzaj: req.body?.rodzaj as never, tresc: req.body?.tresc ?? "", link: req.body?.link ?? null,
         }, ja().userId);
       } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── E3: sekcje „Modele:" z opisów i identyfikatory ─────────────────────
+     Automat NIE proponuje z opisu (decyzja właściciela): człowiek wskazuje
+     markę i model, dopiero to tworzy propozycję. Odrzucenie trwale — wiersz
+     nie wraca po przebudowie po imporcie. */
+  app.get("/api/obsluga/wiedza/z-opisow", async (_req, reply) =>
+    odmowa(reply) ?? listaModeliZOpisow());
+
+  app.post<{ Params: { id: string }; Body: { model?: DaneModelu } }>(
+    "/api/obsluga/wiedza/z-opisow/:id/przerob", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        if (!req.body?.model) throw new Error("Wskaż markę i model maszyny");
+        return przerobModelZOpisu(Number(req.params.id), req.body.model, ja().userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/z-opisow/:id/odrzuc", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return odrzucModelZOpisu(Number(req.params.id), ja().userId); }
+    catch (e) { return konflikt(reply, e); }
+  });
+
+  app.get<{ Params: { twId: string } }>("/api/obsluga/wiedza/identyfikatory/:twId", async (req, reply) =>
+    odmowa(reply) ?? identyfikatoryTowaru(Number(req.params.twId)));
+
+  /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */
+  app.post<{ Body: { twId?: number; rodzaj?: string; wartosc?: string } }>(
+    "/api/obsluga/wiedza/identyfikatory", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const b = req.body ?? {};
+        return dodajIdentyfikator(Number(b.twId), String(b.rodzaj ?? ""), String(b.wartosc ?? ""), ja().userId);
+      } catch (e) { return konflikt(reply, e); }
     });
 }

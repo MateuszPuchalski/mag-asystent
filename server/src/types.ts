@@ -70,6 +70,13 @@ export interface ProductCard {
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
   /**
+   * Identyfikatory części (OEM, numer oryginału, katalog obcy, stare SKU) —
+   * z opisu po imporcie albo wpisane ręcznie przez biuro (E3,
+   * `services/identyfikatory.ts`). Pole ADDYTYWNE obok `zamienniki.obce`:
+   * kolektor renderuje `obce` i nie ma prawa stracić tej sekcji.
+   */
+  identyfikatory: Array<{ rodzaj: string; wartosc: string; zrodlo: "opis" | "reczne" }>;
+  /**
    * Podpowiedź przeslotowania z danych o zbiórkach (`services/zbiorki.ts`).
    * Obecne TYLKO gdy towar jest w górnych 15% rotacji, a jego adres pickingowy
    * leży POZA strefą złotą — czyli gdy jest co zrobić. Pole addytywne: stare

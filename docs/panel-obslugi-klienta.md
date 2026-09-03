@@ -479,13 +479,25 @@ wyszukiwanie semantyczne.
 (nie `dopasowanie` — tę nazwę `migrate()` kasuje). Agent wpisuje dane §11.1,
 widzi kandydatów i wybiera kartotekę. Kandydatów daje `services/kandydaci.ts`
 z czterech szczebli: dokładny symbol, EAN, kartoteka oferty, zamiennik z opisu.
-Numer OEM, zastosowanie i pełny tekst raportują się jako pominięte do E2/E3.
+Zastosowanie doszło w E2, numer OEM i pełny tekst w E3. Wyszukiwanie
+semantyczne nie ma szczebla w kodzie — czeka na F.
 Każdy szczebel mówi, czy był sprawdzony; pominięty niesie powód. Wyszukiwarka
 klikana ręcznie nie jest kandydatem, tylko wyborem z drogą `wyszukiwarka`.
 Furtki na literówki dobór nie używa — blizna „szarpaka".
 
 Zdanie do szkicu pisze serwer, ze źródłem (§14.3). Dobór zatwierdzony przez
 agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
+
+**Co działa od etapu E3.** Numer OEM czyta się z tabeli `towar_identyfikator`,
+odbudowanej z opisów kartotek po każdym imporcie (sekcje `OEM:`, `Nr. oryg.`,
+`Stare SKU`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
+bez stanu i bez przycisku Wybierz. Decyzja właściciela: „nie mamy tego" jest
+odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. Pełny tekst
+to indeks FTS5 `towar_fts` po symbolu, nazwie i opisie, z rankingiem bm25.
+Pyta wyłącznie o dane wpisane przez agenta, nigdy o treść wiadomości (blizna
+„szarpaka"). Marka i model podnoszą ranking, ale go nie warunkują. Trafienie
+po treści ma pewność „wymaga danych" — to podpowiedź, nie dowód. Bez FTS5
+w SQLite szczebel jest pominięty z powodem, a karta pokrycia to pokazuje.
 
 ### 11.3. Poziomy pewności
 
@@ -526,10 +538,11 @@ Wycofać go może tylko człowiek i tylko z powodem (§14.2).
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod od etapu E2 ma
-TRZY tabele, nazwami z kodu: `model_urzadzenia`, `zastosowanie`,
-`dowod_zastosowania`. Każda z pozostałych byłaby dziś tabelą bez czytelnika —
-blizna 0.157.0. Nazwa `dopasowanie` jest spalona (§15) i nie wraca.
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma PIĘĆ tabel,
+nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2)
+oraz `towar_identyfikator` i `model_z_opisu` (E3). Każda z pozostałych byłaby
+dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa `dopasowanie` jest spalona
+(§15) i nie wraca.
 
 **Model** trzyma maszynę i silnik w jednej tabeli z `rodzaj`. Klucz liczy
 `zwin()` z marki, nazwy i wariantu, więc jedna kosiarka to jeden wiersz.
@@ -537,8 +550,9 @@ blizna 0.157.0. Nazwa `dopasowanie` jest spalona (§15) i nie wraca.
 **Zastosowanie** wiąże kartotekę z modelem i mówi, czy część pasuje, czy nie.
 Cykl życia: `propozycja` → `zatwierdzone` | `odrzucone` | `wycofane`.
 Propozycję składa dobór (automatycznie, przy zatwierdzeniu z marką i modelem),
-pomiar z hali (na kliknięcie) albo biuro ręcznie. Źródła `opis` i `copilot`
-stoją na liście bez nadawcy do E3 i F. Rozstrzyga wyłącznie człowiek z biura,
+pomiar z hali (na kliknięcie) albo biuro ręcznie. Źródło `opis` ma nadawcę
+od E3 — człowieka na liście „Z opisów"; `copilot` czeka na F.
+Rozstrzyga wyłącznie człowiek z biura,
 także autor propozycji. Zatwierdzenie wymaga choć jednego dowodu.
 
 **Dowód** przechowuje rodzaj (§11.3), treść, odnośnik, zadanie i rozmowę,
@@ -547,6 +561,19 @@ autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
 **Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
 z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
 Dziennik `events` niesie pełny wiersz przy każdej zmianie.
+
+**Identyfikatory** (`towar_identyfikator`, E3) to numery OEM, numery
+oryginału, katalogi obce i stare SKU. Z opisu biorą się po każdym imporcie
+(źródło `opis`, przebudowa je odtwarza); z ręki biura — z katalogu, którego
+w opisie nie ma (źródło `reczne`, przebudowa je omija). Tabela nie ma klucza
+obcego do `sgt_towar`, bo import wycina read-model.
+
+**Z opisów** (`model_z_opisu`, E3). Sekcje `Modele:` z opisów kartotek
+trafiają na osobną listę na ekranie Wiedza, nie do kolejki propozycji.
+Automat nie proponuje z opisu — decyzja właściciela: `FS350 FS400` nie mówi,
+czyja to maszyna. Człowiek wskazuje markę i model, dopiero to tworzy
+propozycję ze źródłem `opis` i dowodem `decyzja_biura`. Odrzucony wiersz
+zostaje w tabeli i nie wraca po imporcie.
 
 ## 13. Zadania terenowe
 
@@ -627,11 +654,16 @@ conversation_assignment  conversation_comment    conversation_mention
 conversation_draft       offer_snapshot          customer
 customer_machine         order_snapshot          product_link
 dobor_rozmowy            model_urzadzenia        zastosowanie
-dowod_zastosowania       part_identifier         knowledge_document
-zadanie_terenowe         zadanie_zalacznik       allegro_inbox_thread
-allegro_inbox_message    allegro_inbox_sync_state
-outbox                   events
+dowod_zastosowania       towar_identyfikator     model_z_opisu
+towar_fts                knowledge_document      zadanie_terenowe
+zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
+allegro_inbox_sync_state outbox                  events
 ```
+
+Projektowy `part_identifier` nazywa się w kodzie `towar_identyfikator`
+(precedens `sprawa_klienta`). `towar_fts` to tabela wirtualna FTS5 tworzona
+w `migrate()`, nie w `schema.sql`: bez FTS5 w SQLite start ma przeżyć,
+a szczebel pełnego tekstu ma się pominąć z powodem.
 
 Obecności agentów nie ma na tej liście świadomie — patrz §6.3.
 
@@ -698,6 +730,12 @@ POST   /api/obsluga/wiedza/propozycje
 POST   /api/obsluga/wiedza/:id/rozstrzygnij
 POST   /api/obsluga/wiedza/:id/wycofaj
 POST   /api/obsluga/wiedza/:id/dowody
+GET    /api/obsluga/wiedza/z-opisow
+POST   /api/obsluga/wiedza/z-opisow/:id/przerob
+POST   /api/obsluga/wiedza/z-opisow/:id/odrzuc
+GET    /api/obsluga/wiedza/identyfikatory/:twId
+POST   /api/obsluga/wiedza/identyfikatory
+GET    /api/obsluga/pokrycie-wiedzy
 ```
 
 Trasy doboru działają od E1, trasy wiedzy od E2. Projekt właściciela pisał
@@ -723,7 +761,9 @@ Adaptery zewnętrzne: `AllegroMessagingAdapter`, `AllegroOffersAdapter`,
 
 Zostajemy przy `node:sqlite`, dopóki instalacja jest pojedyncza, agentów jest
 niewielu, synchronizacja działa w jednym procesie, zapisy są krótkie,
-a konflikty rozstrzyga wersjonowanie.
+a konflikty rozstrzyga wersjonowanie. Wyszukiwanie pełnotekstowe (E3)
+pokrywa FTS5 wbudowane w `node:sqlite`; progiem PostgreSQL zostaje
+wyszukiwanie wektorowe.
 
 Migrację na PostgreSQL rozważamy przy wielu instancjach backendu, wielu kontach
 marketplace, intensywnej pracy agentów, dużej historii, rozbudowanym
@@ -1324,7 +1364,11 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **częściowo** od E1 | `services/kandydaci.ts`: symbol, EAN, zastosowanie (E2), oferta, zamiennik; OEM i pełny tekst w E3 |
+| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
+| Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |
+| Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
+| Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
+| Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Sprawa nad rozmowami (§6.1) | **działa** od 0.161.0 | `sprawa_klienta`, `services/sprawy.ts`, pasek w rozmowie |
 | Ekran sprawy z własną osią | **poza zakresem** | zdarzenia wiszą przy źródle — blizna 0.130.0 |

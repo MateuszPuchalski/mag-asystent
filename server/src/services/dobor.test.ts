@@ -164,9 +164,9 @@ test("zdjęcie wyboru cofa zatwierdzenie, a nieistniejąca kartoteka i obca drog
   assert.ok(osDoboru().includes("dobor_wybor_zdjety"));
 
   assert.throws(() => wybierzKandydata(rozmowa, 999999, "oferta", 3, biuro), /Nie ma takiej kartoteki/);
-  /* `oem` i `pelnotekst` czekają na E3 — wybór z drogą bez nadawcy udawałby
-     dowód, którego panel jeszcze nie ma. `zastosowanie` doszło w E2. */
-  assert.throws(() => wybierzKandydata(rozmowa, SZARPAK_ALT, "oem", 3, biuro), /nie ma w tym wydaniu nadawcy/);
+  /* Droga spoza §11.2 (semantyka to etap F) — wybór z drogą bez nadawcy
+     udawałby dowód, którego panel nie ma. */
+  assert.throws(() => wybierzKandydata(rozmowa, SZARPAK_ALT, "semantyka", 3, biuro), /nie ma w tym wydaniu nadawcy/);
   assert.equal(doborRozmowy(rozmowa).wersja, 3);
 });
 

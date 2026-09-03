@@ -62,6 +62,7 @@ import { uruchomTakt } from "./services/takt.js";
 import { zwiazPewne } from "./services/sygnatury.js";
 import { zwiazFakturyPewne } from "./services/faktury.js";
 import { allegroTryb } from "./adapters/allegro.js";
+import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
 
 /**
  * Złożenie aplikacji BEZ nasłuchiwania.
@@ -340,6 +341,10 @@ async function main() {
     await odswiezReadModel("start");
     setInterval(() => void odswiezReadModel("cykl"), config.mssql.syncMs);
   }
+  /* Pierwszy start po aktualizacji do E3 (albo seeded bez ponownego seeda):
+     kartoteka już jest, pochodne opisów jeszcze nie. Raz, tylko w api —
+     worker ma własny `migrate()`, ale nie ma czytelnika tych tabel. */
+  if (pochodnePuste()) poImporcie();
 
   /* Wyłącznie punkt wejścia uruchamia pracę w tle: import buildApp w testach
      ani narzędzia administracyjne nie mogą zacząć odpytywać Allegro. */

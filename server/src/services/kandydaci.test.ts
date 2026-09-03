@@ -48,6 +48,11 @@ before(async () => {
   });
   d.exec("COMMIT");
   assert.equal((d.prepare("SELECT symbol FROM sgt_towar WHERE tw_id=?").get(FTC272) as { symbol: string }).symbol, "FTC272");
+  /* E3: szczeble OEM i pełnego tekstu czytają pochodne po imporcie, nie kartotekę. */
+  const { przebudujIdentyfikatory } = await import("./identyfikatory.js");
+  const { przebudujFts } = await import("./pelnotekst.js");
+  przebudujIdentyfikatory(d);
+  assert.ok(przebudujFts(d), "FTS5 ma być dostępne w node:sqlite testów");
 });
 
 beforeEach(() => {
@@ -87,7 +92,8 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   }
   assert.match(szczebel(drogi, "oferta").powod!, /nie jest powiązana z ofertą/);
   assert.match(szczebel(drogi, "zastosowanie").powod!, /marki i modelu/);
-  assert.match(szczebel(drogi, "oem").powod!, /E3/);
+  assert.match(szczebel(drogi, "oem").powod!, /numeru OEM/);
+  assert.match(szczebel(drogi, "pelnotekst").powod!, /nazwy części ani maszyny/);
   /* Patrzenie na kandydatów niczego nie zapisuje — ani wiersza doboru, ani zdarzenia. */
   assert.equal((db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n, przed);
   assert.equal((db().prepare("SELECT count(*) n FROM dobor_rozmowy").get() as { n: number }).n, 0);
@@ -131,9 +137,11 @@ test("literówka w symbolu NIE prowadzi do cudzej kartoteki — furtka jest wył
      symbol i agent brał go za trafienie. Dobór nie ma prawa zgadywać. */
   zapiszDane(rozmowa, { oem: "FTC27Z" }, 1, biuro);
   const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
-  assert.deepEqual(kandydaci, []);
+  assert.deepEqual(kandydaci.filter((k) => k.twId !== null), []);
   assert.equal(szczebel(drogi, "symbol").sprawdzona, true);
   assert.equal(szczebel(drogi, "symbol").wynikow, 0);
+  /* Zostaje wyłącznie karta „bez kartoteki" z pola OEM (E3) — bez wiersza, bez stanu. */
+  assert.deepEqual(kandydaci.map((k) => [k.twId, k.droga, k.pewnosc]), [[null, "oem", "wymaga_danych"]]);
 });
 
 test("kod EAN w danych wejściowych trafia w kartotekę drogą `ean`", () => {
@@ -195,4 +203,73 @@ test("negatyw jest widoczny osobno i jako ostrzeżenie przy kandydacie z innej d
   assert.equal(oferta.ostrzezenia.length, 1);
   assert.match(oferta.ostrzezenia[0], /innego wariantu — nie pasuje do STIHL FS 250/);
   assert.equal(kandydaci.some((k) => k.twId === 1), false);
+});
+
+/* ── Szczeble OEM i pełnego tekstu (E3) ──────────────────────────────────── */
+
+test("numer OEM z opisu trafia w kartotekę drogą `oem`, a ta sama kartoteka z zamiennika to JEDEN kandydat", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { oem: "41307131600" }, 1, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "oem").sprawdzona, true);
+  assert.ok(szczebel(drogi, "oem").wynikow >= 2, "numer stoi w opisie FTC272 i jego zamiennika");
+  const ftc = kandydaci.find((k) => k.twId === FTC272)!;
+  assert.equal(ftc.droga, "oem", "OEM bije kontekst oferty");
+  assert.equal(ftc.pewnosc, "prawdopodobne");
+  assert.match(ftc.zrodlo, /^numer OEM 41307131600 z opisu kartoteki „FTC272”$/);
+  /* Zamiennik z opisu FTC272 ma ten sam numer w SWOIM opisie: jedna karta, mocniejsza droga. */
+  assert.equal(kandydaci.filter((k) => k.twId === ZAMIENNIK_FTC272).length, 1);
+  assert.equal(kandydaci.find((k) => k.twId === ZAMIENNIK_FTC272)!.droga, "oem");
+  assert.equal(kandydaci.some((k) => k.twId === null), false, "numer z kartoteką nie dostaje karty „bez kartoteki”");
+});
+
+test("numer OEM bez kartoteki to kandydat BEZ wiersza na końcu listy — decyzja właściciela, makieta Dobor.dc.html", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { oem: "999999999" }, 1, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "oem").sprawdzona, true);
+  assert.equal(szczebel(drogi, "oem").wynikow, 0, "karta bez kartoteki nie liczy się jako trafienie");
+  const ostatni = kandydaci[kandydaci.length - 1];
+  assert.equal(ostatni.twId, null);
+  assert.equal(ostatni.stan, null);
+  assert.equal(ostatni.symbol, "OEM 999999999");
+  assert.equal(ostatni.nazwa, "identyfikator bez wiersza w kartotece");
+  assert.equal(ostatni.pewnosc, "wymaga_danych");
+  assert.equal(ostatni.nr, kandydaci.length, "numeracja ciągła: karta bez kartoteki idzie PO kartotekach");
+  assert.ok(kandydaci.slice(0, -1).every((k) => k.twId !== null));
+});
+
+test("numer wpisany jako NAZWA części nie dostaje karty „bez kartoteki”", () => {
+  zapiszDane(rozmowa, { nazwaCzesci: "123456789" }, 1, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "oem").sprawdzona, true);
+  assert.deepEqual(kandydaci, []);
+});
+
+test("pełny tekst pyta o dane agenta i daje trafienia `wymaga_danych` z rankingiem, nie dowód", () => {
+  zapiszDane(rozmowa, { nazwaCzesci: "podkładka przekładni", marka: "STIHL", model: "FS 250" }, 1, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "pelnotekst").sprawdzona, true);
+  assert.ok(szczebel(drogi, "pelnotekst").wynikow >= 1);
+  assert.ok(szczebel(drogi, "pelnotekst").wynikow <= 5, "górna zapora: pięć trafień bm25");
+  const pt = kandydaci.filter((k) => k.droga === "pelnotekst");
+  assert.equal(pt.length, szczebel(drogi, "pelnotekst").wynikow);
+  assert.ok(pt.every((k) => k.pewnosc === "wymaga_danych"));
+  assert.match(pt[0].zrodlo, /^trafienie po treści kartoteki dla „podkładka przekładni STIHL FS 250” — nie dowód/);
+  assert.ok(pt.some((k) => k.twId === FTC272), "podkładka przekładni FS jest w opisie FTC272");
+});
+
+test("bez FTS5 szczebel pełnego tekstu jest pominięty z powodem, a reszta drabiny działa", async () => {
+  const { udawajBrakFts } = await import("../db/db.js");
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { nazwaCzesci: "podkładka przekładni" }, 1, biuro);
+  udawajBrakFts(true);
+  try {
+    const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+    assert.equal(szczebel(drogi, "pelnotekst").sprawdzona, false);
+    assert.match(szczebel(drogi, "pelnotekst").powod!, /SQLite bez FTS5/);
+    assert.equal(kandydaci[0].twId, FTC272);
+  } finally {
+    udawajBrakFts(false);
+  }
 });

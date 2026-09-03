@@ -51,6 +51,8 @@ describe("towar przy rozmowie", () => {
         id: 7701, sym: "NOZ-STIGA-43", name: "Nóż do kosiarki 43 cm", ean: "5901234567890",
         unit: "szt.", locs: ["R12-B3"],
         mag: { stan: 7, rez: 2, avail: 5 }, magazyny: [],
+        identyfikatory: [{ rodzaj: "oem", wartosc: "181004341/0", zrodlo: "opis" },
+          { rodzaj: "katalog_obcy", wartosc: "AB-1234", zrodlo: "reczne" }],
       },
     });
     render(<TowarRozmowy rozmowaId={1} oferta={oferta({
@@ -61,6 +63,8 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByText("Nóż do kosiarki 43 cm")).toBeInTheDocument();
     expect(screen.getByText("R12-B3")).toBeInTheDocument();
     expect(screen.getByText("5 szt.")).toBeInTheDocument();
+    /* Identyfikatory z opisu (E3) — po nich klient pyta, gdy nie zna naszego symbolu. */
+    expect(screen.getByText("181004341/0 · AB-1234")).toBeInTheDocument();
     /* Wskazanie człowieka jest podpisane człowiekiem (§4.3). */
     expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
   });

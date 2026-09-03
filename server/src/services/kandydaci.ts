@@ -1,11 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
-import { db } from "../db/db.js";
+import { db, ftsDostepne } from "../db/db.js";
 import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
+import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
+import { szukajPelnotekst } from "./pelnotekst.js";
+import { zwin } from "../tekst.js";
 
 /**
  * Kandydaci doboru (§11.2) — osobny plik od `dobor.ts`, bo E2 i E3 dokładają
@@ -30,11 +33,12 @@ export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "wymaga_danych
 
 export interface KandydatDoboru {
   nr: number;
-  twId: number;
+  /** `null` = identyfikator bez wiersza w kartotece (§11.2, makieta Dobor.dc.html) — decyzja właściciela z E3. */
+  twId: number | null;
   symbol: string;
   nazwa: string;
   /** Dostępne na magazynie głównym (stan minus rezerwacje). */
-  stan: number;
+  stan: number | null;
   droga: DrogaDoboru;
   pewnosc: PewnoscKandydata;
   /** Zdanie dla ekranu — §11.3 żąda widocznego źródła, nie samej drogi. */
@@ -67,14 +71,16 @@ const RANGA: Record<DrogaDoboru, number> = {
 };
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
-  oem: "numery OEM dochodzą w etapie E3",
-  pelnotekst: "wyszukiwanie pełnotekstowe dochodzi w etapie E3",
   wyszukiwarka: "wyszukiwarka to wybór ręczny, nie kandydat",
 };
 
 /** Coś, co wygląda na symbol albo numer: bez spacji, z cyfrą, rozsądnej długości. */
 const JAK_SYMBOL = /^[A-Za-z0-9][A-Za-z0-9\-_./+*]{1,39}$/;
 const wygladaNaSymbol = (v: string | null) => Boolean(v && /\d/.test(v) && JAK_SYMBOL.test(v));
+/* Luźniej niż symbol: `532 16 56-30` ma spacje. Dwie cyfry i cztery znaki,
+   żeby `x2` albo `S` nie uruchamiały szczebla. */
+const wygladaNaNumer = (v: string | null) =>
+  Boolean(v && v.trim().length >= 4 && v.trim().length <= 40 && (v.match(/\d/g) ?? []).length >= 2);
 
 /** Oferta, o którą chodzi: ręczne wskazanie bije numer z wiadomości. */
 function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto: number; ofertaId: string } | null {
@@ -115,6 +121,9 @@ export function kandydaciDoboru(
   const pomin = (droga: DrogaDoboru, powod: string) =>
     drogi.set(droga, { droga, sprawdzona: false, wynikow: 0, powod });
   const dodaj = (k: Omit<KandydatDoboru, "nr">) => {
+    // Mapa jest kluczowana po kartotece; kandydat bez niej (twId null) ma osobną
+    // listę `bezKartoteki`, więc tu nigdy nie wchodzi — strażnik przed pomyłką.
+    if (k.twId === null) return;
     const juz = znalezione.get(k.twId);
     if (!juz || RANGA[k.droga] < RANGA[juz.droga]) znalezione.set(k.twId, k);
   };
@@ -123,6 +132,10 @@ export function kandydaciDoboru(
      wygląda. Zawsze `literowki: false`: furtka na literówki prowadziła już
      do cudzej kartoteki (blizna „szarpaka"), a dobór nie ma prawa zgadywać. */
   const zapytania = [dobor.dane.oem, dobor.dane.nazwaCzesci].filter(wygladaNaSymbol) as string[];
+  /* Wartości, które trafiły w kartotekę symbolem albo EAN-em. Szczebel OEM nie
+     ma prawa dołożyć do nich karty „bez kartoteki": numer, który JEST naszym
+     symbolem, nie jest „numerem, którego nie mamy". */
+  const trafioneNumery = new Set<string>();
   if (zapytania.length === 0) {
     pomin("symbol", "agent nie wpisał symbolu ani numeru w danych wejściowych");
     pomin("ean", "agent nie wpisał kodu EAN w danych wejściowych");
@@ -134,12 +147,12 @@ export function kandydaciDoboru(
       for (const t of trafienia) {
         if (t.sym.trim().toUpperCase() === q.toUpperCase()) {
           const w = towar(database, t.id); if (!w) continue;
-          poSymbolu++;
+          poSymbolu++; trafioneNumery.add(zwin(q));
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "symbol",
             pewnosc: "prawdopodobne", zrodlo: `Dokładny symbol „${q}” z danych wejściowych`, ostrzezenia: [] });
         } else if (cyfry.length >= 8 && t.ean === cyfry) {
           const w = towar(database, t.id); if (!w) continue;
-          poEan++;
+          poEan++; trafioneNumery.add(zwin(q));
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "ean",
             pewnosc: "prawdopodobne", zrodlo: `Kod EAN ${cyfry} z danych wejściowych`, ostrzezenia: [] });
         }
@@ -193,6 +206,42 @@ export function kandydaciDoboru(
     drogi.set("zamiennik", { droga: "zamiennik", sprawdzona: true, wynikow: ile });
   }
 
+  /* SZCZEBEL: numer OEM (E3) — z tabeli identyfikatorów, nie z wyszukiwarki.
+     Numer bez kartoteki NIE znika: decyzją właściciela staje się kandydatem
+     bez wiersza (makieta Dobor.dc.html), bo „nie mamy tego u siebie" jest
+     odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. */
+  const bezKartoteki: Array<Omit<KandydatDoboru, "nr">> = [];
+  const numery = [dobor.dane.oem, dobor.dane.nazwaCzesci].filter(wygladaNaNumer) as string[];
+  if (numery.length === 0) {
+    pomin("oem", "agent nie wpisał numeru OEM w danych wejściowych");
+  } else {
+    let ile = 0;
+    const widziane = new Set<string>();
+    for (const numer of numery) {
+      const norm = zwin(numer);
+      if (!norm || widziane.has(norm)) continue;
+      widziane.add(norm);
+      const trafienia = szukajPoIdentyfikatorze(numer, database);
+      for (const t of trafienia) {
+        const w = towar(database, t.twId); if (!w) continue;
+        ile++;
+        dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oem",
+          pewnosc: "prawdopodobne", ostrzezenia: [],
+          zrodlo: t.zrodlo === "reczne"
+            ? `numer ${t.nazwaRodzaju} ${t.wartosc} wpisany ręcznie przez ${t.dodal}`
+            : `numer ${t.nazwaRodzaju} ${t.wartosc} z opisu kartoteki „${w.symbol}”` });
+      }
+      /* Karta „bez kartoteki" tylko dla pola OEM: numer wpisany jako NAZWA
+         części to nie deklaracja „mam numer producenta". */
+      if (trafienia.length === 0 && numer === dobor.dane.oem && !trafioneNumery.has(norm)) {
+        bezKartoteki.push({ twId: null, symbol: `OEM ${numer.trim()}`, nazwa: "identyfikator bez wiersza w kartotece",
+          stan: null, droga: "oem", pewnosc: "wymaga_danych", ostrzezenia: [],
+          zrodlo: "numer z danych wejściowych — nie ma go w żadnym opisie kartoteki" });
+      }
+    }
+    drogi.set("oem", { droga: "oem", sprawdzona: true, wynikow: ile });
+  }
+
   /* SZCZEBEL: potwierdzone zastosowanie z bazy wiedzy (E2). Tylko
      ZATWIERDZONE wpisy: propozycja czekająca w kolejce nie jest wiedzą.
      Pewność niesie sam wpis (dowód techniczny albo tylko ślad rozmowy),
@@ -218,14 +267,37 @@ export function kandydaciDoboru(
     drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
   }
 
+  /* SZCZEBEL: pełny tekst (E3) — bm25 po symbolu, nazwie i opisie, WYŁĄCZNIE
+     z danych wpisanych przez agenta (blizna „szarpaka": nigdy z treści
+     wiadomości). Trafienie po treści to podpowiedź, nie dowód (§11.2). */
+  const fraza = [dobor.dane.nazwaCzesci, dobor.dane.marka, dobor.dane.model].filter(Boolean).join(" ");
+  if (!ftsDostepne()) {
+    pomin("pelnotekst", "wyszukiwanie pełnotekstowe niedostępne — SQLite bez FTS5");
+  } else if (!fraza) {
+    pomin("pelnotekst", "agent nie wpisał nazwy części ani maszyny");
+  } else {
+    let ile = 0;
+    for (const t of szukajPelnotekst(dobor.dane.nazwaCzesci ?? "", 5, database, [dobor.dane.marka ?? "", dobor.dane.model ?? ""])) {
+      const w = towar(database, t.twId); if (!w) continue;
+      ile++;
+      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "pelnotekst",
+        pewnosc: "wymaga_danych", ostrzezenia: [],
+        zrodlo: `trafienie po treści kartoteki dla „${fraza}” — nie dowód` });
+    }
+    drogi.set("pelnotekst", { droga: "pelnotekst", sprawdzona: true, wynikow: ile });
+  }
+
   for (const droga of DROGI_DOBORU) {
     if (!drogi.has(droga)) pomin(droga, POMINIETE_DO[droga] ?? "szczebel bez nadawcy");
   }
 
   /* Ostrzeżenie przy kandydacie to skrót negatywu o TEJ SAMEJ kartotece —
      ta sama część bywa kandydatem z oferty i negatywem z wiedzy naraz. */
-  const kandydaci = [...znalezione.values()]
-    .sort((a, b) => RANGA[a.droga] - RANGA[b.droga] || b.stan - a.stan || a.symbol.localeCompare(b.symbol))
+  const kandydaci = [...[...znalezione.values()]
+    .sort((a, b) => RANGA[a.droga] - RANGA[b.droga] || (b.stan ?? 0) - (a.stan ?? 0) || a.symbol.localeCompare(b.symbol)),
+  /* Numery bez kartoteki na końcu: nie da się ich wybrać, więc nie mają
+     wyprzedzać niczego, co się da. */
+  ...bezKartoteki]
     .map((k, i) => ({ nr: i + 1, ...k,
       ostrzezenia: negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`) }));
   return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne };

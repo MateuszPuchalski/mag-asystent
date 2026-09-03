@@ -136,6 +136,8 @@ export type KartaTowaru = {
   /** Opis kartoteki i zamienniki z niego wyczytane — serwer to zwraca od dawna, kolektor czyta. */
   desc?: string;
   zamienniki?: { znane: Array<{ id: number; sym: string; name: string }>; obce: string[] };
+  /** Identyfikatory części (E3): z opisu po imporcie albo wpisane ręcznie. Pole addytywne. */
+  identyfikatory?: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string; zrodlo: "opis" | "reczne" }>;
   locs: string[];
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
@@ -188,7 +190,8 @@ export type Dobor = {
 };
 
 export type KandydatDoboru = {
-  nr: number; twId: number; symbol: string; nazwa: string; stan: number;
+  /** `twId: null` = numer OEM bez wiersza w kartotece (§11.2, E3, makieta Dobor.dc.html): bez stanu i bez Wybierz. */
+  nr: number; twId: number | null; symbol: string; nazwa: string; stan: number | null;
   droga: DrogaDoboru;
   pewnosc: "potwierdzone" | "prawdopodobne" | "wymaga_danych";
   /** Zdanie z serwera (§11.3): skąd kandydat, nie sam kod drogi. */
@@ -237,6 +240,30 @@ export type Zastosowanie = {
   pewnosc: "potwierdzone" | "prawdopodobne";
   /** Zdanie źródła pisze SERWER (§14.3). */
   zdanieZrodla: string;
+};
+
+/* ── Identyfikatory i sekcje „Modele:" z opisów (§11.2, etap E3) ─────────── */
+export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku";
+
+export type Identyfikator = {
+  id: number; twId: number; symbol: string; nazwa: string | null;
+  rodzaj: RodzajIdentyfikatora; nazwaRodzaju: string; wartosc: string;
+  zrodlo: "opis" | "reczne"; dodal: string; at: string;
+};
+
+/** Sekcja „Modele:" z opisu kartoteki, którą człowiek zamienia na propozycję albo odrzuca. */
+export type ModelZOpisu = {
+  id: number; twId: number; symbol: string; nazwa: string | null; tekst: string;
+  stan: "nowy" | "przerobiony" | "odrzucony"; zastosowanieId: number | null;
+  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; at: string;
+};
+
+export type PokrycieWiedzy = {
+  kartotek: number; zOpisem: number; zIdentyfikatorem: number;
+  identyfikatorow: number; identyfikatorowRecznych: number;
+  modeleZOpisu: { nowych: number; przerobionych: number; odrzuconych: number };
+  zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
+  fts: { dostepne: boolean; wpisow: number };
 };
 
 export type NowaPropozycja = {

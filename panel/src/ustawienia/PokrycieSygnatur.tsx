@@ -11,7 +11,7 @@ import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
    znaczy jedno kliknięcie w Allegro albo jedną kartotekę w Subiekcie —
    i o tyle mniej zatwierdzania przy zwrotach.                              */
 
-const Liczba = ({ etykieta, ile, ton = "" }: { etykieta: string; ile: number; ton?: string }) =>
+export const Liczba = ({ etykieta, ile, ton = "" }: { etykieta: string; ile: number; ton?: string }) =>
   <div className="flex flex-col">
     <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
     <span className="text-xs text-slate-500">{etykieta}</span>

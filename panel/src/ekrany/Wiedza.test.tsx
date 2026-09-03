@@ -37,6 +37,11 @@ vi.mock("../api/wiedza", async () => {
     useZaproponujZastosowanie: () => ({ mutate: zaproponuj, isPending: false }),
     useModele: () => ({ data: { modele: [] } }),
     useWiedzaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+    useModeleZOpisow: () => ({ data: { wiersze: [], liczba: 2 }, isLoading: false, error: null }),
+    usePrzerobModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
+    useOdrzucModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
+    useIdentyfikatory: () => ({ data: [], isLoading: false, error: null }),
+    useDodajIdentyfikator: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   };
 });
 vi.mock("../wyszukiwarka", () => ({

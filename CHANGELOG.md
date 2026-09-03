@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.186.0 — 3 września 2026
+
+**Identyfikatory z opisów i pełny tekst (§11.2, etap E3).** Dobór miał od E1
+dwa szczeble „pominięte do E3”: numer OEM i pełny tekst. Surowiec leżał
+w opisach kartotek — 460 sekcji `OEM:`, 99 `Nr. oryg.`, 37 `Modele:` —
+a wyszukiwarka nie czytała kolumny `opis` wcale. Teraz po każdym imporcie
+serwer buduje z opisów tabelę `towar_identyfikator`, listę `model_z_opisu`
+i indeks FTS5 `towar_fts`. Dobór dostał oba brakujące szczeble, ekran Wiedza
+czwartą zakładkę „Z opisów”, karta towaru identyfikatory, a ustawienia kartę
+pokrycia wiedzy.
+
+### Dwie decyzje właściciela
+
+- **Numer OEM bez kartoteki to kandydat bez wiersza** — jak w makiecie:
+  symbol „OEM 118550127/0”, pewność „wymaga danych”, bez stanu i bez
+  przycisku Wybierz. „Nie mamy tego” jest odpowiedzią dla klienta.
+- **Sekcje `Modele:` nie idą do kolejki propozycji.** Automat nie zgadnie,
+  czyja to maszyna. Człowiek wskazuje markę i model na liście „Z opisów”,
+  dopiero to tworzy propozycję ze źródłem `opis` i dowodem `decyzja_biura`.
+  Odrzucony wiersz nie wraca po imporcie.
+
+### Zasady, które stoją w kształcie
+
+- Pochodne opisów odbudowuje `poImporcie` PO transakcji importu, po seedzie
+  i raz przy starcie, gdy są puste. Nigdy z `buildApp()` ani z `migrate()`.
+  Każda przebudowa w osobnym try/catch, czas w dzienniku; strażnik < 5 s.
+- Żadnych kluczy obcych do `sgt_towar` — import wycina read-model. Ręczne
+  identyfikatory i odrzucone sekcje przeżywają przebudowę (`INSERT OR IGNORE`).
+- `CREATE VIRTUAL TABLE` stoi w `migrate()` w try/catch, nie w `schema.sql`:
+  bez FTS5 serwer wstaje, szczebel melduje „niedostępne — SQLite bez FTS5”.
+- Pełny tekst pyta WYŁĄCZNIE o dane wpisane przez agenta, nigdy o treść
+  wiadomości (blizna „szarpaka”). Marka i model podnoszą ranking bm25, nie
+  warunkują trafienia. Trafienie po treści to „wymaga danych”, nie dowód.
+- Cyfry ze spacjami to JEDEN numer (`532 16 56-30`); granica sekcji opisu
+  to nadal pierwsze generyczne „Słowo:” — wspólny moduł `opis-sekcje.ts`,
+  a `zamienniki.test.ts` jest strażnikiem refaktoru.
+- Tras zapisu wiedzy jest siedem (było cztery); licznik w teście jest umową.
+
 ## 0.185.0 — 3 września 2026
 
 **Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2).** Do tego wydania
