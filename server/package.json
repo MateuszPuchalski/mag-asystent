@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.193.0",
+  "version": "0.193.1",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -16,7 +16,8 @@
     "build": "tsc -p tsconfig.build.json && node -e \"const f=require('fs');f.copyFileSync('src/db/schema.sql','dist/db/schema.sql');f.mkdirSync('dist/web',{recursive:true});f.copyFileSync('src/web/biuro.html','dist/web/biuro.html');f.cpSync('src/web/fonty','dist/web/fonty',{recursive:true});f.cpSync('../panel/dist','dist/web/obsluga',{recursive:true})\"",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker/worker.js",
-    "test": "tsx --test src/*.test.ts src/**/*.test.ts",
+    "test": "tsx --test --test-reporter=dot src/*.test.ts src/**/*.test.ts",
+    "test:licznik": "tsx --test --test-reporter=tap src/*.test.ts src/**/*.test.ts | grep -E '^# (tests|pass|fail)'",
     "reconcile": "tsx src/reconcile-run.ts",
     "reslot": "tsx src/reslot-run.ts",
     "sonda": "tsx src/sonda-run.ts",
