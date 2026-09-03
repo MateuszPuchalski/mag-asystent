@@ -62,6 +62,36 @@ EXISTS` druga definicja nie jest błędem składni, tylko cichą podmianą schem
 — tak w 0.142.0 scaliła się bez jednego znacznika konfliktu atrapa
 `zadanie_terenowe`.
 
+## 0.193.1 — 3 września 2026
+
+**Trzy poprawki narzędziowe: mniej hałasu z testów, ostrzeżenie o starych
+zależnościach, uczciwy komentarz o cache'owaniu.** Wszystkie z przeglądu
+kosztów pracy nad repo; żadna nie zmienia niczego na ekranie.
+
+**Testy serwera drukują kropki zamiast protokołu TAP.** Pełne wyjście miało
+613 KB i 13 695 linii, z czego treścią było kilkanaście. Reporter `dot` daje
+te same 46 sekund, ten sam kod wyjścia i te same szczegóły porażek —
+asercję, różnicę, plik i linię — w 1,6 KB. To 385 razy mniej do przeczytania
+przez człowieka i przez sesję asystenta, która ma to polecenie w instrukcji.
+
+Kropki nie niosą jednej rzeczy: liczby testów, a tę cytuje się w opisach
+wydań. Stąd `npm run test:licznik` — ten sam przebieg z reporterem TAP,
+z którego zostają trzy wiersze podsumowania.
+
+**`co_w_toku.sh` ostrzega, gdy `node_modules` jest starsze niż `package.json`.**
+Nieaktualna instalacja UDAJE zepsute repozytorium: `npm test` pokazał kiedyś
+290 porażek na czystym `main`, bo pakiet dołożony w międzyczasie nie był
+zainstalowany. Fałszywa awaria kosztuje więcej niż prawdziwa, bo przy
+prawdziwej wiadomo przynajmniej, czego szukać. Skrypt sprawdza istnienie
+katalogów pakietów i jak zawsze kończy się zerem.
+
+**Komentarz przy prompcie Copilota mówi teraz prawdę.** Prompt jest oznaczony
+do cache'owania, ale ma około 380 tokenów, a próg wejścia do cache'u zaczyna
+się od 512. API nie zgłasza tego błędem — po prostu nie cache'uje. Znacznik
+zostaje, bo nic nie kosztuje i zadziała, gdy instrukcja urośnie; zmienił się
+komentarz, żeby nikt nie liczył na oszczędność, której nie ma.
+
+
 ## 0.193.0 — 3 września 2026
 
 **Hierarchia informacji w skrzynce pytań.** Właściciel powiedział wprost, że
