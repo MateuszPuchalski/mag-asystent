@@ -15,7 +15,7 @@ import { wyslijOdpowiedz } from "../services/wysylka.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
-import { ustawStatusDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
+import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
 import { kandydaciDoboru } from "../services/kandydaci.js";
 
 const BIURO = ["biuro", "admin"];
@@ -241,6 +241,28 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         return wybierzKandydata(Number(req.params.id), req.body?.twId ?? null, req.body?.droga ?? "",
           Number(req.body?.expectedVersion), sesjaZadania()!.user.userId);
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* WIEDZA PRZY DOBORZE (E2): dowody wybranej kartoteki i pomiary z tej
+     rozmowy, które mogą stać się dowodem. Odczyt nic nie zapisuje; wynik
+     pomiaru trafia do bazy wiedzy WYŁĄCZNIE na kliknięcie (§13.4). */
+  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/wiedza",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return wiedzaDoboru(Number(req.params.id)); }
+      catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { zadanieId?: number; twId?: number | null; polaryzacja?: string; powodNegatywny?: string | null } }>(
+    "/api/obsluga/rozmowy/:id/dobor/pomiar-do-wiedzy", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return pomiarDoWiedzy(Number(req.params.id), {
+          zadanieId: Number(req.body?.zadanieId), twId: req.body?.twId ?? null,
+          polaryzacja: (req.body?.polaryzacja ?? "pasuje") as "pasuje" | "nie_pasuje",
+          powodNegatywny: (req.body?.powodNegatywny ?? null) as never,
+        }, sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
     });
 
   /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy

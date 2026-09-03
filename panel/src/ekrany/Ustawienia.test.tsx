@@ -72,5 +72,9 @@ describe("Ustawienia obsługi", () => {
        otwiera się razy kilka w miesiącu. Ten sam podział co w biurze. */
     const zakladki = rama.slice(rama.indexOf("const ZAKLADKI"), rama.indexOf("]", rama.indexOf("const ZAKLADKI")));
     expect(zakladki).not.toContain("ustawienia");
+    /* Wiedza (E2) to PRACA — kolejka propozycji do rozstrzygnięcia — więc
+       stoi na pasku, z trasą, jak wzmianki. */
+    expect(zakladki).toContain('"/obsluga/wiedza"');
+    expect(rama).toContain('<Route path="/obsluga/wiedza"');
   });
 });

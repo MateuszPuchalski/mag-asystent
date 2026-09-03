@@ -34,6 +34,58 @@ historii nie przepisujemy.
 ---
 
 
+## 0.185.0 — 3 września 2026
+
+**Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2).** Do tego wydania
+zatwierdzony dobór był zdaniem agenta bez dowodu, a negatywne dopasowania nie
+miały gdzie mieszkać. Teraz są trzy tabele — `model_urzadzenia`,
+`zastosowanie`, `dowod_zastosowania` — nowy ekran „Wiedza” w pasku z kolejką
+propozycji i licznikiem, a zakładka Dobór pokazuje dowody wybranej kartoteki,
+negatywy i pomiary z tej rozmowy. Domyka to oba brakujące kryteria §25:
+rekomendacja pokazuje źródło, negatywne dopasowania są widoczne.
+
+Numer 0.184.0 zajął w międzyczasie otwarty PR ze zwrotami — stąd 0.185.0.
+
+### Skąd bierze się wiedza
+
+Zawsze z pracy i zawsze jako PROPOZYCJA. Zatwierdzenie doboru z marką
+i modelem składa ją automatycznie, z dowodem „rozmowa”. Wynik pomiaru z hali
+trafia do kolejki na kliknięcie w zakładce Dobór — jako dowód `pomiar_wlasny`,
+nigdy fakt (§13.4). Wpis ręczny z ekranu Wiedza niesie dowód z katalogu albo
+z decyzji biura. Negatywy wchodzą wyłącznie ręcznie, z powodem z listy §11.4.
+
+### Kto rozstrzyga
+
+Każdy z biura, także autor propozycji — decyzja właściciela. Roli „ekspert”
+nie ma; w kodzie stoi rodzaj dowodu `decyzja_biura`. Automat nie zatwierdza
+nigdy: serwis sprawdza konto biura PRZED zapisem, a test odmawia hali
+i nieistniejącemu kontu. Odrzucenie wymaga powodu; negatyw wycofuje się
+wyłącznie z powodem (§14.2).
+
+### Zasady, które stoją w kształcie
+
+- Nazwy polskie, żadna ze spalonej listy (`dopasowanie`); adres `wiedza/*`
+  zamiast projektowego `dopasowania/*`. Test migracji pilnuje obu połów.
+- Pięć list `CHECK` zamkniętych od razu: `opis` (E3) i `copilot` (F) stoją
+  bez nadawcy, bo `CHECK` nie da się rozszerzyć bez przebudowy tabeli.
+- Negatyw ZAWSZE z powodem — `CHECK` sprzęgający polaryzację z powodem.
+- Dowody append-only; historia wersji przez `zastepuje_id`, bez tabeli wersji.
+- Pewność: `potwierdzone` przy choć jednym dowodzie technicznym; same ślady
+  rozmów to `prawdopodobne`. Reguła makiety „z najsłabszego dowodu” odrzucona
+  świadomie i opisana w §11.3.
+- Zdanie źródła pisze serwer — kandydat, ostrzeżenie i szkic mówią to samo.
+- Zatwierdzone zastosowanie jest od razu szczeblem doboru (`zastosowanie`,
+  przed ofertą) i wchodzi do zdania szkicu z dowodem.
+
+### Trasy
+
+Siedem tras `GET/POST /api/obsluga/wiedza/*` w nowym `routes/wiedza.ts`
+z własną bramką biura i własnym strażnikiem adresów panelu (czyta
+`panel/src/api/wiedza.ts`). Dwie przy doborze: `GET …/dobor/wiedza`
+i `POST …/dobor/pomiar-do-wiedzy`.
+
+Poza zakresem: identyfikatory OEM i pełny tekst (E3), Copilot (F).
+
 ## 0.184.0 — 2 września 2026
 
 **Do zwrotu da się dopisać produkt, którego klient nie zgłosił.** Decyzja

@@ -5,6 +5,7 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
+import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
 
 /**
  * Kandydaci doboru (§11.2) — osobny plik od `dobor.ts`, bo E2 i E3 dokładają
@@ -23,8 +24,8 @@ import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
  * z drogą `wyszukiwarka` (patrz `wybierzKandydata`).
  */
 
-/* Pewność §11.3 w E1: `potwierdzone` zostaje w typie dla E2 (zastosowanie
-   z dowodem), bo panel ma jedną listę plakietek, nie dwie rosnące osobno. */
+/* Pewność §11.3: `potwierdzone` niesie wyłącznie zatwierdzone zastosowanie
+   z dowodem technicznym (E2); reszta dróg daje najwyżej „prawdopodobne". */
 export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "wymaga_danych";
 
 export interface KandydatDoboru {
@@ -38,8 +39,17 @@ export interface KandydatDoboru {
   pewnosc: PewnoscKandydata;
   /** Zdanie dla ekranu — §11.3 żąda widocznego źródła, nie samej drogi. */
   zrodlo: string;
-  /** Negatywne dopasowania z E2; w E1 zawsze puste, ale panel już je rysuje. */
+  /** Zdania negatywnych zastosowań TEJ kartoteki do wpisanej maszyny (§11.4). */
   ostrzezenia: string[];
+}
+
+/* Negatyw dotyczy także kartoteki, której NIE MA wśród kandydatów — dlatego
+   osobna lista, nie tylko `ostrzezenia` przy kandydacie. §11.4: to jest
+   ostrzeżenie, nie brak danych, i ma być widoczne zawsze. */
+export interface NegatywDoboru {
+  twId: number; symbol: string; nazwa: string | null;
+  /** Zdanie z serwera: powód z §11.4 i dowód. */
+  powod: string; zrodlo: string; at: string;
 }
 
 export interface SzczebelDoboru {
@@ -58,7 +68,6 @@ const RANGA: Record<DrogaDoboru, number> = {
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
   oem: "numery OEM dochodzą w etapie E3",
-  zastosowanie: "baza zastosowań dochodzi w etapie E2",
   pelnotekst: "wyszukiwanie pełnotekstowe dochodzi w etapie E3",
   wyszukiwarka: "wyszukiwarka to wybór ręczny, nie kandydat",
 };
@@ -98,7 +107,7 @@ function towar(database: DatabaseSync, twId: number) {
 
 export function kandydaciDoboru(
   conversationId: number, subiekt: SubiektAdapter, database: DatabaseSync = db(),
-): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[] } {
+): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[] } {
   const dobor = doborRozmowy(conversationId, database);
   const oferta = ofertaRozmowy(database, conversationId);
   const znalezione = new Map<number, Omit<KandydatDoboru, "nr">>();
@@ -184,12 +193,40 @@ export function kandydaciDoboru(
     drogi.set("zamiennik", { droga: "zamiennik", sprawdzona: true, wynikow: ile });
   }
 
+  /* SZCZEBEL: potwierdzone zastosowanie z bazy wiedzy (E2). Tylko
+     ZATWIERDZONE wpisy: propozycja czekająca w kolejce nie jest wiedzą.
+     Pewność niesie sam wpis (dowód techniczny albo tylko ślad rozmowy),
+     a zdanie źródła pisze serwis wiedzy — kandydat i szkic mówią to samo. */
+  const negatywne: NegatywDoboru[] = [];
+  if (!dobor.dane.marka || !dobor.dane.model) {
+    pomin("zastosowanie", "agent nie wpisał marki i modelu maszyny");
+  } else {
+    const klucz = kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant);
+    let ile = 0;
+    for (const z of zastosowaniaModelu(klucz, database)) {
+      const w = towar(database, z.twId);
+      if (z.polaryzacja === "nie_pasuje") {
+        negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
+          powod: z.zdaniePowodu ?? "nie pasuje", zrodlo: z.zdanieZrodla, at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
+        continue;
+      }
+      if (!w) continue;
+      ile++;
+      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "zastosowanie",
+        pewnosc: z.pewnosc, zrodlo: z.zdanieZrodla, ostrzezenia: [] });
+    }
+    drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
+  }
+
   for (const droga of DROGI_DOBORU) {
     if (!drogi.has(droga)) pomin(droga, POMINIETE_DO[droga] ?? "szczebel bez nadawcy");
   }
 
+  /* Ostrzeżenie przy kandydacie to skrót negatywu o TEJ SAMEJ kartotece —
+     ta sama część bywa kandydatem z oferty i negatywem z wiedzy naraz. */
   const kandydaci = [...znalezione.values()]
     .sort((a, b) => RANGA[a.droga] - RANGA[b.droga] || b.stan - a.stan || a.symbol.localeCompare(b.symbol))
-    .map((k, i) => ({ nr: i + 1, ...k }));
-  return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!) };
+    .map((k, i) => ({ nr: i + 1, ...k,
+      ostrzezenia: negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`) }));
+  return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne };
 }

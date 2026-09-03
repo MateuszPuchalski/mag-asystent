@@ -20,6 +20,7 @@ let zapiszDane: typeof import("./dobor.js").zapiszDane;
 let ustawStatusDoboru: typeof import("./dobor.js").ustawStatusDoboru;
 let wybierzKandydata: typeof import("./dobor.js").wybierzKandydata;
 let ConversationConflict: typeof import("./conversations.js").ConversationConflict;
+let W: typeof import("./wiedza.js");
 
 let biuro = 0;
 let rozmowa = 0;
@@ -30,6 +31,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ doborRozmowy, zapiszDane, ustawStatusDoboru, wybierzKandydata } = await import("./dobor.js"));
   ({ ConversationConflict } = await import("./conversations.js"));
+  W = await import("./wiedza.js");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK, "SZR-148/82", "Szarpak 148 mm");
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK_ALT, "SZR-150/82", "Szarpak 150 mm");
@@ -37,8 +39,12 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dobor_rozmowy", "conversation_event", "message", "conversation",
-    "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
+  /* Wiedza PRZED użytkownikami: zatwierdzony dobór rodzi propozycję (E2),
+     a jej autor wskazuje na `app_user` bez kaskady. */
+  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "dobor_rozmowy",
+    "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
+    d.prepare(`DELETE FROM ${t}`).run();
+  }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
     .run().lastInsertRowid);
   const konto = Number(d.prepare(
@@ -158,9 +164,9 @@ test("zdjęcie wyboru cofa zatwierdzenie, a nieistniejąca kartoteka i obca drog
   assert.ok(osDoboru().includes("dobor_wybor_zdjety"));
 
   assert.throws(() => wybierzKandydata(rozmowa, 999999, "oferta", 3, biuro), /Nie ma takiej kartoteki/);
-  /* `zastosowanie`, `oem`, `pelnotekst` czekają na E2/E3 — wybór z drogą bez
-     nadawcy udawałby dowód, którego panel jeszcze nie ma. */
-  assert.throws(() => wybierzKandydata(rozmowa, SZARPAK_ALT, "zastosowanie", 3, biuro), /nie ma w tym wydaniu nadawcy/);
+  /* `oem` i `pelnotekst` czekają na E3 — wybór z drogą bez nadawcy udawałby
+     dowód, którego panel jeszcze nie ma. `zastosowanie` doszło w E2. */
+  assert.throws(() => wybierzKandydata(rozmowa, SZARPAK_ALT, "oem", 3, biuro), /nie ma w tym wydaniu nadawcy/);
   assert.equal(doborRozmowy(rozmowa).wersja, 3);
 });
 
@@ -170,4 +176,65 @@ test("zmiana wyboru na inną kartotekę przy zatwierdzonym doborze cofa do kandy
   const d = wybierzKandydata(rozmowa, SZARPAK_ALT, "zamiennik", 2, biuro);
   assert.equal(d.status, "candidates_found");
   assert.equal(d.wybrany?.symbol, "SZR-150/82");
+});
+
+/* ── Dobór karmi bazę wiedzy (E2) ─────────────────────────────────────────── */
+
+test("zatwierdzony dobór z marką i modelem rodzi PROPOZYCJĘ z dowodem rozmowy — nie fakt", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  const { propozycje } = W.kolejkaPropozycji();
+  assert.equal(propozycje.length, 1);
+  assert.equal(propozycje[0].stan, "propozycja", "automat proponuje, nie zatwierdza");
+  assert.equal(propozycje[0].twId, SZARPAK);
+  assert.equal(propozycje[0].model.etykieta, "NAC LS 46-450");
+  assert.equal(propozycje[0].zrodlo, "dobor");
+  assert.equal(propozycje[0].conversationId, rozmowa);
+  assert.equal(propozycje[0].dowody[0].rodzaj, "rozmowa");
+  /* Drugie zatwierdzenie tej samej pary (po cofnięciu i ponownym wyborze) nie dubluje. */
+  ustawStatusDoboru(rozmowa, "candidates_found", null, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  assert.equal(W.kolejkaPropozycji().liczba, 1);
+  /* Szkic: propozycja to jeszcze nie wiedza — zdanie zostaje zdaniem agenta. */
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /źródło: kartoteka oferty/);
+});
+
+test("dobór bez marki albo modelu nie rodzi propozycji", () => {
+  zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  assert.equal(W.kolejkaPropozycji().liczba, 0);
+  assert.equal(liczba("model_urzadzenia"), 0);
+});
+
+test("zdjęcie wyboru wycofuje własną propozycję; zatwierdzonej nie rusza", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  wybierzKandydata(rozmowa, null, "oferta", 3, biuro);
+  assert.equal(W.kolejkaPropozycji().liczba, 0);
+  assert.equal(W.zastosowaniaTowaru(SZARPAK).propozycje.length, 0);
+
+  wybierzKandydata(rozmowa, SZARPAK_ALT, "zamiennik", 4, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  const z = W.kolejkaPropozycji().propozycje[0];
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 5, biuro);
+  assert.equal(W.zastosowanie(z.id)!.stan, "zatwierdzone", "człowiek zatwierdził — automat nie cofa");
+});
+
+test("zatwierdzone zastosowanie z dowodem technicznym wchodzi do zdania szkicu", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  const z = W.kolejkaPropozycji().propozycje[0];
+  W.dodajDowod(z.id, { rodzaj: "pomiar_wlasny", tresc: "rozstaw 148 mm" }, biuro);
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  const zdanie = doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu;
+  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 — pomiar własny, /);
+  /* Odczyt nadal niczego nie zapisuje. */
+  const przed = liczba("events");
+  doborRozmowy(rozmowa);
+  assert.equal(liczba("events"), przed);
 });

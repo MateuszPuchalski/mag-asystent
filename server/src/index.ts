@@ -30,6 +30,7 @@ import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
+import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import {
   bladImportuFaktur,
@@ -317,6 +318,7 @@ export async function buildApp() {
   await app.register(skrzynkaRoutes);
   await app.register(zwrotyRoutes);
   await app.register(ustawieniaRoutes);
+  await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);
 
   await app.ready();

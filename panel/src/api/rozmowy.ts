@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, Rozmowa,
-  SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WierszSprawy, WpisWzmianki, WynikWysylki,
-  Zadanie, Zdrowie,
+  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PowodNegatywny,
+  Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
+  WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -21,6 +21,7 @@ export const klucze = {
   sygnatury: ["sygnatury"] as const,
   towar: (twId: number) => ["towar", twId] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
+  wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
 };
 
 export function useJa() {
@@ -482,5 +483,35 @@ export function useWybierzKandydata() {
         body: JSON.stringify({ twId: v.twId, droga: v.droga, expectedVersion: v.expectedVersion }),
       }),
     onSettled: (_d, _e, v) => poDoborze(qc, v.id),
+  });
+}
+
+/* ── Wiedza przy doborze (E2) ────────────────────────────────────────────────
+   Dowody wybranej kartoteki i pomiary z tej rozmowy — osobno od rozmowy
+   z tego samego powodu co kandydaci. Wynik pomiaru idzie do bazy wiedzy
+   WYŁĄCZNIE na kliknięcie (§13.4). */
+export function useWiedzaDoboru(id: number | null) {
+  return useQuery({
+    queryKey: klucze.wiedzaDoboru(id ?? 0),
+    queryFn: () => api<WiedzaDoboru>(`/api/obsluga/rozmowy/${id}/dobor/wiedza`),
+    enabled: id !== null,
+  });
+}
+
+export function usePomiarDoWiedzy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zadanieId: number; twId?: number | null; polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny?: PowodNegatywny | null }) =>
+      api<Zastosowanie>(`/api/obsluga/rozmowy/${v.id}/dobor/pomiar-do-wiedzy`, {
+        method: "POST",
+        body: JSON.stringify({ zadanieId: v.zadanieId, twId: v.twId ?? null, polaryzacja: v.polaryzacja,
+          powodNegatywny: v.powodNegatywny ?? null }),
+      }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.kandydaci(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.wiedzaDoboru(v.id) });
+      qc.invalidateQueries({ queryKey: ["wiedza"] });
+    },
   });
 }

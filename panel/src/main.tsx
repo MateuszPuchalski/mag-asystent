@@ -2,15 +2,17 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, ClipboardList, Inbox, LogOut, Settings, Undo2, Warehouse } from "lucide-react";
+import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, Settings, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
+import { useKolejkaWiedzy } from "./api/wiedza";
 import { czas } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
 import { Zadania } from "./ekrany/Zadania";
 import { Wzmianki } from "./ekrany/Wzmianki";
+import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import "./index.css";
 
@@ -41,12 +43,22 @@ const ZAKLADKI = [
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
+  { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
 ];
 
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
    prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
    wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
    dokładnie wtedy, gdy nie jest już potrzebna. */
+/* Ten sam powód co przy wzmiankach: propozycja wiedzy przychodzi z CUDZEJ
+   rozmowy i cudzego pomiaru, więc licznik stoi przy zakładce, nie na ekranie. */
+function LicznikWiedzy() {
+  const { data } = useKolejkaWiedzy();
+  if (!data?.liczba) return null;
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-[11px] font-bold text-wertis-ink"
+    aria-label={`propozycji wiedzy do rozstrzygnięcia: ${data.liczba}`}>{data.liczba}</span>;
+}
+
 function LicznikWzmianek() {
   const { data } = useWzmianki();
   if (!data?.nowe) return null;
@@ -86,7 +98,8 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
             {z.ikona}{z.etykieta}
-            {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}</Link>;
+            {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}
+            {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>;
         })}
       </nav>
       <PigulkaSynchronizacji />
@@ -148,6 +161,7 @@ function App() {
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
+        <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}
         <Route path={USTAWIENIA} element={<Ustawienia />} />

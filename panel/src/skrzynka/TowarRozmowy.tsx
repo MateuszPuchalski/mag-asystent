@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Check, PackageSearch, X as Krzyzyk } from "lucide-react";
 import type { KartaTowaru, OfertaRozmowy } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
+import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Zdjecie } from "../towar/Zdjecie";
 import { Powiekszenie } from "../towar/Powiekszenie";
@@ -31,6 +32,9 @@ export function TowarRozmowy({ oferta, rozmowaId }: { oferta: OfertaRozmowy; roz
      Propozycja automatu ma `twId`, ale czeka na kliknięcie. */
   const potwierdzona = k.pewnosc === "pamiec" ? k.twId : null;
   const karta = useKartaTowaru(potwierdzona);
+  /* Wiedza pyta o KAŻDĄ znaną kartotekę, także propozycję: „3 potwierdzone,
+     1 negatywne" to argument za kliknięciem albo przeciw niemu. */
+  const wiedza = useWiedzaTowaru(k.twId);
 
   const ustaw = (twId: number | null) => zapisz.mutate(
     { id: rozmowaId, ofertaId: oferta.externalId, twId },
@@ -41,6 +45,12 @@ export function TowarRozmowy({ oferta, rozmowaId }: { oferta: OfertaRozmowy; roz
       <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
         Źródło: Subiekt GT
       </span>
+      {/* OSOBNA plakietka, poza blokiem Subiekta: §4.3 nie miesza źródeł, a to
+          jest nasza baza wiedzy, nie dane z ERP. */}
+      {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
+        <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+          Wiedza: {wiedza.data.potwierdzone.length} potwierdzonych · {wiedza.data.negatywne.length} negatywnych
+        </span>}
     </div>
 
     {potwierdzona !== null

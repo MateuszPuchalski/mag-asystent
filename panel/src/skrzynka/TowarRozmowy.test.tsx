@@ -8,6 +8,7 @@ vi.mock("../api/rozmowy", () => ({
   useKartaTowaru: (twId: number | null) => karta(twId),
   useWskazKartoteke: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
+vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => ({ data: undefined }) }));
 vi.mock("../towar/Zdjecie", () => ({ Zdjecie: () => <div data-testid="zdjecie" /> }));
 vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 

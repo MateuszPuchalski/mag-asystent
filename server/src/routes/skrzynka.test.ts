@@ -37,7 +37,7 @@ beforeEach(() => {
      `app_user` bez kaskady. Do 0.181.0 test spraw był ostatni w pliku, więc
      brak tych dwóch nazw nie wywracał niczego — każdy test dopisany po nim
      padał w `beforeEach` na kluczu obcym. */
-  for (const t of ["sprawa_klienta_rozmowa", "sprawa_klienta",
+  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "sprawa_klienta_rozmowa", "sprawa_klienta",
     "conversation_mention", "conversation_comment", "conversation_draft",
     "conversation_assignment", "conversation_event", "message", "conversation",
     "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
@@ -106,6 +106,9 @@ const TRASY = () => [
     payload: { status: "searching" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wybor`,
     payload: { twId: null, droga: "oferta", expectedVersion: 1 } },
+  { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza` },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,
+    payload: { zadanieId: 1, polaryzacja: "pasuje" } },
 ];
 
 test("bez sesji żadna trasa skrzynki nie odpowiada danymi", async () => {
@@ -584,4 +587,33 @@ test("nieaktualna wersja doboru dostaje 409 z bieżącym stanem, zły status 400
     headers: b.naglowki, payload: { status: "confirmed" } });
   assert.equal(r.statusCode, 400);
   assert.match(r.json<{ error: string }>().error, /wybranej kartoteki/);
+});
+
+test("pomiar z hali idzie do wiedzy tylko z marką i modelem — i jako propozycja", async () => {
+  const b = login("biuro", "Anna");
+  const d = db();
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7701,'NOZ-STIGA-43','Nóż 43 cm')").run();
+  const zadanie = Number(d.prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,tw_id,status,utworzono_at,
+    utworzono_przez,conversation_id,wynik,wykonano_at,wykonano_przez)
+    VALUES ('pomiar','Zmierz','x',7701,'wykonane','2026-09-01T08:00:00Z','Anna',?,'rozstaw 148 mm','2026-09-01T09:00:00Z','Marek')`)
+    .run(rozmowa).lastInsertRowid);
+
+  const odczyt = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza`, headers: b.naglowki });
+  assert.equal(odczyt.statusCode, 200, odczyt.body);
+  assert.equal(odczyt.json<{ pomiary: Array<{ zaproponowano: boolean }> }>().pomiary[0].zaproponowano, false);
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,
+    headers: b.naglowki, payload: { zadanieId: zadanie, polaryzacja: "pasuje" } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /markę i model/);
+
+  await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`, headers: b.naglowki,
+    payload: { dane: { marka: "NAC", model: "LS 46-450" }, expectedVersion: 1 } });
+  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,
+    headers: b.naglowki, payload: { zadanieId: zadanie, polaryzacja: "pasuje" } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ stan: string; zrodlo: string }>().stan, "propozycja", "wynik nie staje się faktem");
+  assert.equal(r.json<{ zrodlo: string }>().zrodlo, "pomiar");
+  const po = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza`, headers: b.naglowki });
+  assert.equal(po.json<{ pomiary: Array<{ zaproponowano: boolean }> }>().pomiary[0].zaproponowano, true);
 });
