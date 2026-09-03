@@ -54,7 +54,7 @@ type Zamowienie = {
      zapłaty; identyfikatora ani kwoty nie — kwotę mamy już z `summary`.
      Z `invoice` bierzemy SAMĄ FLAGĘ `required`: `invoice.address` niesie
      ulicę i miasto, a adresy nie przechodzą przez mapowanie. */
-  payment?: { type?: string; finishedAt?: string } | null;
+  payment?: { id?: string; type?: string; finishedAt?: string } | null;
   invoice?: { required?: boolean } | null;
   summary?: { totalToPay?: Kwota } | null;
   lineItems?: Pozycja[];
@@ -159,13 +159,14 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
 
   database.prepare(`INSERT INTO zamowienie_klienta
     (channel_account_id,external_id,status,kupujacy_login,dostawa_grosze,dostawa_metoda,
-     platnosc_typ,platnosc_at,faktura_zadana,
+     platnosc_typ,platnosc_at,platnosc_id,faktura_zadana,
      suma_grosze,waluta,kupiono_at,zmieniono_at,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       status=excluded.status, kupujacy_login=excluded.kupujacy_login,
       dostawa_grosze=excluded.dostawa_grosze, dostawa_metoda=excluded.dostawa_metoda,
       platnosc_typ=excluded.platnosc_typ, platnosc_at=excluded.platnosc_at,
+      platnosc_id=excluded.platnosc_id,
       faktura_zadana=excluded.faktura_zadana,
       suma_grosze=excluded.suma_grosze, waluta=excluded.waluta,
       kupiono_at=excluded.kupiono_at, zmieniono_at=excluded.zmieniono_at,
@@ -174,6 +175,9 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
     z.delivery?.cost?.amount == null ? null : naGrosze(z.delivery.cost.amount),
     z.delivery?.method?.name ?? null,
     z.payment?.type ?? null, z.payment?.finishedAt ?? null,
+    /* Identyfikator płatności (0.190.0) — bez niego `POST /payments/refunds`
+       nie ma jak powstać, bo `payment.id` stoi w `required` schematu. */
+    z.payment?.id ?? null,
     /* `null`, gdy Allegro nie przysłało `invoice` — to nie to samo, co
        „klient nie chciał faktury". Ekran ma prawo powiedzieć „nie wiadomo". */
     z.invoice?.required == null ? null : (z.invoice.required ? 1 : 0),

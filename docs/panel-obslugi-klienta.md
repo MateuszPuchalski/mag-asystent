@@ -444,6 +444,17 @@ podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
+**Z tej listy działa w 0.190.0:** licznik znaków, ostrzeżenie o dopisku
+klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze źródłem,
+wstawienie parametrów produktu i przełączenie trybu.
+
+Wstawka parametrów bierze tożsamość towaru i dostępność. NIE bierze półki,
+rezerwacji ani rozbicia na magazyny. Szkic czyta klient, a adres regału mówi
+obcemu, jak zbudowany jest nasz magazyn.
+
+Nie ma szablonów, podglądu ani historii wersji szkicu. Szkicu ze sztucznej
+inteligencji nie ma i nie będzie przed etapem F.
+
 **Przycisk komentarza i przycisk wysyłki do klienta są jednoznacznie
 rozdzielone.**
 
@@ -1366,6 +1377,53 @@ kryterium: lepszy sygnał z daty nadania niż jego brak.
 Ekran mówi też, gdy przesyłka ma kłopot: awizo, problem, powrót do nadawcy.
 Kod spoza listy pokazuje się surowy — jak przy przewoźniku.
 
+### 25a.17. Oddanie pieniędzy i odmowa (0.190.0)
+
+Do 0.190.0 panel kończył pracę w połowie. Operator rozstrzygał zwrot, zaznaczał
+pozycje i dostawał policzoną kwotę — a potem szedł oddać pieniądze do panelu
+Allegro.
+
+Kryterium gotowości z §25 mówi wprost: agent ma obsłużyć sprawę bez otwierania
+panelu Allegro. Przy zwrocie nie było to spełnione ani razu.
+
+**Dwie końcówki, dwa różne kształty.** Zwrot pieniędzy to
+`POST /payments/refunds` w wersji `public.v1`, na uprawnieniu
+`allegro:api:payments:write`. Odmowa to
+`POST /order/customer-returns/{id}/rejection` w wersji `beta.v1`, na
+`allegro:api:orders:write`.
+
+**Kwoty nie ma w ciele żądania.** Serwer bierze tę, którą sam policzył
+z zaznaczenia. Panel podający liczbę pozwoliłby oddać dowolną kwotę żądaniem
+z pominięciem ekranu — ta sama decyzja co przy `zapiszKwote` w 0.156.0.
+
+**`commandId` powstaje RAZ na zwrot.** Allegro daje przy tej końcówce
+idempotencję po tym polu i to jest jedyna osłona przed drugim przelewem, gdy
+sieć zerwie się po wysłaniu żądania, a przed odpowiedzią. Nowy identyfikator
+przy ponowieniu zamieniłby ostrożność w podwójny zwrot cudzych pieniędzy.
+
+To jest różnica względem rabatu: tam końcówka idempotencji NIE MA i cały
+strażnik musiał być nasz.
+
+**Przeszkoda jest zdaniem, nie wyłączonym przyciskiem.** Serwer wymienia po
+imieniu, czego brakuje: werdyktu, kwoty, numeru zamówienia, identyfikatora
+płatności. Każda z tych rzeczy prowadzi gdzie indziej.
+
+Pobranie dostaje własne zdanie. Tych pieniędzy Allegro nigdy nie trzymało,
+więc wracają przelewem poza panelem — a żądanie i tak skończyłoby się odmową
+bez czytelnego powodu.
+
+**Odmowa pyta o powód, zwrot nie pyta o nic.** Wygląda to na niekonsekwencję,
+a jest §25a.5. Zwrot pieniędzy da się cofnąć dopłatą i widać go od razu na osi.
+Odmowa idzie do klienta jako oświadczenie i drugiej takiej samej Allegro nie
+przyjmie.
+
+Powód czyta KLIENT w Allegro. Ekran mówi to przy polu, bo notatka wewnętrzna
+i oświadczenie wobec kupującego wyglądają na formularzu tak samo.
+
+**Obie trasy stoją za `autoryzuj`.** To jedyne miejsca w tej aplikacji, które
+ruszają cudze pieniądze na zewnątrz, więc obok bramki roli dostają wpis
+`privileged` z nazwą operacji.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -1416,7 +1474,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users`; od 0.157.0 do 0.181.0 panel wołał zły adres i dostawał 404 |
 | Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
-| Obecność i „pisze" | **działa**, w pamięci | `services/conversation-realtime.ts` |
+| Obecność i „pisze" | **na ekranie** od 0.190.0 | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
@@ -1491,7 +1549,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
-| Zwrot pieniędzy i odmowa w Allegro | **projekt** | `outbox`, `commandId` — 0.151.0 |
+| Zwrot pieniędzy i odmowa w Allegro | **działa** od 0.190.0 | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
 | Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |

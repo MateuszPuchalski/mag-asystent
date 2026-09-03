@@ -5,7 +5,7 @@ import { Konflikt } from "../api/klient";
 import {
   useAgenci, useDodajKomentarz, useDolaczDoSprawy, useJa, useOdlaczOdSprawy, usePrzejmij,
   usePrzekaz, useRozmowa, useSprawy, useZalozSprawe,
-  useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
+  usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
@@ -67,10 +67,14 @@ export function Skrzynka() {
   const [bladSprawy, setBladSprawy] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
-  useSzynaZdarzen(wybranaId, () => setNowa(true));
+  const { obecnosc } = useSzynaZdarzen(wybranaId, () => setNowa(true));
   /* Samo wejście w pytanie trzyma je dla tego agenta — do wyjścia albo do
      odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.159.0). */
   useUchwytRozmowy(wybranaId);
+  /* Znak „pisze" powstaje TU, przy polu tekstowym, a nie w hooku obecności:
+     obecność znaczy „mam to otwarte", pisanie znaczy „zaraz odpowiem". Zlanie
+     ich w jedno kazałoby ekranowi kłamać o drugim. */
+  const zglosPisanie = usePisze(wybranaId);
 
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
@@ -180,6 +184,7 @@ export function Skrzynka() {
     <Rozmowa
       dane={rozmowa.data}
       mojeId={ja.data?.user.userId ?? null}
+      obecni={obecnosc}
       nowaWiadomosc={nowa}
       szkic={szkic}
       zapisuje={zapisz.isPending}
@@ -191,7 +196,7 @@ export function Skrzynka() {
         { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
       komentarz={komentarz}
-      onKomentarz={setKomentarz}
+      onKomentarz={(v) => { setKomentarz(v); zglosPisanie(); }}
       komentuje={dodajKomentarz.isPending}
       /* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie
          odpowiedź do klienta. */
@@ -203,7 +208,7 @@ export function Skrzynka() {
         .map((u) => ({ userId: u.userId, name: u.name }))}
       wzmianki={wzmianki}
       onWzmianki={setWzmianki}
-      onSzkic={setSzkic}
+      onSzkic={(v) => { setSzkic(v); zglosPisanie(); }}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
         const ostatnia = [...rozmowa.data.os].reverse().find((w) => w.messageId)?.messageId ?? null;

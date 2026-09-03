@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
@@ -411,6 +411,56 @@ export function useUchwytRozmowy(id: number | null) {
       void melduj(false);
     };
   }, [id]);
+}
+
+/* ── „Pisze" (§6.3, makieta `Main.dc.html`) ──────────────────────────────────
+
+   Serwer obsługuje ten sygnał od 0.159.0 i nikt go dotąd nie wysyłał: trasa
+   `presence` przyjmowała `typing`, a panel meldował wyłącznie obecność. Znak
+   „pisze" nie mógł się więc pojawić na żadnym ekranie, bo nie powstawał.
+
+   RYTM JEST INNY NIŻ BICIE SERCA UCHWYTU. Serwer gasi „pisze" po 12 s
+   (`TYPING_TTL_MS`), więc odświeżamy co 5 s. Po 3 s ciszy mówimy WPROST, że
+   agent przestał — bez tego znak wisiałby do wygaśnięcia i przez kilka sekund
+   kłamałby o człowieku, który już nie pisze.
+
+   Zgłoszenie idzie z klawisza, ale NIE z każdego: między odświeżeniami wpada
+   do dławika. Żądanie na znak zrobiłoby z pisania odpowiedzi pętlę HTTP. */
+const PISZE_ODSTEP_MS = 5_000;
+const PISZE_CISZA_MS = 3_000;
+
+export function usePisze(id: number | null) {
+  const ostatnie = useRef(0);
+  const cisza = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const biezaca = useRef<number | null>(id);
+  biezaca.current = id;
+
+  const melduj = (rozmowaId: number, typing: boolean) =>
+    api(`/api/conversations/${rozmowaId}/presence`, {
+      method: "POST", body: JSON.stringify({ typing }),
+    }).catch(() => {});
+
+  /* Zmiana rozmowy gasi znak w TAMTEJ rozmowie. Bez tego agent zostawiałby za
+     sobą „pisze" wiszące do wygaśnięcia w każdym pytaniu, przez które przeszedł. */
+  useEffect(() => () => {
+    if (cisza.current) clearTimeout(cisza.current);
+    if (ostatnie.current && biezaca.current !== null) void melduj(biezaca.current, false);
+    ostatnie.current = 0;
+  }, [id]);
+
+  return () => {
+    if (id === null) return;
+    const teraz = Date.now();
+    if (teraz - ostatnie.current > PISZE_ODSTEP_MS) {
+      ostatnie.current = teraz;
+      void melduj(id, true);
+    }
+    if (cisza.current) clearTimeout(cisza.current);
+    cisza.current = setTimeout(() => {
+      ostatnie.current = 0;
+      void melduj(id, false);
+    }, PISZE_CISZA_MS);
+  };
 }
 
 /**

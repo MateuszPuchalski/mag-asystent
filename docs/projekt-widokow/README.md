@@ -40,6 +40,19 @@ komentarz.
 **Brak danych mówi o sobie wprost.** Puste pole oferty zostaje puste i jest
 oznaczone. Ekran nie uzupełnia go z kartoteki, bo to mieszałoby źródła.
 
+## Poprawki po decyzjach właściciela
+
+**Kłódka zdjęta z zatwierdzania (0.190.0).** Stopka `Dobor.dc.html` rysowała
+wyłączony przycisk „ZATWIERDŹ ZASTOSOWANIE — tylko ekspert". Roli eksperta
+technicznego NIE MA: zniosła ją decyzja właściciela z etapów E1 i E2, a §26
+zdjęła z listy pytanie, kto zatwierdza zastosowania. Zatwierdza każdy z biura,
+także autor propozycji.
+
+Makieta z rolą, której nie ma, jest gorsza od jej braku. Następna sesja
+zbudowałaby bramkę uprawnień pod byt, którego nikt nie zamawiał — a to repo
+ma dwa udokumentowane przypadki zbudowania tej samej rzeczy dwa razy.
+Przycisk nazywa się dziś tak jak w kodzie: **ZATWIERDŹ DOBÓR**.
+
 ## Skąd wzięte
 
 Ekran stanów pokrywa cztery blizny z `docs/obsluga-klienta.md`. Dopisek

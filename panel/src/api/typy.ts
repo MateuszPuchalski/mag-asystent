@@ -586,3 +586,23 @@ export interface PokrycieSygnatur {
   pudla: WierszSygnatury[];
   zdublowane: WierszSygnatury[];
 }
+
+/**
+ * Stan zapisu do Allegro przy zwrocie (0.190.0).
+ *
+ * Liczy go SERWER i to jest celowe: przeszkody (brak identyfikatora
+ * płatności, pobranie, brak kwoty) są regułą serwera, a panel powtarzający ją
+ * u siebie rozjechałby się z nią przy pierwszej zmianie. Rozjazd znaczyłby
+ * przycisk obiecujący pracę, której serwer nie przyjmie — dokładnie ta blizna,
+ * którą przy rabacie zgłosił właściciel w 0.175.0.
+ */
+export type StanZwrotuPieniedzy = {
+  moznaZwrocic: boolean;
+  moznaOdmowic: boolean;
+  /** Dlaczego nie da się oddać pieniędzy. Zdanie pisze serwer. */
+  powod: string | null;
+  kwotaGrosze: number | null;
+  waluta: string;
+  oddane: { id: string | null; status: string | null; kiedy: string | null } | null;
+  odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+};

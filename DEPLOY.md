@@ -1520,6 +1520,31 @@ kilkadziesiąt minut część rozmów pokaże więc sam numer z odnośnikiem i z
 że treść dopiero przyjedzie. To nie jest usterka. **Panel trzeba
 przebudować** (`npm run build`).
 
+**Aktualizacja do 0.190.0 wymaga JEDNEJ rzeczy ręką: kolejnego uprawnienia.**
+
+Panel zaczyna oddawać pieniądze kupującemu i odmawiać ich oddania — bez
+otwierania panelu Allegro. Zwrot płatności chodzi na uprawnieniu, którego ta
+aplikacja dotąd NIE MIAŁA: `allegro:api:payments:write`. To nie to samo, co
+`allegro:api:orders:write` z 0.164.0; odmowa wypłaty korzysta z tego drugiego.
+
+Na developer.allegro.pl dodaj aplikacji `allegro:api:payments:write`, a potem
+sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
+wydany pod stary zakres sam się nie rozszerzy. Bez tego przycisk ODDAJ
+PIENIĄDZE zwróci odmowę z nazwą brakującego uprawnienia.
+
+**Pierwszy zwrot oddaj na JEDNYM zamówieniu i sprawdź go w panelu Allegro,
+zanim puścisz resztę.** Ta końcówka rusza pieniądze klienta i robi to bez
+pytania o potwierdzenie — tak jak reszta panelu, gdzie cofnięcie zastępuje
+potwierdzanie. Cofnięciem jest tu dopłata po stronie Allegro, więc pomyłka
+kosztuje pracę, nie jest nieodwracalna.
+
+Identyfikator płatności (`payment.id`) dociąga się z zamówieniem. Zwroty
+zsynchronizowane wcześniej dostaną go przy następnym przebiegu taktu albo po
+kliknięciu DOCIĄGNIJ ZAMÓWIENIA. Do tego czasu przycisk mówi wprost, że nie zna
+identyfikatora płatności.
+
+Migracja dokłada kolumny sama. **Panel trzeba przebudować** (`npm run build`).
+
 **Aktualizacja do 0.164.0 wymaga JEDNEJ rzeczy ręką: nowego uprawnienia.**
 
 Panel zaczyna pokazywać przy każdej pozycji zwrotu, czy wniosek o rabat

@@ -34,6 +34,106 @@ historii nie przepisujemy.
 ---
 
 
+## 0.190.0 — 3 września 2026
+
+**Cztery braki z planu obsługi i z makiet, w tym ten najdroższy: pieniądze.**
+
+### 1. Zwrot pieniędzy i odmowa bez otwierania Allegro
+
+Panel rozstrzygał zwrot, liczył kwotę z zaznaczenia — i kazał operatorowi pójść
+oddać pieniądze do panelu Allegro. §25 obiecuje pracę BEZ tamtego panelu,
+a przy zwrocie nie było to spełnione ani razu.
+
+**Dwie końcówki, dwa różne kształty**, oba czytane ze schematu w kopii
+specyfikacji, nie z pamięci. Zwrot pieniędzy: `POST /payments/refunds`,
+wersja `public.v1`, uprawnienie `allegro:api:payments:write`. Odmowa wypłaty:
+`POST /order/customer-returns/{id}/rejection`, wersja `beta.v1`, uprawnienie
+`allegro:api:orders:write`.
+
+**[wymaga działania] Nowe uprawnienie `allegro:api:payments:write`.** Bez niego
+przycisk ODDAJ PIENIĄDZE odpowie odmową z nazwą brakującego zakresu. Szczegóły
+w `DEPLOY.md`.
+
+**`commandId` powstaje RAZ na zwrot i wraca ten sam przy ponowieniu.** To jest
+jedyna osłona przed drugim przelewem, gdy sieć zerwie się po wysłaniu żądania,
+a przed odpowiedzią. Nowy identyfikator przy drugiej próbie oddałby pieniądze
+dwa razy. Różnica względem rabatu, gdzie końcówka idempotencji NIE MA.
+
+**Kwoty nie ma w ciele żądania.** Serwer bierze tę, którą sam policzył
+z zaznaczenia — ta sama decyzja co przy `zapiszKwote` w 0.156.0. Panel podający
+liczbę pozwoliłby oddać dowolną kwotę z pominięciem ekranu.
+
+**Przeszkoda jest zdaniem, nie wyłączonym przyciskiem.** Serwer wymienia po
+imieniu, czego brakuje: werdyktu, kwoty, numeru zamówienia albo identyfikatora
+płatności. Zamówienie za pobraniem dostaje własne zdanie: tych pieniędzy
+Allegro nigdy nie trzymało, więc wracają przelewem.
+
+**Odmowa pyta o powód, zwrot nie pyta o nic** (§25a.5). Zwrot cofa się dopłatą,
+odmowa jest oświadczeniem wobec klienta i drugiej Allegro nie przyjmie. Powód
+czyta kupujący i ekran mówi to przy polu.
+
+Obie trasy stoją za `autoryzuj(…, "zwrot_pieniedzy")` — to jedyne miejsca tej
+aplikacji ruszające cudze pieniądze na zewnątrz, więc każde kliknięcie zostawia
+wpis `privileged`.
+
+Migracja dokłada kolumny sama. Doszedł też `platnosc_id` przy zamówieniu:
+`payment.id` jechał w formularzu zakupowym od zawsze, a mapowanie brało z tego
+obiektu wyłącznie typ i moment.
+
+### 2. Widać, kto jeszcze siedzi przy rozmowie
+
+Serwer liczył obecność i „pisze" od 0.144.0. Kolejka pokazywała trzymającego,
+ale w otwartej rozmowie nie było NIC — a to tam pisze się odpowiedź, którą
+drugi agent właśnie dubluje.
+
+Dane docierały do panelu i były wyrzucane: `useSzynaZdarzen` zwracał
+`obecnosc`, a ekran brał hook wyłącznie dla efektu ubocznego.
+
+**Znaku „pisze" nie wysyłał nikt.** Trasa `presence` przyjmowała `typing` od
+0.159.0, panel meldował samą obecność — więc sygnał nie mógł się pojawić,
+bo nie powstawał. Teraz idzie z pola tekstowego, dławiony: odświeżenie co 5 s,
+zgaszenie po 3 s ciszy, przy TTL 12 s po stronie serwera.
+
+Pasek jest cienki i szary, bo obecność to stan chwilowy, nie status rozmowy.
+
+### 3. Parametry towaru wchodzą do szkicu jednym kliknięciem
+
+§10.4 wymienia to od początku. Wstawka bierze nazwę, symbol, EAN, numery
+zamienne i dostępność — a NIE bierze półki, rezerwacji ani rozbicia na
+magazyny. Szkic czyta klient, a adres regału mówi obcemu, jak zbudowany jest
+nasz magazyn. Pilnuje tego osobny test.
+
+Brak stanu mówi „brak na stanie", nie „0 szt.". Zero czyta się jak awaria
+systemu, a to zdanie idzie do kupującego.
+
+### 4. Makieta doboru przestała rysować rolę, której nie ma
+
+Stopka `Dobor.dc.html` miała wyłączony przycisk „ZATWIERDŹ ZASTOSOWANIE —
+tylko ekspert". Roli eksperta technicznego NIE MA: zniosła ją decyzja
+właściciela z etapów E1 i E2, a §26 zdjęła pytanie „kto zatwierdza" z listy.
+
+Makieta z nieistniejącą rolą jest gorsza od jej braku — następna sesja
+zbudowałaby bramkę uprawnień pod byt, którego nikt nie zamawiał. Przycisk
+nazywa się dziś tak jak w kodzie: ZATWIERDŹ DOBÓR.
+
+### Poprawki w dokumentacji, które kłamała o sobie
+
+`docs/allegro-ksztalt.md` twierdził, że kopia specyfikacji nie ma `commandId`
+ani `order` przy zwrocie płatności. Nieprawda: oba stoją w `required` schematu
+`InitializeRefund`. Zdanie zestarzało się przy odświeżeniu kopii i nikt go nie
+przeczytał ponownie. Kodów odmowy jest SIEDEM, nie cztery; powodów zwrotu też
+siedem, nie cztery.
+
+§28 pisał o obecności „działa" — działał serwer, nie ekran. `Kontekst.tsx`
+tłumaczył brak zakładki „Wiedza" tym, że nie ma skąd wziąć danych; E2 i E3
+dały jej źródło, a zakładka nie wraca z innego powodu (dowody stoją już
+w „Doborze").
+
+### Liczby
+
+Tras POST przy zwrotach jest siedemnaście, trzy wychodzą do Allegro — licznik
+w `routes/zwroty.test.ts` jest umową i podnosi się razem z uzasadnieniem.
+
 ## 0.189.0 — 3 września 2026
 
 **Drugi skan tego samego towaru kończy odłożenie.** Zgłoszenie właściciela:

@@ -219,6 +219,16 @@ export type OperacjaUprzywilejowana =
    * się z krzesła. Dlatego siedzi za rolą i za powodem wpisanym z ręki.
    */
   | "domkniecie_dostawy"
+  /**
+   * Oddanie pieniędzy kupującemu albo odmowa ich oddania (0.190.0).
+   *
+   * JEDYNA operacja tej aplikacji, która rusza cudze pieniądze na zewnątrz.
+   * Bramka roli sama w sobie niewiele tu dodaje — trasy zwrotów i tak stoją
+   * za `odmowa()` — ale `autoryzuj` zapisuje `privileged` z nazwą operacji,
+   * a przy przelewie ślad „kto i kiedy" jest wart więcej niż przy czymkolwiek
+   * innym w tym repo.
+   */
+  | "zwrot_pieniedzy"
   /** Zakładanie kont magazynierów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
@@ -280,6 +290,10 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
      roli, która czyta protokoły rozbieżności i odpowiada za zgodność
      z dokumentem, nie do człowieka przy palecie. */
   domkniecie_dostawy: ["biuro", "admin"],
+  /* BIURO, nie sam admin: zwroty obsługuje biuro codziennie, a operacja
+     zamknięta dla admina znaczyłaby, że pieniądze oddaje ktoś, kto nie widział
+     paczki. Magazynier zostaje poza — on ocenia towar, nie wypłatę. */
+  zwrot_pieniedzy: ["biuro", "admin"],
   zarzadzanie_kontami: ["biuro", "admin"],
   /* §5 projektu panelu daje wymuszone przekazanie administratorowi. Biuro
      prowadzi własne rozmowy; odbieranie cudzych to inna decyzja. */

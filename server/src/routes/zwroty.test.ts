@@ -74,6 +74,11 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/rabat" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan/dociagnij" },
+  /* Zapisy do Allegro (0.190.0). Wchodzą do tej listy jak każda inna trasa:
+     bramka roli stoi przed uprawnieniem, więc hala nie zobaczy nawet powodu
+     odmowy uprzywilejowanej. */
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/pieniadze` },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/odmowa-platnosci` },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -158,7 +163,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają piętnaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
+test("zwroty mają siedemnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -199,18 +204,41 @@ test("zwroty mają piętnaście tras POST, a jedna z nich wychodzi do Allegro", 
      stole — i wtedy dokłada się to, co też nie pasowało. Regulamin Allegro tej
      zgodności nie wymaga: liczy się terminowe oświadczenie o odstąpieniu, nie
      zgodność przesyłki ze zgłoszeniem. Dopisanie bierze POZYCJĘ ZAMÓWIENIA,
-     nigdy nazwy ani ceny; zdjęcie działa wyłącznie na pozycji biura. */
+     nigdy nazwy ani ceny; zdjęcie działa wyłącznie na pozycji biura.
+
+     SZESNASTA I SIEDEMNASTA ODDAJĄ PIENIĄDZE I ODMAWIAJĄ ICH ODDANIA
+     (0.190.0). To jedyne trasy tej aplikacji, które ruszają cudze pieniądze na
+     zewnątrz — i dlatego jako jedyne w tym pliku stoją nie tylko za `odmowa()`,
+     ale i za `autoryzuj(…, "zwrot_pieniedzy")`, czyli za wpisem `privileged`
+     z nazwą operacji.
+
+     Uzasadnienie: do 0.190.0 panel rozstrzygał zwrot, liczył kwotę i kazał
+     operatorowi pójść oddać pieniądze do panelu Allegro — czyli kończył pracę
+     dokładnie tam, gdzie §25 obiecuje nie zaglądać. Kryterium gotowości mówi
+     „agent obsłuży typowe pytanie bez otwierania panelu Allegro"; przy zwrocie
+     nie było to spełnione ani razu.
+
+     KWOTY NIE MA W CIELE ŻĄDANIA i to jest ta sama decyzja, co przy
+     `zapiszKwote` (0.156.0). Gdyby panel podawał liczbę, dałoby się oddać
+     dowolną kwotę żądaniem z pominięciem ekranu; serwer bierze tę, którą sam
+     policzył z zaznaczenia.
+
+     Zwrot pieniędzy ma idempotencję po `commandId` — w odróżnieniu od rabatu,
+     gdzie końcówka jej NIE MA. `commandId` powstaje raz na zwrot i wraca ten
+     sam przy ponowieniu, bo sieć zerwana po wysłaniu żądania, a przed
+     odpowiedzią, jest scenariuszem normalnym. Nowy identyfikator przy drugiej
+     próbie oddałby pieniądze dwa razy. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 15, `tras POST jest ${posty.length}, a umowa mówi o piętnastu`);
+  assert.equal(posty.length, 17, `tras POST jest ${posty.length}, a umowa mówi o siedemnastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
-    "faktura", "pozycje", "zdejmij"]) {
+    "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
