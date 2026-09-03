@@ -447,6 +447,23 @@ tej samej linii — razem z PILNE tworzy jedyną parę sygnałów, po której uk
 się kolejność pracy. Nieprzeczytana wiadomość to KROPKA, nie słowo: „NOWE"
 obok plakietki „NOWA" mówiło dwa różne fakty jednym wyrazem.
 
+**Obecność ŁATA wiersz, nie ściąga listy (0.196.0).** Zdarzenie obecności —
+wejście, wyjście, „pisze" — zmienia w kolejce jedną rzecz: znacznik „ktoś tu
+siedzi". Do 0.195.0 robiło to przez ponowne pobranie CAŁEJ listy, a
+`listaRozmow()` nie ma `LIMIT`-u. Pomiar na tym repo: 100 rozmów to 54 kB,
+1000 — 537 kB, 5000 — 2688 kB. „Pisze" jest dławione co pięć sekund, więc
+kolega redagujący odpowiedź ściągał to wszystkim co pięć sekund.
+
+Teraz zdarzenie podmienia pole w cache'u panelu. Reguła „kto trzyma" nie
+powstaje w panelu drugi raz: serwer oddaje obecnych posortowanych po czasie
+wejścia, a znacznik bierze pierwszego z listy. Pozostałe zdarzenia — nowa
+wiadomość, przejęcie, wynik z hali — odświeżają kolejkę tak jak dotąd, bo od
+nich zależy, za co agent się bierze.
+
+`staleTime` tego NIE załatwia i to jest zmierzone, nie założone:
+`invalidateQueries` znaczy zapytanie stałe niezależnie od niego i odświeża
+aktywne obserwacje tak samo.
+
 **Kolejka ma wyszukiwanie (0.195.0).** Kubełek mówi „czyje to", kategoria
 „o czym to", a pytania „czy TA rozmowa gdzieś tu jest" nie zadawał nikt, bo
 nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
@@ -1710,6 +1727,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
 | Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
+| Obecność łata wiersz kolejki zamiast pobierać listę | **działa** od 0.196.0 | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |
 | Wyszukiwanie w kolejce rozmów | **działa** od 0.195.0 | filtr w pamięci ekranu, `skrzynka/Kolejka.tsx` — login, treść, prowadzący |
 | Zamówienie klienta przy zwrocie | **działa** od 0.152.0 | `services/allegro-zamowienia-sync.ts` |
 | Ręczne dociągnięcie zamówień | **działa** od 0.154.0 | `POST /api/obsluga/zwroty/zamowienia` |

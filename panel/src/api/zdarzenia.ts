@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { klucze } from "./rozmowy";
+import type { Rozmowa } from "./typy";
 import { token } from "./klient";
 
 export type ZdarzenieRozmowy = {
@@ -71,10 +72,40 @@ export function useSzynaZdarzen(
     function obsluz(z: ZdarzenieRozmowy) {
       if (z.type === "presence") {
         setObecnosc((z.obecni as Obecnosc[] | undefined) ?? []);
-        /* Kolejka też musi się odświeżyć: od 0.158.0 wiersz pokazuje, kto
-           siedzi przy rozmowie, a to zmienia się właśnie tymi zdarzeniami.
-           Bicie serca ich NIE wysyła — tylko wejście, wyjście i „pisze". */
-        qc.invalidateQueries({ queryKey: klucze.rozmowy });
+        /* ── OBECNOŚĆ ŁATA CACHE, NIE ŚCIĄGA LISTY (0.196.0) ─────────────────
+           Wiersz kolejki pokazuje od 0.158.0, kto siedzi przy rozmowie, więc
+           zdarzenie obecności musi go zmienić. Do 0.195.0 robiło to przez
+           `invalidateQueries`, czyli PONOWNE POBRANIE CAŁEJ LISTY.
+
+           Rachunek, dla którego to się zmienia: `listaRozmow()` nie ma
+           `LIMIT`-u i oddaje każdą zsynchronizowaną rozmowę z 21 kolumnami.
+           Pomiar na tym repo: 100 rozmów to 54 kB, 1000 — 537 kB, 5000 —
+           2688 kB. Obecność leci przy wejściu, wyjściu i przy PISANIU
+           (dławione co 5 s), więc kolega redagujący odpowiedź ściągał u
+           wszystkich całą listę co pięć sekund.
+
+           `staleTime` by tego NIE załatwił i to sprawdzone, nie założone:
+           `invalidateQueries` znaczy rozmowę stałą niezależnie od niego
+           i odświeża aktywne zapytania tak samo (pomiar: 2 pobrania z
+           `staleTime` i 2 bez).
+
+           Zamiast pobierać, ŁATAMY wiersz w cache'u. Reguła „kto trzyma"
+           nie powstaje tu drugi raz: serwer oddaje `obecni` posortowanych po
+           czasie wejścia, a `uchwyty()` bierze z nich pierwszego — więc
+           bierzemy pierwszy element, nie wyprowadzamy porządku od nowa.
+
+           Efekt uboczny jest dodatni: znacznik pojawia się od razu, bez
+           czekania na odpowiedź serwera. */
+        const obecniTeraz = (z.obecni as Obecnosc[] | undefined) ?? [];
+        const trzyma = obecniTeraz[0]
+          ? { userId: obecniTeraz[0].userId, name: obecniTeraz[0].name }
+          : null;
+        qc.setQueryData(klucze.rozmowy, (stare: { rozmowy: Rozmowa[] } | undefined) =>
+          !stare ? stare : {
+            ...stare,
+            rozmowy: stare.rozmowy.map((r) =>
+              r.id === z.conversationId ? { ...r, oglada: trzyma } : r),
+          });
         return;
       }
       /* Kolejka reaguje na KAŻDE zdarzenie: nowa wiadomość zmienia kolejność,
