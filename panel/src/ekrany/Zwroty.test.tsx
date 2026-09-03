@@ -14,7 +14,7 @@ import type { Kubelek, Zwrot } from "../api/typy";
 
 const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   id, externalId: `zw-${id}`, numer, orderId: `ord-${id}`,
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z",
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null,
   kubelek, sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z", dniDoTerminu: 7,
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, kwotaGrosze: null,

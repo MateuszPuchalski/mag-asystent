@@ -69,6 +69,10 @@ export interface WierszZwrotu {
   orderId: string | null;
   utworzono: string;
   paczkaAt: string | null;
+  /** Kiedy paczka DOTARŁA do nas — z trackingu przewoźnika (0.187.0). */
+  dostarczonoAt: string | null;
+  /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
+  przesylkaStatus: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
   terminAt: string;
@@ -179,14 +183,24 @@ export function kubelekZwrotu(z: {
  * operatora ignorować kolor.
  */
 export function sygnalyZwrotu(z: {
-  kubelek: Kubelek; dni: number; paczkaAt: string | null; rejectionCode: string | null;
+  kubelek: Kubelek; dni: number; paczkaAt: string | null;
+  dostarczonoAt: string | null; przesylkaStatus: string | null;
+  rejectionCode: string | null;
 }): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
      przewijać czerwone wiersze. */
   const wPracy = z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony";
   if (wPracy && z.dni <= PROG_TERMINU_DNI) s.push("termin");
-  if (wPracy && !z.paczkaAt) s.push("brak_dowodu");
+  /* Dowodem jest DORĘCZENIE, nie nadanie (0.187.0). Do 0.186.0 sygnał gasł,
+     gdy klient nadał paczkę — a paczka w drodze nie jest paczką u nas. Zwrot
+     doręczony i ten jadący od tygodnia wyglądały w kolejce identycznie.
+
+     Gdy trackingu nie ma (przewoźnik nie odpowiada, brak numeru), zostaje
+     dawne kryterium: lepszy sygnał z daty nadania niż jego brak. */
+  const wrocila = z.dostarczonoAt != null
+    || (z.przesylkaStatus == null && Boolean(z.paczkaAt));
+  if (wPracy && !wrocila) s.push("brak_dowodu");
   /* Odrzucone w panelu Allegro, nie u nas. Bez tego biuro drugi raz
      rozstrzygałoby sprawę, którą ktoś już zamknął gdzie indziej. */
   if (z.rejectionCode) s.push("odrzucony_w_allegro");
@@ -230,8 +244,13 @@ function zloz(
     orderId: (z.order_id as string) ?? null,
     utworzono,
     paczkaAt: (z.paczka_at as string) ?? null,
+    dostarczonoAt: (z.dostarczono_at as string) ?? null,
+    przesylkaStatus: (z.przesylka_status as string) ?? null,
     kubelek,
-    sygnaly: sygnalyZwrotu({ kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null, rejectionCode }),
+    sygnaly: sygnalyZwrotu({
+      kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null,
+      dostarczonoAt: (z.dostarczono_at as string) ?? null,
+      przesylkaStatus: (z.przesylka_status as string) ?? null, rejectionCode }),
     terminAt,
     dniDoTerminu: dni,
     sumaPozycjiGrosze: suma,

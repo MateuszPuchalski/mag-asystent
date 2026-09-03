@@ -30,6 +30,18 @@ const PLATNOSCI: Record<string, string> = {
   SPLIT_PAYMENT: "podzielona", EXTENDED_TERM: "odroczona",
 };
 
+/* Statusy przesyłki z `/order/carriers/{id}/tracking` (0.187.0). Osiem kodów
+   wymienia specyfikacja; nieznany pokazuje się SUROWY, jak przewoźnik. */
+const PRZESYLKA: Record<string, string> = {
+  PENDING: "Przygotowana, czeka na nadanie.",
+  IN_TRANSIT: "W drodze do nas.",
+  RELEASED_FOR_DELIVERY: "Wydana do doręczenia.",
+  AVAILABLE_FOR_PICKUP: "Czeka do odbioru.",
+  NOTICE_LEFT: "Awizo — próba doręczenia nie powiodła się.",
+  ISSUE: "Problem z przesyłką.",
+  RETURNED: "Wraca do nadawcy.",
+};
+
 const ODRZUCENIA: Record<string, string> = {
   REFUND_REJECTED: "odmowa zwrotu pieniędzy",
   NEW_ITEM_SENT: "wysłano nowy towar",
@@ -208,15 +220,30 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     </Sekcja>
 
     <Sekcja ikona={<Package size={14} />} tytul="Paczka zwrotna">
-      {/* „Nadana", nie „wróciła" (0.169.0). Allegro podaje przy paczce datę
-          jej UTWORZENIA przez klienta i nic poza tym — daty doręczenia do nas
-          nie ma w obiekcie zwrotu wcale. Do 0.167.0 ekran nazywał tę datę
-          powrotem towaru i to było po prostu nieprawdą. */}
+      {/* „Nadana", nie „wróciła" (0.169.0): przy paczce stoi data jej
+          UTWORZENIA przez klienta. Do 0.167.0 ekran nazywał ją powrotem
+          towaru i to było nieprawdą.
+
+          DRUGA NIEPRAWDA, zdjęta w 0.187.0: stało tu „Allegro nie podaje daty
+          doręczenia do nas". Podaje — tyle że nie w obiekcie zwrotu, lecz
+          w `/order/carriers/{id}/tracking`, gdzie każda zmiana statusu ma
+          `occurredAt`. Zdanie wzięło się ze zbyt wąskiego czytania jednego
+          schematu i przez trzy wydania mówiło operatorowi, że czegoś nie da
+          się wiedzieć. */}
       {zwrot.paczkaAt
         ? <>
             <p>Nadana przez klienta {czas(zwrot.paczkaAt)}.</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Allegro nie podaje daty doręczenia do nas.</p>
+            {zwrot.dostarczonoAt
+              ? <p className="mt-1 font-semibold text-ranga-ok">
+                  Doręczona do nas {czas(zwrot.dostarczonoAt)}.</p>
+              : <p className="mt-1 font-semibold text-ranga-uwaga">
+                  {PRZESYLKA[zwrot.przesylkaStatus ?? ""]
+                    ?? "Jeszcze do nas nie dotarła."}</p>}
+            {/* Kod przewoźnika surowo, gdy go nie znamy — ta sama zasada co
+                przy `carrierId`: lista nie jest zamknięta. */}
+            {zwrot.przesylkaStatus && !PRZESYLKA[zwrot.przesylkaStatus] &&
+              <p className="mt-1 text-xs text-slate-500">
+                Przewoźnik mówi: {zwrot.przesylkaStatus}.</p>}
           </>
         : <p className="font-semibold text-ranga-uwaga">
             Klient nie nadał jeszcze paczki, a termin biegnie.</p>}

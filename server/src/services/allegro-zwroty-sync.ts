@@ -5,6 +5,7 @@ import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js
 import { kontoKanalu } from "./kanal-konto.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
+import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -164,9 +165,11 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
     const najnowszy = zebrane.reduce<Zwrot | null>(
       (a, z) => (!a || (z.createdAt ?? "") > (a.createdAt ?? "") ? z : a), null);
 
+    let doSprawdzenia: DoSprawdzenia[] = [];
     transaction(database, () => {
       const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
       for (const zwrot of zebrane) zapisz(database, zwrot, konto, at);
+      doSprawdzenia = paczkiDoSprawdzenia(database, zebrane, konto);
 
       /* `error_count` ZERUJE SIĘ na sukcesie — ta sama poprawka co w skrzynce
          w 0.147.0. Licznik, który tylko rośnie, po tygodniu mówi wyłącznie
@@ -182,6 +185,12 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
         najnowszy?.createdAt ?? start.cursorAt,
         at, at, new Date(Date.parse(at) + interval).toISOString());
     })();
+
+    /* Tracking idzie PO transakcji, bo wychodzi do sieci: trzymanie otwartej
+       transakcji SQLite na czas żądania HTTP blokowałoby drugi proces (worker)
+       na tyle, ile trwa najwolniejszy przewoźnik. */
+    await uzupelnijDoreczenia(database, doSprawdzenia,
+      { query: deps.query, apiUrl });
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
@@ -195,6 +204,39 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
       next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, next);
     throw error;
   }
+}
+
+/**
+ * Które paczki warto odpytać u przewoźnika (0.187.0).
+ *
+ * TYLKO TE W DRODZE — decyzja właściciela. Zwrot z zapisaną datą doręczenia
+ * nie jest pytany drugi raz: data się nie zmieni, a każde żądanie to koszt
+ * u Allegro. Zamknięte i odrzucone odpadają razem z nimi.
+ *
+ * Numer listu bierzemy Z ODPOWIEDZI, nie z bazy — w bazie go nie ma i nie
+ * będzie (polityka 0.163.0). Dlatego ta lista powstaje tutaj, w przebiegu
+ * synchronizacji, i żyje do końca wywołania.
+ */
+function paczkiDoSprawdzenia(
+  database: Db, zwroty: Zwrot[], konto: number,
+): DoSprawdzenia[] {
+  const wynik: DoSprawdzenia[] = [];
+  for (const z of zwroty) {
+    /* Pierwsza paczka z KOMPLETEM danych: bez numeru albo bez przewoźnika
+       tracking nie ma o co zapytać. */
+    const paczka = (z.parcels ?? []).find((p) => p.waybill && p.carrierId);
+    if (!paczka?.waybill || !paczka.carrierId) continue;
+
+    const w = database.prepare(`SELECT id, dostarczono_at, zamkniety_at, werdykt
+      FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?`)
+      .get(konto, z.id) as
+      { id: number; dostarczono_at: string | null; zamkniety_at: string | null;
+        werdykt: string | null } | undefined;
+    if (!w || w.dostarczono_at || w.zamkniety_at || w.werdykt === "odrzucony") continue;
+
+    wynik.push({ zwrotId: Number(w.id), carrierId: paczka.carrierId, waybill: paczka.waybill });
+  }
+  return wynik;
 }
 
 /**

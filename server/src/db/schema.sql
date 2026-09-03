@@ -1160,6 +1160,19 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- uchwytem, po którym da się ją potem znaleźć skanem.
   waybill TEXT,
   notatka TEXT,
+  -- ── Kiedy paczka DO NAS dotarła (0.187.0) ───────────────────────────────
+  -- `paczka_at` to data NADANIA przez klienta i tylko tyle. Moment doręczenia
+  -- podaje osobna końcówka `/order/carriers/{id}/tracking`, po numerze listu.
+  -- Do 0.186.0 panel twierdził, że Allegro tej daty nie podaje — nieprawda
+  -- wzięta ze zbyt wąskiego czytania jednego schematu.
+  --
+  -- Numeru listu nadal tu NIE MA (polityka 0.163.0): synchronizacja ma go
+  -- w ręku podczas przebiegu i zapisuje sam WYNIK odpytania.
+  dostarczono_at TEXT,
+  -- Ostatni kod przewoźnika: IN_TRANSIT, NOTICE_LEFT, ISSUE, RETURNED…
+  -- Bez `CHECK`, bo lista przewoźników bywa szersza niż specyfikacja Allegro
+  -- (sonda złapała już `UNKNOWN` przy `carrierId`).
+  przesylka_status TEXT,
   kupujacy_login TEXT,
   -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
   -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
