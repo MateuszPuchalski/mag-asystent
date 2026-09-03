@@ -17,6 +17,7 @@ on:
 
 jobs:
   test:
+    name: Serwer
     runs-on: ubuntu-latest
     steps:
       # Pełna historia: `git diff` z gałęzią bazową potrzebuje wspólnego

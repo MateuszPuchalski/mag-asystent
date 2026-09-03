@@ -72,20 +72,36 @@ obie **zanim** ruszy praca na prawdziwych danych.
 ## 0a. Automatyczne scalanie PR-ów (0.194.0)
 
 **Czynność jednorazowa, w ustawieniach repozytorium na GitHubie.** Robi ją
-właściciel; żaden workflow nie ustawi tego za siebie. Bez tych trzech rzeczy
-automat z `auto-scalanie.yml` nie ruszy wcale.
+właściciel; żaden workflow ani agent nie ustawi tego za siebie — API GitHuba
+nie udostępnia tu narzędzia. Bez tych dwóch kroków automat z
+`auto-scalanie.yml` nie ruszy wcale.
 
 1. **Settings → General → Pull Requests → Allow auto-merge.** Zaznacz.
-2. **Settings → Rules → Rulesets** dla `main` (albo Branch protection).
-   Włącz **Require status checks to pass**. Dodaj pięć checków:
-   `Serwer / test`, `Android / build`, `Instalator / build`,
-   `Worker Sfery / build`, `Usługa tła / build`.
-3. W tej samej regule zaznacz **Require branches to be up to date before
-   merging**.
+2. **Settings → Rules → Rulesets → New ruleset → Import a ruleset.** Wskaż
+   plik `.github/rulesets/main.json` z tego repozytorium.
 
-Punkt 3 nie jest ozdobą. To on sprawia, że GitHub sam wciąga `main` do gałęzi
-PR-a i uruchamia CI od nowa, zamiast scalać na podstawie wyniku sprzed
-tygodnia. Bez niego gałęzie nie odświeżają się same.
+Import zakłada regułę na gałęzi domyślnej z trzema rzeczami naraz: wymaganymi
+checkami, wymogiem świeżej gałęzi oraz blokadą skasowania `main` i wymuszania
+historii. Klikanie tego ręcznie to pięć nazw checków wpisywanych z palca —
+plik robi to bez literówki.
+
+**Wymóg świeżej gałęzi** (`strict_required_status_checks_policy`) nie jest
+ozdobą. To on sprawia, że GitHub sam wciąga `main` do gałęzi PR-a i uruchamia
+CI od nowa, zamiast scalać na podstawie wyniku sprzed tygodnia. Bez niego
+gałęzie nie odświeżają się same.
+
+**Nazwy checków to `Serwer`, `Android`, `Instalator`, `Worker Sfery`
+i `Usługa tła`** — czyli pola `name` zadań w workflow'ach. Do 0.194.1 cztery
+z nich nazywały się `build`, bo nie miały `name` i GitHub brał klucz zadania.
+Wymagany check dopasowuje się PO NAZWIE, więc reguła „wymagaj `build`" była
+niejednoznaczna i dawała bramkę słabszą, niż wygląda. Zmieniając nazwę zadania
+w workflow, zmień ją też w `main.json` — inaczej reguła będzie czekać na check,
+którego nikt nie zgłasza, i zablokuje scalanie na zawsze.
+
+**`bypass_actors` jest puste**, więc reguła obowiązuje wszystkich łącznie
+z właścicielem: bezpośredni push na `main` przestaje przechodzić. Jeśli chcesz
+zostawić sobie wyjście awaryjne, dopisz siebie jako obchodzącego regułę
+w interfejsie po imporcie.
 
 Punkt 2 działa dopiero od 0.194.0. Wcześniej workflow'y miały filtry `paths:`
 na wyzwalaczu, więc check, który się nie uruchomił, zostawał w wiecznym

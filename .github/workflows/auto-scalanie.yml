@@ -26,6 +26,7 @@ on:
 
 jobs:
   wlacz:
+    name: Auto-scalanie
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

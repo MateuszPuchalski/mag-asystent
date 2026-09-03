@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.194.1 — 3 września 2026
+
+**[wymaga działania] Poprawione nazwy checków w instrukcji reguły.** Wydanie
+0.194.0 kazało wymagać checków `Serwer / test`, `Android / build` i trzech
+podobnych. Tak ich nie widać: GitHub bierze nazwę checka z pola `name` zadania,
+a bez niego z klucza — więc cztery workflow'y zgłaszały check o tej samej
+nazwie `build`. Wymagany check dopasowuje się PO NAZWIE, więc reguła oparta
+na tamtej instrukcji dawałaby bramkę słabszą, niż wygląda.
+
+**Każde zadanie ma teraz nazwę własną:** `Serwer`, `Android`, `Instalator`,
+`Worker Sfery`, `Usługa tła`, `Auto-scalanie`, `Konflikty`.
+
+**Regułę importuje się z pliku, nie klika.** `.github/rulesets/main.json`
+wchodzi przez Settings → Rules → Rulesets → Import a ruleset i zakłada naraz
+wymagane checki, wymóg świeżej gałęzi oraz blokadę skasowania `main`
+i wymuszania historii. Pięć nazw wpisywanych z palca to pięć okazji do
+literówki, a literówka daje regułę czekającą na check, którego nikt nie zgłasza.
+
 ## 0.194.0 — 3 września 2026
 
 **[wymaga działania] PR-y scalają się same, gdy CI jest zielone.** Automat
