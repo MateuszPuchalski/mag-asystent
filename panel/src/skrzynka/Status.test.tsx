@@ -90,3 +90,27 @@ describe("ręczna flaga „pilne”", () => {
     expect(onPriorytet).toHaveBeenCalledWith("normalny");
   });
 });
+
+/* ── Stan raz, nie dwa (0.193.0) ─────────────────────────────────────────────
+   Do 0.192.0 pasek statusu rysował plakietkę ze stanem, a obok pole wyboru
+   z TĄ SAMĄ wartością: jedno pasmo nagłówka mówiło „OTWARTA" dwukrotnie.
+   §7 żąda, żeby nagłówek pokazywał stan zawsze — pokazuje, w rzeczy, którą
+   się go zmienia.                                                            */
+describe("Stan rozmowy stoi w nagłówku raz", () => {
+  it("nazwa stanu bieżącego pada dokładnie jeden raz", () => {
+    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
+      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
+    /* Jedyne wystąpienie to opcja w polu wyboru — plakietki obok już nie ma. */
+    expect(screen.getAllByText("Otwarta")).toHaveLength(1);
+  });
+
+  it("pole wyboru niesie barwę stanu, więc stan dalej czyta się rzutem oka", () => {
+    /* Barwa była wcześniej na plakietce. Znikła plakietka, nie barwa —
+       inaczej „pokazuj stan zawsze" zamieniłoby się w listę rozwijaną
+       nie do odróżnienia od każdej innej. */
+    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
+      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.getByRole("combobox", { name: /Status rozmowy/ }).className)
+      .toMatch(/bg-stan-open/);
+  });
+});

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AlarmClock, Clock, Flame } from "lucide-react";
 import type { Rozmowa, StatusRozmowy } from "../api/typy";
-import { Plakietka, Przycisk, czas } from "../ui";
+import { KLASA_STATUSU, Przycisk, czas } from "../ui";
 import { DO_WYBORU, NAZWA } from "./statusy";
 
 /* Status rozmowy (§7, 0.158.0). Nagłówek rozmowy pokazuje go ZAWSZE, także
@@ -23,9 +23,11 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
   const [odkladanie, setOdkladanie] = useState(false);
   const [termin, setTermin] = useState("");
 
-  return <div className="flex w-full flex-wrap items-center gap-2">
-    <Plakietka status={rozmowa.status}>{NAZWA[rozmowa.status]}</Plakietka>
-
+  /* Bez `w-full` (0.193.0): pasek statusu łamał wiersz nagłówka ZAWSZE,
+     także wtedy, gdy miejsce było. Nagłówek rozmowy zajmował przez to dwa
+     pasma zamiast jednego, a pytanie klienta zaczynało się niżej. Zawinięcie
+     zostaje — przy wąskiej kolumnie ma się złamać. */
+  return <div className="flex flex-wrap items-center gap-2">
     {/* Termin minął, a rozmowa wróciła do otwartych. Bez tego zdania wiersz
         wygląda jak każdy inny otwarty — a to ten, o którym zapomniano. */}
     {rozmowa.poTerminie && <span className="flex items-center gap-1 text-xs font-bold text-ranga-uwaga">
@@ -47,9 +49,16 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
       <Flame size={13} />{rozmowa.priorytet === "pilny" ? "PILNE" : "Oznacz jako pilne"}
     </button>
 
-    <label className="flex items-center gap-2 text-xs text-slate-500">
-      Status
-      <select className="field w-auto py-1 text-sm" aria-label="Status rozmowy"
+    {/* STATUS RAZ, NIE DWA (0.193.0). Do 0.192.0 stała tu plakietka ze stanem,
+        a obok niej pole wyboru z tą samą wartością — jedno pasmo nagłówka
+        mówiło „OTWARTA" dwukrotnie. Barwa przeniosła się na samo pole: §7 żąda,
+        żeby nagłówek pokazywał stan ZAWSZE, i pokazuje — tyle że w rzeczy,
+        którą się go zmienia. Podpis „Status" też zniknął; nazwa stanu w polu
+        mówi to samo, a wyrazu mniej to jeden wyraz mniej do ominięcia. */}
+    <label className="flex items-center gap-2">
+      <span className="sr-only">Status rozmowy</span>
+      <select className={`field w-auto border-0 py-1 text-sm font-bold ${
+        KLASA_STATUSU[rozmowa.status] ?? ""}`} aria-label="Status rozmowy"
         value={rozmowa.status} disabled={zapisuje}
         onChange={(e) => {
           const wybrany = e.target.value as StatusRozmowy;

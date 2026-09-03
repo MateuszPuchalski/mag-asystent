@@ -96,17 +96,29 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
         węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
         blok z bazą 0 — kurczy się do zera. Wzorzec z kolumn zwrotów. */}
+    {/* JEDNO PASMO ZAMIAST DWÓCH (0.193.0). Data synchronizacji stała we
+        WŁASNYM pasku pod nagłówkiem, a pigułka „Synchronizacja 18:29 · 0 błędów"
+        niesie tę samą rzecz w pasku górnym, na każdym ekranie panelu. Pięć
+        pasm sterujących nad pierwszym wierszem zjadało ćwierć wysokości
+        kolumny — a kolumna kolejki istnieje po to, żeby pokazywać PYTANIA.
+
+        Dlaczego data w ogóle tu jest: pusta lista o 9:00 znaczy co innego, gdy
+        synchronizator stanął o 6:00, a co innego, gdy przebiegł minutę temu.
+        Tego zdania nie usuwamy — schodzi obok tytułu, w rozmiar podpisu. */}
     <header className="flex shrink-0 items-center gap-2 border-b p-4">
-      <Inbox size={18} /><b className="mr-auto">Rozmowy</b>
+      <Inbox size={18} />
+      <div className="mr-auto min-w-0">
+        <b>Rozmowy</b>
+        <p className="truncate text-xs font-normal text-slate-500">
+          synchronizacja {czas(stan.ostatniaSynchronizacja)}
+          {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
+        </p>
+      </div>
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
         STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
       <button className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
-    <p className="shrink-0 border-b bg-slate-50 px-4 py-2 text-xs text-slate-500">
-      Ostatnia synchronizacja: {czas(stan.ostatniaSynchronizacja)}
-      {stan.bledy > 0 && <span className="ml-2 font-bold text-amber-700">błędów: {stan.bledy}</span>}
-    </p>
     <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-2">
       {KUBELKI.map((k) => <button key={k.klucz} onClick={() => setKubelek(k.klucz)}
         aria-pressed={kubelek === k.klucz}
@@ -154,30 +166,51 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         aria-current={wybranaId === r.id}
         className={`block w-full border-b p-4 text-left hover:bg-slate-50 ${
           wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
+        {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0) ────────────────────────────
+            Do 0.192.0 najgrubszym drukiem w wierszu stał LOGIN KUPUJĄCEGO,
+            a pytanie leżało pod nim, mniejsze i szare. Login Allegro nie mówi
+            nic — „Kupujący 44300444" to nie jest osoba, którą się zna. Triaż
+            robi się po TREŚCI, więc treść dostała pierwszy plan, a login zszedł
+            do podpisu obok czasu. Makieta rysowała to tak od początku: klient
+            13,5 px, a nad nim temat rozmowy.
+
+            Plakietki zostają na górze, bo odpowiadają na pytanie zadawane
+            PRZED czytaniem: czy tę rozmowę w ogóle brać. */}
         <div className="flex items-center gap-2">
-          <b className="truncate">{r.klient}</b>
           {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
               zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
           {r.priorytet === "pilny" &&
             <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
               PILNE</span>}
-          {r.nieprzeczytana &&
-            <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[11px] font-bold">NOWE</span>}
+          {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
+              statusu, „NOWA" — dwa różne fakty jednym wyrazem. „Nowa" znaczy
+              „sprawy nikt nie tknął", „nowe" znaczyło „Allegro trzyma wątek
+              jako nieodczytany". Czytało się to jak powtórzenie, a przy okazji
+              zjadało szerokość, przez którą plakietka statusu łamała się na
+              dwie linie. Kropka to znak nieprzeczytanego znany ze wszystkich
+              skrzynek — nazwę niesie `title` i tekst dla czytnika ekranu. */}
+          {r.nieprzeczytana && <span title="Nieprzeczytana wiadomość"
+            className="h-2 w-2 shrink-0 rounded-full bg-wertis-amber">
+            <span className="sr-only">NOWE</span></span>}
           <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>
+          {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
+              „za co się wziąć", a data każe je dopiero policzyć w głowie.
+              Stoi w prawym rogu górnej linii, bo razem z PILNE tworzy jedyną
+              parę sygnałów, po której układa się kolejność pracy (§10.2). */}
+          {r.czekaOdMs !== null && <span className={`ml-auto shrink-0 text-xs font-bold ${
+            r.poTerminie ? "text-ranga-zle" : "text-slate-600"}`}>
+            czeka {czekaOd(r.czekaOdMs)}</span>}
         </div>
         {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
             nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
             pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
-        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+        <p className="mt-1.5 line-clamp-2 text-sm font-medium text-slate-800">
           {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
             <span className="font-semibold text-slate-400">Biuro: </span>}
           {r.ostatniaWiadomosc}</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <span className="font-semibold text-slate-500">{r.klient}</span>
           <span>{czas(r.ostatniaWiadomoscAt)}</span>
-          {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
-              „za co się wziąć", a data każe je dopiero policzyć w głowie. */}
-          {r.czekaOdMs !== null &&
-            <span className="font-semibold text-slate-600">czeka {czekaOd(r.czekaOdMs)}</span>}
           {/* Liczba DOPISKÓW klienta od naszej odpowiedzi. Nie nazywamy jej
               „nieprzeczytane": tego Allegro nie podaje, a ekran nie ma prawa
               obiecywać pomiaru, którego nie robi. */}

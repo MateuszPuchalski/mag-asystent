@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.193.0 — 3 września 2026
+## 0.194.0 — 3 września 2026
 
 **[wymaga działania] PR-y scalają się same, gdy CI jest zielone.** Automat
 włącza natywne auto-scalanie GitHuba na każdym PR-ze wyjętym z wersji roboczej.
@@ -61,6 +61,54 @@ zostało sprawdzone".
 EXISTS` druga definicja nie jest błędem składni, tylko cichą podmianą schematu
 — tak w 0.142.0 scaliła się bez jednego znacznika konfliktu atrapa
 `zadanie_terenowe`.
+
+## 0.193.0 — 3 września 2026
+
+**Hierarchia informacji w skrzynce pytań.** Właściciel powiedział wprost, że
+ekran nie ustawia treści w kolejności ważności. Zrzut ekranu pokazał sześć
+miejsc; poprawione są wszystkie, w trzech skupiskach.
+
+### Oś rozmowy miała jedną cechę z czterech
+
+Makieta `docs/projekt-widokow/Main.dc.html` odróżnia rodzaje wpisów tłem,
+ramką, ikoną i wcięciem, a do tego podpisuje rodzaj: „Klient · Allegro",
+„Odpowiedź firmy". Komentarz przy tokenach w `tailwind.config.js` mówi to samo
+od początku. Front doszedł do jednej cechy — tło `#ffffff` kontra `#f8fafc`
+przy tej samej ramce. Na ekranie to jest różnica niewidoczna.
+
+Wychodziło z tego, że najwyraźniejszym wpisem osi była notatka wewnętrzna,
+czyli rzecz, której klient nie zobaczy, a najsłabszym — podział „kto to
+powiedział". Wróciły ikona, podpis rodzaju i wcięcie: klient odsunięty od
+prawej, my od lewej. Widać to, zanim wzrok dojdzie do podpisu.
+
+Przy okazji doszła godzina wpisu. `at` jechał w kontrakcie od początku, a oś
+go nie pokazywała wcale — czytało się rozmowę bez wiedzy, czy między pytaniem
+a odpowiedzią minęła minuta, czy trzy dni.
+
+### Nagłówek rozmowy mówił „OTWARTA" dwa razy
+
+W jednym paśmie stała plakietka ze stanem i pole wyboru z tą samą wartością.
+Plakietka zeszła, barwa przeniosła się na samo pole. §7 żąda, żeby nagłówek
+pokazywał stan zawsze — pokazuje, w rzeczy, którą się go zmienia. Pasek
+statusu przestał też łamać wiersz, gdy miejsce jest: nagłówek zajmuje jedno
+pasmo zamiast dwóch, a pytanie klienta zaczyna się wyżej.
+
+### W kolejce najgrubszym drukiem stał login kupującego
+
+Pytanie leżało pod nim, mniejsze i szare. Login Allegro nie mówi nic —
+„Kupujący 44300444" to nie jest osoba, którą się zna. Triaż robi się po
+treści, więc treść dostała pierwszy plan, a login zszedł do podpisu obok
+czasu. Makieta rysowała to tak od początku.
+
+Czas oczekiwania stanął w prawym rogu górnej linii, razem z PILNE — to jedyna
+para sygnałów, po której układa się kolejność pracy. Po terminie robi się
+czerwony. Znacznik nieprzeczytanej wiadomości to teraz KROPKA: słowo „NOWE"
+stało obok plakietki „NOWA" i mówiło dwa różne fakty jednym wyrazem.
+
+Data synchronizacji zeszła z własnego pasma do podpisu pod tytułem kolumny.
+Pasm sterujących nad listą było pięć i zjadały ćwierć jej wysokości, a tę samą
+datę niesie pigułka w pasku górnym, na każdym ekranie panelu.
+
 
 ## 0.192.0 — 3 września 2026
 

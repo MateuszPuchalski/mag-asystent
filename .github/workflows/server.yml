@@ -3,7 +3,7 @@
 # dokumentacji nie bramkowały niczego — przechodziły tylko wtedy, gdy ktoś
 # uruchomił je u siebie.
 #
-# Od 0.193.0 filtr ścieżek NIE stoi na wyzwalaczu, tylko na krokach. Powód jest
+# Od 0.194.0 filtr ścieżek NIE stoi na wyzwalaczu, tylko na krokach. Powód jest
 # mechaniczny: wymagany check, którego workflow nie ruszył, zostaje w GitHubie
 # w stanie oczekiwania NA ZAWSZE i blokuje scalenie. Bez tej zmiany nie da się
 # uczynić żadnego checka wymaganym, a bez wymaganych checków automatyczne

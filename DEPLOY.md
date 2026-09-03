@@ -69,7 +69,7 @@ Instalator nie robi wszystkiego. Konta pracowników zakłada się z kolektora
 (§5a). Kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia ręcznie —
 obie **zanim** ruszy praca na prawdziwych danych.
 
-## 0a. Automatyczne scalanie PR-ów (0.193.0)
+## 0a. Automatyczne scalanie PR-ów (0.194.0)
 
 **Czynność jednorazowa, w ustawieniach repozytorium na GitHubie.** Robi ją
 właściciel; żaden workflow nie ustawi tego za siebie. Bez tych trzech rzeczy
@@ -87,14 +87,14 @@ Punkt 3 nie jest ozdobą. To on sprawia, że GitHub sam wciąga `main` do gałę
 PR-a i uruchamia CI od nowa, zamiast scalać na podstawie wyniku sprzed
 tygodnia. Bez niego gałęzie nie odświeżają się same.
 
-Punkt 2 działa dopiero od 0.193.0. Wcześniej workflow'y miały filtry `paths:`
+Punkt 2 działa dopiero od 0.194.0. Wcześniej workflow'y miały filtry `paths:`
 na wyzwalaczu, więc check, który się nie uruchomił, zostawał w wiecznym
 oczekiwaniu i blokował scalenie na zawsze. Dziś każde zadanie startuje zawsze
 i kończy się zielone także wtedy, gdy nie ma czego sprawdzać.
 
 **Czego automat NIE robi.** Nie rozstrzyga konfliktów. PR, który przestał się
 scalać, dostaje etykietę `konflikt` i jeden komentarz — rozstrzyga człowiek.
-Powód stoi w `CHANGELOG.md` przy 0.193.0 i wart jest powtórzenia. Trzy
+Powód stoi w `CHANGELOG.md` przy 0.194.0 i wart jest powtórzenia. Trzy
 najgroźniejsze defekty ostatnich wydań przeszły z zielonym CI, a dwa z nich
 bez żadnego konfliktu. Konflikt nie jest miarą ryzyka.
 

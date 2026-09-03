@@ -1,4 +1,4 @@
-# Automatyczne scalanie PR-ów (0.193.0).
+# Automatyczne scalanie PR-ów (0.194.0).
 #
 # Włącza NATYWNE auto-scalanie GitHuba, zamiast wołać `merge` własnym krokiem.
 # Trzy powody, każdy zapłacony wcześniej cudzym błędem:
