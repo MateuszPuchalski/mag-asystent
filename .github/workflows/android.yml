@@ -26,6 +26,7 @@ on:
 
 jobs:
   build:
+    name: Android
     runs-on: ubuntu-latest
     # Zapis potrzebny wyłącznie do utworzenia wydania z APK (krok na końcu).
     permissions:

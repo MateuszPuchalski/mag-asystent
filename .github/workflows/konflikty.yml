@@ -18,6 +18,7 @@ on:
 
 jobs:
   oznacz:
+    name: Konflikty
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

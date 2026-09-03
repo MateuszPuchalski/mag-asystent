@@ -20,6 +20,7 @@ on:
 
 jobs:
   build:
+    name: Instalator
     runs-on: windows-latest
     # `contents: write` jest potrzebne WYŁĄCZNIE ostatniemu krokowi, który
     # dokleja pliki instalatora do wydania. Bez tego `github.token` ma dostęp
