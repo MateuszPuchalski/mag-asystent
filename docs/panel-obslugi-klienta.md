@@ -932,6 +932,15 @@ wysyłał gotową liczbę, dałoby się oddać dowolną kwotę żądaniem z pomi
 ekranu. Koszt dostawy bierze się z zamówienia — dociągamy je od 0.152.0
 i dopiero to zdjęło blokadę opisaną wcześniej przy `sumaPozycji`.
 
+**Oddajemy dostawę, którą klient WYBRAŁ** — decyzja właściciela z 3 września
+2026. Kwotą jest `dostawa_grosze` z zamówienia, czyli to, co klient naprawdę
+zapłacił za swoją opcję.
+
+Pytanie było realne, bo ustawa pozwala oddać mniej. Gdy klient wybrał opcję
+droższą niż najtańsza zwykła, sprzedawca nie musi dopłacać różnicy. Oddajemy
+więcej świadomie: tak samo rozlicza to Allegro, a liczenie najtańszej opcji
+wymagałoby cennika oferty, którego przy zwrocie nie mamy.
+
 Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
 rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
 sztuk — czeka na ocenę hali z 0.151.0.

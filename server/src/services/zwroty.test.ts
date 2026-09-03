@@ -416,6 +416,37 @@ test("kwotę liczy SERWER z zaznaczenia, nie panel", () => {
   assert.equal(obie.kwotaGrosze, 15000, "obie pozycje");
 });
 
+test("oddajemy dostawę, którą klient WYBRAŁ — nie najtańszą z oferty", () => {
+  /* Decyzja właściciela z 3 września 2026. Ustawa pozwala oddać mniej: przy
+     opcji droższej niż najtańsza zwykła sprzedawca nie musi dopłacać różnicy.
+     Oddajemy więcej świadomie, bo tak samo rozlicza to Allegro. Ten test
+     istnieje po to, żeby nikt nie „poprawił" tego jako niedopatrzenia. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { konto, id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+
+  /* Zamówienie musi stać na TYM SAMYM koncie kanału, bo złączenie wiąże
+     zwrot z zamówieniem parą (`order_id`, `channel_account_id`). Numer
+     zamówienia sam w sobie nie wystarcza — to jest ta sama ostrożność, co
+     przy szukaniu zwrotu po numerze. */
+  const ord = (d.prepare("SELECT order_id AS o FROM zwrot_klienta WHERE id=?")
+    .get(id) as { o: string }).o;
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,
+    dostawa_grosze,dostawa_metoda,suma_grosze,waluta,synced_at)
+    VALUES (?,?,'READY_FOR_PROCESSING',1499,'Kurier InPost',20496,'PLN','2026-09-01T10:00:00Z')`)
+    .run(konto, ord);
+
+  /* 1499 gr to koszt dostawy Z ZAMÓWIENIA, czyli kwota zapłacona przez
+     klienta za wybranego kuriera. */
+  const z = zapiszKwote(d, id, { pozycjeIds: poz, dostawa: true }, 4, KTO);
+  assert.equal(z.dostawaGrosze, 1499);
+  assert.equal(z.kwotaGrosze, 15000 + 1499, "pozycje plus zapłacona dostawa");
+  assert.equal(z.wariant, "pelna");
+});
+
 test("zaznaczenie obcej pozycji odpada, zamiast po cichu podnieść kwotę", () => {
   const d = stanowisko();
   const KTO = biuro(d);

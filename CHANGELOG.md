@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.188.1 — 3 września 2026
+
+**Którą dostawę oddajemy — decyzja zapisana, kod bez zmian.**
+
+Pytanie stało otwarte od 0.184.0: czy Allegro zwraca koszt najtańszej opcji
+dostawy z oferty, czy tej, którą wybrał klient. Właściciel odpowiedział: tej,
+którą wybrał klient. Panel liczył tak od początku, więc nic się nie zmienia
+w działaniu.
+
+Zmienia się to, że decyzja jest teraz ZAPISANA. Ustawa pozwala oddać mniej:
+gdy klient wybrał opcję droższą niż najtańsza zwykła, sprzedawca nie musi
+dopłacać różnicy. Oddajemy więcej świadomie — tak samo rozlicza to Allegro,
+a liczenie najtańszej opcji wymagałoby cennika oferty, którego przy zwrocie
+nie mamy.
+
+Bez zapisu wyglądało to na niedopatrzenie i doczekałoby się „poprawki".
+Dlatego stoi w trzech miejscach: komentarz przy `zapiszKwote`, akapit
+w §25a.3 i test, który pilnuje kwoty.
+
 ## 0.188.0 — 3 września 2026
 
 **Data doręczenia zwrotu naprawdę się pojawia.**
