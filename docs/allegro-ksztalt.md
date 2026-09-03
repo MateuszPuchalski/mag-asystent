@@ -482,6 +482,25 @@ numeru i bez kwoty. Od 0.176.0 `stanRabatu` czyta OBA i mówi, z którego wie,
 bo do 0.175.0 ekran pisał przy takim zwrocie „brak wniosku" i podstawiał
 przycisk, który zawsze kończył się konfliktem.
 
+### Wątek przeczytany i załączniki wiadomości (0.195.0)
+
+`PUT /messaging/threads/{threadId}/read`, uprawnienie `allegro:api:messaging`.
+Ciało to `{ "read": true }` ze schematu `ThreadReadFlag` — pole jest `required`,
+a specyfikacja wprost wymienia 422 „missing flag in the request body". Nowego
+scope'u parowanie nie potrzebuje: to ten sam, którym czytamy i wysyłamy.
+
+Załącznik wgrywa się DWOMA żądaniami i skrócić się tego nie da.
+`POST /messaging/message-attachments` z `{ filename, size }` oddaje `{ id }`,
+gdzie `size` ma `maximum: 5242880`. Dopiero `PUT /messaging/message-attachments/{id}`
+niesie bajty, a jego `content-type` to TYP PLIKU, nie wersja zasobu —
+specyfikacja wymienia `image/png`, `image/gif`, `image/bmp`, `image/tiff`,
+`image/jpeg` i `application/pdf`. To jedyny nasz zapis, przy którym 415 znaczy
+„zły plik", a nie „zła wersja zasobu".
+
+Gotowe identyfikatory idą w `NewMessageInThread.attachments` jako lista
+`{ id }`. Deklaracji nie da się cofnąć — nie ma takiej końcówki — więc plik
+dodany i nigdy niewysłany zostaje po ich stronie i wygasa sam.
+
 **TA KOŃCÓWKA NIE MA IDEMPOTENCJI.** Pole `commandId` jest przy zwrocie
 pieniędzy, nie tutaj — więc powtórzone żądanie zakłada DRUGI wniosek, a nie
 ten sam. Strażnik przed dubletem musi stać po naszej stronie i dlatego stoi

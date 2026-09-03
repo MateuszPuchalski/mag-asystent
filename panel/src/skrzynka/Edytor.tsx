@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Lock, MessageSquare, Send } from "lucide-react";
 import { Przycisk } from "../ui";
+import { ZalacznikiWysylki } from "./ZalacznikiWysylki";
+import type { ZalacznikSzkicu } from "../api/rozmowy";
 
 /**
  * Edytor odpowiedzi (§10.4).
@@ -22,6 +24,7 @@ import { Przycisk } from "../ui";
 export function Edytor({
   szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij,
   komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki,
+  zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik,
 }: {
   szkic: string;
   cudza: boolean;
@@ -38,6 +41,14 @@ export function Edytor({
   agenci: Array<{ userId: number; name: string }>;
   wzmianki: number[];
   onWzmianki: (v: number[]) => void;
+  /* Załączniki (0.195.0) — TYLKO w trybie odpowiedzi. Komentarz wewnętrzny
+     nigdzie nie wychodzi, więc dołączanie do niego pliku nie miałoby dokąd
+     pójść, a przycisk obok notatki sugerowałby, że ma. */
+  zalaczniki: ZalacznikSzkicu[];
+  dodajeZalacznik: boolean;
+  bladZalacznika: string;
+  onDodajZalacznik: (plik: File) => void;
+  onUsunZalacznik: (id: number) => void;
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
@@ -101,6 +112,8 @@ export function Edytor({
               <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ DO KLIENTA"}</Przycisk>
             <span className="ml-auto text-xs text-slate-400">{szkic.length} znaków</span>
           </div>
+          <ZalacznikiWysylki lista={zalaczniki} dodaje={dodajeZalacznik} blad={bladZalacznika}
+            onDodaj={onDodajZalacznik} onUsun={onUsunZalacznik} wylaczone={cudza} />
         </>}
   </div>;
 }

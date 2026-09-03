@@ -219,6 +219,28 @@ export function urlWiadomosci(apiUrl: string, threadId: string): string {
   return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/messages`;
 }
 
+/**
+ * Znacznik „wątek przeczytany" (`PUT /messaging/threads/{id}/read`, 0.195.0).
+ *
+ * Ciało to `{ read: true }` ze schematu `ThreadReadFlag` — pole jest
+ * `required`, a specyfikacja wprost wymienia 422 „missing flag in the request
+ * body". Uprawnienie `allegro:api:messaging`, to samo co odczyt i wysyłka,
+ * więc nowego scope'u parowanie NIE potrzebuje.
+ */
+export function urlPrzeczytaniaWatku(apiUrl: string, threadId: string): string {
+  return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/read`;
+}
+
+/** Deklaracja załącznika przed wgraniem (`POST /messaging/message-attachments`). */
+export function urlDeklaracjiZalacznika(apiUrl: string): string {
+  return `${apiUrl}/messaging/message-attachments`;
+}
+
+/** Wgranie binariów zadeklarowanego załącznika (`PUT .../{attachmentId}`). */
+export function urlWgraniaZalacznika(apiUrl: string, attachmentId: string): string {
+  return `${apiUrl}/messaging/message-attachments/${encodeURIComponent(attachmentId)}`;
+}
+
 /* Wersje zasobu, po kolei. `public.v1` to zasoby stabilne, `beta.v1` — te
    w becie; zły nagłówek daje 406, nie pusty wynik. */
 const AKCEPTY = [
@@ -299,7 +321,18 @@ export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
  */
 export async function zapytajAllegro(
   url: string,
-  opcje: { metoda?: "POST" | "PUT" | "DELETE"; body?: unknown } = {}
+  opcje: {
+    metoda?: "POST" | "PUT" | "DELETE";
+    body?: unknown;
+    /**
+     * Ciało BINARNE — plik, nie JSON (0.195.0). `PUT /messaging/message-attachments/{id}`
+     * jako jedyny nasz zapis nie przyjmuje wersji zasobu w `content-type`:
+     * specyfikacja wymienia przy nim `image/png`, `image/jpeg`, `image/gif`,
+     * `image/bmp`, `image/tiff` i `application/pdf`, i nic poza tym. Wersję
+     * zasobu negocjujemy dalej w `accept`, bo ODPOWIEDŹ jest zwykłym JSON-em.
+     */
+    plik?: { dane: Uint8Array; typ: string };
+  } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
   const rodzina = rodzinaKoncowki(url);
@@ -331,9 +364,11 @@ export async function zapytajAllegro(
              z pamięci zamiast z pliku. Odpowiedzią na niezadeklarowany typ
              treści jest 415, czyli odmowa BEZ objawu w panelu poza „nie
              udało się wysłać". */
-          ...(opcje.body === undefined ? {} : { "content-type": accept }),
+          ...(opcje.plik ? { "content-type": opcje.plik.typ }
+            : opcje.body === undefined ? {} : { "content-type": accept }),
         },
-        body: opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
+        body: opcje.plik ? opcje.plik.dane
+          : opcje.body === undefined ? undefined : JSON.stringify(opcje.body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
     } catch (e) {
@@ -347,8 +382,14 @@ export async function zapytajAllegro(
 
     /* 406 = zła WERSJA zasobu w `accept`, 415 = w `content-type`. Jedno i
        drugie znaczy „nie ta wersja", więc obie odpowiedzi prowadzą do próby
-       z następnym nagłówkiem — a nie do surowego błędu na ekranie biura. */
-    if (odp.status === 406 || odp.status === 415) {
+       z następnym nagłówkiem — a nie do surowego błędu na ekranie biura.
+
+       WYJĄTEK: ciało binarne (0.195.0). Tam `content-type` NIE jest wersją
+       zasobu, tylko typem pliku, więc 415 znaczy „Allegro nie przyjmuje
+       takiego pliku" i powtórzenie z innym `accept` nic nie zmieni — poleci
+       drugi raz i skończy się komunikatem o wersji zasobu, czyli zdaniem
+       nieprawdziwym. Odmowa typu pliku ma dojść do agenta taka, jaka jest. */
+    if (odp.status === 406 || (odp.status === 415 && !opcje.plik)) {
       ostatniaOdmowaWersji = await odp.text().catch(() => "");
       dzialajacyAccept.delete(rodzina);
       continue;

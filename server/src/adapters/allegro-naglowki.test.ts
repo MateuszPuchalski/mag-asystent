@@ -34,13 +34,17 @@ after(() => mock.restoreAll());
 
 /** Podstawiony `fetch`: zbiera żądania i oddaje kolejne przygotowane odpowiedzi. */
 function podstaw(odpowiedzi: Array<{ status: number; body?: unknown }>) {
-  const zebrane: Array<{ url: string; headers: Record<string, string>; body: string | null }> = [];
+  const zebrane: Array<{ url: string; headers: Record<string, string>;
+    body: string | null; bajtow: number | null }> = [];
   let i = 0;
   mock.method(globalThis, "fetch", async (url: string, init: RequestInit) => {
     zebrane.push({
       url: String(url),
       headers: init.headers as Record<string, string>,
       body: typeof init.body === "string" ? init.body : null,
+      /* Binaria zbieramy osobno: `body` bywa `Uint8Array`, a wtedy `String(…)`
+         dałby listę liczb i test przestałby o czymkolwiek mówić. */
+      bajtow: init.body instanceof Uint8Array ? init.body.byteLength : null,
     });
     const o = odpowiedzi[Math.min(i++, odpowiedzi.length - 1)];
     return new Response(JSON.stringify(o.body ?? {}), {
@@ -83,4 +87,35 @@ test("ODCZYT nie deklaruje typu treści — pusty content-type bywa powodem odmo
   await zapytajAllegro("https://api.test/messaging/threads?limit=20&offset=0");
   assert.equal(zebrane[0].headers["content-type"], undefined);
   assert.equal(zebrane[0].headers.accept, PUBLIC);
+});
+
+/* ── Ciało binarne: załącznik wiadomości (0.195.0) ───────────────────────────
+   `PUT /messaging/message-attachments/{id}` jako JEDYNY nasz zapis nie
+   przyjmuje wersji zasobu w `content-type`. Specyfikacja wymienia przy nim
+   sześć typów plików i nic poza tym.                                        */
+
+test("wgranie załącznika deklaruje TYP PLIKU, nie wersję zasobu", async () => {
+  const zebrane = podstaw([{ status: 200, body: { id: "att-1" } }]);
+  await zapytajAllegro("https://api.test/messaging/message-attachments/att-1", {
+    metoda: "PUT", plik: { dane: new Uint8Array(64).fill(1), typ: "image/jpeg" },
+  });
+
+  assert.equal(zebrane.length, 1);
+  assert.equal(zebrane[0].headers["content-type"], "image/jpeg");
+  assert.equal(zebrane[0].headers.accept, PUBLIC, "odpowiedź to zwykły JSON, więc accept zostaje");
+  assert.equal(zebrane[0].bajtow, 64, "bajty idą surowe, nie przez JSON.stringify");
+});
+
+test("415 przy BINARIACH nie chodzi po wersjach — to odmowa typu pliku", async () => {
+  /* Powtórka z innym `accept` niczego nie zmieni, a skończyłaby się
+     komunikatem o wersji zasobu, czyli zdaniem nieprawdziwym. Odmowa ma dojść
+     do agenta taka, jaka jest. */
+  const zebrane = podstaw([{ status: 415 }, { status: 200, body: { id: "att-2" } }]);
+
+  await assert.rejects(() => zapytajAllegro(
+    "https://api.test/messaging/message-attachments/att-2", {
+      metoda: "PUT", plik: { dane: new Uint8Array(8), typ: "image/webp" },
+    }));
+
+  assert.equal(zebrane.length, 1, "jedna próba, bez chodzenia po wersjach zasobu");
 });

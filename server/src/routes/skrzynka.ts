@@ -12,6 +12,9 @@ import { db } from "../db/db.js";
 import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
+import {
+  dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
+} from "../services/zalaczniki-wysylki.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
@@ -378,6 +381,52 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       });
     } catch (e) { return konflikt(reply, e); }
   });
+
+  /* ── Załączniki do odpowiedzi (0.195.0) ────────────────────────────────────
+     Plik jedzie base64 w JSON, jak zdjęcia dowodowe z kolektora — `bodyLimit`
+     API stoi na 6 MiB i to on wyznacza nasz próg 4 MiB na plik (uzasadnienie
+     przy `LIMIT_NASZ`). Multipart wymagałby wtyczki Fastify, czyli nowej
+     zależności dla jednej trasy.
+
+     Odczyt listy nie jest zapisem, więc idzie GET-em i niczego nie mutuje. */
+  app.get<{ Params: { id: string } }>(
+    "/api/conversations/:id/zalaczniki", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      return { zalaczniki: zalacznikiRozmowy(db(), Number(req.params.id)) };
+    });
+
+  app.post<{ Params: { id: string }; Body: { nazwa?: string; typ?: string; dane?: string } }>(
+    "/api/conversations/:id/zalaczniki", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const s = sesjaZadania()!;
+      try {
+        /* `Buffer.from(..., "base64")` MILCZY przy śmieciach — oddaje krótszy
+           bufor zamiast rzucić. Pusty wynik przy niepustym wejściu znaczy
+           więc „to nie jest base64", i tak trzeba to nazwać. */
+        const surowe = String(req.body?.dane ?? "");
+        const dane = Buffer.from(surowe, "base64");
+        if (surowe.length > 0 && dane.byteLength === 0) {
+          throw new Error("Treść pliku nie jest poprawnym base64");
+        }
+        return await dodajZalacznik({
+          conversationId: Number(req.params.id),
+          nazwa: String(req.body?.nazwa ?? ""),
+          typ: String(req.body?.typ ?? ""),
+          dane,
+          autor: { id: s.user.userId, name: s.user.name },
+        });
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.delete<{ Params: { id: string; zalacznikId: string } }>(
+    "/api/conversations/:id/zalaczniki/:zalacznikId", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const s = sesjaZadania()!;
+      const zdjety = usunZalacznik(db(), Number(req.params.id), Number(req.params.zalacznikId),
+        { id: s.user.userId, name: s.user.name });
+      if (!zdjety) return reply.code(404).send({ error: "Nie ma takiego załącznika przy tej rozmowie" });
+      return { zdjety: true };
+    });
 
   // SSE: jedna szyna dla obecności, wiadomości, przypisań i wyników magazynu.
   app.get<{ Querystring: { conversationId?: string } }>("/api/conversations/events", async (req, reply) => {

@@ -55,6 +55,13 @@ export function Rozmowa(p: {
   agenci: Array<{ userId: number; name: string }>;
   wzmianki: number[];
   onWzmianki: (v: number[]) => void;
+  /* Załączniki do odpowiedzi (0.195.0). Stan i mutacje mieszkają w
+     `ekrany/Skrzynka.tsx`, jak każdy inny hak zapytania w tym panelu. */
+  zalaczniki: import("../api/rozmowy").ZalacznikSzkicu[];
+  dodajeZalacznik: boolean;
+  bladZalacznika: string;
+  onDodajZalacznik: (plik: File) => void;
+  onUsunZalacznik: (id: number) => void;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
   wymusza: boolean;
@@ -185,6 +192,9 @@ export function Rozmowa(p: {
       onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
       komentarz={p.komentarz} onKomentarz={p.onKomentarz}
       onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
-      agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki} />
+      agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}
+      zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
+      bladZalacznika={p.bladZalacznika}
+      onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik} />
   </section>;
 }
