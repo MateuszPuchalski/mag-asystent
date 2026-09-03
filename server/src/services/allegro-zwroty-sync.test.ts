@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  dociagnijZwrotPoLiscie, naGrosze, synchronizujAllegroZwroty,
+  dociagnijZwrotPoLiscie, naGrosze, paczkiDoSprawdzenia, synchronizujAllegroZwroty,
 } from "./allegro-zwroty-sync.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
@@ -419,4 +419,90 @@ test("pozycja WYCOFANA przez klienta nadal znika", async () => {
     "SELECT nazwa FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
     Array<{ nazwa: string }>).map((r) => r.nazwa);
   assert.deepEqual(zostaly, ["Sekator"], "wycofana przez klienta znika");
+});
+
+/* ── Doręczenie paczki zwrotnej (0.187.0, naprawione w 0.188.0) ─────────────
+   Te dwa testy pilnują poprawki, której 0.187.0 nie miało, choć twierdziło,
+   że pokazuje datę doręczenia. Lista paczek do odpytania powstawała wtedy
+   z tego, co WŁAŚNIE przyszło z Allegro — a synchronizacja chodzi kursorem
+   i raz zobaczony zwrot nigdy nie wraca na listę. Pytaliśmy więc o tracking
+   wyłącznie zwrotów zgłoszonych przed chwilą, czyli nigdy nie doręczonych.
+   Kolumna nie zapełniła się ani razu i właściciel zobaczył to pierwszego dnia.
+
+   Oba testy MUSZĄ padać na kodzie sprzed poprawki — sprawdzone.            */
+
+const paczkaZ1 = { createdAt: "2026-08-30T09:00:00Z", waybill: "WB-1", carrierId: "INPOST" };
+
+/** Historia przewoźnika: w drodze, a po `dostarczona` także doręczona. */
+const historia = (dostarczona: boolean) => ({
+  carrierId: "INPOST",
+  waybills: [{ waybill: "WB-1", trackingDetails: { statuses: [
+    { code: "IN_TRANSIT", occurredAt: "2026-08-30T10:00:00Z" },
+    ...(dostarczona ? [{ code: "DELIVERED", occurredAt: "2026-09-01T09:00:00Z" }] : []),
+  ] } }],
+});
+
+test("doręczenie dochodzi w NASTĘPNYM przebiegu, choć kursor minął już ten zwrot", async () => {
+  const d = stanowisko();
+  let dostarczona = false;
+  let pierwszy = true;
+  const trackingi: string[] = [];
+  const query = async (u: string) => {
+    if (u.includes("/tracking")) { trackingi.push(u); return historia(dostarczona); }
+    const lista = pierwszy ? [zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1] })] : [];
+    pierwszy = false;
+    return odpowiedz(lista);
+  };
+  const wiersz = () => d.prepare(
+    "SELECT dostarczono_at, przesylka_status FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { dostarczono_at: string | null; przesylka_status: string | null };
+
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z",
+    now: () => new Date("2026-08-30T12:00:00Z"), apiUrl: "https://api", query });
+  assert.equal(wiersz().dostarczono_at, null, "jedzie — nie ma czego wpisać");
+  assert.equal(wiersz().przesylka_status, "IN_TRANSIT", "stan przesyłki znamy od razu");
+
+  /* Drugi przebieg: lista zwrotów PUSTA, bo kursor stoi za z1. Tu właśnie
+     kończyła się poprzednia implementacja — i tu ma się zacząć ta. */
+  trackingi.length = 0;
+  dostarczona = true;
+  await synchronizujAllegroZwroty({
+    database: d, now: () => new Date("2026-09-01T12:00:00Z"), apiUrl: "https://api", query });
+  assert.equal(trackingi.length, 1, "pusta strona zwrotów NIE zwalnia z pytania o paczkę");
+  assert.match(trackingi[0], /waybill=WB-1/, "numer listu bierzemy z kopii odpowiedzi Allegro");
+  assert.equal(wiersz().dostarczono_at, "2026-09-01T09:00:00Z");
+  assert.equal(wiersz().przesylka_status, "DELIVERED");
+
+  /* Trzeci przebieg: doręczonego nie pytamy drugi raz — decyzja właściciela
+     („tylko te w drodze"). Data się nie zmieni, a żądanie kosztuje. */
+  trackingi.length = 0;
+  await synchronizujAllegroZwroty({
+    database: d, now: () => new Date("2026-09-02T12:00:00Z"), apiUrl: "https://api", query });
+  assert.equal(trackingi.length, 0, "zwrot z datą doręczenia wypada z pytań");
+});
+
+test("numeru listu nie zapisujemy — do trackingu bierzemy go z lądowiska", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z",
+    now: () => new Date("2026-08-30T12:00:00Z"), apiUrl: "https://api",
+    query: async (u) => (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1] })])),
+  });
+
+  /* Polityka 0.163.0: kolumny na numer listu przy zwrocie z Allegro NIE MA
+     i mieć nie będzie. Numer żyje w kopii odpowiedzi i tam go czytamy. */
+  const w = d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { waybill: string | null };
+  assert.equal(w.waybill, null, "zwrot z Allegro nie zapamiętuje numeru listu");
+
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1")
+    .get() as { id: number }).id);
+  assert.deepEqual(paczkiDoSprawdzenia(d, konto),
+    [{ zwrotId: 1, carrierId: "INPOST", waybill: "WB-1" }]);
+
+  /* Zamknięty zwrot odpada — tak samo jak odrzucony. */
+  d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-02T08:00:00Z'").run();
+  assert.deepEqual(paczkiDoSprawdzenia(d, konto), [], "zamkniętego już nie pytamy");
 });

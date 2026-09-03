@@ -321,6 +321,29 @@ describe("Dowody", () => {
     expect(screen.getByText(/COS_NOWEGO/)).toBeInTheDocument();
   });
 
+  it("brak wiedzy o przesyłce mówi o sobie, zamiast orzekać, że nie dotarła", () => {
+    /* TRZECIA NIEPRAWDA W TEJ SEKCJI (0.188.0). Stało tu „Jeszcze do nas nie
+       dotarła" — zdanie twierdzące stawiane wtedy, gdy przewoźnik nie
+       powiedział NIC. Ekran ma przyznać, że nie wie, a nie zgadywać: paczka
+       leżąca w magazynie od trzech dni wyglądała tak samo jak zaginiona. */
+    render(zKlientem(<Dowody zwrot={zwrot({
+      dostarczonoAt: null, przesylkaStatus: null })} />));
+    expect(screen.getByText(/Nie wiadomo, czy dotarła/)).toBeInTheDocument();
+    expect(screen.queryByText(/Jeszcze do nas nie dotarła/)).toBeNull();
+  });
+
+  it("paczka nieodebrana nie była NADANA PRZEZ KLIENTA — wróciła sama", () => {
+    /* Klient jej właśnie nie odebrał, więc niczego nie nadawał (0.172.0),
+       a `paczkaAt` jest przy niej chwilą, w której biuro wpisało karton do
+       kolejki. Ta paczka jest u nas na pewno — i tak ma się pokazywać. */
+    render(zKlientem(<Dowody zwrot={zwrot({
+      zrodlo: "nieodebrana", paczkaAt: "2026-08-28T09:00:00.000Z",
+      dostarczonoAt: "2026-08-28T09:00:00.000Z" })} />));
+    expect(screen.getByText(/Wróciła nieodebrana/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nadana przez klienta/)).toBeNull();
+    expect(screen.getByText(/Doręczona do nas/)).toBeInTheDocument();
+  });
+
   it("wiadomości o zakupie prowadzą do skrzynki, a ich brak mówi o sobie", () => {
     /* Puste znaczy „Allegro nic nie powiązało", nie „klient nie pisał":
        Allegro oznacza zamówieniem tylko część wiadomości. */

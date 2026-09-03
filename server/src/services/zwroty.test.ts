@@ -869,6 +869,27 @@ test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta",
   assert.match(z.externalId, /^nieodebrana:/, "identyfikator mówi, skąd jest");
   assert.equal(z.linkZwrotu, null, "w Allegro nie ma czego otworzyć");
   assert.ok(z.paczkaAt, "paczka JEST u nas — inaczej nie byłoby czego rejestrować");
+  /* I dlatego DOTARŁA — to jedyny zwrot, przy którym wiemy to na pewno.
+     Do 0.188.0 pole zostawało puste, więc panel pytał „czy dotarła"
+     o karton, który operator właśnie postawił na biurku. Trackingu tu nie
+     ma i nie będzie: przewoźnika nie znamy, a Allegro tego zwrotu nie zna. */
+  assert.equal(z.dostarczonoAt, z.paczkaAt,
+    "nieodebrana leży u nas w chwili rejestracji");
+});
+
+test("migracja domyka datę powrotu paczkom nieodebranym sprzed poprawki", () => {
+  /* Niezmiennik, nie jednorazowa łatka: wiersz nieodebranej bez daty powrotu
+     jest sprzeczny sam ze sobą, więc `migrate()` domyka go przy każdym
+     starcie. Baza produkcyjna ma takie wiersze z 0.172.0. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "STARA-1" }, KTO);
+  d.prepare("UPDATE zwrot_klienta SET dostarczono_at=NULL WHERE id=?").run(w.zwrotId);
+
+  migrate(d as unknown as DatabaseSync);
+
+  const po = d.prepare("SELECT paczka_at, dostarczono_at FROM zwrot_klienta WHERE id=?")
+    .get(w.zwrotId) as { paczka_at: string; dostarczono_at: string };
+  assert.equal(po.dostarczono_at, po.paczka_at);
 });
 
 test("paczkę nieodebraną znajduje skan po numerze listu", () => {

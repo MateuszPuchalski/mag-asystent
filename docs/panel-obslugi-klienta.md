@@ -1315,11 +1315,35 @@ Czas doręczenia podaje osobna końcówka: `GET /order/carriers/{id}/tracking`.
 Każdy wpis historii niesie `occurredAt`, a wśród kodów jest `DELIVERED`.
 
 **Numeru listu dalej nie zapisujemy** (polityka 0.163.0) i nie trzeba.
-Synchronizacja ma go w ręku podczas przebiegu, więc pyta tracking od razu
-i zapisuje sam WYNIK: moment doręczenia i kod statusu.
+Numer leży w kopii odpowiedzi Allegro (`allegro_zwrot.surowe_json`) i stamtąd
+go czytamy — tym samym `json_each`, co szukanie zwrotu po naklejce. Zapisujemy
+sam WYNIK: moment doręczenia i kod statusu.
 
 **Pytamy tylko o paczki w drodze.** Zwrot z zapisaną datą nie jest pytany
 drugi raz — data się nie zmieni, a każde żądanie kosztuje u Allegro.
+
+**Lista paczek do odpytania powstaje z BAZY, nie ze świeżo pobranej strony.**
+Pierwsze podejście brało ją z tego, co właśnie przyszło z Allegro — i nie
+zadziałało ani razu. Synchronizacja chodzi kursorem: `from` w
+`getCustomerReturns` znaczy „zwroty utworzone PO tym zwrocie", więc raz
+zobaczony zwrot nigdy nie wraca na listę. Pytaliśmy zatem o tracking wyłącznie
+zwrotów zgłoszonych przed chwilą, a zwrot zgłoszony przed chwilą nie jest
+doręczony. Kolumna nie zapełniła się ani razu.
+
+Testy jednostkowe tego nie złapały, bo sprawdzały serwis trackingu w izolacji.
+Złapał to właściciel pierwszego dnia. Strażnik stoi teraz na SZWIE: przebieg
+z pustą stroną zwrotów ma i tak zapytać o paczkę w drodze.
+
+**Nie wiem mówi „nie wiem".** Gdy przewoźnik nie podał nic, ekran pisze
+„Nie wiadomo, czy dotarła", a nie „Jeszcze do nas nie dotarła". To była trzecia
+z rzędu nieprawda w tej sekcji: zdanie twierdzące stawiane bez podstawy.
+Paczka leżąca w magazynie od trzech dni wyglądała identycznie jak zaginiona.
+
+**Paczka nieodebrana ma datę powrotu z definicji.** Biuro rejestruje ją,
+trzymając karton w ręku (0.172.0), więc `dostarczono_at` wpisuje się od razu.
+Trackingu dla niej nie ma: przewoźnika nie znamy, a Allegro tego zwrotu nie zna
+wcale. Ekran nie pisze przy niej „nadana przez klienta", bo klient jej właśnie
+nie odebrał i niczego nie nadawał.
 
 **`status` zwrotu tego nie załatwia**, choć ma wartość `DELIVERED`. Sonda
 pokazuje, czym to pole bywa naprawdę: `COMMISSION_REFUNDED` w 95 przypadkach
