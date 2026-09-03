@@ -1,9 +1,8 @@
 import React from "react";
 import { Karta } from "../ui";
-import type { PomiarCopilota as Pomiar } from "../api/typy";
+import type { Kategoria, PomiarCopilota as Pomiar } from "../api/typy";
 import { Liczba } from "./PokrycieSygnatur";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
-import type { Kategoria } from "../api/typy";
 
 /* ── Pomiar Copilota (§14, etap F) ───────────────────────────────────────────
    Diagnostyka mieszka ZA ZĘBATKĄ (0.168.0): ekran pracy niesie to, co woła
