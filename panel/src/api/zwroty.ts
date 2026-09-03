@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -22,7 +22,10 @@ export function useZwroty() {
 export function useZwrot(id: number | null) {
   return useQuery({
     queryKey: kluczeZwrotow.zwrot(id ?? 0),
-    queryFn: () => api<{ zwrot: Zwrot; os: WpisOsiZwrotu[]; kandydaciFaktury: KandydatFaktury[] }>(
+    queryFn: () => api<{
+      zwrot: Zwrot; os: WpisOsiZwrotu[]; kandydaciFaktury: KandydatFaktury[];
+      doDopisania: DoDopisania[];
+    }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,
   });
@@ -248,6 +251,40 @@ export function useFaktura() {
     mutationFn: (v: { id: number; dokId: number | null }) =>
       api<{ faktura: FakturaZwrotu }>(`/api/obsluga/zwroty/${v.id}/faktura`,
         { method: "POST", body: JSON.stringify({ dokId: v.dokId }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/**
+ * Dopisanie produktu, którego klient nie zgłosił (0.184.0).
+ *
+ * Panel wysyła identyfikator POZYCJI ZAMÓWIENIA, nigdy nazwy ani ceny. Klient
+ * może odesłać wyłącznie to, co kupił, a kwotę do oddania dalej składa serwer
+ * z zaznaczenia (§25a.3).
+ */
+export function useDopiszPozycje() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zamPozycjaId: number; wersja: number }) =>
+      api<{ wersja: number; pozycjaId: number }>(`/api/obsluga/zwroty/${v.id}/pozycje`,
+        { method: "POST", body: JSON.stringify({ zamPozycjaId: v.zamPozycjaId, wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/** Zdjęcie pozycji dopisanej przez biuro — §25a.5, cofnięcie zamiast potwierdzenia. */
+export function useZdejmijPozycje() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; pozycjaId: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/pozycje/${v.pozycjaId}/zdejmij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });

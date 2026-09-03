@@ -315,6 +315,8 @@ export type StanRabatu = {
 
 export interface PozycjaZwrotu {
   id: number;
+  /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
+  zrodlo: string;
   offerId: string | null;
   nazwa: string;
   ilosc: number;
@@ -417,6 +419,16 @@ export interface FakturaZwrotu {
 }
 
 /** Dokument, którym MOŻE być ta sprzedaż — z jawnym uzasadnieniem. */
+/** Pozycja zamówienia, której NIE MA jeszcze w zwrocie (0.184.0). */
+export interface DoDopisania {
+  zamPozycjaId: number;
+  offerId: string | null;
+  nazwa: string;
+  ilosc: number;
+  cenaGrosze: number;
+  waluta: string;
+}
+
 export interface KandydatFaktury {
   dokId: number;
   numer: string;

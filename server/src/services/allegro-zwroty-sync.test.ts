@@ -359,3 +359,64 @@ test("pusty kod nie strzela do Allegro", async () => {
   assert.equal(strzalow, 0, "limit Allegro wydany na pusty kod to limit wyrzucony");
 });
 
+
+test("takt NIE kasuje pozycji dopisanej przez biuro", async () => {
+  /* Blizna świeża i cicha (0.184.0). Kasowanie „pozycji, których Allegro już
+     nie oddaje" brało też te, których Allegro nie zna i nigdy nie odda —
+     dopisane u nas, bo klient przysłał więcej, niż zgłosił. Znikały przy
+     najbliższym takcie razem z oceną hali i zaznaczeniem do kwoty. Nic nie
+     wygląda na zepsute, dopóki ktoś nie policzy pieniędzy. */
+  const d = stanowisko();
+  const przebieg = () => synchronizujAllegroZwroty({
+    database: d, zwrotyOd: null, now: () => new Date("2026-09-01T10:00:00Z"),
+    apiUrl: "https://api",
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]),
+  });
+  await przebieg();
+
+  const zwrotId = Number((d.prepare("SELECT id FROM zwrot_klienta").get() as { id: number }).id);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz,zrodlo,ocena)
+    VALUES (?,'222','Łopata',1,2999,'PLN','222|Łopata','biuro','stan')`).run(zwrotId);
+
+  await przebieg();
+
+  const zostaly = (d.prepare(
+    "SELECT nazwa, zrodlo, ocena FROM zwrot_klienta_pozycja WHERE zwrot_id=? ORDER BY nazwa")
+    .all(zwrotId) as Array<{ nazwa: string; zrodlo: string; ocena: string | null }>);
+  assert.equal(zostaly.length, 2, "dopisana pozycja przeżywa takt");
+  const lopata = zostaly.find((p) => p.nazwa === "Łopata");
+  assert.equal(lopata?.zrodlo, "biuro");
+  assert.equal(lopata?.ocena, "stan", "razem z oceną hali");
+});
+
+test("pozycja WYCOFANA przez klienta nadal znika", async () => {
+  /* Druga połowa umowy: osłona dopisanych nie ma prawa kupić sobie zieleni
+     przez zaniechanie kasowania w ogóle. Zwrot potrafi stracić pozycję, gdy
+     klient wycofa część zgłoszenia — i to ma dalej działać. */
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: null, now: () => new Date("2026-09-01T10:00:00Z"),
+    apiUrl: "https://api",
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", {
+      items: [
+        { offerId: "111", quantity: 1, name: "Sekator", price: { amount: "49.99", currency: "PLN" } },
+        { offerId: "222", quantity: 1, name: "Łopata", price: { amount: "29.99", currency: "PLN" } },
+      ],
+    })]),
+  });
+  const zwrotId = Number((d.prepare("SELECT id FROM zwrot_klienta").get() as { id: number }).id);
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) n FROM zwrot_klienta_pozycja WHERE zwrot_id=?").get(zwrotId) as
+    { n: number }).n), 2);
+
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: null, now: () => new Date("2026-09-01T10:05:00Z"),
+    apiUrl: "https://api",
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]),
+  });
+  const zostaly = (d.prepare(
+    "SELECT nazwa FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
+    Array<{ nazwa: string }>).map((r) => r.nazwa);
+  assert.deepEqual(zostaly, ["Sekator"], "wycofana przez klienta znika");
+});

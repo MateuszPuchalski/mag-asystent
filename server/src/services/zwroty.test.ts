@@ -8,6 +8,7 @@ import {
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, znajdzZwrotPoKodzie,
+  dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "./zwroty.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
@@ -969,4 +970,119 @@ test("bez obu źródeł login zostaje pusty — zgadywania nie ma", () => {
   const d = stanowisko();
   dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" }, [{ ilosc: 1, cena: 4999 }]);
   assert.equal(listaZwrotow(d, TERAZ)[0].kupujacyLogin, null);
+});
+
+/* ── Produkt dopisany przez biuro (0.184.0) ──────────────────────────────────
+   Klient zgłasza jedną rzecz, a odsyła dwie. Regulamin Allegro tej zgodności
+   nie wymaga — liczy się terminowe oświadczenie o odstąpieniu, nie zgodność
+   przesyłki ze zgłoszeniem. Pieniądze i tak trzeba oddać.                    */
+
+test("do dopisania zostaje RÓŻNICA zamówienia i zwrotu, nie całe zamówienie", () => {
+  /* Pokazanie pozycji już zgłoszonych kazałoby porównywać dwie listy oczami —
+     a to jest praca, którą ekran ma zdjąć (dekalog ergonomii, punkt 5). */
+  const d = stanowisko();
+  zamowienie(d, "ord-2", [
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+    { offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 },
+  ]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-2" },
+    [{ ilosc: 1, cena: 4999, offerId: "111", nazwa: "Sekator" }]);
+
+  const lista = doDopisania(id, d);
+  assert.equal(lista.length, 1, "Sekator jest już w zwrocie");
+  assert.equal(lista[0].nazwa, "Łopata");
+  assert.equal(lista[0].cenaGrosze, 2999, "cena idzie z zamówienia, nie z pola");
+});
+
+test("dopisana pozycja jest oznaczona jako BIURO i podnosi wersję", () => {
+  const d = stanowisko();
+  zamowienie(d, "ord-3", [
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+    { offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 },
+  ]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-3" },
+    [{ ilosc: 1, cena: 4999, offerId: "111", nazwa: "Sekator" }]);
+
+  const kandydat = doDopisania(id, d)[0];
+  const w = dopiszPozycje(d, id, kandydat.zamPozycjaId, 1, KTO);
+  assert.equal(w.wersja, 2);
+
+  const p = d.prepare("SELECT nazwa, zrodlo, cena_grosze FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(w.pozycjaId) as { nazwa: string; zrodlo: string; cena_grosze: number };
+  assert.equal(p.nazwa, "Łopata");
+  assert.equal(p.zrodlo, "biuro", "ekran ma mówić, że to zapis człowieka (§4.3)");
+  assert.equal(Number(p.cena_grosze), 2999);
+  /* Każda mutacja zostawia ślad. */
+  const ev = d.prepare("SELECT COUNT(*) n FROM events WHERE type='zwrot_pozycja_dopisana'")
+    .get() as { n: number };
+  assert.equal(Number(ev.n), 1);
+});
+
+test("tej samej pozycji nie dopisze się dwa razy", () => {
+  /* Ograniczenie jest tańsze od komunikatu (dekalog, punkt 6): po dopisaniu
+     pozycja znika z listy kandydatów, więc drugie kliknięcie nie ma czego wziąć. */
+  const d = stanowisko();
+  zamowienie(d, "ord-4", [{ offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 }]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-4" }, []);
+  const kandydat = doDopisania(id, d)[0];
+  dopiszPozycje(d, id, kandydat.zamPozycjaId, 1, KTO);
+
+  assert.deepEqual(doDopisania(id, d), []);
+  assert.throws(() => dopiszPozycje(d, id, kandydat.zamPozycjaId, 2, KTO),
+    /nie ma na liście do dopisania/);
+});
+
+test("pozycji z CUDZEGO zamówienia dopisać się nie da", () => {
+  const d = stanowisko();
+  zamowienie(d, "ord-moje", [{ offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 }]);
+  zamowienie(d, "ord-cudze", [{ offerId: "999", nazwa: "Kosa", sku: null, cena: 8999 }]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-moje" }, []);
+  const cudza = Number((d.prepare(`SELECT p.id FROM zamowienie_klienta_pozycja p
+    JOIN zamowienie_klienta k ON k.id=p.zamowienie_id WHERE k.external_id='ord-cudze'`)
+    .get() as { id: number }).id);
+  assert.throws(() => dopiszPozycje(d, id, cudza, 1, KTO), /nie ma na liście/);
+});
+
+test("dopisaną pozycję da się zdjąć, pozycji klienta NIE", () => {
+  /* Cofnięcie zamiast potwierdzenia (§25a.5). Pozycja ze zgłoszenia wróciłaby
+     przy najbliższym takcie, więc przycisk obiecywałby skutek, którego nie ma. */
+  const d = stanowisko();
+  zamowienie(d, "ord-5", [
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+    { offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 },
+  ]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-5" },
+    [{ ilosc: 1, cena: 4999, offerId: "111", nazwa: "Sekator" }]);
+  const zgloszona = Number((d.prepare(
+    "SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?").get(id) as { id: number }).id);
+
+  const w = dopiszPozycje(d, id, doDopisania(id, d)[0].zamPozycjaId, 1, KTO);
+  assert.throws(() => usunDopisanaPozycje(d, zgloszona, 2, KTO), /nie dopisało biuro/);
+
+  const po = usunDopisanaPozycje(d, w.pozycjaId, 2, KTO);
+  assert.equal(po.wersja, 3);
+  const ile = d.prepare("SELECT COUNT(*) n FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { n: number };
+  assert.equal(Number(ile.n), 1);
+});
+
+test("dopisana pozycja wchodzi do kwoty jak każda inna", () => {
+  /* §25a.3 zostaje: panel przysyła ZAZNACZENIE, sumę składa serwer. */
+  const d = stanowisko();
+  zamowienie(d, "ord-6", [
+    { offerId: "111", nazwa: "Sekator", sku: null, cena: 4999 },
+    { offerId: "222", nazwa: "Łopata", sku: null, cena: 2999 },
+  ]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-6" },
+    [{ ilosc: 1, cena: 4999, offerId: "111", nazwa: "Sekator" }]);
+  /* Werdykt ma klucz obcy do `app_user`, więc autor musi istnieć naprawdę. */
+  const agent = biuro(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, agent);
+  const w = dopiszPozycje(d, id, doDopisania(id, d)[0].zamPozycjaId, 2, agent);
+
+  const wszystkie = (d.prepare(
+    "SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=? ORDER BY id").all(id) as
+    Array<{ id: number }>).map((r) => Number(r.id));
+  const k = zapiszKwote(d, id, { pozycjeIds: wszystkie, dostawa: false }, w.wersja, agent);
+  assert.equal(k.kwotaGrosze, 4999 + 2999, "obie pozycje liczą się do kwoty");
 });

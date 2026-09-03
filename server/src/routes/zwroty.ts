@@ -8,6 +8,7 @@ import {
   zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
+  dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { zglosRabat } from "../adapters/allegro.http.js";
@@ -173,6 +174,34 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      jaką panel wolno mu przysłać — i dlatego jest walidowana w widełkach
      `0…wartość pozycji`, wymaga powodu i wisi przy POZYCJI, a nie przy sumie.
      Sumę dalej składa serwer z zaznaczenia. */
+  /* Dopisanie produktu, którego klient nie zgłosił (0.184.0). Panel przysyła
+     identyfikator POZYCJI ZAMÓWIENIA, nigdy nazwy ani ceny: klient może odesłać
+     wyłącznie to, co kupił, a cena ma pochodzić z faktu, nie z pola tekstowego
+     (§25a.3 — kwotę składa serwer). */
+  app.post<{ Params: { id: string }; Body: { zamPozycjaId?: number; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/pozycje", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const zam = Number(req.body?.zamPozycjaId);
+      if (!Number.isInteger(zam)) {
+        return reply.code(400).send({ error: "Wskaż pozycję zamówienia do dopisania." });
+      }
+      try {
+        return dopiszPozycje(db(), Number(req.params.id), zam, Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Zdjęcie pozycji dopisanej przez biuro. Pozycji ze zgłoszenia klienta
+     serwis nie odda — usunięta u nas wróciłaby przy najbliższym takcie. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/pozycje/:id/zdejmij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return usunDopisanaPozycje(db(), Number(req.params.id), Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
   app.post<{ Params: { id: string }; Body: { grosze?: number | null; powod?: string; wersja?: number } }>(
     "/api/obsluga/zwroty/pozycje/:id/potracenie", async (req, reply) => {
       const nie = odmowa(reply);
@@ -321,7 +350,12 @@ export async function zwrotyRoutes(app: FastifyInstance) {
        zwrocie z dokumentem lista nie ma komu służyć, a przebiega okno
        sześćdziesięciu dni sprzedaży. */
     const kandydaci = zwrot.faktura.dokId === null ? kandydaciFaktury(id, db()) : [];
-    return { zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci };
+    return {
+      zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci,
+      /* Czego jeszcze z tego zamówienia nie ma w zwrocie. Liczone tutaj,
+         a nie w kolejce: lista jest potrzebna dopiero przy otwartym zwrocie. */
+      doDopisania: doDopisania(id, db()),
+    };
   });
 
   /* Wskazanie dokumentu sprzedaży przez człowieka (0.174.0). `dokId: null`

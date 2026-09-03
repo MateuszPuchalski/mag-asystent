@@ -158,7 +158,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają trzynaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
+test("zwroty mają piętnaście tras POST, a jedna z nich wychodzi do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -193,18 +193,24 @@ test("zwroty mają trzynaście tras POST, a jedna z nich wychodzi do Allegro", a
      wyłącznie wybór człowieka z listy kandydatów — sam automat wiąże taktem,
      bez trasy, bo „zero zapisu przy patrzeniu" nie zna wyjątków. Uzasadnienie:
      biuro szukało numeru paragonu ręcznie w Subiekcie, po dacie i nazwisku,
-     bo nic innego nie miało. */
+     bo nic innego nie miało. 
+     CZTERNASTA i PIĘTNASTA obsługują produkt, którego klient NIE ZGŁOSIŁ
+     (0.184.0). Formularz zwrotu wypełnia się na ekranie, a paczkę pakuje przy
+     stole — i wtedy dokłada się to, co też nie pasowało. Regulamin Allegro tej
+     zgodności nie wymaga: liczy się terminowe oświadczenie o odstąpieniu, nie
+     zgodność przesyłki ze zgłoszeniem. Dopisanie bierze POZYCJĘ ZAMÓWIENIA,
+     nigdy nazwy ani ceny; zdjęcie działa wyłącznie na pozycji biura. */
   /* Liczymy w ŹRÓDLE tras zwrotów, nie w drzewie Fastify: `printRoutes`
      oddaje całą aplikację (siedemdziesiąt kilka POST-ów), więc licznik z niego
      mierzyłby cokolwiek, tylko nie tę umowę. Ten sam wzorzec co licznik
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 13, `tras POST jest ${posty.length}, a umowa mówi o trzynastu`);
+  assert.equal(posty.length, 15, `tras POST jest ${posty.length}, a umowa mówi o piętnastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
-    "faktura"]) {
+    "faktura", "pozycje", "zdejmij"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

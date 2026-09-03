@@ -237,6 +237,12 @@ export function migrate(database: DatabaseSync) {
      kopii nie ma, więc numer z etykiety jest jedynym uchwytem do skanu. */
   addColumn("zwrot_klienta", "waybill", "TEXT");
   addColumn("zwrot_klienta", "notatka", "TEXT");
+  /* Pozycja dopisana przez biuro (0.184.0). `CHECK` tą samą drogą co przy
+     `zwrot_klienta.zrodlo` — baza sprzed wydania stałaby inaczej bez
+     strażnika. Wartość domyślna `allegro` jest tu jedyną poprawną: wszystko,
+     co stoi w bazie przed tą migracją, przyszło ze zgłoszenia klienta. */
+  addColumn("zwrot_klienta_pozycja", "zrodlo",
+    "TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','biuro'))");
   addColumn("zwrot_klienta_pozycja", "potracenie_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");

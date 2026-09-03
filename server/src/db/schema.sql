@@ -1050,6 +1050,14 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_termin
 CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+  -- Skąd wziął się ten wiersz (0.184.0). `allegro` = ze zgłoszenia klienta,
+  -- `biuro` = dopisany u nas, bo w kartonie było więcej, niż klient zgłosił.
+  --
+  -- Kolumna nie jest opisem, tylko OSŁONĄ. Synchronizacja kasuje pozycje,
+  -- których Allegro już nie oddaje — i skasowałaby też dopisaną, razem
+  -- z oceną hali i zaznaczeniem do kwoty. Cicho, bo nic nie wygląda na
+  -- zepsute, dopóki ktoś nie policzy pieniędzy.
+  zrodlo TEXT NOT NULL DEFAULT 'allegro' CHECK (zrodlo IN ('allegro','biuro')),
   offer_id TEXT,
   nazwa TEXT NOT NULL,
   ilosc REAL NOT NULL,
