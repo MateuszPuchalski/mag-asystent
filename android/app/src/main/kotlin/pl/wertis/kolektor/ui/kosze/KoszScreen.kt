@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.loc.normalizeLoc
+import pl.wertis.kolektor.core.kosze.czyPotwierdzaOdlozenie
 import pl.wertis.kolektor.core.net.KoszPozycja
 import pl.wertis.kolektor.core.net.KoszView
 import pl.wertis.kolektor.core.net.OdlozKoszBody
@@ -114,10 +115,22 @@ fun KoszScreen(graph: AppGraph) {
     var wybrana by remember { mutableStateOf<Long?>(null) }
     var adres by remember { mutableStateOf("") }
     var pomijana by remember { mutableStateOf<KoszPozycja?>(null) }
+    /* Pozycja wskazana SKANEM i chwila tego skanu (0.189.0). Drugi skan tego
+       samego towaru kończy odłożenie — regułę trzyma `czyPotwierdzaOdlozenie`
+       w `:core`, tutaj mieszka tylko jej pamięć. */
+    var uzbrojona by remember { mutableStateOf<Long?>(null) }
+    var ostatniSkanAt by remember { mutableStateOf(0L) }
 
-    fun wybierz(p: KoszPozycja?) {
+    /**
+     * @param przezSkan wskazanie pochodzi ze SKANU towaru, a nie z automatu po
+     *   odłożeniu ani z dotknięcia wiersza. Tylko ono uzbraja drugi skan:
+     *   po każdym odłożeniu ekran sam wskazuje następną pozycję, więc bez tego
+     *   rozróżnienia PIERWSZY skan przy nowej pozycji odkładałby ją od razu.
+     */
+    fun wybierz(p: KoszPozycja?, przezSkan: Boolean = false) {
         wybrana = p?.id
         adres = p?.lokOczekiwana ?: ""
+        uzbrojona = if (przezSkan) p?.id else null
     }
 
     /* Kolejny przedmiot do wzięcia z kosza. Serwer trzyma pozycje zrobione na
@@ -141,10 +154,17 @@ fun KoszScreen(graph: AppGraph) {
         }
     }
 
-    fun odloz(pozycjaId: Long, kod: String, recznie: Boolean) {
+    fun odloz(pozycjaId: Long, kod: String, potwierdzenie: String) {
         scope.launch {
             try {
-                apiCall { graph.api.koszOdloz(pozycjaId, OdlozKoszBody(kod, recznie)) }
+                apiCall {
+                    graph.api.koszOdloz(
+                        pozycjaId,
+                        // `recznie` zostaje dla starszych serwerów i musi zgadzać
+                        // się z `potwierdzenie` — patrz komentarz przy DTO
+                        OdlozKoszBody(kod, recznie = potwierdzenie == "wpis", potwierdzenie = potwierdzenie),
+                    )
+                }
                 graph.feedback.beep(true)
                 /* Wskazanie przeskakuje OD RAZU, nie dopiero z powracającą listą.
                    Między jednym a drugim mieści się skan następnego regału,
@@ -196,8 +216,29 @@ fun KoszScreen(graph: AppGraph) {
                 val r = apiCall { graph.api.koszSkan(id, ScanBody(code)) }
                 when {
                     r.pozycjaId != null -> {
-                        graph.feedback.beep(true)
-                        wybierz(kosz?.pozycje?.firstOrNull { it.id == r.pozycjaId })
+                        val teraz = System.currentTimeMillis()
+                        val potwierdza = czyPotwierdzaOdlozenie(
+                            trafiona = r.pozycjaId!!,
+                            uzbrojona = uzbrojona,
+                            adres = adres,
+                            odstepMs = teraz - ostatniSkanAt,
+                        )
+                        ostatniSkanAt = teraz
+                        if (potwierdza) {
+                            /* Adres pochodzi Z EKRANU, nie z półki, więc musi
+                               wrócić do człowieka SŁOWEM — przy skanie regału
+                               widzi, gdzie stoi, tutaj nie potwierdzał niczego
+                               wzrokiem. */
+                            val kod = normalizeLoc(adres)
+                            graph.effects.toast("Odłożono na $kod")
+                            odloz(r.pozycjaId!!, kod, potwierdzenie = "towar")
+                        } else {
+                            graph.feedback.beep(true)
+                            wybierz(
+                                kosz?.pozycje?.firstOrNull { it.id == r.pozycjaId },
+                                przezSkan = true,
+                            )
+                        }
                     }
                     r.poza -> {
                         graph.feedback.beep(false)
@@ -220,7 +261,7 @@ fun KoszScreen(graph: AppGraph) {
         if (k.status != "zamkniety") return@ScanHandlerEffect true
         val sel = wybrana
         if (sel != null && scan.kind != ScanKind.EAN) {
-            odloz(sel, normalizeLoc(scan.code), recznie = false)
+            odloz(sel, normalizeLoc(scan.code), potwierdzenie = "polka")
         } else {
             skanTowaru(scan.code)
         }
@@ -361,7 +402,7 @@ fun KoszScreen(graph: AppGraph) {
                     wskazana = wskazana,
                     adres = adres,
                     onAdres = { adres = it },
-                    onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), recznie = true) },
+                    onOdloz = { if (adres.isNotBlank()) odloz(p.id, normalizeLoc(adres), potwierdzenie = "wpis") },
                     onPomin = { pomijana = p },
                     onPozniej = {
                         akcjaNaPozycji("odłożyć na później") {
