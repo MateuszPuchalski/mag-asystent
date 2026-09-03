@@ -613,3 +613,50 @@ test("same udane wysyłki nie zapalają wskaźnika", () => {
   assert.equal(s.kolejkaWysylek, "1 wysłanych");
   assert.equal(s.wysylkiDoSprawdzenia, 0);
 });
+
+/* ── Rozpoznanie Copilota nie przestawia kolejki (§14, etap F) ───────────────
+   To jest DECYZJA, nie skutek uboczny, więc dostaje własny test. Dzisiejsze
+   klucze kolejności — ręczna flaga `pilny` i czas oczekiwania klienta — są
+   FAKTAMI. Kategoria jest przypuszczeniem maszyny, a jedna pomyłka
+   klasyfikatora zakopałaby prawdziwe pytanie na dole listy tak, że nikt by
+   tego nie zauważył. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
+   trafności ją uzasadni (etap G).                                            */
+test("rozpoznanie kategorii dokłada plakietkę i NIE rusza kolejności", async () => {
+  const d = db();
+  const { sklasyfikujRozmowy } = await import("./copilot-klasyfikacja.js");
+  const przed = listaRozmow().map((x) => x.id);
+  assert.ok(przed.length >= 2, "test o kolejności potrzebuje co najmniej dwóch wierszy");
+  assert.equal(listaRozmow().find((x) => x.id === rozmowaId)!.kopilot, null,
+    "brak wiersza znaczy \u201enierozpoznana\u201d i liczy się przy odczycie");
+
+  const w = await sklasyfikujRozmowy(d, [rozmowaId], BIURO, async () => ({
+    kategoria: "dobor", pewnosc: "wysoka", uzasadnienie: "pyta o rozstaw",
+    model: "claude-opus-5", ms: 90,
+    zuzycie: { wej: 800, wyj: 150, cacheZapis: 0, cacheOdczyt: 0 },
+  }));
+  assert.equal(w.sklasyfikowane, 1);
+
+  assert.deepEqual(listaRozmow().map((x) => x.id), przed,
+    "kategoria nie jest kluczem kolejności i nie ma prawa nim zostać");
+  const r = listaRozmow().find((x) => x.id === rozmowaId)!;
+  assert.deepEqual(r.kopilot,
+    { kategoria: "dobor", pewnosc: "wysoka", nieaktualna: false, ocena: null });
+});
+
+test("dopisek klienta czyni plakietkę nieaktualną — serwer mówi to sam", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  /* Nowsza wiadomość KLIENTA. Nasza odpowiedź etykiety nie postarza: pytanie
+     zadaje klient, a klasyfikacja opisuje jego pytanie. */
+  const nowa = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-dopisek','incoming','Aha, i jeszcze jedno.','2026-08-31T10:00:00.000Z')`)
+    .run(rozmowaId, konto).lastInsertRowid);
+
+  const r = listaRozmow().find((x) => x.id === rozmowaId)!;
+  assert.equal(r.kopilot!.nieaktualna, true,
+    "etykieta liczona na starszej wiadomości ma się przyznać, że jest stara");
+
+  d.prepare("DELETE FROM message WHERE id=?").run(nowa);
+  assert.equal(listaRozmow().find((x) => x.id === rozmowaId)!.kopilot!.nieaktualna, false);
+});

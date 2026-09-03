@@ -257,3 +257,42 @@ test("komunikat o złym trybie nie wynosi tego, co człowiek wkleił", () => {
   assert.ok(!o.includes("TAJNE"), "komunikat wyniósł sekret");
   assert.match(o, /dev, http/, "bez listy dozwolonych wartości człowiek zgaduje drugi raz");
 });
+
+/* ── Copilot: klucz nie ma prawa przejść przez config (etap F) ───────────────
+   Trzy testy, bo blizna 0.84.1 ma trzy warstwy. Pierwsza: pole trybu i pole
+   modelu sąsiadują w wertis.env z kluczem, więc wklejka jest kwestią czasu,
+   a komunikat idzie do logu. Druga: konfiguracja bywa serializowana w całości
+   (diagnostyka, zrzut do zgłoszenia) — i to jest ten test, którego w 0.84.1
+   NIE BYŁO. Trzecia: brak klucza ma być stanem normalnym, nie awarią startu.  */
+
+test("COPILOT_MODEL z wklejonym kluczem nie wynosi go do komunikatu", () => {
+  const zly = structuredClone(config) as typeof config;
+  (zly.copilot as { model: string }).model = "sk-ant-api03-TAJNE";
+  const o = bledyKonfiguracji(zly).find((b) => b.startsWith("COPILOT_MODEL="));
+  assert.ok(o, "brak zdania o COPILOT_MODEL");
+  assert.ok(!o.includes("TAJNE"), "komunikat wyniósł sekret");
+  assert.match(o, /claude-opus-5/, "bez przykładu poprawnej wartości człowiek zgaduje drugi raz");
+});
+
+test("cała konfiguracja zserializowana nie zawiera klucza Anthropic", () => {
+  /* Klucza NIE MA w `config` z założenia — jest tylko `klucz: boolean`. Ten
+     test pilnuje założenia, a nie implementacji: przyszła wygoda w rodzaju
+     „przecież przyda się w adapterze" wywali się tutaj, a nie na produkcji. */
+  const zrzut = JSON.stringify(config);
+  assert.ok(!zrzut.includes("sk-ant-"), "klucz przeciekł do zrzutu konfiguracji");
+  assert.equal(typeof config.copilot.klucz, "boolean");
+});
+
+test("brak klucza nie jest błędem konfiguracji, gdy Copilot jest wyłączony", () => {
+  const bez = structuredClone(config) as typeof config;
+  (bez.copilot as { mode: string; klucz: boolean }).mode = "off";
+  (bez.copilot as { mode: string; klucz: boolean }).klucz = false;
+  assert.equal(bledyKonfiguracji(bez).filter((b) => b.includes("COPILOT")).length, 0);
+
+  /* Włączony bez klucza mówi ZDANIE, ale start ma przeżyć: usługa NSSM, która
+     odmawia startu, wpada w pętlę restartów — objaw z 0.84.1. */
+  (bez.copilot as { mode: string }).mode = "anthropic";
+  const o = bledyKonfiguracji(bez).find((b) => b.startsWith("COPILOT_MODE=anthropic"));
+  assert.ok(o, "brak ostrzeżenia o włączonym Copilocie bez klucza");
+  assert.match(o, /Serwer działa dalej/, "człowiek ma wiedzieć, że to nie jest awaria startu");
+});

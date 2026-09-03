@@ -1,10 +1,12 @@
 import React from "react";
 import { Settings } from "lucide-react";
 import { usePokrycieSygnatur, usePokrycieWiedzy, useZdrowie } from "../api/rozmowy";
+import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { Karta } from "../ui";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
+import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
 
 /* ── Ustawienia obsługi klienta (0.168.0) ────────────────────────────────────
    Decyzja właściciela: stan integracji schodzi ze Skrzynki za zębatkę.
@@ -28,6 +30,11 @@ export function Ustawienia() {
   const zdrowie = useZdrowie();
   const sygnatury = usePokrycieSygnatur();
   const wiedza = usePokrycieWiedzy();
+  /* Pomiar ciągniemy dopiero po wejściu na ten ekran — na skrzynce byłby
+     zapytaniem po nic. Przy wyłączonym Copilocie nie ciągniemy go wcale:
+     tabela zer nie mówi „wyłączony", tylko „nikt tego nie używa". */
+  const copilot = useCopilot();
+  const pomiar = usePomiarCopilota(copilot.data?.wlaczony === true);
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -41,5 +48,6 @@ export function Ustawienia() {
     <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     <PokrycieSygnatur dane={sygnatury.data} />
     <PokrycieWiedzy dane={wiedza.data} />
+    <PomiarCopilota dane={pomiar.data} />
   </div>;
 }

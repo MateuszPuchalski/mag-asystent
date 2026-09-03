@@ -654,6 +654,53 @@ dane techniczne, niezbędny kontekst. Nie wolno przekazywać tokenów, haseł,
 pełnych danych dostawy, zbędnych danych osobowych ani całej historii klienta
 bez uzasadnienia.
 
+### 14.5. Co działa: klasyfikacja wiadomości (etap F, przyrost pierwszy)
+
+Pierwsza rzecz z §14.1 i pierwsze miejsce, z którego treść rozmowy wychodzi
+poza firmę. Agent klika przycisk NAD KOLEJKĄ, a partia bierze nierozpoznane
+rozmowy z oglądanego kubełka. Przycisku w pojedynczej rozmowie nie ma
+świadomie: etykietowałby treść, którą agent właśnie przeczytał.
+
+Słownik ma osiem wartości: `dobor`, `dostepnosc`, `wysylka`, `zwrot`,
+`reklamacja`, `dokumenty` oraz dwa kosze. `inne` znaczy „słownik jest za
+krótki”, `nie_wiadomo` — „za mało treści, przeczytaj sam”. Kolumna `kategoria`
+nie ma `CHECK`-a, bo w SQLite rozszerzenie zamkniętej listy to przebudowa
+tabeli (blizna 0.135.0). Listy pilnuje serwis, a na ekranie — `Record`
+z nazwami po polsku.
+
+**Kategoria nie przestawia kolejki i to jest decyzja.** Klucze kolejności —
+ręczna flaga „pilne” i czas oczekiwania klienta — są faktami. Kategoria jest
+przypuszczeniem maszyny, a jedna pomyłka zakopałaby prawdziwe pytanie na dole
+listy. Ekran daje plakietkę, pasek liczników i filtr; regułę kolejności wolno
+dołożyć w etapie G, gdy pomiar trafności ją uzasadni.
+
+**Prywatność ma dwa zamki.** Pierwszy jest w typie: nadawca przyjmuje wyłącznie
+`TrescBezpieczna`, a ten typ umie wyprodukować tylko `zamaskuj()`. Drugi to
+asercja tuż przed wysyłką. Maskowanie wycina e-mail, telefon, kod pocztowy
+z miastem, wiersz z markerem adresu, ciąg szesnastu cyfr i login kupującego.
+Znacznik zostaje, żeby model wiedział, że coś tam było.
+
+**Gdzie kończy się gwarancja.** Adres bez markera i bez kodu pocztowego
+przejdzie — rozpoznawanie adresów w wolnym tekście wyrażeniami regularnymi nie
+jest zadaniem rozwiązywalnym. W drugą stronę: numer OEM zapisany jak telefon
+zniknie jako `[telefon]`. Klasyfikacji ten numer nie jest potrzebny, ale
+przyrost ekstrakcji będzie musiał tę regułę zawęzić. Pilnuje tego test.
+
+**Zużycie zapisujemy od pierwszego wywołania**, w tokenach, nie w złotówkach.
+Kwota w bazie jest kłamstwem od dnia zmiany cennika; liczba tokenów jest
+faktem na zawsze. Osobna księga `copilot_wywolanie` liczy też próby nieudane,
+bo one kosztują i nie dają odpowiedzi. Trafność mierzy werdykt człowieka
+(`ocena`) przy plakietce w otwartej rozmowie. Podsumowanie za zębatką zawsze
+podaje `n` i liczbę nieocenionych.
+
+Limit dostawcy zatrzymuje partię czysto: wcześniejsze wyniki zostają, trasa
+oddaje 200 z wypełnionym polem `przerwane`. Zły klucz zatrzymuje ją od razu.
+Ponowień nie ma, bo tickera nie ma i limit obsługuje człowiek.
+
+Copilot jest **wyłączony domyślnie**, a brak klucza nie zatrzymuje startu.
+Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
+(blizna 0.84.1).
+
 ## 15. Model danych
 
 Tabele docelowe, nazwami z kodu:
@@ -669,6 +716,7 @@ dowod_zastosowania       towar_identyfikator     model_z_opisu
 towar_fts                knowledge_document      zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events
+klasyfikacja_rozmowy     copilot_wywolanie
 ```
 
 Projektowy `part_identifier` nazywa się w kodzie `towar_identyfikator`
@@ -875,7 +923,8 @@ obsługa niejednoznacznego timeoutu.
 pozytywne i negatywne zastosowania, dowody.
 
 **F — Copilot:** klasyfikacja, ekstrakcja, OCR, brakujące dane, kandydaci,
-porównanie, szkic z dowodami.
+porównanie, szkic z dowodami. Przyrost pierwszy — klasyfikacja wiadomości —
+stoi; opisuje go §14.5. Reszta czeka.
 
 **G — automatyzacje:** priorytety, routing, terminy, odłożenie, sugestie
 poprawy ofert, analiza powodów kontaktu, kolejne kanały.
@@ -1503,7 +1552,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
-| Copilot (§14) | **projekt** | etap F |
+| Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
+| Copilot — ekstrakcja, OCR, kandydaci, szkic (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
 | Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |

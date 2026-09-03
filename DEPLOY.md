@@ -1892,6 +1892,39 @@ Czas każdej przebudowy stoi w dzienniku zdarzeń (`read_model_po_imporcie`).
 Karta „Wiedza z opisów kartotek" w ustawieniach obsługi pokazuje, ile
 kartotek dostało identyfikatory i czy FTS5 stoi.
 
+### Aktualizacja do 0.191.0 — Copilot rozpoznaje kategorie rozmów
+
+Nic do zrobienia ręką i nic się samo nie włączy. Migracja dokłada dwie tabele:
+`klasyfikacja_rozmowy` i księgę wywołań `copilot_wywolanie`. Bez konfiguracji
+Copilot jest wyłączony, a pasek nad kolejką mówi o tym jednym zdaniem.
+
+Żeby go włączyć, dopisz do `wertis.env` dwie linie i zrestartuj `wertis-api`:
+
+```
+export COPILOT_MODE=anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Klucz wpisz WYŁĄCZNIE do `ANTHROPIC_API_KEY`.** W 0.84.1 wylądował w polu
+trybu. Serwer wtedy nie wstawał, NSSM restartował go w kółko, a wartość szła
+do `logs\wertis-api.err.log` przy każdym obiegu. Klucz trzeba było unieważnić.
+Dziś pola trybu i modelu maskują swoją wartość w komunikacie, ale najtańsza
+obrona to wkleić klucz od razu tam, gdzie ma być.
+
+Brak klucza NIE zatrzymuje startu. Zdanie o tym stoi w dzienniku uruchomienia,
+obok innych błędów konfiguracji, a serwer pracuje dalej.
+
+To kosztuje pieniądze i wydaje je agent, klikając. Jedno kliknięcie bierze
+najwyżej dwadzieścia rozmów; limit zmienia `COPILOT_MAX_PARTIA`. Rachunek,
+zużycie tokenów i trafność pokazuje karta „Copilot" w ustawieniach obsługi,
+za zębatką. Sprawdź ją po pierwszej partii.
+
+Sprawdzenie na żywym koncie idzie tak. Kliknij przycisk przy JEDNEJ rozmowie
+i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
+udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
+rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
+dostaje ostrzeżenie w dzienniku.
+
 ### Aplikacja nie wstaje: pętla restartów NSSM (0.174.2)
 
 Objaw jest mylący. W logu workera stoi „database is locked", w kółko, więc

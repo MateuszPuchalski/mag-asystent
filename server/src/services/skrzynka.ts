@@ -8,6 +8,7 @@ import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
+import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -56,6 +57,19 @@ export interface RozmowaSkrzynki {
      z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
+  /* Rozpoznanie Copilota (§14, etap F). `null` znaczy „nierozpoznana" i liczy
+     się PRZY ODCZYCIE — brak wiersza w `klasyfikacja_rozmowy` niczego nie
+     wstawia, więc otwarcie kolejki dalej nic nie mutuje.
+
+     `nieaktualna` liczy SERWER, tak samo jak `poTerminie`: reguła „klient
+     dopisał po rozpoznaniu" ma jedno źródło, a panel drugi raz jej nie
+     wyprowadza (blizna z kubełków zwrotów). Wyszarzona plakietka mówi
+     agentowi, że etykieta dotyczy starszej wiadomości — milczenie o tym
+     byłoby gorsze niż brak etykiety. */
+  kopilot: {
+    kategoria: Kategoria; pewnosc: Pewnosc; nieaktualna: boolean;
+    ocena: "trafna" | "nietrafna" | null;
+  } | null;
   /* Kto SIEDZI przy rozmowie teraz — przydział tymczasowy, na czas oglądania.
      Nie ma go w bazie i nie ma prawa być (§6.3): po restarcie usługi rozmowa
      nie może zostać zablokowana przez agenta, który dawno wyszedł. */
@@ -143,10 +157,22 @@ const LISTA = `
          ) AS nowych,
          EXISTS(SELECT 1 FROM zadanie_terenowe z
                  WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
-         COALESCE(d.status, 'not_started') AS dobor
+         COALESCE(d.status, 'not_started') AS dobor,
+         kop.kategoria AS kopKategoria, kop.pewnosc AS kopPewnosc,
+         kop.ocena AS kopOcena,
+         -- Etykieta starzeje się sama: liczono ją na kop.message_id, a klient
+         -- dopisał nowszą. Podzapytanie jest CO DO ZNAKU tym samym, co WIERSZ
+         -- w copilot-klasyfikacja.ts. Rozejście się tych dwóch kwalifikacji
+         -- dałoby rozmowę wiecznie nieaktualną, klasyfikowaną w kółko przy
+         -- każdym kliknięciu i płaconą za każdym razem.
+         (kop.message_id IS NOT NULL AND kop.message_id <> (
+            SELECT m.id FROM message m WHERE m.conversation_id=c.id
+              AND m.direction='incoming' ORDER BY m.sent_at DESC, m.id DESC LIMIT 1
+         )) AS kopNieaktualna
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
     LEFT JOIN dobor_rozmowy d ON d.conversation_id=c.id
+    LEFT JOIN klasyfikacja_rozmowy kop ON kop.conversation_id=c.id
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
        ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
@@ -179,6 +205,12 @@ const naRozmowe = (
     dobor: String(w.dobor ?? "not_started") as StatusDoboru,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
+    kopilot: w.kopKategoria == null ? null : {
+      kategoria: String(w.kopKategoria) as Kategoria,
+      pewnosc: String(w.kopPewnosc) as Pewnosc,
+      nieaktualna: Boolean(Number(w.kopNieaktualna ?? 0)),
+      ocena: w.kopOcena == null ? null : (String(w.kopOcena) as "trafna" | "nietrafna"),
+    },
     oglada: trzymane.get(Number(w.id)) ?? null,
   };
 };

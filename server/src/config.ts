@@ -670,6 +670,37 @@ export const config = {
     waitingRetryMs: 60000,
   },
 
+  /* ── Copilot obsługi klienta (etap F, §14) ────────────────────────────────
+     KLUCZA TU NIE MA I NIE BĘDZIE. `config` bywa wypisywany do diagnostyki
+     i do komunikatów błędów — dokładnie tą drogą klucz Anthropic trafił do
+     `logs\\wertis-api.err.log` w 0.84.1 i trzeba go było unieważnić. Klient
+     SDK czyta `ANTHROPIC_API_KEY` ze środowiska sam; my trzymamy wyłącznie
+     odpowiedź na pytanie „czy jest".
+
+     Do 0.140.1 stały tu pola `AI_PROVIDER`, `AI_MODEL`, `ANTHROPIC_API_KEY`
+     i `AI_TIMEOUT_MS` — odeszły razem z funkcją, którą opisywały. To jest
+     nowa konfiguracja pisana od zera, nie wskrzeszenie tamtej. */
+  copilot: {
+    /** `off` = wyłączony i to jest stan domyślny (decyzja właściciela). */
+    mode: (process.env.COPILOT_MODE ?? "off") as "off" | "anthropic",
+    /**
+     * Model do klasyfikacji. Zejście na tańszy ma być JEDNĄ zmianą tutaj,
+     * podjętą po pomiarze trafności — dlatego stoi w konfiguracji, nie w kodzie.
+     */
+    model: process.env.COPILOT_MODEL ?? "claude-opus-5",
+    /**
+     * Ile rozmów bierze jedno kliknięcie. Limit stoi TU, a nie w panelu, bo
+     * to jest hamulec na wydatek, a nie szczegół wyglądu przycisku.
+     */
+    maxPartia: Math.max(1, Number(process.env.COPILOT_MAX_PARTIA ?? 20) || 20),
+    /**
+     * Czy klucz w ogóle jest. `Boolean`, nigdy sama wartość — patrz nagłówek.
+     * SDK i tak czyta zmienną sam, więc to pole odpowiada wyłącznie ekranowi
+     * na pytanie „czy da się kliknąć".
+     */
+    klucz: Boolean(process.env.ANTHROPIC_API_KEY),
+  },
+
 };
 
 /**
@@ -717,6 +748,11 @@ function assertMode(name: string, value: string, allowed: readonly string[]): vo
   }
 }
 assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
+/* COPILOT_MODE idzie przez `assertMode` z jednego powodu: w `wertis.env.example`
+   sąsiaduje z ANTHROPIC_API_KEY, czyli stoi dokładnie w tej samej pułapce,
+   w którą wpadł AI_PROVIDER w 0.84.1. Maska nie jest tu ostrożnością na wyrost,
+   tylko powtórzeniem strażnika, którego to pole jeszcze nie ma. */
+assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
 
 /**
  * Reguły, które muszą być spełnione, żeby wdrożenie w ogóle mogło działać.
@@ -759,6 +795,26 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(
       "SFERA_WORKER=1 wymaga SGT_MODE=mssql — w trybie seeded dokumenty MM " +
         "wykonuje worker Node i zadania mm nie miałyby wykonawcy.",
+    );
+  }
+
+  /* Copilot (etap F). BRAK KLUCZA NIE JEST BŁĘDEM KONFIGURACJI i to jest
+     odwrotność 0.84.x, gdzie ustawiony dostawca bez klucza wywracał start.
+     Odmowa startu w usłudze NSSM znaczy pętlę restartów, czyli ten sam objaw,
+     który tamta blizna zostawiła. Serwer ma wstać, a ekran ma powiedzieć, że
+     Copilot jest niepodłączony. */
+  if (c.copilot.mode === "anthropic" && !c.copilot.klucz) {
+    bledy.push(
+      "COPILOT_MODE=anthropic bez ANTHROPIC_API_KEY — Copilot będzie wyłączony, " +
+        "a przycisk w panelu powie o tym wprost. Serwer działa dalej.",
+    );
+  }
+  /* Model spoza rodziny `claude-` to niemal na pewno wklejka nie w to pole.
+     Wartość przez maskę, bo to pole sąsiaduje z kluczem w wertis.env.example. */
+  if (c.copilot.model && !c.copilot.model.startsWith("claude-")) {
+    bledy.push(
+      `COPILOT_MODEL=${bezpiecznaWartosc(c.copilot.model)} — nazwa modelu Anthropic ` +
+        "zaczyna się od „claude-" + "\u201d (np. claude-opus-5).",
     );
   }
 

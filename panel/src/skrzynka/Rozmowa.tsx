@@ -9,6 +9,7 @@ import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
+import { OcenaKategorii } from "./Copilot";
 import { Sprawa } from "./Sprawa";
 import { Obecni } from "./Obecni";
 
@@ -75,6 +76,11 @@ export function Rozmowa(p: {
   zapisujeStatus: boolean;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
+  /* Werdykt o propozycji Copilota (§14, etap F). Opcjonalny, bo rozmowa bez
+     rozpoznania nie ma czego oceniać — a każdy istniejący test tego ekranu
+     opisuje właśnie taką rozmowę. */
+  ocenia?: boolean;
+  onOcenKategorie?: (ocena: "trafna" | "nietrafna") => void;
   bladStatusu: string;
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
@@ -106,6 +112,11 @@ export function Rozmowa(p: {
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
           w telefonie nie jest przejęciem jej. */}
+      {/* Werdykt o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
+          się to, na co się właśnie patrzy. Za zębatką mieszka SUMA tych ocen,
+          czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
+      {rozmowa.kopilot && <OcenaKategorii kopilot={rozmowa.kopilot}
+        zapisuje={p.ocenia} onOcen={p.onOcenKategorie ?? (() => {})} />}
       <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
         onZmien={p.onZmienStatus}
         onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />

@@ -34,6 +34,115 @@ historii nie przepisujemy.
 ---
 
 
+## 0.191.0 — 3 września 2026
+
+**Etap F ruszył: Copilot rozpoznaje, o co pyta klient.** Pierwsza rzecz z §14.1
+i pierwsze miejsce w tej aplikacji, z którego treść rozmowy wychodzi poza
+firmę. Domyślnie WYŁĄCZONE — bez klucza w `wertis.env` nie wychodzi ani jeden
+znak, a serwer wstaje normalnie.
+
+### Przycisk stoi NAD kolejką, nie w rozmowie
+
+Klasyfikacja ma pomóc ułożyć pracę w skrzynce. Przycisk w otwartej rozmowie
+etykietowałby treść, którą agent WŁAŚNIE PRZECZYTAŁ — wartość bliska zeru,
+a koszt byłby kroplówką: każde otwarcie zaprasza do kliknięcia, nikt ich nie
+liczy i po miesiącu nie wiadomo, na co poszły pieniądze. Rozmowa, której nikt
+nie otworzył, i tak nie dostałaby etykiety.
+
+Partia bierze nierozpoznane rozmowy z OGLĄDANEGO kubełka, przycięte do
+`COPILOT_MAX_PARTIA` (domyślnie 20). Przycisk niesie liczbę, potwierdzenie mówi
+wprost, że treść idzie do dostawcy i że to kosztuje. Trasa przyjmuje LISTĘ
+identyfikatorów, więc przyszły przycisk w pojedynczej rozmowie wyśle jeden —
+bez nowej trasy i bez podnoszenia licznika tras zapisu.
+
+Etykieta starzeje się sama. Zapisujemy `message_id`, na którym ją liczono;
+dopisek klienta czyni ją nieaktualną, plakietka szarzeje, a rozmowa znów
+kwalifikuje się do partii.
+
+### Kategoria NIE przestawia kolejki i to jest decyzja
+
+Klucze kolejności — ręczna flaga „pilne" i czas oczekiwania klienta — są
+FAKTAMI. Kategoria jest przypuszczeniem maszyny, a jedna pomyłka
+klasyfikatora zakopałaby prawdziwe pytanie na dole listy tak, że nikt by tego
+nie zauważył. Ekran daje plakietkę na wierszu, pasek liczników nad kubełkami
+i filtr po kategorii. `ORDER BY` zostaje nietknięte, a test pilnuje tego
+wprost — po stronie zapytania i po stronie ekranu.
+
+Regułę kolejności wolno dołożyć w etapie G. To wydanie dostarczy liczb, którymi
+da się ją uzasadnić: przy 95 % trafności przestawianie jest bezpieczne, przy
+70 % jest szkodliwe.
+
+### Prywatność ma dwa zamki, a jeden z nich jest w typie
+
+Nadawca przyjmuje wyłącznie `TrescBezpieczna` — typ, który umie wyprodukować
+tylko `zamaskuj()`. „Zapomniałem zamaskować" nie jest więc pomyłką do
+wyłapania w przeglądzie, tylko błędem kompilacji. Drugi zamek to asercja tuż
+przed wysyłką.
+
+Znika e-mail, telefon, kod pocztowy z miastem, wiersz z markerem adresu, ciąg
+szesnastu cyfr i login kupującego. W miejscu wartości zostaje znacznik, żeby
+model wiedział, że coś tam było.
+
+Granica jest zapisana, nie przemilczana. Adres bez markera i bez kodu
+pocztowego przejdzie. W drugą stronę: numer OEM zapisany jak telefon zniknie
+jako `[telefon]` — klasyfikacji nie jest potrzebny, ale przyrost ekstrakcji
+będzie musiał tę regułę zawęzić. Oba kierunki mają test. Wzorzec kodu
+pocztowego wymaga miasta po numerze, bo bez tego zjadał `NAC LS 46-450`,
+czyli dokładnie tę daną, po którą klasyfikacja przyszła.
+
+### Zużycie zapisujemy od pierwszego wywołania, w tokenach
+
+Kwota w bazie jest kłamstwem od dnia zmiany cennika; liczba tokenów jest
+faktem na zawsze. Cennik stoi w `services/copilot-koszt.ts` z datą odczytu.
+
+Księga `copilot_wywolanie` jest OSOBNA od klasyfikacji, bo wywołanie
+zakończone błędem kosztuje i nie daje odpowiedzi — trzymanie tokenów przy
+klasyfikacji zgubiłoby tę część rachunku. Trafność mierzy werdykt człowieka
+przy plakietce w otwartej rozmowie. Karta pomiaru za zębatką podaje `n`
+i liczbę nieocenionych, żeby „100 % trafności" z dwóch ocen nie udawało
+pomiaru.
+
+Na `kategoria` nie ma `CHECK`-a i to jest decyzja, nie przeoczenie: w SQLite
+rozszerzenie zamkniętej listy to przebudowa tabeli (0.135.0), a słownik
+kategorii będzie rósł. Listy pilnuje serwis, a na ekranie `Record` z nazwami
+po polsku nie skompiluje się bez nazwy dla nowej wartości.
+
+### Limit dostawcy zatrzymuje partię czysto
+
+429 w połowie partii oddaje **200 z wypełnionym `przerwane`**, nie błąd: część
+rozmów została rozpoznana i ZAPŁACONA, a kod błędu kazałby ekranowi wyrzucić
+wynik, za który już zapłaciliśmy. Zły klucz zatrzymuje partię od razu —
+dwadzieścia prób z tym samym złym kluczem to dwadzieścia śladów w logu i zero
+informacji ponad tę z pierwszej. Ponowień nie ma: tickera nie ma i limit
+obsługuje człowiek.
+
+Każda rozmowa to własna transakcja. Jedna wielka cofnęłaby przy limicie
+kilkanaście zapłaconych odpowiedzi.
+
+### [wymaga działania] Klucz wpisz WYŁĄCZNIE do `ANTHROPIC_API_KEY`
+
+Bez `COPILOT_MODE=anthropic` nic się nie włączy i nic nie wyjdzie na zewnątrz.
+Klucza NIE MA w konfiguracji serwera — jest tam tylko odpowiedź na pytanie
+„czy jest". SDK czyta zmienną środowiskową sam, a własna kopia byłaby trzecim
+miejscem, z którego sekret mógłby wyciec do komunikatu.
+
+W 0.84.1 klucz wklejony do pola trybu wywrócił start, NSSM restartował usługę
+w kółko, a wartość szła do `logs\wertis-api.err.log` przy każdym obiegu.
+Dlatego brak klucza NIE zatrzymuje dziś startu, a `JSON.stringify(config)`
+dostał własny test — ten, którego wtedy nie było.
+
+Migracja dokłada dwie tabele sama. Akapit o włączeniu stoi w `DEPLOY.md`,
+polityka danych — w `docs/obsluga-klienta.md`.
+
+### Czego to wydanie NIE robi
+
+Nie wyciąga danych doboru (`extracting_data` nadal bez nadawcy), nie czyta
+zdjęć, nie pisze szkicu, nie proponuje wpisów do bazy wiedzy, nie ma taktu
+w tle i nie wysyła do klienta ani jednego znaku. Nie rusza `conversation.status`,
+`priorytet` ani `conversation.version` — ta ostatnia pilnuje przejęcia
+i szkicu, więc podniesienie jej wywracałoby komuś szkic na 409 w trakcie
+pisania.
+
 ## 0.190.0 — 3 września 2026
 
 **Cztery braki z planu obsługi i z makiet, w tym ten najdroższy: pieniądze.**

@@ -11,6 +11,7 @@ import {
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
+import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
@@ -28,6 +29,12 @@ export function Skrzynka() {
   const ja = useJa();
   const lista = useRozmowy();
   const rozmowa = useRozmowa(wybranaId);
+  /* Copilot (§14, etap F). Stan to odczyt KONFIGURACJI, więc jeden na wejście
+     do ekranu — hak trzyma go do restartu usługi. Mutacje siedzą tutaj, a nie
+     w widokach: cały katalog `skrzynka/` to komponenty czyste. */
+  const copilot = useCopilot();
+  const klasyfikuj = useKlasyfikuj();
+  const ocenKategorie = useOcenKlasyfikacje();
   const przejmij = usePrzejmij();
   const przekaz = usePrzekaz();
   const oferta = useWskazOferte();
@@ -159,6 +166,13 @@ export function Skrzynka() {
     <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
     <Kolejka
       nieswieza={alarm}
+      copilot={copilot.data}
+      klasyfikacja={{
+        trwa: klasyfikuj.isPending,
+        wynik: klasyfikuj.data ?? null,
+        blad: klasyfikuj.error ? (klasyfikuj.error as Error).message : null,
+      }}
+      onRozpoznaj={(rozmowyId) => klasyfikuj.mutate({ rozmowyId })}
       rozmowy={lista.data?.rozmowy ?? []}
       stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
       wybranaId={wybranaId}
@@ -195,6 +209,9 @@ export function Skrzynka() {
         { id: rozmowa.data.rozmowa.id, expectedVersion: rozmowa.data.rozmowa.wersja },
         { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
+      ocenia={ocenKategorie.isPending}
+      onOcenKategorie={(ocena) => rozmowa.data && ocenKategorie.mutate(
+        { rozmowaId: rozmowa.data.rozmowa.id, ocena })}
       komentarz={komentarz}
       onKomentarz={(v) => { setKomentarz(v); zglosPisanie(); }}
       komentuje={dodajKomentarz.isPending}

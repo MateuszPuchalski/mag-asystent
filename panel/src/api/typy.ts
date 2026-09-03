@@ -38,9 +38,63 @@ export type Rozmowa = {
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
+  /** Rozpoznanie Copilota (§14, etap F). `null` = nikt jeszcze nie rozpoznał. */
+  kopilot: Kopilot | null;
   /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —
      żyje w pamięci serwera i wygasa sam, więc bywa `null` sekundę później. */
   oglada: { userId: number; name: string } | null;
+};
+
+/* Słownik kategorii — LUSTRO stałej `KATEGORIE` z serwera. Dwa kosze, bo mówią
+   o dwóch różnych naprawach: `inne` znaczy „słownik jest za krótki”,
+   `nie_wiadomo` — „za mało treści, przeczytaj sam”. */
+export type Kategoria =
+  | "dobor" | "dostepnosc" | "wysylka" | "zwrot" | "reklamacja" | "dokumenty"
+  | "inne" | "nie_wiadomo";
+
+export type Pewnosc = "wysoka" | "srednia" | "niska";
+
+export type Kopilot = {
+  kategoria: Kategoria;
+  pewnosc: Pewnosc;
+  /** Klient dopisał po rozpoznaniu. Liczy SERWER — panel tej reguły nie powtarza. */
+  nieaktualna: boolean;
+  /** Werdykt człowieka. To on, a nie liczba klasyfikacji, jest pomiarem. */
+  ocena: "trafna" | "nietrafna" | null;
+};
+
+/** Stan Copilota do paska nad kolejką. Czysty odczyt — nic nie mutuje. */
+export type StanCopilota = {
+  wlaczony: boolean;
+  /** Zdanie dla człowieka, gdy `wlaczony` jest fałszem. `null`, gdy działa. */
+  powod: string | null;
+  model: string;
+  maxPartia: number;
+};
+
+/** Wynik partii. `przerwane` niepuste znaczy: część zapłacona, reszta czeka. */
+export type WynikPartii = {
+  sklasyfikowane: number;
+  pominiete: Array<{ rozmowaId: number; powod: string }>;
+  bledy: Array<{ rozmowaId: number; powod: string }>;
+  przerwane: string | null;
+  zuzycie: {
+    wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number; kosztUsd: number;
+  };
+};
+
+/** Pomiar zza zębatki (0.168.0: diagnostyka nie stoi na ekranie pracy). */
+export type PomiarCopilota = {
+  wywolan: number;
+  bledow: number;
+  tokeny: { wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number };
+  kosztUsd: number;
+  udzialCache: number | null;
+  ocen: number;
+  trafnych: number;
+  /** Bez tej liczby „100 % trafności” z dwóch ocen udawałoby pomiar. */
+  nieocenionych: number;
+  wgKategorii: Array<{ kategoria: string; ile: number; ocen: number; trafnych: number }>;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */

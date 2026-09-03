@@ -334,6 +334,23 @@ mają bramkę roli także na odczycie — rozmowy z klientami to dane biura.
 **Wynik nie staje się odpowiedzią sam.** Wraca na oś rozmowy jako osobny wpis
 i do szkicu trafia wyłącznie na jawne kliknięcie agenta.
 
+**Treść wychodzi do dostawcy modelu — na kliknięcie i po maskowaniu (etap F).**
+Copilot rozpoznaje, o co pyta klient. Do dostawcy idzie WYŁĄCZNIE ostatnia
+wiadomość klienta, nigdy cała historia wątku. Przed wysłaniem tekst przechodzi
+przez maskowanie: znikają e-mail, telefon, kod pocztowy z miastem, wiersz
+z markerem adresu, ciąg szesnastu cyfr i login kupującego. W miejscu wartości
+zostaje znacznik.
+
+Adres bez markera i bez kodu pocztowego przejdzie — wyrażenia regularne tego
+nie rozstrzygają. Ta granica jest zapisana, bo milczenie o niej kosztowało już
+raz (0.151.0).
+
+Copilot jest wyłączony domyślnie. Bez `COPILOT_MODE=anthropic` i bez klucza
+z firmy nie wychodzi ani jeden znak. Nic nie idzie taktem w tle: partię
+uruchamia agent klawiszem, a potwierdzenie mówi wprost, że to kosztuje.
+Do klienta dalej mówi wyłącznie człowiek — klasyfikacja nie pisze do niego ani
+jednego znaku.
+
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
 loginem rozmówcy nie są pobierane.
 

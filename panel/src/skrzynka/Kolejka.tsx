@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { AlarmClock, Eye, Inbox, RefreshCw, Ruler, UserCheck, Wrench } from "lucide-react";
-import type { Rozmowa, StanSkrzynki } from "../api/typy";
+import type { Kategoria, Rozmowa, StanCopilota, StanSkrzynki, WynikPartii } from "../api/typy";
 import { Plakietka, czas } from "../ui";
-import { NAZWA, NAZWA_DOBORU } from "./statusy";
+import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
+import { PasekCopilota, PlakietkaKategorii, doRozpoznania } from "./Copilot";
 
 /* Kubełki kolejki wprost z §10.1: „Nieprzypisane, Moje, Oczekujące, Po
    terminie". Filtr jest po stronie EKRANU, bo lista i tak przyjeżdża w
@@ -52,10 +53,16 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
 /* Kolejka pokazuje moment ostatniej synchronizacji, bo pusta lista o 9:00
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
-export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, onOdswiez,
-  laduje, nieswieza }: {
+export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = () => {},
+  wybranaId, mojeId = null, onWybierz, onOdswiez, laduje, nieswieza }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
+  /** Stan Copilota (§14, etap F). `undefined` = jeszcze nie wiadomo, milcz. */
+  copilot?: StanCopilota;
+  /* Przebieg ostatniej partii. Kolejka go nie wywołuje — wywołanie mieszka
+     w `ekrany/Skrzynka.tsx`, tak jak każdy inny hak zapytania w tym panelu. */
+  klasyfikacja?: { trwa: boolean; wynik: WynikPartii | null; blad: string | null };
+  onRozpoznaj?: (rozmowyId: number[]) => void;
   wybranaId: number | null;
   /** Bez tego „Moje" nie ma znaczenia — kubełek zostaje wtedy pusty, nie mylący. */
   mojeId?: number | null;
@@ -67,7 +74,24 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
   nieswieza?: boolean;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("wszystkie");
-  const widoczne = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
+  /* Filtr kategorii jest DRUGIM sitem, nałożonym na kubełek, a nie trzecim
+     rzędem kubełków: kubełek mówi „czyje to", kategoria — „o czym to". Zlanie
+     tego w jedną listę zmusiłoby agenta do wyboru między dwoma pytaniami,
+     na które odpowiada naraz. */
+  const [kategoria, setKategoria] = useState<Kategoria | null>(null);
+  const wKubelkuTeraz = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
+  const widoczne = kategoria === null ? wKubelkuTeraz
+    : wKubelkuTeraz.filter((r) => r.kopilot?.kategoria === kategoria);
+
+  /* Skład kubełka JEDNYM SPOJRZENIEM (dekalog ergonomii, punkt 1: informacja
+     w miejscu, gdzie zapada decyzja). Liczniki liczą się z tego, co widać —
+     serwer nie musi ich podawać, bo lista i tak przyjeżdża w całości. */
+  const liczniki = new Map<Kategoria, number>();
+  for (const r of wKubelkuTeraz) {
+    if (!r.kopilot || r.kopilot.nieaktualna) continue;
+    liczniki.set(r.kopilot.kategoria, (liczniki.get(r.kopilot.kategoria) ?? 0) + 1);
+  }
+  const wgLiczby = [...liczniki.entries()].sort((a, b) => b[1] - a[1]);
   return <section className="card flex min-h-0 flex-col overflow-hidden">
     {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
         węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
@@ -91,6 +115,26 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
         {k.etykieta} <span className="font-normal">
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
     </div>
+    <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)}
+      trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
+      onRozpoznaj={onRozpoznaj} />
+    {/* Pasek liczników zamiast PRZESTAWIANIA kolejki i to jest decyzja.
+        Dzisiejsze klucze kolejności — ręczna flaga „pilne" i czas oczekiwania
+        klienta — są FAKTAMI; kategoria jest przypuszczeniem maszyny, a jedna
+        pomyłka klasyfikatora zakopałaby prawdziwe pytanie na dole listy tak,
+        że nikt by tego nie zauważył. Agent widzi skład skrzynki i sam wybiera,
+        co bierze. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
+        trafności ją uzasadni (etap G). */}
+    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5 text-xs">
+      {wgLiczby.map(([k, ile]) => <button key={k} type="button"
+        aria-pressed={kategoria === k}
+        onClick={() => setKategoria(kategoria === k ? null : k)}
+        className={`rounded px-1.5 py-0.5 font-semibold ${kategoria === k
+          ? "bg-violet-700 text-white" : "bg-violet-50 text-violet-800 hover:bg-violet-100"}`}>
+        {NAZWA_KATEGORII[k]} <span className="font-normal">{ile}</span></button>)}
+      {kategoria !== null && <button type="button" className="ml-auto text-slate-500 underline"
+        onClick={() => setKategoria(null)}>pokaż wszystkie</button>}
+    </div>}
     <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
       {laduje && <p className="p-4 text-sm text-slate-500">Wczytuję…</p>}
       {!laduje && !rozmowy.length &&
@@ -98,7 +142,13 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
       {/* Pusty KUBEŁEK to co innego niż pusta skrzynka: „nic nie czeka na
           mnie" nie znaczy „nic nie przyszło", a jedno zdanie mniej kazałoby
           agentowi zgadywać, czy synchronizacja stanęła. */}
-      {!laduje && rozmowy.length > 0 && !widoczne.length &&
+      {/* Pusty KUBEŁEK to co innego niż pusty FILTR. „Zajrzyj do Wszystkie"
+          przy włączonym filtrze kategorii wysłałoby agenta w złą stronę —
+          rozmowy są, tylko sito je zasłania. */}
+      {!laduje && rozmowy.length > 0 && !widoczne.length && kategoria !== null &&
+        <p className="p-4 text-sm text-slate-500">
+          Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</p>}
+      {!laduje && rozmowy.length > 0 && !widoczne.length && kategoria === null &&
         <p className="p-4 text-sm text-slate-500">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</p>}
       {widoczne.map((r) => <button key={r.id} onClick={() => onWybierz(r.id)}
         aria-current={wybranaId === r.id}
@@ -144,6 +194,10 @@ export function Kolejka({ rozmowy, stan, wybranaId, mojeId = null, onWybierz, on
               r.dobor === "confirmed" ? "text-emerald-700"
                 : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
               <Wrench size={12} />{NAZWA_DOBORU[r.dobor]}</span>}
+          {/* Plakietka Copilota PO statusie doboru: dobór jest faktem
+              zapisanym przez człowieka, kategoria — przypuszczeniem maszyny,
+              a kolejność na wierszu ma odpowiadać wadze. */}
+          {r.kopilot && <PlakietkaKategorii kopilot={r.kopilot} />}
           {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
             <UserCheck size={12} />{r.wlasciciel}</span>}
           {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">

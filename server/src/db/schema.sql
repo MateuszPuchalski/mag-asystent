@@ -224,6 +224,76 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   updated_user_id INTEGER REFERENCES app_user(user_id)
 );
 
+-- ── Copilot: klasyfikacja wiadomości (§14, etap F) ───────────────────────
+-- Odpowiada na pytanie „O CO CHODZI w tej rozmowie" i jest PROSTOPADŁA do
+-- statusu, który odpowiada na „CZYJ JEST RUCH". Rozmowa `waiting_for_customer`
+-- bywa reklamacją, a `new` bywa pytaniem o dostępność — mieszanie tych dwóch
+-- wymiarów zepsułoby oba.
+--
+-- OSOBNA TABELA, nie kolumny na `conversation`, i to nie jest kwestia gustu:
+-- `conversation.version` pilnuje przejęcia rozmowy i szkicu. Klasyfikacja
+-- podnosząca ją wywracałaby komuś szkic na 409 W TRAKCIE PISANIA. Ten sam
+-- powód dał doborowi własną kolumnę `wersja`.
+--
+-- Brak wiersza znaczy „nierozpoznana" i liczy się przy odczycie — otwarcie
+-- kolejki niczego nie wstawia.
+CREATE TABLE IF NOT EXISTS klasyfikacja_rozmowy (
+  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+  -- BEZ `CHECK` I TO JEST DECYZJA, NIE PRZEOCZENIE (blizna 0.135.0).
+  -- Statusy mają `CHECK`, bo ich lista pochodzi z dokumentu i jest zamknięta.
+  -- Słownik kategorii jest odwrotnością tego przypadku: ma ROSNĄĆ od pomiaru,
+  -- a kategoria zwrócona spoza listy jest sygnałem, że słownik jest za krótki.
+  -- `CHECK` zamieniłby każde takie odkrycie w przebudowę tabeli.
+  -- Strażnik stoi w `services/copilot-klasyfikacja.ts` (`KATEGORIE`) i w typie
+  -- panelu (`Record<Kategoria, string>` nie skompiluje się bez nazwy) — dwie
+  -- kopie zamiast trzech, i żadna nie kosztuje migracji.
+  kategoria       TEXT NOT NULL,
+  pewnosc         TEXT NOT NULL CHECK (pewnosc IN ('wysoka','srednia','niska')),
+  -- Jedno zdanie modelu. Służy człowiekowi do oceny trafności, nie automatowi.
+  uzasadnienie    TEXT,
+  -- NA CZYM liczono. Nowsza wiadomość klienta czyni etykietę nieaktualną,
+  -- a rozmowa wraca do partii — bez tego pola trzeba by przycisku w rozmowie.
+  message_id      INTEGER REFERENCES message(id),
+  model           TEXT NOT NULL,
+  at              TEXT NOT NULL,
+  przez           TEXT NOT NULL,
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  -- WERDYKT CZŁOWIEKA o propozycji maszyny. Bez niego trafności nie da się
+  -- policzyć, a decyzja „po pomiarze zejść na tańszy model" tego wymaga.
+  ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
+  ocenil_user_id  INTEGER REFERENCES app_user(user_id),
+  ocena_at        TEXT
+);
+
+-- Księga wywołań Copilota. OSOBNO od klasyfikacji, bo zużycie należy do
+-- WYWOŁANIA, nie do odpowiedzi: próba zakończona błędem nie daje wiersza
+-- klasyfikacji, a kosztować może (429 po wysłaniu wejścia, ucięcie na
+-- `max_tokens`, odmowa). To jest dokładnie ta część rachunku, którą najłatwiej
+-- zgubić, a którą pomiar musi widzieć.
+--
+-- STOJĄ TU TOKENY, NIE ZŁOTÓWKI. Cennik mieszka w `services/copilot-koszt.ts`
+-- z datą odczytu; kwota zapisana w bazie jest kłamstwem od dnia zmiany cennika,
+-- a liczba tokenów jest faktem na zawsze.
+CREATE TABLE IF NOT EXISTS copilot_wywolanie (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  -- BEZ `CHECK` z tego samego powodu, co kategoria: kolejne przyrosty etapu F
+  -- (ekstrakcja, szkic, OCR) dopiszą tu swoje zadania.
+  zadanie         TEXT NOT NULL,
+  conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  model           TEXT NOT NULL,
+  tokeny_wej      INTEGER NOT NULL DEFAULT 0,
+  tokeny_wyj      INTEGER NOT NULL DEFAULT 0,
+  tokeny_cache_zapis  INTEGER NOT NULL DEFAULT 0,
+  tokeny_cache_odczyt INTEGER NOT NULL DEFAULT 0,
+  ms              INTEGER,
+  wynik           TEXT NOT NULL CHECK (wynik IN ('ok','blad')),
+  -- Klasa błędu i status. NIGDY treść wiadomości — §19 i polityka danych.
+  blad            TEXT,
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
+
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
 -- Trzy tabele zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
 -- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
