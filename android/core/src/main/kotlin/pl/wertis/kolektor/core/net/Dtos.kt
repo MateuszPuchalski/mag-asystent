@@ -1096,7 +1096,21 @@ data class PrzyjeciaResponse(val przyjecia: List<PrzyjecieRow> = emptyList())
 data class OtworzPrzyjecieBody(val numer: String)
 
 @Serializable
-data class OdlozKoszBody(val lokalizacja: String, val recznie: Boolean = false)
+data class OdlozKoszBody(
+    val lokalizacja: String,
+    val recznie: Boolean = false,
+    /**
+     * Czym potwierdzono adres (0.189.0): `polka` — zeskanowana etykieta regału,
+     * `towar` — drugi skan tego samego towaru, `wpis` — klawiatura albo
+     * przycisk ODŁÓŻ TUTAJ. Serwer po tym wie, które odłożenie było
+     * ZWERYFIKOWANE półką, a które tylko potwierdzone; `manual_entry` zapisuje
+     * wyłącznie `wpis`, żeby raport etykiet do przedruku został prawdziwy.
+     *
+     * `recznie` zostaje w ciele żądania dla starszych serwerów, które o tym
+     * polu nie wiedzą — i musi się z nim zgadzać.
+     */
+    val potwierdzenie: String? = null,
+)
 
 @Serializable
 data class OdlozKoszResponse(val ok: Boolean = true, val mismatch: Boolean = false)

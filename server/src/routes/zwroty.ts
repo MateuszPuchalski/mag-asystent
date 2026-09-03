@@ -288,7 +288,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
 
      Z tego samego powodu nie ma tu `logEvent`: wpis z kodem w dzienniku byłby
      dokładnie tym zapisem, którego unikamy, a bez kodu nie niósłby nic. */
-  /* ── ZWROT PIENIĘDZY I ODMOWA (0.189.0) ────────────────────────────────
+  /* ── ZWROT PIENIĘDZY I ODMOWA (0.190.0) ────────────────────────────────
      Druga i trzecia trasa tego pliku wychodząca do Allegro — i pierwsza,
      która rusza PIENIĄDZE. Stąd dwie różnice względem reszty:
 
@@ -402,7 +402,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const kandydaci = zwrot.faktura.dokId === null ? kandydaciFaktury(id, db()) : [];
     return {
       zwrot, os: osZwrotu(db(), id), kandydaciFaktury: kandydaci,
-      /* Stan zapisu do Allegro (0.189.0). Liczy go SERWER, bo to on zna
+      /* Stan zapisu do Allegro (0.190.0). Liczy go SERWER, bo to on zna
          przeszkody: brak identyfikatora płatności, pobranie, brak kwoty.
          Panel powtarzający tę regułę rozjechałby się z nią przy pierwszej
          zmianie — a rozjazd znaczyłby tu przycisk obiecujący pracę, której

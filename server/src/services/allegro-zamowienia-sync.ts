@@ -175,7 +175,7 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
     z.delivery?.cost?.amount == null ? null : naGrosze(z.delivery.cost.amount),
     z.delivery?.method?.name ?? null,
     z.payment?.type ?? null, z.payment?.finishedAt ?? null,
-    /* Identyfikator płatności (0.189.0) — bez niego `POST /payments/refunds`
+    /* Identyfikator płatności (0.190.0) — bez niego `POST /payments/refunds`
        nie ma jak powstać, bo `payment.id` stoi w `required` schematu. */
     z.payment?.id ?? null,
     /* `null`, gdy Allegro nie przysłało `invoice` — to nie to samo, co

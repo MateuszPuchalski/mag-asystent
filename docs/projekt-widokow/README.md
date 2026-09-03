@@ -42,7 +42,7 @@ oznaczone. Ekran nie uzupełnia go z kartoteki, bo to mieszałoby źródła.
 
 ## Poprawki po decyzjach właściciela
 
-**Kłódka zdjęta z zatwierdzania (0.189.0).** Stopka `Dobor.dc.html` rysowała
+**Kłódka zdjęta z zatwierdzania (0.190.0).** Stopka `Dobor.dc.html` rysowała
 wyłączony przycisk „ZATWIERDŹ ZASTOSOWANIE — tylko ekspert". Roli eksperta
 technicznego NIE MA: zniosła ją decyzja właściciela z etapów E1 i E2, a §26
 zdjęła z listy pytanie, kto zatwierdza zastosowania. Zatwierdza każdy z biura,

@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Pieniadze } from "./Pieniadze";
 import type { StanZwrotuPieniedzy } from "../api/typy";
 
-/* ── Pieniądze przy zwrocie (§25a, 0.189.0) ──────────────────────────────────
+/* ── Pieniądze przy zwrocie (§25a, 0.190.0) ──────────────────────────────────
    Ten ekran jako pierwszy w panelu rusza cudze pieniądze, więc testy pilnują
    nie wyglądu, tylko czterech rzeczy: że przeszkoda MÓWI, czego brakuje; że
    przycisk nie stoi tam, gdzie serwer i tak odmówi; że odmowa bez powodu nie

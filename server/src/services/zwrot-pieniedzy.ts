@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 
-/* ── Zwrot pieniędzy i odmowa w Allegro (0.189.0) ────────────────────────────
+/* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
 
-   DO 0.189.0 PANEL KOŃCZYŁ PRACĘ W POŁOWIE. Operator rozstrzygał zwrot,
+   DO 0.190.0 PANEL KOŃCZYŁ PRACĘ W POŁOWIE. Operator rozstrzygał zwrot,
    zaznaczał pozycje, dostawał policzoną kwotę — i szedł oddać pieniądze do
    panelu Allegro, czyli dokładnie tam, gdzie §25 obiecuje nie zaglądać.
    Panel zapisywał sam FAKT, że to się stało, i wierzył człowiekowi na słowo.

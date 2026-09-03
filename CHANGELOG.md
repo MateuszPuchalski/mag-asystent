@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.189.0 — 3 września 2026
+## 0.190.0 — 3 września 2026
 
 **Cztery braki z planu obsługi i z makiet, w tym ten najdroższy: pieniądze.**
 
@@ -133,6 +133,53 @@ w „Doborze").
 
 Tras POST przy zwrotach jest siedemnaście, trzy wychodzą do Allegro — licznik
 w `routes/zwroty.test.ts` jest umową i podnosi się razem z uzasadnieniem.
+
+## 0.189.0 — 3 września 2026
+
+**Drugi skan tego samego towaru kończy odłożenie.** Zgłoszenie właściciela:
+„przy rozkładaniu koszyków zwrotów jeśli towar jest wybrany i zeskanuje go
+drugi raz zatwierdź rozkładanie".
+
+Rozłożenie pozycji wymagało dotąd dwóch różnych ruchów. Skan towaru wskazywał
+pozycję, a kończył ją skan regału albo dotknięcie ODŁÓŻ TUTAJ. Gdy towar wracał
+na półkę, którą aplikacja i tak podała, ten drugi ruch był formalnością —
+wykonywaną w rękawicy, z kartonem w drugiej ręce.
+
+Skan półki zostaje bez zmian i pozostaje drogą, która adres WERYFIKUJE.
+
+Trzy warunki bronią przed odłożeniem, którego nikt nie chciał. Uzbraja
+wyłącznie skan, nie automat: po każdym odłożeniu ekran sam wskazuje następną
+pozycję, więc inaczej pierwszy skan przy nowej pozycji odkładałby ją, zanim
+człowiek sprawdził, co trzyma. Między skanami musi minąć 800 ms, bo skaner
+trzymany na spuście wysyła ten sam kod dwa razy. Towar bez adresu w kartotece
+odmawia, tak samo jak przycisk.
+
+**Dziennik mówi teraz, CZYM potwierdzono adres**: skanem półki, drugim skanem
+towaru czy wpisem. Bez tego pola nie dałoby się po pomyłce sprawdzić, czy ktoś
+tę półkę w ogóle zeskanował. Zdarzenie `manual_entry` zapisuje wyłącznie wpis
+z klawiatury — drugi skan tam nie wpada, więc raport etykiet do przedruku
+i kolumna „ręczne" przy pracowniku zostają prawdziwe.
+
+Ten sam ekran rozkłada kosze zwrotowe i kartony, więc zmiana dotyczy obu.
+
+## 0.188.1 — 3 września 2026
+
+**Którą dostawę oddajemy — decyzja zapisana, kod bez zmian.**
+
+Pytanie stało otwarte od 0.184.0: czy Allegro zwraca koszt najtańszej opcji
+dostawy z oferty, czy tej, którą wybrał klient. Właściciel odpowiedział: tej,
+którą wybrał klient. Panel liczył tak od początku, więc nic się nie zmienia
+w działaniu.
+
+Zmienia się to, że decyzja jest teraz ZAPISANA. Ustawa pozwala oddać mniej:
+gdy klient wybrał opcję droższą niż najtańsza zwykła, sprzedawca nie musi
+dopłacać różnicy. Oddajemy więcej świadomie — tak samo rozlicza to Allegro,
+a liczenie najtańszej opcji wymagałoby cennika oferty, którego przy zwrocie
+nie mamy.
+
+Bez zapisu wyglądało to na niedopatrzenie i doczekałoby się „poprawki".
+Dlatego stoi w trzech miejscach: komentarz przy `zapiszKwote`, akapit
+w §25a.3 i test, który pilnuje kwoty.
 
 ## 0.188.0 — 3 września 2026
 

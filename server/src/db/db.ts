@@ -275,8 +275,8 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK(faktura_zrodlo IN ('numer','reczne'))");
   addColumn("zwrot_klienta", "faktura_at", "TEXT");
   addColumn("zwrot_klienta", "faktura_przez", "TEXT");
-  /* ── Zapis do Allegro: zwrot pieniędzy i odmowa (0.189.0) ────────────────
-     Do 0.189.0 z tego systemu wychodziła do Allegro wiadomość do klienta
+  /* ── Zapis do Allegro: zwrot pieniędzy i odmowa (0.190.0) ────────────────
+     Do 0.190.0 z tego systemu wychodziła do Allegro wiadomość do klienta
      i wniosek o rabat. Pieniądze oddawał człowiek w panelu Allegro, a panel
      zapisywał sam FAKT — czyli kończył pracę tam, gdzie §25 obiecuje nie
      zaglądać.

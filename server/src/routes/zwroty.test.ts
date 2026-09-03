@@ -74,7 +74,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/rabat" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/skan/dociagnij" },
-  /* Zapisy do Allegro (0.189.0). Wchodzą do tej listy jak każda inna trasa:
+  /* Zapisy do Allegro (0.190.0). Wchodzą do tej listy jak każda inna trasa:
      bramka roli stoi przed uprawnieniem, więc hala nie zobaczy nawet powodu
      odmowy uprzywilejowanej. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/pieniadze` },
@@ -207,12 +207,12 @@ test("zwroty mają siedemnaście tras POST, a trzy z nich wychodzą do Allegro",
      nigdy nazwy ani ceny; zdjęcie działa wyłącznie na pozycji biura.
 
      SZESNASTA I SIEDEMNASTA ODDAJĄ PIENIĄDZE I ODMAWIAJĄ ICH ODDANIA
-     (0.189.0). To jedyne trasy tej aplikacji, które ruszają cudze pieniądze na
+     (0.190.0). To jedyne trasy tej aplikacji, które ruszają cudze pieniądze na
      zewnątrz — i dlatego jako jedyne w tym pliku stoją nie tylko za `odmowa()`,
      ale i za `autoryzuj(…, "zwrot_pieniedzy")`, czyli za wpisem `privileged`
      z nazwą operacji.
 
-     Uzasadnienie: do 0.189.0 panel rozstrzygał zwrot, liczył kwotę i kazał
+     Uzasadnienie: do 0.190.0 panel rozstrzygał zwrot, liczył kwotę i kazał
      operatorowi pójść oddać pieniądze do panelu Allegro — czyli kończył pracę
      dokładnie tam, gdzie §25 obiecuje nie zaglądać. Kryterium gotowości mówi
      „agent obsłuży typowe pytanie bez otwierania panelu Allegro"; przy zwrocie

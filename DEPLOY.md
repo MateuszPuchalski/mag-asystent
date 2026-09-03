@@ -1084,6 +1084,13 @@ opisanym wyżej. W firmie wygląda on tak:
    kolektorze i rozkłada zawartość na regały.
 4. Dokument powrotny (ZWR→MAG) wystawia **biuro**, nie kolektor.
 
+Od 0.189.0 **drugi skan tego samego towaru kończy odłożenie** pod adresem
+widocznym na ekranie. Robi to samo co dotknięcie ODŁÓŻ TUTAJ, tylko bez
+zdejmowania ręki ze skanera. Skan półki zostaje i pozostaje jedyną drogą, która adres
+weryfikuje fizycznie; dziennik zapisuje przy każdym odłożeniu, czym adres
+potwierdzono. Uzbraja wyłącznie skan, a między pierwszym a drugim musi minąć
+800 ms — dubel ze spustu skanera niczego nie odłoży.
+
 Kolektor w tym obiegu **nie wystawia żadnego dokumentu** — zapisuje wyłącznie
 adresy półek. Punkt 4 jest w całości robotą biura i tak ma zostać: przesunięcie
 zrobione drugi raz zabrałoby ze stanu towar, który nigdzie nie pojechał.
@@ -1513,7 +1520,7 @@ kilkadziesiąt minut część rozmów pokaże więc sam numer z odnośnikiem i z
 że treść dopiero przyjedzie. To nie jest usterka. **Panel trzeba
 przebudować** (`npm run build`).
 
-**Aktualizacja do 0.189.0 wymaga JEDNEJ rzeczy ręką: kolejnego uprawnienia.**
+**Aktualizacja do 0.190.0 wymaga JEDNEJ rzeczy ręką: kolejnego uprawnienia.**
 
 Panel zaczyna oddawać pieniądze kupującemu i odmawiać ich oddania — bez
 otwierania panelu Allegro. Zwrot płatności chodzi na uprawnieniu, którego ta

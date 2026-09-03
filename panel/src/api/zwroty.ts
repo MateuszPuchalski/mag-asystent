@@ -292,7 +292,7 @@ export function useZdejmijPozycje() {
   });
 }
 
-/* ── Zwrot pieniędzy i odmowa (0.189.0) ──────────────────────────────────────
+/* ── Zwrot pieniędzy i odmowa (0.190.0) ──────────────────────────────────────
    Pierwsze wyjście tego panelu po CUDZE PIENIĄDZE. Stąd trzy różnice
    względem sąsiednich mutacji.
 

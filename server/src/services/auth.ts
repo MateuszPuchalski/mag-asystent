@@ -220,7 +220,7 @@ export type OperacjaUprzywilejowana =
    */
   | "domkniecie_dostawy"
   /**
-   * Oddanie pieniędzy kupującemu albo odmowa ich oddania (0.189.0).
+   * Oddanie pieniędzy kupującemu albo odmowa ich oddania (0.190.0).
    *
    * JEDYNA operacja tej aplikacji, która rusza cudze pieniądze na zewnątrz.
    * Bramka roli sama w sobie niewiele tu dodaje — trasy zwrotów i tak stoją

@@ -418,11 +418,22 @@ export function skanTowaruKosza(
  * (kolejność wstawienia + guard po tw_id) — towar nie ma prawa stać się
  * sprzedawalny pod adresem, którego jeszcze nie ma w Subiekcie.
  */
+/**
+ * Czym potwierdzono adres odłożenia (0.189.0).
+ *
+ *   polka → zeskanowano etykietę regału; adres jest ZWERYFIKOWANY fizycznie,
+ *   towar → drugi skan tego samego towaru; adres wzięty z ekranu, bez półki,
+ *   wpis  → adres wpisany albo zatwierdzony przyciskiem ODŁÓŻ TUTAJ.
+ */
+export type Potwierdzenie = "polka" | "towar" | "wpis";
+
+export const POTWIERDZENIA: readonly Potwierdzenie[] = ["polka", "towar", "wpis"] as const;
+
 export function odlozPozycje(
   pozycjaId: number,
   lokalizacja: string,
   autor: string,
-  recznie = false
+  potwierdzenie: Potwierdzenie = "polka"
 ): { ok: true; mismatch: boolean } {
   const p = db().prepare("SELECT * FROM kosz_pozycja WHERE id = ?").get(pozycjaId) as
     | Record<string, unknown>
@@ -481,13 +492,27 @@ export function odlozPozycje(
     )
     .run(code, nowIso(), autor, locQueueId, pozycjaId);
 
-  if (recznie) logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
+  /* `manual_entry` WYŁĄCZNIE przy wpisie z klawiatury. To zdarzenie zasila
+     dwa raporty (`services/raporty.ts`): udział wejść ręcznych per kod, czyli
+     etykiety do przedruku, oraz kolumnę „ręczne" w raporcie wydajności
+     pracownika. Drugi skan towaru (0.189.0) nie jest ani wpisem, ani nieudanym
+     skanem etykiety — a jest drogą wygodną, więc wpadając tam zgłaszałby
+     półki, których nikt nie dotykał, i robił z magazyniera maszynistkę. */
+  if (potwierdzenie === "wpis") {
+    logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
+  }
   logEvent(poprawka ? "kosz_putaway_poprawka" : "kosz_putaway", autor, twId, {
     koszId: kosz.id,
     pozycjaId,
     qty: p.ilosc,
     location: code,
     expected: oczekiwany,
+    /* CZYM potwierdzono adres. Bez tego pola dziennik nie odróżnia odłożenia
+       SPRAWDZONEGO skanem półki od potwierdzonego bez patrzenia na etykietę —
+       a to jest pierwsze pytanie po „towar leży na złej półce". Klucz nie
+       nazywa się `zrodlo`, bo tamten w sąsiednich zdarzeniach znaczy EKRAN
+       (`kosz`, `dostawa`, `przesuniecie`) i jedno słowo niosłoby dwa sensy. */
+    potwierdzenie,
     ...(poprawka ? { poprzedni: (p.lok_faktyczna as string) ?? null } : {}),
   });
   if (mismatch) {

@@ -8,7 +8,7 @@ import {
   ZwrotPieniedzyConflict,
 } from "./zwrot-pieniedzy.js";
 
-/* ── Zwrot pieniędzy i odmowa w Allegro (0.189.0) ────────────────────────────
+/* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
    To jest PIERWSZE miejsce, z którego ten system rusza cudze pieniądze.
    Testy pilnują więc nie kształtu ekranu, tylko czterech rzeczy, po których
    poznaje się, że wolno to wypuścić:
@@ -199,7 +199,7 @@ test("kod spoza schematu jest odrzucany u nas, nie w Allegro", async () => {
   await assert.rejects(
     () => odmowZwrotuPieniedzy(d, id, "WYMYSLONY", null, 1, KTO, async () => null),
     /Nieznany kod/);
-  /* Siedem kodów ze schematu — nie cztery, jak mówił opis do 0.189.0. */
+  /* Siedem kodów ze schematu — nie cztery, jak mówił opis do 0.190.0. */
   assert.equal(KODY_ODMOWY.length, 7);
 });
 

@@ -13,6 +13,8 @@ import {
   koszeDlaKolektora,
   listaKoszy,
   odlozPozycje,
+  POTWIERDZENIA,
+  type Potwierdzenie,
   pominietePozycje,
   pominPozycjeKosza,
   przesunNaKoniec,
@@ -125,13 +127,32 @@ export async function koszeRoutes(app: FastifyInstance) {
     }
   );
 
-  app.post<{ Params: { id: string }; Body: { lokalizacja?: string; recznie?: boolean } }>(
-    "/api/kosze/pozycje/:id/odloz",
-    async (req, reply) =>
-      zBledem(reply, () =>
-        odlozPozycje(Number(req.params.id), req.body?.lokalizacja ?? "", autor(), !!req.body?.recznie)
+  /* `potwierdzenie` mówi, CZYM adres został potwierdzony (0.189.0). Starszy
+     APK go nie zna i wysyła samo `recznie` — wtedy wyprowadzamy je z tamtej
+     flagi, bo do 0.189.0 istniały tylko dwie drogi: skan półki i wpis.
+
+     Wartość spoza trójki to 400, a nie ciche podstawienie „polka": nieznane
+     potwierdzenie udające zweryfikowany skan półki zakłamywałoby dziennik
+     dokładnie tam, gdzie się do niego zagląda. Kierunek zgodności jest zresztą
+     jeden — serwer u klienta rusza `git pull`-em, APK dopiero po nim. */
+  app.post<{
+    Params: { id: string };
+    Body: { lokalizacja?: string; recznie?: boolean; potwierdzenie?: string };
+  }>("/api/kosze/pozycje/:id/odloz", async (req, reply) => {
+    const podane = req.body?.potwierdzenie;
+    const potwierdzenie = podane ?? (req.body?.recznie ? "wpis" : "polka");
+    if (!POTWIERDZENIA.includes(potwierdzenie as Potwierdzenie)) {
+      return reply.code(400).send({ error: `Nieznane potwierdzenie: ${podane}` });
+    }
+    return zBledem(reply, () =>
+      odlozPozycje(
+        Number(req.params.id),
+        req.body?.lokalizacja ?? "",
+        autor(),
+        potwierdzenie as Potwierdzenie
       )
-  );
+    );
+  });
 
   /* Pominięcie pozycji, której w koszu nie ma. Ta sama bramka co odkładanie —
      to decyzja magazyniera stojącego przy koszu, nie biura. */

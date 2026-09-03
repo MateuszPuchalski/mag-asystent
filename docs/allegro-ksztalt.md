@@ -403,7 +403,7 @@ z tej samej kopii specyfikacji, żeby nie odtwarzać go z pamięci później.
 o odmowie ZWROTU PIENIĘDZY, a nie o odrzuceniu samego zwrotu — panel nazywa to
 tak samo (przycisk ODMÓW WYPŁATY).
 
-**Kodów jest SIEDEM, nie cztery.** Do 0.189.0 stały tu tylko `REFUND_REJECTED`,
+**Kodów jest SIEDEM, nie cztery.** Do 0.190.0 stały tu tylko `REFUND_REJECTED`,
 `NEW_ITEM_SENT`, `ITEM_FIXED` i `MISSING_PART_SENT`; schemat
 `CustomerReturnRefundRejectionRequest` wymienia jeszcze `ITEM_MISMATCH`,
 `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`. Wymagany jest sam `code`; `reason`
@@ -429,14 +429,14 @@ Uprawnienie to `allegro:api:payments:write` i jest INNE niż przy rabacie.
 Wersja zasobu: `public.v1`. Odpowiedź (`RefundDetails`) niesie `id`, `payment`,
 `reason`, `status`, `createdAt` i `totalValue`.
 
-`[WERYFIKUJ]` Zachowanie idempotencji `commandId` na żywym koncie. Do 0.189.0
+`[WERYFIKUJ]` Zachowanie idempotencji `commandId` na żywym koncie. Do 0.190.0
 stało tu, że kopia specyfikacji nie ma `commandId` ani `order` — NIEPRAWDA:
 oba stoją w `required` schematu `InitializeRefund`, zgodnie z ogłoszeniem
 Allegro o zmianie z 15 grudnia 2025. Zdanie zestarzało się przy odświeżeniu
 kopii i nikt go nie przeczytał ponownie.
 
 Otwarte zostaje to, czego z pliku wyczytać się nie da: czy powtórzone żądanie
-z tym samym `commandId` naprawdę NIE oddaje pieniędzy drugi raz. Od 0.189.0
+z tym samym `commandId` naprawdę NIE oddaje pieniędzy drugi raz. Od 0.190.0
 identyfikator powstaje raz na zwrot i wraca ten sam przy ponowieniu
 (`zwrot_klienta.zwrot_pieniedzy_command_id`), więc pierwszy ponowiony zwrot
 odpowie na to pytanie. Do tego czasu obowiązuje ostrożność: nasz własny

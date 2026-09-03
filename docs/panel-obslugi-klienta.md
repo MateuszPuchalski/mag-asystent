@@ -444,7 +444,7 @@ podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
-**Z tej listy działa w 0.189.0:** licznik znaków, ostrzeżenie o dopisku
+**Z tej listy działa w 0.190.0:** licznik znaków, ostrzeżenie o dopisku
 klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze źródłem,
 wstawienie parametrów produktu i przełączenie trybu.
 
@@ -943,6 +943,15 @@ wysyłał gotową liczbę, dałoby się oddać dowolną kwotę żądaniem z pomi
 ekranu. Koszt dostawy bierze się z zamówienia — dociągamy je od 0.152.0
 i dopiero to zdjęło blokadę opisaną wcześniej przy `sumaPozycji`.
 
+**Oddajemy dostawę, którą klient WYBRAŁ** — decyzja właściciela z 3 września
+2026. Kwotą jest `dostawa_grosze` z zamówienia, czyli to, co klient naprawdę
+zapłacił za swoją opcję.
+
+Pytanie było realne, bo ustawa pozwala oddać mniej. Gdy klient wybrał opcję
+droższą niż najtańsza zwykła, sprzedawca nie musi dopłacać różnicy. Oddajemy
+więcej świadomie: tak samo rozlicza to Allegro, a liczenie najtańszej opcji
+wymagałoby cennika oferty, którego przy zwrocie nie mamy.
+
 Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
 rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
 sztuk — czeka na ocenę hali z 0.151.0.
@@ -1368,9 +1377,9 @@ kryterium: lepszy sygnał z daty nadania niż jego brak.
 Ekran mówi też, gdy przesyłka ma kłopot: awizo, problem, powrót do nadawcy.
 Kod spoza listy pokazuje się surowy — jak przy przewoźniku.
 
-### 25a.17. Oddanie pieniędzy i odmowa (0.189.0)
+### 25a.17. Oddanie pieniędzy i odmowa (0.190.0)
 
-Do 0.189.0 panel kończył pracę w połowie. Operator rozstrzygał zwrot, zaznaczał
+Do 0.190.0 panel kończył pracę w połowie. Operator rozstrzygał zwrot, zaznaczał
 pozycje i dostawał policzoną kwotę — a potem szedł oddać pieniądze do panelu
 Allegro.
 
@@ -1465,7 +1474,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Komentarze i wzmianki | **działa** od 0.157.0 | oś rozmowy, tryb w `Edytor.tsx`, wzmianki z `/api/users`; od 0.157.0 do 0.181.0 panel wołał zły adres i dostawał 404 |
 | Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
-| Obecność i „pisze" | **na ekranie** od 0.189.0 | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
+| Obecność i „pisze" | **na ekranie** od 0.190.0 | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
@@ -1540,7 +1549,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zdjęcia towaru w panelu obsługi | **działa** od 0.152.0 | `panel/src/zwroty/useZdjecie.ts` |
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
-| Zwrot pieniędzy i odmowa w Allegro | **działa** od 0.189.0 | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
+| Zwrot pieniędzy i odmowa w Allegro | **działa** od 0.190.0 | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
 | Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |

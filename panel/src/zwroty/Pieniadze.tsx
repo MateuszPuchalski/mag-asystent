@@ -4,7 +4,7 @@ import type { StanZwrotuPieniedzy } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
 
-/* ── Oddanie pieniędzy i odmowa (§25a, 0.189.0) ──────────────────────────────
+/* ── Oddanie pieniędzy i odmowa (§25a, 0.190.0) ──────────────────────────────
 
    OSTATNI KROK, KTÓRY DOTĄD ROBIŁO SIĘ POZA PANELEM. Operator rozstrzygał
    zwrot tutaj, dostawał policzoną kwotę tutaj — i szedł oddać pieniądze do

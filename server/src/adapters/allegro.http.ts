@@ -260,7 +260,7 @@ export function scopeDlaUrl(url: string, metoda: string = "GET"): string {
      opiniach w 0.155.0: bez tej gałęzi zwrot pieniędzy wpadał w domyślne
      `orders:read`, a odmowa 403 kazałaby dodać uprawnienie, które konto już
      ma. Zwrot pieniędzy żąda `payments:write` — innego niż cokolwiek, co ta
-     aplikacja miała do 0.189.0. */
+     aplikacja miała do 0.190.0. */
   if (url.includes("/payments/")) {
     return metoda === "GET" ? "allegro:api:payments:read" : "allegro:api:payments:write";
   }
@@ -466,7 +466,7 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
  * tego `scopeDlaUrl` z metodą, żeby odmowa 403 nazwała właściwe.
  */
 /**
- * Zwrot pieniędzy kupującemu — `POST /payments/refunds` (0.189.0).
+ * Zwrot pieniędzy kupującemu — `POST /payments/refunds` (0.190.0).
  *
  * Ciało układa `services/zwrot-pieniedzy.ts`; tutaj jest samo wyjście do
  * sieci. Cztery pola stoją w `required` schematu `InitializeRefund`:

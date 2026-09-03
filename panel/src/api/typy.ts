@@ -588,7 +588,7 @@ export interface PokrycieSygnatur {
 }
 
 /**
- * Stan zapisu do Allegro przy zwrocie (0.189.0).
+ * Stan zapisu do Allegro przy zwrocie (0.190.0).
  *
  * Liczy go SERWER i to jest celowe: przeszkody (brak identyfikatora
  * płatności, pobranie, brak kwoty) są regułą serwera, a panel powtarzający ją
