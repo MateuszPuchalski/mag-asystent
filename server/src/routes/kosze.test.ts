@@ -328,3 +328,90 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
   assert.equal(po.zalatwioneAt, null);
 });
 
+
+test("potwierdzenie adresu: półka, drugi skan towaru i wpis zapisują się różnie", async () => {
+  /* Drugi skan towaru (0.189.0) kończy odłożenie tak samo jak ODŁÓŻ TUTAJ,
+     ale NIE jest wpisem z klawiatury. `manual_entry` zasila raport etykiet do
+     przedruku i kolumnę „ręczne" przy pracowniku, więc wpadając tam zgłaszałby
+     półki, których nikt nie dotykał. Dziennik ma za to odróżniać odłożenie
+     SPRAWDZONE półką od potwierdzonego z ekranu — stąd `potwierdzenie`. */
+  const magazynier = zalogowany("magazynier");
+  const koszId = koszDoRozkladania("KZ-31");
+  const pozycje = db()
+    .prepare("SELECT id FROM kosz_pozycja WHERE kosz_id = ? ORDER BY id")
+    .all(koszId) as Array<{ id: number }>;
+
+  const drogi = [
+    { potwierdzenie: "polka", lok: "B01-01-01" },
+    { potwierdzenie: "towar", lok: "B02-02-02" },
+    { potwierdzenie: "wpis", lok: "B03-03-03" },
+  ];
+  for (const [i, d] of drogi.entries()) {
+    const r = await app.inject({
+      method: "POST",
+      url: `/api/kosze/pozycje/${pozycje[i % pozycje.length].id}/odloz`,
+      payload: { lokalizacja: d.lok, potwierdzenie: d.potwierdzenie },
+      headers: magazynier,
+    });
+    assert.equal(r.statusCode, 200, r.body);
+  }
+
+  const putaway = db()
+    .prepare(
+      `SELECT payload FROM events WHERE type IN ('kosz_putaway','kosz_putaway_poprawka')
+       ORDER BY id`
+    )
+    .all() as Array<{ payload: string }>;
+  assert.deepEqual(
+    putaway.map((e) => JSON.parse(e.payload).potwierdzenie),
+    ["polka", "towar", "wpis"],
+    "każde odłożenie mówi, czym potwierdzono adres"
+  );
+
+  const reczne = db()
+    .prepare("SELECT payload FROM events WHERE type='manual_entry'")
+    .all() as Array<{ payload: string }>;
+  assert.deepEqual(
+    reczne.map((e) => JSON.parse(e.payload).code),
+    ["B03-03-03"],
+    "manual_entry WYŁĄCZNIE przy wpisie — drugi skan towaru nie jest maszynopisaniem"
+  );
+});
+
+test("starszy APK bez pola `potwierdzenie` dalej działa, a śmieć odpada", async () => {
+  const magazynier = zalogowany("magazynier");
+  const koszId = koszDoRozkladania("KZ-32");
+  const poz = db()
+    .prepare("SELECT id FROM kosz_pozycja WHERE kosz_id = ? ORDER BY id LIMIT 1")
+    .get(koszId) as { id: number };
+
+  /* Do 0.189.0 istniały dwie drogi, więc `recznie` wystarcza do wyprowadzenia
+     potwierdzenia. Serwer u klienta rusza przed APK, więc to jedyny kierunek
+     zgodności, jakiego trzeba pilnować. */
+  let r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${poz.id}/odloz`,
+    payload: { lokalizacja: "C01-01-01", recznie: true }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${poz.id}/odloz`,
+    payload: { lokalizacja: "C02-02-02" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 200, r.body);
+  const zdarzenia = db()
+    .prepare("SELECT type, payload FROM events WHERE type LIKE 'kosz_putaway%' ORDER BY id")
+    .all() as Array<{ type: string; payload: string }>;
+  assert.deepEqual(
+    zdarzenia.map((e) => JSON.parse(e.payload).potwierdzenie),
+    ["wpis", "polka"]
+  );
+
+  /* Nieznana wartość to 400, nie ciche „polka": potwierdzenie udające
+     zweryfikowany skan półki zakłamywałoby dziennik tam, gdzie się w niego
+     patrzy po pomyłce. */
+  r = await app.inject({
+    method: "POST", url: `/api/kosze/pozycje/${poz.id}/odloz`,
+    payload: { lokalizacja: "C03-03-03", potwierdzenie: "cokolwiek" }, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 400);
+});
