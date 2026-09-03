@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.194.0 — 3 września 2026
+
+**[wymaga działania] PR-y scalają się same, gdy CI jest zielone.** Automat
+włącza natywne auto-scalanie GitHuba na każdym PR-ze wyjętym z wersji roboczej.
+Trzy ustawienia repozytorium trzeba włączyć ręcznie raz — opisuje je `DEPLOY.md`.
+
+**Konflikty dostają etykietę, nie automatyczne rozstrzygnięcie.** PR, który
+przestał się scalać, dostaje etykietę i jeden komentarz. Rozstrzyga człowiek.
+Powód stoi w liczbach: trzy najgroźniejsze defekty ostatnich wydań przeszły
+z zielonym CI, a dwa z nich bez żadnego konfliktu.
+
+**Każdy check raportuje zawsze.** Filtr ścieżek przeniósł się z wyzwalacza na
+kroki. Wymagany check, którego workflow nie ruszył, zostawał w GitHubie
+w wiecznym oczekiwaniu i blokował scalenie — bez tej zmiany nie dało się
+uczynić wymaganym żadnego. Zadanie kończy się zielone także wtedy, gdy nie ma
+czego sprawdzać.
+
+**Zmiana poza obszarem workflow'ów przestaje przechodzić bez kontroli.** PR
+dotykający wyłącznie `.gitignore` albo `wertis.env.example` nie uruchamiał
+dotąd żadnego zadania — a „nic nie jest czerwone" znaczyło wtedy „nic nie
+zostało sprawdzone".
+
+**Podwójna definicja tabeli nie przejdzie drugi raz.** Nowy strażnik czyta
+`schema.sql` i odrzuca powtórzoną tabelę lub indeks. Przy `CREATE TABLE IF NOT
+EXISTS` druga definicja nie jest błędem składni, tylko cichą podmianą schematu
+— tak w 0.142.0 scaliła się bez jednego znacznika konfliktu atrapa
+`zadanie_terenowe`.
+
 ## 0.193.1 — 3 września 2026
 
 **Trzy poprawki narzędziowe: mniej hałasu z testów, ostrzeżenie o starych
@@ -110,6 +138,7 @@ stało obok plakietki „NOWA" i mówiło dwa różne fakty jednym wyrazem.
 Data synchronizacji zeszła z własnego pasma do podpisu pod tytułem kolumny.
 Pasm sterujących nad listą było pięć i zjadały ćwierć jej wysokości, a tę samą
 datę niesie pigułka w pasku górnym, na każdym ekranie panelu.
+
 
 ## 0.192.0 — 3 września 2026
 

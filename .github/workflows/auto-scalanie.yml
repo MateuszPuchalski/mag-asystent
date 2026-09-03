@@ -1,0 +1,46 @@
+# Automatyczne scalanie PR-ów (0.194.0).
+#
+# Włącza NATYWNE auto-scalanie GitHuba, zamiast wołać `merge` własnym krokiem.
+# Trzy powody, każdy zapłacony wcześniej cudzym błędem:
+#
+# 1. Scalenie wykonane tokenem `GITHUB_TOKEN` NIE WYZWALA kolejnych workflow'ów.
+#    Przepadłby build wydania APK na `main` — ten, z którego kolektory biorą
+#    aktualizację (DEPLOY.md §5). Natywne auto-scalanie wyzwala go normalnie.
+# 2. Natywne przelicza wymagane checki na nowej głowie po każdym odświeżeniu
+#    gałęzi. Własny automat musiałby to śledzić sam i prędzej czy później
+#    scaliłby na podstawie wyniku sprzed odświeżenia.
+# 3. Przy konflikcie natywne po prostu czeka. Nie zgaduje.
+#
+# Bramką jest ZIELONE CI, bez wymogu zatwierdzenia — decyzja właściciela.
+# Zatrzymanie pojedynczego PR-a: wyłącz na nim auto-scalanie w interfejsie.
+#
+# UWAGA: to nie zadziała bez trzech ustawień repozytorium, których workflow
+# nie ustawi za nikogo. Spis w DEPLOY.md, rozdział o automatycznym scalaniu.
+name: Auto-scalanie
+
+on:
+  pull_request:
+    # `ready_for_review` jest tu kluczowe: draftu GitHub nie scala, więc PR
+    # wyjęty z wersji roboczej musi dostać włączenie auto-scalania osobno.
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  wlacz:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+    steps:
+      - name: Włącz auto-scalanie
+        # Draft pomijamy: GitHub odmówiłby, a czerwony krok w bramce wyglądałby
+        # na awarię tam, gdzie zadziałała reguła.
+        if: github.event.pull_request.draft == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # `|| true`: gdy PR jest już scalalny i nie ma na co czekać, GitHub
+          # odmawia włączenia auto-scalania. To nie jest błąd bramki.
+          gh pr merge "$PR" --auto --merge --repo "$GITHUB_REPOSITORY" || {
+            echo "::notice::Nie włączono auto-scalania dla #$PR — sprawdź, czy repozytorium ma włączone Allow auto-merge."
+          }

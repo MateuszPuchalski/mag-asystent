@@ -12,15 +12,32 @@ name: Worker Sfery
 on:
   push:
     branches: [main]
-    paths: ["sfera-worker/**", ".github/workflows/sfera-worker.yml"]
   pull_request:
-    paths: ["sfera-worker/**", ".github/workflows/sfera-worker.yml"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Pełna historia: `git diff` z gałęzią bazową potrzebuje
+      # wspólnego przodka, a domyślny płytki klon go nie ma.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Zakres liczymy TYLKO dla PR-a. Przy `push` na `main` i przy wydaniu
+      # sprawdzamy zawsze wszystko: tam stoi to, co jedzie do ludzi.
+      - name: Zakres zmian
+        id: zakres
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if printf '%s\n' "$zmiany" | grep -qE '^(sfera-worker/|\.github/workflows/sfera-worker\.yml)'; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dotyczy=false" >> "$GITHUB_OUTPUT"
+            echo "Zmiany nie dotyczą obszaru: worker Sfery. Bramka zielona bez pracy."
+          fi
 
       # UTF-8 bez BOM Windows PowerShell 5.1 czyta jako ANSI, a to NIE kończy
       # się na krzakach w komunikacie — kończy się błędem składni. Myślnik `—`
@@ -32,6 +49,7 @@ jobs:
       # w tlo-worker/ pojechał bez BOM-u i nie dał się uruchomić u klienta
       # (0.88.1) — nic tego nie pilnowało po tej stronie repozytorium.
       - name: Kodowanie skryptów (UTF-8 z BOM)
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: |
           bledy=0
           for f in sfera-worker/*.ps1; do
@@ -44,7 +62,9 @@ jobs:
           echo "Wszystkie skrypty maja UTF-8 BOM."
 
       - uses: actions/setup-dotnet@v4
+        if: steps.zakres.outputs.dotyczy == 'true'
         with:
           dotnet-version: "8.0.x"
       - name: Kompilacja
+        if: steps.zakres.outputs.dotyczy == 'true'
         run: dotnet build sfera-worker/WertisSferaWorker.csproj -c Release
