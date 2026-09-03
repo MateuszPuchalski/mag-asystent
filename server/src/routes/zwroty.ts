@@ -3,6 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
+import { stanOtwartegoKosza, zamknijKosz } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
@@ -155,6 +156,34 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* ── Koszyk zwrotów (0.192.0) ──────────────────────────────────────────
+     Obieg biura, opisany przez właściciela: „gdy agent zasiada do zwrotów, to
+     otwiera pustą MM i dodaje kolejno przedmioty ze zwrotów; gdy koszyk się
+     zapełni, zamyka MM i tak w kółko".
+
+     DOKŁADANIA NIE MA W TRASACH i to jest cała sztuczka: dokłada ocena „na
+     stan", którą operator i tak naciska. Osobna trasa kazałaby powiedzieć dwa
+     razy to samo. Tutaj stoi więc wyłącznie ODCZYT stanu koszyka i jedno
+     DOMKNIĘCIE. */
+  app.get("/api/obsluga/zwroty/kosz", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    return { kosz: stanOtwartegoKosza(db(), kto()) };
+  });
+
+  app.post<{ Body: { koszId?: number } }>(
+    "/api/obsluga/zwroty/kosz/zamknij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.koszId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Podaj koszyk, który mam zamknąć." });
+      }
+      try {
+        return zamknijKosz(db(), id, kto());
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
   /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,

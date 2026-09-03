@@ -7,6 +7,7 @@ import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 import type { FakturaZwrotu } from "./faktury.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
+import { dolozDoKosza, zdejmijZKosza } from "./kosze-zwrotow.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -39,6 +40,8 @@ export interface PozycjaZwrotu {
   powod: string | null;
   powodKomentarz: string | null;
   ocena: string | null;
+  /** Czy pozycja leży już w koszyku zwrotów, czyli na dokumencie MM. */
+  wKoszyku: boolean;
   /** Odnośnik do oferty — jedyny link udokumentowany w specyfikacji. */
   url: string | null;
   /** Kartoteka POTWIERDZONA przez człowieka; bez niej nie ma zdjęcia. */
@@ -368,6 +371,12 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
   const pozycje = database.prepare(
     "SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC"
   ).all() as Wiersz[];
+  /* Które pozycje leżą już w koszyku zwrotów (0.192.0). Osobne zapytanie,
+     nie złączenie: `listaZwrotow` czyta całe tabele naraz i dokładanie
+     `LEFT JOIN` do jednej z nich rozjechałoby ten wzorzec bez zysku. */
+  const wKoszyku = new Set((database.prepare(
+    "SELECT zwrot_pozycja_id AS id FROM kosz_pozycja WHERE zwrot_pozycja_id IS NOT NULL")
+    .all() as Array<{ id: number }>).map((k) => Number(k.id)));
   const zamowienia = database.prepare(
     "SELECT * FROM zamowienie_klienta"
   ).all() as Wiersz[];
@@ -462,6 +471,12 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           powod: (p.powod as string) ?? null,
           powodKomentarz: (p.powod_komentarz as string) ?? null,
           ocena: (p.ocena as string) ?? null,
+          /* Czy ta pozycja jest na dokumencie MM (0.192.0). Ocena „na stan"
+             dokłada ją do koszyka, ale pozycja BEZ KARTOTEKI wejść nie może —
+             MM przesuwa stany kartotek. Ekran ma to powiedzieć wprost, bo
+             cicha strata kończy się kartonem na hali z towarem spoza
+             dokumentu. */
+          wKoszyku: wKoszyku.has(Number(p.id)),
           url: (p.url as string) ?? null,
           twId,
           twSymbol: (p.tw_symbol as string) ?? null,
@@ -723,11 +738,28 @@ export function rozstrzygnijZwrot(
   })();
 }
 
-/** Ocena towaru: na stan, na przecenę albo do utylizacji. `null` cofa ocenę. */
+/**
+ * Ocena towaru: na stan, na przecenę albo do utylizacji. `null` cofa ocenę.
+ *
+ * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW (0.192.0) — bez
+ * osobnego ruchu. Właściciel opisał obieg biura tak: „gdy agent zasiada do
+ * zwrotów, to otwiera pustą MM i dodaje kolejno przedmioty ze zwrotów; gdy
+ * koszyk się zapełni, zamyka MM i tak w kółko". Naciśnięcie, które operator
+ * i tak wykonuje, JEST tym dołożeniem; osobny przycisk kazałby mu powiedzieć
+ * dwa razy to samo.
+ *
+ * Do koszyka wchodzi WYŁĄCZNIE „stan" — decyzja właściciela. Utylizacja ma
+ * zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą
+ * stronę; przecena zostaje na razie poza tą ścieżką.
+ *
+ * `koszyk` w wyniku mówi, czy dołożenie się udało. Pozycja bez kartoteki nie
+ * ma `tw_id`, a MM przesuwa stany kartotek — ocena zapisuje się mimo to, bo
+ * jest faktem o towarze, ale ekran musi powiedzieć, czego nie zrobił.
+ */
 export function ocenPozycje(
   database: Db, pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja" | null,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
-): { wersja: number } {
+): { wersja: number; koszyk: number | null } {
   const p = database.prepare("SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?")
     .get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
   if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
@@ -743,7 +775,13 @@ export function ocenPozycje(
     podnies(database, Number(p.zwrot_id));
     logEvent(ocena === null ? "zwrot_ocena_cofnieta" : "zwrot_ocena", kto.name, null,
       { zwrotId: Number(p.zwrot_id), pozycjaId, ocena }, kto.id, database);
-    return { wersja: wersja + 1 };
+    /* Zmiana oceny ZDEJMUJE z koszyka, zanim cokolwiek dołoży. Inaczej
+       „na stan", potem „utylizacja" zostawiłoby towar na dokumencie MM,
+       którego nikt już nie chce na regale. Zamkniętego kosza to nie rusza —
+       tamten pojechał na halę z wystawionym papierem. */
+    zdejmijZKosza(database, pozycjaId, kto);
+    const koszyk = ocena === "stan" ? dolozDoKosza(database, pozycjaId, kto, teraz) : null;
+    return { wersja: wersja + 1, koszyk };
   })();
 }
 

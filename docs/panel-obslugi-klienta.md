@@ -1481,6 +1481,50 @@ i oświadczenie wobec kupującego wyglądają na formularzu tak samo.
 ruszają cudze pieniądze na zewnątrz, więc obok bramki roli dostają wpis
 `privileged` z nazwą operacji.
 
+### 25a.17. Koszyk zwrotów i dokument MM (0.192.0)
+
+Właściciel opisał obieg, który biuro robi ręką od lat:
+
+> „gdy agent zasiada do zwrotów, to otwiera pustą MM i dodaje kolejno
+> przedmioty ze zwrotów; gdy koszyk się zapełni, zamyka MM i tak w kółko"
+
+Panel jest teraz tą pustą MM. Numer dokumentu wraca z Subiekta, więc kartka
+z liczbą pisaną odręcznie przestaje być potrzebna.
+
+**Dokłada OCENA, nie osobny przycisk.** Naciśnięcie „Na stan", które operator
+i tak wykonuje przy towarze, JEST dołożeniem do koszyka. Osobny przycisk
+kazałby powiedzieć dwa razy to samo — dekalog ergonomii, punkt 5. To zarazem
+odpowiedź na pytanie o prędkość decyzji: najszybsza jest ta, której nie
+podejmuje się dwa razy.
+
+**Do koszyka wchodzi wyłącznie „na stan"** — decyzja właściciela. Utylizacja
+ma zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą
+stronę. Przecena zostaje na razie poza tą ścieżką.
+
+**Koszyk jest jeden na operatora** — druga decyzja właściciela. Fizyczny kosz
+stoi przy jednym biurku, więc dwie osoby przy zwrotach nie mieszają towaru
+w jednym dokumencie.
+
+**Pozycja bez kartoteki na dokument nie wejdzie** i ekran mówi to wprost.
+MM przesuwa stany kartotek, a nie nazwy. Ocena zapisuje się mimo to, bo jest
+faktem o towarze; cicha strata kończyłaby się kartonem na hali z towarem
+spoza dokumentu.
+
+**Domknięcie zamyka kosz OD RAZU, a numer dochodzi później.** Hala ma wtedy
+co rozkładać, nie czekając na Subiekta. Kolektor bierze kosz tą samą drogą co
+kosze z dokumentu — po statusie, bez zmian po swojej stronie.
+
+**Dlaczego to wraca dopiero teraz.** Ścieżka koszyków istniała i wypadła
+w 0.17.0 z jednym twardym powodem: *„domknięcie koszyka kolejkuje MM,
+a dokumentów MM na produkcji nie da się dziś wystawić"*. Ten powód wygasł —
+worker Sfery ma prawdziwe `CreateMM`. Schemat `kosz` czekał bez zmian: status
+`otwarty` nosi w komentarzu zdanie „biuro dokłada zwroty", które przez rok nie
+miało kto wykonać.
+
+Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy ona SUROWYCH
+zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem — przez
+Sferę, tak samo jak korekta zwrotu.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
