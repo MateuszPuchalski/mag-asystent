@@ -363,6 +363,41 @@ Zamyka to `sonda.ps1 -SzkicMM -Towar <tw_Id>`. Pozycja powstaje w PAMIĘCI, tak
 samo jak sam dokument: `Zapisz()` nadal nie pada, więc w bazie nie zostaje ślad.
 Sonda wypisze składowe pozycji i sprawdzi `Element(0)` oraz `Element(1)`.
 
+## 2l. Pozycja dokumentu — komplet nazw (0.198.12)
+
+`-SzkicMM -Towar 7341` dodał pozycję w pamięci i wypisał jej składowe.
+`Zapisz()` nie padł, dokument nie powstał.
+
+**Ilość nazywa się `IloscJm`** — dokładnie tak, jak stało w kodzie. Pozycja ma
+obok `Ilosc` i `Jm`; `IloscJm` liczy w jednostce miary z kartoteki.
+
+**Kartotekę na pozycji niesie `TowarId`.** Obok stoją `TowarSymbol`,
+`TowarNazwa` i `TowarRodzaj`. To zamyka adresowanie pozycji korekty: przejście
+po wierszach z porównaniem `TowarId`.
+
+**`Element` liczy OD JEDYNKI.** Zmierzone, nie założone:
+
+```
+Liczba pozycji po Dodaj: 1
+Element(0) -> odmowa: Wartość jest spoza oczekiwanego zakresu.
+Element(1) -> obiekt
+```
+
+Pomyłka o jeden nie wywróciłaby tu pętli. Zgubiłaby PIERWSZĄ albo OSTATNIĄ
+pozycję korekty, a dokument powstałby poprawny dla Sfery i zły dla klienta.
+
+**`IloscPoKorekcie` nie istnieje.** Pozycja ma jedno pole ilości, więc korekta
+ustawia ilość docelową — tak samo, jak Subiekt pyta o nią na ekranie. To już
+pytanie o znaczenie, nie o nazwę, więc zostaje `[WERYFIKUJ]` do pierwszej
+prawdziwej korekty.
+
+**Pozycja ma własne `MagazynId`.** Trzecia droga do magazynu dla RW, obok
+właściwości dokumentu i właściwości sesji. Rozstrzyga pierwszy RW.
+
+Warte zapamiętania na później: `Dysponuj(Variant, Variant)`,
+`PodajDostepneDostawy()` i `DostepnaIlosc`. Wskazywanie dostaw przy rozchodzie
+ma tu gotowy mechanizm, gdyby firma go kiedyś potrzebowała.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.
@@ -413,5 +448,5 @@ od tego jest sonda i bramka 2.
 - [Konfiguracja integracji z Subiektem GT](https://docs.easystorage.io/pl/panel-web/konfiguracja/integracje/subiekt-gt) (`0x80041329` a pierwszy znak hasła SQL)
 - [Najczęstsze problemy przy połączeniu ze Sferą](https://pomoc.integratory.pl/subsync-integracja-z-subiektem/rozwiazywanie-problemow/najczestsze-problemy/) (to samo, niezależnie)
 
-Sekcje od 2a do 2k mają inne źródło: **przebiegi sondy na maszynie firmy**,
+Sekcje od 2a do 2l mają inne źródło: **przebiegi sondy na maszynie firmy**,
 4 września 2026. To jedyne ustalenia w tym pliku potwierdzone na żywej Sferze.

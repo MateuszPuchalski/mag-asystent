@@ -191,11 +191,11 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 3. **Zamknięte (0.198.5):** `Uruchom(gtaUruchomDopasuj, gtaUruchomNowy |
    gtaUruchomWTle)`, czyli `Uruchom(0x0, 0x6)` — zmierzone, sesja otwiera się
    BEZ OKNA. Usługa da się uruchomić bez pulpitu. `docs/sfera-com.md` §2g.
-4. **Zamknięte (0.198.11):** `SuDokumentyManager.DodajMM()`, magazyny
-   `MagazynNadawczyId` i `MagazynOdbiorczyId` (zgadnięte
-   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ) oraz
-   `Pozycje.Dodaj(Variant)` — metoda i liczba argumentów. Otwarta zostaje sama
-   nazwa pola ilości na POZYCJI (`IloscJm`).
+4. **Zamknięte w całości (0.198.12):** `SuDokumentyManager.DodajMM()`,
+   magazyny `MagazynNadawczyId` i `MagazynOdbiorczyId` (zgadnięte
+   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ),
+   `Pozycje.Dodaj(tw_Id)` oraz `IloscJm` na pozycji. Cała ścieżka MM stoi na
+   nazwach zmierzonych.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
    Skutek magazynowy ma własne wywołania, a sygnatura mówi czym się posługują:
    `void SkutekMagazynowyWywolaj(int)` — identyfikatorem dokumentu (0.198.6).
@@ -205,19 +205,18 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
    `NaPodstawie(dok_Id)`. Że Variant bierze identyfikator, mówi bliźniacze
    `NaPodstawieWielu(SAFEARRAY(int))`.
 
-   > **Adresowanie pozycji korekty stoi (0.198.11).** `SuDokument.Pozycje` NIE
-   > MA metody `SzukajTowar`, na której stał kod. Kolekcja daje `Dodaj`,
-   > `DodajWgOrygLp`, `Wczytaj`, indeks `Element` i `Liczba` — żadna droga nie
-   > szuka po kartotece. Brakuje nazwy właściwości kartoteki na pozycji oraz
-   > podstawy indeksu. Ten krok rzuca dziś wyjątek mówiący to wprost, a korekty
-   > wystawia biuro. Zamyka to sonda z `-SzkicMM -Towar <tw_Id>`.
+   > **Adresowanie pozycji zamknięte (0.198.12).** `SzukajTowar` NIE ISTNIEJE;
+   > kod przechodzi po `Element(i)` i porównuje `TowarId`. `Element` liczy
+   > **od jedynki** — zmierzone. Otwarte zostaje znaczenie `IloscJm` na
+   > korekcie: pozycja ma jedno pole ilości, a `IloscPoKorekcie` nie istnieje,
+   > więc kod ustawia ilość docelową. Rozstrzyga pierwsza prawdziwa korekta.
 7. **Sygnatura zamknięta (0.198.7):** `void Usun(bool)`. Znaczenie flagi nie —
    adapter podaje `false` jako działanie węższe. Na tym stoi wycofanie
    łańcucha, gdy dalsze ogniwo padnie.
-8. **Manager, metoda i magazyn zamknięte (0.198.7):**
-   `SuDokumentyManager.DodajRW()` plus `MagazynNadawczyId`. `MagazynId` stoi na
-   SESJI, nie na dokumencie — gdyby RW brało magazyn stamtąd, wołaniem
-   zastępczym jest `su.MagazynId` przed `DodajRW()`.
+8. **Manager i metoda zamknięte (0.198.7):** `SuDokumentyManager.DodajRW()`.
+   Magazyn dostaje `MagazynNadawczyId` na dokumencie, ale `MagazynId` istnieje
+   też na SESJI i — od 0.198.12 — na samej POZYCJI. Trzy drogi, jedna prawdziwa;
+   rozstrzyga pierwszy RW na podmiocie testowym.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
 wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak
