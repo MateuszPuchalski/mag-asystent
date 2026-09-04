@@ -24,22 +24,37 @@
  *   //   eksponuje pola lokalizacji — UPDATE tw__Towar SET tw_Lokalizacja=@v
  *   //   osobnym loginem z GRANT UPDATE wyłącznie na tę kolumnę.
  *
+ * SZKIC PONIŻEJ BYŁ ZMYŚLONY. Nazwy sprawdzone na żywej Sferze (0.198.4–12,
+ * docs/sfera-com.md) obaliły z niego prawie wszystko: managera dokumentów,
+ * właściwości magazynów i sposób adresowania pozycji korekty. Ten plik uchodzi
+ * za kontrakt, z którego wynika kod C#, więc zmyślone nazwy wracały stąd do
+ * niego przy każdej poprawce. Zostają WYŁĄCZNIE zmierzone.
+ *
  * createKorektaZwrotu (Etap 2 zwrotów, RW dla zniszczonych od 0.67.0):
- *   var kor = sfera.DokumentyHandloweManager.DodajKorekte(dokId);  // KFS/KPA
- *   foreach (p in pozycje + pozycjeZniszczone) kor.Pozycje[...].IloscPoKorekcie -= p.qty;
+ *   var kor = sfera.SuDokumentyManager.DodajKFS();   // bezargumentowe
+ *   kor.NaPodstawie(dokId);                          // wiąże z dokumentem pierwotnym
+ *   // pozycje ODNAJDUJE się po TowarId — kolekcja NIE MA metody szukającej,
+ *   // a Element liczy OD JEDYNKI:
+ *   for (i = 1; i <= kor.Pozycje.Liczba; i++) { var p = kor.Pozycje.Element(i); … }
  *   kor.Zapisz();
- *   // …po niej MM (pełnowartościowe → bufor) oraz RW (zniszczone, z magazynu
- *   // sprzedaży): var rw = sfera.DokumentyMagazynoweManager.DodajRW();
- *   // rw.Magazyn = magZrodlowy; rw.Pozycje.Dodaj(twId).IloscJm = qty; rw.Zapisz();
+ *   // [WERYFIKUJ] paragon: `typ` niesie "FS" albo "PA", ale kod woła DodajKFS()
+ *   //   ZAWSZE. Dla paragonu manager ma osobne DodajPAk(), a obok DodajZW()
+ *   //   i DodajZWn(); dokument ma właściwość RodzajZwrotuDetal. Zwrot detaliczny
+ *   //   to inna ewidencja niż korekta faktury — rozstrzygnąć PRZED użyciem.
+ *   // …po korekcie MM (pełnowartościowe → bufor) oraz RW (zniszczone, z magazynu
+ *   // sprzedaży): var rw = sfera.SuDokumentyManager.DodajRW();
+ *   // rw.MagazynNadawczyId = magZrodlowy; rw.Pozycje.Dodaj(twId).IloscJm = qty;
  *   // Rollback ŁAŃCUCHOWY: pad RW usuwa MM i korektę, pad MM usuwa korektę
- *   // (Usun()) — patrz kontrakt niżej.
+ *   // (Usun(bool)) — patrz kontrakt niżej.
  *
  * createMM (MGP→MAG):
- *   var mm = sfera.DokumentyMagazynoweManager.DodajMM();
- *   mm.MagazynZrodlowy = magFrom; mm.MagazynDocelowy = magTo;
+ *   var mm = sfera.SuDokumentyManager.DodajMM();
+ *   mm.MagazynNadawczyId = magFrom; mm.MagazynOdbiorczyId = magTo;
  *   foreach (it in items) { var p = mm.Pozycje.Dodaj(it.twId); p.IloscJm = it.qty; }
  *   mm.Zapisz();
  *   return mm.NumerPelny;   // zapis zwrotny do sfera_queue.sgt_doc_number
+ *   // [WERYFIKUJ] czy Zapisz() daje dokument WYKONANY, czy odkłada do bufora.
+ *   //   Gdy bufor — po zapisie idzie SuDokumentyManager.SkutekMagazynowyWywolaj(id).
  *
  * Sekwencyjność: COM Sfery nie jest thread-safe — przetwarzać po jednym zadaniu.
  */

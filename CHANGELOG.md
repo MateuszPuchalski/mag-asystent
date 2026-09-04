@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.13 — 4 września 2026
+
+**Kontrakt Sfery w `adapters/sfera.ts` powtarzał zmyślone nazwy.** Docstring
+tego pliku uchodzi za źródło, z którego wynika kod C# — i pokazywał
+`DokumentyMagazynoweManager`, `MagazynZrodlowy`, `MagazynDocelowy` oraz
+`Pozycje[...].IloscPoKorekcie`. Żadna z tych nazw nie istnieje.
+
+Zostały wyłącznie zmierzone: `SuDokumentyManager`, `NaPodstawie(dok_Id)`,
+`MagazynNadawczyId`/`MagazynOdbiorczyId`, `Pozycje.Element(i)` liczone od
+jedynki. Otwarte pytania zostają w tekście jako `[WERYFIKUJ]`, a nie jako
+przykład do przepisania.
+
+Dochodzi znacznik przy paragonie. Kontrakt niesie `typ: "FS" | "PA"`, ale kod
+woła `DodajKFS()` zawsze — dla paragonu to zły dokument. Manager ma osobne
+`DodajPAk()`, obok `DodajZW()` i `DodajZWn()`, a dokument właściwość
+`RodzajZwrotuDetal`. Zwrot detaliczny to inna ewidencja niż korekta faktury,
+więc rozstrzyga się to PRZED użyciem, nie w trakcie.
+
 ## 0.198.12 — 4 września 2026
 
 **Szkic pozycji zamknął ścieżkę MM w całości.** `-SzkicMM -Towar 7341` dodał
