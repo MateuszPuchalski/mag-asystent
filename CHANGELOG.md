@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.197.3 — 4 września 2026
+
+**Bramka instalatora przestaje czerwienić `main` przez chwilową awarię
+PowerShell Gallery.** Przebieg na `main` padł na `Install-Module ps2exe`
+komunikatem „No match was found for module 'ps2exe'". Trzydzieści minut
+wcześniej ten sam krok przeszedł na zielono, a w międzyczasie nikt nie tknął
+katalogu `instalator/`.
+
+Komunikat myli: brzmi, jakby moduł nie istniał, więc wysyła diagnozę w stronę
+nazwy pakietu zamiast w stronę sieci. Krok dociąga teraz jawnie dostawcę NuGet,
+rejestruje i ufa repozytorium PSGallery, a instalację powtarza trzy razy
+z rosnącą przerwą. Gdy Gallery leży naprawdę, bramka dalej pada — ale z własnym
+zdaniem zamiast cudzego.
+
+
 ## 0.197.2 — 4 września 2026
 
 **Pierwszy przebieg sondy u właściciela: dwa ustalenia i trzy błędy w samej
