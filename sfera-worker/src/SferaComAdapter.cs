@@ -42,13 +42,33 @@ public sealed class SferaComAdapter : ISferaAdapter
         wskazanego serwera i bazy. */
     private const int URUCHOM_DOPASUJ = 0x0;
 
-    /** UruchomEnum.gtaUruchom — podłącz się do działającej, uruchom dopiero,
-        gdy takiej nie ma. */
-    private const int URUCHOM = 0x0;
+    /** UruchomEnum.gtaUruchomNowy — ZAWSZE własna instancja. */
+    private const int URUCHOM_NOWY = 0x2;
 
     /** UruchomEnum.gtaUruchomWTle — bez interfejsu użytkownika. Usługa Windows
         nie ma pulpitu, na którym mogłaby pokazać okno Subiekta. */
     private const int URUCHOM_W_TLE = 0x4;
+
+    /**
+     * Tryb uruchomienia: WŁASNA instancja, w tle.
+     *
+     * Do 0.198.4 stało tu `gtaUruchom | gtaUruchomWTle`, czyli „podłącz się do
+     * działającego Subiekta, a jak nie ma — uruchom własnego". Sonda pokazała
+     * na maszynie firmy, do czego to prowadzi: przy otwartym Subiekcie sesja
+     * w tle odmawia kodem `0x8004132B`, a ta sama próba z widocznym oknem
+     * przechodzi. Podłączanie się do CUDZEJ instancji z żądaniem „bez okna"
+     * jest sprzeczne samo w sobie.
+     *
+     * Poza tym usługa nie ma prawa zależeć od czyjegoś pulpitu: `wertis-sfera`
+     * wystawia dokumenty firmy i musi mieć instancję, której nikt nie zamknie
+     * ani nie zablokuje oknem dialogowym. Wywołanie z dokumentacji producenta
+     * brzmi zresztą dokładnie tak: `gtaUruchomNowy | gtaUruchomWTle`.
+     *
+     * Wartość da się nadpisać (`SFERA_TRYB_URUCHOMIENIA`) — instalacje bywają
+     * różne, a przestawienie liczby ma kosztować restart usługi, nie budowanie
+     * exe od nowa.
+     */
+    private const int TRYB_DOMYSLNY = URUCHOM_NOWY | URUCHOM_W_TLE;
 
     /**
      * Nazwa wywołania COM, którego Sfera nie zna, to POMYŁKA W NAZWIE, a nie
@@ -309,11 +329,11 @@ public sealed class SferaComAdapter : ISferaAdapter
         gt.OperatorHaslo = _env.Get("SFERA_OPERATOR_HASLO", "");
 
         /* Uruchom(TypDopasowania, TrybUruchomienia). Drugi argument to MASKA
-           BITOWA — `URUCHOM | URUCHOM_W_TLE` znaczy „podłącz się do działającej
-           albo uruchom własną, w obu razach bez okna". Usługa Windows nie ma
-           pulpitu, więc bez `W_TLE` Subiekt nie miałby gdzie się pokazać. */
-        _subiekt = Krok("GT.Uruchom(...)", 3, () => gt.Uruchom(URUCHOM_DOPASUJ, URUCHOM | URUCHOM_W_TLE));
-        Console.WriteLine($"[sfera] sesja Subiekta otwarta (Sfera COM, {progId}, serwer {Serwer()})");
+           BITOWA — powód wybranej kombinacji stoi przy `TRYB_DOMYSLNY`. */
+        var tryb = _env.GetInt("SFERA_TRYB_URUCHOMIENIA", TRYB_DOMYSLNY);
+        _subiekt = Krok("GT.Uruchom(...)", 3, () => gt.Uruchom(URUCHOM_DOPASUJ, tryb));
+        Console.WriteLine(
+            $"[sfera] sesja Subiekta otwarta (Sfera COM, {progId}, serwer {Serwer()}, tryb 0x{tryb:X})");
         return _subiekt!;
     }
 

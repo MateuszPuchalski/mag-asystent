@@ -268,12 +268,14 @@ if ($hasloSql -eq "") {
     }
 }
 
-# gtaUruchomDopasuj = 0x0; gtaUruchom (0x0) -bor gtaUruchomWTle (0x4) - bez okna
+# Tryby uruchomienia (UruchomEnum, docs/sfera-com.md §2):
+#   gtaUruchom 0x0, gtaUruchomNowy 0x2, gtaUruchomWTle 0x4.
 Write-Wynik ""
-Write-Wynik "PUNKT 3 - Uruchom(0x0, 0x0 -bor 0x4)"
+Write-Wynik "PUNKT 3 - Uruchom(dopasuj, tryb)"
 
 $sgt = $null
 $kody = @()
+$udanyTryb = ""
 
 function Kod($blad) {
     $hr = 0
@@ -281,46 +283,60 @@ function Kod($blad) {
     return ("0x{0:X8}" -f $hr)
 }
 
-# Wartosci AutentykacjaEnum nie sa opublikowane, a instalacje roznia sie trybem:
-# jedna loguje sie do SQL loginem, druga kontem Windows. Zamiast kazac zgadywac,
-# sonda probuje obu wartosci i mowi, ktora dziala. Dwie proby, nie petla - konta
-# SQL potrafia sie blokowac po serii nieudanych logowan.
-foreach ($aut in @($autentykacja, $(if ($autentykacja -eq 0) { 1 } else { 0 }))) {
+# Kolejnosc prob nie jest przypadkowa.
+#
+# NOWY|W_TLE idzie pierwszy, bo tak brzmi udokumentowane wywolanie producenta,
+# i bo usluga i tak POWINNA miec wlasna instancje: podlaczanie sie do Subiekta
+# otwartego przez czlowieka wiazaloby dokumenty firmy z czyims pulpitem.
+#
+# Prob jest trzy, nie szesc. Druga wartosc Autentykacji dostaje jeden strzal,
+# bo gdy nie wpuszcza do bazy, tryb uruchomienia nic nie zmieni. Konta SQL
+# potrafia sie blokowac po serii nieudanych logowan i to jest ten limit.
+$proby = @(
+    @{ aut = $autentykacja; tryb = (2 -bor 4); opis = "NOWY|W_TLE" },
+    @{ aut = $autentykacja; tryb = (0 -bor 4); opis = "DOPASUJ|W_TLE" },
+    @{ aut = $(if ($autentykacja -eq 0) { 1 } else { 0 }); tryb = (2 -bor 4); opis = "NOWY|W_TLE" }
+)
+foreach ($p in $proby) {
     if ($null -ne $sgt) { break }
     try {
-        $gt.Autentykacja = $aut
-        $sgt = $gt.Uruchom(0, (0 -bor 4))
-        Write-Wynik "  JEST  sesja otwarta, bez okna (Autentykacja=$aut)"
-        if ($aut -ne $autentykacja) {
-            Write-Wynik "        WPISZ TO DO wertis.env: SFERA_AUTENTYKACJA=$aut"
+        $gt.Autentykacja = $p.aut
+        $sgt = $gt.Uruchom(0, $p.tryb)
+        $udanyTryb = "Autentykacja=$($p.aut), tryb $($p.opis) (0x{0:X})" -f $p.tryb
+        Write-Wynik "  JEST  sesja otwarta BEZ OKNA — $udanyTryb"
+        if ($p.aut -ne $autentykacja) {
+            Write-Wynik "        WPISZ TO DO wertis.env: SFERA_AUTENTYKACJA=$($p.aut)"
         }
     } catch {
         $kod = Kod $_
-        $kody += "Autentykacja=$aut -> $kod"
-        Write-Wynik "  BRAK  Autentykacja=$aut odmowila ($kod): $($_.Exception.Message)"
+        $kody += "Autentykacja=$($p.aut) $($p.opis) -> $kod"
+        Write-Wynik "  BRAK  Autentykacja=$($p.aut), tryb $($p.opis) ($kod): $($_.Exception.Message)"
     }
 }
 
-# Trzecia proba TYLKO na zyczenie: z widocznym oknem. Rozstrzyga, czy blokada
-# siedzi w samym trybie w tle (0x8004132B mowi wprost o instancji w tle),
-# czy w danych logowania. Domyslnie wylaczona, bo otwiera okno Subiekta.
+# Ostatnia proba TYLKO na zyczenie: z widocznym oknem. Rozstrzyga, czy blokada
+# siedzi w samym trybie w tle, czy w danych logowania. Domyslnie wylaczona,
+# bo otwiera okno Subiekta na pulpicie.
 if ($null -eq $sgt -and $ZOknem) {
     Write-Wynik ""
-    Write-Wynik "  ...  proba z WIDOCZNYM oknem (Autentykacja=$autentykacja, bez gtaUruchomWTle)"
+    Write-Wynik "  ...  proba z WIDOCZNYM oknem (Autentykacja=$autentykacja, DOPASUJ)"
     try {
         $gt.Autentykacja = $autentykacja
         $sgt = $gt.Uruchom(0, 0)
+        $udanyTryb = "Autentykacja=$autentykacja, Z OKNEM"
         Write-Wynik "  JEST  sesja otwarta Z OKNEM. Dane logowania sa dobre, blokuje TRYB W TLE."
-        Write-Wynik "        To wazne dla uslugi: wertis-sfera dziala bez pulpitu."
+        Write-Wynik "        Dla uslugi wertis-sfera to jest problem: usluga nie ma pulpitu."
+        Write-Wynik "        Sprawdz, czy Subiekt nie pokazuje czegos przy starcie (komunikat,"
+        Write-Wynik "        abonament, KSeF, zmiana hasla) - w tle nie ma tego gdzie kliknac."
     } catch {
         Write-Wynik "  BRAK  takze z oknem ($(Kod $_)): $($_.Exception.Message)"
     }
 }
 
 if ($null -eq $sgt) {
-    $ostatni = if ($kody.Count -gt 0) { ($kody[-1] -split ' -> ')[-1] } else { "?" }
     Write-Wynik ""
-    Write-Wynik "  BRAK  sesji. Kody po kolei: $($kody -join ', ')"
+    Write-Wynik "  BRAK  sesji. Kody po kolei:"
+    foreach ($k in $kody) { Write-Wynik "        $k" }
     Write-Wynik ""
     Write-Wynik "        NIE CZYTAJ TRESCI KOMUNIKATU DOSLOWNIE. Kody 0x8004xxxx sa"
     Write-Wynik "        interfejsowe: znaczenie nadaje im biblioteka, ktora je zwrocila."
@@ -335,18 +351,14 @@ if ($null -eq $sgt) {
     if ($kody -join ' ' -match '0x8004132B') {
         Write-Wynik ""
         Write-Wynik "        0x8004132B - SFERA WESZLA DALEJ i przewrocila sie na URUCHOMIENIU"
-        Write-Wynik "        SUBIEKTA W TLE. Komunikat producenta brzmi: sprawdz dane logowania"
-        Write-Wynik "        do Subiekta. Czyli patrz na OPERATORA, nie na login SQL:"
+        Write-Wynik "        SUBIEKTA W TLE. Patrz na OPERATORA, nie na login SQL:"
         Write-Wynik "          - SFERA_OPERATOR musi byc dokladna nazwa operatora z Subiekta,"
-        Write-Wynik "          - SFERA_OPERATOR_HASLO musi byc jego haslem (puste tez bywa bledem),"
+        Write-Wynik "          - SFERA_OPERATOR_HASLO musi byc jego haslem,"
         Write-Wynik "          - ten operator musi miec w Subiekcie prawo do Sfery,"
-        Write-Wynik "          - podmiot musi miec WLASNA licencje Sfery (kopia bazy jej nie ma)."
-        Write-Wynik "        Sprawdz, czy blokuje sam tryb w tle: uruchom sonde z -ZOknem."
+        Write-Wynik "          - podmiot musi miec WLASNA licencje Sfery."
+        Write-Wynik "        Uruchom sonde z -ZOknem: gdy z oknem wchodzi, dane sa dobre,"
+        Write-Wynik "        a blokuje sam tryb w tle."
     }
-    Write-Wynik ""
-    Write-Wynik "        Login SQL to NIE jest login do Subiekta. Operator otwiera program,"
-    Write-Wynik "        a Uzytkownik otwiera baze na SQL Serverze - normalnie podaje go sam"
-    Write-Wynik "        Subiekt z ustawien podmiotu, wiec nikt go nie wpisuje."
     $script:linie | Set-Content -LiteralPath $Wynik -Encoding UTF8
     Write-Host "`nWynik zapisany: $Wynik"
     exit 1
@@ -364,18 +376,33 @@ try {
 
 Write-Wynik ""
 Write-Wynik "PUNKTY 4-8 - nazwy, na ktorych stoi kod (sfera-worker/src/SferaComAdapter.cs)"
-$magMenedzer = $null
-$hanMenedzer = $null
-if (Sprawdz-Nazwe $sgt "DokumentyMagazynoweManager" 4) {
-    $magMenedzer = $sgt.DokumentyMagazynoweManager
-    Skladowe $magMenedzer "DokumentyMagazynoweManager"
-    Sprawdz-Nazwe $magMenedzer "DodajMM" 4 | Out-Null
-    Sprawdz-Nazwe $magMenedzer "DodajRW" 8 | Out-Null
+foreach ($nazwa in @("DokumentyMagazynoweManager", "DokumentyHandloweManager", "SuDokumentyManager")) {
+    Sprawdz-Nazwe $sgt $nazwa 4 | Out-Null
 }
-if (Sprawdz-Nazwe $sgt "DokumentyHandloweManager" 6) {
-    $hanMenedzer = $sgt.DokumentyHandloweManager
-    Skladowe $hanMenedzer "DokumentyHandloweManager"
-    Sprawdz-Nazwe $hanMenedzer "DodajKorekte" 6 | Out-Null
+
+# Pierwszy przebieg z otwarta sesja pokazal, ze obu nazw z naszego kodu na
+# obiekcie NIE MA, a dokumenty siedza pod `SuDokumentyManager`. Zamiast pytac
+# o kolejne zgadniete nazwy, sonda wypisuje SKLADOWE KAZDEGO managera - wtedy
+# metody `Dodaj*` widac czarno na bialym i nie trzeba wracac po nie osobno.
+Write-Wynik ""
+Write-Wynik "--- Skladowe kazdego managera (tu sa metody Dodaj*) ---"
+$menedzery = @()
+try {
+    $menedzery = $sgt | Get-Member -ErrorAction Stop |
+        Where-Object { $_.Name -like "*Manager*" } | ForEach-Object { $_.Name }
+} catch { }
+foreach ($m in $menedzery) {
+    try {
+        Skladowe $sgt.$m $m
+    } catch {
+        Write-Wynik "  ($m - nie dalo sie odczytac: $($_.Exception.Message))"
+    }
+}
+
+# `Dokumenty` nie jest managerem z nazwy, ale nazwa mowi, ze moze niesc
+# dokumenty - dlatego dostaje ten sam wypis. Kosztuje jedno wywolanie.
+if (Ma-Nazwe $sgt "Dokumenty") {
+    try { Skladowe $sgt.Dokumenty "Dokumenty" } catch { }
 }
 
 Write-Wynik ""

@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.4 — 4 września 2026
+
+**Pierwsza otwarta sesja Sfery. Dwie nazwy w naszym kodzie okazały się
+zmyślone, a tryb uruchomienia — źle dobrany.** Sonda z przełącznikiem
+`-ZOknem` weszła do Subiekta i wypisała, co naprawdę wisi na obiekcie sesji.
+
+### Managerów jest jedenaście i żaden nie nazywa się tak, jak myśleliśmy
+
+`DokumentyMagazynoweManager` i `DokumentyHandloweManager` **nie istnieją**.
+Obie nazwy przyszły ze szkicu kontraktu w `sfera.ts` i przez cały czas były
+zgadywane. Dokumenty siedzą pod `SuDokumentyManager`.
+
+To ta sama cena, którą `CLAUDE.md` opisuje przy Allegro. Metod `Dodaj*` nie
+zgadujemy trzeci raz: sonda wypisuje teraz składowe KAŻDEGO managera, więc
+następny przebieg poda nazwy zamiast pytania.
+
+### Blokadą był tryb, nie hasło
+
+Przy identycznych danych logowania `Uruchom(dopasuj, w tle)` odmawiał kodem
+`0x8004132B`, a `Uruchom(dopasuj)` z widocznym oknem **otwierał sesję**.
+
+Wyjaśnienie jest proste: `gtaUruchom` znaczy „podłącz się do działającego
+Subiekta". Na tej maszynie Subiekt był otwarty, więc Sfera miała podłączyć się
+do instancji z interfejsem i naraz pracować bez okna.
+
+Worker wysyła teraz `gtaUruchomNowy | gtaUruchomWTle` — **własną instancję
+w tle**. Tak brzmi też wywołanie z dokumentacji producenta, a usługa i tak nie
+ma prawa zależeć od czyjegoś pulpitu: instancję otwartą przez człowieka ktoś
+kiedyś zamknie albo zablokuje oknem. Wartość zmienia `SFERA_TRYB_URUCHOMIENIA`.
+
+Sonda próbuje teraz trybów po kolei i mówi, który wpuścił.
+
+
 ## 0.198.3 — 4 września 2026
 
 **Sam cache w CI daje pięć sekund — zmierzone.** Krok instalacji: 9 s przy
