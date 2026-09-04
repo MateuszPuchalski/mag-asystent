@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.1 — 4 września 2026
+
+**Bramka CI przestała czekać siedem minut na `npm ci`.**
+Pomiar z przebiegu, który przeszedł na zielono: `npm ci` trwał 7 min 03 s
+z 8 min 59 s całej bramki „Serwer". Cała reszta — typy, testy serwera, testy
+panelu, build i dwa skrypty dokumentacji — trwa razem minutę czterdzieści.
+Drzewo ma 372 MB w 27 tysiącach plików i było rozpakowywane od nowa przy
+każdym przebiegu.
+
+Stojące tam wcześniej `cache: npm` tego nie ruszało: trzyma katalog pobrań
+`~/.npm`, a nie `node_modules`. Teraz obie bramki instalujące zależności biorą
+wspólną akcję, która cache'uje samo drzewo. Klucz liczy się z OBCYCH paczek,
+nie z całego lockfile'a — inaczej rozjeżdżałby się przy każdym wydaniu, bo
+numer wersji stoi także w `package-lock.json`.
+
+Przy wdrożeniu: pierwszy przebieg po scaleniu nadal płaci pełną instalację,
+bo zapisuje cache. Dopiero drugi jest szybki. Bramka workera Sfery nie miała
+cache'a wcale i dostaje go przy okazji.
+
 ## 0.198.0 — 4 września 2026
 
 **Oferta i towar w JEDNEJ zakładce kontekstu — kolumna przestała świecić bielą.**

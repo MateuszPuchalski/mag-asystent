@@ -34,27 +34,23 @@ jobs:
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml)'; then
+          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml|\.github/actions/)'; then
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"
           else
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"
             echo "Zmiany nie dotyczą serwera ani dokumentacji — bramka zielona bez pracy."
           fi
-      - uses: actions/setup-node@v4
-        if: steps.zakres.outputs.dotyczy == 'true'
-        with:
-          node-version: "22"
-          cache: npm
       # repo jest npm workspace (`workspaces: ["server","panel"]`), więc lockfile
-      # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć
-      - name: Instalacja zależności
+      # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć.
+      #
+      # Od 0.198.1 stoi tu wspólna akcja zamiast `setup-node` z `cache: npm`.
+      # Tamto trzymało katalog pobrań, a nie drzewo, więc `npm ci` i tak
+      # rozpakowywał 372 MB przy każdym przebiegu: 7 min 03 s z 8 min 59 s
+      # całej bramki. Powód, dla którego klucz nie jest sumą lockfile'a, stoi
+      # w samej akcji — to najważniejsza część tamtej zmiany.
+      - name: Zależności Node
         if: steps.zakres.outputs.dotyczy == 'true'
-        # Przeglądarek Playwrighta CI nie pobiera: testy end-to-end biegną na
-        # razie lokalnie, a `npm ci` bez tej zmiennej ściągałby kilkaset
-        # megabajtów przy każdym przebiegu, żeby ich nie użyć.
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-        run: npm ci
+        uses: ./.github/actions/zaleznosci
       - name: Kontrola typów
         if: steps.zakres.outputs.dotyczy == 'true'
         working-directory: server
