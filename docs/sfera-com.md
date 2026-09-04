@@ -328,6 +328,41 @@ i `ZapiszSymulacja()`. Pierwsze prawdziwe MM da się nimi sprawdzić przed
 `Zapisz()`. Dokument ma też własną właściwość `SkutekMagazynowy` — to ona
 odpowie, czy zapis wykonał ruch, czy odłożył go do bufora.
 
+## 2k. Kolekcja pozycji — i czwarta zgadnięta nazwa (0.198.11)
+
+Po poprawce z 0.198.9 sonda wypisała wreszcie składowe `Pozycje`:
+
+```
+IDispatch Dodaj (Variant)
+IDispatch DodajUslugeJednorazowa ()
+IDispatch DodajUslugeJednorazowaWgOrygLp (int)
+IDispatch DodajWgOrygLp (Variant, int)
+IDispatch Wczytaj (Variant)
+ParameterizedProperty Element
+Property Liczba
+```
+
+**`Dodaj(Variant)` istnieje i bierze jeden argument** — dokładnie tak, jak woła
+adapter przy MM i RW. Pierwsza zgadnięta nazwa w tej historii, która okazała
+się trafiona.
+
+**`SzukajTowar` nie istnieje.** Na tej nazwie stało adresowanie pozycji korekty
+od pierwszego szkicu. To czwarta zgadnięta nazwa z rzędu, która nie przeżyła
+zderzenia z listą składowych.
+
+Kolekcja daje trzy drogi do pozycji: indeks `Element`, `Wczytaj(Variant)`
+i licznik `Liczba`. Żadna z nich nie szuka po kartotece, więc korekta wymaga
+przejścia po wierszach. Brakuje do tego dwóch rzeczy: nazwy właściwości
+kartoteki na POZYCJI oraz podstawy indeksu `Element`.
+
+Adapter nie zgaduje ich piąty raz. Krok adresowania pozycji korekty rzuca
+wyjątek, który wymienia brakujące nazwy i wskazuje sondę. Korekty do tego czasu
+wystawia biuro — czyli tak, jak przed workerem.
+
+Zamyka to `sonda.ps1 -SzkicMM -Towar <tw_Id>`. Pozycja powstaje w PAMIĘCI, tak
+samo jak sam dokument: `Zapisz()` nadal nie pada, więc w bazie nie zostaje ślad.
+Sonda wypisze składowe pozycji i sprawdzi `Element(0)` oraz `Element(1)`.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.
@@ -378,5 +413,5 @@ od tego jest sonda i bramka 2.
 - [Konfiguracja integracji z Subiektem GT](https://docs.easystorage.io/pl/panel-web/konfiguracja/integracje/subiekt-gt) (`0x80041329` a pierwszy znak hasła SQL)
 - [Najczęstsze problemy przy połączeniu ze Sferą](https://pomoc.integratory.pl/subsync-integracja-z-subiektem/rozwiazywanie-problemow/najczestsze-problemy/) (to samo, niezależnie)
 
-Sekcje od 2a do 2j mają inne źródło: **przebiegi sondy na maszynie firmy**,
+Sekcje od 2a do 2k mają inne źródło: **przebiegi sondy na maszynie firmy**,
 4 września 2026. To jedyne ustalenia w tym pliku potwierdzone na żywej Sferze.

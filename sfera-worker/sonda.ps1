@@ -47,7 +47,12 @@ param(
     # (MAG_ID_MAG -> MAG_ID_ZWROTY, czyli ten sam kierunek, co MM zwrotu), wiec
     # normalnie nie podaje sie ich wcale. Dotyczy wylacznie -SzkicMM.
     [int]$MagNadawczy = 0,
-    [int]$MagOdbiorczy = 0
+    [int]$MagOdbiorczy = 0,
+    # Kartoteka do szkicu POZYCJI. Wola Pozycje.Dodaj() na dokumencie, ktory
+    # i tak nie jest zapisywany - pozycja powstaje w pamieci razem z nim.
+    # To zamyka nazwe pola ilosci i podstawe indeksu Element. Dotyczy wylacznie
+    # -SzkicMM; bez tego parametru zaden Dodaj na pozycjach nie pada.
+    [int]$Towar = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -70,6 +75,7 @@ $pLoginSql = $LoginSql
 $pHasloSql = $HasloSql
 $pMagNadawczy = $MagNadawczy
 $pMagOdbiorczy = $MagOdbiorczy
+$pTowar = $Towar
 
 # --- wertis.env: te same reguly co EnvFile.cs (export, cudzyslowy, komentarze) ---
 function Wczytaj-Env([string]$sciezka) {
@@ -492,6 +498,36 @@ if ($SzkicMM) {
             # Ile pozycji ma pusty dokument - odpowiedz „0" potwierdza, ze kolekcja
             # jest pusta, a nie ze jej nie ma. To byla cala zagadka 0.198.8.
             try { Write-Wynik ("  Liczba pozycji: {0}" -f $pozycje.Liczba) } catch { }
+
+            # Pozycja tez powstaje w PAMIECI - dokument nie jest zapisywany, wiec
+            # Dodaj() nie zostawia sladu w bazie. Bez tego nazwa pola ilosci
+            # (IloscJm?) zostaje zgadnieta, a to juz kosztowalo cztery wydania.
+            if ($pTowar -gt 0) {
+                Write-Wynik ""
+                Write-Wynik "SZKIC POZYCJI - Pozycje.Dodaj($pTowar), nadal BEZ Zapisz()"
+                try {
+                    $poz = $pozycje.Dodaj($pTowar)
+                    if ($null -eq $poz) {
+                        Write-Wynik "  BRAK  Dodaj() oddal null - Variant to chyba nie tw_Id"
+                    } else {
+                        Skladowe $poz "SuDokument.Pozycje.Element - skladowe POZYCJI"
+                    }
+                    try { Write-Wynik ("  Liczba pozycji po Dodaj: {0}" -f $pozycje.Liczba) } catch { }
+                    # Podstawa indeksu: kod korekty musi wiedziec, czy liczyc od 0,
+                    # czy od 1. Zgadniecie tego to blad co drugiego przebiegu petli.
+                    foreach ($i in 0..1) {
+                        try {
+                            $el = $pozycje.Element($i)
+                            $czy = if ($null -eq $el) { "null" } else { "obiekt" }
+                            Write-Wynik ("  Element({0}) -> {1}" -f $i, $czy)
+                        } catch {
+                            Write-Wynik ("  Element({0}) -> odmowa: {1}" -f $i, $_.Exception.Message)
+                        }
+                    }
+                } catch {
+                    Write-Wynik "  BRAK  Pozycje.Dodaj() odmowil: $($_.Exception.Message)"
+                }
+            }
         }
     } catch {
         Write-Wynik "  BRAK  DodajMM() odmowil: $($_.Exception.Message)"
@@ -501,8 +537,8 @@ if ($SzkicMM) {
 Write-Wynik "Czego sonda NIE rozstrzyga, bo wymaga wystawienia dokumentu:"
 Write-Wynik "  - punkt 5: czy Zapisz() daje dokument WYKONANY, czy odklada do bufora"
 Write-Wynik "  - znaczenie flagi w Usun(bool) - sygnatura jest znana, sens flagi nie"
-Write-Wynik "  - nazwa i sygnatura pola ilosci na POZYCJI (IloscJm, IloscPoKorekcie)"
-Write-Wynik "    - te widac dopiero na dodanej pozycji, a dodawanie zapisuje"
+Write-Wynik "  - pole ilosci po korekcie (IloscPoKorekcie) - to widac na korekcie,"
+Write-Wynik "    a korekta wymaga dokumentu pierwotnego"
 Write-Wynik "Zamyka je bramka 2 z docs/wdrozenie.md: jedno MM na kartotece probnej."
 Write-Wynik ""
 Write-Wynik "Nastepny krok: wpisz ustalenia do docs/sfera-com.md i zdejmij zamkniete"

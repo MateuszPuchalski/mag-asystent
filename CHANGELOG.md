@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.11 — 4 września 2026
+
+**Kolekcja pozycji oddała nazwy — i obaliła czwartą zgadniętą.** Po poprawce
+`Get-Member` z 0.198.9 szkic MM wypisał wreszcie składowe `Pozycje`:
+
+```
+IDispatch Dodaj (Variant)
+IDispatch DodajWgOrygLp (Variant, int)
+IDispatch Wczytaj (Variant)
+ParameterizedProperty Element
+Property Liczba
+```
+
+### `Dodaj` jest dobre
+
+Pierwsza zgadnięta nazwa w tej historii, która okazała się trafiona. MM i RW
+wołają `Pozycje.Dodaj(tw_Id)` i metoda istnieje z jednym argumentem. Otwarta
+zostaje sama nazwa pola ilości na zwróconej pozycji.
+
+### `SzukajTowar` nie istnieje
+
+Na tej nazwie stało adresowanie pozycji korekty od pierwszego szkicu. Kolekcja
+nie ma żadnej metody szukającej po kartotece — daje indeks `Element`,
+`Wczytaj(Variant)` i `Liczba`.
+
+Do przejścia po wierszach brakuje dwóch rzeczy: nazwy właściwości kartoteki na
+pozycji oraz podstawy indeksu `Element`. Zamiast zgadywać piąty raz, ten krok
+rzuca teraz wyjątek wymieniający, czego brakuje i co to zamyka. Korekty zwrotów
+wystawia do tego czasu biuro w Subiekcie — czyli tak, jak przed workerem.
+
+### Sonda dokłada pozycję w pamięci
+
+`-SzkicMM -Towar <tw_Id>` woła `Pozycje.Dodaj()` i wypisuje składowe pozycji
+oraz wynik `Element(0)` i `Element(1)`. `Zapisz()` nadal nie pada, więc w bazie
+nie zostaje ślad.
+
+## 0.198.10 — 4 września 2026
+
+**Gotowy exe workera nie jest już plikiem nieznanym dla gita.** `.gitignore`
+pokrywał `publish/`, ale instalator szuka exe o poziom wyżej — w
+`<katalog>\sfera-worker\`. U klienta ten katalog jest jednocześnie checkoutem
+repozytorium, więc skopiowany plik pokazywał się w `git status` jako 30 MB
+śmiecia. Doszły `sfera-worker/*.exe` i `tlo-worker/*.exe`.
+
 ## 0.198.9 — 4 września 2026
 
 **„Pozycje są puste" wyglądało jak „Pozycji nie ma" — przez błąd w sondzie.**
