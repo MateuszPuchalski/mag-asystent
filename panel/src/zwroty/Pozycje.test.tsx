@@ -112,6 +112,62 @@ describe("Produkty ze zwrotu", () => {
     expect(onKwota.mock.calls[0]).toHaveLength(2);
   });
 
+  it("PRZEŁĄCZENIE ZWROTU nie zabiera zaznaczenia ze starego", async () => {
+    /* Zgłoszenie z 4 września: zwrot 1MGJ/2026 pokazywał poprawne 36,00 PLN,
+       a serwer odbijał zapis („Pozycje 3742 nie należą do tego zwrotu").
+       Panel szedł z identyfikatorami POPRZEDNIO oglądanego zwrotu: podgląd
+       sumy filtruje po `zwrot.pozycje`, więc rozjazdu nie było na ekranie
+       widać. Ten test przełącza zwrot BEZ odmontowania listy — dokładnie tak,
+       jak robi to kliknięcie w kolejce. */
+    const onKwota = vi.fn();
+    const { klient, rerender } = lista(zwrot({ kubelek: "zwrot" }), { onKwota });
+
+    const drugi = zwrot({ id: 2, kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 3742, nazwa: "Pistolet", cenaGrosze: 3600 }),
+    ] });
+    rerender(<QueryClientProvider client={klient}>
+      <Pozycje zwrot={drugi} trwa={false} blad="" onOcena={vi.fn()} onKwota={onKwota} />
+    </QueryClientProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
+    expect(onKwota).toHaveBeenCalledWith([3742], false);
+  });
+
+  it("pozycja ZDJĘTA ze zwrotu znika z zaznaczenia sama", async () => {
+    /* Ta sama wada przy JEDNYM zwrocie: „zdejmij ze zwrotu" i takt
+       synchronizacji skracają listę pod komponentem. Martwy identyfikator
+       w zaznaczeniu odbiłby zapis tak samo. */
+    const onKwota = vi.fn();
+    const { klient, rerender } = lista(zwrot({ kubelek: "zwrot" }), { onKwota });
+
+    const krotszy = zwrot({ kubelek: "zwrot", pozycje: [POZYCJA({ id: 11 })] });
+    rerender(<QueryClientProvider client={klient}>
+      <Pozycje zwrot={krotszy} trwa={false} blad="" onOcena={vi.fn()} onKwota={onKwota} />
+    </QueryClientProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
+    expect(onKwota).toHaveBeenCalledWith([11], false);
+  });
+
+  it("pozycja DOPISANA przez biuro wchodzi ZAZNACZONA, nie wypada z kwoty", async () => {
+    /* Cichsza połowa tej samej wady. Serwer odrzuca nadmiar identyfikatorów,
+       ale NIGDY braku — dopisana pozycja niezaznaczona kosztowałaby klienta
+       pieniądze bez jednego komunikatu na ekranie. */
+    const onKwota = vi.fn();
+    const { klient, rerender } = lista(zwrot({ kubelek: "zwrot" }), { onKwota });
+
+    const dluzszy = zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 11 }), POZYCJA({ id: 12, nazwa: "Filtr" }),
+      POZYCJA({ id: 13, nazwa: "Wąż" }),
+    ] });
+    rerender(<QueryClientProvider client={klient}>
+      <Pozycje zwrot={dluzszy} trwa={false} blad="" onOcena={vi.fn()} onKwota={onKwota} />
+    </QueryClientProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz kwotę/ }));
+    expect(onKwota).toHaveBeenCalledWith([11, 12, 13], false);
+  });
+
   it("bez zamówienia nie ma czego oddać za dostawę", () => {
     lista(zwrot({ kubelek: "zwrot", zamowienie: null }));
     expect(screen.queryByLabelText(/Koszt dostawy/)).toBeNull();

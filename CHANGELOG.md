@@ -34,6 +34,28 @@ historii nie przepisujemy.
 ---
 
 
+## 0.201.2 — 4 września 2026
+
+**„Pozycje 3742 nie należą do tego zwrotu."** Zapis kwoty odbijał się od
+serwera, a na ekranie stała poprawna suma. Panel wysyłał identyfikatory pozycji
+z POPRZEDNIO oglądanego zwrotu.
+
+Lista pozycji trzymała zaznaczenie w stanie zakładanym raz, przy montowaniu
+komponentu. Przełączenie zwrotu w kolejce komponentu nie odmontowywało, więc
+zaznaczenie zostawało ze starego. Podgląd sumy filtruje po pozycjach BIEŻĄCEGO
+zwrotu i dlatego kwota wyglądała dobrze — rozjazd widać było dopiero po
+kliknięciu.
+
+Ta sama wada miała dwa cichsze warianty przy jednym zwrocie. Pozycja zdjęta ze
+zwrotu zostawiała martwy identyfikator i odbijała zapis tak samo. Pozycja
+dopisana przez biuro wchodziła NIEZAZNACZONA i po cichu wypadała z kwoty — bo
+serwer odrzuca nadmiar, ale nigdy braku.
+
+Stan trzyma teraz ODZNACZONE, a zaznaczenie wyprowadza z listy pozycji. Kopii
+listy, która może się z nią rozjechać, po prostu nie ma. Lista dostaje też
+`key` na zwrocie, więc przełączenie zeruje razem z zaznaczeniem haczyk przy
+koszcie dostawy.
+
 ## 0.201.1 — 4 września 2026
 
 **`dok_DoDokId` nie znaczy „to jest korekta" — a automat z 0.201.0 tak to
