@@ -34,7 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.2 — 4 września 2026
+
+**Sprostowanie do 0.198.1: zysku nie dał cache, tylko `--no-audit`.**
+Wpis 0.198.1 mówił, że bramkę spowalniało rozpakowywanie 372 MB w 27 tysiącach
+plików. To była diagnoza z jednej próbki i była błędna.
+
+Rozstrzygnął przebieg już po tamtej zmianie. Krok instalacji trwał 9 sekund
+PRZY NIETRAFIONYM cache'u: drzewo instalowało się od zera, bo cache zapisał
+minutę później równoległy przebieg bramki workera Sfery. Skoro bez cache'a
+wyszło 9 sekund, kosztem nie było rozpakowywanie, tylko `npm audit` — wysyła
+całe drzewo do rejestru i czeka na odpowiedź.
+
+Trzy pomiary tego samego kroku na tej samej gałęzi: 3 min 41 s i 7 min 03 s
+przed zmianą, 9 s po niej. Sam rozrzut między dwoma pierwszymi, przy
+identycznej konfiguracji, powinien był zatrzymać tamtą diagnozę.
+
+**Cache drzewa zostaje, ale jako jawny ZAKŁAD bez pomiaru.** Ma zdejmować tę
+zmienność, bo `--no-audit` nie chroni przed wolnym pobieraniem paczek. Jeśli
+kolejne przebiegi pokażą instalację w sekundach także bez cache'a, cache jest
+do usunięcia — i tak stoi w nagłówku akcji.
+
+To wydanie nie rusza kodu bramek. Poprawia nagłówek akcji i komentarz
+w `server.yml`, bo tam stoi żywa dokumentacja, którą ktoś przeczyta następnym
+razem. Wpisu 0.198.1 nie przepisuje: historia ma pokazywać, że pomyliliśmy
+przyczynę, a nie udawać, że od razu było wiadomo.
+
 ## 0.198.1 — 4 września 2026
+
+> **Uzasadnienie w tym wpisie jest błędne — patrz 0.198.2.**
+> Zysk dało `--no-audit`, nie cache drzewa.
 
 **Bramka CI przestała czekać siedem minut na `npm ci`.**
 Pomiar z przebiegu, który przeszedł na zielono: `npm ci` trwał 7 min 03 s

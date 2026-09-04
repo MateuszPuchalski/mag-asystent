@@ -1,26 +1,42 @@
-# Zależności Node dla bramek CI (0.198.1).
+# Zależności Node dla bramek CI (0.198.2).
 #
-# POWÓD: `npm ci` zjadał 7 minut 3 sekundy z 8 minut 59 sekund całego przebiegu
-# bramki „Serwer" — 81 procent. Cała reszta, czyli to, co faktycznie sprawdza
-# kod (typy, testy serwera, testy panelu, build, dwa skrypty dokumentacji),
-# trwa razem minutę czterdzieści. Drzewo ma 372 MB w 27 tysiącach plików;
-# `npm ci` kasuje je i rozpakowuje od nowa przy KAŻDYM przebiegu.
+# ── CO ZOSTAŁO ZMIERZONE ────────────────────────────────────────────────────
+# Krok instalacji w bramce „Serwer", ta sama gałąź, trzy pomiary:
+#   3 min 41 s  (przebieg 639, `cache: npm`, audyt włączony)
+#   7 min 03 s  (przebieg 642, jak wyżej)
+#           9 s (przebieg 645, ta akcja — i to przy NIETRAFIONYM cache'u)
 #
-# `cache: npm` w `setup-node`, które stało tu wcześniej, tego nie ruszało:
-# trzyma katalog pobrań `~/.npm`, a nie `node_modules`. Oszczędzało sieć,
-# nie rozpakowywanie — a rozpakowywanie jest tu kosztem głównym.
+# Trzeci pomiar jest z przebiegu, w którym cache'a jeszcze nie było: drzewo
+# instalowało się od zera. Zysku nie dał więc cache, tylko `--no-audit`.
+# `npm audit` wysyła całe drzewo do rejestru i czeka; dwa pierwsze pomiary to
+# najpewniej to czekanie, a nie rozpakowywanie plików.
+#
+# Pierwsza diagnoza brzmiała odwrotnie — że kosztem jest rozpakowanie 372 MB
+# w 27 tysiącach plików — i była BŁĘDNA. Wynikała z jednego pomiaru i z tego,
+# że liczba wyglądała na strukturalną. Zostawiam to zdanie, bo następny, kto
+# zobaczy wolną bramkę, ma zacząć od rejestru, nie od dysku.
+#
+# ── CO JEST ZAKŁADEM ────────────────────────────────────────────────────────
+# Cache drzewa `node_modules` zostaje mimo to i nie ma pomiaru na swoją
+# obronę. Ma zdejmować tę zmienność, która dała rozrzut od czterech do siedmiu
+# minut, bo `--no-audit` nie chroni przed wolnym POBIERANIEM paczek. Jeśli
+# kolejne przebiegi pokażą, że instalacja bez cache'a i tak trwa sekundy,
+# ten cache jest do usunięcia — złożoności bez zysku się nie trzyma.
+#
+# `cache: npm` w `setup-node`, które stało tu wcześniej, trzymało katalog
+# pobrań `~/.npm`, a nie drzewo.
 #
 # ── KLUCZ NIE MOŻE BYĆ SUMĄ CAŁEGO LOCKFILE'A ───────────────────────────────
-# I to jest właściwa część tej zmiany. Każde wydanie w tym repo podbija numer
-# wersji, a numer stoi TAKŻE w `package-lock.json` (trzy miejsca). Klucz liczony
-# z całego pliku rozjeżdżałby się przy każdym wydaniu — czyli dokładnie przy
-# tych commitach, o które chodzi. Cache trafiałby wyłącznie w gałęziach, które
-# niczego nie wydają.
+# Każde wydanie w tym repo podbija numer wersji, a numer stoi TAKŻE
+# w `package-lock.json` (trzy miejsca). Klucz liczony z całego pliku
+# rozjeżdżałby się przy każdym wydaniu — czyli dokładnie przy tych commitach,
+# o które chodzi. Cache trafiałby wyłącznie w gałęziach, które niczego nie
+# wydają.
 #
 # Klucz bierze więc WYŁĄCZNIE obce paczki: ścieżkę, wersję i sumę kontrolną
 # każdego wpisu, który ma `resolved`. Wpisy lokalne („", „server", „panel")
 # `resolved` nie mają, więc podbicie wersji nie rusza klucza. Sprawdzone:
-# lockfile z 0.198.1 i lockfile z main dają tę samą sumę.
+# lockfile 0.198.0 i lockfile 0.198.1 dają tę samą sumę.
 #
 # CENA: przy trafieniu nie biegną skrypty instalacyjne. W tym drzewie są trzy
 # (`esbuild`, `fsevents` ×2) i wszystkie trzy zależą od systemu i architektury,
