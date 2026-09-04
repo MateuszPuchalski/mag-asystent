@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.8 — 4 września 2026
+
+**Sonda bierze magazyny z `wertis.env`.** Przykład w README pokazywał
+`-MagNadawczy N -MagOdbiorczy M`, gdzie `N` i `M` miały być liczbami. Wklejony
+dosłownie kończył się odmową PowerShella przy przekształceniu argumentu.
+
+Przełącznik `-SzkicMM` bierze teraz magazyny z pliku: `MAG_ID_MAG` jako
+nadawczy, `MAG_ID_ZWROTY` jako odbiorczy. To ten sam kierunek, którym idzie MM
+zwrotu w `kosze-zwrotow.ts`. Parametry nadal biorą górę nad plikiem, a gdy
+w pliku ich nie ma, sonda mówi to wprost i podaje przykład z liczbami.
+
+Przykład, w którym trzeba coś podmienić, jest przykładem do podmienienia przy
+wklejaniu — a wkleja się go w konsoli na maszynie firmy, nie w edytorze.
+
 ## 0.198.7 — 4 września 2026
 
 **Trzecia zgadnięta nazwa z rzędu okazała się błędna — i to ta, na której stał

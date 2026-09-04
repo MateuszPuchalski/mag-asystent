@@ -43,9 +43,9 @@ param(
     # Zapisz(), wiec dokument nie powstaje - ale to jedyne wywolanie Dodaj*
     # w calej sondzie, wiec wlacza sie je swiadomie.
     [switch]$SzkicMM,
-    # Identyfikatory magazynow do szkicu MM. Pusty dokument oddal Pozycje jako
-    # null - kolekcja pozycji zwykle potrzebuje najpierw magazynu, bo bez niego
-    # nie wiadomo, z czego wolno brac. Dotyczy wylacznie -SzkicMM.
+    # Identyfikatory magazynow do szkicu MM. Domyslnie biora sie z wertis.env
+    # (MAG_ID_MAG -> MAG_ID_ZWROTY, czyli ten sam kierunek, co MM zwrotu), wiec
+    # normalnie nie podaje sie ich wcale. Dotyczy wylacznie -SzkicMM.
     [int]$MagNadawczy = 0,
     [int]$MagOdbiorczy = 0
 )
@@ -208,6 +208,11 @@ $baza = Klucz $env_ "MSSQL_DATABASE"
 # w workerze (zmienna wygrywa z wertis.env).
 if ($pSerwer -ne "") { $serwer = $pSerwer }
 if ($pBaza -ne "") { $baza = $pBaza }
+# Magazyny do szkicu MM: z pliku, chyba ze czlowiek podal je parametrem.
+# Kierunek jest ten sam, co w kosze-zwrotow.ts - z magazynu sprzedazy do bufora
+# zwrotow. Zerowy identyfikator znaczy „nie ustawiaj", a nie magazyn numer zero.
+if ($pMagNadawczy -eq 0) { $pMagNadawczy = [int](Klucz $env_ "MAG_ID_MAG" "0") }
+if ($pMagOdbiorczy -eq 0) { $pMagOdbiorczy = [int](Klucz $env_ "MAG_ID_ZWROTY" "0") }
 $produkt = [int](Klucz $env_ "SFERA_PRODUKT" "1")
 $autentykacja = [int](Klucz $env_ "SFERA_AUTENTYKACJA" "0")
 
@@ -455,10 +460,13 @@ if ($SzkicMM) {
 
         # Pierwszy przebieg (0.198.6) pokazal, ze na PUSTYM dokumencie Pozycje
         # jest null - Get-Member odmowil komunikatem o braku obiektu, ktory
-        # wyglada na blad sondy, a jest stanem dokumentu. Magazyny podane
-        # parametrem pozwalaja sprawdzic, czy kolekcja pojawia sie dopiero po
-        # nich; nadal bez Zapisz().
-        if ($pMagNadawczy -gt 0 -or $pMagOdbiorczy -gt 0) {
+        # wyglada na blad sondy, a jest stanem dokumentu. Magazyny z wertis.env
+        # pozwalaja sprawdzic, czy kolekcja pojawia sie dopiero po nich; nadal
+        # bez Zapisz().
+        if ($pMagNadawczy -eq 0 -and $pMagOdbiorczy -eq 0) {
+            Write-Wynik "  BRAK  magazynow: nie ma MAG_ID_MAG ani MAG_ID_ZWROTY w wertis.env"
+            Write-Wynik "        podaj je wprost, np. -MagNadawczy 1 -MagOdbiorczy 3"
+        } else {
             try {
                 if ($pMagNadawczy -gt 0) { $mm.MagazynNadawczyId = $pMagNadawczy }
                 if ($pMagOdbiorczy -gt 0) { $mm.MagazynOdbiorczyId = $pMagOdbiorczy }
@@ -473,7 +481,7 @@ if ($SzkicMM) {
         if ($null -eq $pozycje) {
             Write-Wynik ""
             Write-Wynik "--- SuDokument.Pozycje ---"
-            Write-Wynik "  (null - kolekcja jeszcze nie istnieje; sprobuj -MagNadawczy N -MagOdbiorczy M)"
+            Write-Wynik "  (null - kolekcja jeszcze nie istnieje mimo magazynow)"
         } else {
             Skladowe $pozycje "SuDokument.Pozycje"
         }

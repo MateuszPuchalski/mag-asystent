@@ -149,11 +149,18 @@ Ostatni przełącznik, `-SzkicMM`, jest jedynym miejscem, gdzie sonda woła
 wyłącznie na obiekcie dokumentu, bez wystawiania czegokolwiek. Domyślnie
 wyłączony, bo obietnica „sonda niczego nie tworzy" ma zostać dosłowna.
 
-Kolekcja `Pozycje` wraca na pustym dokumencie jako `null`. Magazyny podane
-parametrem rozstrzygają, czy potrzebuje ich, zanim powstanie:
+Kolekcja `Pozycje` wraca na pustym dokumencie jako `null`. Sonda ustawia więc
+magazyny, zanim po nią sięgnie — bierze je z `wertis.env` (`MAG_ID_MAG`
+→ `MAG_ID_ZWROTY`, ten sam kierunek co MM zwrotu), więc nie trzeba ich podawać:
 
 ```powershell
-powershell ... -File sonda.ps1 -SzkicMM -MagNadawczy 1 -MagOdbiorczy 2
+powershell ... -File sonda.ps1 -SzkicMM
+```
+
+Gdy w pliku ich nie ma, sonda mówi to wprost. Wtedy podaje się LICZBY, nie nazwy:
+
+```powershell
+powershell ... -File sonda.ps1 -SzkicMM -MagNadawczy 1 -MagOdbiorczy 3
 ```
 
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
