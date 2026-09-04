@@ -1,0 +1,122 @@
+# Zależności Node dla bramek CI (0.198.1).
+#
+# POWÓD: `npm ci` zjadał 7 minut 3 sekundy z 8 minut 59 sekund całego przebiegu
+# bramki „Serwer" — 81 procent. Cała reszta, czyli to, co faktycznie sprawdza
+# kod (typy, testy serwera, testy panelu, build, dwa skrypty dokumentacji),
+# trwa razem minutę czterdzieści. Drzewo ma 372 MB w 27 tysiącach plików;
+# `npm ci` kasuje je i rozpakowuje od nowa przy KAŻDYM przebiegu.
+#
+# `cache: npm` w `setup-node`, które stało tu wcześniej, tego nie ruszało:
+# trzyma katalog pobrań `~/.npm`, a nie `node_modules`. Oszczędzało sieć,
+# nie rozpakowywanie — a rozpakowywanie jest tu kosztem głównym.
+#
+# ── KLUCZ NIE MOŻE BYĆ SUMĄ CAŁEGO LOCKFILE'A ───────────────────────────────
+# I to jest właściwa część tej zmiany. Każde wydanie w tym repo podbija numer
+# wersji, a numer stoi TAKŻE w `package-lock.json` (trzy miejsca). Klucz liczony
+# z całego pliku rozjeżdżałby się przy każdym wydaniu — czyli dokładnie przy
+# tych commitach, o które chodzi. Cache trafiałby wyłącznie w gałęziach, które
+# niczego nie wydają.
+#
+# Klucz bierze więc WYŁĄCZNIE obce paczki: ścieżkę, wersję i sumę kontrolną
+# każdego wpisu, który ma `resolved`. Wpisy lokalne („", „server", „panel")
+# `resolved` nie mają, więc podbicie wersji nie rusza klucza. Sprawdzone:
+# lockfile z 0.198.1 i lockfile z main dają tę samą sumę.
+#
+# CENA: przy trafieniu nie biegną skrypty instalacyjne. W tym drzewie są trzy
+# (`esbuild`, `fsevents` ×2) i wszystkie trzy zależą od systemu i architektury,
+# a te stoją w kluczu. Gdyby drzewo mimo to przyjechało niepełne, krok
+# sprawdzający zawraca do pełnego `npm ci` — cache ma przyspieszać, nie
+# rozstrzygać o poprawności.
+name: Zależności Node
+description: Odtwarza node_modules z cache'a albo instaluje je raz i zapisuje.
+
+inputs:
+  node-version:
+    description: Wersja Node dla runnera i dla klucza cache'a.
+    required: false
+    default: "22"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Klucz zależności
+      id: klucz
+      shell: bash
+      run: |
+        suma=$(python3 - <<'PY'
+        import json, hashlib
+        lock = json.load(open("package-lock.json"))
+        # Liczą się tylko paczki POBIERANE. Wpisy warsztatu (root, server,
+        # panel) nie mają `resolved` i to one niosą numer wydania.
+        obce = sorted(
+            (sciezka, dane.get("version", ""), dane.get("integrity", ""))
+            for sciezka, dane in lock.get("packages", {}).items()
+            if dane.get("resolved")
+        )
+        if not obce:
+            raise SystemExit("package-lock.json bez paczek z `resolved` — klucz byłby fałszywy")
+        print(hashlib.sha256(repr(obce).encode()).hexdigest()[:32])
+        PY
+        )
+        echo "suma=$suma" >> "$GITHUB_OUTPUT"
+        echo "Klucz z $(python3 -c "import json;print(sum(1 for d in json.load(open('package-lock.json'))['packages'].values() if d.get('resolved')))") obcych paczek: $suma"
+
+    - name: Cache drzewa zależności
+      id: cache
+      uses: actions/cache@v4
+      with:
+        # Warsztat npm hoistuje wszystko do korzenia; `panel/` trzyma resztki
+        # własne. `server/` swojego katalogu dziś nie ma i dlatego go tu nie ma:
+        # ścieżka nieistniejąca przy zapisie to ostrzeżenie w logu przy każdym
+        # przebiegu, a ostrzeżenie, które zawsze jest, przestaje być czytane.
+        path: |
+          node_modules
+          panel/node_modules
+        key: nm-${{ runner.os }}-${{ runner.arch }}-node${{ inputs.node-version }}-${{ steps.klucz.outputs.suma }}
+
+    # Trafienie w cache nie jest dowodem, że drzewo jest kompletne: cache bywa
+    # zapisany z przerwanego przebiegu. `npm ls --depth=0` kosztuje sekundę
+    # i mówi to wprost, zanim błąd wyjdzie dwa kroki dalej jako brakujący import.
+    - name: Sprawdzenie odtworzonego drzewa
+      id: sprawdzenie
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        if npm ls --workspaces --include-workspace-root --depth=0 >/dev/null 2>&1; then
+          echo "kompletne=true" >> "$GITHUB_OUTPUT"
+          echo "Drzewo odtworzone z cache'a — instalacja pominięta."
+        else
+          echo "kompletne=false" >> "$GITHUB_OUTPUT"
+          echo "Cache trafiony, ale drzewo niepełne — instaluję od nowa."
+        fi
+
+    # Lista katalogów w `path:` wyżej jest wpisana RĘCZNIE, więc może zestarzeć
+    # się po cichu: dołożenie zależności, której npm nie wyhoistuje, założy
+    # `server/node_modules`, a cache będzie go pomijał. Objawem byłby przebieg
+    # z trafionym cache'em i brakującym importem dwa kroki dalej — czyli
+    # najgorszy możliwy objaw. Ten krok mówi to wprost, przy pierwszym razie.
+    - name: Kompletność listy cache'owanych katalogów
+      shell: bash
+      run: |
+        nieujete=$(ls -d ./*/node_modules 2>/dev/null | grep -v '^\./panel/node_modules$' || true)
+        if [ -n "$nieujete" ]; then
+          echo "Warsztat ma katalog node_modules spoza listy cache'a:"
+          printf '%s\n' "$nieujete"
+          echo 'Dopisz go do path: w .github/actions/zaleznosci/action.yml — inaczej cache jest niepełny.'
+          exit 1
+        fi
+        echo "Lista cache'owanych katalogów zgodna z drzewem."
+
+    - name: Instalacja zależności
+      if: steps.cache.outputs.cache-hit != 'true' || steps.sprawdzenie.outputs.kompletne != 'true'
+      shell: bash
+      # Przeglądarek Playwrighta CI nie pobiera: testy end-to-end biegną na
+      # razie lokalnie, a `npm ci` bez tej zmiennej ściągałby kilkaset
+      # megabajtów przy każdym przebiegu, żeby ich nie użyć.
+      env:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      run: npm ci --no-audit --no-fund

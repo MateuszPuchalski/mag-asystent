@@ -33,7 +33,7 @@ jobs:
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if printf '%s\n' "$zmiany" | grep -qE '^(sfera-worker/|\.github/workflows/sfera-worker\.yml)'; then
+          if printf '%s\n' "$zmiany" | grep -qE '^(sfera-worker/|\.github/workflows/sfera-worker\.yml|\.github/actions/)'; then
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"
           else
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"
@@ -74,13 +74,12 @@ jobs:
       # razem z migracjami. Baza z samego `schema.sql` nie ma `events.user_ref`
       # i test przechodziłby obok błędu, który u klienta wyszedłby dopiero
       # PO wystawieniu dokumentu w Subiekcie.
-      - uses: actions/setup-node@v4
-        if: steps.zakres.outputs.dotyczy == 'true'
-        with:
-          node-version: "22"
+      # Ta bramka nie miała cache'a WCALE, więc gdy jej filtr ścieżek się
+      # otwiera, płaci pełne siedem minut za `npm ci`. Bierze tę samą akcję
+      # co bramka serwera — jeden cache, jeden klucz, jedno miejsce do zmiany.
       - name: Zależności Node (baza testowa)
         if: steps.zakres.outputs.dotyczy == 'true'
-        run: npm ci
+        uses: ./.github/actions/zaleznosci
 
       # Dry-run nie dotyka COM, więc cała kolejka daje się zmierzyć TUTAJ —
       # przejścia statusów, audyt, heartbeat i guard kolejności z sql/*.sql
