@@ -34,6 +34,61 @@ historii nie przepisujemy.
 ---
 
 
+## 0.197.2 — 4 września 2026
+
+**Pierwszy przebieg sondy u właściciela: dwa ustalenia i trzy błędy w samej
+sondzie.** Narzędzie z 0.197.0 pojechało na maszynę z Subiektem i od razu
+zarobiło na siebie — w obie strony.
+
+### Co potwierdziła Sfera
+
+Obiekt COM `InsERT.GT` powstaje, a jego składowe zgadzają się z tym, co
+wpisaliśmy w kod. Widać wprost `Uzytkownik` i `UzytkownikHaslo`, więc poprawka
+z 0.197.0 trafiła: login SQL ma gdzie jechać.
+
+Doszła też droga na skróty. Właściwość `ProduktNazwa` czyta się po samym
+ustawieniu `Produkt`, bez logowania — więc numer `gtaProduktSubiekt` da się
+potwierdzić bez sesji. Sonda przechodzi teraz wartości od 0 do 8 i wypisuje
+nazwy.
+
+### Trzy błędy w sondzie, wszystkie wyszły w tym jednym przebiegu
+
+**Brak `wertis.env` wywracał start.** `Test-Path` na pustej ścieżce sypał dwie
+czerwone ściany tekstu, zanim sonda zdążyła cokolwiek powiedzieć. Doszły też
+parametry `-Baza`, `-Operator`, `-LoginSql` i reszta, bo na maszynie z Subiektem
+repozytorium stoi gdzie indziej niż plik ustawień.
+
+**Parametry i tak by nie zadziałały.** W PowerShellu `$Baza` i `$baza` to jedna
+zmienna, więc odczyt z pliku kasował to, co podał człowiek. Po cichu.
+
+**Bez nazwy podmiotu sonda szła prosto na `Uruchom()`** i dostawała kod
+HRESULT zamiast zdania. Teraz odmawia wcześniej i mówi, czego brakuje.
+
+**Szukanie `wertis.env` sięgało jeden katalog w górę i tyle.** Właściciel miał
+plik piętro wyżej i sonda go nie wzięła, a jedyne, co powiedziała, to „nie
+znaleziono". Teraz idzie w górę aż do korzenia dysku — jak Node i jak
+`EnvFile.cs` — a gdy nie znajdzie, **wypisuje wszystkie sprawdzone ścieżki**.
+Taką pomyłkę jak `wertis.env.txt` z Notatnika widać wtedy od razu.
+
+Katalog skryptu bierze się teraz z `$PSScriptRoot`, a nie z `$MyInvocation`.
+Ten drugi bywa pusty zależnie od sposobu uruchomienia, a wtedy cała lista
+kandydatów po cichu degenerowała się do katalogu bieżącego — czyli dokładnie
+ten objaw, który właściciel zobaczył przy poprawnie nazwanym pliku.
+
+### Komunikat błędu, który kłamie
+
+`Uruchom()` odmówił kodem `0x80041329`, a Windows dokleił do niego zdanie
+o „aparacie planowania". Kody `0x8004xxxx` są interfejsowe — znaczenie nadaje
+im biblioteka, która je zwróciła, a Windows podstawia opis Harmonogramu zadań.
+
+U Sfery ten kod znaczy co innego: hasło loginu SQL zaczyna się od cyfry albo
+litery `a`–`f`. Ten sam kod pada przy pustym loginie SQL i tak było tym razem.
+Sonda rozpoznaje go teraz sama i mówi, co zrobić.
+
+Skoro wartości `AutentykacjaEnum` nikt nie publikuje, sonda próbuje obu i mówi,
+która otworzyła sesję. Dwie próby, nie pętla — konta SQL potrafią się blokować.
+
+
 ## 0.197.1 — 4 września 2026
 
 **Piaskownicą dla workera Sfery nie jest kopia bazy.** Właściciel sprawdził to
