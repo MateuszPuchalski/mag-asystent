@@ -13,7 +13,15 @@ import type { KoszZwrotow } from "../api/typy";
    2 (pusty kosz nie zajmuje miejsca) i 5 (przycisku „dodaj" NIE MA, bo
    dokłada ocena „na stan").                                                 */
 
-const { odpowiedz } = vi.hoisted(() => ({ odpowiedz: { kosz: null as KoszZwrotow | null } }));
+const { odpowiedz } = vi.hoisted(() => ({
+  odpowiedz: {
+    kosz: null as KoszZwrotow | null,
+    czekajace: [] as Array<{
+      id: number; kod: string; zamknietoAt: string;
+      brakuje: Array<{ zwrotId: number; numer: string }>;
+    }>,
+  },
+}));
 
 vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
@@ -36,7 +44,7 @@ const pokaz = () => {
 };
 
 describe("Koszyk zwrotów", () => {
-  beforeEach(() => { odpowiedz.kosz = null; zamknij.mockClear(); });
+  beforeEach(() => { odpowiedz.kosz = null; odpowiedz.czekajace = []; zamknij.mockClear(); });
 
   it("pusty koszyk NIE ZAJMUJE miejsca na ekranie", () => {
     /* Punkt 2 dekalogu. Stały pasek mówiący „zero" byłby elementem, który
@@ -74,5 +82,32 @@ describe("Koszyk zwrotów", () => {
     odpowiedz.kosz = KOSZ();
     pokaz();
     expect(screen.getByText(/MM z magazynu głównego na regał zwrotów/)).toBeInTheDocument();
+  });
+
+  it("koszyk czekający na korekty MÓWI, na co czeka i dlaczego", () => {
+    /* Bez tego zamknięty kosz bez dokumentu wygląda na zaciętą kolejkę.
+       MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero
+       po korekcie — ekran ma to powiedzieć, nie kazać się domyślać. */
+    odpowiedz.czekajace = [{
+      id: 9, kod: "Z-6", zamknietoAt: "2026-09-03T09:00:00Z",
+      brakuje: [{ zwrotId: 1, numer: "ZW-7" }],
+    }];
+    pokaz();
+    expect(screen.getByText(/Koszyk Z-6/)).toBeInTheDocument();
+    expect(screen.getByText(/ZW-7/)).toBeInTheDocument();
+    expect(screen.getByText(/po korekcie/)).toBeInTheDocument();
+  });
+
+  it("czekający pokazuje się BEZ otwartego koszyka", () => {
+    /* To praca biura, nie tego biurka: operator może nie mieć otwartego kosza,
+       a zaległość i tak jest jego do dopilnowania. */
+    odpowiedz.kosz = null;
+    odpowiedz.czekajace = [{
+      id: 9, kod: "Z-6", zamknietoAt: "2026-09-03T09:00:00Z",
+      brakuje: [{ zwrotId: 1, numer: "ZW-7" }, { zwrotId: 2, numer: "ZW-8" }],
+    }];
+    pokaz();
+    expect(screen.getByText(/czeka na korekty/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
   });
 });

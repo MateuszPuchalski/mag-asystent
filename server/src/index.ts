@@ -61,6 +61,7 @@ import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { zwiazPewne } from "./services/sygnatury.js";
+import { wypuscGotoweKoszyki } from "./services/kosze-zwrotow.js";
 import { zwiazFakturyPewne } from "./services/faktury.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
@@ -368,6 +369,11 @@ async function main() {
          więc kolejność nie jest wymogiem — ale kandydaci do wskazania ręcznego
          liczą się z `tw_id`, a te dopiero co powstały. */
       zwiazFakturyPewne(db());
+      /* Koszyki czekające na komplet korekt (0.200.0). Zwykle wypuszcza je już
+         `zapiszKorekte`, w sekundzie wpisania numeru. Ten przebieg jest
+         DRUGĄ drogą: numer bywa wpisany, gdy koszyka jeszcze nie zamknięto,
+         a wtedy nikt by go potem nie ruszył. */
+      wypuscGotoweKoszyki(db());
     });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem

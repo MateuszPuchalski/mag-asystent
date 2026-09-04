@@ -7,7 +7,7 @@ import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 import type { FakturaZwrotu } from "./faktury.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
-import { dolozDoKosza, zdejmijZKosza } from "./kosze-zwrotow.js";
+import { dolozDoKosza, wypuscGotoweKoszyki, zdejmijZKosza } from "./kosze-zwrotow.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -1197,7 +1197,7 @@ export function zapiszKorekte(
   if (!dokument) {
     throw new Error("Korekta wymaga numeru dokumentu z Subiekta — bez niego nic nie domyka.");
   }
-  return transaction(database, () => {
+  const wynik = transaction(database, () => {
     podKlucz(database, zwrotId, wersja);
     /* Kolejność bramek jest UMOWĄ kolejki. Numer zapisany przed kwotą
        przeskoczyłby zwrot z DO ZWROTU wprost do zamkniętych — czyli zamknąłby
@@ -1216,6 +1216,16 @@ export function zapiszKorekte(
     logEvent("zwrot_korekta", kto.name, null, { zwrotId, numer: dokument }, kto.id, database);
     return { korektaNumer: dokument, zamknietyAt: kiedy, wersja: wersja + 1 };
   })();
+
+  /* Ten numer bywa OSTATNIM brakującym w koszyku, który stoi zamknięty
+     i czeka na komplet korekt (0.200.0). MM wychodzi wtedy natychmiast,
+     a nie po najbliższym takcie — biuro wpisuje numer i odchodzi.
+
+     PO transakcji, nie w niej: `transaction` woła `BEGIN IMMEDIATE`, którego
+     SQLite nie zagnieżdża. Wypuszczenie ma zresztą własną atomowość na
+     koszyk i nie ma prawa wywrócić zapisu numeru. */
+  wypuscGotoweKoszyki(database, teraz);
+  return wynik;
 }
 
 /**

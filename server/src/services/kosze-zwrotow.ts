@@ -36,6 +36,10 @@ import { config } from "../config.js";
       i tak naciska, JEST dołożeniem do koszyka — najszybsza decyzja to ta,
       której nie podejmuje się dwa razy.                                     */
 
+/** Kto podpisuje wypuszczenie MM po dojściu ostatniej korekty. Nie człowiek —
+    to nie on kliknął; ten sam wzorzec co `AUTOMAT` w `services/sygnatury.ts`. */
+const AUTOMAT_KOREKTY = "automat (komplet korekt)";
+
 /** Przedrostek kodu koszy składanych u nas. */
 const PRZEDROSTEK = "Z-";
 
@@ -167,13 +171,135 @@ export function stanOtwartegoKosza(database: Db, kto: { name: string }): StanKos
 }
 
 /**
- * Zamyka koszyk i KOLEJKUJE dokument MM (magazyn główny → regał zwrotów).
+ * Zwroty wnoszące pozycje do koszyka, którym BRAKUJE numeru korekty.
  *
- * Kosz staje się `zamkniety` OD RAZU, nie po powrocie numeru z Sfery. Hala ma
- * wtedy co rozkładać, a numer dochodzi w sekundach — wiązanie widoku
- * magazyniera z dostępnością Subiekta zatrzymywałoby pracę fizyczną przy
- * awarii, która jej nie dotyczy. Numer wraca do `sfera_queue.sgt_doc_number`
- * i panel czyta go stamtąd, przez `kosz.mm_queue_id`.
+ * `LEFT JOIN` świadomie: `zwroty:reset` (0.199.0) kasuje zwroty, zostawiając
+ * pozycje zamkniętych koszyków jako snapshot z wiszącym `zwrot_pozycja_id`.
+ * Wiersz bez zwrotu NIE BLOKUJE — koszyk czekający wiecznie na dokument, po
+ * którym nie ma śladu, jest gorszy niż wypuszczony.
+ */
+export function brakujaceKorekty(database: Db, koszId: number): Array<{
+  zwrotId: number; numer: string;
+}> {
+  return (database.prepare(
+    `SELECT DISTINCT p.zwrot_id AS zwrot_id,
+            COALESCE(z.reference_number, z.external_id) AS numer
+       FROM kosz_pozycja kp
+       JOIN zwrot_klienta_pozycja p ON p.id = kp.zwrot_pozycja_id
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id
+      WHERE kp.kosz_id = ? AND z.korekta_numer IS NULL
+      ORDER BY p.zwrot_id`).all(koszId) as Array<{ zwrot_id: number; numer: string }>)
+    .map((w) => ({ zwrotId: Number(w.zwrot_id), numer: w.numer }));
+}
+
+/**
+ * Wkłada MM koszyka do kolejki. Oddaje `id` zadania.
+ *
+ * Wydzielone, bo od 0.200.0 wołają to DWIE drogi: zamknięcie koszyka, którego
+ * korekty już są, i późniejsze wypuszczenie po dopisaniu ostatniego numeru.
+ */
+function zakolejkujMm(
+  database: Db, k: { id: number; kod: string }, kto: { id: number | null; name: string },
+  at: string,
+): number {
+  const pozycje = database.prepare(
+    "SELECT tw_id, ilosc FROM kosz_pozycja WHERE kosz_id=?")
+    .all(k.id) as Array<{ tw_id: number; ilosc: number }>;
+
+  /* Pozycje SUMUJĄ SIĘ po kartotece. Ten sam towar z dwóch różnych zwrotów
+     to jedna linia dokumentu — Subiekt przyjąłby i dwie, ale magazynier
+     liczyłby wtedy ten sam symbol dwa razy przy tym samym regale. */
+  const wgTowaru = new Map<number, number>();
+  for (const p of pozycje) {
+    wgTowaru.set(Number(p.tw_id), (wgTowaru.get(Number(p.tw_id)) ?? 0) + Number(p.ilosc));
+  }
+  const items = [...wgTowaru].map(([twId, qty]) => ({ twId, qty }));
+
+  const queueId = Number(database.prepare(
+    `INSERT INTO sfera_queue(type, payload, status, label, detail, created_by, created_by_ref,
+                             created_at)
+     VALUES ('mm', ?, 'pending', ?, ?, ?, ?, ?)`).run(
+    JSON.stringify({ magFrom: config.magId.MAG, magTo: config.magId.ZWROTY, items }),
+    `Koszyk zwrotów ${k.kod}`,
+    `${items.length} kartotek na regał zwrotów`,
+    kto.name, kto.id, at).lastInsertRowid);
+
+  database.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(queueId, k.id);
+  return queueId;
+}
+
+/**
+ * Wypuszcza MM koszyków, którym doszedł ostatni brakujący numer korekty.
+ *
+ * Oddaje liczbę wypuszczonych — takt ma powiedzieć, ile pracy zdjął.
+ *
+ * IDEMPOTENCJA STOI NA `mm_queue_id`. Koszyk z wypełnioną kolumną jest poza
+ * zasięgiem tej funkcji, bo dwa takty w tej samej sekundzie dałyby dwa
+ * dokumenty MM na jeden fizyczny kosz — a magazynier dostałby dwie kartki
+ * i rozłożyłby towar raz.
+ */
+export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
+  const czekajace = database.prepare(
+    `SELECT id, kod FROM kosz
+      WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
+        AND rodzaj='zwroty' ORDER BY id`).all() as Array<{ id: number; kod: string }>;
+
+  let wypuszczone = 0;
+  for (const k of czekajace) {
+    if (brakujaceKorekty(database, Number(k.id)).length > 0) continue;
+    /* Każdy koszyk WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
+       pozostałych — ta sama lekcja co przy sygnaturach w 0.169.0. */
+    transaction(database, () => {
+      const queueId = zakolejkujMm(database, { id: Number(k.id), kod: k.kod },
+        { id: null, name: AUTOMAT_KOREKTY }, teraz.toISOString());
+      logEvent("kosz_zwrotow_wypuszczony", AUTOMAT_KOREKTY, null,
+        { koszId: Number(k.id), kod: k.kod, queueId }, undefined, database);
+    })();
+    wypuszczone++;
+  }
+  return wypuszczone;
+}
+
+export interface KoszykCzekajacy {
+  id: number;
+  kod: string;
+  zamknietoAt: string;
+  /** Zwroty bez numeru korekty — człowiek ma wiedzieć, czego szukać. */
+  brakuje: Array<{ zwrotId: number; numer: string }>;
+}
+
+/**
+ * Koszyki zamknięte, którym brakuje korekt — do pokazania w panelu.
+ *
+ * Bez tego czekanie byłoby ciszą: kosz stoi zamknięty, dokumentu nie ma,
+ * a nikt nie wie, na czym stoi sprawa. Kubełek DO KOREKTY zbiera tę samą
+ * pracę, więc to jedno zdanie przy koszyku, nie nowy ekran.
+ */
+export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
+  const kosze = database.prepare(
+    `SELECT id, kod, zamknieto_at FROM kosz
+      WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
+        AND rodzaj='zwroty' ORDER BY id`)
+    .all() as Array<{ id: number; kod: string; zamknieto_at: string }>;
+  return kosze.map((k) => ({
+    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at,
+    brakuje: brakujaceKorekty(database, Number(k.id)),
+  })).filter((k) => k.brakuje.length > 0);
+}
+
+/**
+ * Zamyka koszyk. Dokument MM wychodzi DOPIERO PO KOREKTACH.
+ *
+ * Do 0.199.0 zamknięcie kolejkowało MM od razu — i to był błąd kolejności,
+ * nie kosmetyka. MM zdejmuje towar z magazynu GŁÓWNEGO, a towar ze zwrotu
+ * trafia na ten magazyn dopiero wtedy, gdy biuro wystawi w Subiekcie korektę
+ * albo zwrot do paragonu. Dokument szedł więc na stan, którego jeszcze nie
+ * było. Właściciel opisał właściwą kolejność sam (`docs/obsluga-klienta.md`):
+ * „paczka wraca, korekta, MM na bufor".
+ *
+ * Kosz staje się `zamkniety` OD RAZU, bo zamknięcie jest czynnością FIZYCZNĄ:
+ * kosz się zapełnił, więc odchodzi od biurka. Wiązanie tego z papierologią
+ * zatrzymywałoby pracę hali na decyzji, która jej nie dotyczy.
  *
  * Pusty kosz odmawia. Dokument bez pozycji nie jest dokumentem, a Sfera i tak
  * odrzuciłaby go dopiero w workerze — czyli po tym, jak operator odszedłby
@@ -181,7 +307,10 @@ export function stanOtwartegoKosza(database: Db, kto: { name: string }): StanKos
  */
 export function zamknijKosz(
   database: Db, koszId: number, kto: { id: number; name: string }, teraz = new Date(),
-): { koszId: number; kod: string; pozycji: number; queueId: number } {
+): {
+  koszId: number; kod: string; pozycji: number;
+  queueId: number | null; brakujeKorekt: number;
+} {
   return transaction(database, () => {
     const k = database.prepare(
       "SELECT id, kod, status FROM kosz WHERE id=? AND mm_dok_id IS NULL")
@@ -196,32 +325,25 @@ export function zamknijKosz(
       throw new Error(`Koszyk ${k.kod} jest pusty — nie ma z czego wystawić MM.`);
     }
 
-    /* Pozycje SUMUJĄ SIĘ po kartotece. Ten sam towar z dwóch różnych zwrotów
-       to jedna linia dokumentu — Subiekt przyjąłby i dwie, ale magazynier
-       liczyłby wtedy ten sam symbol dwa razy przy tym samym regale. */
-    const wgTowaru = new Map<number, number>();
-    for (const p of pozycje) {
-      wgTowaru.set(Number(p.tw_id), (wgTowaru.get(Number(p.tw_id)) ?? 0) + Number(p.ilosc));
-    }
-    const items = [...wgTowaru].map(([twId, qty]) => ({ twId, qty }));
-
     const at = teraz.toISOString();
-    const queueId = Number(database.prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, created_by, created_by_ref,
-                               created_at)
-       VALUES ('mm', ?, 'pending', ?, ?, ?, ?, ?)`).run(
-      JSON.stringify({ magFrom: config.magId.MAG, magTo: config.magId.ZWROTY, items }),
-      `Koszyk zwrotów ${k.kod}`,
-      `${items.length} kartotek na regał zwrotów`,
-      kto.name, kto.id, at).lastInsertRowid);
-
     database.prepare(
-      `UPDATE kosz SET status='zamkniety', zamknieto_at=?, zamknieto_przez=?, mm_queue_id=?
-        WHERE id=?`).run(at, kto.name, queueId, koszId);
+      `UPDATE kosz SET status='zamkniety', zamknieto_at=?, zamknieto_przez=?
+        WHERE id=?`).run(at, kto.name, koszId);
+
+    /* Komplet korekt sprawdzamy PO zamknięciu, na zapisanym już koszu: gdy
+       niczego nie brakuje, MM wychodzi w tej samej transakcji i operator nie
+       widzi różnicy wobec dawnego zachowania. */
+    const braki = brakujaceKorekty(database, koszId);
+    const queueId = braki.length === 0
+      ? zakolejkujMm(database, { id: koszId, kod: k.kod }, kto, at)
+      : null;
 
     logEvent("kosz_zwrotow_zamkniety", kto.name, null,
-      { koszId, kod: k.kod, pozycji: pozycje.length, kartotek: items.length, queueId },
+      { koszId, kod: k.kod, pozycji: pozycje.length, queueId,
+        brakujeKorekt: braki.length },
       kto.id, database);
-    return { koszId, kod: k.kod, pozycji: pozycje.length, queueId };
+    return {
+      koszId, kod: k.kod, pozycji: pozycje.length, queueId, brakujeKorekt: braki.length,
+    };
   })();
 }

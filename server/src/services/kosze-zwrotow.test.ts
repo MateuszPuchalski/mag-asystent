@@ -4,7 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  dolozDoKosza, otwartyKosz, stanOtwartegoKosza, zamknijKosz, zdejmijZKosza,
+  brakujaceKorekty, dolozDoKosza, otwartyKosz, stanOtwartegoKosza, wypuscGotoweKoszyki,
+  zamknijKosz, zdejmijZKosza,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
@@ -34,7 +35,8 @@ function biuro(d: Db) {
 }
 
 /** Zwrot przyjęty, z pozycjami wiszącymi na kartotekach. */
-function zwrotZTowarem(d: Db, twIdy: Array<number | null>, kto: { id: number; name: string }) {
+function zwrotZTowarem(d: Db, twIdy: Array<number | null>, kto: { id: number; name: string },
+  extId = "z1") {
   for (const tw of twIdy) {
     if (tw === null) continue;
     d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
@@ -42,13 +44,18 @@ function zwrotZTowarem(d: Db, twIdy: Array<number | null>, kto: { id: number; na
   }
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,created_at,synced_at)
-    VALUES (1,'z1','2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`).run().lastInsertRowid);
+    VALUES (1,?,'2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`).run(extId).lastInsertRowid);
   const poz = twIdy.map((tw, i) => Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
     (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta,tw_id)
     VALUES (?,?,?,?,?,?, 'PLN', ?)`)
     .run(id, `k${i}`, `of${i}`, `Część ${i}`, 2, 5000, tw).lastInsertRowid));
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, kto);
   return { id, poz };
+}
+
+/** Korekta wystawiona w Subiekcie — bez niej MM nie ma z czego zejść. */
+function skorygowany(d: Db, zwrotId: number, numer = "KFS 1/2026") {
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer=? WHERE id=?").run(numer, zwrotId);
 }
 
 test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
@@ -106,14 +113,18 @@ test("pozycja BEZ KARTOTEKI nie wchodzi na dokument, a ocena i tak się zapisuje
 test("domknięcie kolejkuje MM z magazynu głównego na regał zwrotów", () => {
   const d = stanowisko();
   const KTO = biuro(d);
-  const { poz } = zwrotZTowarem(d, [11, 11, 12], KTO);
+  const { id: zwrotId, poz } = zwrotZTowarem(d, [11, 11, 12], KTO);
   ocenPozycje(d, poz[0], "stan", 2, KTO);
   ocenPozycje(d, poz[1], "stan", 3, KTO);
   ocenPozycje(d, poz[2], "stan", 4, KTO);
+  /* Korekta MUSI być wcześniej: MM zdejmuje towar z magazynu głównego,
+     a wraca on tam dopiero po korekcie w Subiekcie. */
+  skorygowany(d, zwrotId);
 
   const kosz = stanOtwartegoKosza(d, KTO)!;
   const wynik = zamknijKosz(d, kosz.id, KTO);
   assert.equal(wynik.pozycji, 3);
+  assert.equal(wynik.brakujeKorekt, 0);
 
   const z = d.prepare("SELECT type, payload, status FROM sfera_queue WHERE id=?")
     .get(wynik.queueId) as { type: string; payload: string; status: string };
@@ -182,4 +193,55 @@ test("każdy operator ma SWÓJ otwarty koszyk", () => {
   assert.equal(stanOtwartegoKosza(d, ala)?.pozycji, 1);
   assert.equal(stanOtwartegoKosza(d, bo)?.pozycji, 1);
   assert.notEqual(stanOtwartegoKosza(d, ala)?.kod, stanOtwartegoKosza(d, bo)?.kod);
+});
+
+test("koszyk bez kompletu korekt CZEKA, a ostatni numer go wypuszcza", () => {
+  /* Sedno błędu zgłoszonego przez właściciela: MM zdejmuje towar z magazynu
+     głównego, a ze zwrotu trafia on tam dopiero po korekcie. Dokument szedł
+     więc na stan, którego jeszcze nie było. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  const b = zwrotZTowarem(d, [12], KTO, "z2");
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  ocenPozycje(d, b.poz[0], "stan", 2, KTO);
+  skorygowany(d, a.id);   // jeden z dwóch — komplet to jeszcze nie jest
+
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  const wynik = zamknijKosz(d, kosz.id, KTO);
+  assert.equal(wynik.queueId, null, "MM nie ma prawa wyjść przed korektą");
+  assert.equal(wynik.brakujeKorekt, 1);
+  assert.equal(Number((d.prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'")
+    .get() as { n: number }).n), 0);
+
+  const k = d.prepare("SELECT status FROM kosz WHERE id=?").get(kosz.id) as { status: string };
+  assert.equal(k.status, "zamkniety",
+    "zamknięcie jest czynnością FIZYCZNĄ — kosz odchodzi od biurka mimo braku papieru");
+
+  assert.equal(wypuscGotoweKoszyki(d), 0, "wciąż brakuje jednej korekty");
+
+  skorygowany(d, b.id, "KFS 2/2026");
+  assert.equal(wypuscGotoweKoszyki(d), 1);
+  const q = d.prepare("SELECT type, status FROM sfera_queue WHERE type='mm'")
+    .get() as { type: string; status: string };
+  assert.equal(q.status, "pending");
+
+  assert.equal(wypuscGotoweKoszyki(d), 0,
+    "drugi przebieg NIE tworzy drugiego dokumentu na jeden fizyczny kosz");
+  assert.equal(Number((d.prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'")
+    .get() as { n: number }).n), 1);
+});
+
+test("brakujące korekty wymieniają zwroty Z IMIENIA", () => {
+  /* Człowiek ma wiedzieć, czego szukać w Subiekcie, a nie samo „czekam". */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  d.prepare("UPDATE zwrot_klienta SET reference_number='ZW-7' WHERE id=?").run(a.id);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+
+  const braki = brakujaceKorekty(d, kosz.id);
+  assert.deepEqual(braki, [{ zwrotId: a.id, numer: "ZW-7" }]);
 });

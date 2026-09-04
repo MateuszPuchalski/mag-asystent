@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.200.0 — 4 września 2026
+
+**[wymaga działania]** MM koszyka zwrotów czeka na korekty. Zgłoszenie
+właściciela: *„zamknięcie koszyka robi MM na magazyn główny, ale produkty ze
+zwrotów trafiają na główny dopiero po zrobieniu zwrotu do paragonu"*.
+
+To był błąd kolejności, nie kosmetyka. Dokument zdejmuje towar z magazynu
+głównego, a ze zwrotu wraca on tam dopiero po korekcie wystawionej w Subiekcie.
+MM szło więc na stan, którego jeszcze nie było.
+
+Właściwą kolejność właściciel opisał sam w `docs/obsluga-klienta.md`: **„paczka
+wraca, korekta, MM na bufor"**. Implementacja koszyka z 0.192.0 pominęła
+środkowy krok.
+
+### Zamknięcie zostaje natychmiastowe
+
+Kosz jedzie na halę od razu, bo zamknięcie jest czynnością FIZYCZNĄ: zapełnił
+się, więc odchodzi od biurka. Czekanie dotyczy wyłącznie dokumentu.
+
+### Ostatni numer korekty wypuszcza MM sam
+
+Zapisanie numeru sprawdza koszyki czekające i wypuszcza te, którym niczego już
+nie brakuje — w tej samej sekundzie, nie po takcie. Drugą drogą jest takt
+synchronizacji zwrotów, na wypadek numeru wpisanego przed zamknięciem koszyka.
+
+Idempotencja stoi na `kosz.mm_queue_id`: dwa przebiegi w tej samej sekundzie
+nie dadzą dwóch dokumentów na jeden fizyczny kosz.
+
+### Widać, na co się czeka
+
+Panel pokazuje przy koszyku brakujące zwroty Z IMIENIA i jedno zdanie
+o powodzie — bez tego zamknięty kosz bez dokumentu wygląda na zaciętą kolejkę.
+Koszyk czekający ponad dobę wchodzi do rekoncyliacji jako
+`kosz_czeka_na_korekte`, tym samym progiem co `mm_czeka`.
+
+### Czego to wydanie NIE robi
+
+Numer korekty nadal przepisuje człowiek. Automatyczne czytanie korekt
+z Subiekta wymaga nazwy kolumny w `dok__Dokument` wskazującej dokument
+korygowany — nieudokumentowanej w repo. Zgadnięcie jej byłoby piątą zgadniętą
+nazwą w tym tygodniu, więc czeka na sprawdzenie na bazie firmy.
+
 ## 0.199.0 — 4 września 2026
 
 **[wymaga działania]** Nowe narzędzie konserwacyjne: czyści zapisane zwroty

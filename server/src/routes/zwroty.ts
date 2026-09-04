@@ -3,7 +3,9 @@ import { sesjaZadania } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
-import { stanOtwartegoKosza, zamknijKosz } from "../services/kosze-zwrotow.js";
+import {
+  koszykiCzekajaceNaKorekty, stanOtwartegoKosza, zamknijKosz,
+} from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
@@ -170,7 +172,13 @@ export async function zwrotyRoutes(app: FastifyInstance) {
   app.get("/api/obsluga/zwroty/kosz", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    return { kosz: stanOtwartegoKosza(db(), kto()) };
+    /* `czekajace` jest polem ADDYTYWNYM (0.200.0): koszyki zamknięte, którym
+       brakuje korekt, nie należą do żadnego operatora — to praca biura, nie
+       jego biurka. Stary panel je zignoruje. */
+    return {
+      kosz: stanOtwartegoKosza(db(), kto()),
+      czekajace: koszykiCzekajaceNaKorekty(db()),
+    };
   });
 
   app.post<{ Body: { koszId?: number } }>(
