@@ -273,6 +273,57 @@ bez zapisu, jego właściwości można obejrzeć bez wystawiania dokumentu —
 robi to sonda z przełącznikiem `-SzkicMM`. Domyślnie wyłączony, bo to jedyne
 `Dodaj*` w całym skrypcie.
 
+## 2j. Szkic MM — właściwości dokumentu, trzecia zgadnięta nazwa (0.198.7)
+
+Przełącznik `-SzkicMM` utworzył MM w pamięci i wypisał jego właściwości.
+Dokument nie powstał: `Zapisz()` nie padł ani razu.
+
+**Magazynów na dokumencie nie nazywa się tak, jak stało w kodzie.**
+
+```
+Property     MagazynNadawczyId
+Property     MagazynOdbiorczyId
+```
+
+`MagazynZrodlowyId` i `MagazynDocelowyId` nie istnieją. Adapter stał na nich
+od pierwszego szkicu. To trzecia zgadnięta nazwa z rzędu, która wywróciłaby
+się dopiero przy pierwszym zwrocie u klienta.
+
+`MagazynId` na dokumencie też nie ma — ta właściwość stoi na SESJI. RW dostaje
+więc `MagazynNadawczyId`, bo rozchód wyprowadza towar. Lista składowych jest
+wspólna dla wszystkich typów dokumentu, więc istnienie właściwości nie dowodzi
+jeszcze, że RW jej używa. Wołanie zastępcze to `su.MagazynId` przed `DodajRW()`.
+
+**Powiązanie korekty z dokumentem pierwotnym to metoda, nie właściwość.**
+
+```
+void NaPodstawie (Variant)
+void NaPodstawieWielu (SAFEARRAY(int))
+Property DoDokumentuId
+Property DokumentyZrodlowe
+```
+
+Wariant „wielu" bierze tablicę `int`, więc `NaPodstawie` przyjmuje najpewniej
+identyfikator. `DoDokumentuId` wygląda na pole odczytywane po powiązaniu.
+Korekta musi przejąć pozycje dokumentu pierwotnego, a to robi wywołanie.
+
+**`Usun` bierze flagę:** `void Usun (bool)`. Sygnatura jest znana, znaczenie
+flagi nie. Adapter podaje `false`, bo w każdym czytaniu tej flagi to działanie
+węższe: jeden dokument i bez pytania. Usługa nie ma pulpitu, na którym mogłaby
+na pytanie odpowiedzieć.
+
+**Potwierdzone bez zmian:** `NumerPelny`, `Zapisz()`, `Pozycje`.
+
+**Otwarte zostają składowe kolekcji `Pozycje`.** Na pustym dokumencie wróciła
+jako `null`, więc `Get-Member` nie miał czego opisać. Sonda przyjmuje teraz
+`-MagNadawczy` i `-MagOdbiorczy`: kolekcja może potrzebować magazynu, zanim
+w ogóle powstanie.
+
+Dwie metody warte zapamiętania na bramkę 2: `SprawdzPoprawnosc()`
+i `ZapiszSymulacja()`. Pierwsze prawdziwe MM da się nimi sprawdzić przed
+`Zapisz()`. Dokument ma też własną właściwość `SkutekMagazynowy` — to ona
+odpowie, czy zapis wykonał ruch, czy odłożył go do bufora.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.
@@ -289,9 +340,9 @@ Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.
 ## 4. Jak zamknąć resztę listy
 
 **Najpierw sonda.** [`sfera-worker/sonda.ps1`](../sfera-worker/sonda.ps1)
-otwiera sesję i wypisuje nazwy składowych. Niczego nie zapisuje: żadnego
-`Dodaj*`, żadnego `Zapisz()`. Zamyka punkty od 1 do 4, 6 i 8, bez śladu w bazie
-i bez pakietu SDK.
+otwiera sesję i wypisuje nazwy składowych. `Zapisz()` nie pada w niej ani razu,
+więc w bazie nie zostaje ślad. Zamyka punkty od 1 do 4, 6 i 8, bez pakietu SDK.
+Przełącznik `-SzkicMM` dokłada właściwości samego dokumentu.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
@@ -323,5 +374,5 @@ od tego jest sonda i bramka 2.
 - [Konfiguracja integracji z Subiektem GT](https://docs.easystorage.io/pl/panel-web/konfiguracja/integracje/subiekt-gt) (`0x80041329` a pierwszy znak hasła SQL)
 - [Najczęstsze problemy przy połączeniu ze Sferą](https://pomoc.integratory.pl/subsync-integracja-z-subiektem/rozwiazywanie-problemow/najczestsze-problemy/) (to samo, niezależnie)
 
-Sekcje 2a i 2b mają inne źródło: **przebieg sondy na maszynie firmy**, 4 września
-2026. To jedyne ustalenia w tym pliku potwierdzone na żywej Sferze.
+Sekcje od 2a do 2j mają inne źródło: **przebiegi sondy na maszynie firmy**,
+4 września 2026. To jedyne ustalenia w tym pliku potwierdzone na żywej Sferze.

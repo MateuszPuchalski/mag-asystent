@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.7 — 4 września 2026
+
+**Trzecia zgadnięta nazwa z rzędu okazała się błędna — i to ta, na której stał
+adapter od pierwszego dnia.** Przełącznik `-SzkicMM` utworzył MM w pamięci
+i wypisał właściwości dokumentu. `Zapisz()` nie padł, więc dokument nie powstał.
+
+### Magazyny nazywają się inaczej
+
+```
+Property     MagazynNadawczyId
+Property     MagazynOdbiorczyId
+```
+
+`MagazynZrodlowyId` i `MagazynDocelowyId` nie istnieją. Kod stał na nich od
+szkicu w `sfera.ts` i wywróciłby się przy pierwszym zwrocie u klienta.
+
+`MagazynId` na dokumencie też nie ma — ta właściwość stoi na SESJI. RW dostaje
+`MagazynNadawczyId`, bo rozchód wyprowadza towar z magazynu.
+
+### Korektę wiąże się wywołaniem, nie właściwością
+
+`void NaPodstawie(Variant)` — a bliźniacze `NaPodstawieWielu(SAFEARRAY(int))`
+mówi, że Variant bierze identyfikator. To zamyka punkt 6 listy `[WERYFIKUJ]`
+poza samym adresowaniem pozycji.
+
+### `Usun` bierze flagę
+
+`void Usun(bool)`. Sygnatura jest znana, znaczenie flagi nie. Wycofanie łańcucha
+podaje `false`, bo w każdym czytaniu tej flagi to działanie węższe: jeden
+dokument i bez pytania. Usługa nie ma pulpitu, na którym odpowiedziałaby na
+pytanie.
+
+### Kolekcja `Pozycje` na pustym dokumencie jest pusta
+
+Wróciła jako `null`, więc składowych nie oddała. Sonda przyjmuje teraz
+`-MagNadawczy` i `-MagOdbiorczy`: sprawdzą, czy kolekcja potrzebuje magazynu,
+zanim w ogóle powstanie.
+
+Potwierdzone bez zmian: `NumerPelny`, `Zapisz()`, `Pozycje`. Ustalenia
+w `docs/sfera-com.md` §2j, stan listy w `sfera-worker/README.md`.
+
 ## 0.198.6 — 4 września 2026
 
 **Sygnatury pokazały, że wczorajsze zgadnięcie było błędne — drugi raz w tym
