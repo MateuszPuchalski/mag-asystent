@@ -122,14 +122,26 @@ test("domknięcie kolejkuje MM z magazynu głównego na regał zwrotów", () => 
   skorygowany(d, zwrotId);
 
   const kosz = stanOtwartegoKosza(d, KTO)!;
-  const wynik = zamknijKosz(d, kosz.id, KTO);
+  const at = "2026-09-04T11:22:33.000Z";
+  const wynik = zamknijKosz(d, kosz.id, KTO, new Date(at));
   assert.equal(wynik.pozycji, 3);
   assert.equal(wynik.brakujeKorekt, 0);
 
-  const z = d.prepare("SELECT type, payload, status FROM sfera_queue WHERE id=?")
-    .get(wynik.queueId) as { type: string; payload: string; status: string };
+  const z = d.prepare(
+    "SELECT type, payload, status, tw_id, created_at FROM sfera_queue WHERE id=?")
+    .get(wynik.queueId) as { type: string; payload: string; status: string;
+      tw_id: number | null; created_at: string };
   assert.equal(z.type, "mm");
   assert.equal(z.status, "pending");
+  /* Bez `tw_id`, bo zadanie jest WIELOPOZYCYJNE — i to jest dokładnie ten
+     kształt, który guard kolejności workera przepuszcza (MM na bufor nie
+     czyni towaru sprzedawalnym). Ustawione `tw_id` znaczyłoby, że koszyk
+     rozbito na zadania jednopozycyjne, a wtedy jeden fizyczny kosz dałby
+     magazynierowi kilka kartek. */
+  assert.equal(z.tw_id, null);
+  /* Czas ZAMKNIĘCIA kosza, nie chwila wstawienia wiersza: przy koszyku, który
+     czekał na korektę, dzieli je nawet doba. */
+  assert.equal(z.created_at, at);
   const p = JSON.parse(z.payload) as { magFrom: number; magTo: number;
     items: Array<{ twId: number; qty: number }> };
   assert.notEqual(p.magFrom, p.magTo, "MM z magazynu głównego NA regał zwrotów");

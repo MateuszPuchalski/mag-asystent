@@ -401,7 +401,11 @@ export function Zwroty() {
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }} />}
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <Pozycje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+              {/* `key` na ZWROCIE: przełączenie zwrotu w kolejce ma montować
+                  listę od nowa. Bez tego zostawał w niej stan poprzedniego —
+                  zaznaczenie pozycji i haczyk przy koszcie dostawy — a zapis
+                  kwoty szedł z cudzymi identyfikatorami. */}
+              <Pozycje key={zwrot.id} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
                 onOcena={(pozycjaId, ocena) =>
                   ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}

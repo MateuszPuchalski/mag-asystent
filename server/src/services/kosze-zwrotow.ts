@@ -1,6 +1,7 @@
 import { logEvent } from "./events.js";
 import { transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
+import { enqueueMM } from "./queue.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką:
@@ -215,14 +216,21 @@ function zakolejkujMm(
   }
   const items = [...wgTowaru].map(([twId, qty]) => ({ twId, qty }));
 
-  const queueId = Number(database.prepare(
-    `INSERT INTO sfera_queue(type, payload, status, label, detail, created_by, created_by_ref,
-                             created_at)
-     VALUES ('mm', ?, 'pending', ?, ?, ?, ?, ?)`).run(
-    JSON.stringify({ magFrom: config.magId.MAG, magTo: config.magId.ZWROTY, items }),
-    `Koszyk zwrotów ${k.kod}`,
-    `${items.length} kartotek na regał zwrotów`,
-    kto.name, kto.id, at).lastInsertRowid);
+  /* Przez `enqueueMM`, nie własnym INSERT-em. Do 0.201.3 był to DRUGI writer
+     kolejki w produkcji — a niezmiennik o kształcie zadania MM stoi przy
+     `enqueueMM` i tam się go czyta. Zadanie jest WIELOPOZYCYJNE i bez `twId`:
+     jeden koszyk to jeden dokument i jedna kartka dla magazyniera. Guard
+     kolejności nic przez to nie traci, bo MM idzie NA BUFOR (MAG→ZWROTY)
+     i sprzedawalnym towaru nie czyni. */
+  const queueId = enqueueMM(config.magId.MAG, config.magId.ZWROTY, items, {
+    createdBy: kto.name,
+    /* JAWNY `null` automatu ma przeżyć: `wypuscGotoweKoszyki` biegnie także
+       z wnętrza żądania, tuż po tym, jak człowiek wpisał numer korekty. */
+    createdByRef: kto.id,
+    createdAt: at,
+    label: `Koszyk zwrotów ${k.kod}`,
+    detail: `${items.length} kartotek na regał zwrotów`,
+  }, database);
 
   database.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(queueId, k.id);
   return queueId;

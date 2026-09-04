@@ -138,8 +138,19 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   const [powiekszony, setPowiekszony] = useState<PozycjaZwrotu | null>(null);
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
      o niej decyduje człowiek, bo zależy od tego, czy klient odstępuje od
-     całego zamówienia, czy oddaje jedną rzecz z pięciu. */
-  const [wybrane, setWybrane] = useState<number[]>(() => zwrot.pozycje.map((p) => p.id));
+     całego zamówienia, czy oddaje jedną rzecz z pięciu.
+
+     STAN TRZYMA ODZNACZONE, nie zaznaczone — i to jest naprawa błędu, nie
+     upodobanie. Lista zaznaczonych była KOPIĄ listy pozycji, więc rozjeżdżała
+     się z nią przy każdej zmianie: pozycja zdjęta ze zwrotu zostawiała martwy
+     identyfikator (serwer odbijał zapis: „Pozycje 3742 nie należą do tego
+     zwrotu"), a pozycja DOPISANA przez biuro wchodziła odznaczona i po cichu
+     wypadała z kwoty — bo serwer odrzuca nadmiar, nigdy braku. Wyprowadzenie
+     zaznaczenia z `zwrot.pozycje` znosi obie te drogi naraz. */
+  const [odznaczone, setOdznaczone] = useState<ReadonlySet<number>>(() => new Set());
+  const wybrane = useMemo(
+    () => zwrot.pozycje.filter((p) => !odznaczone.has(p.id)).map((p) => p.id),
+    [zwrot.pozycje, odznaczone]);
   const [dostawa, setDostawa] = useState(false);
 
   const wycena = zwrot.kubelek === "zwrot";
@@ -156,8 +167,11 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
     return pozycje + (dostawa ? dostawaGrosze ?? 0 : 0);
   }, [zwrot.pozycje, wybrane, dostawa, dostawaGrosze]);
 
-  const przelacz = (id: number) => setWybrane((w) =>
-    w.includes(id) ? w.filter((x) => x !== id) : [...w, id].sort((a, b) => a - b));
+  const przelacz = (id: number) => setOdznaczone((w) => {
+    const n = new Set(w);
+    if (!n.delete(id)) n.add(id);
+    return n;
+  });
 
   if (!zwrot.pozycje.length) {
     return <p className="p-4 text-sm text-slate-500">Zwrot bez pozycji — nie ma czego wycenić.</p>;

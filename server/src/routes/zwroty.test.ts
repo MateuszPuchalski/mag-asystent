@@ -440,6 +440,64 @@ test("kwota bierze się z zaznaczenia — liczba przysłana przez panel jest ign
   assert.equal(odp.json().kwotaGrosze, 4999, "jedna sztuka po 49,99 z fixture'u");
 });
 
+test("MM wypuszczone przez automat NIE dostaje konta klikającego człowieka", async () => {
+  /* Numer korekty wpisuje CZŁOWIEK, ale MM wypuszcza z tego automat — i to
+     jest jedyna droga, na której widać różnicę. Zadanie powstaje wewnątrz
+     żądania, więc kolejka miała skąd wziąć konto z sesji i wpisywała je
+     zamiast jawnego „bez konta". Audyt wiąże po koncie, nie po nazwie, więc
+     wypuszczenie automatu wyglądałoby na ręczne kliknięcie Ali.
+
+     Przy okazji kształt wiersza, na którym stoi guard kolejności workera
+     (sfera-worker/sql/pick_mm_pending.sql): koszyk to JEDNO zadanie
+     wielopozycyjne bez `tw_id`. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  /* Koszyki i kolejka nie schodzą w `beforeEach` — czyścimy je tutaj, żeby
+     licznik zadań MM mierzył TEN przebieg, a nie resztki po sąsiadach. */
+  for (const t of ["kosz_pozycja", "kosz", "sfera_queue"]) db().prepare(`DELETE FROM ${t}`).run();
+  const wersja = () => (db().prepare("SELECT wersja FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { wersja: number }).wersja;
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+  /* Bez kartoteki pozycja do koszyka nie wchodzi — MM przesuwa stany kartotek. */
+  db().prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-01','Sekator NAC')").run();
+  db().prepare("UPDATE zwrot_klienta_pozycja SET tw_id=77 WHERE id=?").run(pozycja);
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
+    headers: naglowki, payload: { ocena: "stan", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const kosz = (db().prepare(
+    "SELECT id FROM kosz WHERE rodzaj='zwroty' AND status='otwarty'")
+    .get() as { id: number } | undefined);
+  assert.ok(kosz, "ocena „na stan\" zakłada koszyk zwrotów");
+
+  r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/kosz/zamknij",
+    headers: naglowki, payload: { koszId: kosz.id } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().queueId, null, "MM czeka na korektę");
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
+    headers: naglowki, payload: { pozycjeIds: [pozycja], dostawa: false, wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/korekta`,
+    headers: naglowki, payload: { numer: "KFS 21/2026", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const q = db().prepare(
+    "SELECT created_by, created_by_ref, tw_id, payload FROM sfera_queue WHERE type='mm'")
+    .all() as Array<{ created_by: string; created_by_ref: number | null;
+      tw_id: number | null; payload: string }>;
+  assert.equal(q.length, 1, "jeden koszyk to JEDEN dokument i jedna kartka");
+  assert.equal(q[0].created_by_ref, null, "autorem jest automat, nie osoba przy klawiaturze");
+  assert.match(q[0].created_by, /automat/);
+  assert.equal(q[0].tw_id, null, "MM na bufor jest wielopozycyjne — guard go nie dotyczy");
+  assert.ok((JSON.parse(q[0].payload) as { items: unknown[] }).items.length >= 1);
+});
+
 test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", async () => {
   /* Cała droga jednym ciągiem, bo to jedyny test, w którym widać, że kubełki
      naprawdę się przesuwają: werdykt → ocena → kwota → korekta → zamknięty. */
