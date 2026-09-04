@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.3 — 4 września 2026
+
+**Sam cache w CI daje pięć sekund — zmierzone.** Krok instalacji: 9 s przy
+nietrafionym cache'u, 4 s przy trafionym. Pierwsze prawdziwe trafienie
+potwierdza log: „Cache hit occurred on the primary key
+nm-Linux-X64-node22-37ddd58…".
+
+Pełna droga tego pomiaru: 3 min 41 s i 7 min 03 s przed zmianą, 9 s po dodaniu
+`--no-audit` przy nietrafionym cache'u, 4 s przy trafionym. Skok jest między
+drugim a trzecim pomiarem i nie ma z cache'em nic wspólnego.
+
+**Cache zostaje decyzją właściciela, z tymi liczbami na stole.** Nagłówek akcji
+niósł regułę, że przy takim wyniku jest do usunięcia. Reguła znika, bo kazałaby
+skasować coś, o czym już zapadło rozstrzygnięcie.
+
+Zapisane też, czego cache NIE robi. Wolne przebiegi miały `cache: npm`, czyli
+ciepły katalog pobrań — paczki już tam leżały, wolny był audyt. Cache drzewa
+nie ubezpiecza przed tamtą awarią. Pomoże przy nowej zależności albo gdy
+rejestr padnie przy pobieraniu.
+
 ## 0.198.2 — 4 września 2026
 
 **Sprostowanie do 0.198.1: zysku nie dał cache, tylko `--no-audit`.**

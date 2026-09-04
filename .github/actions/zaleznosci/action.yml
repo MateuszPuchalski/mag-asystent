@@ -1,4 +1,4 @@
-# Zależności Node dla bramek CI (0.198.2).
+# Zależności Node dla bramek CI (0.198.3).
 #
 # ── CO ZOSTAŁO ZMIERZONE ────────────────────────────────────────────────────
 # Krok instalacji w bramce „Serwer", ta sama gałąź, trzy pomiary:
@@ -16,12 +16,21 @@
 # że liczba wyglądała na strukturalną. Zostawiam to zdanie, bo następny, kto
 # zobaczy wolną bramkę, ma zacząć od rejestru, nie od dysku.
 #
-# ── CO JEST ZAKŁADEM ────────────────────────────────────────────────────────
-# Cache drzewa `node_modules` zostaje mimo to i nie ma pomiaru na swoją
-# obronę. Ma zdejmować tę zmienność, która dała rozrzut od czterech do siedmiu
-# minut, bo `--no-audit` nie chroni przed wolnym POBIERANIEM paczek. Jeśli
-# kolejne przebiegi pokażą, że instalacja bez cache'a i tak trwa sekundy,
-# ten cache jest do usunięcia — złożoności bez zysku się nie trzyma.
+# ── ILE DAJE SAM CACHE: PIĘĆ SEKUND ─────────────────────────────────────────
+# Zmierzone na dwóch kolejnych przebiegach tej samej gałęzi:
+#   9 s  przebieg 645 — cache NIETRAFIONY, drzewo instalowane od zera
+#   4 s  przebieg 646 — cache trafiony („Cache hit occurred on the primary
+#        key nm-Linux-X64-node22-37ddd58…, not saving cache")
+#
+# Cache daje więc pięć sekund, a nie minuty. Stało tu wcześniej zdanie, że
+# przy takim wyniku jest do usunięcia — WŁAŚCICIEL ZDECYDOWAŁ INACZEJ i cache
+# zostaje. Nie kasuj go „bo się nie opłaca": ta decyzja już zapadła, z tymi
+# liczbami na stole.
+#
+# Uczciwie o tym, czego cache NIE robi: nie ubezpiecza przed awarią, która nas
+# uderzyła. Przebiegi na 3 min 41 s i 7 min 03 s miały `cache: npm`, czyli
+# ciepły katalog pobrań — paczki już tam leżały, wolny był audyt. Cache drzewa
+# pomoże przy NOWEJ zależności albo gdy rejestr padnie przy pobieraniu, i tyle.
 #
 # `cache: npm` w `setup-node`, które stało tu wcześniej, trzymało katalog
 # pobrań `~/.npm`, a nie drzewo.
