@@ -138,13 +138,18 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 [`src/SferaComAdapter.cs`](src/SferaComAdapter.cs) i jest oznaczone
 `[WERYFIKUJ]` (konwencja repo — wartość do potwierdzenia na własnym systemie):
 
-1. ProgID obiektu GT (`"InsERT.GT"`) i **wartość liczbowa** `gtaProduktSubiekt`.
-   Nazwy są z dokumentacji; liczby producent publikuje tylko w InfoSferze, więc
-   obie siedzą w `wertis.env` (`SFERA_PROGID`, `SFERA_PRODUKT`).
-2. Mechanizm logowania (`Autentykacja` — mieszana kontra Windows; przy mieszanej
-   ZARÓWNO `Uzytkownik`/`UzytkownikHaslo`, jak i `Operator`/`OperatorHaslo`).
-   Komplet właściwości jest już ustalony i wpisany w kod; do potwierdzenia
-   zostaje wartość `SFERA_AUTENTYKACJA` na tej instalacji.
+1. **Ustalone (0.197.2):** ProgID `"InsERT.GT"` — obiekt powstaje na maszynie
+   firmy. Zostaje **wartość liczbowa** `gtaProduktSubiekt`, ale i ją zamyka
+   sonda: czyta `ProduktNazwa` dla kolejnych numerów, bez logowania.
+2. **Nazwy ustalone (0.197.2)**, sonda wypisała komplet właściwości logowania.
+   Do potwierdzenia zostaje sama wartość `SFERA_AUTENTYKACJA` — mieszana kontra
+   Windows. Przy mieszanej Sfera chce ZARÓWNO `Uzytkownik`/`UzytkownikHaslo`,
+   jak i `Operator`/`OperatorHaslo`.
+
+   > Odmowa z kodem `0x80041329` to najczęściej **hasło loginu SQL zaczynające
+   > się od cyfry albo litery `a`–`f`**. Windows dokleja do tego kodu opis
+   > Harmonogramu zadań — tekst o „aparacie planowania" jest mylący i nie
+   > dotyczy Sfery. Szczegóły: `docs/sfera-com.md` §2b.
 3. **Ustalone (0.197.0):** `Uruchom(gtaUruchomDopasuj, gtaUruchom | gtaUruchomWTle)`
    — czyli `Uruchom(0x0, 0x4)`. Wartości i źródła: `docs/sfera-com.md` §2.
 4. Manager i metoda dodania MM (`DokumentyMagazynoweManager.DodajMM()`),

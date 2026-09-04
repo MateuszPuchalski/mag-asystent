@@ -37,6 +37,21 @@ uwierzytelnienie w bazie. `Operator` i `OperatorHaslo` to użytkownik Subiekta.
 Przy autentykacji mieszanej Sfera potrzebuje obu par. Nasz kod ustawiał tylko
 drugą, więc połączenie nie miało czym otworzyć bazy.
 
+Warto to rozdzielić dokładnie, bo nazwy mylą.
+
+| pole | co to jest | kto to zwykle podaje |
+|---|---|---|
+| `Operator` | **login do Subiekta** — ten sam, który wpisujesz przy otwieraniu programu (np. „Szef") | człowiek, w oknie logowania |
+| `Uzytkownik` | login do **SQL Servera**, na którym stoi baza podmiotu | sam Subiekt, z ustawień połączenia podmiotu |
+
+Uruchamiając Subiekta z pulpitu, drugiego z nich nigdy nie widzisz — program
+bierze go z własnej konfiguracji. Przez Sferę to **Ty tworzysz obiekt GT**,
+więc podajesz oba. Przy autentykacji Windows loginu SQL nie ma wcale: bazę
+otwiera konto, na którym działa proces.
+
+Stąd praktyczny wniosek dla usługi. `wertis-sfera` działa na koncie usługi,
+a nie na Twoim — przy autentykacji Windows to konto musi mieć dostęp do bazy.
+
 To **nie jest** `MSSQL_USER` z `wertis.env`. Tamten login ma z założenia prawo
 `SELECT` na sześciu tabelach i `UPDATE` na dwóch kolumnach (`DEPLOY.md` §6).
 Sfera wystawia dokumenty i potrzebuje pełnych praw podmiotu. Stąd osobne klucze
@@ -64,6 +79,43 @@ tego typu, podłączona do wskazanego serwera i bazy.
 Worker wysyła `Uruchom(0x0, 0x0 | 0x4)`. Usługa Windows nie ma pulpitu, więc bez
 `gtaUruchomWTle` Subiekt nie miałby gdzie pokazać okna. Kod miał tu wcześniej
 gołe `Uruchom(0, 4)` — te same liczby, bez śladu, skąd się wzięły.
+
+## 2a. Co potwierdziła sonda na maszynie firmy (0.197.2)
+
+Pierwszy przebieg `sonda.ps1` u właściciela zamknął punkt 1 i większość punktu
+2. Obiekt COM `InsERT.GT` **powstaje**, a jego składowe wyglądają tak:
+
+| rodzaj | nazwy |
+|---|---|
+| metody | `Uruchom`, `Wczytaj` |
+| właściwości | `Autentykacja`, `Baza`, `Klucz`, `Konfiguracja`, `Operator`, `OperatorHaslo`, `Polaczenie`, `Produkt`, `ProduktNazwa`, `Serwer`, `Uzytkownik`, `UzytkownikHaslo` |
+
+Z tego wynikają trzy rzeczy.
+
+**Poprawka z 0.197.0 trafiła.** `Uzytkownik` i `UzytkownikHaslo` naprawdę są na
+obiekcie, więc login SQL miał gdzie jechać. Wcześniejszy kod ich nie ustawiał.
+
+**Wszystkie nazwy z naszego kodu istnieją.** Żadna właściwość logowania nie
+okazała się zmyślona.
+
+**`ProduktNazwa` daje numer produktu za darmo.** Czyta się ją zaraz po
+ustawieniu `Produkt`, bez logowania i bez licencji. Sonda przechodzi teraz
+wartości od 0 do 8 i wypisuje nazwy, więc `gtaProduktSubiekt` ustala się
+bez jednego dokumentu.
+
+## 2b. Pułapka: HRESULT `0x8004xxxx` kłamie w komunikacie
+
+`Uruchom()` odmówił z kodem `0x80041329`, a Windows dokleił do niego zdanie
+o „aparacie planowania". To zdanie **nie ma ze Sferą nic wspólnego**.
+
+Kody `0x8004xxxx` należą do grupy interfejsowej: znaczenie nadaje im ta
+biblioteka, która je zwróciła. Windows zna z tej puli kody Harmonogramu zadań
+i podstawia jego opis. Liczy się sama liczba, nie tekst.
+
+Dla Sfery `0x80041329` znaczy co innego: **hasło loginu SQL zaczyna się od
+cyfry albo od litery `a`–`f`**. Rozwiązanie brzmi absurdalnie i takie jest —
+hasło ma się zaczynać od litery z zakresu `g`–`z`. Ten sam kod pada przy pustym
+albo błędnym loginie SQL, a tak było w pierwszym przebiegu.
 
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
@@ -112,3 +164,8 @@ od tego jest sonda i bramka 2.
 - [Sfera Subiekt GT — wywołanie Uruchom w C#](https://4programmers.net/Forum/C_i_C++/191405-sfera_subiekt_gt) (maska trybu uruchomienia)
 - [Problem z integracją przez Sferę](https://forumsubiekta.pl/dodatki-zestawienia/problem-z-integracja-\(polaczenie-przez-sfere\)/10?wap2=) (wartości `UruchomEnum` i `UruchomDopasujEnum`)
 - [Sfera dla InsERT GT — informacje zaawansowane](https://www.insert.com.pl/dla_uzytkownikow/e-pomoc_techniczna/7667,sfera-dla-insert-gt-%E2%80%93-informacje-zaawansowane.html) (gdzie szukać InfoSfery)
+- [Konfiguracja integracji z Subiektem GT](https://docs.easystorage.io/pl/panel-web/konfiguracja/integracje/subiekt-gt) (`0x80041329` a pierwszy znak hasła SQL)
+- [Najczęstsze problemy przy połączeniu ze Sferą](https://pomoc.integratory.pl/subsync-integracja-z-subiektem/rozwiazywanie-problemow/najczestsze-problemy/) (to samo, niezależnie)
+
+Sekcje 2a i 2b mają inne źródło: **przebieg sondy na maszynie firmy**, 4 września
+2026. To jedyne ustalenia w tym pliku potwierdzone na żywej Sferze.
