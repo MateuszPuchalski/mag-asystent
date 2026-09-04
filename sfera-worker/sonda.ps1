@@ -42,7 +42,12 @@ param(
     # Tworzy MM jako obiekt w pamieci i wypisuje jego wlasciwosci. NIE wola
     # Zapisz(), wiec dokument nie powstaje - ale to jedyne wywolanie Dodaj*
     # w calej sondzie, wiec wlacza sie je swiadomie.
-    [switch]$SzkicMM
+    [switch]$SzkicMM,
+    # Identyfikatory magazynow do szkicu MM. Pusty dokument oddal Pozycje jako
+    # null - kolekcja pozycji zwykle potrzebuje najpierw magazynu, bo bez niego
+    # nie wiadomo, z czego wolno brac. Dotyczy wylacznie -SzkicMM.
+    [int]$MagNadawczy = 0,
+    [int]$MagOdbiorczy = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -63,6 +68,8 @@ $pOperator = $Operator
 $pOperatorHaslo = $OperatorHaslo
 $pLoginSql = $LoginSql
 $pHasloSql = $HasloSql
+$pMagNadawczy = $MagNadawczy
+$pMagOdbiorczy = $MagOdbiorczy
 
 # --- wertis.env: te same reguly co EnvFile.cs (export, cudzyslowy, komentarze) ---
 function Wczytaj-Env([string]$sciezka) {
@@ -429,8 +436,10 @@ Write-Wynik ""
 # Sygnatury pokazaly, ze KAZDE `Dodaj*` na SuDokumentyManager jest BEZ
 # ARGUMENTOW i zwraca `SuDokument`. Czyli dokument powstaje najpierw jako
 # obiekt, a dopiero `Zapisz()` go utrwala - i to jest szansa, zeby zobaczyc
-# jego wlasciwosci (MagazynZrodlowyId, Pozycje, NumerPelny) BEZ wystawiania
-# czegokolwiek.
+# jego wlasciwosci (magazyny, Pozycje, NumerPelny) BEZ wystawiania czegokolwiek.
+# Pierwszy taki przebieg od razu sie zwrocil: magazyny na dokumencie nazywaja
+# sie MagazynNadawczyId i MagazynOdbiorczyId, a nie MagazynZrodlowyId, na
+# ktorym stal kod.
 #
 # DOMYSLNIE WYLACZONE i tak zostaje. Sonda ma jedna obietnice - „niczego nie
 # zapisuje" - a `DodajMM()` jest pierwszym wywolaniem, ktore tej obietnicy
@@ -443,8 +452,30 @@ if ($SzkicMM) {
     try {
         $mm = $sgt.SuDokumentyManager.DodajMM()
         Skladowe $mm "SuDokument (MM) - wlasciwosci dokumentu"
-        if (Ma-Nazwe $mm "Pozycje") {
-            Skladowe $mm.Pozycje "SuDokument.Pozycje"
+
+        # Pierwszy przebieg (0.198.6) pokazal, ze na PUSTYM dokumencie Pozycje
+        # jest null - Get-Member odmowil komunikatem o braku obiektu, ktory
+        # wyglada na blad sondy, a jest stanem dokumentu. Magazyny podane
+        # parametrem pozwalaja sprawdzic, czy kolekcja pojawia sie dopiero po
+        # nich; nadal bez Zapisz().
+        if ($pMagNadawczy -gt 0 -or $pMagOdbiorczy -gt 0) {
+            try {
+                if ($pMagNadawczy -gt 0) { $mm.MagazynNadawczyId = $pMagNadawczy }
+                if ($pMagOdbiorczy -gt 0) { $mm.MagazynOdbiorczyId = $pMagOdbiorczy }
+                Write-Wynik ("  JEST  magazyny ustawione: nadawczy={0} odbiorczy={1}" -f $pMagNadawczy, $pMagOdbiorczy)
+            } catch {
+                Write-Wynik "  BRAK  ustawienie magazynow odmowilo: $($_.Exception.Message)"
+            }
+        }
+
+        $pozycje = $null
+        try { $pozycje = $mm.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
+        if ($null -eq $pozycje) {
+            Write-Wynik ""
+            Write-Wynik "--- SuDokument.Pozycje ---"
+            Write-Wynik "  (null - kolekcja jeszcze nie istnieje; sprobuj -MagNadawczy N -MagOdbiorczy M)"
+        } else {
+            Skladowe $pozycje "SuDokument.Pozycje"
         }
     } catch {
         Write-Wynik "  BRAK  DodajMM() odmowil: $($_.Exception.Message)"
@@ -453,10 +484,10 @@ if ($SzkicMM) {
 
 Write-Wynik "Czego sonda NIE rozstrzyga, bo wymaga wystawienia dokumentu:"
 Write-Wynik "  - punkt 5: czy Zapisz() daje dokument WYKONANY, czy odklada do bufora"
-Write-Wynik "  - nazwy wlasciwosci na SAMYM dokumencie (MagazynZrodlowyId, Pozycje.Dodaj,"
-Write-Wynik "    IloscJm, NumerPelny, IloscPoKorekcie, Usun) - te widac dopiero na obiekcie"
-Write-Wynik "    dokumentu, a ten powstaje przez Dodaj*, czego sonda nie robi z zalozenia."
-Write-Wynik "    Zamyka je bramka 2 z docs/wdrozenie.md: jedno MM na kartotece probnej."
+Write-Wynik "  - znaczenie flagi w Usun(bool) - sygnatura jest znana, sens flagi nie"
+Write-Wynik "  - skladowe kolekcji Pozycje (Dodaj, SzukajTowar, IloscJm, IloscPoKorekcie),"
+Write-Wynik "    jesli kolekcja wraca jako null nawet po podaniu magazynow"
+Write-Wynik "Zamyka je bramka 2 z docs/wdrozenie.md: jedno MM na kartotece probnej."
 Write-Wynik ""
 Write-Wynik "Nastepny krok: wpisz ustalenia do docs/sfera-com.md i zdejmij zamkniete"
 Write-Wynik "znaczniki [WERYFIKUJ] z sfera-worker/README.md."

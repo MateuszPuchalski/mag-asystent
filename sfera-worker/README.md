@@ -149,6 +149,13 @@ Ostatni przełącznik, `-SzkicMM`, jest jedynym miejscem, gdzie sonda woła
 wyłącznie na obiekcie dokumentu, bez wystawiania czegokolwiek. Domyślnie
 wyłączony, bo obietnica „sonda niczego nie tworzy" ma zostać dosłowna.
 
+Kolekcja `Pozycje` wraca na pustym dokumencie jako `null`. Magazyny podane
+parametrem rozstrzygają, czy potrzebuje ich, zanim powstanie:
+
+```powershell
+powershell ... -File sonda.ps1 -SzkicMM -MagNadawczy 1 -MagOdbiorczy 2
+```
+
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
 Wszystko, co dotyczy COM, siedzi w **jednym pliku**
@@ -170,23 +177,27 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 3. **Zamknięte (0.198.5):** `Uruchom(gtaUruchomDopasuj, gtaUruchomNowy |
    gtaUruchomWTle)`, czyli `Uruchom(0x0, 0x6)` — zmierzone, sesja otwiera się
    BEZ OKNA. Usługa da się uruchomić bez pulpitu. `docs/sfera-com.md` §2g.
-4. **Zamknięte (0.198.5):** `SuDokumentyManager.DodajMM()`. Nazwy właściwości
-   na samym dokumencie (`MagazynZrodlowyId`, `Pozycje.Dodaj`, `IloscJm`)
-   zostają — te widać dopiero na obiekcie dokumentu.
+4. **Zamknięte (0.198.7):** `SuDokumentyManager.DodajMM()`, a magazyny na
+   dokumencie to `MagazynNadawczyId` i `MagazynOdbiorczyId`. Zgadnięte
+   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ. Otwarte zostaje samo
+   dodawanie pozycji (`Pozycje.Dodaj`, `IloscJm`): na pustym dokumencie
+   kolekcja `Pozycje` wraca jako `null`.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
    Skutek magazynowy ma własne wywołania, a sygnatura mówi czym się posługują:
    `void SkutekMagazynowyWywolaj(int)` — identyfikatorem dokumentu (0.198.6).
    Czy `Zapisz()` robi to sam, pokaże pierwszy dokument.
-6. **Metoda i sygnatura zamknięte (0.198.6):** `SuDokument DodajKFS()`, bez
-   argumentów. Korekta powstaje jako pusty dokument, więc otwarte zostaje
-   POWIĄZANIE z dokumentem pierwotnym — manager ma `WczytajDokument(dok_Id)`,
-   ale którą właściwością te dwa się łączy, widać dopiero na obiekcie.
-   Sposób adresowania pozycji i pole ilości po korekcie: też do ustalenia.
-7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
-   dalsze ogniwo padnie.
-8. **Manager i metoda zamknięte (0.198.5):** `SuDokumentyManager.DodajRW()`.
-   Właściwość magazynu na dokumencie zostaje — pierwsze RW na podmiocie
-   testowym, na zwrocie próbnym.
+6. **Metoda, sygnatura i powiązanie zamknięte (0.198.7):**
+   `SuDokument DodajKFS()`, a dokument pierwotny wskazuje się wywołaniem
+   `NaPodstawie(dok_Id)`. Że Variant bierze identyfikator, mówi bliźniacze
+   `NaPodstawieWielu(SAFEARRAY(int))`. Sposób adresowania pozycji korekty
+   i pole ilości po korekcie zostają otwarte.
+7. **Sygnatura zamknięta (0.198.7):** `void Usun(bool)`. Znaczenie flagi nie —
+   adapter podaje `false` jako działanie węższe. Na tym stoi wycofanie
+   łańcucha, gdy dalsze ogniwo padnie.
+8. **Manager, metoda i magazyn zamknięte (0.198.7):**
+   `SuDokumentyManager.DodajRW()` plus `MagazynNadawczyId`. `MagazynId` stoi na
+   SESJI, nie na dokumencie — gdyby RW brało magazyn stamtąd, wołaniem
+   zastępczym jest `su.MagazynId` przed `DodajRW()`.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
 wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak

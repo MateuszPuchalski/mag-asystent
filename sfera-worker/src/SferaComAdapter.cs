@@ -151,10 +151,15 @@ public sealed class SferaComAdapter : ISferaAdapter
            obiekcie sesji NIE MA WCALE. */
         dynamic mm = Krok("SuDokumentyManager.DodajMM()", 4,
             () => su.SuDokumentyManager.DodajMM());
-        Krok("MM.MagazynZrodlowyId / MagazynDocelowyId", 4, () =>
+        /* USTALONE (0.198.7) szkicem MM w sondzie: magazyny nazywają się
+           `MagazynNadawczyId` i `MagazynOdbiorczyId`. Zgadnięte
+           `MagazynZrodlowyId`/`MagazynDocelowyId` na dokumencie NIE ISTNIEJĄ —
+           byłaby to TRZECIA zgadnięta nazwa, która wywróciłaby się dopiero
+           przy pierwszym zwrocie u klienta. */
+        Krok("MM.MagazynNadawczyId / MagazynOdbiorczyId", 4, () =>
         {
-            mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
-            mm.MagazynDocelowyId = magTo;
+            mm.MagazynNadawczyId = magFrom;
+            mm.MagazynOdbiorczyId = magTo;
         });
         foreach (var it in items)
         {
@@ -169,6 +174,7 @@ public sealed class SferaComAdapter : ISferaAdapter
            (docs/wdrozenie.md); jeśli firma woli bufor, tu jest to jedno
            wywołanie do zmiany. */
         Krok("MM.Zapisz()", 5, () => { mm.Zapisz(); });
+        // `NumerPelny` potwierdzony na obiekcie dokumentu (szkic MM, 0.198.7)
         return (mm, Krok("MM.NumerPelny", 5, () => (string)mm.NumerPelny));
     }
 
@@ -183,7 +189,14 @@ public sealed class SferaComAdapter : ISferaAdapter
            co MM — sonda wypisała komplet jego metod `Dodaj*`. */
         dynamic rw = Krok("SuDokumentyManager.DodajRW()", 8,
             () => su.SuDokumentyManager.DodajRW());
-        Krok("RW.MagazynId", 8, () => { rw.MagazynId = magId; });
+        /* `MagazynId` stoi na SESJI, nie na dokumencie — szkic MM pokazał, że
+           `SuDokument` ma wyłącznie `MagazynNadawczyId` i `MagazynOdbiorczyId`.
+           RW to rozchód, więc towar wychodzi z magazynu NADAWCZEGO. Lista
+           składowych jest wspólna dla wszystkich typów dokumentu, więc to, że
+           właściwość istnieje, nie dowodzi jeszcze, że RW jej używa: gdyby
+           Sfera brała magazyn RW z kontekstu sesji, wołaniem zastępczym jest
+           `su.MagazynId = magId` przed `DodajRW()`. [WERYFIKUJ] na bramce 2. */
+        Krok("RW.MagazynNadawczyId", 8, () => { rw.MagazynNadawczyId = magId; });
         foreach (var it in items)
         {
             Krok("RW.Pozycje.Dodaj(tw_Id).IloscJm", 8, () =>
@@ -219,9 +232,16 @@ public sealed class SferaComAdapter : ISferaAdapter
             dynamic korekta = Krok("SuDokumentyManager.DodajKFS()", 6,
                 () => su.SuDokumentyManager.DodajKFS());
 
-            /* [WERYFIKUJ] powiązanie korekty z dokumentem pierwotnym.
-               Kandydat: właściwość na obiekcie korekty przyjmująca dokument
-               z `WczytajDokument(z.DokId)`. Nazwy nie zgadujemy trzeci raz. */
+            /* Powiązanie z dokumentem pierwotnym: `void NaPodstawie(Variant)`
+               na obiekcie dokumentu (szkic MM, 0.198.7). Że Variant przyjmuje
+               IDENTYFIKATOR, a nie wczytany dokument, mówi bliźniacza metoda
+               `NaPodstawieWielu(SAFEARRAY(int))` — ta bierze tablicę intów.
+               [WERYFIKUJ] zostaje sam typ argumentu; gdyby Sfera chciała
+               obiektu, w tym miejscu wchodzi `WczytajDokument(z.DokId)`.
+               Właściwość `DoDokumentuId` istnieje obok, ale wygląda na pole
+               ODCZYTYWANE po powiązaniu: korekta musi przejąć pozycje
+               dokumentu pierwotnego, a to robi się wywołaniem, nie przypisaniem. */
+            Krok("Korekta.NaPodstawie(dok_Id)", 6, () => { korekta.NaPodstawie(z.DokId); });
             foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
                 /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
@@ -260,12 +280,18 @@ public sealed class SferaComAdapter : ISferaAdapter
                    trafia do komunikatu z IMIENIA, bo to jego człowiek będzie
                    musiał usunąć ręką przed ponowieniem. */
                 var nieWycofane = new List<string>();
+                /* `void Usun(bool)` — sygnatura ustalona (0.198.7), znaczenie
+                   flagi NIE. Idzie `false`, bo w każdym czytaniu tej flagi
+                   (potwierdzenie, kaskada na dokumenty powiązane, wymuszenie)
+                   `false` jest działaniem WĘŻSZYM: usuwa ten jeden dokument
+                   i o nic nie pyta. Usługa nie ma pulpitu, na którym mogłaby
+                   odpowiedzieć na pytanie. [WERYFIKUJ] na bramce 2. */
                 if (mmDok is not null)
                 {
-                    try { mmDok.Usun(); }                     // [WERYFIKUJ]
+                    try { mmDok.Usun(false); }
                     catch { nieWycofane.Add($"MM {nrMm}"); }
                 }
-                try { korekta.Usun(); }                       // [WERYFIKUJ]
+                try { korekta.Usun(false); }
                 catch { nieWycofane.Add($"korekta {nrKorekty}"); }
 
                 throw nieWycofane.Count == 0
