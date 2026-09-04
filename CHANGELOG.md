@@ -34,6 +34,68 @@ historii nie przepisujemy.
 ---
 
 
+## 0.197.0 — 4 września 2026
+
+**Worker Sfery przed pierwszym wdrożeniem: dwie poprawki z dokumentacji,
+własny test i exe prosto z CI.** Nic z tego nie zmienia ekranu; wszystko
+zmienia to, ile podejść kosztuje etap 2 z `docs/wdrozenie.md`.
+
+### Logowanie do Sfery miało dwie dziury, obie z pamięci zamiast z dokumentacji
+
+Przykład producenta ustawia przed `Uruchom` osiem właściwości. Kod ustawiał
+sześć. Brakowało pary `Uzytkownik` / `UzytkownikHaslo`, czyli **loginu SQL** —
+osobnego od operatora Subiekta i wymaganego przy autentykacji mieszanej.
+Doszły klucze `SFERA_SQL_LOGIN` i `SFERA_SQL_HASLO`; celowo NIE jest to
+`MSSQL_USER`, bo tamten login ma z założenia prawo do sześciu tabel, a Sfera
+wystawia dokumenty.
+
+Druga dziura to adres serwera. Sfera chce postaci `HOST\INSTANCJA`, a worker
+wysyłał samo `MSSQL_SERVER` — czyli celował w instancję domyślną, podczas gdy
+instalator InsERT-u zakłada `INSERTGT`. Teraz skleja adres tak samo jak serwer
+po stronie Node.
+
+Ustalenia i ich źródła zebrane są w nowym `docs/sfera-com.md`. To ta sama
+zasada, którą `CLAUDE.md` trzyma dla Allegro: kształt czyta się z pliku, nie
+z pamięci.
+
+### Sonda: nazwy Sfery bez wystawiania dokumentu
+
+`sfera-worker/sonda.ps1` otwiera sesję Subiekta i wypisuje nazwy składowych —
+obiektu GT, Subiekta, managerów. Nie woła żadnego `Dodaj*` ani `Zapisz()`,
+więc nie zostawia śladu w bazie. Zamyka większość listy `[WERYFIKUJ]` w jednym
+przebiegu, zamiast pętli „popraw C#, zbuduj exe, skopiuj, zrestartuj usługę".
+
+Gdy nazwa mimo to okaże się zła, worker mówi to wprost: komunikat nazywa
+wywołanie i numer punktu z listy w `sfera-worker/README.md`.
+
+### Kod C# dostał pierwszy test w historii tego repo
+
+Do dziś CI sprawdzało wyłącznie, że projekt się kompiluje. Pierwszym
+uruchomieniem `Queue.cs` była więc bramka na maszynie klienta. `test-dymny.sh`
+przepuszcza przez workera jedno MM w trybie `--dry-run` i sprawdza status,
+numer dokumentu, zdarzenie audytu, heartbeat oraz guard kolejności.
+
+Test zwrócił się przy pierwszym uruchomieniu. Bazę zakłada **kod serwera**,
+z migracjami — bo `events.user_ref` dochodzi właśnie migracją, a baza z samego
+`schema.sql` wywracała zapis audytu i zostawiała zadanie w `processing`. Na
+hali zobaczyłby to ktoś dopiero po wystawieniu dokumentu w Subiekcie.
+
+### Exe schodzi z CI, a `e_sqlite3.dll` wreszcie siedzi w środku
+
+Przebieg workflow wiesza gotowy `wertis-sfera-worker.exe` jako artefakt, więc
+**wdrożenie nie potrzebuje już .NET SDK na żadnej maszynie**. Late binding
+sprawia, że Windows nie jest potrzebny nawet do kompilacji.
+
+Przy okazji wyszło, że `PublishSingleFile` zostawiał `e_sqlite3.dll` OBOK exe,
+a instrukcja każe skopiować na serwer sam plik wykonywalny. Skończyłoby się
+to „Unable to load DLL" przy pierwszym otwarciu bazy. Ustawienie stoi teraz
+w `.csproj`, więc obowiązuje każdą drogę budowania.
+
+**[wymaga działania]** tylko przy wdrażaniu workera Sfery: usługę
+`wertis-sfera` rejestruje się jako OSTATNIĄ, po ręcznym `--dry-run --once`.
+Błąd widać wtedy na ekranie, a nie w przekierowanym dzienniku NSSM.
+
+
 ## 0.196.0 — 3 września 2026
 
 **Obecność przestała ściągać całą listę rozmów.** Zdarzenie obecności —

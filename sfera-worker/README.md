@@ -34,6 +34,17 @@ z którego wynika ten kod: [`server/src/adapters/sfera.ts`](../server/src/adapte
 
 ## Budowa i wdrożenie
 
+**Najkrócej: weź exe z CI.** Workflow `Worker Sfery` buduje przy każdej zmianie
+w `sfera-worker/` samowystarczalny `wertis-sfera-worker.exe` dla Windows x64
+i wiesza go jako artefakt przebiegu (Actions → wybrany przebieg → Artifacts →
+`wertis-sfera-worker`). Late binding sprawia, że kompilacja nie potrzebuje ani
+Subiekta, ani Windowsa, więc ta sama maszyna, która sprawdza testy, produkuje
+gotowy plik. Wtedy **nie instalujesz .NET SDK nigdzie** — ani u siebie, ani
+u klienta — i nie ma pytania „skąd ten exe".
+
+Droga poniżej zostaje na wypadek pracy bez sieci albo poprawki, której nie ma
+jeszcze w repozytorium.
+
 **Bez .NET 8 SDK ten skrypt nie ruszy.** Instalacja na Windowsie:
 
 ```powershell
@@ -74,8 +85,17 @@ na kopii bazy, potem **jedno** MM na kartotece próbnej, dopiero potem produkcja
 Szuka pliku: `WERTIS_ENV_FILE` → katalog exe → katalog wyżej (`C:\wertis`) →
 bieżący. Zmienna środowiskowa wygrywa z plikiem (semantyka jak w Node).
 Czytane klucze: `DB_PATH`, `SGT_MODE` (wymagane `mssql`), `WORKER_POLL_MS`,
-`MSSQL_SERVER`, `MSSQL_DATABASE`, `SFERA_WORKER`, `SFERA_OPERATOR`,
-`SFERA_OPERATOR_HASLO`.
+`MSSQL_SERVER`, `MSSQL_INSTANCE`, `MSSQL_PORT`, `MSSQL_DATABASE`,
+`SFERA_WORKER`, `SFERA_OPERATOR`, `SFERA_OPERATOR_HASLO`, `SFERA_SQL_LOGIN`,
+`SFERA_SQL_HASLO`, `SFERA_PROGID`, `SFERA_PRODUKT`, `SFERA_AUTENTYKACJA`.
+
+Dwie rzeczy warto wiedzieć, zanim się je wypełni. **Login SQL jest osobny od
+operatora**: `SFERA_SQL_LOGIN` otwiera bazę, `SFERA_OPERATOR` jest użytkownikiem
+Subiekta, a przy autentykacji mieszanej Sfera chce obu. To nie jest `MSSQL_USER`
+— tamten login ma prawa do sześciu tabel, a Sfera wystawia dokumenty.
+**Adres serwera niesie instancję**: worker skleja `MSSQL_SERVER\MSSQL_INSTANCE`
+(domyślnie `INSERTGT`), bo tego oczekuje Sfera. Powód i źródła:
+[`docs/sfera-com.md`](../docs/sfera-com.md).
 
 Stałe retry (backoff 5 s / 30 s / 2 min, trzy próby, ponowienie bufora co
 60 s) są zaszyte identycznie jak w workerze Node — źródłem jest
@@ -88,17 +108,44 @@ Stałe retry (backoff 5 s / 30 s / 2 min, trzy próby, ponowienie bufora co
 | `--dry-run` | pełny cykl pick → done **bez Sfery**; numer `MM DRY-RUN/n` w `sgt_doc_number`, `sfera_mode='dry-run'` w heartbeacie. Działa też na Linuksie. |
 | `--once` | jeden tick pętli i wyjście — do testów |
 
+Obie razem bramkują całą kolejkę w CI — `test-dymny.sh` zakłada bazę ze schematu
+serwera, przepuszcza przez workera jedno MM i sprawdza status, numer, zdarzenie
+audytu, heartbeat oraz guard kolejności. Uruchamiasz to samo u siebie:
+
+```bash
+sfera-worker/test-dymny.sh
+```
+
+## Sonda — nazwy Sfery bez wystawiania dokumentu
+
+[`sonda.ps1`](sonda.ps1) otwiera sesję Subiekta i wypisuje nazwy składowych:
+obiektu GT, Subiekta, managerów dokumentów. **Niczego nie zapisuje** — żadnego
+`Dodaj*`, żadnego `Zapisz()`. Odpowiada na większość listy niżej w jednym
+przebiegu, bez pakietu SDK i bez śladu w bazie.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
+```
+
+Wynik ląduje na ekranie i w `sonda-sfery.txt`. To on wraca do repozytorium jako
+wypełniona lista — ustalenia dopisuje się do
+[`docs/sfera-com.md`](../docs/sfera-com.md).
+
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
 Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 [`src/SferaComAdapter.cs`](src/SferaComAdapter.cs) i jest oznaczone
 `[WERYFIKUJ]` (konwencja repo — wartość do potwierdzenia na własnym systemie):
 
-1. ProgID obiektu GT (`"InsERT.GT"`) i wartość `gtaProduktSubiekt`.
-2. Mechanizm logowania operatora (`Autentykacja`, `Operator`, `OperatorHaslo`
-   — możliwa autoryzacja Windows; od tego zależą ostateczne nazwy kluczy
-   `SFERA_OPERATOR*`).
-3. Tryb `Uruchom(...)` (dopasowanie wersji, praca w tle bez okna).
+1. ProgID obiektu GT (`"InsERT.GT"`) i **wartość liczbowa** `gtaProduktSubiekt`.
+   Nazwy są z dokumentacji; liczby producent publikuje tylko w InfoSferze, więc
+   obie siedzą w `wertis.env` (`SFERA_PROGID`, `SFERA_PRODUKT`).
+2. Mechanizm logowania (`Autentykacja` — mieszana kontra Windows; przy mieszanej
+   ZARÓWNO `Uzytkownik`/`UzytkownikHaslo`, jak i `Operator`/`OperatorHaslo`).
+   Komplet właściwości jest już ustalony i wpisany w kod; do potwierdzenia
+   zostaje wartość `SFERA_AUTENTYKACJA` na tej instalacji.
+3. **Ustalone (0.197.0):** `Uruchom(gtaUruchomDopasuj, gtaUruchom | gtaUruchomWTle)`
+   — czyli `Uruchom(0x0, 0x4)`. Wartości i źródła: `docs/sfera-com.md` §2.
 4. Manager i metoda dodania MM (`DokumentyMagazynoweManager.DodajMM()`),
    nazwy właściwości magazynów i pozycji.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora —
@@ -111,7 +158,19 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 8. RW dla pozycji zniszczonych (`DokumentyMagazynoweManager.DodajRW()`,
    właściwość magazynu) — pierwsze RW na kopii bazy, na zwrocie próbnym.
 
-Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa.
+Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
+wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak
+**bez budowania** — `SFERA_PROGID`, `SFERA_PRODUKT` i `SFERA_AUTENTYKACJA` stoją
+w `wertis.env`, więc kosztują restart usługi.
+
+Kolejność, która oszczędza wyjazdy: najpierw [sonda](#sonda--nazwy-sfery-bez-wystawiania-dokumentu)
+(punkty 1, 2, 4, 6, 8), potem jedno MM na kartotece próbnej (punkty 5 i 7 oraz
+nazwy właściwości dokumentu). Ustalenia zapisuje się w
+[`docs/sfera-com.md`](../docs/sfera-com.md), razem ze źródłem.
+
+Gdy nazwa jest zła, worker mówi to wprost: komunikat nazywa wywołanie i **numer
+punktu z tej listy**, zamiast zostawiać gołe „`__ComObject` does not contain
+a definition for `DodajMM`" w środku wystawiania dokumentu.
 
 ## Niezmienniki, których pilnuje ten proces
 

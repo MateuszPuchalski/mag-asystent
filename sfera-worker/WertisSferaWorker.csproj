@@ -15,6 +15,12 @@
     <!-- Ścieżki i formaty dat są ustalane ręcznie (ISO, lustro nowIso() z
          Node) — globalizacja ICU tylko powiększałaby exe. -->
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Bez tego `PublishSingleFile` zostawia `e_sqlite3.dll` OBOK exe, a README
+         i build.ps1 każą skopiować na serwer sam plik wykonywalny. Skończyłoby
+         się to „Unable to load DLL 'e_sqlite3'" przy pierwszym otwarciu bazy —
+         czyli na maszynie klienta, po całej instalacji. Właściwość stoi tutaj,
+         a nie w wywołaniu, żeby obowiązywała KAŻDĄ drogę budowania. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

@@ -208,6 +208,10 @@ to zdanie sprawdzalne. Instrukcja instalacji: `DEPLOY.md` §6, etap 2.
 
 **Bramki — wszystkie na kopii bazy, zanim dotknie produkcji:**
 
+0. **Sonda nazw** (`sfera-worker\sonda.ps1`): otwiera sesję Subiekta i wypisuje
+   nazwy składowych. Niczego nie zapisuje. Robi się ją PRZED usługą, bo zamyka
+   większość listy `[WERYFIKUJ]` bez wystawiania dokumentu. Ustalenia wpisz do
+   [`sfera-com.md`](sfera-com.md).
 1. **Przebieg próbny** (`--dry-run`): pętla działa, `/api/health` pokazuje
    blok `sfera` z `zyje: true`. Zadanie mm przechodzi cykl z numerem
    `MM DRY-RUN/n` — dokument w Subiekcie NIE powstaje.

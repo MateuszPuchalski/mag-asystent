@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Microsoft.CSharp.RuntimeBinder;
 
 namespace WertisSferaWorker;
 
@@ -28,6 +29,70 @@ public sealed class SferaComAdapter : ISferaAdapter
     private dynamic? _subiekt;
 
     public SferaComAdapter(EnvFile env) => _env = env;
+
+    /* ── Stałe Sfery ustalone z dokumentacji, nie zgadnięte ───────────────────
+       `UruchomEnum` i `UruchomDopasujEnum` mają opublikowane wartości i te
+       zostają tutaj nazwane. Reszta (Produkt, Autentykacja) jest znana
+       Z NAZWY, ale nie z wartości — dlatego siedzi w wertis.env z domyślną
+       wartością do potwierdzenia, a nie w kodzie. Poprawka takiej liczby na
+       hali kosztuje wtedy restart usługi, a nie przebudowanie exe na innej
+       maszynie. Komplet z opisem źródeł: docs/sfera-com.md. */
+
+    /** UruchomDopasujEnum.gtaUruchomDopasuj — pierwsza aplikacja podłączona do
+        wskazanego serwera i bazy. */
+    private const int URUCHOM_DOPASUJ = 0x0;
+
+    /** UruchomEnum.gtaUruchom — podłącz się do działającej, uruchom dopiero,
+        gdy takiej nie ma. */
+    private const int URUCHOM = 0x0;
+
+    /** UruchomEnum.gtaUruchomWTle — bez interfejsu użytkownika. Usługa Windows
+        nie ma pulpitu, na którym mogłaby pokazać okno Subiekta. */
+    private const int URUCHOM_W_TLE = 0x4;
+
+    /**
+     * Nazwa wywołania COM, którego Sfera nie zna, to POMYŁKA W NAZWIE, a nie
+     * awaria — i wtedy komunikat ma powiedzieć, KTÓRY punkt listy `[WERYFIKUJ]`
+     * poprawić. Bez tego zostaje gołe „'System.__ComObject' does not contain
+     * a definition for 'DodajMM'" w środku wystawiania dokumentu.
+     *
+     * Błąd MERYTORYCZNY Sfery (brak stanu, zablokowany dokument) przechodzi
+     * dalej z własną treścią — dopisujemy do niej wyłącznie nazwę kroku, bo
+     * ona mówi, gdzie łańcuch stanął.
+     */
+    private static T Krok<T>(string wywolanie, int punkt, Func<T> co)
+    {
+        try
+        {
+            return co();
+        }
+        catch (Exception e) when (NieznanaNazwa(e))
+        {
+            throw new InvalidOperationException(
+                $"Sfera nie zna wywołania „{wywolanie}” — to punkt {punkt} listy [WERYFIKUJ] " +
+                "w sfera-worker/README.md. Właściwą nazwę podaje InfoSfera (pomoc instalowana " +
+                "ze Sferą); sprawdzisz ją bez wystawiania dokumentu przez sfera-worker/sonda.ps1. " +
+                $"Błąd źródłowy: {e.Message}", e);
+        }
+        catch (Exception e) when (e is not InvalidOperationException)
+        {
+            throw new InvalidOperationException($"Sfera odrzuciła „{wywolanie}”: {e.Message}", e);
+        }
+    }
+
+    private static void Krok(string wywolanie, int punkt, Action co) =>
+        Krok<object?>(wywolanie, punkt, () => { co(); return null; });
+
+    /**
+     * Czy wyjątek mówi „nie ma takiej nazwy". Late binding zgłasza to na dwa
+     * sposoby zależnie od tego, czy nazwa padła po stronie bindera C#, czy
+     * dopiero w IDispatch obiektu COM.
+     */
+    private static bool NieznanaNazwa(Exception e) =>
+        e is RuntimeBinderException
+        || e is MissingMemberException
+        // DISP_E_MEMBERNOTFOUND / DISP_E_UNKNOWNNAME
+        || (e is COMException com && ((uint)com.HResult is 0x80020003 or 0x80020006));
 
     public string CreateMM(int magFrom, int magTo, IReadOnlyList<MmItem> items)
     {
@@ -63,20 +128,27 @@ public sealed class SferaComAdapter : ISferaAdapter
         /* [WERYFIKUJ] nazwa managera i metody — kontrakt sfera.ts podaje
            DokumentyMagazynoweManager.DodajMM(); w nowszych wersjach Sfery
            bywa SuDokumentyManager z typem dokumentu w argumencie. */
-        dynamic mm = su.DokumentyMagazynoweManager.DodajMM();
-        mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
-        mm.MagazynDocelowyId = magTo;
+        dynamic mm = Krok("DokumentyMagazynoweManager.DodajMM()", 4,
+            () => su.DokumentyMagazynoweManager.DodajMM());
+        Krok("MM.MagazynZrodlowyId / MagazynDocelowyId", 4, () =>
+        {
+            mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
+            mm.MagazynDocelowyId = magTo;
+        });
         foreach (var it in items)
         {
-            dynamic p = mm.Pozycje.Dodaj(it.TwId);   // [WERYFIKUJ] dodawanie pozycji po tw_Id
-            p.IloscJm = it.Qty;
+            Krok("MM.Pozycje.Dodaj(tw_Id).IloscJm", 4, () =>
+            {
+                dynamic p = mm.Pozycje.Dodaj(it.TwId);   // [WERYFIKUJ] dodawanie pozycji po tw_Id
+                p.IloscJm = it.Qty;
+            });
         }
         /* Decyzja domyślna: MM powstaje WYKONANE, nie w buforze — sens
            operacji to „towar sprzedawalny na hali". [WERYFIKUJ] na etapie 2
            (docs/wdrozenie.md); jeśli firma woli bufor, tu jest to jedno
            wywołanie do zmiany. */
-        mm.Zapisz();                                  // [WERYFIKUJ]
-        return (mm, (string)mm.NumerPelny);           // [WERYFIKUJ] → sgt_doc_number
+        Krok("MM.Zapisz()", 5, () => { mm.Zapisz(); });
+        return (mm, Krok("MM.NumerPelny", 5, () => (string)mm.NumerPelny));
     }
 
     /// <summary>
@@ -88,15 +160,19 @@ public sealed class SferaComAdapter : ISferaAdapter
         dynamic su = sesja;
         /* [WERYFIKUJ] nazwa metody RW — kontrakt sfera.ts podaje
            DokumentyMagazynoweManager.DodajRW(); dok_Typ RW = 13. */
-        dynamic rw = su.DokumentyMagazynoweManager.DodajRW();
-        rw.MagazynId = magId;                         // [WERYFIKUJ] właściwość magazynu RW
+        dynamic rw = Krok("DokumentyMagazynoweManager.DodajRW()", 8,
+            () => su.DokumentyMagazynoweManager.DodajRW());
+        Krok("RW.MagazynId", 8, () => { rw.MagazynId = magId; });
         foreach (var it in items)
         {
-            dynamic p = rw.Pozycje.Dodaj(it.TwId);    // [WERYFIKUJ]
-            p.IloscJm = it.Qty;
+            Krok("RW.Pozycje.Dodaj(tw_Id).IloscJm", 8, () =>
+            {
+                dynamic p = rw.Pozycje.Dodaj(it.TwId);
+                p.IloscJm = it.Qty;
+            });
         }
-        rw.Zapisz();                                  // [WERYFIKUJ]
-        return (string)rw.NumerPelny;                 // [WERYFIKUJ]
+        Krok("RW.Zapisz()", 8, () => { rw.Zapisz(); });
+        return Krok("RW.NumerPelny", 8, () => (string)rw.NumerPelny);
     }
 
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
@@ -112,7 +188,8 @@ public sealed class SferaComAdapter : ISferaAdapter
             /* [WERYFIKUJ] wystawienie korekty do istniejącego dokumentu —
                kontrakt sfera.ts podaje DokumentyHandloweManager.DodajKorekte(dokId);
                nazwa managera i metody zależy od wersji Sfery. */
-            dynamic korekta = su.DokumentyHandloweManager.DodajKorekte(z.DokId);
+            dynamic korekta = Krok("DokumentyHandloweManager.DodajKorekte(dok_Id)", 6,
+                () => su.DokumentyHandloweManager.DodajKorekte(z.DokId));
             foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
                 /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
@@ -120,11 +197,14 @@ public sealed class SferaComAdapter : ISferaAdapter
                    dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ po tw_Id.
                    Zniszczone wchodzą na korektę RAZEM z pełnowartościowymi:
                    klient oddał towar, sprzedaż koryguje się w całości. */
-                dynamic p = korekta.Pozycje.SzukajTowar(it.TwId);
-                p.IloscPoKorekcie = p.Ilosc - it.Qty;
+                Krok("Korekta.Pozycje.SzukajTowar(tw_Id).IloscPoKorekcie", 6, () =>
+                {
+                    dynamic p = korekta.Pozycje.SzukajTowar(it.TwId);
+                    p.IloscPoKorekcie = p.Ilosc - it.Qty;
+                });
             }
-            korekta.Zapisz();                                 // [WERYFIKUJ]
-            string nrKorekty = (string)korekta.NumerPelny;    // [WERYFIKUJ]
+            Krok("Korekta.Zapisz()", 6, () => { korekta.Zapisz(); });
+            string nrKorekty = Krok("Korekta.NumerPelny", 6, () => (string)korekta.NumerPelny);
 
             /* Dalsze ogniwa TEJ SAMEJ operacji: MM (pełnowartościowe → bufor)
                i RW (zniszczone schodzą ze stanu). Gdy którekolwiek padnie,
@@ -174,30 +254,66 @@ public sealed class SferaComAdapter : ISferaAdapter
         }
     }
 
+    /**
+     * Adres serwera w postaci, której chce Sfera: `HOST\INSTANCJA`.
+     *
+     * Lustro `config.mssql` po stronie Node: instancja domyślnie INSERTGT,
+     * a ustawiony `MSSQL_PORT` ma przed nią pierwszeństwo. Instancji nie
+     * doklejamy, gdy ktoś wpisał ją już w `MSSQL_SERVER` — inaczej powstałoby
+     * `HOST\INSERTGT\INSERTGT`, czyli adres, pod którym nie ma nikogo.
+     */
+    private string Serwer()
+    {
+        var serwer = _env.Get("MSSQL_SERVER", "localhost");
+        var instancja = _env.Get("MSSQL_INSTANCE", "INSERTGT");
+        if (serwer.Contains('\\') || instancja.Length == 0) return serwer;
+        if ((_env.Get("MSSQL_PORT") ?? "").Length > 0) return serwer;
+        return $"{serwer}\\{instancja}";
+    }
+
     private dynamic Sesja()
     {
         if (_subiekt is not null) return _subiekt;
 
-        /* [WERYFIKUJ] ProgID obiektu GT — wg dokumentacji Sfery "InsERT.GT". */
-        var typ = Type.GetTypeFromProgID("InsERT.GT")
+        /* [WERYFIKUJ] ProgID obiektu GT — wg dokumentacji Sfery "InsERT.GT".
+           Z wertis.env, bo pomyłka tutaj blokuje absolutnie wszystko, a poprawka
+           przez przebudowanie exe wymaga innej maszyny (patrz docs/sfera-com.md). */
+        var progId = _env.Get("SFERA_PROGID", "InsERT.GT");
+        var typ = Type.GetTypeFromProgID(progId)
             ?? throw new InvalidOperationException(
-                "Nie znaleziono COM \"InsERT.GT\" — czy Subiekt GT (ze Sferą) jest zainstalowany na tej maszynie?");
+                $"Nie znaleziono COM \"{progId}\" — czy Subiekt GT (ze Sferą) jest zainstalowany na tej maszynie?");
         dynamic gt = Activator.CreateInstance(typ)!;
 
-        /* [WERYFIKUJ] wyliczenia i logowanie — wartości wg dokumentacji Sfery:
-           Produkt = gtaProduktSubiekt (1), Autentykacja wg mechanizmu firmy
-           (operator/hasło albo Windows). Serwer i baza jak w wertis.env —
-           te same, które czyta API. */
-        gt.Produkt = 1;                                   // gtaProduktSubiekt [WERYFIKUJ]
-        gt.Serwer = _env.Get("MSSQL_SERVER", "localhost");
+        /* Kolejność i komplet właściwości wg przykładu z dokumentacji Sfery
+           (docs/sfera-com.md §1). Dwie z nich to NIE kosmetyka:
+
+           — `Uzytkownik`/`UzytkownikHaslo` to LOGIN SQL, osobny od `Operator`.
+             Przy autentykacji mieszanej Sfera bez niego nie ma czym otworzyć
+             bazy. Nie jest to `MSSQL_USER`: tamten login ma z założenia prawo
+             SELECT na sześciu tabelach i UPDATE na dwóch kolumnach (§6 etap 1),
+             a Sfera wystawia dokumenty i potrzebuje pełnych praw podmiotu.
+           — `Serwer` chce postaci `HOST\INSTANCJA`; instalator InsERT-u zakłada
+             instancję INSERTGT, więc samo `MSSQL_SERVER` trafia w instancję
+             domyślną, czyli zwykle w nic. */
+        gt.Produkt = _env.GetInt("SFERA_PRODUKT", 1);         // gtaProduktSubiekt [WERYFIKUJ]
+        gt.Serwer = Serwer();
         gt.Baza = _env.Get("MSSQL_DATABASE", "");
-        gt.Autentykacja = 0;                              // [WERYFIKUJ] 0=mieszana/SQL?
+        gt.Autentykacja = _env.GetInt("SFERA_AUTENTYKACJA", 0);   // [WERYFIKUJ] mieszana vs Windows
+        var loginSql = _env.Get("SFERA_SQL_LOGIN", "");
+        if (loginSql.Length > 0)
+        {
+            gt.Uzytkownik = loginSql;
+            gt.UzytkownikHaslo = _env.Get("SFERA_SQL_HASLO", "");
+        }
         gt.Operator = _env.Get("SFERA_OPERATOR", "");
         gt.OperatorHaslo = _env.Get("SFERA_OPERATOR_HASLO", "");
 
-        /* [WERYFIKUJ] tryb uruchomienia: gtaUruchomDopasuj / w tle, bez okna. */
-        _subiekt = gt.Uruchom(0, 4);
-        Console.WriteLine("[sfera] sesja Subiekta otwarta (Sfera COM)");
+        /* Uruchom(TypDopasowania, TrybUruchomienia). Drugi argument to MASKA
+           BITOWA — `URUCHOM | URUCHOM_W_TLE` znaczy „podłącz się do działającej
+           albo uruchom własną, w obu razach bez okna". Usługa Windows nie ma
+           pulpitu, więc bez `W_TLE` Subiekt nie miałby gdzie się pokazać. */
+        _subiekt = Krok("GT.Uruchom(...)", 3, () => gt.Uruchom(URUCHOM_DOPASUJ, URUCHOM | URUCHOM_W_TLE));
+        Console.WriteLine($"[sfera] sesja Subiekta otwarta (Sfera COM, {progId}, serwer {Serwer()})");
         return _subiekt!;
     }
 
