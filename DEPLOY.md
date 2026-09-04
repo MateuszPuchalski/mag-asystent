@@ -1573,6 +1573,31 @@ zrobiłby to samo później, a `--bez-pobrania` zostawia to właśnie jemu.
 
 Decyzje biura wracają PUSTE. Werdykty, oceny i kwoty trzeba nadać od nowa.
 
+## 6g. Kolejność przy zwrotach: korekta, potem MM (0.200.0)
+
+MM koszyka zdejmuje towar z **magazynu głównego**. Towar ze zwrotu trafia na
+ten magazyn dopiero wtedy, gdy biuro wystawi w Subiekcie korektę albo zwrot do
+paragonu. Do 0.199.0 dokument szedł od razu przy zamknięciu koszyka — czyli na
+stan, którego jeszcze nie było.
+
+Od 0.200.0 kolejność jest wymuszona:
+
+1. Operator ocenia pozycje „na stan" — koszyk się napełnia.
+2. **Zamknięcie koszyka nadal jest natychmiastowe.** Kosz jedzie na halę, bo
+   to czynność fizyczna: zapełnił się, więc odchodzi od biurka.
+3. Dokument MM czeka, aż **każdy** zwrot wnoszący do niego pozycję dostanie
+   numer korekty (kubełek DO KOREKTY w panelu).
+4. Ostatni wpisany numer wypuszcza MM **natychmiast** — nie po takcie.
+
+Panel pokazuje przy koszyku, których korekt brakuje. Koszyk stojący ponad dobę
+wchodzi do rekoncyliacji jako `kosz_czeka_na_korekte`.
+
+**Nic nie trzeba ustawiać.** Zmiana nie ma przełącznika w `wertis.env`.
+
+**Koszyki zamknięte przed aktualizacją zostają bez zmian** — mają już zadanie
+w kolejce. Jeśli któreś stoi w `pending` na towar, którego nie ma na stanie,
+Sfera odrzuci je czytelnym błędem; wystaw korektę i użyj PONÓW.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

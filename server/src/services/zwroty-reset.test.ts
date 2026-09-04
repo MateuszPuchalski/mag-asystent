@@ -72,8 +72,11 @@ test("ZAMKNIĘTY koszyk i jego zadanie mm zostają nietknięte", () => {
      własny ładunek. Skasowanie ich rozjechałoby papier z zawartością. */
   const d = stanowisko();
   const KTO = biuro(d);
-  const { poz } = zwrotZTowarem(d, KTO);
+  const { id, poz } = zwrotZTowarem(d, KTO);
   const koszId = ocenPozycje(d, poz, "stan", 2, KTO).koszyk!;
+  /* Korekta przed zamknięciem — od 0.200.0 bez niej MM nie wychodzi wcale,
+     a ten test pilnuje właśnie tego, że WYSTAWIONE zadanie przeżywa. */
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
   zamknijKosz(d, koszId, KTO);
 
   const przed = policzZwroty(d);

@@ -1,5 +1,6 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
+import { koszykiCzekajaceNaKorekty } from "./kosze-zwrotow.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
@@ -17,7 +18,8 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
    być czytany po tygodniu — a wtedy nie chroni już przed niczym.             */
 
 export interface Rozjazd {
-  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka";
+  rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
+    | "kosz_czeka_na_korekte";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -144,18 +146,43 @@ function mmCzekajace(): Rozjazd[] {
   }));
 }
 
+/**
+ * 5. Koszyki zwrotów zamknięte ponad dobę temu, którym wciąż brakuje korekty.
+ *
+ * Od 0.200.0 MM koszyka czeka na komplet numerów korekt — bo zdejmuje towar
+ * z magazynu głównego, a ten wraca tam dopiero po korekcie. Czekanie jest
+ * więc POPRAWNE, ale bezterminowe czekanie jest cichym zakleszczeniem: kosz
+ * stoi na hali, magazynier nie ma czego rozłożyć, a nikt nie pyta dlaczego.
+ *
+ * Próg doby jest ten sam co przy `mm_czeka` — dwa progi to dwa nawyki.
+ */
+function koszeBezKorekty(): Rozjazd[] {
+  return koszykiCzekajaceNaKorekty(db())
+    .filter((k) => k.zamknietoAt < new Date(Date.now() - 86400_000).toISOString())
+    .map((k) => ({
+      rodzaj: "kosz_czeka_na_korekte" as const,
+      klucz: k.kod,
+      opis:
+        `Koszyk ${k.kod} czeka ponad dobę na korekty — bez nich MM zdjęłoby towar ` +
+        `z magazynu głównego, na który jeszcze nie wrócił. Brakuje: ` +
+        k.brakuje.map((b) => b.numer).join(", "),
+      odKiedy: k.zamknietoAt,
+    }));
+}
+
 export function reconcile(): Rekoncyliacja {
   const loc = lokalizacje();
   const bledy = zadaniaWBledzie();
   const bufor = utknieteWBuforze();
   const mm = mmCzekajace();
+  const kosze = koszeBezKorekty();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
-      zadan: bledy.length + bufor.length + mm.length,
+      zadan: bledy.length + bufor.length + mm.length + kosze.length,
     },
-    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor, ...mm],
+    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze],
   };
 }
 

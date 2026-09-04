@@ -24,9 +24,29 @@ export function Koszyk() {
   const { data } = useKosz();
   const zamknij = useZamknijKosz();
   const kosz = data?.kosz ?? null;
-  if (!kosz || kosz.pozycji === 0) return null;
+  const czekajace = data?.czekajace ?? [];
+  if ((!kosz || kosz.pozycji === 0) && czekajace.length === 0) return null;
 
-  return <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
+  return <>
+    {/* Koszyki zamknięte, którym brakuje korekt. Stoją NAD otwartym, bo to
+        praca zaległa: kosz jest już na hali, a dokumentu wciąż nie ma. */}
+    {czekajace.map((c) => <div key={c.id}
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
+        border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      <PackageOpen size={14} className="shrink-0" />
+      <b>Koszyk {c.kod}</b>
+      <span className="min-w-0 flex-1">
+        czeka na {c.brakuje.length === 1 ? "korektę" : "korekty"}: {
+          c.brakuje.map((b) => b.numer).join(", ")}
+      </span>
+      {/* DLACZEGO czeka — bez tego zdania wygląda to na zaciętą kolejkę. */}
+      <span className="w-full text-amber-700">
+        MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero
+        po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni numer.
+      </span>
+    </div>)}
+    {kosz && kosz.pozycji > 0 && <div
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
       border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
     <PackageOpen size={14} className="shrink-0" />
     <b>Koszyk {kosz.kod}</b>
@@ -45,9 +65,10 @@ export function Koszyk() {
         Ta sama zasada co przy korekcie: ekran mówi, czego NIE robi i co robi
         za człowieka. */}
     <span className="w-full text-sky-700">
-      Domknięcie wystawia MM z magazynu głównego na regał zwrotów; numer wraca
-      z Subiekta. Kosz jedzie wtedy na halę do rozłożenia.
+      Kosz jedzie na halę od razu. MM z magazynu głównego na regał zwrotów
+      wychodzi, gdy wszystkie zwroty z tego kosza mają numer korekty.
     </span>
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
-  </div>;
+    </div>}
+  </>;
 }

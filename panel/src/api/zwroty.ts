@@ -105,16 +105,25 @@ export function useOcena() {
   });
 }
 
+/** Koszyk zamknięty, który CZEKA na korekty (0.200.0). */
+export interface KoszykCzekajacy {
+  id: number;
+  kod: string;
+  zamknietoAt: string;
+  brakuje: Array<{ zwrotId: number; numer: string }>;
+}
+
 /** Co leży w otwartym koszyku zwrotów tego operatora (0.192.0). */
 export function useKosz() {
   return useQuery({
     queryKey: kluczeZwrotow.kosz,
-    queryFn: () => api<{ kosz: KoszZwrotow | null }>("/api/obsluga/zwroty/kosz"),
+    queryFn: () => api<{ kosz: KoszZwrotow | null; czekajace?: KoszykCzekajacy[] }>(
+      "/api/obsluga/zwroty/kosz"),
   });
 }
 
 /**
- * Domknięcie koszyka: kolejkuje MM z magazynu głównego na regał zwrotów.
+ * Domknięcie koszyka: MM wychodzi PO KOMPLECIE KOREKT (0.200.0).
  *
  * Odświeża TAKŻE kolejkę zwrotów, bo domknięcie zmienia stan pozycji
  * (`wKoszyku`) w każdym zwrocie, z którego coś do kosza wpadło.
