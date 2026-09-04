@@ -27,7 +27,7 @@ z którego wynika ten kod: [`server/src/adapters/sfera.ts`](../server/src/adapte
 | co | po co |
 |---|---|
 | Windows z zainstalowanym Subiektem GT | COM Sfery jest biblioteką lokalną |
-| **licencja Sfery** do Subiekta GT | bez niej COM nie wystartuje |
+| **licencja Sfery** do Subiekta GT | bez niej COM nie wystartuje; na podmiocie testowym wystarczy próbna Sfera (15 dni) |
 | konto operatora Subiekta z prawem wystawiania MM i korekt | to użytkownik Subiekta, nie login SQL |
 | dostęp do `C:\wertis\server\data\wertis.db` | wspólna kolejka z API i workerem Node |
 | `SFERA_WORKER=1` w `wertis.env` | inaczej zadania dokumentowe bierze worker Node — proces odmawia startu, żeby nie było dwóch wykonawców |
@@ -78,7 +78,8 @@ nssm install wertis-sfera C:\wertis\sfera-worker\wertis-sfera-worker.exe
 
 Kolejność i bramki wdrożenia — [`DEPLOY.md`](../DEPLOY.md) §6, etap 2 oraz
 [`docs/wdrozenie.md`](../docs/wdrozenie.md). Najkrócej: najpierw `--dry-run`
-na kopii bazy, potem **jedno** MM na kartotece próbnej, dopiero potem produkcja.
+na PODMIOCIE TESTOWYM (na kopii bazy Sfera nie wstaje — traci licencję), potem
+jedno MM na kartotece próbnej, dopiero potem produkcja.
 
 ## Konfiguracja — ten sam `wertis.env` co API i worker
 
@@ -156,7 +157,7 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
    dalsze ogniwo padnie.
 8. RW dla pozycji zniszczonych (`DokumentyMagazynoweManager.DodajRW()`,
-   właściwość magazynu) — pierwsze RW na kopii bazy, na zwrocie próbnym.
+   właściwość magazynu) — pierwsze RW na podmiocie testowym, na zwrocie próbnym.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
 wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak
