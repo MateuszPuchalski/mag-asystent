@@ -87,7 +87,7 @@ function PigulkaSynchronizacji() {
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
-    <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-5 py-3">
+    <div className="flex items-center gap-4 px-5 py-3">
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
       <div className="mr-auto"><b>WERTIS</b>
         <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
@@ -149,7 +149,13 @@ function App() {
      blokada wyglądała na zepsutą. */
   return <div className="min-h-screen lg:flex lg:h-dvh lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={() => { wyczyscToken(); klient.clear(); setZalogowany(false); }} />
-    <main className="mx-auto w-full max-w-[1500px] p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+    {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
+        z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
+        oddawał 210 pikseli na margines z każdej strony, na 2560 — po 530,
+        a kolumny stały wąskie: kolejka ucinała nazwy, kontekst dusił zdjęcie
+        i tabelę stanu. Czytelność linijki tekstu pilnuje próg przy samych
+        wypowiedziach (`Os.tsx`), bo tylko tam jest czego pilnować. */}
+    <main className="w-full p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <Routes>
         <Route path="/obsluga/" element={<Zadania />} />
         {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,

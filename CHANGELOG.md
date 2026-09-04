@@ -54,6 +54,17 @@ firma trzyma gwinty, wymiary, rozstawy i sekcje „Modele:" — czyli odpowiedzi
 pytania zadawane najczęściej. Blok jest zwinięty do sześciu linijek
 i rozwija się jednym kliknięciem, bez pytania serwera.
 
+**Ekran bierze całą szerokość okna.** `<main>` miał `max-w-[1500px]`
+z makiety, bez uzasadnienia w kodzie. Na monitorze 1920 oddawał 210 pikseli
+na margines z każdej strony, na 2560 — po 530, a kolumny stały wąskie mimo
+wolnego miejsca. Rosną kolumny skrajne: kolejka i kontekst zamieniają
+szerokość na treść. Środkowa nie rośnie bez końca — wypowiedzi mają próg 75
+znaków i dosuwają się do przeciwnych krawędzi, klient do lewej, my do prawej.
+
+Szerokości obu ekranów obsługi stoją teraz w jednym miejscu. Skrzynka miała
+kolejkę 22 rem, a zwroty 320 px, choć projekt wymienia szerokości kolumn jako
+część „jednego nawyku".
+
 Przycisku „wstaw do szkicu" opis NIE dostał i to jest decyzja. Wstawka
 parametrów wybiera pola świadomie, bo szkic idzie do klienta; w opisie bywa
 notatka dla magazynu. Agent skopiuje zdanie, które przeczytał — ale nie wyśle

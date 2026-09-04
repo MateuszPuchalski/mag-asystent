@@ -67,6 +67,31 @@ export const Pusto = ({ ikona, children }: { ikona: React.ReactNode; children: R
 export const Blad = ({ children }: { children: React.ReactNode }) =>
   children ? <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{children}</p> : null;
 
+/**
+ * Trzy kolumny obu ekranów obsługi — JEDNA definicja (0.198.0).
+ *
+ * §10.1 mówi: „jeden nawyk, nie dwa" i wymienia wprost układ, SZEROKOŚCI
+ * kolumn i przewijanie. Mimo to skrzynka miała kolejkę 22 rem, a zwroty
+ * 320 px — rozjazd o 32 piksele, którego nikt nie zdecydował. Stoi tu, żeby
+ * następna zmiana szerokości nie musiała trafić w dwa pliki.
+ *
+ * Kolumny ROSNĄ z ekranem, bo do 0.197.4 nie rosły wcale: `<main>` miał
+ * `max-w-[1500px]`, więc monitor 1920 oddawał 210 pikseli na margines
+ * z każdej strony, a 2560 — po 530. Właściciel nazwał to wprost:
+ * „rozszerzenie kolumn, nie zostawiać niepotrzebnych marginesów po bokach".
+ *
+ * Rosną SKRAJNE, nie środkowa. W kolejce i w kontekście szerokość zamienia
+ * się w treść: mniej uciętych nazw, więcej wiersza tabeli, szersze zdjęcie.
+ * W środku zamieniłaby się w dłuższą linijkę tekstu, a linijka na sto
+ * dwadzieścia znaków czyta się GORZEJ, nie lepiej — dlatego wypowiedzi mają
+ * własny próg czytelności (`Os.tsx`), a nie ten z okna.
+ */
+export const SIATKA_TRZECH_KOLUMN =
+  "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
+  "lg:grid-cols-[21rem_minmax(0,1fr)_21rem] " +
+  "xl:grid-cols-[23rem_minmax(0,1fr)_24rem] " +
+  "2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
+
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
 export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl") : "—";

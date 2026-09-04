@@ -57,12 +57,24 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
   });
 
   it("obie strony rozmowy stoją po dwóch stronach kolumny", () => {
-    /* Wcięcie z makiety: klient odsunięty od PRAWEJ, my od LEWEJ. To ta cecha
-       działa, zanim wzrok dojdzie do podpisu. */
+    /* Klient przy lewej krawędzi, my przy prawej. To ta cecha działa, zanim
+       wzrok dojdzie do podpisu.
+
+       Do 0.197.4 robiły to stałe wcięcia `mr-10`/`ml-10`. Od 0.198.0 kolumna
+       rośnie z monitorem, więc wypowiedzi mają próg czytelności i dosuwają
+       się marginesem automatycznym — inaczej obie zaczynałyby się w tym samym
+       miejscu, a strona przestałaby cokolwiek znaczyć. */
     const { container } = os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
     const karty = container.querySelectorAll("article");
-    expect(karty[0].className).toMatch(/\bmr-10\b/);
-    expect(karty[1].className).toMatch(/\bml-10\b/);
+    expect(karty[0].className).toMatch(/\bmr-auto\b/);
+    expect(karty[1].className).toMatch(/\bml-auto\b/);
+  });
+
+  /* Szeroki monitor nie ma prawa rozciągnąć wypowiedzi na całą kolumnę:
+     linijka na sto dwadzieścia znaków gubi początek następnego wiersza. */
+  it("wypowiedź ma próg czytelności, nie szerokość okna", () => {
+    const { container } = os([wpis()]);
+    expect(container.querySelector("article")!.className).toMatch(/max-w-\[75ch\]/);
   });
 
   it("wpis niesie godzinę — bez niej nie widać, ile trwała cisza", () => {

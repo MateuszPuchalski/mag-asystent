@@ -10,7 +10,7 @@ import {
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
 } from "../api/rozmowy";
 import { useSzynaZdarzen } from "../api/zdarzenia";
-import { Blad } from "../ui";
+import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
@@ -168,7 +168,7 @@ export function Skrzynka() {
         środek rozpychałby się ponad przydział, gdy oś dostanie długi wyraz.
         `lg:grid-rows-[minmax(0,1fr)]` trzyma wysokość: pojedynczy wiersz
         `auto` mierzy się do `max-content` i grid wylewa się poza okno. */}
-    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[22rem_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
+    <div className={SIATKA_TRZECH_KOLUMN}>
     <Kolejka
       nieswieza={alarm}
       copilot={copilot.data}

@@ -418,6 +418,22 @@ zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
 i przyciskami. „Klient" i „Wiedza" z makiety nie wracają: pierwsza nie ma bytu,
 a dowody kartoteki stoją już w „Doborze".
 
+**Ekran bierze CAŁĄ szerokość okna od 0.198.0.** Wcześniej `<main>` miał
+`max-w-[1500px]` i wyśrodkowanie. Ogranicznik przyszedł z makiety i nikt go
+nigdy nie uzasadnił. Na monitorze 1920 oddawał 210 pikseli na margines z każdej
+strony, na 2560 — po 530, a kolumny stały wąskie mimo wolnego miejsca.
+
+Rosną kolumny SKRAJNE, nie środkowa. W kolejce i w kontekście szerokość zamienia
+się w treść: mniej uciętych nazw, więcej wiersza tabeli, szersze zdjęcie.
+W środku zamieniłaby się w dłuższą linijkę, a linijka na sto dwadzieścia znaków
+czyta się gorzej. Wypowiedzi mają więc własny próg 75 znaków i dosuwają się do
+przeciwnych krawędzi: klient do lewej, my do prawej. Strona kolumny mówi, kto
+mówi, zanim wzrok dojdzie do podpisu.
+
+Szerokości kolumn stoją w JEDNYM miejscu (`SIATKA_TRZECH_KOLUMN` w `panel/src/ui`).
+Do 0.197.4 skrzynka miała kolejkę 22 rem, a zwroty 320 px — rozjazd, którego
+nikt nie zdecydował, choć ta sekcja wymienia szerokości wprost.
+
 Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
 scrollery po dwieście pikseli czytałoby się gorzej niż jedną przewijaną stronę;
 widok wąski jest osobnym ekranem (§10.5), nie tym samym w miniaturze.
