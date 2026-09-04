@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { Zwrot } from "../api/typy";
 import { Przycisk, Pole, Blad } from "../ui";
+import { zlote } from "../api/zwroty";
 
 /* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
    Do tego wydania klawisze z §25a.2 stały tu jako PODPISY: `kubelekZwrotu`
@@ -22,11 +23,12 @@ type Props = {
   onWerdykt: (decyzja: "przyjety" | "odrzucony", powod: string | null) => void;
   onKorekta: (numer: string) => void;
   onCofnijKorekte: () => void;
+  onCofnijKwote: () => void;
   trwa: boolean;
   blad: string;
 };
 
-export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte,
+export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
   trwa, blad }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
@@ -75,6 +77,18 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte,
 
   if (zwrot.kubelek === "korekta") {
     return <div className={ramka}>
+      {/* KWOTA Z DROGĄ WYJŚCIA (0.202.0). To jedyny ekran, na którym kwota jest
+          już ustalona, a jeszcze nic na jej podstawie nie wyszło z firmy —
+          więc tu, i tylko tu, da się ją poprawić. Pomyłka w zaznaczeniu
+          pozycji zostawała dotąd na zawsze: pasek wyceny znika razem
+          z kubełkiem DO ZWROTU. */}
+      {zwrot.kwotaGrosze !== null && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-500">Do oddania</span>
+        <b className="tabular-nums">{zlote(zwrot.kwotaGrosze, zwrot.waluta)}</b>
+        <button type="button" disabled={trwa} onClick={onCofnijKwote}
+          className="text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
+          popraw kwotę</button>
+      </div>}
       <p className="mb-2 text-xs text-slate-500">
         {/* Wprost, bo inaczej ekran obiecywałby, że zrobi to sam. */}
         Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.

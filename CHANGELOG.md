@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.202.0 — 4 września 2026
+
+**Drabina cofania w obsłudze zwrotów.** §25a.5 obiecywał cofnięcie wszędzie
+poza oddaniem pieniędzy i odmową. Obietnica była spełniona w połowie: ocena
+pozycji i ustalona kwota nie miały drogi wyjścia.
+
+Ocena bolała najbardziej. Serwer umiał ją cofnąć od 0.192.0 — razem ze
+zdjęciem pozycji z koszyka — ale w panelu przyciski oceny znikały po pierwszym
+kliknięciu. Pomyłkowa „Utylizacja" na złym wierszu była z ekranu nie do
+odkręcenia. Teraz przy zapisanej ocenie stoi „cofnij ocenę", wszędzie tam,
+gdzie zwrot jest jeszcze w pracy.
+
+Kwota nie miała cofnięcia w ogóle. Nadpisać dawało się ją tylko w kubełku
+DO ZWROTU, a zapis natychmiast z niego wyprowadzał — więc literówka
+w zaznaczeniu zostawała na zawsze. Kubełek DO KOREKTY pokazuje teraz kwotę
+z klawiszem „popraw kwotę".
+
+Każdy kubełek cofa dokładnie ten krok, który go wprowadził: zamknięty cofa
+korektę, DO KOREKTY kwotę, DO ZWROTU ocenę. Dwóch szczebli naraz nie trzeba
+zabraniać, bo kubełek wynika ze stanu.
+
+**Przy okazji cicha strata, którą to odsłoniło.** Zmiana oceny na pozycji
+z ZAMKNIĘTEGO koszyka przechodziła bez słowa: funkcja zdejmująca z kosza szuka
+wyłącznie kosza otwartego, a jej odpowiedzi nikt nie czytał. Towar zostawał na
+dokumencie MM, który pojechał na halę, a w bazie nie było już oceny, która go
+tam posłała. Teraz ekran odmawia i nazywa koszyk.
+
 ## 0.201.3 — 4 września 2026
 
 **Koszyk zwrotów kolejkuje MM przez `enqueueMM`, a nie własnym INSERT-em.**

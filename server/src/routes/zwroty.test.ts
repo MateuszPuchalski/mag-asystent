@@ -163,7 +163,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają osiemnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
+test("zwroty mają dziewiętnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -229,7 +229,14 @@ test("zwroty mają osiemnaście tras POST, a trzy z nich wychodzą do Allegro", 
      odpowiedzią, jest scenariuszem normalnym. Nowy identyfikator przy drugiej
      próbie oddałby pieniądze dwa razy.
 
-     OSIEMNASTA DOMYKA KOSZYK ZWROTÓW (0.192.0) i kolejkuje dokument MM
+     DZIEWIĘTNASTA COFA USTALONĄ KWOTĘ (0.202.0). Do tego wydania kwota była
+     wyjęta z obietnicy §25a.5 („reszta ma cofnięcie"): nadpisać dawało się ją
+     tylko w kubełku DO ZWROTU, a zapis natychmiast z niego wyprowadzał.
+     Bramki stoją w serwisie, nie tutaj, bo zależą od stanu zwrotu: oddane
+     pieniądze zatrzymują cofnięcie na dobre, a zapisana korekta każe cofnąć
+     najpierw ją — cofa się o jeden szczebel.
+
+          OSIEMNASTA DOMYKA KOSZYK ZWROTÓW (0.192.0) i kolejkuje dokument MM
      z magazynu głównego na regał zwrotów. Jedyna trasa zwrotów, po której
      powstaje dokument w Subiekcie — przez Sferę, tą samą drogą co korekta.
 
@@ -246,7 +253,7 @@ test("zwroty mają osiemnaście tras POST, a trzy z nich wychodzą do Allegro", 
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 18, `tras POST jest ${posty.length}, a umowa mówi o osiemnastu`);
+  assert.equal(posty.length, 19, `tras POST jest ${posty.length}, a umowa mówi o dziewiętnastu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
@@ -496,6 +503,48 @@ test("MM wypuszczone przez automat NIE dostaje konta klikającego człowieka", a
   assert.match(q[0].created_by, /automat/);
   assert.equal(q[0].tw_id, null, "MM na bufor jest wielopozycyjne — guard go nie dotyczy");
   assert.ok((JSON.parse(q[0].payload) as { items: unknown[] }).items.length >= 1);
+});
+
+test("kwotę da się cofnąć przez HTTP i zapisać inną", async () => {
+  /* Drabina cofania (0.202.0): DO KOREKTY cofa kwotę, DO ZWROTU cofa ocenę.
+     Ten test przechodzi cały szczebel, bo dopiero on pokazuje, że po
+     cofnięciu zwrot wraca do kubełka, w którym wycena jest w ogóle możliwa. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  const wersja = () => (db().prepare("SELECT wersja FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { wersja: number }).wersja;
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
+    headers: naglowki, payload: { ocena: "przecena", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
+    headers: naglowki, payload: { pozycjeIds: [pozycja], dostawa: false, wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(r.json().zwrot.kubelek, "korekta");
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  r = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(r.json().zwrot.kubelek, "zwrot", "wraca tam, gdzie wycena jest możliwa");
+  assert.equal(r.json().zwrot.kwotaGrosze, null);
+
+  /* Stara wersja dostaje 409, nie ciche nadpisanie — jak przy każdej decyzji. */
+  const stara = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() - 1 } });
+  assert.equal(stara.statusCode, 409, stara.body);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
+    headers: naglowki, payload: { pozycjeIds: [], dostawa: false, wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().kwotaGrosze, 0, "puste zaznaczenie to zero, nie odmowa");
 });
 
 test("korekta domyka zwrot przez HTTP, a cofnięcie otwiera go z powrotem", async () => {

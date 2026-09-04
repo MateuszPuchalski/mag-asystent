@@ -7,7 +7,7 @@ import {
   koszykiCzekajaceNaKorekty, stanOtwartegoKosza, wypuscGotoweKoszyki, zamknijKosz,
 } from "../services/kosze-zwrotow.js";
 import {
-  bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  bilansKartotek, cofnijKorekte, cofnijKwote, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
   zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
@@ -291,6 +291,19 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return zapiszKorekte(db(), Number(req.params.id), req.body?.numer ?? "",
           Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Cofnięcie kwoty stoi za samym `odmowa()`, bez `autoryzuj()` — to ta sama
+     praca biura co jej zapis, a nic nie opuszcza firmy. Bramki, które są tu
+     naprawdę potrzebne (oddane pieniądze, zapisana korekta), pilnuje serwis:
+     zna stan zwrotu, a trasa go nie zna. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/kwota/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return cofnijKwote(db(), Number(req.params.id), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

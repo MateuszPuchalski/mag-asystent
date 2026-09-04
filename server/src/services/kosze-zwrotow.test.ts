@@ -172,11 +172,18 @@ test("zamkniętego kosza nie da się opróżnić ani zamknąć drugi raz", () =>
     .get(kosz.id) as { n: number }).n, 1);
   assert.throws(() => zamknijKosz(d, kosz.id, KTO), /jest już zamkniety/);
 
-  /* Zmiana oceny po domknięciu zostawia kosz w spokoju: towar fizycznie
-     w nim leży, a dokument już powstał. */
-  ocenPozycje(d, poz[0], "utylizacja", 3, KTO);
+  /* Zmiana oceny po domknięciu ODMAWIA i nazywa kosz (0.202.0). Do tego
+     wydania przechodziła w ciszy „zostawiając kosz w spokoju" — brzmiało to
+     bezpiecznie, a znaczyło: towar zostaje na dokumencie, który pojechał na
+     halę, tyle że bez oceny, która go tam posłała. Zawartość kosza jest
+     nietknięta tak samo jak wcześniej; nowe jest to, że nietknięta zostaje
+     też ocena, a człowiek dostaje kod kosza. */
+  assert.throws(() => ocenPozycje(d, poz[0], "utylizacja", 3, KTO), new RegExp(kosz.kod));
+  assert.throws(() => ocenPozycje(d, poz[0], null, 3, KTO), /zamkniętym koszyku/);
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?")
     .get(kosz.id) as { n: number }).n, 1);
+  assert.equal((d.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz[0]) as { ocena: string | null }).ocena, "stan");
 });
 
 test("pusty koszyk odmawia domknięcia", () => {

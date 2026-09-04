@@ -91,7 +91,10 @@ export function useWerdykt() {
 export function useOcena() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "przecena" | "utylizacja"; wersja: number }) =>
+    /* `null` COFA ocenę (0.202.0) — serwer i trasa umiały to od 0.192.0, tylko
+       panel nie miał klawisza. */
+    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "przecena" | "utylizacja" | null;
+      wersja: number }) =>
       api<{ wersja: number; koszyk: number | null }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
         { method: "POST", body: JSON.stringify({ ocena: v.ocena, wersja: v.wersja }) }),
@@ -210,6 +213,22 @@ export function useKorekta() {
       api<{ korektaNumer: string; zamknietyAt: string; wersja: number }>(
         `/api/obsluga/zwroty/${v.id}/korekta`,
         { method: "POST", body: JSON.stringify({ numer: v.numer, wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
+ * Cofnięcie ustalonej kwoty — zwrot wraca do DO ZWROTU (0.202.0).
+ *
+ * Odświeża kolejkę tak samo jak zapis kwoty: kubełek zwrotu się zmienia, więc
+ * licznik przy nagłówku musi ruszyć razem z nim.
+ */
+export function useCofnijKwote() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/kwota/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }
