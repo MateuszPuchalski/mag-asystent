@@ -83,6 +83,7 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
           {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
           {karta.data && <>
             <StanTowaru karta={karta.data} />
+            <OpisKartoteki desc={karta.data.desc} />
             {/* Przycisk stoi POD tabelą, nie nad nią: agent najpierw sprawdza,
                 czy to ta kartoteka, a dopiero potem przepisuje ją do odpowiedzi.
                 Nad tabelą zapraszałby do wstawienia czegoś nieprzeczytanego. */}
@@ -161,6 +162,44 @@ export function parametryDoSzkicu(karta: KartaTowaru): string {
     ? `Dostępność: ${karta.mag.avail} ${jednostka}`
     : "Dostępność: brak na stanie");
   return linie.join("\n");
+}
+
+/**
+ * Opis kartoteki z Subiekta (0.198.0).
+ *
+ * Pole `desc` jechało w odpowiedzi `/api/products/:twId` od dawna i panel NIE
+ * pokazywał go nigdzie. A to w nim ta firma trzyma wymiary, gwinty, rozstawy
+ * i sekcje „Modele:" — czyli odpowiedzi na pytania, które klienci zadają
+ * najczęściej. Właściciel przysłał zrzut, na którym klient prosi o wymiar
+ * gwintu korka; opis kartoteki stał wtedy w pobranych danych, niewidoczny.
+ *
+ * ZWINIĘTY DO SZEŚCIU LINII, bo opisy bywają na pół ekranu, a kolumna niesie
+ * też stan i półkę. Rozwinięcie jest jednym kliknięciem i nie idzie po sieć.
+ *
+ * BEZ PRZYCISKU „wstaw do szkicu" i to jest decyzja. Wstawka parametrów
+ * (`parametryDoSzkicu`) wybiera pola świadomie, bo szkic idzie DO KLIENTA;
+ * opis to wolny tekst, w którym bywa notatka dla magazynu. Agent może
+ * skopiować zdanie, które przeczytał — ale nie wyśle całości jednym kliknięciem,
+ * nie wiedząc, co w niej stoi.
+ */
+function OpisKartoteki({ desc }: { desc?: string }) {
+  const [calosc, setCalosc] = useState(false);
+  const tresc = (desc ?? "").trim();
+  if (!tresc) return null;
+
+  return <div className="rounded-lg border border-slate-200 p-3">
+    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+      Opis kartoteki</p>
+    <p className={`whitespace-pre-wrap text-xs text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
+      {tresc}</p>
+    {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
+        — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
+        skala Tailwinda kończy się na sześciu, a `line-clamp-8` nie powstałoby
+        w arkuszu i opis jechałby CAŁY. */}
+    {tresc.length > 320 && <button type="button" onClick={() => setCalosc((c) => !c)}
+      className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+      {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
+  </div>;
 }
 
 function StanTowaru({ karta }: { karta: KartaTowaru }) {

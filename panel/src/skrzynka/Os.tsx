@@ -97,9 +97,18 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
           <Przycisk className="mt-2 text-xs" onClick={() => onWstawDoSzkicu(w.tresc)}>
             Wstaw wynik do szkicu</Przycisk>
         </article>
-      : <article key={w.id} className={`rounded-lg border p-3 ${w.odKlienta
-          ? "mr-10 border-os-klient-ramka bg-os-klient"
-          : "ml-10 border-os-firma-ramka bg-os-firma"}`}>
+      /* PRÓG CZYTELNOŚCI, nie ozdoba (0.198.0). Od zdjęcia ogranicznika
+         1500 px z `<main>` środkowa kolumna rośnie z monitorem, a wypowiedź
+         rozciągnięta na całą jej szerokość dawałaby linijkę na sto dwadzieścia
+         znaków: oko gubi początek następnego wiersza. 75ch to górna granica
+         tego, co czyta się bez wysiłku.
+         Kierunek zamiast wcięcia: klient przy lewej krawędzi, my przy prawej.
+         Stałe `mr-10`/`ml-10` zostawiały na szerokim ekranie jeden martwy
+         pas z jednej strony i nie mówiły nic — teraz strona sama mówi, kto
+         mówi, zanim agent przeczyta podpis. */
+      : <article key={w.id} className={`max-w-[75ch] rounded-lg border p-3 ${w.odKlienta
+          ? "mr-auto border-os-klient-ramka bg-os-klient"
+          : "ml-auto border-os-firma-ramka bg-os-firma"}`}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {/* Podpis RODZAJU przed nazwiskiem: „kto to powiedział" czyta się
                 przed „jak się nazywa". Login kupującego i tak nic nie mówi. */}

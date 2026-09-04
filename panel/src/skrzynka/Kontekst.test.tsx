@@ -37,14 +37,18 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
 });
 
 describe("kolumna kontekstu", () => {
-  it("otwiera się na ofercie i przełącza na towar", async () => {
+  /* ── Umowa 0.198.0 ─────────────────────────────────────────────────────────
+     Oferta i kartoteka stoją RAZEM, bez klikania. Zrzut z pracy pokazał
+     zakładkę „Oferta" na jedenaście linijek w kolumnie na osiemset pikseli,
+     a zdjęcie, stan i parametry towaru leżały schowane obok. Klient pytał
+     wtedy o wymiar gwintu; parametr stał w niewidocznej zakładce.
+
+     Test sprawdza WIDOCZNOŚĆ NARAZ, nie liczbę zakładek: gdyby ktoś rozbił
+     to z powrotem na dwie karty, oba `getByTestId` nie mogłyby przejść. */
+  it("oferta i towar widać naraz, bez klikania w zakładkę", () => {
     render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
     expect(screen.getByTestId("oferta")).toBeInTheDocument();
-    expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Towar" }));
     expect(screen.getByTestId("towar")).toBeInTheDocument();
-    expect(screen.queryByTestId("oferta")).not.toBeInTheDocument();
   });
 
   /* Zamówienie stoi POD ofertą w tej samej zakładce: oba mówią „czego dotyczy
@@ -57,28 +61,35 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
   });
 
-  it("bez oferty obie zakładki mówią, czego brakuje, zamiast milczeć", async () => {
+  it("bez oferty kolumna mówi, czego brakuje, zamiast milczeć", () => {
     render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
     expect(screen.getByText(/nie jest powiązana z ofertą/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Towar" }));
+    /* Drugie zdanie mówi osobno o kartotece, bo to osobny brak: numer oferty
+       bywa, a przypisania do Subiekta nie ma. */
     expect(screen.getByText(/nie ma z czego wywieść kartoteki/)).toBeInTheDocument();
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
   });
 
   /* Pięciu zakładek z makiety NIE ma: „Klient" i „Wiedza" nie mają dziś skąd
-     wziąć danych, a zakładka mówiąca zawsze „wkrótce" uczy nie klikać. „Dobór"
-     doszła w E1 razem ze swoim bytem — i dopiero wtedy. */
-  it("ma dokładnie trzy zakładki, a dobór działa nawet bez oferty", async () => {
+     wziąć danych, a zakładka mówiąca zawsze „wkrótce" uczy nie klikać. Od
+     0.198.0 nie ma też osobnej „Oferty" ani „Towaru" — zeszły się w jedną. */
+  it("ma dokładnie dwie zakładki, a dobór działa nawet bez oferty", async () => {
     render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
-    for (const nazwa of ["Klient", "Wiedza"]) {
+    for (const nazwa of ["Klient", "Wiedza", "Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: "Oferta" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Towar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Oferta i towar" })).toBeInTheDocument();
     /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
        i część wpisuje agent. */
     await userEvent.click(screen.getByRole("button", { name: "Dobór" }));
     expect(screen.getByTestId("dobor")).toBeInTheDocument();
+  });
+
+  /* „Dobór" zostaje OSOBNO i to jest decyzja, nie przeoczenie: to nie karta
+     faktów, tylko robota z własnymi krokami i przyciskami zmieniającymi stan
+     rozmowy. Doklejona pod kartotekę zepchnęłaby stan magazynowy z ekranu. */
+  it("dobór zostaje osobną zakładką — nie doklejamy go pod towar", () => {
+    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    expect(screen.queryByTestId("dobor")).not.toBeInTheDocument();
   });
 });

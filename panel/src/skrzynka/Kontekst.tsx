@@ -17,8 +17,28 @@ import type { Towar } from "../wyszukiwarka";
  * nad osią: cztery bloki jeden pod drugim spychały pytanie klienta poniżej
  * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
- * TRZY zakładki, nie pięć z makiety. „Dobór" doszła w etapie E1, gdy dostała
- * byt (`dobor_rozmowy`). Zakładka, która zawsze mówi „wkrótce", uczy nie klikać.
+ * DWIE zakładki od 0.198.0, wcześniej trzy. Makieta miała pięć; „Dobór" doszła
+ * w etapie E1, gdy dostała byt (`dobor_rozmowy`). Zakładka, która zawsze mówi
+ * „wkrótce", uczy nie klikać.
+ *
+ * ── DLACZEGO OFERTA I TOWAR ZESZŁY SIĘ W JEDNO (0.198.0) ────────────────────
+ * Właściciel przysłał zrzut z pracy: „powinniśmy wykorzystać puste miejsce
+ * z boku". Zakładka „Oferta" to jedenaście linijek — numer, tytuł, SKU, cena —
+ * w kolumnie wysokiej na osiemset pikseli. Reszta świeciła bielą.
+ *
+ * A pod zakładką obok, niewidoczne, leżały: zdjęcie towaru, stan magazynowy,
+ * półka i PARAMETRY KARTOTEKI. Na tamtym zrzucie klient pytał o wymiar gwintu
+ * korka, a parametr „Gwint" stał w schowanej zakładce. Jeden klik dalej, ale
+ * niewidoczny — czyli dla kogoś, kto nie wie, że tam jest, nieistniejący.
+ *
+ * §10.1 uzasadniał zakładki tym, że kolumna niesie „dwa RÓWNORZĘDNE tematy:
+ * co klient kupuje i co mamy na półce". To jeden temat oglądany z dwóch stron
+ * i odpowiedź prawie zawsze potrzebuje obu naraz. Argument o przewijaniu „obok
+ * tematu, którego akurat nie czytasz" trzymał się, dopóki obie zakładki były
+ * wysokie; oferta ma jedenaście linijek.
+ *
+ * „Dobór" ZOSTAJE osobno, bo to nie jest karta faktów, tylko robota: własne
+ * kroki, kandydaci, dowody i przyciski zmieniające stan rozmowy.
  *
  * „Wiedza" ma źródło od E2 (`/api/obsluga/wiedza/*`) i mimo to nie wraca tutaj:
  * dowody wybranej kartoteki stoją już w zakładce „Dobór", a druga zakładka
@@ -29,27 +49,28 @@ import type { Towar } from "../wyszukiwarka";
  * pomiaru: zakładka doboru wstawia zdanie do szkicu i podstawia kartotekę
  * do zlecenia — obu rzeczy nie ma prawa robić po cichu.
  */
-type Widok = "oferta" | "towar" | "dobor";
+type Widok = "towar" | "dobor";
 
 export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
   dane: OsRozmowy;
   onWstawDoSzkicu: (tresc: string) => void;
   onZlecPomiar: (towar: Towar) => void;
 }) {
-  const [widok, setWidok] = useState<Widok>("oferta");
+  const [widok, setWidok] = useState<Widok>("towar");
   const oferta = dane.oferta;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
-      { klucz: "oferta", etykieta: "Oferta" },
-      { klucz: "towar", etykieta: "Towar" },
+      { klucz: "towar", etykieta: "Oferta i towar" },
       { klucz: "dobor", etykieta: "Dobór" },
     ]} />
 
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
         pasek w pasku, a treść bez `min-h-0` rozpycha kartę poza okno. */}
     <div className="min-h-0 flex-1 overflow-y-auto">
-      {widok === "oferta" && <>
+      {/* KOLEJNOŚĆ: oferta, zamówienie, kartoteka. Od tego, co klient widział
+          kupując, do tego, co my mamy na półce — a nie odwrotnie. */}
+      {widok === "towar" && <>
         {oferta
           ? <OfertaRozmowy oferta={oferta} />
           : <p className="p-4 text-sm text-slate-500">
@@ -57,18 +78,17 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
               z treści pytania — numer wskazuje agent albo dopytuje klienta.
             </p>}
         {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} />}
+        {oferta
+          ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
+              onWstawDoSzkicu={onWstawDoSzkicu} />
+          /* Bez numeru oferty nie ma z czego wywieść kartoteki. Ekran mówi to
+             wprost, zamiast pokazywać pustą sekcję. */
+          : <p className="flex items-start gap-2 border-t p-4 text-sm text-slate-500">
+              <PackageSearch size={16} className="mt-0.5 shrink-0" />
+              <span>Bez powiązanej oferty nie ma z czego wywieść kartoteki.
+                Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</span>
+            </p>}
       </>}
-
-      {widok === "towar" && (oferta
-        ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
-            onWstawDoSzkicu={onWstawDoSzkicu} />
-        /* Bez numeru oferty nie ma z czego wywieść kartoteki. Ekran mówi to
-           wprost, zamiast pokazywać pustą sekcję. */
-        : <p className="flex items-start gap-2 p-4 text-sm text-slate-500">
-            <PackageSearch size={16} className="mt-0.5 shrink-0" />
-            <span>Bez powiązanej oferty nie ma z czego wywieść kartoteki.
-              Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</span>
-          </p>)}
 
       {widok === "dobor" && <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
         onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />}

@@ -11,7 +11,7 @@ import {
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
 } from "../api/zwroty";
-import { Blad, Karta, Pusto } from "../ui";
+import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
@@ -275,7 +275,7 @@ export function Zwroty() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
     <Koszyk />
-    <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
+    <div className={SIATKA_TRZECH_KOLUMN}>
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
           więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}

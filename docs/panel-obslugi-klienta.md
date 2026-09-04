@@ -387,11 +387,11 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 ┌─────────────────┬───────────────────────────┬──────────────────────┐
 │ Kolejka         │ Rozmowa                   │ Kontekst             │
 │                 │                           │                      │
-│ Nieprzypisane   │ Klient                    │ Oferta Allegro       │
-│ Moje            │ Agent                     │ Towar z Subiekta     │
-│ Oczekujące      │ Komentarze                │ Dobór części         │
-│ Po terminie     │ Zadania i wyniki          │ Historia klienta     │
-│                 │                           │ Wiedza i źródła      │
+│ Nieprzypisane   │ Klient                    │ Oferta i towar       │
+│ Moje            │ Agent                     │   oferta Allegro     │
+│ Oczekujące      │ Komentarze                │   towar z Subiekta   │
+│ Po terminie     │ Zadania i wyniki          │   opis kartoteki     │
+│                 │                           │ Dobór części         │
 └─────────────────┴───────────────────────────┴──────────────────────┘
 ```
 
@@ -403,9 +403,36 @@ Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku.
 **Skrzynka ma trzy kolumny od 0.180.0.** Do 0.179.0 miała dwie, a kontekst —
 oferta, towar i zamówienie — leżał w środkowej, nad osią. Cztery bloki jeden
 pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
-po co agent otwiera rozmowę. Kolumna kontekstu ma DWIE zakładki: „Oferta"
-i „Towar". Trzech pozostałych z makiety — „Dobór", „Klient", „Wiedza" — nie ma,
-bo nie mają skąd wziąć danych; wchodzą razem z etapem E.
+po co agent otwiera rozmowę.
+
+**Kolumna kontekstu ma DWIE zakładki od 0.198.0: „Oferta i towar" oraz
+„Dobór".** Wcześniej oferta i towar stały osobno. Zakładka „Oferta" to
+jedenaście linijek w kolumnie wysokiej na osiemset pikseli, a zdjęcie, stan,
+półka i parametry kartoteki leżały schowane obok. Właściciel przysłał zrzut,
+na którym klient pyta o wymiar gwintu, a parametr „Gwint" stoi w niewidocznej
+zakładce.
+
+Argument za rozdziałem brzmiał: to dwa równorzędne tematy, więc niech się nie
+przewijają nawzajem. Trzyma się on, dopóki obie karty są wysokie. „Dobór"
+zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
+i przyciskami. „Klient" i „Wiedza" z makiety nie wracają: pierwsza nie ma bytu,
+a dowody kartoteki stoją już w „Doborze".
+
+**Ekran bierze CAŁĄ szerokość okna od 0.198.0.** Wcześniej `<main>` miał
+`max-w-[1500px]` i wyśrodkowanie. Ogranicznik przyszedł z makiety i nikt go
+nigdy nie uzasadnił. Na monitorze 1920 oddawał 210 pikseli na margines z każdej
+strony, na 2560 — po 530, a kolumny stały wąskie mimo wolnego miejsca.
+
+Rosną kolumny SKRAJNE, nie środkowa. W kolejce i w kontekście szerokość zamienia
+się w treść: mniej uciętych nazw, więcej wiersza tabeli, szersze zdjęcie.
+W środku zamieniłaby się w dłuższą linijkę, a linijka na sto dwadzieścia znaków
+czyta się gorzej. Wypowiedzi mają więc własny próg 75 znaków i dosuwają się do
+przeciwnych krawędzi: klient do lewej, my do prawej. Strona kolumny mówi, kto
+mówi, zanim wzrok dojdzie do podpisu.
+
+Szerokości kolumn stoją w JEDNYM miejscu (`SIATKA_TRZECH_KOLUMN` w `panel/src/ui`).
+Do 0.197.4 skrzynka miała kolejkę 22 rem, a zwroty 320 px — rozjazd, którego
+nikt nie zdecydował, choć ta sekcja wymienia szerokości wprost.
 
 Blokada zaczyna się od szerokości `lg`. Niżej grid jest jednokolumnowy, a trzy
 scrollery po dwieście pikseli czytałoby się gorzej niż jedną przewijaną stronę;
@@ -1701,7 +1728,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx` |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`, zakładki Oferta, Towar i od E1 Dobór |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.198.0 zakładki „Oferta i towar" oraz „Dobór" |
+| Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
