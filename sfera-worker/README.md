@@ -161,21 +161,25 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
    > się od cyfry albo litery `a`–`f`**. Windows dokleja do tego kodu opis
    > Harmonogramu zadań — tekst o „aparacie planowania" jest mylący i nie
    > dotyczy Sfery. Szczegóły: `docs/sfera-com.md` §2b.
-3. **Ustalone (0.197.0):** `Uruchom(gtaUruchomDopasuj, gtaUruchom | gtaUruchomWTle)`
-   — czyli `Uruchom(0x0, 0x4)`. Wartości i źródła: `docs/sfera-com.md` §2.
-4. **Manager USTALONY (0.198.4), metoda nie.** Dokumenty niesie
-   `SuDokumentyManager` — `DokumentyMagazynoweManager` z naszego kodu na
-   obiekcie NIE ISTNIEJE. Nazw metod `Dodaj*` nie zgadujemy: wypisze je
-   następny przebieg sondy, która czyta składowe każdego managera.
-5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora —
-   decyzja domyślna: wykonany (sens operacji to „towar sprzedawalny").
-6. Wystawienie korekty do istniejącego dokumentu. `DokumentyHandloweManager`
-   również NIE ISTNIEJE (0.198.4) — szukaj w `SuDokumentyManager`. Sposób
-   adresowania pozycji i pole ilości po korekcie: bez zmian, do ustalenia.
+3. **Zamknięte (0.198.5):** `Uruchom(gtaUruchomDopasuj, gtaUruchomNowy |
+   gtaUruchomWTle)`, czyli `Uruchom(0x0, 0x6)` — zmierzone, sesja otwiera się
+   BEZ OKNA. Usługa da się uruchomić bez pulpitu. `docs/sfera-com.md` §2g.
+4. **Zamknięte (0.198.5):** `SuDokumentyManager.DodajMM()`. Nazwy właściwości
+   na samym dokumencie (`MagazynZrodlowyId`, `Pozycje.Dodaj`, `IloscJm`)
+   zostają — te widać dopiero na obiekcie dokumentu.
+5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
+   Sonda pokazała (0.198.5), że to osobna decyzja z własnym wywołaniem:
+   `SkutekMagazynowyWywolaj`, `SkutekMagazynowyOdloz`, `SkutekMagazynowyCofnij`.
+   Której użyć — pokaże pierwszy dokument.
+6. Korekta faktury sprzedaży to **`SuDokumentyManager.DodajKFS`** (0.198.5) —
+   manager nazywa metody symbolem dokumentu, więc `DodajKorekte` nie istniało.
+   Otwarta zostaje SYGNATURA: czy bierze `dok_Id`, czy wczytany dokument.
+   Sposób adresowania pozycji i pole ilości po korekcie: też do ustalenia.
 7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
    dalsze ogniwo padnie.
-8. RW dla pozycji zniszczonych (`DokumentyMagazynoweManager.DodajRW()`,
-   właściwość magazynu) — pierwsze RW na podmiocie testowym, na zwrocie próbnym.
+8. **Manager i metoda zamknięte (0.198.5):** `SuDokumentyManager.DodajRW()`.
+   Właściwość magazynu na dokumencie zostaje — pierwsze RW na podmiocie
+   testowym, na zwrocie próbnym.
 
 Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
 wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak

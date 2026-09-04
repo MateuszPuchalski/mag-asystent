@@ -94,9 +94,19 @@ function Skladowe($obiekt, [string]$etykieta) {
     Write-Wynik ""
     Write-Wynik "--- $etykieta ---"
     try {
+        # Definicja METODY niesie liste argumentow, a to jest jedyna rzecz,
+        # ktorej sama nazwa nie zdradza. Bez niej wiadomo, ze DodajKFS istnieje,
+        # ale nie wiadomo, czy bierze dok_Id, czy wczytany dokument - i zostaje
+        # zgadywanie, czyli to, przed czym ta sonda ma bronic.
         $czlonkowie = $obiekt | Get-Member -ErrorAction Stop |
             Where-Object { $_.MemberType -ne "AliasProperty" } |
-            ForEach-Object { "{0,-12} {1}" -f $_.MemberType, $_.Name }
+            ForEach-Object {
+                if ($_.MemberType -eq "Method" -and $_.Definition) {
+                    "{0,-12} {1}" -f $_.MemberType, ($_.Definition -replace '\s+', ' ')
+                } else {
+                    "{0,-12} {1}" -f $_.MemberType, $_.Name
+                }
+            }
         if ($czlonkowie) { $czlonkowie | ForEach-Object { Write-Wynik "  $_" } }
         else { Write-Wynik "  (obiekt nie oddal listy skladowych)" }
     } catch {

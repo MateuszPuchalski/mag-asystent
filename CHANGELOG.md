@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.5 — 4 września 2026
+
+**Sesja bez okna działa, a `SuDokumentyManager` oddał nazwy metod.** Przebieg
+sondy po zamknięciu Subiekta zamknął trzy punkty listy `[WERYFIKUJ]` naraz.
+
+### Usługa da się uruchomić bez pulpitu
+
+```
+JEST  sesja otwarta BEZ OKNA — Autentykacja=0, tryb NOWY|W_TLE (0x6)
+```
+
+To było pytanie ważące najwięcej dla całego wdrożenia. Poprawka trybu z 0.198.4
+okazała się trafiona, a `SFERA_AUTENTYKACJA=0` jest właściwą wartością na tej
+instalacji.
+
+### Kod woła wreszcie istniejące nazwy
+
+Manager wystawia dokumenty metodami nazwanymi **symbolem dokumentu**, więc
+`DodajKorekte` nie miało prawa istnieć. Za to `DodajMM` i `DodajRW` były
+trafione od początku — zmyślony był sam manager.
+
+| wywołanie | stan |
+|---|---|
+| `SuDokumentyManager.DodajMM()` | ustalone, w kodzie |
+| `SuDokumentyManager.DodajRW()` | ustalone, w kodzie |
+| `SuDokumentyManager.DodajKFS(…)` | nazwa ustalona, sygnatura otwarta |
+
+### Punkt 5 przestał być zgadywanką
+
+Na managerze siedzą `SkutekMagazynowyWywolaj`, `SkutekMagazynowyOdloz`,
+`SkutekMagazynowyCofnij` i `SkutekMagazynowyWywolajTylkoNaMagZrodl`. Czyli
+„dokument wykonany kontra bufor" to **osobna decyzja z własnym wywołaniem**,
+a nie domyślne zachowanie `Zapisz()`. Której użyć — pokaże pierwszy dokument.
+
+### Sonda wypisuje teraz sygnatury
+
+Sama nazwa nie mówi, czy `DodajKFS` bierze `dok_Id`, czy wczytany dokument.
+Definicja metody to mówi, więc następny przebieg poda listy argumentów zamiast
+zostawiać kolejne zgadywanie.
+
+
 ## 0.198.4 — 4 września 2026
 
 **Pierwsza otwarta sesja Sfery. Dwie nazwy w naszym kodzie okazały się
