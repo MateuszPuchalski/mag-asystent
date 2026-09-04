@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.199.0 — 4 września 2026
+
+**[wymaga działania]** Nowe narzędzie konserwacyjne: czyści zapisane zwroty
+i pobiera je od nowa. Zgłoszenie właściciela — testowe klikanie na żywym koncie
+zostawiło zwroty obsłużone niepoprawnie, a prostowanie ich pojedynczo kosztuje
+więcej niż czysty stan.
+
+```bash
+npm --prefix server run zwroty:reset               # RAPORT, nic nie kasuje
+npm --prefix server run zwroty:reset -- --wykonaj  # kasuje i pobiera od nowa
+```
+
+### Raport jest domyślny
+
+Kasowanie zwrotów jest nieodwracalne, więc bez `--wykonaj` narzędzie tylko
+liczy. Dwie liczby są w tym raporcie ważniejsze od reszty: ile zwrotów jest
+WŁASNYCH (nieodebrane paczki zakłada biuro — Allegro ich nie odda) i ile ma
+zapisany zwrot płatności.
+
+### Oddane pieniądze zatrzymują całość
+
+Wiersz ze zwrotem płatności jest jedynym śladem, że przelew do klienta wyszedł.
+Narzędzie wypisuje numery i odmawia; pominięcie tej bramki wymaga
+`--mimo-pieniedzy`. „Wiem, że nie klikałem" i „sprawdziłem" to dwie różne
+rzeczy, a różnica kosztuje ślad po cudzych pieniądzach.
+
+### Kursor wraca do zera
+
+Samo skasowanie wierszy nie wystarczy: synchronizacja chodzi na kursorze, więc
+Allegro oddawałoby już tylko zwroty nowsze niż ostatni widziany — czyli nic.
+Ekran pokazałby pustkę wyglądającą na awarię Allegro.
+
+### Co zostaje nietknięte
+
+Pamięć powiązań oferta–kartoteka, zamknięte koszyki, ich zadania `mm`
+w kolejce i dziennik zdarzeń. Zamknięty koszyk pojechał na halę z wystawionym
+papierem, a jego pozycje są snapshotem — przeżywają skasowanie zwrotu.
+
+Narzędzie jest procesem, nie trasą w API. Trasa dałaby przycisk kasujący
+zwroty firmy jednym kliknięciem.
+
 ## 0.198.13 — 4 września 2026
 
 **Kontrakt Sfery w `adapters/sfera.ts` powtarzał zmyślone nazwy.** Docstring
