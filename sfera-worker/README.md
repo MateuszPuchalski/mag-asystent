@@ -88,7 +88,8 @@ bieżący. Zmienna środowiskowa wygrywa z plikiem (semantyka jak w Node).
 Czytane klucze: `DB_PATH`, `SGT_MODE` (wymagane `mssql`), `WORKER_POLL_MS`,
 `MSSQL_SERVER`, `MSSQL_INSTANCE`, `MSSQL_PORT`, `MSSQL_DATABASE`,
 `SFERA_WORKER`, `SFERA_OPERATOR`, `SFERA_OPERATOR_HASLO`, `SFERA_SQL_LOGIN`,
-`SFERA_SQL_HASLO`, `SFERA_PROGID`, `SFERA_PRODUKT`, `SFERA_AUTENTYKACJA`.
+`SFERA_SQL_HASLO`, `SFERA_PROGID`, `SFERA_PRODUKT`, `SFERA_AUTENTYKACJA`,
+`SFERA_TRYB_URUCHOMIENIA`.
 
 Dwie rzeczy warto wiedzieć, zanim się je wypełni. **Login SQL jest osobny od
 operatora**: `SFERA_SQL_LOGIN` otwiera bazę, `SFERA_OPERATOR` jest użytkownikiem
@@ -162,13 +163,15 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
    > dotyczy Sfery. Szczegóły: `docs/sfera-com.md` §2b.
 3. **Ustalone (0.197.0):** `Uruchom(gtaUruchomDopasuj, gtaUruchom | gtaUruchomWTle)`
    — czyli `Uruchom(0x0, 0x4)`. Wartości i źródła: `docs/sfera-com.md` §2.
-4. Manager i metoda dodania MM (`DokumentyMagazynoweManager.DodajMM()`),
-   nazwy właściwości magazynów i pozycji.
+4. **Manager USTALONY (0.198.4), metoda nie.** Dokumenty niesie
+   `SuDokumentyManager` — `DokumentyMagazynoweManager` z naszego kodu na
+   obiekcie NIE ISTNIEJE. Nazw metod `Dodaj*` nie zgadujemy: wypisze je
+   następny przebieg sondy, która czyta składowe każdego managera.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora —
    decyzja domyślna: wykonany (sens operacji to „towar sprzedawalny").
-6. Wystawienie korekty do istniejącego dokumentu
-   (`DokumentyHandloweManager.DodajKorekte(dokId)`), sposób adresowania
-   pozycji (`Pozycje.SzukajTowar`) i pole ilości po korekcie.
+6. Wystawienie korekty do istniejącego dokumentu. `DokumentyHandloweManager`
+   również NIE ISTNIEJE (0.198.4) — szukaj w `SuDokumentyManager`. Sposób
+   adresowania pozycji i pole ilości po korekcie: bez zmian, do ustalenia.
 7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
    dalsze ogniwo padnie.
 8. RW dla pozycji zniszczonych (`DokumentyMagazynoweManager.DodajRW()`,

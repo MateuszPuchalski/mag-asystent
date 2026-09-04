@@ -76,9 +76,9 @@ instalator InsERT-u zakłada instancję `INSERTGT`. Nasz kod wysyłał samo
 `UruchomDopasujEnum.gtaUruchomDopasuj` to `0x0`: pierwsza znaleziona aplikacja
 tego typu, podłączona do wskazanego serwera i bazy.
 
-Worker wysyła `Uruchom(0x0, 0x0 | 0x4)`. Usługa Windows nie ma pulpitu, więc bez
-`gtaUruchomWTle` Subiekt nie miałby gdzie pokazać okna. Kod miał tu wcześniej
-gołe `Uruchom(0, 4)` — te same liczby, bez śladu, skąd się wzięły.
+Worker wysyłał do 0.198.4 `Uruchom(0x0, 0x0 | 0x4)`, a wcześniej gołe
+`Uruchom(0, 4)` — te same liczby, bez śladu, skąd się wzięły. Dziś wysyła
+`gtaUruchomNowy | gtaUruchomWTle`; powód opisuje §2f.
 
 ## 2a. Co potwierdziła sonda na maszynie firmy (0.197.2)
 
@@ -156,8 +156,51 @@ Subiekta w tle — sprawdź dane logowania do Subiekta". To kieruje uwagę na
 3. Prawo do Sfery na tym operatorze, nadawane w Subiekcie.
 4. Licencja Sfery na tym podmiocie.
 
-Wartość `0` prowadzi więc dalej niż `1` i to ona zostaje domyślna. Czy sam tryb
-w tle jest blokadą, rozstrzyga sonda uruchomiona z przełącznikiem `-ZOknem`.
+Wartość `0` prowadzi więc dalej niż `1` i to ona zostaje domyślna. Że blokadą
+jest sam tryb w tle, rozstrzygnął kolejny przebieg — §2f.
+
+## 2e. Pierwsza otwarta sesja — model obiektowy Subiekta (0.198.4)
+
+Sonda z przełącznikiem `-ZOknem` weszła do Subiekta i wypisała, co naprawdę
+wisi na obiekcie sesji. Wynik jest bezlitosny dla naszego kodu.
+
+**Managerów jest jedenaście i nie ma wśród nich żadnego z naszych dwóch:**
+
+```
+CesjeManager            EFakturyKSeFManager   FinManager
+InwentaryzacjaManager   KontrahenciManager    RaportyKasoweManager
+SesjeKasoweManager      SMSManager            SuDokumentyManager
+TowaryManager           WyciagiBankoweManager
+```
+
+`DokumentyMagazynoweManager` i `DokumentyHandloweManager` **nie istnieją**.
+Obie nazwy przyszły ze szkicu kontraktu w `sfera.ts` i przez cały czas były
+zgadywane. Dokumenty siedzą pod **`SuDokumentyManager`**.
+
+To jest dokładnie ta cena, którą `CLAUDE.md` opisuje przy Allegro: mapowanie
+z pamięci kosztuje wydania. Metod `Dodaj*` nie zgadujemy trzeci raz — sonda
+wypisuje teraz składowe KAŻDEGO managera, więc następny przebieg poda nazwy.
+
+## 2f. Tryb w tle: podłączenie kontra własna instancja
+
+Ta sama sesja rozstrzygnęła drugą rzecz. Przy identycznych danych logowania:
+
+| wywołanie | wynik |
+|---|---|
+| `Uruchom(dopasuj, gtaUruchom \| gtaUruchomWTle)` | `0x8004132B` |
+| `Uruchom(dopasuj, gtaUruchom)` — z oknem | **sesja otwarta** |
+
+Czyli dane były dobre od początku, a blokował sam tryb. Wyjaśnienie jest
+proste: `gtaUruchom` znaczy „podłącz się do działającego Subiekta". Na tej
+maszynie Subiekt był otwarty, więc Sfera próbowała podłączyć się do instancji
+z interfejsem i jednocześnie zażądać pracy bez okna.
+
+Worker wysyła od 0.198.4 `gtaUruchomNowy | gtaUruchomWTle`, czyli **własną
+instancję w tle**. Tak brzmi też wywołanie z dokumentacji producenta. Usługa
+i tak nie ma prawa zależeć od czyjegoś pulpitu: instancję otwartą przez
+człowieka ktoś kiedyś zamknie albo zablokuje oknem dialogowym.
+
+Wartość da się nadpisać przez `SFERA_TRYB_URUCHOMIENIA`.
 
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
