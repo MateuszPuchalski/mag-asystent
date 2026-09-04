@@ -44,10 +44,9 @@ jobs:
       # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć.
       #
       # Od 0.198.1 stoi tu wspólna akcja zamiast `setup-node` z `cache: npm`.
-      # Tamto trzymało katalog pobrań, a nie drzewo, więc `npm ci` i tak
-      # rozpakowywał 372 MB przy każdym przebiegu: 7 min 03 s z 8 min 59 s
-      # całej bramki. Powód, dla którego klucz nie jest sumą lockfile'a, stoi
-      # w samej akcji — to najważniejsza część tamtej zmiany.
+      # Krok instalacji szedł 3 min 41 s, potem 7 min 03 s, teraz 9 s. Co ten
+      # czas zjadało naprawdę — i dlaczego pierwsza diagnoza z 0.198.1 była
+      # błędna — stoi w nagłówku samej akcji.
       - name: Zależności Node
         if: steps.zakres.outputs.dotyczy == 'true'
         uses: ./.github/actions/zaleznosci
