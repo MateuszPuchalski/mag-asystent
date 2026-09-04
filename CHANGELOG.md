@@ -34,6 +34,54 @@ historii nie przepisujemy.
 ---
 
 
+## 0.196.0 — 3 września 2026
+
+**Obecność przestała ściągać całą listę rozmów.** Zdarzenie obecności —
+wejście do rozmowy, wyjście, „pisze" — zmienia w kolejce jedną rzecz: znacznik
+„ktoś tu siedzi". Do 0.195.0 robiło to przez ponowne pobranie CAŁEJ listy.
+
+### Rachunek, nie przeczucie
+
+`listaRozmow()` nie ma `LIMIT`-u ani odsiewu po statusie: oddaje każdą
+zsynchronizowaną rozmowę z dwudziestoma jeden kolumnami. Zamknięte i spam
+odsiewa dopiero przeglądarka, czyli po przesłaniu.
+
+Pomiar na tym repo, przy treści pytania realnej długości:
+
+```
+  100 rozmów →    54 kB,   2 ms zapytania
+ 1000 rozmów →   537 kB,  26 ms zapytania
+ 5000 rozmów →  2688 kB,  81 ms zapytania
+```
+
+Znak „pisze" jest dławiony co pięć sekund, a `useRozmowy` nie ma `staleTime`,
+więc każde unieważnienie to natychmiastowe pobranie. Kolega redagujący
+odpowiedź ściągał całą listę wszystkim otwartym kartom co pięć sekund.
+
+### Czego NIE zrobiliśmy i dlaczego
+
+Pierwszy pomysł brzmiał „dołóż `staleTime`". Sprawdzony pomiarem: nie działa.
+`invalidateQueries` znaczy zapytanie stałe niezależnie od `staleTime`
+i odświeża aktywne obserwacje tak samo — dwa pobrania z nim i dwa bez.
+
+Odrzucone zostało też dławienie unieważnień. Opóźniałoby zdarzenia RZADKIE
+i ważne: nowa wiadomość klienta pojawiałaby się na liście z sekundowym
+poślizgiem, żeby zaoszczędzić na czymś, co da się usunąć zupełnie.
+
+### Co robi teraz
+
+Zdarzenie obecności podmienia pole w pamięci panelu, bez żadnego żądania.
+Reguła „kto trzyma rozmowę" nie powstaje przy tym drugi raz: serwer oddaje
+obecnych posortowanych po czasie wejścia, a panel bierze pierwszego z listy,
+zamiast wyprowadzać porządek od nowa.
+
+Efekt uboczny jest dodatni: znacznik pojawia się natychmiast, bez czekania na
+odpowiedź serwera. Pozostałe zdarzenia — nowa wiadomość, przejęcie, wynik
+z hali — odświeżają kolejkę dokładnie jak dotąd.
+
+To jest jedna z trzech rzeczy z przeglądu ładunku listy. Dwie zostają:
+odsiew zamkniętych po stronie serwera i `LIMIT` z dociąganiem.
+
 ## 0.195.0 — 3 września 2026
 
 **Trzy braki w skrzynce pytań, wskazane przy przeglądzie panelu.** Wszystkie
