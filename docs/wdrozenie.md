@@ -203,10 +203,33 @@ literówka wygląda jak brak aktualizacji, a nie jak błąd.
 
 Worker Sfery (`sfera-worker/`) automatyzuje dokumenty MM i dochodzi
 **po** ustabilizowaniu etapów powyżej. To nowy proces piszący do bazy firmy,
-więc obowiązuje ta sama zasada: każdy krok najpierw na **kopii**, każda bramka
-to zdanie sprawdzalne. Instrukcja instalacji: `DEPLOY.md` §6, etap 2.
+więc każda bramka jest zdaniem sprawdzalnym. Instrukcja instalacji:
+`DEPLOY.md` §6, etap 2.
 
-**Bramki — wszystkie na kopii bazy, zanim dotknie produkcji:**
+### Piaskownicą NIE jest kopia bazy
+
+Etapy 1 i 2 wyżej idą na kopii i tak zostaje. Worker Sfery jest inny, bo
+**na kopii Sfera nie wstaje**. Licencje InsERT-a siedzą w bazie podmiotu
+i przywrócenie archiwum pod inną nazwą daje podmiot bez licencji. Taki podmiot
+chodzi jako demo, a Sfera w demie nie działa.
+
+Piaskownicą jest **podmiot testowy**, zakładany w oknie wyboru podmiotu:
+Nowy → Wersja próbna → dane przykładowe. Działa 45 dni, a próbną Sferę
+włącza się na nim osobno, na 15 dni. Tyle wystarczy na bramki niżej.
+
+> ⚠️ Nie ruszaj „wymiany licencji" z programu serwisowego. Ona przenosi
+> licencję między podmiotami i potrafi rozbroić produkcję.
+
+Dwie rzeczy, o których trzeba pamiętać przy podmiocie testowym. Ma **własne
+identyfikatory** towarów i magazynów, więc `MAG_ID_*` i kartoteki są inne niż
+na produkcji. Sprawdzasz na nim **nazwy i zachowanie Sfery**, nie liczby firmy.
+Wskazujesz go przez `MSSQL_DATABASE` w osobnym `wertis.env`.
+
+Opis producenta:
+[jak włączyć próbną Sferę](https://www.insert.com.pl/dla_uzytkownikow/e-pomoc_techniczna/3332,jak-wlaczyc-probna-wersje-sfery-w-insert-gt.html)
+oraz [ograniczenia wersji demo](https://www.insert.com.pl/dla_uzytkownikow/e-pomoc_techniczna/4469,insert-gt-jakie-ograniczenia-posiada-wersja-demo.html).
+
+**Bramki — na podmiocie testowym, zanim cokolwiek dotknie produkcji:**
 
 0. **Sonda nazw** (`sfera-worker\sonda.ps1`): otwiera sesję Subiekta i wypisuje
    nazwy składowych. Niczego nie zapisuje. Robi się ją PRZED usługą, bo zamyka
@@ -228,6 +251,20 @@ to zdanie sprawdzalne. Instrukcja instalacji: `DEPLOY.md` §6, etap 2.
 5. **Odporność.** Ubij proces w trakcie zapisu. Po restarcie zadanie jest
    w `error` z ostrzeżeniem o możliwym duplikacie, a w Subiekcie NIE ma dwóch
    MM. Zatrzymanie usługi → zdanie o Sferze w `problemy` w `/api/health`.
+
+**Bramka 6 — jedno MM na produkcji.** Wykonaj ją dopiero po piątce i dopiero
+po kopii zapasowej podmiotu. Weź kartotekę próbną i jedną sztukę. Numer
+dokumentu ma się zgadzać, a stany na obu magazynach mają wrócić do siebie po
+usunięciu MM w Subiekcie.
+
+Ta bramka **nie służy do ustalania `mag_Id`** — te są znane i stoją
+w `wertis.env` od etapu 1. Służy do czegoś innego: to pierwszy dokument, jaki
+Sfera wystawia na podmiocie produkcyjnym.
+
+Zmienia się przy tym wszystko poza kodem. Inna licencja, inny operator, inne
+uprawnienia i pierwsze zetknięcie `Zapisz()` z prawdziwymi stanami. Podmiot
+testowy odpowiada na pytanie „czy nazwy są dobre", a ten jeden dokument na
+pytanie „czy Sfera wpuszcza nas u Was".
 
 **Wycofanie:** `SFERA_WORKER=0` (albo usunięcie wpisu) + restart usług —
 zadania mm wracają do dawnego zachowania (czytelny błąd, MM wystawia biuro).

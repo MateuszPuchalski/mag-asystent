@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.197.1 — 4 września 2026
+
+**Piaskownicą dla workera Sfery nie jest kopia bazy.** Właściciel sprawdził to
+na własnej instalacji: na kopii Sfera nie wstaje. Powód jest po stronie
+InsERT-a — licencje siedzą w bazie podmiotu, a podmiot przywrócony z archiwum
+chodzi jako demo. W demie Sfery nie ma.
+
+Bramki z `docs/wdrozenie.md` mówiły „wszystkie na kopii bazy" i były przez to
+niewykonalne. Piaskownicą jest **podmiot testowy** zakładany w Subiekcie
+(Nowy → Wersja próbna → dane przykładowe, 45 dni), z próbną Sferą włączaną na
+nim osobno na 15 dni.
+
+Doszła też bramka 6: jedno MM na produkcji, na kartotece próbnej, po kopii
+zapasowej. Nie służy ustalaniu `mag_Id` — te są znane i stoją w `wertis.env`
+od etapu 1. Jest pierwszym dokumentem, jaki Sfera wystawia na podmiocie
+produkcyjnym: inna licencja, inny operator, inne uprawnienia.
+
+Ostrzeżenie przy okazji: „wymiana licencji" z programu serwisowego przenosi
+licencję między podmiotami i potrafi rozbroić produkcję. Nie tędy droga do
+Sfery na podmiocie testowym.
+
+Etapów 1 i 2 to nie dotyczy. Tam pracuje worker Node, który pisze do bazy
+wprost, i kopia zostaje właściwym miejscem.
+
+
 ## 0.197.0 — 4 września 2026
 
 **Worker Sfery przed pierwszym wdrożeniem: dwie poprawki z dokumentacji,

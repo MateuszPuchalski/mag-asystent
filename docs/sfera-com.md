@@ -89,8 +89,13 @@ i bez pakietu SDK.
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
 ```
 
+Sonda potrzebuje **działającej licencji Sfery**, bo otwiera prawdziwą sesję.
+Kopia bazy do tego nie służy: przywrócony podmiot traci licencje i chodzi jako
+demo. Właściwe miejsce to podmiot testowy z próbną Sferą albo produkcja —
+sonda i tak niczego nie zapisuje.
+
 **Potem bramka 2** z [`wdrozenie.md`](wdrozenie.md): jedno prawdziwe MM na
-kartotece próbnej, na kopii bazy. Ona rozstrzyga punkty 5 i 7 oraz nazwy
+kartotece próbnej, na PODMIOCIE TESTOWYM. Ona rozstrzyga punkty 5 i 7 oraz nazwy
 właściwości na samym dokumencie.
 
 Po ustaleniach poprawia się jeden plik — `SferaComAdapter.cs` — i dopisuje

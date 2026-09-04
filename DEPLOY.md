@@ -257,6 +257,11 @@ droga ręczna stoi w [`sfera-worker/README.md`](sfera-worker/README.md).
 > a nie w przekierowanym dzienniku NSSM. Bramki opisuje
 > [`docs/wdrozenie.md`](docs/wdrozenie.md).
 
+> **Piaskownicą nie jest kopia bazy.** Przywrócony podmiot traci licencje
+> i chodzi jako demo, a w demie Sfera nie wstaje. Bramki idą na **podmiocie
+> testowym** (Nowy → Wersja próbna → dane przykładowe), z próbną Sferą na
+> 15 dni. Dopiero po nich jedno MM na produkcji.
+
 ```powershell
 nssm install wertis-sfera 'C:\wertis\sfera-worker\wertis-sfera-worker.exe'
 nssm set wertis-sfera AppDirectory 'C:\wertis'
