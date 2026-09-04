@@ -1539,6 +1539,40 @@ sparowane (§6b).
 Numeru listu WERTIS nigdzie nie zapisuje. Nie ma go w dzienniku zdarzeń ani
 w logu żądań serwera.
 
+## 6f. Czyszczenie zwrotów i pobranie od nowa (0.199.0)
+
+Ekran zwrotów zbiera decyzje biura: werdykt, oceny pozycji, kwotę do oddania.
+Po testach na żywym koncie te decyzje bywają nie do uratowania pojedynczo —
+wtedy tańszy jest czysty stan niż prostowanie wiersz po wierszu.
+
+```bash
+cd /c/wertis && source wertis.env
+npm --prefix server run zwroty:reset               # RAPORT, nic nie kasuje
+npm --prefix server run zwroty:reset -- --wykonaj  # kasuje i pobiera od nowa
+```
+
+**Raport jest domyślny**, bo kasowanie zwrotów jest nieodwracalne. Pokazuje,
+ile czego zniknie, a osobno wypisuje dwie liczby warte przeczytania przed
+decyzją.
+
+**Zwroty własne (nieodebrane paczki) NIE WRÓCĄ.** Zakłada je biuro, Allegro
+takiego bytu nie zna, więc ponowne pobranie ich nie odtworzy.
+
+**Zwrot z oddanymi pieniędzmi zatrzymuje całość.** Ten wiersz jest jedynym
+śladem, że przelew do klienta wyszedł. Narzędzie wypisze numery i odmówi;
+świadome skasowanie wymaga `--mimo-pieniedzy`.
+
+Zostają nietknięte: pamięć powiązań oferta–kartoteka, zamknięte koszyki, ich
+zadania `mm` w kolejce Sfery oraz dziennik zdarzeń. Zamknięty koszyk pojechał
+na halę z wystawionym papierem, a jego pozycje są snapshotem — przeżywają
+skasowanie zwrotu, z którego powstały.
+
+Usługi nie trzeba zatrzymywać. Narzędzie kasuje przy okazji kursor
+synchronizacji, więc pobranie startuje od progu `ALLEGRO_ZWROTY_OD` — sam takt
+zrobiłby to samo później, a `--bez-pobrania` zostawia to właśnie jemu.
+
+Decyzje biura wracają PUSTE. Werdykty, oceny i kwoty trzeba nadać od nowa.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
