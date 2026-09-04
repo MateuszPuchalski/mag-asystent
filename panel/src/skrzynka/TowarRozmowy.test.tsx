@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy } from "../api/typy";
 
 const karta = vi.fn();
@@ -19,6 +20,13 @@ const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
 });
 
 const PUSTA = { data: undefined, isLoading: false, error: null };
+
+/** Kartoteka jak z Subiekta — testy opisu podmieniają w niej jedno pole. */
+const PELNA: KartaTowaru = {
+  id: 7701, sym: "NOZ-STIGA-43", name: "Nóż do kosiarki 43 cm", ean: "5901234567890",
+  unit: "szt.", locs: ["R12-B3"], mag: { stan: 7, rez: 2, avail: 5 }, magazyny: [],
+  identyfikatory: [],
+};
 
 describe("towar przy rozmowie", () => {
   it("brak kartoteki niesie POWÓD, nie samo „bez kartoteki”", () => {
@@ -67,6 +75,66 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByText("181004341/0 · AB-1234")).toBeInTheDocument();
     /* Wskazanie człowieka jest podpisane człowiekiem (§4.3). */
     expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
+  });
+
+  /* ── Opis kartoteki (0.198.0) ────────────────────────────────────────────
+     `desc` jechał w odpowiedzi `/api/products/:twId` od dawna i nie był
+     pokazywany NIGDZIE. A to w nim ta firma trzyma gwinty, wymiary i sekcje
+     „Modele:" — czyli odpowiedzi na najczęstsze pytania. Test pilnuje, że
+     treść dojechała na ekran; jak długi jest fragment, wolno zmienić. */
+  it("opis kartoteki widać przy towarze — tam stoją wymiary i gwinty", () => {
+    karta.mockReturnValue({
+      isLoading: false, error: null,
+      data: { ...PELNA, desc: "Korek wlewu paliwa. Gwint M41 x 1,5. Zamiennik 490425." },
+    });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByText(/Gwint M41 x 1,5/)).toBeInTheDocument();
+  });
+
+  it("pusty opis nie zostawia nagłówka nad niczym", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc: "   " } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.queryByText(/Opis kartoteki/)).not.toBeInTheDocument();
+  });
+
+  /* Rozwinięcie dostaje przycisk tylko wtedy, gdy jest co rozwijać — inaczej
+     kolumna niosłaby martwy odnośnik pod każdym jednozdaniowym opisem. */
+  it("krótki opis nie dostaje przycisku rozwijania", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc: "Gwint M41." } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.queryByRole("button", { name: /pokaż cały opis/ })).not.toBeInTheDocument();
+  });
+
+  /* Rozwinięcie jest stanem komponentu — nie idzie po sieć i nie otwiera
+     nowego widoku, bo opis czyta się w biegu, w trakcie pisania odpowiedzi. */
+  it("długi opis rozwija się na miejscu, jednym kliknięciem", async () => {
+    karta.mockReturnValue({
+      isLoading: false, error: null, data: { ...PELNA, desc: "Zamiennik 490425. ".repeat(30) },
+    });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    await userEvent.click(screen.getByRole("button", { name: /pokaż cały opis/ }));
+    expect(screen.getByRole("button", { name: /zwiń opis/ })).toBeInTheDocument();
+  });
+
+  /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka
+     parametrów wybiera pola świadomie, bo szkic idzie do klienta. */
+  it("opisu NIE da się wstawić do szkicu jednym kliknięciem", () => {
+    karta.mockReturnValue({
+      isLoading: false, error: null,
+      data: { ...PELNA, desc: "Gwint M41 x 1,5. UWAGA: ostatnia sztuka z reklamacji." },
+    });
+    render(<TowarRozmowy rozmowaId={1} onWstawDoSzkicu={() => {}} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getAllByRole("button", { name: /wstaw|szkic/i }).length).toBe(1);
   });
 
   it("każdy fakt magazynowy jest podpisany źródłem", () => {

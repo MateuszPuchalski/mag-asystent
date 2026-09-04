@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.0 — 4 września 2026
+
+**Oferta i towar w JEDNEJ zakładce kontekstu — kolumna przestała świecić bielą.**
+Właściciel przysłał zrzut z pracy: kolumna po prawej stronie skrzynki niosła
+jedenaście linijek — numer oferty, tytuł, SKU, cena — a resztę z ośmiuset
+pikseli zostawiała pustą. Zdjęcie towaru, stan magazynowy, półka i parametry
+kartoteki leżały pod sąsiednią zakładką, niewidoczne. Na tamtym zrzucie klient
+prosił o wymiar gwintu korka.
+
+Zakładki „Oferta" i „Towar" zeszły się w jedną: „Oferta i towar". Bloki stoją
+w jednym przewijaniu, w kolejności od tego, co klient widział kupując, do tego,
+co my mamy na półce — oferta, zamówienie, kartoteka. „Dobór" zostaje osobno, bo
+to nie karta faktów, tylko robota z własnymi krokami i przyciskami.
+
+**Opis kartoteki wreszcie widać.** Pole `desc` jechało w odpowiedzi
+`/api/products/:twId` od dawna i panel nie pokazywał go NIGDZIE. A to w nim ta
+firma trzyma gwinty, wymiary, rozstawy i sekcje „Modele:" — czyli odpowiedzi na
+pytania zadawane najczęściej. Blok jest zwinięty do sześciu linijek
+i rozwija się jednym kliknięciem, bez pytania serwera.
+
+Przycisku „wstaw do szkicu" opis NIE dostał i to jest decyzja. Wstawka
+parametrów wybiera pola świadomie, bo szkic idzie do klienta; w opisie bywa
+notatka dla magazynu. Agent skopiuje zdanie, które przeczytał — ale nie wyśle
+całości, nie wiedząc, co w niej stoi.
+
 ## 0.197.3 — 4 września 2026
 
 **Bramka instalatora przestaje czerwienić `main` przez chwilową awarię
