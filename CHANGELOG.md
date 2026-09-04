@@ -64,6 +64,13 @@ zmienna, więc odczyt z pliku kasował to, co podał człowiek. Po cichu.
 **Bez nazwy podmiotu sonda szła prosto na `Uruchom()`** i dostawała kod
 HRESULT zamiast zdania. Teraz odmawia wcześniej i mówi, czego brakuje.
 
+**Szukanie `wertis.env` sięgało jeden katalog w górę i tyle.** Właściciel miał
+plik piętro wyżej i sonda go nie wzięła, a jedyne, co powiedziała, to „nie
+znaleziono". Teraz idzie w górę aż do korzenia dysku — jak Node i jak
+`EnvFile.cs` — a gdy nie znajdzie, **wypisuje wszystkie sprawdzone ścieżki**.
+Najczęstsza przyczyna to Notatnik zapisujący `wertis.env.txt` przy ukrytym
+rozszerzeniu; taką pomyłkę widać wtedy od razu.
+
 ### Komunikat błędu, który kłamie
 
 `Uruchom()` odmówił kodem `0x80041329`, a Windows dokleił do niego zdanie

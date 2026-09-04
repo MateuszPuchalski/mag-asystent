@@ -116,17 +116,43 @@ function Write-Wynik([string]$tekst) {
 }
 
 # --- start ---------------------------------------------------------------
+
+# Szukanie idzie W GORE, katalog po katalogu, az do korzenia dysku - ta sama
+# regula co w Node i w EnvFile.cs. Jeden poziom nie wystarczy: repozytorium bywa
+# rozpakowane glebiej, a plik lezy przy jego korzeniu albo w C:\wertis.
+function Kandydaci([string]$start) {
+    $lista = New-Object System.Collections.Generic.List[string]
+    $kat = $start
+    while ($null -ne $kat -and $kat -ne "") {
+        $lista.Add((Join-Path $kat "wertis.env")) | Out-Null
+        $rodzic = Split-Path -Parent $kat
+        if ($rodzic -eq $kat) { break }
+        $kat = $rodzic
+    }
+    return $lista
+}
+
+$sprawdzone = New-Object System.Collections.Generic.List[string]
 if ($PlikEnv -eq "") {
     $tu = Split-Path -Parent $MyInvocation.MyCommand.Path
-    # C:\wertis dochodzi do listy, bo tam instalator klasycznie klada plik,
-    # a repozytorium bywa rozpakowane zupelnie gdzie indziej.
-    foreach ($kandydat in @((Join-Path $tu "wertis.env"), (Join-Path (Split-Path -Parent $tu) "wertis.env"), "wertis.env", "C:\wertis\wertis.env")) {
-        if (Test-Path -LiteralPath $kandydat) { $PlikEnv = $kandydat; break }
+    foreach ($kandydat in @(Kandydaci $tu) + @(Kandydaci (Get-Location).Path) + @("C:\wertis\wertis.env")) {
+        if ($sprawdzone -contains $kandydat) { continue }
+        $sprawdzone.Add($kandydat) | Out-Null
+        if ($PlikEnv -eq "" -and (Test-Path -LiteralPath $kandydat)) { $PlikEnv = $kandydat }
     }
 }
 
 Write-Wynik "=== Sonda Sfery === $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Wynik "wertis.env: $(if ($PlikEnv -ne '' -and (Test-Path -LiteralPath $PlikEnv)) { (Resolve-Path $PlikEnv).Path } else { '(nie znaleziono - biore parametry i domyslne)' })"
+if ($PlikEnv -ne "" -and (Test-Path -LiteralPath $PlikEnv)) {
+    Write-Wynik "wertis.env: $((Resolve-Path $PlikEnv).Path)"
+} else {
+    # Cisza „nie znaleziono" kosztuje kwadrans zgadywania, wiec sonda pokazuje
+    # WPROST, gdzie zagladala. Najczestsza przyczyna to Notatnik, ktory zapisuje
+    # plik jako wertis.env.txt, a Eksplorator ukrywa to rozszerzenie.
+    Write-Wynik "wertis.env: NIE ZNALEZIONY - biore parametry i domyslne. Szukalem tutaj:"
+    foreach ($s in $sprawdzone) { Write-Wynik "            $s" }
+    Write-Wynik "            (wskaz wprost: -PlikEnv C:\sciezka\wertis.env)"
+}
 
 $env_ = Wczytaj-Env $PlikEnv
 $progId = Klucz $env_ "SFERA_PROGID" "InsERT.GT"

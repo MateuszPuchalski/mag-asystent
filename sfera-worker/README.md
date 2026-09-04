@@ -128,6 +128,16 @@ przebiegu, bez pakietu SDK i bez śladu w bazie.
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
 ```
 
+Ustawienia bierze z `wertis.env`: szuka go od katalogu skryptu i od katalogu
+roboczego, w górę aż do korzenia dysku, na końcu w `C:\wertis`. Gdy nie znajdzie,
+wypisuje wszystkie sprawdzone ścieżki. Można też wskazać plik wprost albo podać
+wartości z ręki:
+
+```powershell
+powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env
+powershell ... -File sonda.ps1 -Baza PODMIOT -Operator Szef -OperatorHaslo *** -LoginSql sa -HasloSql ***
+```
+
 Wynik ląduje na ekranie i w `sonda-sfery.txt`. To on wraca do repozytorium jako
 wypełniona lista — ustalenia dopisuje się do
 [`docs/sfera-com.md`](../docs/sfera-com.md).
