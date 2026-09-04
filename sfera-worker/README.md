@@ -121,9 +121,9 @@ sfera-worker/test-dymny.sh
 ## Sonda — nazwy Sfery bez wystawiania dokumentu
 
 [`sonda.ps1`](sonda.ps1) otwiera sesję Subiekta i wypisuje nazwy składowych:
-obiektu GT, Subiekta, managerów dokumentów. **Niczego nie zapisuje** — żadnego
-`Dodaj*`, żadnego `Zapisz()`. Odpowiada na większość listy niżej w jednym
-przebiegu, bez pakietu SDK i bez śladu w bazie.
+obiektu GT, Subiekta, managerów dokumentów wraz z sygnaturami metod.
+**Niczego nie zapisuje** — `Zapisz()` nie pada w niej ani razu. Odpowiada na
+większość listy niżej w jednym przebiegu, bez pakietu SDK i bez śladu w bazie.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
@@ -142,6 +142,12 @@ powershell ... -File sonda.ps1 -Baza PODMIOT -Operator Szef -OperatorHaslo *** -
 Wynik ląduje na ekranie i w `sonda-sfery.txt`. To on wraca do repozytorium jako
 wypełniona lista — ustalenia dopisuje się do
 [`docs/sfera-com.md`](../docs/sfera-com.md).
+
+Ostatni przełącznik, `-SzkicMM`, jest jedynym miejscem, gdzie sonda woła
+`Dodaj*`. Tworzy MM jako obiekt w pamięci i wypisuje jego właściwości —
+`Zapisz()` nie pada, więc dokument nie powstaje. To zamyka nazwy widoczne
+wyłącznie na obiekcie dokumentu, bez wystawiania czegokolwiek. Domyślnie
+wyłączony, bo obietnica „sonda niczego nie tworzy" ma zostać dosłowna.
 
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
@@ -168,12 +174,13 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
    na samym dokumencie (`MagazynZrodlowyId`, `Pozycje.Dodaj`, `IloscJm`)
    zostają — te widać dopiero na obiekcie dokumentu.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
-   Sonda pokazała (0.198.5), że to osobna decyzja z własnym wywołaniem:
-   `SkutekMagazynowyWywolaj`, `SkutekMagazynowyOdloz`, `SkutekMagazynowyCofnij`.
-   Której użyć — pokaże pierwszy dokument.
-6. Korekta faktury sprzedaży to **`SuDokumentyManager.DodajKFS`** (0.198.5) —
-   manager nazywa metody symbolem dokumentu, więc `DodajKorekte` nie istniało.
-   Otwarta zostaje SYGNATURA: czy bierze `dok_Id`, czy wczytany dokument.
+   Skutek magazynowy ma własne wywołania, a sygnatura mówi czym się posługują:
+   `void SkutekMagazynowyWywolaj(int)` — identyfikatorem dokumentu (0.198.6).
+   Czy `Zapisz()` robi to sam, pokaże pierwszy dokument.
+6. **Metoda i sygnatura zamknięte (0.198.6):** `SuDokument DodajKFS()`, bez
+   argumentów. Korekta powstaje jako pusty dokument, więc otwarte zostaje
+   POWIĄZANIE z dokumentem pierwotnym — manager ma `WczytajDokument(dok_Id)`,
+   ale którą właściwością te dwa się łączy, widać dopiero na obiekcie.
    Sposób adresowania pozycji i pole ilości po korekcie: też do ustalenia.
 7. Usunięcie dokumentu (`Usun()`) — na nim stoi wycofanie łańcucha, gdy
    dalsze ogniwo padnie.

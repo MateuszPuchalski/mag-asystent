@@ -6,7 +6,11 @@
 # tej sondy zamyka cala liste, bez SDK i bez sladu w bazie.
 #
 # Sonda NICZEGO NIE ZAPISUJE. Otwiera sesje, czyta nazwy skladowych i konczy
-# prace. Zadnego Dodaj*, zadnego Zapisz().
+# prace. Zadnego Zapisz().
+#
+# Jeden wyjatek, wlaczany swiadomie: -SzkicMM wola DodajMM(), zeby zobaczyc
+# wlasciwosci obiektu dokumentu. Dokument zostaje w pamieci i nie jest
+# zapisywany, ale to jedyne Dodaj* w calym skrypcie.
 #
 # Uzycie (PowerShell na maszynie z Subiektem GT i Sfera):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
@@ -34,7 +38,11 @@ param(
     # Trzecia proba logowania, z WIDOCZNYM oknem Subiekta. Rozstrzyga, czy
     # blokuje tryb w tle, czy dane logowania. Domyslnie wylaczona, bo otwiera
     # okno na pulpicie.
-    [switch]$ZOknem
+    [switch]$ZOknem,
+    # Tworzy MM jako obiekt w pamieci i wypisuje jego wlasciwosci. NIE wola
+    # Zapisz(), wiec dokument nie powstaje - ale to jedyne wywolanie Dodaj*
+    # w calej sondzie, wiec wlacza sie je swiadomie.
+    [switch]$SzkicMM
 )
 
 $ErrorActionPreference = "Continue"
@@ -416,6 +424,33 @@ if (Ma-Nazwe $sgt "Dokumenty") {
 }
 
 Write-Wynik ""
+# --- Szkic MM: ostatnia rzecz, ktorej nie widac bez obiektu dokumentu -------
+#
+# Sygnatury pokazaly, ze KAZDE `Dodaj*` na SuDokumentyManager jest BEZ
+# ARGUMENTOW i zwraca `SuDokument`. Czyli dokument powstaje najpierw jako
+# obiekt, a dopiero `Zapisz()` go utrwala - i to jest szansa, zeby zobaczyc
+# jego wlasciwosci (MagazynZrodlowyId, Pozycje, NumerPelny) BEZ wystawiania
+# czegokolwiek.
+#
+# DOMYSLNIE WYLACZONE i tak zostaje. Sonda ma jedna obietnice - „niczego nie
+# zapisuje" - a `DodajMM()` jest pierwszym wywolaniem, ktore tej obietnicy
+# dotyka: nie zapisuje, ale tworzy. Czlowiek ma to wlaczyc swiadomie.
+if ($SzkicMM) {
+    Write-Wynik ""
+    Write-Wynik "SZKIC MM - obiekt dokumentu w pamieci, BEZ Zapisz()"
+    Write-Wynik "  Uwaga: to jedyne miejsce, gdzie sonda wola Dodaj*. Dokument"
+    Write-Wynik "  NIE jest zapisywany; po odczytaniu nazw sesja sie konczy."
+    try {
+        $mm = $sgt.SuDokumentyManager.DodajMM()
+        Skladowe $mm "SuDokument (MM) - wlasciwosci dokumentu"
+        if (Ma-Nazwe $mm "Pozycje") {
+            Skladowe $mm.Pozycje "SuDokument.Pozycje"
+        }
+    } catch {
+        Write-Wynik "  BRAK  DodajMM() odmowil: $($_.Exception.Message)"
+    }
+}
+
 Write-Wynik "Czego sonda NIE rozstrzyga, bo wymaga wystawienia dokumentu:"
 Write-Wynik "  - punkt 5: czy Zapisz() daje dokument WYKONANY, czy odklada do bufora"
 Write-Wynik "  - nazwy wlasciwosci na SAMYM dokumencie (MagazynZrodlowyId, Pozycje.Dodaj,"
