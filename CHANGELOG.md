@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.201.3 — 4 września 2026
+
+**Koszyk zwrotów kolejkuje MM przez `enqueueMM`, a nie własnym INSERT-em.**
+Był to drugi writer kolejki w produkcji, obok jedynego nadawcy usług. Wiersz
+w bazie wychodzi ten sam — zysk jest w tym, że niezmiennik o kształcie zadania
+MM stoi teraz w jednym miejscu i czyta się go tam, gdzie się go łamie.
+
+Przy okazji dwie rzeczy, które ta droga naprawia. Zadanie wypuszczone przez
+AUTOMAT po dopisaniu ostatniego numeru korekty dostawało konto człowieka, który
+ten numer wpisał — bo powstaje wewnątrz jego żądania, a kolejka zamieniała jawne
+„bez konta" na konto z sesji. Audyt wiąże po koncie, więc wypuszczenie automatu
+wyglądało na ręczne kliknięcie. Drugie: `enqueueMM` przyjmuje teraz uchwyt bazy,
+tak jak `logEvent` — bez tego zapis szedłby przez inne połączenie niż otwarta
+transakcja.
+
+Niezmiennik jest zapisany dokładniej niż był. Jednopozycyjność z `tw_id`
+obowiązuje MM czyniące towar SPRZEDAWALNYM, bo tylko takie ma czego pilnować
+w guardzie „adres przed sprzedawalnością". MM koszyka idzie w drugą stronę —
+zabiera towar na bufor — więc może być wielopozycyjne. I ma takie zostać: jeden
+koszyk to jeden dokument i jedna kartka dla magazyniera.
+
 ## 0.201.2 — 4 września 2026
 
 **„Pozycje 3742 nie należą do tego zwrotu."** Zapis kwoty odbijał się od

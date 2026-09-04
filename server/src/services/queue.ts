@@ -1,4 +1,4 @@
-import { db } from "../db/db.js";
+import { db, type Db } from "../db/db.js";
 import { currentUserRef } from "../context.js";
 import { logEvent } from "./events.js";
 import type { MmItem } from "../adapters/sfera.js";
@@ -15,12 +15,22 @@ export interface EnqueueBase {
   sourceDocId?: number | null;
   label: string;
   detail: string;
+  /**
+   * Czas zdarzenia, gdy różni się od chwili wstawienia wiersza. Puste =
+   * `DEFAULT` ze schematu.
+   *
+   * Podaje się go wtedy, gdy zadanie opisuje czynność wykonaną wcześniej niż
+   * sam zapis — zamknięcie koszyka zwrotów niesie czas domknięcia kosza, nie
+   * czas, w którym doszedł ostatni numer korekty.
+   */
+  createdAt?: string;
 }
 
 function insert(
   type: string,
   payload: unknown,
-  base: EnqueueBase
+  base: EnqueueBase,
+  database: Db = db()
 ): number {
   /* `created_by_ref` obok `created_by`: nazwa to snapshot z chwili zapisu,
      konto to tożsamość. Worker działa POZA żądaniem — nie ma tam sesji ani
@@ -28,10 +38,14 @@ function insert(
      wszedł" umiałyby podać wyłącznie łańcuch znaków, a audyt wiąże po koncie. */
   // `next_attempt_at` zostaje NULL — zadanie jest do wzięcia od razu. Kolumnę
   // wypełnia dopiero worker: backoff przy retry i `waiting_for_doc`.
-  const res = db()
+  /* Uchwyt bazy jest PARAMETREM, tak jak w `logEvent`. Usługi pracujące na
+     przekazanym uchwycie — i wewnątrz `transaction(database, …)` — pisałyby
+     przez singleton z INNEGO połączenia: z zewnątrz otwartej transakcji
+     w produkcji, a w teście do prawdziwej bazy z konfiguracji. */
+  const res = database
     .prepare(
-      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, created_by, created_by_ref, next_attempt_at)
-       VALUES (?,?, 'pending', ?,?,?,?,?,?,?)`
+      `INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id, source_doc_id, created_by, created_by_ref, created_at, next_attempt_at)
+       VALUES (?,?, 'pending', ?,?,?,?,?,?, COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ','now')), ?)`
     )
     .run(
       type,
@@ -41,7 +55,12 @@ function insert(
       base.twId ?? null,
       base.sourceDocId ?? null,
       base.createdBy,
-      base.createdByRef ?? currentUserRef(),
+      /* JAWNY `null` znaczy „bez konta" i musi przeżyć. `??` zamieniał go na
+         konto z sesji, więc zadanie AUTOMATU wypuszczone przy okazji kliknięcia
+         człowieka dostawało konto tego człowieka. Pominięcie pola nadal bierze
+         sesję — dla dotychczasowych wywołań nic się nie zmienia. */
+      base.createdByRef === undefined ? currentUserRef() : base.createdByRef,
+      base.createdAt ?? null,
       null
     );
   return Number(res.lastInsertRowid);
@@ -177,18 +196,30 @@ export function enqueueSetLocation(
 /**
  * Zadanie MM (spec §5.3): przesunięcie stanu między dowolną parą magazynów.
  *
- * NIEZMIENNIK: każde MM jest jednopozycyjne i ma ustawione `base.twId`.
- * Guard kolejności workera Sfery (sfera-worker/sql/pick_mm_*.sql) pilnuje
- * „adres przed sprzedawalnością" po KOLUMNIE `tw_id` — MM wielopozycyjne
- * albo bez `twId` prześlizgnęłoby się obok guardu i mogło wejść przed
- * zapisem lokalizacji. Gdyby kiedyś powstał nadawca wielopozycyjny, guard
- * musi najpierw nauczyć się czytać pozycje z payloadu.
+ * NIEZMIENNIK: MM czyniące towar SPRZEDAWALNYM jest jednopozycyjne i ma
+ * ustawione `base.twId`. Guard kolejności workera Sfery
+ * (sfera-worker/sql/pick_mm_*.sql) pilnuje „adres przed sprzedawalnością" po
+ * KOLUMNIE `tw_id`; bez niej porównanie z NULL nie dopasowuje i zadanie
+ * przechodzi obok bramki. Dotyczy to każdego MM na magazyn, z którego się
+ * sprzedaje i kompletuje — przesunięcia z odkładania i powrotu z bufora
+ * (`kosz_pozycja.mm_queue_id`).
+ *
+ * MM W DRUGĄ STRONĘ — na bufor — może być wielopozycyjne z `twId: null`.
+ * Zabiera towar ze sprzedaży, więc nie ma czego pilnować; tą samą furtką
+ * chodzi `korekta_zwrot`. Tak idzie MM koszyka zwrotów (MAG→ZWROTY): jeden
+ * koszyk to jeden dokument i jedna kartka dla magazyniera, a rozbicie go na
+ * zadania jednopozycyjne dałoby N dokumentów, N koszy po stronie kolektora
+ * i N wpisów w rekoncyliacji.
+ *
+ * Nadawca wielopozycyjny NA magazyn sprzedażowy wymaga więc najpierw guardu
+ * umiejącego czytać pozycje z payloadu.
  */
 export function enqueueMM(
   magFrom: number,
   magTo: number,
   items: MmItem[],
-  base: EnqueueBase
+  base: EnqueueBase,
+  database?: Db
 ): number {
-  return insert("mm", { magFrom, magTo, items }, base);
+  return insert("mm", { magFrom, magTo, items }, base, database ?? db());
 }

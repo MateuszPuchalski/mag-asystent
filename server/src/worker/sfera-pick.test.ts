@@ -121,6 +121,25 @@ test("najstarsze odblokowane mm wychodzi pierwsze (ORDER BY id)", () => {
   dodaj("mm", 2);
   assert.equal(pickPending()?.id, pierwsze);
 });
+test("MM koszyka zwrotów też przechodzi obok guardu — i tak ma być", () => {
+  /* Od 0.201.3 koszyk zwrotów idzie przez `enqueueMM` jako JEDNO zadanie
+     wielopozycyjne, więc jak `korekta_zwrot` nie ma jednego `tw_id`. Guard go
+     nie obejmuje i nie ma czego pilnować: MM koszyka idzie MAG→ZWROTY, czyli
+     zabiera towar ZE sprzedaży. Pilnowania wymaga ruch w drugą stronę i ten
+     jest jednopozycyjny — niżej. */
+  const lokalizacja = dodaj("set_location", 900_041);
+  const koszyk = dodaj("mm", null);
+  assert.equal(pickPending()?.id, koszyk, "bufor nie czeka na cudzy adres");
+
+  /* Kontrola: MM z `tw_id` tej samej kartoteki co wiszący adres CZEKA. */
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(koszyk);
+  dodaj("mm", 900_041);
+  assert.equal(pickPending(), undefined, "adres przed sprzedawalnością");
+
+  db().prepare("UPDATE sfera_queue SET status='cancelled' WHERE id=?").run(lokalizacja);
+  assert.notEqual(pickPending(), undefined, "wycofany adres nie blokuje");
+});
+
 test("worker Sfery bierze też korektę zwrotu, a guard lokalizacji jej nie dotyczy", () => {
   /* `korekta_zwrot` powstaje z wielu pozycji, więc nie ma jednego `tw_id`
      i guard „adres przed sprzedawalnością" jej nie obejmuje. To poprawne:

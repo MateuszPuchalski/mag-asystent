@@ -23,9 +23,13 @@
 --  • set_location nigdy nie bywa w 'waiting_for_doc' (czekanie na dokument
 --    dotyczy wyłącznie mm), więc lista statusów jest kompletna;
 --  • tw_id IS NULL w q → porównanie z NULL nie dopasowuje → NOT EXISTS
---    przepuszcza; tak właśnie chodzi 'korekta_zwrot' (wiele pozycji, więc
---    bez jednego tw_id). Guard jej nie dotyczy i nie ma czego pilnować:
---    korekta nie czyni towaru sprzedawalnym, tylko zabiera go na bufor.
+--    przepuszcza. Chodzą tędy DWA rodzaje zadań, oba wielopozycyjne i oba
+--    na bufor: 'korekta_zwrot' oraz MM koszyka zwrotów (MAG→ZWROTY,
+--    services/kosze-zwrotow.ts). Guard ich nie dotyczy i nie ma czego
+--    pilnować — żadne z nich nie czyni towaru sprzedawalnym, tylko zabiera
+--    go ze sprzedaży. Pilnowania wymaga ruch w drugą stronę: odkładanie
+--    i powrót z bufora (kosz_pozycja.mm_queue_id) są jednopozycyjne
+--    z ustawionym tw_id i tu właśnie wpadają w NOT EXISTS.
 SELECT q.id, q.type, q.payload, q.attempts, q.source_doc_id, q.tw_id,
        q.created_by, q.created_by_ref
 FROM sfera_queue q
