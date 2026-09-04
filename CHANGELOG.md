@@ -34,6 +34,28 @@ historii nie przepisujemy.
 ---
 
 
+## 0.201.1 — 4 września 2026
+
+**`dok_DoDokId` nie znaczy „to jest korekta" — a automat z 0.201.0 tak to
+czytał.** Zrzut z bazy firmy pokazał tę kolumnę wypełnioną na 20 418 paragonach
+i 25 778 dokumentach WZ. To ogólny odnośnik „do dokumentu", nie znacznik
+korygowania.
+
+Wystarczyłaby więc **faktura do paragonu** — w detalu rzecz codzienna — żeby
+automat wziął ją za korektę tego paragonu, wpisał jej numer jako numer korekty
+i wypuścił MM na towar, którego nikt nie oddał.
+
+Wiązanie ma teraz bramkę po TYPIE dokumentu: liczą się wyłącznie symbole
+z `DOK_TYPY_KOREKT` (domyślnie KFS i ZW), a `dok_DoDokId` mówi tylko, czego
+korekta dotyczy. Symbole biorą się z tej samej mapy, którą import zapisuje do
+`sgt_faktura.typ` — dwa źródła prawdy o tym samym rozjechałyby się przy
+pierwszej zmianie ustawienia.
+
+Przy okazji przesłanka do otwartego `[WERYFIKUJ]`: w tym samym zbiorze jest
+655 dokumentów typu 6 (KFS) i 772 typu 14 (ZW). Oba kody są w użyciu i w
+podobnej skali, więc domyślne `6,14` jest trafione. Znacznik zostaje, bo to
+jeszcze nie dowód, że `ZW` wskazuje wtedy zwracany paragon.
+
 ## 0.201.0 — 4 września 2026
 
 **[wymaga działania]** Numer korekty czyta automat z Subiekta. Biuro wystawia

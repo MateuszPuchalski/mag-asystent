@@ -353,3 +353,35 @@ test("korekta NIE jest kandydatem na dokument sprzedaży zwrotu", () => {
   assert.deepEqual(kandydaciFaktury(id, d).map((k) => k.dokId), [],
     "korekta ma numer zamówienia tak samo jak faktura — filtruje ją TYP");
 });
+
+test("FAKTURA DO PARAGONU nie jest korektą, choć wskazuje ten paragon", () => {
+  /* Zrzut z bazy firmy (0.201.1) pokazał `dok_DoDokId` wypełnione na dwudziestu
+     tysiącach paragonów i dwudziestu pięciu tysiącach WZ — to ogólny odnośnik
+     „do dokumentu", nie znacznik korygowania.
+
+     Faktura do paragonu jest w detalu rzeczą codzienną. Bez bramki po TYPIE
+     automat wziąłby ją za korektę tego paragonu, wpisał jej numer i wypuścił
+     MM na towar, którego nikt nie oddał. */
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  dokument(d, 601, { typ: "FS", numer: "FS 90/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), false);
+  assert.equal(stanKorekty(d, id).korekta_numer, null);
+
+  /* Ta sama sytuacja plus prawdziwa korekta: bierze się WYŁĄCZNIE korektę. */
+  dokument(d, 602, { typ: "KFS", numer: "KFS 9/2026", koryguje: 500 });
+  assert.equal(zwiazKorekte(id, d), true);
+  assert.equal(stanKorekty(d, id).korekta_numer, "KFS 9/2026");
+});
+
+test("zwrot detaliczny (ZW) wiąże się tak samo jak korekta faktury", () => {
+  /* Sprzedaż paragonowa koryguje się `ZW`, nie `KFS` — a paragonów jest u tej
+     firmy czterokrotnie więcej niż faktur. Oba kody stoją w DOK_TYPY_KOREKT. */
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  dokument(d, 601, { typ: "ZW", numer: "ZW 4/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), true);
+  assert.equal(stanKorekty(d, id).korekta_numer, "ZW 4/2026");
+});
