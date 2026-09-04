@@ -128,7 +128,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   /** Pozycje zamówienia, których w zwrocie jeszcze nie ma (0.184.0). */
   doDopisania?: DoDopisania[];
   bladDopisania?: string;
-  onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja") => void;
+  onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja" | null) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
@@ -155,6 +155,10 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
 
   const wycena = zwrot.kubelek === "zwrot";
   const ocenianie = zwrot.kubelek === "ocena";
+  /* Ocenę cofa się wszędzie, gdzie zwrot jest jeszcze w pracy — pomyłkę widać
+     równie dobrze przy wycenie, co przy ocenianiu. Zamknięty i odrzucony
+     odpadają, bo `podKlucz` po stronie serwera i tak ich nie wpuści. */
+  const cofalne = zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony";
   const dostawaGrosze = zwrot.zamowienie?.dostawaGrosze ?? null;
 
   /* Podgląd odejmuje potrącenia tak samo jak serwer — inaczej operator
@@ -241,10 +245,21 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 <kbd className="rounded border border-slate-300 px-1">{klawisz}</kbd> {etykieta}
               </Przycisk>))}
           </div>}
-          {p.ocena && <p className="mt-2 text-xs font-bold text-ranga-ok">
-            Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}
-            {p.ocena === "stan" && p.wKoszyku && <span className="ml-1 font-normal text-slate-500">
-              · w koszyku zwrotów</span>}</p>}
+          {p.ocena && <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-ranga-ok">
+            <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}
+              {p.ocena === "stan" && p.wKoszyku && <span className="ml-1 font-normal text-slate-500">
+                · w koszyku zwrotów</span>}</span>
+            {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5). Do 0.202.0 przyciski
+                oceny znikały po pierwszym kliknięciu, więc pomyłkowa
+                „Utylizacja" na złym wierszu była z ekranu nie do odkręcenia.
+                Nie pokazujemy go tam, gdzie serwer i tak odmówi: zwrot
+                zamknięty i odrzucony są poza pracą, a pozycja z zamkniętego
+                koszyka dostanie zdanie z nazwą kosza dopiero po kliknięciu —
+                bo tego panel z listy pozycji nie wie. */}
+            {cofalne && <button type="button" disabled={trwa}
+              className="font-normal text-slate-500 underline underline-offset-2
+                disabled:opacity-50"
+              onClick={() => onOcena(p.id, null)}>cofnij ocenę</button>}</p>}
           {/* CICHA STRATA JEST TU NAJGORSZYM WYJŚCIEM (0.192.0). Ocena „na
               stan" dokłada pozycję do koszyka, czyli na dokument MM — ale MM
               przesuwa stany KARTOTEK, więc pozycja bez kartoteki wejść nie

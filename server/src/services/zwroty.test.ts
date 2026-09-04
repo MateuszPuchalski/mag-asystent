@@ -7,9 +7,10 @@ import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte, znajdzZwrotPoKodzie,
+  cofnijKorekte, cofnijKwote, znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "./zwroty.js";
+import { zamknijKosz } from "./kosze-zwrotow.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
    Ekran ma zjadać klikanie, a nie je mnożyć. Trzy rzeczy to gwarantują
@@ -538,6 +539,112 @@ test("korekta przed kwotą odpada — nie ma czego korygować", () => {
   ocenPozycje(d, poz[1], "stan", 3, KTO);
 
   assert.throws(() => zapiszKorekte(d, id, "KFS 12/2026", 4, KTO), /kwot/i);
+});
+
+/* ── Drabina cofania (0.202.0) ───────────────────────────────────────────────
+   §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową. Każdy
+   kubełek cofa DOKŁADNIE ten krok, który go wprowadził — testy niżej pilnują,
+   że schodzi się po jednym szczeblu i że oba nieodwracalne kroki zatrzymują
+   całość.                                                                  */
+
+test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[1], "utylizacja", 2, KTO);
+  const kosz = ocenPozycje(d, poz[0], "stan", 3, KTO).koszyk!;
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(kosz) as { n: number }).n), 1);
+
+  ocenPozycje(d, poz[0], null, 4, KTO);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.equal(z.kubelek, "ocena", "brak oceny cofa zwrot o jeden szczebel");
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(kosz) as { n: number }).n), 0,
+    "towar schodzi z dokumentu, którego jeszcze nikt nie wystawił");
+});
+
+test("ocena pozycji z ZAMKNIĘTEGO koszyka ODMAWIA i nazywa kosz", () => {
+  /* Do 0.202.0 przechodziła po cichu: `zdejmijZKosza` szuka kosza otwartego,
+     a jego brak oddawał `false`, którego nikt nie czytał. Towar zostawał na
+     dokumencie, który pojechał na halę — bez oceny, która go tam posłała. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
+  const kod = (d.prepare("SELECT kod FROM kosz WHERE id=?").get(kosz) as { kod: string }).kod;
+  /* Korekta przed zamknięciem — od 0.200.0 bez niej MM nie wychodzi wcale. */
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
+  zamknijKosz(d, kosz, KTO);
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer=NULL WHERE id=?").run(id);
+
+  /* Wersja to 3, nie 2: pierwsza ocena ją podniosła. Bramka wersji stoi PRZED
+     bramką kosza i to jest właściwa kolejność — konflikt dwóch agentów jest
+     pytaniem wcześniejszym niż to, gdzie leży towar. */
+  assert.throws(() => ocenPozycje(d, poz[0], null, 3, KTO), new RegExp(kod));
+  assert.throws(() => ocenPozycje(d, poz[0], "utylizacja", 3, KTO), new RegExp(kod));
+
+  /* ODMOWA NIE ZMIENIA NICZEGO — ani oceny, ani zawartości kosza. */
+  assert.equal((d.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz[0]) as { ocena: string | null }).ocena, "stan");
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(kosz) as { n: number }).n), 1);
+});
+
+test("cofnięcie kwoty wraca do DO ZWROTU i czyści zaznaczenie pozycji", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz, wersja } = zwrotDoKorekty(d, KTO);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)?.kubelek, "korekta");
+
+  cofnijKwote(d, id, wersja, KTO);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.equal(z.kubelek, "zwrot");
+  assert.equal(z.kwotaGrosze, null);
+  /* `w_zwrocie` JEST zaznaczeniem — zostawione kazałoby następnej wycenie
+     startować z cudzego wyboru. */
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_klienta_pozycja WHERE zwrot_id=? AND w_zwrocie=1")
+    .get(id) as { n: number }).n), 0);
+  /* Oceny ZOSTAJĄ: cofamy pieniądze, nie pracę nad towarem. */
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_klienta_pozycja WHERE zwrot_id=? AND ocena IS NOT NULL")
+    .get(id) as { n: number }).n), poz.length);
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_zdarzenie WHERE zwrot_id=? AND rodzaj='kwota_cofnieta'")
+    .get(id) as { n: number }).n), 1, "oś zwrotu ma powiedzieć, czemu wrócił");
+
+  /* Po cofnięciu da się zapisać INNĄ kwotę — po to całe cofnięcie jest. */
+  const nowa = zapiszKwote(d, id, { pozycjeIds: [poz[0]], dostawa: false }, wersja + 1, KTO);
+  assert.equal(nowa.kwotaGrosze, 5000);
+});
+
+test("oddane pieniądze i zapisana korekta ZATRZYMUJĄ cofnięcie kwoty", () => {
+  /* Dwie różne odmowy. Pieniądze wyszły PRZECIW tej kwocie i wiersz jest
+     jedynym śladem po przelewie; korekta to tylko szczebel wyżej. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, wersja } = zwrotDoKorekty(d, KTO);
+  zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
+  assert.throws(() => cofnijKwote(d, id, wersja + 1, KTO), /KFS 12\/2026/);
+
+  cofnijKorekte(d, id, wersja + 1, KTO);
+  d.prepare("UPDATE zwrot_klienta SET zwrot_pieniedzy_id='REF-1' WHERE id=?").run(id);
+  assert.throws(() => cofnijKwote(d, id, wersja + 2, KTO), /oddane/i);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)?.kwotaGrosze, 15000,
+    "odmowa nie zmienia ANI grosza");
+
+  /* Stara wersja to konflikt, nie ciche nadpisanie — jak wszędzie w zwrotach. */
+  d.prepare("UPDATE zwrot_klienta SET zwrot_pieniedzy_id=NULL WHERE id=?").run(id);
+  assert.throws(() => cofnijKwote(d, id, wersja, KTO), /w międzyczasie/);
 });
 
 test("cofnięcie korekty otwiera zwrot z powrotem — numer przepisuje człowiek", () => {

@@ -38,7 +38,8 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
 
 const pasek = (z: Zwrot, h: Partial<Parameters<typeof Decyzje>[0]> = {}) =>
   render(<Decyzje zwrot={z} onWerdykt={vi.fn()}
-    onKorekta={vi.fn()} onCofnijKorekte={vi.fn()} trwa={false} blad="" {...h} />);
+    onKorekta={vi.fn()} onCofnijKorekte={vi.fn()} onCofnijKwote={vi.fn()}
+    trwa={false} blad="" {...h} />);
 
 describe("Decyzje zwrotu", () => {
   it("przyjęcie idzie jednym kliknięciem, bez pytania o nic", () => {
@@ -91,6 +92,18 @@ describe("Korekta zwrotu (0.162.0)", () => {
     pasek(doKorekty());
     expect(screen.getByText(/wystawiasz w Subiekcie/i)).toBeInTheDocument();
     expect(screen.getByText(/Pieniądze oddajesz w panelu Allegro/i)).toBeInTheDocument();
+  });
+
+  it("kwota ma tu DROGĘ WYJŚCIA — to ostatni ekran przed korektą", async () => {
+    /* §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową.
+       Do 0.202.0 kwota była z tej obietnicy wyjęta: pasek wyceny znika razem
+       z kubełkiem DO ZWROTU, więc pomyłka w zaznaczeniu zostawała na zawsze. */
+    const onCofnijKwote = vi.fn();
+    pasek(doKorekty(), { onCofnijKwote });
+    expect(screen.getByText("99,98 PLN")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /popraw kwotę/i }));
+    expect(onCofnijKwote).toHaveBeenCalled();
   });
 
   it("pusty numer nie domyka zwrotu", async () => {

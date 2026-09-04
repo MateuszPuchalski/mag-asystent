@@ -168,6 +168,26 @@ describe("Produkty ze zwrotu", () => {
     expect(onKwota).toHaveBeenCalledWith([11, 12, 13], false);
   });
 
+  it("ocenę DA SIĘ COFNĄĆ — inaczej pomyłka zostaje na wierszu na zawsze", async () => {
+    /* §25a.5. Do 0.202.0 przyciski oceny znikały po pierwszym kliknięciu
+       (`ocenianie && !p.ocena`), a serwer cofnięcie przyjmował od 0.192.0 —
+       brakowało wyłącznie klawisza. */
+    const onOcena = vi.fn();
+    lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA({ id: 11, ocena: "utylizacja" })] }),
+      { onOcena });
+
+    await userEvent.click(screen.getByRole("button", { name: /cofnij ocenę/i }));
+    expect(onOcena).toHaveBeenCalledWith(11, null);
+  });
+
+  it("na zwrocie ZAMKNIĘTYM cofnięcia oceny nie ma — serwer i tak odmówi", () => {
+    /* Przycisk, po którym zawsze przychodzi błąd, jest gorszy niż jego brak:
+       uczy ignorować komunikaty. */
+    lista(zwrot({ kubelek: "zamkniety", pozycje: [POZYCJA({ id: 11, ocena: "stan" })] }));
+    expect(screen.getByText(/Ocena: Na stan/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cofnij ocenę/i })).toBeNull();
+  });
+
   it("bez zamówienia nie ma czego oddać za dostawę", () => {
     lista(zwrot({ kubelek: "zwrot", zamowienie: null }));
     expect(screen.queryByLabelText(/Koszt dostawy/)).toBeNull();

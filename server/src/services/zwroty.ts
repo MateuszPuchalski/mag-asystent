@@ -7,7 +7,8 @@ import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 import type { FakturaZwrotu } from "./faktury.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
-import { dolozDoKosza, wypuscGotoweKoszyki, zdejmijZKosza } from "./kosze-zwrotow.js";
+import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
+  from "./kosze-zwrotow.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -771,6 +772,15 @@ export function ocenPozycje(
     /* Ocena ma sens dopiero po przyjęciu. Ocenianie towaru ze zwrotu, którego
        nie przyjęliśmy, zostawiałoby w bazie decyzję o czymś, co nie wraca. */
     if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    /* ODMOWA PRZED ZAPISEM, nie po nim: pozycja z zamkniętego koszyka jest już
+       na dokumencie MM, który pojechał na halę. Do 0.202.0 zmiana oceny
+       przechodziła tu po cichu i zostawiała towar na cudzym papierze — bez
+       oceny, która go tam posłała, więc i bez tropu przy szukaniu. */
+    const zamkniety = zamknietyKoszPozycji(database, pozycjaId);
+    if (zamkniety) {
+      throw new Error(`Pozycja jest na zamkniętym koszyku ${zamkniety.kod} — ` +
+        "dokument już pojechał na halę.");
+    }
     database.prepare(`UPDATE zwrot_klienta_pozycja
       SET ocena=?, ocena_at=?, ocena_przez=? WHERE id=?`)
       .run(ocena, ocena === null ? null : teraz.toISOString(),
@@ -1165,6 +1175,69 @@ export function zapiszKwote(
       { zwrotId, kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant,
         pozycje: [...wybrane] }, kto.id, database);
     return { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant, wersja: wersja + 1 };
+  })();
+}
+
+/**
+ * Cofa ustaloną kwotę — zwrot wraca do DO ZWROTU (0.202.0).
+ *
+ * §25a.5 obiecuje cofnięcie wszędzie poza oddaniem pieniędzy i odmową. Kwota
+ * była z tej obietnicy wyjęta: nadpisać dawało się ją tylko w kubełku DO
+ * ZWROTU, a zapis natychmiast z niego wyprowadzał. Pomyłka w zaznaczeniu
+ * zostawała więc na zawsze.
+ *
+ * DWIE ODMOWY, obie z nazwą, po czym szukać:
+ *
+ * 1. **Pieniądze wyszły.** `zwrot_pieniedzy_id` znaczy, że przelew poszedł do
+ *    klienta PRZECIW tej kwocie, a wiersz jest jedynym jego śladem. Ta sama
+ *    zasada, co bramka w `zwroty-reset.ts`. Poprawia się to dopłatą w panelu
+ *    Allegro, nie skasowaniem liczby u nas.
+ * 2. **Korekta stoi.** Cofa się o JEDEN szczebel: najpierw korekta, potem
+ *    kwota. Bez tego zdania człowiek dostałby gołe „Zwrot jest zamknięty"
+ *    z `podKlucz` i nie wiedziałby, że droga wyjścia istnieje.
+ *
+ * Pozycje wracają do `w_zwrocie=0`, bo ta kolumna JEST zaznaczeniem: gdyby
+ * została, następna wycena startowałaby z cudzego wyboru.
+ */
+export function cofnijKwote(
+  database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
+  teraz = new Date(),
+): { wersja: number } {
+  return transaction(database, () => {
+    const z = database.prepare(
+      `SELECT wersja, kwota_grosze, korekta_numer, zwrot_pieniedzy_id
+         FROM zwrot_klienta WHERE id=?`).get(zwrotId) as
+      { wersja: number; kwota_grosze: number | null; korekta_numer: string | null;
+        zwrot_pieniedzy_id: string | null } | undefined;
+    if (!z) throw new Error("Nie znaleziono zwrotu");
+    if (Number(z.wersja) !== wersja) {
+      throw new ZwrotConflict(
+        "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.",
+        { wersja: Number(z.wersja), przyslana: wersja });
+    }
+    if (z.kwota_grosze === null) throw new Error("Ten zwrot nie ma ustalonej kwoty");
+    if (z.zwrot_pieniedzy_id) {
+      throw new Error(
+        "Pieniądze zostały już oddane — kwoty nie cofam. Różnicę dopłać w panelu Allegro.");
+    }
+    if (z.korekta_numer) {
+      throw new Error(`Najpierw cofnij korektę ${z.korekta_numer} — kwota jest pod nią.`);
+    }
+
+    const kiedy = teraz.toISOString();
+    database.prepare("UPDATE zwrot_klienta_pozycja SET w_zwrocie=0 WHERE zwrot_id=?").run(zwrotId);
+    database.prepare(
+      `UPDATE zwrot_klienta
+        SET kwota_grosze=NULL, kwota_dostawa_grosze=NULL, kwota_wariant=NULL,
+            kwota_at=NULL, kwota_przez=NULL
+        WHERE id=?`).run(zwrotId);
+    podnies(database, zwrotId);
+    zdarzenie(database, zwrotId, "kwota_cofnieta",
+      `Cofnięto kwotę ${(Number(z.kwota_grosze) / 100).toFixed(2)}`,
+      { kwotaGrosze: Number(z.kwota_grosze) }, kto, kiedy);
+    logEvent("zwrot_kwota_cofnieta", kto.name, null,
+      { zwrotId, kwotaGrosze: Number(z.kwota_grosze) }, kto.id, database);
+    return { wersja: wersja + 1 };
   })();
 }
 

@@ -132,6 +132,30 @@ export function dolozDoKosza(
 }
 
 /**
+ * Koszyk ZAMKNIĘTY, na którym siedzi ta pozycja — albo `null`.
+ *
+ * Bramka dla zmiany i cofnięcia oceny (0.202.0). Do tego wydania zmiana oceny
+ * na pozycji z zamkniętego kosza przechodziła po cichu: `zdejmijZKosza` szuka
+ * wyłącznie kosza otwartego i przy braku trafienia oddaje `false`, którego
+ * nikt nie czytał. Towar zostawał na dokumencie MM, który pojechał na halę,
+ * a w bazie nie było już oceny, która go tam posłała.
+ *
+ * Oddajemy KOD, nie samo „tak": człowiek ma wiedzieć, na którym papierze
+ * szukać, a nie tylko że się nie da.
+ */
+export function zamknietyKoszPozycji(
+  database: Db, pozycjaId: number,
+): { id: number; kod: string } | null {
+  const w = database.prepare(
+    `SELECT k.id, k.kod FROM kosz_pozycja kp
+       JOIN kosz k ON k.id = kp.kosz_id
+      WHERE kp.zwrot_pozycja_id=? AND k.status<>'otwarty'
+      ORDER BY k.id LIMIT 1`)
+    .get(pozycjaId) as { id: number; kod: string } | undefined;
+  return w ? { id: Number(w.id), kod: w.kod } : null;
+}
+
+/**
  * Zdejmuje pozycję z koszyka po cofnięciu albo zmianie oceny.
  *
  * TYLKO Z OTWARTEGO. Kosz zamknięty pojechał już na halę z wystawionym

@@ -1214,6 +1214,32 @@ Cofnięcie zdejmuje kwotę razem z powodem (§25a.5).
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
 zwrotu. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
 
+**Drabina cofania (0.202.0).** Każdy kubełek cofa dokładnie ten krok, który go
+wprowadził. Schodzi się po jednym szczeblu, tą samą drogą, którą się weszło:
+
+| kubełek | co cofa | dokąd wraca |
+|---|---|---|
+| ZAMKNIĘTY | cofnij korektę | DO KOREKTY |
+| DO KOREKTY | popraw kwotę | DO ZWROTU |
+| DO ZWROTU, DO OCENY | cofnij ocenę | DO OCENY |
+
+Dwóch szczebli naraz nie trzeba zabraniać — sam kształt na to nie pozwala.
+Kubełek wynika ze stanu, a bramka wersji odrzuca zwrot zamknięty, więc kwoty
+spod zapisanej korekty nie da się ruszyć, dopóki korekta stoi.
+
+Ocena i kwota są NIEZALEŻNE. Cofnięcie oceny zostawia kwotę, więc po ponownym
+ocenieniu zwrot wraca prosto do DO KOREKTY, bez powtarzania wyceny: ocena jest
+faktem o towarze, kwota o pieniądzach.
+
+Dwie rzeczy cofnięcia NIE mają, i obie mówią, dlaczego:
+
+- **Pozycja na zamkniętym koszyku.** Dokument MM pojechał na halę. Ekran
+  nazywa kosz, żeby człowiek wiedział, na którym papierze szukać. Do 0.202.0
+  zmiana oceny przechodziła tu po cichu i zostawiała towar na cudzym
+  dokumencie.
+- **Kwota, przeciw której poszły pieniądze.** Wiersz zwrotu płatności jest
+  jedynym śladem po przelewie. Różnicę dopłaca się w panelu Allegro.
+
 ### 25a.6. Zamówienie i zdjęcia
 
 Zwrot niesie sam numer zamówienia, więc panel dociąga jego treść i pokazuje
