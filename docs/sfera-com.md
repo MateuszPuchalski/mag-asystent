@@ -245,6 +245,34 @@ coś robi — rozstrzyga bramka 2, bo to zachowanie, nie nazwa.
 Sonda wypisuje od 0.198.5 także **sygnatury metod**, więc następny przebieg
 poda listę argumentów `DodajKFS` i `SkutekMagazynowy*`.
 
+## 2i. Sygnatury — i zgadnięta sygnatura, która była błędna (0.198.6)
+
+Sonda wypisała listy argumentów. Dwie linie zmieniają kod:
+
+```
+SuDokument DodajKFS ()
+void SkutekMagazynowyWywolaj (int)
+```
+
+**`DodajKFS` nie bierze żadnego argumentu.** Kod z 0.198.5 wołał
+`DodajKFS(dok_Id)` i wywróciłby się na liczbie argumentów. Zgadnięcie sygnatury
+kosztowało dokładnie tyle samo, co wcześniejsze zgadnięcie nazwy — to już drugi
+raz w tym samym miejscu.
+
+Wszystkie `Dodaj*` na `SuDokumentyManager` są bezargumentowe i zwracają
+`SuDokument`. Dokument powstaje więc najpierw jako **obiekt**, a dopiero
+`Zapisz()` go utrwala. Powiązanie korekty z dokumentem pierwotnym siedzi na
+obiekcie; manager ma osobne `SuDokument WczytajDokument(Variant)`.
+
+**Skutek magazynowy bierze `int`** — czyli identyfikator dokumentu. Po zapisie
+MM da się więc jawnie zażądać wykonania, zamiast liczyć na domyślne zachowanie
+`Zapisz()`.
+
+Z tego wynika też droga do ostatniego punktu. Skoro `DodajMM()` tworzy obiekt
+bez zapisu, jego właściwości można obejrzeć bez wystawiania dokumentu —
+robi to sonda z przełącznikiem `-SzkicMM`. Domyślnie wyłączony, bo to jedyne
+`Dodaj*` w całym skrypcie.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.

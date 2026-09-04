@@ -206,15 +206,22 @@ public sealed class SferaComAdapter : ISferaAdapter
         try
         {
             var su = Sesja();
-            /* Manager USTALONY, metoda WYBRANA, sygnatura `[WERYFIKUJ]`.
-               `DodajKorekte` nie istnieje; `SuDokumentyManager` wystawia korekty
-               metodami nazwanymi po symbolu dokumentu, a korekta faktury
-               sprzedaży to `DodajKFS`. Czy bierze `dok_Id` dokumentu
-               pierwotnego, czy dokument wczytany przez `WczytajDokument` —
-               tego sonda nie powie, bo to argument, nie nazwa. Rozstrzyga
-               bramka 2 z docs/wdrozenie.md. */
-            dynamic korekta = Krok("SuDokumentyManager.DodajKFS(dok_Id)", 6,
-                () => su.SuDokumentyManager.DodajKFS(z.DokId));
+            /* Sygnatura USTALONA sondą (0.198.6): `SuDokument DodajKFS()`,
+               BEZ ARGUMENTÓW. Poprzednie wydanie wołało `DodajKFS(dok_Id)`
+               i wywróciłoby się na liczbie argumentów — zgadywanie sygnatury
+               kosztowało tyle samo, co zgadywanie nazwy.
+
+               Korekta powstaje więc jako PUSTY dokument, a wskazanie dokumentu
+               pierwotnego siedzi na obiekcie: `SuDokumentyManager` ma osobne
+               `WczytajDokument(dok_Id)` zwracające `SuDokument`. Którą
+               właściwością te dwa się wiąże — widać dopiero na obiekcie
+               korekty, więc to `[WERYFIKUJ]` do bramki 2. */
+            dynamic korekta = Krok("SuDokumentyManager.DodajKFS()", 6,
+                () => su.SuDokumentyManager.DodajKFS());
+
+            /* [WERYFIKUJ] powiązanie korekty z dokumentem pierwotnym.
+               Kandydat: właściwość na obiekcie korekty przyjmująca dokument
+               z `WczytajDokument(z.DokId)`. Nazwy nie zgadujemy trzeci raz. */
             foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
                 /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie

@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.6 — 4 września 2026
+
+**Sygnatury pokazały, że wczorajsze zgadnięcie było błędne — drugi raz w tym
+samym miejscu.** Sonda wypisuje od 0.198.5 listy argumentów i pierwszy przebieg
+z nimi od razu na to trafił.
+
+### `DodajKFS` nie bierze żadnego argumentu
+
+```
+SuDokument DodajKFS ()
+```
+
+Kod z 0.198.5 wołał `DodajKFS(dok_Id)` i wywróciłby się na liczbie argumentów.
+Najpierw zgadnięta była nazwa managera, teraz sygnatura metody — ta sama lekcja
+dwa razy pod rząd.
+
+Wszystkie `Dodaj*` są bezargumentowe i zwracają `SuDokument`. Korekta powstaje
+więc jako pusty dokument, a wskazanie dokumentu pierwotnego siedzi na obiekcie.
+Manager ma osobne `WczytajDokument(dok_Id)`; którą właściwością te dwa się
+wiąże, widać dopiero na obiekcie korekty.
+
+### Skutek magazynowy bierze identyfikator
+
+```
+void SkutekMagazynowyWywolaj (int)
+```
+
+Po zapisie MM da się więc jawnie zażądać wykonania, zamiast liczyć na domyślne
+zachowanie `Zapisz()`.
+
+### Ostatni punkt też da się zamknąć bez dokumentu
+
+Skoro `DodajMM()` tworzy obiekt, a utrwala dopiero `Zapisz()`, właściwości
+dokumentu można obejrzeć bez wystawiania czegokolwiek. Robi to sonda
+z przełącznikiem `-SzkicMM`, domyślnie wyłączonym: obietnica „sonda niczego nie
+tworzy" ma zostać dosłowna, więc jedyne `Dodaj*` w skrypcie włącza się ręką.
+
+
 ## 0.198.5 — 4 września 2026
 
 **Sesja bez okna działa, a `SuDokumentyManager` oddał nazwy metod.** Przebieg
