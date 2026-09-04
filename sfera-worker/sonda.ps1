@@ -134,7 +134,14 @@ function Kandydaci([string]$start) {
 
 $sprawdzone = New-Object System.Collections.Generic.List[string]
 if ($PlikEnv -eq "") {
-    $tu = Split-Path -Parent $MyInvocation.MyCommand.Path
+    # $PSScriptRoot to droga kanoniczna i ZAWSZE ustawiona dla skryptu.
+    # $MyInvocation.MyCommand.Path bywa pusty zaleznie od sposobu uruchomienia,
+    # a wtedy cala lista kandydatow cicho degeneruje sie do katalogu biezacego.
+    $tu = $PSScriptRoot
+    if ($null -eq $tu -or $tu -eq "") {
+        $tu = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if ($null -eq $tu -or $tu -eq "") { $tu = (Get-Location).Path }
     foreach ($kandydat in @(Kandydaci $tu) + @(Kandydaci (Get-Location).Path) + @("C:\wertis\wertis.env")) {
         if ($sprawdzone -contains $kandydat) { continue }
         $sprawdzone.Add($kandydat) | Out-Null

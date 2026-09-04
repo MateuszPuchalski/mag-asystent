@@ -68,8 +68,12 @@ HRESULT zamiast zdania. Teraz odmawia wcześniej i mówi, czego brakuje.
 plik piętro wyżej i sonda go nie wzięła, a jedyne, co powiedziała, to „nie
 znaleziono". Teraz idzie w górę aż do korzenia dysku — jak Node i jak
 `EnvFile.cs` — a gdy nie znajdzie, **wypisuje wszystkie sprawdzone ścieżki**.
-Najczęstsza przyczyna to Notatnik zapisujący `wertis.env.txt` przy ukrytym
-rozszerzeniu; taką pomyłkę widać wtedy od razu.
+Taką pomyłkę jak `wertis.env.txt` z Notatnika widać wtedy od razu.
+
+Katalog skryptu bierze się teraz z `$PSScriptRoot`, a nie z `$MyInvocation`.
+Ten drugi bywa pusty zależnie od sposobu uruchomienia, a wtedy cała lista
+kandydatów po cichu degenerowała się do katalogu bieżącego — czyli dokładnie
+ten objaw, który właściciel zobaczył przy poprawnie nazwanym pliku.
 
 ### Komunikat błędu, który kłamie
 
