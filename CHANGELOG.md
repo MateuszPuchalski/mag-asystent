@@ -59,6 +59,48 @@ parametrów wybiera pola świadomie, bo szkic idzie do klienta; w opisie bywa
 notatka dla magazynu. Agent skopiuje zdanie, które przeczytał — ale nie wyśle
 całości, nie wiedząc, co w niej stoi.
 
+## 0.197.4 — 4 września 2026
+
+**Drugi przebieg sondy: `ProduktEnum` zamknięty, a odmowa logowania okazała
+się DWIEMA różnymi odmowami.** Sonda wczytała wreszcie `wertis.env`
+(`C:\wertis\wertis.env`), więc doszła dalej niż kiedykolwiek.
+
+### Który numer znaczy Subiekt — już wiadomo
+
+`ProduktNazwa` odczytana bez logowania dała komplet: 1 to Subiekt, 2 Rachmistrz,
+3 Rewizor, 4 Gratyfikant, 5 MikroGratyfikant, 6 Gestor. Domyślne
+`SFERA_PRODUKT=1` było trafne, a punkt 1 listy `[WERYFIKUJ]` jest zamknięty.
+
+Nazwa pod numerem 8 przyszła jako krzaki — to strona kodowa konsoli, nie błąd
+Sfery. Sonda ustawia teraz wyjście na UTF-8.
+
+### Dwa kody, dwie różne diagnozy
+
+`Autentykacja=0` odmówiła kodem `0x8004132B`, a `Autentykacja=1` kodem
+`0x80041329`. To nie jest ta sama porażka dwa razy.
+
+`0x80041329` znaczy, że Sfera **nie weszła do bazy** — login albo hasło SQL.
+`0x8004132B` znaczy, że weszła i przewróciła się dopiero na **uruchomieniu
+Subiekta w tle**; producent opisuje ten kod zdaniem „sprawdź dane logowania do
+Subiekta". Czyli wartość `0` prowadzi dalej, a szukać trzeba przy operatorze,
+nie przy loginie SQL.
+
+### Co sonda robi z tym teraz
+
+Rozpoznaje oba kody osobno i przy `0x8004132B` wypisuje listę czterech rzeczy
+do sprawdzenia: nazwa operatora, jego hasło, prawo do Sfery na tym operatorze
+i licencja Sfery na podmiocie.
+
+Mówi też o hasłach tyle, ile trzeba do diagnozy, i ani słowa więcej: czy są
+ustawione, ile mają znaków i **czy hasło SQL zaczyna się od znaku
+szesnastkowego** — bo to jest dokładnie ta cecha, którą Sfera odrzuca.
+Samych haseł nie wypisuje, bo wynik wraca do repozytorium.
+
+Doszedł przełącznik `-ZOknem`: trzecia próba logowania z widocznym oknem
+Subiekta. Rozstrzyga, czy blokadą jest sam tryb w tle, a to pytanie ma dla
+usługi `wertis-sfera` znaczenie zasadnicze — usługa pulpitu nie ma.
+
+
 ## 0.197.3 — 4 września 2026
 
 **Bramka instalatora przestaje czerwienić `main` przez chwilową awarię
