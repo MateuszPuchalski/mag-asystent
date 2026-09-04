@@ -47,6 +47,9 @@ DOCS = [
     # Procedura wdrożenia wchodzi tu z tego samego powodu co DEPLOY: wykonuje ją
     # człowiek pod presją, na cudzej maszynie, często pierwszy raz.
     "docs/wdrozenie.md",
+    # Ustalenia o COM Sfery czyta się przy maszynie klienta, obok otwartej
+    # konsoli. Ten sam powód co przy opisie struktury Subiekta.
+    "docs/sfera-com.md",
 ]
 
 SLOWNIK = "docs/slownik.md"

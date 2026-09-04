@@ -52,3 +52,13 @@ __pycache__/
 # Artefakty testów end-to-end panelu obsługi (Playwright).
 panel/test-results/
 panel/playwright-report/
+
+# Wynik `dotnet build`/`publish` obu workerów C#. Do 0.197.0 nikt nie budował
+# ich lokalnie — robiło to wyłącznie CI. Od testu dymnego katalogi wynikowe
+# pojawiają się u każdego, kto ten test uruchomi.
+sfera-worker/bin/
+sfera-worker/obj/
+sfera-worker/publish/
+tlo-worker/bin/
+tlo-worker/obj/
+tlo-worker/publish/

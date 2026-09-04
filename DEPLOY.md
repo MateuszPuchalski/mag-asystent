@@ -247,9 +247,15 @@ nssm start wertis-worker
 ```
 
 **Trzecia usługa — worker Sfery (opcjonalna, etap 2 z §6).** Dochodzi dopiero
-przy automatyzacji dokumentów MM: samodzielny exe zbudowany wg
-[`sfera-worker/README.md`](sfera-worker/README.md), wymaga licencji Sfery
-i `SFERA_WORKER=1` w `wertis.env`:
+przy automatyzacji dokumentów MM. Wymaga licencji Sfery i `SFERA_WORKER=1`
+w `wertis.env`. Samowystarczalny exe zdejmujesz z artefaktu przebiegu CI
+(workflow „Worker Sfery" → Artifacts), więc .NET SDK nie jest tu potrzebny;
+droga ręczna stoi w [`sfera-worker/README.md`](sfera-worker/README.md).
+
+> **Usługę rejestruj jako OSTATNIĄ.** Najpierw uruchom exe z ręki:
+> `wertis-sfera-worker.exe --dry-run --once`. Błąd widać wtedy na ekranie,
+> a nie w przekierowanym dzienniku NSSM. Bramki opisuje
+> [`docs/wdrozenie.md`](docs/wdrozenie.md).
 
 ```powershell
 nssm install wertis-sfera 'C:\wertis\sfera-worker\wertis-sfera-worker.exe'
@@ -1972,6 +1978,22 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.197.0 — worker Sfery przed pierwszym wdrożeniem
+
+**Instalacje bez workera Sfery: nic do zrobienia.** Zmiany dotyczą wyłącznie
+usługi `wertis-sfera`, a ta domyślnie nie istnieje.
+
+Kto dopiero ją wdraża, zyskuje trzy rzeczy. Exe schodzi z artefaktu przebiegu
+CI, więc .NET SDK nie jest już nigdzie potrzebny. Nazwy Sfery sprawdza
+`sfera-worker\sonda.ps1`, bez wystawiania dokumentu. Doszły też klucze
+`SFERA_SQL_LOGIN` i `SFERA_SQL_HASLO` — login SQL, którego Sfera wymaga obok
+operatora Subiekta.
+
+Kolejność jest teraz odwrotna niż wcześniej: usługę rejestruj **po** ręcznym
+przebiegu `--dry-run --once`. Bramki opisuje
+[`docs/wdrozenie.md`](docs/wdrozenie.md), ustalenia o COM —
+[`docs/sfera-com.md`](docs/sfera-com.md).
 
 ### Aplikacja nie wstaje: pętla restartów NSSM (0.174.2)
 

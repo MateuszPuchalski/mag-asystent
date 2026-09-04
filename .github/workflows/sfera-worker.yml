@@ -69,3 +69,40 @@ jobs:
       - name: Kompilacja
         if: steps.zakres.outputs.dotyczy == 'true'
         run: dotnet build sfera-worker/WertisSferaWorker.csproj -c Release
+
+      # Node jest tu dla BAZY testowej, nie dla workera: zakłada ją kod serwera,
+      # razem z migracjami. Baza z samego `schema.sql` nie ma `events.user_ref`
+      # i test przechodziłby obok błędu, który u klienta wyszedłby dopiero
+      # PO wystawieniu dokumentu w Subiekcie.
+      - uses: actions/setup-node@v4
+        if: steps.zakres.outputs.dotyczy == 'true'
+        with:
+          node-version: "22"
+      - name: Zależności Node (baza testowa)
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: npm ci
+
+      # Dry-run nie dotyka COM, więc cała kolejka daje się zmierzyć TUTAJ —
+      # przejścia statusów, audyt, heartbeat i guard kolejności z sql/*.sql
+      # wykonany naprawdę z zasobów exe. Do 0.197.0 pierwszym uruchomieniem
+      # tego kodu była bramka na maszynie klienta (docs/wdrozenie.md).
+      - name: Test dymny (dry-run, bez Sfery)
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: sfera-worker/test-dymny.sh
+
+      # Exe buduje się dla Windows z Linuksa (late binding, żadnego interopu
+      # w czasie kompilacji), więc wdrożenie nie potrzebuje już maszyny z .NET
+      # SDK. Artefakt przebiegu jest jedynym exe, jakie ma trafić do klienta —
+      # „skąd ten plik" przestaje być pytaniem.
+      - name: Exe dla Windows (self-contained)
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: |
+          dotnet publish sfera-worker/WertisSferaWorker.csproj \
+            -c Release -r win-x64 --self-contained -p:PublishSingleFile=true \
+            -o sfera-worker/publish
+      - name: Artefakt wertis-sfera-worker.exe
+        if: steps.zakres.outputs.dotyczy == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wertis-sfera-worker
+          path: sfera-worker/publish/wertis-sfera-worker.exe
