@@ -47,9 +47,9 @@ niewykonalne. Piaskownicą jest **podmiot testowy** zakładany w Subiekcie
 nim osobno na 15 dni.
 
 Doszła też bramka 6: jedno MM na produkcji, na kartotece próbnej, po kopii
-zapasowej. Istnieje dlatego, że podmiot testowy ma własne `mag_Id` i własne
-kartoteki — nazwy Sfery sprawdzają bramki wcześniejsze, a mapowanie na
-prawdziwych danych sprawdza dopiero ta.
+zapasowej. Nie służy ustalaniu `mag_Id` — te są znane i stoją w `wertis.env`
+od etapu 1. Jest pierwszym dokumentem, jaki Sfera wystawia na podmiocie
+produkcyjnym: inna licencja, inny operator, inne uprawnienia.
 
 Ostrzeżenie przy okazji: „wymiana licencji" z programu serwisowego przenosi
 licencję między podmiotami i potrafi rozbroić produkcję. Nie tędy droga do

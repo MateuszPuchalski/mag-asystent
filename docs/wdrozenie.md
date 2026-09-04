@@ -257,9 +257,14 @@ po kopii zapasowej podmiotu. Weź kartotekę próbną i jedną sztukę. Numer
 dokumentu ma się zgadzać, a stany na obu magazynach mają wrócić do siebie po
 usunięciu MM w Subiekcie.
 
-Ta bramka istnieje, bo podmiot testowy nie zna Waszych `mag_Id` ani kartotek.
-Nazwy Sfery sprawdziły bramki wyżej; ta sprawdza mapowanie na prawdziwych
-danych.
+Ta bramka **nie służy do ustalania `mag_Id`** — te są znane i stoją
+w `wertis.env` od etapu 1. Służy do czegoś innego: to pierwszy dokument, jaki
+Sfera wystawia na podmiocie produkcyjnym.
+
+Zmienia się przy tym wszystko poza kodem. Inna licencja, inny operator, inne
+uprawnienia i pierwsze zetknięcie `Zapisz()` z prawdziwymi stanami. Podmiot
+testowy odpowiada na pytanie „czy nazwy są dobre", a ten jeden dokument na
+pytanie „czy Sfera wpuszcza nas u Was".
 
 **Wycofanie:** `SFERA_WORKER=0` (albo usunięcie wpisu) + restart usług —
 zadania mm wracają do dawnego zachowania (czytelny błąd, MM wystawia biuro).
