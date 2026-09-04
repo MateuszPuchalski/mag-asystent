@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.12 — 4 września 2026
+
+**Szkic pozycji zamknął ścieżkę MM w całości.** `-SzkicMM -Towar 7341` dodał
+pozycję w pamięci i wypisał jej składowe. `Zapisz()` nie padł.
+
+### Ilość nazywa się `IloscJm`
+
+Dokładnie tak, jak stało w kodzie. Pozycja ma obok `Ilosc` i `Jm`, a `IloscJm`
+liczy w jednostce miary z kartoteki. Cała ścieżka MM stoi teraz na nazwach
+zmierzonych, nie zgadniętych.
+
+### Korekta wie już, jak znaleźć wiersz
+
+Kartotekę na pozycji niesie `TowarId`. Kod przechodzi po `Element(i)`
+i porównuje ten identyfikator — bo metody szukającej kolekcja nie ma.
+
+`Element` liczy **od jedynki**, i to zmierzone: `Element(0)` odmawia, a na
+dokumencie z jedną pozycją `Element(1)` oddaje obiekt. Pomyłka o jeden nie
+wywróciłaby pętli — zgubiłaby pierwszą albo ostatnią pozycję, a dokument
+wyszedłby poprawny dla Sfery i zły dla klienta.
+
+Kartoteka wymieniona w zwrocie, a nieobecna na fakturze, przerywa całość
+z nazwanym błędem. Cichy przeskok dałby korektę na mniejszą kwotę, niż należy
+się klientowi.
+
+### `IloscPoKorekcie` nie istnieje
+
+Pozycja ma jedno pole ilości, więc korekta ustawia ilość docelową — tak samo,
+jak pyta o nią Subiekt na ekranie. To pytanie o znaczenie, nie o nazwę, więc
+zostaje `[WERYFIKUJ]` do pierwszej prawdziwej korekty.
+
+### Trzecia droga do magazynu dla RW
+
+Pozycja ma własne `MagazynId`, obok właściwości dokumentu i sesji. Trzy drogi,
+jedna prawdziwa; rozstrzyga pierwszy RW.
+
+Ustalenia w `docs/sfera-com.md` §2l.
+
 ## 0.198.11 — 4 września 2026
 
 **Kolekcja pozycji oddała nazwy — i obaliła czwartą zgadniętą.** Po poprawce

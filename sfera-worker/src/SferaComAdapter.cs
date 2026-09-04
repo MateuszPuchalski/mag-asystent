@@ -71,6 +71,17 @@ public sealed class SferaComAdapter : ISferaAdapter
     private const int TRYB_DOMYSLNY = URUCHOM_NOWY | URUCHOM_W_TLE;
 
     /**
+     * `SuDokument.Pozycje.Element` liczy OD JEDYNKI — zmierzone sondą
+     * (0.198.12): `Element(0)` odmawia „Wartość jest spoza oczekiwanego
+     * zakresu", `Element(1)` na dokumencie z jedną pozycją oddaje obiekt.
+     *
+     * Stała stoi osobno, bo pomyłka o jeden nie wywraca pętli — ona gubi
+     * PIERWSZĄ albo OSTATNIĄ pozycję korekty. Dokument powstaje wtedy poprawny
+     * z punktu widzenia Sfery i zły z punktu widzenia klienta.
+     */
+    private const int PIERWSZA_POZYCJA = 1;
+
+    /**
      * Nazwa wywołania COM, którego Sfera nie zna, to POMYŁKA W NAZWIE, a nie
      * awaria — i wtedy komunikat ma powiedzieć, KTÓRY punkt listy `[WERYFIKUJ]`
      * poprawić. Bez tego zostaje gołe „'System.__ComObject' does not contain
@@ -102,6 +113,20 @@ public sealed class SferaComAdapter : ISferaAdapter
 
     private static void Krok(string wywolanie, int punkt, Action co) =>
         Krok<object?>(wywolanie, punkt, () => { co(); return null; });
+
+    /**
+     * Właściwość COM z argumentem (`ParameterizedProperty`), czyli `Element(i)`.
+     *
+     * Idzie przez `InvokeMember`, a nie przez `dynamic`, ŚWIADOMIE: wiązanie
+     * dynamiczne w C# tłumaczy `x.Element[i]` na indeksator, a to jest inne
+     * wywołanie IDispatch niż pobranie właściwości z argumentem. Tego nie da
+     * się sprawdzić w CI — COM-u tam nie ma — więc wybrana jest droga, która
+     * nie zależy od zachowania bindera.
+     */
+    private static object ElementZIndeksem(object kolekcja, int indeks) =>
+        kolekcja.GetType().InvokeMember(
+            "Element", System.Reflection.BindingFlags.GetProperty,
+            null, kolekcja, new object[] { indeks })!;
 
     /**
      * Czy wyjątek mówi „nie ma takiej nazwy". Late binding zgłasza to na dwa
@@ -163,14 +188,14 @@ public sealed class SferaComAdapter : ISferaAdapter
         });
         foreach (var it in items)
         {
-            /* `IDispatch Dodaj(Variant)` — metoda i liczba argumentów USTALONE
-               (0.198.11, szkic MM). Co dokładnie niesie Variant i jak nazywa
-               się pole ilości na zwróconej pozycji, zostaje `[WERYFIKUJ]`:
-               widać to dopiero na dodanej pozycji. */
+            /* USTALONE (0.198.12, szkic pozycji): `Dodaj(Variant)` przyjmuje
+               identyfikator kartoteki i oddaje pozycję, a ilość na niej niesie
+               `IloscJm`. Pozycja ma też `Ilosc` i `Jm` — `IloscJm` jest tym
+               polem, które liczy w jednostce miary z kartoteki. */
             Krok("MM.Pozycje.Dodaj(tw_Id).IloscJm", 4, () =>
             {
                 dynamic p = mm.Pozycje.Dodaj(it.TwId);
-                p.IloscJm = it.Qty;   // [WERYFIKUJ] nazwa pola ilości na pozycji
+                p.IloscJm = it.Qty;
             });
         }
         /* Decyzja domyślna: MM powstaje WYKONANE, nie w buforze — sens
@@ -199,14 +224,16 @@ public sealed class SferaComAdapter : ISferaAdapter
            składowych jest wspólna dla wszystkich typów dokumentu, więc to, że
            właściwość istnieje, nie dowodzi jeszcze, że RW jej używa: gdyby
            Sfera brała magazyn RW z kontekstu sesji, wołaniem zastępczym jest
-           `su.MagazynId = magId` przed `DodajRW()`. [WERYFIKUJ] na bramce 2. */
+           `su.MagazynId = magId` przed `DodajRW()`. Trzecia droga wyszła przy
+           szkicu pozycji (0.198.12): POZYCJA też ma własne `MagazynId`.
+           [WERYFIKUJ] na bramce 2 — rozstrzyga pierwszy RW. */
         Krok("RW.MagazynNadawczyId", 8, () => { rw.MagazynNadawczyId = magId; });
         foreach (var it in items)
         {
             Krok("RW.Pozycje.Dodaj(tw_Id).IloscJm", 8, () =>
             {
                 dynamic p = rw.Pozycje.Dodaj(it.TwId);
-                p.IloscJm = it.Qty;   // [WERYFIKUJ] jak wyżej
+                p.IloscJm = it.Qty;
             });
         }
         Krok("RW.Zapisz()", 8, () => { rw.Zapisz(); });
@@ -246,30 +273,51 @@ public sealed class SferaComAdapter : ISferaAdapter
                ODCZYTYWANE po powiązaniu: korekta musi przejąć pozycje
                dokumentu pierwotnego, a to robi się wywołaniem, nie przypisaniem. */
             Krok("Korekta.NaPodstawie(dok_Id)", 6, () => { korekta.NaPodstawie(z.DokId); });
-            /* ── Adresowanie pozycji korekty: NIEROZSTRZYGNIĘTE ───────────────
-               Do 0.198.10 stało tu `korekta.Pozycje.SzukajTowar(tw_Id)`. Szkic
-               MM pokazał komplet składowych kolekcji i takiej metody TAM NIE MA.
-               Kolekcja oddaje `Dodaj(Variant)`, `DodajWgOrygLp(Variant, int)`,
-               `Wczytaj(Variant)`, indeks `Element` oraz `Liczba`.
+            /* ── Adresowanie pozycji korekty ──────────────────────────────────
+               Korekta nie DODAJE wierszy — `NaPodstawie` przenosi pozycje
+               dokumentu pierwotnego, a my zmieniamy na nich ilość. Pozycję
+               trzeba więc ODNALEŹĆ po kartotece.
 
-               Korekta nie DODAJE wierszy — zmienia ilość po korekcie na
-               wierszach dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ.
-               Do tego potrzeba dwóch rzeczy, których jeszcze nie znamy: nazwy
-               właściwości kartoteki na POZYCJI oraz podstawy indeksu `Element`.
+               Kolekcja nie ma metody szukającej (`SzukajTowar`, na której stał
+               kod do 0.198.10, NIE ISTNIEJE — sprawdzone sondą). Zostaje przejście
+               po `Element(i)` z porównaniem `TowarId`. Obie nazwy i podstawa
+               indeksu są zmierzone (0.198.12).
 
-               Zamiast zgadywać PIĄTĄ nazwę z rzędu, ten krok mówi wprost, czego
-               brakuje. Korekty do tego czasu wystawia biuro — dokładnie tak, jak
-               przed workerem. Zamyka to `sonda.ps1 -SzkicMM -Towar <tw_Id>`:
-               dodaje pozycję W PAMIĘCI i wypisuje jej składowe. */
-            if (z.Pozycje.Count + z.PozycjeZniszczone.Count > 0)
+               Zniszczone wchodzą na korektę RAZEM z pełnowartościowymi: klient
+               oddał towar, sprzedaż koryguje się w całości. */
+            dynamic pozycjeKorekty = Krok("Korekta.Pozycje", 6, () => korekta.Pozycje);
+            int ilePozycji = Krok("Korekta.Pozycje.Liczba", 6, () => (int)pozycjeKorekty.Liczba);
+            foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
-                throw new InvalidOperationException(
-                    "Adresowanie pozycji korekty jest nierozstrzygnięte — punkt 6 listy [WERYFIKUJ] " +
-                    "w sfera-worker/README.md. Kolekcja `SuDokument.Pozycje` NIE MA metody " +
-                    "`SzukajTowar`; ma `Dodaj`, `DodajWgOrygLp`, `Wczytaj`, `Element` i `Liczba`. " +
-                    "Brakuje nazwy właściwości kartoteki na pozycji oraz podstawy indeksu `Element`. " +
-                    "Poda je sfera-worker/sonda.ps1 z przełącznikiem -SzkicMM -Towar <tw_Id>. " +
-                    "Do tego czasu korekty zwrotów wystawia biuro w Subiekcie.");
+                dynamic? wiersz = null;
+                for (int i = PIERWSZA_POZYCJA; i < PIERWSZA_POZYCJA + ilePozycji; i++)
+                {
+                    int nr = i;
+                    dynamic p = Krok($"Korekta.Pozycje.Element({nr}).TowarId", 6,
+                        () => ElementZIndeksem((object)pozycjeKorekty, nr));
+                    if ((int)p.TowarId != it.TwId) continue;
+                    wiersz = p;
+                    break;
+                }
+                /* Brak wiersza to NIEZGODNOŚĆ DANYCH, nie awaria Sfery: zwrot
+                   mówi o kartotece, której nie ma na fakturze. Cichy `continue`
+                   dałby korektę na mniejszą kwotę, niż należy się klientowi. */
+                if (wiersz is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Dokument {z.DokId} nie ma pozycji z kartoteką {it.TwId}, a zwrot ją wymienia. " +
+                        "Sprawdź powiązanie zwrotu z fakturą — korekty na resztę pozycji NIE wystawiono.");
+                }
+                /* [WERYFIKUJ] czy na KOREKCIE `IloscJm` znaczy „ilość po
+                   korekcie". Pozycja ma jedno pole ilości w jednostce miary
+                   i żadnego `IloscPoKorekcie` — Subiekt na ekranie korekty też
+                   pyta o ilość docelową, nie o różnicę. Rozstrzyga to pierwsza
+                   prawdziwa korekta na podmiocie testowym. */
+                Krok("Korekta.pozycja.IloscJm", 6, () =>
+                {
+                    dynamic p = wiersz;
+                    p.IloscJm = (double)p.IloscJm - it.Qty;
+                });
             }
             Krok("Korekta.Zapisz()", 6, () => { korekta.Zapisz(); });
             string nrKorekty = Krok("Korekta.NumerPelny", 6, () => (string)korekta.NumerPelny);
