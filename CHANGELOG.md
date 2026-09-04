@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.9 — 4 września 2026
+
+**„Pozycje są puste" wyglądało jak „Pozycji nie ma" — przez błąd w sondzie.**
+Szkic MM z 0.198.8 ustawił magazyny bez odmowy, a i tak wypisał:
+
+```
+--- SuDokument.Pozycje ---
+  (Get-Member odmowil: You must specify an object for the Get-Member cmdlet.)
+```
+
+Kolekcja szła do `Get-Member` POTOKIEM, a potok ją rozwija. Pusta kolekcja nie
+wysyła ani jednego elementu, więc `Get-Member` mówi, że nie dostał obiektu.
+Brzmi to jak brak właściwości i tak to odczytałem w 0.198.8.
+
+`Skladowe` i `Ma-Nazwe` wołają teraz `Get-Member -InputObject`. Sonda wypisuje
+też `Pozycje.Liczba`: zero potwierdza, że kolekcja jest pusta, a nie że jej nie
+ma. Przy okazji potwierdzone na żywym obiekcie: `MagazynNadawczyId`
+i `MagazynOdbiorczyId` przyjmują wartości bez odmowy.
+
 ## 0.198.8 — 4 września 2026
 
 **Sonda bierze magazyny z `wertis.env`.** Przykład w README pokazywał

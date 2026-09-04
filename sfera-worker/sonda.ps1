@@ -113,7 +113,11 @@ function Skladowe($obiekt, [string]$etykieta) {
         # ktorej sama nazwa nie zdradza. Bez niej wiadomo, ze DodajKFS istnieje,
         # ale nie wiadomo, czy bierze dok_Id, czy wczytany dokument - i zostaje
         # zgadywanie, czyli to, przed czym ta sonda ma bronic.
-        $czlonkowie = $obiekt | Get-Member -ErrorAction Stop |
+        # -InputObject, a NIE potok. Potok ROZWIJA kolekcje: pusta kolekcja COM
+        # nie wysyla do Get-Member ani jednego elementu i wraca odmowa „You must
+        # specify an object", ktora wyglada jak brak obiektu. Tak wlasnie wygladal
+        # pierwszy szkic MM: Pozycje istnialy, tylko byly puste (0.198.9).
+        $czlonkowie = Get-Member -InputObject $obiekt -ErrorAction Stop |
             Where-Object { $_.MemberType -ne "AliasProperty" } |
             ForEach-Object {
                 if ($_.MemberType -eq "Method" -and $_.Definition) {
@@ -133,7 +137,8 @@ function Skladowe($obiekt, [string]$etykieta) {
 # odpowiedz TAK/NIE zamiast wystawionego dokumentu.
 function Ma-Nazwe($obiekt, [string]$nazwa) {
     if ($null -eq $obiekt) { return $false }
-    try { return ($obiekt | Get-Member -Name $nazwa -ErrorAction Stop) -ne $null }
+    # -InputObject z tego samego powodu co w Skladowe: potok rozwinalby kolekcje.
+    try { return (Get-Member -InputObject $obiekt -Name $nazwa -ErrorAction Stop) -ne $null }
     catch { return $false }
 }
 
@@ -484,6 +489,9 @@ if ($SzkicMM) {
             Write-Wynik "  (null - kolekcja jeszcze nie istnieje mimo magazynow)"
         } else {
             Skladowe $pozycje "SuDokument.Pozycje"
+            # Ile pozycji ma pusty dokument - odpowiedz „0" potwierdza, ze kolekcja
+            # jest pusta, a nie ze jej nie ma. To byla cala zagadka 0.198.8.
+            try { Write-Wynik ("  Liczba pozycji: {0}" -f $pozycje.Liczba) } catch { }
         }
     } catch {
         Write-Wynik "  BRAK  DodajMM() odmowil: $($_.Exception.Message)"
@@ -493,8 +501,8 @@ if ($SzkicMM) {
 Write-Wynik "Czego sonda NIE rozstrzyga, bo wymaga wystawienia dokumentu:"
 Write-Wynik "  - punkt 5: czy Zapisz() daje dokument WYKONANY, czy odklada do bufora"
 Write-Wynik "  - znaczenie flagi w Usun(bool) - sygnatura jest znana, sens flagi nie"
-Write-Wynik "  - skladowe kolekcji Pozycje (Dodaj, SzukajTowar, IloscJm, IloscPoKorekcie),"
-Write-Wynik "    jesli kolekcja wraca jako null nawet po podaniu magazynow"
+Write-Wynik "  - nazwa i sygnatura pola ilosci na POZYCJI (IloscJm, IloscPoKorekcie)"
+Write-Wynik "    - te widac dopiero na dodanej pozycji, a dodawanie zapisuje"
 Write-Wynik "Zamyka je bramka 2 z docs/wdrozenie.md: jedno MM na kartotece probnej."
 Write-Wynik ""
 Write-Wynik "Nastepny krok: wpisz ustalenia do docs/sfera-com.md i zdejmij zamkniete"

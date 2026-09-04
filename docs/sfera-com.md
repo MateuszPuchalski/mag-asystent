@@ -314,10 +314,14 @@ na pytanie odpowiedzieć.
 
 **Potwierdzone bez zmian:** `NumerPelny`, `Zapisz()`, `Pozycje`.
 
-**Otwarte zostają składowe kolekcji `Pozycje`.** Na pustym dokumencie wróciła
-jako `null`, więc `Get-Member` nie miał czego opisać. Sonda przyjmuje teraz
-`-MagNadawczy` i `-MagOdbiorczy`: kolekcja może potrzebować magazynu, zanim
-w ogóle powstanie.
+**`Pozycje` nie były `null` — były PUSTE, a odmowa wyszła z sondy** (0.198.9).
+`Get-Member` dostawał kolekcję potokiem, a potok ją ROZWIJA: pusta kolekcja nie
+wysyła ani jednego elementu i wraca „You must specify an object". Wygląda to na
+brak obiektu i tak to odczytałem. Poprawne wywołanie to
+`Get-Member -InputObject`.
+
+Ustawienie magazynów na dokumencie przeszło bez odmowy (`nadawczy=1`,
+`odbiorczy=12`), więc nazwy z sekcji wyżej są potwierdzone na żywym obiekcie.
 
 Dwie metody warte zapamiętania na bramkę 2: `SprawdzPoprawnosc()`
 i `ZapiszSymulacja()`. Pierwsze prawdziwe MM da się nimi sprawdzić przed
