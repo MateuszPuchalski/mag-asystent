@@ -157,6 +157,13 @@ ich podawać:
 powershell ... -File sonda.ps1 -SzkicMM
 ```
 
+Kartoteka podana parametrem dokłada do szkicu jedną POZYCJĘ — też w pamięci,
+bo `Zapisz()` dalej nie pada. To jedyna droga do nazwy pola ilości:
+
+```powershell
+powershell ... -File sonda.ps1 -SzkicMM -Towar 1234
+```
+
 Gdy w pliku ich nie ma, sonda mówi to wprost. Wtedy podaje się LICZBY, nie nazwy:
 
 ```powershell
@@ -184,11 +191,11 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 3. **Zamknięte (0.198.5):** `Uruchom(gtaUruchomDopasuj, gtaUruchomNowy |
    gtaUruchomWTle)`, czyli `Uruchom(0x0, 0x6)` — zmierzone, sesja otwiera się
    BEZ OKNA. Usługa da się uruchomić bez pulpitu. `docs/sfera-com.md` §2g.
-4. **Zamknięte (0.198.7):** `SuDokumentyManager.DodajMM()`, a magazyny na
-   dokumencie to `MagazynNadawczyId` i `MagazynOdbiorczyId`. Zgadnięte
-   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ. Otwarte zostaje samo
-   dodawanie pozycji (`Pozycje.Dodaj`, `IloscJm`): na pustym dokumencie
-   kolekcja `Pozycje` wraca jako `null`.
+4. **Zamknięte (0.198.11):** `SuDokumentyManager.DodajMM()`, magazyny
+   `MagazynNadawczyId` i `MagazynOdbiorczyId` (zgadnięte
+   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ) oraz
+   `Pozycje.Dodaj(Variant)` — metoda i liczba argumentów. Otwarta zostaje sama
+   nazwa pola ilości na POZYCJI (`IloscJm`).
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
    Skutek magazynowy ma własne wywołania, a sygnatura mówi czym się posługują:
    `void SkutekMagazynowyWywolaj(int)` — identyfikatorem dokumentu (0.198.6).
@@ -196,8 +203,14 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 6. **Metoda, sygnatura i powiązanie zamknięte (0.198.7):**
    `SuDokument DodajKFS()`, a dokument pierwotny wskazuje się wywołaniem
    `NaPodstawie(dok_Id)`. Że Variant bierze identyfikator, mówi bliźniacze
-   `NaPodstawieWielu(SAFEARRAY(int))`. Sposób adresowania pozycji korekty
-   i pole ilości po korekcie zostają otwarte.
+   `NaPodstawieWielu(SAFEARRAY(int))`.
+
+   > **Adresowanie pozycji korekty stoi (0.198.11).** `SuDokument.Pozycje` NIE
+   > MA metody `SzukajTowar`, na której stał kod. Kolekcja daje `Dodaj`,
+   > `DodajWgOrygLp`, `Wczytaj`, indeks `Element` i `Liczba` — żadna droga nie
+   > szuka po kartotece. Brakuje nazwy właściwości kartoteki na pozycji oraz
+   > podstawy indeksu. Ten krok rzuca dziś wyjątek mówiący to wprost, a korekty
+   > wystawia biuro. Zamyka to sonda z `-SzkicMM -Towar <tw_Id>`.
 7. **Sygnatura zamknięta (0.198.7):** `void Usun(bool)`. Znaczenie flagi nie —
    adapter podaje `false` jako działanie węższe. Na tym stoi wycofanie
    łańcucha, gdy dalsze ogniwo padnie.

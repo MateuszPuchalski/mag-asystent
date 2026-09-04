@@ -163,10 +163,14 @@ public sealed class SferaComAdapter : ISferaAdapter
         });
         foreach (var it in items)
         {
+            /* `IDispatch Dodaj(Variant)` — metoda i liczba argumentów USTALONE
+               (0.198.11, szkic MM). Co dokładnie niesie Variant i jak nazywa
+               się pole ilości na zwróconej pozycji, zostaje `[WERYFIKUJ]`:
+               widać to dopiero na dodanej pozycji. */
             Krok("MM.Pozycje.Dodaj(tw_Id).IloscJm", 4, () =>
             {
-                dynamic p = mm.Pozycje.Dodaj(it.TwId);   // [WERYFIKUJ] dodawanie pozycji po tw_Id
-                p.IloscJm = it.Qty;
+                dynamic p = mm.Pozycje.Dodaj(it.TwId);
+                p.IloscJm = it.Qty;   // [WERYFIKUJ] nazwa pola ilości na pozycji
             });
         }
         /* Decyzja domyślna: MM powstaje WYKONANE, nie w buforze — sens
@@ -202,7 +206,7 @@ public sealed class SferaComAdapter : ISferaAdapter
             Krok("RW.Pozycje.Dodaj(tw_Id).IloscJm", 8, () =>
             {
                 dynamic p = rw.Pozycje.Dodaj(it.TwId);
-                p.IloscJm = it.Qty;
+                p.IloscJm = it.Qty;   // [WERYFIKUJ] jak wyżej
             });
         }
         Krok("RW.Zapisz()", 8, () => { rw.Zapisz(); });
@@ -242,18 +246,30 @@ public sealed class SferaComAdapter : ISferaAdapter
                ODCZYTYWANE po powiązaniu: korekta musi przejąć pozycje
                dokumentu pierwotnego, a to robi się wywołaniem, nie przypisaniem. */
             Krok("Korekta.NaPodstawie(dok_Id)", 6, () => { korekta.NaPodstawie(z.DokId); });
-            foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
+            /* ── Adresowanie pozycji korekty: NIEROZSTRZYGNIĘTE ───────────────
+               Do 0.198.10 stało tu `korekta.Pozycje.SzukajTowar(tw_Id)`. Szkic
+               MM pokazał komplet składowych kolekcji i takiej metody TAM NIE MA.
+               Kolekcja oddaje `Dodaj(Variant)`, `DodajWgOrygLp(Variant, int)`,
+               `Wczytaj(Variant)`, indeks `Element` oraz `Liczba`.
+
+               Korekta nie DODAJE wierszy — zmienia ilość po korekcie na
+               wierszach dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ.
+               Do tego potrzeba dwóch rzeczy, których jeszcze nie znamy: nazwy
+               właściwości kartoteki na POZYCJI oraz podstawy indeksu `Element`.
+
+               Zamiast zgadywać PIĄTĄ nazwę z rzędu, ten krok mówi wprost, czego
+               brakuje. Korekty do tego czasu wystawia biuro — dokładnie tak, jak
+               przed workerem. Zamyka to `sonda.ps1 -SzkicMM -Towar <tw_Id>`:
+               dodaje pozycję W PAMIĘCI i wypisuje jej składowe. */
+            if (z.Pozycje.Count + z.PozycjeZniszczone.Count > 0)
             {
-                /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
-                   nie DODAJE wierszy — zmienia ilość po korekcie na wierszach
-                   dokumentu pierwotnego, więc pozycję trzeba ODNALEŹĆ po tw_Id.
-                   Zniszczone wchodzą na korektę RAZEM z pełnowartościowymi:
-                   klient oddał towar, sprzedaż koryguje się w całości. */
-                Krok("Korekta.Pozycje.SzukajTowar(tw_Id).IloscPoKorekcie", 6, () =>
-                {
-                    dynamic p = korekta.Pozycje.SzukajTowar(it.TwId);
-                    p.IloscPoKorekcie = p.Ilosc - it.Qty;
-                });
+                throw new InvalidOperationException(
+                    "Adresowanie pozycji korekty jest nierozstrzygnięte — punkt 6 listy [WERYFIKUJ] " +
+                    "w sfera-worker/README.md. Kolekcja `SuDokument.Pozycje` NIE MA metody " +
+                    "`SzukajTowar`; ma `Dodaj`, `DodajWgOrygLp`, `Wczytaj`, `Element` i `Liczba`. " +
+                    "Brakuje nazwy właściwości kartoteki na pozycji oraz podstawy indeksu `Element`. " +
+                    "Poda je sfera-worker/sonda.ps1 z przełącznikiem -SzkicMM -Towar <tw_Id>. " +
+                    "Do tego czasu korekty zwrotów wystawia biuro w Subiekcie.");
             }
             Krok("Korekta.Zapisz()", 6, () => { korekta.Zapisz(); });
             string nrKorekty = Krok("Korekta.NumerPelny", 6, () => (string)korekta.NumerPelny);
