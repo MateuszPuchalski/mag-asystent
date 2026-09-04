@@ -30,10 +30,20 @@ param(
     [string]$Operator = "",
     [string]$OperatorHaslo = "",
     [string]$LoginSql = "",
-    [string]$HasloSql = ""
+    [string]$HasloSql = "",
+    # Trzecia proba logowania, z WIDOCZNYM oknem Subiekta. Rozstrzyga, czy
+    # blokuje tryb w tle, czy dane logowania. Domyslnie wylaczona, bo otwiera
+    # okno na pulpicie.
+    [switch]$ZOknem
 )
 
 $ErrorActionPreference = "Continue"
+
+# Nazwy produktow wracaja ze Sfery po polsku. Konsola Windows w stronie kodowej
+# 852 robi z nich krzaki - „Biuro" wygladalo jak „?????e" i wygladalo na blad
+# odczytu, ktorym nie bylo. Ustawienie jest kosmetyczne, wiec porazka nie ma
+# prawa zatrzymac diagnozy.
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 
 # Nazwy zmiennych w PowerShellu NIE ROZROZNIAJA WIELKOSCI LITER: $Baza i $baza
 # to jedna zmienna. Parametry przepisujemy wiec od razu pod wlasne nazwy, bo
@@ -242,12 +252,34 @@ $gt.Operator = $operator
 $gt.OperatorHaslo = $operatorHaslo
 Write-Wynik "  operator Subiekta: $(if ($operator -ne '') { $operator } else { '(pusty)' })"
 
+# O hasle mowimy WYLACZNIE tyle, ile potrzeba do diagnozy: czy jest i czy ma
+# ceche, ktora Sfere wywraca. Samego hasla sonda nie wypisuje - wynik wraca
+# do repozytorium i trafia do cudzych oczu.
+Write-Wynik "  haslo operatora: $(if ($operatorHaslo -ne '') { "ustawione ($($operatorHaslo.Length) znakow)" } else { 'PUSTE' })"
+if ($hasloSql -eq "") {
+    Write-Wynik "  haslo SQL: PUSTE"
+} else {
+    $pierwszy = $hasloSql[0]
+    $ryzykowny = ($pierwszy -match '[0-9a-fA-F]')
+    Write-Wynik "  haslo SQL: ustawione ($($hasloSql.Length) znakow), pierwszy znak $(if ($ryzykowny) { 'HEKSADECYMALNY - to znany problem Sfery' } else { 'poza zakresem 0-9 a-f, w porzadku' })"
+    if ($ryzykowny) {
+        Write-Wynik "             Sfera odrzuca hasla zaczynajace sie od cyfry albo litery a-f"
+        Write-Wynik "             (blad 0x80041329). Zmien haslo na zaczynajace sie od g-z."
+    }
+}
+
 # gtaUruchomDopasuj = 0x0; gtaUruchom (0x0) -bor gtaUruchomWTle (0x4) - bez okna
 Write-Wynik ""
 Write-Wynik "PUNKT 3 - Uruchom(0x0, 0x0 -bor 0x4)"
 
 $sgt = $null
-$ostatniBlad = $null
+$kody = @()
+
+function Kod($blad) {
+    $hr = 0
+    try { $hr = $blad.Exception.HResult } catch { }
+    return ("0x{0:X8}" -f $hr)
+}
 
 # Wartosci AutentykacjaEnum nie sa opublikowane, a instalacje roznia sie trybem:
 # jedna loguje sie do SQL loginem, druga kontem Windows. Zamiast kazac zgadywac,
@@ -263,36 +295,58 @@ foreach ($aut in @($autentykacja, $(if ($autentykacja -eq 0) { 1 } else { 0 })))
             Write-Wynik "        WPISZ TO DO wertis.env: SFERA_AUTENTYKACJA=$aut"
         }
     } catch {
-        $ostatniBlad = $_
-        Write-Wynik "  BRAK  Autentykacja=$aut odmowila: $($_.Exception.Message)"
+        $kod = Kod $_
+        $kody += "Autentykacja=$aut -> $kod"
+        Write-Wynik "  BRAK  Autentykacja=$aut odmowila ($kod): $($_.Exception.Message)"
+    }
+}
+
+# Trzecia proba TYLKO na zyczenie: z widocznym oknem. Rozstrzyga, czy blokada
+# siedzi w samym trybie w tle (0x8004132B mowi wprost o instancji w tle),
+# czy w danych logowania. Domyslnie wylaczona, bo otwiera okno Subiekta.
+if ($null -eq $sgt -and $ZOknem) {
+    Write-Wynik ""
+    Write-Wynik "  ...  proba z WIDOCZNYM oknem (Autentykacja=$autentykacja, bez gtaUruchomWTle)"
+    try {
+        $gt.Autentykacja = $autentykacja
+        $sgt = $gt.Uruchom(0, 0)
+        Write-Wynik "  JEST  sesja otwarta Z OKNEM. Dane logowania sa dobre, blokuje TRYB W TLE."
+        Write-Wynik "        To wazne dla uslugi: wertis-sfera dziala bez pulpitu."
+    } catch {
+        Write-Wynik "  BRAK  takze z oknem ($(Kod $_)): $($_.Exception.Message)"
     }
 }
 
 if ($null -eq $sgt) {
-    $hr = 0
-    try { $hr = $ostatniBlad.Exception.HResult } catch { }
-    $hex = "0x{0:X8}" -f $hr
+    $ostatni = if ($kody.Count -gt 0) { ($kody[-1] -split ' -> ')[-1] } else { "?" }
     Write-Wynik ""
-    Write-Wynik "  BRAK  sesji przy obu wartosciach Autentykacji. Ostatni kod: $hex"
+    Write-Wynik "  BRAK  sesji. Kody po kolei: $($kody -join ', ')"
     Write-Wynik ""
     Write-Wynik "        NIE CZYTAJ TRESCI KOMUNIKATU DOSLOWNIE. Kody 0x8004xxxx sa"
     Write-Wynik "        interfejsowe: znaczenie nadaje im biblioteka, ktora je zwrocila."
     Write-Wynik "        Windows dokleja do nich opis Harmonogramu zadan, wiec zdanie"
     Write-Wynik "        o 'aparacie planowania' nie ma ze Sfera nic wspolnego."
-    if ($hex -eq "0x80041329") {
+    if ($kody -join ' ' -match '0x80041329') {
         Write-Wynik ""
-        Write-Wynik "        0x80041329 u Sfery znaczy co innego: HASLO LOGINU SQL zaczyna sie"
-        Write-Wynik "        od cyfry albo od litery a-f. Zmien je na zaczynajace sie od g-z."
-        Write-Wynik "        Ten sam kod dostaniesz przy pustym lub blednym loginie SQL."
+        Write-Wynik "        0x80041329 - SFERA NIE WESZLA DO BAZY. Najczestsza przyczyna to"
+        Write-Wynik "        haslo loginu SQL zaczynajace sie od cyfry albo litery a-f."
+        Write-Wynik "        Ten sam kod pada przy pustym lub blednym loginie SQL."
+    }
+    if ($kody -join ' ' -match '0x8004132B') {
+        Write-Wynik ""
+        Write-Wynik "        0x8004132B - SFERA WESZLA DALEJ i przewrocila sie na URUCHOMIENIU"
+        Write-Wynik "        SUBIEKTA W TLE. Komunikat producenta brzmi: sprawdz dane logowania"
+        Write-Wynik "        do Subiekta. Czyli patrz na OPERATORA, nie na login SQL:"
+        Write-Wynik "          - SFERA_OPERATOR musi byc dokladna nazwa operatora z Subiekta,"
+        Write-Wynik "          - SFERA_OPERATOR_HASLO musi byc jego haslem (puste tez bywa bledem),"
+        Write-Wynik "          - ten operator musi miec w Subiekcie prawo do Sfery,"
+        Write-Wynik "          - podmiot musi miec WLASNA licencje Sfery (kopia bazy jej nie ma)."
+        Write-Wynik "        Sprawdz, czy blokuje sam tryb w tle: uruchom sonde z -ZOknem."
     }
     Write-Wynik ""
-    Write-Wynik "        Login SQL to NIE jest login do Subiekta. Operator ('Szef') otwiera"
-    Write-Wynik "        program, a Uzytkownik otwiera baze na SQL Serverze - normalnie"
-    Write-Wynik "        podaje go sam Subiekt z ustawien podmiotu, wiec nikt go nie wpisuje."
-    Write-Wynik "        Przy autentykacji Windows loginu SQL nie ma wcale."
-    Write-Wynik ""
-    Write-Wynik "        Pozostale czeste przyczyny: zly operator Subiekta albo jego haslo,"
-    Write-Wynik "        zla nazwa podmiotu, brak licencji Sfery na tym podmiocie."
+    Write-Wynik "        Login SQL to NIE jest login do Subiekta. Operator otwiera program,"
+    Write-Wynik "        a Uzytkownik otwiera baze na SQL Serverze - normalnie podaje go sam"
+    Write-Wynik "        Subiekt z ustawien podmiotu, wiec nikt go nie wpisuje."
     $script:linie | Set-Content -LiteralPath $Wynik -Encoding UTF8
     Write-Host "`nWynik zapisany: $Wynik"
     exit 1
