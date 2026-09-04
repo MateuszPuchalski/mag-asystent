@@ -202,6 +202,49 @@ człowieka ktoś kiedyś zamknie albo zablokuje oknem dialogowym.
 
 Wartość da się nadpisać przez `SFERA_TRYB_URUCHOMIENIA`.
 
+## 2g. Tryb w tle działa — zmierzone (0.198.5)
+
+Po zamknięciu Subiekta i z trybem `gtaUruchomNowy | gtaUruchomWTle` sonda
+otworzyła sesję **bez okna**, za pierwszym podejściem:
+
+```
+JEST  sesja otwarta BEZ OKNA — Autentykacja=0, tryb NOWY|W_TLE (0x6)
+```
+
+To zamyka punkt 3 i odpowiada na pytanie, które ważyło najwięcej dla wdrożenia:
+**usługa `wertis-sfera` da się uruchomić bez pulpitu.** Potwierdzone też
+`SFERA_AUTENTYKACJA=0` jako właściwa wartość na tej instalacji.
+
+## 2h. Metody `SuDokumentyManager` — punkty 4 i 8 zamknięte
+
+Manager wystawia dokumenty metodami nazwanymi **symbolem dokumentu**. Stąd
+nasze `DodajKorekte` nie miało prawa istnieć. Wyciąg z tego, co nas dotyczy:
+
+| metoda | dokument | punkt |
+|---|---|---|
+| `DodajMM` | przesunięcie międzymagazynowe | 4 — **zamknięty** |
+| `DodajRW` | rozchód wewnętrzny | 8 — **zamknięty** |
+| `DodajKFS` | korekta faktury sprzedaży | 6 — nazwa wybrana, sygnatura otwarta |
+| `DodajPW`, `DodajPZ`, `DodajWZ`, `DodajFS`, `DodajZD` … | reszta rodzajów | — |
+
+Nazwy metod `DodajMM` i `DodajRW` okazały się trafione; zmyślony był sam
+manager. Kod woła je od 0.198.5 przez `SuDokumentyManager`.
+
+**Punkt 5 przestał być zgadywanką.** Na managerze siedzą cztery metody skutku
+magazynowego:
+
+```
+SkutekMagazynowyWywolaj   SkutekMagazynowyOdloz
+SkutekMagazynowyCofnij    SkutekMagazynowyWywolajTylkoNaMagZrodl
+```
+
+Czyli „wykonany kontra bufor" to nie jest domyślne zachowanie `Zapisz()`, tylko
+**osobna decyzja z własnym wywołaniem**. Której użyć i czy `Zapisz()` sam już
+coś robi — rozstrzyga bramka 2, bo to zachowanie, nie nazwa.
+
+Sonda wypisuje od 0.198.5 także **sygnatury metod**, więc następny przebieg
+poda listę argumentów `DodajKFS` i `SkutekMagazynowy*`.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.

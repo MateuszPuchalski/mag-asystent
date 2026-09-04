@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Microsoft.CSharp.RuntimeBinder;
 
 namespace WertisSferaWorker;
@@ -145,11 +145,12 @@ public sealed class SferaComAdapter : ISferaAdapter
         object sesja, int magFrom, int magTo, IReadOnlyList<MmItem> items)
     {
         dynamic su = sesja;
-        /* [WERYFIKUJ] nazwa managera i metody — kontrakt sfera.ts podaje
-           DokumentyMagazynoweManager.DodajMM(); w nowszych wersjach Sfery
-           bywa SuDokumentyManager z typem dokumentu w argumencie. */
-        dynamic mm = Krok("DokumentyMagazynoweManager.DodajMM()", 4,
-            () => su.DokumentyMagazynoweManager.DodajMM());
+        /* USTALONE (0.198.5) sondą na maszynie firmy: dokumenty niesie
+           `SuDokumentyManager`, a metoda nazywa się `DodajMM`. Managera
+           `DokumentyMagazynoweManager` — z dawnego szkicu w sfera.ts — na
+           obiekcie sesji NIE MA WCALE. */
+        dynamic mm = Krok("SuDokumentyManager.DodajMM()", 4,
+            () => su.SuDokumentyManager.DodajMM());
         Krok("MM.MagazynZrodlowyId / MagazynDocelowyId", 4, () =>
         {
             mm.MagazynZrodlowyId = magFrom;   // [WERYFIKUJ] nazwy właściwości magazynów
@@ -178,10 +179,10 @@ public sealed class SferaComAdapter : ISferaAdapter
     private static string DodajRw(object sesja, int magId, IReadOnlyList<MmItem> items)
     {
         dynamic su = sesja;
-        /* [WERYFIKUJ] nazwa metody RW — kontrakt sfera.ts podaje
-           DokumentyMagazynoweManager.DodajRW(); dok_Typ RW = 13. */
-        dynamic rw = Krok("DokumentyMagazynoweManager.DodajRW()", 8,
-            () => su.DokumentyMagazynoweManager.DodajRW());
+        /* USTALONE (0.198.5): `SuDokumentyManager.DodajRW()`. Ten sam manager
+           co MM — sonda wypisała komplet jego metod `Dodaj*`. */
+        dynamic rw = Krok("SuDokumentyManager.DodajRW()", 8,
+            () => su.SuDokumentyManager.DodajRW());
         Krok("RW.MagazynId", 8, () => { rw.MagazynId = magId; });
         foreach (var it in items)
         {
@@ -205,11 +206,15 @@ public sealed class SferaComAdapter : ISferaAdapter
         try
         {
             var su = Sesja();
-            /* [WERYFIKUJ] wystawienie korekty do istniejącego dokumentu —
-               kontrakt sfera.ts podaje DokumentyHandloweManager.DodajKorekte(dokId);
-               nazwa managera i metody zależy od wersji Sfery. */
-            dynamic korekta = Krok("DokumentyHandloweManager.DodajKorekte(dok_Id)", 6,
-                () => su.DokumentyHandloweManager.DodajKorekte(z.DokId));
+            /* Manager USTALONY, metoda WYBRANA, sygnatura `[WERYFIKUJ]`.
+               `DodajKorekte` nie istnieje; `SuDokumentyManager` wystawia korekty
+               metodami nazwanymi po symbolu dokumentu, a korekta faktury
+               sprzedaży to `DodajKFS`. Czy bierze `dok_Id` dokumentu
+               pierwotnego, czy dokument wczytany przez `WczytajDokument` —
+               tego sonda nie powie, bo to argument, nie nazwa. Rozstrzyga
+               bramka 2 z docs/wdrozenie.md. */
+            dynamic korekta = Krok("SuDokumentyManager.DodajKFS(dok_Id)", 6,
+                () => su.SuDokumentyManager.DodajKFS(z.DokId));
             foreach (var it in z.Pozycje.Concat(z.PozycjeZniszczone))
             {
                 /* [WERYFIKUJ] adresowanie pozycji korekty. Korekta w Subiekcie
