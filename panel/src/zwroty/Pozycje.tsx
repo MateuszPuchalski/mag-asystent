@@ -6,6 +6,7 @@ import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Przycisk, Blad } from "../ui";
 import { Zdjecie } from "../towar/Zdjecie";
 import { Powiekszenie } from "../towar/Powiekszenie";
+import { Kafel } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
 import { Potracenie } from "./Potracenie";
@@ -87,13 +88,22 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
          a nie na jednej wartości pewności — inaczej propozycja z pamięci
          wskazań (ta najpewniejsza, bo za nią stoi człowiek) nie dostałaby
          przycisku i wymagałaby ręcznego wskazania po raz drugi. */
-      ? <div className="flex flex-wrap items-center gap-2 text-amber-800">
-          <span>Propozycja: <b>{prop.symbol}</b>
-            <span className="text-slate-500"> · {prop.zrodlo}</span></span>
-          <button type="button" disabled={zapisz.isPending}
-            onClick={() => ustaw(prop.twId, "sku")}
-            className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-            <Check size={12} />Zatwierdź</button>
+      /* Zdjęcie przy PROPOZYCJI (0.203.0). Kafel na początku wiersza pokazuje
+         kartotekę POTWIERDZONĄ, więc pozycja czekająca na zatwierdzenie stała
+         przy pustym kwadracie — a to właśnie przy niej zapada decyzja.
+         Obraz siedzi WEWNĄTRZ bloku propozycji, w jego barwie: wyniesiony na
+         wiersz udawałby fakt, a §4.3 nie pozwala, żeby wybór automatu wyglądał
+         jak dana z Allegro. Mniejszy niż kafel wiersza z tego samego powodu. */
+      ? <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-amber-900">
+          <Kafel twId={prop.twId} rozmiar={40} nazwa={prop.symbol ?? p.nazwa} symbol={prop.symbol} />
+          <div className="min-w-0 flex-1">
+            <p>Propozycja: <b className="font-mono">{prop.symbol}</b></p>
+            <p className="text-slate-500">{prop.zrodlo}</p>
+            <button type="button" disabled={zapisz.isPending}
+              onClick={() => ustaw(prop.twId, "sku")}
+              className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Check size={12} />Zatwierdź</button>
+          </div>
         </div>
       /* POWÓD, nie samo „Bez kartoteki". Do 0.153.1 sześć różnych zerwań
          łańcucha wyglądało tu identycznie i operator nie miał jak odróżnić

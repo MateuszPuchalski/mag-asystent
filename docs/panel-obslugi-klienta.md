@@ -1280,10 +1280,40 @@ Przy zamówieniu, którego jeszcze nie pobrano, stoi przycisk „Dociągnij tera
 Bez niego diagnoza wymagała czekania dziesięciu minut na ticker. Przycisku nie
 ma tam, gdzie Allegro nie podało numeru zamówienia: nie byłoby czego pobrać.
 
-Zdjęcie widać w trzech miejscach: miniatura w wierszu kolejki, kafel przy
-pozycji w kolumnie dowodów i powiększenie po kliknięciu. Kafel ma stały
-rozmiar także wtedy, gdy zdjęcia nie ma — rosnący przesuwałby wiersze pod
-kursorem.
+Zdjęcie widać w czterech miejscach: miniatura w wierszu kolejki, kafel przy
+pozycji w kolumnie dowodów, kafel w bloku PROPOZYCJI kartoteki (0.203.0)
+i powiększenie po kliknięciu. Kafel ma stały rozmiar także wtedy, gdy zdjęcia
+nie ma — rosnący przesuwałby wiersze pod kursorem.
+
+Obraz propozycji stoi WEWNĄTRZ jej ramki, nie na wierszu. Kafel wiersza należy
+do kartoteki potwierdzonej; wyniesiony na wiersz obraz propozycji udawałby
+fakt, a §4.3 nie pozwala, żeby wybór automatu wyglądał jak dana z Allegro.
+
+### 25a.6a. Zdjęcia w całej obsłudze (0.203.0)
+
+Do 0.202.0 kafel stał wyłącznie tam, gdzie kartoteka była już rozstrzygnięta:
+w kolejce zwrotów, przy pozycji zwrotu i przy kartotece potwierdzonej przy
+rozmowie. Miejsca, w których człowiek DECYDUJE, obrazu nie miały.
+
+Zdjęcie doszło więc do kandydatów doboru, negatywnych dopasowań, wybranej
+kartoteki doboru, wyników wyszukiwarki kartotek, obu propozycji kartoteki
+(przy rozmowie i przy pozycji zwrotu), karty zadania terenowego oraz obu kart
+bazy wiedzy. Wszystkie biorą obraz z trasy `/api/products/:twId/zdjecie` —
+z Allegro nie pobieramy nic (§ oferta przy rozmowie).
+
+Wyszukiwarka jest tu jedną zmianą dla pięciu ekranów: doboru, kartoteki przy
+rozmowie, zlecenia pomiaru, sprawdzenia wiedzy i nowej propozycji.
+
+**Nazwa przed symbolem.** Wiersz kandydata i wynik wyszukiwarki zaczynały się
+od symbolu, a nazwa leżała pod nim, w rozmiarze podpisu. Symbol jedzie na
+dokument i na halę, więc zostaje — ale rozpoznaje się część po nazwie i po
+obrazku, nie po kodzie magazynowym.
+
+**Kolejka rozmów zdjęcia NIE dostaje i to jest decyzja.** Triaż w skrzynce robi
+się po pilności, czasie oczekiwania i treści pytania — nie po tym, jak wygląda
+towar. Rozmowa nie niesie zresztą kartoteki na liście: wywodzi się ją z oferty
+dopiero po otwarciu. Zdjęcie wchodzi tam, gdzie pada pytanie „czy to ta
+część", czyli o jeden ekran dalej.
 
 ### 25a.7. Odnośniki do Allegro
 

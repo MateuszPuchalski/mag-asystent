@@ -4,6 +4,7 @@ import { Check, X as Krzyzyk } from "lucide-react";
 import type { Zastosowanie } from "../api/typy";
 import { Pole, Przycisk, czas } from "../ui";
 import { NAZWA_ZRODLA } from "../skrzynka/statusy";
+import { Kafel } from "../towar/Kafel";
 
 /**
  * Karta propozycji w kolejce wiedzy (E2). Niesie to, po czym biuro rozstrzyga:
@@ -26,15 +27,22 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
 
   return <article className={`rounded-lg border p-4 ${negatyw ? "border-red-200" : "border-slate-200"}`}
     aria-label={`Propozycja: ${z.symbol} – ${z.model.etykieta}`}>
-    <div className="flex flex-wrap items-center gap-2">
-      <b className="font-mono">{z.symbol}</b>
-      <span className="text-slate-500">→</span>
-      <b>{z.model.etykieta}</b>
-      <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase ${negatyw
-        ? "bg-red-100 text-ranga-zle" : "bg-emerald-100 text-emerald-800"}`}>
-        {negatyw ? "nie pasuje" : "pasuje"}</span>
-      <span className="ml-auto text-xs text-slate-500">
-        {z.zaproponowal} · {czas(z.zaproponowanoAt)} · {NAZWA_ZRODLA[z.zrodlo]}</span>
+    {/* Zdjęcie części przy propozycji (0.203.0). Rozstrzygający czyta zdanie
+        „symbol → maszyna" i ma powiedzieć, czy to prawda. Symbol jest kodem
+        magazynu, a nie obrazem części, więc sprawdzenie znaczyło otwarcie
+        Subiekta na drugim monitorze. Kolejka bywa długa i to się mnoży. */}
+    <div className="flex items-start gap-3">
+      <Kafel twId={z.twId} rozmiar={48} nazwa={`${z.symbol} → ${z.model.etykieta}`} symbol={z.symbol} />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <b className="font-mono">{z.symbol}</b>
+        <span className="text-slate-500">→</span>
+        <b>{z.model.etykieta}</b>
+        <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase ${negatyw
+          ? "bg-red-100 text-ranga-zle" : "bg-emerald-100 text-emerald-800"}`}>
+          {negatyw ? "nie pasuje" : "pasuje"}</span>
+        <span className="ml-auto text-xs text-slate-500">
+          {z.zaproponowal} · {czas(z.zaproponowanoAt)} · {NAZWA_ZRODLA[z.zrodlo]}</span>
+      </div>
     </div>
     {z.zdaniePowodu && <p className="mt-1 text-sm text-red-900">{z.zdaniePowodu}</p>}
     {z.komentarz && <p className="mt-1 text-sm text-slate-700">{z.komentarz}</p>}

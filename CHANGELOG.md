@@ -34,6 +34,64 @@ historii nie przepisujemy.
 ---
 
 
+## 0.203.0 — 4 września 2026
+
+**Zdjęcia tam, gdzie zapada decyzja o części — i hierarchia, która ją skraca.**
+Panel obsługi pokazywał zdjęcie kartoteki w trzech miejscach: w wierszu kolejki
+zwrotów, przy pozycji zwrotu i przy kartotece POTWIERDZONEJ przy rozmowie.
+Wspólna cecha całej trójki: to miejsca, w których nikt już niczego nie
+rozstrzyga.
+
+Rozstrzyga się gdzie indziej — i tam obrazu nie było. Kandydat doboru, wynik
+wyszukiwarki, propozycja automatu czekająca na „Zatwierdź", propozycja
+w kolejce wiedzy, zadanie dla hali. Wszystkie te ekrany zadają jedno pytanie:
+„czy TO jest ta część". Odpowiadały na nie symbolem i nazwą, a nazwy w tej
+kartotece różnią się końcówką — „szarpak NAC LS46" obok „szarpak NAC LS51".
+Sprawdzenie znaczyło otwarcie Subiekta na drugim monitorze, czyli dokładnie to,
+czego §25 obiecuje agentowi oszczędzić.
+
+Zdjęcie doszło w ośmiu miejscach: kandydaci doboru, negatywne dopasowania,
+wybrana kartoteka doboru, wyniki wyszukiwarki kartotek (a przez nią pięć
+ekranów naraz), wybrany towar w wyszukiwarce, propozycja kartoteki przy
+rozmowie, propozycja kartoteki przy pozycji zwrotu, karta zadania terenowego
+oraz obie karty bazy wiedzy. Wszystkie biorą obraz z NASZEJ trasy
+`/api/products/:twId/zdjecie` — z Allegro nie pobieramy nic, bo to
+wyprowadzałoby przeglądarkę biura poza własną sieć.
+
+**Propozycja dostaje zdjęcie WEWNĄTRZ swojej ramki, nie na wierszu.** §4.3 nie
+pozwala, żeby wybór automatu wyglądał jak fakt z Allegro. Kafel wiersza dalej
+należy do kartoteki potwierdzonej; obraz propozycji stoi w bloku w jej barwie,
+obok przycisku, który ją zatwierdza.
+
+**Hierarchia: nazwa przed symbolem.** Wiersz kandydata i wynik wyszukiwarki
+zaczynały się od pogrubionego symbolu — czyli od tego, czego nikt nie nosi
+w głowie. Nazwa leżała pod nim, w rozmiarze podpisu, obok drogi i źródła:
+cztery linijki jednej wagi, z których trzeba przeczytać wszystkie, żeby wybrać
+jedną. Teraz pierwszy plan ma nazwa, symbol schodzi do podpisu, droga
+i źródło na trzeci plan. Symbol zostaje wszędzie — to on jedzie na dokument
+i na halę.
+
+**Dostępność ma barwę w obie strony.** Przy kandydacie doboru czerwone było
+tylko zero, a dodatnie liczby szare jak reszta. „Mamy 28 sztuk" kończy rozmowę
+z klientem jednym zdaniem i zasługuje na tyle samo uwagi, co brak.
+
+**Wybrany dobór wygląda na wniosek.** Sekcja „Wybrano" stała gołym tekstem pod
+listą kandydatów, w rozmiarze ich podpisów — choć to jedyna rzecz na tej
+zakładce, która trafia do klienta. Dostała ramę w barwie stanu: bursztynową,
+dopóki dobór nie jest zatwierdzony, zieloną potem.
+
+**Dwa braki, dwa znaki.** Kafel odpowiadał tym samym obrazkiem na dwa różne
+pytania. „Bez kartoteki" znaczy „nie wiadomo, o który towar chodzi" i jest
+pracą dla agenta; „bez zdjęcia" znaczy „towar znany, obrazu w Subiekcie nie
+ma" i pracą nie jest. Pierwszy nosi teraz znak `PackageSearch`, ten sam,
+którym panel opisuje brak kartoteki w zdaniu obok. Słowo „bez zdjęcia" zostaje
+na kaflach od 44 px w górę, czyli wszędzie, gdzie stało do 0.202.0; mniejsze
+kafle weszły dopiero w tym wydaniu i noszą ikonę.
+
+Powiększenie po kliknięciu ma jedną implementację (`towar/Kafel.tsx`) zamiast
+trzech kopii tego samego stanu. Wyszukiwarka kartotek dostała pierwszy własny
+test — obsługuje pięć ekranów i nie miała żadnego.
+
 ## 0.202.0 — 4 września 2026
 
 **Drabina cofania w obsłudze zwrotów.** §25a.5 obiecywał cofnięcie wszędzie
