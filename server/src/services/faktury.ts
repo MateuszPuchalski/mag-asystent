@@ -1,5 +1,7 @@
 import { db as defaultDb, type Db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { config } from "../config.js";
+import { symbolTypu } from "../adapters/typy-dokumentow.js";
 
 /* ── Dokument sprzedaży przy zwrocie (0.174.0) ───────────────────────────────
    Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Pracownik
@@ -337,6 +339,18 @@ export function zwiazFakturyPewne(database: Db = defaultDb(), teraz = new Date()
 export const AUTOMAT_KOREKTY = "automat (korekta w Subiekcie)";
 
 /**
+ * Symbole dokumentów uznawanych za ODDAJĄCE TOWAR NA STAN.
+ *
+ * Lustro `DOK_TYPY_KOREKT`, przepuszczone przez tę samą mapę, którą import
+ * zapisuje do `sgt_faktura.typ`. Liczyć po symbolu, a nie po kodzie, bo
+ * read-model kodu nie trzyma — a dwa źródła prawdy o tym samym rozjechałyby
+ * się przy pierwszej zmianie ustawienia.
+ */
+function symboleKorekt(): string[] {
+  return config.mssql.dokTypyKorekt.map(symbolTypu);
+}
+
+/**
  * Wiąże korektę z JEDNYM zwrotem. Oddaje `true`, gdy coś zapisał.
  *
  * Wiąże WYŁĄCZNIE pewność: dokładnie jeden dokument korygujący wskazujący
@@ -362,9 +376,21 @@ export function zwiazKorekte(
   if (z.korekta_numer !== null || z.zamkniety_at !== null) return false;
   if (z.werdykt !== "przyjety" || z.kwota_grosze === null) return false;
 
+  /* TYP jest bramką, nie ozdobą (0.201.1). `dok_DoDokId` nie znaczy „to jest
+     korekta" — zrzut z bazy firmy pokazał tę kolumnę wypełnioną na dwudziestu
+     tysiącach paragonów i dwudziestu pięciu tysiącach WZ. To ogólny odnośnik
+     „do dokumentu", a nie znacznik korygowania.
+
+     Bez filtra po typie wystarczyłaby FAKTURA DO PARAGONU — rzecz w detalu
+     codzienna — żeby automat wziął ją za korektę tego paragonu, wpisał jej
+     numer i wypuścił MM na towar, którego nikt nie oddał. */
+  const symbole = symboleKorekt();
+  if (symbole.length === 0) return false;
   const korekty = database.prepare(
-    `SELECT nr_pelny FROM sgt_faktura WHERE koryguje_dok_id=? ORDER BY dok_id`)
-    .all(Number(z.faktura_dok_id)) as Array<{ nr_pelny: string }>;
+    `SELECT nr_pelny FROM sgt_faktura
+      WHERE koryguje_dok_id=? AND typ IN (${symbole.map(() => "?").join(",")})
+      ORDER BY dok_id`)
+    .all(Number(z.faktura_dok_id), ...symbole) as Array<{ nr_pelny: string }>;
   if (korekty.length !== 1) return false;
 
   const kiedy = teraz.toISOString();

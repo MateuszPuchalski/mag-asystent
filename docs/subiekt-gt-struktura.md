@@ -79,14 +79,28 @@ obiekt Sfery ma dokładnie `DoDokumentuId`, `DoDokumentuNumerPelny`
 i `DoDokumentuDataWystawienia`. Zgodność w obie strony jest tu całym dowodem.
 
 Po `dok_DoDokId` automat znajduje korektę do zwrotu i zamyka go bez
-przepisywania numeru ręką (0.201.0). Dokument sprzedaży ma tam pusto albo zero;
-zero traktujemy jak brak, bo jako identyfikator wiązałoby korekty z niczym.
+przepisywania numeru ręką (0.201.0).
+
+**Ta kolumna NIE znaczy „to jest korekta".** Zrzut z bazy firmy (0.201.1) pokazał
+ją wypełnioną na 20 418 paragonach i 25 778 dokumentach WZ. To ogólny odnośnik
+„do dokumentu", a nie znacznik korygowania. Faktura do paragonu wskazuje nim ten
+paragon, i to jest w detalu rzecz codzienna.
+
+Korektę rozstrzyga więc `dok_Typ`, a `dok_DoDokId` mówi tylko, CZEGO dotyczy.
+Zapytanie liczące dokumenty po typie tam, gdzie ta kolumna jest niepusta, nie
+odpowiada na pytanie „ile jest korekt".
 
 `[WERYFIKUJ]` **Czym firma księguje zwrot do paragonu.** Kod `14-ZW` jest ze
 struktury, ale praktyka podmiotu nią nie jest: sprzedaż paragonowa bywa
 korygowana `PAk`, `ZW` albo `ZWn`, a to zmienia listę `DOK_TYPY_KOREKT`.
 Pomyłka daje koszyk czekający na korektę, która w oczach aplikacji nie
 istnieje — czyli zatrzymanie, nie zły dokument.
+
+Przesłanka z bazy firmy: w zbiorze dokumentów z niepustym `dok_DoDokId` jest
+655 pozycji typu `6` (KFS) i 772 typu `14` (ZW). Oba kody są więc W UŻYCIU
+i w podobnej skali, przy czterokrotnej przewadze paragonów nad fakturami.
+Znacznik zostaje, bo to nie dowód, że `ZW` wskazuje wtedy paragon zwracany —
+rozstrzygnie pierwszy zwrot przepuszczony przez automat.
 
 ## Numer obcy na dokumencie sprzedaży — arytmetyka, nie domysł
 
