@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.198.10 — 4 września 2026
+
+**Gotowy exe workera nie jest już plikiem nieznanym dla gita.** `.gitignore`
+pokrywał `publish/`, ale instalator szuka exe o poziom wyżej — w
+`<katalog>\sfera-worker\`. U klienta ten katalog jest jednocześnie checkoutem
+repozytorium, więc skopiowany plik pokazywał się w `git status` jako 30 MB
+śmiecia. Doszły `sfera-worker/*.exe` i `tlo-worker/*.exe`.
+
 ## 0.198.9 — 4 września 2026
 
 **„Pozycje są puste" wyglądało jak „Pozycji nie ma" — przez błąd w sondzie.**

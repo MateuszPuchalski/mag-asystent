@@ -59,6 +59,11 @@ panel/playwright-report/
 sfera-worker/bin/
 sfera-worker/obj/
 sfera-worker/publish/
+# Gotowy exe kopiuje sie o poziom wyzej niz publish/, bo instalator szuka go
+# w <katalog>\sfera-worker\. U klienta ten katalog JEST checkoutem repozytorium,
+# wiec bez tej linii 30 MB binarki siedzi w `git status` jako plik nieznany.
+sfera-worker/*.exe
+tlo-worker/*.exe
 tlo-worker/bin/
 tlo-worker/obj/
 tlo-worker/publish/
