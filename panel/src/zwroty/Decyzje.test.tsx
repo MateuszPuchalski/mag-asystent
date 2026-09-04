@@ -17,7 +17,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   linkZwrotu: null, werdykt: null, kwotaGrosze: null, kwotaWariant: null,
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
-  korektaNumer: null, rejectionCode: null, wersja: 3,
+  korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 3,
   zamowienie: { externalId: "ord-1", status: null, kupujacyLogin: null,
     dostawaGrosze: 1500, dostawaMetoda: "InPost", platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 11498,
     waluta: "PLN", kupionoAt: null, link: null, pozycje: [] },
@@ -124,5 +124,20 @@ describe("Korekta zwrotu (0.162.0)", () => {
     pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
     expect(screen.getByText(/Stan końcowy/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Cofnij korektę/ })).toBeNull();
+  });
+
+  it("mówi, czy numer korekty znalazł automat, czy przepisał człowiek", () => {
+    /* Ta sama zasada co przy dokumencie sprzedaży (§4.3): fakt z danych nie
+       ma udawać czyjejś decyzji, a decyzja nie ma udawać faktu. */
+    pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026",
+      korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
+    expect(screen.getByText(/Znaleziona w Subiekcie/)).toBeInTheDocument();
+  });
+
+  it("cofnięcie korekty znalezionej przez automat jest tak samo dostępne", () => {
+    /* Cofnięcie cudzej pomyłki nie ma być trudniejsze niż własnej. */
+    pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026",
+      korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
+    expect(screen.getByRole("button", { name: /Cofnij korektę/ })).toBeEnabled();
   });
 });

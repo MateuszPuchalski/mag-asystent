@@ -1147,10 +1147,14 @@ dotyczy CAŁEGO zwrotu: werdykt, korekta, cofnięcie.
 
 ### 25a.4a. Korekta i zamknięcie (0.162.0)
 
-Korektę wystawia człowiek w Subiekcie, a panel zapisuje jej NUMER — i to nie
-jest półśrodek w drodze do automatu. Zadanie `korekta_zwrot` w kolejce Sfery
-potrzebuje identyfikatora dokumentu SPRZEDAŻY, a read-model Subiekta trzyma
-wyłącznie zakupy (FZ, PZ). Bez tego identyfikatora automat musiałby go zgadywać.
+Korektę wystawia człowiek w Subiekcie. Do 0.201.0 panel zapisywał jej NUMER
+przepisany ręką, bo zadanie `korekta_zwrot` w kolejce Sfery potrzebuje
+identyfikatora dokumentu SPRZEDAŻY, a read-model trzymał wyłącznie zakupy.
+
+**Ten powód wygasł.** Read-model sprzedaży wrócił w 0.174.0, a w 0.201.0 doszła
+kolumna `dok_DoDokId` — dokument korygowany. Numer czyta więc automat, a pole
+w panelu zostaje dla przypadków, w których pewności nie ma: dwóch korekt do
+jednej faktury albo braku wskazanego dokumentu sprzedaży.
 
 Zapisany numer zamyka zwrot i zdejmuje go z kolejki pracy. Zamknięcie znaczy
 „nasza część jest zrobiona", nie „klient dostał przelew": pieniądze oddaje
@@ -1763,7 +1767,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odnośniki do panelu sprzedawcy | **niepotwierdzone** | `[WERYFIKUJ]`, wzorce w `ALLEGRO_PANEL_*` |
 | Czyszczenie lądowisk z danych osobowych | **działa** od 0.152.0 | `services/allegro-oczyszczanie.ts` |
 | Zwrot pieniędzy i odmowa w Allegro | **działa** od 0.190.0 | `services/zwrot-pieniedzy.ts`, `panel/src/zwroty/Pieniadze.tsx`; `commandId` stały na zwrot, uprawnienie `payments:write` |
-| Automat korekty przez Sferę | **poza zasięgiem** | brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ |
+| Numer korekty czytany z Subiekta | **działa** od 0.201.0 | `zwiazKorektyPewne` po `dok_DoDokId`; wiąże tylko pewność, bramki jak u człowieka |
+| Automat WYSTAWIANIA korekty przez Sferę | **poza zasięgiem** | pytanie do księgowości: `PAk`, `ZW` czy `ZWn` przy paragonie |
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |

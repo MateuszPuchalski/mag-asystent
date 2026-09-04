@@ -37,6 +37,7 @@ import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
   brakKolumnyUwag,
+  brakKolumnyKorekty,
   bladImportuMm,
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
@@ -62,7 +63,7 @@ import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
 import { zwiazPewne } from "./services/sygnatury.js";
 import { wypuscGotoweKoszyki } from "./services/kosze-zwrotow.js";
-import { zwiazFakturyPewne } from "./services/faktury.js";
+import { zwiazFakturyPewne, zwiazKorektyPewne } from "./services/faktury.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
 
@@ -187,6 +188,10 @@ export async function buildApp() {
          zamówienia (0.175.0). Bez nich automat nie zwiąże ani jednego zwrotu,
          choć wszystko inne działa; ktoś ma się o tym dowiedzieć. */
       brakKolumnyUwag,
+      /* Kolumna dokumentu korygowanego niedostępna (0.201.0) — numery korekt
+         przepisuje wtedy człowiek, jak przed tym wydaniem. Bez tego zdania
+         brak automatu wyglądałby na zepsuty automat. */
+      brakKolumnyKorekty,
       /* Odczyt sprzedaży padł w całości (timeout/8623) — zwroty pokazują
          dokument z ostatniej udanej synchronizacji, ktoś ma o tym wiedzieć. */
       bladImportuFaktur,
@@ -369,6 +374,9 @@ async function main() {
          więc kolejność nie jest wymogiem — ale kandydaci do wskazania ręcznego
          liczą się z `tw_id`, a te dopiero co powstały. */
       zwiazFakturyPewne(db());
+      /* Korekta PO dokumencie sprzedaży, bo wiąże się PRZEZ niego (0.201.0):
+         zwrot bez wskazanej faktury nie ma czego korygować. */
+      zwiazKorektyPewne(db());
       /* Koszyki czekające na komplet korekt (0.200.0). Zwykle wypuszcza je już
          `zapiszKorekte`, w sekundzie wpisania numeru. Ten przebieg jest
          DRUGĄ drogą: numer bywa wpisany, gdy koszyka jeszcze nie zamknięto,
@@ -387,7 +395,13 @@ async function main() {
        ono niesie sygnaturę, więc bez tego wywołania pozycja czekałaby na
        powiązanie do następnego przebiegu zwrotów. */
     uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
-      async () => { await uzupelnijZamowienia(); zwiazPewne(db()); zwiazFakturyPewne(db()); });
+      async () => {
+        await uzupelnijZamowienia();
+        zwiazPewne(db());
+        zwiazFakturyPewne(db());
+        zwiazKorektyPewne(db());
+        wypuscGotoweKoszyki(db());
+      });
     /* Czwarty ticker: tytuły ofert do rozmów (0.178.0). Osobno od zamówień,
        bo dotyczy pytań SPRZED zakupu — tam zamówienia nie ma i nigdy nie
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia

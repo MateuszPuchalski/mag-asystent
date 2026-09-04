@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   dolnaGranicaOkna, fakturaZwrotu, kandydaciFaktury, numerWskazuje, wskazFakture, zwiazFakture,
+  zwiazKorekte, zwiazKorektyPewne,
 } from "./faktury.js";
 
 /* ── Dokument sprzedaży przy zwrocie (0.174.0) ───────────────────────────────
@@ -49,11 +50,13 @@ function zwrot(d: Db, pola: { orderId?: string | null; referencja?: string | nul
 }
 
 function dokument(d: Db, dokId: number, pola: { typ?: string; numer?: string;
-  nrOryg?: string | null; zUwag?: string | null; data?: string } = {}, twIds: number[] = []) {
-  d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,zamowienie_z_uwag,data_wyst)
-    VALUES (?,?,?,?,?,?)`)
+  nrOryg?: string | null; zUwag?: string | null; data?: string; koryguje?: number } = {},
+  twIds: number[] = []) {
+  d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,zamowienie_z_uwag,
+    koryguje_dok_id,data_wyst) VALUES (?,?,?,?,?,?,?)`)
     .run(dokId, pola.typ ?? "FS", pola.numer ?? `FS ${dokId}/2026`,
-      pola.nrOryg ?? null, pola.zUwag ?? null, pola.data ?? "2026-08-20");
+      pola.nrOryg ?? null, pola.zUwag ?? null, pola.koryguje ?? null,
+      pola.data ?? "2026-08-20");
   for (const tw of twIds) {
     d.prepare("INSERT INTO sgt_faktura_pozycja(dok_id,tw_id,ilosc) VALUES (?,?,1)").run(dokId, tw);
   }
@@ -266,4 +269,87 @@ test("bez pobranego zamówienia okno zostaje przy sześćdziesięciu dniach od z
   /* Zakup starszy niż okno nie ROZSZERZA okna — granica to zawsze późniejsza
      z dwóch dat. */
   assert.equal(dolnaGranicaOkna("2026-09-01T10:00:00Z", "2026-01-05T10:00:00Z", 60), "2026-07-03");
+});
+
+/* ── Numer korekty czytany z Subiekta (0.201.0) ─────────────────────────────
+   Automat robi to, co przycisk: zapisuje numer i zamyka zwrot. Bramki są te
+   same co u człowieka, bo numer zapisany przed kwotą zamknąłby sprawę
+   pieniędzy, o których nikt nie zdecydował.                                 */
+
+/** Zwrot przyjęty, z ustaloną kwotą i wskazanym dokumentem sprzedaży. */
+function gotowyDoKorekty(d: Db, dokId = 500): number {
+  dokument(d, dokId);
+  const id = zwrot(d);
+  d.prepare(`UPDATE zwrot_klienta SET werdykt='przyjety', kwota_grosze=4999,
+    faktura_dok_id=?, faktura_numer='FS 500/2026', faktura_typ='FS',
+    faktura_zrodlo='numer' WHERE id=?`).run(dokId, id);
+  return id;
+}
+
+const stanKorekty = (d: Db, id: number) => d.prepare(
+  "SELECT korekta_numer, korekta_zrodlo, zamkniety_at, wersja FROM zwrot_klienta WHERE id=?")
+  .get(id) as { korekta_numer: string | null; korekta_zrodlo: string | null;
+    zamkniety_at: string | null; wersja: number };
+
+test("jedna korekta do dokumentu sprzedaży zamyka zwrot sama", () => {
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  dokument(d, 600, { typ: "KFS", numer: "KFS 7/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), true);
+  const po = stanKorekty(d, id);
+  assert.equal(po.korekta_numer, "KFS 7/2026");
+  assert.equal(po.korekta_zrodlo, "subiekt", "ma być widać, że to nie decyzja człowieka");
+  assert.notEqual(po.zamkniety_at, null, "automat robi to, co przycisk — łącznie z zamknięciem");
+  assert.equal(Number(po.wersja), 2,
+    "wersja rośnie: panel trzymający starą ma dostać konflikt, a nie ciche wyprzedzenie");
+});
+
+test("zwrot BEZ USTALONEJ KWOTY zostaje nietknięty, choć korekta jest", () => {
+  /* Decyzja właściciela. Numer zapisany przed kwotą zamknąłby sprawę
+     pieniędzy, o których nikt nie zdecydował — ta sama bramka co u człowieka
+     (`zapiszKorekte`). Koszyk czeka wtedy dalej, a praca stoi w DO ZWROTU. */
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  d.prepare("UPDATE zwrot_klienta SET kwota_grosze=NULL WHERE id=?").run(id);
+  dokument(d, 600, { typ: "KFS", numer: "KFS 7/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), false);
+  assert.equal(stanKorekty(d, id).korekta_numer, null);
+  assert.equal(zwiazKorektyPewne(d), 0, "przebieg zbiorczy też go nie bierze");
+});
+
+test("DWIE korekty do jednego dokumentu to spór, nie trafienie", () => {
+  /* Korekta częściowa i druga po niej są legalne. Zła korekta wypuszcza MM
+     na cudzy towar, więc przy dwóch numer wskazuje człowiek. */
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  dokument(d, 600, { typ: "KFS", numer: "KFS 7/2026", koryguje: 500 });
+  dokument(d, 601, { typ: "KFS", numer: "KFS 8/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), false);
+  assert.equal(stanKorekty(d, id).korekta_numer, null);
+});
+
+test("wskazania człowieka automat NIE nadpisuje", () => {
+  const d = stanowisko();
+  const id = gotowyDoKorekty(d);
+  d.prepare(`UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026',
+    korekta_zrodlo='reczne', zamkniety_at='2026-09-02T09:00:00Z' WHERE id=?`).run(id);
+  dokument(d, 600, { typ: "KFS", numer: "KFS 7/2026", koryguje: 500 });
+
+  assert.equal(zwiazKorekte(id, d), false);
+  assert.equal(stanKorekty(d, id).korekta_numer, "KFS 1/2026");
+});
+
+test("korekta NIE jest kandydatem na dokument sprzedaży zwrotu", () => {
+  /* Inaczej automat proponowałby korektę do korekty — człowiekowi, który ma
+     z tego wystawić dokument. */
+  const d = stanowisko();
+  zamowienie(d, ZAMOWIENIE, "2026-08-15T10:00:00Z");
+  const id = zwrot(d, { orderId: ZAMOWIENIE });
+  dokument(d, 600, { typ: "KFS", numer: "KFS 7/2026", nrOryg: ZAMOWIENIE, koryguje: 500 });
+
+  assert.deepEqual(kandydaciFaktury(id, d).map((k) => k.dokId), [],
+    "korekta ma numer zamówienia tak samo jak faktura — filtruje ją TYP");
 });

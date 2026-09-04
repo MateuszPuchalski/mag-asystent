@@ -95,6 +95,8 @@ export interface WierszZwrotu {
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
+  /** `subiekt` = automat znalazł dokument, `reczne` = człowiek przepisał. */
+  korektaZrodlo: string | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
@@ -272,6 +274,7 @@ function zloz(
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
+    korektaZrodlo: (z.korekta_zrodlo as string) ?? null,
     rejectionCode,
     zrodlo: String(z.zrodlo ?? "allegro"),
     notatka: (z.notatka as string) ?? null,
@@ -1209,8 +1212,12 @@ export function zapiszKorekte(
     if (stan.kwota_grosze === null) throw new Error("Najpierw ustal kwotę do oddania");
 
     const kiedy = teraz.toISOString();
+    /* `reczne` odróżnia to od numeru znalezionego w Subiekcie przez automat
+       (0.201.0). Wybór człowieka nie ma udawać faktu z danych, ale i odwrotnie:
+       fakt z danych nie ma udawać czyjejś decyzji. */
     database.prepare(`UPDATE zwrot_klienta
-      SET korekta_numer=?, zamkniety_at=? WHERE id=?`).run(dokument, kiedy, zwrotId);
+      SET korekta_numer=?, korekta_zrodlo='reczne', zamkniety_at=? WHERE id=?`)
+      .run(dokument, kiedy, zwrotId);
     podnies(database, zwrotId);
     zdarzenie(database, zwrotId, "korekta", `Korekta ${dokument}`, { numer: dokument }, kto, kiedy);
     logEvent("zwrot_korekta", kto.name, null, { zwrotId, numer: dokument }, kto.id, database);
@@ -1258,7 +1265,8 @@ export function cofnijKorekte(
 
     const kiedy = teraz.toISOString();
     database.prepare(
-      "UPDATE zwrot_klienta SET korekta_numer=NULL, zamkniety_at=NULL WHERE id=?").run(zwrotId);
+      `UPDATE zwrot_klienta
+        SET korekta_numer=NULL, korekta_zrodlo=NULL, zamkniety_at=NULL WHERE id=?`).run(zwrotId);
     podnies(database, zwrotId);
     zdarzenie(database, zwrotId, "korekta_cofnieta", `Cofnięto korektę ${z.korekta_numer}`,
       { numer: z.korekta_numer }, kto, kiedy);

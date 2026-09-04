@@ -30,6 +30,12 @@ function nazwane(): Map<number, string> {
     // sprzedaż (0.53.0) — read-model sgt_sprzedaz do dopasowywania zwrotów
     [dokTypFS, "FS"],
     [dokTypPA, "PA"],
+    /* Dokumenty oddające towar na stan po zwrocie (0.201.0). Kody ze struktury
+       bazy: 6 = KFS, 14 = ZW. Bez tych dwóch wpisów korekta wpadałaby do
+       `sgt_faktura.typ` jako `TYP-6`, a filtr kandydatów na dokument sprzedaży
+       stoi właśnie na symbolu. */
+    [6, "KFS"],
+    [14, "ZW"],
   ]);
 }
 
