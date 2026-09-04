@@ -120,9 +120,13 @@ export function kandydaciFaktury(zwrotId: number, database: Db = defaultDb()): K
   const koniec = String(z.created_at).slice(0, 10);
   const poczatek = dolnaGranicaOkna(String(z.created_at), z.kupiono_at ?? null, OKNO_DNI);
 
+  /* Wyłącznie SPRZEDAŻ. Od 0.201.0 `sgt_faktura` niesie też korekty (żeby
+     automat wiedział, że towar wrócił na stan), a kandydatem na dokument
+     sprzedaży zwrotu korekta być nie może — proponowalibyśmy korektę do
+     korekty, i to człowiekowi, który ma z tego wystawić dokument. */
   const dokumenty = database.prepare(
     `SELECT dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst FROM sgt_faktura
-     WHERE data_wyst >= ? AND data_wyst <= ?`)
+     WHERE typ IN ('FS','PA') AND data_wyst >= ? AND data_wyst <= ?`)
     .all(poczatek, koniec) as Array<{
       dok_id: number; typ: string; nr_pelny: string;
       nr_oryg: string | null; zamowienie_z_uwag: string | null; data_wyst: string;
@@ -306,6 +310,105 @@ export function zwiazFakturyPewne(database: Db = defaultDb(), teraz = new Date()
       }
     } catch (e) {
       console.warn("[faktury] zwrot pominięty:", z.id, e instanceof Error ? e.message : e);
+    }
+  }
+  return powiazane;
+}
+
+/* ── Numer korekty czytany z Subiekta (0.201.0) ─────────────────────────────
+   Do tego wydania numer przepisywał człowiek. Powód był zapisany w projekcie
+   panelu: „brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ". Ten powód
+   WYGASŁ w 0.174.0 razem z read-modelem sprzedaży, a ostatnią brakującą
+   rzeczą była nazwa kolumny wskazującej dokument korygowany. Właściciel
+   sprawdził ją na bazie firmy: `dok_DoDokId`.
+
+   Automat robi DOKŁADNIE to, co przycisk: zapisuje numer i zamyka zwrot.
+   Drugiego kształtu zamkniętego zwrotu nie tworzymy — stan „numer bez
+   zamknięcia" zachowuje się w tej bazie niespójnie, bo koszyki patrzą na
+   numer, a reszta aplikacji na `zamkniety_at`.
+
+   BRAMKI SĄ TE SAME CO U CZŁOWIEKA (decyzja właściciela): werdykt i ustalona
+   kwota. Zwrot bez kwoty automat zostawia, choć korekta w Subiekcie już jest —
+   numer zapisany przed kwotą zamknąłby sprawę pieniędzy, o których nikt nie
+   zdecydował. Koszyk czeka wtedy dalej, a praca stoi w kubełku DO ZWROTU,
+   czyli tam, gdzie widzi ją człowiek.                                        */
+
+/** Kto podpisuje wiązanie w audycie. Nie człowiek — to nie on przepisał. */
+export const AUTOMAT_KOREKTY = "automat (korekta w Subiekcie)";
+
+/**
+ * Wiąże korektę z JEDNYM zwrotem. Oddaje `true`, gdy coś zapisał.
+ *
+ * Wiąże WYŁĄCZNIE pewność: dokładnie jeden dokument korygujący wskazujący
+ * dokument sprzedaży tego zwrotu. Dwie korekty do jednej faktury są zupełnie
+ * legalne (korekta częściowa i druga po niej), więc dwie to spór, nie
+ * trafienie — wtedy numer wskazuje człowiek.
+ *
+ * Reguła jest ostrzejsza niż przy wiązaniu faktury i z konkretnego powodu:
+ * zły dokument sprzedaży pokazuje złe pozycje na ekranie, a zła korekta
+ * WYPUSZCZA MM na cudzy towar.
+ */
+export function zwiazKorekte(
+  zwrotId: number, database: Db = defaultDb(), teraz = new Date(),
+): boolean {
+  const z = database.prepare(
+    `SELECT faktura_dok_id, korekta_numer, zamkniety_at, werdykt, kwota_grosze
+       FROM zwrot_klienta WHERE id=?`).get(zwrotId) as {
+      faktura_dok_id: number | null; korekta_numer: string | null;
+      zamkniety_at: string | null; werdykt: string | null; kwota_grosze: number | null;
+    } | undefined;
+  if (!z || z.faktura_dok_id === null) return false;
+  /* Wskazania człowieka nie nadpisujemy — ta sama zasada co przy fakturze. */
+  if (z.korekta_numer !== null || z.zamkniety_at !== null) return false;
+  if (z.werdykt !== "przyjety" || z.kwota_grosze === null) return false;
+
+  const korekty = database.prepare(
+    `SELECT nr_pelny FROM sgt_faktura WHERE koryguje_dok_id=? ORDER BY dok_id`)
+    .all(Number(z.faktura_dok_id)) as Array<{ nr_pelny: string }>;
+  if (korekty.length !== 1) return false;
+
+  const kiedy = teraz.toISOString();
+  database.prepare(`UPDATE zwrot_klienta
+    SET korekta_numer=?, korekta_zrodlo='subiekt', zamkniety_at=? WHERE id=?`)
+    .run(korekty[0].nr_pelny, kiedy, zwrotId);
+  /* Wersję PODNOSIMY, inaczej niż przy fakturze: tam automat dopisuje pole,
+     tu ZAMYKA zwrot. Panel trzymający starą wersję ma dostać konflikt, a nie
+     zobaczyć, że jego decyzja przepadła bez słowa. */
+  database.prepare("UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?").run(zwrotId);
+  database.prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto)
+    VALUES (?,'korekta',?,?,?,?)`).run(zwrotId, `Korekta ${korekty[0].nr_pelny}`,
+    JSON.stringify({ numer: korekty[0].nr_pelny, zrodlo: "subiekt" }), kiedy, AUTOMAT_KOREKTY);
+  logEvent("zwrot_korekta", AUTOMAT_KOREKTY, null,
+    { zwrotId, numer: korekty[0].nr_pelny, zrodlo: "subiekt" }, null, database);
+  return true;
+}
+
+/**
+ * Wiąże korekty wszystkim zwrotom, którym dokument korygujący wskazuje jedną.
+ *
+ * Idempotentne: rusza wyłącznie zwroty bez numeru, więc drugi przebieg nie ma
+ * czego zmienić. Idzie taktem, nigdy z otwarcia ekranu. Oddaje liczbę
+ * powiązanych, żeby dziennik taktu mówił, ile pracy zdjął.
+ *
+ * Zwrot idzie WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
+ * pozostałych.
+ */
+export function zwiazKorektyPewne(database: Db = defaultDb(), teraz = new Date()): number {
+  const zwroty = database.prepare(
+    `SELECT id FROM zwrot_klienta
+     WHERE korekta_numer IS NULL AND zamkniety_at IS NULL
+       AND faktura_dok_id IS NOT NULL
+       AND werdykt='przyjety' AND kwota_grosze IS NOT NULL`)
+    .all() as Array<{ id: number }>;
+
+  let powiazane = 0;
+  for (const z of zwroty) {
+    try {
+      if (transaction(database, () => zwiazKorekte(Number(z.id), database, teraz))()) {
+        powiazane++;
+      }
+    } catch (e) {
+      console.warn("[korekty] zwrot pominięty:", z.id, e instanceof Error ? e.message : e);
     }
   }
   return powiazane;

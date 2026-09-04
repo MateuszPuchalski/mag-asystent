@@ -31,11 +31,16 @@ test("kod bez nazwy dostaje własny symbol, a nie cudzy", () => {
      `else`, nie filtr. Dopisanie trzeciego typu do `DOK_TYPY_DOSTAW` dawało
      więc dokumenty pod CUDZĄ nazwą, bez jednego słowa błędu po drodze.
 
-     `TYP-14` jest brzydkie i o to chodzi: widać, że czegoś nie nazwano. */
+     `TYP-20` jest brzydkie i o to chodzi: widać, że czegoś nie nazwano.
+
+     Przykładem był kod 14, dopóki 0.201.0 nie nazwało go `ZW` — zwrot
+     detaliczny wszedł do mapy razem z automatem numerów korekt. Test pilnuje
+     ZACHOWANIA przy kodzie bez nazwy, więc przykład się zmienia, a asercja
+     nie. */
   const orig = config.mssql.dokTypyDostaw;
-  config.mssql.dokTypyDostaw = [config.mssql.dokTypFZ, 14, 20];
+  config.mssql.dokTypyDostaw = [config.mssql.dokTypFZ, 20, 22];
   try {
-    assert.deepEqual(etykietyDostaw(), ["FZ", "TYP-14", "TYP-20"]);
+    assert.deepEqual(etykietyDostaw(), ["FZ", "TYP-20", "TYP-22"]);
   } finally {
     config.mssql.dokTypyDostaw = orig;
   }

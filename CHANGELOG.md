@@ -34,6 +34,64 @@ historii nie przepisujemy.
 ---
 
 
+## 0.201.0 — 4 września 2026
+
+**[wymaga działania]** Numer korekty czyta automat z Subiekta. Biuro wystawia
+korektę i nic więcej nie robi: takt znajduje dokument, zamyka zwrot
+i wypuszcza MM koszyka czekającego od 0.200.0.
+
+Powód, dla którego to było „poza zasięgiem", wygasł dawno temu. Projekt panelu
+mówił „brak `dok_Id` sprzedaży — read-model zna tylko FZ i PZ", ale read-model
+sprzedaży wrócił w 0.174.0. Brakowało jednej nazwy: kolumny wskazującej
+dokument korygowany. Właściciel sprawdził ją na bazie firmy —
+**`dok_DoDokId`**, obok `dok_DoDokNrPelny` i `dok_DoDokDataWyst`.
+
+Nazwa zgadza się z obiektem Sfery (`DoDokumentuId`, `DoDokumentuNumerPelny`,
+`DoDokumentuDataWystawienia`). Zgodność w obie strony jest tu całym dowodem —
+w tym repo zgadnięta nazwa kosztowała cztery wydania w jeden dzień.
+
+### Wiąże wyłącznie pewność
+
+Dokładnie jedna korekta wskazująca dokument sprzedaży zwrotu. Dwie do jednej
+faktury są zupełnie legalne (korekta częściowa i druga po niej), więc dwie to
+spór, nie trafienie — wtedy numer wpisuje człowiek, jak dotąd.
+
+Reguła jest ostrzejsza niż przy wiązaniu faktury i z konkretnego powodu: zły
+dokument sprzedaży pokazuje złe pozycje na ekranie, a zła korekta **wypuszcza
+MM na cudzy towar**.
+
+### Czeka na ustaloną kwotę
+
+Decyzja właściciela. Automat nie rusza zwrotu bez werdyktu i kwoty — te same
+bramki, które ma przycisk. Numer zapisany przed kwotą zamknąłby sprawę
+pieniędzy, o których nikt nie zdecydował.
+
+Przy okazji nie powstaje stan „numer bez zamknięcia", który zachowywał się
+w tej bazie niespójnie: koszyki patrzą na numer, a reszta aplikacji na
+`zamkniety_at`.
+
+### Widać, skąd wziął się numer
+
+Nowa kolumna `korekta_zrodlo`: `subiekt` albo `reczne`. Panel pisze przy
+zamkniętym zwrocie „Znaleziona w Subiekcie" albo „Numer przepisany w panelu" —
+ta sama zasada co przy dokumencie sprzedaży. Cofnięcie działa tak samo dla
+obu: cofnięcie cudzej pomyłki nie ma być trudniejsze niż własnej.
+
+### Degradacja zamiast awarii
+
+Brak kolumny albo brak prawa do niej (SQL Server 207/230) schodzi o szczebel
+w drabince, którą import sprzedaży ma od 0.175.0. Numery przepisuje wtedy
+biuro, a `/api/health` mówi czego brakuje. Nowego GRANT-u nie trzeba —
+`GRANT SELECT` idzie na całą tabelę `dok__Dokument`.
+
+Korekty wpadają do `sgt_faktura` obok sprzedaży, ale **bez pozycji** i z filtrem
+`typ IN ('FS','PA')` przy szukaniu kandydatów: inaczej automat proponowałby
+korektę jako dokument sprzedaży zwrotu, czyli korektę do korekty.
+
+Kody typów: `6` (KFS) i `14` (ZW), oba ze struktury bazy. Czym ta firma
+księguje zwrot do paragonu — nowy `[WERYFIKUJ]` w
+`docs/subiekt-gt-struktura.md`; przestawia to `DOK_TYPY_KOREKT`.
+
 ## 0.200.0 — 4 września 2026
 
 **[wymaga działania]** MM koszyka zwrotów czeka na korekty. Zgłoszenie

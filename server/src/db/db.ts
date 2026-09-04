@@ -328,6 +328,14 @@ export function migrate(database: DatabaseSync) {
      dostawki `INSERT` z nową kolumną wywracałby pierwszą synchronizację po
      aktualizacji. */
   addColumn("sgt_faktura", "zamowienie_z_uwag", "TEXT");
+  /* Dokument korygowany (0.201.0) — ten sam powód co wyżej: read-model czyści
+     się przy imporcie, ale SCHEMAT zostaje, więc bez dostawki pierwszy INSERT
+     po aktualizacji wywróciłby synchronizację. */
+  addColumn("sgt_faktura", "koryguje_dok_id", "INTEGER");
+  /* Skąd wziął się numer korekty: `subiekt` = automat znalazł dokument
+     korygujący, `reczne` = człowiek przepisał. Ta sama zasada co przy
+     `faktura_zrodlo` — wybór człowieka nie ma udawać faktu z danych. */
+  addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do

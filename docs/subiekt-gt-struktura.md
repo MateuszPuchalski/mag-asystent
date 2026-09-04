@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało piętnaście.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało szesnaście.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -19,6 +19,10 @@ nieaktualny, bo schemat leżał już w repo od 0.151.0.
 W 0.174.0 doszedł jeden, razem z read-modelem sprzedaży: nie wiadomo, czy
 integracja tej firmy wypełnia `dok_NrPelnyOryg` i czym. Pomyłka daje pustą
 listę pewnych trafień, a nie złe dane.
+
+W 0.201.0 doszedł jeden, razem z automatem numerów korekt: nie wiadomo, czym
+ta firma księguje zwrot do paragonu. Kod `ZW` jest ze struktury, praktyka
+podmiotu nie. Pomyłka zatrzymuje koszyk, a nie wystawia złego dokumentu.
 
 W 0.187.0 doszedł jeden, przy trackingu przesyłki zwrotnej: końcówka
 `/order/carriers/{id}/tracking` jest w dokumentacji opisana przy przesyłkach
@@ -62,10 +66,27 @@ Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`.
 |---|---|
 | `tw__Towar` (dwa podkreślenia) | `tw_Id`, `tw_Symbol`, `tw_Nazwa`, `tw_PodstKodKresk`, `tw_JednMiary`, `tw_Opis`, `tw_Zablokowany`, `tw_Pole1..8` |
 | `tw_Stan` | `st_TowId`, `st_MagId`, `st_Stan`, `st_StanRez` (PK: `st_TowId`+`st_MagId`) |
-| `dok__Dokument` | `dok_Id`, `dok_Typ`, `dok_NrPelny`, `dok_NrPelnyOryg` (varchar 30, numer dokumentu oryginalnego — integracje wpisują tu numer obcy), `dok_Uwagi` (varchar 500), `dok_DataWyst`, `dok_MagId`, `dok_PlatnikId`, `dok_Status` |
+| `dok__Dokument` | `dok_Id`, `dok_Typ`, `dok_NrPelny`, `dok_NrPelnyOryg` (varchar 30, numer dokumentu oryginalnego — integracje wpisują tu numer obcy), `dok_Uwagi` (varchar 500), `dok_DataWyst`, `dok_MagId`, `dok_PlatnikId`, `dok_Status`, `dok_DoDokId` (dokument korygowany; obok `dok_DoDokNrPelny` i `dok_DoDokDataWyst`) |
 | `dok_Pozycja` | `ob_DokHanId` (→ `dok_Id` dokumentu **handlowego**), `ob_DokMagId` (→ `dok_Id` dokumentu **magazynowego**), `ob_TowId` (→ `tw_Id`), `ob_IloscMag` |
 | `kh__Kontrahent` | `kh_Id`, `kh_Symbol` |
 | `sl_Magazyn` | `mag_Id`, `mag_Symbol`, `mag_Nazwa` — nazwy magazynów na karcie towaru |
+
+## Korekta wskazuje dokument korygowany — `dok_DoDokId`
+
+Trójka kolumn: `dok_DoDokId`, `dok_DoDokNrPelny`, `dok_DoDokDataWyst`.
+Sprawdzone na bazie firmy, nie zgadnięte — i potwierdzone z drugiej strony:
+obiekt Sfery ma dokładnie `DoDokumentuId`, `DoDokumentuNumerPelny`
+i `DoDokumentuDataWystawienia`. Zgodność w obie strony jest tu całym dowodem.
+
+Po `dok_DoDokId` automat znajduje korektę do zwrotu i zamyka go bez
+przepisywania numeru ręką (0.201.0). Dokument sprzedaży ma tam pusto albo zero;
+zero traktujemy jak brak, bo jako identyfikator wiązałoby korekty z niczym.
+
+`[WERYFIKUJ]` **Czym firma księguje zwrot do paragonu.** Kod `14-ZW` jest ze
+struktury, ale praktyka podmiotu nią nie jest: sprzedaż paragonowa bywa
+korygowana `PAk`, `ZW` albo `ZWn`, a to zmienia listę `DOK_TYPY_KOREKT`.
+Pomyłka daje koszyk czekający na korektę, która w oczach aplikacji nie
+istnieje — czyli zatrzymanie, nie zły dokument.
 
 ## Numer obcy na dokumencie sprzedaży — arytmetyka, nie domysł
 

@@ -1313,6 +1313,10 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   faktura_at TEXT, faktura_przez TEXT,
   korekta_queue_id INTEGER REFERENCES sfera_queue(id),
   korekta_numer TEXT,
+  -- `subiekt` = automat znalazł dokument korygujący, `reczne` = człowiek
+  -- przepisał numer. Bez CHECK: kolumna dochodzi migracją do istniejących baz,
+  -- a ALTER TABLE w SQLite nie umie dołożyć ograniczenia.
+  korekta_zrodlo TEXT,
   zamkniety_at TEXT,
   -- Ocena towaru wraca z hali. `zadanie_terenowe` niesie ją w `wynik`;
   -- tu stoi samo powiązanie, żeby oś zwrotu miała po czym trafić do zadania.
@@ -1719,6 +1723,10 @@ CREATE TABLE IF NOT EXISTS sgt_faktura (
   -- wywracałby start na bazie sprzed 0.175.0 (ta sama mina co przy
   -- `ix_conversation_mention_user`). Dopasowanie i tak czyta okno dat.
   zamowienie_z_uwag TEXT,
+  -- Dokument KORYGOWANY (`dok__Dokument.dok_DoDokId`, 0.201.0). Niepuste tylko
+  -- na korektach; po nim automat wiąże korektę ze zwrotem. Bez indeksu z tego
+  -- samego powodu co przy `zamowienie_z_uwag` — kolumna dochodzi migracją.
+  koryguje_dok_id INTEGER,
   data_wyst TEXT NOT NULL            -- ISO date
 );
 CREATE INDEX IF NOT EXISTS ix_faktura_data ON sgt_faktura(data_wyst);

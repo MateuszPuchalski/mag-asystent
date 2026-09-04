@@ -279,6 +279,33 @@ export const config = {
      * Puste = świadoma rezygnacja; wtedy zostaje dopasowanie po pozycjach.
      */
     fakturyNrOrygColumn: process.env.MSSQL_SPRZEDAZ_NR_ORYG_COLUMN ?? "dok_NrPelnyOryg",
+    /**
+     * Kolumna `dok__Dokument` wskazująca dokument KORYGOWANY.
+     *
+     * Nazwa sprawdzona na bazie firmy (0.201.0), nie zgadnięta: trójka
+     * `dok_DoDokId` / `dok_DoDokNrPelny` / `dok_DoDokDataWyst` odpowiada
+     * właściwościom obiektu Sfery (`DoDokumentuId`, `DoDokumentuNumerPelny`,
+     * `DoDokumentuDataWystawienia`). Zgodność w obie strony jest tu całym
+     * dowodem — w tym repo zgadnięta nazwa kosztowała już cztery wydania.
+     *
+     * Puste = automat numerów korekt wyłączony; biuro przepisuje je ręką, jak
+     * przed 0.201.0. Tak samo działa brak kolumny albo brak prawa do niej:
+     * import sprzedaży schodzi wtedy o szczebel niżej, zamiast się wywrócić.
+     */
+    korektaColumn: process.env.MSSQL_KOREKTA_COLUMN ?? "dok_DoDokId",
+    /**
+     * Kody `dok_Typ` dokumentów, które ODDAJĄ TOWAR NA STAN po zwrocie.
+     *
+     * Domyślnie `6` (KFS — korekta faktury sprzedaży) i `14` (ZW — zwrot
+     * detaliczny), oba ze struktury bazy 1.8731.31.6933
+     * (`docs/subiekt-gt-struktura.md`). Lista, a nie para, bo praktyka
+     * podmiotu bywa inna niż kod ze struktury: firma księgująca zwroty do
+     * paragonu inaczej przestawia to jedną wartością w `wertis.env`.
+     */
+    dokTypyKorekt: (process.env.DOK_TYPY_KOREKT ?? "6,14")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
   },
 
   /**

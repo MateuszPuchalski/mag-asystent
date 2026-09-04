@@ -99,14 +99,26 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte,
 
   return <div className={ramka}>
     {zwrot.korektaNumer
-      ? <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-slate-500">Korekta</span>
-          <b className="mr-auto">{zwrot.korektaNumer}</b>
-          {/* §25a.5: cofnięcie zamiast potwierdzenia — numer przepisano ręką. */}
-          <Przycisk disabled={trwa} onClick={onCofnijKorekte}>
-            <kbd className="rounded border border-slate-300 px-1 text-xs">R</kbd> Cofnij korektę
-          </Przycisk>
-        </div>
+      ? <>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-slate-500">Korekta</span>
+            <b className="mr-auto">{zwrot.korektaNumer}</b>
+            {/* Cofnięcie zamiast potwierdzenia (§25a.5) — i tak samo dostępne
+                dla numeru znalezionego przez automat: cofnięcie cudzej pomyłki
+                nie ma być trudniejsze niż cofnięcie własnej. */}
+            <Przycisk disabled={trwa} onClick={onCofnijKorekte}>
+              <kbd className="rounded border border-slate-300 px-1 text-xs">R</kbd> Cofnij korektę
+            </Przycisk>
+          </div>
+          {/* Skąd wziął się numer, jest częścią informacji — ta sama zasada co
+              przy dokumencie sprzedaży (§4.3). Fakt z danych nie ma udawać
+              czyjejś decyzji, a decyzja nie ma udawać faktu. */}
+          <p className="mt-0.5 text-xs text-slate-500">
+            {zwrot.korektaZrodlo === "subiekt"
+              ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
+              : "Numer przepisany w panelu."}
+          </p>
+        </>
       : <p className="text-xs text-slate-500">Stan końcowy — nie ma tu decyzji do podjęcia.</p>}
     {blad && <Blad>{blad}</Blad>}
   </div>;

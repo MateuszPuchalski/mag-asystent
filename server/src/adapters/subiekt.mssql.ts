@@ -144,6 +144,8 @@ interface FakturaRow {
   nr_oryg: string | null;
   /** UUID wycięty z `dok_Uwagi` po stronie SQL — patrz `subiekt.uuid.ts`. */
   zamowienie_z_uwag: string | null;
+  /** Dokument KORYGOWANY (`dok_DoDokId`) — niepuste tylko na korektach. */
+  koryguje_dok_id: number | null;
   data_wyst: string;
 }
 
@@ -220,6 +222,14 @@ export let bladImportuFaktur: string | null = null;
 export let brakKolumnyNrOryg: string | null = null;
 /** Uwagi dokumentu (`dok_Uwagi`) niedostępne — numer zamówienia z nich nie wyjdzie. */
 export let brakKolumnyUwag: string | null = null;
+/**
+ * Kolumna dokumentu korygowanego niedostępna (0.201.0).
+ *
+ * Degradacja, nie awaria: numery korekt przepisuje wtedy człowiek, dokładnie
+ * jak przed tym wydaniem. Zdanie w `/api/health` istnieje po to, żeby brak
+ * automatu nie wyglądał na zepsuty automat.
+ */
+export let brakKolumnyKorekty: string | null = null;
 
 /**
  * Dokumenty MM weszły, pozycji nie ma ani jednej.
@@ -498,7 +508,15 @@ async function pobierzFaktury(
   pool: sql.ConnectionPool
 ): Promise<{ faktury: FakturaRow[]; fakturyPozycje: PozRow[] }> {
   const c = config.mssql;
-  const gdzie = budujFiltrFaktur([c.dokTypFS, c.dokTypPA]);
+  /* Korekty jadą TYM SAMYM zapytaniem co sprzedaż (0.201.0): to ten sam
+     dokument o innym `dok_Typ`, a osobna droga znaczyłaby drugą drabinkę
+     degradacji i drugie miejsce do zapomnienia przy zmianie okna dat. */
+  const gdzie = budujFiltrFaktur([c.dokTypFS, c.dokTypPA, ...c.dokTypyKorekt]);
+  /* POZYCJE bierzemy wyłącznie ze sprzedaży. Pozycje korekty wpadłyby do
+     `nakladkaPozycji` w `services/faktury.ts` i korekta zaczęłaby się
+     pokazywać jako kandydat na dokument sprzedaży zwrotu — czyli automat
+     proponowałby korektę do korekty. */
+  const gdziePozycje = budujFiltrFaktur([c.dokTypFS, c.dokTypPA]);
   const cutoff = new Date(Date.now() - c.fakturyDniWstecz * 86400_000)
     .toISOString()
     .slice(0, 10);
@@ -509,13 +527,14 @@ async function pobierzFaktury(
      pisze go w `dok_Uwagi`, a `dok_NrPelnyOryg` zostawia pusty — więc do tego
      wydania mocny sygnał nie miał prawa zadziałać ani razu. Uwag NIE kopiujemy:
      przez SQL przechodzi wyłącznie ciąg o kształcie UUID-a (`subiekt.uuid.ts`). */
-  const zapytanie = (nrOryg: string, zUwag: string) =>
+  const zapytanie = (nrOryg: string, zUwag: string, koryguje: string) =>
     req()
       .input("uuid", sql.VarChar, WZORZEC_UUID_TSQL)
       .query<FakturaRow>(
         `SELECT d.dok_Id, d.dok_Typ, d.dok_NrPelny,
                 ${nrOryg} AS nr_oryg,
                 ${zUwag} AS zamowienie_z_uwag,
+                ${koryguje} AS koryguje_dok_id,
                 CONVERT(varchar(10), d.dok_DataWyst, 120) AS data_wyst
          FROM dok__Dokument d WITH (NOLOCK)
          WHERE ${gdzie}`
@@ -525,22 +544,32 @@ async function pobierzFaktury(
     ? `d.${assertSafeColumn(c.fakturyNrOrygColumn)}`
     : "NULL";
   const uwagi = wyrazenieUuid("d.dok_Uwagi");
+  const korekta = c.korektaColumn
+    ? `d.${assertSafeColumn(c.korektaColumn)}`
+    : "NULL";
 
   /* Drabinka degradacji. Każda z dwóch kolumn jest opcjonalna z OSOBNA:
      brak jednej nie ma prawa zabrać drugiej, a zdanie w /api/health ma nazwać
      tę, której brakuje. Próby idą od pełnej do pustej; dalej schodzi się
      wyłącznie po błędzie „nie ma takiej kolumny" (207) albo „brak uprawnienia
      do kolumny" (230) — każdy inny błąd jest awarią odczytu i leci wyżej. */
-  const proby: Array<[string, string]> = [
-    [kolumna, uwagi], [kolumna, "NULL"], ["NULL", uwagi], ["NULL", "NULL"],
-  ].filter(([a, b], i, wszystkie) =>
-    wszystkie.findIndex(([x, y]) => x === a && y === b) === i) as Array<[string, string]>;
+  const wszystkieProby: Array<[string, string, string]> = [];
+  for (const [a, b] of [[kolumna, uwagi], [kolumna, "NULL"], ["NULL", uwagi], ["NULL", "NULL"]]) {
+    for (const k of [korekta, "NULL"]) wszystkieProby.push([a, b, k]);
+  }
+  /* Kolejność: najpierw próby tracące NAJMNIEJ. Trzy osie dają osiem
+     kombinacji, ale każda kolejna ma tracić dokładnie jedną kolumnę więcej —
+     inaczej pierwsza odmowa zabierałaby przy okazji dwie pozostałe. */
+  const ile = (t: [string, string, string]) => t.filter((x) => x === "NULL").length;
+  const proby = wszystkieProby
+    .filter((t, i) => wszystkieProby.findIndex((u) => u.join("|") === t.join("|")) === i)
+    .sort((a, b) => ile(a) - ile(b));
 
   let faktury: FakturaRow[] | null = null;
-  let uzyte: [string, string] = proby[0];
+  let uzyte: [string, string, string] = proby[0];
   for (const proba of proby) {
     try {
-      faktury = (await zapytanie(proba[0], proba[1])).recordset;
+      faktury = (await zapytanie(proba[0], proba[1], proba[2])).recordset;
       uzyte = proba;
       break;
     } catch (e) {
@@ -562,7 +591,13 @@ async function pobierzFaktury(
       "z uwag dokumentu nie wchodzi i automat nie zwiąże żadnego zwrotu. Sprawdź " +
       "GRANT SELECT na dok__Dokument dla konta wertis (DEPLOY §6)."
     : null;
-  for (const zdanie of [brakKolumnyNrOryg, brakKolumnyUwag]) {
+  brakKolumnyKorekty = korekta !== "NULL" && uzyte[2] === "NULL"
+    ? `Kolumna ${korekta} nie istnieje w dok__Dokument albo konto aplikacji jej ` +
+      "nie widzi — numery korekt do zwrotów przepisuje wtedy człowiek, jak przed " +
+      "0.201.0. Sprawdź nazwę na własnej bazie i ustaw MSSQL_KOREKTA_COLUMN " +
+      "(DEPLOY §6g); puste = świadoma rezygnacja."
+    : null;
+  for (const zdanie of [brakKolumnyNrOryg, brakKolumnyUwag, brakKolumnyKorekty]) {
     if (zdanie) console.warn(`[mssql] ${zdanie}`);
   }
 
@@ -572,7 +607,7 @@ async function pobierzFaktury(
       `SELECT p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag
        FROM dok_Pozycja p WITH (NOLOCK)
        JOIN dok__Dokument d WITH (NOLOCK) ON d.dok_Id = p.ob_DokHanId
-       WHERE ${gdzie}`
+       WHERE ${gdziePozycje}`
     )
   ).recordset;
   return { faktury, fakturyPozycje };
@@ -725,8 +760,9 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa) VALUES (?,?,?,?,?)"
   );
   const insFaktura = d.prepare(
-    `INSERT INTO sgt_faktura(dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst)
-     VALUES (?,?,?,?,?,?)`
+    `INSERT INTO sgt_faktura(dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag,
+                             koryguje_dok_id, data_wyst)
+     VALUES (?,?,?,?,?,?,?)`
   );
   const insFakturaPoz = d.prepare(
     "INSERT INTO sgt_faktura_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
@@ -830,6 +866,10 @@ export async function importFromMssql(): Promise<ImportStats> {
         (f.nr_oryg ?? "").trim() || null,
         /* Druga zapora: SQL wyciął 36 znaków, JS sprawdza, że to UUID. */
         uuidZTekstu(f.zamowienie_z_uwag),
+        /* Zero traktujemy jak brak: Subiekt wpisuje `dok_DoDokId` wyłącznie na
+           korektach, a dokument sprzedaży ma tam NULL albo 0 zależnie od
+           wersji. Zero jako identyfikator wiązałoby korekty z niczym. */
+        Number(f.koryguje_dok_id ?? 0) > 0 ? Number(f.koryguje_dok_id) : null,
         f.data_wyst
       );
     }

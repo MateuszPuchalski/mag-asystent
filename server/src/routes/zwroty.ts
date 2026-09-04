@@ -4,7 +4,7 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, stanOtwartegoKosza, zamknijKosz,
+  koszykiCzekajaceNaKorekty, stanOtwartegoKosza, wypuscGotoweKoszyki, zamknijKosz,
 } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -21,7 +21,9 @@ import {
 } from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { zwiazPewne } from "../services/sygnatury.js";
-import { kandydaciFaktury, wskazFakture, zwiazFakturyPewne } from "../services/faktury.js";
+import {
+  kandydaciFaktury, wskazFakture, zwiazFakturyPewne, zwiazKorektyPewne,
+} from "../services/faktury.js";
 import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -87,7 +89,12 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
          więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
          „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu. */
-      return { pobrano, powiazano: zwiazPewne(db()), faktury: zwiazFakturyPewne(db()) };
+      /* Korekty i koszyki tą samą drogą (0.201.0): kto klika „dociągnij",
+         chce zobaczyć AKTUALNY stan, a nie jego część. */
+      const faktury = zwiazFakturyPewne(db());
+      const korekty = zwiazKorektyPewne(db());
+      wypuscGotoweKoszyki(db());
+      return { pobrano, powiazano: zwiazPewne(db()), faktury, korekty };
     } catch (e) {
       return reply.code(400).send({ error: (e as Error).message });
     }

@@ -531,6 +531,8 @@ export interface Zwrot {
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
+  /** `subiekt` = numer znaleziony w Subiekcie, `reczne` = przepisany ręką. */
+  korektaZrodlo: string | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;

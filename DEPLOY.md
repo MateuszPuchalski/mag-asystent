@@ -1592,7 +1592,23 @@ Od 0.200.0 kolejność jest wymuszona:
 Panel pokazuje przy koszyku, których korekt brakuje. Koszyk stojący ponad dobę
 wchodzi do rekoncyliacji jako `kosz_czeka_na_korekte`.
 
-**Nic nie trzeba ustawiać.** Zmiana nie ma przełącznika w `wertis.env`.
+**Numer korekty czyta automat (0.201.0).** Biuro wystawia korektę w Subiekcie
+i nic więcej nie robi: takt znajduje dokument po kolumnie `dok_DoDokId`,
+zamyka zwrot i wypuszcza MM koszyka. Pole „numer korekty" w panelu zostaje dla
+przypadków bez pewności — dwie korekty do jednej faktury albo brak wskazanego
+dokumentu sprzedaży.
+
+Automat **czeka na ustaloną kwotę**: numer zapisany przed nią zamknąłby sprawę
+pieniędzy, o których nikt nie zdecydował. Zwrot bez kwoty stoi w DO ZWROTU,
+a koszyk czeka dalej — i mówi to wprost.
+
+**Nowego GRANT-u nie trzeba**: `GRANT SELECT` z etapu 1 idzie na całą tabelę
+`dok__Dokument`. Gdyby kolumna nie istniała albo konto jej nie widziało, import
+sprzedaży schodzi szczebel niżej, `/api/health` mówi czego brakuje, a numery
+przepisuje biuro jak dotąd. Nazwę i listę typów przestawiają
+`MSSQL_KOREKTA_COLUMN` oraz `DOK_TYPY_KOREKT` (domyślnie `6,14` — KFS i ZW).
+
+**Poza tym nic nie trzeba ustawiać.** Bramka kolejności nie ma przełącznika.
 
 **Koszyki zamknięte przed aktualizacją zostają bez zmian** — mają już zadanie
 w kolejce. Jeśli któreś stoi w `pending` na towar, którego nie ma na stanie,
