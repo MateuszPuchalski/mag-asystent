@@ -148,9 +148,9 @@ Wszystko, co dotyczy COM, siedzi w **jednym pliku**
 [`src/SferaComAdapter.cs`](src/SferaComAdapter.cs) i jest oznaczone
 `[WERYFIKUJ]` (konwencja repo — wartość do potwierdzenia na własnym systemie):
 
-1. **Ustalone (0.197.2):** ProgID `"InsERT.GT"` — obiekt powstaje na maszynie
-   firmy. Zostaje **wartość liczbowa** `gtaProduktSubiekt`, ale i ją zamyka
-   sonda: czyta `ProduktNazwa` dla kolejnych numerów, bez logowania.
+1. **Zamknięte (0.197.4):** ProgID `"InsERT.GT"` działa, a `gtaProduktSubiekt`
+   to **1** — sonda odczytała `ProduktNazwa` dla kolejnych numerów.
+   Tabela w `docs/sfera-com.md` §2c.
 2. **Nazwy ustalone (0.197.2)**, sonda wypisała komplet właściwości logowania.
    Do potwierdzenia zostaje sama wartość `SFERA_AUTENTYKACJA` — mieszana kontra
    Windows. Przy mieszanej Sfera chce ZARÓWNO `Uzytkownik`/`UzytkownikHaslo`,

@@ -117,6 +117,48 @@ cyfry albo od litery `a`–`f`**. Rozwiązanie brzmi absurdalnie i takie jest �
 hasło ma się zaczynać od litery z zakresu `g`–`z`. Ten sam kod pada przy pustym
 albo błędnym loginie SQL, a tak było w pierwszym przebiegu.
 
+## 2c. `ProduktEnum` — ustalone na żywej Sferze (0.197.4)
+
+Sonda odczytała `ProduktNazwa` dla kolejnych numerów, bez logowania:
+
+| `Produkt` | nazwa |
+|---|---|
+| 1 | Subiekt |
+| 2 | Rachmistrz |
+| 3 | Rewizor |
+| 4 | Gratyfikant |
+| 5 | MikroGratyfikant |
+| 6 | Gestor |
+| 8 | nazwa nieczytelna w konsoli (polskie znaki) |
+
+Numer 7 nie oddaje nazwy, a numer 8 przyszedł jako krzaki — to strona kodowa
+konsoli, nie błąd Sfery. Sonda ustawia teraz wyjście na UTF-8.
+
+`gtaProduktSubiekt` to **1**, czyli domyślna wartość
+`SFERA_PRODUKT` była trafna. Punkt 1 listy `[WERYFIKUJ]` zamknięty.
+
+## 2d. Dwa różne kody odmowy przy `Uruchom()`
+
+Pierwsze logowanie na produkcji dało **różne kody dla dwóch wartości
+`Autentykacja`**, a ta różnica jest całą diagnozą.
+
+| `Autentykacja` | kod | co znaczy |
+|---|---|---|
+| 0 | `0x8004132B` | baza otwarta, przewróciło się URUCHOMIENIE Subiekta w tle |
+| 1 | `0x80041329` | Sfera nie weszła do bazy — login albo hasło SQL |
+
+Producent opisuje `0x8004132B` zdaniem „nie udało się uruchomić instancji
+Subiekta w tle — sprawdź dane logowania do Subiekta". To kieruje uwagę na
+**operatora**, nie na login SQL. Cztery rzeczy do sprawdzenia po kolei:
+
+1. `SFERA_OPERATOR` — dokładna nazwa operatora z Subiekta.
+2. `SFERA_OPERATOR_HASLO` — jego hasło; puste też bywa błędem.
+3. Prawo do Sfery na tym operatorze, nadawane w Subiekcie.
+4. Licencja Sfery na tym podmiocie.
+
+Wartość `0` prowadzi więc dalej niż `1` i to ona zostaje domyślna. Czy sam tryb
+w tle jest blokadą, rozstrzyga sonda uruchomiona z przełącznikiem `-ZOknem`.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.
