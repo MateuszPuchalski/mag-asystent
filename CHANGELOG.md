@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.207.0 — 5 września 2026
+
+**Nadmiar ponad fakturę wreszcie dochodzi do biura.** Od 0.64.0 licznik `+`
+w panelu odkładania idzie ponad ilość z dokumentu — po jednym potwierdzeniu, bo
+nadmiar ma trafić do biura jako zgłoszenie wobec dostawcy. Zapis mimo to ścinał
+ilość do reszty z faktury. Magazynier potwierdzał 15 przy 10 na dokumencie,
+kafel pokazywał 15, sygnał zapisu brzmiał normalnie — a na półkę szło 10 i biuro
+nie dowiadywało się o niczym. Checklista sprzętowa w `android/README.md` prosi
+o sprawdzenie, czy po zamknięciu dostawy nadmiar jest w wyjątkach; tą drogą nie
+miała prawa przejść.
+
+Winna jest jedna linia, wpisana w 0.42.0 razem z odkładaniem częściowym:
+`coerceIn(1.0, zostalo)`. Wtedy była poprawna, bo nadmiar był niedozwolony.
+Dwadzieścia dwa wydania później przestała być — i nikt tego nie zobaczył, bo
+reguła stała w ciele composable'a. Serwer nadmiar przyjmował przez cały ten czas
+(`putawayLine` nie ma górnej granicy), więc ścinał go wyłącznie kolektor.
+
+**Poprawka ilości na pozycji odłożonej w całości przestała wywalać zapis.** Ta
+sama linia: przy pozycji zamkniętej reszta wynosi zero, więc `coerceIn(1.0, 0.0)`
+rzucał wyjątek. Łapał go ten sam `catch`, co błędy sieci, i pokazywał jako „Błąd
+zapisu" — nie do odróżnienia od zerwanego Wi-Fi. Wiersz odłożony i jednocześnie
+rozwinięty zdarza się realnie: wraca się do niego po drugą półkę albo po korektę.
+
+**Trzy reguły rozkładania wyszły z ekranu do `:core`.** Ilość odłożenia, pamięć
+decyzji o rozjeździe półek i wybór wiersza, gdy ten sam towar stoi w dokumencie
+dwa razy. Każda ma teraz testy biegnące bez Android SDK — 26 nowych, razem 300.
+
+Ekran przez to nie zmalał i nie o to chodziło. Zmalała liczba miejsc, w których
+ta sama reguła może się po cichu rozjechać sama ze sobą: ilość liczy dziś JEDNA
+funkcja dla kafla, dla zapisu i dla echa bufora offline. Wcześniej liczyły ją
+trzy wyrażenia i każde znaczyło co innego.
+
+**Reszta zachowania bez zmian.** Rozjazd dalej pyta ZAMIEŃ czy DODAJ przy
+pierwszej parze półek i powtarza odpowiedź przy kolejnych pozycjach z tego
+samego kartonu. Wejście z karty towaru dalej otwiera wiersz, przy którym jest co
+robić.
+
+**Dwa wpisy w dokumentacji, oba z audytu warstw kolektora.** Komentarz nad
+`AppGraph` opisywał ViewModele i helper `viewModelFactory`, których w repo nigdy
+nie było — teraz mówi, co jest naprawdę, i nazywa granicę: reguła zasługująca na
+test wraca do `:core`. `docs/architektura.md` dostał sekcję o tym, dlaczego DTO
+z serwera SĄ modelem kolektora i dlaczego nie ma warstwy mapowania — razem
+z ceną tej decyzji.
+
 ## 0.206.0 — 5 września 2026
 
 **Zdjęcie w dostawie na kolektorze też powiększa się dotknięciem.** Dopełnienie
