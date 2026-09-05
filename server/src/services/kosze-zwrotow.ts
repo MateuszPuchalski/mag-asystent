@@ -2,6 +2,7 @@ import { logEvent } from "./events.js";
 import { transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
 import { enqueueMM } from "./queue.js";
+import { iloscLiczona } from "./ilosc-zwrotu.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką:
@@ -138,12 +139,12 @@ export function dolozDoKosza(
      powie, że do koszyka nie weszła. */
   if (magazynDocelowy(rodzaj) <= 0) return null;
   const p = database.prepare(
-    `SELECT p.id, p.tw_id, p.nazwa, p.ilosc, t.symbol
+    `SELECT p.id, p.tw_id, p.nazwa, p.ilosc, p.ilosc_zwrocona, t.symbol
        FROM zwrot_klienta_pozycja p
        LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
       WHERE p.id=?`).get(pozycjaId) as
-    { id: number; tw_id: number | null; nazwa: string; ilosc: number; symbol: string | null }
-    | undefined;
+    { id: number; tw_id: number | null; nazwa: string; ilosc: number;
+      ilosc_zwrocona: number | null; symbol: string | null } | undefined;
   if (!p || p.tw_id == null) return null;
 
   const koszId = otwartyKosz(database, kto, teraz, rodzaj);
@@ -154,12 +155,16 @@ export function dolozDoKosza(
     .get(koszId, pozycjaId) as { id: number } | undefined;
   if (stoi) return koszId;
 
+  /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0). Na dokument MM idzie
+     towar, który fizycznie leży w pudle — liczba z Allegro opisuje zamiar
+     klienta, a magazynier rozkłada sztuki. */
+  const ile = iloscLiczona(p);
   database.prepare(
     `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
      VALUES (?,?,?,?,?,?)`).run(koszId, Number(p.tw_id),
-      p.symbol ?? String(p.tw_id), p.nazwa, Number(p.ilosc), pozycjaId);
+      p.symbol ?? String(p.tw_id), p.nazwa, ile, pozycjaId);
   logEvent("kosz_zwrotow_dolozono", kto.name, null,
-    { koszId, pozycjaId, twId: Number(p.tw_id), ilosc: Number(p.ilosc) }, kto.id, database);
+    { koszId, pozycjaId, twId: Number(p.tw_id), ilosc: ile }, kto.id, database);
   return koszId;
 }
 

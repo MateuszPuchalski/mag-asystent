@@ -418,7 +418,8 @@ export type SzczegolyWysylki = {
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
-  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna";
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
+  | "rozjazd_ilosci";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -451,6 +452,12 @@ export type StanRabatu = {
 };
 
 export interface PozycjaZwrotu {
+  /**
+   * Ile sztuk NAPRAWDĘ wróciło. `null` = nikt jeszcze nie liczył (0.212.0).
+   *
+   * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
+   */
+  iloscZwrocona: number | null;
   id: number;
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
   zrodlo: string;

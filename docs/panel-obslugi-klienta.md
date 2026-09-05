@@ -1276,11 +1276,20 @@ miejsce, a MM się nie cofa jednym kliknięciem.
 i kończy; `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro. Zwrot
 domyka się korektą, ale bez zapisu, czy klient dostał pieniądze.
 
-**Rozjazd ilości nie ma gdzie zamieszkać.** Klient zgłasza dwie sztuki, wraca
-jedna — pozycji z Allegro nie da się poprawić, a kwota liczy się z deklaracji.
-Sygnał rozjazdu kwoty tego nie łapie: pozycja dołożona po wycenie ma
-`w_zwrocie = 0` i sumy nie rusza, a odróżnić jej od świadomie odznaczonej nie
-sposób, bo pozycja nie ma daty dopisania.
+**Rozjazd ilości liczy BIURO od 0.212.0.** Decyzja właściciela: „biuro zajmuje
+się otwieraniem i procesowaniem zwrotów". Przy pozycji z więcej niż jedną sztuką
+stoi „wróciło mniej, niż zgłosił"; wpisana liczba wchodzi do kwoty i na dokument
+MM, a wiersz kolejki dostaje sygnał. Puste to NIE zero: zero jest zdaniem
+„zgłosił dwie, nie wróciła żadna", puste znaczy „nikt jeszcze nie otworzył
+kartonu".
+
+Więcej niż zgłoszono odpada. Nadmiar z kartonu jest INNĄ pozycją i ma własną
+drogę (`dopiszPozycje` od 0.184.0); podniesienie liczby tutaj wypłaciłoby za
+sztuki, o których zwrocie klient nigdy nie napisał.
+
+Sygnał rozjazdu KWOTY dalej nie łapie jednego przypadku: pozycja dołożona przez
+Allegro po wycenie ma `w_zwrocie = 0` i sumy nie rusza, a odróżnić jej od
+świadomie odznaczonej nie sposób, bo pozycja nie ma daty dopisania.
 
 ### 25a.6. Zamówienie i zdjęcia
 
@@ -1857,7 +1866,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odmowa zwrotu dociera do klienta | **działa** przez ODMÓW WYPŁATY | werdykt biura jest wewnętrzny; klienta zawiadamia Allegro po zgłoszeniu odmowy wypłaty |
 | Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone |
 | Ślad po zwrocie pieniędzy przy pobraniu | **nie działa** | `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro |
-| Rozjazd ilości zgłoszonej i zwróconej | **nie działa** | pozycji z Allegro nie da się poprawić; kwota liczy się z deklaracji klienta |
+| Rozjazd ilości zgłoszonej i zwróconej | **działa** od 0.212.0 | `zapiszIloscZwrocona`, `ilosc_zwrocona`; liczy biuro przy rozpakowaniu |
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
 | Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`utylizacja` — przecena zdjęta w 0.209.0 |
 | Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |

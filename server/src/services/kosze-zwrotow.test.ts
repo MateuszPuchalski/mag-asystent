@@ -160,6 +160,19 @@ test("domknięcie kolejkuje MM z magazynu głównego na regał zwrotów", () => 
   assert.equal(Number(k.mm_queue_id), wynik.queueId);
 });
 
+test("na dokument MM idzie to, CO WRÓCIŁO, a nie deklaracja klienta (0.212.0)", () => {
+  /* Magazynier rozkłada sztuki, nie zamiary. Gdyby kosz brał deklarację,
+     dokument MM przesuwałby więcej, niż fizycznie leży w pudle. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZTowarem(d, [11], KTO);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc_zwrocona=1 WHERE id=?").run(poz[0]);
+
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  assert.equal(kosz.sztuk, 1, "zgłoszono 2, wróciła 1 — na dokument idzie 1");
+});
+
 test("BEZ MAG_ID_ODP utylizacja zachowuje się jak przed 0.211.0", () => {
   /* Ten plik biegnie bez `MAG_ID_ODP` w środowisku, więc mierzy dokładnie to,
      co zobaczy firma, która wdroży wydanie i nie ustawi numeru magazynu:

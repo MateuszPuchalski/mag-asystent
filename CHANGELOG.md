@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.212.0 — 5 września 2026
+
+**Biuro może wreszcie zapisać, ile sztuk NAPRAWDĘ wróciło.** Decyzja
+właściciela: „rozjazd ilości sprawdza biuro, biuro zajmuje się otwieraniem
+i procesowaniem zwrotów".
+
+Klient zgłasza w Allegro dwie sztuki, w kartonie przyjeżdża jedna. Do tego
+wydania nie było tego gdzie zapisać: pozycji z Allegro nie da się poprawić,
+a kwota liczyła się z DEKLARACJI klienta. Zostawało odznaczyć całą pozycję albo
+zapłacić za dwie — „wróciła jedna z dwóch" nie mieściło się w bazie.
+
+Liczba wchodzi w trzy miejsca naraz, bo wszystkie trzy mówią o tym samym
+towarze: do kwoty do oddania, na dokument MM koszyka i na wiersz kolejki jako
+sygnał. Reguła „ile sztuk liczymy" stoi w JEDNYM pliku — trzy kopie rozjechałyby
+się przy pierwszej poprawce, a rozjazd znaczyłby tu dokument na inną liczbę
+sztuk niż wypłata.
+
+**Puste to nie zero.** Zero jest zdaniem „zgłosił dwie, nie wróciła żadna";
+puste znaczy „nikt jeszcze nie otworzył kartonu" i wtedy jedyną liczbą, jaką
+mamy, jest deklaracja. Synchronizator nadpisuje deklarację przy każdym takcie
+i tej kolumny nie rusza.
+
+**Więcej niż zgłoszono odpada** — i mówi to ekran, zanim serwer odmówi. Nadmiar
+z kartonu jest inną pozycją i ma własną drogę od 0.184.0; podniesienie liczby
+tutaj wypłaciłoby za sztuki, o których zwrocie klient nigdy nie napisał.
+
+Pole otwiera się dopiero na żądanie i tylko przy pozycjach z więcej niż jedną
+sztuką — przy jednej „wróciło zero" znaczy to samo co odznaczenie, a dwie drogi
+do tej samej rzeczy kosztują namysł przy każdym wierszu.
+
 ## 0.211.0 — 5 września 2026
 
 **Utylizacja przestała być ślepym zaułkiem — towar jedzie na magazyn odpadu.**

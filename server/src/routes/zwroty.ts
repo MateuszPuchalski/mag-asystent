@@ -8,7 +8,8 @@ import {
 } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
-  potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
+  potwierdzKartoteke, rozstrzygnijZwrot, zapiszIloscZwrocona, zapiszKorekte, zapiszKwote,
+  zapiszPotracenie,
   zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
@@ -265,6 +266,24 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       if (nie) return nie;
       try {
         return usunDopisanaPozycje(db(), Number(req.params.id), Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Ile sztuk NAPRAWDĘ wróciło (0.212.0). Liczy biuro przy rozpakowaniu —
+     decyzja właściciela. Widełki i bramkę „najpierw przyjmij" zna serwis:
+     zależą od deklaracji klienta i od stanu zwrotu, a trasa żadnego z nich
+     nie zna. */
+  app.post<{ Params: { id: string }; Body: { ilosc?: number | null; wersja?: number } }>(
+    "/api/obsluga/zwroty/pozycje/:id/ilosc", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const i = req.body?.ilosc;
+      if (i !== null && i !== undefined && typeof i !== "number") {
+        return reply.code(400).send({ error: "Liczba sztuk to liczba albo brak." });
+      }
+      try {
+        return zapiszIloscZwrocona(db(), Number(req.params.id), i ?? null,
+          Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

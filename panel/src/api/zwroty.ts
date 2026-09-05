@@ -220,6 +220,26 @@ export function useKorekta() {
 }
 
 /**
+ * Ile sztuk naprawdę wróciło w kartonie (0.212.0). `null` czyści zapis.
+ *
+ * Odświeża też pasek koszyka: liczba sztuk na dokumencie MM bierze się z tej
+ * samej wartości, więc licznik przy koszu musi ruszyć razem z nią.
+ */
+export function useIloscZwrocona() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; ilosc: number | null; wersja: number }) =>
+      api<{ wersja: number; iloscZwrocona: number | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ilosc`,
+        { method: "POST", body: JSON.stringify({ ilosc: v.ilosc, wersja: v.wersja }) }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
+  });
+}
+
+/**
  * Cofnięcie PRZYJĘCIA zwrotu — wraca do kubełka DECYZJA (0.204.0).
  */
 export function useCofnijWerdykt() {
