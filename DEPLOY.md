@@ -1807,9 +1807,10 @@ już stoi. Jeśli w `wertis.env` stoi własna wartość, to ona nadal rządzi.
 
 **Odnośniki do panelu Allegro mogą wymagać poprawki.** Adresy stron panelu
 sprzedawcy nie są przez Allegro udokumentowane, więc domyślne wzorce są
-założeniem. Kliknij w numer zwrotu i w zamówienie po wdrożeniu; gdy trafią
-w 404, popraw `ALLEGRO_PANEL_ZWROT` i `ALLEGRO_PANEL_ZAMOWIENIE`
-w `wertis.env`. Pusta wartość wyłącza odnośnik i zostawia sam tekst.
+założeniem. Wyjątkiem jest zwrot: od 0.207.0 prowadzi do Centrum Sprzedaży
+adresem podanym przez właściciela. Kliknij po wdrożeniu w numer zamówienia;
+gdy trafi w 404, popraw `ALLEGRO_PANEL_ZAMOWIENIE` w `wertis.env`. Pusta
+wartość wyłącza odnośnik i zostawia sam tekst.
 
 **Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
 Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.

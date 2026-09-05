@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  CalendarClock, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart, Undo2,
+  CalendarClock, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart,
 } from "lucide-react";
 import type { KandydatFaktury, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { Dokument, ikonaDokumentu } from "./Dokument";
@@ -108,30 +108,11 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         oświadczenia — te dwa momenty nie muszą być tym samym.</p>
     </Sekcja>
 
-    <Sekcja ikona={<Undo2 size={14} />} tytul="Zwrot">
-      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
-        <dt className="text-slate-500">Numer</dt>
-        <dd><Link href={zwrot.linkZwrotu}>{zwrot.numer ?? zwrot.externalId}</Link></dd>
-        {/* Login stoi PRZY ZWROCIE, więc widać go także wtedy, gdy zamówienia
-            jeszcze nie pobrano. To jedyna dana osobowa, którą polityka danych
-            zwrotów dopuszcza wprost — imienia Allegro tu nie podaje wcale.
-
-            WIERSZ STOI ZAWSZE (0.177.0). Do 0.176.0 znikał przy pustym polu,
-            więc na ekranie nie było ani loginu, ani śladu po nim — a właściciel
-            szukał go i nie znalazł. Puste pole ma powiedzieć, że to Allegro go
-            nie podało, a nie zostawiać ekran, który o kupującym milczy. */}
-        <dt className="text-slate-500">Kupujący</dt>
-        <dd className="flex items-center gap-1 break-all">
-          {zwrot.kupujacyLogin
-            ? <>{zwrot.kupujacyLogin}
-                <Skopiuj tekst={zwrot.kupujacyLogin} tytul="Kopiuj login kupującego" /></>
-            : <span className="text-slate-400">Allegro nie podało</span>}</dd>
-        {zwrot.przewoznik && <>
-          <dt className="text-slate-500">Przewoźnik</dt>
-          <dd>{PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</dd></>}
-      </dl>
-    </Sekcja>
-
+    {/* SEKCJI „ZWROT" TU JUŻ NIE MA (0.207.0). Numer i login kupującego stoją
+        w nagłówku sprawy, po lewej: tożsamość zwrotu czyta się jako pierwszą
+        i to ją się przepisuje, a numer stał dotąd w dwóch miejscach naraz.
+        Przewoźnik został — i przeniósł się do PACZKI ZWROTNEJ, bo mówi
+        o paczce, nie o zwrocie jako sprawie. */}
     <Sekcja ikona={<ShoppingCart size={14} />} tytul="Zamówienie">
       {!zam
         ? <>
@@ -257,6 +238,10 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           </>
         : <p className="font-semibold text-ranga-uwaga">
             Klient nie nadał jeszcze paczki, a termin biegnie.</p>}
+      {/* Przewoźnik mówi o PACZCE, nie o zwrocie jako sprawie — do 0.206.0
+          stał w sekcji „Zwrot" razem z numerem i loginem. */}
+      {zwrot.przewoznik && <p className="mt-1 text-slate-600">
+        Przewoźnik: {PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</p>}
       <p className="mt-2 text-xs text-slate-500">
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>

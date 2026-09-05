@@ -40,3 +40,31 @@ test("wzorzec z konfiguracji rządzi w całości, razem z hostem", () => {
     "https://allegro.pl.allegrosandbox.pl/x/7"
   );
 });
+
+/* ── Zakres dat w adresie Centrum Sprzedaży (0.207.0) ───────────────────────
+   Lista zwrotów filtruje po zakresie, więc numer w `search` sam nie wystarcza:
+   zwrot spoza okna nie pokaże się mimo trafionego numeru.                   */
+
+const CENTRUM = "https://salescenter.allegro.com/returns?page=1&limit=25&from={od}&search={id}";
+
+test("data zgłoszenia wchodzi w zakres i jest zakodowana", () => {
+  assert.equal(
+    zWzorca(CENTRUM, "N4QZ/2026", "2026-08-20T00:00:00.000Z"),
+    "https://salescenter.allegro.com/returns?page=1&limit=25" +
+    "&from=2026-08-20T00%3A00%3A00.000Z&search=N4QZ%2F2026"
+  );
+});
+
+test("brak daty zostawia zakres PUSTY, nie goły znacznik", () => {
+  /* `from={od}` wysłane dosłownie byłoby błędem po tamtej stronie; bez
+     wartości lista pokazuje własne domyślne okno. */
+  assert.equal(
+    zWzorca(CENTRUM, "abc"),
+    "https://salescenter.allegro.com/returns?page=1&limit=25&from=&search=abc"
+  );
+});
+
+test("wzorzec bez znacznika daty działa dalej — sandboks go nie ma", () => {
+  assert.equal(zWzorca(WZOR, "abc", "2026-08-20T00:00:00.000Z"),
+    "https://allegro.pl/moje-allegro/sprzedaz/zwroty/abc");
+});
