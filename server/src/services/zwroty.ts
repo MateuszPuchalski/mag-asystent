@@ -743,6 +743,62 @@ export function rozstrzygnijZwrot(
 }
 
 /**
+ * Cofa PRZYJĘCIE zwrotu — wraca do kubełka DECYZJA (0.204.0).
+ *
+ * Trzeci i ostatni szczebel drabiny z §25a.5. Zgłoszenie właściciela: „gdy
+ * kliknę przyjęcie zwrotu, na DO OCENY nie mogę tego cofnąć". Przyjęcie idzie
+ * JEDNYM kliknięciem, bez pytania o nic — i tak ma zostać, bo tak wygląda
+ * typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną,
+ * inaczej cena pomyłki jest wyższa niż cena pytania, którego celowo nie ma.
+ *
+ * ODMOWY NIE COFAMY. Idzie do Allegro jako oświadczenie wobec klienta i drugiej
+ * takiej samej nie da się złożyć (422) — dlatego to ona ma potwierdzenie
+ * w formie wpisanego powodu, a nie cofnięcie.
+ *
+ * OCENA MUSI ZEJŚĆ PIERWSZA. Schodzi się po JEDNYM szczeblu: gdyby cofnięcie
+ * werdyktu czyściło przy okazji oceny, kasowałoby wpisy, których nikt o to nie
+ * prosił — a przy pozycji z zamkniętego koszyka rozjechałoby papier
+ * z zawartością, czyli obeszłoby bramkę z `ocenPozycje`. Zwrot z ustaloną
+ * kwotą jest tym samym przypadkiem: kwota bez kompletu ocen nie istnieje.
+ */
+export function cofnijWerdykt(
+  database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
+  teraz = new Date(),
+): { wersja: number } {
+  return transaction(database, () => {
+    const z = podKlucz(database, zwrotId, wersja);
+    if (!z.werdykt) throw new Error("Ten zwrot nie ma jeszcze werdyktu");
+    if (z.werdykt === "odrzucony") {
+      throw new Error(
+        "Odmowy zwrotu nie cofam — poszła do klienta jako oświadczenie i drugiej " +
+        "takiej samej Allegro nie przyjmie.");
+    }
+    const pieniadze = database.prepare(
+      "SELECT zwrot_pieniedzy_id FROM zwrot_klienta WHERE id=?")
+      .get(zwrotId) as { zwrot_pieniedzy_id: string | null };
+    if (pieniadze.zwrot_pieniedzy_id) {
+      throw new Error("Pieniądze zostały już oddane — przyjęcia nie cofam.");
+    }
+    const ocenione = Number((database.prepare(
+      `SELECT COUNT(*) AS n FROM zwrot_klienta_pozycja
+        WHERE zwrot_id=? AND ocena IS NOT NULL`).get(zwrotId) as { n: number }).n);
+    if (ocenione > 0) {
+      throw new Error(`Najpierw cofnij oceny (${ocenione}) — przyjęcie jest pod nimi.`);
+    }
+
+    const kiedy = teraz.toISOString();
+    database.prepare(`UPDATE zwrot_klienta
+      SET werdykt=NULL, werdykt_at=NULL, werdykt_przez=NULL, werdykt_user_id=NULL,
+          werdykt_powod=NULL
+      WHERE id=?`).run(zwrotId);
+    podnies(database, zwrotId);
+    zdarzenie(database, zwrotId, "werdykt_cofniety", "Cofnięto przyjęcie zwrotu", {}, kto, kiedy);
+    logEvent("zwrot_werdykt_cofniety", kto.name, null, { zwrotId }, kto.id, database);
+    return { wersja: wersja + 1 };
+  })();
+}
+
+/**
  * Ocena towaru: na stan, na przecenę albo do utylizacji. `null` cofa ocenę.
  *
  * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW (0.192.0) — bez

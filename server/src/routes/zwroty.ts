@@ -7,7 +7,7 @@ import {
   koszykiCzekajaceNaKorekty, stanOtwartegoKosza, wypuscGotoweKoszyki, zamknijKosz,
 } from "../services/kosze-zwrotow.js";
 import {
-  bilansKartotek, cofnijKorekte, cofnijKwote, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszKorekte, zapiszKwote, zapiszPotracenie,
   zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
@@ -150,6 +150,19 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return rozstrzygnijZwrot(db(), Number(req.params.id), d,
           req.body?.powod ?? null, Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Cofnięcie PRZYJĘCIA (0.204.0). Osobna trasa, nie `werdykt` z pustą
+     decyzją: ta przyjmuje wyłącznie dwie wartości i ma tak zostać, żeby
+     literówka w ciele nie wyzerowała werdyktu po cichu. Bramki — odmowa,
+     oddane pieniądze, ustawione oceny — zna serwis, nie trasa. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/werdykt/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return cofnijWerdykt(db(), Number(req.params.id), Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
 

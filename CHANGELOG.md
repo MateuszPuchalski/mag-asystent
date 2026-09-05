@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.204.0 — 4 września 2026
+
+**Cofnięcie przyjęcia zwrotu — ostatni szczebel drabiny z §25a.5.** Zgłoszenie
+właściciela: „gdy kliknę przyjęcie zwrotu, na DO OCENY nie mogę tego cofnąć".
+
+Przyjęcie idzie jednym kliknięciem, bez pytania o nic, i tak zostaje — tak
+wygląda typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną,
+inaczej cena pomyłki jest wyższa niż cena pytania, którego celowo nie ma.
+
+Klawisz stoi w kubełku DO OCENY i pokazuje się TYLKO wtedy, gdy nikt jeszcze
+nic nie ocenił. To jedno zdanie, nie ramka z decyzją: pytanie tego ekranu dalej
+zadaje wiersz produktu. Po pierwszej ocenie klawisz znika, bo schodzi się po
+jednym szczeblu — ocena jest szczebel niżej i ma własne cofnięcie.
+
+Trzy rzeczy zatrzymują cofnięcie, każda z innego powodu. **Ustawione oceny** —
+cofnięcie werdyktu, które czyściłoby je przy okazji, kasowałoby wpisy, o które
+nikt nie prosił, a przy pozycji z zamkniętego koszyka obeszłoby bramkę
+z 0.202.0. **Oddane pieniądze** — wyszły do klienta. **Odmowa zwrotu** — poszła
+jako oświadczenie i drugiej takiej samej Allegro nie przyjmie; dlatego to ona
+ma potwierdzenie w formie wpisanego powodu.
+
 ## 0.203.0 — 4 września 2026
 
 **Zdjęcia tam, gdzie zapada decyzja o części — i hierarchia, która ją skraca.**

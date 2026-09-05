@@ -1222,6 +1222,7 @@ wprowadził. Schodzi się po jednym szczeblu, tą samą drogą, którą się wes
 | ZAMKNIĘTY | cofnij korektę | DO KOREKTY |
 | DO KOREKTY | popraw kwotę | DO ZWROTU |
 | DO ZWROTU, DO OCENY | cofnij ocenę | DO OCENY |
+| DO OCENY, nic nieocenione | cofnij przyjęcie | DECYZJA |
 
 Dwóch szczebli naraz nie trzeba zabraniać — sam kształt na to nie pozwala.
 Kubełek wynika ze stanu, a bramka wersji odrzuca zwrot zamknięty, więc kwoty
@@ -1239,6 +1240,15 @@ Dwie rzeczy cofnięcia NIE mają, i obie mówią, dlaczego:
   dokumencie.
 - **Kwota, przeciw której poszły pieniądze.** Wiersz zwrotu płatności jest
   jedynym śladem po przelewie. Różnicę dopłaca się w panelu Allegro.
+- **Odmowa zwrotu.** Poszła do klienta jako oświadczenie, a drugiej takiej
+  samej Allegro nie przyjmie (422). Dlatego to ona ma potwierdzenie w formie
+  wpisanego powodu — cofnięcie ma przyjęcie, nie ona.
+
+Cofnięcie przyjęcia jest ostatnim szczeblem i pokazuje się TYLKO wtedy, gdy
+nikt jeszcze nic nie ocenił. To jedno zdanie w kubełku DO OCENY, nie ramka
+z decyzją: pytanie tego ekranu dalej zadaje wiersz produktu. Przyjęcie idzie
+jednym kliknięciem, bez pytania o nic — i tak zostaje, bo tak wygląda typowy
+zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną.
 
 ### 25a.6. Zamówienie i zdjęcia
 

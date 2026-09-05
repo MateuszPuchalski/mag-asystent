@@ -39,7 +39,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
 const pasek = (z: Zwrot, h: Partial<Parameters<typeof Decyzje>[0]> = {}) =>
   render(<Decyzje zwrot={z} onWerdykt={vi.fn()}
     onKorekta={vi.fn()} onCofnijKorekte={vi.fn()} onCofnijKwote={vi.fn()}
-    trwa={false} blad="" {...h} />);
+    onCofnijWerdykt={vi.fn()} trwa={false} blad="" {...h} />);
 
 describe("Decyzje zwrotu", () => {
   it("przyjęcie idzie jednym kliknięciem, bez pytania o nic", () => {
@@ -79,6 +79,43 @@ describe("Decyzje zwrotu", () => {
     expect(container).toBeEmptyDOMElement();
     const drugi = pasek(zwrot({ kubelek: "zwrot" }));
     expect(drugi.container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Cofnięcie przyjęcia (0.204.0)", () => {
+  /* Przyjęcie idzie jednym kliknięciem, bez pytania o nic — i tak ma zostać.
+     Kliknięcie bez pytania musi jednak mieć drogę powrotną. */
+  /* Pozycje BEZ oceny — fabryka `zwrot()` daje je ocenione, a tu chodzi
+     dokładnie o chwilę tuż po kliknięciu „Przyjmij". */
+  const doOceny = (n: Partial<Zwrot> = {}) => {
+    const z = zwrot({ kubelek: "ocena", werdykt: "przyjety", ...n });
+    z.pozycje = z.pozycje.map((p) => ({ ...p, ocena: null }));
+    return z;
+  };
+
+  it("świeżo przyjęty zwrot daje się cofnąć jednym zdaniem, nie ramką", async () => {
+    const onCofnijWerdykt = vi.fn();
+    pasek(doOceny(), { onCofnijWerdykt });
+    expect(screen.getByText(/Zwrot przyjęty/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /cofnij przyjęcie/i }));
+    expect(onCofnijWerdykt).toHaveBeenCalled();
+  });
+
+  it("po pierwszej ocenie klawisz znika — schodzi się po JEDNYM szczeblu", () => {
+    /* Serwer odmówiłby („najpierw cofnij oceny"), a przycisk, po którym zawsze
+       przychodzi błąd, uczy ignorować komunikaty. */
+    const z = doOceny();
+    z.pozycje = [{ ...z.pozycje[0], ocena: "stan" }, ...z.pozycje.slice(1)];
+    pasek(z);
+    expect(screen.queryByRole("button", { name: /cofnij przyjęcie/i })).toBeNull();
+  });
+
+  it("w kubełku DO ZWROTU paska nie ma wcale", () => {
+    /* Wszystko ocenione, więc cofnięcie werdyktu i tak by odpadło; pytanie
+       tego ekranu zadaje wiersz produktu. */
+    const { container } = pasek(zwrot({ kubelek: "zwrot", werdykt: "przyjety" }));
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

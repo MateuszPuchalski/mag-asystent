@@ -163,7 +163,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają dziewiętnaście tras POST, a trzy z nich wychodzą do Allegro", async () => {
+test("zwroty mają dwadzieścia tras POST, a trzy z nich wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -229,7 +229,14 @@ test("zwroty mają dziewiętnaście tras POST, a trzy z nich wychodzą do Allegr
      odpowiedzią, jest scenariuszem normalnym. Nowy identyfikator przy drugiej
      próbie oddałby pieniądze dwa razy.
 
-     DZIEWIĘTNASTA COFA USTALONĄ KWOTĘ (0.202.0). Do tego wydania kwota była
+     DWUDZIESTA COFA PRZYJĘCIE ZWROTU (0.204.0) i domyka drabinę z §25a.5.
+     Przyjęcie idzie jednym kliknięciem, bez pytania o nic — i tak ma zostać,
+     bo tak wygląda typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę
+     powrotną. Osobna trasa, a nie `werdykt` z pustą decyzją: tamta przyjmuje
+     wyłącznie dwie wartości, żeby literówka w ciele nie wyzerowała werdyktu.
+     ODMOWY nie cofa nic — poszła do klienta jako oświadczenie.
+
+          DZIEWIĘTNASTA COFA USTALONĄ KWOTĘ (0.202.0). Do tego wydania kwota była
      wyjęta z obietnicy §25a.5 („reszta ma cofnięcie"): nadpisać dawało się ją
      tylko w kubełku DO ZWROTU, a zapis natychmiast z niego wyprowadzał.
      Bramki stoją w serwisie, nie tutaj, bo zależą od stanu zwrotu: oddane
@@ -253,7 +260,7 @@ test("zwroty mają dziewiętnaście tras POST, a trzy z nich wychodzą do Allegr
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 19, `tras POST jest ${posty.length}, a umowa mówi o dziewiętnastu`);
+  assert.equal(posty.length, 20, `tras POST jest ${posty.length}, a umowa mówi o dwudziestu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
@@ -503,6 +510,44 @@ test("MM wypuszczone przez automat NIE dostaje konta klikającego człowieka", a
   assert.match(q[0].created_by, /automat/);
   assert.equal(q[0].tw_id, null, "MM na bufor jest wielopozycyjne — guard go nie dotyczy");
   assert.ok((JSON.parse(q[0].payload) as { items: unknown[] }).items.length >= 1);
+});
+
+test("przyjęcie da się cofnąć przez HTTP, dopóki nikt nic nie ocenił", async () => {
+  const { naglowki } = login("biuro", "Ala z biura");
+  const wersja = () => (db().prepare("SELECT wersja FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { wersja: number }).wersja;
+  const pozycja = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+  const kubelek = async () => (await app.inject(
+    { method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki })).json().zwrot.kubelek;
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(await kubelek(), "ocena");
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(await kubelek(), "decyzja", "wraca tam, gdzie zapada werdykt");
+
+  /* Po ocenie odmawia — schodzi się po jednym szczeblu. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
+    headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
+    headers: naglowki, payload: { ocena: "przecena", wersja: wersja() } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const poOcenie = await app.inject({ method: "POST",
+    url: `/api/obsluga/zwroty/${zwrot}/werdykt/cofnij`,
+    headers: naglowki, payload: { wersja: wersja() } });
+  assert.equal(poOcenie.statusCode, 400, poOcenie.body);
+  assert.match(poOcenie.json().error, /cofnij oceny/);
+  /* Jedyna pozycja jest oceniona, więc kubełek to już DO ZWROTU. Sprawdzamy
+     WERDYKT, bo to on jest przedmiotem odmowy. */
+  assert.equal((db().prepare("SELECT werdykt FROM zwrot_klienta WHERE id=?")
+    .get(zwrot) as { werdykt: string }).werdykt, "przyjety", "odmowa niczego nie zmienia");
 });
 
 test("kwotę da się cofnąć przez HTTP i zapisać inną", async () => {

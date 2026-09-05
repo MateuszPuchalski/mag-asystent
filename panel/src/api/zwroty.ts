@@ -218,6 +218,19 @@ export function useKorekta() {
 }
 
 /**
+ * Cofnięcie PRZYJĘCIA zwrotu — wraca do kubełka DECYZJA (0.204.0).
+ */
+export function useCofnijWerdykt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/werdykt/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
  * Cofnięcie ustalonej kwoty — zwrot wraca do DO ZWROTU (0.202.0).
  *
  * Odświeża kolejkę tak samo jak zapis kwoty: kubełek zwrotu się zmienia, więc
