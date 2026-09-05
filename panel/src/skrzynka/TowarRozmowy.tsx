@@ -4,8 +4,7 @@ import type { KartaTowaru, OfertaRozmowy } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
-import { Zdjecie } from "../towar/Zdjecie";
-import { Powiekszenie } from "../towar/Powiekszenie";
+import { Kafel } from "../towar/Kafel";
 
 /**
  * Towar z Subiekta przy rozmowie (0.179.0).
@@ -30,7 +29,6 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
   onWstawDoSzkicu?: (tresc: string) => void;
 }) {
   const [szukam, setSzukam] = useState(false);
-  const [powiekszone, setPowiekszone] = useState(false);
   const zapisz = useWskazKartoteke();
   const k = oferta.kartoteka;
   /* Potwierdzona jest wtedy, gdy stoi za nią człowiek — pamięć wskazań.
@@ -60,9 +58,9 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
 
     {potwierdzona !== null
       ? <>
-          <div className="flex gap-3">
-            <Zdjecie twId={potwierdzona} rozmiar={72} nazwa={k.symbol ?? ""}
-              onKlik={() => setPowiekszone(true)} />
+          <div className="flex items-start gap-3">
+            <Kafel twId={potwierdzona} rozmiar={72} nazwa={karta.data?.name ?? k.symbol ?? ""}
+              symbol={k.symbol} />
             <div className="min-w-0">
               <p className="text-sm font-semibold">{karta.data?.name ?? k.symbol}</p>
               <p className="mt-0.5 font-mono text-xs text-slate-600">{k.symbol}</p>
@@ -92,20 +90,28 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
               className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
               Wstaw parametry do szkicu</button>}
           </>}
-
-          {powiekszone && <Powiekszenie twId={potwierdzona} nazwa={karta.data?.name ?? ""}
-            symbol={k.symbol ?? ""} zamknij={() => setPowiekszone(false)} />}
         </>
       : <div className="text-xs">
           {k.twId !== null
             /* Propozycja nie udaje faktu — mówi, skąd się wzięła, i czeka na
-               zatwierdzenie (§4.3, §11.3). */
-            ? <div className="flex flex-wrap items-center gap-2 text-amber-800">
-                <span>Propozycja: <b>{k.symbol}</b>
-                  <span className="text-slate-500"> · {k.zrodlo}</span></span>
-                <button type="button" disabled={zapisz.isPending} onClick={() => ustaw(k.twId)}
-                  className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-                  <Check size={12} />Zatwierdź</button>
+               zatwierdzenie (§4.3, §11.3).
+
+               Zdjęcie przy PROPOZYCJI (0.203.0). Do 0.202.0 kafel dostawała
+               wyłącznie kartoteka potwierdzona — czyli ta, przy której nikt
+               już niczego nie rozstrzyga. Propozycja automatu jest dokładnie
+               tym miejscem, gdzie człowiek decyduje, i decydował po samym
+               symbolu: „FTC272" nie mówi, czy to podkładka, czy szarpak.
+               Zdjęcie zamienia zatwierdzenie w spojrzenie. */
+            ? <div className="flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                <Kafel twId={k.twId} rozmiar={56} nazwa={k.symbol ?? "Propozycja kartoteki"}
+                  symbol={k.symbol} />
+                <div className="min-w-0 flex-1 text-amber-900">
+                  <p>Propozycja: <b className="font-mono text-sm">{k.symbol}</b></p>
+                  <p className="mt-0.5 text-slate-500">{k.zrodlo}</p>
+                  <button type="button" disabled={zapisz.isPending} onClick={() => ustaw(k.twId)}
+                    className="mt-1.5 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+                    <Check size={12} />Zatwierdź</button>
+                </div>
               </div>
             /* POWÓD, nie samo „bez kartoteki": „oferty jeszcze nie pobrano"
                naprawi się samo w kilka minut, a „oferta bez SKU" nigdy. */

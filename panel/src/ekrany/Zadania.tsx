@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { useNoweZadanie, useZadania } from "../api/rozmowy";
 import { Blad, Karta, Przycisk, Pusto, czas } from "../ui";
+import { Kafel } from "../towar/Kafel";
 
 const Schemat = z.object({
   rodzaj: z.enum(["pomiar", "zdjecie", "weryfikacja", "inne"]),
@@ -112,9 +113,24 @@ export function Zadania() {
             <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{t.instrukcja}</p>
           </div>
         </div>
-        {t.symbol && <div className="border-y bg-slate-50 px-5 py-3 text-sm">
-          <b>{t.symbol}</b> · {t.nazwaTowaru}
-          <div className="text-slate-500">Lokalizacja: {t.lokalizacja || "brak"}</div>
+        {/* ── PASEK TOWARU ZE ZDJĘCIEM (0.203.0) ────────────────────────
+            Zadanie terenowe zleca się na konkretną kartotekę, a kafelek
+            mówił o niej symbolem i nazwą w jednej linijce. Biuro zleca
+            pomiary seriami i wraca do tego ekranu po wyniki — wtedy pytanie
+            brzmi „które to było", a odpowiada na nie kształt części.
+            Kolektor pokazuje zdjęcie przy zadaniu od dawna (§ zadania
+            terenowe); ekran zlecającego był jedynym końcem tej pary bez
+            obrazu.
+
+            Nazwa idzie przed symbolem, jak w wyszukiwarce: to ona wraca
+            w rozmowie z magazynem. */}
+        {t.symbol && <div className="flex items-center gap-3 border-y bg-slate-50 px-5 py-3 text-sm">
+          <Kafel twId={t.twId} rozmiar={48} nazwa={t.nazwaTowaru ?? t.symbol} symbol={t.symbol} />
+          <div className="min-w-0">
+            <div className="truncate font-semibold">{t.nazwaTowaru}</div>
+            <div className="truncate font-mono text-xs text-slate-600">{t.symbol}</div>
+            <div className="text-xs text-slate-500">Lokalizacja: {t.lokalizacja || "brak"}</div>
+          </div>
         </div>}
         <div className="space-y-2 p-5 text-sm">
           {t.przypisanoPrzez && <p><Clock className="mr-2 inline" size={15} />

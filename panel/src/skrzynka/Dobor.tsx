@@ -10,6 +10,7 @@ import {
 } from "../api/rozmowy";
 import { Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
+import { Kafel } from "../towar/Kafel";
 import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_POWODU } from "./statusy";
 
 /**
@@ -223,20 +224,45 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
           const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
           return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
             ? "border-wertis-amber bg-amber-50" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
-            <div className="flex items-center gap-2">
-              <span className="grid h-5 w-5 place-items-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">{k.nr}</span>
-              <b className="font-mono text-xs">{k.symbol}</b>
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
-                {PEWNOSC[k.pewnosc].etykieta}</span>
-              {k.stan === null
-                ? <span className="ml-auto text-[11px] font-bold text-slate-500">brak w kartotece</span>
-                : <span className={`ml-auto text-[11px] ${k.stan <= 0 ? "font-bold text-ranga-zle" : "text-slate-500"}`}>
-                    dostępne {k.stan}</span>}
+            {/* ── CO CZYTA SIĘ PIERWSZE (0.203.0) ─────────────────────────
+                Wiersz kandydata zaczynał się od symbolu, a nazwa leżała pod
+                nim, w tym samym rozmiarze co źródło i droga. Cztery linijki
+                jednej wagi każą przeczytać wszystkie, żeby wybrać jedną.
+
+                Dobór rozstrzyga pytanie „czy TO jest ta część", a odpowiada
+                na nie kształt przedmiotu i jego nazwa. Zdjęcie idzie więc na
+                lewo, nazwa dostaje pierwszy plan, symbol i pewność schodzą
+                do podpisu, a droga ze źródłem — na trzeci plan. Symbol
+                zostaje, bo to on jedzie na dokument i na halę.
+
+                DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY. Do 0.202.0 tylko zero
+                było czerwone, a dodatnie liczby były szare jak reszta —
+                choć „mamy 28 sztuk" kończy rozmowę z klientem jednym
+                zdaniem, a zero każe szukać dalej. */}
+            {/* `items-start`: kafle mają stać w JEDNEJ pionowej linii, bo
+                wzrok jedzie po nich w dół. Wyśrodkowane skakałyby wraz
+                z długością nazwy — a nazwa raz się łamie, raz nie. */}
+            <div className="flex items-start gap-2">
+              <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">{k.nr}</span>
+                  <b className="min-w-0 flex-1 text-sm leading-snug text-slate-900">{k.nazwa}</b>
+                  {k.stan === null
+                    ? <span className="shrink-0 text-[11px] font-bold text-slate-500">brak w kartotece</span>
+                    : <span className={`shrink-0 text-[11px] font-bold ${k.stan <= 0
+                        ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
+                    {PEWNOSC[k.pewnosc].etykieta}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
+                  {" "}{k.zrodlo}</p>
+              </div>
             </div>
-            <p className="mt-1 text-xs text-slate-700">{k.nazwa}</p>
-            <p className="mt-1 text-[11px] text-slate-500">
-              <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
-              {" "}{k.zrodlo}</p>
             {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
               <AlertTriangle size={12} />{o}</p>)}
             {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
@@ -262,14 +288,35 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
     <section className="p-3" aria-label="Wybrano">
       {dobor.wybrany
         ? <>
-            <p className="text-xs text-slate-500">Wybrano: <b className="font-mono text-slate-900">{dobor.wybrany.symbol}</b>
-              {" "}· droga: {NAZWA_DROGI[dobor.wybrany.droga]} · {dobor.wybrany.przez}
-              <button type="button" title="Zdejmij wybór" disabled={wybierz.isPending}
-                onClick={() => wybierzTowar(null, dobor.wybrany!.droga)}
-                className="ml-1 rounded p-0.5 align-middle text-slate-400 hover:bg-slate-200 hover:text-slate-700">
-                <Krzyzyk size={12} /></button></p>
-            <p className="mt-1 rounded border border-slate-200 bg-slate-50 p-2 text-xs italic text-slate-700">
-              {dobor.wybrany.zdanieDoSzkicu}</p>
+            {/* ── WNIOSEK MA WYGLĄDAĆ NA WNIOSEK (0.203.0) ─────────────────
+                Sekcja stała gołym tekstem pod listą kandydatów, w tym samym
+                rozmiarze co ich podpisy — a to jest jedyna rzecz na tej
+                zakładce, która trafi do klienta. Rama z barwą stanu oddziela
+                to, co WYBRANO, od tego, co dopiero można wybrać, i mówi bez
+                czytania, czy dobór jest już zatwierdzony.
+
+                Zdjęcie stoi tu drugi raz, choć widać je wyżej przy
+                kandydacie. Nie jest powtórzeniem: przy kandydacie odpowiada
+                na pytanie „którego wybrać", a tutaj — „czy na pewno ten
+                pojechał do odpowiedzi". Lista kandydatów bywa przewinięta
+                poza ekran, gdy agent pisze szkic. */}
+            <div className={`rounded-lg border p-2 ${dobor.status === "confirmed"
+              ? "border-emerald-300 bg-emerald-50" : "border-wertis-amber bg-amber-50"}`}>
+              <div className="flex gap-3">
+                <Kafel twId={dobor.wybrany.twId} rozmiar={56}
+                  nazwa={dobor.wybrany.symbol} symbol={dobor.wybrany.symbol} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-slate-500">Wybrano: <b className="font-mono text-sm text-slate-900">{dobor.wybrany.symbol}</b>
+                    {" "}· droga: {NAZWA_DROGI[dobor.wybrany.droga]} · {dobor.wybrany.przez}
+                    <button type="button" title="Zdejmij wybór" disabled={wybierz.isPending}
+                      onClick={() => wybierzTowar(null, dobor.wybrany!.droga)}
+                      className="ml-1 rounded p-0.5 align-middle text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                      <Krzyzyk size={12} /></button></p>
+                  <p className="mt-1 rounded border border-slate-200 bg-white p-2 text-xs italic text-slate-700">
+                    {dobor.wybrany.zdanieDoSzkicu}</p>
+                </div>
+              </div>
+            </div>
             <Dowody zastosowanie={wiedza.data?.zastosowanie ?? null} wczytuje={wiedza.isLoading} />
             <div className="mt-2 flex flex-wrap gap-2">
               <Przycisk className="text-xs" onClick={() => onZlecPomiar({
@@ -314,11 +361,17 @@ function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
     <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-900">
       <AlertTriangle size={12} />Nie pasuje do tej maszyny
       <span className="font-normal text-red-800">· ostrzeżenie, nie brak danych</span></p>
+    {/* Kafel jest MNIEJSZY niż przy kandydacie i to jest celowe: negatyw ma
+        się rzucić w oczy, gdy agent pojedzie wzrokiem po liście, ale nie ma
+        konkurować z częściami, które wolno wybrać. */}
     <ul className="divide-y divide-red-100">
-      {lista.map((n) => <li key={n.twId} className="px-2 py-1.5 text-xs">
-        <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}
-        <p className="text-red-900">{n.powod}</p>
-        <p className="text-[11px] text-slate-500">{n.zrodlo}</p>
+      {lista.map((n) => <li key={n.twId} className="flex items-start gap-2 px-2 py-1.5 text-xs">
+        <Kafel twId={n.twId} rozmiar={36} nazwa={n.nazwa ?? n.symbol} symbol={n.symbol} />
+        <div className="min-w-0 flex-1">
+          <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}
+          <p className="text-red-900">{n.powod}</p>
+          <p className="text-[11px] text-slate-500">{n.zrodlo}</p>
+        </div>
       </li>)}
     </ul>
   </div>;

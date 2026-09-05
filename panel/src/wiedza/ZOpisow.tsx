@@ -4,6 +4,7 @@ import type { ModelZOpisu } from "../api/typy";
 import { useModeleZOpisow, useOdrzucModelZOpisu, usePrzerobModelZOpisu } from "../api/wiedza";
 import { Blad, Pusto, Przycisk } from "../ui";
 import { PolaModelu, type DaneModelu } from "./PolaModelu";
+import { Kafel } from "../towar/Kafel";
 
 /**
  * „Z opisów" (E3): sekcje „Modele:" wycięte z opisów kartotek po imporcie.
@@ -53,11 +54,19 @@ function Wiersz({ m, trwa, onPrzerob, onOdrzuc }: {
   /* Bez marki i modelu przycisk stoi — pilnuje tego przycisk, nie odmowa z serwera. */
   const gotowe = Boolean(model.marka.trim() && model.nazwa.trim());
   return <li className="rounded-lg border border-slate-200 p-3" aria-label={`Z opisu: ${m.symbol}`}>
-    <div className="flex flex-wrap items-baseline gap-2">
-      <b className="font-mono">{m.symbol}</b>
-      <span className="text-sm text-slate-700">{m.nazwa ?? ""}</span>
+    {/* Zdjęcie przy wierszu (0.203.0). Człowiek ma tu wskazać markę i model
+        do listy w rodzaju „FS200 FS250", a lista nie mówi, do czego pasuje.
+        Wygląd części bywa jedyną wskazówką, czy to osprzęt kosy, czy pilarki. */}
+    <div className="flex items-start gap-3">
+      <Kafel twId={m.twId} rozmiar={40} nazwa={m.nazwa ?? m.symbol} symbol={m.symbol} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <b className="font-mono">{m.symbol}</b>
+          <span className="text-sm text-slate-700">{m.nazwa ?? ""}</span>
+        </div>
+        <p className="mt-1 rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-800">Modele: {m.tekst}</p>
+      </div>
     </div>
-    <p className="mt-1 rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-800">Modele: {m.tekst}</p>
     <div className="mt-2 space-y-2">
       <PolaModelu dane={model} onZmiana={setModel} zwarte />
       <div className="flex flex-wrap gap-2">

@@ -26,6 +26,12 @@ vi.mock("../api/rozmowy", () => ({
   usePomiarDoWiedzy: () => pomiar,
 }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
+/* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
+   dokąd go wysłać — atrapa mówi „każda kartoteka ma obraz". Dzięki temu kafle
+   renderują się jako `<img>` i widać, PRZY KTÓRYCH wierszach stoją. */
+vi.mock("../towar/useZdjecie", () => ({
+  useZdjecie: (twId: number | null) => (twId == null ? null : `blob:${twId}`),
+}));
 
 const { Dobor } = await import("./Dobor");
 
@@ -119,6 +125,30 @@ describe("zakładka doboru", () => {
     await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
     expect(status.mutate).toHaveBeenCalledWith(
       { id: 4821, status: "confirmed", brakuje: null }, expect.anything());
+  });
+
+  /* ── Zdjęcia przy doborze (0.203.0) ────────────────────────────────────
+     Dobór odpowiada na pytanie „czy TO jest ta część", a odpowiadał samym
+     symbolem i nazwą. Zdjęcie stoi w trzech miejscach tej zakładki, bo każde
+     odpowiada na inne pytanie: przy kandydacie „którego wybrać", przy
+     negatywie „czy to nie ten odrzucony", przy wyborze „co poszło do
+     odpowiedzi". Test pilnuje wszystkich trzech naraz — pojedyncze zniknięcie
+     wyglądałoby jak brak zdjęcia w kartotece, nie jak regres. */
+  it("kandydat, negatyw i wybrana kartoteka niosą zdjęcie", () => {
+    kandydaci.mockReturnValue({ isLoading: false, error: null, data: {
+      ...Z_KANDYDATAMI,
+      negatywne: [{ twId: 77, symbol: "SZR-140/82", nazwa: "Szarpak 140", powod: "niewłaściwy rozstaw",
+        zrodlo: "pomiar własny", at: "2026-09-01" }],
+    } });
+    pokaz(dobor({ status: "candidates_found", wybrany: {
+      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "",
+      zdanieDoSzkicu: "Do STIHL FS250 pasuje FTC272 — źródło: kartoteka oferty." } }));
+
+    expect(screen.getByAltText("Podkładka przekładni STIHL FS120")).toBeInTheDocument();
+    expect(screen.getByAltText("Podkładka zamienna")).toBeInTheDocument();
+    expect(screen.getByAltText("Szarpak 140")).toBeInTheDocument();
+    /* Wybrany dobór zna sam symbol — `WyborDoboru` nie niesie nazwy. */
+    expect(screen.getByAltText("FTC272")).toBeInTheDocument();
   });
 
   it("zatwierdzony dobór nie ma drugiego przycisku zatwierdzania", () => {
