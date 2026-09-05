@@ -694,6 +694,25 @@ model sesji, reguły zakładania kont i bufor offline mają testy uruchamialne
 wszędzie. To nie jest podział „bo warstwy": to jest podział przebiegający tam,
 gdzie kończy się możliwość szybkiego sprawdzenia.
 
+### DTO z serwera SĄ modelem kolektora — nie ma warstwy mapowania
+
+`core/net/Dtos.kt` to sto kilka klas `@Serializable`, importowanych wprost przez
+dwadzieścia kilka plików ekranów. Podręcznikowa warstwowość każe wstawić tu
+mapper DTO→model domenowy. Nie wstawiamy go świadomie i z jednego powodu:
+**kształt danych ma jednego właściciela, a jest nim serwer.** Mapper byłby
+drugim miejscem do zmiany przy każdym nowym polu, a drugie miejsce w tym repo
+zawsze starzeje się po cichu. Tak zestarzało się mapowanie Allegro pisane
+z pamięci — trzy wydania i jedna niema skrzynka.
+
+Cena jest realna i warto ją nazwać: zmiana kształtu odpowiedzi dotyka ekranów
+bezpośrednio, bez amortyzatora. Kupujemy za nią jedno źródło prawdy o polach
+i brak klasy, która istnieje wyłącznie po to, żeby przepisać dziesięć pól na
+dziesięć identycznych.
+
+To NIE jest zgoda na logikę w ekranie. Kształt danych wolno dzielić z serwerem;
+regułę, co z tymi danymi zrobić, wypycha się do `:core` — powód stoi w komentarzu
+przy `AppGraph`.
+
 ### Dwa narzędzia zamiast kompilatora
 
 `:app` nie kompiluje się poza CI, więc powstały dwa tanie strażniki:

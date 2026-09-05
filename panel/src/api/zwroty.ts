@@ -93,7 +93,7 @@ export function useOcena() {
   return useMutation({
     /* `null` COFA ocenę (0.202.0) — serwer i trasa umiały to od 0.192.0, tylko
        panel nie miał klawisza. */
-    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "przecena" | "utylizacja" | null;
+    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "utylizacja" | null;
       wersja: number }) =>
       api<{ wersja: number; koszyk: number | null }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,

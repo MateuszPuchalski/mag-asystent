@@ -95,6 +95,19 @@ function tablica<T>(value: unknown, pole: string): T[] {
 }
 
 /**
+ * `count` z odpowiedzi — ile zwrotów pasuje do zapytania W CAŁOŚCI.
+ *
+ * Schemat `CustomerReturnResponse` wymienia to pole w `required` obok
+ * `customerReturns`, więc mamy prawo go oczekiwać. Brak NIE WYWRACA przebiegu:
+ * pobranie zwrotów jest ważniejsze od licznika, a `null` umie powiedzieć
+ * „nie wiem" — w przeciwieństwie do zera, które kłamałoby, że nic nie zostało.
+ */
+function liczba(value: unknown): number | null {
+  const n = (value as Record<string, unknown> | null)?.count;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+/**
  * Kwota Allegro na grosze.
  *
  * Allegro oddaje kwotę STRINGIEM i mówi wprost dlaczego: „to avoid rounding
@@ -147,16 +160,40 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
   const odKiedy = start.cursorId ? null : od;
 
   const zebrane: Zwrot[] = [];
+  /* Ile rekordów Allegro nam ODDAŁO — surowo, przed odsianiem progiem. Do
+     porównania z `count` liczy się to, co przyszło, a nie to, co zatrzymaliśmy:
+     próg `zwrotyOd` odrzuca rekordy CELOWO i nie jest żadną luką. */
+  let pobrano = 0;
+  let wszystkich: number | null = null;
+  /* Czy lista skończyła się sama. `false` znaczy, że urwał ją bezpiecznik
+     stron — i wtedy reszta zwrotów zostaje po tamtej stronie. */
+  let komplet = false;
   try {
     for (let strona = 0; strona < MAKS_STRON; strona++) {
       const body = await query(urlListyZwrotow(apiUrl, odKiedy, strona * NA_STRONE, start.cursorId));
       const partia = tablica<Zwrot>(body, "customerReturns");
+      if (strona === 0) wszystkich = liczba(body);
+      pobrano += partia.length;
       /* Zwrot BEZ daty przepuszczamy — `createdAt` jest w schemacie opcjonalne,
          a cicha utrata zwrotu kosztuje więcej niż jeden rekord za progiem. */
       zebrane.push(...partia.filter((z) => typeof z?.id === "string"
         && !(od && z.createdAt && z.createdAt < od)));
-      if (partia.length < NA_STRONE) break;
+      if (partia.length < NA_STRONE) { komplet = true; break; }
     }
+
+    /* OGON, czyli czego ten przebieg NIE wziął (0.209.0).
+       Bezpiecznik `MAKS_STRON` chronił konto przed zapętloną paginacją i robił
+       to dobrze — ale robił to CICHO. Przebieg urwany na dziesiątej stronie
+       kończył się sukcesem, kursor szedł naprzód i zwroty spoza tamtej granicy
+       nie wracały już nigdy. Kolejka ustawia się według terminu ustawowego,
+       więc niewidoczne wiersze były w większości tymi najbardziej spóźnionymi.
+
+       Liczymy z `count`, a nie z „ile stron przeszliśmy": Allegro samo mówi,
+       ile rekordów pasuje do zapytania. Lista domknięta własnym końcem nie ma
+       ogona z definicji — nawet gdyby `count` mówił inaczej, bo między
+       pierwszą a ostatnią stroną mógł dojść nowy zwrot. */
+    const pozostalo = komplet ? 0
+      : wszystkich === null ? null : Math.max(0, wszystkich - pobrano);
 
     const at = now().toISOString();
     /* Kursor liczymy z NAJPÓŹNIEJSZEJ daty, a nie z ostatniego elementu
@@ -175,14 +212,15 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
          „kiedyś było źle". */
       database.prepare(`INSERT INTO allegro_zwroty_sync_state
         (id,cursor_id,cursor_at,last_success_at,last_attempt_at,last_error_code,
-         error_count,next_attempt_at)
-        VALUES(1,?,?,?,?,NULL,0,?) ON CONFLICT(id) DO UPDATE SET
+         error_count,next_attempt_at,pozostalo)
+        VALUES(1,?,?,?,?,NULL,0,?,?) ON CONFLICT(id) DO UPDATE SET
         cursor_id=excluded.cursor_id, cursor_at=excluded.cursor_at,
         last_success_at=excluded.last_success_at, last_attempt_at=excluded.last_attempt_at,
-        last_error_code=NULL, error_count=0, next_attempt_at=excluded.next_attempt_at`).run(
+        last_error_code=NULL, error_count=0, next_attempt_at=excluded.next_attempt_at,
+        pozostalo=excluded.pozostalo`).run(
         najnowszy?.id ?? start.cursorId,
         najnowszy?.createdAt ?? start.cursorAt,
-        at, at, new Date(Date.parse(at) + interval).toISOString());
+        at, at, new Date(Date.parse(at) + interval).toISOString(), pozostalo);
     })();
 
     /* Tracking idzie PO transakcji, bo wychodzi do sieci: trzymanie otwartej

@@ -233,7 +233,7 @@ test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
   /* Ta sama oferta dwa razy w jednym zwrocie — Allegro tak potrafi, bo
      `CustomerReturnItem` NIE MA identyfikatora pozycji. */
   wstaw.run(1, "111", "Sekator", 1, 4999, "PLN", "stan");
-  wstaw.run(1, "111", "Sekator", 2, 4999, "PLN", "przecena");
+  wstaw.run(1, "111", "Sekator", 2, 4999, "PLN", "utylizacja");
   /* I para bez oferty, o tej samej nazwie — drugi wariant tej kolizji. */
   wstaw.run(1, null, "Uszczelka", 1, 999, "PLN", null);
   wstaw.run(1, null, "Uszczelka", 3, 999, "PLN", null);
@@ -250,7 +250,7 @@ test("przebudowa przeżywa DUPLIKAT klucza naturalnego z zastanej bazy", () => {
      zmigrowana nie przekluczy ani jednego wiersza, a to do klucza przywiązana
      jest praca człowieka. */
   assert.deepEqual(poz.map((p) => p.ilosc), [1, 2, 1, 3], "ilości zostają rozdzielone");
-  assert.deepEqual(poz.map((p) => p.ocena), ["stan", "przecena", null, null],
+  assert.deepEqual(poz.map((p) => p.ocena), ["stan", "utylizacja", null, null],
     "druga pozycja nie nadpisuje oceny pierwszej");
 
   /* `w_zwrocie` dochodzi `addColumn` PRZED przebudową, więc nowa tabela musi

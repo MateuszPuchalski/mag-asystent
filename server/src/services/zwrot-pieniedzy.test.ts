@@ -141,6 +141,28 @@ test("udany zwrot zapisuje numer, zdarzenie i podnosi wersję", async () => {
   assert.match(String(zd.tresc), /64,98 PLN|64\.98 PLN/);
 });
 
+test("ekran czyta zapisany przelew i mówi, czy ALLEGRO go potwierdziło", async () => {
+  /* Do 0.209.0 stały tu trzy `null`-e mimo wypełnionych kolumn: ekran nie
+     wiedział ani kiedy przelew poszedł, ani co Allegro na niego odpowiedziało.
+     Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
+     zwrotu płatności w specyfikacji nie istnieje. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  await zwrocPieniadze(d, id, 1, KTO, async () => ({ id: "ref-9", status: "SUCCEEDED" }),
+    new Date("2026-09-01T10:00:00Z"));
+
+  const przed = stanZwrotuPieniedzy(d, id);
+  assert.equal(przed.oddane?.id, "ref-9");
+  assert.equal(przed.oddane?.status, "SUCCEEDED", "odpowiedź na nasze polecenie");
+  assert.equal(przed.oddane?.kiedy, "2026-09-01T10:00:00.000Z");
+  assert.equal(przed.oddane?.potwierdzone, false,
+    "przyjęcie polecenia to jeszcze nie przelew — Allegro nie mówi FINISHED");
+
+  d.prepare("UPDATE zwrot_klienta SET status_allegro='FINISHED' WHERE id=?").run(id);
+  assert.equal(stanZwrotuPieniedzy(d, id).oddane?.potwierdzone, true,
+    "dopiero status zwrotu jest dowodem, że pieniądze wyszły");
+});
+
 test("drugi zwrot pieniędzy jest odmawiany bez wyjścia do sieci", async () => {
   const d = stanowisko();
   const id = zwrotGotowy(d);

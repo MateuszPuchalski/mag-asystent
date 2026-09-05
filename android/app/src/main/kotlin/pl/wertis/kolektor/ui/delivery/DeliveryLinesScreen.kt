@@ -29,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -55,10 +54,17 @@ import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.core.delivery.StatusLinii
 import pl.wertis.kolektor.core.delivery.TrybWiersza
 import pl.wertis.kolektor.core.delivery.KierunekRozbieznosci
+import pl.wertis.kolektor.core.delivery.DecyzjaRozjazdu
+import pl.wertis.kolektor.core.delivery.PamiecRozjazdu
 import pl.wertis.kolektor.core.delivery.adresWiersza
 import pl.wertis.kolektor.core.delivery.rozbieznoscStanu
 import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
+import pl.wertis.kolektor.core.delivery.iloscDoOdlozenia
+import pl.wertis.kolektor.core.delivery.iloscNaKaflu
+import pl.wertis.kolektor.core.delivery.odlozonePoZapisie
+import pl.wertis.kolektor.core.delivery.wybierzPozycjeTowaru
+import pl.wertis.kolektor.core.delivery.zostaloDoOdlozenia
 import pl.wertis.kolektor.core.delivery.uporzadkujPozycje
 import pl.wertis.kolektor.core.delivery.trybWiersza
 import pl.wertis.kolektor.core.loc.normalizeLoc
@@ -200,13 +206,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         val cel = graph.nav.pendingLineTwId ?: return@LaunchedEffect
         val lines = view?.lines ?: return@LaunchedEffect
         graph.nav.pendingLineTwId = null
-        val kandydaci = lines.filter { it.twId == cel }
-        /* Ten sam towar potrafi stać w dokumencie w DWÓCH wierszach (scenariusz
-           S26). Otwieramy ten, przy którym jest co robić — wiersz odłożony
-           albo z wyjątkiem nie jest odpowiedzią na „chcę to odłożyć". */
-        val wybrana = kandydaci.firstOrNull {
-            it.status == StatusLinii.TODO || it.status == StatusLinii.PARTIAL
-        } ?: kandydaci.firstOrNull()
+        // który wiersz, gdy ten sam towar stoi w dokumencie dwa razy (S26) —
+        // reguła i jej cena stoją przy `wybierzPozycjeTowaru`
+        val wybrana = wybierzPozycjeTowaru(lines, cel, { it.twId }, { it.status })
         if (wybrana != null) {
             active = wybrana
             czesc = null
@@ -218,13 +220,9 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     var mismatch by remember(id) { mutableStateOf<Pair<DeliveryLineView, String>?>(null) }
     /** Czy kod w `mismatch` był wpisany z ręki — do raportu etykiet. */
     var mismatchReczna by remember(id) { mutableStateOf(false) }
-    /* Pamięć decyzji rozjazdu W TEJ dostawie, per para oczekiwana→zeskanowana.
-       Dziesięć pozycji z jednego kartonu odłożonych na tę samą „inną" półkę
-       pytało dziesięć razy o to samo — identyczna odpowiedź przestaje być
-       decyzją, a staje się przeszkodą w rytmie. Powtórka idzie automatem
-       Z TOASTEM (człowiek widzi, co się stało), inna para pyta normalnie.
-       Pamięć umiera z dostawą — to decyzja o TYM kartonie, nie reguła. */
-    val rozjazdPamiec = remember(id) { mutableStateMapOf<Pair<String, String>, LocApplyAction>() }
+    /* Pamięć decyzji rozjazdu W TEJ dostawie — `remember(id)` daje jej dokładnie
+       tyle życia, ile ma karton. Reguła i jej uzasadnienie: `PamiecRozjazdu`. */
+    val rozjazdPamiec = remember(id) { PamiecRozjazdu() }
     /* Pole ręcznego wpisu otwarte per DOSTAWA, nie per pozycja: seria przy
        zniszczonych etykietach nie wymaga ponownego tapnięcia co pozycję. */
     var manualOpen by remember(id) { mutableStateOf(false) }
@@ -301,12 +299,15 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     ) {
         if (busy) return
         busy = true
-        /* Ile sztuk idzie na półkę. `null` w polu znaczy „cała reszta" i tak
-           właśnie rozumie to serwer, więc nie podstawiamy tu liczby — pusta
-           wartość niesie intencję, a wyliczona zamrażałaby ilość z chwili
-           otwarcia panelu. */
-        val zostalo = line.qtyDoc - line.qtyDone
-        val ile = czesc?.coerceIn(1.0, zostalo)
+        /* Ile sztuk idzie na półkę — jedna reguła dla kafla, zapisu i echa
+           bufora (`iloscDoOdlozenia`), razem z powodem, dla którego `null`
+           zostaje `null`.
+
+           KOPIA POLA, nie odczyt `czesc` w dalszych linijkach: zapis zeruje je
+           zaraz po odpowiedzi, a echo bufora liczy się już PO tym zerowaniu —
+           czytane stamtąd dałoby „cała reszta" przy odłożeniu częściowym. */
+        val wybrana = czesc
+        val ile = iloscDoOdlozenia(wybrana)
         try {
             val res = graph.offlineQueue.runOrBuffer(
                 kind = PendingOp.OpKind.PUTAWAY,
@@ -340,7 +341,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                        stało tu `qtyDoc`, czyli bufor zamykał całą pozycję nawet
                        przy odłożeniu trzech sztuk z dziesięciu — i reszta partii
                        znikała z listy pracy do czasu odpowiedzi serwera. */
-                    val zrobione = (line.qtyDone + (ile ?: zostalo)).coerceAtMost(line.qtyDoc)
+                    val zrobione = odlozonePoZapisie(wybrana, line.qtyDoc, line.qtyDone)
                     graph.cards.putDelivery(id, v.copy(
                         lines = v.lines.map {
                             if (it.id == line.id) {
@@ -372,25 +373,26 @@ fun DeliveryLinesScreen(graph: AppGraph) {
      * przeniesiono, czy leży teraz w dwóch miejscach (§4.3).
      */
     suspend fun putaway(line: DeliveryLineView, code: String, recznie: Boolean = false) {
-        val expected = line.locExpected
-        if (!expected.isNullOrBlank() && expected != code) {
-            val zapamietana = rozjazdPamiec[expected to code]
-            if (zapamietana != null) {
+        when (val decyzja = rozjazdPamiec.rozstrzygnij(line.locExpected, code)) {
+            is DecyzjaRozjazdu.Zgodna -> commitPutaway(line, code, locAction = null, recznie = recznie)
+
+            is DecyzjaRozjazdu.Powtorz -> {
+                // automat, którego nie widać, byłby cichą decyzją za człowieka
                 graph.effects.toast(
                     "Rozjazd jak poprzednio: " +
-                        if (zapamietana == LocApplyAction.REPLACE) "ZAMIEŃ" else "DODAJ"
+                        if (decyzja.akcja == LocApplyAction.REPLACE) "ZAMIEŃ" else "DODAJ"
                 )
-                commitPutaway(line, code, zapamietana, recznie = recznie)
-                return
+                commitPutaway(line, code, decyzja.akcja, recznie = recznie)
             }
-            graph.feedback.beep(false)
-            // pochodzenie kodu przeżywa pytanie o rozjazd — inaczej ręczny
-            // wpis z inną półką wypadałby z raportu etykiet
-            mismatchReczna = recznie
-            mismatch = line to code
-            return
+
+            is DecyzjaRozjazdu.Zapytaj -> {
+                graph.feedback.beep(false)
+                // pochodzenie kodu przeżywa pytanie o rozjazd — inaczej ręczny
+                // wpis z inną półką wypadałby z raportu etykiet
+                mismatchReczna = recznie
+                mismatch = line to code
+            }
         }
-        commitPutaway(line, code, locAction = null, recznie = recznie)
     }
 
     // router skanów: gdy czekamy na lokalizację — LOC kończy operację;
@@ -693,7 +695,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         mismatch?.let { (l, code) ->
                             // decyzja zostaje w pamięci dostawy — powtórka tej
                             // samej pary półek nie zapyta drugi raz
-                            l.locExpected?.let { rozjazdPamiec[it to code] = action }
+                            rozjazdPamiec.zapamietaj(l.locExpected, code, action)
                             scope.launch { commitPutaway(l, code, action, recznie = mismatchReczna) }
                         }
                     },
@@ -1302,11 +1304,13 @@ private fun PanelOdkladania(
 
            Podział jest treścią, nie ozdobą: po lewej to, co magazynier USTAWIA,
            po prawej to, dokąd IDZIE. */
-        val zostalo = line.qtyDoc - line.qtyDone
+        val zostalo = zostaloDoOdlozenia(line.qtyDoc, line.qtyDone)
         /* Górnej granicy nie ma od 0.64.0 — nadmiar ponad fakturę jest
-           dozwolony. Bramką jest przycisk `+`, nie `coerceIn`: przekroczenie
-           wymaga jednego potwierdzenia, a potem licznik idzie swobodnie. */
-        val ile = (czesc ?: zostalo).coerceAtLeast(1.0)
+           dozwolony. Bramką jest przycisk `+`, nie ścinanie liczby: przekroczenie
+           wymaga jednego potwierdzenia, a potem licznik idzie swobodnie.
+           TA SAMA liczba idzie do zapisu (`iloscDoOdlozenia`) — wcześniej kafel
+           i zapis liczyły ją osobno i rozjechały się dokładnie o nadmiar. */
+        val ile = iloscNaKaflu(czesc, line.qtyDoc, line.qtyDone)
         /* Pytanie zadajemy RAZ NA POZYCJĘ. Przy każdym kroku byłoby karą za
            liczenie sztuk, a przy zerowej liczbie pytań przypadkowe dotknięcie
            `+` wysyłałoby dostawcy reklamację. */
@@ -1420,7 +1424,7 @@ private fun PanelOdkladania(
                 } else if (ile > zostalo) {
                     // stan, którego nie widać nigdzie indziej, a zmienia skutek zapisu
                     Text(
-                        "o ${formatQty(ile - zostalo.coerceAtLeast(0.0))} ponad fakturę",
+                        "o ${formatQty(ile - zostalo)} ponad fakturę",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Destructive,

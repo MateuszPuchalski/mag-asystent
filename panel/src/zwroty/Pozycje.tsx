@@ -42,9 +42,12 @@ const POWODY: Record<string, string> = {
   ORDERED_FOR_COMPARISON: "zamówiony na przymiarkę",
 };
 
-const OCENY: Array<["stan" | "przecena" | "utylizacja", string, string]> = [
+/* DWA PRZYCISKI, NIE TRZY (0.209.0). „Na przecenę" nie prowadziła donikąd:
+   nie dokładała do koszyka, nie ruszała stanu, nie zakładała zadania. Trzeci
+   przycisk, który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy
+   każdej pozycji — a ocena jest tu naciskana najczęściej ze wszystkiego. */
+const OCENY: Array<["stan" | "utylizacja", string, string]> = [
   ["stan", "S", "Na stan"],
-  ["przecena", "C", "Na przecenę"],
   ["utylizacja", "U", "Utylizacja"],
 ];
 
@@ -138,7 +141,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   /** Pozycje zamówienia, których w zwrocie jeszcze nie ma (0.184.0). */
   doDopisania?: DoDopisania[];
   bladDopisania?: string;
-  onOcena: (pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja" | null) => void;
+  onOcena: (pozycjaId: number, ocena: "stan" | "utylizacja" | null) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;

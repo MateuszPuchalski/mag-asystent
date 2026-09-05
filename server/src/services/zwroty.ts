@@ -9,6 +9,7 @@ import type { FakturaZwrotu } from "./faktury.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
 import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
   from "./kosze-zwrotow.js";
+import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -27,7 +28,8 @@ import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza 
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 
-export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
+export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem";
 
 export interface PozycjaZwrotu {
   id: number;
@@ -180,19 +182,37 @@ export function kubelekZwrotu(z: {
 }
 
 /**
- * Sygnały — jedyne trzy rzeczy, które każą przeczytać wiersz.
+ * Ile dni czekamy na potwierdzenie przelewu, zanim zapalimy sygnał.
  *
- * Wszystko inne wiersz mówi bez czytania. Czwartego sygnału z projektu,
- * „rozjazd" (klient zgłosił inną liczbę sztuk, niż wróciła), tu jeszcze
- * nie ma: liczbę zwróconą zna dopiero ocena hali, która wchodzi w 0.151.0.
- * Reguła bez danych zapalałaby się na ślepo albo nigdy — obie wersje uczą
- * operatora ignorować kolor.
+ * Allegro przestawia `CustomerReturn.status` na `FINISHED` dopiero po
+ * rozliczeniu płatności, a nie w chwili przyjęcia polecenia. Trzy dni, bo
+ * przelew zlecony w piątek ma mieć prawo potwierdzić się w poniedziałek —
+ * sygnał krzyczący przez weekend nauczyłby operatora przewijać go dalej.
+ */
+const PROG_POTWIERDZENIA_DNI = 3;
+
+/**
+ * Sygnały — jedyne rzeczy, które każą przeczytać wiersz.
+ *
+ * Wszystko inne wiersz mówi bez czytania. Sygnału „rozjazd" (klient zgłosił
+ * inną liczbę sztuk, niż wróciła) tu nadal nie ma: liczbę zwróconą zna
+ * dopiero ocena hali. Reguła bez danych zapalałaby się na ślepo albo nigdy —
+ * obie wersje uczą operatora ignorować kolor.
+ *
+ * DWA SYGNAŁY O PIENIĄDZACH SĄ OSOBNE, BO MÓWIĄ COŚ INNEGO. Jeden mówi
+ * „wysłaliśmy i nie wiemy", drugi „nie wysyłaliśmy, a poszło". Zwinięte
+ * w jeden kolor kazałyby operatorowi otwierać wiersz, żeby dowiedzieć się,
+ * w którą stronę patrzeć.
  */
 export function sygnalyZwrotu(z: {
   kubelek: Kubelek; dni: number; paczkaAt: string | null;
   dostarczonoAt: string | null; przesylkaStatus: string | null;
   rejectionCode: string | null;
-}): Sygnal[] {
+  /* Kiedy TO MY zleciliśmy przelew; `null` = nie zleciliśmy go z panelu. */
+  pieniadzeAt: string | null;
+  /* Ostatni status zwrotu po stronie Allegro — nasze jedyne potwierdzenie. */
+  statusAllegro: string | null;
+}, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
      przewijać czerwone wiersze. */
@@ -210,6 +230,33 @@ export function sygnalyZwrotu(z: {
   /* Odrzucone w panelu Allegro, nie u nas. Bez tego biuro drugi raz
      rozstrzygałoby sprawę, którą ktoś już zamknął gdzie indziej. */
   if (z.rejectionCode) s.push("odrzucony_w_allegro");
+
+  const oddane = STATUSY_ODDANE.has(String(z.statusAllegro ?? ""));
+  /* PRZELEW BEZ POTWIERDZENIA. Do tego wydania status płatności zapisywał się
+     RAZ, z odpowiedzi na `POST /payments/refunds`, i nikt go już nie czytał:
+     przelew, który Allegro odrzuciło godzinę później, wyglądał u nas
+     dokładnie jak udany. Potwierdzeniem jest status zwrotu, bo `GET` po
+     identyfikatorze zwrotu płatności w specyfikacji NIE ISTNIEJE — sprawdzone
+     w `docs/allegro/swagger.yaml`, jest tam samo `POST /payments/refunds`.
+
+     Ten jeden sygnał obowiązuje TAKŻE na zwrocie zamkniętym. Wszystkie
+     pozostałe gasną na stanach końcowych, bo mówią o pracy do zrobienia —
+     a ten mówi o pieniądzach, które mogły nie wyjść. Zwrot zamyka się zaraz
+     po korekcie, czyli zwykle ZANIM Allegro potwierdzi przelew; gaszenie go
+     razem z resztą wyciszyłoby go dokładnie wtedy, gdy zaczyna być prawdziwy. */
+  if (z.pieniadzeAt && !oddane
+      && teraz - Date.parse(z.pieniadzeAt) > PROG_POTWIERDZENIA_DNI * 86_400_000) {
+    s.push("pieniadze_niepotwierdzone");
+  }
+  /* PIENIĄDZE POSZŁY POZA PANELEM. Allegro mówi, że płatność jest oddana,
+     a u nas nie ma po niej śladu — ktoś oddał ją ręką w panelu Allegro albo
+     zrobiło to Allegro Protect. Sygnał chroni przed DRUGIM przelewem: bez
+     niego zwrot stoi w kubełku „do zwrotu" i prosi o pieniądze, które klient
+     już ma.
+
+     Tylko na zwrocie w pracy. Na zamkniętych zapaliłby się na całej
+     historii sprzed tego panelu — a tam nie ma już czego zapłacić drugi raz. */
+  if (wPracy && oddane && !z.pieniadzeAt) s.push("pieniadze_poza_panelem");
   return s;
 }
 
@@ -256,7 +303,9 @@ function zloz(
     sygnaly: sygnalyZwrotu({
       kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null,
       dostarczonoAt: (z.dostarczono_at as string) ?? null,
-      przesylkaStatus: (z.przesylka_status as string) ?? null, rejectionCode }),
+      przesylkaStatus: (z.przesylka_status as string) ?? null, rejectionCode,
+      pieniadzeAt: (z.zwrot_pieniedzy_at as string) ?? null,
+      statusAllegro: (z.status_allegro as string) ?? null }, teraz),
     terminAt,
     dniDoTerminu: dni,
     sumaPozycjiGrosze: suma,
@@ -800,7 +849,7 @@ export function cofnijWerdykt(
 }
 
 /**
- * Ocena towaru: na stan, na przecenę albo do utylizacji. `null` cofa ocenę.
+ * Ocena towaru: na stan albo do utylizacji. `null` cofa ocenę.
  *
  * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW (0.192.0) — bez
  * osobnego ruchu. Właściciel opisał obieg biura tak: „gdy agent zasiada do
@@ -809,16 +858,22 @@ export function cofnijWerdykt(
  * i tak wykonuje, JEST tym dołożeniem; osobny przycisk kazałby mu powiedzieć
  * dwa razy to samo.
  *
+ * OCENY SĄ DWIE, NIE TRZY (0.209.0). „Przecena" stała tu od 0.156.0 i nie
+ * prowadziła DONIKĄD: nie dokładała do koszyka, nie ruszała stanu, nie
+ * zakładała zadania — zapisywała się i na tym się kończyła. Trzeci przycisk,
+ * który wygląda jak decyzja, a nie jest żadną, kosztuje operatora namysł przy
+ * każdej pozycji i zostawia towar w stanie, z którego nic nie wyprowadza.
+ * Wraca dopiero razem ze ścieżką przeceny, jeśli właściciel jej zechce.
+ *
  * Do koszyka wchodzi WYŁĄCZNIE „stan" — decyzja właściciela. Utylizacja ma
- * zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą
- * stronę; przecena zostaje na razie poza tą ścieżką.
+ * zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą stronę.
  *
  * `koszyk` w wyniku mówi, czy dołożenie się udało. Pozycja bez kartoteki nie
  * ma `tw_id`, a MM przesuwa stany kartotek — ocena zapisuje się mimo to, bo
  * jest faktem o towarze, ale ekran musi powiedzieć, czego nie zrobił.
  */
 export function ocenPozycje(
-  database: Db, pozycjaId: number, ocena: "stan" | "przecena" | "utylizacja" | null,
+  database: Db, pozycjaId: number, ocena: "stan" | "utylizacja" | null,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
 ): { wersja: number; koszyk: number | null } {
   const p = database.prepare("SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?")

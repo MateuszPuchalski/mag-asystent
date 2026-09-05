@@ -417,7 +417,8 @@ export type SzczegolyWysylki = {
    kolejkę niż liczniki.                                                     */
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
-export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro";
+export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -610,6 +611,14 @@ export interface StanZwrotow {
   opoznienieMs: number | null;
   nastepnaProba: string | null;
   interwalMs: number;
+  /**
+   * Ile zwrotów Allegro miało jeszcze do oddania po ostatnim przebiegu.
+   *
+   * `null` znaczy „nie wiem", zero — „lista skończyła się sama". Liczba większa
+   * od zera znaczy, że kolejka NIE JEST kompletna, choć synchronizacja
+   * skończyła się sukcesem.
+   */
+  pozostaloDoPobrania: number | null;
 }
 
 /** Ile pozycji czeka na kartotekę i dlaczego — licznik do nagłówka ekranu. */
@@ -661,7 +670,11 @@ export type StanZwrotuPieniedzy = {
   powod: string | null;
   kwotaGrosze: number | null;
   waluta: string;
-  oddane: { id: string | null; status: string | null; kiedy: string | null } | null;
+  oddane: {
+    id: string | null; status: string | null; kiedy: string | null;
+    /** Czy ALLEGRO potwierdziło wyjście pieniędzy — nie mylić ze `status`. */
+    potwierdzone: boolean;
+  } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
 };
 

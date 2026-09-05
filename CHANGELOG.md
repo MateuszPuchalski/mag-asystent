@@ -34,6 +34,106 @@ historii nie przepisujemy.
 ---
 
 
+## 0.209.0 — 5 września 2026
+
+**Przelew, którego Allegro nie potwierdziło, przestał wyglądać jak udany.** Od
+0.190.0 panel oddaje pieniądze sam, a status zapisywał RAZ — z odpowiedzi na
+`POST /payments/refunds`. Odpowiedź mówi tylko, że Allegro PRZYJĘŁO polecenie.
+Przelew odrzucony godzinę później miał w bazie dokładnie ten sam ślad co
+zaksięgowany, a `stanZwrotuPieniedzy` i tak zwracał w tym miejscu trzy `null`-e
+zamiast czytać wypełnione kolumny. Zwrot zamykał się po korekcie i nikt już nigdy
+do niego nie wracał.
+
+Potwierdzeniem jest `CustomerReturn.status`: `FINISHED` to w schemacie *„the
+payment has been refunded"*, `FINISHED_APT` to samo ręką Allegro Protect.
+`GET` po identyfikatorze zwrotu płatności w specyfikacji **nie istnieje** —
+sprawdzone w `docs/allegro/swagger.yaml`, jest tam samo `POST`. Nowego pobierania
+więc nie ma: synchronizator zapisuje ten status do `status_allegro` od 0.164.0
+i do tego wydania czytały go wyłącznie rabaty.
+
+Stąd dwa sygnały, osobne, bo mówią co innego. **„przelew?"** — zleciliśmy
+i po trzech dniach nadal bez potwierdzenia; jako jedyny nie gaśnie na zwrocie
+zamkniętym, bo zwrot zamyka się zwykle ZANIM Allegro potwierdzi wypłatę. **„już
+oddane"** — Allegro mówi, że płatność wróciła, a u nas nie ma po niej śladu:
+ktoś oddał ją ręką w panelu Allegro albo zrobiło to Allegro Protect. Ten drugi
+chroni przed drugim przelewem, bo bez niego zwrot stoi w kubełku „do zwrotu"
+i prosi o pieniądze, które klient już ma. Trzy dni, a nie jeden: przelew zlecony
+w piątek ma prawo potwierdzić się w poniedziałek.
+
+**Synchronizacja zwrotów mówi, ilu zwrotów NIE wzięła.** Bezpiecznik dziesięciu
+stron chronił konto przed zapętloną paginacją i robił to dobrze — ale cicho.
+Przebieg urwany na dziesiątej stronie kończył się sukcesem, kursor szedł naprzód,
+a reszta nie wracała już nigdy. Kolejka ustawia się według terminu ustawowego,
+więc niewidoczne wiersze były w większości tymi najbardziej spóźnionymi. Liczba
+bierze się z `count`, które schemat `CustomerReturnResponse` wymienia
+w `required`; `NULL` znaczy „nie wiem", zero — „lista skończyła się sama". Nad
+kolejką staje wtedy pasek mówiący wprost, że nie jest kompletna.
+
+**Ocena „na przecenę" zeszła z ekranu.** Stała tam od 0.156.0 i nie prowadziła
+donikąd: nie dokładała do koszyka, nie ruszała stanu, nie zakładała zadania —
+zapisywała się i na tym się kończyło. Trzeci przycisk, który wygląda jak decyzja,
+a nie jest żadną, kosztuje namysł przy każdej pozycji, a ocena jest najczęściej
+naciskanym miejscem tego ekranu. Zostają dwie: **na stan** i **utylizacja**.
+Wraca dopiero razem ze ścieżką przeceny, jeśli właściciel jej zechce.
+
+**[wymaga działania]** Migracja zeruje zapisane przeceny: pozycja wraca do
+kubełka „do oceny", bo `NULL` mówi prawdę — decyzji o tym towarze nikt nie
+podjął, a „stan" i „utylizacja" to dwie różne decyzje i zgadywanie między nimi
+byłoby zapisem cudzego zdania. Zwrotów zamkniętych to nie odemknie: kubełek
+rozstrzyga stany końcowe pierwsze. Migracja MUSI stać przed przebudową
+`zwrot_klienta_pozycja` — nowa definicja tabeli nie zna już `przecena`, więc
+przepisanie wiersza z tą oceną wywróciłoby `CHECK`, a razem z nim start każdego
+procesu. Bazy sprzed 0.156.0 nie mają jeszcze kolumny `ocena` i migracja pyta
+o nią, zanim ją tknie.
+
+Termin ustawowy **nadal ma znacznik `[WERYFIKUJ]`** i tego wydania to nie
+zmienia. Liczymy go od `createdAt` zwrotu, a ustawa liczy czternaście dni od
+otrzymania oświadczenia o odstąpieniu. Błąd idzie w stronę bezpieczną, ale
+sprawdzenie wymaga danych z żywego Allegro i decyzji właściciela — nie kodu.
+
+## 0.208.0 — 5 września 2026
+
+**Nadmiar ponad fakturę wreszcie dochodzi do biura.** Od 0.64.0 licznik `+`
+w panelu odkładania idzie ponad ilość z dokumentu — po jednym potwierdzeniu, bo
+nadmiar ma trafić do biura jako zgłoszenie wobec dostawcy. Zapis mimo to ścinał
+ilość do reszty z faktury. Magazynier potwierdzał 15 przy 10 na dokumencie,
+kafel pokazywał 15, sygnał zapisu brzmiał normalnie — a na półkę szło 10 i biuro
+nie dowiadywało się o niczym. Checklista sprzętowa w `android/README.md` prosi
+o sprawdzenie, czy po zamknięciu dostawy nadmiar jest w wyjątkach; tą drogą nie
+miała prawa przejść.
+
+Winna jest jedna linia, wpisana w 0.42.0 razem z odkładaniem częściowym:
+`coerceIn(1.0, zostalo)`. Wtedy była poprawna, bo nadmiar był niedozwolony.
+Dwadzieścia dwa wydania później przestała być — i nikt tego nie zobaczył, bo
+reguła stała w ciele composable'a. Serwer nadmiar przyjmował przez cały ten czas
+(`putawayLine` nie ma górnej granicy), więc ścinał go wyłącznie kolektor.
+
+**Poprawka ilości na pozycji odłożonej w całości przestała wywalać zapis.** Ta
+sama linia: przy pozycji zamkniętej reszta wynosi zero, więc `coerceIn(1.0, 0.0)`
+rzucał wyjątek. Łapał go ten sam `catch`, co błędy sieci, i pokazywał jako „Błąd
+zapisu" — nie do odróżnienia od zerwanego Wi-Fi. Wiersz odłożony i jednocześnie
+rozwinięty zdarza się realnie: wraca się do niego po drugą półkę albo po korektę.
+
+**Trzy reguły rozkładania wyszły z ekranu do `:core`.** Ilość odłożenia, pamięć
+decyzji o rozjeździe półek i wybór wiersza, gdy ten sam towar stoi w dokumencie
+dwa razy. Każda ma teraz testy biegnące bez Android SDK — 26 nowych, razem 300.
+
+Ekran przez to nie zmalał i nie o to chodziło. Zmalała liczba miejsc, w których
+ta sama reguła może się po cichu rozjechać sama ze sobą: ilość liczy dziś JEDNA
+funkcja dla kafla, dla zapisu i dla echa bufora offline. Wcześniej liczyły ją
+trzy wyrażenia i każde znaczyło co innego.
+
+**Reszta zachowania bez zmian.** Rozjazd dalej pyta ZAMIEŃ czy DODAJ przy
+pierwszej parze półek i powtarza odpowiedź przy kolejnych pozycjach z tego
+samego kartonu. Wejście z karty towaru dalej otwiera wiersz, przy którym jest co
+robić.
+
+**Dwa wpisy w dokumentacji, oba z audytu warstw kolektora.** Komentarz nad
+`AppGraph` opisywał ViewModele i helper `viewModelFactory`, których w repo nigdy
+nie było — teraz mówi, co jest naprawdę, i nazywa granicę: reguła zasługująca na
+test wraca do `:core`. `docs/architektura.md` dostał sekcję o tym, dlaczego DTO
+z serwera SĄ modelem kolektora i dlaczego nie ma warstwy mapowania — razem
+z ceną tej decyzji.
 ## 0.207.0 — 5 września 2026
 
 **Numer zwrotu i login kupującego stoją w nagłówku sprawy, a numer prowadzi

@@ -1,4 +1,9 @@
-node_modules/
+# Bez ukośnika: wzorzec z ukośnikiem pasuje wyłącznie do KATALOGU, więc
+# DOWIĄZANIE o tej nazwie przechodziło przez `git add -A` do repozytorium.
+# Zdarzyło się to raz, przy uruchamianiu testów w osobnym drzewie roboczym:
+# do gałęzi trafiły trzy dowiązania z bezwzględną ścieżką cudzej maszyny,
+# a złapała je dopiero bramka kompletności cache'a w CI.
+node_modules
 dist/
 dev-dist/
 *.local

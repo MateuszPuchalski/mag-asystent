@@ -36,7 +36,21 @@ import pl.wertis.kolektor.scan.ScannerManager
 import pl.wertis.kolektor.ui.chrome.UiEffects
 
 /* ── Kompozycja aplikacji — ręczny service locator (bez DI frameworka) ──────
-   ~10 singletonów; ViewModel-e dostają graf przez viewModelFactory helper.   */
+   ~10 singletonów budowanych w jednym miejscu i podawanych ekranom wprost,
+   jako `graph: AppGraph`. Koin ani Hilt nie kupiłyby tu niczego poza
+   adnotacjami: graf jest płaski, powstaje raz i nie ma wariantów do podmiany.
+
+   VIEWMODELI NIE MA — i to jest dług, nie wzorzec. Do teraz stało tu zdanie
+   o „viewModelFactory helper", którego w repo nigdy nie było: komentarz opisał
+   architekturę, której nikt nie napisał, i przetrwał w tej roli kilkadziesiąt
+   wydań. Stan ekranu siedzi w `remember` wewnątrz composable'ów, więc reguła,
+   która tam zabłądzi, jest niesprawdzalna NIGDZIE — `:app` nie ma testów i nie
+   kompiluje się poza CI.
+
+   Granica jest więc inna niż zwykle i obowiązuje przy każdym nowym ekranie:
+   reguła, która zasługuje na test, wraca do `:core` jako czysta funkcja. Tak
+   stoją `LineDisplay`, `SkanKosza`, `NadanieEan`, `IloscOdlozenia`
+   i `PamiecRozjazdu` — ekran zostaje z rysowaniem i stanem, nie z decyzjami. */
 
 class AppGraph(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)

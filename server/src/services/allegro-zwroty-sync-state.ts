@@ -25,16 +25,25 @@ export interface AllegroZwrotySyncState {
   lastErrorCode: number | null;
   errorCount: number;
   nextAttemptAt: string | null;
+  /**
+   * Ile zwrotów Allegro miało jeszcze do oddania po ostatnim przebiegu.
+   *
+   * `null` znaczy „nie wiem" — albo przebiegu jeszcze nie było, albo Allegro
+   * nie podało `count`. Zero znaczy „lista skończyła się sama". Różnica jest
+   * ważna: liczba to jedyny ślad po zwrotach, które bezpiecznik stron zostawił
+   * po tamtej stronie, choć kursor i tak przesunął się naprzód.
+   */
+  pozostalo: number | null;
 }
 
 const PUSTY: AllegroZwrotySyncState = {
   cursorId: null, cursorAt: null, lastSuccessAt: null, lastAttemptAt: null,
-  lastErrorCode: null, errorCount: 0, nextAttemptAt: null,
+  lastErrorCode: null, errorCount: 0, nextAttemptAt: null, pozostalo: null,
 };
 
 export function stanZwrotow(db: Db): AllegroZwrotySyncState {
   const row = db.prepare(`SELECT cursor_id, cursor_at, last_success_at, last_attempt_at,
-    last_error_code, error_count, next_attempt_at
+    last_error_code, error_count, next_attempt_at, pozostalo
     FROM allegro_zwroty_sync_state WHERE id=1`).get() as Record<string, unknown> | undefined;
   if (!row) return PUSTY;
   return {
@@ -45,6 +54,7 @@ export function stanZwrotow(db: Db): AllegroZwrotySyncState {
     lastErrorCode: row.last_error_code == null ? null : Number(row.last_error_code),
     errorCount: Number(row.error_count ?? 0),
     nextAttemptAt: (row.next_attempt_at as string) ?? null,
+    pozostalo: row.pozostalo == null ? null : Number(row.pozostalo),
   };
 }
 
@@ -81,5 +91,9 @@ export function stanZwrotowHealth(
     opoznienieMs: s.lastSuccessAt ? Math.max(0, teraz - Date.parse(s.lastSuccessAt)) : null,
     nastepnaProba: s.nextAttemptAt,
     interwalMs,
+    /* Ogon ostatniego przebiegu (0.209.0). Stoi obok błędów, bo znaczy to samo
+       co one — kolejka NIE JEST kompletna — tylko że synchronizacja o tym nie
+       wie, bo skończyła się sukcesem. */
+    pozostaloDoPobrania: s.pozostalo,
   };
 }

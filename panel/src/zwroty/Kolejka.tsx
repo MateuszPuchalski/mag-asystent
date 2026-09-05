@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { AlertTriangle, PackageX, Ban } from "lucide-react";
+import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
@@ -23,13 +23,31 @@ export const KUBELKI: Array<{ id: Kubelek; etykieta: string; pytanie: string }> 
   { id: "zamkniety", etykieta: "Zamknięte", pytanie: "Tylko wgląd." },
 ];
 
-const SYGNALY: Record<Sygnal, { tytul: string; ikona: React.ReactNode; klasa: string }> = {
-  termin: { tytul: "Termin ustawowy blisko albo minął", klasa: "bg-red-100 text-ranga-zle",
-    ikona: <AlertTriangle size={13} /> },
+/* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze (0.209.0). Łańcuch
+   znał trzy sygnały i milcząco podpisywał każdy czwarty ostatnią gałęzią —
+   czyli nowy sygnał kłamałby na ekranie, zamiast nie przejść kompilacji. */
+const SYGNALY: Record<Sygnal,
+  { tytul: string; krotko: string; ikona: React.ReactNode; klasa: string }> = {
+  termin: { tytul: "Termin ustawowy blisko albo minął", krotko: "termin",
+    klasa: "bg-red-100 text-ranga-zle", ikona: <AlertTriangle size={13} /> },
   brak_dowodu: { tytul: "Klient nie nadał jeszcze paczki, a termin biegnie",
+    krotko: "nie nadana",
     klasa: "bg-amber-100 text-ranga-uwaga", ikona: <PackageX size={13} /> },
   odrzucony_w_allegro: { tytul: "Ktoś rozstrzygnął to już w panelu Allegro",
+    krotko: "w Allegro",
     klasa: "bg-slate-200 text-ranga-nic", ikona: <Ban size={13} /> },
+  /* Przelew wyszedł od nas, a Allegro go nie potwierdziło — trzeba zajrzeć
+     w panel Allegro, zanim ktoś zleci drugi. */
+  pieniadze_niepotwierdzone: {
+    tytul: "Zleciliśmy przelew, a Allegro go nie potwierdziło",
+    krotko: "przelew?", klasa: "bg-red-100 text-ranga-zle",
+    ikona: <CircleHelp size={13} /> },
+  /* Odwrotnie: pieniądze poszły poza tym panelem, a wiersz nadal prosi
+     o kwotę, którą klient już dostał. */
+  pieniadze_poza_panelem: {
+    tytul: "Allegro mówi, że pieniądze już oddano — u nas nie ma po tym śladu",
+    krotko: "już oddane", klasa: "bg-amber-100 text-ranga-uwaga",
+    ikona: <BanknoteArrowDown size={13} /> },
 };
 
 /**
@@ -127,7 +145,7 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
             {z.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>
-                {SYGNALY[s].ikona}{s === "termin" ? "termin" : s === "brak_dowodu" ? "nie nadana" : "w Allegro"}
+                {SYGNALY[s].ikona}{SYGNALY[s].krotko}
               </span>
             ))}
           </div>

@@ -171,8 +171,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       const o = req.body?.ocena ?? null;
-      if (o !== null && !["stan", "przecena", "utylizacja"].includes(o)) {
-        return reply.code(400).send({ error: "Ocena to `stan`, `przecena`, `utylizacja` albo brak." });
+      /* „Przecena" zeszła w 0.209.0 — patrz `ocenPozycje`. Panel, który jej
+         jeszcze nie zdjął, ma dostać 400 z wymienionymi ocenami, a nie cichy
+         zapis wartości, której baza już nie zna. */
+      if (o !== null && !["stan", "utylizacja"].includes(o)) {
+        return reply.code(400).send({ error: "Ocena to `stan`, `utylizacja` albo brak." });
       }
       try {
         return ocenPozycje(db(), Number(req.params.id), o as never,

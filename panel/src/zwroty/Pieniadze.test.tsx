@@ -42,10 +42,22 @@ describe("Pieniądze przy zwrocie", () => {
   });
 
   it("po oddaniu pokazuje numer z Allegro i nie oferuje drugiego kliknięcia", () => {
-    ekran({ stan: stan({ moznaZwrocic: false, oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null } }) });
+    ekran({ stan: stan({ moznaZwrocic: false,
+      oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: true } }) });
     expect(screen.getByText("ref-9")).toBeInTheDocument();
+    expect(screen.getByText(/Oddano/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /ODMÓW WYPŁATY/ })).toBeNull();
+  });
+
+  it("przyjęte polecenie NIE UDAJE oddanych pieniędzy", () => {
+    /* 0.209.0: do tego wydania stało tu „Oddano" od chwili, w której Allegro
+       przyjęło polecenie. Przelew odrzucony godzinę później wyglądał na
+       ekranie dokładnie tak samo jak udany. */
+    ekran({ stan: stan({ moznaZwrocic: false,
+      oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: false } }) });
+    expect(screen.getByText(/jeszcze nie potwierdziło/)).toBeInTheDocument();
+    expect(screen.queryByText(/Oddano/)).toBeNull();
   });
 
   it("odmowa z kodem wymagającym powodu nie wychodzi pusta", async () => {
