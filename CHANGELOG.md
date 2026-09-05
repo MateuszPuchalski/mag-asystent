@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.210.0 — 5 września 2026
+
+**Trzy luki z przeglądu procesu zwrotów.** Właściciel poprosił o przegląd
+end-to-end; te trzy dały się zamknąć bez decyzji o obiegu papieru.
+
+**Termin ustawowy pilnował wyłącznie kolor wiersza.** Sygnał zapala się przy
+trzech dniach, ale zapala się NA EKRANIE — rekoncyliacja i `/api/health` nie
+znały zwrotów w ogóle. Czternaście dni mijało bez jednego alarmu, jeśli przez
+tydzień nikt nie otworzył panelu. To jedyna kontrola w tym pliku o skutku
+prawnym, nie operacyjnym, więc próg jest ostrzejszy niż dobowe progi obok:
+doba przed terminem to ostatni moment, żeby zdążyć. Rozjazd stoi na GÓRZE
+raportu, bo raport czyta się od góry.
+
+**Kwota była migawką, a pozycje żyją dalej.** Synchronizator przy każdym takcie
+nadpisuje ilość i cenę pozycji, a zapisanej kwoty nie dotykało nic — nikt jej
+po zapisie nie porównywał. Zwrot poprawiony po wycenie wypłacał kwotę sprzed
+poprawki, cicho, bo obie liczby były zgodne w chwili zapisu. Nowy sygnał
+„kwota?" liczy tą samą arytmetyką co zapis i nie gaśnie na zwrocie zamkniętym:
+mówi o pieniądzach, a zwrot zamyka się zaraz po korekcie.
+
+**Ekran obiecywał, że powód odmowy zobaczy klient.** Nie zobaczy. Allegro nie
+zna pojęcia „odrzuć zwrot" — końcówka `rejection` odmawia WYPŁATY, nie zwrotu.
+Nasz werdykt jest decyzją biura i nigdzie nie wychodzi. Co gorsza, wpisany
+powód trafiał do kolumny, której nie czytał NIKT: nie widział go nawet
+operator, który go wpisał. Etykieta mówi teraz prawdę, powód jest widoczny na
+zwrocie odrzuconym z klawiszem kopiowania, a zdanie obok mówi, co zrobić dalej.
+
+**Cztery luki zostają otwarte i czekają na decyzję, nie na kod** — spisane
+w `docs/panel-obslugi-klienta.md` §25a.5a: odmowa nie dociera do klienta,
+utylizacja nie schodzi ze stanu, pobranie nie ma gdzie zostawić śladu po
+przelewie, rozjazd ilości nie ma gdzie zamieszkać.
+
 ## 0.209.0 — 5 września 2026
 
 **Przelew, którego Allegro nie potwierdziło, przestał wyglądać jak udany.** Od

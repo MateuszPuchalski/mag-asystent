@@ -48,6 +48,13 @@ const SYGNALY: Record<Sygnal,
     tytul: "Allegro mówi, że pieniądze już oddano — u nas nie ma po tym śladu",
     krotko: "już oddane", klasa: "bg-amber-100 text-ranga-uwaga",
     ikona: <BanknoteArrowDown size={13} /> },
+  /* Kwotę ustalono, a pozycje zmieniły się po niej: synchronizator nadpisuje
+     ilość i cenę przy każdym takcie. Czerwony, bo to pieniądze w złej
+     wysokości, a nie praca do zrobienia kiedyś. */
+  kwota_nieaktualna: {
+    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie",
+    krotko: "kwota?", klasa: "bg-red-100 text-ranga-zle",
+    ikona: <CircleHelp size={13} /> },
 };
 
 /**

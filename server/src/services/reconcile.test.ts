@@ -62,6 +62,56 @@ beforeEach(() => {
   db().prepare("DELETE FROM sfera_queue").run();
   db().prepare("DELETE FROM delivery_line").run();
   db().prepare("DELETE FROM delivery").run();
+  db().prepare("DELETE FROM zwrot_klienta_pozycja").run();
+  db().prepare("DELETE FROM zwrot_klienta").run();
+});
+
+/** Zwrot w pracy, zgłoszony `dni` dni temu. Termin ustawowy to czternaście. */
+function zwrotZgloszonyPrzed(dni: number, numer: string): void {
+  db().prepare(`INSERT INTO channel_account(channel, external_account_id)
+    VALUES ('allegro','rekoncyliacja') ON CONFLICT DO NOTHING`).run();
+  const konto = Number((db().prepare(
+    "SELECT id FROM channel_account WHERE external_account_id='rekoncyliacja'")
+    .get() as { id: number }).id);
+  db().prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id, external_id, reference_number, created_at, synced_at)
+    VALUES (?,?,?, datetime('now', ?), datetime('now'))`)
+    .run(konto, `zw-${numer}`, numer, `-${dni} days`);
+}
+
+/* ── Termin ustawowy (0.210.0) ──────────────────────────────────────────────
+   Do tego wydania terminu pilnował WYŁĄCZNIE kolor wiersza w panelu.
+   Rekoncyliacja i /api/health nie znały zwrotów wcale, więc czternaście dni
+   mijało bez alarmu, jeśli przez tydzień nikt nie otworzył ekranu.         */
+
+test("zwrot po terminie ustawowym trafia do raportu, i to na jego GÓRĘ", () => {
+  zwrotZgloszonyPrzed(20, "PO-1");
+  const r = reconcile();
+  const w = r.rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie");
+  assert.equal(w.length, 1);
+  assert.match(w[0].opis, /PO terminie/);
+  assert.match(w[0].opis, /PO-1/);
+  /* Skutek prawny czyta się przed operacyjnym — raport czyta się od góry. */
+  assert.equal(r.rozjazdy[0].rodzaj, "zwrot_po_terminie");
+});
+
+test("doba przed terminem już zgłasza — to ostatni moment, żeby zdążyć", () => {
+  zwrotZgloszonyPrzed(13, "BLISKO-1");
+  const r = reconcile();
+  assert.equal(r.rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 1);
+});
+
+test("zwrot z zapasem czasu NIE zgłasza się — raport ma zostać pusty", () => {
+  /* Raport przychodzący codziennie przestaje być czytany po tygodniu. */
+  zwrotZgloszonyPrzed(3, "SPOKOJ-1");
+  assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 0);
+});
+
+test("zwrot ZAMKNIĘTY nie ma już terminu do pilnowania", () => {
+  zwrotZgloszonyPrzed(30, "ZAMK-1");
+  db().prepare(`UPDATE zwrot_klienta SET werdykt='przyjety', kwota_grosze=100,
+    korekta_numer='KFS 1/2026', zamkniety_at=datetime('now') WHERE reference_number='ZAMK-1'`).run();
+  assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 0);
 });
 
 test("zgodny zapis nie generuje raportu", () => {

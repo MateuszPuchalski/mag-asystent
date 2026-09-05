@@ -7,7 +7,7 @@ import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte, cofnijKwote, cofnijWerdykt, znajdzZwrotPoKodzie,
+  cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
@@ -597,6 +597,51 @@ test("korekta przed kwotą odpada — nie ma czego korygować", () => {
    kubełek cofa DOKŁADNIE ten krok, który go wprowadził — testy niżej pilnują,
    że schodzi się po jednym szczeblu i że oba nieodwracalne kroki zatrzymują
    całość.                                                                  */
+
+/* ── Kwota rozjechana z pozycjami (0.210.0) ─────────────────────────────────
+   Synchronizator nadpisuje ilość i cenę pozycji przy każdym takcie, a zapisanej
+   kwoty nie dotyka nic. Zwrot poprawiony po wycenie wypłacał starą kwotę.   */
+
+test("zmiana ilości po wycenie zapala sygnał — kwota była migawką", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+  zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 4, KTO);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)!.sygnaly.includes("kwota_nieaktualna"),
+    false, "tuż po zapisie kwota zgadza się z pozycjami");
+
+  /* Tak właśnie robi to synchronizator: `ON CONFLICT DO UPDATE SET ilosc=…`. */
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc=5 WHERE id=?").run(poz[0]);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.ok(z.sygnaly.includes("kwota_nieaktualna"),
+    "kwota nie zgadza się już z pozycjami, a nic jej nie przelicza");
+  /* Sygnał NIE gaśnie na zwrocie zamkniętym: mówi o pieniądzach, a zwrot
+     zamyka się zaraz po korekcie, czyli zanim ktokolwiek to zauważy. */
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026', zamkniety_at=? WHERE id=?")
+    .run("2026-09-05T10:00:00Z", id);
+  assert.ok(listaZwrotow(d).find((x) => x.id === id)!.sygnaly.includes("kwota_nieaktualna"));
+});
+
+test("kwotaRozjechana liczy TĄ SAMĄ arytmetyką co zapisKwoty", () => {
+  /* Inna dałaby fałszywy alarm przy pierwszym zaokrągleniu, a fałszywy alarm
+     uczy przewijać kolor. */
+  const bez = { kwota_grosze: null, kwota_dostawa_grosze: null };
+  assert.equal(kwotaRozjechana(bez, []), false, "bez kwoty nie ma czego porównać");
+
+  const poz = [
+    { w_zwrocie: 1, cena_grosze: 5000, ilosc: 2, potracenie_grosze: 500 },
+    { w_zwrocie: 0, cena_grosze: 9900, ilosc: 1, potracenie_grosze: null },
+  ];
+  /* 5000×2 − 500 = 9500, plus dostawa 1499. Odznaczona pozycja nie liczy się. */
+  assert.equal(kwotaRozjechana(
+    { kwota_grosze: 10999, kwota_dostawa_grosze: 1499 }, poz), false);
+  assert.equal(kwotaRozjechana(
+    { kwota_grosze: 10999, kwota_dostawa_grosze: null }, poz), true);
+});
 
 test("cofnięcie przyjęcia wraca do DECYZJI, dopóki nikt nic nie ocenił", () => {
   /* Zgłoszenie właściciela: przyjęcie idzie jednym kliknięciem, bez pytania

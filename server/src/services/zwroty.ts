@@ -29,7 +29,7 @@ import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
-  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem";
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna";
 
 export interface PozycjaZwrotu {
   id: number;
@@ -95,6 +95,14 @@ export interface WierszZwrotu {
   linkZwrotu: string | null;
   zamowienie: Zamowienie | null;
   werdykt: string | null;
+  /**
+   * Powód odmowy wpisany przez biuro (0.210.0).
+   *
+   * Do tego wydania zapisywał się do `werdykt_powod` i NIKT go nie czytał —
+   * ani panel, ani nic innego. Ekran obiecywał przy nim „zobaczy go klient",
+   * a nie widział go nawet operator, który go wpisał.
+   */
+  werdyktPowod: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
@@ -212,6 +220,8 @@ export function sygnalyZwrotu(z: {
   pieniadzeAt: string | null;
   /* Ostatni status zwrotu po stronie Allegro — nasze jedyne potwierdzenie. */
   statusAllegro: string | null;
+  /** Czy zapisana kwota rozjechała się z pozycjami (0.210.0). */
+  kwotaRozjazd?: boolean;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
@@ -257,6 +267,12 @@ export function sygnalyZwrotu(z: {
      Tylko na zwrocie w pracy. Na zamkniętych zapaliłby się na całej
      historii sprzed tego panelu — a tam nie ma już czego zapłacić drugi raz. */
   if (wPracy && oddane && !z.pieniadzeAt) s.push("pieniadze_poza_panelem");
+  /* KWOTA ROZJECHANA Z POZYCJAMI. Świeci także na zwrocie ZAMKNIĘTYM, z tego
+     samego powodu co niepotwierdzony przelew: mówi o pieniądzach, które mogły
+     wyjść w złej wysokości, a zwrot zamyka się zaraz po korekcie. Gaśnie
+     dopiero wtedy, gdy ktoś kwotę poprawi — drabina cofania z 0.202.0 daje
+     na to drogę nawet po zamknięciu. */
+  if (z.kwotaRozjazd) s.push("kwota_nieaktualna");
   return s;
 }
 
@@ -273,9 +289,46 @@ export function sumaPozycji(pozycje: Array<{ cenaGrosze: number; ilosc: number }
   return pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
 }
 
+/**
+ * Czy zapisana kwota nadal zgadza się z pozycjami (0.210.0).
+ *
+ * KWOTA JEST MIGAWKĄ, A POZYCJE ŻYJĄ DALEJ. Synchronizator przy każdym takcie
+ * nadpisuje `ilosc` i `cena_grosze` pozycji z Allegro, a zapisanej
+ * `kwota_grosze` nie dotyka nic — do tego wydania nikt jej po zapisie nie
+ * porównywał. Zwrot, którego klient poprawił po wycenie, wypłacał kwotę
+ * sprzed poprawki. Cicho, bo obie liczby leżały w bazie zgodne ze sobą
+ * w chwili zapisu.
+ *
+ * Liczymy TĄ SAMĄ arytmetyką co `zapiszKwote`: zaznaczone pozycje minus
+ * potrącenia, plus zapisany koszt dostawy. Inna dałaby fałszywy alarm przy
+ * pierwszej różnicy zaokrąglenia.
+ *
+ * `w_zwrocie` JEST zaznaczeniem i przeżywa synchronizację, więc pozycja
+ * dołożona przez Allegro po wycenie ma tam zero i sumy nie rusza. Tego
+ * przypadku ten sygnał NIE łapie — nie da się odróżnić pozycji dołożonej
+ * później od świadomie odznaczonej, bo pozycja nie ma daty dopisania.
+ */
+export function kwotaRozjechana(
+  z: { kwota_grosze: unknown; kwota_dostawa_grosze: unknown },
+  surowe: Array<{ w_zwrocie: unknown; cena_grosze: unknown; ilosc: unknown;
+    potracenie_grosze: unknown }>,
+): boolean {
+  if (z.kwota_grosze == null) return false;
+  const zPozycji = surowe
+    .filter((p) => Number(p.w_zwrocie) === 1)
+    .reduce((sum, p) => sum
+      + Math.round(Number(p.cena_grosze) * Number(p.ilosc))
+      - Number(p.potracenie_grosze ?? 0), 0);
+  return zPozycji + Number(z.kwota_dostawa_grosze ?? 0) !== Number(z.kwota_grosze);
+}
+
 function zloz(
   z: Wiersz, pozycje: PozycjaZwrotu[], zamowienie: Zamowienie | null, teraz: number,
   rozmowy: RozmowaZwrotu[] = [],
+  /* Surowe wiersze pozycji obok złożonych: sygnał rozjazdu kwoty liczy się
+     z `w_zwrocie`, `cena_grosze` i `potracenie_grosze`, a DTO pozycji nie
+     niesie zaznaczenia — i nie ma powodu, żeby zaczęło. */
+  surowe: Wiersz[] = [],
 ): WierszZwrotu {
   const utworzono = String(z.created_at);
   const terminAt = terminZwrotu(utworzono);
@@ -305,7 +358,8 @@ function zloz(
       dostarczonoAt: (z.dostarczono_at as string) ?? null,
       przesylkaStatus: (z.przesylka_status as string) ?? null, rejectionCode,
       pieniadzeAt: (z.zwrot_pieniedzy_at as string) ?? null,
-      statusAllegro: (z.status_allegro as string) ?? null }, teraz),
+      statusAllegro: (z.status_allegro as string) ?? null,
+      kwotaRozjazd: kwotaRozjechana(z as never, surowe as never) }, teraz),
     terminAt,
     dniDoTerminu: dni,
     sumaPozycjiGrosze: suma,
@@ -322,6 +376,7 @@ function zloz(
         (z.created_at as string) ?? null),
     zamowienie,
     werdykt: (z.werdykt as string) ?? null,
+    werdyktPowod: (z.werdykt_powod as string) ?? null,
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
@@ -570,7 +625,7 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           ?? 0) : null;
 
       return zloz(z, zlozone, zamowienie, teraz,
-        rozmowyWgZam.get(String(z.order_id ?? "")) ?? []);
+        rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe);
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. */
