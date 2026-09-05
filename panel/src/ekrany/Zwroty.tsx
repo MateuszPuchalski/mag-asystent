@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
-import type { BilansKartotek, Kubelek, Zwrot } from "../api/typy";
+import type { BilansKartotek, Kubelek, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
@@ -66,6 +66,30 @@ function PasekKartotek({ bilans }: { bilans: BilansKartotek }) {
     {powody.map(([kod, ile]) => <span key={kod} className="text-amber-800">
       {POWODY_SKROT[kod] ?? kod} <b className="tabular-nums">{ile}</b>
     </span>)}
+  </div>;
+}
+
+/**
+ * Ile zwrotów NIE WESZŁO do tej kolejki (0.208.0).
+ *
+ * Synchronizacja chodzi z bezpiecznikiem dziesięciu stron i do tego wydania
+ * urywała się na nim CICHO: przebieg kończył się sukcesem, kursor szedł
+ * naprzód, a reszta nie wracała już nigdy. Kolejka ustawia się według terminu
+ * ustawowego, więc brakujące wiersze były w większości tymi najbardziej
+ * spóźnionymi — czyli dokładnie tymi, dla których ten ekran istnieje.
+ *
+ * Zero i `null` MILCZĄ. Zero znaczy „lista skończyła się sama", `null` — że
+ * Allegro nie podało liczby; o żadnym z tych stanów pasek nie ma co powiedzieć,
+ * a pasek stojący nad kolejką zawsze przestaje być czytany po tygodniu.
+ */
+function PasekOgona({ stan }: { stan: StanZwrotow }) {
+  if (!stan.pozostaloDoPobrania) return null;
+  return <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
+    <b>Ta kolejka nie jest kompletna: {stan.pozostaloDoPobrania} zwrotów czeka
+      po stronie Allegro.</b>{" "}
+    Ostatni przebieg stanął na bezpieczniku stron. Dociągną się kolejnymi
+    przebiegami — ale dopóki liczba tu stoi, najstarszych zwrotów może w tej
+    liście nie być.
   </div>;
 }
 
@@ -278,6 +302,7 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    {data?.stan && <PasekOgona stan={data.stan} />}
     {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>

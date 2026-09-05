@@ -176,6 +176,34 @@ export function migrate(database: DatabaseSync) {
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");
+  /* Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
+     (0.208.0). Bez tej liczby urwanie na limicie stron było CICHE: przebieg
+     kończył się sukcesem, kursor szedł naprzód, a zwroty spoza dziesiątej
+     strony nie wracały nigdy. `NULL` znaczy „nie wiem", nie „zero". */
+  addColumn("allegro_zwroty_sync_state", "pozostalo", "INTEGER");
+  /* Zejście oceny „przecena" (0.208.0).
+
+     MUSI STAĆ PRZED przebudową `zwrot_klienta_pozycja` niżej w tym samym
+     przebiegu. Nowa definicja tamtej tabeli nie zna już `przecena`, więc
+     `INSERT ... SELECT` przepisujący wiersz z tą oceną wywróciłby CHECK
+     i całą migrację — a `migrate()` woła KAŻDY proces, więc instalacja nie
+     wstałaby wcale. To ta sama blizna co przy przekluczaniu pozycji.
+
+     Ocena schodzi na `NULL`, nie na „stan" ani „utylizacja". Obie tamte są
+     decyzją o towarze, której nikt nie podjął; `NULL` mówi prawdę — pozycja
+     czeka na ocenę i wróci do kubełka „do oceny". Zwrotu zamkniętego to nie
+     odemknie: `kubelekZwrotu` rozstrzyga stany końcowe pierwsze.
+
+     KOLUMNY PYTAMY, zanim ją odczytamy. Baza sprzed 0.156.0 nie ma jeszcze
+     `ocena` — dokłada ją dopiero przebudowa niżej — a `UPDATE` na nieistniejącej
+     kolumnie wywraca całą migrację i z nią start każdego procesu. Tam nie ma
+     zresztą czego czyścić: bez kolumny nie było jak zapisać przeceny. */
+  const maOcene = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
+    .all() as Array<{ name: string }>).some((c) => c.name === "ocena");
+  if (maOcene) {
+    database.exec(`UPDATE zwrot_klienta_pozycja
+      SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE ocena='przecena'`);
+  }
   /* Odhaczenie wzmianki (0.160.0). Do tego wydania `conversation_mention`
      mówiła tylko „ktoś cię wymienił" i nie znała odpowiedzi na „czy już się
      tym zająłeś" — a bez niej skrzynka wzmianek pokazywałaby w kółko to samo. */
@@ -672,7 +700,7 @@ function pozycjaZwrotuBezReadModelu(database: DatabaseSync) {
           -- zapiszKwote leci na nieistniejącą kolumnę.
           w_zwrocie INTEGER NOT NULL DEFAULT 0,
           klucz TEXT NOT NULL,
-          ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
+          ocena TEXT CHECK (ocena IN ('stan','utylizacja')),
           ocena_at TEXT, ocena_przez TEXT,
           tw_id INTEGER,
           tw_symbol TEXT,

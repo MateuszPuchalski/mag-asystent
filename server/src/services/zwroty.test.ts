@@ -137,7 +137,8 @@ test("zwrot bez pozycji zostaje przy ocenie, a nie przeskakuje do kwoty", () => 
 test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
   const w = (o: Record<string, unknown>) => sygnalyZwrotu({
     kubelek: "decyzja", dni: 10, paczkaAt: "2026-08-30T00:00:00Z",
-    dostarczonoAt: null, przesylkaStatus: null, rejectionCode: null, ...o,
+    dostarczonoAt: null, przesylkaStatus: null, rejectionCode: null,
+    pieniadzeAt: null, statusAllegro: null, ...o,
   } as Parameters<typeof sygnalyZwrotu>[0]);
   assert.deepEqual(w({}), [], "zwrot w terminie z paczką nie żąda niczego");
   assert.deepEqual(w({ dni: 3 }), ["termin"], "trzy dni to już próg");
@@ -162,6 +163,50 @@ test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
      jego brak. Przewoźnik bywa nieznany, a Allegro nie zawsze odpowie. */
   assert.deepEqual(w({ przesylkaStatus: null, dostarczonoAt: null }), [],
     "brak trackingu → data nadania jak dawniej");
+});
+
+test("sygnały o pieniądzach mówią, W KTÓRĄ STRONĘ patrzeć", () => {
+  /* Do 0.208.0 status przelewu zapisywał się RAZ, z odpowiedzi na
+     `POST /payments/refunds`, i nikt go już nie czytał. Przelew odrzucony
+     przez Allegro godzinę później wyglądał u nas dokładnie jak udany.
+     Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
+     zwrotu płatności w specyfikacji nie istnieje. */
+  const TERAZ = Date.parse("2026-09-05T12:00:00Z");
+  const w = (o: Record<string, unknown>) => sygnalyZwrotu({
+    kubelek: "zwrot", dni: 10, paczkaAt: "2026-08-30T00:00:00Z",
+    dostarczonoAt: "2026-08-31T00:00:00Z", przesylkaStatus: "DELIVERED",
+    rejectionCode: null, pieniadzeAt: null, statusAllegro: "DELIVERED", ...o,
+  } as Parameters<typeof sygnalyZwrotu>[0], TERAZ);
+
+  assert.deepEqual(w({}), [], "bez przelewu i bez potwierdzenia nie ma o co pytać");
+
+  /* Próg trzech dni: przelew zlecony w piątek ma prawo potwierdzić się
+     w poniedziałek. Sygnał krzyczący od razu nauczyłby go przewijać. */
+  assert.deepEqual(w({ pieniadzeAt: "2026-09-05T09:00:00Z" }), [],
+    "zlecony dziś — Allegro ma jeszcze czas");
+  assert.deepEqual(w({ pieniadzeAt: "2026-09-03T09:00:00Z" }), [],
+    "dwa dni to jeszcze nie pytanie");
+  assert.deepEqual(w({ pieniadzeAt: "2026-09-01T09:00:00Z" }), ["pieniadze_niepotwierdzone"],
+    "cztery dni bez potwierdzenia to już pytanie");
+
+  for (const status of ["FINISHED", "FINISHED_APT"]) {
+    assert.deepEqual(w({ pieniadzeAt: "2026-09-01T09:00:00Z", statusAllegro: status }), [],
+      `${status} znaczy „pieniądze u klienta" — sygnał gaśnie`);
+  }
+
+  /* JEDYNY sygnał, który przeżywa zamknięcie zwrotu. Zwrot zamyka się zaraz
+     po korekcie, czyli zwykle ZANIM Allegro potwierdzi przelew — gaszenie go
+     razem z resztą wyciszyłoby go dokładnie wtedy, gdy zaczyna być prawdziwy. */
+  assert.deepEqual(w({ kubelek: "zamkniety", pieniadzeAt: "2026-09-01T09:00:00Z" }),
+    ["pieniadze_niepotwierdzone"], "zamknięcie nie jest dowodem na przelew");
+
+  /* Druga strona rozjazdu: Allegro mówi „oddane", a u nas nie ma śladu.
+     Ktoś oddał pieniądze ręką w panelu Allegro albo zrobiło to Allegro
+     Protect. Bez tego zwrot stoi w kubełku „do zwrotu" i prosi o pieniądze,
+     które klient już ma — czyli prowadzi wprost do drugiego przelewu. */
+  assert.deepEqual(w({ statusAllegro: "FINISHED" }), ["pieniadze_poza_panelem"]);
+  assert.deepEqual(w({ kubelek: "zamkniety", statusAllegro: "FINISHED" }), [],
+    "na zamkniętym nie ma już czego zapłacić drugi raz");
 });
 
 test("suma pozycji mnoży cenę przez ilość i zostaje w groszach", () => {
@@ -719,7 +764,7 @@ test("zamknięty zwrot nie przyjmuje innych zmian niż cofnięcie korekty", () =
   const { id, poz, wersja } = zwrotDoKorekty(d, KTO);
   zapiszKorekte(d, id, "KFS 12/2026", wersja, KTO);
 
-  assert.throws(() => ocenPozycje(d, poz[0], "przecena", wersja + 1, KTO), /zamkni/i);
+  assert.throws(() => ocenPozycje(d, poz[0], "utylizacja", wersja + 1, KTO), /zamkni/i);
   assert.throws(() => zapiszKwote(d, id, { pozycjeIds: poz, dostawa: true }, wersja + 1, KTO),
     /zamkni/i);
 });

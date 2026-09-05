@@ -66,8 +66,18 @@ describe("Produkty ze zwrotu", () => {
   it("ocena stoi PRZY towarze, nie obok listy nazw", async () => {
     const onOcena = vi.fn();
     lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] }), { onOcena });
-    await userEvent.click(screen.getByRole("button", { name: /Na przecenę/ }));
-    expect(onOcena).toHaveBeenCalledWith(11, "przecena");
+    await userEvent.click(screen.getByRole("button", { name: /Utylizacja/ }));
+    expect(onOcena).toHaveBeenCalledWith(11, "utylizacja");
+  });
+
+  it("oceny są DWIE — przecena zeszła razem z martwą ścieżką", () => {
+    /* 0.208.0: „Na przecenę" zapisywała się i na tym się kończyła. Przycisk,
+       który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy każdej
+       pozycji — a to jest najczęściej naciskane miejsce tego ekranu. */
+    lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] }));
+    expect(screen.getByRole("button", { name: /Na stan/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Utylizacja/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /przecen/i })).toBeNull();
   });
 
   it("oceniona pozycja pokazuje ocenę zamiast pytać drugi raz", () => {

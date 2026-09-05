@@ -536,7 +536,7 @@ test("przyjęcie da się cofnąć przez HTTP, dopóki nikt nic nie ocenił", asy
     headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
   assert.equal(r.statusCode, 200, r.body);
   r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
-    headers: naglowki, payload: { ocena: "przecena", wersja: wersja() } });
+    headers: naglowki, payload: { ocena: "utylizacja", wersja: wersja() } });
   assert.equal(r.statusCode, 200, r.body);
 
   const poOcenie = await app.inject({ method: "POST",
@@ -564,7 +564,7 @@ test("kwotę da się cofnąć przez HTTP i zapisać inną", async () => {
     headers: naglowki, payload: { decyzja: "przyjety", wersja: wersja() } });
   assert.equal(r.statusCode, 200, r.body);
   r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/pozycje/${pozycja}/ocena`,
-    headers: naglowki, payload: { ocena: "przecena", wersja: wersja() } });
+    headers: naglowki, payload: { ocena: "utylizacja", wersja: wersja() } });
   assert.equal(r.statusCode, 200, r.body);
   r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/kwota`,
     headers: naglowki, payload: { pozycjeIds: [pozycja], dostawa: false, wersja: wersja() } });

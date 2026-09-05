@@ -28,6 +28,20 @@ import { logEvent } from "./events.js";
 
 export class ZwrotPieniedzyConflict extends Error {}
 
+/**
+ * Statusy zwrotu, przy których PŁATNOŚĆ JEST ODDANA.
+ *
+ * Ze SCHEMATU `CustomerReturn.status` w `docs/allegro/swagger.yaml`:
+ * `FINISHED` to „the payment has been refunded", `FINISHED_APT` to to samo
+ * ręką Allegro Protect. Dla nas obie znaczą jedno — pieniądze są u klienta —
+ * bo różnica mówi, KTO zapłacił, a nie CZY.
+ *
+ * Mieszka TUTAJ, choć czyta to także kolejka (`zwroty.ts`): to jest wiedza
+ * o pieniądzach, a dwie kopie tej listy rozjechałyby się przy pierwszym
+ * nowym statusie — i wtedy kolejka mówiłaby co innego niż przycisk.
+ */
+export const STATUSY_ODDANE = new Set(["FINISHED", "FINISHED_APT"]);
+
 /** Kody odmowy ze schematu `CustomerReturnRefundRejectionRequest`. */
 export const KODY_ODMOWY = [
   "REFUND_REJECTED", "NEW_ITEM_SENT", "ITEM_FIXED", "MISSING_PART_SENT",
@@ -61,13 +75,17 @@ type Wiersz = {
   waluta: string | null;
   platnosc_id: string | null; platnosc_typ: string | null;
   zwrot_pieniedzy_id: string | null; zwrot_pieniedzy_command_id: string | null;
-  odmowa_kod: string | null;
+  zwrot_pieniedzy_status: string | null; zwrot_pieniedzy_at: string | null;
+  odmowa_kod: string | null; odmowa_powod: string | null; odmowa_at: string | null;
+  status_allegro: string | null;
 };
 
 const wczytaj = (database: Db, zwrotId: number): Wiersz => {
   const w = database.prepare(`SELECT z.id, z.external_id, z.order_id, z.channel_account_id,
       z.wersja, z.werdykt, z.zamkniety_at, z.kwota_grosze, z.kwota_dostawa_grosze,
-      z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id, z.odmowa_kod,
+      z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id,
+      z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
+      z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro,
       o.platnosc_id, o.platnosc_typ, o.waluta
     FROM zwrot_klienta z
     LEFT JOIN zamowienie_klienta o
@@ -85,7 +103,18 @@ export type StanZwrotuPieniedzy = {
   powod: string | null;
   kwotaGrosze: number | null;
   waluta: string;
-  oddane: { id: string | null; status: string | null; kiedy: string | null } | null;
+  oddane: {
+    id: string | null; status: string | null; kiedy: string | null;
+    /**
+     * Czy ALLEGRO potwierdziło, że pieniądze wyszły.
+     *
+     * `status` to odpowiedź na nasze polecenie sprzed chwili; to pole mówi,
+     * co Allegro sądzi o zwrocie TERAZ. Do 0.208.0 ekran pokazywał wyłącznie
+     * to pierwsze i przez to nie umiał odróżnić przelewu udanego od
+     * przyjętego-i-odrzuconego.
+     */
+    potwierdzone: boolean;
+  } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
 };
 
@@ -104,9 +133,20 @@ export function stanZwrotuPieniedzy(
   const podstawa = {
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: w.waluta ?? "PLN",
+    /* Kolumny CZYTANE, nie zerowane. Do 0.208.0 stały tu trzy `null`-e mimo
+       wypełnionych kolumn — ekran nie mówił ani kiedy przelew poszedł, ani co
+       Allegro na niego odpowiedziało. Zapisane i nieodczytane pole jest
+       gorsze od nieistniejącego: wygląda jak wiedza, której nie ma. */
     oddane: w.zwrot_pieniedzy_id || w.zwrot_pieniedzy_command_id
-      ? { id: w.zwrot_pieniedzy_id, status: null, kiedy: null } : null,
-    odmowa: w.odmowa_kod ? { kod: w.odmowa_kod, powod: null, kiedy: null } : null,
+      ? {
+        id: w.zwrot_pieniedzy_id,
+        status: w.zwrot_pieniedzy_status,
+        kiedy: w.zwrot_pieniedzy_at,
+        potwierdzone: STATUSY_ODDANE.has(String(w.status_allegro ?? "")),
+      }
+      : null,
+    odmowa: w.odmowa_kod
+      ? { kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at } : null,
   };
   const nie = (powod: string) =>
     ({ ...podstawa, moznaZwrocic: false, moznaOdmowic: false, powod });

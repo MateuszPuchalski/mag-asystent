@@ -68,8 +68,11 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
   assert.equal(ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk !== null, true);
   assert.equal(ocenPozycje(d, poz[1], "utylizacja", 3, KTO).koszyk, null,
     "utylizacja ma zejść ze stanu, nie pojechać na regał zwrotów");
-  assert.equal(ocenPozycje(d, poz[2], "przecena", 4, KTO).koszyk, null,
-    "przecena zostaje poza tą ścieżką — decyzja właściciela");
+  /* Trzecia pozycja zostaje BEZ OCENY i to też jest wypowiedź: brak oceny nie
+     dokłada niczego do koszyka. Do 0.208.0 stała tu „przecena" — ocena, która
+     nie prowadziła donikąd i dlatego zeszła razem z przyciskiem. */
+  assert.equal(ocenPozycje(d, poz[2], null, 4, KTO).koszyk, null,
+    "bez oceny nie ma czego dokładać do MM");
 
   const kosz = stanOtwartegoKosza(d, KTO);
   assert.equal(kosz?.pozycji, 1);

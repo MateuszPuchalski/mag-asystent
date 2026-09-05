@@ -60,9 +60,20 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
 
       {/* Oddane: numer zwrotu płatności z Allegro, nie samo „zrobione".
           Bez numeru nie da się niczego znaleźć po drugiej stronie. */}
-      {stan.oddane && <span className="flex items-center gap-1 text-sm font-semibold text-ranga-ok">
-        <Check size={14} />Oddano{stan.oddane.id && <span className="font-mono text-xs font-normal
-          text-slate-500">{stan.oddane.id}</span>}</span>}
+      {/* DWA STANY, NIE JEDEN (0.208.0). Do tego wydania stało tu samo
+          „Oddano" — od chwili, w której Allegro PRZYJĘŁO polecenie. Przelew
+          odrzucony godzinę później wyglądał identycznie jak udany. Zieleń
+          należy się dopiero potwierdzeniu ze statusu zwrotu; do tego czasu
+          ekran mówi, na co czeka, zamiast obiecywać przelew. */}
+      {stan.oddane && (stan.oddane.potwierdzone
+        ? <span className="flex items-center gap-1 text-sm font-semibold text-ranga-ok">
+            <Check size={14} />Oddano{stan.oddane.id && <span className="font-mono text-xs font-normal
+              text-slate-500">{stan.oddane.id}</span>}</span>
+        : <span title="Allegro przyjęło polecenie, ale nie potwierdziło jeszcze wypłaty"
+            className="flex items-center gap-1 text-sm font-semibold text-ranga-uwaga">
+            <Check size={14} />Zlecone — Allegro jeszcze nie potwierdziło
+            {stan.oddane.id && <span className="font-mono text-xs font-normal
+              text-slate-500">{stan.oddane.id}</span>}</span>)}
 
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono ({stan.odmowa.kod})</span>}

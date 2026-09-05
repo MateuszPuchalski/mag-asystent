@@ -97,6 +97,52 @@ test("paginacja idzie dalej niż pierwsza strona i staje na bezpieczniku", async
   assert.equal(ile.c, 1000);
 });
 
+test("urwanie na bezpieczniku ZOSTAWIA ŚLAD, zamiast gubić resztę po cichu", async () => {
+  /* Do 0.208.0 przebieg urwany na dziesiątej stronie kończył się SUKCESEM:
+     kursor szedł naprzód, błędu nie było, a zwroty spoza granicy nie wracały
+     już nigdy. Kolejka ustawia się według terminu ustawowego, więc niewidoczne
+     wiersze były w większości tymi najbardziej spóźnionymi — czyli dokładnie
+     tymi, dla których ten ekran istnieje. */
+  const d = stanowisko();
+  let strony = 0;
+  await synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", now: () => new Date("2026-09-01T10:00:00Z"),
+    query: async () => {
+      strony++;
+      return { count: 1500, customerReturns: Array.from({ length: 100 },
+        (_, i) => zwrot(`s${strony}-${i}`, "2026-08-30T00:00:00Z")) };
+    },
+  });
+  assert.equal(stanZwrotow(d).pozostalo, 500,
+    "tysiąc pięćset pasujących minus tysiąc wziętych — tyle zostało po tamtej stronie");
+});
+
+test("lista domknięta własnym końcem nie ma ogona", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", now: () => new Date("2026-09-01T10:00:00Z"),
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T00:00:00Z")]),
+  });
+  assert.equal(stanZwrotow(d).pozostalo, 0, "niepełna strona znaczy koniec listy");
+});
+
+test("brak `count` zapisuje „nie wiem\", a nie „zero\"", async () => {
+  /* Zero kłamałoby, że nic nie zostało. `null` mówi prawdę: Allegro nie
+     podało liczby, więc ogona nie umiemy policzyć — a przebieg i tak ma się
+     odbyć, bo pobranie zwrotów jest ważniejsze od licznika. */
+  const d = stanowisko();
+  let strony = 0;
+  await synchronizujAllegroZwroty({
+    database: d, apiUrl: "https://api", now: () => new Date("2026-09-01T10:00:00Z"),
+    query: async () => {
+      strony++;
+      return { customerReturns: Array.from({ length: 100 },
+        (_, i) => zwrot(`b${strony}-${i}`, "2026-08-30T00:00:00Z")) };
+    },
+  });
+  assert.equal(stanZwrotow(d).pozostalo, null);
+});
+
 test("drugi przebieg nie tworzy duplikatów i nie rusza decyzji biura", async () => {
   const d = stanowisko();
   const partia = [zwrot("z1", "2026-08-30T08:00:00Z")];

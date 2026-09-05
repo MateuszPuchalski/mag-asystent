@@ -1355,7 +1355,10 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   -- Adres oferty wprost z `items[].url` — JEDYNY odnośnik, który specyfikacja
   -- Allegro opisuje, więc jedyny bez znacznika `[WERYFIKUJ]`.
   url TEXT,
-  ocena TEXT CHECK (ocena IN ('stan','przecena','utylizacja')),
+  -- Oceny są DWIE od 0.208.0. „Przecena" nie prowadziła donikąd: nie dokładała
+  -- do koszyka, nie ruszała stanu, nie zakładała zadania. Zdjęta razem
+  -- z przyciskiem — wraca dopiero ze ścieżką przeceny, jeśli powstanie.
+  ocena TEXT CHECK (ocena IN ('stan','utylizacja')),
   ocena_at TEXT, ocena_przez TEXT,
   -- ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────────
   -- Ile MNIEJ oddajemy za tę pozycję, bo wróciła używana albo uszkodzona.
@@ -1510,7 +1513,12 @@ CREATE TABLE IF NOT EXISTS allegro_zwroty_sync_state (
   last_attempt_at TEXT,
   last_error_code INTEGER,
   error_count INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at TEXT
+  next_attempt_at TEXT,
+  -- Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
+  -- (0.208.0). Bezpiecznik stron urywał listę CICHO: przebieg kończył się
+  -- sukcesem, kursor szedł naprzód, a reszta nie wracała nigdy. `NULL` znaczy
+  -- „nie wiem" — Allegro nie podało liczby — i to co innego niż zero.
+  pozostalo INTEGER
 );
 
 -- ── Zamówienia klienckie z Allegro (0.152.0) ────────────────────────────────
