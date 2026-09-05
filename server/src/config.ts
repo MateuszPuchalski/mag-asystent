@@ -485,6 +485,17 @@ export const config = {
     MGP: num(process.env.MAG_ID_MGP, 2, "MAG_ID_MGP"),
     /** Magazyn zwrotów od klientów (biuro kompletuje kartony i wystawia dokument). */
     ZWROTY: num(process.env.MAG_ID_ZWROTY, 3, "MAG_ID_ZWROTY"),
+    /**
+     * Magazyn ODPADU — towar z oceny „utylizacja" (0.211.0).
+     *
+     * ZERO ZNACZY WYŁĄCZONE i to jest cała domyślna wartość. Pozostałe trzy
+     * magazyny mają domyślne numery, bo pomyłka daje najwyżej pusty ekran.
+     * Tutaj pomyłka WYSTAWIA DOKUMENT: zgadnięty numer przesunąłby złom na
+     * cudzy magazyn, a MM się nie cofa jednym kliknięciem. Dopóki numeru nie
+     * ma w `wertis.env`, ocena „utylizacja" zapisuje się jak dotąd i nie
+     * zakłada koszyka — czyli zachowanie sprzed tego wydania.
+     */
+    ODP: num(process.env.MAG_ID_ODP, 0, "MAG_ID_ODP"),
   },
 
   /**

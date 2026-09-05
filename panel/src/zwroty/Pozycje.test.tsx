@@ -14,7 +14,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   id: 11, zrodlo: "allegro", offerId: "of-1", ofertaZamowienia: null, nazwa: "Szarpak", ilosc: 1, cenaGrosze: 4999,
-  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, url: null,
+  waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, iloscZwrocona: null, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
     prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
@@ -370,7 +370,7 @@ describe("Pozycja dopisana przez biuro", () => {
        kartoteki nie ma czego wpisać. Bez tego zdania karton pojechałby na halę
        z towarem, którego nie ma na żadnym papierze. */
     lista(zwrot({ kubelek: "zwrot", pozycje: [
-      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, iloscZwrocona: null, twId: null }),
     ] }));
     expect(screen.getByText(/Nie weszła do koszyka/)).toBeInTheDocument();
   });

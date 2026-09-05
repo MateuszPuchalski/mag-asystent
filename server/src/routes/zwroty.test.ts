@@ -163,7 +163,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają dwadzieścia tras POST, a trzy z nich wychodzą do Allegro", async () => {
+test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -229,7 +229,14 @@ test("zwroty mają dwadzieścia tras POST, a trzy z nich wychodzą do Allegro", 
      odpowiedzią, jest scenariuszem normalnym. Nowy identyfikator przy drugiej
      próbie oddałby pieniądze dwa razy.
 
-     DWUDZIESTA COFA PRZYJĘCIE ZWROTU (0.204.0) i domyka drabinę z §25a.5.
+     DWUDZIESTA PIERWSZA ZAPISUJE, ILE SZTUK NAPRAWDĘ WRÓCIŁO (0.212.0).
+     Klient zgłasza dwie, w kartonie przyjeżdża jedna — do 0.211.0 nie było
+     tego gdzie zapisać, a kwota liczyła się z deklaracji. Liczy BIURO,
+     decyzja właściciela. Widełki zna serwis, nie trasa: zależą od deklaracji
+     klienta, a więcej niż zgłoszono odpada, bo nadmiar z kartonu jest inną
+     pozycją i ma własną drogę.
+
+          DWUDZIESTA COFA PRZYJĘCIE ZWROTU (0.204.0) i domyka drabinę z §25a.5.
      Przyjęcie idzie jednym kliknięciem, bez pytania o nic — i tak ma zostać,
      bo tak wygląda typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę
      powrotną. Osobna trasa, a nie `werdykt` z pustą decyzją: tamta przyjmuje
@@ -260,9 +267,10 @@ test("zwroty mają dwadzieścia tras POST, a trzy z nich wychodzą do Allegro", 
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 20, `tras POST jest ${posty.length}, a umowa mówi o dwudziestu`);
+  assert.equal(posty.length, 21,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu jeden`);
 
-  for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "zamowienia",
+  for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);

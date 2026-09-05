@@ -55,6 +55,13 @@ const SYGNALY: Record<Sygnal,
     tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie",
     krotko: "kwota?", klasa: "bg-red-100 text-ranga-zle",
     ikona: <CircleHelp size={13} /> },
+  /* Wróciło mniej, niż klient zgłosił. Bursztyn, nie czerwień: to nie jest
+     usterka, tylko fakt, który biuro już zapisało — a wypłata się z nim
+     zgadza. Kolor mówi „przeczytaj przy reklamacji", nie „napraw teraz". */
+  rozjazd_ilosci: {
+    tytul: "Wróciło mniej sztuk, niż klient zgłosił",
+    krotko: "mniej szt.", klasa: "bg-amber-100 text-ranga-uwaga",
+    ikona: <PackageX size={13} /> },
 };
 
 /**

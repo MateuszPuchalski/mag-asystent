@@ -8,6 +8,7 @@ import { Kafel, KafelOferty } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
 import { Potracenie } from "./Potracenie";
+import { IloscZwrocona } from "./IloscZwrocona";
 import { Dopisz } from "./Dopisz";
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
@@ -130,7 +131,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   doDopisania = [], bladDopisania = "",
-  onOcena, onKwota, onZglosRabat, onPotracenie, onDopisz, onZdejmij }: {
+  onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij }: {
   zwrot: Zwrot;
   trwa: boolean;
   blad: string;
@@ -143,6 +144,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
+  /** Ile sztuk naprawdę wróciło; `null` czyści zapis (0.212.0). */
+  onIlosc?: (pozycjaId: number, ilosc: number | null) => void;
   onDopisz?: (zamPozycjaId: number) => void;
   onZdejmij?: (pozycjaId: number) => void;
 }) {
@@ -297,6 +300,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               rozkładaniu. */}
           {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 text-xs font-semibold text-ranga-uwaga">
             Nie weszła do koszyka — bez kartoteki nie ma czego wpisać na MM.</p>}
+
+          {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —
+              i tam ją proponujemy. Zapisaną widać wszędzie, bo po zamknięciu
+              zwrotu to ona tłumaczy, czemu wypłata była niższa. */}
+          {onIlosc && (ocenianie || wycena || p.iloscZwrocona != null) &&
+            <IloscZwrocona p={p} trwa={trwa} blad={blad}
+              onZapisz={(ile) => onIlosc(p.id, ile)} />}
 
           {/* Potrącenie proponuje się TAM, gdzie zapada decyzja o pieniądzach,
               czyli przy wycenie. Zapisane widać wszędzie, bo to fakt o pozycji

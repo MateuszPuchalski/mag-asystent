@@ -369,6 +369,18 @@ export function migrate(database: DatabaseSync) {
   /* Skąd wziął się numer korekty: `subiekt` = automat znalazł dokument
      korygujący, `reczne` = człowiek przepisał. Ta sama zasada co przy
      `faktura_zrodlo` — wybór człowieka nie ma udawać faktu z danych. */
+  /* Ile sztuk NAPRAWDĘ wróciło (0.212.0). `ilosc` niesie DEKLARACJĘ klienta
+     i nadpisuje ją synchronizator przy każdym takcie; tej kolumny nie rusza
+     nic poza biurem.
+
+     Puste znaczy „nie liczono" i to nie to samo co zero: zero jest zdaniem
+     „klient zgłosił dwie, nie wróciła żadna", a puste — „nikt jeszcze nie
+     otworzył kartonu". Kwota i koszyk biorą tę liczbę, gdy jest, a deklarację
+     tylko wtedy, gdy jej nie ma.
+
+     Rozjazd ilości sprawdza BIURO — decyzja właściciela: „biuro zajmuje się
+     otwieraniem i procesowaniem zwrotów". */
+  addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej

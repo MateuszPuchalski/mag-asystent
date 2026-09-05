@@ -7,7 +7,8 @@ import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, znajdzZwrotPoKodzie,
+  cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona,
+  znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
@@ -597,6 +598,68 @@ test("korekta przed kwotą odpada — nie ma czego korygować", () => {
    kubełek cofa DOKŁADNIE ten krok, który go wprowadził — testy niżej pilnują,
    że schodzi się po jednym szczeblu i że oba nieodwracalne kroki zatrzymują
    całość.                                                                  */
+
+/* ── Ile sztuk naprawdę wróciło (0.212.0) ───────────────────────────────────
+   Klient zgłasza dwie, w kartonie przyjeżdża jedna. Liczy BIURO — decyzja
+   właściciela: to ono otwiera i procesuje zwroty.                          */
+
+test("kwota liczy się z tego, CO WRÓCIŁO, a nie z deklaracji klienta", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  /* Pozycje mają po 1 szt. za 50 i 100 zł — podnosimy pierwszą do dwóch, żeby
+     było z czego zejść. */
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc=2 WHERE id=?").run(poz[0]);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+
+  const przed = zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 4, KTO);
+  assert.equal(przed.kwotaGrosze, 5000 * 2 + 10000, "deklaracja: dwie sztuki i jedna");
+
+  zapiszIloscZwrocona(d, poz[0], 1, 5, KTO);
+  const po = zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 6, KTO);
+  assert.equal(po.kwotaGrosze, 5000 + 10000, "wróciła jedna, nie dwie");
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.ok(z.sygnaly.includes("rozjazd_ilosci"), "rozjazd widać na wierszu kolejki");
+  assert.equal(z.pozycje.find((p) => p.id === poz[0])!.iloscZwrocona, 1);
+});
+
+test("puste to NIE zero — deklaracja rządzi, dopóki nikt nie policzył", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  ocenPozycje(d, poz[1], "stan", 3, KTO);
+
+  /* Zero jest ZDANIEM: „zgłosił jedną, nie wróciła żadna". */
+  zapiszIloscZwrocona(d, poz[0], 0, 4, KTO);
+  assert.equal(zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 5, KTO).kwotaGrosze,
+    10000, "za pozycję, która nie wróciła, nie płacimy");
+
+  /* `null` czyści zapis i wraca do deklaracji — to nie to samo co zero. */
+  zapiszIloscZwrocona(d, poz[0], null, 6, KTO);
+  assert.equal(zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 7, KTO).kwotaGrosze,
+    15000);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)!.sygnaly.includes("rozjazd_ilosci"),
+    false, "bez zapisu nie ma rozjazdu");
+});
+
+test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () => {
+  /* Podniesienie liczby tutaj wypłaciłoby za sztuki, o których zwrocie klient
+     nigdy nie napisał. Na nadmiar jest `dopiszPozycje` od 0.184.0. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  assert.throws(() => zapiszIloscZwrocona(d, poz[0], 5, 2, KTO), /dopisz/);
+  assert.throws(() => zapiszIloscZwrocona(d, poz[0], -1, 2, KTO), /ujemna/);
+  assert.equal((d.prepare("SELECT ilosc_zwrocona FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz[0]) as { ilosc_zwrocona: number | null }).ilosc_zwrocona, null,
+    "odmowa niczego nie zapisuje");
+});
 
 /* ── Kwota rozjechana z pozycjami (0.210.0) ─────────────────────────────────
    Synchronizator nadpisuje ilość i cenę pozycji przy każdym takcie, a zapisanej

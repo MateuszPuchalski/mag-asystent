@@ -15,6 +15,7 @@ const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
   waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null,
   potracenieGrosze: null, potraceniePowod: null, propozycja: null,
+  iloscZwrocona: null,
   rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
     prowizjaGrosze: null, waluta: null, typ: null, powod: null, zrodlo: null },
   ...n,

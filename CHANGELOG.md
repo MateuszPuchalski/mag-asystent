@@ -92,6 +92,72 @@ zaczynać się w jednej linii, a pusty kafel niesie własną informację — poz
 która nie związała się z żadną linią zamówienia, to wiersz, o którym wiemy
 mniej niż o sąsiednich.
 
+
+## 0.212.0 — 5 września 2026
+
+**Biuro może wreszcie zapisać, ile sztuk NAPRAWDĘ wróciło.** Decyzja
+właściciela: „rozjazd ilości sprawdza biuro, biuro zajmuje się otwieraniem
+i procesowaniem zwrotów".
+
+Klient zgłasza w Allegro dwie sztuki, w kartonie przyjeżdża jedna. Do tego
+wydania nie było tego gdzie zapisać: pozycji z Allegro nie da się poprawić,
+a kwota liczyła się z DEKLARACJI klienta. Zostawało odznaczyć całą pozycję albo
+zapłacić za dwie — „wróciła jedna z dwóch" nie mieściło się w bazie.
+
+Liczba wchodzi w trzy miejsca naraz, bo wszystkie trzy mówią o tym samym
+towarze: do kwoty do oddania, na dokument MM koszyka i na wiersz kolejki jako
+sygnał. Reguła „ile sztuk liczymy" stoi w JEDNYM pliku — trzy kopie rozjechałyby
+się przy pierwszej poprawce, a rozjazd znaczyłby tu dokument na inną liczbę
+sztuk niż wypłata.
+
+**Puste to nie zero.** Zero jest zdaniem „zgłosił dwie, nie wróciła żadna";
+puste znaczy „nikt jeszcze nie otworzył kartonu" i wtedy jedyną liczbą, jaką
+mamy, jest deklaracja. Synchronizator nadpisuje deklarację przy każdym takcie
+i tej kolumny nie rusza.
+
+**Więcej niż zgłoszono odpada** — i mówi to ekran, zanim serwer odmówi. Nadmiar
+z kartonu jest inną pozycją i ma własną drogę od 0.184.0; podniesienie liczby
+tutaj wypłaciłoby za sztuki, o których zwrocie klient nigdy nie napisał.
+
+Pole otwiera się dopiero na żądanie i tylko przy pozycjach z więcej niż jedną
+sztuką — przy jednej „wróciło zero" znaczy to samo co odznaczenie, a dwie drogi
+do tej samej rzeczy kosztują namysł przy każdym wierszu.
+
+## 0.211.0 — 5 września 2026
+
+**Utylizacja przestała być ślepym zaułkiem — towar jedzie na magazyn odpadu.**
+Decyzja właściciela po przeglądzie z 0.210.0: „utylizacja powinna przenosić na
+magazyn odpad ODP".
+
+Do tego wydania ocena zapisywała się w kolumnie i na tym koniec: bez dokumentu,
+bez ruchu stanu, bez listy do przerobienia. Towar leżał, a w Subiekcie nie było
+po nim żadnego śladu. Dokładnie ten ślepy zaułek kosztował „przecenę" w 0.209.0
+— utylizacji wtedy nikt nie policzył.
+
+Utylizacja dostaje WŁASNY koszyk, tą samą maszynerią co zwroty: biuro zbiera do
+pudła, zamyka, MM wychodzi po komplecie korekt. Różni się wyłącznie magazynem
+docelowym. Bramka korekty obowiązuje tak samo i z tego samego powodu — towar
+wraca na magazyn główny dopiero po korekcie, więc MM zdjęłoby stan, którego
+jeszcze nie ma. To ta sama lekcja co 0.200.0, tylko drugim końcem hali.
+
+Operator ma teraz przy biurku dwa pudła naraz. Koszyk odpadu ma inny kolor
+i inną etykietę na dokumencie („Koszyk odpadu Z-8", „N kartotek na magazyn
+odpadu"), bo magazynier bierze kartkę i idzie — a dokument MM sam z siebie nie
+powie, na który koniec hali.
+
+**`MAG_ID_ODP` nie ma domyślnej wartości.** Zero znaczy wyłączone i to jest cała
+domyślna konfiguracja. Pozostałe trzy magazyny mają domyślne numery, bo pomyłka
+daje najwyżej pusty ekran; tutaj pomyłka WYSTAWIA DOKUMENT przesuwający złom na
+cudzy magazyn, a MM się nie cofa jednym kliknięciem. Bez wpisu w `wertis.env`
+ocena „utylizacja" zachowuje się jak przed tym wydaniem — pilnuje tego osobny
+test, który biegnie bez tej zmiennej.
+
+**Przy okazji, z przeglądu:** odmowa zwrotu jednak dociera do klienta — przez
+ODMÓW WYPŁATY, bo to ta końcówka niesie kod i powód, a wiadomość wysyła Allegro.
+Nasz werdykt `odrzucony` zostaje decyzją wewnętrzną. Tabela gotowości i §25a.5a
+mówią to teraz dokładnie, zamiast twierdzić, że klient nie dowiaduje się nic.
+
+
 ## 0.210.0 — 5 września 2026
 
 **Trzy luki z przeglądu procesu zwrotów.** Właściciel poprosił o przegląd

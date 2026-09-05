@@ -15,9 +15,9 @@ import type { KoszZwrotow } from "../api/typy";
 
 const { odpowiedz } = vi.hoisted(() => ({
   odpowiedz: {
-    kosz: null as KoszZwrotow | null,
+    kosze: [] as KoszZwrotow[],
     czekajace: [] as Array<{
-      id: number; kod: string; zamknietoAt: string;
+      id: number; kod: string; rodzaj: "zwroty" | "odpad"; zamknietoAt: string;
       brakuje: Array<{ zwrotId: number; numer: string }>;
     }>,
   },
@@ -32,6 +32,7 @@ vi.mock("../api/zwroty", async (orig) => ({
 const zamknij = vi.fn();
 
 const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
+  rodzaj: "zwroty",
   id: 3, kod: "Z-7", pozycji: 2, sztuk: 5, otwartyOd: "2026-09-03T08:00:00Z",
   pozycje: [{ symbol: "SEK-01", nazwa: "Sekator", ilosc: 2 },
     { symbol: "LOP-02", nazwa: "Łopata", ilosc: 3 }],
@@ -44,7 +45,7 @@ const pokaz = () => {
 };
 
 describe("Koszyk zwrotów", () => {
-  beforeEach(() => { odpowiedz.kosz = null; odpowiedz.czekajace = []; zamknij.mockClear(); });
+  beforeEach(() => { odpowiedz.kosze = []; odpowiedz.czekajace = []; zamknij.mockClear(); });
 
   it("pusty koszyk NIE ZAJMUJE miejsca na ekranie", () => {
     /* Punkt 2 dekalogu. Stały pasek mówiący „zero" byłby elementem, który
@@ -52,14 +53,14 @@ describe("Koszyk zwrotów", () => {
        gdy zacznie coś znaczyć. */
     expect(pokaz().container).toBeEmptyDOMElement();
 
-    odpowiedz.kosz = KOSZ({ pozycji: 0, sztuk: 0, pozycje: [] });
+    odpowiedz.kosze = [KOSZ({ pozycji: 0, sztuk: 0, pozycje: [] })];
     expect(pokaz().container).toBeEmptyDOMElement();
   });
 
   it("pokazuje kod, licznik i symbole, gdy coś w nim leży", () => {
-    odpowiedz.kosz = KOSZ();
+    odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.getByText(/Koszyk Z-7/)).toBeInTheDocument();
+    expect(screen.getByText(/Koszyk zwrotów Z-7/)).toBeInTheDocument();
     expect(screen.getByText(/2 poz\. · 5 szt\./)).toBeInTheDocument();
     /* SYMBOLE, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
        i na dokumencie MM. */
@@ -70,7 +71,7 @@ describe("Koszyk zwrotów", () => {
     /* Punkt 5 dekalogu i sedno tej zmiany: naciśnięcie, które operator i tak
        wykonuje przy towarze, JEST dołożeniem do MM. Osobny przycisk kazałby
        powiedzieć dwa razy to samo. */
-    odpowiedz.kosz = KOSZ();
+    odpowiedz.kosze = [KOSZ()];
     pokaz();
     expect(screen.queryByRole("button", { name: /dodaj|dołóż/i })).toBeNull();
     expect(screen.getByRole("button", { name: /Zamknij koszyk/ })).toBeInTheDocument();
@@ -79,7 +80,7 @@ describe("Koszyk zwrotów", () => {
   it("mówi WPROST, co się stanie po domknięciu", () => {
     /* Powstaje dokument w Subiekcie i kosz jedzie na halę. Ta sama zasada co
        przy korekcie: ekran nazywa skutek, zamiast go zaskakiwać. */
-    odpowiedz.kosz = KOSZ();
+    odpowiedz.kosze = [KOSZ()];
     pokaz();
     expect(screen.getByText(/MM z magazynu głównego na regał zwrotów/)).toBeInTheDocument();
   });
@@ -89,11 +90,11 @@ describe("Koszyk zwrotów", () => {
        MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero
        po korekcie — ekran ma to powiedzieć, nie kazać się domyślać. */
     odpowiedz.czekajace = [{
-      id: 9, kod: "Z-6", zamknietoAt: "2026-09-03T09:00:00Z",
+      id: 9, kod: "Z-6", rodzaj: "zwroty", zamknietoAt: "2026-09-03T09:00:00Z",
       brakuje: [{ zwrotId: 1, numer: "ZW-7" }],
     }];
     pokaz();
-    expect(screen.getByText(/Koszyk Z-6/)).toBeInTheDocument();
+    expect(screen.getByText(/Koszyk zwrotów Z-6/)).toBeInTheDocument();
     expect(screen.getByText(/ZW-7/)).toBeInTheDocument();
     expect(screen.getByText(/po korekcie/)).toBeInTheDocument();
   });
@@ -101,9 +102,9 @@ describe("Koszyk zwrotów", () => {
   it("czekający pokazuje się BEZ otwartego koszyka", () => {
     /* To praca biura, nie tego biurka: operator może nie mieć otwartego kosza,
        a zaległość i tak jest jego do dopilnowania. */
-    odpowiedz.kosz = null;
+    odpowiedz.kosze = [];
     odpowiedz.czekajace = [{
-      id: 9, kod: "Z-6", zamknietoAt: "2026-09-03T09:00:00Z",
+      id: 9, kod: "Z-6", rodzaj: "zwroty", zamknietoAt: "2026-09-03T09:00:00Z",
       brakuje: [{ zwrotId: 1, numer: "ZW-7" }, { zwrotId: 2, numer: "ZW-8" }],
     }];
     pokaz();
