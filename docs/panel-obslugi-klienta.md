@@ -1250,6 +1250,32 @@ z decyzją: pytanie tego ekranu dalej zadaje wiersz produktu. Przyjęcie idzie
 jednym kliknięciem, bez pytania o nic — i tak zostaje, bo tak wygląda typowy
 zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną.
 
+### 25a.5a. Czego proces zwrotu wciąż nie domyka
+
+Przegląd z 0.210.0. Trzy luki zamknięte w tym wydaniu, cztery zostają otwarte
+i każda czeka na decyzję, a nie na kod.
+
+**Odmowa zwrotu nie dociera do klienta.** Allegro nie zna pojęcia „odrzuć
+zwrot" — końcówka `rejection` odmawia WYPŁATY. Nasz werdykt jest decyzją biura
+i nigdzie nie wychodzi. Od 0.210.0 ekran mówi to wprost, a powód odmowy jest
+widoczny z klawiszem kopiowania; wysłania wiadomości nadal nikt nie robi za
+człowieka.
+
+**Utylizacja to ślepy zaułek.** Ocena zapisuje się i na tym koniec: nie ma
+dokumentu, nie ma ruchu stanu, nie ma listy do przerobienia. Przecena zeszła
+w 0.209.0 dokładnie za to samo. Rozstrzygnięcia wymaga obieg papieru: lista
+z potwierdzeniem czy dokument RW przez Sferę.
+
+**Pobranie nie ma gdzie zostawić śladu.** Panel mówi „oddaj przelewem"
+i kończy; `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro. Zwrot
+domyka się korektą, ale bez zapisu, czy klient dostał pieniądze.
+
+**Rozjazd ilości nie ma gdzie zamieszkać.** Klient zgłasza dwie sztuki, wraca
+jedna — pozycji z Allegro nie da się poprawić, a kwota liczy się z deklaracji.
+Sygnał rozjazdu kwoty tego nie łapie: pozycja dołożona po wycenie ma
+`w_zwrocie = 0` i sumy nie rusza, a odróżnić jej od świadomie odznaczonej nie
+sposób, bo pozycja nie ma daty dopisania.
+
 ### 25a.6. Zamówienie i zdjęcia
 
 Zwrot niesie sam numer zamówienia, więc panel dociąga jego treść i pokazuje
@@ -1819,6 +1845,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
+| Termin ustawowy w rekoncyliacji | **działa** od 0.210.0 | `zwrotyPoTerminie` w `services/reconcile.ts`; do 0.209.0 pilnował go wyłącznie kolor wiersza |
+| Sygnał rozjazdu kwoty z pozycjami | **działa** od 0.210.0 | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |
+| Powód odmowy widoczny na zwrocie | **działa** od 0.210.0 | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
+| Odmowa zwrotu dociera do klienta | **nie działa** | Allegro nie zna „odrzuć zwrot"; werdykt jest wewnętrzny, klientowi trzeba napisać |
+| Utylizacja schodzi ze stanu | **nie działa** | ocena zapisuje się i kończy: bez dokumentu, bez ruchu stanu, bez listy |
+| Ślad po zwrocie pieniędzy przy pobraniu | **nie działa** | `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro |
+| Rozjazd ilości zgłoszonej i zwróconej | **nie działa** | pozycji z Allegro nie da się poprawić; kwota liczy się z deklaracji klienta |
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
 | Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`utylizacja` — przecena zdjęta w 0.209.0 |
 | Kwota do oddania | **działa** od 0.156.0 | `zapiszKwote`, suma z zaznaczenia po stronie serwera |

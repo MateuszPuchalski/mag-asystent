@@ -418,7 +418,7 @@ export type SzczegolyWysylki = {
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
-  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem";
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -529,6 +529,8 @@ export interface Zwrot {
   linkZwrotu: string | null;
   zamowienie: Zamowienie | null;
   werdykt: string | null;
+  /** Powód odmowy wpisany przez biuro (0.210.0). */
+  werdyktPowod: string | null;
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;

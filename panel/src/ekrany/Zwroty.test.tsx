@@ -17,7 +17,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null,
   kubelek, sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z", dniDoTerminu: 7,
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
-  linkZwrotu: null, zamowienie: null, werdykt: null, kwotaGrosze: null,
+  linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },

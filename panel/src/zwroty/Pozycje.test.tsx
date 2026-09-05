@@ -26,7 +26,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   utworzono: "2026-09-01T08:00:00Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, kubelek: "decyzja",
   sygnaly: [], terminAt: "2026-09-15T08:00:00Z", dniDoTerminu: 14,
   sumaPozycjiGrosze: 9998, kwotaPelnaGrosze: null, waluta: "PLN",
-  linkZwrotu: null, werdykt: null, kwotaGrosze: null, kwotaWariant: null,
+  linkZwrotu: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null,
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 3,

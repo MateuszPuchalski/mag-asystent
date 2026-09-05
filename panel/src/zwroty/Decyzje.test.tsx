@@ -14,7 +14,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   utworzono: "2026-09-01T08:00:00Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, kubelek: "decyzja",
   sygnaly: [], terminAt: "2026-09-15T08:00:00Z", dniDoTerminu: 14,
   sumaPozycjiGrosze: 9998, kwotaPelnaGrosze: null, waluta: "PLN",
-  linkZwrotu: null, werdykt: null, kwotaGrosze: null, kwotaWariant: null,
+  linkZwrotu: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null,
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 3,
@@ -79,6 +79,35 @@ describe("Decyzje zwrotu", () => {
     expect(container).toBeEmptyDOMElement();
     const drugi = pasek(zwrot({ kubelek: "zwrot" }));
     expect(drugi.container).toBeEmptyDOMElement();
+  });
+});
+
+describe("Odmowa zwrotu (0.210.0)", () => {
+  it("etykieta NIE obiecuje, że powód zobaczy klient", async () => {
+    /* Jedyna nieprawda, jaka stała na tym ekranie. Allegro nie zna pojęcia
+       „odrzuć zwrot" — końcówka `rejection` odmawia WYPŁATY. Nasz werdykt
+       nigdzie nie wychodzi, więc klient nie dowie się nic sam. */
+    pasek(zwrot());
+    await userEvent.click(screen.getByRole("button", { name: /Odrzuć/ }));
+    expect(screen.getByText(/Powód odmowy — zostaje u nas/)).toBeInTheDocument();
+    expect(screen.queryByText(/zobaczy go klient/)).toBeNull();
+    expect(screen.getByText(/Klientowi trzeba powiedzieć osobno/)).toBeInTheDocument();
+  });
+
+  it("na zwrocie odrzuconym POWÓD JEST WIDOCZNY, z klawiszem kopiowania", () => {
+    /* Zapisywał się do bazy i nikt go nie czytał — ani panel, ani nic innego.
+       Operator, który ma napisać klientowi, musiał pamiętać własne zdanie
+       sprzed tygodnia. */
+    pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony",
+      werdyktPowod: "towar nosi ślady użycia" }));
+    expect(screen.getByText("towar nosi ślady użycia")).toBeInTheDocument();
+    expect(screen.getByTitle("Kopiuj powód odmowy")).toBeInTheDocument();
+    expect(screen.queryByText(/nie ma tu decyzji do podjęcia/)).toBeNull();
+  });
+
+  it("stan końcowy BEZ powodu mówi po staremu — nie ma czego pokazać", () => {
+    pasek(zwrot({ kubelek: "zamkniety", werdykt: "przyjety" }));
+    expect(screen.getByText(/nie ma tu decyzji do podjęcia/)).toBeInTheDocument();
   });
 });
 

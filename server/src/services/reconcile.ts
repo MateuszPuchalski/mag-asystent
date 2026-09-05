@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { koszykiCzekajaceNaKorekty } from "./kosze-zwrotow.js";
+import { listaZwrotow } from "./zwroty.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
@@ -19,7 +20,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 
 export interface Rozjazd {
   rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
-    | "kosz_czeka_na_korekte";
+    | "kosz_czeka_na_korekte" | "zwrot_po_terminie";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -170,19 +171,53 @@ function koszeBezKorekty(): Rozjazd[] {
     }));
 }
 
+/**
+ * 6. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
+ *
+ * DO 0.210.0 TERMINU PILNOWAŁ WYŁĄCZNIE KOLOR WIERSZA. Sygnał „termin" zapala
+ * się przy trzech dniach, ale zapala się NA EKRANIE — a rekoncyliacja
+ * i `/api/health` nie znały zwrotów w ogóle. Czternaście dni ustawowych mijało
+ * bez jednego alarmu, jeśli przez tydzień nikt nie otworzył panelu.
+ *
+ * To jedyna kontrola w tym pliku o skutku PRAWNYM, nie operacyjnym: po
+ * terminie kupującemu należą się odsetki, a sprzedawca traci argument
+ * w sporze. Dlatego próg jest ostrzejszy niż dobowe progi wyżej — doba przed
+ * terminem to ostatni moment, w którym da się zdążyć.
+ *
+ * Stany końcowe pomija `kubelekZwrotu`: zwrot zamknięty i odrzucony nie mają
+ * już terminu do pilnowania, a czerwień na nich uczyłaby przewijać raport.
+ */
+function zwrotyPoTerminie(): Rozjazd[] {
+  return listaZwrotow(db())
+    .filter((z) => z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony")
+    .filter((z) => z.dniDoTerminu <= 1)
+    .map((z) => ({
+      rodzaj: "zwrot_po_terminie" as const,
+      klucz: z.numer ?? z.externalId,
+      opis: z.dniDoTerminu < 0
+        ? `Zwrot ${z.numer ?? z.externalId} jest ${-z.dniDoTerminu} dni PO terminie ` +
+          `ustawowym, w kubełku ${z.kubelek}.`
+        : `Zwrot ${z.numer ?? z.externalId} ma termin ustawowy za ${z.dniDoTerminu} ` +
+          `dni, a stoi w kubełku ${z.kubelek}.`,
+      odKiedy: z.terminAt,
+    }));
+}
+
 export function reconcile(): Rekoncyliacja {
   const loc = lokalizacje();
   const bledy = zadaniaWBledzie();
   const bufor = utknieteWBuforze();
   const mm = mmCzekajace();
   const kosze = koszeBezKorekty();
+  const terminy = zwrotyPoTerminie();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
-      zadan: bledy.length + bufor.length + mm.length + kosze.length,
+      zadan: bledy.length + bufor.length + mm.length + kosze.length + terminy.length,
     },
-    rozjazdy: [...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze],
+    /* Terminy PIERWSZE: mają skutek prawny, a raport czyta się od góry. */
+    rozjazdy: [...terminy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze],
   };
 }
 

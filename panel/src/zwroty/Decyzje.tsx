@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Zwrot } from "../api/typy";
-import { Przycisk, Pole, Blad } from "../ui";
+import { Przycisk, Pole, Blad, Skopiuj } from "../ui";
 import { zlote } from "../api/zwroty";
 
 /* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
@@ -53,9 +53,16 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           </div>
         : <div className="space-y-2">
             {/* Odmowa jest NIEODWRACALNA (§25a.5), więc dostaje potwierdzenie
-                i wymaga powodu — bez niego nie ma czego pokazać klientowi. */}
+                i wymaga powodu.
+
+                ETYKIETA MÓWI PRAWDĘ OD 0.210.0. Stało tu „zobaczy go klient" —
+                i to była jedyna nieprawda na tym ekranie. Allegro nie zna
+                pojęcia „odrzuć zwrot": końcówka `rejection` odmawia WYPŁATY,
+                nie zwrotu. Nasz werdykt jest decyzją biura i nigdzie nie
+                wychodzi, więc klient nie dowie się niczego, dopóki ktoś mu
+                nie napisze. Zdanie niżej mówi, co zrobić dalej. */}
             <label className="block text-xs font-bold text-slate-600" htmlFor="powod-odmowy">
-              Powód odmowy — zobaczy go klient
+              Powód odmowy — zostaje u nas
             </label>
             <Pole id="powod-odmowy" value={powod} autoFocus
               onChange={(e) => setPowod(e.target.value)}
@@ -67,6 +74,11 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
               </Przycisk>
               <Przycisk onClick={() => { setOdmowa(false); setPowod(""); }}>Wróć</Przycisk>
             </div>
+            <p className="text-xs text-slate-500">
+              Klientowi trzeba powiedzieć osobno — Allegro nie zna odmowy
+              zwrotu, zna tylko odmowę wypłaty. Napisz do niego w skrzynce
+              albo kliknij ODMÓW WYPŁATY z kodem.
+            </p>
           </div>}
       {blad && <Blad>{blad}</Blad>}
     </div>;
@@ -153,7 +165,23 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
               : "Numer przepisany w panelu."}
           </p>
         </>
-      : <p className="text-xs text-slate-500">Stan końcowy — nie ma tu decyzji do podjęcia.</p>}
+      : zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod
+        /* POWÓD ODMOWY WIDOCZNY (0.210.0). Zapisywał się do bazy i nikt go nie
+           czytał — ani panel, ani nic innego. Operator, który ma napisać
+           klientowi, musiał pamiętać własne zdanie sprzed tygodnia albo szukać
+           go w dzienniku. Z klawiszem kopiowania, bo to zdanie się przekleja. */
+        ? <div className="text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-slate-500">Odmówiono</span>
+              <b className="mr-auto">{zwrot.werdyktPowod}</b>
+              <Skopiuj tekst={zwrot.werdyktPowod} tytul="Kopiuj powód odmowy" />
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Powód został u nas. Jeśli klient go jeszcze nie zna, napisz mu
+              w skrzynce.
+            </p>
+          </div>
+        : <p className="text-xs text-slate-500">Stan końcowy — nie ma tu decyzji do podjęcia.</p>}
     {blad && <Blad>{blad}</Blad>}
   </div>;
 }
