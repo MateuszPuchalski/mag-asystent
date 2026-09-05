@@ -37,7 +37,7 @@ export function Kafel({ twId, rozmiar = 48, nazwa, symbol = null }: {
 }
 
 /**
- * To samo dla zdjęcia listingowego oferty (0.211.0).
+ * To samo dla zdjęcia listingowego oferty (0.213.0).
  *
  * Osobny komponent, nie prop `rodzaj` w `Kafel`: każdy z nich woła INNY hak,
  * a haka nie wolno wołać warunkowo. Wspólne jest to, co ma być wspólne —

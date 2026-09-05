@@ -112,7 +112,7 @@ export interface OfertaRozmowy {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
-    /* Czy Allegro podało adres zdjęcia listingowego (0.211.0). Sam adres NIE
+    /* Czy Allegro podało adres zdjęcia listingowego (0.213.0). Sam adres NIE
        jedzie do panelu i to jest cała różnica: gdyby jechał, front miałby
        w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś wstawiłby
        go w `src`, czyli wyprowadził przeglądarkę biura poza własną sieć.

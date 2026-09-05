@@ -37,7 +37,7 @@ export interface PozycjaZwrotu {
   zrodlo: string;
   offerId: string | null;
   /**
-   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.211.0), nie z pozycji zwrotu.
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.213.0), nie z pozycji zwrotu.
    *
    * `offerId` wyżej należy do przestrzeni, której nie znamy; ten jest
    * `lineItems[].offer.id` ze specyfikacji. `null` znaczy „nie ma zamówienia
@@ -576,7 +576,7 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
         }
       }
 
-      /* ── NUMER OFERTY DO ZDJĘCIA (0.211.0) ──────────────────────────────
+      /* ── NUMER OFERTY DO ZDJĘCIA (0.213.0) ──────────────────────────────
          `PozycjaZwrotu.offerId` do zdjęcia się NIE NADAJE i mówi o tym cały
          akapit niżej: nie wiadomo, czy to numer oferty, czy identyfikator
          pozycji zamówienia (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`).

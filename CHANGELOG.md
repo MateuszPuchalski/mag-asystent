@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.211.0 — 5 września 2026
+## 0.213.0 — 5 września 2026
 
 **Zdjęcie z oferty Allegro przy ofertach i przy zwrotach.** Panel pokazywał
 zdjęcie kartoteki z Subiekta, a kartoteka odpowiada na pytanie „co mamy na

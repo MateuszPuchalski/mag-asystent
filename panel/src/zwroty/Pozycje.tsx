@@ -199,7 +199,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
         {wycena && <input type="checkbox" className="mt-1 h-4 w-4 shrink-0"
           aria-label={`Oddaj: ${p.nazwa}`}
           checked={wybrane.includes(p.id)} onChange={() => przelacz(p.id)} />}
-        {/* ── DWA ZDJĘCIA, DWA PYTANIA (0.211.0) ──────────────────────────
+        {/* ── DWA ZDJĘCIA, DWA PYTANIA (0.213.0) ──────────────────────────
             Kafel kartoteki odpowiada „co mamy na półce", kafel oferty — „co
             klient widział, kupując". To nie jest powtórzenie: różnica między
             nimi bywa właśnie tym, o co poszedł spór („na zdjęciu było inaczej").

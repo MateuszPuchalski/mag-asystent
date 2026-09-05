@@ -22,11 +22,11 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
    jedno wywołanie. `/sale/product-offers/{id}` obok dałoby ten sam tytuł po
    jednym strzale na sztukę.
 
-   ZDJĘCIE LISTINGOWE OD 0.211.0. `OfferListingDto.primaryImage.url` jedzie
+   ZDJĘCIE LISTINGOWE OD 0.213.0. `OfferListingDto.primaryImage.url` jedzie
    w TEJ SAMEJ odpowiedzi i do 0.210.0 wypadało przy mapowaniu — specyfikacja
    opisuje to pole jako „The image used as a thumbnail on the listings".
    Wzięcie go nie kosztuje żądania, uprawnienia ani limitu; kosztowało wyłącznie
-   decyzję, którą właściciel podjął w 0.211.0 (patrz `schema.sql`).
+   decyzję, którą właściciel podjął w 0.213.0 (patrz `schema.sql`).
 
    Ten przebieg nie chodzi po ofertach konta — dociąga wyłącznie te, na które
    wskazuje wiadomość, i najwyżej `NA_PRZEBIEG` naraz.                       */
@@ -80,9 +80,9 @@ export interface OfertySyncDeps {
  * partia, agent najpierw dostaje tytuły przy rozmowach, które ma dziś na
  * ekranie, a nie przy najstarszych w historii.
  *
- * ── DWA ŹRÓDŁA NUMERÓW OD 0.211.0 ─────────────────────────────────────────
+ * ── DWA ŹRÓDŁA NUMERÓW OD 0.213.0 ─────────────────────────────────────────
  * Do 0.210.0 przebieg chodził wyłącznie po ofertach WSKAZANYCH W WIADOMOŚCI,
- * bo snapshot służył jednej rzeczy: tytułowi przy rozmowie. Od 0.211.0 niesie
+ * bo snapshot służył jednej rzeczy: tytułowi przy rozmowie. Od 0.213.0 niesie
  * też adres zdjęcia listingowego, a zdjęcie jest potrzebne również przy
  * ZWROCIE — czyli tam, gdzie rozmowy nie ma wcale.
  *

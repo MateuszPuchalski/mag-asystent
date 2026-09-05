@@ -1600,7 +1600,7 @@ CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
 -- z chwili, w której klient pytał. Oferta bywa poprawiana i kończona, a
 -- rozmowa sprzed tygodnia ma zostać czytelna.
 --
--- ZDJĘCIE JEST OD 0.211.0, a do 0.210.0 nie było — z uzasadnieniem, które
+-- ZDJĘCIE JEST OD 0.213.0, a do 0.210.0 nie było — z uzasadnieniem, które
 -- zakazywało czego innego, niż się wydawało. Brzmiało: „obrazek z serwera
 -- Allegro znaczyłby wyjście przeglądarki biura poza własną sieć". To jest
 -- zakaz HOTLINKA i on obowiązuje dalej: `<img src="https://a.allegroimg.com/…">`
@@ -1623,7 +1623,7 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- `publication.status` z Allegro. Bez `CHECK`: lista wartości jest po ich
   -- stronie i rośnie, a zablokowany zapis byłby gorszy niż nieznana wartość.
   status TEXT,
-  -- `primaryImage.url` — zdjęcie LISTINGOWE oferty (0.211.0). Specyfikacja
+  -- `primaryImage.url` — zdjęcie LISTINGOWE oferty (0.213.0). Specyfikacja
   -- opisuje je wprost: „The image used as a thumbnail on the listings"
   -- (`OfferListingDtoImage`, docs/allegro/swagger.yaml). Jedzie w tej samej
   -- odpowiedzi `GET /sale/offers`, którą i tak pobieramy po tytuł i cenę, więc
@@ -1636,7 +1636,7 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   UNIQUE (channel_account_id, external_id)
 );
 
--- ── Cache zdjęć ofert Allegro (0.211.0) ──────────────────────────────────────
+-- ── Cache zdjęć ofert Allegro (0.213.0) ──────────────────────────────────────
 -- Osobna tabela i OSOBNY KATALOG względem `zdjecie_cache`, choć oba trzymają
 -- obrazy. Powód jest mechaniczny: każdy cache ma własną sprzątaczkę liczącą
 -- sumę bajtów SWOICH wpisów, a dwie sprzątaczki nad jednym katalogiem kasują

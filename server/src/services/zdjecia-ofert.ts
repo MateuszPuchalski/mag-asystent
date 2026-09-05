@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { config } from "../config.js";
 import { db as defaultDb, nowIso, type Db } from "../db/db.js";
 
-/* ── Cache zdjęć listingowych z Allegro (0.211.0) ────────────────────────────
+/* ── Cache zdjęć listingowych z Allegro (0.213.0) ────────────────────────────
    Adres `primaryImage.url` leży w `offer_snapshot`; tutaj mieszka PLIK.
 
    DLACZEGO PRZEZ SERWER, A NIE WPROST Z `<img src>`. Do 0.210.0 zdjęcia oferty

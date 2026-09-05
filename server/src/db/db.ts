@@ -208,7 +208,7 @@ export function migrate(database: DatabaseSync) {
      mówiła tylko „ktoś cię wymienił" i nie znała odpowiedzi na „czy już się
      tym zająłeś" — a bez niej skrzynka wzmianek pokazywałaby w kółko to samo. */
   addColumn("conversation_mention", "seen_at", "TEXT");
-  /* Zdjęcie listingowe oferty (0.211.0). `offer_snapshot` stoi u klienta od
+  /* Zdjęcie listingowe oferty (0.213.0). `offer_snapshot` stoi u klienta od
      0.178.0, więc adres musi dojść migracją. `NULL` znaczy „Allegro nie podało
      adresu" — pole jest w specyfikacji opcjonalne — a nie „oferta bez zdjęcia";
      wiersze sprzed tego wydania uzupełni najbliższy przebieg synchronizacji,

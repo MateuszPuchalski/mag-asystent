@@ -21,7 +21,7 @@ import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
    wydaniu: negatyw doboru ma 36 px i słowo by się w nim rozjechało. */
 
 /**
- * Sama PŁYTKA — pudełko o stałym rozmiarze z trzema stanami (0.211.0).
+ * Sama PŁYTKA — pudełko o stałym rozmiarze z trzema stanami (0.213.0).
  *
  * Wydzielona, bo od tego wydania obrazy mają dwa źródła: kartotekę Subiekta
  * i ofertę Allegro. Wygląd, rozmiary i próg słowa „bez zdjęcia" mają zostać
@@ -89,7 +89,7 @@ export function Zdjecie({ twId, rozmiar = 48, nazwa, onKlik }: {
 }
 
 /**
- * Zdjęcie listingowe oferty Allegro (0.211.0).
+ * Zdjęcie listingowe oferty Allegro (0.213.0).
  *
  * Trzy stany mówią co innego i to jest cały powód, dla którego nie da się tu
  * użyć `Zdjecie` z innym adresem:

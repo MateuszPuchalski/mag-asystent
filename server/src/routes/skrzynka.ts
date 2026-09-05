@@ -89,7 +89,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Zdjęcie listingowe oferty (0.211.0).
+   * Zdjęcie listingowe oferty (0.213.0).
    *
    * OSOBNA TRASA, nigdy pole `osRozmowy` — dokładnie z tego powodu, co przy
    * kartotece (`GET /api/products/:twId/zdjecie`). Oś rozmowy odświeża się przy
@@ -97,7 +97,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
    * Osobny adres daje też 304, czyli „to samo, co masz" za cenę nagłówka.
    *
    * ADRES IDZIE Z NASZEGO SERWERA, nie z `a.allegroimg.com`, i to jest cała
-   * treść decyzji z 0.211.0: zakaz z 0.178.0 dotyczył wyjścia PRZEGLĄDARKI
+   * treść decyzji z 0.213.0: zakaz z 0.178.0 dotyczył wyjścia PRZEGLĄDARKI
    * biura poza własną sieć, a nie zdjęcia. Wychodzi serwer, który i tak
    * rozmawia z Allegro.
    *

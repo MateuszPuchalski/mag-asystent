@@ -636,7 +636,7 @@ export const config = {
   },
 
   /**
-   * Zdjęcia listingowe ofert Allegro (0.211.0).
+   * Zdjęcia listingowe ofert Allegro (0.213.0).
    *
    * OSOBNY BLOK od `zdjecia`, choć oba opisują cache obrazów — i to nie jest
    * symetria dla samej symetrii. Tamte zdjęcia idą z bazy firmy przez sieć

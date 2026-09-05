@@ -167,7 +167,7 @@ export type OfertaRozmowy = {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
     /**
-     * Czy Allegro podało adres zdjęcia listingowego (0.211.0).
+     * Czy Allegro podało adres zdjęcia listingowego (0.213.0).
      *
      * Sam adres do panelu NIE JEDZIE i to jest cała różnica: gdyby jechał,
      * front miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później
@@ -465,7 +465,7 @@ export interface PozycjaZwrotu {
   zrodlo: string;
   offerId: string | null;
   /**
-   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.211.0) — tym wolno pytać
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.213.0) — tym wolno pytać
    * o zdjęcie listingowe. `offerId` wyżej należy do przestrzeni, której nie
    * znamy, więc do niczego poza wyświetleniem się nie nadaje.
    */

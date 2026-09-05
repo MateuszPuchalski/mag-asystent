@@ -17,7 +17,7 @@ import { KafelOferty } from "../towar/Kafel";
  * dociągnął snapshot) albo zdanie, że tytuł dopiero przyjedzie. Milczenie
  * w drugim stanie wyglądałoby jak usterka.
  *
- * ── ZDJĘCIE OFERTY JEST OD 0.211.0 ─────────────────────────────────────────
+ * ── ZDJĘCIE OFERTY JEST OD 0.213.0 ─────────────────────────────────────────
  * Do 0.210.0 stało tu zdanie „zdjęcia z Allegro nie ma świadomie", bo obrazek
  * z ich serwera znaczyłby wyjście przeglądarki biura poza własną sieć. Zakaz
  * dotyczył HOTLINKA i obowiązuje dalej — `<img src="https://a.allegroimg.com/…">`

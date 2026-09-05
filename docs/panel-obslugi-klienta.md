@@ -1325,7 +1325,7 @@ Obraz propozycji stoi WEWNĄTRZ jej ramki, nie na wierszu. Kafel wiersza należy
 do kartoteki potwierdzonej; wyniesiony na wiersz obraz propozycji udawałby
 fakt, a §4.3 nie pozwala, żeby wybór automatu wyglądał jak dana z Allegro.
 
-### 25a.6b. Zdjęcie z oferty Allegro (0.211.0)
+### 25a.6b. Zdjęcie z oferty Allegro (0.213.0)
 
 Kartoteka odpowiada na pytanie „co mamy na półce". Oferta odpowiada na inne:
 „co klient WIDZIAŁ, kupując". Zbieżność nie jest przesądzona i właśnie ta
@@ -1379,7 +1379,7 @@ obrazku, nie po kodzie magazynowym.
 się po pilności, czasie oczekiwania i treści pytania — nie po tym, jak wygląda
 towar. Rozmowa nie niesie zresztą kartoteki na liście: wywodzi się ją z oferty
 dopiero po otwarciu. Zdjęcie wchodzi tam, gdzie pada pytanie „czy to ta
-część", czyli o jeden ekran dalej. Zdjęcie z oferty (0.211.0) tego nie zmienia:
+część", czyli o jeden ekran dalej. Zdjęcie z oferty (0.213.0) tego nie zmienia:
 snapshot oferty przy rozmowie też powstaje dopiero po otwarciu.
 
 ### 25a.7. Odnośniki do Allegro

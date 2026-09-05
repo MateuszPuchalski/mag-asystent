@@ -3,7 +3,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import type { OfertaRozmowy as Dane } from "../api/typy";
 
-/* Zdjęcie oferty (0.211.0): pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
+/* Zdjęcie oferty (0.213.0): pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
    go wysłać. Atrapa mówi „obraz jest", więc widać, czy kafel w ogóle staje. */
 vi.mock("../towar/useZdjecie", () => ({
   useZdjecie: () => null,
@@ -62,7 +62,7 @@ describe("blok oferty przy rozmowie", () => {
   });
 });
 
-describe("zdjęcie listingowe oferty (0.211.0)", () => {
+describe("zdjęcie listingowe oferty (0.213.0)", () => {
   const snapshot = (maZdjecie: boolean): Dane["pobrana"] => ({
     nazwa: "NÓŻ DO KOSIARKI STIGA 43cm", sku: "NOZ-STIGA-43", cenaGrosze: 4890,
     waluta: "PLN", status: "ACTIVE", syncedAt: "2026-09-02T14:50:00Z", maZdjecie,

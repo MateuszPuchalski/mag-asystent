@@ -20,7 +20,7 @@ import { token } from "../api/klient";
    Miniatur KARTOTEK nie ma i nie będzie: serwer nie skaluje obrazów (zero
    modułów natywnych). Kafel dostaje pełny obraz i `object-fit: cover`.
 
-   ── DRUGIE ŹRÓDŁO OBRAZÓW (0.211.0) ───────────────────────────────────────
+   ── DRUGIE ŹRÓDŁO OBRAZÓW (0.213.0) ───────────────────────────────────────
    Doszły zdjęcia listingowe ofert Allegro. Mechanika jest CO DO JOTY ta sama —
    sesja w nagłówku, pamięć negatywu, trzy pobrania naraz — więc kolejka i mapa
    są wspólne, a klucz zmienił się z `twId` na ŚCIEŻKĘ trasy. Druga kopia tych
@@ -120,7 +120,7 @@ export function useZdjecie(twId: number | null | undefined): string | null | und
 }
 
 /**
- * Zdjęcie listingowe oferty Allegro (0.211.0).
+ * Zdjęcie listingowe oferty Allegro (0.213.0).
  *
  * Adres jest NASZ, nie `a.allegroimg.com` — zakaz wyprowadzania przeglądarki
  * biura poza własną sieć obowiązuje dalej, a plik ciągnie serwer. Panel nie

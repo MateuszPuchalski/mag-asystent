@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-/* ── Cache zdjęć ofert Allegro (0.211.0) ─────────────────────────────────────
+/* ── Cache zdjęć ofert Allegro (0.213.0) ─────────────────────────────────────
    Stawka tego modułu jest jedna: drugie spojrzenie na tę samą ofertę NIE MA
    dojść do CDN-u. Dlatego źródło wchodzi parametrem i wszystkie testy liczą
    WYWOŁANIA, nie tylko wynik.

@@ -159,7 +159,7 @@ test("oferta, której Allegro nie oddało, wraca do kolejki i nie psuje reszty",
 });
 
 
-/* ── Zdjęcie listingowe (0.211.0) ────────────────────────────────────────────
+/* ── Zdjęcie listingowe (0.213.0) ────────────────────────────────────────────
    `primaryImage.url` jedzie w TEJ SAMEJ odpowiedzi, po którą i tak idziemy
    po tytuł. Testy pilnują, że adres wchodzi do snapshotu, że pusty schodzi
    na NULL i że numery ofert biorą się także z pozycji ZAMÓWIENIA — bez tego

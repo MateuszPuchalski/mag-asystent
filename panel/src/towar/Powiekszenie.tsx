@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 /* Powiększenie służy JEDNEMU pytaniu: czy to ten sam wariant, który wrócił.
    Dlatego nie ma tu galerii ani zoomu — jest obraz, podpis i wyjście.
 
-   OBRAZ WCHODZI PROPSEM, nie hakiem po `twId` (0.211.0). Od tego wydania
+   OBRAZ WCHODZI PROPSEM, nie hakiem po `twId` (0.213.0). Od tego wydania
    źródła są dwa — kartoteka Subiekta i oferta Allegro — a okno powiększenia
    jest dla obu takie samo. Wybór źródła należy do kafla, który je otworzył. */
 
