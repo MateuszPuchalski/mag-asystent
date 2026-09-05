@@ -166,6 +166,15 @@ export type OfertaRozmowy = {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
+    /**
+     * Czy Allegro podało adres zdjęcia listingowego (0.211.0).
+     *
+     * Sam adres do panelu NIE JEDZIE i to jest cała różnica: gdyby jechał,
+     * front miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później
+     * ktoś wstawiłby go w `src`, czyli wyprowadził przeglądarkę biura poza
+     * własną sieć. Flaga mówi tylko „jest po co pytać naszej trasy".
+     */
+    maZdjecie: boolean;
   } | null;
   /** Kartoteka wywiedziona z SKU oferty (0.179.0) — PROPOZYCJA z powodem. */
   kartoteka: DopasowanieKartoteki;
@@ -455,6 +464,12 @@ export interface PozycjaZwrotu {
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
   zrodlo: string;
   offerId: string | null;
+  /**
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.211.0) — tym wolno pytać
+   * o zdjęcie listingowe. `offerId` wyżej należy do przestrzeni, której nie
+   * znamy, więc do niczego poza wyświetleniem się nie nadaje.
+   */
+  ofertaZamowienia: string | null;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;

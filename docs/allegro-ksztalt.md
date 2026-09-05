@@ -647,9 +647,34 @@ Uprawnienie to `allegro:api:sale:offers:read`, inne niż przy skrzynce.
 Konto bez niego dostanie 403, a odmowa nazwie brakujący scope po imieniu —
 `scopeDlaUrl` w `adapters/allegro.http.ts` ma dla tego adresu własną gałąź.
 
-Zdjęcia z `primaryImage` NIE POBIERAMY. To ta sama decyzja, co przy awatarze
-rozmówcy: obrazek z serwera Allegro znaczyłby wyjście przeglądarki biura poza
-własną sieć przy każdym otwarciu skrzynki.
+**Zdjęcie z `primaryImage` bierzemy od 0.211.0.** Schemat `OfferListingDtoImage`
+opisuje je wprost: „The image used as a thumbnail on the listings", czyli to,
+co kupujący widzi na liście ofert. Pole jedzie w TEJ SAMEJ odpowiedzi, więc nie
+kosztuje żądania, uprawnienia ani limitu; do 0.210.0 po prostu wypadało przy
+mapowaniu.
+
+Decyzja z 0.178.0 brzmiała „nie pobieramy, bo obrazek z serwera Allegro to
+wyjście przeglądarki biura poza własną sieć". To jest zakaz HOTLINKA i on
+obowiązuje dalej — panel nie dostaje adresu w `allegroimg.com` i nie ma go po
+co dostawać. Po plik idzie SERWER, który i tak rozmawia z Allegro, i podaje go
+z własnej trasy `/api/obsluga/oferta/:externalId/zdjecie`. Ta sama droga, którą
+od 0.30.0 idą zdjęcia kartotek.
+
+Kopia ma trzy uzasadnienia poza prywatnością: zachowuje obraz, który klient
+NAPRAWDĘ widział (sprzedawca podmienia zdjęcie, a rozmowa sprzed tygodnia ma
+zostać czytelna — §15.2), pozwala pracować na stanowisku bez wyjścia na świat
+i daje jedno pobranie na ofertę dla wszystkich agentów.
+
+`OfferListingDto` nie ma bloku `required`, więc `primaryImage` bywa puste —
+`NULL` w kolumnie znaczy „Allegro nie podało adresu", nie „oferta nie ma
+zdjęcia".
+
+**Wariant rozmiarowy adresu jest konwencją, nie specyfikacją.** Schemat
+dokumentuje wyłącznie adres w rozmiarze ORYGINALNYM. Podmiana segmentu
+(`/original/` → `/s320/`) daje miniaturę i tak robią to strony Allegro, ale
+w `swagger.yaml` tego nie ma. Serwer traktuje ją więc jako PRÓBĘ i w tym samym
+przebiegu wraca do oryginału, gdy CDN nie odda obrazu. Tym różni się to od
+mapowania z pamięci: tam pomyłka jest cicha, tu ma jawną drogę wyjścia.
 
 ## Odnośniki do panelu sprzedawcy
 

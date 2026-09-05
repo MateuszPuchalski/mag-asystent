@@ -1600,9 +1600,15 @@ CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
 -- z chwili, w której klient pytał. Oferta bywa poprawiana i kończona, a
 -- rozmowa sprzed tygodnia ma zostać czytelna.
 --
--- Zdjęcia NIE MA i to jest ta sama decyzja, co przy awatarze rozmówcy
--- (`docs/allegro-ksztalt.md`): obrazek z serwera Allegro znaczyłby wyjście
--- przeglądarki biura poza własną sieć przy każdym otwarciu skrzynki.
+-- ZDJĘCIE JEST OD 0.211.0, a do 0.210.0 nie było — z uzasadnieniem, które
+-- zakazywało czego innego, niż się wydawało. Brzmiało: „obrazek z serwera
+-- Allegro znaczyłby wyjście przeglądarki biura poza własną sieć". To jest
+-- zakaz HOTLINKA i on obowiązuje dalej: `<img src="https://a.allegroimg.com/…">`
+-- w panelu nie stanie. Plik ciągnie SERWER, panel dostaje go z naszej trasy —
+-- czyli dokładnie tak, jak zdjęcia kartotek od 0.30.0.
+--
+-- Trzymamy sam ADRES, nie bajty: obraz mieszka w `zdjecie_oferty_cache`, który
+-- wolno skasować w każdej chwili. Ten wiersz ma przeżyć czyszczenie cache'u.
 CREATE TABLE IF NOT EXISTS offer_snapshot (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
@@ -1617,8 +1623,47 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- `publication.status` z Allegro. Bez `CHECK`: lista wartości jest po ich
   -- stronie i rośnie, a zablokowany zapis byłby gorszy niż nieznana wartość.
   status TEXT,
+  -- `primaryImage.url` — zdjęcie LISTINGOWE oferty (0.211.0). Specyfikacja
+  -- opisuje je wprost: „The image used as a thumbnail on the listings"
+  -- (`OfferListingDtoImage`, docs/allegro/swagger.yaml). Jedzie w tej samej
+  -- odpowiedzi `GET /sale/offers`, którą i tak pobieramy po tytuł i cenę, więc
+  -- nie kosztuje ani jednego żądania więcej.
+  --
+  -- `OfferListingDto` NIE MA bloku `required`, więc pole bywa puste i `NULL`
+  -- znaczy „Allegro nie podało adresu", nie „oferta nie ma zdjęcia".
+  primary_image_url TEXT,
   synced_at TEXT NOT NULL,
   UNIQUE (channel_account_id, external_id)
+);
+
+-- ── Cache zdjęć ofert Allegro (0.211.0) ──────────────────────────────────────
+-- Osobna tabela i OSOBNY KATALOG względem `zdjecie_cache`, choć oba trzymają
+-- obrazy. Powód jest mechaniczny: każdy cache ma własną sprzątaczkę liczącą
+-- sumę bajtów SWOICH wpisów, a dwie sprzątaczki nad jednym katalogiem kasują
+-- sobie nawzajem pliki spod nóg. Powód drugi jest znaczeniowy: klucz kartoteki
+-- to `tw_id` z Subiekta, klucz oferty to para (konto kanału, numer oferty).
+--
+-- ADRES TEŻ JEST KLUCZEM ŚWIEŻOŚCI. Sprzedawca podmienia zdjęcie w ofercie
+-- i Allegro wydaje wtedy NOWY adres; ten sam adres znaczy ten sam obraz.
+-- Dlatego nie ma tu TTL-a jak przy kartotekach — jest porównanie adresu.
+CREATE TABLE IF NOT EXISTS zdjecie_oferty_cache (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  -- Adres, Z KTÓREGO pobrano ten plik. Różny od `offer_snapshot` znaczy
+  -- „obraz w ofercie się zmienił, pobierz od nowa".
+  zrodlo_url TEXT NOT NULL,
+  -- Nazwa pliku w `data/zdjecia-ofert`; `NULL` = pobranie się nie udało
+  -- i `blad` mówi dlaczego.
+  plik TEXT,
+  mime TEXT,
+  bajtow INTEGER NOT NULL DEFAULT 0,
+  etag TEXT,
+  pobrano_at TEXT NOT NULL,
+  uzyto_at TEXT NOT NULL,
+  -- Zdanie o BŁĘDZIE. Nigdy o braku zdjęcia — to dwie różne rzeczy, jak
+  -- w `zdjecie_cache`.
+  blad TEXT,
+  PRIMARY KEY (channel_account_id, external_id)
 );
 
 -- ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────

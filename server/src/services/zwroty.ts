@@ -36,6 +36,14 @@ export interface PozycjaZwrotu {
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
   zrodlo: string;
   offerId: string | null;
+  /**
+   * Numer oferty wzięty z POZYCJI ZAMÓWIENIA (0.211.0), nie z pozycji zwrotu.
+   *
+   * `offerId` wyżej należy do przestrzeni, której nie znamy; ten jest
+   * `lineItems[].offer.id` ze specyfikacji. `null` znaczy „nie ma zamówienia
+   * albo pozycja się z niczym nie związała".
+   */
+  ofertaZamowienia: string | null;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;
@@ -568,6 +576,26 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
         }
       }
 
+      /* ── NUMER OFERTY DO ZDJĘCIA (0.211.0) ──────────────────────────────
+         `PozycjaZwrotu.offerId` do zdjęcia się NIE NADAJE i mówi o tym cały
+         akapit niżej: nie wiadomo, czy to numer oferty, czy identyfikator
+         pozycji zamówienia (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`).
+         Pytanie CDN-u tym identyfikatorem trafiałoby raz w dziesięć.
+
+         `zamowienie_klienta_pozycja.offer_id` dwuznaczności nie ma: to
+         `lineItems[].offer.id` ze specyfikacji zamówienia. Przechodzimy więc
+         przez pozycję ZAMÓWIENIA — tą samą drogą i tym samym dopasowaniem po
+         obu kolumnach, którym wyżej idzie SKU. Druga, własna reguła
+         dopasowania rozjechałaby się z tamtą przy pierwszej poprawce. */
+      const ofertaWgKlucza = new Map<string, string>();
+      for (const pz of pozZamowienia) {
+        const oferta = (pz.offer_id as string) ?? "";
+        if (!oferta) continue;
+        for (const k of [pz.offer_id, pz.external_id]) {
+          if (k) ofertaWgKlucza.set(String(k), oferta);
+        }
+      }
+
       const zlozone: PozycjaZwrotu[] = surowe.map((p) => {
         const twId = p.tw_id == null ? null : Number(p.tw_id);
         return {
@@ -591,6 +619,8 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twSymbol: (p.tw_symbol as string) ?? null,
           twZrodlo: (p.tw_zrodlo as string) ?? null,
           sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
+          /* Numer oferty NADAJĄCY SIĘ do zapytania o zdjęcie — patrz wyżej. */
+          ofertaZamowienia: ofertaWgKlucza.get(String(p.offer_id ?? "")) ?? null,
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
           zrodlo: String(p.zrodlo ?? "allegro"),
           potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),

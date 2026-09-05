@@ -20,7 +20,13 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
    JEDNO ŻĄDANIE NA PARTIĘ, nie na ofertę: `offer.id` w `/sale/offers` jest
    tablicą (`docs/allegro/swagger.yaml`), więc dwadzieścia numerów kosztuje
    jedno wywołanie. `/sale/product-offers/{id}` obok dałoby ten sam tytuł po
-   jednym strzale na sztukę i dokładałoby zdjęcia, których nie pobieramy.
+   jednym strzale na sztukę.
+
+   ZDJĘCIE LISTINGOWE OD 0.211.0. `OfferListingDto.primaryImage.url` jedzie
+   w TEJ SAMEJ odpowiedzi i do 0.210.0 wypadało przy mapowaniu — specyfikacja
+   opisuje to pole jako „The image used as a thumbnail on the listings".
+   Wzięcie go nie kosztuje żądania, uprawnienia ani limitu; kosztowało wyłącznie
+   decyzję, którą właściciel podjął w 0.211.0 (patrz `schema.sql`).
 
    Ten przebieg nie chodzi po ofertach konta — dociąga wyłącznie te, na które
    wskazuje wiadomość, i najwyżej `NA_PRZEBIEG` naraz.                       */
@@ -49,6 +55,7 @@ type Oferta = {
   sellingMode?: { price?: { amount?: string; currency?: string } | null } | null;
   external?: { id?: string } | null;
   publication?: { status?: string } | null;
+  primaryImage?: { url?: string } | null;
 };
 type Odpowiedz = { offers?: Oferta[] };
 
@@ -72,19 +79,48 @@ export interface OfertySyncDeps {
  * Kolejność od najnowszej wiadomości: gdy do nadrobienia jest więcej ofert niż
  * partia, agent najpierw dostaje tytuły przy rozmowach, które ma dziś na
  * ekranie, a nie przy najstarszych w historii.
+ *
+ * ── DWA ŹRÓDŁA NUMERÓW OD 0.211.0 ─────────────────────────────────────────
+ * Do 0.210.0 przebieg chodził wyłącznie po ofertach WSKAZANYCH W WIADOMOŚCI,
+ * bo snapshot służył jednej rzeczy: tytułowi przy rozmowie. Od 0.211.0 niesie
+ * też adres zdjęcia listingowego, a zdjęcie jest potrzebne również przy
+ * ZWROCIE — czyli tam, gdzie rozmowy nie ma wcale.
+ *
+ * Drugie źródło to `zamowienie_klienta_pozycja.offer_id`, czyli
+ * `lineItems[].offer.id` ze specyfikacji zamówienia. Bierzemy TĘ kolumnę,
+ * a nie `offerId` z pozycji zwrotu, bo tamta należy do przestrzeni, której
+ * wciąż nie znamy (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`) — pytanie
+ * Allegro takim numerem kosztowałoby żądania i nie oddawałoby nic.
+ *
+ * WIADOMOŚCI IDĄ PIERWSZE i to jest cała rola `rzad` w sortowaniu. Partia ma
+ * dwadzieścia miejsc; gdy do nadrobienia jest więcej, agent patrzący na
+ * rozmowę ma dostać tytuł przed zdjęciem przy zwrocie sprzed miesiąca.
  */
 export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): string[] {
   const prog = new Date(teraz.getTime() - SWIEZOSC_MS).toISOString();
-  return (database.prepare(`SELECT m.related_object_id AS id
-      FROM message m
+  return (database.prepare(`
+    WITH zrodla AS (
+      SELECT m.channel_account_id AS konto, m.related_object_id AS id,
+             0 AS rzad, MAX(m.sent_at) AS kiedy
+        FROM message m
+       WHERE m.related_object_type = 'OFFER'
+         AND m.related_object_id IS NOT NULL AND TRIM(m.related_object_id) <> ''
+       GROUP BY m.channel_account_id, m.related_object_id
+      UNION ALL
+      SELECT z.channel_account_id AS konto, p.offer_id AS id,
+             1 AS rzad, MAX(COALESCE(z.kupiono_at, z.synced_at)) AS kiedy
+        FROM zamowienie_klienta_pozycja p
+        JOIN zamowienie_klienta z ON z.id = p.zamowienie_id
+       WHERE p.offer_id IS NOT NULL AND TRIM(p.offer_id) <> ''
+       GROUP BY z.channel_account_id, p.offer_id
+    )
+    SELECT s.id AS id
+      FROM zrodla s
       LEFT JOIN offer_snapshot o
-        ON o.channel_account_id = m.channel_account_id
-       AND o.external_id = m.related_object_id
-     WHERE m.related_object_type = 'OFFER'
-       AND m.related_object_id IS NOT NULL AND TRIM(m.related_object_id) <> ''
-       AND (o.id IS NULL OR o.synced_at < ?)
-     GROUP BY m.related_object_id
-     ORDER BY MAX(m.sent_at) DESC
+        ON o.channel_account_id = s.konto AND o.external_id = s.id
+     WHERE o.id IS NULL OR o.synced_at < ?
+     GROUP BY s.id
+     ORDER BY MIN(s.rzad), MAX(s.kiedy) DESC
      LIMIT ?`).all(prog, ile) as Array<{ id: string }>).map((r) => r.id);
 }
 
@@ -129,13 +165,17 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
 
 function zapisz(database: Db, o: Oferta, konto: number, at: string): void {
   const kwota = o.sellingMode?.price;
+  /* Pusty adres schodzi na `NULL`. `""` w tej kolumnie znaczyłoby „mamy adres
+     długości zero" i cache poszedłby po niego do sieci. */
+  const obraz = (o.primaryImage?.url ?? "").trim() || null;
   database.prepare(`INSERT INTO offer_snapshot
-    (channel_account_id,external_id,nazwa,sku,cena_grosze,waluta,status,synced_at)
-    VALUES (?,?,?,?,?,?,?,?)
+    (channel_account_id,external_id,nazwa,sku,cena_grosze,waluta,status,primary_image_url,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       nazwa=excluded.nazwa, sku=excluded.sku, cena_grosze=excluded.cena_grosze,
-      waluta=excluded.waluta, status=excluded.status, synced_at=excluded.synced_at`).run(
+      waluta=excluded.waluta, status=excluded.status,
+      primary_image_url=excluded.primary_image_url, synced_at=excluded.synced_at`).run(
     konto, String(o.id), o.name ?? "", o.external?.id ?? null,
     kwota?.amount == null ? null : naGrosze(kwota.amount),
-    kwota?.currency ?? null, o.publication?.status ?? null, at);
+    kwota?.currency ?? null, o.publication?.status ?? null, obraz, at);
 }

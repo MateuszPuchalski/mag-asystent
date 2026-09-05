@@ -112,6 +112,12 @@ export interface OfertaRozmowy {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
+    /* Czy Allegro podało adres zdjęcia listingowego (0.211.0). Sam adres NIE
+       jedzie do panelu i to jest cała różnica: gdyby jechał, front miałby
+       w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś wstawiłby
+       go w `src`, czyli wyprowadził przeglądarkę biura poza własną sieć.
+       Flaga mówi tylko „jest po co pytać naszej trasy". */
+    maZdjecie: boolean;
   } | null;
   /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). To PROPOZYCJA
      z powodem, nie fakt — §4.3 nie pozwala, żeby wybór automatu udawał daną
@@ -313,7 +319,8 @@ export function listaRozmow(): RozmowaSkrzynki[] {
  * miejscu wygląda jak usterka.
  */
 function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana"] {
-  const w = db().prepare(`SELECT nazwa, sku, cena_grosze, waluta, status, synced_at
+  const w = db().prepare(`SELECT nazwa, sku, cena_grosze, waluta, status, synced_at,
+        primary_image_url
       FROM offer_snapshot WHERE channel_account_id=? AND external_id=?`)
     .get(konto, ofertaId) as Record<string, unknown> | undefined;
   if (!w) return null;
@@ -324,6 +331,7 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
     waluta: w.waluta == null ? null : String(w.waluta),
     status: w.status == null ? null : String(w.status),
     syncedAt: String(w.synced_at),
+    maZdjecie: String(w.primary_image_url ?? "").trim() !== "",
   };
 }
 

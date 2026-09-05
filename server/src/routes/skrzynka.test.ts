@@ -71,6 +71,9 @@ const liczbaZdarzen = () =>
 const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/rozmowy" },
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}` },
+  /* Zdjęcie oferty (0.211.0) stoi za tą samą bramką, co reszta skrzynki:
+     obraz z oferty klienta nie jest daną dla hali. */
+  { method: "GET" as const, url: "/api/obsluga/oferta/111/zdjecie" },
   { method: "POST" as const, url: "/api/obsluga/zadania/pomiar",
     payload: { rozmowaId: rozmowa, wiadomoscId: pytanie, instrukcja: "Zmierz rozstaw." } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/claim`, payload: { expectedVersion: 1 } },

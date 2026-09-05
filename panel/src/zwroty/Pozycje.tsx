@@ -4,9 +4,7 @@ import type { DoDopisania, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Przycisk, Blad } from "../ui";
-import { Zdjecie } from "../towar/Zdjecie";
-import { Powiekszenie } from "../towar/Powiekszenie";
-import { Kafel } from "../towar/Kafel";
+import { Kafel, KafelOferty } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
 import { Potracenie } from "./Potracenie";
@@ -148,7 +146,6 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   onDopisz?: (zamPozycjaId: number) => void;
   onZdejmij?: (pozycjaId: number) => void;
 }) {
-  const [powiekszony, setPowiekszony] = useState<PozycjaZwrotu | null>(null);
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
      o niej decyduje człowiek, bo zależy od tego, czy klient odstępuje od
      całego zamówienia, czy oddaje jedną rzecz z pięciu.
@@ -196,14 +193,32 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
 
   return <div className="p-4">
     <ul className="space-y-2">
-      {zwrot.pozycje.map((p) => <li key={p.id} className="flex gap-3 rounded-lg bg-slate-50 p-3">
+      {zwrot.pozycje.map((p) => <li key={p.id} className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
         {/* Pole zaznaczenia stoi PRZED zdjęciem, w jednej kolumnie dla całej
             listy: odhaczanie idzie wtedy w dół jednym ruchem oka. */}
         {wycena && <input type="checkbox" className="mt-1 h-4 w-4 shrink-0"
           aria-label={`Oddaj: ${p.nazwa}`}
           checked={wybrane.includes(p.id)} onChange={() => przelacz(p.id)} />}
-        <Zdjecie twId={p.twId} rozmiar={72} nazwa={p.nazwa}
-          onKlik={p.twId !== null ? () => setPowiekszony(p) : undefined} />
+        {/* ── DWA ZDJĘCIA, DWA PYTANIA (0.211.0) ──────────────────────────
+            Kafel kartoteki odpowiada „co mamy na półce", kafel oferty — „co
+            klient widział, kupując". To nie jest powtórzenie: różnica między
+            nimi bywa właśnie tym, o co poszedł spór („na zdjęciu było inaczej").
+
+            Zdjęcie oferty stoi DRUGIE i jest mniejsze, bo pierwsze pytanie
+            przy zwrocie brzmi „czym to jest u nas".
+
+            KAFEL STOI ZAWSZE, także pusty, i to jest ta sama reguła, dla której
+            kafel kartoteki nie znika: wiersze mają zaczynać się w JEDNEJ linii,
+            bo wzrok jedzie po nich w dół. Pusty niesie zresztą własną
+            informację — pozycja, która nie związała się z żadną linią
+            zamówienia, to wiersz, o którym wiemy mniej niż o sąsiednich.
+
+            Numer bierzemy z pozycji ZAMÓWIENIA (`ofertaZamowienia`), nie
+            z `offerId` pozycji zwrotu: tamten należy do przestrzeni, której
+            nie znamy — patrz `services/zwroty.ts`. */}
+        <Kafel twId={p.twId} rozmiar={72} nazwa={p.nazwa} symbol={p.twSymbol} />
+        <KafelOferty externalId={p.ofertaZamowienia} rozmiar={48}
+          nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             {/* Bez `truncate`: w środkowej kolumnie nazwa się MIEŚCI, a gdy
@@ -358,8 +373,5 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
     {/* Błąd oceny i kwoty ląduje TU, bo tu stoją ich przyciski. */}
     {(wycena || ocenianie) && blad && <div className="mt-3"><Blad>{blad}</Blad></div>}
 
-    {powiekszony?.twId != null && <Powiekszenie
-      twId={powiekszony.twId} nazwa={powiekszony.nazwa} symbol={powiekszony.twSymbol}
-      zamknij={() => setPowiekszony(null)} />}
   </div>;
 }

@@ -1325,6 +1325,36 @@ Obraz propozycji stoi WEWNĄTRZ jej ramki, nie na wierszu. Kafel wiersza należy
 do kartoteki potwierdzonej; wyniesiony na wiersz obraz propozycji udawałby
 fakt, a §4.3 nie pozwala, żeby wybór automatu wyglądał jak dana z Allegro.
 
+### 25a.6b. Zdjęcie z oferty Allegro (0.211.0)
+
+Kartoteka odpowiada na pytanie „co mamy na półce". Oferta odpowiada na inne:
+„co klient WIDZIAŁ, kupując". Zbieżność nie jest przesądzona i właśnie ta
+różnica bywa treścią sporu — „na zdjęciu było inaczej".
+
+Adres zdjęcia listingowego jedzie w odpowiedzi `GET /sale/offers`, po którą
+i tak idziemy po tytuł i cenę, więc funkcja nie kosztuje żądań. Do 0.210.0
+pole wypadało przy mapowaniu.
+
+**Zakaz z 0.178.0 obowiązuje dalej i dotyczył czego innego.** Brzmiał: obrazek
+z serwera Allegro znaczyłby wyjście przeglądarki biura poza własną sieć. To jest
+zakaz hotlinka. Panel nie dostaje adresu w `allegroimg.com`; po plik idzie
+serwer i podaje go z trasy `/api/obsluga/oferta/:externalId/zdjecie`, tak jak
+od 0.30.0 podaje zdjęcia kartotek.
+
+Zdjęcie stoi w dwóch miejscach i w obu ma PODPIS, bo źródła się nie mieszają
+(§4.3): w bloku oferty przy rozmowie, nad blokiem towaru z Subiekta, oraz przy
+pozycji zwrotu, obok kafla kartoteki.
+
+**Przy zwrocie numer oferty bierze się z pozycji ZAMÓWIENIA.** `offerId`
+pozycji zwrotu należy do przestrzeni, której nie znamy (`[WERYFIKUJ]`
+w `docs/allegro-ksztalt.md`), więc pytanie nim trafiałoby raz na dziesięć.
+Droga idzie przez pozycję zamówienia — tym samym dopasowaniem po obu
+kolumnach, którym idzie SKU.
+
+To zakrywa dziurę, której kartoteka zakryć nie umie. Pytanie sprzed zakupu
+przychodzi bez kartoteki, a większość kartotek i tak zdjęcia nie ma; oferta ma
+je prawie zawsze.
+
 ### 25a.6a. Zdjęcia w całej obsłudze (0.203.0)
 
 Do 0.202.0 kafel stał wyłącznie tam, gdzie kartoteka była już rozstrzygnięta:
@@ -1349,7 +1379,8 @@ obrazku, nie po kodzie magazynowym.
 się po pilności, czasie oczekiwania i treści pytania — nie po tym, jak wygląda
 towar. Rozmowa nie niesie zresztą kartoteki na liście: wywodzi się ją z oferty
 dopiero po otwarciu. Zdjęcie wchodzi tam, gdzie pada pytanie „czy to ta
-część", czyli o jeden ekran dalej.
+część", czyli o jeden ekran dalej. Zdjęcie z oferty (0.211.0) tego nie zmienia:
+snapshot oferty przy rozmowie też powstaje dopiero po otwarciu.
 
 ### 25a.7. Odnośniki do Allegro
 

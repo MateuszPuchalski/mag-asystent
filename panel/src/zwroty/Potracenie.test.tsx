@@ -11,7 +11,7 @@ import type { PozycjaZwrotu } from "../api/typy";
    liczby bez uzasadnienia ani większej niż wart jest towar. */
 
 const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
-  id: 11, zrodlo: "allegro", offerId: "of-1", nazwa: "Szarpak", ilosc: 2, cenaGrosze: 5000,
+  id: 11, zrodlo: "allegro", offerId: "of-1", ofertaZamowienia: null, nazwa: "Szarpak", ilosc: 2, cenaGrosze: 5000,
   waluta: "PLN", powod: null, powodKomentarz: null, ocena: null, wKoszyku: false, url: null,
   twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null,
   potracenieGrosze: null, potraceniePowod: null, propozycja: null,

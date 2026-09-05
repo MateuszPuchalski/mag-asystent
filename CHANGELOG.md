@@ -34,6 +34,64 @@ historii nie przepisujemy.
 ---
 
 
+## 0.211.0 — 5 września 2026
+
+**Zdjęcie z oferty Allegro przy ofertach i przy zwrotach.** Panel pokazywał
+zdjęcie kartoteki z Subiekta, a kartoteka odpowiada na pytanie „co mamy na
+półce". Klient pyta o coś innego: o rzecz, którą właśnie ogląda na ekranie.
+Tego obrazu nie było nigdzie, a przy pytaniu SPRZED zakupu — czyli takim, jakie
+przychodzi pod ofertą — kartoteki zwykle nie ma wcale i kafel świecił pustką.
+
+Adres zdjęcia listingowego jedzie w tej samej odpowiedzi `GET /sale/offers`,
+którą pobieramy po tytuł i cenę. Nie kosztuje żądania, uprawnienia ani limitu:
+do 0.210.0 po prostu wypadał przy mapowaniu. Schemat `OfferListingDtoImage`
+opisuje to pole wprost — „The image used as a thumbnail on the listings".
+
+**Zakaz z 0.178.0 obowiązuje dalej i dotyczył czego innego.** Brzmiał: obrazek
+z serwera Allegro znaczyłby wyjście przeglądarki biura poza własną sieć. To jest
+zakaz HOTLINKA. Panel nie dostaje adresu w `allegroimg.com` i nie ma go po co
+dostawać — po plik idzie serwer, który i tak rozmawia z Allegro, i podaje go
+z własnej trasy. Ta sama droga, którą od 0.30.0 idą zdjęcia kartotek.
+
+Kopia ma trzy uzasadnienia poza prywatnością. Zachowuje obraz, który klient
+NAPRAWDĘ widział: sprzedawca podmienia zdjęcie w ofercie, a rozmowa sprzed
+tygodnia ma zostać czytelna. Pozwala pracować na stanowisku bez wyjścia na
+świat. I daje jedno pobranie na ofertę dla wszystkich agentów, nie jedno na
+spojrzenie.
+
+**Dwa zdjęcia obok siebie i oba mają podpis.** Przy rozmowie zdjęcie oferty
+stoi nad blokiem towaru z Subiekta, przy pozycji zwrotu — obok kafla kartoteki.
+Źródła się nie mieszają (§4.3), więc każde mówi, skąd jest; różnica między nimi
+bywa właśnie tym, o co poszedł spór.
+
+**Przy zwrocie numer oferty bierze się z pozycji ZAMÓWIENIA**, nie z pozycji
+zwrotu. Tamten identyfikator należy do przestrzeni, której wciąż nie znamy, więc
+pytanie nim trafiałoby raz na dziesięć. Synchronizacja ofert dostała przez to
+drugie źródło numerów — same wiadomości nie wystarczą, bo przy zwrocie rozmowy
+zwykle nie ma. Oferty z wiadomości idą w partii pierwsze.
+
+**Miniatury: korzystamy z konwencji, ale na niej nie stoimy.** Specyfikacja
+dokumentuje wyłącznie adres w rozmiarze oryginalnym; wariant `/s320/` jest
+niepisaną konwencją CDN-u Allegro. Pobranie idzie więc najpierw po miniaturę,
+a gdy CDN nie odda obrazu, TEN SAM przebieg bierze oryginał. Konwencja, która
+działa, oszczędza transfer; konwencja, która przestanie działać, kosztuje jedno
+żądanie i nic na ekranie. `ALLEGRO_ZDJECIA_PX=0` wyłącza próbę.
+
+Cache zdjęć ofert jest osobny od cache'u kartotek — osobna tabela i osobny
+katalog, bo dwie sprzątaczki nad jednym katalogiem kasują sobie pliki spod nóg.
+Świeżość idzie po ADRESIE, nie po czasie: Allegro wydaje nowy adres dla
+podmienionego obrazu, więc nie trzeba tu zgadywać TTL-em.
+
+Serwer pobiera wyłącznie z `allegroimg.com` i wyłącznie po https. Adres
+przyjeżdża z zewnątrz i ląduje w naszej bazie, a potem serwer sam po niego
+idzie — bez tej bramki wystarczyłby jeden dziwny wiersz, żeby zamienić trasę
+zdjęć w czytnik cudzej sieci wewnętrznej.
+
+Kafel oferty stoi przy pozycji zwrotu ZAWSZE, także pusty: wiersze mają
+zaczynać się w jednej linii, a pusty kafel niesie własną informację — pozycja,
+która nie związała się z żadną linią zamówienia, to wiersz, o którym wiemy
+mniej niż o sąsiednich.
+
 ## 0.210.0 — 5 września 2026
 
 **Trzy luki z przeglądu procesu zwrotów.** Właściciel poprosił o przegląd
