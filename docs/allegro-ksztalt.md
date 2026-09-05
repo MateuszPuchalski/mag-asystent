@@ -660,13 +660,26 @@ na ekran wprost.
 Adresy PANELU SPRZEDAWCY to strony UI, więc nie opisuje ich ani ta
 specyfikacja, ani żadna inna.
 
-`[WERYFIKUJ]` Zwrot otwiera się pod
-`https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}`, a zamówienie pod
-`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}`. Oferta z rozmowy
-prowadzi pod `https://allegro.pl/oferta/{id}`, czyli na stronę PUBLICZNĄ:
-agent chce zobaczyć to, co widzi klient, a nie formularz edycji. Wszystkie trzy
-wzorce stoją w konfiguracji (`ALLEGRO_PANEL_ZWROT`, `ALLEGRO_PANEL_ZAMOWIENIE`,
-`ALLEGRO_PANEL_OFERTA`), bo link trafiający w 404 kosztuje kliknięcie
-i zaufanie do ekranu — a poprawka ma być wpisem w `wertis.env`, nie nowym
-wydaniem. Udokumentowany przykład `CustomerReturnItem.url` niesie w adresie
-także slug tytułu; czy sam numer wystarczy, sprawdza się kliknięciem.
+**Zwrot — adres ZWERYFIKOWANY (0.207.0).** Właściciel podał działający:
+lista zwrotów Centrum Sprzedaży z numerem w wyszukiwaniu,
+`https://salescenter.allegro.com/returns?page=1&limit=25&from={od}&search={id}`.
+Dawny `moje-allegro/sprzedaz/zwroty/{id}` był zgadnięty i zwrot nie ma pod nim
+własnej strony.
+
+`{od}` to dolna granica zakresu dat listy i bierze się z DNIA ZGŁOSZENIA tego
+zwrotu. Stała granica — na przykład sprzed trzech miesięcy — wycięłaby starszy
+zwrot i wyszukanie po poprawnym numerze oddałoby pustą listę.
+
+`[WERYFIKUJ]` Zamówienie otwiera się pod
+`https://allegro.pl/moje-allegro/sprzedaz/zamowienia/{id}`, a oferta z rozmowy
+pod `https://allegro.pl/oferta/{id}`, czyli na stronie PUBLICZNEJ: agent chce
+zobaczyć to, co widzi klient, a nie formularz edycji. Oba wzorce stoją
+w konfiguracji (`ALLEGRO_PANEL_ZAMOWIENIE`, `ALLEGRO_PANEL_OFERTA`), bo link
+trafiający w 404 kosztuje kliknięcie i zaufanie do ekranu — a poprawka ma być
+wpisem w `wertis.env`, nie nowym wydaniem. Udokumentowany przykład
+`CustomerReturnItem.url` niesie w adresie także slug tytułu; czy sam numer
+wystarczy, sprawdza się kliknięciem.
+
+Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
+zostaje przy dawnym wzorcu. Zgadywanie go drugi raz kosztowałoby to samo, co
+pierwszy.

@@ -1401,6 +1401,16 @@ osobowa, którą polityka dopuszcza wprost; imienia Allegro przy zwrocie nie
 podaje wcale. Nieznanego przewoźnika pokazujemy surowo, bo Allegro nie publikuje
 zamkniętej listy — sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
 
+Od 0.207.0 stoją w DWÓCH różnych miejscach, bo odpowiadają na dwa różne
+pytania. Login jest w NAGŁÓWKU sprawy, razem z numerem zwrotu: to tożsamość,
+czyli pierwsze, co się czyta, i jedyne, co się przepisuje. Przewoźnik zszedł do
+PACZKI ZWROTNEJ, bo mówi o paczce, nie o zwrocie. Sekcja „Zwrot" po prawej
+przestała istnieć — numer stał dotąd w dwóch miejscach naraz.
+
+**Numer zwrotu prowadzi do Centrum Sprzedaży**, wyszukany po sobie samym.
+Zakres dat listy startuje od dnia zgłoszenia tego zwrotu; stała granica
+wycięłaby starszy zwrot i wyszukanie oddałoby pustkę mimo trafionego numeru.
+
 **Forma płatności i rodzaj dokumentu** przy zamówieniu. Przy pobraniu nie ma
 karty, na którą oddać pieniądze, a rodzaj dokumentu mówi, czy potrzebna będzie
 korekta faktury. Bierzemy SAMĄ FLAGĘ `invoice.required`: dane firmy niosą ulicę

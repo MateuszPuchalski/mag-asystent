@@ -430,11 +430,28 @@ export const config = {
      * Dlatego stoją w konfiguracji: gdy Allegro przestawi adres, poprawia się
      * to wpisem w `wertis.env`, a nie wydaniem aplikacji.
      */
+    /**
+     * Zwrot — CENTRUM SPRZEDAŻY z wyszukiwaniem po numerze (0.207.0).
+     *
+     * Do tego wydania stał tu `moje-allegro/sprzedaz/zwroty/{id}`: adres
+     * zgadnięty, bo zwrot nie ma w panelu własnej strony pod identyfikatorem.
+     * Właściciel podał działający — lista zwrotów Centrum Sprzedaży
+     * z numerem w `search`. To jedyny z trzech wzorców tutaj, który przeszedł
+     * przez żywe konto.
+     *
+     * `{od}` to dolna granica zakresu dat listy. Bierzemy DZIEŃ ZGŁOSZENIA
+     * tego zwrotu, nie stałą sprzed trzech miesięcy: filtr zakresu wycina
+     * wiersze spoza okna, więc stała data odcięłaby starsze zwroty i wyszukanie
+     * oddałoby pustą listę przy poprawnym numerze.
+     *
+     * Sandboks zostaje przy dawnym wzorcu — hosta Centrum Sprzedaży dla
+     * sandboksu nie znamy, a zgadywanie go drugi raz kosztowałoby to samo.
+     */
     panelZwrot:
       process.env.ALLEGRO_PANEL_ZWROT ??
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/zwroty/{id}"
-        : "https://allegro.pl/moje-allegro/sprzedaz/zwroty/{id}"),
+        : "https://salescenter.allegro.com/returns?page=1&limit=25&from={od}&search={id}"),
     panelZamowienie:
       process.env.ALLEGRO_PANEL_ZAMOWIENIE ??
       (process.env.ALLEGRO_SANDBOX === "1"

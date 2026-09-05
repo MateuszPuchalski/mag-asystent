@@ -20,13 +20,37 @@ import { config } from "../config.js";
  * Identyfikator kodujemy: numery zwrotów bywają postaci `4R50/2026`, a ukośnik
  * w ścieżce zrobiłby z jednego segmentu dwa.
  */
-export function zWzorca(wzorzec: string, id: string | null | undefined): string | null {
+export function zWzorca(
+  wzorzec: string, id: string | null | undefined, od?: string | null,
+): string | null {
   if (!wzorzec || !id) return null;
-  return wzorzec.replace("{id}", encodeURIComponent(id));
+  return wzorzec
+    .replace("{id}", encodeURIComponent(id))
+    /* `{od}` bez wartości zostaje PUSTE, a nie z gołym znacznikiem w adresie:
+       lista Centrum Sprzedaży bez dolnej granicy pokazuje własne domyślne
+       okno, a `from={od}` wysłane dosłownie byłoby błędem po tamtej stronie. */
+    .replace("{od}", od ? encodeURIComponent(od) : "");
 }
 
-export const linkZwrotu = (id: string | null | undefined) =>
-  zWzorca(config.allegro.panelZwrot, id);
+/**
+ * Odnośnik do zwrotu w Centrum Sprzedaży.
+ *
+ * `utworzono` wyznacza dolną granicę zakresu dat listy — bez niej filtr
+ * wyciąłby starszy zwrot i wyszukanie po poprawnym numerze oddałoby pustkę.
+ * Bierzemy POCZĄTEK DNIA zgłoszenia, żeby strefa czasowa nie zjadła zwrotu
+ * zgłoszonego nad ranem.
+ */
+export const linkZwrotu = (id: string | null | undefined, utworzono?: string | null) =>
+  zWzorca(config.allegro.panelZwrot, id, poczatekDnia(utworzono));
+
+/** `2026-08-20T07:28:12Z` → `2026-08-20T00:00:00.000Z`; `null` przy śmieciu. */
+function poczatekDnia(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
 
 export const linkZamowienia = (id: string | null | undefined) =>
   zWzorca(config.allegro.panelZamowienie, id);

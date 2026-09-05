@@ -359,7 +359,13 @@ test("zwrot niesie odnośniki, a brak numeru nie robi linku donikąd", () => {
     [{ ilosc: 1, cena: 8999, offerId: "111", url: "https://allegro.pl/oferta/sekator-111" }]);
   zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: null, cena: 8999 }]);
   const z = listaZwrotow(d, TERAZ)[0];
-  assert.match(z.linkZwrotu!, /moje-allegro/);
+  /* Centrum Sprzedaży z numerem w `search` (0.207.0) — to jedyny z trzech
+     wzorców, który przeszedł przez żywe konto. Zakres dat startuje od DNIA
+     ZGŁOSZENIA: stała granica wycięłaby starszy zwrot i wyszukanie po
+     poprawnym numerze oddałoby pustkę. */
+  assert.match(z.linkZwrotu!, /salescenter\.allegro\.com\/returns\?/);
+  assert.match(z.linkZwrotu!, /search=/);
+  assert.match(z.linkZwrotu!, /from=2026-08-31T00%3A00%3A00\.000Z/);
   assert.match(z.zamowienie!.link!, /ord-1$/);
   assert.equal(z.pozycje[0].url, "https://allegro.pl/oferta/sekator-111",
     "adres oferty to jedyny link opisany w specyfikacji");
