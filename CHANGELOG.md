@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.206.0 — 5 września 2026
+
+**Zdjęcie w dostawie na kolektorze też powiększa się dotknięciem.** Dopełnienie
+0.205.0, na wyraźne życzenie właściciela. Mechanizm istniał od dawna
+(`MiniaturaTowaru(powieksz = …)`), ale ekran dostaw jako jedyny go nie włączał —
+a to tam, przy regale, pada pytanie „czy karton niesie TĘ kartotekę".
+
+Powiększenie działa w DWÓCH miejscach i w obu z podanym powodem. W rozwiniętym
+wierszu pozycji — bo cała karta wiersza jest klikalna, więc klikalna miniatura
+zabiera jej dotknięcie, a w rozwiniętym to uczciwa zamiana: karta jest duża
+i zwinie ją dotknięcie obok. W zwiniętym i oczekującym miniatura klikalna
+zostaje wyłączona: byłby to cel 28–36 dp z inną akcją niż reszta gęstej listy,
+czyli pomyłka co kilka pozycji, w rękawicy. Miniatura rozwiniętego urosła przy
+tym z 44 do 48 dp, bo od teraz JEST celem dotyku — punkt 4 dekalogu.
+
+Drugie miejsce to wybór kartoteki, gdy kod wskazuje kilka towarów. Wiersz służy
+tam wyborowi, więc dotknięcie zdjęcia zamiast wyboru kosztuje jedno zbędne
+dotknięcie — ale wybór złej kartoteki kosztuje zły towar na dokumencie.
+Dekalog rozstrzyga taki spór na korzyść mniejszej liczby błędów.
+
+**Przy okazji: „pełny ekran" nigdy nie był pełnym ekranem.** `PelnyEkranZdjecia`
+było gołym `Box(fillMaxSize())` renderowanym tam, gdzie stoi miniatura —
+a stoi ona we wszystkich czterech dotychczasowych wywołaniach wewnątrz `Row`.
+Wypełniało więc wysokość wiersza, nie ekran; nazwa funkcji obiecywała co innego,
+niż robiła. Teraz jest to okno nad całym ekranem, niezależne od tego, w czym
+siedzi miniatura, i zamyka je także KLAWISZ WSTECZ — na kolektorze pierwszy
+odruch, a dotąd cofał cały ekran.
+
 ## 0.205.0 — 4 września 2026
 
 **Zdjęcie w dostawie powiększa się kliknięciem.** Zgłoszenie właściciela.

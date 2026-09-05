@@ -1078,8 +1078,13 @@ private fun LineRow(
             /* Rozwinięty wiersz dostaje kafelek 44 dp na białym tle — nagłówek
                karty z makiety. Oczekujący zostaje przy 36 dp: tam liczy się
                gęstość listy, a nie okazałość jednej pozycji. */
+            /* Rozwinięty ma 48 dp, nie 44 jak do 0.206.0. Od tego wydania
+               miniatura rozwiniętego wiersza JEST celem dotyku (powiększenie
+               zdjęcia), a cel dotyku ma minimum 48 dp — punkt 4 dekalogu.
+               Zwinięty i oczekujący zostają przy swoich rozmiarach, bo tam
+               miniatura klikalna nie jest. */
             val bokMiniatury = when {
-                rozwiniety -> 44.dp
+                rozwiniety -> 48.dp
                 zwiniety -> 28.dp
                 else -> 36.dp
             }
@@ -1106,6 +1111,18 @@ private fun LineRow(
                 graph,
                 line.twId,
                 bokMiniatury,
+                /* Powiększenie WYŁĄCZNIE w rozwiniętym wierszu (0.206.0).
+                   Zgłoszenie właściciela: przy regale trzeba czasem sprawdzić,
+                   czy karton niesie tę kartotekę — nazwy różnią się końcówką,
+                   a miniatura w rękawicy nie rozstrzyga.
+
+                   Cała karta wiersza jest klikalna (zwija i rozwija), więc
+                   miniatura klikalna ZABIERA jej dotknięcie. W rozwiniętym to
+                   uczciwa zamiana: karta jest duża, zwinie ją dotknięcie
+                   obok. W zwiniętym i oczekującym byłby to cel 28–36 dp z inną
+                   akcją niż reszta gęstej listy — czyli pomyłka co kilka
+                   pozycji, w rękawicy. */
+                powieksz = rozwiniety,
                 // przy zgłoszonym problemie `Alert` już stoi na tej pozycji
                 zamiast = if (problem) null else ikonaPudelka,
             )
@@ -1791,7 +1808,12 @@ private fun EanConflictSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                MiniaturaTowaru(graph, c.twId, 56.dp)
+                /* Powiększenie także tu (0.206.0), choć wiersz służy WYBOROWI.
+                   Dotknięcie zdjęcia zamiast wyboru kosztuje jedno zbędne
+                   dotknięcie; wybór złej kartoteki kosztuje zły towar na
+                   dokumencie. Dekalog rozstrzyga taki spór na korzyść mniejszej
+                   liczby błędów, nie mniejszej liczby interakcji. */
+                MiniaturaTowaru(graph, c.twId, 56.dp, powieksz = true)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(c.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
                     Text(c.name, fontSize = 12.5.sp, color = InkSoft, maxLines = 2)
