@@ -233,44 +233,28 @@ describe("Dowody", () => {
     expect(screen.getByText(/dociągnie ją najbliższa synchronizacja/)).toBeInTheDocument();
   });
 
-  it("odnośniki wychodzą w nowej karcie i nie wynoszą naszego adresu", () => {
-    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE, linkZwrotu: "https://allegro.pl/zwroty/1" })} />));
-    const zwrotLink = screen.getByRole("link", { name: /REF-1/ });
-    expect(zwrotLink).toHaveAttribute("href", "https://allegro.pl/zwroty/1");
-    expect(zwrotLink).toHaveAttribute("target", "_blank");
-    expect(zwrotLink).toHaveAttribute("rel", "noopener noreferrer");
-    expect(screen.getByRole("link", { name: /Otwórz w Allegro/ }))
-      .toHaveAttribute("href", "https://allegro.pl/moje-allegro/zam/ord-1");
+  it("odnośnik zamówienia wychodzi w nowej karcie i nie wynosi naszego adresu", () => {
+    /* Numer zwrotu i login kupującego przeprowadziły się w 0.207.0 do
+       nagłówka sprawy — pilnuje ich `Naglowek.test.tsx`. Tutaj zostaje to,
+       co dalej należy do prawej kolumny. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
+    const link = screen.getByRole("link", { name: /Otwórz w Allegro/ });
+    expect(link).toHaveAttribute("href", "https://allegro.pl/moje-allegro/zam/ord-1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("bez adresu zostaje sam tekst — link donikąd jest gorszy od jego braku", () => {
-    render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.queryByRole("link", { name: /REF-1/ })).not.toBeInTheDocument();
-    expect(screen.getByText("REF-1")).toBeInTheDocument();
-  });
-
-  it("kupujący i przewoźnik stoją przy zwrocie, bez pobranego zamówienia", () => {
-    /* Login niesie sam zwrot, więc widać go także wtedy, gdy zamówienia
-       jeszcze nie pobrano. To jedyna dana osobowa dopuszczona wprost. */
-    render(zKlientem(<Dowody zwrot={zwrot({ kupujacyLogin: "mirek352810",
-      przewoznik: "INPOST" })} />));
-    expect(screen.getByText("mirek352810")).toBeInTheDocument();
-    expect(screen.getByText("InPost")).toBeInTheDocument();
-  });
-
-  /* ZGŁOSZENIE WŁAŚCICIELA (0.177.0): „nie widzę nigdzie w otwartym zwrocie
-     loginu klienta". Wiersz znikał przy pustym polu, więc ekran o kupującym
-     MILCZAŁ — a milczenie wygląda jak usterka panelu, nie jak brak danych. */
-  it("pusty login mówi, że nie podało go Allegro — wiersz nie znika", () => {
-    render(zKlientem(<Dowody zwrot={zwrot({ kupujacyLogin: null })} />));
-    expect(screen.getByText("Kupujący")).toBeInTheDocument();
-    expect(screen.getByText("Allegro nie podało")).toBeInTheDocument();
+  it("przewoźnik stoi przy PACZCE, nie przy zwrocie jako sprawie", () => {
+    /* Mówi o tym, czym paczka jedzie — a nie o zwrocie. Do 0.206.0 stał
+       w sekcji „Zwrot" razem z numerem i loginem, które już tam nie stoją. */
+    render(zKlientem(<Dowody zwrot={zwrot({ przewoznik: "INPOST" })} />));
+    expect(screen.getByText(/Przewoźnik: InPost/)).toBeInTheDocument();
   });
 
   it("nieznany przewoźnik pokazuje się surowy, bo Allegro nie zamyka listy", () => {
     /* Sonda złapała `UNKNOWN`, którego nie ma w żadnej specyfikacji. */
     render(zKlientem(<Dowody zwrot={zwrot({ przewoznik: "JAKAS_FIRMA" })} />));
-    expect(screen.getByText("JAKAS_FIRMA")).toBeInTheDocument();
+    expect(screen.getByText(/JAKAS_FIRMA/)).toBeInTheDocument();
   });
 
   it("płatność i rodzaj dokumentu stoją przy zamówieniu", () => {

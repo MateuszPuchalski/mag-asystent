@@ -12,6 +12,7 @@ import {
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
 } from "../api/zwroty";
 import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Naglowek } from "../zwroty/Naglowek";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
@@ -358,26 +359,7 @@ export function Zwroty() {
         ? <Pusto ikona={<Undo2 size={40} className="text-slate-300" />}>
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
-            {/* Pytanie bierze się z kubełka WYBRANEGO zwrotu, nie z zakładki
-                listy. Te dwie rzeczy rozjeżdżają się przy wejściu z paska
-                adresu, a wtedy nagłówek pytałby o co innego niż klawisze. */}
-            <header className="shrink-0 border-b border-slate-200 p-4">
-              <h2 className="flex items-center gap-2 text-lg font-bold">
-                {zwrot.zrodlo === "nieodebrana"
-                  ? (zwrot.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
-                  : (zwrot.numer ?? zwrot.externalId)}
-                {/* Oznaczenie stoi PRZY NUMERZE, nie w dowodach: operator ma
-                    wiedzieć, z czym pracuje, zanim cokolwiek kliknie. */}
-                {zwrot.zrodlo === "nieodebrana" &&
-                  <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
-                    nieodebrana paczka</span>}
-              </h2>
-              <p className="text-sm text-slate-500">
-                {KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</p>
-              {zwrot.zrodlo === "nieodebrana" && <p className="mt-1 text-xs text-violet-800">
-                Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.
-                {zwrot.notatka ? ` „${zwrot.notatka}"` : ""}</p>}
-            </header>
+            <Naglowek zwrot={zwrot} />
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
                 operator zjechał na dziewiątą pozycję. */}

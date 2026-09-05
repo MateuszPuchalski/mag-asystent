@@ -269,7 +269,8 @@ function zloz(
        link prowadziłby w 404 i kosztował zaufanie do całego ekranu. */
     linkZwrotu: String(z.zrodlo ?? "allegro") === "nieodebrana"
       ? null
-      : linkZwrotu((z.reference_number as string) ?? (z.external_id as string)),
+      : linkZwrotu((z.reference_number as string) ?? (z.external_id as string),
+        (z.created_at as string) ?? null),
     zamowienie,
     werdykt: (z.werdykt as string) ?? null,
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),

@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.207.0 — 5 września 2026
+
+**Numer zwrotu i login kupującego stoją w nagłówku sprawy, a numer prowadzi
+do Centrum Sprzedaży.** Zgłoszenie właściciela wraz z działającym adresem.
+
+Numer stał dotąd w DWÓCH miejscach naraz: jako tytuł po lewej i jako wiersz
+sekcji „Zwrot" po prawej. Login kupującego — tylko po prawej, czyli po drugiej
+stronie ekranu od nazwiska sprawy, choć to jedyna dana, którą przepisuje się
+do panelu Allegro. Oba stoją teraz w nagłówku, razem, z klawiszem kopiowania
+przy loginie. Sekcja „Zwrot" przestała istnieć; przewoźnik zszedł do PACZKI
+ZWROTNEJ, bo mówi o paczce, nie o zwrocie jako sprawie.
+
+**Adres zwrotu jest wreszcie zweryfikowany.** Dotąd wzorzec brzmiał
+`moje-allegro/sprzedaz/zwroty/{id}` i był zgadnięty — zwrot nie ma pod nim
+własnej strony. Właściciel podał działający: lista zwrotów Centrum Sprzedaży
+z numerem w wyszukiwaniu. Znacznik `[WERYFIKUJ]` zostaje przy zamówieniu
+i ofercie, bo tych dwóch nikt nie sprawdził.
+
+Zakres dat w adresie startuje od DNIA ZGŁOSZENIA tego zwrotu, a nie od stałej
+sprzed trzech miesięcy. Lista filtruje po zakresie, więc stała granica
+wycięłaby starszy zwrot i wyszukanie po poprawnym numerze oddałoby pustkę.
+Hosta Centrum Sprzedaży dla sandboksu nie znamy, więc sandboks zostaje przy
+dawnym wzorcu.
+
+Nagłówek dostał przy okazji własny plik (`Naglowek.tsx`), tak jak `Decyzje`
+i `Dowody`. Niesie własne reguły — nieodebrana paczka, brak numeru, brak
+loginu — a te da się sprawdzić testem dopiero wtedy, gdy stoją osobno od
+całego ekranu.
+
 ## 0.206.0 — 5 września 2026
 
 **Zdjęcie w dostawie na kolektorze też powiększa się dotknięciem.** Dopełnienie
