@@ -688,6 +688,8 @@ export type StanZwrotuPieniedzy = {
  * dokument na regał zwrotów.
  */
 export interface KoszZwrotow {
+  /** `zwroty` na regał zwrotów, `odpad` na magazyn odpadu (0.211.0). */
+  rodzaj: "zwroty" | "odpad";
   id: number;
   /** Kod z przedrostkiem `Z-`; numery bez niego należą do koszy z Subiekta. */
   kod: string;

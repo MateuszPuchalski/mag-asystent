@@ -1255,16 +1255,22 @@ zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną.
 Przegląd z 0.210.0. Trzy luki zamknięte w tym wydaniu, cztery zostają otwarte
 i każda czeka na decyzję, a nie na kod.
 
-**Odmowa zwrotu nie dociera do klienta.** Allegro nie zna pojęcia „odrzuć
-zwrot" — końcówka `rejection` odmawia WYPŁATY. Nasz werdykt jest decyzją biura
-i nigdzie nie wychodzi. Od 0.210.0 ekran mówi to wprost, a powód odmowy jest
-widoczny z klawiszem kopiowania; wysłania wiadomości nadal nikt nie robi za
-człowieka.
+**Odmowa: dwa różne kroki, oba potrzebne.** Nasz werdykt `odrzucony` jest
+decyzją biura i nigdzie nie wychodzi — Allegro nie zna pojęcia „odrzuć zwrot".
+Klienta zawiadamia dopiero ODMÓW WYPŁATY: to ta końcówka niesie kod i powód,
+a wiadomość do klienta wysyła Allegro. Pasek pieniędzy stoi na zwrocie
+odrzuconym tak samo jak na każdym innym, więc droga jest pod ręką — ale nic nie
+przypomina o jej przejściu, a sam werdykt do niczego nie zobowiązuje.
 
-**Utylizacja to ślepy zaułek.** Ocena zapisuje się i na tym koniec: nie ma
-dokumentu, nie ma ruchu stanu, nie ma listy do przerobienia. Przecena zeszła
-w 0.209.0 dokładnie za to samo. Rozstrzygnięcia wymaga obieg papieru: lista
-z potwierdzeniem czy dokument RW przez Sferę.
+**Utylizacja od 0.211.0 ma własny koszyk.** Decyzja właściciela: towar z tej
+oceny idzie na magazyn odpadu. Droga jest ta sama co przy zwrotach — biuro
+zbiera do pudła, zamyka, MM wychodzi po komplecie korekt — różni się WYŁĄCZNIE
+magazynem docelowym. Bramka korekty obowiązuje tak samo, bo towar wraca na
+magazyn główny dopiero po niej.
+
+Numer magazynu stoi w `MAG_ID_ODP` i **nie ma domyślnej wartości**. Zero znaczy
+wyłączone: zgadnięty numer wystawiłby dokument przesuwający złom w cudze
+miejsce, a MM się nie cofa jednym kliknięciem.
 
 **Pobranie nie ma gdzie zostawić śladu.** Panel mówi „oddaj przelewem"
 i kończy; `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro. Zwrot
@@ -1848,8 +1854,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Termin ustawowy w rekoncyliacji | **działa** od 0.210.0 | `zwrotyPoTerminie` w `services/reconcile.ts`; do 0.209.0 pilnował go wyłącznie kolor wiersza |
 | Sygnał rozjazdu kwoty z pozycjami | **działa** od 0.210.0 | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |
 | Powód odmowy widoczny na zwrocie | **działa** od 0.210.0 | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
-| Odmowa zwrotu dociera do klienta | **nie działa** | Allegro nie zna „odrzuć zwrot"; werdykt jest wewnętrzny, klientowi trzeba napisać |
-| Utylizacja schodzi ze stanu | **nie działa** | ocena zapisuje się i kończy: bez dokumentu, bez ruchu stanu, bez listy |
+| Odmowa zwrotu dociera do klienta | **działa** przez ODMÓW WYPŁATY | werdykt biura jest wewnętrzny; klienta zawiadamia Allegro po zgłoszeniu odmowy wypłaty |
+| Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone |
 | Ślad po zwrocie pieniędzy przy pobraniu | **nie działa** | `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro |
 | Rozjazd ilości zgłoszonej i zwróconej | **nie działa** | pozycji z Allegro nie da się poprawić; kwota liczy się z deklaracji klienta |
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |

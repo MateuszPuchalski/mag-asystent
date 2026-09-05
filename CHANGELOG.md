@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.211.0 — 5 września 2026
+
+**Utylizacja przestała być ślepym zaułkiem — towar jedzie na magazyn odpadu.**
+Decyzja właściciela po przeglądzie z 0.210.0: „utylizacja powinna przenosić na
+magazyn odpad ODP".
+
+Do tego wydania ocena zapisywała się w kolumnie i na tym koniec: bez dokumentu,
+bez ruchu stanu, bez listy do przerobienia. Towar leżał, a w Subiekcie nie było
+po nim żadnego śladu. Dokładnie ten ślepy zaułek kosztował „przecenę" w 0.209.0
+— utylizacji wtedy nikt nie policzył.
+
+Utylizacja dostaje WŁASNY koszyk, tą samą maszynerią co zwroty: biuro zbiera do
+pudła, zamyka, MM wychodzi po komplecie korekt. Różni się wyłącznie magazynem
+docelowym. Bramka korekty obowiązuje tak samo i z tego samego powodu — towar
+wraca na magazyn główny dopiero po korekcie, więc MM zdjęłoby stan, którego
+jeszcze nie ma. To ta sama lekcja co 0.200.0, tylko drugim końcem hali.
+
+Operator ma teraz przy biurku dwa pudła naraz. Koszyk odpadu ma inny kolor
+i inną etykietę na dokumencie („Koszyk odpadu Z-8", „N kartotek na magazyn
+odpadu"), bo magazynier bierze kartkę i idzie — a dokument MM sam z siebie nie
+powie, na który koniec hali.
+
+**`MAG_ID_ODP` nie ma domyślnej wartości.** Zero znaczy wyłączone i to jest cała
+domyślna konfiguracja. Pozostałe trzy magazyny mają domyślne numery, bo pomyłka
+daje najwyżej pusty ekran; tutaj pomyłka WYSTAWIA DOKUMENT przesuwający złom na
+cudzy magazyn, a MM się nie cofa jednym kliknięciem. Bez wpisu w `wertis.env`
+ocena „utylizacja" zachowuje się jak przed tym wydaniem — pilnuje tego osobny
+test, który biegnie bez tej zmiennej.
+
+**Przy okazji, z przeglądu:** odmowa zwrotu jednak dociera do klienta — przez
+ODMÓW WYPŁATY, bo to ta końcówka niesie kod i powód, a wiadomość wysyła Allegro.
+Nasz werdykt `odrzucony` zostaje decyzją wewnętrzną. Tabela gotowości i §25a.5a
+mówią to teraz dokładnie, zamiast twierdzić, że klient nie dowiaduje się nic.
+
 ## 0.210.0 — 5 września 2026
 
 **Trzy luki z przeglądu procesu zwrotów.** Właściciel poprosił o przegląd

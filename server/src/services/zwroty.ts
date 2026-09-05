@@ -920,8 +920,16 @@ export function cofnijWerdykt(
  * każdej pozycji i zostawia towar w stanie, z którego nic nie wyprowadza.
  * Wraca dopiero razem ze ścieżką przeceny, jeśli właściciel jej zechce.
  *
- * Do koszyka wchodzi WYŁĄCZNIE „stan" — decyzja właściciela. Utylizacja ma
- * zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą stronę.
+ * KAŻDA OCENA MA SWÓJ KOSZYK (0.211.0). „Stan" idzie na regał zwrotów,
+ * „utylizacja" na magazyn odpadu — decyzja właściciela. Do 0.210.0 utylizacja
+ * zapisywała się i na tym koniec: bez dokumentu, bez ruchu stanu, bez listy.
+ * Towar leżał, a w Subiekcie nie było po nim żadnego śladu. Był to dokładnie
+ * ten ślepy zaułek, za który w 0.209.0 zdjęto „przecenę" — tylko utylizacji
+ * nikt wtedy nie policzył.
+ *
+ * Odpad bez `MAG_ID_ODP` w `wertis.env` zachowuje się jak przed 0.211.0:
+ * ocena się zapisuje, koszyka nie ma. Zgadnięty numer magazynu wystawiłby
+ * dokument przesuwający złom w cudze miejsce.
  *
  * `koszyk` w wyniku mówi, czy dołożenie się udało. Pozycja bez kartoteki nie
  * ma `tw_id`, a MM przesuwa stany kartotek — ocena zapisuje się mimo to, bo
@@ -960,7 +968,12 @@ export function ocenPozycje(
        którego nikt już nie chce na regale. Zamkniętego kosza to nie rusza —
        tamten pojechał na halę z wystawionym papierem. */
     zdejmijZKosza(database, pozycjaId, kto);
-    const koszyk = ocena === "stan" ? dolozDoKosza(database, pozycjaId, kto, teraz) : null;
+    /* Każda ocena do SWOJEGO koszyka. `zdejmijZKosza` wyżej zdejmuje
+       z dowolnego otwartego, więc „na stan", potem „utylizacja" przenosi
+       pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
+    const koszyk = ocena === null ? null
+      : dolozDoKosza(database, pozycjaId, kto, teraz,
+        ocena === "utylizacja" ? "odpad" : "zwroty");
     return { wersja: wersja + 1, koszyk };
   })();
 }

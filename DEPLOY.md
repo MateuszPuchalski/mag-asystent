@@ -945,6 +945,7 @@ bazie. Przejdź tę tabelę przed pierwszą pracą na produkcji:
 | `DOK_STATUS_ZD_OTWARTE` | które zamówienia uznajemy za otwarte | zamknięte zamówienie wisi na karcie |
 | `MM_ZWROTY_DNI_WSTECZ` | okno importu przesunięć na regał zwrotów (§6a) | starszy kosz z kartką nie otworzy się numerem |
 | `MAG_ID_ZWROTY` | magazyn, na który biuro wystawia MM ZWROTY (§6a) | lista przyjęć pusta, bez błędu |
+| `MAG_ID_ODP` | magazyn odpadu dla oceny „utylizacja" (0.211.0) | brak wpisu wyłącza koszyk odpadu; ocena zapisuje się jak dotąd |
 | `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (§6) | starsza sprzedaż nie pokaże się przy zwrocie |
 | `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` | kolumna z numerem obcym na dokumencie | dokument wskaże człowiek, nie automat |
 

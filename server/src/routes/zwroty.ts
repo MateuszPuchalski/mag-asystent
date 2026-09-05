@@ -4,7 +4,7 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, stanOtwartegoKosza, wypuscGotoweKoszyki, zamknijKosz,
+  koszykiCzekajaceNaKorekty, otwarteKoszyki, wypuscGotoweKoszyki, zamknijKosz,
 } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -199,7 +199,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
        brakuje korekt, nie należą do żadnego operatora — to praca biura, nie
        jego biurka. Stary panel je zignoruje. */
     return {
-      kosz: stanOtwartegoKosza(db(), kto()),
+      /* DWA koszyki od 0.211.0 — zwroty i odpad. Lista, nie pole: trzeci
+         rodzaj (przecena?) nie ma wtedy zmieniać kształtu odpowiedzi. */
+      kosze: otwarteKoszyki(db(), kto()),
       czekajace: koszykiCzekajaceNaKorekty(db()),
     };
   });

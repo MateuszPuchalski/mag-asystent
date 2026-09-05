@@ -112,6 +112,8 @@ export function useOcena() {
 export interface KoszykCzekajacy {
   id: number;
   kod: string;
+  /** Zwroty czy odpad — ekran mówi, na który koniec hali czeka papier. */
+  rodzaj: "zwroty" | "odpad";
   zamknietoAt: string;
   brakuje: Array<{ zwrotId: number; numer: string }>;
 }
@@ -120,7 +122,7 @@ export interface KoszykCzekajacy {
 export function useKosz() {
   return useQuery({
     queryKey: kluczeZwrotow.kosz,
-    queryFn: () => api<{ kosz: KoszZwrotow | null; czekajace?: KoszykCzekajacy[] }>(
+    queryFn: () => api<{ kosze: KoszZwrotow[]; czekajace?: KoszykCzekajacy[] }>(
       "/api/obsluga/zwroty/kosz"),
   });
 }
