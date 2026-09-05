@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.205.0 — 4 września 2026
+
+**Zdjęcie w dostawie powiększa się kliknięciem.** Zgłoszenie właściciela.
+Miniatura w wierszu pozycji ma 48 px, a pytanie, przy którym się jej używa,
+brzmi „czy to TA część". Przy kartotekach różniących się końcówką nazwy —
+„szarpak NAC LS46" obok „LS51" — 48 px nie wystarcza, więc sprawdzenie
+znaczyło otwarcie Subiekta na drugim monitorze. To samo, przed czym broni
+0.203.0 w panelu obsługi.
+
+Kliknięcie w zdjęcie pokazuje je na pełnym ekranie, ponowne kliknięcie —
+gdziekolwiek — je zamyka. Escape robi to samo, bo ręka bywa na klawiaturze.
+Krzyżyka nie ma: cel do trafienia byłby mniejszy niż całe tło.
+
+Bez pobierania. Adres pliku leży już w miniaturze, bo kolejka zdjęć ściągnęła
+go raz i trzyma do wylogowania — powiększenie to ten sam plik w większym
+pudełku, nie drugie żądanie do serwera. Działa też na zdjęciach dowodowych
+problemów, bo delegacja stoi na sekcji szczegółu, a nie na tabeli pozycji.
+
 ## 0.204.0 — 4 września 2026
 
 **Cofnięcie przyjęcia zwrotu — ostatni szczebel drabiny z §25a.5.** Zgłoszenie
