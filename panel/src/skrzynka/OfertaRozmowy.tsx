@@ -2,6 +2,7 @@ import React from "react";
 import { ExternalLink, Package, Tag } from "lucide-react";
 import type { OfertaRozmowy as Dane } from "../api/typy";
 import { zlote } from "../api/zwroty";
+import { KafelOferty } from "../towar/Kafel";
 
 /**
  * Oferta, pod którą padło pytanie (0.178.0).
@@ -16,11 +17,22 @@ import { zlote } from "../api/zwroty";
  * dociągnął snapshot) albo zdanie, że tytuł dopiero przyjedzie. Milczenie
  * w drugim stanie wyglądałoby jak usterka.
  *
- * ZDJĘCIA Z ALLEGRO NIE MA świadomie: obrazek z ich serwera znaczyłby wyjście
- * przeglądarki biura poza własną sieć przy każdym otwarciu skrzynki — ta sama
- * decyzja, co przy awatarze rozmówcy (`docs/allegro-ksztalt.md`). Zdjęcie
- * z NASZEJ trasy `/api/products/:twId/zdjecie` tego zastrzeżenia nie łamie
- * i stoi w bloku towaru obok (0.179.0).
+ * ── ZDJĘCIE OFERTY JEST OD 0.213.0 ─────────────────────────────────────────
+ * Do 0.210.0 stało tu zdanie „zdjęcia z Allegro nie ma świadomie", bo obrazek
+ * z ich serwera znaczyłby wyjście przeglądarki biura poza własną sieć. Zakaz
+ * dotyczył HOTLINKA i obowiązuje dalej — `<img src="https://a.allegroimg.com/…">`
+ * w tym pliku nie stanie. Plik ciągnie SERWER i podaje go z naszej trasy
+ * `/api/obsluga/oferta/:externalId/zdjecie`, dokładnie tak, jak od 0.30.0
+ * podaje zdjęcia kartotek.
+ *
+ * DWA ZDJĘCIA W JEDNEJ ZAKŁADCE I OBA SĄ POTRZEBNE. Tutaj stoi to, co klient
+ * WIDZIAŁ, kupując; w bloku towaru niżej — to, co mamy na półce. Zbieżność
+ * nie jest przesądzona i właśnie ta różnica bywa treścią pytania. Kafle mają
+ * więc podpisy: źródło musi być widać (§4.3).
+ *
+ * Zdjęcie oferty zakrywa też dziurę, której kartoteka zakryć nie umie: pytanie
+ * SPRZED zakupu przychodzi zwykle bez kartoteki, a większość kartotek i tak
+ * zdjęcia nie ma. Oferta ma je prawie zawsze.
  */
 export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
   const o = oferta.pobrana;
@@ -39,14 +51,26 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
     </div>
 
     {o
-      ? <div className="mt-2 flex flex-wrap items-baseline gap-2 rounded bg-white px-2 py-1.5">
-          <span className="text-sm font-semibold">{o.nazwa}</span>
-          {/* SKU sprzedawcy z `external.id` OFERTY — mostek do kartoteki dla
-              pytania sprzed zakupu, gdzie zamówienia jeszcze nie ma. */}
-          {o.sku && <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-            <Tag size={11} />{o.sku}</span>}
-          {o.cenaGrosze != null && <span className="ml-auto shrink-0 tabular-nums text-sm font-bold">
-            {zlote(o.cenaGrosze, o.waluta ?? "PLN")}</span>}
+      ? <div className="mt-2 flex items-start gap-3 rounded bg-white px-2 py-1.5">
+          {/* Kafel tylko wtedy, gdy Allegro podało adres. `maZdjecie` liczy
+              SERWER — bez tej flagi pusta oferta pytałaby naszej trasy o 404
+              przy każdym otwarciu rozmowy. */}
+          {o.maZdjecie && <KafelOferty externalId={oferta.externalId} rozmiar={56}
+            nazwa={o.nazwa} symbol={o.sku} />}
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
+            <span className="text-sm font-semibold">{o.nazwa}</span>
+            {/* SKU sprzedawcy z `external.id` OFERTY — mostek do kartoteki dla
+                pytania sprzed zakupu, gdzie zamówienia jeszcze nie ma. */}
+            {o.sku && <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+              <Tag size={11} />{o.sku}</span>}
+            {o.cenaGrosze != null && <span className="ml-auto shrink-0 tabular-nums text-sm font-bold">
+              {zlote(o.cenaGrosze, o.waluta ?? "PLN")}</span>}
+            {/* PODPIS ŹRÓDŁA. Blok towaru niżej pokazuje zdjęcie z Subiekta,
+                a §4.3 nie pozwala mieszać źródeł — bez tej linijki dwa obrazy
+                obok siebie wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
+            {o.maZdjecie && <span className="w-full text-[11px] text-slate-400">
+              Zdjęcie z oferty Allegro — to widział klient.</span>}
+          </div>
         </div>
       : <p className="mt-1 text-xs text-slate-500">
           Tytułu oferty jeszcze nie pobrano — dociągnie go najbliższa synchronizacja (do 7 min).

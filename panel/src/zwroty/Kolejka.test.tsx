@@ -13,7 +13,7 @@ import type { PozycjaZwrotu, Zamowienie, Zwrot } from "../api/typy";
    czego NIE wie i czego nie pobiera. */
 
 const POZYCJA: PozycjaZwrotu = {
-  id: 1, zrodlo: "allegro", offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
+  id: 1, zrodlo: "allegro", offerId: "111", ofertaZamowienia: null, nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
   waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
   wKoszyku: false, iloscZwrocona: null, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
@@ -41,7 +41,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   rejectionCode: null, wersja: 1,
-  pozycje: [{ id: 1, zrodlo: "allegro", offerId: "111", nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
+  pozycje: [{ id: 1, zrodlo: "allegro", offerId: "111", ofertaZamowienia: null, nazwa: "Sekator NAC", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: "DONT_LIKE_IT", powodKomentarz: "za ciężki", ocena: null,
     wKoszyku: false, iloscZwrocona: null, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,

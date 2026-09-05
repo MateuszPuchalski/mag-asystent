@@ -1,14 +1,18 @@
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
-import { useZdjecie } from "./useZdjecie";
 
 /* Powiększenie służy JEDNEMU pytaniu: czy to ten sam wariant, który wrócił.
-   Dlatego nie ma tu galerii ani zoomu — jest obraz, podpis i wyjście. */
+   Dlatego nie ma tu galerii ani zoomu — jest obraz, podpis i wyjście.
 
-export function Powiekszenie({ twId, nazwa, symbol, zamknij }: {
-  twId: number; nazwa: string; symbol: string | null; zamknij: () => void;
+   OBRAZ WCHODZI PROPSEM, nie hakiem po `twId` (0.213.0). Od tego wydania
+   źródła są dwa — kartoteka Subiekta i oferta Allegro — a okno powiększenia
+   jest dla obu takie samo. Wybór źródła należy do kafla, który je otworzył. */
+
+export function Powiekszenie({ url, nazwa, symbol, zamknij }: {
+  /** `undefined` = jeszcze się ładuje, `null` = obrazu nie ma. */
+  url: string | null | undefined;
+  nazwa: string; symbol: string | null; zamknij: () => void;
 }) {
-  const url = useZdjecie(twId);
 
   useEffect(() => {
     /* Escape zamyka, jak każdy dialog w tym panelu. Bez tego operator

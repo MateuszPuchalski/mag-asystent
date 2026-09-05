@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Zdjecie } from "./Zdjecie";
+import { Zdjecie, ZdjecieOferty } from "./Zdjecie";
 import { Powiekszenie } from "./Powiekszenie";
+import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
 
 /**
  * Kafel zdjęcia, który POWIĘKSZA SIĘ SAM (0.203.0).
@@ -26,10 +27,34 @@ export function Kafel({ twId, rozmiar = 48, nazwa, symbol = null }: {
   symbol?: string | null;
 }) {
   const [powiekszone, setPowiekszone] = useState(false);
+  const url = useZdjecie(twId);
   return <>
     <Zdjecie twId={twId} rozmiar={rozmiar} nazwa={nazwa}
       onKlik={twId === null ? undefined : () => setPowiekszone(true)} />
-    {powiekszone && twId !== null && <Powiekszenie twId={twId} nazwa={nazwa} symbol={symbol}
+    {powiekszone && twId !== null && <Powiekszenie url={url} nazwa={nazwa} symbol={symbol}
+      zamknij={() => setPowiekszone(false)} />}
+  </>;
+}
+
+/**
+ * To samo dla zdjęcia listingowego oferty (0.213.0).
+ *
+ * Osobny komponent, nie prop `rodzaj` w `Kafel`: każdy z nich woła INNY hak,
+ * a haka nie wolno wołać warunkowo. Wspólne jest to, co ma być wspólne —
+ * płytka (`Zdjecie.tsx`) i okno powiększenia.
+ */
+export function KafelOferty({ externalId, rozmiar = 48, nazwa, symbol = null }: {
+  externalId: string | null;
+  rozmiar?: number;
+  nazwa: string;
+  symbol?: string | null;
+}) {
+  const [powiekszone, setPowiekszone] = useState(false);
+  const url = useZdjecieOferty(externalId);
+  return <>
+    <ZdjecieOferty externalId={externalId} rozmiar={rozmiar} nazwa={nazwa}
+      onKlik={!externalId ? undefined : () => setPowiekszone(true)} />
+    {powiekszone && externalId && <Powiekszenie url={url} nazwa={nazwa} symbol={symbol}
       zamknij={() => setPowiekszone(false)} />}
   </>;
 }

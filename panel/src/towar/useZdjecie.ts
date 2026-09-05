@@ -17,23 +17,35 @@ import { token } from "../api/klient";
       kolektory stojące przy regale. Ta liczba jest w `biuro.html` od
       0.60.0 i ma tam ten sam komentarz.
 
-   Miniatur nie ma i nie będzie: serwer nie skaluje obrazów (zero modułów
-   natywnych). Kafel dostaje pełny obraz i `object-fit: cover`.             */
+   Miniatur KARTOTEK nie ma i nie będzie: serwer nie skaluje obrazów (zero
+   modułów natywnych). Kafel dostaje pełny obraz i `object-fit: cover`.
+
+   ── DRUGIE ŹRÓDŁO OBRAZÓW (0.213.0) ───────────────────────────────────────
+   Doszły zdjęcia listingowe ofert Allegro. Mechanika jest CO DO JOTY ta sama —
+   sesja w nagłówku, pamięć negatywu, trzy pobrania naraz — więc kolejka i mapa
+   są wspólne, a klucz zmienił się z `twId` na ŚCIEŻKĘ trasy. Druga kopia tych
+   trzech rzeczy rozjechałaby się z pierwszą przy pierwszej poprawce, a objawem
+   rozjazdu byłaby lista dobijająca serwer o obrazy, których nie ma.
+
+   Miniatury ofert ISTNIEJĄ i robi je CDN Allegro — zmniejsza serwer, ale nie
+   nasz. Panel o tym nie wie i wiedzieć nie musi: dostaje adres własnej trasy,
+   a rozmiar dobiera `services/zdjecia-ofert.ts`.                             */
 
 const ROWNOLEGLE = 3;
 
-/** `undefined` = jeszcze nie wiemy, `null` = na pewno brak, string = blob. */
-const pamiec = new Map<number, string | null>();
-const wToku = new Map<number, Promise<string | null>>();
+/** `undefined` = jeszcze nie wiemy, `null` = na pewno brak, string = blob.
+    Klucz to ŚCIEŻKA trasy — patrz nagłówek. */
+const pamiec = new Map<string, string | null>();
+const wToku = new Map<string, Promise<string | null>>();
 const kolejka: Array<() => Promise<void>> = [];
 let biegnie = 0;
 
-/* Nasłuchy komponentów: jeden `twId` bywa w wierszu kolejki i w kolumnie
+/* Nasłuchy komponentów: jeden obraz bywa w wierszu kolejki i w kolumnie
    dowodów naraz, a oba mają się odświeżyć po jednym pobraniu. */
-const nasluchy = new Map<number, Set<() => void>>();
+const nasluchy = new Map<string, Set<() => void>>();
 
-function ogloś(twId: number) {
-  for (const f of nasluchy.get(twId) ?? []) f();
+function ogloś(klucz: string) {
+  for (const f of nasluchy.get(klucz) ?? []) f();
 }
 
 function pchnij() {
@@ -44,8 +56,8 @@ function pchnij() {
   }
 }
 
-async function pobierz(twId: number): Promise<string | null> {
-  const odp = await fetch(`/api/products/${twId}/zdjecie`, {
+async function pobierz(sciezka: string): Promise<string | null> {
+  const odp = await fetch(sciezka, {
     headers: { "x-session": token() },
   });
   /* 404 znaczy „potwierdzony brak" i jest ODPOWIEDZIĄ, nie awarią — serwer
@@ -55,21 +67,21 @@ async function pobierz(twId: number): Promise<string | null> {
   return URL.createObjectURL(await odp.blob());
 }
 
-function zamow(twId: number): Promise<string | null> {
-  const juz = wToku.get(twId);
+function zamow(sciezka: string): Promise<string | null> {
+  const juz = wToku.get(sciezka);
   if (juz) return juz;
   const p = new Promise<string | null>((resolve) => {
     kolejka.push(async () => {
       let wynik: string | null = null;
-      try { wynik = await pobierz(twId); } catch { wynik = null; }
-      pamiec.set(twId, wynik);
-      wToku.delete(twId);
-      ogloś(twId);
+      try { wynik = await pobierz(sciezka); } catch { wynik = null; }
+      pamiec.set(sciezka, wynik);
+      wToku.delete(sciezka);
+      ogloś(sciezka);
       resolve(wynik);
     });
     pchnij();
   });
-  wToku.set(twId, p);
+  wToku.set(sciezka, p);
   return p;
 }
 
@@ -83,24 +95,43 @@ function zamow(twId: number): Promise<string | null> {
  * w `biuro.html`. Zwolnienie przy odmontowaniu komponentu unieważniłoby je
  * drugiemu miejscu, które pokazuje ten sam towar.
  */
-export function useZdjecie(twId: number | null | undefined): string | null | undefined {
+function useObraz(sciezka: string | null): string | null | undefined {
   const [, odswiez] = useState(0);
 
   useEffect(() => {
-    if (twId == null) return;
+    if (sciezka == null) return;
     const f = () => odswiez((n) => n + 1);
-    const zbior = nasluchy.get(twId) ?? new Set<() => void>();
+    const zbior = nasluchy.get(sciezka) ?? new Set<() => void>();
     zbior.add(f);
-    nasluchy.set(twId, zbior);
-    if (!pamiec.has(twId)) void zamow(twId);
+    nasluchy.set(sciezka, zbior);
+    if (!pamiec.has(sciezka)) void zamow(sciezka);
     return () => {
       zbior.delete(f);
-      if (!zbior.size) nasluchy.delete(twId);
+      if (!zbior.size) nasluchy.delete(sciezka);
     };
-  }, [twId]);
+  }, [sciezka]);
 
-  if (twId == null) return null;
-  return pamiec.get(twId);
+  if (sciezka == null) return null;
+  return pamiec.get(sciezka);
+}
+
+export function useZdjecie(twId: number | null | undefined): string | null | undefined {
+  return useObraz(twId == null ? null : `/api/products/${twId}/zdjecie`);
+}
+
+/**
+ * Zdjęcie listingowe oferty Allegro (0.213.0).
+ *
+ * Adres jest NASZ, nie `a.allegroimg.com` — zakaz wyprowadzania przeglądarki
+ * biura poza własną sieć obowiązuje dalej, a plik ciągnie serwer. Panel nie
+ * zna adresu w CDN-ie i nie ma go po co znać.
+ *
+ * Numer oferty koduje `encodeURIComponent`: to jest ciąg z zewnątrz, wstawiany
+ * w ścieżkę.
+ */
+export function useZdjecieOferty(externalId: string | null | undefined): string | null | undefined {
+  const id = (externalId ?? "").trim();
+  return useObraz(id === "" ? null : `/api/obsluga/oferta/${encodeURIComponent(id)}/zdjecie`);
 }
 
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */

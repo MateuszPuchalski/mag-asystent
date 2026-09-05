@@ -157,3 +157,70 @@ test("oferta, której Allegro nie oddało, wraca do kolejki i nie psuje reszty",
   assert.equal(ile, 1);
   assert.deepEqual(brakujaceOferty(d, 20, new Date("2026-09-02T15:30:00Z")), ["99999999999"]);
 });
+
+
+/* ── Zdjęcie listingowe (0.213.0) ────────────────────────────────────────────
+   `primaryImage.url` jedzie w TEJ SAMEJ odpowiedzi, po którą i tak idziemy
+   po tytuł. Testy pilnują, że adres wchodzi do snapshotu, że pusty schodzi
+   na NULL i że numery ofert biorą się także z pozycji ZAMÓWIENIA — bez tego
+   ostatniego zwrot nigdy nie doczekałby się zdjęcia, bo rozmowy przy nim
+   nie ma.                                                                    */
+
+function zamowienieZOfertą(d: Db, ofertaId: string, kupiono = "2026-08-30T09:00:00Z") {
+  d.prepare(`INSERT INTO zamowienie_klienta
+    (channel_account_id,external_id,waluta,kupiono_at,synced_at)
+    VALUES (1,'zam-1','PLN',?,?)`).run(kupiono, kupiono);
+  const id = Number((d.prepare("SELECT id FROM zamowienie_klienta WHERE external_id='zam-1'")
+    .get() as { id: number }).id);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,external_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (?,'li-1',?,'Nóż',NULL,1,4890,'PLN')`).run(id, ofertaId);
+}
+
+test("adres zdjęcia listingowego wchodzi do snapshotu, a pusty schodzi na NULL", async () => {
+  const d = stanowisko();
+  wiadomosc(d, 1, "111");
+  wiadomosc(d, 2, "222");
+  await uzupelnijOferty({
+    database: d, accountId: "k",
+    query: async () => ({ offers: [
+      oferta("111", { primaryImage: { url: "https://a.allegroimg.com/original/aa/bb" } }),
+      oferta("222", { primaryImage: { url: "   " } }),
+    ] }),
+  });
+  const wiersze = (d.prepare(
+    "SELECT external_id, primary_image_url FROM offer_snapshot ORDER BY external_id",
+  ).all() as Array<{ external_id: string; primary_image_url: string | null }>)
+    /* Wiersze SQLite mają prototyp `null`, więc do porównania przepisujemy je
+       na zwykłe obiekty — jak wszędzie indziej w tych testach. */
+    .map((w) => ({ external_id: w.external_id, primary_image_url: w.primary_image_url }));
+  assert.deepEqual(wiersze, [
+    { external_id: "111", primary_image_url: "https://a.allegroimg.com/original/aa/bb" },
+    /* Pusty adres to NIE jest adres. `""` w tej kolumnie posłałby cache po
+       obraz spod adresu długości zero. */
+    { external_id: "222", primary_image_url: null },
+  ]);
+});
+
+test("numer oferty bierze się także z pozycji zamówienia — zwrot rozmowy nie ma", () => {
+  const d = stanowisko();
+  zamowienieZOfertą(d, "333");
+  assert.deepEqual(brakujaceOferty(d, 20), ["333"]);
+});
+
+test("oferta z wiadomości idzie przed ofertą z samego zamówienia", () => {
+  const d = stanowisko();
+  /* Zamówienie jest ŚWIEŻSZE od wiadomości i mimo to schodzi niżej: partia ma
+     dwadzieścia miejsc, a agent patrzący na rozmowę ma dostać tytuł przed
+     zdjęciem przy zwrocie sprzed miesiąca. */
+  wiadomosc(d, 1, "111", "2026-08-01T10:00:00Z");
+  zamowienieZOfertą(d, "333", "2026-09-03T10:00:00Z");
+  assert.deepEqual(brakujaceOferty(d, 20), ["111", "333"]);
+});
+
+test("ten sam numer w wiadomości i w zamówieniu pobiera się RAZ", () => {
+  const d = stanowisko();
+  wiadomosc(d, 1, "111");
+  zamowienieZOfertą(d, "111");
+  assert.deepEqual(brakujaceOferty(d, 20), ["111"]);
+});

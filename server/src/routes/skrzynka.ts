@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
@@ -16,6 +17,8 @@ import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
+import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
 import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
@@ -84,6 +87,49 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         .send(Buffer.from(odp));
     } catch (e) { return blad(reply, e); }
   });
+
+  /**
+   * Zdjęcie listingowe oferty (0.213.0).
+   *
+   * OSOBNA TRASA, nigdy pole `osRozmowy` — dokładnie z tego powodu, co przy
+   * kartotece (`GET /api/products/:twId/zdjecie`). Oś rozmowy odświeża się przy
+   * każdym zdarzeniu szyny, a obraz w base64 w tym cyklu to megabajty za nic.
+   * Osobny adres daje też 304, czyli „to samo, co masz" za cenę nagłówka.
+   *
+   * ADRES IDZIE Z NASZEGO SERWERA, nie z `a.allegroimg.com`, i to jest cała
+   * treść decyzji z 0.213.0: zakaz z 0.178.0 dotyczył wyjścia PRZEGLĄDARKI
+   * biura poza własną sieć, a nie zdjęcia. Wychodzi serwer, który i tak
+   * rozmawia z Allegro.
+   *
+   * 404 znaczy „nie ma czego pokazać" i jest ODPOWIEDZIĄ, nie awarią: oferta
+   * bez adresu w snapshocie, snapshot jeszcze niepobrany albo CDN, który nie
+   * oddał obrazu. Panel rysuje wtedy kafel zastępczy i nie pyta drugi raz.
+   */
+  app.get<{ Params: { externalId: string } }>(
+    "/api/obsluga/oferta/:externalId/zdjecie", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const konto = kontoKanalu(db(), config.allegro.clientId);
+      const w = await zapewnijZdjecieOferty(konto, String(req.params.externalId));
+      if (!w?.plik || !w.etag) return reply.code(404).send({ error: "Brak zdjęcia oferty" });
+
+      const etag = `"${w.etag}"`;
+      /* 304 PRZED otwarciem pliku — jak przy kartotece. */
+      if (req.headers["if-none-match"] === etag) {
+        return reply.code(304).header("etag", etag).send();
+      }
+      const plik = sciezkaZdjeciaOferty(w.plik);
+      if (!plik) return reply.code(404).send({ error: "Brak pliku" });
+      /* Długość ze `stat`, nie z bazy: między odczytem wpisu a wysyłką plik mógł
+         wypaść z cache'u, a skłamany `content-length` urywa obraz w połowie BEZ
+         żadnego błędu — na ekranie wygląda to jak zepsute zdjęcie. */
+      return reply
+        .type(w.mime ?? "image/jpeg")
+        .header("etag", etag)
+        .header("cache-control", "private, max-age=86400")
+        .header("content-length", String(fs.statSync(plik).size))
+        .send(fs.createReadStream(plik));
+    });
 
   app.post<{ Body: { rozmowaId?: number; wiadomoscId?: number; instrukcja?: string; twId?: number | null } }>(
     "/api/obsluga/zadania/pomiar", async (req, reply) => {

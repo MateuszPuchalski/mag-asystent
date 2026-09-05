@@ -647,6 +647,41 @@ export const config = {
   },
 
   /**
+   * Zdjęcia listingowe ofert Allegro (0.213.0).
+   *
+   * OSOBNY BLOK od `zdjecia`, choć oba opisują cache obrazów — i to nie jest
+   * symetria dla samej symetrii. Tamte zdjęcia idą z bazy firmy przez sieć
+   * lokalną i bywają skanami po kilka megabajtów; te idą z publicznego CDN-u
+   * i są już przygotowane pod stronę www. Jeden komplet progów na oba znaczyłby
+   * próg dobrany pod gorszy przypadek i stosowany do lepszego.
+   *
+   * Wyłącznika nie ma i to jest decyzja: adres jedzie w odpowiedzi, którą
+   * pobieramy tak czy owak, a plik ciągnie się dopiero wtedy, gdy ktoś na
+   * ekranie na niego patrzy. Nie ma czego wyłączać, bo nie ma stałego kosztu.
+   */
+  allegroZdjecia: {
+    /**
+     * Szerokość miniatury w pikselach — segment `/s{px}/` w adresie CDN-u.
+     * `0` wyłącza próbę i zostawia sam oryginał.
+     *
+     * 320, bo najszerszy kafel w panelu ma 72 px, a przy podwójnej gęstości
+     * ekranu to 144 px; zapas idzie na powiększenie po kliknięciu, które
+     * pokazuje ten sam plik. Wariant rozmiarowy jest konwencją CDN-u, nie
+     * częścią specyfikacji — dlatego `services/zdjecia-ofert.ts` traktuje go
+     * jako PRÓBĘ z powrotem do oryginału, a nie jako pewnik.
+     */
+    miniaturaPx: num(process.env.ALLEGRO_ZDJECIA_PX, 320, "ALLEGRO_ZDJECIA_PX"),
+    /** Ponad tyle kilobajtów obrazu NIE bierzemy — serwer nie skaluje. */
+    maxKb: num(process.env.ALLEGRO_ZDJECIA_MAX_KB, 1024, "ALLEGRO_ZDJECIA_MAX_KB"),
+    /** Limit katalogu `data/zdjecia-ofert` [MB]; ponad to wypada najdawniej oglądane. */
+    cacheMb: num(process.env.ALLEGRO_ZDJECIA_CACHE_MB, 256, "ALLEGRO_ZDJECIA_CACHE_MB"),
+    /** Ile czekamy na CDN. Bez limitu jedno zawieszone żądanie blokuje trasę. */
+    timeoutMs: num(process.env.ALLEGRO_ZDJECIA_TIMEOUT_MS, 8000, "ALLEGRO_ZDJECIA_TIMEOUT_MS"),
+    /** Jak długo NIE ponawiamy po błędzie — jak przy kartotekach. */
+    bladTtlMin: num(process.env.ALLEGRO_ZDJECIA_BLAD_TTL_MIN, 5, "ALLEGRO_ZDJECIA_BLAD_TTL_MIN"),
+  },
+
+  /**
    * Usuwanie tła ze zdjęcia wgrywanego z kolektora (0.88.0).
    *
    * OSOBNY PROCES, nie biblioteka. Model działa na runtime ONNX, czyli na
