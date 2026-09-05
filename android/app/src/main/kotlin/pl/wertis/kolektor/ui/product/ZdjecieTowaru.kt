@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.product.StanSlotu
 import pl.wertis.kolektor.core.product.pokazacDodanie
@@ -238,6 +240,15 @@ fun MiniaturaTowaru(
  *
  * Bitmapa pełnego rozmiaru powstaje TYLKO tutaj i jest zwalniana przy
  * zamknięciu: 1024×1024 w ARGB_8888 to 4 MB, a kolektor jest tani.
+ *
+ * W OKNIE, nie w miejscu miniatury (0.206.0). Do tego wydania było to gołe
+ * `Box(fillMaxSize())` renderowane tam, gdzie stoi miniatura — a stoi ona we
+ * WSZYSTKICH czterech dotychczasowych wywołaniach wewnątrz `Row`. „Pełny
+ * ekran" wypełniał więc wysokość wiersza, nie ekran: nazwa funkcji obiecywała
+ * co innego, niż robiła. `Dialog` bez domyślnej szerokości platformy daje
+ * powierzchnię nad całym ekranem niezależnie od tego, w czym siedzi miniatura,
+ * i przy okazji zamyka zdjęcie KLAWISZEM WSTECZ — na kolektorze to pierwszy
+ * odruch, a dotąd cofał cały ekran.
  */
 @Composable
 private fun PelnyEkranZdjecia(bajty: ByteArray?, onZamknij: () -> Unit) {
@@ -250,20 +261,28 @@ private fun PelnyEkranZdjecia(bajty: ByteArray?, onZamknij: () -> Unit) {
         onDispose { duze?.recycle() }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.92f))
-            .clickable(onClick = onZamknij),
-        contentAlignment = Alignment.Center,
+    Dialog(
+        onDismissRequest = onZamknij,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        duze?.let {
-            Image(
-                bitmap = it.asImageBitmap(),
-                contentDescription = "Zdjęcie towaru",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(12.dp),
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                /* ergonomia: całe tło jest celem zamknięcia — cel większy od
+                   ekranu nie wymaga celowania, a zdjęcie ogląda się i zamyka
+                   w rękawicy. */
+                .clickable(onClick = onZamknij),
+            contentAlignment = Alignment.Center,
+        ) {
+            duze?.let {
+                Image(
+                    bitmap = it.asImageBitmap(),
+                    contentDescription = "Zdjęcie towaru",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().padding(12.dp),
+                )
+            }
         }
     }
 }

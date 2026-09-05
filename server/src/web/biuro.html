@@ -754,6 +754,16 @@
   td.kolFoto { width: 56px; }
   .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
   .foto { object-fit: cover; border: 1px solid var(--border); }
+  /* Miniatura w wierszu ma 48 px, a pytanie „czy to TA część" pada przy
+     kartotekach różniących się końcówką nazwy. Kursor mówi, że da się
+     powiększyć — bez niego nikt nie zgadnie, że obrazek jest klikalny. */
+  #szczegol img { cursor: zoom-in; }
+  #lupa {
+    position: fixed; inset: 0; z-index: 60; display: flex; cursor: zoom-out;
+    align-items: center; justify-content: center; background: rgba(15,23,42,.85);
+  }
+  #lupa[hidden] { display: none; }
+  #lupa img { max-width: 92vw; max-height: 92vh; border-radius: 12px; }
   .brakfoto {
     border: 1px dashed var(--border); color: var(--ink-mute); font-size: 9px;
     display: flex; align-items: center; justify-content: center; text-align: center;
@@ -1503,6 +1513,12 @@
     </section>
   </div>
 </main>
+
+<!-- Powiększenie zdjęcia. Jeden element na całą stronę, poza widokami: żyje
+     NAD nimi, a nie w którymś z nich. Stoi PRZED skryptem, bo nasłuch
+     zamknięcia rejestruje się przy starcie — za skryptem `$("lupa")`
+     oddałoby `null` i położyło cały panel. -->
+<div id="lupa" hidden><img alt=""></div>
 
 <script>
 "use strict";
@@ -3579,6 +3595,34 @@ function wstawZdjecie(z, url) {
     : z.klasa ? '<div class="brakfoto">bez zdjęcia</div>' : "";
   for (const cel of document.querySelectorAll(z.sel)) cel.innerHTML = tresc;
 }
+
+/* ── Powiększenie zdjęcia w dostawie (0.205.0) ────────────────────────────────
+   Zgłoszenie właściciela. Miniatura ma 48 px, a pytanie, przy którym się jej
+   używa, brzmi „czy to TA część" — przy kartotekach różniących się końcówką
+   nazwy („szarpak NAC LS46" obok „LS51") 48 px nie wystarcza. Sprawdzenie
+   znaczyło otwarcie Subiekta na drugim monitorze.
+
+   Delegacja stoi na SEKCJI `#szczegol`, nie na tabeli pozycji: tabelę
+   przerysowuje każde wejście w dokument, a `#szczegol` obejmuje przy okazji
+   zdjęcia dowodowe problemów — te same 48 px i to samo pytanie.
+
+   BEZ POBIERANIA. Adres blobu leży już w miniaturze, bo kolejka zdjęć
+   ściągnęła go raz i trzyma do wylogowania. Powiększenie to ten sam plik
+   w większym pudełku, nie drugie żądanie do serwera.
+
+   ZAMYKA KAŻDE KLIKNIĘCIE, nie tylko krzyżyk — „po ponownym kliknięciu ma
+   zniknąć". Escape robi to samo, bo ręka bywa na klawiaturze. */
+$("szczegol").addEventListener("click", (e) => {
+  if (e.target.tagName !== "IMG") return;
+  const lupa = $("lupa");
+  lupa.querySelector("img").src = e.target.src;
+  lupa.hidden = false;
+});
+
+$("lupa").addEventListener("click", () => { $("lupa").hidden = true; });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("lupa").hidden) $("lupa").hidden = true;
+});
 
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
    Druki dostawców pytają o dane ZGŁASZAJĄCEGO (nazwa, NIP, adres, osoba

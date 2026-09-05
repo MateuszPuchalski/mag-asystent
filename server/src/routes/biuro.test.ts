@@ -973,6 +973,28 @@ test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
 });
 
+test("zdjęcie w dostawie powiększa się i zamyka kliknięciem (0.205.0)", () => {
+  /* Miniatura ma 48 px, a pytanie, przy którym się jej używa, brzmi „czy to
+     TA część" — przy kartotekach różniących się końcówką nazwy tyle nie
+     wystarcza. Trzy rzeczy są tu niezbywalne i każda ma swój powód. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  /* 1. Delegacja z SEKCJI, nie z tabeli pozycji: tabelę przerysowuje każde
+        wejście w dokument, a sekcja obejmuje też zdjęcia dowodowe. */
+  assert.match(html, /\$\("szczegol"\)\.addEventListener\("click"/,
+    "powiększenie deleguje z sekcji szczegółu, nie z tabeli");
+  /* 2. Element przed skryptem — nasłuch zamknięcia rejestruje się przy
+        starcie, więc za skryptem `$("lupa")` oddałoby null i położyło panel. */
+  assert.ok(html.indexOf('id="lupa"') < html.indexOf('<script>'),
+    "lupa stoi PRZED skryptem, inaczej nasłuch dostaje null");
+  /* 3. Zamyka każde kliknięcie, nie krzyżyk — zgłoszenie mówiło wprost
+        „po ponownym kliknięciu zniknąć". Escape robi to samo. */
+  assert.match(html, /\$\("lupa"\)\.addEventListener\("click"/, "kliknięcie zamyka");
+  assert.match(html, /e\.key === "Escape" && !\$\("lupa"\)\.hidden/, "Escape też zamyka");
+});
+
 test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0)", () => {
   /* Miejsce, w którym problem widać, musi być miejscem, w którym da się go
      naprawić. Kolejka błędów dostała PONÓW/ANULUJ (te same trasy co

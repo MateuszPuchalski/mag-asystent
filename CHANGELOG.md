@@ -34,6 +34,73 @@ historii nie przepisujemy.
 ---
 
 
+## 0.206.0 — 5 września 2026
+
+**Zdjęcie w dostawie na kolektorze też powiększa się dotknięciem.** Dopełnienie
+0.205.0, na wyraźne życzenie właściciela. Mechanizm istniał od dawna
+(`MiniaturaTowaru(powieksz = …)`), ale ekran dostaw jako jedyny go nie włączał —
+a to tam, przy regale, pada pytanie „czy karton niesie TĘ kartotekę".
+
+Powiększenie działa w DWÓCH miejscach i w obu z podanym powodem. W rozwiniętym
+wierszu pozycji — bo cała karta wiersza jest klikalna, więc klikalna miniatura
+zabiera jej dotknięcie, a w rozwiniętym to uczciwa zamiana: karta jest duża
+i zwinie ją dotknięcie obok. W zwiniętym i oczekującym miniatura klikalna
+zostaje wyłączona: byłby to cel 28–36 dp z inną akcją niż reszta gęstej listy,
+czyli pomyłka co kilka pozycji, w rękawicy. Miniatura rozwiniętego urosła przy
+tym z 44 do 48 dp, bo od teraz JEST celem dotyku — punkt 4 dekalogu.
+
+Drugie miejsce to wybór kartoteki, gdy kod wskazuje kilka towarów. Wiersz służy
+tam wyborowi, więc dotknięcie zdjęcia zamiast wyboru kosztuje jedno zbędne
+dotknięcie — ale wybór złej kartoteki kosztuje zły towar na dokumencie.
+Dekalog rozstrzyga taki spór na korzyść mniejszej liczby błędów.
+
+**Przy okazji: „pełny ekran" nigdy nie był pełnym ekranem.** `PelnyEkranZdjecia`
+było gołym `Box(fillMaxSize())` renderowanym tam, gdzie stoi miniatura —
+a stoi ona we wszystkich czterech dotychczasowych wywołaniach wewnątrz `Row`.
+Wypełniało więc wysokość wiersza, nie ekran; nazwa funkcji obiecywała co innego,
+niż robiła. Teraz jest to okno nad całym ekranem, niezależne od tego, w czym
+siedzi miniatura, i zamyka je także KLAWISZ WSTECZ — na kolektorze pierwszy
+odruch, a dotąd cofał cały ekran.
+
+## 0.205.0 — 4 września 2026
+
+**Zdjęcie w dostawie powiększa się kliknięciem.** Zgłoszenie właściciela.
+Miniatura w wierszu pozycji ma 48 px, a pytanie, przy którym się jej używa,
+brzmi „czy to TA część". Przy kartotekach różniących się końcówką nazwy —
+„szarpak NAC LS46" obok „LS51" — 48 px nie wystarcza, więc sprawdzenie
+znaczyło otwarcie Subiekta na drugim monitorze. To samo, przed czym broni
+0.203.0 w panelu obsługi.
+
+Kliknięcie w zdjęcie pokazuje je na pełnym ekranie, ponowne kliknięcie —
+gdziekolwiek — je zamyka. Escape robi to samo, bo ręka bywa na klawiaturze.
+Krzyżyka nie ma: cel do trafienia byłby mniejszy niż całe tło.
+
+Bez pobierania. Adres pliku leży już w miniaturze, bo kolejka zdjęć ściągnęła
+go raz i trzyma do wylogowania — powiększenie to ten sam plik w większym
+pudełku, nie drugie żądanie do serwera. Działa też na zdjęciach dowodowych
+problemów, bo delegacja stoi na sekcji szczegółu, a nie na tabeli pozycji.
+
+## 0.204.0 — 4 września 2026
+
+**Cofnięcie przyjęcia zwrotu — ostatni szczebel drabiny z §25a.5.** Zgłoszenie
+właściciela: „gdy kliknę przyjęcie zwrotu, na DO OCENY nie mogę tego cofnąć".
+
+Przyjęcie idzie jednym kliknięciem, bez pytania o nic, i tak zostaje — tak
+wygląda typowy zwrot. Kliknięcie bez pytania musi jednak mieć drogę powrotną,
+inaczej cena pomyłki jest wyższa niż cena pytania, którego celowo nie ma.
+
+Klawisz stoi w kubełku DO OCENY i pokazuje się TYLKO wtedy, gdy nikt jeszcze
+nic nie ocenił. To jedno zdanie, nie ramka z decyzją: pytanie tego ekranu dalej
+zadaje wiersz produktu. Po pierwszej ocenie klawisz znika, bo schodzi się po
+jednym szczeblu — ocena jest szczebel niżej i ma własne cofnięcie.
+
+Trzy rzeczy zatrzymują cofnięcie, każda z innego powodu. **Ustawione oceny** —
+cofnięcie werdyktu, które czyściłoby je przy okazji, kasowałoby wpisy, o które
+nikt nie prosił, a przy pozycji z zamkniętego koszyka obeszłoby bramkę
+z 0.202.0. **Oddane pieniądze** — wyszły do klienta. **Odmowa zwrotu** — poszła
+jako oświadczenie i drugiej takiej samej Allegro nie przyjmie; dlatego to ona
+ma potwierdzenie w formie wpisanego powodu.
+
 ## 0.203.0 — 4 września 2026
 
 **Zdjęcia tam, gdzie zapada decyzja o części — i hierarchia, która ją skraca.**

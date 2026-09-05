@@ -7,7 +7,7 @@ import {
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
-  cofnijKorekte, cofnijKwote, znajdzZwrotPoKodzie,
+  cofnijKorekte, cofnijKwote, cofnijWerdykt, znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
@@ -546,6 +546,51 @@ test("korekta przed kwotą odpada — nie ma czego korygować", () => {
    kubełek cofa DOKŁADNIE ten krok, który go wprowadził — testy niżej pilnują,
    że schodzi się po jednym szczeblu i że oba nieodwracalne kroki zatrzymują
    całość.                                                                  */
+
+test("cofnięcie przyjęcia wraca do DECYZJI, dopóki nikt nic nie ocenił", () => {
+  /* Zgłoszenie właściciela: przyjęcie idzie jednym kliknięciem, bez pytania
+     o nic — a pomyłkę widać natychmiast po kubełku, do którego zwrot wpadł. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)?.kubelek, "ocena");
+
+  cofnijWerdykt(d, id, 2, KTO);
+
+  const z = listaZwrotow(d).find((x) => x.id === id)!;
+  assert.equal(z.kubelek, "decyzja");
+  assert.equal(z.werdykt, null);
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_zdarzenie WHERE zwrot_id=? AND rodzaj='werdykt_cofniety'")
+    .get(id) as { n: number }).n), 1);
+
+  /* Po cofnięciu da się rozstrzygnąć inaczej — po to całe cofnięcie jest. */
+  rozstrzygnijZwrot(d, id, "odrzucony", "towar nosi ślady użycia", 3, KTO);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)?.kubelek, "odrzucony");
+});
+
+test("ocena, odmowa i oddane pieniądze ZATRZYMUJĄ cofnięcie przyjęcia", () => {
+  /* Trzy różne powody. Ocena to szczebel niżej — cofnięcie werdyktu, które
+     czyściłoby przy okazji oceny, obeszłoby bramkę zamkniętego koszyka.
+     Odmowa poszła do klienta jako oświadczenie. Pieniądze wyszły. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  ocenPozycje(d, poz[0], "utylizacja", 2, KTO);
+  assert.throws(() => cofnijWerdykt(d, id, 3, KTO), /cofnij oceny \(1\)/);
+
+  ocenPozycje(d, poz[0], null, 3, KTO);
+  d.prepare("UPDATE zwrot_klienta SET zwrot_pieniedzy_id='REF-1' WHERE id=?").run(id);
+  assert.throws(() => cofnijWerdykt(d, id, 4, KTO), /oddane/i);
+  assert.equal(listaZwrotow(d).find((x) => x.id === id)?.werdykt, "przyjety",
+    "odmowa nie zmienia werdyktu");
+
+  const inny = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, inny.id, "odrzucony", "ślady użycia", 1, KTO);
+  assert.throws(() => cofnijWerdykt(d, inny.id, 2, KTO), /oświadczenie/);
+});
 
 test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY", () => {
   const d = stanowisko();

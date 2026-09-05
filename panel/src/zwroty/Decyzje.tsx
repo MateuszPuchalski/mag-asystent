@@ -24,12 +24,13 @@ type Props = {
   onKorekta: (numer: string) => void;
   onCofnijKorekte: () => void;
   onCofnijKwote: () => void;
+  onCofnijWerdykt: () => void;
   trwa: boolean;
   blad: string;
 };
 
 export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
-  trwa, blad }: Props) {
+  onCofnijWerdykt, trwa, blad }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
   /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
@@ -72,8 +73,27 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   }
 
   /* DO OCENY i DO ZWROTU nie mają paska: ich pytanie zadaje wiersz produktu,
-     bo dotyczy pojedynczej pozycji, a nie całego zwrotu. */
-  if (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot") return null;
+     bo dotyczy pojedynczej pozycji, a nie całego zwrotu.
+
+     WYJĄTEK: świeżo przyjęty zwrot, w którym nikt jeszcze nic nie ocenił
+     (0.204.0). Przyjęcie idzie jednym kliknięciem, bez pytania o nic, więc
+     pomyłka jest zdarzeniem normalnym — a wykrywa się ją natychmiast, patrząc
+     na kubełek, do którego zwrot właśnie wpadł. To jedno zdanie, nie ramka
+     z decyzją: pytanie ekranu dalej zadaje wiersz produktu.
+
+     Po pierwszej ocenie klawisz znika, bo serwer i tak by odmówił — schodzi
+     się po jednym szczeblu, a ocena jest szczebel niżej. */
+  if (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot") {
+    const nieoceniony = zwrot.kubelek === "ocena" && zwrot.pozycje.every((p) => !p.ocena);
+    if (!nieoceniony) return null;
+    return <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50
+      px-4 py-2 text-xs text-slate-500">
+      <span>Zwrot przyjęty — oceń produkty niżej.</span>
+      <button type="button" disabled={trwa} onClick={onCofnijWerdykt}
+        className="underline underline-offset-2 disabled:opacity-50">cofnij przyjęcie</button>
+      {blad && <span className="text-ranga-zle">{blad}</span>}
+    </div>;
+  }
 
   if (zwrot.kubelek === "korekta") {
     return <div className={ramka}>
