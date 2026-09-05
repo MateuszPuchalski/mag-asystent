@@ -3,6 +3,7 @@ import { db as defaultDb, type Db, transaction } from "../db/db.js";
 import { zaproponujKartoteke, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanRabatu, type StanRabatu } from "./rabaty.js";
 import { linkZwrotu } from "./allegro-linki.js";
+import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 import type { FakturaZwrotu } from "./faktury.js";
@@ -29,10 +30,17 @@ import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
-  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna";
+  | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
+  | "rozjazd_ilosci";
 
 export interface PozycjaZwrotu {
   id: number;
+  /**
+   * Ile sztuk naprawdę wróciło. `null` = nikt jeszcze nie liczył (0.212.0).
+   *
+   * `ilosc` obok niesie DEKLARACJĘ klienta i nadpisuje ją synchronizator.
+   */
+  iloscZwrocona: number | null;
   /** `allegro` = ze zgłoszenia klienta, `biuro` = dopisana u nas (0.184.0). */
   zrodlo: string;
   offerId: string | null;
@@ -222,6 +230,8 @@ export function sygnalyZwrotu(z: {
   statusAllegro: string | null;
   /** Czy zapisana kwota rozjechała się z pozycjami (0.210.0). */
   kwotaRozjazd?: boolean;
+  /** Czy któraś pozycja wróciła w innej liczbie, niż klient zgłosił (0.212.0). */
+  rozjazdIlosci?: boolean;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
@@ -273,6 +283,15 @@ export function sygnalyZwrotu(z: {
      dopiero wtedy, gdy ktoś kwotę poprawi — drabina cofania z 0.202.0 daje
      na to drogę nawet po zamknięciu. */
   if (z.kwotaRozjazd) s.push("kwota_nieaktualna");
+  /* ROZJAZD ILOŚCI (0.212.0). Do 0.211.0 tego sygnału nie było, bo nie było
+     DANYCH: liczbę zwróconą znała tylko paczka, nie baza, a reguła bez danych
+     zapala się na ślepo albo nigdy. Teraz liczy ją biuro przy rozpakowaniu,
+     więc sygnał ma z czego świecić.
+
+     Świeci także na zwrocie zamkniętym: mówi, że wypłata poszła za inną liczbę
+     sztuk, niż klient zgłosił — a to jest zdanie, którego szuka się po fakcie,
+     przy reklamacji. */
+  if (z.rozjazdIlosci) s.push("rozjazd_ilosci");
   return s;
 }
 
@@ -311,13 +330,13 @@ export function sumaPozycji(pozycje: Array<{ cenaGrosze: number; ilosc: number }
 export function kwotaRozjechana(
   z: { kwota_grosze: unknown; kwota_dostawa_grosze: unknown },
   surowe: Array<{ w_zwrocie: unknown; cena_grosze: unknown; ilosc: unknown;
-    potracenie_grosze: unknown }>,
+    ilosc_zwrocona?: unknown; potracenie_grosze: unknown }>,
 ): boolean {
   if (z.kwota_grosze == null) return false;
   const zPozycji = surowe
     .filter((p) => Number(p.w_zwrocie) === 1)
     .reduce((sum, p) => sum
-      + Math.round(Number(p.cena_grosze) * Number(p.ilosc))
+      + Math.round(Number(p.cena_grosze) * iloscLiczona(p))
       - Number(p.potracenie_grosze ?? 0), 0);
   return zPozycji + Number(z.kwota_dostawa_grosze ?? 0) !== Number(z.kwota_grosze);
 }
@@ -359,7 +378,10 @@ function zloz(
       przesylkaStatus: (z.przesylka_status as string) ?? null, rejectionCode,
       pieniadzeAt: (z.zwrot_pieniedzy_at as string) ?? null,
       statusAllegro: (z.status_allegro as string) ?? null,
-      kwotaRozjazd: kwotaRozjechana(z as never, surowe as never) }, teraz),
+      kwotaRozjazd: kwotaRozjechana(z as never, surowe as never),
+      rozjazdIlosci: surowe.some(
+        (p) => p.ilosc_zwrocona != null && Number(p.ilosc_zwrocona) !== Number(p.ilosc)),
+    }, teraz),
     terminAt,
     dniDoTerminu: dni,
     sumaPozycjiGrosze: suma,
@@ -593,6 +615,8 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
           zrodlo: String(p.zrodlo ?? "allegro"),
+          /* Ile NAPRAWDĘ wróciło; `null` = nikt jeszcze nie liczył (0.212.0). */
+          iloscZwrocona: p.ilosc_zwrocona == null ? null : Number(p.ilosc_zwrocona),
           potracenieGrosze: p.potracenie_grosze == null ? null : Number(p.potracenie_grosze),
           potraceniePowod: (p.potracenie_powod as string) ?? null,
           /* Propozycję liczymy TYLKO tam, gdzie kartoteki jeszcze nie ma.
@@ -920,8 +944,16 @@ export function cofnijWerdykt(
  * każdej pozycji i zostawia towar w stanie, z którego nic nie wyprowadza.
  * Wraca dopiero razem ze ścieżką przeceny, jeśli właściciel jej zechce.
  *
- * Do koszyka wchodzi WYŁĄCZNIE „stan" — decyzja właściciela. Utylizacja ma
- * zejść ze stanu, więc MM na regał zwrotów byłby dla niej ruchem w złą stronę.
+ * KAŻDA OCENA MA SWÓJ KOSZYK (0.211.0). „Stan" idzie na regał zwrotów,
+ * „utylizacja" na magazyn odpadu — decyzja właściciela. Do 0.210.0 utylizacja
+ * zapisywała się i na tym koniec: bez dokumentu, bez ruchu stanu, bez listy.
+ * Towar leżał, a w Subiekcie nie było po nim żadnego śladu. Był to dokładnie
+ * ten ślepy zaułek, za który w 0.209.0 zdjęto „przecenę" — tylko utylizacji
+ * nikt wtedy nie policzył.
+ *
+ * Odpad bez `MAG_ID_ODP` w `wertis.env` zachowuje się jak przed 0.211.0:
+ * ocena się zapisuje, koszyka nie ma. Zgadnięty numer magazynu wystawiłby
+ * dokument przesuwający złom w cudze miejsce.
  *
  * `koszyk` w wyniku mówi, czy dołożenie się udało. Pozycja bez kartoteki nie
  * ma `tw_id`, a MM przesuwa stany kartotek — ocena zapisuje się mimo to, bo
@@ -960,7 +992,12 @@ export function ocenPozycje(
        którego nikt już nie chce na regale. Zamkniętego kosza to nie rusza —
        tamten pojechał na halę z wystawionym papierem. */
     zdejmijZKosza(database, pozycjaId, kto);
-    const koszyk = ocena === "stan" ? dolozDoKosza(database, pozycjaId, kto, teraz) : null;
+    /* Każda ocena do SWOJEGO koszyka. `zdejmijZKosza` wyżej zdejmuje
+       z dowolnego otwartego, więc „na stan", potem „utylizacja" przenosi
+       pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
+    const koszyk = ocena === null ? null
+      : dolozDoKosza(database, pozycjaId, kto, teraz,
+        ocena === "utylizacja" ? "odpad" : "zwroty");
     return { wersja: wersja + 1, koszyk };
   })();
 }
@@ -1219,6 +1256,60 @@ export function usunDopisanaPozycje(
  * mniej. `null` w kwocie cofa potrącenie razem z powodem — to samo cofnięcie
  * co przy ocenie i korekcie (§25a.5).
  */
+/**
+ * Ile sztuk NAPRAWDĘ wróciło w kartonie (0.212.0).
+ *
+ * Klient zgłasza w Allegro dwie sztuki, w paczce przyjeżdża jedna — do tego
+ * wydania nie było tego gdzie zapisać. Pozycji z Allegro nie da się poprawić
+ * (zdjąć wolno tylko pozycję dopisaną przez biuro), a kwota liczyła się
+ * z DEKLARACJI klienta. Zostawało odznaczyć całą pozycję albo zapłacić za
+ * dwie; „wróciła jedna z dwóch" nie mieściło się w bazie.
+ *
+ * LICZY BIURO — decyzja właściciela: to ono otwiera i procesuje zwroty.
+ *
+ * `null` CZYŚCI zapis i wraca do deklaracji. To nie to samo co zero: zero
+ * znaczy „nie wróciło nic", puste — „nikt jeszcze nie liczył".
+ *
+ * Więcej niż zgłoszono ODPADA. W kartonie bywa więcej, niż klient zgłosił, ale
+ * to jest INNA pozycja i ma własną drogę (`dopiszPozycje` od 0.184.0).
+ * Podniesienie liczby tutaj wypłaciłoby za sztuki, o których zwrocie klient
+ * nigdy nie napisał.
+ */
+export function zapiszIloscZwrocona(
+  database: Db, pozycjaId: number, ilosc: number | null,
+  wersja: number, kto: { id: number; name: string },
+): { wersja: number; iloscZwrocona: number | null } {
+  const p = database.prepare(
+    "SELECT id, zwrot_id, ilosc, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as
+    { id: number; zwrot_id: number; ilosc: number; nazwa: string } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+
+  if (ilosc !== null) {
+    if (!Number.isFinite(ilosc) || ilosc < 0) {
+      throw new Error("Liczba sztuk nie może być ujemna.");
+    }
+    if (ilosc > Number(p.ilosc)) {
+      throw new Error(
+        `Klient zgłosił ${Number(p.ilosc)} szt. — więcej nie wpiszesz. ` +
+        "Nadmiar z kartonu dopisz jako osobną pozycję.");
+    }
+  }
+
+  return transaction(database, () => {
+    const z = podKlucz(database, Number(p.zwrot_id), wersja);
+    /* Tak samo jak ocena i potrącenie: liczenie sztuk ma sens po przyjęciu. */
+    if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
+    database.prepare("UPDATE zwrot_klienta_pozycja SET ilosc_zwrocona=? WHERE id=?")
+      .run(ilosc, pozycjaId);
+    podnies(database, Number(p.zwrot_id));
+    logEvent("zwrot_ilosc_zwrocona", kto.name, null,
+      { zwrotId: Number(p.zwrot_id), pozycjaId, zgloszono: Number(p.ilosc), wrocilo: ilosc },
+      kto.id, database);
+    return { wersja: wersja + 1, iloscZwrocona: ilosc };
+  })();
+}
+
 export function zapiszPotracenie(
   database: Db, pozycjaId: number, grosze: number | null, powod: string,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
@@ -1285,10 +1376,10 @@ export function zapiszKwote(
     if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
 
     const wszystkie = database.prepare(
-      `SELECT id, cena_grosze, ilosc, potracenie_grosze
+      `SELECT id, cena_grosze, ilosc, ilosc_zwrocona, potracenie_grosze
          FROM zwrot_klienta_pozycja WHERE zwrot_id=?`)
       .all(zwrotId) as Array<{ id: number; cena_grosze: number; ilosc: number;
-        potracenie_grosze: number | null }>;
+        ilosc_zwrocona: number | null; potracenie_grosze: number | null }>;
     const znane = new Set(wszystkie.map((p) => Number(p.id)));
     /* Obca pozycja ODPADA GŁOŚNO. Ciche pominięcie zapisałoby kwotę niższą,
        niż operator widział na ekranie — a on kliknął to, co widział. */
@@ -1302,7 +1393,10 @@ export function zapiszKwote(
        `zapiszPotracenie`, więc suma nie ma prawa zejść poniżej zera. */
     const suma = wszystkie
       .filter((p) => wybrane.has(Number(p.id)))
-      .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * Number(p.ilosc))
+      /* PO TYM, CO WRÓCIŁO (0.212.0). Do tego wydania kwota liczyła się
+         z deklaracji klienta, więc zwrot dwóch sztuk, z których przyjechała
+         jedna, wypłacał za dwie. */
+      .reduce((s, p) => s + Math.round(Number(p.cena_grosze) * iloscLiczona(p))
         - Number(p.potracenie_grosze ?? 0), 0);
 
     /* Koszt dostawy bierze się z ZAMÓWIENIA, nie ze zwrotu: Allegro nie

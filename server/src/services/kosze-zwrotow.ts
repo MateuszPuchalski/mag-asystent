@@ -2,6 +2,7 @@ import { logEvent } from "./events.js";
 import { transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
 import { enqueueMM } from "./queue.js";
+import { iloscLiczona } from "./ilosc-zwrotu.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką:
@@ -44,7 +45,29 @@ const AUTOMAT_KOREKTY = "automat (komplet korekt)";
 /** Przedrostek kodu koszy składanych u nas. */
 const PRZEDROSTEK = "Z-";
 
+/**
+ * Do czego ten koszyk służy (0.211.0).
+ *
+ * `zwroty` idzie na regał zwrotów, `odpad` na magazyn odpadu. Różnią się
+ * WYŁĄCZNIE magazynem docelowym MM — reszta drogi jest ta sama, bo fizycznie
+ * to ta sama praca: biuro zbiera towar do pudła, zamyka je i wysyła na halę
+ * z jednym papierem. Dwie osobne maszynerie znaczyłyby dwa miejsca, w których
+ * trzeba pamiętać o bramce korekty.
+ */
+export type RodzajKosza = "zwroty" | "odpad";
+
+/**
+ * Magazyn docelowy MM dla tego rodzaju. `0` znaczy WYŁĄCZONY.
+ *
+ * Odpad bez numeru w `wertis.env` nie ma dokąd jechać, więc koszyka nie
+ * zakładamy wcale — zgadnięty numer przesunąłby złom na cudzy magazyn.
+ */
+export const magazynDocelowy = (rodzaj: RodzajKosza): number =>
+  rodzaj === "odpad" ? config.magId.ODP : config.magId.ZWROTY;
+
 export interface StanKosza {
+  /** Do czego służy — panel pokazuje dwa koszyki obok siebie (0.211.0). */
+  rodzaj: RodzajKosza;
   id: number;
   kod: string;
   pozycji: number;
@@ -77,18 +100,23 @@ function nowyKod(database: Db): string {
  * praca przy biurku, i nigdy nie stoją otwarte.
  */
 export function otwartyKosz(database: Db, kto: { id: number; name: string },
-  teraz = new Date()): number {
+  teraz = new Date(), rodzaj: RodzajKosza = "zwroty"): number {
+  /* PO RODZAJU, nie tylko po właścicielu (0.211.0). Operator ma przy biurku
+     dwa pudła naraz — zwroty i odpad — a bez tego warunku pozycja do
+     utylizacji wpadłaby do pierwszego z brzegu i pojechała na zły magazyn. */
   const juz = database.prepare(
     `SELECT id FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
-       AND utworzono_przez=? ORDER BY id LIMIT 1`).get(kto.name) as { id: number } | undefined;
+       AND utworzono_przez=? AND rodzaj=? ORDER BY id LIMIT 1`)
+    .get(kto.name, rodzaj) as { id: number } | undefined;
   if (juz) return Number(juz.id);
 
   const at = teraz.toISOString();
   const kod = nowyKod(database);
   const id = Number(database.prepare(
     `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez)
-     VALUES (?, 'otwarty', 'zwroty', ?, ?)`).run(kod, at, kto.name).lastInsertRowid);
-  logEvent("kosz_zwrotow_otwarty", kto.name, null, { koszId: id, kod }, kto.id, database);
+     VALUES (?, 'otwarty', ?, ?, ?)`).run(kod, rodzaj, at, kto.name).lastInsertRowid);
+  logEvent("kosz_zwrotow_otwarty", kto.name, null, { koszId: id, kod, rodzaj },
+    kto.id, database);
   return id;
 }
 
@@ -104,17 +132,22 @@ export function otwartyKosz(database: Db, kto: { id: number; name: string },
  */
 export function dolozDoKosza(
   database: Db, pozycjaId: number, kto: { id: number; name: string }, teraz = new Date(),
+  rodzaj: RodzajKosza = "zwroty",
 ): number | null {
+  /* Odpad bez numeru magazynu w `wertis.env` nie ma dokąd jechać. Koszyka
+     wtedy NIE zakładamy: ocena zapisuje się jak przed 0.211.0, a ekran
+     powie, że do koszyka nie weszła. */
+  if (magazynDocelowy(rodzaj) <= 0) return null;
   const p = database.prepare(
-    `SELECT p.id, p.tw_id, p.nazwa, p.ilosc, t.symbol
+    `SELECT p.id, p.tw_id, p.nazwa, p.ilosc, p.ilosc_zwrocona, t.symbol
        FROM zwrot_klienta_pozycja p
        LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
       WHERE p.id=?`).get(pozycjaId) as
-    { id: number; tw_id: number | null; nazwa: string; ilosc: number; symbol: string | null }
-    | undefined;
+    { id: number; tw_id: number | null; nazwa: string; ilosc: number;
+      ilosc_zwrocona: number | null; symbol: string | null } | undefined;
   if (!p || p.tw_id == null) return null;
 
-  const koszId = otwartyKosz(database, kto, teraz);
+  const koszId = otwartyKosz(database, kto, teraz, rodzaj);
   /* Dwa razy ta sama pozycja to jeden wiersz. Operator bywa poprawiany:
      cofnięcie oceny i ponowne „na stan" nie ma prawa podwoić sztuk na MM. */
   const stoi = database.prepare(
@@ -122,12 +155,16 @@ export function dolozDoKosza(
     .get(koszId, pozycjaId) as { id: number } | undefined;
   if (stoi) return koszId;
 
+  /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0). Na dokument MM idzie
+     towar, który fizycznie leży w pudle — liczba z Allegro opisuje zamiar
+     klienta, a magazynier rozkłada sztuki. */
+  const ile = iloscLiczona(p);
   database.prepare(
     `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
      VALUES (?,?,?,?,?,?)`).run(koszId, Number(p.tw_id),
-      p.symbol ?? String(p.tw_id), p.nazwa, Number(p.ilosc), pozycjaId);
+      p.symbol ?? String(p.tw_id), p.nazwa, ile, pozycjaId);
   logEvent("kosz_zwrotow_dolozono", kto.name, null,
-    { koszId, pozycjaId, twId: Number(p.tw_id), ilosc: Number(p.ilosc) }, kto.id, database);
+    { koszId, pozycjaId, twId: Number(p.tw_id), ilosc: ile }, kto.id, database);
   return koszId;
 }
 
@@ -177,22 +214,39 @@ export function zdejmijZKosza(
   return true;
 }
 
-/** Co leży w otwartym koszyku operatora. `null`, gdy jeszcze żadnego nie ma. */
-export function stanOtwartegoKosza(database: Db, kto: { name: string }): StanKosza | null {
+/** Co leży w otwartym koszyku tego rodzaju. `null`, gdy jeszcze żadnego nie ma. */
+export function stanOtwartegoKosza(
+  database: Db, kto: { name: string }, rodzaj: RodzajKosza = "zwroty",
+): StanKosza | null {
   const k = database.prepare(
     `SELECT id, kod, utworzono_at FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
-       AND utworzono_przez=? ORDER BY id LIMIT 1`).get(kto.name) as
+       AND utworzono_przez=? AND rodzaj=? ORDER BY id LIMIT 1`).get(kto.name, rodzaj) as
     { id: number; kod: string; utworzono_at: string } | undefined;
   if (!k) return null;
   const pozycje = database.prepare(
     "SELECT symbol, nazwa, ilosc FROM kosz_pozycja WHERE kosz_id=? ORDER BY id")
     .all(k.id) as Array<{ symbol: string; nazwa: string; ilosc: number }>;
   return {
+    rodzaj,
     id: Number(k.id), kod: k.kod, otwartyOd: k.utworzono_at,
     pozycji: pozycje.length,
     sztuk: pozycje.reduce((s, p) => s + Number(p.ilosc), 0),
     pozycje: pozycje.map((p) => ({ ...p, ilosc: Number(p.ilosc) })),
   };
+}
+
+/**
+ * Wszystkie otwarte koszyki operatora — zwroty i odpad (0.211.0).
+ *
+ * Odpad wyłączony w konfiguracji nie ma prawa pokazać się na ekranie: koszyka
+ * bez magazynu docelowego i tak nie da się zamknąć.
+ */
+export function otwarteKoszyki(database: Db, kto: { name: string }): StanKosza[] {
+  const rodzaje: RodzajKosza[] = ["zwroty", "odpad"];
+  return rodzaje
+    .filter((r) => magazynDocelowy(r) > 0)
+    .map((r) => stanOtwartegoKosza(database, kto, r))
+    .filter((k): k is StanKosza => k !== null);
 }
 
 /**
@@ -224,8 +278,8 @@ export function brakujaceKorekty(database: Db, koszId: number): Array<{
  * korekty już są, i późniejsze wypuszczenie po dopisaniu ostatniego numeru.
  */
 function zakolejkujMm(
-  database: Db, k: { id: number; kod: string }, kto: { id: number | null; name: string },
-  at: string,
+  database: Db, k: { id: number; kod: string; rodzaj: RodzajKosza },
+  kto: { id: number | null; name: string }, at: string,
 ): number {
   const pozycje = database.prepare(
     "SELECT tw_id, ilosc FROM kosz_pozycja WHERE kosz_id=?")
@@ -244,16 +298,20 @@ function zakolejkujMm(
      kolejki w produkcji — a niezmiennik o kształcie zadania MM stoi przy
      `enqueueMM` i tam się go czyta. Zadanie jest WIELOPOZYCYJNE i bez `twId`:
      jeden koszyk to jeden dokument i jedna kartka dla magazyniera. Guard
-     kolejności nic przez to nie traci, bo MM idzie NA BUFOR (MAG→ZWROTY)
-     i sprzedawalnym towaru nie czyni. */
-  const queueId = enqueueMM(config.magId.MAG, config.magId.ZWROTY, items, {
+     kolejności nic przez to nie traci, bo MM idzie Z magazynu głównego —
+     na bufor zwrotów albo na odpad — i sprzedawalnym towaru nie czyni. */
+  const odpad = k.rodzaj === "odpad";
+  const queueId = enqueueMM(config.magId.MAG, magazynDocelowy(k.rodzaj), items, {
     createdBy: kto.name,
     /* JAWNY `null` automatu ma przeżyć: `wypuscGotoweKoszyki` biegnie także
        z wnętrza żądania, tuż po tym, jak człowiek wpisał numer korekty. */
     createdByRef: kto.id,
     createdAt: at,
-    label: `Koszyk zwrotów ${k.kod}`,
-    detail: `${items.length} kartotek na regał zwrotów`,
+    /* Etykieta MÓWI, DOKĄD jedzie. Magazynier bierze kartkę i idzie: „regał
+       zwrotów" i „magazyn odpadu" to dwa różne końce hali, a dokument MM sam
+       z siebie tego nie powie. */
+    label: `${odpad ? "Koszyk odpadu" : "Koszyk zwrotów"} ${k.kod}`,
+    detail: `${items.length} kartotek ${odpad ? "na magazyn odpadu" : "na regał zwrotów"}`,
   }, database);
 
   database.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(queueId, k.id);
@@ -271,10 +329,14 @@ function zakolejkujMm(
  * i rozłożyłby towar raz.
  */
 export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
+  /* OBA RODZAJE (0.211.0). Bramka korekty obowiązuje odpad tak samo jak
+     zwroty: towar wraca na magazyn główny dopiero po korekcie, więc MM na
+     odpad zdjęłoby stan, którego jeszcze nie ma. */
   const czekajace = database.prepare(
-    `SELECT id, kod FROM kosz
+    `SELECT id, kod, rodzaj FROM kosz
       WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
-        AND rodzaj='zwroty' ORDER BY id`).all() as Array<{ id: number; kod: string }>;
+        AND rodzaj IN ('zwroty','odpad') ORDER BY id`)
+    .all() as Array<{ id: number; kod: string; rodzaj: RodzajKosza }>;
 
   let wypuszczone = 0;
   for (const k of czekajace) {
@@ -282,7 +344,8 @@ export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
     /* Każdy koszyk WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
        pozostałych — ta sama lekcja co przy sygnaturach w 0.169.0. */
     transaction(database, () => {
-      const queueId = zakolejkujMm(database, { id: Number(k.id), kod: k.kod },
+      const queueId = zakolejkujMm(database,
+        { id: Number(k.id), kod: k.kod, rodzaj: k.rodzaj },
         { id: null, name: AUTOMAT_KOREKTY }, teraz.toISOString());
       logEvent("kosz_zwrotow_wypuszczony", AUTOMAT_KOREKTY, null,
         { koszId: Number(k.id), kod: k.kod, queueId }, undefined, database);
@@ -295,6 +358,8 @@ export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
 export interface KoszykCzekajacy {
   id: number;
   kod: string;
+  /** Zwroty czy odpad — ekran mówi, na który koniec hali czeka papier. */
+  rodzaj: RodzajKosza;
   zamknietoAt: string;
   /** Zwroty bez numeru korekty — człowiek ma wiedzieć, czego szukać. */
   brakuje: Array<{ zwrotId: number; numer: string }>;
@@ -309,12 +374,12 @@ export interface KoszykCzekajacy {
  */
 export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
   const kosze = database.prepare(
-    `SELECT id, kod, zamknieto_at FROM kosz
+    `SELECT id, kod, zamknieto_at, rodzaj FROM kosz
       WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
-        AND rodzaj='zwroty' ORDER BY id`)
-    .all() as Array<{ id: number; kod: string; zamknieto_at: string }>;
+        AND rodzaj IN ('zwroty','odpad') ORDER BY id`)
+    .all() as Array<{ id: number; kod: string; zamknieto_at: string; rodzaj: RodzajKosza }>;
   return kosze.map((k) => ({
-    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at,
+    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
     brakuje: brakujaceKorekty(database, Number(k.id)),
   })).filter((k) => k.brakuje.length > 0);
 }
@@ -345,8 +410,9 @@ export function zamknijKosz(
 } {
   return transaction(database, () => {
     const k = database.prepare(
-      "SELECT id, kod, status FROM kosz WHERE id=? AND mm_dok_id IS NULL")
-      .get(koszId) as { id: number; kod: string; status: string } | undefined;
+      "SELECT id, kod, status, rodzaj FROM kosz WHERE id=? AND mm_dok_id IS NULL")
+      .get(koszId) as
+      { id: number; kod: string; status: string; rodzaj: RodzajKosza } | undefined;
     if (!k) throw new Error("Nie znam takiego koszyka zwrotów.");
     if (k.status !== "otwarty") throw new Error(`Koszyk ${k.kod} jest już ${k.status}.`);
 
@@ -367,7 +433,7 @@ export function zamknijKosz(
        widzi różnicy wobec dawnego zachowania. */
     const braki = brakujaceKorekty(database, koszId);
     const queueId = braki.length === 0
-      ? zakolejkujMm(database, { id: koszId, kod: k.kod }, kto, at)
+      ? zakolejkujMm(database, { id: koszId, kod: k.kod, rodzaj: k.rodzaj }, kto, at)
       : null;
 
     logEvent("kosz_zwrotow_zamkniety", kto.name, null,

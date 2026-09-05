@@ -4,8 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  brakujaceKorekty, dolozDoKosza, otwartyKosz, stanOtwartegoKosza, wypuscGotoweKoszyki,
-  zamknijKosz, zdejmijZKosza,
+  brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
+  wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
@@ -158,6 +158,37 @@ test("domknięcie kolejkuje MM z magazynu głównego na regał zwrotów", () => 
     .get(kosz.id) as { status: string; mm_queue_id: number };
   assert.equal(k.status, "zamkniety", "hala ma co rozkładać, nie czekając na numer");
   assert.equal(Number(k.mm_queue_id), wynik.queueId);
+});
+
+test("na dokument MM idzie to, CO WRÓCIŁO, a nie deklaracja klienta (0.212.0)", () => {
+  /* Magazynier rozkłada sztuki, nie zamiary. Gdyby kosz brał deklarację,
+     dokument MM przesuwałby więcej, niż fizycznie leży w pudle. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZTowarem(d, [11], KTO);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc_zwrocona=1 WHERE id=?").run(poz[0]);
+
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  assert.equal(kosz.sztuk, 1, "zgłoszono 2, wróciła 1 — na dokument idzie 1");
+});
+
+test("BEZ MAG_ID_ODP utylizacja zachowuje się jak przed 0.211.0", () => {
+  /* Ten plik biegnie bez `MAG_ID_ODP` w środowisku, więc mierzy dokładnie to,
+     co zobaczy firma, która wdroży wydanie i nie ustawi numeru magazynu:
+     ocena się zapisuje, koszyka nie ma, żaden dokument nie wychodzi.
+     Zgadnięty numer przesunąłby złom w cudze miejsce, a MM się nie cofa
+     jednym kliknięciem — dlatego domyślna wartość to zero, nie „jakiś". */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZTowarem(d, [11], KTO);
+
+  const wynik = ocenPozycje(d, poz[0], "utylizacja", 2, KTO);
+  assert.equal(wynik.koszyk, null, "bez magazynu odpadu nie ma dokąd jechać");
+  assert.equal((d.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz[0]) as { ocena: string }).ocena, "utylizacja", "ocena to fakt o towarze");
+  assert.deepEqual(otwarteKoszyki(d, KTO).map((k) => k.rodzaj), [],
+    "wyłączony odpad nie pokazuje się nawet jako pusty koszyk");
 });
 
 test("zamkniętego kosza nie da się opróżnić ani zamknąć drugi raz", () => {

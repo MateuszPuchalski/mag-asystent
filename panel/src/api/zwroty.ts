@@ -112,6 +112,8 @@ export function useOcena() {
 export interface KoszykCzekajacy {
   id: number;
   kod: string;
+  /** Zwroty czy odpad — ekran mówi, na który koniec hali czeka papier. */
+  rodzaj: "zwroty" | "odpad";
   zamknietoAt: string;
   brakuje: Array<{ zwrotId: number; numer: string }>;
 }
@@ -120,7 +122,7 @@ export interface KoszykCzekajacy {
 export function useKosz() {
   return useQuery({
     queryKey: kluczeZwrotow.kosz,
-    queryFn: () => api<{ kosz: KoszZwrotow | null; czekajace?: KoszykCzekajacy[] }>(
+    queryFn: () => api<{ kosze: KoszZwrotow[]; czekajace?: KoszykCzekajacy[] }>(
       "/api/obsluga/zwroty/kosz"),
   });
 }
@@ -214,6 +216,26 @@ export function useKorekta() {
         `/api/obsluga/zwroty/${v.id}/korekta`,
         { method: "POST", body: JSON.stringify({ numer: v.numer, wersja: v.wersja }) }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
+/**
+ * Ile sztuk naprawdę wróciło w kartonie (0.212.0). `null` czyści zapis.
+ *
+ * Odświeża też pasek koszyka: liczba sztuk na dokumencie MM bierze się z tej
+ * samej wartości, więc licznik przy koszu musi ruszyć razem z nią.
+ */
+export function useIloscZwrocona() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; ilosc: number | null; wersja: number }) =>
+      api<{ wersja: number; iloscZwrocona: number | null }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ilosc`,
+        { method: "POST", body: JSON.stringify({ ilosc: v.ilosc, wersja: v.wersja }) }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
   });
 }
 
