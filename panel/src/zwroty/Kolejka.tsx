@@ -23,7 +23,7 @@ export const KUBELKI: Array<{ id: Kubelek; etykieta: string; pytanie: string }> 
   { id: "zamkniety", etykieta: "Zamknięte", pytanie: "Tylko wgląd." },
 ];
 
-/* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze (0.208.0). Łańcuch
+/* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze (0.209.0). Łańcuch
    znał trzy sygnały i milcząco podpisywał każdy czwarty ostatnią gałęzią —
    czyli nowy sygnał kłamałby na ekranie, zamiast nie przejść kompilacji. */
 const SYGNALY: Record<Sygnal,

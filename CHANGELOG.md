@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.208.0 — 5 września 2026
+## 0.209.0 — 5 września 2026
 
 **Przelew, którego Allegro nie potwierdziło, przestał wyglądać jak udany.** Od
 0.190.0 panel oddaje pieniądze sam, a status zapisywał RAZ — z odpowiedzi na
@@ -91,7 +91,7 @@ zmienia. Liczymy go od `createdAt` zwrotu, a ustawa liczy czternaście dni od
 otrzymania oświadczenia o odstąpieniu. Błąd idzie w stronę bezpieczną, ale
 sprawdzenie wymaga danych z żywego Allegro i decyzji właściciela — nie kodu.
 
-## 0.207.0 — 5 września 2026
+## 0.208.0 — 5 września 2026
 
 **Nadmiar ponad fakturę wreszcie dochodzi do biura.** Od 0.64.0 licznik `+`
 w panelu odkładania idzie ponad ilość z dokumentu — po jednym potwierdzeniu, bo

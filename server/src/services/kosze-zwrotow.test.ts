@@ -69,7 +69,7 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
   assert.equal(ocenPozycje(d, poz[1], "utylizacja", 3, KTO).koszyk, null,
     "utylizacja ma zejść ze stanu, nie pojechać na regał zwrotów");
   /* Trzecia pozycja zostaje BEZ OCENY i to też jest wypowiedź: brak oceny nie
-     dokłada niczego do koszyka. Do 0.208.0 stała tu „przecena" — ocena, która
+     dokłada niczego do koszyka. Do 0.209.0 stała tu „przecena" — ocena, która
      nie prowadziła donikąd i dlatego zeszła razem z przyciskiem. */
   assert.equal(ocenPozycje(d, poz[2], null, 4, KTO).koszyk, null,
     "bez oceny nie ma czego dokładać do MM");

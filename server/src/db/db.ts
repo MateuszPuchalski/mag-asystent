@@ -177,11 +177,11 @@ export function migrate(database: DatabaseSync) {
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");
   /* Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
-     (0.208.0). Bez tej liczby urwanie na limicie stron było CICHE: przebieg
+     (0.209.0). Bez tej liczby urwanie na limicie stron było CICHE: przebieg
      kończył się sukcesem, kursor szedł naprzód, a zwroty spoza dziesiątej
      strony nie wracały nigdy. `NULL` znaczy „nie wiem", nie „zero". */
   addColumn("allegro_zwroty_sync_state", "pozostalo", "INTEGER");
-  /* Zejście oceny „przecena" (0.208.0).
+  /* Zejście oceny „przecena" (0.209.0).
 
      MUSI STAĆ PRZED przebudową `zwrot_klienta_pozycja` niżej w tym samym
      przebiegu. Nowa definicja tamtej tabeli nie zna już `przecena`, więc

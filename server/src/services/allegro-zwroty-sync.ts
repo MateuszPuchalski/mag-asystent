@@ -181,7 +181,7 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
       if (partia.length < NA_STRONE) { komplet = true; break; }
     }
 
-    /* OGON, czyli czego ten przebieg NIE wziął (0.208.0).
+    /* OGON, czyli czego ten przebieg NIE wziął (0.209.0).
        Bezpiecznik `MAKS_STRON` chronił konto przed zapętloną paginacją i robił
        to dobrze — ale robił to CICHO. Przebieg urwany na dziesiątej stronie
        kończył się sukcesem, kursor szedł naprzód i zwroty spoza tamtej granicy

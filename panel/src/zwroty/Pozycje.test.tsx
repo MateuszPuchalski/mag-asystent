@@ -71,7 +71,7 @@ describe("Produkty ze zwrotu", () => {
   });
 
   it("oceny są DWIE — przecena zeszła razem z martwą ścieżką", () => {
-    /* 0.208.0: „Na przecenę" zapisywała się i na tym się kończyła. Przycisk,
+    /* 0.209.0: „Na przecenę" zapisywała się i na tym się kończyła. Przycisk,
        który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy każdej
        pozycji — a to jest najczęściej naciskane miejsce tego ekranu. */
     lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] }));

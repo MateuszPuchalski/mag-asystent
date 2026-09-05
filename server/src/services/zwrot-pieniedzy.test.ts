@@ -142,7 +142,7 @@ test("udany zwrot zapisuje numer, zdarzenie i podnosi wersję", async () => {
 });
 
 test("ekran czyta zapisany przelew i mówi, czy ALLEGRO go potwierdziło", async () => {
-  /* Do 0.208.0 stały tu trzy `null`-e mimo wypełnionych kolumn: ekran nie
+  /* Do 0.209.0 stały tu trzy `null`-e mimo wypełnionych kolumn: ekran nie
      wiedział ani kiedy przelew poszedł, ani co Allegro na niego odpowiedziało.
      Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze
      zwrotu płatności w specyfikacji nie istnieje. */

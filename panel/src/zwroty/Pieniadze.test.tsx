@@ -51,7 +51,7 @@ describe("Pieniądze przy zwrocie", () => {
   });
 
   it("przyjęte polecenie NIE UDAJE oddanych pieniędzy", () => {
-    /* 0.208.0: do tego wydania stało tu „Oddano" od chwili, w której Allegro
+    /* 0.209.0: do tego wydania stało tu „Oddano" od chwili, w której Allegro
        przyjęło polecenie. Przelew odrzucony godzinę później wyglądał na
        ekranie dokładnie tak samo jak udany. */
     ekran({ stan: stan({ moznaZwrocic: false,

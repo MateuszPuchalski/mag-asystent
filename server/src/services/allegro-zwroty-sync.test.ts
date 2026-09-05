@@ -98,7 +98,7 @@ test("paginacja idzie dalej niż pierwsza strona i staje na bezpieczniku", async
 });
 
 test("urwanie na bezpieczniku ZOSTAWIA ŚLAD, zamiast gubić resztę po cichu", async () => {
-  /* Do 0.208.0 przebieg urwany na dziesiątej stronie kończył się SUKCESEM:
+  /* Do 0.209.0 przebieg urwany na dziesiątej stronie kończył się SUKCESEM:
      kursor szedł naprzód, błędu nie było, a zwroty spoza granicy nie wracały
      już nigdy. Kolejka ustawia się według terminu ustawowego, więc niewidoczne
      wiersze były w większości tymi najbardziej spóźnionymi — czyli dokładnie

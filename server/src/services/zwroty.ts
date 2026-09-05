@@ -857,7 +857,7 @@ export function cofnijWerdykt(
  * i tak wykonuje, JEST tym dołożeniem; osobny przycisk kazałby mu powiedzieć
  * dwa razy to samo.
  *
- * OCENY SĄ DWIE, NIE TRZY (0.208.0). „Przecena" stała tu od 0.156.0 i nie
+ * OCENY SĄ DWIE, NIE TRZY (0.209.0). „Przecena" stała tu od 0.156.0 i nie
  * prowadziła DONIKĄD: nie dokładała do koszyka, nie ruszała stanu, nie
  * zakładała zadania — zapisywała się i na tym się kończyła. Trzeci przycisk,
  * który wygląda jak decyzja, a nie jest żadną, kosztuje operatora namysł przy

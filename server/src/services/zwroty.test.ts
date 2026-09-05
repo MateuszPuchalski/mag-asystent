@@ -166,7 +166,7 @@ test("sygnał zapala się tylko tam, gdzie każe przeczytać wiersz", () => {
 });
 
 test("sygnały o pieniądzach mówią, W KTÓRĄ STRONĘ patrzeć", () => {
-  /* Do 0.208.0 status przelewu zapisywał się RAZ, z odpowiedzi na
+  /* Do 0.209.0 status przelewu zapisywał się RAZ, z odpowiedzi na
      `POST /payments/refunds`, i nikt go już nie czytał. Przelew odrzucony
      przez Allegro godzinę później wyglądał u nas dokładnie jak udany.
      Potwierdzeniem jest `CustomerReturn.status`, bo `GET` po identyfikatorze

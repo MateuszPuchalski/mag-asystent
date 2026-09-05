@@ -60,7 +60,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
 
       {/* Oddane: numer zwrotu płatności z Allegro, nie samo „zrobione".
           Bez numeru nie da się niczego znaleźć po drugiej stronie. */}
-      {/* DWA STANY, NIE JEDEN (0.208.0). Do tego wydania stało tu samo
+      {/* DWA STANY, NIE JEDEN (0.209.0). Do tego wydania stało tu samo
           „Oddano" — od chwili, w której Allegro PRZYJĘŁO polecenie. Przelew
           odrzucony godzinę później wyglądał identycznie jak udany. Zieleń
           należy się dopiero potwierdzeniu ze statusu zwrotu; do tego czasu

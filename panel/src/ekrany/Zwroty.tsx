@@ -70,7 +70,7 @@ function PasekKartotek({ bilans }: { bilans: BilansKartotek }) {
 }
 
 /**
- * Ile zwrotów NIE WESZŁO do tej kolejki (0.208.0).
+ * Ile zwrotów NIE WESZŁO do tej kolejki (0.209.0).
  *
  * Synchronizacja chodzi z bezpiecznikiem dziesięciu stron i do tego wydania
  * urywała się na nim CICHO: przebieg kończył się sukcesem, kursor szedł

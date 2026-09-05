@@ -171,7 +171,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       const o = req.body?.ocena ?? null;
-      /* „Przecena" zeszła w 0.208.0 — patrz `ocenPozycje`. Panel, który jej
+      /* „Przecena" zeszła w 0.209.0 — patrz `ocenPozycje`. Panel, który jej
          jeszcze nie zdjął, ma dostać 400 z wymienionymi ocenami, a nie cichy
          zapis wartości, której baza już nie zna. */
       if (o !== null && !["stan", "utylizacja"].includes(o)) {

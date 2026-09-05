@@ -109,7 +109,7 @@ export type StanZwrotuPieniedzy = {
      * Czy ALLEGRO potwierdziło, że pieniądze wyszły.
      *
      * `status` to odpowiedź na nasze polecenie sprzed chwili; to pole mówi,
-     * co Allegro sądzi o zwrocie TERAZ. Do 0.208.0 ekran pokazywał wyłącznie
+     * co Allegro sądzi o zwrocie TERAZ. Do 0.209.0 ekran pokazywał wyłącznie
      * to pierwsze i przez to nie umiał odróżnić przelewu udanego od
      * przyjętego-i-odrzuconego.
      */
@@ -133,7 +133,7 @@ export function stanZwrotuPieniedzy(
   const podstawa = {
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: w.waluta ?? "PLN",
-    /* Kolumny CZYTANE, nie zerowane. Do 0.208.0 stały tu trzy `null`-e mimo
+    /* Kolumny CZYTANE, nie zerowane. Do 0.209.0 stały tu trzy `null`-e mimo
        wypełnionych kolumn — ekran nie mówił ani kiedy przelew poszedł, ani co
        Allegro na niego odpowiedziało. Zapisane i nieodczytane pole jest
        gorsze od nieistniejącego: wygląda jak wiedza, której nie ma. */

@@ -42,7 +42,7 @@ const POWODY: Record<string, string> = {
   ORDERED_FOR_COMPARISON: "zamówiony na przymiarkę",
 };
 
-/* DWA PRZYCISKI, NIE TRZY (0.208.0). „Na przecenę" nie prowadziła donikąd:
+/* DWA PRZYCISKI, NIE TRZY (0.209.0). „Na przecenę" nie prowadziła donikąd:
    nie dokładała do koszyka, nie ruszała stanu, nie zakładała zadania. Trzeci
    przycisk, który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy
    każdej pozycji — a ocena jest tu naciskana najczęściej ze wszystkiego. */

@@ -91,7 +91,7 @@ export function stanZwrotowHealth(
     opoznienieMs: s.lastSuccessAt ? Math.max(0, teraz - Date.parse(s.lastSuccessAt)) : null,
     nastepnaProba: s.nextAttemptAt,
     interwalMs,
-    /* Ogon ostatniego przebiegu (0.208.0). Stoi obok błędów, bo znaczy to samo
+    /* Ogon ostatniego przebiegu (0.209.0). Stoi obok błędów, bo znaczy to samo
        co one — kolejka NIE JEST kompletna — tylko że synchronizacja o tym nie
        wie, bo skończyła się sukcesem. */
     pozostaloDoPobrania: s.pozostalo,
