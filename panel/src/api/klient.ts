@@ -51,3 +51,41 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
   if (!odp.ok) throw new Error(dane.error ?? `Błąd ${odp.status}`);
   return dane as T;
 }
+
+/**
+ * Pobranie pliku na dysk agenta (0.219.1).
+ *
+ * ── DLACZEGO NIE `<a href>` ───────────────────────────────────────────────
+ * Sesja jedzie NAGŁÓWKIEM, a zwykły odnośnik nagłówków nie niesie — kliknięcie
+ * wychodzi bez `x-session` i serwer odpowiada „Brak sesji — zaloguj się".
+ * Załączniki wiadomości miały ten błąd od 0.155.0: nazwa pliku była
+ * odnośnikiem, więc pobranie NIGDY nie działało, a wyglądało, jakby działało.
+ *
+ * Token do adresu NIE WCHODZI. Ścieżki lądują w logach serwera, w historii
+ * przeglądarki i w nagłówku `Referer`, więc klucz sesji w adresie to klucz
+ * sesji rozdany trzem miejscom naraz.
+ *
+ * Zamiast tego pobieramy `fetch`em, robimy `blob:` i klikamy w niego sami —
+ * `download` niesie nazwę pliku, więc na dysku ląduje „szarpak.jpeg", a nie
+ * numer z trasy.
+ */
+export async function pobierzPlik(sciezka: string, nazwa: string): Promise<void> {
+  const odp = await fetch(sciezka, { headers: { "x-session": token() } });
+  if (odp.status === 401) throw new BrakSesji("Sesja wygasła — zaloguj się");
+  if (!odp.ok) {
+    const dane = await odp.json().catch(() => ({}));
+    throw new Error(dane.error ?? `Błąd ${odp.status}`);
+  }
+  const url = URL.createObjectURL(await odp.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nazwa;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  /* Zwolnienie ODŁOŻONE, inaczej niż przy zdjęciach na osi. Tamte adresy żyją
+     do przeładowania panelu, bo ogląda je kilka miejsc; ten ma jednego
+     czytelnika i bywa wielomegabajtowy. Natychmiastowe `revoke` po `click()`
+     ucina jednak zapis w części przeglądarek — stąd odbicie przez `setTimeout`. */
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

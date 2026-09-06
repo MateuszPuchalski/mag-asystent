@@ -87,6 +87,14 @@ agent musiał kliknąć, zapisać plik na dysku i otworzyć go w przeglądarce z
 żeby zobaczyć treść pytania. W sklepie z częściami zdjęcie pękniętego elementu
 bywa całym pytaniem, a nazwa pliku nie mówi o nim nic.
 
+Obie drogi do pliku idą przez `fetch`, nie przez atrybut HTML. Sesja jedzie
+nagłówkiem `x-session`, którego ani `<img src>`, ani `<a href>` nie niosą —
+pierwsze wydanie podglądu (0.218.0) pokazywało przez to ikonę zepsutego obrazu,
+a odnośnik pobrania oddawał surowy JSON „Brak sesji". Pobranie było zepsute
+od 0.155.0 i wyglądało, jakby działało. Poprawka 0.219.1 wpina podgląd we
+wspólną kolejkę obrazów (`useZdjecieZalacznika`), a pobranie w `pobierzPlik` —
+token do adresu nie wchodzi, bo ścieżki lądują w logach i w historii.
+
 Podgląd ma WŁASNĄ trasę i węższą bramkę niż pobranie. Oddaje wyłącznie cztery
 typy rastrowe (`image/jpeg`, `image/png`, `image/webp`, `image/gif`) i wyłącznie
 przy stanie `SAFE`; `image/svg+xml` jest obrazem i dokumentem ze skryptem
@@ -106,6 +114,18 @@ sporze szukać prawdy poza panelem. Rozpoznajemy ją po zdaniu, które sama o
 sobie mówi („ta wiadomość jest generowana automatycznie", w obu językach),
 i wyłącznie przy wiadomościach WYCHODZĄCYCH: klient odpisujący z cytatem
 naszego potwierdzenia niesie ten sam podpis, a jego wiadomość jest pytaniem.
+
+**Stopka firmowa zwinięta pod odpowiedzią (0.219.1).** Każda nasza wiadomość
+kończy się blokiem: nazwa spółki, adres, NIP, KRS, REGON, telefon. Siedem
+wierszy, w każdej wiadomości te same. Przy trzech odpowiedziach w wątku stopka
+zajmowała na osi więcej miejsca niż wszystko, co naprawdę napisaliśmy.
+
+Cięcie zaczyna się na NAZWIE SPÓŁKI i bierze ostatnie jej wystąpienie: agent
+bywa, że wymienia firmę w zdaniu, a cięcie od pierwszego trafienia zjadłoby
+połowę odpowiedzi. Podpis człowieka („Z poważaniem, Mateusz") zostaje w treści,
+bo mówi, z kim klient rozmawiał, i przy sporze jest tym, czego się szuka.
+Reguła obowiązuje wyłącznie wiadomości wychodzące — z tego samego powodu, co
+przy autoodpowiedzi.
 
 ### 4.3. Kontekst oferty i produktu
 
@@ -2054,6 +2074,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0 | `typPodgladu`, `GET /api/obsluga/zalaczniki/:id/podglad` — cztery typy rastrowe, tylko `SAFE` |
 | Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
+| Stopka firmowa zwinięta pod odpowiedzią | **działa** od 0.219.1 | `podzielStopke`, pole `stopka` w `WpisOsi` |
 | Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
 | Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
 | Obecność łata wiersz kolejki zamiast pobierać listę | **działa** od 0.196.0 | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |

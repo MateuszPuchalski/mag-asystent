@@ -132,6 +132,8 @@ export type WpisOsi = {
   wzmianki?: Array<{ userId: number; name: string }>;
   /* Nasze automatyczne „Dziękujemy za kontakt" (0.218.0) — wpis zwinięty. */
   automatyczna?: boolean;
+  /* Blok firmowy odcięty od treści (0.219.1) — `tresc` jest bez niego. */
+  stopka?: string;
 };
 
 /* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.160.0). Fragment liczy
