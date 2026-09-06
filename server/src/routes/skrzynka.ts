@@ -2,7 +2,7 @@ import fs from "node:fs";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
-import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
+import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
 import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
@@ -85,6 +85,65 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
            w naszym origin. Cudzysłowy w nazwie znikają, bo rozbiłyby nagłówek. */
         .header("content-disposition",
           `attachment; filename="${String(z.file_name).replace(/["\r\n]/g, "")}"`)
+        .send(Buffer.from(odp));
+    } catch (e) { return blad(reply, e); }
+  });
+
+  /**
+   * Podgląd załącznika WPROST na osi (0.218.0).
+   *
+   * ── DLACZEGO OSOBNA TRASA, A NIE PARAMETR PRZY POBRANIU ───────────────────
+   * Trasa wyżej odsyła `content-disposition: attachment` i to jest DECYZJA,
+   * nie szczegół: cudzy plik nie ma się otwierać w naszym origin, gdy agent
+   * wejdzie na ten adres paskiem przeglądarki. Zdjęcie w `<img>` to inna
+   * sytuacja — nie nawigacja, tylko podzasób — ale rozstrzyganie tego jednym
+   * nagłówkiem dla obu przypadków znaczyłoby, że jeden z nich jest ustawiony
+   * źle. Dwa adresy, dwie odpowiedzi, każda mówi prawdę o sobie.
+   *
+   * WĄSKIE GARDŁO JEST CELOWE. Oddajemy WYŁĄCZNIE cztery typy rastrowe
+   * (`TYPY_PODGLADU`) i wyłącznie przy `SAFE`; `content-type` bierzemy z tej
+   * listy, nie z bazy, a `nosniff` zabrania przeglądarce zgadywać lepiej.
+   * Plik spoza listy dostaje 415 i zostaje przy pobieraniu — to nie awaria,
+   * tylko odpowiedź „tego nie pokażę".
+   *
+   * ETAG PRZED POBRANIEM OD ALLEGRO, jak przy zdjęciu oferty. Treść załącznika
+   * jest niezmienna (nowy plik = nowy wiersz), więc identyfikator wystarcza za
+   * odcisk. Bez tego oś rysowana przy każdym zdarzeniu szyny ciągnęłaby te same
+   * megabajty od Allegro raz za razem.
+   */
+  app.get<{ Params: { id: string } }>("/api/obsluga/zalaczniki/:id/podglad", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+
+    const etag = `"zal-${Number(req.params.id)}"`;
+    if (req.headers["if-none-match"] === etag) {
+      return reply.code(304).header("etag", etag).send();
+    }
+
+    const z = db().prepare(`SELECT a.file_name, a.mime_type, a.url, a.status
+      FROM message_attachment a WHERE a.id=?`)
+      .get(Number(req.params.id)) as Record<string, unknown> | undefined;
+    if (!z) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
+
+    const typ = String(z.status) === "SAFE" ? typPodgladu(z.mime_type as string | null) : null;
+    if (typ == null || z.url == null) {
+      return reply.code(415).send({
+        error: `Załącznik „${String(z.file_name)}" nie jest obrazem do pokazania na osi.`,
+      });
+    }
+
+    try {
+      const odp = await pobierzZalacznik(String(z.url));
+      /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu rozmowy, więc wpis
+         w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
+         oś" — a to już mówi audyt otwarcia rozmowy. Pobranie na dysk, czyli
+         czynność agenta, dalej zostawia ślad na trasie wyżej. */
+      return reply
+        .header("content-type", typ)
+        .header("x-content-type-options", "nosniff")
+        .header("content-disposition", "inline")
+        .header("etag", etag)
+        .header("cache-control", "private, max-age=86400")
         .send(Buffer.from(odp));
     } catch (e) { return blad(reply, e); }
   });

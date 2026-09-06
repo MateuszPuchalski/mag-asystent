@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.218.0 — 6 września 2026
+
+**Zdjęcie od klienta widać na osi, bez klikania.** Załącznik będący obrazem
+rysuje się wprost w rozmowie. 0.155.0 dołożyło na oś samą nazwę pliku i na tym
+stanęło: żeby zobaczyć, o co klient pyta, agent musiał kliknąć, zapisać plik na
+dysku i otworzyć go w przeglądarce zdjęć. W sklepie z częściami zdjęcie
+pękniętego elementu bywa całym pytaniem, a „szarpak.jpeg" nie mówi o nim nic.
+
+Podgląd ma własną trasę `GET /api/obsluga/zalaczniki/:id/podglad` i węższą
+bramkę niż pobranie: cztery typy rastrowe (JPEG, PNG, WEBP, GIF) i wyłącznie
+stan `SAFE`. `image/svg+xml` jest obrazem i dokumentem ze skryptem naraz, więc
+listy nie przechodzi. Nagłówek `content-type` bierzemy z własnej listy, nie
+z pola przysłanego przez Allegro, i dokładamy `nosniff`. Trasa pobrania zostaje
+bez zmian, z `content-disposition: attachment` — to była decyzja z 0.155.0
+i dalej obowiązuje.
+
+`ETag` odpowiada przed pytaniem Allegro o plik, więc oś rysowana przy każdym
+zdarzeniu szyny nie ciągnie tych samych megabajtów raz za razem. Podgląd nie
+dopisuje zdarzenia do dziennika: rysuje się sam przy otwarciu rozmowy, więc
+wpis znaczyłby „ktoś spojrzał na oś", a nie „ktoś wziął plik". Pobranie na dysk
+ślad zostawia jak dotąd.
+
+**Autoodpowiedź biura zwinięta do jednej linijki i nazwana.** Skrzynka odbija
+przychodzący list potwierdzeniem „Dziękujemy za kontakt": kilkanaście wierszy
+z godzinami pracy, po polsku i po angielsku, ani jednego zdania o sprawie
+klienta. Na osi zajmowało to tyle miejsca, co odpowiedź, i przy dwóch odbiciach
+spychało pytanie klienta poniżej krawędzi okna.
+
+Zwijamy, a nie kasujemy: autoodpowiedź jest dowodem, że list dotarł, i tłumaczy
+klientowi kontakt bez treści — ukryta kazałaby przy sporze szukać prawdy poza
+panelem. Treść stoi jedno kliknięcie dalej. Rozpoznajemy ją po zdaniu, które
+sama o sobie mówi („ta wiadomość jest generowana automatycznie", w obu
+językach), i wyłącznie przy wiadomościach wychodzących: klient odpisujący
+z cytatem naszego potwierdzenia niesie ten sam podpis, a jego wiadomość jest
+pytaniem, nie odbiciem.
+
 ## 0.217.0 — 6 września 2026
 
 **Zdjęcie przy pozycji zamówienia — ostatnie miejsce w obsłudze bez obrazu.**

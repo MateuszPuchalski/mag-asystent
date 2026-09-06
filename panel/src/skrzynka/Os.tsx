@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Lock, Paperclip, Ruler, Send, User } from "lucide-react";
+import { ArrowRight, Bot, Lock, Paperclip, Ruler, Send, User } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk, czas } from "../ui";
 
@@ -18,19 +18,76 @@ const POWOD: Record<string, string> = {
   NEW: "Allegro jeszcze go sprawdza",
 };
 
+/**
+ * ZDJĘCIE WIDAĆ, NIE TRZEBA W NIE KLIKAĆ (0.218.0).
+ *
+ * 0.155.0 dołożyło na oś nazwę pliku i na tym stanęło. Agent widział
+ * „szarpak.jpeg" i musiał kliknąć, ściągnąć plik na dysk i otworzyć go
+ * w przeglądarce zdjęć — trzy ruchy po to, żeby zobaczyć treść pytania.
+ * Właściciel: „gdy klient wysyła zdjęcie, wyświetlaj w czacie".
+ *
+ * NAZWA ZOSTAJE POD OBRAZEM i dalej jest odnośnikiem: podgląd odpowiada na
+ * „co klient przysłał", a pobranie na „chcę to mieć u siebie" — i to są dwa
+ * różne pytania. Odnośnik prowadzi na trasę pobrania, nie podglądu, więc
+ * plik schodzi na dysk pod własną nazwą.
+ *
+ * OBRAZ NIE JEST ODNOŚNIKIEM, choć kusiło. Opakowany w `<a>` dawał drugi
+ * odnośnik o tej samej nazwie i tym samym celu, co nazwa pliku pod spodem —
+ * czytnik ekranu odczytałby „szarpak.jpeg, odnośnik" dwa razy pod rząd i za
+ * pierwszym razem nie miałby czym ich odróżnić.
+ *
+ * `loading="lazy"`, bo długi wątek z kilkoma zdjęciami ciągnąłby wszystkie
+ * naraz przy otwarciu rozmowy, choć widać z nich jedno.
+ */
 function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
-  return <ul className="mt-2 space-y-1 border-t pt-2 text-xs">
-    {lista.map((z) => <li key={z.id} className="flex items-center gap-1.5">
-      <Paperclip size={12} className="shrink-0 text-slate-400" />
-      {z.doPobrania
-        ? <a className="font-bold text-slate-700 underline hover:text-slate-900"
-             href={`/api/obsluga/zalaczniki/${z.id}`}>{z.nazwa}</a>
-        : <span className="text-slate-500">
-            <span className="font-bold">{z.nazwa}</span>
-            {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
-          </span>}
+  return <ul className="mt-2 space-y-2 border-t pt-2 text-xs">
+    {lista.map((z) => <li key={z.id}>
+      {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
+          i rozpychałoby oś na cały ekran. */}
+      {z.podglad && <img src={`/api/obsluga/zalaczniki/${z.id}/podglad`} alt={z.nazwa}
+        loading="lazy"
+        className="mb-1 max-h-64 w-auto max-w-full rounded border border-slate-200 bg-white p-1" />}
+      <span className="flex items-center gap-1.5">
+        <Paperclip size={12} className="shrink-0 text-slate-400" />
+        {z.doPobrania
+          ? <a className="font-bold text-slate-700 underline hover:text-slate-900"
+               href={`/api/obsluga/zalaczniki/${z.id}`}>{z.nazwa}</a>
+          : <span className="text-slate-500">
+              <span className="font-bold">{z.nazwa}</span>
+              {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
+            </span>}
+      </span>
     </li>)}
   </ul>;
+}
+
+/**
+ * Nasze automatyczne potwierdzenie, ZWINIĘTE do jednej linijki (0.218.0).
+ *
+ * Odbicie „Dziękujemy za kontakt" jest długie — godziny pracy biura, ta sama
+ * treść po polsku i po angielsku — i nie niesie ani jednego zdania o sprawie
+ * klienta. Rozwinięte na osi spycha pytanie poniżej krawędzi okna, czyli
+ * chowa dokładnie tę rzecz, po którą agent tu przyszedł.
+ *
+ * ZWIJAMY, NIE KASUJEMY. Autoodpowiedź jest faktem w rozmowie: dowodzi, że
+ * list dotarł, i tłumaczy, skąd u klienta kontakt bez treści. Ukryta kazałaby
+ * przy sporze szukać prawdy poza panelem. Rozwinięcie stoi jedno kliknięcie
+ * dalej i pokazuje całość.
+ */
+function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
+  const [otwarte, setOtwarte] = React.useState(false);
+  return <article className="ml-auto max-w-[75ch] rounded-lg border border-dashed
+      border-slate-200 bg-slate-50/70 px-3 py-1.5">
+    <button type="button" className="flex w-full items-center gap-2 text-left text-xs text-slate-400"
+      aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
+      <Bot size={12} className="shrink-0" />
+      <span className="font-bold uppercase tracking-wide">Autoodpowiedź biura</span>
+      <span>{czas(wpis.at)}</span>
+      <span className="ml-auto underline">{otwarte ? "zwiń" : "pokaż treść"}</span>
+    </button>
+    {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-sm text-slate-500">
+      {wpis.tresc}</p>}
+  </article>;
 }
 
 /* §10.3: każdy rodzaj wpisu ma wyglądać inaczej. Komentarze, zdarzenia
@@ -87,6 +144,10 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
         </article>
+      /* Zwinięcie stoi PRZED gałęzią zwykłej wiadomości, bo autoodpowiedź jest
+         wiadomością wychodzącą i inaczej wpadłaby w tamtą gałąź. */
+      : w.automatyczna
+      ? <Autoodpowiedz key={w.id} wpis={w} />
       : w.rodzaj === "wynik_zadania"
       ? <article key={w.id} className="ml-6 rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase text-ranga-ok">

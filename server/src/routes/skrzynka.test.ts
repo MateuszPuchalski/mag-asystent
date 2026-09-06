@@ -74,6 +74,9 @@ const TRASY = () => [
   /* Zdjęcie oferty (0.213.0) stoi za tą samą bramką, co reszta skrzynki:
      obraz z oferty klienta nie jest daną dla hali. */
   { method: "GET" as const, url: "/api/obsluga/oferta/111/zdjecie" },
+  /* Podgląd załącznika (0.218.0) — ta sama bramka: zdjęcie od klienta nie jest
+     daną dla hali, tak samo jak zdjęcie z jego oferty. */
+  { method: "GET" as const, url: "/api/obsluga/zalaczniki/1/podglad" },
   { method: "POST" as const, url: "/api/obsluga/zadania/pomiar",
     payload: { rozmowaId: rozmowa, wiadomoscId: pytanie, instrukcja: "Zmierz rozstaw." } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/claim`, payload: { expectedVersion: 1 } },
@@ -374,6 +377,58 @@ test("pobranie załącznika: rola, stan i nieznane id", async () => {
   const nieznany = await app.inject({ method: "GET",
     url: "/api/obsluga/zalaczniki/99999", headers: biuro.naglowki });
   assert.equal(nieznany.statusCode, 404);
+});
+
+test("podgląd na osi: tylko obraz i tylko SAFE", async () => {
+  /* Trasa podglądu jest WĘŻSZA od trasy pobrania i to jest cała jej treść.
+     Plik, który wolno ściągnąć na dysk świadomym kliknięciem, niekoniecznie
+     wolno wyrysować samoczynnie w naszym origin — a `.exe` z nagłówkiem
+     `image/png` to dokładnie ta różnica. */
+  const d = db();
+  const biuro = login("biuro", "Biuro");
+
+  const exe = Number(d.prepare(`INSERT INTO message_attachment
+    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
+    .run(pytanie, "instalator.exe", "application/octet-stream",
+      "https://upload.allegro.pl/e", "SAFE").lastInsertRowid);
+  const nieObraz = await app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${exe}/podglad`, headers: biuro.naglowki });
+  assert.equal(nieObraz.statusCode, 415, "plik spoza listy typów zostaje przy pobieraniu");
+
+  /* SVG jest obrazem i jest dokumentem ze skryptem. Odmowa jest tu decyzją,
+     nie przeoczeniem — uzasadnienie stoi przy `TYPY_PODGLADU`. */
+  const svg = Number(d.prepare(`INSERT INTO message_attachment
+    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
+    .run(pytanie, "rysunek.svg", "image/svg+xml",
+      "https://upload.allegro.pl/s", "SAFE").lastInsertRowid);
+  assert.equal((await app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${svg}/podglad`, headers: biuro.naglowki })).statusCode, 415);
+
+  /* Obraz, ale Allegro uznało go za niebezpieczny: podgląd wpuściłby go do
+     biura bez żadnego kliknięcia, więc odmawiamy tak samo jak przy pobraniu. */
+  const brudny = Number(d.prepare(`INSERT INTO message_attachment
+    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
+    .run(pytanie, "zdjecie.jpeg", "image/jpeg",
+      "https://upload.allegro.pl/u", "UNSAFE").lastInsertRowid);
+  assert.equal((await app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${brudny}/podglad`, headers: biuro.naglowki })).statusCode, 415);
+
+  /* 304 ma wypaść PRZED pytaniem Allegro o plik — inaczej oszczędza tylko
+     łącze do przeglądarki, a nie to, na czym naprawdę zależy. */
+  const zdjecie = Number(d.prepare(`INSERT INTO message_attachment
+    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
+    .run(pytanie, "szarpak.jpeg", "image/jpeg",
+      "https://upload.allegro.pl/z", "SAFE").lastInsertRowid);
+  const przed = liczbaZdarzen();
+  const swieze = await app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${zdjecie}/podglad`,
+    headers: { ...biuro.naglowki, "if-none-match": `"zal-${zdjecie}"` } });
+  assert.equal(swieze.statusCode, 304);
+
+  /* „Zero zapisu przy patrzeniu" obowiązuje TĘ trasę mocniej niż pobranie:
+     podgląd rysuje się sam przy otwarciu rozmowy, więc wpis w dzienniku
+     znaczyłby „ktoś spojrzał na oś", a nie „ktoś wziął plik". */
+  assert.equal(liczbaZdarzen(), przed, "podgląd dopisał zdarzenie");
 });
 
 test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async () => {
