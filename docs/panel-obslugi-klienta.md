@@ -1209,6 +1209,17 @@ po zamknięciu zwrotu trzeba umieć powiedzieć, czemu klient dostał mniej.
 
 Cofnięcie zdejmuje kwotę razem z powodem (§25a.5).
 
+### 25a.4c. Pytanie kubełka stoi RAZ (0.214.0)
+
+Nagłówek otwartego zwrotu powtarzał pytanie kubełka — „Przyjąć czy odrzucić?"
+bezpośrednio nad przyciskami PRZYJMIJ i ODRZUĆ. Pytanie i odpowiedź o dwa
+centymetry od siebie to dekalog ergonomii, punkt 5: nie każ mówić dwa razy
+tego samego.
+
+Pytanie zostaje NAD LISTĄ i w podpowiedzi zakładki — tam nazywa kubełek,
+w którym się stoi, i nic go nie powtarza. Nagłówek niesie tożsamość zwrotu:
+numer i login kupującego, czyli to, co się z niego przepisuje.
+
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
@@ -1358,7 +1369,7 @@ od 0.30.0 podaje zdjęcia kartotek.
 
 Zdjęcie stoi w dwóch miejscach i w obu ma PODPIS, bo źródła się nie mieszają
 (§4.3): w bloku oferty przy rozmowie, nad blokiem towaru z Subiekta, oraz przy
-pozycji zwrotu, obok kafla kartoteki.
+pozycji zwrotu, obok kafla kartoteki. Stany braku rozróżnia §25a.6c.
 
 **Przy zwrocie numer oferty bierze się z pozycji ZAMÓWIENIA.** `offerId`
 pozycji zwrotu należy do przestrzeni, której nie znamy (`[WERYFIKUJ]`
@@ -1369,6 +1380,26 @@ kolumnach, którym idzie SKU.
 To zakrywa dziurę, której kartoteka zakryć nie umie. Pytanie sprzed zakupu
 przychodzi bez kartoteki, a większość kartotek i tak zdjęcia nie ma; oferta ma
 je prawie zawsze.
+
+### 25a.6c. Trzy stany zdjęcia oferty (0.214.0)
+
+„Bez zdjęcia" znaczyło trzy rzeczy naraz i myliło najgorszą z możliwych.
+Zgłoszenie właściciela: przy pozycji zwrotu stały dwa puste kafle, a oferta
+miała na Allegro zdjęcie.
+
+Przyczyna była w warunku świeżości. Snapshot odświeżamy raz na dobę, a kolumna
+z adresem weszła w 0.213.0 — więc wiersz zapisany wcześniej był „świeży"
+i „bez adresu" naraz. Snapshot NIEKOMPLETNY nie jest snapshotem świeżym: brak
+adresu jest teraz trzecim powodem pobrania.
+
+Kolumna niesie trzy wartości: `NULL` — nikt jeszcze nie pytał; `''` —
+pytaliśmy i Allegro nie podało obrazu; adres — mamy obraz. To ta sama różnica,
+którą przy SKU oferty robi `dopasowanie-sku.ts`.
+
+Kafel mówi, na co się czeka: **zegar** — obraz dociągnie najbliższa
+synchronizacja; **„bez zdjęcia"** — Allegro nie ma obrazu tej oferty;
+**koszyk** — pozycja nie wiąże się z żadną linią zamówienia. Trasy nie pytamy
+tam, gdzie serwer już wie, że nie ma o co.
 
 ### 25a.6a. Zdjęcia w całej obsłudze (0.203.0)
 

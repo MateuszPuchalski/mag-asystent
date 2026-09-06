@@ -11,6 +11,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
   from "./kosze-zwrotow.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
+import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -52,6 +53,14 @@ export interface PozycjaZwrotu {
    * albo pozycja się z niczym nie związała".
    */
   ofertaZamowienia: string | null;
+  /**
+   * Co wiadomo o zdjęciu tej oferty (0.214.0).
+   *
+   * `nieznane` znaczy „jeszcze nie pytaliśmy Allegro" ALBO „nie ma numeru
+   * oferty" — w obu wypadkach ekran nie ma prawa powiedzieć „bez zdjęcia",
+   * bo to nieprawda. `brak` znaczy: pytaliśmy, Allegro nie podało obrazu.
+   */
+  ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;
@@ -523,6 +532,17 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
     "SELECT * FROM zamowienie_klienta_pozycja ORDER BY id ASC"
   ).all() as Wiersz[];
 
+  /* Stan zdjęcia oferty (0.214.0). JEDNO zapytanie na całą kolejkę, jak przy
+     zamówieniach wyżej — snapshotów jest tyle, co ofert, a `LEFT JOIN` na
+     wiersz pozycji ciągnąłby je po jednym. Ekran ma tu powiedzieć trzy różne
+     rzeczy, więc niesie stan, a nie samo „jest/nie ma". */
+  const zdjeciaOfert = new Map<string, string | null>();
+  for (const o of database.prepare(
+    "SELECT channel_account_id AS konto, external_id AS id, primary_image_url AS url FROM offer_snapshot",
+  ).all() as Array<{ konto: number; id: string; url: string | null }>) {
+    zdjeciaOfert.set(`${o.konto}|${o.id}`, o.url);
+  }
+
   const zamWgKlucza = new Map<string, Wiersz>();
   for (const k of zamowienia) zamWgKlucza.set(`${k.channel_account_id}|${k.external_id}`, k);
   const pozWgZam = new Map<number, Wiersz[]>();
@@ -620,6 +640,7 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
 
       const zlozone: PozycjaZwrotu[] = surowe.map((p) => {
         const twId = p.tw_id == null ? null : Number(p.tw_id);
+        const oferta = ofertaWgKlucza.get(String(p.offer_id ?? "")) ?? null;
         return {
           id: Number(p.id),
           offerId: (p.offer_id as string) ?? null,
@@ -642,7 +663,11 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
           twZrodlo: (p.tw_zrodlo as string) ?? null,
           sku: skuWgOferty.get(String(p.offer_id ?? "")) ?? null,
           /* Numer oferty NADAJĄCY SIĘ do zapytania o zdjęcie — patrz wyżej. */
-          ofertaZamowienia: ofertaWgKlucza.get(String(p.offer_id ?? "")) ?? null,
+          ofertaZamowienia: oferta,
+          /* Bez numeru oferty nie ma o co pytać i to NIE jest „brak zdjęcia" —
+             stan zostaje nieznany, a kafel mówi wtedy o braku POWIĄZANIA. */
+          ofertaZdjecie: oferta === null ? "nieznane"
+            : stanZdjeciaOferty(zdjeciaOfert.get(`${z.channel_account_id}|${oferta}`)),
           ean: twId === null ? null : eanWgTw.get(twId) ?? null,
           zrodlo: String(p.zrodlo ?? "allegro"),
           /* Ile NAPRAWDĘ wróciło; `null` = nikt jeszcze nie liczył (0.212.0). */

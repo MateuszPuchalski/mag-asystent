@@ -7,6 +7,7 @@ import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
+import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 
@@ -112,12 +113,13 @@ export interface OfertaRozmowy {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
-    /* Czy Allegro podało adres zdjęcia listingowego (0.213.0). Sam adres NIE
-       jedzie do panelu i to jest cała różnica: gdyby jechał, front miałby
-       w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś wstawiłby
-       go w `src`, czyli wyprowadził przeglądarkę biura poza własną sieć.
-       Flaga mówi tylko „jest po co pytać naszej trasy". */
-    maZdjecie: boolean;
+    /* Co wiadomo o zdjęciu listingowym (0.214.0; do 0.213.0 `maZdjecie: boolean`).
+       Adres NIE jedzie do panelu i to jest cała różnica: gdyby jechał, front
+       miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś
+       wstawiłby go w `src`, czyli wyprowadził przeglądarkę biura poza własną
+       sieć. Jedzie sam STAN — a stany są trzy, bo „czekam na Allegro" i „tej
+       oferty Allegro nie ma z czym pokazać" to dwa różne zdania na ekranie. */
+    zdjecie: StanZdjeciaOferty;
   } | null;
   /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). To PROPOZYCJA
      z powodem, nie fakt — §4.3 nie pozwala, żeby wybór automatu udawał daną
@@ -331,7 +333,7 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
     waluta: w.waluta == null ? null : String(w.waluta),
     status: w.status == null ? null : String(w.status),
     syncedAt: String(w.synced_at),
-    maZdjecie: String(w.primary_image_url ?? "").trim() !== "",
+    zdjecie: stanZdjeciaOferty(w.primary_image_url as string | null),
   };
 }
 

@@ -1,3 +1,12 @@
+/**
+ * Co wiadomo o zdjęciu oferty, zanim ktokolwiek pójdzie po plik (0.214.0).
+ *
+ * Trzy stany, bo każdy każe co innego zrobić — a jeden napis „bez zdjęcia"
+ * na wszystkie trzy kazał agentowi zgadywać, czy obraz dopiero przyjedzie.
+ * Lustro `StanZdjeciaOferty` z `services/zdjecia-ofert.ts`.
+ */
+export type StanZdjeciaOferty = "jest" | "brak" | "nieznane";
+
 /* Kształty odpowiedzi serwera. Trzymane osobno, bo czytają je i ekrany,
    i testy — a duplikat rozjechałby się przy pierwszym nowym polu. */
 
@@ -167,14 +176,14 @@ export type OfertaRozmowy = {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
     /**
-     * Czy Allegro podało adres zdjęcia listingowego (0.213.0).
+     * Co wiadomo o zdjęciu listingowym (0.214.0; do 0.213.0 `maZdjecie`).
      *
      * Sam adres do panelu NIE JEDZIE i to jest cała różnica: gdyby jechał,
      * front miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później
      * ktoś wstawiłby go w `src`, czyli wyprowadził przeglądarkę biura poza
-     * własną sieć. Flaga mówi tylko „jest po co pytać naszej trasy".
+     * własną sieć. Jedzie sam STAN.
      */
-    maZdjecie: boolean;
+    zdjecie: StanZdjeciaOferty;
   } | null;
   /** Kartoteka wywiedziona z SKU oferty (0.179.0) — PROPOZYCJA z powodem. */
   kartoteka: DopasowanieKartoteki;
@@ -477,6 +486,8 @@ export interface PozycjaZwrotu {
    * znamy, więc do niczego poza wyświetleniem się nie nadaje.
    */
   ofertaZamowienia: string | null;
+  /** Co wiadomo o zdjęciu tej oferty (0.214.0) — liczy SERWER. */
+  ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;

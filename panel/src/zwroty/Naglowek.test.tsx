@@ -73,8 +73,22 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText(/kurier zwrócił po 14 dniach/)).toBeInTheDocument();
   });
 
-  it("pytanie bierze się z kubełka WYBRANEGO zwrotu", () => {
+  /* Do 0.213.0 ten test pilnował, że nagłówek NIESIE pytanie kubełka. Decyzją
+     właściciela pytanie z nagłówka zeszło (0.214.0): stało nad przyciskami,
+     które pytają o to samo i od razu odpowiadają. Strażnik zostaje, tylko
+     odwrócony — żeby kopia nie wróciła tam przy następnej zmianie. */
+  it("nagłówek NIE powtarza pytania kubełka — odpowiadają na nie przyciski pod nim", () => {
     render(<Naglowek zwrot={zwrot({ kubelek: "korekta" })} />);
-    expect(screen.getByText(/korekt/i)).toBeInTheDocument();
+    expect(screen.queryByText(/korekt/i)).toBeNull();
+    render(<Naglowek zwrot={zwrot({ kubelek: "decyzja" })} />);
+    expect(screen.queryByText(/Przyjąć czy odrzucić/i)).toBeNull();
+  });
+
+  it("tożsamość zwrotu w nagłówku zostaje: numer i login kupującego", () => {
+    /* To jest jedyny powód istnienia tego paska — i to, co się z niego
+       przepisuje. Zdjęcie pytania nie miało prawa tego ruszyć. */
+    render(<Naglowek zwrot={zwrot({ numer: "70X0/2026", kupujacyLogin: "Fenix-Warszawa" })} />);
+    expect(screen.getByText("70X0/2026")).toBeInTheDocument();
+    expect(screen.getByText("Fenix-Warszawa")).toBeInTheDocument();
   });
 });

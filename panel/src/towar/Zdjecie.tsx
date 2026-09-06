@@ -1,6 +1,7 @@
 import React from "react";
-import { ImageOff, PackageSearch, ShoppingBag } from "lucide-react";
+import { Clock, ImageOff, PackageSearch, ShoppingBag } from "lucide-react";
 import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
+import type { StanZdjeciaOferty } from "../api/typy";
 
 /* Kafel zdjęcia o STAŁYM rozmiarze — także wtedy, gdy zdjęcia nie ma i gdy
    jeszcze się ładuje. To jest lekcja z `biuro.html`: kafel, który rośnie po
@@ -101,19 +102,35 @@ export function Zdjecie({ twId, rozmiar = 48, nazwa, onKlik }: {
  * Znak pustego stanu to koszyk, nie lupa nad paczką: brak oferty jest tu
  * faktem o SPRZEDAŻY, nie zaproszeniem do wskazania kartoteki.
  */
-export function ZdjecieOferty({ externalId, rozmiar = 48, nazwa, onKlik }: {
+export function ZdjecieOferty({ externalId, stan = "jest", rozmiar = 48, nazwa, onKlik }: {
   externalId: string | null;
+  /**
+   * Co WIADOMO o zdjęciu, zanim pójdziemy po plik (0.214.0).
+   *
+   * Bez tego kafel miał jeden napis „bez zdjęcia" na trzy różne prawdy
+   * i mylił najgorszą z możliwych: „jeszcze nie pytaliśmy Allegro" wyglądało
+   * jak „Allegro nie ma obrazu". Właściciel przysłał zrzut zwrotu z dwoma
+   * pustymi kaflami przy ofercie, która na Allegro zdjęcie miała.
+   */
+  stan?: StanZdjeciaOferty;
   rozmiar?: number;
   nazwa?: string;
   onKlik?: () => void;
 }) {
-  const url = useZdjecieOferty(externalId);
+  /* Trasy NIE pytamy, gdy serwer już wie, że nie ma o co — 404 przy każdym
+     przerysowaniu listy zwrotów to kilkadziesiąt żądań za nic. */
+  const url = useZdjecieOferty(stan === "jest" ? externalId : null);
   const ikona = Math.max(12, Math.round(rozmiar / 3));
+  const czekamy = stan === "nieznane" && Boolean(externalId);
   return <Plytka url={url} rozmiar={rozmiar} nazwa={nazwa ?? "Zdjęcie oferty"} onKlik={onKlik}
     tytul="Zdjęcie z oferty Allegro — to widział klient"
-    puste={!externalId}
-    pusteTytul="Bez powiązanej oferty — nie ma czego pokazać"
-    pusteIkona={<ShoppingBag size={ikona} />}
+    puste={!externalId || czekamy}
+    pusteTytul={czekamy
+      ? "Zdjęcia oferty jeszcze nie pobrano — dociągnie je najbliższa synchronizacja"
+      : "Bez powiązanej oferty — nie ma czego pokazać"}
+    /* Zegar, nie koszyk: „czekam" to inny stan niż „nie ma czego szukać",
+       a kafel jest jedynym miejscem, w którym widać, który to. */
+    pusteIkona={czekamy ? <Clock size={ikona} /> : <ShoppingBag size={ikona} />}
     brakTytul="Allegro nie podało zdjęcia tej oferty"
     brakSlowo="bez zdjęcia"
     brakIkona={<ImageOff size={ikona} />} />;

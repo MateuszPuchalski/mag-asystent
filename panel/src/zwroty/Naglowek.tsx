@@ -1,7 +1,6 @@
 import React from "react";
 import type { Zwrot } from "../api/typy";
 import { Skopiuj } from "../ui";
-import { KUBELKI } from "./Kolejka";
 import { Link } from "./Link";
 
 /* ── Nagłówek sprawy (0.207.0) ───────────────────────────────────────────────
@@ -35,12 +34,17 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
           nieodebrana paczka</span>}
     </h2>
 
-    {/* Pytanie bierze się z kubełka WYBRANEGO zwrotu, nie z zakładki listy.
-        Te dwie rzeczy rozjeżdżają się przy wejściu z paska adresu, a wtedy
-        nagłówek pytałby o co innego niż klawisze. */}
+    {/* ── PYTANIE KUBEŁKA ZESZŁO Z NAGŁÓWKA (0.214.0) ──────────────────────
+        Stało tu „Przyjąć czy odrzucić?" — dokładnie nad przyciskami PRZYJMIJ
+        i ODRZUĆ, które pytają o to samo i od razu na to odpowiadają. Decyzja
+        właściciela; dekalog ergonomii, punkt 5: nie każ mówić dwa razy tego
+        samego. Tak samo w pozostałych kubełkach — „Co z towarem?" stoi nad
+        wierszem produktu z klawiszami oceny, „Ile oddać?" nad paskiem wyceny.
+
+        Pytanie ZOSTAJE nad LISTĄ (`ekrany/Zwroty.tsx`) i w podpowiedzi
+        zakładki: tam nazywa kubełek, w którym się stoi, i nic go nie
+        powtarza. Zniknęła kopia, nie sama informacja. */}
     <p className="flex flex-wrap items-center gap-x-2 text-sm text-slate-500">
-      <span>{KUBELKI.find((k) => k.id === zwrot.kubelek)?.pytanie}</span>
-      <span aria-hidden className="text-slate-300">·</span>
       {/* Login jest jedyną daną osobową, którą polityka danych zwrotów
           dopuszcza wprost — imienia Allegro nie podaje wcale.
 

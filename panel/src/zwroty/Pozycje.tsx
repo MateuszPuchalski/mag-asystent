@@ -220,7 +220,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             z `offerId` pozycji zwrotu: tamten należy do przestrzeni, której
             nie znamy — patrz `services/zwroty.ts`. */}
         <Kafel twId={p.twId} rozmiar={72} nazwa={p.nazwa} symbol={p.twSymbol} />
-        <KafelOferty externalId={p.ofertaZamowienia} rozmiar={48}
+        <KafelOferty externalId={p.ofertaZamowienia} stan={p.ofertaZdjecie} rozmiar={48}
           nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">

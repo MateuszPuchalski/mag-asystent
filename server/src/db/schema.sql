@@ -1629,8 +1629,14 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- odpowiedzi `GET /sale/offers`, którą i tak pobieramy po tytuł i cenę, więc
   -- nie kosztuje ani jednego żądania więcej.
   --
-  -- `OfferListingDto` NIE MA bloku `required`, więc pole bywa puste i `NULL`
-  -- znaczy „Allegro nie podało adresu", nie „oferta nie ma zdjęcia".
+  -- TRZY WARTOŚCI, TRZY ZNACZENIA (0.214.0). `NULL` = nikt jeszcze nie pytał
+  -- Allegro o tę ofertę (wiersz sprzed 0.213.0 albo świeżo dołożony);
+  -- `''` = pytaliśmy i `primaryImage` nie przyszło — `OfferListingDto` nie ma
+  -- bloku `required`, więc to jest normalna odpowiedź; adres = mamy obraz.
+  --
+  -- Do 0.213.0 pierwsze dwa dzieliły `NULL` i nie dawało się ich rozróżnić.
+  -- Kosztowało to ekran mówiący „bez zdjęcia" przy ofercie, która na Allegro
+  -- zdjęcie miała — bo snapshot był po prostu starszy niż ta kolumna.
   primary_image_url TEXT,
   synced_at TEXT NOT NULL,
   UNIQUE (channel_account_id, external_id)
