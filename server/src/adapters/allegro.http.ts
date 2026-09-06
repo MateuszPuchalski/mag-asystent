@@ -489,8 +489,26 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
     );
   }
   if (!odp.ok) {
+    /* ── TREŚĆ ODMOWY IDZIE NA EKRAN (0.219.2) ────────────────────────────
+       Samo „(403)" nie mówi nic i nie da się z tego wyjść: pobierania
+       załącznika NIE MA w `docs/allegro/swagger.yaml` — specyfikacja zna
+       tylko deklarację (POST) i wysyłkę (PUT), a do odczytu daje wyłącznie
+       pole `url` na innym hoście. Nie zgadujemy więc kształtu, tylko
+       pokazujemy, co Allegro odpowiedziało — to jest jedyne źródło, jakie
+       tu mamy, i tak samo rozstrzygały się poprzednie spory o kształt. */
+    const tresc = await odp.text().catch(() => "");
+    const powod = tresc.trim().slice(0, 300);
     throw new BladOdpowiedziAllegro(
-      `Allegro nie oddało załącznika (${odp.status}).`, odp.status);
+      `Allegro nie oddało załącznika (${odp.status}).` +
+        (odp.status === 403
+          /* Wskazówka o uprawnieniu jak w `zapytajAllegro`: token wydany pod
+             stary zakres sam się nie rozszerzy, więc samo dodanie uprawnienia
+             w panelu Allegro nie wystarczy — konto trzeba sparować ponownie. */
+          ? ` Sprawdź uprawnienie ${scopeDlaUrl("https://api.allegro.pl/messaging/")}` +
+            ` i sparuj konto ponownie.`
+          : "") +
+        (powod ? ` Odpowiedź Allegro: ${powod}` : ""),
+      odp.status);
   }
   return odp.arrayBuffer();
 }

@@ -416,7 +416,22 @@ export function osRozmowy(id: number): {
   const wiadomosci = db().prepare(`
     SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
-           m.channel_account_id AS konto, c.subject AS klient,
+           m.channel_account_id AS konto,
+           /* ── PODPIS TO LOGIN, NIE TEMAT (0.219.2) ────────────────────────
+              Do 0.219.1 stała tu kolumna c.subject i przez to podpis
+              wiadomości niósł TEMAT WĄTKU. Na koncie właściciela temat bywa
+              równy loginowi, więc wyglądało to poprawnie — i dokładnie dlatego
+              było groźne: przy wątku o temacie „Zaworek zwrotny" wiadomość
+              klienta podpisywała się nazwą części.
+
+              Login stoi w allegro_inbox_thread, złączony po identyfikatorze
+              wątku, tak samo jak w klient-historia.ts (§4.3: jedno źródło na
+              jeden fakt). COALESCE zostawia temat jako drugą drogę i słowo
+              „Klient" jako trzecią — wątek bez rozmówcy istnieje. */
+           COALESCE(
+             (SELECT t.interlocutor_login FROM allegro_inbox_thread t
+               WHERE t.id = c.external_conversation_id),
+             c.subject, 'Klient') AS klient,
            COALESCE(
              (SELECT o.nazwa FROM offer_snapshot o
                WHERE o.channel_account_id = m.channel_account_id

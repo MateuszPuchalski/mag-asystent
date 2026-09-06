@@ -211,13 +211,25 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
           ? "mr-auto border-os-klient-ramka bg-os-klient"
           : "ml-auto border-os-firma-ramka bg-os-firma"}`}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
-            {/* Podpis RODZAJU przed nazwiskiem: „kto to powiedział" czyta się
-                przed „jak się nazywa". Login kupującego i tak nic nie mówi. */}
+            {/* ── LOGIN STOI W MIEJSCU SŁOWA „KLIENT" (0.219.2) ────────────
+                Do 0.219.1 podpis brzmiał „KLIENT · ALLEGRO", a login jechał
+                obok, drobnym drukiem. Komentarz tłumaczył to zdaniem „login
+                kupującego i tak nic nie mówi" — i to jest nieprawda, którą
+                obalił własny ekran: agent czyta wątek, żeby wiedzieć, KTO
+                pisze, a „bagslublin" odróżnia rozmówcę, podczas gdy słowo
+                „klient" jest prawdziwe o każdej wiadomości przychodzącej.
+
+                Fallback zostaje: gdy wątek nie niesie loginu, serwer podstawia
+                „Klient" i wtedy podpis wygląda jak dawniej. Kanał („Allegro")
+                zostaje przy loginie, bo ten sam ciąg na innym kanale byłby
+                kimś innym. */}
             <span className={`flex items-center gap-1 font-bold uppercase tracking-wide ${
               w.odKlienta ? "text-amber-700" : "text-slate-600"}`}>
               {w.odKlienta ? <User size={12} /> : <Send size={12} />}
-              {w.odKlienta ? "Klient · Allegro" : "Odpowiedź firmy"}</span>
-            <b>{w.autor}</b>
+              {w.odKlienta ? `${w.autor} · Allegro` : "Odpowiedź firmy"}</span>
+            {/* Nazwisko OSOBNO tylko przy nas: przy kliencie stoi już wyżej,
+                a powtórzone dwa razy w jednym wierszu jest szumem. */}
+            {!w.odKlienta && <b>{w.autor}</b>}
             <span className="text-slate-400">{czas(w.at)}</span>
             {/* Nazwa przy ofercie jest Z ZAMÓWIENIA (§4.3) — mail Allegro
                 „Wiadomość dotyczy" pokazuje tytuł, goły numer kazał agentowi

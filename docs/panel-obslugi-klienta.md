@@ -115,6 +115,18 @@ sobie mówi („ta wiadomość jest generowana automatycznie", w obu językach),
 i wyłącznie przy wiadomościach WYCHODZĄCYCH: klient odpisujący z cytatem
 naszego potwierdzenia niesie ten sam podpis, a jego wiadomość jest pytaniem.
 
+**Podpis wiadomości klienta to jego LOGIN (0.219.2).** Do 0.219.1 podpis brał
+temat wątku (`conversation.subject`). Na koncie właściciela temat bywa równy
+loginowi, więc ekran wyglądał poprawnie — i właśnie dlatego było groźnie: przy
+wątku o temacie „Zaworek zwrotny" wiadomość klienta podpisywała się nazwą
+części, a nie tym, kto ją napisał.
+
+Login stoi w `allegro_inbox_thread.interlocutor_login`, złączonym po
+identyfikatorze wątku — to samo źródło, z którego czyta zakładka KLIENT.
+Gdy wątek nie niesie rozmówcy, podpis schodzi na temat, a potem na słowo
+„Klient": wątek bez rozmówcy istnieje i ekran nie ma prawa udawać, że wie
+więcej.
+
 **Stopka firmowa zwinięta pod odpowiedzią (0.219.1).** Każda nasza wiadomość
 kończy się blokiem: nazwa spółki, adres, NIP, KRS, REGON, telefon. Siedem
 wierszy, w każdej wiadomości te same. Przy trzech odpowiedziach w wątku stopka
@@ -2087,6 +2099,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0 | `typPodgladu`, `GET /api/obsluga/zalaczniki/:id/podglad` — cztery typy rastrowe, tylko `SAFE` |
 | Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
 | Stopka firmowa zwinięta pod odpowiedzią | **działa** od 0.219.1 | `podzielStopke`, pole `stopka` w `WpisOsi` |
+| Podpis wiadomości klienta niesie jego login | **działa** od 0.219.2 | `allegro_inbox_thread.interlocutor_login` w zapytaniu osi |
 | Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
 | Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
 | Obecność łata wiersz kolejki zamiast pobierać listę | **działa** od 0.196.0 | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |
