@@ -71,7 +71,10 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
             {z.pozycje.map((p, i) => <li key={`${p.offerId}-${i}`}
               className="flex items-start gap-2 rounded bg-white px-2 py-1.5 text-xs"
               aria-label={`Pozycja: ${p.nazwa}`}>
-              <KafelOferty externalId={p.offerId} rozmiar={40}
+              {/* `stan` od 0.217.0: bez niego kafel pisał „bez zdjęcia" także
+                  wtedy, gdy o obraz nikt jeszcze nie pytał — ta sama pomyłka,
+                  którą 0.214.0 naprawiło przy pozycji zwrotu. */}
+              <KafelOferty externalId={p.offerId} stan={p.ofertaZdjecie} rozmiar={40}
                 nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
               <Kafel twId={p.twId} rozmiar={40} nazwa={p.nazwa} symbol={p.twSymbol} />
               <div className="min-w-0 flex-1">

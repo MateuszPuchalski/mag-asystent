@@ -11,7 +11,7 @@ import type { DoDopisania } from "../api/typy";
    co potrzebne teraz).                                                       */
 
 const KANDYDAT = (n: Partial<DoDopisania> = {}): DoDopisania => ({
-  zamPozycjaId: 7, offerId: "222", nazwa: "Łopata", ilosc: 1,
+  zamPozycjaId: 7, offerId: "222", ofertaZdjecie: "nieznane", nazwa: "Łopata", ilosc: 1,
   cenaGrosze: 2999, waluta: "PLN", ...n,
 });
 

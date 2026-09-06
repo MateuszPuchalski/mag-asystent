@@ -701,7 +701,20 @@ export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): Wi
       const zamowienie = zam ? naZamowienie(zam, pozZamowienia, (p) =>
         wracajace.get((p.offer_id as string) ?? "")
           ?? wracajace.get((p.external_id as string) ?? "")
-          ?? 0) : null;
+          ?? 0,
+      /* Kartoteki przy pozycji ZAMÓWIENIA nie dokładamy i to jest decyzja:
+         kolumna dowodów mówi, co klient KUPIŁ na Allegro, a co mamy na półce
+         — mówi kolumna środkowa, przy pozycji zwrotu. Dwa razy to samo
+         w jednym ekranie to szum, nie pomoc (dekalog, punkt 5). */
+      undefined,
+      /* Stan zdjęcia z mapy wczytanej raz na całą kolejkę. `offer_id` pozycji
+         ZAMÓWIENIA to `lineItems[].offer.id` ze specyfikacji, więc tym wolno
+         pytać — inaczej niż `offerId` pozycji zwrotu. */
+      (p) => {
+        const oferta = (p.offer_id as string) ?? "";
+        return oferta === "" ? "nieznane"
+          : stanZdjeciaOferty(zdjeciaOfert.get(`${z.channel_account_id}|${oferta}`));
+      }) : null;
 
       return zloz(z, zlozone, zamowienie, teraz,
         rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe);
@@ -1164,6 +1177,8 @@ export function zarejestrujNieodebrana(
 export interface DoDopisania {
   zamPozycjaId: number;
   offerId: string | null;
+  /** Stan zdjęcia oferty (0.217.0) — kandydat też jest odniesieniem do towaru. */
+  ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;
@@ -1196,6 +1211,14 @@ export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopi
   /* Klucz liczy się tak samo jak przy synchronizacji i przy paczce
      nieodebranej: przyrostek per POWTÓRZENIE pary `offer_id|nazwa`. Dwie
      sztuki tego samego towaru w zamówieniu to dwa osobne kandydaty. */
+  /* Snapshoty ofert TEGO konta jednym zapytaniem — kandydatów bywa kilku. */
+  const obrazy = new Map<string, string | null>();
+  for (const o of database.prepare(
+    "SELECT external_id AS id, primary_image_url AS url FROM offer_snapshot WHERE channel_account_id=?",
+  ).all(z.channel_account_id) as Array<{ id: string; url: string | null }>) {
+    obrazy.set(o.id, o.url);
+  }
+
   const licznik = new Map<string, number>();
   const wynik: DoDopisania[] = [];
   for (const p of poz) {
@@ -1205,6 +1228,8 @@ export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopi
     if (wZwrocie.has(n === 1 ? baza : `${baza}|#${n}`)) continue;
     wynik.push({
       zamPozycjaId: Number(p.id), offerId: (p.offer_id as string) ?? null,
+      ofertaZdjecie: (p.offer_id as string)
+        ? stanZdjeciaOferty(obrazy.get(String(p.offer_id))) : "nieznane",
       nazwa: String(p.nazwa), ilosc: Number(p.ilosc),
       cenaGrosze: Number(p.cena_grosze), waluta: String(p.waluta ?? "PLN"),
     });

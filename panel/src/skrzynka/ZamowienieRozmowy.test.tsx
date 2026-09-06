@@ -37,7 +37,8 @@ describe("Zamówienie przy rozmowie", () => {
   const pozycja = (n: Partial<PozycjaZamowienia> = {}): PozycjaZamowienia => ({
     offerId: "17235726715", nazwa: "Szarpak do NAC LS 46-450", sku: "SZR-NAC-46",
     ilosc: 1, cenaGrosze: 4599, waluta: "PLN", zwracana: false, wracaIlosc: 0,
-    twId: 501, twSymbol: "SZR-NAC-46", twZrodlo: "SKU oferty „SZR-NAC-46”", ...n,
+    twId: 501, twSymbol: "SZR-NAC-46", twZrodlo: "SKU oferty „SZR-NAC-46”",
+    ofertaZdjecie: "jest", ...n,
   });
   const pobrane = (pozycje: PozycjaZamowienia[]): NonNullable<Dane["pobrane"]> => ({
     externalId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001", status: "READY_FOR_PROCESSING",

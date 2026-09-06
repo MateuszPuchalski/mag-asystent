@@ -1434,6 +1434,22 @@ To zakrywa dziurę, której kartoteka zakryć nie umie. Pytanie sprzed zakupu
 przychodzi bez kartoteki, a większość kartotek i tak zdjęcia nie ma; oferta ma
 je prawie zawsze.
 
+### 25a.6d. Zdjęcie przy pozycji ZAMÓWIENIA (0.217.0)
+
+Decyzja właściciela: „wszędzie, gdzie jest odniesienie do produktu, powinno być
+zdjęcie". Listy pozycji zamówienia — w kolumnie dowodów zwrotu, przy rozmowie
+i wśród kandydatów do dopisania — wymieniały towary samym tekstem.
+
+Kafel jest MNIEJSZY niż przy pozycji zwrotu, 32 px wobec 72. To hierarchia,
+nie oszczędność: pozycja zwrotu to praca, pozycja zamówienia to jej kontekst.
+
+Stoi tam WYŁĄCZNIE zdjęcie oferty. Co mamy na półce, mówi kolumna środkowa
+przy pozycji zwrotu; powtórzenie tego obok byłoby szumem.
+
+Nazwa idzie przed ceną i wolno jej zająć dwa wiersze. Kolumna ma 21 rem przy
+węższym oknie, a kafel zabiera z niej 32 px — przy jednym wierszu zostawało
+„NAKRĘTKA DO…", czyli nazwa, z której nie da się rozpoznać towaru.
+
 ### 25a.6c. Trzy stany zdjęcia oferty (0.214.0)
 
 „Bez zdjęcia" znaczyło trzy rzeczy naraz i myliło najgorszą z możliwych.

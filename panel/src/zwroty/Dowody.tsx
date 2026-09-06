@@ -7,6 +7,7 @@ import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
 import { czas, Plakietka, Skopiuj } from "../ui";
 import { Link } from "./Link";
+import { KafelOferty } from "../towar/Kafel";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
    Akcji tu nie ma — te stoją w pasku werdyktu i mają być jedynym miejscem,
@@ -164,18 +165,47 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 oddaje jedną" jest kontekstem decyzji, a nie ciekawostką. */}
             <ul className="mt-3 space-y-1">
               {zam.pozycje.map((p, i) => <li key={`${p.offerId}-${i}`}
-                className={`flex items-baseline gap-2 rounded px-2 py-1 text-xs ${
+                className={`flex items-start gap-2 rounded px-2 py-1 text-xs ${
                   p.zwracana ? "bg-amber-50 font-semibold" : "text-slate-600"}`}>
-                <span className="truncate">{p.nazwa}</span>
-                <span className="ml-auto shrink-0 tabular-nums">
-                  {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+                {/* ── ZDJĘCIE PRZY POZYCJI ZAMÓWIENIA (0.217.0) ─────────────
+                    Zgłoszenie właściciela: „wszędzie, gdzie jest odniesienie
+                    do produktu, powinno być zdjęcie". Ta lista była ostatnim
+                    miejscem w obsłudze, które wymieniało towary samym tekstem
+                    — a odpowiada na pytanie „co klient w ogóle kupił", czyli
+                    takie, przy którym nazwa ucięta w połowie nie wystarcza.
+
+                    Kafel jest MNIEJSZY niż przy pozycji zwrotu (32 px wobec
+                    72) i to jest hierarchia, nie oszczędność: pozycja zwrotu
+                    to praca, pozycja zamówienia to kontekst tej pracy.
+
+                    Tu stoi WYŁĄCZNIE zdjęcie oferty. Co mamy na półce, mówi
+                    kolumna środkowa przy pozycji zwrotu; powtórzenie tego
+                    obok byłoby szumem (dekalog, punkt 5). */}
+                <KafelOferty externalId={p.offerId} stan={p.ofertaZdjecie} rozmiar={32}
+                  nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
+                {/* NAZWA W DWÓCH LINIACH, nie ucięta w jednej. Ta kolumna ma
+                    21 rem przy węższym oknie, a kafel zabiera z niej 32 px;
+                    `truncate` zostawiał wtedy „NAKRĘTKA DO…", czyli nazwę,
+                    z której nie da się rozpoznać towaru. Cena schodzi do
+                    drugiego wiersza, bo odpowiada na inne pytanie niż „co to
+                    jest" i nie musi stać w tej samej linii. */}
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2">{p.nazwa}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-x-2">
+                    {/* `whitespace-nowrap`: obok stoi plakietka WRACA i bez
+                        tego kwota łamała się w środku, na „1 ×", „13,93",
+                        „EUR" w trzech wierszach. */}
+                    <span className="whitespace-nowrap tabular-nums">
+                      {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
                 {/* PLAKIETKA NIESIE SZTUKI (0.176.0). Samo „wraca" stało obok
                     liczby KUPIONYCH sztuk, więc „2 × 18,99 wraca" czytało się
                     jako „wracają dwie" przy zwrocie jednej. Przy zwrocie
                     całości „z 2" byłoby szumem — dlatego pada tylko wtedy,
                     gdy część zakupu zostaje u klienta. */}
-                {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-[10px] uppercase">
-                  wraca {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
+                    {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-[10px] uppercase">
+                      wraca {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
+                  </span>
+                </span>
               </li>)}
             </ul>
           </>}
