@@ -743,7 +743,16 @@ export function bilansKartotek(zwroty: WierszZwrotu[]) {
       wszystkie++;
       if (p.twId !== null) continue;
       bez++;
-      const powod = p.propozycja?.powod ?? (p.propozycja?.twId != null ? "do_zatwierdzenia" : "inne");
+      /* DWA RODZAJE CZEKANIA (0.220.0), bo znaczą co innego i co innego
+         każą zrobić. Pewność `sku` wiąże automat sam — pozycja z taką
+         propozycją NIE POWINNA tu stać, a gdy stoi, znaczy to, że automat
+         nie chodzi (`services/wiazania.ts`). Pozostałe stopnie czekają
+         na człowieka z założenia: zgadywanie prowadzi do korekty stanu
+         w Subiekcie, więc klika je biuro. Jedna liczba na oba przypadki
+         mieszała usterkę z pracą do zrobienia. */
+      const powod = p.propozycja?.powod
+        ?? (p.propozycja?.twId == null ? "inne"
+          : p.propozycja.pewnosc === "sku" ? "do_zwiazania" : "do_zatwierdzenia");
       powody[powod] = (powody[powod] ?? 0) + 1;
     }
   }

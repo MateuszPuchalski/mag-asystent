@@ -80,8 +80,12 @@ function DociagnijZamowienia() {
     </button>
     {dociagnij.error && <p className="mt-1 text-xs text-red-700">
       {(dociagnij.error as Error).message}</p>}
+    {/* LICZBY, nie samo „gotowe" (0.220.0). Zero pobranych zamówień przy
+        dwunastu powiązanych kartotekach znaczy „zamówienia były, brakowało
+        wiązania" — a to jest odpowiedź na pytanie, z którym się tu klika. */}
     {dociagnij.isSuccess && <p className="mt-1 text-xs text-slate-500">
-      Pobrano zamówień: {dociagnij.data?.pobrano ?? 0}.</p>}
+      Pobrano zamówień: {dociagnij.data?.pobrano ?? 0} · powiązano kartotek:{" "}
+      {dociagnij.data?.kartoteki ?? 0}.</p>}
   </div>;
 }
 
@@ -127,10 +131,6 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                    synchronizacja. Bez niej pozycje zwrotu nie mają skąd wziąć kartoteki.`
                 : `Allegro nie podało przy tym zwrocie numeru zamówienia. Bez niego
                    nie ma czego dociągnąć ani z czego wziąć kartoteki.`}</p>
-            {/* Przycisk tylko wtedy, gdy JEST co pobrać. Przy zwrocie bez numeru
-                zamówienia dociąganie nie zmieni niczego, a obiecywałoby, że
-                zmieni. */}
-            {zwrot.orderId && <DociagnijZamowienia />}
           </>
         : <>
             <div className="flex items-center gap-1">
@@ -209,6 +209,15 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               </li>)}
             </ul>
           </>}
+
+      {/* PRZYCISK POD OBIEMA GAŁĘZIAMI (0.220.0). Do tego wydania stał tylko
+          przy zamówieniu NIEPOBRANYM — czyli znikał dokładnie tam, gdzie jest
+          jedyną ręczną drogą do wiązania. Zamówienie bywa pobrane, a kartoteki
+          i tak nie ma: wiąże ją przebieg, który ten przycisk uruchamia.
+
+          Bez numeru zamówienia przycisku dalej nie ma. Dociąganie nie zmieni
+          wtedy niczego, a obiecywałoby, że zmieni. */}
+      {zwrot.orderId && <DociagnijZamowienia />}
 
       {/* ── Dokument sprzedaży (0.174.0, wciągnięty do zamówienia w 0.176.0) ──
           Do 0.175.0 stał osobną sekcją NA DNIE kolumny, pod wiadomościami —

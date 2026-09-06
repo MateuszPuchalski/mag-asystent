@@ -360,4 +360,14 @@ describe("Dowody", () => {
     expect(screen.queryByRole("button", { name: /Dociągnij teraz/ })).not.toBeInTheDocument();
     expect(screen.getByText(/nie podało przy tym zwrocie numeru zamówienia/)).toBeInTheDocument();
   });
+
+  it("przycisk zostaje TAKŻE przy pobranym zamówieniu", () => {
+    /* Blizna 0.220.0. Przycisk stał wyłącznie przy zamówieniu niepobranym,
+       a to jest gałąź, w której akurat najmniej pomaga: gdy zamówienie już
+       jest, a kartoteki nie ma, ten przycisk uruchamia jedyną ręczną drogę
+       do powiązania. Bez niego zostawało klikanie „Zatwierdź" przy każdej
+       pozycji z osobna. */
+    render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
+    expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
+  });
 });

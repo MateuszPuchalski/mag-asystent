@@ -34,6 +34,15 @@ const ZWROTY = [
     dniDoTerminu: 9 },
 ];
 
+/* Bilans i stan synchronizacji są ZMIENNE, bo pasek mówi co innego przy
+   działającej synchronizacji, a co innego przy stojącej. `vi.hoisted`, bo
+   fabryka `vi.mock` jedzie przed resztą pliku. */
+const scena = vi.hoisted(() => ({
+  kartoteki: { bez: 3, wszystkie: 8, powody: { oferta_bez_sku: 2, jakis_nowy_kod: 1 } } as
+    { bez: number; wszystkie: number; powody: Record<string, number> },
+  stan: {} as Record<string, unknown>,
+}));
+
 vi.mock("../api/zwroty", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/zwroty")>("../api/zwroty");
   return {
@@ -41,8 +50,7 @@ vi.mock("../api/zwroty", async () => {
     useZwroty: () => ({
       data: { zwroty: ZWROTY, liczniki: { decyzja: 1, ocena: 0, zwrot: 1, korekta: 0,
         zamkniety: 0, odrzucony: 0 },
-        kartoteki: { bez: 3, wszystkie: 8, powody: { oferta_bez_sku: 2, jakis_nowy_kod: 1 } },
-        stan: {} },
+        kartoteki: scena.kartoteki, stan: scena.stan },
       isLoading: false, error: null,
     }),
   };
@@ -192,5 +200,37 @@ describe("Ekran zwrotów", () => {
     expect(screen.getByText(/Bez kartoteki: 3 z 8 pozycji w pracy/)).toBeInTheDocument();
     expect(screen.getByText(/oferta bez SKU/)).toBeInTheDocument();
     expect(screen.getByText(/jakis_nowy_kod/)).toBeInTheDocument();
+  });
+
+  it("czekanie na automat nazywa się inaczej niż czekanie na człowieka", () => {
+    /* Pozycja z pewnością `sku` wiąże się sama. Gdy stoi w liczniku, to jest
+       usterka, a nie praca do zrobienia — jedna liczba na oba przypadki
+       kazała szukać winy nie tam, gdzie trzeba. */
+    scena.kartoteki = { bez: 5, wszystkie: 9,
+      powody: { do_zwiazania: 4, do_zatwierdzenia: 1 } };
+    scena.stan = {};
+    pokaz();
+    expect(screen.getByText(/czeka na automat/)).toBeInTheDocument();
+    expect(screen.getByText(/czeka na zatwierdzenie/)).toBeInTheDocument();
+  });
+
+  it("stojąca synchronizacja mówi o sobie przy pozycjach czekających na automat", () => {
+    /* Wiązanie jedzie taktem synchronizacji. Gdy takt stoi, ekran ma to
+       powiedzieć — inaczej operator klika „Zatwierdź" siedemset razy zamiast
+       naprawić jedną rzecz. */
+    scena.kartoteki = { bez: 4, wszystkie: 9, powody: { do_zwiazania: 4 } };
+    scena.stan = { status: "authentication_error", kodOstatniegoBledu: 401,
+      pozostaloDoPobrania: null };
+    pokaz();
+    expect(screen.getByText(/odmowa logowania do Allegro/)).toBeInTheDocument();
+    expect(screen.getByText(/kod 401/)).toBeInTheDocument();
+  });
+
+  it("działająca synchronizacja NIE dopisuje zdania o sobie", () => {
+    /* Zdanie wypisywane zawsze przestaje być czytane po tygodniu. */
+    scena.kartoteki = { bez: 4, wszystkie: 9, powody: { do_zwiazania: 4 } };
+    scena.stan = { status: "current", kodOstatniegoBledu: null, pozostaloDoPobrania: null };
+    pokaz();
+    expect(screen.queryByText(/Wiązanie idzie taktem/)).not.toBeInTheDocument();
   });
 });

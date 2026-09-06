@@ -4,7 +4,7 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, otwarteKoszyki, wypuscGotoweKoszyki, zamknijKosz,
+  koszykiCzekajaceNaKorekty, otwarteKoszyki, zamknijKosz,
 } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -21,10 +21,8 @@ import {
   odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
-import { zwiazPewne } from "../services/sygnatury.js";
-import {
-  kandydaciFaktury, wskazFakture, zwiazFakturyPewne, zwiazKorektyPewne,
-} from "../services/faktury.js";
+import { powiazZaleglosci } from "../services/wiazania.js";
+import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
 import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -89,15 +87,18 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const pobrano = await uzupelnijZamowienia();
       /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
          więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
-         „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu. */
-      /* Korekty i koszyki tą samą drogą (0.201.0): kto klika „dociągnij",
+         „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu.
+         Korekty i koszyki tą samą drogą (0.201.0): kto klika „dociągnij",
          chce zobaczyć AKTUALNY stan, a nie jego część. */
-      const faktury = zwiazFakturyPewne(db());
-      const korekty = zwiazKorektyPewne(db());
-      wypuscGotoweKoszyki(db());
-      return { pobrano, powiazano: zwiazPewne(db()), faktury, korekty };
+      return { pobrano, ...powiazZaleglosci(db()) };
     } catch (e) {
-      return reply.code(400).send({ error: (e as Error).message });
+      /* WIĄŻEMY TAKŻE PO BŁĘDZIE (0.220.0). Ten przycisk jest jedyną ręczną
+         drogą do wiązania, a zaległość w bazie nie ma nic wspólnego z tym,
+         czy Allegro właśnie odpowiedziało. Odmowa dociągnięcia zostaje
+         odmową — treść błędu jedzie na ekran jak dotąd. */
+      return reply.code(400).send({
+        error: (e as Error).message, pobrano: 0, ...powiazZaleglosci(db()),
+      });
     }
   });
 

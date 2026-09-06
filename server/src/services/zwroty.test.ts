@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
+  bilansKartotek,
   csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
@@ -338,6 +339,37 @@ test("propozycja kartoteki liczy się z SKU zamówienia i niesie źródło", () 
   assert.equal(p.propozycja?.pewnosc, "sku");
   assert.equal(p.propozycja?.twId, 10);
   assert.match(p.propozycja!.zrodlo, /SEK-46/);
+});
+
+test("licznik dzieli czekanie na AUTOMAT i na człowieka", () => {
+  /* Dwa różne stany wyglądały do 0.220.0 tak samo — jedną liczbą „czeka na
+     zatwierdzenie". Pierwszy jest USTERKĄ: pewność `sku` wiąże automat sam,
+     więc pozycja z taką propozycją stoi tu tylko wtedy, gdy automat nie
+     chodzi. Drugi jest PRACĄ: zgadywanie prowadzi do korekty stanu, więc
+     klika je człowiek. Jedna liczba na oba kazała szukać usterki tam, gdzie
+     jej nie ma — albo jej nie zauważyć. */
+  const d = stanowisko();
+  towar(d, 10, "SEK-46");
+  towar(d, 11, "NOZ-12");
+
+  /* Sygnatura trafia w jedną kartotekę — to wiąże automat. */
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-1" },
+    [{ ilosc: 1, cena: 8999, offerId: "111" }]);
+  zamowienie(d, "ord-1", [{ offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", cena: 8999 }]);
+
+  /* Pamięć wskazań: za propozycją stoi człowiek, ale automat jej nie wiąże,
+     bo nie ma uczciwej wartości dla `tw_zrodlo` (patrz `sygnatury.ts`). */
+  dodaj(d, "2026-08-31T00:00:00Z", { order_id: "ord-2" },
+    [{ ilosc: 1, cena: 4999, offerId: "222" }]);
+  zamowienie(d, "ord-2", [{ offerId: "222", nazwa: "Nóż", sku: null, cena: 4999 }]);
+  d.prepare(`INSERT INTO oferta_kartoteka
+    (channel_account_id,offer_id,tw_id,tw_symbol,wskazano_at,wskazano_przez)
+    VALUES (1,'222',11,'NOZ-12','2026-08-01T00:00:00Z','Ala')`).run();
+
+  const b = bilansKartotek(listaZwrotow(d, TERAZ));
+  assert.equal(b.bez, 2);
+  assert.equal(b.powody.do_zwiazania, 1, "sygnatura jeden do jednego czeka na AUTOMAT");
+  assert.equal(b.powody.do_zatwierdzenia, 1, "pamięć wskazań czeka na człowieka");
 });
 
 test("przy potwierdzonej kartotece propozycji już nie liczymy", () => {

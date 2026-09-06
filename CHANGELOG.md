@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.220.0 — 6 września 2026
+
+**Kartoteki wiązały się same, dopóki Allegro nie kichnęło.** Właściciel pokazał
+zrzut: „Bez kartoteki: 746 z 746 pozycji w pracy", z czego 739 z gotową
+propozycją i przyciskiem „Zatwierdź" obok. Sygnatura zgadzała się jeden do
+jednego, a mimo to nic się nie wiązało.
+
+Dopasowanie działało — nie działało jego zapisanie. Automat sygnatur (0.169.0)
+chodzi taktem synchronizacji i stał w nim jako CIĄG DALSZY po pobraniu:
+
+```
+await synchronizujAllegroZwroty();   // wyjątek leci wyżej
+zwiazPewne(db());                    // te cztery kroki nie wykonają się nigdy
+zwiazFakturyPewne(db()); zwiazKorektyPewne(db()); wypuscGotoweKoszyki(db());
+```
+
+Wystarczył wygasły token, limit 429 albo jeden felerny rekord w partii. Zwroty
+zapisane wcześniejszymi przebiegami zostawały w bazie, więc kolejka wyglądała
+zdrowo — brakowało wyłącznie tego, co miało dojść PO pobraniu. Ta sama lekcja
+co przy wątkach skrzynki w 0.149.2, tylko piętro wyżej: jedna końcówka
+zabierała pracę, która jej do niczego nie potrzebowała.
+
+Cztery kroki mają teraz wspólny dom (`services/wiazania.ts`) i wołane są
+w `finally`, każdy pod własnym parasolem. Kolejność zostaje ta sama i z tych
+samych powodów co dotąd: kartoteka, dokument sprzedaży, korekta, koszyk.
+
+**Licznik rozróżnia usterkę od pracy.** „Czeka na zatwierdzenie" znaczyło dwie
+różne rzeczy naraz. Pewność `sku` wiąże automat sam, więc taka pozycja stoi
+w liczniku tylko wtedy, gdy automat NIE CHODZI — to usterka. Pozostałe stopnie
+(jedyna pozycja, zgodna nazwa, pamięć wskazań) czekają na człowieka
+z założenia, bo zgadywanie prowadzi do korekty stanu w Subiekcie. Nowy powód
+nazywa się „czeka na automat", a gdy synchronizacja stoi, pasek dopisuje jej
+stan i kod błędu. Zdanie pada wyłącznie wtedy — wypisywane zawsze przestałoby
+być czytane po tygodniu.
+
+**„Dociągnij teraz" zostaje przy pobranym zamówieniu.** Przycisk pokazywał się
+tylko przy zamówieniu, którego jeszcze nie ma — czyli znikał dokładnie tam,
+gdzie jest jedyną ręczną drogą do wiązania. Mówi teraz także, ile kartotek
+powiązał, i wiąże również wtedy, gdy samo dociągnięcie skończy się błędem:
+zaległość w bazie nie ma nic wspólnego z tym, czy Allegro właśnie odpowiedziało.
 ## 0.219.2 — 6 września 2026
 
 **Podpis wiadomości klienta niesie jego login, nie temat wątku.** Właściciel:
