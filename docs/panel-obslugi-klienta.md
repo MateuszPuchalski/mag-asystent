@@ -507,6 +507,13 @@ zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie nap
 stoi nasza wiadomość z podpisem „Biuro". Kolejność listy dalej niesie datę
 wątku — tę samą, którą właściciel widzi w panelu sprzedawcy.
 
+**Kolejność jest przełącznikiem (0.215.0).** Domyślna zostaje: PILNE, potem
+najdłużej czekające pytanie. Drugi porządek, „od najnowszych", odpowiada na
+inne pytanie — „co właśnie przyszło" — tym samym wzorem, co data nadania przy
+zwrotach. PILNE zostaje na górze w obu porządkach, bo flaga ręczna przebija
+automat. Wybór pamięta przeglądarka stanowiska, nie serwer: kolejność to nawyk
+człowieka przy biurku, a nie fakt o rozmowie.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany
@@ -1371,6 +1378,22 @@ Zdjęcie stoi w dwóch miejscach i w obu ma PODPIS, bo źródła się nie miesza
 (§4.3): w bloku oferty przy rozmowie, nad blokiem towaru z Subiekta, oraz przy
 pozycji zwrotu, obok kafla kartoteki. Stany braku rozróżnia §25a.6c.
 
+**Trzecie miejsce: pozycja zamówienia przy rozmowie (0.215.0).** Właściciel
+przysłał zrzut rozmowy z samym zamówieniem — kolumna nie miała ani zdjęcia,
+ani kartoteki. Pozycja niesie teraz oba źródła obok siebie, jak pozycja
+zwrotu: kafel oferty Allegro i kafel kartoteki Subiekta, z podpisem pod listą.
+Kartotekę za pozycją daje ten sam mostek, co dla oferty rozmowy: pamięć
+wskazań, a bez niej SKU z formularza zakupu.
+
+**Skąd numer oferty rozmowy (0.215.0).** Trzy drogi, w tej kolejności:
+wskazanie agenta, numer z wiadomości klienta, jedyna pozycja zamówienia. Do
+0.213.0 wskazanie ręczne zapisywało się w zdarzeniu, a blok oferty go nie
+czytał. Zamówienie z jedną pozycją nie ma czego mylić, więc jego oferta jest
+ofertą rozmowy — z podpisem „z jedynej pozycji zamówienia". Przy kilku
+pozycjach panel nie zgaduje: przy każdej stoi „Wskaż jako ofertę rozmowy",
+a wybór zapisuje się jako decyzja człowieka. SKU pozycji jest zapasem dla
+mostka, dopóki takt ofert nie dociągnie snapshotu.
+
 **Przy zwrocie numer oferty bierze się z pozycji ZAMÓWIENIA.** `offerId`
 pozycji zwrotu należy do przestrzeni, której nie znamy (`[WERYFIKUJ]`
 w `docs/allegro-ksztalt.md`), więc pytanie nim trafiałoby raz na dziesięć.
@@ -1907,8 +1930,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
 | Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.167.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
-| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx` |
-| Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx` |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż" |
+| Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
+| Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
 | Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.198.0 zakładki „Oferta i towar" oraz „Dobór" |

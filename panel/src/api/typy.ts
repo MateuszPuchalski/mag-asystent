@@ -172,6 +172,8 @@ export type ZamowienieRozmowy = {
    pytania (§15.2), nie dzisiejszy cennik. */
 export type OfertaRozmowy = {
   externalId: string; link: string | null;
+  /** Skąd numer (0.215.0): wskazanie agenta, wiadomość klienta albo jedyna pozycja zamówienia. */
+  zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
@@ -521,6 +523,11 @@ export interface PozycjaZamowienia {
   zwracana: boolean;
   /** Ile sztuk WRACA — mniej niż `ilosc`, gdy klient oddaje część zakupu. */
   wracaIlosc: number;
+  /** Kartoteka Subiekta za pozycją (0.215.0): z pamięci wskazań albo po SKU. `null` = brak. */
+  twId: number | null;
+  twSymbol: string | null;
+  /** Zdanie źródła pisze serwer (§4.3). */
+  twZrodlo: string | null;
 }
 
 export interface Zamowienie {

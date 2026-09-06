@@ -31,7 +31,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
       oem: null, nazwaCzesci: null, parametry: {} } },
-  oferta: { externalId: "12096815384", link: null, pobrana: null,
+  oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
 });
@@ -68,6 +68,19 @@ describe("kolumna kontekstu", () => {
        bywa, a przypisania do Subiekta nie ma. */
     expect(screen.getByText(/nie ma z czego wywieść kartoteki/)).toBeInTheDocument();
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
+  });
+
+  it("zamówienie z kilku pozycji bez oferty każe wskazać pozycję, nie wpisywać numer", () => {
+    const pozycja = { offerId: "1", nazwa: "A", sku: null, ilosc: 1, cenaGrosze: 100, waluta: "PLN",
+      zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null };
+    render(<Kontekst dane={dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, pobrane: {
+      externalId: "zam-77", status: null, kupujacyLogin: null, dostawaGrosze: null, dostawaMetoda: null,
+      platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 200, waluta: "PLN", kupionoAt: null,
+      link: null, pozycje: [pozycja, { ...pozycja, offerId: "2", nazwa: "B" }],
+    } } })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    expect(screen.getByText(/Zamówienie ma 2 pozycje — wskaż niżej/)).toBeInTheDocument();
+    expect(screen.getByText(/Wskaż pozycję zamówienia wyżej/)).toBeInTheDocument();
+    expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
   });
 
   /* Pięciu zakładek z makiety NIE ma: „Klient" i „Wiedza" nie mają dziś skąd

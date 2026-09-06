@@ -45,6 +45,13 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
           sens całej odpowiedzi, a agent czyta tę linijkę pierwszą. */}
       {o?.status && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
         {o.status}</span>}
+      {/* Skąd numer (0.215.0). Numer z wiadomości klienta jest faktem z Allegro
+          i nie potrzebuje podpisu; dwa pozostałe to wnioski — agenta albo
+          serwera z jedynej pozycji zamówienia — i §4.3 każe je podpisać. */}
+      {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+        wskazana przez agenta</span>}
+      {oferta.zrodlo === "zamowienie" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+        z jedynej pozycji zamówienia</span>}
       {oferta.link && <a href={oferta.link} target="_blank" rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
         Otwórz w Allegro<ExternalLink size={12} /></a>}

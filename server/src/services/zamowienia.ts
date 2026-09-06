@@ -1,5 +1,6 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
+import { kartotekaOferty } from "./dopasowanie-sku.js";
 
 /* ── Zamówienie klienta jako DTO (0.166.0) ──────────────────────────────────
    Do 0.165.0 mapowanie wiersza `zamowienie_klienta` na kształt dla panelu
@@ -17,6 +18,18 @@ export interface PozycjaZamowienia {
   cenaGrosze: number;
   waluta: string;
   zwracana: boolean;
+  /**
+   * Kartoteka Subiekta za pozycją (0.215.0): pamięć wskazań tej oferty, a bez
+   * niej SKU sprzedawcy z pozycji. `null` = nie ma czego pokazać. Zdanie
+   * `twZrodlo` pisze `dopasowanie-sku.ts`, panel go nie układa (§4.3).
+   *
+   * Zdjęcie oferty NIE ma tu flagi, inaczej niż `OfertaRozmowy.maZdjecie`:
+   * pozycja niesie `offerId`, a hak obrazów w panelu pamięta negatyw — jedno
+   * 404 na ofertę i sesję, tak samo jak przy pozycji zwrotu.
+   */
+  twId: number | null;
+  twSymbol: string | null;
+  twZrodlo: string | null;
   /**
    * Ile sztuk WRACA (0.176.0). Plakietka „wraca" stała dotąd obok liczby
    * kupionych sztuk i czytało się to jako „wracają dwie" przy zwrocie jednej.
@@ -52,8 +65,14 @@ type Wiersz = Record<string, unknown>;
  * wcale i zostaje przy domyślnym zerze. Funkcja oddaje LICZBĘ, nie „tak/nie" —
  * `zwracana` da się z liczby wyprowadzić, odwrotnie nie.
  */
+export type KartotekaPozycji = Pick<PozycjaZamowienia, "twId" | "twSymbol" | "twZrodlo">;
+const BEZ_KARTOTEKI: KartotekaPozycji = { twId: null, twSymbol: null, twZrodlo: null };
+
 export function naZamowienie(
   zam: Wiersz, pozycje: Wiersz[], wraca: (p: Wiersz) => number = () => 0,
+  /* Kartotekę dokłada WOŁAJĄCY, jak sztuki zwrotu: zwrot ma własne wiązanie
+     pozycji z towarem (`zwroty.ts`), rozmowa bierze mostek po ofercie. */
+  kartoteka: (p: Wiersz) => KartotekaPozycji = () => BEZ_KARTOTEKI,
 ): Zamowienie {
   return {
     externalId: String(zam.external_id),
@@ -77,6 +96,7 @@ export function naZamowienie(
       waluta: String(p.waluta),
       zwracana: wraca(p) > 0,
       wracaIlosc: wraca(p),
+      ...kartoteka(p),
     })),
   };
 }
@@ -98,5 +118,11 @@ export function zamowienieRozmowy(
   const pozycje = database.prepare(
     "SELECT * FROM zamowienie_klienta_pozycja WHERE zamowienie_id=? ORDER BY id",
   ).all(Number(zam.id)) as Wiersz[];
-  return naZamowienie(zam, pozycje);
+  /* Ten sam mostek, co dla oferty rozmowy: pamięć wskazań bije SKU, a puste
+     SKU to „bez kartoteki", nie „oferty nie pobrano" — pozycja zamówienia
+     ZAWSZE ma już swoje SKU z formularza zakupu, więc nie ma na co czekać. */
+  return naZamowienie(zam, pozycje, () => 0, (p) => {
+    const k = kartotekaOferty(database, konto, (p.offer_id as string) ?? null, String(p.sku ?? ""));
+    return k.twId === null ? BEZ_KARTOTEKI : { twId: k.twId, twSymbol: k.symbol, twZrodlo: k.zrodlo };
+  });
 }

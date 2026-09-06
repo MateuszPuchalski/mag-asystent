@@ -660,3 +660,78 @@ test("dopisek klienta czyni plakietkę nieaktualną — serwer mówi to sam", ()
   d.prepare("DELETE FROM message WHERE id=?").run(nowa);
   assert.equal(listaRozmow().find((x) => x.id === rozmowaId)!.kopilot!.nieaktualna, false);
 });
+
+test("rozmowa z samym zamówieniem: jedyna pozycja daje ofertę rozmowy, a pozycja niesie kartotekę", async () => {
+  /* Zrzut od właściciela (0.215.0): rozmowa bez oferty, z zamówieniem na jedną
+     pozycję — a kolumna mówiła „nie ma z czego wywieść kartoteki". Zamówienie
+     nazywa towar dokładniej niż oferta i ma SKU od razu, z formularza zakupu. */
+  const { wskazOferte } = await import("./conversations.js");
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-tylko-zam','kupujacy_91','2026-09-06T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_order_id,sent_at) VALUES (?,?,'m-tz-1','incoming','Czy to pasuje do MTD 600?','zam-91',
+    '2026-09-06T10:00:00.000Z')`).run(r, konto);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7801,'16-25003','Mandrela piasta MTD')").run();
+
+  /* Zanim ticker dociągnie zamówienie: ani oferty, ani kartoteki — i to nie jest usterka. */
+  assert.equal(osRozmowy(r).oferta, null);
+
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at)
+    VALUES (?,'zam-91','2026-09-06T10:10:00.000Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (?,'9100000001','MANDRELA PIASTA DO MTD 600','16-25003',2,9292,'PLN')`).run(zam);
+
+  let os = osRozmowy(r);
+  assert.equal(os.oferta?.externalId, "9100000001");
+  assert.equal(os.oferta?.zrodlo, "zamowienie");
+  assert.equal(os.oferta?.pobrana, null, "snapshotu oferty nie ma — numer i kartoteka są mimo to");
+  /* Kartoteka z SKU POZYCJI, nie ze snapshotu: pozycja zamówienia ma SKU od razu. */
+  assert.equal(os.oferta?.kartoteka.twId, 7801);
+  assert.equal(os.oferta?.kartoteka.pewnosc, "sku");
+  const p = os.zamowienie?.pobrane?.pozycje[0];
+  assert.equal(p?.twId, 7801);
+  assert.equal(p?.twSymbol, "16-25003");
+  assert.match(String(p?.twZrodlo), /SKU oferty/);
+
+  /* Druga pozycja: automat nie zgaduje — oferty nie ma, a pozycja bez kartoteki mówi `null`. */
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+    VALUES (?,'9200000002','Linka gazu','BRAK-XYZ',1,1500,'PLN')`).run(zam);
+  os = osRozmowy(r);
+  assert.equal(os.oferta, null);
+  assert.equal(os.zamowienie?.pobrane?.pozycje[1].twId, null);
+  assert.equal(os.zamowienie?.pobrane?.pozycje[1].twZrodlo, null);
+
+  /* Wskazanie przy pozycji = to samo zdarzenie, co ręczny numer; blok oferty je CZYTA (do 0.213.0 nie czytał). */
+  wskazOferte(r, "9200000002", BIURO.id, d);
+  os = osRozmowy(r);
+  assert.equal(os.oferta?.externalId, "9200000002");
+  assert.equal(os.oferta?.zrodlo, "reczne");
+  /* Wskazana pozycja ma SKU z formularza zakupu, więc mostek nie czeka na
+     snapshot: powodem braku jest „SKU nie trafia", nie „oferty nie pobrano". */
+  assert.equal(os.oferta?.kartoteka.powod, "sku_nie_trafia");
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+  d.prepare("DELETE FROM zamowienie_klienta WHERE id=?").run(zam);
+  d.prepare("DELETE FROM sgt_towar WHERE tw_id=7801").run();
+});
+
+test("ręczne wskazanie oferty przebija numer z wiadomości — jak w doborze", async () => {
+  const { wskazOferte } = await import("./conversations.js");
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-reczna','kupujacy_92','2026-09-06T11:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_object_type,related_object_id,sent_at)
+    VALUES (?,?,'m-r-1','incoming','Pasuje?','OFFER','111','2026-09-06T11:00:00.000Z')`).run(r, konto);
+  assert.equal(osRozmowy(r).oferta?.zrodlo, "wiadomosc");
+  assert.equal(osRozmowy(r).oferta?.externalId, "111");
+  wskazOferte(r, "222", BIURO.id, d);
+  assert.equal(osRozmowy(r).oferta?.externalId, "222");
+  assert.equal(osRozmowy(r).oferta?.zrodlo, "reczne");
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});

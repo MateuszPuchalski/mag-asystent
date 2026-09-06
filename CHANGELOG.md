@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.215.0 — 6 września 2026
+
+**Zdjęcia przy pozycji zamówienia, oferta z zamówienia i kolejność „od
+najnowszych”.** Właściciel przysłał zrzut rozmowy z samym zamówieniem: kolumna
+„Oferta i towar” nie miała ani zdjęcia, ani kartoteki, choć zamówienie nazywa
+towar dokładniej niż oferta. Druga prośba z tej samej rozmowy: sortowanie
+listy rozmów od najnowszych.
+
+Numer 0.214.0 zajął w międzyczasie PR ze stanem zdjęcia oferty — stąd 0.215.0.
+
+### Pozycja zamówienia niesie oba zdjęcia
+
+Przy każdej pozycji stoją dwa kafle, jak przy pozycji zwrotu: zdjęcie oferty
+Allegro (to widział klient) i zdjęcie kartoteki Subiekta (to mamy na półce),
+z podpisem pod listą (§4.3). Kartotekę za pozycją daje ten sam mostek, co dla
+oferty rozmowy: pamięć wskazań, a bez niej SKU z formularza zakupu.
+
+### Oferta rozmowy z trzech dróg
+
+Wskazanie agenta, numer z wiadomości klienta, jedyna pozycja zamówienia — w tej
+kolejności. Do 0.213.0 wskazanie ręczne zapisywało się w zdarzeniu, a blok
+oferty go nie czytał. Zamówienie z jedną pozycją daje ofertę samo, z podpisem
+„z jedynej pozycji zamówienia”; przy kilku pozycjach panel nie zgaduje — przy
+każdej stoi „Wskaż jako ofertę rozmowy”. SKU pozycji jest zapasem dla mostka,
+dopóki takt ofert nie dociągnie snapshotu.
+
+### Kolejność listy rozmów
+
+Przełącznik obok pola szukania: „najdłużej czekające” (domyślnie, decyzja
+z 0.181.0) albo „od najnowszych”. PILNE zostaje na górze w obu porządkach.
+Wybór pamięta przeglądarka stanowiska.
 ## 0.214.0 — 5 września 2026
 
 **„Bez zdjęcia" znaczyło trzy różne rzeczy naraz.** Właściciel przysłał zrzut:

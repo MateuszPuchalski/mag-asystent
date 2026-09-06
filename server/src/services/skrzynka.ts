@@ -110,6 +110,14 @@ export interface ZamowienieRozmowy {
    a nie dzisiejszy cennik. */
 export interface OfertaRozmowy {
   externalId: string; link: string | null;
+  /**
+   * Skąd numer oferty (0.215.0): wskazanie agenta bije numer z wiadomości,
+   * a gdy nie ma żadnego z nich — JEDYNA pozycja zamówienia. Do 0.213.0
+   * ręczne wskazanie zapisywało się w zdarzeniu, a blok oferty go nie czytał;
+   * rozmowa z samym zamówieniem stała bez oferty i bez kartoteki, choć
+   * zamówienie nazywa towar dokładniej niż oferta.
+   */
+  zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
@@ -428,20 +436,40 @@ export function osRozmowy(id: number): {
   const zrodloOferty = zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null
       && String(m.direction) === "incoming")
     ?? zNumerem.find((m) => String(m.typ ?? "") === "OFFER" && m.oferta != null);
-  const oferta: OfertaRozmowy | null = zrodloOferty ? (() => {
-    const konto = Number(zrodloOferty.konto);
-    const ofertaId = String(zrodloOferty.oferta);
+  const kontoRozmowy = Number((db().prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
+    .get(id) as { konto: number }).konto);
+  /* SKU z pozycji zamówienia o tym numerze oferty — zapas na czas, gdy
+     snapshotu jeszcze nie ma. Pozycja ma SKU od razu, z formularza zakupu,
+     więc kartoteka nie musi czekać na takt ofert; dotyczy każdej z trzech
+     dróg, bo wskazanie ręczne bywa właśnie kliknięciem przy pozycji. */
+  const skuZPozycji = (ofertaId: string) =>
+    zamowienie?.pobrane?.pozycje.find((p) => p.offerId === ofertaId)?.sku ?? null;
+  const zOferty = (konto: number, ofertaId: string, zrodlo: OfertaRozmowy["zrodlo"]): OfertaRozmowy => {
     const pobrana = snapshotOferty(konto, ofertaId);
+    const skuZapas = skuZPozycji(ofertaId);
     return {
       externalId: ofertaId,
       link: linkOferty(ofertaId),
+      zrodlo,
       pobrana,
       /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
          „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
-         różne zdania na ekranie i dwie różne rzeczy do zrobienia. */
-      kartoteka: kartotekaOferty(db(), konto, ofertaId, pobrana ? pobrana.sku : undefined),
+         różne zdania na ekranie i dwie różne rzeczy do zrobienia. Oferta
+         z zamówienia ma zapas: SKU pozycji z formularza zakupu jest od razu. */
+      kartoteka: kartotekaOferty(db(), konto, ofertaId, pobrana ? pobrana.sku : (skuZapas ?? undefined)),
     };
-  })() : null;
+  };
+  /* Kolejność jak w doborze (`kandydaci.ts`): ręczne wskazanie bije numer
+     z wiadomości. Trzecia droga jest nowa (0.215.0): zamówienie z JEDNĄ
+     pozycją nie ma czego mylić, więc jego oferta jest ofertą rozmowy. Przy
+     kilku pozycjach rozstrzyga człowiek — przyciskiem przy pozycji. */
+  const reczna = ofertaWskazana(id);
+  const jedynaPozycja = zamowienie?.pobrane?.pozycje.length === 1 && zamowienie.pobrane.pozycje[0].offerId
+    ? zamowienie.pobrane.pozycje[0] : null;
+  const oferta: OfertaRozmowy | null = reczna ? zOferty(kontoRozmowy, reczna.ofertaId, "reczne")
+    : zrodloOferty ? zOferty(Number(zrodloOferty.konto), String(zrodloOferty.oferta), "wiadomosc")
+    : jedynaPozycja ? zOferty(kontoRozmowy, String(jedynaPozycja.offerId), "zamowienie")
+    : null;
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —
      to zasada z docs/obsluga-klienta.md i ona decyduje o tym kształcie. */
