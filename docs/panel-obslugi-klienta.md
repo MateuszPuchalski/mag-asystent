@@ -1695,6 +1695,15 @@ tym mostkiem się nie znajdzie.
 **Po loginie kupującego dobierać nie wolno** — blizna 0.56.6: Allegro maskuje
 rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze.
 
+**W drugą stronę: zwrot przy rozmowie (0.221.0).** Klient często pyta pod
+zamówieniem o zwrot, którego dokonał — „czy paczka doszła", „kiedy pieniądze".
+Do 0.220.0 agent szedł na ekran Zwroty i szukał zwrotu ręcznie. Teraz zwroty
+tego zamówienia stoją w kolumnie „Oferta i towar", pod zamówieniem, tym samym
+mostkiem i tym samym składem wiersza, co w kolejce zwrotów: kubełek, sygnały,
+termin, paczka, pozycje, decyzja i kwota. Praca nad zwrotem zostaje na ekranie
+Zwroty; odnośnik prowadzi prosto do tego zwrotu. Po loginie nie dobieramy —
+ta sama blizna.
+
 ### 25a.12. Lista, filtry i eksport (0.169.0)
 
 Siódma zakładka WSZYSTKIE jest do SZUKANIA, nie do pracy: kubełki zostają
@@ -2094,6 +2103,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Potrącenie za utratę wartości pozycji | **działa** od 0.170.0 | `zapiszPotracenie`, `panel/src/zwroty/Potracenie.tsx` |
 | EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |
 | Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
+| Zwrot tego zamówienia przy rozmowie | **działa** od 0.221.0 | `osRozmowy.zwroty` z `listaZwrotow` po zamówieniu, `skrzynka/ZwrotRozmowy.tsx` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0 | `typPodgladu`, `GET /api/obsluga/zalaczniki/:id/podglad` — cztery typy rastrowe, tylko `SAFE` |

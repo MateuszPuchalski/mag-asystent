@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.221.0 — 6 września 2026
+
+**Zwrot tego zamówienia widać z rozmowy.** Właściciel: „klienci często pytają
+pod zamówieniem o zwrot, którego dokonali”. Do 0.220.0 agent szedł na ekran
+Zwroty i szukał zwrotu ręcznie, a odpowiedź „paczka doszła wczoraj, pieniądze
+idą jutro” baza znała od dawna. Teraz zwroty tego zamówienia stoją w kolumnie
+„Oferta i towar”, pod zamówieniem, z odnośnikiem prosto do zwrotu w panelu
+i w Allegro.
+
+Mostkiem jest numer zamówienia — ten sam, którym zwrot znajduje swoje rozmowy
+od 0.169.0. Po loginie kupującego nie dobieramy (blizna 0.56.6). Skład wiersza
+jest ten sam, co w kolejce zwrotów (`listaZwrotow` z filtrem po zamówieniu):
+kubełek, sygnały, termin, paczka z przewoźnikiem, pozycje z kartoteką, decyzja
+z powodem, kwota i korekta. Druga funkcja składająca zwrot rozjechałaby się
+z pierwszą przy pierwszym nowym polu. Zero nowych tras, zero zapisów przy
+patrzeniu.
+
 ## 0.220.0 — 6 września 2026
 
 **Kartoteki wiązały się same, dopóki Allegro nie kichnęło.** Właściciel pokazał

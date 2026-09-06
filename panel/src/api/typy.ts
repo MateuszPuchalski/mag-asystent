@@ -232,6 +232,8 @@ export type OsRozmowy = {
   sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null;
   oferta: OfertaRozmowy | null;
+  /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
+  zwroty: Zwrot[];
   dobor: Dobor;
 };
 

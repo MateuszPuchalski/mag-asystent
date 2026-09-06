@@ -5,6 +5,7 @@ import { ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
+import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
@@ -401,6 +402,14 @@ export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
+  /**
+   * Zwroty TEGO zamówienia (0.221.0). Właściciel: „klienci często pytają
+   * pod zamówieniem o zwrot, którego dokonali" — agent szedł po stan zwrotu
+   * do ekranu Zwroty i szukał go ręcznie. Mostkiem jest numer zamówienia,
+   * ten sam, którym zwrot znajduje swoje rozmowy od 0.169.0; po loginie
+   * dobierać nie wolno (blizna 0.56.6). Bez zamówienia lista jest pusta.
+   */
+  zwroty: WierszZwrotu[];
   dobor: Dobor;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
@@ -675,6 +684,9 @@ export function osRozmowy(id: number): {
        padła już odpowiedź. */
     sprawa: sprawaRozmowy(id),
     zamowienie, oferta,
+    zwroty: zamowienie
+      ? listaZwrotow(db(), Date.now(), { channelAccountId: kontoRozmowy, orderId: zamowienie.externalId })
+      : [],
     /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
        to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
        zdarzenie szyny. */

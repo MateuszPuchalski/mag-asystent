@@ -4,6 +4,7 @@ import type { OsRozmowy } from "../api/typy";
 import { Zakladki } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
+import { ZwrotRozmowy } from "./ZwrotRozmowy";
 import { TowarRozmowy } from "./TowarRozmowy";
 import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
@@ -103,6 +104,9 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
               </p>}
         {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
           ofertaRozmowy={oferta?.externalId ?? null} />}
+        {/* Zwrot POD zamówieniem, bo to zwrot tego zakupu (0.221.0). Jeden
+            zakup miewa kilka zwrotów, stąd lista. */}
+        {dane.zwroty.map((z) => <ZwrotRozmowy key={z.id} zwrot={z} />)}
         {oferta
           ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
               onWstawDoSzkicu={onWstawDoSzkicu} />
