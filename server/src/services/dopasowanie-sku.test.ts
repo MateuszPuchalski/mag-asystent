@@ -224,3 +224,54 @@ test("skrzynka: bez numeru oferty pamięci nie ma czego szukać", () => {
   const w = kartotekaOferty(d, 1, null, "SEK-46");
   assert.equal(w.twId, 10, "sam SKU dalej działa");
 });
+
+/* ── Sygnatura się zmienia (0.219.0) ─────────────────────────────────────────
+   Decyzja właściciela: sprzedawca przepina sygnaturę oferty, gdy towar od
+   jednego dostawcy się wyczerpie. Pamięć wskazania obowiązuje więc tylko przy
+   TEJ SAMEJ sygnaturze; przy nowej rządzi sygnatura, a zdanie mówi, co ustąpiło. */
+
+test("skrzynka: wskazanie ręczne ustępuje, gdy sygnatura oferty się zmieniła", () => {
+  const d = stanowisko();
+  d.prepare(`INSERT INTO oferta_kartoteka
+    (channel_account_id,offer_id,tw_id,tw_symbol,sku,sku_wtedy,wskazano_at,wskazano_przez)
+    VALUES (1,?,12,'DUBEL',NULL,'SEK-46','2026-09-02T10:00:00Z','A. Lewandowska')`).run(NUMER_OFERTY);
+  /* Ta sama sygnatura co przy wskazaniu — człowiek dalej wygrywa. */
+  assert.equal(zeSkrzynki(d, "SEK-46").pewnosc, "pamiec");
+  assert.equal(zeSkrzynki(d, "sek-46 ").pewnosc, "pamiec", "wielkość liter i spacja nie są zmianą sygnatury");
+  /* Bez snapshotu nie ma czym podważyć pamięci. */
+  assert.equal(zeSkrzynki(d, undefined).pewnosc, "pamiec");
+  /* Sygnatura przepięta na ZRA-01 — wygrywa sygnatura, ze zdaniem o dawnym wskazaniu. */
+  const w = zeSkrzynki(d, "ZRA-01");
+  assert.equal(w.pewnosc, "sku");
+  assert.equal(w.twId, 11);
+  assert.match(w.zrodlo, /SKU oferty „ZRA-01"/);
+  assert.match(w.zrodlo, /sygnatura zmieniła się z „SEK-46”/);
+  assert.match(w.zrodlo, /A\. Lewandowska/);
+  /* Nowa sygnatura bez kartoteki: brak Z POWODEM i z tym samym dopiskiem. */
+  const brak = zeSkrzynki(d, "NIE-MA");
+  assert.equal(brak.powod, "sku_nie_trafia");
+  assert.match(brak.zrodlo, /dawne wskazanie/);
+});
+
+test("skrzynka: wiersz pamięci sprzed 0.219.0 (bez sygnatury) obowiązuje jak dotąd", () => {
+  const d = stanowisko();
+  d.prepare(`INSERT INTO oferta_kartoteka
+    (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
+    VALUES (1,?,11,'ZRA-01',NULL,'2026-09-02T10:00:00Z','Ala')`).run(NUMER_OFERTY);
+  assert.equal(zeSkrzynki(d, "SEK-46").pewnosc, "pamiec");
+});
+
+test("zwrot: zatwierdzona propozycja z dawną sygnaturą ustępuje sygnaturze z pozycji zamówienia", () => {
+  const d = stanowisko();
+  /* Automat zatwierdzony przy SEK-46; zamówienie mówi, że kupiono pod ZRA-01. */
+  d.prepare(`INSERT INTO oferta_kartoteka
+    (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
+    VALUES (1,?,10,'SEK-46','SEK-46','2026-09-01T10:00:00Z','automat (sygnatura)')`).run(NUMER_OFERTY);
+  zamowienie(d, "ord-1", [{ offerId: NUMER_OFERTY, lineId: "l-1", nazwa: "Sekator", sku: "ZRA-01" }]);
+  const w = propozycja(d);
+  assert.equal(w.pewnosc, "sku");
+  assert.equal(w.twId, 11);
+  assert.match(w.zrodlo, /sygnatura zmieniła się z „SEK-46”/);
+  /* Zwrot bez zamówienia nie zna sygnatury — pamięć obowiązuje. */
+  assert.equal(propozycja(d, { orderId: null }).pewnosc, "pamiec");
+});

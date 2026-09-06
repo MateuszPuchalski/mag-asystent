@@ -1376,14 +1376,27 @@ sam nie zna — oraz SKU sprzedawcy (`offer.external.id`), czyli mostek do
 kartoteki Subiekta. Bez kartoteki nie ma zdjęcia: cache obrazów jest
 kluczowany po `tw_id`.
 
-**Automat proponuje, człowiek zatwierdza.** Dopasowanie po SKU niesie źródło
-i czeka na jedno kliknięcie. Zero i wiele trafień daje brak, nigdy
-zgadywanie; po nazwie towaru w KARTOTECE nie dopasowujemy nigdy.
+**Jedno trafienie po sygnaturze łączy samo (0.219.0).** Do 0.218.0 obowiązywało
+„automat proponuje, człowiek zatwierdza" i dopasowanie po SKU czekało na
+kliknięcie. Zwroty wiązały je same od 0.169.0, dobór brał za kandydata bez
+klikania, a skrzynka kazała klikać po stan i półkę. Właściciel zdecydował:
+sygnatura trafiająca w dokładnie jedną kartotekę jest powiązaniem, z podpisem
+„SKU oferty". Zero i wiele trafień daje brak, nigdy zgadywanie; po nazwie
+towaru w KARTOTECE nie dopasowujemy nigdy. Propozycje z zapasowych dróg
+(jedyna pozycja, zgodna nazwa) dalej czekają na człowieka.
 
-**Pamięć wskazań (0.154.0).** Potwierdzenie zapamiętuje parę oferta–kartoteka,
+**Pamięć wskazań (0.154.0).** Wskazanie zapamiętuje parę oferta–kartoteka,
 a następny zwrot tej samej oferty dostaje ją bez pytania o zamówienie. To
 jedyna zmiana, która realnie zdejmuje pracę powtarzalną; źródłem jest wtedy
 człowiek, nie SKU, i ekran tak to podpisuje.
+
+**Pamięć obowiązuje, dopóki sygnatura jest ta sama (0.219.0).** Sprzedawca
+przepina sygnaturę oferty, gdy towar od jednego dostawcy się wyczerpie. Para
+zapamiętana przy dawnej sygnaturze mówi wtedy o towarze, którego pod tym
+numerem już nie ma, więc ustępuje nowej sygnaturze — a zdanie źródła mówi,
+co ustąpiło i komu. Wiersz pamięta sygnaturę z chwili wskazania
+(`sku_wtedy`); wiersze sprzed 0.219.0 obowiązują jak dotąd. Bez snapshotu
+oferty pamięci nie ma czym podważyć.
 
 **Dopasowanie zapasowe idzie wyłącznie w obrębie jednego zamówienia.** Gdy
 identyfikator nie trafia, a zamówienie ma dokładnie jedną pozycję — to jest ta
@@ -1966,7 +1979,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |
 | Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
-| Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias` |
+| Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias`; od 0.219.0 ważna tylko przy tej samej sygnaturze (`pamiecAktualna`) |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
 | Statusy rozmowy (§7) | **działa** od 0.158.0 | `conversation.status`, `ustawStatus`, kubełki kolejki |
 | Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
@@ -2006,7 +2019,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
 | Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
-| Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
+| Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
 | Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.198.0 zakładki „Oferta i towar" oraz „Dobór" |
 | Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |

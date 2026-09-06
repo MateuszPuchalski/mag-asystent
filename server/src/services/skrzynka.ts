@@ -174,9 +174,10 @@ export interface OfertaRozmowy {
        oferty Allegro nie ma z czym pokazać" to dwa różne zdania na ekranie. */
     zdjecie: StanZdjeciaOferty;
   } | null;
-  /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). To PROPOZYCJA
-     z powodem, nie fakt — §4.3 nie pozwala, żeby wybór automatu udawał daną
-     z Allegro. Ciężkich danych towaru tu NIE MA: stan, półki i zamienniki
+  /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). Od 0.219.0 jedno
+     trafienie po sygnaturze jest POWIĄZANIEM (decyzja właściciela), a zdanie
+     źródła mówi, że stoi za nim sygnatura, nie człowiek — §4.3 nie pozwala,
+     żeby wynik automatu udawał daną z Allegro. Ciężkich danych towaru tu NIE MA: stan, półki i zamienniki
      panel bierze z `GET /api/products/:twId`, bo `osRozmowy` odświeża się
      przy każdym zdarzeniu szyny, a karta towaru ciągnie kolejkę MM. */
   kartoteka: Dopasowanie;

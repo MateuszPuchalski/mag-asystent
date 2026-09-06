@@ -239,13 +239,19 @@ export function wskazKartoteke(conversationId: number, ofertaId: string, twId: n
       .get(twId) as { tw_id: number; symbol: string } | undefined;
     if (!towar) throw new Error("Nie znaleziono kartoteki o tym numerze");
 
+    /* Sygnatura oferty W TEJ CHWILI (0.219.0): gdy sprzedawca ją przepnie,
+       to wskazanie ma ustąpić nowej sygnaturze — patrz `pamiecAktualna`. */
+    const snapshot = database.prepare(
+      "SELECT sku FROM offer_snapshot WHERE channel_account_id=? AND external_id=?")
+      .get(konto, numer) as { sku: string | null } | undefined;
+    const skuWtedy = snapshot?.sku == null ? null : String(snapshot.sku);
     database.prepare(`INSERT INTO oferta_kartoteka
-      (channel_account_id, offer_id, tw_id, tw_symbol, sku, wskazano_at, wskazano_przez)
-      VALUES (?,?,?,?,NULL,strftime('%Y-%m-%dT%H:%M:%fZ','now'),?)
+      (channel_account_id, offer_id, tw_id, tw_symbol, sku, sku_wtedy, wskazano_at, wskazano_przez)
+      VALUES (?,?,?,?,NULL,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),?)
       ON CONFLICT(channel_account_id, offer_id) DO UPDATE SET
-        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=NULL,
+        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=NULL, sku_wtedy=excluded.sku_wtedy,
         wskazano_at=excluded.wskazano_at, wskazano_przez=excluded.wskazano_przez`)
-      .run(konto, numer, towar.tw_id, towar.symbol, autor);
+      .run(konto, numer, towar.tw_id, towar.symbol, skuWtedy, autor);
 
     database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
       VALUES (?, NULL, 'product_linked_manually',

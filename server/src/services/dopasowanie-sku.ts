@@ -157,11 +157,40 @@ export function kartotekaPoSku(database: Db, sku: string | null | undefined) {
 export function zPamieci(database: Db, channelAccountId: number, offerId: string | null) {
   if (!offerId) return null;
   return (database.prepare(
-    `SELECT tw_id, tw_symbol, wskazano_przez FROM oferta_kartoteka
+    `SELECT tw_id, tw_symbol, wskazano_przez, sku, sku_wtedy FROM oferta_kartoteka
      WHERE channel_account_id=? AND offer_id=?`
   ).get(channelAccountId, offerId) as
-    { tw_id: number; tw_symbol: string; wskazano_przez: string } | undefined) ?? null;
+    { tw_id: number; tw_symbol: string; wskazano_przez: string; sku: string | null; sku_wtedy: string | null }
+    | undefined) ?? null;
 }
+
+const zwinSku = (s: string) => s.trim().toLowerCase();
+
+/**
+ * Czy pamięć wskazania obowiązuje przy DZISIEJSZEJ sygnaturze oferty (0.219.0).
+ *
+ * Decyzja właściciela: sprzedawca przepina sygnaturę oferty, gdy towar od
+ * jednego dostawcy się wyczerpie. Para oferta–kartoteka zapamiętana przy
+ * dawnej sygnaturze mówi wtedy o towarze, którego już nie sprzedajemy pod tym
+ * numerem — i musi ustąpić sygnaturze. Wiersz pamięta sygnaturę z chwili
+ * wskazania: `sku` przy zatwierdzonej propozycji, `sku_wtedy` przy ręcznym.
+ *
+ * `undefined` = sygnatury dziś nie znamy (snapshotu jeszcze nie ma, zwrot bez
+ * zamówienia) — wtedy pamięć obowiązuje, bo nie ma czym jej podważyć. Wiersz
+ * bez zapisanej sygnatury (sprzed 0.219.0) obowiązuje jak dotąd.
+ */
+export function pamiecAktualna(
+  pamiec: { sku: string | null; sku_wtedy: string | null }, skuTeraz: string | null | undefined,
+): boolean {
+  if (skuTeraz === undefined) return true;
+  const wtedy = pamiec.sku ?? pamiec.sku_wtedy;
+  if (wtedy == null) return true;
+  return zwinSku(wtedy) === zwinSku(skuTeraz ?? "");
+}
+
+/** Dopisek do zdania źródła, gdy dawne wskazanie ustąpiło nowej sygnaturze. */
+const poZmianieSygnatury = (pamiec: { sku: string | null; sku_wtedy: string | null; wskazano_przez: string }) =>
+  ` — sygnatura zmieniła się z „${pamiec.sku ?? pamiec.sku_wtedy}”, dawne wskazanie (${pamiec.wskazano_przez}) nie obowiązuje`;
 
 /**
  * Propozycja kartoteki dla pozycji zwrotu — z powodem, gdy jej nie ma.
@@ -177,17 +206,22 @@ export function zaproponujKartoteke(
   },
 ): Dopasowanie {
   const pamiec = zPamieci(database, channelAccountId, offerId);
-  if (pamiec) {
+  /* Pozycję zamówienia liczymy PRZED rozstrzygnięciem pamięci: to jej SKU
+     mówi, czy pamięć jeszcze obowiązuje (0.219.0). Bez zamówienia albo bez
+     pozycji sygnatury nie znamy i pamięć obowiązuje jak dotąd. */
+  const t = orderId ? dopasujPozycjeZamowienia(database, channelAccountId, orderId, offerId, nazwa) : null;
+  const skuTeraz = t?.pozycja ? (t.pozycja.sku ?? "") : undefined;
+  if (pamiec && pamiecAktualna(pamiec, skuTeraz)) {
     return {
       pewnosc: "pamiec", twId: pamiec.tw_id, symbol: pamiec.tw_symbol,
       zrodlo: `Wskazane wcześniej przez: ${pamiec.wskazano_przez}`,
       powod: null, poKolumnie: null,
     };
   }
+  const dopisek = pamiec ? poZmianieSygnatury(pamiec) : "";
 
-  if (!orderId) return brak("brak_zamowienia_w_zwrocie", "Zwrot bez numeru zamówienia");
+  if (!orderId || !t) return brak("brak_zamowienia_w_zwrocie", "Zwrot bez numeru zamówienia");
 
-  const t = dopasujPozycjeZamowienia(database, channelAccountId, orderId, offerId, nazwa);
   if (t.pusteZamowienie) {
     return brak("zamowienie_niepobrane", "Zamówienia jeszcze nie pobrano");
   }
@@ -196,16 +230,16 @@ export function zaproponujKartoteke(
   }
 
   const sku = (t.pozycja.sku ?? "").trim();
-  if (!sku) return brak("oferta_bez_sku", "Oferta bez SKU w Allegro (pole „sygnatura”)");
+  if (!sku) return brak("oferta_bez_sku", `Oferta bez SKU w Allegro (pole „sygnatura”)${dopisek}`);
 
   const k = kartotekaPoSku(database, sku);
   if (k.stan === "brak") {
-    return brak("sku_nie_trafia", `Kartoteki o symbolu „${sku}" nie ma`);
+    return brak("sku_nie_trafia", `Kartoteki o symbolu „${sku}" nie ma${dopisek}`);
   }
   if (k.stan === "wiele") {
     return {
       pewnosc: "niejednoznaczne", twId: null, symbol: null,
-      zrodlo: `Symbol „${sku}" ma więcej niż jedną kartotekę — wskaż ją`,
+      zrodlo: `Symbol „${sku}" ma więcej niż jedną kartotekę — wskaż ją${dopisek}`,
       powod: "symbol_zdublowany", poKolumnie: t.poKolumnie,
     };
   }
@@ -217,7 +251,7 @@ export function zaproponujKartoteke(
       : `SKU „${sku}" z pozycji zamówienia o tej samej nazwie`;
   return {
     pewnosc: t.pewnosc, twId: k.twId, symbol: k.symbol,
-    zrodlo: jak, powod: null, poKolumnie: t.poKolumnie,
+    zrodlo: jak + dopisek, powod: null, poKolumnie: t.poKolumnie,
   };
 }
 
@@ -240,13 +274,16 @@ export function kartotekaOferty(
   sku: string | null | undefined,
 ): Dopasowanie {
   const pamiec = zPamieci(database, channelAccountId, offerId);
-  if (pamiec) {
+  /* Pamięć obowiązuje, dopóki sygnatura oferty jest ta sama (0.219.0);
+     `undefined` (bez snapshotu) jej nie podważa. */
+  if (pamiec && pamiecAktualna(pamiec, sku === null ? undefined : sku)) {
     return {
       pewnosc: "pamiec", twId: pamiec.tw_id, symbol: pamiec.tw_symbol,
       zrodlo: `Wskazane wcześniej przez: ${pamiec.wskazano_przez}`,
       powod: null, poKolumnie: null,
     };
   }
+  const dopisek = pamiec ? poZmianieSygnatury(pamiec) : "";
 
   /* `undefined` znaczy „nie mamy snapshotu", a `""` — „mamy snapshot, ale
      sprzedawca nie wypełnił sygnatury". Pierwsze naprawi się samo, drugie
@@ -256,19 +293,22 @@ export function kartotekaOferty(
   }
 
   const szukane = sku.trim();
-  if (!szukane) return brak("oferta_bez_sku", "Oferta bez SKU w Allegro (pole „sygnatura”)");
+  if (!szukane) return brak("oferta_bez_sku", `Oferta bez SKU w Allegro (pole „sygnatura”)${dopisek}`);
 
   const k = kartotekaPoSku(database, szukane);
-  if (k.stan === "brak") return brak("sku_nie_trafia", `Kartoteki o symbolu „${szukane}" nie ma`);
+  if (k.stan === "brak") return brak("sku_nie_trafia", `Kartoteki o symbolu „${szukane}" nie ma${dopisek}`);
   if (k.stan === "wiele") {
     return {
       pewnosc: "niejednoznaczne", twId: null, symbol: null,
-      zrodlo: `Symbol „${szukane}" ma więcej niż jedną kartotekę — wskaż ją`,
+      zrodlo: `Symbol „${szukane}" ma więcej niż jedną kartotekę — wskaż ją${dopisek}`,
       powod: "symbol_zdublowany", poKolumnie: null,
     };
   }
+  /* JEDNO trafienie po sygnaturze to POWIĄZANIE, nie propozycja (0.219.0,
+     decyzja właściciela) — jak przy zwrotach od 0.169.0. Zdanie źródła mówi,
+     że stoi za nim sygnatura, nie człowiek. */
   return {
     pewnosc: "sku", twId: k.twId, symbol: k.symbol,
-    zrodlo: `SKU oferty „${szukane}"`, powod: null, poKolumnie: null,
+    zrodlo: `SKU oferty „${szukane}"${dopisek}`, powod: null, poKolumnie: null,
   };
 }

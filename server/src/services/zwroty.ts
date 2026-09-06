@@ -800,12 +800,13 @@ export function potwierdzKartoteke(
   zapamietaj = true,
 ): { twId: number | null; twSymbol: string | null; twZrodlo: string | null } {
   const pozycja = database.prepare(
-    `SELECT p.id, p.zwrot_id, p.offer_id, z.channel_account_id
+    `SELECT p.id, p.zwrot_id, p.offer_id, z.channel_account_id, z.order_id
      FROM zwrot_klienta_pozycja p
      JOIN zwrot_klienta z ON z.id = p.zwrot_id
      WHERE p.id=?`
   ).get(pozycjaId) as
-    { id: number; zwrot_id: number; offer_id: string | null; channel_account_id: number } | undefined;
+    { id: number; zwrot_id: number; offer_id: string | null; channel_account_id: number;
+      order_id: string | null } | undefined;
   if (!pozycja) throw new Error("Nie znaleziono pozycji zwrotu");
 
   if (twId === null) {
@@ -848,14 +849,23 @@ export function potwierdzKartoteke(
 
      Pamięć trzyma się OFERTY, nie pozycji: pozycja żyje jednym zwrotem. */
   if (pozycja.offer_id && zapamietaj) {
+    /* Sygnatura pozycji zamówienia W TEJ CHWILI (0.219.0) — po obu kolumnach
+       złączenia, jak `dopasujPozycjeZamowienia`. Gdy sprzedawca przepnie
+       sygnaturę, to wskazanie ma jej ustąpić — patrz `pamiecAktualna`. */
+    const linia = pozycja.order_id ? database.prepare(`SELECT p.sku FROM zamowienie_klienta k
+        JOIN zamowienie_klienta_pozycja p ON p.zamowienie_id = k.id
+       WHERE k.channel_account_id=? AND k.external_id=? AND (p.offer_id=? OR p.external_id=?) LIMIT 1`)
+      .get(pozycja.channel_account_id, pozycja.order_id, pozycja.offer_id, pozycja.offer_id) as
+      { sku: string | null } | undefined : undefined;
+    const skuWtedy = linia?.sku == null ? null : String(linia.sku);
     database.prepare(`INSERT INTO oferta_kartoteka
-      (channel_account_id,offer_id,tw_id,tw_symbol,sku,wskazano_at,wskazano_przez)
-      VALUES (?,?,?,?,?,?,?)
+      (channel_account_id,offer_id,tw_id,tw_symbol,sku,sku_wtedy,wskazano_at,wskazano_przez)
+      VALUES (?,?,?,?,?,?,?,?)
       ON CONFLICT(channel_account_id, offer_id) DO UPDATE SET
-        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=excluded.sku,
+        tw_id=excluded.tw_id, tw_symbol=excluded.tw_symbol, sku=excluded.sku, sku_wtedy=excluded.sku_wtedy,
         wskazano_at=excluded.wskazano_at, wskazano_przez=excluded.wskazano_przez`).run(
       pozycja.channel_account_id, pozycja.offer_id, towar.tw_id, towar.symbol,
-      zrodlo === "sku" ? towar.symbol : null, teraz.toISOString(), kto.name);
+      zrodlo === "sku" ? towar.symbol : null, skuWtedy, teraz.toISOString(), kto.name);
   }
 
   database.prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id)

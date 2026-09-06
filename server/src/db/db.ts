@@ -172,6 +172,9 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
+     w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
+  addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
   /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */

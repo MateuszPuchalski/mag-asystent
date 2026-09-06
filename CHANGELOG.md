@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.219.0 — 6 września 2026
+
+**Sygnatura jeden do jednego łączy ofertę z kartoteką sama.** Właściciel
+zapytał, po co zatwierdzać propozycję, skoro SKU trafia w dokładnie jedną
+kartotekę — i zdecydował: łączyć automatycznie. W skrzynce stan, półka,
+zdjęcie i parametry pokazują się od razu, z podpisem „SKU oferty”; przycisk
+„Zatwierdź” zostaje tylko przy zapasowych drogach (jedyna pozycja, zgodna
+nazwa). Zwroty wiązały tak od 0.169.0, dobór brał to za kandydata bez
+klikania; skrzynka była ostatnia.
+
+**Pamięć wskazań obowiązuje, dopóki sygnatura jest ta sama.** Sprzedawca
+przepina sygnaturę oferty, gdy towar od jednego dostawcy się wyczerpie. Para
+zapamiętana przy dawnej sygnaturze ustępuje wtedy nowej, a zdanie źródła mówi,
+co ustąpiło i komu. Wiersz pamięta sygnaturę z chwili wskazania (nowa kolumna
+`sku_wtedy`, migracja sama); wiersze sprzed tego wydania obowiązują jak dotąd,
+a bez snapshotu oferty pamięci nie ma czym podważyć. Dotyczy obu dróg: skrzynki
+(sygnatura ze snapshotu) i zwrotów (sygnatura z pozycji zamówienia).
+
 ## 0.218.0 — 6 września 2026
 
 **Zdjęcie od klienta widać na osi, bez klikania.** Załącznik będący obrazem

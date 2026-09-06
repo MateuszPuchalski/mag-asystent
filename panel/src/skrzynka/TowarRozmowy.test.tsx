@@ -40,15 +40,30 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(null);
   });
 
-  it("propozycja z SKU czeka na zatwierdzenie i mówi, skąd się wzięła", () => {
-    karta.mockReturnValue(PUSTA);
+  it("jedno trafienie po SKU jest powiązaniem: stan od razu, bez „Zatwierdź”, z podpisem źródła", () => {
+    /* Decyzja właściciela (0.219.0): sygnatura jeden do jednego łączy sama.
+       Do 0.218.0 stał tu przycisk, a stanu nie pobierano przed kliknięciem. */
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
     render(<TowarRozmowy rozmowaId={1} oferta={oferta({
       pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43",
       zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
     })} />);
-    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
+    expect(karta).toHaveBeenCalledWith(7701);
+    expect(screen.queryByRole("button", { name: /Zatwierdź/ })).toBeNull();
     expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-    /* Propozycja to jeszcze nie fakt — stanu magazynowego nie pobieramy. */
+    expect(screen.getByText("5 szt.")).toBeInTheDocument();
+    /* Powiązania po sygnaturze nie da się „zdjąć" — wróciłoby; można wskazać inną. */
+    expect(screen.queryByTitle("Zdejmij powiązanie")).toBeNull();
+    expect(screen.getByRole("button", { name: /wskaż inną kartotekę/ })).toBeInTheDocument();
+  });
+
+  it("propozycja spoza sygnatury dalej czeka na zatwierdzenie", () => {
+    karta.mockReturnValue(PUSTA);
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "jedyna_pozycja", twId: 7701, symbol: "NOZ-STIGA-43",
+      zrodlo: 'SKU „NOZ-STIGA-43" z jedynej pozycji zamówienia', powod: null,
+    })} />);
+    expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
     expect(karta).toHaveBeenCalledWith(null);
   });
 
