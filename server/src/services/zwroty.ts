@@ -512,13 +512,24 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
  * i dzięki temu przełączenie kubełka jest natychmiastowe — a to jest
  * dokładnie ten koszt, który miał zniknąć.
  */
-export function listaZwrotow(database: Db = defaultDb(), teraz = Date.now()): WierszZwrotu[] {
-  const zwroty = database.prepare(
-    "SELECT * FROM zwrot_klienta ORDER BY created_at ASC"
-  ).all() as Wiersz[];
-  const pozycje = database.prepare(
-    "SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC"
-  ).all() as Wiersz[];
+export function listaZwrotow(
+  database: Db = defaultDb(), teraz = Date.now(),
+  /* Zwroty JEDNEGO zamówienia (0.221.0) — dla bloku zwrotu przy rozmowie.
+     Ten sam skład wiersza, co w kolejce zwrotów: druga funkcja składająca
+     zwrot rozjechałaby się z pierwszą przy pierwszym nowym polu. Filtr
+     zawęża zwroty i ich pozycje; reszta to proste odczyty słownikowe. */
+  zamowienie: { channelAccountId: number; orderId: string } | null = null,
+): WierszZwrotu[] {
+  const zwroty = (zamowienie
+    ? database.prepare(`SELECT * FROM zwrot_klienta WHERE channel_account_id=? AND order_id=?
+        ORDER BY created_at ASC`).all(zamowienie.channelAccountId, zamowienie.orderId)
+    : database.prepare("SELECT * FROM zwrot_klienta ORDER BY created_at ASC").all()) as Wiersz[];
+  const pozycje = (zamowienie
+    ? database.prepare(`SELECT p.* FROM zwrot_klienta_pozycja p
+        JOIN zwrot_klienta z ON z.id = p.zwrot_id
+       WHERE z.channel_account_id=? AND z.order_id=? ORDER BY p.id ASC`)
+      .all(zamowienie.channelAccountId, zamowienie.orderId)
+    : database.prepare("SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC").all()) as Wiersz[];
   /* Które pozycje leżą już w koszyku zwrotów (0.192.0). Osobne zapytanie,
      nie złączenie: `listaZwrotow` czyta całe tabele naraz i dokładanie
      `LEFT JOIN` do jednej z nich rozjechałoby ten wzorzec bez zysku. */

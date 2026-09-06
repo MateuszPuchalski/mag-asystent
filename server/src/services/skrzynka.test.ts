@@ -783,3 +783,41 @@ test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
 
   assert.equal(osRozmowy(rozmowa).os.find((w) => w.rodzaj === "wiadomosc")!.autor, "Pytanie o gwint");
 });
+
+test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy po loginie", () => {
+  /* Właściciel (0.221.0): klient pyta pod zamówieniem o zwrot, którego dokonał,
+     a agent szukał go ręcznie na ekranie Zwroty. Mostek jest ten sam, którym
+     zwrot znajduje swoje rozmowy od 0.169.0 — `related_order_id`. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,updated_at) VALUES (?,'w-ze-zwrotem','kupujacy_44','2026-09-06T12:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_order_id,sent_at) VALUES (?,?,'m-zw-1','incoming','Kiedy dostanę pieniądze za zwrot?','zam-zw-1',
+    '2026-09-06T12:00:00.000Z')`).run(r, konto);
+  /* Zwrot INNEGO zamówienia tego samego kupującego nie ma prawa się tu pokazać. */
+  const zw1 = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
+    kupujacy_login,paczka_at) VALUES (?,'zwrot-1','zam-zw-1','2026-09-01T10:00:00.000Z','2026-09-06T11:00:00.000Z',
+    'kupujacy_44','2026-09-03T08:00:00.000Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,klucz)
+    VALUES (?,'oferta-9','Szarpak do NAC',1,4599,'PLN','DAMAGED','oferta-9')`).run(zw1);
+  const zw2 = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
+    kupujacy_login) VALUES (?,'zwrot-2','zam-inne','2026-08-01T10:00:00.000Z','2026-09-06T11:00:00.000Z','kupujacy_44')`)
+    .run(konto).lastInsertRowid);
+
+  const os = osRozmowy(r);
+  assert.equal(os.zwroty.length, 1);
+  assert.equal(os.zwroty[0].externalId, "zwrot-1");
+  assert.equal(os.zwroty[0].kubelek, "decyzja");
+  assert.equal(os.zwroty[0].paczkaAt, "2026-09-03T08:00:00.000Z");
+  assert.deepEqual(os.zwroty[0].pozycje.map((p) => [p.nazwa, p.ilosc, p.powod]), [["Szarpak do NAC", 1, "DAMAGED"]]);
+  /* Ten sam skład, co w kolejce zwrotów — z rozmową o tym zakupie włącznie. */
+  assert.deepEqual(os.zwroty[0].rozmowy.map((x) => x.id), [r]);
+  /* Rozmowa bez numeru zamówienia nie ma zwrotów, choć login by pasował. */
+  assert.deepEqual(osRozmowy(rozmowaId).zwroty, []);
+
+  d.prepare("DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id IN (?,?)").run(zw1, zw2);
+  d.prepare("DELETE FROM zwrot_klienta WHERE id IN (?,?)").run(zw1, zw2);
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});

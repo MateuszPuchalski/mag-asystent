@@ -26,7 +26,7 @@ export const KUBELKI: Array<{ id: Kubelek; etykieta: string; pytanie: string }> 
 /* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze (0.209.0). Łańcuch
    znał trzy sygnały i milcząco podpisywał każdy czwarty ostatnią gałęzią —
    czyli nowy sygnał kłamałby na ekranie, zamiast nie przejść kompilacji. */
-const SYGNALY: Record<Sygnal,
+export const SYGNALY: Record<Sygnal,
   { tytul: string; krotko: string; ikona: React.ReactNode; klasa: string }> = {
   termin: { tytul: "Termin ustawowy blisko albo minął", krotko: "termin",
     klasa: "bg-red-100 text-ranga-zle", ikona: <AlertTriangle size={13} /> },

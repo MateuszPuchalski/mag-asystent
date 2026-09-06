@@ -13,6 +13,9 @@ vi.mock("./OfertaRozmowy", () => ({
 vi.mock("./ZamowienieRozmowy", () => ({
   ZamowienieRozmowy: () => <div data-testid="zamowienie">blok zamówienia</div>,
 }));
+vi.mock("./ZwrotRozmowy", () => ({
+  ZwrotRozmowy: ({ zwrot }: { zwrot: { id: number } }) => <div data-testid="zwrot">zwrot {zwrot.id}</div>,
+}));
 vi.mock("./Dobor", () => ({
   Dobor: () => <div data-testid="dobor">blok doboru</div>,
 }));
@@ -27,7 +30,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
     kopilot: null,
   },
-  os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null,
+  os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null, zwroty: [],
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
       oem: null, nazwaCzesci: null, parametry: {} } },
@@ -59,6 +62,14 @@ describe("kolumna kontekstu", () => {
     })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
+  });
+
+  it("zwroty tego zamówienia stoją pod zamówieniem, każdy osobno", () => {
+    render(<Kontekst dane={dane({
+      zamowienie: { externalId: "zam-77", link: null, pobrane: null },
+      zwroty: [{ id: 5 } as never, { id: 9 } as never],
+    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    expect(screen.getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5", "zwrot 9"]);
   });
 
   it("bez oferty kolumna mówi, czego brakuje, zamiast milczeć", () => {
