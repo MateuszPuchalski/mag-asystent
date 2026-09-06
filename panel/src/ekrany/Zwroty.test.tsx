@@ -21,7 +21,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
   zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
-  pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
+  pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
     wKoszyku: false, iloscZwrocona: null, url: null, twId: null, twSymbol: null, twZrodlo: null, sku: null, ean: null, potracenieGrosze: null, potraceniePowod: null, propozycja: null,
       rabat: { stan: "brak", lineItemId: "li-1", ilosc: 1, wniosekId: null,
@@ -144,9 +144,10 @@ describe("Ekran zwrotów", () => {
     await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
     expect(screen.getAllByText("ZW-2").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
-    /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Nagłówek środkowej
-       kolumny zostaje, bo opisuje otwarty zwrot, a nie zakładkę. */
-    expect(screen.getAllByText("Przyjąć czy odrzucić?")).toHaveLength(1);
+    /* Pytanie nad LISTĄ milczy — nie ma czyje zadać. Od 0.214.0 nie ma go też
+       w nagłówku środkowej kolumny: stało tam nad przyciskami PRZYJMIJ
+       i ODRZUĆ, czyli pytało o to, na co odpowiedź była pod spodem. */
+    expect(screen.queryByText("Przyjąć czy odrzucić?")).toBeNull();
   });
 
   it("filtr przewoźnika zna tylko firmy, które naprawdę przyjechały", () => {
