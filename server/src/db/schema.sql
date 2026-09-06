@@ -1443,6 +1443,11 @@ CREATE TABLE IF NOT EXISTS oferta_kartoteka (
   tw_symbol TEXT NOT NULL,
   -- SKU, po którym trafiło, gdy trafiło. NULL = człowiek wskazał ręcznie.
   sku TEXT,
+  -- Sygnatura oferty W CHWILI wskazania (0.219.0). Sprzedawca przepina
+  -- sygnaturę, gdy towar od jednego dostawcy się wyczerpie — para zapamiętana
+  -- przy dawnej sygnaturze przestaje wtedy obowiązywać. NULL = wiersz sprzed
+  -- 0.219.0 albo oferta bez snapshotu; taki wiersz obowiązuje jak dotąd.
+  sku_wtedy TEXT,
   wskazano_at TEXT NOT NULL,
   wskazano_przez TEXT NOT NULL,
   PRIMARY KEY (channel_account_id, offer_id)

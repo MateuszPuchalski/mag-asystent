@@ -14,9 +14,19 @@ import { Kafel } from "../towar/Kafel";
  * to, czego §25 zabrania („agent obsłuży typowe pytanie bez otwierania panelu
  * Allegro" ma ten sam sens co „bez otwierania Subiekta").
  *
- * Blok ma trzy stany i każdy każe co innego zrobić: potwierdzona kartoteka
+ * Blok ma trzy stany i każdy każe co innego zrobić: powiązana kartoteka
  * (widać stan i półkę), propozycja z automatu (jedno kliknięcie), brak
  * z POWODEM (wiadomo, które ogniwo pękło i czy naprawi się samo).
+ *
+ * ── JEDNO TRAFIENIE PO SYGNATURZE TO POWIĄZANIE (0.219.0) ──────────────────
+ * Do 0.218.0 kartoteka z SKU była propozycją i czekała na „Zatwierdź", choć
+ * ten sam wynik dobór brał za kandydata bez klikania, a zwroty wiązały go
+ * same od 0.169.0. Właściciel zapytał, po co klikać, skoro sygnatura trafia
+ * jeden do jednego — i zdecydował: łączyć automatycznie. Kliknięcie było
+ * zapisem pamięci wskazań; patrzenie na stan i półkę niczego nie zapisuje,
+ * więc nie ma za co brać opłaty w kliknięciach. Pamięć zostaje dla wskazań
+ * ręcznych i obowiązuje, dopóki sprzedawca nie przepnie sygnatury
+ * (`pamiecAktualna` na serwerze).
  *
  * ŹRÓDŁA SIĘ NIE MIESZAJĄ (§4.3). Wszystko pod nagłówkiem „Subiekt GT" jest
  * z Subiekta, a podpis przy kartotece mówi, czy stoi za nią SKU z Allegro,
@@ -31,9 +41,9 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
   const [szukam, setSzukam] = useState(false);
   const zapisz = useWskazKartoteke();
   const k = oferta.kartoteka;
-  /* Potwierdzona jest wtedy, gdy stoi za nią człowiek — pamięć wskazań.
-     Propozycja automatu ma `twId`, ale czeka na kliknięcie. */
-  const potwierdzona = k.pewnosc === "pamiec" ? k.twId : null;
+  /* Powiązana: człowiek (pamięć wskazań) albo JEDNO trafienie po sygnaturze
+     (0.219.0). Pozostałe stopnie pewności zostają propozycją z przyciskiem. */
+  const potwierdzona = k.pewnosc === "pamiec" || k.pewnosc === "sku" ? k.twId : null;
   const karta = useKartaTowaru(potwierdzona);
   /* Wiedza pyta o KAŻDĄ znaną kartotekę, także propozycję: „3 potwierdzone,
      1 negatywne" to argument za kliknięciem albo przeciw niemu. */
@@ -70,12 +80,21 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
                 {k.zrodlo}
               </p>
             </div>
-            <button type="button" title="Zdejmij powiązanie" disabled={zapisz.isPending}
+            {/* Zdjąć da się WSKAZANIE człowieka (kasuje pamięć). Powiązanie
+                po sygnaturze nie ma czego zdjąć — wróciłoby przy następnym
+                odczycie; tu właściwym ruchem jest wskazanie INNEJ kartoteki. */}
+            {k.pewnosc === "pamiec" && <button type="button" title="Zdejmij powiązanie" disabled={zapisz.isPending}
               onClick={() => ustaw(null)}
               className="ml-auto h-6 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
               <Krzyzyk size={14} />
-            </button>
+            </button>}
           </div>
+          {k.pewnosc === "sku" && (szukam
+            ? <Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
+                onWybierz={(t: TowarZWyszukiwarki | null) => t && ustaw(t.id)} />
+            : <button type="button" onClick={() => setSzukam(true)}
+                className="block text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+                wskaż inną kartotekę</button>)}
 
           {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
           {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}

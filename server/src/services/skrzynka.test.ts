@@ -247,17 +247,22 @@ test("ręczne wskazanie kartoteki zapisuje pamięć, oś i audyt, a zdjęcie ją
     .run(konto).lastInsertRowid);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7702,'REC-01','Wskazany ręcznie')").run();
 
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at)
+    VALUES (?,'12096815384','Nóż','NOZ-STIGA-43','2026-09-02T14:50:00.000Z')`).run(konto);
   const w = wskazKartoteke(r, "12096815384", 7702, BIURO.id, d);
   assert.equal(w.twId, 7702);
   assert.equal(w.symbol, "REC-01");
 
-  const pamiec = d.prepare(`SELECT tw_id, sku, wskazano_przez FROM oferta_kartoteka
+  const pamiec = d.prepare(`SELECT tw_id, sku, sku_wtedy, wskazano_przez FROM oferta_kartoteka
     WHERE channel_account_id=? AND offer_id='12096815384'`).get(konto) as
-    { tw_id: number; sku: string | null; wskazano_przez: string };
+    { tw_id: number; sku: string | null; sku_wtedy: string | null; wskazano_przez: string };
   assert.equal(pamiec.tw_id, 7702);
   /* Puste `sku` znaczy „wskazał człowiek", wypełnione — „zatwierdził
      propozycję automatu". Ekran czyta z tego, co podpisać przy kartotece. */
   assert.equal(pamiec.sku, null);
+  /* Sygnatura z chwili wskazania (0.219.0): gdy sprzedawca ją przepnie, wskazanie ustąpi. */
+  assert.equal(pamiec.sku_wtedy, "NOZ-STIGA-43");
+  d.prepare("DELETE FROM offer_snapshot WHERE channel_account_id=?").run(konto);
   assert.equal(pamiec.wskazano_przez, "Biuro");
 
   const naOsi = d.prepare(`SELECT event_type FROM conversation_event
