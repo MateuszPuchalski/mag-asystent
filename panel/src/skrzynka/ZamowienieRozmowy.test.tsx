@@ -55,7 +55,7 @@ describe("Zamówienie przy rozmowie", () => {
   });
 
   it("pozycja niesie DWA zdjęcia: oferty Allegro i kartoteki Subiekta, każde ze swoim wejściem", () => {
-    /* Zrzut od właściciela (0.214.0): „tutaj powinny być zdjęcia i przy
+    /* Zrzut od właściciela (0.215.0): „tutaj powinny być zdjęcia i przy
        ofercie, i przy towarze". Oba źródła obok siebie, z podpisem. */
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([
       pozycja(), pozycja({ offerId: "999", nazwa: "Linka", sku: "BRAK", twId: null, twSymbol: null, twZrodlo: null }),

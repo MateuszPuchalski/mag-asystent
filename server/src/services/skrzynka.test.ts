@@ -662,7 +662,7 @@ test("dopisek klienta czyni plakietkę nieaktualną — serwer mówi to sam", ()
 });
 
 test("rozmowa z samym zamówieniem: jedyna pozycja daje ofertę rozmowy, a pozycja niesie kartotekę", async () => {
-  /* Zrzut od właściciela (0.214.0): rozmowa bez oferty, z zamówieniem na jedną
+  /* Zrzut od właściciela (0.215.0): rozmowa bez oferty, z zamówieniem na jedną
      pozycję — a kolumna mówiła „nie ma z czego wywieść kartoteki". Zamówienie
      nazywa towar dokładniej niż oferta i ma SKU od razu, z formularza zakupu. */
   const { wskazOferte } = await import("./conversations.js");

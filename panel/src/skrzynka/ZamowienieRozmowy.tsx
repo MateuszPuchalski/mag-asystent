@@ -18,7 +18,7 @@ import { Kafel, KafelOferty } from "../towar/Kafel";
  * Przycisku „dociągnij teraz" ze zwrotów tu NIE ma: to zapis, a ekran rozmowy
  * nie ma żadnego zapisu przy patrzeniu — liczniki tras skrzynki tego pilnują.
  *
- * ── DWA ZDJĘCIA PRZY POZYCJI (0.214.0) ─────────────────────────────────────
+ * ── DWA ZDJĘCIA PRZY POZYCJI (0.215.0) ─────────────────────────────────────
  * Właściciel przysłał zrzut rozmowy z samym zamówieniem: „tutaj powinny być
  * zdjęcia i przy ofercie, i przy towarze". Pozycja niesie OBA źródła naraz —
  * zdjęcie z oferty Allegro (to widział klient, kupując) i zdjęcie kartoteki

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Zdjecie, ZdjecieOferty } from "./Zdjecie";
 import { Powiekszenie } from "./Powiekszenie";
 import { useZdjecie, useZdjecieOferty } from "./useZdjecie";
+import type { StanZdjeciaOferty } from "../api/typy";
 
 /**
  * Kafel zdjęcia, który POWIĘKSZA SIĘ SAM (0.203.0).
@@ -43,18 +44,19 @@ export function Kafel({ twId, rozmiar = 48, nazwa, symbol = null }: {
  * a haka nie wolno wołać warunkowo. Wspólne jest to, co ma być wspólne —
  * płytka (`Zdjecie.tsx`) i okno powiększenia.
  */
-export function KafelOferty({ externalId, rozmiar = 48, nazwa, symbol = null }: {
+export function KafelOferty({ externalId, stan = "jest", rozmiar = 48, nazwa, symbol = null }: {
   externalId: string | null;
+  stan?: StanZdjeciaOferty;
   rozmiar?: number;
   nazwa: string;
   symbol?: string | null;
 }) {
   const [powiekszone, setPowiekszone] = useState(false);
-  const url = useZdjecieOferty(externalId);
+  const url = useZdjecieOferty(stan === "jest" ? externalId : null);
   return <>
-    <ZdjecieOferty externalId={externalId} rozmiar={rozmiar} nazwa={nazwa}
-      onKlik={!externalId ? undefined : () => setPowiekszone(true)} />
-    {powiekszone && externalId && <Powiekszenie url={url} nazwa={nazwa} symbol={symbol}
+    <ZdjecieOferty externalId={externalId} stan={stan} rozmiar={rozmiar} nazwa={nazwa}
+      onKlik={stan !== "jest" ? undefined : () => setPowiekszone(true)} />
+    {powiekszone && stan === "jest" && <Powiekszenie url={url} nazwa={nazwa} symbol={symbol}
       zamknij={() => setPowiekszone(false)} />}
   </>;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import type { OfertaRozmowy as Dane } from "../api/typy";
+import type { OfertaRozmowy as Dane, StanZdjeciaOferty } from "../api/typy";
 
 /* Zdjęcie oferty (0.213.0): pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
    go wysłać. Atrapa mówi „obraz jest", więc widać, czy kafel w ogóle staje. */
@@ -30,7 +30,7 @@ describe("blok oferty przy rozmowie", () => {
     render(<OfertaRozmowy oferta={dane({
       nazwa: "NÓŻ DO KOSIARKI STIGA 43cm 46S CASTELGARDEN NG464",
       sku: "NOZ-STIGA-43", cenaGrosze: 4890, waluta: "PLN", status: "ACTIVE",
-      syncedAt: "2026-09-02T14:50:00Z", maZdjecie: false,
+      syncedAt: "2026-09-02T14:50:00Z", zdjecie: "brak" as const,
     })} />);
     expect(screen.getByText(/NÓŻ DO KOSIARKI STIGA 43cm/)).toBeInTheDocument();
     expect(screen.getByText("NOZ-STIGA-43")).toBeInTheDocument();
@@ -56,21 +56,21 @@ describe("blok oferty przy rozmowie", () => {
   it("bez ceny pokazuje sam tytuł", () => {
     render(<OfertaRozmowy oferta={dane({
       nazwa: "Szarpak", sku: null, cenaGrosze: null, waluta: null, status: null,
-      syncedAt: "2026-09-02T14:50:00Z", maZdjecie: false,
+      syncedAt: "2026-09-02T14:50:00Z", zdjecie: "brak" as const,
     })} />);
     expect(screen.getByText("Szarpak")).toBeInTheDocument();
     expect(screen.queryByText(/zł/)).not.toBeInTheDocument();
   });
 });
 
-describe("zdjęcie listingowe oferty (0.213.0)", () => {
-  const snapshot = (maZdjecie: boolean): Dane["pobrana"] => ({
+describe("zdjęcie listingowe oferty", () => {
+  const snapshot = (zdjecie: StanZdjeciaOferty): Dane["pobrana"] => ({
     nazwa: "NÓŻ DO KOSIARKI STIGA 43cm", sku: "NOZ-STIGA-43", cenaGrosze: 4890,
-    waluta: "PLN", status: "ACTIVE", syncedAt: "2026-09-02T14:50:00Z", maZdjecie,
+    waluta: "PLN", status: "ACTIVE", syncedAt: "2026-09-02T14:50:00Z", zdjecie,
   });
 
   it("pokazuje zdjęcie i PODPISUJE jego źródło", () => {
-    render(<OfertaRozmowy oferta={dane(snapshot(true))} />);
+    render(<OfertaRozmowy oferta={dane(snapshot("jest"))} />);
     const obraz = screen.getByAltText("NÓŻ DO KOSIARKI STIGA 43cm");
     /* Adres jest NASZ. Gdyby panel dostał `https://a.allegroimg.com/…`, każde
        otwarcie skrzynki wyprowadzałoby przeglądarkę biura poza własną sieć —
@@ -81,9 +81,22 @@ describe("zdjęcie listingowe oferty (0.213.0)", () => {
     expect(screen.getByText(/Zdjęcie z oferty Allegro/)).toBeInTheDocument();
   });
 
-  it("bez adresu w Allegro nie rezerwuje miejsca ani nie pyta trasy", () => {
-    render(<OfertaRozmowy oferta={dane(snapshot(false))} />);
+  /* ── TRZY STANY, TRZY ZDANIA (0.214.0) ────────────────────────────────────
+     Właściciel przysłał zrzut: przy zwrocie stały dwa kafle „BEZ ZDJĘCIA",
+     a oferta na Allegro zdjęcie miała. Snapshot był po prostu starszy niż
+     kolumna z adresem — czyli ekran mówił „nie ma", gdy prawdą było „jeszcze
+     nie pytaliśmy". Te dwa testy pilnują, żeby się nie zlały z powrotem.    */
+  it("pytaliśmy i Allegro nie ma obrazu — kafla nie ma i trasy nie pytamy", () => {
+    render(<OfertaRozmowy oferta={dane(snapshot("brak"))} />);
     expect(screen.queryByAltText("NÓŻ DO KOSIARKI STIGA 43cm")).not.toBeInTheDocument();
     expect(screen.queryByText(/Zdjęcie z oferty Allegro/)).not.toBeInTheDocument();
+  });
+
+  it("jeszcze nie pytaliśmy — ekran mówi, że obraz dopiero przyjedzie", () => {
+    render(<OfertaRozmowy oferta={dane(snapshot("nieznane"))} />);
+    expect(screen.queryByAltText("NÓŻ DO KOSIARKI STIGA 43cm")).not.toBeInTheDocument();
+    /* Zdanie, nie milczenie: brak obrazu naprawi się sam przy najbliższej
+       synchronizacji, a agent ma prawo o tym wiedzieć. */
+    expect(screen.getByText(/Zdjęcie oferty dociągnie/)).toBeInTheDocument();
   });
 });

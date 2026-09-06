@@ -45,7 +45,7 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
           sens całej odpowiedzi, a agent czyta tę linijkę pierwszą. */}
       {o?.status && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
         {o.status}</span>}
-      {/* Skąd numer (0.214.0). Numer z wiadomości klienta jest faktem z Allegro
+      {/* Skąd numer (0.215.0). Numer z wiadomości klienta jest faktem z Allegro
           i nie potrzebuje podpisu; dwa pozostałe to wnioski — agenta albo
           serwera z jedynej pozycji zamówienia — i §4.3 każe je podpisać. */}
       {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
@@ -59,10 +59,10 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
 
     {o
       ? <div className="mt-2 flex items-start gap-3 rounded bg-white px-2 py-1.5">
-          {/* Kafel tylko wtedy, gdy Allegro podało adres. `maZdjecie` liczy
-              SERWER — bez tej flagi pusta oferta pytałaby naszej trasy o 404
-              przy każdym otwarciu rozmowy. */}
-          {o.maZdjecie && <KafelOferty externalId={oferta.externalId} rozmiar={56}
+          {/* Kafel tylko wtedy, gdy Allegro podało adres. Stan liczy SERWER —
+              bez niego oferta bez obrazu pytałaby naszej trasy o 404 przy
+              każdym otwarciu rozmowy. */}
+          {o.zdjecie === "jest" && <KafelOferty externalId={oferta.externalId} rozmiar={56}
             nazwa={o.nazwa} symbol={o.sku} />}
           <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
             <span className="text-sm font-semibold">{o.nazwa}</span>
@@ -75,8 +75,16 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
             {/* PODPIS ŹRÓDŁA. Blok towaru niżej pokazuje zdjęcie z Subiekta,
                 a §4.3 nie pozwala mieszać źródeł — bez tej linijki dwa obrazy
                 obok siebie wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
-            {o.maZdjecie && <span className="w-full text-[11px] text-slate-400">
+            {o.zdjecie === "jest" && <span className="w-full text-[11px] text-slate-400">
               Zdjęcie z oferty Allegro — to widział klient.</span>}
+            {/* ── MILCZENIE WYGLĄDAŁO JAK BRAK (0.214.0) ────────────────────
+                Snapshot sprzed 0.213.0 nie ma jeszcze kolumny z adresem, więc
+                zdjęcia nie ma — ale to znaczy „nie pytaliśmy", nie „Allegro
+                nie ma obrazu". Bez tego zdania ekran kłamał: właściciel
+                przysłał zrzut oferty, która na Allegro zdjęcie miała.
+                Naprawia się samo, więc zdanie mówi KIEDY. */}
+            {o.zdjecie === "nieznane" && <span className="w-full text-[11px] text-slate-400">
+              Zdjęcie oferty dociągnie najbliższa synchronizacja (do 7 min).</span>}
           </div>
         </div>
       : <p className="mt-1 text-xs text-slate-500">

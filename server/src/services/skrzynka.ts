@@ -7,6 +7,7 @@ import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
+import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 
@@ -110,7 +111,7 @@ export interface ZamowienieRozmowy {
 export interface OfertaRozmowy {
   externalId: string; link: string | null;
   /**
-   * Skąd numer oferty (0.214.0): wskazanie agenta bije numer z wiadomości,
+   * Skąd numer oferty (0.215.0): wskazanie agenta bije numer z wiadomości,
    * a gdy nie ma żadnego z nich — JEDYNA pozycja zamówienia. Do 0.213.0
    * ręczne wskazanie zapisywało się w zdarzeniu, a blok oferty go nie czytał;
    * rozmowa z samym zamówieniem stała bez oferty i bez kartoteki, choć
@@ -120,12 +121,13 @@ export interface OfertaRozmowy {
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
-    /* Czy Allegro podało adres zdjęcia listingowego (0.213.0). Sam adres NIE
-       jedzie do panelu i to jest cała różnica: gdyby jechał, front miałby
-       w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś wstawiłby
-       go w `src`, czyli wyprowadził przeglądarkę biura poza własną sieć.
-       Flaga mówi tylko „jest po co pytać naszej trasy". */
-    maZdjecie: boolean;
+    /* Co wiadomo o zdjęciu listingowym (0.214.0; do 0.213.0 `maZdjecie: boolean`).
+       Adres NIE jedzie do panelu i to jest cała różnica: gdyby jechał, front
+       miałby w ręku `https://a.allegroimg.com/…` i prędzej czy później ktoś
+       wstawiłby go w `src`, czyli wyprowadził przeglądarkę biura poza własną
+       sieć. Jedzie sam STAN — a stany są trzy, bo „czekam na Allegro" i „tej
+       oferty Allegro nie ma z czym pokazać" to dwa różne zdania na ekranie. */
+    zdjecie: StanZdjeciaOferty;
   } | null;
   /* Kartoteka Subiekta wywiedziona z SKU oferty (0.179.0). To PROPOZYCJA
      z powodem, nie fakt — §4.3 nie pozwala, żeby wybór automatu udawał daną
@@ -339,7 +341,7 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
     waluta: w.waluta == null ? null : String(w.waluta),
     status: w.status == null ? null : String(w.status),
     syncedAt: String(w.synced_at),
-    maZdjecie: String(w.primary_image_url ?? "").trim() !== "",
+    zdjecie: stanZdjeciaOferty(w.primary_image_url as string | null),
   };
 }
 
@@ -458,7 +460,7 @@ export function osRozmowy(id: number): {
     };
   };
   /* Kolejność jak w doborze (`kandydaci.ts`): ręczne wskazanie bije numer
-     z wiadomości. Trzecia droga jest nowa (0.214.0): zamówienie z JEDNĄ
+     z wiadomości. Trzecia droga jest nowa (0.215.0): zamówienie z JEDNĄ
      pozycją nie ma czego mylić, więc jego oferta jest ofertą rozmowy. Przy
      kilku pozycjach rozstrzyga człowiek — przyciskiem przy pozycji. */
   const reczna = ofertaWskazana(id);

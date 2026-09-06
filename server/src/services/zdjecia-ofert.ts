@@ -39,6 +39,23 @@ import { db as defaultDb, nowIso, type Db } from "../db/db.js";
  */
 const DOZWOLONE_HOSTY = [".allegroimg.com"];
 
+/**
+ * Co wiadomo o zdjęciu oferty, ZANIM ktokolwiek pójdzie po plik (0.214.0).
+ *
+ * Ekran musi umieć powiedzieć trzy różne rzeczy, bo każda każe co innego
+ * zrobić: „czekam na Allegro" naprawi się samo w kilka minut, „Allegro nie ma
+ * zdjęcia tej oferty" nie naprawi się nigdy, a obraz — jest do obejrzenia.
+ * Jeden napis „bez zdjęcia" na wszystkie trzy to ta sama blizna, co sześć
+ * zerwanych ogniw łańcucha kartoteki wyglądających identycznie (0.153.1).
+ */
+export type StanZdjeciaOferty = "jest" | "brak" | "nieznane";
+
+/** Odczyt stanu z kolumny `offer_snapshot.primary_image_url`. */
+export function stanZdjeciaOferty(url: string | null | undefined): StanZdjeciaOferty {
+  if (url == null) return "nieznane";
+  return url.trim() === "" ? "brak" : "jest";
+}
+
 /** Wpis cache'u. `plik = null` znaczy „pobranie się nie udało", patrz `blad`. */
 export interface WpisZdjeciaOferty {
   channel_account_id: number;

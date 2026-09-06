@@ -332,7 +332,7 @@ describe("Szukanie w kolejce", () => {
   });
 });
 
-describe("kolejność listy (0.214.0)", () => {
+describe("kolejność listy (0.215.0)", () => {
   const LISTA = [
     rozmowa({ id: 1, klient: "Najstarsze pytanie", ostatniaWiadomoscAt: "2026-09-01T07:00:00.000Z" }),
     rozmowa({ id: 2, klient: "Świeże pytanie", ostatniaWiadomoscAt: "2026-09-06T09:00:00.000Z" }),

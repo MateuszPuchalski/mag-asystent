@@ -78,7 +78,7 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
         {oferta
           ? <OfertaRozmowy oferta={oferta} />
           : kilkaPozycji
-            /* Zamówienie z kilku pozycji (0.214.0): oferta jest do WSKAZANIA
+            /* Zamówienie z kilku pozycji (0.215.0): oferta jest do WSKAZANIA
                przy pozycji niżej, nie do wpisania z ręki i nie do zgadnięcia. */
             ? <p className="p-4 text-sm text-slate-500">
                 Zamówienie ma {kilkaPozycji} pozycje — wskaż niżej tę, o którą pyta klient,

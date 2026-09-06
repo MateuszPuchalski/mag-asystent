@@ -507,7 +507,7 @@ zasłaniała pytanie, a data pod nią była datą wątku. Gdy klient nic nie nap
 stoi nasza wiadomość z podpisem „Biuro". Kolejność listy dalej niesie datę
 wątku — tę samą, którą właściciel widzi w panelu sprzedawcy.
 
-**Kolejność jest przełącznikiem (0.214.0).** Domyślna zostaje: PILNE, potem
+**Kolejność jest przełącznikiem (0.215.0).** Domyślna zostaje: PILNE, potem
 najdłużej czekające pytanie. Drugi porządek, „od najnowszych", odpowiada na
 inne pytanie — „co właśnie przyszło" — tym samym wzorem, co data nadania przy
 zwrotach. PILNE zostaje na górze w obu porządkach, bo flaga ręczna przebija
@@ -1216,6 +1216,17 @@ po zamknięciu zwrotu trzeba umieć powiedzieć, czemu klient dostał mniej.
 
 Cofnięcie zdejmuje kwotę razem z powodem (§25a.5).
 
+### 25a.4c. Pytanie kubełka stoi RAZ (0.214.0)
+
+Nagłówek otwartego zwrotu powtarzał pytanie kubełka — „Przyjąć czy odrzucić?"
+bezpośrednio nad przyciskami PRZYJMIJ i ODRZUĆ. Pytanie i odpowiedź o dwa
+centymetry od siebie to dekalog ergonomii, punkt 5: nie każ mówić dwa razy
+tego samego.
+
+Pytanie zostaje NAD LISTĄ i w podpowiedzi zakładki — tam nazywa kubełek,
+w którym się stoi, i nic go nie powtarza. Nagłówek niesie tożsamość zwrotu:
+numer i login kupującego, czyli to, co się z niego przepisuje.
+
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
 Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
@@ -1365,16 +1376,16 @@ od 0.30.0 podaje zdjęcia kartotek.
 
 Zdjęcie stoi w dwóch miejscach i w obu ma PODPIS, bo źródła się nie mieszają
 (§4.3): w bloku oferty przy rozmowie, nad blokiem towaru z Subiekta, oraz przy
-pozycji zwrotu, obok kafla kartoteki.
+pozycji zwrotu, obok kafla kartoteki. Stany braku rozróżnia §25a.6c.
 
-**Trzecie miejsce: pozycja zamówienia przy rozmowie (0.214.0).** Właściciel
+**Trzecie miejsce: pozycja zamówienia przy rozmowie (0.215.0).** Właściciel
 przysłał zrzut rozmowy z samym zamówieniem — kolumna nie miała ani zdjęcia,
 ani kartoteki. Pozycja niesie teraz oba źródła obok siebie, jak pozycja
 zwrotu: kafel oferty Allegro i kafel kartoteki Subiekta, z podpisem pod listą.
 Kartotekę za pozycją daje ten sam mostek, co dla oferty rozmowy: pamięć
 wskazań, a bez niej SKU z formularza zakupu.
 
-**Skąd numer oferty rozmowy (0.214.0).** Trzy drogi, w tej kolejności:
+**Skąd numer oferty rozmowy (0.215.0).** Trzy drogi, w tej kolejności:
 wskazanie agenta, numer z wiadomości klienta, jedyna pozycja zamówienia. Do
 0.213.0 wskazanie ręczne zapisywało się w zdarzeniu, a blok oferty go nie
 czytał. Zamówienie z jedną pozycją nie ma czego mylić, więc jego oferta jest
@@ -1392,6 +1403,26 @@ kolumnach, którym idzie SKU.
 To zakrywa dziurę, której kartoteka zakryć nie umie. Pytanie sprzed zakupu
 przychodzi bez kartoteki, a większość kartotek i tak zdjęcia nie ma; oferta ma
 je prawie zawsze.
+
+### 25a.6c. Trzy stany zdjęcia oferty (0.214.0)
+
+„Bez zdjęcia" znaczyło trzy rzeczy naraz i myliło najgorszą z możliwych.
+Zgłoszenie właściciela: przy pozycji zwrotu stały dwa puste kafle, a oferta
+miała na Allegro zdjęcie.
+
+Przyczyna była w warunku świeżości. Snapshot odświeżamy raz na dobę, a kolumna
+z adresem weszła w 0.213.0 — więc wiersz zapisany wcześniej był „świeży"
+i „bez adresu" naraz. Snapshot NIEKOMPLETNY nie jest snapshotem świeżym: brak
+adresu jest teraz trzecim powodem pobrania.
+
+Kolumna niesie trzy wartości: `NULL` — nikt jeszcze nie pytał; `''` —
+pytaliśmy i Allegro nie podało obrazu; adres — mamy obraz. To ta sama różnica,
+którą przy SKU oferty robi `dopasowanie-sku.ts`.
+
+Kafel mówi, na co się czeka: **zegar** — obraz dociągnie najbliższa
+synchronizacja; **„bez zdjęcia"** — Allegro nie ma obrazu tej oferty;
+**koszyk** — pozycja nie wiąże się z żadną linią zamówienia. Trasy nie pytamy
+tam, gdzie serwer już wie, że nie ma o co.
 
 ### 25a.6a. Zdjęcia w całej obsłudze (0.203.0)
 
@@ -1899,9 +1930,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
 | Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.167.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
-| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.214.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż" |
-| Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.214.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
-| Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.214.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż" |
+| Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
+| Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie |
 | Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.198.0 zakładki „Oferta i towar" oraz „Dobór" |

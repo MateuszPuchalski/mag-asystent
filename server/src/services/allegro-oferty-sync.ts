@@ -95,6 +95,17 @@ export interface OfertySyncDeps {
  * WIADOMOŚCI IDĄ PIERWSZE i to jest cała rola `rzad` w sortowaniu. Partia ma
  * dwadzieścia miejsc; gdy do nadrobienia jest więcej, agent patrzący na
  * rozmowę ma dostać tytuł przed zdjęciem przy zwrocie sprzed miesiąca.
+ *
+ * ── SNAPSHOT NIEKOMPLETNY TO NIE SNAPSHOT ŚWIEŻY (0.214.0) ────────────────
+ * Warunek świeżości puszczał wiersz z wczoraj, choć nie miał on jeszcze
+ * kolumny `primary_image_url` — bo kolumna weszła w 0.213.0, a wiersz powstał
+ * wcześniej. Zdjęcia czekały więc na to, aż snapshot zestarzeje się o dobę,
+ * i tak właśnie wyglądało to na ekranie: „bez zdjęcia" przy ofercie, która
+ * na Allegro zdjęcie ma.
+ *
+ * `primary_image_url IS NULL` znaczy „nie pytaliśmy jeszcze o obraz" i jest
+ * trzecim powodem pobrania. Pętli z tego nie ma, bo po pobraniu kolumna
+ * dostaje ADRES albo pusty łańcuch — patrz `zapisz`.
  */
 export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): string[] {
   const prog = new Date(teraz.getTime() - SWIEZOSC_MS).toISOString();
@@ -118,7 +129,7 @@ export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): 
       FROM zrodla s
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = s.konto AND o.external_id = s.id
-     WHERE o.id IS NULL OR o.synced_at < ?
+     WHERE o.id IS NULL OR o.synced_at < ? OR o.primary_image_url IS NULL
      GROUP BY s.id
      ORDER BY MIN(s.rzad), MAX(s.kiedy) DESC
      LIMIT ?`).all(prog, ile) as Array<{ id: string }>).map((r) => r.id);
@@ -165,9 +176,19 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
 
 function zapisz(database: Db, o: Oferta, konto: number, at: string): void {
   const kwota = o.sellingMode?.price;
-  /* Pusty adres schodzi na `NULL`. `""` w tej kolumnie znaczyłoby „mamy adres
-     długości zero" i cache poszedłby po niego do sieci. */
-  const obraz = (o.primaryImage?.url ?? "").trim() || null;
+  /* ── PUSTY ŁAŃCUCH ZNACZY „PYTALIŚMY, NIE MA" (0.214.0) ──────────────────
+     Do 0.213.0 brak adresu schodził na `NULL` — ten sam znak, którym wiersz
+     sprzed tego wydania mówi „nikt jeszcze nie pytał". Dwa różne fakty pod
+     jednym znakiem to dokładnie ta blizna, którą `dopasowanie-sku.ts` opisuje
+     przy SKU oferty: tam `undefined` znaczy „nie mamy snapshotu", a `""` —
+     „mamy snapshot, tylko sprzedawca nie wypełnił pola".
+
+     Bez tego rozróżnienia nie da się ani odpytać wiersza niekompletnego raz
+     (bo nie wiadomo, który jest niekompletny), ani powiedzieć agentowi
+     prawdy na ekranie: „czekam na Allegro" to co innego niż „Allegro nie ma
+     zdjęcia tej oferty". Cache po pusty łańcuch do sieci nie idzie —
+     `zapewnijZdjecieOferty` sprawdza `trim()`. */
+  const obraz = (o.primaryImage?.url ?? "").trim();
   database.prepare(`INSERT INTO offer_snapshot
     (channel_account_id,external_id,nazwa,sku,cena_grosze,waluta,status,primary_image_url,synced_at)
     VALUES (?,?,?,?,?,?,?,?,?)

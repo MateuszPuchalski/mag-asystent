@@ -17,7 +17,7 @@ import { PasekCopilota, PlakietkaKategorii, doRozpoznania } from "./Copilot";
    jednej definicji: dwiema różnymi kolejkami przy jednym liczniku. */
 type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace" | "poTerminie";
 
-/* ── Kolejność listy (0.214.0) ───────────────────────────────────────────────
+/* ── Kolejność listy (0.215.0) ───────────────────────────────────────────────
    Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
    decyzja właściciela z 0.181.0 i odpowiedź na pytanie „za co się wziąć".
    „Od najnowszych" odpowiada na INNE pytanie — „co właśnie przyszło" — i jest

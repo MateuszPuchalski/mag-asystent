@@ -34,13 +34,15 @@ historii nie przepisujemy.
 ---
 
 
-## 0.214.0 — 6 września 2026
+## 0.215.0 — 6 września 2026
 
 **Zdjęcia przy pozycji zamówienia, oferta z zamówienia i kolejność „od
 najnowszych”.** Właściciel przysłał zrzut rozmowy z samym zamówieniem: kolumna
 „Oferta i towar” nie miała ani zdjęcia, ani kartoteki, choć zamówienie nazywa
 towar dokładniej niż oferta. Druga prośba z tej samej rozmowy: sortowanie
 listy rozmów od najnowszych.
+
+Numer 0.214.0 zajął w międzyczasie PR ze stanem zdjęcia oferty — stąd 0.215.0.
 
 ### Pozycja zamówienia niesie oba zdjęcia
 
@@ -63,6 +65,37 @@ dopóki takt ofert nie dociągnie snapshotu.
 Przełącznik obok pola szukania: „najdłużej czekające” (domyślnie, decyzja
 z 0.181.0) albo „od najnowszych”. PILNE zostaje na górze w obu porządkach.
 Wybór pamięta przeglądarka stanowiska.
+## 0.214.0 — 5 września 2026
+
+**„Bez zdjęcia" znaczyło trzy różne rzeczy naraz.** Właściciel przysłał zrzut:
+przy pozycji zwrotu stały dwa puste kafle, a ta sama oferta miała na Allegro
+zdjęcie. Ekran nie kłamał o obrazie — kłamał o POWODZIE jego braku.
+
+Przyczyna siedziała w warunku świeżości. Snapshot oferty odświeżamy raz na
+dobę, a kolumna z adresem zdjęcia weszła dopiero w 0.213.0 — więc każdy wiersz
+zapisany wcześniej był „świeży" i „bez adresu" jednocześnie, i czekał na
+zestarzenie się o dobę, zamiast dostać adres od razu. Snapshot NIEKOMPLETNY to
+nie jest snapshot świeży: brak adresu jest teraz trzecim powodem pobrania.
+
+**Pusty łańcuch zamiast NULL.** Żeby to w ogóle dało się odróżnić, kolumna
+niesie trzy wartości: `NULL` — nikt jeszcze nie pytał Allegro; `''` —
+pytaliśmy i `primaryImage` nie przyszło (`OfferListingDto` nie ma bloku
+`required`, więc to normalna odpowiedź); adres — mamy obraz. Ta sama różnica,
+którą `dopasowanie-sku.ts` robi od dawna przy SKU oferty. Pętli z tego nie ma:
+po pobraniu wiersz ma już `''` albo adres.
+
+**Kafel mówi, na co się czeka.** Trzy stany, trzy znaki: zegar — „zdjęcia
+jeszcze nie pobrano, dociągnie je najbliższa synchronizacja"; „bez zdjęcia" —
+pytaliśmy, Allegro nie ma obrazu tej oferty; koszyk — pozycja nie wiąże się
+z żadną linią zamówienia, więc nie ma o co pytać. Blok oferty przy rozmowie
+mówi to zdaniem. Trasy nie pytamy tam, gdzie serwer już wie, że nie ma o co —
+przy liście zwrotów to kilkadziesiąt żądań mniej za nic.
+
+**Pytanie kubełka zeszło z nagłówka zwrotu.** Stało tam „Przyjąć czy
+odrzucić?" — bezpośrednio nad przyciskami PRZYJMIJ i ODRZUĆ, które pytają
+o to samo i od razu odpowiadają. Decyzja właściciela; dekalog ergonomii,
+punkt 5. Pytanie ZOSTAJE nad listą i w podpowiedzi zakładki: tam nazywa
+kubełek i nic go nie powtarza. Zniknęła kopia, nie informacja.
 
 ## 0.213.0 — 5 września 2026
 

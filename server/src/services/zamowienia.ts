@@ -19,7 +19,7 @@ export interface PozycjaZamowienia {
   waluta: string;
   zwracana: boolean;
   /**
-   * Kartoteka Subiekta za pozycją (0.214.0): pamięć wskazań tej oferty, a bez
+   * Kartoteka Subiekta za pozycją (0.215.0): pamięć wskazań tej oferty, a bez
    * niej SKU sprzedawcy z pozycji. `null` = nie ma czego pokazać. Zdanie
    * `twZrodlo` pisze `dopasowanie-sku.ts`, panel go nie układa (§4.3).
    *

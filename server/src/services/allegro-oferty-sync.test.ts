@@ -177,7 +177,7 @@ function zamowienieZOfertą(d: Db, ofertaId: string, kupiono = "2026-08-30T09:00
     VALUES (?,'li-1',?,'Nóż',NULL,1,4890,'PLN')`).run(id, ofertaId);
 }
 
-test("adres zdjęcia listingowego wchodzi do snapshotu, a pusty schodzi na NULL", async () => {
+test("adres zdjęcia wchodzi do snapshotu, a pusty zapisuje się jako „pytaliśmy, nie ma\u201d", async () => {
   const d = stanowisko();
   wiadomosc(d, 1, "111");
   wiadomosc(d, 2, "222");
@@ -196,9 +196,10 @@ test("adres zdjęcia listingowego wchodzi do snapshotu, a pusty schodzi na NULL"
     .map((w) => ({ external_id: w.external_id, primary_image_url: w.primary_image_url }));
   assert.deepEqual(wiersze, [
     { external_id: "111", primary_image_url: "https://a.allegroimg.com/original/aa/bb" },
-    /* Pusty adres to NIE jest adres. `""` w tej kolumnie posłałby cache po
-       obraz spod adresu długości zero. */
-    { external_id: "222", primary_image_url: null },
+    /* `""`, nie `NULL` (0.214.0). Cache po pusty adres do sieci nie idzie, a ta
+       wartość niesie fakt, którego `NULL` nie niósł: PYTALIŚMY już Allegro
+       o tę ofertę. `NULL` znaczy dalej „nikt nie pytał" i wraca do kolejki. */
+    { external_id: "222", primary_image_url: "" },
   ]);
 });
 
@@ -223,4 +224,38 @@ test("ten sam numer w wiadomości i w zamówieniu pobiera się RAZ", () => {
   wiadomosc(d, 1, "111");
   zamowienieZOfertą(d, "111");
   assert.deepEqual(brakujaceOferty(d, 20), ["111"]);
+});
+
+
+/* ── Niekompletny snapshot to nie snapshot świeży (0.214.0) ──────────────────
+   Zgłoszenie właściciela: przy zwrocie stały dwa kafle „BEZ ZDJĘCIA", a oferta
+   na Allegro zdjęcie miała. Przyczyna: wiersz `offer_snapshot` był świeższy
+   niż doba, więc warunek świeżości go przepuszczał — mimo że powstał PRZED
+   kolumną z adresem i adresu nie miał. Zdjęcie czekało na zestarzenie się
+   snapshotu, czyli do doby.                                                 */
+
+test("snapshot bez adresu zdjęcia wraca do pobrania, choć jest świeży", () => {
+  const d = stanowisko();
+  wiadomosc(d, 1, "111");
+  /* Wiersz sprzed 0.213.0: świeży co do minuty, ale kolumny obrazu nie zna. */
+  d.prepare(`INSERT INTO offer_snapshot
+    (channel_account_id,external_id,nazwa,primary_image_url,synced_at)
+    VALUES (1,'111','Nóż',NULL,?)`).run(new Date().toISOString());
+  assert.deepEqual(brakujaceOferty(d, 20), ["111"]);
+});
+
+test("snapshot, o który JUŻ pytaliśmy i obrazu nie ma, nie wraca w kółko", async () => {
+  const d = stanowisko();
+  wiadomosc(d, 1, "111");
+  /* Allegro oddaje ofertę bez `primaryImage` — `OfferListingDto` nie ma bloku
+     `required`, więc to jest normalna odpowiedź, nie awaria. */
+  await uzupelnijOferty({ database: d, accountId: "k",
+    query: async () => ({ offers: [oferta("111")] }) });
+  const zapisane = d.prepare(
+    "SELECT primary_image_url AS url FROM offer_snapshot WHERE external_id='111'",
+  ).get() as { url: string | null };
+  /* Pusty łańcuch, nie NULL: to jest RÓŻNICA między „pytaliśmy, nie ma"
+     a „nikt jeszcze nie pytał". Bez niej pętla byłaby wieczna. */
+  assert.equal(zapisane.url, "");
+  assert.deepEqual(brakujaceOferty(d, 20), [], "drugi raz już nie pytamy");
 });
