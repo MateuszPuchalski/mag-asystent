@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.219.1 — 6 września 2026
+
+**Zdjęcie i pobranie załącznika naprawione — obu nie dało się użyć.** Właściciel
+przysłał zrzut: w miejscu zdjęcia ikona zepsutego obrazu, a kliknięcie w nazwę
+pliku otwierało kartę z surowym `{"error":"Brak sesji — zaloguj się"}`.
+
+Sesja panelu jedzie nagłówkiem `x-session`, a ani `<img src>`, ani `<a href>`
+nagłówków nie niosą — obie drogi wychodziły do serwera bez klucza i wracały
+z 401. `useZdjecie.ts` zapisał tę regułę w 0.152.0, a 0.213.0 zapłacił za nią
+drugi raz; podgląd z 0.218.0 kupił ją trzeci. Pobranie było zepsute od 0.155.0
+i wyglądało, jakby działało: nazwa pliku była zwykłym odnośnikiem, więc nigdy
+nie ściągnęła ani jednego załącznika.
+
+Podgląd dochodzi teraz do wspólnej kolejki obrazów (trzy pobrania naraz, pamięć
+negatywu), a pobranie idzie przez `pobierzPlik` — `fetch` z nagłówkiem, `blob:`,
+własne kliknięcie z atrybutem `download`, więc na dysku ląduje „szarpak.jpeg",
+a nie numer z trasy. Token do adresu NIE wchodzi: ścieżki lądują w logach
+serwera, w historii przeglądarki i w nagłówku `Referer`. Nieudane pobranie mówi
+teraz o sobie pod nazwą pliku, zamiast otwierać kartę z JSON-em.
+
+**Stopka firmowa zwinięta pod odpowiedzią.** Nazwa spółki, adres, NIP, KRS,
+REGON i telefon — siedem wierszy, w każdej naszej wiadomości te same, i ani
+jeden o sprawie klienta. Przy trzech odpowiedziach w wątku zajmowały na osi
+więcej miejsca niż wszystko, co naprawdę napisaliśmy.
+
+Zwijamy, a nie kasujemy: to treść, którą klient DOSTAŁ, i przy sporze musi dać
+się przeczytać w panelu. Cięcie zaczyna się na nazwie spółki, w jej OSTATNIM
+wystąpieniu — agent bywa, że wymienia firmę w zdaniu, a cięcie od pierwszego
+trafienia zjadłoby połowę odpowiedzi. Podpis człowieka („Z poważaniem,
+Mateusz") zostaje w treści, bo mówi, z kim klient rozmawiał.
 ## 0.219.0 — 6 września 2026
 
 **Sygnatura jeden do jednego łączy ofertę z kartoteką sama.** Właściciel

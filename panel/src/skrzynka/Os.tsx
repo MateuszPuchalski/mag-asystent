@@ -2,6 +2,8 @@ import React from "react";
 import { ArrowRight, Bot, Lock, Paperclip, Ruler, Send, User } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk, czas } from "../ui";
+import { pobierzPlik } from "../api/klient";
+import { useZdjecieZalacznika } from "../towar/useZdjecie";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -19,46 +21,84 @@ const POWOD: Record<string, string> = {
 };
 
 /**
- * ZDJĘCIE WIDAĆ, NIE TRZEBA W NIE KLIKAĆ (0.218.0).
+ * ZDJĘCIE WIDAĆ, NIE TRZEBA W NIE KLIKAĆ (0.218.0, naprawione w 0.219.1).
  *
  * 0.155.0 dołożyło na oś nazwę pliku i na tym stanęło. Agent widział
  * „szarpak.jpeg" i musiał kliknąć, ściągnąć plik na dysk i otworzyć go
  * w przeglądarce zdjęć — trzy ruchy po to, żeby zobaczyć treść pytania.
  * Właściciel: „gdy klient wysyła zdjęcie, wyświetlaj w czacie".
  *
- * NAZWA ZOSTAJE POD OBRAZEM i dalej jest odnośnikiem: podgląd odpowiada na
- * „co klient przysłał", a pobranie na „chcę to mieć u siebie" — i to są dwa
- * różne pytania. Odnośnik prowadzi na trasę pobrania, nie podglądu, więc
- * plik schodzi na dysk pod własną nazwą.
+ * ── OBIE DROGI IDĄ PRZEZ `fetch`, NIE PRZEZ ATRYBUT (0.219.1) ──────────────
+ * Sesja jedzie nagłówkiem `x-session`, a ani `<img src>`, ani `<a href>` go
+ * nie niosą: obie dostają 401 i pokazują ikonę zepsutego obrazu albo surowy
+ * JSON z „Brak sesji". Podgląd bierze więc `useZdjecieZalacznika` (wspólna
+ * kolejka obrazów), a pobranie — `pobierzPlik`. Pobranie było zepsute
+ * od 0.155.0 i wyglądało, jakby działało.
  *
- * OBRAZ NIE JEST ODNOŚNIKIEM, choć kusiło. Opakowany w `<a>` dawał drugi
- * odnośnik o tej samej nazwie i tym samym celu, co nazwa pliku pod spodem —
- * czytnik ekranu odczytałby „szarpak.jpeg, odnośnik" dwa razy pod rząd i za
- * pierwszym razem nie miałby czym ich odróżnić.
- *
- * `loading="lazy"`, bo długi wątek z kilkoma zdjęciami ciągnąłby wszystkie
- * naraz przy otwarciu rozmowy, choć widać z nich jedno.
+ * PODGLĄD I POBRANIE ZOSTAJĄ OSOBNO. Pierwsze odpowiada na „co klient
+ * przysłał", drugie na „chcę to mieć u siebie" — to dwa różne pytania,
+ * a plik na dysku ma nosić własną nazwę.
  */
 function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
   return <ul className="mt-2 space-y-2 border-t pt-2 text-xs">
-    {lista.map((z) => <li key={z.id}>
-      {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
-          i rozpychałoby oś na cały ekran. */}
-      {z.podglad && <img src={`/api/obsluga/zalaczniki/${z.id}/podglad`} alt={z.nazwa}
-        loading="lazy"
-        className="mb-1 max-h-64 w-auto max-w-full rounded border border-slate-200 bg-white p-1" />}
-      <span className="flex items-center gap-1.5">
-        <Paperclip size={12} className="shrink-0 text-slate-400" />
-        {z.doPobrania
-          ? <a className="font-bold text-slate-700 underline hover:text-slate-900"
-               href={`/api/obsluga/zalaczniki/${z.id}`}>{z.nazwa}</a>
-          : <span className="text-slate-500">
-              <span className="font-bold">{z.nazwa}</span>
-              {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
-            </span>}
-      </span>
-    </li>)}
+    {lista.map((z) => <Zalacznik key={z.id} z={z} />)}
   </ul>;
+}
+
+/** Jeden załącznik: obraz nad nazwą, nazwa zawsze. Osobny komponent, bo obraz
+    wisi na haku, a haka nie wolno wołać w pętli. */
+function Zalacznik({ z }: { z: ZalacznikOsi }) {
+  const obraz = useZdjecieZalacznika(z.podglad ? z.id : null);
+  const [blad, setBlad] = React.useState<string | null>(null);
+
+  return <li>
+    {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
+        i rozpychałoby oś na cały ekran. */}
+    {obraz && <img src={obraz} alt={z.nazwa} loading="lazy"
+      className="mb-1 max-h-64 w-auto max-w-full rounded border border-slate-200 bg-white p-1" />}
+    <span className="flex items-center gap-1.5">
+      <Paperclip size={12} className="shrink-0 text-slate-400" />
+      {z.doPobrania
+        ? <button type="button" className="font-bold text-slate-700 underline hover:text-slate-900"
+            onClick={() => {
+              setBlad(null);
+              pobierzPlik(`/api/obsluga/zalaczniki/${z.id}`, z.nazwa)
+                .catch((e: unknown) => setBlad(e instanceof Error ? e.message : "Nie udało się pobrać"));
+            }}>{z.nazwa}</button>
+        : <span className="text-slate-500">
+            <span className="font-bold">{z.nazwa}</span>
+            {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
+          </span>}
+    </span>
+    {/* Nieudane pobranie MÓWI o sobie. Do 0.219.1 kliknięcie otwierało kartę
+        z surowym JSON-em błędu — agent nie miał jak zgadnąć, co poszło źle. */}
+    {blad && <p className="mt-0.5 text-ranga-zle">{blad}</p>}
+  </li>;
+}
+
+/**
+ * Blok firmowy pod odpowiedzią, ZWINIĘTY (0.219.1).
+ *
+ * Nazwa spółki, adres, NIP, KRS, REGON, telefon — siedem wierszy, w każdej
+ * naszej wiadomości te same, i ani jeden o sprawie klienta. Przy trzech
+ * odpowiedziach w wątku stopka zajmowała na osi więcej miejsca niż wszystko,
+ * co naprawdę napisaliśmy.
+ *
+ * Zwinięta, nie skasowana — z tego samego powodu, co autoodpowiedź: to jest
+ * treść, którą klient DOSTAŁ, i przy sporze musi dać się przeczytać w panelu.
+ * Podpis człowieka („Z poważaniem, Mateusz") zostaje wyżej, w treści: mówi,
+ * z kim klient rozmawiał, więc nie jest stopką.
+ */
+function Stopka({ tresc }: { tresc: string }) {
+  const [otwarte, setOtwarte] = React.useState(false);
+  return <div className="mt-1">
+    <button type="button" className="text-[11px] text-slate-400 underline hover:text-slate-600"
+      aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
+      {otwarte ? "ukryj stopkę firmową" : "stopka firmowa"}
+    </button>
+    {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-xs text-slate-500">
+      {tresc}</p>}
+  </div>;
 }
 
 /**
@@ -187,6 +227,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {w.zamowienieId && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+          {w.stopka && <Stopka tresc={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
           {w.odKlienta && mozeZlecac && <button
             className={`mt-2 text-xs font-bold ${

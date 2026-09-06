@@ -45,6 +45,28 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.queryByText(/generowana automatycznie/)).toBeNull();
   });
 
+  /* ── Stopka firmowa (0.219.1) ───────────────────────────────────────────
+     Nazwa spółki, adres, NIP, KRS, REGON, telefon — siedem wierszy w każdej
+     naszej wiadomości. Przy trzech odpowiedziach w wątku zajmowały na osi
+     więcej miejsca niż wszystko, co naprawdę napisaliśmy.                  */
+  it("stopka firmowa jest zwinięta, a treść i podpis zostają widoczne", async () => {
+    os(wpis({ automatyczna: false, tresc: "Prosimy o zgłoszenie reklamacji.\n\nZ poważaniem,\nMateusz",
+      stopka: "WERTIS Sp. z o.o.\nNIP: 5423444020" }));
+
+    expect(screen.getByText(/Prosimy o zgłoszenie reklamacji/)).toBeTruthy();
+    /* Podpis człowieka NIE jest stopką: mówi, z kim klient rozmawiał. */
+    expect(screen.getByText(/Mateusz/)).toBeTruthy();
+    expect(screen.queryByText(/NIP: 5423444020/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "stopka firmowa" }));
+    expect(screen.getByText(/NIP: 5423444020/)).toBeTruthy();
+  });
+
+  it("wiadomość bez stopki nie dostaje przycisku do pustki", () => {
+    os(wpis({ automatyczna: false, tresc: "Szarpak pasuje." }));
+    expect(screen.queryByRole("button", { name: /stopka/ })).toBeNull();
+  });
+
   it("odpowiedź agenta zostaje pełnym kafelkiem", () => {
     /* Bez flagi z serwera wpis idzie zwykłą gałęzią — zwinięcie prawdziwej
        odpowiedzi kosztowałoby więcej niż niezwinięcie jednego odbicia. */

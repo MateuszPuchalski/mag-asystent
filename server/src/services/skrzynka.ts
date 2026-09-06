@@ -11,6 +11,7 @@ import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 import { czyAutoresponder } from "./autoresponder.js";
+import { podzielStopke } from "./stopka.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -140,6 +141,10 @@ export interface WpisOsi {
      zwija taki wpis do jednej linijki. Flaga stoi wyłącznie przy wiadomościach
      WYCHODZĄCYCH — uzasadnienie w `czyAutoresponder`. */
   automatyczna?: boolean;
+  /* Blok firmowy odcięty od treści (0.219.1): nazwa spółki, adres, NIP, KRS,
+     REGON, telefon. `tresc` jest wtedy BEZ niego, a panel chowa go pod
+     przyciskiem. Też tylko przy wychodzących — patrz `podzielStopke`. */
+  stopka?: string;
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
@@ -456,20 +461,29 @@ export function osRozmowy(id: number): {
      uzasadnienie „Allegro podaje datę wątku, nie wiadomości" — nieprawdziwe,
      `createdAt` jest per wiadomość. Kolejność po identyfikatorze zostaje, bo
      jest stabilna także przy dwóch wiadomościach z tej samej sekundy. */
-  const os: WpisOsi[] = wiadomosci.map((m) => ({
+  const os: WpisOsi[] = wiadomosci.map((m) => {
+    /* Stopkę odcinamy TYLKO od naszych wiadomości: cytat naszej odpowiedzi
+       w liście klienta niesie ją w środku, a cięcie „do końca" zabrałoby to,
+       co klient dopisał pod spodem. */
+    const wychodzaca = String(m.direction) === "outgoing";
+    const { tresc, stopka } = wychodzaca
+      ? podzielStopke(String(m.body))
+      : { tresc: String(m.body), stopka: null };
+    return {
     id: `msg-${m.id}`, rodzaj: "wiadomosc" as const, messageId: Number(m.id),
     autor: String(m.direction) === "incoming" ? String(m.klient ?? "Klient") : "Biuro",
     odKlienta: String(m.direction) === "incoming",
-    tresc: String(m.body), at: String(m.sent_at),
+    tresc, at: String(m.sent_at),
     ofertaId: String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null,
     nazwaOferty: m.nazwaOferty == null ? null : String(m.nazwaOferty),
     zamowienieId: m.zamowienie == null ? null : String(m.zamowienie),
     ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
     /* Tylko wychodzące: cytat naszego potwierdzenia pod odpowiedzią klienta
        niesie ten sam podpis, a jego wiadomość jest pytaniem, nie odbiciem. */
-    ...(String(m.direction) === "outgoing" && czyAutoresponder(String(m.body))
-      ? { automatyczna: true } : {}),
-  }));
+    ...(wychodzaca && czyAutoresponder(String(m.body)) ? { automatyczna: true } : {}),
+    ...(stopka == null ? {} : { stopka }),
+    };
+  });
 
   /* JEDNO zamówienie na rozmowę: numer z najnowszej wiadomości KLIENTA, która
      go niesie (wątek dotyczy jednego zakupu), a gdy klient go nie podał —

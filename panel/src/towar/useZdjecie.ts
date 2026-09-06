@@ -29,7 +29,14 @@ import { token } from "../api/klient";
 
    Miniatury ofert ISTNIEJĄ i robi je CDN Allegro — zmniejsza serwer, ale nie
    nasz. Panel o tym nie wie i wiedzieć nie musi: dostaje adres własnej trasy,
-   a rozmiar dobiera `services/zdjecia-ofert.ts`.                             */
+   a rozmiar dobiera `services/zdjecia-ofert.ts`.
+
+   ── TRZECIE ŹRÓDŁO: ZAŁĄCZNIKI KLIENTA (0.219.1) ──────────────────────────
+   0.218.0 wystawiło zdjęcie z wiadomości wprost przez `<img src>` — czyli
+   dokładnie tak, jak punkt 1 wyżej ZABRANIA od 0.152.0. Na ekranie właściciela
+   wyszła ikona zepsutego obrazu, bo trasa oddała 401. Blizna kupiona trzeci
+   raz w tym samym froncie; dlatego załączniki dochodzą TUTAJ, a nie dostają
+   własnego pobierania obok.                                                  */
 
 const ROWNOLEGLE = 3;
 
@@ -132,6 +139,21 @@ export function useZdjecie(twId: number | null | undefined): string | null | und
 export function useZdjecieOferty(externalId: string | null | undefined): string | null | undefined {
   const id = (externalId ?? "").trim();
   return useObraz(id === "" ? null : `/api/obsluga/oferta/${encodeURIComponent(id)}/zdjecie`);
+}
+
+/**
+ * Podgląd załącznika wiadomości (0.219.1).
+ *
+ * Trasa `/api/obsluga/zalaczniki/:id/podglad` stoi za sesją jak dwie poprzednie,
+ * więc `<img src>` na nią dostaje 401 i rysuje ikonę zepsutego obrazu. Wspólna
+ * kolejka jest tu warta więcej niż przy kartotekach: jedna wiadomość niesie
+ * czasem kilka zdjęć z telefonu, a te bywają wielomegabajtowe.
+ *
+ * `null` (nieudane pobranie) NIE jest awarią ekranu — pod obrazem stoi nazwa
+ * pliku i odnośnik pobrania, więc agent dalej wie, że klient coś przysłał.
+ */
+export function useZdjecieZalacznika(id: number | null | undefined): string | null | undefined {
+  return useObraz(id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`);
 }
 
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */
