@@ -10,6 +10,7 @@ import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
+import { czyAutoresponder } from "./autoresponder.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -79,7 +80,47 @@ export interface RozmowaSkrzynki {
 /** Załącznik wiadomości. `SAFE` znaczy „wolno pobrać"; reszta tylko informuje. */
 export interface ZalacznikOsi {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
+  /* Czy pokazać obraz WPROST na osi (0.218.0). Decyduje SERWER, bo to on zna
+     listę typów, które trasa podglądu odda — panel zgadujący po `typ`
+     rysowałby zepsuty obrazek przy każdym rozjeździe tych dwóch list. */
+  podglad: boolean;
 }
+/**
+ * Typy obrazu, które oś rysuje WPROST, bez klikania (0.218.0).
+ *
+ * ── PO CO ─────────────────────────────────────────────────────────────────
+ * W sklepie z częściami do maszyn ogrodniczych zdjęcie pękniętego elementu
+ * bywa CAŁĄ treścią pytania — 0.155.0 zapisało to zdanie, dokładając nazwę
+ * pliku na oś, i zatrzymało się w pół drogi. Agent i tak musiał kliknąć,
+ * ściągnąć plik na dysk i otworzyć go w przeglądarce zdjęć, żeby zobaczyć,
+ * o co klient pyta. Właściciel: „wyświetlaj w czacie, nie każ mi w nie klikać".
+ *
+ * ── DLACZEGO LISTA, A NIE `image/*` ───────────────────────────────────────
+ * `image/svg+xml` JEST obrazem i JEST dokumentem ze skryptem. Wpuszczony do
+ * `<img>` skryptu nie odpali, ale ta lista broni się sama, bez polegania na
+ * tym, gdzie dokładnie przeglądarka stawia granicę — plik przychodzi od obcego
+ * i leci przez nasz origin. To ta sama ostrożność, którą 0.155.0 zapisało
+ * w nagłówku `content-disposition: attachment` przy pobieraniu.
+ *
+ * Cztery formaty rastrowe pokrywają wszystko, co wychodzi z telefonu.
+ */
+export const TYPY_PODGLADU = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+
+/**
+ * Typ do odesłania w podglądzie albo `null`, gdy plik nie jest obrazem z listy.
+ *
+ * ZWRACAMY WARTOŚĆ Z LISTY, nie z bazy. `mime_type` przyszedł od Allegro,
+ * a nagłówek `content-type` przepisany z cudzego pola to cudzy tekst
+ * w naszej odpowiedzi.
+ */
+export function typPodgladu(mime: string | null | undefined): string | null {
+  if (mime == null) return null;
+  /* Sam typ, bez parametrów w rodzaju `; charset=` — i bez wielkości liter,
+     bo RFC 2045 mówi, że typ jest nieczuły na wielkość, a nadawcy bywają różni. */
+  const czysty = String(mime).split(";")[0]!.trim().toLowerCase();
+  return TYPY_PODGLADU.find((t) => t === czysty) ?? null;
+}
+
 /** Wzmianka w komentarzu — kto ma to przeczytać. */
 export interface Wzmianka { userId: number; name: string }
 
@@ -95,6 +136,10 @@ export interface WpisOsi {
   zamowienieId?: string | null;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Wzmianka[];
+  /* Nasze automatyczne potwierdzenie „Dziękujemy za kontakt" (0.218.0). Panel
+     zwija taki wpis do jednej linijki. Flaga stoi wyłącznie przy wiadomościach
+     WYCHODZĄCYCH — uzasadnienie w `czyAutoresponder`. */
+  automatyczna?: boolean;
 }
 export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
 
@@ -398,6 +443,10 @@ export function osRozmowy(id: number): {
          i tak wędrowałby przez maszynę biura. `EXPIRED` i `NEW` nie mają czego
          oddać. */
       doPobrania: String(z.status) === "SAFE",
+      /* Podgląd wymaga OBU warunków: obrazu i zgody Allegro. Sam obraz nie
+         wystarcza — `UNSAFE` znaczy, że plik jest podejrzany, a rysowanie go
+         na osi byłoby wpuszczeniem go do biura tylnymi drzwiami. */
+      podglad: String(z.status) === "SAFE" && typPodgladu(z.mime_type as string | null) !== null,
     });
     zalaczniki.set(Number(z.message_id), lista);
   }
@@ -415,6 +464,10 @@ export function osRozmowy(id: number): {
     nazwaOferty: m.nazwaOferty == null ? null : String(m.nazwaOferty),
     zamowienieId: m.zamowienie == null ? null : String(m.zamowienie),
     ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
+    /* Tylko wychodzące: cytat naszego potwierdzenia pod odpowiedzią klienta
+       niesie ten sam podpis, a jego wiadomość jest pytaniem, nie odbiciem. */
+    ...(String(m.direction) === "outgoing" && czyAutoresponder(String(m.body))
+      ? { automatyczna: true } : {}),
   }));
 
   /* JEDNO zamówienie na rozmowę: numer z najnowszej wiadomości KLIENTA, która

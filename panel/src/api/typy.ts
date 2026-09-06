@@ -109,6 +109,9 @@ export type PomiarCopilota = {
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
 export type ZalacznikOsi = {
   id: number; nazwa: string; typ: string | null; status: string; doPobrania: boolean;
+  /* Czy obraz rysuje się WPROST na osi (0.218.0). Liczy SERWER — panel nie
+     zgaduje po `typ`, bo lista typów, które trasa podglądu odda, jest tam. */
+  podglad: boolean;
 };
 
 export type WpisOsi = {
@@ -127,6 +130,8 @@ export type WpisOsi = {
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;
+  /* Nasze automatyczne „Dziękujemy za kontakt" (0.218.0) — wpis zwinięty. */
+  automatyczna?: boolean;
 };
 
 /* Wzmianka w skrzynce „wspomniano o mnie" (§6.4, 0.160.0). Fragment liczy

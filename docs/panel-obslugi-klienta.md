@@ -81,6 +81,32 @@ i godzinę, kanał, załączniki, ofertę, powiązane zamówienie, komentarze
 wewnętrzne, zadania terenowe, wyniki z magazynu, szkic odpowiedzi i historię
 jego zmian.
 
+**Zdjęcie widać, nie klika się w nie (0.218.0).** Załącznik będący obrazem
+rysuje się wprost na osi. 0.155.0 dołożyło samą nazwę pliku i na tym stanęło:
+agent musiał kliknąć, zapisać plik na dysku i otworzyć go w przeglądarce zdjęć,
+żeby zobaczyć treść pytania. W sklepie z częściami zdjęcie pękniętego elementu
+bywa całym pytaniem, a nazwa pliku nie mówi o nim nic.
+
+Podgląd ma WŁASNĄ trasę i węższą bramkę niż pobranie. Oddaje wyłącznie cztery
+typy rastrowe (`image/jpeg`, `image/png`, `image/webp`, `image/gif`) i wyłącznie
+przy stanie `SAFE`; `image/svg+xml` jest obrazem i dokumentem ze skryptem
+naraz, więc listy nie przechodzi. Nagłówek `content-type` bierzemy z tej listy,
+nie z pola `mime_type` przysłanego przez Allegro. Trasa pobrania zostaje bez
+zmian, z `content-disposition: attachment` — dwa adresy, dwie odpowiedzi, każda
+mówi o sobie prawdę.
+
+**Autoodpowiedź biura jest zwinięta i oznaczona (0.218.0).** Skrzynka odbija
+przychodzący list potwierdzeniem „Dziękujemy za kontakt": kilkanaście wierszy
+z godzinami pracy, po polsku i po angielsku, zero zdań o sprawie klienta.
+Rozwinięte na osi spycha pytanie poniżej krawędzi okna.
+
+Zwijamy, a NIE kasujemy. Autoodpowiedź jest faktem w rozmowie — dowodzi, że
+list dotarł, i tłumaczy klientowi kontakt bez treści; ukryta kazałaby przy
+sporze szukać prawdy poza panelem. Rozpoznajemy ją po zdaniu, które sama o
+sobie mówi („ta wiadomość jest generowana automatycznie", w obu językach),
+i wyłącznie przy wiadomościach WYCHODZĄCYCH: klient odpisujący z cytatem
+naszego potwierdzenia niesie ten sam podpis, a jego wiadomość jest pytaniem.
+
 ### 4.3. Kontekst oferty i produktu
 
 Panel prezentuje oddzielnie dane Allegro (identyfikator oferty, tytuł,
@@ -2013,6 +2039,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiadomości o tym zakupie przy zwrocie | **działa** od 0.169.0 | złączenie po `message.related_order_id` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
+| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0 | `typPodgladu`, `GET /api/obsluga/zalaczniki/:id/podglad` — cztery typy rastrowe, tylko `SAFE` |
+| Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
 | Załączniki przy odpowiedzi — WYSYŁKA | **działa** od 0.195.0 | `wysylka_zalacznik`, `services/zalaczniki-wysylki.ts`, `skrzynka/Zalaczniki.tsx`; dwukrokowe wgranie do Allegro |
 | Wątek oznaczany jako przeczytany w Allegro | **działa** od 0.195.0 | `oznaczPrzeczytanyWAllegro`, `PUT /messaging/threads/{id}/read` po udanej wysyłce |
 | Obecność łata wiersz kolejki zamiast pobierać listę | **działa** od 0.196.0 | `setQueryData` w `api/zdarzenia.ts`; pomiar ładunku w `CHANGELOG.md` |
