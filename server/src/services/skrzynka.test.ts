@@ -740,3 +740,46 @@ test("ręczne wskazanie oferty przebija numer z wiadomości — jak w doborze", 
   assert.equal(osRozmowy(r).oferta?.zrodlo, "reczne");
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
 });
+
+/* ── Podpis rozmówcy (0.219.2) ───────────────────────────────────────────────
+   NA KOŃCU PLIKU celowo: oba testy zakładają własne rozmowy, a testy listy
+   wyżej liczą wiersze skrzynki. Dopisane przed nimi psuły trzy z nich. */
+test("podpis wiadomości klienta niesie LOGIN, nie temat wątku", () => {
+  /* ── Blizna 0.219.2 ────────────────────────────────────────────────────────
+     Do 0.219.1 podpis brał `c.subject`, czyli TEMAT wątku. Na koncie
+     właściciela temat bywa równy loginowi, więc ekran wyglądał poprawnie —
+     i dokładnie dlatego było groźnie: przy wątku o temacie „Zaworek zwrotny"
+     wiadomość klienta podpisywała się nazwą części, a nie tym, kto ją napisał.
+     Ten test rozdziela oba pola, żeby nie dało się ich znowu pomylić. */
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-login')")
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
+    VALUES ('w-login',1,'2026-09-01T10:00:00.000Z','bagslublin','{}','2026-09-01T10:00:00.000Z')`).run();
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-login','Zaworek zwrotny',1,'2026-09-01T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-login','incoming','Dzień dobry','2026-09-01T10:00:00.000Z')`).run(rozmowa, konto);
+
+  const wpis = osRozmowy(rozmowa).os.find((w) => w.rodzaj === "wiadomosc")!;
+  assert.equal(wpis.autor, "bagslublin");
+  assert.notEqual(wpis.autor, "Zaworek zwrotny");
+});
+
+test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
+  /* Wątek bez rozmówcy ISTNIEJE — Allegro takie oddaje. Ekran ma wtedy
+     pokazać cokolwiek prawdziwego, a nie puste miejsce po podpisie. */
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-bez')")
+    .run().lastInsertRowid);
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-bez','Pytanie o gwint',1,'2026-09-01T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-bez','incoming','Dzień dobry','2026-09-01T10:00:00.000Z')`).run(rozmowa, konto);
+
+  assert.equal(osRozmowy(rozmowa).os.find((w) => w.rodzaj === "wiadomosc")!.autor, "Pytanie o gwint");
+});

@@ -51,8 +51,12 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
     mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
   it("wiadomość klienta i nasza odpowiedź mają RÓŻNE podpisy rodzaju", () => {
+    /* Od 0.219.2 podpis klienta niesie JEGO LOGIN zamiast słowa „Klient" —
+       decyzja właściciela. Test pilnuje dalej tego samego, co w 0.193.0: że
+       obie strony rozmowy mają podpis i że są to podpisy RÓŻNE. Zmieniła się
+       treść po stronie klienta, nie reguła. */
     os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
-    expect(screen.getByText("Klient · Allegro")).toBeInTheDocument();
+    expect(screen.getByText("kupujacy_7 · Allegro")).toBeInTheDocument();
     expect(screen.getByText("Odpowiedź firmy")).toBeInTheDocument();
   });
 

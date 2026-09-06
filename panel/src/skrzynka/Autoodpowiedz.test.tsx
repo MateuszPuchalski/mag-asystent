@@ -67,6 +67,25 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.queryByRole("button", { name: /stopka/ })).toBeNull();
   });
 
+  /* ── Login w miejscu słowa „KLIENT" (0.219.2) ───────────────────────────
+     Właściciel: „login klienta powinien być na miejscu napisu KLIENT".
+     Słowo „klient" jest prawdziwe o KAŻDEJ wiadomości przychodzącej, więc
+     nie odróżnia niczego; login odróżnia rozmówcę.                        */
+  it("wiadomość klienta podpisuje się jego loginem, nie słowem „klient”", () => {
+    os(wpis({ automatyczna: false, odKlienta: true, autor: "bagslublin",
+      tresc: "Dzień dobry" }));
+
+    expect(screen.getByText("bagslublin · Allegro")).toBeTruthy();
+    /* Login PADA RAZ: powtórzony obok podpisu byłby szumem w tym samym wierszu. */
+    expect(screen.getAllByText(/bagslublin/)).toHaveLength(1);
+  });
+
+  it("wątek bez loginu wygląda jak dawniej", () => {
+    /* Serwer podstawia wtedy „Klient" — ekran nie udaje, że wie więcej. */
+    os(wpis({ automatyczna: false, odKlienta: true, autor: "Klient", tresc: "Dzień dobry" }));
+    expect(screen.getByText("Klient · Allegro")).toBeTruthy();
+  });
+
   it("odpowiedź agenta zostaje pełnym kafelkiem", () => {
     /* Bez flagi z serwera wpis idzie zwykłą gałęzią — zwinięcie prawdziwej
        odpowiedzi kosztowałoby więcej niż niezwinięcie jednego odbicia. */

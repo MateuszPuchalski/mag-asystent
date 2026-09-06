@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.219.2 — 6 września 2026
+
+**Podpis wiadomości klienta niesie jego login, nie temat wątku.** Właściciel:
+„login klienta powinien być na miejscu napisu KLIENT". Przy okazji wyszło coś
+gorszego od kosmetyki: podpis brał `conversation.subject`, czyli TEMAT wątku.
+Na koncie właściciela temat bywa równy loginowi, więc ekran wyglądał poprawnie
+— i dokładnie dlatego było groźnie. Przy wątku o temacie „Zaworek zwrotny"
+wiadomość klienta podpisywałaby się nazwą części, a nie tym, kto ją napisał.
+
+Login idzie teraz z `allegro_inbox_thread.interlocutor_login`, złączonego po
+identyfikatorze wątku — to samo źródło, z którego czyta zakładka KLIENT. Wątek
+bez rozmówcy schodzi na temat, a potem na słowo „Klient", bo taki wątek
+istnieje i ekran nie ma prawa udawać, że wie więcej. Słowo „klient" i tak nie
+odróżniało niczego: jest prawdziwe o każdej wiadomości przychodzącej.
+
+**Odmowa Allegro przy załączniku mówi, co odpowiedziało Allegro.** Zgłoszenie
+z panelu: „Allegro nie oddało załącznika (403)" — komunikat, z którego nie da
+się wyjść. Pobierania załącznika NIE MA w `docs/allegro/swagger.yaml`:
+specyfikacja zna deklarację (POST) i wysyłkę (PUT), a do odczytu daje wyłącznie
+pole `url` na innym hoście. Kształtu nie zgadujemy — to reguła, która w tym
+projekcie ma już cenę trzech wydań.
+
+Zamiast zgadywania komunikat niesie teraz treść odpowiedzi Allegro i, przy 403,
+nazwę uprawnienia wraz z przypomnieniem, że token wydany pod stary zakres sam
+się nie rozszerzy. **To nie naprawia pobierania** — daje jedno zdanie, po
+którym wiadomo, gdzie szukać dalej.
+
 ## 0.219.1 — 6 września 2026
 
 **Zdjęcie i pobranie załącznika naprawione — obu nie dało się użyć.** Właściciel
