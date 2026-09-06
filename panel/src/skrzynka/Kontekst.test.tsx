@@ -72,7 +72,7 @@ describe("kolumna kontekstu", () => {
 
   it("zamówienie z kilku pozycji bez oferty każe wskazać pozycję, nie wpisywać numer", () => {
     const pozycja = { offerId: "1", nazwa: "A", sku: null, ilosc: 1, cenaGrosze: 100, waluta: "PLN",
-      zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null };
+      zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const };
     render(<Kontekst dane={dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, pobrane: {
       externalId: "zam-77", status: null, kupujacyLogin: null, dostawaGrosze: null, dostawaMetoda: null,
       platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 200, waluta: "PLN", kupionoAt: null,

@@ -1,6 +1,7 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
+import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Zamówienie klienta jako DTO (0.166.0) ──────────────────────────────────
    Do 0.165.0 mapowanie wiersza `zamowienie_klienta` na kształt dla panelu
@@ -23,13 +24,25 @@ export interface PozycjaZamowienia {
    * niej SKU sprzedawcy z pozycji. `null` = nie ma czego pokazać. Zdanie
    * `twZrodlo` pisze `dopasowanie-sku.ts`, panel go nie układa (§4.3).
    *
-   * Zdjęcie oferty NIE ma tu flagi, inaczej niż `OfertaRozmowy.maZdjecie`:
-   * pozycja niesie `offerId`, a hak obrazów w panelu pamięta negatyw — jedno
-   * 404 na ofertę i sesję, tak samo jak przy pozycji zwrotu.
    */
   twId: number | null;
   twSymbol: string | null;
   twZrodlo: string | null;
+  /**
+   * Co wiadomo o zdjęciu OFERTY tej pozycji (0.217.0).
+   *
+   * Do 0.216.0 stan tu nie jechał — z uzasadnieniem, że pozycja niesie
+   * `offerId`, a hak obrazów pamięta negatyw, więc to najwyżej jedno 404 na
+   * ofertę i sesję. Rachunek się zgadzał, ale mierzył nie to co trzeba:
+   * kosztem nie były żądania, tylko ZDANIE NA EKRANIE. Bez stanu kafel pisze
+   * „bez zdjęcia" zarówno wtedy, gdy Allegro obrazu nie ma, jak i wtedy, gdy
+   * po prostu jeszcze o niego nie pytaliśmy — a to jest dokładnie ta pomyłka,
+   * którą 0.214.0 naprawiło przy pozycji zwrotu (blizna: właściciel przysłał
+   * zrzut oferty, która na Allegro zdjęcie miała).
+   *
+   * Przy okazji znika też tamto 404, ale to skutek uboczny, nie powód.
+   */
+  ofertaZdjecie: StanZdjeciaOferty;
   /**
    * Ile sztuk WRACA (0.176.0). Plakietka „wraca" stała dotąd obok liczby
    * kupionych sztuk i czytało się to jako „wracają dwie" przy zwrocie jednej.
@@ -73,6 +86,11 @@ export function naZamowienie(
   /* Kartotekę dokłada WOŁAJĄCY, jak sztuki zwrotu: zwrot ma własne wiązanie
      pozycji z towarem (`zwroty.ts`), rozmowa bierze mostek po ofercie. */
   kartoteka: (p: Wiersz) => KartotekaPozycji = () => BEZ_KARTOTEKI,
+  /* Stan zdjęcia oferty tą samą drogą i z tego samego powodu: zwrot ma mapę
+     snapshotów na całą kolejkę, rozmowa pyta o jedno zamówienie. Domyślne
+     „nieznane" jest uczciwe — wołający, który nie sprawdził, nie ma prawa
+     powiedzieć „Allegro nie ma obrazu". */
+  zdjecie: (p: Wiersz) => StanZdjeciaOferty = () => "nieznane",
 ): Zamowienie {
   return {
     externalId: String(zam.external_id),
@@ -97,6 +115,7 @@ export function naZamowienie(
       zwracana: wraca(p) > 0,
       wracaIlosc: wraca(p),
       ...kartoteka(p),
+      ofertaZdjecie: zdjecie(p),
     })),
   };
 }
@@ -121,8 +140,21 @@ export function zamowienieRozmowy(
   /* Ten sam mostek, co dla oferty rozmowy: pamięć wskazań bije SKU, a puste
      SKU to „bez kartoteki", nie „oferty nie pobrano" — pozycja zamówienia
      ZAWSZE ma już swoje SKU z formularza zakupu, więc nie ma na co czekać. */
+  /* Snapshoty pozycji JEDNYM zapytaniem, nie po jednym na wiersz: zamówienie
+     ma dwie–pięć pozycji, ale zapytanie na pozycję to wzorzec, który przy
+     kolejce zwrotów kosztowałby setki odczytów. */
+  const obrazy = new Map<string, string | null>();
+  for (const o of database.prepare(
+    "SELECT external_id AS id, primary_image_url AS url FROM offer_snapshot WHERE channel_account_id=?",
+  ).all(konto) as Array<{ id: string; url: string | null }>) {
+    obrazy.set(o.id, o.url);
+  }
   return naZamowienie(zam, pozycje, () => 0, (p) => {
     const k = kartotekaOferty(database, konto, (p.offer_id as string) ?? null, String(p.sku ?? ""));
     return k.twId === null ? BEZ_KARTOTEKI : { twId: k.twId, twSymbol: k.symbol, twZrodlo: k.zrodlo };
+  }, (p) => {
+    const oferta = (p.offer_id as string) ?? "";
+    /* Bez numeru oferty nie ma o co pytać — i to NIE jest „brak zdjęcia". */
+    return oferta === "" ? "nieznane" : stanZdjeciaOferty(obrazy.get(oferta));
   });
 }

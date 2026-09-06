@@ -3,6 +3,7 @@ import { PackagePlus } from "lucide-react";
 import type { DoDopisania } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Blad } from "../ui";
+import { ZdjecieOferty } from "../towar/Zdjecie";
 
 /* ── Produkt, którego klient nie zgłosił (0.184.0) ───────────────────────────
    Klient zgłasza jedną rzecz, a odsyła dwie. Formularz zwrotu wypełnia się na
@@ -62,15 +63,27 @@ export function Dopisz({ kandydaci, trwa, blad, onDopisz }: {
       {kandydaci.map((k) => <li key={k.zamPozycjaId}>
         <button type="button" disabled={trwa}
           onClick={() => onDopisz(k.zamPozycjaId)}
-          className="flex w-full items-baseline justify-between gap-2 rounded border
+          className="flex w-full items-center gap-2 rounded border
             border-slate-200 bg-white px-2 py-1 text-left text-sm hover:bg-sky-50
             disabled:opacity-50">
-          <span>
-            <span className="font-semibold">{k.nazwa}</span>
-            {k.ilosc !== 1 && <span className="ml-1 text-xs text-slate-500">{k.ilosc} szt.</span>}
+          {/* Zdjęcie kandydata (0.217.0). Operator dopisuje to, co NAPRAWDĘ
+              przyszło w kartonie — a rozstrzyga to, patrząc na przedmiot,
+              nie na nazwę z Allegro. Kafel jest bez powiększenia: cały wiersz
+              jest przyciskiem, więc przycisk w przycisku zabierałby kliknięcie
+              temu, po co ta lista jest. */}
+          <ZdjecieOferty externalId={k.offerId} stan={k.ofertaZdjecie} rozmiar={32}
+            nazwa={`${k.nazwa} — zdjęcie oferty`} />
+          {/* CENA POD NAZWĄ, nie obok. Kolumna bywa wąska, a cena ma
+              `shrink-0`, więc w jednym wierszu zabierała nazwie całą
+              szerokość — zostawało „Ł…". Nazwa jest tym, po czym operator
+              rozpoznaje pozycję, więc dostaje wiersz dla siebie. */}
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{k.nazwa}</span>
+            <span className="mt-0.5 block text-xs text-slate-600">
+              {k.ilosc !== 1 && <span className="text-slate-500">{k.ilosc} szt. · </span>}
+              <span className="tabular-nums">{zlote(k.cenaGrosze, k.waluta)}</span>
+            </span>
           </span>
-          <span className="shrink-0 tabular-nums text-slate-600">
-            {zlote(k.cenaGrosze, k.waluta)}</span>
         </button>
       </li>)}
     </ul>

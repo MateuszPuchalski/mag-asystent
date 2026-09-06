@@ -26,8 +26,8 @@ const ZAMOWIENIE: Zamowienie = {
   waluta: "PLN", kupionoAt: "2026-08-20T11:00:00.000Z",
   link: "https://allegro.pl/moje-allegro/zam/ord-1",
   pozycje: [
-    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", ilosc: 1, cenaGrosze: 4999, waluta: "PLN", zwracana: true, wracaIlosc: 1, twId: null, twSymbol: null, twZrodlo: null },
-    { offerId: "222", nazwa: "Zraszacz obrotowy", sku: null, ilosc: 1, cenaGrosze: 3490, waluta: "PLN", zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null },
+    { offerId: "111", nazwa: "Sekator NAC", sku: "SEK-46", ilosc: 1, cenaGrosze: 4999, waluta: "PLN", zwracana: true, wracaIlosc: 1, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
+    { offerId: "222", nazwa: "Zraszacz obrotowy", sku: null, ilosc: 1, cenaGrosze: 3490, waluta: "PLN", zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
   ],
 };
 
@@ -200,7 +200,7 @@ describe("Dowody", () => {
   it("przy zwrocie części zakupu plakietka mówi ile z ilu", () => {
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE, pozycje: [
       { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
-        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 1, twId: null, twSymbol: null, twZrodlo: null },
+        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 1, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
     ] } })} />));
     expect(screen.getByText("wraca 1 z 2")).toBeInTheDocument();
     /* Liczba kupionych sztuk NIE znika — to ona mówi, ile klient ma u siebie. */
@@ -222,7 +222,7 @@ describe("Dowody", () => {
     /* „wraca 2 z 2" byłoby szumem: nic u klienta nie zostaje. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: { ...ZAMOWIENIE, pozycje: [
       { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
-        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 2, twId: null, twSymbol: null, twZrodlo: null },
+        cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 2, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
     ] } })} />));
     expect(screen.getByText("wraca 2")).toBeInTheDocument();
   });

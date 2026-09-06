@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.217.0 — 6 września 2026
+
+**Zdjęcie przy pozycji zamówienia — ostatnie miejsce w obsłudze bez obrazu.**
+Zgłoszenie właściciela: „wszędzie, gdzie jest odniesienie do produktu, powinno
+być zdjęcie". Kolumna dowodów przy zwrocie wymieniała kupione towary samym
+tekstem, a odpowiada na pytanie „co klient w ogóle kupił" — takie, przy którym
+nazwa ucięta w połowie nie wystarcza.
+
+Kafle doszły w trzech listach: pozycje zamówienia w kolumnie dowodów zwrotu,
+kandydaci do dopisania pozycji oraz pozycje zamówienia przy rozmowie, gdzie
+kafel był, ale bez stanu.
+
+**Kafel jest MNIEJSZY niż przy pozycji zwrotu** (32 px wobec 72) i to jest
+hierarchia, nie oszczędność: pozycja zwrotu to praca, pozycja zamówienia to jej
+kontekst. Stoi tam WYŁĄCZNIE zdjęcie oferty — co mamy na półce, mówi kolumna
+środkowa, a powtórzenie tego obok byłoby szumem.
+
+**Stan zdjęcia jedzie też przy pozycji zamówienia.** Do 0.216.0 nie jechał,
+z uzasadnieniem, że pozycja niesie numer oferty, a hak obrazów pamięta negatyw,
+więc to najwyżej jedno 404 na ofertę i sesję. Rachunek się zgadzał, ale mierzył
+nie to co trzeba: kosztem nie były żądania, tylko ZDANIE NA EKRANIE. Bez stanu
+kafel pisze „bez zdjęcia" także wtedy, gdy o obraz nikt jeszcze nie pytał — ta
+sama pomyłka, którą 0.214.0 naprawiło przy pozycji zwrotu.
+
+**Nazwa przed ceną, w dwóch wierszach.** Kolumna dowodów ma 21 rem przy węższym
+oknie, a kafel zabiera z niej 32 px; przy jednym wierszu zostawało „NAKRĘTKA
+DO…", czyli nazwa, z której nie da się rozpoznać towaru. Cena schodzi niżej, bo
+odpowiada na inne pytanie niż „co to jest". Ten sam układ dostała lista
+kandydatów do dopisania — tam cena z `shrink-0` zabierała nazwie całą
+szerokość i zostawało „Ł…".
+
 ## 0.216.0 — 6 września 2026
 
 **Wracają dwie zakładki z makiety: KLIENT i WIEDZA.** §10.1 skreślił obie

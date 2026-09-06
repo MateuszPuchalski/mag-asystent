@@ -549,6 +549,8 @@ export interface PozycjaZamowienia {
   twSymbol: string | null;
   /** Zdanie źródła pisze serwer (§4.3). */
   twZrodlo: string | null;
+  /** Co wiadomo o zdjęciu OFERTY tej pozycji (0.217.0) — liczy serwer. */
+  ofertaZdjecie: StanZdjeciaOferty;
 }
 
 export interface Zamowienie {
@@ -631,6 +633,8 @@ export interface FakturaZwrotu {
 export interface DoDopisania {
   zamPozycjaId: number;
   offerId: string | null;
+  /** Co wiadomo o zdjęciu tej oferty (0.217.0). */
+  ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
   ilosc: number;
   cenaGrosze: number;
