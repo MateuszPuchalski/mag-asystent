@@ -17,6 +17,32 @@ import { PasekCopilota, PlakietkaKategorii, doRozpoznania } from "./Copilot";
    jednej definicji: dwiema różnymi kolejkami przy jednym liczniku. */
 type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace" | "poTerminie";
 
+/* ── Kolejność listy (0.214.0) ───────────────────────────────────────────────
+   Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
+   decyzja właściciela z 0.181.0 i odpowiedź na pytanie „za co się wziąć".
+   „Od najnowszych" odpowiada na INNE pytanie — „co właśnie przyszło" — i jest
+   przełącznikiem, nie nową regułą, tym samym wzorem co data nadania przy
+   zwrotach. PILNE zostaje na górze w obu porządkach: flaga ręczna przebija
+   automat, bez względu na to, który automat wybrano. Wybór pamięta
+   przeglądarka, bo kolejność to nawyk stanowiska, nie decyzja na jedno
+   otwarcie ekranu. */
+type Porzadek = "czekanie" | "najnowsze";
+const KLUCZ_PORZADKU = "wertis.kolejka.porzadek";
+
+function zapamietanyPorzadek(): Porzadek {
+  try {
+    return localStorage.getItem(KLUCZ_PORZADKU) === "najnowsze" ? "najnowsze" : "czekanie";
+  } catch { return "czekanie"; }
+}
+
+/** Kolejność dla „od najnowszych": PILNE przed resztą, potem ostatnia wiadomość malejąco. */
+export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
+  return [...rozmowy].sort((a, b) =>
+    Number(b.priorytet === "pilny") - Number(a.priorytet === "pilny")
+    || b.ostatniaWiadomoscAt.localeCompare(a.ostatniaWiadomoscAt)
+    || b.id - a.id);
+}
+
 const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "wszystkie", etykieta: "Wszystkie" },
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
@@ -90,8 +116,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      Filtr liczy się W PAMIĘCI EKRANU, bez debounce'u i bez ruchu do serwera —
      lista i tak przyjeżdża w całości, ten sam wzorzec co przy kubełkach. */
   const [fraza, setFraza] = useState("");
+  const [porzadek, setPorzadek] = useState<Porzadek>(zapamietanyPorzadek);
+  const ustawPorzadek = (p: Porzadek) => {
+    setPorzadek(p);
+    try { localStorage.setItem(KLUCZ_PORZADKU, p); } catch { /* prywatne okno — wybór na jedno otwarcie */ }
+  };
   const szukane = fraza.trim().toLowerCase();
-  const wKubelkuTeraz = rozmowy.filter((r) => wKubelku(r, kubelek, mojeId));
+  const uporzadkowane = porzadek === "najnowsze" ? odNajnowszych(rozmowy) : rozmowy;
+  const wKubelkuTeraz = uporzadkowane.filter((r) => wKubelku(r, kubelek, mojeId));
   const poKategorii = kategoria === null ? wKubelkuTeraz
     : wKubelkuTeraz.filter((r) => r.kopilot?.kategoria === kategoria);
   /* Szukamy po LOGINIE i po TREŚCI. Login, bo tak się wraca do znanej sprawy;
@@ -147,17 +179,26 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
-        wejście, a szuka się w środku tego, co się wybrało. */}
-    <div className="relative shrink-0 border-b px-2 py-2">
-      <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-      <input value={fraza} onChange={(e) => setFraza(e.target.value)}
-        aria-label="Szukaj w rozmowach"
-        placeholder="Szukaj: login, treść, prowadzący"
-        className="field w-full py-1 pl-7 pr-7 text-sm" />
-      {fraza !== "" && <button type="button" onClick={() => setFraza("")}
-        aria-label="Wyczyść szukanie"
-        className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-        <X size={14} /></button>}
+        wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
+        pola, w tym samym paśmie: to trzecie sito na tę samą listę, a osobny
+        rząd zjadałby wysokość kolumny, która ma pokazywać PYTANIA. */}
+    <div className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
+      <div className="relative min-w-0 flex-1">
+        <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={fraza} onChange={(e) => setFraza(e.target.value)}
+          aria-label="Szukaj w rozmowach"
+          placeholder="Szukaj: login, treść, prowadzący"
+          className="field w-full py-1 pl-7 pr-7 text-sm" />
+        {fraza !== "" && <button type="button" onClick={() => setFraza("")}
+          aria-label="Wyczyść szukanie"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <X size={14} /></button>}
+      </div>
+      <select className="field w-auto shrink-0 py-1 text-xs" aria-label="Kolejność" value={porzadek}
+        onChange={(e) => ustawPorzadek(e.target.value as Porzadek)}>
+        <option value="czekanie">najdłużej czekające</option>
+        <option value="najnowsze">od najnowszych</option>
+      </select>
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}

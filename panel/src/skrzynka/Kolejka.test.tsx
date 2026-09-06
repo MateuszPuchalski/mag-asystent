@@ -174,7 +174,8 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
 
   it("rozmowa bez pytania klienta nie pokazuje zegara", () => {
     pokaz([rozmowa({ czekaOdMs: null })]);
-    expect(screen.queryByText(/czeka/)).not.toBeInTheDocument();
+    /* Od początku wiersza: przełącznik kolejności ma w opcji „czekające". */
+    expect(screen.queryByText(/^czeka /)).not.toBeInTheDocument();
   });
 
   it("PILNE widać w wierszu", () => {
@@ -328,5 +329,33 @@ describe("Szukanie w kolejce", () => {
     await userEvent.click(screen.getByRole("button", { name: /Wyczyść szukanie/ }));
     expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
     expect(screen.getByText("mirek352810")).toBeInTheDocument();
+  });
+});
+
+describe("kolejność listy (0.214.0)", () => {
+  const LISTA = [
+    rozmowa({ id: 1, klient: "Najstarsze pytanie", ostatniaWiadomoscAt: "2026-09-01T07:00:00.000Z" }),
+    rozmowa({ id: 2, klient: "Świeże pytanie", ostatniaWiadomoscAt: "2026-09-06T09:00:00.000Z" }),
+    rozmowa({ id: 3, klient: "Pilna sprzed tygodnia", priorytet: "pilny", ostatniaWiadomoscAt: "2026-08-30T07:00:00.000Z" }),
+  ];
+  const klienci = () => screen.getAllByText(/Najstarsze pytanie|Świeże pytanie|Pilna sprzed tygodnia/)
+    .map((e) => e.textContent);
+
+  it("domyślnie zostaje kolejność serwera — PILNE i najdłużej czekające", () => {
+    localStorage.removeItem("wertis.kolejka.porzadek");
+    render(<Kolejka rozmowy={LISTA} stan={STAN} wybranaId={null} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByLabelText("Kolejność")).toHaveValue("czekanie");
+    expect(klienci()).toEqual(["Najstarsze pytanie", "Świeże pytanie", "Pilna sprzed tygodnia"]);
+  });
+
+  it("„od najnowszych” ustawia ostatnią wiadomość na górze, ale PILNE dalej przebija", async () => {
+    localStorage.removeItem("wertis.kolejka.porzadek");
+    render(<Kolejka rozmowy={LISTA} stan={STAN} wybranaId={null} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.selectOptions(screen.getByLabelText("Kolejność"), "najnowsze");
+    expect(klienci()).toEqual(["Pilna sprzed tygodnia", "Świeże pytanie", "Najstarsze pytanie"]);
+    /* Wybór to nawyk stanowiska — przeglądarka go pamięta. */
+    expect(localStorage.getItem("wertis.kolejka.porzadek")).toBe("najnowsze");
   });
 });

@@ -58,6 +58,10 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
 }) {
   const [widok, setWidok] = useState<Widok>("towar");
   const oferta = dane.oferta;
+  /* Liczba pozycji, gdy jest ich więcej niż jedna; z jednej serwer wywodzi
+     ofertę sam, więc ten przypadek nie dochodzi do tego zdania. */
+  const pozycji = dane.zamowienie?.pobrane?.pozycje.length ?? 0;
+  const kilkaPozycji = pozycji > 1 ? pozycji : 0;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
@@ -73,11 +77,19 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
       {widok === "towar" && <>
         {oferta
           ? <OfertaRozmowy oferta={oferta} />
-          : <p className="p-4 text-sm text-slate-500">
-              Ta rozmowa nie jest powiązana z ofertą. Panel nie zgaduje towaru
-              z treści pytania — numer wskazuje agent albo dopytuje klienta.
-            </p>}
-        {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} />}
+          : kilkaPozycji
+            /* Zamówienie z kilku pozycji (0.214.0): oferta jest do WSKAZANIA
+               przy pozycji niżej, nie do wpisania z ręki i nie do zgadnięcia. */
+            ? <p className="p-4 text-sm text-slate-500">
+                Zamówienie ma {kilkaPozycji} pozycje — wskaż niżej tę, o którą pyta klient,
+                a oferta i kartoteka pojawią się tutaj.
+              </p>
+            : <p className="p-4 text-sm text-slate-500">
+                Ta rozmowa nie jest powiązana z ofertą. Panel nie zgaduje towaru
+                z treści pytania — numer wskazuje agent albo dopytuje klienta.
+              </p>}
+        {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
+          ofertaRozmowy={oferta?.externalId ?? null} />}
         {oferta
           ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
               onWstawDoSzkicu={onWstawDoSzkicu} />
@@ -86,7 +98,9 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
           : <p className="flex items-start gap-2 border-t p-4 text-sm text-slate-500">
               <PackageSearch size={16} className="mt-0.5 shrink-0" />
               <span>Bez powiązanej oferty nie ma z czego wywieść kartoteki.
-                Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</span>
+                {kilkaPozycji
+                  ? " Wskaż pozycję zamówienia wyżej, a towar pojawi się tutaj."
+                  : " Wskaż ofertę przy rozmowie, a towar pojawi się tutaj."}</span>
             </p>}
       </>}
 

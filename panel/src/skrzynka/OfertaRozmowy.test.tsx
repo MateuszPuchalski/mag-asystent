@@ -20,6 +20,7 @@ const BEZ_KARTOTEKI: Dane["kartoteka"] = {
 const dane = (pobrana: Dane["pobrana"], kartoteka = BEZ_KARTOTEKI): Dane => ({
   externalId: "12096815384",
   link: "https://allegro.pl/oferta/12096815384",
+  zrodlo: "wiadomosc",
   pobrana,
   kartoteka,
 });
