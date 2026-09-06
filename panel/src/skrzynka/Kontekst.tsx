@@ -6,6 +6,8 @@ import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { TowarRozmowy } from "./TowarRozmowy";
 import { Dobor } from "./Dobor";
+import { Klient } from "./Klient";
+import { Wiedza } from "./Wiedza";
 import type { Towar } from "../wyszukiwarka";
 
 /**
@@ -17,9 +19,8 @@ import type { Towar } from "../wyszukiwarka";
  * nad osią: cztery bloki jeden pod drugim spychały pytanie klienta poniżej
  * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
- * DWIE zakładki od 0.198.0, wcześniej trzy. Makieta miała pięć; „Dobór" doszła
- * w etapie E1, gdy dostała byt (`dobor_rozmowy`). Zakładka, która zawsze mówi
- * „wkrótce", uczy nie klikać.
+ * CZTERY zakładki. Makieta miała pięć: „Oferta" i „Towar" zeszły się w jedną
+ * (niżej), a „Klient" i „Wiedza" wróciły decyzją właściciela.
  *
  * ── DLACZEGO OFERTA I TOWAR ZESZŁY SIĘ W JEDNO (0.198.0) ────────────────────
  * Właściciel przysłał zrzut z pracy: „powinniśmy wykorzystać puste miejsce
@@ -40,21 +41,31 @@ import type { Towar } from "../wyszukiwarka";
  * „Dobór" ZOSTAJE osobno, bo to nie jest karta faktów, tylko robota: własne
  * kroki, kandydaci, dowody i przyciski zmieniające stan rozmowy.
  *
- * „Wiedza" ma źródło od E2 (`/api/obsluga/wiedza/*`) i mimo to nie wraca tutaj:
- * dowody wybranej kartoteki stoją już w zakładce „Dobór", a druga zakładka
- * z tą samą treścią kazałaby zgadywać, w której szukać. „Klient" nadal nie ma
- * bytu — historii maszyn kupującego nie trzyma żadna tabela.
+ * „Wiedza" i „Klient" wracają — obie z powodów, które unieważniły tamte dwa
+ * zdania, a nie wbrew nim.
+ *
+ * Wiedzy odmawialiśmy, bo dowody stały już w „Doborze" i druga zakładka z tą
+ * samą treścią kazałaby zgadywać, w której szukać. Argument był słuszny, więc
+ * dowody STAMTĄD WYSZŁY: stoją w jednym miejscu, nie w dwóch. Dobór został
+ * robotą (kroki, kandydaci, przyciski), Wiedza jest kartą faktów pod szkic —
+ * sięga się po nią także wtedy, gdy dobór dawno domknięto.
+ *
+ * Klientowi odmawialiśmy, bo „historii maszyn kupującego nie trzyma żadna
+ * tabela". To była prawda o TABELI, nie o danych: login kupującego wiąże jego
+ * zamówienia, jego rozmowy i maszyny z domkniętych doborów. Zakładka jest
+ * czystym odczytem i nie zakłada ani jednej nowej tabeli.
  *
  * Dwa zwrotne uchwyty idą ze `Skrzynka.tsx`, gdzie leży szkic i formularz
  * pomiaru: zakładka doboru wstawia zdanie do szkicu i podstawia kartotekę
  * do zlecenia — obu rzeczy nie ma prawa robić po cichu.
  */
-type Widok = "towar" | "dobor";
+type Widok = "towar" | "dobor" | "klient" | "wiedza";
 
-export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
+export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   dane: OsRozmowy;
   onWstawDoSzkicu: (tresc: string) => void;
   onZlecPomiar: (towar: Towar) => void;
+  onOtworzRozmowe: (id: number) => void;
 }) {
   const [widok, setWidok] = useState<Widok>("towar");
   const oferta = dane.oferta;
@@ -67,6 +78,8 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
       { klucz: "towar", etykieta: "Oferta i towar" },
       { klucz: "dobor", etykieta: "Dobór" },
+      { klucz: "klient", etykieta: "Klient" },
+      { klucz: "wiedza", etykieta: "Wiedza" },
     ]} />
 
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
@@ -106,6 +119,15 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar }: {
 
       {widok === "dobor" && <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
         onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />}
+
+      {widok === "klient" && <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}
+        onOtworzRozmowe={onOtworzRozmowe} />}
+
+      {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
+          tego, o co pyta ta rozmowa. */}
+      {widok === "wiedza" && <Wiedza key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}
+        twId={dane.dobor.wybrany?.twId ?? null}
+        maMaszyne={Boolean(dane.dobor.dane.marka && dane.dobor.dane.model)} />}
     </div>
   </section>;
 }

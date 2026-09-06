@@ -392,6 +392,8 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 │ Oczekujące      │ Komentarze                │   towar z Subiekta   │
 │ Po terminie     │ Zadania i wyniki          │   opis kartoteki     │
 │                 │                           │ Dobór części         │
+│                 │                           │ Klient               │
+│                 │                           │ Wiedza               │
 └─────────────────┴───────────────────────────┴──────────────────────┘
 ```
 
@@ -415,8 +417,36 @@ zakładce.
 Argument za rozdziałem brzmiał: to dwa równorzędne tematy, więc niech się nie
 przewijają nawzajem. Trzyma się on, dopóki obie karty są wysokie. „Dobór"
 zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
-i przyciskami. „Klient" i „Wiedza" z makiety nie wracają: pierwsza nie ma bytu,
-a dowody kartoteki stoją już w „Doborze".
+i przyciskami.
+
+**„Klient" i „Wiedza" WRACAJĄ z makiety (0.216.0)** — decyzja właściciela,
+która unieważnia oba powody odmowy z 0.198.0, a nie idzie wbrew nim.
+
+Wiedzy odmawialiśmy, bo dowody stały już w „Doborze", a druga zakładka z tą
+samą treścią kazałaby zgadywać, w której szukać. Argument był słuszny, więc
+dowody STAMTĄD WYSZŁY: stoją w jednym miejscu, nie w dwóch. Dobór został
+robotą, Wiedza jest kartą faktów pod szkic — sięga się po nią także wtedy,
+gdy dobór dawno domknięto i nikt nie przewija jego kroków. U góry stoi
+klauzula §14.3: twierdzenie bez źródła jest przypuszczeniem. Zdanie ma stać
+tam, gdzie agent pisze, a nie tylko w tym dokumencie.
+
+Klientowi odmawialiśmy zdaniem „nie ma bytu". Było prawdziwe o TABELI i
+fałszywe o danych: login kupującego wiąże jego zamówienia (`zamowienie_klienta`),
+jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z domkniętych
+doborów (`dobor_rozmowy`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
+JEDNEJ NOWEJ TABELI — osobny rejestr maszyn trzeba by utrzymywać przy każdej
+poprawce doboru, czyli ten sam kształt, który w 0.128.0 kosztował cztery tabele
+nakładki spraw.
+
+Maszyna liczy się jako ustalona dopiero z doborem `confirmed`: w trakcie agent
+wpisuje markę, zanim cokolwiek ustali. Ta sama maszyna z kilku rozmów zostaje
+jedna, z NAJSTARSZĄ — pytanie brzmi „od kiedy to wiemy". Wątek bez loginu mówi,
+że nie wiemy, czyja to historia; pusta oś byłaby wtedy kłamstwem o kliencie,
+który kupuje u nas od lat.
+
+Po co to biuru: odpowiedź „ten szarpak pasuje" waży inaczej, gdy ten sam klient
+kupił go rok temu do tej samej kosiarki. §11.3 nazywa to wprost —
+`sprzedaz_weryfikacja` jest rodzajem dowodu.
 
 **Ekran bierze CAŁĄ szerokość okna od 0.198.0.** Wcześniej `<main>` miał
 `max-w-[1500px]` i wyśrodkowanie. Ogranicznik przyszedł z makiety i nikt go

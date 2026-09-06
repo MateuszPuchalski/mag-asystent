@@ -110,6 +110,9 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wybor`,
     payload: { twId: null, droga: "oferta", expectedVersion: 1 } },
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza` },
+  /* Historia klienta niesie CUDZE ZAKUPY — bramka roli jest tu ostrzejszym
+     wymogiem niż przy reszcie skrzynki, nie luźniejszym. */
+  { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/klient` },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,
     payload: { zadanieId: 1, polaryzacja: "pasuje" } },
 ];
@@ -132,7 +135,8 @@ test("magazynier nie widzi rozmów — także na odczycie", async () => {
 test("patrzenie na skrzynkę niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const przed = liczbaZdarzen();
-  for (const url of ["/api/obsluga/rozmowy", `/api/obsluga/rozmowy/${rozmowa}`]) {
+  for (const url of ["/api/obsluga/rozmowy", `/api/obsluga/rozmowy/${rozmowa}`,
+    `/api/obsluga/rozmowy/${rozmowa}/klient`]) {
     const r = await app.inject({ method: "GET", url, headers: b.naglowki });
     assert.equal(r.statusCode, 200, r.body);
   }
