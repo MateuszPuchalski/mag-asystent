@@ -40,6 +40,11 @@ import { useSkaner } from "../skaner";
    po naszej stronie — i dlatego nieznany kod pokazuje się SUROWY zamiast
    zniknąć. Licznik, który cicho gubi część liczb, jest gorszy od jego braku. */
 const POWODY_SKROT: Record<string, string> = {
+  /* DWA RÓŻNE CZEKANIA (0.220.0). „Czeka na automat" znaczy, że sygnatura
+     trafia w jedną kartotekę — takiej pozycji nikt nie musi klikać, wiąże ją
+     przebieg po synchronizacji. Liczba, która nie spada, mówi więc o USTERCE,
+     nie o pracy do zrobienia. */
+  do_zwiazania: "czeka na automat",
   do_zatwierdzenia: "czeka na zatwierdzenie",
   brak_zamowienia_w_zwrocie: "zwrot bez zamówienia",
   zamowienie_niepobrane: "zamówienie niepobrane",
@@ -47,6 +52,16 @@ const POWODY_SKROT: Record<string, string> = {
   oferta_bez_sku: "oferta bez SKU",
   sku_nie_trafia: "SKU nie trafia w kartotekę",
   symbol_zdublowany: "symbol zdublowany",
+};
+
+/* Statusy synchronizacji po polsku. Słownik z §7 mówi je po angielsku, bo
+   dzieli je ze skrzynką — a pasek czyta człowiek przy biurku. */
+const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
+  current: "działa",
+  delayed: "opóźniona",
+  rate_limited: "wstrzymana limitem Allegro",
+  authentication_error: "odmowa logowania do Allegro",
+  failed: "nie działa",
 };
 
 /**
@@ -60,14 +75,25 @@ const POWODY_SKROT: Record<string, string> = {
  * zwrot nie jest pracą do zrobienia i zawyżałby liczbę, która ma mówić „ile
  * jeszcze przede mną".
  */
-function PasekKartotek({ bilans }: { bilans: BilansKartotek }) {
+function PasekKartotek({ bilans, stan }: { bilans: BilansKartotek; stan?: StanZwrotow }) {
   if (!bilans.bez) return null;
   const powody = Object.entries(bilans.powody).sort((a, b) => b[1] - a[1]);
+  /* Zdanie o synchronizacji pada TYLKO przy pozycjach czekających na automat
+     i tylko wtedy, gdy synchronizacja naprawdę stoi. Wiązanie jedzie jej
+     taktem, więc to jest pierwsze miejsce do sprawdzenia — a zdanie
+     wypisywane zawsze przestaje być czytane po tygodniu. */
+  const automat = bilans.powody.do_zwiazania ?? 0;
+  const stoi = stan && stan.status !== "current";
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
     <b>Bez kartoteki: {bilans.bez} z {bilans.wszystkie} pozycji w pracy</b>
     {powody.map(([kod, ile]) => <span key={kod} className="text-amber-800">
       {POWODY_SKROT[kod] ?? kod} <b className="tabular-nums">{ile}</b>
     </span>)}
+    {automat > 0 && stoi && <span className="w-full text-amber-800">
+      Wiązanie idzie taktem synchronizacji, a ta stoi ({STANY_SYNCHRONIZACJI[stan!.status]}
+      {stan!.kodOstatniegoBledu ? `, kod ${stan!.kodOstatniegoBledu}` : ""}).
+      Dopóki nie ruszy, te pozycje same się nie powiążą.
+    </span>}
   </div>;
 }
 
@@ -306,7 +332,7 @@ export function Zwroty() {
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.stan && <PasekOgona stan={data.stan} />}
-    {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} />}
+    {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} stan={data.stan} />}
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
     <Karta className="flex min-h-0 flex-col overflow-hidden">

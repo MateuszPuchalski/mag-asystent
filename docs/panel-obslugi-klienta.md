@@ -1405,6 +1405,18 @@ sygnatura trafiająca w dokładnie jedną kartotekę jest powiązaniem, z podpis
 towaru w KARTOTECE nie dopasowujemy nigdy. Propozycje z zapasowych dróg
 (jedyna pozycja, zgodna nazwa) dalej czekają na człowieka.
 
+**Wiązanie nie zależy od Allegro (0.220.0).** Automat sygnatur chodzi taktem
+synchronizacji i do 0.219.1 stał w nim jako ciąg dalszy po pobraniu. Wyjątek
+z pobierania — wygasły token, limit, jeden felerny rekord — zabierał go ze
+sobą przy każdym przebiegu. Zwroty zapisane wcześniej zostawały, więc kolejka
+wyglądała zdrowo, a przy każdej pozycji stało „Bez kartoteki" z gotową
+propozycją obok. Wiązanie idzie teraz w `finally`, każdy krok pod własnym
+parasolem (`services/wiazania.ts`), a licznik nagłówka rozdziela dwa różne
+czekania: „czeka na automat" znaczy usterkę, „czeka na zatwierdzenie" — pracę
+biura. Gdy synchronizacja stoi, pasek mówi to wprost. Przycisk „Dociągnij
+teraz" jest jedyną ręczną drogą do wiązania, więc stoi też przy zamówieniu
+już pobranym.
+
 **Pamięć wskazań (0.154.0).** Wskazanie zapamiętuje parę oferta–kartoteka,
 a następny zwrot tej samej oferty dostaje ją bez pytania o zamówienie. To
 jedyna zmiana, która realnie zdejmuje pracę powtarzalną; źródłem jest wtedy
@@ -2029,7 +2041,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Status synchronizacji (§7) | **działa** od 0.147.0 | `statusSynchronizacji` |
 | Trwały alarm synchronizacji (§21) | **działa** od 0.147.0 | `skrzynka/AlarmSynchronizacji.tsx` |
 | Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
-| Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`, takt zwrotów i zamówień |
+| Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |

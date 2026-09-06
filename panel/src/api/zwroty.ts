@@ -64,10 +64,21 @@ export function usePotwierdzKartoteke() {
  * gdy ktoś patrzy na ekran i chce wiedzieć, czy problem jest w danych, czy
  * w kodzie.
  */
+export interface WynikDociagniecia {
+  pobrano: number;
+  /* Ile zaległości dopiął przy okazji przebieg wiązania (0.220.0). Kartoteki
+     są tu najważniejsze: to one odpowiadają na pytanie „czemu ta pozycja nie
+     ma kartoteki", z którym operator ten przycisk naciska. */
+  kartoteki: number;
+  faktury: number;
+  korekty: number;
+  koszyki: number;
+}
+
 export function useDociagnijZamowienia() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api<{ pobrano: number }>("/api/obsluga/zwroty/zamowienia", { method: "POST" }),
+    mutationFn: () => api<WynikDociagniecia>("/api/obsluga/zwroty/zamowienia", { method: "POST" }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
   });
 }

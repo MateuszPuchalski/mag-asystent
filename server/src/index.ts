@@ -61,9 +61,7 @@ import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
-import { zwiazPewne } from "./services/sygnatury.js";
-import { wypuscGotoweKoszyki } from "./services/kosze-zwrotow.js";
-import { zwiazFakturyPewne, zwiazKorektyPewne } from "./services/faktury.js";
+import { powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
 
@@ -366,22 +364,20 @@ async function main() {
        (patrz nagłówek `services/takt.ts`). */
     /* Wiązanie po sygnaturze idzie ZARAZ PO synchronizacji, w takcie, nigdy
        przy otwarciu ekranu. Nowy zwrot bywa gotowy do powiązania od razu —
-       gdy zamówienie stoi już w bazie. */
+       gdy zamówienie stoi już w bazie.
+
+       `finally`, a nie ciąg dalszy (0.220.0). Wiązanie nie potrzebuje Allegro
+       do niczego: czyta i pisze własną bazę. Gdy stało po `await`, wyjątek
+       z pobierania zabierał je ze sobą przy KAŻDYM przebiegu — a zwroty
+       zapisane wcześniej zostawały, więc kolejka wyglądała zdrowo i tylko
+       kartotek nie było. Co robią te cztery kroki i w jakiej kolejności,
+       mówi `services/wiazania.ts`. */
     uruchomTakt("allegro-zwroty", config.allegro.zwrotySyncMs, async () => {
-      await synchronizujAllegroZwroty();
-      zwiazPewne(db());
-      /* Dokument sprzedaży PO kartotece (0.174.0): wiąże go numer zamówienia,
-         więc kolejność nie jest wymogiem — ale kandydaci do wskazania ręcznego
-         liczą się z `tw_id`, a te dopiero co powstały. */
-      zwiazFakturyPewne(db());
-      /* Korekta PO dokumencie sprzedaży, bo wiąże się PRZEZ niego (0.201.0):
-         zwrot bez wskazanej faktury nie ma czego korygować. */
-      zwiazKorektyPewne(db());
-      /* Koszyki czekające na komplet korekt (0.200.0). Zwykle wypuszcza je już
-         `zapiszKorekte`, w sekundzie wpisania numeru. Ten przebieg jest
-         DRUGĄ drogą: numer bywa wpisany, gdy koszyka jeszcze nie zamknięto,
-         a wtedy nikt by go potem nie ruszył. */
-      wypuscGotoweKoszyki(db());
+      try {
+        await synchronizujAllegroZwroty();
+      } finally {
+        powiazZaleglosci(db());
+      }
     });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
@@ -396,11 +392,13 @@ async function main() {
        powiązanie do następnego przebiegu zwrotów. */
     uruchomTakt("allegro-zamowienia", config.allegro.zamowieniaSyncMs,
       async () => {
-        await uzupelnijZamowienia();
-        zwiazPewne(db());
-        zwiazFakturyPewne(db());
-        zwiazKorektyPewne(db());
-        wypuscGotoweKoszyki(db());
+        /* Ten sam parasol co przy zwrotach: zamówienie bywa niepobrane, a
+           zaległość z poprzedniego przebiegu i tak ma się dopiąć. */
+        try {
+          await uzupelnijZamowienia();
+        } finally {
+          powiazZaleglosci(db());
+        }
       });
     /* Czwarty ticker: tytuły ofert do rozmów (0.178.0). Osobno od zamówień,
        bo dotyczy pytań SPRZED zakupu — tam zamówienia nie ma i nigdy nie
