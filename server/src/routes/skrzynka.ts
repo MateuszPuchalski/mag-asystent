@@ -23,6 +23,7 @@ import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../servic
 import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../services/sprawy.js";
 import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
 import { kandydaciDoboru } from "../services/kandydaci.js";
+import { historiaKlienta } from "../services/klient-historia.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -299,6 +300,18 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       try { return wiedzaDoboru(Number(req.params.id)); }
+      catch (e) { return blad(reply, e); }
+    });
+
+  /* HISTORIA KLIENTA (§10.1, zakładka KLIENT). Osobna trasa, nie pole
+     w `GET …/rozmowy/:id`: zakładkę otwiera się rzadziej niż rozmowę, a to
+     są dwa złączenia po loginie i przegląd doborów. Oś rozmowy przeładowuje
+     się przy każdym zdarzeniu — dokładanie do niej pracy, której nikt w tej
+     chwili nie ogląda, kosztowałoby przy każdym odświeżeniu. */
+  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/klient",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return historiaKlienta(Number(req.params.id)); }
       catch (e) { return blad(reply, e); }
     });
 

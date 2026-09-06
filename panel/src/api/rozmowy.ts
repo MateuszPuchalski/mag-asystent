@@ -4,6 +4,7 @@ import { api } from "./klient";
 import type {
   DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
   PowodNegatywny,
+  HistoriaKlienta,
   Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
@@ -25,6 +26,7 @@ export const klucze = {
   zalaczniki: (id: number) => ["zalaczniki", id] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
   wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
+  historiaKlienta: (id: number) => ["historiaKlienta", id] as const,
 };
 
 export function useJa() {
@@ -605,6 +607,19 @@ export function useWiedzaDoboru(id: number | null) {
   return useQuery({
     queryKey: klucze.wiedzaDoboru(id ?? 0),
     queryFn: () => api<WiedzaDoboru>(`/api/obsluga/rozmowy/${id}/dobor/wiedza`),
+    enabled: id !== null,
+  });
+}
+
+/* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
+   Osobne zapytanie, nie pole rozmowy: dwa złączenia po loginie i przegląd
+   doborów kosztują, a oś rozmowy przeładowuje się przy każdym zdarzeniu
+   szyny. Zakładkę otwiera się rzadziej niż rozmowę, więc płaci za siebie
+   dopiero wtedy, gdy ktoś na nią patrzy. */
+export function useHistoriaKlienta(id: number | null) {
+  return useQuery({
+    queryKey: klucze.historiaKlienta(id ?? 0),
+    queryFn: () => api<HistoriaKlienta>(`/api/obsluga/rozmowy/${id}/klient`),
     enabled: id !== null,
   });
 }

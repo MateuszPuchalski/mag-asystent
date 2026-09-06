@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.216.0 — 6 września 2026
+
+**Wracają dwie zakładki z makiety: KLIENT i WIEDZA.** §10.1 skreślił obie
+w 0.198.0. Właściciel przysłał makiety i cofnął tę decyzję — a oba powody
+odmowy dały się unieważnić, zamiast obejść.
+
+**KLIENT: historia u nas, bez ani jednej nowej tabeli.** Odmawialiśmy zdaniem
+„nie ma bytu". Było prawdziwe o TABELI i fałszywe o danych: login kupującego
+wiąże jego zamówienia, jego rozmowy i maszyny ustalone w domkniętych doborach.
+Zakładka jest czystym odczytem.
+
+**Maszyna niesie rozmowę, w której ją ustalono.** „NAC LS 46-450 (2019),
+silnik 1P70FV — ustalone w rozmowie #3140" prowadzi jednym kliknięciem do tej
+rozmowy. Fakt bez źródła jest twierdzeniem bez pokrycia i §4.3 tego zabrania.
+
+**Ustalenie znaczy dobór DOMKNIĘTY, nie wpisaną markę.** Agent wpisuje markę,
+zanim cokolwiek ustali — gdyby liczył się każdy dobór, ekran mówiłby „klient ma
+taką maszynę" o zgadywance sprzed pięciu minut. Ta sama maszyna z kilku rozmów
+zostaje jedna, z najstarszą: pytanie brzmi „od kiedy to wiemy".
+
+**Wątek bez loginu mówi, że nie wiemy, czyja to historia.** Pusta oś byłaby
+kłamstwem o kliencie, który kupuje u nas od lat, a tylko napisał z wątku bez
+rozmówcy. Panel nie zgaduje klienta z treści rozmowy.
+
+**WIEDZA: dowody WYSZŁY z Doboru, zamiast się zdublować.** Odmawialiśmy, bo
+stały już w „Doborze" i druga zakładka z tą samą treścią kazałaby zgadywać,
+w której szukać. Argument był słuszny, więc dowody i pomiary mieszkają teraz
+w jednym miejscu. Dobór został robotą: kroki, kandydaci, przyciski.
+
+**Klauzula §14.3 stoi na ekranie, nie tylko w dokumencie.** „Każde twierdzenie
+techniczne w szkicu wskazuje jeden z tych dowodów. Bez źródła treść jest
+przypuszczeniem" — zdanie ma być tam, gdzie agent pisze odpowiedź.
+
+**Pomiar z hali jest podpisany „niezatwierdzone jako wiedza".** Bursztyn obok
+zielonych dowodów, bo różnica między pomiarem a katalogiem producenta jest
+dokładnie tym, co ta zakładka pokazuje. Propozycja dalej idzie wyłącznie na
+kliknięcie (§13.4).
+
+**Wdrożenie nie wymaga niczego.** Zero migracji, zero nowych ustawień, zero
+nowych zapisów — trasa `GET /api/obsluga/rozmowy/:id/klient` tylko czyta,
+za tą samą bramką roli co reszta skrzynki.
+
 ## 0.215.0 — 6 września 2026
 
 **Zdjęcia przy pozycji zamówienia, oferta z zamówienia i kolejność „od

@@ -46,7 +46,7 @@ describe("kolumna kontekstu", () => {
      Test sprawdza WIDOCZNOŚĆ NARAZ, nie liczbę zakładek: gdyby ktoś rozbił
      to z powrotem na dwie karty, oba `getByTestId` nie mogłyby przejść. */
   it("oferta i towar widać naraz, bez klikania w zakładkę", () => {
-    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByTestId("oferta")).toBeInTheDocument();
     expect(screen.getByTestId("towar")).toBeInTheDocument();
   });
@@ -56,13 +56,13 @@ describe("kolumna kontekstu", () => {
   it("zamówienie jedzie razem z ofertą, nie osobną zakładką", () => {
     render(<Kontekst dane={dane({
       zamowienie: { externalId: "zam-77", link: null, pobrane: null },
-    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
   });
 
   it("bez oferty kolumna mówi, czego brakuje, zamiast milczeć", () => {
-    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByText(/nie jest powiązana z ofertą/)).toBeInTheDocument();
     /* Drugie zdanie mówi osobno o kartotece, bo to osobny brak: numer oferty
        bywa, a przypisania do Subiekta nie ma. */
@@ -77,21 +77,24 @@ describe("kolumna kontekstu", () => {
       externalId: "zam-77", status: null, kupujacyLogin: null, dostawaGrosze: null, dostawaMetoda: null,
       platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 200, waluta: "PLN", kupionoAt: null,
       link: null, pozycje: [pozycja, { ...pozycja, offerId: "2", nazwa: "B" }],
-    } } })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    } } })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByText(/Zamówienie ma 2 pozycje — wskaż niżej/)).toBeInTheDocument();
     expect(screen.getByText(/Wskaż pozycję zamówienia wyżej/)).toBeInTheDocument();
     expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
   });
 
-  /* Pięciu zakładek z makiety NIE ma: „Klient" i „Wiedza" nie mają dziś skąd
-     wziąć danych, a zakładka mówiąca zawsze „wkrótce" uczy nie klikać. Od
-     0.198.0 nie ma też osobnej „Oferty" ani „Towaru" — zeszły się w jedną. */
-  it("ma dokładnie dwie zakładki, a dobór działa nawet bez oferty", async () => {
-    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
-    for (const nazwa of ["Klient", "Wiedza", "Oferta", "Towar"]) {
+  /* Zakładek jest CZTERY, nie pięć z makiety: „Oferta" i „Towar" zeszły się
+     w jedną w 0.198.0 i to zostaje — jeden temat oglądany z dwóch stron.
+     „Klient" i „Wiedza" wróciły, bo dostały treść: pierwsza czyta historię
+     po loginie kupującego, druga trzyma dowody, które WYSZŁY z „Doboru". */
+  it("ma cztery zakładki, a dobór działa nawet bez oferty", async () => {
+    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: "Oferta i towar" })).toBeInTheDocument();
+    for (const nazwa of ["Oferta i towar", "Dobór", "Klient", "Wiedza"]) {
+      expect(screen.getByRole("button", { name: nazwa })).toBeInTheDocument();
+    }
     /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
        i część wpisuje agent. */
     await userEvent.click(screen.getByRole("button", { name: "Dobór" }));
@@ -102,7 +105,7 @@ describe("kolumna kontekstu", () => {
      faktów, tylko robota z własnymi krokami i przyciskami zmieniającymi stan
      rozmowy. Doklejona pod kartotekę zepchnęłaby stan magazynowy z ekranu. */
   it("dobór zostaje osobną zakładką — nie doklejamy go pod towar", () => {
-    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} />);
+    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.queryByTestId("dobor")).not.toBeInTheDocument();
   });
 });

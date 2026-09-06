@@ -357,6 +357,27 @@ export type PomiarRozmowy = {
 
 export type WiedzaDoboru = { zastosowanie: Zastosowanie | null; pomiary: PomiarRozmowy[] };
 
+/* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
+   Kształt jest ODCZYTEM po loginie kupującego — panel nie ma tu czego zapisać.
+   `login: null` znaczy „wątek bez rozmówcy", a nie „klient bez historii":
+   ekran mówi wtedy, że nie wie, zamiast pokazywać pustą oś. */
+export type MaszynaKlienta = {
+  marka: string; nazwa: string; wariant: string | null;
+  rocznik: string | null; silnik: string | null;
+  /** Rozmowa, w której maszynę ustalono — makieta: „ustalone w rozmowie #N". */
+  rozmowaId: number; at: string;
+};
+
+export type WpisHistorii = {
+  rodzaj: "zakup" | "rozmowa";
+  at: string; tresc: string;
+  zamowienieId: string | null; link: string | null; rozmowaId: number | null;
+};
+
+export type HistoriaKlienta = {
+  login: string | null; maszyny: MaszynaKlienta[]; wpisy: WpisHistorii[];
+};
+
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null;

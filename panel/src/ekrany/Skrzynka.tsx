@@ -350,6 +350,9 @@ export function Skrzynka() {
         zamiast stać pusta i zabierać środkowi 340 px. */}
     {rozmowa.data && <Kontekst dane={rozmowa.data}
       onWstawDoSzkicu={(t) => setSzkic((s) => s ? `${s}\n${t}` : t)}
+      /* Ta sama droga, co z osi rozmowy: historia klienta prowadzi do rozmowy,
+         w której maszynę ustalono. */
+      onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
       /* „Zleć pomiar" z doboru to ISTNIEJĄCY przepływ: kartoteka wskazana
          z góry, źródłem ostatnia wiadomość klienta — agent widzi formularz
          i sam klika ZLEĆ. Bez wiadomości klienta nie ma z czego zlecać. */

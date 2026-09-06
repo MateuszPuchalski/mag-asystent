@@ -15,15 +15,11 @@ const kandydaci = vi.fn();
 const zapisz = { mutate: vi.fn(), isPending: false, error: null as unknown };
 const status = { mutate: vi.fn(), isPending: false, error: null as unknown };
 const wybierz = { mutate: vi.fn(), isPending: false, error: null as unknown };
-const wiedza = vi.fn();
-const pomiar = { mutate: vi.fn(), isPending: false, error: null as unknown };
 vi.mock("../api/rozmowy", () => ({
   useKandydaci: (id: number | null) => kandydaci(id),
   useZapiszDaneDoboru: () => zapisz,
   useStatusDoboru: () => status,
   useWybierzKandydata: () => wybierz,
-  useWiedzaDoboru: (id: number | null) => wiedza(id),
-  usePomiarDoWiedzy: () => pomiar,
 }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
 /* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
@@ -74,9 +70,8 @@ const pokaz = (d: DoborTyp, uchwyty: Partial<{ onWstawDoSzkicu: (t: string) => v
     onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
 
 beforeEach(() => {
-  zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset(); pomiar.mutate.mockReset();
+  zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset();
   kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
-  wiedza.mockReturnValue({ data: { zastosowanie: null, pomiary: [] }, isLoading: false, error: null });
 });
 
 describe("zakładka doboru", () => {
@@ -202,51 +197,6 @@ describe("zakładka doboru", () => {
     expect(screen.getByText(/ostrzeżenie, nie brak danych/)).toBeInTheDocument();
   });
 
-  it("wybrany bez wpisu w bazie wiedzy mówi, że dobór to przypuszczenie; z wpisem pokazuje dowody", () => {
-    const wybrany = { twId: 14, symbol: "FTC272", droga: "oferta" as const, przez: "A. Lewandowska", at: "",
-      zdanieDoSzkicu: "Do STIHL FS250 pasuje FTC272 — źródło: potwierdzone zastosowanie do STIHL FS250 — katalog dostawcy, 2.09.2026, A. Lewandowska." };
-    const { rerender } = render(<Dobor dobor={dobor({ status: "confirmed", wybrany })} rozmowaId={4821}
-      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/Brak wpisu w bazie wiedzy/)).toBeInTheDocument();
-
-    wiedza.mockReturnValue({ isLoading: false, error: null, data: { pomiary: [], zastosowanie: {
-      id: 3, twId: 14, symbol: "FTC272", polaryzacja: "pasuje", powodNegatywny: null, zdaniePowodu: null,
-      model: { id: 1, rodzaj: "maszyna", marka: "STIHL", nazwa: "FS250", wariant: null, lata: null, klucz: "maszyna|stihlfs250", etykieta: "STIHL FS250" },
-      stan: "zatwierdzone", zrodlo: "dobor", komentarz: null, conversationId: 4821, zastepujeId: null,
-      zaproponowal: "A. Lewandowska", zaproponowanoAt: "2026-09-02T08:00:00Z", rozstrzygnal: "O. Nowak",
-      rozstrzygnietoAt: "2026-09-02T09:00:00Z", powodRozstrzygniecia: null, pewnosc: "potwierdzone",
-      zdanieZrodla: "potwierdzone zastosowanie do STIHL FS250 — katalog dostawcy, 2.09.2026, A. Lewandowska",
-      dowody: [{ id: 9, rodzaj: "katalog_dostawcy", nazwaRodzaju: "katalog dostawcy", tresc: "Katalog 2024, s. 12",
-        link: null, zadanieId: null, conversationId: null, autor: "A. Lewandowska", at: "2026-09-02T08:00:00Z" }],
-    } } });
-    rerender(<Dobor dobor={dobor({ status: "confirmed", wybrany })} rozmowaId={4821}
-      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByLabelText("Dowody zastosowania")).toBeInTheDocument();
-    expect(screen.getByText("Katalog 2024, s. 12")).toBeInTheDocument();
-    expect(screen.getByText(/zatwierdził O\. Nowak/)).toBeInTheDocument();
-  });
-
-  it("pomiar z hali proponuje się jako dowód dopiero z marką i modelem — i tylko na kliknięcie", async () => {
-    const pomiary = [{ zadanieId: 312, tytul: "Zmierz rozstaw", wynik: "rozstaw 148 mm", wykonanoAt: "2026-09-01T09:00:00Z",
-      wykonanoPrzez: "M. Kowal", twId: 14, symbol: "FTC272", zaproponowano: false }];
-    wiedza.mockReturnValue({ data: { zastosowanie: null, pomiary }, isLoading: false, error: null });
-    const { rerender } = render(<Dobor dobor={dobor()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /Zaproponuj jako dowód/ })).toBeDisabled();
-    expect(screen.getByText(/najpierw marka i model/)).toBeInTheDocument();
-    expect(pomiar.mutate).not.toHaveBeenCalled();
-
-    rerender(<Dobor dobor={dobor({ dane: { ...dobor().dane, marka: "STIHL", model: "FS250" } })} rozmowaId={4821}
-      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    await userEvent.selectOptions(screen.getByLabelText("Wynik pomiaru: Zmierz rozstaw"), "nie_pasuje");
-    await userEvent.click(screen.getByRole("button", { name: /Zaproponuj jako dowód/ }));
-    expect(pomiar.mutate).toHaveBeenCalledWith(
-      { id: 4821, zadanieId: 312, twId: 14, polaryzacja: "nie_pasuje", powodNegatywny: "niewlasciwy_rozstaw" });
-
-    wiedza.mockReturnValue({ data: { zastosowanie: null, pomiary: [{ ...pomiary[0], zaproponowano: true }] }, isLoading: false, error: null });
-    rerender(<Dobor dobor={dobor()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/w kolejce wiedzy/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Zaproponuj jako dowód/ })).not.toBeInTheDocument();
-  });
 });
 
 describe("kandydat bez kartoteki (E3)", () => {
