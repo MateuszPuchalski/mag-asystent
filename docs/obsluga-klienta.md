@@ -522,6 +522,45 @@ i `additionalInformation` zostają, choć nie mają własnych kolumn ani ekranu.
 Model kanoniczny bierze z wiadomości wyłącznie treść, autora, datę, temat
 i numer oferty.
 
+## Polityka danych reklamacji (0.222.0)
+
+Ten rozdział powstaje razem z pierwszym ekranem reklamacji, a nie po nim —
+`CLAUDE.md` wymaga tego zapisu, zanim moduł dotknie pierwszej sprawy.
+
+**Co zapisujemy.** Treść zgłoszenia i całą rozmowę, login kupującego, powód
+i oczekiwanie klienta, kwotę, którą podał, terminy z Allegro, statusy oraz
+nasze własne notatki i znacznik „kto prowadzi". Rozmowa reklamacyjna jest
+dowodem w sporze i jej kopia lokalna jest ceną za działający ekran — dokładnie
+tak samo, jak przy skrzynce w 0.143.0.
+
+**Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
+niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
+prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po
+cichu. Lądowisko i tak przechodzi przez `services/allegro-oczyszczanie.ts`.
+
+**Plików załączników nie trzymamy.** Zostaje nazwa i adres u Allegro; pobranie
+idzie przez nasz serwer, żeby token firmy nie opuścił maszyny, i zostawia ślad
+w dzienniku. Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak jak
+w skrzynce.
+
+**Podglądu na osi nie ma.** `PostPurchaseIssueAttachment` ma dwa pola — nazwę
+i adres — więc bramki `SAFE`, na której stoi podgląd zdjęć w skrzynce od
+0.218.0, nie da się tu postawić. Rysowanie cudzego pliku bez niej byłoby
+cofnięciem tamtej decyzji, a nie jej rozszerzeniem.
+
+**Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
+odczycie — tak samo jak przy skrzynce i przy zwrotach.
+
+**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
+ekranu i w tym przyroście go nie dostaje.
+
+**Do dziennika nie idzie treść.** `logEvent` przy notatce zapisuje jej DŁUGOŚĆ,
+nigdy słowa: `events` nie ma retencji i nie jest kasowane.
+
+**Do Allegro nie wychodzi stąd nic.** Przyrost pierwszy wyłącznie czyta. Gdy
+dojdzie odpowiedź i werdykt, ten rozdział dostanie akapit o tym, co dokładnie
+opuszcza maszynę.
+
 ## Co się nie zmienia
 
 Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:

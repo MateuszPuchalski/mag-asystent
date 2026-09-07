@@ -1844,3 +1844,137 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
   at     TEXT NOT NULL,
   przez  TEXT NOT NULL
 );
+
+-- ── Reklamacje klienckie z Allegro (0.222.0) ────────────────────────────────
+-- Allegro trzyma dyskusje i reklamacje w JEDNYM zasobie `/sale/issues`,
+-- rozróżnia je polem `type` (`DISPUTE`|`CLAIM`). Panel prowadzi wyłącznie
+-- reklamacje — decyzja właściciela z 6 września 2026. Filtr stoi w mapowaniu
+-- synchronizatora, a nie tutaj: kolumna `typ` zostaje, bo bez niej nie dałoby
+-- się pokazać, że coś odsialiśmy.
+--
+-- NAZWA `reklamacja_klienta`, nie `reklamacja`. Wzór ten sam co przy
+-- `zwrot_klienta` i `sprawa_klienta`: krótkie nazwy po starej obsłudze klienta
+-- kasuje `bezObslugiKlienta()` przy każdym starcie. `reklamacja` nie stoi na
+-- tamtej liście, bo stare reklamacje żyły jako kolumny `rekl_*` w
+-- `zwrot_pozycja` — ale sufiks zdejmuje to pytanie na zawsze.
+CREATE TABLE IF NOT EXISTS allegro_reklamacja (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  surowe_json TEXT NOT NULL,
+  synced_at TEXT NOT NULL
+);
+
+-- Model pracy. KUBEŁKA NIE MA W KOLUMNIE — wynika ze statusu i z czatu,
+-- a liczy go `services/reklamacje.ts`. Ten sam powód co przy zwrotach.
+CREATE TABLE IF NOT EXISTS reklamacja_klienta (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  -- `referenceNumber` — czytelny numer reklamacji, na przykład „123/2024".
+  -- Specyfikacja mówi wprost: NULL dla dyskusji. Po nim szuka człowiek.
+  reference_number TEXT,
+  -- `checkoutForm.id`. To jest MOSTEK do reszty danych: zamówienia, zwrotów
+  -- i wiadomości ze skrzynki. Innego wiązania nie budujemy (§3 planu).
+  order_id TEXT,
+  offer_id TEXT,
+  kupujacy_login TEXT,
+  typ TEXT NOT NULL DEFAULT 'CLAIM',
+  -- `right`: WARRANTY (gwarancja) albo COMPLAINT (rękojmia). Sonda z żywego
+  -- konta pokazała COMPLAINT przy wszystkich 65 reklamacjach — ale to jest
+  -- obserwacja jednej próbki, nie kontrakt, więc kolumna dopuszcza obie.
+  prawo TEXT,
+  powod_typ TEXT,
+  powod_opis TEXT,
+  temat TEXT,
+  opis TEXT,
+  -- Czego klient chce: REPAIR, EXCHANGE, REFUND albo PARTIAL_REFUND, plus
+  -- kwota, jeśli ją podał. Bierzemy PIERWSZE oczekiwanie z listy — tablica
+  -- `expectations` bywa dłuższa, a wiersz kolejki niesie jedno zdanie.
+  oczekiwanie TEXT,
+  oczekiwana_kwota_grosze INTEGER,
+  waluta TEXT NOT NULL DEFAULT 'PLN',
+  status_allegro TEXT,
+  -- ZEGAR CZYTAMY, NIE LICZYMY. `decisionDueDate` to termin na uznanie albo
+  -- odrzucenie reklamacji; poprzednia implementacja liczyła ustawowe 14 dni
+  -- sama, bo nie wiedziała, że pole istnieje. NULL znaczy „Allegro terminu nie
+  -- podało" i to co innego niż „termin minął".
+  decyzja_do TEXT,
+  status_do TEXT,
+  -- Decyzja sprzedawcy o zwrocie towaru: 1 wymagany, 0 niewymagany,
+  -- NULL „jeszcze nie zdecydowano". Trzy stany, więc kolumna, a nie flaga.
+  -- POKAZUJEMY, nie obsługujemy: obieg magazynowy zostaje przy zwrotach.
+  zwrot_wymagany INTEGER,
+  -- `chatActive` — czy Allegro w ogóle przyjmie nową wiadomość. Bez tego
+  -- ekran obiecywałby odpowiedź, którą Allegro odrzuci z 409.
+  czat_aktywny INTEGER NOT NULL DEFAULT 1,
+  wiadomosci_ile INTEGER NOT NULL DEFAULT 0,
+  ostatnia_wiadomosc_status TEXT,
+  ostatnia_wiadomosc_at TEXT,
+  -- `openedDate` — moment otwarcia albo PONOWNEGO otwarcia sprawy.
+  otwarto_at TEXT NOT NULL,
+  -- Kto wziął sprawę. ZNACZNIK dla reszty biura, nie zamek: reklamacja przed
+  -- werdyktem nie ma żadnego zapisu, przy którym nazwisko pojawiłoby się samo.
+  prowadzi TEXT,
+  prowadzi_at TEXT,
+  notatka TEXT,
+  wersja INTEGER NOT NULL DEFAULT 1,
+  synced_at TEXT NOT NULL,
+  UNIQUE(channel_account_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_termin
+  ON reklamacja_klienta(decyzja_do);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_zamowienie
+  ON reklamacja_klienta(order_id);
+
+-- Czat sprawy. Idempotencja po identyfikatorze wiadomości z Allegro — blizna
+-- 0.128.0: drugi przebieg nie ma prawa robić duplikatów.
+CREATE TABLE IF NOT EXISTS reklamacja_wiadomosc (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id),
+  external_id TEXT NOT NULL,
+  -- `author.login` bywa PUSTY i to jest udokumentowane: schemat mówi „not
+  -- present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro odpisał
+  -- w 61 sprawach na 100, więc to jest przypadek typowy, nie brzegowy.
+  autor_login TEXT,
+  autor_rola TEXT,
+  tresc TEXT NOT NULL DEFAULT '',
+  utworzono_at TEXT,
+  UNIQUE(reklamacja_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_wiadomosc_czas
+  ON reklamacja_wiadomosc(reklamacja_id, utworzono_at);
+
+-- Załączniki. PLIKÓW NIE TRZYMAMY — polityka danych skrzynki z 0.143.0.
+-- Zostaje nazwa i adres u Allegro; pobranie idzie przez nasz serwer, żeby
+-- token firmy nie opuścił maszyny.
+CREATE TABLE IF NOT EXISTS reklamacja_zalacznik (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id),
+  wiadomosc_id INTEGER REFERENCES reklamacja_wiadomosc(id),
+  nazwa TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  UNIQUE(reklamacja_id, url)
+);
+
+-- Stan synchronizatora reklamacji. Osobny wiersz od zwrotów i od skrzynki, bo
+-- to osobna rodzina końcówek z własnym limitem i własnym rytmem.
+--
+-- KURSORA NIE MA, i to jest różnica wobec zwrotów. `getListOfIssuesUsingGET`
+-- nie przyjmuje ani `from`, ani filtra daty — wyłącznie `offset`, `limit`,
+-- `status` i `checkoutForm.id`. Każdy przebieg czyta więc listę od początku.
+CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  last_success_at TEXT,
+  last_attempt_at TEXT,
+  last_error_code INTEGER,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT,
+  -- Ile spraw Allegro miało jeszcze do oddania, gdy przebieg się skończył.
+  -- `NULL` znaczy „nie wiem", zero — „lista skończyła się sama". Blizna
+  -- 0.127.0: rejestr widział pierwszą setkę i gubił resztę po cichu.
+  pozostalo INTEGER,
+  -- Ile spraw odsialiśmy jako dyskusje. Nie jest to błąd, tylko decyzja
+  -- właściciela — ale liczba musi być widoczna, żeby nikt nie szukał
+  -- „zaginionych" reklamacji, które nigdy reklamacjami nie były.
+  dyskusji INTEGER
+);

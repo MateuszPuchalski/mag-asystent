@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.222.0 — 7 września 2026
+
+**Reklamacje klientów przestają czekać niezauważone.** Sonda z żywego konta
+pokazała, ile ich jest: na sto spraw z `/sale/issues` sześćdziesiąt pięć to
+reklamacje, a dwadzieścia z nich czekało na decyzję sprzedawcy. Nie stały
+nigdzie — ani w kolejce, ani z zegarem, ani z nazwiskiem. Agent musiał je sam
+znaleźć w Centrum Sprzedaży, a sprawa bez właściciela i bez terminu czeka do
+daty decyzji. Dokładnie to zabiło rejestr skasowany w 0.140.0.
+
+Nowa zakładka **Reklamacje** obok Zwrotów: trzy kolumny jak w skrzynce, trzy
+kubełki po jednym pytaniu, kolejność wprost z terminu decyzji. Środek okna
+niesie zgłoszenie i rozmowę, prawa kolumna — zegar, oczekiwanie klienta
+z kwotą, kartotekę, zamówienie oraz zwroty i rozmowy tego samego zakupu.
+Mostkiem jest numer zamówienia, ten sam co przy zwrocie od 0.221.0.
+
+**Zegar czytamy, nie liczymy.** `decisionDueDate` przychodzi z Allegro.
+Implementacja sprzed 0.140.0 liczyła ustawowe czternaście dni sama, bo
+komentarz obok twierdził, że tego pola nie ma — a było. Liczba wzięta z naszego
+kodu rozjeżdżałaby się z tą, którą widzi kupujący, a rozstrzyga jego.
+
+**Panel prowadzi wyłącznie reklamacje** (decyzja właściciela). Dyskusje
+przyjeżdżają tą samą listą i są odsiewane w jednym miejscu, a ich liczba stoi
+na pasku synchronizacji — inaczej ktoś szukałby kiedyś reklamacji, która nigdy
+reklamacją nie była.
+
+**To przyrost pierwszy z trzech i tylko czyta.** Do Allegro nie wychodzi stąd
+ani jeden zapis; odpowiedź w czacie i formalny werdykt wysyła się na razie
+w Centrum Sprzedaży, a ekran mówi to wprost pod rozmową. Oba są nieodwracalne
+wobec kupującego i dostaną własne wydania. U nas zapisują się dwie rzeczy,
+obie jawnym kliknięciem: znacznik „prowadzę" i notatka biura.
+
+Załącznik pobiera się przez nasz serwer, ale nie rysuje na osi:
+`PostPurchaseIssueAttachment` ma dwa pola — nazwę i adres — więc bramki `SAFE`,
+na której stoi podgląd zdjęć w skrzynce, nie da się tu postawić.
+
+Piąty ticker, `ALLEGRO_REKLAMACJE_SYNC_MS`, domyślnie trzy minuty. Rozmowy
+dociąga po dwadzieścia na przebieg i tylko te, w których licznik Allegro
+rozjechał się z naszym — sześćdziesiąt żądań co trzy minuty byłoby prostą
+drogą do 429.
+
 ## 0.221.0 — 6 września 2026
 
 **Zwrot tego zamówienia widać z rozmowy.** Właściciel: „klienci często pytają

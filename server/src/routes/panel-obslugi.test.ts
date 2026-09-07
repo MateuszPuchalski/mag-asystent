@@ -19,7 +19,8 @@ before(async () => { app = await (await import("../index.js")).buildApp(); });
    Test celowo NIE zakłada, że panel jest zbudowany: w CI `npm test` biegnie
    przed `npm run build`. Sprawdza więc rzecz, która nie zależy od builda —
    że głęboki link dostaje TO SAMO co korzeń. */
-const EKRANY = ["/obsluga/", "/obsluga/skrzynka", "/obsluga/skrzynka/4821"];
+const EKRANY = ["/obsluga/", "/obsluga/skrzynka", "/obsluga/skrzynka/4821",
+  "/obsluga/reklamacje", "/obsluga/reklamacje/17"];
 
 test("każdy ekran panelu odpowiada tak samo jak jego korzeń", async () => {
   const odpowiedzi = [];

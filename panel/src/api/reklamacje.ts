@@ -1,0 +1,91 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, pobierzPlik } from "./klient";
+import type { KolejkaReklamacji, Reklamacja, SzczegolReklamacji } from "./typy";
+
+/* Reklamacje jadą JEDNYM zapytaniem razem z licznikami — ten sam wybór co przy
+   zwrotach. Spraw w pracy są dziesiątki, nie tysiące, więc przełączenie
+   kubełka nie kosztuje ani jednego strzału do serwera. */
+
+export const kluczeReklamacji = {
+  kolejka: ["reklamacje"] as const,
+  reklamacja: (id: number) => ["reklamacja", id] as const,
+};
+
+export function useReklamacje() {
+  return useQuery({
+    queryKey: kluczeReklamacji.kolejka,
+    queryFn: () => api<KolejkaReklamacji>("/api/obsluga/reklamacje"),
+  });
+}
+
+export function useReklamacja(id: number | null) {
+  return useQuery({
+    queryKey: kluczeReklamacji.reklamacja(id ?? 0),
+    queryFn: () => api<SzczegolReklamacji>(`/api/obsluga/reklamacje/${id}`),
+    enabled: id !== null,
+  });
+}
+
+/**
+ * Ręczne dociągnięcie.
+ *
+ * Ten sam powód co przy zwrotach: bez niego diagnoza „czemu tej reklamacji tu
+ * nie ma" wymagałaby czekania trzech minut na ticker — czyli dokładnie wtedy,
+ * gdy ktoś patrzy na ekran i chce wiedzieć, czy problem jest w danych, czy
+ * w kodzie.
+ */
+export interface WynikSynchronizacji {
+  reklamacji: number;
+  /** Ile spraw odsialiśmy jako dyskusje. Nie jest to błąd, tylko zakres panelu. */
+  dyskusji: number;
+  czatow: number;
+}
+
+export function useSynchronizuj() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Żądanie BEZ ciała nie deklaruje typu treści — pilnuje tego `api()`
+       i jego test. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY` i gołe
+       „Bad Request" na ekranie; ta blizna kosztowała dwa razy. */
+    mutationFn: () => api<WynikSynchronizacji>("/api/obsluga/reklamacje/synchronizuj",
+      { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka }),
+  });
+}
+
+/** Znacznik „prowadzę" — ponowne kliknięcie go zdejmuje. */
+export function useProwadze() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/prowadze`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
+  });
+}
+
+export function useNotatka() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; notatka: string | null; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka`,
+        { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
+  });
+}
+
+/**
+ * Pobranie załącznika.
+ *
+ * Idzie przez `pobierzPlik`, a nie przez `<a href>`: sesja jedzie nagłówkiem
+ * `x-session`, którego odnośnik nie niesie. Pobranie załącznika rozmowy było
+ * z tego powodu zepsute od 0.155.0 do 0.219.1 i wyglądało, jakby działało.
+ */
+export const pobierzZalacznik = (reklamacjaId: number, zalacznikId: number, nazwa: string) =>
+  pobierzPlik(`/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}`, nazwa);
