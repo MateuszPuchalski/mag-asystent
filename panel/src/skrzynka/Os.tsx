@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
-import { Przycisk, czas } from "../ui";
+import { LoginKlienta, Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
@@ -229,7 +229,11 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             <span className={`flex items-center gap-1 font-bold uppercase tracking-wide ${
               w.odKlienta ? "text-amber-700" : "text-slate-600"}`}>
               {w.odKlienta ? <User size={12} /> : <Send size={12} />}
-              {w.odKlienta ? `${w.autor} · Allegro` : "Odpowiedź firmy"}</span>
+              {/* Login kopiuje się kliknięciem (0.228.0). Kanał zostaje obok,
+                  poza przyciskiem: kopiujemy sam login, nie zdanie o nim. */}
+              {w.odKlienta
+                ? <><LoginKlienta login={w.autor} className="uppercase" /> · Allegro</>
+                : "Odpowiedź firmy"}</span>
             {/* Nazwisko OSOBNO tylko przy nas: przy kliencie stoi już wyżej,
                 a powtórzone dwa razy w jednym wierszu jest szumem. */}
             {!w.odKlienta && <b>{w.autor}</b>}

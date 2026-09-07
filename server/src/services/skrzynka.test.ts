@@ -801,6 +801,28 @@ test("podpis wiadomości klienta niesie LOGIN, nie temat wątku", () => {
   assert.notEqual(wpis.autor, "Zaworek zwrotny");
 });
 
+test("kolejka i nagłówek też biorą LOGIN, nie temat (0.228.0)", () => {
+  /* 0.219.2 naprawiło to na OSI rozmowy i zatrzymało się w pół drogi: wiersz
+     kolejki i nagłówek dalej brały `c.subject`. Złapała to dopiero przeglądarka
+     — przycisk „kopiuj login" w nagłówku kopiował nazwę części. */
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','naglowek')")
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
+    VALUES ('w-naglowek',1,'2026-09-01T10:00:00.000Z','bagslublin','{}','2026-09-01T10:00:00.000Z')`).run();
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,updated_at)
+    VALUES (?,'w-naglowek','Zaworek zwrotny','2026-09-01T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'m-naglowek','incoming','Pytanie','2026-09-01T10:00:00.000Z')`)
+    .run(rozmowa, konto);
+
+  assert.equal(listaRozmow().find((x) => x.id === rozmowa)!.klient, "bagslublin");
+  assert.equal(osRozmowy(rozmowa).rozmowa.klient, "bagslublin");
+});
+
 test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
   /* Wątek bez rozmówcy ISTNIEJE — Allegro takie oddaje. Ekran ma wtedy
      pokazać cokolwiek prawdziwego, a nie puste miejsce po podpisie. */
@@ -993,4 +1015,40 @@ test("odbicie CYTOWANE przez klienta nie jest naszym odbiciem", () => {
     "SELECT auto_odpowiedz a FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1")
     .get(r) as { a: number }).a, 0);
   assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_us");
+});
+
+/* ── Zdarzenie niesie KIERUNEK (0.228.0) ─────────────────────────────────────
+   Panel zapalał pasek „Klient dopisał nową wiadomość" na każde
+   `message.created` — także na naszą odpowiedź wracającą z synchronizacji
+   i na autoodpowiedź. Bez kierunku w zdarzeniu odbiorca nie miał z czego
+   odróżnić pytania od echa własnej pracy.                                  */
+test("message.created mówi, czy pisał klient i czy to odbicie", async () => {
+  const { onConversationEvent } = await import("./conversation-realtime.js");
+  const zebrane: Array<Record<string, unknown>> = [];
+  const stop = onConversationEvent((e) => {
+    if (e.type === "message.created") zebrane.push(e.data as Record<string, unknown>);
+  });
+
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','zdarzenia')")
+    .run().lastInsertRowid);
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject) VALUES (?,'w-zdarzenia','Temat')`)
+    .run(konto).lastInsertRowid);
+  const pisz = (i: number, dir: "incoming" | "outgoing", body: string) =>
+    zapiszWiadomosc({ conversationId: rozmowa, channelAccountId: konto,
+      externalMessageId: `z-${i}`, direction: dir, body,
+      sentAt: `2026-09-01T1${i}:00:00.000Z` }, d);
+
+  pisz(1, "incoming", "Pytanie klienta");
+  pisz(2, "outgoing", "Dziękujemy za kontakt\n\nTa wiadomość jest generowana automatycznie.");
+  pisz(3, "outgoing", "Odpowiedź agenta");
+  stop();
+
+  assert.deepEqual(zebrane.map((z) => [z.odKlienta, z.automatyczna]), [
+    [true, false],   // pytanie klienta — TO zapala pasek
+    [false, true],   // odbicie — ani nasze „prawdziwe", ani klienta
+    [false, false],  // nasza odpowiedź
+  ]);
 });

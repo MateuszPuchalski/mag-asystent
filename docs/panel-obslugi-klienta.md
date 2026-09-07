@@ -348,6 +348,12 @@ przez `czyAutoresponder`. Odczyt go tylko czyta, a SQL nie powtarza reguły —
 dwie kopie rozjechałyby się przy pierwszej poprawce. Migracja wypełnia kolumnę
 wstecz i mówi w dzienniku, ile wiadomości oznaczyła.
 
+**PASEK O NOWEJ WIADOMOŚCI TYLKO PRZY KLIENCIE (0.228.0).** Panel zapalał go
+na każde zdarzenie `message.created` — także na naszą odpowiedź wracającą
+z synchronizacji i na autoodpowiedź. Agent odpisywał i po chwili dostawał od
+panelu wiadomość, że odpisał mu klient. Zdarzenie niesie odtąd kierunek
+i znacznik odbicia; nasze wiadomości dociągają rozmowę po cichu, bez alarmu.
+
 **Werdykty człowieka przebijają wyliczenie.** `snoozed`, `resolved`, `closed`
 i `spam` zostają, choćby ostatnia wiadomość była klienta — inaczej nie dałoby
 się domknąć żadnej sprawy. Przebija je także `waiting_for_internal`: nie
@@ -2300,6 +2306,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasa przyjmuje tylko `STATUSY_RECZNE` |
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
+| Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
+| Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
 | Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |

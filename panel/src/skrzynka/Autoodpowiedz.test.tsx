@@ -75,15 +75,19 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     os(wpis({ automatyczna: false, odKlienta: true, autor: "bagslublin",
       tresc: "Dzień dobry" }));
 
-    expect(screen.getByText("bagslublin · Allegro")).toBeTruthy();
+    /* Od 0.228.0 login jest PRZYCISKIEM (kopiuje się kliknięciem), a kanał
+       stoi obok, poza nim — kopiujemy sam login, nie zdanie o nim. */
+    expect(screen.getByRole("button", { name: /Kopiuj login/ })).toHaveTextContent("bagslublin");
+    expect(screen.getByText(/· Allegro/)).toBeTruthy();
     /* Login PADA RAZ: powtórzony obok podpisu byłby szumem w tym samym wierszu. */
-    expect(screen.getAllByText(/bagslublin/)).toHaveLength(1);
+    expect(screen.getAllByText("bagslublin")).toHaveLength(1);
   });
 
   it("wątek bez loginu wygląda jak dawniej", () => {
     /* Serwer podstawia wtedy „Klient" — ekran nie udaje, że wie więcej. */
     os(wpis({ automatyczna: false, odKlienta: true, autor: "Klient", tresc: "Dzień dobry" }));
-    expect(screen.getByText("Klient · Allegro")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Kopiuj login/ })).toHaveTextContent("Klient");
+    expect(screen.getByText(/· Allegro/)).toBeTruthy();
   });
 
   it("odpowiedź agenta zostaje pełnym kafelkiem", () => {

@@ -56,7 +56,10 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
        obie strony rozmowy mają podpis i że są to podpisy RÓŻNE. Zmieniła się
        treść po stronie klienta, nie reguła. */
     os([wpis(), wpis({ id: "msg-2", odKlienta: false, autor: "Biuro" })]);
-    expect(screen.getByText("kupujacy_7 · Allegro")).toBeInTheDocument();
+    /* Od 0.228.0 login jest przyciskiem kopiowania, więc podpis klienta czyta
+       się z dwóch węzłów. Reguła bez zmian: obie strony mają RÓŻNE podpisy. */
+    expect(screen.getByRole("button", { name: /Kopiuj login/ }))
+      .toHaveTextContent("kupujacy_7");
     expect(screen.getByText("Odpowiedź firmy")).toBeInTheDocument();
   });
 

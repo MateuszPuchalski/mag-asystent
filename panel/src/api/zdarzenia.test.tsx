@@ -58,10 +58,13 @@ function podstawSzyne() {
 function stanowisko(lista: Rozmowa[]) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const pobran = { ile: 0 };
+  /* Alarm „Klient dopisał" liczymy, bo od 0.228.0 NIE zapala się na każdą
+     wiadomość — a różnicę widać tylko po tym, ile razy go wywołano. */
+  const alarm = { ile: 0 };
   const wyslij = podstawSzyne();
 
   function Ekran() {
-    useSzynaZdarzen(1, () => {});
+    useSzynaZdarzen(1, () => { alarm.ile += 1; });
     const q = useQuery({
       queryKey: klucze.rozmowy,
       queryFn: async () => { pobran.ile += 1; return { rozmowy: lista, stan: {} }; },
@@ -71,7 +74,7 @@ function stanowisko(lista: Rozmowa[]) {
 
   const widok = render(<QueryClientProvider client={qc}><Ekran /></QueryClientProvider>);
   return {
-    widok, pobran,
+    widok, pobran, alarm,
     /* Ramki idą dopiero, gdy lista stoi w cache'u — jak w pracy. */
     wyslij: async (z: object[]) => {
       await waitFor(() => expect(pobran.ile).toBe(1));
@@ -135,8 +138,44 @@ describe("Szyna zdarzeń a kolejka rozmów", () => {
     /* Oszczędność dotyczy obecności, nie wszystkiego. Zdarzenia rzadkie mają
        odświeżać natychmiast, bo od nich zależy, za co agent się bierze. */
     const { pobran, wyslij } = stanowisko([rozmowa()]);
-    await wyslij([{ id: 1, type: "message.created", conversationId: 1 }]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: true }]);
 
     await waitFor(() => expect(pobran.ile).toBe(2));
+  });
+});
+
+/* ── Alarm tylko o KLIENCIE (0.228.0) ────────────────────────────────────────
+   Pasek „Klient dopisał nową wiadomość" zapalał się na KAŻDE `message.created`:
+   także na naszą własną odpowiedź wracającą z synchronizacji i na
+   autoodpowiedź. Agent odpisywał i po chwili dostawał od panelu wiadomość, że
+   odpisał mu klient — a szkic zostawał pod paskiem, którego nie było czym
+   zamknąć poza kliknięciem „Pokaż".                                          */
+describe("Alarm o nowej wiadomości", () => {
+  it("wiadomość KLIENTA zapala pasek", async () => {
+    const { alarm, wyslij } = stanowisko([rozmowa()]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: true }]);
+
+    await waitFor(() => expect(alarm.ile).toBe(1));
+  });
+
+  it("NASZA odpowiedź paska nie zapala", async () => {
+    const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1, odKlienta: false }]);
+
+    /* Rozmowa dociąga się mimo to — agent ma zobaczyć własną wiadomość na osi,
+       tylko bez alarmu. Po tym pobraniu wiemy, że ramka NIE została zgubiona. */
+    await waitFor(() => expect(pobran.ile).toBe(2));
+    expect(alarm.ile).toBe(0);
+  });
+
+  it("AUTOODPOWIEDŹ paska nie zapala", async () => {
+    /* Odbicie „Dziękujemy za kontakt" jedzie jako wychodzące, ale przechodzi
+       tu drugą bramkę — na wypadek, gdyby kiedyś przyszło innym kierunkiem. */
+    const { alarm, pobran, wyslij } = stanowisko([rozmowa()]);
+    await wyslij([{ id: 1, type: "message.created", conversationId: 1,
+      odKlienta: true, automatyczna: true }]);
+
+    await waitFor(() => expect(pobran.ile).toBe(2));
+    expect(alarm.ile).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 import React from "react";
 import type { Zwrot } from "../api/typy";
-import { Skopiuj } from "../ui";
+import { LoginKlienta, Skopiuj } from "../ui";
 import { Link } from "./Link";
 
 /* ── Nagłówek sprawy (0.207.0) ───────────────────────────────────────────────
@@ -52,11 +52,10 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
           ekranie nie było ani loginu, ani śladu po nim, a właściciel szukał go
           i nie znalazł. Puste pole ma powiedzieć, że to Allegro go nie podało,
           a nie zostawiać ekran milczący o kupującym. */}
+      {/* Klik na SAMYM LOGINIE kopiuje (0.228.0) — osobna ikona obok była
+          drugim celem dotyku dla tej samej czynności. */}
       {zwrot.kupujacyLogin
-        ? <span className="inline-flex items-center gap-1 break-all font-semibold text-slate-700">
-            {zwrot.kupujacyLogin}
-            <Skopiuj tekst={zwrot.kupujacyLogin} tytul="Kopiuj login kupującego" />
-          </span>
+        ? <LoginKlienta login={zwrot.kupujacyLogin} className="font-semibold text-slate-700" />
         : <span className="text-slate-400">kupujący: Allegro nie podało</span>}
     </p>
 

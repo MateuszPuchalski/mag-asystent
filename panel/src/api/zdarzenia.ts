@@ -115,8 +115,21 @@ export function useSzynaZdarzen(
       if (z.conversationId !== wybranaRef.current) return;
       /* Nowa wiadomość klienta w OTWARTEJ rozmowie nie przeładowuje jej sama:
          agent może być w połowie szkicu. Ekran mówi o dopisku i czeka na
-         kliknięcie — blizna 0.110.0 zabrania cichego nadpisania. */
-      if (z.type === "message.created") onNowa.current(z.conversationId);
+         kliknięcie — blizna 0.110.0 zabrania cichego nadpisania.
+
+         ── ALE TYLKO WIADOMOŚĆ KLIENTA (0.228.0) ────────────────────────────
+         Do 0.227.0 pasek „Klient dopisał nową wiadomość" zapalał się na KAŻDE
+         `message.created`: także na naszą własną odpowiedź wracającą
+         z synchronizacji i na autoodpowiedź „Dziękujemy za kontakt". Agent
+         odpisywał i po chwili dostawał od panelu wiadomość, że odpisał mu
+         klient — a szkic zostawał zablokowany paskiem, którego nie było czym
+         zamknąć poza kliknięciem „Pokaż".
+
+         Nasza wiadomość i odbicie DOCIĄGAJĄ rozmowę po cichu: agent ma je
+         zobaczyć na osi, tylko bez alarmu. */
+      const odKlienta = z.type === "message.created"
+        && z.odKlienta === true && z.automatyczna !== true;
+      if (odKlienta) onNowa.current(z.conversationId);
       else qc.invalidateQueries({ queryKey: klucze.rozmowa(z.conversationId) });
     }
 
