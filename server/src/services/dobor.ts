@@ -7,6 +7,7 @@ import {
   kluczModelu, propozycjaZPomiaru, wycofajPropozycjeDoboru, zaproponujZastosowanie, zastosowaniaModelu,
   type Polaryzacja, type PowodNegatywny, type Zastosowanie,
 } from "./wiedza.js";
+import { zabudowyMaszyny, type Zabudowa } from "./silniki.js";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1).
@@ -39,9 +40,10 @@ export type StatusDoboru = (typeof STATUSY_DOBORU)[number];
 export const STATUSY_DOBORU_RECZNE: StatusDoboru[] =
   STATUSY_DOBORU.filter((s) => s !== "extracting_data");
 
-/* Osiem dróg §11.2. Trzy ostatnie czekają na E2/E3 bez nadawcy. */
+/* Dziewięć dróg §11.2. `silnik` doszła razem z `zabudowa_silnika`: bazy sprzed
+   tamtego wydania znają osiem, więc `CHECK` przebudowuje `migrate()`. */
 export const DROGI_DOBORU = [
-  "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "oem", "pelnotekst",
+  "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "silnik", "oem", "pelnotekst",
 ] as const;
 export type DrogaDoboru = (typeof DROGI_DOBORU)[number];
 /* Od E3 każda droga z §11.2 ma nadawcę; lista zostaje jako strażnik przed
@@ -57,6 +59,7 @@ const ZRODLO_DROGI: Record<DrogaDoboru, string> = {
   ean: "kod EAN",
   wyszukiwarka: "wskazane ręcznie przez agenta",
   zastosowanie: "potwierdzone zastosowanie",
+  silnik: "potwierdzone zastosowanie do silnika maszyny",
   oem: "numer OEM",
   pelnotekst: "trafienie po treści — nie dowód",
 };
@@ -139,15 +142,26 @@ function urzadzenie(dane: DaneDoboru): string {
  * „prawdopodobnie" i „bez potwierdzonego zastosowania".
  */
 function zdanieDoSzkicu(
-  dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru, zastosowanie: Zastosowanie | null,
+  dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
+  podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
 ): string {
   const maszyna = urzadzenie(dane);
   const zrodlo = `źródło: ${ZRODLO_DROGI[droga]}`;
   if (!maszyna) return `${symbol} — ${zrodlo}; dobór bez wskazanej maszyny — to przypuszczenie.`;
   /* Zastosowanie zatwierdzone na samym śladzie rozmowy to nadal „prawdopodobnie":
      zdanie źródła mówi wprost, że dowodu technicznego nie ma. */
-  if (zastosowanie) {
-    const orzeczenie = zastosowanie.pewnosc === "potwierdzone" ? "pasuje" : "prawdopodobnie pasuje";
+  if (podparcie) {
+    const { zastosowanie, zabudowa } = podparcie;
+    /* Łańcuch przez silnik jest wart tyle, co jego słabsze ogniwo — tak samo
+       liczy szczebel w `kandydaci.ts`. Zdanie MUSI nazwać oba ogniwa (§14.3):
+       klient ma prawo wiedzieć, że dopasowanie idzie przez silnik. */
+    const pewne = zastosowanie.pewnosc === "potwierdzone"
+      && (zabudowa === null || zabudowa.pewnosc === "potwierdzone");
+    const orzeczenie = pewne ? "pasuje" : "prawdopodobnie pasuje";
+    if (zabudowa) {
+      return `Do ${maszyna} ${orzeczenie} ${symbol} — pasuje do ${zabudowa.silnik.etykieta},`
+        + ` który stoi w tej maszynie; źródło: ${zastosowanie.zdanieZrodla}; ${zabudowa.zdanieZrodla}.`;
+    }
     return `Do ${maszyna} ${orzeczenie} ${symbol} — źródło: ${zastosowanie.zdanieZrodla}.`;
   }
   return status === "confirmed"
@@ -155,11 +169,29 @@ function zdanieDoSzkicu(
     : `Do ${maszyna} prawdopodobnie pasuje ${symbol} — ${zrodlo}; dobór bez potwierdzonego zastosowania.`;
 }
 
-/** Zatwierdzone POZYTYWNE zastosowanie wybranej kartoteki do wpisanej maszyny — albo nic. */
-function zastosowanieWyboru(database: DatabaseSync, dane: DaneDoboru, twId: number): Zastosowanie | null {
+/**
+ * Czym podparty jest wybór: zastosowaniem do MASZYNY albo — gdy takiego nie ma
+ * — zastosowaniem do jej zatwierdzonego SILNIKA.
+ *
+ * Bez tego fallbacku wybór z drogi `silnik` schodziłby na zdanie
+ * „prawdopodobnie pasuje … dobór bez potwierdzonego zastosowania" przy pełnym
+ * dowodzie w bazie. To byłoby kłamstwo przez pominięcie — a szkic ma mówić to
+ * samo, co kandydat.
+ */
+function zastosowanieWyboru(
+  database: DatabaseSync, dane: DaneDoboru, twId: number,
+): { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null {
   if (!dane.marka || !dane.model) return null;
-  return zastosowaniaModelu(kluczModelu("maszyna", dane.marka, dane.model, dane.wariant), database)
-    .find((z) => z.twId === twId && z.polaryzacja === "pasuje") ?? null;
+  const kluczMaszyny = kluczModelu("maszyna", dane.marka, dane.model, dane.wariant);
+  const wprost = zastosowaniaModelu(kluczMaszyny, database)
+    .find((z) => z.twId === twId && z.polaryzacja === "pasuje");
+  if (wprost) return { zastosowanie: wprost, zabudowa: null };
+  for (const zab of zabudowyMaszyny(kluczMaszyny, database)) {
+    const przezSilnik = zastosowaniaModelu(zab.silnik.klucz, database)
+      .find((z) => z.twId === twId && z.polaryzacja === "pasuje");
+    if (przezSilnik) return { zastosowanie: przezSilnik, zabudowa: zab };
+  }
+  return null;
 }
 
 function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync): Dobor {
@@ -306,7 +338,7 @@ export function zapiszDane(
  */
 export function ustawStatusDoboru(
   conversationId: number, status: string, brakuje: string | null | undefined, userId: number,
-  database: DatabaseSync = db(),
+  database: DatabaseSync = db(), silnikModelId?: number | null,
 ): Dobor {
   istniejeRozmowa(database, conversationId);
   if (status === "extracting_data") {
@@ -328,13 +360,31 @@ export function ustawStatusDoboru(
        staje się PROPOZYCJĄ zastosowania — z dowodem „rozmowa", do kolejki,
        nigdy faktem. Bez marki albo modelu nie ma do czego pasować, więc nic
        nie powstaje. W tej samej transakcji: dobór bez propozycji albo
-       propozycja bez doboru byłyby stanem w połowie. */
+       propozycja bez doboru byłyby stanem w połowie.
+
+       DO MASZYNY ALBO DO JEJ SILNIKA — agent wybiera. Bez tej gałęzi baza
+       silnikowa nie urosłaby nigdy: hak wpisywał `rodzaj: "maszyna"` na
+       sztywno, więc szczebel „przez silnik" zwracałby zero na zawsze. Filtr
+       zatwierdzony raz przy jednej kosiarce odpowiada odtąd na pytania
+       o wszystkie maszyny z tym samym silnikiem — to jest cały zysk tej
+       zmiany. Silnik musi być ZATWIERDZONĄ zabudową TEJ maszyny: inaczej
+       wybór z ekranu udawałby fakt, którego w bazie nie ma. */
     if (po === "confirmed" && przed.wybrany && przed.dane.marka && przed.dane.model) {
+      const kluczMaszyny = kluczModelu("maszyna", przed.dane.marka, przed.dane.model, przed.dane.wariant);
+      const zab = silnikModelId == null ? null
+        : zabudowyMaszyny(kluczMaszyny, database).find((z) => z.silnik.id === silnikModelId);
+      if (silnikModelId != null && !zab) {
+        throw new Error("To nie jest zatwierdzony silnik tej maszyny — zatwierdź zabudowę w Wiedza → Silniki");
+      }
+      const model = zab
+        ? { rodzaj: "silnik" as const, marka: zab.silnik.marka, nazwa: zab.silnik.nazwa, wariant: zab.silnik.wariant }
+        : { rodzaj: "maszyna" as const, marka: przed.dane.marka, nazwa: przed.dane.model, wariant: przed.dane.wariant };
+      const doCzego = zab ? `silnika ${zab.silnik.etykieta}` : "maszyny";
       zaproponujZastosowanie({
-        twId: przed.wybrany.twId,
-        model: { rodzaj: "maszyna", marka: przed.dane.marka, nazwa: przed.dane.model, wariant: przed.dane.wariant },
+        twId: przed.wybrany.twId, model,
         polaryzacja: "pasuje", zrodlo: "dobor", conversationId,
-        dowod: { rodzaj: "rozmowa", tresc: `dobór zatwierdzony w rozmowie #${conversationId} przez ${autor}` },
+        dowod: { rodzaj: "rozmowa",
+          tresc: `dobór zatwierdzony w rozmowie #${conversationId} przez ${autor} — do ${doCzego}` },
       }, { userId, name: autor }, database);
     }
     podpisz(database, conversationId, autor, userId);
@@ -421,10 +471,17 @@ export interface PomiarRozmowy {
  * odświeża się na każde zdarzenie szyny, a to są dwa dodatkowe zapytania.
  */
 export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db()): {
-  zastosowanie: Zastosowanie | null; pomiary: PomiarRozmowy[];
+  zastosowanie: Zastosowanie | null; zabudowa: Zabudowa | null;
+  silniki: Zabudowa[]; pomiary: PomiarRozmowy[];
 } {
   const dobor = doborRozmowy(conversationId, database);
-  const zastosowanie = dobor.wybrany ? zastosowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null;
+  const podparcie = dobor.wybrany ? zastosowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null;
+  /* Silniki maszyny jadą tą samą trasą co dowody: ekran doboru potrzebuje ich
+     do czipów pod polem „Silnik" i do wyboru przy zatwierdzeniu, a osobne
+     żądanie na tę samą rozmowę byłoby drugim strzałem po to samo. */
+  const silniki = dobor.dane.marka && dobor.dane.model
+    ? zabudowyMaszyny(kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant), database)
+    : [];
   const pomiary = (database.prepare(`
     SELECT z.id, z.tytul, z.wynik, z.wykonano_at, z.wykonano_przez, z.tw_id, t.symbol,
            EXISTS(SELECT 1 FROM dowod_zastosowania d WHERE d.zadanie_id = z.id) AS zaproponowano
@@ -436,7 +493,8 @@ export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db
       twId: z.tw_id == null ? null : Number(z.tw_id), symbol: z.symbol == null ? null : String(z.symbol),
       zaproponowano: Boolean(Number(z.zaproponowano ?? 0)),
     }));
-  return { zastosowanie, pomiary };
+  return { zastosowanie: podparcie?.zastosowanie ?? null, zabudowa: podparcie?.zabudowa ?? null,
+    silniki, pomiary };
 }
 
 /**

@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  Identyfikator, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora,
-  Zastosowanie,
+  Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowaZabudowa, PowodNegatywny,
+  RodzajDowodu, RodzajIdentyfikatora, Zabudowa, Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -18,6 +18,7 @@ export const kluczeWiedzy = {
   towar: (twId: number) => ["wiedza", "towar", twId] as const,
   zOpisow: ["wiedza", "z-opisow"] as const,
   identyfikatory: (twId: number) => ["wiedza", "identyfikatory", twId] as const,
+  silniki: ["wiedza", "silniki"] as const,
 };
 
 /**
@@ -57,6 +58,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: kluczeWiedzy.zOpisow });
   qc.invalidateQueries({ queryKey: ["wiedza", "identyfikatory"] });
   qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.silniki });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -154,3 +156,52 @@ export function useDodajIdentyfikator() {
 }
 
 export type { PowodNegatywny };
+
+/* ── Zabudowa silnika (§11.2) ────────────────────────────────────────────────
+   Jeden odczyt oddaje trzy rzeczy: kolejkę par do rozstrzygnięcia, listę luk
+   i pary zatwierdzone. Trzy zapytania po to samo byłyby trzema strzałami przy
+   jednym otwarciu zakładki.
+
+   Zegar jak przy kolejce propozycji: para przychodzi z cudzej rozmowy, więc
+   ten ekran nie ma po czym poznać, że coś doszło. */
+export function useSilniki() {
+  return useQuery({
+    queryKey: kluczeWiedzy.silniki,
+    queryFn: () => api<{
+      propozycje: Zabudowa[]; doRozstrzygniecia: number;
+      luki: LukaSilnika[]; lukiRazem: number; zatwierdzone: Zabudowa[];
+    }>(`/api/obsluga/wiedza/silniki`),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useZaproponujZabudowe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: NowaZabudowa) =>
+      api<Zabudowa>(`/api/obsluga/wiedza/silniki`, { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useRozstrzygnijZabudowe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; decyzja: "zatwierdz" | "odrzuc"; powod?: string | null }) =>
+      api<Zabudowa>(`/api/obsluga/wiedza/silniki/${v.id}/rozstrzygnij`, {
+        method: "POST", body: JSON.stringify({ decyzja: v.decyzja, powod: v.powod ?? null }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useWycofajZabudowe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; powod: string }) =>
+      api<Zabudowa>(`/api/obsluga/wiedza/silniki/${v.id}/wycofaj`, {
+        method: "POST", body: JSON.stringify({ powod: v.powod }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}

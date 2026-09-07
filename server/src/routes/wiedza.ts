@@ -7,12 +7,20 @@ import {
 import {
   dodajIdentyfikator, identyfikatoryTowaru, listaModeliZOpisow, odrzucModelZOpisu, przerobModelZOpisu,
 } from "../services/identyfikatory.js";
+import {
+  kolejkaZabudow, lukiSilnikow, rozstrzygnijZabudowe, wycofajZabudowe, zaproponujZabudowe,
+  zatwierdzoneZabudowy, type NowaZabudowa,
+} from "../services/silniki.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   SIEDEM ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2) oraz
-   przerobienie i odrzucenie sekcji „Modele:" z opisu i ręczny identyfikator
-   (E3). Każdy idzie przez serwis, który sprawdza konto biura PRZED zapisem —
-   trasa nie ma własnej listy ról poza bramką odczytu.
+   DZIESIĘĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
+   (E3) oraz trzy przy zabudowie silnika: propozycja pary, rozstrzygnięcie
+   i wycofanie. Trzy nowe, bo para maszyna→silnik ma ten sam cykl życia co
+   zastosowanie — propozycja, którą rozstrzyga człowiek — a bez własnego
+   wycofania zatwierdzona pomyłka zostałaby w bazie na zawsze. Każdy zapis
+   idzie przez serwis, który sprawdza konto biura PRZED zapisem — trasa nie ma
+   własnej listy ról poza bramką odczytu.
 
    Adres `wiedza/*`, nie `dopasowania/*` z §16: `dopasowanie` to nazwa
    spalona w bazie i nie ożywiamy jej nawet w URL-u.
@@ -113,6 +121,56 @@ export async function wiedzaRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { twId: string } }>("/api/obsluga/wiedza/identyfikatory/:twId", async (req, reply) =>
     odmowa(reply) ?? identyfikatoryTowaru(Number(req.params.twId)));
+
+  /* ── Zabudowa silnika: który silnik stoi w której maszynie ──────────────
+     `luki` to CZYSTY ODCZYT — ranking maszyn liczony z pól wpisanych przez
+     agenta w doborze, nigdy z treści wiadomości klienta (blizna „szarpaka").
+     Automat układa kolejkę; markę i nazwę silnika wpisuje człowiek. */
+  app.get("/api/obsluga/wiedza/silniki", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const kolejka = kolejkaZabudow();
+    const luki = lukiSilnikow();
+    /* Pola nazwane OSOBNO, bo oba serwisy zwracają `liczba` i rozsypanie ich
+       w jeden obiekt dałoby ciche nadpisanie: zakładka pokazywałaby liczbę luk
+       pod napisem „do rozstrzygnięcia". */
+    return {
+      propozycje: kolejka.propozycje, doRozstrzygniecia: kolejka.liczba,
+      luki: luki.luki, lukiRazem: luki.liczba,
+      zatwierdzone: zatwierdzoneZabudowy(),
+    };
+  });
+
+  app.post<{ Body: Partial<NowaZabudowa> }>("/api/obsluga/wiedza/silniki", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try {
+      const b = req.body ?? {};
+      const z = zaproponujZabudowe({
+        maszyna: b.maszyna!, silnik: b.silnik!, rodzajDowodu: b.rodzajDowodu!,
+        dowodTresc: String(b.dowodTresc ?? ""), dowodLink: b.dowodLink ?? null,
+        komentarz: b.komentarz ?? null, zrodlo: "reczne", zastepujeId: b.zastepujeId ?? null,
+      }, { userId: ja().userId, name: ja().name });
+      /* Duplikat to odmowa ze zdaniem, nie cichy sukces — jak przy
+         zastosowaniu: agent ma wiedzieć, że ta para już czeka albo stoi. */
+      if (!z) return reply.code(409).send({ error: "Ta para maszyna–silnik już czeka w kolejce albo jest zatwierdzona" });
+      return z;
+    } catch (e) { return blad(reply, e); }
+  });
+
+  app.post<{ Params: { id: string }; Body: { decyzja?: string; powod?: string | null } }>(
+    "/api/obsluga/wiedza/silniki/:id/rozstrzygnij", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return rozstrzygnijZabudowe(Number(req.params.id),
+          (req.body?.decyzja ?? "") as "zatwierdz" | "odrzuc", req.body?.powod ?? null, ja().userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { powod?: string | null } }>(
+    "/api/obsluga/wiedza/silniki/:id/wycofaj", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return wycofajZabudowe(Number(req.params.id), req.body?.powod ?? null, ja().userId); }
+      catch (e) { return blad(reply, e); }
+    });
 
   /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */
   app.post<{ Body: { twId?: number; rodzaj?: string; wartosc?: string } }>(

@@ -334,12 +334,16 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  app.post<{ Params: { id: string }; Body: { status?: string; brakuje?: string | null } }>(
+  /* `silnikModelId` jedzie tą samą trasą co status, a nie własną: to jedno
+     pole przy JEDNEJ czynności („zatwierdź dobór"), a nowa trasa podniosłaby
+     licznik zapisów panelu bez nowej decyzji do podjęcia. */
+  app.post<{ Params: { id: string }; Body: { status?: string; brakuje?: string | null; silnikModelId?: number | null } }>(
     "/api/obsluga/rozmowy/:id/dobor/status", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       try {
         return ustawStatusDoboru(Number(req.params.id), req.body?.status ?? "",
-          req.body?.brakuje ?? null, sesjaZadania()!.user.userId);
+          req.body?.brakuje ?? null, sesjaZadania()!.user.userId, undefined,
+          req.body?.silnikModelId ?? null);
       } catch (e) { return blad(reply, e); }
     });
 

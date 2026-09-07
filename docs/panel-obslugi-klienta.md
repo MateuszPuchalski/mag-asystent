@@ -777,8 +777,8 @@ może je poprawić.
 ### 11.2. Kandydaci
 
 Kolejność wyszukiwania: dokładny symbol, EAN, numer OEM, potwierdzone
-zastosowanie, zamiennik, zgodne parametry, wyszukiwanie pełnotekstowe,
-wyszukiwanie semantyczne.
+zastosowanie, zastosowanie przez silnik, zamiennik, zgodne parametry,
+wyszukiwanie pełnotekstowe, wyszukiwanie semantyczne.
 
 **Wynik semantyczny nie jest dowodem kompatybilności.**
 
@@ -806,6 +806,25 @@ Pyta wyłącznie o dane wpisane przez agenta, nigdy o treść wiadomości (blizn
 po treści ma pewność „wymaga danych" — to podpowiedź, nie dowód. Bez FTS5
 w SQLite szczebel jest pominięty z powodem, a karta pokrycia to pokazuje.
 
+**Co działa od wydania 0.229.0: szczebel „przez silnik".** Części ogrodnicze
+mają problem dwupoziomowy. Filtr, gaźnik, świeca i linka rozrusznika pasują do
+SILNIKA, a kupujący zna wyłącznie model kosiarki. Bez tego szczebla pytanie
+„filtr do NAC LS 46-450" nie ma jak trafić na filtr Loncina, choć oba wpisy
+leżą w bazie obok siebie. Szczebel stoi zaraz za zastosowaniem do maszyny
+i przed ofertą, bo łańcuch ma o jedno ogniwo więcej.
+
+Szczebel idzie WYŁĄCZNIE przez zatwierdzoną zabudowę (§12). Pola
+`dobor_rozmowy.silnik` nie czyta: to wolny tekst, a „B&S 450E" nigdy nie
+trafi na „Briggs & Stratton 450E". Rozbijanie go na markę i nazwę byłoby tym
+samym zgadywaniem, które właściciel odrzucił przy sekcjach „Modele:".
+Wpisany tekst służy teraz do czego innego — karmi listę luk na ekranie
+Silniki i podpowiedź pod polem w zakładce Dobór.
+
+Pominięcie tego szczebla jest produktem, nie porażką: powód „nie wiadomo, jaki
+silnik stoi w NAC LS 46-450 — dopisz go w Wiedza → Silniki" to jedyna droga,
+którą agent dowie się o luce. Silnik znany, ale bez zastosowań, daje
+`sprawdzona: true` z zerem wyników — to dwie różne prawdy.
+
 ### 11.3. Poziomy pewności
 
 Dopasowanie bywa potwierdzone przez producenta, katalogiem dostawcy, pomiarem
@@ -826,6 +845,19 @@ pewności nie podnosi. Makieta mówiła „z najsłabszego dowodu" — brane dos
 karałoby za dopisanie śladu rozmowy do katalogu producenta, więc reguła jest
 inna i zapisana tu świadomie.
 
+**Łańcuch przez silnik rządzi się INNĄ regułą: najsłabszego ogniwa.** Powyższa
+reguła dotyczy JEDNEGO twierdzenia i wygrywa w niej najmocniejszy dowód.
+Kandydat z drogi `silnik` niesie twierdzenia DWA — „część pasuje do silnika"
+oraz „silnik stoi w tej maszynie" — i jest wart tyle, co jego słabsze ogniwo.
+`potwierdzone` wymaga więc dowodu technicznego po obu stronach. Ta rozbieżność
+jest celowa; nie należy jej „naprawiać" na spójność.
+
+**Maszyna z kilkoma silnikami nigdy nie daje `potwierdzone`.** Klient zna
+model kosiarki, nie wersję silnikową. Każdy kandydat z tej drogi niesie wtedy
+ostrzeżenie „potwierdź z tabliczki znamionowej", a pewność spada do
+`prawdopodobne`. Milcząca pewność w tym miejscu kończy się zwrotem „nie
+pasuje" — czyli psuje właśnie tę miarę, którą dobór ma poprawiać.
+
 ### 11.4. Negatywne dopasowania
 
 Przechowujemy również wiedzę, że część nie pasuje, pasuje tylko do innego
@@ -845,11 +877,11 @@ Wycofać go może tylko człowiek i tylko z powodem (§14.2).
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma PIĘĆ tabel,
-nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2)
-oraz `towar_identyfikator` i `model_z_opisu` (E3). Każda z pozostałych byłaby
-dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa `dopasowanie` jest spalona
-(§15) i nie wraca.
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma SZEŚĆ tabel,
+nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2),
+`towar_identyfikator` i `model_z_opisu` (E3) oraz `zabudowa_silnika` (0.229.0).
+Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
+`dopasowanie` jest spalona (§15) i nie wraca.
 
 **Model** trzyma maszynę i silnik w jednej tabeli z `rodzaj`. Klucz liczy
 `zwin()` z marki, nazwy i wariantu, więc jedna kosiarka to jeden wiersz.
@@ -864,6 +896,38 @@ także autor propozycji. Zatwierdzenie wymaga choć jednego dowodu.
 
 **Dowód** przechowuje rodzaj (§11.3), treść, odnośnik, zadanie i rozmowę,
 autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
+
+**Zabudowa silnika** (`zabudowa_silnika`, 0.229.0) mówi, który silnik stoi
+w której maszynie. Relacja jest wiele do wielu: jedna kosiarka bywa sprzedawana
+w dwóch wersjach silnikowych, a jeden silnik stoi w setkach maszyn. Cykl życia
+i podpisy ma te same co zastosowanie, rozstrzyga wyłącznie człowiek z biura,
+a wycofanie wymaga powodu ZAWSZE — cofnięcie pary gasi całą gałąź kandydatów
+naraz.
+
+Dlaczego to nie jest wiersz w `zastosowanie`: tam `tw_id` znaczy kartoteka
+Subiekta i wierzy w to cała warstwa odczytu. Wiersz, w którym `tw_id` znaczy
+„model", zatruwałby każdego z tych czytelników po cichu.
+
+Dlaczego dowód stoi w wierszu, a nie w `dowod_zastosowania`: dowody zabudowy
+się nie kumulują. „Ten silnik stoi w tej kosiarce" ma jedno źródło naraz — IPL,
+tabliczkę albo katalog dealera. Drugie źródło albo mówi to samo, albo mówi co
+innego, a wtedy chcemy nowego wiersza z `zastepuje_id`, nie dopisku. Dowód jest
+obowiązkowy, więc para bez niego nie powstaje wcale.
+
+**Skąd biorą się pary.** Ekran Wiedza → Silniki układa listę luk: maszyny
+z doborów, od najczęściej pytanych, z surowymi łańcuchami wpisanymi w pole
+„Silnik" i licznikiem. Ranking liczy się z pól WPISANYCH PRZEZ AGENTA
+w zakładce Dobór, nigdy z treści wiadomości klienta (blizna „szarpaka").
+Automat nie rozbija tych łańcuchów na markę i nazwę — markę i nazwę wpisuje
+człowiek, tak jak przy sekcjach „Modele:".
+
+Druga droga to zatwierdzenie doboru. Do 0.229.0 hak wpisywał `rodzaj:
+"maszyna"` na sztywno, więc żadne zastosowanie do silnika nie mogło powstać
+z pracy, a szczebel „przez silnik" zwracałby zero na zawsze. Od tego wydania
+agent wybiera przy zatwierdzeniu, czy wiedza ma urosnąć przy maszynie, czy przy
+jej silniku. Opcja silnikowa pojawia się wyłącznie przy zatwierdzonej
+zabudowie. Część silnikowa zapisana raz przy jednej kosiarce odpowiada odtąd
+na pytania o wszystkie maszyny z tym samym silnikiem.
 
 **Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
 z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
@@ -2309,7 +2373,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
+| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
@@ -2322,6 +2386,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
+| Zabudowa silnika (§12) | **działa** od 0.229.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |

@@ -23,7 +23,9 @@ let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
 let W: typeof import("../services/wiedza.js");
+let S: typeof import("../services/silniki.js");
 let propozycja = 0;
+let zabudowa = 0;
 let zOpisu = 0;
 const SZR = 501;
 
@@ -31,6 +33,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
   W = await import("../services/wiedza.js");
+  S = await import("../services/silniki.js");
   app = await (await import("../index.js")).buildApp();
   db().prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa,opis) VALUES (?,?,?,?)")
     .run(SZR, "SZR-148/82", "Szarpak", "OEM: 41307131600 Modele: LS 46-450 LS 51 Zamiennik: X");
@@ -38,8 +41,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie", "model_urzadzenia",
-    "events", "device_session", "app_user"]) {
+  for (const t of ["model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie",
+    "zabudowa_silnika", "model_urzadzenia", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   zOpisu = Number(d.prepare(`INSERT INTO model_z_opisu(tw_id,tw_symbol,tekst,tekst_norm)
@@ -48,6 +51,11 @@ beforeEach(() => {
   propozycja = W.zaproponujZastosowanie({
     twId: SZR, model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450" }, polaryzacja: "pasuje",
     zrodlo: "reczne", dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024" },
+  }, { userId: autor, name: "A. Lewandowska" })!.id;
+  zabudowa = S.zaproponujZabudowe({
+    maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450" },
+    silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" },
+    rodzajDowodu: "producent", dowodTresc: "karta katalogowa", zrodlo: "reczne",
   }, { userId: autor, name: "A. Lewandowska" })!.id;
 });
 
@@ -78,6 +86,13 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/wiedza/z-opisow/${zOpisu}/odrzuc` },
   { method: "GET" as const, url: `/api/obsluga/wiedza/identyfikatory/${SZR}` },
   { method: "POST" as const, url: "/api/obsluga/wiedza/identyfikatory", payload: { twId: SZR, rodzaj: "katalog_obcy", wartosc: "AB-1234" } },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/silniki" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/silniki",
+    payload: { maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 51" },
+      silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" },
+      rodzajDowodu: "producent", dowodTresc: "karta katalogowa" } },
+  { method: "POST" as const, url: `/api/obsluga/wiedza/silniki/${zabudowa}/rozstrzygnij`, payload: { decyzja: "zatwierdz" } },
+  { method: "POST" as const, url: `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, payload: { powod: "x" } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -95,14 +110,18 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest siedem — licznik jest umową", () => {
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 7);
+test("tras zapisu jest dziesięć — licznik jest umową", () => {
+  /* Trzy nowe przy zabudowie silnika: propozycja pary, rozstrzygnięcie
+     i wycofanie. Para maszyna→silnik ma ten sam cykl życia co zastosowanie,
+     a bez własnego wycofania zatwierdzona pomyłka zostałaby w bazie na
+     zawsze — i gasiłaby albo zapalała całą gałąź kandydatów bez śladu. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 10);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
-  const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu", "towar_identyfikator"]
-    .map(liczba);
+  const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
+    "towar_identyfikator", "zabudowa_silnika"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -195,4 +214,64 @@ test("każdy adres wołany z panel/src/api/wiedza.ts ma trasę na serwerze", asy
     if (r.statusCode === 404 && /^Route /.test(tresc.message ?? "")) bledne.push(`${method} ${adres}`);
   }
   assert.deepEqual(bledne, [], "panel woła adresy bez trasy na serwerze");
+});
+
+test("zabudowa przez trasę: propozycja, duplikat 409, zatwierdzenie i wycofanie tylko z powodem", async () => {
+  const b = login("biuro", "Anna");
+  const para = {
+    maszyna: { rodzaj: "maszyna", marka: "STIGA", nazwa: "Combi 48" },
+    silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" },
+    rodzajDowodu: "producent", dowodTresc: "karta katalogowa 2024",
+  };
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/silniki", headers: b.naglowki, payload: para });
+  assert.equal(r.statusCode, 200, r.body);
+  const z = r.json<{ id: number; stan: string; zrodlo: string; zaproponowal: string; pewnosc: string }>();
+  assert.equal(z.stan, "propozycja", "także wpis ręczny idzie do kolejki — precedens `przerobModelZOpisu`");
+  assert.equal(z.zrodlo, "reczne");
+  assert.equal(z.zaproponowal, "Anna", "autorem jest sesja, nigdy pole z ciała");
+
+  /* Duplikat to odmowa ze zdaniem, nie cichy sukces. */
+  r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/silniki", headers: b.naglowki, payload: para });
+  assert.equal(r.statusCode, 409);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/silniki/${z.id}/rozstrzygnij`,
+    headers: b.naglowki, payload: { decyzja: "zatwierdz" } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ stan: string }>().stan, "zatwierdzone");
+  /* Drugie rozstrzygnięcie to 409 z tym, kto był pierwszy. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/silniki/${z.id}/rozstrzygnij`,
+    headers: login("biuro", "Ola").naglowki, payload: { decyzja: "odrzuc", powod: "jednak nie" } });
+  assert.equal(r.statusCode, 409);
+  assert.equal(r.json<{ rozstrzygnal: string }>().rozstrzygnal, "Anna");
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/silniki/${z.id}/wycofaj`,
+    headers: b.naglowki, payload: {} });
+  assert.equal(r.statusCode, 400, "wycofanie bez powodu gasi całą gałąź po cichu");
+});
+
+test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
+  /* Reguła klienta HTTP obowiązuje KAŻDY front z osobna. Trasa musi oddać
+     błąd biznesowy, a nie gołe „Bad Request" z `FST_ERR_CTP_EMPTY_JSON_BODY`. */
+  const b = login("biuro", "Anna");
+  for (const url of [`/api/obsluga/wiedza/silniki/${zabudowa}/rozstrzygnij`,
+    `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, "/api/obsluga/wiedza/silniki"]) {
+    const r = await app.inject({ method: "POST", url, headers: b.naglowki });
+    assert.equal(r.statusCode, 400, url);
+    assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);
+  }
+});
+
+test("luki idą razem z kolejką jednym odczytem", async () => {
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/silniki", headers: b.naglowki });
+  assert.equal(r.statusCode, 200, r.body);
+  const w = r.json<{ propozycje: unknown[]; doRozstrzygniecia: number;
+    luki: unknown[]; lukiRazem: number; zatwierdzone: unknown[] }>();
+  assert.equal(w.propozycje.length, 1, "para z beforeEach czeka w kolejce");
+  /* Dwa liczniki, dwie prawdy: propozycje to decyzje, luki to praca. Jedno
+     pole `liczba` nadpisałoby drugie po cichu. */
+  assert.equal(w.doRozstrzygniecia, 1);
+  assert.equal(typeof w.lukiRazem, "number");
+  assert.deepEqual(w.zatwierdzone, []);
+  assert.ok(Array.isArray(w.luki));
 });

@@ -5,7 +5,9 @@ import type {
   StatusDoboru, SzczebelDoboru,
 } from "../api/typy";
 import { Konflikt } from "../api/klient";
-import { useKandydaci, useStatusDoboru, useWybierzKandydata, useZapiszDaneDoboru } from "../api/rozmowy";
+import {
+  useKandydaci, useStatusDoboru, useWiedzaDoboru, useWybierzKandydata, useZapiszDaneDoboru,
+} from "../api/rozmowy";
 import { Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
@@ -41,8 +43,8 @@ const POLA: Array<{ klucz: keyof Omit<DaneDoboru, "parametry">; nazwa: string; p
 ];
 
 const NAZWA_DROGI: Record<DrogaDoboru, string> = {
-  symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", zamiennik: "zamiennik",
-  oferta: "oferta", pelnotekst: "pełny tekst", wyszukiwarka: "wyszukiwarka",
+  symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
+  zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst", wyszukiwarka: "wyszukiwarka",
 };
 
 const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: string }> = {
@@ -90,6 +92,10 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   const zapisz = useZapiszDaneDoboru();
   const status = useStatusDoboru();
   const wybierz = useWybierzKandydata();
+  /* Ten sam odczyt, z którego zakładka WIEDZA bierze dowody — tu potrzebne są
+     z niego SILNIKI maszyny. Drugie żądanie po to samo byłoby drugim strzałem. */
+  const wiedza = useWiedzaDoboru(rozmowaId);
+  const silniki = wiedza.data?.silniki ?? [];
 
   const [edycja, setEdycja] = useState(false);
   const [formularz, setFormularz] = useState<Formularz>(() => naFormularz(dobor.dane));
@@ -97,6 +103,9 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   const [brakuje, setBrakuje] = useState(dobor.brakuje ?? "");
   const [pytamOBrak, setPytamOBrak] = useState(false);
   const [szukam, setSzukam] = useState(false);
+  /* `null` = zapisz wiedzę przy MASZYNIE (zachowanie sprzed zmiany). Liczba to
+     model silnika z zatwierdzonej zabudowy — nigdy tekst z pola „Silnik". */
+  const [doSilnika, setDoSilnika] = useState<number | null>(null);
 
   const blad = [zapisz.error, status.error, wybierz.error]
     .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
@@ -116,8 +125,9 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
     });
   };
 
-  const ustawStatus = (s: StatusDoboru, notatka: string | null = null) =>
-    status.mutate({ id: rozmowaId, status: s, brakuje: notatka }, { onSuccess: () => setPytamOBrak(false) });
+  const ustawStatus = (s: StatusDoboru, notatka: string | null = null, silnikModelId: number | null = null) =>
+    status.mutate({ id: rozmowaId, status: s, brakuje: notatka, silnikModelId },
+      { onSuccess: () => setPytamOBrak(false) });
 
   const wybierzTowar = (twId: number | null, droga: DrogaDoboru) =>
     wybierz.mutate({ id: rozmowaId, twId, droga, expectedVersion: dobor.wersja },
@@ -182,6 +192,20 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
               <span key={`p-${k}`} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs">
                 <span className="text-slate-500">{k}: </span><b>{v}</b></span>)}
           </div>)}
+
+      {/* POLE „SILNIK" PRZESTAJE BYĆ SIEROTĄ. Do tego wydania agent je wypełniał,
+          a żaden szczebel go nie czytał. Szczebel „przez silnik" idzie przez
+          ZATWIERDZONĄ zabudowę, więc ekran musi powiedzieć, czy taka jest —
+          inaczej wpisany tekst dalej wygląda na coś, co działa. */}
+      {!edycja && dobor.dane.marka && dobor.dane.model && <p className="mt-1 text-[11px] text-slate-500">
+        {silniki.length > 0
+          ? <>Silnik z bazy: <b>{silniki.map((z) => z.silnik.etykieta).join(" · ")}</b>
+            {silniki.length > 1 && " — ta maszyna bywa z kilkoma silnikami, potwierdź z tabliczki"}</>
+          : dobor.dane.silnik
+            ? <>„{dobor.dane.silnik}" to na razie tylko notatka. Dopisz silnik w Wiedza → Silniki,
+              wtedy dobór znajdzie części tego silnika.</>
+            : null}
+      </p>}
 
       {edycja && <form className="grid grid-cols-2 gap-2" onSubmit={(e) => { e.preventDefault(); zapiszDane(); }}>
         {POLA.map((p) => <label key={p.klucz} className="text-[11px] text-slate-500">{p.nazwa}
@@ -319,9 +343,28 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
               <Przycisk className="text-xs" onClick={() => onWstawDoSzkicu(dobor.wybrany!.zdanieDoSzkicu)}>
                 <FileText size={14} />Wstaw do szkicu ze źródłem</Przycisk>
               {dobor.status !== "confirmed" && <Przycisk wariant="glowny" className="text-xs"
-                disabled={status.isPending} onClick={() => ustawStatus("confirmed")}>
+                disabled={status.isPending} onClick={() => ustawStatus("confirmed", null, doSilnika)}>
                 <Check size={14} />ZATWIERDŹ DOBÓR</Przycisk>}
             </div>
+            {/* DO MASZYNY CZY DO SILNIKA — bez tego wyboru baza silnikowa nie
+                urosłaby nigdy, bo zatwierdzenie zawsze zapisywało maszynę.
+                Opcja silnikowa pojawia się WYŁĄCZNIE przy zatwierdzonej
+                zabudowie: wybór z ekranu nie ma udawać faktu, którego w bazie
+                nie ma. Część silnikowa zapisana raz przy jednej kosiarce
+                odpowiada odtąd na pytania o wszystkie maszyny z tym silnikiem. */}
+            {dobor.status !== "confirmed" && silniki.length > 0 &&
+              <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+                <legend className="sr-only">Gdzie zapisać zastosowanie</legend>
+                <span>zastosowanie zapisz do:</span>
+                <label className="flex items-center gap-1">
+                  <input type="radio" name="doCzego" checked={doSilnika === null}
+                    onChange={() => setDoSilnika(null)} />
+                  maszyny {[dobor.dane.marka, dobor.dane.model].filter(Boolean).join(" ")}</label>
+                {silniki.map((z) => <label key={z.id} className="flex items-center gap-1">
+                  <input type="radio" name="doCzego" checked={doSilnika === z.silnik.id}
+                    onChange={() => setDoSilnika(z.silnik.id)} />
+                  {z.silnik.etykieta}</label>)}
+              </fieldset>}
           </>
         : <p className="text-xs text-slate-500">Nic jeszcze nie wybrano. Zatwierdzenie doboru wymaga
             wybranej kartoteki.</p>}

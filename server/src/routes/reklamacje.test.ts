@@ -5,9 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Rola } from "../services/users.js";
-import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
-import { typPodgladu } from "../services/skrzynka.js";
 
+/* WARTOŚCIOWYCH IMPORTÓW SERWISU NIE MA TU CELOWO. Statyczny import biegnie
+   PRZED ciałem modułu, więc `skrzynka.js` i `zdjecia.sgt.js` ładowały `config`
+   i `db` zanim ta linia ustawiła `DB_PATH` — i cały plik pracował na PRAWDZIWEJ bazie biura
+   (`server/data/wertis.db`), kasując jej zawartość w `beforeEach`. Póki tamta
+   baza była pusta, testy przechodziły i nikt tego nie widział. Serwisy
+   dociągamy dynamicznie w `before()`, jak w pozostałych plikach tras. */
 process.env.DB_PATH = path.join(
   fs.mkdtempSync(path.join(os.tmpdir(), "wertis-reklamacje-tras-")), "t.db");
 process.env.LOG_LEVEL = "silent";
@@ -29,12 +33,16 @@ process.env.SGT_MODE = "seeded";
 let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
+let typPodgladu: typeof import("../services/skrzynka.js").typPodgladu;
+let rozpoznajMime: typeof import("../adapters/zdjecia.sgt.js").rozpoznajMime;
 let reklamacja = 0;
 let zalacznik = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
+  ({ typPodgladu } = await import("../services/skrzynka.js"));
+  ({ rozpoznajMime } = await import("../adapters/zdjecia.sgt.js"));
   app = await (await import("../index.js")).buildApp();
 });
 

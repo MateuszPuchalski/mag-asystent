@@ -19,8 +19,10 @@ let doborRozmowy: typeof import("./dobor.js").doborRozmowy;
 let zapiszDane: typeof import("./dobor.js").zapiszDane;
 let ustawStatusDoboru: typeof import("./dobor.js").ustawStatusDoboru;
 let wybierzKandydata: typeof import("./dobor.js").wybierzKandydata;
+let wiedzaDoboru: typeof import("./dobor.js").wiedzaDoboru;
 let ConversationConflict: typeof import("./conversations.js").ConversationConflict;
 let W: typeof import("./wiedza.js");
+let S: typeof import("./silniki.js");
 
 let biuro = 0;
 let rozmowa = 0;
@@ -29,9 +31,10 @@ const SZARPAK_ALT = 502;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ doborRozmowy, zapiszDane, ustawStatusDoboru, wybierzKandydata } = await import("./dobor.js"));
+  ({ doborRozmowy, zapiszDane, ustawStatusDoboru, wybierzKandydata, wiedzaDoboru } = await import("./dobor.js"));
   ({ ConversationConflict } = await import("./conversations.js"));
   W = await import("./wiedza.js");
+  S = await import("./silniki.js");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK, "SZR-148/82", "Szarpak 148 mm");
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK_ALT, "SZR-150/82", "Szarpak 150 mm");
@@ -41,7 +44,7 @@ beforeEach(() => {
   const d = db();
   /* Wiedza PRZED użytkownikami: zatwierdzony dobór rodzi propozycję (E2),
      a jej autor wskazuje na `app_user` bez kaskady. */
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "dobor_rozmowy",
+  for (const t of ["dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -237,4 +240,86 @@ test("zatwierdzone zastosowanie z dowodem technicznym wchodzi do zdania szkicu",
   const przed = liczba("events");
   doborRozmowy(rozmowa);
   assert.equal(liczba("events"), przed);
+});
+
+/* ── Silnik jako drugie ogniwo: zdanie do szkicu i wybór przy zatwierdzeniu ── */
+
+const NAC = { rodzaj: "maszyna" as const, marka: "NAC", nazwa: "LS 46-450" };
+const BS450 = { rodzaj: "silnik" as const, marka: "Briggs & Stratton", nazwa: "450E" };
+
+/** Zatwierdzona para NAC → B&S 450E. */
+const zabuduj = () => S.rozstrzygnijZabudowe(S.zaproponujZabudowe({
+  maszyna: NAC, silnik: BS450, rodzajDowodu: "producent", dowodTresc: "karta katalogowa",
+  zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
+
+test("zdanie do szkicu przez silnik nazywa OBA ogniwa — inaczej kłamałoby przez pominięcie", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const zab = zabuduj();
+  /* Zastosowanie części do SILNIKA, nie do maszyny. */
+  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024" } }, { userId: biuro, name: "A. Lewandowska" })!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "silnik", 2, biuro);
+
+  const zdanie = doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu;
+  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — pasuje do silnik Briggs & Stratton 450E, który stoi w tej maszynie/);
+  assert.match(zdanie, /zastosowanie do silnik Briggs & Stratton 450E — katalog dostawcy/);
+  assert.match(zdanie, /silnik Briggs & Stratton 450E stoi w NAC LS 46-450 — producent/);
+  assert.equal(zab.pewnosc, "potwierdzone");
+});
+
+test("słabsze ogniwo zbija zdanie na „prawdopodobnie”", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  S.rozstrzygnijZabudowe(S.zaproponujZabudowe({ maszyna: NAC, silnik: BS450, rodzajDowodu: "rozmowa",
+    dowodTresc: "klient podał z tabliczki", zrodlo: "reczne" },
+    { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
+  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "producent", tresc: "IPL" } }, { userId: biuro, name: "A. Lewandowska" })!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "silnik", 2, biuro);
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /prawdopodobnie pasuje/);
+});
+
+test("zatwierdzenie „do silnika” rodzi propozycję przy MODELU SILNIKA, nie maszyny", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const zab = zabuduj();
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro, undefined, zab.silnik.id);
+
+  const p = W.kolejkaPropozycji().propozycje;
+  assert.equal(p.length, 1);
+  assert.equal(p[0].model.rodzaj, "silnik");
+  assert.equal(p[0].model.etykieta, "silnik Briggs & Stratton 450E");
+  /* Ślad mówi, DO CZEGO zatwierdzono — inaczej kolejka nie odróżni obu gałęzi. */
+  assert.match(p[0].dowody[0].tresc, /do silnika silnik Briggs & Stratton 450E/);
+});
+
+test("bez wskazania silnika propozycja idzie do maszyny — zachowanie sprzed zmiany", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  zabuduj();
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  assert.equal(W.kolejkaPropozycji().propozycje[0].model.rodzaj, "maszyna");
+});
+
+test("silnik spoza ZATWIERDZONYCH zabudów tej maszyny odbija się ze zdaniem", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  /* Propozycja zabudowy to jeszcze nie zabudowa — wybór z ekranu nie ma prawa
+     udawać faktu, którego w bazie nie ma. */
+  const propozycja = S.zaproponujZabudowe({ maszyna: NAC, silnik: BS450, rodzajDowodu: "producent",
+    dowodTresc: "karta", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!;
+  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
+  assert.throws(() => ustawStatusDoboru(rozmowa, "confirmed", null, biuro, undefined, propozycja.silnik.id),
+    /nie jest zatwierdzony silnik tej maszyny/);
+  /* Transakcja się cofnęła: status nie przeszedł na `confirmed`. */
+  assert.notEqual(doborRozmowy(rozmowa).status, "confirmed");
+});
+
+test("wiedzaDoboru oddaje silniki maszyny — jedno żądanie, nie drugie na to samo", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const zab = zabuduj();
+  const w = wiedzaDoboru(rozmowa);
+  assert.deepEqual(w.silniki.map((z) => z.silnik.id), [zab.silnik.id]);
+  assert.equal(w.zastosowanie, null);
+  assert.equal(w.zabudowa, null);
 });

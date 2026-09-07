@@ -18,6 +18,7 @@ let db: typeof import("../db/db.js").db;
 let kandydaciDoboru: typeof import("./kandydaci.js").kandydaciDoboru;
 let zapiszDane: typeof import("./dobor.js").zapiszDane;
 let W: typeof import("./wiedza.js");
+let S: typeof import("./silniki.js");
 let config: typeof import("../config.js").config;
 let subiekt: typeof import("../context.js").subiekt;
 
@@ -36,6 +37,7 @@ before(async () => {
   ({ kandydaciDoboru } = await import("./kandydaci.js"));
   ({ zapiszDane } = await import("./dobor.js"));
   W = await import("./wiedza.js");
+  S = await import("./silniki.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
@@ -57,7 +59,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "dobor_rozmowy", "offer_snapshot",
+  for (const t of ["dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia",
+    "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -85,13 +88,14 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   const przed = (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
   const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
   assert.deepEqual(kandydaci, []);
-  assert.equal(drogi.length, 8, "raport ma KAŻDY szczebel §11.2");
+  assert.equal(drogi.length, 9, "raport ma KAŻDY szczebel §11.2");
   for (const d of drogi) {
     assert.equal(d.sprawdzona, false, `${d.droga} udaje sprawdzony`);
     assert.ok(d.powod, `${d.droga} pominięty bez powodu`);
   }
   assert.match(szczebel(drogi, "oferta").powod!, /nie jest powiązana z ofertą/);
   assert.match(szczebel(drogi, "zastosowanie").powod!, /marki i modelu/);
+  assert.match(szczebel(drogi, "silnik").powod!, /marki i modelu/);
   assert.match(szczebel(drogi, "oem").powod!, /numeru OEM/);
   assert.match(szczebel(drogi, "pelnotekst").powod!, /nazwy części ani maszyny/);
   /* Patrzenie na kandydatów niczego nie zapisuje — ani wiersza doboru, ani zdarzenia. */
@@ -272,4 +276,118 @@ test("bez FTS5 szczebel pełnego tekstu jest pominięty z powodem, a reszta drab
   } finally {
     udawajBrakFts(false);
   }
+});
+
+/* ── Szczebel „przez silnik": zabudowa jako drugie ogniwo łańcucha ────────── */
+
+const BS450 = { rodzaj: "silnik" as const, marka: "Briggs & Stratton", nazwa: "450E" };
+const HONDA = { rodzaj: "silnik" as const, marka: "Honda", nazwa: "GCV160" };
+
+/** Zatwierdzona para maszyna→silnik. `dowod` steruje pewnością drugiego ogniwa. */
+function zabuduj(silnik: typeof BS450, rodzajDowodu: Parameters<typeof S.zaproponujZabudowe>[0]["rodzajDowodu"] = "producent") {
+  const z = S.zaproponujZabudowe({ maszyna: STIHL, silnik, rodzajDowodu,
+    dowodTresc: "karta katalogowa", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!;
+  return S.rozstrzygnijZabudowe(z.id, "zatwierdz", null, biuro);
+}
+
+/** Zatwierdzone zastosowanie części DO SILNIKA — bez tego szczebel nie ma paliwa. */
+function zastosowanieDoSilnika(twId: number, silnik: typeof BS450, rodzaj: "katalog_dostawcy" | "rozmowa" = "katalog_dostawcy") {
+  const z = W.zaproponujZastosowanie({ twId, model: silnik, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj, tresc: "katalog 2024" } }, { userId: biuro, name: "A. Lewandowska" })!;
+  return W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+}
+
+test("bez zabudowy szczebel silnika jest POMINIĘTY i mówi, czego brakuje", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  const { drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "silnik").sprawdzona, false);
+  /* Powód NAZYWA maszynę i mówi, gdzie iść — to jedyna droga, którą agent
+     dowie się, że baza silników ma lukę. */
+  assert.match(szczebel(drogi, "silnik").powod!, /nie wiadomo, jaki silnik stoi w STIHL FS 250/);
+  assert.match(szczebel(drogi, "silnik").powod!, /Wiedza → Silniki/);
+});
+
+test("silnik znany, ale bez zastosowań to SPRAWDZONY z zerem, nie pominięcie", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450);
+  const { drogi } = kandydaciDoboru(rozmowa, subiekt);
+  /* Dwie różne prawdy: „nie wiem, jaki silnik” kontra „wiem i nic nie mam”. */
+  assert.equal(szczebel(drogi, "silnik").sprawdzona, true);
+  assert.equal(szczebel(drogi, "silnik").wynikow, 0);
+  assert.equal(szczebel(drogi, "silnik").powod, undefined);
+});
+
+test("część silnika trafia do kandydatów, a źródło nazywa OBA ogniwa łańcucha", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450);
+  zastosowanieDoSilnika(FTC272, BS450);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "silnik").wynikow, 1);
+  const k = kandydaci.find((x) => x.twId === FTC272)!;
+  assert.equal(k.droga, "silnik");
+  assert.equal(k.pewnosc, "potwierdzone", "dowód techniczny po obu stronach łańcucha");
+  assert.match(k.zrodlo, /zastosowanie do silnik Briggs & Stratton 450E/);
+  assert.match(k.zrodlo, /silnik Briggs & Stratton 450E stoi w STIHL FS 250/);
+  assert.deepEqual(k.ostrzezenia, [], "jeden silnik — nie ma czego potwierdzać z tabliczki");
+});
+
+test("dwie wersje silnikowe: nigdy „potwierdzone” i zawsze ostrzeżenie o tabliczce", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450);
+  zabuduj(HONDA);
+  zastosowanieDoSilnika(FTC272, BS450);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  const k = kandydaci.find((x) => x.twId === FTC272)!;
+  /* Klient zna model kosiarki, nie wersję silnika. Milcząca pewność w tym
+     miejscu kończy się zwrotem „nie pasuje". */
+  assert.equal(k.pewnosc, "prawdopodobne");
+  assert.equal(k.ostrzezenia.length, 1);
+  assert.match(k.ostrzezenia[0], /bywa z kilkoma silnikami — potwierdź z tabliczki/);
+});
+
+test("ślad rozmowy po którejkolwiek stronie łańcucha zbija pewność do „prawdopodobne”", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450, "rozmowa");
+  zastosowanieDoSilnika(FTC272, BS450);
+  const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.twId === FTC272)!;
+  assert.equal(k.pewnosc, "prawdopodobne", "łańcuch jest wart tyle, co słabsze ogniwo");
+});
+
+test("negatyw przez silnik jest widoczny i cytuje oba dowody", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450);
+  const neg = W.zaproponujZastosowanie({ twId: FTC272, model: BS450, polaryzacja: "nie_pasuje",
+    powodNegatywny: "tylko_inny_wariant", zrodlo: "reczne",
+    dowod: { rodzaj: "pomiar_wlasny", tresc: "inny gwint" } }, { userId: biuro, name: "A. Lewandowska" })!;
+  W.rozstrzygnijZastosowanie(neg.id, "zatwierdz", null, biuro);
+  const { negatywne } = kandydaciDoboru(rozmowa, subiekt);
+  assert.deepEqual(negatywne.map((n) => n.twId), [FTC272]);
+  assert.match(negatywne[0].zrodlo, /nie pasuje do silnik Briggs & Stratton 450E/);
+  assert.match(negatywne[0].zrodlo, /stoi w STIHL FS 250/);
+});
+
+test("zastosowanie do MASZYNY bije to samo przez silnik — jeden kandydat, mocniejsza droga", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(BS450);
+  zastosowanieDoSilnika(FTC272, BS450);
+  W.rozstrzygnijZastosowanie(zaproponuj(FTC272).id, "zatwierdz", null, biuro);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(kandydaci.filter((k) => k.twId === FTC272).length, 1);
+  assert.equal(kandydaci.find((k) => k.twId === FTC272)!.droga, "zastosowanie");
+});
+
+test("propozycja zabudowy i zabudowa wycofana NIE karmią szczebla", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  S.zaproponujZabudowe({ maszyna: STIHL, silnik: HONDA, rodzajDowodu: "producent",
+    dowodTresc: "karta", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" });
+  zastosowanieDoSilnika(FTC272, HONDA);
+  assert.equal(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik").sprawdzona, false,
+    "propozycja nie jest wiedzą");
+
+  const zab = zabuduj(BS450);
+  zastosowanieDoSilnika(ZAMIENNIK_FTC272, BS450);
+  assert.equal(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik").wynikow, 1);
+  S.wycofajZabudowe(zab.id, "pomyłka: to inna wersja kosiarki", biuro);
+  /* Wycofanie zabudowy gasi CAŁĄ gałąź naraz — dlatego wymaga powodu. */
+  assert.equal(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik").sprawdzona, false);
 });
