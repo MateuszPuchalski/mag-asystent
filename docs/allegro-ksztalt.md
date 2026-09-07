@@ -627,13 +627,29 @@ Typem jest `string`, więc rozstrzyga to dopiero pierwsze trafienie w
 `offer_snapshot` — to jest ta sama otwarta sprawa dwóch przestrzeni
 identyfikatora oferty, co przy pozycji zwrotu.
 
-### Załącznika nie pokazujemy na osi
+### Załącznik: typ rozstrzygają BAJTY
 
 `PostPurchaseIssueAttachment` ma DWA pola: `fileName` i `url`. Nie ma ani typu
 MIME, ani stanu `SAFE`/`UNSAFE`, na którym stoi podgląd zdjęć w skrzynce
-(0.218.0). Rysowanie cudzego pliku bez tej bramki byłoby cofnięciem tamtej
-decyzji, a nie jej rozszerzeniem — więc zostaje samo pobranie przez nasz
-serwer, z `content-disposition: attachment`.
+(0.218.0). Do 0.222.0 wyciągaliśmy z tego wniosek, że zdjęcia nie da się
+pokazać na osi — i ten wniosek był zbyt szeroki.
+
+Bramka ze skrzynki pilnowała JEDNEJ rzeczy: żeby na osi rysowały się wyłącznie
+typy, które przeglądarka narysuje, i nic innego. Tego da się dopilnować bez
+pola, po SYGNATURZE pliku — bajty i tak przechodzą przez nasz serwer. Od
+0.223.0 robi to `rozpoznajMime` (ta sama funkcja, co przy zdjęciach z Subiekta)
+przecięte z `TYPY_PODGLADU`.
+
+Przechodzą TRZY typy, i to jest przecięcie dwóch list. Allegro przyjmuje przy
+tym zasobie `image/png`, `image/gif`, `image/bmp`, `image/tiff`, `image/jpeg`
+i `application/pdf` (`PUT /sale/issues/attachments/{attachmentId}`); skrzynka
+rysuje cztery typy rastrowe. Wspólne są JPEG, PNG i GIF — `webp` po stronie
+Allegro nie istnieje, a `bmp` i `tiff` przeglądarki rysują nierówno albo wcale.
+Reszta zostaje przy pobieraniu i to jest odpowiedź, nie awaria.
+
+Nazwa pliku niczego nie rozstrzyga: decyduje o UKŁADZIE po stronie panelu
+(pole `podglad`), a plik nazwany `usterka.jpg`, który sygnatury obrazu nie ma,
+dostaje 415 i spada z powrotem na przycisk pobrania.
 
 Pobranie ma tu za to WŁASNĄ końcówkę w specyfikacji
 (`GET /sale/issues/attachments/{attachmentId}`), czego brakuje przy

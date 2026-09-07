@@ -543,10 +543,17 @@ idzie przez nasz serwer, żeby token firmy nie opuścił maszyny, i zostawia śl
 w dzienniku. Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak jak
 w skrzynce.
 
-**Podglądu na osi nie ma.** `PostPurchaseIssueAttachment` ma dwa pola — nazwę
-i adres — więc bramki `SAFE`, na której stoi podgląd zdjęć w skrzynce od
-0.218.0, nie da się tu postawić. Rysowanie cudzego pliku bez niej byłoby
-cofnięciem tamtej decyzji, a nie jej rozszerzeniem.
+**Zdjęcie widać na osi, ale przez WĄSKIE gardło (0.223.0).**
+`PostPurchaseIssueAttachment` ma dwa pola — nazwę i adres — więc bramki `SAFE`
+ze skrzynki nie da się tu POWTÓRZYĆ. Powtarzamy jej skutek: na oś idą wyłącznie
+JPEG, PNG i GIF, a rozpoznaje je sygnatura pliku po stronie serwera, nie pole
+przysłane z zewnątrz i nie rozszerzenie w nazwie. `content-type` bierzemy z tej
+listy, `nosniff` zabrania przeglądarce zgadywać lepiej, a wszystko inne — PDF,
+BMP, TIFF — zostaje przy pobieraniu.
+
+Powód jest ten sam, co w skrzynce w 0.218.0: w sklepie z częściami zdjęcie
+pękniętego elementu bywa całym zgłoszeniem, a nazwa pliku nie mówi o nim nic.
+Sonda widziała załączniki przy 57 sprawach na 100.
 
 **Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
 odczycie — tak samo jak przy skrzynce i przy zwrotach.

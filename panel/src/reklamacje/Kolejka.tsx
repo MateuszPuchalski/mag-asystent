@@ -2,11 +2,19 @@ import React, { useEffect, useRef } from "react";
 import { AlertTriangle, MessageSquareWarning, Headset, Lock, PackageCheck, CircleHelp } from "lucide-react";
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
+import { ZdjecieOferty } from "../towar/Zdjecie";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
-   Wiersz ma się czytać W BIEGU, więc niesie SZEŚĆ rzeczy i ani jednej więcej:
-   numer, klienta, powód, czego klient chce, dni do terminu decyzji i sygnały.
-   Wszystko, co trzeba doczytać, siedzi w kolumnie dowodów po prawej.
+   Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej więcej:
+   zdjęcie, numer, klienta, powód, czego klient chce, dni do terminu decyzji
+   i sygnały. Wszystko, co trzeba doczytać, siedzi w kolumnie dowodów po prawej.
+
+   ZDJĘCIE JEST TOŻSAMOŚCIĄ SPRAWY (0.223.0), nie ozdobą. Reklamacja dotyczy
+   jednej oferty, a „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu —
+   przy samym numerze wymaga otwarcia sprawy. Bierzemy obraz OFERTY, nie
+   kartoteki: klient reklamuje to, co kupił, a kartoteka bywa niepowiązana.
+   Kafel ma stały rozmiar także wtedy, gdy obrazu nie ma — rosnący przesuwałby
+   wiersze pod kursorem (lekcja z `biuro.html`).
 
    Kolejność liczy SERWER (najkrótszy termin na górze) i panel jej nie zmienia.
    Dwie reguły sortowania rozjechałyby się przy pierwszej poprawce jednej
@@ -119,8 +127,11 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
           aria-current={aktywna ? "true" : undefined}
           ref={aktywna ? aktywnyWiersz : null}
           onClick={() => onWybierz(r.id)}
-          className={`flex w-full flex-col gap-1 px-4 py-3 text-left ${
+          className={`flex w-full gap-3 px-4 py-3 text-left ${
             aktywna ? "bg-amber-50" : "hover:bg-slate-50"}`}>
+          <ZdjecieOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={44}
+            nazwa={r.ofertaNazwa ?? r.numer ?? r.externalId} />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-bold">{r.numer ?? r.externalId}</span>
             {r.prowadzi && <span title={`Prowadzi: ${r.prowadzi}`}
@@ -131,6 +142,10 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
               {KUBELKI.find((k) => k.id === r.kubelek)?.etykieta}</span>}
             <Termin dni={r.dniDoTerminu} />
           </div>
+          {/* Nazwa oferty PRZED loginem: agent szuka oczami towaru, nie
+              klienta. Bez snapshotu zostaje sam login i powód. */}
+          {r.ofertaNazwa && <div className="truncate text-sm text-slate-800">
+            {r.ofertaNazwa}</div>}
           <div className="truncate text-sm text-slate-600">
             {r.kupujacyLogin ?? "bez loginu"}
             {r.powodTyp ? ` · ${POWODY[r.powodTyp] ?? r.powodTyp}` : ""}
@@ -146,6 +161,7 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
                 {SYGNALY[s].ikona}{SYGNALY[s].krotko}
               </span>
             ))}
+          </div>
           </div>
         </button>
       </li>;

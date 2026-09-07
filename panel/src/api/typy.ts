@@ -826,12 +826,28 @@ export interface Reklamacja {
   link: string | null;
   linkZamowienia: string | null;
   linkOferty: string | null;
+  /* Co widać na wierszu (0.223.0). Reklamacja dotyczy jednej oferty, więc
+     obraz jest tożsamością sprawy, a nie ozdobą. */
+  ofertaNazwa: string | null;
+  ofertaZdjecie: StanZdjeciaOferty;
+  /** Kartoteka POTWIERDZONA; propozycję liczy dopiero szczegół sprawy. */
+  twId: number | null;
+  twSymbol: string | null;
 }
 
 export interface ZalacznikReklamacji {
   id: number;
   wiadomoscId: number | null;
   nazwa: string;
+  /**
+   * Czy warto próbować pokazać go na osi — PODPOWIEDŹ z nazwy pliku.
+   *
+   * Allegro nie podaje przy tym zasobie ani typu MIME, ani stanu `SAFE`, więc
+   * rozstrzygają dopiero BAJTY po stronie serwera. Ta flaga decyduje o
+   * układzie, nie o wydaniu: kafel, którego trasa nie obsłuży, spada
+   * z powrotem na przycisk pobrania.
+   */
+  podglad: boolean;
 }
 
 export interface WiadomoscReklamacji {

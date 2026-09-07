@@ -29,6 +29,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
+  ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
 });
 
 const REKLAMACJE = [
@@ -64,7 +65,7 @@ vi.mock("../api/reklamacje", async () => {
         czat: [{
           id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
           tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z",
-          zalaczniki: [],
+          zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }],
         }],
         zalaczniki: [], zwroty: [], rozmowy: [], kartoteka: null,
       },

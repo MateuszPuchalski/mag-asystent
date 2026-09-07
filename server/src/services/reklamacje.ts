@@ -3,6 +3,7 @@ import { logEvent } from "./events.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
+import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
    Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"`), a nie dyskusje —
@@ -74,7 +75,30 @@ export interface ZalacznikReklamacji {
   id: number;
   wiadomoscId: number | null;
   nazwa: string;
+  /**
+   * Czy warto próbować pokazać go na osi. PODPOWIEDŹ, nie prawda.
+   *
+   * `PostPurchaseIssueAttachment` ma DWA pola — `fileName` i `url` — więc ani
+   * typu MIME, ani stanu `SAFE` nie znamy. Rozstrzygnąć da się to wyłącznie
+   * po BAJTACH, a bajty ma dopiero trasa podglądu. Ta flaga decyduje o
+   * UKŁADZIE (kafel czy przycisk), a bajty decydują o wydaniu: plik, którego
+   * nazwa kłamie, dostaje 415 i zostaje przy pobieraniu.
+   */
+  podglad: boolean;
 }
+
+/**
+ * Czy nazwa pliku obiecuje obraz, który przeglądarka narysuje.
+ *
+ * Rozszerzeń jest TRZY, nie sześć, i to jest przecięcie dwóch list. Allegro
+ * przyjmuje przy tym zasobie `png`, `gif`, `bmp`, `tiff`, `jpeg` i `pdf`
+ * (`PUT /sale/issues/attachments/{id}`), a `TYPY_PODGLADU` ze skrzynki
+ * wymienia cztery typy rastrowe. Wspólne są trzy — `webp` po stronie Allegro
+ * nie istnieje, a `bmp` i `tiff` przeglądarki rysują nierówno albo wcale.
+ * Reszta zostaje przy pobieraniu i to nie jest awaria, tylko odpowiedź.
+ */
+export const czyObrazZNazwy = (nazwa: string | null | undefined): boolean =>
+  /\.(jpe?g|png|gif)$/i.test((nazwa ?? "").trim());
 
 export interface WiadomoscReklamacji {
   id: number;
@@ -124,6 +148,16 @@ export interface WierszReklamacji {
   link: string | null;
   linkZamowienia: string | null;
   linkOferty: string | null;
+  /* ── Co widać na wierszu (0.223.0) ────────────────────────────────────────
+     Reklamacja dotyczy JEDNEJ oferty, więc obraz jest tu tożsamością sprawy,
+     a nie ozdobą: „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu,
+     a przy samym numerze wymaga otwarcia sprawy. */
+  ofertaNazwa: string | null;
+  /** Trzy stany, jak przy zwrocie od 0.214.0: `jest`, `brak`, `nieznane`. */
+  ofertaZdjecie: StanZdjeciaOferty;
+  /** Kartoteka POTWIERDZONA (`oferta_kartoteka`); propozycję liczy szczegół. */
+  twId: number | null;
+  twSymbol: string | null;
 }
 
 type Wiersz = Record<string, unknown>;
@@ -238,6 +272,15 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     link: linkReklamacji(tekst(w.reference_number) ?? String(w.external_id)),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
     linkOferty: linkOferty(tekst(w.offer_id)),
+    ofertaNazwa: tekst(w.oferta_nazwa),
+    /* Trzy stany, nie dwa (blizna 0.214.0). NULL znaczy „jeszcze nie wiemy" —
+       i to samo znaczy BRAK WIERSZA snapshotu przy złączeniu lewym, więc obie
+       drogi schodzą się w jednej odpowiedzi. Pusty łańcuch znaczy co innego:
+       „snapshot jest, Allegro zdjęcia tej oferty nie ma" — a tego nie naprawi
+       żadna synchronizacja. Kafel mówi w każdym z tych przypadków co innego. */
+    ofertaZdjecie: stanZdjeciaOferty(w.oferta_zdjecie as string | null | undefined),
+    twId: w.tw_id == null ? null : Number(w.tw_id),
+    twSymbol: tekst(w.tw_symbol),
   };
 }
 
@@ -255,8 +298,25 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
 export function listaReklamacji(
   database: Db = defaultDb(), teraz = Date.now(),
 ): WierszReklamacji[] {
-  const wiersze = database.prepare(`SELECT * FROM reklamacja_klienta
-    ORDER BY decyzja_do IS NULL, decyzja_do ASC, otwarto_at DESC`).all() as Wiersz[];
+  /* Dwa złączenia LEWE po tej samej ofercie: snapshot Allegro (nazwa i adres
+     zdjęcia) oraz potwierdzona kartoteka Subiekta. Oba po `channel_account_id`
+     RAZEM z `offer_id` — identyfikator oferty jest unikalny w obrębie konta,
+     nie globalnie, a dwa konta sprzedawcy to nie jest przypadek niemożliwy.
+
+     Propozycji kartoteki tu NIE liczymy. `kartotekaOferty` chodzi po pamięci
+     wskazań i po SKU, czyli kilka zapytań NA WIERSZ; kolejka ma pokazać, co
+     wiadomo na pewno, a proponowanie kartoteki jest pracą przy jednej
+     otwartej sprawie (szczegół). */
+  const wiersze = database.prepare(`
+    SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
+           k.tw_id, k.tw_symbol
+      FROM reklamacja_klienta r
+      LEFT JOIN offer_snapshot o
+        ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
+      LEFT JOIN oferta_kartoteka k
+        ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+     ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
+    .all() as Wiersz[];
   return wiersze.map((w) => zWiersza(w, teraz));
 }
 
@@ -284,6 +344,7 @@ export function czatReklamacji(database: Db, reklamacjaId: number): WiadomoscRek
     zalaczniki: zalaczniki.filter((z) => Number(z.wiadomosc_id) === Number(w.id))
       .map((z) => ({
         id: Number(z.id), wiadomoscId: Number(z.wiadomosc_id), nazwa: String(z.nazwa ?? ""),
+        podglad: czyObrazZNazwy(z.nazwa as string),
       })),
   }));
 }
@@ -295,6 +356,7 @@ export function zalacznikiSprawy(database: Db, reklamacjaId: number): ZalacznikR
       WHERE reklamacja_id=? AND wiadomosc_id IS NULL ORDER BY id`,
   ).all(reklamacjaId) as Wiersz[]).map((z) => ({
     id: Number(z.id), wiadomoscId: null, nazwa: String(z.nazwa ?? ""),
+    podglad: czyObrazZNazwy(z.nazwa as string),
   }));
 }
 
@@ -328,8 +390,19 @@ export interface SzczegolReklamacji {
 export function szczegolReklamacji(
   database: Db, id: number, teraz = Date.now(),
 ): SzczegolReklamacji {
-  const w = database.prepare("SELECT * FROM reklamacja_klienta WHERE id=?")
-    .get(id) as Wiersz | undefined;
+  /* Skład wiersza jest TEN SAM, co w kolejce — `listaReklamacji` z filtrem po
+     identyfikatorze. Druga funkcja składająca reklamację rozjechałaby się
+     z pierwszą przy pierwszym nowym polu; dokładnie tak zrobiono przy zwrocie
+     w rozmowie (0.221.0). */
+  const w = database.prepare(`
+    SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
+           k.tw_id, k.tw_symbol
+      FROM reklamacja_klienta r
+      LEFT JOIN offer_snapshot o
+        ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
+      LEFT JOIN oferta_kartoteka k
+        ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+     WHERE r.id=?`).get(id) as Wiersz | undefined;
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
   const konto = Number(w.channel_account_id);

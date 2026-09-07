@@ -4,6 +4,8 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
+import { typPodgladu } from "../services/skrzynka.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji,
   ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
@@ -95,12 +97,15 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
    * serwer stałby się bramką pod dowolny adres w internecie. Bearer firmy nie
    * wychodzi do przeglądarki, a pobranie zostawia ślad w audycie.
    *
-   * PODGLĄDU NA OSI NIE MA, i to nie jest przeoczenie. Skrzynka rysuje zdjęcie
-   * klienta wprost (0.218.0), ale stoi to na bramce `attachments[].status ===
-   * "SAFE"` z Centrum Wiadomości. `PostPurchaseIssueAttachment` ma w schemacie
-   * DWA pola — `fileName` i `url` — więc ani stanu, ani typu MIME nie znamy.
-   * Rysowanie cudzego pliku bez tej bramki byłoby cofnięciem tamtej decyzji,
-   * a nie jej rozszerzeniem. Dlatego `attachment` i nazwa, jak przed 0.218.0.
+   * DWA ADRESY, DWIE ODPOWIEDZI (0.223.0). Ta trasa oddaje PLIK: zawsze
+   * `application/octet-stream` i `content-disposition: attachment`, bo cudzy
+   * plik nie ma się otwierać w naszym origin, gdy agent wejdzie tu paskiem
+   * przeglądarki. Podgląd na osi ma własną trasę niżej, węższą bramkę i inne
+   * nagłówki. Rozstrzyganie obu przypadków jednym nagłówkiem znaczyłoby, że
+   * jeden z nich jest ustawiony źle — ta sama decyzja co przy skrzynce.
+   *
+   * Tu ZOSTAJE ślad w dzienniku, bo to jest czynność agenta: ktoś wziął plik
+   * na dysk. Podgląd rysuje się sam i śladu nie zostawia.
    */
   app.get<{ Params: { id: string; zid: string } }>(
     "/api/obsluga/reklamacje/:id/zalaczniki/:zid", async (req, reply) => {
@@ -118,6 +123,71 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
           .header("content-disposition",
             `attachment; filename="${z.nazwa.replace(/["\r\n]/g, "")}"`)
           .send(Buffer.from(odp));
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /**
+   * Podgląd załącznika WPROST na osi (0.223.0).
+   *
+   * ── DLACZEGO TERAZ, SKORO 0.222.0 MÓWIŁO „NIE DA SIĘ" ─────────────────────
+   * Tamto zdanie było prawdziwe co do POWODU i fałszywe co do wniosku.
+   * `PostPurchaseIssueAttachment` faktycznie nie ma ani `mimeType`, ani
+   * `status`, więc bramki ze skrzynki (0.218.0) nie da się tu POWTÓRZYĆ.
+   * Ale bramka pilnowała jednej rzeczy: żeby na osi rysowały się wyłącznie
+   * cztery typy rastrowe i nic innego. Tego można dopilnować bez pola —
+   * po BAJTACH, które i tak mamy w ręku, bo plik przechodzi przez nasz serwer.
+   *
+   * Nie zgadujemy więc kształtu i nie wymyślamy pola, którego nie ma:
+   * `rozpoznajMime` czyta sygnaturę pliku (ta sama funkcja, co przy zdjęciach
+   * z Subiekta), a `typPodgladu` przecina wynik z listą ze skrzynki. Przejdą
+   * trzy typy — JPEG, PNG i GIF — bo tyle jest we WSPÓLNEJ części tego, co
+   * Allegro przy tym zasobie przyjmuje (`png`, `gif`, `bmp`, `tiff`, `jpeg`,
+   * `pdf`) i co przeglądarka rysuje. BMP, TIFF i PDF zostają przy pobieraniu.
+   *
+   * NAZWA PLIKU NICZEGO NIE ROZSTRZYGA. Decyduje o UKŁADZIE po stronie panelu
+   * (`podglad` przy załączniku), a tutaj rozstrzygają bajty: plik nazwany
+   * `usterka.jpg`, który nie zaczyna się sygnaturą obrazu, dostaje 415.
+   *
+   * W sklepie z częściami zdjęcie pękniętego elementu bywa CAŁYM zgłoszeniem,
+   * a sonda widziała załączniki przy 57 sprawach na 100. Kazanie agentowi
+   * zapisywać każdy z nich na dysk to ta sama usterka, którą skrzynka
+   * naprawiła w 0.218.0.
+   *
+   * ETAG PRZED POBRANIEM OD ALLEGRO. Treść załącznika jest niezmienna (nowy
+   * plik to nowy wiersz), więc identyfikator wystarcza za odcisk — bez tego
+   * oś ciągnęłaby te same megabajty przy każdym przerysowaniu.
+   */
+  app.get<{ Params: { id: string; zid: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki/:zid/podglad", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+
+      const etag = `"rekl-zal-${Number(req.params.zid)}"`;
+      if (req.headers["if-none-match"] === etag) {
+        return reply.code(304).header("etag", etag).send();
+      }
+      try {
+        const z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
+        const odp = await pobierzZalacznik(z.url);
+        const bajty = Buffer.from(odp);
+        const typ = typPodgladu(rozpoznajMime(bajty));
+        if (typ === null) {
+          /* 415, nie 404: plik JEST, tylko nie jest obrazem, który narysujemy.
+             Panel spada wtedy na przycisk pobrania — to odpowiedź, nie awaria. */
+          return reply.code(415).send({
+            error: `Załącznik „${z.nazwa}" nie jest obrazem do pokazania na osi.`,
+          });
+        }
+        /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu sprawy, więc wpis
+           w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
+           ekran". Pobranie na dysk, czyli czynność agenta, ślad zostawia. */
+        return reply
+          .header("content-type", typ)
+          .header("x-content-type-options", "nosniff")
+          .header("content-disposition", "inline")
+          .header("etag", etag)
+          .header("cache-control", "private, max-age=86400")
+          .send(bajty);
       } catch (e) { return blad(reply, e); }
     });
 

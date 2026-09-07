@@ -156,6 +156,24 @@ export function useZdjecieZalacznika(id: number | null | undefined): string | nu
   return useObraz(id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`);
 }
 
+/**
+ * CZWARTE ŹRÓDŁO: załączniki reklamacji (0.223.0).
+ *
+ * Ta sama mechanika, co przy trzech poprzednich — sesja w nagłówku, pamięć
+ * negatywu, trzy pobrania naraz — więc wchodzi do WSPÓLNEJ kolejki, a nie
+ * obok niej. Osobne pobieranie rozjechałoby się z tym przy pierwszej
+ * poprawce; nagłówek tego pliku opisuje, ile razy już to kosztowało.
+ *
+ * `null` znaczy tu coś WIĘCEJ niż „brak zdjęcia": trasa oddaje 415, gdy plik
+ * obrazem nie jest, choć jego nazwa to obiecywała. Panel spada wtedy na
+ * przycisk pobrania, a pamięć negatywu pilnuje, żeby nie pytał drugi raz.
+ */
+export function useObrazZalacznikaReklamacji(
+  reklamacjaId: number, zalacznikId: number,
+): string | null | undefined {
+  return useObraz(`/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`);
+}
+
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */
 export function _wyczyscPamiecZdjec() {
   pamiec.clear();

@@ -3,6 +3,7 @@ import { ExternalLink, Undo2 } from "lucide-react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { czas, Przycisk, Skopiuj } from "../ui";
+import { Kafel, KafelOferty } from "../towar/Kafel";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 
 /* ── Kolumna dowodów o reklamacji ────────────────────────────────────────────
@@ -116,6 +117,31 @@ export function Dowody({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
       </Wiersz>
     </Sekcja>
 
+    {/* ── DWA OBRAZY, DWA ŹRÓDŁA (0.223.0) ──────────────────────────────────
+        Lewy to oferta Allegro: dokładnie to, co widział klient, kupując.
+        Prawy to kartoteka Subiekta: to, co leży u nas na półce. Przy
+        reklamacji różnica między nimi bywa całą sprawą — „niezgodny
+        z opisem" to siedemnaście spraw na sto w sondzie.
+
+        Kafel kartoteki milczy, dopóki wiązania nie ma: `twId: null` rysuje
+        znak „bez kartoteki", nie pustkę. To są dwa różne braki i dwa różne
+        znaki, dokładnie jak przy zwrocie od 0.203.0. */}
+    <Sekcja tytul="Towar">
+      <div className="flex items-start gap-3">
+        <KafelOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={72}
+          nazwa={r.ofertaNazwa ?? "Oferta"} symbol={r.offerId} />
+        <Kafel twId={r.twId} rozmiar={72} nazwa={r.ofertaNazwa ?? "Kartoteka"}
+          symbol={r.twSymbol} />
+        <div className="min-w-0 flex-1 text-sm">
+          <p className="font-semibold text-slate-800">{r.ofertaNazwa ?? "Oferty nie pobrano"}</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {r.twSymbol ?? szczegol.kartoteka?.symbol ?? szczegol.kartoteka?.powod
+              ?? "bez kartoteki"}
+          </p>
+        </div>
+      </div>
+    </Sekcja>
+
     <Sekcja tytul="Kontekst zakupu">
       <Wiersz etykieta="Zamówienie">
         {r.orderId
@@ -125,11 +151,6 @@ export function Dowody({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
       </Wiersz>
       <Wiersz etykieta="Oferta">
         {r.offerId ? <Link href={r.linkOferty}>{r.offerId}</Link> : "—"}
-      </Wiersz>
-      <Wiersz etykieta="Kartoteka">
-        {szczegol.kartoteka?.twId
-          ? `${szczegol.kartoteka.symbol ?? szczegol.kartoteka.twId}`
-          : (szczegol.kartoteka?.powod ?? "—")}
       </Wiersz>
     </Sekcja>
 

@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  adresZalacznika, BladReklamacji, dniDoTerminu, kubelek, licznikiKubelkow,
-  listaReklamacji, ReklamacjaConflict, stempelProwadzi, sygnaly,
+  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, kubelek,
+  licznikiKubelkow, listaReklamacji, ReklamacjaConflict, stempelProwadzi, sygnaly,
   szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
@@ -256,4 +256,76 @@ test("nieistniejąca reklamacja to 404, a nie pusty ekran", () => {
     assert.equal(e.kod, 404);
     return true;
   });
+});
+
+test("wiersz niesie ofertę i kartotekę — obraz jest tożsamością sprawy", () => {
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1' WHERE id=?").run(id);
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,
+    primary_image_url,synced_at)
+    VALUES (?,'of-1','Kosiarka NAC LS 46-450','NAC-4645',
+      'https://a.allegroimg.com/x/1.jpg','2026-09-07T08:00:00Z')`).run(konto);
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'NAC-4645','2026-09-07T08:00:00Z','A. L.')`)
+    .run(konto);
+
+  const [r] = listaReklamacji(d, TERAZ);
+  assert.equal(r.ofertaNazwa, "Kosiarka NAC LS 46-450");
+  assert.equal(r.ofertaZdjecie, "jest");
+  assert.equal(r.twId, 77, "kartoteka POTWIERDZONA wchodzi już do kolejki");
+  assert.equal(r.twSymbol, "NAC-4645");
+  /* Szczegół składa wiersz TĄ SAMĄ funkcją — druga rozjechałaby się z pierwszą
+     przy pierwszym nowym polu. */
+  assert.equal(szczegolReklamacji(d, id, TERAZ).reklamacja.ofertaNazwa,
+    "Kosiarka NAC LS 46-450");
+});
+
+test("trzy stany zdjęcia oferty, nie dwa", () => {
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-2' WHERE id=?").run(id);
+
+  /* Bez snapshotu: „nie wiadomo" — naprawi się samo następną synchronizacją. */
+  assert.equal(listaReklamacji(d, TERAZ)[0].ofertaZdjecie, "nieznane");
+
+  /* Snapshot z pustym adresem znaczy TO SAMO, i to jest zgodne ze
+     `stanZdjeciaOferty`: NULL w tej kolumnie mówi „jeszcze nie pobrano". */
+  d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,
+    primary_image_url,synced_at) VALUES (?,'of-2','Szarpak',NULL,'2026-09-07T08:00:00Z')`)
+    .run(konto);
+  assert.equal(listaReklamacji(d, TERAZ)[0].ofertaZdjecie, "nieznane");
+
+  /* Dopiero PUSTY ŁAŃCUCH znaczy „Allegro zdjęcia tej oferty nie ma" — i tego
+     nie naprawi żadna synchronizacja. Blizna 0.214.0: te trzy stany znaczyły
+     wcześniej jedno „bez zdjęcia". */
+  d.prepare("UPDATE offer_snapshot SET primary_image_url='' WHERE external_id='of-2'").run();
+  assert.equal(listaReklamacji(d, TERAZ)[0].ofertaZdjecie, "brak");
+});
+
+test("podgląd obiecuje się z nazwy pliku, a rozstrzygają bajty", () => {
+  /* Przecięcie dwóch list: Allegro przyjmuje png, gif, bmp, tiff, jpeg i pdf,
+     a przeglądarka rysuje cztery typy rastrowe. Wspólne są trzy. */
+  for (const n of ["usterka.jpg", "USTERKA.JPEG", "dowod.png", "film.gif"]) {
+    assert.equal(czyObrazZNazwy(n), true, n);
+  }
+  for (const n of ["paragon.pdf", "skan.tiff", "rysunek.bmp", "notatka.txt", "", null]) {
+    assert.equal(czyObrazZNazwy(n), false, String(n));
+  }
+});
+
+test("flaga podglądu jedzie przy KAŻDYM załączniku, w rozmowie i przy sprawie", () => {
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  const w = Number(d.prepare(
+    `INSERT INTO reklamacja_wiadomosc(reklamacja_id,external_id,autor_rola,tresc)
+     VALUES (?,'w-1','BUYER','patrz zdjęcie')`).run(id).lastInsertRowid);
+  d.prepare("INSERT INTO reklamacja_zalacznik(reklamacja_id,wiadomosc_id,nazwa,url) VALUES (?,?,?,?)")
+    .run(id, w, "usterka.jpg", "https://api.allegro.pl/sale/issues/attachments/a-1");
+  d.prepare("INSERT INTO reklamacja_zalacznik(reklamacja_id,wiadomosc_id,nazwa,url) VALUES (?,NULL,?,?)")
+    .run(id, "paragon.pdf", "https://api.allegro.pl/sale/issues/attachments/a-2");
+
+  const s = szczegolReklamacji(d, id, TERAZ);
+  assert.equal(s.czat[0].zalaczniki[0].podglad, true, "zdjęcie rysuje się na osi");
+  assert.equal(s.zalaczniki[0].podglad, false, "PDF zostaje przy pobieraniu");
 });

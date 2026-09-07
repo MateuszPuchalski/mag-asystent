@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import type { Rola } from "../services/users.js";
+import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
+import { typPodgladu } from "../services/skrzynka.js";
 
 process.env.DB_PATH = path.join(
   fs.mkdtempSync(path.join(os.tmpdir(), "wertis-reklamacje-tras-")), "t.db");
@@ -75,6 +77,7 @@ const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/reklamacje" },
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}` },
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}` },
+  { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad` },
   { method: "POST" as const, url: "/api/obsluga/reklamacje/synchronizuj" },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
@@ -206,4 +209,52 @@ test("synchronizacja bez sparowanego konta mówi zdaniem, a nie kodem", async ()
     method: "POST", url: "/api/obsluga/reklamacje/synchronizuj", headers: naglowki });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /sparowane/);
+});
+
+test("podgląd rozstrzygają BAJTY, nie pole, którego Allegro nie przysyła", () => {
+  /* `PostPurchaseIssueAttachment` ma dwa pola — `fileName` i `url` — więc
+     bramki `SAFE` ze skrzynki nie da się tu powtórzyć. Powtarzamy jej SKUTEK:
+     na oś idą wyłącznie typy, które przeglądarka narysuje, a rozpoznaje je
+     sygnatura pliku.
+
+     Przechodzą TRZY, bo tyle jest we wspólnej części tego, co Allegro przy
+     tym zasobie przyjmuje (png, gif, bmp, tiff, jpeg, pdf) i co rysuje
+     przeglądarka (`TYPY_PODGLADU`). */
+  const sygnatura = (b: number[]) => typPodgladu(rozpoznajMime(Buffer.from(b)));
+  assert.equal(sygnatura([0xff, 0xd8, 0xff, 0xe0]), "image/jpeg");
+  assert.equal(sygnatura([0x89, 0x50, 0x4e, 0x47]), "image/png");
+  assert.equal(sygnatura([0x47, 0x49, 0x46, 0x38]), "image/gif");
+
+  /* BMP i TIFF Allegro przyjmuje, a przeglądarki rysują je nierówno albo
+     wcale — zostają przy pobieraniu i to jest odpowiedź, nie awaria. */
+  assert.equal(sygnatura([0x42, 0x4d, 0x00, 0x00]), null, "BMP nie idzie na oś");
+  assert.equal(sygnatura([0x49, 0x49, 0x2a, 0x00]), null, "TIFF nie idzie na oś");
+  /* PDF to najczęstszy załącznik niebędący zdjęciem — paragon albo faktura. */
+  assert.equal(sygnatura([0x25, 0x50, 0x44, 0x46]), null, "PDF nie idzie na oś");
+  /* Plik nazwany `usterka.jpg`, który obrazem nie jest, dostaje 415: nazwa
+     decyduje o UKŁADZIE, bajty o wydaniu. */
+  assert.equal(sygnatura([0x3c, 0x73, 0x76, 0x67]), null, "SVG też nie — to dokument ze skryptem");
+});
+
+test("podgląd cudzej sprawy nie wychodzi tą trasą", async () => {
+  const { naglowki } = login("biuro", "Ala dziewiąta");
+  const obca = Number(db().prepare(`INSERT INTO reklamacja_klienta(channel_account_id,
+    external_id,otwarto_at,synced_at)
+    SELECT channel_account_id,'i-3','2026-09-06T10:00:00Z','2026-09-07T10:00:00Z'
+      FROM reklamacja_klienta WHERE id=?`).run(reklamacja).lastInsertRowid);
+  const r = await app.inject({
+    method: "GET", url: `/api/obsluga/reklamacje/${obca}/zalaczniki/${zalacznik}/podglad`,
+    headers: naglowki });
+  assert.equal(r.statusCode, 404);
+});
+
+test("ETag odpowiada 304 PRZED pójściem do Allegro", async () => {
+  /* Bez tego oś ciągnęłaby te same megabajty przy każdym przerysowaniu.
+     Że 304 wraca bez sieci, widać po tym, że test przechodzi bez konta
+     Allegro — gdyby trasa pytała Allegro, poleciałby błąd. */
+  const { naglowki } = login("biuro", "Ala dziesiąta");
+  const r = await app.inject({
+    method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`,
+    headers: { ...naglowki, "if-none-match": `"rekl-zal-${zalacznik}"` } });
+  assert.equal(r.statusCode, 304);
 });

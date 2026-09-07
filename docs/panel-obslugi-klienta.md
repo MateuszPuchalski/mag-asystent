@@ -2075,6 +2075,14 @@ zwrocie w 0.180.0).
 Rola autora jest podpisem, a nie ozdobą: rozmowa bywa trójstronna i bez
 wyraźnego podpisu agent odpowiadałby doradcy tak, jak odpowiada klientowi.
 
+**Zdjęcia są w trzech miejscach (0.223.0) i w każdym z innego powodu.**
+Wiersz kolejki niesie obraz OFERTY, bo reklamacja dotyczy jednej rzeczy
+i „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu. Kolumna dowodów
+stawia obok siebie ofertę i kartotekę — przy „niezgodny z opisem", czyli
+siedemnastu sprawach na sto, różnica między nimi bywa całą sprawą. Oś rozmowy
+rysuje zdjęcia klienta wprost, bo zdjęcie pękniętego elementu bywa całym
+zgłoszeniem; typ rozstrzyga sygnatura pliku, nie jego nazwa.
+
 Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
 przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
 jak całą.
@@ -2253,5 +2261,6 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dyskusje (`type: "DISPUTE"`) | **poza zakresem** | decyzja właściciela z 6 września 2026; liczba odsianych na pasku |
 | Odpowiedź w czacie reklamacji | **projekt** | przyrost drugi, `POST /sale/issues/{id}/message` |
 | Werdykt reklamacji do Allegro | **projekt** | przyrost trzeci, `POST /sale/issues/{id}/status`, jedenaście wartości |
-| Podgląd załącznika reklamacji na osi | **poza zasięgiem** | schemat nie ma pola `status`, więc bramki `SAFE` nie da się postawić |
+| Podgląd załącznika reklamacji na osi | **działa** od 0.223.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF |
+| Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

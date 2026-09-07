@@ -23,6 +23,8 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   ostatniaWiadomoscAt: "2026-09-07T08:00:00.000Z", otwartoAt: "2026-09-06T10:00:00.000Z",
   prowadzi: null, prowadziAt: null, notatka: null, wersja: 1,
   kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,
+  ofertaNazwa: "Kosiarka spalinowa NAC LS 46-450", ofertaZdjecie: "brak",
+  twId: null, twSymbol: null,
   ...n,
 });
 
@@ -35,6 +37,28 @@ describe("Kolejka reklamacji", () => {
        człowiek przy biurku, a nie integrator. */
     expect(screen.getByText(/usterka przy używaniu/)).toBeInTheDocument();
     expect(screen.getByText(/zwrot pieniędzy · 129,99 PLN/)).toBeInTheDocument();
+  });
+
+  it("wiersz niesie ZDJĘCIE oferty i jej nazwę — to tożsamość sprawy", () => {
+    /* „Pękła obudowa" przy zdjęciu kosiarki czyta się w biegu; przy samym
+       numerze wymaga otwarcia sprawy. Kafel ma stały rozmiar także bez
+       obrazu — rosnący przesuwałby wiersze pod kursorem. */
+    render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByText("Kosiarka spalinowa NAC LS 46-450")).toBeInTheDocument();
+    /* Kafel mówi, w którym z TRZECH stanów jest (blizna 0.214.0): tu Allegro
+       zdjęcia tej oferty nie ma i to się samo nie naprawi. */
+    expect(screen.getByTitle("Allegro nie podało zdjęcia tej oferty")).toBeInTheDocument();
+  });
+
+  it("bez snapshotu oferty wiersz nie udaje, że zna towar", () => {
+    render(<Kolejka reklamacje={[rek({ ofertaNazwa: null, ofertaZdjecie: "nieznane" })]}
+      wybrana={null} onWybierz={() => {}} />);
+    expect(screen.queryByText("Kosiarka spalinowa NAC LS 46-450")).not.toBeInTheDocument();
+    /* „Czekam na Allegro" to inny stan niż „Allegro zdjęcia nie ma" — i kafel
+       jest jedynym miejscem, w którym widać, który to. */
+    expect(screen.getByTitle(/jeszcze nie pobrano/)).toBeInTheDocument();
+    /* Numer i powód zostają — wiersz ma dalej mówić, o jaką sprawę chodzi. */
+    expect(screen.getByText("123/2026")).toBeInTheDocument();
   });
 
   it("nieznany powód zostaje SUROWY, zamiast zniknąć", () => {

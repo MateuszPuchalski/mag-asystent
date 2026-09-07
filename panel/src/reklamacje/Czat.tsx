@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Paperclip } from "lucide-react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
+import { useObrazZalacznikaReklamacji } from "../towar/useZdjecie";
+import { Powiekszenie } from "../towar/Powiekszenie";
 import { czas } from "../ui";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
@@ -21,22 +23,65 @@ const ROLE: Record<string, { etykieta: string; klasa: string; nasza: boolean }> 
   FULFILLMENT: { etykieta: "Magazyn Allegro", klasa: "bg-slate-50 border-slate-200", nasza: false },
 };
 
+/** Przycisk pobrania — jedyna droga dla plików, których nie narysujemy. */
+function DoPobrania({ reklamacjaId, z }: { reklamacjaId: number; z: ZalacznikReklamacji }) {
+  /* PRZYCISK, nie odnośnik. Sesja jedzie nagłówkiem `x-session`, którego
+     `<a href>` nie niesie — pobranie załącznika rozmowy było z tego powodu
+     zepsute od 0.155.0 do 0.219.1 i wyglądało, jakby działało. */
+  return <button type="button"
+    onClick={() => { void pobierzZalacznik(reklamacjaId, z.id, z.nazwa); }}
+    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white
+      px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+    <Paperclip size={12} />{z.nazwa || "załącznik"}
+  </button>;
+}
+
+/**
+ * Zdjęcie klienta WPROST na osi (0.223.0).
+ *
+ * W sklepie z częściami zdjęcie pękniętego elementu bywa CAŁYM zgłoszeniem,
+ * a nazwa pliku nie mówi o nim nic. Ta sama lekcja, którą skrzynka kupiła
+ * w 0.218.0 — tylko że tam bramką był stan `SAFE` z Centrum Wiadomości,
+ * a tu rozstrzygają BAJTY po stronie serwera.
+ *
+ * SPADEK NA PRZYCISK JEST CZĘŚCIĄ PROJEKTU, nie obsługą awarii. `podglad`
+ * to podpowiedź z NAZWY pliku, więc bywa nieprawdziwa: plik nazwany
+ * `usterka.jpg`, który obrazem nie jest, dostaje z trasy 415, hak oddaje
+ * `null`, a kafel zamienia się w przycisk pobrania. Ekran nie ma prawa
+ * pokazać zepsutej ikony obrazu — to była pierwsza wersja podglądu
+ * w 0.218.0 i właśnie tak wyglądała u właściciela.
+ */
+function ZdjecieZalacznika({ reklamacjaId, z }: {
+  reklamacjaId: number; z: ZalacznikReklamacji;
+}) {
+  const [powiekszone, setPowiekszone] = useState(false);
+  const url = useObrazZalacznikaReklamacji(reklamacjaId, z.id);
+  if (url === null) return <DoPobrania reklamacjaId={reklamacjaId} z={z} />;
+  return <>
+    <button type="button" onClick={() => url && setPowiekszone(true)}
+      title={`${z.nazwa} — kliknij, żeby powiększyć`}
+      className="block overflow-hidden rounded border border-slate-200 bg-slate-100">
+      {/* Stały rozmiar także PRZED pobraniem: kafel, który rośnie po
+          doładowaniu, przesuwa treść pod kursorem. */}
+      {url
+        ? <img src={url} alt={z.nazwa} loading="lazy"
+            className="h-32 w-32 object-cover" />
+        : <span className="flex h-32 w-32 items-center justify-center text-xs text-slate-400">
+            wczytuję…</span>}
+    </button>
+    {powiekszone && url && <Powiekszenie url={url} nazwa={z.nazwa} symbol={null}
+      zamknij={() => setPowiekszone(false)} />}
+  </>;
+}
+
 function Zalaczniki({ reklamacjaId, lista }: {
   reklamacjaId: number; lista: ZalacznikReklamacji[];
 }) {
   if (!lista.length) return null;
-  return <div className="mt-2 flex flex-wrap gap-2">
-    {lista.map((z) => (
-      /* PRZYCISK, nie odnośnik. Sesja jedzie nagłówkiem `x-session`, którego
-         `<a href>` nie niesie — pobranie załącznika rozmowy było z tego powodu
-         zepsute od 0.155.0 do 0.219.1 i wyglądało, jakby działało. */
-      <button key={z.id} type="button"
-        onClick={() => { void pobierzZalacznik(reklamacjaId, z.id, z.nazwa); }}
-        className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white
-          px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-        <Paperclip size={12} />{z.nazwa || "załącznik"}
-      </button>
-    ))}
+  return <div className="mt-2 flex flex-wrap items-start gap-2">
+    {lista.map((z) => z.podglad
+      ? <ZdjecieZalacznika key={z.id} reklamacjaId={reklamacjaId} z={z} />
+      : <DoPobrania key={z.id} reklamacjaId={reklamacjaId} z={z} />)}
   </div>;
 }
 
