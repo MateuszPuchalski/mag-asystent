@@ -293,6 +293,7 @@ ale nie ma prawa kupić ich drugi raz.
 | 0.151.0 | kształt odczytu Allegro wymyślony razem z kodem, pod etykietą „raport z produkcji" | kształt czyta się ze `swagger.yaml` w repo; znacznik mierzy to, komu się przyznano, a nie to, co sprawdzone |
 | 0.152.0 | encje HTML DRUGI RAZ — `odkodujEncje` czekała gotowa z testami, a mapowanie jej nie wołało | odtrutka bez wołającego to odtrutka nieużyta; przepisując funkcję od nowa, sprawdź, co po starej zostało |
 | 0.152.0 | 62 przebiegi pod słowem `failed`, gdy serwer znał zdanie „konto niepołączone" | powód zapisuje się SŁOWEM, nie tylko kodem HTTP; wiersz nazwany „połączenie" pokazuje połączenie |
+| 0.224.1 | flaga jawnej zgody ginęła na trasie, choć serwis ją obsługiwał i panel ją wysyłał | pole nieopisane w typie `Body` znika po cichu; flagi ciała testuje się na TRASIE, nie tylko w serwisie |
 | 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy, które zostają) |
 
 ## Polityka danych skrzynki (0.143.0)

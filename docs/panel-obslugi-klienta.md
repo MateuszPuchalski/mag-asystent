@@ -2194,6 +2194,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Skrzynka wzmianek („wspomniano o mnie") | **działa** od 0.160.0 | `services/wzmianki.ts`, `panel/src/ekrany/Wzmianki.tsx` |
 | Oś rozmowy w kolejności czasu | **działa** od 0.157.0 | do 0.156.0 wyniki zadań doklejały się na końcu |
 | Obecność i „pisze" | **na ekranie** od 0.190.0 | serwer od 0.144.0; kolejka pokazuje trzymającego, pasek w rozmowie — resztę i piszących (`skrzynka/Obecni.tsx`, `usePisze`) |
+| Jawna zgoda „odpowiedz mimo to" przy cudzym uchwycie | **działa** od 0.224.1 | flaga `mimoObecnosci` w ciele wysyłki; do 0.224.0 trasa jej nie deklarowała i gubiła, więc miękka blokada działała jak twarda |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |

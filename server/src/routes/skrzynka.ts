@@ -481,10 +481,17 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
 
   /* Wysyłka odpowiedzi (§8.5). Warunki „zalogowany agent" i „uprawnienie""
      domyka `odmowa()`; resztą — przypisaniem, wersją, świeżością, kluczem
-     idempotencji i audytem — zajmuje się serwis. */
+     idempotencji i audytem — zajmuje się serwis.
+
+     OBIE FLAGI JAWNEJ ZGODY MUSZĄ BYĆ WYMIENIONE Z NAZWY — w typie i niżej.
+     Pole, którego trasa nie deklaruje, ginie po cichu: `mimoObecnosci` jechał
+     tędy od 0.190.0 i nie dojeżdżał, więc miękka blokada obecności zachowywała
+     się jak twarda przez pełne TTL uchwytu (poprawione w 0.224.1). Zgoda
+     wyrażona przez człowieka i zgubiona przez kod jest gorsza niż brak
+     przycisku. */
   app.post<{ Params: { id: string }; Body: {
     body?: string; expectedVersion?: number; expectedLastMessageId?: number | null;
-    mimoNowejWiadomosci?: boolean;
+    mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
   } }>("/api/conversations/:id/send", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const s = sesjaZadania()!;
@@ -496,6 +503,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         expectedVersion: Number(req.body?.expectedVersion),
         expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
         mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
+        mimoObecnosci: Boolean(req.body?.mimoObecnosci),
       });
     } catch (e) { return konflikt(reply, e); }
   });

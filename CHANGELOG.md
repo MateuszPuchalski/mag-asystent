@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.224.1 — 7 września 2026
+
+**Miękka blokada obecności zachowywała się jak twarda.** Gdy przy rozmowie
+siedzi kolega, wysyłka odpada z 409 i nazwiskiem — a ekran daje jawne
+„Odpowiedz mimo to". Ten przycisk nie działał od chwili, gdy stanął na ekranie
+w 0.190.0: kliknięcie wracało z tym samym 409, a agent był zablokowany przez
+pełne TTL uchwytu.
+
+Flaga `mimoObecnosci` ginęła na TRASIE. Serwis obsługiwał ją od 0.159.0 i miał
+na nią test, panel ją wysyłał — ale trasa wysyłki ani nie deklarowała pola
+w typie ciała, ani nie podawała go niżej. Pole nieopisane w `Body` znika po
+cichu, bez żadnego śladu w logu.
+
+Dwie linijki poprawki i jedno pytanie warte zapisania: **dlaczego to przeszło.**
+Test serwisu woła funkcję wprost, z pominięciem HTTP. Strażnik tras sprawdza,
+czy każdy adres wołany z panelu ma trasę na serwerze — nie sprawdza pól ciała.
+Oba zestawy testów były zielone przez cztery wydania.
+
+Trasa dostała więc test na TRASIE, dowodzący przez zachowanie: bez flagi cudzy
+uchwyt daje 409 z nazwiskiem, z flagą bramka przepuszcza. Ten sam wzorzec stoi
+od 0.224.0 przy odpowiedzi w reklamacji — napisany właśnie dlatego, że tę
+usterkę widać było w skrzynce.
+
+To jest brat blizny 0.152.0: odtrutka istniała, miała testy i nie była wołana.
+
+---
+
+
 ## 0.224.0 — 7 września 2026
 
 **Odpowiedź w reklamacji wychodzi z panelu.** Przez dwa wydania ekran mówił
