@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import type { RodzajDowodu, RodzajIdentyfikatora, Zastosowanie } from "../api/typy";
+import type { Pasowanie, PasowaniaTowaru, RodzajDowodu, RodzajIdentyfikatora, TrafieniePasowania, Zastosowanie } from "../api/typy";
 import {
-  useDodajDowod, useDodajIdentyfikator, useIdentyfikatory, useWiedzaTowaru, useWycofajZastosowanie,
+  useDodajDowod, useDodajIdentyfikator, useIdentyfikatory, useWiedzaTowaru, useWycofajPasowanie,
+  useWycofajZastosowanie, useZaproponujPasowanie,
 } from "../api/wiedza";
+import { PasowanieForm } from "./PasowanieForm";
 import { Pole, Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import {
@@ -25,6 +27,7 @@ export function WiedzaTowaru() {
       <Sekcja tytul="Potwierdzone zastosowania" lista={wiedza.data.potwierdzone} pusto="brak potwierdzonych zastosowań" />
       <Sekcja tytul="Nie pasuje do" lista={wiedza.data.negatywne} pusto="brak negatywnych dopasowań" negatyw />
       <Sekcja tytul="Czeka w kolejce" lista={wiedza.data.propozycje} pusto="nic nie czeka" tylkoOdczyt />
+      {wiedza.data.pasowania && <Pasowania towar={{ twId: towar!.id, symbol: towar!.sym, nazwa: towar!.name }} dane={wiedza.data.pasowania} />}
     </>}
     {towar && <Identyfikatory twId={towar.id} />}
   </div>;
@@ -124,4 +127,82 @@ function Wpis({ z, tylkoOdczyt }: { z: Zastosowanie; tylkoOdczyt: boolean }) {
     </div>}
     {blad && <p className="mt-1 text-xs text-red-700">{blad.message}</p>}
   </li>;
+}
+
+/**
+ * Pasowania część↔część (§11.2): do czego ta część pasuje i co pasuje do
+ * niej — wprost i przez zamiennik (z dopiskiem, bo przechodnie nigdy nie jest
+ * „potwierdzone"), negatywy i to, co czeka. Tu też dopisuje się nową parę,
+ * z radiem kierunku, bo ekran nie wie, czy patrzy na uszczelkę, czy na gaźnik.
+ */
+function Pasowania({ towar, dane }: { towar: { twId: number; symbol: string; nazwa: string }; dane: PasowaniaTowaru }) {
+  const zaproponuj = useZaproponujPasowanie();
+  const [dopisuje, setDopisuje] = useState(false);
+  const [ok, setOk] = useState("");
+  return <section aria-label="Pasowania">
+    <b className="text-xs uppercase tracking-wide text-slate-500">Pasowania części</b>
+    <Trafienia tytul="Ta część pasuje do" lista={dane.pasujeDo} pusto="nie wiemy, do czego pasuje" strona="doCzego" />
+    <Trafienia tytul="Do tej części pasują" lista={dane.pasujace} pusto="nie wiemy, co do niej pasuje" strona="czesc" />
+    {dane.negatywne.length > 0 && <ul className="mt-1 space-y-1">
+      {dane.negatywne.map((p) => <WpisPasowania key={p.id} p={p} negatyw />)}
+    </ul>}
+    {dane.propozycje.length > 0 && <p className="mt-1 text-xs text-slate-500">
+      Czeka w kolejce: {dane.propozycje.map((p) => `${p.czesc.symbol} → ${p.doCzego.symbol}`).join(" · ")}</p>}
+    <div className="mt-2">
+      {ok && <p className="mb-1 text-xs text-emerald-800">{ok}</p>}
+      {!dopisuje
+        ? <Przycisk className="text-xs" onClick={() => { setDopisuje(true); setOk(""); }}>Dopisz pasowanie</Przycisk>
+        : <PasowanieForm kartoteka={towar} trwa={zaproponuj.isPending} blad={(zaproponuj.error as Error | null)?.message}
+            onAnuluj={() => setDopisuje(false)}
+            onWyslij={(v) => zaproponuj.mutate(v, { onSuccess: (z) => { setDopisuje(false);
+              setOk(`Propozycja ${z.czesc.symbol} → ${z.doCzego.symbol} czeka w kolejce.`); } })} />}
+    </div>
+  </section>;
+}
+
+function Trafienia({ tytul, lista, pusto, strona }: {
+  tytul: string; lista: TrafieniePasowania[]; pusto: string; strona: "czesc" | "doCzego";
+}) {
+  return <div className="mt-1">
+    <span className="text-xs font-semibold text-slate-600">{tytul}</span>
+    {lista.length === 0
+      ? <p className="text-sm text-slate-500">{pusto}</p>
+      : <ul className="mt-1 space-y-1">{lista.map((t) => <li key={`${t.czesc.twId}-${t.doCzego.twId}`}
+          className="flex flex-wrap items-center gap-2 rounded border border-slate-200 px-2 py-1 text-sm">
+          <b className="font-mono">{t[strona].symbol}</b>
+          <span className="text-slate-600">{t[strona].nazwa}</span>
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
+          <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${t.pewnosc === "potwierdzone"
+            ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.pewnosc}</span>
+          {t.przezZamiennik && <span className="text-[11px] text-slate-500">przez zamiennik</span>}
+          <span className="basis-full text-[11px] text-slate-500">{t.zdanie}</span>
+          {!t.przezZamiennik && <Wycofanie p={t.pasowanie} />}
+        </li>)}</ul>}
+  </div>;
+}
+
+function WpisPasowania({ p, negatyw }: { p: Pasowanie; negatyw: boolean }) {
+  return <li className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1 text-sm ${negatyw ? "border-red-200" : "border-slate-200"}`}>
+    <b className="font-mono">{p.czesc.symbol}</b><span className="text-slate-400">⇏</span><b className="font-mono">{p.doCzego.symbol}</b>
+    {p.zdaniePowodu && <span className="text-red-900">{p.zdaniePowodu}</span>}
+    <span className="basis-full text-[11px] text-slate-500">{p.zdanieZrodla}</span>
+    <Wycofanie p={p} />
+  </li>;
+}
+
+/** Wycofanie ZATWIERDZONEGO pasowania: negatyw wyłącznie z powodem (§14.2). */
+function Wycofanie({ p }: { p: Pasowanie }) {
+  const wycofaj = useWycofajPasowanie();
+  const [cofam, setCofam] = useState(false);
+  const [powod, setPowod] = useState("");
+  const negatyw = p.polaryzacja === "nie_pasuje";
+  if (!cofam) return <Przycisk className="ml-auto text-xs" onClick={() => setCofam(true)}>Wycofaj</Przycisk>;
+  return <span className="flex basis-full flex-wrap items-center gap-2">
+    <Pole className="w-64" aria-label={`Powód wycofania: ${p.czesc.symbol} → ${p.doCzego.symbol}`} value={powod}
+      placeholder={negatyw ? "powód — negatyw nie schodzi bez powodu" : "powód (opcjonalnie)"} onChange={(e) => setPowod(e.target.value)} />
+    <Przycisk wariant="glowny" className="text-xs" disabled={wycofaj.isPending || (negatyw && !powod.trim())}
+      onClick={() => wycofaj.mutate({ id: p.id, powod: powod.trim() || null }, { onSuccess: () => setCofam(false) })}>Potwierdź wycofanie</Przycisk>
+    <Przycisk className="text-xs" onClick={() => setCofam(false)}>Wróć</Przycisk>
+    {wycofaj.error && <span className="text-xs text-red-700">{(wycofaj.error as Error).message}</span>}
+  </span>;
 }

@@ -2,14 +2,16 @@ import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy } from "../api/typy";
+import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru, TrafieniePasowania } from "../api/typy";
 
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({
   useKartaTowaru: (twId: number | null) => karta(twId),
   useWskazKartoteke: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }));
-vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => ({ data: undefined }) }));
+type WiedzaAtrapa = { data: undefined | { potwierdzone: never[]; negatywne: never[]; propozycje: never[]; pasowania: PasowaniaTowaru } };
+const wiedza = vi.fn<() => WiedzaAtrapa>(() => ({ data: undefined }));
+vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => wiedza() }));
 vi.mock("../towar/Zdjecie", () => ({ Zdjecie: () => <div data-testid="zdjecie" /> }));
 vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 
@@ -150,6 +152,78 @@ describe("towar przy rozmowie", () => {
       pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
     })} />);
     expect(screen.getAllByRole("button", { name: /wstaw|szkic/i }).length).toBe(1);
+  });
+
+  /* ── Pasowania część↔część (0.230.0) ───────────────────────────────────
+     Blok jest WYŁĄCZNIE odczytem: przy gaźniku „do tej części pasują", przy
+     uszczelce „ta część pasuje do". Trafienie przez zamiennik nosi dopisek,
+     bo pewność „prawdopodobne" bez powodu wygląda jak brak dowodu. */
+  const trafienie = (n: Partial<TrafieniePasowania> = {}): TrafieniePasowania => ({
+    czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160" },
+    doCzego: { twId: 7701, symbol: "NOZ-STIGA-43", nazwa: "Nóż do kosiarki 43 cm" },
+    pasowanie: { id: 5, czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160" },
+      doCzego: { twId: 7701, symbol: "NOZ-STIGA-43", nazwa: "Nóż do kosiarki 43 cm" },
+      rola: "uszczelka", nazwaRoli: "uszczelka", pozycja: "od strony filtra", polaryzacja: "pasuje",
+      powodNegatywny: null, zdaniePowodu: null, stan: "zatwierdzone", zrodlo: "reczne",
+      rodzajDowodu: "katalog_dostawcy", nazwaRodzajuDowodu: "katalog dostawcy", dowodTresc: "katalog, str. 12",
+      dowodLink: null, komentarz: null, conversationId: null, zastepujeId: null, zaproponowal: "Anna",
+      zaproponowanoAt: "2026-09-07T08:00:00Z", rozstrzygnal: "Anna", rozstrzygnietoAt: "2026-09-07T09:00:00Z",
+      powodRozstrzygniecia: null, pewnosc: "potwierdzone",
+      zdanieZrodla: "uszczelka (od strony filtra) LC170430140-0001 pasuje do NOZ-STIGA-43 — katalog dostawcy, 7.09.2026, Anna" },
+    przezZamiennik: null, pewnosc: "potwierdzone",
+    zdanie: "uszczelka (od strony filtra) LC170430140-0001 pasuje do NOZ-STIGA-43 — katalog dostawcy, 7.09.2026, Anna",
+    ...n,
+  });
+
+  it("pasowania z wiedzy stoją przy kartotece z obu stron, przechodnie z dopiskiem", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    /* `mockReturnValue`, nie `Once`: hook woła się przy każdym renderze. */
+    wiedza.mockReturnValue({ data: { potwierdzone: [], negatywne: [], propozycje: [], pasowania: {
+      pasujace: [trafienie(), trafienie({
+        czesc: { twId: 812, symbol: "06-12038", nazwa: "Uszczelka gaźnika" }, pewnosc: "prawdopodobne",
+        przezZamiennik: "LC170430140-0001 podaje 06-12038 jako zamiennik w opisie",
+        zdanie: "06-12038 to zamiennik LC170430140-0001, która pasuje do NOZ-STIGA-43 — prawdopodobne",
+      })],
+      pasujeDo: [trafienie({
+        czesc: { twId: 7701, symbol: "NOZ-STIGA-43", nazwa: "Nóż do kosiarki 43 cm" },
+        doCzego: { twId: 900, symbol: "W09-0211", nazwa: "Gaźnik GX160" },
+        zdanie: "NOZ-STIGA-43 pasuje do W09-0211 — katalog dostawcy",
+      })],
+      negatywne: [], propozycje: [],
+    } } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByText("Do tej części pasują")).toBeInTheDocument();
+    expect(screen.getByText("LC170430140-0001")).toBeInTheDocument();
+    expect(screen.getByText("06-12038")).toBeInTheDocument();
+    expect(screen.getByText("przez zamiennik")).toBeInTheDocument();
+    expect(screen.getByText("Ta część pasuje do")).toBeInTheDocument();
+    expect(screen.getByText("W09-0211")).toBeInTheDocument();
+    /* Odczyt, nie edycja: dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */
+    expect(screen.queryByRole("button", { name: /Zaproponuj pasowanie/ })).toBeNull();
+  });
+
+  it("bez pasowań blok wiedzy nie zajmuje kolumny", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    wiedza.mockReturnValue({ data: { potwierdzone: [], negatywne: [], propozycje: [],
+      pasowania: { pasujace: [], pasujeDo: [], negatywne: [], propozycje: [] } } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.queryByText(/pasowania części/i)).toBeNull();
+  });
+
+  /* Zamienniki jechały w JSON-ie od dawna i rysował je tylko kolektor. Agent,
+     który widzi kandydata „przez zamiennik EX055", musi mieć skąd ten EX055 wziąć. */
+  it("zamienniki z opisu widać w tabeli: nasze symbolem, obce licznikiem", () => {
+    wiedza.mockReturnValue({ data: undefined });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA,
+      zamienniki: { znane: [{ id: 5, sym: "EX055", name: "Gaźnik" }, { id: 6, sym: "10-02001", name: "Gaźnik" }], obce: ["16100-ZH8-W61", "520070"] } } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByText("EX055 · 10-02001 (+2 numery obce w opisie)")).toBeInTheDocument();
   });
 
   it("każdy fakt magazynowy jest podpisany źródłem", () => {

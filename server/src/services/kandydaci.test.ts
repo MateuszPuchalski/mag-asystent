@@ -19,6 +19,7 @@ let kandydaciDoboru: typeof import("./kandydaci.js").kandydaciDoboru;
 let zapiszDane: typeof import("./dobor.js").zapiszDane;
 let W: typeof import("./wiedza.js");
 let S: typeof import("./silniki.js");
+let P: typeof import("./pasowania.js");
 let config: typeof import("../config.js").config;
 let subiekt: typeof import("../context.js").subiekt;
 
@@ -38,6 +39,7 @@ before(async () => {
   ({ zapiszDane } = await import("./dobor.js"));
   W = await import("./wiedza.js");
   S = await import("./silniki.js");
+  P = await import("./pasowania.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
@@ -59,7 +61,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia",
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia",
     "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -88,7 +90,7 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   const przed = (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
   const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
   assert.deepEqual(kandydaci, []);
-  assert.equal(drogi.length, 9, "raport ma KAŻDY szczebel §11.2");
+  assert.equal(drogi.length, 10, "raport ma KAŻDY szczebel §11.2");
   for (const d of drogi) {
     assert.equal(d.sprawdzona, false, `${d.droga} udaje sprawdzony`);
     assert.ok(d.powod, `${d.droga} pominięty bez powodu`);
@@ -96,6 +98,7 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   assert.match(szczebel(drogi, "oferta").powod!, /nie jest powiązana z ofertą/);
   assert.match(szczebel(drogi, "zastosowanie").powod!, /marki i modelu/);
   assert.match(szczebel(drogi, "silnik").powod!, /marki i modelu/);
+  assert.match(szczebel(drogi, "pasowanie").powod!, /nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty/);
   assert.match(szczebel(drogi, "oem").powod!, /numeru OEM/);
   assert.match(szczebel(drogi, "pelnotekst").powod!, /nazwy części ani maszyny/);
   /* Patrzenie na kandydatów niczego nie zapisuje — ani wiersza doboru, ani zdarzenia. */
@@ -390,4 +393,67 @@ test("propozycja zabudowy i zabudowa wycofana NIE karmią szczebla", () => {
   S.wycofajZabudowe(zab.id, "pomyłka: to inna wersja kosiarki", biuro);
   /* Wycofanie zabudowy gasi CAŁĄ gałąź naraz — dlatego wymaga powodu. */
   assert.equal(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik").sprawdzona, false);
+});
+
+/* ── Szczebel „pasowanie": części do KOTWICY (uszczelka do gaźnika) ──────────
+   Kotwica to kartoteka, którą agent WSKAZAŁ symbolem/numerem albo kartoteka
+   oferty — nigdy treść wiadomości. Scenariusz GX160 z seedu: gaźniki
+   `W09-0211` ≡ `EX055`, uszczelki `LC170430140-0001` ≡ `06-12038`.          */
+
+const tw = (symbol: string) =>
+  (db().prepare("SELECT tw_id FROM sgt_towar WHERE symbol=?").get(symbol) as { tw_id: number }).tw_id;
+const pasuje = (czesc: string, doCzego: string, n: Record<string, unknown> = {}) =>
+  P.rozstrzygnijPasowanie(P.zaproponujPasowanie({ twId: tw(czesc), doTwId: tw(doCzego), rola: "uszczelka",
+    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne", ...n } as never,
+    { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
+
+test("klient nazwał gaźnik: symbol daje gaźnik jako kotwicę, pasowanie — jego uszczelki", () => {
+  pasuje("LC170430140-0001", "W09-0211", { pozycja: "od strony filtra" });
+  zapiszDane(rozmowa, { oem: "W09-0211", nazwaCzesci: "uszczelka" }, 1, biuro);
+  const { kandydaci, drogi, kotwice } = kandydaciDoboru(rozmowa, subiekt);
+  assert.deepEqual(kotwice.map((k) => k.symbol), ["W09-0211"]);
+  assert.equal(szczebel(drogi, "pasowanie").sprawdzona, true);
+  /* Wprost + przez zamiennik uszczelki (06-12038). */
+  assert.equal(szczebel(drogi, "pasowanie").wynikow, 2);
+  const wprost = kandydaci.find((k) => k.symbol === "LC170430140-0001")!;
+  assert.equal(wprost.droga, "pasowanie");
+  assert.equal(wprost.pewnosc, "potwierdzone");
+  assert.match(wprost.zrodlo, /^uszczelka \(od strony filtra\) LC170430140-0001 pasuje do W09-0211 — katalog dostawcy/);
+  const przez = kandydaci.find((k) => k.symbol === "06-12038")!;
+  assert.equal(przez.pewnosc, "prawdopodobne");
+  assert.match(przez.zrodlo, /podaje 06-12038 jako zamiennik/);
+  /* Sam gaźnik jest kandydatem z drogi `symbol` — kotwica nie znika z listy. */
+  assert.equal(kandydaci.find((k) => k.symbol === "W09-0211")!.droga, "symbol");
+});
+
+test("kotwica z zamiennika gaźnika: EX055 dziedziczy uszczelki W09-0211 jako prawdopodobne", () => {
+  pasuje("LC170430140-0001", "W09-0211");
+  zapiszDane(rozmowa, { oem: "EX055" }, 1, biuro);
+  const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.symbol === "LC170430140-0001")!;
+  assert.equal(k.droga, "pasowanie");
+  assert.equal(k.pewnosc, "prawdopodobne");
+  assert.match(k.zrodlo, /EX055 podaje W09-0211 jako zamiennik/);
+});
+
+test("scenariusz odwrotny: oferta to uszczelka, klient pyta o swój gaźnik — droga `pasowanie` bije `oferta`", () => {
+  pasuje("06-12038", "W09-0211");
+  pytaniePodOferta("14892374513", "06-12038");
+  zapiszDane(rozmowa, { oem: "W09-0211" }, 1, biuro);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  const u = kandydaci.find((k) => k.symbol === "06-12038")!;
+  /* Gdyby `oferta` była wyżej, zdanie brzmiałoby „Kartoteka oferty…" i dowód
+     pasowania zniknąłby ze szkicu. */
+  assert.equal(u.droga, "pasowanie");
+  assert.match(u.zrodlo, /pasuje do W09-0211/);
+});
+
+test("kotwica bez pasowań to sprawdzony szczebel z zerem; negatyw pasowania ląduje w ostrzeżeniach", () => {
+  zapiszDane(rozmowa, { oem: "W09-0211" }, 1, biuro);
+  assert.deepEqual(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "pasowanie"),
+    { droga: "pasowanie", sprawdzona: true, wynikow: 0 });
+  pasuje("170430138-0001", "W09-0211", { polaryzacja: "nie_pasuje", powodNegatywny: "tylko_inny_wariant",
+    rodzajDowodu: "pomiar_wlasny", dowodTresc: "inny rozstaw" });
+  const { negatywne } = kandydaciDoboru(rozmowa, subiekt);
+  assert.deepEqual(negatywne.map((n) => n.symbol), ["170430138-0001"]);
+  assert.match(negatywne[0].zrodlo, /nie pasuje do W09-0211/);
 });

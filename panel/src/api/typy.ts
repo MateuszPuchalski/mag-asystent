@@ -258,7 +258,7 @@ export type StatusDoboru =
 /* Dziewięć dróg §11.2. `silnik` to zastosowanie o jeden przeskok dalej:
    część pasuje do silnika, a silnik stoi w maszynie, o którą pyta klient. */
 export type DrogaDoboru =
-  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "silnik"
+  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "silnik" | "pasowanie"
   | "oem" | "pelnotekst";
 
 export type DaneDoboru = {
@@ -302,7 +302,11 @@ export type NegatywDoboru = {
   twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string; at: string;
 };
 
-export type KandydaciDoboru = { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[] };
+/** Kartoteka wskazana przez agenta (symbol/EAN/OEM) albo kartoteka oferty — cel przycisku „Pasuje do…". */
+export type KotwicaDoboru = { twId: number; symbol: string; nazwa: string };
+export type KandydaciDoboru = {
+  kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[]; kotwice: KotwicaDoboru[];
+};
 
 /* ── Baza wiedzy (§11.3, §11.4, §12, etap E2) ────────────────────────────────
    Listy ZAMKNIĘTE — trzecia kopia obok `services/wiedza.ts` i `CHECK`. */
@@ -380,6 +384,8 @@ export type WiedzaDoboru = {
   zastosowanie: Zastosowanie | null;
   /** Drugie ogniwo, gdy podparcie idzie przez silnik — inaczej `null`. */
   zabudowa: Zabudowa | null;
+  /** Pasowanie do części, którą agent wskazał (symbol/numer w danych doboru) — inaczej `null`. */
+  pasowanie: TrafieniePasowania | null;
   /** ZATWIERDZONE silniki wpisanej maszyny: czipy pod polem i wybór przy zatwierdzeniu. */
   silniki: Zabudowa[];
   pomiary: PomiarRozmowy[];
@@ -943,3 +949,45 @@ export interface WynikOdpowiedziReklamacji {
   externalMessageId: string | null;
   kluczIdempotencji: string;
 }
+
+/* ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────
+   Trzecia kopia list obok `services/pasowania.ts` i `CHECK`. */
+export type RolaPasowania = "uszczelka" | "membrana" | "zestaw_naprawczy" | "lacznik" | "element_zestawu" | "inne";
+
+export type KartotekaPasowania = { twId: number; symbol: string; nazwa: string };
+
+export type Pasowanie = {
+  id: number;
+  /** Część, która PASUJE (uszczelka). */
+  czesc: KartotekaPasowania;
+  /** DO CZEGO pasuje (gaźnik). */
+  doCzego: KartotekaPasowania;
+  rola: RolaPasowania; nazwaRoli: string; pozycja: string | null;
+  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny: PowodNegatywny | null; zdaniePowodu: string | null;
+  stan: StanZastosowania; zrodlo: "reczne" | "dobor" | "opis" | "copilot";
+  rodzajDowodu: RodzajDowodu; nazwaRodzajuDowodu: string; dowodTresc: string; dowodLink: string | null;
+  komentarz: string | null; conversationId: number | null; zastepujeId: number | null;
+  zaproponowal: string; zaproponowanoAt: string;
+  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
+  pewnosc: "potwierdzone" | "prawdopodobne";
+  /** Zdanie źródła z serwera. Panel go nie układa. */
+  zdanieZrodla: string;
+};
+
+/** Trafienie przy odczycie: wprost albo przez zamiennik (wtedy pewność najwyżej `prawdopodobne`). */
+export type TrafieniePasowania = {
+  czesc: KartotekaPasowania; doCzego: KartotekaPasowania; pasowanie: Pasowanie;
+  przezZamiennik: string | null; pewnosc: "potwierdzone" | "prawdopodobne"; zdanie: string;
+};
+
+export type PasowaniaTowaru = {
+  pasujeDo: TrafieniePasowania[]; pasujace: TrafieniePasowania[]; negatywne: Pasowanie[]; propozycje: Pasowanie[];
+};
+
+export type NowePasowanie = {
+  twId: number; doTwId: number; rola: RolaPasowania; pozycja?: string | null;
+  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny?: PowodNegatywny | null;
+  rodzajDowodu: RodzajDowodu; dowodTresc: string; dowodLink?: string | null; komentarz?: string | null;
+  /** Obecność mówi serwerowi, że propozycja idzie z pracy (`dobor`), nie z ekranu Wiedza (`reczne`). */
+  conversationId?: number | null;
+};

@@ -7,6 +7,7 @@ import { podzielZamienniki } from "./zamienniki.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
 import { zabudowyMaszyny } from "./silniki.js";
+import { pasowaniaTowaru, type Kartoteka } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { szukajPelnotekst } from "./pelnotekst.js";
 import { zwin } from "../tekst.js";
@@ -68,8 +69,8 @@ export interface SzczebelDoboru {
 /* Kolejność §11.2: dokładny symbol i EAN biją wszystko, oferta jest kontekstem
    pytania, zamiennik idzie z opisu. Dedup po `twId` zostawia najmocniejszą. */
 const RANGA: Record<DrogaDoboru, number> = {
-  symbol: 1, ean: 2, oem: 3, zastosowanie: 4, silnik: 5, oferta: 6, zamiennik: 7, pelnotekst: 8,
-  wyszukiwarka: 9,
+  symbol: 1, ean: 2, oem: 3, zastosowanie: 4, silnik: 5, pasowanie: 6, oferta: 7, zamiennik: 8,
+  pelnotekst: 9, wyszukiwarka: 10,
 };
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
@@ -115,7 +116,7 @@ function towar(database: DatabaseSync, twId: number) {
 
 export function kandydaciDoboru(
   conversationId: number, subiekt: SubiektAdapter, database: DatabaseSync = db(),
-): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[] } {
+): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[]; kotwice: Kartoteka[] } {
   const dobor = doborRozmowy(conversationId, database);
   const oferta = ofertaRozmowy(database, conversationId);
   const znalezione = new Map<number, Omit<KandydatDoboru, "nr">>();
@@ -138,6 +139,14 @@ export function kandydaciDoboru(
      ma prawa dołożyć do nich karty „bez kartoteki": numer, który JEST naszym
      symbolem, nie jest „numerem, którego nie mamy". */
   const trafioneNumery = new Set<string>();
+  /* KOTWICE szczebla `pasowanie`: kartoteki, które agent WSKAZAŁ — symbolem,
+     EAN-em, numerem OEM — oraz kartoteka oferty. Nigdy treść wiadomości. Gdy
+     klient pisze „mam gaźnik W09-0211, jaka uszczelka", agent wpisuje symbol,
+     szczebel `symbol` daje SAM GAŹNIK, a `pasowanie` — części, które do niego
+     pasują. Panel dostaje listę kotwic do przycisku „Pasuje do…". */
+  const kotwice = new Map<number, Kartoteka>();
+  const kotwica = (w: { tw_id: number; symbol: string; nazwa: string }) =>
+    kotwice.set(w.tw_id, { twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa });
   if (zapytania.length === 0) {
     pomin("symbol", "agent nie wpisał symbolu ani numeru w danych wejściowych");
     pomin("ean", "agent nie wpisał kodu EAN w danych wejściowych");
@@ -149,12 +158,12 @@ export function kandydaciDoboru(
       for (const t of trafienia) {
         if (t.sym.trim().toUpperCase() === q.toUpperCase()) {
           const w = towar(database, t.id); if (!w) continue;
-          poSymbolu++; trafioneNumery.add(zwin(q));
+          poSymbolu++; trafioneNumery.add(zwin(q)); kotwica(w);
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "symbol",
             pewnosc: "prawdopodobne", zrodlo: `Dokładny symbol „${q}” z danych wejściowych`, ostrzezenia: [] });
         } else if (cyfry.length >= 8 && t.ean === cyfry) {
           const w = towar(database, t.id); if (!w) continue;
-          poEan++; trafioneNumery.add(zwin(q));
+          poEan++; trafioneNumery.add(zwin(q)); kotwica(w);
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "ean",
             pewnosc: "prawdopodobne", zrodlo: `Kod EAN ${cyfry} z danych wejściowych`, ostrzezenia: [] });
         }
@@ -180,7 +189,7 @@ export function kandydaciDoboru(
       if (!w) {
         pomin("oferta", `kartoteki ${k.symbol ?? k.twId} nie ma w read-modelu Subiekta`);
       } else {
-        kartotekaOfertyTwId = w.tw_id;
+        kartotekaOfertyTwId = w.tw_id; kotwica(w);
         drogi.set("oferta", { droga: "oferta", sprawdzona: true, wynikow: 1 });
         dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oferta",
           pewnosc: "prawdopodobne", zrodlo: `Kartoteka oferty ${oferta.ofertaId} — ${k.zrodlo}`, ostrzezenia: [] });
@@ -226,7 +235,7 @@ export function kandydaciDoboru(
       const trafienia = szukajPoIdentyfikatorze(numer, database);
       for (const t of trafienia) {
         const w = towar(database, t.twId); if (!w) continue;
-        ile++;
+        ile++; kotwica(w);
         dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oem",
           pewnosc: "prawdopodobne", ostrzezenia: [],
           zrodlo: t.zrodlo === "reczne"
@@ -323,6 +332,36 @@ export function kandydaciDoboru(
     }
   }
 
+  /* SZCZEBEL: PASOWANIE — części, które pasują DO kotwicy (uszczelka do
+     gaźnika, membrany, zestaw naprawczy). Wprost i przez zamiennik (obie strony,
+     głębokość jeden, przechodnie nigdy `potwierdzone` — liczy to serwis).
+     Nie filtrujemy po `nazwaCzesci`: gaźnik ma 3–8 części pasujących, agent
+     czyta nazwy. Kotwica trafiona, ale bez pasowań, to `sprawdzona: true`
+     z zerem, nie pominięcie. Dedup po `twId` gubi drugą kotwicę (uszczelka
+     pasująca do obu wpisanych gaźników pokaże zdanie tylko pierwszego) —
+     akceptowalne, bo obie kotwice widać osobno na liście kandydatów. */
+  if (kotwice.size === 0) {
+    pomin("pasowanie", "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty");
+  } else {
+    let ile = 0;
+    for (const k of kotwice.values()) {
+      const p = pasowaniaTowaru(k.twId, database);
+      for (const t of p.pasujace) {
+        const w = towar(database, t.czesc.twId); if (!w) continue;
+        ile++;
+        dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "pasowanie",
+          pewnosc: t.pewnosc, zrodlo: t.zdanie, ostrzezenia: [] });
+      }
+      for (const n of p.negatywne) {
+        if (n.doCzego.twId !== k.twId) continue;
+        const w = towar(database, n.czesc.twId);
+        negatywne.push({ twId: n.czesc.twId, symbol: w?.symbol ?? n.czesc.symbol, nazwa: w?.nazwa ?? null,
+          powod: n.zdaniePowodu ?? "nie pasuje", zrodlo: n.zdanieZrodla, at: n.rozstrzygnietoAt ?? n.zaproponowanoAt });
+      }
+    }
+    drogi.set("pasowanie", { droga: "pasowanie", sprawdzona: true, wynikow: ile });
+  }
+
   /* SZCZEBEL: pełny tekst (E3) — bm25 po symbolu, nazwie i opisie, WYŁĄCZNIE
      z danych wpisanych przez agenta (blizna „szarpaka": nigdy z treści
      wiadomości). Trafienie po treści to podpowiedź, nie dowód (§11.2). */
@@ -360,5 +399,5 @@ export function kandydaciDoboru(
     .map((k, i) => ({ nr: i + 1, ...k,
       ostrzezenia: [...k.ostrzezenia,
         ...negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`)] }));
-  return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne };
+  return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne, kotwice: [...kotwice.values()] };
 }

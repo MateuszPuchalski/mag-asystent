@@ -8,6 +8,9 @@ import {
   type Polaryzacja, type PowodNegatywny, type Zastosowanie,
 } from "./wiedza.js";
 import { zabudowyMaszyny, type Zabudowa } from "./silniki.js";
+import { pasowaniaTowaru, type TrafieniePasowania } from "./pasowania.js";
+import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
+import { zwin } from "../tekst.js";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1).
@@ -40,10 +43,11 @@ export type StatusDoboru = (typeof STATUSY_DOBORU)[number];
 export const STATUSY_DOBORU_RECZNE: StatusDoboru[] =
   STATUSY_DOBORU.filter((s) => s !== "extracting_data");
 
-/* Dziewięć dróg §11.2. `silnik` doszła razem z `zabudowa_silnika`: bazy sprzed
-   tamtego wydania znają osiem, więc `CHECK` przebudowuje `migrate()`. */
+/* Dziesięć dróg §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
+   `pasowanie` z `pasowanie_czesci`; starsze bazy przebudowuje `doborZnaDrogi()`
+   w `migrate()`. */
 export const DROGI_DOBORU = [
-  "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "silnik", "oem", "pelnotekst",
+  "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "silnik", "pasowanie", "oem", "pelnotekst",
 ] as const;
 export type DrogaDoboru = (typeof DROGI_DOBORU)[number];
 /* Od E3 każda droga z §11.2 ma nadawcę; lista zostaje jako strażnik przed
@@ -60,6 +64,7 @@ const ZRODLO_DROGI: Record<DrogaDoboru, string> = {
   wyszukiwarka: "wskazane ręcznie przez agenta",
   zastosowanie: "potwierdzone zastosowanie",
   silnik: "potwierdzone zastosowanie do silnika maszyny",
+  pasowanie: "potwierdzone pasowanie do części klienta",
   oem: "numer OEM",
   pelnotekst: "trafienie po treści — nie dowód",
 };
@@ -144,13 +149,13 @@ function urzadzenie(dane: DaneDoboru): string {
 function zdanieDoSzkicu(
   dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
   podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
+  pasowanie: TrafieniePasowania | null,
 ): string {
   const maszyna = urzadzenie(dane);
   const zrodlo = `źródło: ${ZRODLO_DROGI[droga]}`;
-  if (!maszyna) return `${symbol} — ${zrodlo}; dobór bez wskazanej maszyny — to przypuszczenie.`;
   /* Zastosowanie zatwierdzone na samym śladzie rozmowy to nadal „prawdopodobnie":
      zdanie źródła mówi wprost, że dowodu technicznego nie ma. */
-  if (podparcie) {
+  if (podparcie && maszyna) {
     const { zastosowanie, zabudowa } = podparcie;
     /* Łańcuch przez silnik jest wart tyle, co jego słabsze ogniwo — tak samo
        liczy szczebel w `kandydaci.ts`. Zdanie MUSI nazwać oba ogniwa (§14.3):
@@ -164,6 +169,16 @@ function zdanieDoSzkicu(
     }
     return `Do ${maszyna} ${orzeczenie} ${symbol} — źródło: ${zastosowanie.zdanieZrodla}.`;
   }
+  /* PASOWANIE nie potrzebuje maszyny: klient nazwał GAŹNIK, nie kosiarkę.
+     Bez tej gałęzi wybór z drogi `pasowanie` mówiłby „dobór bez wskazanej
+     maszyny — to przypuszczenie" przy pełnym dowodzie w bazie. */
+  if (pasowanie) {
+    const p = pasowanie.pasowanie;
+    const orzeczenie = pasowanie.pewnosc === "potwierdzone" ? "pasuje" : "prawdopodobnie pasuje";
+    const co = `${p.nazwaRoli}${p.pozycja ? `, ${p.pozycja}` : ""}`;
+    return `Do ${pasowanie.doCzego.symbol} ${orzeczenie} ${symbol} (${co}) — źródło: ${pasowanie.zdanie}.`;
+  }
+  if (!maszyna) return `${symbol} — ${zrodlo}; dobór bez wskazanej maszyny — to przypuszczenie.`;
   return status === "confirmed"
     ? `Do ${maszyna} pasuje ${symbol} — ${zrodlo}.`
     : `Do ${maszyna} prawdopodobnie pasuje ${symbol} — ${zrodlo}; dobór bez potwierdzonego zastosowania.`;
@@ -194,6 +209,24 @@ function zastosowanieWyboru(
   return null;
 }
 
+/**
+ * Pasowanie, którym podparty jest wybór: wybrana część pasuje DO kartoteki,
+ * którą agent wskazał w danych (symbol albo numer w polu OEM / nazwie części).
+ * Wprost albo przez zamiennik — serwis pasowań porządkuje wprost pierwsze.
+ */
+function pasowanieWyboru(database: DatabaseSync, dane: DaneDoboru, twId: number): TrafieniePasowania | null {
+  const wpisane = [dane.oem, dane.nazwaCzesci].map((v) => zwin(v ?? "")).filter(Boolean);
+  if (wpisane.length === 0) return null;
+  const { pasujeDo } = pasowaniaTowaru(twId, database);
+  if (pasujeDo.length === 0) return null;
+  const cele = new Set<number>();
+  for (const v of [dane.oem, dane.nazwaCzesci]) {
+    if (!v) continue;
+    for (const t of szukajPoIdentyfikatorze(v, database)) cele.add(t.twId);
+  }
+  return pasujeDo.find((t) => wpisane.includes(zwin(t.doCzego.symbol)) || cele.has(t.doCzego.twId)) ?? null;
+}
+
 function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync): Dobor {
   if (!w) {
     return { status: "not_started", wersja: 1, dane: PUSTE, brakuje: null, wybrany: null,
@@ -213,7 +246,8 @@ function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync)
       twId: Number(w.wybrany_tw_id), symbol: String(w.wybrany_symbol), droga,
       przez: String(w.wybrano_przez ?? "?"), at: String(w.wybrano_at ?? ""),
       zdanieDoSzkicu: zdanieDoSzkicu(dane, String(w.wybrany_symbol), droga, status,
-        zastosowanieWyboru(database, dane, Number(w.wybrany_tw_id))),
+        zastosowanieWyboru(database, dane, Number(w.wybrany_tw_id)),
+        pasowanieWyboru(database, dane, Number(w.wybrany_tw_id))),
     },
     updatedBy: w.updated_by == null ? null : String(w.updated_by),
     updatedAt: w.updated_at == null ? null : String(w.updated_at),
@@ -471,7 +505,7 @@ export interface PomiarRozmowy {
  * odświeża się na każde zdarzenie szyny, a to są dwa dodatkowe zapytania.
  */
 export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db()): {
-  zastosowanie: Zastosowanie | null; zabudowa: Zabudowa | null;
+  zastosowanie: Zastosowanie | null; zabudowa: Zabudowa | null; pasowanie: TrafieniePasowania | null;
   silniki: Zabudowa[]; pomiary: PomiarRozmowy[];
 } {
   const dobor = doborRozmowy(conversationId, database);
@@ -494,6 +528,7 @@ export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db
       zaproponowano: Boolean(Number(z.zaproponowano ?? 0)),
     }));
   return { zastosowanie: podparcie?.zastosowanie ?? null, zabudowa: podparcie?.zabudowa ?? null,
+    pasowanie: dobor.wybrany ? pasowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null,
     silniki, pomiary };
 }
 

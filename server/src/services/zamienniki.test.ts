@@ -42,6 +42,41 @@ const TABELA: Array<{
     po: "numery z sekcji OEM nie wciekają do zamienników mimo tych samych separatorów",
   },
   {
+    opis: "OME: 591852 // 793463 // 793493 Zamiennik: W09-0503 // 520070/1 W zestawie uszczelka - W53-0501",
+    sym: "10-01022",
+    maSymbole: ["W09-0503", "W53-0501"],
+    znane: ["W09-0503"],
+    /* `520070` bez `/1`: drabina dzieli po `/` i to jest zachowanie sprzed tej
+       poprawki (sufiks `/0` GGP zna tylko parser identyfikatorów). Ten wiersz
+       pilnuje czego innego — że W53-0501 NIE stoi w `znane`. */
+    obce: ["520070"],
+    po: "„W zestawie” BEZ dwukropka kończy listę — uszczelka z kompletu NIE jest zamiennikiem gaźnika",
+  },
+  {
+    opis: "Zamiennie: 95-001 Zawiera: 97-001",
+    sym: "W53-0807",
+    maSymbole: ["95-001", "97-001"],
+    znane: ["95-001"],
+    obce: [],
+    po: "„Zawiera:” to zawartość zestawu, nie zamiennik",
+  },
+  {
+    opis: "Zamiennie: 168F-M79851 // 06-02003 Do / W zestawie z: 10-02001",
+    sym: "W53-0204",
+    maSymbole: ["06-02003", "10-02001"],
+    znane: ["06-02003"],
+    obce: ["168F-M79851"],
+    po: "„W zestawie z:” — gaźnik, do którego zestaw należy, nie jest jego zamiennikiem",
+  },
+  {
+    opis: "W zestawie Uszczelka  Zamiennie: M831402 // 520003",
+    sym: "W09-0801",
+    maSymbole: ["M831402", "520003"],
+    znane: ["M831402", "520003"],
+    obce: [],
+    po: "zestaw PRZED etykietą zamiennika nie zjada listy",
+  },
+  {
     opis: "OEM: 492932, 492056, 696854 Zastępuje: 05-01001",
     sym: "W06-1302",
     maSymbole: ["05-01001"],

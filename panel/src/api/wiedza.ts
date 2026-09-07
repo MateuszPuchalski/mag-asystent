@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowaZabudowa, PowodNegatywny,
-  RodzajDowodu, RodzajIdentyfikatora, Zabudowa, Zastosowanie,
+  Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie, NowaZabudowa,
+  Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, Zabudowa, Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -29,7 +29,9 @@ export const kluczeWiedzy = {
 export function useKolejkaWiedzy() {
   return useQuery({
     queryKey: kluczeWiedzy.kolejka,
-    queryFn: () => api<{ propozycje: Zastosowanie[]; liczba: number }>(`/api/obsluga/wiedza/kolejka`),
+    /* Dwa rodzaje propozycji w jednej kolejce; liczniki OSOBNO (lekcja 0.229.0). */
+    queryFn: () => api<{ propozycje: Zastosowanie[]; liczba: number; pasowania: Pasowanie[]; pasowanDoRozstrzygniecia: number }>(
+      `/api/obsluga/wiedza/kolejka`),
     refetchInterval: 30_000,
   });
 }
@@ -45,8 +47,11 @@ export function useModele(q: string) {
 export function useWiedzaTowaru(twId: number | null) {
   return useQuery({
     queryKey: kluczeWiedzy.towar(twId ?? 0),
-    queryFn: () => api<{ potwierdzone: Zastosowanie[]; negatywne: Zastosowanie[]; propozycje: Zastosowanie[] }>(
-      `/api/obsluga/wiedza/towar/${twId}`),
+    queryFn: () => api<{
+      potwierdzone: Zastosowanie[]; negatywne: Zastosowanie[]; propozycje: Zastosowanie[];
+      /** Pasowania część↔część — ta sama trasa, drugi strzał po to samo byłby zbędny. */
+      pasowania: PasowaniaTowaru;
+    }>(`/api/obsluga/wiedza/towar/${twId}`),
     enabled: twId !== null,
   });
 }
@@ -201,6 +206,39 @@ export function useWycofajZabudowe() {
     mutationFn: (v: { id: number; powod: string }) =>
       api<Zabudowa>(`/api/obsluga/wiedza/silniki/${v.id}/wycofaj`, {
         method: "POST", body: JSON.stringify({ powod: v.powod }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+/* ── Pasowanie części (§11.2) ────────────────────────────────────────────────
+   Adresy WYŁĄCZNIE tutaj — strażnik w `routes/wiedza.test.ts` czyta ten plik. */
+export function useZaproponujPasowanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: NowePasowanie) =>
+      api<Pasowanie>(`/api/obsluga/wiedza/pasowania`, { method: "POST", body: JSON.stringify(v) }),
+    onSettled: (_d, _e, v) => { poWiedzy(qc, v.twId); qc.invalidateQueries({ queryKey: klucze.towar(v.doTwId) }); },
+  });
+}
+
+export function useRozstrzygnijPasowanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; decyzja: "zatwierdz" | "odrzuc"; powod?: string | null }) =>
+      api<Pasowanie>(`/api/obsluga/wiedza/pasowania/${v.id}/rozstrzygnij`, {
+        method: "POST", body: JSON.stringify({ decyzja: v.decyzja, powod: v.powod ?? null }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useWycofajPasowanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; powod?: string | null }) =>
+      api<Pasowanie>(`/api/obsluga/wiedza/pasowania/${v.id}/wycofaj`, {
+        method: "POST", body: JSON.stringify({ powod: v.powod ?? null }),
       }),
     onSettled: () => poWiedzy(qc),
   });

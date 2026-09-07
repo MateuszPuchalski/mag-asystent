@@ -777,8 +777,9 @@ może je poprawić.
 ### 11.2. Kandydaci
 
 Kolejność wyszukiwania: dokładny symbol, EAN, numer OEM, potwierdzone
-zastosowanie, zastosowanie przez silnik, zamiennik, zgodne parametry,
-wyszukiwanie pełnotekstowe, wyszukiwanie semantyczne.
+zastosowanie, zastosowanie przez silnik, pasowanie do części klienta,
+zamiennik, zgodne parametry, wyszukiwanie pełnotekstowe, wyszukiwanie
+semantyczne.
 
 **Wynik semantyczny nie jest dowodem kompatybilności.**
 
@@ -824,6 +825,38 @@ Pominięcie tego szczebla jest produktem, nie porażką: powód „nie wiadomo, 
 silnik stoi w NAC LS 46-450 — dopisz go w Wiedza → Silniki" to jedyna droga,
 którą agent dowie się o luce. Silnik znany, ale bez zastosowań, daje
 `sprawdzona: true` z zerem wyników — to dwie różne prawdy.
+
+**Co działa od wydania 0.230.0: szczebel „pasuje do części".** Firma sprzedaje
+dużo gaźników, a klient pyta: „czy ta uszczelka pasuje do mojego gaźnika?".
+Do 0.229.0 baza nie znała ŻADNEJ relacji część↔część — zastosowanie wiąże
+część z modelem, zabudowa model z modelem. Jedyną relacją między kartotekami
+był zamiennik, liczony z opisu i jednokierunkowy. Odpowiedź na to pytanie
+brał agent z pamięci albo z katalogu na drugim monitorze.
+
+Szczebel czyta zatwierdzone pasowania (§12) do KOTWIC. Kotwica to kartoteka
+trafiona w tym przebiegu przez symbol, EAN albo numer OEM wpisany przez agenta,
+oraz kartoteka oferty. Nigdy treść wiadomości — blizna „szarpaka". Bez
+kotwicy szczebel jest pominięty z powodem „agent nie wpisał symbolu ani
+numeru, a rozmowa nie ma kartoteki oferty". Kotwica bez pasowań daje
+`sprawdzona: true` z zerem. Wyników nie filtruje się po nazwie części: gaźnik
+ma trzy uszczelki, membranę i zestaw naprawczy, a agent czyta nazwy sam.
+
+Szczebel stoi PRZED ofertą, choć dziś oferta bije zastosowanie. Powód to
+scenariusz odwrotny: oferta jest uszczelką, klient pyta „pasuje do W09-0211?".
+Symbol wpisany przez agenta daje gaźnik jako kotwicę, a pasowanie oddaje
+uszczelkę oferty. Gdyby oferta stała wyżej, dedup po `twId` zostawiłby zdanie
+„kartoteka oferty…", a dowód pasowania zniknąłby ze szkicu.
+
+Pewność trafienia wprost to pewność wiersza. Trafienie PRZEZ ZAMIENNIK
+(§12) nigdy nie jest `potwierdzone` — zamiennik gaźnika bywa produktem
+nadrzędnym z innym rozstawem uszczelki. Negatywne pasowania do kotwicy idą do
+sekcji negatywów i do ostrzeżeń kandydata, scalane, nie nadpisywane.
+
+Odpowiedź kandydatów niesie listę `kotwice`. Panel potrzebuje jej do przycisku
+„Pasuje do W09-0211" przy wybranym kandydacie — jedynego miejsca, gdzie
+pasowanie rodzi się z pracy. Kierunek jest narzucony: wybrany pasuje DO
+kotwicy. Automatu przy ZATWIERDŹ DOBÓR nie ma: rola części jest nieznana,
+a kotwica bywa samą częścią, gdy klient pyta o dostępność gaźnika.
 
 ### 11.3. Poziomy pewności
 
@@ -873,13 +906,20 @@ sprzęgający obie kolumny. Negatyw pokazuje się przy kandydacie jako
 ostrzeżenie i osobno, bo dotyczy także kartoteki, której nie ma na liście.
 Wycofać go może tylko człowiek i tylko z powodem (§14.2).
 
+Ta sama lista powodów obowiązuje pasowanie części (0.230.0). Dwa z nich —
+`niewlasciwy_rozstaw` i `srednica_ok_inne_mocowanie` — są wręcz kształtu
+uszczelkowego. „Nie, ta jest od strony kolektora" to odpowiedź, którą
+właściciel chce dawać klientowi, więc negatyw wszedł do tabeli od razu.
+Dołożenie go później oznaczałoby przebudowę tabeli.
+
 ## 12. Baza wiedzy
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma SZEŚĆ tabel,
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma SIEDEM tabel,
 nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2),
-`towar_identyfikator` i `model_z_opisu` (E3) oraz `zabudowa_silnika` (0.229.0).
+`towar_identyfikator` i `model_z_opisu` (E3), `zabudowa_silnika` (0.229.0)
+oraz `pasowanie_czesci` (0.230.0).
 Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
 `dopasowanie` jest spalona (§15) i nie wraca.
 
@@ -928,6 +968,46 @@ agent wybiera przy zatwierdzeniu, czy wiedza ma urosnąć przy maszynie, czy prz
 jej silniku. Opcja silnikowa pojawia się wyłącznie przy zatwierdzonej
 zabudowie. Część silnikowa zapisana raz przy jednej kosiarce odpowiada odtąd
 na pytania o wszystkie maszyny z tym samym silnikiem.
+
+**Pasowanie części** (`pasowanie_czesci`, 0.230.0) mówi, że część `tw_id`
+pasuje DO części `do_tw_id`: uszczelka do gaźnika, membrana do gaźnika,
+łącznik do kolektora. Kierunek jest semantyczny — gaźnik nie „pasuje do
+uszczelki" — a odczyt symetryczny: ekran gaźnika czyta `pasujace`, ekran
+uszczelki `pasujeDo`. Wiersz niesie ROLĘ z listy zamkniętej (`uszczelka`,
+`membrana`, `zestaw_naprawczy`, `lacznik`, `element_zestawu`, `inne`)
+i POZYCJĘ jako wolny tekst: „od strony filtra", „między dystansem". Jeden
+gaźnik GX160 ma trzy różne uszczelki i pozycja jest jedynym, co je rozróżnia.
+Enum pozycji byłby trzecią listą do pilnowania dla czterech wierszy.
+
+Rola należy do CZĘŚCI, a zapisujemy ją w relacji tylko dlatego, że nazwa
+kartoteki to wolny tekst. Automat NIE wyprowadza roli z nazwy — to ta sama
+pułapka, co rozbijanie „B&S 450E". Dowód stoi w wierszu jak przy zabudowie,
+z tego samego powodu: jedno źródło naraz. Polaryzacja i powody z §11.4
+obowiązują od pierwszego wydania. Cykl życia, podpisy i rozstrzyganie te same
+co przy zastosowaniu; wycofanie negatywu wymaga powodu, pozytywu — nie, bo
+pasowanie nie gasi żadnej gałęzi kandydatów.
+
+Dlaczego to nie jest wiersz w `zastosowanie`: tam drugi koniec to MODEL,
+a wiersz z kartoteką w tym miejscu zatruwałby po cichu każdego czytelnika
+zastosowań. Dlaczego nie `dopasowanie_czesci`: nazwa `dopasowanie` jest
+spalona (§15).
+
+**Przechodniość przez zamiennik** liczy się PRZY ODCZYCIE, na głębokość
+jeden, po obu stronach, nigdy jako `potwierdzone`. Uszczelka stoi w kartotece
+pod czterema symbolami od czterech dostawców, z wzajemnym „Zamiennik:" —
+231 takich skupisk. Zapisanie pasowania do jednej z nich ma odpowiedzieć
+o wszystkie. Nie materializujemy tego: zamiennik jest efemeryczny, parsowany
+z opisu po każdym imporcie, a odczyt pyta o jedną kartotekę. Czytamy TEN
+opis: jeśli opis Y′ wymienia Y, a Y nie wymienia Y′, przy odczycie Y nie ma
+nic. Wprost bije przechodnie po `twId`.
+
+**Skąd biorą się pasowania.** Z pracy: przycisk „Pasuje do …" przy wybranym
+kandydacie w Doborze, gdy kotwica jest inna niż wybrany (§11.2); propozycja
+niesie rozmowę i dowód `rozmowa`. Z ręki: Wiedza → Sprawdź kartotekę →
+„Dopisz pasowanie", z radiem kierunku i dowodem technicznym. Propozycje
+czekają w kolejce Wiedza jako druga sekcja „Pasowania części" — ta sama
+decyzja tego samego człowieka, nie szósta zakładka. Źródła `opis` i `copilot`
+stoją w `CHECK` bez nadawcy, precedensem `zastosowanie`.
 
 **Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
 z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
@@ -2373,7 +2453,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
+| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
@@ -2387,6 +2467,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
 | Zabudowa silnika (§12) | **działa** od 0.229.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
+| Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |

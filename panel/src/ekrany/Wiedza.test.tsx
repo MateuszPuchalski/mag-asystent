@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Zastosowanie } from "../api/typy";
+import type { Pasowanie, Zastosowanie } from "../api/typy";
 
 /* ── Ekran wiedzy (E2) ───────────────────────────────────────────────────────
    Kolejka ma nieść to, po czym biuro rozstrzyga: kartotekę, maszynę, dowód.
@@ -24,16 +24,34 @@ const propozycja = (n: Partial<Zastosowanie> = {}): Zastosowanie => ({
   ...n,
 });
 
+/** Propozycja pasowania część↔część (0.230.0): uszczelka do gaźnika, z rozmowy. */
+const pasowanie = (n: Partial<Pasowanie> = {}): Pasowanie => ({
+  id: 5, czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160" },
+  doCzego: { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik GX160" },
+  rola: "uszczelka", nazwaRoli: "uszczelka", pozycja: "od strony filtra",
+  polaryzacja: "pasuje", powodNegatywny: null, zdaniePowodu: null, stan: "propozycja", zrodlo: "dobor",
+  rodzajDowodu: "rozmowa", nazwaRodzajuDowodu: "rozmowa", dowodTresc: "dobór w rozmowie #4821", dowodLink: null,
+  komentarz: null, conversationId: 4821, zastepujeId: null,
+  zaproponowal: "A. Lewandowska", zaproponowanoAt: "2026-09-07T08:00:00Z",
+  rozstrzygnal: null, rozstrzygnietoAt: null, powodRozstrzygniecia: null, pewnosc: "prawdopodobne",
+  zdanieZrodla: "uszczelka (od strony filtra) LC170430140-0001 pasuje do W09-0211 — rozmowa, 7.09.2026, A. Lewandowska",
+  ...n,
+});
+
 let LISTA: Zastosowanie[] = [];
+let PASOWANIA: Pasowanie[] = [];
 const rozstrzygnij = vi.fn();
+const rozstrzygnijPasowanie = vi.fn();
 const zaproponuj = vi.fn();
 
 vi.mock("../api/wiedza", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/wiedza")>("../api/wiedza");
   return {
     ...rzeczywisty,
-    useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length }, isLoading: false, error: null }),
+    useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
+      pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length }, isLoading: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
+    useRozstrzygnijPasowanie: () => ({ mutate: rozstrzygnijPasowanie, isPending: false }),
     useZaproponujZastosowanie: () => ({ mutate: zaproponuj, isPending: false }),
     useModele: () => ({ data: { modele: [] } }),
     useWiedzaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
@@ -61,9 +79,27 @@ const pokaz = () => render(
     </MemoryRouter>
   </QueryClientProvider>);
 
-beforeEach(() => { rozstrzygnij.mockReset(); zaproponuj.mockReset(); LISTA = []; });
+beforeEach(() => { rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset(); LISTA = []; PASOWANIA = []; });
 
 describe("Ekran wiedzy", () => {
+  /* Pasowania część↔część (0.230.0) czekają w TEJ SAMEJ kolejce jako druga
+     sekcja — ta sama decyzja tego samego człowieka. Osobna zakładka łamałaby
+     etykiety, a osobny licznik bez sekcji kłamałby przez pominięcie. */
+  it("pasowania części stoją jako druga sekcja kolejki z własnym licznikiem", async () => {
+    PASOWANIA = [pasowanie()];
+    pokaz();
+    expect(screen.getByText(/1 pasowanie do rozstrzygnięcia/)).toBeInTheDocument();
+    /* Pusta lista zastosowań NIE pokazuje „nic nie czeka", bo czeka pasowanie. */
+    expect(screen.queryByText(/Nic nie czeka/)).toBeNull();
+    const sekcja = screen.getByRole("region", { name: "Pasowania części" });
+    expect(sekcja).toHaveTextContent("Pasowania części (1)");
+    expect(screen.getByText("LC170430140-0001")).toBeInTheDocument();
+    expect(screen.getByText("W09-0211")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /rozmowa #4821/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Zatwierdź" }));
+    expect(rozstrzygnijPasowanie).toHaveBeenCalledWith({ id: 5, decyzja: "zatwierdz", powod: null }, expect.anything());
+  });
+
   it("kolejka niesie kartotekę, maszynę, dowód i odnośnik do rozmowy", () => {
     LISTA = [propozycja()];
     pokaz();
