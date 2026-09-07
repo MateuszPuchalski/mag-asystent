@@ -1,10 +1,10 @@
-import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { allegroTryb } from "../adapters/allegro.js";
 import { db, transaction } from "../db/db.js";
 import { ConversationConflict, zmienStatus } from "./conversations.js";
 import { publishConversationEvent, trzymajacy } from "./conversation-realtime.js";
 import { logEvent } from "./events.js";
+import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
 import {
   oznaczPrzeczytanyWAllegro, wyslijDoAllegro,
   type OznaczPrzeczytany, type WyslijDoAllegro,
@@ -33,31 +33,16 @@ export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed
 class PomijamOznaczenie extends Error {}
 
 /**
- * Klucz idempotencji wylicza SERWER, nie klient.
+ * Klucz idempotencji dla ROZMOWY — cienka nakładka na wspólny rdzeń.
  *
- * Gdyby podawał go klient, dwie zakładki albo podwójne kliknięcie dałyby dwa
- * różne klucze i dwie odpowiedzi u klienta. Wyliczony z rozmowy, ostatniej
- * wiadomości i treści jest identyczny dla tego samego zamiaru — a inny, gdy
- * agent poprawił choć jedno słowo.
+ * Rdzeń mieszka od 0.224.0 w `services/idempotencja.ts`, bo potrzebuje go też
+ * odpowiedź w reklamacji. Ta nakładka zostaje, żeby format klucza (`snd-…`)
+ * i wołający nie zmienili się ani o znak — a testy tego pliku są dowodem, że
+ * wyjęcie było czyste.
  */
-export function kluczIdempotencji(
+export const kluczIdempotencji = (
   conversationId: number, lastMessageId: number | null, body: string, zalaczniki: string[] = [],
-) {
-  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA (0.195.0). Bez nich „ten sam tekst z innym
-     zdjęciem" miałby klucz identyczny z wysyłką sprzed chwili, a strażnik
-     dubletu oddałby stan tamtej próby zamiast wysłać poprawiony komplet —
-     czyli zdjęcie po cichu nie poszłoby do klienta. Kolejność sortowana, bo
-     ta sama para plików dodana odwrotnie to ten sam zamiar. */
-  const material = zalaczniki.length === 0 ? body : `${body}\u0000${[...zalaczniki].sort().join(",")}`;
-  const skrot = createHash("sha256").update(material).digest("hex").slice(0, 4);
-  return `snd-${conversationId}-${lastMessageId ?? 0}-${skrot}`;
-}
-
-/* Niejednoznaczny timeout to NIE to samo co odmowa. Odmowę widać w kodzie
-   HTTP i wiadomo, że nic nie poszło; po timeoucie żądanie mogło dojść.
-   §8.5: nie ponawiamy takiej wysyłki automatycznie. */
-const niejednoznaczny = (e: unknown) =>
-  /timeout|abort|ECONNRESET|socket hang up/i.test(e instanceof Error ? e.message : String(e));
+) => kluczWysylki("snd-", conversationId, lastMessageId, body, zalaczniki);
 
 interface Kontekst {
   externalConversationId: string;

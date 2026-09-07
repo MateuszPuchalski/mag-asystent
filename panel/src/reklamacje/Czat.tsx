@@ -85,11 +85,14 @@ function Zalaczniki({ reklamacjaId, lista }: {
   </div>;
 }
 
-export function Czat({ reklamacja, czat, zalaczniki }: {
+export function Czat({ reklamacja, czat, zalaczniki, edytor }: {
   reklamacja: Reklamacja;
   czat: WiadomoscReklamacji[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
   zalaczniki: ZalacznikReklamacji[];
+  /* Edytor wstrzykiwany, nie wołany stąd: cały katalog `reklamacje/` trzyma
+     komponenty czyste, a mutacje mieszkają w ekranie (wzorzec `skrzynka/`). */
+  edytor?: React.ReactNode;
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -135,12 +138,10 @@ export function Czat({ reklamacja, czat, zalaczniki }: {
           })}
         </ol>}
 
-    {/* Zdanie o tym, czego panel NIE robi, jest tu tak samo potrzebne jak
-        sama rozmowa: bez niego pusty ekran pod czatem obiecywałby odpowiedź. */}
-    <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">
-      {reklamacja.czatAktywny
-        ? "Odpowiedź i formalny werdykt wysyła się na razie w Centrum Sprzedaży Allegro. Ten panel je czyta."
-        : "Allegro zamknęło rozmowę w tej sprawie — nowej wiadomości nie przyjmie."}
-    </p>
+    {/* Od 0.224.0 pod rozmową stoi EDYTOR, a nie zdanie o tym, że odpowiedź
+        wysyła się gdzie indziej. Zdanie było prawdziwe przez dwa wydania
+        i przestało być — komentarz, który skłamał, jest gorszy od jego braku.
+        To, czego panel nadal nie robi (werdykt), mówi sam edytor. */}
+    {edytor}
   </div>;
 }

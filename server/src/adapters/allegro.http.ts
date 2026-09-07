@@ -214,6 +214,20 @@ export function urlWiadomosciDyskusji(apiUrl: string, id: string, offset = 0): s
   return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat?limit=100${dalej}`;
 }
 
+/**
+ * Nowa wiadomość w sprawie posprzedażowej (`/sale/issues/{issueId}/message`).
+ *
+ * Adres z tej samej rodziny co odczyt czatu, więc `zapytajAllegro` użyje
+ * zapamiętanej wersji zasobu (`beta.v1`) bez ponownej nauki.
+ *
+ * ADRESU NIE ZGADUJEMY — to jest ta sama rodzina, przy której projekt raz już
+ * zgadł źle: do 0.155.0 kod pukał do `/sale/disputes/{id}/messages`, którego
+ * w całej specyfikacji nie ma. Ten pochodzi z `addMessageToIssueUsingPOST`.
+ */
+export function urlNowejWiadomosciSprawy(apiUrl: string, id: string): string {
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/message`;
+}
+
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
 export function urlWatkow(apiUrl: string, offset: number): string {
   return `${apiUrl}/messaging/threads?limit=20&offset=${Math.max(0, Math.trunc(offset))}`;
@@ -426,6 +440,16 @@ export async function zapytajAllegro(
         poIluMs
       );
     }
+    /* 409 przy sprawach posprzedażowych NIE JEST konfliktem wersji (0.224.0).
+       Specyfikacja opisuje go przy `POST /sale/issues/{id}/message` jednym
+       zdaniem: „Dispute is in a state that forbids adding new messages" —
+       czyli to odpowiednik `currentState.chatActive: false`. Bez tego zdania
+       agent zobaczyłby goły kod przy sprawie, która wygląda na otwartą. */
+    if (odp.status === 409 && url.includes("/sale/issues")) {
+      throw new BladOdpowiedziAllegro(
+        "Allegro zamknęło rozmowę w tej sprawie i nie przyjmie nowej wiadomości (409).",
+        409);
+    }
     if (!odp.ok) {
       const tresc = await odp.text().catch(() => "");
       throw new BladOdpowiedziAllegro(
@@ -579,4 +603,26 @@ export async function zglosRabat(
     metoda: "POST",
     body: { lineItem: { id: lineItemId }, quantity: Math.max(1, Math.round(ilosc)) },
   }) as { id?: string } | null;
+}
+
+/**
+ * Odpowiedź w reklamacji (0.224.0) — PIERWSZY zapis tego modułu do Allegro.
+ *
+ * `type` jest w `MessageRequest` jedynym polem, przy którym lista `required`
+ * ma pokrycie w schemacie, więc jedzie ZAWSZE. `REGULAR` to zwykła wiadomość;
+ * trzech wartości `RETURN_*` panel świadomie nie wysyła — one są formalnym
+ * stanowiskiem sprzedawcy w sprawie zwrotu towaru, a specyfikacja nigdzie nie
+ * łączy ich wprost z polem `currentState.returnRequired`. To wniosek z nazw,
+ * a mapowanie z domysłu kosztowało ten projekt trzy wydania.
+ *
+ * Ciało składane TUTAJ, wzorem `odmowZwrotuPieniedzy`: kształt jest stały,
+ * a serwis nie ma powodu go znać.
+ */
+export async function wyslijWiadomoscSprawy(
+  apiUrl: string, issueId: string, tekst: string,
+): Promise<{ id?: string; createdAt?: string } | null> {
+  return await zapytajAllegro(urlNowejWiadomosciSprawy(apiUrl, issueId), {
+    metoda: "POST",
+    body: { text: tekst, type: "REGULAR" },
+  }) as { id?: string; createdAt?: string } | null;
 }

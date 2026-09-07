@@ -110,11 +110,24 @@ describe("Oś rozmowy reklamacyjnej", () => {
     expect(screen.getByText(/Ta rozmowa jest niepełna/)).toBeInTheDocument();
   });
 
-  it("zamknięty czat mówi co innego niż otwarty", () => {
+  it("edytor jest WSTRZYKIWANY i stoi POD rozmową, a nie nad nią", () => {
+    /* Do 0.223.0 stało tu zdanie „odpowiedź wysyła się w Centrum Sprzedaży".
+       Przestało być prawdą razem z przyrostem drugim, więc zniknęło — a oś
+       rozmowy sama nadal nic nie wysyła: mutacje mieszkają w ekranie.
+       Kolejność ma znaczenie: pole do pisania pod ostatnią wiadomością to
+       jedyny układ, w którym czyta się przed pisaniem. */
     scena.obrazy = {};
-    const { rerender } = render(<Czat reklamacja={rek()} zalaczniki={[]} czat={[wiad()]} />);
-    expect(screen.getByText(/wysyła się na razie w Centrum Sprzedaży/)).toBeInTheDocument();
-    rerender(<Czat reklamacja={rek({ czatAktywny: false })} zalaczniki={[]} czat={[wiad()]} />);
-    expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
+    render(<Czat reklamacja={rek()} zalaczniki={[]} czat={[wiad()]}
+      edytor={<button type="button">WYŚLIJ ODPOWIEDŹ</button>} />);
+    const edytor = screen.getByRole("button", { name: "WYŚLIJ ODPOWIEDŹ" });
+    const ostatnia = screen.getByText("Kosiarka przestała ciąć");
+    expect(ostatnia.compareDocumentPosition(edytor))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("bez wstrzykniętego edytora oś rozmowy nie dokłada niczego od siebie", () => {
+    scena.obrazy = {};
+    render(<Czat reklamacja={rek({ czatAktywny: false })} zalaczniki={[]} czat={[wiad()]} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

@@ -450,7 +450,10 @@ export type WynikWysylki = {
 /** Szczegóły 409 przy kontroli świeżości — z nich rysuje się dialog konfliktu. */
 export type SzczegolyWysylki = {
   lastMessageId?: number | null;
-  nowaWiadomosc?: { id: number; tresc: string; at: string } | null;
+  /* `rola` jedzie tylko przy reklamacji (0.224.0): rozmowa bywa trójstronna,
+     więc dopisek bywa doradcy Allegro, a nie kupującego. Skrzynka jej nie
+     podaje i nie potrzebuje — tam autor dopisku jest zawsze klientem. */
+  nowaWiadomosc?: { id: number; tresc: string; at: string | null; rola?: string | null } | null;
   kluczIdempotencji?: string;
   /* Drugi rodzaj konfliktu wysyłki (0.159.0): przy rozmowie siedzi kto inny.
      Osobne pole, bo i pytanie do agenta jest inne — tam „klient dopisał",
@@ -882,4 +885,11 @@ export interface SzczegolReklamacji {
     pewnosc: string; twId: number | null; symbol: string | null;
     zrodlo: string | null; powod: string | null;
   } | null;
+}
+
+/** Wynik wysyłki odpowiedzi w reklamacji (0.224.0). */
+export interface WynikOdpowiedziReklamacji {
+  status: "sending" | "sent" | "send_uncertain" | "send_failed";
+  externalMessageId: string | null;
+  kluczIdempotencji: string;
 }

@@ -522,7 +522,7 @@ i `additionalInformation` zostają, choć nie mają własnych kolumn ani ekranu.
 Model kanoniczny bierze z wiadomości wyłącznie treść, autora, datę, temat
 i numer oferty.
 
-## Polityka danych reklamacji (0.222.0)
+## Polityka danych reklamacji (0.222.0, wysyłka od 0.224.0)
 
 Ten rozdział powstaje razem z pierwszym ekranem reklamacji, a nie po nim —
 `CLAUDE.md` wymaga tego zapisu, zanim moduł dotknie pierwszej sprawy.
@@ -561,12 +561,27 @@ odczycie — tak samo jak przy skrzynce i przy zwrotach.
 **Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
 ekranu i w tym przyroście go nie dostaje.
 
-**Do dziennika nie idzie treść.** `logEvent` przy notatce zapisuje jej DŁUGOŚĆ,
-nigdy słowa: `events` nie ma retencji i nie jest kasowane.
+**Do dziennika nie idzie treść.** `logEvent` przy notatce i przy wysyłce
+zapisuje jej DŁUGOŚĆ, nigdy słowa: `events` nie ma retencji i nie jest kasowane.
 
-**Do Allegro nie wychodzi stąd nic.** Przyrost pierwszy wyłącznie czyta. Gdy
-dojdzie odpowiedź i werdykt, ten rozdział dostanie akapit o tym, co dokładnie
-opuszcza maszynę.
+**Co opuszcza maszynę przy odpowiedzi (0.224.0).** Wyłącznie tekst napisany
+przez agenta i identyfikator sprawy. Nic więcej: ani notatka wewnętrzna, ani
+znacznik „kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia. Ciało
+żądania ma dwa pola — `text` i `type: "REGULAR"` — i składa je adapter, więc
+nie ma drogi, którą dołożyłoby się trzecie.
+
+**Załączniki wychodzące nie istnieją.** Decyzja właściciela z 7 września 2026.
+Plik z naszego dysku nie ma jak trafić do Allegro tą trasą, bo panel nie ma
+czego wysłać: pola na to nie ma ani w formularzu, ani w ciele żądania.
+
+**Kopia wysłanego tekstu zostaje u nas dwa razy.** Raz w `reklamacja_outbox`
+jako ślad PRÓBY — także tej nieudanej i tej niejednoznacznej — i raz na osi
+rozmowy po potwierdzeniu. To ta sama cena, co przy skrzynce w 0.148.0:
+bez kopii próby timeout znaczyłby ciszę, a cisza po wysyłce do kupującego jest
+gorsza od podwójnej wiadomości.
+
+**Werdykt nadal nie wychodzi stąd wcale.** Przyrost trzeci dostanie własny
+akapit w tym rozdziale.
 
 ## Co się nie zmienia
 

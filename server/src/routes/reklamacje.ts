@@ -12,6 +12,7 @@ import {
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
+import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
    PRZYROST PIERWSZY: odczyt, kolejka z zegarem, czat do czytania. Do Allegro
@@ -19,9 +20,11 @@ import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sy
    dwa następne przyrosty, a każdy z nich jest nieodwracalny wobec kupującego
    i dostanie własne wydanie.
 
-   DWA ZAPISY, oba wyłącznie u nas i oba dotyczące pracy biura: znacznik „kto
-   prowadzi" i notatka z ustaleń. Otwarcie ekranu nie zapisuje nic (blizna
-   0.18.0), a synchronizacja jest osobnym, jawnym kliknięciem.
+   OD 0.224.0 SĄ TRZY ZAPISY. Dwa zostają wyłącznie u nas — znacznik „kto
+   prowadzi" i notatka z ustaleń. Trzeci, ODPOWIEDŹ, wychodzi do Allegro i jest
+   pierwszym takim w tym module; formalny werdykt to nadal przyrost następny.
+   Otwarcie ekranu nie zapisuje nic (blizna 0.18.0), a synchronizacja jest
+   osobnym, jawnym kliknięciem.
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
    skrzynce i przy zwrotach. Reklamacja niesie login kupującego, treść jego
@@ -201,6 +204,38 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
         return { reklamacja: stempelProwadzi(db(), Number(req.params.id), autor(), req.body?.wersja) };
       } catch (e) { return blad(reply, e); }
     });
+
+  /**
+   * Odpowiedź w rozmowie reklamacyjnej (0.224.0).
+   *
+   * Bez `autoryzuj()`: to zwykła praca biura, tak samo jak wysyłka w skrzynce.
+   * Uprawnienie dostanie dopiero werdykt, bo tamten jest nieodwracalny wobec
+   * kupującego, a wiadomość — nie.
+   *
+   * KAŻDA FLAGA Z CIAŁA JEST TU DEKLAROWANA I PRZEKAZYWANA DALEJ. To nie jest
+   * ostrożność na wyrost: w skrzynce `mimoObecnosci` ginie dokładnie w tym
+   * miejscu — serwis go obsługuje, panel go wysyła, a trasa ani go nie
+   * deklaruje, ani nie podaje niżej, więc jawna zgoda agenta nie ma jak
+   * zadziałać. Strażnik tras pilnuje ADRESÓW, nie pól ciała, więc przeszło.
+   */
+  app.post<{ Params: { id: string }; Body: {
+    tresc?: string; expectedWersja?: number;
+    expectedLastMessageId?: number | null; mimoNowejWiadomosci?: boolean;
+  } }>("/api/obsluga/reklamacje/:id/odpowiedz", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const s = sesjaZadania()!;
+    try {
+      return await odpowiedzWSprawie({
+        reklamacjaId: Number(req.params.id),
+        autor: { id: s.user.userId, name: s.user.name },
+        tresc: req.body?.tresc ?? "",
+        expectedWersja: Number(req.body?.expectedWersja),
+        expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
+        mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
+      });
+    } catch (e) { return blad(reply, e); }
+  });
 
   app.post<{ Params: { id: string }; Body: { notatka?: string | null; wersja?: number } }>(
     "/api/obsluga/reklamacje/:id/notatka", async (req, reply) => {

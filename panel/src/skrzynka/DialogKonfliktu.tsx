@@ -12,14 +12,22 @@ import { Przycisk, czas } from "../ui";
  * wie, na którą wersję pytania odpowiada.
  *
  * Szkic zostaje nietknięty: serwer odrzucił wysyłkę PRZED strzałem do Allegro.
+ *
+ * `ktoDopisal` jest PARAMETREM od 0.224.0 i domyślnie brzmi „klient", więc
+ * skrzynka wygląda dokładnie tak, jak wyglądała. Reklamacja podaje tu czasem
+ * „doradca Allegro": rozmowa bywa trójstronna, a dialog, który nazywa autora
+ * dopisku klientem, mówiłby wtedy nieprawdę o tym, na co agent patrzy.
  */
-export function DialogKonfliktu({ szczegoly, szkic, wysyla, blad, onWyslijMimoTo, onPopraw }: {
+export function DialogKonfliktu({
+  szczegoly, szkic, wysyla, blad, onWyslijMimoTo, onPopraw, ktoDopisal = "klient",
+}: {
   szczegoly: SzczegolyWysylki;
   szkic: string;
   wysyla: boolean;
   blad: string;
   onWyslijMimoTo: () => void;
   onPopraw: () => void;
+  ktoDopisal?: string;
 }) {
   const [zgoda, setZgoda] = useState(false);
   const nowa = szczegoly.nowaWiadomosc ?? null;
@@ -30,7 +38,7 @@ export function DialogKonfliktu({ szczegoly, szkic, wysyla, blad, onWyslijMimoTo
       <header className="border-b border-amber-200 bg-amber-50 p-4">
         <div className="flex items-center gap-2">
           <AlertTriangle className="text-ranga-uwaga" size={18} />
-          <b className="text-ranga-uwaga">Wysyłka zatrzymana — klient dopisał wiadomość</b>
+          <b className="text-ranga-uwaga">Wysyłka zatrzymana — {ktoDopisal} dopisał wiadomość</b>
         </div>
         <p className="mt-1 text-sm text-amber-900">
           Serwer odpowiedział 409 przed wysłaniem. Nic nie poszło do Allegro, a Twój szkic
@@ -45,7 +53,7 @@ export function DialogKonfliktu({ szczegoly, szkic, wysyla, blad, onWyslijMimoTo
         </section>
         <section className="rounded-lg border border-os-komentarz-ramka bg-os-komentarz p-3">
           <div className="text-[11px] font-bold uppercase tracking-wide text-ranga-uwaga">
-            Nowa wiadomość klienta{nowa ? ` · ${czas(nowa.at)}` : ""}
+            Nowa wiadomość — {ktoDopisal}{nowa ? ` · ${czas(nowa.at)}` : ""}
           </div>
           <p className="mt-2 whitespace-pre-wrap text-sm">{nowa?.tresc ?? "—"}</p>
           {nowa && <p className="mt-2 text-xs text-slate-500">wiadomość #{nowa.id}</p>}
@@ -53,7 +61,7 @@ export function DialogKonfliktu({ szczegoly, szkic, wysyla, blad, onWyslijMimoTo
       </div>
 
       <p className="px-4 text-sm text-slate-500">
-        Dopisek klienta nie zakłada drugiej sprawy i nie kasuje szkicu. Zmienia tylko to,
+        Dopisek nie zakłada drugiej sprawy i nie kasuje szkicu. Zmienia tylko to,
         na którą wersję pytania odpowiadasz.
       </p>
 

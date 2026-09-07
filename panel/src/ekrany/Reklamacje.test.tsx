@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { KubelekReklamacji, Reklamacja } from "../api/typy";
+import { Konflikt } from "../api/klient";
+import type { KubelekReklamacji, Reklamacja, WiadomoscReklamacji } from "../api/typy";
 
 /* ── Ekran reklamacji ────────────────────────────────────────────────────────
    Trzy rzeczy warte testu, bo żadnej nie widać w serwisie:
@@ -15,7 +16,10 @@ import type { KubelekReklamacji, Reklamacja } from "../api/typy";
       przy zwrotach: lista się zmienia, a zaznaczenie zostaje na sprawie
       z poprzedniego kubełka.
    3. LICZBA ODSIANYCH DYSKUSJI jest widoczna. Bez niej ktoś szukałby kiedyś
-      reklamacji, która nigdy reklamacją nie była.                          */
+      reklamacji, która nigdy reklamacją nie była.
+   4. PUNKT ODNIESIENIA ŚWIEŻOŚCI (0.224.0) liczy się z osi, a własna
+      odpowiedź go NIE przesuwa — inaczej druga wiadomość z rzędu wyglądałaby
+      na spóźnioną i ekran pytałby o zgodę bez powodu.                      */
 
 const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja => ({
   id, externalId: `i-${id}`, numer, orderId: `ord-${id}`, offerId: null,
@@ -41,6 +45,10 @@ const REKLAMACJE = [
 const scena = vi.hoisted(() => ({
   mutacje: [] as string[],
   stan: {} as Record<string, unknown>,
+  czat: [] as unknown[],
+  /* Czym kończy się wysyłka w danym teście: `Error` idzie do `onError`,
+     cokolwiek innego do `onSuccess`, `null` nie woła żadnego z nich. */
+  wynikWysylki: null as unknown,
 }));
 
 vi.mock("../api/reklamacje", async () => {
@@ -62,13 +70,23 @@ vi.mock("../api/reklamacje", async () => {
     useReklamacja: (id: number | null) => ({
       data: id === null ? undefined : {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
-        czat: [{
-          id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
-          tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z",
-          zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }],
-        }],
+        czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], kartoteka: null,
       },
+    }),
+    /* Wysyłka ma WŁASNY podrabiacz, bo jako jedyna oddaje sterowanie z
+       powrotem do ekranu: to `onSuccess`/`onError` rozstrzygają, czy pole się
+       wyczyści i czy otworzy się dialog konfliktu. */
+    useOdpowiedz: () => ({
+      mutate: (v: unknown, opcje?: {
+        onSuccess?: (w: unknown) => void; onError?: (e: unknown) => void;
+      }) => {
+        scena.mutacje.push(`odpowiedz:${JSON.stringify(v)}`);
+        const w = scena.wynikWysylki;
+        if (w instanceof Error) opcje?.onError?.(w);
+        else if (w) opcje?.onSuccess?.(w);
+      },
+      isPending: false, error: null,
     }),
     useProwadze: mutacja("prowadze"),
     useNotatka: mutacja("notatka"),
@@ -78,8 +96,16 @@ vi.mock("../api/reklamacje", async () => {
 
 const { Reklamacje } = await import("./Reklamacje");
 
-function pokaz(adres = "/obsluga/reklamacje") {
+const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
+  id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
+  tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z",
+  zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }], ...n,
+});
+
+function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wiad()]) {
   scena.mutacje = [];
+  scena.czat = czat;
+  scena.wynikWysylki = null;
   scena.stan = {
     status: "current", alarm: false, ostatniaProba: null,
     ostatniaUdanaSynchronizacja: "2026-09-07T11:00:00.000Z", kodOstatniegoBledu: null,
@@ -138,9 +164,11 @@ describe("Ekran reklamacji", () => {
   });
 
   it("ekran mówi WPROST, czego panel jeszcze nie robi", () => {
-    /* Bez tego zdania puste miejsce pod rozmową obiecywałoby odpowiedź. */
+    /* Od 0.224.0 zdanie dotyczy WYŁĄCZNIE werdyktu: odpowiedź wychodzi już
+       stąd, a napis, który mówiłby inaczej, byłby po prostu nieprawdą. */
     pokaz("/obsluga/reklamacje/1");
-    expect(screen.getByText(/wysyła się na razie w Centrum Sprzedaży/)).toBeInTheDocument();
+    expect(screen.getByText(/Formalny werdykt/)).toBeInTheDocument();
+    expect(screen.queryByText(/Odpowiedź .* wysyła się/)).not.toBeInTheDocument();
   });
 
   it("bez wybranej sprawy środek zaprasza do kolejki, zamiast świecić pustką", () => {
@@ -171,5 +199,103 @@ describe("Ekran reklamacji", () => {
        tego stoi filtr, który do niczego nie pasuje. */
     expect(screen.getByText(/nie pasuje do tego, czego szukasz/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
+  });
+
+  it("odpowiedź jedzie z WERSJĄ i z ostatnią NIE naszą wiadomością", async () => {
+    /* Własna odpowiedź NIE przesuwa punktu odniesienia. Gdyby przesuwała,
+       druga wiadomość z rzędu wyglądałaby na spóźnioną i ekran pytałby
+       o zgodę, mimo że po naszej stronie nic się nie zmieniło. */
+    pokaz("/obsluga/reklamacje/1", [
+      wiad(),
+      wiad({ id: 2, externalId: "w-2", autorRola: "SELLER", tresc: "Proszę o zdjęcie" }),
+    ]);
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(scena.mutacje).toEqual([`odpowiedz:${JSON.stringify({
+      id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
+      expectedLastMessageId: 1, mimoNowejWiadomosci: false,
+    })}`]);
+  });
+
+  it("dopisek DORADCY otwiera dialog zgody i nazywa go po imieniu", async () => {
+    /* 409 z `nowaWiadomosc` to jedyny konflikt wymagający decyzji człowieka.
+       Autorem bywa doradca Allegro, nie kupujący — dialog, który nazwałby go
+       klientem, mówiłby nieprawdę o tym, na co agent patrzy. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = new Konflikt("Ktoś dopisał wiadomość", {
+      lastMessageId: 7, kluczIdempotencji: "rek-1-7-ab12",
+      nowaWiadomosc: { id: 7, tresc: "Proszę o zdjęcie noża", at: null, rola: "ADMIN" },
+    });
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(screen.getByRole("dialog", { name: "Wysyłka zatrzymana" })).toBeInTheDocument();
+    expect(screen.getByText(/doradca Allegro dopisał wiadomość/)).toBeInTheDocument();
+    /* Szkic zostaje NIETKNIĘTY: serwer odrzucił wysyłkę przed strzałem. */
+    expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveValue("Wysyłam nowy nóż");
+  });
+
+  it("„WYŚLIJ MIMO TO” jest martwy do jawnej zgody, a potem niesie flagę", async () => {
+    /* Blizna 0.110.0: do niej odpowiedź szła na starą wersję pytania po cichu.
+       Flaga MUSI dojechać — w skrzynce gubi ją trasa i nikt tego nie zauważył
+       przez cztery wydania. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = new Konflikt("Ktoś dopisał wiadomość", {
+      lastMessageId: 7, kluczIdempotencji: "rek-1-7-ab12",
+      nowaWiadomosc: { id: 7, tresc: "Dopisuję", at: null, rola: "BUYER" },
+    });
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(screen.getByText(/klient dopisał wiadomość/)).toBeInTheDocument();
+    const mimoTo = screen.getByRole("button", { name: "WYŚLIJ MIMO TO" });
+    expect(mimoTo).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox"));
+    scena.mutacje = [];
+    await userEvent.click(mimoTo);
+    expect(scena.mutacje).toEqual([`odpowiedz:${JSON.stringify({
+      id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
+      expectedLastMessageId: 1, mimoNowejWiadomosci: true,
+    })}`]);
+  });
+
+  it("po wysłaniu pole się czyści, a po niejednoznacznym wyniku — NIE", async () => {
+    /* Wyczyszczone pole po timeoucie znaczyłoby, że agent napisze tekst
+       drugi raz, nie wiedząc, czy pierwszy poszedł. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = { status: "sent" };
+    const pole = screen.getByLabelText("Odpowiedź w sprawie");
+    await userEvent.type(pole, "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(pole).toHaveValue("");
+
+    scena.wynikWysylki = { status: "send_uncertain" };
+    await userEvent.type(pole, "Druga próba");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(pole).toHaveValue("Druga próba");
+    expect(screen.getByText(/nie dała jednoznacznej odpowiedzi/)).toBeInTheDocument();
+  });
+
+  it("odmowa BEZ dopisku to jedno zdanie pod polem, nie dialog", async () => {
+    /* Zamknięta rozmowa i rozjazd wersji nie wymagają decyzji — wymagają
+       przeczytania. Dialog nad ekranem byłby tu kosztem bez zysku. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = new Konflikt(
+      "Allegro zamknęło rozmowę w tej sprawie i nie przyjmie nowej wiadomości.", {});
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
+  });
+
+  it("zamknięta rozmowa nie daje pola do pisania — ani wyłączonego, ani żadnego", () => {
+    /* `czatAktywny` idzie z rekordu przez ekran do edytora. Test stoi tutaj,
+       a nie tylko przy edytorze, bo gubi się właśnie na tej drodze. */
+    REKLAMACJE[1].czatAktywny = false;
+    try {
+      pokaz("/obsluga/reklamacje/2");
+      expect(screen.queryByLabelText("Odpowiedź w sprawie")).not.toBeInTheDocument();
+      expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
+    } finally {
+      REKLAMACJE[1].czatAktywny = true;
+    }
   });
 });
