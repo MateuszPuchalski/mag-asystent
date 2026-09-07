@@ -121,6 +121,11 @@ CREATE TABLE IF NOT EXISTS message (
   -- mapowaniu, choć sonda pokazuje ją częściej niż ofertę (7 z 33 wobec 5).
   related_order_id    TEXT,
   sent_at             TEXT NOT NULL,
+  -- Nasza automatyczna odpowiedź „Dziękujemy za kontakt" (0.227.0). Liczona RAZ,
+  -- przy zapisie, przez `czyAutoresponder` — a nie przy każdym odczycie i nie
+  -- drugi raz w SQL-u. Dwie kopie tej reguły rozjechałyby się przy pierwszej
+  -- poprawce, a objawem byłaby rozmowa uznana za odpisaną, bo odbiła się echem.
+  auto_odpowiedz      INTEGER NOT NULL DEFAULT 0,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   -- Ponowne pobranie tej samej strony kanału ma skończyć się konfliktem,
   -- który importer zamienia na no-op, a nie drugim wierszem wiadomości.

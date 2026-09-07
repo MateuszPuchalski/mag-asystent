@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.227.0 — 7 września 2026
+
+**Autoodpowiedź przestaje udawać naszą odpowiedź.** 0.225.0 zaczęło czytać
+z wiadomości, kto ma następny ruch — i zaraz wyszło, że odbicie „Dziękujemy za
+kontakt" psuje ten odczyt. Wychodzi samo, w sekundę po pytaniu, i nie odpowiada
+na nic, ale liczyło się jako nasza wiadomość: rozmowa przeskakiwała na „czeka
+na klienta" i znikała z listy tych, które czekają na odpowiedź. Pytanie ginęło
+przez to, że skrzynka grzecznie potwierdziła jego odbiór.
+
+Teraz odbicie nie zamyka piłki — po nim rozmowa dalej czeka na nas. Ten sam
+błąd zerował licznik dopisków klienta w wierszu kolejki („zero dopisków" przy
+rozmowie, w której klient napisał i nikt mu nie odpowiedział); ten licznik też
+liczy się odtąd od PRAWDZIWEJ odpowiedzi.
+
+Reguła jest wąska: pomija odbicie, a nie wszystko, co od nas wychodzi.
+Prawdziwa odpowiedź agenta oddaje piłkę jak dotąd. Kierunek dalej rozstrzyga
+pewnie — klient cytujący nasze potwierdzenie zadaje pytanie i tak jest liczony.
+
+**Znacznik liczy się RAZ, przy zapisie** (`message.auto_odpowiedz`). Odczyt go
+tylko czyta, a SQL nie powtarza reguły — dwie kopie rozjechałyby się przy
+pierwszej poprawce. Migracja wypełnia kolumnę wstecz i mówi w dzienniku, ile
+wiadomości oznaczyła.
+
+**[wymaga działania]** Po aktualizacji część rozmów zmieni stan w kolejce:
+te, które kończyły się autoodpowiedzią, wrócą z „Czeka na klienta" na „Czeka na
+nas". To nie jest usterka — to rozmowy, które czekały na odpowiedź od początku.
+Warto przejrzeć kolejkę raz po wdrożeniu.
+
 ## 0.226.1 — 7 września 2026
 
 **Numer reklamacji prowadził w 404.** Właściciel kliknął sprawę w kolumnie

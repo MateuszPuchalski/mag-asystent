@@ -14,6 +14,7 @@ let zlecPomiar: typeof import("./skrzynka.js").zlecPomiar;
 let stanSkrzynki: typeof import("./skrzynka.js").stanSkrzynki;
 let stanKolejkiWysylek: typeof import("./skrzynka.js").stanKolejkiWysylek;
 let przejmijRozmowe: typeof import("./conversations.js").przejmijRozmowe;
+let zapiszWiadomosc: typeof import("./conversations.js").zapiszWiadomosc;
 let wskazKartoteke: typeof import("./conversations.js").wskazKartoteke;
 let ustawPriorytet: typeof import("./conversations.js").ustawPriorytet;
 let wezZadanie: typeof import("./zadania-terenowe.js").wezZadanie;
@@ -27,7 +28,7 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki, stanKolejkiWysylek } =
     await import("./skrzynka.js"));
-  ({ przejmijRozmowe, wskazKartoteke, ustawPriorytet } = await import("./conversations.js"));
+  ({ przejmijRozmowe, wskazKartoteke, ustawPriorytet, zapiszWiadomosc } = await import("./conversations.js"));
   ({ wezZadanie, wykonajZadanie } = await import("./zadania-terenowe.js"));
   const d = db();
   BIURO.id = Number(d.prepare(
@@ -915,4 +916,81 @@ test("wątek bez ani jednej wiadomości zostaje przy stanie zapisanym", () => {
      prawa zgadywać. */
   const r = rozmowaZWiadomosciami([], "new");
   assert.equal(osRozmowy(r).rozmowa.status, "new");
+});
+
+/* ── Autoodpowiedź nie zamyka piłki (0.227.0) ────────────────────────────────
+   „Dziękujemy za kontakt" wychodzi SAMO, w sekundę po pytaniu, i nie odpowiada
+   na nic. Liczone jako nasza wiadomość przestawiało rozmowę na „czeka na
+   klienta" i zdejmowało ją z listy tych, które czekają na odpowiedź — pytanie
+   ginęło przez to, że skrzynka grzecznie potwierdziła jego odbiór.        */
+
+const ODBICIE = "Dziękujemy za kontakt\n\nTa wiadomość jest generowana automatycznie.";
+
+function rozmowaZOdbiciem(poOdbiciu: Array<"incoming" | "outgoing"> = []) {
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro',?)")
+    .run(`auto-${Math.random()}`).lastInsertRowid);
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,status,updated_at)
+    VALUES (?,?,'Temat','open','2026-09-01T10:00:00.000Z')`)
+    .run(konto, `w-${Math.random()}`).lastInsertRowid);
+  /* Przez `zapiszWiadomosc`, nie wprost do tabeli: to ta funkcja rozpoznaje
+     odbicie przy zapisie i test ma przejść JEJ ścieżką. */
+  const pisz = (dir: "incoming" | "outgoing", body: string, i: number) =>
+    zapiszWiadomosc({ conversationId: rozmowa, channelAccountId: konto,
+      externalMessageId: `a-${rozmowa}-${i}`, direction: dir, body,
+      sentAt: `2026-09-01T1${i}:00:00.000Z` }, d);
+  pisz("incoming", "Czy ten szarpak pasuje?", 0);
+  pisz("outgoing", ODBICIE, 1);
+  poOdbiciu.forEach((k, i) => pisz(k, k === "incoming" ? "Dopisuję" : "Pasuje.", i + 2));
+  return rozmowa;
+}
+
+test("po autoodpowiedzi rozmowa DALEJ czeka na nas", () => {
+  const r = rozmowaZOdbiciem();
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_us");
+  assert.equal(listaRozmow().find((x) => x.id === r)!.status, "waiting_for_us");
+});
+
+test("prawdziwa odpowiedź agenta piłkę oddaje", () => {
+  /* Reguła jest WĄSKA: pomija odbicie, a nie wszystko, co od nas wychodzi. */
+  const r = rozmowaZOdbiciem(["outgoing"]);
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_customer");
+});
+
+test("licznik dopisków liczy się od PRAWDZIWEJ odpowiedzi, nie od odbicia", () => {
+  /* Wiersz kolejki mówił „zero dopisków" o rozmowie, w której klient napisał
+     i nikt mu nie odpowiedział — bo autoodpowiedź stała po jego pytaniu. */
+  const r = rozmowaZOdbiciem(["incoming"]);
+  assert.equal(listaRozmow().find((x) => x.id === r)!.nowychOdOdpowiedzi, 2);
+});
+
+test("oś bierze znacznik odbicia z KOLUMNY, nie liczy go drugi raz", () => {
+  /* Jedno źródło: tę samą wartość czyta kolejka przy wyliczaniu, kto ma ruch. */
+  const r = rozmowaZOdbiciem();
+  const d = db();
+  const wpisy = osRozmowy(r).os.filter((w) => w.rodzaj === "wiadomosc");
+  assert.equal(wpisy.at(-1)!.automatyczna, true);
+  assert.equal(wpisy[0]!.automatyczna, undefined, "pytanie klienta nie jest odbiciem");
+  assert.equal((d.prepare(
+    "SELECT auto_odpowiedz a FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1")
+    .get(r) as { a: number }).a, 1);
+});
+
+test("odbicie CYTOWANE przez klienta nie jest naszym odbiciem", () => {
+  /* Kierunek rozstrzyga pewnie, treść nie rozstrzyga wcale: klient odpisujący
+     z naszym potwierdzeniem pod spodem zadaje pytanie. */
+  const d = db();
+  const r = rozmowaZOdbiciem();
+  const konto = Number((d.prepare(
+    "SELECT channel_account_id k FROM conversation WHERE id=?").get(r) as { k: number }).k);
+  zapiszWiadomosc({ conversationId: r, channelAccountId: konto,
+    externalMessageId: `cytat-${r}`, direction: "incoming",
+    body: `Dopytuję.\n\n> ${ODBICIE}`, sentAt: "2026-09-01T19:00:00.000Z" }, d);
+
+  assert.equal((d.prepare(
+    "SELECT auto_odpowiedz a FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1")
+    .get(r) as { a: number }).a, 0);
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_us");
 });

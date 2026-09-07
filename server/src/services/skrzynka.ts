@@ -11,7 +11,6 @@ import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
-import { czyAutoresponder } from "./autoresponder.js";
 import { podzielStopke } from "./stopka.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
@@ -231,17 +230,27 @@ const LISTA = `
          -- ostatnią wiadomość KLIENTA, bo podgląd w kolejce ma pokazywać jego
          -- słowa, nie nasze. Użycie go tutaj dawało „czeka na nas" także tuż
          -- po naszej odpowiedzi.
-         (SELECT m.direction FROM message m WHERE m.conversation_id=c.id
+         -- AUTOODPOWIEDŹ NIE JEST NASZYM RUCHEM (0.227.0): „Dziękujemy za
+         -- kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na
+         -- nic. Liczona jako nasza wiadomość zdejmowała rozmowę z listy tych,
+         -- które czekają na odpowiedź.
+         (SELECT m.direction FROM message m
+           WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
            ORDER BY m.id DESC LIMIT 1) AS ostatniRuch,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
          (SELECT MAX(k.sent_at) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming') AS pytanieAt,
+         -- Licznik dopisków liczy się OD NASZEJ PRAWDZIWEJ ODPOWIEDZI
+         -- (0.227.0). Autoodpowiedź stojąca po pytaniu zerowała go, więc
+         -- wiersz kolejki mówił „zero dopisków" o rozmowie, w której klient
+         -- napisał i nikt mu nie odpowiedział.
          (SELECT COUNT(*) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming'
              AND k.id > COALESCE((SELECT MAX(n.id) FROM message n
-                                   WHERE n.conversation_id=c.id AND n.direction='outgoing'), 0)
+                                   WHERE n.conversation_id=c.id
+                                     AND n.direction='outgoing' AND n.auto_odpowiedz=0), 0)
          ) AS nowych,
          EXISTS(SELECT 1 FROM zadanie_terenowe z
                  WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
@@ -448,7 +457,8 @@ export function osRozmowy(id: number): {
      Do 0.177.1 stała tu wyłącznie druga droga, więc pytanie SPRZED zakupu —
      czyli każde zadane pod ofertą — zostawało z gołym numerem. */
   const wiadomosci = db().prepare(`
-    SELECT m.id, m.direction, m.body, m.sent_at, m.related_object_type AS typ,
+    SELECT m.id, m.direction, m.body, m.sent_at, m.auto_odpowiedz AS auto,
+           m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
            m.channel_account_id AS konto,
            /* ── PODPIS TO LOGIN, NIE TEMAT (0.219.2) ────────────────────────
@@ -527,9 +537,10 @@ export function osRozmowy(id: number): {
     nazwaOferty: m.nazwaOferty == null ? null : String(m.nazwaOferty),
     zamowienieId: m.zamowienie == null ? null : String(m.zamowienie),
     ...(zalaczniki.has(Number(m.id)) ? { zalaczniki: zalaczniki.get(Number(m.id)) } : {}),
-    /* Tylko wychodzące: cytat naszego potwierdzenia pod odpowiedzią klienta
-       niesie ten sam podpis, a jego wiadomość jest pytaniem, nie odbiciem. */
-    ...(wychodzaca && czyAutoresponder(String(m.body)) ? { automatyczna: true } : {}),
+    /* Znacznik z KOLUMNY, nie liczony drugi raz (0.227.0): tę samą wartość
+       czyta kolejka przy wyliczaniu, kto ma ruch, a jedno źródło znaczy, że
+       oba miejsca nie mogą się rozejść. */
+    ...(Number(m.auto ?? 0) ? { automatyczna: true } : {}),
     ...(stopka == null ? {} : { stopka }),
     };
   });
