@@ -22,6 +22,9 @@ export const KLASA_STATUSU: Record<string, string> = {
   "new": "bg-stan-new text-stan-new-tekst",
   "open": "bg-stan-open text-stan-open-tekst",
   "waiting_for_customer": "bg-stan-klient text-stan-klient-tekst",
+  /* „Czeka na nas" pożycza barwę stanu wewnętrznego: oba znaczą „piłka po
+     naszej stronie", tylko jeden czeka na słowo, a drugi na pomiar. */
+  "waiting_for_us": "bg-stan-wewnetrzne text-stan-wewnetrzne-tekst",
   "waiting_for_internal": "bg-stan-wewnetrzne text-stan-wewnetrzne-tekst",
   "resolved": "bg-stan-zrobione text-stan-zrobione-tekst",
   "snoozed": "bg-stan-odlozona text-stan-odlozona-tekst",

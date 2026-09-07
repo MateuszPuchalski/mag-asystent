@@ -450,7 +450,17 @@ test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async
     url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
     payload: { status: "zalatwione" } });
   assert.equal(zmyslony.statusCode, 400);
-  assert.match(zmyslony.json().error, /waiting_for_customer/, "błąd ma wymienić dozwolone stany");
+  assert.match(zmyslony.json().error, /snoozed/, "błąd ma wymienić dozwolone stany");
+
+  /* ── STANY WYLICZANE NIE PRZECHODZĄ TRASĄ (0.225.0) ───────────────────────
+     „Czeka na klienta" wynika z ostatniej wiadomości, więc nadanie go z ręki
+     byłoby przepisaniem faktu, który już stoi w wątku. Bramka stoi na trasie,
+     bo `ustawStatus` wołają też zdarzenia po naszej stronie. */
+  const wyliczany = await app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
+    payload: { status: "waiting_for_customer" } });
+  assert.equal(wyliczany.statusCode, 400);
+  assert.match(wyliczany.json().error, /nie nadaje się ręcznie/);
 
   const bezTerminu = await app.inject({ method: "POST",
     url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
