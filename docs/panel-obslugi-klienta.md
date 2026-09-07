@@ -277,8 +277,8 @@ z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
 
 ## 7. Statusy
 
-**Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_internal`,
-`snoozed`, `resolved`, `closed`, `spam`.
+**Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_us`,
+`waiting_for_internal`, `snoozed`, `resolved`, `closed`, `spam`.
 
 **Dobór:** `not_started`, `extracting_data`, `missing_information`, `searching`,
 `candidates_found`, `requires_expert`, `confirmed`, `rejected`,
@@ -314,8 +314,48 @@ Budzenie omija `closed` i `spam`. To jawne werdykty człowieka, a automat,
 który je cofa, kazałby zamykać tę samą rozmowę w kółko.
 
 Odłożenie wymaga terminu i kończy się SAMO — liczymy to przy odczycie, bez
-tickera. Rozmowa po minionym terminie wraca jako `open` i niesie znacznik
+tickera. Rozmowa po minionym terminie wraca jako żywa i niesie znacznik
 „po terminie", bo inaczej niczym nie różniłaby się od świeżo otwartej.
+
+### 7.2. Kto ma następny ruch — WYLICZANE, nie klikane (0.225.0)
+
+Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
+czeka na klienta, czeka na nas powinno być odczytywane z wiadomości". Miał
+rację: kto ma następny ruch, widać po ostatniej wiadomości. Ustawianie tego
+z ręki było przepisywaniem faktu, który już stoi w wątku, a jedynym możliwym
+wynikiem takiej pracy jest pomyłka.
+
+Cztery stany — `new`, `open`, `waiting_for_customer`, `waiting_for_us` —
+liczą się przy ODCZYCIE z kierunku ostatniej wiadomości. Ostatnia od klienta
+znaczy `waiting_for_us`, ostatnia nasza znaczy `waiting_for_customer`. Wątek
+bez ani jednej wiadomości zostaje przy stanie zapisanym: nie ma z czego
+wywieść ruchu, a ekran nie zgaduje.
+
+Regułę trzyma `statusZKierunku` w `services/conversations.ts` i wołają ją dwa
+miejsca: `statusRozmowy` przy jednej rozmowie i `naRozmowe` przy całej liście.
+Druga kopia rozjechałaby się przy pierwszej poprawce, a objawem byłaby kolejka
+mówiąca co innego niż rozmowa po kliknięciu.
+
+**Werdykty człowieka przebijają wyliczenie.** `snoozed`, `resolved`, `closed`
+i `spam` zostają, choćby ostatnia wiadomość była klienta — inaczej nie dałoby
+się domknąć żadnej sprawy. Przebija je także `waiting_for_internal`: nie
+wynika z wiadomości, tylko ze zlecenia pomiaru, i zdejmuje go dopiero wynik
+z hali.
+
+**Trasa przyjmuje TYLKO statusy ręczne** (`STATUSY_RECZNE`): cztery werdykty
+plus `open` jako droga powrotna, znacząca „oddaj sterowanie rozmowie". Bez tej
+piątej pozycji werdykt „Rozwiązana" trzymałby rozmowę, dopóki klient sam nie
+napisze, a pomyłki nie dałoby się cofnąć. Bramka stoi na trasie, a nie
+w serwisie, bo `ustawStatus` wołają też zdarzenia po naszej stronie i te mają
+prawo pisać stan wprost.
+
+**AUDYT MÓWI O KOLUMNIE, nie o wyliczeniu.** Zmiany statusu porównują wartość
+zapisaną (`statusZapisany`), inaczej zdjęcie werdyktu zapisałoby w dzienniku
+przejście „czeka na klienta → otwarta", którego nikt nie zrobił.
+
+`waiting_for_internal` nazywa się na ekranie **„Czeka na halę"**, nie „Czeka
+na nas". Stara etykieta kłamała o tym, na co rozmowa czeka, i stała w menu
+obok „Otwartej" jak coś do wybrania ręką.
 
 Zamknięcia automatycznego po N dniach NIE MA. §26 wymienia je wśród pytań
 do właściciela; do czasu decyzji rozmowę zamyka wyłącznie człowiek.
@@ -2242,6 +2282,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
+| Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasa przyjmuje tylko `STATUSY_RECZNE` |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
 | Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |

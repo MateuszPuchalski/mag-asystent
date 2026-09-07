@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_ROZMOWY, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_RECZNE, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
@@ -416,9 +416,15 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       const s = req.body?.status ?? "";
-      if (!(STATUSY_ROZMOWY as readonly string[]).includes(s)) {
+      /* TYLKO STATUSY RĘCZNE (0.225.0). „Otwarta", „czeka na klienta" i „czeka
+         na nas" WYNIKAJĄ z ostatniej wiadomości, więc nadanie ich z ręki byłoby
+         przepisaniem faktu, który już stoi w wątku — i jedyne, co mogłoby z tego
+         wyjść, to rozjazd. Bramka stoi na TRASIE, nie w serwisie: `ustawStatus`
+         wołają też zdarzenia po naszej stronie (zlecenie pomiaru stawia
+         `waiting_for_internal`), a te mają prawo pisać stan wprost. */
+      if (!(STATUSY_RECZNE as readonly string[]).includes(s)) {
         return reply.code(400).send({
-          error: `Nieznany status. Dozwolone: ${STATUSY_ROZMOWY.join(", ")}.` });
+          error: `Tego statusu nie nadaje się ręcznie. Dozwolone: ${STATUSY_RECZNE.join(", ")}.` });
       }
       try {
         return ustawStatus(db(), Number(req.params.id), s as StatusRozmowy,

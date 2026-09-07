@@ -14,7 +14,7 @@ export type StanZdjeciaOferty = "jest" | "brak" | "nieznane";
    w `STATUSY_ROZMOWY` na serwerze i w `CHECK` na kolumnie — trzy kopie jednej
    listy, bo każda pilnuje innej granicy: typów, API i bazy. */
 export type StatusRozmowy =
-  | "new" | "open" | "waiting_for_customer" | "waiting_for_internal"
+  | "new" | "open" | "waiting_for_customer" | "waiting_for_us" | "waiting_for_internal"
   | "snoozed" | "resolved" | "closed" | "spam";
 
 export type Rozmowa = {

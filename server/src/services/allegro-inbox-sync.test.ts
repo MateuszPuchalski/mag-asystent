@@ -515,7 +515,9 @@ test("nowa wiadomość klienta otwiera rozmowę uznaną za rozwiązaną", async 
       new Map([["t-1", ["m-1", "m-2"]]])).query,
   });
 
-  assert.equal(statusRozmowy(database, rozmowa), "open",
+  /* Od 0.225.0 obudzona rozmowa mówi WPROST, kto ma ruch: klient właśnie
+     dopisał pytanie, więc czeka na nas. Kolumna wraca do `open` jak dotąd. */
+  assert.equal(statusRozmowy(database, rozmowa), "waiting_for_us",
     "rozmowa została rozwiązana mimo nowego pytania klienta");
 });
 

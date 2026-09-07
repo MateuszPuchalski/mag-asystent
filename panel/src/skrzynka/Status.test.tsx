@@ -23,6 +23,43 @@ describe("Status rozmowy", () => {
     expect(screen.getAllByText("Nowa").length).toBeGreaterThan(0);
   });
 
+  /* ── Wyliczanego stanu nie da się kliknąć (0.225.0) ──────────────────────
+     Właściciel: „w większości nie powinienem był robić tego ręcznie".
+     Kto ma następny ruch, wynika z ostatniej wiadomości; pole ma to POKAZAĆ,
+     a nie oddawać do wyboru.                                              */
+  it("stany wyliczane widać, ale nie da się ich nadać", () => {
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} zapisuje={false} blad=""
+      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
+
+    const pole = screen.getByRole("combobox", { name: /Status rozmowy/ });
+    expect(pole).toHaveValue("waiting_for_us");
+    /* Pokazana, ale nieaktywna: pole musi mieć opcję dla wartości, którą
+       wyświetla, inaczej przeglądarka wybrałaby pierwszą z listy. */
+    expect(screen.getByRole("option", { name: "Czeka na nas" })).toBeDisabled();
+
+    /* Do wzięcia zostają CZTERY werdykty człowieka. */
+    for (const nazwa of ["Otwarta", "Czeka na klienta", "Czeka na halę"]) {
+      expect(screen.queryByRole("option", { name: nazwa })).toBeNull();
+    }
+    for (const nazwa of ["Odłożona", "Rozwiązana", "Zamknięta", "Spam"]) {
+      expect(screen.getByRole("option", { name: nazwa })).toBeEnabled();
+    }
+  });
+
+  it("z werdyktu jest droga powrotna, a bez werdyktu jej nie ma", async () => {
+    /* Bez niej „Rozwiązana" trzymałaby rozmowę, dopóki klient sam nie napisze,
+       a pomyłki nie dałoby się cofnąć. */
+    const zmien = vi.fn();
+    const { rerender } = render(<Status rozmowa={rozmowa({ status: "resolved" })} zapisuje={false}
+      blad="" onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }), "open");
+    expect(zmien).toHaveBeenCalledWith("open", null);
+
+    rerender(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} zapisuje={false} blad=""
+      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.queryByRole("option", { name: /Wróć do stanu z rozmowy/ })).toBeNull();
+  });
+
   it("zwykła zmiana idzie od razu, bez terminu", async () => {
     const zmien = vi.fn();
     render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""

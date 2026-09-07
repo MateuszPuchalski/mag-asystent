@@ -170,20 +170,19 @@ test("komentarz zapisuje wzmianki bez duplikatów i odrzuca pustą treść", () 
    gdy klient dopisze pytanie, jest gorszy od jego braku: rozmowa wygląda na
    załatwioną i nikt do niej nie zagląda. */
 
-test("nowa rozmowa jest `new`, przejęcie robi z niej `open`", () => {
+test("rozmowa z pytaniem klienta czeka NA NAS, i to bez klikania (0.225.0)", () => {
+  /* Do 0.224.0 stało tu `new`, a po przejęciu `open`. Oba były prawdziwe
+     o KOLUMNIE i nic nie mówiły o tym, kto ma następny ruch — a to jedyne,
+     po co agent na ten stan patrzy. Kolumna dalej trzyma `new` i przejęcie
+     dalej robi z niej `open`; zmieniło się to, co widać na ekranie. */
   const { d, ala, rozmowa } = stanowisko();
-  assert.equal(statusRozmowy(d, rozmowa), "new");
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 
   przejmijRozmowe(rozmowa, ala, 1, d);
-  assert.equal(statusRozmowy(d, rozmowa), "open");
-});
-
-test("wysłanie odpowiedzi przestawia rozmowę na `waiting_for_customer`", () => {
-  const { d, ala, rozmowa } = stanowisko();
-  przejmijRozmowe(rozmowa, ala, 1, d);
-
-  ustawStatus(d, rozmowa, "waiting_for_customer", ala, null);
-  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_customer");
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us",
+    "przejęcie nie zdejmuje piłki — pytanie klienta dalej czeka na odpowiedź");
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "open", "kolumna zmieniła się tak jak dotąd");
 });
 
 test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () => {
@@ -197,7 +196,10 @@ test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () =
 
     obudzPrzychodzaca(d, rozmowa);
 
-    assert.equal(statusRozmowy(d, rozmowa), "open", `${zamkniety} nie wróciło do open`);
+    /* Po obudzeniu kolumna wraca do `open`, a ekran mówi konkretnie: ostatnia
+       wiadomość jest klienta, więc piłka stoi u nas. */
+    assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us",
+      `${zamkniety} nie wróciło do żywych`);
   }
 });
 
@@ -226,7 +228,8 @@ test("odłożenie wymaga terminu, a po nim rozmowa wraca sama", () => {
   assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-01T20:00:00Z")), "snoozed");
   /* Po terminie wraca SAMA, bez tickera: liczymy przy odczycie, bo stan
      wyliczalny nie potrzebuje procesu, który go pilnuje. */
-  assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-02T09:00:00Z")), "open");
+  assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-02T09:00:00Z")), "waiting_for_us",
+    "po terminie rozmowa jest żywa, a pytanie klienta czeka na odpowiedź");
 });
 
 test("zmiana statusu ląduje na osi i w audycie", () => {
