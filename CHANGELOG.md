@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.225.0 — 7 września 2026
+
+**Kto ma następny ruch, czyta się z wiadomości — nie klika ręką.** Właściciel:
+„w większości nie powinienem był robić tego ręcznie — otwarta, czeka na
+klienta, czeka na nas powinno być odczytywane z wiadomości". Kto ma ruch,
+widać po ostatniej wiadomości; ustawianie tego z ręki było przepisywaniem
+faktu, który już stoi w wątku, a jedynym możliwym wynikiem takiej pracy jest
+pomyłka.
+
+Cztery stany liczą się przy odczycie: ostatnia wiadomość od klienta znaczy
+„Czeka na nas", ostatnia nasza — „Czeka na klienta". Wątek bez ani jednej
+wiadomości zostaje przy stanie zapisanym, bo nie ma z czego wywieść ruchu.
+Regułę trzyma jedna funkcja, wołana i przy pojedynczej rozmowie, i przy całej
+kolejce — dwie kopie rozjechałyby się przy pierwszej poprawce, a objawem
+byłaby kolejka mówiąca co innego niż rozmowa po kliknięciu.
+
+**W rozwijanym menu zostają CZTERY werdykty:** Odłożona, Rozwiązana,
+Zamknięta, Spam. Stan wyliczany widać w tym samym polu jako pozycję
+nieaktywną — §7 żąda, żeby nagłówek pokazywał stan zawsze, a 0.193.0
+zabroniło mówić go dwa razy. Dochodzi piąta pozycja „Wróć do stanu z rozmowy":
+bez niej werdykt trzymałby rozmowę, dopóki klient sam nie napisze, a pomyłki
+nie dałoby się cofnąć.
+
+**„Czeka na nas" znaczyło co innego, niż mówiło.** Ten status stawiało
+ZLECENIE POMIARU, a zdejmował wynik z magazynu — czyli czekanie na halę, nie
+na odpowiedź biura. Pod starą nazwą stał w menu obok „Otwartej" i wyglądał
+jak coś do wybrania ręką. Nazywa się teraz **„Czeka na halę"**, zniknął
+z listy do wyboru i dalej działa sam.
+
+Werdykt człowieka przebija wyliczenie: rozmowa rozwiązana zostaje rozwiązana,
+choćby klient właśnie dopisał pytanie — inaczej nie dałoby się domknąć żadnej
+sprawy. Przebija je także czekanie na halę. Trasa `POST /status` przyjmuje
+odtąd wyłącznie statusy ręczne i odmawia reszcie zdaniem, które mówi dlaczego.
+
+Audyt mówi dalej o KOLUMNIE, nie o wyliczeniu: zdjęcie werdyktu nie zapisuje
+w dzienniku przejścia „czeka na klienta → otwarta", którego nikt nie zrobił.
+
 ## 0.224.1 — 7 września 2026
 
 **Miękka blokada obecności zachowywała się jak twarda.** Gdy przy rozmowie

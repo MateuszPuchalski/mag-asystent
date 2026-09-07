@@ -8,6 +8,18 @@ import { DO_WYBORU, NAZWA } from "./statusy";
    gdy nikt go nie ruszył — „Nowa" znaczy, że sprawy nie tknięto, a to jest
    informacja, nie brak informacji.
 
+   ── WIĘKSZOŚCI TEGO NIE KLIKA SIĘ JUŻ RĘKĄ (0.225.0) ──────────────────────
+   Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
+   czeka na klienta, czeka na nas powinno być odczytywane z wiadomości".
+   Kto ma następny ruch, WIDAĆ po ostatniej wiadomości, więc ustawianie tego
+   z ręki było przepisywaniem faktu, który już stoi w wątku — pracą, której
+   jedynym możliwym wynikiem jest pomyłka.
+
+   W polu zostają CZTERY werdykty człowieka plus droga powrotna. Stan wyliczany
+   pokazuje się w tym samym polu jako pozycja NIEAKTYWNA: §7 żąda, żeby nagłówek
+   pokazywał stan zawsze, a 0.193.0 zabroniło mówić go dwa razy — plakietka obok
+   pola byłaby powtórzeniem, które tamto wydanie właśnie usunęło.
+
    ODŁOŻENIE MA WŁASNY KROK. Serwer odrzuca `snoozed` bez terminu (§7 nie zna
    rozmowy odłożonej na zawsze), więc ekran pyta o datę PRZED wysłaniem, a nie
    pokazuje potem błędu z serwera — agent nie ma się dowiadywać o regule
@@ -66,11 +78,21 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
           setOdkladanie(false);
           onZmien(wybrany, null);
         }}>
-        {/* `new` bywa stanem BIEŻĄCYM, choć nie da się go wybrać: pole musi
-            mieć opcję dla wartości, którą pokazuje, inaczej przeglądarka
-            wybrałaby pierwszą z listy i ekran skłamałby o stanie sprawy. */}
-        {rozmowa.status === "new" && <option value="new">{NAZWA.new}</option>}
+        {/* STAN WYLICZANY JEST W POLU, ALE NIE DO WZIĘCIA (0.225.0).
+            Pole musi mieć opcję dla wartości, którą pokazuje — inaczej
+            przeglądarka wybrałaby pierwszą z listy i ekran skłamałby o stanie
+            sprawy. `disabled` mówi resztę: to nie jest wybór, tylko odczyt
+            z rozmowy. Ten sam zabieg obejmuje „Czeka na halę", którego stawia
+            zlecenie pomiaru. */}
+        {!(DO_WYBORU as string[]).includes(rozmowa.status) &&
+          <option value={rozmowa.status} disabled>{NAZWA[rozmowa.status]}</option>}
         {DO_WYBORU.map((s) => <option key={s} value={s}>{NAZWA[s]}</option>)}
+        {/* DROGA POWROTNA. Bez niej werdykt trzymałby rozmowę, dopóki klient
+            sam nie napisze, a agent, który zamknął sprawę omyłkowo, nie miałby
+            czym tego cofnąć. `open` znaczy tu „oddaj sterowanie rozmowie" —
+            serwer wyliczy stan z ostatniej wiadomości. */}
+        {(DO_WYBORU as string[]).includes(rozmowa.status) &&
+          <option value="open">Wróć do stanu z rozmowy</option>}
       </select>
     </label>
 

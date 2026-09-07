@@ -99,7 +99,10 @@ export function przejmijRozmowe(conversationId: number, userId: number, expected
        Zapis idzie PO wpisie o przejęciu i to nie jest przypadek: audyt czyta
        się z góry na dół, a status zmieniony przed przejęciem opowiadałby, że
        rozmowa otworzyła się sama, zanim ktokolwiek ją wziął. */
-    const przedPrzejeciem = statusRozmowy(database, conversationId);
+    /* Stan Z KOLUMNY: „nietknięta" jest faktem zapisanym, a nie tym, kto ma
+       ruch. Wyliczony powiedziałby „czeka na nas" i przejęcie przestałoby
+       zdejmować `new` — rozmowa zostałaby nowa na zawsze. */
+    const przedPrzejeciem = statusZapisany(database, conversationId);
     if (przedPrzejeciem === "new") {
       database.prepare("UPDATE conversation SET status='open' WHERE id=?").run(conversationId);
       zapiszZmianeStatusu(database, conversationId, przedPrzejeciem, "open",
@@ -351,7 +354,7 @@ export function dopiszZdarzenieWyniku(
      Bez własnej transakcji — `wykonajZadanie` stoi już w swojej, tak samo jak
      synchronizator przy `obudzPrzychodzaca`. Autorem jest HALA, nie agent:
      to jej pomiar zmienił stan sprawy. */
-  const przedWynikiem = statusRozmowy(database, conversationId);
+  const przedWynikiem = statusZapisany(database, conversationId);
   if (przedWynikiem === "waiting_for_internal") {
     database.prepare("UPDATE conversation SET status='open', snoozed_until=NULL WHERE id=?")
       .run(conversationId);
@@ -369,9 +372,60 @@ export function dopiszZdarzenieWyniku(
    Lista pochodzi wprost z §7 i jest ZAMKNIĘTA. Status spoza niej znaczyłby,
    że ktoś dołożył pojęcie, którego dokument nie zna.                        */
 
-export const STATUSY_ROZMOWY = ["new", "open", "waiting_for_customer",
+export const STATUSY_ROZMOWY = ["new", "open", "waiting_for_customer", "waiting_for_us",
   "waiting_for_internal", "snoozed", "resolved", "closed", "spam"] as const;
 export type StatusRozmowy = (typeof STATUSY_ROZMOWY)[number];
+
+/**
+ * Stany, które WYNIKAJĄ Z ROZMOWY i których agent nie nadaje (0.225.0).
+ *
+ * ── DLACZEGO ──────────────────────────────────────────────────────────────
+ * Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
+ * czeka na klienta, czeka na nas powinno być odczytywane z wiadomości".
+ * I miał rację: kto ma następny ruch, WIDAĆ po ostatniej wiadomości. Ręczne
+ * ustawianie tego jest przepisywaniem faktu, który już stoi w wątku — czyli
+ * pracą, której jedynym możliwym wynikiem jest pomyłka.
+ *
+ * Stan wyliczany nie potrzebuje nikogo, kto go pilnuje. To ta sama zasada,
+ * którą 0.158.0 zapisało przy odłożeniu: odłożenie kończy się samo, bo liczymy
+ * je przy odczycie, zamiast budzić rozmowy tickerem.
+ *
+ * `waiting_for_internal` NIE JEST na tej liście, choć też jest automatyczny:
+ * jego stawia zlecenie pomiaru, a zdejmuje wynik z hali. To nie wynika
+ * z wiadomości, tylko ze zdarzenia po naszej stronie — i dlatego zapisuje się
+ * w kolumnie, a nie liczy przy odczycie.
+ */
+const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
+  "new", "open", "waiting_for_customer", "waiting_for_us",
+]);
+
+/**
+ * Statusy, które agent NADAJE — i tylko te przyjmuje trasa (0.225.0).
+ *
+ * Cztery werdykty człowieka plus `open`, które znaczy „oddaj sterowanie
+ * rozmowie". Bez tego piątego nie byłoby drogi POWROTNEJ z „Rozwiązanej":
+ * werdykt trzymałby rozmowę, dopóki klient sam nie napisze, a agent, który
+ * zamknął sprawę omyłkowo, nie miałby czym tego cofnąć.
+ */
+export const STATUSY_RECZNE = ["open", "snoozed", "resolved", "closed", "spam"] as const;
+
+/**
+ * Kto ma następny ruch, wprost z ostatniej wiadomości.
+ *
+ * Funkcja jest CZYSTA i to jest jej sens: tę samą regułę stosuje `statusRozmowy`
+ * (jedna rozmowa, osobne zapytanie) i `naRozmowe` w skrzynce (cała lista,
+ * kierunek już w wierszu). Dwie kopie rozjechałyby się przy pierwszej poprawce,
+ * a objawem byłaby kolejka mówiąca co innego niż otwarta rozmowa.
+ *
+ * `null` w kierunku znaczy „wątek bez ani jednej wiadomości" — Allegro takie
+ * oddaje. Wtedy nie ma z czego wywieść ruchu i zostaje stan zapisany.
+ */
+export function statusZKierunku(
+  zapisany: StatusRozmowy, ostatniKierunek: string | null,
+): StatusRozmowy {
+  if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany) || ostatniKierunek == null) return zapisany;
+  return ostatniKierunek === "incoming" ? "waiting_for_us" : "waiting_for_customer";
+}
 
 /**
  * Stany, z których PRZYCHODZĄCA wiadomość budzi rozmowę.
@@ -385,7 +439,8 @@ export type StatusRozmowy = (typeof STATUSY_ROZMOWY)[number];
  * który je cofa, kazałby zamykać tę samą rozmowę w kółko.
  */
 const BUDZONE: ReadonlySet<string> = new Set([
-  "new", "open", "waiting_for_customer", "waiting_for_internal", "snoozed", "resolved",
+  "new", "open", "waiting_for_customer", "waiting_for_us", "waiting_for_internal",
+  "snoozed", "resolved",
 ]);
 
 /**
@@ -396,16 +451,38 @@ const BUDZONE: ReadonlySet<string> = new Set([
  * pilnuje — a ticker, który raz nie wstanie, zostawiłby rozmowy odłożone
  * na zawsze.
  */
-export function statusRozmowy(
+/**
+ * Stan Z KOLUMNY, po wygaśnięciu odłożenia — bez pytania rozmowy o ruch.
+ *
+ * To jest wartość, o której mówi AUDYT. Zmiana statusu opisuje, co stało się
+ * z kolumną; wpisanie tam stanu wyliczanego dałoby w dzienniku przejścia,
+ * których nikt nie zrobił — po zdjęciu werdyktu „Rozwiązana" oś zapisałaby
+ * „czeka na klienta → otwarta", choć dla czytelnika nic się nie zmieniło.
+ */
+function statusZapisany(
   database: DatabaseSync, conversationId: number, teraz = Date.now(),
 ): StatusRozmowy {
   const r = database.prepare("SELECT status, snoozed_until FROM conversation WHERE id=?")
     .get(conversationId) as { status: string; snoozed_until: string | null } | undefined;
   if (!r) throw new Error("Nie znaleziono rozmowy");
-  if (r.status === "snoozed" && r.snoozed_until && Date.parse(r.snoozed_until) <= teraz) {
-    return "open";
-  }
-  return r.status as StatusRozmowy;
+  /* Odłożenie wygasa samo — liczone przy odczycie, jak od 0.158.0. */
+  return (r.status === "snoozed" && r.snoozed_until && Date.parse(r.snoozed_until) <= teraz
+    ? "open" : r.status) as StatusRozmowy;
+}
+
+export function statusRozmowy(
+  database: DatabaseSync, conversationId: number, teraz = Date.now(),
+): StatusRozmowy {
+  const zapisany = statusZapisany(database, conversationId, teraz);
+  if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany)) return zapisany;
+
+  /* Kierunek OSTATNIEJ wiadomości. Kolejność po `id`, nie po `sent_at` — tak
+     samo jak oś rozmowy (dwie wiadomości z tej samej sekundy zdarzają się,
+     a identyfikator jest stabilny). */
+  const ost = database.prepare(
+    "SELECT direction FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1",
+  ).get(conversationId) as { direction: string } | undefined;
+  return statusZKierunku(zapisany, ost?.direction ?? null);
 }
 
 /** Zmiana statusu ręką agenta. `doKiedy` wymagane wyłącznie przy odłożeniu. */
@@ -478,7 +555,7 @@ export function zmienStatus(
   database: DatabaseSync, conversationId: number, status: StatusRozmowy,
   userId: number, doKiedy: string | null, teraz = new Date(),
 ): { status: StatusRozmowy; snoozedUntil: string | null } {
-  const przed = statusRozmowy(database, conversationId, teraz.getTime());
+  const przed = statusZapisany(database, conversationId, teraz.getTime());
   database.prepare("UPDATE conversation SET status=?, snoozed_until=? WHERE id=?")
     .run(status, status === "snoozed" ? doKiedy : null, conversationId);
   zapiszZmianeStatusu(database, conversationId, przed, status, imieAutora(database, userId), userId);
@@ -495,7 +572,7 @@ export function zmienStatus(
 export function obudzPrzychodzaca(
   database: DatabaseSync, conversationId: number, teraz = new Date(),
 ): void {
-  const przed = statusRozmowy(database, conversationId, teraz.getTime());
+  const przed = statusZapisany(database, conversationId, teraz.getTime());
   if (!BUDZONE.has(przed) || przed === "open") return;
   /* BEZ własnej transakcji — woła to synchronizator, który stoi już w swojej
      (patrz `zmienStatus`). */

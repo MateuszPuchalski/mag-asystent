@@ -527,13 +527,18 @@ test("treść komentarza NIE trafia do tabeli, z której czyta wysyłka", async 
 test("odłożenie po terminie wraca do kolejki jako otwarte i widać, że termin minął", async () => {
   /* Rozmowa odłożona na wczoraj wygląda w kolumnie tak samo jak odłożona na
      przyszły tydzień — różnicę robi dopiero czas. Kolejka ma pokazać ją jako
-     otwartą, ale nie milczeć o tym, że nikt jej po terminie nie tknął. */
+     żywą, ale nie milczeć o tym, że nikt jej po terminie nie tknął.
+
+     Od 0.225.0 „żywa" znaczy KONKRETNIE, kto ma następny ruch: odłożenie
+     wygasa, a potem rozmowa sama mówi, czyja kolej. W tej rozmowie ostatnia
+     jest NASZA odpowiedź, więc piłka stoi po stronie klienta. */
   const { ustawStatus } = await import("./conversations.js");
   const d = db();
   ustawStatus(d, rozmowaId, "snoozed", BIURO.id, "2026-08-31T06:00:00.000Z");
 
   const wiersz = listaRozmow().find((r) => r.id === rozmowaId)!;
-  assert.equal(wiersz.status, "open", "termin minął, więc rozmowa jest znów otwarta");
+  assert.equal(wiersz.status, "waiting_for_customer",
+    "termin minął, więc rozmowa jest znów żywa — a ostatnia była nasza odpowiedź");
   assert.equal(wiersz.poTerminie, true);
   assert.equal(wiersz.odlozoneDo, "2026-08-31T06:00:00.000Z");
 
@@ -820,4 +825,67 @@ test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy
   d.prepare("DELETE FROM zwrot_klienta_pozycja WHERE zwrot_id IN (?,?)").run(zw1, zw2);
   d.prepare("DELETE FROM zwrot_klienta WHERE id IN (?,?)").run(zw1, zw2);
   d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});
+
+/* ── Kto ma następny ruch (0.225.0) ──────────────────────────────────────────
+   Właściciel: „w większości nie powinienem był robić tego ręcznie — otwarta,
+   czeka na klienta, czeka na nas powinno być odczytywane z wiadomości".
+   Te testy pilnują, że reguła jest jedna i że werdykt człowieka ją przebija. */
+
+function rozmowaZWiadomosciami(kierunki: Array<"incoming" | "outgoing">, status = "open") {
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro',?)")
+    .run(`ruch-${Math.random()}`).lastInsertRowid);
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,status,updated_at)
+    VALUES (?,?,'Temat',?,'2026-09-01T10:00:00.000Z')`)
+    .run(konto, `w-${Math.random()}`, status).lastInsertRowid);
+  kierunki.forEach((k, i) => d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at)
+    VALUES (?,?,?,?,'x',?)`).run(rozmowa, konto, `m-${rozmowa}-${i}`, k,
+      `2026-09-01T1${i}:00:00.000Z`));
+  return rozmowa;
+}
+
+test("ostatnia wiadomość klienta znaczy „czeka na nas”", () => {
+  const r = rozmowaZWiadomosciami(["outgoing", "incoming"]);
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_us");
+});
+
+test("nasza odpowiedź na końcu znaczy „czeka na klienta”", () => {
+  const r = rozmowaZWiadomosciami(["incoming", "outgoing"]);
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_customer");
+});
+
+test("kolejka i otwarta rozmowa mówią to samo", () => {
+  /* Dwie kopie reguły rozjechałyby się przy pierwszej poprawce, a objawem
+     byłaby kolejka pokazująca inny stan niż rozmowa po kliknięciu. */
+  const r = rozmowaZWiadomosciami(["outgoing", "incoming"]);
+  const zListy = listaRozmow().find((x) => x.id === r)!;
+  assert.equal(zListy.status, osRozmowy(r).rozmowa.status);
+  assert.equal(zListy.status, "waiting_for_us");
+});
+
+test("werdykt człowieka przebija wyliczenie", () => {
+  /* „Rozwiązana" i „Zamknięta" mają zostać mimo pytania klienta na końcu —
+     inaczej nie dałoby się domknąć żadnej sprawy. */
+  for (const status of ["resolved", "closed", "spam", "snoozed"]) {
+    const r = rozmowaZWiadomosciami(["incoming"], status);
+    assert.equal(osRozmowy(r).rozmowa.status, status, `status ${status} miał zostać`);
+  }
+});
+
+test("czekanie na halę przebija wyliczenie — pomiar trwa mimo pytania klienta", () => {
+  /* `waiting_for_internal` nie wynika z wiadomości, tylko ze zlecenia pomiaru,
+     więc wyliczenie nie ma prawa go zdjąć. Zdejmie go dopiero wynik z hali. */
+  const r = rozmowaZWiadomosciami(["incoming"], "waiting_for_internal");
+  assert.equal(osRozmowy(r).rozmowa.status, "waiting_for_internal");
+});
+
+test("wątek bez ani jednej wiadomości zostaje przy stanie zapisanym", () => {
+  /* Allegro oddaje takie wątki. Nie ma z czego wywieść ruchu i ekran nie ma
+     prawa zgadywać. */
+  const r = rozmowaZWiadomosciami([], "new");
+  assert.equal(osRozmowy(r).rozmowa.status, "new");
 });

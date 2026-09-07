@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
-import { ustawStatus } from "./conversations.js";
+import { statusZKierunku, ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
@@ -213,6 +213,13 @@ const LISTA = `
          o.body AS ostatniaWiadomosc,
          COALESCE(o.sent_at, c.updated_at) AS ostatniaWiadomoscAt,
          o.direction AS ostatniKierunek,
+         -- KTO PISAŁ NAPRAWDĘ OSTATNI (0.225.0). Kolumna ostatniKierunek wyżej
+         -- NIE nadaje się do wyliczenia stanu: złączenie o celowo preferuje
+         -- ostatnią wiadomość KLIENTA, bo podgląd w kolejce ma pokazywać jego
+         -- słowa, nie nasze. Użycie go tutaj dawało „czeka na nas" także tuż
+         -- po naszej odpowiedzi.
+         (SELECT m.direction FROM message m WHERE m.conversation_id=c.id
+           ORDER BY m.id DESC LIMIT 1) AS ostatniRuch,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
@@ -262,10 +269,15 @@ const naRozmowe = (
     wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
     wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
     wersja: Number(w.wersja),
-    /* Ta sama reguła co w `statusRozmowy`, liczona tu bez dodatkowego zapytania
-       na wiersz: odłożenie kończy się samo, a status zapisany w kolumnie zostaje
-       `snoozed` do najbliższej ręcznej zmiany. */
-    status: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    /* Te same DWIE reguły co w `statusRozmowy`, liczone tu bez dodatkowego
+       zapytania na wiersz — kierunek ostatniej wiadomości niesie już `LISTA`.
+       Najpierw wygasa odłożenie (kolumna zostaje `snoozed` do ręcznej zmiany),
+       potem rozmowa mówi, kto ma następny ruch. Regułę drugą trzyma
+       `statusZKierunku`: gdyby kolejka liczyła ją po swojemu, mówiłaby co
+       innego niż otwarta rozmowa. */
+    status: statusZKierunku(
+      (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+      w.ostatniRuch == null ? null : String(w.ostatniRuch)),
     priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
