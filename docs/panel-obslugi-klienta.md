@@ -59,7 +59,9 @@ utrwalenie potwierdzonej wiedzy
 
 Pierwszy kanał to Allegro: Centrum Wiadomości, pytania pod ofertami, kolejne
 wiadomości w istniejących rozmowach, kontekst własnej oferty, kontekst
-zamówienia, docelowo dyskusje i reklamacje.
+zamówienia oraz — od 0.222.0 — reklamacje (§25b). Dyskusje zostają
+w Centrum Sprzedaży: przyjeżdżają tą samą listą co reklamacje i są odsiewane
+świadomie, decyzją właściciela.
 
 Architektura nie może zakładać, że Allegro zostanie jedynym kanałem. Mają być
 możliwe adaptery poczty, sklepu internetowego, formularza kontaktowego, innych
@@ -1004,6 +1006,12 @@ POST   /api/obsluga/wiedza/z-opisow/:id/odrzuc
 GET    /api/obsluga/wiedza/identyfikatory/:twId
 POST   /api/obsluga/wiedza/identyfikatory
 GET    /api/obsluga/pokrycie-wiedzy
+GET    /api/obsluga/reklamacje
+GET    /api/obsluga/reklamacje/:id
+GET    /api/obsluga/reklamacje/:id/zalaczniki/:zid
+POST   /api/obsluga/reklamacje/synchronizuj
+POST   /api/obsluga/reklamacje/:id/prowadze
+POST   /api/obsluga/reklamacje/:id/notatka
 ```
 
 Trasy doboru działają od E1, trasy wiedzy od E2. Projekt właściciela pisał
@@ -1980,6 +1988,126 @@ Sferę, tak samo jak korekta zwrotu.
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
 to wprost, zamiast pokazywać sumę pozycji jako całość.
 
+## 25b. Reklamacje klienckie
+
+Rozdział dopisany w 0.222.0. Opisuje trzeci ekran obsługi i odpowiada na
+pytanie, które §26 zostawiało otwarte: czy prowadzimy dyskusje.
+
+### 25b.1. Czym jest reklamacja
+
+Sprawą posprzedażową, która żyje w całości w Allegro. Inaczej niż zwrot,
+nie ma drugiego obiegu w Subiekcie: nie ma korekty, nie ma MM, nie ma paczki
+na regale. Panel niczego tu nie spina — dokłada to, czego Centrum Sprzedaży
+nie daje: kolejkę z priorytetem, właściciela sprawy i notatkę z ustaleń.
+
+Reklamacja to NIE ZWROT i nie wolno ich skleić. Odstąpienie od umowy
+i rękojmia to dwa różne tytuły prawne, dwie różne rozmowy z klientem i dwa
+różne terminy. Sklejenie ich w jeden rekord kosztowało już nakładkę spraw.
+Reklamacja nie zakłada więc zwrotu i go nie wiąże; pokazuje tylko zwroty tego
+samego ZAMÓWIENIA, tym samym mostkiem co rozmowa od 0.221.0.
+
+### 25b.2. Dlaczego tylko reklamacje
+
+`/sale/issues` niesie dyskusje i reklamacje pod jednym zasobem, rozróżnione
+polem `type`. Właściciel zdecydował 6 września 2026, że panel prowadzi
+wyłącznie reklamacje: mają zegar, mają formalny werdykt i to one gniją
+niezauważone. Dyskusja jest rozmową, a rozmowy panel już ma.
+
+Synchronizacja i tak pobiera całą listę, więc filtr stoi po naszej stronie,
+w jednym miejscu. **Liczba odsianych jest widoczna** na pasku — bez niej ktoś
+szukałby kiedyś reklamacji, która nigdy reklamacją nie była.
+
+### 25b.3. Kolejka bramek
+
+Ekran nie jest rejestrem. Praca dzieli się na kubełki, a w każdym stoi jedno
+pytanie, więc operator nie wybiera akcji z menu — odpowiada.
+
+| kubełek | pytanie | skąd |
+|---|---|---|
+| DO DECYZJI | uznać czy odrzucić? | `CLAIM_SUBMITTED` |
+| DO ODPOWIEDZI | co odpisać klientowi? | rozstrzygnięta, a ostatnie słowo było klienta |
+| ROZSTRZYGNIĘTE | — | `CLAIM_ACCEPTED`, `CLAIM_REJECTED` |
+
+**DO DECYZJI trzyma także sprawy z nową wiadomością od klienta.** Obowiązek
+wobec terminu jest jeden i to on rządzi kolejnością pracy; „klient czeka" jest
+przy takim wierszu SYGNAŁEM, a nie osobną kolejką. Przeniesienie go do
+DO ODPOWIEDZI zaniżyłoby licznik spraw z zegarem — czyli jedyną liczbę, dla
+której ten ekran powstał.
+
+Strzałki chodzą po kolejce, cyfry przełączają kubełek, a przełączenie kubełka
+przestawia też kursor na jego pierwszą sprawę. Skróty milkną, gdy ognisko stoi
+w polu tekstowym: inaczej cyfra wpisana w notatkę zmieniałaby listę.
+
+### 25b.4. Zegar
+
+**Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo
+odrzucenie reklamacji i przychodzi z Allegro przy każdej sprawie tego typu.
+Implementacja skasowana w 0.140.0 liczyła ustawowe czternaście dni sama, bo
+komentarz obok twierdził, że ten zasób żadnego zegara nie oddaje. Liczba wzięta
+z naszego kodu rozjeżdżałaby się z tą, którą widzi kupujący — a rozstrzyga jego.
+
+Brak terminu MÓWI o sobie („bez terminu"), zamiast zostawiać puste miejsce
+w kolumnie pilności. Puste miejsce czyta się jako „zdąży się", czyli odwrotnie,
+niż trzeba.
+
+### 25b.5. Sygnały
+
+Sześć, każdy z jednym powodem istnienia:
+
+- **termin** — decyzja za trzy dni albo mniej; przy sprawie rozstrzygniętej milczy.
+- **klient czeka** — ostatnie słowo było klienta, ruch należy do nas.
+- **doradca** — w rozmowie jest doradca Allegro. Sonda widziała go w 61 sprawach
+  na 100, więc to przypadek typowy, a nie brzegowy; zmienia ton odpowiedzi,
+  bo czyta ją trzecia strona.
+- **czat zamknięty** — Allegro nowej wiadomości nie przyjmie (10 spraw na 100).
+- **zwrot towaru** — sprzedawca zażądał odesłania. POKAZUJEMY, nie obsługujemy.
+- **status?** — wartość spoza `PostPurchaseIssueStatus`. Nie jest błędem: sprawa
+  wchodzi do kolejki, a sygnał prosi właściciela o potwierdzenie na żywym koncie.
+
+### 25b.6. Układ
+
+Trzy kolumny, jak §10.1 i jak zwroty — trzy ekrany obsługi mają mieć jeden
+nawyk, nie trzy. Kolumna dowodów ma SEKCJE, nie zakładki: to jedna lista
+faktów o jednej sprawie, więc czyta się ją w całości (ta sama decyzja co przy
+zwrocie w 0.180.0).
+
+Środek okna niesie ZGŁOSZENIE I ROZMOWĘ, bo po to agent otwiera ten ekran.
+Rola autora jest podpisem, a nie ozdobą: rozmowa bywa trójstronna i bez
+wyraźnego podpisu agent odpowiadałby doradcy tak, jak odpowiada klientowi.
+
+**Zdjęcia są w trzech miejscach (0.223.0) i w każdym z innego powodu.**
+Wiersz kolejki niesie obraz OFERTY, bo reklamacja dotyczy jednej rzeczy
+i „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu. Kolumna dowodów
+stawia obok siebie ofertę i kartotekę — przy „niezgodny z opisem", czyli
+siedemnastu sprawach na sto, różnica między nimi bywa całą sprawą. Oś rozmowy
+rysuje zdjęcia klienta wprost, bo zdjęcie pękniętego elementu bywa całym
+zgłoszeniem; typ rozstrzyga sygnatura pliku, nie jego nazwa.
+
+Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
+przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
+jak całą.
+
+### 25b.7. Czego panel jeszcze nie robi
+
+Przyrost pierwszy CZYTA. Odpowiedź w czacie i formalny werdykt wysyła się
+w Centrum Sprzedaży, a ekran mówi to zdaniem pod rozmową. Zdanie o tym, czego
+panel nie robi, jest tu tak samo potrzebne jak sama kolejka: bez niego puste
+miejsce pod czatem obiecywałoby odpowiedź.
+
+Przyrost drugi doniesie odpowiedź (`POST /sale/issues/{id}/message`), trzeci —
+werdykt (`POST /sale/issues/{id}/status`, cztery uznania i siedem odmów,
+wiadomość do klienta wymagana przez Allegro). Oba są nieodwracalne wobec
+kupującego, więc każdy dostanie własne wydanie, a werdykt także operację
+uprzywilejowaną i potwierdzenie — jak oddanie pieniędzy przy zwrocie.
+
+### 25b.8. Czego panel nie wie
+
+Czy rozmowa mieści się w stu wiadomościach — sonda tej sekcji nie zdjęła
+(`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Do której przestrzeni należy
+`offer.id` przy sprawie: przykład w specyfikacji pokazuje UUID, a sonda zwykły
+tekst. I czy adres reklamacji w Centrum Sprzedaży, zbudowany z analogii do
+zwrotu, w ogóle otwiera właściwą stronę.
+
 ## 26. Decyzje do potwierdzenia
 
 Ile kont Allegro podłączymy? Ilu agentów pracuje jednocześnie? Jak długo
@@ -1993,6 +2121,9 @@ jedynym ERP?
 
 Pytanie „kto zatwierdza nowe zastosowania części" zeszło z tej listy w E2:
 każdy z biura, także autor propozycji (§5, §12).
+
+Pytanie „czy obsługujemy też dyskusje" zeszło z niej w 0.222.0: NIE. Panel
+prowadzi wyłącznie reklamacje, a dyskusje zostają w Centrum Sprzedaży (§25b).
 
 ## 27. Zasady nadrzędne
 
@@ -2125,4 +2256,11 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
+| Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
+| Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
+| Dyskusje (`type: "DISPUTE"`) | **poza zakresem** | decyzja właściciela z 6 września 2026; liczba odsianych na pasku |
+| Odpowiedź w czacie reklamacji | **projekt** | przyrost drugi, `POST /sale/issues/{id}/message` |
+| Werdykt reklamacji do Allegro | **projekt** | przyrost trzeci, `POST /sale/issues/{id}/status`, jedenaście wartości |
+| Podgląd załącznika reklamacji na osi | **działa** od 0.223.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF |
+| Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

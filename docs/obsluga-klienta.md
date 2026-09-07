@@ -522,6 +522,52 @@ i `additionalInformation` zostają, choć nie mają własnych kolumn ani ekranu.
 Model kanoniczny bierze z wiadomości wyłącznie treść, autora, datę, temat
 i numer oferty.
 
+## Polityka danych reklamacji (0.222.0)
+
+Ten rozdział powstaje razem z pierwszym ekranem reklamacji, a nie po nim —
+`CLAUDE.md` wymaga tego zapisu, zanim moduł dotknie pierwszej sprawy.
+
+**Co zapisujemy.** Treść zgłoszenia i całą rozmowę, login kupującego, powód
+i oczekiwanie klienta, kwotę, którą podał, terminy z Allegro, statusy oraz
+nasze własne notatki i znacznik „kto prowadzi". Rozmowa reklamacyjna jest
+dowodem w sporze i jej kopia lokalna jest ceną za działający ekran — dokładnie
+tak samo, jak przy skrzynce w 0.143.0.
+
+**Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
+niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
+prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po
+cichu. Lądowisko i tak przechodzi przez `services/allegro-oczyszczanie.ts`.
+
+**Plików załączników nie trzymamy.** Zostaje nazwa i adres u Allegro; pobranie
+idzie przez nasz serwer, żeby token firmy nie opuścił maszyny, i zostawia ślad
+w dzienniku. Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak jak
+w skrzynce.
+
+**Zdjęcie widać na osi, ale przez WĄSKIE gardło (0.223.0).**
+`PostPurchaseIssueAttachment` ma dwa pola — nazwę i adres — więc bramki `SAFE`
+ze skrzynki nie da się tu POWTÓRZYĆ. Powtarzamy jej skutek: na oś idą wyłącznie
+JPEG, PNG i GIF, a rozpoznaje je sygnatura pliku po stronie serwera, nie pole
+przysłane z zewnątrz i nie rozszerzenie w nazwie. `content-type` bierzemy z tej
+listy, `nosniff` zabrania przeglądarce zgadywać lepiej, a wszystko inne — PDF,
+BMP, TIFF — zostaje przy pobieraniu.
+
+Powód jest ten sam, co w skrzynce w 0.218.0: w sklepie z częściami zdjęcie
+pękniętego elementu bywa całym zgłoszeniem, a nazwa pliku nie mówi o nim nic.
+Sonda widziała załączniki przy 57 sprawach na 100.
+
+**Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
+odczycie — tak samo jak przy skrzynce i przy zwrotach.
+
+**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
+ekranu i w tym przyroście go nie dostaje.
+
+**Do dziennika nie idzie treść.** `logEvent` przy notatce zapisuje jej DŁUGOŚĆ,
+nigdy słowa: `events` nie ma retencji i nie jest kasowane.
+
+**Do Allegro nie wychodzi stąd nic.** Przyrost pierwszy wyłącznie czyta. Gdy
+dojdzie odpowiedź i werdykt, ten rozdział dostanie akapit o tym, co dokładnie
+opuszcza maszynę.
+
 ## Co się nie zmienia
 
 Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:

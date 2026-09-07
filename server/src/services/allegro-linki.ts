@@ -59,3 +59,8 @@ export const linkZamowienia = (id: string | null | undefined) =>
    zobaczyć to, co widzi klient — zdjęcia, parametry, opis. */
 export const linkOferty = (id: string | null | undefined) =>
   zWzorca(config.allegro.panelOferta, id);
+
+/* Reklamacja w Centrum Sprzedaży (0.222.0). Wzorzec zgadnięty z analogii do
+   zwrotu i dlatego opatrzony `[WERYFIKUJ]`; sprawdza się go kliknięciem. */
+export const linkReklamacji = (id: string | null | undefined) =>
+  zWzorca(config.allegro.panelReklamacja, id);

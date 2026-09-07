@@ -34,6 +34,91 @@ historii nie przepisujemy.
 ---
 
 
+## 0.223.0 — 7 września 2026
+
+**Reklamacja bez zdjęcia to numer i zdanie.** 0.222.0 postawiło kolejkę
+z zegarem, ale wiersz mówił „usterka przy używaniu" i nie pokazywał CZEGO.
+Agent otwierał sprawę, żeby zobaczyć, o jaki towar chodzi — czyli robił to
+jedno kliknięcie, którego ten ekran miał nie mieć.
+
+Zdjęcia doszły w trzech miejscach i w każdym z innego powodu:
+
+- **Wiersz kolejki** niesie obraz OFERTY. Reklamacja dotyczy jednej rzeczy,
+  a klient reklamuje to, co kupił — nie to, co leży u nas na półce. Kafel ma
+  stały rozmiar także bez obrazu; rosnący przesuwałby wiersze pod kursorem.
+- **Kolumna dowodów** stawia obok siebie ofertę i kartotekę Subiekta. Przy
+  „niezgodny z opisem", czyli siedemnastu sprawach na sto w sondzie, różnica
+  między tymi dwoma obrazami bywa całą sprawą.
+- **Oś rozmowy** rysuje zdjęcia klienta wprost. W sklepie z częściami zdjęcie
+  pękniętego elementu bywa całym zgłoszeniem, a nazwa pliku nie mówi o nim nic
+  — ta sama lekcja, którą skrzynka kupiła w 0.218.0. Sonda widziała załączniki
+  przy 57 sprawach na 100.
+
+**Wniosek z 0.222.0 był za szeroki.** Tamto wydanie stwierdziło, że podglądu
+załącznika nie da się zrobić, bo `PostPurchaseIssueAttachment` nie ma pola
+`status` ani typu MIME. Powód był prawdziwy, wniosek nie: bramka ze skrzynki
+pilnowała jednej rzeczy — żeby na osi rysowały się wyłącznie typy, które
+przeglądarka narysuje. Tego da się dopilnować bez pola, po SYGNATURZE pliku.
+
+Typ czyta więc `rozpoznajMime` (ta sama funkcja, co przy zdjęciach z Subiekta)
+przecięty z `TYPY_PODGLADU` ze skrzynki. Przechodzą trzy typy — JPEG, PNG
+i GIF — bo tyle jest we wspólnej części tego, co Allegro przy tym zasobie
+przyjmuje i co rysuje przeglądarka. PDF, BMP i TIFF zostają przy pobieraniu.
+
+**Nazwa pliku niczego nie rozstrzyga.** Decyduje o układzie — kafel czy
+przycisk — a plik nazwany `usterka.jpg` bez sygnatury obrazu dostaje 415
+i spada z powrotem na pobranie. Ekran nie ma prawa pokazać zepsutej ikony
+obrazu; tak wyglądała pierwsza wersja podglądu w 0.218.0.
+
+Załączniki wchodzą do WSPÓLNEJ kolejki obrazów panelu (`useZdjecie.ts`),
+czwartym już źródłem: sesja w nagłówku, pamięć negatywu, trzy pobrania naraz.
+Osobne pobieranie obok rozjechałoby się z tym przy pierwszej poprawce — ta
+blizna jest w tym froncie kupiona trzy razy.
+
+Zero nowych tabel, zero nowych zapisów. Kolejka dokłada dwa złączenia lewe po
+tej samej ofercie; propozycji kartoteki dalej nie liczy, bo to praca przy
+jednej otwartej sprawie, a nie przy liście.
+
+## 0.222.0 — 7 września 2026
+
+**Reklamacje klientów przestają czekać niezauważone.** Sonda z żywego konta
+pokazała, ile ich jest: na sto spraw z `/sale/issues` sześćdziesiąt pięć to
+reklamacje, a dwadzieścia z nich czekało na decyzję sprzedawcy. Nie stały
+nigdzie — ani w kolejce, ani z zegarem, ani z nazwiskiem. Agent musiał je sam
+znaleźć w Centrum Sprzedaży, a sprawa bez właściciela i bez terminu czeka do
+daty decyzji. Dokładnie to zabiło rejestr skasowany w 0.140.0.
+
+Nowa zakładka **Reklamacje** obok Zwrotów: trzy kolumny jak w skrzynce, trzy
+kubełki po jednym pytaniu, kolejność wprost z terminu decyzji. Środek okna
+niesie zgłoszenie i rozmowę, prawa kolumna — zegar, oczekiwanie klienta
+z kwotą, kartotekę, zamówienie oraz zwroty i rozmowy tego samego zakupu.
+Mostkiem jest numer zamówienia, ten sam co przy zwrocie od 0.221.0.
+
+**Zegar czytamy, nie liczymy.** `decisionDueDate` przychodzi z Allegro.
+Implementacja sprzed 0.140.0 liczyła ustawowe czternaście dni sama, bo
+komentarz obok twierdził, że tego pola nie ma — a było. Liczba wzięta z naszego
+kodu rozjeżdżałaby się z tą, którą widzi kupujący, a rozstrzyga jego.
+
+**Panel prowadzi wyłącznie reklamacje** (decyzja właściciela). Dyskusje
+przyjeżdżają tą samą listą i są odsiewane w jednym miejscu, a ich liczba stoi
+na pasku synchronizacji — inaczej ktoś szukałby kiedyś reklamacji, która nigdy
+reklamacją nie była.
+
+**To przyrost pierwszy z trzech i tylko czyta.** Do Allegro nie wychodzi stąd
+ani jeden zapis; odpowiedź w czacie i formalny werdykt wysyła się na razie
+w Centrum Sprzedaży, a ekran mówi to wprost pod rozmową. Oba są nieodwracalne
+wobec kupującego i dostaną własne wydania. U nas zapisują się dwie rzeczy,
+obie jawnym kliknięciem: znacznik „prowadzę" i notatka biura.
+
+Załącznik pobiera się przez nasz serwer, ale nie rysuje na osi:
+`PostPurchaseIssueAttachment` ma dwa pola — nazwę i adres — więc bramki `SAFE`,
+na której stoi podgląd zdjęć w skrzynce, nie da się tu postawić.
+
+Piąty ticker, `ALLEGRO_REKLAMACJE_SYNC_MS`, domyślnie trzy minuty. Rozmowy
+dociąga po dwadzieścia na przebieg i tylko te, w których licznik Allegro
+rozjechał się z naszym — sześćdziesiąt żądań co trzy minuty byłoby prostą
+drogą do 429.
+
 ## 0.221.0 — 6 września 2026
 
 **Zwrot tego zamówienia widać z rozmowy.** Właściciel: „klienci często pytają

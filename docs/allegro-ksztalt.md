@@ -521,6 +521,159 @@ wtedy status z §21, a nie pustą kolejkę udającą brak zwrotów.
 Przy zapisie (0.151.0): Allegro odpowie 400 albo 422, kolejka zapisze to jako
 porażkę razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
 
+## Reklamacje — kształt ze specyfikacji i z sondy
+
+Rodzina `/sale/issues` („Post Purchase Issues") niesie DWA byty pod jednym
+zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Panel
+prowadzi wyłącznie reklamacje — decyzja właściciela z 6 września 2026. Filtr
+stoi w mapowaniu synchronizatora, a liczba odsianych idzie do stanu
+synchronizacji: bez niej ktoś szukałby kiedyś reklamacji, która nigdy
+reklamacją nie była.
+
+Cała rodzina chodzi po `application/vnd.allegro.beta.v1+json` i po uprawnieniu
+`allegro:api:disputes`. To samo uprawnienie obsługuje zapisy, więc przyrosty
+drugi i trzeci nie będą wymagały ponownego parowania konta.
+
+### Ile tego jest
+
+Sonda z żywego konta (2 września 2026, próbka stu spraw): **65 CLAIM i 35
+DISPUTE**, `right: COMPLAINT` przy wszystkich sześćdziesięciu pięciu. Statusy:
+`CLAIM_ACCEPTED` 33, `DISPUTE_ONGOING` 25, `CLAIM_SUBMITTED` 20,
+`CLAIM_REJECTED` 12, `DISPUTE_CLOSED` 10. Powody: `DEFECT_FOUND_DURING_USE` 34,
+`NOT_AS_DESCRIBED` 17, `OTHER` 6, `MISSING_PRODUCT_ELEMENT` 5,
+`PRODUCT_DAMAGED_PARCEL_INTACT` 3.
+
+Dwadzieścia spraw czekało na decyzję sprzedawcy i żadna z nich nie miała
+u nas kolejki ani zegara.
+
+### `GET /sale/issues`
+
+Parametry: `checkoutForm.id`, `limit` (1–100, domyślnie 10), `offset`, `status`
+(tablica) oraz `Accept-Language`. **Kursora ani granicy dat NIE MA** i to jest
+różnica wobec zwrotów: `getCustomerReturns` przyjmuje `from`, ten zasób nie.
+Każdy przebieg czyta listę od początku, posortowaną malejąco po dacie otwarcia.
+
+Odpowiedź `PostPurchaseIssueListResponse` ma w schemacie WYŁĄCZNIE pole
+`issues`. Licznika `count` tam nie ma, więc czytamy go miękko: gdy przyjdzie,
+ogon przebiegu będzie policzony; gdy nie, zostaje „nie wiem".
+
+**ŻADEN ze schematów `PostPurchaseIssue*` nie ma listy `required`.** Wymagalność
+pola mówi wyłącznie ta lista, więc kod traktuje każde pole jako opcjonalne —
+poza `id`, bez którego nie ma czego zapisać. Tak samo potraktowaliśmy
+`OfferListingDto` w 0.214.0 i to nie była wtedy usterka Allegro.
+
+### Co mapujemy
+
+| pole Allegro | kolumna | po co |
+|---|---|---|
+| `id` | `external_id` | klucz naturalny w parze z kontem |
+| `type` | `typ` | zostaje, żeby dało się sprawdzić, co odsialiśmy |
+| `referenceNumber` | `reference_number` | numer, który widzi też kupujący |
+| `decisionDueDate` | `decyzja_do` | termin decyzji — **czytany, nie liczony** |
+| `currentState.statusDueDate` | `status_do` | drugi zegar Allegro |
+| `currentState.status` | `status_allegro` | z niego wynika kubełek |
+| `currentState.returnRequired` | `zwrot_wymagany` | trzy stany, więc kolumna, nie flaga |
+| `currentState.chatActive` | `czat_aktywny` | czy Allegro przyjmie odpowiedź |
+| `openedDate` | `otwarto_at` | moment otwarcia albo ponownego otwarcia |
+| `buyer.login` | `kupujacy_login` | jedyna dana osobowa, jak przy zwrocie |
+| `checkoutForm.id` | `order_id` | mostek do zamówienia, zwrotów i rozmów |
+| `offer.id` | `offer_id` | mostek do kartoteki przez `offer_snapshot` |
+| `reason.type`, `reason.description` | `powod_typ`, `powod_opis` | powód i słowa klienta |
+| `right` | `prawo` | rękojmia albo gwarancja — dwa tytuły prawne |
+| `expectations[0].name` i `.refund` | `oczekiwanie`, `oczekiwana_kwota_grosze` | czego klient chce |
+| `chat.messagesCount` | `wiadomosci_ile` | mówi, czy rozmowa jest kompletna |
+| `chat.lastMessage.status` | `ostatnia_wiadomosc_status` | czyj jest ruch |
+| `chat.initialMessage` | wiersz w `reklamacja_wiadomosc` | treść zgłoszenia bez dodatkowego żądania |
+| `attachments[]` | `reklamacja_zalacznik` | nazwa i adres, **nigdy plik** |
+
+`decisionDueDate` jest tu najważniejszy. Implementacja skasowana w 0.140.0
+liczyła ustawowe czternaście dni SAMA, bo komentarz obok twierdził, że ten
+zasób żadnego zegara nie oddaje. Twierdzenie było nieprawdziwe już wtedy,
+a liczba wzięta z naszego kodu rozjeżdżałaby się z tą, którą widzi kupujący.
+
+Kwotę z `expectations[].refund.amount` liczymy na TEKŚCIE, tą samą funkcją co
+przy zwrotach (`naGrosze`). Allegro oddaje ją stringiem i mówi wprost dlaczego:
+„to avoid rounding errors".
+
+### Czego NIE mapujemy i dlaczego
+
+`product.id` — identyfikator katalogu Allegro, a my wiążemy przez ofertę
+i sygnaturę. `offer.quantity` — liczba sztuk objętych sprawą; przyda się
+dopiero przy częściowym zwrocie pieniędzy, czyli w przyroście trzecim.
+Danych adresowych i kontaktowych schemat `PostPurchaseIssue` nie niesie
+w ogóle, więc kolumn na nie po prostu nie ma.
+
+### `GET /sale/issues/{issueId}/chat`
+
+Zwraca obiekt z tablicą `chat`, a nie `messages` — do 0.164.0 sonda pytała
+o zły klucz i dlatego jej sekcja rozmowy była pusta przy stu sprawach
+z niezerowym `chat.messagesCount`. Domyślny `limit` przy tej jednej końcówce
+to **10**, nie 100 jak przy listach obok, więc podajemy go jawnie.
+
+`PostPurchaseIssueMessageAuthor.login` bywa PUSTY i schemat mówi wprost, kiedy:
+„not present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro
+(`ADMIN`) odpisał w 61 sprawach na 100, więc to jest przypadek typowy.
+
+`[WERYFIKUJ]` Kształt rozmowy na ŻYWYM koncie. `docs/allegro-sonda.md` ma tę
+sekcję pustą, bo próbkę zdjęto przed poprawką klucza. Kolumna „niepuste" dla
+`chat[].text`, `chat[].author.login` i `chat[].attachments` jest więc nieznana,
+a razem z nią odpowiedź na pytanie, czy rozmowa mieści się w stu wiadomościach.
+Sprawdza się to jednym `npm run sonda`.
+
+`[WERYFIKUJ]` Do której przestrzeni należy `PostPurchaseIssue.offer.id`. Przykład
+w specyfikacji pokazuje UUID (`54b50cb5-2dd3-4ce0-9c41-57ac5981d2ab`), a sonda
+z żywego konta zapisała zwykły tekst przy sześćdziesięciu pięciu sprawach.
+Typem jest `string`, więc rozstrzyga to dopiero pierwsze trafienie w
+`offer_snapshot` — to jest ta sama otwarta sprawa dwóch przestrzeni
+identyfikatora oferty, co przy pozycji zwrotu.
+
+### Załącznik: typ rozstrzygają BAJTY
+
+`PostPurchaseIssueAttachment` ma DWA pola: `fileName` i `url`. Nie ma ani typu
+MIME, ani stanu `SAFE`/`UNSAFE`, na którym stoi podgląd zdjęć w skrzynce
+(0.218.0). Do 0.222.0 wyciągaliśmy z tego wniosek, że zdjęcia nie da się
+pokazać na osi — i ten wniosek był zbyt szeroki.
+
+Bramka ze skrzynki pilnowała JEDNEJ rzeczy: żeby na osi rysowały się wyłącznie
+typy, które przeglądarka narysuje, i nic innego. Tego da się dopilnować bez
+pola, po SYGNATURZE pliku — bajty i tak przechodzą przez nasz serwer. Od
+0.223.0 robi to `rozpoznajMime` (ta sama funkcja, co przy zdjęciach z Subiekta)
+przecięte z `TYPY_PODGLADU`.
+
+Przechodzą TRZY typy, i to jest przecięcie dwóch list. Allegro przyjmuje przy
+tym zasobie `image/png`, `image/gif`, `image/bmp`, `image/tiff`, `image/jpeg`
+i `application/pdf` (`PUT /sale/issues/attachments/{attachmentId}`); skrzynka
+rysuje cztery typy rastrowe. Wspólne są JPEG, PNG i GIF — `webp` po stronie
+Allegro nie istnieje, a `bmp` i `tiff` przeglądarki rysują nierówno albo wcale.
+Reszta zostaje przy pobieraniu i to jest odpowiedź, nie awaria.
+
+Nazwa pliku niczego nie rozstrzyga: decyduje o UKŁADZIE po stronie panelu
+(pole `podglad`), a plik nazwany `usterka.jpg`, który sygnatury obrazu nie ma,
+dostaje 415 i spada z powrotem na przycisk pobrania.
+
+Pobranie ma tu za to WŁASNĄ końcówkę w specyfikacji
+(`GET /sale/issues/attachments/{attachmentId}`), czego brakuje przy
+załącznikach Centrum Wiadomości. Adres i tak czytamy z bazy, a host sprawdza
+`pobierzZalacznik` — dwie niezależne zapory, bo obie kosztują jedną linijkę.
+
+### Zapisy: czego jeszcze nie robimy
+
+Przyrost pierwszy (0.222.0) tylko CZYTA. Dwa zapisy do Allegro czekają:
+`POST /sale/issues/{issueId}/message` (`MessageRequest`, `text` do 20 000
+znaków — inaczej niż 2000 w Centrum Wiadomości) oraz
+`POST /sale/issues/{issueId}/status` (`ClaimStatusChangeRequest`, `required:
+[status, message]`, cztery wartości `ACCEPTED_*` i siedem `REJECTED_*`,
+`partialRefund` wyłącznie przy `ACCEPTED_PARTIAL_REFUND`). Oba są nieodwracalne
+wobec kupującego i dostaną własne wydania.
+
+### Co się stanie, jeśli kształt jest inny
+
+`tablica()` rzuca zdaniem wskazującym ten plik, a przebieg kończy się porażką
+z kodem HTTP w `allegro_reklamacje_sync_state`. Panel pokazuje wtedy status
+z §21, a nie pustą kolejkę udającą brak reklamacji. Status Allegro spoza
+`PostPurchaseIssueStatus` NIE jest błędem: sprawa wchodzi do kolejki
+z sygnałem „status?", żeby właściciel potwierdził wartość na żywym koncie.
+
 ## Zamówienie klienta — kształt ze specyfikacji w repo
 
 Ta sekcja różni się od poprzednich pochodzeniem po raz drugi, tym razem na
@@ -704,6 +857,11 @@ trafiający w 404 kosztuje kliknięcie i zaufanie do ekranu — a poprawka ma by
 wpisem w `wertis.env`, nie nowym wydaniem. Udokumentowany przykład
 `CustomerReturnItem.url` niesie w adresie także slug tytułu; czy sam numer
 wystarczy, sprawdza się kliknięciem.
+
+Reklamacja dostała w 0.222.0 trzeci taki wzorzec, `ALLEGRO_PANEL_REKLAMACJA`,
+zbudowany z ANALOGII do zwrotu: lista Centrum Sprzedaży z numerem sprawy
+w wyszukiwaniu. Nikt go jeszcze nie kliknął, więc obowiązuje ten sam znacznik
+co dwa poprzednie.
 
 Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
 zostaje przy dawnym wzorcu. Zgadywanie go drugi raz kosztowałoby to samo, co

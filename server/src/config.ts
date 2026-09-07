@@ -383,6 +383,17 @@ export const config = {
        nie minutami — Allegro część z nich rozpatruje samo. Rzadziej niż zwroty. */
     rabatySyncMs: num(process.env.ALLEGRO_RABATY_SYNC_MS, 900_000, "ALLEGRO_RABATY_SYNC_MS"),
     /**
+     * Takt synchronizacji reklamacji (`/sale/issues`); 0 wyłącza ticker.
+     *
+     * GĘŚCIEJ NIŻ ZWROTY, i to jest różnica natury sprawy, nie kaprys.
+     * Reklamacja niesie CZAT: klient pisze i czeka na odpowiedź tak samo jak
+     * w skrzynce, a `decisionDueDate` bywa krótszy niż zegar zwrotu. Rytm i tak
+     * inny niż u sąsiadów — równy chór na jednym adresie jest tą sygnaturą
+     * maszyny, którą rozpoznaje anti-bot (patrz `services/takt.ts`).
+     */
+    reklamacjeSyncMs: num(
+      process.env.ALLEGRO_REKLAMACJE_SYNC_MS, 180_000, "ALLEGRO_REKLAMACJE_SYNC_MS"),
+    /**
      * Ile dni ma sprzedawca na oddanie pieniędzy od oświadczenia klienta.
      * Ustawowo czternaście; w env, bo to liczba z prawa, a nie z naszego
      * kodu — zmiana przepisu ma być wpisem w `wertis.env`, nie wydaniem.
@@ -469,6 +480,20 @@ export const config = {
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://allegro.pl.allegrosandbox.pl/oferta/{id}"
         : "https://allegro.pl/oferta/{id}"),
+    /**
+     * Reklamacja w Centrum Sprzedaży (0.222.0) — wzorzec ZGADNIĘTY z analogii.
+     *
+     * Zbudowany na wzór zwrotu, którego adres właściciel potwierdził w 0.207.0:
+     * lista Centrum Sprzedaży z numerem sprawy w wyszukiwaniu. Nikt go jeszcze
+     * nie kliknął, więc niesie `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` razem
+     * z zamówieniem i ofertą. Stoi w konfiguracji właśnie dlatego: poprawka ma
+     * być wpisem w `wertis.env`, a nie nowym wydaniem.
+     */
+    panelReklamacja:
+      process.env.ALLEGRO_PANEL_REKLAMACJA ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
+        : "https://salescenter.allegro.com/disputes?search={id}"),
   },
 
   /**

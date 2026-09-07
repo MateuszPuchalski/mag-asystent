@@ -203,11 +203,15 @@ export function urlOpinii(apiUrl: string, offset: number): string {
  * przestrzeń". Dzielą: specyfikacja opisuje `issueId` jako „Dispute or claim
  * identifier". Zgadnięte było co innego — sam adres.
  */
-export function urlWiadomosciDyskusji(apiUrl: string, id: string): string {
+export function urlWiadomosciDyskusji(apiUrl: string, id: string, offset = 0): string {
   /* `limit` JAWNIE, bo specyfikacja daje przy tej końcówce domyślne 10 — a nie
      100 jak przy listach obok. Bez tego próbka sondy była cicho przycięta
      i nikt by się nie dowiedział, że rozmowa ma dalszy ciąg. */
-  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat?limit=100`;
+  /* `offset` dochodzi TYLKO wtedy, gdy jest niezerowy (0.222.0). Sto wiadomości
+     mieści całą rozmowę w każdej sprawie, jaką widziała sonda, więc pierwsza
+     strona jest przypadkiem normalnym i jej adres zostaje taki, jaki był. */
+  const dalej = offset > 0 ? `&offset=${Math.trunc(offset)}` : "";
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/chat?limit=100${dalej}`;
 }
 
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */

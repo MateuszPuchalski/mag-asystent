@@ -30,6 +30,7 @@ import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { copilotRoutes } from "./routes/copilot.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
+import { reklamacjeRoutes } from "./routes/reklamacje.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
@@ -57,6 +58,7 @@ import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js
 import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
+import { synchronizujAllegroReklamacje } from "./services/allegro-reklamacje-sync.js";
 import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
@@ -324,6 +326,7 @@ export async function buildApp() {
   await app.register(skrzynkaRoutes);
   await app.register(copilotRoutes);
   await app.register(zwrotyRoutes);
+  await app.register(reklamacjeRoutes);
   await app.register(ustawieniaRoutes);
   await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);
@@ -383,6 +386,13 @@ async function main() {
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
        (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację). */
     uruchomTakt("allegro-rabaty", config.allegro.rabatySyncMs, synchronizujAllegroRabaty);
+    /* Reklamacje (0.222.0) — piąty ticker i piąty rytm. Gęstszy niż zwroty,
+       rzadszy niż skrzynka: reklamacja niesie CZAT, więc klient czeka na
+       odpowiedź jak w skrzynce, ale `decisionDueDate` liczy się w dniach.
+       Osobny takt z tego samego powodu co rabaty — jedna końcówka nie ma
+       prawa zabrać drugiej ze sobą, gdy odpowie błędem. */
+    uruchomTakt("allegro-reklamacje", config.allegro.reklamacjeSyncMs,
+      async () => { await synchronizujAllegroReklamacje(); });
     /* Trzeci ticker, najrzadszy z całej trójki. Uzupełnia zamówienia do
        zwrotów, które już mamy, więc po kilku przebiegach nie ma czego
        pobierać i milczy — a gdy zwrot dojdzie, dociągnie mu kontekst

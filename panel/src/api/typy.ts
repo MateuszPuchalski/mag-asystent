@@ -772,3 +772,114 @@ export interface KoszZwrotow {
   otwartyOd: string;
   pozycje: Array<{ symbol: string; nazwa: string; ilosc: number }>;
 }
+
+/* ── Reklamacje klienckie (0.222.0) ──────────────────────────────────────────
+   Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"` z `/sale/issues`).
+   Dyskusje odsiewa synchronizator, więc tu ich nie ma. */
+
+export type KubelekReklamacji = "decyzja" | "odpowiedz" | "zamknieta";
+
+export type SygnalReklamacji =
+  | "termin"
+  | "klient_czeka"
+  | "doradca"
+  | "czat_zamkniety"
+  | "zwrot_wymagany"
+  | "status_nieznany";
+
+export interface Reklamacja {
+  id: number;
+  externalId: string;
+  /** Czytelny numer, np. „123/2026". Po nim szuka człowiek. */
+  numer: string | null;
+  orderId: string | null;
+  offerId: string | null;
+  kupujacyLogin: string | null;
+  /** WARRANTY (gwarancja) albo COMPLAINT (rękojmia). */
+  prawo: string | null;
+  powodTyp: string | null;
+  powodOpis: string | null;
+  temat: string | null;
+  opis: string | null;
+  /** Czego klient chce: REPAIR, EXCHANGE, REFUND albo PARTIAL_REFUND. */
+  oczekiwanie: string | null;
+  oczekiwanaKwotaGrosze: number | null;
+  waluta: string;
+  statusAllegro: string | null;
+  decyzjaDo: string | null;
+  /** `null` znaczy „Allegro terminu nie podało" — to co innego niż „minął". */
+  dniDoTerminu: number | null;
+  poTerminie: boolean;
+  zwrotWymagany: boolean | null;
+  czatAktywny: boolean;
+  wiadomosciIle: number;
+  ostatniaWiadomoscStatus: string | null;
+  ostatniaWiadomoscAt: string | null;
+  otwartoAt: string;
+  prowadzi: string | null;
+  prowadziAt: string | null;
+  notatka: string | null;
+  wersja: number;
+  kubelek: KubelekReklamacji;
+  sygnaly: SygnalReklamacji[];
+  /** `null` znaczy „nie ma czego linkować" — ekran pokazuje wtedy sam tekst. */
+  link: string | null;
+  linkZamowienia: string | null;
+  linkOferty: string | null;
+  /* Co widać na wierszu (0.223.0). Reklamacja dotyczy jednej oferty, więc
+     obraz jest tożsamością sprawy, a nie ozdobą. */
+  ofertaNazwa: string | null;
+  ofertaZdjecie: StanZdjeciaOferty;
+  /** Kartoteka POTWIERDZONA; propozycję liczy dopiero szczegół sprawy. */
+  twId: number | null;
+  twSymbol: string | null;
+}
+
+export interface ZalacznikReklamacji {
+  id: number;
+  wiadomoscId: number | null;
+  nazwa: string;
+  /**
+   * Czy warto próbować pokazać go na osi — PODPOWIEDŹ z nazwy pliku.
+   *
+   * Allegro nie podaje przy tym zasobie ani typu MIME, ani stanu `SAFE`, więc
+   * rozstrzygają dopiero BAJTY po stronie serwera. Ta flaga decyduje o
+   * układzie, nie o wydaniu: kafel, którego trasa nie obsłuży, spada
+   * z powrotem na przycisk pobrania.
+   */
+  podglad: boolean;
+}
+
+export interface WiadomoscReklamacji {
+  id: number;
+  externalId: string;
+  autorLogin: string | null;
+  /** BUYER, SELLER, ADMIN, SYSTEM albo FULFILLMENT. Doradca Allegro to ADMIN. */
+  autorRola: string | null;
+  tresc: string;
+  utworzonoAt: string | null;
+  zalaczniki: ZalacznikReklamacji[];
+}
+
+export interface StanReklamacji extends StanZwrotow {
+  /** Ile spraw z ostatniego przebiegu było dyskusjami. Nie jest to błąd. */
+  dyskusjiPominietych: number | null;
+}
+
+export interface KolejkaReklamacji {
+  reklamacje: Reklamacja[];
+  liczniki: Record<KubelekReklamacji, number>;
+  stan: StanReklamacji;
+}
+
+export interface SzczegolReklamacji {
+  reklamacja: Reklamacja;
+  czat: WiadomoscReklamacji[];
+  zalaczniki: ZalacznikReklamacji[];
+  zwroty: Zwrot[];
+  rozmowy: Array<{ id: number; temat: string | null; status: string; ostatniaAt: string | null }>;
+  kartoteka: {
+    pewnosc: string; twId: number | null; symbol: string | null;
+    zrodlo: string | null; powod: string | null;
+  } | null;
+}

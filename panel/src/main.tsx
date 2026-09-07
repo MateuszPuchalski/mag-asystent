@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, Settings, Undo2, Warehouse } from "lucide-react";
+import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { useKolejkaWiedzy } from "./api/wiedza";
@@ -10,6 +10,7 @@ import { czas } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
+import { Reklamacje } from "./ekrany/Reklamacje";
 import { Zadania } from "./ekrany/Zadania";
 import { Wzmianki } from "./ekrany/Wzmianki";
 import { Wiedza } from "./ekrany/Wiedza";
@@ -42,6 +43,7 @@ const ZAKLADKI = [
   { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: true },
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
+  { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false },
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
 ];
@@ -166,6 +168,10 @@ function App() {
             go nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
+        {/* Reklamacja ma własny adres z tego samego powodu co zwrot i rozmowa:
+            odświeżenie jej nie gubi, a link do sprawy da się wkleić koledze. */}
+        <Route path="/obsluga/reklamacje" element={<Reklamacje />} />
+        <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
