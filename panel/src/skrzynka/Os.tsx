@@ -1,9 +1,10 @@
 import React from "react";
-import { ArrowRight, Bot, Lock, Paperclip, Ruler, Send, User } from "lucide-react";
+import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User } from "lucide-react";
 import type { WpisOsi, ZalacznikOsi } from "../api/typy";
 import { Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
+import { Kafel } from "../towar/Kafel";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -188,6 +189,8 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
          wiadomością wychodzącą i inaczej wpadłaby w tamtą gałąź. */
       : w.automatyczna
       ? <Autoodpowiedz key={w.id} wpis={w} />
+      : w.rodzaj === "zlecenie"
+      ? <Zlecenie key={w.id} wpis={w} />
       : w.rodzaj === "wynik_zadania"
       ? <article key={w.id} className="ml-6 rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase text-ranga-ok">
@@ -248,4 +251,78 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {zrodloPomiaru === w.messageId ? "✓ źródło pomiaru" : "Zleć z tej wiadomości"}</button>}
         </article>)}
   </div>;
+}
+
+/* ── ZLECENIE DLA HALI NA OSI (0.226.0) ──────────────────────────────────────
+   Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
+   jako blok w wiadomości". Do 0.224.0 oś pokazywała sam WYNIK — prośba, która
+   go wywołała, nie zostawiała po sobie nic poza kreskami zmiany statusu
+   rozmowy, z których nie da się odczytać, o co kto poprosił.
+
+   Blok stoi PO TEJ SAMEJ STRONIE co wynik (`ml-6`) i w tej samej rodzinie
+   kształtu, bo to dwie połowy jednej sprawy: pytanie do hali i odpowiedź hali.
+   Barwa jest inna i to jest cała różnica na ekranie — bursztyn znaczy „czeka",
+   zieleń wyniku „przyszło". Zlecenie WYKONANE gaśnie do szarości: jego rola
+   się skończyła, a odpowiedź stoi niżej i to ona ma przyciągać wzrok.
+
+   Kartoteka z kaflem, bo to jest odniesienie do produktu — ta sama reguła, co
+   wszędzie indziej w obsłudze (§25a.6a).                                     */
+
+/* Nagłówek i ikona idą z rodzaju zadania. IKONA NIE JEST OZDOBĄ: rozmowa
+   bywa długa, a agent przewija ją wzrokiem, nie czyta od góry. Jeden kształt
+   dla czterech różnych próśb kazałby czytać nagłówek, żeby odróżnić pomiar
+   od zdjęcia — a to jest dokładnie ta sekunda, którą blok miał oszczędzić. */
+const RODZAJ_ZLECENIA: Record<string, { nazwa: string; Ikona: typeof Ruler }> = {
+  pomiar: { nazwa: "Zlecono pomiar", Ikona: Ruler },
+  zdjecie: { nazwa: "Zlecono zdjęcie", Ikona: Camera },
+  weryfikacja: { nazwa: "Zlecono weryfikację", Ikona: ScanSearch },
+  inne: { nazwa: "Zlecenie dla magazynu", Ikona: ClipboardList },
+};
+
+/* Status mówi, CZY CZEKAMY — nie powtarza słownika ekranu zadań. */
+const STAN_ZLECENIA: Record<string, { etykieta: string; klasa: string }> = {
+  nowe: { etykieta: "czeka na halę", klasa: "bg-amber-100 text-amber-900" },
+  w_toku: { etykieta: "hala pracuje", klasa: "bg-sky-100 text-sky-900" },
+  wykonane: { etykieta: "wykonane", klasa: "bg-emerald-100 text-emerald-800" },
+  anulowane: { etykieta: "anulowane", klasa: "bg-slate-200 text-slate-600" },
+};
+
+function Zlecenie({ wpis }: { wpis: WpisOsi }) {
+  const z = wpis.zlecenie;
+  if (!z) return null;
+  const zamkniete = z.status === "wykonane" || z.status === "anulowane";
+  const stan = STAN_ZLECENIA[z.status] ?? { etykieta: z.status, klasa: "bg-slate-100 text-slate-600" };
+  const { nazwa, Ikona } = RODZAJ_ZLECENIA[z.rodzaj] ?? RODZAJ_ZLECENIA.inne;
+  return <article aria-label={`Zlecenie: ${z.tytul}`}
+    className={`ml-6 rounded-lg border p-3 ${zamkniete
+      ? "border-slate-200 bg-slate-50" : "border-amber-300 bg-amber-50"}`}>
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-bold uppercase ${
+      zamkniete ? "text-slate-500" : "text-amber-800"}`}>
+      <Ikona size={12} />
+      {nazwa} · {wpis.autor}
+      {/* GODZINA ZLECENIA, choć wynik jej nie ma. Wynik jest ostatnim, co się
+          wydarzyło, a otwarte zlecenie ma WIEK — „czeka na halę" od dziesięciu
+          minut i od wczoraj to dwie różne decyzje agenta wobec klienta. */}
+      <span className="font-normal normal-case text-slate-500">{czas(wpis.at)}</span>
+      <span className={`rounded px-1.5 py-0.5 text-[10px] ${stan.klasa}`}>{stan.etykieta}</span>
+      {/* PILNE mówi o tym, jak zlecenie stoi w kolejce hali, nie o rozmowie. */}
+      {z.priorytet === "pilny" &&
+        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-ranga-zle">pilne</span>}
+    </div>
+    <p className="mt-1 text-sm font-semibold">{z.tytul}</p>
+    {/* Instrukcja słowo w słowo: to ona pojechała na kolektor i po niej widać,
+        czy wynik odpowiada na zadane pytanie. */}
+    {wpis.tresc && <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-700">{wpis.tresc}</p>}
+    {z.twId !== null && <div className="mt-2 flex items-center gap-2">
+      <Kafel twId={z.twId} rozmiar={32} nazwa={z.nazwaTowaru ?? z.symbol ?? ""} symbol={z.symbol} />
+      <div className="min-w-0 text-xs">
+        <div className="truncate font-semibold">{z.nazwaTowaru}</div>
+        <div className="truncate font-mono text-slate-600">{z.symbol}</div>
+      </div>
+    </div>}
+    {/* Kto WZIĄŁ zadanie. Bez tego „czeka na halę" i „ktoś już to robi"
+        wyglądają tak samo, a to różnica między czekaniem a ponagleniem. */}
+    {z.przypisanoPrzez && !zamkniete && <p className="mt-1 text-xs text-slate-500">
+      realizuje: {z.przypisanoPrzez}</p>}
+  </article>;
 }

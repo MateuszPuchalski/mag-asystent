@@ -397,6 +397,24 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   assert.equal(z.twId, null);
 });
 
+/* ── Zlecenie i wynik to DWA wpisy (0.226.0) ─────────────────────────────────
+   Zgłoszenie właściciela: „zlecenie zmierzenia też powinno zostać pokazane
+   jako blok w wiadomości". Do 0.224.0 oś niosła sam wynik, a prośba, która go
+   wywołała, nie zostawiała po sobie nic poza kreskami zmiany statusu.        */
+
+test("zlecenie stoi na osi ZANIM wynik przyjdzie — bo wtedy właśnie się czeka", () => {
+  const { os } = osRozmowy(rozmowaId);
+  const zlec = os.find((w) => w.rodzaj === "zlecenie");
+  assert.ok(zlec, "zlecenie ma stać na osi od chwili zlecenia");
+  assert.equal(zlec.zlecenie?.status, "nowe");
+  /* Treścią wpisu jest INSTRUKCJA: po niej widać, czy wynik odpowiada na
+     zadane pytanie. Tytuł jedzie osobnym polem, bo jest etykietą. */
+  assert.match(zlec.tresc, /Czy zmierzycie rozstaw otworów\?/);
+  assert.ok(zlec.zlecenie?.tytul, "tytuł jedzie osobno, nie sklejony z instrukcją");
+  /* Wyniku jeszcze nie ma — i to jest cała wartość tego wpisu. */
+  assert.equal(os.find((w) => w.rodzaj === "wynik_zadania"), undefined);
+});
+
 test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
   const zadanie = db().prepare(
     "SELECT id FROM zadanie_terenowe WHERE conversation_id=?").get(rozmowaId) as { id: number };
@@ -417,6 +435,15 @@ test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
   assert.equal((db().prepare(
     "SELECT count(*) n FROM conversation_event WHERE conversation_id=? AND event_type='field_task_result'")
     .get(rozmowaId) as { n: number }).n, 1);
+
+  /* ZLECENIE ZOSTAJE i stoi PRZED wynikiem. Sklejenie ich w jeden kafelek
+     przesunęłoby prośbę do godziny odpowiedzi i skłamało o kolejności —
+     a między jednym a drugim mija czas, w którym bywają wiadomości klienta. */
+  const zlec = os.findIndex((w) => w.rodzaj === "zlecenie");
+  const wynikIdx = os.findIndex((w) => w.rodzaj === "wynik_zadania");
+  assert.ok(zlec >= 0, "zlecenie nie znika po wykonaniu");
+  assert.ok(zlec < wynikIdx, "prośba przed odpowiedzią");
+  assert.equal(os[zlec].zlecenie?.status, "wykonane");
 });
 
 /* Bramka własności zostaje bramką także wtedy, gdy zadanie wisi na rozmowie. */

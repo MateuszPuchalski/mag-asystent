@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.226.0 — 7 września 2026
+
+**Oś rozmowy pokazywała odpowiedź hali, ale nie pytanie.** Agent zlecał pomiar,
+zlecenie jechało na kolektor, a rozmowa milczała o tym, że coś zlecono. Wracał
+po godzinie i widział własną wiadomość do klienta, pod nią pustkę — bo wynik
+jeszcze nie przyszedł. Zgłoszenie właściciela: „zlecenie zmierzenia też powinno
+zostać pokazane jako blok w wiadomości".
+
+`docs/panel-obslugi-klienta.md` §10.3 wymienia „utworzenie zadania" wśród
+zdarzeń osi od pierwszego wydania tego dokumentu. Front nigdy tego nie robił.
+Serwis budował oś z pięciu źródeł i `zadanie_terenowe` czytał wyłącznie po to,
+by wyciągnąć z niego WYNIK.
+
+**Zlecenie i wynik to dwa wpisy, nie jeden.** Dwa momenty, dwie osoby, między
+nimi godzina albo dzień. Sklejenie ich w jeden kafelek kłamałoby o czasie na
+osi, która jest chronologiczna.
+
+**Blok widać w każdym stanie, nie dopiero po wykonaniu.** Zlecenie bez wyniku
+to najważniejszy przypadek: rozmowa czeka na halę i agent ma to wiedzieć,
+zanim obieca klientowi termin. Gdyby blok pojawiał się razem z wynikiem, jedyny
+stan wymagający decyzji byłby niewidoczny.
+
+Blok niesie rodzaj zadania, tytuł, instrukcję słowo w słowo, kafel kartoteki,
+znacznik `pilne` i podpis magazyniera, który zadanie przejął. Bursztyn znaczy
+„czekamy", zieleń wyniku „przyszło", a zlecenie wykonane gaśnie do szarości —
+jego rola skończyła się w chwili, gdy przyszła odpowiedź.
+
+Dwie rzeczy poza samym blokiem, obie liczone w sekundach agenta. Godzina stoi
+przy zleceniu, choć wynik jej nie ma: wynik jest ostatnim, co się wydarzyło,
+a otwarte zlecenie ma WIEK. Ikona idzie z rodzaju zadania — miarka, aparat,
+lupa, notes — bo długą rozmowę przewija się wzrokiem, a jeden kształt dla
+czterech próśb kazałby czytać nagłówek.
+
+Przycisku „wstaw do szkicu" przy zleceniu NIE MA. Do szkicu trafia wynik;
+przycisk przy prośbie wstawiłby klientowi naszą instrukcję dla magazynu.
+
 ## 0.224.1 — 7 września 2026
 
 **Miękka blokada obecności zachowywała się jak twarda.** Gdy przy rozmowie

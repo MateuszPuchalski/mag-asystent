@@ -116,7 +116,7 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -127,6 +127,16 @@ export type WpisOsi = {
   /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`, 0.166.0). */
   zamowienieId?: string | null;
   zadanieId?: number;
+  /**
+   * Szczegóły ZLECENIA dla hali (0.226.0) — tylko przy `rodzaj: "zlecenie"`.
+   * Lustro pola z `services/skrzynka.ts`; panel rysuje z tego blok, więc
+   * części jadą osobno, a nie sklejone w jeden łańcuch.
+   */
+  zlecenie?: {
+    rodzaj: string; tytul: string; status: string; priorytet: string;
+    przypisanoPrzez: string | null;
+    twId: number | null; symbol: string | null; nazwaTowaru: string | null;
+  };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;
