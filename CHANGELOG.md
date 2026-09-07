@@ -34,6 +34,112 @@ historii nie przepisujemy.
 ---
 
 
+## 0.229.0 — 7 września 2026
+
+**Dobór wie, jaki silnik stoi w kosiarce — i szuka części tego silnika.**
+
+Części ogrodnicze mają problem dwupoziomowy. Filtr powietrza, gaźnik, świeca
+i linka rozrusznika pasują do **silnika**, a kupujący zna wyłącznie model
+kosiarki. Pytanie „filtr do NAC LS 46-450" nie miało jak trafić na filtr
+Loncina, choć oba wpisy leżały w bazie obok siebie.
+
+Pole **Silnik** w zakładce Dobór istniało od E1 i agenci je wypełniali. Nie
+czytał go **żaden** szczebel drabiny: `kandydaci.ts` pytał wyłącznie o klucz
+maszyny, a `model_urzadzenia` trzymało silniki jako osobne wiersze, których nic
+nie wiązało z kosiarką. Trzy lata wpisywania w pole, które nic nie robiło.
+
+### Nowa tabela `zabudowa_silnika`
+
+Relacja jest **wiele do wielu**: jedna kosiarka bywa sprzedawana w dwóch
+wersjach silnikowych, a jeden silnik stoi w setkach maszyn. Cykl życia ten sam
+co przy zastosowaniu — propozycja, którą rozstrzyga człowiek z biura.
+
+Dowód stoi **w wierszu**, nie w osobnej tabeli, bo dowody zabudowy się nie
+kumulują: „ten silnik stoi w tej kosiarce" ma jedno źródło naraz. Drugie źródło
+albo mówi to samo, albo mówi co innego — i wtedy powstaje nowy wiersz
+z `zastepuje_id`. Dowód jest obowiązkowy, więc para bez niego nie powstaje.
+
+Wycofanie wymaga powodu **zawsze**, inaczej niż przy pozytywnym zastosowaniu:
+cofnięcie pary gasi całą gałąź kandydatów naraz.
+
+### Dziewiąty szczebel drabiny
+
+Stoi zaraz za zastosowaniem do maszyny, przed ofertą — łańcuch ma o jedno
+ogniwo więcej. Idzie **wyłącznie** przez zatwierdzoną zabudowę. Wpisanego
+w pole tekstu nie czyta: „B&S 450E" nigdy nie trafi na „Briggs & Stratton
+450E", a rozbijanie go na markę i nazwę byłoby zgadywaniem odrzuconym już przy
+sekcjach „Modele:".
+
+**Pewność idzie z najsłabszego ogniwa** i to jest inna reguła niż §11.3. Tam
+wygrywa najmocniejszy dowód jednego twierdzenia; tu twierdzenia są dwa, więc
+`potwierdzone` wymaga dowodu technicznego po obu stronach.
+
+**Maszyna z kilkoma silnikami nigdy nie daje `potwierdzone`.** Każdy kandydat
+niesie ostrzeżenie „potwierdź z tabliczki znamionowej". Klient zna model
+kosiarki, nie wersję silnikową, a milcząca pewność w tym miejscu kończy się
+zwrotem „nie pasuje".
+
+Pominięcie szczebla jest tu produktem: powód „nie wiadomo, jaki silnik stoi
+w NAC LS 46-450 — dopisz go w Wiedza → Silniki" to jedyna droga, którą agent
+dowie się o luce.
+
+### Bez tego wydanie byłoby puste
+
+Hak „wiedza rośnie z pracy" wpisywał `rodzaj: "maszyna"` na sztywno, więc żadne
+zastosowanie do silnika nie mogło powstać z codziennej pracy — a nowy szczebel
+zwracałby zero na zawsze. Przy **ZATWIERDŹ DOBÓR** agent wybiera teraz, czy
+wiedza ma urosnąć przy maszynie, czy przy jej silniku. Opcja silnikowa
+pojawia się wyłącznie przy zatwierdzonej zabudowie. Filtr zapisany raz przy
+jednej kosiarce odpowiada odtąd na pytania o wszystkie maszyny z tym silnikiem.
+
+### Ekran Wiedza → Silniki
+
+Trzy sekcje: pary czekające na rozstrzygnięcie, **luki** i pary zatwierdzone.
+
+Lista luk to maszyny z doborów, od najczęściej pytanych, z surowymi łańcuchami
+wpisanymi w pole „Silnik" i licznikiem („B&S 450E ×9"). Ranking liczy się
+z pól **wpisanych przez agenta**, nigdy z treści wiadomości klienta — blizna
+„szarpaka" obowiązuje także tutaj. Klik na czipie wstawia tekst do poprawki,
+nie wysyła go: markę i nazwę wpisuje człowiek.
+
+W zakładce Dobór pole Silnik przestaje być sierotą. Pod danymi stoi zdanie
+o stanie wiedzy: silnik z bazy, albo „to na razie tylko notatka" z odsyłaczem
+do ekranu Silniki.
+
+### Migracja
+
+`CHECK` na `dobor_rozmowy.wybrany_droga` stał wyłącznie w `schema.sql`, więc
+bazy sprzed tego wydania znają osiem dróg. Bez przebudowy kliknięcie „Wybierz"
+przy kandydacie z drogi `silnik` rzuciłoby surowy `SQLITE_CONSTRAINT` — dopiero
+u klienta i dopiero przy pierwszym trafieniu nowego szczebla. Przebudowa idzie
+sama przy starcie, raz.
+
+### Naprawione przy okazji
+
+Końcowe złożenie listy kandydatów **nadpisywało** pole `ostrzezenia`
+negatywami z bazy wiedzy. Ostrzeżenie postawione przez sam szczebel gasło po
+cichu. Teraz oba źródła się scalają. Złapał to test nowej drogi.
+
+**Cztery pola formularza modelu były niewidoczne — od E3.** Klasa `sr-only`
+stała na `<label>`, a ten obejmuje także pole. W trybie zwartym znikał więc
+cały wiersz: marka, model i wariant zwężone do 26 pikseli, nie do trafienia
+myszą. Dotyczyło to ekranu **Z opisów**, gdzie stoi od 0.186.0. Testy tego nie
+widziały, bo w jsdomie klasa nie ma szerokości — wyszło dopiero w przeglądarce.
+Chowa się teraz sam napis, a strażnik pilnuje kształtu.
+
+Odczyt silników rozsypywał w jeden obiekt dwa wyniki z polem `liczba` — kolejkę
+i luki. Drugie po cichu nadpisywało pierwsze, więc nagłówek pokazywałby liczbę
+luk pod napisem „do rozstrzygnięcia". Pola nazywają się teraz osobno.
+
+**Testy reklamacji pracowały na PRAWDZIWEJ bazie biura.** Dwa wartościowe
+importy stały nad linią ustawiającą `DB_PATH`, a statyczny import biegnie przed
+ciałem modułu — więc `config` i `db` wstawały ze ścieżką domyślną, czyli
+`server/data/wertis.db`. Ten plik czyścił ją w `beforeEach` przy każdym
+`npm test`. Póki tamta baza nie miała wiedzy, wszystko przechodziło i nikt tego
+nie widział; wyszło dopiero wtedy, gdy sprawdzenie w przeglądarce zostawiło
+w niej pierwsze zabudowy. Serwisy dociągają się teraz dynamicznie. Przegląd
+pozostałych plików testowych nie znalazł drugiego takiego przypadku.
+
 ## 0.228.0 — 7 września 2026
 
 **Login klienta kopiuje się kliknięciem.** Decyzja właściciela. Po loginie

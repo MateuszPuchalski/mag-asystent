@@ -578,9 +578,14 @@ export function useZapiszDaneDoboru() {
 export function useStatusDoboru() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; status: StatusDoboru; brakuje?: string | null }) =>
+    /* `silnikModelId` jedzie tą samą trasą co status: to jedno pole przy JEDNEJ
+       czynności („zatwierdź dobór"), a wskazuje, czy wiedza ma urosnąć przy
+       maszynie, czy przy jej silniku. */
+    mutationFn: (v: { id: number; status: StatusDoboru; brakuje?: string | null; silnikModelId?: number | null }) =>
       api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/status`, {
-        method: "POST", body: JSON.stringify({ status: v.status, brakuje: v.brakuje ?? null }),
+        method: "POST", body: JSON.stringify({
+          status: v.status, brakuje: v.brakuje ?? null, silnikModelId: v.silnikModelId ?? null,
+        }),
       }),
     onSettled: (_d, _e, v) => poDoborze(qc, v.id),
   });

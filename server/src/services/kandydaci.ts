@@ -6,6 +6,7 @@ import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
+import { zabudowyMaszyny } from "./silniki.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { szukajPelnotekst } from "./pelnotekst.js";
 import { zwin } from "../tekst.js";
@@ -67,7 +68,8 @@ export interface SzczebelDoboru {
 /* Kolejność §11.2: dokładny symbol i EAN biją wszystko, oferta jest kontekstem
    pytania, zamiennik idzie z opisu. Dedup po `twId` zostawia najmocniejszą. */
 const RANGA: Record<DrogaDoboru, number> = {
-  symbol: 1, ean: 2, oem: 3, zastosowanie: 4, oferta: 5, zamiennik: 6, pelnotekst: 7, wyszukiwarka: 8,
+  symbol: 1, ean: 2, oem: 3, zastosowanie: 4, silnik: 5, oferta: 6, zamiennik: 7, pelnotekst: 8,
+  wyszukiwarka: 9,
 };
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
@@ -267,6 +269,60 @@ export function kandydaciDoboru(
     drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
   }
 
+  /* SZCZEBEL: zastosowanie PRZEZ SILNIK. Filtr, gaźnik, świeca i linka pasują
+     do SILNIKA, a kupujący zna wyłącznie model kosiarki — bez tego szczebla
+     „filtr do NAC LS 46-450" nie trafi na filtr Loncina, choć oba wpisy leżą
+     w bazie. Idziemy WYŁĄCZNIE przez zatwierdzoną zabudowę; pola
+     `dobor_rozmowy.silnik` nie czytamy, bo to wolny tekst („B&S 450E" nigdy
+     nie trafi na „Briggs & Stratton 450E") i rozbijanie go byłoby zgadywaniem.
+
+     PEWNOŚĆ IDZIE Z NAJSŁABSZEGO OGNIWA i to jest INNA reguła niż §11.3.
+     Tam wygrywa najmocniejszy dowód JEDNEGO twierdzenia; tutaj twierdzenia są
+     dwa („część pasuje do silnika" i „silnik stoi w tej maszynie") i łańcuch
+     jest wart tyle, co jego słabsze ogniwo. Nie „naprawiać" tego na spójność.
+
+     Maszyna z kilkoma wersjami silnikowymi NIGDY nie daje `potwierdzone`:
+     klient zna model kosiarki, nie wersję silnika, a milcząca pewność w tym
+     miejscu kończy się zwrotem „nie pasuje". */
+  if (!dobor.dane.marka || !dobor.dane.model) {
+    pomin("silnik", "agent nie wpisał marki i modelu maszyny");
+  } else {
+    const maszyna = [dobor.dane.marka, dobor.dane.model, dobor.dane.wariant].filter(Boolean).join(" ");
+    const zabudowy = zabudowyMaszyny(
+      kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant), database);
+    if (zabudowy.length === 0) {
+      pomin("silnik", `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`);
+    } else {
+      /* Ostrzeżenie przy KAŻDYM kandydacie tej drogi, nie raz na liście:
+         kandydat wędruje do szkicu osobno i ma nieść swoje zastrzeżenie. */
+      const kilka = zabudowy.length > 1
+        ? [`${maszyna} bywa z kilkoma silnikami — potwierdź z tabliczki znamionowej`]
+        : [];
+      let ile = 0;
+      for (const zab of zabudowy) {
+        for (const z of zastosowaniaModelu(zab.silnik.klucz, database)) {
+          const w = towar(database, z.twId);
+          if (z.polaryzacja === "nie_pasuje") {
+            negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
+              powod: z.zdaniePowodu ?? "nie pasuje",
+              zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`,
+              at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
+            continue;
+          }
+          if (!w) continue;
+          ile++;
+          const pewne = z.pewnosc === "potwierdzone" && zab.pewnosc === "potwierdzone" && kilka.length === 0;
+          dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne),
+            droga: "silnik", pewnosc: pewne ? "potwierdzone" : "prawdopodobne",
+            zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`, ostrzezenia: [...kilka] });
+        }
+      }
+      /* Silnik znany, ale bez zastosowań to `sprawdzona: true, wynikow: 0` —
+         nie pominięcie. To dwie różne prawdy i agent musi je rozróżnić. */
+      drogi.set("silnik", { droga: "silnik", sprawdzona: true, wynikow: ile });
+    }
+  }
+
   /* SZCZEBEL: pełny tekst (E3) — bm25 po symbolu, nazwie i opisie, WYŁĄCZNIE
      z danych wpisanych przez agenta (blizna „szarpaka": nigdy z treści
      wiadomości). Trafienie po treści to podpowiedź, nie dowód (§11.2). */
@@ -291,14 +347,18 @@ export function kandydaciDoboru(
     if (!drogi.has(droga)) pomin(droga, POMINIETE_DO[droga] ?? "szczebel bez nadawcy");
   }
 
-  /* Ostrzeżenie przy kandydacie to skrót negatywu o TEJ SAMEJ kartotece —
-     ta sama część bywa kandydatem z oferty i negatywem z wiedzy naraz. */
+  /* Ostrzeżenia mają DWA źródła i oba muszą dojechać. Pierwsze to negatyw
+     o tej samej kartotece — ta sama część bywa kandydatem z oferty i negatywem
+     z wiedzy naraz. Drugie stawia sam szczebel: „ta maszyna bywa z kilkoma
+     silnikami". Ta lista SCALA oba; nadpisanie gasiłoby zastrzeżenie szczebla
+     po cichu, a właśnie ono chroni przed zwrotem „nie pasuje". */
   const kandydaci = [...[...znalezione.values()]
     .sort((a, b) => RANGA[a.droga] - RANGA[b.droga] || (b.stan ?? 0) - (a.stan ?? 0) || a.symbol.localeCompare(b.symbol)),
   /* Numery bez kartoteki na końcu: nie da się ich wybrać, więc nie mają
      wyprzedzać niczego, co się da. */
   ...bezKartoteki]
     .map((k, i) => ({ nr: i + 1, ...k,
-      ostrzezenia: negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`) }));
+      ostrzezenia: [...k.ostrzezenia,
+        ...negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`)] }));
   return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne };
 }

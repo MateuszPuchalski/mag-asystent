@@ -15,11 +15,17 @@ const kandydaci = vi.fn();
 const zapisz = { mutate: vi.fn(), isPending: false, error: null as unknown };
 const status = { mutate: vi.fn(), isPending: false, error: null as unknown };
 const wybierz = { mutate: vi.fn(), isPending: false, error: null as unknown };
+/* Silniki maszyny jadą tą samą trasą co dowody wiedzy — atrapa oddaje to,
+   co ustawi test, a domyślnie pustą listę (maszyna bez znanego silnika). */
+type WiedzaAtrapa = { data: { zastosowanie: null; zabudowa: null; silniki: unknown[]; pomiary: unknown[] } };
+const wiedzaDoboru = vi.fn<() => WiedzaAtrapa>(
+  () => ({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } }));
 vi.mock("../api/rozmowy", () => ({
   useKandydaci: (id: number | null) => kandydaci(id),
   useZapiszDaneDoboru: () => zapisz,
   useStatusDoboru: () => status,
   useWybierzKandydata: () => wybierz,
+  useWiedzaDoboru: () => wiedzaDoboru(),
 }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
 /* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
@@ -118,8 +124,10 @@ describe("zakładka doboru", () => {
     expect(onZlecPomiar).toHaveBeenCalledWith(expect.objectContaining({ id: 14, sym: "FTC272" }));
 
     await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
+    /* `silnikModelId: null` = wiedza rośnie przy MASZYNIE — zachowanie sprzed
+       dołożenia szczebla „przez silnik". */
     expect(status.mutate).toHaveBeenCalledWith(
-      { id: 4821, status: "confirmed", brakuje: null }, expect.anything());
+      { id: 4821, status: "confirmed", brakuje: null, silnikModelId: null }, expect.anything());
   });
 
   /* ── Zdjęcia przy doborze (0.203.0) ────────────────────────────────────
@@ -215,5 +223,60 @@ describe("kandydat bez kartoteki (E3)", () => {
     expect(screen.getByText("brak w kartotece")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Wybierz/ })).toHaveLength(2);
     expect(screen.getByText(/nie ma go w żadnym opisie/)).toBeInTheDocument();
+  });
+});
+
+/* ── Silnik przestaje być polem-sierotą ─────────────────────────────────────
+   Do tego wydania agent wypełniał pole „Silnik", a żaden szczebel go nie
+   czytał. Szczebel „przez silnik" idzie przez ZATWIERDZONĄ zabudowę, więc
+   ekran musi rozróżnić trzy stany: silnik znany z bazy, sam wpisany tekst
+   (czyli notatka) i brak jednego i drugiego.                               */
+
+describe("Dobór a silnik maszyny", () => {
+  const zabudowa = (id: number, etykieta: string) => ({
+    id, silnik: { id, etykieta }, maszyna: { etykieta: "NAC LS 46-450" },
+    pewnosc: "potwierdzone", zdanieZrodla: `${etykieta} stoi w NAC LS 46-450 — producent`,
+  });
+  const zDanymi = (n: Partial<DoborTyp> = {}) => dobor({
+    dane: { marka: "NAC", model: "LS 46-450", wariant: null, rocznik: null, nrSeryjny: null,
+      silnik: "B&S 450E", oem: null, nazwaCzesci: null, parametry: {} },
+    ...n,
+  });
+
+  beforeEach(() => {
+    kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
+    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } });
+  });
+
+  it("bez zabudowy mówi, że wpisany silnik to na razie notatka", () => {
+    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    expect(screen.getByText(/to na razie tylko notatka/)).toBeInTheDocument();
+    expect(screen.getByText(/Wiedza → Silniki/)).toBeInTheDocument();
+  });
+
+  it("przy dwóch zabudowach każe potwierdzić tabliczkę", () => {
+    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, pomiary: [],
+      silniki: [zabudowa(7, "silnik Briggs & Stratton 450E"), zabudowa(8, "silnik Honda GCV160")] } });
+    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    expect(screen.getByText(/bywa z kilkoma silnikami, potwierdź z tabliczki/)).toBeInTheDocument();
+  });
+
+  it("wybór „do silnika” jedzie razem ze statusem — bez zabudowy nie ma go wcale", async () => {
+    const wybrany = { twId: 14, symbol: "FTC272", droga: "silnik" as const, przez: "Ala",
+      at: "2026-09-07T10:00:00Z", zdanieDoSzkicu: "Do NAC LS 46-450 pasuje FTC272." };
+    /* Najpierw bez zabudowy: opcji silnikowej NIE MA, bo nie ma faktu w bazie. */
+    const { unmount } = render(<Dobor dobor={zDanymi({ wybrany })} rozmowaId={4821}
+      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    expect(screen.queryByText(/zastosowanie zapisz do/)).toBeNull();
+    unmount();
+
+    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, pomiary: [],
+      silniki: [zabudowa(7, "silnik Briggs & Stratton 450E")] } });
+    render(<Dobor dobor={zDanymi({ wybrany })} rozmowaId={4821}
+      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    await userEvent.click(screen.getByRole("radio", { name: /Briggs & Stratton 450E/ }));
+    await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
+    expect(status.mutate).toHaveBeenCalledWith(
+      { id: 4821, status: "confirmed", brakuje: null, silnikModelId: 7 }, expect.anything());
   });
 });

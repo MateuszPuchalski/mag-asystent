@@ -569,6 +569,7 @@ export function migrate(database: DatabaseSync) {
   zadanieNieTrzymaTowaru(database);
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
+  doborZnaDrogeSilnika(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);
@@ -1206,6 +1207,75 @@ function bezBrygadzisty(database: DatabaseSync) {
  * (pierwsza: `naLoginIHaslo`) i z tego samego powodu: SQLite nie umie zdjąć
  * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
  */
+/**
+ * Droga `silnik` w `dobor_rozmowy.wybrany_droga` — PRZEBUDOWA TABELI.
+ *
+ * Szczebel „przez silnik" dokłada dziewiątą drogę doboru, a `CHECK` na tej
+ * kolumnie stoi WYŁĄCZNIE w `schema.sql`. Bazy sprzed tego wydania znają osiem
+ * wartości i `CREATE TABLE IF NOT EXISTS` ich nie poprawi. Bez tej funkcji
+ * agent kliknąłby „Wybierz" przy kandydacie z nowej drogi i dostał surowy
+ * `SQLITE_CONSTRAINT` — najgorszy możliwy objaw, bo wyszedłby dopiero
+ * u klienta i dopiero przy pierwszym trafieniu nowego szczebla.
+ *
+ * Rozszerzenia `CHECK` SQLite nie robi w miejscu (blizna 0.135.0), więc idzie
+ * pełna przebudowa wzorem `kosz_pozycja`. Warunek wejścia czytamy z treści
+ * `sqlite_master`, żeby nie przebudowywać tabeli przy każdym starcie.
+ *
+ * `ON DELETE CASCADE` z `conversation` odtwarzamy JAWNIE: przebudowa gubi
+ * klucze obce, a bez niego skasowana rozmowa zostawiałaby dobór-sierotę.
+ */
+function doborZnaDrogeSilnika(database: DatabaseSync) {
+  const w = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'")
+    .get() as { sql: string | null } | undefined;
+  if (!w?.sql || w.sql.includes("'silnik'")) return;
+
+  const stare = (
+    database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>
+  ).map((c) => c.name);
+
+  database.exec(`
+    CREATE TABLE dobor_rozmowy_nowa (
+      conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+      status          TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN (
+                        'not_started','extracting_data','missing_information','searching',
+                        'candidates_found','requires_expert','confirmed','rejected',
+                        'not_applicable')),
+      wersja          INTEGER NOT NULL DEFAULT 1,
+      marka           TEXT,
+      model           TEXT,
+      wariant         TEXT,
+      rocznik         TEXT,
+      nr_seryjny      TEXT,
+      silnik          TEXT,
+      oem             TEXT,
+      nazwa_czesci    TEXT,
+      parametry_json  TEXT,
+      brakuje         TEXT,
+      wybrany_tw_id   INTEGER,
+      wybrany_symbol  TEXT,
+      wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
+                        'oferta','zamiennik','symbol','ean','wyszukiwarka',
+                        'zastosowanie','silnik','oem','pelnotekst')),
+      wybrano_przez   TEXT,
+      wybrano_user_id INTEGER REFERENCES app_user(user_id),
+      wybrano_at      TEXT,
+      updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      updated_by      TEXT,
+      updated_user_id INTEGER REFERENCES app_user(user_id)
+    );
+  `);
+  const nowe = (
+    database.prepare("PRAGMA table_info(dobor_rozmowy_nowa)").all() as Array<{ name: string }>
+  ).map((c) => c.name);
+  const wspolne = nowe.filter((c) => stare.includes(c)).join(", ");
+  database.exec(`
+    INSERT INTO dobor_rozmowy_nowa(${wspolne}) SELECT ${wspolne} FROM dobor_rozmowy;
+    DROP TABLE dobor_rozmowy;
+    ALTER TABLE dobor_rozmowy_nowa RENAME TO dobor_rozmowy;
+  `);
+}
+
 /**
  * Indeks unikalności kodu kosza — PRZEBUDOWA, nie dopisanie (0.123.0).
  *

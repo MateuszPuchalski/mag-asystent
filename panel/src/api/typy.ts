@@ -255,9 +255,11 @@ export type StatusDoboru =
   | "not_started" | "extracting_data" | "missing_information" | "searching"
   | "candidates_found" | "requires_expert" | "confirmed" | "rejected" | "not_applicable";
 
-/* Osiem dróg §11.2. `zastosowanie`, `oem` i `pelnotekst` czekają na E2/E3. */
+/* Dziewięć dróg §11.2. `silnik` to zastosowanie o jeden przeskok dalej:
+   część pasuje do silnika, a silnik stoi w maszynie, o którą pyta klient. */
 export type DrogaDoboru =
-  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "oem" | "pelnotekst";
+  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "silnik"
+  | "oem" | "pelnotekst";
 
 export type DaneDoboru = {
   marka: string | null; model: string | null; wariant: string | null; rocznik: string | null;
@@ -374,7 +376,45 @@ export type PomiarRozmowy = {
   twId: number | null; symbol: string | null; zaproponowano: boolean;
 };
 
-export type WiedzaDoboru = { zastosowanie: Zastosowanie | null; pomiary: PomiarRozmowy[] };
+export type WiedzaDoboru = {
+  zastosowanie: Zastosowanie | null;
+  /** Drugie ogniwo, gdy podparcie idzie przez silnik — inaczej `null`. */
+  zabudowa: Zabudowa | null;
+  /** ZATWIERDZONE silniki wpisanej maszyny: czipy pod polem i wybór przy zatwierdzeniu. */
+  silniki: Zabudowa[];
+  pomiary: PomiarRozmowy[];
+};
+
+/* ── Zabudowa silnika (§11.2) ─────────────────────────────────────────────── */
+
+export type Zabudowa = {
+  id: number; maszyna: ModelUrzadzenia; silnik: ModelUrzadzenia;
+  stan: StanZastosowania; zrodlo: "reczne" | "dobor" | "copilot";
+  rodzajDowodu: RodzajDowodu; nazwaRodzajuDowodu: string;
+  dowodTresc: string; dowodLink: string | null; komentarz: string | null;
+  conversationId: number | null; zastepujeId: number | null;
+  zaproponowal: string; zaproponowanoAt: string;
+  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
+  pewnosc: "potwierdzone" | "prawdopodobne";
+  /** Zdanie źródła z serwera — drugie ogniwo łańcucha. Panel go nie układa. */
+  zdanieZrodla: string;
+};
+
+/** Maszyna z doborów i to, czego o jej silniku jeszcze nie wiemy. */
+export type LukaSilnika = {
+  marka: string; model: string; wariant: string | null; klucz: string;
+  /** Ile doborów wskazało tę maszynę — po tym idzie kolejność. */
+  pytan: number;
+  /** SUROWY tekst z pola „Silnik" z licznikiem. Automat go NIE rozbija. */
+  wpisaneSilniki: Array<{ tekst: string; ile: number }>;
+  zabudowy: Zabudowa[];
+};
+
+export type NowaZabudowa = {
+  maszyna: { rodzaj: "maszyna"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
+  silnik: { rodzaj: "silnik"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
+  rodzajDowodu: RodzajDowodu; dowodTresc: string; dowodLink?: string | null;
+};
 
 /* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
    Kształt jest ODCZYTEM po loginie kupującego — panel nie ma tu czego zapisać.

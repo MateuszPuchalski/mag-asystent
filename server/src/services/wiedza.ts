@@ -103,7 +103,7 @@ export class WiedzaConflict extends Error {
    transakcja jest wtedy transakcją wołającego — zapis idzie w niej, a jej
    ROLLBACK cofa także wiedzę. Tego właśnie chcemy: dobór bez propozycji
    albo propozycja bez doboru byłyby stanem w połowie. */
-function wTransakcji<R>(database: DatabaseSync, fn: () => R): R {
+export function wTransakcji<R>(database: DatabaseSync, fn: () => R): R {
   return database.isTransaction ? fn() : transaction(database, fn)();
 }
 
@@ -119,10 +119,14 @@ export function kluczModelu(
   return `${rodzaj}|${zwin([marka, nazwa, wariant ?? ""].join(" "))}`;
 }
 
-const etykietaModelu = (m: { marka: string; nazwa: string; wariant: string | null }) =>
-  [m.marka, m.nazwa, m.wariant].filter(Boolean).join(" ");
+/* Przedrostek „silnik" NIE jest ozdobnikiem. Od wydania z `zabudowa_silnika`
+   w tej tabeli stoją oba rodzaje naraz, a „Briggs & Stratton 450E" w kolejce
+   propozycji wyglądałoby jak kosiarka. Etykieta jedzie stąd do kandydata,
+   ostrzeżenia i szkicu, więc rozróżnienie musi paść w JEDNYM miejscu. */
+const etykietaModelu = (m: { rodzaj?: "maszyna" | "silnik"; marka: string; nazwa: string; wariant: string | null }) =>
+  [m.rodzaj === "silnik" ? "silnik" : null, m.marka, m.nazwa, m.wariant].filter(Boolean).join(" ");
 
-function naModel(w: Record<string, unknown>): ModelUrzadzenia {
+export function naModel(w: Record<string, unknown>): ModelUrzadzenia {
   const m = {
     id: Number(w.id), rodzaj: String(w.rodzaj) as "maszyna" | "silnik",
     marka: String(w.marka), nazwa: String(w.nazwa),
@@ -145,7 +149,7 @@ export function czlowiekZBiura(database: DatabaseSync, userId: number): string {
   return u.name;
 }
 
-const podpis = (autor: Autor) =>
+export const podpis = (autor: Autor) =>
   "automat" in autor ? { name: `automat (${autor.automat})`, userId: null } : { name: autor.name, userId: autor.userId };
 
 /** Modele do podpowiedzi w formularzu. Odczyt, `LIKE` po formie zwiniętej. */
@@ -209,7 +213,7 @@ export function pewnoscZastosowania(lista: Array<{ rodzaj: RodzajDowodu }>): Pew
   return lista.some((d) => DOWODY_TECHNICZNE.includes(d.rodzaj)) ? "potwierdzone" : "prawdopodobne";
 }
 
-const dzien = (iso: string) => {
+export const dzien = (iso: string) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
 };

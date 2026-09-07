@@ -215,12 +215,13 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   brakuje         TEXT,
   wybrany_tw_id   INTEGER,
   wybrany_symbol  TEXT,
-  -- OSIEM dróg z §11.2. `zastosowanie`, `oem` i `pelnotekst` czekają na E2/E3
-  -- bez nadawcy — z tego samego powodu, dla którego lista statusów jest pełna:
-  -- panel ma jedną listę, a nie trzy rosnące osobno.
+  -- DZIEWIĘĆ dróg z §11.2. Droga `silnik` doszła razem z `zabudowa_silnika`;
+  -- bazy sprzed tego wydania znają osiem, więc `CHECK` przebudowuje
+  -- `doborZnaDrogeSilnika()` w `migrate()`. Bez tego „Wybierz" przy kandydacie
+  -- z nowej drogi rzuciłby `SQLITE_CONSTRAINT` dopiero u klienta.
   wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
                     'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                    'zastosowanie','oem','pelnotekst')),
+                    'zastosowanie','silnik','oem','pelnotekst')),
   wybrano_przez   TEXT,
   wybrano_user_id INTEGER REFERENCES app_user(user_id),
   wybrano_at      TEXT,
@@ -300,7 +301,7 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
--- Trzy tabele zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
+-- Cztery tabele zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
 -- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
 -- czytelnika — blizna 0.157.0. Nazwy polskie, jak `sprawa_klienta`; żadna nie
 -- stoi na liście spalonych w `bezObslugiKlienta()` (tam jest `dopasowanie`).
@@ -391,6 +392,63 @@ CREATE TABLE IF NOT EXISTS dowod_zastosowania (
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS ix_dowod_zastosowania ON dowod_zastosowania(zastosowanie_id);
+
+-- ── Zabudowa silnika: który silnik stoi w której maszynie (§11.2) ──────────
+-- Część silnikowa — filtr, gaźnik, świeca, linka rozrusznika — pasuje do
+-- SILNIKA, a kupujący zna wyłącznie model kosiarki. Bez tej relacji pytanie
+-- „filtr do NAC LS 46-450" nie ma jak trafić na filtr Loncina, choć oba wpisy
+-- leżą w bazie. To jest jedyny powód istnienia tej tabeli.
+--
+-- Wiele do wielu, w obie strony: jedna kosiarka bywa sprzedawana w dwóch
+-- wersjach silnikowych, a jeden silnik stoi w setkach maszyn. Kolumna
+-- w `model_urzadzenia` zapisałaby najwyżej jeden silnik na maszynę i nie
+-- miałaby gdzie trzymać stanu, dowodu ani autora rozstrzygnięcia.
+--
+-- DLACZEGO NIE `zastosowanie`: tam `tw_id` to kartoteka Subiekta i wierzy w to
+-- cała warstwa odczytu — `zaproponujZastosowanie` czyta `sgt_towar`,
+-- `tw_symbol` jest NOT NULL, a `pokrycieWiedzy()` liczy wiersze bez filtra.
+-- Wiersz, w którym `tw_id` znaczy „model", zatruwałby każdego z tych
+-- czytelników po cichu.
+--
+-- DOWÓD STOI W WIERSZU, nie w osobnej tabeli. Dowody zabudowy się NIE
+-- kumulują: „ten silnik stoi w tej kosiarce" ma jedno źródło naraz — IPL,
+-- tabliczkę albo katalog dealera. Drugie źródło albo mówi to samo, albo mówi
+-- co innego, a wtedy chcemy nowego wiersza z `zastepuje_id`, nie dopisku.
+-- Fitment części kumuluje się inaczej i dlatego ma `dowod_zastosowania`.
+-- `rodzaj_dowodu` jest NOT NULL, więc para bez dowodu nie powstaje wcale.
+--
+-- BEZ UNIQUE na parze: wycofany wiersz musi móc stać obok nowego. Dubel łapie
+-- serwis, dokładnie jak przy `zaproponujZastosowanie`.
+--
+-- Że `maszyna_id` wskazuje wiersz o `rodzaj='maszyna'`, pilnuje SERWIS —
+-- SQLite nie umie podzapytania w CHECK. `copilot` stoi na liście źródeł bez
+-- nadawcy, bo rozszerzenie CHECK to przebudowa tabeli (blizna 0.135.0).
+CREATE TABLE IF NOT EXISTS zabudowa_silnika (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  maszyna_id            INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+  silnik_id             INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+  stan                  TEXT NOT NULL DEFAULT 'propozycja'
+                          CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
+  zrodlo_propozycji     TEXT NOT NULL CHECK (zrodlo_propozycji IN ('reczne','dobor','copilot')),
+  rodzaj_dowodu         TEXT NOT NULL CHECK (rodzaj_dowodu IN ('producent','katalog_dostawcy',
+                          'pomiar_wlasny','decyzja_biura','sprzedaz_weryfikacja','rozmowa')),
+  dowod_tresc           TEXT NOT NULL,
+  dowod_link            TEXT,
+  komentarz             TEXT,
+  conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  zastepuje_id          INTEGER REFERENCES zabudowa_silnika(id),
+  zaproponowal          TEXT NOT NULL,
+  zaproponowal_user_id  INTEGER REFERENCES app_user(user_id),
+  zaproponowano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  rozstrzygnal          TEXT,
+  rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at     TEXT,
+  powod_rozstrzygniecia TEXT,
+  CHECK (maszyna_id != silnik_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zabudowa_maszyna ON zabudowa_silnika(maszyna_id, stan);
+CREATE INDEX IF NOT EXISTS ix_zabudowa_silnik  ON zabudowa_silnika(silnik_id, stan);
+CREATE INDEX IF NOT EXISTS ix_zabudowa_stan    ON zabudowa_silnika(stan, zaproponowano_at);
 
 -- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────
 -- Parser zamienników od 0.61.0 wycina z opisów kartotek tokeny, które NIE są
