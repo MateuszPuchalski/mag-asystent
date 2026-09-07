@@ -895,10 +895,28 @@ wpisem w `wertis.env`, nie nowym wydaniem. Udokumentowany przykład
 `CustomerReturnItem.url` niesie w adresie także slug tytułu; czy sam numer
 wystarczy, sprawdza się kliknięciem.
 
-Reklamacja dostała w 0.222.0 trzeci taki wzorzec, `ALLEGRO_PANEL_REKLAMACJA`,
-zbudowany z ANALOGII do zwrotu: lista Centrum Sprzedaży z numerem sprawy
-w wyszukiwaniu. Nikt go jeszcze nie kliknął, więc obowiązuje ten sam znacznik
-co dwa poprzednie.
+**Reklamacja — adres ZWERYFIKOWANY (0.226.1).** Wzorzec z 0.222.0 zbudowano
+z ANALOGII do zwrotu: lista Centrum Sprzedaży z numerem sprawy w wyszukiwaniu.
+Właściciel kliknął i dostał „Ups, nic tu nie ma". Domysł mylił się w OBU
+członach naraz — sprawa ma WŁASNĄ stronę, a adresuje się identyfikatorem
+zasobu, nie numerem czytelnym:
+
+`https://salescenter.allegro.com/claims/{id}?sellerId={sprzedawca}`
+
+`{id}` to `PostPurchaseIssue.id`, czyli UUID. Numer `2585498/2026` widzi
+kupujący i widzi go agent, ale w adresie jest bezużyteczny.
+
+`{sprzedawca}` to identyfikator konta sprzedawcy i nie mamy go skąd wziąć
+sami: `channel_account.external_account_id` trzyma clientId OAuth, a `GET /me`
+wymaga uprawnienia `allegro:api:profile:read`, którego konto nie ma. Stoi więc
+w `ALLEGRO_SELLER_ID` z domyślną wartością WERTIS — decyzja właściciela, żeby
+odnośnik działał bez wpisu przy wdrożeniu. Doklejany jest w kodzie, a nie we
+wzorcu: przy pustej wartości w adresie zawisłby goły `?sellerId=`, o którym nic
+nie wiemy.
+
+Lekcja jest ta sama, co przy zwrocie w 0.207.0 i kosztowała drugi raz tyle
+samo: adres panelu zgadnięty z analogii do innego adresu panelu trafia w 404,
+a znacznik przy nim wisi dopóty, dopóki ktoś go nie kliknie.
 
 Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
 zostaje przy dawnym wzorcu. Zgadywanie go drugi raz kosztowałoby to samo, co
