@@ -664,6 +664,41 @@ powiedział". Wcięcia idą z makiety: klient odsunięty od prawej, firma od lew
 nie pokazywała. Bez godziny nie widać, czy między pytaniem a odpowiedzią
 minęła minuta, czy trzy dni.
 
+### 10.3a. Zlecenie dla hali jako blok osi (0.226.0)
+
+Akapit wyżej wymienia „utworzenie zadania" wśród zdarzeń osi od pierwszego
+wydania tego dokumentu. Front nigdy tego nie robił. Oś pokazywała sam WYNIK
+z magazynu; prośba, która go wywołała, nie zostawiała po sobie nic. Zgłoszenie
+właściciela: „zlecenie zmierzenia też powinno zostać pokazane jako blok
+w wiadomości".
+
+**Zlecenie i wynik to DWA wpisy, nie jeden.** To dwa momenty i dwie osoby.
+Sklejenie ich w jeden kafelek kłamałoby o czasie: oś jest chronologiczna,
+a między prośbą a odpowiedzią hali mija godzina albo dzień. Zlecenie stoi
+pod swoim `utworzono_at`, wynik pod swoim.
+
+**Widać je w KAŻDYM stanie, nie tylko po wykonaniu.** Zlecenie bez wyniku to
+najważniejszy przypadek: rozmowa czeka na halę i agent musi wiedzieć, że czeka.
+Gdyby blok pojawiał się dopiero z wynikiem, jedyny stan wymagający decyzji
+byłby niewidoczny.
+
+**Barwa niesie stan.** Bursztyn znaczy „czekamy", zieleń wyniku „przyszło".
+Zlecenie wykonane albo anulowane gaśnie do szarości — jego rola się skończyła,
+a odpowiedź stoi niżej i to ona ma przyciągać wzrok.
+
+**Godzina stoi przy zleceniu, choć wynik jej nie ma.** Wynik jest ostatnim, co
+się wydarzyło. Otwarte zlecenie ma WIEK, a „czeka na halę" od dziesięciu minut
+i od wczoraj to dwie różne decyzje wobec klienta.
+
+**Ikona idzie z rodzaju zadania**: miarka, aparat, lupa, notes. Rozmowa bywa
+długa i agent przewija ją wzrokiem. Jeden kształt dla czterech próśb kazałby
+czytać nagłówek, żeby odróżnić pomiar od zdjęcia.
+
+Blok niesie tytuł, instrukcję słowo w słowo, kafel kartoteki (§25a.6a), znacznik
+`pilne` i podpis magazyniera, który zadanie przejął. Instrukcja jest dosłowna,
+bo po niej widać, czy wynik odpowiada na zadane pytanie. Blok NIE ma przycisku
+„wstaw do szkicu" — do szkicu wstawia się wynik, nie prośbę o niego.
+
 ### 10.4. Edytor odpowiedzi
 
 **Rozdzielenie trybów (0.157.0).** Przełącznik ma dwa tryby i każdy ma WŁASNE

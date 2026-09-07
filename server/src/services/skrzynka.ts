@@ -127,9 +127,22 @@ export function typPodgladu(mime: string | null | undefined): string | null {
 export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  id: string; rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
+  /**
+   * Szczegóły ZLECENIA dla hali (0.226.0) — tylko przy `rodzaj: "zlecenie"`.
+   *
+   * Osobne pole, nie doklejka do `tresc`: panel rysuje z tego blok ze
+   * statusem, priorytetem i kartoteką, a sklejanie tego w jeden łańcuch
+   * kazałoby frontowi rozbierać tekst z powrotem na części.
+   */
+  zlecenie?: {
+    rodzaj: string; tytul: string; status: string; priorytet: string;
+    /** Kto wziął zadanie na kolektorze. `null` = jeszcze nikt. */
+    przypisanoPrzez: string | null;
+    twId: number | null; symbol: string | null; nazwaTowaru: string | null;
+  };
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
@@ -574,6 +587,48 @@ export function osRozmowy(id: number): {
     : zrodloOferty ? zOferty(Number(zrodloOferty.konto), String(zrodloOferty.oferta), "wiadomosc")
     : jedynaPozycja ? zOferty(kontoRozmowy, String(jedynaPozycja.offerId), "zamowienie")
     : null;
+
+  /* ── ZLECENIE I WYNIK TO DWA WPISY (0.226.0) ────────────────────────────
+     Do 0.224.0 oś pokazywała sam WYNIK z hali. Zlecenie — czyli moment,
+     w którym agent poprosił magazyn o pomiar — nie zostawiało po sobie nic
+     poza kreskami zmian statusu rozmowy, z których nie da się odczytać, o co
+     kto prosił. Zgłoszenie właściciela: „zlecenie zmierzenia też powinno
+     zostać pokazane jako blok w wiadomości".
+
+     Rozdzielenie na dwa wpisy, a nie jeden blok „zlecenie z wynikiem", bo to
+     dwa różne momenty i oś jest chronologiczna: między prośbą a odpowiedzią
+     hali mija czas, a w nim bywają wiadomości klienta. Sklejenie ich w jeden
+     kafelek przesunęłoby prośbę do godziny odpowiedzi i skłamało o kolejności.
+
+     Zlecenie jedzie w KAŻDYM statusie, także niewykonane — to jest cała jego
+     wartość przy otwartej rozmowie: „poprosiłem halę i czekam" widać dopiero
+     wtedy, gdy prośba ma swój wpis. Wynik dalej wymaga `wykonane` i treści. */
+  const zlecenia = db().prepare(`
+    SELECT z.id, z.rodzaj, z.tytul, z.instrukcja, z.status, z.priorytet,
+           z.utworzono_at, z.utworzono_przez, z.przypisano_przez, z.tw_id AS twId,
+           t.symbol, t.nazwa AS nazwaTowaru
+      FROM zadanie_terenowe z
+      LEFT JOIN sgt_towar t ON t.tw_id = z.tw_id
+     WHERE z.conversation_id=? ORDER BY z.utworzono_at, z.id
+  `).all(id) as Array<Record<string, unknown>>;
+  for (const z of zlecenia) {
+    os.push({
+      id: `zlecenie-${z.id}`, rodzaj: "zlecenie",
+      autor: String(z.utworzono_przez ?? "biuro"), odKlienta: false,
+      /* Treścią wpisu jest INSTRUKCJA, nie tytuł: to ona mówi, o co dokładnie
+         poproszono halę, a tytuł jest etykietą i jedzie osobnym polem. */
+      tresc: String(z.instrukcja ?? ""), at: String(z.utworzono_at),
+      ofertaId: null, zadanieId: Number(z.id),
+      zlecenie: {
+        rodzaj: String(z.rodzaj), tytul: String(z.tytul), status: String(z.status),
+        priorytet: String(z.priorytet ?? "normalny"),
+        przypisanoPrzez: z.przypisano_przez == null ? null : String(z.przypisano_przez),
+        twId: z.twId == null ? null : Number(z.twId),
+        symbol: z.symbol == null ? null : String(z.symbol),
+        nazwaTowaru: z.nazwaTowaru == null ? null : String(z.nazwaTowaru),
+      },
+    });
+  }
 
   /* Wynik z hali jest osobnym wpisem osi, nigdy podmianą treści klienta —
      to zasada z docs/obsluga-klienta.md i ona decyduje o tym kształcie. */
