@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
+import { czyAutoresponder } from "./autoresponder.js";
 import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 
@@ -31,10 +32,19 @@ export interface NowaWiadomosc {
 
 /** Zapis z synchronizacji. Unikalny klucz robi z ponownego przebiegu no-op. */
 export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db()): number | null {
+  /* AUTOODPOWIEDŹ ROZPOZNAJEMY RAZ, PRZY ZAPISIE (0.227.0). Reguła zna jedno
+     miejsce (`czyAutoresponder`), a kolumna niesie wynik dalej — do kolejki
+     i do wyliczenia stanu. Liczenie tego przy odczycie kazałoby powtórzyć
+     regułę w SQL-u, a dwie kopie rozjechałyby się przy pierwszej poprawce.
+
+     Tylko WYCHODZĄCE: klient cytujący nasze potwierdzenie niesie ten sam
+     podpis, a jego list jest pytaniem, nie odbiciem. */
+  const auto = dane.direction === "outgoing" && czyAutoresponder(dane.body) ? 1 : 0;
   const wynik = database.prepare(`
     INSERT INTO message(
-      conversation_id, channel_account_id, external_message_id, direction, body, sent_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      conversation_id, channel_account_id, external_message_id, direction, body, sent_at,
+      auto_odpowiedz
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(channel_account_id, external_message_id) DO NOTHING
   `).run(
     dane.conversationId,
@@ -43,6 +53,7 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
     dane.direction,
     dane.body,
     dane.sentAt,
+    auto,
   );
   const id = wynik.changes === 0 ? null : Number(wynik.lastInsertRowid);
   if (id !== null) publishConversationEvent("message.created", dane.conversationId, { messageId: id });
@@ -476,11 +487,17 @@ export function statusRozmowy(
   const zapisany = statusZapisany(database, conversationId, teraz);
   if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany)) return zapisany;
 
-  /* Kierunek OSTATNIEJ wiadomości. Kolejność po `id`, nie po `sent_at` — tak
-     samo jak oś rozmowy (dwie wiadomości z tej samej sekundy zdarzają się,
-     a identyfikator jest stabilny). */
+  /* Kierunek OSTATNIEJ PRAWDZIWEJ wiadomości. Kolejność po `id`, nie po
+     `sent_at` — tak samo jak oś rozmowy (dwie wiadomości z tej samej sekundy
+     zdarzają się, a identyfikator jest stabilny).
+
+     AUTOODPOWIEDŹ NIE LICZY SIĘ JAKO NASZ RUCH (0.227.0). „Dziękujemy za
+     kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na nic —
+     a liczone jako nasza wiadomość przestawiało rozmowę na „czeka na klienta"
+     i zdejmowało ją z listy tych, które czekają na odpowiedź. Pytanie klienta
+     ginęło przez to, że skrzynka grzecznie potwierdziła jego odbiór. */
   const ost = database.prepare(
-    "SELECT direction FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1",
+    "SELECT direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0 ORDER BY id DESC LIMIT 1",
   ).get(conversationId) as { direction: string } | undefined;
   return statusZKierunku(zapisany, ost?.direction ?? null);
 }

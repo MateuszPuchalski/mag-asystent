@@ -4,6 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
 import { odkodujEncje } from "../tekst.js";
+/* Serwis, nie odwrotnie: `autoresponder.ts` zna tylko `tekst.ts`, więc
+   import w tę stronę nie zapętla modułów. */
+import { czyAutoresponder } from "../services/autoresponder.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -184,6 +187,10 @@ export function migrate(database: DatabaseSync) {
      kończył się sukcesem, kursor szedł naprzód, a zwroty spoza dziesiątej
      strony nie wracały nigdy. `NULL` znaczy „nie wiem", nie „zero". */
   addColumn("allegro_zwroty_sync_state", "pozostalo", "INTEGER");
+  /* Znacznik naszej autoodpowiedzi (0.227.0) — patrz `message` w `schema.sql`
+     i `oznaczAutoodpowiedziWZastanych` niżej, które wypełnia go wstecz. Stare
+     wiersze wchodzą z zerem i backfill je poprawia w tym samym przebiegu. */
+  addColumn("message", "auto_odpowiedz", "INTEGER NOT NULL DEFAULT 0");
   /* Zejście oceny „przecena" (0.209.0).
 
      MUSI STAĆ PRZED przebudową `zwrot_klienta_pozycja` niżej w tym samym
@@ -566,7 +573,45 @@ export function migrate(database: DatabaseSync) {
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
+  oznaczAutoodpowiedziWZastanych(database);
   tabelaFts(database);
+}
+
+/**
+ * Znacznik autoodpowiedzi na wiadomościach, które już leżą w bazie (0.227.0).
+ *
+ * ── DLACZEGO KOLUMNA, A NIE LICZENIE PRZY ODCZYCIE ────────────────────────
+ * Regułę zna JEDNA funkcja (`czyAutoresponder`) i to ona ma tu zostać jedyną.
+ * Odczyt liczyłby ją przy każdym rysowaniu kolejki, a wersja SQL-owa byłaby
+ * DRUGĄ kopią — rozjechałaby się przy pierwszej poprawce, a objawem byłaby
+ * rozmowa uznana za odpisaną, bo odbiła się echem naszego potwierdzenia.
+ *
+ * Backfill idzie po wiadomościach WYCHODZĄCYCH: klient cytujący nasze
+ * potwierdzenie niesie ten sam podpis, a jego list jest pytaniem. To ten sam
+ * warunek, który stoi przy zapisie.
+ */
+function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
+  if (!maKolumne(database, "message", "auto_odpowiedz")) return;
+  /* Tylko wiersze jeszcze nieoznaczone: bez tego każdy start przepisywałby
+     całą tabelę wiadomości. */
+  const kandydaci = database.prepare(
+    "SELECT id, body FROM message WHERE direction='outgoing' AND auto_odpowiedz=0",
+  ).all() as Array<{ id: number; body: string }>;
+  const doOznaczenia = kandydaci.filter((m) => czyAutoresponder(String(m.body)));
+  if (!doOznaczenia.length) return;
+
+  /* Nawias na końcu NIE jest ozdobą: `transaction` ZWRACA funkcję, a nie
+     wykonuje jej. Bez wywołania backfill kończył się cichym niczym — licznik
+     w komunikacie zgadzał się, bo stoi poza transakcją, a kolumna zostawała
+     zerem. Złapał to dopiero test migracji. */
+  transaction(database, () => {
+    const ustaw = database.prepare("UPDATE message SET auto_odpowiedz=1 WHERE id=?");
+    for (const m of doOznaczenia) ustaw.run(m.id);
+  })();
+  /* Głośno, bo to zmiana danych, której nikt nie zlecił — i bo zmienia stany
+     rozmów widoczne w kolejce zaraz po wdrożeniu. */
+  console.warn(`[migracja] oznaczyłem ${doOznaczenia.length} autoodpowiedzi biura ` +
+    "— te wiadomości przestają liczyć się jako nasza odpowiedź.");
 }
 
 /* ── Indeks pełnotekstowy kartotek (etap E3) ────────────────────────────────

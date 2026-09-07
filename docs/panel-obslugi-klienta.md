@@ -336,6 +336,18 @@ miejsca: `statusRozmowy` przy jednej rozmowie i `naRozmowe` przy całej liście.
 Druga kopia rozjechałaby się przy pierwszej poprawce, a objawem byłaby kolejka
 mówiąca co innego niż rozmowa po kliknięciu.
 
+**AUTOODPOWIEDŹ NIE JEST NASZYM RUCHEM (0.227.0).** Odbicie „Dziękujemy za
+kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na nic. Liczone
+jako nasza wiadomość przestawiało rozmowę na „czeka na klienta" i zdejmowało ją
+z listy tych, które czekają na odpowiedź — pytanie ginęło przez to, że skrzynka
+grzecznie potwierdziła jego odbiór. Ten sam błąd zerował licznik dopisków
+klienta w wierszu kolejki.
+
+Znacznik liczy się RAZ, przy zapisie wiadomości (`message.auto_odpowiedz`),
+przez `czyAutoresponder`. Odczyt go tylko czyta, a SQL nie powtarza reguły —
+dwie kopie rozjechałyby się przy pierwszej poprawce. Migracja wypełnia kolumnę
+wstecz i mówi w dzienniku, ile wiadomości oznaczyła.
+
 **Werdykty człowieka przebijają wyliczenie.** `snoozed`, `resolved`, `closed`
 i `spam` zostają, choćby ostatnia wiadomość była klienta — inaczej nie dałoby
 się domknąć żadnej sprawy. Przebija je także `waiting_for_internal`: nie
@@ -2287,6 +2299,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasa przyjmuje tylko `STATUSY_RECZNE` |
+| Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
 | Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |
