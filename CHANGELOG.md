@@ -34,6 +34,62 @@ historii nie przepisujemy.
 ---
 
 
+## 0.224.0 — 7 września 2026
+
+**Odpowiedź w reklamacji wychodzi z panelu.** Przez dwa wydania ekran mówił
+wprost, czego nie robi: agent widział sprawę, termin, towar i zdjęcie usterki
+w jednym oknie, a żeby napisać jedno zdanie — otwierał Centrum Sprzedaży.
+Przyrost drugi zamyka tę połowę pętli. Werdykt zostaje w Centrum Sprzedaży
+i mówi to teraz sam edytor, zamiast napisu obiecującego mniej, niż jest.
+
+Wysyłamy `type: "REGULAR"` i sam tekst — bez załączników wychodzących i bez
+typów `RETURN_*`. Te ostatnie są jedyną drogą do `returnRequired`, ale
+specyfikacja nie łączy tych dwóch miejsc ani jednym zdaniem: to wniosek z nazw,
+a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy wobec
+kupującego. Mapowanie z pamięci kosztowało w tym repo trzy wydania, więc
+`RETURN_*` czeka na próbę na żywej sprawie.
+
+**Jeden wiersz w kolejce opisuje PRÓBĘ, nie wysłaną wiadomość.** `reklamacja_outbox`
+powtarza wzorzec `outbox` ze skrzynki: strzał do Allegro idzie POZA transakcją,
+timeout zostawia `send_uncertain` zamiast ciszy, a sukces bez `id` w odpowiedzi
+też — bo wiersz bez identyfikatora nie ma jak być idempotentny wobec
+`UNIQUE(reklamacja_id, external_id)`. Podwójne kliknięcie daje jeden strzał
+i jedną wiadomość u kupującego.
+
+Klucz idempotencji liczy SERWER — gdyby podawał go klient, dwie zakładki dałyby
+dwie odpowiedzi. Rdzeń przeniósł się do `services/idempotencja.ts` i jest teraz
+wspólny ze skrzynką; format klucza `snd-` nie zmienił się ani o znak, a jego
+testy przeszły bez jednej poprawki — to jest dowód, że refaktor był czysty.
+
+**Świeżość liczy się od ostatniej NIE naszej wiadomości**, czyli o roli innej
+niż `SELLER`. Doradca Allegro odpisał w 61 sprawach na 100, a jego zdanie
+zmienia to, co należy napisać, dokładnie tak samo jak dopisek klienta. Własna
+odpowiedź punktu nie przesuwa, więc druga wiadomość z rzędu nie wygląda na
+spóźnioną. Dialog zgody jest ten sam, co w skrzynce (blizna 0.110.0) —
+z jedną różnicą: nazywa autora dopisku, bo bywa nim doradca, a nie kupujący.
+
+**Zamkniętą rozmowę wyłapujemy PRZED strzałem.** `409` z tej końcówki nie jest
+konfliktem wersji — znaczy „sprawa jest w stanie, który zabrania nowych
+wiadomości". Bez tej bramki wysyłalibyśmy żądanie, o którym z góry wiadomo, że
+wróci odmową, a agent zobaczyłby surowy kod. Przy zamkniętej rozmowie edytora
+w ogóle nie ma na ekranie: pole, w które wolno pisać, a którego nie da się
+wysłać, jest obietnicą bez pokrycia.
+
+Limit 20 000 znaków blokuje panel, a nie dopiero serwer — znamy go
+ze specyfikacji (`MessageRequest.text`). W skrzynce limit 2000 pilnuje wyłącznie
+serwer, więc tam agent dowiaduje się o przekroczeniu po kliknięciu.
+
+Do dziennika idzie liczba znaków, nigdy treść. `status_allegro` zostaje
+nietknięty — należy do Allegro, a sprawa wychodzi z kubełka DO ODPOWIEDZI przy
+najbliższej synchronizacji.
+
+Dwa nowe `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: czy `409` naprawdę
+odpowiada `chatActive: false` i czy odpowiedź `201` zawsze niesie `id`.
+Rozstrzygnie je pierwsza prawdziwa wysyłka na koncie właściciela.
+
+---
+
+
 ## 0.223.0 — 7 września 2026
 
 **Reklamacja bez zdjęcia to numer i zdanie.** 0.222.0 postawiło kolejkę

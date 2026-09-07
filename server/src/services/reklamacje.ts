@@ -30,10 +30,20 @@ export class BladReklamacji extends Error {
   }
 }
 
-/** Konflikt wersji — panel dostaje 409 i pokazuje, co się zmieniło. */
+/**
+ * Konflikt 409 — panel dostaje ładunek i pokazuje, co się zmieniło.
+ *
+ * Zdanie jest PARAMETREM od 0.224.0, bo powodów jest kilka i każdy każe co
+ * innego zrobić: cudza zmiana rekordu (odśwież), dopisek klienta albo doradcy
+ * (przeczytaj i zdecyduj), zamknięta rozmowa (nie da się już nic wysłać).
+ * Jedno zdanie na wszystkie trzy kazałoby agentowi zgadywać, na co patrzy.
+ */
 export class ReklamacjaConflict extends Error {
-  constructor(readonly szczegoly: Record<string, unknown>) {
-    super("Reklamacja zmieniła się, odkąd ją otworzyłeś — odśwież i spróbuj jeszcze raz");
+  constructor(
+    readonly szczegoly: Record<string, unknown>,
+    message = "Reklamacja zmieniła się, odkąd ją otworzyłeś — odśwież i spróbuj jeszcze raz",
+  ) {
+    super(message);
     this.name = "ReklamacjaConflict";
   }
 }

@@ -1978,3 +1978,43 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
   -- „zaginionych" reklamacji, które nigdy reklamacjami nie były.
   dyskusji INTEGER
 );
+
+-- ── Kolejka odpowiedzi w reklamacjach (0.224.0) ─────────────────────────────
+-- Jeden wiersz na PRÓBĘ wysyłki, nie na wysłaną wiadomość — dokładnie jak
+-- `outbox` przy skrzynce. Bez tego rozdziału niejednoznaczny timeout nie ma
+-- gdzie zostać: żądanie poszło, odpowiedź nie wróciła, a `reklamacja_wiadomosc`
+-- mówiłaby albo „wysłano", albo nic — obie odpowiedzi nieprawdziwe.
+--
+-- OSOBNA TABELA, nie kolumna `rodzaj` w `outbox`. Tamta ma `conversation_id`
+-- jako NOT NULL z kluczem obcym do `conversation` i `expected_last_message_id`
+-- do `message`; reklamacja nie ma ani jednego, ani drugiego. Wspólna tabela
+-- znaczyłaby dwie kolumny obce, z których zawsze jedna jest pusta.
+--
+-- `CHECK` z PEŁNYM zbiorem od razu — blizna 0.135.0: SQLite nie rozszerza
+-- `CHECK` bez przebudowy tabeli, więc dokładanie wartości po jednej
+-- kosztowałoby migrację za każdym razem.
+CREATE TABLE IF NOT EXISTS reklamacja_outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  -- Klucz wylicza SERWER (`services/idempotencja.ts`), nigdy panel. Gdyby
+  -- podawał go klient, podwójne kliknięcie z dwiema zakładkami dałoby dwa
+  -- klucze i dwie wiadomości u kupującego.
+  idempotency_key TEXT NOT NULL UNIQUE,
+  body TEXT NOT NULL,
+  expected_wersja INTEGER NOT NULL,
+  -- Ostatnia wiadomość NIE NASZA w chwili pisania. Punktem odniesienia jest
+  -- rola autora, bo `reklamacja_wiadomosc` nie ma kolumny kierunku — a doradca
+  -- Allegro (`ADMIN`) zmienia treść odpowiedzi tak samo jak dopisek klienta.
+  expected_last_message_id INTEGER REFERENCES reklamacja_wiadomosc(id) ON DELETE SET NULL,
+  status TEXT NOT NULL
+    CHECK (status IN ('sending','sent','send_uncertain','send_failed')),
+  -- Numer nadany przez Allegro. Po niejednoznacznym timeoucie zostaje pusty
+  -- i dopiero synchronizacja rozstrzyga, czy wiadomość tam jest.
+  external_message_id TEXT,
+  blad TEXT,
+  created_by INTEGER NOT NULL REFERENCES app_user(user_id),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
+  ON reklamacja_outbox(reklamacja_id, id);

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
-import type { KolejkaReklamacji, Reklamacja, SzczegolReklamacji } from "./typy";
+import type {
+  KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji,
+} from "./typy";
 
 /* Reklamacje jadą JEDNYM zapytaniem razem z licznikami — ten sam wybór co przy
    zwrotach. Spraw w pracy są dziesiątki, nie tysiące, więc przełączenie
@@ -89,3 +91,39 @@ export function useNotatka() {
  */
 export const pobierzZalacznik = (reklamacjaId: number, zalacznikId: number, nazwa: string) =>
   pobierzPlik(`/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}`, nazwa);
+
+/**
+ * Odpowiedź w rozmowie reklamacyjnej (0.224.0) — pierwszy zapis tego ekranu
+ * wychodzący do Allegro.
+ *
+ * Konfliktu 409 hook CELOWO nie łapie: rozróżnia je ekran, bo każdy każe co
+ * innego zrobić — dopisek otwiera dialog z jawną zgodą, zamknięta rozmowa
+ * kończy temat, a rozjazd wersji każe odświeżyć. Ten sam podział co
+ * w skrzynce.
+ *
+ * `expectedLastMessageId` to identyfikator ostatniej NIE naszej wiadomości —
+ * liczy go panel z osi, a serwer sprawdza po swojemu i rozstrzyga.
+ */
+export function useOdpowiedz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      id: number; tresc: string; expectedWersja: number;
+      expectedLastMessageId: number | null; mimoNowejWiadomosci?: boolean;
+    }) => api<WynikOdpowiedziReklamacji>(`/api/obsluga/reklamacje/${v.id}/odpowiedz`, {
+      method: "POST",
+      body: JSON.stringify({
+        tresc: v.tresc,
+        expectedWersja: v.expectedWersja,
+        expectedLastMessageId: v.expectedLastMessageId,
+        mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
+      }),
+    }),
+    /* `onSettled`, nie `onSuccess`: po niejednoznacznym timeoucie stan sprawy
+       też mógł się zmienić, a ekran ma pokazać to, co naprawdę jest. */
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+    },
+  });
+}

@@ -531,8 +531,10 @@ synchronizacji: bez niej ktoś szukałby kiedyś reklamacji, która nigdy
 reklamacją nie była.
 
 Cała rodzina chodzi po `application/vnd.allegro.beta.v1+json` i po uprawnieniu
-`allegro:api:disputes`. To samo uprawnienie obsługuje zapisy, więc przyrosty
-drugi i trzeci nie będą wymagały ponownego parowania konta.
+`allegro:api:disputes` — specyfikacja podaje je przy wszystkich trzech zapisach
+tak samo, jak przy odczytach. Wysyłka odpowiedzi (0.224.0) nie prosi więc
+o nowe uprawnienie i werdykt też nie będzie prosił; parowania konta żaden
+z tych przyrostów nie powtarza.
 
 ### Ile tego jest
 
@@ -656,15 +658,50 @@ Pobranie ma tu za to WŁASNĄ końcówkę w specyfikacji
 załącznikach Centrum Wiadomości. Adres i tak czytamy z bazy, a host sprawdza
 `pobierzZalacznik` — dwie niezależne zapory, bo obie kosztują jedną linijkę.
 
+### `POST /sale/issues/{issueId}/message` — odpowiedź w sprawie (0.224.0)
+
+Pierwszy zapis tego modułu. Ciało to `MessageRequest`: `text` (**maxLength
+20 000** — dziesięć razy więcej niż 2000 w Centrum Wiadomości), `attachments`
+i `type`. Wysyłamy `{ text, type: "REGULAR" }` i nic więcej.
+
+Lista `required: [text, attachment, type]` w tym schemacie jest FIKCJĄ:
+właściwości `attachment` w nim nie ma, a lista przeczy własnemu opisowi obok.
+Wiążący jest opis końcówki — „At least one of fields: 'text', 'attachment'".
+To trzeci raz, gdy przykład albo lista `required` u Allegro kłóci się z resztą
+schematu, i trzeci raz wygrywa schemat czytany w całości.
+
+Enum `type` niesie też `END_REQUEST` (wyłącznie dyskusje) i trzy `RETURN_*`
+(wyłącznie reklamacje). Te trzy są JEDYNĄ drogą do `currentState.returnRequired`
+— osiem trafień w całej specyfikacji i ani jednej innej końcówki. Ale
+specyfikacja nie łączy tych miejsc ani jednym zdaniem: to wniosek z nazw,
+a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy. Zostaje poza
+panelem do rozstrzygnięcia próbą na żywej sprawie.
+
+**`409` przy tej końcówce NIE jest konfliktem wersji.** Opis brzmi `Dispute is
+in a state that forbids adding new messages` — to odpowiednik
+`currentState.chatActive: false`. Panel sprawdza tę flagę PRZED strzałem, żeby
+agent zobaczył zdanie zamiast surowego kodu.
+
+`[WERYFIKUJ]` czy `409` z tej końcówki naprawdę odpowiada `chatActive: false`.
+Powiązanie jest wnioskiem z opisu, nie zdaniem specyfikacji. Gdyby kod niósł
+też coś innego, bramka sprawdzana przed strzałem byłaby za wąska, a agent
+dostałby zdanie o zamkniętej rozmowie przy sprawie, która wcale zamknięta
+nie jest.
+
+`[WERYFIKUJ]` czy odpowiedź `201` ZAWSZE niesie `id` wiadomości. Schemat
+`Message` nie ma listy `required`, więc formalnie każde pole jest opcjonalne.
+Sukces bez `id` traktujemy dziś jak wynik niejednoznaczny i nie dopisujemy
+wiersza na osi rozmowy — `reklamacja_wiadomosc` ma
+`UNIQUE(reklamacja_id, external_id)`, więc wiersz bez identyfikatora nie miałby
+jak być idempotentny.
+
 ### Zapisy: czego jeszcze nie robimy
 
-Przyrost pierwszy (0.222.0) tylko CZYTA. Dwa zapisy do Allegro czekają:
-`POST /sale/issues/{issueId}/message` (`MessageRequest`, `text` do 20 000
-znaków — inaczej niż 2000 w Centrum Wiadomości) oraz
-`POST /sale/issues/{issueId}/status` (`ClaimStatusChangeRequest`, `required:
-[status, message]`, cztery wartości `ACCEPTED_*` i siedem `REJECTED_*`,
-`partialRefund` wyłącznie przy `ACCEPTED_PARTIAL_REFUND`). Oba są nieodwracalne
-wobec kupującego i dostaną własne wydania.
+Jeden zapis do Allegro nadal czeka: `POST /sale/issues/{issueId}/status`
+(`ClaimStatusChangeRequest`, `required: [status, message]`, cztery wartości
+`ACCEPTED_*` i siedem `REJECTED_*`, `partialRefund` wyłącznie przy
+`ACCEPTED_PARTIAL_REFUND`). Jest nieodwracalny wobec kupującego i dostanie
+własne wydanie.
 
 ### Co się stanie, jeśli kształt jest inny
 

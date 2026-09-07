@@ -2087,20 +2087,57 @@ Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
 przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
 jak całą.
 
-### 25b.7. Czego panel jeszcze nie robi
+### 25b.7. Odpowiedź w rozmowie (0.224.0)
 
-Przyrost pierwszy CZYTA. Odpowiedź w czacie i formalny werdykt wysyła się
-w Centrum Sprzedaży, a ekran mówi to zdaniem pod rozmową. Zdanie o tym, czego
-panel nie robi, jest tu tak samo potrzebne jak sama kolejka: bez niego puste
-miejsce pod czatem obiecywałoby odpowiedź.
+Przyrost drugi zamyka połowę pętli: **odpowiedź wychodzi z panelu**. Agent
+widzi sprawę, termin, towar i zdjęcie usterki w jednym oknie, więc nie ma po
+co otwierać Centrum Sprzedaży, żeby napisać jedno zdanie.
 
-Przyrost drugi doniesie odpowiedź (`POST /sale/issues/{id}/message`), trzeci —
-werdykt (`POST /sale/issues/{id}/status`, cztery uznania i siedem odmów,
-wiadomość do klienta wymagana przez Allegro). Oba są nieodwracalne wobec
-kupującego, więc każdy dostanie własne wydanie, a werdykt także operację
-uprzywilejowaną i potwierdzenie — jak oddanie pieniędzy przy zwrocie.
+Wysyłamy `type: "REGULAR"` i sam tekst. Bez załączników wychodzących i bez
+typów `RETURN_*` — te są formalnym stanowiskiem sprzedawcy wobec kupującego
+i idą razem z werdyktem, nie przed nim (§25b.8).
 
-### 25b.8. Czego panel nie wie
+**Klucz idempotencji liczy SERWER, nigdy panel.** Gdyby podawał go klient,
+dwie zakładki dałyby kupującemu dwie odpowiedzi. Jeden wiersz w kolejce
+`reklamacja_outbox` opisuje jedną PRÓBĘ, a nie jedną wysłaną wiadomość, więc
+timeout zostawia ślad `send_uncertain` zamiast ciszy.
+
+Trzy powody odmowy i każdy każe co innego zrobić:
+
+| powód | co widzi agent |
+|---|---|
+| rozmowa zamknięta po stronie Allegro | zdanie zamiast pola do pisania |
+| rozjazd wersji sprawy | zdanie pod polem: odśwież i spróbuj jeszcze raz |
+| ktoś dopisał wiadomość | dialog z jawną zgodą, szkic nietknięty |
+
+Trzeci przypadek to blizna 0.110.0 i dialog jest ten sam, co w skrzynce —
+z jedną różnicą: nazywa autora dopisku. Rozmowa reklamacyjna bywa trójstronna,
+więc dopisał ją czasem doradca Allegro, a nie kupujący.
+
+**Punktem odniesienia świeżości jest ostatnia NIE nasza wiadomość** — o roli
+innej niż `SELLER`, więc także doradcy. Własna odpowiedź punktu nie przesuwa,
+inaczej druga wiadomość z rzędu wyglądałaby na spóźnioną. Doradca odpisał
+w 61 sprawach na 100, a jego zdanie zmienia to, co należy napisać, dokładnie
+tak samo jak dopisek klienta.
+
+Limit `text` to 20 000 znaków i **panel blokuje przed wysłaniem**, bo zna go
+ze specyfikacji. W skrzynce limit 2000 pilnuje wyłącznie serwer, więc tam agent
+dowiaduje się o przekroczeniu dopiero po kliknięciu.
+
+`status_allegro` nie jest przestawiany po wysyłce. Należy do Allegro, a sprawa
+wychodzi z DO ODPOWIEDZI przy najbliższej synchronizacji.
+
+### 25b.8. Czego panel jeszcze nie robi
+
+Formalny werdykt (`POST /sale/issues/{id}/status`, cztery uznania i siedem
+odmów, wiadomość do klienta wymagana przez Allegro) wydaje się nadal w Centrum
+Sprzedaży, a mówi to sam edytor pod rozmową. Zdanie o tym, czego panel nie
+robi, jest tu tak samo potrzebne jak przycisk, który robi resztę.
+
+Werdykt jest nieodwracalny wobec kupującego, więc dostanie własne wydanie,
+operację uprzywilejowaną i potwierdzenie — jak oddanie pieniędzy przy zwrocie.
+
+### 25b.9. Czego panel nie wie
 
 Czy rozmowa mieści się w stu wiadomościach — sonda tej sekcji nie zdjęła
 (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Do której przestrzeni należy
@@ -2259,7 +2296,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
 | Dyskusje (`type: "DISPUTE"`) | **poza zakresem** | decyzja właściciela z 6 września 2026; liczba odsianych na pasku |
-| Odpowiedź w czacie reklamacji | **projekt** | przyrost drugi, `POST /sale/issues/{id}/message` |
+| Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
+| Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
+| Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
 | Werdykt reklamacji do Allegro | **projekt** | przyrost trzeci, `POST /sale/issues/{id}/status`, jedenaście wartości |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |

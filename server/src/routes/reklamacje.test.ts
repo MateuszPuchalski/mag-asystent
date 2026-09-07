@@ -81,6 +81,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/reklamacje/synchronizuj" },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
 ];
 
 test("bez sesji żadna trasa reklamacji nie odpowiada danymi", async () => {
@@ -99,14 +100,14 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("DWA ZAPISY w przyroście pierwszym — licznik jest umową", () => {
-  /* Ta liczba jest kontraktem, nie obserwacją. Rośnie razem z przyrostem
-     drugim (odpowiedź w czacie) i trzecim (werdykt), a każdy z nich dostaje
-     zdanie w uzasadnieniu. `synchronizuj` NIE JEST zapisem do Allegro: to
-     odczyt na żądanie, który zapisuje wynik u nas. */
+test("TRZY ZAPISY po przyroście drugim — licznik jest umową", () => {
+  /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
+     z odpowiedzią w czacie (0.224.0) i urośnie na cztery przy werdykcie —
+     a każdy nowy zapis dostaje zdanie w uzasadnieniu. `synchronizuj` NIE JEST
+     zapisem do Allegro: to odczyt na żądanie, który zapisuje wynik u nas. */
   const zapisy = TRASY().filter((t) => t.method === "POST" && !t.url.endsWith("synchronizuj"));
-  assert.equal(zapisy.length, 2,
-    "prowadzę i notatka — oba wyłącznie u nas, żaden nie wychodzi do Allegro");
+  assert.equal(zapisy.length, 3,
+    "prowadzę i notatka zostają u nas; odpowiedź jest pierwszym zapisem wychodzącym");
 });
 
 test("biuro dostaje kolejkę z kubełkiem, terminem, sygnałami i licznikami", async () => {
@@ -257,4 +258,66 @@ test("ETag odpowiada 304 PRZED pójściem do Allegro", async () => {
     method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`,
     headers: { ...naglowki, "if-none-match": `"rekl-zal-${zalacznik}"` } });
   assert.equal(r.statusCode, 304);
+});
+
+test("trasa odpowiedzi PRZEKAZUJE każdą flagę z ciała", async () => {
+  /* To jest blizna znaleziona w skrzynce przy rozpoznaniu do tego wydania:
+     `mimoObecnosci` ginie tam dokładnie w tym miejscu — serwis go obsługuje,
+     panel go wysyła, a trasa ani nie deklaruje pola, ani nie podaje go niżej.
+     Jawna zgoda agenta nie ma wtedy jak zadziałać, a strażnik tras pilnuje
+     ADRESÓW, nie pól ciała, więc przechodzi niezauważone.
+
+     Dowód idzie przez ZACHOWANIE: bez `mimoNowejWiadomosci` dopisek daje 409,
+     z flagą — przechodzi dalej. Gdyby trasa flagę gubiła, drugie żądanie
+     dostałoby to samo 409. */
+  const { naglowki } = login("biuro", "Ala jedenasta");
+  const d = db();
+  d.prepare(`INSERT INTO reklamacja_wiadomosc(reklamacja_id,external_id,autor_rola,tresc)
+    VALUES (?,'w-2','ADMIN','Doradca dopisał')`).run(reklamacja);
+
+  const wersja = Number((d.prepare("SELECT wersja FROM reklamacja_klienta WHERE id=?")
+    .get(reklamacja) as { wersja: number }).wersja);
+  const cialo = (extra: Record<string, unknown>) => ({
+    tresc: "Odpowiadam na starszą wersję.", expectedWersja: wersja,
+    expectedLastMessageId: 1, ...extra,
+  });
+
+  const bez = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz`,
+    headers: naglowki, payload: cialo({}) });
+  assert.equal(bez.statusCode, 409);
+  assert.match(bez.json().error, /dopisał/);
+  /* Ładunek jedzie PŁASKO obok `error` — dzięki temu `DialogKonfliktu`
+     z panelu czyta go bez zmian. */
+  assert.ok(bez.json().nowaWiadomosc, "409 niesie treść dopisku");
+  assert.match(String(bez.json().kluczIdempotencji), /^rkl-/);
+
+  /* Z flagą trasa idzie dalej i dopiero brak konta Allegro ją zatrzymuje —
+     czyli konflikt świeżości został przepuszczony. */
+  const zFlaga = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz`,
+    headers: naglowki, payload: cialo({ mimoNowejWiadomosci: true }) });
+  assert.notEqual(zFlaga.statusCode, 409,
+    "flaga z ciała musi dojechać do serwisu — inaczej jawna zgoda nie działa");
+});
+
+test("odpowiedź bez treści to 400 ze zdaniem, nie 500", async () => {
+  const { naglowki } = login("biuro", "Ala dwunasta");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz`,
+    headers: naglowki, payload: { tresc: "   ", expectedWersja: 1 } });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /Pusta odpowiedź/);
+});
+
+test("zamknięta rozmowa oddaje 409 ze zdaniem, a nie kodem Allegro", async () => {
+  const { naglowki } = login("biuro", "Ala trzynasta");
+  db().prepare("UPDATE reklamacja_klienta SET czat_aktywny=0 WHERE id=?").run(reklamacja);
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz`,
+    headers: naglowki, payload: { tresc: "Cokolwiek", expectedWersja: 1,
+      expectedLastMessageId: 1 } });
+  assert.equal(r.statusCode, 409);
+  assert.match(r.json().error, /nie przyjmie/);
+  assert.equal(r.json().czatAktywny, false);
 });

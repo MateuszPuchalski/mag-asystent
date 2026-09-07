@@ -2,25 +2,31 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
-  useNotatka, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useNotatka, useOdpowiedz, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
 } from "../api/reklamacje";
-import type { KubelekReklamacji, Reklamacja, StanReklamacji } from "../api/typy";
+import { Konflikt } from "../api/klient";
+import type {
+  KubelekReklamacji, Reklamacja, StanReklamacji, SzczegolyWysylki, WiadomoscReklamacji,
+} from "../api/typy";
+import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
+import { Edytor } from "../reklamacje/Edytor";
 import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 
-/* ── Ekran reklamacji (0.222.0) ──────────────────────────────────────────────
+/* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0) ────────────────────────
    Trzy kolumny, jak skrzynka i jak zwroty — trzy ekrany obsługi mają mieć
    jeden nawyk, nie trzy.
 
-   PRZYROST PIERWSZY CZYTA. Odpowiedź w czacie i formalny werdykt wysyła się
-   na razie w Centrum Sprzedaży, a ekran mówi to wprost pod rozmową. Zdanie
-   o tym, czego panel NIE robi, jest tu tak samo potrzebne jak sama kolejka:
-   bez niego puste miejsce pod czatem obiecywałoby odpowiedź.
+   OD 0.224.0 ODPOWIEDŹ WYCHODZI STĄD. Formalny werdykt zostaje w Centrum
+   Sprzedaży i mówi to sam edytor — zdanie o tym, czego panel nie robi, jest
+   tak samo potrzebne jak przycisk, który robi resztę.
 
-   Zysk przyrostu jest jeden i mierzalny: sprawy czekające na decyzję stoją
-   uszeregowane po terminie, który podaje Allegro. Do tej pory nie stały nigdzie.
+   TRZY RODZAJE 409 i każdy każe co innego zrobić: dopisek klienta albo doradcy
+   otwiera dialog z jawną zgodą, zamknięta rozmowa kończy temat, a rozjazd
+   wersji każe odświeżyć. Rozróżnia je EKRAN, nie hak — ten sam podział co
+   w skrzynce, bo tam ta sama sztuczka kosztowała blizna 0.110.0.
 
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się od
@@ -97,7 +103,12 @@ export function Reklamacje() {
   const prowadze = useProwadze();
   const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
+  const odpowiedz = useOdpowiedz();
   const trwa = prowadze.isPending || notatka.isPending;
+
+  const [tresc, setTresc] = useState("");
+  const [bladWysylki, setBladWysylki] = useState("");
+  const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
 
   const wKubelku = useMemo(() => kubelek === null
     ? (data?.reklamacje ?? [])
@@ -148,6 +159,59 @@ export function Reklamacje() {
     const i = widoczne.findIndex((r) => r.id === wybrana);
     const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
     if (nast) nawiguj(`/obsluga/reklamacje/${nast.id}`);
+  };
+
+  /* Pole czyści się przy ZMIANIE SPRAWY, nigdy przy odświeżeniu zapytania —
+     inaczej odpowiedź pisana w trakcie taktu synchronizacji znikałaby w pół
+     zdania. Ten sam warunek co przy szkicu w skrzynce. */
+  useEffect(() => {
+    setTresc("");
+    setBladWysylki("");
+    setKonfliktWysylki(null);
+  }, [wybrana]);
+
+  /**
+   * Ostatnia NIE nasza wiadomość — punkt odniesienia dla kontroli świeżości.
+   *
+   * Liczy go panel z osi, a serwer sprawdza po swojemu i to on rozstrzyga.
+   * Dwie kopie tej reguły są tu świadome: panel musi mieć CO wysłać, zanim
+   * serwer powie, czy się zgadza.
+   */
+  const ostatniaNieNasza = (czat: WiadomoscReklamacji[]): number | null => {
+    for (let i = czat.length - 1; i >= 0; i -= 1) {
+      if (czat[i].autorRola !== "SELLER") return czat[i].id;
+    }
+    return null;
+  };
+
+  const wyslij = (mimoNowejWiadomosci = false) => {
+    const d = szczegol.data;
+    if (!d) return;
+    setBladWysylki("");
+    odpowiedz.mutate({
+      id: d.reklamacja.id,
+      tresc,
+      expectedWersja: d.reklamacja.wersja,
+      expectedLastMessageId: ostatniaNieNasza(d.czat),
+      mimoNowejWiadomosci,
+    }, {
+      onSuccess: (w) => {
+        setKonfliktWysylki(null);
+        if (w.status === "sent") setTresc("");
+        else setBladWysylki(
+          "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+      },
+      onError: (e) => {
+        /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
+           rozmowa, rozjazd wersji, odmowa Allegro — to jedno zdanie pod polem;
+           serwer przysyła je gotowe i panel go nie układa od nowa. */
+        if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined) {
+          setKonfliktWysylki(e.szczegoly as SzczegolyWysylki);
+        } else {
+          setBladWysylki((e as Error).message);
+        }
+      },
+    });
   };
 
   /* Skróty milkną, gdy ognisko stoi w polu tekstowym — inaczej cyfra wpisana
@@ -230,7 +294,10 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
         {szczegol.data
           ? <Czat reklamacja={szczegol.data.reklamacja} czat={szczegol.data.czat}
-              zalaczniki={szczegol.data.zalaczniki} />
+              zalaczniki={szczegol.data.zalaczniki}
+              edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                czatAktywny={szczegol.data.reklamacja.czatAktywny}
+                onZmiana={setTresc} onWyslij={() => wyslij()} />} />
           : <Pusto ikona={<ShieldQuestion size={40} className="text-slate-300" />}>
               {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
             </Pusto>}
@@ -256,5 +323,18 @@ export function Reklamacje() {
               Dowody o sprawie pokażą się po wybraniu reklamacji.</p>}
       </Karta>
     </div>
+
+    {/* Jawna zgoda po dopisku — dialog ze skrzynki, bez kopiowania. Autora
+        nazywa `ktoDopisal`, bo przy reklamacji bywa nim doradca Allegro,
+        a nie kupujący. */}
+    {konfliktWysylki && <DialogKonfliktu
+      szczegoly={konfliktWysylki}
+      szkic={tresc}
+      wysyla={odpowiedz.isPending}
+      blad={bladWysylki}
+      ktoDopisal={konfliktWysylki.nowaWiadomosc?.rola === "ADMIN"
+        ? "doradca Allegro" : "klient"}
+      onWyslijMimoTo={() => wyslij(true)}
+      onPopraw={() => setKonfliktWysylki(null)} />}
   </div>;
 }
