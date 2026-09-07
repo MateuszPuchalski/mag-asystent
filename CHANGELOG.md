@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.226.1 — 7 września 2026
+
+**Numer reklamacji prowadził w 404.** Właściciel kliknął sprawę w kolumnie
+dowodów i zobaczył „Ups, nic tu nie ma".
+
+Wzorzec adresu zbudowano w 0.222.0 z ANALOGII do zwrotu — lista Centrum
+Sprzedaży z numerem sprawy w wyszukiwaniu — i niósł za to `[WERYFIKUJ]`.
+Dokumentacja mówiła wprost: „Nikt go jeszcze nie kliknął". Kliknięcie
+rozstrzygnęło: domysł mylił się w OBU członach naraz. Sprawa ma własną stronę
+`/claims/{uuid}`, nie wiersz na liście, i adresuje się identyfikatorem zasobu,
+nie numerem czytelnym. Numer `2585498/2026` widzi kupujący i widzi go agent,
+ale w adresie jest bezużyteczny.
+
+Strona sprawy chce też zakresu konta, `?sellerId=`. Tej liczby nie mieliśmy
+skąd wziąć sami: `channel_account` trzyma clientId OAuth, czyli co innego,
+a `GET /me` z Allegro wymaga uprawnienia, którego konto nie ma — ponowne
+parowanie konta dla jednego odnośnika to zła cena. Stoi więc w nowym
+`ALLEGRO_SELLER_ID` z domyślną wartością WERTIS: link działa po `git pull`,
+bez wpisu przy wdrożeniu. Doklejany jest w kodzie, a nie we wzorcu, żeby przy
+pustej wartości w adresie nie zawisł goły `?sellerId=`.
+
+`zWzorca` została NIETKNIĘTA, choć kusiło wyciąć puste parametry ogólnie.
+`{od}` przy zwrocie zostaje pusty celowo i jest to zachowanie sprawdzone na
+żywym Centrum Sprzedaży — ogólna reguła zmieniałaby działający adres przy
+okazji naprawiania zepsutego.
+
+To ta sama lekcja, co przy zwrocie w 0.207.0, i kosztowała drugi raz tyle
+samo: adres panelu zgadnięty z analogii do innego adresu panelu trafia w 404,
+a znacznik przy nim wisi, dopóki ktoś nie kliknie. Znacznik przy reklamacji
+schodzi.
+
+---
+
+
 ## 0.226.0 — 7 września 2026
 
 **Oś rozmowy pokazywała odpowiedź hali, ale nie pytanie.** Agent zlecał pomiar,

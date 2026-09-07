@@ -1808,10 +1808,17 @@ już stoi. Jeśli w `wertis.env` stoi własna wartość, to ona nadal rządzi.
 
 **Odnośniki do panelu Allegro mogą wymagać poprawki.** Adresy stron panelu
 sprzedawcy nie są przez Allegro udokumentowane, więc domyślne wzorce są
-założeniem. Wyjątkiem jest zwrot: od 0.207.0 prowadzi do Centrum Sprzedaży
-adresem podanym przez właściciela. Kliknij po wdrożeniu w numer zamówienia;
-gdy trafi w 404, popraw `ALLEGRO_PANEL_ZAMOWIENIE` w `wertis.env`. Pusta
-wartość wyłącza odnośnik i zostawia sam tekst.
+założeniem. Dwa wyjątki są już sprawdzone kliknięciem: zwrot od 0.207.0
+i reklamacja od 0.226.1. Kliknij po wdrożeniu w numer zamówienia; gdy trafi
+w 404, popraw `ALLEGRO_PANEL_ZAMOWIENIE` w `wertis.env`. Pusta wartość wyłącza
+odnośnik i zostawia sam tekst.
+
+**`ALLEGRO_SELLER_ID` — nic nie musisz robić (0.226.1).** Strona sprawy
+reklamacyjnej chce w adresie identyfikatora sprzedawcy, a wartość domyślna jest
+już wartością WERTIS. Wpis w `wertis.env` przyda się dopiero przy innym koncie:
+liczbę widać w pasku adresu dowolnej strony Centrum Sprzedaży, po `sellerId=`.
+Pusta wartość nie psuje odnośnika — zostaje sam adres sprawy, bez zakresu
+konta.
 
 **Zdjęcia w panelu obsługi działają tylko przy włączonym `ZDJECIA_ZRODLO`.**
 Bez niego kafle pokazują „bez zdjęcia" i nic więcej się nie psuje.

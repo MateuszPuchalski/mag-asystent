@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { zWzorca } from "./allegro-linki.js";
+import { config } from "../config.js";
+import { linkReklamacji, zWzorca } from "./allegro-linki.js";
 
 /* Link, który trafia w 404, kosztuje kliknięcie i zaufanie do ekranu —
    a numer zwrotu bywa postaci `4R50/2026`, więc kodowanie nie jest tu
@@ -67,4 +68,57 @@ test("brak daty zostawia zakres PUSTY, nie goły znacznik", () => {
 test("wzorzec bez znacznika daty działa dalej — sandboks go nie ma", () => {
   assert.equal(zWzorca(WZOR, "abc", "2026-08-20T00:00:00.000Z"),
     "https://allegro.pl/moje-allegro/sprzedaz/zwroty/abc");
+});
+
+/* ── Adres sprawy reklamacyjnej (0.226.1) ───────────────────────────────────
+   Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i mylił się w OBU
+   członach: sprawa ma własną stronę `/claims/{uuid}`, nie wiersz na liście
+   z wyszukiwaniem, a adresuje się identyfikatorem zasobu, nie numerem
+   czytelnym. Kliknięcie właściciela dawało 404.
+
+   Testy porównują PEŁNY łańcuch, nie wzorzec — dowodzą, że budujemy dokładnie
+   ten adres, który u właściciela się otworzył.                              */
+
+const UUID = "067de4cd-015e-4cae-a091-8fb92cb5a558";
+
+/** Podmiana konfiguracji na czas jednego sprawdzenia; `config` to zwykły obiekt. */
+function zKonfiguracja<T>(wzorzec: string, sprzedawca: string, f: () => T): T {
+  const b = { w: config.allegro.panelReklamacja, s: config.allegro.sellerId };
+  config.allegro.panelReklamacja = wzorzec;
+  config.allegro.sellerId = sprzedawca;
+  try { return f(); } finally {
+    config.allegro.panelReklamacja = b.w;
+    config.allegro.sellerId = b.s;
+  }
+}
+
+const CLAIMS = "https://salescenter.allegro.com/claims/{id}";
+
+test("sprawa otwiera się pod własnym adresem, z zakresem konta", () => {
+  zKonfiguracja(CLAIMS, "37755893", () => {
+    assert.equal(linkReklamacji(UUID),
+      `https://salescenter.allegro.com/claims/${UUID}?sellerId=37755893`);
+  });
+});
+
+test("bez identyfikatora sprzedawcy zostaje sam adres sprawy", () => {
+  /* Goły `?sellerId=` na końcu byłby zgadywaniem drugi raz: nie wiemy, jak
+     strona sprawy zachowa się przy pustym zakresie konta. */
+  zKonfiguracja(CLAIMS, "", () => {
+    assert.equal(linkReklamacji(UUID), `https://salescenter.allegro.com/claims/${UUID}`);
+  });
+});
+
+test("wzorzec z własnym parametrem dokleja przez „&”, nie drugie „?”", () => {
+  /* Wpis w `wertis.env` może nieść własne pytanie w adresie — drugi znak
+     zapytania rozwaliłby zapytanie po tamtej stronie. */
+  zKonfiguracja("https://przyklad/claims/{id}?tab=chat", "7", () => {
+    assert.equal(linkReklamacji(UUID), `https://przyklad/claims/${UUID}?tab=chat&sellerId=7`);
+  });
+});
+
+test("brak sprawy to brak odnośnika, mimo znanego sprzedawcy", () => {
+  zKonfiguracja(CLAIMS, "37755893", () => {
+    for (const v of [null, undefined, ""]) assert.equal(linkReklamacji(v), null);
+  });
 });

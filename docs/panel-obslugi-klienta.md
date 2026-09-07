@@ -2217,8 +2217,12 @@ operację uprzywilejowaną i potwierdzenie — jak oddanie pieniędzy przy zwroc
 Czy rozmowa mieści się w stu wiadomościach — sonda tej sekcji nie zdjęła
 (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Do której przestrzeni należy
 `offer.id` przy sprawie: przykład w specyfikacji pokazuje UUID, a sonda zwykły
-tekst. I czy adres reklamacji w Centrum Sprzedaży, zbudowany z analogii do
-zwrotu, w ogóle otwiera właściwą stronę.
+tekst.
+
+Z tej listy zeszło w 0.226.1 pytanie o adres sprawy w Centrum Sprzedaży.
+Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
+sprawa ma własną stronę `/claims/{uuid}?sellerId={id}`, a numer czytelny
+w adresie jest bezużyteczny.
 
 ## 26. Decyzje do potwierdzenia
 

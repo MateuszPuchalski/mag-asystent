@@ -481,19 +481,37 @@ export const config = {
         ? "https://allegro.pl.allegrosandbox.pl/oferta/{id}"
         : "https://allegro.pl/oferta/{id}"),
     /**
-     * Reklamacja w Centrum Sprzedaży (0.222.0) — wzorzec ZGADNIĘTY z analogii.
+     * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY (0.226.1).
      *
-     * Zbudowany na wzór zwrotu, którego adres właściciel potwierdził w 0.207.0:
-     * lista Centrum Sprzedaży z numerem sprawy w wyszukiwaniu. Nikt go jeszcze
-     * nie kliknął, więc niesie `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` razem
-     * z zamówieniem i ofertą. Stoi w konfiguracji właśnie dlatego: poprawka ma
-     * być wpisem w `wertis.env`, a nie nowym wydaniem.
+     * Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i okazał się zły
+     * w OBU członach naraz: sprawa ma własną stronę `/claims/{uuid}`, a nie
+     * wiersz na liście z wyszukiwaniem, i adresuje się identyfikatorem
+     * zasobu, a nie numerem czytelnym. Kliknięcie właściciela dawało 404.
+     *
+     * Parametru `sellerId` NIE MA w tym wzorcu świadomie — dokleja go
+     * `linkReklamacji`, żeby przy pustym `ALLEGRO_SELLER_ID` w adresie nie
+     * zawisł goły `?sellerId=`.
      */
     panelReklamacja:
       process.env.ALLEGRO_PANEL_REKLAMACJA ??
       (process.env.ALLEGRO_SANDBOX === "1"
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
-        : "https://salescenter.allegro.com/disputes?search={id}"),
+        : "https://salescenter.allegro.com/claims/{id}"),
+    /**
+     * Identyfikator sprzedawcy do adresów Centrum Sprzedaży (0.226.1).
+     *
+     * Strona sprawy chce `?sellerId=` i tej liczby nie mamy skąd wziąć sami:
+     * `channel_account.external_account_id` trzyma clientId OAuth (inna
+     * liczba), a `GET /me` z Allegro wymaga uprawnienia
+     * `allegro:api:profile:read`, którego konto nie ma — ponowne parowanie
+     * konta dla jednego odnośnika to zła cena.
+     *
+     * Domyślna wartość jest wartością WERTIS, decyzja właściciela: link ma
+     * działać po `git pull`, bez wpisu przy wdrożeniu. Identyfikator
+     * sprzedawcy jest jawny — stoi w adresie każdej oferty — więc nie jest
+     * sekretem i nie ma powodu trzymać go poza repo.
+     */
+    sellerId: process.env.ALLEGRO_SELLER_ID ?? "37755893",
   },
 
   /**

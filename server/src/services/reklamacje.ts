@@ -277,9 +277,11 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     wersja: Number(w.wersja ?? 1),
     kubelek: kubelek(rdzen),
     sygnaly: sygnaly(rdzen),
-    /* Numer czytelny bije identyfikator: Centrum Sprzedaży szuka po tym, co
-       widzi też kupujący. Bez numeru zostaje identyfikator sprawy. */
-    link: linkReklamacji(tekst(w.reference_number) ?? String(w.external_id)),
+    /* W ADRESIE STOI UUID, nie numer czytelny (0.226.1). Sprawa ma własną
+       stronę `/claims/{uuid}` i adresuje się identyfikatorem zasobu; numer
+       `2585498/2026` jest dla CZŁOWIEKA i zostaje etykietą odnośnika. Do
+       0.226.0 szło tu odwrotnie i kliknięcie dawało 404. */
+    link: linkReklamacji(String(w.external_id)),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
     linkOferty: linkOferty(tekst(w.offer_id)),
     ofertaNazwa: tekst(w.oferta_nazwa),

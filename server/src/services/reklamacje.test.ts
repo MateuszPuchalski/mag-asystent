@@ -329,3 +329,22 @@ test("flaga podglądu jedzie przy KAŻDYM załączniku, w rozmowie i przy sprawi
   assert.equal(s.czat[0].zalaczniki[0].podglad, true, "zdjęcie rysuje się na osi");
   assert.equal(s.zalaczniki[0].podglad, false, "PDF zostaje przy pobieraniu");
 });
+
+test("odnośnik do sprawy niesie UUID, a nie numer czytelny", () => {
+  /* Blizna 0.226.1. Do 0.226.0 pierwszeństwo miał `reference_number`, bo
+     zgadnięty wzorzec prowadził na LISTĘ z wyszukiwaniem. Sprawa ma własną
+     stronę i adresuje się identyfikatorem zasobu — kliknięcie właściciela
+     kończyło się na „Ups, nic tu nie ma".
+
+     Numer czytelny zostaje na ekranie jako ETYKIETA odnośnika i to jest cała
+     jego rola: dla adresu jest bezużyteczny, dla człowieka niezastąpiony. */
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "067de4cd-015e-4cae-a091-8fb92cb5a558" });
+  const r = listaReklamacji(d, TERAZ)[0];
+  assert.ok(r.link, "sprawa z identyfikatorem ma odnośnik");
+  assert.match(r.link!, /\/claims\/067de4cd-015e-4cae-a091-8fb92cb5a558(\?|$)/,
+    "w adresie stoi identyfikator sprawy");
+  assert.doesNotMatch(r.link!, /nr-/, "numer czytelny nie ma prawa trafić do adresu");
+  /* Numer nadal JEST — tylko gdzie indziej niż w adresie. */
+  assert.equal(r.numer, "nr-067de4cd-015e-4cae-a091-8fb92cb5a558");
+});

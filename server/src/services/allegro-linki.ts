@@ -60,7 +60,27 @@ export const linkZamowienia = (id: string | null | undefined) =>
 export const linkOferty = (id: string | null | undefined) =>
   zWzorca(config.allegro.panelOferta, id);
 
-/* Reklamacja w Centrum Sprzedaży (0.222.0). Wzorzec zgadnięty z analogii do
-   zwrotu i dlatego opatrzony `[WERYFIKUJ]`; sprawdza się go kliknięciem. */
-export const linkReklamacji = (id: string | null | undefined) =>
-  zWzorca(config.allegro.panelReklamacja, id);
+/**
+ * Reklamacja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem (0.226.1).
+ *
+ * Wzorzec z 0.222.0 był zgadnięty z analogii do zwrotu i mylił się w obu
+ * członach: sprawa ma WŁASNĄ stronę `/claims/{uuid}`, nie wiersz na liście
+ * z wyszukiwaniem, a adresuje się identyfikatorem zasobu, nie numerem
+ * czytelnym. `{id}` to więc `external_id` sprawy, nigdy `reference_number`.
+ *
+ * `sellerId` dokleja się TUTAJ, a nie we wzorcu, i tylko gdy go znamy —
+ * inaczej przy pustym `ALLEGRO_SELLER_ID` w adresie zawisłby goły
+ * `?sellerId=`, o którym nie wiadomo, jak zachowa się strona sprawy.
+ *
+ * Kusi, żeby wycinać puste parametry ogólnie, w `zWzorca`. Nie robimy tego:
+ * `{od}` przy zwrocie zostaje pusty CELOWO i jest to zachowanie sprawdzone na
+ * żywym Centrum Sprzedaży. Ogólna reguła zmieniałaby działający adres przy
+ * okazji naprawiania zepsutego.
+ */
+export const linkReklamacji = (id: string | null | undefined) => {
+  const adres = zWzorca(config.allegro.panelReklamacja, id);
+  if (!adres) return null;
+  const sprzedawca = config.allegro.sellerId;
+  if (!sprzedawca) return adres;
+  return `${adres}${adres.includes("?") ? "&" : "?"}sellerId=${encodeURIComponent(sprzedawca)}`;
+};
