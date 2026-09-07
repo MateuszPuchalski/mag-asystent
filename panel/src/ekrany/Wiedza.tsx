@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
 import {
-  useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijZastosowanie, useSilniki, useZaproponujZastosowanie,
+  useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZastosowanie, useSilniki,
+  useZaproponujZastosowanie,
 } from "../api/wiedza";
+import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
 import { Blad, Karta, Pusto, Zakladki } from "../ui";
 import { Propozycja } from "../wiedza/Propozycja";
 import { NowaPropozycja } from "../wiedza/NowaPropozycja";
@@ -30,12 +32,14 @@ export function Wiedza() {
   const zOpisow = useModeleZOpisow();
   const silniki = useSilniki();
   const rozstrzygnij = useRozstrzygnijZastosowanie();
+  const rozstrzygnijPasowanie = useRozstrzygnijPasowanie();
   const zaproponuj = useZaproponujZastosowanie();
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
   const [wyslano, setWyslano] = useState("");
 
   const propozycje = kolejka.data?.propozycje ?? [];
+  const pasowania = kolejka.data?.pasowania ?? [];
 
   /* Własny scroller — patrz `Wzmianki`; rama panelu nie przewija za ekrany. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -45,6 +49,7 @@ export function Wiedza() {
           pominięcie: para maszyna–silnik czeka na tę samą decyzję człowieka. */}
       <span className="text-sm text-slate-500">
         {kolejka.data ? `${kolejka.data.liczba} do rozstrzygnięcia` : "Wczytuję…"}
+        {kolejka.data?.pasowanDoRozstrzygniecia ? ` · ${odmienPasowania(kolejka.data.pasowanDoRozstrzygniecia)} do rozstrzygnięcia` : ""}
         {silniki.data?.doRozstrzygniecia ? ` · ${silniki.data.doRozstrzygniecia} silników do rozstrzygnięcia` : ""}</span>
     </Karta>
 
@@ -62,7 +67,7 @@ export function Wiedza() {
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
 
         {widok === "kolejka" && <>
-          {!kolejka.isLoading && propozycje.length === 0 &&
+          {!kolejka.isLoading && propozycje.length === 0 && pasowania.length === 0 &&
             <Pusto ikona={<BookMarked size={38} />}>
               Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
             </Pusto>}
@@ -71,6 +76,17 @@ export function Wiedza() {
               onRozstrzygnij={(id, decyzja, powod) => { setBlad("");
                 rozstrzygnij.mutate({ id, decyzja, powod }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
           </div>
+          {/* DRUGA SEKCJA TEJ SAMEJ KOLEJKI, nie szósta zakładka: `Zakladki` daje
+              każdej `flex-1` w jednym wierszu, a szósta łamie etykiety. Ważniejsze:
+              to ta sama decyzja („rozstrzygnij") tego samego człowieka. */}
+          {pasowania.length > 0 && <section className="mt-4" aria-label="Pasowania części">
+            <h3 className="mb-2 text-sm font-bold">Pasowania części ({pasowania.length})</h3>
+            <div className="space-y-3">
+              {pasowania.map((p) => <PropozycjaPasowania key={p.id} p={p} trwa={rozstrzygnijPasowanie.isPending}
+                onDecyzja={(decyzja, powod) => { setBlad("");
+                  rozstrzygnijPasowanie.mutate({ id: p.id, decyzja, powod }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
+            </div>
+          </section>}
         </>}
 
         {widok === "nowa" && <>
@@ -89,4 +105,11 @@ export function Wiedza() {
       </div>
     </Karta>
   </div>;
+}
+
+/** „1 pasowanie / 2 pasowania / 5 pasowań" — licznik czyta człowiek, nie parser. */
+function odmienPasowania(n: number): string {
+  const r10 = n % 10, r100 = n % 100;
+  const slowo = n === 1 ? "pasowanie" : r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14) ? "pasowania" : "pasowań";
+  return `${n} ${slowo}`;
 }

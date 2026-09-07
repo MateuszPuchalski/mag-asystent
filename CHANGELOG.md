@@ -34,6 +34,89 @@ historii nie przepisujemy.
 ---
 
 
+## 0.230.0 — 7 września 2026
+
+**„Czy ta uszczelka pasuje do tego gaźnika?" — baza ma na to wiersz.**
+
+Firma sprzedaje dużo gaźników, a klienci pytają o uszczelki, membrany
+i zestawy naprawcze do nich. Baza wiedzy nie znała ŻADNEJ relacji
+część↔część: zastosowanie wiąże część z maszyną, zabudowa maszynę z silnikiem.
+Jedyną relacją między kartotekami był zamiennik — liczony z opisu,
+jednokierunkowy i nigdzie niezapisany. Agent odpowiadał z pamięci.
+
+Arkusz kartoteki od właściciela (3415 pozycji) pokazał kształt problemu.
+Jeden gaźnik GX160 ma TRZY różne uszczelki: od strony filtra, od strony
+kolektora, między dystansem. Ta sama uszczelka stoi pod czterema symbolami
+od czterech dostawców. Pomiary w arkuszu okazały się wymiarami OPAKOWANIA —
+nic na nich nie stawiamy.
+
+### Nowa tabela `pasowanie_czesci`
+
+Wiersz mówi: część X pasuje DO części Y, w roli (uszczelka, membrana, zestaw
+naprawczy, łącznik, element zestawu, inne) i na pozycji („od strony filtra").
+Kierunek jest semantyczny, odczyt symetryczny. Dowód stoi w wierszu jak przy
+zabudowie, polaryzacja z powodami §11.4 od razu, cykl życia i podpisy jak przy
+zastosowaniu. Rozstrzyga człowiek z biura. Szczegóły i uzasadnienia:
+`docs/panel-obslugi-klienta.md` §12.
+
+**Przechodniość przez zamiennik** liczy się przy odczycie, na głębokość jeden,
+z obu stron, nigdy jako `potwierdzone`. Pasowanie zapisane do jednego z czterech
+symboli tej samej uszczelki odpowiada o wszystkie cztery — z dopiskiem „przez
+zamiennik", bo zamiennik gaźnika bywa wariantem z innym rozstawem.
+
+### Dziesiąty szczebel doboru: „pasuje do części"
+
+Stoi za zastosowaniem przez silnik, PRZED ofertą. Czyta pasowania do KOTWIC:
+kartotek trafionych przez symbol, EAN albo numer OEM wpisany przez agenta,
+oraz kartoteki oferty. Nigdy z treści wiadomości. Przed ofertą dlatego, że
+w scenariuszu odwrotnym (oferta to uszczelka, klient pyta o swój gaźnik) dedup
+zostawiłby zdanie o ofercie i dowód pasowania zniknąłby ze szkicu. Szkic
+cytuje gaźnik, rolę i pozycję: „Do W09-0211 pasuje LC170430140-0001
+(uszczelka, od strony filtra) — źródło: katalog dostawcy…".
+
+Tabela `dobor_rozmowy` przebudowuje się RAZ, także u klientów, którzy
+pominęli 0.229.0 — jedna funkcja `doborZnaDrogi` obsługuje oba kształty.
+
+### Trzy miejsca na ekranie
+
+- **Dobór:** przy wybranym kandydacie przycisk „Pasuje do W09-0211" dla każdej
+  kotwicy innej niż wybrany. Kierunek narzucony, dowód „rozmowa" wypełniony
+  numerem rozmowy. Automatu przy ZATWIERDŹ DOBÓR nie ma: rola nieznana,
+  a kotwica bywa samą częścią.
+- **Wiedza → Kolejka:** druga sekcja „Pasowania części (N)" z dwoma kaflami,
+  rolą, dowodem i odnośnikiem do rozmowy; licznik w nagłówku. Nie szósta
+  zakładka — to ta sama decyzja tego samego człowieka.
+- **Wiedza → Sprawdź kartotekę:** obie strony relacji, negatywy, czekające,
+  wycofanie i formularz „Dopisz pasowanie" z radiem kierunku.
+- **Rozmowa, blok towaru:** wyłącznie odczyt — „Do tej części pasują" przy
+  gaźniku, „Ta część pasuje do" przy uszczelce, przechodnie z dopiskiem.
+
+Trasy: `POST /api/obsluga/wiedza/pasowania`, `…/:id/rozstrzygnij`,
+`…/:id/wycofaj`; `GET …/wiedza/towar/:twId` i `GET …/wiedza/kolejka` niosą
+pasowania w osobnych polach. Licznik zapisów w `routes/wiedza.test.ts`:
+10 → 13, bo relacja część↔część ma ten sam cykl życia co zastosowanie.
+
+### Naprawione przy okazji
+
+- **Parser opisów nie znał „W zestawie".** `Zamiennik: W09-0503 // 520070/1
+  W zestawie uszczelka - W53-0501` ciągnął sekcję do końca, więc uszczelka
+  W53-0501 była ogłaszana ZAMIENNIKIEM gaźnika 10-01022. Sekcja kończy się
+  teraz na wcześniejszym z dwóch: „Słowo:" albo „W zestawie / Zawiera /
+  Zawartość". Whitelisty słów bez dwukropka NIE wróciło — to jedna etykieta
+  z uzasadnieniem w komentarzu.
+- **`OME:`** (literówka od `OEM:` w czterech opisach) czyta się jako numer OEM.
+- **Zamienniki z opisu wreszcie widać w panelu.** Serwer oddawał je od dawna,
+  rysował je tylko kolektor. Agent, który widzi kandydata „przez zamiennik
+  EX055", ma teraz w tabeli towaru wiersz „Zamienniki: EX055 · 10-02001
+  (+3 numery obce w opisie)".
+
+### Poza wydaniem, zaaprobowane
+
+Słownik rodzin silników (token w nazwie kartoteki → model, wpisywany ręką
+biura) — następne wydanie. Wymiary uszczelek, pętla zwrotów i Copilot
+proponujący pasowania czekają.
+
+
 ## 0.229.0 — 7 września 2026
 
 **Dobór wie, jaki silnik stoi w kosiarce — i szuka części tego silnika.**

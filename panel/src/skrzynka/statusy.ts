@@ -1,7 +1,6 @@
 import type {
   Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
-  StatusRozmowy, ZrodloPropozycji,
-} from "../api/typy";
+  StatusRozmowy, ZrodloPropozycji, RolaPasowania } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -120,6 +119,16 @@ export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
   reczne: "wpis ręczny",
   opis: "z opisu kartoteki",
   copilot: "propozycja Copilota",
+};
+
+/* Rola części w pasowaniu (§11.2). To własność CZĘŚCI zapisana w relacji,
+   bo nazwa kartoteki to wolny tekst; lista zamknięta jak `RodzajDowodu`. */
+export const ROLE_PASOWANIA: RolaPasowania[] = [
+  "uszczelka", "membrana", "zestaw_naprawczy", "lacznik", "element_zestawu", "inne",
+];
+export const NAZWA_ROLI: Record<RolaPasowania, string> = {
+  uszczelka: "uszczelka", membrana: "membrany", zestaw_naprawczy: "zestaw naprawczy",
+  lacznik: "łącznik kolektora", element_zestawu: "element zestawu", inne: "inne",
 };
 
 export const NAZWA_RODZAJU_IDENTYFIKATORA: Record<RodzajIdentyfikatora, string> = {

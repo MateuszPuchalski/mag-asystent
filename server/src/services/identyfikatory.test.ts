@@ -67,6 +67,12 @@ const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, stri
   { opis: "OEM:", sym: "18-11011", oczekiwane: [], po: "pusta sekcja na końcu" },
   { opis: "Stare SKU: FTC272 W zestawiie: 3 szt", sym: "FTC272", oczekiwane: [], po: "własny symbol odpada; literówka etykiety to nadal granica" },
   { opis: "silnik OEM Honda GX160 Zamiennik: 76-064", sym: "Y", oczekiwane: [], po: "OEM bez dwukropka nie jest etykietą" },
+  { opis: "OME: 591852 // 793463 // 793493 Zamiennik: W09-0503", sym: "10-01022",
+    oczekiwane: [["oem", "591852"], ["oem", "793463"], ["oem", "793493"]], po: "`OME:` to literówka od `OEM:` — cztery opisy" },
+  { opis: "Obrót w prawo OME: M145245, AM131560", sym: "Z", oczekiwane: [["oem", "M145245"], ["oem", "AM131560"]],
+    po: "`OME:` w środku prozy" },
+  { opis: "OEM: 1234567 W zestawie uszczelka - W53-0501", sym: "Q", oczekiwane: [["oem", "1234567"]],
+    po: "„W zestawie” bez dwukropka kończy sekcję OEM — symbol z kompletu nie jest numerem OEM" },
 ];
 
 test("parser identyfikatorów: kształty z prawdziwych opisów", () => {
@@ -85,7 +91,9 @@ test("sekcja Modele: to jeden wiersz, pusta sekcja nie wraca", () => {
 
 test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i nie tysiące", () => {
   const w = I.przebudujIdentyfikatory(db());
-  assert.ok(w.kartotek >= 350 && w.kartotek <= 550, `kartotek z identyfikatorem: ${w.kartotek}`);
+  /* Górna granica 560, nie 550: `OME:` (literówka od `OEM:`) dokłada cztery
+     kartoteki, które do tej poprawki nie miały ani jednego identyfikatora. */
+  assert.ok(w.kartotek >= 350 && w.kartotek <= 560, `kartotek z identyfikatorem: ${w.kartotek}`);
   assert.ok(w.identyfikatorow >= 800 && w.identyfikatorow < 3000, `identyfikatorów: ${w.identyfikatorow}`);
   assert.ok(w.ms < 5000, `przebudowa trwała ${w.ms} ms — rytm importu to 60 s`);
   const m = I.przebudujModeleZOpisu(db());

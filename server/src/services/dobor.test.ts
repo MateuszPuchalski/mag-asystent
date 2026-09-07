@@ -23,6 +23,7 @@ let wiedzaDoboru: typeof import("./dobor.js").wiedzaDoboru;
 let ConversationConflict: typeof import("./conversations.js").ConversationConflict;
 let W: typeof import("./wiedza.js");
 let S: typeof import("./silniki.js");
+let P: typeof import("./pasowania.js");
 
 let biuro = 0;
 let rozmowa = 0;
@@ -35,6 +36,7 @@ before(async () => {
   ({ ConversationConflict } = await import("./conversations.js"));
   W = await import("./wiedza.js");
   S = await import("./silniki.js");
+  P = await import("./pasowania.js");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK, "SZR-148/82", "Szarpak 148 mm");
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(SZARPAK_ALT, "SZR-150/82", "Szarpak 150 mm");
@@ -44,7 +46,7 @@ beforeEach(() => {
   const d = db();
   /* Wiedza PRZED użytkownikami: zatwierdzony dobór rodzi propozycję (E2),
      a jej autor wskazuje na `app_user` bez kaskady. */
-  for (const t of ["dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -322,4 +324,30 @@ test("wiedzaDoboru oddaje silniki maszyny — jedno żądanie, nie drugie na to 
   assert.deepEqual(w.silniki.map((z) => z.silnik.id), [zab.silnik.id]);
   assert.equal(w.zastosowanie, null);
   assert.equal(w.zabudowa, null);
+});
+
+/* ── Pasowanie w szkicu: klient nazwał CZĘŚĆ, nie maszynę ─────────────────── */
+
+test("wybór z drogi `pasowanie` wchodzi, a szkic nazywa gaźnik, rolę i pozycję — bez maszyny", () => {
+  const p = P.zaproponujPasowanie({ twId: SZARPAK_ALT, doTwId: SZARPAK, rola: "uszczelka", pozycja: "od strony filtra",
+    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog 2024", zrodlo: "reczne" },
+    { userId: biuro, name: "A. Lewandowska" })!;
+  P.rozstrzygnijPasowanie(p.id, "zatwierdz", null, biuro);
+  /* Agent wpisał SYMBOL części klienta w polu OEM; maszyny nie zna wcale. */
+  zapiszDane(rozmowa, { oem: "SZR-148/82", nazwaCzesci: "uszczelka" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK_ALT, "pasowanie", 2, biuro);
+  const d = doborRozmowy(rozmowa);
+  assert.equal(d.wybrany!.droga, "pasowanie", "CHECK zna nową drogę");
+  assert.match(d.wybrany!.zdanieDoSzkicu,
+    /^Do SZR-148\/82 pasuje SZR-150\/82 \(uszczelka, od strony filtra\) — źródło: uszczelka \(od strony filtra\) SZR-150\/82 pasuje do SZR-148\/82 — katalog dostawcy, /);
+  assert.equal(wiedzaDoboru(rozmowa).pasowanie?.doCzego.symbol, "SZR-148/82");
+});
+
+test("bez wskazanej części klienta pasowanie nie podpiera szkicu — zostaje przypuszczenie", () => {
+  const p = P.zaproponujPasowanie({ twId: SZARPAK_ALT, doTwId: SZARPAK, rola: "uszczelka", polaryzacja: "pasuje",
+    rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!;
+  P.rozstrzygnijPasowanie(p.id, "zatwierdz", null, biuro);
+  zapiszDane(rozmowa, { nazwaCzesci: "uszczelka" }, 1, biuro);
+  wybierzKandydata(rozmowa, SZARPAK_ALT, "wyszukiwarka", 2, biuro);
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /to przypuszczenie/);
 });

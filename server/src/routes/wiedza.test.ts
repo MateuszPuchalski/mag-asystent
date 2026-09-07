@@ -24,24 +24,30 @@ let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
 let W: typeof import("../services/wiedza.js");
 let S: typeof import("../services/silniki.js");
+let P: typeof import("../services/pasowania.js");
 let propozycja = 0;
 let zabudowa = 0;
+let pasowanie = 0;
 let zOpisu = 0;
 const SZR = 501;
+const GAZ = 502;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
   W = await import("../services/wiedza.js");
   S = await import("../services/silniki.js");
+  P = await import("../services/pasowania.js");
   app = await (await import("../index.js")).buildApp();
   db().prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa,opis) VALUES (?,?,?,?)")
     .run(SZR, "SZR-148/82", "Szarpak", "OEM: 41307131600 Modele: LS 46-450 LS 51 Zamiennik: X");
+  db().prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa,opis) VALUES (?,?,?,?)")
+    .run(GAZ, "GAZ-1", "Gaźnik", "");
 });
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie",
+  for (const t of ["pasowanie_czesci", "model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie",
     "zabudowa_silnika", "model_urzadzenia", "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -56,6 +62,10 @@ beforeEach(() => {
     maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450" },
     silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" },
     rodzajDowodu: "producent", dowodTresc: "karta katalogowa", zrodlo: "reczne",
+  }, { userId: autor, name: "A. Lewandowska" })!.id;
+  pasowanie = P.zaproponujPasowanie({
+    twId: SZR, doTwId: GAZ, rola: "uszczelka", polaryzacja: "pasuje",
+    rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne",
   }, { userId: autor, name: "A. Lewandowska" })!.id;
 });
 
@@ -93,6 +103,10 @@ const TRASY = () => [
       rodzajDowodu: "producent", dowodTresc: "karta katalogowa" } },
   { method: "POST" as const, url: `/api/obsluga/wiedza/silniki/${zabudowa}/rozstrzygnij`, payload: { decyzja: "zatwierdz" } },
   { method: "POST" as const, url: `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, payload: { powod: "x" } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/pasowania",
+    payload: { twId: GAZ, doTwId: SZR, rola: "inne", polaryzacja: "pasuje", rodzajDowodu: "producent", dowodTresc: "x" } },
+  { method: "POST" as const, url: `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`, payload: { decyzja: "zatwierdz" } },
+  { method: "POST" as const, url: `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, payload: { powod: "x" } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -110,18 +124,18 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dziesięć — licznik jest umową", () => {
-  /* Trzy nowe przy zabudowie silnika: propozycja pary, rozstrzygnięcie
-     i wycofanie. Para maszyna→silnik ma ten sam cykl życia co zastosowanie,
-     a bez własnego wycofania zatwierdzona pomyłka zostałaby w bazie na
-     zawsze — i gasiłaby albo zapalała całą gałąź kandydatów bez śladu. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 10);
+test("tras zapisu jest trzynaście — licznik jest umową", () => {
+  /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
+     propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
+     cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
+     o uszczelce zostałaby w bazie na zawsze. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 13);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
-    "towar_identyfikator", "zabudowa_silnika"].map(liczba);
+    "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -254,7 +268,9 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
      błąd biznesowy, a nie gołe „Bad Request" z `FST_ERR_CTP_EMPTY_JSON_BODY`. */
   const b = login("biuro", "Anna");
   for (const url of [`/api/obsluga/wiedza/silniki/${zabudowa}/rozstrzygnij`,
-    `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, "/api/obsluga/wiedza/silniki"]) {
+    `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, "/api/obsluga/wiedza/silniki",
+    `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
+    `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);
@@ -274,4 +290,40 @@ test("luki idą razem z kolejką jednym odczytem", async () => {
   assert.equal(typeof w.lukiRazem, "number");
   assert.deepEqual(w.zatwierdzone, []);
   assert.ok(Array.isArray(w.luki));
+});
+
+test("pasowanie przez trasę: źródło z kontekstu, duplikat 409, kolejka i kartoteka widzą obie strony", async () => {
+  const b = login("biuro", "Anna");
+  /* Z rozmowy → `dobor`; z ekranu Wiedza (bez `conversationId`) → `reczne`. */
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/pasowania", headers: b.naglowki,
+    payload: { twId: GAZ, doTwId: SZR, rola: "lacznik", polaryzacja: "pasuje", rodzajDowodu: "producent", dowodTresc: "IPL" } });
+  assert.equal(r.statusCode, 200, r.body);
+  const z = r.json<{ id: number; zrodlo: string; zaproponowal: string; stan: string }>();
+  assert.equal(z.zrodlo, "reczne");
+  assert.equal(z.zaproponowal, "Anna", "autor z sesji, nie z ciała");
+  assert.equal(z.stan, "propozycja");
+  r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/pasowania", headers: b.naglowki,
+    payload: { twId: GAZ, doTwId: SZR, rola: "lacznik", polaryzacja: "pasuje", rodzajDowodu: "producent", dowodTresc: "IPL" } });
+  assert.equal(r.statusCode, 409);
+
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/kolejka", headers: b.naglowki });
+  const k = r.json<{ liczba: number; pasowania: unknown[]; pasowanDoRozstrzygniecia: number }>();
+  assert.equal(k.liczba, 1, "zastosowania liczą się osobno");
+  assert.equal(k.pasowanDoRozstrzygniecia, 2, "pasowanie z beforeEach + to z trasy");
+  assert.equal(k.pasowania.length, 2);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
+    headers: b.naglowki, payload: { decyzja: "zatwierdz" } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "GET", url: `/api/obsluga/wiedza/towar/${GAZ}`, headers: b.naglowki });
+  const g = r.json<{ pasowania: { pasujace: Array<{ czesc: { symbol: string } }>; pasujeDo: unknown[] } }>();
+  assert.deepEqual(g.pasowania.pasujace.map((t) => t.czesc.symbol), ["SZR-148/82"]);
+  r = await app.inject({ method: "GET", url: `/api/obsluga/wiedza/towar/${SZR}`, headers: b.naglowki });
+  const u = r.json<{ pasowania: { pasujeDo: Array<{ doCzego: { symbol: string } }> } }>();
+  assert.deepEqual(u.pasowania.pasujeDo.map((t) => t.doCzego.symbol), ["GAZ-1"]);
+
+  /* Drugie rozstrzygnięcie → 409 z tym, kto był pierwszy. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
+    headers: login("biuro", "Ola").naglowki, payload: { decyzja: "odrzuc", powod: "nie" } });
+  assert.equal(r.statusCode, 409);
 });

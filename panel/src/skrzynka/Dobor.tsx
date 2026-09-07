@@ -11,6 +11,8 @@ import {
 import { Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
+import { PasowanieForm } from "../wiedza/PasowanieForm";
+import { useZaproponujPasowanie } from "../api/wiedza";
 import { DO_WYBORU_DOBORU, NAZWA_DOBORU } from "./statusy";
 
 /**
@@ -44,7 +46,8 @@ const POLA: Array<{ klucz: keyof Omit<DaneDoboru, "parametry">; nazwa: string; p
 
 const NAZWA_DROGI: Record<DrogaDoboru, string> = {
   symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
-  zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst", wyszukiwarka: "wyszukiwarka",
+  pasowanie: "pasuje do części", zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst",
+  wyszukiwarka: "wyszukiwarka",
 };
 
 const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: string }> = {
@@ -96,6 +99,14 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
      z niego SILNIKI maszyny. Drugie żądanie po to samo byłoby drugim strzałem. */
   const wiedza = useWiedzaDoboru(rozmowaId);
   const silniki = wiedza.data?.silniki ?? [];
+  /* „Pasuje do…": jedyne miejsce, gdzie pasowanie rodzi się Z PRACY. Kotwica
+     to kartoteka, którą agent wskazał symbolem/numerem albo kartoteka oferty —
+     inna niż wybrany kandydat. Kierunek narzucony (wybrany pasuje DO kotwicy),
+     bo taki jest sens pytania klienta. Bez automatu przy ZATWIERDŹ DOBÓR: rola
+     nieznana, a kotwica bywa samą częścią (klient pyta o dostępność gaźnika). */
+  const zaproponujPasowanie = useZaproponujPasowanie();
+  const [pasujeDo, setPasujeDo] = useState<number | null>(null);
+  const [pasowanieOk, setPasowanieOk] = useState("");
 
   const [edycja, setEdycja] = useState(false);
   const [formularz, setFormularz] = useState<Formularz>(() => naFormularz(dobor.dane));
@@ -352,6 +363,27 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
                 zabudowie: wybór z ekranu nie ma udawać faktu, którego w bazie
                 nie ma. Część silnikowa zapisana raz przy jednej kosiarce
                 odpowiada odtąd na pytania o wszystkie maszyny z tym silnikiem. */}
+            {(() => {
+              const kotwice = (kandydaci.data?.kotwice ?? []).filter((k) => k.twId !== dobor.wybrany!.twId);
+              const cel = kotwice.find((k) => k.twId === pasujeDo);
+              if (kotwice.length === 0) return null;
+              return <div className="mt-2">
+                {!cel && <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
+                  <span>pasowanie:</span>
+                  {kotwice.map((k) => <Przycisk key={k.twId} className="text-xs" onClick={() => { setPasujeDo(k.twId); setPasowanieOk(""); }}>
+                    Pasuje do {k.symbol}</Przycisk>)}
+                  {pasowanieOk && <span className="text-emerald-800">{pasowanieOk}</span>}
+                </div>}
+                {cel && <PasowanieForm
+                  para={{ czesc: { twId: dobor.wybrany!.twId, symbol: dobor.wybrany!.symbol, nazwa: dobor.wybrany!.symbol }, doCzego: cel }}
+                  conversationId={rozmowaId} trwa={zaproponujPasowanie.isPending}
+                  blad={(zaproponujPasowanie.error as Error | null)?.message}
+                  onAnuluj={() => setPasujeDo(null)}
+                  onWyslij={(v) => zaproponujPasowanie.mutate(v, {
+                    onSuccess: () => { setPasujeDo(null); setPasowanieOk(`Propozycja „${dobor.wybrany!.symbol} pasuje do ${cel.symbol}” czeka w kolejce wiedzy.`); },
+                  })} />}
+              </div>;
+            })()}
             {dobor.status !== "confirmed" && silniki.length > 0 &&
               <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
                 <legend className="sr-only">Gdzie zapisać zastosowanie</legend>
@@ -382,7 +414,8 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
 function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
   return <div className="mt-3 rounded-lg border border-red-200" aria-label="Negatywne dopasowania">
     <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-900">
-      <AlertTriangle size={12} />Nie pasuje do tej maszyny
+      {/* „Nie pasuje", nie „do tej maszyny": negatyw pasowania dotyczy części klienta. */}
+      <AlertTriangle size={12} />Nie pasuje
       <span className="font-normal text-red-800">· ostrzeżenie, nie brak danych</span></p>
     {/* Kafel jest MNIEJSZY niż przy kandydacie i to jest celowe: negatyw ma
         się rzucić w oczy, gdy agent pojedzie wzrokiem po liście, ale nie ma

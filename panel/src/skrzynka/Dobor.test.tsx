@@ -28,6 +28,10 @@ vi.mock("../api/rozmowy", () => ({
   useWiedzaDoboru: () => wiedzaDoboru(),
 }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
+/* Pasowanie „z pracy" (0.230.0) idzie trasą wiedzy, nie rozmów — hook z tego
+   modułu woła `useQueryClient`, a zakładka renderuje się tu bez dostawcy. */
+const zaproponujPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
+vi.mock("../api/wiedza", () => ({ useZaproponujPasowanie: () => zaproponujPasowanie }));
 /* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
    dokąd go wysłać — atrapa mówi „każda kartoteka ma obraz". Dzięki temu kafle
    renderują się jako `<img>` i widać, PRZY KTÓRYCH wierszach stoją. */
@@ -45,12 +49,14 @@ const dobor = (n: Partial<DoborTyp> = {}): DoborTyp => ({
 });
 
 const PUSTE: KandydaciDoboru = {
+  kotwice: [],
   kandydaci: [], negatywne: [],
   drogi: [
     { droga: "symbol", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu" },
     { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN" },
     { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM" },
     { droga: "zastosowanie", sprawdzona: false, wynikow: 0, powod: "etap E2" },
+    { droga: "pasowanie", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty" },
     { droga: "oferta", sprawdzona: false, wynikow: 0, powod: "rozmowa nie jest powiązana z ofertą" },
     { droga: "zamiennik", sprawdzona: false, wynikow: 0, powod: "bez kartoteki oferty" },
     { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał nazwy części ani maszyny" },
@@ -60,6 +66,7 @@ const PUSTE: KandydaciDoboru = {
 
 const Z_KANDYDATAMI: KandydaciDoboru = {
   negatywne: [],
+  kotwice: [{ twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni STIHL FS120" }],
   kandydaci: [
     { nr: 1, twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni STIHL FS120", stan: 28,
       droga: "oferta", pewnosc: "prawdopodobne", zrodlo: 'Kartoteka oferty 148 — SKU oferty „FTC272"', ostrzezenia: [] },
@@ -76,7 +83,7 @@ const pokaz = (d: DoborTyp, uchwyty: Partial<{ onWstawDoSzkicu: (t: string) => v
     onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
 
 beforeEach(() => {
-  zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset();
+  zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset(); zaproponujPasowanie.mutate.mockReset();
   kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
 });
 
@@ -203,6 +210,51 @@ describe("zakładka doboru", () => {
     expect(screen.getByLabelText("Negatywne dopasowania")).toBeInTheDocument();
     expect(screen.getByText("SZR-140/82")).toBeInTheDocument();
     expect(screen.getByText(/ostrzeżenie, nie brak danych/)).toBeInTheDocument();
+  });
+
+  /* ── Pasowanie część↔część (0.230.0) ────────────────────────────────────
+     Klient pyta „czy ta uszczelka pasuje do mojego gaźnika". Odpowiedź rodzi
+     się w doborze: wybrany kandydat pasuje DO kotwicy (kartoteki, którą agent
+     wpisał symbolem/numerem albo którą ma oferta). Kierunek jest narzucony,
+     a przycisk nie ma prawa proponować „X pasuje do X". */
+  it("kandydat z drogi pasowania nosi własną plakietkę", () => {
+    kandydaci.mockReturnValue({ data: { ...PUSTE, kandydaci: [
+      { nr: 1, twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160", stan: 12,
+        droga: "pasowanie", pewnosc: "potwierdzone", ostrzezenia: [],
+        zrodlo: "uszczelka (od strony filtra) LC170430140-0001 pasuje do W09-0211 — katalog dostawcy, 7.09.2026, Anna" },
+    ] }, isLoading: false, error: null });
+    pokaz(dobor({ status: "searching", dane: { ...dobor().dane, oem: "W09-0211" } }));
+    expect(screen.getByText("droga: pasuje do części")).toBeInTheDocument();
+    expect(screen.getByText(/od strony filtra/)).toBeInTheDocument();
+  });
+
+  it("„Pasuje do…” stoi tylko przy kotwicy INNEJ niż wybrany i wysyła kierunek z rozmową", async () => {
+    kandydaci.mockReturnValue({ data: { ...PUSTE, kotwice: [
+      { twId: 14, symbol: "FTC272", nazwa: "Podkładka" },
+      { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik GX160" },
+    ] }, isLoading: false, error: null });
+    pokaz(dobor({ status: "candidates_found", wybrany: {
+      twId: 14, symbol: "FTC272", droga: "symbol", przez: "A. Lewandowska", at: "2026-09-02T08:00:00Z",
+      zdanieDoSzkicu: "Do W09-0211 pasuje FTC272.",
+    } }));
+    /* Kotwica równa wybranemu nie dostaje przycisku — relacja do siebie samej. */
+    expect(screen.queryByRole("button", { name: "Pasuje do FTC272" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Pasuje do W09-0211" }));
+    /* Dowód z rozmowy jest wypełniony — agent nie przepisuje numeru rozmowy ręcznie. */
+    expect(screen.getByLabelText("Dowód")).toHaveValue("dobór w rozmowie #4821");
+    await userEvent.click(screen.getByRole("button", { name: /Zaproponuj pasowanie/ }));
+    expect(zaproponujPasowanie.mutate).toHaveBeenCalledWith(expect.objectContaining({
+      twId: 14, doTwId: 502, rola: "uszczelka", polaryzacja: "pasuje", rodzajDowodu: "rozmowa",
+      dowodTresc: "dobór w rozmowie #4821", conversationId: 4821,
+    }), expect.anything());
+  });
+
+  it("bez kotwicy innej niż wybrany przycisku pasowania nie ma wcale", () => {
+    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
+    pokaz(dobor({ status: "candidates_found", wybrany: {
+      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "", zdanieDoSzkicu: "Do X pasuje FTC272.",
+    } }));
+    expect(screen.queryByRole("button", { name: /Pasuje do/ })).toBeNull();
   });
 
 });

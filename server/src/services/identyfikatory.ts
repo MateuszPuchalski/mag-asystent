@@ -34,7 +34,10 @@ export const NAZWA_RODZAJU: Record<RodzajIdentyfikatora, string> = {
    nie whitelista (decyzja 0.61.0). `katalog_obcy` parsera nie ma — to
    rezerwa dla wpisu ręcznego biura. */
 const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
-  { rodzaj: "oem", re: /\bOEM\s*:/gi },
+  /* `OME:` to literówka z czterech opisów (`OME: 591852 // 793463 // 793493`).
+     Bez tego wyjątku te numery nie trafiają do tabeli, a szczebel OEM w doborze
+     na nie nie trafi. Bez dwukropka nadal nie jest etykietą. */
+  { rodzaj: "oem", re: /\bO(?:EM|ME)\s*:/gi },
   { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*oryg(?:inaln[ya]|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
   { rodzaj: "stare_sku", re: /\bstare\s+sku\s*:/gi },
 ];

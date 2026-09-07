@@ -569,7 +569,7 @@ export function migrate(database: DatabaseSync) {
   zadanieNieTrzymaTowaru(database);
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
-  doborZnaDrogeSilnika(database);
+  doborZnaDrogi(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);
@@ -1208,27 +1208,31 @@ function bezBrygadzisty(database: DatabaseSync) {
  * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
  */
 /**
- * Droga `silnik` w `dobor_rozmowy.wybrany_droga` — PRZEBUDOWA TABELI.
+ * Drogi doboru w `dobor_rozmowy.wybrany_droga` — PRZEBUDOWA TABELI.
  *
- * Szczebel „przez silnik" dokłada dziewiątą drogę doboru, a `CHECK` na tej
- * kolumnie stoi WYŁĄCZNIE w `schema.sql`. Bazy sprzed tego wydania znają osiem
- * wartości i `CREATE TABLE IF NOT EXISTS` ich nie poprawi. Bez tej funkcji
- * agent kliknąłby „Wybierz" przy kandydacie z nowej drogi i dostał surowy
+ * `CHECK` na tej kolumnie stoi WYŁĄCZNIE w `schema.sql`, a `CREATE TABLE IF
+ * NOT EXISTS` nie poprawi bazy, która już istnieje. Bez tej funkcji agent
+ * kliknąłby „Wybierz" przy kandydacie z nowej drogi i dostał surowy
  * `SQLITE_CONSTRAINT` — najgorszy możliwy objaw, bo wyszedłby dopiero
  * u klienta i dopiero przy pierwszym trafieniu nowego szczebla.
  *
- * Rozszerzenia `CHECK` SQLite nie robi w miejscu (blizna 0.135.0), więc idzie
- * pełna przebudowa wzorem `kosz_pozycja`. Warunek wejścia czytamy z treści
- * `sqlite_master`, żeby nie przebudowywać tabeli przy każdym starcie.
+ * JEDNA funkcja dla WSZYSTKICH dołożonych dróg, nie jedna na drogę. 0.229.0
+ * dołożyło `silnik`, to wydanie `pasowanie`; klient, który przeskakuje oba,
+ * przebudowałby tabelę dwa razy z rzędu. Warunek wejścia sprawdza OSTATNIĄ
+ * dołożoną drogę w treści `sqlite_master` — brak jej znaczy, że tabela ma
+ * dowolny starszy kształt i idzie od razu do docelowego. Dokładając kolejną
+ * drogę: dopisz ją do `CREATE` niżej i podmień wartość w warunku.
  *
- * `ON DELETE CASCADE` z `conversation` odtwarzamy JAWNIE: przebudowa gubi
- * klucze obce, a bez niego skasowana rozmowa zostawiałaby dobór-sierotę.
+ * Rozszerzenia `CHECK` SQLite nie robi w miejscu (blizna 0.135.0), więc idzie
+ * pełna przebudowa wzorem `kosz_pozycja`. `ON DELETE CASCADE` z `conversation`
+ * odtwarzamy JAWNIE: przebudowa gubi klucze obce, a bez niego skasowana
+ * rozmowa zostawiałaby dobór-sierotę.
  */
-function doborZnaDrogeSilnika(database: DatabaseSync) {
+function doborZnaDrogi(database: DatabaseSync) {
   const w = database
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'")
     .get() as { sql: string | null } | undefined;
-  if (!w?.sql || w.sql.includes("'silnik'")) return;
+  if (!w?.sql || w.sql.includes("'pasowanie'")) return;
 
   const stare = (
     database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>
@@ -1256,7 +1260,7 @@ function doborZnaDrogeSilnika(database: DatabaseSync) {
       wybrany_symbol  TEXT,
       wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
                         'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                        'zastosowanie','silnik','oem','pelnotekst')),
+                        'zastosowanie','silnik','pasowanie','oem','pelnotekst')),
       wybrano_przez   TEXT,
       wybrano_user_id INTEGER REFERENCES app_user(user_id),
       wybrano_at      TEXT,

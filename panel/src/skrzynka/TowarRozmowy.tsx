@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, PackageSearch, X as Krzyzyk } from "lucide-react";
-import type { KartaTowaru, OfertaRozmowy } from "../api/typy";
+import type { KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
@@ -100,6 +100,10 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
           {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
           {karta.data && <>
             <StanTowaru karta={karta.data} />
+            {/* WYŁĄCZNIE ODCZYT — blok jest „Źródło: Subiekt GT" (§4.3 nie miesza
+                źródeł), a wiedza stoi tu jako osobna plakietka. Dopisuje się
+                w Doborze (z pracy) albo w Wiedza → Sprawdź kartotekę. */}
+            {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
             <OpisKartoteki desc={karta.data.desc} />
             {/* Przycisk stoi POD tabelą, nie nad nią: agent najpierw sprawdza,
                 czy to ta kartoteka, a dopiero potem przepisuje ją do odpowiedzi.
@@ -236,6 +240,14 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
     ["EAN", karta.ean || "brak"],
     /* Identyfikatory z opisu (E3): to, po czym klient pyta, gdy nie zna naszego symbolu. */
     ["Identyfikatory", karta.identyfikatory?.length ? karta.identyfikatory.map((i) => i.wartosc).join(" · ") : "brak"],
+    /* Zamienniki JEDZIŁY w JSON-ie od dawna i rysował je tylko kolektor. Bez
+       nich agent widzi kandydata „przez zamiennik EX055" i nie ma jak
+       sprawdzić, skąd ten EX055. Obce tylko jako licznik — to szary tekst dla
+       rozmowy z dostawcą, nie klikalna lista. */
+    ["Zamienniki", karta.zamienniki?.znane.length
+      ? karta.zamienniki.znane.map((z) => z.sym).join(" · ")
+        + (karta.zamienniki.obce.length ? ` (+${karta.zamienniki.obce.length} numery obce w opisie)` : "")
+      : karta.zamienniki?.obce.length ? `brak naszych; ${karta.zamienniki.obce.length} numery obce w opisie` : "brak"],
   ];
   return <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
     {wiersze.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">
@@ -246,5 +258,40 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
     {karta.magazyny.length > 0 && <p className="pt-1 text-[11px] text-slate-500">
       Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
     </p>}
+  </div>;
+}
+
+/**
+ * Pasowania część↔część przy kartotece (§11.2): przy gaźniku „Pasujące do
+ * niego", przy uszczelce „Pasuje do". Przechodnie przez zamiennik z dopiskiem
+ * (nigdy „potwierdzone"), negatywy na czerwono. Pusty blok nie renderuje się
+ * wcale — brak wiedzy to nie informacja, którą warto zajmować kolumnę.
+ */
+function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
+  if (dane.pasujeDo.length + dane.pasujace.length + dane.negatywne.length === 0) return null;
+  const wiersz = (t: { czesc: { symbol: string; nazwa: string }; doCzego: { symbol: string; nazwa: string };
+    pasowanie: { nazwaRoli: string; pozycja: string | null }; pewnosc: string; przezZamiennik: string | null; zdanie: string },
+    strona: "czesc" | "doCzego") =>
+    <li key={`${t.czesc.symbol}>${t.doCzego.symbol}`} className="text-xs">
+      <b className="font-mono">{t[strona].symbol}</b> <span className="text-slate-600">{t[strona].nazwa}</span>
+      <span className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-[10px]">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
+      <span className={`ml-1 rounded px-1 py-0.5 text-[10px] font-bold ${t.pewnosc === "potwierdzone"
+        ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.pewnosc}</span>
+      {t.przezZamiennik && <span className="ml-1 text-[10px] text-slate-500">przez zamiennik</span>}
+      <p className="text-[11px] text-slate-500">{t.zdanie}</p>
+    </li>;
+  return <div className="rounded-lg border border-emerald-200 p-3">
+    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-emerald-800">Wiedza: pasowania części</p>
+    {dane.pasujace.length > 0 && <>
+      <p className="text-[11px] font-semibold text-slate-600">Do tej części pasują</p>
+      <ul className="mb-1 space-y-1">{dane.pasujace.map((t) => wiersz(t, "czesc"))}</ul></>}
+    {dane.pasujeDo.length > 0 && <>
+      <p className="text-[11px] font-semibold text-slate-600">Ta część pasuje do</p>
+      <ul className="mb-1 space-y-1">{dane.pasujeDo.map((t) => wiersz(t, "doCzego"))}</ul></>}
+    {dane.negatywne.length > 0 && <ul className="space-y-1">
+      {dane.negatywne.map((p) => <li key={p.id} className="text-xs text-red-900">
+        <b className="font-mono">{p.czesc.symbol}</b> ⇏ <b className="font-mono">{p.doCzego.symbol}</b>: {p.zdaniePowodu}
+        <span className="block text-[11px] text-slate-500">{p.zdanieZrodla}</span></li>)}
+    </ul>}
   </div>;
 }

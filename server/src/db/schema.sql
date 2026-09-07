@@ -215,13 +215,14 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   brakuje         TEXT,
   wybrany_tw_id   INTEGER,
   wybrany_symbol  TEXT,
-  -- DZIEWIĘĆ dróg z §11.2. Droga `silnik` doszła razem z `zabudowa_silnika`;
-  -- bazy sprzed tego wydania znają osiem, więc `CHECK` przebudowuje
-  -- `doborZnaDrogeSilnika()` w `migrate()`. Bez tego „Wybierz" przy kandydacie
-  -- z nowej drogi rzuciłby `SQLITE_CONSTRAINT` dopiero u klienta.
+  -- DZIESIĘĆ dróg z §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
+  -- `pasowanie` z `pasowanie_czesci`; bazy sprzed tych wydań znają osiem albo
+  -- dziewięć, więc `CHECK` przebudowuje `doborZnaDrogi()` w `migrate()` — RAZ,
+  -- do kształtu docelowego. Bez tego „Wybierz" przy kandydacie z nowej drogi
+  -- rzuciłby `SQLITE_CONSTRAINT` dopiero u klienta.
   wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
                     'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                    'zastosowanie','silnik','oem','pelnotekst')),
+                    'zastosowanie','silnik','pasowanie','oem','pelnotekst')),
   wybrano_przez   TEXT,
   wybrano_user_id INTEGER REFERENCES app_user(user_id),
   wybrano_at      TEXT,
@@ -301,7 +302,7 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
--- Cztery tabele zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
+-- Pięć tabel zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
 -- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
 -- czytelnika — blizna 0.157.0. Nazwy polskie, jak `sprawa_klienta`; żadna nie
 -- stoi na liście spalonych w `bezObslugiKlienta()` (tam jest `dopasowanie`).
@@ -449,6 +450,81 @@ CREATE TABLE IF NOT EXISTS zabudowa_silnika (
 CREATE INDEX IF NOT EXISTS ix_zabudowa_maszyna ON zabudowa_silnika(maszyna_id, stan);
 CREATE INDEX IF NOT EXISTS ix_zabudowa_silnik  ON zabudowa_silnika(silnik_id, stan);
 CREATE INDEX IF NOT EXISTS ix_zabudowa_stan    ON zabudowa_silnika(stan, zaproponowano_at);
+
+-- ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────
+-- Klienci pytają „czy ta uszczelka pasuje do tego gaźnika" (także membrany,
+-- zestawy naprawcze, łączniki kolektora). Do tej tabeli relacji część↔część
+-- nie było wcale: `zastosowanie` wiąże część z MODELEM, `zabudowa_silnika`
+-- model z modelem. Jedyna relacja część↔część — zamiennik — jest liczona na
+-- żądanie z tekstu opisu i nigdzie nie zapisana.
+--
+-- KIERUNEK: `tw_id` pasuje DO `do_tw_id` (uszczelka → gaźnik). Relacja nie
+-- jest symetryczna znaczeniowo — gaźnik nie „pasuje do uszczelki". Odczyt
+-- jest symetryczny: ekran gaźnika czyta wiersze po `do_tw_id`, ekran
+-- uszczelki po `tw_id`.
+--
+-- DLACZEGO NIE `zastosowanie`: tam po drugiej stronie stoi model
+-- z `model_urzadzenia`, a nie kartoteka. Wiersz, w którym `model_id` znaczyłby
+-- „inna część", zatruwałby każdego czytelnika tamtej tabeli po cichu.
+--
+-- ROLA to własność CZĘŚCI (uszczelka jest uszczelką niezależnie od gaźnika),
+-- zapisana w relacji tylko dlatego, że nazwa kartoteki to wolny tekst i nie ma
+-- gdzie indziej. Lista zamknięta w CHECK, bo kod na niej gałęzi się
+-- (nagłówki grup); `inne` to furtka, żeby piąty rodzaj nie wymagał przebudowy.
+-- NIE wyprowadzać roli z nazwy automatem — to ta sama pułapka, co rozbijanie
+-- „B&S 450E" na markę i nazwę.
+--
+-- POZYCJA („od strony filtra", „od strony kolektora", „między dystansem") to
+-- wolny tekst: cztery wiersze w danych, trzy sformułowania, czyta je człowiek
+-- i klient, żaden kod się na niej nie gałęzi. Enum byłby trzecią listą do
+-- pilnowania dla czterech wierszy.
+--
+-- DOWÓD W WIERSZU (wzorzec zabudowy): „ta uszczelka pasuje do tego gaźnika"
+-- ma jedno źródło naraz; drugie albo mówi to samo, albo co innego — wtedy nowy
+-- wiersz z `zastepuje_id`. `rodzaj_dowodu NOT NULL` daje „zatwierdzenie wymaga
+-- dowodu" strukturalnie. Negatyw ZAWSZE z powodem z §11.4 — te powody
+-- (niewłaściwy rozstaw, średnica ok inne mocowanie) są kształtu uszczelkowego.
+--
+-- BEZ UNIQUE: wycofany wiersz stoi obok nowego; dubel łapie serwis. BEZ klucza
+-- obcego do `sgt_towar`: import odtwarza read-model (blizna 0.154.0).
+-- `element_zestawu`, `opis` i `copilot` stoją w CHECK bez nadawcy — rozszerzenie
+-- CHECK to przebudowa tabeli (blizna 0.135.0).
+CREATE TABLE IF NOT EXISTS pasowanie_czesci (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_id                 INTEGER NOT NULL,
+  tw_symbol             TEXT NOT NULL,
+  do_tw_id              INTEGER NOT NULL,
+  do_tw_symbol          TEXT NOT NULL,
+  rola                  TEXT NOT NULL CHECK (rola IN ('uszczelka','membrana','zestaw_naprawczy',
+                          'lacznik','element_zestawu','inne')),
+  pozycja               TEXT,
+  polaryzacja           TEXT NOT NULL CHECK (polaryzacja IN ('pasuje','nie_pasuje')),
+  powod_negatywny       TEXT CHECK (powod_negatywny IS NULL OR powod_negatywny IN (
+                          'nie_pasuje','tylko_inny_wariant','niewlasciwy_rozstaw',
+                          'srednica_ok_inne_mocowanie','mylace_oznaczenie','wymaga_pomiaru')),
+  stan                  TEXT NOT NULL DEFAULT 'propozycja'
+                          CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
+  zrodlo_propozycji     TEXT NOT NULL CHECK (zrodlo_propozycji IN ('reczne','dobor','opis','copilot')),
+  rodzaj_dowodu         TEXT NOT NULL CHECK (rodzaj_dowodu IN ('producent','katalog_dostawcy',
+                          'pomiar_wlasny','decyzja_biura','sprzedaz_weryfikacja','rozmowa')),
+  dowod_tresc           TEXT NOT NULL,
+  dowod_link            TEXT,
+  komentarz             TEXT,
+  conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  zastepuje_id          INTEGER REFERENCES pasowanie_czesci(id),
+  zaproponowal          TEXT NOT NULL,
+  zaproponowal_user_id  INTEGER REFERENCES app_user(user_id),
+  zaproponowano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  rozstrzygnal          TEXT,
+  rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at     TEXT,
+  powod_rozstrzygniecia TEXT,
+  CHECK (tw_id != do_tw_id),
+  CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_pasowanie_czesc ON pasowanie_czesci(tw_id, stan);
+CREATE INDEX IF NOT EXISTS ix_pasowanie_do    ON pasowanie_czesci(do_tw_id, stan);
+CREATE INDEX IF NOT EXISTS ix_pasowanie_stan  ON pasowanie_czesci(stan, zaproponowano_at);
 
 -- ── Identyfikatory części z opisów (§11.2, etap E3) ─────────────────────────
 -- Parser zamienników od 0.61.0 wycina z opisów kartotek tokeny, które NIE są
