@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
+import { kopiujDoSchowka } from "./kopiuj";
 
 /* Prymitywy stoją na warstwie `@layer components` z `index.css` (`.card`,
    `.btn-primary`, `.field`). Druga, równoległa konwencja klas kosztowałaby
@@ -109,16 +110,63 @@ export const czas = (v: string | null | undefined) =>
  * schowek jest najkrótszą drogą do okna „Znajdź dokument".
  */
 export function Skopiuj({ tekst, tytul = "Kopiuj" }: { tekst: string; tytul?: string }) {
-  const [zrobione, setZrobione] = useState(false);
-  return <button type="button" title={tytul}
-    onClick={() => {
-      void navigator.clipboard?.writeText(tekst).then(() => {
-        setZrobione(true);
-        setTimeout(() => setZrobione(false), 1500);
-      }).catch(() => {});
-    }}
-    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+  const { stan, kopiuj } = useKopiowanie(tekst);
+  return <button type="button" title={stan === "blad" ? "Nie udało się skopiować" : tytul}
+    onClick={kopiuj}
+    className={`rounded p-1 hover:bg-slate-100 ${
+      stan === "blad" ? "text-ranga-zle" : "text-slate-400 hover:text-slate-700"}`}>
     <Copy size={13} />
-    <span className="sr-only">{zrobione ? "Skopiowano" : "Kopiuj"}</span>
+    <span className="sr-only">{
+      stan === "zrobione" ? "Skopiowano" : stan === "blad" ? "Nie udało się skopiować" : "Kopiuj"}</span>
+  </button>;
+}
+
+/**
+ * Wspólny stan kopiowania: „gotowe", „skopiowano" i „nie udało się".
+ *
+ * TRZECI STAN JEST TU NAJWAŻNIEJSZY. Do 0.227.0 nieudane kopiowanie kończyło
+ * się `.catch(() => {})`, więc ekran mrugał „skopiowano" nad pustym schowkiem —
+ * a człowiek dowiadywał się o tym dopiero przy wklejaniu, gdzie indziej.
+ * Uzasadnienie samego kopiowania po HTTP stoi w `ui/kopiuj.ts`.
+ */
+function useKopiowanie(tekst: string) {
+  const [stan, setStan] = useState<"gotowe" | "zrobione" | "blad">("gotowe");
+  const kopiuj = () => {
+    void kopiujDoSchowka(tekst).then((udalo) => {
+      setStan(udalo ? "zrobione" : "blad");
+      setTimeout(() => setStan("gotowe"), udalo ? 1500 : 3000);
+    });
+  };
+  return { stan, kopiuj };
+}
+
+/**
+ * LOGIN KLIENTA, KTÓRY KOPIUJE SIĘ KLIKNIĘCIEM (0.228.0).
+ *
+ * Decyzja właściciela: „loginy klientów powinny być kopiowalne przez
+ * kliknięcie". Login jest tym, po czym szuka się klienta w panelu Allegro
+ * i w Subiekcie, a przepisywany z ekranu bywa przekręcony — `bagslublin`
+ * i `bags1ublin` wyglądają na monitorze tak samo.
+ *
+ * KLIKALNY JEST SAM LOGIN, nie ikona obok. Ikona zostaje jako znak, że da się
+ * kliknąć, ale cel dotyku to całe słowo — mniejszy cel to więcej chybień
+ * (`docs/ergonomia-magazynu.md` p. 2).
+ *
+ * `title` mówi, co się stanie PRZED kliknięciem; `sr-only` mówi, co się stało
+ * PO nim. Bez tego drugiego czytnik ekranu milczy o skutku.
+ */
+export function LoginKlienta({ login, className = "" }: { login: string; className?: string }) {
+  const { stan, kopiuj } = useKopiowanie(login);
+  return <button type="button" onClick={kopiuj}
+    title={stan === "blad" ? "Nie udało się skopiować" : `Kopiuj login: ${login}`}
+    className={`group inline-flex max-w-full items-center gap-1 rounded hover:bg-slate-100 ${
+      stan === "blad" ? "text-ranga-zle" : ""} ${className}`}>
+    <span className="truncate">{login}</span>
+    {stan === "zrobione"
+      ? <Check size={12} className="shrink-0 text-ranga-ok" />
+      : <Copy size={12} className="shrink-0 text-slate-300 group-hover:text-slate-500" />}
+    <span className="sr-only">{
+      stan === "zrobione" ? "Skopiowano login" : stan === "blad"
+        ? "Nie udało się skopiować loginu" : "Kopiuj login"}</span>
   </button>;
 }

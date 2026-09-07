@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { czas, Przycisk, Skopiuj } from "../ui";
+import { czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 
@@ -79,7 +79,8 @@ export function Dowody({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
         <Link href={r.link}>{r.numer ?? r.externalId}</Link>
         <Skopiuj tekst={r.numer ?? r.externalId} tytul="Kopiuj numer reklamacji" />
       </Wiersz>
-      <Wiersz etykieta="Kupujący">{r.kupujacyLogin ?? "—"}</Wiersz>
+      <Wiersz etykieta="Kupujący">{r.kupujacyLogin
+        ? <LoginKlienta login={r.kupujacyLogin} /> : "—"}</Wiersz>
       {/* Rękojmia i gwarancja to dwa różne tytuły prawne i dwie różne rozmowy
           z klientem. Sonda widziała wyłącznie COMPLAINT, ale to obserwacja
           jednej próbki, a nie kontrakt. */}

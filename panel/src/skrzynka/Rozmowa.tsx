@@ -3,7 +3,7 @@ import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
-import { Przycisk, Pusto } from "../ui";
+import { LoginKlienta, Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
 import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
@@ -108,7 +108,7 @@ export function Rozmowa(p: {
         blokiem z bazą 0 — bez tych klauzul kurczyłaby się treść rozmowy,
         czyli jedyna rzecz, po którą agent tu przyszedł. */}
     <header className="flex shrink-0 flex-wrap items-center gap-3 border-b p-4">
-      <b className="mr-auto">{rozmowa.klient}</b>
+      <LoginKlienta login={rozmowa.klient} className="mr-auto font-bold" />
       {rozmowa.wlasciciel
         ? <span className={`flex items-center gap-1 text-sm font-semibold ${
             moja ? "text-emerald-700" : "text-slate-600"}`}>

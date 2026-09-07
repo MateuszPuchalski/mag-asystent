@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.228.0 — 7 września 2026
+
+**Login klienta kopiuje się kliknięciem.** Decyzja właściciela. Po loginie
+szuka się klienta w panelu Allegro i w Subiekcie, a przepisany z ekranu bywa
+przekręcony — `bagslublin` i `bags1ublin` wyglądają na monitorze tak samo.
+Klika się SAM LOGIN, nie ikonę obok: mniejszy cel to więcej chybień. Login jest
+teraz przyciskiem w nagłówku rozmowy, w podpisie wiadomości klienta, w zakładce
+KLIENT, w nagłówku zwrotu i przy reklamacji.
+
+**Kopiowanie zaczyna działać po zwykłym HTTP.** `navigator.clipboard` istnieje
+wyłącznie w bezpiecznym kontekście — HTTPS albo `localhost`. Biuro pracuje pod
+`http://serwer:3001`, czyli ani jedno, ani drugie: tego obiektu tam NIE MA.
+Dotychczasowe przyciski kopiowania przy zwrotach wołały go z pustym `catch`
+na końcu, więc nie kopiowały nic i nie mówiły o tym ani słowa — ikona mrugała
+„skopiowano" nad pustym schowkiem. Doszła droga zapasowa i trzeci stan: „nie
+udało się". Cisza była gorsza od braku przycisku, bo człowiek dowiaduje się
+o niepowodzeniu dopiero przy wklejaniu.
+
+**Pasek o nowej wiadomości przestaje kłamać.** Zapalał się przy KAŻDEJ nowej
+wiadomości w otwartej rozmowie — także przy naszej własnej odpowiedzi wracającej
+z synchronizacji i przy autoodpowiedzi. Agent odpisywał i po chwili dostawał od
+panelu wiadomość, że odpisał mu klient, a szkic zostawał pod paskiem, którego
+nie było czym zamknąć poza kliknięciem „Pokaż". Zdarzenie niesie odtąd kierunek
+i znacznik odbicia; nasze wiadomości dociągają rozmowę po cichu, bez alarmu.
+
+**Nagłówek rozmowy i wiersz kolejki brały TEMAT wątku zamiast loginu.**
+0.219.2 naprawiło to na osi rozmowy i zatrzymało się w pół drogi. Na koncie
+właściciela temat bywa równy loginowi, więc wyglądało poprawnie — aż do wątku
+o temacie „Zaworek zwrotny", który podpisywał klienta nazwą części. Wyszło
+dopiero wtedy, gdy login stał się przyciskiem: kopiował nazwę części.
+
 ## 0.227.0 — 7 września 2026
 
 **Autoodpowiedź przestaje udawać naszą odpowiedź.** 0.225.0 zaczęło czytać

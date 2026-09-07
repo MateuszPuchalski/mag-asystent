@@ -218,7 +218,17 @@ const SKRZYNKA = "skrzynka";
    wiadomości — Allegro takie oddaje. Kolejność LISTY dalej niesie
    `updated_at`, czyli tę samą, którą właściciel widzi w panelu sprzedawcy. */
 const LISTA = `
-  SELECT c.id, c.subject AS klient, c.unread,
+  SELECT c.id, c.unread,
+         -- KLIENT TO LOGIN, NIE TEMAT (0.228.0). 0.219.2 naprawiło to na OSI
+         -- rozmowy i zatrzymało się w pół drogi: nagłówek rozmowy i wiersz
+         -- kolejki dalej brały c.subject. Na koncie właściciela temat bywa
+         -- równy loginowi, więc wyglądało poprawnie — aż do wątku o temacie
+         -- „Zaworek zwrotny", który podpisywał klienta nazwą części.
+         -- Złączenie po identyfikatorze wątku, jak w klient-historia.ts.
+         COALESCE(
+           (SELECT t.interlocutor_login FROM allegro_inbox_thread t
+             WHERE t.id = c.external_conversation_id),
+           c.subject, 'Klient') AS klient,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
          c.status, c.snoozed_until AS odlozoneDo,
          c.priorytet,

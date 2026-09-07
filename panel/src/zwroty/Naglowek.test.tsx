@@ -42,15 +42,17 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("N4QZ/2026")).toBeInTheDocument();
   });
 
-  it("login kupującego stoi przy numerze, z klawiszem kopiowania", () => {
+  it("login kupującego stoi przy numerze i KOPIUJE SIĘ KLIKNIĘCIEM", () => {
     /* Jedyna dana osobowa dopuszczona wprost przez politykę danych zwrotów.
        Przepisuje się go do panelu Allegro, więc kopiowanie jest tu pracą,
-       nie ozdobą. */
+       nie ozdobą.
+
+       Od 0.228.0 klika się SAM LOGIN, a nie ikonę obok: osobna ikona była
+       drugim celem dotyku dla tej samej czynności, i to mniejszym. */
     render(<Naglowek zwrot={zwrot({ kupujacyLogin: "michael20177" })} />);
-    expect(screen.getByText("michael20177")).toBeInTheDocument();
-    /* Po `title`, nie po nazwie dostępnej: `Skopiuj` niesie w niej stałe
-       „Kopiuj", a rozróżnia je dopiero tytuł. */
-    expect(screen.getByTitle("Kopiuj login kupującego")).toBeInTheDocument();
+    const login = screen.getByRole("button", { name: /Kopiuj login/ });
+    expect(login).toHaveTextContent("michael20177");
+    expect(screen.queryByTitle("Kopiuj login kupującego")).toBeNull();
   });
 
   it("pusty login mówi, że nie podało go Allegro — nie znika", () => {

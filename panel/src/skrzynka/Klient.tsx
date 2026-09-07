@@ -2,7 +2,7 @@ import React from "react";
 import { ExternalLink, MessageSquare, Tractor, UserRound } from "lucide-react";
 import type { MaszynaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
-import { czas } from "../ui";
+import { czas, LoginKlienta } from "../ui";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -46,7 +46,9 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
 
   return <div className="p-3" aria-label="Historia klienta">
     <p className="text-[11px] uppercase tracking-wide text-slate-500">Historia u nas</p>
-    <p className="font-mono text-sm font-semibold text-slate-900">{login}</p>
+    {/* Klik kopiuje (0.228.0): po loginie szuka się klienta w panelu Allegro
+        i w Subiekcie, a przepisany z ekranu bywa przekręcony. */}
+    <LoginKlienta login={login} className="font-mono text-sm font-semibold text-slate-900" />
 
     {maszyny.length > 0 && <section className="mt-3" aria-label="Maszyny klienta">
       <b className="text-xs uppercase tracking-wide text-slate-500">Maszyny klienta</b>

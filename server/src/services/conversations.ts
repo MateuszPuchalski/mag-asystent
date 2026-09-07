@@ -56,7 +56,20 @@ export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db
     auto,
   );
   const id = wynik.changes === 0 ? null : Number(wynik.lastInsertRowid);
-  if (id !== null) publishConversationEvent("message.created", dane.conversationId, { messageId: id });
+  /* ── ZDARZENIE NIESIE KIERUNEK (0.228.0) ──────────────────────────────────
+     Panel zapalał pasek „Klient dopisał nową wiadomość" na KAŻDE
+     `message.created` — także na naszą własną odpowiedź, która wraca
+     z synchronizacji, i na autoodpowiedź. Agent odpisywał i po chwili dostawał
+     od panelu wiadomość, że odpisał mu klient.
+
+     Kierunek i znacznik odbicia jadą więc w zdarzeniu: bez nich odbiorca nie
+     ma z czego odróżnić pytania od echa własnej pracy, a dociąganie rozmowy
+     tylko po to, żeby to sprawdzić, robiłoby zapytanie na każdą wiadomość. */
+  if (id !== null) {
+    publishConversationEvent("message.created", dane.conversationId, {
+      messageId: id, odKlienta: dane.direction === "incoming", automatyczna: auto === 1,
+    });
+  }
   return id;
 }
 
