@@ -22,12 +22,20 @@ process.env.SGT_MODE = "seeded";
 let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
+/* Obecność żyje w PAMIĘCI procesu (§6.3), więc test stawia uchwyt wprost.
+   Import dynamiczny jak reszta: `DB_PATH` musi stanąć przed pierwszym
+   dotknięciem modułów serwera. */
+let wejdzDoRozmowy: typeof import("../services/conversation-realtime.js").wejdzDoRozmowy;
+let wyjdzZRozmowy: typeof import("../services/conversation-realtime.js").wyjdzZRozmowy;
+let _wyczyscObecnosc: typeof import("../services/conversation-realtime.js")._wyczyscObecnosc;
 let rozmowa = 0;
 let pytanie = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
+  ({ wejdzDoRozmowy, wyjdzZRozmowy, _wyczyscObecnosc } =
+    await import("../services/conversation-realtime.js"));
   app = await (await import("../index.js")).buildApp();
 });
 
@@ -678,4 +686,45 @@ test("pomiar z hali idzie do wiedzy tylko z marką i modelem — i jako propozyc
   assert.equal(r.json<{ zrodlo: string }>().zrodlo, "pomiar");
   const po = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza`, headers: b.naglowki });
   assert.equal(po.json<{ pomiary: Array<{ zaproponowano: boolean }> }>().pomiary[0].zaproponowano, true);
+});
+
+/* ── Flagi jawnej zgody jadą CIAŁEM, więc trasa musi je wymienić (0.224.1) ───
+   Blizna znaleziona przy rozpoznaniu do 0.224.0. `mimoObecnosci` istniał
+   w serwisie od 0.159.0 razem z testem, panel wysyłał go od 0.190.0 — a trasa
+   ani nie deklarowała pola w typie `Body`, ani nie podawała go niżej. Pole
+   nieopisane w `Body` znika po cichu: miękka blokada obecności zachowywała się
+   przez to jak twarda przez pełne TTL uchwytu.
+
+   Przeszło niezauważone, bo test serwisu woła `wyslijOdpowiedz()` z pominięciem
+   HTTP, a strażnik adresów niżej pilnuje ADRESÓW, nie pól ciała. Dlatego dowód
+   idzie tu przez ZACHOWANIE na trasie, tak samo jak przy odpowiedzi
+   w reklamacji (`routes/reklamacje.test.ts`).                               */
+test("trasa wysyłki PRZEKAZUJE „mimo to” — inaczej jawna zgoda nie działa", async () => {
+  _wyczyscObecnosc();
+  const ala = login("biuro", "A. Lewandowska");
+  const marek = login("biuro", "M. Wójcik");
+  /* Ala weszła pierwsza i siedzi przy pytaniu — uchwyt żyje w pamięci procesu,
+     nie w bazie, więc stawiamy go wprost. */
+  wejdzDoRozmowy(rozmowa, ala.userId, "A. Lewandowska");
+
+  const wersja = Number((db().prepare("SELECT version FROM conversation WHERE id=?")
+    .get(rozmowa) as { version: number }).version);
+  const cialo = (extra: Record<string, unknown>) => ({
+    body: "Pasuje.", expectedVersion: wersja, expectedLastMessageId: pytanie, ...extra,
+  });
+
+  const bez = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
+    headers: marek.naglowki, payload: cialo({}) });
+  assert.equal(bez.statusCode, 409, bez.body);
+  /* Ładunek jedzie PŁASKO obok `error` — panel czyta z niego nazwisko. */
+  assert.equal(bez.json<{ trzymajacyName: string }>().trzymajacyName, "A. Lewandowska");
+
+  /* Z flagą bramka obecności ma przepuścić. Dalej zatrzyma żądanie brak konta
+     Allegro i to jest w porządku — pilnujemy tego, że zgoda dojechała. */
+  const zFlaga = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/send`,
+    headers: marek.naglowki, payload: cialo({ mimoObecnosci: true }) });
+  assert.doesNotMatch(String(zFlaga.json<{ error?: string }>().error ?? ""), /siedzi/,
+    "flaga z ciała musi dojechać do serwisu — inaczej jawna zgoda jest ścianą");
+
+  wyjdzZRozmowy(rozmowa, ala.userId);
 });
