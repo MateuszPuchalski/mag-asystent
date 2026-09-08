@@ -580,7 +580,7 @@ export function migrate(database: DatabaseSync) {
 }
 
 /**
- * Piąty rodzaj identyfikatora: `zamiennik` (0.233.0).
+ * Piąty rodzaj identyfikatora: `zamiennik` (0.234.0).
  *
  * CHECK na `towar_identyfikator.rodzaj` był zamknięty na cztery wartości,
  * a SQLite nie umie go rozszerzyć w miejscu — stąd przebudowa tabeli, ta sama

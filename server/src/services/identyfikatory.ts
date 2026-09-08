@@ -44,7 +44,7 @@ const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
   { rodzaj: "oem", re: /\bO(?:EM|ME)\s*:/gi },
   { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*oryg(?:inaln[ya]|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
   { rodzaj: "stare_sku", re: /\bstare\s+sku\s*:/gi },
-  /* SEKCJA ZAMIENNIKÓW (0.233.0). Ta sama rodzina etykiet co w
+  /* SEKCJA ZAMIENNIKÓW (0.234.0). Ta sama rodzina etykiet co w
      `zamienniki.ts` — świadomie, bo mówi o tej samej liście. Tamten parser
      czyta ją po SWOJEMU: zostawia wyłącznie tokeny będące NASZĄ kartoteką,
      a numery obcych katalogów wyrzuca. W eksporcie kartotek z 8 września
@@ -139,7 +139,7 @@ export function przebudujIdentyfikatory(database: DatabaseSync = db()): { kartot
   let kartotek = 0; let identyfikatorow = 0;
   transaction(database, () => {
     database.prepare("DELETE FROM towar_identyfikator WHERE zrodlo='opis'").run();
-    /* NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.233.0). Sekcja
+    /* NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.234.0). Sekcja
        zamienników miesza jedno z drugim: `Zamiennie: 15-06002 / RO1205 /
        W28-0503`. Nasze kartoteki czyta stamtąd `zamienniki.ts` i pokazuje
        jako zamienniki — wpisanie ich tutaj drugi raz mnożyłoby ten sam fakt

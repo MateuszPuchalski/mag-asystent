@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.233.0 — 8 września 2026
+## 0.234.0 — 8 września 2026
 
 **Numer z sekcji zamienników prowadzi wreszcie do towaru.** Właściciel
 przysłał eksport kartotek i poprosił, żeby wyciągnąć z niego wszystko, co
@@ -65,6 +65,47 @@ Piąty rodzaj kosztował przebudowę tabeli — `CHECK` w SQLite nie rozszerza s
 w miejscu. Migracja przepisuje WSZYSTKIE wiersze, także ręczne: przebudowa po
 imporcie kasuje tylko te z opisu, więc wpis biura skasowany przy migracji nie
 wróciłby już nigdy.
+
+## 0.233.0 — 8 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU
+repo, nie w `server/` — tamten skrypt kopiuje `panel/dist`, ale go nie buduje).
+Poprawka siedzi w CSS, więc bez przebudowy nic się nie zmieni.
+
+**Panel dawał się przewijać, choć miał się mieścić w oknie.** Zgłoszenie
+właściciela: „dlaczego mogę przesunąć w dół". Cały dokument jechał razem
+z nagłówkiem, dokładnie jak przed 0.165.0, kiedy ramy okna nie było wcale.
+
+Przyczyną była JEDNA JEDNOSTKA. Wysokość ramy trzymało samo `lg:h-dvh`,
+a przeglądarka, która nie zna `dvh`, nie ignoruje takiej deklaracji po
+kawałku — wyrzuca ją całą. `lg:min-h-0` skasowało już `min-h-screen`, więc
+ramie nie zostawał żaden limit wysokości.
+
+Usterka udawała zepsuty układ, bo kolumny dalej stały obok siebie: `lg:grid-cols`
+liczy w pikselach i działa wszędzie. Wyglądało to więc na błąd w siatce, a nie
+na brak obsługi jednostki — i dlatego przeżyło kilkanaście wydań.
+
+Wysokość bierze teraz `rama-okna` z `index.css`: `100vh` bezwarunkowo,
+`100dvh` pod `@supports`. Nowa przeglądarka zostaje przy `dvh` i zachowuje
+powód z 0.165.0 — na tablecie w poziomie `100vh` bywa większe niż widoczne
+okno. Stara spada na `vh`: ciasno o pasek przeglądarki, ale rama trzyma.
+
+Jedno warto zapisać osobno, bo kosztowało podejście. Pierwsza wersja poprawki
+zapisała dwie deklaracje `height` pod rząd, licząc na kaskadę. **Minifikator
+skasował pierwszą jako nadmiarową** i w `dist` zostało samo `100dvh`, czyli
+stan sprzed poprawki. W trybie deweloperskim wyglądało to na naprawione.
+Bloku `@supports` minifikator skleić nie może, bo nie wolno mu.
+
+Strażnik: `panel/src/RamaOkna.test.ts` pilnuje, że `vh` stoi bezwarunkowo
+i że rama nie wraca do `lg:h-dvh`. Test patrzy na kształt źródła, bo jsdom
+nie liczy układu, a `dvh` nie jest przełącznikiem do wyłączenia w testach.
+
+**Nagłówek przestał chować przyciski poza kadrem.** Rama jest `overflow-hidden`,
+więc nadmiar szerokości nie dostaje paska przewijania — po prostu znika dla
+myszy. Pasek potrzebuje 1112 px, więc poniżej ~1150 px szerokości okna zębatka
+ustawień i wylogowanie były NIEKLIKALNE, bez żadnego sygnału na ekranie.
+Teraz pasek zawija się na drugi rząd: 117 px zamiast 65 px na wąskim oknie,
+za to nic nie znika.
 
 ## 0.232.2 — 8 września 2026
 

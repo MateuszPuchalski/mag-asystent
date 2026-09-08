@@ -45,14 +45,14 @@ test("identyfikator: CHECK rodzaju i źródła, UNIQUE po zwiniętej wartości, 
   wstaw("oem", "opis");
   assert.throws(() => wstaw("oem", "reczne"), /UNIQUE/);
   wstaw("nr_oryg", "reczne");
-  /* Piąty rodzaj (0.233.0) — numery z sekcji „Zamiennik:". */
+  /* Piąty rodzaj (0.234.0) — numery z sekcji „Zamiennik:". */
   wstaw("zamiennik", "opis", "3");
   assert.throws(() => wstaw("ean", "opis", "1"), /CHECK/);
   assert.throws(() => wstaw("oem", "copilot", "2"), /CHECK/);
   d.close();
 });
 
-test("baza sprzed 0.233.0 dostaje piąty rodzaj identyfikatora, nie tracąc wierszy", () => {
+test("baza sprzed 0.234.0 dostaje piąty rodzaj identyfikatora, nie tracąc wierszy", () => {
   /* SQLite nie rozszerza CHECK w miejscu, więc migracja PRZEPISUJE tabelę.
      Wiersz ręczny musi ją przeżyć: przebudowa po imporcie kasuje wyłącznie
      `zrodlo='opis'`, więc skasowany tutaj nie wróciłby już nigdy. */

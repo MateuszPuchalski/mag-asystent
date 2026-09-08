@@ -520,6 +520,39 @@ przewijał się dokument, czyli wszystkie kolumny naraz: żeby dojść do dołu
 dowodów przy zwrocie, operator zjeżdżał z oczu kolejce i paskowi decyzji.
 Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku.
 
+**Rama stała na jednej jednostce i to ją przewróciło (0.233.0).** Wysokość
+okna trzymało samo `lg:h-dvh`. Przeglądarka, która nie zna `dvh`, nie ignoruje
+jej po kawałku — wyrzuca całą deklarację. `lg:min-h-0` skasowało już wtedy
+`min-h-screen`, więc ramie nie zostawał ŻADEN limit: przewijał się cały
+dokument razem z nagłówkiem, dokładnie jak przed 0.165.0.
+
+Wyglądało to na zepsuty układ, a nie na brak obsługi jednostki, bo kolumny
+dalej stały obok siebie — `lg:grid-cols` liczy w pikselach i działa wszędzie.
+Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół". Zmierzone na żywej
+przeglądarce: bez `dvh` dokument rósł o 182 px.
+
+Wysokość bierze teraz klasa `rama-okna` z `index.css`: `100vh` bezwarunkowo,
+`100dvh` pod `@supports`. Kolejność jest odwrotna, niż podpowiada odruch, i to
+jest sedno poprawki. Pierwsze podejście zapisało dwie deklaracje `height` pod
+rząd, licząc na kaskadę — MINIFIKATOR SKASOWAŁ PIERWSZĄ jako nadmiarową
+i w `dist` zostało samo `100dvh`, czyli stan sprzed poprawki. Widać to
+wyłącznie w zbudowanym pliku, nigdy w trybie deweloperskim. Bloku `@supports`
+minifikator skleić nie może, bo nie wolno mu.
+
+Pilnuje tego `panel/src/RamaOkna.test.ts`. Test patrzy na KSZTAŁT ŹRÓDŁA,
+nie na zachowanie: jsdom nie liczy układu, a `dvh` nie jest przełącznikiem,
+który dałoby się wyłączyć w przeglądarce testowej.
+
+**Nagłówek zawija się, zamiast znikać poza kadrem (0.233.0).** Rama jest
+`overflow-hidden`, więc to, co nie mieści się w szerokości, nie dostaje paska
+przewijania — przestaje istnieć dla myszy. Pasek potrzebuje 1112 px, więc
+poniżej ~1150 px zębatka ustawień i wylogowanie leżały poza oknem i nie dało
+się w nie kliknąć. Żadnego sygnału o tym na ekranie nie było.
+
+`flex-wrap` kosztuje drugi rząd na wąskim oknie (117 px zamiast 65 px) i to
+jest cena świadoma: rząd zabiera kilkadziesiąt pikseli, brak wylogowania
+zabiera całą funkcję.
+
 **Skrzynka ma trzy kolumny od 0.180.0.** Do 0.179.0 miała dwie, a kontekst —
 oferta, towar i zamówienie — leżał w środkowej, nad osią. Cztery bloki jeden
 pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
@@ -805,7 +838,7 @@ agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
 
 **Co działa od etapu E3.** Numer OEM czyta się z tabeli `towar_identyfikator`,
 odbudowanej z opisów kartotek po każdym imporcie (sekcje `OEM:`, `Nr. oryg.`,
-`Stare SKU`, a od 0.233.0 także `Zamiennik:`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
+`Stare SKU`, a od 0.234.0 także `Zamiennik:`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
 bez stanu i bez przycisku Wybierz. Decyzja właściciela: „nie mamy tego" jest
 odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. Pełny tekst
 to indeks FTS5 `towar_fts` po symbolu, nazwie i opisie, z rankingiem bm25.
@@ -1023,7 +1056,7 @@ Dziennik `events` niesie pełny wiersz przy każdej zmianie.
 **Identyfikatory** (`towar_identyfikator`, E3) to numery OEM, numery
 oryginału, katalogi obce, stare SKU i numery z sekcji zamienników.
 
-**Sekcja zamienników niesie numery obcych katalogów (0.233.0).** Eksport
+**Sekcja zamienników niesie numery obcych katalogów (0.234.0).** Eksport
 kartotek z 8 września pokazał, gdzie leży druga połowa mostka „numer klienta →
 towar". Etykiet `Zamiennik:`, `Zamiennie:` i `ZAM:` jest w opisach tyle samo
 co `OEM:` — po około czterysta każdej. Czytał je jednak wyłącznie parser
@@ -2543,7 +2576,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
 | Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
-| Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.233.0 |
+| Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
 | Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |

@@ -136,7 +136,7 @@ export const NAZWA_RODZAJU_IDENTYFIKATORA: Record<RodzajIdentyfikatora, string> 
   nr_oryg: "nr oryginału",
   katalog_obcy: "katalog obcy",
   stare_sku: "stare SKU",
-  /* 0.233.0 — numer wyczytany z sekcji „Zamiennik:". Podpis mówi SKĄD, bo ta
+  /* 0.234.0 — numer wyczytany z sekcji „Zamiennik:". Podpis mówi SKĄD, bo ta
      sekcja jest słabszym świadectwem niż numer producenta (§11.3). */
   zamiennik: "z zamienników",
 };

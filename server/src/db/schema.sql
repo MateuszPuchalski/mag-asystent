@@ -575,7 +575,7 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
   -- `katalog_obcy` nie ma parsera — to rezerwa dla wpisu ręcznego. CHECK
   -- zamknięty od razu, bo rozszerzenie to przebudowa tabeli (blizna 0.135.0).
   --
-  -- `zamiennik` doszedł w 0.233.0 i kosztował dokładnie tę przebudowę.
+  -- `zamiennik` doszedł w 0.234.0 i kosztował dokładnie tę przebudowę.
   -- Numery obcych katalogów stoją w opisach nie tylko po `OEM:`, ale też po
   -- `Zamiennik:`, `Zamiennie:` i `ZAM:` — a stamtąd czytał je wyłącznie parser
   -- zamienników, który wyrzuca wszystko, co nie jest NASZĄ kartoteką. Numer

@@ -48,7 +48,7 @@ const liczba = (t: string) => (db().prepare(`SELECT count(*) n FROM ${t}`).get()
 const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, string]>; po: string }> = [
   { opis: "OEM: 41307131600 Modele: FS200 FS250 Zamiennik: 24-04003", sym: "FTC272",
     oczekiwane: [["oem", "41307131600"], ["zamiennik", "24-04003"]],
-    po: "Modele: i Zamiennik: to granice sekcji OEM — a sam zamiennik jest osobnym rodzajem (0.233.0)" },
+    po: "Modele: i Zamiennik: to granice sekcji OEM — a sam zamiennik jest osobnym rodzajem (0.234.0)" },
   { opis: "OEM: 165630 // 532 16 56-30  Zamiennik: RO15136", sym: "20-05017",
     oczekiwane: [["oem", "165630"], ["oem", "532 16 56-30"], ["zamiennik", "RO15136"]],
     po: "cyfry ze spacjami po ≤3 to JEDEN numer Husqvarny" },
@@ -67,7 +67,7 @@ const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, stri
   { opis: "Numery oryginalnej części: 503-91-34-01, 530-05-63-63 Modele: 236; 240", sym: "100-008",
     oczekiwane: [["nr_oryg", "503-91-34-01"], ["nr_oryg", "530-05-63-63"]], po: "etykieta wielosłowna z liczbą mnogą" },
   { opis: "OEM: Zamiennie: 101-024", sym: "X", oczekiwane: [["zamiennik", "101-024"]],
-    po: "pusta sekcja OEM nie zjada sekcji zamienników — a ta sekcja od 0.233.0 wraca" },
+    po: "pusta sekcja OEM nie zjada sekcji zamienników — a ta sekcja od 0.234.0 wraca" },
   { opis: "OEM:", sym: "18-11011", oczekiwane: [], po: "pusta sekcja na końcu" },
   { opis: "Stare SKU: FTC272 W zestawiie: 3 szt", sym: "FTC272", oczekiwane: [], po: "własny symbol odpada; literówka etykiety to nadal granica" },
   { opis: "silnik OEM Honda GX160 Zamiennik: 76-064", sym: "Y", oczekiwane: [["zamiennik", "76-064"]],
@@ -79,7 +79,7 @@ const TABELA: Array<{ opis: string; sym: string; oczekiwane: Array<[string, stri
     po: "`OME:` w środku prozy" },
   { opis: "OEM: 1234567 W zestawie uszczelka - W53-0501", sym: "Q", oczekiwane: [["oem", "1234567"]],
     po: "„W zestawie” bez dwukropka kończy sekcję OEM — symbol z kompletu nie jest numerem OEM" },
-  /* ── Rodzina „zamiennik" (0.233.0) ────────────────────────────────────────
+  /* ── Rodzina „zamiennik" (0.234.0) ────────────────────────────────────────
      Te same etykiety co w `zamienniki.ts`, bo mówią o tej samej liście. Tamten
      parser zostawia z niej wyłącznie NASZE kartoteki; ten zatrzymuje resztę,
      czyli numery obcych katalogów — dotąd nie zapisywał ich nikt. */
@@ -109,7 +109,7 @@ test("sekcja Modele: to jeden wiersz, pusta sekcja nie wraca", () => {
 
 test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i nie tysiące", () => {
   const w = I.przebudujIdentyfikatory(db());
-  /* PROGI PODNIESIONE W 0.233.0, bo doszła rodzina „zamiennik": z 530 kartotek
+  /* PROGI PODNIESIONE W 0.234.0, bo doszła rodzina „zamiennik": z 530 kartotek
      zrobiło się 973, z 1742 numerów — 3443, z czego 1701 z sekcji zamienników.
      To nie jest rozluźnienie strażnika: dolna granica pilnuje, że reguły
      w ogóle trafiają w dane, a górna — że parser nie zaczął mielić prozy. */
