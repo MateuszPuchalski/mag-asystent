@@ -1094,6 +1094,10 @@ Każde twierdzenie techniczne w szkicu wskazuje źródło: ofertę, kartotekę,
 dokumentację, dowód zastosowania, pomiar magazyniera, wcześniejszą rozmowę albo
 decyzję biura. Brak źródła oznacza treść jako przypuszczenie.
 
+Podpis dowodu w szkicu dla klienta niesie rodzaj i datę, bez nazwiska
+pracownika — z obu dróg: wstawki „ze źródłem" z Doboru i szkicu Copilota
+(0.232.1, decyzja właściciela). Ekran biura autora pokazuje nadal.
+
 ### 14.4. Prywatność
 
 Do dostawcy trafia minimalny zakres: potrzebny fragment rozmowy, dane produktu,
@@ -1172,6 +1176,8 @@ dziś, dane doboru wpisane przez agenta, kandydaci i negatywy ze zdaniem
 prozę wyłącznie z faktów i cytuje ich identyfikatory. Serwer SPRAWDZA wynik
 w kodzie: każdy numer w szkicu musi stać w faktach albo w rozmowie, każdy
 cytowany fakt musi istnieć, a długość nie może przekroczyć limitu wysyłki.
+Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
+model pisze je zawsze, klient nie widzi ich nigdy.
 Szkic, który to łamie, jest odrzucony ze zdaniem dla agenta i wierszem
 `blad` w księdze. Zła proza kosztuje „brzmi nieładnie"; wymyślony numer
 kosztowałby zwrot — i tego drugiego kod nie przepuszcza.

@@ -61,7 +61,10 @@ export function Edytor({
   const przelacz = (id: number) => onWzmianki(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
 
-  return <div className={`shrink-0 border-t p-4 ${wKomentarzu ? "bg-amber-50" : ""}`}>
+  /* `max-h-[60vh] overflow-y-auto` to siatka bezpieczeństwa (0.232.1): edytor
+     jest `shrink-0`, więc gdy coś go rozepchnie (karta szkicu, załączniki),
+     ma się przewinąć sam, a nie zjeść oś rozmowy i obciąć własny dół. */
+  return <div className={`max-h-[60vh] shrink-0 overflow-y-auto border-t p-4 ${wKomentarzu ? "bg-amber-50" : ""}`}>
     {/* Przełącznik trybu stoi NAD polem, żeby było widać, gdzie się pisze,
         zanim się zacznie pisać. */}
     <div className="mb-2 flex gap-1 text-xs font-bold">

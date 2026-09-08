@@ -284,3 +284,18 @@ export function odkodujEncje(s: string): string {
     return ENCJE[cialo] ?? calosc;
   });
 }
+
+/**
+ * Podpis dowodu bez nazwiska pracownika: `— katalog dostawcy, 7.09.2026, Anna`
+ * staje się `— katalog dostawcy, 7.09.2026`. Klient ma dostać źródło z datą,
+ * nie nazwisko (§14.4); dostaje je z obu dróg — wstawki „ze źródłem" z Doboru
+ * i szkicu Copilota — decyzja właściciela z 8 września 2026. Ekran biura
+ * autora nadal pokazuje: tam jest potrzebny. Wzorzec jest DATĄ, po której
+ * stoi autor — tak buduje podpis `zdanieZrodla()` w `wiedza.ts`,
+ * `silniki.ts` i `pasowania.ts`. Leży tu, w module-liściu, bo czytają go
+ * `dobor.ts` i `copilot-szkic.ts`, a ten drugi importuje pierwszy.
+ */
+export function bezPodpisu(zdanie: string): string {
+  return zdanie.replace(
+    /(\b\d{1,2}\.\d{2}\.\d{4}), (?:[^;).]|\.(?=\s?\p{Lu}))+(?=;|\)|\.(?:\s|$)|$)/gu, "$1");
+}

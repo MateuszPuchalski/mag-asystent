@@ -50,23 +50,30 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
   /* Oceniony szkic zniknął z ekranu: wstawiony już jest w polu, odrzucony
      nie ma po co wisieć. Wiersz w bazie zostaje dla pomiaru. */
   if (!s || s.ocena !== null) return null;
+  /* PRZYCISKI NA GÓRZE, TREŚĆ PRZEWIJA SIĘ SAMA (0.232.1). Karta stoi
+     wewnątrz edytora, który jest `shrink-0`; długi szkic rozpychał go tak, że
+     oś rozmowy zwijała się do jednej linii, a dół karty — z przyciskami —
+     ginął pod krawędzią kolumny. Zrzut właściciela z 8.09.2026. Przycisk,
+     którego nie widać, nie istnieje, a dół jest tym, co ginie pierwsze. */
   return <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3" aria-label="Szkic Copilota">
-    <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
       <b className="text-violet-900"><Sparkles size={12} className="inline" /> Szkic Copilota</b>
       <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez}</span>
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
+      <span className="ml-auto flex flex-wrap items-center gap-2">
+        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onWstaw}>Wstaw do szkicu</Przycisk>
+        {p.maSzkicAgenta && <Przycisk className="text-xs" disabled={p.wylaczony} onClick={p.onZastap}>Zastąp szkic</Przycisk>}
+        <Przycisk className="text-xs" onClick={p.onOdrzuc}>Odrzuć</Przycisk>
+      </span>
     </div>
-    {s.zastrzezenia.length > 0 && <ul className="mb-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
-      aria-label="Czego model nie znalazł w faktach">
-      {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}
-    </ul>}
-    <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800">{s.tresc}</pre>
-    <div className="mt-2 flex flex-wrap items-center gap-2">
-      <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onWstaw}>Wstaw do szkicu</Przycisk>
-      {p.maSzkicAgenta && <Przycisk className="text-xs" disabled={p.wylaczony} onClick={p.onZastap}>Zastąp szkic</Przycisk>}
-      <Przycisk className="text-xs" onClick={p.onOdrzuc}>Odrzuć</Przycisk>
-      <span className="ml-auto text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma źródło (F…)</span>
+    <div className="max-h-56 overflow-y-auto" data-testid="szkic-copilota-tresc">
+      {s.zastrzezenia.length > 0 && <ul className="mb-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
+        aria-label="Czego model nie znalazł w faktach">
+        {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}
+      </ul>}
+      <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800">{s.tresc}</pre>
     </div>
+    <p className="mt-1 text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma źródło w faktach</p>
   </section>;
 }

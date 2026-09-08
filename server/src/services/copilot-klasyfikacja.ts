@@ -79,6 +79,8 @@ export interface WynikPartii {
 
 type Wiersz = {
   id: number; subject: string | null;
+  /** Login rozmówcy z wątku Allegro; `null` bez wątku (seed, stare importy). */
+  login: string | null;
   message_id: number | null; body: string | null;
   sklasyfikowana_na: number | null;
 };
@@ -88,6 +90,8 @@ type Wiersz = {
    zapytanie po `IN (...)` zaciemniłoby pominięcia. */
 const WIERSZ = `
   SELECT c.id, c.subject,
+         (SELECT t.interlocutor_login FROM allegro_inbox_thread t
+            WHERE t.id = c.external_conversation_id) AS login,
          (SELECT m.id FROM message m WHERE m.conversation_id=c.id
             AND m.direction='incoming' ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS message_id,
          (SELECT m.body FROM message m WHERE m.conversation_id=c.id
@@ -138,7 +142,10 @@ export async function sklasyfikujRozmowy(
       continue;
     }
 
-    const tresc = zamaskuj(String(w.body), w.subject);
+    /* Login z WĄTKU Allegro (0.232.1). Do 0.231.0 szedł tu temat rozmowy,
+       a temat bywa tytułem oferty — wtedy login w treści zostawał bez maski.
+       Temat zostaje zapasem dla rozmów bez wątku (seed, stare importy). */
+    const tresc = zamaskuj(String(w.body), String(w.login ?? "").trim() || w.subject);
     /* Asercja końcowa PRZED siecią. Te same wzorce właśnie maskowały, więc
        trafienie znaczy zepsute maskowanie, a nie fałszywy alarm. */
     if (zostalyDaneOsobowe(String(tresc))) {

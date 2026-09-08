@@ -10,7 +10,7 @@ import {
 import { zabudowyMaszyny, type Zabudowa } from "./silniki.js";
 import { pasowaniaTowaru, type TrafieniePasowania } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
-import { zwin } from "../tekst.js";
+import { bezPodpisu, zwin } from "../tekst.js";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1).
@@ -147,6 +147,18 @@ function urzadzenie(dane: DaneDoboru): string {
  * „prawdopodobnie" i „bez potwierdzonego zastosowania".
  */
 function zdanieDoSzkicu(
+  dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
+  podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
+  pasowanie: TrafieniePasowania | null,
+): string {
+  /* Do klienta idzie źródło z datą, BEZ nazwiska pracownika (0.232.1) — to samo,
+     co dostaje szkic Copilota. Ekran biura autora nadal widzi w `zdanieZrodla`
+     kandydata i wiedzy; szkic czyta klient. Wycięcie na wyjściu, w jednym
+     miejscu, bo każda gałąź niżej wkleja czyjś podpis. */
+  return bezPodpisu(zdanieDoSzkicuZPodpisem(dane, symbol, droga, status, podparcie, pasowanie));
+}
+
+function zdanieDoSzkicuZPodpisem(
   dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
   podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
   pasowanie: TrafieniePasowania | null,

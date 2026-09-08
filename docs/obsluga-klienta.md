@@ -361,7 +361,8 @@ klasyfikacji; stopka firmowa jest wycięta. Sufit to dwanaście wiadomości albo
 sześć tysięcy znaków, liczone od najnowszej; starsze zastępuje jeden znacznik
 `[wcześniejsze wiadomości pominięte]`. Login do maskowania bierze się z wątku
 Allegro, nie z tematu rozmowy — temat bywa tytułem oferty i wtedy login
-w treści zostawał odsłonięty.
+w treści zostawał odsłonięty. Od 0.232.1 tak samo robi klasyfikacja; temat
+jest zapasem tylko dla rozmów bez wątku.
 
 Obok rozmowy idą FAKTY, które układa serwer: kartoteka oferty (symbol, nazwa,
 EAN, numery, dostępność dziś), dane doboru wpisane przez agenta, kandydaci

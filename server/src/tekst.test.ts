@@ -183,3 +183,15 @@ test("odkodujEncje: nbsp na zwykłą spację, typografia dekodowana", () => {
   assert.equal(odkodujEncje("a&nbsp;b"), "a b");
   assert.equal(odkodujEncje("&bdquo;x&rdquo; &ndash; 5&deg;"), "„x” – 5°");
 });
+
+/* ── Podpis bez nazwiska (0.232.1) ──────────────────────────────────────── */
+import { bezPodpisu } from "./tekst.js";
+
+test("bezPodpisu wycina autora po dacie w trzech kształtach podpisu", () => {
+  assert.equal(bezPodpisu("potwierdzone — katalog dostawcy, 7.09.2026, A. Lewandowska; bez dowodu"),
+    "potwierdzone — katalog dostawcy, 7.09.2026; bez dowodu");
+  assert.equal(bezPodpisu("Do X pasuje Y — źródło: rozmowa, 12.09.2026, Admin Test."),
+    "Do X pasuje Y — źródło: rozmowa, 12.09.2026.");
+  assert.equal(bezPodpisu("pomiar własny, 1.09.2026, Anna"), "pomiar własny, 1.09.2026");
+  assert.equal(bezPodpisu("bez daty, Anna"), "bez daty, Anna", "bez daty nie ma czego wycinać");
+});

@@ -238,6 +238,9 @@ test("zatwierdzone zastosowanie z dowodem technicznym wchodzi do zdania szkicu",
   W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
   const zdanie = doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu;
   assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 — pomiar własny, /);
+  /* Do klienta bez nazwiska pracownika (0.232.1) — to samo, co szkic Copilota. */
+  assert.doesNotMatch(zdanie, /Lewandowska|Kowal/, "nazwisko pracownika w zdaniu dla klienta");
+  assert.match(zdanie, /pomiar własny, \d{1,2}\.\d{2}\.\d{4}\.$/, "źródło z datą zostaje");
   /* Odczyt nadal niczego nie zapisuje. */
   const przed = liczba("events");
   doborRozmowy(rozmowa);
@@ -267,6 +270,7 @@ test("zdanie do szkicu przez silnik nazywa OBA ogniwa — inaczej kłamałoby pr
   assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — pasuje do silnik Briggs & Stratton 450E, który stoi w tej maszynie/);
   assert.match(zdanie, /zastosowanie do silnik Briggs & Stratton 450E — katalog dostawcy/);
   assert.match(zdanie, /silnik Briggs & Stratton 450E stoi w NAC LS 46-450 — producent/);
+  assert.doesNotMatch(zdanie, /Lewandowska|Kowal/, "nazwisko pracownika w zdaniu dla klienta");
   assert.equal(zab.pewnosc, "potwierdzone");
 });
 
