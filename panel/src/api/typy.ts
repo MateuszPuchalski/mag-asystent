@@ -364,7 +364,7 @@ export type Zastosowanie = {
 };
 
 /* ── Identyfikatory i sekcje „Modele:" z opisów (§11.2, etap E3) ─────────── */
-export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku";
+export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku" | "zamiennik";
 
 export type Identyfikator = {
   id: number; twId: number; symbol: string; nazwa: string | null;

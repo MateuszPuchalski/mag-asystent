@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.233.1 — 8 września 2026
+## 0.234.1 — 8 września 2026
 
 **DODAJ przy rozjeździe adresu dokłada półkę, a nie przejmuje podstawową.**
 
@@ -72,6 +72,37 @@ zamiast tego: użyć ZAMIEŃ albo zdjąć niepotrzebny adres na karcie towaru.
 
 **Nie trzeba nowego APK.** Kolektor od początku wysyła `locAction: "add"` —
 cała usterka siedziała po stronie serwera, więc poprawka jedzie z serwerem.
+## 0.234.0 — 8 września 2026
+
+**Numer z sekcji zamienników prowadzi wreszcie do towaru.** Właściciel
+przysłał eksport kartotek i poprosił, żeby wyciągnąć z niego wszystko, co
+wesprze dobór części. Plik nie przyniósł danych, których nie mamy — przyniósł
+POMIAR: w 2311 opisach etykiet `Zamiennik:`, `Zamiennie:` i `ZAM:` jest tyle
+samo co `OEM:`, po około czterysta każdej.
+
+Czytał je dotąd wyłącznie parser zamienników. Ten szuka NASZYCH kartotek
+i wyrzuca wszystko inne — a „wszystko inne" to numery obcych katalogów, czyli
+dokładnie to, co klient wpisuje w pytaniu. Z 5561 tokenów takich sekcji naszą
+kartoteką było 881; reszta szła do kosza. Numer stał w opisie i nie prowadził
+do niczego.
+
+Sekcja zamienników dostaje więc drugiego czytelnika — parser identyfikatorów —
+i własny rodzaj `zamiennik` z podpisem „z zamienników". Osobny, bo sekcja
+zamienników jest słabszym świadectwem niż numer producenta, a §11.3 każe
+pokazywać źródło. Na pełnej kartotece: 1701 nowych numerów przy 1742 czytanych
+dotąd ze wszystkich pozostałych sekcji razem, 973 kartoteki z identyfikatorem
+zamiast 530. Indeks „numer → towar" urósł dwukrotnie.
+
+**Nasz symbol z tej listy do tabeli nie wchodzi.** Sekcja miesza jedno
+z drugim (`Zamiennie: 15-06002 / W28-0503`); nasze kartoteki pokazuje sekcja
+zamienników, a szukanie po numerze i tak trafia w nie po symbolu. Filtr stoi
+w przebudowie, nie w parserze: parser jest czystą funkcją i o kartotece nic
+nie wie.
+
+Piąty rodzaj kosztował przebudowę tabeli — `CHECK` w SQLite nie rozszerza się
+w miejscu. Migracja przepisuje WSZYSTKIE wiersze, także ręczne: przebudowa po
+imporcie kasuje tylko te z opisu, więc wpis biura skasowany przy migracji nie
+wróciłby już nigdy.
 
 ## 0.233.0 — 8 września 2026
 
@@ -113,6 +144,7 @@ myszy. Pasek potrzebuje 1112 px, więc poniżej ~1150 px szerokości okna zębat
 ustawień i wylogowanie były NIEKLIKALNE, bez żadnego sygnału na ekranie.
 Teraz pasek zawija się na drugi rząd: 117 px zamiast 65 px na wąskim oknie,
 za to nic nie znika.
+
 ## 0.232.2 — 8 września 2026
 
 **Szkic nie pyta o to, co klient już podał.** Drugi żywy przykład od

@@ -570,12 +570,67 @@ export function migrate(database: DatabaseSync) {
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
   doborZnaDrogi(database);
+  identyfikatorZamiennika(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
   oznaczAutoodpowiedziWZastanych(database);
   tabelaFts(database);
+}
+
+/**
+ * Piąty rodzaj identyfikatora: `zamiennik` (0.234.0).
+ *
+ * CHECK na `towar_identyfikator.rodzaj` był zamknięty na cztery wartości,
+ * a SQLite nie umie go rozszerzyć w miejscu — stąd przebudowa tabeli, ta sama
+ * co przy `zwrot_klienta_pozycja`. Powód rozszerzenia stoi w `schema.sql`:
+ * numery obcych katalogów siedzą także w sekcjach „Zamiennik:", a stamtąd nie
+ * czytał ich nikt, kto zapisuje.
+ *
+ * Wiersze przepisujemy WSZYSTKIE, także `zrodlo='reczne'`. Przebudowa
+ * identyfikatorów po imporcie kasuje wyłącznie te z opisu, więc wpis biura
+ * skasowany tutaj nie wróciłby już nigdy.
+ */
+function identyfikatorZamiennika(database: DatabaseSync) {
+  const wiersz = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+  ).get() as { sql: string } | undefined;
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'zamiennik'")) return;
+
+  transaction(database, () => {
+    /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+       przy żywym serwerze, a obie strony wołają `migrate()`. */
+    const teraz = database.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+    ).get() as { sql: string } | undefined;
+    if (!teraz || teraz.sql.includes("'zamiennik'")) return;
+    database.exec(`
+      CREATE TABLE towar_identyfikator_nowa (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        tw_id           INTEGER NOT NULL,
+        tw_symbol       TEXT NOT NULL,
+        rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku','zamiennik')),
+        wartosc         TEXT NOT NULL,
+        wartosc_norm    TEXT NOT NULL,
+        zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne')),
+        dodal           TEXT NOT NULL,
+        dodal_user_id   INTEGER REFERENCES app_user(user_id),
+        at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (tw_id, rodzaj, wartosc_norm)
+      );
+      INSERT INTO towar_identyfikator_nowa
+        (id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at)
+        SELECT id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at
+        FROM towar_identyfikator;
+      DROP TABLE towar_identyfikator;
+      ALTER TABLE towar_identyfikator_nowa RENAME TO towar_identyfikator;
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+    `);
+  })();
 }
 
 /**
