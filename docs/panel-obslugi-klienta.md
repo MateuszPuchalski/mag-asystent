@@ -531,17 +531,36 @@ dalej stały obok siebie — `lg:grid-cols` liczy w pikselach i działa wszędzi
 Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół". Zmierzone na żywej
 przeglądarce: bez `dvh` dokument rósł o 182 px.
 
-Wysokość bierze teraz klasa `rama-okna` z `index.css`: `100vh` bezwarunkowo,
-`100dvh` pod `@supports`. Kolejność jest odwrotna, niż podpowiada odruch, i to
-jest sedno poprawki. Pierwsze podejście zapisało dwie deklaracje `height` pod
-rząd, licząc na kaskadę — MINIFIKATOR SKASOWAŁ PIERWSZĄ jako nadmiarową
-i w `dist` zostało samo `100dvh`, czyli stan sprzed poprawki. Widać to
-wyłącznie w zbudowanym pliku, nigdy w trybie deweloperskim. Bloku `@supports`
-minifikator skleić nie może, bo nie wolno mu.
+0.233.0 dołożyło do tego zapas `100vh` pod `@supports` — i **to nie zamknęło
+usterki**. Właściciel wrócił z nagraniem: „nadal mogę swobodnie przesuwać".
 
-Pilnuje tego `panel/src/RamaOkna.test.ts`. Test patrzy na KSZTAŁT ŹRÓDŁA,
-nie na zachowanie: jsdom nie liczy układu, a `dvh` nie jest przełącznikiem,
-który dałoby się wyłączyć w przeglądarce testowej.
+**Rama nie używa już żadnej jednostki okna (0.236.0).** `vh` mierzy okno
+UKŁADU, a ono bywa wyższe niż okno WIDOCZNE — dokładnie ten przypadek wymienia
+komentarz z 0.165.0 jako powód, dla którego wybrano wtedy `dvh`. Zapas z
+0.233.0 był więc drugim zakładem o to, co przeglądarka rozumie i jak liczy,
+zamiast wyjściem z zakładu.
+
+`position: fixed` z `inset: 0` zakładem nie jest: to definicja kadru
+widocznego, znana każdej przeglądarce od kilkunastu lat, wolna od różnicy
+między oknem układu a oknem widocznym i od pytania, czy jednostka jest
+obsługiwana. `lg:min-h-0` musi ZOSTAĆ — bez niego `min-h-screen`, czyli
+`min-height: 100vh`, wpuściłoby `vh` z powrotem tylnymi drzwiami.
+
+Modale (`fixed inset-0`) pozycjonują się teraz względem ramy, nie względem
+okna. Zmierzone, nie założone: przy oknie 1918×966 modal wypada `1918×966`
+w punkcie `0,0`, a jego treść na środku — czyli bez różnicy na ekranie.
+
+Pilnują tego dwa testy o rozdzielonych rolach. `panel/e2e/dym.spec.ts` mierzy
+niezmiennik pikselowy w prawdziwej przeglądarce: wstawia do ramy 5000 px
+treści i sprawdza, że dokument dalej się nie przewija. `panel/src/RamaOkna.test.ts`
+pilnuje, żeby JSX nie wrócił do klasy Tailwinda z jednostką i żeby nie zniknęło
+`lg:min-h-0`.
+
+Warto zapisać, dlaczego pierwsza poprawka przeszła wszystkie bramki i nie
+pomogła: dopóki rama stała na jednostce okna, żaden test w Chromium nie mógł
+jej podważyć — Chromium zna `dvh` i `vh` i liczy je równo z oknem widocznym.
+Niezmiennik „rama równa się kadrowi" da się sprawdzić wszędzie; „jednostka
+znaczy to samo wszędzie" nie dało się sprawdzić nigdzie.
 
 **Nagłówek zawija się, zamiast znikać poza kadrem (0.233.0).** Rama jest
 `overflow-hidden`, więc to, co nie mieści się w szerokości, nie dostaje paska

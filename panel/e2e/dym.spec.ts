@@ -13,23 +13,24 @@ test("głęboki adres rozmowy też prowadzi do logowania", async ({ page }) => {
   await expect(page.getByLabel("Hasło")).toBeVisible();
 });
 
-/* ── Rama okna trzyma wysokość (0.233.0) ─────────────────────────────────────
+/* ── Rama okna trzyma wysokość (0.233.0, wzmocnione w 0.236.0) ───────────────
    Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół, panel miał się
-   mieścić na jednej stronie". Rama z 0.165.0 stała na samym `lg:h-dvh`,
-   a przeglądarka bez `dvh` wyrzuca CAŁĄ deklarację — zostawało `lg:min-h-0`,
-   które skasowało już `min-h-screen`, więc ramie nie zostawał żaden limit.
+   mieścić na jednej stronie" — i, po pierwszej poprawce, „nadal mogę
+   swobodnie przesuwać". Rama z 0.165.0 stała na samym `lg:h-dvh`, a
+   przeglądarka bez `dvh` wyrzuca CAŁĄ deklarację; zapas `100vh` z 0.233.0
+   usterki nie zamknął, bo `vh` mierzy okno UKŁADU, nie okno WIDOCZNE.
+   Od 0.236.0 rama nie używa żadnej jednostki: `position: fixed; inset: 0`.
 
    Ten test stoi TUTAJ, a nie w Vitest, i to jest jedyne miejsce, gdzie ma
    sens: jsdom nie liczy układu, a niezmiennik brzmi „dokument się nie
    przewija" — czyli jest o pikselach, nie o klasach. Cena: `e2e/` nie biegnie
    dziś w CI, więc to strażnik na żądanie, nie bramka.
 
-   CZEGO TEN TEST NIE ZŁAPIE, i to warto wiedzieć: braku zapasu `vh`. Chromium
-   zna `dvh`, więc rama stojąca na samym `dvh` przechodzi tu na zielono —
-   dokładnie tak, jak przechodziła przez kilkanaście wydań, zanim usterkę
-   zgłosił człowiek. Żadna przeglądarka testowa tego nie wykryje, bo każda
-   nowoczesna `dvh` obsługuje. Kształtu CSS pilnuje więc czytanie kodu, nie
-   automat; `src/RamaOkna.test.ts` łapie tylko powrót do `lg:h-dvh` w JSX.
+   Od 0.236.0 ten test ŁAPIE JUŻ CAŁĄ USTERKĘ, a wcześniej nie łapił: dopóki
+   rama stała na jednostce okna, Chromium — które zna i `dvh`, i `vh`, i liczy
+   je równo — przechodził na zielono niezależnie od tego, co robiła
+   przeglądarka właściciela. Niezmiennik „rama równa się kadrowi" da się
+   sprawdzić wszędzie; „jednostka znaczy to samo wszędzie" nie dało się nigdzie.
 
    Token wstawiamy do `localStorage` PRZED wczytaniem, bo ekran logowania nie
    renderuje ramy wcale — `App` zwraca go wcześniejszym `return`. Pierwsza

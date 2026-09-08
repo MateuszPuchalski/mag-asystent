@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.236.0 — 8 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU
+repo, nie w `server/` — tamten skrypt kopiuje `panel/dist`, ale go nie buduje).
+Poprawka siedzi w CSS, więc bez przebudowy nic się nie zmieni.
+
+**Rama okna przestała stać na jednostce okna.** Właściciel wrócił z nagraniem
+po 0.233.0: „nadal mogę swobodnie przesuwać". Poprzednia poprawka usterki nie
+zamknęła i warto zapisać, dlaczego.
+
+0.165.0 przypięło ramę do `dvh`. 0.233.0 dołożyło zapas `100vh` na wypadek
+przeglądarki, która `dvh` nie zna. Obie decyzje są zakładem o to samo: że
+jednostka okna znaczy wszędzie to, co widać. Nie znaczy. `vh` mierzy okno
+UKŁADU, a ono bywa wyższe niż okno WIDOCZNE — ten przypadek wymienia wprost
+komentarz z 0.165.0 jako powód wyboru `dvh`. Zapas był więc drugim zakładem,
+nie wyjściem z zakładu.
+
+Od tego wydania rama nie używa żadnej jednostki: `position: fixed` z
+`inset: 0`. To nie jest zakład, tylko definicja kadru widocznego — znana
+każdej przeglądarce od kilkunastu lat, wolna od różnicy między oknem układu
+a oknem widocznym i od pytania, czy jednostka jest obsługiwana.
+
+`lg:min-h-0` ZOSTAJE i to nie jest pozostałość. Bez niego `min-h-screen`,
+czyli `min-height: 100vh`, wpuściłoby `vh` z powrotem tylnymi drzwiami.
+
+Modale pozycjonują się teraz względem ramy, nie względem okna. Zmierzone:
+przy oknie 1918×966 modal wypada `1918×966` w punkcie `0,0`, treść na środku
+— bez różnicy na ekranie.
+
+Zmieniły się też role strażników. `e2e/dym.spec.ts` wstawia do ramy 5000 px
+treści i sprawdza, że dokument dalej się nie przewija; sprawdzony przez
+zepsucie — ze statyczną ramą upada na 4709 px. `RamaOkna.test.ts` pilnuje,
+żeby JSX nie wrócił do klasy z jednostką i żeby nie zniknęło `lg:min-h-0`.
+
+Jedno zdanie warte więcej niż sama poprawka: **pierwsza próba przeszła
+wszystkie bramki i nie pomogła, bo nie mogła ich nie przejść.** Dopóki rama
+stała na jednostce okna, żaden test w Chromium nie miał jak jej podważyć —
+Chromium zna `dvh` i `vh` i liczy je równo z oknem widocznym. Niezmiennik
+„rama równa się kadrowi" da się sprawdzić wszędzie; „jednostka znaczy to samo
+wszędzie" nie dało się sprawdzić nigdzie.
+
 ## 0.235.0 — 8 września 2026
 
 **W panelu biura da się przejrzeć dostawy starsze niż 14 dni.** Zgłoszenie
