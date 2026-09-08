@@ -88,10 +88,21 @@ function PigulkaSynchronizacji() {
 
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
+  /* ── NAGŁÓWEK ZAWIJA, ZAMIAST ZNIKAĆ POZA KADREM (0.233.0) ────────────────
+     Rama okna jest `overflow-hidden`, więc to, co nie zmieści się w szerokości,
+     nie daje paska przewijania — po prostu PRZESTAJE ISTNIEĆ dla myszy.
+     Zmierzone: pasek potrzebuje 1112 px, a poniżej ~1150 px szerokości okna
+     zębatka ustawień i wylogowanie leżały poza kadrem i nie dało się w nie
+     kliknąć. Nie było o tym żadnego sygnału na ekranie.
+
+     `flex-wrap` kosztuje drugi rząd na wąskim oknie i to jest cena świadoma:
+     rząd zabiera kilkadziesiąt pikseli wysokości, brak wylogowania zabiera
+     całą funkcję. `min-w-0` na tytule, żeby to on oddawał miejsce pierwszy —
+     „WERTIS · Obsługa klienta" wolno ucinać, przyciskom nie. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
-    <div className="flex items-center gap-4 px-5 py-3">
+    <div className="flex flex-wrap items-center gap-4 px-5 py-3">
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
-      <div className="mr-auto"><b>WERTIS</b>
+      <div className="mr-auto min-w-0"><b>WERTIS</b>
         <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
@@ -148,8 +159,14 @@ function App() {
      `h-dvh`, nie `h-screen`, i `lg:min-h-0` kasujące `min-h-screen`: na
      tablecie w poziomie `100vh` bywa większe niż widoczne okno i strona
      przewijałaby się o te kilkadziesiąt pikseli — czyli akurat o tyle, żeby
-     blokada wyglądała na zepsutą. */
-  return <div className="min-h-screen lg:flex lg:h-dvh lg:min-h-0 lg:flex-col lg:overflow-hidden">
+     blokada wyglądała na zepsutą.
+
+     Wysokość bierze `rama-okna` z `index.css`, NIE `lg:h-dvh` (0.233.0).
+     Powód jest jednozdaniowy: przeglądarka, która nie zna `dvh`, wyrzuca całą
+     deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — ramie nie
+     zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
+     i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
+  return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={() => { wyczyscToken(); klient.clear(); setZalogowany(false); }} />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920

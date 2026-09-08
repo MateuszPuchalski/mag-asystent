@@ -16,3 +16,36 @@
   .card { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
   .field { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-wertis-amber focus:ring-2 focus:ring-amber-100; }
 }
+
+/* ── WYSOKOŚĆ RAMY OKNA MA ZAPAS (0.233.0) ───────────────────────────────────
+   Rama z 0.165.0 stała na samym `lg:h-dvh`, a `dvh` to jedyna rzecz w tym
+   pliku, której starsza przeglądarka może NIE ZNAĆ. Deklaracji z nieznaną
+   jednostką nie da się zignorować częściowo — przeglądarka wyrzuca ją całą.
+   Zostawało `lg:min-h-0`, które kasuje `min-h-screen`, więc ramie nie zostawał
+   ŻADEN limit wysokości: dokument przewijał się w całości, nagłówek odjeżdżał
+   w górę, a kolumny dalej stały obok siebie, bo `lg:grid-cols` to piksele.
+   Wyglądało to na zepsuty układ, a było jedną nieobsłużoną jednostką.
+
+   Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół, panel miał się
+   mieścić na jednej stronie". Zmierzone: bez `dvh` dokument urósł o 182 px.
+
+   Dwie deklaracje, nie jedna. Przeglądarka bierze OSTATNIĄ, którą rozumie:
+   nowa zostaje przy `dvh` i zachowuje powód z 0.165.0 (na tablecie w poziomie
+   `100vh` bywa większe niż widoczne okno), stara spada na `vh` — ciasno
+   o pasek przeglądarki, ale rama trzyma. Tego się NIE DA zapisać jedną klasą
+   Tailwinda, bo jedna klasa to jedna deklaracja; stąd własna klasa tutaj.
+
+   ZAPAS JEST BEZWARUNKOWY, ULEPSZENIE WARUNKOWE — i to nie jest kwestia gustu.
+   Pierwsza wersja tej poprawki zapisała dwie deklaracje `height` pod rząd,
+   licząc na to, że stara przeglądarka weźmie pierwszą. MINIFIKATOR SKASOWAŁ
+   PIERWSZĄ jako nadmiarową: w zbudowanym CSS zostało samo `100dvh`, czyli
+   dokładnie stan sprzed poprawki. Widać to tylko w `dist`, nigdy w `dev`.
+   Dlatego `vh` stoi samo, a `dvh` pod `@supports` — bloku warunkowego żaden
+   minifikator nie sklei z regułą obok, bo nie wolno mu. */
+@media (min-width: 1024px) {
+  .rama-okna { height: 100vh; }
+
+  @supports (height: 100dvh) {
+    .rama-okna { height: 100dvh; }
+  }
+}
