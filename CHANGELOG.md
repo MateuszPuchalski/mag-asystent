@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.234.1 — 8 września 2026
+
+**DODAJ przy rozjeździe adresu dokłada półkę, a nie przejmuje podstawową.**
+
+Zgłoszenie właściciela: „gdy skanuję inną lokalizację niż produkt posiada
+i decyduję się ją dodać, to powinna dodawać się jako dodatkowa lokalizacja,
+a nie jako podstawowa".
+
+Przycisk na kolektorze mówi **„LEŻY W OBU — DODAJ"** i o kolejności nie
+obiecuje nic. Serwer stawiał jednak zeskanowany kod na PIERWSZYM miejscu pola,
+a pierwszy kod JEST lokalizacją pickingową. Magazynier prosił o drugi adres,
+dostawał przeprowadzkę — i to widziała cała reszta systemu, bo z pickingowego
+liczy się trasa zbierania i adnotacje na karcie.
+
+**Dwie drogi do tej samej operacji rozjechały się po cichu.** Trasa karty
+towaru dokłada adres na koniec od zawsze (`computeNewLocs`, akcja `add`);
+rozkładanie dostaw robiło odwrotnie. Gałąź `replace` miała przy sobie
+komentarz z uzasadnieniem, gałąź `add` nie miała żadnego — ślad po kopiowaniu,
+nie po decyzji.
+
+**Nie pilnował tego ŻADEN test.** `locAction` nie miał ani jednego trafienia
+w całym `server/src` i dlatego rozjazd mógł tam siedzieć. Dochodzi
+`services/putaway-lokalizacja.test.ts` z dziesięcioma przypadkami, pilnujący
+OBU akcji — żeby naprawa jednej nie zjadła drugiej.
+
+**DODAJ pod adresem, który towar już ma, nie kolejkuje nic.** Wspólny warunek
+zapisu pytał „czy ten kod jest pickingowy", co dla dokładania jest złym
+pytaniem: towar odłożony na swoją drugą półkę dostawał zadanie zapisujące pole
+identyczne z obecnym.
+
+**Pełne pole adresów odmawia zamiast uciąć kod w połowie.** Dotąd stało tam
+ślepe przycięcie do 50 znaków. Przy ZAMIEŃ obcinało ogon starych adresów, ale
+odkąd DODAJ dokłada na końcu, ucięciu podlegałby kod właśnie zeskanowany — do
+kartoteki wjechałby adres, którego nikt nie znajdzie. Komunikat mówi, co zrobić
+zamiast tego: użyć ZAMIEŃ albo zdjąć niepotrzebny adres na karcie towaru.
+
+**Nie trzeba nowego APK.** Kolektor od początku wysyła `locAction: "add"` —
+cała usterka siedziała po stronie serwera, więc poprawka jedzie z serwerem.
 ## 0.234.0 — 8 września 2026
 
 **Numer z sekcji zamienników prowadzi wreszcie do towaru.** Właściciel

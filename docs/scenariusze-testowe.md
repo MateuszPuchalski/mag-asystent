@@ -296,6 +296,17 @@ Zeskanuj półkę `C01-02-02`.
 Aplikacja ma zapytać **przed zapisem**: ZAMIEŃ czy DODAJ. Z samego skanu tych
 dwóch sytuacji odróżnić się nie da.
 
+Wybierz **DODAJ**. Kartoteka ma dostać `A01-02-03 B02-03-04 PAL-042 H04-01-02
+C01-02-02` — nowy adres **na końcu**, a podstawowy bez zmian. To jest cała
+treść poprawki z 0.233.1: wcześniej `C01-02-02` lądował na początku, czyli
+stawał się adresem pickingowym.
+
+Powtórz odłożenie na `C01-02-02`. Drugi raz nie ma zakolejkować nic — kartoteka
+już ten adres zna.
+
+Wybierz **ZAMIEŃ** przy innej pozycji. Tam nowy adres ma stanąć na początku
+i zastąpić podstawowy, a pozostałe zostają.
+
 ### S33 — przesyłka i protokół kuriera
 
 Trzy dostawy niosą trzy stany. `FZ 9002` ma numer przesyłki i protokół `tak`.
