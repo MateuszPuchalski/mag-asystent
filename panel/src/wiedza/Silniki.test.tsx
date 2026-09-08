@@ -12,11 +12,16 @@ const dane = vi.fn();
 const zaproponuj = { mutate: vi.fn(), isPending: false };
 const rozstrzygnij = { mutate: vi.fn(), isPending: false };
 const wycofaj = { mutate: vi.fn(), isPending: false };
+/* Słownik silników (0.238.0): dwa zapisy ręki biura, bez rozstrzygania. */
+const dodajAlias = { mutate: vi.fn(), isPending: false };
+const usunAlias = { mutate: vi.fn(), isPending: false };
 vi.mock("../api/wiedza", () => ({
   useSilniki: () => dane(),
   useZaproponujZabudowe: () => zaproponuj,
   useRozstrzygnijZabudowe: () => rozstrzygnij,
   useWycofajZabudowe: () => wycofaj,
+  useDodajAliasSilnika: () => dodajAlias,
+  useUsunAliasSilnika: () => usunAlias,
   useModele: () => ({ data: undefined }),
 }));
 
@@ -36,7 +41,14 @@ const para = (id: number, silnik: string) => ({
 
 const luka = (n: Record<string, unknown> = {}) => ({
   marka: "NAC", model: "LS 46-450", wariant: null, klucz: "maszyna|nacls46450", pytan: 14,
-  wpisaneSilniki: [{ tekst: "B&S 450E", ile: 9 }, { tekst: "Loncin", ile: 2 }], zabudowy: [], ...n,
+  wpisaneSilniki: [{ tekst: "B&S 450E", ile: 9, silnik: null }, { tekst: "Loncin", ile: 2, silnik: null }],
+  zabudowy: [], ...n,
+});
+
+const SILNIK_BS = { id: 7, rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null, lata: null,
+  klucz: "silnik|briggs&stratton450e", etykieta: "silnik Briggs & Stratton 450E" };
+const alias = (n: Record<string, unknown> = {}) => ({
+  id: 3, tekst: "B&S 450E", silnik: SILNIK_BS, dodal: "Ala", dodanoAt: "2026-09-08T10:00:00Z", ...n,
 });
 
 beforeEach(() => {
@@ -101,6 +113,67 @@ describe("Silniki", () => {
     await userEvent.type(screen.getByLabelText("Powód wycofania"), "pomyłka");
     await userEvent.click(screen.getAllByRole("button", { name: "Wycofaj" })[0]);
     expect(wycofaj.mutate).toHaveBeenCalledWith({ id: 7, powod: "pomyłka" }, expect.anything());
+  });
+
+  /* ── Słownik silników (0.238.0) ─────────────────────────────────────────
+     Most tekst→model jest ludzki. Pilnujemy, że czip ZE słownika wypełnia
+     formularz modelem (nie tekstem), czip BEZ słownika proponuje zapamiętanie
+     i wysyła alias osobnym zapisem, a odznaczenie go wyłącza. */
+  it("czip ze słownika wypełnia formularz modelem — bez przepisywania i bez aliasu", async () => {
+    dane.mockReturnValue({ data: { propozycje: [], doRozstrzygniecia: 0, lukiRazem: 1, zatwierdzone: [], aliasy: [alias()],
+      luki: [luka({ wpisaneSilniki: [{ tekst: "B&S 450E", ile: 9, silnik: SILNIK_BS }] })] },
+      isLoading: false, error: null });
+    render(<Silniki />);
+    await userEvent.click(screen.getByRole("button", { name: "B&S 450E ×9 = silnik Briggs & Stratton 450E" }));
+    expect(screen.getByLabelText("Marka")).toHaveValue("Briggs & Stratton");
+    expect(screen.getByLabelText("Model")).toHaveValue("450E");
+    expect(screen.queryByLabelText(/zapamiętaj w słowniku/)).toBeNull();
+    await userEvent.type(screen.getByLabelText("Dowód"), "tabliczka");
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj" }));
+    expect(zaproponuj.mutate).toHaveBeenCalledTimes(1);
+    expect(dodajAlias.mutate).not.toHaveBeenCalled();
+  });
+
+  it("czip bez słownika: „Zaproponuj” zapisuje też alias, chyba że człowiek odznaczy", async () => {
+    render(<Silniki />);
+    await userEvent.click(screen.getByRole("button", { name: "B&S 450E ×9" }));
+    expect(screen.getByLabelText(/zapamiętaj w słowniku: „B&S 450E" = ten silnik/)).toBeChecked();
+    await userEvent.type(screen.getByLabelText("Marka"), "Briggs & Stratton");
+    await userEvent.clear(screen.getByLabelText("Model"));
+    await userEvent.type(screen.getByLabelText("Model"), "450E");
+    await userEvent.type(screen.getByLabelText("Dowód"), "tabliczka");
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj" }));
+    /* Alias niesie TEKST CZIPU i model wpisany przez człowieka — to on mówi, co tekst znaczy. */
+    expect(dodajAlias.mutate).toHaveBeenCalledWith(
+      { tekst: "B&S 450E", silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null } },
+      expect.anything());
+    expect(zaproponuj.mutate).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    await userEvent.click(screen.getByLabelText(/zapamiętaj w słowniku/));
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj" }));
+    expect(dodajAlias.mutate).not.toHaveBeenCalled();
+    expect(zaproponuj.mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("sekcja słownika wymienia aliasy z usuwaniem i przyjmuje nowy wpis", async () => {
+    dane.mockReturnValue({ data: { propozycje: [], doRozstrzygniecia: 0, lukiRazem: 0, luki: [], zatwierdzone: [],
+      aliasy: [alias()] }, isLoading: false, error: null });
+    render(<Silniki />);
+    const sekcja = screen.getByRole("region", { name: "Słownik silników" });
+    expect(sekcja).toHaveTextContent("„B&S 450E\" = silnik Briggs & Stratton 450E");
+    await userEvent.click(screen.getByRole("button", { name: "Usuń" }));
+    expect(usunAlias.mutate).toHaveBeenCalledWith({ id: 3 }, expect.anything());
+
+    await userEvent.click(screen.getByRole("button", { name: "Dodaj alias" }));
+    expect(screen.getByRole("button", { name: "Dodaj do słownika" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Tekst z pola Silnik"), "Lonci v200");
+    await userEvent.type(screen.getByLabelText("Marka"), "Loncin");
+    await userEvent.type(screen.getByLabelText("Model"), "V200");
+    await userEvent.click(screen.getByRole("button", { name: "Dodaj do słownika" }));
+    expect(dodajAlias.mutate).toHaveBeenCalledWith(
+      { tekst: "Lonci v200", silnik: { rodzaj: "silnik", marka: "Loncin", nazwa: "V200", wariant: null } },
+      expect.anything());
   });
 
   it("maszyna ze znanym silnikiem nie krzyczy „brak silnika”", () => {

@@ -890,13 +890,24 @@ Szczebel idzie WYŁĄCZNIE przez zatwierdzoną zabudowę (§12). Pola
 `dobor_rozmowy.silnik` nie czyta: to wolny tekst, a „B&S 450E" nigdy nie
 trafi na „Briggs & Stratton 450E". Rozbijanie go na markę i nazwę byłoby tym
 samym zgadywaniem, które właściciel odrzucił przy sekcjach „Modele:".
-Wpisany tekst służy teraz do czego innego — karmi listę luk na ekranie
-Silniki i podpowiedź pod polem w zakładce Dobór.
+Wpisany tekst służy do czego innego — karmi listę luk na ekranie Silniki
+i podpowiedź pod polem w zakładce Dobór.
 
-Pominięcie tego szczebla jest produktem, nie porażką: powód „nie wiadomo, jaki
-silnik stoi w NAC LS 46-450 — dopisz go w Wiedza → Silniki" to jedyna droga,
-którą agent dowie się o luce. Silnik znany, ale bez zastosowań, daje
-`sprawdzona: true` z zerem wyników — to dwie różne prawdy.
+**Od 0.238.0 most między tekstem a modelem jest LUDZKI: słownik silników**
+(§12). Biuro zapisuje, że „B&S 450E" znaczy silnik Briggs & Stratton 450E,
+a system dopasowuje tekst dokładnie po zwinięciu pisowni — bez rozbijania
+i bez furtki na literówki. Alias nie karmi szczebla: prowadzi tylko do
+propozycji zabudowy jednym kliknięciem pod polem „Silnik", z dowodem
+`rozmowa` (klient podał silnik), więc z pewnością „prawdopodobne". Rozstrzyga
+człowiek w Wiedza → Silniki, dopiero wtedy szczebel rusza.
+
+Pominięcie tego szczebla jest produktem, nie porażką: powód pominięcia to
+jedyna droga, którą agent dowie się o luce, więc prowadzi o krok dalej.
+Tekst bez aliasu: „„Lonci v200" nie ma w słowniku silników, dopisz go
+w Wiedza → Silniki". Alias bez pary: „to silnik Loncin V200 wg słownika, ale
+nikt nie zatwierdził, że stoi w tej maszynie — zaproponuj zabudowę pod polem
+Silnik". Silnik znany, ale bez zastosowań, daje `sprawdzona: true` z zerem
+wyników — to dwie różne prawdy.
 
 **Co działa od wydania 0.230.0: szczebel „pasuje do części".** Firma sprzedaje
 dużo gaźników, a klient pyta: „czy ta uszczelka pasuje do mojego gaźnika?".
@@ -988,10 +999,10 @@ Dołożenie go później oznaczałoby przebudowę tabeli.
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma SIEDEM tabel,
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma OSIEM tabel,
 nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2),
-`towar_identyfikator` i `model_z_opisu` (E3), `zabudowa_silnika` (0.229.0)
-oraz `pasowanie_czesci` (0.230.0).
+`towar_identyfikator` i `model_z_opisu` (E3), `zabudowa_silnika` (0.229.0),
+`pasowanie_czesci` (0.230.0) oraz `alias_silnika` (0.238.0).
 Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
 `dopasowanie` jest spalona (§15) i nie wraca.
 
@@ -1032,6 +1043,22 @@ z doborów, od najczęściej pytanych, z surowymi łańcuchami wpisanymi w pole
 w zakładce Dobór, nigdy z treści wiadomości klienta (blizna „szarpaka").
 Automat nie rozbija tych łańcuchów na markę i nazwę — markę i nazwę wpisuje
 człowiek, tak jak przy sekcjach „Modele:".
+
+**Słownik silników** (`alias_silnika`, 0.238.0) to to, co człowiek wpisał
+o tych łańcuchach: „B&S 450E" = silnik Briggs & Stratton 450E. Powód: po
+0.237.0 Copilot wpisuje silnik z rozmowy do pola, a „Lonci v200" dalej był
+tylko notatką. Dopasowanie jest dokładne po `zwin()`, tą samą normalizacją,
+co klucz modelu i `towar_identyfikator`. Alias nie ma cyklu życia — jest
+zapisem ręki biura, nie propozycją automatu, więc pomyłkę się usuwa. Czip na
+liście luk ze słownikiem wypełnia formularz zabudowy modelem; czip bez
+słownika otwiera formularz z zaznaczonym „zapamiętaj w słowniku", bo
+człowiek, który właśnie wpisuje markę i nazwę, mówi, co ten tekst znaczy.
+Alias nigdy nie wskazuje maszyny (pilnuje serwis) i nigdy nie karmi
+szczebla wprost: w zakładce Dobór daje jedno zdanie i przycisk „Zaproponuj
+zabudowę" z dowodem `rozmowa`, a szczebel rusza po zatwierdzeniu pary.
+Alias marki bez modelu („Lonci" = Loncin) nie istnieje — to byłoby
+rozbijanie. Drugi słownik, „token w nazwie kartoteki → model silnika"
+(zapowiedź z 0.230.0), czeka jako osobny przyrost.
 
 Druga droga to zatwierdzenie doboru. Do 0.229.0 hak wpisywał `rodzaj:
 "maszyna"` na sztywno, więc żadne zastosowanie do silnika nie mogło powstać
@@ -1346,6 +1373,7 @@ conversation_draft       offer_snapshot          customer
 customer_machine         order_snapshot          product_link
 dobor_rozmowy            model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
+zabudowa_silnika         pasowanie_czesci        alias_silnika
 towar_fts                knowledge_document      zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events
@@ -2662,6 +2690,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
 | Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
 | Zabudowa silnika (§12) | **działa** od 0.229.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
+| Słownik silników (§12) | **działa** od 0.238.0 | `alias_silnika`, `silnikZTekstu` w `services/silniki.ts`, sekcja „Słownik silników" na ekranie Silniki, przycisk „Zaproponuj zabudowę" pod polem Silnik w Doborze |
 | Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |

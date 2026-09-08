@@ -52,7 +52,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "pasowanie_czesci", "dobor_rozmowy",
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
     "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -126,6 +126,17 @@ test("wątek idzie w całości, zamaskowany, z loginem z WĄTKU Allegro, nie z t
   assert.equal(w.includes("601"), false, "telefon wyszedł");
   assert.match(w, /jaka uszczelka pod filtr/);
   assert.equal(k.ostatniaWiadomoscId, pytanie, "świeżość liczy się na ostatniej wiadomości KLIENTA");
+});
+
+test("fakt danych doboru niesie kanoniczny silnik ze słownika, gdy alias istnieje", async () => {
+  const Sl = await import("./silniki.js");
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", silnik: "Lonci v200" }, 1, biuro);
+  let f = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "dobor")!;
+  assert.match(f.zdanie, /silnik Lonci v200(?!\s*\(wg)/);
+  Sl.dodajAliasSilnika({ tekst: "Lonci v200", silnik: { rodzaj: "silnik", marka: "Loncin", nazwa: "V200" } },
+    { userId: biuro, name: "A. Lewandowska" });
+  f = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "dobor")!;
+  assert.match(f.zdanie, /silnik Lonci v200 \(wg słownika: silnik Loncin V200\)/);
 });
 
 test("intake milknie, gdy agent wybrał kandydata z potwierdzonym dowodem", () => {

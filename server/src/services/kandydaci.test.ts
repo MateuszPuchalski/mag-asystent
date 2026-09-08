@@ -61,7 +61,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia",
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia",
     "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -308,6 +308,23 @@ test("bez zabudowy szczebel silnika jest POMINIĘTY i mówi, czego brakuje", () 
      dowie się, że baza silników ma lukę. */
   assert.match(szczebel(drogi, "silnik").powod!, /nie wiadomo, jaki silnik stoi w STIHL FS 250/);
   assert.match(szczebel(drogi, "silnik").powod!, /Wiedza → Silniki/);
+});
+
+test("powód pominięcia prowadzi do słownika albo do przycisku zabudowy — a alias sam nie daje kandydatów", () => {
+  /* Tekst bez aliasu: agent ma wiedzieć, że brakuje wpisu w słowniku. */
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", silnik: "B&S 450E" }, 1, biuro);
+  let sz = szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik");
+  assert.equal(sz.sprawdzona, false);
+  assert.match(sz.powod!, /„B&S 450E” nie ma w słowniku silników/);
+  /* Alias jest, zabudowy nie ma: krok dalej to przycisk pod polem, nie zgadywanie. */
+  S.dodajAliasSilnika({ tekst: "B&S 450E", silnik: BS450 }, { userId: biuro, name: "A. Lewandowska" });
+  zastosowanieDoSilnika(FTC272, BS450);
+  const w = kandydaciDoboru(rozmowa, subiekt);
+  sz = szczebel(w.drogi, "silnik");
+  assert.equal(sz.sprawdzona, false, "alias to nie zabudowa — szczebel dalej pominięty");
+  assert.match(sz.powod!, /to silnik Briggs & Stratton 450E wg słownika/);
+  assert.match(sz.powod!, /zaproponuj zabudowę pod polem Silnik/);
+  assert.equal(w.kandydaci.some((k) => k.droga === "silnik"), false, "kandydatów z samego aliasu nie ma");
 });
 
 test("silnik znany, ale bez zastosowań to SPRAWDZONY z zerem, nie pominięcie", () => {

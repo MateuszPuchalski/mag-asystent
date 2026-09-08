@@ -46,7 +46,7 @@ beforeEach(() => {
   const d = db();
   /* Wiedza PRZED użytkownikami: zatwierdzony dobór rodzi propozycję (E2),
      a jej autor wskazuje na `app_user` bez kaskady. */
-  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -328,6 +328,23 @@ test("wiedzaDoboru oddaje silniki maszyny — jedno żądanie, nie drugie na to 
   assert.deepEqual(w.silniki.map((z) => z.silnik.id), [zab.silnik.id]);
   assert.equal(w.zastosowanie, null);
   assert.equal(w.zabudowa, null);
+  assert.equal(w.silnikZPola, null, "pole „Silnik” puste — nie ma czego rozpoznawać");
+});
+
+test("wiedzaDoboru rozpoznaje tekst z pola „Silnik” słownikiem i mówi, czy para już istnieje", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", silnik: "Lonci v200" }, 1, biuro);
+  assert.equal(wiedzaDoboru(rozmowa).silnikZPola, null, "bez aliasu tekst nic nie znaczy");
+  const LONCIN = { rodzaj: "silnik" as const, marka: "Loncin", nazwa: "V200" };
+  S.dodajAliasSilnika({ tekst: "Lonci v200", silnik: LONCIN }, { userId: biuro, name: "A. Lewandowska" });
+  let w = wiedzaDoboru(rozmowa);
+  assert.equal(w.silnikZPola?.alias.silnik.etykieta, "silnik Loncin V200");
+  assert.equal(w.silnikZPola?.zabudowa, null, "pary nie ma — można zaproponować");
+  const z = S.zaproponujZabudowe({ maszyna: NAC, silnik: LONCIN, rodzajDowodu: "rozmowa",
+    dowodTresc: "klient podał", zrodlo: "dobor", conversationId: rozmowa }, { userId: biuro, name: "A. Lewandowska" })!;
+  w = wiedzaDoboru(rozmowa);
+  assert.equal(w.silnikZPola?.zabudowa?.id, z.id);
+  assert.equal(w.silnikZPola?.zabudowa?.stan, "propozycja");
+  assert.equal(w.silnikZPola?.zabudowa?.pewnosc, "prawdopodobne", "ślad rozmowy to nie dowód techniczny");
 });
 
 /* ── Pasowanie w szkicu: klient nazwał CZĘŚĆ, nie maszynę ─────────────────── */

@@ -17,7 +17,9 @@ const status = { mutate: vi.fn(), isPending: false, error: null as unknown };
 const wybierz = { mutate: vi.fn(), isPending: false, error: null as unknown };
 /* Silniki maszyny jadą tą samą trasą co dowody wiedzy — atrapa oddaje to,
    co ustawi test, a domyślnie pustą listę (maszyna bez znanego silnika). */
-type WiedzaAtrapa = { data: { zastosowanie: null; zabudowa: null; silniki: unknown[]; pomiary: unknown[] } };
+type WiedzaAtrapa = { data: {
+  zastosowanie: null; zabudowa: null; silniki: unknown[]; pomiary: unknown[]; silnikZPola?: unknown;
+} };
 const wiedzaDoboru = vi.fn<() => WiedzaAtrapa>(
   () => ({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } }));
 vi.mock("../api/rozmowy", () => ({
@@ -34,7 +36,12 @@ vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszuk
 /* Pasowanie „z pracy" (0.230.0) idzie trasą wiedzy, nie rozmów — hook z tego
    modułu woła `useQueryClient`, a zakładka renderuje się tu bez dostawcy. */
 const zaproponujPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
-vi.mock("../api/wiedza", () => ({ useZaproponujPasowanie: () => zaproponujPasowanie }));
+/* Zabudowa spod pola „Silnik" (0.238.0) idzie tą samą trasą wiedzy, co z ekranu Silniki. */
+const zaproponujZabudowe = { mutate: vi.fn(), isPending: false, error: null as unknown };
+vi.mock("../api/wiedza", () => ({
+  useZaproponujPasowanie: () => zaproponujPasowanie,
+  useZaproponujZabudowe: () => zaproponujZabudowe,
+}));
 /* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
    dokąd go wysłać — atrapa mówi „każda kartoteka ma obraz". Dzięki temu kafle
    renderują się jako `<img>` i widać, PRZY KTÓRYCH wierszach stoją. */
@@ -357,10 +364,39 @@ describe("Dobór a silnik maszyny", () => {
     wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } });
   });
 
-  it("bez zabudowy mówi, że wpisany silnik to na razie notatka", () => {
+  it("bez zabudowy i bez aliasu mówi, że tekstu nie ma w słowniku", () => {
     render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/to na razie tylko notatka/)).toBeInTheDocument();
+    expect(screen.getByText(/„B&S 450E" nie ma w słowniku silników/)).toBeInTheDocument();
     expect(screen.getByText(/Wiedza → Silniki/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Zaproponuj zabudowę" })).toBeNull();
+  });
+
+  /* Słownik (0.238.0): alias rozpoznaje tekst, a jedno kliknięcie proponuje
+     zabudowę z dowodem „rozmowa" i numerem rozmowy — automat nie zgaduje,
+     człowiek rozstrzyga w Wiedza → Silniki. */
+  it("alias bez pary daje przycisk, który proponuje zabudowę z dowodem „rozmowa” i numerem rozmowy", async () => {
+    const silnik = { id: 9, rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null, lata: null,
+      klucz: "silnik|bs450e", etykieta: "silnik Briggs & Stratton 450E" };
+    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [],
+      silnikZPola: { alias: { id: 1, tekst: "B&S 450E", silnik, dodal: "Ala", dodanoAt: "x" }, zabudowa: null } } });
+    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    expect(screen.getByText(/Nikt nie potwierdził, że stoi w NAC LS 46-450/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj zabudowę" }));
+    expect(zaproponujZabudowe.mutate).toHaveBeenCalledWith({
+      maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450", wariant: null },
+      silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null },
+      rodzajDowodu: "rozmowa", dowodTresc: "klient podał silnik „B&S 450E” w rozmowie", conversationId: 4821,
+    }, expect.anything());
+  });
+
+  it("gdy para już czeka, zamiast przycisku jest zdanie o kolejce", () => {
+    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [],
+      silnikZPola: { alias: { id: 1, tekst: "B&S 450E", dodal: "Ala", dodanoAt: "x",
+        silnik: { id: 9, etykieta: "silnik Briggs & Stratton 450E", marka: "Briggs & Stratton", nazwa: "450E", wariant: null } },
+        zabudowa: { id: 5, stan: "propozycja" } } } });
+    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
+    expect(screen.getByText(/czeka na rozstrzygnięcie w Wiedza → Silniki/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Zaproponuj zabudowę" })).toBeNull();
   });
 
   it("przy dwóch zabudowach każe potwierdzić tabliczkę", () => {

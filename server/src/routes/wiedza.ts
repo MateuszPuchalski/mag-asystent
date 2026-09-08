@@ -8,8 +8,8 @@ import {
   dodajIdentyfikator, identyfikatoryTowaru, listaModeliZOpisow, odrzucModelZOpisu, przerobModelZOpisu,
 } from "../services/identyfikatory.js";
 import {
-  kolejkaZabudow, lukiSilnikow, rozstrzygnijZabudowe, wycofajZabudowe, zaproponujZabudowe,
-  zatwierdzoneZabudowy, type NowaZabudowa,
+  aliasySilnikow, dodajAliasSilnika, kolejkaZabudow, lukiSilnikow, rozstrzygnijZabudowe, usunAliasSilnika,
+  wycofajZabudowe, zaproponujZabudowe, zatwierdzoneZabudowy, type NowaZabudowa,
 } from "../services/silniki.js";
 import {
   kolejkaPasowan, pasowaniaTowaru, rozstrzygnijPasowanie, wycofajPasowanie, zaproponujPasowanie,
@@ -17,14 +17,17 @@ import {
 } from "../services/pasowania.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   TRZYNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   PIĘTNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
-   (E3), trzy przy zabudowie silnika (0.229.0) oraz trzy przy pasowaniu części:
-   propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
-   cykl życia co zastosowanie — propozycja, którą rozstrzyga człowiek — a bez
+   (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
+   propozycja, rozstrzygnięcie i wycofanie, oraz dwa przy słowniku silników
+   (0.238.0): dodanie i usunięcie aliasu. Każda z relacji ma ten sam cykl
+   życia co zastosowanie — propozycja, którą rozstrzyga człowiek — a bez
    własnego wycofania zatwierdzona pomyłka o uszczelce zostałaby w bazie na
-   zawsze. Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED
-   zapisem — trasa nie ma własnej listy ról poza bramką odczytu.
+   zawsze. Alias cyklu nie ma (zapis ręki biura, nie propozycja automatu),
+   stąd dwie trasy, nie trzy. Każdy zapis idzie przez serwis, który sprawdza
+   konto biura PRZED zapisem — trasa nie ma własnej listy ról poza bramką
+   odczytu.
 
    Adres `wiedza/*`, nie `dopasowania/*` z §16: `dopasowanie` to nazwa
    spalona w bazie i nie ożywiamy jej nawet w URL-u.
@@ -146,9 +149,13 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       propozycje: kolejka.propozycje, doRozstrzygniecia: kolejka.liczba,
       luki: luki.luki, lukiRazem: luki.liczba,
       zatwierdzone: zatwierdzoneZabudowy(),
+      aliasy: aliasySilnikow(),
     };
   });
 
+  /* `zrodlo` wynika z KONTEKSTU, jak przy pasowaniu: para zaproponowana spod
+     pola „Silnik" w rozmowie (jest `conversationId`) to `dobor`, z ekranu
+     Wiedza — `reczne`. Agent nie ma jak podać cudzego źródła. */
   app.post<{ Body: Partial<NowaZabudowa> }>("/api/obsluga/wiedza/silniki", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     try {
@@ -156,7 +163,8 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       const z = zaproponujZabudowe({
         maszyna: b.maszyna!, silnik: b.silnik!, rodzajDowodu: b.rodzajDowodu!,
         dowodTresc: String(b.dowodTresc ?? ""), dowodLink: b.dowodLink ?? null,
-        komentarz: b.komentarz ?? null, zrodlo: "reczne", zastepujeId: b.zastepujeId ?? null,
+        komentarz: b.komentarz ?? null, zrodlo: b.conversationId ? "dobor" : "reczne",
+        conversationId: b.conversationId ?? null, zastepujeId: b.zastepujeId ?? null,
       }, { userId: ja().userId, name: ja().name });
       /* Duplikat to odmowa ze zdaniem, nie cichy sukces — jak przy
          zastosowaniu: agent ma wiedzieć, że ta para już czeka albo stoi. */
@@ -180,6 +188,25 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       try { return wycofajZabudowe(Number(req.params.id), req.body?.powod ?? null, ja().userId); }
       catch (e) { return blad(reply, e); }
     });
+
+  /* ── Słownik silników (0.238.0): co znaczy tekst z pola „Silnik" ──────────
+     Dwie trasy, nie trzy: alias jest zapisem ręki biura bez cyklu życia,
+     pomyłkę się usuwa. Dubel tekstu to 409 ze wskazaniem, do czego prowadzi. */
+  app.post<{ Body: { tekst?: string; silnik?: DaneModelu } }>(
+    "/api/obsluga/wiedza/silniki/aliasy", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const b = req.body ?? {};
+        return dodajAliasSilnika({ tekst: String(b.tekst ?? ""), silnik: b.silnik! },
+          { userId: ja().userId, name: ja().name });
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/silniki/aliasy/:id/usun", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { usunAliasSilnika(Number(req.params.id), ja().userId); return { ok: true }; }
+    catch (e) { return blad(reply, e); }
+  });
 
   /* ── Pasowanie części: uszczelka pasuje DO gaźnika ──────────────────────
      `zrodlo` wynika z KONTEKSTU, nie z ciała: propozycja złożona z rozmowy

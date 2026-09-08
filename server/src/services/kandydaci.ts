@@ -6,7 +6,7 @@ import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
-import { zabudowyMaszyny } from "./silniki.js";
+import { silnikZTekstu, zabudowyMaszyny } from "./silniki.js";
 import { pasowaniaTowaru, type Kartoteka } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { szukajPelnotekst } from "./pelnotekst.js";
@@ -300,7 +300,19 @@ export function kandydaciDoboru(
     const zabudowy = zabudowyMaszyny(
       kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant), database);
     if (zabudowy.length === 0) {
-      pomin("silnik", `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`);
+      /* Pole „Silnik" czytamy TU wyłącznie do ZDANIA POWODU, nie do szukania:
+         powód pominięcia to jedyna droga, którą agent dowiaduje się o luce
+         (§11.2), więc ma prowadzić o jeden krok dalej — do przycisku pod
+         polem albo do słownika. Kandydatów z samego aliasu nie ma nigdy. */
+      const tekst = String(dobor.dane.silnik ?? "").trim();
+      const alias = tekst ? silnikZTekstu(tekst, database) : null;
+      pomin("silnik", alias
+        ? `„${tekst}” to ${alias.silnik.etykieta} wg słownika, ale nikt nie zatwierdził, że stoi w ${maszyna}`
+          + " — zaproponuj zabudowę pod polem Silnik"
+        : tekst
+          ? `nie wiadomo, jaki silnik stoi w ${maszyna} — „${tekst}” nie ma w słowniku silników,`
+            + " dopisz go w Wiedza → Silniki"
+          : `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`);
     } else {
       /* Ostrzeżenie przy KAŻDYM kandydacie tej drogi, nie raz na liście:
          kandydat wędruje do szkicu osobno i ma nieść swoje zastrzeżenie. */

@@ -7,7 +7,7 @@ import {
   kluczModelu, propozycjaZPomiaru, wycofajPropozycjeDoboru, zaproponujZastosowanie, zastosowaniaModelu,
   type Polaryzacja, type PowodNegatywny, type Zastosowanie,
 } from "./wiedza.js";
-import { zabudowyMaszyny, type Zabudowa } from "./silniki.js";
+import { silnikZTekstu, zabudowaPary, zabudowyMaszyny, type AliasSilnika, type Zabudowa } from "./silniki.js";
 import { pasowaniaTowaru, type TrafieniePasowania } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { bezPodpisu, zwin } from "../tekst.js";
@@ -518,16 +518,23 @@ export interface PomiarRozmowy {
  */
 export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db()): {
   zastosowanie: Zastosowanie | null; zabudowa: Zabudowa | null; pasowanie: TrafieniePasowania | null;
-  silniki: Zabudowa[]; pomiary: PomiarRozmowy[];
+  silniki: Zabudowa[]; silnikZPola: SilnikZPola | null; pomiary: PomiarRozmowy[];
 } {
   const dobor = doborRozmowy(conversationId, database);
   const podparcie = dobor.wybrany ? zastosowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null;
   /* Silniki maszyny jadą tą samą trasą co dowody: ekran doboru potrzebuje ich
      do czipów pod polem „Silnik" i do wyboru przy zatwierdzeniu, a osobne
      żądanie na tę samą rozmowę byłoby drugim strzałem po to samo. */
-  const silniki = dobor.dane.marka && dobor.dane.model
-    ? zabudowyMaszyny(kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant), database)
-    : [];
+  const kluczMaszyny = dobor.dane.marka && dobor.dane.model
+    ? kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant) : null;
+  const silniki = kluczMaszyny ? zabudowyMaszyny(kluczMaszyny, database) : [];
+  /* Słownik (0.238.0): co znaczy tekst z pola „Silnik" i czy para z wpisaną
+     maszyną już istnieje. Ekran z tego układa jedno zdanie i jeden przycisk
+     „Zaproponuj zabudowę"; niczego nie zgaduje, bo alias wpisało biuro. */
+  const alias = silnikZTekstu(dobor.dane.silnik, database);
+  const silnikZPola = alias
+    ? { alias, zabudowa: kluczMaszyny ? zabudowaPary(kluczMaszyny, alias.silnik.klucz, database) : null }
+    : null;
   const pomiary = (database.prepare(`
     SELECT z.id, z.tytul, z.wynik, z.wykonano_at, z.wykonano_przez, z.tw_id, t.symbol,
            EXISTS(SELECT 1 FROM dowod_zastosowania d WHERE d.zadanie_id = z.id) AS zaproponowano
@@ -541,7 +548,14 @@ export function wiedzaDoboru(conversationId: number, database: DatabaseSync = db
     }));
   return { zastosowanie: podparcie?.zastosowanie ?? null, zabudowa: podparcie?.zabudowa ?? null,
     pasowanie: dobor.wybrany ? pasowanieWyboru(database, dobor.dane, dobor.wybrany.twId) : null,
-    silniki, pomiary };
+    silniki, silnikZPola, pomiary };
+}
+
+/** Tekst z pola „Silnik" rozpoznany słownikiem i stan pary z wpisaną maszyną. */
+export interface SilnikZPola {
+  alias: AliasSilnika;
+  /** Żywa para (propozycja albo zatwierdzona) dla tej maszyny; `null` = można zaproponować. */
+  zabudowa: Zabudowa | null;
 }
 
 /**

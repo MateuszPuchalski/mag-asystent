@@ -14,7 +14,7 @@ import { Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PasowanieForm } from "../wiedza/PasowanieForm";
-import { useZaproponujPasowanie } from "../api/wiedza";
+import { useZaproponujPasowanie, useZaproponujZabudowe } from "../api/wiedza";
 import { DO_WYBORU_DOBORU, NAZWA_DOBORU } from "./statusy";
 
 /**
@@ -105,6 +105,23 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
      z niego SILNIKI maszyny. Drugie żądanie po to samo byłoby drugim strzałem. */
   const wiedza = useWiedzaDoboru(rozmowaId);
   const silniki = wiedza.data?.silniki ?? [];
+  /* Słownik (0.238.0): tekst z pola „Silnik" rozpoznany aliasem biura. Jedno
+     kliknięcie proponuje zabudowę z dowodem „rozmowa" (klient podał silnik);
+     rozstrzyga człowiek w Wiedza → Silniki, a szczebel rusza po zatwierdzeniu. */
+  const zPola = wiedza.data?.silnikZPola ?? null;
+  const zaproponujZabudowe = useZaproponujZabudowe();
+  const [bladZabudowy, setBladZabudowy] = useState("");
+  const zaproponujZPola = () => {
+    if (!zPola || !dobor.dane.marka || !dobor.dane.model) return;
+    setBladZabudowy("");
+    zaproponujZabudowe.mutate({
+      maszyna: { rodzaj: "maszyna", marka: dobor.dane.marka, nazwa: dobor.dane.model, wariant: dobor.dane.wariant },
+      silnik: { rodzaj: "silnik", marka: zPola.alias.silnik.marka, nazwa: zPola.alias.silnik.nazwa,
+        wariant: zPola.alias.silnik.wariant },
+      rodzajDowodu: "rozmowa", dowodTresc: `klient podał silnik „${dobor.dane.silnik}” w rozmowie`,
+      conversationId: rozmowaId,
+    }, { onError: (e) => setBladZabudowy((e as Error).message) });
+  };
   /* „Pasuje do…": jedyne miejsce, gdzie pasowanie rodzi się Z PRACY. Kotwica
      to kartoteka, którą agent wskazał symbolem/numerem albo kartoteka oferty —
      inna niż wybrany kandydat. Kierunek narzucony (wybrany pasuje DO kotwicy),
@@ -258,10 +275,20 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
         {silniki.length > 0
           ? <>Silnik z bazy: <b>{silniki.map((z) => z.silnik.etykieta).join(" · ")}</b>
             {silniki.length > 1 && " — ta maszyna bywa z kilkoma silnikami, potwierdź z tabliczki"}</>
-          : dobor.dane.silnik
-            ? <>„{dobor.dane.silnik}" to na razie tylko notatka. Dopisz silnik w Wiedza → Silniki,
-              wtedy dobór znajdzie części tego silnika.</>
-            : null}
+          : zPola
+            ? zPola.zabudowa
+              /* Para już czeka: drugi klik dałby 409, więc zamiast przycisku jest zdanie. */
+              ? <>„{dobor.dane.silnik}" to <b>{zPola.alias.silnik.etykieta}</b> (słownik) — para z tą maszyną
+                czeka na rozstrzygnięcie w Wiedza → Silniki.</>
+              : <>„{dobor.dane.silnik}" to <b>{zPola.alias.silnik.etykieta}</b> (słownik). Nikt nie potwierdził,
+                że stoi w {[dobor.dane.marka, dobor.dane.model, dobor.dane.wariant].filter(Boolean).join(" ")}.{" "}
+                <button type="button" className="font-semibold text-violet-800 underline underline-offset-2"
+                  disabled={zaproponujZabudowe.isPending} onClick={zaproponujZPola}>Zaproponuj zabudowę</button>
+                {bladZabudowy && <span className="ml-1 font-semibold text-ranga-zle">{bladZabudowy}</span>}</>
+            : dobor.dane.silnik
+              ? <>„{dobor.dane.silnik}" nie ma w słowniku silników — dopisz go w Wiedza → Silniki,
+                wtedy dobór znajdzie części tego silnika.</>
+              : null}
       </p>}
 
       {edycja && <form className="grid grid-cols-2 gap-2" onSubmit={(e) => { e.preventDefault(); zapiszDane(); }}>

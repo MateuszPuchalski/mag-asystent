@@ -16,6 +16,7 @@ process.env.SGT_MODE = "seeded";
 
 let db: typeof import("../db/db.js").db;
 let S: typeof import("./silniki.js");
+let W: typeof import("./wiedza.js");
 let zapiszDane: typeof import("./dobor.js").zapiszDane;
 
 let biuro = 0;
@@ -31,13 +32,14 @@ const LONCIN = { rodzaj: "silnik" as const, marka: "Loncin", nazwa: "LC1P65FE" }
 before(async () => {
   ({ db } = await import("../db/db.js"));
   S = await import("./silniki.js");
+  W = await import("./wiedza.js");
   ({ zapiszDane } = await import("./dobor.js"));
 });
 
 beforeEach(() => {
   const d = db();
   /* `zabudowa_silnika` PRZED `model_urzadzenia`: ON DELETE RESTRICT. */
-  for (const t of ["zabudowa_silnika", "dowod_zastosowania", "zastosowanie", "model_urzadzenia",
+  for (const t of ["alias_silnika", "zabudowa_silnika", "dowod_zastosowania", "zastosowanie", "model_urzadzenia",
     "dobor_rozmowy", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -156,8 +158,9 @@ test("luki idą od maszyn BEZ silnika, potem po częstości, i nie rozbijają wp
   assert.equal(liczba, 2);
   assert.equal(luki[0].marka, "NAC", "maszyna bez silnika idzie pierwsza");
   assert.equal(luki[0].pytan, 3, "trzy dobory mimo różnej pisowni — klucz je scala");
-  assert.deepEqual(luki[0].wpisaneSilniki, [{ tekst: "B&S 450E", ile: 2 }, { tekst: "Loncin", ile: 1 }],
-    "surowy tekst z licznikiem, nierozbity na markę i nazwę");
+  assert.deepEqual(luki[0].wpisaneSilniki,
+    [{ tekst: "B&S 450E", ile: 2, silnik: null }, { tekst: "Loncin", ile: 1, silnik: null }],
+    "surowy tekst z licznikiem, nierozbity na markę i nazwę; bez aliasu `silnik` jest puste");
   assert.deepEqual(luki[0].zabudowy, []);
   assert.equal(luki[1].marka, "STIGA");
   assert.equal(luki[1].zabudowy.length, 1, "maszyna z silnikiem zostaje na liście, ale niżej");
@@ -171,4 +174,55 @@ test("odczyt luk niczego nie zapisuje", () => {
   S.lukiSilnikow();
   S.kolejkaZabudow();
   assert.equal(licz(), przed, "zero zapisu przy patrzeniu");
+});
+
+/* ── Słownik silników (0.238.0) ──────────────────────────────────────────────
+   Most między tekstem z pola „Silnik" a modelem jest LUDZKI: biuro wpisuje
+   alias, system dopasowuje DOKŁADNIE po zwinięciu. Pilnujemy czterech granic:
+   bez aliasu tekst nic nie znaczy; alias nie zgaduje (żadnej literówki);
+   słownik nigdy nie wskazuje maszyny; dubel to konflikt, nie nadpisanie. */
+
+test("alias dopasowuje tekst po zwinięciu, bez furtki na literówki", () => {
+  const a = S.dodajAliasSilnika({ tekst: "B&S 450E", silnik: BS450 }, { ...ala, userId: biuro });
+  assert.equal(a.silnik.etykieta, "silnik Briggs & Stratton 450E");
+  assert.equal(a.dodal, "A. Lewandowska");
+  for (const t of ["B&S 450E", "b&s 450e", "B&S-450E", "  B & S 450 E "]) {
+    assert.equal(S.silnikZTekstu(t)?.silnik.klucz, a.silnik.klucz, `„${t}” nie trafił w alias`);
+  }
+  /* Jedna litera różnicy to INNY tekst — dobór nie ma prawa zgadywać. */
+  assert.equal(S.silnikZTekstu("B&S 450"), null);
+  assert.equal(S.silnikZTekstu("BS 450E"), null);
+  assert.equal(S.silnikZTekstu(""), null);
+  assert.equal(S.silnikZTekstu(null), null);
+});
+
+test("słownik wskazuje tylko silnik; dubel tekstu to konflikt ze wskazaniem, dokąd prowadzi", () => {
+  assert.throws(() => S.dodajAliasSilnika({ tekst: "NAC", silnik: NAC as unknown as typeof BS450 }, { ...ala, userId: biuro }),
+    /wskazuje SILNIK/);
+  assert.throws(() => S.dodajAliasSilnika({ tekst: "  ", silnik: BS450 }, { ...ala, userId: biuro }), /wymaga tekstu/);
+  S.dodajAliasSilnika({ tekst: "B&S 450E", silnik: BS450 }, { ...ala, userId: biuro });
+  assert.throws(() => S.dodajAliasSilnika({ tekst: "b&s-450e", silnik: LONCIN }, { ...ala, userId: biuro }),
+    (e: Error) => e instanceof W.WiedzaConflict && /znaczy silnik Briggs & Stratton 450E/.test(e.message));
+  /* Hala nie prowadzi słownika — ta sama bramka, co przy rozstrzyganiu. */
+  assert.throws(() => S.dodajAliasSilnika({ tekst: "Honda", silnik: LONCIN }, { name: "B. Nowak", userId: hala }),
+    /człowiek z biura/);
+});
+
+test("usunięcie aliasu zostawia ślad, a luki i para maszyna–silnik czytają słownik", () => {
+  const a = S.dodajAliasSilnika({ tekst: "Lonci v200", silnik: LONCIN }, { ...ala, userId: biuro });
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", silnik: "lonci V200" }, 1, biuro);
+  let luki = S.lukiSilnikow().luki;
+  assert.equal(luki[0].wpisaneSilniki[0].silnik?.klucz, a.silnik.klucz, "czip niesie silnik ze słownika");
+  assert.equal(S.zabudowaPary(luki[0].klucz, a.silnik.klucz), null);
+  const z = zaproponuj(NAC, LONCIN)!;
+  assert.equal(S.zabudowaPary(luki[0].klucz, a.silnik.klucz)?.id, z.id, "żywa para: propozycja");
+  assert.deepEqual(S.aliasySilnikow().map((x) => x.tekst), ["Lonci v200"]);
+
+  S.usunAliasSilnika(a.id, biuro);
+  assert.deepEqual(S.aliasySilnikow(), []);
+  luki = S.lukiSilnikow().luki;
+  assert.equal(luki[0].wpisaneSilniki[0].silnik, null);
+  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
+  assert.ok(typy.includes("alias_silnika_dodany") && typy.includes("alias_silnika_usuniety"));
+  assert.throws(() => S.usunAliasSilnika(a.id, biuro), /Nie znaleziono/);
 });
