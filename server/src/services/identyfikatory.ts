@@ -23,10 +23,14 @@ import {
  * człowiek i dopiero wtedy powstaje propozycja zastosowania.
  */
 
-export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku";
-export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] = ["oem", "nr_oryg", "katalog_obcy", "stare_sku"];
+export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku" | "zamiennik";
+export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] =
+  ["oem", "nr_oryg", "katalog_obcy", "stare_sku", "zamiennik"];
 export const NAZWA_RODZAJU: Record<RodzajIdentyfikatora, string> = {
   oem: "OEM", nr_oryg: "nr oryginału", katalog_obcy: "katalog obcy", stare_sku: "stare SKU",
+  /* Zdanie mówi, SKĄD numer — sekcja zamienników jest słabszym świadectwem
+     niż numer producenta i ekran nie ma prawa zrównać ich podpisem (§11.3). */
+  zamiennik: "z zamienników",
 };
 
 /* Etykiety Z DWUKROPKIEM — bez niego `OEM` w prozie („silnik OEM Honda")
@@ -40,6 +44,18 @@ const ETYKIETY: Array<{ rodzaj: RodzajIdentyfikatora; re: RegExp }> = [
   { rodzaj: "oem", re: /\bO(?:EM|ME)\s*:/gi },
   { rodzaj: "nr_oryg", re: /\b(?:nr\.?\s*oryg(?:inaln[ya]|\.)?|numery?\s+(?:cz[eę][sś]ci\s+)?oryginaln(?:y|ej)(?:\s+cz[eę][sś]ci)?)\s*:/gi },
   { rodzaj: "stare_sku", re: /\bstare\s+sku\s*:/gi },
+  /* SEKCJA ZAMIENNIKÓW (0.234.0). Ta sama rodzina etykiet co w
+     `zamienniki.ts` — świadomie, bo mówi o tej samej liście. Tamten parser
+     czyta ją po SWOJEMU: zostawia wyłącznie tokeny będące NASZĄ kartoteką,
+     a numery obcych katalogów wyrzuca. W eksporcie kartotek z 8 września
+     stało w takich sekcjach 1883 numerów spoza naszej kartoteki, przy 1813
+     wyczytanych ze wszystkich sekcji `OEM:` i `Nr oryg.:` razem — czyli
+     połowa mostka „numer klienta → towar" leżała nieużywana.
+
+     Bez `\b` przed `ZAM`, bo `\b` nie zadziała po myślniku w `PRO-491588-ZAM:`;
+     dwukropek jest tu jedynym wymogiem, tak samo jak w `zamienniki.ts`. */
+  { rodzaj: "zamiennik",
+    re: /\b(?:zamienni[a-ząćęłńóśźż]*|zamienne\s+na|zast[ęe]puje|odpowiednik[a-ząćęłńóśźż]*)\s*:|ZAM\s*:/gi },
 ];
 const MODELE = /\bmodel[e]?\s*:/gi;
 
@@ -123,10 +139,20 @@ export function przebudujIdentyfikatory(database: DatabaseSync = db()): { kartot
   let kartotek = 0; let identyfikatorow = 0;
   transaction(database, () => {
     database.prepare("DELETE FROM towar_identyfikator WHERE zrodlo='opis'").run();
+    /* NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.234.0). Sekcja
+       zamienników miesza jedno z drugim: `Zamiennie: 15-06002 / RO1205 /
+       W28-0503`. Nasze kartoteki czyta stamtąd `zamienniki.ts` i pokazuje
+       jako zamienniki — wpisanie ich tutaj drugi raz mnożyłoby ten sam fakt
+       w dwóch tabelach, a szukanie po numerze i tak znajdzie kartotekę po
+       symbolu. Filtr stoi w PRZEBUDOWIE, nie w parserze: parser jest czystą
+       funkcją i o kartotece nic nie wie. */
+    const nasze = new Set((database.prepare("SELECT symbol FROM sgt_towar").all() as
+      Array<{ symbol: string }>).map((t) => zwin(t.symbol)));
     const ins = database.prepare(`INSERT OR IGNORE INTO towar_identyfikator
       (tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal) VALUES (?,?,?,?,?,'opis','import')`);
     for (const t of kartoteki(database)) {
-      const lista = identyfikatoryZOpisu(t.opis, t.symbol);
+      const lista = identyfikatoryZOpisu(t.opis, t.symbol)
+        .filter((i) => i.rodzaj !== "zamiennik" || !nasze.has(zwin(i.wartosc)));
       if (lista.length === 0) continue;
       kartotek++;
       for (const i of lista) identyfikatorow += Number(ins.run(t.tw_id, t.symbol, i.rodzaj, i.wartosc, zwin(i.wartosc)).changes);
