@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.237.0 — 8 września 2026
+
+**Copilot rozpoznaje dane doboru z rozmowy; agent wpisuje je jednym
+kliknięciem.** Właściciel, nad szkicem o śrubę noża do kosiarki Faworyt
+GTV51N196L-4W1 z silnikiem „Lonci v200", zapytał: „dlaczego dane wejściowe
+nie zostały wprowadzone automatycznie ze szkicu?". Model czytał te dane
+i odsyłał agenta do przepisywania (zastrzeżenie 3a z 0.232.2). Bez danych
+żaden szczebel doboru nie szukał. Trzeci przyrost etapu F (§14.7).
+
+- **To samo wywołanie „Ułóż odpowiedź"** oddaje w `daneDoboru` markę,
+  model, wariant, rocznik, numer seryjny, silnik, numer OEM, nazwę części
+  i parametry — dosłownie tak, jak napisał je klient. Zero dodatkowego kosztu.
+- **Serwer sprawdza każdą wartość przeciw rozmowie** (token z cyfrą po
+  zwinięciu separatorów, słowo po pierwszych czterech literach). Wartość
+  spoza rozmowy wypada z propozycji, szkic zostaje; liczba wyrzuconych idzie
+  do dziennika. Wartość zamaskowana nie ma jak wrócić.
+- **Zakładka Dobór dostaje kartę „Copilot rozpoznał w rozmowie"** z polami,
+  których agent nie ma. „Wpisz do danych" zapisuje je drogą ręcznego zapisu:
+  wersja doboru rośnie, status idzie do `searching`, wyścig kończy się 409.
+  Słowo agenta zostaje — różnicę karta tylko nazywa. „Odrzuć" liczy się
+  w pomiarze. Karta szkicu w edytorze mówi, jakie pola rozpoznano, i dostaje
+  pastylkę „dane doboru zmieniły się od szkicu — ułóż ponownie".
+- **Maskowanie zawężone po kontekście** (decyzja właściciela): dziewięć cyfr
+  tuż po OEM, nr, numer, symbol albo kod nie jest telefonem — inaczej
+  „532 19 93-77" nigdy nie doszłoby do modelu. Cena zapisana w teście:
+  telefon podany jako „nr 601…" bez słowa „tel" przejdzie.
+- Piąta trasa zapisu Copilota `POST /api/obsluga/copilot/szkic/:id/dane`
+  (licznik w teście), kolumny `dane_doboru`, `dane_ocena`, `dane_ocena_at`,
+  `dobor_wersja` w `szkic_copilota` dochodzą migracją. Pomiar zza zębatki
+  liczy los propozycji danych osobno od losu szkicu.
+
+Statusu `extracting_data` to wydanie nie używa — propozycja jest wierszem,
+nie stanem doboru (§7.2).
+
+
 ## 0.236.0 — 8 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU

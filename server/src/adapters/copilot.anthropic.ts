@@ -139,21 +139,46 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
    Osobna instrukcja, bo klasyfikator i redaktor to dwie różne role, a wspólny
    prefiks „jesteś klasyfikatorem" psułby jedną z nich.                       */
 
+/* Dane doboru rozpoznane w rozmowie (przyrost trzeci). Pola jak w `DaneDoboru`,
+   każde `nullable`, bo wyjście strukturalne wymaga WSZYSTKICH kluczy;
+   parametry jako tablica par, bo słownik o dynamicznych kluczach nie ma
+   schematu. Serwis sprawdza każdą wartość przeciw rozmowie i wyrzuca te,
+   których w niej nie ma — model może się pomylić, ale nie może dopisać. */
+const DaneZRozmowy = z.object({
+  marka: z.string().nullable(),
+  model: z.string().nullable(),
+  wariant: z.string().nullable(),
+  rocznik: z.string().nullable(),
+  nrSeryjny: z.string().nullable(),
+  silnik: z.string().nullable(),
+  oem: z.string().nullable(),
+  nazwaCzesci: z.string().nullable(),
+  parametry: z.array(z.object({ nazwa: z.string(), wartosc: z.string() })),
+});
+
 const Szkic = z.object({
   tresc: z.string(),
   uzyteFakty: z.array(z.string()),
   zastrzezenia: z.array(z.string()),
+  daneDoboru: DaneZRozmowy,
 });
 
 /* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
    Tu prefiks jest już dość długi, żeby cache się włączył; sprawdzisz to
    w księdze po `cache_read_input_tokens`.
 
-   Reguła 3 i 3a (0.232.2) mają jeden powód: klientka podała komplet danych
+   Reguła 3 (0.232.2) ma jeden powód: klientka podała komplet danych
    z tabliczki (model FPLMP139) i poprosiła o linkę napędu, a szkic poprosił
    o tabliczkę raz jeszcze, bo fakt intake kazał „zapytać o…", a agent nie
-   wpisał modelu do doboru. Model widział FPLMP139 w rozmowie i nie miał jak
-   powiedzieć tego agentowi. */
+   wpisał modelu do doboru.
+
+   Reguła 3a zastąpiła zastrzeżenie „w rozmowie jest model X, wpisz go"
+   z 0.232.2. Właściciel, patrząc na szkic o śrubę noża (Faworyt GTV51N196L-4W1,
+   silnik „Lonci v200"), zapytał: „dlaczego dane wejściowe nie zostały
+   wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
+   agenta do przepisywania. Teraz oddaje je w `daneDoboru` — DOSŁOWNIE, jak
+   napisał klient — a serwis sprawdza każdą wartość przeciw rozmowie; do
+   danych doboru trafiają dopiero na kliknięcie agenta, w puste pola. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -176,10 +201,14 @@ const INSTRUKCJA_SZKICU = [
   "   poprosisz, sprawdź wiersze KLIENT:. Jeśli klient podał już model,",
   "   dane z tabliczki, wymiary albo zdjęcie, nie proś o nie ponownie —",
   "   potwierdź jednym zdaniem, co masz, i pytaj tylko o resztę.",
-  "3a. Jeśli w rozmowie stoi marka, model albo numer maszyny, a żaden fakt go",
-  "   nie wymienia, dopisz do `zastrzezenia` zdanie dla agenta: „w rozmowie",
-  "   jest model X, w danych doboru go nie ma — wpisz go i ułóż szkic",
-  "   ponownie”. Klientowi tego nie pisz.",
+  "3a. Dane maszyny i części, które stoją w ROZMOWIE (marka, model, wariant,",
+  "   rocznik, numer seryjny, silnik, numer OEM lub symbol, nazwa części,",
+  "   wymiary i parametry), wpisz do `daneDoboru` DOKŁADNIE tak, jak napisał",
+  "   je klient — bez poprawiania pisowni i bez uzupełniania z pamięci. System",
+  "   sprawdza, czy każda wartość stoi w rozmowie, i wyrzuca te, których nie",
+  "   ma. Pola, których rozmowa nie podaje, zostaw puste (null, pusta lista).",
+  "   Nie pytaj klienta o to, co wpisałeś do `daneDoboru`, i nie pisz mu, że",
+  "   agent ma coś wpisać — to robi system.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
   "   sprawdzenie (tabliczka, zdjęcie starej części). Fakt „NIE PASUJE” to",
   "   ostrzeżenie — powiedz je klientowi wprost.",
@@ -194,7 +223,8 @@ const INSTRUKCJA_SZKICU = [
   "„proszę Państwa o”), NIGDY dosłownie „Pan/Pani” ani imię; zwięźle, bez wstępów",
   `o firmie. Najwyżej ${LIMIT_ZNAKOW - 200} znaków. Jedno twierdzenie na zdanie.`,
   "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
-  "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło).",
+  "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło),",
+  "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a).",
 ].join("\n");
 
 /** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
@@ -204,9 +234,10 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
     const odp = await anthropic().messages.parse({
       model: config.copilot.model,
       /* Szkic ma do 1800 znaków polskiego tekstu plus JSON wokół — 1200 tokenów
-         to sufit z zapasem, a nie zaproszenie do rozwlekłości (limit stoi też
-         w instrukcji). */
-      max_tokens: 1200,
+         było sufitem z zapasem; `daneDoboru` dokłada kilkadziesiąt tokenów
+         kluczy i wartości, stąd 1500. To nadal nie jest zaproszenie do
+         rozwlekłości (limit stoi też w instrukcji). */
+      max_tokens: 1500,
       system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta. */
@@ -221,8 +252,15 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
       throw new BladOdpowiedziCopilota(
         `Model nie oddał szkicu (stop: ${odp.stop_reason ?? "?"})`, 200);
     }
+    /* Tablica par → słownik, taki jak w `DaneDoboru`. Pusta nazwa albo pusta
+       wartość wypada tu, nie w serwisie — to jest kształt, nie treść. */
+    const parametry: Record<string, string> = {};
+    for (const p of w.daneDoboru.parametry) {
+      if (p.nazwa.trim() && p.wartosc.trim()) parametry[p.nazwa.trim()] = p.wartosc.trim();
+    }
     return {
       tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
+      daneDoboru: { ...w.daneDoboru, parametry },
       model: odp.model ?? config.copilot.model,
       zuzycie: {
         wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,

@@ -390,6 +390,11 @@ dane z pytania klienta (etap F). Człowiek dane wpisuje, nie wyciąga, więc
 serwis odrzuca ten status z ręki. `CHECK` zostawia go na liście, żeby etap F
 nie przebudowywał tabeli.
 
+Przyrost trzeci etapu F (§14.7) tego statusu NIE użył i nie użyje. Rozpoznanie
+danych jest propozycją w wierszu szkicu, a nie stanem doboru: dobór dostaje
+wartości dopiero na kliknięcie agenta, drogą zwykłego zapisu, więc przechodzi
+z `not_started` wprost do `searching`. Status stoi w `CHECK` jako rezerwa.
+
 Trzy przejścia dzieją się SAME:
 
 - pierwszy zapis danych wejściowych prowadzi `not_started` → `searching`;
@@ -833,6 +838,14 @@ model i kod silnika, numer OEM, nazwę części, parametry, wymiary, dane ze
 zdjęcia oraz wcześniejsze ustalenia. Rozpoznane wartości są propozycją i agent
 może je poprawić.
 
+**Co działa od przyrostu trzeciego etapu F (§14.7).** Copilot rozpoznaje
+markę, model, wariant, rocznik, numer seryjny, silnik, numer OEM, nazwę części
+i parametry z treści rozmowy — przy tym samym wywołaniu, które układa szkic.
+Serwer sprawdza każdą wartość przeciw rozmowie. Zakładka Dobór pokazuje je
+kartą „Copilot rozpoznał w rozmowie", a „Wpisz do danych" zapisuje je jednym
+kliknięciem w PUSTE pola. Słowo agenta zostaje; różnicę karta tylko nazywa.
+Zdjęcia i OCR czekają.
+
 ### 11.2. Kandydaci
 
 Kolejność wyszukiwania: dokładny symbol, EAN, numer OEM, potwierdzone
@@ -1200,8 +1213,10 @@ Znacznik zostaje, żeby model wiedział, że coś tam było.
 **Gdzie kończy się gwarancja.** Adres bez markera i bez kodu pocztowego
 przejdzie — rozpoznawanie adresów w wolnym tekście wyrażeniami regularnymi nie
 jest zadaniem rozwiązywalnym. W drugą stronę: numer OEM zapisany jak telefon
-zniknie jako `[telefon]`. Klasyfikacji ten numer nie jest potrzebny, ale
-przyrost ekstrakcji będzie musiał tę regułę zawęzić. Pilnuje tego test.
+znikał jako `[telefon]`. Klasyfikacji ten numer nie był potrzebny, ale
+przyrost ekstrakcji (§14.7) regułę zawęził: dziewięć cyfr tuż po słowie OEM,
+nr, numer, symbol albo kod zostaje. Cena: telefon podany jako „nr 601…" bez
+słowa „tel" przejdzie do dostawcy. Pilnuje tego test.
 
 **Zużycie zapisujemy od pierwszego wywołania**, w tokenach, nie w złotówkach.
 Kwota w bazie jest kłamstwem od dnia zmiany cennika; liczba tokenów jest
@@ -1253,9 +1268,9 @@ z intake per typ części (nóż, pasek, filtr, linka, rozrusznik, gaźnik
 z uszczelką), wybrane po nazwie części z DANYCH DOBORU, nigdy z treści
 wiadomości. Słownik pytań jest kodem, nie promptem. Przy wyborze
 z potwierdzonym dowodem pytań nie ma — udawałyby niewiedzę. Szkic pyta
-tylko o to, czego rozmowa jeszcze nie zawiera; model z rozmowy, którego nie
-ma w faktach, wraca do agenta jako zastrzeżenie „wpisz go do doboru"
-(0.232.2).
+tylko o to, czego rozmowa jeszcze nie zawiera (0.232.2). Model z rozmowy,
+którego nie ma w faktach, wracał do agenta jako zastrzeżenie „wpisz go do
+doboru"; od przyrostu trzeciego wraca jako propozycja danych doboru (§14.7).
 
 **Do dostawcy idzie cały wątek, zamaskowany, z sufitem.** Decyzja
 właściciela; zapis w polityce danych skrzynki (`docs/obsluga-klienta.md`).
@@ -1280,6 +1295,44 @@ razy więcej niż etykieta.
 użył; odrzucony — że napisał sam. Ten odsetek, nie liczba wywołań, mówi, czy
 przycisk jest wart pieniędzy. „Confidence bez konsekwencji to dekoracja" —
 z tej samej krytyki.
+
+### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
+
+Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
+Faworyt GTV51N196L-4W1 z silnikiem „Lonci v200": „dlaczego dane wejściowe nie
+zostały wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
+agenta do przepisywania. Bez nich żaden szczebel doboru nie szukał.
+
+**Trzy decyzje właściciela.** Rozpoznanie idzie RAZEM ze szkicem — to samo
+wywołanie „Ułóż odpowiedź", zero dodatkowego kosztu. Jedno kliknięcie
+wpisuje: karta w zakładce Dobór pokazuje wartości, a „Wpisz do danych"
+zapisuje je w puste pola. Maskowanie zawężone po kontekście: dziewięć cyfr
+tuż po OEM, nr, numer, symbol albo kod nie jest telefonem (§14.5).
+
+**Model oddaje, serwer sprawdza, agent wpisuje.** Model wpisuje do
+`daneDoboru` dane maszyny i części dosłownie tak, jak napisał je klient.
+Serwer sprawdza każdą wartość przeciw ZAMASKOWANEMU wątkowi, czyli temu, co
+model widział: każdy token z cyfrą musi stać w rozmowie po zwinięciu
+separatorów, a każde słowo musi mieć swoje pierwsze cztery litery w rozmowie.
+Wartość spoza rozmowy wypada z propozycji, a szkic zostaje — jest wart
+pieniędzy sam w sobie. Liczba wyrzuconych idzie do dziennika jako miara tego,
+ile model zmyśla. Wartość zamaskowana nie ma jak wrócić.
+
+**Tylko puste pola.** Propozycja mieszka w wierszu `szkic_copilota`, nie
+w `dobor_rozmowy`. Kliknięcie „Wpisz do danych" idzie drogą ręcznego zapisu:
+wersja doboru rośnie, dziennik dostaje `dobor_dane`, status przechodzi
+z `not_started` do `searching`, a wyścig kończy się tym samym 409. Słowo
+agenta zostaje; pola, które ma inaczej niż model, karta wymienia jednym
+zdaniem i nie nadpisuje. Blizna szarpaka nietknięta: szczeble czytają
+wyłącznie `dobor_rozmowy`, a tam trafia tylko to, co agent kliknął.
+
+**Los propozycji jest miarą.** `wpisane` albo `odrzucone` liczy się osobno
+od losu szkicu, bo dobry szkic bywa ze złym modelem i odwrotnie. Pomiar zza
+zębatki mówi, w ilu szkicach model coś rozpoznał i co agent z tym zrobił.
+Karta szkicu w edytorze tylko mówi, jakie pola rozpoznano — bez drugiego
+przycisku, bo dane wpisuje się tam, gdzie stoją. Zmiana danych doboru po
+szkicu czyni go nieświeżym tak samo jak dopisek klienta: pastylka mówi
+„ułóż ponownie", bo fakty są inne.
 
 ## 15. Model danych
 
@@ -1511,7 +1564,8 @@ pozytywne i negatywne zastosowania, dowody.
 **F — Copilot:** klasyfikacja, ekstrakcja, OCR, brakujące dane, kandydaci,
 porównanie, szkic z dowodami. Przyrost pierwszy — klasyfikacja wiadomości —
 stoi (§14.5). Przyrost drugi — szkic z dowodami — stoi od 0.231.0 (§14.6).
-Reszta czeka.
+Przyrost trzeci — dane doboru z rozmowy — stoi (§14.7). OCR, kandydaci
+i porównanie czekają.
 
 **G — automatyzacje:** priorytety, routing, terminy, odłożenie, sugestie
 poprawy ofert, analiza powodów kontaktu, kolejne kanały.
@@ -2613,7 +2667,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; numery spoza faktów odrzuca kod |
-| Copilot — ekstrakcja, OCR, kandydaci (§14.1) | **projekt** | etap F, przyrosty dalsze |
+| Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu, kolumny `dane_doboru`/`dane_ocena` w `szkic_copilota`, karta „Copilot rozpoznał w rozmowie" w `skrzynka/Dobor.tsx`; wpisuje agent, tylko w puste pola |
+| Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
 | Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |

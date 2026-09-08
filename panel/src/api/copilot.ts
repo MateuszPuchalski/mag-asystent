@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
-import type { OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii } from "./typy";
+import type {
+  OcenaDanych, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii,
+} from "./typy";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
    Osobny plik, nie dopisek do `rozmowy.ts`: tamten ma już ponad dwadzieścia
@@ -104,6 +106,30 @@ export function useOcenSzkic() {
         { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+    },
+  });
+}
+
+/**
+ * Los danych doboru rozpoznanych w rozmowie (przyrost trzeci): „wpisane"
+ * idzie z WERSJĄ doboru, bo serwer zapisuje je drogą ręcznego zapisu i 409
+ * przy wyścigu jest tym samym 409, co przy formularzu. Konflikt NIE jest tu
+ * łapany — zakładka Dobór mówi „ktoś zmienił dane — odśwież".
+ *
+ * Unieważnia rozmowę (propozycja i dobór jadą w `osRozmowy`), kolejkę
+ * (pastylka statusu doboru) i kandydatów (nowe dane = nowe szczeble).
+ */
+export function useOcenDaneDoboru() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; ocena: OcenaDanych; expectedVersion?: number }) =>
+      api<{ szkic: SzkicCopilota }>(`/api/obsluga/copilot/szkic/${v.rozmowaId}/dane`,
+        { method: "POST", body: JSON.stringify({ ocena: v.ocena, expectedVersion: v.expectedVersion }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.kandydaci(v.rozmowaId) });
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
     },
   });

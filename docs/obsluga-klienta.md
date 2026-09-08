@@ -373,8 +373,17 @@ rezerwacje, rozbicie na magazyny, opis kartoteki w całości (bywa notatką
 magazynu), historia zakupów klienta ani jego adres.
 
 Granica gwarancji maskowania jest ta sama, co wyżej: adres bez markera i bez
-kodu pocztowego przejdzie. Szkic nie staje się odpowiedzią sam — wraca jako
-propozycja pod edytorem i do szkicu trafia na jawne kliknięcie agenta.
+kodu pocztowego przejdzie. Od przyrostu trzeciego etapu F dziewięć cyfr tuż
+po słowie OEM, nr, numer, symbol albo kod NIE jest maskowane jako telefon —
+decyzja właściciela, żeby numer OEM dało się rozpoznać. Cena: telefon podany
+jako „nr 601…" bez słowa „tel" wyjdzie do dostawcy. Szkic nie staje się
+odpowiedzią sam — wraca jako propozycja pod edytorem i do szkicu trafia na
+jawne kliknięcie agenta.
+
+Z tego samego wywołania wracają DANE DOBORU rozpoznane w rozmowie: marka,
+model, silnik, numer, nazwa części, parametry. Serwer sprawdza każdą wartość
+przeciw zamaskowanemu wątkowi i wyrzuca te, których tam nie ma. Do pól doboru
+wchodzą dopiero na kliknięcie agenta, wyłącznie w puste pola.
 
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
 loginem rozmówcy nie są pobierane.

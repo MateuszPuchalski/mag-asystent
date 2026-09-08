@@ -329,7 +329,22 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   przez           TEXT NOT NULL,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('wstawiony','zastapiony','odrzucony')),
-  ocena_at        TEXT
+  ocena_at        TEXT,
+  -- DANE DOBORU ROZPOZNANE W ROZMOWIE (etap F, przyrost trzeci). JSON w kształcie
+  -- `DaneDoboru`; NULL = model niczego nie znalazł albo nic nie przeszło
+  -- sprawdzenia. Kolumny PRZY SZKICU, nie osobna tabela: propozycja rodzi się
+  -- z tego samego wywołania i ginie z następnym, a jej los liczy się tak samo
+  -- jak los szkicu. To NIE jest `dobor_rozmowy` — tam trafia wyłącznie to, co
+  -- agent kliknął (blizna szarpaka: szczeble czytają tylko tamtą tabelę).
+  dane_doboru     TEXT,
+  -- Los propozycji danych: `wpisane` = agent kliknął i puste pola dostały
+  -- wartości; `odrzucone` = odesłał. Osobno od `ocena`, bo szkic i dane mają
+  -- różne losy — dobry szkic z błędnym modelem i odwrotnie.
+  dane_ocena      TEXT CHECK (dane_ocena IS NULL OR dane_ocena IN ('wpisane','odrzucone')),
+  dane_ocena_at   TEXT,
+  -- Wersja `dobor_rozmowy` w chwili szkicu: zmiana danych doboru po szkicu
+  -- czyni go nieświeżym tak samo jak dopisek klienta.
+  dobor_wersja    INTEGER NOT NULL DEFAULT 0
 );
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────

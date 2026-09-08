@@ -122,6 +122,7 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
       </>}
 
       {widok === "dobor" && <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
+        propozycja={dane.szkicCopilota}
         onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />}
 
       {widok === "klient" && <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}

@@ -22,6 +22,10 @@ export interface PropsSzkicuCopilota {
   szkic: SzkicCopilota | null;
   /** Klient dopisał po tym, jak szkic powstał — propozycja odpowiada na stare pytanie. */
   nieswiezy: boolean;
+  /** Bieżąca wersja doboru; inna niż w szkicu = fakty się zmieniły od szkicu. `null` = nieznana. */
+  doborWersja: number | null;
+  /** Nazwy pól doboru, które Copilot rozpoznał w rozmowie, a agent jeszcze nie ma (liczy `propozycjaDoboru`). */
+  nowePolaDoboru: string[];
   uklada: boolean;
   blad: string;
   /** Szkic agenta jest niepusty — dopiero wtedy „Zastąp" ma sens. */
@@ -61,6 +65,13 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
       <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez}</span>
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
+      {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
+          po szkicu — zwykle dlatego, że agent właśnie wpisał to, co Copilot
+          rozpoznał. Fakty są inne, więc szkic trzeba ułożyć jeszcze raz.
+          Zero w szkicu = wiersz sprzed migracji, o którym nic nie wiemy. */}
+      {p.doborWersja !== null && s.doborWersja > 0 && s.doborWersja !== p.doborWersja &&
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
+          dane doboru zmieniły się od szkicu — ułóż ponownie</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
         <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onWstaw}>Wstaw do szkicu</Przycisk>
         {p.maSzkicAgenta && <Przycisk className="text-xs" disabled={p.wylaczony} onClick={p.onZastap}>Zastąp szkic</Przycisk>}
@@ -68,6 +79,10 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
       </span>
     </div>
     <div className="max-h-56 overflow-y-auto" data-testid="szkic-copilota-tresc">
+      {/* Bez drugiego przycisku „Wpisz": dane wpisuje się tam, gdzie stoją —
+          w zakładce Dobór. Tu tylko zdanie, żeby agent wiedział, że są. */}
+      {p.nowePolaDoboru.length > 0 && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
+        Copilot rozpoznał w rozmowie: {p.nowePolaDoboru.join(", ")} — wpisz je w zakładce Dobór.</p>}
       {s.zastrzezenia.length > 0 && <ul className="mb-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
         aria-label="Czego model nie znalazł w faktach">
         {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}

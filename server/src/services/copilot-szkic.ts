@@ -7,14 +7,14 @@ import {
   zamaskujWatek, zostalyDaneOsobowe, type TrescBezpieczna, type WiadomoscWatku,
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
-import { doborRozmowy, wiedzaDoboru } from "./dobor.js";
+import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor.js";
 import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { buildProductCard } from "./stock.js";
 import { pasowaniaTowaru } from "./pasowania.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
-import { bezPodpisu } from "../tekst.js";
+import { bezPodpisu, zwin } from "../tekst.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -60,6 +60,8 @@ export interface KontekstSzkicu {
   watek: TrescBezpieczna;
   /** Ostatnia wiadomość KLIENTA — na niej liczymy świeżość propozycji. */
   ostatniaWiadomoscId: number | null;
+  /** Wersja doboru w chwili układania — zmiana danych po szkicu czyni go nieświeżym. */
+  doborWersja: number;
 }
 
 /** Surowa odpowiedź modelu. Walidacja jest niżej, w `ulozSzkic`. */
@@ -67,6 +69,12 @@ export interface OdpowiedzSzkicu {
   tresc: string;
   uzyteFakty: string[];
   zastrzezenia: string[];
+  /**
+   * Dane maszyny i części, które model ODCZYTAŁ z rozmowy (przyrost trzeci).
+   * `null` = nadawca ich nie oddaje (atrapy w testach). Surowe: sprawdzenie
+   * przeciw rozmowie robi `oczyscPropozycje`, nie adapter.
+   */
+  daneDoboru: DaneDoboru | null;
   model: string;
   zuzycie: Tokeny;
   ms: number;
@@ -83,6 +91,10 @@ export type NadawcaSzkicu = (watek: TrescBezpieczna, fakty: FaktyBezpieczne) => 
 export const OCENY_SZKICU = ["wstawiony", "zastapiony", "odrzucony"] as const;
 export type OcenaSzkicu = (typeof OCENY_SZKICU)[number];
 
+/** Los propozycji DANYCH — osobny od losu szkicu, bo bywają różne. */
+export const OCENY_DANYCH = ["wpisane", "odrzucone"] as const;
+export type OcenaDanych = (typeof OCENY_DANYCH)[number];
+
 export interface SzkicCopilota {
   tresc: string;
   zastrzezenia: string[];
@@ -92,6 +104,15 @@ export interface SzkicCopilota {
   at: string;
   przez: string;
   ocena: OcenaSzkicu | null;
+  /**
+   * Dane doboru rozpoznane w rozmowie i SPRAWDZONE przeciw niej. `null` = nic
+   * nie rozpoznano. To propozycja: do `dobor_rozmowy` wchodzi na kliknięcie
+   * agenta (`przyjmijDaneDoboru`), wyłącznie w puste pola.
+   */
+  daneDoboru: DaneDoboru | null;
+  daneOcena: OcenaDanych | null;
+  /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
+  doborWersja: number;
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -159,6 +180,67 @@ export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
     if (!korpus.includes(m.toUpperCase())) obce.add(m);
   }
   return [...obce];
+}
+
+/* ── Dane doboru z rozmowy: sprawdzenie przeciw temu, co model widział ──────
+   Model może POMYLIĆ pole (wpisać silnik jako model), ale nie może DOPISAĆ
+   wartości, której w rozmowie nie ma — a to drugie kosztowałoby zły dobór,
+   bo dane doboru karmią szczeble wyszukiwania. Reguła jest deterministyczna
+   jak `numerySpozaFaktow`: każdy token z cyfrą musi stać w rozmowie po `zwin`
+   („532 19 93-77" = „532199377"), a każde słowo bez cyfry musi mieć swoje
+   pierwsze cztery litery w rozmowie — „śrubę do noża" pokrywa „śruba noża",
+   „linki napędowej" pokrywa „linka napędu". Sprawdzamy przeciw ZAMASKOWANEMU
+   wątkowi, bo to on poszedł do modelu: wartość, która zniknęła jako
+   `[telefon]`, nie ma jak wrócić do danych.                                  */
+
+const KLUCZE_DANYCH: Array<keyof Omit<DaneDoboru, "parametry">> = [
+  "marka", "model", "wariant", "rocznik", "nrSeryjny", "silnik", "oem", "nazwaCzesci",
+];
+
+export function wartoscZRozmowy(wartosc: string, watek: string): boolean {
+  const w = wartosc.trim();
+  if (!w || w.length > 120) return false;
+  const tekst = watek.toLowerCase();
+  const zwiniety = zwin(watek).toLowerCase();
+  const tokeny = w.split(/[\s,;:()]+/).filter(Boolean);
+  if (tokeny.length === 0) return false;
+  for (const t of tokeny) {
+    if (/\d/.test(t)) {
+      if (!zwiniety.includes(zwin(t).toLowerCase())) return false;
+    } else {
+      const rdzen = t.toLowerCase().replace(/[^\p{L}]/gu, "").slice(0, 4);
+      if (rdzen && !tekst.includes(rdzen)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Propozycja po sprawdzeniu: zostają wyłącznie wartości, które stoją
+ * w rozmowie. `null`, gdy nie zostało nic. Druga liczba to ile wypadło —
+ * idzie do dziennika jako miara, ile model zmyśla.
+ */
+export function oczyscPropozycje(
+  dane: DaneDoboru | null, watek: string,
+): { dane: DaneDoboru | null; odrzuconych: number } {
+  if (!dane) return { dane: null, odrzuconych: 0 };
+  let odrzuconych = 0;
+  let cokolwiek = false;
+  const czyste: DaneDoboru = {
+    marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
+    silnik: null, oem: null, nazwaCzesci: null, parametry: {},
+  };
+  for (const k of KLUCZE_DANYCH) {
+    const v = (dane[k] ?? "").trim();
+    if (!v) continue;
+    if (wartoscZRozmowy(v, watek)) { czyste[k] = v; cokolwiek = true; } else odrzuconych += 1;
+  }
+  for (const [nazwa, wartosc] of Object.entries(dane.parametry ?? {})) {
+    const n = nazwa.trim(); const v = String(wartosc ?? "").trim();
+    if (!n || !v) continue;
+    if (wartoscZRozmowy(v, watek)) { czyste.parametry[n] = v; cokolwiek = true; } else odrzuconych += 1;
+  }
+  return { dane: cokolwiek ? czyste : null, odrzuconych };
 }
 
 /** Login rozmówcy z WĄTKU Allegro — nie z tematu, bo temat bywa tytułem oferty. */
@@ -279,6 +361,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     fakty, tekstFaktow,
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
+    doborWersja: dobor.wersja,
   };
 }
 
@@ -336,23 +419,31 @@ export async function ulozSzkic(
 
   /* Dopiero TERAZ, po sprawdzeniu: odwołania były potrzebne kontroli, klientowi nie. */
   const tresc = bezZnacznikow(odp.tresc);
+  /* Dane z rozmowy: zmyślona wartość NIE odrzuca szkicu (szkic jest wart
+     pieniędzy sam w sobie), tylko wypada z propozycji; liczbę notujemy. */
+  const propozycja = oczyscPropozycje(odp.daneDoboru, String(k.watek));
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
-      (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?)
+      (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
+       dane_doboru,dobor_wersja)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
-        /* Nowa propozycja — stara ocena jej nie dotyczy. */
-        ocena=NULL, ocena_at=NULL`)
+        dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
+        /* Nowa propozycja — stara ocena jej nie dotyczy; danych też. */
+        ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
-        k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id);
+        k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
+        propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja);
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
       conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,
       faktow: k.fakty.length, model: odp.model, tokeny: odp.zuzycie,
+      polDoboru: propozycja.dane ? liczbaPol(propozycja.dane) : 0,
+      polOdrzuconych: propozycja.odrzuconych,
     }, kto.id, db());
     db().prepare("INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)")
       .run(conversationId, "copilot_szkic",
@@ -379,9 +470,64 @@ export function ocenSzkic(
   return { ocena: ocena as OcenaSzkicu };
 }
 
+const liczbaPol = (d: DaneDoboru) =>
+  KLUCZE_DANYCH.filter((k) => d[k]).length + Object.keys(d.parametry).length;
+
+/**
+ * Agent kliknął „Wpisz do danych": propozycja wchodzi do `dobor_rozmowy`
+ * WYŁĄCZNIE w puste pola — to, co agent wpisał sam, jest jego słowem i zostaje.
+ * Zapis idzie przez `zapiszDane`, więc dostaje wszystko, co ręczny: wersję,
+ * dziennik `dobor_dane`, przejście `not_started → searching`, zdarzenie dla
+ * ekranów i 409 przy wyścigu (leci dalej, jak z ręki). Gdy nic nie było puste,
+ * los jest „wpisane" bez zapisu doboru — agent to już miał.
+ */
+export function przyjmijDaneDoboru(
+  conversationId: number, expectedVersion: number, kto: { id: number; name: string }, teraz = new Date(),
+): SzkicCopilota {
+  const s = szkicCopilota(conversationId);
+  if (!s || !s.daneDoboru) throw new Error("Ta rozmowa nie ma propozycji danych doboru");
+  if (s.daneOcena !== null) throw new Error("Propozycja danych została już oceniona");
+  const biezace = doborRozmowy(conversationId).dane;
+  const czesc: Partial<DaneDoboru> = {};
+  let pol = 0;
+  for (const k of KLUCZE_DANYCH) {
+    if (s.daneDoboru[k] && !biezace[k]) { czesc[k] = s.daneDoboru[k]; pol += 1; }
+  }
+  const parametry = { ...biezace.parametry };
+  for (const [n, v] of Object.entries(s.daneDoboru.parametry)) {
+    if (!(n in parametry)) { parametry[n] = v; pol += 1; }
+  }
+  if (pol > 0) {
+    czesc.parametry = parametry;
+    zapiszDane(conversationId, czesc, expectedVersion, kto.id);
+  }
+  transaction(db(), () => {
+    db().prepare("UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=? WHERE conversation_id=?")
+      .run(teraz.toISOString(), conversationId);
+    /* Liczby, nie wartości (§19) — wartości są w `dobor_dane` z ręcznego zapisu. */
+    logEvent("copilot_dane_doboru", kto.name, null, { conversationId, ocena: "wpisane", pol }, kto.id, db());
+  })();
+  return szkicCopilota(conversationId)!;
+}
+
+/** Agent odesłał propozycję danych. Wiersz zostaje dla pomiaru. */
+export function odrzucDaneDoboru(
+  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
+): SzkicCopilota {
+  const s = szkicCopilota(conversationId);
+  if (!s || !s.daneDoboru) throw new Error("Ta rozmowa nie ma propozycji danych doboru");
+  transaction(db(), () => {
+    db().prepare("UPDATE szkic_copilota SET dane_ocena='odrzucone', dane_ocena_at=? WHERE conversation_id=?")
+      .run(teraz.toISOString(), conversationId);
+    logEvent("copilot_dane_doboru", kto.name, null, { conversationId, ocena: "odrzucone" }, kto.id, db());
+  })();
+  return szkicCopilota(conversationId)!;
+}
+
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
-  const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena
+  const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
+      dane_doboru, dane_ocena, dobor_wersja
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -391,6 +537,9 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     messageId: w.message_id == null ? null : Number(w.message_id),
     model: String(w.model), at: String(w.at), przez: String(w.przez),
     ocena: w.ocena == null ? null : String(w.ocena) as OcenaSzkicu,
+    daneDoboru: w.dane_doboru == null ? null : JSON.parse(String(w.dane_doboru)) as DaneDoboru,
+    daneOcena: w.dane_ocena == null ? null : String(w.dane_ocena) as OcenaDanych,
+    doborWersja: Number(w.dobor_wersja ?? 0),
   };
 }
 

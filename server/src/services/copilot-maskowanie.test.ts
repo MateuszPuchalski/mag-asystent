@@ -96,14 +96,27 @@ test("dane techniczne przeżywają maskowanie", () => {
 
 /* ── Cena, którą płacimy świadomie ───────────────────────────────────────
    Numer OEM bywa nieodróżnialny od telefonu: dziewięć cyfr ze spacjami
-   i myślnikiem. Klasyfikacji numer nie jest potrzebny — wystarczy jej ślad.
-   PRZYROST EKSTRAKCJI BĘDZIE MUSIAŁ TĘ REGUŁĘ ZAWĘZIĆ i ten test jest po to,
-   żeby odkrył to na zielono, a nie po trzech wydaniach na produkcji. */
-test("numer OEM w kształcie telefonu znika — cena zapisana jako umowa", () => {
-  const t = bez("Czy pasuje numer 532 19 93-77 do mojej kosiarki");
-  assert.match(t, /\[telefon\]/);
-  assert.match(t, /Czy pasuje numer/);
-  assert.match(t, /do mojej kosiarki/);
+   i myślnikiem. Do przyrostu ekstrakcji znikał jako `[telefon]` i ten test
+   pilnował tej ceny. Przyrost trzeci REGUŁĘ ZAWĘZIŁ (decyzja właściciela,
+   8.09.2026): dziewięć cyfr tuż po OEM / nr / numer / symbol / kod zostaje,
+   bo rozpoznanie danych doboru ma ten numer oddać. Nowa cena stoi niżej. */
+test("numer OEM po słowie „numer”, „OEM”, „nr”, „symbol” albo „kod” zostaje", () => {
+  for (const zd of ["Czy pasuje numer 532 19 93-77 do mojej kosiarki", "OEM: 532199377",
+    "nr 532-19-93-77", "Symbol 532 199 377", "kod 532199377"]) {
+    const t = bez(zd);
+    assert.doesNotMatch(t, /\[telefon\]/, `numer OEM zniknął: ${zd} → ${t}`);
+  }
+});
+
+test("telefon ze słowem „tel” przed cyframi znika także po „nr” — a goły numer nadal znika", () => {
+  for (const zd of ["nr tel. 601 234 567", "nr tel 601234567", "Numer telefonu: 601 234 567",
+    "dzwońcie 601 234 567", "601234567"]) {
+    const t = bez(zd);
+    assert.match(t, /\[telefon\]/, `telefon przeszedł: ${zd} → ${t}`);
+    assert.equal(/\d{3}/.test(t.replace("[telefon]", "")), false, `cyfry przeszły: ${zd} → ${t}`);
+  }
+  /* Zapisana cena zawężenia: telefon podany jako „nr 601…" bez słowa „tel". */
+  assert.doesNotMatch(bez("nr 601 234 567"), /\[telefon\]/);
 });
 
 test("asercja końcowa nie znajduje niczego w zamaskowanym tekście", () => {

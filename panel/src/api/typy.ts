@@ -106,7 +106,11 @@ export type PomiarCopilota = {
   wgKategorii: Array<{ kategoria: string; ile: number; ocen: number; trafnych: number }>;
   /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
-  szkice: { ile: number; wstawionych: number; zastapionych: number; odrzuconych: number };
+  szkice: {
+    ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
+    /** Los danych doboru z rozmowy — osobno od losu szkicu. */
+    daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
+  };
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
@@ -267,7 +271,17 @@ export type SzkicCopilota = {
   at: string;
   przez: string;
   ocena: OcenaSzkicu | null;
+  /**
+   * Dane doboru rozpoznane w rozmowie (przyrost trzeci), sprawdzone przez
+   * serwer przeciw wątkowi. `null` = nic nie rozpoznano. To PROPOZYCJA: do
+   * pól doboru wchodzi na kliknięcie agenta, wyłącznie w puste.
+   */
+  daneDoboru: DaneDoboru | null;
+  daneOcena: OcenaDanych | null;
+  /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
+  doborWersja: number;
 };
+export type OcenaDanych = "wpisane" | "odrzucone";
 
 /* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
    Lista statusów ZAMKNIĘTA, wprost z §7 — trzecia kopia obok `STATUSY_DOBORU`
