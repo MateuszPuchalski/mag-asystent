@@ -43,9 +43,21 @@
    Dlatego `vh` stoi samo, a `dvh` pod `@supports` — bloku warunkowego żaden
    minifikator nie sklei z regułą obok, bo nie wolno mu. */
 @media (min-width: 1024px) {
-  .rama-okna { height: 100vh; }
+  /* RAMA NIE UŻYWA JUŻ ŻADNEJ JEDNOSTKI OKNA (0.236.0). `100dvh` przewróciło
+     ramę w 0.165.0, a `100vh` dołożony w 0.233.0 jako zapas okazał się tylko
+     drugim zakładem o to, co przeglądarka rozumie i jak liczy. `inset: 0` przy
+     `position: fixed` NIE JEST zakładem: to definicja kadru widocznego, znana
+     każdej przeglądarce od kilkunastu lat i wolna od różnicy między oknem
+     układu a oknem widocznym, o którą rozbił się `vh` na tablecie.
 
-  @supports (height: 100dvh) {
-    .rama-okna { height: 100dvh; }
+     Modale (`fixed inset-0`) pozycjonują się teraz względem tej ramy, nie
+     względem okna — a że rama JEST oknem co do piksela, na ekranie nie zmienia
+     to nic. Zmierzone, nie założone.
+
+     Poniżej `lg` ramy nie ma świadomie (§10.5): widok wąski przewija się cały,
+     więc pozycjonowanie zostaje statyczne i strona zachowuje się normalnie. */
+  .rama-okna {
+    position: fixed;
+    inset: 0;
   }
 }
