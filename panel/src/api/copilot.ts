@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
-import type { PomiarCopilota, StanCopilota, WynikPartii } from "./typy";
+import type { OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii } from "./typy";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
    Osobny plik, nie dopisek do `rozmowy.ts`: tamten ma już ponad dwadzieścia
@@ -72,6 +72,37 @@ export function useOcenKlasyfikacje() {
         { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+    },
+  });
+}
+
+/* ── Szkic odpowiedzi z faktów (§14.6, 0.231.0) ──────────────────────────────
+   Jedna rozmowa na kliknięcie. Unieważnia ROZMOWĘ, bo propozycja jedzie
+   w `osRozmowy` obok szkicu agenta — i pomiar, bo każde wywołanie kosztuje. */
+
+export function useUlozSzkic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number }) =>
+      api<{ szkic: SzkicCopilota }>("/api/obsluga/copilot/szkic",
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+    },
+  });
+}
+
+/** Werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. To jest miernik. */
+export function useOcenSzkic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; ocena: OcenaSzkicu }) =>
+      api<{ ocena: OcenaSzkicu }>(`/api/obsluga/copilot/szkic/${v.rozmowaId}/ocena`,
+        { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
+    onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
     },

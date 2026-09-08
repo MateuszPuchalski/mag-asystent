@@ -352,6 +352,29 @@ uruchamia agent klawiszem, a potwierdzenie mówi wprost, że to kosztuje.
 Do klienta dalej mówi wyłącznie człowiek — klasyfikacja nie pisze do niego ani
 jednego znaku.
 
+**Szkic odpowiedzi z Copilota wysyła CAŁY WĄTEK — zamaskowany, z sufitem
+(0.231.0).** Decyzja właściciela z 7 września: krótka odpowiedź klienta
+(„tak, GX160") bez naszego pytania nie mówi modelowi nic. Do dostawcy idą
+wszystkie wiadomości TEJ JEDNEJ rozmowy, także nasze wychodzące, bo agent bywa
+cytuje klienta. Każda przechodzi przez to samo maskowanie co przy
+klasyfikacji; stopka firmowa jest wycięta. Sufit to dwanaście wiadomości albo
+sześć tysięcy znaków, liczone od najnowszej; starsze zastępuje jeden znacznik
+`[wcześniejsze wiadomości pominięte]`. Login do maskowania bierze się z wątku
+Allegro, nie z tematu rozmowy — temat bywa tytułem oferty i wtedy login
+w treści zostawał odsłonięty.
+
+Obok rozmowy idą FAKTY, które układa serwer: kartoteka oferty (symbol, nazwa,
+EAN, numery, dostępność dziś), dane doboru wpisane przez agenta, kandydaci
+i negatywy ze zdaniami źródła, wiedza o zastosowaniach, silnikach, pasowaniach
+i pomiarach z tej rozmowy. Podpisy dowodów jadą BEZ nazwiska pracownika —
+model go nie potrzebuje, a klient nie ma go dostać. Nie idą: półka,
+rezerwacje, rozbicie na magazyny, opis kartoteki w całości (bywa notatką
+magazynu), historia zakupów klienta ani jego adres.
+
+Granica gwarancji maskowania jest ta sama, co wyżej: adres bez markera i bez
+kodu pocztowego przejdzie. Szkic nie staje się odpowiedzią sam — wraca jako
+propozycja pod edytorem i do szkicu trafia na jawne kliknięcie agenta.
+
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
 loginem rozmówcy nie są pobierane.
 

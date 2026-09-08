@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { config, bledyKonfiguracji, bezpiecznaWartosc } from "./config.js";
+import { config, bledyKonfiguracji, ostrzezeniaKonfiguracji, bezpiecznaWartosc } from "./config.js";
 
 /* Kody Subiekta jako test, nie jako komentarz.
    ─────────────────────────────────────────────────────────────────────────
@@ -290,9 +290,13 @@ test("brak klucza nie jest błędem konfiguracji, gdy Copilot jest wyłączony",
   assert.equal(bledyKonfiguracji(bez).filter((b) => b.includes("COPILOT")).length, 0);
 
   /* Włączony bez klucza mówi ZDANIE, ale start ma przeżyć: usługa NSSM, która
-     odmawia startu, wpada w pętlę restartów — objaw z 0.84.1. */
+     odmawia startu, wpada w pętlę restartów — objaw z 0.84.1. Do 0.230.0 ten
+     test szukał zdania w liście BŁĘDÓW — a każdy błąd tej listy zatrzymuje
+     serwer, więc test pilnował dokładnie odwrotności tego, co obiecywał. */
   (bez.copilot as { mode: string }).mode = "anthropic";
-  const o = bledyKonfiguracji(bez).find((b) => b.startsWith("COPILOT_MODE=anthropic"));
+  assert.equal(bledyKonfiguracji(bez).filter((b) => b.includes("COPILOT")).length, 0,
+    "brak klucza zatrzymałby start");
+  const o = ostrzezeniaKonfiguracji(bez).find((b) => b.startsWith("COPILOT_MODE=anthropic"));
   assert.ok(o, "brak ostrzeżenia o włączonym Copilocie bez klucza");
   assert.match(o, /Serwer działa dalej/, "człowiek ma wiedzieć, że to nie jest awaria startu");
 });

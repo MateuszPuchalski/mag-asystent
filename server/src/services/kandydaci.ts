@@ -86,7 +86,7 @@ const wygladaNaNumer = (v: string | null) =>
   Boolean(v && v.trim().length >= 4 && v.trim().length <= 40 && (v.match(/\d/g) ?? []).length >= 2);
 
 /** Oferta, o którą chodzi: ręczne wskazanie bije numer z wiadomości. */
-function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto: number; ofertaId: string } | null {
+export function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto: number; ofertaId: string } | null {
   const konto = database.prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
     .get(conversationId) as { konto: number } | undefined;
   if (!konto) throw new Error("Nie znaleziono rozmowy");

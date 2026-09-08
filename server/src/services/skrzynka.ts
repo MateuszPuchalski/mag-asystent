@@ -10,6 +10,7 @@ import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
+import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 import { podzielStopke } from "./stopka.js";
 
@@ -455,6 +456,8 @@ export function osRozmowy(id: number): {
    */
   zwroty: WierszZwrotu[];
   dobor: Dobor;
+  /** Propozycja Copilota (§14.6) — osobny wiersz, nie szkic agenta. `null` = nikt nie prosił. */
+  szkicCopilota: SzkicCopilota | null;
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
@@ -779,6 +782,7 @@ export function osRozmowy(id: number): {
        to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
        zdarzenie szyny. */
     dobor: doborRozmowy(id),
+    szkicCopilota: szkicCopilota(id),
   };
 }
 

@@ -1,17 +1,29 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sesjaZadania } from "../context.js";
+import { sesjaZadania, subiekt } from "../context.js";
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import {
   ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
-import { nadawcaAnthropic } from "../adapters/copilot.anthropic.js";
+import { nadawcaAnthropic, nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
+import { ocenSzkic, ulozSzkic } from "../services/copilot-szkic.js";
+import {
+  BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
+  BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
+} from "../adapters/copilot.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   DWIE TRASY ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji oraz
-   werdykt człowieka o jej trafności. Ta druga wygląda na drobiazg, a bez niej
-   nie da się policzyć trafności — czyli nie da się podjąć decyzji „zejdź na
-   tańszy model", dla której cały pomiar powstał.
+   CZTERY TRASY ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0) i werdykt
+   o szkicu. Werdykty wyglądają na drobiazg, a bez nich nie da się policzyć,
+   CZY Copilot jest dobry — czyli nie da się podjąć decyzji „zejdź na tańszy
+   model", dla której cały pomiar powstał.
+
+   Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
+   nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
+   z jednym identyfikatorem). Szkic to inne ZADANIE księgi, inny nadawca
+   i inna odpowiedź — upychanie go w trasę partii byłoby drugą prawdą o tym,
+   co ta trasa robi.
 
    Bramka roli stoi też na ODCZYCIE, tak jak w skrzynce: rozmowy z klientami to
    dane biura, a nie hali.
@@ -111,6 +123,43 @@ export async function copilotRoutes(app: FastifyInstance) {
       if (nie) return nie;
       try {
         return ocenKlasyfikacje(db(), Number(req.params.id), req.body?.ocena ?? "", kto());
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /**
+   * Szkic odpowiedzi z faktów (§14.6). Jedna rozmowa na kliknięcie — agent
+   * prosi o pracę dla siebie, więc bez potwierdzenia kosztu (inaczej niż
+   * partia nad kolejką, która była kroplówką). Koszt wraca w odpowiedzi.
+   */
+  app.post<{ Body: { rozmowaId?: number } }>("/api/obsluga/copilot/szkic", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const powod = czemuWylaczony();
+    if (powod) return reply.code(400).send({ error: powod });
+    const rozmowaId = Number(req.body?.rozmowaId);
+    if (!Number.isInteger(rozmowaId)) return reply.code(400).send({ error: "Nie podano rozmowy" });
+    try {
+      return { szkic: await ulozSzkic(rozmowaId, kto(), nadawcaSzkicuAnthropic, subiekt) };
+    } catch (e) {
+      /* Odmowa dostawcy albo szkic odrzucony przez sprawdzenie — 502 ze
+         ZDANIEM dla człowieka; ślad poszedł do księgi. Reszta to nasze 400
+         (rozmowa bez wiadomości, zły identyfikator). */
+      const dostawcy = e instanceof BladLimituCopilota || e instanceof BladKluczaCopilota
+        || e instanceof BladPrzeciazeniaCopilota || e instanceof BladLacznosciCopilota
+        || e instanceof BladOdpowiedziCopilota;
+      return reply.code(dostawcy ? 502 : 400).send({ error: (e as Error).message });
+    }
+  });
+
+  /** Werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. To jest miernik. */
+  app.post<{ Params: { id: string }; Body: { ocena?: string } }>(
+    "/api/obsluga/copilot/szkic/:id/ocena", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return ocenSzkic(Number(req.params.id), req.body?.ocena ?? "", kto());
       } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }

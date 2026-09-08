@@ -30,7 +30,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
     kopilot: null,
   },
-  os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null, zwroty: [],
+  os: [], szkic: null, ofertaWskazana: null, sprawa: null, zamowienie: null, zwroty: [], szkicCopilota: null,
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
       oem: null, nazwaCzesci: null, parametry: {} } },

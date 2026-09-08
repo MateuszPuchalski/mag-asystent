@@ -104,6 +104,9 @@ export type PomiarCopilota = {
   /** Bez tej liczby „100 % trafności” z dwóch ocen udawałoby pomiar. */
   nieocenionych: number;
   wgKategorii: Array<{ kategoria: string; ile: number; ocen: number; trafnych: number }>;
+  /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
+  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
+  szkice: { ile: number; wstawionych: number; zastapionych: number; odrzuconych: number };
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
@@ -245,6 +248,25 @@ export type OsRozmowy = {
   /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
   zwroty: Zwrot[];
   dobor: Dobor;
+  /** Propozycja Copilota (§14.6) — osobny byt, nie szkic agenta. `null` = nikt nie prosił. */
+  szkicCopilota: SzkicCopilota | null;
+};
+
+/* ── Szkic odpowiedzi z Copilota (§14.6, 0.231.0) ────────────────────────────
+   Serwer układa fakty, model pisze prozę, serwer sprawdza numery. Do szkicu
+   agenta trafia WYŁĄCZNIE na kliknięcie — stąd `ocena`, która jest miernikiem. */
+export type OcenaSzkicu = "wstawiony" | "zastapiony" | "odrzucony";
+export type SzkicCopilota = {
+  tresc: string;
+  /** Czego model NIE znalazł w faktach — treść dla agenta, nie dla klienta. */
+  zastrzezenia: string[];
+  uzyteFakty: string[];
+  /** Ostatnia wiadomość klienta, na której powstał. Nowsza = propozycja nieświeża. */
+  messageId: number | null;
+  model: string;
+  at: string;
+  przez: string;
+  ocena: OcenaSzkicu | null;
 };
 
 /* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────

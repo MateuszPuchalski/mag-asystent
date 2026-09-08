@@ -112,3 +112,40 @@ test("asercja końcowa nie znajduje niczego w zamaskowanym tekście", () => {
   assert.equal(zostalyDaneOsobowe(brudny), true, "brudny tekst ma się zapalić");
   assert.equal(zostalyDaneOsobowe(bez(brudny)), false, "po maskowaniu ma być czysto");
 });
+
+/* ── Cały wątek (0.231.0, szkic odpowiedzi) ─────────────────────────────────
+   Decyzja właściciela: do dostawcy idzie cały wątek, nie jedna wiadomość.
+   Pilnujemy trzech rzeczy: maskowanie obejmuje TAKŻE nasze wychodzące (agent
+   bywa cytuje klienta), sufit tnie od najstarszej z JEDNYM znacznikiem,
+   a kolejność zostaje chronologiczna. */
+import { SUFIT_WATKU, ZNACZNIK_POMINIETYCH, zamaskujWatek } from "./copilot-maskowanie.js";
+
+test("wątek: nasze wychodzące też są maskowane, a login znika w obu kierunkach", () => {
+  const t = String(zamaskujWatek([
+    { odKlienta: true, tresc: "Tu zielony_ogrod, mój telefon 601 234 567" },
+    { odKlienta: false, tresc: "Dzień dobry zielony_ogrod, oddzwonię na 601 234 567" },
+  ], "zielony_ogrod"));
+  assert.equal(t.includes("601"), false, "telefon wyszedł w naszej odpowiedzi");
+  assert.equal(/zielony_ogrod/i.test(t), false, "login wyszedł");
+  assert.match(t, /^KLIENT: .*\nMY: /, "kolejność chronologiczna z etykietami stron");
+});
+
+test("wątek: sufit tnie od najstarszej i zostawia jeden znacznik", () => {
+  const wiadomosci = Array.from({ length: SUFIT_WATKU.wiadomosci + 3 }, (_, i) =>
+    ({ odKlienta: i % 2 === 0, tresc: `wiadomość ${i}` }));
+  const t = String(zamaskujWatek(wiadomosci, null));
+  assert.equal(t.startsWith(ZNACZNIK_POMINIETYCH), true);
+  assert.equal(t.split(ZNACZNIK_POMINIETYCH).length, 2, "znacznik ma być jeden");
+  assert.equal(t.includes("wiadomość 0"), false, "najstarsza miała wypaść");
+  assert.match(t, new RegExp(`wiadomość ${SUFIT_WATKU.wiadomosci + 2}$`), "najnowsza zostaje na końcu");
+});
+
+test("wątek: sufit znaków też liczy się od najnowszej", () => {
+  const dluga = "x".repeat(SUFIT_WATKU.znakow - 10);
+  const t = String(zamaskujWatek([
+    { odKlienta: true, tresc: dluga }, { odKlienta: false, tresc: "krótko" }, { odKlienta: true, tresc: "i jeszcze" },
+  ], null));
+  assert.equal(t.includes("xxxx"), false, "stara długa wiadomość miała wypaść");
+  assert.match(t, /krótko/);
+  assert.match(t, /i jeszcze/);
+});

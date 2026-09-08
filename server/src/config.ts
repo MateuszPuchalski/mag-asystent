@@ -931,17 +931,11 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     );
   }
 
-  /* Copilot (etap F). BRAK KLUCZA NIE JEST BŁĘDEM KONFIGURACJI i to jest
-     odwrotność 0.84.x, gdzie ustawiony dostawca bez klucza wywracał start.
-     Odmowa startu w usłudze NSSM znaczy pętlę restartów, czyli ten sam objaw,
-     który tamta blizna zostawiła. Serwer ma wstać, a ekran ma powiedzieć, że
-     Copilot jest niepodłączony. */
-  if (c.copilot.mode === "anthropic" && !c.copilot.klucz) {
-    bledy.push(
-      "COPILOT_MODE=anthropic bez ANTHROPIC_API_KEY — Copilot będzie wyłączony, " +
-        "a przycisk w panelu powie o tym wprost. Serwer działa dalej.",
-    );
-  }
+  /* Copilot (etap F). BRAK KLUCZA NIE JEST BŁĘDEM KONFIGURACJI — stoi w
+     `ostrzezeniaKonfiguracji()` niżej. Do 0.230.0 zdanie o tym lądowało w TEJ
+     liście, a każda pozycja tej listy wywraca start: usługa mówiła „serwer
+     działa dalej" i umierała, czyli odwrotność tego, co obiecywał komentarz
+     i §14.5. Wyszło przy sprawdzaniu ekranu bez klucza w 0.231.0. */
   /* Model spoza rodziny `claude-` to niemal na pewno wklejka nie w to pole.
      Wartość przez maskę, bo to pole sąsiaduje z kluczem w wertis.env.example. */
   if (c.copilot.model && !c.copilot.model.startsWith("claude-")) {
@@ -1103,9 +1097,28 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   return bledy;
 }
 
+/**
+ * Ostrzeżenia: zdania do dziennika, które NIE zatrzymują startu.
+ *
+ * Osobna lista, bo „błąd konfiguracji" znaczy tu odmowę startu, a odmowa
+ * startu w usłudze NSSM to pętla restartów — objaw blizny 0.84.x. Brak klucza
+ * Copilota ma dać działający serwer i zdanie na ekranie zamiast przycisku.
+ */
+export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
+  const ostrzezenia: string[] = [];
+  if (c.copilot.mode === "anthropic" && !c.copilot.klucz) {
+    ostrzezenia.push(
+      "COPILOT_MODE=anthropic bez ANTHROPIC_API_KEY — Copilot będzie wyłączony, " +
+        "a przycisk w panelu powie o tym wprost. Serwer działa dalej.",
+    );
+  }
+  return ostrzezenia;
+}
+
 const bledy = bledyKonfiguracji();
 if (bledy.length) {
   throw new Error("Błędna konfiguracja:\n  - " + bledy.join("\n  - "));
 }
+for (const o of ostrzezeniaKonfiguracji()) console.warn(`[konfiguracja] ${o}`);
 
 export type Config = typeof config;

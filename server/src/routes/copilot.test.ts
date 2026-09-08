@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["klasyfikacja_rozmowy", "copilot_wywolanie", "message", "conversation",
+  for (const t of ["klasyfikacja_rozmowy", "szkic_copilota", "copilot_wywolanie", "message", "conversation",
     "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -66,6 +66,9 @@ const TRASY = () => [
     payload: { rozmowyId: [rozmowa] } },
   { method: "POST" as const, url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/ocena`,
     payload: { ocena: "trafna" } },
+  { method: "POST" as const, url: "/api/obsluga/copilot/szkic", payload: { rozmowaId: rozmowa } },
+  { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
+    payload: { ocena: "wstawiony" } },
 ];
 
 test("bez sesji żadna trasa Copilota nie odpowiada danymi", async () => {
@@ -84,36 +87,45 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
   }
 });
 
-/* ── Umowa: DWIE trasy zapisu ───────────────────────────────────────────────
+/* ── Umowa: CZTERY trasy zapisu ─────────────────────────────────────────────
    Licznik jest umową, jak przy zwrotach. Każdy nowy zapis podnosi liczbę
    i dostaje zdanie uzasadnienia.
 
-   PIERWSZA to partia klasyfikacji — jedyne miejsce, z którego treść rozmowy
-   wychodzi poza firmę, i dlatego jedyne, przed którym stoi warstwa maskowania.
+   PIERWSZA to partia klasyfikacji — pierwsze miejsce, z którego treść rozmowy
+   wychodzi poza firmę, i dlatego pierwsze, przed którym stoi warstwa maskowania.
 
    DRUGA to werdykt człowieka o trafności. Wygląda na drobiazg, a jest
    warunkiem pomiaru: bez niej da się policzyć, ILE Copilot kosztuje, ale nie
    da się policzyć, CZY jest dobry — a decyzja właściciela brzmi „zejdź na
    tańszy model po pomiarze". Pomiar bez trafności odpowiadałby na pytanie,
-   którego nikt nie zadał.                                                    */
-test("Copilot ma DWIE trasy zapisu", async () => {
+   którego nikt nie zadał.
+
+   TRZECIA to szkic odpowiedzi z faktów (0.231.0) — drugie miejsce, z którego
+   treść wychodzi, tym razem cały wątek za tym samym maskowaniem. Osobna trasa,
+   bo to inne ZADANIE księgi i inna odpowiedź; trasa partii przyjmuje listę
+   rozmów do etykiety, nie rozmowę do napisania.
+
+   CZWARTA to werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. Ten sam
+   argument co przy drugiej — bez niej „szkic z AI" byłby kosztem bez miary. */
+test("Copilot ma CZTERY trasy zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 2, `tras POST jest ${posty.length}, a umowa mówi o dwóch`);
-  for (const slowo of ["klasyfikacja", "ocena"]) {
+  assert.equal(posty.length, 4, `tras POST jest ${posty.length}, a umowa mówi o czterech`);
+  for (const slowo of ["klasyfikacja", "ocena", "szkic"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
 
 test("patrzenie na Copilota niczego nie mutuje", async () => {
   const b = login("biuro", "Ala");
-  const przed = [liczba("klasyfikacja_rozmowy"), liczba("copilot_wywolanie"), liczba("events")];
+  const stan = () => [liczba("klasyfikacja_rozmowy"), liczba("szkic_copilota"),
+    liczba("copilot_wywolanie"), liczba("events")];
+  const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     await app.inject({ method: t.method, url: t.url, headers: b.naglowki });
     await app.inject({ method: t.method, url: t.url, headers: b.naglowki });
   }
-  assert.deepEqual(
-    [liczba("klasyfikacja_rozmowy"), liczba("copilot_wywolanie"), liczba("events")], przed,
+  assert.deepEqual(stan(), przed,
     "otwarcie ekranu Copilota coś zapisało",
   );
 });
@@ -159,6 +171,48 @@ test("wyłączony Copilot odmawia przed sprawdzeniem listy, a nie po", async () 
      żaden test nie miał jak wyjść do Anthropic. */
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   assert.match(zrodlo, /Nie podano rozmów/);
+});
+
+test("wyłączony Copilot nie układa szkicu i nie wychodzi do sieci", async () => {
+  const b = login("biuro", "Ala");
+  const r = await app.inject({
+    method: "POST", url: "/api/obsluga/copilot/szkic", headers: b.naglowki, payload: { rozmowaId: rozmowa },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /COPILOT_MODE|wertis\.env/);
+  assert.equal(liczba("copilot_wywolanie"), 0, "odmowa nie ma prawa nic kosztować");
+  assert.equal(liczba("szkic_copilota"), 0);
+});
+
+test("ocena szkicu bez szkicu odmawia zdaniem", async () => {
+  const b = login("biuro", "Ala");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
+    headers: b.naglowki, payload: { ocena: "wstawiony" },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /nie ma jeszcze szkicu/);
+});
+
+/* Strażnik adresów panelu (blizna 0.181.1): każdy adres wołany z
+   `panel/src/api/copilot.ts` ma trasę. Do 0.230.0 ten plik nie miał strażnika —
+   strażnik skrzynki czyta tylko `rozmowy.ts`, a wiedzy tylko `wiedza.ts`. */
+test("każdy adres wołany z panel/src/api/copilot.ts ma trasę na serwerze", async () => {
+  const b = login("biuro", "Ala");
+  const zrodlo = fs.readFileSync(new URL("../../../panel/src/api/copilot.ts", import.meta.url), "utf8");
+  /* Adresy stałe stoją w cudzysłowie, szablonowe w odwrotnych apostrofach —
+     strażnik czyta oba, inaczej widziałby tylko połowę pliku. */
+  const re = /api(?:<[^>]*>)?\(\s*(["`])([^"`]+)\1(?:\s*,\s*\{[^}]*?method:\s*"(GET|POST|PUT|DELETE)")?/gs;
+  const wywolania: Array<{ url: string; method: "GET" | "POST" | "PUT" | "DELETE" }> = [];
+  for (const m of zrodlo.matchAll(re)) {
+    wywolania.push({ url: m[2]!.replace(/\$\{[^}]+\}/g, String(rozmowa)), method: (m[3] as "GET") ?? "GET" });
+  }
+  assert.ok(wywolania.length >= 4, `strażnik widzi tylko ${wywolania.length} adresów — regex się rozjechał`);
+  for (const w of wywolania) {
+    const r = await app.inject({ method: w.method, url: w.url, headers: b.naglowki,
+      payload: w.method === "GET" ? undefined : {} });
+    assert.doesNotMatch(r.body, /Route .* not found/, `${w.method} ${w.url} nie ma trasy`);
+  }
 });
 
 test("ocena bez rozpoznanej kategorii odmawia zdaniem", async () => {
