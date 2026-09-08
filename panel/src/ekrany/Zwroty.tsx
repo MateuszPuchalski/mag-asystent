@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Undo2 } from "lucide-react";
-import { useDociagnijPoSkanie, useSkanZwrotu, useZwroty, type WynikSkanu } from "../api/zwroty";
+import { RefreshCw, Undo2 } from "lucide-react";
+import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
@@ -176,6 +176,7 @@ export function Zwroty() {
      w 0.140.0 mieszał te dwie rzeczy i to go pogrążyło. */
   const [przewoznik, setPrzewoznik] = useState<string>("");
   const [poNadaniu, setPoNadaniu] = useState(false);
+  const [bladSync, setBladSync] = useState("");
 
   const wKubelku = useMemo(() => {
     const lista = kubelek === null
@@ -193,6 +194,7 @@ export function Zwroty() {
 
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
+  const synchronizuj = useSynchronizujZwroty();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
@@ -371,10 +373,31 @@ export function Zwroty() {
             onChange={() => setPoNadaniu((v) => !v)} />
           Od daty nadania
         </label>
+        {/* SYNCHRONIZACJA W ISTNIEJĄCYM PAŚMIE, nie we własnym (0.232.0).
+            Osobny pasek nad listą kosztowałby wiersze kolejki — a to ona jest
+            treścią tej kolumny (blizna 0.193.0 ze skrzynki). Przycisk stoi
+            obok filtrów, bo należy do tej samej rodziny: wszystkie mówią
+            o tym, CO widać na liście.
+
+            Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro,
+            które właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel
+            i czekało na niego kilkanaście minut. */}
+        <button type="button" disabled={synchronizuj.isPending}
+          onClick={() => { setBladSync(""); synchronizuj.mutate(undefined,
+            { onError: (e) => setBladSync((e as Error).message) }); }}
+          title="Pobierz nowe zwroty z Allegro teraz"
+          className="ml-auto inline-flex items-center gap-1 rounded border border-slate-300
+            bg-white px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <RefreshCw size={12} className={synchronizuj.isPending ? "animate-spin" : ""} />
+          {synchronizuj.isPending ? "Pobieram…" : "Synchronizuj"}
+        </button>
         {/* Eksport zostawia ŚLAD w dzienniku, bo wynosi loginy kupujących —
             ta sama zasada co przy analizie i audycie. */}
-        <a href="/api/obsluga/zwroty/csv" className="ml-auto text-slate-500 underline
+        <a href="/api/obsluga/zwroty/csv" className="text-slate-500 underline
           underline-offset-2 hover:text-slate-800">Pobierz CSV</a>
+        {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token,
+            uprawnienie, przerwę — a sam kod HTTP nie mówi nic. */}
+        {bladSync && <span className="w-full text-red-700">{bladSync}</span>}
       </div>
       <Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}

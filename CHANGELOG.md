@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.232.0 — 8 września 2026
+
+**Zwroty pobiera się teraz przyciskiem.** Zgłoszenie właściciela: „dodaj
+przycisk do synchronizacji zwrotów". Takt zwrotów chodzi pięć razy rzadziej
+niż skrzynka i to jest decyzja z 0.150.0 — zwrot ma termin liczony w dniach,
+a pytanie klienta czeka na odpowiedź. Kosztowało to czekanie w jednym miejscu:
+biuro przyjmuje paczkę, wie o zwrocie wcześniej niż panel i nie ma jak
+poprosić o jego pobranie.
+
+Przycisk stoi w PAŚMIE FILTRÓW kolejki, przy „Pobierz CSV", a nie we własnym
+pasku nad listą. To ta sama lekcja co 0.193.0 w skrzynce: pasma sterujące nad
+pierwszym wierszem zjadają kolumnę, która ma pokazywać pracę. Należy zresztą
+do tej samej rodziny co filtry — wszystkie mówią o tym, CO widać na liście.
+
+**Przerwy nie omija, ale gate stoi na kodzie 429, nie na dacie.**
+`next_attempt_at` zapisuje się także po udanym przebiegu, jako „za jeden
+takt". Warunek po samej dacie wyłączałby przycisk przez większość doby —
+czyli zawsze poza tą jedną chwilą, w której nikt go nie potrzebuje.
+
+Po przebiegu wiąże zaległości jak takt (0.220.0): kto klika, chce zobaczyć
+aktualny stan, a nie jego połowę. Odmowa Allegro jedzie na ekran całym
+zdaniem, bo to ono mówi, co naprawić — token, uprawnienie, przerwę. Licznik
+umowy tras POST: 21 → 22.
+
 ## 0.231.0 — 7 września 2026
 
 **„Ułóż odpowiedź": szkic z Copilota, który nie zna dopasowań z pamięci.**

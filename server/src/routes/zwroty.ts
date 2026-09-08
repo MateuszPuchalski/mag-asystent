@@ -23,7 +23,7 @@ import {
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
-import { dociagnijZwrotPoLiscie } from "../services/allegro-zwroty-sync.js";
+import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
@@ -65,6 +65,52 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       kartoteki: bilansKartotek(zwroty),
       stan: stanZwrotowHealth(db()),
     };
+  });
+
+  /* Ręczna synchronizacja zwrotów (§9, wzorzec ze skrzynki i reklamacji).
+
+     Zgłoszenie właściciela: „dodaj przycisk do synchronizacji zwrotów". Takt
+     zwrotów chodzi rzadziej niż skrzynka — zwrot ma termin w dniach, pytanie
+     klienta czeka na odpowiedź — więc po nadaniu paczki biuro czekało na
+     nowy zwrot nawet kilkanaście minut, patrząc na listę, która niczego nie
+     mówi o tym, czy jest kompletna.
+
+     PRZERWY, O KTÓRĄ POPROSIŁO ALLEGRO, PRZYCISK NIE OMIJA. Ale gate stoi na
+     KODZIE 429, nie na samej dacie kolejnej próby: `next_attempt_at` zapisuje
+     się także po sukcesie (jako „za jeden takt"), więc warunek po samej dacie
+     wyłączałby przycisk przez większość doby. Agent klika wtedy, gdy najbardziej
+     mu zależy — czyli dokładnie w środku limitu, gdyby limit trwał.
+
+     Wiązanie zaległości jak przy dociąganiu zamówień (0.220.0): kto klika,
+     chce zobaczyć AKTUALNY stan, a nie jego połowę. */
+  app.post("/api/obsluga/zwroty/synchronizuj", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    const przed = stanZwrotowHealth(db());
+    if (przed.kodOstatniegoBledu === 429 && przed.nastepnaProba
+        && Date.parse(przed.nastepnaProba) > Date.now()) {
+      return reply.code(409).send({
+        error: "Allegro prosi o przerwę — synchronizacja czeka",
+        nastepnaProba: przed.nastepnaProba,
+      });
+    }
+    const s = sesjaZadania()!;
+    logEvent("zwroty_synchronizacja_reczna", s.user.name);
+    try {
+      await synchronizujAllegroZwroty();
+      return { stan: stanZwrotowHealth(db()), ...powiazZaleglosci(db()) };
+    } catch (e) {
+      /* Zdanie z adaptera mówi, co naprawić — token, uprawnienie, limit —
+         więc jedzie na ekran w całości. Sam kod HTTP nie mówi nic. Zaległość
+         wiąże się mimo to: z odpowiedzią Allegro nie ma nic wspólnego. */
+      return reply.code(502).send({
+        error: (e as Error).message,
+        stan: stanZwrotowHealth(db()), ...powiazZaleglosci(db()),
+      });
+    }
   });
 
   /* Ręczne dociągnięcie zamówień (§9, wzorzec „synchronizuj teraz" ze
