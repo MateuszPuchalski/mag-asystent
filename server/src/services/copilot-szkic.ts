@@ -111,7 +111,8 @@ const INTAKE: Array<{ typ: string; slowa: RegExp; pytania: string[] }> = [
     "wymiary długość × szerokość × wysokość", "kształt: płaski, okrągły czy owalny",
     "papierowy czy piankowy", "z filtrem wstępnym czy bez", "zdjęcie tabliczki znamionowej silnika" ] },
   { typ: "linka", slowa: /\blink[aiąę]\b|cięgn/i, pytania: [
-    "długość pancerza", "długość rdzenia", "rodzaj końcówek" ] },
+    "długość pancerza", "długość rdzenia", "rodzaj końcówek",
+    "zdjęcie starej linki na tle linijki z widocznymi końcówkami" ] },
   { typ: "rozrusznik", slowa: /rozruszn|spręż/i, pytania: [
     "średnica bębna", "kierunek nawinięcia", "zdjęcie tabliczki znamionowej silnika" ] },
   { typ: "gaźnik lub uszczelka", slowa: /ga[zź]nik|uszczelk|membran/i, pytania: [
@@ -266,7 +267,11 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     && kand.kandydaci.some((k) => k.twId === dobor.wybrany!.twId && k.pewnosc === "potwierdzone");
   if (!wybranyPewny) {
     const i = pytaniaIntake(d.nazwaCzesci);
-    dodaj("intake", `Gdy fakty nie rozstrzygają, zapytaj klienta (${i.typ}): ${i.pytania.join("; ")}`);
+    /* „TYLKO o to, czego jeszcze nie podał" stoi w FAKCIE, nie tylko w
+       instrukcji (0.232.2): klientka podała komplet danych z tabliczki,
+       a szkic poprosił o tabliczkę raz jeszcze, bo fakt brzmiał „zapytaj o…". */
+    dodaj("intake", `Gdy fakty nie rozstrzygają, zapytaj klienta TYLKO o to, czego w rozmowie jeszcze nie podał`
+      + ` (${i.typ}): ${i.pytania.join("; ")}; to, co już podał, potwierdź jednym zdaniem`);
   }
 
   const tekstFaktow = fakty.map((f) => `${f.id}: ${f.zdanie}`).join("\n") as FaktyBezpieczne;

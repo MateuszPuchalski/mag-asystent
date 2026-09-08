@@ -1186,7 +1186,10 @@ kosztowałby zwrot — i tego drugiego kod nie przepuszcza.
 z intake per typ części (nóż, pasek, filtr, linka, rozrusznik, gaźnik
 z uszczelką), wybrane po nazwie części z DANYCH DOBORU, nigdy z treści
 wiadomości. Słownik pytań jest kodem, nie promptem. Przy wyborze
-z potwierdzonym dowodem pytań nie ma — udawałyby niewiedzę.
+z potwierdzonym dowodem pytań nie ma — udawałyby niewiedzę. Szkic pyta
+tylko o to, czego rozmowa jeszcze nie zawiera; model z rozmowy, którego nie
+ma w faktach, wraca do agenta jako zastrzeżenie „wpisz go do doboru"
+(0.232.2).
 
 **Do dostawcy idzie cały wątek, zamaskowany, z sufitem.** Decyzja
 właściciela; zapis w polityce danych skrzynki (`docs/obsluga-klienta.md`).
