@@ -574,7 +574,15 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
   tw_symbol       TEXT NOT NULL,
   -- `katalog_obcy` nie ma parsera — to rezerwa dla wpisu ręcznego. CHECK
   -- zamknięty od razu, bo rozszerzenie to przebudowa tabeli (blizna 0.135.0).
-  rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku')),
+  --
+  -- `zamiennik` doszedł w 0.233.0 i kosztował dokładnie tę przebudowę.
+  -- Numery obcych katalogów stoją w opisach nie tylko po `OEM:`, ale też po
+  -- `Zamiennik:`, `Zamiennie:` i `ZAM:` — a stamtąd czytał je wyłącznie parser
+  -- zamienników, który wyrzuca wszystko, co nie jest NASZĄ kartoteką. Numer
+  -- z pytania klienta nie prowadził więc do towaru, choć stał w opisie.
+  -- Osobny rodzaj, a nie `oem`: sekcja zamienników jest słabszym świadectwem
+  -- niż numer producenta i ekran ma to mówić (§11.3).
+  rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku','zamiennik')),
   wartosc         TEXT NOT NULL,
   -- `zwin(wartosc)`: `532 16 56-30`, `5321656-30` i `532165630` to jeden numer.
   wartosc_norm    TEXT NOT NULL,

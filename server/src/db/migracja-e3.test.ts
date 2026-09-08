@@ -45,8 +45,54 @@ test("identyfikator: CHECK rodzaju i źródła, UNIQUE po zwiniętej wartości, 
   wstaw("oem", "opis");
   assert.throws(() => wstaw("oem", "reczne"), /UNIQUE/);
   wstaw("nr_oryg", "reczne");
+  /* Piąty rodzaj (0.233.0) — numery z sekcji „Zamiennik:". */
+  wstaw("zamiennik", "opis", "3");
   assert.throws(() => wstaw("ean", "opis", "1"), /CHECK/);
   assert.throws(() => wstaw("oem", "copilot", "2"), /CHECK/);
+  d.close();
+});
+
+test("baza sprzed 0.233.0 dostaje piąty rodzaj identyfikatora, nie tracąc wierszy", () => {
+  /* SQLite nie rozszerza CHECK w miejscu, więc migracja PRZEPISUJE tabelę.
+     Wiersz ręczny musi ją przeżyć: przebudowa po imporcie kasuje wyłącznie
+     `zrodlo='opis'`, więc skasowany tutaj nie wróciłby już nigdy. */
+  const d = new DatabaseSync(":memory:");
+  /* Pełny schemat, a POTEM tabela cofnięta do dawnego kształtu: migracje
+     wołane przez `migrate()` zakładają obecność sąsiednich tabel, a ta jedna
+     ma być stara. */
+  d.exec(schema);
+  d.exec("DROP TABLE towar_identyfikator");
+  d.exec(`CREATE TABLE towar_identyfikator (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, tw_id INTEGER NOT NULL, tw_symbol TEXT NOT NULL,
+    rodzaj TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku')),
+    wartosc TEXT NOT NULL, wartosc_norm TEXT NOT NULL,
+    zrodlo TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne')),
+    dodal TEXT NOT NULL, dodal_user_id INTEGER,
+    at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    UNIQUE (tw_id, rodzaj, wartosc_norm));`);
+  d.prepare(`INSERT INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal)
+    VALUES (7,'W07-1301','katalog_obcy','HQ-12345','hq12345','reczne','Ala')`).run();
+  assert.throws(() => d.prepare(`INSERT INTO towar_identyfikator
+    (tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal)
+    VALUES (7,'W07-1301','zamiennik','76-041','76041','opis','import')`).run(), /CHECK/);
+
+  migrate(d);
+
+  d.prepare(`INSERT INTO towar_identyfikator
+    (tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal)
+    VALUES (7,'W07-1301','zamiennik','76-041','76041','opis','import')`).run();
+  const reczny = d.prepare(
+    "SELECT dodal, zrodlo FROM towar_identyfikator WHERE wartosc_norm='hq12345'").get() as
+    { dodal: string; zrodlo: string } | undefined;
+  assert.equal(reczny?.dodal, "Ala", "wpis biura przeżywa przebudowę tabeli");
+  assert.equal(reczny?.zrodlo, "reczne");
+  /* Indeksy wracają razem z tabelą — bez nich szukanie po numerze schodzi
+     do skanu przy każdym pytaniu klienta. */
+  const indeksy = (d.prepare(
+    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='towar_identyfikator'")
+    .all() as Array<{ name: string }>).map((i) => i.name);
+  assert.ok(indeksy.includes("ix_towar_identyfikator_norm"), `indeksy: ${indeksy.join(", ")}`);
+  assert.ok(indeksy.includes("ix_towar_identyfikator_tw"), `indeksy: ${indeksy.join(", ")}`);
   d.close();
 });
 

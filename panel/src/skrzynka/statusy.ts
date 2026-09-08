@@ -136,5 +136,12 @@ export const NAZWA_RODZAJU_IDENTYFIKATORA: Record<RodzajIdentyfikatora, string> 
   nr_oryg: "nr oryginału",
   katalog_obcy: "katalog obcy",
   stare_sku: "stare SKU",
+  /* 0.233.0 — numer wyczytany z sekcji „Zamiennik:". Podpis mówi SKĄD, bo ta
+     sekcja jest słabszym świadectwem niż numer producenta (§11.3). */
+  zamiennik: "z zamienników",
 };
+/* Lista do WYBORU przy wpisie ręcznym, nie do wyświetlania. `zamiennik` jej
+   nie ma i to jest decyzja: ten rodzaj znaczy „parser wyczytał z sekcji
+   zamienników". Wpisany ręką kłamałby o swoim pochodzeniu, a biuro ma do tego
+   `katalog_obcy`. */
 export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] = ["oem", "nr_oryg", "katalog_obcy", "stare_sku"];

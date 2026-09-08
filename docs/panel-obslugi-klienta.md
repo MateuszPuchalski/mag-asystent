@@ -805,7 +805,7 @@ agenta to wciąż dobór, nie potwierdzone zastosowanie — wiedza idzie w E2.
 
 **Co działa od etapu E3.** Numer OEM czyta się z tabeli `towar_identyfikator`,
 odbudowanej z opisów kartotek po każdym imporcie (sekcje `OEM:`, `Nr. oryg.`,
-`Stare SKU`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
+`Stare SKU`, a od 0.233.0 także `Zamiennik:`). Numer bez kartoteki nie znika: staje się kandydatem bez wiersza,
 bez stanu i bez przycisku Wybierz. Decyzja właściciela: „nie mamy tego" jest
 odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. Pełny tekst
 to indeks FTS5 `towar_fts` po symbolu, nazwie i opisie, z rankingiem bm25.
@@ -1021,7 +1021,21 @@ z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
 Dziennik `events` niesie pełny wiersz przy każdej zmianie.
 
 **Identyfikatory** (`towar_identyfikator`, E3) to numery OEM, numery
-oryginału, katalogi obce i stare SKU. Z opisu biorą się po każdym imporcie
+oryginału, katalogi obce, stare SKU i numery z sekcji zamienników.
+
+**Sekcja zamienników niesie numery obcych katalogów (0.233.0).** Eksport
+kartotek z 8 września pokazał, gdzie leży druga połowa mostka „numer klienta →
+towar". Etykiet `Zamiennik:`, `Zamiennie:` i `ZAM:` jest w opisach tyle samo
+co `OEM:` — po około czterysta każdej. Czytał je jednak wyłącznie parser
+zamienników, a ten zostawia z listy tylko NASZE kartoteki i wyrzuca resztę.
+Numer obcego katalogu stał więc w opisie i nie prowadził do niczego.
+
+Na pełnej kartotece daje to 1701 numerów przy 1742 czytanych dotąd ze
+wszystkich pozostałych sekcji razem — indeks urósł dwukrotnie, do 973 kartotek.
+Rodzaj jest osobny (`zamiennik`, podpis „z zamienników"), bo sekcja zamienników
+jest słabszym świadectwem niż numer producenta, a §11.3 każe pokazywać źródło.
+Nasze symbole z tej listy do tabeli NIE wchodzą: pokazuje je sekcja
+zamienników, a szukanie po numerze i tak trafia w kartotekę po symbolu. Z opisu biorą się po każdym imporcie
 (źródło `opis`, przebudowa je odtwarza); z ręki biura — z katalogu, którego
 w opisie nie ma (źródło `reczne`, przebudowa je omija). Tabela nie ma klucza
 obcego do `sgt_towar`, bo import wycina read-model.
@@ -2529,7 +2543,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
 | Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
-| Identyfikatory z opisów (OEM, nr oryg., stare SKU) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts` |
+| Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.233.0 |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
 | Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
