@@ -421,6 +421,11 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
 - **Rozjazd lokalizacji**: skan innej półki niż kartoteka otwiera pytanie
   **PRZED zapisem** — „przeniesiony (ZAMIEŃ)” czy „leży w obu (DODAJ)”. Z samego
   skanu tych dwóch sytuacji odróżnić się nie da, więc decyduje człowiek.
+
+  > ZAMIEŃ podmienia adres **podstawowy** (pickingowy), a reszta adresów
+  > zostaje. DODAJ dokłada nowy adres **na końcu** i podstawowego nie rusza —
+  > o to właśnie chodzi w „leży w obu". Gdy pole adresów jest pełne (50 znaków,
+  > czyli pięć adresów), DODAJ odmawia zamiast uciąć kod w połowie.
 - **Wyjątki jako obiekt pierwszej klasy.** Lista kategorii jest zamknięta. Od
   0.21.0 jest to lista z firmowego formularza „Niezgodność w dostawie": błędny
   artykuł, brak w przesyłce, uszkodzone w transporcie, zła ilość, artykuł

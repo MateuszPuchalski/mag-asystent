@@ -674,13 +674,45 @@ export function putawayLine(
   const t = subiekt.getProductById(line.tw_id);
   const current = parseLocs(t?.lokalizacja);
   let queueId: number | undefined;
-  if (current[0] !== code) {
+  /* Warunek zapisu ZALEŻY OD AKCJI i to nie jest drobiazg.
+
+     Przy `replace` pytanie brzmi „czy ten kod jest już pickingowy", bo tylko
+     pierwszą pozycję ta akcja rusza. Przy `add` brzmi „czy towar w ogóle ten
+     kod ma": towar stojący na `A01-01-01 B02-02-02` i odłożony na `B02-02-02`
+     ma tam już swój adres, a wspólny warunek `current[0] !== code` przepuszczał
+     go dalej i kolejkował zapis pola identycznego z obecnym. */
+  const juzMa = locAction === "add" ? current.includes(code) : current[0] === code;
+  if (!juzMa) {
+    /* DODAJ dokłada adres na KONIEC, nie na przód. Pierwszy kod pola jest
+       lokalizacją pickingową (`locs.ts`), więc wstawienie zeskanowanego kodu
+       przed pozostałe robiło z „leży w obu" przeprowadzkę — a przycisk na
+       kolektorze mówi „LEŻY W OBU — DODAJ" i o kolejności nie obiecuje nic.
+       Magazynier prosił o drugi adres, dostawał zmianę adresu podstawowego.
+
+       Zgłoszone przez właściciela; do 0.233.1 nie pilnował tego żaden test,
+       i tak właśnie ta gałąź rozjechała się z `computeNewLocs` w trasie karty
+       towaru, która od zawsze dokłada na koniec. */
     const newLocs =
       locAction === "add"
-        ? Array.from(new Set([code, ...current]))
+        ? Array.from(new Set([...current, code]))
         : // 'replace' — towar przeniesiony: nowa lokalizacja zastępuje pickingową
           Array.from(new Set([code, ...current.slice(1)]));
-    queueId = enqueueSetLocation(line.tw_id, newLocs.join(" ").slice(0, config.locFieldLimit), {
+
+    /* Pełne pole ODMAWIA, zamiast dać się uciąć w połowie kodu.
+       Dotąd stało tu ślepe `.slice(0, locFieldLimit)`. Przy `replace` obcinało
+       ogon starych adresów, ale gdy DODAJ dokłada na końcu, ucięciu podlega
+       kod właśnie zeskanowany — do kartoteki wjechałby adres, którego nikt nie
+       znajdzie. Komunikat mówi, co zrobić zamiast tego; tę samą regułę stosują
+       już trasa karty towaru i import z arkusza. */
+    const pole = newLocs.join(" ");
+    if (pole.length > config.locFieldLimit) {
+      return {
+        error:
+          `Pole adresów jest pełne (limit ${config.locFieldLimit} znaków). ` +
+          "Użyj ZAMIEŃ albo zdejmij niepotrzebny adres na karcie towaru.",
+      };
+    }
+    queueId = enqueueSetLocation(line.tw_id, pole, {
       createdBy: user,
       twId: line.tw_id,
       label: "Lokalizacja · " + (t?.symbol ?? line.tw_id),
