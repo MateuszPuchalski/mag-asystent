@@ -88,6 +88,8 @@ test("dane strony zostają za bramką sesji", async () => {
     "/api/biuro/dokument/1",
     // Dostawy zdjęte z listy pracy (0.40.0) — niosą nazwiska i powody.
     "/api/biuro/zamkniete-poza",
+    // Archiwum dostaw (0.235.0) — historia z nazwiskami i adresami półek.
+    "/api/biuro/dostawy/archiwum",
   ]) {
     const r = await app.inject({ method: "GET", url });
     assert.equal(r.statusCode, 401, url);
@@ -1140,4 +1142,89 @@ test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
     }
   }
   assert.ok(znalezione >= 5, "wzorzec przestał cokolwiek znajdować — test pilnowałby pustki");
+});
+
+test("archiwum dostaw jest czipem tej samej kolejki i szuka po stronie serwera (0.235.0)", () => {
+  /* Lista rozkładania pokazuje okno importu — domyślnie czternaście dni.
+     Dostawa starsza znikała z panelu w całości: nie dało się jej otworzyć ani
+     sprawdzić, kto odłożył pozycję, choć wszystko to leży w `delivery_line`
+     i nigdy nie jest kasowane. Cztery decyzje trzymają ten ekran i każda ma
+     swój koszt, gdy zniknie. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  /* 1. CZIP, nie osobna zakładka. Pytanie „co było z fakturą z zeszłego
+        miesiąca" pada przy tej liście; zakładka obok kazałaby najpierw
+        wiedzieć, że istnieje — tak zgubiła się kiedyś „Poza WERTIS". */
+  assert.match(html, /data-stan="archiwum"/, "archiwum stoi w czipach kolejki dostaw");
+  assert.ok(
+    html.indexOf('data-stan="archiwum"') < html.indexOf('id="szukaj"'),
+    "czip jest w tej samej karcie co wyszukiwarka, nad tabelą"
+  );
+  /* 2. SZUKA SERWER. Archiwum rośnie z każdym rokiem i jedzie obcięte, więc
+        filtrowanie po stronie przeglądarki zawężałoby stronę wyników, a nie
+        zbiór: faktura sprzed roku nie znalazłaby się mimo poprawnego numeru,
+        a wyglądałoby to jak faktura, której nigdy nie było. */
+  assert.match(
+    html,
+    /\/api\/biuro\/dostawy\/archiwum\?q=\$\{encodeURIComponent\(q\)\}/,
+    "zapytanie jedzie do serwera, nie filtruje się na stronie"
+  );
+  /* 3. LICZBA CAŁEGO DOPASOWANIA na ekranie. Obcięta lista wygląda identycznie
+        jak pełna — bez tego zdania nikt nie ma jak zauważyć, że szuka dalej. */
+  assert.match(html, /pokazano \$\{archiwumLista\.length\} z \$\{archiwumIle\}/,
+    "stopka mówi, że lista jest obcięta");
+  /* 4. POBIERANE PRZY WYBRANYM CZIPIE. Lista pracy odpytuje się co pół minuty
+        i musi; archiwum zmienia się raz na dobę, gdy okno przesunie się o
+        dzień. W tle byłoby dwustoma wierszami na cykl za nic. */
+  assert.match(html, /if \(filtrDostaw === "archiwum"\) await odswiezArchiwum\(\);/,
+    "cykl odświeżania ciągnie archiwum tylko przy wybranym czipie");
+  /* 5. WYNIK PORZUCONEGO ZAPYTANIA nie osiada na ekranie. Przy wpisywaniu
+        „FZ 512" leci kilka żądań i wracają w dowolnej kolejności. */
+  assert.match(html, /if \(\$\("szukaj"\)\.value\.trim\(\) !== q \|\| filtrDostaw !== "archiwum"\) return;/,
+    "odpowiedź na nieaktualne zapytanie jest odrzucana");
+});
+
+test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async () => {
+  /* Sedno całej zmiany po stronie trasy. Do 0.235.0 podgląd zaczynał się od
+     read-modelu i kończył na 404 — a 404 wygląda w panelu identycznie jak
+     dokument, którego nigdy nie było. */
+  const DOK = 91_235;
+  const d = db();
+  const id = Number(
+    d
+      .prepare(
+        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, status,
+                              opened_at, closed_at, source_mag_id)
+         VALUES (?,?,?,?, 'done', ?, ?, 1)`
+      )
+      .run(DOK, "FZ 91235/MAG/01/2026", "OGRÓD-POL", "2026-01-15",
+           "2026-01-15T08:00:00.000Z", "2026-01-15T12:00:00.000Z").lastInsertRowid
+  );
+  d.prepare(
+    `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok,
+                               ilosc_odlozona, lok_faktyczna, status, done_at, done_by)
+     VALUES (?, 4242, 'LS51-139', 'Gaźnik kompletny', 4, 4, 'A01-02-03', 'done', ?, 'Krzysiek')`
+  ).run(id, "2026-01-15T10:00:00.000Z");
+
+  const lista = await app.inject({
+    method: "GET",
+    url: "/api/biuro/dostawy/archiwum",
+    ...jako("biuro"),
+  });
+  assert.equal(lista.statusCode, 200);
+  const w = lista.json().documents.find((x: { dokId: number }) => x.dokId === DOK);
+  assert.ok(w, "dostawa bez dokumentu w read-modelu jest w archiwum");
+  assert.equal(w.nrPelny, "FZ 91235/MAG/01/2026");
+
+  const szczegol = await app.inject({
+    method: "GET",
+    url: `/api/biuro/dokument/${DOK}`,
+    ...jako("biuro"),
+  });
+  assert.equal(szczegol.statusCode, 200, "wejście w wiersz archiwum nie kończy się odmową");
+  const p = szczegol.json();
+  assert.equal(p.archiwalny, true, "panel wie, że to nasz zapis, a nie dzisiejsza faktura");
+  assert.equal(p.lines[0].doneBy, "Krzysiek", "nazwisko odkładającego przeżyło okno importu");
 });

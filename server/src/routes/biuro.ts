@@ -16,6 +16,7 @@ import {
   oznaczOdpowiedzPrzeczytana,
 } from "../services/notatki.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
+import { archiwumDostaw } from "../services/archiwum-dostaw.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
    Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro widziało
@@ -95,6 +96,24 @@ export async function biuroRoutes(app: FastifyInstance) {
     if (!d) return reply.code(404).send({ error: "Nie znaleziono dokumentu" });
     return d;
   });
+
+  /**
+   * Archiwum dostaw — te, których dokument wypadł już z okna importu.
+   *
+   * Ta sama bramka co u sąsiadów wyżej i niżej: zwykły odczyt, sesja globalna
+   * wystarcza, `autoryzuj()` byłoby tu szkodliwe (zapisuje zdarzenie
+   * `privileged` przy każdym sprawdzeniu).
+   *
+   * Wyszukiwanie liczy SERWER, w odróżnieniu od listy rozkładania, którą panel
+   * filtruje u siebie. Powód jest jeden: lista pracy ma kilkanaście wierszy
+   * i mieści się w przeglądarce w całości, a archiwum rośnie z każdym rokiem.
+   * Filtrowanie po stronie panelu znaczyłoby, że faktura sprzed roku nie
+   * znajduje się mimo poprawnego numeru — i wygląda to identycznie jak
+   * faktura, której nigdy nie było.
+   */
+  app.get<{ Querystring: { q?: string } }>("/api/biuro/dostawy/archiwum", async (req) =>
+    archiwumDostaw(req.query.q ?? "")
+  );
 
   /**
    * Dostawy zdjęte z listy pracy jako rozłożone poza WERTIS.

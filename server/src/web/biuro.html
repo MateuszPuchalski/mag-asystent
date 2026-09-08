@@ -970,6 +970,12 @@
         <button class="czip" data-stan="praca" aria-pressed="true">W toku</button>
         <button class="czip" data-stan="done" aria-pressed="false">Zamknięte</button>
         <button class="czip" data-stan="external" aria-pressed="false">Poza WERTIS</button>
+        <!-- ARCHIWUM to czwarty stan tej samej kolejki, nie osobna zakładka.
+             Pytanie „a co było z fakturą z zeszłego miesiąca" pada przy tej
+             liście i tutaj ma dostać odpowiedź — zakładka obok kazałaby
+             najpierw wiedzieć, że istnieje. Wiersz wygląda identycznie jak
+             w pracy, bo niesie dokładnie to samo. -->
+        <button class="czip" data-stan="archiwum" aria-pressed="false">Archiwum</button>
       </div>
       <input class="szukaj" id="szukaj" style="margin-top:10px" placeholder="szukaj: numer albo dostawca">
       <table id="dostawy"></table>
@@ -1873,11 +1879,36 @@ function statusDostawy(d) {
    stanem dokumentu w oknie importu, tylko osobnym zapisem naszej bazy. */
 let filtrDostaw = "praca";
 let pozaWertisLista = [];
+/* Archiwum: dostawy, których dokument wypadł już z okna importu. Trzyma się
+   osobno od `dokumenty`, bo pochodzi z INNEGO źródła — naszego snapshotu,
+   nie z read-modelu Subiekta — i wolno mu być obcięte.
+
+   Szuka SERWER, nie ta strona. Filtrowanie po stronie przeglądarki znaczyłoby,
+   że faktura sprzed roku nie znajduje się mimo poprawnego numeru, i wyglądałoby
+   dokładnie tak, jak faktura, której nigdy nie było. */
+let archiwumLista = [];
+let archiwumIle = 0;
+/* Pusta historia i historia jeszcze niepobrana wyglądają w tabeli identycznie.
+   Ta flaga jest jedyną rzeczą, która je rozróżnia. */
+let archiwumWczytane = false;
+/* Okno importu z ostatniej odpowiedzi — stopka mówi nim, gdzie kończy się
+   praca, a zaczyna historia. */
+let oknoDni = 14;
+
+/**
+ * Polska odmiana po liczbie: 1 dokument, 2 dokumenty, 5 dokumentów.
+ *
+ * Wyjęta z `podsumujDostawy`, bo stopka archiwum liczy dostawy tą samą regułą.
+ * Dwie kopie tego wyrażenia rozjechałyby się przy pierwszej poprawce — a „1
+ * dostaw" na ekranie wygląda jak usterka i nią jest.
+ */
+function slowo(n, a, b, c) {
+  return n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c;
+}
 
 /** Ile dokumentów i pozycji za nimi stoi — nagłówek szyny liczy z tego, co widać. */
 function podsumujDostawy(lista) {
   const pozycji = lista.reduce((n, d) => n + (d.linesTotal || d.positions || 0), 0);
-  const slowo = (n, a, b, c) => (n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c);
   $("dostawyPodsumowanie").innerHTML = lista.length
     ? `<span class="temat">${lista.length}</span>
        <span class="mute">${slowo(lista.length, "dokument", "dokumenty", "dokumentów")}
@@ -1916,6 +1947,39 @@ function wiekWiersza(at) {
   return dni === 1 ? "1 dzień" : `${dni} dni`;
 }
 
+/**
+ * JEDEN wiersz listy dostaw — praca i archiwum rysują się tym samym kodem.
+ *
+ * Wspólny, bo niosą DOKŁADNIE to samo: numer, wiek, dostawcę, liczbę pozycji,
+ * postęp, stan i wyjątki. Drugi wariant wiersza dla historii zacząłby się od
+ * jednej różnicy i skończył na dwóch listach, które trzeba czytać inaczej —
+ * a to jest ta sama faktura, tylko starsza.
+ */
+function wierszDostawy(d) {
+  const total = d.linesTotal || d.positions;
+  const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
+  /* Pasek postępu jako PODKREŚLENIE wiersza, nie kolumna obok licznika.
+     Zajmuje całą szerokość i czyta się jednym rzutem oka przez całą
+     kolejkę — a licznik schodzi do stopki, gdzie i tak stoi wszystko,
+     co się o dokumencie mówi zdaniem. */
+  return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
+    <td class="sprawaWiersz">
+      <span class="sprawaGora">
+        <span class="b">${esc(d.nrPelny)}</span>
+        <span class="mute">${esc(wiekWiersza(d.dataWyst))}</span>
+      </span>
+      <span class="sprawaTemat">${esc(d.dostawca)} · ${total} poz.</span>
+      <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto;display:block;margin-top:7px"><i style="width:${frac}%"></i></span>
+      <span class="sprawaStopka">${statusDostawy(d)}
+        <span class="mute">${d.linesDone}/${total} odłożone</span>${
+        d.wyjatkiOtwarte
+          ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+          : ""
+      }</span>
+    </td>
+  </tr>`;
+}
+
 function rysujDostawy() {
   const q = $("szukaj").value.trim().toLowerCase();
   const pasuje = (nr, kto) => !q || nr.toLowerCase().includes(q) || (kto || "").toLowerCase().includes(q);
@@ -1943,6 +2007,24 @@ function rysujDostawy() {
     return;
   }
 
+  /* Archiwum przychodzi z serwera już zawężone — filtrowanie go tutaj jeszcze
+     raz zawężałoby stronę wyników, a nie zbiór, i cicho gubiło faktury spoza
+     pierwszych dwustu. */
+  if (filtrDostaw === "archiwum") {
+    podsumujDostawy(archiwumLista);
+    $("dostawy").innerHTML =
+      archiwumLista.map(wierszDostawy).join("") ||
+      `<tr><td class="mute">${
+        !archiwumWczytane
+          ? "Wczytywanie…"
+          : q
+            ? "Nic w archiwum nie pasuje do wyszukiwania"
+            : "Archiwum jest puste — nic jeszcze nie wypadło z okna importu"
+      }</td></tr>`;
+    dolozLoga();
+    return;
+  }
+
   const pasujace = dokumenty
     .filter((d) => (filtrDostaw === "done" ? d.status === "done" : d.status !== "done"))
     .filter((d) => pasuje(d.nrPelny, d.dostawca));
@@ -1960,30 +2042,8 @@ function rysujDostawy() {
      i logo dostawcy, które przeniosło się do kontekstu sprawy — tam stoi przy
      nazwie, dużo większe, i mówi to samo. */
   $("dostawy").innerHTML =
-      pasujace.map((d) => {
-        const total = d.linesTotal || d.positions;
-        const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-        /* Pasek postępu jako PODKREŚLENIE wiersza, nie kolumna obok licznika.
-           Zajmuje całą szerokość i czyta się jednym rzutem oka przez całą
-           kolejkę — a licznik schodzi do stopki, gdzie i tak stoi wszystko,
-           co się o dokumencie mówi zdaniem. */
-        return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
-          <td class="sprawaWiersz">
-            <span class="sprawaGora">
-              <span class="b">${esc(d.nrPelny)}</span>
-              <span class="mute">${esc(wiekWiersza(d.dataWyst))}</span>
-            </span>
-            <span class="sprawaTemat">${esc(d.dostawca)} · ${total} poz.</span>
-            <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto;display:block;margin-top:7px"><i style="width:${frac}%"></i></span>
-            <span class="sprawaStopka">${statusDostawy(d)}
-              <span class="mute">${d.linesDone}/${total} odłożone</span>${
-              d.wyjatkiOtwarte
-                ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
-                : ""
-            }</span>
-          </td>
-        </tr>`;
-      }).join("") || '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
+      pasujace.map(wierszDostawy).join("") ||
+      '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
   dolozLoga();
 }
 
@@ -2065,6 +2125,13 @@ function rysujSzczegol(d) {
     : d.zrodlo === "podglad"
       ? '<p class="mute">Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>'
       : "";
+  /* Zdanie osobne, nie dopisek do `prognoza`: te dwie rzeczy mówią o czym
+     innym. Tamto o tym, CZY ktoś to rozkładał, to o tym, SKĄD są liczby.
+     Ekran bez tego wygląda jak każdy inny dokument, a nie jest: faktura mogła
+     się w Subiekcie od tamtej pory zmienić i nie mamy jak tego zobaczyć. */
+  const archiwum = d.archiwalny
+    ? '<p class="mute">Dokument wypadł z okna importu — poniżej NASZ zapis z chwili rozkładania, nie dzisiejsza faktura z Subiekta.</p>'
+    : "";
   /* Dostawy domkniętej normalnie nie ma czego zdejmować z listy — praca
      została wykonana TUTAJ i ma pokrycie w skanach. Przycisku wtedy nie ma
      wcale, zamiast wyszarzonego, który zaprasza do kliknięcia i odmawia. */
@@ -2091,7 +2158,7 @@ function rysujSzczegol(d) {
       <span class="mute">${d.progress.done}/${d.progress.total} poz.${
         d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
     </div>
-    ${prognoza}`;
+    ${archiwum}${prognoza}`;
 
   /* Trzy liczby o dostawcy stoją PRZY wyjątku, który się właśnie rozstrzyga.
      Biuro patrzy na jedną pozycję jednej faktury i bez nich nie ma z czego
@@ -3895,6 +3962,50 @@ async function odswiezStan() {
   } catch (e) { cichaAwaria("stan serwera", e); return {}; }
 }
 
+/**
+ * Stopka listy — GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ.
+ *
+ * Przy pracy jest to okno importu, przy archiwum granica tego okna i liczba
+ * dostaw za nią. Obcięta lista archiwum musi to powiedzieć wprost: z ekranu
+ * wygląda identycznie jak pełna, a to jest dokładnie ta pomyłka, po której
+ * ktoś orzeka, że faktury nie ma.
+ */
+function opiszOdswiezono() {
+  const czas = `odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
+  if (filtrDostaw !== "archiwum") {
+    $("odswiezono").textContent = `okno: ostatnie ${oknoDni} dni · ${czas}`;
+    return;
+  }
+  const ile =
+    archiwumIle > archiwumLista.length
+      ? `pokazano ${archiwumLista.length} z ${archiwumIle} — zawęź wyszukiwaniem`
+      : `${archiwumIle} ${slowo(archiwumIle, "dostawa", "dostawy", "dostaw")}`;
+  $("odswiezono").textContent = `archiwum: starsze niż ${oknoDni} dni · ${ile} · ${czas}`;
+}
+
+/**
+ * Archiwum z serwera — pobierane WYŁĄCZNIE przy wybranym czipie.
+ *
+ * Lista pracy jedzie co pół minuty i musi. Archiwum zmienia się raz na dobę,
+ * gdy okno importu przesunie się o dzień, więc ciągnięcie go w tle byłoby
+ * dwustoma wierszami na cykl za odpowiedź, na którą nikt nie patrzy.
+ */
+async function odswiezArchiwum() {
+  const q = $("szukaj").value.trim();
+  try {
+    const a = await (await api(`/api/biuro/dostawy/archiwum?q=${encodeURIComponent(q)}`)).json();
+    /* Odpowiedź na PORZUCONE zapytanie nie ma prawa trafić na ekran. Przy
+       wpisywaniu „FZ 512" leci kilka żądań i wracają w dowolnej kolejności —
+       bez tego warunku na liście osiadałby wynik dla „FZ 5". */
+    if ($("szukaj").value.trim() !== q || filtrDostaw !== "archiwum") return;
+    archiwumLista = a.documents || [];
+    archiwumIle = a.ile ?? archiwumLista.length;
+    archiwumWczytane = true;
+    rysujDostawy();
+    opiszOdswiezono();
+  } catch (e) { cichaAwaria("archiwum dostaw", e); }
+}
+
 async function odswiezDostawy() {
   try {
     const [dok, prob, poza] = await Promise.all([
@@ -3903,11 +4014,12 @@ async function odswiezDostawy() {
       (await api("/api/biuro/zamkniete-poza")).json(),
     ]);
     dokumenty = dok.documents || [];
+    oknoDni = dok.dniWstecz ?? oknoDni;
     rysujDostawy();
     rysujReklamacje(prob.problems || []);
     rysujPozaWertis(poza.documents || []);
-    $("odswiezono").textContent =
-      `okno: ostatnie ${dok.dniWstecz ?? 14} dni · odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
+    opiszOdswiezono();
+    if (filtrDostaw === "archiwum") await odswiezArchiwum();
   } catch (e) { cichaAwaria("dostawy", e); }
 }
 
@@ -4475,7 +4587,15 @@ for (const id of ["poleLogin", "poleHaslo"]) {
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
 }
 $("wyloguj").addEventListener("click", wyloguj);
-$("szukaj").addEventListener("input", rysujDostawy);
+/* Szukanie w archiwum liczy SERWER, więc każde naciśnięcie klawisza byłoby
+   osobnym żądaniem. Ćwierć sekundy to próg, poniżej którego pisanie i tak
+   trwa — a lista pracy, filtrowana u siebie, odpowiada jak dotąd od razu. */
+let szukanieOdliczanie = null;
+$("szukaj").addEventListener("input", () => {
+  if (filtrDostaw !== "archiwum") { rysujDostawy(); return; }
+  clearTimeout(szukanieOdliczanie);
+  szukanieOdliczanie = setTimeout(odswiezArchiwum, 250);
+});
 $("dostawyCzipy").addEventListener("click", (e) => {
   const b = e.target.closest("[data-stan]");
   if (!b) return;
@@ -4484,6 +4604,11 @@ $("dostawyCzipy").addEventListener("click", (e) => {
     c.setAttribute("aria-pressed", String(c === b));
   }
   rysujDostawy();
+  opiszOdswiezono();
+  /* Archiwum ciągniemy dopiero tutaj — patrz `odswiezArchiwum`. Do czasu
+     odpowiedzi tabela mówi „wczytywanie", a nie „pusto": pusta historia
+     i historia jeszcze niepobrana to dwie różne wiadomości. */
+  if (filtrDostaw === "archiwum") odswiezArchiwum();
 });
 /* Delegacja siedzi na dokumencie, nie na `nav`: przyciski widoków stoją od
    0.76.0 w dwóch miejscach (pasek i zębatka w nagłówku), a `data-widok` jest

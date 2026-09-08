@@ -34,6 +34,53 @@ historii nie przepisujemy.
 ---
 
 
+## 0.235.0 — 8 września 2026
+
+**W panelu biura da się przejrzeć dostawy starsze niż 14 dni.** Zgłoszenie
+właściciela. Lista rozkładania pokazuje okno importu, więc faktura sprzed
+trzech tygodni znikała z panelu w całości — nie dało się jej ani otworzyć,
+ani sprawdzić, kto odłożył pozycję i na którą półkę.
+
+**Brak wyglądał jak nieobecność.** Wejście w taki dokument kończyło się
+odmową 404, czyli dokładnie tym samym, co dokument, którego nigdy nie było.
+Biuro odpowiadało na takie pytania Subiektem obok — a Subiekt o odłożeniach
+nie wie nic.
+
+**Okna importu NIE ruszamy i to jest cała decyzja tego wydania.** Kusiło
+podniesienie `DOK_DNI_WSTECZ`, ale import zaorywa read-model przy każdym cyklu,
+a dokumenty sprzed kwartału wjechałyby na LISTĘ PRACY kolektora. Odpowiedź
+leżała tymczasem w naszych własnych tabelach: `delivery` i `delivery_line`
+trzymają numer, dostawcę, datę, każdą pozycję, adres faktyczny i nazwisko
+odkładającego — i nigdy nie są czyszczone. Analiza dostaw czyta stamtąd okna
+30/90/180 dni od 0.48.0.
+
+**Archiwum jest czwartym czipem tej samej kolejki**, nie osobną zakładką.
+Pytanie „co było z fakturą z zeszłego miesiąca" pada przy tej liście i tutaj
+dostaje odpowiedź; zakładka obok kazałaby najpierw wiedzieć, że istnieje —
+tak zgubiła się kiedyś „Poza WERTIS". Wiersz wygląda identycznie jak w pracy,
+bo niesie dokładnie to samo.
+
+**Granicą jest nieobecność dokumentu w read-modelu, a nie liczba dni.**
+Dokument stoi zawsze w dokładnie jednym z dwóch miejsc, a zmiana
+`DOK_DNI_WSTECZ` przesuwa granicę w obu naraz. Data liczona osobno dawałaby
+przy każdej zmianie ustawienia albo dziurę, albo dublet.
+
+**Wyszukiwarka pyta wtedy serwer.** Archiwum rośnie z każdym rokiem i jedzie
+obcięte do dwustu wierszy, więc filtrowanie w przeglądarce zawężałoby stronę
+wyników, a nie zbiór. Stopka mówi, ile dostaw pasuje poza pokazanymi — obcięta
+lista wygląda z ekranu identycznie jak pełna.
+
+**Ekran dostawy archiwalnej mówi, skąd są liczby.** To nasz zapis z chwili
+rozkładania, nie dzisiejsza faktura: mogła się w Subiekcie od tamtej pory
+zmienić i nie mamy jak tego zobaczyć.
+
+Wdrożenie: nic ręką. Zero nowych ustawień, zero zapisu — archiwum tylko czyta.
+
+- `services/archiwum-dostaw.ts` z testami; `GET /api/biuro/dostawy/archiwum`
+- `podgladDokumentu` wraca do naszego snapshotu, gdy dokumentu nie ma
+  w read-modelu, i mówi o tym polem `archiwalny`
+- czip ARCHIWUM w `biuro.html` razem ze strażnikiem w `routes/biuro.test.ts`
+
 ## 0.234.1 — 8 września 2026
 
 **DODAJ przy rozjeździe adresu dokłada półkę, a nie przejmuje podstawową.**

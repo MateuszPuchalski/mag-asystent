@@ -12,6 +12,7 @@ import {
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
 import { listByDelivery, PROBLEM_TYPES_LABELS } from "./problems.js";
 import type { ProblemType, ProblemView } from "../types.js";
+import type { RawDocument } from "../adapters/subiekt.js";
 
 /* ── Podgląd dokumentu dla biura (0.36.0) ────────────────────────────────────
    Podgląd pod `/biuro` pokazywał dostawy jako płaską tabelę z paskiem postępu.
@@ -97,6 +98,15 @@ export interface PodgladDokumentu {
   /** Notatki biura do tego dokumentu — panel pokazuje je razem z pozycjami. */
   notatki: Notatka[];
   /**
+   * Dokumentu nie ma już w read-modelu — wypadł z okna importu.
+   *
+   * Wszystko poniżej pochodzi wtedy z NASZEGO snapshotu, nie z Subiekta:
+   * pozycje są takie, jak w chwili otwarcia dostawy, a nie takie, jak dziś
+   * wygląda faktura. Panel mówi o tym wprost, bo to jedyna różnica, której
+   * czytający nie ma jak zobaczyć w tabeli.
+   */
+  archiwalny: boolean;
+  /**
    * `snapshot` — to, co widzi kolektor. `podglad` — to, co zobaczy po otwarciu.
    *
    * Rozróżnienie jedzie na ekran, bo dwie te listy są prawdziwe inaczej: druga
@@ -125,11 +135,56 @@ interface WierszLinii {
 }
 
 /**
- * Pozycje dokumentu dla biura. `undefined`, gdy dokumentu nie ma w read-modelu
- * (nie istnieje albo wypadł z okna importu — dla biura to ten sam brak).
+ * Nagłówek dostawy odtworzony z NASZEGO wiersza `delivery`.
+ *
+ * Wołany dopiero wtedy, gdy dokumentu nie ma już w read-modelu. Do 0.235.0
+ * biuro dostawało wtedy 404 — dostawa sprzed trzech tygodni była dla panelu
+ * nieodróżnialna od dokumentu, który nigdy nie istniał. A wszystko, co biuro
+ * o niej pyta (kto odłożył, gdzie, ile brakowało), leży w `delivery_line`
+ * i nie zniknęło razem z oknem importu.
+ *
+ * Typ dokumentu, płatnik i flaga bufora zostają puste, bo `delivery` ich nie
+ * przepisuje. Zgadywanie ich („to pewnie FZ") dałoby ekran, który wygląda
+ * na pewny, a nie jest — a `kh_id` bez pokrycia kazałoby panelowi pytać
+ * o logo kontrahenta, którego nie zna.
+ */
+function naglowekZArchiwum(dokId: number): RawDocument | undefined {
+  const w = db()
+    .prepare(
+      `SELECT sgt_dok_numer AS nr_pelny, COALESCE(dostawca,'') AS dostawca,
+              COALESCE(data_dok,'') AS data_wyst, source_mag_id AS mag_id
+         FROM delivery WHERE sgt_dok_id = ?`
+    )
+    .get(dokId) as
+    | { nr_pelny: string; dostawca: string; data_wyst: string; mag_id: number | null }
+    | undefined;
+  if (!w) return undefined;
+  return {
+    dok_id: dokId,
+    typ: "",
+    nr_pelny: w.nr_pelny,
+    data_wyst: w.data_wyst,
+    /* Magazyn skutku z chwili otwarcia. Brak (dostawy sprzed wprowadzenia
+       kolumny) czytamy jako halę — bo `wPrzyjeciach` mówi „zostało jeszcze
+       przesunięcie stanu", a przy dostawie domkniętej dawno temu takie
+       ostrzeżenie byłoby fałszywym alarmem. */
+    mag_id: w.mag_id ?? config.magId.MAG,
+    dostawca: w.dostawca,
+    kh_id: null,
+    w_buforze: 0,
+  };
+}
+
+/**
+ * Pozycje dokumentu dla biura.
+ *
+ * Dokument spoza okna importu czytamy z naszego snapshotu (`naglowekZArchiwum`).
+ * `undefined` zostaje dla dokumentu, o którym nie wiemy NIC — nie ma go ani
+ * w read-modelu, ani w `delivery`.
  */
 export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
-  const doc = subiekt.getDocument(dokId);
+  const zSubiekta = subiekt.getDocument(dokId);
+  const doc = zSubiekta ?? naglowekZArchiwum(dokId);
   if (!doc) return undefined;
 
   const d = db()
@@ -175,6 +230,7 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
         ? { kto: d.closed_by, at: d.closed_at, powod: d.powod }
         : null,
     dostawcaStat: doc.dostawca ? statystykiDostawcy(doc.dostawca) : null,
+    archiwalny: !zSubiekta,
     zrodlo: d && !bezSnapshotu ? "snapshot" : "podglad",
     progress: { total: lines.length, done, remaining: lines.length - done, problems },
     lines,
