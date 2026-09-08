@@ -109,7 +109,7 @@ test("fakty niosą kartotekę oferty z dostępnością, pasowanie z pozycją i i
   assert.equal(/rezerwac|półk|regał/i.test(f), false, "półka albo rezerwacje w faktach (§10.4)");
   assert.ok(k.fakty.some((x) => x.rodzaj === "intake"), "bez potwierdzonego wyboru fakty niosą pytania intake");
   /* Typ części bierze się z DANYCH DOBORU, nie z treści pytania (blizna szarpaka) — tu ich nie ma. */
-  assert.match(f, /zapytaj klienta \(część\)/);
+  assert.match(f, /zapytaj klienta TYLKO o to, czego w rozmowie jeszcze nie podał \(część\)/);
 });
 
 test("wątek idzie w całości, zamaskowany, z loginem z WĄTKU Allegro, nie z tematu", () => {

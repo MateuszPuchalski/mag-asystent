@@ -34,6 +34,28 @@ historii nie przepisujemy.
 ---
 
 
+## 0.232.2 — 8 września 2026
+
+**Szkic nie pyta o to, co klient już podał.** Drugi żywy przykład od
+właściciela: klientka podała komplet danych z tabliczki (model FPLMP139,
+pojemność, moc, szerokość koszenia) i poprosiła o linkę napędu, a szkic
+Copilota poprosił o dane z tabliczki raz jeszcze. Trzy ogniwa: fakt intake
+brzmiał „zapytaj klienta o…" bez „tylko o to, czego brakuje"; agent nie
+wpisał modelu do danych doboru, więc żaden szczebel nie szukał części do
+FPLMP139; model widział ten numer w rozmowie i nie miał jak powiedzieć tego
+agentowi.
+
+- Fakt intake mówi teraz: „zapytaj TYLKO o to, czego w rozmowie jeszcze nie
+  podał; to, co podał, potwierdź jednym zdaniem". Przy lince doszło zdjęcie
+  starej linki na tle linijki.
+- Instrukcja modelu: przed każdą prośbą sprawdź wiersze KLIENT:; model albo
+  numer maszyny z rozmowy, którego nie ma w faktach, wraca do agenta jako
+  zastrzeżenie „wpisz go do doboru i ułóż ponownie", nie do klienta.
+
+Właściwa naprawa drugiego ogniwa — Copilot wyciągający dane doboru
+z rozmowy do pól — to osobny, zaaprobowany przyrost etapu F.
+
+
 ## 0.232.1 — 8 września 2026
 
 **Karta szkicu Copilota zwijała rozmowę do jednej linii i chowała własne

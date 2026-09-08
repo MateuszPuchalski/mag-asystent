@@ -147,7 +147,13 @@ const Szkic = z.object({
 
 /* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
    Tu prefiks jest już dość długi, żeby cache się włączył; sprawdzisz to
-   w księdze po `cache_read_input_tokens`. */
+   w księdze po `cache_read_input_tokens`.
+
+   Reguła 3 i 3a (0.232.2) mają jeden powód: klientka podała komplet danych
+   z tabliczki (model FPLMP139) i poprosiła o linkę napędu, a szkic poprosił
+   o tabliczkę raz jeszcze, bo fakt intake kazał „zapytać o…", a agent nie
+   wpisał modelu do doboru. Model widział FPLMP139 w rozmowie i nie miał jak
+   powiedzieć tego agentowi. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -165,8 +171,15 @@ const INSTRUKCJA_SZKICU = [
   "2. Nie wymyślaj numerów, symboli ani nazw części. Każdy numer w szkicu musi",
   "   stać w faktach albo w rozmowie — system to sprawdza i odrzuca szkic.",
   "3. Gdy fakty czegoś nie mówią, NIE zgaduj: wpisz to do `zastrzezenia`",
-  "   (dla agenta, nie dla klienta) i w szkicu zadaj klientowi pytania z faktu",
-  "   oznaczonego jako intake.",
+  "   (dla agenta, nie dla klienta) i zadaj klientowi pytania z faktu intake —",
+  "   ale WYŁĄCZNIE te, na które ROZMOWA jeszcze nie odpowiada. Zanim o coś",
+  "   poprosisz, sprawdź wiersze KLIENT:. Jeśli klient podał już model,",
+  "   dane z tabliczki, wymiary albo zdjęcie, nie proś o nie ponownie —",
+  "   potwierdź jednym zdaniem, co masz, i pytaj tylko o resztę.",
+  "3a. Jeśli w rozmowie stoi marka, model albo numer maszyny, a żaden fakt go",
+  "   nie wymienia, dopisz do `zastrzezenia` zdanie dla agenta: „w rozmowie",
+  "   jest model X, w danych doboru go nie ma — wpisz go i ułóż szkic",
+  "   ponownie”. Klientowi tego nie pisz.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
   "   sprawdzenie (tabliczka, zdjęcie starej części). Fakt „NIE PASUJE” to",
   "   ostrzeżenie — powiedz je klientowi wprost.",
