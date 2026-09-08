@@ -1720,6 +1720,14 @@ sygnatura trafiająca w dokładnie jedną kartotekę jest powiązaniem, z podpis
 towaru w KARTOTECE nie dopasowujemy nigdy. Propozycje z zapasowych dróg
 (jedyna pozycja, zgodna nazwa) dalej czekają na człowieka.
 
+**Zwroty pobiera się też ręcznie (0.232.0).** Takt zwrotów chodzi pięć razy
+rzadziej niż skrzynka, bo zwrot ma termin liczony w dniach. Biuro, które
+właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel — i czekało na
+wiersz kilkanaście minut. Przycisk „Synchronizuj" stoi w paśmie filtrów
+kolejki, przy „Pobierz CSV": osobny pasek nad listą zjadałby wiersze, a to
+one są treścią tej kolumny. Przerwy, o którą poprosiło Allegro kodem 429,
+przycisk nie omija; po przebiegu wiąże zaległości tak samo jak takt.
+
 **Wiązanie nie zależy od Allegro (0.220.0).** Automat sygnatur chodzi taktem
 synchronizacji i do 0.219.1 stał w nim jako ciąg dalszy po pobraniu. Wyjątek
 z pobierania — wygasły token, limit, jeden felerny rekord — zabierał go ze
@@ -2558,6 +2566,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
+| Ręczna synchronizacja zwrotów | **działa** od 0.232.0 | `POST /api/obsluga/zwroty/synchronizuj`, przycisk w paśmie filtrów kolejki |
 | Kształt zwrotów z dokumentacji, nie z sondy | **niepotwierdzony** | `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` |
 | Termin ustawowy w rekoncyliacji | **działa** od 0.210.0 | `zwrotyPoTerminie` w `services/reconcile.ts`; do 0.209.0 pilnował go wyłącznie kolor wiersza |
 | Sygnał rozjazdu kwoty z pozycjami | **działa** od 0.210.0 | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |

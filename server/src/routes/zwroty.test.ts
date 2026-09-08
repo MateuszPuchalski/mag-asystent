@@ -66,6 +66,7 @@ const TRASY = () => [
   { method: "GET" as const, url: `/api/obsluga/zwroty/${zwrot}` },
   { method: "GET" as const, url: "/api/obsluga/zwroty/csv" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/zamowienia" },
+  { method: "POST" as const, url: "/api/obsluga/zwroty/synchronizuj" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/kwota` },
   { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/ocena" },
@@ -267,10 +268,15 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 21,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu jeden`);
+  /* Dwudziesta druga (0.232.0): ręczna synchronizacja zwrotów. Takt chodzi
+     rzadko, bo zwrot ma termin w dniach — a biuro po nadaniu paczki chce
+     zobaczyć zwrot teraz, nie za kwadrans. Zapis, bo woła Allegro i pisze
+     kursor; dlatego podnosi licznik i dostaje to zdanie. */
+  assert.equal(posty.length, 22,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu dwóch`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
+    "synchronizuj",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
@@ -337,6 +343,16 @@ test("ręczne dociągnięcie zamówień wymaga sparowanego konta", async () => {
      tokenu i oddawać 401 z obcego systemu. */
   const { naglowki } = login("biuro", "Ala dociąga");
   const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/zamowienia", headers: naglowki });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /sparowane/);
+});
+
+test("ręczna synchronizacja zwrotów też wymaga sparowanego konta", async () => {
+  /* Ta trasa woła Allegro, więc bez konta mówi, czego brakuje — zamiast
+     strzelać bez tokenu i oddawać 401 z obcego systemu. */
+  const { naglowki } = login("biuro", "Ala synchronizuje");
+  const r = await app.inject({
+    method: "POST", url: "/api/obsluga/zwroty/synchronizuj", headers: naglowki });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /sparowane/);
 });

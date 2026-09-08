@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, StanZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -64,6 +64,26 @@ export function usePotwierdzKartoteke() {
  * gdy ktoś patrzy na ekran i chce wiedzieć, czy problem jest w danych, czy
  * w kodzie.
  */
+/**
+ * Ręczna synchronizacja zwrotów (0.232.0).
+ *
+ * Takt zwrotów chodzi rzadziej niż skrzynka — zwrot ma termin w dniach —
+ * więc po nadaniu paczki biuro czekało kilkanaście minut na wiersz, o którym
+ * już wie. Ten sam wzorzec co „Synchronizuj teraz" w reklamacjach.
+ *
+ * Żądanie BEZ ciała nie deklaruje typu treści; pilnuje tego `api()` i jego
+ * test. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY` i gołe „Bad Request"
+ * na ekranie — ta blizna kosztowała dwa razy.
+ */
+export function useSynchronizujZwroty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ stan: StanZwrotow; kartoteki: number }>(
+      "/api/obsluga/zwroty/synchronizuj", { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+  });
+}
+
 export interface WynikDociagniecia {
   pobrano: number;
   /* Ile zaległości dopiął przy okazji przebieg wiązania (0.220.0). Kartoteki

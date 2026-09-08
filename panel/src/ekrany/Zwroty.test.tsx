@@ -41,12 +41,22 @@ const scena = vi.hoisted(() => ({
   kartoteki: { bez: 3, wszystkie: 8, powody: { oferta_bez_sku: 2, jakis_nowy_kod: 1 } } as
     { bez: number; wszystkie: number; powody: Record<string, number> },
   stan: {} as Record<string, unknown>,
+  /* Ręczna synchronizacja jedzie do Allegro, więc w teście stoi atrapa:
+     inaczej kliknięcie strzelałoby `fetch`-em w nieistniejący serwer. */
+  synchronizuj: { wolano: 0, blad: "" as string },
 }));
 
 vi.mock("../api/zwroty", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/zwroty")>("../api/zwroty");
   return {
     ...rzeczywisty,
+    useSynchronizujZwroty: () => ({
+      isPending: false,
+      mutate: (_v: unknown, opcje?: { onError?: (e: Error) => void }) => {
+        scena.synchronizuj.wolano++;
+        if (scena.synchronizuj.blad) opcje?.onError?.(new Error(scena.synchronizuj.blad));
+      },
+    }),
     useZwroty: () => ({
       data: { zwroty: ZWROTY, liczniki: { decyzja: 1, ocena: 0, zwrot: 1, korekta: 0,
         zamkniety: 0, odrzucony: 0 },
@@ -224,6 +234,22 @@ describe("Ekran zwrotów", () => {
     pokaz();
     expect(screen.getByText(/odmowa logowania do Allegro/)).toBeInTheDocument();
     expect(screen.getByText(/kod 401/)).toBeInTheDocument();
+  });
+
+  it("przycisk synchronizacji woła Allegro i pokazuje jego odmowę", async () => {
+    /* Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro, które
+       właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel — i do
+       0.231.0 nie miało jak go poprosić o pobranie.
+
+       Odmowa Allegro jedzie na ekran CAŁYM zdaniem: mówi, co naprawić,
+       a sam kod HTTP nie mówi nic. */
+    scena.synchronizuj.wolano = 0;
+    scena.synchronizuj.blad = "Allegro prosi o przerwę — synchronizacja czeka";
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /Synchronizuj/ }));
+    expect(scena.synchronizuj.wolano).toBe(1);
+    expect(screen.getByText(/prosi o przerwę/)).toBeInTheDocument();
+    scena.synchronizuj.blad = "";
   });
 
   it("działająca synchronizacja NIE dopisuje zdania o sobie", () => {
