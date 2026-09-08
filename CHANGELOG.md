@@ -34,6 +34,90 @@ historii nie przepisujemy.
 ---
 
 
+## 0.231.0 — 7 września 2026
+
+**„Ułóż odpowiedź": szkic z Copilota, który nie zna dopasowań z pamięci.**
+
+Decyzja właściciela z 7 września: „w oknie odpowiedzi powinien być guzik,
+który konstruuje odpowiedź z pomocą AI, kartotek etc." Wydania 0.229.0
+i 0.230.0 dały bazie fakty — silniki i pasowania części. Teraz agent dostaje
+z nich gotowy szkic, jednym kliknięciem, w otwartej rozmowie.
+
+### Model pisze prozę, serwer pisze fakty i sprawdza wynik
+
+Doktryna z krytyki promptu doboru („Usprawnijmy dobór części") obowiązuje tu
+dosłownie. Serwer układa FAKTY (F1, F2, …) ze zdań, które już pisze dla
+ekranu: kartoteka oferty z dostępnością dziś, dane doboru wpisane przez
+agenta, kandydaci i negatywy ze zdaniem źródła, zastosowania, silniki,
+pasowania i pomiary z tej rozmowy. Model pisze wyłącznie z faktów i cytuje
+ich identyfikatory. Serwer sprawdza wynik W KODZIE: każdy numer w szkicu musi
+stać w faktach albo w rozmowie, każdy cytowany fakt musi istnieć, a długość
+nie może przekroczyć limitu Allegro. Szkic, który to łamie, jest odrzucony
+ze zdaniem dla agenta i wierszem `blad` w księdze — bez ponowienia, bo
+wywołanie jest zapłacone.
+
+Gdy fakty nie rozstrzygają, szkic pyta klienta o to, co rozstrzyga: słownik
+pytań per typ części (nóż, pasek, filtr, linka, rozrusznik, gaźnik
+z uszczelką) jest kodem, nie promptem, i bierze typ z danych doboru, nigdy
+z treści wiadomości.
+
+### Propozycja nie wchodzi do pola sama
+
+Karta „Szkic Copilota" stoi pod edytorem: zastrzeżenia modelu na górze (czego
+nie znalazł w faktach), treść, znacznik „powstał przed nową wiadomością
+klienta", gdy klient dopisał. „Wstaw do szkicu" dopisuje z nową linią, jak
+każda wstawka. „Zastąp szkic" pojawia się tylko przy niepustym szkicu agenta.
+„Odrzuć" chowa kartę. Każde kliknięcie jest werdyktem: odsetek szkiców
+wstawionych albo zastąpionych jest jedyną liczbą, która mówi, czy przycisk
+jest wart pieniędzy. Pomiar zza zębatki rozbija koszt po zadaniu, bo jeden
+szkic kosztuje kilkadziesiąt razy więcej niż etykieta.
+
+Własna tabela `szkic_copilota`, jeden wiersz na rozmowę — z tego samego
+powodu, dla którego klasyfikacja ma swoją: `conversation.version` pilnuje
+szkicu agenta i 409 w trakcie pisania byłby katastrofą.
+
+### Polityka danych rośnie: cały wątek, zamaskowany, z sufitem
+
+Decyzja właściciela, zapisana w `docs/obsluga-klienta.md` PRZED kodem. Do
+dostawcy idą wszystkie wiadomości tej jednej rozmowy, także nasze wychodzące
+(agent bywa cytuje klienta), każda po tym samym maskowaniu, co przy
+klasyfikacji, bez stopki firmowej. Sufit: dwanaście wiadomości albo sześć
+tysięcy znaków od najnowszej; starsze zastępuje jeden znacznik. Fakty NIE
+przechodzą przez maskowanie — reguła „dziewięć cyfr to telefon" zjadłaby
+numery OEM — i mają własny typ `FaktyBezpieczne`, który produkuje jeden plik.
+Podpisy dowodów jadą bez nazwiska pracownika. Historia zakupów klienta, półka,
+rezerwacje i opis kartoteki w całości nie jadą.
+
+Trasy: `POST /api/obsluga/copilot/szkic`, `POST …/szkic/:id/ocena`. Licznik
+tras zapisu Copilota: 2 → 4, ze zdaniami w teście. Nowy strażnik adresów dla
+`panel/src/api/copilot.ts` — ten plik nie miał żadnego.
+
+Klucz i tryb bez zmian: `COPILOT_MODE=anthropic` i `ANTHROPIC_API_KEY`.
+Bez nich w edytorze stoi zdanie zamiast przycisku.
+
+### Naprawione przy okazji
+
+- **Login do maskowania bierze się z wątku Allegro, nie z tematu.**
+  Klasyfikacja podawała `conversation.subject`, a temat bywa tytułem oferty —
+  wtedy login klienta w treści szedł do dostawcy bez maski. Szkic czyta
+  `allegro_inbox_thread.interlocutor_login`; klasyfikacja dostanie to samo
+  w następnym wydaniu, bo jej test na ten układ dziś nie patrzy.
+- **`COPILOT_MODE=anthropic` bez klucza wywracał start.** Zdanie „Copilot
+  będzie wyłączony, serwer działa dalej" szło do listy BŁĘDÓW konfiguracji,
+  a każdy błąd tej listy zatrzymuje usługę — komentarz w kodzie i §14.5
+  obiecywały odwrotność. Brak klucza jest teraz ostrzeżeniem w dzienniku,
+  serwer wstaje, a edytor pokazuje zdanie o kluczu. Wyszło przy sprawdzaniu
+  ekranu w przeglądarce.
+
+### Do sprawdzenia u właściciela
+
+Sesja nie ma klucza Anthropic, więc jakość prozy nie była strojona na żywo.
+Sprawdzone w przeglądarce: zdanie zamiast przycisku przy `COPILOT_MODE=off`
+i przy braku klucza; cała ścieżka z nadawcą-atrapą w testach serwisu.
+Pierwsze prawdziwe kliknięcie należy do właściciela — sprawdzenie numerów
+w kodzie ogranicza szkodę złego zdania do „brzmi nieładnie".
+
+
 ## 0.230.0 — 7 września 2026
 
 **„Czy ta uszczelka pasuje do tego gaźnika?" — baza ma na to wiersz.**

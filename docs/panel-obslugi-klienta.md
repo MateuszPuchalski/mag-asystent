@@ -740,16 +740,23 @@ podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
-**Z tej listy działa w 0.190.0:** licznik znaków, ostrzeżenie o dopisku
+**Z tej listy działa w 0.231.0:** licznik znaków, ostrzeżenie o dopisku
 klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze źródłem,
-wstawienie parametrów produktu i przełączenie trybu.
+wstawienie parametrów produktu, przełączenie trybu i szkic ze sztucznej
+inteligencji — przycisk „Ułóż odpowiedź" nad polem, opisany w §14.6.
 
 Wstawka parametrów bierze tożsamość towaru i dostępność. NIE bierze półki,
 rezerwacji ani rozbicia na magazyny. Szkic czyta klient, a adres regału mówi
 obcemu, jak zbudowany jest nasz magazyn.
 
-Nie ma szablonów, podglądu ani historii wersji szkicu. Szkicu ze sztucznej
-inteligencji nie ma i nie będzie przed etapem F.
+Nie ma szablonów, podglądu ani historii wersji szkicu.
+
+**Szkic Copilota nie wchodzi do pola sam (0.231.0).** Propozycja stoi w karcie
+pod polem, a do szkicu agenta trafia na jedno z dwóch kliknięć. „Wstaw"
+dopisuje z nową linią — ten sam kontrakt, co każda wstawka. „Zastąp" jest
+jedyną świadomą drogą nadpisania i pojawia się tylko, gdy jest co nadpisać.
+„Odrzuć" chowa kartę. Każde z tych kliknięć jest werdyktem liczonym w pomiarze.
+W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
 
 **Przycisk komentarza i przycisk wysyłki do klienta są jednoznacznie
 rozdzielone.**
@@ -1149,6 +1156,56 @@ Copilot jest **wyłączony domyślnie**, a brak klucza nie zatrzymuje startu.
 Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
 (blizna 0.84.1).
 
+### 14.6. Co działa: szkic odpowiedzi z faktów (etap F, przyrost drugi)
+
+Decyzja właściciela z 7 września 2026: „w oknie odpowiedzi powinien być
+guzik, który konstruuje odpowiedź z pomocą AI, kartotek etc.". Przycisk
+„Ułóż odpowiedź" stoi nad polem szkicu, w jednej rozmowie, na jedno
+kliknięcie. Nie ma kroku „to kosztuje": agent prosi o pracę dla siebie,
+a nie uruchamia partię na dwadzieścia rozmów.
+
+**Model nie zna dopasowań z pamięci.** To zdanie z krytyki promptu doboru jest
+tu mechanizmem, nie życzeniem, i ma trzy ogniwa. Serwer układa FAKTY (F1,
+F2, …) ze zdań, które już pisze dla ekranu: kartoteka oferty z dostępnością
+dziś, dane doboru wpisane przez agenta, kandydaci i negatywy ze zdaniem
+źródła, zastosowania, silniki, pasowania, pomiary z tej rozmowy. Model pisze
+prozę wyłącznie z faktów i cytuje ich identyfikatory. Serwer SPRAWDZA wynik
+w kodzie: każdy numer w szkicu musi stać w faktach albo w rozmowie, każdy
+cytowany fakt musi istnieć, a długość nie może przekroczyć limitu wysyłki.
+Szkic, który to łamie, jest odrzucony ze zdaniem dla agenta i wierszem
+`blad` w księdze. Zła proza kosztuje „brzmi nieładnie"; wymyślony numer
+kosztowałby zwrot — i tego drugiego kod nie przepuszcza.
+
+**Gdy fakty nie rozstrzygają, szkic pyta.** Serwer dokłada do faktów pytania
+z intake per typ części (nóż, pasek, filtr, linka, rozrusznik, gaźnik
+z uszczelką), wybrane po nazwie części z DANYCH DOBORU, nigdy z treści
+wiadomości. Słownik pytań jest kodem, nie promptem. Przy wyborze
+z potwierdzonym dowodem pytań nie ma — udawałyby niewiedzę.
+
+**Do dostawcy idzie cały wątek, zamaskowany, z sufitem.** Decyzja
+właściciela; zapis w polityce danych skrzynki (`docs/obsluga-klienta.md`).
+Nasze wychodzące też przechodzą przez maskowanie, stopka jest wycięta, sufit
+to dwanaście wiadomości albo sześć tysięcy znaków od najnowszej. Fakty NIE
+przechodzą przez `zamaskuj()`: reguła „dziewięć cyfr to telefon" zjadłaby
+numery OEM. Bezpieczeństwo faktów bierze się z konstrukcji i ma własny typ
+`FaktyBezpieczne`, który produkuje jeden plik. Podpisy dowodów jadą bez
+nazwiska pracownika. Login do maskowania bierze się z wątku Allegro, nie
+z tematu rozmowy — to naprawa błędu klasyfikacji, która przy temacie będącym
+tytułem oferty zostawiała login w treści.
+
+**Propozycja ma własną tabelę `szkic_copilota`**, jeden wiersz na rozmowę,
+z tego samego powodu, dla którego klasyfikacja ma swoją: `conversation.version`
+pilnuje szkicu agenta i 409 w trakcie pisania byłby katastrofą. Wiersz niesie
+`message_id`, na którym powstał — dopisek klienta czyni propozycję nieświeżą
+i karta to mówi. Księga `copilot_wywolanie` dostaje zadanie `szkic`; pomiar
+zza zębatki rozbija koszt po zadaniu, bo jeden szkic kosztuje kilkadziesiąt
+razy więcej niż etykieta.
+
+**Miarą szkicu jest jego los.** Wstawiony albo zastąpiony znaczy, że agent go
+użył; odrzucony — że napisał sam. Ten odsetek, nie liczba wywołań, mówi, czy
+przycisk jest wart pieniędzy. „Confidence bez konsekwencji to dekoracja" —
+z tej samej krytyki.
+
 ## 15. Model danych
 
 Tabele docelowe, nazwami z kodu:
@@ -1378,7 +1435,8 @@ pozytywne i negatywne zastosowania, dowody.
 
 **F — Copilot:** klasyfikacja, ekstrakcja, OCR, brakujące dane, kandydaci,
 porównanie, szkic z dowodami. Przyrost pierwszy — klasyfikacja wiadomości —
-stoi; opisuje go §14.5. Reszta czeka.
+stoi (§14.5). Przyrost drugi — szkic z dowodami — stoi od 0.231.0 (§14.6).
+Reszta czeka.
 
 **G — automatyzacje:** priorytety, routing, terminy, odłożenie, sugestie
 poprawy ofert, analiza powodów kontaktu, kolejne kanały.
@@ -2471,7 +2529,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
-| Copilot — ekstrakcja, OCR, kandydaci, szkic (§14.1) | **projekt** | etap F, przyrosty dalsze |
+| Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; numery spoza faktów odrzuca kod |
+| Copilot — ekstrakcja, OCR, kandydaci (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
 | Audyt mutacji rozmowy | **działa** od 0.145.1 | `logEvent` w `services/conversations.ts` |

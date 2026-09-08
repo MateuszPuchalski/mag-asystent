@@ -62,6 +62,8 @@ export function Rozmowa(p: {
   bladZalacznika: string;
   onDodajZalacznik: (plik: File) => void;
   onUsunZalacznik: (id: number) => void;
+  /** Szkic z Copilota (0.231.0). Stan i mutacje w `ekrany/Skrzynka.tsx`, jak reszta. */
+  copilot: import("./SzkicCopilota").PropsSzkicuCopilota;
   konflikt: SzczegolyKonfliktu | null;
   mozeWymusic: boolean;
   wymusza: boolean;
@@ -195,6 +197,7 @@ export function Rozmowa(p: {
       agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}
       zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
       bladZalacznika={p.bladZalacznika}
-      onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik} />
+      onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik}
+      copilot={p.copilot} />
   </section>;
 }

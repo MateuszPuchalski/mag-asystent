@@ -12,7 +12,7 @@ import {
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
-import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje } from "../api/copilot";
+import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje, useOcenSzkic, useUlozSzkic } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
@@ -34,6 +34,11 @@ export function Skrzynka() {
      do ekranu — hak trzyma go do restartu usługi. Mutacje siedzą tutaj, a nie
      w widokach: cały katalog `skrzynka/` to komponenty czyste. */
   const copilot = useCopilot();
+  /* Szkic z Copilota (0.231.0): jedna rozmowa na kliknięcie, wynik wraca
+     w `osRozmowy` i wchodzi do pola dopiero na „Wstaw" albo „Zastąp". */
+  const ulozSzkic = useUlozSzkic();
+  const ocenSzkic = useOcenSzkic();
+  const [bladSzkicu, setBladSzkicu] = useState("");
   const klasyfikuj = useKlasyfikuj();
   const ocenKategorie = useOcenKlasyfikacje();
   const przejmij = usePrzejmij();
@@ -95,6 +100,7 @@ export function Skrzynka() {
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
     setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setBladSprawy(""); setPrzyRozmowie(null);
+    setBladSzkicu("");
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -230,6 +236,36 @@ export function Skrzynka() {
         .map((u) => ({ userId: u.userId, name: u.name }))}
       wzmianki={wzmianki}
       onWzmianki={setWzmianki}
+      copilot={{
+        stan: copilot.data,
+        szkic: rozmowa.data?.szkicCopilota ?? null,
+        /* Nieświeży = klient dopisał po tym, jak model czytał wątek. Porównanie
+           po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
+        nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
+        uklada: ulozSzkic.isPending,
+        blad: bladSzkicu,
+        maSzkicAgenta: szkic.trim() !== "",
+        /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
+        wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
+          && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
+        onUloz: () => rozmowa.data && ulozSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id },
+          { onError: (e) => setBladSzkicu((e as Error).message), onSuccess: () => setBladSzkicu("") }),
+        /* Wstaw = DOPISZ z nową linią, ten sam kontrakt co każda wstawka. */
+        onWstaw: () => {
+          const t = rozmowa.data?.szkicCopilota?.tresc;
+          if (!rozmowa.data || !t) return;
+          setSzkic((s) => (s ? `${s}\n${t}` : t));
+          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "wstawiony" });
+        },
+        onZastap: () => {
+          const t = rozmowa.data?.szkicCopilota?.tresc;
+          if (!rozmowa.data || !t) return;
+          setSzkic(t);
+          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "zastapiony" });
+        },
+        onOdrzuc: () => rozmowa.data
+          && ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" }),
+      }}
       zalaczniki={zalaczniki.data?.zalaczniki ?? []}
       dodajeZalacznik={dodajZalacznik.isPending}
       bladZalacznika={bladZalacznika}

@@ -297,6 +297,14 @@ export interface PomiarCopilota {
   /** Ile klasyfikacji NIKT nie ocenił. Bez tej liczby „100 % trafności" kłamie. */
   nieocenionych: number;
   wgKategorii: Array<{ kategoria: string; ile: number; ocen: number; trafnych: number }>;
+  /**
+   * Rozbicie księgi po ZADANIU (0.231.0). Bez tego koszt szkiców zlałby się
+   * z miarą klasyfikacji i „zejdź na tańszy model" nie wiedziałoby, o którym
+   * zadaniu mówi.
+   */
+  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
+  /** Szkice odpowiedzi: ile powstało i co agent z nimi zrobił. */
+  szkice: { ile: number; wstawionych: number; zastapionych: number; odrzuconych: number };
 }
 
 /** Pomiar do ekranu ustawień. Czysty odczyt — nie zapisuje niczego. */
@@ -338,6 +346,32 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     FROM klasyfikacja_rozmowy GROUP BY kategoria ORDER BY ile DESC`)
     .all() as Array<Record<string, string | number>>;
 
+  const wgZadania = (database.prepare(`SELECT zadanie, model,
+      COUNT(*) AS wywolan, SUM(CASE WHEN wynik='blad' THEN 1 ELSE 0 END) AS bledow,
+      COALESCE(SUM(tokeny_wej),0) AS wej, COALESCE(SUM(tokeny_wyj),0) AS wyj,
+      COALESCE(SUM(tokeny_cache_zapis),0) AS cacheZapis,
+      COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt
+    FROM copilot_wywolanie GROUP BY zadanie, model ORDER BY zadanie`)
+    .all() as Array<Record<string, string | number>>)
+    .reduce((acc, w) => {
+      const z = acc.find((x) => x.zadanie === String(w.zadanie))
+        ?? acc[acc.push({ zadanie: String(w.zadanie), wywolan: 0, bledow: 0, kosztUsd: 0 }) - 1]!;
+      z.wywolan += Number(w.wywolan); z.bledow += Number(w.bledow ?? 0);
+      if (String(w.model)) {
+        z.kosztUsd = Number((z.kosztUsd + kosztUsd(String(w.model), {
+          wej: Number(w.wej), wyj: Number(w.wyj),
+          cacheZapis: Number(w.cacheZapis), cacheOdczyt: Number(w.cacheOdczyt),
+        })).toFixed(6));
+      }
+      return acc;
+    }, [] as PomiarCopilota["wgZadania"]);
+
+  const sz = database.prepare(`SELECT COUNT(*) AS ile,
+      SUM(CASE WHEN ocena='wstawiony' THEN 1 ELSE 0 END) AS wstawionych,
+      SUM(CASE WHEN ocena='zastapiony' THEN 1 ELSE 0 END) AS zastapionych,
+      SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych
+    FROM szkic_copilota`).get() as Record<string, number>;
+
   const wejscieRazem = tokeny.wej + tokeny.cacheOdczyt;
   return {
     wywolan: Number(w.wywolan), bledow: Number(w.bledow ?? 0),
@@ -350,5 +384,10 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       kategoria: String(k.kategoria), ile: Number(k.ile),
       ocen: Number(k.ocen ?? 0), trafnych: Number(k.trafnych ?? 0),
     })),
+    wgZadania,
+    szkice: {
+      ile: Number(sz.ile ?? 0), wstawionych: Number(sz.wstawionych ?? 0),
+      zastapionych: Number(sz.zastapionych ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
+    },
   };
 }

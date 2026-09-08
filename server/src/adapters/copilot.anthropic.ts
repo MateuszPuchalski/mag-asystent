@@ -10,6 +10,8 @@ import {
 import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
+import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import { LIMIT_ZNAKOW } from "../services/wysylka.js";
 
 /* ── Wyjście do Anthropic (etap F) ───────────────────────────────────────────
 
@@ -125,6 +127,91 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
       uzasadnienie: w.uzasadnienie,
       model: odp.model ?? config.copilot.model,
       zuzycie,
+      ms: Date.now() - start,
+    };
+  } catch (e) {
+    throw naNasz(e);
+  }
+};
+
+/* ── Szkic odpowiedzi (§14.6, przyrost drugi) ───────────────────────────────
+   Drugie ZADANIE tego samego adaptera, ta sama droga błędów i ten sam klient.
+   Osobna instrukcja, bo klasyfikator i redaktor to dwie różne role, a wspólny
+   prefiks „jesteś klasyfikatorem" psułby jedną z nich.                       */
+
+const Szkic = z.object({
+  tresc: z.string(),
+  uzyteFakty: z.array(z.string()),
+  zastrzezenia: z.array(z.string()),
+});
+
+/* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
+   Tu prefiks jest już dość długi, żeby cache się włączył; sprawdzisz to
+   w księdze po `cache_read_input_tokens`. */
+const INSTRUKCJA_SZKICU = [
+  "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
+  "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
+  "Szkic czyta i poprawia człowiek; do klienta wysyła go człowiek. Ty nie wysyłasz.",
+  "",
+  "DOSTAJESZ dwie części: FAKTY (ponumerowane F1, F2, …) ułożone przez system",
+  "z bazy sklepu oraz ROZMOWĘ (wiersze KLIENT: i MY:, od najstarszej).",
+  "",
+  "ZASADY, KTÓRYCH NIE WOLNO ZŁAMAĆ:",
+  "1. Nie znasz dopasowań części z pamięci. Każde twierdzenie techniczne",
+  "   (co pasuje, co nie pasuje, jaki numer, jaki symbol) bierzesz WYŁĄCZNIE",
+  "   z faktów i oznaczasz identyfikatorem w nawiasie, np. „pasuje (F3)”.",
+  "2. Nie wymyślaj numerów, symboli ani nazw części. Każdy numer w szkicu musi",
+  "   stać w faktach albo w rozmowie — system to sprawdza i odrzuca szkic.",
+  "3. Gdy fakty czegoś nie mówią, NIE zgaduj: wpisz to do `zastrzezenia`",
+  "   (dla agenta, nie dla klienta) i w szkicu zadaj klientowi pytania z faktu",
+  "   oznaczonego jako intake.",
+  "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
+  "   sprawdzenie (tabliczka, zdjęcie starej części). Fakt „NIE PASUJE” to",
+  "   ostrzeżenie — powiedz je klientowi wprost.",
+  "5. Nie obiecuj terminu dostawy ani przyszłej dostępności. Dostępność",
+  "   podawaj tylko jako „dziś”, tak jak stoi w fakcie.",
+  "6. Nie podawaj półek, rezerwacji, magazynów, nazwisk pracowników ani",
+  "   danych osobowych. Znaczniki [e-mail], [telefon], [adres], [konto], [login]",
+  "   to wycięte dane — nie zgaduj ich treści.",
+  "7. Alternatywy proponuj wyłącznie spośród kandydatów z faktów.",
+  "",
+  "FORMA: po polsku, zwrot „Pan/Pani” bez imienia, zwięźle, bez wstępów",
+  `o firmie. Najwyżej ${LIMIT_ZNAKOW - 200} znaków. Jedno twierdzenie na zdanie.`,
+  "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
+  "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło).",
+].join("\n");
+
+/** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
+export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promise<OdpowiedzSzkicu> => {
+  const start = Date.now();
+  try {
+    const odp = await anthropic().messages.parse({
+      model: config.copilot.model,
+      /* Szkic ma do 1800 znaków polskiego tekstu plus JSON wokół — 1200 tokenów
+         to sufit z zapasem, a nie zaproszenie do rozwlekłości (limit stoi też
+         w instrukcji). */
+      max_tokens: 1200,
+      system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
+      output_config: {
+        /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta. */
+        effort: "medium",
+        format: zodOutputFormat(Szkic),
+      },
+      messages: [{ role: "user", content: `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}` }],
+    });
+    const u = odp.usage;
+    const w = odp.parsed_output;
+    if (!w) {
+      throw new BladOdpowiedziCopilota(
+        `Model nie oddał szkicu (stop: ${odp.stop_reason ?? "?"})`, 200);
+    }
+    return {
+      tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
+      model: odp.model ?? config.copilot.model,
+      zuzycie: {
+        wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,
+        cacheZapis: u?.cache_creation_input_tokens ?? 0, cacheOdczyt: u?.cache_read_input_tokens ?? 0,
+      },
       ms: Date.now() - start,
     };
   } catch (e) {

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Lock, MessageSquare, Send } from "lucide-react";
 import { Przycisk } from "../ui";
 import { ZalacznikiWysylki } from "./ZalacznikiWysylki";
+import { KartaSzkicu, PrzyciskSzkicu, type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
 /**
@@ -24,7 +25,7 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
 export function Edytor({
   szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij,
   komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki,
-  zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik,
+  zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik, copilot,
 }: {
   szkic: string;
   cudza: boolean;
@@ -49,6 +50,10 @@ export function Edytor({
   bladZalacznika: string;
   onDodajZalacznik: (plik: File) => void;
   onUsunZalacznik: (id: number) => void;
+  /* Szkic z Copilota (0.231.0) — TYLKO w trybie odpowiedzi: propozycja jest
+     dla klienta, a w komentarzu nie ma czego układać. Opcjonalny, bo edytor
+     reklamacji i testy komentarza nie mają Copilota wcale. */
+  copilot?: PropsSzkicuCopilota;
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
@@ -99,6 +104,7 @@ export function Edytor({
       : <>
           {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
+          {copilot && <PrzyciskSzkicu p={copilot} />}
           <textarea className="field min-h-20" value={szkic} aria-label="Szkic odpowiedzi"
             onChange={(e) => onZmiana(e.target.value)}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
@@ -114,6 +120,7 @@ export function Edytor({
           </div>
           <ZalacznikiWysylki lista={zalaczniki} dodaje={dodajeZalacznik} blad={bladZalacznika}
             onDodaj={onDodajZalacznik} onUsun={onUsunZalacznik} wylaczone={cudza} />
+          {copilot && <KartaSzkicu p={copilot} />}
         </>}
   </div>;
 }

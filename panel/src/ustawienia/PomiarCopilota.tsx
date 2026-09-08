@@ -62,6 +62,25 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         ta liczba jeszcze nic nie rozstrzyga.</span>}
     </p>
 
+    {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
+        niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
+        Miarą szkicu nie jest trafność, tylko los: wstawiony albo zastąpiony
+        znaczy, że agent go użył; odrzucony — że napisał sam. */}
+    {(() => {
+      const sz = dane.wgZadania.find((z) => z.zadanie === "szkic");
+      if (!sz && dane.szkice.ile === 0) return null;
+      const uzyte = dane.szkice.wstawionych + dane.szkice.zastapionych;
+      const ocenionych = uzyte + dane.szkice.odrzuconych;
+      return <p className="border-t p-4 text-sm text-slate-600" aria-label="Szkice odpowiedzi">
+        Szkice odpowiedzi: <b>{sz?.wywolan ?? 0}</b> wywołań
+        {sz && sz.bledow > 0 && <>, <b className="text-wertis-amber">{sz.bledow}</b> nieudanych</>},
+        {" "}rachunek <b>{(sz?.kosztUsd ?? 0).toFixed(2)} USD</b> ({zl(sz?.kosztUsd ?? 0)}).
+        {" "}Użytych: <b>{proc(uzyte, ocenionych)}</b> z {ocenionych} ocenionych
+        {" "}(wstawionych {dane.szkice.wstawionych}, zastąpionych {dane.szkice.zastapionych},
+        {" "}odrzuconych {dane.szkice.odrzuconych}).
+      </p>;
+    })()}
+
     {dane.wgKategorii.length > 0 && <div className="border-t p-4">
       <table className="w-full text-sm">
         <thead><tr className="text-left text-xs uppercase text-slate-400">

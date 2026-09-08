@@ -100,6 +100,44 @@ export function zamaskuj(tresc: string, login: string | null): TrescBezpieczna {
   return out as TrescBezpieczna;
 }
 
+/** Jedna wiadomość wątku do zamaskowania — kierunek i treść BEZ stopki. */
+export interface WiadomoscWatku { odKlienta: boolean; tresc: string }
+
+/**
+ * Sufit wątku wysyłanego dostawcy (polityka danych skrzynki, 0.231.0).
+ * Liczony od NAJNOWSZEJ wiadomości: to ona niesie pytanie, na które szkic ma
+ * odpowiedzieć, a dwunasta wstecz bywa już inną sprawą tego samego klienta.
+ */
+export const SUFIT_WATKU = { wiadomosci: 12, znakow: 6000 } as const;
+
+export const ZNACZNIK_POMINIETYCH = "[wcześniejsze wiadomości pominięte]";
+
+/**
+ * Cały wątek jako jeden bezpieczny tekst — decyzja właściciela z 7 września
+ * 2026 dla szkicu odpowiedzi (klasyfikacja dalej bierze jedną wiadomość).
+ *
+ * Nasze wychodzące też przechodzą przez maskowanie: agent bywa cytuje klienta
+ * („proszę o adres — Polna 7, tak?"), a `zamaskuj()` nie wie, kto napisał
+ * zdanie. Sufit tnie od najstarszej, zostawiając jeden znacznik: model ma
+ * wiedzieć, że coś było wcześniej, ale nie ma się tego domyślać.
+ */
+export function zamaskujWatek(wiadomosci: WiadomoscWatku[], login: string | null): TrescBezpieczna {
+  const linie: string[] = [];
+  let znakow = 0;
+  let pominieto = false;
+  for (const w of [...wiadomosci].reverse()) {
+    const linia = `${w.odKlienta ? "KLIENT" : "MY"}: ${String(zamaskuj(w.tresc, login)).trim()}`;
+    if (linie.length >= SUFIT_WATKU.wiadomosci || znakow + linia.length > SUFIT_WATKU.znakow) {
+      pominieto = true;
+      break;
+    }
+    linie.unshift(linia);
+    znakow += linia.length;
+  }
+  if (pominieto) linie.unshift(ZNACZNIK_POMINIETYCH);
+  return linie.join("\n") as TrescBezpieczna;
+}
+
 /**
  * Czy w tekście ZOSTAŁY dane osobowe rozpoznawalne naszymi wzorcami.
  *

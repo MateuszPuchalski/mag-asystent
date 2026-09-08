@@ -301,6 +301,37 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 
+-- ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ────
+-- Propozycja modelu, NIE szkic agenta. Szkic agenta mieszka w
+-- `conversation_draft` i pilnuje go `conversation.version`; gdyby model pisał
+-- prosto tam, wywracałby komuś szkic na 409 w trakcie pisania — ten sam
+-- powód, dla którego klasyfikacja dostała własną tabelę.
+--
+-- JEDEN WIERSZ NA ROZMOWĘ: poprzednia propozycja po nowej nie ma czytelnika,
+-- a historia kosztu i tak stoi w `copilot_wywolanie`.
+--
+-- `ocena` to miernik z krytyki właściciela („confidence bez konsekwencji to
+-- dekoracja"): odsetek szkiców, które agent wstawił albo którymi zastąpił
+-- własny, jest jedyną liczbą mówiącą, czy ten przycisk jest wart pieniędzy.
+CREATE TABLE IF NOT EXISTS szkic_copilota (
+  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
+  tresc           TEXT NOT NULL,
+  -- JSON: zdania o tym, czego model NIE znalazł w faktach. To jest treść
+  -- dla agenta, nie dla klienta — stoi nad szkicem na bursztynowo.
+  zastrzezenia    TEXT NOT NULL DEFAULT '[]',
+  -- JSON: identyfikatory faktów (F1, F2…), na których model oparł zdania.
+  uzyte_fakty     TEXT NOT NULL DEFAULT '[]',
+  -- NA CZYM liczono. Dopisek klienta czyni propozycję nieświeżą, a ekran
+  -- ma to powiedzieć zamiast udawać, że szkic odpowiada na nowe pytanie.
+  message_id      INTEGER REFERENCES message(id),
+  model           TEXT NOT NULL,
+  at              TEXT NOT NULL,
+  przez           TEXT NOT NULL,
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('wstawiony','zastapiony','odrzucony')),
+  ocena_at        TEXT
+);
+
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
 -- Pięć tabel zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
 -- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
