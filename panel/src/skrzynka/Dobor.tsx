@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { AlertTriangle, Check, FileText, Pencil, Ruler, Search, X as Krzyzyk } from "lucide-react";
+import { AlertTriangle, Check, FileText, Pencil, Ruler, Search, Sparkles, X as Krzyzyk } from "lucide-react";
 import type {
   DaneDoboru, Dobor as DoborTyp, DrogaDoboru, KandydatDoboru, NegatywDoboru,
-  StatusDoboru, SzczebelDoboru,
+  StatusDoboru, SzczebelDoboru, SzkicCopilota,
 } from "../api/typy";
 import { Konflikt } from "../api/klient";
 import {
   useKandydaci, useStatusDoboru, useWiedzaDoboru, useWybierzKandydata, useZapiszDaneDoboru,
 } from "../api/rozmowy";
+import { useOcenDaneDoboru } from "../api/copilot";
+import { propozycjaDoboru } from "./propozycjaDoboru";
 import { Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
@@ -85,14 +87,18 @@ const naFormularz = (d: DaneDoboru): Formularz => ({
   parametry: parametryNaTekst(d.parametry),
 });
 
-export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
+export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, onZlecPomiar }: {
   dobor: DoborTyp;
   rozmowaId: number;
+  /** Szkic Copilota z danymi rozpoznanymi w rozmowie (przyrost trzeci). */
+  propozycja?: SzkicCopilota | null;
   onWstawDoSzkicu: (tresc: string) => void;
   onZlecPomiar: (towar: TowarZWyszukiwarki) => void;
 }) {
   const kandydaci = useKandydaci(rozmowaId);
   const zapisz = useZapiszDaneDoboru();
+  const ocenDane = useOcenDaneDoboru();
+  const zRozmowy = propozycjaDoboru(propozycja, dobor.dane);
   const status = useStatusDoboru();
   const wybierz = useWybierzKandydata();
   /* Ten sam odczyt, z którego zakładka WIEDZA bierze dowody — tu potrzebne są
@@ -118,8 +124,20 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
      model silnika z zatwierdzonej zabudowy — nigdy tekst z pola „Silnik". */
   const [doSilnika, setDoSilnika] = useState<number | null>(null);
 
-  const blad = [zapisz.error, status.error, wybierz.error]
+  const blad = [zapisz.error, status.error, wybierz.error, ocenDane.error]
     .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
+
+  /* Konflikt przy propozycji to ten sam wyścig, co przy formularzu: ktoś zapisał
+     dane, zanim doszło kliknięcie. Zdanie to samo, bo sytuacja ta sama. */
+  const ocenDaneZRozmowy = (ocena: "wpisane" | "odrzucone") =>
+    ocenDane.mutate({ rozmowaId, ocena, expectedVersion: dobor.wersja }, {
+      onSuccess: () => setKonflikt(""),
+      onError: (e) => {
+        if (e instanceof Konflikt) {
+          setKonflikt(`Ktoś zmienił dane doboru (${String(e.szczegoly.updatedBy ?? "inny agent")}) — odśwież i kliknij ponownie`);
+        }
+      },
+    });
 
   const zapiszDane = () => {
     const dane: Partial<DaneDoboru> = { parametry: tekstNaParametry(formularz.parametry) };
@@ -192,6 +210,34 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
           onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
           <Pencil size={12} />{wypelnione.length ? "Popraw" : "Wpisz dane"}</button>}
       </div>
+
+      {/* DANE Z ROZMOWY (etap F, przyrost trzeci). Pytanie właściciela z 8.09.2026:
+          „dlaczego dane wejściowe nie zostały wprowadzone automatycznie ze
+          szkicu?". Odpowiedź stoi tu: Copilot je ROZPOZNAŁ, serwer sprawdził
+          przeciw rozmowie, a wpisuje agent — jednym kliknięciem, w PUSTE pola.
+          To, co agent wpisał sam, zostaje; różnicę karta tylko nazywa. Bez
+          nowych pól karty nie ma, bo nie miałaby czego wpisać. */}
+      {!edycja && zRozmowy.nowe.length > 0 && <section aria-label="Dane z rozmowy"
+        className="mb-2 rounded-lg border border-violet-200 bg-violet-50 p-2">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
+          <b className="text-violet-900"><Sparkles size={12} className="inline" /> Copilot rozpoznał w rozmowie</b>
+          <span className="ml-auto flex flex-wrap items-center gap-2">
+            <Przycisk wariant="glowny" className="text-xs" disabled={ocenDane.isPending}
+              onClick={() => ocenDaneZRozmowy("wpisane")}>Wpisz do danych</Przycisk>
+            <Przycisk className="text-xs" disabled={ocenDane.isPending}
+              onClick={() => ocenDaneZRozmowy("odrzucone")}>Odrzuć</Przycisk>
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {zRozmowy.nowe.map((p) => <span key={p.klucz} className="rounded border border-violet-200 bg-white px-2 py-0.5 text-xs">
+            <span className="text-slate-500">{p.nazwa}: </span><b>{p.wartosc}</b></span>)}
+        </div>
+        {zRozmowy.inaczej.length > 0 && <p className="mt-1 text-[11px] text-slate-600">
+          Inaczej niż wpisano (zostaje Twoje): {zRozmowy.inaczej.map((p) => `${p.nazwa} „${p.wartosc}"`).join(", ")}.</p>}
+        <p className="mt-1 text-[11px] text-slate-500">Wartości dosłownie z rozmowy klienta — sprawdzone przez serwer, wpisane dopiero po kliknięciu.</p>
+        {konflikt && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
+          <AlertTriangle size={13} />{konflikt}</p>}
+      </section>}
 
       {!edycja && (wypelnione.length === 0 && Object.keys(dobor.dane.parametry).length === 0
         ? <p className="text-xs text-slate-500">Nie wiadomo jeszcze, o jaką maszynę i część chodzi.

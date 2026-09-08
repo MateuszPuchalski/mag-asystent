@@ -6,18 +6,26 @@ import {
   ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
 import { nadawcaAnthropic, nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
-import { ocenSzkic, ulozSzkic } from "../services/copilot-szkic.js";
+import { ocenSzkic, odrzucDaneDoboru, przyjmijDaneDoboru, ulozSzkic } from "../services/copilot-szkic.js";
+import { ConversationConflict } from "../services/conversations.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   CZTERY TRASY ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
-   werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0) i werdykt
-   o szkicu. Werdykty wyglądają na drobiazg, a bez nich nie da się policzyć,
-   CZY Copilot jest dobry — czyli nie da się podjąć decyzji „zejdź na tańszy
-   model", dla której cały pomiar powstał.
+   PIĘĆ TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0), werdykt
+   o szkicu i los danych doboru z rozmowy (przyrost trzeci). Werdykty
+   wyglądają na drobiazg, a bez nich nie da się policzyć, CZY Copilot jest
+   dobry — czyli nie da się podjąć decyzji „zejdź na tańszy model", dla
+   której cały pomiar powstał.
+
+   Piąta trasa jest OSOBNA od `PUT dobor/dane` z rozkładu skrzynki, choć
+   kończy w tej samej tabeli: serwis sam pilnuje „tylko puste pola" i liczy
+   los propozycji. Gdyby panel przepisywał wartości do zwykłego PUT, każda
+   propozycja wyglądałaby w dzienniku jak ręczny wpis agenta — i pomiar
+   nie miałby czego mierzyć.
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -161,6 +169,30 @@ export async function copilotRoutes(app: FastifyInstance) {
       try {
         return ocenSzkic(Number(req.params.id), req.body?.ocena ?? "", kto());
       } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /**
+   * Los danych doboru rozpoznanych w rozmowie: `wpisane` (w puste pola,
+   * przez `zapiszDane` — stąd wersja doboru i 409 jak przy ręcznym zapisie)
+   * albo `odrzucone`. Jedno kliknięcie agenta; automat sam nie wpisuje.
+   */
+  app.post<{ Params: { id: string }; Body: { ocena?: string; expectedVersion?: number } }>(
+    "/api/obsluga/copilot/szkic/:id/dane", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.params.id);
+      try {
+        if (req.body?.ocena === "wpisane") {
+          return { szkic: przyjmijDaneDoboru(id, Number(req.body.expectedVersion), kto()) };
+        }
+        if (req.body?.ocena === "odrzucone") return { szkic: odrzucDaneDoboru(id, kto()) };
+        return reply.code(400).send({ error: "Ocena danych może być „wpisane” albo „odrzucone”." });
+      } catch (e) {
+        if (e instanceof ConversationConflict) {
+          return reply.code(409).send({ error: e.message, ...e.details });
+        }
         return reply.code(400).send({ error: (e as Error).message });
       }
     });

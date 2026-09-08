@@ -78,6 +78,9 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         {" "}Użytych: <b>{proc(uzyte, ocenionych)}</b> z {ocenionych} ocenionych
         {" "}(wstawionych {dane.szkice.wstawionych}, zastąpionych {dane.szkice.zastapionych},
         {" "}odrzuconych {dane.szkice.odrzuconych}).
+        {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
+        {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
+          {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}
       </p>;
     })()}
 

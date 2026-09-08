@@ -80,7 +80,9 @@ const odpowiedz = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}
   /* Domyślna odpowiedź cytuje wyłącznie numer, który JEST w faktach (kartoteka
      oferty) — testy sprawdzenia dokładają własne numery świadomie. */
   tresc: "Dzień dobry, gaźnik W09-0211 jest dziś dostępny (F1).",
-  uzyteFakty: ["F1"], zastrzezenia: [], model: "claude-opus-5", ms: 800,
+  /* `daneDoboru: null` domyślnie — testy propozycji dokładają dane świadomie,
+     a reszta nie zmienia znaczenia przez sam fakt, że model coś rozpoznał. */
+  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, model: "claude-opus-5", ms: 800,
   zuzycie: { wej: 2000, wyj: 300, cacheZapis: 0, cacheOdczyt: 1500 }, ...n,
 });
 const nadawca = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}): import("./copilot-szkic.js").NadawcaSzkicu =>
@@ -257,7 +259,109 @@ test("pomiar rozbija księgę po zadaniu i liczy losy szkiców", async () => {
   assert.ok(sz, "brak zadania „szkic” w rozbiciu");
   assert.equal(sz.wywolan, 1);
   assert.ok(sz.kosztUsd > 0);
-  assert.deepEqual(p.szkice, { ile: 1, wstawionych: 0, zastapionych: 1, odrzuconych: 0 });
+  assert.deepEqual(p.szkice, {
+    ile: 1, wstawionych: 0, zastapionych: 1, odrzuconych: 0,
+    daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
+  });
+});
+
+/* ── Dane doboru z rozmowy (przyrost trzeci) ───────────────────────────────
+   Pytanie właściciela z 8.09.2026: „dlaczego dane wejściowe nie zostały
+   wprowadzone automatycznie ze szkicu?". Pilnujemy czterech granic: wartość
+   spoza rozmowy wypada (model nie może DOPISAĆ), wartość zamaskowana nie
+   wraca, samo ułożenie NIE dotyka `dobor_rozmowy`, a kliknięcie wpisuje
+   WYŁĄCZNIE w puste pola i idzie drogą ręcznego zapisu (wersja, 409). */
+
+const DANE = (n: Partial<import("./dobor.js").DaneDoboru> = {}): import("./dobor.js").DaneDoboru => ({
+  marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
+  silnik: null, oem: null, nazwaCzesci: null, parametry: {}, ...n,
+});
+
+const dopiszKlienta = (tresc: string) => db().prepare(`INSERT INTO message
+    (conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,?,'incoming',?,?)`)
+  .run(rozmowa, konto, `m-${Date.now()}-${Math.random()}`, tresc, "2026-09-08T09:00:00Z");
+
+test("wartość z rozmowy zostaje, zmyślona wypada — po zwinięciu numeru i po rdzeniu słowa", () => {
+  const w = "KLIENT: Mam kosiarkę Faworyt GTV51N196L-4W1 z silnikiem Lonci v200, szukam śrubę do noża. OEM 532 19 93-77.";
+  assert.equal(S.wartoscZRozmowy("Faworyt", w), true);
+  assert.equal(S.wartoscZRozmowy("GTV51N196L-4W1", w), true);
+  assert.equal(S.wartoscZRozmowy("Lonci v200", w), true);
+  assert.equal(S.wartoscZRozmowy("śruba noża", w), true, "odmiana: „śrubę do noża” pokrywa „śruba noża”");
+  assert.equal(S.wartoscZRozmowy("532199377", w), true, "„532 19 93-77” to ten sam numer po zwinięciu");
+  /* Rdzeń czterech liter przepuszcza „Loncin" przy „Lonci" w rozmowie — to
+     zapisana cena reguły odmiany, nie zaproszenie: instrukcja każe pisać
+     dosłownie, a poprawia agent. */
+  assert.equal(S.wartoscZRozmowy("Loncin", w), true);
+  assert.equal(S.wartoscZRozmowy("Husqvarna", w), false, "marki nie ma w rozmowie");
+  assert.equal(S.wartoscZRozmowy("GTV51N196L-4W2", w), false, "inny numer");
+  assert.equal(S.wartoscZRozmowy("", w), false);
+  const p = S.oczyscPropozycje(DANE({ marka: "Faworyt", model: "GX160", nazwaCzesci: "śruba noża",
+    parametry: { "klucz": "16", "długość": "50 mm" } }), w + " Klucz 16.");
+  assert.deepEqual(p.dane, DANE({ marka: "Faworyt", nazwaCzesci: "śruba noża", parametry: { klucz: "16" } }));
+  assert.equal(p.odrzuconych, 2, "GX160 i „50 mm” nie stoją w rozmowie");
+  assert.deepEqual(S.oczyscPropozycje(DANE({ model: "GX160" }), w), { dane: null, odrzuconych: 1 });
+  assert.deepEqual(S.oczyscPropozycje(null, w), { dane: null, odrzuconych: 0 });
+});
+
+test("ułożenie zapisuje propozycję sprawdzoną przeciw rozmowie i NIE dotyka doboru", async () => {
+  dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, szukam śruby noża.");
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
+      nazwaCzesci: "śruba noża", oem: "17211-ZL8-023" }),
+  }), subiekt);
+  assert.deepEqual(s.daneDoboru, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
+    nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy wypadł, reszta została");
+  assert.equal(s.daneOcena, null);
+  assert.equal(s.doborWersja, 1);
+  assert.equal(liczba("dobor_rozmowy"), 0, "samo ułożenie wpisało coś do doboru");
+  assert.equal(D.doborRozmowy(rozmowa).status, "not_started");
+  const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic'").get() as { payload: string };
+  assert.match(zd.payload, /"polDoboru":4/);
+  assert.match(zd.payload, /"polOdrzuconych":1/);
+  assert.equal(zd.payload.includes("Faworyt"), false, "wartość w dzienniku (§19)");
+});
+
+test("wartość zamaskowana nie wraca do danych — telefon podany jako numer seryjny wypada", async () => {
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    daneDoboru: DANE({ nrSeryjny: "601 234 567", nazwaCzesci: "uszczelka" }),
+  }), subiekt);
+  assert.deepEqual(s.daneDoboru, DANE({ nazwaCzesci: "uszczelka" }));
+});
+
+test("„Wpisz do danych” wpisuje TYLKO puste pola drogą ręcznego zapisu: wersja, status, dziennik, 409", async () => {
+  dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, klucz 16.");
+  /* Agent wpisał model sam, inaczej niż model to widzi — jego słowo zostaje. */
+  D.zapiszDane(rozmowa, { model: "GTV51" }, 1, biuro);
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200", parametry: { klucz: "16" } }),
+  }), subiekt);
+  assert.equal(s.doborWersja, 2);
+  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, 1, KTO()), /odśwież/, "stara wersja doboru musi dać konflikt");
+  const po = S.przyjmijDaneDoboru(rozmowa, 2, KTO());
+  assert.equal(po.daneOcena, "wpisane");
+  const d = D.doborRozmowy(rozmowa);
+  assert.equal(d.wersja, 3);
+  assert.equal(d.status, "searching");
+  assert.deepEqual(d.dane, DANE({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200", parametry: { klucz: "16" } }));
+  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
+  assert.ok(typy.includes("dobor_dane") && typy.includes("copilot_dane_doboru"));
+  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_dane_doboru'").get() as { payload: string };
+  assert.match(los.payload, /"pol":3/);
+  assert.equal(los.payload.includes("Faworyt"), false);
+  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, 3, KTO()), /już oceniona/);
+  assert.equal(K.pomiarCopilota(db()).szkice.daneWpisane, 1);
+});
+
+test("odrzucenie zostawia wiersz dla pomiaru; nowy szkic zeruje ocenę danych", async () => {
+  dopiszKlienta("Kosiarka Faworyt.");
+  await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
+  assert.equal(S.odrzucDaneDoboru(rozmowa, KTO()).daneOcena, "odrzucone");
+  assert.equal(K.pomiarCopilota(db()).szkice.daneOdrzucone, 1);
+  assert.equal(liczba("dobor_rozmowy"), 0);
+  const znow = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
+  assert.equal(znow.daneOcena, null);
+  assert.throws(() => S.odrzucDaneDoboru(rozmowa + 1000, KTO()), /nie ma propozycji/);
 });
 
 test("rozmowa bez wiadomości nie ma na co odpowiadać", async () => {

@@ -310,8 +310,15 @@ export interface PomiarCopilota {
    * zadaniu mówi.
    */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
-  /** Szkice odpowiedzi: ile powstało i co agent z nimi zrobił. */
-  szkice: { ile: number; wstawionych: number; zastapionych: number; odrzuconych: number };
+  /**
+   * Szkice odpowiedzi: ile powstało i co agent z nimi zrobił. Od przyrostu
+   * trzeciego także los DANYCH z rozmowy — osobno, bo dobry szkic bywa ze
+   * złym modelem i odwrotnie.
+   */
+  szkice: {
+    ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
+    daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
+  };
 }
 
 /** Pomiar do ekranu ustawień. Czysty odczyt — nie zapisuje niczego. */
@@ -376,7 +383,10 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
   const sz = database.prepare(`SELECT COUNT(*) AS ile,
       SUM(CASE WHEN ocena='wstawiony' THEN 1 ELSE 0 END) AS wstawionych,
       SUM(CASE WHEN ocena='zastapiony' THEN 1 ELSE 0 END) AS zastapionych,
-      SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych
+      SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych,
+      SUM(CASE WHEN dane_doboru IS NOT NULL THEN 1 ELSE 0 END) AS daneZaproponowane,
+      SUM(CASE WHEN dane_ocena='wpisane' THEN 1 ELSE 0 END) AS daneWpisane,
+      SUM(CASE WHEN dane_ocena='odrzucone' THEN 1 ELSE 0 END) AS daneOdrzucone
     FROM szkic_copilota`).get() as Record<string, number>;
 
   const wejscieRazem = tokeny.wej + tokeny.cacheOdczyt;
@@ -395,6 +405,8 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     szkice: {
       ile: Number(sz.ile ?? 0), wstawionych: Number(sz.wstawionych ?? 0),
       zastapionych: Number(sz.zastapionych ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
+      daneZaproponowane: Number(sz.daneZaproponowane ?? 0),
+      daneWpisane: Number(sz.daneWpisane ?? 0), daneOdrzucone: Number(sz.daneOdrzucone ?? 0),
     },
   };
 }

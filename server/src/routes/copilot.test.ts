@@ -69,6 +69,8 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/copilot/szkic", payload: { rozmowaId: rozmowa } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
     payload: { ocena: "wstawiony" } },
+  { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/dane`,
+    payload: { ocena: "odrzucone" } },
 ];
 
 test("bez sesji żadna trasa Copilota nie odpowiada danymi", async () => {
@@ -106,12 +108,18 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
    rozmów do etykiety, nie rozmowę do napisania.
 
    CZWARTA to werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. Ten sam
-   argument co przy drugiej — bez niej „szkic z AI" byłby kosztem bez miary. */
-test("Copilot ma CZTERY trasy zapisu", async () => {
+   argument co przy drugiej — bez niej „szkic z AI" byłby kosztem bez miary.
+
+   PIĄTA to los danych doboru rozpoznanych w rozmowie (przyrost trzeci):
+   jedno kliknięcie agenta wpisuje je w PUSTE pola doboru albo odsyła.
+   Osobna od `PUT dobor/dane`, bo serwis sam pilnuje „tylko puste pola"
+   i liczy los propozycji — przez zwykły PUT każda wyglądałaby w dzienniku
+   jak ręczny wpis agenta. Automat sam nie wpisuje nigdy. */
+test("Copilot ma PIĘĆ tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 4, `tras POST jest ${posty.length}, a umowa mówi o czterech`);
-  for (const slowo of ["klasyfikacja", "ocena", "szkic"]) {
+  assert.equal(posty.length, 5, `tras POST jest ${posty.length}, a umowa mówi o pięciu`);
+  for (const slowo of ["klasyfikacja", "ocena", "szkic", "dane"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

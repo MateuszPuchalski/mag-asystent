@@ -70,9 +70,18 @@ const WZORCE: Array<{ nazwa: string; re: RegExp; znacznik: string }> = [
     re: /\b(?:PL\s*)?(?:\d[\s-]?){16,}\d?/gi },
   /* Telefon: dziewięć cyfr, z prefiksem kraju albo bez, ze spacjami
      i myślnikami. Granice po obu stronach, żeby nie wyjadać środka
-     dłuższego ciągu — ten i tak zniknął wyżej jako konto. */
+     dłuższego ciągu — ten i tak zniknął wyżej jako konto.
+
+     ZAWĘŻENIE PO KONTEKŚCIE (decyzja właściciela z 8.09.2026, przyrost
+     ekstrakcji). Numer OEM Husqvarny „532 19 93-77" ma dokładnie kształt
+     telefonu i do tego wydania znikał jako `[telefon]` — klasyfikacji
+     wystarczał ślad, ale rozpoznanie danych doboru ma ten numer ODDAĆ.
+     Dziewięć cyfr tuż po słowie OEM / nr / numer / symbol / kod nie jest
+     telefonem. Cena zapisana świadomie: „nr 532199377" podany jako telefon
+     bez słowa „tel" przejdzie do dostawcy; „nr tel. 532…" znika dalej, bo
+     tuż przed cyframi stoi „tel", nie „nr". */
   { nazwa: "telefon", znacznik: "[telefon]",
-    re: /(?<![\d-])(?:(?:\+|00)\s?48[\s-]?)?(?:\d[\s-]?){8}\d(?![\d-])/g },
+    re: /(?<![\d-])(?<!\b(?:oem|nr|numer|symbol|kod)\s*[:.]?\s*)(?:(?:\+|00)\s?48[\s-]?)?(?:\d[\s-]?){8}\d(?![\d-])/gi },
 ];
 
 /** Zamiana znanego loginu — osobno, bo to podmiana wartości, nie wzorca. */

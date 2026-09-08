@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Dobor as DoborTyp, KandydaciDoboru } from "../api/typy";
+import type { Dobor as DoborTyp, KandydaciDoboru, SzkicCopilota } from "../api/typy";
 import { Konflikt } from "../api/klient";
 
 /* ── Zakładka doboru (§11, etap E1) ──────────────────────────────────────────
@@ -27,6 +27,9 @@ vi.mock("../api/rozmowy", () => ({
   useWybierzKandydata: () => wybierz,
   useWiedzaDoboru: () => wiedzaDoboru(),
 }));
+/* Los danych z rozmowy (przyrost trzeci) idzie trasą Copilota, nie rozmów. */
+const ocenDane = { mutate: vi.fn(), isPending: false, error: null as unknown };
+vi.mock("../api/copilot", () => ({ useOcenDaneDoboru: () => ocenDane }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
 /* Pasowanie „z pracy" (0.230.0) idzie trasą wiedzy, nie rozmów — hook z tego
    modułu woła `useQueryClient`, a zakładka renderuje się tu bez dostawcy. */
@@ -78,12 +81,21 @@ const Z_KANDYDATAMI: KandydaciDoboru = {
     ? { droga: d.droga, sprawdzona: true, wynikow: 1 } : d),
 };
 
-const pokaz = (d: DoborTyp, uchwyty: Partial<{ onWstawDoSzkicu: (t: string) => void; onZlecPomiar: () => void }> = {}) =>
-  render(<Dobor dobor={d} rozmowaId={4821} onWstawDoSzkicu={uchwyty.onWstawDoSzkicu ?? vi.fn()}
-    onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
+const pokaz = (d: DoborTyp, uchwyty: Partial<{
+  onWstawDoSzkicu: (t: string) => void; onZlecPomiar: () => void; propozycja: SzkicCopilota | null;
+}> = {}) =>
+  render(<Dobor dobor={d} rozmowaId={4821} propozycja={uchwyty.propozycja ?? null}
+    onWstawDoSzkicu={uchwyty.onWstawDoSzkicu ?? vi.fn()} onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
+
+const propozycja = (dane: Partial<SzkicCopilota["daneDoboru"] & object>, n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
+  tresc: "Dzień dobry…", zastrzezenia: [], uzyteFakty: [], messageId: 41, model: "claude-opus-5",
+  at: "2026-09-08T12:00:00Z", przez: "A. Lewandowska", ocena: null, daneOcena: null, doborWersja: 1,
+  daneDoboru: { ...dobor().dane, ...dane }, ...n,
+});
 
 beforeEach(() => {
   zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset(); zaproponujPasowanie.mutate.mockReset();
+  ocenDane.mutate.mockReset();
   kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
 });
 
@@ -190,6 +202,51 @@ describe("zakładka doboru", () => {
     expect(onWstawDoSzkicu).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: /wstaw pytanie do szkicu/ }));
     expect(onWstawDoSzkicu).toHaveBeenCalledWith(expect.stringContaining("pełny numer seryjny"));
+  });
+
+  /* ── Dane z rozmowy (etap F, przyrost trzeci) ──────────────────────────
+     Pytanie właściciela: „dlaczego dane wejściowe nie zostały wprowadzone
+     automatycznie ze szkicu?". Pilnujemy granic: karta pokazuje TYLKO nowe
+     pola, wpisuje na kliknięcie z wersją doboru, nie nadpisuje słowa agenta,
+     a oceniona albo pusta propozycja nie zostawia po sobie karty. */
+  it("karta z rozmowy pokazuje tylko nowe pola, nazywa różnice i wpisuje jednym kliknięciem z wersją", async () => {
+    pokaz(dobor({ wersja: 2, dane: { ...dobor().dane, model: "GTV51" } }), {
+      propozycja: propozycja({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200", parametry: { klucz: "16" } }),
+    });
+    const karta = screen.getByRole("region", { name: "Dane z rozmowy" });
+    expect(karta).toHaveTextContent("Marka: Faworyt");
+    expect(karta).toHaveTextContent("Silnik: Lonci v200");
+    expect(karta).toHaveTextContent("klucz: 16");
+    /* Model agent ma inaczej — karta to mówi, ale go nie proponuje jako nowy. */
+    expect(karta).toHaveTextContent(/Inaczej niż wpisano.*Model „GTV51N196L-4W1"/);
+    expect(karta.querySelectorAll("b").length).toBeGreaterThanOrEqual(3);
+    await userEvent.click(screen.getByRole("button", { name: "Wpisz do danych" }));
+    expect(ocenDane.mutate).toHaveBeenCalledWith(
+      { rozmowaId: 4821, ocena: "wpisane", expectedVersion: 2 }, expect.anything());
+    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
+    expect(ocenDane.mutate).toHaveBeenLastCalledWith(
+      { rozmowaId: 4821, ocena: "odrzucone", expectedVersion: 2 }, expect.anything());
+  });
+
+  it("bez nowych pól, po ocenie albo bez propozycji karty nie ma", () => {
+    const wpisane = { ...dobor().dane, marka: "Faworyt" };
+    const { unmount } = pokaz(dobor({ dane: wpisane }), { propozycja: propozycja({ marka: "Faworyt" }) });
+    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
+    unmount();
+    const drugi = pokaz(dobor(), { propozycja: propozycja({ marka: "Faworyt" }, { daneOcena: "wpisane" }) });
+    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
+    drugi.unmount();
+    pokaz(dobor(), { propozycja: propozycja({}, { daneDoboru: null }) });
+    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
+  });
+
+  it("konflikt przy wpisywaniu z rozmowy mówi, kto zmienił, i zostawia kartę", async () => {
+    ocenDane.mutate.mockImplementation((_v, o: { onError: (e: unknown) => void }) =>
+      o.onError(new Konflikt("Ktoś zmienił dobór", { wersja: 5, updatedBy: "M. Wójcik" })));
+    pokaz(dobor(), { propozycja: propozycja({ marka: "Faworyt" }) });
+    await userEvent.click(screen.getByRole("button", { name: "Wpisz do danych" }));
+    expect(screen.getByText(/Ktoś zmienił dane doboru \(M\. Wójcik\)/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Dane z rozmowy" })).toBeInTheDocument();
   });
 
   it("Copilotowego `extracting_data` nie da się wybrać ręcznie", () => {

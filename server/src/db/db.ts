@@ -178,6 +178,15 @@ export function migrate(database: DatabaseSync) {
   /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
+  /* Dane doboru rozpoznane w rozmowie przy szkicu Copilota (etap F, przyrost
+     trzeci) — patrz `szkic_copilota` w `schema.sql`. Tabela stoi na produkcji
+     od 0.231.0, więc kolumny dochodzą migracją; stare szkice mają NULL i zero,
+     czyli „nic nie rozpoznano, wersja doboru nieznana". */
+  addColumn("szkic_copilota", "dane_doboru", "TEXT");
+  addColumn("szkic_copilota", "dane_ocena",
+    "TEXT CHECK (dane_ocena IS NULL OR dane_ocena IN ('wpisane','odrzucone'))");
+  addColumn("szkic_copilota", "dane_ocena_at", "TEXT");
+  addColumn("szkic_copilota", "dobor_wersja", "INTEGER NOT NULL DEFAULT 0");
   /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */

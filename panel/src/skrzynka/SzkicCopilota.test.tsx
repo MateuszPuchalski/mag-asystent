@@ -15,12 +15,14 @@ import type { SzkicCopilota } from "../api/typy";
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
   zastrzezenia: [], uzyteFakty: ["F3"], messageId: 41, model: "claude-opus-5",
-  at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null, ...n,
+  at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
+  daneDoboru: null, daneOcena: null, doborWersja: 1, ...n,
 });
 
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
   stan: { wlaczony: true, powod: null, model: "claude-opus-5", maxPartia: 20 },
-  szkic: null, nieswiezy: false, uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
+  szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [],
+  uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
   onUloz: vi.fn(), onWstaw: vi.fn(), onZastap: vi.fn(), onOdrzuc: vi.fn(), ...n,
 });
 
@@ -93,6 +95,21 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(copilot({ szkic: szkic({ zastrzezenia: ["brak dowodu na dopasowanie do LS 46-450"] }), nieswiezy: true }));
     expect(screen.getByLabelText("Czego model nie znalazł w faktach")).toHaveTextContent("brak dowodu");
     expect(screen.getByText(/powstał przed nową wiadomością klienta/)).toBeInTheDocument();
+  });
+
+  /* Dane doboru z rozmowy (przyrost trzeci): karta w edytorze tylko MÓWI, że
+     są — wpisuje je zakładka Dobór. Druga nieświeżość: fakty się zmieniły. */
+  it("mówi, jakie dane rozpoznał, bez drugiego przycisku; zmiana doboru po szkicu jest nazwana", () => {
+    edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2, nowePolaDoboru: ["Marka", "Model", "Silnik"] }));
+    expect(screen.getByText(/Copilot rozpoznał w rozmowie: Marka, Model, Silnik/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
+    expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
+  });
+
+  it("szkic sprzed migracji (wersja doboru 0) nie udaje nieświeżego, a bez nowych pól nie ma zdania", () => {
+    edytor(copilot({ szkic: szkic({ doborWersja: 0 }), doborWersja: 3 }));
+    expect(screen.queryByText(/dane doboru zmieniły się/)).toBeNull();
+    expect(screen.queryByText(/Copilot rozpoznał w rozmowie/)).toBeNull();
   });
 
   it("oceniony szkic znika z ekranu — wiersz zostaje dla pomiaru", () => {
