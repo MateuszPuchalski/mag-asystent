@@ -14,6 +14,7 @@ import { buildProductCard } from "./stock.js";
 import { pasowaniaTowaru } from "./pasowania.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
+import { bezPodpisu } from "../tekst.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -131,15 +132,16 @@ export function pytaniaIntake(nazwaCzesci: string | null): { typ: string; pytani
 }
 
 /**
- * Podpis dowodu bez nazwiska pracownika: `— katalog dostawcy, 7.09.2026, Anna`
- * staje się `— katalog dostawcy, 7.09.2026`. Model nazwiska nie potrzebuje,
- * a klient nie ma go dostać; §14.4 mówi o „zbędnych danych osobowych" i to jest
- * taka dana. Wzorzec jest DATĄ, po której stoi autor — tak buduje podpis
- * `zdanieZrodla()` w `wiedza.ts`, `silniki.ts` i `pasowania.ts`.
+ * Odwołania do faktów „(F3)", „(F1, F2)" znikają z treści PO sprawdzeniu.
+ * Model ma je pisać — to na nich stoi kontrola pokrycia — ale klient nie ma
+ * ich czytać. Na zrzucie właściciela (8.09.2026) stały w szkicu gotowym do
+ * wstawienia. `uzyteFakty` zostaje w wierszu jako ślad dla pomiaru.
  */
-export function bezPodpisu(zdanie: string): string {
-  return zdanie.replace(
-    /(\b\d{1,2}\.\d{2}\.\d{4}), (?:[^;).]|\.(?=\s?\p{Lu}))+(?=;|\)|\.(?:\s|$)|$)/gu, "$1");
+export function bezZnacznikow(tresc: string): string {
+  return tresc
+    .replace(/\s*\(\s*F\d+(?:\s*,\s*F\d+)*\s*\)/g, "")
+    .replace(/ {2,}/g, " ")
+    .replace(/ +([.,;:!?])/g, "$1");
 }
 
 /* Kształt numeru części: litery i cyfry z myślnikiem albo ukośnikiem, co
@@ -327,6 +329,8 @@ export async function ulozSzkic(
       200, "za_dlugi");
   }
 
+  /* Dopiero TERAZ, po sprawdzeniu: odwołania były potrzebne kontroli, klientowi nie. */
+  const tresc = bezZnacznikow(odp.tresc);
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id)
@@ -337,17 +341,17 @@ export async function ulozSzkic(
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
         /* Nowa propozycja — stara ocena jej nie dotyczy. */
         ocena=NULL, ocena_at=NULL`)
-      .run(conversationId, odp.tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
+      .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id);
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
-      conversationId, znakow: odp.tresc.length, zastrzezen: odp.zastrzezenia.length,
+      conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,
       faktow: k.fakty.length, model: odp.model, tokeny: odp.zuzycie,
     }, kto.id, db());
     db().prepare("INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)")
       .run(conversationId, "copilot_szkic",
-        JSON.stringify({ znakow: odp.tresc.length, model: odp.model, autor: kto.name }));
+        JSON.stringify({ znakow: tresc.length, model: odp.model, autor: kto.name }));
   })();
   publishConversationEvent("assignment.changed", conversationId, { szkic: true });
   return szkicCopilota(conversationId)!;

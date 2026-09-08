@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.232.1 — 8 września 2026
+
+**Karta szkicu Copilota zwijała rozmowę do jednej linii i chowała własne
+przyciski.** Właściciel kliknął „Ułóż odpowiedź" na żywo i przysłał zrzut:
+szkic powstał poprawnie, ale edytor jest `shrink-0`, więc długa karta
+rozpychała go w górę, oś rozmowy kurczyła się do zera, a dół karty —
+z „Wstaw do szkicu" — ginął pod krawędzią kolumny. Agent nie miał jak wstawić
+tego, za co zapłacił.
+
+- Przyciski karty stoją teraz w jej NAGŁÓWKU, nad treścią; treść i
+  zastrzeżenia przewijają się we własnym pojemniku. Oś rozmowy nie schodzi
+  poniżej dziesięciu remów, a edytor przewija się sam, gdy coś go rozepchnie.
+- **Odwołania „(F3)" znikają z treści dla klienta** — dopiero po sprawdzeniu
+  pokrycia, bo to na nich stoi kontrola. `uzyteFakty` zostaje jako ślad.
+- **„Państwo" zamiast dosłownego „Pan/Pani".** Instrukcja mówiła „zwrot
+  Pan/Pani" i model wziął to literalnie.
+
+### Wyrównania (decyzja właściciela: „align them")
+
+- **Wstawka „ze źródłem" z Doboru bez nazwiska pracownika** — to samo, co
+  szkic Copilota. Klient dostaje rodzaj dowodu i datę; ekran biura autora
+  widzi nadal. `bezPodpisu` przeniosło się do `tekst.ts`, bo czytają je dwa
+  serwisy, z których jeden importuje drugi.
+- **Klasyfikacja maskuje login z wątku Allegro**, nie z tematu rozmowy. Przy
+  temacie będącym tytułem oferty login klienta w treści szedł do dostawcy bez
+  maski; temat zostaje zapasem dla rozmów bez wątku.
+
+
 ## 0.232.0 — 8 września 2026
 
 **Zwroty pobiera się teraz przyciskiem.** Zgłoszenie właściciela: „dodaj

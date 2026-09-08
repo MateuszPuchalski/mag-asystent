@@ -68,6 +68,18 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.queryByRole("button", { name: "Zastąp szkic" })).toBeNull();
   });
 
+  /* Zrzut właściciela z 8.09.2026: długi szkic rozpychał edytor, oś rozmowy
+     zwijała się do jednej linii, a przyciski ginęły pod krawędzią kolumny.
+     Przyciski stoją nad treścią, a treść przewija się we własnym pojemniku. */
+  it("przyciski stoją PRZED treścią, a treść ma własny przewijany pojemnik", () => {
+    edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }) }));
+    const wstaw = screen.getByRole("button", { name: "Wstaw do szkicu" });
+    const tresc = screen.getByTestId("szkic-copilota-tresc");
+    expect(wstaw.compareDocumentPosition(tresc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tresc.className).toMatch(/max-h-\d+/);
+    expect(tresc.className).toMatch(/overflow-y-auto/);
+  });
+
   it("„Zastąp szkic” pojawia się tylko przy niepustym szkicu agenta", async () => {
     const c = copilot({ szkic: szkic(), maSzkicAgenta: true });
     edytor(c, { szkic: "Dzień dobry," });

@@ -153,13 +153,13 @@ test("kontekst niczego nie zapisuje", () => {
   assert.deepEqual([liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"), liczba("conversation_event")], przed);
 });
 
-test("bezPodpisu wycina autora po dacie w trzech kształtach podpisu", () => {
-  assert.equal(S.bezPodpisu("potwierdzone — katalog dostawcy, 7.09.2026, A. Lewandowska; bez dowodu"),
-    "potwierdzone — katalog dostawcy, 7.09.2026; bez dowodu");
-  assert.equal(S.bezPodpisu("Do X pasuje Y — źródło: rozmowa, 12.09.2026, Admin Test."),
-    "Do X pasuje Y — źródło: rozmowa, 12.09.2026.");
-  assert.equal(S.bezPodpisu("pomiar własny, 1.09.2026, Anna"), "pomiar własny, 1.09.2026");
-  assert.equal(S.bezPodpisu("bez daty, Anna"), "bez daty, Anna", "bez daty nie ma czego wycinać");
+test("odwołania (F…) znikają z treści PO sprawdzeniu, uzyteFakty zostaje", async () => {
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    tresc: "Gaźnik W09-0211 pasuje (F1). Dziś dostępny (F1, F2) .", uzyteFakty: ["F1"],
+  }), subiekt);
+  assert.equal(s.tresc, "Gaźnik W09-0211 pasuje. Dziś dostępny.");
+  assert.deepEqual(s.uzyteFakty, ["F1"]);
+  assert.equal(S.bezZnacznikow("bez odwołań"), "bez odwołań");
 });
 
 /* ── Sprawdzenie deterministyczne ──────────────────────────────────────── */

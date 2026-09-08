@@ -92,6 +92,25 @@ test("do dostawcy nie idzie e-mail, telefon ani login kupującego", async () => 
   assert.match(widziane, /Czy jest nóż/, "treść pytania ma przeżyć — bez niej nie ma czego klasyfikować");
 });
 
+/* Login stoi w WĄTKU Allegro; temat bywa tytułem oferty. Do 0.231.0 maska
+   brała temat, więc w takim wątku login klienta w treści wychodził na zewnątrz. */
+test("login z wątku jest maskowany także wtedy, gdy temat rozmowy to tytuł oferty", async () => {
+  const d = stanowisko();
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,interlocutor_login,surowe_json,synced_at)
+    VALUES ('w-oferta',1,'zielony_ogrod','{}','2026-09-03T08:00:00Z')`).run();
+  const id = Number(d.prepare(`INSERT INTO conversation
+    (channel_account_id,external_conversation_id,subject) VALUES (1,'w-oferta','Gaźnik Honda GX160')`)
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO message
+    (conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,1,'m-oferta','incoming','Tu zielony_ogrod, czy pasuje do GX160?','2026-09-03T08:00:00Z')`).run(id);
+
+  let widziane = "";
+  await sklasyfikujRozmowy(d, [id], KTO, async (tresc) => { widziane = String(tresc); return odpowiedz(); });
+  assert.equal(/zielony_ogrod/i.test(widziane), false, "login z wątku wyszedł poza firmę");
+  assert.match(widziane, /GX160/, "temat-tytuł NIE jest maskowany jako login — treść ma przeżyć");
+});
+
 test("ładunek dziennika niesie identyfikatory, nigdy treści wiadomości", async () => {
   const d = stanowisko();
   const id = rozmowa(d, "Sekret: przesyłka miała numer 601 234 567");

@@ -162,7 +162,10 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
-  return <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+  /* `min-h-40`, nie `min-h-0` (0.232.1): karta szkicu Copilota zwinęła oś do
+     jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
+     czytelna przy każdej wysokości edytora — to ona jest powodem ekranu. */
+  return <div className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
     {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa" || w.rodzaj === "dobor"
       /* Zmiana statusu (§10.3, 0.158.0), sklejenie sprawy (0.161.0) i krok
          doboru (E1) są KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
