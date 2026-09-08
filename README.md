@@ -538,6 +538,11 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   co dostawy.
 - **DOSTAWY I REKLAMACJE** — postęp per dokument oraz nierozwiązane wyjątki;
   protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
+- **Archiwum dostaw** (0.235.0): czwarty czip kolejki pokazuje dostawy starsze
+  niż okno importu. Czyta je z tabel `delivery` i `delivery_line`, których
+  import nigdy nie czyści, więc wejść da się także w fakturę sprzed roku.
+  Wyszukiwarka pyta wtedy serwer — archiwum jedzie obcięte i mówi na dole,
+  ile dostaw pasuje poza pokazanymi.
 - **Wyjątki widać z listy** (0.57.0): wiersz dostawy niesie licznik
   nierozwiązanych zgłoszeń. Pasek postępu ich nie pokaże i pokazać nie może —
   wyjątek liczy się jako pozycja domknięta. Biuro może też **zamknąć wyjątek**

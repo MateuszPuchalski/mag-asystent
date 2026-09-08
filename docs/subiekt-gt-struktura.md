@@ -407,7 +407,8 @@ gdy firma faktycznie wypełnia termin na zamówieniach.
 
 **Okno importu** (`DOK_DNI_WSTECZ`). Domyślnie 14 dni. To okno **importu**, nie
 filtr widoku, ale dostawa nierozłożona do końca zostaje widoczna niezależnie od
-wieku.
+wieku. Dostawa już rozłożona wypada z listy pracy i przechodzi do **archiwum**
+w panelu biura — czyta się je z naszych tabel, nie z Subiekta.
 
 **Port SQL** (`MSSQL_PORT`). Kreator o niego nie pyta, choć zapisuje go do pliku.
 Potrzebny, gdy SQL stoi na innej maszynie, a nie da się otworzyć portu UDP 1434

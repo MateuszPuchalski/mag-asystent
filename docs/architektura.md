@@ -119,6 +119,12 @@ patrzenie zapełniałoby listę pracy dokumentami, których nikt nie tknął. Dl
 albo pozycje z faktury tym samym helperem, którego użyje otwarcie — i mówi
 w odpowiedzi, którą z nich pokazuje.
 
+Od 0.235.0 lista ma czwarty czip: **archiwum**. Trzy poprzednie pokazują okno
+importu, więc dostawa starsza znikała z panelu w całości. Odpowiedź leży
+w tabelach `delivery` i `delivery_line`, których import nigdy nie czyści.
+Granicą jest nieobecność dokumentu w read-modelu, a nie liczba dni. Dzięki temu
+dokument stoi zawsze w dokładnie jednym z dwóch miejsc.
+
 Od 0.27.0 ma zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
 (metryki, kolejka, rekoncyliacja, kolizje kodów, meldunek serwera) oraz ślad
 audytowy z filtrami. Zasada „zero zapisu" nie drgnęła — ponowienie zadania
