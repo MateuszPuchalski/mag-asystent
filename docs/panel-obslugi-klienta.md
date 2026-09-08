@@ -520,6 +520,39 @@ przewijał się dokument, czyli wszystkie kolumny naraz: żeby dojść do dołu
 dowodów przy zwrocie, operator zjeżdżał z oczu kolejce i paskowi decyzji.
 Makieta `docs/projekt-widokow/Main.dc.html` rysowała to poprawnie od początku.
 
+**Rama stała na jednej jednostce i to ją przewróciło (0.233.0).** Wysokość
+okna trzymało samo `lg:h-dvh`. Przeglądarka, która nie zna `dvh`, nie ignoruje
+jej po kawałku — wyrzuca całą deklarację. `lg:min-h-0` skasowało już wtedy
+`min-h-screen`, więc ramie nie zostawał ŻADEN limit: przewijał się cały
+dokument razem z nagłówkiem, dokładnie jak przed 0.165.0.
+
+Wyglądało to na zepsuty układ, a nie na brak obsługi jednostki, bo kolumny
+dalej stały obok siebie — `lg:grid-cols` liczy w pikselach i działa wszędzie.
+Zgłoszenie właściciela: „dlaczego mogę przesunąć w dół". Zmierzone na żywej
+przeglądarce: bez `dvh` dokument rósł o 182 px.
+
+Wysokość bierze teraz klasa `rama-okna` z `index.css`: `100vh` bezwarunkowo,
+`100dvh` pod `@supports`. Kolejność jest odwrotna, niż podpowiada odruch, i to
+jest sedno poprawki. Pierwsze podejście zapisało dwie deklaracje `height` pod
+rząd, licząc na kaskadę — MINIFIKATOR SKASOWAŁ PIERWSZĄ jako nadmiarową
+i w `dist` zostało samo `100dvh`, czyli stan sprzed poprawki. Widać to
+wyłącznie w zbudowanym pliku, nigdy w trybie deweloperskim. Bloku `@supports`
+minifikator skleić nie może, bo nie wolno mu.
+
+Pilnuje tego `panel/src/RamaOkna.test.ts`. Test patrzy na KSZTAŁT ŹRÓDŁA,
+nie na zachowanie: jsdom nie liczy układu, a `dvh` nie jest przełącznikiem,
+który dałoby się wyłączyć w przeglądarce testowej.
+
+**Nagłówek zawija się, zamiast znikać poza kadrem (0.233.0).** Rama jest
+`overflow-hidden`, więc to, co nie mieści się w szerokości, nie dostaje paska
+przewijania — przestaje istnieć dla myszy. Pasek potrzebuje 1112 px, więc
+poniżej ~1150 px zębatka ustawień i wylogowanie leżały poza oknem i nie dało
+się w nie kliknąć. Żadnego sygnału o tym na ekranie nie było.
+
+`flex-wrap` kosztuje drugi rząd na wąskim oknie (117 px zamiast 65 px) i to
+jest cena świadoma: rząd zabiera kilkadziesiąt pikseli, brak wylogowania
+zabiera całą funkcję.
+
 **Skrzynka ma trzy kolumny od 0.180.0.** Do 0.179.0 miała dwie, a kontekst —
 oferta, towar i zamówienie — leżał w środkowej, nad osią. Cztery bloki jeden
 pod drugim spychały pytanie klienta poniżej krawędzi okna, czyli chowały to,
