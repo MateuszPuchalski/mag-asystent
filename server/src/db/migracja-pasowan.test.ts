@@ -4,11 +4,12 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── Pasowanie części i dziesiąta droga doboru przeżywają migrację ──────────
+/* ── Pasowanie części i kolejne drogi doboru przeżywają migrację ────────────
    `CHECK` na `dobor_rozmowy.wybrany_droga` stoi wyłącznie w `schema.sql`.
-   Bazy sprzed 0.229.0 znają osiem dróg, bazy z 0.229.0 — dziewięć. Jedna
-   funkcja ma doprowadzić OBA kształty do docelowego jedną przebudową — klient,
-   który przeskoczy dwa wydania, nie może przebudowywać tabeli dwa razy.     */
+   Bazy sprzed 0.229.0 znają osiem dróg, z 0.229.0 — dziewięć, z 0.230.0 —
+   dziesięć; szczebel zgodnych wymiarów dokłada jedenastą. Jedna funkcja ma
+   doprowadzić KAŻDY kształt do docelowego jedną przebudową — klient, który
+   przeskoczy kilka wydań, nie może przebudowywać tabeli kilka razy.         */
 
 const schema = fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8");
 
@@ -36,6 +37,8 @@ function bazaZDrogami(drogi: string[]) {
 }
 const OSIEM = ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "oem", "pelnotekst"];
 const DZIEWIEC = [...OSIEM.slice(0, 6), "silnik", ...OSIEM.slice(6)];
+/* Kształt z produkcji między 0.230.0 a szczeblem zgodnych wymiarów. */
+const DZIESIEC = [...DZIEWIEC.slice(0, 7), "pasowanie", ...DZIEWIEC.slice(7)];
 const sqlTabeli = (d: DatabaseSync) =>
   (d.prepare("SELECT sql FROM sqlite_master WHERE name='dobor_rozmowy'").get() as { sql: string }).sql;
 
@@ -48,8 +51,8 @@ test("pasowanie_czesci przeżywa kasatę nakładek, a spalona nazwa nadal znika"
   d.close();
 });
 
-for (const [nazwa, drogi] of [["ośmioma", OSIEM], ["dziewięcioma", DZIEWIEC]] as const) {
-  test(`baza z ${nazwa} drogami po JEDNEJ migracji przyjmuje pasowanie, odrzuca wymyśloną i nie gubi pól`, () => {
+for (const [nazwa, drogi] of [["ośmioma", OSIEM], ["dziewięcioma", DZIEWIEC], ["dziesięcioma", DZIESIEC]] as const) {
+  test(`baza z ${nazwa} drogami po JEDNEJ migracji przyjmuje pasowanie i wymiar, odrzuca wymyśloną i nie gubi pól`, () => {
     const d = bazaZDrogami([...drogi]);
     const wiersz = { conversation_id: 1, status: "candidates_found", wersja: 7, marka: "NAC", model: "LS 46-450",
       silnik: "B&S 450E", oem: "W09-0211", nazwa_czesci: "uszczelka", parametry_json: "{}", brakuje: "x",
@@ -57,12 +60,13 @@ for (const [nazwa, drogi] of [["ośmioma", OSIEM], ["dziewięcioma", DZIEWIEC]] 
       wybrano_at: "2026-09-01T07:00:00Z", updated_at: "2026-09-01T08:00:00Z", updated_by: "Ala" } as Record<string, string | number>;
     const kol = Object.keys(wiersz);
     d.prepare(`INSERT INTO dobor_rozmowy(${kol.join(",")}) VALUES (${kol.map(() => "?").join(",")})`).run(...Object.values(wiersz));
-    assert.throws(() => d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='pasowanie'").run(), /CHECK/);
+    assert.throws(() => d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='wymiar'").run(), /CHECK/);
 
     migrate(d);
     const poPierwszej = sqlTabeli(d);
     d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='pasowanie'").run();
     d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='silnik'").run();
+    d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='wymiar'").run();
     assert.throws(() => d.prepare("UPDATE dobor_rozmowy SET wybrany_droga='semantyka'").run(), /CHECK/);
     const po = d.prepare("SELECT * FROM dobor_rozmowy WHERE conversation_id=1").get() as Record<string, unknown>;
     for (const k of kol) if (k !== "wybrany_droga") assert.equal(String(po[k]), String(wiersz[k]), `zgubiona kolumna ${k}`);

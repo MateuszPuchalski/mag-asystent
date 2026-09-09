@@ -43,11 +43,13 @@ export type StatusDoboru = (typeof STATUSY_DOBORU)[number];
 export const STATUSY_DOBORU_RECZNE: StatusDoboru[] =
   STATUSY_DOBORU.filter((s) => s !== "extracting_data");
 
-/* Dziesięć dróg §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
-   `pasowanie` z `pasowanie_czesci`; starsze bazy przebudowuje `doborZnaDrogi()`
+/* Jedenaście dróg §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
+   `pasowanie` z `pasowanie_czesci` (0.230.0), `wymiar` z `wymiar_kartoteki`
+   (zgodne wymiary z parametrów); starsze bazy przebudowuje `doborZnaDrogi()`
    w `migrate()`. */
 export const DROGI_DOBORU = [
   "oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie", "silnik", "pasowanie", "oem", "pelnotekst",
+  "wymiar",
 ] as const;
 export type DrogaDoboru = (typeof DROGI_DOBORU)[number];
 /* Od E3 każda droga z §11.2 ma nadawcę; lista zostaje jako strażnik przed
@@ -67,6 +69,7 @@ const ZRODLO_DROGI: Record<DrogaDoboru, string> = {
   pasowanie: "potwierdzone pasowanie do części klienta",
   oem: "numer OEM",
   pelnotekst: "trafienie po treści — nie dowód",
+  wymiar: "zgodny wymiar z parametrów doboru — nie dowód",
 };
 
 /** Dane wejściowe §11.1. Każde pole jest propozycją, którą agent poprawia. */

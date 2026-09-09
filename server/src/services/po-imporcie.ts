@@ -4,6 +4,7 @@ import { logEvent } from "./events.js";
 import { przebudujIdentyfikatory, przebudujModeleZOpisu } from "./identyfikatory.js";
 import { przebudujFts } from "./pelnotekst.js";
 import { przebudujTokenySilnikow } from "./tokeny-silnikow.js";
+import { przebudujWymiary } from "./wymiary.js";
 
 /**
  * Konsekwencje importu read-modelu (etap E3) — NIE ticker.
@@ -34,13 +35,27 @@ export function poImporcie(database: DatabaseSync = db()): void {
   /* Tokeny silników w nazwach (0.239.0): nowa kartoteka z „GX160" w nazwie
      ma wrócić do biura jako `nowa` po najbliższym imporcie. */
   krok("tokenySilnikow", () => przebudujTokenySilnikow(database));
+  /* Wymiary z nazw i opisów — paliwo szczebla „zgodne wymiary". */
+  krok("wymiary", () => przebudujWymiary(database));
   krok("fts", () => przebudujFts(database) ?? "niedostepne");
   wynik.ms = Date.now() - start;
   logEvent("read_model_po_imporcie", "system", null, wynik, null, database);
 }
 
-/** Czy pochodne są puste przy niepustym read-modelu — wtedy start je zakłada. */
+/**
+ * Czy pochodne są puste przy niepustym read-modelu — wtedy start je zakłada.
+ *
+ * Drugi warunek: ostatnia przebudowa nie znała kroku `wymiary`. Po wdrożeniu
+ * szczebla zgodnych wymiarów tabela `wymiar_kartoteki` stałaby pusta do
+ * następnego importu, a pusta tabela to szczebel pominięty u klienta. Licznik
+ * wierszy nie nadaje się na wartownika — katalog bez wymiarów w nazwach dawałby
+ * przebudowę przy każdym starcie. Ostatni wpis audytu mówi prawdę.
+ */
 export function pochodnePuste(database: DatabaseSync = db()): boolean {
   const n = (sql: string) => Number((database.prepare(sql).get() as { n: number }).n);
-  return n("SELECT count(*) n FROM sgt_towar") > 0 && n("SELECT count(*) n FROM towar_identyfikator") === 0;
+  if (n("SELECT count(*) n FROM sgt_towar") === 0) return false;
+  if (n("SELECT count(*) n FROM towar_identyfikator") === 0) return true;
+  const ostatni = database.prepare(`SELECT payload FROM events WHERE type='read_model_po_imporcie'
+      ORDER BY id DESC LIMIT 1`).get() as { payload: string } | undefined;
+  return !ostatni || !ostatni.payload.includes('"wymiary"');
 }

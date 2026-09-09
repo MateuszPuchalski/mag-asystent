@@ -68,10 +68,12 @@ const PUSTE: KandydaciDoboru = {
     { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN" },
     { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM" },
     { droga: "zastosowanie", sprawdzona: false, wynikow: 0, powod: "etap E2" },
+    { droga: "silnik", sprawdzona: false, wynikow: 0, powod: "nie wiadomo, jaki silnik stoi w maszynie" },
     { droga: "pasowanie", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty" },
     { droga: "oferta", sprawdzona: false, wynikow: 0, powod: "rozmowa nie jest powiązana z ofertą" },
     { droga: "zamiennik", sprawdzona: false, wynikow: 0, powod: "bez kartoteki oferty" },
     { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał nazwy części ani maszyny" },
+    { droga: "wymiar", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)" },
     { droga: "wyszukiwarka", sprawdzona: false, wynikow: 0, powod: "wybór ręczny" },
   ],
 };
@@ -125,6 +127,19 @@ describe("zakładka doboru", () => {
     /* Bez wyboru nie ma czego zatwierdzać. */
     expect(screen.queryByRole("button", { name: /ZATWIERDŹ DOBÓR/ })).not.toBeInTheDocument();
     expect(kandydaci).toHaveBeenCalledWith(4821);
+  });
+
+  it("czip „zgodne wymiary” pominięty niesie powód, a kandydat z tej drogi nazywa ją po polsku", () => {
+    /* Blizna linki 148 cm: agent ma z czipa wiedzieć, CO wpisać, żeby szczebel ruszył. */
+    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI, kandydaci: [
+      { nr: 1, twId: 1402, symbol: "18-11010", nazwa: "Linka napędu Castel Garden 81000668/1 1170x1480", stan: 0,
+        droga: "wymiar", pewnosc: "wymaga_danych", ostrzezenia: [],
+        zrodlo: "zgodny wymiar 1480 mm (długość: 148 cm) w nazwie kartoteki „1170x1480” — nie dowód" },
+    ] }, isLoading: false, error: null });
+    pokaz(dobor({ status: "searching", dane: { ...dobor().dane, parametry: { "długość": "148 cm" } } }));
+    expect(screen.getByTitle(/pominięty: agent nie wpisał wymiarów w parametrach doboru/)).toHaveTextContent("zgodne wymiary");
+    expect(screen.getByText(/droga: zgodne wymiary/)).toBeInTheDocument();
+    expect(screen.getByText(/zgodny wymiar 1480 mm/)).toBeInTheDocument();
   });
 
   it("kandydat niesie drogę, źródło i ostrzeżenie, a wybór jedzie z wersją doboru", async () => {

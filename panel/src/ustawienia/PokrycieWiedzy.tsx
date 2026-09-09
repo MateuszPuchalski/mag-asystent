@@ -44,6 +44,12 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
       <Liczba etykieta="zatwierdzonych z tokenu" ile={dane.tokeny.zatwierdzonych} ton="text-ranga-ok" />
     </div>
 
+    <div className="flex flex-wrap gap-8 border-t p-4">
+      {/* Wymiary z nazw i opisów: paliwo szczebla „zgodne wymiary" w doborze. */}
+      <Liczba etykieta="kartotek z wymiarem w nazwie lub opisie" ile={dane.wymiary.kartotek} />
+      <Liczba etykieta="wymiarów" ile={dane.wymiary.wymiarow} />
+    </div>
+
     <p className="border-t p-4 text-sm text-slate-600">
       {dane.fts.dostepne
         ? <>Pełny tekst: indeks FTS5 ma <b>{dane.fts.wpisow}</b> kartotek.</>

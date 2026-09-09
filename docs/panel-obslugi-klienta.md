@@ -852,7 +852,7 @@ czekają.
 
 Kolejność wyszukiwania: dokładny symbol, EAN, numer OEM, potwierdzone
 zastosowanie, zastosowanie przez silnik, pasowanie do części klienta,
-zamiennik, zgodne parametry, wyszukiwanie pełnotekstowe, wyszukiwanie
+zamiennik, zgodne wymiary, wyszukiwanie pełnotekstowe, wyszukiwanie
 semantyczne.
 
 **Wynik semantyczny nie jest dowodem kompatybilności.**
@@ -880,6 +880,33 @@ Pyta wyłącznie o dane wpisane przez agenta, nigdy o treść wiadomości (blizn
 „szarpaka"). Marka i model podnoszą ranking, ale go nie warunkują. Trafienie
 po treści ma pewność „wymaga danych" — to podpowiedź, nie dowód. Bez FTS5
 w SQLite szczebel jest pominięty z powodem, a karta pokrycia to pokazuje.
+
+**Co działa od 0.241.0: szczebel „zgodne wymiary".** Blizna z 9.09.2026:
+klient pytał na ofercie linki do COMBI 48-53 o „linkę napędową 148 cm
+zakończoną sprężyną". Katalog MIAŁ tę linkę — 18-11010 i 470002 „Linka
+napędu Castel Garden 81000668/1 1170x1480" — a szkic Copilota opisał linkę
+z oferty jako „prawdopodobną" i poprosił o tabliczkę. Model zrobił jedyne,
+co doktryna pozwala: fakty niosły kartotekę oferty i jej zamienniki, a numeru
+spoza faktów nazwać nie wolno. Luka siedziała w szczeblach: żaden nie czytał
+parametrów doboru, pełny tekst pyta o słowa, a „148 cm" nigdzie nie stawało
+się „1480". Ten szczebel stał w tym zdaniu wyżej od dawna — teraz ma kod.
+
+Wymiary czyta się z tabeli `wymiar_kartoteki`, odbudowanej z NAZW i OPISÓW
+kartotek po każdym imporcie (wzór `towar_identyfikator`). Parser jest
+deterministyczny: liczba z jednostką („40 cm", „102 MM", „2,5m") i para
+„1170x1480"; metry wyłącznie małą literą, bo „1330M" to model Mountfield;
+para z trzech cyfr, bo „M12x1,5" to gwint. Milimetry całkowite. Wejście
+idzie WYŁĄCZNIE z parametrów doboru wpisanych przez agenta („długość:
+148 cm"), nigdy z treści wiadomości (blizna „szarpaka"). Jednostka jest
+obowiązkowa — „148" nie mówi, czy to centymetry — a dopasowanie jest
+dokładne co do milimetra: tolerancja byłaby zgadywaniem, a szczebel i tak
+mówi „wymaga danych". Kandydat cytuje zapis z kartoteki: „zgodny wymiar
+1480 mm (długość: 148 cm) w nazwie kartoteki „1170x1480” — nie dowód".
+Trzy powody pominięcia, bo trzy różne rzeczy może zrobić agent: wpisać
+parametr, dopisać jednostkę, poczekać na odbudowę indeksu. Copilot podaje
+wymiary z rozmowy w `daneDoboru` (§14.7); po „Wpisz do danych" szczebel
+je czyta. Po wdrożeniu tabelę zakłada start serwera — ostatni wpis audytu
+przebudowy bez klucza `wymiary` znaczy, że pochodne są sprzed tego wydania.
 
 **Co działa od wydania 0.229.0: szczebel „przez silnik".** Części ogrodnicze
 mają problem dwupoziomowy. Filtr, gaźnik, świeca i linka rozrusznika pasują do
@@ -1009,11 +1036,12 @@ Dołożenie go później oznaczałoby przebudowę tabeli.
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma DZIESIĘĆ
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma JEDENAŚCIE
 tabel, nazwami z kodu: `model_urzadzenia`, `zastosowanie`,
 `dowod_zastosowania` (E2), `towar_identyfikator` i `model_z_opisu` (E3),
 `zabudowa_silnika` (0.229.0), `pasowanie_czesci` (0.230.0), `alias_silnika`
-(0.238.0) oraz `token_silnika` z `token_silnika_kartoteka` (0.239.0).
+(0.238.0), `token_silnika` z `token_silnika_kartoteka` (0.239.0) oraz
+`wymiar_kartoteki` (0.241.0, pochodna nazw i opisów jak identyfikatory).
 Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
 `dopasowanie` jest spalona (§15) i nie wraca.
 
@@ -1455,8 +1483,8 @@ customer_machine         order_snapshot          product_link
 dobor_rozmowy            model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
 zabudowa_silnika         pasowanie_czesci        alias_silnika
-token_silnika            token_silnika_kartoteka towar_fts
-knowledge_document       zadanie_terenowe
+token_silnika            token_silnika_kartoteka wymiar_kartoteki
+towar_fts                knowledge_document      zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events
 klasyfikacja_rozmowy     copilot_wywolanie
@@ -2759,7 +2787,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
 | Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
+| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, zgodne wymiary (0.241.0), pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
+| Wymiary z kartotek (§11.2) | **działa** od 0.241.0 | `wymiar_kartoteki`, `services/wymiary.ts`: parser nazw i opisów po imporcie, szczebel „zgodne wymiary" z parametrów doboru, wiersz w pokryciu wiedzy |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |

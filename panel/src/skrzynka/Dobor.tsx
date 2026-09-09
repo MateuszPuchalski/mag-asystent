@@ -49,7 +49,7 @@ const POLA: Array<{ klucz: keyof Omit<DaneDoboru, "parametry">; nazwa: string; p
 const NAZWA_DROGI: Record<DrogaDoboru, string> = {
   symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
   pasowanie: "pasuje do części", zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst",
-  wyszukiwarka: "wyszukiwarka",
+  wyszukiwarka: "wyszukiwarka", wymiar: "zgodne wymiary",
 };
 
 const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: string }> = {

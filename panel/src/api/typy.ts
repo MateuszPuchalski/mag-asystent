@@ -305,11 +305,12 @@ export type StatusDoboru =
   | "not_started" | "extracting_data" | "missing_information" | "searching"
   | "candidates_found" | "requires_expert" | "confirmed" | "rejected" | "not_applicable";
 
-/* Dziewięć dróg §11.2. `silnik` to zastosowanie o jeden przeskok dalej:
-   część pasuje do silnika, a silnik stoi w maszynie, o którą pyta klient. */
+/* Jedenaście dróg §11.2. `silnik` to zastosowanie o jeden przeskok dalej:
+   część pasuje do silnika, a silnik stoi w maszynie, o którą pyta klient.
+   `wymiar` to zgodna liczba z jednostką z parametrów doboru — podpowiedź. */
 export type DrogaDoboru =
   | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "silnik" | "pasowanie"
-  | "oem" | "pelnotekst";
+  | "oem" | "pelnotekst" | "wymiar";
 
 export type DaneDoboru = {
   marka: string | null; model: string | null; wariant: string | null; rocznik: string | null;
@@ -414,6 +415,8 @@ export type PokrycieWiedzy = {
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
   /** Tokeny silników w nazwach kartotek (0.239.0): ile słów, ile kartotek czeka, ile zatwierdzono. */
   tokeny: { tokenow: number; nowych: number; zatwierdzonych: number };
+  /** Wymiary z nazw i opisów kartotek — paliwo szczebla „zgodne wymiary". */
+  wymiary: { kartotek: number; wymiarow: number };
   fts: { dostepne: boolean; wpisow: number };
 };
 
