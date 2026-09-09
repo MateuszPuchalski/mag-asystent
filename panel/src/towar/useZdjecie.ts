@@ -227,14 +227,25 @@ export function useZdjecieZalacznika(id: number | null | undefined): {
  * obok niej. Osobne pobieranie rozjechałoby się z tym przy pierwszej
  * poprawce; nagłówek tego pliku opisuje, ile razy już to kosztowało.
  *
- * `null` znaczy tu coś WIĘCEJ niż „brak zdjęcia": trasa oddaje 415, gdy plik
- * obrazem nie jest, choć jego nazwa to obiecywała. Panel spada wtedy na
- * przycisk pobrania, a pamięć negatywu pilnuje, żeby nie pytał drugi raz.
+ * TEN SAM KSZTAŁT WYNIKU, CO W SKRZYNCE (wydanie „wspólny załącznik"). Do tej
+ * pory hak oddawał sam adres, więc czat reklamacji nie umiał powiedzieć,
+ * CZEMU zdjęcia nie ma — 503 „konto niepołączone" wyglądało dokładnie jak
+ * 415 „to nie obraz" i spadało na przycisk pobrania bez słowa. Dwa źródła
+ * o różnym kształcie wyniku to dwa rysunki tego samego na ekranie; jeden
+ * z nich zawsze zostaje w tyle przy poprawce. Zmiana nazwy jest celowa:
+ * atrapa ze starą nazwą ma krzyknąć brakiem eksportu, nie oddać cicho string.
+ *
+ * `null` w `zalacznikId` = nie pytaj: plik bez `podglad` (PDF, paragon) nie
+ * dobija trasy, która i tak odda 415.
  */
-export function useObrazZalacznikaReklamacji(
-  reklamacjaId: number, zalacznikId: number,
-): string | null | undefined {
-  return useObraz(`/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`);
+export function useZdjecieZalacznikaReklamacji(
+  reklamacjaId: number, zalacznikId: number | null | undefined,
+): { url: string | null | undefined; blad: string | null; ponow: () => void } {
+  const sciezka = zalacznikId == null
+    ? null : `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
+  const url = useObraz(sciezka);
+  const { blad, ponow } = useBladObrazu(sciezka);
+  return { url, blad, ponow };
 }
 
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */

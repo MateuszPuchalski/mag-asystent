@@ -15,6 +15,7 @@ import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sy
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
 import { autoryzuj } from "../services/auth.js";
+import { bladPobrania } from "./pobranie.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
    PRZYROST PIERWSZY: odczyt, kolejka z zegarem, czat do czytania. Do Allegro
@@ -121,11 +122,18 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     "/api/obsluga/reklamacje/:id/zalaczniki/:zid", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
+      /* Adres z bazy PRZED próbą pobrania i pod innym błędem: brak wiersza to
+         404 z `blad()`, a odmowa Allegro to 502/503 z `bladPobrania` — jak
+         w skrzynce od 0.244.0. Jeden `catch` na oba mieszał „nie ma takiego
+         załącznika" z „Allegro nie oddało" pod wspólnym 400. */
+      let z: { url: string; nazwa: string };
       try {
-        const z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
+        z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
+      } catch (e) { return blad(reply, e); }
+      try {
         const odp = await pobierzZalacznik(z.url);
         logEvent("reklamacja_zalacznik_pobrany", autor(), null,
-          { id: Number(req.params.id), nazwa: z.nazwa });
+          { id: Number(req.params.id), nazwa: z.nazwa, bajtow: odp.byteLength });
         return reply
           .header("content-type", "application/octet-stream")
           /* Cudzysłowy i znaki końca wiersza znikają z nazwy — rozbiłyby
@@ -133,7 +141,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
           .header("content-disposition",
             `attachment; filename="${z.nazwa.replace(/["\r\n]/g, "")}"`)
           .send(Buffer.from(odp));
-      } catch (e) { return blad(reply, e); }
+      } catch (e) { return bladPobrania(reply, e); }
     });
 
   /**
@@ -176,16 +184,20 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       if (req.headers["if-none-match"] === etag) {
         return reply.code(304).header("etag", etag).send();
       }
+      let z: { url: string; nazwa: string };
       try {
-        const z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
+        z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
+      } catch (e) { return blad(reply, e); }
+      try {
         const odp = await pobierzZalacznik(z.url);
         const bajty = Buffer.from(odp);
         const typ = typPodgladu(rozpoznajMime(bajty));
         if (typ === null) {
           /* 415, nie 404: plik JEST, tylko nie jest obrazem, który narysujemy.
-             Panel spada wtedy na przycisk pobrania — to odpowiedź, nie awaria. */
+             Panel zostaje wtedy przy nazwie z pobraniem — to odpowiedź, nie
+             awaria; awaria drogi do Allegro wychodzi niżej jako 502/503. */
           return reply.code(415).send({
-            error: `Załącznik „${z.nazwa}" nie jest obrazem do pokazania na osi.`,
+            error: `Załącznik „${z.nazwa}" nie jest obrazem do pokazania na osi (sygnatura pliku).`,
           });
         }
         /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu sprawy, więc wpis
@@ -197,8 +209,9 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
           .header("content-disposition", "inline")
           .header("etag", etag)
           .header("cache-control", "private, max-age=86400")
+          .header("content-length", String(bajty.length))
           .send(bajty);
-      } catch (e) { return blad(reply, e); }
+      } catch (e) { return bladPobrania(reply, e); }
     });
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez

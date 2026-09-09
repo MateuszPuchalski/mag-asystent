@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.246.0 — 9 września 2026
+
+**Jeden załącznik rozmowy dla skrzynki i reklamacji.** Właściciel po 0.244.0:
+„Wspólny komponent załącznika", wygląd połączony. Do tego wydania to samo było
+narysowane dwa razy. Skrzynka (`Os.tsx`) pokazywała zdjęcie w linii, nazwę
+pod spodem, zdanie odmowy i „Spróbuj ponownie". Czat reklamacji (`Czat.tsx`)
+rysował kafel 128 px z lupą, ale porażka podglądu milczała — spadała na
+przycisk pobrania bez słowa, a błąd pobrania był połykany. Każda poprawka
+w jednym miejscu omijała drugie; 0.244.0 naprawiło skrzynkę i reklamacje
+zostały w tyle.
+
+- **Powłoka `panel/src/towar/Zalacznik.tsx`** (`KartaZalacznika`,
+  `ListaZalacznikow`): zdjęcie w linii do 256 px wysokości, kliknięcie
+  powiększa (`Powiekszenie`), nazwa pliku pod zdjęciem jest pobraniem, pod
+  nazwą zdanie odmowy z serwera i „Spróbuj ponownie" albo błąd pobrania. Ramka
+  „wczytuję…" w drodze, nigdy pusta linia ani ikona zepsutego obrazu. Powłoka
+  nie woła haka obrazu — hak zależy od źródła, więc wołają go cienkie
+  opakowania w `Os.tsx` i `Czat.tsx` (wzór `Kafel` × `Plytka`).
+- **Skrzynka zyskuje powiększenie**, reklamacje — zdania odmowy, widoczny
+  błąd pobrania i większe zdjęcie. Sygnatura `Zalaczniki({ reklamacjaId,
+  lista })` w `Czat.tsx` bez zmiany.
+- **Hak `useZdjecieZalacznikaReklamacji(reklamacjaId, zalacznikId | null)`**
+  oddaje `{ url, blad, ponow }` jak hak skrzynki; `null` znaczy „nie pytaj".
+  Zastępuje `useObrazZalacznikaReklamacji`, który oddawał sam adres — przez to
+  503 „konto niepołączone" wyglądało jak 415 „to nie obraz".
+- **Serwer: parytet reklamacji ze skrzynką.** `routes/pobranie.ts` niesie
+  `bladPobrania` (502 odmowa Allegro, 503 awaria drogi) dla obu tras; trasy
+  załączników reklamacji przestają oddawać 400 na wszystko. Podgląd dostaje
+  `content-length` i 415 „(sygnatura pliku)"; brak wiersza zostaje 404.
+- Testy: `towar/Zalacznik.test.tsx` (same propsy), `reklamacje/ZalacznikiCzatu.test.tsx`,
+  przypadek haka reklamacji w `useZdjecie.test.tsx`, powiększenie w
+  `skrzynka/Zalaczniki.test.tsx`, trasy reklamacji z podstawionym `fetch`
+  (200 z nagłówkami, 415, 502, 503, 404).
+
+Sprawdzone w przeglądarce bez konta Allegro: obie rozmowy pokazują pod nazwą
+pliku ramkę, potem zdanie „Konto Allegro niepołączone — …" i „Spróbuj
+ponownie"; z podstawionym 200 obraz w linii i powiększenie po kliknięciu.
+
 ## 0.244.0 — 9 września 2026
 
 **Zdjęcia w rozmowach skrzynki znów się wyświetlają, a każda odmowa ma

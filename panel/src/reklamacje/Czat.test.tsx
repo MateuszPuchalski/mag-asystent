@@ -18,12 +18,18 @@ import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../ap
 
 const scena = vi.hoisted(() => ({ obrazy: {} as Record<number, string | null | undefined> }));
 
+/* Hak oddaje OBIEKT (wydanie „wspólny załącznik"): adres, zdanie porażki
+   i ponowienie — ten sam kształt, co w skrzynce. `null` w identyfikatorze
+   znaczy „nie pytaj" (plik bez podglądu). */
 vi.mock("../towar/useZdjecie", () => ({
-  useObrazZalacznikaReklamacji: (_r: number, id: number) => scena.obrazy[id],
+  useZdjecieZalacznikaReklamacji: (_r: number, id: number | null) =>
+    ({ url: id == null ? undefined : scena.obrazy[id], blad: null, ponow: () => {} }),
 }));
 const pobrania = vi.hoisted(() => ({ lista: [] as string[] }));
 vi.mock("../api/reklamacje", () => ({
-  pobierzZalacznik: (_r: number, _z: number, nazwa: string) => { pobrania.lista.push(nazwa); },
+  pobierzZalacznik: (_r: number, _z: number, nazwa: string) => {
+    pobrania.lista.push(nazwa); return Promise.resolve();
+  },
 }));
 
 const { Czat } = await import("./Czat");
