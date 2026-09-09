@@ -84,7 +84,7 @@ test("token wpisuje biuro i wskazuje silnik; krótki token nie wchodzi", () => {
 
 test("jedno kliknięcie: zaznaczone → ZATWIERDZONE zastosowania z pełnym śladem, odznaczone → pominięte", () => {
   const t = T.dodajToken({ token: "GX160", silnik: GX160 }, ala());
-  const [pierwsza, druga, ...reszta] = t.nowe.map((k) => k.twId);
+  const [pierwsza, druga] = t.nowe.map((k) => k.twId);
   const w = T.rozstrzygnijToken(t.id, { zatwierdz: [pierwsza, GAZNIK_GX160], pomin: [druga] }, biuro);
   assert.deepEqual(w, { zatwierdzonych: 2, juzBylo: 0, pominietych: 1 });
 
@@ -104,7 +104,6 @@ test("jedno kliknięcie: zaznaczone → ZATWIERDZONE zastosowania z pełnym śla
   assert.equal(po.zatwierdzonych, 2);
   assert.equal(po.pominietych, 1);
   assert.equal(po.nowych, t.nowych - 3, "reszta czeka");
-  assert.equal(po.nowych, t.nowych - 3);
   assert.equal(po.nowe.some((k) => k.twId === druga), false);
   const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
   assert.ok(typy.includes("token_silnika_rozstrzygniecie") && typy.includes("wiedza_propozycja") && typy.includes("wiedza_rozstrzygniecie"));
