@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
-import { wyslijWiadomoscSprawy } from "../adapters/allegro.http.js";
+import { wyslijWiadomoscSprawy, type TypWiadomosciSprawy } from "../adapters/allegro.http.js";
 import { logEvent } from "./events.js";
 import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
 import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
@@ -25,9 +25,11 @@ import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
       autora. Doradca Allegro (`ADMIN`) odpisał w 61 sprawach na 100 w sondzie
       i jego zdanie zmienia treść odpowiedzi tak samo jak dopisek klienta.
 
-   Czego tu NIE MA i nie będzie w tym wydaniu: załączników wychodzących
-   (dwukrokowe wgranie to osobna maszyneria) oraz typów `RETURN_*`, które są
-   formalnym stanowiskiem sprzedawcy w sprawie zwrotu towaru.                */
+   Czego tu NIE MA: załączników wychodzących (dwukrokowe wgranie to osobna
+   maszyneria). Typy `RETURN_*` weszły z przyrostem trzecim jako `typ` PRÓBY:
+   krok „towar do odesłania?" po uznaniu (`services/reklamacja-werdykt.ts`)
+   idzie tą samą końcówką, tym samym outboxem i z tą samą świeżością — inna
+   jest tylko wartość `MessageRequest.type`.                                 */
 
 /** Rola, którą podpisujemy własne wiadomości; ta sama, którą oddaje Allegro. */
 const NASZA_ROLA = "SELLER";
@@ -45,8 +47,12 @@ export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed
 
 /** Wysyłka wstrzykiwana, żeby test nie strzelał do Allegro (wzorzec skrzynki). */
 export type WyslijWiadomosc = (
-  issueId: string, tekst: string,
+  issueId: string, tekst: string, typ: TypWiadomosciSprawy,
 ) => Promise<{ id?: string; createdAt?: string } | null>;
+
+/** Typy, które panel wysyła: zwykła wiadomość i dwa stanowiska o towarze. */
+export type TypOdpowiedzi = Extract<TypWiadomosciSprawy,
+  "REGULAR" | "RETURN_REQUIRED_CUSTOM" | "RETURN_NOT_REQUIRED">;
 
 export interface ZadanieOdpowiedzi {
   reklamacjaId: number;
@@ -56,6 +62,8 @@ export interface ZadanieOdpowiedzi {
   expectedLastMessageId: number | null;
   /** Jawna zgoda agenta po 409 „ktoś dopisał" — nigdy domyślna. */
   mimoNowejWiadomosci?: boolean;
+  /** `MessageRequest.type`; brak znaczy zwykłą wiadomość. */
+  typ?: TypOdpowiedzi;
   database?: Db;
   wyslij?: WyslijWiadomosc;
 }
@@ -118,7 +126,8 @@ const outboxPoKluczu = (database: Db, klucz: string) => database.prepare(
 export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpowiedzi> {
   const database = z.database ?? defaultDb();
   const wyslij: WyslijWiadomosc = z.wyslij
-    ?? ((id, tekst) => wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst));
+    ?? ((id, tekst, typ) => wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst, typ));
+  const typ: TypOdpowiedzi = z.typ ?? "REGULAR";
 
   const tresc = (z.tresc ?? "").trim();
   if (!tresc) throw new BladReklamacji("Pusta odpowiedź nie idzie do Allegro");
@@ -144,7 +153,12 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
     throw new ReklamacjaConflict({ wersja: k.wersja, prowadzi: k.prowadzi });
   }
 
-  const klucz = kluczWysylki("rkl-", z.reklamacjaId, k.lastMessageId, tresc);
+  /* TYP WCHODZI DO KLUCZA. Stanowisko o towarze z tym samym zdaniem, co
+     zwykła wiadomość sprzed chwili, to inny zamiar — strażnik dubletu nie ma
+     prawa oddać tamtej próby zamiast wysłać `RETURN_*`. Zwykła wiadomość
+     trzyma klucz jak w 0.224.0, żeby stare wiersze outboxu dalej pasowały. */
+  const klucz = kluczWysylki("rkl-", z.reklamacjaId, k.lastMessageId,
+    typ === "REGULAR" ? tresc : `${typ}\u0000${tresc}`);
 
   if (k.lastMessageId !== (z.expectedLastMessageId ?? null) && !z.mimoNowejWiadomosci) {
     /* Ktoś dopisał, odkąd agent zaczął pisać — klient albo doradca. Ładunek
@@ -197,20 +211,20 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
     outboxId = zastany.id;
   } else {
     outboxId = Number(database.prepare(
-      `INSERT INTO reklamacja_outbox(reklamacja_id,idempotency_key,body,expected_wersja,
+      `INSERT INTO reklamacja_outbox(reklamacja_id,idempotency_key,body,typ,expected_wersja,
          expected_last_message_id,status,created_by)
-       VALUES (?,?,?,?,?,'sending',?)`,
-    ).run(z.reklamacjaId, klucz, tresc, k.wersja, k.lastMessageId, z.autor.id).lastInsertRowid);
+       VALUES (?,?,?,?,?,?,'sending',?)`,
+    ).run(z.reklamacjaId, klucz, tresc, typ, k.wersja, k.lastMessageId, z.autor.id).lastInsertRowid);
   }
 
   logEvent("reklamacja_wysylka_proba", z.autor.name, null,
-    { id: z.reklamacjaId, znakow: tresc.length }, undefined, database);
+    { id: z.reklamacjaId, znakow: tresc.length, typ }, undefined, database);
 
   /* SIEĆ POZA TRANSAKCJĄ. Trzymanie otwartej transakcji SQLite na czas żądania
      HTTP blokowałoby drugi proces na tyle, ile trwa najwolniejsza odpowiedź. */
   let odp: { id?: string; createdAt?: string } | null;
   try {
-    odp = await wyslij(k.externalId, tresc);
+    odp = await wyslij(k.externalId, tresc, typ);
   } catch (e) {
     const status: StatusWysylki = niejednoznaczny(e) ? "send_uncertain" : "send_failed";
     database.prepare(
@@ -266,7 +280,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
 
     /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji. */
     logEvent("reklamacja_odpowiedz", z.autor.name, null,
-      { id: z.reklamacjaId, znakow: tresc.length, externalMessageId },
+      { id: z.reklamacjaId, znakow: tresc.length, externalMessageId, typ },
       undefined, database);
   })();
 

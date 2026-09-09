@@ -1569,9 +1569,13 @@ GET    /api/obsluga/pokrycie-wiedzy
 GET    /api/obsluga/reklamacje
 GET    /api/obsluga/reklamacje/:id
 GET    /api/obsluga/reklamacje/:id/zalaczniki/:zid
+GET    /api/obsluga/reklamacje/:id/zalaczniki/:zid/podglad
 POST   /api/obsluga/reklamacje/synchronizuj
 POST   /api/obsluga/reklamacje/:id/prowadze
 POST   /api/obsluga/reklamacje/:id/notatka
+POST   /api/obsluga/reklamacje/:id/odpowiedz
+POST   /api/obsluga/reklamacje/:id/werdykt
+POST   /api/obsluga/reklamacje/:id/zwrot-towaru
 ```
 
 Trasy doboru działają od E1, trasy wiedzy od E2. Projekt właściciela pisał
@@ -2595,9 +2599,16 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 
 | kubełek | pytanie | skąd |
 |---|---|---|
-| DO DECYZJI | uznać czy odrzucić? | `CLAIM_SUBMITTED` |
+| DO DECYZJI | uznać czy odrzucić? | `CLAIM_SUBMITTED` bez naszego werdyktu |
 | DO ODPOWIEDZI | co odpisać klientowi? | rozstrzygnięta, a ostatnie słowo było klienta |
-| ROZSTRZYGNIĘTE | — | `CLAIM_ACCEPTED`, `CLAIM_REJECTED` |
+| ROZSTRZYGNIĘTE | — | `CLAIM_ACCEPTED`, `CLAIM_REJECTED` albo werdykt z panelu, który wyszedł |
+
+**Werdykt z panelu zamyka sprawę od razu, nie za takt synchronizacji.**
+Po „WYŚLIJ WERDYKT" wiersz przechodzi do ROZSTRZYGNIĘTYCH, zanim Allegro
+odda `CLAIM_*` — inaczej dwie osoby przy dwóch biurkach widziałyby ją jako
+otwartą jeszcze przez minutę. Los niepewny (timeout) liczy się jak wydany,
+bo drugiego strzału i tak nie oddamy; porażka kodem zostawia sprawę w DO
+DECYZJI z sygnałem, bo wiadomo, że nic nie poszło.
 
 **DO DECYZJI trzyma także sprawy z nową wiadomością od klienta.** Obowiązek
 wobec terminu jest jeden i to on rządzi kolejnością pracy; „klient czeka" jest
@@ -2623,7 +2634,7 @@ niż trzeba.
 
 ### 25b.5. Sygnały
 
-Sześć, każdy z jednym powodem istnienia:
+Dziewięć, każdy z jednym powodem istnienia:
 
 - **termin** — decyzja za trzy dni albo mniej; przy sprawie rozstrzygniętej milczy.
 - **klient czeka** — ostatnie słowo było klienta, ruch należy do nas.
@@ -2634,6 +2645,12 @@ Sześć, każdy z jednym powodem istnienia:
 - **zwrot towaru** — sprzedawca zażądał odesłania. POKAZUJEMY, nie obsługujemy.
 - **status?** — wartość spoza `PostPurchaseIssueStatus`. Nie jest błędem: sprawa
   wchodzi do kolejki, a sygnał prosi właściciela o potwierdzenie na żywym koncie.
+- **werdykt czeka** — nasz werdykt wyszedł (albo mógł wyjść), a `status_allegro`
+  nie pokazuje jeszcze `CLAIM_*`. Gaśnie z synchronizacją, nie z naszej ręki.
+- **werdykt nieudany** — Allegro odmówiło kodem; sprawa wraca do DO DECYZJI
+  i wolno spróbować raz jeszcze.
+- **towar?** — uznana z panelu, a kupujący nie wie, czy odsyłać towar: ani my
+  nie zajęliśmy stanowiska, ani `returnRequired` nic nie mówi.
 
 ### 25b.6. Układ
 
@@ -2698,15 +2715,69 @@ dowiaduje się o przekroczeniu dopiero po kliknięciu.
 `status_allegro` nie jest przestawiany po wysyłce. Należy do Allegro, a sprawa
 wychodzi z DO ODPOWIEDZI przy najbliższej synchronizacji.
 
-### 25b.8. Czego panel jeszcze nie robi
+### 25b.8. Werdykt do Allegro (przyrost trzeci, 0.242.0)
 
-Formalny werdykt (`POST /sale/issues/{id}/status`, cztery uznania i siedem
-odmów, wiadomość do klienta wymagana przez Allegro) wydaje się nadal w Centrum
-Sprzedaży, a mówi to sam edytor pod rozmową. Zdanie o tym, czego panel nie
-robi, jest tu tak samo potrzebne jak przycisk, który robi resztę.
+Kryterium §25 „bez otwierania panelu Allegro" jest przy reklamacji spełnione:
+uznanie albo odrzucenie wychodzi z paska nad rozmową przez
+`POST /sale/issues/{id}/status` (`ClaimStatusChangeRequest`,
+`required: [status, message]`). Decyzje właściciela z 9.09.2026: częściowy
+zwrot pieniędzy WCHODZI z kwotą wpisaną przez agenta; po uznaniu jest krok
+„towar do odesłania?".
 
-Werdykt jest nieodwracalny wobec kupującego, więc dostanie własne wydanie,
-operację uprzywilejowaną i potwierdzenie — jak oddanie pieniędzy przy zwrocie.
+**Dwa przyciski, potem lista.** „UZNAJĘ" otwiera cztery `ACCEPTED_*`,
+„ODRZUCAM" siedem `REJECTED_*`; jedenaście pozycji w jednym `select` to
+jedenaście decyzji naraz. Etykiety po polsku stoją w `reklamacje/statusy.ts`
+(lista wyboru) i w `services/reklamacje.ts` (zdanie na wierszu). Kod spoza
+mapy nie kompiluje się.
+
+**Wiadomość jest wymagana i czyta ją kupujący.** Allegro nie przyjmie
+werdyktu bez niej, więc panel mówi to przy polu, a nie po kliknięciu. Limit
+20 000 znaków jak w czacie — schemat `message` nie ogranicza, a agent nie ma
+uczyć się dwóch liczb dla dwóch pól tego samego ekranu. Kopia wiadomości
+zostaje na wierszu z przyciskiem „Kopiuj", bo Allegro nie oddaje jej w czacie.
+
+**Kwota tylko przy częściowym zwrocie, w groszach, z sufitem nazwanym
+zdaniem.** Serwer pilnuje `> 0` i sufitu: kwota, o którą prosił klient (gdy
+prosił o częściowy zwrot i ją podał), inaczej cena oferty × `offer.quantity`
+(kolumna `ilosc`), inaczej bez sufitu — bez ilości NIE zgadujemy jednej
+sztuki. Kwota przy innym werdykcie to błąd, nie cicha utrata. Na drut idzie
+`partialRefund: { amount: "40.00", currency }` — `amount` jako tekst, bo tak
+mówi schemat `Price`.
+
+**Potwierdzenie zamiast cofnięcia (§25a.5).** Allegro drugiego werdyktu
+w tej samej sprawie nie przyjmie, więc przycisk „WYŚLIJ WERDYKT" bramkuje
+zgoda: „Rozumiem: werdykt jest nieodwracalny i razem z wiadomością trafia do
+kupującego". Trasa stoi za `autoryzuj("reklamacja_werdykt")` (biuro, admin)
+z wpisem `privileged` — jak oddanie pieniędzy przy zwrocie. Wersja sprawy
+z ekranu jest obowiązkowa: werdykt bez wiedzy, na co agent patrzył, to werdykt
+w ciemno.
+
+**Los próby stoi na wierszu, nie w outboxie.** Werdykt jest jeden na sprawę,
+więc tabela prób miałaby jeden wiersz na klucz. `werdykt_status` przechodzi
+`sending` → `sent` / `send_failed` (odmowa kodem; wolno ponowić) /
+`send_uncertain` (timeout; drugiego strzału NIE MA, pasek mówi „sprawdź
+w Centrum Sprzedaży, nie wysyłaj drugi raz"). Próba zapisana ZANIM wyjdzie,
+strzał poza transakcją. `status_allegro` zostaje własnością Allegro:
+synchronizacja potwierdza `send_uncertain` → `sent`, gdy odda tę samą gałąź
+(`CLAIM_ACCEPTED` przy uznaniu), a przy gałęzi przeciwnej nazywa porażkę —
+werdykt zapadł poza panelem. Zieleń „Potwierdzony przez Allegro" należy się
+dopiero statusowi z synchronizacji (wzór pieniędzy z 0.209.0).
+
+**Werdykt z Centrum Sprzedaży nie udaje naszego.** `werdykt` pusty przy
+`CLAIM_ACCEPTED` to sprawa rozstrzygnięta poza panelem i pasek mówi to wprost;
+czipa w kolejce taka sprawa nie ma. Pochodzenie decyzji jest informacją.
+
+**Krok „towar do odesłania?" po uznaniu.** Dwa przyciski, zdanie startowe do
+edycji, wysyłka tą samą kolejką co odpowiedź (`reklamacja_outbox.typ`:
+`RETURN_REQUIRED_CUSTOM` albo `RETURN_NOT_REQUIRED`), z tą samą świeżością
+i tym samym dialogiem po dopisku. Decyzja zapisuje się na wierszu po wyjściu
+próby i tylko raz; `returnRequired` z Allegro jest jej potwierdzeniem, nie
+założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
+łączy `RETURN_*` z `returnRequired` ani jednym zdaniem.
+
+**Do dziennika idą długości i kody, nigdy treść:** `reklamacja_werdykt_proba`
+(werdykt, liczba znaków, kwota), `reklamacja_werdykt` (los, kod HTTP),
+`reklamacja_zwrot_towaru` (decyzja, liczba znaków), `privileged` (operacja).
 
 ### 25b.9. Czego panel nie wie
 
@@ -2888,7 +2959,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
-| Werdykt reklamacji do Allegro | **projekt** | przyrost trzeci, `POST /sale/issues/{id}/status`, jedenaście wartości |
+| Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
+| Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

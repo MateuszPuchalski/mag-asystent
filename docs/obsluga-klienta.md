@@ -621,8 +621,16 @@ rozmowy po potwierdzeniu. To ta sama cena, co przy skrzynce w 0.148.0:
 bez kopii próby timeout znaczyłby ciszę, a cisza po wysyłce do kupującego jest
 gorsza od podwójnej wiadomości.
 
-**Werdykt nadal nie wychodzi stąd wcale.** Przyrost trzeci dostanie własny
-akapit w tym rozdziale.
+**Werdykt (przyrost trzeci) wychodzi jednym strzałem, wydanym przez
+człowieka.** Do Allegro idą trzy rzeczy: status z listy jedenastu wartości,
+wiadomość agenta (kupujący ją czyta) i — wyłącznie przy częściowym zwrocie —
+kwota. Nic poza tym: ani notatka biura, ani dane z rozmowy. U nas zostaje
+kopia wiadomości na wierszu `reklamacja_klienta` (Allegro nie oddaje jej
+w czacie), kwota, kto i kiedy, oraz los próby (`werdykt_status`) — także
+niepewny po timeoucie, bo cisza po werdykcie jest gorsza niż wpis „nie
+wiadomo". Do dziennika idą długości, kody HTTP i nazwa operacji
+uprzywilejowanej, nigdy treść. Stanowisko o towarze po uznaniu jedzie tą
+samą kolejką co odpowiedź i podlega tym samym regułom kopii.
 
 ## Co się nie zmienia
 

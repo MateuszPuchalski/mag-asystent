@@ -34,6 +34,55 @@ historii nie przepisujemy.
 ---
 
 
+## 0.242.0 — 9 września 2026
+
+**Werdykt reklamacji wychodzi z panelu: uznanie albo odrzucenie do Allegro,
+z częściowym zwrotem i krokiem „towar do odesłania?".** Przyrost trzeci
+reklamacji (po kolejce z 0.222.0 i odpowiedzi w czacie z 0.224.0). Kryterium
+§25 „bez otwierania panelu Allegro" jest przy reklamacji spełnione; zdanie
+„formalny werdykt wydaje się w Centrum Sprzedaży" znika z edytora, bo
+przestało być prawdą. Decyzje właściciela z 9.09.2026: częściowy zwrot
+pieniędzy z kwotą wpisaną przez agenta; po uznaniu pytanie o towar.
+
+- **Pasek werdyktu nad rozmową** (`reklamacje/Werdykt.tsx`): najpierw dwa
+  przyciski „UZNAJĘ" / „ODRZUCAM", potem lista czterech uznań albo siedmiu
+  odmów po polsku, wiadomość do kupującego (wymagana przez Allegro, klient ją
+  czyta), kwota tylko przy częściowym zwrocie z podpowiedzią, o co prosił
+  klient, i zgoda „werdykt jest nieodwracalny" bramkująca „WYŚLIJ WERDYKT".
+  Po wysłaniu blok tylko do odczytu: werdykt, kwota, kto i kiedy, wiadomość
+  z „Kopiuj" i los próby zdaniem — „Allegro jeszcze nie potwierdziło",
+  „Potwierdzony przez Allegro", „Nieudany: …" z ponowieniem, „Niepewny —
+  nie wysyłaj drugi raz". Werdykt z Centrum Sprzedaży nie udaje naszego.
+- **Serwer** (`services/reklamacja-werdykt.ts`): `POST /sale/issues/{id}/status`
+  ze schematu (`required: [status, message]`, `partialRefund` jako `Price`
+  z `amount` tekstem), ciało układa adapter i test sprawdza je bez sieci.
+  Serwer pilnuje kwoty `> 0` i sufitu nazwanego zdaniem: kwota klienta, potem
+  cena oferty × `offer.quantity` (nowa kolumna `ilosc`), inaczej bez sufitu.
+  Jeden werdykt na sprawę: los próby na wierszu (`werdykt_status`), drugi
+  strzał po `sent` i po timeoucie to 409; ponowić wolno tylko po odmowie
+  kodem. Strzał poza transakcją, próba zapisana zanim wyjdzie. Nowa operacja
+  uprzywilejowana `reklamacja_werdykt` (biuro, admin) z wpisem `privileged`.
+- **`status_allegro` zostaje własnością Allegro.** Werdykt z panelu zamyka
+  sprawę od razu (kubełek ROZSTRZYGNIĘTE), a synchronizacja potwierdza
+  niepewny los, gdy odda tę samą gałąź — i nazywa porażkę, gdy odda
+  przeciwną. Trzy nowe sygnały: „werdykt czeka", „werdykt nieudany", „towar?".
+- **Krok „towar do odesłania?" po uznaniu**: dwa przyciski, zdanie do edycji,
+  wysyłka tą samą kolejką co odpowiedź z `typ` `RETURN_REQUIRED_CUSTOM` albo
+  `RETURN_NOT_REQUIRED` (nowa kolumna `reklamacja_outbox.typ`), ten sam
+  triage 409 po dopisku. Decyzja na wierszu, raz; `returnRequired` z Allegro
+  jest potwierdzeniem.
+- Trasy: `POST …/reklamacje/:id/werdykt` i `…/zwrot-towaru` — licznik
+  zapisów TRZY → PIĘĆ; nowy strażnik adresów dla `panel/src/api/reklamacje.ts`.
+  Do dziennika idą długości i kody, nigdy treść. Migracja `addColumn`
+  na `reklamacja_klienta` (dwanaście kolumn) i `reklamacja_outbox.typ`.
+
+**Do sprawdzenia u właściciela.** Pierwszy werdykt na żywej sprawie
+potwierdza kształt `/status` (200 bez ciała) i mapowanie `RETURN_*` na
+`returnRequired` — dwa nowe `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`
+(licznik dwadzieścia dwie; `docs_check` umie od dziś liczebniki
+dwuwyrazowe). Adres do odesłania towaru w zdaniu startowym jest ogólny
+(„na adres sklepu") — do uzupełnienia własnym tekstem przy pierwszym uznaniu.
+
 ## 0.241.0 — 9 września 2026
 
 **Szczebel „zgodne wymiary": „linka 148 cm" trafia w „1170x1480".** Blizna

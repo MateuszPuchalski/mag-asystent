@@ -193,6 +193,32 @@ export function migrate(database: DatabaseSync) {
   addColumn("szkic_copilota", "pasowanie_ocena",
     "TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone'))");
   addColumn("szkic_copilota", "pasowanie_ocena_at", "TEXT");
+  /* Werdykt reklamacji (przyrost trzeci) — patrz `reklamacja_klienta`
+     w `schema.sql`. Tabela stoi na produkcji od 0.222.0, więc kolumny dochodzą
+     migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to
+     jest prawda o każdej sprawie rozstrzygniętej w Centrum Sprzedaży. `CHECK`
+     z PEŁNYM zbiorem od razu (blizna 0.135.0), ten sam co w `schema.sql`. */
+  addColumn("reklamacja_klienta", "werdykt", `TEXT CHECK (werdykt IS NULL OR werdykt IN (
+    'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
+    'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',
+    'REJECTED_PRODUCT_DAMAGED_BY_USER','REJECTED_PRODUCT_CONFORMS_TO_CONTRACT',
+    'REJECTED_MINOR_DEFECT','REJECTED_OTHER','REJECTED_CLAIM_WITHDRAWN_BY_BUYER'))`);
+  addColumn("reklamacja_klienta", "werdykt_wiadomosc", "TEXT");
+  addColumn("reklamacja_klienta", "werdykt_kwota_grosze", "INTEGER");
+  addColumn("reklamacja_klienta", "werdykt_at", "TEXT");
+  addColumn("reklamacja_klienta", "werdykt_przez", "TEXT");
+  addColumn("reklamacja_klienta", "werdykt_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("reklamacja_klienta", "werdykt_status", `TEXT CHECK (werdykt_status IS NULL OR
+    werdykt_status IN ('sending','sent','send_uncertain','send_failed'))`);
+  addColumn("reklamacja_klienta", "werdykt_blad", "TEXT");
+  addColumn("reklamacja_klienta", "zwrot_towaru",
+    "TEXT CHECK (zwrot_towaru IS NULL OR zwrot_towaru IN ('wymagany','niewymagany'))");
+  addColumn("reklamacja_klienta", "zwrot_towaru_at", "TEXT");
+  addColumn("reklamacja_klienta", "ilosc", "INTEGER");
+  /* Typ wiadomości w kolejce odpowiedzi — tabela z 0.224.0 stoi na produkcji.
+     Stare próby to zwykłe wiadomości, stąd `DEFAULT 'REGULAR'`. */
+  addColumn("reklamacja_outbox", "typ", `TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
+    ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM','RETURN_NOT_REQUIRED'))`);
   /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */

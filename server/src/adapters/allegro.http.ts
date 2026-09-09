@@ -228,6 +228,16 @@ export function urlNowejWiadomosciSprawy(apiUrl: string, id: string): string {
   return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/message`;
 }
 
+/**
+ * Werdykt w reklamacji (`POST /sale/issues/{issueId}/status`,
+ * `changeStatusOfIssueUsingPOST`, przyrost trzeci). Ta sama rodzina `issues`,
+ * więc ta sama nauczona wersja zasobu (`beta.v1`) i to samo uprawnienie
+ * `allegro:api:disputes` — nowego parowania nie ma.
+ */
+export function urlZmianyStatusuSprawy(apiUrl: string, id: string): string {
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}/status`;
+}
+
 /** Lista wątków Centrum wiadomości. Allegro pozwala najwyżej 20 na stronę. */
 export function urlWatkow(apiUrl: string, offset: number): string {
   return `${apiUrl}/messaging/threads?limit=20&offset=${Math.max(0, Math.trunc(offset))}`;
@@ -350,6 +360,12 @@ export async function zapytajAllegro(
      * zasobu negocjujemy dalej w `accept`, bo ODPOWIEDŹ jest zwykłym JSON-em.
      */
     plik?: { dane: Uint8Array; typ: string };
+    /**
+     * 404 jako BŁĄD, nie `null` (przyrost trzeci). Przy odczycie „nie ma"
+     * jest odpowiedzią; przy werdykcie 200 bez ciała TEŻ oddaje `null`, więc
+     * bez tej opcji „sprawa nie istnieje" wyglądałoby jak „werdykt przyjęty".
+     */
+    blad404?: boolean;
   } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
@@ -413,7 +429,10 @@ export async function zapytajAllegro(
       continue;
     }
 
-    if (odp.status === 404) return null;
+    if (odp.status === 404) {
+      if (!opcje.blad404) return null;
+      throw new BladOdpowiedziAllegro("Allegro nie zna tej sprawy (404)", 404);
+    }
     if (odp.status === 401) {
       throw new BladOdpowiedziAllegro(
         "Allegro odrzuciło token (401) — sparuj konto ponownie: " +
@@ -605,24 +624,81 @@ export async function zglosRabat(
   }) as { id?: string } | null;
 }
 
+/** `MessageRequest.type` ze schematu — pełny zbiór, choć panel wysyła trzy z pięciu. */
+export type TypWiadomosciSprawy =
+  | "REGULAR" | "END_REQUEST"
+  | "RETURN_REQUIRED_SELLER_LABEL" | "RETURN_REQUIRED_CUSTOM" | "RETURN_NOT_REQUIRED";
+
 /**
  * Odpowiedź w reklamacji (0.224.0) — PIERWSZY zapis tego modułu do Allegro.
  *
  * `type` jest w `MessageRequest` jedynym polem, przy którym lista `required`
- * ma pokrycie w schemacie, więc jedzie ZAWSZE. `REGULAR` to zwykła wiadomość;
- * trzech wartości `RETURN_*` panel świadomie nie wysyła — one są formalnym
- * stanowiskiem sprzedawcy w sprawie zwrotu towaru, a specyfikacja nigdzie nie
- * łączy ich wprost z polem `currentState.returnRequired`. To wniosek z nazw,
- * a mapowanie z domysłu kosztowało ten projekt trzy wydania.
+ * ma pokrycie w schemacie, więc jedzie ZAWSZE. `REGULAR` to zwykła wiadomość.
+ * Od przyrostu trzeciego wychodzą też `RETURN_REQUIRED_CUSTOM`
+ * i `RETURN_NOT_REQUIRED` — formalne stanowisko sprzedawcy w sprawie zwrotu
+ * towaru po uznaniu. Specyfikacja nigdzie nie łączy ich wprost z polem
+ * `currentState.returnRequired`; to wniosek z nazw i dlatego stoi przy nim
+ * znacznik weryfikacji w `docs/allegro-ksztalt.md`, a `zwrot_wymagany` po
+ * synchronizacji jest potwierdzeniem, nie założeniem.
  *
  * Ciało składane TUTAJ, wzorem `odmowZwrotuPieniedzy`: kształt jest stały,
  * a serwis nie ma powodu go znać.
  */
 export async function wyslijWiadomoscSprawy(
-  apiUrl: string, issueId: string, tekst: string,
+  apiUrl: string, issueId: string, tekst: string, typ: TypWiadomosciSprawy = "REGULAR",
 ): Promise<{ id?: string; createdAt?: string } | null> {
   return await zapytajAllegro(urlNowejWiadomosciSprawy(apiUrl, issueId), {
     metoda: "POST",
-    body: { text: tekst, type: "REGULAR" },
+    body: { text: tekst, type: typ },
   }) as { id?: string; createdAt?: string } | null;
+}
+
+/** `ClaimStatusChangeRequest.status` — jedenaście wartości, ze schematu. */
+export type StatusWerdyktu =
+  | "ACCEPTED_REPAIR" | "ACCEPTED_REFUND" | "ACCEPTED_EXCHANGE" | "ACCEPTED_PARTIAL_REFUND"
+  | "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED" | "REJECTED_PRODUCT_NOT_RETURNED"
+  | "REJECTED_PRODUCT_DAMAGED_BY_USER" | "REJECTED_PRODUCT_CONFORMS_TO_CONTRACT"
+  | "REJECTED_MINOR_DEFECT" | "REJECTED_OTHER" | "REJECTED_CLAIM_WITHDRAWN_BY_BUYER";
+
+export interface Werdykt {
+  status: StatusWerdyktu;
+  message: string;
+  /** Grosze; ADAPTER zamienia je na `Price.amount` jako tekst „12.50". */
+  kwotaGrosze?: number | null;
+  waluta?: string;
+}
+
+/**
+ * Ciało `ClaimStatusChangeRequest` — czysta funkcja, żeby test sprawdził
+ * kształt bez sieci. `required: [status, message]`; `partialRefund` to
+ * `Price` (`amount` jako TEKST „w formacie string, żeby uniknąć zaokrągleń")
+ * i jedzie WYŁĄCZNIE przy `ACCEPTED_PARTIAL_REFUND`. Przy innych werdyktach
+ * kwotę pomijamy tu po raz drugi — pierwszą bramkę ma serwis, ale ciało na
+ * drucie ma być poprawne nawet, gdyby serwis kiedyś przepuścił.
+ */
+export function cialoWerdyktu(w: Werdykt): Record<string, unknown> {
+  const cialo: Record<string, unknown> = { status: w.status, message: w.message };
+  if (w.status === "ACCEPTED_PARTIAL_REFUND" && w.kwotaGrosze != null) {
+    cialo.partialRefund = {
+      amount: (Math.round(w.kwotaGrosze) / 100).toFixed(2),
+      currency: w.waluta ?? "PLN",
+    };
+  }
+  return cialo;
+}
+
+/**
+ * Werdykt reklamacji (`changeStatusOfIssueUsingPOST`, przyrost trzeci) —
+ * DRUGI zapis tego modułu i pierwszy NIEODWRACALNY wobec kupującego.
+ *
+ * Specyfikacja deklaruje przy 200 tylko „Status changed correctly", bez
+ * ciała — więc sukcesem jest BRAK wyjątku, a nie kształt odpowiedzi. 404
+ * jest tu błędem, nie pustym odczytem (`blad404`). Odpowiedzi 400/401/403
+ * lecą jako `BladOdpowiedziAllegro` z kodem; timeout jako zwykły `Error`,
+ * który serwis czyta jako los niejednoznaczny.
+ */
+export async function zmienStatusSprawy(apiUrl: string, issueId: string, w: Werdykt): Promise<void> {
+  await zapytajAllegro(urlZmianyStatusuSprawy(apiUrl, issueId), {
+    metoda: "POST", body: cialoWerdyktu(w), blad404: true,
+  });
 }

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
 import type {
-  KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji,
+  KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
 /* Reklamacje jadą JEDNYM zapytaniem razem z licznikami — ten sam wybór co przy
@@ -121,6 +121,59 @@ export function useOdpowiedz() {
     }),
     /* `onSettled`, nie `onSuccess`: po niejednoznacznym timeoucie stan sprawy
        też mógł się zmienić, a ekran ma pokazać to, co naprawdę jest. */
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+    },
+  });
+}
+
+/**
+ * Werdykt reklamacji (przyrost trzeci) — uznanie albo odrzucenie do Allegro.
+ *
+ * Bez ponowienia i bez `onSuccess`: los próby przychodzi w odpowiedzi
+ * (`sent`, `send_uncertain`, `send_failed`) i ekran pokazuje go ZDANIEM, a po
+ * `onSettled` dociąga sprawę — bo `werdykt_*` stoi na wierszu, nie w wyniku.
+ * 409 nie łapiemy: „już wyszedł" i „ktoś zmienił sprawę" to jedno zdanie
+ * z serwera pod formularzem, nie dialog.
+ */
+export function useWerdykt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      id: number; werdykt: string; wiadomosc: string; kwotaGrosze: number | null; wersja: number;
+    }) => api<WynikWerdyktu>(`/api/obsluga/reklamacje/${v.id}/werdykt`, {
+      method: "POST",
+      body: JSON.stringify({
+        werdykt: v.werdykt, wiadomosc: v.wiadomosc, kwotaGrosze: v.kwotaGrosze, wersja: v.wersja,
+      }),
+    }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+    },
+  });
+}
+
+/**
+ * Krok „towar do odesłania?" po uznaniu — zwykła wysyłka z innym `type`,
+ * więc i 409 z dopiskiem klienta wraca tak samo i ekran robi ten sam triage,
+ * co przy odpowiedzi. Każde pole ciała jawnie, jak przy odpowiedzi.
+ */
+export function useZwrotTowaru() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      id: number; decyzja: "wymagany" | "niewymagany"; tresc: string; expectedWersja: number;
+      expectedLastMessageId: number | null; mimoNowejWiadomosci?: boolean;
+    }) => api<WynikOdpowiedziReklamacji>(`/api/obsluga/reklamacje/${v.id}/zwrot-towaru`, {
+      method: "POST",
+      body: JSON.stringify({
+        decyzja: v.decyzja, tresc: v.tresc, expectedWersja: v.expectedWersja,
+        expectedLastMessageId: v.expectedLastMessageId,
+        mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
+      }),
+    }),
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });

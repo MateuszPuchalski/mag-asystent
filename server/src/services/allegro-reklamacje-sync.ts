@@ -65,7 +65,7 @@ type Sprawa = {
   right?: string | null;
   buyer?: { login?: string } | null;
   checkoutForm?: { id?: string } | null;
-  offer?: { id?: string | null } | null;
+  offer?: { id?: string | null; quantity?: number | null } | null;
   reason?: { type?: string; description?: string } | null;
   expectations?: Array<{ name?: string | null; refund?: Kwota | null }> | null;
   currentState?: {
@@ -321,8 +321,8 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
     (channel_account_id,external_id,reference_number,order_id,offer_id,kupujacy_login,
      typ,prawo,powod_typ,powod_opis,temat,opis,oczekiwanie,oczekiwana_kwota_grosze,waluta,
      status_allegro,decyzja_do,status_do,zwrot_wymagany,czat_aktywny,wiadomosci_ile,
-     ostatnia_wiadomosc_status,ostatnia_wiadomosc_at,otwarto_at,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ostatnia_wiadomosc_status,ostatnia_wiadomosc_at,otwarto_at,synced_at,ilosc)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
       offer_id=excluded.offer_id, kupujacy_login=excluded.kupujacy_login,
@@ -335,7 +335,8 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
       czat_aktywny=excluded.czat_aktywny, wiadomosci_ile=excluded.wiadomosci_ile,
       ostatnia_wiadomosc_status=excluded.ostatnia_wiadomosc_status,
       ostatnia_wiadomosc_at=excluded.ostatnia_wiadomosc_at,
-      otwarto_at=excluded.otwarto_at, synced_at=excluded.synced_at`).run(
+      otwarto_at=excluded.otwarto_at, synced_at=excluded.synced_at,
+      ilosc=excluded.ilosc`).run(
     konto, sprawa.id, sprawa.referenceNumber ?? null, sprawa.checkoutForm?.id ?? null,
     sprawa.offer?.id ?? null, sprawa.buyer?.login ?? null,
     sprawa.type ?? "CLAIM", sprawa.right ?? null,
@@ -346,7 +347,12 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
     stan.returnRequired == null ? null : (stan.returnRequired ? 1 : 0),
     czatAktywny, Number(sprawa.chat?.messagesCount ?? 0),
     sprawa.chat?.lastMessage?.status ?? null, sprawa.chat?.lastMessage?.createdAt ?? null,
-    otwarto, at);
+    otwarto, at, ilosc(sprawa.offer?.quantity));
+
+  /* Kolumny `werdykt_*`, `zwrot_towaru*` NIE STOJĄ w `DO UPDATE` — to praca
+     biura i ponowne pobranie ma jej nie ruszać. Jedno wyjątkowe dotknięcie
+     niżej: potwierdzenie werdyktu, którego los był niejednoznaczny. */
+  potwierdzWerdykt(database, konto, sprawa.id, stan.status ?? null);
 
   const id = Number((database.prepare(
     "SELECT id FROM reklamacja_klienta WHERE channel_account_id=? AND external_id=?",
@@ -360,6 +366,48 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
   /* Załączniki SAMEJ SPRAWY — te spoza rozmowy. Sonda widziała je przy 57
      sprawach na 100, więc to nie jest przypadek brzegowy. */
   for (const z of sprawa.attachments ?? []) zapiszZalacznik(database, id, null, z);
+}
+
+/** `offer.quantity` ma w schemacie `minimum: 1`; śmieci i brak dają NULL, nie zero. */
+function ilosc(q: unknown): number | null {
+  const n = Number(q);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/** Statusy końcowe z `PostPurchaseIssueStatus` i gałąź werdyktu, która do nich prowadzi. */
+const GALAZ_STATUSU: Record<string, "ACCEPTED" | "REJECTED"> = {
+  CLAIM_ACCEPTED: "ACCEPTED", CLAIM_REJECTED: "REJECTED",
+};
+
+/**
+ * Potwierdzenie werdyktu ze statusu Allegro (przyrost trzeci).
+ *
+ * `POST /sale/issues/{id}/status` po timeoucie zostawia `werdykt_status` na
+ * `send_uncertain`: żądanie poszło, odpowiedź nie wróciła. Drugiego strzału
+ * nie oddajemy (Allegro drugiego werdyktu nie przyjmie), więc rozstrzyga
+ * synchronizacja — wzór „Zlecone — Allegro jeszcze nie potwierdziło" od
+ * pieniędzy przy zwrocie. Gałąź musi się ZGADZAĆ: uznanie potwierdza tylko
+ * `CLAIM_ACCEPTED`. Gdy Allegro pokazuje drugą gałąź, nasz werdykt nie
+ * zapadł — ktoś rozstrzygnął sprawę w Centrum Sprzedaży — i to jest
+ * porażka nazwana zdaniem, nie „niepewność" do końca świata.
+ */
+function potwierdzWerdykt(database: Db, konto: number, externalId: string, status: string | null): void {
+  const galaz = status ? GALAZ_STATUSU[status] : undefined;
+  if (!galaz) return;
+  const w = database.prepare(
+    `SELECT id, werdykt FROM reklamacja_klienta
+      WHERE channel_account_id=? AND external_id=? AND werdykt_status='send_uncertain'`,
+  ).get(konto, externalId) as { id: number; werdykt: string | null } | undefined;
+  if (!w?.werdykt) return;
+  if (w.werdykt.startsWith(galaz)) {
+    database.prepare(
+      "UPDATE reklamacja_klienta SET werdykt_status='sent', werdykt_blad=NULL WHERE id=?",
+    ).run(w.id);
+  } else {
+    database.prepare(
+      "UPDATE reklamacja_klienta SET werdykt_status='send_failed', werdykt_blad=? WHERE id=?",
+    ).run(`Allegro pokazuje ${status}, a wysłano ${w.werdykt} — werdykt zapadł poza panelem`, w.id);
+  }
 }
 
 /**

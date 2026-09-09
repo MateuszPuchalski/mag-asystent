@@ -270,7 +270,20 @@ export type OperacjaUprzywilejowana =
    * Dlatego admin, a nie biuro: to nie jest praca biurowa, tylko przebudowa
    * magazynu wykonana z zewnątrz.
    */
-  | "masowa_lokalizacja";
+  | "masowa_lokalizacja"
+  /**
+   * Werdykt reklamacji — uznanie albo odrzucenie wysłane do Allegro
+   * (przyrost trzeci reklamacji).
+   *
+   * Pierwsza operacja tej aplikacji NIEODWRACALNA wobec kupującego: Allegro
+   * drugiego werdyktu w tej samej sprawie nie przyjmie, a kupujący czyta
+   * wiadomość od razu. Bramka roli mało tu dodaje (trasy reklamacji stoją
+   * za `odmowa()`), ale `autoryzuj` zapisuje `privileged` z nazwą operacji —
+   * ten sam powód, co przy oddaniu pieniędzy. Krok „towar do odesłania?"
+   * idzie pod tą samą nazwą, bo jest stanowiskiem wobec tego samego
+   * kupującego w tej samej sprawie.
+   */
+  | "reklamacja_werdykt";
 
 /**
  * Kto może.
@@ -304,6 +317,10 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   widocznosc_magazynow: ["biuro", "admin"],
   // Setki kartotek jednym kliknięciem — patrz uzasadnienie przy nazwie operacji.
   masowa_lokalizacja: ["admin"],
+  /* BIURO, jak pieniądze przy zwrocie: reklamacje prowadzi biuro codziennie,
+     a werdykt zamknięty dla admina znaczyłby, że orzeka ktoś, kto nie czytał
+     sprawy. Magazynier zostaje poza — on ocenia towar, nie roszczenie. */
+  reklamacja_werdykt: ["biuro", "admin"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {

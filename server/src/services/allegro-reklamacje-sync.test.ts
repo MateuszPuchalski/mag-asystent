@@ -163,6 +163,67 @@ test("drugi przebieg nie robi duplikatów i nie kasuje pracy biura", async () =>
     "ponowne pobranie nie ma prawa zabrać pracy człowieka");
 });
 
+test("werdykt biura jest nietykalny przy ponownym pobraniu; `ilosc` idzie z `offer.quantity`", async () => {
+  const d = baza();
+  const { query } = api([sprawa({ offer: { id: "of-1", quantity: 3 } })]);
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
+  const id = Number((d.prepare("SELECT id FROM reklamacja_klienta").get() as { id: number }).id);
+  assert.equal((d.prepare("SELECT ilosc FROM reklamacja_klienta WHERE id=?").get(id) as { ilosc: number }).ilosc, 3);
+
+  d.prepare(`UPDATE reklamacja_klienta SET werdykt='ACCEPTED_REFUND', werdykt_wiadomosc='Zwracamy.',
+    werdykt_status='sent', werdykt_przez='A. Lewandowska', zwrot_towaru='wymagany' WHERE id=?`).run(id);
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
+  const w = { ...(d.prepare(
+    "SELECT werdykt, werdykt_wiadomosc, werdykt_status, werdykt_przez, zwrot_towaru FROM reklamacja_klienta WHERE id=?",
+  ).get(id) as Record<string, unknown>) };
+  assert.deepEqual(w, {
+    werdykt: "ACCEPTED_REFUND", werdykt_wiadomosc: "Zwracamy.", werdykt_status: "sent",
+    werdykt_przez: "A. Lewandowska", zwrot_towaru: "wymagany",
+  }, "werdykt to praca biura — ponowne pobranie go nie rusza");
+  /* Śmieci w `quantity` dają NULL, nie zero: zero kłamałoby o sufit kwoty. */
+  const { query: q2 } = api([sprawa({ id: "i-2", offer: { id: "of-2", quantity: 0 } })]);
+  await synchronizujAllegroReklamacje({ database: d, query: q2, czatow: 0 });
+  assert.equal((d.prepare("SELECT ilosc FROM reklamacja_klienta WHERE external_id='i-2'").get() as { ilosc: unknown }).ilosc, null);
+});
+
+test("status z Allegro rozstrzyga niejednoznaczny werdykt: ta sama gałąź potwierdza, inna nazywa porażkę", async () => {
+  const d = baza();
+  await synchronizujAllegroReklamacje({ database: d, query: api([sprawa()]).query, czatow: 0 });
+  const id = Number((d.prepare("SELECT id FROM reklamacja_klienta").get() as { id: number }).id);
+  const stan = () => ({ ...(d.prepare(
+    "SELECT werdykt, werdykt_status, werdykt_blad, status_allegro FROM reklamacja_klienta WHERE id=?",
+  ).get(id) as Record<string, unknown>) });
+  const ustaw = (status: string) => d.prepare(
+    "UPDATE reklamacja_klienta SET werdykt='REJECTED_OTHER', werdykt_status=?, werdykt_blad=NULL WHERE id=?",
+  ).run(status, id);
+  const allegro = (status: string) => api([sprawa({
+    currentState: { status, statusDueDate: null, returnRequired: null, chatActive: false },
+  })]).query;
+
+  /* Wciąż CLAIM_SUBMITTED — nic nie wiadomo, `send_uncertain` zostaje. */
+  ustaw("send_uncertain");
+  await synchronizujAllegroReklamacje({ database: d, query: allegro("CLAIM_SUBMITTED"), czatow: 0 });
+  assert.equal(stan().werdykt_status, "send_uncertain");
+
+  /* Odmowa potwierdzona odmową. */
+  await synchronizujAllegroReklamacje({ database: d, query: allegro("CLAIM_REJECTED"), czatow: 0 });
+  assert.deepEqual(stan(), {
+    werdykt: "REJECTED_OTHER", werdykt_status: "sent", werdykt_blad: null, status_allegro: "CLAIM_REJECTED",
+  });
+
+  /* `sent` już nikt nie przestawia, nawet gdy Allegro pokaże co innego. */
+  await synchronizujAllegroReklamacje({ database: d, query: allegro("CLAIM_ACCEPTED"), czatow: 0 });
+  assert.equal(stan().werdykt_status, "sent");
+
+  /* Niejednoznaczna odmowa, a Allegro pokazuje UZNANIE: nasz werdykt nie
+     zapadł — ktoś rozstrzygnął w Centrum Sprzedaży. Porażka ze zdaniem. */
+  ustaw("send_uncertain");
+  await synchronizujAllegroReklamacje({ database: d, query: allegro("CLAIM_ACCEPTED"), czatow: 0 });
+  const po = stan();
+  assert.equal(po.werdykt_status, "send_failed");
+  assert.match(String(po.werdykt_blad), /CLAIM_ACCEPTED.*REJECTED_OTHER.*poza panelem/);
+});
+
 test("rozmowę dociągamy tylko wtedy, gdy licznik Allegro rozjechał się z bazą", async () => {
   const d = baza();
   const czat = [

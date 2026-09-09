@@ -13,6 +13,8 @@ import {
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
+import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
+import { autoryzuj } from "../services/auth.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
    PRZYROST PIERWSZY: odczyt, kolejka z zegarem, czat do czytania. Do Allegro
@@ -22,9 +24,14 @@ import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 
    OD 0.224.0 SĄ TRZY ZAPISY. Dwa zostają wyłącznie u nas — znacznik „kto
    prowadzi" i notatka z ustaleń. Trzeci, ODPOWIEDŹ, wychodzi do Allegro i jest
-   pierwszym takim w tym module; formalny werdykt to nadal przyrost następny.
-   Otwarcie ekranu nie zapisuje nic (blizna 0.18.0), a synchronizacja jest
-   osobnym, jawnym kliknięciem.
+   pierwszym takim w tym module. Otwarcie ekranu nie zapisuje nic (blizna
+   0.18.0), a synchronizacja jest osobnym, jawnym kliknięciem.
+
+   PRZYROST TRZECI DOKŁADA DWA: WERDYKT i decyzję o TOWARZE. Oba wychodzą do
+   Allegro i oba są stanowiskiem wobec kupującego, którego nie da się cofnąć —
+   dlatego jako jedyne w module stoją za `autoryzuj()` z wpisem `privileged`,
+   jak oddanie pieniędzy przy zwrocie. Razem PIĘĆ zapisów; licznik w teście
+   tras jest umową.
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
    skrzynce i przy zwrotach. Reklamacja niesie login kupującego, treść jego
@@ -233,6 +240,70 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
         expectedWersja: Number(req.body?.expectedWersja),
         expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
         mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
+      });
+    } catch (e) { return blad(reply, e); }
+  });
+
+  /**
+   * Werdykt reklamacji (przyrost trzeci) — uznanie albo odrzucenie do Allegro.
+   *
+   * ZA `autoryzuj()`, choć `odmowa()` i tak wpuszcza tylko biuro: bramka roli
+   * niewiele tu dodaje, ale wpis `privileged` z nazwą operacji — tak. To
+   * pierwszy zapis tej aplikacji nieodwracalny wobec kupującego i ślad
+   * „kto i kiedy" jest przy nim wart więcej niż przy czymkolwiek innym
+   * w module. Potwierdzenie stoi w PANELU (zgoda przed przyciskiem); serwer
+   * strzela raz i drugiego werdyktu w tej samej sprawie nie wyśle (409).
+   *
+   * Każde pole ciała jawnie w typie (blizna 0.224.1). Wersja z ekranu jest
+   * OBOWIĄZKOWA: werdykt bez wiedzy, na co agent patrzył, to werdykt w ciemno.
+   */
+  app.post<{ Params: { id: string }; Body: {
+    werdykt?: string; wiadomosc?: string; kwotaGrosze?: number | null; wersja?: number;
+  } }>("/api/obsluga/reklamacje/:id/werdykt", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const s = sesjaZadania()!;
+    /* Kształt ciała PRZED `autoryzuj()`: wpis `privileged` ma znaczyć „człowiek
+       wydał werdykt", a nie „panel wysłał ciało bez wersji". */
+    if (!Number.isInteger(Number(req.body?.wersja))) {
+      return reply.code(400).send({ error: "Werdykt wymaga wersji sprawy z ekranu" });
+    }
+    const w = autoryzuj(s.user, "reklamacja_werdykt");
+    if (!w.ok) return reply.code(403).send({ error: w.powod });
+    try {
+      return await wydajWerdykt(db(), Number(req.params.id), {
+        werdykt: String(req.body?.werdykt ?? ""),
+        wiadomosc: String(req.body?.wiadomosc ?? ""),
+        kwotaGrosze: req.body?.kwotaGrosze ?? null,
+        wersja: Number(req.body?.wersja),
+      }, { id: s.user.userId, name: s.user.name });
+    } catch (e) { return blad(reply, e); }
+  });
+
+  /**
+   * Krok „towar do odesłania?" po uznaniu — ta sama operacja uprzywilejowana,
+   * bo to stanowisko wobec tego samego kupującego w tej samej sprawie.
+   * Ciało jak przy odpowiedzi plus `decyzja`; 409 z `nowaWiadomosc`, gdy ktoś
+   * dopisał — panel robi ten sam triage, co w czacie.
+   */
+  app.post<{ Params: { id: string }; Body: {
+    decyzja?: string; tresc?: string; expectedWersja?: number;
+    expectedLastMessageId?: number | null; mimoNowejWiadomosci?: boolean;
+  } }>("/api/obsluga/reklamacje/:id/zwrot-towaru", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const s = sesjaZadania()!;
+    const w = autoryzuj(s.user, "reklamacja_werdykt");
+    if (!w.ok) return reply.code(403).send({ error: w.powod });
+    try {
+      return await zdecydujZwrotTowaru({
+        reklamacjaId: Number(req.params.id),
+        decyzja: String(req.body?.decyzja ?? ""),
+        tresc: req.body?.tresc ?? "",
+        expectedWersja: Number(req.body?.expectedWersja),
+        expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
+        mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
+        autor: { id: s.user.userId, name: s.user.name },
       });
     } catch (e) { return blad(reply, e); }
   });

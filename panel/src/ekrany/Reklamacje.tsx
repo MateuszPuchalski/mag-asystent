@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
   useNotatka, useOdpowiedz, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useWerdykt, useZwrotTowaru,
 } from "../api/reklamacje";
 import { Konflikt } from "../api/klient";
 import type {
@@ -10,23 +11,26 @@ import type {
 } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
+import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 
-/* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0) ────────────────────────
+/* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0, werdykt od przyrostu trzeciego) ──
    Trzy kolumny, jak skrzynka i jak zwroty — trzy ekrany obsługi mają mieć
    jeden nawyk, nie trzy.
 
-   OD 0.224.0 ODPOWIEDŹ WYCHODZI STĄD. Formalny werdykt zostaje w Centrum
-   Sprzedaży i mówi to sam edytor — zdanie o tym, czego panel nie robi, jest
-   tak samo potrzebne jak przycisk, który robi resztę.
+   OD 0.224.0 ODPOWIEDŹ WYCHODZI STĄD, a od przyrostu trzeciego także WERDYKT
+   i stanowisko o towarze — pasek nad rozmową (`reklamacje/Werdykt.tsx`).
+   Kryterium §25 „bez otwierania panelu Allegro" jest przy reklamacji spełnione.
 
    TRZY RODZAJE 409 i każdy każe co innego zrobić: dopisek klienta albo doradcy
    otwiera dialog z jawną zgodą, zamknięta rozmowa kończy temat, a rozjazd
    wersji każe odświeżyć. Rozróżnia je EKRAN, nie hak — ten sam podział co
-   w skrzynce, bo tam ta sama sztuczka kosztowała blizna 0.110.0.
+   w skrzynce, bo tam ta sama sztuczka kosztowała blizna 0.110.0. Stanowisko
+   o towarze idzie tą samą kolejką, więc dostaje TEN SAM triage (`dopisek()`),
+   a nie drugą kopię.
 
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się od
@@ -87,6 +91,15 @@ function PasekSynchronizacji({ stan, trwa, blad, onSynchronizuj }: {
   </div>;
 }
 
+/**
+ * Dopisek klienta albo doradcy w chwili wysyłki — jedyny 409, który wymaga
+ * DECYZJI agenta, więc jedyny z własnym dialogiem. Reszta (zamknięta rozmowa,
+ * rozjazd wersji, odmowa Allegro) to zdanie z serwera pod polem.
+ */
+const dopisek = (e: unknown): SzczegolyWysylki | null =>
+  e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined
+    ? (e.szczegoly as SzczegolyWysylki) : null;
+
 /** Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie. */
 const kody = (r: Reklamacja) => [r.numer, r.externalId, r.orderId, r.kupujacyLogin]
   .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
@@ -104,11 +117,19 @@ export function Reklamacje() {
   const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
   const odpowiedz = useOdpowiedz();
+  const werdykt = useWerdykt();
+  const zwrotTowaru = useZwrotTowaru();
   const trwa = prowadze.isPending || notatka.isPending;
 
   const [tresc, setTresc] = useState("");
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
+  const [bladWerdyktu, setBladWerdyktu] = useState("");
+  const [bladTowaru, setBladTowaru] = useState("");
+  /* Dopisek przy stanowisku o towarze niesie DECYZJĘ i treść, żeby „wyślij
+     mimo to" poszło z tym samym zamiarem, a nie z pustym formularzem. */
+  const [konfliktTowaru, setKonfliktTowaru] = useState<
+    { szczegoly: SzczegolyWysylki; decyzja: DecyzjaOTowarze; tresc: string } | null>(null);
 
   const wKubelku = useMemo(() => kubelek === null
     ? (data?.reklamacje ?? [])
@@ -168,6 +189,9 @@ export function Reklamacje() {
     setTresc("");
     setBladWysylki("");
     setKonfliktWysylki(null);
+    setBladWerdyktu("");
+    setBladTowaru("");
+    setKonfliktTowaru(null);
   }, [wybrana]);
 
   /**
@@ -205,11 +229,45 @@ export function Reklamacje() {
         /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
            rozmowa, rozjazd wersji, odmowa Allegro — to jedno zdanie pod polem;
            serwer przysyła je gotowe i panel go nie układa od nowa. */
-        if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined) {
-          setKonfliktWysylki(e.szczegoly as SzczegolyWysylki);
-        } else {
-          setBladWysylki((e as Error).message);
-        }
+        const d = dopisek(e);
+        if (d) setKonfliktWysylki(d);
+        else setBladWysylki((e as Error).message);
+      },
+    });
+  };
+
+  /* Werdykt: los próby przychodzi w odpowiedzi, a po `onSettled` sprawa
+     dociąga się z kolumnami `werdykt_*` i pasek pokazuje stan z WIERSZA.
+     Tu zostaje tylko zdanie o porażce, żeby agent nie czekał na odświeżenie. */
+  const wyslijWerdykt = (z: ZadanieWerdyktu) => {
+    const d = szczegol.data;
+    if (!d) return;
+    setBladWerdyktu("");
+    werdykt.mutate({ id: d.reklamacja.id, ...z, wersja: d.reklamacja.wersja }, {
+      onSuccess: (w) => { if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło"); },
+      onError: (e) => setBladWerdyktu((e as Error).message),
+    });
+  };
+
+  const wyslijTowar = (decyzja: DecyzjaOTowarze, trescTowaru: string, mimoNowejWiadomosci = false) => {
+    const d = szczegol.data;
+    if (!d) return;
+    setBladTowaru("");
+    zwrotTowaru.mutate({
+      id: d.reklamacja.id, decyzja, tresc: trescTowaru,
+      expectedWersja: d.reklamacja.wersja,
+      expectedLastMessageId: ostatniaNieNasza(d.czat),
+      mimoNowejWiadomosci,
+    }, {
+      onSuccess: (w) => {
+        setKonfliktTowaru(null);
+        if (w.status !== "sent") setBladTowaru(
+          "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+      },
+      onError: (e) => {
+        const k = dopisek(e);
+        if (k) setKonfliktTowaru({ szczegoly: k, decyzja, tresc: trescTowaru });
+        else setBladTowaru((e as Error).message);
       },
     });
   };
@@ -292,6 +350,12 @@ export function Reklamacje() {
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
+        {/* Pasek werdyktu NAD rozmową: rozstrzygnięcie całej sprawy stoi
+            wyżej niż jej ostatnia wiadomość. */}
+        {szczegol.data && <Werdykt reklamacja={szczegol.data.reklamacja}
+          trwa={werdykt.isPending} blad={bladWerdyktu}
+          trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
+          onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} />}
         {szczegol.data
           ? <Czat reklamacja={szczegol.data.reklamacja} czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
@@ -336,5 +400,17 @@ export function Reklamacje() {
         ? "doradca Allegro" : "klient"}
       onWyslijMimoTo={() => wyslij(true)}
       onPopraw={() => setKonfliktWysylki(null)} />}
+
+    {/* Ten sam dialog przy stanowisku o towarze — to ta sama kolejka i ten
+        sam rodzaj konfliktu, więc drugiego okna nie ma. */}
+    {konfliktTowaru && <DialogKonfliktu
+      szczegoly={konfliktTowaru.szczegoly}
+      szkic={konfliktTowaru.tresc}
+      wysyla={zwrotTowaru.isPending}
+      blad={bladTowaru}
+      ktoDopisal={konfliktTowaru.szczegoly.nowaWiadomosc?.rola === "ADMIN"
+        ? "doradca Allegro" : "klient"}
+      onWyslijMimoTo={() => wyslijTowar(konfliktTowaru.decyzja, konfliktTowaru.tresc, true)}
+      onPopraw={() => setKonfliktTowaru(null)} />}
   </div>;
 }

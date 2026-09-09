@@ -34,6 +34,9 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
+  werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
+  werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
+  zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,
 });
 
 const REKLAMACJE = [
@@ -91,6 +94,8 @@ vi.mock("../api/reklamacje", async () => {
     useProwadze: mutacja("prowadze"),
     useNotatka: mutacja("notatka"),
     useSynchronizuj: mutacja("synchronizuj"),
+    useWerdykt: mutacja("werdykt"),
+    useZwrotTowaru: mutacja("zwrot-towaru"),
   };
 });
 
@@ -163,12 +168,33 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText("35")).toBeInTheDocument();
   });
 
-  it("ekran mówi WPROST, czego panel jeszcze nie robi", () => {
-    /* Od 0.224.0 zdanie dotyczy WYŁĄCZNIE werdyktu: odpowiedź wychodzi już
-       stąd, a napis, który mówiłby inaczej, byłby po prostu nieprawdą. */
+  it("nad rozmową stoi pasek werdyktu z dwoma przyciskami, a zdanie o Centrum Sprzedaży zniknęło", () => {
+    /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
+       Centrum Sprzedaży byłby nieprawdą — tak samo jak w 0.224.0 napis
+       o odpowiedzi. */
     pokaz("/obsluga/reklamacje/1");
-    expect(screen.getByText(/Formalny werdykt/)).toBeInTheDocument();
+    const pasek = screen.getByRole("region", { name: "Werdykt" });
+    expect(pasek).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /UZNAJĘ/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ODRZUCAM/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Odpowiedź .* wysyła się/)).not.toBeInTheDocument();
+  });
+
+  it("werdykt z ekranu niesie WERSJĘ sprawy i idzie dopiero po zgodzie", async () => {
+    /* Wersja z ekranu jest obowiązkowa po stronie serwera: werdykt bez
+       wiedzy, na co agent patrzył, to werdykt w ciemno. Ekran ją dokłada sam. */
+    pokaz("/obsluga/reklamacje/1");
+    await userEvent.click(screen.getByRole("button", { name: /ODRZUCAM/ }));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Towar sprawny.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ WERDYKT/ }));
+    expect(scena.mutacje).toEqual([
+      `werdykt:${JSON.stringify({
+        id: 1, werdykt: "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED",
+        wiadomosc: "Towar sprawny.", kwotaGrosze: null, wersja: 1,
+      })}`,
+    ]);
   });
 
   it("bez wybranej sprawy środek zaprasza do kolejki, zamiast świecić pustką", () => {

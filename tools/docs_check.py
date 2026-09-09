@@ -203,6 +203,20 @@ LICZEBNIKI = {
     "czternaście": 14, "piętnaście": 15, "szesnaście": 16, "siedemnaście": 17,
     "osiemnaście": 18, "dziewiętnaście": 19, "dwadzieścia": 20,
 }
+# Powyżej dwudziestu liczebnik jest DWUWYRAZOWY („dwadzieścia dwie"). Ta sama
+# mina co w 0.150.0, tylko o dziesięć dalej: werdykt reklamacji dołożył dwa
+# znaczniki i licznik stanął na „ZŁY LICZEBNIK". Składamy dziesiątki
+# z jednostkami do dziewięćdziesięciu dziewięciu, żeby kolejny próg nie kusił
+# skasowaniem znacznika zamiast sprawdzeniem rzeczy.
+_DZIESIATKI = {
+    "dwadzieścia": 20, "trzydzieści": 30, "czterdzieści": 40, "pięćdziesiąt": 50,
+    "sześćdziesiąt": 60, "siedemdziesiąt": 70, "osiemdziesiąt": 80, "dziewięćdziesiąt": 90,
+}
+for _dz, _n in _DZIESIATKI.items():
+    LICZEBNIKI[_dz] = _n
+    for _j, _m in list(LICZEBNIKI.items()):
+        if 1 <= _m <= 9:
+            LICZEBNIKI[f"{_dz} {_j}"] = _n + _m
 
 # Znacznik otwierający akapit — taka jest konwencja tego dokumentu. Wystąpienie
 # w środku zdania (jak w samej preambule) NIE jest pozycją do ustalenia.
@@ -210,7 +224,7 @@ ZNACZNIK_RE = re.compile(r"^`\[WERYFIKUJ\]`", re.MULTILINE)
 # Dwie formy, bo polszczyzna wymaga innej przy trzech, a innej przy sześciu:
 # „zostały trzy", ale „zostało sześć". Zamknięcie regexu na jednej z nich
 # kazałoby wybierać między zielonym testem a poprawnym zdaniem.
-DEKLARACJA_RE = re.compile(r"takich rzeczy (?:zostały|zostało) (\w+)")
+DEKLARACJA_RE = re.compile(r"takich rzeczy (?:zostały|zostało) (\w+(?: \w+)?)")
 
 
 def sprawdz_licznik_weryfikuj() -> int:
@@ -230,6 +244,10 @@ def sprawdz_licznik_weryfikuj() -> int:
         return 1
 
     slowo = m.group(1)
+    # Regex bierze DWA słowa na zapas („dwadzieścia dwie"); gdy drugie nie jest
+    # jednostką („trzy rzeczy"), wraca do pierwszego.
+    if slowo not in LICZEBNIKI and slowo.split()[0] in LICZEBNIKI:
+        slowo = slowo.split()[0]
     if slowo not in LICZEBNIKI:
         print(f"ZŁY LICZEBNIK   {STRUKTURA}: {slowo!r} - dopisz go do LICZEBNIKI")
         return 1

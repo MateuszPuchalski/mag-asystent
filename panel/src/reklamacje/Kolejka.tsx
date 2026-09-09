@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from "react";
-import { AlertTriangle, MessageSquareWarning, Headset, Lock, PackageCheck, CircleHelp } from "lucide-react";
+import {
+  AlertTriangle, MessageSquareWarning, Headset, Lock, PackageCheck, CircleHelp,
+  Gavel, CircleX, PackageSearch,
+} from "lucide-react";
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
@@ -50,6 +53,15 @@ export const SYGNALY: Record<SygnalReklamacji,
      znika z ekranu. To jest mechanizm weryfikacji listy na żywym koncie. */
   status_nieznany: { tytul: "Allegro przysłało status, którego nie ma w specyfikacji",
     krotko: "status?", klasa: "bg-red-100 text-ranga-zle", ikona: <CircleHelp size={13} /> },
+  /* Los NASZEGO werdyktu (przyrost trzeci). `statusAllegro` należy do Allegro
+     i mówi o nim dopiero po synchronizacji — do tego czasu wiersz ma powiedzieć,
+     że decyzja zapadła i czeka na potwierdzenie, a nie milczeć. */
+  werdykt_niepotwierdzony: { tytul: "Werdykt wysłany z panelu — Allegro jeszcze nie potwierdziło",
+    krotko: "werdykt czeka", klasa: "bg-amber-100 text-ranga-uwaga", ikona: <Gavel size={13} /> },
+  werdykt_nieudany: { tytul: "Allegro odrzuciło werdykt kodem — spróbuj jeszcze raz",
+    krotko: "werdykt nieudany", klasa: "bg-red-100 text-ranga-zle", ikona: <CircleX size={13} /> },
+  towar_do_decyzji: { tytul: "Reklamacja uznana, a kupujący nie wie, czy odsyłać towar",
+    krotko: "towar?", klasa: "bg-violet-100 text-violet-800", ikona: <PackageSearch size={13} /> },
 };
 
 /** Powody z `PostPurchaseIssueReason.type` po polsku. Nieznany zostaje SUROWY. */
@@ -155,6 +167,13 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
               {OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie}
               {r.oczekiwanaKwotaGrosze !== null
                 ? ` · ${zlote(r.oczekiwanaKwotaGrosze, r.waluta)}` : ""}</span>}
+            {/* Werdykt z PANELU na wierszu rozstrzygniętym — zdanie pisze serwer.
+                Sprawa rozstrzygnięta w Centrum Sprzedaży czipa nie ma: „pochodzenie
+                decyzji jest informacją", a udawanie jej naszą byłoby kłamstwem. */}
+            {r.werdyktNazwa && r.werdyktStatus !== "send_failed" &&
+              <span title={`Werdykt z panelu${r.werdyktPrzez ? `: ${r.werdyktPrzez}` : ""}`}
+                className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
+                <Gavel size={13} />{r.werdyktNazwa}</span>}
             {r.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>

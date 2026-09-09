@@ -56,7 +56,22 @@ export type Sygnal =
   | "doradca"
   | "czat_zamkniety"
   | "zwrot_wymagany"
-  | "status_nieznany";
+  | "status_nieznany"
+  /* ── Werdykt z panelu (przyrost trzeci) ──────────────────────────────────
+     Trzy sygnały o LOSIE naszego werdyktu, bo `status_allegro` należy do
+     Allegro i mówi o nim dopiero po synchronizacji. */
+  /** Wysłany, a Allegro jeszcze nie pokazuje `CLAIM_*` — albo los niepewny. */
+  | "werdykt_niepotwierdzony"
+  /** Allegro odmówiło kodem; wolno spróbować raz jeszcze. */
+  | "werdykt_nieudany"
+  /** Uznana u nas, a nikt nie powiedział kupującemu, czy odsyłać towar. */
+  | "towar_do_decyzji";
+
+/** Losy próby werdyktu — te same cztery, co `reklamacja_outbox.status`. */
+export type StatusWerdyktu = "sending" | "sent" | "send_uncertain" | "send_failed";
+
+/** Losy, przy których werdykt UZNAJEMY za wydany: poszedł albo mógł pójść. */
+const WERDYKT_WYDANY: readonly string[] = ["sent", "send_uncertain"];
 
 /**
  * Statusy, które ZNAMY ze specyfikacji (`PostPurchaseIssueStatus`).
@@ -72,6 +87,25 @@ export const STATUSY_ALLEGRO = [
 
 /** Statusy końcowe reklamacji — po nich biuro nie ma już decyzji do podjęcia. */
 const ROZSTRZYGNIETE = ["CLAIM_ACCEPTED", "CLAIM_REJECTED"];
+
+/**
+ * Werdykt po polsku — zdanie pisze SERWER, panel nie tłumaczy kodów. Kod
+ * spoza mapy wraca goły (`werdyktNazwa` = kod), a nie znika: kolumna ma
+ * `CHECK` z jedenastoma wartościami, więc to gałąź na nowy schemat Allegro.
+ */
+export const NAZWA_WERDYKTU: Record<string, string> = {
+  ACCEPTED_REPAIR: "Uznana — naprawa",
+  ACCEPTED_REFUND: "Uznana — zwrot pieniędzy",
+  ACCEPTED_EXCHANGE: "Uznana — wymiana",
+  ACCEPTED_PARTIAL_REFUND: "Uznana — częściowy zwrot pieniędzy",
+  REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED: "Odrzucona — kupujący nie spełnił dodatkowych wymagań",
+  REJECTED_PRODUCT_NOT_RETURNED: "Odrzucona — towar nie wrócił",
+  REJECTED_PRODUCT_DAMAGED_BY_USER: "Odrzucona — uszkodzenie z winy użytkownika",
+  REJECTED_PRODUCT_CONFORMS_TO_CONTRACT: "Odrzucona — towar zgodny z umową",
+  REJECTED_MINOR_DEFECT: "Odrzucona — wada nieistotna",
+  REJECTED_OTHER: "Odrzucona — inny powód",
+  REJECTED_CLAIM_WITHDRAWN_BY_BUYER: "Odrzucona — kupujący wycofał reklamację",
+};
 
 /** Statusy ostatniej wiadomości, przy których ruch należy do nas. */
 const CZEKA_NA_NAS = ["NEW", "BUYER_REPLIED"];
@@ -150,6 +184,22 @@ export interface WierszReklamacji {
   prowadzi: string | null;
   prowadziAt: string | null;
   notatka: string | null;
+  /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
+     `null` w `werdykt` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
+     panelem" i to jest informacja, nie brak. */
+  werdykt: string | null;
+  werdyktNazwa: string | null;
+  werdyktStatus: StatusWerdyktu | null;
+  werdyktWiadomosc: string | null;
+  werdyktKwotaGrosze: number | null;
+  werdyktAt: string | null;
+  werdyktPrzez: string | null;
+  werdyktBlad: string | null;
+  /** Krok „towar do odesłania?" — decyzja lokalna; `zwrotWymagany` ją potwierdza. */
+  zwrotTowaru: "wymagany" | "niewymagany" | null;
+  zwrotTowaruAt: string | null;
+  /** `offer.quantity` — sufit częściowego zwrotu, gdy klient nie podał kwoty. */
+  ilosc: number | null;
   wersja: number;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
@@ -199,12 +249,27 @@ export function dniDoTerminu(termin: string | null, teraz = Date.now()): number 
  * zaniżyłoby licznik spraw z zegarem — czyli jedyną liczbę, dla której ten
  * ekran powstał.
  */
+/**
+ * Czy sprawa jest rozstrzygnięta — przez Allegro ALBO przez nas.
+ *
+ * Werdykt człowieka z panelu przebija wyliczenie ze statusu: po „WYŚLIJ
+ * WERDYKT" sprawa ma zniknąć z DO DECYZJI od razu, a nie za takt
+ * synchronizacji — inaczej dwie osoby przy dwóch biurkach widziałyby ją
+ * jako otwartą jeszcze przez minutę. `send_uncertain` liczy się jak wydany:
+ * żądanie mogło dojść, a drugiego strzału i tak nie oddamy.
+ */
+export const rozstrzygnieta = (w: {
+  statusAllegro: string | null; werdyktStatus?: StatusWerdyktu | null;
+}): boolean =>
+  ROZSTRZYGNIETE.includes(w.statusAllegro ?? "") || WERDYKT_WYDANY.includes(w.werdyktStatus ?? "");
+
 export function kubelek(w: {
   statusAllegro: string | null;
   ostatniaWiadomoscStatus: string | null;
   czatAktywny: boolean;
+  werdyktStatus?: StatusWerdyktu | null;
 }): Kubelek {
-  if (!ROZSTRZYGNIETE.includes(w.statusAllegro ?? "")) return "decyzja";
+  if (!rozstrzygnieta(w)) return "decyzja";
   /* Rozstrzygnięta, ale rozmowa trwa i ostatnie słowo było klienta. Werdykt
      zapadł, a człowiek po drugiej stronie nadal czeka na zdanie. */
   if (w.czatAktywny && CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) return "odpowiedz";
@@ -217,10 +282,24 @@ export function sygnaly(w: {
   ostatniaWiadomoscStatus: string | null;
   czatAktywny: boolean;
   zwrotWymagany: boolean | null;
+  werdykt?: string | null;
+  werdyktStatus?: StatusWerdyktu | null;
+  zwrotTowaru?: string | null;
 }): Sygnal[] {
   const s: Sygnal[] = [];
-  const otwarta = !ROZSTRZYGNIETE.includes(w.statusAllegro ?? "");
+  const otwarta = !rozstrzygnieta(w);
   if (otwarta && w.dniDoTerminu !== null && w.dniDoTerminu <= PROG_TERMINU_DNI) s.push("termin");
+  /* Los naszego werdyktu. „Niepotwierdzony" trwa, dopóki `status_allegro`
+     nie pokaże gałęzi końcowej — potwierdza synchronizacja, nie my. */
+  const wydany = WERDYKT_WYDANY.includes(w.werdyktStatus ?? "");
+  if (wydany && !ROZSTRZYGNIETE.includes(w.statusAllegro ?? "")) s.push("werdykt_niepotwierdzony");
+  if (w.werdyktStatus === "send_failed") s.push("werdykt_nieudany");
+  /* Uznana u nas, a stanowisko o towarze nie wyszło ani od nas, ani — sądząc
+     po `returnRequired` — z Centrum Sprzedaży. Sygnał, nie kubełek: to jest
+     drugi krok tej samej sprawy, a nie osobna kolejka. */
+  if (wydany && (w.werdykt ?? "").startsWith("ACCEPTED") && !w.zwrotTowaru && w.zwrotWymagany === null) {
+    s.push("towar_do_decyzji");
+  }
   if (CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) s.push("klient_czeka");
   /* Doradca Allegro odpisał w 61 sprawach na 100 w sondzie — to jest przypadek
      typowy, nie brzegowy, i zmienia ton odpowiedzi: w rozmowie jest trzecia
@@ -241,9 +320,12 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
   const czatAktywny = Number(w.czat_aktywny ?? 1) === 1;
   const ostatnia = tekst(w.ostatnia_wiadomosc_status);
   const zwrotWymagany = w.zwrot_wymagany == null ? null : Number(w.zwrot_wymagany) === 1;
+  const werdykt = tekst(w.werdykt);
+  const werdyktStatus = tekst(w.werdykt_status) as StatusWerdyktu | null;
+  const zwrotTowaru = tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null;
   const rdzen = {
     statusAllegro, dniDoTerminu: dni, ostatniaWiadomoscStatus: ostatnia,
-    czatAktywny, zwrotWymagany,
+    czatAktywny, zwrotWymagany, werdykt, werdyktStatus, zwrotTowaru,
   };
   return {
     id: Number(w.id),
@@ -274,6 +356,17 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     prowadzi: tekst(w.prowadzi),
     prowadziAt: tekst(w.prowadzi_at),
     notatka: tekst(w.notatka),
+    werdykt,
+    werdyktNazwa: werdykt ? (NAZWA_WERDYKTU[werdykt] ?? werdykt) : null,
+    werdyktStatus,
+    werdyktWiadomosc: tekst(w.werdykt_wiadomosc),
+    werdyktKwotaGrosze: w.werdykt_kwota_grosze == null ? null : Number(w.werdykt_kwota_grosze),
+    werdyktAt: tekst(w.werdykt_at),
+    werdyktPrzez: tekst(w.werdykt_przez),
+    werdyktBlad: tekst(w.werdykt_blad),
+    zwrotTowaru,
+    zwrotTowaruAt: tekst(w.zwrot_towaru_at),
+    ilosc: w.ilosc == null ? null : Number(w.ilosc),
     wersja: Number(w.wersja ?? 1),
     kubelek: kubelek(rdzen),
     sygnaly: sygnaly(rdzen),
