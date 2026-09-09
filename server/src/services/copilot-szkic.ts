@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { BladOdpowiedziCopilota } from "../adapters/copilot.js";
@@ -11,7 +12,10 @@ import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor
 import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { buildProductCard } from "./stock.js";
-import { pasowaniaTowaru } from "./pasowania.js";
+import {
+  aktywnePasowanie, pasowaniaTowaru, ROLE_PASOWANIA, zaproponujPasowanie, type Kartoteka, type RolaPasowania,
+} from "./pasowania.js";
+import { wTransakcji } from "./wiedza.js";
 import { silnikZTekstu } from "./silniki.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
@@ -63,7 +67,22 @@ export interface KontekstSzkicu {
   ostatniaWiadomoscId: number | null;
   /** Wersja doboru w chwili układania — zmiana danych po szkicu czyni go nieświeżym. */
   doborWersja: number;
+  /**
+   * BIAŁA LISTA kartotek, które serwer sam położył na stole (przyrost
+   * czwarty): kartoteka oferty, kandydaci z faktów, kotwice, strony pasowań.
+   * Klucz to `zwin(symbol)`. Tylko z niej wolno wziąć końce pary pasowania
+   * z rozmowy — nigdy z wyszukiwania po treści wiadomości (blizna szarpaka).
+   * Symbol, którego tu nie ma, nie wejdzie do bazy wiedzy, także gdy klient
+   * go napisał.
+   */
+  kartoteki: Map<string, Kartoteka>;
 }
+
+/**
+ * Pasowanie, które model ODCZYTAŁ z rozmowy (przyrost czwarty): SYMBOLE
+ * cytowane z faktów, nie identyfikatory. Surowe — sprawdza `sprawdzPasowanie`.
+ */
+export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: string; pozycja: string | null }
 
 /** Surowa odpowiedź modelu. Walidacja jest niżej, w `ulozSzkic`. */
 export interface OdpowiedzSzkicu {
@@ -76,6 +95,8 @@ export interface OdpowiedzSzkicu {
    * przeciw rozmowie robi `oczyscPropozycje`, nie adapter.
    */
   daneDoboru: DaneDoboru | null;
+  /** Para część→część z rozmowy (przyrost czwarty); `null` = nic albo nadawca nie oddaje. */
+  pasowanie: PasowanieZRozmowy | null;
   model: string;
   zuzycie: Tokeny;
   ms: number;
@@ -96,6 +117,15 @@ export type OcenaSzkicu = (typeof OCENY_SZKICU)[number];
 export const OCENY_DANYCH = ["wpisane", "odrzucone"] as const;
 export type OcenaDanych = (typeof OCENY_DANYCH)[number];
 
+/** Los propozycji PASOWANIA (przyrost czwarty) — trzeci osobny los z tego samego wywołania. */
+export const OCENY_PASOWANIA = ["zaproponowane", "odrzucone"] as const;
+export type OcenaPasowania = (typeof OCENY_PASOWANIA)[number];
+
+/** Para po sprawdzeniu: oba końce to kartoteki z kontekstu rozmowy. */
+export interface PropozycjaPasowaniaCopilota {
+  czesc: Kartoteka; doCzego: Kartoteka; rola: RolaPasowania; pozycja: string | null;
+}
+
 export interface SzkicCopilota {
   tresc: string;
   zastrzezenia: string[];
@@ -114,6 +144,13 @@ export interface SzkicCopilota {
   daneOcena: OcenaDanych | null;
   /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
   doborWersja: number;
+  /**
+   * Pasowanie rozpoznane w rozmowie i SPRAWDZONE po kartotekach z kontekstu
+   * (przyrost czwarty). `null` = nic. To propozycja: do kolejki wiedzy wchodzi
+   * na kliknięcie agenta (`przyjmijPasowanie`), rozstrzyga biuro.
+   */
+  pasowanie: PropozycjaPasowaniaCopilota | null;
+  pasowanieOcena: OcenaPasowania | null;
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -244,6 +281,51 @@ export function oczyscPropozycje(
   return { dane: cokolwiek ? czyste : null, odrzuconych };
 }
 
+/* Powody, dla których para z rozmowy nie stała się propozycją. Etykieta do
+   dziennika — nigdy treść (§19). Cztery, bo tyle jest bram: symbol musi
+   być z kontekstu, para nie może być jedną kartoteką, rola z listy, a para
+   jeszcze nieznana bazie. */
+export const POWODY_ODRZUCENIA_PASOWANIA = ["symbol_spoza_kontekstu", "ta_sama_kartoteka", "zla_rola", "juz_jest"] as const;
+export type PowodOdrzuceniaPasowania = (typeof POWODY_ODRZUCENIA_PASOWANIA)[number];
+
+/**
+ * Sprawdzenie pary z rozmowy (przyrost czwarty). Kontrakt jak przy danych:
+ * odrzucona para NIE odrzuca szkicu — szkic jest wart pieniędzy sam w sobie —
+ * tylko wypada z propozycji, a powód idzie do dziennika.
+ *
+ * Oba końce muszą stać na BIAŁEJ LIŚCIE kartotek z kontekstu (decyzja
+ * właściciela): model widział tylko je, więc tylko one mogą być tym, o czym
+ * mówi. Dopasowanie symbolu po `zwin`, tą samą normalizacją, co wszędzie.
+ * Para już żywa w bazie — w dowolnej polaryzacji — wypada: pozytyw wobec
+ * negatywu to to, czego §14.2 automatowi zabrania, a dubel pozytywu
+ * i tak nie wszedłby do kolejki.
+ *
+ * POZYCJA zostaje tylko, gdy stoi w rozmowie (`wartoscZRozmowy`): fakt intake
+ * wymienia „od strony filtra / kolektora", więc model mógłby przepisać ją
+ * z faktu, nie z rozmowy — a pozycja jest jedynym, co rozróżnia trzy
+ * uszczelki jednego gaźnika. Zmyślona pozycja to zły fakt w bazie; para
+ * bez pozycji to prawda, tylko mniejsza.
+ */
+export function sprawdzPasowanie(
+  p: PasowanieZRozmowy | null, kartoteki: Map<string, Kartoteka>, watek: string, database: DatabaseSync = db(),
+): { propozycja: PropozycjaPasowaniaCopilota | null; powod: PowodOdrzuceniaPasowania | null } {
+  if (!p) return { propozycja: null, powod: null };
+  const czesc = kartoteki.get(zwin(p.czesc ?? ""));
+  const doCzego = kartoteki.get(zwin(p.doCzego ?? ""));
+  if (!czesc || !doCzego) return { propozycja: null, powod: "symbol_spoza_kontekstu" };
+  if (czesc.twId === doCzego.twId) return { propozycja: null, powod: "ta_sama_kartoteka" };
+  if (!(ROLE_PASOWANIA as readonly string[]).includes(p.rola)) return { propozycja: null, powod: "zla_rola" };
+  if (aktywnePasowanie(czesc.twId, doCzego.twId, database)) return { propozycja: null, powod: "juz_jest" };
+  const pozycja = (p.pozycja ?? "").trim();
+  return {
+    propozycja: {
+      czesc, doCzego, rola: p.rola as RolaPasowania,
+      pozycja: pozycja && pozycja.length <= 80 && wartoscZRozmowy(pozycja, watek) ? pozycja : null,
+    },
+    powod: null,
+  };
+}
+
 /** Login rozmówcy z WĄTKU Allegro — nie z tematu, bo temat bywa tytułem oferty. */
 function loginRozmowcy(conversationId: number): string | null {
   const w = db().prepare(`SELECT t.interlocutor_login AS login
@@ -288,6 +370,11 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const fakty: Fakt[] = [];
   const dodaj = (rodzaj: RodzajFaktu, zdanie: string) =>
     fakty.push({ id: `F${fakty.length + 1}`, rodzaj, zdanie: bezPodpisu(zdanie.replace(/\s+/g, " ").trim()) });
+  /* Biała lista kartotek dla pary z rozmowy: dopisuje się tu KAŻDA kartoteka,
+     której symbol trafia do faktów. Zbiera ją ten sam przebieg, który układa
+     fakty, bo drugi przebieg po to samo rozjechałby się z pierwszym. */
+  const kartoteki = new Map<string, Kartoteka>();
+  const zapamietaj = (k: Kartoteka | null | undefined) => { if (k) kartoteki.set(zwin(k.symbol), k); };
 
   /* Oferta i jej kartoteka — tą samą regułą, którą czyta je dobór. */
   const oferta = ofertaRozmowy(db(), conversationId);
@@ -302,6 +389,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       const karta = buildProductCard(subiekt, k.twId);
       if (karta) {
         kartotekaTwId = k.twId;
+        zapamietaj({ twId: k.twId, symbol: karta.sym, nazwa: karta.name });
         const numery = karta.identyfikatory.map((i) => i.wartosc).join(", ");
         dodaj("kartoteka", `Kartoteka oferty: ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
           + ` numery: ${numery || "brak"}; ${dostepnosc(karta.mag.avail, karta.unit)} (${k.zrodlo})`);
@@ -326,13 +414,20 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     dodaj("dobor", `Dane doboru wpisane przez agenta: ${[...pola.map(([k, v]) => `${k} ${v}`), ...parametry].join("; ")}`);
   }
   if (dobor.brakuje) dodaj("dobor", `Agent zaznaczył, czego brakuje do doboru: ${dobor.brakuje}`);
-  if (dobor.wybrany) dodaj("dobor", `Część wybrana przez agenta: ${dobor.wybrany.zdanieDoSzkicu}`);
+  if (dobor.wybrany) {
+    dodaj("dobor", `Część wybrana przez agenta: ${dobor.wybrany.zdanieDoSzkicu}`);
+    /* Wybrany bywa z wyszukiwarki, poza listą kandydatów — nazwa z kartoteki. */
+    const w = db().prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?").get(dobor.wybrany.twId) as { nazwa: string } | undefined;
+    zapamietaj({ twId: dobor.wybrany.twId, symbol: dobor.wybrany.symbol, nazwa: w?.nazwa ?? dobor.wybrany.symbol });
+  }
 
   const kand = kandydaciDoboru(conversationId, subiekt);
   for (const k of kand.kandydaci.slice(0, 6)) {
     dodaj("kandydat", `Kandydat ${k.symbol} — ${k.nazwa}; pewność: ${k.pewnosc}; ${k.zrodlo};`
       + ` ${dostepnosc(k.stan, null)}${k.ostrzezenia.length ? `; ostrzeżenia: ${k.ostrzezenia.join("; ")}` : ""}`);
+    if (k.twId !== null) zapamietaj({ twId: k.twId, symbol: k.symbol, nazwa: k.nazwa });
   }
+  for (const k of kand.kotwice) zapamietaj(k);
   for (const n of kand.negatywne) {
     dodaj("negatyw", `NIE PASUJE: ${n.symbol}${n.nazwa ? ` (${n.nazwa})` : ""} — ${n.powod}; ${n.zrodlo}`);
   }
@@ -342,11 +437,17 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   if (wiedza.zabudowa) dodaj("wiedza", `Silnik maszyny: ${wiedza.zabudowa.zdanieZrodla}`);
   for (const z of wiedza.silniki) dodaj("wiedza", `Silnik maszyny wg bazy: ${z.zdanieZrodla}`);
   for (const p of wiedza.pomiary) dodaj("wiedza", `Pomiar z hali „${p.tytul}": ${p.wynik}`);
-  if (wiedza.pasowanie) dodaj("pasowanie", `Wybrana część: ${wiedza.pasowanie.zdanie}`);
+  if (wiedza.pasowanie) {
+    dodaj("pasowanie", `Wybrana część: ${wiedza.pasowanie.zdanie}`);
+    zapamietaj(wiedza.pasowanie.czesc); zapamietaj(wiedza.pasowanie.doCzego);
+  }
 
   if (kartotekaTwId !== null) {
     const pas = pasowaniaTowaru(kartotekaTwId);
-    for (const t of [...pas.pasujace, ...pas.pasujeDo]) dodaj("pasowanie", t.zdanie);
+    for (const t of [...pas.pasujace, ...pas.pasujeDo]) {
+      dodaj("pasowanie", t.zdanie);
+      zapamietaj(t.czesc); zapamietaj(t.doCzego);
+    }
     for (const n of pas.negatywne) {
       dodaj("negatyw", `NIE PASUJE: ${n.czesc.symbol} do ${n.doCzego.symbol} — ${n.zdaniePowodu}; ${n.zdanieZrodla}`);
     }
@@ -371,6 +472,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
     doborWersja: dobor.wersja,
+    kartoteki,
   };
 }
 
@@ -431,21 +533,26 @@ export async function ulozSzkic(
   /* Dane z rozmowy: zmyślona wartość NIE odrzuca szkicu (szkic jest wart
      pieniędzy sam w sobie), tylko wypada z propozycji; liczbę notujemy. */
   const propozycja = oczyscPropozycje(odp.daneDoboru, String(k.watek));
+  /* Para z rozmowy tą samą regułą: wypada, szkic zostaje, powód do dziennika. */
+  const para = sprawdzPasowanie(odp.pasowanie, k.kartoteki, String(k.watek));
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       dane_doboru,dobor_wersja,pasowanie_propozycja)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
         dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
-        /* Nowa propozycja — stara ocena jej nie dotyczy; danych też. */
-        ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL`)
+        pasowanie_propozycja=excluded.pasowanie_propozycja,
+        /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
+        ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
+        pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
-        propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja);
+        propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
+        para.propozycja ? JSON.stringify(para.propozycja) : null);
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -453,6 +560,7 @@ export async function ulozSzkic(
       faktow: k.fakty.length, model: odp.model, tokeny: odp.zuzycie,
       polDoboru: propozycja.dane ? liczbaPol(propozycja.dane) : 0,
       polOdrzuconych: propozycja.odrzuconych,
+      pasowanie: para.propozycja ? 1 : 0, pasowanieOdrzucone: para.powod,
     }, kto.id, db());
     db().prepare("INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)")
       .run(conversationId, "copilot_szkic",
@@ -533,10 +641,64 @@ export function odrzucDaneDoboru(
   return szkicCopilota(conversationId)!;
 }
 
+/**
+ * Agent kliknął „Zaproponuj pasowanie" (przyrost czwarty). Para idzie do
+ * kolejki wiedzy drogą `zaproponujPasowanie` — ten sam wiersz, ten sam cykl
+ * i to samo rozstrzygnięcie biura, co przy „Pasuje do…" z Doboru. AUTOREM
+ * jest klikający: za wpis odpowiada człowiek (§14.2), a `zrodlo: copilot`
+ * niesie pochodzenie dla pomiaru i plakietki w kolejce. Dowód `rozmowa`
+ * daje pewność „prawdopodobne" — jak przy każdej parze z rozmowy.
+ *
+ * DUBEL NIE JEST BŁĘDEM: gdy ktoś zdążył wpisać tę parę ręcznie, ocena
+ * i tak brzmi `zaproponowane`, tylko dziennik dostaje `dubel: true`. 409
+ * znaczy w tym kodzie „wyścig — odśwież i kliknij ponownie", a tu drugie
+ * kliknięcie dawałoby 409 na zawsze i karta wisiałaby bez wyjścia. Para
+ * w kolejce to skutek, którego agent chciał.
+ */
+export function przyjmijPasowanie(
+  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
+): SzkicCopilota {
+  const s = szkicCopilota(conversationId);
+  if (!s || !s.pasowanie) throw new Error("Ta rozmowa nie ma propozycji pasowania");
+  if (s.pasowanieOcena !== null) throw new Error("Propozycja pasowania została już oceniona");
+  const p = s.pasowanie;
+  /* Jedna transakcja przez `wTransakcji`: `zaproponujPasowanie` sam ją
+     otwiera, a `node:sqlite` nie zagnieżdża BEGIN (blizna z tokenów 0.239.0). */
+  wTransakcji(db(), () => {
+    const z = zaproponujPasowanie({
+      twId: p.czesc.twId, doTwId: p.doCzego.twId, rola: p.rola, pozycja: p.pozycja,
+      polaryzacja: "pasuje", rodzajDowodu: "rozmowa",
+      dowodTresc: `Copilot rozpoznał w rozmowie #${conversationId}: ${p.czesc.symbol} pasuje do ${p.doCzego.symbol}`
+        + (p.pozycja ? ` (${p.pozycja})` : ""),
+      zrodlo: "copilot", conversationId,
+    }, { userId: kto.id, name: kto.name });
+    db().prepare("UPDATE szkic_copilota SET pasowanie_ocena='zaproponowane', pasowanie_ocena_at=? WHERE conversation_id=?")
+      .run(teraz.toISOString(), conversationId);
+    logEvent("copilot_pasowanie", kto.name, p.czesc.twId,
+      { conversationId, ocena: "zaproponowane", pasowanieId: z?.id ?? null, dubel: z === null }, kto.id, db());
+  });
+  return szkicCopilota(conversationId)!;
+}
+
+/** Agent odesłał parę. Wiersz zostaje dla pomiaru. */
+export function odrzucPasowanie(
+  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
+): SzkicCopilota {
+  const s = szkicCopilota(conversationId);
+  if (!s || !s.pasowanie) throw new Error("Ta rozmowa nie ma propozycji pasowania");
+  if (s.pasowanieOcena !== null) throw new Error("Propozycja pasowania została już oceniona");
+  transaction(db(), () => {
+    db().prepare("UPDATE szkic_copilota SET pasowanie_ocena='odrzucone', pasowanie_ocena_at=? WHERE conversation_id=?")
+      .run(teraz.toISOString(), conversationId);
+    logEvent("copilot_pasowanie", kto.name, null, { conversationId, ocena: "odrzucone" }, kto.id, db());
+  })();
+  return szkicCopilota(conversationId)!;
+}
+
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
-      dane_doboru, dane_ocena, dobor_wersja
+      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -549,6 +711,9 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     daneDoboru: w.dane_doboru == null ? null : JSON.parse(String(w.dane_doboru)) as DaneDoboru,
     daneOcena: w.dane_ocena == null ? null : String(w.dane_ocena) as OcenaDanych,
     doborWersja: Number(w.dobor_wersja ?? 0),
+    pasowanie: w.pasowanie_propozycja == null
+      ? null : JSON.parse(String(w.pasowanie_propozycja)) as PropozycjaPasowaniaCopilota,
+    pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
   };
 }
 

@@ -344,7 +344,17 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   dane_ocena_at   TEXT,
   -- Wersja `dobor_rozmowy` w chwili szkicu: zmiana danych doboru po szkicu
   -- czyni go nieświeżym tak samo jak dopisek klienta.
-  dobor_wersja    INTEGER NOT NULL DEFAULT 0
+  dobor_wersja    INTEGER NOT NULL DEFAULT 0,
+  -- PASOWANIE ROZPOZNANE W ROZMOWIE (etap F, przyrost czwarty). JSON
+  -- {czesc:{twId,symbol,nazwa}, doCzego:{…}, rola, pozycja}; OBA końce to
+  -- kartoteki z kontekstu tej rozmowy, sprawdzone przez serwer. NULL = model
+  -- niczego nie nazwał albo nic nie przeszło. Przy szkicu, nie w
+  -- `pasowanie_czesci`: tam trafia dopiero to, co agent kliknął — biuro
+  -- rozstrzyga w kolejce Wiedza. Los osobno od losu szkicu i danych, bo
+  -- każdy z nich bywa inny.
+  pasowanie_propozycja TEXT,
+  pasowanie_ocena      TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone')),
+  pasowanie_ocena_at   TEXT
 );
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────

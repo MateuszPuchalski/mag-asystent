@@ -8,14 +8,14 @@ import { Konflikt } from "../api/klient";
 import {
   useKandydaci, useStatusDoboru, useWiedzaDoboru, useWybierzKandydata, useZapiszDaneDoboru,
 } from "../api/rozmowy";
-import { useOcenDaneDoboru } from "../api/copilot";
+import { useOcenDaneDoboru, useOcenPasowanie } from "../api/copilot";
 import { propozycjaDoboru } from "./propozycjaDoboru";
 import { Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PasowanieForm } from "../wiedza/PasowanieForm";
 import { useZaproponujPasowanie, useZaproponujZabudowe } from "../api/wiedza";
-import { DO_WYBORU_DOBORU, NAZWA_DOBORU } from "./statusy";
+import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_ROLI } from "./statusy";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1) — trzecia zakładka kolumny
@@ -99,6 +99,12 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
   const zapisz = useZapiszDaneDoboru();
   const ocenDane = useOcenDaneDoboru();
   const zRozmowy = propozycjaDoboru(propozycja, dobor.dane);
+  /* Para z rozmowy (przyrost czwarty): karta stoi, dopóki agent nie kliknie;
+     po „Zaproponuj" zdanie bierze się Z DANYCH (`pasowanieOcena`), więc
+     przeżywa odświeżenie — w odróżnieniu od lokalnego `pasowanieOk` niżej. */
+  const ocenPasowanie = useOcenPasowanie();
+  const para = propozycja?.pasowanie ?? null;
+  const paraOcena = propozycja?.pasowanieOcena ?? null;
   const status = useStatusDoboru();
   const wybierz = useWybierzKandydata();
   /* Ten sam odczyt, z którego zakładka WIEDZA bierze dowody — tu potrzebne są
@@ -141,7 +147,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
      model silnika z zatwierdzonej zabudowy — nigdy tekst z pola „Silnik". */
   const [doSilnika, setDoSilnika] = useState<number | null>(null);
 
-  const blad = [zapisz.error, status.error, wybierz.error, ocenDane.error]
+  const blad = [zapisz.error, status.error, wybierz.error, ocenDane.error, ocenPasowanie.error]
     .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
 
   /* Konflikt przy propozycji to ten sam wyścig, co przy formularzu: ktoś zapisał
@@ -254,6 +260,45 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
         <p className="mt-1 text-[11px] text-slate-500">Wartości dosłownie z rozmowy klienta — sprawdzone przez serwer, wpisane dopiero po kliknięciu.</p>
         {konflikt && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
           <AlertTriangle size={13} />{konflikt}</p>}
+      </section>}
+
+      {/* PASOWANIE Z ROZMOWY (etap F, przyrost czwarty). Model nazwał parę
+          SYMBOLAMI z faktów, serwer sprawdził oba końce po kartotekach, które
+          sam położył na stole — tu agent tylko klika. „Zaproponuj" kładzie parę
+          w kolejce wiedzy ze źródłem copilot i JEGO podpisem; rozstrzyga biuro.
+          Zła rola albo pozycja → „Odrzuć" i formularz „Pasuje do…" obok,
+          bo poprawianie propozycji modelu w miejscu byłoby drugim formularzem. */}
+      {!edycja && para && paraOcena !== "odrzucone" && <section aria-label="Pasowanie z rozmowy"
+        className="mb-2 rounded-lg border border-violet-200 bg-violet-50 p-2">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
+          <b className="text-violet-900"><Sparkles size={12} className="inline" /> Copilot rozpoznał pasowanie</b>
+          {paraOcena === null && <span className="ml-auto flex flex-wrap items-center gap-2">
+            <Przycisk wariant="glowny" className="text-xs" disabled={ocenPasowanie.isPending}
+              onClick={() => ocenPasowanie.mutate({ rozmowaId, ocena: "zaproponowane" })}>Zaproponuj pasowanie</Przycisk>
+            <Przycisk className="text-xs" disabled={ocenPasowanie.isPending}
+              onClick={() => ocenPasowanie.mutate({ rozmowaId, ocena: "odrzucone" })}>Odrzuć</Przycisk>
+          </span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <Kafel twId={para.czesc.twId} rozmiar={40} nazwa={para.czesc.nazwa} symbol={para.czesc.symbol} />
+          <div className="min-w-0 flex-1 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <b className="font-mono">{para.czesc.symbol}</b>
+              <span className="text-slate-400">→</span>
+              <b className="font-mono">{para.doCzego.symbol}</b>
+              <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-[11px]">
+                {NAZWA_ROLI[para.rola]}{para.pozycja ? ` · ${para.pozycja}` : ""}</span>
+            </div>
+            <p className="truncate text-slate-600">{para.czesc.nazwa} → {para.doCzego.nazwa}</p>
+          </div>
+          <Kafel twId={para.doCzego.twId} rozmiar={40} nazwa={para.doCzego.nazwa} symbol={para.doCzego.symbol} />
+        </div>
+        {paraOcena === "zaproponowane"
+          ? <p className="mt-1 text-[11px] text-emerald-800">
+              Propozycja „{para.czesc.symbol} pasuje do {para.doCzego.symbol}” czeka w kolejce wiedzy — rozstrzyga biuro.</p>
+          : <p className="mt-1 text-[11px] text-slate-500">
+              Oba końce to kartoteki z tej rozmowy, sprawdzone przez serwer; do kolejki trafia po kliknięciu,
+              rozstrzyga biuro. Zła rola albo pozycja: Odrzuć i użyj „Pasuje do…” przy wybranym kandydacie.</p>}
       </section>}
 
       {!edycja && (wypelnione.length === 0 && Object.keys(dobor.dane.parametry).length === 0

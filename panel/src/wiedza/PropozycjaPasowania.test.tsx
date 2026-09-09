@@ -43,6 +43,15 @@ describe("PropozycjaPasowania", () => {
     expect(screen.getAllByRole("img").length).toBe(2);
   });
 
+  it("parę z Copilota znaczy pastylka; parę z ręki i z doboru nie", () => {
+    const { unmount } = render(<MemoryRouter><PropozycjaPasowania trwa={false} onDecyzja={vi.fn()}
+      p={{ ...P, zrodlo: "copilot", dowodTresc: "Copilot rozpoznał w rozmowie #4821: LC170430140-0001 pasuje do W09-0211" }} /></MemoryRouter>);
+    expect(screen.getByText("z Copilota")).toBeInTheDocument();
+    unmount();
+    pokaz();
+    expect(screen.queryByText("z Copilota")).toBeNull();
+  });
+
   it("zatwierdzenie idzie bez powodu, odrzucenie — dopiero z powodem", async () => {
     const onDecyzja = pokaz();
     await userEvent.click(screen.getByRole("button", { name: "Zatwierdź" }));

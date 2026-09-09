@@ -11,6 +11,7 @@ import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import { ROLE_PASOWANIA } from "../services/pasowania.js";
 import { LIMIT_ZNAKOW } from "../services/wysylka.js";
 
 /* ── Wyjście do Anthropic (etap F) ───────────────────────────────────────────
@@ -156,11 +157,24 @@ const DaneZRozmowy = z.object({
   parametry: z.array(z.object({ nazwa: z.string(), wartosc: z.string() })),
 });
 
+/* Pasowanie rozpoznane w rozmowie (przyrost czwarty): SYMBOLE z faktów, nie
+   identyfikatory. Rola z listy serwisu — jedna lista, bez trzeciej kopii.
+   Obiekt `nullable`, bo wyjście strukturalne wymaga wszystkich kluczy, a brak
+   pary jest normą, nie wyjątkiem. Serwis sprawdza oba końce przeciw
+   kartotekom, które sam położył na stole. */
+const PasowanieZRozmowy = z.object({
+  czesc: z.string(),
+  doCzego: z.string(),
+  rola: z.enum(ROLE_PASOWANIA),
+  pozycja: z.string().nullable(),
+}).nullable();
+
 const Szkic = z.object({
   tresc: z.string(),
   uzyteFakty: z.array(z.string()),
   zastrzezenia: z.array(z.string()),
   daneDoboru: DaneZRozmowy,
+  pasowanie: PasowanieZRozmowy,
 });
 
 /* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
@@ -209,6 +223,16 @@ const INSTRUKCJA_SZKICU = [
   "   ma. Pola, których rozmowa nie podaje, zostaw puste (null, pusta lista).",
   "   Nie pytaj klienta o to, co wpisałeś do `daneDoboru`, i nie pisz mu, że",
   "   agent ma coś wpisać — to robi system.",
+  "3b. Gdy z ROZMOWY wynika, że jedna część z FAKTÓW PASUJE do drugiej części",
+  "   z FAKTÓW (uszczelka, membrana, zestaw naprawczy, łącznik albo element",
+  "   zestawu do gaźnika lub kolektora) i fakty nie mówią jeszcze o tym",
+  "   pasowaniu, wpisz je do `pasowanie`: `czesc` = symbol części, która",
+  "   pasuje, `doCzego` = symbol tego, do czego pasuje — OBA DOSŁOWNIE z faktów",
+  "   (kartoteka oferty, kandydaci, pasowania). `rola` z listy, `pozycja` tylko",
+  "   słowami klienta (np. „od strony filtra”) albo null. Tylko „pasuje” —",
+  "   „nie pasuje” zostaw w `zastrzezenia`. Symbol spoza faktów system wyrzuca.",
+  "   Gdy nic takiego nie wynika, `pasowanie` = null. Nie wnioskuj pasowania",
+  "   z pamięci i nie pisz klientowi, że coś zapisujemy — propozycję składa agent.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
   "   sprawdzenie (tabliczka, zdjęcie starej części). Fakt „NIE PASUJE” to",
   "   ostrzeżenie — powiedz je klientowi wprost.",
@@ -224,7 +248,8 @@ const INSTRUKCJA_SZKICU = [
   `o firmie. Najwyżej ${LIMIT_ZNAKOW - 200} znaków. Jedno twierdzenie na zdanie.`,
   "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
   "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło),",
-  "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a).",
+  "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a), `pasowanie` (para",
+  "kartotek z faktów wg reguły 3b albo null).",
 ].join("\n");
 
 /** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
@@ -261,6 +286,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
     return {
       tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
       daneDoboru: { ...w.daneDoboru, parametry },
+      pasowanie: w.pasowanie,
       model: odp.model ?? config.copilot.model,
       zuzycie: {
         wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,

@@ -844,7 +844,9 @@ i parametry z treści rozmowy — przy tym samym wywołaniu, które układa szki
 Serwer sprawdza każdą wartość przeciw rozmowie. Zakładka Dobór pokazuje je
 kartą „Copilot rozpoznał w rozmowie", a „Wpisz do danych" zapisuje je jednym
 kliknięciem w PUSTE pola. Słowo agenta zostaje; różnicę karta tylko nazywa.
-Zdjęcia i OCR czekają.
+Od przyrostu czwartego (§14.8) Copilot rozpoznaje też parę część→część
+i agent proponuje ją jednym kliknięciem do kolejki wiedzy. Zdjęcia i OCR
+czekają.
 
 ### 11.2. Kandydaci
 
@@ -1141,8 +1143,11 @@ kandydacie w Doborze, gdy kotwica jest inna niż wybrany (§11.2); propozycja
 niesie rozmowę i dowód `rozmowa`. Z ręki: Wiedza → Sprawdź kartotekę →
 „Dopisz pasowanie", z radiem kierunku i dowodem technicznym. Propozycje
 czekają w kolejce Wiedza jako druga sekcja „Pasowania części" — ta sama
-decyzja tego samego człowieka, nie szósta zakładka. Źródła `opis` i `copilot`
-stoją w `CHECK` bez nadawcy, precedensem `zastosowanie`.
+decyzja tego samego człowieka, nie szósta zakładka. Z Copilota (§14.8): model
+nazywa parę symbolami z faktów, serwer sprawdza oba końce po kartotekach
+z kontekstu, agent klika „Zaproponuj pasowanie"; źródło `copilot`, podpis
+agenta, pastylka w kolejce. Źródło `opis` stoi w `CHECK` bez nadawcy,
+precedensem `zastosowanie`.
 
 **Historia wersji** bez `KnowledgeRevision`: poprawka to nowy wiersz
 z `zastepuje_id`, a stary schodzi na `wycofane` przy zatwierdzeniu nowego.
@@ -1397,6 +1402,46 @@ przycisku, bo dane wpisuje się tam, gdzie stoją. Zmiana danych doboru po
 szkicu czyni go nieświeżym tak samo jak dopisek klienta: pastylka mówi
 „ułóż ponownie", bo fakty są inne.
 
+### 14.8. Co działa: Copilot proponuje pasowania (etap F, przyrost czwarty)
+
+Zapowiedź z 0.230.0 („Copilot proponujący pasowania czeka"). Od 0.230.0
+pasowanie część↔część ma tabelę, kolejkę i przycisk „Pasuje do…" w Doborze,
+ale rodziło się wyłącznie z ręki agenta. Klient mówi wprost: „mam gaźnik
+W09-0211, potrzebuję uszczelki od strony filtra". Model to czytał, a wiedza
+przepadała, bo nikt nie klikał formularza.
+
+**Trzy decyzje właściciela.** Agent proponuje jednym kliknięciem — wzór
+danych doboru z §14.7: model oddaje, serwer sprawdza, człowiek klika. Oba
+końce pary muszą być kartotekami z FAKTÓW tej rozmowy: kartoteka oferty,
+kandydaci, kotwice z wpisanych symboli, strony cytowanych pasowań. Tylko
+polaryzacja „pasuje" — negatyw wymaga powodu z listy zamkniętej, a model nie
+ma go skąd wziąć.
+
+**Model nazywa, serwer sprawdza po faktach.** Model wpisuje do `pasowanie`
+oba SYMBOLE dosłownie z faktów, rolę z listy i pozycję słowami klienta.
+Serwer trzyma BIAŁĄ LISTĘ kartotek, które sam położył na stole, i dopasowuje
+symbole po `zwin()`. Symbol spoza listy, ta sama kartoteka po obu stronach,
+rola spoza listy albo para już żywa w bazie — w dowolnej polaryzacji —
+wypada z propozycją, a powód idzie do dziennika jako etykieta. Pozycja
+zostaje tylko, gdy stoi w rozmowie: fakt intake wymienia „od strony filtra",
+więc model mógłby przepisać ją z faktu. Szkic zostaje w każdym z tych
+przypadków. Żadnego szukania symbolu w treści wiadomości (blizna szarpaka).
+
+**Agent klika, biuro rozstrzyga.** Karta „Copilot rozpoznał pasowanie"
+w zakładce Dobór pokazuje oba końce z kaflami, rolę i pozycję. „Zaproponuj
+pasowanie" kładzie parę w kolejce Wiedza drogą `zaproponujPasowanie`, ze
+źródłem `copilot`, dowodem `rozmowa` i PODPISEM AGENTA — za wpis odpowiada
+człowiek (§14.2), a źródło niesie pochodzenie dla pomiaru i pastylki
+„z Copilota" w kolejce. Pewność „prawdopodobne", jak przy każdej parze
+z rozmowy. Dubel nie jest błędem: para wpisana ręcznie między szkicem
+a kliknięciem daje ocenę `zaproponowane` bez drugiego wiersza. Zła rola
+albo pozycja to „Odrzuć" i formularz „Pasuje do…" obok. Karta szkicu
+w edytorze tylko mówi o parze, bez drugiego przycisku.
+
+**Los propozycji jest miarą.** Pomiar liczy pary rozpoznane, zaproponowane
+i odrzucone osobno od losu szkicu i danych. Właściwa miara jakości stoi
+obok: ile par ze źródłem `copilot` biuro ZATWIERDZIŁO.
+
 ## 15. Model danych
 
 Tabele docelowe, nazwami z kodu:
@@ -1629,8 +1674,9 @@ pozytywne i negatywne zastosowania, dowody.
 **F — Copilot:** klasyfikacja, ekstrakcja, OCR, brakujące dane, kandydaci,
 porównanie, szkic z dowodami. Przyrost pierwszy — klasyfikacja wiadomości —
 stoi (§14.5). Przyrost drugi — szkic z dowodami — stoi od 0.231.0 (§14.6).
-Przyrost trzeci — dane doboru z rozmowy — stoi (§14.7). OCR, kandydaci
-i porównanie czekają.
+Przyrost trzeci — dane doboru z rozmowy — stoi (§14.7). Przyrost czwarty —
+Copilot proponuje pasowania — stoi (§14.8). OCR, kandydaci i porównanie
+czekają.
 
 **G — automatyzacje:** priorytety, routing, terminy, odłożenie, sugestie
 poprawy ofert, analiza powodów kontaktu, kolejne kanały.
@@ -2734,6 +2780,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; numery spoza faktów odrzuca kod |
+| Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |
 | Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu, kolumny `dane_doboru`/`dane_ocena` w `szkic_copilota`, karta „Copilot rozpoznał w rozmowie" w `skrzynka/Dobor.tsx`; wpisuje agent, tylko w puste pola |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |

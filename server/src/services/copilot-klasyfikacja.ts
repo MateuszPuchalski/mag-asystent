@@ -318,6 +318,12 @@ export interface PomiarCopilota {
   szkice: {
     ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
     daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
+    /**
+     * Pasowania z rozmowy (przyrost czwarty): ile model nazwał, co agent
+     * kliknął i — właściwa miara jakości — ile z nich biuro ZATWIERDZIŁO.
+     */
+    pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
+    pasowaniaZatwierdzonePrzezBiuro: number;
   };
 }
 
@@ -386,8 +392,13 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych,
       SUM(CASE WHEN dane_doboru IS NOT NULL THEN 1 ELSE 0 END) AS daneZaproponowane,
       SUM(CASE WHEN dane_ocena='wpisane' THEN 1 ELSE 0 END) AS daneWpisane,
-      SUM(CASE WHEN dane_ocena='odrzucone' THEN 1 ELSE 0 END) AS daneOdrzucone
+      SUM(CASE WHEN dane_ocena='odrzucone' THEN 1 ELSE 0 END) AS daneOdrzucone,
+      SUM(CASE WHEN pasowanie_propozycja IS NOT NULL THEN 1 ELSE 0 END) AS pasowaniaRozpoznane,
+      SUM(CASE WHEN pasowanie_ocena='zaproponowane' THEN 1 ELSE 0 END) AS pasowaniaZaproponowane,
+      SUM(CASE WHEN pasowanie_ocena='odrzucone' THEN 1 ELSE 0 END) AS pasowaniaOdrzucone
     FROM szkic_copilota`).get() as Record<string, number>;
+  const zatw = database.prepare(`SELECT COUNT(*) AS n FROM pasowanie_czesci
+    WHERE zrodlo_propozycji='copilot' AND stan='zatwierdzone'`).get() as { n: number };
 
   const wejscieRazem = tokeny.wej + tokeny.cacheOdczyt;
   return {
@@ -407,6 +418,10 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       zastapionych: Number(sz.zastapionych ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
       daneZaproponowane: Number(sz.daneZaproponowane ?? 0),
       daneWpisane: Number(sz.daneWpisane ?? 0), daneOdrzucone: Number(sz.daneOdrzucone ?? 0),
+      pasowaniaRozpoznane: Number(sz.pasowaniaRozpoznane ?? 0),
+      pasowaniaZaproponowane: Number(sz.pasowaniaZaproponowane ?? 0),
+      pasowaniaOdrzucone: Number(sz.pasowaniaOdrzucone ?? 0),
+      pasowaniaZatwierdzonePrzezBiuro: Number(zatw.n ?? 0),
     },
   };
 }

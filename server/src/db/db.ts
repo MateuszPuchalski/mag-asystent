@@ -187,6 +187,12 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK (dane_ocena IS NULL OR dane_ocena IN ('wpisane','odrzucone'))");
   addColumn("szkic_copilota", "dane_ocena_at", "TEXT");
   addColumn("szkic_copilota", "dobor_wersja", "INTEGER NOT NULL DEFAULT 0");
+  /* Pasowanie rozpoznane w rozmowie (etap F, przyrost czwarty) — te same
+     powody co wyżej: tabela stoi na produkcji, stare szkice mają NULL. */
+  addColumn("szkic_copilota", "pasowanie_propozycja", "TEXT");
+  addColumn("szkic_copilota", "pasowanie_ocena",
+    "TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone'))");
+  addColumn("szkic_copilota", "pasowanie_ocena_at", "TEXT");
   /* Status zwrotu po stronie Allegro (0.164.0). Bez `CHECK` — schemat Allegro
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */

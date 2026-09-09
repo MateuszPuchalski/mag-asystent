@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  OcenaDanych, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii,
+  OcenaDanych, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii,
 } from "./typy";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
@@ -131,6 +131,28 @@ export function useOcenDaneDoboru() {
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
       qc.invalidateQueries({ queryKey: klucze.kandydaci(v.rozmowaId) });
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+    },
+  });
+}
+
+/**
+ * Los pasowania rozpoznanego w rozmowie (przyrost czwarty): `zaproponowane`
+ * kładzie parę w kolejce wiedzy jako propozycję ze źródłem `copilot`,
+ * `odrzucone` odsyła. Unieważnia rozmowę (propozycja jedzie w `osRozmowy`),
+ * pomiar i KOLEJKĘ WIEDZY — para właśnie tam wylądowała — oraz kartoteki,
+ * bo blok towaru w rozmowie pokazuje, co czeka.
+ */
+export function useOcenPasowanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; ocena: OcenaPasowania }) =>
+      api<{ szkic: SzkicCopilota }>(`/api/obsluga/copilot/szkic/${v.rozmowaId}/pasowanie`,
+        { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+      qc.invalidateQueries({ queryKey: ["wiedza", "kolejka"] });
+      qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
     },
   });
 }

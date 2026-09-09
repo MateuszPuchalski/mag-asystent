@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import type { Pasowanie } from "../api/typy";
 import { Pole, Przycisk, czas } from "../ui";
 import { Kafel } from "../towar/Kafel";
@@ -26,6 +27,11 @@ export function PropozycjaPasowania({ p, trwa, onDecyzja }: {
           <span className="text-slate-400">{negatyw ? "⇏" : "→"}</span>
           <b className="font-mono">{p.doCzego.symbol}</b>
           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{p.nazwaRoli}{p.pozycja ? ` · ${p.pozycja}` : ""}</span>
+          {/* Tylko dla `copilot` (przyrost czwarty): `reczne` i `dobor` to para
+              wpisana przez człowieka. Tu parę nazwał model, agent ją tylko
+              potwierdził — rozstrzygający ma czytać dowód uważniej. */}
+          {p.zrodlo === "copilot" && <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-800">
+            <Sparkles size={11} className="inline" /> z Copilota</span>}
           <span className="ml-auto text-xs text-slate-500">{p.zaproponowal} · {czas(p.zaproponowanoAt)}</span>
         </div>
         <p className="text-xs text-slate-600">{p.czesc.nazwa} → {p.doCzego.nazwa}</p>

@@ -110,6 +110,9 @@ export type PomiarCopilota = {
     ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
     /** Los danych doboru z rozmowy — osobno od losu szkicu. */
     daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
+    /** Pasowania z rozmowy (przyrost czwarty); ostatnia liczba to właściwa miara jakości. */
+    pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
+    pasowaniaZatwierdzonePrzezBiuro: number;
   };
 };
 
@@ -280,8 +283,19 @@ export type SzkicCopilota = {
   daneOcena: OcenaDanych | null;
   /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
   doborWersja: number;
+  /**
+   * Pasowanie rozpoznane w rozmowie (przyrost czwarty): oba końce to kartoteki
+   * z kontekstu tej rozmowy, sprawdzone przez serwer. `null` = nic. To
+   * PROPOZYCJA: do kolejki wiedzy wchodzi na kliknięcie agenta, rozstrzyga biuro.
+   */
+  pasowanie: PropozycjaPasowaniaCopilota | null;
+  pasowanieOcena: OcenaPasowania | null;
 };
 export type OcenaDanych = "wpisane" | "odrzucone";
+export type OcenaPasowania = "zaproponowane" | "odrzucone";
+export type PropozycjaPasowaniaCopilota = {
+  czesc: KartotekaPasowania; doCzego: KartotekaPasowania; rola: RolaPasowania; pozycja: string | null;
+};
 
 /* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
    Lista statusów ZAMKNIĘTA, wprost z §7 — trzecia kopia obok `STATUSY_DOBORU`
