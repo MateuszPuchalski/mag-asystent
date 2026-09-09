@@ -109,14 +109,23 @@ export function Rozmowa(p: {
         ~700 px nagłówki zawijają się na dwie linie, a `Os` jest jedynym
         blokiem z bazą 0 — bez tych klauzul kurczyłaby się treść rozmowy,
         czyli jedyna rzecz, po którą agent tu przyszedł. */}
-    <header className="flex shrink-0 flex-wrap items-center gap-3 border-b p-4">
-      <LoginKlienta login={rozmowa.klient} className="mr-auto font-bold" />
-      {rozmowa.wlasciciel
-        ? <span className={`flex items-center gap-1 text-sm font-semibold ${
-            moja ? "text-emerald-700" : "text-slate-600"}`}>
-            <UserCheck size={15} />{moja ? "Twoja rozmowa" : `Prowadzi ${rozmowa.wlasciciel}`}</span>
-        : <Przycisk wariant="glowny" onClick={p.onPrzejmij}>
-            <UserCheck size={16} />PRZEJMIJ ROZMOWĘ</Przycisk>}
+    {/* ── HIERARCHIĘ ROBIĄ TRZY NARZĘDZIA NARAZ (0.247.0) ─────────────────────
+        Login, „Twoja rozmowa", ocena kategorii i status stały w jednym rzędzie
+        w tym samym stopniu pisma i niemal tej samej wadze — cztery rzeczy
+        walczyły o pierwsze spojrzenie, choć tylko jedna jest tematem ekranu.
+
+        Login rośnie i ciemnieje, kto prowadzi — schodzi do drugiego wiersza
+        w 12 px. Skala urosła z dwóch stopni do czterech, a rozmiar, waga
+        i barwa mówią teraz to samo, zamiast każde co innego.
+
+        PRZEJĘCIE ZOSTAJE W PIERWSZYM RZĘDZIE i zostaje przyciskiem: przy
+        rozmowie niczyjej to jest działanie główne ekranu, nie metadana. */}
+    <header className="shrink-0 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <LoginKlienta login={rozmowa.klient}
+          className="mr-auto text-[19px] font-bold tracking-tight text-wertis-ink" />
+        {!rozmowa.wlasciciel && <Przycisk wariant="glowny" onClick={p.onPrzejmij}>
+          <UserCheck size={16} />PRZEJMIJ ROZMOWĘ</Przycisk>}
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
@@ -126,9 +135,20 @@ export function Rozmowa(p: {
           czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
       {rozmowa.kopilot && <OcenaKategorii kopilot={rozmowa.kopilot}
         zapisuje={p.ocenia} onOcen={p.onOcenKategorie ?? (() => {})} />}
-      <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
-        onZmien={p.onZmienStatus}
-        onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />
+        <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
+          onZmien={p.onZmienStatus}
+          onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />
+      </div>
+
+      {/* Drugi wiersz niesie METADANE: kto prowadzi i skąd przyszła rozmowa.
+          Oba są prawdziwe przez cały czas trwania sprawy, więc żadne nie ma
+          prawa konkurować z pytaniem klienta o uwagę. */}
+      {rozmowa.wlasciciel && <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span className={`flex items-center gap-1 font-semibold ${
+          moja ? "text-ranga-ok" : "text-slate-600"}`}>
+          <UserCheck size={13} />{moja ? "Twoja rozmowa" : `Prowadzi ${rozmowa.wlasciciel}`}</span>
+        <span className="text-slate-300">·</span><span>Allegro</span>
+      </div>}
     </header>
 
     {/* Obecność IDZIE PRZED sprawą: „ktoś tu już siedzi" zmienia decyzję

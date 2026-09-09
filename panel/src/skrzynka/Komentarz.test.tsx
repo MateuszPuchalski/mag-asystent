@@ -29,17 +29,17 @@ const edytor = (n: Partial<typeof props> = {}) => render(<Edytor {...props} {...
 describe("Edytor — tryb komentarza wewnętrznego", () => {
   it("domyślnie jest trybem odpowiedzi do klienta", () => {
     edytor({ szkic: "Dzień dobry" });
-    expect(screen.getByRole("button", { name: /WYŚLIJ DO KLIENTA/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /DODAJ KOMENTARZ/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Dodaj komentarz/ })).toBeNull();
   });
 
   it("w trybie komentarza przycisku wysyłki NIE MA — nie da się go kliknąć", async () => {
     edytor({ szkic: "Dzień dobry" });
     await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
 
-    expect(screen.queryByRole("button", { name: /WYŚLIJ DO KLIENTA/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /ZAPISZ SZKIC/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /DODAJ KOMENTARZ/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Wyślij do klienta/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Zapisz szkic/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeInTheDocument();
   });
 
   it("komentarz ma WŁASNE pole — przełączenie trybu nie przenosi tekstu do szkicu", async () => {
@@ -71,7 +71,7 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
   it("pusty komentarz nie wychodzi", async () => {
     edytor({ komentarz: "   " });
     await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
-    expect(screen.getByRole("button", { name: /DODAJ KOMENTARZ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeDisabled();
   });
 
   it("cudza rozmowa nie blokuje komentowania — blokuje tylko odpowiedź", async () => {
@@ -79,7 +79,7 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
        „to ten sam klient co wczoraj" bez przejmowania rozmowy. */
     edytor({ cudza: true, wlasciciel: "Ala", komentarz: "Uwaga" });
     await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
-    expect(screen.getByRole("button", { name: /DODAJ KOMENTARZ/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeEnabled();
   });
 });
 

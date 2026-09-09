@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Layers, Link2, Unlink } from "lucide-react";
+import { Layers, Unlink } from "lucide-react";
 import type { SprawaRozmowy, WierszSprawy } from "../api/typy";
 import { Przycisk } from "../ui";
 
@@ -48,11 +48,20 @@ export function Sprawa({ sprawa, rozmowaId, sprawy, trwa, blad, onZaloz, onDolac
     </div>;
   }
 
-  return <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 text-sm">
-    <Layers size={15} className="text-slate-400" />
-    <span className="text-slate-500">Rozmowa nie należy do żadnej sprawy</span>
-    <Przycisk className="ml-auto text-xs" onClick={() => setOtwarte((o) => !o)}>
-      <Link2 size={14} />PRZYPISZ DO SPRAWY</Przycisk>
+  /* ── ETYKIETA TO OSTATECZNOŚĆ (0.247.0) ────────────────────────────────────
+     Ten wiersz zajmował pełną wysokość pasa z obramowanym przyciskiem po to,
+     żeby powiedzieć, czego NIE MA. Brak sprawy jest stanem domyślnym: klamrę
+     zakłada się przy co którejś rozmowie, więc ekran informował o normie.
+
+     Zdanie schodzi do dwóch słów, przycisk do odnośnika, kreska znika —
+     zostaje pas 24 px zamiast 37 px, a odzyskana wysokość idzie do rozmowy.
+     Formularz po rozwinięciu zostaje bez zmian: tam decyzja już zapadła
+     i wtedy pełne pole z przyciskiem jest właściwą wagą. */
+  return <div className="flex flex-wrap items-center gap-2 px-4 py-1 text-xs text-slate-500">
+    <Layers size={13} className="text-slate-400" />
+    <span>bez sprawy</span>
+    <button type="button" className="font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900"
+      onClick={() => setOtwarte((o) => !o)}>przypisz do sprawy</button>
 
     {otwarte && <div className="w-full space-y-2 rounded-lg bg-slate-50 p-3">
       <div className="flex flex-wrap items-end gap-2">

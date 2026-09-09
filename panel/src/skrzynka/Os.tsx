@@ -218,9 +218,16 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
          Stałe `mr-10`/`ml-10` zostawiały na szerokim ekranie jeden martwy
          pas z jednej strony i nie mówiły nic — teraz strona sama mówi, kto
          mówi, zanim agent przeczyta podpis. */
-      : <article key={w.id} className={`max-w-[75ch] rounded-lg border p-3 ${w.odKlienta
-          ? "mr-auto border-os-klient-ramka bg-os-klient"
-          : "ml-auto border-os-firma-ramka bg-os-firma"}`}>
+      /* ── PODKREŚLAJ PRZEZ WYGASZANIE (0.247.0) ────────────────────────────
+         Pytanie klienta i nasza odpowiedź różniły się tłem #ffffff kontra
+         #f8fafc przy identycznej obwódce — różnica na granicy widoczności,
+         choć to rozróżnienie jest jedynym powodem, dla którego oś ma dwie
+         strony. Zamiast rozjaśniać pytanie (nie ma dokąd: jest już białe),
+         cofamy odpowiedź: nasza traci obwódkę i cień, a jej tekst schodzi
+         na szarość. Pytanie zostaje jedyną kartą z cieniem na ekranie. */
+      : <article key={w.id} className={`max-w-[75ch] rounded-lg p-3 ${w.odKlienta
+          ? "mr-auto border border-slate-300 bg-os-klient shadow-sm"
+          : "ml-auto bg-os-firma"}`}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {/* ── LOGIN STOI W MIEJSCU SŁOWA „KLIENT" (0.219.2) ────────────
                 Do 0.219.1 podpis brzmiał „KLIENT · ALLEGRO", a login jechał
@@ -253,7 +260,8 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {w.ofertaId && <span>· oferta {w.ofertaId}{w.nazwaOferty && ` — ${w.nazwaOferty}`}</span>}
             {w.zamowienieId && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+          <p className={`mt-1 whitespace-pre-wrap ${w.odKlienta
+            ? "text-[15px] leading-[23px]" : "text-sm text-slate-600"}`}>{w.tresc}</p>
           {w.stopka && <Stopka tresc={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
           {w.odKlienta && mozeZlecac && <button
@@ -332,10 +340,10 @@ export function rozdziel(wpisy: WpisOsi[]): {
    RODZAJ NIESIE BARWA, nie prefiks. „dobór: " przed każdym chipem kosztowało
    siedem znaków na każdym z nich i mówiło to samo co kolor. */
 const BARWA_ZDARZENIA: Record<string, string> = {
-  status: "border-slate-200 bg-white text-slate-600",
-  dobor: "border-sky-200 bg-sky-50 text-sky-900",
-  dobor_wybor: "border-sky-200 bg-sky-50 text-sky-900",
-  sprawa: "border-violet-200 bg-violet-50 text-violet-900",
+  status: "bg-slate-100 text-slate-600",
+  dobor: "bg-sky-100 text-sky-900",
+  dobor_wybor: "bg-sky-100 text-sky-900",
+  sprawa: "bg-violet-100 text-violet-900",
 };
 
 function etykieta(z: Zdarzenie): string {
@@ -364,17 +372,20 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
      stanu jest częsta i pas szarości pod nią mówiłby, że czegoś brakuje. */
   if (!zdarzenia.length) return null;
 
+  /* Pasek CICHNIE (0.247.0): niesie kontekst, nie treść, a stał w tej samej
+     wadze co wypowiedzi — obwódki chipów rysowały dziewięć ramek pod rozmową.
+     Zostaje samo wypełnienie, bo to ono niesie rodzaj zdarzenia. */
   return <nav aria-label="Przebieg sprawy"
-    className="shrink-0 border-t bg-slate-50 px-3 py-2">
+    className="shrink-0 bg-[#fbfcfd] px-3 py-1.5">
     {/* Przewijanie w POZIOMIE, nie zawijanie do drugiego rzędu: pasek ma mieć
         stałą wysokość, bo rośnie kosztem osi, czyli kosztem rozmowy. */}
     <ol className="flex items-center gap-1.5 overflow-x-auto">
       {zdarzenia.map((z, i) => <li key={z.id} className="flex shrink-0 items-center gap-1.5">
-        {i > 0 && <ArrowRight size={11} className="shrink-0 text-slate-300" />}
+        {i > 0 && <ArrowRight size={10} className="shrink-0 text-slate-300" />}
         <button type="button" disabled={z.cel === null}
           onClick={() => z.cel !== null && onSkocz(z.cel)}
           title={`${z.tresc} · ${z.autor} · ${czas(z.at)}`}
-          className={`max-w-[14rem] truncate rounded-full border px-2.5 py-1 text-xs ${
+          className={`max-w-[14rem] truncate rounded-full px-2.5 py-0.5 text-[11px] ${
             BARWA_ZDARZENIA[z.zdarzenie?.rodzaj ?? "status"] ?? BARWA_ZDARZENIA.status} ${
             z.cel === null ? "cursor-default opacity-60" : "hover:ring-2 hover:ring-amber-300"}`}>
           {etykieta(z)}

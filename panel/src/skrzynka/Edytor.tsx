@@ -65,20 +65,30 @@ export function Edytor({
      jest `shrink-0`, więc gdy coś go rozepchnie (karta szkicu, załączniki),
      ma się przewinąć sam, a nie zjeść oś rozmowy i obciąć własny dół. */
   return <div className={`max-h-[60vh] shrink-0 overflow-y-auto border-t p-4 ${wKomentarzu ? "bg-amber-50" : ""}`}>
-    {/* Przełącznik trybu stoi NAD polem, żeby było widać, gdzie się pisze,
-        zanim się zacznie pisać. */}
-    <div className="mb-2 flex gap-1 text-xs font-bold">
-      <button className={`rounded px-2 py-1 ${!wKomentarzu ? "bg-slate-200" : "text-slate-500"}`}
-        onClick={() => setTryb("odpowiedz")}>Odpowiedź do klienta</button>
-      <button className={`rounded px-2 py-1 ${wKomentarzu ? "bg-amber-200" : "text-slate-500"}`}
-        onClick={() => setTryb("komentarz")}>
-        <MessageSquare size={12} className="inline" /> Komentarz wewnętrzny
-      </button>
+    {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA (0.247.0) ──────────────
+        Dwa luźne przyciski o tej samej wadze nie mówiły, że wybiera się JEDEN
+        z dwóch — mówiły, że są dwie rzeczy do kliknięcia. Bieżnia z tłem
+        i wyniesiony kafelek aktywny to ten sam kształt, co przełącznik
+        w każdym innym programie, więc nie wymaga czytania.
+
+        Przełącznik stoi NAD polem, żeby było widać, gdzie się pisze, zanim
+        się zacznie pisać. */}
+    <div className="mb-2.5 flex items-center gap-2">
+      <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
+        <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] ${!wKomentarzu
+          ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-500"}`}
+          onClick={() => setTryb("odpowiedz")}>Odpowiedź do klienta</button>
+        <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] ${wKomentarzu
+          ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-500"}`}
+          onClick={() => setTryb("komentarz")}>
+          <MessageSquare size={13} />Komentarz wewnętrzny
+        </button>
+      </div>
     </div>
 
     {wKomentarzu
       ? <>
-          <textarea className="field min-h-20" value={komentarz}
+          <textarea className="field min-h-[88px] text-[15px] leading-[23px]" value={komentarz}
             aria-label="Komentarz wewnętrzny — zobaczy go tylko zespół"
             onChange={(e) => onKomentarz(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
@@ -97,32 +107,53 @@ export function Edytor({
                 nie odpowiedź, a kolega ma prawo dopisać „to ten sam klient co
                 wczoraj" bez przejmowania sprawy. */}
             <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
-              onClick={onDodajKomentarz}>
-              <MessageSquare size={16} />{komentuje ? "ZAPISUJĘ…" : "DODAJ KOMENTARZ"}
+              onClick={onDodajKomentarz} className="px-5 py-2.5 text-[15px] shadow-sm">
+              <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj komentarz"}
             </Przycisk>
             <span className="text-xs text-amber-800">Widoczne tylko dla zespołu.</span>
-            <span className="ml-auto text-xs text-slate-400">{komentarz.length} znaków</span>
+            <span className="ml-auto text-[11px] text-amber-700/70">{komentarz.length} znaków</span>
           </div>
         </>
       : <>
           {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
+          {/* Copilot zostaje we WŁASNYM wierszu nad polem. Próba wciągnięcia go
+              do rzędu przełącznika trybu wyglądała dobrze z włączonym Copilotem
+              i rozpadała się z wyłączonym: wtedy komponent renderuje ZDANIE
+              z serwera („Copilot jest wyłączony…"), nie przycisk, a zdanie
+              w rzędzie przełącznika łamało go na dwa wiersze. */}
           {copilot && <PrzyciskSzkicu p={copilot} />}
-          <textarea className="field min-h-20" value={szkic} aria-label="Szkic odpowiedzi"
+          {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
+              wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
+              choć agent spędza w nim najwięcej czasu z całego panelu. */}
+          <textarea className="field min-h-[88px] text-[15px] leading-[23px]" value={szkic}
+            aria-label="Szkic odpowiedzi"
             onChange={(e) => onZmiana(e.target.value)}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
-          <div className="mt-2 flex items-center gap-2">
-            <Przycisk onClick={onZapisz} disabled={cudza || zapisuje}>
-              {zapisuje ? "ZAPISUJĘ…" : "ZAPISZ SZKIC"}</Przycisk>
-            {/* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
-                zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka. Automat nie
-                wysyła nic — druga zasada nadrzędna projektu panelu. */}
-            <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}>
-              <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ DO KLIENTA"}</Przycisk>
-            <span className="ml-auto text-xs text-slate-400">{szkic.length} znaków</span>
-          </div>
+          {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
+              Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
+              zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka (druga zasada
+              nadrzędna projektu panelu). Wyglądała przy tym jak sąsiad
+              „ZAPISZ SZKIC": ta sama wysokość, waga i krój, różnica tylko
+              w wypełnieniu. Dostaje większy stopień pisma, wyższy padding
+              i cień; zapis szkicu schodzi do zwykłego tekstu.
+
+              Wersaliki znikają, bo spowalniają czytanie: „WYŚLIJ DO KLIENTA"
+              to ciąg prostokątów bez wydźwięku liter wystających nad linię. */}
+          {/* Załączniki stoją NAD rzędem działań (0.247.0): należą do
+              komponowanej wiadomości, nie do przycisków, a rząd działań ma być
+              ostatnią rzeczą na ekranie — wtedy wzrok kończy na wysyłce. */}
           <ZalacznikiWysylki lista={zalaczniki} dodaje={dodajeZalacznik} blad={bladZalacznika}
             onDodaj={onDodajZalacznik} onUsun={onUsunZalacznik} wylaczone={cudza} />
+          <div className="mt-3 flex items-center gap-3">
+            <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
+              className="px-5 py-2.5 text-[15px] shadow-sm">
+              <Send size={17} />{wysyla ? "Wysyłam…" : "Wyślij do klienta"}</Przycisk>
+            <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
+              className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
+              {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
+            <span className="ml-auto text-[11px] text-slate-400">{szkic.length} znaków</span>
+          </div>
           {copilot && <KartaSzkicu p={copilot} />}
         </>}
   </div>;
