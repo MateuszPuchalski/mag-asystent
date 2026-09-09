@@ -366,6 +366,31 @@ test("oś rozmowy pokazuje wiadomości i numer oferty", () => {
   assert.equal(os[1].odKlienta, false);
 });
 
+test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy przy pustym polu", () => {
+  /* `mimeType` jest w schemacie Allegro opcjonalne. Do tego wydania brak pola
+     znaczył „nie obraz" i zdjęcie z telefonu zostawało samą nazwą. Nazwa
+     decyduje o UKŁADZIE; o wydaniu rozstrzygają bajty na trasie podglądu. */
+  const msg = Number((db().prepare("SELECT id FROM message WHERE conversation_id=? ORDER BY id LIMIT 1")
+    .get(rozmowaId) as { id: number }).id);
+  const url = "https://upload.allegro.pl/message-center/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6";
+  const ins = db().prepare("INSERT INTO message_attachment(message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)");
+  const przypadki: Array<[string, string | null, string, string | null, boolean]> = [
+    ["a.jpeg", "image/jpeg", "SAFE", url, true],
+    ["b.jpg", null, "SAFE", url, true],
+    ["c.webp", null, "SAFE", url, true],
+    ["d.pdf", null, "SAFE", url, false],
+    ["e.jpg", "application/octet-stream", "SAFE", url, false],
+    ["f.jpg", "image/jpeg", "NEW", url, false],
+    ["g.jpg", "image/jpeg", "SAFE", null, false],
+  ];
+  for (const [nazwa, mime, status, adres] of przypadki) ins.run(msg, nazwa, mime, adres, status);
+  const zal = osRozmowy(rozmowaId).os.find((w) => w.rodzaj === "wiadomosc" && w.zalaczniki?.length)!.zalaczniki!;
+  for (const [nazwa, , , , oczekiwane] of przypadki) {
+    assert.equal(zal.find((z) => z.nazwa === nazwa)?.podglad, oczekiwane, nazwa);
+  }
+  db().prepare("DELETE FROM message_attachment WHERE message_id=?").run(msg);
+});
+
 test("nieznana rozmowa nie udaje pustej", () => {
   assert.throws(() => osRozmowy(9999), /Nie znaleziono rozmowy/);
 });

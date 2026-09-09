@@ -7,6 +7,7 @@ import { publishConversationEvent } from "./conversation-realtime.js";
 import { obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
+import { zapiszZalaczniki } from "./zalaczniki-wiadomosci.js";
 
 /* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
    stały tu nazwy wymyślone razem z kodem (`lastMessageDate`, `author.role`,
@@ -66,9 +67,11 @@ function tablica<T>(value: unknown, pole: string): T[] {
    ale to jest założenie, nie prawo, i dlatego stoi tu wypisane. */
 const MAKS_STRON = 25;
 
+type InboxQuery = (url: string) => Promise<unknown | null>;
+
 export interface InboxSyncDeps {
   database?: Db;
-  query?: (url: string) => Promise<unknown | null>;
+  query?: InboxQuery;
   now?: () => Date;
   apiUrl?: string;
   intervalMs?: number;
@@ -91,6 +94,10 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
      wtedy wiadomo, który wątek faktycznie wszedł do skrzynki. */
   const widziane: Thread[] = [];
   const zepsute = new Set<string>();
+  /* Wątki, których wiadomości ten przebieg NAPRAWDĘ przeczytał — dociąg
+     `NEW` ma je pominąć. `widziane` to co innego: tam trafia też wątek
+     zatrzymany na kursorze, którego nikt nie czytał. */
+  const przeczytane = new Set<string>();
   const at = now().toISOString();
   const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
   let offset = 0;
@@ -200,6 +207,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           const body = await query(urlWiadomosci(apiUrl, thread.id));
           messages.set(thread.id, tablica<Message>(body, "messages"));
           threads.push(thread);
+          przeczytane.add(thread.id);
         }
       }
       /* ZAPIS PO KAŻDEJ STRONIE, nie na końcu przebiegu (0.164.1). Do tego
@@ -219,6 +227,10 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         break;
       }
     } while (!reachedCursor);
+
+    /* Po liście, przed zapisem stanu: wątki z załącznikiem `NEW`, których
+       data się nie zmieniła. Pomijamy te, które ten przebieg już przeczytał. */
+    await dociagnijZalacznikiNew(database, query, apiUrl, konto, przeczytane);
 
     if (obciety) {
       /* Zdanie do dziennika, bo obcięcie jest STANEM, nie awarią: przebieg
@@ -393,19 +405,63 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
       if (flaga(message.author.isInterlocutor, "author.isInterlocutor")) {
         obudzPrzychodzaca(database, rozmowa);
       }
-      /* Załączniki wchodzą TYLKO razem z nową wiadomością. Wiadomości nie
-         nadpisujemy (wiszą na nich szkice i zadania), więc powtórny przebieg
-         nie ma tu czego robić — i dzięki temu nie trzeba osobnego klucza
-         przeciw duplikatom na polach, z których żadne nie jest wymagane. */
-      for (const z of message.attachments ?? []) {
-        database.prepare(`INSERT INTO message_attachment
-          (message_id, file_name, mime_type, url, status) VALUES (?,?,?,?,?)`).run(
-          Number(wynik.lastInsertRowid), odkodujEncje(z.fileName),
-          z.mimeType ?? null, z.url ?? null, z.status);
-      }
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
       });
+    }
+    /* ZAŁĄCZNIKI PRZY KAŻDYM PRZEBIEGU, także przy wiadomości już znanej.
+       Do 0.242.0 wchodziły wyłącznie z nową wiadomością, więc `NEW`
+       („Allegro jeszcze sprawdza") zostawało zamrożone na zawsze, a zdjęcia
+       z wiadomości sprzed 0.155.0 nie istniały w bazie wcale. Sama wiadomość
+       dalej jest nietykalna — wiszą na niej szkice i zadania; dotykamy
+       wyłącznie tabeli załączników, po kluczu `(message_id, file_name)`. */
+    const messageId = wynik.changes > 0
+      ? Number(wynik.lastInsertRowid)
+      : Number((database.prepare(
+        "SELECT id FROM message WHERE channel_account_id=? AND external_message_id=?",
+      ).get(konto, message.id) as { id: number }).id);
+    zapiszZalaczniki(database, messageId, message.attachments);
+  }
+}
+
+/** Sufit wątków dociąganych w jednym przebiegu po sam status załącznika. */
+const MAKS_DOCIAGU_NEW = 5;
+
+/**
+ * Dociąg wątków, w których załącznik stoi na `NEW`.
+ *
+ * Wątek bez zmiany `lastMessageDateTime` nie jest czytany ponownie, więc
+ * `NEW → SAFE` bez nowej wiadomości nie doszłoby nigdy — Allegro nie
+ * przestawia daty wątku, gdy kończy sprawdzać plik. Pytamy więc osobno,
+ * wyłącznie o wątki z takim załącznikiem i najwyżej pięć na przebieg:
+ * to rzadkość, a sufit pilnuje, żeby nie stała się drugą listą.
+ * Awaria jednego wątku nie kończy przebiegu — jak przy partii.
+ */
+async function dociagnijZalacznikiNew(
+  database: Db, query: InboxQuery, apiUrl: string, konto: number, pominiete: Set<string>,
+): Promise<void> {
+  const watki = (database.prepare(`
+    SELECT DISTINCT c.external_conversation_id AS id
+      FROM message_attachment a
+      JOIN message m ON m.id = a.message_id
+      JOIN conversation c ON c.id = m.conversation_id
+     WHERE a.status = 'NEW' AND c.channel_account_id = ?
+     LIMIT ?`).all(konto, MAKS_DOCIAGU_NEW) as Array<{ id: string }>)
+    .map((w) => w.id).filter((id) => !pominiete.has(id));
+  for (const id of watki) {
+    try {
+      const wiadomosci = tablica<Message>(await query(urlWiadomosci(apiUrl, id)), "messages");
+      transaction(database, () => {
+        for (const m of wiadomosci) {
+          const w = database.prepare(
+            "SELECT id FROM message WHERE channel_account_id=? AND external_message_id=?",
+          ).get(konto, m.id) as { id: number } | undefined;
+          if (w) zapiszZalaczniki(database, Number(w.id), m.attachments);
+        }
+      })();
+    } catch (e) {
+      console.warn("[allegro-inbox] dociąg załączników NEW pominięty:", id,
+        e instanceof Error ? e.message : e);
     }
   }
 }

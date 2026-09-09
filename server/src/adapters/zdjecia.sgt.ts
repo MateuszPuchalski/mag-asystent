@@ -67,6 +67,13 @@ export function rozpoznajMime(b: Buffer): string | null {
   if (b[0] === 0x42 && b[1] === 0x4d) return "image/bmp";
   if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
   if ((b[0] === 0x49 && b[1] === 0x49) || (b[0] === 0x4d && b[1] === 0x4d)) return "image/tiff";
+  /* WebP: `RIFF....WEBP` — telefony z Androidem wysyłają go w Centrum
+     Wiadomości, a `TYPY_PODGLADU` skrzynki obiecuje go od 0.218.0. Do tego
+     wydania sygnatura go nie znała, więc podgląd po bajtach dawałby 415
+     przy pliku, który przeglądarka narysuje. */
+  if (b.length >= 12 && b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
   return null;
 }
 

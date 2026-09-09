@@ -157,15 +157,15 @@ export interface ZalacznikReklamacji {
 /**
  * Czy nazwa pliku obiecuje obraz, który przeglądarka narysuje.
  *
- * Rozszerzeń jest TRZY, nie sześć, i to jest przecięcie dwóch list. Allegro
- * przyjmuje przy tym zasobie `png`, `gif`, `bmp`, `tiff`, `jpeg` i `pdf`
- * (`PUT /sale/issues/attachments/{id}`), a `TYPY_PODGLADU` ze skrzynki
- * wymienia cztery typy rastrowe. Wspólne są trzy — `webp` po stronie Allegro
- * nie istnieje, a `bmp` i `tiff` przeglądarki rysują nierówno albo wcale.
- * Reszta zostaje przy pobieraniu i to nie jest awaria, tylko odpowiedź.
+ * Cztery rozszerzenia z `TYPY_PODGLADU`: `jpeg`, `png`, `gif` i `webp`.
+ * `bmp` i `tiff` przeglądarki rysują nierówno albo wcale, więc zostają przy
+ * pobieraniu. `webp` doszedł razem z sygnaturą w `rozpoznajMime` — od tego
+ * wydania tę samą podpowiedź czyta też skrzynka, gdy Allegro nie podało
+ * `mimeType`, a tam zdjęcia z Androida bywają właśnie WebP. To nie jest
+ * awaria, tylko odpowiedź; rozstrzygają i tak BAJTY na trasie podglądu.
  */
 export const czyObrazZNazwy = (nazwa: string | null | undefined): boolean =>
-  /\.(jpe?g|png|gif)$/i.test((nazwa ?? "").trim());
+  /\.(jpe?g|png|gif|webp)$/i.test((nazwa ?? "").trim());
 
 export interface WiadomoscReklamacji {
   id: number;

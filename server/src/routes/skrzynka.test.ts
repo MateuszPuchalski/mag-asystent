@@ -1,4 +1,4 @@
-import { before, beforeEach, test } from "node:test";
+import { after, before, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -387,56 +387,128 @@ test("pobranie załącznika: rola, stan i nieznane id", async () => {
   assert.equal(nieznany.statusCode, 404);
 });
 
-test("podgląd na osi: tylko obraz i tylko SAFE", async () => {
-  /* Trasa podglądu jest WĘŻSZA od trasy pobrania i to jest cała jej treść.
-     Plik, który wolno ściągnąć na dysk świadomym kliknięciem, niekoniecznie
-     wolno wyrysować samoczynnie w naszym origin — a `.exe` z nagłówkiem
-     `image/png` to dokładnie ta różnica. */
-  const d = db();
+/* ── Podgląd na osi: bajty rozstrzygają, Allegro mówi zdaniem ─────────────────
+   Od tego wydania trasa podglądu CIĄGNIE plik i czyta typ z SYGNATURY
+   (port z reklamacji, 0.223.0), a odmowa Allegro wraca jako 502 ze zdaniem,
+   nie jako 400 nierozróżnialne od „to nie obraz". Token w bazie, żeby
+   `wazneBearer` nie szedł po sieć; `fetch` podstawiony — żaden test nie
+   strzela do Allegro.                                                       */
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
+const URL_ZAL = "https://upload.allegro.pl/message-center/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6";
+
+function tokenAllegro(jest: boolean) {
+  db().prepare("DELETE FROM allegro_token").run();
+  if (jest) {
+    db().prepare(`INSERT INTO allegro_token(id,access_token,refresh_token,wygasa_at,srodowisko,
+      polaczono_at,polaczono_przez) VALUES (1,'tok','ref',?, 'prod','2026-09-01T00:00:00Z','test')`)
+      .run(new Date(Date.now() + 86_400_000).toISOString());
+  }
+}
+
+/** Podstawiony `fetch` do Allegro: liczy strzały, oddaje bajty albo kod. */
+function allegroOddaje(odp: { status: number; bajty?: Buffer } | Error) {
+  const s = { strzalow: 0 };
+  mock.method(globalThis, "fetch", async () => {
+    s.strzalow += 1;
+    if (odp instanceof Error) throw odp;
+    return new Response(odp.status === 200 ? new Uint8Array(odp.bajty ?? PNG) : JSON.stringify({ error: "nie" }),
+      { status: odp.status, headers: { "content-type": odp.status === 200 ? "application/octet-stream" : "application/json" } });
+  });
+  return s;
+}
+
+const zalacznik = (nazwa: string, mime: string | null, status = "SAFE", url: string | null = URL_ZAL) =>
+  Number(db().prepare(`INSERT INTO message_attachment(message_id,file_name,mime_type,url,status)
+    VALUES (?,?,?,?,?)`).run(pytanie, nazwa, mime, url, status).lastInsertRowid);
+
+after(() => mock.restoreAll());
+
+test("podgląd na osi: stan przed ETagiem, 304 przed Allegro, typ z sygnatury bajtów", async () => {
+  mock.restoreAll();
+  tokenAllegro(true);
   const biuro = login("biuro", "Biuro");
+  const podglad = (id: number, naglowki: Record<string, string> = {}) => app.inject({
+    method: "GET", url: `/api/obsluga/zalaczniki/${id}/podglad`, headers: { ...biuro.naglowki, ...naglowki } });
 
-  const exe = Number(d.prepare(`INSERT INTO message_attachment
-    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
-    .run(pytanie, "instalator.exe", "application/octet-stream",
-      "https://upload.allegro.pl/e", "SAFE").lastInsertRowid);
-  const nieObraz = await app.inject({ method: "GET",
-    url: `/api/obsluga/zalaczniki/${exe}/podglad`, headers: biuro.naglowki });
-  assert.equal(nieObraz.statusCode, 415, "plik spoza listy typów zostaje przy pobieraniu");
+  /* Obraz, ale Allegro uznało go za niebezpieczny: 415 BEZ strzału do Allegro
+     i bez ETaga — stan sprawdza się przed obiema rzeczami. */
+  const bez = allegroOddaje({ status: 200 });
+  const brudny = zalacznik("zdjecie.jpeg", "image/jpeg", "UNSAFE");
+  const odmowa = await podglad(brudny, { "if-none-match": `"zal-${brudny}"` });
+  assert.equal(odmowa.statusCode, 415);
+  assert.match(odmowa.json().error, /stan UNSAFE/);
+  assert.equal(bez.strzalow, 0);
 
-  /* SVG jest obrazem i jest dokumentem ze skryptem. Odmowa jest tu decyzją,
-     nie przeoczeniem — uzasadnienie stoi przy `TYPY_PODGLADU`. */
-  const svg = Number(d.prepare(`INSERT INTO message_attachment
-    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
-    .run(pytanie, "rysunek.svg", "image/svg+xml",
-      "https://upload.allegro.pl/s", "SAFE").lastInsertRowid);
-  assert.equal((await app.inject({ method: "GET",
-    url: `/api/obsluga/zalaczniki/${svg}/podglad`, headers: biuro.naglowki })).statusCode, 415);
-
-  /* Obraz, ale Allegro uznało go za niebezpieczny: podgląd wpuściłby go do
-     biura bez żadnego kliknięcia, więc odmawiamy tak samo jak przy pobraniu. */
-  const brudny = Number(d.prepare(`INSERT INTO message_attachment
-    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
-    .run(pytanie, "zdjecie.jpeg", "image/jpeg",
-      "https://upload.allegro.pl/u", "UNSAFE").lastInsertRowid);
-  assert.equal((await app.inject({ method: "GET",
-    url: `/api/obsluga/zalaczniki/${brudny}/podglad`, headers: biuro.naglowki })).statusCode, 415);
-
-  /* 304 ma wypaść PRZED pytaniem Allegro o plik — inaczej oszczędza tylko
-     łącze do przeglądarki, a nie to, na czym naprawdę zależy. */
-  const zdjecie = Number(d.prepare(`INSERT INTO message_attachment
-    (message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)`)
-    .run(pytanie, "szarpak.jpeg", "image/jpeg",
-      "https://upload.allegro.pl/z", "SAFE").lastInsertRowid);
+  /* 304 wypada PRZED pytaniem Allegro o plik i nie dopisuje zdarzenia. */
+  const zdjecie = zalacznik("szarpak.jpeg", "image/jpeg");
   const przed = liczbaZdarzen();
-  const swieze = await app.inject({ method: "GET",
-    url: `/api/obsluga/zalaczniki/${zdjecie}/podglad`,
-    headers: { ...biuro.naglowki, "if-none-match": `"zal-${zdjecie}"` } });
+  const swieze = await podglad(zdjecie, { "if-none-match": `"zal-${zdjecie}"` });
   assert.equal(swieze.statusCode, 304);
-
-  /* „Zero zapisu przy patrzeniu" obowiązuje TĘ trasę mocniej niż pobranie:
-     podgląd rysuje się sam przy otwarciu rozmowy, więc wpis w dzienniku
-     znaczyłby „ktoś spojrzał na oś", a nie „ktoś wziął plik". */
+  assert.equal(bez.strzalow, 0, "304 ma oszczędzać łącze do Allegro, nie tylko do przeglądarki");
   assert.equal(liczbaZdarzen(), przed, "podgląd dopisał zdarzenie");
+
+  /* Szczęśliwa droga: bajty PNG pod nazwą `.jpeg` i polem `image/jpeg` —
+     nagłówek mówi PRAWDĘ o bajtach, nie o polu z Allegro. */
+  const png = allegroOddaje({ status: 200, bajty: PNG });
+  const ok = await podglad(zdjecie);
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal(ok.headers["content-type"], "image/png");
+  assert.equal(ok.headers["x-content-type-options"], "nosniff");
+  assert.equal(ok.headers["content-disposition"], "inline");
+  assert.equal(ok.headers.etag, `"zal-${zdjecie}"`);
+  assert.equal(Number(ok.headers["content-length"]), PNG.byteLength);
+  assert.equal(png.strzalow, 1, "droga API zadziałała za pierwszym strzałem");
+  assert.equal(liczbaZdarzen(), przed, "podgląd nie zostawia śladu w dzienniku");
+
+  /* `mimeType` PUSTE, nazwa `.jpg`: do tego wydania 415 bez pytania. Teraz
+     rozstrzygają bajty. */
+  allegroOddaje({ status: 200, bajty: JPEG });
+  const bezTypu = await podglad(zalacznik("usterka.jpg", null));
+  assert.equal(bezTypu.statusCode, 200);
+  assert.equal(bezTypu.headers["content-type"], "image/jpeg");
+
+  /* `.exe` z polem `image/png` (albo SVG, albo PDF): sygnatura nie jest
+     obrazem z listy → 415, plik zostaje przy pobraniu. */
+  allegroOddaje({ status: 200, bajty: Buffer.from("MZ\u0090\u0000\u0003\u0000\u0000\u0000", "latin1") });
+  const exe = await podglad(zalacznik("instalator.exe", "image/png"));
+  assert.equal(exe.statusCode, 415);
+  assert.match(exe.json().error, /sygnatura pliku/);
+  allegroOddaje({ status: 200, bajty: Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>") });
+  assert.equal((await podglad(zalacznik("rysunek.svg", "image/svg+xml"))).statusCode, 415,
+    "SVG jest obrazem i dokumentem ze skryptem — nie przechodzi po bajtach");
+});
+
+test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 503", async () => {
+  mock.restoreAll();
+  tokenAllegro(true);
+  const biuro = login("biuro", "Biuro");
+  const zdjecie = zalacznik("szarpak.jpeg", "image/jpeg");
+  const podglad = () => app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${zdjecie}/podglad`, headers: biuro.naglowki });
+  const pobranie = () => app.inject({ method: "GET",
+    url: `/api/obsluga/zalaczniki/${zdjecie}`, headers: biuro.naglowki });
+
+  /* 403 z KAŻDEJ drogi: zdanie wymienia próby, nie adresy. */
+  const trzy = allegroOddaje({ status: 403 });
+  const odmowa = await podglad();
+  assert.equal(odmowa.statusCode, 502);
+  assert.match(odmowa.json().error, /końcówka API.*403.*zapisany adres: 403/);
+  assert.match(odmowa.json().error, /allegro:api:messaging/);
+  assert.equal(/https?:\/\//.test(odmowa.json().error), false);
+  assert.equal(trzy.strzalow, 3, "public, beta, zapisany adres — i koniec");
+  assert.equal((await pobranie()).statusCode, 502, "pobranie na dysk mówi tym samym zdaniem");
+
+  allegroOddaje(new Error("fetch failed: timeout"));
+  const siec = await podglad();
+  assert.equal(siec.statusCode, 503);
+  assert.match(siec.json().error, /internet na serwerze/);
+
+  tokenAllegro(false);
+  const bezKonta = await podglad();
+  assert.equal(bezKonta.statusCode, 503);
+  assert.match(bezKonta.json().error, /niepołączone/);
+  mock.restoreAll();
 });
 
 test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async () => {

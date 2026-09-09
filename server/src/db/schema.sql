@@ -1403,6 +1403,11 @@ CREATE TABLE IF NOT EXISTS message_attachment (
 );
 CREATE INDEX IF NOT EXISTS ix_message_attachment_wiadomosc
   ON message_attachment(message_id);
+-- Klucz naturalny `UNIQUE(message_id, file_name)` zakłada `migrate()`
+-- (`zalacznikiBezDubli`), nie ten plik: bazy sprzed przyrostu „zdjęcia
+-- w rozmowach" mają duplikaty, a `schema.sql` wykonuje się przed migracją.
+-- Załączniki są od tego przyrostu UPSERTOWANE przy każdym przebiegu
+-- (`services/zalaczniki-wiadomosci.ts`), bo `NEW` musi móc stać się `SAFE`.
 
 -- ── Załącznik CZEKAJĄCY na wysyłkę (0.195.0) ────────────────────────────────
 -- `message_attachment` opisuje pliki, które PRZYSZŁY; ta tabela — te, które

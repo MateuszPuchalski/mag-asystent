@@ -97,6 +97,9 @@ test("rozpoznaje formaty, które kolektor umie narysować", () => {
   assert.equal(rozpoznajMime(Buffer.from([0x89, 0x50, 0x4e, 0x47])), "image/png");
   assert.equal(rozpoznajMime(Buffer.from([0x42, 0x4d, 0x00, 0x00])), "image/bmp");
   assert.equal(rozpoznajMime(Buffer.from([0x47, 0x49, 0x46, 0x38])), "image/gif");
+  /* WebP z Androida: `RIFF` + rozmiar + `WEBP`. Sam `RIFF` (WAV, AVI) nie wystarcza. */
+  assert.equal(rozpoznajMime(Buffer.from("RIFF\u0010\u0000\u0000\u0000WEBPVP8 ", "latin1")), "image/webp");
+  assert.equal(rozpoznajMime(Buffer.from("RIFF\u0010\u0000\u0000\u0000WAVEfmt ", "latin1")), null);
 });
 
 test("kontener OLE i RTF są ODRZUCANE, nie przepuszczane jako obraz", () => {

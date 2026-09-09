@@ -86,6 +86,46 @@ skrzynki nadawczej o wartość `END_REQUEST`; zero nowych ustawień.
 - zakładka DYSKUSJE: `panel/src/ekrany/Dyskusje.tsx`, `panel/src/dyskusje/`
 - czat, edytor i dialog konfliktu wspólne z reklamacjami — bez kopiowania
 - §25c dokumentacji na stan zbudowany, polityka danych dyskusji, `allegro-ksztalt.md`
+## 0.244.0 — 9 września 2026
+
+**Zdjęcia w rozmowach skrzynki znów się wyświetlają, a każda odmowa ma
+zdanie.** Właściciel: „Napraw wyświetlanie zdjęć w rozmowach" — w skrzynce
+stała sama nazwa pliku, bez obrazka i bez powodu, a kliknięcie dawało
+„Allegro nie oddało załącznika (403)". W czacie reklamacji zdjęcia działały.
+Obie drogi idą tym samym `pobierzZalacznik`, więc token i uprawnienie są
+dobre — odmawia HOST z `MessageAttachmentInfo.url` (`upload.allegro.pl`).
+0.219.2 zapisało ten 403 jako nienaprawiony. Do jednej przyczyny dochodziło
+pięć powodów, dla których ekran milczał; wszystkie pięć zamknięte.
+
+- **Droga API z zapasem** (`kandydaciPobrania`, `pobierzZalacznikWiadomosci`):
+  `GET /messaging/message-attachments/{uuid}` z `Accept` `public.v1`, potem
+  `beta.v1`, na końcu zapisany `url` jak dotąd. UUID z ogona `url`, bez
+  migracji na beta.v1. 401 kończy od razu; odmowa każdej drogi wraca jednym
+  zdaniem z kodem każdej próby, bez adresów. Droga API jest wnioskiem
+  z tutorialu Allegro — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`.
+- **`npm run sonda:zalacznik`**: jeden załącznik `SAFE`, tabela kodów i typów
+  dla każdej drogi (nigdy bajtów ani adresów) i zdanie, czy znacznik wolno zdjąć.
+- **Typ z sygnatury bajtów, nie z pola** (port z reklamacji 0.223.0): `mimeType`
+  jest w schemacie opcjonalne; brak pola znaczył 415 przy zdjęciu z telefonu.
+  `rozpoznajMime` zna WebP. Przy pustym polu o układzie decyduje nazwa pliku,
+  o wydaniu — bajty. Stan sprawdza się PRZED ETagiem.
+- **Odmowa Allegro to 502, awaria drogi 503** — nie 400 nierozróżnialne od
+  „to nie obraz". Panel pokazuje zdanie z serwera pod nazwą pliku i „Spróbuj
+  ponownie"; w trakcie pobierania stoi ramka, nie pusta linia. Pamięć negatywu
+  trzyma już tylko odpowiedzi (404, 415); porażki z powodem wygasają po minucie.
+- **Załączniki przy każdym przebiegu** (`zapiszZalaczniki`, klucz
+  `(message_id, file_name)`): `NEW` staje się `SAFE` dociągiem wątków bez
+  zmiany daty (sufit 5 na przebieg); migracja rozplątuje duplikaty PRZED
+  indeksem i dosypuje brakujące wiersze z lądowiska `surowe_json` —
+  wiadomości sprzed 0.155.0 dostają swoje zdjęcia. Pobranie na dysk zapisuje
+  w dzienniku drogę i liczbę bajtów.
+
+**Do sprawdzenia u właściciela.** Po aktualizacji `cd server && npm run
+sonda:zalacznik`: oczekiwany 200 na drodze API; wtedy zdjąć znacznik
+w `docs/allegro-ksztalt.md` (licznik dwadzieścia trzy). Gdy 200 daje tylko
+zapisany adres — panel i tak działa, a kody z tabeli idą do sekcji
+„Pobranie załącznika Centrum Wiadomości". Gdy obie drogi 403 — uprawnienie
+`allegro:api:messaging` i ponowne parowanie.
 
 ## 0.243.1 — 9 września 2026
 
