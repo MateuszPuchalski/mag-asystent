@@ -75,6 +75,84 @@ zapisany adres — panel i tak działa, a kody z tabeli idą do sekcji
 „Pobranie załącznika Centrum Wiadomości". Gdy obie drogi 403 — uprawnienie
 `allegro:api:messaging` i ponowne parowanie.
 
+## 0.243.1 — 9 września 2026
+
+**Projekt panelu dyskusji.** Zgłoszenie właściciela: „zaprojektuj Panel
+dyskusji". Sam projekt, bez linijki kodu — §25c w `docs/panel-obslugi-klienta.md`.
+
+**To odwraca decyzję sprzed trzech dni i dokument mówi o tym wprost.** 6 września
+zapadło: panel prowadzi wyłącznie reklamacje, bo „dyskusja jest rozmową,
+a rozmowy panel już ma". Obie daty zostają w §25b.2 — pierwsza tłumaczy kształt
+kodu przez trzy wydania, druga mówi, dlaczego ten kształt się zmieni.
+
+**Liczby nie były po stronie pierwszej decyzji.** Sonda z żywego konta pokazała
+35 dyskusji na 65 reklamacji, w tym 25 otwartych. Zdanie „rozmowy panel już ma"
+też się nie broni: dyskusja ma formalny status Allegro i flagę `chatActive`,
+nie ma flagi przeczytania, odpowiada się w niej inną końcówką i bywa
+trójstronna — doradca Allegro odezwał się w 61 sprawach na 100.
+
+**Trzy rozstrzygnięcia właściciela z 9 września.** Własna zakładka, a nie
+kubełek w reklamacjach ani rozmowy w skrzynce. Czytanie, odpowiedź i prośba
+o zakończenie. Pilność mierzona czasem, od kiedy ruch należy do nas.
+
+**Przycisk nazywa się POPROŚ O ZAKOŃCZENIE, nie ZAKOŃCZ**, i to jest ustalenie
+z tego projektu warte osobnego zdania. Enum Allegro nazywa tę wartość
+`END_REQUEST` — żądaniem. Ani schemat, ani opis nie obiecują, że dyskusja
+zamknie się od naszego kliknięcia. Przycisk obiecujący więcej, niż mówi
+specyfikacja, to ten sam rodzaj zgadywania, który do 0.155.0 trzymał w kodzie
+adres `/sale/disputes/{id}/messages`.
+
+**Pilność liczymy sami i mówimy o tym wprost.** Allegro nie daje dyskusji
+żadnego terminu. Wiersz mówi „czeka 5 dni", nigdy „termin": to fakt o naszej
+skrzynce, nie zobowiązanie wobec klienta. Blizna 0.121.0 była dokładnie tym —
+ustawowym zegarem liczonym przez nas i rozjeżdżającym się z tym, co widział
+kupujący.
+
+Wdrożenie: nic ręką. Zero kodu, zero ustawień, zero zmian w bazie.
+
+- §25c w `docs/panel-obslugi-klienta.md` — dziewięć podrozdziałów
+- poprawki §3, §25b.2, §26 i wiersza tabeli §28 („poza zakresem" →
+  „zaprojektowane, niezbudowane")
+
+## 0.243.0 — 9 września 2026
+
+**Zdarzenia sprawy zeszły z osi do jednego paska pod oknem wiadomości.**
+Zgłoszenie właściciela: przenieść wszystkie zmiany statusu do poziomego rzędu
+jak oś czasu, a kliknięcie ma prowadzić do tego miejsca w rozmowie.
+
+Do 0.242.0 zmiana statusu, sklejenie sprawy i każdy krok doboru stały między
+wypowiedziami jako kreski. Przy jednym zdarzeniu to znak, że sprawa przeszła
+dalej; przy dziewięciu — ściana szarego tekstu, przez którą trzeba się
+przewinąć do zdania klienta. Na zrzucie od właściciela dwa takie bloki zajmują
+więcej miejsca niż obie wypowiedzi razem i to one dyktują długość przewijania.
+
+Oś zostaje ROZMOWĄ, pasek zostaje PRZEBIEGIEM. To dwa różne pytania: „co klient
+napisał" i „jak sprawa szła". Pierwsze czyta się po kolei, drugie ogarnia
+jednym spojrzeniem — dlatego jedno jest kolumną, a drugie rzędem.
+
+Kliknięcie wraca na oś: celem jest pierwsza wypowiedź PO zdarzeniu, a gdy
+zdarzenie jest ostatnie — ostatnia przed nim, bo przycisk bez skutku jest
+gorszy niż brak przycisku. Cel podświetla się na moment i gaśnie sam; trwałe
+podświetlenie byłoby stanem, którego nikt nie zdejmuje.
+
+Jedna rzecz wyszła dopiero z pomiaru i warto ją zapisać. Pierwsza wersja paska
+pokazywała pełne zdanie z osi — dziewięć zdarzeń dało 1343 px nadmiaru
+w poziomie przy kolumnie na 680 px, czyli widać było TRZY z dziewięciu. Rząd,
+po którym trzeba przewijać, nie daje tego jednego spojrzenia, po które się go
+zakładało. Chip niesie więc stan DOCELOWY (stan poprzedni stoi w chipie obok),
+a rodzaj niesie barwa zamiast prefiksu „dobór: ". Po skróceniu: 471 px
+i sześć z dziewięciu.
+
+Serwis podaje zdarzenie rozłożone na klucze (`zdarzenie` obok `tresc`),
+a polszczyznę składa panel ze słownika, który już miał. Panel nie rozbiera
+`tresc` — to zdanie dla człowieka, nie format danych. `tresc` zostaje
+nietknięta i niesie ją podpowiedź chipa razem z autorem i godziną.
+
+Strażnicy: `panel/src/skrzynka/OsStatus.test.tsx` pilnuje, że przebieg dalej
+widać, że oś przestała nieść kreski i że kliknięcie skacze pod właściwy wpis;
+`server/src/services/skrzynka.test.ts` — że serwis podaje klucze obok zdania.
+Skok, podświetlenie i jego wygaszenie sprawdzone dodatkowo w przeglądarce.
+
 ## 0.242.0 — 9 września 2026
 
 **Werdykt reklamacji wychodzi z panelu: uznanie albo odrzucenie do Allegro,

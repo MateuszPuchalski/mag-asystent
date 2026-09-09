@@ -1,6 +1,7 @@
 import React from "react";
 import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User } from "lucide-react";
-import type { WpisOsi, ZalacznikOsi } from "../api/typy";
+import type { StatusDoboru, StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
+import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { LoginKlienta, Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
@@ -176,21 +177,42 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
 }) {
+  const listaRef = React.useRef<HTMLDivElement>(null);
+  const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
+
+  const { wypowiedzi, zdarzenia } = React.useMemo(() => rozdziel(wpisy), [wpisy]);
+
+  /* Podświetlenie GAŚNIE SAMO. Trwałe zostawiłoby na osi ślad po nawigacji,
+     czyli stan, którego nikt nie zdejmuje i który po chwili kłamie o tym,
+     gdzie agent jest. Skok ma pokazać miejsce, nie oznaczyć go. */
+  React.useEffect(() => {
+    if (podswietlony === null) return;
+    const t = setTimeout(() => setPodswietlony(null), 1600);
+    return () => clearTimeout(t);
+  }, [podswietlony]);
+
+  const skocz = (celId: string) => {
+    /* Szukamy po DZIECIACH, nie selektorem `[data-wpis="..."]`: identyfikator
+       wpisu jest ciągiem z serwera, a wstawiony do selektora wymagałby
+       ucieczki. Lista dzieci to dokładnie owijki wypowiedzi — porównanie
+       wartości nie ma jak się pomylić i nie zależy od `CSS.escape`. */
+    const el = Array.from(listaRef.current?.children ?? [])
+      .find((c) => (c as HTMLElement).dataset.wpis === celId);
+    /* `center`, nie `start`: wypowiedź wepchnięta pod górną krawędź traci
+       kontekst tego, co ją poprzedza, a po to właśnie się tu skacze. */
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPodswietlony(celId);
+  };
+
   /* `min-h-40`, nie `min-h-0` (0.232.1): karta szkicu Copilota zwinęła oś do
      jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
      czytelna przy każdej wysokości edytora — to ona jest powodem ekranu. */
-  return <div className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
-    {wpisy.map((w) => w.rodzaj === "status" || w.rodzaj === "sprawa" || w.rodzaj === "dobor"
-      /* Zmiana statusu (§10.3, 0.158.0), sklejenie sprawy (0.161.0) i krok
-         doboru (E1) są KRESKĄ, nie kafelkiem: to nie czyjaś wypowiedź, tylko znak, że sprawa
-         przeszła dalej. Kafelek w rzędzie wiadomości przerwałby czytanie
-         rozmowy w biegu. */
-      ? <p key={w.id} className="flex items-center justify-center gap-2 text-xs text-slate-400">
-          <span className="h-px flex-1 bg-slate-200" />
-          <ArrowRight size={12} />{w.tresc} · {w.autor}
-          <span className="h-px flex-1 bg-slate-200" />
-        </p>
-      : w.rodzaj === "komentarz"
+  return <div className="flex min-h-0 flex-1 flex-col">
+  <div ref={listaRef} className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
+    {wypowiedzi.map((w) => <div key={w.id} data-wpis={w.id}
+      className={podswietlony === w.id
+        ? "rounded-lg ring-2 ring-amber-400 ring-offset-2 transition-shadow" : "transition-shadow"}>
+    {w.rodzaj === "komentarz"
       /* §6.4: komentarz ma być WIZUALNIE ODRÓŻNIONY od wiadomości klienta.
          Inna barwa to za mało — kłódka i podpis mówią wprost, że klient tego
          nie widzi, bo to jedyna rzecz, o którą tu naprawdę chodzi. */
@@ -270,8 +292,127 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
               zrodloPomiaru === w.messageId ? "text-amber-700" : "text-slate-500"}`}
             onClick={() => onZrodlo(zrodloPomiaru === w.messageId ? null : w.messageId!)}>
             {zrodloPomiaru === w.messageId ? "✓ źródło pomiaru" : "Zleć z tej wiadomości"}</button>}
-        </article>)}
+        </article>}
+    </div>)}
+  </div>
+
+    {/* Pasek stoi POD oknem wiadomości, nad edytorem — czyli tam, gdzie kończy
+        się czytanie, a zaczyna pisanie odpowiedzi. */}
+    <PasekZdarzen zdarzenia={zdarzenia} onSkocz={skocz} />
   </div>;
+}
+
+/* ── ZDARZENIA SPRAWY ZESZŁY Z OSI DO JEDNEGO PASKA (0.243.0) ────────────────
+   Zgłoszenie właściciela: „can we move all the status changes into one
+   horizontal row below messaging window like a timeline, when clicking on
+   event it goes to that part in messaging window".
+
+   Do 0.242.0 każda zmiana statusu, sklejenie sprawy i każdy krok doboru stały
+   na osi jako osobna kreska między wypowiedziami. Przy jednej sprawie to jest
+   znak, że coś się wydarzyło; przy siedmiu — ściana szarego tekstu, przez
+   którą trzeba się przewinąć, żeby dojść do zdania klienta. Na zrzucie od
+   właściciela dwa takie bloki zajmują więcej miejsca niż obie wypowiedzi
+   razem, i to one, nie rozmowa, dyktują długość przewijania.
+
+   OŚ ZOSTAJE ROZMOWĄ, PASEK ZOSTAJE PRZEBIEGIEM. To są dwa różne pytania:
+   „co klient napisał" i „jak sprawa szła". Pierwsze czyta się po kolei, drugie
+   ogarnia się jednym spojrzeniem — i dlatego jedno jest kolumną, a drugie
+   rzędem.
+
+   Kliknięcie WRACA na oś, bo inaczej rozdzielenie gubiłoby to, co kreska
+   niosła najlepiej: MIEJSCE w rozmowie, w którym stan się zmienił. Celem
+   skoku jest pierwsza wypowiedź PO zdarzeniu — ta, której zdarzenie dotyczy.
+   Gdy zdarzenie jest ostatnie i nic po nim nie padło, celem zostaje ostatnia
+   wypowiedź przed nim, bo skok donikąd byłby przyciskiem bez skutku.        */
+
+const ZDARZENIE: ReadonlySet<string> = new Set(["status", "sprawa", "dobor"]);
+
+type Zdarzenie = WpisOsi & { cel: string | null };
+
+export function rozdziel(wpisy: WpisOsi[]): {
+  wypowiedzi: WpisOsi[]; zdarzenia: Zdarzenie[];
+} {
+  const wypowiedzi: WpisOsi[] = [];
+  const zdarzenia: Zdarzenie[] = [];
+  for (let i = 0; i < wpisy.length; i++) {
+    const w = wpisy[i];
+    if (!ZDARZENIE.has(w.rodzaj)) { wypowiedzi.push(w); continue; }
+    let cel: string | null = null;
+    for (let j = i + 1; j < wpisy.length && cel === null; j++) {
+      if (!ZDARZENIE.has(wpisy[j].rodzaj)) cel = wpisy[j].id;
+    }
+    for (let j = i - 1; j >= 0 && cel === null; j--) {
+      if (!ZDARZENIE.has(wpisy[j].rodzaj)) cel = wpisy[j].id;
+    }
+    zdarzenia.push({ ...w, cel });
+  }
+  return { wypowiedzi, zdarzenia };
+}
+
+/* ── KRÓTKA ETYKIETA I BARWA RODZAJU ────────────────────────────────────────
+   Pierwsza wersja paska pokazywała `tresc` w całości i to była pomyłka
+   zmierzona, nie przeczuta: dziewięć zdarzeń dało 1343 px nadmiaru w poziomie
+   przy kolumnie na 680 px, czyli widać było trzy z dziewięciu. Rząd, po którym
+   trzeba przewijać, nie daje tego jednego spojrzenia, po które się go zakładało.
+
+   Chip niesie STAN DOCELOWY, nie przejście. Stan poprzedni stoi w chipie obok,
+   po lewej — powtarzanie go dublowałoby połowę paska. Pełne zdanie, autor
+   i godzina zostają w podpowiedzi, bo to są dane do sprawdzenia, nie do
+   przeglądania.
+
+   RODZAJ NIESIE BARWA, nie prefiks. „dobór: " przed każdym chipem kosztowało
+   siedem znaków na każdym z nich i mówiło to samo co kolor. */
+const BARWA_ZDARZENIA: Record<string, string> = {
+  status: "border-slate-200 bg-white text-slate-600",
+  dobor: "border-sky-200 bg-sky-50 text-sky-900",
+  dobor_wybor: "border-sky-200 bg-sky-50 text-sky-900",
+  sprawa: "border-violet-200 bg-violet-50 text-violet-900",
+};
+
+function etykieta(z: Zdarzenie): string {
+  const e = z.zdarzenie;
+  /* Bez pola strukturalnego zostaje pełne zdanie. To nie jest martwa gałąź:
+     oś bywa czytana z odpowiedzi zapisanej przed 0.243.0. */
+  if (!e) return z.tresc;
+  if (e.rodzaj === "status") return e.po ? NAZWA[e.po as StatusRozmowy] ?? e.po : z.tresc;
+  if (e.rodzaj === "dobor") return e.po ? NAZWA_DOBORU[e.po as StatusDoboru] ?? e.po : z.tresc;
+  if (e.rodzaj === "dobor_wybor") {
+    return `${e.wybrano ? "wybrano" : "zdjęto"} ${e.symbol ?? "?"}`;
+  }
+  /* Gałąź JAWNA, nie „reszta": `"status" | "dobor"` to jeden wariant unii,
+     więc dwa `return` wyżej go nie wyczerpują i TypeScript ma rację. */
+  if (e.rodzaj === "sprawa") {
+    return e.dolaczona ? `sprawa: ${e.tytul ?? "?"}` : "odłączono od sprawy";
+  }
+  return z.tresc;
+}
+
+function PasekZdarzen({ zdarzenia, onSkocz }: {
+  zdarzenia: Zdarzenie[];
+  onSkocz: (celId: string) => void;
+}) {
+  /* Pusty pasek NIE ZOSTAJE jako pusta ramka. Rozmowa bez ani jednej zmiany
+     stanu jest częsta i pas szarości pod nią mówiłby, że czegoś brakuje. */
+  if (!zdarzenia.length) return null;
+
+  return <nav aria-label="Przebieg sprawy"
+    className="shrink-0 border-t bg-slate-50 px-3 py-2">
+    {/* Przewijanie w POZIOMIE, nie zawijanie do drugiego rzędu: pasek ma mieć
+        stałą wysokość, bo rośnie kosztem osi, czyli kosztem rozmowy. */}
+    <ol className="flex items-center gap-1.5 overflow-x-auto">
+      {zdarzenia.map((z, i) => <li key={z.id} className="flex shrink-0 items-center gap-1.5">
+        {i > 0 && <ArrowRight size={11} className="shrink-0 text-slate-300" />}
+        <button type="button" disabled={z.cel === null}
+          onClick={() => z.cel !== null && onSkocz(z.cel)}
+          title={`${z.tresc} · ${z.autor} · ${czas(z.at)}`}
+          className={`max-w-[14rem] truncate rounded-full border px-2.5 py-1 text-xs ${
+            BARWA_ZDARZENIA[z.zdarzenie?.rodzaj ?? "status"] ?? BARWA_ZDARZENIA.status} ${
+            z.cel === null ? "cursor-default opacity-60" : "hover:ring-2 hover:ring-amber-300"}`}>
+          {etykieta(z)}
+        </button>
+      </li>)}
+    </ol>
+  </nav>;
 }
 
 /* ── ZLECENIE DLA HALI NA OSI (0.226.0) ──────────────────────────────────────

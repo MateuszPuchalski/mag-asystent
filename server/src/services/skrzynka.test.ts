@@ -1077,3 +1077,48 @@ test("message.created mówi, czy pisał klient i czy to odbicie", async () => {
     [false, false],  // nasza odpowiedź
   ]);
 });
+
+/* ── ZDARZENIA SPRAWY NIOSĄ KLUCZE, NIE TYLKO ZDANIE (0.243.0) ───────────────
+   Pasek zdarzeń w panelu pokazuje krótką etykietę po polsku, a słownik
+   polszczyzny stoi po tamtej stronie. Bez tych pól panel musiałby rozbierać
+   `tresc` z powrotem na części — czyli traktować zdanie dla człowieka jak
+   format danych. `tresc` ZOSTAJE nietknięta, bo niesie ją podpowiedź. */
+test("oś podaje zdarzenia sprawy rozłożone na klucze, obok gotowego zdania", () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
+    subject,unread,updated_at) VALUES (?,'w-zdarz','kupujacy_9',0,'2026-09-01T10:00:00.000Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-zdarz-1','incoming','Pytanie','2026-09-01T09:00:00.000Z')`).run(r, konto);
+
+  const zdarz = d.prepare(`INSERT INTO conversation_event(conversation_id,event_type,payload,created_at)
+    VALUES (?,?,?,?)`);
+  zdarz.run(r, "status_changed",
+    JSON.stringify({ przed: "new", po: "open", autor: "klient" }), "2026-09-01T09:10:00.000Z");
+  zdarz.run(r, "dobor_status_changed",
+    JSON.stringify({ przed: "searching", po: "confirmed", autor: "Biuro" }), "2026-09-01T09:20:00.000Z");
+  zdarz.run(r, "dobor_wybrano",
+    JSON.stringify({ symbol: "W09-0513", droga: "wyszukiwarka", autor: "Biuro" }), "2026-09-01T09:30:00.000Z");
+  zdarz.run(r, "sprawa_dolaczona",
+    JSON.stringify({ tytul: "Linka T375", autor: "Biuro" }), "2026-09-01T09:40:00.000Z");
+
+  const wpisy = osRozmowy(r).os;
+  const zdarzenie = (rodzaj: string) => wpisy.find((w) => w.rodzaj === rodzaj)?.zdarzenie;
+
+  assert.deepEqual(zdarzenie("status"), { rodzaj: "status", po: "open" });
+  /* Dwa różne zdarzenia doboru dają DWA różne kształty — panel rysuje z nich
+     co innego, więc zlanie ich w jeden kształt kazałoby mu zgadywać. */
+  const dobory = wpisy.filter((w) => w.rodzaj === "dobor").map((w) => w.zdarzenie);
+  assert.deepEqual(dobory, [
+    { rodzaj: "dobor", po: "confirmed" },
+    { rodzaj: "dobor_wybor", wybrano: true, symbol: "W09-0513" },
+  ]);
+  assert.deepEqual(zdarzenie("sprawa"),
+    { rodzaj: "sprawa", dolaczona: true, tytul: "Linka T375" });
+
+  /* Zdanie dla człowieka zostaje nietknięte — to ono stoi w podpowiedzi. */
+  assert.equal(wpisy.find((w) => w.rodzaj === "status")?.tresc, "new → open");
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});
