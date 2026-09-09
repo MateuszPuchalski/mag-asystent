@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.243.0 — 9 września 2026
+
+**Zdarzenia sprawy zeszły z osi do jednego paska pod oknem wiadomości.**
+Zgłoszenie właściciela: przenieść wszystkie zmiany statusu do poziomego rzędu
+jak oś czasu, a kliknięcie ma prowadzić do tego miejsca w rozmowie.
+
+Do 0.242.0 zmiana statusu, sklejenie sprawy i każdy krok doboru stały między
+wypowiedziami jako kreski. Przy jednym zdarzeniu to znak, że sprawa przeszła
+dalej; przy dziewięciu — ściana szarego tekstu, przez którą trzeba się
+przewinąć do zdania klienta. Na zrzucie od właściciela dwa takie bloki zajmują
+więcej miejsca niż obie wypowiedzi razem i to one dyktują długość przewijania.
+
+Oś zostaje ROZMOWĄ, pasek zostaje PRZEBIEGIEM. To dwa różne pytania: „co klient
+napisał" i „jak sprawa szła". Pierwsze czyta się po kolei, drugie ogarnia
+jednym spojrzeniem — dlatego jedno jest kolumną, a drugie rzędem.
+
+Kliknięcie wraca na oś: celem jest pierwsza wypowiedź PO zdarzeniu, a gdy
+zdarzenie jest ostatnie — ostatnia przed nim, bo przycisk bez skutku jest
+gorszy niż brak przycisku. Cel podświetla się na moment i gaśnie sam; trwałe
+podświetlenie byłoby stanem, którego nikt nie zdejmuje.
+
+Jedna rzecz wyszła dopiero z pomiaru i warto ją zapisać. Pierwsza wersja paska
+pokazywała pełne zdanie z osi — dziewięć zdarzeń dało 1343 px nadmiaru
+w poziomie przy kolumnie na 680 px, czyli widać było TRZY z dziewięciu. Rząd,
+po którym trzeba przewijać, nie daje tego jednego spojrzenia, po które się go
+zakładało. Chip niesie więc stan DOCELOWY (stan poprzedni stoi w chipie obok),
+a rodzaj niesie barwa zamiast prefiksu „dobór: ". Po skróceniu: 471 px
+i sześć z dziewięciu.
+
+Serwis podaje zdarzenie rozłożone na klucze (`zdarzenie` obok `tresc`),
+a polszczyznę składa panel ze słownika, który już miał. Panel nie rozbiera
+`tresc` — to zdanie dla człowieka, nie format danych. `tresc` zostaje
+nietknięta i niesie ją podpowiedź chipa razem z autorem i godziną.
+
+Strażnicy: `panel/src/skrzynka/OsStatus.test.tsx` pilnuje, że przebieg dalej
+widać, że oś przestała nieść kreski i że kliknięcie skacze pod właściwy wpis;
+`server/src/services/skrzynka.test.ts` — że serwis podaje klucze obok zdania.
+Skok, podświetlenie i jego wygaszenie sprawdzone dodatkowo w przeglądarce.
+
 ## 0.242.0 — 9 września 2026
 
 **Werdykt reklamacji wychodzi z panelu: uznanie albo odrzucenie do Allegro,

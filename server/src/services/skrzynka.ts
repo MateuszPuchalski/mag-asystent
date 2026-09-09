@@ -143,6 +143,18 @@ export interface WpisOsi {
     przypisanoPrzez: string | null;
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
+  /**
+   * Zdarzenie sprawy w postaci KLUCZY (0.243.0) — przy `status`, `sprawa`
+   * i `dobor`. `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
+   * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
+   * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
+   * zostają w bazie i w API. Panel nie ma prawa rozbierać `tresc` z powrotem:
+   * to jest zdanie dla człowieka, a nie format.
+   */
+  zdarzenie?:
+    | { rodzaj: "status" | "dobor"; po: string | null }
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
+    | { rodzaj: "sprawa"; dolaczona: boolean; tytul: string | null };
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
@@ -717,6 +729,12 @@ export function osRozmowy(id: number): {
       id: `status-${z.id}`, rodzaj: "status", autor: String(p.autor ?? "system"),
       odKlienta: false, tresc: `${p.przed ?? "?"} → ${p.po ?? "?"}`,
       at: String(z.created_at), ofertaId: null,
+      /* KLUCZ, NIE ZDANIE (0.243.0). `tresc` zostaje dla podpowiedzi, ale pasek
+         zdarzeń potrzebuje krótkiej etykiety PO POLSKU, a słownik polszczyzny
+         stoi w panelu (`skrzynka/statusy.ts`) — tak jak wszędzie indziej:
+         angielskie klucze w bazie i w API, polszczyzna na ekranie. Panel nie
+         ma parsować `tresc`, bo to jest zdanie dla człowieka, nie format. */
+      zdarzenie: { rodzaj: "status", po: p.po ?? null },
     });
   }
 
@@ -734,6 +752,11 @@ export function osRozmowy(id: number): {
       odKlienta: false,
       tresc: `${String(z.event_type) === "sprawa_dolaczona" ? "dołączono do sprawy" : "odłączono od sprawy"} „${p.tytul ?? "?"}"`,
       at: String(z.created_at), ofertaId: null,
+      zdarzenie: {
+        rodzaj: "sprawa",
+        dolaczona: String(z.event_type) === "sprawa_dolaczona",
+        tytul: p.tytul ?? null,
+      },
     });
   }
 
@@ -756,6 +779,9 @@ export function osRozmowy(id: number): {
     os.push({
       id: `dobor-${z.id}`, rodzaj: "dobor", autor: String(p.autor ?? "system"),
       odKlienta: false, tresc, at: String(z.created_at), ofertaId: null,
+      zdarzenie: typ === "dobor_status_changed"
+        ? { rodzaj: "dobor", po: p.po ?? null }
+        : { rodzaj: "dobor_wybor", wybrano: typ === "dobor_wybrano", symbol: p.symbol ?? null },
     });
   }
 
