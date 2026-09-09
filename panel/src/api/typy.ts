@@ -1075,6 +1075,77 @@ export interface SzczegolReklamacji {
   } | null;
 }
 
+/* ── Dyskusje (0.245.0) ──────────────────────────────────────────────────────
+   Ten sam zasób Allegro co reklamacje, ta sama tabela i ten sam czat — więc
+   `WiadomoscReklamacji` i `ZalacznikReklamacji` obsługują oba ekrany. Różni
+   się WIERSZ: dyskusja nie ma numeru, terminu, prawa, powodu, oczekiwania,
+   kwoty ani oferty. Schemat mówi przy każdym z tych pól `Null for disputes`,
+   więc powtórzenie ich tutaj jako `null` byłoby obietnicą pustych kolumn. */
+
+export type KubelekDyskusji = "odpowiedz" | "klient" | "zamknieta";
+
+export type SygnalDyskusji =
+  | "klient_czeka" | "doradca" | "czat_zamkniety"
+  | "nierozstrzygnieta" | "status_nieznany";
+
+export interface Dyskusja {
+  id: number;
+  externalId: string;
+  orderId: string | null;
+  kupujacyLogin: string | null;
+  temat: string | null;
+  opis: string | null;
+  /** DISPUTE_ONGOING, DISPUTE_CLOSED albo DISPUTE_UNRESOLVED. */
+  statusAllegro: string | null;
+  czatAktywny: boolean;
+  wiadomosciIle: number;
+  ostatniaWiadomoscStatus: string | null;
+  ostatniaWiadomoscAt: string | null;
+  /** Czy ruch należy do nas — z niego biorą się kubełek i czas czekania. */
+  ruchNasz: boolean;
+  /**
+   * Ile dni piłka jest po naszej stronie; `null`, gdy nie jest.
+   *
+   * TO NIE JEST TERMIN i ekran nie ma prawa tak tego nazwać. Allegro dla
+   * dyskusji zegara nie oddaje — to jest fakt o naszej skrzynce.
+   */
+  czekaOdDni: number | null;
+  dlugoCzeka: boolean;
+  otwartoAt: string;
+  prowadzi: string | null;
+  prowadziAt: string | null;
+  notatka: string | null;
+  /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */
+  zakonczenieStatus: "sent" | "send_uncertain" | null;
+  zakonczenieAt: string | null;
+  zakonczeniePrzez: string | null;
+  wersja: number;
+  kubelek: KubelekDyskusji;
+  sygnaly: SygnalDyskusji[];
+  linkZamowienia: string | null;
+}
+
+export interface KolejkaDyskusji {
+  dyskusje: Dyskusja[];
+  liczniki: Record<KubelekDyskusji, number>;
+  /** Pasek synchronizacji jest WSPÓLNY: obie sprawy jadą jedną listą. */
+  stan: StanReklamacji;
+}
+
+export interface SzczegolDyskusji {
+  dyskusja: Dyskusja;
+  czat: WiadomoscReklamacji[];
+  zalaczniki: ZalacznikReklamacji[];
+  zwroty: Zwrot[];
+  rozmowy: Array<{ id: number; temat: string | null; status: string; ostatniaAt: string | null }>;
+}
+
+/** Wynik prośby o zakończenie — los próby, nie potwierdzenie zamknięcia. */
+export interface WynikZakonczenia {
+  status: "sent" | "send_uncertain";
+  wersja: number;
+}
+
 /** Wynik wysyłki odpowiedzi w reklamacji (0.224.0). */
 export interface WynikOdpowiedziReklamacji {
   status: "sending" | "sent" | "send_uncertain" | "send_failed";

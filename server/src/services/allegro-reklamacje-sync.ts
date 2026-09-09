@@ -26,11 +26,16 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
       `status` i `checkoutForm.id` — ani `from`, ani granicy dat. Lista jest
       posortowana malejąco po dacie otwarcia, więc każdy przebieg czyta ją od
       początku i po prostu nadpisuje to, co już zna.
-   2. ODSIEWAMY DYSKUSJE. Ta sama końcówka niesie `DISPUTE` i `CLAIM`; panel
-      prowadzi wyłącznie reklamacje (decyzja właściciela z 6 września 2026).
-      Filtr stoi TUTAJ, w jednym miejscu, a liczba odsianych idzie do stanu
-      synchronizacji — inaczej ktoś szukałby kiedyś reklamacji, która nigdy
-      reklamacją nie była.
+   2. KLASYFIKUJEMY, A NIE ODSIEWAMY (od 0.245.0). Ta sama końcówka niesie
+      `DISPUTE` i `CLAIM`. Do 0.244.0 dyskusje leciały do kosza w pamięci:
+      panel prowadził wyłącznie reklamacje, decyzją właściciela z 6 września
+      2026. Właściciel odwrócił ją 9 września i dyskusje mają własny ekran
+      (§25c), więc obie gałęzie idą do bazy, a `typ` bierze się z ładunku.
+
+      Licznik `dyskusji` w stanie synchronizacji ZOSTAJE i zmienia znaczenie
+      z „ile wyrzuciliśmy" na „ile przyjechało". Jest wtedy kontrolą krzyżową
+      dla licznika kolejki dyskusji: rozjazd tych dwóch liczb znaczy, że coś
+      nie doszło do zapisu.
    3. CZAT DOCIĄGAMY OSOBNO I Z LIMITEM. Lista niesie samą PIERWSZĄ wiadomość
       (`chat.initialMessage`) oraz licznik i status ostatniej. Pełna rozmowa to
       jedno żądanie NA SPRAWĘ, więc pytamy tylko o te, w których licznik
@@ -138,7 +143,14 @@ function liczba(value: unknown): number | null {
   return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
 
-/** Czy sprawa jest reklamacją. Dyskusji panel nie prowadzi. */
+/**
+ * Czy sprawa jest reklamacją.
+ *
+ * Do 0.244.0 był to FILTR i wszystko, co nie było reklamacją, przepadało.
+ * Dziś jest klasyfikatorem: obie gałęzie lądują w bazie, a ta funkcja mówi
+ * już tylko, którą kolejkę sprawa zasili. Zapis bierze `typ` z ładunku,
+ * nie stąd — jedno źródło prawdy o typie to samo pole, które przysłało Allegro.
+ */
 export const czyReklamacja = (s: Sprawa): boolean => s.type === "CLAIM";
 
 /**
@@ -169,7 +181,9 @@ export async function synchronizujAllegroReklamacje(
   const interval = deps.intervalMs ?? config.allegro.reklamacjeSyncMs;
   const budzetCzatow = deps.czatow ?? CZATOW_NA_PRZEBIEG;
 
-  const reklamacje: Sprawa[] = [];
+  /* JEDNA lista do zapisu, nie dwie. `typ` rozróżnia je w bazie, a rozdzielenie
+     ich tutaj kazałoby pamiętać o obu przy każdej zmianie zapisu. */
+  const sprawy: Sprawa[] = [];
   let pobrano = 0;
   let dyskusji = 0;
   let wszystkich: number | null = null;
@@ -185,8 +199,8 @@ export async function synchronizujAllegroReklamacje(
       pobrano += partia.length;
       for (const sprawa of partia) {
         if (typeof sprawa?.id !== "string") continue;
-        if (czyReklamacja(sprawa)) reklamacje.push(sprawa);
-        else dyskusji += 1;
+        sprawy.push(sprawa);
+        if (!czyReklamacja(sprawa)) dyskusji += 1;
       }
       if (partia.length < NA_STRONE) { komplet = true; break; }
     }
@@ -201,7 +215,7 @@ export async function synchronizujAllegroReklamacje(
     let konto = 0;
     transaction(database, () => {
       konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-      for (const sprawa of reklamacje) zapisz(database, sprawa, konto, at);
+      for (const sprawa of sprawy) zapisz(database, sprawa, konto, at);
       database.prepare(`INSERT INTO allegro_reklamacje_sync_state
         (id,last_success_at,last_attempt_at,last_error_code,error_count,
          next_attempt_at,pozostalo,dyskusji)
@@ -218,7 +232,7 @@ export async function synchronizujAllegroReklamacje(
     const czatow = await uzupelnijCzaty(database, konto, {
       query, apiUrl, limit: budzetCzatow,
     });
-    return { reklamacji: reklamacje.length, dyskusji, czatow };
+    return { reklamacji: sprawy.length - dyskusji, dyskusji, czatow };
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
@@ -239,12 +253,24 @@ export async function synchronizujAllegroReklamacje(
  *
  * Licznik `chat.messagesCount` z listy jest tu jedynym sygnałem: gdy zgadza się
  * z liczbą wiadomości, które mamy, rozmowa jest kompletna i pytanie o nią byłoby
- * żądaniem bez treści. Kolejność bierze się z TERMINU DECYZJI rosnąco — przy
- * ciasnym budżecie pierwszeństwo ma sprawa, która się najbardziej pali, a nie
- * ta, która przypadkiem stoi wyżej na liście Allegro.
+ * żądaniem bez treści.
+ *
+ * KOLEJNOŚĆ MA DWA CZŁONY, bo od 0.245.0 w tabeli stoją dwa rodzaje spraw.
+ * Najpierw termin decyzji rosnąco: przy ciasnym budżecie pierwszeństwo ma
+ * reklamacja, która się najbardziej pali. Dyskusja terminu NIE MA — Allegro
+ * nie oddaje jej ani `decisionDueDate`, ani `statusDueDate` — więc sam ten
+ * człon zsunąłby wszystkie dyskusje na koniec i przy dwudziestu reklamacjach
+ * w toku żadna nie dostałaby rozmowy nigdy. Drugim członem jest więc data
+ * ostatniej wiadomości rosnąco, czyli „kto czeka najdłużej".
+ *
+ * Zaległość pierwszego przebiegu po zdjęciu filtru domyka się sama: przy
+ * budżecie dwudziestu rozmów i takcie trzech minut trzydzieści pięć dyskusji
+ * schodzi w dwóch taktach.
  *
  * Sprawy rozstrzygnięte odpadają: ich rozmowa już niczego nie zmieni, a każde
- * żądanie to koszt u Allegro.
+ * żądanie to koszt u Allegro. Dla dyskusji stanem końcowym jest
+ * `DISPUTE_CLOSED`; bez niego zamknięte dyskusje wracałyby po rozmowę przy
+ * każdym przebiegu, dopóki Allegro nie odda kompletu wiadomości.
  */
 export function czatyDoUzupelnienia(
   database: Db, konto: number, limit = CZATOW_NA_PRZEBIEG,
@@ -255,10 +281,12 @@ export function czatyDoUzupelnienia(
     SELECT r.id, r.external_id
       FROM reklamacja_klienta r
      WHERE r.channel_account_id = ?
-       AND COALESCE(r.status_allegro,'') NOT IN ('CLAIM_ACCEPTED','CLAIM_REJECTED')
+       AND COALESCE(r.status_allegro,'') NOT IN
+           ('CLAIM_ACCEPTED','CLAIM_REJECTED','DISPUTE_CLOSED')
        AND r.wiadomosci_ile >
            (SELECT COUNT(*) FROM reklamacja_wiadomosc w WHERE w.reklamacja_id = r.id)
-     ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.id ASC
+     ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC,
+              r.ostatnia_wiadomosc_at IS NULL, r.ostatnia_wiadomosc_at ASC, r.id ASC
      LIMIT ?`).all(konto, Math.max(0, limit)) as Array<{ id: number; external_id: string }>;
   return wiersze.map((w) => ({ id: Number(w.id), externalId: String(w.external_id) }));
 }

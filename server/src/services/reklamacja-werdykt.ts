@@ -97,7 +97,14 @@ function wiersz(database: Db, id: number): Wiersz {
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
-     WHERE r.id=?`).get(id) as Wiersz | undefined;
+     WHERE r.id=? AND r.typ='CLAIM'`).get(id) as Wiersz | undefined;
+  /* Warunek na `typ` jest BRAMKĄ CAŁEJ ŚCIEŻKI WERDYKTU, nie ozdobą zapytania.
+     Allegro odmawia werdyktu na dyskusji („Not a valid operation for
+     disputes"), a od 0.245.0 obie sprawy leżą w jednej tabeli — bez tego
+     warunku panel wysłałby żądanie, o którym z góry wiadomo, że wróci błędem,
+     i zostawiłby po nim `werdykt_status='send_failed'` na sprawie, która
+     werdyktu mieć nie może. Zapisy niżej działają na wierszu, który przeszedł
+     tędy. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   return w;
 }
@@ -189,6 +196,9 @@ export async function wydajWerdykt(
       throw new ReklamacjaConflict({ werdyktStatus: swiezy.werdykt_status },
         "Werdykt już wyszedł albo jest w drodze — drugiego Allegro nie przyjmie");
     }
+    /* bez typu: wiersz przeszedł przez bramkę `wiersz()` wyżej w tej samej
+       transakcji, więc jest reklamacją; powtórzony warunek udawałby drugą
+       niezależną kontrolę. */
     database.prepare(`UPDATE reklamacja_klienta
         SET werdykt=?, werdykt_wiadomosc=?, werdykt_kwota_grosze=?, werdykt_at=?,
             werdykt_przez=?, werdykt_user_id=?, werdykt_status='sending', werdykt_blad=NULL,
@@ -219,10 +229,13 @@ export async function wydajWerdykt(
   }
 
   const wersja = transaction(database, () => {
+    /* bez typu: dopisek losu do próby, która już wyszła — sprawę rozstrzygnęła
+       bramka przed strzałem do Allegro. */
     database.prepare(
       "UPDATE reklamacja_klienta SET werdykt_status=?, werdykt_blad=? WHERE id=?",
     ).run(status, blad, id);
     logEvent("reklamacja_werdykt", kto.name, null, { id, werdykt, status, kod }, undefined, database);
+    /* bez typu: sam numer wersji do odpowiedzi, po zapisie wyżej. */
     return Number((database.prepare("SELECT wersja FROM reklamacja_klienta WHERE id=?")
       .get(id) as { wersja: number }).wersja);
   })();
@@ -266,7 +279,8 @@ export async function zdecydujZwrotTowaru(z: ZadanieZwrotuTowaru): Promise<Wynik
     throw new BladReklamacji("Decyzja o towarze to „wymagany” albo „niewymagany”");
   }
   const w = database.prepare(
-    "SELECT werdykt, werdykt_status, zwrot_towaru FROM reklamacja_klienta WHERE id=?",
+    `SELECT werdykt, werdykt_status, zwrot_towaru FROM reklamacja_klienta
+      WHERE id=? AND typ='CLAIM'`,
   ).get(z.reklamacjaId) as
     { werdykt: string | null; werdykt_status: string | null; zwrot_towaru: string | null } | undefined;
   if (!w) throw new BladReklamacji(`Reklamacja ${z.reklamacjaId} nie istnieje`, 404);
@@ -291,6 +305,8 @@ export async function zdecydujZwrotTowaru(z: ZadanieZwrotuTowaru): Promise<Wynik
   /* Próba WYSZŁA (albo mogła wyjść). Porażka kodem rzuciła wyżej i wiersza
      nie dotknęła — wolno spróbować jeszcze raz. */
   transaction(database, () => {
+    /* bez typu: stanowisko o towarze zapisujemy dopiero po udanej wysyłce,
+       a ta poszła przez bramkę uznanej reklamacji. */
     database.prepare(`UPDATE reklamacja_klienta
         SET zwrot_towaru=?, zwrot_towaru_at=datetime('now'), wersja=wersja+1
       WHERE id=? AND zwrot_towaru IS NULL`).run(decyzja, z.reklamacjaId);

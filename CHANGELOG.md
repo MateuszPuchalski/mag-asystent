@@ -34,6 +34,58 @@ historii nie przepisujemy.
 ---
 
 
+## 0.245.0 — 9 września 2026
+
+**Panel dyskusji.** Zgłoszenie właściciela: „zaprojektuj Panel dyskusji", potem
+„przejdź do wykonania". Projekt wszedł w 0.243.1 jako §25c; to jest jego
+wykonanie, w jednym przyroście zamiast trzech — maszyneria reklamacji stała już
+gotowa, więc do napisania został model pracy i ekran, a nie integracja.
+
+**Dyskusje przestały lecieć do kosza.** Allegro trzyma dyskusje i reklamacje
+pod jednym zasobem `/sale/issues` i rozróżnia je polem `type`. Od 0.222.0 każdy
+przebieg synchronizacji pobierał jedne i drugie, po czym dyskusje wyrzucał
+jedną linią. Na żywym koncie to 35 spraw na 100, w tym 25 otwartych.
+
+**Zegara tu nie ma i ekran mówi to wprost.** `decisionDueDate` i `statusDueDate`
+są przy dyskusji zawsze puste, więc pilność liczymy sami: od kiedy piłka jest
+po naszej stronie. Wiersz mówi **„czeka 5 dni"**, nigdy „termin" — to fakt
+o naszej skrzynce, nie zobowiązanie wobec kupującego. Blizna 0.121.0 była
+dokładnie odwrotna: ustawowy zegar czternastu dni liczony przez nas
+i rozjeżdżający się z tym, co widział kupujący.
+
+**Doradca Allegro stawia piłkę po NASZEJ stronie** i to jedyna reguła, która
+różni tę kolejkę od reklamacyjnej. Tam `ALLEGRO_ADVISOR_REPLIED` jest samym
+sygnałem, bo o kolejności rozstrzyga zegar. Tutaj zegara nie ma, a doradca
+odezwał się jako ostatni w 61 sprawach na 100 — zostawienie go poza kubełkiem
+„do odpowiedzi" wsadziłoby większość dyskusji do „czeka na klienta" w chwili,
+gdy czeka Allegro.
+
+**Przycisk nazywa się POPROŚ O ZAKOŃCZENIE, nie ZAKOŃCZ.** Enum Allegro nazywa
+tę wartość `END_REQUEST` — żądaniem — i nigdzie nie obiecuje, że dyskusja się
+od niej zamknie. Stan sprawy czytamy wyłącznie z synchronizacji. Operacja stoi
+za własnym uprawnieniem z wpisem `privileged`, wymaga wiadomości dla kupującego
+i zgody przed kliknięciem. Znacznik `[WERYFIKUJ]` schodzi po pierwszym udanym
+zakończeniu na żywym koncie.
+
+**Jedna tabela, rozróżnik niosący.** Identyfikatory obu bytów żyją w jednej
+przestrzeni — specyfikacja opisuje `{issueId}` jako „Dispute or claim
+identifier" — więc trzyma je jedna tabela; dwie czyniłyby z „jedna sprawa =
+jeden wiersz" umowę, której baza nie pilnuje.
+
+**Strażnik złapał przy okazji prawdziwą dziurę.** Ścieżka werdyktu nie
+sprawdzała rodzaju sprawy, bo do 0.244.0 nie miała czego: dyskusje nie
+docierały do bazy. Po zdjęciu filtru dało się wysłać werdykt na dyskusję,
+której Allegro werdyktu nie przyjmie. Teraz każde sięgnięcie do tabeli spraw
+niesie warunek na `typ`, a zwolnienie wymaga zdania z powodem — tak samo jak
+cel dotyku mniejszy niż 48 dp na kolektorze.
+
+Wdrożenie: nic ręką. Migracja dokłada pięć kolumn i przebudowuje `CHECK`
+skrzynki nadawczej o wartość `END_REQUEST`; zero nowych ustawień.
+
+- `services/dyskusje.ts`, `services/dyskusja-zakonczenie.ts`, `routes/dyskusje.ts`
+- zakładka DYSKUSJE: `panel/src/ekrany/Dyskusje.tsx`, `panel/src/dyskusje/`
+- czat, edytor i dialog konfliktu wspólne z reklamacjami — bez kopiowania
+- §25c dokumentacji na stan zbudowany, polityka danych dyskusji, `allegro-ksztalt.md`
 ## 0.244.0 — 9 września 2026
 
 **Zdjęcia w rozmowach skrzynki znów się wyświetlają, a każda odmowa ma

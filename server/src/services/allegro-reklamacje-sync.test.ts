@@ -72,7 +72,13 @@ function api(issues: unknown[], czat: unknown[] = []) {
   return { query, wywolania };
 }
 
-test("dyskusje nie wchodzą do rejestru, ale są POLICZONE", async () => {
+test("dyskusje WCHODZĄ do rejestru z własnym typem i są policzone (0.245.0)", async () => {
+  /* Do 0.244.0 ten test pilnował rzeczy odwrotnej: dyskusje leciały do kosza
+     w pamięci, bo panel prowadził wyłącznie reklamacje. Właściciel odwrócił tę
+     decyzję 9 września 2026, więc obie gałęzie lądują w bazie, a rozróżnia je
+     kolumna `typ`. Licznik `dyskusji` ZOSTAŁ i zmienił znaczenie z „ile
+     wyrzuciliśmy" na „ile przyjechało" — jest teraz kontrolą krzyżową dla
+     licznika kolejki dyskusji. */
   const d = baza();
   const { query } = api([
     sprawa(),
@@ -82,16 +88,36 @@ test("dyskusje nie wchodzą do rejestru, ale są POLICZONE", async () => {
 
   const wynik = await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
 
-  assert.equal(wynik.reklamacji, 1, "do rejestru wchodzi wyłącznie CLAIM");
+  assert.equal(wynik.reklamacji, 1, "licznik reklamacji nie liczy dyskusji");
   assert.equal(wynik.dyskusji, 2);
   /* `node:sqlite` oddaje wiersze BEZ prototypu, a `deepEqual` ze `strict`
      porównuje także prototyp — stąd rozłożenie na zwykły obiekt. */
-  const w = (d.prepare("SELECT external_id, typ FROM reklamacja_klienta").all() as
-    Array<Record<string, unknown>>).map((r) => ({ ...r }));
-  assert.deepEqual(w, [{ external_id: "i-1", typ: "CLAIM" }]);
-  /* Liczba odsianych stoi w stanie synchronizacji, bo bez niej ktoś szukałby
-     kiedyś reklamacji, która nigdy reklamacją nie była. */
+  const w = (d.prepare("SELECT external_id, typ FROM reklamacja_klienta ORDER BY external_id")
+    .all() as Array<Record<string, unknown>>).map((r) => ({ ...r }));
+  assert.deepEqual(w, [
+    { external_id: "i-1", typ: "CLAIM" },
+    { external_id: "i-2", typ: "DISPUTE" },
+    { external_id: "i-3", typ: "DISPUTE" },
+  ], "typ bierze się z ładunku Allegro, nie z gałęzi kodu");
   assert.equal(stanReklamacji(d).dyskusji, 2);
+});
+
+test("dyskusja bez pól reklamacyjnych zapisuje się pustymi kolumnami, nie zgadywanymi", async () => {
+  /* Schemat mówi `Null for disputes` przy `referenceNumber`, `decisionDueDate`,
+     `reason`, `right` i `expectations`. Podstawienie tam czegokolwiek zrobiłoby
+     z dyskusji reklamację bez tytułu prawnego. */
+  const d = baza();
+  const { query } = api([sprawa({
+    id: "d-1", type: "DISPUTE", referenceNumber: null, right: null,
+    decisionDueDate: null, reason: null, expectations: null,
+  })]);
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
+  const w = d.prepare("SELECT * FROM reklamacja_klienta WHERE external_id='d-1'")
+    .get() as Record<string, unknown>;
+  assert.equal(w.typ, "DISPUTE");
+  for (const kolumna of ["reference_number", "decyzja_do", "prawo", "powod_typ", "oczekiwanie"]) {
+    assert.equal(w[kolumna], null, kolumna);
+  }
 });
 
 test("mapowanie bierze zegar Z ALLEGRO, nie liczy go samo", async () => {

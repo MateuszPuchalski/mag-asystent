@@ -632,6 +632,44 @@ wiadomo". Do dziennika idą długości, kody HTTP i nazwa operacji
 uprzywilejowanej, nigdy treść. Stanowisko o towarze po uznaniu jedzie tą
 samą kolejką co odpowiedź i podlega tym samym regułom kopii.
 
+## Polityka danych dyskusji (0.245.0)
+
+Dyskusja jest tym samym zasobem Allegro co reklamacja i leży w tej samej
+tabeli, więc obowiązuje ją cała polityka rozdziału wyżej. Ten rozdział mówi
+wyłącznie o RÓŻNICACH, bo powtórzenie reszty zestarzałoby się osobno.
+
+**Zapisujemy mniej, bo Allegro daje mniej.** Dyskusja nie niesie numeru
+sprawy, terminu, tytułu prawnego, powodu, oczekiwania ani kwoty — schemat
+opisuje każde z tych pól jako nieobecne przy `type: "DISPUTE"`. Kolumny na nie
+zostają puste i nic ich nie podstawia. Zostaje login kupującego, temat,
+zgłoszenie własnymi słowami, numer zamówienia, cała rozmowa i nasze notatki.
+
+**Rozmowa dyskusyjna jest dowodem w sporze** i jej kopia lokalna jest ceną za
+działający ekran — dokładnie tak samo, jak przy skrzynce w 0.143.0 i przy
+reklamacji w 0.222.0.
+
+**Co opuszcza maszynę przy odpowiedzi.** Wyłącznie tekst napisany przez agenta
+i identyfikator sprawy. Nic poza tym: ani notatka wewnętrzna, ani znacznik
+„kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia.
+
+**Prośba o zakończenie wysyła to samo**: tekst agenta i identyfikator sprawy,
+z inną wartością pola `type`. Kupujący czyta ten tekst, więc panel wymaga go
+przed wysłaniem, zamiast pozwolić Allegro odrzucić puste żądanie.
+
+**Załączników wychodzących nie ma** — decyzja właściciela z 7 września 2026
+obowiązuje tu tak samo.
+
+**Do dziennika nie idzie treść.** Zapisujemy DŁUGOŚĆ, los próby i kody, nigdy
+słowa: `events` nie ma retencji i nie jest kasowane. Zdarzenia mają własne
+nazwy (`dyskusja_odpowiedz`, `dyskusja_zakonczenie`), żeby ślad mówił, o którą
+sprawę chodziło.
+
+**Hala nie widzi dyskusji.** Bramka roli stoi na każdej trasie, także na
+odczycie.
+
+**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
+ekranu, tak samo jak nie ma go do reklamacji.
+
 ## Co się nie zmienia
 
 Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:

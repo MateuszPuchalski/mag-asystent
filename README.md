@@ -68,6 +68,13 @@ React z Tailwind CSS. Wysyła pomiary i weryfikacje bezpośrednio na kolektory
 magazynierów, a wykonany wynik wraca do biura; pod `/obsluga/skrzynka` czyta
 zsynchronizowane rozmowy Allegro.
 
+Sprawy posprzedażowe Allegro mają dwie zakładki, bo są dwiema pracami.
+`/obsluga/reklamacje` prowadzi reklamacje: mają zegar z Allegro i formalny
+werdykt. `/obsluga/dyskusje` prowadzi dyskusje (0.245.0): nie mają ani zegara,
+ani werdyktu, więc kolejka układa się według tego, jak długo sprawa czeka na
+naszą odpowiedź. Obie przyjeżdżają jedną listą `/sale/issues` i rozróżnia je
+pole `type`.
+
 Panel nie wymaga osobnych poleceń. `npm run dev` podnosi go razem z API
 i workerem: Vite na porcie 5174, proxy `/api` na 3001. `npm run build`
 wkłada gotowy panel do `dist/web/obsluga`, skąd serwuje go ten sam proces
