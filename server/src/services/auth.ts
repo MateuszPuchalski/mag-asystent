@@ -283,7 +283,20 @@ export type OperacjaUprzywilejowana =
    * idzie pod tą samą nazwą, bo jest stanowiskiem wobec tego samego
    * kupującego w tej samej sprawie.
    */
-  | "reklamacja_werdykt";
+  | "reklamacja_werdykt"
+  /**
+   * Prośba o zakończenie dyskusji (`MessageRequest.type = "END_REQUEST"`).
+   *
+   * WŁASNA nazwa, nie `reklamacja_werdykt`, choć rola jest ta sama. Ślad
+   * `privileged` ma mówić, CO się stało: „wydał werdykt" i „poprosił
+   * o zakończenie dyskusji" to dwie różne rzeczy wobec dwóch różnych spraw,
+   * a `events` nie ma retencji i czyta się je po latach.
+   *
+   * Uprzywilejowana z tego samego powodu co werdykt: prośba trafia do
+   * kupującego natychmiast i drugiej nie wyślemy — pierwsza mogła dojść.
+   * Allegro nigdzie przy tym nie obiecuje, że dyskusja się od niej zamknie.
+   */
+  | "dyskusja_zakonczenie";
 
 /**
  * Kto może.
@@ -321,6 +334,10 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
      a werdykt zamknięty dla admina znaczyłby, że orzeka ktoś, kto nie czytał
      sprawy. Magazynier zostaje poza — on ocenia towar, nie roszczenie. */
   reklamacja_werdykt: ["biuro", "admin"],
+  /* To samo co werdykt i z tego samego powodu: dyskusje prowadzi biuro
+     codziennie, a prośba zamknięta dla admina znaczyłaby, że o zakończenie
+     prosi ktoś, kto nie czytał rozmowy. */
+  dyskusja_zakonczenie: ["biuro", "admin"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {

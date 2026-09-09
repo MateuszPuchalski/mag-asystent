@@ -3,7 +3,9 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { wyslijWiadomoscSprawy, type TypWiadomosciSprawy } from "../adapters/allegro.http.js";
 import { logEvent } from "./events.js";
 import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
-import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
+import {
+  BladReklamacji, NAZWA_SPRAWY, ReklamacjaConflict, type TypSprawy,
+} from "./reklamacje.js";
 
 /* ── Odpowiedź w reklamacji (0.224.0) ────────────────────────────────────────
    PIERWSZY zapis tego modułu wychodzący do Allegro. Wzorzec w całości
@@ -52,7 +54,7 @@ export type WyslijWiadomosc = (
 
 /** Typy, które panel wysyła: zwykła wiadomość i dwa stanowiska o towarze. */
 export type TypOdpowiedzi = Extract<TypWiadomosciSprawy,
-  "REGULAR" | "RETURN_REQUIRED_CUSTOM" | "RETURN_NOT_REQUIRED">;
+  "REGULAR" | "RETURN_REQUIRED_CUSTOM" | "RETURN_NOT_REQUIRED" | "END_REQUEST">;
 
 export interface ZadanieOdpowiedzi {
   reklamacjaId: number;
@@ -64,6 +66,17 @@ export interface ZadanieOdpowiedzi {
   mimoNowejWiadomosci?: boolean;
   /** `MessageRequest.type`; brak znaczy zwykłą wiadomość. */
   typ?: TypOdpowiedzi;
+  /**
+   * RODZAJ SPRAWY — reklamacja czy dyskusja (0.245.0).
+   *
+   * Ten moduł obsługuje oba ekrany, bo wysyłka jest identyczna: ta sama
+   * końcówka, ta sama bramka `czat_aktywny`, ta sama świeżość i ten sam klucz
+   * idempotencji. Rodzaj robi dokładnie dwie rzeczy i obie są konieczne:
+   * bramkuje odczyt wiersza (wysyłka z ekranu dyskusji nie ma prawa dosięgnąć
+   * reklamacji) i nazywa zdarzenie w dzienniku. `reklamacja_odpowiedz` przy
+   * dyskusji byłoby wpisem nieprawdziwym, a `events` nie ma retencji.
+   */
+  rodzaj?: TypSprawy;
   database?: Db;
   wyslij?: WyslijWiadomosc;
 }
@@ -83,11 +96,12 @@ interface Kontekst {
   lastMessageId: number | null;
 }
 
-function kontekst(database: Db, reklamacjaId: number): Kontekst {
+function kontekst(database: Db, reklamacjaId: number, rodzaj: TypSprawy): Kontekst {
   const r = database.prepare(
-    "SELECT external_id, wersja, czat_aktywny, prowadzi FROM reklamacja_klienta WHERE id=?",
-  ).get(reklamacjaId) as Record<string, unknown> | undefined;
-  if (!r) throw new BladReklamacji(`Reklamacja ${reklamacjaId} nie istnieje`, 404);
+    `SELECT external_id, wersja, czat_aktywny, prowadzi FROM reklamacja_klienta
+      WHERE id=? AND typ=?`,
+  ).get(reklamacjaId, rodzaj) as Record<string, unknown> | undefined;
+  if (!r) throw new BladReklamacji(`${NAZWA_SPRAWY[rodzaj]} ${reklamacjaId} nie istnieje`, 404);
 
   /* NIE NASZA, a nie „od kupującego". Rozmowa bywa trójstronna, więc punkt
      odniesienia przesuwa też doradca Allegro. Własna odpowiedź go NIE
@@ -129,17 +143,21 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
     ?? ((id, tekst, typ) => wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst, typ));
   const typ: TypOdpowiedzi = z.typ ?? "REGULAR";
 
+  const rodzaj: TypSprawy = z.rodzaj ?? "CLAIM";
+
   const tresc = (z.tresc ?? "").trim();
   if (!tresc) throw new BladReklamacji("Pusta odpowiedź nie idzie do Allegro");
   if (tresc.length > LIMIT_ZNAKOW) {
     /* Bramka PRZED kolejką i przed siecią. Agent ma zobaczyć liczbę, a nie
-       stracić tekst i dostać kod błędu z Allegro. */
+       stracić tekst i dostać kod błędu z Allegro. Zdanie nazywa RODZAJ sprawy,
+       bo ten sam moduł obsługuje dwa ekrany i „przy reklamacji" na ekranie
+       dyskusji byłoby komunikatem o czymś innym, niż widzi agent. */
     throw new BladReklamacji(
-      `Allegro przyjmuje przy reklamacji najwyżej ${LIMIT_ZNAKOW} znaków, ` +
-      `a odpowiedź ma ${tresc.length}`);
+      `Allegro przyjmuje przy sprawie „${NAZWA_SPRAWY[rodzaj].toLowerCase()}" `
+      + `najwyżej ${LIMIT_ZNAKOW} znaków, a odpowiedź ma ${tresc.length}`);
   }
 
-  const k = kontekst(database, z.reklamacjaId);
+  const k = kontekst(database, z.reklamacjaId, rodzaj);
 
   /* Rozmowa zamknięta przez Allegro. 409, nie 400: to nie jest błąd agenta,
      tylko stan sprawy, który mógł się zmienić, odkąd otworzył ekran. */
@@ -261,6 +279,8 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
     /* LICZNIK ROŚNIE O JEDEN. `wiadomosci_ile` jest snapshotem sprzed naszej
        wysyłki, więc bez tego ekran natychmiast skłamałby „ta rozmowa jest
        niepełna" — porównuje liczbę z Allegro z liczbą wierszy u nas. */
+    /* bez typu: wiersz przeszedł przez bramkę `kontekst()` na początku tej
+       operacji, więc rodzaj sprawy jest już rozstrzygnięty. */
     database.prepare(
       `UPDATE reklamacja_klienta
           SET wiadomosci_ile = wiadomosci_ile + 1,
@@ -273,13 +293,15 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
        Ta sama doktryna co przy odkładaniu towaru na półkę reklamacyjną
        w implementacji sprzed 0.140.0. */
     if (k.prowadzi === null) {
+      /* bez typu: ten sam wiersz co wyżej, za tą samą bramką. */
       database.prepare(
         "UPDATE reklamacja_klienta SET prowadzi=?, prowadzi_at=datetime('now') WHERE id=?",
       ).run(z.autor.name, z.reklamacjaId);
     }
 
     /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji. */
-    logEvent("reklamacja_odpowiedz", z.autor.name, null,
+    logEvent(rodzaj === "DISPUTE" ? "dyskusja_odpowiedz" : "reklamacja_odpowiedz",
+      z.autor.name, null,
       { id: z.reklamacjaId, znakow: tresc.length, externalMessageId, typ },
       undefined, database);
   })();

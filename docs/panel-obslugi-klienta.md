@@ -59,10 +59,9 @@ utrwalenie potwierdzonej wiedzy
 
 Pierwszy kanał to Allegro: Centrum Wiadomości, pytania pod ofertami, kolejne
 wiadomości w istniejących rozmowach, kontekst własnej oferty, kontekst
-zamówienia oraz — od 0.222.0 — reklamacje (§25b). Dyskusje weszły do zakresu
-decyzją właściciela z 9 września 2026 i mają projekt w §25c; kodu jeszcze nie
-mają. Jedne i drugie przyjeżdżają tą samą listą `/sale/issues` i różnią się
-polem `type`.
+zamówienia, od 0.222.0 reklamacje (§25b), a od 0.245.0 także dyskusje (§25c) —
+decyzją właściciela z 9 września 2026. Jedne i drugie przyjeżdżają tą samą listą
+`/sale/issues` i różnią się polem `type`.
 
 Architektura nie może zakładać, że Allegro zostanie jedynym kanałem. Mają być
 możliwe adaptery poczty, sklepu internetowego, formularza kontaktowego, innych
@@ -2839,7 +2838,9 @@ w adresie jest bezużyteczny.
 
 ## 25c. Dyskusje
 
-Projekt z 9 września 2026. Nic z tego rozdziału nie jest jeszcze zbudowane.
+Zaprojektowane 9 września 2026, zbudowane w 0.245.0. Jeden przyrost, nie trzy:
+maszyneria reklamacji stała już gotowa, więc do napisania został model pracy
+i ekran, a nie integracja.
 
 ### 25c.1. Czym jest dyskusja
 
@@ -2900,6 +2901,9 @@ Ranga wizualna jest inna niż czerwony termin reklamacji.
 
 Próg wyróżnienia to trzy dni, ta sama liczba co przy terminie reklamacji.
 Agent nie ma uczyć się dwóch progów na dwóch ekranach tego samego panelu.
+
+Kolejka idzie od najdłużej czekających. Sprawy, w których ruch należy do
+klienta, stoją za nimi — nie czekają na nas, więc nie mają pilności.
 
 ### 25c.5. Sygnały
 
@@ -2969,11 +2973,44 @@ Wiadomość jest wymagana i czyta ją kupujący. Limit ten sam co w czacie.
 a potwierdzenie przynosi synchronizacja — jak zieleń przy pieniądzach z 0.209.0
 i przy werdykcie z 0.242.0.
 
+Los prośby ma WŁASNE kolumny, nie `werdykt_*`. Werdykt rozstrzyga reklamację
+jedną z jedenastu wartości; prośba niczego nie rozstrzyga. Jedna kolumna na oba
+znaczenia kazałaby czytać ten sam zapis raz jako decyzję, raz jako pytanie.
+
+Stany są DWA: „poszła" i „poszła, ale Allegro nie potwierdziło". Porażka kodem
+nie dotyka sprawy — zostaje w skrzynce nadawczej, a agent może spróbować raz
+jeszcze. Na wierszu stoi wyłącznie to, po czym drugiej próby robić NIE WOLNO.
+
 Potwierdzenie zamiast cofnięcia: „Rozumiem: prośba o zakończenie trafia do
 kupującego i nie da się jej cofnąć". Trasa stoi za rolą biura i zostawia wpis
 `privileged`. Wersja sprawy z ekranu jest obowiązkowa.
 
-### 25c.9. Czego panel nie wie
+### 25c.9. Co dzielimy z reklamacjami
+
+Jedna tabela, bo Allegro ma jedną przestrzeń identyfikatorów: `{issueId}` jest
+w specyfikacji opisane jako „Dispute or claim identifier". Rozróżnia je kolumna
+`typ`, a każde zapytanie po obu stronach musi ją nieść — pilnuje tego strażnik
+czytający ŹRÓDŁO obu serwisów. Zwolnienie istnieje dla zapisów stojących za
+bramką i wymaga zdania z powodem, jak przy celach dotyku na kolektorze.
+
+Jedna synchronizacja, bo obie sprawy przyjeżdżają jedną listą. Drugi przycisk
+„synchronizuj teraz" byłby drugim żądaniem o to samo i drugą drogą w limit 429,
+więc ekran dyskusji pokazuje stan wspólnego przebiegu i odsyła po odświeżenie
+do reklamacji.
+
+Jedna skrzynka nadawcza i jeden klucz idempotencji. Jedne trasy załączników —
+klucz jest tym samym wierszem tej samej tabeli, a bramka roli identyczna.
+
+Jeden czat, ten sam komponent. Czyta on ze sprawy TRZY pola i tyle bierze;
+gdyby brał całą reklamację, dyskusja musiałaby mu podać dwadzieścia pól
+z `null`, z których żadne nie jest o niej prawdą.
+
+Jedna rzecz jest ROZŁĄCZNA i to celowo: nazwy zdarzeń w dzienniku.
+`dyskusja_prowadzi`, `dyskusja_notatka`, `dyskusja_odpowiedz`
+i `dyskusja_zakonczenie` mówią, z którego ekranu padło kliknięcie. `events`
+nie ma retencji i czyta się je po latach.
+
+### 25c.10. Czego panel nie wie
 
 **Co `END_REQUEST` robi naprawdę.** Sonda nigdy tej operacji nie wykonała.
 Z nazwy wynika prośba, ze statusu `DISPUTE_CLOSED` — możliwy skutek natychmiastowy.
@@ -3149,7 +3186,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
-| Dyskusje (`type: "DISPUTE"`) | **zaprojektowane**, niezbudowane | §25c; decyzja z 6 września odwrócona 9 września 2026 |
+| Dyskusje (`type: "DISPUTE"`) | **działa** od 0.245.0 | §25c; `services/dyskusje.ts`, `panel/src/dyskusje/` |
+| Prośba o zakończenie dyskusji (`END_REQUEST`) | **działa** od 0.245.0, `[WERYFIKUJ]` | `services/dyskusja-zakonczenie.ts` |
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |

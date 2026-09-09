@@ -215,6 +215,16 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK (zwrot_towaru IS NULL OR zwrot_towaru IN ('wymagany','niewymagany'))");
   addColumn("reklamacja_klienta", "zwrot_towaru_at", "TEXT");
   addColumn("reklamacja_klienta", "ilosc", "INTEGER");
+  /* Prośba o zakończenie dyskusji (0.245.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. WŁASNE kolumny, nie `werdykt_*`: werdykt rozstrzyga
+     reklamację, a `END_REQUEST` jest prośbą w dyskusji i niczego nie zamyka
+     sam. Stare wiersze mają NULL, czyli „o zakończenie nikt stąd nie prosił". */
+  addColumn("reklamacja_klienta", "zakonczenie_status", `TEXT CHECK (zakonczenie_status IS NULL OR
+    zakonczenie_status IN ('sent','send_uncertain'))`);
+  addColumn("reklamacja_klienta", "zakonczenie_at", "TEXT");
+  addColumn("reklamacja_klienta", "zakonczenie_przez", "TEXT");
+  addColumn("reklamacja_klienta", "zakonczenie_user_id",
+    "INTEGER REFERENCES app_user(user_id)");
   /* Typ wiadomości w kolejce odpowiedzi — tabela z 0.224.0 stoi na produkcji.
      Stare próby to zwykłe wiadomości, stąd `DEFAULT 'REGULAR'`. */
   addColumn("reklamacja_outbox", "typ", `TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
@@ -612,6 +622,7 @@ export function migrate(database: DatabaseSync) {
   wiadomoscInboxuMaKsztaltAllegro(database);
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
+  typZakonczeniaWSkrzynce(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);
@@ -670,6 +681,72 @@ function identyfikatorZamiennika(database: DatabaseSync) {
       ALTER TABLE towar_identyfikator_nowa RENAME TO towar_identyfikator;
       CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
       CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+    `);
+  })();
+}
+
+/**
+ * Piąta wartość w skrzynce nadawczej spraw: `END_REQUEST` (0.245.0).
+ *
+ * CHECK na `reklamacja_outbox.typ` był zamknięty na cztery wartości i wszystkie
+ * cztery dotyczyły reklamacji. Prośba o zakończenie dyskusji idzie tą samą
+ * końcówką i tą samą skrzynką, więc bez tej wartości pierwsza próba zakończenia
+ * padłaby na CHECK-u — i to PO udanym strzale do Allegro, czyli w miejscu,
+ * w którym nie da się już nic cofnąć.
+ *
+ * SQLite nie rozszerza CHECK-a w miejscu, stąd przebudowa tabeli — ta sama
+ * droga co przy `towar_identyfikator` w 0.234.0. Klucze obce zostają
+ * w kształcie ze `schema.sql`, a `ON DELETE CASCADE` na sprawie jest tu
+ * istotny: skasowanie sprawy ma zabrać jej próby wysyłki.
+ */
+function typZakonczeniaWSkrzynce(database: DatabaseSync) {
+  const wiersz = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='reklamacja_outbox'"
+  ).get() as { sql: string } | undefined;
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'END_REQUEST'")) return;
+
+  transaction(database, () => {
+    /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+       przy żywym serwerze, a obie strony wołają `migrate()`. */
+    const teraz = database.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='reklamacja_outbox'"
+    ).get() as { sql: string } | undefined;
+    if (!teraz || teraz.sql.includes("'END_REQUEST'")) return;
+    database.exec(`
+      CREATE TABLE reklamacja_outbox_nowa (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reklamacja_id INTEGER NOT NULL
+          REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        body TEXT NOT NULL,
+        typ TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
+          ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM',
+           'RETURN_NOT_REQUIRED','END_REQUEST')),
+        expected_wersja INTEGER NOT NULL,
+        expected_last_message_id INTEGER
+          REFERENCES reklamacja_wiadomosc(id) ON DELETE SET NULL,
+        status TEXT NOT NULL
+          CHECK (status IN ('sending','sent','send_uncertain','send_failed')),
+        external_message_id TEXT,
+        blad TEXT,
+        created_by INTEGER NOT NULL REFERENCES app_user(user_id),
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        finished_at TEXT
+      );
+      INSERT INTO reklamacja_outbox_nowa
+        (id,reklamacja_id,idempotency_key,body,typ,expected_wersja,
+         expected_last_message_id,status,external_message_id,blad,
+         created_by,created_at,finished_at)
+        SELECT id,reklamacja_id,idempotency_key,body,typ,expected_wersja,
+               expected_last_message_id,status,external_message_id,blad,
+               created_by,created_at,finished_at
+        FROM reklamacja_outbox;
+      DROP TABLE reklamacja_outbox;
+      ALTER TABLE reklamacja_outbox_nowa RENAME TO reklamacja_outbox;
+      CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
+        ON reklamacja_outbox(reklamacja_id, id);
     `);
   })();
 }

@@ -521,14 +521,22 @@ wtedy status z §21, a nie pustą kolejkę udającą brak zwrotów.
 Przy zapisie (0.151.0): Allegro odpowie 400 albo 422, kolejka zapisze to jako
 porażkę razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
 
-## Reklamacje — kształt ze specyfikacji i z sondy
+## Sprawy posprzedażowe — kształt ze specyfikacji i z sondy
 
 Rodzina `/sale/issues` („Post Purchase Issues") niesie DWA byty pod jednym
-zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Panel
-prowadzi wyłącznie reklamacje — decyzja właściciela z 6 września 2026. Filtr
-stoi w mapowaniu synchronizatora, a liczba odsianych idzie do stanu
-synchronizacji: bez niej ktoś szukałby kiedyś reklamacji, która nigdy
-reklamacją nie była.
+zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Do
+0.244.0 panel prowadził wyłącznie reklamacje, a dyskusje odsiewał filtr
+w mapowaniu synchronizatora — decyzja właściciela z 6 września 2026.
+
+**Właściciel odwrócił ją 9 września 2026.** Od 0.245.0 obie gałęzie lądują
+w bazie, a rozróżnia je kolumna `typ`; dyskusje mają własny ekran (§25c
+projektu panelu). Licznik odsianych ZOSTAŁ i zmienił znaczenie na „ile dyskusji
+przyjechało" — jest teraz kontrolą krzyżową dla licznika kolejki.
+
+Identyfikatory obu bytów żyją w JEDNEJ przestrzeni: specyfikacja opisuje
+`{issueId}` jako `Dispute or claim identifier` przy każdej końcówce rodziny.
+Dlatego trzyma je jedna tabela — dwie czyniłyby z „jedna sprawa = jeden wiersz"
+umowę, której baza nie pilnuje.
 
 Cała rodzina chodzi po `application/vnd.allegro.beta.v1+json` i po uprawnieniu
 `allegro:api:disputes` — specyfikacja podaje je przy wszystkich trzech zapisach
@@ -669,6 +677,14 @@ właściwości `attachment` w nim nie ma, a lista przeczy własnemu opisowi obok
 Wiążący jest opis końcówki — „At least one of fields: 'text', 'attachment'".
 To trzeci raz, gdy przykład albo lista `required` u Allegro kłóci się z resztą
 schematu, i trzeci raz wygrywa schemat czytany w całości.
+
+`[WERYFIKUJ]` `END_REQUEST` jest ŻĄDANIEM, nie zakończeniem. Panel wysyła tę
+wartość od 0.245.0 jako „poproś o zakończenie dyskusji". Nazwa mówi `request`,
+a specyfikacja nie łączy jej ani jednym zdaniem ze statusem `DISPUTE_CLOSED`;
+że dyskusja od niej się zamyka, byłoby wnioskiem z nazwy, nie z kontraktu.
+Sonda tej operacji nigdy nie wykonała — znacznik schodzi po pierwszym udanym
+zakończeniu na żywym koncie. Do tego czasu panel mówi „poproszono", a stan
+sprawy czyta wyłącznie z `currentState.status` po synchronizacji.
 
 Enum `type` niesie też `END_REQUEST` (wyłącznie dyskusje) i trzy `RETURN_*`
 (wyłącznie reklamacje). Te trzy są JEDYNĄ drogą do `currentState.returnRequired`

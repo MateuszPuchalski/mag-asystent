@@ -6,10 +6,17 @@ import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
-   Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"`), a nie dyskusje —
-   decyzja właściciela z 6 września 2026. Odsiewa je synchronizator, więc do
-   tego pliku dyskusja nie dociera; kolumna `typ` zostaje wyłącznie po to,
-   żeby dało się to sprawdzić.
+   TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i od 0.245.0 musi
+   to mówić KAŻDYM zapytaniem. Do 0.244.0 dyskusje nie docierały do bazy, bo
+   odsiewał je synchronizator, więc zapytanie bez warunku było bezpieczne.
+   Po zdjęciu tamtego filtru `reklamacja_klienta` trzyma oba rodzaje spraw
+   i pominięcie warunku pokazałoby dyskusję w kolejce reklamacji — z pustym
+   paskiem werdyktu i pustą kolumną terminu.
+
+   To jest dokładnie blizna 0.121.0: „CLAIM miał tę samą plakietkę co zwykła
+   dyskusja". Pilnuje tego strażnik w `dyskusje.test.ts`, który czyta ŹRÓDŁO
+   tego pliku i wymaga warunku na `typ` przy każdym `FROM reklamacja_klienta`.
+   Dyskusje prowadzi `services/dyskusje.ts`.
 
    ZEGAR CZYTAMY, NIE LICZYMY. `decisionDueDate` z Allegro jest terminem na
    uznanie albo odrzucenie reklamacji. Implementacja skasowana w 0.140.0
@@ -49,6 +56,22 @@ export class ReklamacjaConflict extends Error {
 }
 
 export type Kubelek = "decyzja" | "odpowiedz" | "zamknieta";
+
+/**
+ * Rodzaj sprawy posprzedażowej — rozróżnik kolumny `typ`.
+ *
+ * Allegro trzyma dyskusje i reklamacje pod jednym zasobem `/sale/issues`
+ * i pod jedną przestrzenią identyfikatorów, więc trzyma je też jedna tabela.
+ * Ten typ jest jedynym, co je w kodzie rozdziela — i dlatego stoi w sygnaturze
+ * każdej funkcji, która sięga do tabeli po identyfikatorze.
+ */
+export type TypSprawy = "CLAIM" | "DISPUTE";
+
+/** Nazwa rodzaju sprawy w zdaniu błędu; kod w komunikacie nie jest komunikatem. */
+export const NAZWA_SPRAWY: Record<TypSprawy, string> = {
+  CLAIM: "Reklamacja",
+  DISPUTE: "Dyskusja",
+};
 
 export type Sygnal =
   | "termin"
@@ -420,6 +443,7 @@ export function listaReklamacji(
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+     WHERE r.typ = 'CLAIM'
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all() as Wiersz[];
   return wiersze.map((w) => zWiersza(w, teraz));
@@ -485,6 +509,39 @@ export interface SzczegolReklamacji {
 }
 
 /**
+ * Co jeszcze wiemy o TYM ZAMÓWIENIU — zwroty i rozmowy.
+ *
+ * Wspólne dla reklamacji i dyskusji (0.245.0), bo obie sprawy wiszą przy
+ * zamówieniu i obie odpowiadają na to samo pytanie biura: „czy ten klient
+ * pisał już w tej sprawie gdzie indziej". Druga kopia tego mostka rozjechałaby
+ * się z pierwszą przy pierwszym nowym polu — dokładnie tak, jak ostrzega
+ * komentarz przy `szczegolReklamacji`.
+ *
+ * Zero nowych żądań do Allegro: numer zamówienia sprawa ma od pierwszej
+ * synchronizacji, a wiadomości leżą już w naszej bazie. Grupujemy po rozmowie,
+ * bo jeden zakup potrafi mieć kilka wątków.
+ */
+export function kontekstZamowienia(
+  database: Db, konto: number, orderId: string | null, teraz: number,
+): { zwroty: WierszZwrotu[]; rozmowy: RozmowaZakupu[] } {
+  if (!orderId) return { zwroty: [], rozmowy: [] };
+  return {
+    zwroty: listaZwrotow(database, teraz, { channelAccountId: konto, orderId }),
+    rozmowy: (database.prepare(`
+      SELECT c.id, c.subject, c.status, MAX(m.sent_at) AS ostatnia
+        FROM message m JOIN conversation c ON c.id = m.conversation_id
+       WHERE m.related_order_id = ?
+       GROUP BY c.id
+       ORDER BY ostatnia DESC`).all(orderId) as Wiersz[]).map((r) => ({
+      id: Number(r.id),
+      temat: tekst(r.subject),
+      status: String(r.status),
+      ostatniaAt: tekst(r.ostatnia),
+    })),
+  };
+}
+
+/**
  * Wszystko o jednej sprawie — CZYSTY ODCZYT.
  *
  * Otwarcie reklamacji niczego nie mutuje (blizna 0.18.0). Rozmowa dociąga się
@@ -507,29 +564,15 @@ export function szczegolReklamacji(
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
-     WHERE r.id=?`).get(id) as Wiersz | undefined;
+     WHERE r.id=? AND r.typ = 'CLAIM'`).get(id) as Wiersz | undefined;
+  /* Dyskusja pod tym identyfikatorem to dla TEGO ekranu brak, a nie sprawa
+     bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie
+     dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
   const konto = Number(w.channel_account_id);
 
-  const zwroty = reklamacja.orderId
-    ? listaZwrotow(database, teraz, { channelAccountId: konto, orderId: reklamacja.orderId })
-    : [];
-
-  /* Rozmowy o tym zakupie. Grupujemy po rozmowie, bo jeden zakup potrafi mieć
-     kilka wątków. Zero nowych żądań do Allegro: numer zamówienia reklamacja ma
-     od pierwszej synchronizacji, a wiadomości leżą już w naszej bazie. */
-  const rozmowy = reklamacja.orderId ? (database.prepare(`
-    SELECT c.id, c.subject, c.status, MAX(m.sent_at) AS ostatnia
-      FROM message m JOIN conversation c ON c.id = m.conversation_id
-     WHERE m.related_order_id = ?
-     GROUP BY c.id
-     ORDER BY ostatnia DESC`).all(reklamacja.orderId) as Wiersz[]).map((r) => ({
-    id: Number(r.id),
-    temat: tekst(r.subject),
-    status: String(r.status),
-    ostatniaAt: tekst(r.ostatnia),
-  })) : [];
+  const { zwroty, rozmowy } = kontekstZamowienia(database, konto, reklamacja.orderId, teraz);
 
   /* Kartoteka po ofercie — ten sam łańcuch co w skrzynce (pamięć wskazań,
      potem SKU ze snapshotu). Bez snapshotu `sku` jest `undefined` i ekran
@@ -551,12 +594,27 @@ export function szczegolReklamacji(
   };
 }
 
-/** Wiersz do mutacji plus kontrola wersji. Wspólne dla obu zapisów niżej. */
-function doZapisu(database: Db, id: number, wersja: number | undefined) {
+/**
+ * Wiersz do mutacji plus kontrola wersji. Wspólne dla obu zapisów niżej
+ * ORAZ dla dyskusji (`services/dyskusje.ts`), stąd `typ` jako parametr.
+ *
+ * Warunek na `typ` stoi przy ZAPISIE, nie tylko przy odczycie, i to jest
+ * sedno: bez niego trasa reklamacji przyjęłaby werdykt na dyskusji, której
+ * Allegro werdyktu nie przyjmie („Not a valid operation for disputes"),
+ * a trasa dyskusji poprosiłaby o zakończenie reklamacji, gdzie `END_REQUEST`
+ * jest niedozwolone.
+ *
+ * Zdanie w błędzie mówi RODZAJ sprawy, nie samo „nie istnieje": agent, który
+ * wkleił numer z drugiego ekranu, ma się dowiedzieć, że pomylił ekran,
+ * a nie że sprawa zniknęła.
+ */
+export function doZapisu(
+  database: Db, id: number, wersja: number | undefined, typ: TypSprawy = "CLAIM",
+) {
   const w = database.prepare(
-    "SELECT id, wersja, prowadzi FROM reklamacja_klienta WHERE id=?",
-  ).get(id) as { id: number; wersja: number; prowadzi: string | null } | undefined;
-  if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
+    "SELECT id, wersja, prowadzi FROM reklamacja_klienta WHERE id=? AND typ=?",
+  ).get(id, typ) as { id: number; wersja: number; prowadzi: string | null } | undefined;
+  if (!w) throw new BladReklamacji(`${NAZWA_SPRAWY[typ]} ${id} nie istnieje`, 404);
   if (wersja !== undefined && Number(w.wersja) !== Number(wersja)) {
     throw new ReklamacjaConflict({ wersja: Number(w.wersja), prowadzi: w.prowadzi });
   }
@@ -582,11 +640,13 @@ export function stempelProwadzi(
     const w = doZapisu(database, id, wersja);
     const zdejmuje = w.prowadzi === autor;
     database.prepare(`UPDATE reklamacja_klienta
-      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1 WHERE id=?`).run(
+      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1
+      WHERE id=? AND typ='CLAIM'`).run(
       zdejmuje ? null : autor, zdejmuje ? null : new Date().toISOString(), id);
     logEvent("reklamacja_prowadzi", autor, null, { id, zdjete: zdejmuje }, undefined, database);
     return zWiersza(
-      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=?").get(id) as Wiersz,
+      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+        .get(id) as Wiersz,
       Date.now());
   })();
 }
@@ -604,12 +664,13 @@ export function zapiszNotatke(
   return transaction(database, () => {
     doZapisu(database, id, wersja);
     database.prepare(
-      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=?",
+      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=? AND typ='CLAIM'",
     ).run(wartosc, id);
     logEvent("reklamacja_notatka", autor, null,
       { id, znakow: wartosc?.length ?? 0 }, undefined, database);
     return zWiersza(
-      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=?").get(id) as Wiersz,
+      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+        .get(id) as Wiersz,
       Date.now());
   })();
 }

@@ -2238,6 +2238,24 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- `offer.quantity` — ile sztuk oferty obejmuje sprawa. Sufit częściowego
   -- zwrotu pieniędzy, gdy klient nie podał własnej kwoty: cena × ilość.
   ilosc INTEGER,
+  -- ── Prośba o zakończenie DYSKUSJI (0.245.0) ───────────────────────────────
+  -- WŁASNE kolumny, nie `werdykt_*`, i to nie jest kwestia porządku. Werdykt
+  -- to formalne rozstrzygnięcie reklamacji z jedenastu wartości; `END_REQUEST`
+  -- jest prośbą wysłaną kupującemu w dyskusji i Allegro nigdzie nie obiecuje,
+  -- że cokolwiek nią zamyka. Jedna kolumna na oba znaczenia kazałaby czytać
+  -- `werdykt_status='sent'` raz jako „decyzja zapadła", raz jako „poprosiliśmy".
+  --
+  -- Stanu SAMEJ dyskusji tu nie ma: należy do Allegro i przychodzi
+  -- w `status_allegro` po synchronizacji.
+  -- DWIE wartości, nie cztery jak przy werdykcie. Porażka kodem NIE dotyka
+  -- tego wiersza: zostaje w `reklamacja_outbox`, a agent może spróbować jeszcze
+  -- raz — ten sam wzorzec co krok „towar do odesłania?" z 0.242.0. Na wierszu
+  -- stoi więc wyłącznie to, po czym drugiej próby robić NIE WOLNO.
+  zakonczenie_status TEXT CHECK (zakonczenie_status IS NULL OR
+    zakonczenie_status IN ('sent','send_uncertain')),
+  zakonczenie_at TEXT,
+  zakonczenie_przez TEXT,
+  zakonczenie_user_id INTEGER REFERENCES app_user(user_id),
   wersja INTEGER NOT NULL DEFAULT 1,
   synced_at TEXT NOT NULL,
   UNIQUE(channel_account_id, external_id)
@@ -2327,8 +2345,15 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   -- `RETURN_NOT_REQUIRED` tą samą końcówką, więc typ jest cechą PRÓBY.
   -- `RETURN_REQUIRED_SELLER_LABEL` w zbiorze od razu (blizna 0.135.0), choć
   -- etykiety od sprzedawcy panel jeszcze nie wysyła.
+  --
+  -- `END_REQUEST` doszedł w 0.245.0 razem z ekranem dyskusji i jest jedyną
+  -- wartością, której Allegro NIE przyjmie przy reklamacji („`END_REQUEST` is
+  -- only allowed for disputes"). Odwrotnie niż trzy `RETURN_*`, które są
+  -- wyłącznie dla reklamacji — jeden zbiór na dwa rodzaje spraw, bo skrzynka
+  -- nadawcza jest jedna, tak jak tabela spraw.
   typ TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
-    ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM','RETURN_NOT_REQUIRED')),
+    ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM',
+     'RETURN_NOT_REQUIRED','END_REQUEST')),
   expected_wersja INTEGER NOT NULL,
   -- Ostatnia wiadomość NIE NASZA w chwili pisania. Punktem odniesienia jest
   -- rola autora, bo `reklamacja_wiadomosc` nie ma kolumny kierunku — a doradca

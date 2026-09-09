@@ -357,7 +357,16 @@ export function Reklamacje() {
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
           onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} />}
         {szczegol.data
-          ? <Czat reklamacja={szczegol.data.reklamacja} czat={szczegol.data.czat}
+          ? <Czat
+              sprawa={{
+                id: szczegol.data.reklamacja.id,
+                /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
+                   bywa przy reklamacji pusty. Skleja to wołający, bo tylko on
+                   wie, jaki rodzaj sprawy trzyma. */
+                opisZgloszenia: szczegol.data.reklamacja.powodOpis ?? szczegol.data.reklamacja.opis,
+                wiadomosciIle: szczegol.data.reklamacja.wiadomosciIle,
+              }}
+              czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
               edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
                 czatAktywny={szczegol.data.reklamacja.czatAktywny}
