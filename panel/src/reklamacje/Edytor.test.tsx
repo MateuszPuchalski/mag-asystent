@@ -66,11 +66,12 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
   });
 
-  it("edytor mówi WPROST, czego panel nadal nie robi", () => {
-    /* Werdykt zostaje w Centrum Sprzedaży do przyrostu trzeciego. Bez tego
-       zdania sam przycisk „WYŚLIJ ODPOWIEDŹ" obiecywałby całą sprawę. */
+  it("edytor NIE odsyła już do Centrum Sprzedaży — werdykt wychodzi z panelu", () => {
+    /* Do przyrostu trzeciego stało tu zdanie „Formalny werdykt wydaje się
+       w Centrum Sprzedaży". Zdanie, które przestało być prawdą, jest gorsze
+       od jego braku. */
     render(<Edytor {...props()} />);
-    expect(screen.getByText(/Formalny werdykt/)).toBeInTheDocument();
+    expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
   });
 
   it("błąd z serwera stoi PRZY POLU, a nie w rogu ekranu", () => {

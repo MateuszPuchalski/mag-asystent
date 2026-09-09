@@ -932,7 +932,22 @@ export type SygnalReklamacji =
   | "doradca"
   | "czat_zamkniety"
   | "zwrot_wymagany"
-  | "status_nieznany";
+  | "status_nieznany"
+  /* Los NASZEGO werdyktu (przyrost trzeci) — `statusAllegro` mówi o nim
+     dopiero po synchronizacji. */
+  | "werdykt_niepotwierdzony"
+  | "werdykt_nieudany"
+  | "towar_do_decyzji";
+
+/** `ClaimStatusChangeRequest.status` — jedenaście wartości ze schematu Allegro. */
+export type Werdykt =
+  | "ACCEPTED_REPAIR" | "ACCEPTED_REFUND" | "ACCEPTED_EXCHANGE" | "ACCEPTED_PARTIAL_REFUND"
+  | "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED" | "REJECTED_PRODUCT_NOT_RETURNED"
+  | "REJECTED_PRODUCT_DAMAGED_BY_USER" | "REJECTED_PRODUCT_CONFORMS_TO_CONTRACT"
+  | "REJECTED_MINOR_DEFECT" | "REJECTED_OTHER" | "REJECTED_CLAIM_WITHDRAWN_BY_BUYER";
+
+/** Los próby werdyktu — te same cztery stany, co przy wysyłce odpowiedzi. */
+export type StatusWerdyktu = "sending" | "sent" | "send_uncertain" | "send_failed";
 
 export interface Reklamacja {
   id: number;
@@ -966,6 +981,23 @@ export interface Reklamacja {
   prowadzi: string | null;
   prowadziAt: string | null;
   notatka: string | null;
+  /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
+     `werdykt: null` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
+     panelem" i ekran to mówi, zamiast udawać, że to nasza decyzja. */
+  werdykt: Werdykt | string | null;
+  /** Zdanie pisze serwer; panel ma własną mapę tylko do listy wyboru. */
+  werdyktNazwa: string | null;
+  werdyktStatus: StatusWerdyktu | null;
+  werdyktWiadomosc: string | null;
+  werdyktKwotaGrosze: number | null;
+  werdyktAt: string | null;
+  werdyktPrzez: string | null;
+  werdyktBlad: string | null;
+  /** Krok „towar do odesłania?" — decyzja lokalna; `zwrotWymagany` ją potwierdza. */
+  zwrotTowaru: "wymagany" | "niewymagany" | null;
+  zwrotTowaruAt: string | null;
+  /** `offer.quantity` — sufit częściowego zwrotu, gdy klient nie podał kwoty. */
+  ilosc: number | null;
   wersja: number;
   kubelek: KubelekReklamacji;
   sygnaly: SygnalReklamacji[];
@@ -1036,6 +1068,15 @@ export interface WynikOdpowiedziReklamacji {
   status: "sending" | "sent" | "send_uncertain" | "send_failed";
   externalMessageId: string | null;
   kluczIdempotencji: string;
+}
+
+/** Wynik werdyktu (przyrost trzeci) — los próby, nie potwierdzenie Allegro. */
+export interface WynikWerdyktu {
+  werdykt: Werdykt;
+  werdyktNazwa: string;
+  status: StatusWerdyktu;
+  blad: string | null;
+  wersja: number;
 }
 
 /* ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────

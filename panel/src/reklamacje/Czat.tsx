@@ -141,7 +141,8 @@ export function Czat({ reklamacja, czat, zalaczniki, edytor }: {
     {/* Od 0.224.0 pod rozmową stoi EDYTOR, a nie zdanie o tym, że odpowiedź
         wysyła się gdzie indziej. Zdanie było prawdziwe przez dwa wydania
         i przestało być — komentarz, który skłamał, jest gorszy od jego braku.
-        To, czego panel nadal nie robi (werdykt), mówi sam edytor. */}
+        Werdykt ma własny pasek NAD rozmową (`Werdykt.tsx`), bo rozstrzyga
+        całą sprawę, a nie jedną wiadomość. */}
     {edytor}
   </div>;
 }

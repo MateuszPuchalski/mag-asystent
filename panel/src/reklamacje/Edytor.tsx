@@ -66,12 +66,8 @@ export function Edytor({ tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij }:
         <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ ODPOWIEDŹ"}
       </Przycisk>
     </div>
-
-    {/* Czego panel nadal NIE robi. Zdanie znika dopiero razem z przyrostem
-        trzecim — obietnica bez pokrycia jest gorsza od jej braku. */}
-    <p className="text-xs text-slate-500">
-      Formalny werdykt — uznanie albo odrzucenie — wydaje się nadal w Centrum
-      Sprzedaży Allegro. Ten panel prowadzi rozmowę.
-    </p>
+    {/* Do przyrostu trzeciego stało tu zdanie „formalny werdykt wydaje się
+        w Centrum Sprzedaży". Zniknęło razem z paskiem werdyktu nad rozmową —
+        komentarz, który skłamał, jest gorszy od jego braku. */}
   </div>;
 }

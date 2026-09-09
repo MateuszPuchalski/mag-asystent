@@ -2200,6 +2200,44 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   prowadzi TEXT,
   prowadzi_at TEXT,
   notatka TEXT,
+  -- ── Werdykt biura (przyrost trzeci) ────────────────────────────────────────
+  -- OSOBNE KOLUMNY, nie `status_allegro`. Tamta kolumna należy do Allegro
+  -- i przestawia ją wyłącznie synchronizacja; tu stoi to, co MY wysłaliśmy.
+  -- Pochodzenie decyzji jest informacją: werdykt z Centrum Sprzedaży zostawia
+  -- `werdykt` pusty przy `status_allegro='CLAIM_ACCEPTED'` i to widać.
+  -- PEŁNY zbiór jedenastu wartości `ClaimStatusChangeRequest.status` od razu
+  -- (blizna 0.135.0: `CHECK` nie rośnie bez przebudowy tabeli).
+  werdykt TEXT CHECK (werdykt IS NULL OR werdykt IN (
+    'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
+    'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',
+    'REJECTED_PRODUCT_DAMAGED_BY_USER','REJECTED_PRODUCT_CONFORMS_TO_CONTRACT',
+    'REJECTED_MINOR_DEFECT','REJECTED_OTHER','REJECTED_CLAIM_WITHDRAWN_BY_BUYER')),
+  -- Wiadomość WYMAGANA przez schemat (`required: [status, message]`) i czytana
+  -- przez kupującego. Kopia zostaje, bo Allegro nie oddaje jej w czacie.
+  werdykt_wiadomosc TEXT,
+  -- Tylko przy `ACCEPTED_PARTIAL_REFUND`; przy innych werdyktach NULL.
+  werdykt_kwota_grosze INTEGER,
+  werdykt_at TEXT,
+  werdykt_przez TEXT,
+  werdykt_user_id INTEGER REFERENCES app_user(user_id),
+  -- LOS PRÓBY na wierszu, nie w osobnym outboxie: werdykt jest JEDEN na
+  -- sprawę, więc tabela prób miałaby jeden wiersz na klucz. Te same cztery
+  -- stany co `reklamacja_outbox.status`; `send_uncertain` rozstrzyga
+  -- synchronizacja, gdy Allegro odda `CLAIM_ACCEPTED`/`CLAIM_REJECTED`.
+  werdykt_status TEXT CHECK (werdykt_status IS NULL OR
+    werdykt_status IN ('sending','sent','send_uncertain','send_failed')),
+  -- Kod HTTP i zdanie, nigdy treść wiadomości.
+  werdykt_blad TEXT,
+  -- Krok „towar do odesłania?" po uznaniu — decyzja LOKALNA. Wychodzi jako
+  -- wiadomość `RETURN_REQUIRED_CUSTOM` albo `RETURN_NOT_REQUIRED` przez
+  -- `reklamacja_outbox` (kolumna `typ`), a `zwrot_wymagany` z Allegro zostaje
+  -- potwierdzeniem, że Allegro tak to zrozumiało. Niezweryfikowane na żywym
+  -- koncie — znacznik stoi w `docs/allegro-ksztalt.md`.
+  zwrot_towaru TEXT CHECK (zwrot_towaru IS NULL OR zwrot_towaru IN ('wymagany','niewymagany')),
+  zwrot_towaru_at TEXT,
+  -- `offer.quantity` — ile sztuk oferty obejmuje sprawa. Sufit częściowego
+  -- zwrotu pieniędzy, gdy klient nie podał własnej kwoty: cena × ilość.
+  ilosc INTEGER,
   wersja INTEGER NOT NULL DEFAULT 1,
   synced_at TEXT NOT NULL,
   UNIQUE(channel_account_id, external_id)
@@ -2284,6 +2322,13 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   -- klucze i dwie wiadomości u kupującego.
   idempotency_key TEXT NOT NULL UNIQUE,
   body TEXT NOT NULL,
+  -- `MessageRequest.type`. Do przyrostu trzeciego zawsze `REGULAR`; krok
+  -- „towar do odesłania?" wysyła `RETURN_REQUIRED_CUSTOM` albo
+  -- `RETURN_NOT_REQUIRED` tą samą końcówką, więc typ jest cechą PRÓBY.
+  -- `RETURN_REQUIRED_SELLER_LABEL` w zbiorze od razu (blizna 0.135.0), choć
+  -- etykiety od sprzedawcy panel jeszcze nie wysyła.
+  typ TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
+    ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM','RETURN_NOT_REQUIRED')),
   expected_wersja INTEGER NOT NULL,
   -- Ostatnia wiadomość NIE NASZA w chwili pisania. Punktem odniesienia jest
   -- rola autora, bo `reklamacja_wiadomosc` nie ma kolumny kierunku — a doradca

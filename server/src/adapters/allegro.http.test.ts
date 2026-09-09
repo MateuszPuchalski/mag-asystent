@@ -14,6 +14,9 @@ import {
   urlWiadomosciDyskusji,
   pobierzZalacznik,
   urlZwrotu,
+  urlNowejWiadomosciSprawy,
+  urlZmianyStatusuSprawy,
+  cialoWerdyktu,
 } from "./allegro.http.js";
 import { allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { config } from "../config.js";
@@ -326,4 +329,26 @@ test("adres pojedynczego wniosku koduje identyfikator", () => {
     urlWnioskuORabat("https://api.allegro.pl", "rc/1"),
     "https://api.allegro.pl/order/refund-claims/rc%2F1"
   );
+});
+
+test("werdykt reklamacji: adres ze specyfikacji, ciało ze schematu, kwota tylko przy częściowym", () => {
+  /* `changeStatusOfIssueUsingPOST` — ta sama rodzina `issues`, co czat
+     i odpowiedź, więc jedna nauka `Accept` i jedno uprawnienie. */
+  const url = urlZmianyStatusuSprawy("https://api.allegro.pl", "a/1");
+  assert.equal(url, "https://api.allegro.pl/sale/issues/a%2F1/status");
+  assert.equal(rodzinaKoncowki(url), rodzinaKoncowki(urlNowejWiadomosciSprawy("https://api.allegro.pl", "a/1")));
+  assert.equal(scopeDlaUrl(url, "POST"), "allegro:api:disputes");
+
+  /* `required: [status, message]` i nic więcej przy zwykłym uznaniu. */
+  assert.deepEqual(cialoWerdyktu({ status: "ACCEPTED_REFUND", message: "Zwracamy.", kwotaGrosze: 1250 }),
+    { status: "ACCEPTED_REFUND", message: "Zwracamy." },
+    "kwota przy innym werdykcie niż częściowy NIE jedzie na drut");
+  /* `Price.amount` jako TEKST „12.50" — schemat mówi wprost o zaokrągleniach. */
+  assert.deepEqual(
+    cialoWerdyktu({ status: "ACCEPTED_PARTIAL_REFUND", message: "Część.", kwotaGrosze: 1250 }),
+    { status: "ACCEPTED_PARTIAL_REFUND", message: "Część.", partialRefund: { amount: "12.50", currency: "PLN" } });
+  assert.equal((cialoWerdyktu({ status: "ACCEPTED_PARTIAL_REFUND", message: "x", kwotaGrosze: 5, waluta: "CZK" })
+    .partialRefund as { amount: string; currency: string }).currency, "CZK");
+  assert.deepEqual(cialoWerdyktu({ status: "REJECTED_OTHER", message: "Nie." }),
+    { status: "REJECTED_OTHER", message: "Nie." });
 });

@@ -25,9 +25,11 @@ process.env.SGT_MODE = "seeded";
       bez bramki wygląda niewinnie i przecieka po cichu.
    2. ZERO ZAPISU PRZY PATRZENIU (blizna 0.18.0). Otwarcie kolejki i otwarcie
       sprawy nie mają prawa dołożyć ani jednego wiersza.
-   3. LICZNIK ZAPISÓW JEST UMOWĄ. Przyrost pierwszy ma DWA zapisy, oba
-      wyłącznie u nas: „prowadzę" i notatka. Do Allegro nie wychodzi stąd nic —
-      odpowiedź w czacie i werdykt to dwa następne przyrosty.
+   3. LICZNIK ZAPISÓW JEST UMOWĄ. Przyrost pierwszy miał DWA zapisy, oba
+      wyłącznie u nas: „prowadzę" i notatka. Drugi dołożył odpowiedź w czacie,
+      trzeci — werdykt i decyzję o towarze, jedyne dwa za `autoryzuj()`.
+   5. STRAŻNIK ADRESÓW. Każdy adres z `panel/src/api/reklamacje.ts` ma trasę —
+      ta sama blizna, którą skrzynka kupiła w 0.181.0.
    4. 401 PRZED 403. Brak sesji to inna naprawa niż zła rola.               */
 
 let app: FastifyInstance;
@@ -90,6 +92,8 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/werdykt` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zwrot-towaru` },
 ];
 
 test("bez sesji żadna trasa reklamacji nie odpowiada danymi", async () => {
@@ -108,14 +112,86 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("TRZY ZAPISY po przyroście drugim — licznik jest umową", () => {
+test("PIĘĆ ZAPISÓW po przyroście trzecim — licznik jest umową", () => {
   /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
-     z odpowiedzią w czacie (0.224.0) i urośnie na cztery przy werdykcie —
-     a każdy nowy zapis dostaje zdanie w uzasadnieniu. `synchronizuj` NIE JEST
-     zapisem do Allegro: to odczyt na żądanie, który zapisuje wynik u nas. */
+     z odpowiedzią w czacie (0.224.0) i z trzech na pięć z werdyktem: czwarty
+     zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
+     o towarze po uznaniu. Oba są nieodwracalne wobec kupującego i jako
+     jedyne w module stoją za `autoryzuj()` z wpisem `privileged`. Każdy nowy
+     zapis dostaje zdanie w uzasadnieniu. `synchronizuj` NIE JEST zapisem do
+     Allegro: to odczyt na żądanie, który zapisuje wynik u nas. */
   const zapisy = TRASY().filter((t) => t.method === "POST" && !t.url.endsWith("synchronizuj"));
-  assert.equal(zapisy.length, 3,
-    "prowadzę i notatka zostają u nas; odpowiedź jest pierwszym zapisem wychodzącym");
+  assert.equal(zapisy.length, 5,
+    "prowadzę i notatka u nas; odpowiedź, werdykt i towar wychodzą do Allegro");
+});
+
+test("werdykt: wersja obowiązkowa, wpis `privileged` z nazwą operacji, dziennik bez treści", async () => {
+  const { naglowki } = login("biuro", "Ala werdykt");
+  const bez = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/werdykt`,
+    headers: naglowki, payload: { werdykt: "REJECTED_OTHER", wiadomosc: "Nie." } });
+  assert.equal(bez.statusCode, 400, "werdykt bez wersji z ekranu to werdykt w ciemno");
+  assert.match(bez.json().error, /wersji/);
+  /* Złe ciało NIE zostawia wpisu `privileged`: ten ma znaczyć decyzję człowieka. */
+
+  /* Testy chodzą bez sparowanego konta, więc strzał kończy się porażką
+     nazwaną kodem u nas — a nie wyjątkiem 500. Wpis `privileged` musi stać
+     NIEZALEŻNIE od losu strzału: to ślad decyzji człowieka, nie sieci. */
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/werdykt`,
+    headers: naglowki, payload: { werdykt: "REJECTED_OTHER", wiadomosc: "Towar sprawny.", wersja: 1 } });
+  assert.equal(r.statusCode, 200, r.body);
+  const body = r.json();
+  assert.equal(body.werdykt, "REJECTED_OTHER");
+  assert.equal(body.werdyktNazwa, "Odrzucona — inny powód");
+  assert.ok(["send_failed", "send_uncertain"].includes(body.status), body.status);
+  assert.equal(body.wersja, 2);
+  const zdarzenia = (type: string) => (db().prepare(
+    "SELECT user_id, payload FROM events WHERE type=? ORDER BY id").all(type) as
+    Array<{ user_id: string; payload: string }>).map((z) => ({ user: z.user_id, ...JSON.parse(z.payload) }));
+  assert.deepEqual(zdarzenia("privileged").filter((z) => z.user === "Ala werdykt"),
+    [{ user: "Ala werdykt", operacja: "reklamacja_werdykt" }]);
+  assert.equal(zdarzenia("reklamacja_werdykt_proba").length, 1);
+  const dziennik = (db().prepare("SELECT payload FROM events").all() as Array<{ payload: string | null }>)
+    .map((e) => e.payload ?? "").join(" ");
+  assert.equal(dziennik.includes("sprawny"), false, "treść do kupującego nie idzie do dziennika");
+
+  /* Konflikt wersji wraca jako 409 z ładunkiem, jak przy notatce. */
+  const konflikt = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/werdykt`,
+    headers: naglowki, payload: { werdykt: "REJECTED_OTHER", wiadomosc: "Nie.", wersja: 1 } });
+  assert.equal(konflikt.statusCode, 409);
+  assert.equal(konflikt.json().wersja, 2);
+
+  /* Towar przed uznaniem — 409 ze stanem, żadnego 500. */
+  const towar = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/zwrot-towaru`,
+    headers: naglowki, payload: { decyzja: "wymagany", tresc: "Odeślij.", expectedWersja: 2, expectedLastMessageId: null } });
+  assert.equal(towar.statusCode, 409);
+  assert.match(towar.json().error, /po uznaniu/);
+});
+
+/* ── Strażnik adresów (wzór `skrzynka.test.ts`) ──────────────────────────────
+   Do tego wydania `panel/src/api/reklamacje.ts` nie miał strażnika, a to jest
+   plik, do którego dochodzą dwa nowe adresy. Czyta źródło hooków i puszcza
+   PRAWDZIWE żądanie przez router; brak trasy poznaje po domyślnym 404 Fastify. */
+test("każdy adres wołany z panel/src/api/reklamacje.ts ma trasę na serwerze", async () => {
+  const zrodlo = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/api/reklamacje.ts"), "utf8");
+  /* Adresy stoją w tym pliku w obu cudzysłowach: `"…"` bez parametru i `\`…\`` z `${id}`. */
+  const wywolania = [...zrodlo.matchAll(/api(?:<[^>]*>)?\(\s*[`"]([^`"]+)[`"](?:\s*,\s*\{[^}]*?method:\s*"(GET|POST|PUT|DELETE)")?/gs)];
+  assert.ok(wywolania.length >= 8, `spodziewałem się co najmniej ośmiu wywołań api(), jest ${wywolania.length}`);
+  const { naglowki } = login("biuro", "Strażnik adresów");
+  const bledne: string[] = [];
+  for (const [, adres, metoda] of wywolania) {
+    const url = adres.replace(/\$\{[^}]+\}/g, "1").replace(/\?.*$/, "");
+    const method = (metoda ?? "GET") as "GET" | "POST" | "PUT" | "DELETE";
+    const r = await app.inject({ method, url, headers: naglowki,
+      ...(method === "GET" ? {} : { payload: {} }) });
+    const tresc = r.json<{ message?: string }>();
+    if (r.statusCode === 404 && /^Route /.test(tresc.message ?? "")) bledne.push(`${method} ${adres}`);
+  }
+  assert.deepEqual(bledne, [], "panel woła adresy bez trasy na serwerze");
 });
 
 test("biuro dostaje kolejkę z kubełkiem, terminem, sygnałami i licznikami", async () => {

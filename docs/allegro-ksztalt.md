@@ -674,8 +674,17 @@ Enum `type` niesie też `END_REQUEST` (wyłącznie dyskusje) i trzy `RETURN_*`
 (wyłącznie reklamacje). Te trzy są JEDYNĄ drogą do `currentState.returnRequired`
 — osiem trafień w całej specyfikacji i ani jednej innej końcówki. Ale
 specyfikacja nie łączy tych miejsc ani jednym zdaniem: to wniosek z nazw,
-a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy. Zostaje poza
-panelem do rozstrzygnięcia próbą na żywej sprawie.
+a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy. Od przyrostu
+trzeciego panel wysyła dwa z nich po uznaniu (`RETURN_REQUIRED_CUSTOM`,
+`RETURN_NOT_REQUIRED`) jako krok „towar do odesłania?" — tą samą końcówką,
+z `typ` zapisanym na próbie w `reklamacja_outbox`. `RETURN_REQUIRED_SELLER_LABEL`
+(etykieta od sprzedawcy) zostaje poza panelem.
+
+`[WERYFIKUJ]` czy `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` naprawdę
+przestawiają `currentState.returnRequired`. Panel zapisuje decyzję lokalnie
+(`zwrot_towaru`) i traktuje `returnRequired` po synchronizacji jako
+POTWIERDZENIE, nie założenie; sygnał „towar?" gaśnie po naszej decyzji, a nie
+po wartości z Allegro. Pierwsze uznanie na żywej sprawie rozstrzyga.
 
 **`409` przy tej końcówce NIE jest konfliktem wersji.** Opis brzmi `Dispute is
 in a state that forbids adding new messages` — to odpowiednik
@@ -695,13 +704,24 @@ wiersza na osi rozmowy — `reklamacja_wiadomosc` ma
 `UNIQUE(reklamacja_id, external_id)`, więc wiersz bez identyfikatora nie miałby
 jak być idempotentny.
 
-### Zapisy: czego jeszcze nie robimy
+### Werdykt: `POST /sale/issues/{issueId}/status` (przyrost trzeci, 0.242.0)
 
-Jeden zapis do Allegro nadal czeka: `POST /sale/issues/{issueId}/status`
-(`ClaimStatusChangeRequest`, `required: [status, message]`, cztery wartości
-`ACCEPTED_*` i siedem `REJECTED_*`, `partialRefund` wyłącznie przy
-`ACCEPTED_PARTIAL_REFUND`). Jest nieodwracalny wobec kupującego i dostanie
-własne wydanie.
+`changeStatusOfIssueUsingPOST`, wyłącznie `application/vnd.allegro.beta.v1+json`,
+uprawnienie `allegro:api:disputes` — to samo, co odczyt spraw, więc nowego
+parowania nie ma. Ciało `ClaimStatusChangeRequest`: `required: [status, message]`;
+`status` z enumu jedenastu wartości (cztery `ACCEPTED_*`, siedem `REJECTED_*`),
+`partialRefund` to `Price` (`amount` jako TEKST „40.00", `currency`) i jedzie
+wyłącznie przy `ACCEPTED_PARTIAL_REFUND` — ciało układa `cialoWerdyktu()`
+w adapterze, a test sprawdza je bez sieci. Odpowiedzi: `200` „Status changed
+correctly" BEZ ciała, `400`, `401`, `403`, `404`. Sukcesem jest brak wyjątku,
+nie kształt odpowiedzi; `404` jest przy tym zapisie błędem (`blad404`), bo
+pusta `200` też oddaje `null` i bez tej opcji „sprawa nie istnieje" wyglądałoby
+jak „werdykt przyjęty". Kolumna `werdykt` ma `CHECK` z pełnym enumem od razu.
+
+`[WERYFIKUJ]` `message` nie ma w schemacie `maxLength` — inaczej niż
+`MessageRequest.text` (20 000). Panel przyjmuje limit czatu jako własny, żeby
+agent nie uczył się dwóch liczb; gdyby Allegro cięło krócej, odmowa wróci
+jako `400` i `werdykt_status='send_failed'` ze zdaniem, a nie jako cisza.
 
 ### Co się stanie, jeśli kształt jest inny
 

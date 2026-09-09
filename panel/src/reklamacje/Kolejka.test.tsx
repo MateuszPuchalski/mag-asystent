@@ -25,6 +25,9 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: "Kosiarka spalinowa NAC LS 46-450", ofertaZdjecie: "brak",
   twId: null, twSymbol: null,
+    werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
+  werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
+  zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,
   ...n,
 });
 
@@ -99,10 +102,11 @@ describe("Kolejka reklamacji", () => {
        podpisywałby każdy nowy sygnał ostatnią gałęzią, czyli kłamał. */
     render(<Kolejka reklamacje={[rek({
       sygnaly: ["termin", "klient_czeka", "doradca", "czat_zamkniety",
-        "zwrot_wymagany", "status_nieznany"],
+        "zwrot_wymagany", "status_nieznany", "werdykt_niepotwierdzony",
+        "werdykt_nieudany", "towar_do_decyzji"],
     })]} wybrana={null} onWybierz={() => {}} />);
     for (const t of ["termin", "klient czeka", "doradca", "czat zamknięty",
-      "zwrot towaru", "status?"]) {
+      "zwrot towaru", "status?", "werdykt czeka", "werdykt nieudany", "towar?"]) {
       expect(screen.getByText(t)).toBeInTheDocument();
     }
   });
@@ -139,5 +143,21 @@ describe("Kolejka reklamacji", () => {
     render(<Kolejka reklamacje={[rek({ kubelek: "zamknieta" })]} wybrana={null}
       zKubelkiem onWybierz={() => {}} />);
     expect(screen.getByText("Rozstrzygnięte")).toBeInTheDocument();
+  });
+  it("werdykt z PANELU stoi na wierszu zdaniem serwera; werdykt z Centrum Sprzedaży czipa nie ma", () => {
+    /* „Pochodzenie decyzji jest informacją": `werdykt: null` przy CLAIM_ACCEPTED
+       znaczy „rozstrzygnięte poza panelem" i wiersz tego nie udaje. */
+    render(<Kolejka reklamacje={[
+      rek({ id: 1, numer: "1/2026", statusAllegro: "CLAIM_SUBMITTED", kubelek: "zamknieta",
+        werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód", werdyktStatus: "sent",
+        werdyktPrzez: "Ala" }),
+      rek({ id: 2, numer: "2/2026", statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" }),
+      rek({ id: 3, numer: "3/2026", werdykt: "ACCEPTED_REFUND", werdyktNazwa: "Uznana — zwrot pieniędzy",
+        werdyktStatus: "send_failed" }),
+    ]} wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByText("Odrzucona — inny powód")).toBeInTheDocument();
+    expect(screen.getByTitle("Werdykt z panelu: Ala")).toBeInTheDocument();
+    /* Nieudany werdykt NIE dostaje czipa „uznana" — nic nie poszło. */
+    expect(screen.queryByText("Uznana — zwrot pieniędzy")).not.toBeInTheDocument();
   });
 });
