@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.243.1 — 9 września 2026
+
+**Projekt panelu dyskusji.** Zgłoszenie właściciela: „zaprojektuj Panel
+dyskusji". Sam projekt, bez linijki kodu — §25c w `docs/panel-obslugi-klienta.md`.
+
+**To odwraca decyzję sprzed trzech dni i dokument mówi o tym wprost.** 6 września
+zapadło: panel prowadzi wyłącznie reklamacje, bo „dyskusja jest rozmową,
+a rozmowy panel już ma". Obie daty zostają w §25b.2 — pierwsza tłumaczy kształt
+kodu przez trzy wydania, druga mówi, dlaczego ten kształt się zmieni.
+
+**Liczby nie były po stronie pierwszej decyzji.** Sonda z żywego konta pokazała
+35 dyskusji na 65 reklamacji, w tym 25 otwartych. Zdanie „rozmowy panel już ma"
+też się nie broni: dyskusja ma formalny status Allegro i flagę `chatActive`,
+nie ma flagi przeczytania, odpowiada się w niej inną końcówką i bywa
+trójstronna — doradca Allegro odezwał się w 61 sprawach na 100.
+
+**Trzy rozstrzygnięcia właściciela z 9 września.** Własna zakładka, a nie
+kubełek w reklamacjach ani rozmowy w skrzynce. Czytanie, odpowiedź i prośba
+o zakończenie. Pilność mierzona czasem, od kiedy ruch należy do nas.
+
+**Przycisk nazywa się POPROŚ O ZAKOŃCZENIE, nie ZAKOŃCZ**, i to jest ustalenie
+z tego projektu warte osobnego zdania. Enum Allegro nazywa tę wartość
+`END_REQUEST` — żądaniem. Ani schemat, ani opis nie obiecują, że dyskusja
+zamknie się od naszego kliknięcia. Przycisk obiecujący więcej, niż mówi
+specyfikacja, to ten sam rodzaj zgadywania, który do 0.155.0 trzymał w kodzie
+adres `/sale/disputes/{id}/messages`.
+
+**Pilność liczymy sami i mówimy o tym wprost.** Allegro nie daje dyskusji
+żadnego terminu. Wiersz mówi „czeka 5 dni", nigdy „termin": to fakt o naszej
+skrzynce, nie zobowiązanie wobec klienta. Blizna 0.121.0 była dokładnie tym —
+ustawowym zegarem liczonym przez nas i rozjeżdżającym się z tym, co widział
+kupujący.
+
+Wdrożenie: nic ręką. Zero kodu, zero ustawień, zero zmian w bazie.
+
+- §25c w `docs/panel-obslugi-klienta.md` — dziewięć podrozdziałów
+- poprawki §3, §25b.2, §26 i wiersza tabeli §28 („poza zakresem" →
+  „zaprojektowane, niezbudowane")
+
 ## 0.243.0 — 9 września 2026
 
 **Zdarzenia sprawy zeszły z osi do jednego paska pod oknem wiadomości.**

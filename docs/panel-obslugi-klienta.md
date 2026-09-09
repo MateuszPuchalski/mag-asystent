@@ -59,9 +59,10 @@ utrwalenie potwierdzonej wiedzy
 
 Pierwszy kanał to Allegro: Centrum Wiadomości, pytania pod ofertami, kolejne
 wiadomości w istniejących rozmowach, kontekst własnej oferty, kontekst
-zamówienia oraz — od 0.222.0 — reklamacje (§25b). Dyskusje zostają
-w Centrum Sprzedaży: przyjeżdżają tą samą listą co reklamacje i są odsiewane
-świadomie, decyzją właściciela.
+zamówienia oraz — od 0.222.0 — reklamacje (§25b). Dyskusje weszły do zakresu
+decyzją właściciela z 9 września 2026 i mają projekt w §25c; kodu jeszcze nie
+mają. Jedne i drugie przyjeżdżają tą samą listą `/sale/issues` i różnią się
+polem `type`.
 
 Architektura nie może zakładać, że Allegro zostanie jedynym kanałem. Mają być
 możliwe adaptery poczty, sklepu internetowego, formularza kontaktowego, innych
@@ -2617,16 +2618,25 @@ różne terminy. Sklejenie ich w jeden rekord kosztowało już nakładkę spraw.
 Reklamacja nie zakłada więc zwrotu i go nie wiąże; pokazuje tylko zwroty tego
 samego ZAMÓWIENIA, tym samym mostkiem co rozmowa od 0.221.0.
 
-### 25b.2. Dlaczego tylko reklamacje
+### 25b.2. Dlaczego najpierw tylko reklamacje
 
 `/sale/issues` niesie dyskusje i reklamacje pod jednym zasobem, rozróżnione
 polem `type`. Właściciel zdecydował 6 września 2026, że panel prowadzi
 wyłącznie reklamacje: mają zegar, mają formalny werdykt i to one gniją
 niezauważone. Dyskusja jest rozmową, a rozmowy panel już ma.
 
-Synchronizacja i tak pobiera całą listę, więc filtr stoi po naszej stronie,
-w jednym miejscu. **Liczba odsianych jest widoczna** na pasku — bez niej ktoś
-szukałby kiedyś reklamacji, która nigdy reklamacją nie była.
+**Decyzja została odwrócona 9 września 2026.** Dyskusje dostają własny ekran
+(§25c). Obie daty zostają tutaj, bo pierwsza z nich tłumaczy kształt kodu przez
+trzy wydania, a druga mówi, dlaczego ten kształt się zmienił.
+
+Trzy dni starczyły, bo liczby okazały się nie po stronie pierwszej decyzji.
+Sonda z żywego konta pokazała **35 dyskusji na 65 reklamacji**, w tym 25
+w stanie `DISPUTE_ONGOING`. To nie jest ogon rozkładu.
+
+Zdanie „rozmowy panel już ma" też się nie broni: dyskusja nie jest wątkiem
+z Centrum Wiadomości. Ma formalny status Allegro, ma flagę `chatActive`,
+nie ma flagi przeczytania, odpowiada się w niej inną końcówką i bywa
+**trójstronna** — doradca Allegro odezwał się w 61 sprawach na 100.
 
 ### 25b.3. Kolejka bramek
 
@@ -2827,6 +2837,152 @@ Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
 sprawa ma własną stronę `/claims/{uuid}?sellerId={id}`, a numer czytelny
 w adresie jest bezużyteczny.
 
+## 25c. Dyskusje
+
+Projekt z 9 września 2026. Nic z tego rozdziału nie jest jeszcze zbudowane.
+
+### 25c.1. Czym jest dyskusja
+
+Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło
+nie tak, a nie chce jeszcze składać reklamacji. Allegro trzyma ją tym samym
+zasobem co reklamację i różnicuje polem `type`.
+
+**Dyskusja to NIE reklamacja i nie wolno ich skleić.** Reklamacja ma zegar,
+formalny werdykt i tytuł prawny. Dyskusja nie ma żadnego z tych trzech: pola
+`decisionDueDate`, `statusDueDate`, `reason`, `right`, `expectations`
+i `referenceNumber` są dla niej w schemacie opisane jako puste. Sklejenie ich
+jedną plakietką kosztowało już wydanie — blizna 0.121.0.
+
+Trzecią stroną rozmowy bywa **doradca Allegro**. Sonda widziała go jako autora
+ostatniej wypowiedzi w 61 sprawach na 100. To przypadek typowy, nie brzegowy.
+
+### 25c.2. Co panel dokłada
+
+To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem, właściciela
+sprawy i notatkę z ustaleń. Panel niczego tu nie spina z Subiektem — dyskusja
+żyje w całości w Allegro.
+
+### 25c.3. Kolejka bramek
+
+Ekran nie jest rejestrem. Praca dzieli się na kubełki, a w każdym stoi jedno
+pytanie — operator nie wybiera akcji z menu, tylko odpowiada.
+
+| kubełek | pytanie | skąd |
+|---|---|---|
+| DO ODPOWIEDZI | co odpisać? | rozmowa otwarta, ostatnie słowo NIE nasze |
+| CZEKA NA KLIENTA | — | rozmowa otwarta, ostatnie słowo nasze |
+| ZAMKNIĘTE | — | `DISPUTE_CLOSED` albo rozmowa zamknięta przez Allegro |
+
+Trzy kubełki, tyle samo co przy reklamacjach, więc klawisze `1`–`3` zachowują
+naturę. Strzałki chodzą po kolejce, cyfry przełączają kubełek, a przełączenie
+przestawia kursor na pierwszą sprawę. Skróty milkną w polu tekstowym.
+
+**Doradca Allegro stawia piłkę po NASZEJ stronie** i to jest jedyna reguła,
+która różni ten ekran od reklamacji. Tam `ALLEGRO_ADVISOR_REPLIED` jest samym
+sygnałem. Gdyby tak zostało tutaj, większość dyskusji siedziałaby w CZEKA NA
+KLIENTA, podczas gdy czeka Allegro.
+
+### 25c.4. Pilność bez zegara
+
+Allegro nie oddaje dla dyskusji żadnego terminu. Porządek liczymy więc sami
+i mówimy o tym wprost.
+
+Miarą jest **czas od ostatniej NIE naszej wiadomości** — czyli od kiedy ruch
+należy do nas. Na wierszu stoi zdanie „czeka 5 dni". Gdy ruch należy do
+klienta albo rozmowa jest zamknięta, nie stoi nic: liczba bez znaczenia jest
+gorsza od jej braku.
+
+**To nie jest termin i nie wolno go tak nazwać ani tak pokazać.** Blizna
+0.121.0 to ustawowy zegar czternastu dni liczony przez nas samych, rozjeżdżający
+się z tym, co widział kupujący. Tutaj liczymy fakt o WŁASNEJ skrzynce, nie
+zobowiązanie wobec klienta — i dlatego zdanie mówi „czeka", a nie „zostało".
+Ranga wizualna jest inna niż czerwony termin reklamacji.
+
+Próg wyróżnienia to trzy dni, ta sama liczba co przy terminie reklamacji.
+Agent nie ma uczyć się dwóch progów na dwóch ekranach tego samego panelu.
+
+### 25c.5. Sygnały
+
+Pięć, każdy z jednym powodem istnienia.
+
+**Klient czeka** — ruch należy do nas. **Doradca** — ostatnie słowo miało
+Allegro; zmienia ton odpowiedzi, bo czyta ją trzecia strona. **Czat zamknięty**
+— `chatActive` jest fałszem, więc nie wyjdzie stąd ani wiadomość, ani prośba
+o zakończenie. **Nierozstrzygnięta** — `DISPUTE_UNRESOLVED`; sonda nie widziała
+ani jednej na sto, więc gdy się pojawi, jest wiadomością samą w sobie.
+**Status?** — wartość spoza `PostPurchaseIssueStatus`, czyli sygnał, że lista
+w kodzie się zestarzała.
+
+Odpadają wszystkie sygnały reklamacyjne: termin, zwrot towaru i trzy o losie
+werdyktu. Dyskusja żadnego z tych bytów nie ma.
+
+### 25c.6. Układ
+
+Trzy kolumny, jak §10.1, jak zwroty i jak reklamacje. Cztery ekrany obsługi
+mają mieć jeden nawyk, nie cztery. Kolumna faktów ma **sekcje, nie zakładki**:
+to jedna lista faktów o jednej sprawie.
+
+Środek okna niesie rozmowę, bo po to agent otwiera ten ekran. Rola autora jest
+podpisem, a nie ozdobą — bez wyraźnego podpisu agent odpowiadałby doradcy tak,
+jak odpowiada klientowi.
+
+Dwie różnice wobec ekranu reklamacji, obie wymuszone przez dane:
+
+**Wiersz kolejki nie ma zdjęcia oferty.** Pole `offer` jest w schemacie opisane
+jako nieobecne przy dyskusji. Zamiast obrazu stoi numer zamówienia.
+
+**Kolumna faktów jest chudsza i ma to powiedzieć.** Dyskusja nie niesie powodu,
+oczekiwania, prawa ani kwoty. Zostaje kupujący, zamówienie razem ze zwrotami
+tego samego zamówienia, data otwarcia, status, załączniki, notatka biura i „kto
+prowadzi". Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
+
+### 25c.7. Odpowiedź w rozmowie
+
+Wychodzi z panelu, tą samą maszynerią co odpowiedź w reklamacji: `type:
+"REGULAR"`, limit 20 000 znaków sprawdzany PRZED wysłaniem, klucz idempotencji
+liczony przez serwer, jeden wiersz na próbę.
+
+Bramka `chatActive` stoi przed strzałem, żeby agent zobaczył zdanie zamiast
+surowego kodu 409. Przy zamkniętej rozmowie **edytora nie ma w drzewie** — nie
+jest wyłączony. Pole, w które wolno pisać, a którego nie da się wysłać, jest
+obietnicą bez pokrycia.
+
+Punktem odniesienia świeżości jest ostatnia NIE nasza wiadomość, więc także
+wypowiedź doradcy. Załączników wychodzących nie ma.
+
+### 25c.8. Prośba o zakończenie
+
+Jedyna operacja zapisu, którą Allegro przewiduje **wyłącznie dla dyskusji**.
+Werdykt tu nie istnieje: `POST /sale/issues/{id}/status` ma w specyfikacji
+adnotację „Not a valid operation for disputes".
+
+**Przycisk nazywa się POPROŚ O ZAKOŃCZENIE, nie ZAKOŃCZ.** Enum nazywa tę
+wartość `END_REQUEST` — żądaniem zakończenia. Ani schemat, ani opis nigdzie nie
+obiecują, że dyskusja zamknie się od naszego kliknięcia. Przycisk obiecujący
+więcej, niż mówi specyfikacja, to ten sam rodzaj zgadywania, który do 0.155.0
+trzymał w kodzie adres `/sale/disputes/{id}/messages` — adres, którego Allegro
+nigdy nie miało.
+
+Wiadomość jest wymagana i czyta ją kupujący. Limit ten sam co w czacie.
+
+`status_allegro` nie jest przestawiany po wysyłce. Należy do Allegro,
+a potwierdzenie przynosi synchronizacja — jak zieleń przy pieniądzach z 0.209.0
+i przy werdykcie z 0.242.0.
+
+Potwierdzenie zamiast cofnięcia: „Rozumiem: prośba o zakończenie trafia do
+kupującego i nie da się jej cofnąć". Trasa stoi za rolą biura i zostawia wpis
+`privileged`. Wersja sprawy z ekranu jest obowiązkowa.
+
+### 25c.9. Czego panel nie wie
+
+**Co `END_REQUEST` robi naprawdę.** Sonda nigdy tej operacji nie wykonała.
+Z nazwy wynika prośba, ze statusu `DISPUTE_CLOSED` — możliwy skutek natychmiastowy.
+Znacznik `[WERYFIKUJ]` stoi przy tym w `docs/allegro-ksztalt.md` i schodzi
+dopiero po pierwszym udanym zakończeniu na żywym koncie.
+
+**Czy rozmowa mieści się w stu wiadomościach** — to samo pytanie co przy
+reklamacji i ta sama odpowiedź: nie wiemy.
+
 ## 26. Decyzje do potwierdzenia
 
 Ile kont Allegro podłączymy? Ilu agentów pracuje jednocześnie? Jak długo
@@ -2841,8 +2997,10 @@ jedynym ERP?
 Pytanie „kto zatwierdza nowe zastosowania części" zeszło z tej listy w E2:
 każdy z biura, także autor propozycji (§5, §12).
 
-Pytanie „czy obsługujemy też dyskusje" zeszło z niej w 0.222.0: NIE. Panel
-prowadzi wyłącznie reklamacje, a dyskusje zostają w Centrum Sprzedaży (§25b).
+Pytanie „czy obsługujemy też dyskusje" zeszło z niej dwa razy i za każdym
+razem inaczej. W 0.222.0: NIE — panel prowadzi wyłącznie reklamacje.
+9 września 2026: **TAK**, dyskusje dostają własną zakładkę (§25c). Pierwsza
+odpowiedź stoi tu dalej, bo tłumaczy kod trzech wydań.
 
 ## 27. Zasady nadrzędne
 
@@ -2991,7 +3149,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
-| Dyskusje (`type: "DISPUTE"`) | **poza zakresem** | decyzja właściciela z 6 września 2026; liczba odsianych na pasku |
+| Dyskusje (`type: "DISPUTE"`) | **zaprojektowane**, niezbudowane | §25c; decyzja z 6 września odwrócona 9 września 2026 |
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
