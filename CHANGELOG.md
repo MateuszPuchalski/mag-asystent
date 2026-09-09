@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.241.0 — 9 września 2026
+
+**Szczebel „zgodne wymiary": „linka 148 cm" trafia w „1170x1480".** Blizna
+z 9.09.2026: klient pytał na ofercie linki do COMBI 48-53 o linkę napędową
+148 cm zakończoną sprężyną. Katalog MIAŁ ją (18-11010 i 470002 „Linka napędu
+Castel Garden 81000668/1 1170x1480"), a szkic Copilota opisał linkę z oferty
+jako „prawdopodobną" i poprosił o tabliczkę — bo żaden szczebel nie czytał
+parametrów doboru, pełny tekst pyta o słowa, a „148 cm" nigdzie nie stawało
+się „1480". §11.2 wymieniał ten szczebel od dawna; teraz ma kod.
+
+- **Tabela `wymiar_kartoteki`** odbudowywana z NAZW i OPISÓW kartotek po
+  każdym imporcie (wzór identyfikatorów): liczba z jednostką i para
+  „1170x1480", milimetry całkowite. Metry tylko małą literą („1330M" to
+  model), para z trzech cyfr („M12x1,5" to gwint). Na seedzie: 911 kartotek,
+  1233 wymiary.
+- **Jedenasta droga doboru `wymiar`** za zamiennikiem, przed pełnym tekstem:
+  czyta WYŁĄCZNIE parametry wpisane przez agenta („długość: 148 cm"),
+  z obowiązkową jednostką, dokładnie co do milimetra, z pewnością „wymaga
+  danych" i zdaniem źródła cytującym zapis z kartoteki. Trzy powody
+  pominięcia: brak parametrów, brak jednostki, pusty indeks.
+- Copilot podaje wymiary z rozmowy w `daneDoboru` (0.237.0) — po „Wpisz do
+  danych" szczebel je czyta; fakt kandydata trafia do następnego szkicu.
+- `CHECK` na `dobor_rozmowy.wybrany_droga` rośnie do jedenastu dróg —
+  `doborZnaDrogi()` przebudowuje starsze bazy raz. Start serwera zakłada
+  tabelę wymiarów, gdy ostatnia przebudowa pochodnych była sprzed tego
+  wydania. Pokrycie wiedzy dostaje wiersz o wymiarach; czip „zgodne wymiary"
+  w Doborze.
+
 ## 0.240.0 — 9 września 2026
 
 **Copilot proponuje pasowania: „ta uszczelka pasuje do tego gaźnika"

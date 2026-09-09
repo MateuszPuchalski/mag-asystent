@@ -10,6 +10,7 @@ import { silnikZTekstu, zabudowyMaszyny } from "./silniki.js";
 import { pasowaniaTowaru, type Kartoteka } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { szukajPelnotekst } from "./pelnotekst.js";
+import { indeksWymiarowPusty, szukajPoWymiarach, wymiaryZParametrow } from "./wymiary.js";
 import { zwin } from "../tekst.js";
 
 /**
@@ -67,10 +68,12 @@ export interface SzczebelDoboru {
 }
 
 /* Kolejność §11.2: dokładny symbol i EAN biją wszystko, oferta jest kontekstem
-   pytania, zamiennik idzie z opisu. Dedup po `twId` zostawia najmocniejszą. */
+   pytania, zamiennik idzie z opisu. Zgodny wymiar stoi za zamiennikiem, a przed
+   pełnym tekstem: liczba z jednostką to mocniejszy ślad niż słowo, słabszy niż
+   zamiennik z opisu. Dedup po `twId` zostawia najmocniejszą. */
 const RANGA: Record<DrogaDoboru, number> = {
   symbol: 1, ean: 2, oem: 3, zastosowanie: 4, silnik: 5, pasowanie: 6, oferta: 7, zamiennik: 8,
-  pelnotekst: 9, wyszukiwarka: 10,
+  wymiar: 9, pelnotekst: 10, wyszukiwarka: 11,
 };
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
@@ -372,6 +375,36 @@ export function kandydaciDoboru(
       }
     }
     drogi.set("pasowanie", { droga: "pasowanie", sprawdzona: true, wynikow: ile });
+  }
+
+  /* SZCZEBEL: zgodne wymiary — liczby z jednostką z PARAMETRÓW doboru przeciw
+     wymiarom wyciętym z nazw i opisów kartotek po imporcie (`wymiar_kartoteki`).
+     Blizna: „linka napędowa 148 cm" nie trafiała w „1170x1480". Wyłącznie
+     z parametrów wpisanych przez agenta, nigdy z treści (blizna szarpaka);
+     jednostka obowiązkowa, dopasowanie co do milimetra, pewność „wymaga
+     danych" — zgodna długość to podpowiedź, nie dowód. Trzy powody pominięcia,
+     bo trzy różne rzeczy może zrobić agent: wpisać parametr, dopisać jednostkę,
+     poczekać na odbudowę indeksu. */
+  const wymiary = wymiaryZParametrow(dobor.dane.parametry);
+  if (Object.keys(dobor.dane.parametry).length === 0) {
+    pomin("wymiar", "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)");
+  } else if (wymiary.length === 0) {
+    pomin("wymiar", "parametry nie mają wymiaru z jednostką — wpisz mm, cm albo m");
+  } else if (indeksWymiarowPusty(database)) {
+    pomin("wymiar", "indeks wymiarów pusty — odbuduje się przy starcie serwera albo po imporcie");
+  } else {
+    let ile = 0;
+    for (const t of szukajPoWymiarach(wymiary.map((w) => w.mm), 8, database)) {
+      const w = towar(database, t.twId); if (!w) continue;
+      ile++;
+      const zdania = t.trafienia.map((x) => {
+        const etykieta = wymiary.find((y) => y.mm === x.mm)?.etykieta ?? `${x.mm} mm`;
+        return `zgodny wymiar ${x.mm} mm (${etykieta}) w ${x.pole === "nazwa" ? "nazwie" : "opisie"} kartoteki „${x.zapis}”`;
+      });
+      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "wymiar",
+        pewnosc: "wymaga_danych", ostrzezenia: [], zrodlo: `${zdania.join("; ")} — nie dowód` });
+    }
+    drogi.set("wymiar", { droga: "wymiar", sprawdzona: true, wynikow: ile });
   }
 
   /* SZCZEBEL: pełny tekst (E3) — bm25 po symbolu, nazwie i opisie, WYŁĄCZNIE

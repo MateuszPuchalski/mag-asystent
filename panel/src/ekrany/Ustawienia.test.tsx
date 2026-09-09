@@ -41,7 +41,8 @@ vi.mock("../api/rozmowy", async () => {
       data: { kartotek: 3200, zOpisem: 1400, zIdentyfikatorem: 460, identyfikatorow: 1900, identyfikatorowRecznych: 0,
         modeleZOpisu: { nowych: 37, przerobionych: 0, odrzuconych: 0 },
         zastosowania: { zatwierdzonych: 0, negatywnych: 0, propozycji: 0 },
-        tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, fts: { dostepne: false, wpisow: 0 } },
+        tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, wymiary: { kartotek: 0, wymiarow: 0 },
+        fts: { dostepne: false, wpisow: 0 } },
     }),
   };
 });

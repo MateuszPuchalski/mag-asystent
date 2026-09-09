@@ -323,6 +323,8 @@ export interface PokrycieWiedzy {
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
   /** Tokeny silników w nazwach (0.239.0): ile słownik ma wpisów i ile kartotek czeka na decyzję. */
   tokeny: { tokenow: number; nowych: number; zatwierdzonych: number };
+  /** Wymiary z nazw i opisów: ile kartotek ma choć jeden i ile ich jest razem. */
+  wymiary: { kartotek: number; wymiarow: number };
   fts: { dostepne: boolean; wpisow: number };
 }
 
@@ -348,6 +350,10 @@ export function pokrycieWiedzy(database: DatabaseSync = db()): PokrycieWiedzy {
       tokenow: n("SELECT count(*) n FROM token_silnika"),
       nowych: n("SELECT count(*) n FROM token_silnika_kartoteka WHERE stan='nowa'"),
       zatwierdzonych: n("SELECT count(*) n FROM token_silnika_kartoteka WHERE stan='zatwierdzona'"),
+    },
+    wymiary: {
+      kartotek: n("SELECT count(DISTINCT tw_id) n FROM wymiar_kartoteki"),
+      wymiarow: n("SELECT count(*) n FROM wymiar_kartoteki"),
     },
     fts: { dostepne: ftsDostepne(), wpisow: ftsDostepne() ? n("SELECT count(*) n FROM towar_fts") : 0 },
   };

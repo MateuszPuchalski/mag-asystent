@@ -215,14 +215,15 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   brakuje         TEXT,
   wybrany_tw_id   INTEGER,
   wybrany_symbol  TEXT,
-  -- DZIESIĘĆ dróg z §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
-  -- `pasowanie` z `pasowanie_czesci`; bazy sprzed tych wydań znają osiem albo
-  -- dziewięć, więc `CHECK` przebudowuje `doborZnaDrogi()` w `migrate()` — RAZ,
-  -- do kształtu docelowego. Bez tego „Wybierz" przy kandydacie z nowej drogi
-  -- rzuciłby `SQLITE_CONSTRAINT` dopiero u klienta.
+  -- JEDENAŚCIE dróg z §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
+  -- `pasowanie` z `pasowanie_czesci` (0.230.0), `wymiar` z `wymiar_kartoteki`;
+  -- bazy sprzed tych wydań znają osiem, dziewięć albo dziesięć, więc `CHECK`
+  -- przebudowuje `doborZnaDrogi()` w `migrate()` — RAZ, do kształtu
+  -- docelowego. Bez tego „Wybierz" przy kandydacie z nowej drogi rzuciłby
+  -- `SQLITE_CONSTRAINT` dopiero u klienta.
   wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
                     'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                    'zastosowanie','silnik','pasowanie','oem','pelnotekst')),
+                    'zastosowanie','silnik','pasowanie','oem','pelnotekst','wymiar')),
   wybrano_przez   TEXT,
   wybrano_user_id INTEGER REFERENCES app_user(user_id),
   wybrano_at      TEXT,
@@ -643,6 +644,24 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
 );
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+
+-- Wymiary z nazw i opisów kartotek — szczebel „zgodne wymiary" (§11.2).
+-- Blizna: klient pytał o „linkę 148 cm", katalog miał „1170x1480", a żaden
+-- szczebel liczby nie czytał. TABELA POCHODNA jak `towar_identyfikator`:
+-- powstaje przy przebudowie po imporcie, bez cyklu życia i bez wpisów
+-- ręcznych. Czyta NAZWĘ i OPIS — wymiar w opisie nie bywa negacją, inaczej
+-- niż tokeny silników. Milimetry całkowite, dokładne: tolerancja byłaby
+-- zgadywaniem. Bez klucza obcego do `sgt_towar` (blizna 0.154.0).
+CREATE TABLE IF NOT EXISTS wymiar_kartoteki (
+  tw_id     INTEGER NOT NULL,
+  tw_symbol TEXT NOT NULL,
+  mm        INTEGER NOT NULL,
+  -- Oryginalny zapis („1170x1480", „148 cm") do zdania źródła kandydata.
+  zapis     TEXT NOT NULL,
+  pole      TEXT NOT NULL CHECK (pole IN ('nazwa','opis')),
+  PRIMARY KEY (tw_id, mm)
+);
+CREATE INDEX IF NOT EXISTS ix_wymiar_kartoteki_mm ON wymiar_kartoteki(mm);
 
 -- Sekcje „Modele:" z opisów kartotek do PRZEROBIENIA przez człowieka.
 -- Decyzja właściciela: automat nie zgaduje marki z `FS450` ani `236; 240`.

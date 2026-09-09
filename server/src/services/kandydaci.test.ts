@@ -21,6 +21,7 @@ let W: typeof import("./wiedza.js");
 let S: typeof import("./silniki.js");
 let P: typeof import("./pasowania.js");
 let T: typeof import("./tokeny-silnikow.js");
+let Wy: typeof import("./wymiary.js");
 let config: typeof import("../config.js").config;
 let subiekt: typeof import("../context.js").subiekt;
 
@@ -42,6 +43,7 @@ before(async () => {
   S = await import("./silniki.js");
   P = await import("./pasowania.js");
   T = await import("./tokeny-silnikow.js");
+  Wy = await import("./wymiary.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
@@ -58,6 +60,7 @@ before(async () => {
   const { przebudujIdentyfikatory } = await import("./identyfikatory.js");
   const { przebudujFts } = await import("./pelnotekst.js");
   przebudujIdentyfikatory(d);
+  Wy.przebudujWymiary(d);
   assert.ok(przebudujFts(d), "FTS5 ma być dostępne w node:sqlite testów");
 });
 
@@ -93,7 +96,7 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   const przed = (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
   const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
   assert.deepEqual(kandydaci, []);
-  assert.equal(drogi.length, 10, "raport ma KAŻDY szczebel §11.2");
+  assert.equal(drogi.length, 11, "raport ma KAŻDY szczebel §11.2");
   for (const d of drogi) {
     assert.equal(d.sprawdzona, false, `${d.droga} udaje sprawdzony`);
     assert.ok(d.powod, `${d.droga} pominięty bez powodu`);
@@ -102,6 +105,7 @@ test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „
   assert.match(szczebel(drogi, "zastosowanie").powod!, /marki i modelu/);
   assert.match(szczebel(drogi, "silnik").powod!, /marki i modelu/);
   assert.match(szczebel(drogi, "pasowanie").powod!, /nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty/);
+  assert.match(szczebel(drogi, "wymiar").powod!, /nie wpisał wymiarów w parametrach doboru/);
   assert.match(szczebel(drogi, "oem").powod!, /numeru OEM/);
   assert.match(szczebel(drogi, "pelnotekst").powod!, /nazwy części ani maszyny/);
   /* Patrzenie na kandydatów niczego nie zapisuje — ani wiersza doboru, ani zdarzenia. */
@@ -439,6 +443,54 @@ test("propozycja zabudowy i zabudowa wycofana NIE karmią szczebla", () => {
   S.wycofajZabudowe(zab.id, "pomyłka: to inna wersja kosiarki", biuro);
   /* Wycofanie zabudowy gasi CAŁĄ gałąź naraz — dlatego wymaga powodu. */
   assert.equal(szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "silnik").sprawdzona, false);
+});
+
+/* ── Szczebel „zgodne wymiary": liczby z parametrów doboru ──────────────────
+   Blizna z 9.09.2026: „linka napędowa 148 cm" a w katalogu „Linka napędu
+   Castel Garden 81000668/1 1170x1480" (18-11010, 470002). Wchodzi WYŁĄCZNIE
+   z parametrów wpisanych przez agenta, z jednostką, co do milimetra.        */
+
+test("długość 148 cm w parametrach daje linki Castel Garden drogą „wymiar” jako podpowiedź ze zdaniem źródła", () => {
+  zapiszDane(rozmowa, { nazwaCzesci: "linka napędowa", parametry: { "długość": "148 cm", "zakończenie": "sprężyna" } }, 1, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "wymiar").sprawdzona, true);
+  assert.ok(szczebel(drogi, "wymiar").wynikow >= 2);
+  const k = kandydaci.find((x) => x.twId === tw("18-11010"))!;
+  assert.ok(k, "18-11010 ma 1480 w nazwie");
+  assert.equal(k.droga, "wymiar");
+  assert.equal(k.pewnosc, "wymaga_danych", "zgodna długość to podpowiedź, nie dowód");
+  assert.match(k.zrodlo, /zgodny wymiar 1480 mm \(długość: 148 cm\) w nazwie kartoteki „1170x1480” — nie dowód/);
+  assert.ok(kandydaci.some((x) => x.twId === tw("470002")), "zamiennik z tym samym wymiarem też");
+  /* Pełny tekst po „linka napędowa" też coś dał — obie drogi widać osobno, a 1481 nie trafia. */
+  assert.equal(szczebel(drogi, "pelnotekst").sprawdzona, true);
+});
+
+test("bez parametrów, bez jednostki i przy pustym indeksie szczebel wymiarów jest POMINIĘTY z nazwanym powodem", () => {
+  zapiszDane(rozmowa, { marka: "STIHL" }, 1, biuro);
+  let sz = szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "wymiar");
+  assert.equal(sz.sprawdzona, false);
+  assert.match(sz.powod!, /nie wpisał wymiarów w parametrach doboru/);
+  zapiszDane(rozmowa, { parametry: { "długość": "148" } }, 2, biuro);
+  sz = szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "wymiar");
+  assert.equal(sz.sprawdzona, false);
+  assert.match(sz.powod!, /wymiaru z jednostką/);
+  zapiszDane(rozmowa, { parametry: { "długość": "148 cm" } }, 3, biuro);
+  db().prepare("DELETE FROM wymiar_kartoteki").run();
+  try {
+    sz = szczebel(kandydaciDoboru(rozmowa, subiekt).drogi, "wymiar");
+    assert.equal(sz.sprawdzona, false);
+    assert.match(sz.powod!, /indeks wymiarów pusty/);
+  } finally {
+    Wy.przebudujWymiary(db());
+  }
+});
+
+test("ta sama kartoteka z symbolu i z wymiaru to JEDEN kandydat mocniejszą drogą", () => {
+  zapiszDane(rozmowa, { oem: "18-11010", parametry: { "długość": "148 cm" } }, 1, biuro);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  const linki = kandydaci.filter((x) => x.twId === tw("18-11010"));
+  assert.equal(linki.length, 1);
+  assert.equal(linki[0]!.droga, "symbol");
 });
 
 /* ── Szczebel „pasowanie": części do KOTWICY (uszczelka do gaźnika) ──────────

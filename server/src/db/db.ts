@@ -1287,8 +1287,9 @@ function bezBrygadzisty(database: DatabaseSync) {
  * u klienta i dopiero przy pierwszym trafieniu nowego szczebla.
  *
  * JEDNA funkcja dla WSZYSTKICH dołożonych dróg, nie jedna na drogę. 0.229.0
- * dołożyło `silnik`, to wydanie `pasowanie`; klient, który przeskakuje oba,
- * przebudowałby tabelę dwa razy z rzędu. Warunek wejścia sprawdza OSTATNIĄ
+ * dołożyło `silnik`, 0.230.0 `pasowanie`, szczebel zgodnych wymiarów `wymiar`;
+ * klient, który przeskakuje kilka wydań, przebudowałby tabelę kilka razy
+ * z rzędu. Warunek wejścia sprawdza OSTATNIĄ
  * dołożoną drogę w treści `sqlite_master` — brak jej znaczy, że tabela ma
  * dowolny starszy kształt i idzie od razu do docelowego. Dokładając kolejną
  * drogę: dopisz ją do `CREATE` niżej i podmień wartość w warunku.
@@ -1302,7 +1303,8 @@ function doborZnaDrogi(database: DatabaseSync) {
   const w = database
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'")
     .get() as { sql: string | null } | undefined;
-  if (!w?.sql || w.sql.includes("'pasowanie'")) return;
+  /* Wartownik to OSTATNIA dołożona droga: `wymiar` (szczebel zgodnych wymiarów). */
+  if (!w?.sql || w.sql.includes("'wymiar'")) return;
 
   const stare = (
     database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>
@@ -1330,7 +1332,7 @@ function doborZnaDrogi(database: DatabaseSync) {
       wybrany_symbol  TEXT,
       wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
                         'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                        'zastosowanie','silnik','pasowanie','oem','pelnotekst')),
+                        'zastosowanie','silnik','pasowanie','oem','pelnotekst','wymiar')),
       wybrano_przez   TEXT,
       wybrano_user_id INTEGER REFERENCES app_user(user_id),
       wybrano_at      TEXT,
