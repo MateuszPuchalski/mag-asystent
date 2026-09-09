@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
+import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { useKolejkaWiedzy } from "./api/wiedza";
@@ -11,6 +11,7 @@ import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
 import { Reklamacje } from "./ekrany/Reklamacje";
+import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { Wzmianki } from "./ekrany/Wzmianki";
 import { Wiedza } from "./ekrany/Wiedza";
@@ -44,6 +45,11 @@ const ZAKLADKI = [
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
   { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false },
+  /* DYSKUSJE OBOK REKLAMACJI, nie w nich. Allegro trzyma oba rodzaje spraw pod
+     jednym zasobem, ale to dwie różne prace: reklamacja ma zegar i werdykt,
+     dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
+     rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
+  { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false },
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
 ];
@@ -189,6 +195,8 @@ function App() {
             odświeżenie jej nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/reklamacje" element={<Reklamacje />} />
         <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
+    <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
+    <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić

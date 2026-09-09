@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Reklamacja, WiadomoscReklamacji } from "../api/typy";
+import type { WiadomoscReklamacji } from "../api/typy";
 
 /* ── Załączniki w czacie reklamacji — opakowanie na wspólnej powłoce ─────────
    OSOBNY PLIK od `Czat.test.tsx` celowo: tamten pilnuje rozmowy (role,
@@ -29,27 +29,13 @@ vi.mock("../api/reklamacje", () => ({
 
 const { Czat } = await import("./Czat");
 
-const rek = (): Reklamacja => ({
-  id: 3, externalId: "i-1", numer: "123/2026", orderId: null, offerId: null,
-  kupujacyLogin: "kupujacy1", prawo: "COMPLAINT", powodTyp: "DEFECT_FOUND_DURING_USE",
-  powodOpis: "Pękła obudowa", temat: null, opis: null,
-  oczekiwanie: "REFUND", oczekiwanaKwotaGrosze: null, waluta: "PLN",
-  statusAllegro: "CLAIM_SUBMITTED", decyzjaDo: null, dniDoTerminu: null, poTerminie: false,
-  zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1,
-  ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
-  notatka: null, wersja: 1, kubelek: "decyzja", sygnaly: [],
-  link: null, linkZamowienia: null, linkOferty: null,
-  ofertaNazwa: null, ofertaZdjecie: "nieznane", twId: null, twSymbol: null,
-  werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
-  werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
-  zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,
-});
+/* Kształt strukturalny z 0.245.0: czat czyta o sprawie tylko tyle. */
+const sprawa = () => ({ id: 3, opisZgloszenia: "Pękła obudowa", wiadomosciIle: 1 });
 const wiad = (zalaczniki: WiadomoscReklamacji["zalaczniki"]): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "kupujacy1", autorRola: "BUYER",
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z", zalaczniki,
 });
-const czat = (podglad: boolean) => render(<Czat reklamacja={rek()} zalaczniki={[]}
+const czat = (podglad: boolean) => render(<Czat sprawa={sprawa()} zalaczniki={[]}
   czat={[wiad([{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad }])]} />);
 
 describe("Załączniki w czacie reklamacji", () => {

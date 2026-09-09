@@ -59,8 +59,28 @@ function Zalaczniki({ reklamacjaId, lista }: {
   </ListaZalacznikow>;
 }
 
-export function Czat({ reklamacja, czat, zalaczniki, edytor }: {
-  reklamacja: Reklamacja;
+/**
+ * Tyle o sprawie, ile ten komponent naprawdę czyta.
+ *
+ * KSZTAŁT STRUKTURALNY, nie `Reklamacja`, od 0.245.0 — bo ten sam czat rysuje
+ * dyskusję, a dyskusja nie ma ani powodu, ani oferty, ani terminu. Trzymanie
+ * tu pełnego typu reklamacji kazałoby albo zduplikować komponent, albo podać
+ * dyskusji dwadzieścia pól z `null`, z których żadne nie jest prawdą o niej.
+ *
+ * `opisZgloszenia` skleja go WOŁAJĄCY: przy reklamacji to `powodOpis` z zejściem
+ * na `opis`, przy dyskusji sam `opis`. Rozstrzyganie tego tutaj wymagałoby
+ * z powrotem wiedzy o rodzaju sprawy.
+ */
+export interface SprawaCzatu {
+  id: number;
+  /** Zgłoszenie własnymi słowami klienta; `null`, gdy nic nie napisał. */
+  opisZgloszenia: string | null;
+  /** Ile wiadomości widzi Allegro — po tym poznaje się rozmowę niepełną. */
+  wiadomosciIle: number;
+}
+
+export function Czat({ sprawa, czat, zalaczniki, edytor }: {
+  sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
   zalaczniki: ZalacznikReklamacji[];
@@ -71,20 +91,20 @@ export function Czat({ reklamacja, czat, zalaczniki, edytor }: {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
      i ekran ma to POWIEDZIEĆ, zamiast pokazywać urwaną rozmowę jak całą. */
-  const brakuje = Math.max(0, reklamacja.wiadomosciIle - czat.length);
+  const brakuje = Math.max(0, sprawa.wiadomosciIle - czat.length);
 
   return <div className="flex min-h-0 flex-col gap-3">
     {/* Zgłoszenie: powód, oczekiwanie i opis własnymi słowami klienta. */}
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Zgłoszenie</h3>
       <p className="mt-1 text-sm text-slate-800">
-        {reklamacja.powodOpis ?? reklamacja.opis ?? "Klient nie opisał sprawy własnymi słowami."}
+        {sprawa.opisZgloszenia ?? "Klient nie opisał sprawy własnymi słowami."}
       </p>
-      <Zalaczniki reklamacjaId={reklamacja.id} lista={zalaczniki} />
+      <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
     </section>
 
     {brakuje > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-      <b>Ta rozmowa jest niepełna:</b> Allegro widzi {reklamacja.wiadomosciIle} wiadomości,
+      <b>Ta rozmowa jest niepełna:</b> Allegro widzi {sprawa.wiadomosciIle} wiadomości,
       a mamy {czat.length}. Reszta dojdzie następną synchronizacją.
     </p>}
 
@@ -107,7 +127,7 @@ export function Czat({ reklamacja, czat, zalaczniki, edytor }: {
                 <span className="ml-auto text-slate-400">{czas(w.utworzonoAt)}</span>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{w.tresc}</p>
-              <Zalaczniki reklamacjaId={reklamacja.id} lista={w.zalaczniki} />
+              <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
             </li>;
           })}
         </ol>}
