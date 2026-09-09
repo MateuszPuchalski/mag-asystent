@@ -20,6 +20,11 @@ vi.mock("../api/wiedza", () => ({
   usePrzerobModelZOpisu: () => ({ mutate: przerob, isPending: false }),
   useOdrzucModelZOpisu: () => ({ mutate: odrzuc, isPending: false }),
   useModele: () => ({ data: { modele: [] } }),
+  /* Tokeny (0.239.0) mają własny test; tu sekcja ma tylko nie przeszkadzać. */
+  useTokenySilnikow: () => ({ data: { tokeny: [], nowychRazem: 0 }, isLoading: false, error: null }),
+  useDodajToken: () => ({ mutate: vi.fn(), isPending: false }),
+  useRozstrzygnijToken: () => ({ mutate: vi.fn(), isPending: false }),
+  useUsunToken: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const { ZOpisow } = await import("./ZOpisow");

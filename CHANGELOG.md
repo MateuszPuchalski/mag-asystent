@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.239.0 — 9 września 2026
+
+**Tokeny silników w nazwach kartotek: paliwo dla szczebla „przez silnik".**
+Po 0.238.0 łańcuch rozmowa → alias → zabudowa → silnik działa, ale kandydatów
+daje dopiero zastosowanie części DO SILNIKA — a tych było tyle, ile biuro
+wpisało ręcznie. Tymczasem nazwy kartotek mówią wprost „Gaźnik do silników
+HONDA GX160". Zamyka zapowiedź z 0.230.0 („token w nazwie kartoteki → model
+silnika, wpisywany ręką biura").
+
+- **Tabele `token_silnika` i `token_silnika_kartoteka`** oraz sekcja „Tokeny
+  silników w nazwach kartotek" na ekranie Wiedza → Z opisów. Biuro wpisuje
+  „GX160" = Honda GX160; serwer dopasowuje słowo do NAZW kartotek po
+  zwinięciu pisowni (`zwin`, jak alias) przy dodaniu i po każdym imporcie —
+  nigdy po opisie, bo opis bywa notatką i mówi też „nie pasuje do…".
+- **Jedno kliknięcie zatwierdza zaznaczone** (decyzja właściciela). Lista
+  kartotek z tokenem startuje zaznaczona; odznaczone idą do pominiętych i nie
+  wracają po imporcie, zaznaczone dostają ZATWIERDZONE zastosowanie do
+  silnika ze źródłem `opis` i dowodem `decyzja_biura` z tokenem i nazwą.
+  Propozycja i rozstrzygnięcie to ten sam człowiek w jednej transakcji.
+- **Dobór:** kartoteka zatwierdzona z tokenu jest kandydatem szczebla „przez
+  silnik" z pewnością „potwierdzone" — dowodem jest decyzja biura, nie ślad
+  rozmowy.
+- Usunięcie tokenu nie cofa zastosowań (fakty z dowodem cofa się osobno).
+  Zakładka „Z opisów" liczy sekcje „Modele:" i kartoteki z tokenem razem;
+  karta pokrycia wiedzy w Ustawieniach dostaje wiersz o tokenach.
+- Trzy nowe trasy zapisu wiedzy (dodanie, rozstrzygnięcie listy, usunięcie;
+  licznik „osiemnaście") i hak po imporcie `tokenySilnikow`.
+
 ## 0.238.0 — 8 września 2026
 
 **Słownik silników: co znaczy tekst z pola „Silnik".** Po 0.237.0 Copilot

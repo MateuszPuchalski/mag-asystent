@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
 import {
   useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZastosowanie, useSilniki,
+  useTokenySilnikow,
   useZaproponujZastosowanie,
 } from "../api/wiedza";
 import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
@@ -31,6 +32,10 @@ export function Wiedza() {
   const kolejka = useKolejkaWiedzy();
   const zOpisow = useModeleZOpisow();
   const silniki = useSilniki();
+  const tokeny = useTokenySilnikow();
+  /* Jedna liczba pracy na zakładce: sekcje „Modele:" i kartoteki z tokenem
+     czekają na tego samego człowieka w tym samym widoku. */
+  const zOpisowRazem = (zOpisow.data?.liczba ?? 0) + (tokeny.data?.nowychRazem ?? 0);
   const rozstrzygnij = useRozstrzygnijZastosowanie();
   const rozstrzygnijPasowanie = useRozstrzygnijPasowanie();
   const zaproponuj = useZaproponujZastosowanie();
@@ -58,7 +63,7 @@ export function Wiedza() {
         { klucz: "kolejka", etykieta: "Kolejka" },
         { klucz: "nowa", etykieta: "Nowa propozycja" },
         { klucz: "kartoteka", etykieta: "Sprawdź kartotekę" },
-        { klucz: "z-opisow", etykieta: zOpisow.data?.liczba ? `Z opisów (${zOpisow.data.liczba})` : "Z opisów" },
+        { klucz: "z-opisow", etykieta: zOpisowRazem ? `Z opisów (${zOpisowRazem})` : "Z opisów" },
         /* Zakładka liczy LUKI, nagłówek — propozycje. Dwie różne prawdy: luka
            to praca do zrobienia, propozycja to decyzja do podjęcia. */
         { klucz: "silniki", etykieta: silniki.data?.lukiRazem ? `Silniki (${silniki.data.lukiRazem})` : "Silniki" },

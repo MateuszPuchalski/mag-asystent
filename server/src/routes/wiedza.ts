@@ -15,19 +15,23 @@ import {
   kolejkaPasowan, pasowaniaTowaru, rozstrzygnijPasowanie, wycofajPasowanie, zaproponujPasowanie,
   type NowePasowanie,
 } from "../services/pasowania.js";
+import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   PIĘTNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   OSIEMNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
-   propozycja, rozstrzygnięcie i wycofanie, oraz dwa przy słowniku silników
-   (0.238.0): dodanie i usunięcie aliasu. Każda z relacji ma ten sam cykl
-   życia co zastosowanie — propozycja, którą rozstrzyga człowiek — a bez
-   własnego wycofania zatwierdzona pomyłka o uszczelce zostałaby w bazie na
-   zawsze. Alias cyklu nie ma (zapis ręki biura, nie propozycja automatu),
-   stąd dwie trasy, nie trzy. Każdy zapis idzie przez serwis, który sprawdza
-   konto biura PRZED zapisem — trasa nie ma własnej listy ról poza bramką
-   odczytu.
+   propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
+   (0.238.0): dodanie i usunięcie aliasu, oraz trzy przy tokenach w nazwach
+   kartotek (0.239.0): dodanie, rozstrzygnięcie listy i usunięcie. Każda
+   z relacji ma ten sam cykl życia co zastosowanie — propozycja, którą
+   rozstrzyga człowiek — a bez własnego wycofania zatwierdzona pomyłka
+   o uszczelce zostałaby w bazie na zawsze. Alias i token cyklu nie mają
+   (zapis ręki biura, nie propozycja automatu). Rozstrzygnięcie tokenu to
+   JEDNA trasa dla listy, bo decyzja dotyczy kartotek przejrzanych naraz;
+   osobne wywołanie na kartotekę zamieniłoby jedno kliknięcie w trzydzieści.
+   Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
+   — trasa nie ma własnej listy ról poza bramką odczytu.
 
    Adres `wiedza/*`, nie `dopasowania/*` z §16: `dopasowanie` to nazwa
    spalona w bazie i nie ożywiamy jej nawet w URL-u.
@@ -129,6 +133,35 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply); if (nie) return nie;
     try { return odrzucModelZOpisu(Number(req.params.id), ja().userId); }
     catch (e) { return konflikt(reply, e); }
+  });
+
+  /* ── Tokeny silników w nazwach kartotek (0.239.0) ────────────────────────
+     Człowiek wpisuje token i silnik, automat układa listę kartotek z tokenem
+     w nazwie, człowiek przegląda i klika raz: zaznaczone → zatwierdzone
+     zastosowania, odznaczone → pominięte. Automat nie zgaduje marki. */
+  app.get("/api/obsluga/wiedza/tokeny", async (_req, reply) => odmowa(reply) ?? listaTokenow());
+
+  app.post<{ Body: { token?: string; silnik?: DaneModelu } }>("/api/obsluga/wiedza/tokeny", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try {
+      const b = req.body ?? {};
+      return dodajToken({ token: String(b.token ?? ""), silnik: b.silnik! }, { userId: ja().userId, name: ja().name });
+    } catch (e) { return konflikt(reply, e); }
+  });
+
+  app.post<{ Params: { id: string }; Body: { zatwierdz?: number[]; pomin?: number[] } }>(
+    "/api/obsluga/wiedza/tokeny/:id/rozstrzygnij", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return rozstrzygnijToken(Number(req.params.id),
+          { zatwierdz: req.body?.zatwierdz ?? [], pomin: req.body?.pomin ?? [] }, ja().userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/tokeny/:id/usun", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { usunToken(Number(req.params.id), ja().userId); return { ok: true }; }
+    catch (e) { return blad(reply, e); }
   });
 
   app.get<{ Params: { twId: string } }>("/api/obsluga/wiedza/identyfikatory/:twId", async (req, reply) =>

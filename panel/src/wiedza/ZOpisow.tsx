@@ -5,6 +5,7 @@ import { useModeleZOpisow, useOdrzucModelZOpisu, usePrzerobModelZOpisu } from ".
 import { Blad, Pusto, Przycisk } from "../ui";
 import { PolaModelu, type DaneModelu } from "./PolaModelu";
 import { Kafel } from "../towar/Kafel";
+import { Tokeny } from "./Tokeny";
 
 /**
  * „Z opisów" (E3): sekcje „Modele:" wycięte z opisów kartotek po imporcie.
@@ -42,6 +43,10 @@ export function ZOpisow() {
         onOdrzuc={() => { setBlad(""); setOstatnie("");
           odrzuc.mutate({ id: m.id }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
     </ul>
+    {/* DRUGA SEKCJA TEGO SAMEGO WIDOKU, nie szósta zakładka (komentarz przy
+        `Zakladki` w ekranie Wiedza). Obie sekcje to ta sama robota: wiedza
+        wyjęta z kartotek, którą człowiek zamienia na zastosowania. */}
+    <Tokeny />
   </div>;
 }
 

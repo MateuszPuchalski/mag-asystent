@@ -47,8 +47,9 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["pasowanie_czesci", "model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie",
-    "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "events", "device_session", "app_user"]) {
+  for (const t of ["token_silnika_kartoteka", "token_silnika", "pasowanie_czesci", "model_z_opisu", "towar_identyfikator",
+    "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "events",
+    "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   zOpisu = Number(d.prepare(`INSERT INTO model_z_opisu(tw_id,tw_symbol,tekst,tekst_norm)
@@ -106,6 +107,11 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/silniki/aliasy",
     payload: { tekst: "B&S 450E", silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" } } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/silniki/aliasy/1/usun" },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/tokeny" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/tokeny",
+    payload: { token: "GX160", silnik: { rodzaj: "silnik", marka: "Honda", nazwa: "GX160" } } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/tokeny/1/rozstrzygnij", payload: { zatwierdz: [], pomin: [] } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/tokeny/1/usun" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasowania",
     payload: { twId: GAZ, doTwId: SZR, rola: "inne", polaryzacja: "pasuje", rodzajDowodu: "producent", dowodTresc: "x" } },
   { method: "POST" as const, url: `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`, payload: { decyzja: "zatwierdz" } },
@@ -127,7 +133,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest piętnaście — licznik jest umową", () => {
+test("tras zapisu jest osiemnaście — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -136,14 +142,20 @@ test("tras zapisu jest piętnaście — licznik jest umową", () => {
      Dwie przy słowniku silników (0.238.0): dodanie i usunięcie aliasu. Alias
      jest zapisem ręki biura, nie propozycją automatu — nie ma cyklu życia,
      więc nie ma trzeciej trasy. Osobne od zabudowy, bo alias mówi „co znaczy
-     tekst z pola", a zabudowa „co stoi w maszynie". */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 15);
+     tekst z pola", a zabudowa „co stoi w maszynie".
+
+     Trzy przy tokenach w nazwach kartotek (0.239.0): dodanie, rozstrzygnięcie
+     listy i usunięcie. Rozstrzygnięcie to JEDNA trasa dla listy, bo decyzja
+     dotyczy kartotek przejrzanych naraz — osobne wywołanie na kartotekę
+     zamieniłoby jedno kliknięcie w trzydzieści. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 18);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
-    "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika"].map(liczba);
+    "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika", "token_silnika",
+    "token_silnika_kartoteka"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -365,4 +377,38 @@ test("słownik silników przez trasę: dodanie, dubel 409 ze wskazaniem, usunię
   r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/silniki/aliasy/${a.id}/usun`, headers: b.naglowki });
   assert.equal(r.statusCode, 200, r.body);
   assert.equal(liczba("alias_silnika"), 0);
+});
+
+test("tokeny przez trasę: dodanie z listą dopasowań, dubel 409, rozstrzygnięcie listy, usunięcie", async () => {
+  const b = login("biuro", "Anna");
+  db().prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa,opis) VALUES (?,?,?,?)")
+    .run(503, "GAZ-GX", "Gaźnik do silników HONDA GX160", "");
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/tokeny", headers: b.naglowki,
+    payload: { token: "GX160", silnik: { rodzaj: "silnik", marka: "Honda", nazwa: "GX160" } } });
+  assert.equal(r.statusCode, 200, r.body);
+  const t = r.json<{ id: number; nowych: number; nowe: Array<{ twId: number; symbol: string }> }>();
+  assert.equal(t.nowych, 1);
+  assert.deepEqual(t.nowe.map((k) => k.symbol), ["GAZ-GX"]);
+  r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/tokeny", headers: b.naglowki,
+    payload: { token: "gx 160", silnik: { rodzaj: "silnik", marka: "Honda", nazwa: "GX200" } } });
+  assert.equal(r.statusCode, 409);
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/tokeny", headers: b.naglowki });
+  assert.equal(r.json<{ nowychRazem: number }>().nowychRazem, 1);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/tokeny/${t.id}/rozstrzygnij`, headers: b.naglowki,
+    payload: { zatwierdz: [503], pomin: [] } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json(), { zatwierdzonych: 1, juzBylo: 0, pominietych: 0 });
+  const z = W.zastosowaniaTowaru(503).potwierdzone[0];
+  assert.equal(z.zaproponowal, "Anna");
+  assert.equal(z.rozstrzygnal, "Anna", "jedno kliknięcie: propozycja i rozstrzygnięcie tej samej osoby");
+  /* Obce id to 400 ze zdaniem, nie cichy sukces. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/tokeny/${t.id}/rozstrzygnij`, headers: b.naglowki,
+    payload: { zatwierdz: [503], pomin: [] } });
+  assert.equal(r.statusCode, 400);
+
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/tokeny/${t.id}/usun`, headers: b.naglowki });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(liczba("token_silnika"), 0);
+  assert.equal(W.zastosowaniaTowaru(503).potwierdzone.length, 1, "usunięcie tokenu nie cofa faktu");
 });
