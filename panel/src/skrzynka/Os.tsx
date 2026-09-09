@@ -6,6 +6,7 @@ import { LoginKlienta, Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
+import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -42,54 +43,22 @@ const POWOD: Record<string, string> = {
  * a plik na dysku ma nosić własną nazwę.
  */
 function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
-  return <ul className="mt-2 space-y-2 border-t pt-2 text-xs">
+  /* Kreska nad listą zostaje tylko tu: w skrzynce załączniki stoją pod
+     treścią wiadomości, a w reklamacjach obok niej. */
+  return <ListaZalacznikow className="border-t pt-2">
     {lista.map((z) => <Zalacznik key={z.id} z={z} />)}
-  </ul>;
+  </ListaZalacznikow>;
 }
 
-/** Jeden załącznik: obraz nad nazwą, nazwa zawsze. Osobny komponent, bo obraz
-    wisi na haku, a haka nie wolno wołać w pętli. */
+/** Opakowanie per źródło: woła hak SKRZYNKI i podaje wynik wspólnej powłoce.
+    Osobny komponent, bo obraz wisi na haku, a haka nie wolno wołać w pętli.
+    Wygląd — ramka, zdanie odmowy, ponowienie, powiększenie — mieszka
+    w `towar/Zalacznik.tsx`, wspólnie z czatem reklamacji. */
 function Zalacznik({ z }: { z: ZalacznikOsi }) {
-  const { url: obraz, blad: bladPodgladu, ponow } = useZdjecieZalacznika(z.podglad ? z.id : null);
-  const [blad, setBlad] = React.useState<string | null>(null);
-
-  return <li>
-    {/* Stałe miejsce PRZED pobraniem: bez ramki oś skakała przy doładowaniu,
-        a przy porażce nie zostawało nic — agent widział samą nazwę pliku
-        i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane. */}
-    {z.podglad && obraz === undefined &&
-      <span className="mb-1 flex h-32 w-48 items-center justify-center rounded border border-dashed
-        border-slate-300 text-xs text-slate-400">wczytuję…</span>}
-    {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
-        i rozpychałoby oś na cały ekran. */}
-    {obraz && <img src={obraz} alt={z.nazwa} loading="lazy"
-      className="mb-1 max-h-64 w-auto max-w-full rounded border border-slate-200 bg-white p-1" />}
-    <span className="flex items-center gap-1.5">
-      <Paperclip size={12} className="shrink-0 text-slate-400" />
-      {z.doPobrania
-        ? <button type="button" className="font-bold text-slate-700 underline hover:text-slate-900"
-            onClick={() => {
-              setBlad(null);
-              pobierzPlik(`/api/obsluga/zalaczniki/${z.id}`, z.nazwa)
-                .catch((e: unknown) => setBlad(e instanceof Error ? e.message : "Nie udało się pobrać"));
-            }}>{z.nazwa}</button>
-        : <span className="text-slate-500">
-            <span className="font-bold">{z.nazwa}</span>
-            {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
-          </span>}
-    </span>
-    {/* Nieudany PODGLĄD też mówi o sobie — zdaniem z serwera (502 „Allegro
-        nie oddało…", 503 „Konto niepołączone…") i przyciskiem ponowienia.
-        Do tego wydania porażka rysowała nic, a `null` bez zdania to nadal
-        odpowiedź „to nie obraz" (415) — wtedy zostaje sama nazwa z pobraniem. */}
-    {z.podglad && obraz === null && bladPodgladu &&
-      <p className="mt-0.5 text-ranga-zle">{bladPodgladu}{" "}
-        <button type="button" className="font-bold underline" onClick={ponow}>Spróbuj ponownie</button>
-      </p>}
-    {/* Nieudane pobranie MÓWI o sobie. Do 0.219.1 kliknięcie otwierało kartę
-        z surowym JSON-em błędu — agent nie miał jak zgadnąć, co poszło źle. */}
-    {blad && <p className="mt-0.5 text-ranga-zle">{blad}</p>}
-  </li>;
+  const obraz = useZdjecieZalacznika(z.podglad ? z.id : null);
+  return <KartaZalacznika nazwa={z.nazwa} podglad={z.podglad} obraz={obraz}
+    pobierz={z.doPobrania ? () => pobierzPlik(`/api/obsluga/zalaczniki/${z.id}`, z.nazwa) : null}
+    powodBrakuPobrania={POWOD[z.status] ?? `stan ${z.status}`} />;
 }
 
 /**

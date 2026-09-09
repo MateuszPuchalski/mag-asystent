@@ -1,4 +1,4 @@
-import { before, beforeEach, test } from "node:test";
+import { afterEach, before, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -404,4 +404,101 @@ test("zamknięta rozmowa oddaje 409 ze zdaniem, a nie kodem Allegro", async () =
   assert.equal(r.statusCode, 409);
   assert.match(r.json().error, /nie przyjmie/);
   assert.equal(r.json().czatAktywny, false);
+});
+
+/* ── Załącznik od Allegro: parytet ze skrzynką (wydanie „wspólny załącznik") ──
+   Do tego wydania każda awaria przy załączniku reklamacji wracała jako 400
+   z JSON-em, a panel nie odróżniał „Allegro nie oddało" od 415 „to nie obraz"
+   i milczał. Skrzynka dostała 502/503 w 0.244.0; wspólna powłoka w panelu
+   zakłada, że obie trasy mówią tym samym językiem kodów.
+
+   Pomocnicy skopiowani ze `skrzynka.test.ts` — dwadzieścia linii jest tańsze
+   niż wspólny moduł testowy, którego serwer nie ma.                          */
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+
+function tokenAllegro(jest: boolean) {
+  db().prepare("DELETE FROM allegro_token").run();
+  if (jest) {
+    db().prepare(`INSERT INTO allegro_token(id,access_token,refresh_token,wygasa_at,srodowisko,
+      polaczono_at,polaczono_przez) VALUES (1,'tok','ref',?, 'prod','2026-09-01T00:00:00Z','test')`)
+      .run(new Date(Date.now() + 86_400_000).toISOString());
+  }
+}
+
+/** Podstawiony `fetch` do Allegro: liczy strzały, oddaje bajty albo kod. */
+function allegroOddaje(odp: { status: number; bajty?: Buffer } | Error) {
+  const s = { strzalow: 0 };
+  mock.method(globalThis, "fetch", async () => {
+    s.strzalow += 1;
+    if (odp instanceof Error) throw odp;
+    return new Response(odp.status === 200 ? new Uint8Array(odp.bajty ?? PNG) : JSON.stringify({ error: "nie" }),
+      { status: odp.status, headers: { "content-type": odp.status === 200 ? "application/octet-stream" : "application/json" } });
+  });
+  return s;
+}
+
+afterEach(() => { mock.restoreAll(); tokenAllegro(false); });
+
+/** Ile śladów pobrania zostawiła trasa w dzienniku. */
+const sladowPobrania = () => Number((db().prepare(
+  "SELECT COUNT(*) AS n FROM events WHERE type='reklamacja_zalacznik_pobrany'").get() as { n: number }).n);
+
+test("podgląd przez trasę: 200 z typem z SYGNATURY i długością, 415 gdy bajty kłamią", async () => {
+  const { naglowki } = login("biuro", "Ala trzynasta");
+  tokenAllegro(true);
+  const podglad = `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`;
+
+  const png = allegroOddaje({ status: 200, bajty: PNG });
+  const r = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.headers["content-type"], "image/png");
+  assert.equal(r.headers["x-content-type-options"], "nosniff");
+  assert.equal(r.headers["content-disposition"], "inline");
+  assert.equal(r.headers["etag"], `"rekl-zal-${zalacznik}"`);
+  assert.equal(r.headers["content-length"], String(PNG.length));
+  assert.equal(png.strzalow, 1);
+  /* Podgląd nie zostawia śladu — to nie jest czynność agenta. */
+  assert.equal(sladowPobrania(), 0);
+
+  /* Nazwa `paragon.pdf` obiecuje mało, ale i tak rozstrzygają bajty: plik
+     wykonywalny udający obraz dostaje 415 ze wskazaniem na sygnaturę. */
+  mock.restoreAll();
+  allegroOddaje({ status: 200, bajty: Buffer.from([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0]) });
+  const exe = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(exe.statusCode, 415);
+  assert.match(exe.json().error, /sygnatura pliku/);
+});
+
+test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 503", async () => {
+  const { naglowki } = login("biuro", "Ala czternasta");
+  const podglad = `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad`;
+  const pobranie = `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}`;
+
+  tokenAllegro(true);
+  const odmowa = allegroOddaje({ status: 403 });
+  const r = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(r.statusCode, 502, "odmowa Allegro to 502, nie 400");
+  assert.match(r.json().error, /Allegro nie oddało załącznika \(403\)/);
+  assert.doesNotMatch(r.json().error, /https?:\/\//, "adres nie wychodzi na ekran");
+  assert.equal(odmowa.strzalow, 1);
+  /* Pobranie na dysk mówi tym samym kodem — panel pokazuje zdanie pod nazwą. */
+  const p = await app.inject({ method: "GET", url: pobranie, headers: naglowki });
+  assert.equal(p.statusCode, 502);
+  assert.equal(sladowPobrania(), 0, "nieudane pobranie nie zostawia śladu");
+
+  mock.restoreAll();
+  allegroOddaje(new Error("fetch failed: timeout"));
+  const siec = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(siec.statusCode, 503);
+  assert.match(siec.json().error, /internet na serwerze/);
+
+  mock.restoreAll();
+  tokenAllegro(false);
+  const bezKonta = await app.inject({ method: "GET", url: podglad, headers: naglowki });
+  assert.equal(bezKonta.statusCode, 503);
+  assert.match(bezKonta.json().error, /niepołączone/i);
+
+  /* 404 zostaje przy `blad()`: brak wiersza to nie wina Allegro. */
+  const brak = await app.inject({ method: "GET", url: `${pobranie}9999/podglad`, headers: naglowki });
+  assert.equal(brak.statusCode, 404);
 });

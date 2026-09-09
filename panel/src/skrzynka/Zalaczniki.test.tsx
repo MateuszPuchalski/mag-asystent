@@ -95,6 +95,16 @@ describe("Załączniki na osi rozmowy", () => {
     expect(zdjecie).toHaveBeenCalledWith(7);
   });
 
+  it("kliknięcie w zdjęcie powiększa je — skrzynka dostała lupę z reklamacji", async () => {
+    /* Wspólna powłoka (`towar/Zalacznik.tsx`): pęknięcie na zdjęciu z telefonu
+       bywa niewidoczne w 256 px, a agent nie ma po co zapisywać pliku na dysk. */
+    zdjecie.mockReturnValue(wynikHaka("blob:podglad-7"));
+    os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
+      status: "SAFE", doPobrania: true, podglad: true }]));
+    await userEvent.click(screen.getByRole("button", { name: "Powiększ: szarpak.jpeg" }));
+    expect(screen.getByRole("dialog", { name: "Zdjęcie: szarpak.jpeg" })).toBeTruthy();
+  });
+
   it("plik, którego nie umiemy pokazać, w ogóle nie pyta o obraz", () => {
     /* `podglad` liczy SERWER. Panel nie zgaduje po typie i nie dobija trasy
        podglądu o PDF, którego ona i tak nie odda. */

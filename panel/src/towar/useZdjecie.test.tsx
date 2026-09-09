@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { Zdjecie } from "./Zdjecie";
-import { _wyczyscPamiecZdjec, useZdjecieZalacznika } from "./useZdjecie";
+import { _wyczyscPamiecZdjec, useZdjecieZalacznika, useZdjecieZalacznikaReklamacji } from "./useZdjecie";
 
 /* Trzy lekcje z `biuro.html`, każda kupiona tam osobno. Ten plik pilnuje, żeby
    panel obsługi nie kupił ich drugi raz. */
@@ -145,5 +145,38 @@ describe("Załącznik wiadomości — zdanie i ponowienie", () => {
     await waitFor(() => expect(odpowiedzi).toHaveLength(1));
     odpowiedzi[0].rozwiaz(false, 401);
     await waitFor(() => expect(screen.getByText(/Sesja wygasła/)).toBeInTheDocument());
+  });
+});
+
+/* ── Załącznik reklamacji — ten sam kształt, co w skrzynce (wspólny załącznik) ──
+   Do tego wydania hak oddawał sam adres, więc 503 „konto niepołączone"
+   wyglądało w czacie reklamacji jak 415 „to nie obraz". */
+function ZalacznikReklamacji({ id }: { id: number | null }) {
+  const { url, blad, ponow } = useZdjecieZalacznikaReklamacji(3, id);
+  return <div>
+    {url === undefined && <span>wczytuję</span>}
+    {url && <img src={url} alt="z" />}
+    {blad && <p>{blad}<button onClick={ponow}>ponów</button></p>}
+    {url === null && !blad && <span>brak</span>}
+  </div>;
+}
+
+describe("Załącznik reklamacji — zdanie i ponowienie", () => {
+  it("pyta trasę reklamacji, 503 daje zdanie, „ponów” pyta drugi raz", async () => {
+    render(<ZalacznikReklamacji id={9} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    expect(odpowiedzi[0].url).toBe("/api/obsluga/reklamacje/3/zalaczniki/9/podglad");
+    odpowiedzi[0].rozwiaz(false, 503, { error: "Konto Allegro niepołączone — połącz w STAN SYSTEMU." });
+    await waitFor(() => expect(screen.getByText(/Konto Allegro niepołączone/)).toBeInTheDocument());
+    expect(screen.queryByText("brak")).not.toBeInTheDocument();
+    const { click } = await import("@testing-library/user-event").then((m) => m.default);
+    await click(screen.getByText("ponów"));
+    await waitFor(() => expect(odpowiedzi).toHaveLength(2));
+  });
+
+  it("`null` w identyfikatorze znaczy „nie pytaj” — zero żądań", async () => {
+    render(<ZalacznikReklamacji id={null} />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(odpowiedzi).toHaveLength(0);
   });
 });

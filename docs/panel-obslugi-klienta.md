@@ -105,6 +105,15 @@ nie z pola `mime_type` przysłanego przez Allegro. Trasa pobrania zostaje bez
 zmian, z `content-disposition: attachment` — dwa adresy, dwie odpowiedzi, każda
 mówi o sobie prawdę.
 
+**Jedna powłoka załącznika dla skrzynki i reklamacji (0.246.0).** Do tego
+wydania to samo było narysowane dwa razy: skrzynka pokazywała zdjęcie w linii
+ze zdaniem odmowy, a czat reklamacji kafel z lupą, który przy odmowie milczał.
+Od 0.246.0 obie rozmowy rysują `towar/Zalacznik.tsx`: zdjęcie w linii,
+kliknięcie powiększa, nazwa pliku pod spodem jest pobraniem, a pod nazwą stoi
+zdanie odmowy z „Spróbuj ponownie" albo błąd pobrania. Powłoka nie woła haka
+obrazu — hak zależy od źródła, więc woła go cienkie opakowanie w `Os.tsx`
+i w `Czat.tsx`, tak jak `Kafel` przy kartotece.
+
 **Autoodpowiedź biura jest zwinięta i oznaczona (0.218.0).** Skrzynka odbija
 przychodzący list potwierdzeniem „Dziękujemy za kontakt": kilkanaście wierszy
 z godzinami pracy, po polsku i po angielsku, zero zdań o sprawie klienta.
@@ -2714,7 +2723,10 @@ i „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu. Kolumna dowodó
 stawia obok siebie ofertę i kartotekę — przy „niezgodny z opisem", czyli
 siedemnastu sprawach na sto, różnica między nimi bywa całą sprawą. Oś rozmowy
 rysuje zdjęcia klienta wprost, bo zdjęcie pękniętego elementu bywa całym
-zgłoszeniem; typ rozstrzyga sygnatura pliku, nie jego nazwa.
+zgłoszeniem; typ rozstrzyga sygnatura pliku, nie jego nazwa. Od 0.246.0 oś
+reklamacji i oś skrzynki rysują załącznik tą samą powłoką (§4.2): odmowa
+Allegro stoi pod nazwą pliku zdaniem z serwera i daje „Spróbuj ponownie",
+a nieudane pobranie mówi o sobie zamiast milczeć.
 
 Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
 przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
@@ -3165,7 +3177,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zwrot tego zamówienia przy rozmowie | **działa** od 0.221.0 | `osRozmowy.zwroty` z `listaZwrotow` po zamówieniu, `skrzynka/ZwrotRozmowy.tsx` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
-| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia |
+| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia; od 0.246.0 kliknięcie powiększa (`towar/Zalacznik.tsx`, wspólne z reklamacjami) |
 | Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **kandydat** od 0.244.0 | `kandydaciPobrania`: końcówka API z `Accept` przed zapisanym `url`; `[WERYFIKUJ]` w `allegro-ksztalt.md`, `npm run sonda:zalacznik` zdejmuje |
 | Załączniki odświeżane przy każdym przebiegu | **działa** od 0.244.0 | `zapiszZalaczniki` upsert po `(message_id, file_name)`, dociąg wątków ze stanem `NEW` (sufit 5), dosypka z lądowiska przy starcie |
 | Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
@@ -3195,6 +3207,6 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
-| Podgląd załącznika reklamacji na osi | **działa** od 0.223.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF |
+| Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

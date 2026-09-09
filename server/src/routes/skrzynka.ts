@@ -17,7 +17,7 @@ import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
 import { pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
-import { BladOdpowiedziAllegro } from "../adapters/allegro.js";
+import { bladPobrania } from "./pobranie.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
 import { kontoKanalu } from "../services/kanal-konto.js";
@@ -30,19 +30,6 @@ import { historiaKlienta } from "../services/klient-historia.js";
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
   reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
-
-/**
- * Błąd POBRANIA załącznika — inny kod niż `blad()`, bo to inna wina.
- *
- * 400 mówi „źle poprosiłeś", a przy załączniku prośba jest dobra: to Allegro
- * odmówiło (502 ze zdaniem z adaptera) albo nie dało się do niego dojść —
- * timeout, konto niepołączone, adres poza Allegro (503). Do tego wydania
- * wszystko szło jako 400 z JSON-em, więc panel nie odróżniał „Allegro nie
- * oddało" od 415 „to nie obraz" i rysował pustą linię pod nazwą pliku.
- */
-const bladPobrania = (reply: FastifyReply, e: unknown) =>
-  reply.code(e instanceof BladOdpowiedziAllegro ? 502 : 503)
-    .send({ error: e instanceof Error ? e.message : String(e) });
 
 /* Skrzynka jest ekranem biura, więc bramka roli stoi na każdej trasie — także
    na odczycie. Rozmowy z klientami nie są danymi, które ma widzieć hala. */
