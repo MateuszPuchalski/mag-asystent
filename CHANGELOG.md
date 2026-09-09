@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.240.0 — 9 września 2026
+
+**Copilot proponuje pasowania: „ta uszczelka pasuje do tego gaźnika"
+z rozmowy do kolejki wiedzy jednym kliknięciem.** Od 0.230.0 pasowanie
+część↔część rodziło się wyłącznie z ręki agenta, a klienci mówią je wprost.
+Zamyka zapowiedź z 0.230.0 („Copilot proponujący pasowania"). Czwarty
+przyrost etapu F (§14.8).
+
+- **To samo wywołanie „Ułóż odpowiedź"** oddaje w `pasowanie` parę
+  SYMBOLI z faktów, rolę z listy i pozycję słowami klienta (reguła 3b).
+- **Serwer sprawdza oba końce po białej liście kartotek z kontekstu**
+  rozmowy: kartoteka oferty, kandydaci, kotwice, strony cytowanych pasowań.
+  Symbol spoza listy, ta sama kartoteka, zła rola albo para już żywa
+  w bazie — wypada, szkic zostaje, powód idzie do dziennika. Pozycja
+  zostaje tylko, gdy stoi w rozmowie. Żadnego szukania po treści wiadomości.
+- **Zakładka Dobór dostaje kartę „Copilot rozpoznał pasowanie"** z oboma
+  kaflami, rolą i pozycją. „Zaproponuj pasowanie" kładzie parę w kolejce
+  Wiedza ze źródłem `copilot`, dowodem `rozmowa` i podpisem agenta;
+  rozstrzyga biuro. Dubel nie jest błędem. „Odrzuć" liczy się w pomiarze.
+  Karta szkicu w edytorze mówi o parze; kolejka Wiedza znaczy ją pastylką
+  „z Copilota".
+- **Pomiar** liczy pary rozpoznane, zaproponowane i odrzucone oraz ile
+  z nich biuro zatwierdziło — to jest miara, czy model trafia.
+- Szósta trasa zapisu Copilota `POST /api/obsluga/copilot/szkic/:id/pasowanie`
+  (licznik w teście), kolumny `pasowanie_propozycja`, `pasowanie_ocena`,
+  `pasowanie_ocena_at` w `szkic_copilota` dochodzą migracją.
+
+Tylko polaryzacja „pasuje": negatyw wymaga powodu z listy zamkniętej, a model
+nie ma go skąd wziąć (poza wydaniem: pętla zwrotów).
+
 ## 0.239.0 — 9 września 2026
 
 **Tokeny silników w nazwach kartotek: paliwo dla szczebla „przez silnik".**

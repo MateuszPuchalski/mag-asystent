@@ -153,3 +153,19 @@ test("ślad rozmowy i dziennik przy każdej mutacji; odczyt niczego nie zapisuje
   P.pasowaniaTowaru(ID["W09-0211"]); P.pasowaniaTowaru(ID["EX055"]); P.kolejkaPasowan();
   assert.equal(licz(), przed);
 });
+
+test("aktywnePasowanie widzi propozycję i zatwierdzone w obu polaryzacjach, a odrzucone i wycofane nie", () => {
+  const usz = ID["LC170430140-0001"]; const gaz = ID["W09-0211"];
+  assert.equal(P.aktywnePasowanie(usz, gaz), false);
+  const p = zaproponuj("LC170430140-0001", "W09-0211")!;
+  assert.equal(P.aktywnePasowanie(usz, gaz), true, "propozycja już liczy się jako żywa");
+  assert.equal(P.aktywnePasowanie(gaz, usz), false, "kierunek jest semantyczny");
+  P.rozstrzygnijPasowanie(p.id, "odrzuc", "nie ten wariant", biuro);
+  assert.equal(P.aktywnePasowanie(usz, gaz), false, "po odrzuceniu wolno zaproponować od nowa");
+  const n = zaproponuj("170430138-0001", "W09-0211", { polaryzacja: "nie_pasuje", powodNegatywny: "tylko_inny_wariant",
+    pozycja: "od strony kolektora", rodzajDowodu: "pomiar_wlasny", dowodTresc: "inny rozstaw" })!;
+  P.rozstrzygnijPasowanie(n.id, "zatwierdz", null, biuro);
+  assert.equal(P.aktywnePasowanie(ID["170430138-0001"], gaz), true, "negatyw też blokuje — pozytyw wobec niego to robota człowieka");
+  P.wycofajPasowanie(n.id, "pomyłka", biuro);
+  assert.equal(P.aktywnePasowanie(ID["170430138-0001"], gaz), false);
+});

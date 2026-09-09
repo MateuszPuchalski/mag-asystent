@@ -151,6 +151,18 @@ export function kolejkaPasowan(database: DatabaseSync = db()): { propozycje: Pas
   return { propozycje, liczba: propozycje.length };
 }
 
+/**
+ * Czy para (część, do czego) ma już żywy wiersz — propozycję albo zatwierdzone,
+ * w DOWOLNEJ polaryzacji. Dla propozycji z Copilota (przyrost czwarty): pozytyw
+ * wobec zapisanego negatywu to dokładnie to, czego §14.2 automatowi zabrania,
+ * a dubel pozytywu i tak odbiłby się o `zaproponujPasowanie`. Odrzucone
+ * i wycofane nie liczą się — po nich wolno zaproponować od nowa.
+ */
+export function aktywnePasowanie(twId: number, doTwId: number, database: DatabaseSync = db()): boolean {
+  return Boolean(database.prepare(`SELECT 1 FROM pasowanie_czesci
+    WHERE tw_id=? AND do_tw_id=? AND stan IN ('propozycja','zatwierdzone') LIMIT 1`).get(twId, doTwId));
+}
+
 function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: string }) | null {
   const w = database.prepare("SELECT tw_id, symbol, nazwa, opis FROM sgt_towar WHERE tw_id=?").get(twId) as
     { tw_id: number; symbol: string; nazwa: string; opis: string | null } | undefined;

@@ -41,3 +41,15 @@ export function propozycjaDoboru(szkic: SzkicCopilota | null | undefined, dane: 
   }
   return { nowe, inaczej };
 }
+
+/**
+ * Para z rozmowy do pokazania (przyrost czwarty): „LC170430140-0001 → W09-0211"
+ * albo `null`, gdy nic nie rozpoznano albo agent już zdecydował. Ta sama reguła
+ * dla karty szkicu (mówi) i zakładki Dobór (klika) — z tego samego powodu,
+ * co `propozycjaDoboru`.
+ */
+export function paraPasowania(szkic: SzkicCopilota | null | undefined): string | null {
+  const p = szkic?.pasowanie;
+  if (!p || szkic.pasowanieOcena !== null) return null;
+  return `${p.czesc.symbol} → ${p.doCzego.symbol}`;
+}

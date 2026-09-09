@@ -15,7 +15,7 @@ import { Kolejka } from "../skrzynka/Kolejka";
 import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje, useOcenSzkic, useUlozSzkic } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
-import { propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
+import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -246,6 +246,7 @@ export function Skrzynka() {
         doborWersja: rozmowa.data?.dobor.wersja ?? null,
         nowePolaDoboru: propozycjaDoboru(rozmowa.data?.szkicCopilota, rozmowa.data?.dobor.dane)
           .nowe.map((n) => n.nazwa),
+        paraPasowania: paraPasowania(rozmowa.data?.szkicCopilota),
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",

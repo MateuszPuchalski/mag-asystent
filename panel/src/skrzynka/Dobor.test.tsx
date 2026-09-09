@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Dobor as DoborTyp, KandydaciDoboru, SzkicCopilota } from "../api/typy";
 import { Konflikt } from "../api/klient";
@@ -31,7 +31,9 @@ vi.mock("../api/rozmowy", () => ({
 }));
 /* Los danych z rozmowy (przyrost trzeci) idzie trasą Copilota, nie rozmów. */
 const ocenDane = { mutate: vi.fn(), isPending: false, error: null as unknown };
-vi.mock("../api/copilot", () => ({ useOcenDaneDoboru: () => ocenDane }));
+/* Para z rozmowy (przyrost czwarty) idzie tą samą drogą, co dane: hook Copilota. */
+const ocenPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
+vi.mock("../api/copilot", () => ({ useOcenDaneDoboru: () => ocenDane, useOcenPasowanie: () => ocenPasowanie }));
 vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
 /* Pasowanie „z pracy" (0.230.0) idzie trasą wiedzy, nie rozmów — hook z tego
    modułu woła `useQueryClient`, a zakładka renderuje się tu bez dostawcy. */
@@ -97,12 +99,18 @@ const pokaz = (d: DoborTyp, uchwyty: Partial<{
 const propozycja = (dane: Partial<SzkicCopilota["daneDoboru"] & object>, n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry…", zastrzezenia: [], uzyteFakty: [], messageId: 41, model: "claude-opus-5",
   at: "2026-09-08T12:00:00Z", przez: "A. Lewandowska", ocena: null, daneOcena: null, doborWersja: 1,
-  daneDoboru: { ...dobor().dane, ...dane }, ...n,
+  daneDoboru: { ...dobor().dane, ...dane }, pasowanie: null, pasowanieOcena: null, ...n,
 });
+
+const PARA: SzkicCopilota["pasowanie"] = {
+  czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka do gaźników GX160 (od strony filtra)" },
+  doCzego: { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik do silników HONDA GX160" },
+  rola: "uszczelka", pozycja: "od strony filtra",
+};
 
 beforeEach(() => {
   zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset(); zaproponujPasowanie.mutate.mockReset();
-  ocenDane.mutate.mockReset();
+  ocenDane.mutate.mockReset(); ocenPasowanie.mutate.mockReset();
   kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
 });
 
@@ -254,6 +262,35 @@ describe("zakładka doboru", () => {
     await userEvent.click(screen.getByRole("button", { name: "Wpisz do danych" }));
     expect(screen.getByText(/Ktoś zmienił dane doboru \(M\. Wójcik\)/)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Dane z rozmowy" })).toBeInTheDocument();
+  });
+
+  /* ── Pasowanie z rozmowy (etap F, przyrost czwarty) ──────────────────────
+     Zapowiedź z 0.230.0. Pilnujemy granic: karta pokazuje OBA końce, rolę
+     i pozycję; „Zaproponuj" i „Odrzuć" idą hookiem Copilota z samą oceną
+     (parę zna serwer, nie ciało żądania); po ocenie zdanie z danych, a nie
+     przyciski; odrzucona propozycja nie zostawia karty. */
+  it("karta pary pokazuje oba końce z rolą i pozycją; klik proponuje albo odrzuca samą oceną", async () => {
+    pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA }) });
+    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
+    expect(karta).toHaveTextContent("LC170430140-0001");
+    expect(karta).toHaveTextContent("W09-0211");
+    expect(karta).toHaveTextContent("uszczelka · od strony filtra");
+    await userEvent.click(within(karta).getByRole("button", { name: "Zaproponuj pasowanie" }));
+    expect(ocenPasowanie.mutate).toHaveBeenCalledWith({ rozmowaId: 4821, ocena: "zaproponowane" });
+    /* Drugi „Odrzuć" stoi w karcie danych — szukamy W REGIONIE pary. */
+    await userEvent.click(within(karta).getByRole("button", { name: "Odrzuć" }));
+    expect(ocenPasowanie.mutate).toHaveBeenLastCalledWith({ rozmowaId: 4821, ocena: "odrzucone" });
+  });
+
+  it("po zaproponowaniu karta mówi, że para czeka w kolejce, i nie ma przycisków; po odrzuceniu karty nie ma", () => {
+    const { unmount } = pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA, pasowanieOcena: "zaproponowane" }) });
+    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
+    expect(karta).toHaveTextContent(/czeka w kolejce wiedzy/);
+    /* Kafle zdjęć też są przyciskami — pytamy o te dwa z decyzją. */
+    expect(within(karta).queryByRole("button", { name: /Zaproponuj|Odrzuć/ })).toBeNull();
+    unmount();
+    pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA, pasowanieOcena: "odrzucone" }) });
+    expect(screen.queryByRole("region", { name: "Pasowanie z rozmowy" })).toBeNull();
   });
 
   it("Copilotowego `extracting_data` nie da się wybrać ręcznie", () => {

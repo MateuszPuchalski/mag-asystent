@@ -81,6 +81,11 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
         {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
           {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}
+        {/* Pasowania z rozmowy (przyrost czwarty): właściwa miara to ostatnia liczba —
+            czy biuro zatwierdza to, co model widzi. */}
+        {dane.szkice.pasowaniaRozpoznane > 0 && <> Pasowania z rozmowy w <b>{dane.szkice.pasowaniaRozpoznane}</b> szkicach:
+          {" "}zaproponowanych {dane.szkice.pasowaniaZaproponowane}, odrzuconych {dane.szkice.pasowaniaOdrzucone};
+          {" "}biuro zatwierdziło <b>{dane.szkice.pasowaniaZatwierdzonePrzezBiuro}</b>.</>}
       </p>;
     })()}
 

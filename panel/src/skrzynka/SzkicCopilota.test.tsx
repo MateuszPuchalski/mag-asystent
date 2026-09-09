@@ -16,12 +16,12 @@ const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
   zastrzezenia: [], uzyteFakty: ["F3"], messageId: 41, model: "claude-opus-5",
   at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
-  daneDoboru: null, daneOcena: null, doborWersja: 1, ...n,
+  daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
 });
 
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
   stan: { wlaczony: true, powod: null, model: "claude-opus-5", maxPartia: 20 },
-  szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [],
+  szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [], paraPasowania: null,
   uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
   onUloz: vi.fn(), onWstaw: vi.fn(), onZastap: vi.fn(), onOdrzuc: vi.fn(), ...n,
 });

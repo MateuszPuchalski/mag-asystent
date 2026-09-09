@@ -26,6 +26,8 @@ export interface PropsSzkicuCopilota {
   doborWersja: number | null;
   /** Nazwy pól doboru, które Copilot rozpoznał w rozmowie, a agent jeszcze nie ma (liczy `propozycjaDoboru`). */
   nowePolaDoboru: string[];
+  /** Para „X → Y" rozpoznana w rozmowie, jeszcze bez decyzji agenta (liczy `paraPasowania`). */
+  paraPasowania: string | null;
   uklada: boolean;
   blad: string;
   /** Szkic agenta jest niepusty — dopiero wtedy „Zastąp" ma sens. */
@@ -83,6 +85,9 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
           w zakładce Dobór. Tu tylko zdanie, żeby agent wiedział, że są. */}
       {p.nowePolaDoboru.length > 0 && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
         Copilot rozpoznał w rozmowie: {p.nowePolaDoboru.join(", ")} — wpisz je w zakładce Dobór.</p>}
+      {/* Para z rozmowy (przyrost czwarty) tą samą zasadą: zdanie tu, kliknięcie w Doborze. */}
+      {p.paraPasowania && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
+        Copilot rozpoznał pasowanie {p.paraPasowania} — zaproponuj je w zakładce Dobór.</p>}
       {s.zastrzezenia.length > 0 && <ul className="mb-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
         aria-label="Czego model nie znalazł w faktach">
         {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}

@@ -6,7 +6,9 @@ import {
   ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
 import { nadawcaAnthropic, nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
-import { ocenSzkic, odrzucDaneDoboru, przyjmijDaneDoboru, ulozSzkic } from "../services/copilot-szkic.js";
+import {
+  ocenSzkic, odrzucDaneDoboru, odrzucPasowanie, przyjmijDaneDoboru, przyjmijPasowanie, ulozSzkic,
+} from "../services/copilot-szkic.js";
 import { ConversationConflict } from "../services/conversations.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
@@ -14,18 +16,25 @@ import {
 } from "../adapters/copilot.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   PIĘĆ TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   SZEŚĆ TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
    werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0), werdykt
-   o szkicu i los danych doboru z rozmowy (przyrost trzeci). Werdykty
-   wyglądają na drobiazg, a bez nich nie da się policzyć, CZY Copilot jest
-   dobry — czyli nie da się podjąć decyzji „zejdź na tańszy model", dla
-   której cały pomiar powstał.
+   o szkicu, los danych doboru z rozmowy (przyrost trzeci) i los pasowania
+   z rozmowy (przyrost czwarty). Werdykty wyglądają na drobiazg, a bez nich
+   nie da się policzyć, CZY Copilot jest dobry — czyli nie da się podjąć
+   decyzji „zejdź na tańszy model", dla której cały pomiar powstał.
 
    Piąta trasa jest OSOBNA od `PUT dobor/dane` z rozkładu skrzynki, choć
    kończy w tej samej tabeli: serwis sam pilnuje „tylko puste pola" i liczy
    los propozycji. Gdyby panel przepisywał wartości do zwykłego PUT, każda
    propozycja wyglądałaby w dzienniku jak ręczny wpis agenta — i pomiar
    nie miałby czego mierzyć.
+
+   Szósta trasa jest OSOBNA od `POST wiedza/pasowania` z tego samego powodu
+   i z jednego więcej: tamta trasa WYWODZI źródło z kontekstu (`dobor` albo
+   `reczne`) i nie ma jak oznaczyć Copilota, a bez `zrodlo: copilot` pomiar
+   nie policzy, ile par model trafia. Do tego para, rola i dowód pochodzą
+   z wiersza szkicu SPRAWDZONEGO przez serwer, nie z ciała żądania — panel
+   nie ma jak podać cudzej pary.
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -193,6 +202,26 @@ export async function copilotRoutes(app: FastifyInstance) {
         if (e instanceof ConversationConflict) {
           return reply.code(409).send({ error: e.message, ...e.details });
         }
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /**
+   * Los pasowania rozpoznanego w rozmowie (przyrost czwarty): `zaproponowane`
+   * kładzie parę w kolejce wiedzy jako propozycję ze źródłem `copilot`
+   * i podpisem klikającego agenta; `odrzucone` odsyła. Rozstrzyga biuro
+   * w Wiedza → Kolejka. Bez gałęzi 409: dubel nie jest tu błędem (serwis).
+   */
+  app.post<{ Params: { id: string }; Body: { ocena?: string } }>(
+    "/api/obsluga/copilot/szkic/:id/pasowanie", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.params.id);
+      try {
+        if (req.body?.ocena === "zaproponowane") return { szkic: przyjmijPasowanie(id, kto()) };
+        if (req.body?.ocena === "odrzucone") return { szkic: odrzucPasowanie(id, kto()) };
+        return reply.code(400).send({ error: "Ocena pasowania może być „zaproponowane” albo „odrzucone”." });
+      } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }
     });

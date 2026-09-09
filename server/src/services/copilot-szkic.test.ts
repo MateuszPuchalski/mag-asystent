@@ -82,7 +82,7 @@ const odpowiedz = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}
   tresc: "Dzień dobry, gaźnik W09-0211 jest dziś dostępny (F1).",
   /* `daneDoboru: null` domyślnie — testy propozycji dokładają dane świadomie,
      a reszta nie zmienia znaczenia przez sam fakt, że model coś rozpoznał. */
-  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, model: "claude-opus-5", ms: 800,
+  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, pasowanie: null, model: "claude-opus-5", ms: 800,
   zuzycie: { wej: 2000, wyj: 300, cacheZapis: 0, cacheOdczyt: 1500 }, ...n,
 });
 const nadawca = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}): import("./copilot-szkic.js").NadawcaSzkicu =>
@@ -273,6 +273,7 @@ test("pomiar rozbija księgę po zadaniu i liczy losy szkiców", async () => {
   assert.deepEqual(p.szkice, {
     ile: 1, wstawionych: 0, zastapionych: 1, odrzuconych: 0,
     daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
+    pasowaniaRozpoznane: 0, pasowaniaZaproponowane: 0, pasowaniaOdrzucone: 0, pasowaniaZatwierdzonePrzezBiuro: 0,
   });
 });
 
@@ -373,6 +374,129 @@ test("odrzucenie zostawia wiersz dla pomiaru; nowy szkic zeruje ocenę danych", 
   const znow = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
   assert.equal(znow.daneOcena, null);
   assert.throws(() => S.odrzucDaneDoboru(rozmowa + 1000, KTO()), /nie ma propozycji/);
+});
+
+/* ── Pasowanie z rozmowy (przyrost czwarty) ─────────────────────────────────
+   Zapowiedź z 0.230.0. Pilnujemy trzech granic właściciela: oba końce pary
+   muszą być kartotekami, które serwer SAM położył na stole (biała lista
+   z kontekstu — nigdy symbol z treści wiadomości), para wypada bez szkody
+   dla szkicu, a do kolejki wiedzy wchodzi dopiero na kliknięcie agenta,
+   jako propozycja ze źródłem `copilot`, którą rozstrzyga biuro. */
+
+const PARA = (n: Partial<import("./copilot-szkic.js").PasowanieZRozmowy> = {}) =>
+  ({ czesc: "LC170430140-0001", doCzego: "W09-0211", rola: "uszczelka", pozycja: null, ...n });
+
+test("biała lista kartotek: oferta zawsze, kotwica po wpisaniu symbolu przez agenta — kontekst nic nie zapisuje", () => {
+  let k = S.kontekstSzkicu(rozmowa, subiekt);
+  const ma = (sym: string) => [...k.kartoteki.values()].some((x) => x.symbol === sym);
+  assert.equal(ma("W09-0211"), true, "kartoteka oferty stoi na liście");
+  assert.equal(ma("LC170430140-0001"), false, "uszczelki nikt jeszcze nie wskazał");
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  const przed = liczba("events");
+  k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.equal(ma("LC170430140-0001"), true, "symbol wpisany przez agenta jest kotwicą, więc i kartoteką z kontekstu");
+  assert.equal(liczba("events"), przed, "kontekst niczego nie zapisuje");
+});
+
+test("sprawdzPasowanie: symbole po zwinięciu, cztery powody odrzucenia, pozycja tylko z rozmowy", () => {
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const w = String(k.watek);
+  const ok = S.sprawdzPasowanie(PARA({ czesc: "lc 170430140-0001", doCzego: "w09 0211" }), k.kartoteki, w);
+  assert.equal(ok.powod, null);
+  assert.equal(ok.propozycja!.czesc.twId, ID["LC170430140-0001"], "symbol trafia po zwinięciu, jak wszędzie");
+  assert.equal(ok.propozycja!.doCzego.twId, ID["W09-0211"]);
+  assert.equal(ok.propozycja!.rola, "uszczelka");
+  assert.equal(S.sprawdzPasowanie(PARA({ czesc: "06-12038" }), k.kartoteki, w).powod, "symbol_spoza_kontekstu",
+    "uszczelka z seedu, ale NIE z kontekstu — model nie ma jak jej nazwać");
+  assert.equal(S.sprawdzPasowanie(PARA({ czesc: "W09-0211" }), k.kartoteki, w).powod, "ta_sama_kartoteka");
+  assert.equal(S.sprawdzPasowanie(PARA({ rola: "kolo" }), k.kartoteki, w).powod, "zla_rola");
+  assert.equal(S.sprawdzPasowanie(null, k.kartoteki, w).powod, null);
+  /* Pozycja: „od strony filtra" stoi w fakcie intake, nie w rozmowie — wypada, para zostaje. */
+  const bez = S.sprawdzPasowanie(PARA({ pozycja: "od strony filtra" }), k.kartoteki, w);
+  assert.equal(bez.propozycja!.pozycja, null);
+  dopiszKlienta("Chodzi o uszczelkę od strony filtra.");
+  const z = S.sprawdzPasowanie(PARA({ pozycja: "od strony filtra" }), k.kartoteki, String(S.kontekstSzkicu(rozmowa, subiekt).watek));
+  assert.equal(z.propozycja!.pozycja, "od strony filtra");
+  /* Para już żywa w bazie — w dowolnej polaryzacji — wypada. */
+  zatwierdzPasowanie();
+  assert.equal(S.sprawdzPasowanie(PARA(), k.kartoteki, w).powod, "juz_jest");
+});
+
+test("ułożenie zapisuje parę przy szkicu i NIE dotyka pasowań; para spoza kontekstu wypada, szkic zostaje", async () => {
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
+  assert.deepEqual(s.pasowanie, {
+    czesc: { twId: ID["LC170430140-0001"], symbol: "LC170430140-0001", nazwa: "Uszczelka do gaźników GX160 (od strony filtra)" },
+    doCzego: { twId: ID["W09-0211"], symbol: "W09-0211", nazwa: "Gaźnik do silników HONDA GX160 z kranikiem i odsto" },
+    rola: "uszczelka", pozycja: null,
+  });
+  assert.equal(s.pasowanieOcena, null);
+  assert.equal(liczba("pasowanie_czesci"), 0, "samo ułożenie nic nie wkłada do kolejki wiedzy");
+  let zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic' ORDER BY id DESC").get() as { payload: string };
+  assert.match(zd.payload, /"pasowanie":1/);
+  assert.match(zd.payload, /"pasowanieOdrzucone":null/);
+  const bez = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA({ czesc: "06-12038" }) }), subiekt);
+  assert.equal(bez.pasowanie, null);
+  assert.equal(bez.tresc.length > 0, true, "szkic jest wart pieniędzy sam w sobie");
+  zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic' ORDER BY id DESC").get() as { payload: string };
+  assert.match(zd.payload, /"pasowanieOdrzucone":"symbol_spoza_kontekstu"/);
+  assert.equal(zd.payload.includes("06-12038"), false, "symbol w dzienniku (§19)");
+});
+
+test("„Zaproponuj pasowanie”: propozycja ze źródłem copilot, dowodem rozmowa i podpisem agenta; rozstrzyga biuro", async () => {
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  dopiszKlienta("Chodzi o uszczelkę od strony filtra.");
+  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA({ pozycja: "od strony filtra" }) }), subiekt);
+  const po = S.przyjmijPasowanie(rozmowa, KTO());
+  assert.equal(po.pasowanieOcena, "zaproponowane");
+  const kolejka = P.kolejkaPasowan().propozycje;
+  assert.equal(kolejka.length, 1);
+  const z = kolejka[0]!;
+  assert.equal(z.zrodlo, "copilot");
+  assert.equal(z.rodzajDowodu, "rozmowa");
+  assert.equal(z.pewnosc, "prawdopodobne", "ślad rozmowy nie jest dowodem technicznym");
+  assert.equal(z.conversationId, rozmowa);
+  assert.equal(z.zaproponowal, "A. Lewandowska", "autorem jest klikający, nie automat");
+  assert.equal(z.pozycja, "od strony filtra");
+  assert.match(z.dowodTresc, /^Copilot rozpoznał w rozmowie #\d+: LC170430140-0001 pasuje do W09-0211 \(od strony filtra\)/);
+  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
+  assert.ok(typy.includes("pasowanie_propozycja") && typy.includes("copilot_pasowanie"));
+  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_pasowanie'").get() as { payload: string };
+  assert.match(los.payload, /"dubel":false/);
+  assert.throws(() => S.przyjmijPasowanie(rozmowa, KTO()), /już oceniona/);
+  assert.throws(() => S.odrzucPasowanie(rozmowa, KTO()), /już oceniona/);
+  let pomiar = K.pomiarCopilota(db()).szkice;
+  assert.equal(pomiar.pasowaniaRozpoznane, 1);
+  assert.equal(pomiar.pasowaniaZaproponowane, 1);
+  assert.equal(pomiar.pasowaniaZatwierdzonePrzezBiuro, 0);
+  P.rozstrzygnijPasowanie(z.id, "zatwierdz", null, biuro);
+  pomiar = K.pomiarCopilota(db()).szkice;
+  assert.equal(pomiar.pasowaniaZatwierdzonePrzezBiuro, 1, "właściwa miara: biuro zatwierdza to, co Copilot widzi");
+});
+
+test("dubel nie jest błędem: para wpisana ręcznie między szkicem a kliknięciem daje ocenę bez drugiego wiersza", async () => {
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
+  P.zaproponujPasowanie({ twId: ID["LC170430140-0001"], doTwId: ID["W09-0211"], rola: "uszczelka",
+    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne" },
+    { userId: biuro, name: "A. Lewandowska" });
+  const po = S.przyjmijPasowanie(rozmowa, KTO());
+  assert.equal(po.pasowanieOcena, "zaproponowane");
+  assert.equal(liczba("pasowanie_czesci"), 1, "drugiego wiersza nie ma");
+  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_pasowanie'").get() as { payload: string };
+  assert.match(los.payload, /"dubel":true/);
+});
+
+test("odrzucenie pary zostawia wiersz dla pomiaru; nowy szkic zeruje ocenę pary", async () => {
+  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
+  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
+  assert.equal(S.odrzucPasowanie(rozmowa, KTO()).pasowanieOcena, "odrzucone");
+  assert.equal(liczba("pasowanie_czesci"), 0);
+  assert.equal(K.pomiarCopilota(db()).szkice.pasowaniaOdrzucone, 1);
+  const znow = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
+  assert.equal(znow.pasowanieOcena, null);
+  assert.throws(() => S.przyjmijPasowanie(rozmowa + 1000, KTO()), /nie ma propozycji pasowania/);
 });
 
 test("rozmowa bez wiadomości nie ma na co odpowiadać", async () => {
