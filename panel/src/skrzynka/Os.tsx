@@ -49,10 +49,16 @@ function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
 /** Jeden załącznik: obraz nad nazwą, nazwa zawsze. Osobny komponent, bo obraz
     wisi na haku, a haka nie wolno wołać w pętli. */
 function Zalacznik({ z }: { z: ZalacznikOsi }) {
-  const obraz = useZdjecieZalacznika(z.podglad ? z.id : null);
+  const { url: obraz, blad: bladPodgladu, ponow } = useZdjecieZalacznika(z.podglad ? z.id : null);
   const [blad, setBlad] = React.useState<string | null>(null);
 
   return <li>
+    {/* Stałe miejsce PRZED pobraniem: bez ramki oś skakała przy doładowaniu,
+        a przy porażce nie zostawało nic — agent widział samą nazwę pliku
+        i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane. */}
+    {z.podglad && obraz === undefined &&
+      <span className="mb-1 flex h-32 w-48 items-center justify-center rounded border border-dashed
+        border-slate-300 text-xs text-slate-400">wczytuję…</span>}
     {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
         i rozpychałoby oś na cały ekran. */}
     {obraz && <img src={obraz} alt={z.nazwa} loading="lazy"
@@ -71,6 +77,14 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
             {" — "}{POWOD[z.status] ?? `stan ${z.status}`}
           </span>}
     </span>
+    {/* Nieudany PODGLĄD też mówi o sobie — zdaniem z serwera (502 „Allegro
+        nie oddało…", 503 „Konto niepołączone…") i przyciskiem ponowienia.
+        Do tego wydania porażka rysowała nic, a `null` bez zdania to nadal
+        odpowiedź „to nie obraz" (415) — wtedy zostaje sama nazwa z pobraniem. */}
+    {z.podglad && obraz === null && bladPodgladu &&
+      <p className="mt-0.5 text-ranga-zle">{bladPodgladu}{" "}
+        <button type="button" className="font-bold underline" onClick={ponow}>Spróbuj ponownie</button>
+      </p>}
     {/* Nieudane pobranie MÓWI o sobie. Do 0.219.1 kliknięcie otwierało kartę
         z surowym JSON-em błędu — agent nie miał jak zgadnąć, co poszło źle. */}
     {blad && <p className="mt-0.5 text-ranga-zle">{blad}</p>}

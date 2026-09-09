@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.242.0",
+  "version": "0.244.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -21,6 +21,7 @@
     "reconcile": "tsx src/reconcile-run.ts",
     "reslot": "tsx src/reslot-run.ts",
     "sonda": "tsx src/sonda-run.ts",
+    "sonda:zalacznik": "tsx src/sonda-zalacznik-run.ts",
     "inwentarz": "tsx src/inwentarz-run.ts",
     "zwroty:reset": "tsx src/zwroty-reset-run.ts"
   },

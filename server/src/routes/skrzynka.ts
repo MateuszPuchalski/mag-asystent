@@ -16,7 +16,9 @@ import { wyslijOdpowiedz } from "../services/wysylka.js";
 import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
-import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
+import { BladOdpowiedziAllegro } from "../adapters/allegro.js";
+import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
 import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
@@ -28,6 +30,19 @@ import { historiaKlienta } from "../services/klient-historia.js";
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
   reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
+
+/**
+ * Błąd POBRANIA załącznika — inny kod niż `blad()`, bo to inna wina.
+ *
+ * 400 mówi „źle poprosiłeś", a przy załączniku prośba jest dobra: to Allegro
+ * odmówiło (502 ze zdaniem z adaptera) albo nie dało się do niego dojść —
+ * timeout, konto niepołączone, adres poza Allegro (503). Do tego wydania
+ * wszystko szło jako 400 z JSON-em, więc panel nie odróżniał „Allegro nie
+ * oddało" od 415 „to nie obraz" i rysował pustą linię pod nazwą pliku.
+ */
+const bladPobrania = (reply: FastifyReply, e: unknown) =>
+  reply.code(e instanceof BladOdpowiedziAllegro ? 502 : 503)
+    .send({ error: e instanceof Error ? e.message : String(e) });
 
 /* Skrzynka jest ekranem biura, więc bramka roli stoi na każdej trasie — także
    na odczycie. Rozmowy z klientami nie są danymi, które ma widzieć hala. */
@@ -76,17 +91,19 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       });
     }
     try {
-      const odp = await pobierzZalacznik(String(z.url));
+      const { bajty, droga } = await pobierzZalacznikWiadomosci(config.allegro.apiUrl, String(z.url));
+      /* `droga` i liczba bajtów w dzienniku — nigdy adres: to jedyny ślad,
+         po którym da się poznać, czy działa końcówka API, czy zapas. */
       logEvent("obsluga.zalacznik.pobrany", sesjaZadania()?.user.name ?? "?", null,
-        { rozmowaId: Number(z.conversation_id), nazwa: String(z.file_name) });
+        { rozmowaId: Number(z.conversation_id), nazwa: String(z.file_name), droga, bajtow: bajty.byteLength });
       return reply
         .header("content-type", String(z.mime_type ?? "application/octet-stream"))
         /* `attachment` z nazwą: przeglądarka nie ma renderować cudzego pliku
            w naszym origin. Cudzysłowy w nazwie znikają, bo rozbiłyby nagłówek. */
         .header("content-disposition",
           `attachment; filename="${String(z.file_name).replace(/["\r\n]/g, "")}"`)
-        .send(Buffer.from(odp));
-    } catch (e) { return blad(reply, e); }
+        .send(Buffer.from(bajty));
+    } catch (e) { return bladPobrania(reply, e); }
   });
 
   /**
@@ -115,37 +132,51 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply);
     if (nie) return nie;
 
-    const etag = `"zal-${Number(req.params.id)}"`;
-    if (req.headers["if-none-match"] === etag) {
-      return reply.code(304).header("etag", etag).send();
-    }
-
     const z = db().prepare(`SELECT a.file_name, a.mime_type, a.url, a.status
       FROM message_attachment a WHERE a.id=?`)
       .get(Number(req.params.id)) as Record<string, unknown> | undefined;
     if (!z) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
 
-    const typ = String(z.status) === "SAFE" ? typPodgladu(z.mime_type as string | null) : null;
-    if (typ == null || z.url == null) {
+    /* Bramka STANU przed ETagiem. Do tego wydania 304 wypadało przed odczytem
+       wiersza, więc załącznik, któremu synchronizacja zmieniła status,
+       dostawał z przeglądarki starą odpowiedź. Sam 304 dalej stoi PRZED
+       pytaniem Allegro o plik — to on oszczędza łącze, na którym zależy. */
+    if (String(z.status) !== "SAFE" || z.url == null) {
       return reply.code(415).send({
-        error: `Załącznik „${String(z.file_name)}" nie jest obrazem do pokazania na osi.`,
+        error: `Załącznik „${String(z.file_name)}" nie jest do pokazania (stan ${String(z.status)}).`,
       });
     }
+    const etag = `"zal-${Number(req.params.id)}"`;
+    if (req.headers["if-none-match"] === etag) {
+      return reply.code(304).header("etag", etag).send();
+    }
 
+    let bajty: Buffer;
     try {
-      const odp = await pobierzZalacznik(String(z.url));
-      /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu rozmowy, więc wpis
-         w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
-         oś" — a to już mówi audyt otwarcia rozmowy. Pobranie na dysk, czyli
-         czynność agenta, dalej zostawia ślad na trasie wyżej. */
-      return reply
-        .header("content-type", typ)
-        .header("x-content-type-options", "nosniff")
-        .header("content-disposition", "inline")
-        .header("etag", etag)
-        .header("cache-control", "private, max-age=86400")
-        .send(Buffer.from(odp));
-    } catch (e) { return blad(reply, e); }
+      bajty = Buffer.from((await pobierzZalacznikWiadomosci(config.allegro.apiUrl, String(z.url))).bajty);
+    } catch (e) { return bladPobrania(reply, e); }
+
+    /* TYP Z BAJTÓW, nie z pola (port z reklamacji, 0.223.0). `mimeType`
+       w schemacie Allegro jest opcjonalne i bywa cudzym zdaniem o pliku;
+       sygnatura jest nasza. `nosniff` zabrania przeglądarce zgadywać lepiej. */
+    const typ = typPodgladu(rozpoznajMime(bajty));
+    if (typ == null) {
+      return reply.code(415).send({
+        error: `Załącznik „${String(z.file_name)}" nie jest obrazem do pokazania na osi (sygnatura pliku).`,
+      });
+    }
+    /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu rozmowy, więc wpis
+       w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
+       oś" — a to już mówi audyt otwarcia rozmowy. Pobranie na dysk, czyli
+       czynność agenta, dalej zostawia ślad na trasie wyżej. */
+    return reply
+      .header("content-type", typ)
+      .header("content-length", String(bajty.byteLength))
+      .header("x-content-type-options", "nosniff")
+      .header("content-disposition", "inline")
+      .header("etag", etag)
+      .header("cache-control", "private, max-age=86400")
+      .send(bajty);
   });
 
   /**

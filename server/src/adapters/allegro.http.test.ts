@@ -17,6 +17,8 @@ import {
   urlNowejWiadomosciSprawy,
   urlZmianyStatusuSprawy,
   cialoWerdyktu,
+  idZalacznikaZUrl,
+  kandydaciPobrania,
 } from "./allegro.http.js";
 import { allegroUserAgent, retryAfterMs } from "./allegro.js";
 import { config } from "../config.js";
@@ -351,4 +353,26 @@ test("werdykt reklamacji: adres ze specyfikacji, ciało ze schematu, kwota tylko
     .partialRefund as { amount: string; currency: string }).currency, "CZK");
   assert.deepEqual(cialoWerdyktu({ status: "REJECTED_OTHER", message: "Nie." }),
     { status: "REJECTED_OTHER", message: "Nie." });
+});
+
+test("załącznik Centrum Wiadomości: droga API z UUID z ogona `url`, zapisany adres zostaje zapasem", () => {
+  /* Reklamacje pobierają z `api.allegro.pl` i działają; skrzynka z `upload.allegro.pl`
+     dostaje 403. Kandydat API jest wnioskiem z tutorialu ([WERYFIKUJ]), więc
+     zapisany adres NIE znika z listy — stoi ostatni. */
+  const url = "https://upload.allegro.pl/message-center/message-attachments/97DC0B60-2da4-4247-92ba-b748630ba0f6";
+  assert.equal(idZalacznikaZUrl(url), "97dc0b60-2da4-4247-92ba-b748630ba0f6", "UUID małymi literami");
+  const k = kandydaciPobrania("https://api.allegro.pl", url);
+  assert.deepEqual(k.map((x) => [x.droga, x.akcept ?? null]), [
+    ["api", "application/vnd.allegro.public.v1+json"],
+    ["api", "application/vnd.allegro.beta.v1+json"],
+    ["url", null],
+  ]);
+  assert.equal(k[0]!.adres, "https://api.allegro.pl/messaging/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6");
+  assert.equal(k[2]!.adres, url, "zapas to DOKŁADNIE zapisany adres");
+  /* Sandbox dziedziczy `apiUrl`, więc droga API idzie na sandbox. */
+  assert.match(kandydaciPobrania("https://api.allegro.pl.allegrosandbox.pl", url)[0]!.adres, /^https:\/\/api\.allegro\.pl\.allegrosandbox\.pl\//);
+  /* Bez ogona UUID (reklamacje, adres innego kształtu) — tylko zapisany adres. */
+  assert.deepEqual(kandydaciPobrania("https://api.allegro.pl", "https://api.allegro.pl/sale/issues/attachments/a-1"),
+    [{ droga: "url", adres: "https://api.allegro.pl/sale/issues/attachments/a-1" }]);
+  assert.equal(idZalacznikaZUrl("https://upload.allegro.pl/message-attachments/nie-uuid"), null);
 });

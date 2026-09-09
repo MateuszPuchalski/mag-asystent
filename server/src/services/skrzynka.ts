@@ -13,6 +13,7 @@ import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
 import { podzielStopke } from "./stopka.js";
+import { czyObrazZNazwy } from "./reklamacje.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -507,7 +508,7 @@ export function osRozmowy(id: number): {
      płacić za to osobnym odpytaniem przy każdym wierszu osi. */
   const zalaczniki = new Map<number, ZalacznikOsi[]>();
   for (const z of db().prepare(`
-    SELECT a.id, a.message_id, a.file_name, a.mime_type, a.status
+    SELECT a.id, a.message_id, a.file_name, a.mime_type, a.status, a.url
       FROM message_attachment a JOIN message m ON m.id=a.message_id
      WHERE m.conversation_id=? ORDER BY a.id
   `).all(id) as Array<Record<string, unknown>>) {
@@ -523,8 +524,17 @@ export function osRozmowy(id: number): {
       doPobrania: String(z.status) === "SAFE",
       /* Podgląd wymaga OBU warunków: obrazu i zgody Allegro. Sam obraz nie
          wystarcza — `UNSAFE` znaczy, że plik jest podejrzany, a rysowanie go
-         na osi byłoby wpuszczeniem go do biura tylnymi drzwiami. */
-      podglad: String(z.status) === "SAFE" && typPodgladu(z.mime_type as string | null) !== null,
+         na osi byłoby wpuszczeniem go do biura tylnymi drzwiami.
+
+         `mimeType` jest w schemacie Allegro OPCJONALNE. Gdy go nie ma, o UKŁADZIE
+         decyduje nazwa pliku (jak w reklamacjach od 0.223.0), a o WYDANIU —
+         sygnatura bajtów na trasie podglądu; plik nazwany `usterka.jpg` bez
+         sygnatury obrazu dostaje 415 i spada na przycisk pobrania. Do tego
+         wydania brak pola znaczył „nie obraz" i zdjęcie z telefonu zostawało
+         samą nazwą, bez zdania dlaczego. */
+      podglad: String(z.status) === "SAFE" && z.url != null
+        && (typPodgladu(z.mime_type as string | null) !== null
+          || (z.mime_type == null && czyObrazZNazwy(String(z.file_name)))),
     });
     zalaczniki.set(Number(z.message_id), lista);
   }

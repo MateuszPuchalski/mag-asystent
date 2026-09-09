@@ -63,15 +63,45 @@ function pchnij() {
   }
 }
 
+/* ── Porażka Z POWODEM, osobno od pamięci negatywu (przyrost „zdjęcia w rozmowach") ──
+   Do tego wydania KAŻDY kod poza 2xx — także 401 po wygaśnięciu sesji, 502
+   „Allegro odmówiło" i urwana sieć — lądował w `pamiec` jako `null`, czyli
+   „na pewno brak", do końca życia karty. Jedna chwilowa porażka gasiła
+   zdjęcie na resztę dnia, a odświeżenie strony „naprawiało" i zacierało ślad.
+
+   `null` w `pamiec` zostaje dla ODPOWIEDZI: 404 (zdjęcia nie ma) i 415 (plik
+   nie jest obrazem). Reszta trafia tutaj, ze zdaniem z serwera i z czasem —
+   po minucie ponowne zamontowanie pyta znowu, a `ponow()` od razu.        */
+const BLAD_TTL_MS = 60_000;
+const bledy = new Map<string, { zdanie: string; at: number }>();
+
+const bladSwiezy = (sciezka: string): string | null => {
+  const b = bledy.get(sciezka);
+  if (!b) return null;
+  if (Date.now() - b.at > BLAD_TTL_MS) { bledy.delete(sciezka); return null; }
+  return b.zdanie;
+};
+
+/** Kody, które są ODPOWIEDZIĄ o obrazie, nie awarią drogi do niego. */
+const KODY_BRAKU = new Set([404, 415]);
+
 async function pobierz(sciezka: string): Promise<string | null> {
-  const odp = await fetch(sciezka, {
-    headers: { "x-session": token() },
-  });
+  let odp: Response;
+  try {
+    odp = await fetch(sciezka, { headers: { "x-session": token() } });
+  } catch {
+    throw new Error("Serwer nie odpowiada — sprawdź połączenie z siecią firmy.");
+  }
+  if (odp.ok) return URL.createObjectURL(await odp.blob());
   /* 404 znaczy „potwierdzony brak" i jest ODPOWIEDZIĄ, nie awarią — serwer
-     nie zapisuje go nawet w audycie. Każdy inny kod też kończy się `null`:
-     ekran zwrotu nie ma prawa zatrzymać się na zdjęciu. */
-  if (!odp.ok) return null;
-  return URL.createObjectURL(await odp.blob());
+     nie zapisuje go nawet w audycie; 415 to „plik nie jest obrazem". */
+  if (KODY_BRAKU.has(odp.status)) return null;
+  if (odp.status === 401) throw new Error("Sesja wygasła — zaloguj się ponownie.");
+  /* Zdanie z serwera, gdy je dał (502 „Allegro nie oddało…", 503 „Konto
+     niepołączone…"); goły kod dopiero, gdy nie dał nic. */
+  let zdanie = "";
+  try { zdanie = String(((await odp.json()) as { error?: unknown })?.error ?? ""); } catch { /* nie JSON */ }
+  throw new Error(zdanie || `Serwer odpowiedział kodem ${odp.status}.`);
 }
 
 function zamow(sciezka: string): Promise<string | null> {
@@ -80,8 +110,14 @@ function zamow(sciezka: string): Promise<string | null> {
   const p = new Promise<string | null>((resolve) => {
     kolejka.push(async () => {
       let wynik: string | null = null;
-      try { wynik = await pobierz(sciezka); } catch { wynik = null; }
-      pamiec.set(sciezka, wynik);
+      try {
+        wynik = await pobierz(sciezka);
+        pamiec.set(sciezka, wynik);
+        bledy.delete(sciezka);
+      } catch (e) {
+        /* Porażka NIE idzie do `pamiec` — tam leżą wyłącznie odpowiedzi. */
+        bledy.set(sciezka, { zdanie: e instanceof Error ? e.message : String(e), at: Date.now() });
+      }
       wToku.delete(sciezka);
       ogloś(sciezka);
       resolve(wynik);
@@ -111,7 +147,8 @@ function useObraz(sciezka: string | null): string | null | undefined {
     const zbior = nasluchy.get(sciezka) ?? new Set<() => void>();
     zbior.add(f);
     nasluchy.set(sciezka, zbior);
-    if (!pamiec.has(sciezka)) void zamow(sciezka);
+    /* Świeża porażka NIE pyta drugi raz — dopiero po minucie albo po `ponow()`. */
+    if (!pamiec.has(sciezka) && bladSwiezy(sciezka) === null) void zamow(sciezka);
     return () => {
       zbior.delete(f);
       if (!zbior.size) nasluchy.delete(sciezka);
@@ -119,7 +156,25 @@ function useObraz(sciezka: string | null): string | null | undefined {
   }, [sciezka]);
 
   if (sciezka == null) return null;
-  return pamiec.get(sciezka);
+  if (pamiec.has(sciezka)) return pamiec.get(sciezka);
+  /* Porażka wygląda dla odbiorców jak brak (`null`) — kafel kartoteki,
+     oferty i reklamacji zachowują się jak dotąd. Kto chce zdania i ponowienia,
+     bierze `useZdjecieZalacznika`. */
+  return bladSwiezy(sciezka) !== null ? null : undefined;
+}
+
+/** Zdanie ostatniej porażki dla ścieżki albo `null`; `ponow` kasuje ją i pyta od razu. */
+function useBladObrazu(sciezka: string | null): { blad: string | null; ponow: () => void } {
+  const [, odswiez] = useState(0);
+  return {
+    blad: sciezka == null ? null : bladSwiezy(sciezka),
+    ponow: () => {
+      if (sciezka == null) return;
+      bledy.delete(sciezka);
+      odswiez((n) => n + 1);
+      void zamow(sciezka);
+    },
+  };
 }
 
 export function useZdjecie(twId: number | null | undefined): string | null | undefined {
@@ -152,8 +207,16 @@ export function useZdjecieOferty(externalId: string | null | undefined): string 
  * `null` (nieudane pobranie) NIE jest awarią ekranu — pod obrazem stoi nazwa
  * pliku i odnośnik pobrania, więc agent dalej wie, że klient coś przysłał.
  */
-export function useZdjecieZalacznika(id: number | null | undefined): string | null | undefined {
-  return useObraz(id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`);
+export function useZdjecieZalacznika(id: number | null | undefined): {
+  url: string | null | undefined; blad: string | null; ponow: () => void;
+} {
+  const sciezka = id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`;
+  const url = useObraz(sciezka);
+  /* Zdanie i ponowienie WYŁĄCZNIE tutaj: w skrzynce brak zdjęcia to sama
+     nazwa pliku bez powodu, a właściciel patrzył na to od 0.219.2. Kartoteka
+     i oferta zostają przy `null` — tam brak obrazu jest stanem codziennym. */
+  const { blad, ponow } = useBladObrazu(sciezka);
+  return { url, blad, ponow };
 }
 
 /**
@@ -177,6 +240,7 @@ export function useObrazZalacznikaReklamacji(
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */
 export function _wyczyscPamiecZdjec() {
   pamiec.clear();
+  bledy.clear();
   wToku.clear();
   kolejka.length = 0;
   biegnie = 0;

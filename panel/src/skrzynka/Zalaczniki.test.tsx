@@ -31,9 +31,13 @@ const wiadomosc = (zalaczniki: WpisOsi["zalaczniki"]): WpisOsi => ({
 const os = (w: WpisOsi) => render(<Os wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
   onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
+/* Hak oddaje OBIEKT: adres, zdanie porażki i ponowienie. */
+const ponow = vi.fn();
+const wynikHaka = (url: string | null | undefined, blad: string | null = null) => ({ url, blad, ponow });
+
 beforeEach(() => {
   vi.clearAllMocks();
-  zdjecie.mockReturnValue(null);
+  zdjecie.mockReturnValue(wynikHaka(null));
   pobierz.mockResolvedValue(undefined);
 });
 
@@ -81,7 +85,7 @@ describe("Załączniki na osi rozmowy", () => {
      Właściciel: „gdy klient wysyła zdjęcie, wyświetlaj w czacie, nie każ mi
      w nie klikać".                                                          */
   it("zdjęcie klienta rysuje się na osi z pobranego obrazu", () => {
-    zdjecie.mockReturnValue("blob:podglad-7");
+    zdjecie.mockReturnValue(wynikHaka("blob:podglad-7"));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
       status: "SAFE", doPobrania: true, podglad: true }]));
 
@@ -100,5 +104,38 @@ describe("Załączniki na osi rozmowy", () => {
     expect(zdjecie).toHaveBeenCalledWith(null);
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.getByRole("button", { name: /gwarancja\.pdf/ })).toBeTruthy();
+  });
+  /* ── Porażka podglądu MÓWI (przyrost „zdjęcia w rozmowach") ────────────────
+     Do tego wydania nieudany podgląd rysował nic: agent widział samą nazwę
+     pliku i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane.     */
+  it("w trakcie pobierania stoi ramka, żeby oś nie skakała", () => {
+    zdjecie.mockReturnValue(wynikHaka(undefined));
+    os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
+      status: "SAFE", doPobrania: true, podglad: true }]));
+    expect(screen.getByText(/wczytuję/)).toBeTruthy();
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("odmowa Allegro stoi pod nazwą pliku zdaniem z serwera i daje „Spróbuj ponownie”", async () => {
+    zdjecie.mockReturnValue(wynikHaka(null, "Allegro nie oddało załącznika — końcówka API: 403; zapisany adres: 403."));
+    os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
+      status: "SAFE", doPobrania: true, podglad: true }]));
+    expect(screen.getByText(/Allegro nie oddało załącznika/)).toBeTruthy();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText(/wczytuję/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Spróbuj ponownie/ }));
+    expect(ponow).toHaveBeenCalledTimes(1);
+    /* Nazwa z pobraniem zostaje — to inne pytanie niż podgląd. */
+    expect(screen.getByRole("button", { name: /szarpak\.jpeg/ })).toBeTruthy();
+  });
+
+  it("`null` bez zdania to odpowiedź „nie obraz” — sama nazwa, bez ponowienia", () => {
+    zdjecie.mockReturnValue(wynikHaka(null));
+    os(wiadomosc([{ id: 7, nazwa: "usterka.jpg", typ: null,
+      status: "SAFE", doPobrania: true, podglad: true }]));
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.queryByText(/wczytuję/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Spróbuj ponownie/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /usterka\.jpg/ })).toBeTruthy();
   });
 });
