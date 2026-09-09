@@ -481,6 +481,59 @@ test("powtórna synchronizacja nie dubluje załączników", async () => {
     .get() as { n: number }).n, 1);
 });
 
+/* ── Załączniki przy KAŻDYM przebiegu (przyrost „zdjęcia w rozmowach") ──────
+   Do 0.242.0 wchodziły wyłącznie z nową wiadomością: `NEW` („Allegro jeszcze
+   sprawdza") zostawało zamrożone, a wiadomości sprzed 0.155.0 nie miały
+   zdjęć wcale. Allegro nie przestawia daty wątku, gdy kończy sprawdzać plik,
+   więc `NEW` dociąga się osobno, po samym statusie.                        */
+test("NEW → SAFE aktualizuje wiersz załącznika, choć wiadomość już istnieje", async () => {
+  const database = mkDb();
+  const url = "https://upload.allegro.pl/message-center/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6";
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]),
+      { attachments: [{ fileName: "a.jpg", status: "NEW" }] }).query });
+  const stan = () => ({ ...(database.prepare("SELECT file_name, mime_type, url, status FROM message_attachment")
+    .get() as Record<string, unknown>) });
+  assert.deepEqual(stan(), { file_name: "a.jpg", mime_type: null, url: null, status: "NEW" });
+
+  /* Data wątku BEZ zmiany: główna pętla go nie czyta. Dociąg pyta o wiadomości
+     wyłącznie przez `NEW` w bazie. */
+  const drugi = fake([[thread(1)]], new Map([["t-1", ["m-1"]]]),
+    { attachments: [{ fileName: "a.jpg", mimeType: "image/jpeg", status: "SAFE", url }] });
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: drugi.query });
+  assert.equal(drugi.urls.filter((u) => u.includes("/messages")).length, 1, "dociąg NEW pyta o wątek mimo niezmienionej daty");
+  assert.deepEqual(stan(), { file_name: "a.jpg", mime_type: "image/jpeg", url, status: "SAFE" });
+  assert.equal((database.prepare("SELECT count(*) n FROM message_attachment").get() as { n: number }).n, 1);
+  assert.equal((database.prepare("SELECT count(*) n FROM message").get() as { n: number }).n, 1, "wiadomość nietknięta");
+
+  /* Po `SAFE` nikt już o ten wątek nie pyta. */
+  const trzeci = fake([[thread(1)]], new Map([["t-1", ["m-1"]]]));
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: trzeci.query });
+  assert.equal(trzeci.urls.filter((u) => u.includes("/messages")).length, 0);
+});
+
+test("załącznik dochodzi do ISTNIEJĄCEJ wiadomości, gdy wątek wraca z nową datą", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]])).query });
+  assert.equal((database.prepare("SELECT count(*) n FROM message_attachment").get() as { n: number }).n, 0);
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test",
+    query: fake([[thread(1, "2026-09-30T12:00:00.000Z")]], new Map([["t-1", ["m-1", "m-2"]]]),
+      { attachments: [{ fileName: "a.jpg", status: "SAFE", url: "https://u/1" }] }).query });
+  assert.equal((database.prepare("SELECT count(*) n FROM message_attachment").get() as { n: number }).n, 2,
+    "po jednym na każdą z dwóch wiadomości, także na tę sprzed przebiegu");
+});
+
+test("dwa pliki o tej samej nazwie w jednej wiadomości to jeden wiersz — ostatni wygrywa", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map([["t-1", ["m-1"]]]), { attachments: [
+      { fileName: "a.jpg", status: "NEW" }, { fileName: "a.jpg", status: "SAFE", url: "https://u/2" },
+    ] }).query });
+  const w = database.prepare("SELECT status, url FROM message_attachment").all() as Array<Record<string, unknown>>;
+  assert.deepEqual(w.map((x) => ({ ...x })), [{ status: "SAFE", url: "https://u/2" }]);
+});
+
 test("wiadomość bez załączników nie zakłada pustych wierszy", async () => {
   const database = mkDb();
   await synchronizujAllegroInbox({

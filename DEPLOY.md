@@ -1719,6 +1719,11 @@ cd C:\wertis\tools
 
 Po starcie sprawdź `/api/health` i dopiero wtedy uruchamiaj `npm run sonda`.
 
+Od 0.244.0 jest też `npm run sonda:zalacznik` (w `server/`). Bierze jeden
+załącznik `SAFE` ze skrzynki i wypisuje, którą drogą Allegro oddaje plik:
+kody i typy, bez bajtów i bez adresów. Uruchom raz po aktualizacji; zdanie
+na końcu mówi, czy znacznik `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` wolno zdjąć.
+
 **Aktualizacja do 0.162.0 nie wymaga niczego ręcznego** — kolumny stoją
 w bazie od 0.150.0, migracji nie ma. Zmienia się nawyk biura.
 

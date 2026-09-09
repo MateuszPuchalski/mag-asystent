@@ -131,11 +131,14 @@ Trzy pola z tej listy zmieniają działanie synchronizatora:
 
 ### Czego nie mapujemy i dlaczego
 
-`attachments[]` niesie `fileName`, `mimeType`, `url` i `status`; obok stoi
-`hasAdditionalAttachments`. Załączników ani nie pobieramy, ani nie wysyłamy,
-więc kolumn na nie nie ma. `type` (`MESSAGE_CENTER`) rozróżnia kanały, których
-mamy jeden. `additionalInformation` niesie dane właściwe branży (w przykładzie
-`vin`) i nie ma u nas ekranu.
+`attachments[]` niesie `fileName`, `mimeType`, `url` i `status` — od 0.155.0
+mapujemy je do `message_attachment`, od 0.195.0 wysyłamy, a od 0.244.0
+upsertujemy przy każdym przebiegu (patrz „Pobranie załącznika Centrum
+Wiadomości" niżej). `hasAdditionalAttachments` zostaje w `surowe_json`:
+sonda widziała `false` w 33 na 33 wiadomościach, a specyfikacja nie mówi, co
+znaczy `true`. `type` (`MESSAGE_CENTER`) rozróżnia kanały, których mamy jeden.
+`additionalInformation` niesie dane właściwe branży (w przykładzie `vin`)
+i nie ma u nas ekranu.
 
 Do 0.165.0 stało tu zdanie, że `relatesTo.order.id` „czeka na ekran
 zamówienia". Ekran jest od 0.166.0: numer trafia do modelu, ticker
@@ -497,6 +500,31 @@ specyfikacja wymienia `image/png`, `image/gif`, `image/bmp`, `image/tiff`,
 `image/jpeg` i `application/pdf`. To jedyny nasz zapis, przy którym 415 znaczy
 „zły plik", a nie „zła wersja zasobu".
 
+### Pobranie załącznika Centrum Wiadomości — kształt spoza specyfikacji (0.244.0)
+
+Specyfikacja zna deklarację (`POST`) i wgranie (`PUT`), a do ODCZYTU daje
+wyłącznie pole `url` w `MessageAttachmentInfo` — w przykładzie
+`https://upload.allegro.pl/message-center/message-attachments/{uuid}`.
+Ten adres z Bearerem konta odpowiada u właściciela **403**, a ten sam
+`pobierzZalacznik` oddaje zdjęcia reklamacji z `api.allegro.pl` bez zarzutu.
+Odmawia więc host, nie token. 0.219.2 zapisało ten stan jako nienaprawiony.
+
+Od 0.244.0 adapter próbuje KANDYDATÓW po kolei (`kandydaciPobrania`):
+`GET {api}/messaging/message-attachments/{uuid}` z `Accept` `public.v1`, to
+samo z `beta.v1`, na końcu zapisany `url` bez `Accept` — dzisiejsza droga
+jako zapas. UUID bierzemy z OGONA `url`; `MessageAttachmentInfoVBeta1` ma go
+w `id`, a oba przykłady w swaggerze niosą ten sam ciąg. 401 kończy próby od
+razu, bo token jest jeden. Odmowa każdej drogi wraca jednym zdaniem z kodem
+każdej próby, bez adresów i bez identyfikatora.
+
+`[WERYFIKUJ]` czy `GET /messaging/message-attachments/{attachmentId}`
+z `Accept: application/vnd.allegro.public.v1+json` oddaje bajty. Tutorial
+Allegro, na który swagger odsyła przy deklaracji, tak to opisuje — z PAMIĘCI,
+bo z maszyny roboczej nie da się go otworzyć, a w `swagger.yaml` tej operacji
+nie ma. Rozstrzyga `cd server && npm run sonda:zalacznik`: tabela kodów dla
+każdej drogi i zdanie, czy znacznik wolno zdjąć. Do tego czasu panel ma zapas
+i zdanie na ekranie, nie pustą linię.
+
 Gotowe identyfikatory idą w `NewMessageInThread.attachments` jako lista
 `{ id }`. Deklaracji nie da się cofnąć — nie ma takiej końcówki — więc plik
 dodany i nigdy niewysłany zostaje po ich stronie i wygasa sam.
@@ -655,8 +683,10 @@ dostaje 415 i spada z powrotem na przycisk pobrania.
 
 Pobranie ma tu za to WŁASNĄ końcówkę w specyfikacji
 (`GET /sale/issues/attachments/{attachmentId}`), czego brakuje przy
-załącznikach Centrum Wiadomości. Adres i tak czytamy z bazy, a host sprawdza
-`pobierzZalacznik` — dwie niezależne zapory, bo obie kosztują jedną linijkę.
+załącznikach Centrum Wiadomości — tamte dostały w 0.244.0 kandydatów
+i znacznik (sekcja „Pobranie załącznika Centrum Wiadomości"). Adres i tak
+czytamy z bazy, a host sprawdza `pobierzZalacznik` — dwie niezależne zapory,
+bo obie kosztują jedną linijkę.
 
 ### `POST /sale/issues/{issueId}/message` — odpowiedź w sprawie (0.224.0)
 

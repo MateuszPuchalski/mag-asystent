@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import React from "react";
 import { Zdjecie } from "./Zdjecie";
-import { _wyczyscPamiecZdjec } from "./useZdjecie";
+import { _wyczyscPamiecZdjec, useZdjecieZalacznika } from "./useZdjecie";
 
 /* Trzy lekcje z `biuro.html`, każda kupiona tam osobno. Ten plik pilnuje, żeby
    panel obsługi nie kupił ich drugi raz. */
 
-let odpowiedzi: Array<{ url: string; rozwiaz: (ok: boolean) => void }> = [];
+let odpowiedzi: Array<{ url: string; rozwiaz: (ok: boolean, status?: number, tresc?: unknown) => void }> = [];
 
 beforeEach(() => {
   _wyczyscPamiecZdjec();
@@ -17,7 +18,11 @@ beforeEach(() => {
   vi.stubGlobal("fetch", (url: string) => new Promise((resolve) => {
     odpowiedzi.push({
       url,
-      rozwiaz: (ok) => resolve({ ok, blob: async () => Object.assign(new Blob(), { __id: url }) } as any),
+      /* Atrapa mówi PRAWDĘ o kodzie: `ok:false` bez statusu było do tego
+         wydania „jakąś porażką", a hak od dziś rozróżnia 404 od 503. */
+      rozwiaz: (ok, status = ok ? 200 : 404, tresc = {}) => resolve({
+        ok, status, blob: async () => Object.assign(new Blob(), { __id: url }), json: async () => tresc,
+      } as any),
     });
   }));
 });
@@ -92,5 +97,53 @@ describe("Zdjęcie kartoteki", () => {
     odpowiedzi[0].rozwiaz(false);
     await waitFor(() => expect(screen.getByText("bez zdjęcia")).toBeInTheDocument());
     expect((container.firstElementChild as HTMLElement).style.width).toBe("44px");
+  });
+});
+
+/* ── Porażka z powodem, nie pamięć negatywu (przyrost „zdjęcia w rozmowach") ──
+   Do tego wydania 503 z serwera lądowało w pamięci jako „na pewno brak" do
+   końca życia karty. Załącznik w skrzynce ma dostać ZDANIE i ponowienie. */
+function Zalacznik({ id }: { id: number }) {
+  const { url, blad, ponow } = useZdjecieZalacznika(id);
+  return <div>
+    {url === undefined && <span>wczytuję</span>}
+    {url && <img src={url} alt="z" />}
+    {blad && <p>{blad}<button onClick={ponow}>ponów</button></p>}
+    {url === null && !blad && <span>brak</span>}
+  </div>;
+}
+
+describe("Załącznik wiadomości — zdanie i ponowienie", () => {
+  it("503 daje zdanie z serwera i NIE zatruwa pamięci; „ponów” pyta od razu", async () => {
+    render(<Zalacznik id={7} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    expect(odpowiedzi[0].url).toBe("/api/obsluga/zalaczniki/7/podglad");
+    odpowiedzi[0].rozwiaz(false, 503, { error: "Konto Allegro niepołączone — połącz w STAN SYSTEMU." });
+    await waitFor(() => expect(screen.getByText(/Konto Allegro niepołączone/)).toBeInTheDocument());
+    expect(screen.queryByText("brak")).not.toBeInTheDocument();
+
+    const { click } = await import("@testing-library/user-event").then((m) => m.default);
+    await click(screen.getByText("ponów"));
+    await waitFor(() => expect(odpowiedzi).toHaveLength(2));
+    odpowiedzi[1].rozwiaz(true);
+    await waitFor(() => expect(screen.getByRole("img")).toHaveAttribute("src", expect.stringContaining("blob:")));
+  });
+
+  it("415 to odpowiedź „nie obraz”: brak bez zdania, zapamiętany jak 404", async () => {
+    const { unmount } = render(<Zalacznik id={8} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    odpowiedzi[0].rozwiaz(false, 415, { error: "nie jest obrazem" });
+    await waitFor(() => expect(screen.getByText("brak")).toBeInTheDocument());
+    unmount();
+    render(<Zalacznik id={8} />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(odpowiedzi).toHaveLength(1);
+  });
+
+  it("401 mówi o sesji, a urwana sieć o serwerze", async () => {
+    render(<Zalacznik id={9} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    odpowiedzi[0].rozwiaz(false, 401);
+    await waitFor(() => expect(screen.getByText(/Sesja wygasła/)).toBeInTheDocument());
   });
 });

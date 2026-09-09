@@ -511,7 +511,9 @@ export async function zapytajAllegro(
  */
 const HOSTY_ZALACZNIKOW = ["allegro.pl", "allegro.pl.allegrosandbox.pl"];
 
-export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
+export async function pobierzZalacznik(
+  url: string, opcje: { akcept?: string } = {},
+): Promise<ArrayBuffer> {
   let host: string;
   try {
     host = new URL(url).hostname;
@@ -526,7 +528,13 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
   let odp: Response;
   try {
     odp = await fetch(url, {
-      headers: { authorization: `Bearer ${bearer}`, "user-agent": allegroUserAgent() },
+      headers: {
+        authorization: `Bearer ${bearer}`, "user-agent": allegroUserAgent(),
+        /* `Accept` TYLKO na życzenie (droga API przy Centrum Wiadomości).
+           Zapisany `url` idzie bez niego, jak od 0.155.0 — plik nie ma
+           wersji zasobu. */
+        ...(opcje.akcept ? { accept: opcje.akcept } : {}),
+      },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (e) {
@@ -558,6 +566,156 @@ export async function pobierzZalacznik(url: string): Promise<ArrayBuffer> {
       odp.status);
   }
   return odp.arrayBuffer();
+}
+
+/* ── Załącznik CENTRUM WIADOMOŚCI: droga API z zapasem (przyrost „zdjęcia w rozmowach") ──
+   Ten sam `pobierzZalacznik` oddaje zdjęcia z reklamacji
+   (`api.allegro.pl/sale/issues/attachments/{id}`) i odmawia 403 przy
+   skrzynce (`upload.allegro.pl/message-center/message-attachments/{uuid}`
+   z `MessageAttachmentInfo.url`). Token i uprawnienie są więc dobre —
+   odmawia HOST. 0.219.2 zapisało, że ten 403 „nie jest naprawiony".
+
+   Specyfikacja w repo nie ma GET do pobrania załącznika Centrum Wiadomości
+   (tylko POST deklaracji i PUT wgrania). Tutorial Allegro, na który swagger
+   odsyła, opisuje pobranie jako `GET {api}/messaging/message-attachments/{id}`
+   z `Accept: application/vnd.allegro.public.v1+json` — z PAMIĘCI, więc to jest
+   KANDYDAT z `[WERYFIKUJ]` (`docs/allegro-ksztalt.md`), nie fakt. Dlatego:
+   1. kandydaci w kolejności, zapisany `url` ZOSTAJE jako ostatni zapas;
+   2. identyfikator z OGONA `url`, bez migracji na beta.v1 — public.v1
+      i beta.v1 „bywają różne kształty", a oba przykłady w swaggerze niosą
+      w `id` i w `url` ten sam UUID;
+   3. `sondujZalacznik` pokazuje na żywym koncie, która droga działa —
+      to zdejmuje znacznik, nie kolejne wydanie.                            */
+
+const UUID_ZALACZNIKA = /\/message-attachments\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+
+export type DrogaPobrania = "api" | "url";
+
+export interface KandydatPobrania {
+  droga: DrogaPobrania;
+  adres: string;
+  akcept?: string;
+}
+
+/** Identyfikator załącznika z ogona `MessageAttachmentInfo.url` albo `null`. */
+export function idZalacznikaZUrl(url: string): string | null {
+  const m = UUID_ZALACZNIKA.exec(url);
+  return m ? m[1]!.toLowerCase() : null;
+}
+
+/**
+ * Kandydaci pobrania w kolejności prób — czysta funkcja, żeby test sprawdził
+ * ją bez sieci. Bez ogona UUID zostaje sam zapisany `url`.
+ */
+export function kandydaciPobrania(apiUrl: string, url: string): KandydatPobrania[] {
+  const id = idZalacznikaZUrl(url);
+  const zapas: KandydatPobrania = { droga: "url", adres: url };
+  if (!id) return [zapas];
+  const api = `${apiUrl}/messaging/message-attachments/${encodeURIComponent(id)}`;
+  return [
+    { droga: "api", adres: api, akcept: AKCEPTY[0] },
+    { droga: "api", adres: api, akcept: AKCEPTY[1] },
+    zapas,
+  ];
+}
+
+/* Kody, po których wolno spróbować NASTĘPNEGO kandydata: odmowa tej drogi,
+   nie tokena. 401 przerywa od razu — token jest jeden dla wszystkich dróg. */
+const KODY_NASTEPNEJ_DROGI = new Set([403, 404, 405, 406, 415]);
+
+/* Raz na proces, nie raz na plik: ślad w logu ma powiedzieć „droga API
+   potwierdzona", a nie zalać dziennik przy każdym zdjęciu. */
+let drogaApiPotwierdzona = false;
+
+/**
+ * Pobranie załącznika Centrum Wiadomości: kandydaci po kolei, pierwszy sukces
+ * wygrywa. Gdy wszystkie odmówią — jedno zdanie z kodem KAŻDEJ próby, bez
+ * adresów i bez identyfikatora (te idą do dziennika serwera, nie na ekran).
+ */
+export async function pobierzZalacznikWiadomosci(
+  apiUrl: string, url: string,
+): Promise<{ bajty: ArrayBuffer; droga: DrogaPobrania }> {
+  const proby: string[] = [];
+  let ostatni: unknown = null;
+  for (const k of kandydaciPobrania(apiUrl, url)) {
+    try {
+      const bajty = await pobierzZalacznik(k.adres, { akcept: k.akcept });
+      if (k.droga === "api" && !drogaApiPotwierdzona) {
+        drogaApiPotwierdzona = true;
+        console.info(`[allegro] droga API do załączników Centrum Wiadomości działa (${bajty.byteLength} B)`);
+      } else if (k.droga === "url" && proby.length) {
+        console.warn(`[allegro] droga API odmówiła (${proby.join(", ")}), zapisany adres oddał plik`);
+      }
+      return { bajty, droga: k.droga };
+    } catch (e) {
+      ostatni = e;
+      const kod = e instanceof BladOdpowiedziAllegro ? e.status : null;
+      proby.push(`${k.droga === "api" ? "końcówka API" : "zapisany adres"}${k.akcept ? ` (${k.akcept.replace("application/vnd.allegro.", "")})` : ""}: ${kod ?? "błąd sieci"}`);
+      if (kod === null || !KODY_NASTEPNEJ_DROGI.has(kod)) break;
+    }
+  }
+  if (ostatni instanceof BladOdpowiedziAllegro) {
+    throw new BladOdpowiedziAllegro(
+      `Allegro nie oddało załącznika — ${proby.join("; ")}.` +
+        (ostatni.status === 403 ? ` Sprawdź uprawnienie ${scopeDlaUrl(`${apiUrl}/messaging/`)} i sparuj konto ponownie.` : ""),
+      ostatni.status);
+  }
+  throw ostatni instanceof Error ? ostatni : new Error(String(ostatni));
+}
+
+export interface WynikSondyZalacznika {
+  droga: DrogaPobrania;
+  akcept: string | null;
+  status: number | null;
+  typ: string | null;
+  bajtow: number | null;
+  przekierowany: boolean;
+  /** Sam host adresu końcowego — undici zdejmuje `Authorization` przy skoku na inny origin. */
+  hostKoncowy: string | null;
+  blad: string | null;
+}
+
+/**
+ * Sonda JEDNEGO załącznika na żywym koncie (`npm run sonda:zalacznik`):
+ * kandydaci plus dwie próby kontrolne (API bez `Accept`, `url` z `Accept`).
+ * Oddaje kody i typy, nigdy bajtów ani adresów — raport ma zdjąć
+ * `[WERYFIKUJ]`, nie przenieść zdjęcia klienta do dziennika.
+ */
+export async function sondujZalacznik(apiUrl: string, url: string): Promise<WynikSondyZalacznika[]> {
+  const kandydaci = kandydaciPobrania(apiUrl, url);
+  const api = kandydaci.find((k) => k.droga === "api");
+  const proby: KandydatPobrania[] = [
+    ...kandydaci,
+    ...(api ? [{ droga: "api" as const, adres: api.adres }] : []),
+    { droga: "url", adres: url, akcept: AKCEPTY[0] },
+  ];
+  const bearer = await wazneBearer();
+  const wyniki: WynikSondyZalacznika[] = [];
+  for (const k of proby) {
+    try {
+      const odp = await fetch(k.adres, {
+        headers: {
+          authorization: `Bearer ${bearer}`, "user-agent": allegroUserAgent(),
+          ...(k.akcept ? { accept: k.akcept } : {}),
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      const bajty = odp.ok ? (await odp.arrayBuffer()).byteLength : null;
+      wyniki.push({
+        droga: k.droga, akcept: k.akcept ?? null, status: odp.status,
+        typ: odp.headers.get("content-type"), bajtow: bajty, przekierowany: odp.redirected,
+        hostKoncowy: (() => { try { return new URL(odp.url || k.adres).hostname; } catch { return null; } })(),
+        blad: null,
+      });
+    } catch (e) {
+      wyniki.push({
+        droga: k.droga, akcept: k.akcept ?? null, status: null, typ: null, bajtow: null,
+        przekierowany: false, hostKoncowy: null,
+        blad: (e instanceof Error ? e.message : String(e)).slice(0, 120),
+      });
+    }
+  }
+  return wyniki;
 }
 
 /**

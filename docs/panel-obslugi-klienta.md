@@ -3128,7 +3128,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zwrot tego zamówienia przy rozmowie | **działa** od 0.221.0 | `osRozmowy.zwroty` z `listaZwrotow` po zamówieniu, `skrzynka/ZwrotRozmowy.tsx` |
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
-| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0 | `typPodgladu`, `GET /api/obsluga/zalaczniki/:id/podglad` — cztery typy rastrowe, tylko `SAFE` |
+| Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia |
+| Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **kandydat** od 0.244.0 | `kandydaciPobrania`: końcówka API z `Accept` przed zapisanym `url`; `[WERYFIKUJ]` w `allegro-ksztalt.md`, `npm run sonda:zalacznik` zdejmuje |
+| Załączniki odświeżane przy każdym przebiegu | **działa** od 0.244.0 | `zapiszZalaczniki` upsert po `(message_id, file_name)`, dociąg wątków ze stanem `NEW` (sufit 5), dosypka z lądowiska przy starcie |
 | Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
 | Stopka firmowa zwinięta pod odpowiedzią | **działa** od 0.219.1 | `podzielStopke`, pole `stopka` w `WpisOsi` |
 | Podpis wiadomości klienta niesie jego login | **działa** od 0.219.2 | `allegro_inbox_thread.interlocutor_login` w zapytaniu osi |

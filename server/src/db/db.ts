@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
 import { odkodujEncje } from "../tekst.js";
+import { zapiszZalaczniki, type ZalacznikAllegro } from "../services/zalaczniki-wiadomosci.js";
 /* Serwis, nie odwrotnie: `autoresponder.ts` zna tylko `tekst.ts`, więc
    import w tę stronę nie zapętla modułów. */
 import { czyAutoresponder } from "../services/autoresponder.js";
@@ -617,6 +618,8 @@ export function migrate(database: DatabaseSync) {
   sprzatnijSprzedGranicy(database);
   odkodujEncjeWZastanych(database);
   oznaczAutoodpowiedziWZastanych(database);
+  zalacznikiBezDubli(database);
+  dosypZalacznikiZLadowiska(database);
   tabelaFts(database);
 }
 
@@ -687,6 +690,53 @@ function identyfikatorZamiennika(database: DatabaseSync) {
  * potwierdzenie niesie ten sam podpis, a jego list jest pytaniem. To ten sam
  * warunek, który stoi przy zapisie.
  */
+/**
+ * Klucz naturalny załącznika wiadomości: `(message_id, file_name)`.
+ *
+ * Indeks stoi TUTAJ, nie w `schema.sql`, bo `schema.sql` wykonuje się przed
+ * migracją, a baza sprzed tego wydania może mieć duplikaty — synchronizator
+ * wstawiał załączniki bez żadnego ograniczenia. `CREATE UNIQUE INDEX` na
+ * takich wierszach wywróciłby start (ta sama blizna co `ux_zwrot_klienta_pozycja_klucz`,
+ * 0.174.2). Zostaje najniższe `id`: na nim wiszą ETagi w przeglądarkach biura.
+ */
+function zalacznikiBezDubli(database: DatabaseSync) {
+  database.exec(`DELETE FROM message_attachment
+    WHERE id NOT IN (SELECT MIN(id) FROM message_attachment GROUP BY message_id, file_name)`);
+  database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_message_attachment_nazwa
+    ON message_attachment(message_id, file_name)`);
+}
+
+/**
+ * Dosypka załączników z lądowiska (precedens 0.166.0: numer zamówienia).
+ *
+ * Do tego wydania załączniki wchodziły wyłącznie z NOWĄ wiadomością, więc
+ * wiadomości sprzed 0.155.0 — i każda, która pierwszy raz przyszła ze
+ * statusem `NEW` — nie mają wierszy, choć `allegro_inbox_message.surowe_json`
+ * trzyma całą listę. Bierzemy wyłącznie wiadomości BEZ żadnego załącznika
+ * w bazie, więc każdy start po pierwszym jest tani; klucz upsertu chroni
+ * przed dublem, gdyby synchronizacja zdążyła pierwsza.
+ */
+function dosypZalacznikiZLadowiska(database: DatabaseSync) {
+  const kandydaci = database.prepare(`
+    SELECT m.id AS message_id, l.surowe_json
+      FROM allegro_inbox_message l
+      JOIN message m ON m.external_message_id = l.id
+     WHERE l.surowe_json LIKE '%"attachments":[{%'
+       AND NOT EXISTS (SELECT 1 FROM message_attachment a WHERE a.message_id = m.id)`)
+    .all() as Array<{ message_id: number; surowe_json: string }>;
+  if (!kandydaci.length) return;
+  let wierszy = 0;
+  transaction(database, () => {
+    for (const k of kandydaci) {
+      let lista: ZalacznikAllegro[] | undefined;
+      try { lista = (JSON.parse(k.surowe_json) as { attachments?: ZalacznikAllegro[] }).attachments; }
+      catch { continue; }
+      wierszy += zapiszZalaczniki(database, Number(k.message_id), lista);
+    }
+  })();
+  if (wierszy) console.info(`[migracja] załączniki z lądowiska: ${wierszy} wierszy przy ${kandydaci.length} wiadomościach`);
+}
+
 function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
   if (!maKolumne(database, "message", "auto_odpowiedz")) return;
   /* Tylko wiersze jeszcze nieoznaczone: bez tego każdy start przepisywałby
