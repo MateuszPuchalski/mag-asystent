@@ -164,6 +164,13 @@ zapisana świadomie, a nie odziedziczona.
 > wiedzę na zawsze. Autor i zatwierdzający są zapisani osobno. Automat składa
 > propozycje (z doboru, z pomiaru), ale nie rozstrzyga — pilnuje tego serwis,
 > nie dyscyplina. Bazę zaczynamy od zera, bez importu.
+>
+> **Doprecyzowanie z 0.239.0 — co znaczy „bez importu".** Bez importu
+> CUDZEJ bazy pasowań. Własne nazwy kartotek są źródłem, a tokeny silników
+> (§12 panelu) to zapis ręki biura: człowiek wpisuje słowo i silnik, przegląda
+> listę kartotek i zatwierdza zaznaczone. Propozycja i rozstrzygnięcie idą
+> wtedy jedną transakcją tego samego człowieka — to ta sama zasada „zatwierdza
+> każdy z biura, także autor", tylko za jednym kliknięciem.
 
 ### 6. Czym jest zwrot?
 

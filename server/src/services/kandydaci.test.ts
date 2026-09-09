@@ -20,6 +20,7 @@ let zapiszDane: typeof import("./dobor.js").zapiszDane;
 let W: typeof import("./wiedza.js");
 let S: typeof import("./silniki.js");
 let P: typeof import("./pasowania.js");
+let T: typeof import("./tokeny-silnikow.js");
 let config: typeof import("../config.js").config;
 let subiekt: typeof import("../context.js").subiekt;
 
@@ -40,6 +41,7 @@ before(async () => {
   W = await import("./wiedza.js");
   S = await import("./silniki.js");
   P = await import("./pasowania.js");
+  T = await import("./tokeny-silnikow.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length} pozycji`);
@@ -61,7 +63,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia",
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
+    "token_silnika_kartoteka", "token_silnika", "model_urzadzenia",
     "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -349,6 +352,32 @@ test("część silnika trafia do kandydatów, a źródło nazywa OBA ogniwa ła�
   assert.match(k.zrodlo, /zastosowanie do silnik Briggs & Stratton 450E/);
   assert.match(k.zrodlo, /silnik Briggs & Stratton 450E stoi w STIHL FS 250/);
   assert.deepEqual(k.ostrzezenia, [], "jeden silnik — nie ma czego potwierdzać z tabliczki");
+});
+
+test("zastosowanie z tokenu w nazwie kartoteki karmi szczebel przez silnik jak wpis ręczny", () => {
+  /* Token to najtańsze paliwo szczebla: biuro wpisuje „GX160” = Honda GX160,
+     zatwierdza kartoteki z listy i od tej chwili dobór widzi je przez silnik.
+     Dowód jest decyzją biura, więc pewność zostaje „potwierdzone” — to nie
+     ślad rozmowy, tylko człowiek, który przejrzał nazwę i kliknął. */
+  const GX160 = { rodzaj: "silnik" as const, marka: "Honda", nazwa: "GX160" };
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  zabuduj(GX160);
+  const t = T.dodajToken({ token: "GX160", silnik: GX160 }, { userId: biuro, name: "A. Lewandowska" });
+  const gaznik = tw("W09-0211");
+  assert.ok(t.nowe.some((k) => k.twId === gaznik), "gaźnik GX160 z seedu jest na liście tokenu");
+  T.rozstrzygnijToken(t.id, { zatwierdz: [gaznik], pomin: [] }, biuro);
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "silnik").sprawdzona, true);
+  const k = kandydaci.find((x) => x.twId === gaznik)!;
+  assert.ok(k, "kartoteka zatwierdzona z tokenu jest kandydatem");
+  assert.equal(k.droga, "silnik");
+  assert.equal(k.pewnosc, "potwierdzone");
+  assert.match(k.zrodlo, /potwierdzone zastosowanie do silnik Honda GX160 — decyzja biura/);
+  assert.match(k.zrodlo, /silnik Honda GX160 stoi w STIHL FS 250/);
+  /* Treść dowodu (token i nazwa kartoteki) leży przy zastosowaniu, nie w zdaniu
+     źródła — zdanie mówi CZYM potwierdzone, kartę dowodu otwiera się osobno. */
+  const z = W.zastosowaniaTowaru(gaznik).potwierdzone.find((x) => x.model.nazwa === "GX160")!;
+  assert.match(z.dowody[0]!.tresc, /token „GX160” w nazwie kartoteki/);
 });
 
 test("dwie wersje silnikowe: nigdy „potwierdzone” i zawsze ostrzeżenie o tabliczce", () => {

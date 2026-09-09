@@ -56,6 +56,11 @@ vi.mock("../api/wiedza", async () => {
     useModele: () => ({ data: { modele: [] } }),
     useWiedzaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
     useModeleZOpisow: () => ({ data: { wiersze: [], liczba: 2 }, isLoading: false, error: null }),
+    /* Tokeny (0.239.0) dokładają się do liczby na zakładce „Z opisów": 2 + 3 = 5. */
+    useTokenySilnikow: () => ({ data: { tokeny: [], nowychRazem: 3 }, isLoading: false, error: null }),
+    useDodajToken: () => ({ mutate: vi.fn(), isPending: false }),
+    useRozstrzygnijToken: () => ({ mutate: vi.fn(), isPending: false }),
+    useUsunToken: () => ({ mutate: vi.fn(), isPending: false }),
     usePrzerobModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
     useOdrzucModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
     useIdentyfikatory: () => ({ data: [], isLoading: false, error: null }),
@@ -122,6 +127,13 @@ describe("Ekran wiedzy", () => {
     await userEvent.type(screen.getByLabelText(/Powód odrzucenia/), "to LS 51");
     await userEvent.click(potwierdz);
     expect(rozstrzygnij).toHaveBeenLastCalledWith({ id: 3, decyzja: "odrzuc", powod: "to LS 51" }, expect.anything());
+  });
+
+  it("zakładka „Z opisów” liczy sekcje „Modele:” RAZEM z kartotekami z tokenem", () => {
+    /* Jedna liczba pracy: 2 sekcje + 3 kartoteki z tokenem = 5. Oba czekają
+       na tego samego człowieka w tym samym widoku. */
+    pokaz();
+    expect(screen.getByRole("button", { name: "Z opisów (5)" })).toBeInTheDocument();
   });
 
   it("pusta kolejka mówi, skąd biorą się propozycje", () => {

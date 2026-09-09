@@ -901,6 +901,14 @@ propozycji zabudowy jednym kliknięciem pod polem „Silnik", z dowodem
 `rozmowa` (klient podał silnik), więc z pewnością „prawdopodobne". Rozstrzyga
 człowiek w Wiedza → Silniki, dopiero wtedy szczebel rusza.
 
+**Od 0.239.0 szczebel ma paliwo z nazw kartotek: tokeny silników** (§12).
+Zabudowa mówi, jaki silnik stoi w maszynie, ale kandydatów daje dopiero
+zastosowanie części DO SILNIKA — a tych było tyle, ile biuro wpisało ręcznie.
+Tymczasem nazwy kartotek mówią wprost „Gaźnik do silników HONDA GX160".
+Biuro wpisuje token „GX160" = Honda GX160, przegląda listę kartotek z tym
+słowem w nazwie i jednym kliknięciem zatwierdza zaznaczone. Kandydat z tokenu
+ma pewność „potwierdzone", bo dowodem jest decyzja biura, nie ślad rozmowy.
+
 Pominięcie tego szczebla jest produktem, nie porażką: powód pominięcia to
 jedyna droga, którą agent dowie się o luce, więc prowadzi o krok dalej.
 Tekst bez aliasu: „„Lonci v200" nie ma w słowniku silników, dopisz go
@@ -999,10 +1007,11 @@ Dołożenie go później oznaczałoby przebudowę tabeli.
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
-`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma OSIEM tabel,
-nazwami z kodu: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania` (E2),
-`towar_identyfikator` i `model_z_opisu` (E3), `zabudowa_silnika` (0.229.0),
-`pasowanie_czesci` (0.230.0) oraz `alias_silnika` (0.238.0).
+`Measurement`, `KnowledgeDocument`, `KnowledgeRevision`. Kod ma DZIESIĘĆ
+tabel, nazwami z kodu: `model_urzadzenia`, `zastosowanie`,
+`dowod_zastosowania` (E2), `towar_identyfikator` i `model_z_opisu` (E3),
+`zabudowa_silnika` (0.229.0), `pasowanie_czesci` (0.230.0), `alias_silnika`
+(0.238.0) oraz `token_silnika` z `token_silnika_kartoteka` (0.239.0).
 Każda z pozostałych byłaby dziś tabelą bez czytelnika — blizna 0.157.0. Nazwa
 `dopasowanie` jest spalona (§15) i nie wraca.
 
@@ -1057,8 +1066,35 @@ Alias nigdy nie wskazuje maszyny (pilnuje serwis) i nigdy nie karmi
 szczebla wprost: w zakładce Dobór daje jedno zdanie i przycisk „Zaproponuj
 zabudowę" z dowodem `rozmowa`, a szczebel rusza po zatwierdzeniu pary.
 Alias marki bez modelu („Lonci" = Loncin) nie istnieje — to byłoby
-rozbijanie. Drugi słownik, „token w nazwie kartoteki → model silnika"
-(zapowiedź z 0.230.0), czeka jako osobny przyrost.
+rozbijanie.
+
+**Tokeny silników w nazwach kartotek** (`token_silnika`,
+`token_silnika_kartoteka`, 0.239.0) to drugi słownik, zapowiedziany
+w 0.230.0. Alias mówi, co znaczy tekst z pola „Silnik"; token mówi, co znaczy
+słowo w NAZWIE kartoteki: „GX160" = silnik Honda GX160. To dwie tabele, nie
+jedna z flagą, bo alias jest dokładnym tekstem pola, a token podłańcuchem
+nazwy — jedna kolumna niosłaby dwie prawdy. Serwer dopasowuje token do nazw
+po `zwin()` przy dodaniu i po każdym imporcie, nigdy przy odczycie; wiersz na
+parę (token, kartoteka) ma cykl jak `model_z_opisu`: `nowa` czeka na decyzję,
+`zatwierdzona` wskazuje zastosowanie, `pominieta` nie wraca po imporcie,
+a `nowa` znika, gdy kartoteka przestaje pasować. Dopasowanie idzie WYŁĄCZNIE
+po nazwie, nigdy po opisie: opis bywa notatką i mówi też „nie pasuje do…".
+
+Decyzja właściciela: **jedno kliknięcie zatwierdza zaznaczone.** Biuro widzi
+listę kartotek z tokenem w nazwie, odznacza te, które nie pasują, i klika.
+Zaznaczone dostają ZATWIERDZONE zastosowanie do silnika, odznaczone idą do
+pominiętych. Propozycję i rozstrzygnięcie robi ten sam człowiek w jednej
+transakcji — wolno, bo zatwierdza każdy z biura, także autor (Q5); nowe jest
+tylko to, że oba zapisy idą za jednym kliknięciem. Ślad jest pełny:
+`zaproponowal` = `rozstrzygnal`, źródło `opis`, dowód `decyzja_biura`
+z tokenem i nazwą kartoteki. Automat dalej nie zgaduje marki z tokenu
+(0.186.0) — lista kartotek jest podglądem decyzji człowieka, nie propozycją
+automatu. Usunięcie tokenu nie cofa zastosowań: to fakty z dowodem, cofa się
+je osobno przez wycofanie. Rozstrzygnięcie idzie hurtem jedną trasą, bo
+decyzja dotyczy listy przejrzanej naraz. Sekcja stoi na ekranie Wiedza →
+Z opisów jako druga sekcja tego samego widoku; zakładka liczy sekcje
+„Modele:" i kartoteki z tokenem razem, bo to jedna praca tego samego
+człowieka.
 
 Druga droga to zatwierdzenie doboru. Do 0.229.0 hak wpisywał `rodzaj:
 "maszyna"` na sztywno, więc żadne zastosowanie do silnika nie mogło powstać
@@ -1374,7 +1410,8 @@ customer_machine         order_snapshot          product_link
 dobor_rozmowy            model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
 zabudowa_silnika         pasowanie_czesci        alias_silnika
-towar_fts                knowledge_document      zadanie_terenowe
+token_silnika            token_silnika_kartoteka towar_fts
+knowledge_document       zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events
 klasyfikacja_rozmowy     copilot_wywolanie
@@ -2691,6 +2728,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
 | Zabudowa silnika (§12) | **działa** od 0.229.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
 | Słownik silników (§12) | **działa** od 0.238.0 | `alias_silnika`, `silnikZTekstu` w `services/silniki.ts`, sekcja „Słownik silników" na ekranie Silniki, przycisk „Zaproponuj zabudowę" pod polem Silnik w Doborze |
+| Tokeny silników w nazwach kartotek (§12) | **działa** od 0.239.0 | `token_silnika`, `token_silnika_kartoteka`, `services/tokeny-silnikow.ts`, sekcja „Tokeny silników w nazwach kartotek" na ekranie Z opisów, hak po imporcie |
 | Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |

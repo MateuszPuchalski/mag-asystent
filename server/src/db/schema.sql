@@ -655,6 +655,43 @@ CREATE TABLE IF NOT EXISTS model_z_opisu (
 );
 CREATE INDEX IF NOT EXISTS ix_model_z_opisu_stan ON model_z_opisu(stan, at);
 
+-- ── Tokeny silników w NAZWACH kartotek (§12, 0.239.0) ────────────────────
+-- Zapowiedź z 0.230.0: „token w nazwie kartoteki → model, wpisywany ręką
+-- biura". Nazwa „Gaźnik do silników HONDA GX160" mówi wprost, do czego
+-- pasuje część, ale to CZŁOWIEK wpisuje, że „GX160" to silnik Honda GX160
+-- — automat nie zgaduje marki z tokenu (0.186.0). Osobno od `alias_silnika`:
+-- alias to DOKŁADNY tekst pola „Silnik", token to PODŁAŃCUCH nazwy; jedna
+-- tabela z flagą byłaby dwiema prawdami w jednej kolumnie. Dopasowanie po
+-- `zwin` (nazwa i token bez separatorów); tylko nazwa, nigdy opis — opis
+-- bywa notatką i mówi też „nie pasuje do…".
+CREATE TABLE IF NOT EXISTS token_silnika (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  token         TEXT NOT NULL,
+  token_norm    TEXT NOT NULL UNIQUE,
+  silnik_id     INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+  dodal         TEXT NOT NULL,
+  dodal_user_id INTEGER REFERENCES app_user(user_id),
+  dodano_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Para (token, kartoteka) z cyklem jak `model_z_opisu`: `nowa` czeka na
+-- człowieka, `zatwierdzona` wskazuje zastosowanie, `pominieta` nie wraca po
+-- imporcie. `nowa`, której nazwa przestała pasować, schodzi przy przebudowie.
+-- Bez FK do `sgt_towar`: import odbudowuje read-model (blizna 0.154.0).
+CREATE TABLE IF NOT EXISTS token_silnika_kartoteka (
+  token_id             INTEGER NOT NULL REFERENCES token_silnika(id) ON DELETE CASCADE,
+  tw_id                INTEGER NOT NULL,
+  tw_symbol            TEXT NOT NULL,
+  stan                 TEXT NOT NULL DEFAULT 'nowa' CHECK (stan IN ('nowa','zatwierdzona','pominieta')),
+  zastosowanie_id      INTEGER REFERENCES zastosowanie(id) ON DELETE SET NULL,
+  rozstrzygnal         TEXT,
+  rozstrzygnal_user_id INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at    TEXT,
+  at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (token_id, tw_id)
+);
+CREATE INDEX IF NOT EXISTS ix_token_silnika_kartoteka_stan ON token_silnika_kartoteka(token_id, stan);
+
 -- Indeks pełnotekstowy `towar_fts` (FTS5) NIE stoi w tym pliku: `db()` wykonuje
 -- schemat bez try/catch, a FTS5 zależy od flag builda SQLite w Node. Tabelę
 -- wirtualną zakłada `migrate()` w try/catch i wystawia `ftsDostepne()`.

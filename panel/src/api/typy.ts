@@ -398,7 +398,26 @@ export type PokrycieWiedzy = {
   identyfikatorow: number; identyfikatorowRecznych: number;
   modeleZOpisu: { nowych: number; przerobionych: number; odrzuconych: number };
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
+  /** Tokeny silników w nazwach kartotek (0.239.0): ile słów, ile kartotek czeka, ile zatwierdzono. */
+  tokeny: { tokenow: number; nowych: number; zatwierdzonych: number };
   fts: { dostepne: boolean; wpisow: number };
+};
+
+/* ── Tokeny silników w nazwach kartotek (0.239.0) ────────────────────────────
+   Token to słowo wpisane ręką biura („GX160") z modelem silnika; serwer
+   dopasowuje je do NAZW kartotek po `zwin`. Kartoteka z tokenem ma cykl jak
+   sekcja „Modele:": `nowa` czeka na decyzję, `zatwierdzona` ma zastosowanie,
+   `pominieta` nie wraca po imporcie. */
+export type KartotekaTokenu = {
+  twId: number; symbol: string; nazwa: string | null;
+  stan: "nowa" | "zatwierdzona" | "pominieta"; zastosowanieId: number | null;
+};
+
+export type TokenSilnika = {
+  id: number; token: string; silnik: ModelUrzadzenia; dodal: string; dodanoAt: string;
+  nowych: number; zatwierdzonych: number; pominietych: number;
+  /** Kartoteki do decyzji — najwyżej 200, jak lista „Z opisów". */
+  nowe: KartotekaTokenu[];
 };
 
 export type NowaPropozycja = {

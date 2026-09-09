@@ -3,8 +3,8 @@ import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
   AliasSilnika, Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
-  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, Zabudowa,
-  Zastosowanie,
+  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, TokenSilnika,
+  Zabudowa, Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -20,6 +20,7 @@ export const kluczeWiedzy = {
   zOpisow: ["wiedza", "z-opisow"] as const,
   identyfikatory: (twId: number) => ["wiedza", "identyfikatory", twId] as const,
   silniki: ["wiedza", "silniki"] as const,
+  tokeny: ["wiedza", "tokeny"] as const,
 };
 
 /**
@@ -65,6 +66,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: ["wiedza", "identyfikatory"] });
   qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.silniki });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.tokeny });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -201,6 +203,49 @@ export function useUsunAliasSilnika() {
   return useMutation({
     mutationFn: (v: { id: number }) =>
       api<{ ok: true }>(`/api/obsluga/wiedza/silniki/aliasy/${v.id}/usun`, { method: "POST" }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+/* ── Tokeny silników w nazwach kartotek (0.239.0) ────────────────────────────
+   Lista zmienia się po imporcie i po decyzji biura, więc minuta świeżości
+   jak przy „Z opisów". Rozstrzygnięcie idzie HURTEM — jedna trasa na listę
+   przejrzaną naraz, bo osobne wywołanie na kartotekę zamieniłoby jedno
+   kliknięcie w trzydzieści. Zatwierdzone zastosowania są od razu szczeblem
+   doboru, stąd wspólne `poWiedzy`. */
+export function useTokenySilnikow() {
+  return useQuery({
+    queryKey: kluczeWiedzy.tokeny,
+    queryFn: () => api<{ tokeny: TokenSilnika[]; nowychRazem: number }>(`/api/obsluga/wiedza/tokeny`),
+    staleTime: 60_000,
+  });
+}
+
+export function useDodajToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { token: string; silnik: NowaZabudowa["silnik"] }) =>
+      api<TokenSilnika>(`/api/obsluga/wiedza/tokeny`, { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useRozstrzygnijToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zatwierdz: number[]; pomin: number[] }) =>
+      api<{ zatwierdzonych: number; juzBylo: number; pominietych: number }>(
+        `/api/obsluga/wiedza/tokeny/${v.id}/rozstrzygnij`,
+        { method: "POST", body: JSON.stringify({ zatwierdz: v.zatwierdz, pomin: v.pomin }) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useUsunToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ ok: true }>(`/api/obsluga/wiedza/tokeny/${v.id}/usun`, { method: "POST" }),
     onSettled: () => poWiedzy(qc),
   });
 }

@@ -3,6 +3,7 @@ import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { przebudujIdentyfikatory, przebudujModeleZOpisu } from "./identyfikatory.js";
 import { przebudujFts } from "./pelnotekst.js";
+import { przebudujTokenySilnikow } from "./tokeny-silnikow.js";
 
 /**
  * Konsekwencje importu read-modelu (etap E3) — NIE ticker.
@@ -30,6 +31,9 @@ export function poImporcie(database: DatabaseSync = db()): void {
   };
   krok("identyfikatory", () => przebudujIdentyfikatory(database));
   krok("modeleZOpisu", () => przebudujModeleZOpisu(database));
+  /* Tokeny silników w nazwach (0.239.0): nowa kartoteka z „GX160" w nazwie
+     ma wrócić do biura jako `nowa` po najbliższym imporcie. */
+  krok("tokenySilnikow", () => przebudujTokenySilnikow(database));
   krok("fts", () => przebudujFts(database) ?? "niedostepne");
   wynik.ms = Date.now() - start;
   logEvent("read_model_po_imporcie", "system", null, wynik, null, database);

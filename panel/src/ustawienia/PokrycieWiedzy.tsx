@@ -36,6 +36,14 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
       <Liczba etykieta="propozycji w kolejce" ile={dane.zastosowania.propozycji} />
     </div>
 
+    <div className="flex flex-wrap gap-8 border-t p-4">
+      {/* Tokeny silników (0.239.0): „do decyzji" to lista na ekranie Wiedza → Z opisów. */}
+      <Liczba etykieta="tokenów silników w nazwach" ile={dane.tokeny.tokenow} />
+      <Liczba etykieta="kartotek z tokenem do decyzji" ile={dane.tokeny.nowych}
+        ton={dane.tokeny.nowych > 0 ? "text-wertis-amber" : ""} />
+      <Liczba etykieta="zatwierdzonych z tokenu" ile={dane.tokeny.zatwierdzonych} ton="text-ranga-ok" />
+    </div>
+
     <p className="border-t p-4 text-sm text-slate-600">
       {dane.fts.dostepne
         ? <>Pełny tekst: indeks FTS5 ma <b>{dane.fts.wpisow}</b> kartotek.</>
