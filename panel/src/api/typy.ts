@@ -147,6 +147,18 @@ export type WpisOsi = {
     przypisanoPrzez: string | null;
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
+  /**
+   * Zdarzenie sprawy w postaci KLUCZY (0.243.0) — przy `status`, `sprawa`
+   * i `dobor`. `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
+   * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
+   * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
+   * zostają w bazie i w API. Panel nie ma prawa rozbierać `tresc` z powrotem:
+   * to jest zdanie dla człowieka, a nie format.
+   */
+  zdarzenie?:
+    | { rodzaj: "status" | "dobor"; po: string | null }
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
+    | { rodzaj: "sprawa"; dolaczona: boolean; tytul: string | null };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;

@@ -739,6 +739,42 @@ powiedział". Wcięcia idą z makiety: klient odsunięty od prawej, firma od lew
 nie pokazywała. Bez godziny nie widać, czy między pytaniem a odpowiedzią
 minęła minuta, czy trzy dni.
 
+### 10.3b. Zdarzenia sprawy zeszły z osi do paska (0.243.0)
+
+Zgłoszenie właściciela: przenieść wszystkie zmiany statusu do jednego rzędu
+pod oknem wiadomości, jak oś czasu, a kliknięcie ma prowadzić do tego miejsca
+w rozmowie.
+
+Do 0.242.0 zmiana statusu, sklejenie sprawy i każdy krok doboru stały między
+wypowiedziami jako kreski. Przy jednym zdarzeniu to jest znak, że sprawa
+przeszła dalej; przy dziewięciu — ściana szarego tekstu, przez którą trzeba
+się przewinąć do zdania klienta. Na zrzucie od właściciela dwa takie bloki
+zajmują więcej miejsca niż obie wypowiedzi razem.
+
+**Oś zostaje ROZMOWĄ, pasek zostaje PRZEBIEGIEM.** To dwa różne pytania: „co
+klient napisał" i „jak sprawa szła". Pierwsze czyta się po kolei, drugie ogarnia
+jednym spojrzeniem — dlatego jedno jest kolumną, a drugie rzędem.
+
+**Kliknięcie wraca na oś**, bo inaczej rozdzielenie gubiłoby to, co kreska
+niosła najlepiej: MIEJSCE, w którym stan się zmienił. Celem skoku jest pierwsza
+wypowiedź PO zdarzeniu; gdy zdarzenie jest ostatnie, celem zostaje ostatnia
+wypowiedź przed nim, bo przycisk bez skutku jest gorszy niż brak przycisku.
+Podświetlenie celu GAŚNIE po chwili — trwałe byłoby stanem, którego nikt nie
+zdejmuje.
+
+**Chip niesie stan DOCELOWY, nie przejście, a rodzaj niesie barwa.** Pierwsza
+wersja pokazywała pełne zdanie z osi i to była pomyłka zmierzona, nie
+przeczuta: dziewięć zdarzeń dało 1343 px nadmiaru w poziomie przy kolumnie na
+680 px, czyli widać było trzy z dziewięciu. Po skróceniu — 471 px i sześć
+z dziewięciu. Stan poprzedni stoi w chipie obok, po lewej; prefiks „dobór: "
+kosztował siedem znaków na każdym chipie i mówił to samo co kolor.
+
+**Serwis podaje zdarzenie ROZŁOŻONE NA KLUCZE** (`zdarzenie` obok `tresc`),
+a polszczyznę składa panel ze słownika w `skrzynka/statusy.ts`. Panel nie ma
+prawa rozbierać `tresc`: to jest zdanie dla człowieka, nie format danych.
+`tresc` zostaje nietknięta, bo niesie ją podpowiedź chipa razem z autorem
+i godziną — dane do sprawdzenia, nie do przeglądania.
+
 ### 10.3a. Zlecenie dla hali jako blok osi (0.226.0)
 
 Akapit wyżej wymienia „utworzenie zadania" wśród zdarzeń osi od pierwszego
