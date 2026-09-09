@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.238.0 — 8 września 2026
+
+**Słownik silników: co znaczy tekst z pola „Silnik".** Po 0.237.0 Copilot
+wpisuje z rozmowy „Lonci v200" do pola „Silnik", ale ten tekst dalej był
+tylko notatką: szczebel „przez silnik" idzie wyłącznie przez zatwierdzoną
+zabudowę (0.229.0), a rozbijanie tekstu na markę i nazwę to zgadywanie
+odrzucone przy sekcjach „Modele:". Decyzja właściciela: most ma być LUDZKI.
+
+- **Tabela `alias_silnika`** i sekcja „Słownik silników" na ekranie Wiedza →
+  Silniki. Biuro zapisuje, że „B&S 450E" = silnik Briggs & Stratton 450E.
+  Dopasowanie dokładne po zwinięciu pisowni (`zwin`, jak klucz modelu) —
+  bez furtki na literówki. Alias nie ma cyklu życia: pomyłkę się usuwa.
+- **Czipy na liście luk** scalają pisownie po zwinięciu; czip ze słownika
+  wypełnia formularz zabudowy modelem, czip bez słownika otwiera formularz
+  z zaznaczonym „zapamiętaj w słowniku" — człowiek, który wpisuje markę
+  i nazwę, mówi, co ten tekst znaczy.
+- **Zakładka Dobór, pod polem „Silnik":** „„Lonci v200" to silnik Loncin V200
+  (słownik). Nikt nie potwierdził, że stoi w NAC LS 46-450" i przycisk
+  **„Zaproponuj zabudowę"** — jedno kliknięcie, dowód `rozmowa`, źródło
+  `dobor`, pewność „prawdopodobne". Rozstrzyga człowiek w Wiedza → Silniki;
+  szczebel rusza po zatwierdzeniu. Para, która już czeka, dostaje zdanie
+  zamiast drugiego kliknięcia.
+- **Powód pominięcia szczebla** prowadzi o krok dalej: „nie ma w słowniku —
+  dopisz w Wiedza → Silniki" albo „wg słownika to X, nikt nie zatwierdził
+  zabudowy — zaproponuj ją pod polem Silnik". Kandydatów z samego aliasu
+  nie ma nigdy.
+- Fakt danych doboru dla szkicu Copilota niesie kanoniczną nazwę silnika
+  „(wg słownika: …)", więc model nie zgaduje, co znaczy „Lonci".
+- Dwie nowe trasy zapisu wiedzy (dodanie i usunięcie aliasu; licznik
+  „piętnaście"), `POST /wiedza/silniki` przyjmuje `conversationId` i nadaje
+  wtedy źródło `dobor`.
+
+Drugi słownik z zapowiedzi 0.230.0 — token w nazwie kartoteki → model
+silnika — czeka jako osobny przyrost.
+
+
 ## 0.237.0 — 8 września 2026
 
 **Copilot rozpoznaje dane doboru z rozmowy; agent wpisuje je jednym

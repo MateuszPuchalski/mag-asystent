@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
+import { zwin } from "../tekst.js";
 import { logEvent } from "./events.js";
 import {
   DOWODY_TECHNICZNE, NAZWA_DOWODU, RODZAJE_DOWODU, WiedzaConflict, czlowiekZBiura, dzien,
@@ -29,6 +30,15 @@ import type {
  * a markę i nazwę silnika wpisuje człowiek. Rozbijanie „B&S 450E" na markę
  * i nazwę to to samo zgadywanie, które właściciel odrzucił przy `FS350 FS400`
  * (§12).
+ *
+ * ── SŁOWNIK SILNIKÓW (0.238.0) ────────────────────────────────────────────
+ * Most między wolnym tekstem a modelem jest LUDZKI: biuro wpisuje alias
+ * „B&S 450E" = silnik Briggs & Stratton 450E, a `silnikZTekstu()` dopasowuje
+ * tekst DOKŁADNIE po zwinięciu — bez rozbijania i bez furtki na literówki.
+ * Alias prowadzi tylko do PROPOZYCJI zabudowy jednym kliknięciem w Doborze;
+ * szczebel dalej czyta wyłącznie zabudowę zatwierdzoną przez człowieka.
+ * Powód: po 0.237.0 Copilot wpisuje „Lonci v200" z rozmowy do pola, a bez
+ * słownika ten tekst dalej był tylko notatką.
  */
 
 export const ZRODLA_ZABUDOWY = ["reczne", "dobor", "copilot"] as const;
@@ -118,6 +128,102 @@ export function zabudowySilnika(kluczSilnika: string, database: DatabaseSync = d
     .all(kluczSilnika) as Array<Record<string, unknown>>).map(naZabudowe);
 }
 
+/**
+ * Para w stanie ŻYWYM (`propozycja` albo `zatwierdzone`) dla maszyny
+ * i silnika — do podpowiedzi pod polem „Silnik": czy klikać „Zaproponuj
+ * zabudowę", czy para już czeka. `null` = nie ma takiej pary.
+ */
+export function zabudowaPary(
+  kluczMaszyny: string, kluczSilnika: string, database: DatabaseSync = db(),
+): Zabudowa | null {
+  const w = database.prepare(`${SELECT} WHERE ma.klucz=? AND si.klucz=?
+      AND z.stan IN ('propozycja','zatwierdzone') ORDER BY z.stan='zatwierdzone' DESC, z.id DESC LIMIT 1`)
+    .get(kluczMaszyny, kluczSilnika) as Record<string, unknown> | undefined;
+  return w ? naZabudowe(w) : null;
+}
+
+/* ── Słownik silników ────────────────────────────────────────────────────── */
+
+export interface AliasSilnika {
+  id: number;
+  /** Tekst tak, jak wpisało go biuro — etykieta; dopasowanie idzie po `zwin`. */
+  tekst: string;
+  silnik: ModelUrzadzenia;
+  dodal: string;
+  dodanoAt: string;
+}
+
+const SELECT_ALIAS = `
+  SELECT a.id, a.tekst, a.dodal, a.dodano_at,
+         si.id s_id, si.rodzaj s_rodzaj, si.marka s_marka, si.nazwa s_nazwa,
+         si.wariant s_wariant, si.lata s_lata, si.klucz s_klucz
+    FROM alias_silnika a JOIN model_urzadzenia si ON si.id = a.silnik_id`;
+
+const naAlias = (w: Record<string, unknown>): AliasSilnika => ({
+  id: Number(w.id), tekst: String(w.tekst), dodal: String(w.dodal), dodanoAt: String(w.dodano_at),
+  silnik: naModel({ id: w.s_id, rodzaj: w.s_rodzaj, marka: w.s_marka, nazwa: w.s_nazwa,
+    wariant: w.s_wariant, lata: w.s_lata, klucz: w.s_klucz }),
+});
+
+/** Cały słownik do ekranu, alfabetycznie. */
+export function aliasySilnikow(database: DatabaseSync = db()): AliasSilnika[] {
+  return (database.prepare(`${SELECT_ALIAS} ORDER BY a.tekst COLLATE NOCASE, a.id`)
+    .all() as Array<Record<string, unknown>>).map(naAlias);
+}
+
+/**
+ * Jedyna droga od tekstu z pola „Silnik" do modelu. Dopasowanie DOKŁADNE po
+ * `zwin` — ta sama normalizacja, co klucz modelu i `towar_identyfikator`,
+ * nigdy własny `toLowerCase` i nigdy odległość edycyjna (blizna szarpaka).
+ */
+export function silnikZTekstu(tekst: string | null | undefined, database: DatabaseSync = db()): AliasSilnika | null {
+  const norm = zwin(String(tekst ?? ""));
+  if (!norm) return null;
+  const w = database.prepare(`${SELECT_ALIAS} WHERE a.tekst_norm=?`).get(norm) as Record<string, unknown> | undefined;
+  return w ? naAlias(w) : null;
+}
+
+/**
+ * Alias wpisuje CZŁOWIEK z biura. Model silnika powstaje tą samą drogą, co
+ * przy zabudowie (`upewnijModel`), więc słownik nigdy nie wskazuje maszyny.
+ * Dubel to `WiedzaConflict` (409): biuro ma zobaczyć, do czego ten tekst
+ * już prowadzi, zamiast po cichu nadpisać cudzy wpis.
+ */
+export function dodajAliasSilnika(
+  p: { tekst: string; silnik: DaneModelu }, autor: Autor, database: DatabaseSync = db(),
+): AliasSilnika {
+  const tekst = oczysc(p.tekst);
+  if (!tekst) throw new Error("Alias wymaga tekstu — tego, co agenci wpisują w pole „Silnik”");
+  if (tekst.length > 80) throw new Error("Alias to krótki tekst z pola, nie opis — najwyżej 80 znaków");
+  if (p.silnik?.rodzaj !== "silnik") throw new Error("Alias słownika wskazuje SILNIK, nie maszynę");
+  if (!("automat" in autor)) czlowiekZBiura(database, autor.userId);
+  const norm = zwin(tekst);
+  const kto = podpis(autor);
+  return wTransakcji(database, () => {
+    const jest = database.prepare(`${SELECT_ALIAS} WHERE a.tekst_norm=?`).get(norm) as Record<string, unknown> | undefined;
+    if (jest) {
+      const a = naAlias(jest);
+      throw new WiedzaConflict(`„${a.tekst}” już jest w słowniku i znaczy ${a.silnik.etykieta}`,
+        { aliasId: a.id, silnik: a.silnik });
+    }
+    const silnik = upewnijModel(p.silnik, autor, database);
+    const id = Number(database.prepare(`INSERT INTO alias_silnika(tekst,tekst_norm,silnik_id,dodal,dodal_user_id)
+      VALUES (?,?,?,?,?)`).run(tekst, norm, silnik.id, kto.name, kto.userId).lastInsertRowid);
+    logEvent("alias_silnika_dodany", kto.name, null, { aliasId: id, tekst, silnik: silnik.klucz }, kto.userId, database);
+    return naAlias(database.prepare(`${SELECT_ALIAS} WHERE a.id=?`).get(id) as Record<string, unknown>);
+  });
+}
+
+/** Pomyłkę w słowniku się usuwa — alias nie ma stanów, bo nie jest propozycją. */
+export function usunAliasSilnika(id: number, userId: number, database: DatabaseSync = db()): void {
+  const autor = czlowiekZBiura(database, userId);
+  const w = database.prepare(`${SELECT_ALIAS} WHERE a.id=?`).get(id) as Record<string, unknown> | undefined;
+  if (!w) throw new Error("Nie znaleziono aliasu");
+  const a = naAlias(w);
+  database.prepare("DELETE FROM alias_silnika WHERE id=?").run(id);
+  logEvent("alias_silnika_usuniety", autor, null, { aliasId: id, tekst: a.tekst, silnik: a.silnik.klucz }, userId, database);
+}
+
 /** Kolejka do rozstrzygnięcia — najstarsze pierwsze, jak przy zastosowaniach. */
 export function kolejkaZabudow(database: DatabaseSync = db()): { propozycje: Zabudowa[]; liczba: number } {
   const propozycje = (database.prepare(
@@ -141,8 +247,12 @@ export interface LukaSilnika {
   klucz: string;
   /** Ile doborów wskazało tę maszynę — po tym sortujemy. */
   pytan: number;
-  /** SUROWE łańcuchy z pola „Silnik", z licznikiem. Nierozbite i nieinterpretowane. */
-  wpisaneSilniki: Array<{ tekst: string; ile: number }>;
+  /**
+   * SUROWE łańcuchy z pola „Silnik", z licznikiem, scalone po `zwin` (pierwsza
+   * pisownia zostaje etykietą). Nierozbite — `silnik` niesie wyłącznie to, co
+   * biuro wpisało do słownika; `null` = tekst bez aliasu.
+   */
+  wpisaneSilniki: Array<{ tekst: string; ile: number; silnik: ModelUrzadzenia | null }>;
   zabudowy: Zabudowa[];
 }
 
@@ -180,9 +290,11 @@ export function lukiSilnikow(
     luka.pytan += ile;
     const tekst = oczysc(w.silnik);
     if (tekst) {
-      const juz = luka.wpisaneSilniki.find((s) => s.tekst === tekst);
+      /* Scalanie po `zwin`, nie po równości: „B&S 450E" i „b&s 450e" to jeden
+         czip, tak samo jak jeden alias w słowniku. */
+      const juz = luka.wpisaneSilniki.find((s) => zwin(s.tekst) === zwin(tekst));
       if (juz) juz.ile += ile;
-      else luka.wpisaneSilniki.push({ tekst, ile });
+      else luka.wpisaneSilniki.push({ tekst, ile, silnik: null });
     }
     mapa.set(klucz, luka);
   }
@@ -190,6 +302,7 @@ export function lukiSilnikow(
   const luki = [...mapa.values()];
   for (const l of luki) {
     l.zabudowy = zabudowyMaszyny(l.klucz, database);
+    for (const s of l.wpisaneSilniki) s.silnik = silnikZTekstu(s.tekst, database)?.silnik ?? null;
     l.wpisaneSilniki.sort((a, b) => b.ile - a.ile || a.tekst.localeCompare(b.tekst));
   }
   /* Bez zabudowy najpierw — to jest lista PRACY, nie raport. W drugiej

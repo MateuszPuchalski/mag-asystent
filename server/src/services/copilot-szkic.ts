@@ -12,6 +12,7 @@ import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { buildProductCard } from "./stock.js";
 import { pasowaniaTowaru } from "./pasowania.js";
+import { silnikZTekstu } from "./silniki.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
 import { bezPodpisu, zwin } from "../tekst.js";
@@ -252,6 +253,12 @@ function loginRozmowcy(conversationId: number): string | null {
   return l || null;
 }
 
+const zdanieSilnika = (tekst: string | null): string | null => {
+  if (!tekst) return null;
+  const alias = silnikZTekstu(tekst);
+  return alias ? `${tekst} (wg słownika: ${alias.silnik.etykieta})` : tekst;
+};
+
 const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
@@ -309,7 +316,9 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const d = dobor.dane;
   const pola = [
     ["marka", d.marka], ["model", d.model], ["wariant", d.wariant], ["rocznik", d.rocznik],
-    ["numer seryjny", d.nrSeryjny], ["silnik", d.silnik], ["numer OEM lub symbol", d.oem],
+    /* Silnik z aliasu słownika (0.238.0): model dostaje KANONICZNĄ nazwę
+       do zdania „mają Państwo silnik…", zamiast zgadywać, co znaczy „Lonci". */
+    ["numer seryjny", d.nrSeryjny], ["silnik", zdanieSilnika(d.silnik)], ["numer OEM lub symbol", d.oem],
     ["szukana część", d.nazwaCzesci],
   ].filter((p): p is [string, string] => Boolean(p[1]));
   const parametry = Object.entries(d.parametry).map(([k, v]) => `${k}: ${v}`);

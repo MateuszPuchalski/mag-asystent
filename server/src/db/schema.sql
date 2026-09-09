@@ -497,6 +497,30 @@ CREATE INDEX IF NOT EXISTS ix_zabudowa_maszyna ON zabudowa_silnika(maszyna_id, s
 CREATE INDEX IF NOT EXISTS ix_zabudowa_silnik  ON zabudowa_silnika(silnik_id, stan);
 CREATE INDEX IF NOT EXISTS ix_zabudowa_stan    ON zabudowa_silnika(stan, zaproponowano_at);
 
+-- ── Słownik silników: co znaczy tekst z pola „Silnik" (§12) ──────────────
+-- Agent (albo Copilot z rozmowy, 0.237.0) wpisuje w pole „Silnik" wolny
+-- tekst: „Lonci v200", „B&S 450E". Szczebel „przez silnik" go nie czyta
+-- (0.229.0) — rozbijanie na markę i nazwę byłoby zgadywaniem. Słownik to
+-- LUDZKI most: biuro wpisuje, że „B&S 450E" znaczy silnik Briggs & Stratton
+-- 450E, a system dopasowuje tekst DOKŁADNIE po zwinięciu (`zwin`, jak
+-- `towar_identyfikator.wartosc_norm`), bez furtki na literówki.
+--
+-- Bez cyklu życia (propozycja/zatwierdzone), inaczej niż zabudowa: alias jest
+-- zapisem ręki biura, nie propozycją automatu — pomyłkę się USUWA. Że
+-- `silnik_id` wskazuje `rodzaj='silnik'`, pilnuje serwis (SQLite nie ma
+-- podzapytań w CHECK — ta sama umowa, co przy zabudowie).
+CREATE TABLE IF NOT EXISTS alias_silnika (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  tekst         TEXT NOT NULL,
+  -- `zwin(tekst)`: „B&S 450E", „b&s-450e" i „B&S450E" to jeden alias.
+  tekst_norm    TEXT NOT NULL UNIQUE,
+  silnik_id     INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+  dodal         TEXT NOT NULL,
+  dodal_user_id INTEGER REFERENCES app_user(user_id),
+  dodano_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_alias_silnika_silnik ON alias_silnika(silnik_id);
+
 -- ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────
 -- Klienci pytają „czy ta uszczelka pasuje do tego gaźnika" (także membrany,
 -- zestawy naprawcze, łączniki kolektora). Do tej tabeli relacji część↔część

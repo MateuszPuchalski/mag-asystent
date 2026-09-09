@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie, NowaZabudowa,
-  Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, Zabudowa, Zastosowanie,
+  AliasSilnika, Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, Zabudowa,
+  Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -175,8 +176,32 @@ export function useSilniki() {
     queryFn: () => api<{
       propozycje: Zabudowa[]; doRozstrzygniecia: number;
       luki: LukaSilnika[]; lukiRazem: number; zatwierdzone: Zabudowa[];
+      /** Słownik silników (0.238.0) — ten sam odczyt, bo ekran pokazuje go obok luk. */
+      aliasy: AliasSilnika[];
     }>(`/api/obsluga/wiedza/silniki`),
     refetchInterval: 30_000,
+  });
+}
+
+/* ── Słownik silników (0.238.0) ──────────────────────────────────────────────
+   Alias to zapis ręki biura: dodanie i usunięcie, bez rozstrzygania. Każda
+   zmiana unieważnia też dobór (podpowiedź pod polem „Silnik") i kandydatów
+   (powód pominięcia szczebla nazywa słownik) — robi to wspólne `poWiedzy`. */
+export function useDodajAliasSilnika() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { tekst: string; silnik: NowaZabudowa["silnik"] }) =>
+      api<AliasSilnika>(`/api/obsluga/wiedza/silniki/aliasy`, { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useUsunAliasSilnika() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ ok: true }>(`/api/obsluga/wiedza/silniki/aliasy/${v.id}/usun`, { method: "POST" }),
+    onSettled: () => poWiedzy(qc),
   });
 }
 

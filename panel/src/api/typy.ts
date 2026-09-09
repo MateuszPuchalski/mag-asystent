@@ -424,7 +424,18 @@ export type WiedzaDoboru = {
   pasowanie: TrafieniePasowania | null;
   /** ZATWIERDZONE silniki wpisanej maszyny: czipy pod polem i wybór przy zatwierdzeniu. */
   silniki: Zabudowa[];
+  /**
+   * Tekst z pola „Silnik" rozpoznany SŁOWNIKIEM (0.238.0) i żywa para z wpisaną
+   * maszyną (`propozycja` albo `zatwierdzone`); `zabudowa: null` = można
+   * zaproponować. `null` = tekstu nie ma w słowniku albo pole jest puste.
+   */
+  silnikZPola: { alias: AliasSilnika; zabudowa: Zabudowa | null } | null;
   pomiary: PomiarRozmowy[];
+};
+
+/** Słownik silników: co znaczy tekst z pola „Silnik". Zapis ręki biura, bez cyklu życia. */
+export type AliasSilnika = {
+  id: number; tekst: string; silnik: ModelUrzadzenia; dodal: string; dodanoAt: string;
 };
 
 /* ── Zabudowa silnika (§11.2) ─────────────────────────────────────────────── */
@@ -447,8 +458,11 @@ export type LukaSilnika = {
   marka: string; model: string; wariant: string | null; klucz: string;
   /** Ile doborów wskazało tę maszynę — po tym idzie kolejność. */
   pytan: number;
-  /** SUROWY tekst z pola „Silnik" z licznikiem. Automat go NIE rozbija. */
-  wpisaneSilniki: Array<{ tekst: string; ile: number }>;
+  /**
+   * SUROWY tekst z pola „Silnik" z licznikiem, scalony po zwinięciu. Automat go
+   * NIE rozbija — `silnik` to wyłącznie wpis biura ze słownika, `null` bez aliasu.
+   */
+  wpisaneSilniki: Array<{ tekst: string; ile: number; silnik: ModelUrzadzenia | null }>;
   zabudowy: Zabudowa[];
 };
 
@@ -456,6 +470,8 @@ export type NowaZabudowa = {
   maszyna: { rodzaj: "maszyna"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
   silnik: { rodzaj: "silnik"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
   rodzajDowodu: RodzajDowodu; dowodTresc: string; dowodLink?: string | null;
+  /** Para spod pola „Silnik" w rozmowie — serwer nadaje wtedy źródło `dobor`. */
+  conversationId?: number | null;
 };
 
 /* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
