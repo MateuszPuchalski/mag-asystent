@@ -69,6 +69,22 @@ function bezKomentarzy(tekst: string): string {
     .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
 }
 
+/**
+ * Czy łańcuch sam gwarantuje wysokość progu przez `min-h-*`.
+ *
+ * `py-0.5` NIE JEST usterką, gdy obok stoi `min-h-6`: skala Tailwinda liczy
+ * w ćwiartkach `rem`, więc `min-h-6` to 1.5 rem, czyli dokładnie 24 px progu.
+ * Tak właśnie 0.255.0 uratowało przycisk „Synchronizuj" na Zwrotach — i to jest
+ * poprawka, a nie obejście, więc bramka ma ją rozpoznać, zamiast żądać
+ * zwolnienia w komentarzu. Wartość arbitralna (`min-h-[26px]`) tu nie wchodzi:
+ * ta idzie przez `kontrast: <powód>`, bo wymaga przeczytania przez człowieka.
+ */
+const MIN_H = /\bmin-h-(\d+)\b/;
+function progZMinH(okno: string): boolean {
+  const m = okno.match(MIN_H);
+  return m !== null && Number(m[1]) >= 6;
+}
+
 /** Zgłoszenia dla jednego wzorca, z pominięciem ikon i zwolnień. */
 function znajdz(wzorzec: RegExp, { pomijajIkony = false } = {}): string[] {
   const trafienia: string[] = [];
@@ -119,6 +135,16 @@ describe("Cele klikalne w kolejkach mają 24 px", () => {
        progu 24×24 z WCAG 2.2 AA (2.5.8). Zakres wąski celowo: bramka ma łapać
        TĘ regresję, a nie zgadywać wysokość dowolnego przycisku. Wysokość
        w pikselach mierzy się w przeglądarce, nie w jsdomie. */
+    /* ── OKNO Z TRZECH LINII NA SZEŚĆ ────────────────────────────────────────
+       Pierwsza wersja szukała `<button` w oknie TRZECH linii nad klasą i przez
+       to przepuściła kategorie Copilota: tam między znacznikiem a `className`
+       stoją `aria-pressed` i `onClick`, czyli `<button` jest cztery linie
+       wyżej. Pigułka miała 20 px i stała DWADZIEŚCIA LINII pod tą, którą
+       0.255.0 podniosło do 24 px — w tym samym pliku. Bramka pilnowała
+       sąsiada i nie widziała tego obok.
+
+       Sześć, bo tyle samo co okno zwolnień niżej: jeśli uzasadnienie wolno
+       postawić sześć linii nad klasą, to i znacznik wolno tam szukać. */
     const winne: string[] = [];
     for (const [plik, zrodlo] of Object.entries(ZRODLA)) {
       if (!/Kolejka|Zwroty|Reklamacje|Dyskusje/.test(plik)) continue;
@@ -126,7 +152,12 @@ describe("Cele klikalne w kolejkach mają 24 px", () => {
       const surowe = zrodlo.split("\n");
       linie.forEach((l, i) => {
         if (!/\bpy-0\.5\b/.test(l)) return;
-        if (!/<button/.test(linie.slice(Math.max(0, i - 2), i + 1).join(" "))) return;
+        /* Okno patrzy WSTECZ, nie w przód. Wersja sięgająca trzech linii dalej
+           zgłaszała plakietkę „STAN Z …" — zwykły `<span>`, nad którym przypadkiem
+           stoi przycisk odświeżania. Znacznik jest ZAWSZE przed swoimi atrybutami. */
+        const okno = linie.slice(Math.max(0, i - 6), i + 1).join(" ");
+        if (!/<button/.test(okno)) return;
+        if (progZMinH(okno)) return;
         if (surowe.slice(Math.max(0, i - 6), i + 1).some((x) => ZWOLNIENIE.test(x))) return;
         winne.push(`${plik}:${i + 1} → ${l.trim().slice(0, 72)}`);
       });

@@ -5,7 +5,7 @@ import {
 import type {
   Kategoria, Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { Plakietka, czas } from "../ui";
+import { FiltrSegmentowy, Plakietka, czas } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
 import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
@@ -213,12 +213,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
         chromu — cena, której próg dostępności jest wart. */}
     <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-1">
-      {KUBELKI.map((k) => <button key={k.klucz} type="button" onClick={() => setKubelek(k.klucz)}
-        aria-pressed={kubelek === k.klucz}
-        className={`rounded px-2 py-1 text-xs font-semibold ${kubelek === k.klucz
-          ? "bg-wertis-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-        {k.etykieta} <span className="font-normal">
-          {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
+      <FiltrSegmentowy<Kubelek> wybrany={kubelek} onWybierz={setKubelek}
+        pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
+          ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
@@ -253,12 +250,20 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         co bierze. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
         trafności ją uzasadni (etap G). */}
     {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-podpis">
-      {wgLiczby.map(([k, ile]) => <button key={k} type="button"
-        aria-pressed={kategoria === k}
-        onClick={() => setKategoria(kategoria === k ? null : k)}
-        className={`rounded px-1.5 py-0.5 font-semibold ${kategoria === k
-          ? "bg-violet-700 text-white" : "bg-violet-50 text-violet-800 hover:bg-violet-100"}`}>
-        {NAZWA_KATEGORII[k]} <span className="font-normal">{ile}</span></button>)}
+      {/* FIOLET JEST WYJĄTKIEM BARWY, NIE KSZTAŁTU. Kategoria to PRZYPUSZCZENIE
+          maszyny, a nie fakt — i to jedyny powód, dla którego te pigułki nie są
+          atramentowe jak kubełki nad nimi. Kształt, rozmiar i próg dotyku biorą
+          z `FiltrSegmentowy`: do 0.261.0 stały na `px-1.5 py-0.5`, czyli 20 px
+          przy progu 24×24, dwadzieścia linii pod pigułkami, które 0.255.0
+          podniosło właśnie z tego powodu.
+
+          Kliknięcie w wybraną kategorię ją ZDEJMUJE, bo to zawężenie listy,
+          a nie kubełek — stąd `kategoria === k ? null : k`. */}
+      <FiltrSegmentowy<Kategoria | null> wybrany={kategoria}
+        onWybierz={(k) => setKategoria(kategoria === k ? null : k)}
+        ton={["bg-violet-700 text-white",
+          "bg-violet-50 text-violet-800 hover:bg-violet-100"]}
+        pozycje={wgLiczby.map(([k, ile]) => ({ klucz: k, etykieta: NAZWA_KATEGORII[k], ile }))} />
       {kategoria !== null && <button type="button" className="ml-auto text-slate-500 underline"
         onClick={() => setKategoria(null)}>pokaż wszystkie</button>}
     </div>}

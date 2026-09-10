@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { useNoweZadanie, useZadania } from "../api/rozmowy";
-import { Blad, Karta, Przycisk, Pusto, czas } from "../ui";
+import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas } from "../ui";
 import { Kafel } from "../towar/Kafel";
 
 const Schemat = z.object({
@@ -88,10 +88,15 @@ export function Zadania() {
         <p className="text-sm text-slate-600">Pomiary i weryfikacje wracają bezpośrednio z kolektorów.</p>
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex rounded-lg border bg-white p-1">
-          {FILTRY.map(([v, l]) => <button key={v} onClick={() => setFiltr(v)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${
-              filtr === v ? "bg-wertis-ink text-white" : "text-slate-600"}`}>{l}</button>)}
+        {/* Filtr miał WŁASNĄ bieżnię — białą, w obwódce, z pigułką 14 px na
+            `px-4 py-2` — i jako jedyny z sześciu nie miał `aria-pressed`.
+            Kształt idzie pod wspólny, czyli schodzi na szczebel kontrolki.
+            Bieżnia zostaje szara jak wszędzie: niewybrana pigułka Z TŁEM mówi
+            „wybiera się jedną z tych", a bez tła mówiła „oto trzy rzeczy do
+            kliknięcia" — a to jest jeden wybór, nie trzy. */}
+        <div className="flex gap-1">
+          <FiltrSegmentowy<string> wybrany={filtr} onWybierz={setFiltr}
+            pozycje={FILTRY.map(([v, l]) => ({ klucz: v, etykieta: l }))} />
         </div>
         <Przycisk wariant="glowny" onClick={() => setModal(true)}>
           <Plus size={18} />ZADANIE DLA MAGAZYNU</Przycisk>

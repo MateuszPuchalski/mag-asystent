@@ -12,7 +12,7 @@ import type {
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
-import { Blad, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
@@ -240,22 +240,23 @@ export function Dyskusje() {
         {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
             więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
         <nav className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 p-2">
-          {KUBELKI.map((k, i) => {
-            const ile = data?.liczniki?.[k.id] ?? 0;
-            const aktywny = k.id === kubelek;
-            return <button key={k.id} onClick={() => przelacz(k.id)}
-              title={`${k.pytanie} (klawisz ${i + 1})`}
-              className={`rounded-md px-2 py-1 text-xs font-bold ${
-                aktywny ? "bg-wertis-amber text-wertis-ink" : "text-slate-600 hover:bg-slate-100"}`}>
-              {k.etykieta}<span className="ml-1 tabular-nums opacity-70">{ile}</span>
-            </button>;
-          })}
-          <button onClick={() => przelacz(null)} title="Wszystkie dyskusje (klawisz 4)"
-            className={`rounded-md px-2 py-1 text-xs font-bold ${
-              kubelek === null ? "bg-wertis-amber text-wertis-ink" : "text-slate-600 hover:bg-slate-100"}`}>
-            Wszystkie<span className="ml-1 tabular-nums opacity-70">
-              {data?.dyskusje?.length ?? 0}</span>
-          </button>
+          {/* ── JEDEN KSZTAŁT WYBORU (0.262.0) ─────────────────────────────────
+              Ten rząd stał w trzech ekranach przepisany znak w znak, w bursztynie,
+              bez tła pigułki niewybranej i bez `aria-pressed`. Kształt jest teraz
+              jeden dla całego panelu — powód stoi przy `FiltrSegmentowy`.
+
+              „Wszystkie" WCHODZI DO TABLICY, zamiast wisieć osobnym przyciskiem
+              pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
+              zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
+              kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
+          <FiltrSegmentowy<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
+            pozycje={[
+              ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
+                ile: data?.liczniki?.[k.id] ?? 0,
+                podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
+              { klucz: null, etykieta: "Wszystkie", ile: data?.dyskusje?.length ?? 0,
+                podpowiedz: `Wszystkie dyskusje (klawisz ${KUBELKI.length + 1})` },
+            ]} />
         </nav>
 
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
