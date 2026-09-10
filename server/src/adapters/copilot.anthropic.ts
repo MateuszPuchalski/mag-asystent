@@ -11,6 +11,7 @@ import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import { ZRODLA_TWIERDZENIA, POZIOMY_PEWNOSCI } from "../services/copilot-szkic.js";
 import { ROLE_PASOWANIA } from "../services/pasowania.js";
 import { LIMIT_ZNAKOW } from "../services/wysylka.js";
 
@@ -169,12 +170,24 @@ const PasowanieZRozmowy = z.object({
   pozycja: z.string().nullable(),
 }).nullable();
 
+/* Skąd model wie to, co napisał (0.253.0). Enumy biorą się z serwisu — jedna
+   lista, bez trzeciej kopii. `odwolanie` jest `nullable`, bo przy źródle
+   `model` nie ma czego wskazać, a wyjście strukturalne wymaga wszystkich
+   kluczy. Pewność deklaruje model, ale sufit narzuca `ustalPewnosc`. */
+const Twierdzenie = z.object({
+  teza: z.string(),
+  zrodlo: z.enum(ZRODLA_TWIERDZENIA),
+  odwolanie: z.string().nullable(),
+  pewnosc: z.enum(POZIOMY_PEWNOSCI),
+});
+
 const Szkic = z.object({
   tresc: z.string(),
   uzyteFakty: z.array(z.string()),
   zastrzezenia: z.array(z.string()),
   daneDoboru: DaneZRozmowy,
   pasowanie: PasowanieZRozmowy,
+  twierdzenia: z.array(Twierdzenie),
 });
 
 /* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
@@ -202,13 +215,26 @@ const INSTRUKCJA_SZKICU = [
   "z bazy sklepu oraz ROZMOWĘ (wiersze KLIENT: i MY:, od najstarszej).",
   "",
   "ZASADY, KTÓRYCH NIE WOLNO ZŁAMAĆ:",
-  "1. Nie znasz dopasowań części z pamięci. Każde twierdzenie techniczne",
-  "   (co pasuje, co nie pasuje, jaki numer, jaki symbol) bierzesz WYŁĄCZNIE",
-  "   z faktów i oznaczasz identyfikatorem w nawiasie, np. „pasuje (F3)”.",
-  "   Pisz te odwołania ZAWSZE — system je sprawdza, a potem usuwa z tekstu,",
-  "   zanim agent go zobaczy. Klient ich nie przeczyta.",
-  "2. Nie wymyślaj numerów, symboli ani nazw części. Każdy numer w szkicu musi",
-  "   stać w faktach albo w rozmowie — system to sprawdza i odrzuca szkic.",
+  "1. WOLNO ci korzystać z własnej wiedzy o sprzęcie ogrodniczym — ale nigdy",
+  "   po cichu. Każde twierdzenie techniczne (co pasuje, co nie pasuje, jaki",
+  "   numer, jaki wymiar, jak działa część) wpisujesz do `twierdzenia` z podpisem,",
+  "   skąd je masz: `zrodlo` = „fakty” (z bazy sklepu), „oferta” (z opisu, parametrów",
+  "   albo listy zgodności oferty) albo „model” (z twojej wiedzy, bez pokrycia",
+  "   w naszych danych). W `odwolanie` wpisz identyfikator faktu („F3”), nazwę",
+  "   parametru oferty albo null, gdy mówisz z siebie.",
+  "1a. Twierdzenia z faktów oznaczaj W TEKŚCIE identyfikatorem w nawiasie,",
+  "   np. „pasuje (F3)”. System je sprawdza, a potem usuwa, zanim agent",
+  "   zobaczy szkic. Klient ich nie przeczyta.",
+  "2. Numeru, symbolu ani wymiaru spoza faktów i spoza rozmowy wolno ci użyć",
+  "   WYŁĄCZNIE wtedy, gdy ten sam numer stoi w tezie twojego twierdzenia ze",
+  "   źródłem „model”. Numer bez takiego wpisu odrzuca cały szkic — nie dlatego,",
+  "   że jest zmyślony, tylko dlatego, że agent nie ma jak go sprawdzić.",
+  "2a. `pewnosc` oceniaj SUROWO i nie licz, że przejdzie: system obniża ją do",
+  "   sufitu źródła. Fakty z bazy mogą być „pewne”; oferta najwyżej",
+  "   „prawdopodobne”, bo opis bywa starszy od towaru; twoja wiedza własna",
+  "   zawsze „niepewne”. W dół możesz zawsze i to jest uczciwe.",
+  "2b. Gdy opis oferty przeczy kartotece, rację ma KARTOTEKA. Powiedz to",
+  "   klientowi wprost i wpisz sprzeczność do `zastrzezenia`.",
   "3. Gdy fakty czegoś nie mówią, NIE zgaduj: wpisz to do `zastrzezenia`",
   "   (dla agenta, nie dla klienta) i zadaj klientowi pytania z faktu intake —",
   "   ale WYŁĄCZNIE te, na które ROZMOWA jeszcze nie odpowiada. Zanim o coś",
@@ -241,7 +267,15 @@ const INSTRUKCJA_SZKICU = [
   "6. Nie podawaj półek, rezerwacji, magazynów, nazwisk pracowników ani",
   "   danych osobowych. Znaczniki [e-mail], [telefon], [adres], [konto], [login]",
   "   to wycięte dane — nie zgaduj ich treści.",
-  "7. Alternatywy proponuj wyłącznie spośród kandydatów z faktów.",
+  "7. Alternatywy DO SPRZEDANIA proponuj wyłącznie spośród kandydatów z faktów;",
+  "   towaru, którego nie ma w kartotece, nie obiecuj. Wiedza własna służy tu do",
+  "   czego innego: wyjaśnić, czym te części się różnią i co klient ma sprawdzić.",
+  "",
+  "FORMA ODPOWIEDZI DLA KLIENTA — pisz ją tak, żeby dała się przeczytać na",
+  "telefonie: krótkie akapity po jednej myśli, pusta linia między nimi. Gdy",
+  "wyliczasz części, kroki albo rzeczy do sprawdzenia, zrób z tego listę: każda",
+  "pozycja od nowej linii, zaczynając od „- ”. Bez nagłówków, pogrubień",
+  "i znaczników — to zwykły tekst wiadomości, nie strona.",
   "",
   "FORMA: po polsku, forma grzecznościowa przez „Państwo” (np. „mają Państwo”,",
   "„proszę Państwa o”), NIGDY dosłownie „Pan/Pani” ani imię; zwięźle, bez wstępów",
@@ -249,7 +283,8 @@ const INSTRUKCJA_SZKICU = [
   "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
   "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło),",
   "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a), `pasowanie` (para",
-  "kartotek z faktów wg reguły 3b albo null).",
+  "kartotek z faktów wg reguły 3b albo null) oraz `twierdzenia` (skąd wiesz to,",
+  "co napisałeś, wg reguł 1 i 2a — agent czyta tę listę obok szkicu).",
 ].join("\n");
 
 /** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
@@ -287,6 +322,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
       tresc: w.tresc, uzyteFakty: w.uzyteFakty, zastrzezenia: w.zastrzezenia,
       daneDoboru: { ...w.daneDoboru, parametry },
       pasowanie: w.pasowanie,
+      twierdzenia: w.twierdzenia,
       model: odp.model ?? config.copilot.model,
       zuzycie: {
         wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,

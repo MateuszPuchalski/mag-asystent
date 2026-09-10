@@ -355,7 +355,21 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   -- każdy z nich bywa inny.
   pasowanie_propozycja TEXT,
   pasowanie_ocena      TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone')),
-  pasowanie_ocena_at   TEXT
+  pasowanie_ocena_at   TEXT,
+  -- ── SKĄD MODEL TO WIE (0.253.0) ────────────────────────────────────────
+  -- JSON: lista `{teza, zrodlo, odwolanie, pewnosc}`. Do 0.252.0 model nie
+  -- miał prawa użyć własnej wiedzy — każdy numer spoza faktów odrzucał cały
+  -- szkic. Właściciel zdjął ten zakaz i postawił w jego miejsce inny warunek:
+  -- „pełna swoboda, ale niech przy tym załącza źródła".
+  --
+  -- Ta kolumna JEST tą ceną. Wiedza własna modelu wolno wchodzi do szkicu
+  -- dokładnie wtedy, gdy stoi tutaj wpisana i podpisana źródłem; zdanie bez
+  -- wpisu dalej wywraca szkic. Pewność przyznaje SERWER, nie model — patrz
+  -- `ustalPewnosc` w `services/copilot-szkic.ts`.
+  --
+  -- Przy szkicu, nie w osobnej tabeli: lista rodzi się z tego samego wywołania
+  -- i ginie z następnym, tak samo jak zastrzeżenia.
+  twierdzenia          TEXT NOT NULL DEFAULT '[]'
 );
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
@@ -1972,6 +1986,30 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- zdjęcie miała — bo snapshot był po prostu starszy niż ta kolumna.
   primary_image_url TEXT,
   synced_at TEXT NOT NULL,
+  -- ── TREŚĆ OFERTY DLA COPILOTA (0.253.0) ────────────────────────────────
+  -- Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje,
+  -- wymiary z oferty, dane techniczne". To jest wiedza, którą sprzedawca już
+  -- zapisał, a Copilot odpowiadał bez niej — znał wyłącznie tytuł.
+  --
+  -- OSOBNA KOŃCÓWKA, więc osobna świeżość. Tytuł, cenę i zdjęcie oddaje
+  -- `GET /sale/offers` po dwadzieścia ofert na żądanie; opis, parametry
+  -- i listę zgodności wyłącznie `GET /sale/product-offers/{id}`, czyli jedno
+  -- żądanie NA OFERTĘ. Jedna kolumna `synced_at` na oba rytmy zmuszałaby do
+  -- wyboru: albo dociągamy drogi opis co dobę razem z ceną, albo trzymamy
+  -- nieświeżą cenę, żeby oszczędzić opis. `tresc_synced_at` znosi ten wybór.
+  --
+  -- NULL znaczy „nie pytaliśmy jeszcze o treść tej oferty" i to jedyny stan,
+  -- w którym sięgamy do sieci poza upływem świeżości.
+  opis TEXT,
+  -- `parameters[].{name, values}` — parametry techniczne WPROST, bez
+  -- wyciągania ich z prozy. Wymiar stojący tu jest wart więcej niż ten sam
+  -- wymiar wypatrzony w zdaniu opisu, bo sprzedawca wpisał go w pole.
+  parametry_json TEXT,
+  -- `compatibilityList.items[].text` — „pasuje do wersji" w formie LISTY,
+  -- nie zdania. Obie odmiany listy (`MANUAL`, `PRODUCT_BASED`) oddają `text`;
+  -- pozycja typu `ID` bez tekstu nie niesie nic dla człowieka i wypada.
+  pasuje_do_json TEXT,
+  tresc_synced_at TEXT,
   UNIQUE (channel_account_id, external_id)
 );
 

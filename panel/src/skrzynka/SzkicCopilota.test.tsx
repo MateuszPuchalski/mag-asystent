@@ -14,7 +14,7 @@ import type { SzkicCopilota } from "../api/typy";
 
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
-  zastrzezenia: [], uzyteFakty: ["F3"], messageId: 41, model: "claude-opus-5",
+  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], messageId: 41, model: "claude-opus-5",
   at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
   daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
 });

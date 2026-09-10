@@ -34,6 +34,55 @@ historii nie przepisujemy.
 ---
 
 
+## 0.253.0 — 10 września 2026
+
+**Copilot dostaje treść oferty i legitymuje każde zdanie.** Dwie decyzje
+właściciela, które trzymają się razem.
+
+Pierwsza: „często oferta ma w sobie opis, do jakich wersji pasuje, wymiary
+z oferty, dane techniczne". Copilot znał do teraz wyłącznie TYTUŁ oferty.
+Wiedza, którą sprzedawca sam zapisał, leżała nietknięta kilka lat.
+
+Od tego wydania do faktów wchodzą trzy nowe rzeczy: opis oferty, parametry
+techniczne wprost z formularza i lista zgodności, czyli „pasuje do wersji"
+w formie pozycji, nie zdania. Wszystko z `GET /sale/product-offers/{id}` —
+jedynej końcówki, która opis oddaje. Kosztuje ona jedno żądanie NA OFERTĘ,
+podczas gdy tytuł i cena chodzą po dwadzieścia na raz, więc treści nie
+synchronizujemy hurtem: dociąga się leniwie, dla oferty otwartej rozmowy,
+przy kliknięciu „Ułóż odpowiedź", i trzyma tydzień.
+
+Druga decyzja: „Copilot powinien też korzystać z wiedzy ogólnej modelu AI".
+Do 0.252.0 reguła brzmiała odwrotnie — „model nie zna dopasowań z pamięci" —
+a każdy numer spoza faktów odrzucał cały szkic. Szkic był przez to suchy:
+model widział pytanie, znał odpowiedź i nie miał prawa jej napisać.
+
+Zakaz zamienił się w RACHUNEK, zgodnie z warunkiem właściciela: „pełna
+swoboda, ale niech przy tym załącza źródła, sztywno oceniany poziom
+pewności". Każde twierdzenie techniczne stoi teraz na liście z podpisem,
+skąd pochodzi — z bazy, z opisu oferty albo z wiedzy modelu. Numer, którego
+nie pokrywa żadne zadeklarowane twierdzenie, dalej wywraca szkic; powodem
+nie jest już „wymyślony", tylko „agent nie ma jak go sprawdzić".
+
+Pewność przyznaje SERWER, nie model. Sufit zależy od źródła: baza może być
+„pewna", opis oferty najwyżej „prawdopodobny", bo bywa starszy od towaru,
+a wiedza modelu zawsze „niepewna". W dół model może zawsze. Bez sufitu ocena
+byłaby jego zdaniem o sobie samym.
+
+Agent czyta ten rachunek w nowym oknie „Skąd to wiem" pod szkicem — osobno od
+tekstu, bo klient ma dostać gładką odpowiedź, a nie prozę z przypisami. Okno
+otwiera się samo tylko wtedy, gdy pada choć jedno zdanie spoza bazy; szkic
+w całości oparty o kartotekę nie zabiera agentowi ani jednego ruchu.
+
+Sam szkic jest też inaczej formatowany: krótkie akapity po jednej myśli
+i lista tam, gdzie model wylicza części albo kroki do sprawdzenia.
+
+Wdrożenie bez pracy ręcznej. Nowe kolumny zakładają się przy starcie; stare
+szkice mają pustą listę twierdzeń i to jest o nich prawda — powstały, zanim
+model musiał się legitymować.
+
+---
+
+
 ## 0.252.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

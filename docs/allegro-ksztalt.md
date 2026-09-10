@@ -905,6 +905,32 @@ kontrakt czyta się ze specyfikacji w repo, nie z kopii cudzych danych.
 Lista pól idzie po NAZWIE, nie po ścieżce — tak, żeby pole, które Allegro
 doda w przyszłości pod tą samą nazwą, odpadło samo.
 
+## `GET /sale/product-offers/{offerId}` — jedna oferta z całą treścią
+
+Jedyna końcówka, która oddaje OPIS oferty. Schemat
+`SaleProductOfferResponseV1` niesie trzy rzeczy, po które tu chodzimy.
+
+`description.sections[].items[]` to opis pokrojony na kawałki. Pozycja ma
+`type`: `TEXT` niesie `content` z HTML-em, `IMAGE` niesie `url`. Sekcja ma
+sufit 40 000 bajtów, a sekcji bywa kilka.
+
+`parameters[].{name, values}` to parametry techniczne wprost z formularza
+sprzedawcy — wymiar stojący tu jest wart więcej niż ten sam wymiar wypatrzony
+w prozie opisu.
+
+`compatibilityList.items[].text` to lista „pasuje do" w formie pozycji, nie
+zdania, na przykład `CITROËN C6 (TD_) 2005/09-2011/12 2.7 HDi 204KM/150kW`.
+Lista ma dwie odmiany, `MANUAL` i `PRODUCT_BASED`, i OBIE oddają `text`.
+Pozycja typu `ID` niesie sam identyfikator, więc dla człowieka nie znaczy nic.
+
+**Ta końcówka kosztuje jedno żądanie NA OFERTĘ.** `GET /sale/offers` obok
+przyjmuje dwadzieścia numerów naraz, ale opisu nie oddaje.
+`/sale/product-offers/{offerId}/parts` nie jest tańszym zamiennikiem: schemat
+dopuszcza w `include` wyłącznie `stock` i `price`. Dlatego po treść chodzimy
+leniwie i tylko dla oferty, o którą pyta klient w otwartej rozmowie.
+
+Uprawnienie: `allegro:api:sale:offers:read`, to samo co przy liście ofert.
+
 ## `GET /sale/offers` — oferty sprzedawcy po numerach
 
 Końcówka oddaje `offers`, `count` i `totalCount` (schemat

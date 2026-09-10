@@ -1,6 +1,7 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
 import { Przycisk, czas } from "../ui";
+import { ProcesCopilota } from "./ProcesCopilota";
 import type { StanCopilota, SzkicCopilota } from "../api/typy";
 
 /**
@@ -113,6 +114,10 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
       </ul>}
       <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800">{s.tresc}</pre>
     </div>
-    <p className="mt-1 text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma źródło w faktach</p>
+    {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
+        odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
+        nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
+    <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
+    <p className="mt-1 text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
   </section>;
 }
