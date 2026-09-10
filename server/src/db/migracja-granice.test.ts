@@ -129,3 +129,45 @@ test("encje w zastanych wierszach schodzą, a drugie wejście ich nie rusza", ()
   assert.equal((d.prepare("SELECT body FROM message").get() as { body: string }).body,
     "Stihl & Husqvarna");
 });
+
+test("encje schodzą też ze SPRAW POSPRZEDAŻOWYCH i ze zwrotów (0.250.0)", () => {
+  /* Dwa powody, dla których tamte wiersze zostały z encjami do dziś.
+     Po pierwsze: synchronizator spraw nie dekodował NICZEGO. Po drugie —
+     i to dotyczy także skrzynki — tablica znała wyłącznie polskie znaki, więc
+     `&aacute;` przetrwało nawet tam, gdzie dekoder był wołany. */
+  const d = baza();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s-1')")
+    .run().lastInsertRowid);
+  const sprawa = Number(d.prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,
+      typ,temat,opis,powod_opis,otwarto_at,synced_at)
+    VALUES (?,'i-encje','DISPUTE','Z&aacute;silka nebyla doručena',
+      'Objedn&aacute;vka &ccaron;. 12','&Scaron;t&iacute;tek chyb&iacute;',
+      '2026-09-10T10:00:00Z','2026-09-10T10:00:00Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO reklamacja_wiadomosc(reklamacja_id,external_id,autor_rola,tresc,utworzono_at)
+    VALUES (?,'w-1','BUYER','K&ouml;sz&ouml;n&ouml;m, v&aacute;rok','2026-09-10T10:01:00Z')`)
+    .run(sprawa);
+  d.prepare("INSERT INTO reklamacja_zalacznik(reklamacja_id,nazwa,url) VALUES (?,?,?)")
+    .run(sprawa, "&scaron;t&iacute;tek.jpg", "https://api.allegro.pl/x");
+  const zwrot = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,
+      status_allegro,created_at,synced_at)
+    VALUES (?,'z-1','CREATED',?,?)`)
+    .run(konto, po(ZWROTY_OD), po(ZWROTY_OD)).lastInsertRowid);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,klucz,nazwa,ilosc,
+      cena_grosze,waluta,powod_komentarz)
+    VALUES (?,'k-1','Nóż',1,12900,'PLN','Nesed&iacute; rozm&ecaron;r')`).run(zwrot);
+
+  migrate(d);
+
+  const s = d.prepare("SELECT temat, opis, powod_opis FROM reklamacja_klienta").get() as
+    Record<string, string>;
+  assert.equal(s.temat, "Zásilka nebyla doručena");
+  assert.equal(s.opis, "Objednávka č. 12");
+  assert.equal(s.powod_opis, "Štítek chybí");
+  assert.equal((d.prepare("SELECT tresc FROM reklamacja_wiadomosc").get() as { tresc: string })
+    .tresc, "Köszönöm, várok");
+  assert.equal((d.prepare("SELECT nazwa FROM reklamacja_zalacznik").get() as { nazwa: string })
+    .nazwa, "štítek.jpg");
+  assert.equal((d.prepare("SELECT powod_komentarz FROM zwrot_klienta_pozycja").get() as
+    { powod_komentarz: string }).powod_komentarz, "Nesedí rozměr");
+});
