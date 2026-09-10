@@ -14,7 +14,7 @@ import type { SzkicCopilota } from "../api/typy";
 
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
-  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], messageId: 41, model: "claude-opus-5",
+  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], lukiKartoteki: [], messageId: 41, model: "claude-opus-5",
   at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
   daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
 });
@@ -133,5 +133,19 @@ describe("Szkic Copilota w edytorze", () => {
   it("błąd układania stoi obok przycisku zdaniem", () => {
     edytor(copilot({ blad: "Model użył numeru XYZ-9999, którego nie ma w faktach — szkic odrzucony." }));
     expect(screen.getByText(/XYZ-9999/)).toBeInTheDocument();
+  });
+});
+
+describe("okazja do uzupełnienia kartoteki (0.254.0)", () => {
+  it("oznaczenia z oferty spoza kartoteki widzi AGENT, jako okazję", () => {
+    edytor(copilot({ szkic: szkic({ lukiKartoteki: ["FS250", "BT120C"] }) }));
+    const pasek = screen.getByTestId("luki-kartoteki");
+    expect(pasek.textContent).toContain("FS250, BT120C");
+    expect(pasek.textContent).toContain("okazja");
+  });
+
+  it("bez luk nie ma paska — plakietka należy się wyjątkowi, nie normie", () => {
+    edytor(copilot({ szkic: szkic({ lukiKartoteki: [] }) }));
+    expect(screen.queryByTestId("luki-kartoteki")).toBeNull();
   });
 });

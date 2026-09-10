@@ -118,6 +118,17 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
     <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
+    {/* OKAZJA, NIE BŁĄD (0.254.0). Oferta wymienia oznaczenia, których nasza
+        kartoteka nie zna — właściciel nazwał to „organiczną okazją do
+        uzupełnienia danych", bo obie listy stoją tu obok siebie pierwszy
+        i jedyny raz. Pasek jest dla AGENTA: do faktów ta lista nie wchodzi,
+        więc klient nie ma jak jej zobaczyć. */}
+    {s.lukiKartoteki.length > 0 &&
+      <p className="mt-2 rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900"
+        data-testid="luki-kartoteki">
+        W ofercie są oznaczenia, których nie ma w kartotece: <b>{s.lukiKartoteki.join(", ")}</b>
+        {" "}— okazja, żeby je dopisać.
+      </p>}
     <p className="mt-1 text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
   </section>;
 }

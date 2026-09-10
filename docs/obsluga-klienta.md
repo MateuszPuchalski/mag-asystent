@@ -304,6 +304,7 @@ ale nie ma prawa kupić ich drugi raz.
 | 0.250.0 | encje HTML TRZECI RAZ — czeskie, słowackie i węgierskie litery wracały dosłownie, a sprawy posprzedażowe nie przechodziły przez dekoder w ogóle | tablicę encji GENERUJE się parserem przeglądarki, nie pisze z pamięci pod jeden alfabet; nowy synchronizator dostaje dekoder razem z mapowaniem, nie później |
 | 0.253.0 | zakaz wiedzy własnej dawał szkic suchy, a opis oferty z wymiarami i listą zgodności leżał nietknięty | swobodę modelu kupuje się JAWNOŚCIĄ, nie zaufaniem: źródło przy każdym twierdzeniu, pewność przyznaje serwer wg źródła, a agent widzi rachunek przed wysłaniem |
 | 0.253.1 | nowe pole w wyjściu modelu przy starym suficie `max_tokens` ucinało JSON, a błąd odczytu SDK spadał do gałęzi „coś u nas" | rosnąc o pole w wyjściu, rośnij o sufit; `APIError` dziedziczy po `AnthropicError`, więc kolejność `instanceof` jest logiką, nie stylem |
+| 0.254.0 | szkic mówił klientowi, że zapisujemy jego model, czego nam brak w kartotece i ile sztuk leży na półce | odpowiedź jest o MASZYNIE KLIENTA, nie o naszej pracy; stan wiedzy i stan magazynu idą do agenta, nie do klienta |
 | 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy, które zostają) |
 
 ## Polityka danych skrzynki (0.143.0)

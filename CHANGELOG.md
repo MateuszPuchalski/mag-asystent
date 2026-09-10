@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.254.0 — 10 września 2026
+
+**Copilot przestaje opowiadać klientowi o naszej kuchni i zaczyna wskazywać
+braki w kartotece.** Oba wnioski wyszły z jednego prawdziwego szkicu —
+o cewkę zapłonową do kosy Stihl FS56.
+
+Szkic był rzeczowy i mówił klientowi trzy rzeczy, które go nie dotyczą: że
+zapisujemy jego model, że nie mamy czegoś potwierdzonego w kartotece i ile
+sztuk leży dziś na półce. Każde z tych zdań jest zdaniem o NAS. Klient pyta,
+czy część pasuje, a nie o sprawozdanie z naszej pracy — a „dla informacji:
+dostępne 8 szt." przy części, która może nie pasować, brzmi jak namawianie
+do zakupu.
+
+Wniosek zostaje, uzasadnienie się skraca. Zamiast „nie mamy tego
+potwierdzonego w kartotece" idzie zdanie o tym, co sprawę rozstrzygnie.
+Stan naszej wiedzy opisują zastrzeżenia, które czyta wyłącznie agent.
+Dostępność podajemy wtedy, gdy klient o nią zapyta.
+
+Druga rzecz jest zyskiem, nie poprawką. Ta oferta wymieniała jedenaście
+modeli zgodnych, a kartoteka znała dwa — i był to jedyny moment, w którym
+obie listy stanęły obok siebie. Właściciel nazwał to organiczną okazją do
+uzupełnienia danych, więc panel pokazuje ją teraz paskiem pod szkicem:
+oznaczenia, które zna oferta, a nie zna ich kartoteka.
+
+Liczy je KOD, nie model. Lista braków wyliczana przez model raz by była,
+a raz nie — i przestałaby być listą braków. Parametr czytamy jako jedną
+wartość, bo „4134 400 1306" rozbite na trzy liczby przestaje być numerem
+katalogowym; z pozycji listy zgodności wyjmujemy oznaczenia z cyfrą i literą,
+żeby zakres lat nie udawał braku. Do faktów lista nie wchodzi, więc model
+nie ma jak jej klientowi napisać.
+
+Wdrożenie bez pracy ręcznej.
+
+---
+
+
 ## 0.253.1 — 10 września 2026
 
 **Copilot przestaje się wywracać przed wysyłką.** Właściciel kliknął „Ułóż

@@ -97,6 +97,54 @@ const zatwierdzPasowanie = () => P.rozstrzygnijPasowanie(P.zaproponujPasowanie({
 
 /* ── Co idzie do dostawcy ──────────────────────────────────────────────── */
 
+test("luki w kartotece liczy KOD i to na przykładzie właściciela", () => {
+  /* Cewka do FS56: oferta wymienia jedenaście modeli, kartoteka zna dwa.
+     Dziewięć pozostałych nikt nigdy nie wpisał, bo nikt ich nie zobaczył
+     obok siebie — właśnie to ma zaznaczyć ta lista. */
+  const luki = S.lukiZOferty({
+    parametry: [{ nazwa: "Kod producenta", wartosci: ["4134 400 1306"] }],
+    zgodnosc: ["STIHL FS120", "STIHL FS200", "STIHL FS250", "STIHL FR450", "STIHL BT120C"],
+  }, "Kartoteka oferty: W02-0401 — CEWKA ZAPŁONOWA DO STIHL FS120 FS200; EAN brak");
+
+  assert.deepEqual(luki, ["4134 400 1306", "FS250", "FR450", "BT120C"],
+    "kartoteka zna FS120 i FS200, reszta jest okazją do uzupełnienia");
+});
+
+test("numer katalogowy z pola parametru zostaje W CAŁOŚCI, nie w kawałkach", () => {
+  /* „4134 400 1306" rozbite na trzy liczby przestaje być numerem, po którym
+     szuka człowiek. Pole to jedna wartość — czytamy je jako jedną. */
+  assert.deepEqual(S.lukiZOferty(
+    { parametry: [{ nazwa: "Numer katalogowy", wartosci: ["4134 400 1306"] }], zgodnosc: [] }, "nic"),
+  ["4134 400 1306"]);
+});
+
+test("rok i sama liczba nie są oznaczeniem części", () => {
+  /* Bez tego każda oferta motoryzacyjna zgłaszałaby zakres lat jako brak. */
+  const luki = S.lukiZOferty(
+    { parametry: [], zgodnosc: ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"] }, "nic");
+  assert.equal(luki.includes("2005/09-2011/12"), false);
+  assert.deepEqual(luki, ["204KM/150kW"], "oznaczenie z literami zostaje, sam rok wypada");
+});
+
+test("oznaczenie zapisane inaczej niż w kartotece nie jest brakiem", () => {
+  /* „STIHL FS 120" i „FS120" to ten sam model. Porównanie po `zwin`, tak jak
+     przy danych doboru — inaczej spacja sprzedawcy robiłaby fałszywy brak. */
+  assert.deepEqual(S.lukiZOferty(
+    { parametry: [], zgodnosc: ["STIHL FS 120"] }, "CEWKA DO FS120"), []);
+});
+
+test("luki NIE wchodzą do faktów, bo to zdanie o nas, nie o maszynie klienta", () => {
+  db().prepare(`UPDATE offer_snapshot SET pasuje_do_json=?,
+      tresc_synced_at='2026-09-10T10:00:00Z' WHERE external_id='of-1'`)
+    .run(JSON.stringify(["HONDA GX160", "HONDA GX999"]));
+
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.ok(k.luki.includes("GX999"), "brak nie został policzony");
+  const f = String(k.tekstFaktow);
+  assert.equal(/brak w kartotece|luk|uzupełni/i.test(f), false,
+    "lista braków poszła do modelu — ma ją widzieć wyłącznie agent");
+});
+
 test("treść oferty wchodzi do faktów i mówi o sobie, że jest słowem SPRZEDAWCY", () => {
   /* Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje,
      wymiary z oferty, dane techniczne". Fakt musi jednak nieść też to, że

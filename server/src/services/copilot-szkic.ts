@@ -81,6 +81,12 @@ export interface KontekstSzkicu {
    * go napisał.
    */
   kartoteki: Map<string, Kartoteka>;
+  /**
+   * Oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka (0.254.0).
+   * Dla agenta, nie dla klienta — do faktów NIE wchodzą, więc model nie ma
+   * jak ich zdradzić. To lista okazji do uzupełnienia bazy, nie lista błędów.
+   */
+  luki: string[];
 }
 
 /**
@@ -239,6 +245,11 @@ export interface SzkicCopilota {
    * Pusta lista przy szkicach sprzed tego wydania — i to o nich prawda.
    */
   twierdzenia: Twierdzenie[];
+  /**
+   * Oznaczenia znane OFERCIE, a nieznane kartotece (0.254.0) — okazja do
+   * uzupełnienia bazy, którą widzi WYŁĄCZNIE agent. Do faktów nie wchodzą.
+   */
+  lukiKartoteki: string[];
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -493,11 +504,11 @@ const LIMIT_ZGODNOSCI = 30;
 function faktyZTresciOferty(
   database: DatabaseSync, konto: number, ofertaId: string,
   dodaj: (rodzaj: RodzajFaktu, zdanie: string) => void,
-): void {
+): { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] } {
   const w = database.prepare(`SELECT opis, parametry_json, pasuje_do_json FROM offer_snapshot
       WHERE channel_account_id=? AND external_id=?`).get(konto, ofertaId) as
     { opis: string | null; parametry_json: string | null; pasuje_do_json: string | null } | undefined;
-  if (!w) return;
+  if (!w) return { parametry: [], zgodnosc: [] };
 
   const parametry = czytajListe<{ nazwa: string; wartosci: string[] }>(w.parametry_json);
   if (parametry.length) {
@@ -520,6 +531,63 @@ function faktyZTresciOferty(
     dodaj("oferta_opis", `Opis oferty — SŁOWA SPRZEDAWCY, nie kartoteka; gdy przeczy `
       + `kartotece, rację ma kartoteka: ${przyciety}${ogon}`);
   }
+  /* Surowe listy wracają do wołającego po jedno: policzenie luk w kartotece
+     (0.254.0). Robi się to na KOŃCU kontekstu, bo korpus porównania to
+     wszystko, co już wiemy — także wiedza i kandydaci, którzy dochodzą niżej. */
+  return { parametry, zgodnosc };
+}
+
+/**
+ * LUKI W KARTOTECE (0.254.0) — oznaczenia, które oferta zna, a kartoteka nie.
+ *
+ * Właściciel, czytając szkic o cewce do FS56: „jeśli jakieś numery są w ofercie,
+ * a nie ma w kartotece, zaznacz — to jest organiczna okazja do uzupełnienia
+ * danych". Ta cewka miała w liście zgodności jedenaście modeli, a kartoteka
+ * znała dwa. Dziewięć pozostałych nikt nigdy nie wpisał, bo nikt ich nie
+ * zobaczył obok siebie.
+ *
+ * DETERMINISTYCZNIE, NIE MODELEM. To jest porównanie dwóch list, więc robi je
+ * kod. Model umiałby to zauważyć, ale zauważałby RÓŻNIE przy każdym kliknięciu,
+ * a lista braków, która raz jest a raz jej nie ma, przestaje być listą braków.
+ *
+ * DLA AGENTA, NIE DLA KLIENTA — i dlatego NIE WCHODZI DO FAKTÓW. Czego nam
+ * brakuje w danych, to jest zdanie o nas (reguła 6a instrukcji); model, który
+ * tego nie dostaje, nie ma jak tego napisać klientowi.
+ *
+ * PARAMETR I POZYCJA ZGODNOŚCI CZYTA SIĘ INACZEJ, i to nie jest niekonsekwencja.
+ * Parametr to POLE, które sprzedawca wypełnił jedną wartością — bierzemy ją
+ * w całości, bo „4134 400 1306" jest numerem katalogowym i rozbicie go na trzy
+ * liczby gubi dokładnie tę daną, po której szuka człowiek. Pozycja listy
+ * zgodności to ZDANIE („STIHL FS250", „CITROËN C6 (TD_) 2005/09-2011/12"),
+ * więc wyjmujemy z niego tokeny z cyfrą ORAZ literą: bez tego warunku zakres
+ * lat wchodziłby na listę braków przy każdej ofercie motoryzacyjnej.
+ *
+ * Porównanie po `zwin`, tak jak przy danych doboru: „STIHL FS 120" i „FS120"
+ * to ten sam model, a spacja sprzedawcy nie jest brakiem w naszej bazie.
+ */
+export function lukiZOferty(
+  zrodla: { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] },
+  kartotekaTekst: string,
+): string[] {
+  const korpus = zwin(kartotekaTekst).toUpperCase();
+  const braki = new Map<string, string>();
+  const dodaj = (oznaczenie: string) => {
+    const klucz = zwin(oznaczenie).toUpperCase();
+    if (!klucz || korpus.includes(klucz)) return;
+    if (!braki.has(klucz)) braki.set(klucz, oznaczenie.trim());
+  };
+
+  /* Parametr: cała wartość pola, bez rozbierania. */
+  for (const p of zrodla.parametry) {
+    for (const w of p.wartosci) if (/\d/.test(w)) dodaj(w);
+  }
+  /* Pozycja zgodności: tokeny z cyfrą I literą, wyjęte ze zdania. */
+  for (const z of zrodla.zgodnosc) {
+    for (const m of z.match(NUMER) ?? []) {
+      if (/\d/.test(m) && /[A-Za-z]/.test(m)) dodaj(m);
+    }
+  }
+  return [...braki.values()];
 }
 
 /** Lista z kolumny JSON. Uszkodzony wpis to pusta lista, nie wywrócony szkic. */
@@ -568,6 +636,9 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const kartoteki = new Map<string, Kartoteka>();
   const zapamietaj = (k: Kartoteka | null | undefined) => { if (k) kartoteki.set(zwin(k.symbol), k); };
 
+  /* Treść oferty przechwycona do policzenia luk w kartotece — patrz niżej. */
+  let trescOferty: { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] } =
+    { parametry: [], zgodnosc: [] };
   /* Oferta i jej kartoteka — tą samą regułą, którą czyta je dobór. */
   const oferta = ofertaRozmowy(db(), conversationId);
   let kartotekaTwId: number | null = null;
@@ -576,7 +647,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
         WHERE channel_account_id=? AND external_id=?`).get(oferta.konto, oferta.ofertaId) as
       { nazwa: string; sku: string | null } | undefined;
     if (snap) dodaj("oferta", `Oferta, o którą pyta klient: „${snap.nazwa}"`);
-    faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
+    trescOferty = faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
     const k = kartotekaOferty(db(), oferta.konto, oferta.ofertaId, snap?.sku ?? undefined);
     if (k.twId !== null) {
       const karta = buildProductCard(subiekt, k.twId);
@@ -659,9 +730,22 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       + ` (${i.typ}): ${i.pytania.join("; ")}; to, co już podał, potwierdź jednym zdaniem`);
   }
 
+  /* LUKI W KARTOTECE (0.254.0) na samym końcu, bo korpus porównania to
+     wszystko, co JUŻ WIEMY: kartoteka, wiedza, pasowania, kandydaci, dane
+     doboru. Fakty z oferty są z niego wyłączone — inaczej lista zgodności
+     pokrywałaby samą siebie i braków nie byłoby nigdy.
+
+     Lista NIE wchodzi do `tekstFaktow`: to zdanie o naszych danych, nie
+     o maszynie klienta (reguła 6a). Model, który go nie dostaje, nie ma jak
+     go klientowi napisać. */
+  const znane = fakty
+    .filter((f) => !f.rodzaj.startsWith("oferta"))
+    .map((f) => f.zdanie).join(" ");
+  const luki = lukiZOferty(trescOferty, znane);
+
   const tekstFaktow = fakty.map((f) => `${f.id}: ${f.zdanie}`).join("\n") as FaktyBezpieczne;
   return {
-    fakty, tekstFaktow,
+    fakty, tekstFaktow, luki,
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
     doborWersja: dobor.wersja,
@@ -746,15 +830,15 @@ export async function ulozSzkic(
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
         dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
         pasowanie_propozycja=excluded.pasowanie_propozycja,
-        twierdzenia=excluded.twierdzenia,
+        twierdzenia=excluded.twierdzenia, luki_kartoteki=excluded.luki_kartoteki,
         /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
         ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
         pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
@@ -762,7 +846,7 @@ export async function ulozSzkic(
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
         para.propozycja ? JSON.stringify(para.propozycja) : null,
-        JSON.stringify(twierdzenia));
+        JSON.stringify(twierdzenia), JSON.stringify(k.luki));
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -908,7 +992,8 @@ export function odrzucPasowanie(
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
-      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena, twierdzenia
+      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena,
+      twierdzenia, luki_kartoteki
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -925,6 +1010,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
       ? null : JSON.parse(String(w.pasowanie_propozycja)) as PropozycjaPasowaniaCopilota,
     pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
     twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
+    lukiKartoteki: JSON.parse(String(w.luki_kartoteki ?? "[]")) as string[],
   };
 }
 
