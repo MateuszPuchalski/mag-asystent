@@ -115,6 +115,12 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
           return <Link key={z.do} to={z.do}
+            /* Kolizja, którą naprawia ustalenie 02, dotyczy pasm `bg-amber-50`
+               na BIAŁYCH listach: tam zaznaczenie myli się z ostrzeżeniem, bo
+               ostrzeżenia też są bursztynowe i też mają biel dookoła.
+               Na ciemnym pasku żadnego ostrzeżenia nie ma i nie będzie.
+
+               bursztyn: zakładka na ciemnym tle jest marką */
             className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
             {z.ikona}{z.etykieta}

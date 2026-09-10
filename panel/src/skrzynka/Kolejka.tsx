@@ -302,8 +302,31 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         const glosne = r.priorytet === "pilny" || wyjatkowy;
         return <button key={r.id} onClick={() => onWybierz(r.id)}
           aria-current={wybranaId === r.id}
-          className={`block w-full border-b px-4 py-3 text-left hover:bg-slate-50 ${
-            wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
+          /* ── ZAZNACZENIE PRZESTAJE BYĆ BURSZTYNOWE (0.265.0) ───────────────
+             `bg-amber-50` znaczyło w panelu naraz „wybrany wiersz" i „coś tu
+             jest nie tak": tym samym `#FFFBEB` malowały się pasmo braku oferty,
+             konflikt przejęcia, ostrzeżenie Copilota, notatka wewnętrzna
+             i formularz pomiaru. Dwa z tych znaczeń są PRZECIWSTAWNE.
+
+             Zaznaczenie schodzi na szarość, bo jest stanem STRUKTURALNYM, nie
+             znaczeniowym — a wolnej rodziny barw już nie ma: czerwień to błąd,
+             zieleń powodzenie, fiolet przypuszczenie Copilota, błękit zdarzenia
+             doboru. Marka zostaje na belce 3 px, gdzie nie udaje pasma.
+
+             STOPIEŃ SZAROŚCI ZMIERZONY, nie dobrany okiem. `slate-100` różni się
+             od `slate-50` (czyli od najechania kursorem) o ΔE 2,2, a próg
+             zauważalności dla dużych płaszczyzn to ok. 2,3 — wiersz wybrany
+             wyglądałby jak wiersz pod kursorem. `slate-200` daje ΔE 7,3 wobec
+             najechania i 14,4 wobec pasma ostrzeżenia, przy kontraście tekstu
+             8,4:1. Dalej, na `slate-300`, wiersz zaczyna wyglądać na wyłączony.
+
+             `border-l-[3px]` stoi PRZY KAŻDYM wierszu, nie tylko przy wybranym:
+             dokładana dopiero przy zaznaczeniu przesuwała treść o trzy piksele
+             w prawo, więc kliknięcie w wiersz szarpało tekstem. */
+          className={`block w-full border-b border-l-[3px] px-4 py-3 text-left ${
+            wybranaId === r.id
+              ? "border-l-wertis-amber bg-slate-200"
+              : "border-l-transparent hover:bg-slate-50"}`}>
           {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0, doprecyzowane w 0.251.0) ────
               0.193.0 oddało pierwszy plan TREŚCI: login Allegro nie mówi nic,
               a triaż robi się po pytaniu. Ta decyzja zostaje. Zepsuł ją górny

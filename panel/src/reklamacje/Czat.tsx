@@ -16,7 +16,15 @@ import { NaglowekSekcji, czas } from "../ui";
 
 const ROLE: Record<string, { etykieta: string; klasa: string; nasza: boolean }> = {
   BUYER: { etykieta: "Klient", klasa: "bg-white border-slate-200", nasza: false },
-  SELLER: { etykieta: "My", klasa: "bg-amber-50 border-amber-200", nasza: true },
+  /* ── NASZA STRONA CICHNIE, NIE KRZYCZY (0.265.0) ─────────────────────────────
+     Do 0.264.0 nasza wypowiedź była tu BURSZTYNOWA, a klienta — biała. Na osi
+     skrzynki jest dokładnie odwrotnie: bursztyn to podpis KLIENTA, a naszą
+     odpowiedź 0.247.0 świadomie wygasiło („podkreślaj przez wygaszanie" —
+     pytanie zostaje jedyną kartą z cieniem). Ta sama barwa znaczyła więc
+     w dwóch oknach dwie przeciwne strony rozmowy.
+
+     Wyrównujemy do skrzynki, bo tam decyzja ma uzasadnienie i pomiar. */
+  SELLER: { etykieta: "My", klasa: "bg-os-firma border-slate-200", nasza: true },
   ADMIN: { etykieta: "Doradca Allegro", klasa: "bg-sky-50 border-sky-200", nasza: false },
   SYSTEM: { etykieta: "Allegro (automat)", klasa: "bg-slate-50 border-slate-200", nasza: false },
   FULFILLMENT: { etykieta: "Magazyn Allegro", klasa: "bg-slate-50 border-slate-200", nasza: false },
