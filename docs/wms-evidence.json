@@ -1,5 +1,5 @@
 {
-  "version": "0.271.0",
+  "version": "0.271.1",
   "date": "2026-09-11",
   "branch": "codex/robust-wms",
   "serverTests": {
@@ -25,7 +25,7 @@
     "kt_imports_check.py"
   ],
   "capacity": {
-    "at": "2026-09-10T22:14:12.245Z",
+    "at": "2026-09-10T22:52:58.694Z",
     "node": "v24.15.0",
     "sqlite": "3.51.3",
     "platform": "win32",
@@ -34,22 +34,22 @@
     "orders": 1500,
     "concurrency": 16,
     "requests": 16650,
-    "elapsedSeconds": 77.15,
-    "ordersPerHour": 69993,
+    "elapsedSeconds": 76.97,
+    "ordersPerHour": 70154,
     "httpMs": {
-      "p50": 70.73,
-      "p95": 90.4,
-      "p99": 101.61,
-      "max": 127.08
+      "p50": 70.55,
+      "p95": 90.5,
+      "p99": 104.72,
+      "max": 131.81
     },
-    "eventLoopMaxMs": 106,
+    "eventLoopMaxMs": 110,
     "integrity": {
       "ok": true,
       "balances": [],
       "reservations": []
     },
     "limitations": "Localhost, synthetic 3-line orders, warm database, one API process. Excludes ERP, carrier, physical scanners and production hardware.",
-    "testedVersion": "0.270.0"
+    "testedVersion": "0.271.1"
   },
   "retainedHistory": {
     "orders": 136500,
@@ -57,27 +57,34 @@
     "results": [
       {
         "url": "/api/wms/analytics?days=90",
-        "milliseconds": 628.29
+        "milliseconds": 1336.86
       },
       {
         "url": "/api/wms/analytics?days=30",
-        "milliseconds": 244.7
+        "milliseconds": 435.18
       },
       {
         "url": "/api/wms/orders?status=allocated",
-        "milliseconds": 3.38
+        "milliseconds": 1.22
       },
       {
         "url": "/api/wms/inventory?q=SKU-4",
-        "milliseconds": 9.65
+        "milliseconds": 9.23
       },
       {
         "url": "/api/wms/reconciliation",
-        "milliseconds": 147.53
+        "milliseconds": 141.74
+      },
+      {
+        "url": "/api/wms/integrity",
+        "milliseconds": 1009.03
       }
     ],
-    "limitations": "Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths.",
-    "testedVersion": "0.270.0"
+    "movementRows": 1229000,
+    "auditRows": 1506501,
+    "withLedger": true,
+    "limitations": "Historical rows are synthetic reporting fixtures; balanced receive/reserve/pick entries and audit rows are included when withLedger=true. The preceding 1500-order run exercises real write paths.",
+    "testedVersion": "0.271.1"
   },
   "browser": {
     "passed": true,
@@ -93,6 +100,8 @@
       "lost response and reload",
       "expired session preserves pending scan",
       "pack",
+      "packing stays locked until refreshed state arrives",
+      "failed refresh removes stale scan form and recovers committed packing",
       "ship",
       "receive",
       "stock movement history",
@@ -162,6 +171,13 @@
       "Android tests and debug APK": "success",
       "Sfera worker": "success"
     },
-    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099"
+    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099",
+    "regression": {
+      "run": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34538316280",
+      "fixedVersion": "0.271.1",
+      "verification": "Controlled delayed read fails before fix and passes after fix; failed-read recovery also passes",
+      "failure": "Windows packing form accepted input before post-save refresh completed",
+      "commit": "6b117d2030947ebbfd68d8f40c50e543b7cfce26"
+    }
   }
 }

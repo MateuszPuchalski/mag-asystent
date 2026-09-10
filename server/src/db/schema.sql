@@ -103,7 +103,11 @@ CREATE TABLE IF NOT EXISTS wms_movement (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_wms_movement_stock ON wms_movement(tw_id, bin, id);
-CREATE INDEX IF NOT EXISTS ix_wms_movement_time ON wms_movement(created_at, kind);
+-- Pokrycie agregacji ogranicza odczyty tabeli przy ponad milionie ruchów w raporcie 90 dni.
+CREATE INDEX IF NOT EXISTS ix_wms_movement_time_cover ON wms_movement(created_at, kind, delta);
+DROP INDEX IF EXISTS ix_wms_movement_time;
+CREATE INDEX IF NOT EXISTS ix_wms_movement_pick_report ON wms_movement(created_at, user_id, order_id, delta) WHERE kind='pick';
+CREATE INDEX IF NOT EXISTS ix_wms_movement_count_report ON wms_movement(created_at, tw_id, delta) WHERE kind='count';
 CREATE TRIGGER IF NOT EXISTS wms_movement_no_update BEFORE UPDATE ON wms_movement
 BEGIN SELECT RAISE(ABORT, 'WMS movement is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS wms_movement_no_delete BEFORE DELETE ON wms_movement

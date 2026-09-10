@@ -170,6 +170,10 @@ WMS w przeglądarce wymaga połączenia z API.
 Trwały bufor Androida nadal obsługuje wcześniejsze operacje kolektora.
 Nowe operacje WMS nie zostały dodane do natywnych ekranów Androida.
 
+Po zapisie formularz pozostaje zablokowany, aż pojawi się aktualny stan.
+Następny skan wykonaj po powrocie kursora do pola skanowania.
+Jeżeli odczyt zawiedzie, **Ponów odczyt** przywraca formularz bez ponawiania zatwierdzonego ruchu.
+
 ### Kompletacja kilku zamówień wózkiem
 
 **Zbiórka wózkiem → Przygotuj wózek** pokazuje zarezerwowane zamówienia według priorytetu i terminu.
@@ -295,14 +299,16 @@ Telefon przełącza wybrane zamówienie w skupiony widok skanowania.
 Przy 390 × 844 px potwierdzenie pobrania mieści się bez przewijania.
 Przycisk **Pokaż kolejkę** przywraca filtry i pozostałe zamówienia.
 
-Pomiar z 10 września 2026: 5000 SKU, 1500 zamówień po trzy pozycje i 16 równoległych klientów.
-16650 żądań ukończyło pracę w 78,26 s. Opóźnienie p95 wyniosło 93,18 ms.
+Pomiar wersji 0.271.1: 5000 SKU, 1500 zamówień po trzy pozycje i 16 równoległych klientów.
+16650 żądań ukończyło pracę w 76,97 s. Opóźnienie p95 wyniosło 90,5 ms.
 Stan i rezerwacje zgodziły się z dziennikiem po wszystkich wysyłkach.
 Sprzęt: Windows, Ryzen 7 7730U, Node 24.15.0, SQLite 3.51.3.
 Pomiar dotyczy localhost oraz syntetycznych danych. Nie obejmuje usług przewoźników, Subiekta i fizycznych urządzeń.
 
 Opcja `npm run test:wms:capacity -- --history` dodaje 90 dni danych raportowych.
-Próba 136500 zamówień i 409500 pozycji dała 613 ms dla raportu 90-dniowego oraz 241 ms dla 30-dniowego.
+Pełniejsza próba: `npm run test:wms:capacity -- --history --ledger-history`.
+Obejmuje 136500 zamówień, 409500 pozycji, 1229000 ruchów i 1506501 zdarzeń audytu.
+Raport 90-dniowy zajął 1337 ms, a 30-dniowy 435 ms. Kontrola dziennika zakończyła się poprawnie w 1009 ms.
 Historyczne rekordy są osobnymi danymi testowymi; właściwe operacje zapisu sprawdza wcześniejszy przebieg 1500 zamówień.
 
 Pełny odbiór produkcyjny wymaga próby z rzeczywistym eksportem sklepu, drukarką, skanerami i uzgodnionymi dokumentami ERP.

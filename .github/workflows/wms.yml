@@ -2,7 +2,7 @@ name: WMS
 on:
   pull_request:
   push:
-    branches: [main, 'codex/robust-wms']
+    branches: [main]
 jobs:
   workflow:
     name: WMS (${{ matrix.os }})

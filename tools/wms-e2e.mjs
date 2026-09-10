@@ -208,16 +208,65 @@ try {
   await page
     .getByRole("button", { name: "ROZPOCZNIJ KONTROLĘ PACZKI", exact: true })
     .click();
+  await expect(page.locator("#wms-step")).toContainText(
+    "Sprawdzono 0 z 3 szt.",
+  );
+  let signalPackRefresh, releasePackRefresh;
+  const packRefreshEntered = new Promise((resolve) => {
+    signalPackRefresh = resolve;
+  });
+  const packRefreshGate = new Promise((resolve) => {
+    releasePackRefresh = resolve;
+  });
+  // Wolny odczyt po zapisie odsłania okno, w którym stary formularz gubił następny skan.
+  await page.route(
+    "**/api/wms/orders?**",
+    async (route) => {
+      signalPackRefresh();
+      await packRefreshGate;
+      await route.continue();
+    },
+    { times: 1 },
+  );
   for (const [sku, qty] of [
     ["WMS-0001", "2"],
     ["WMS-0002", "1"],
   ]) {
+    if (sku === "WMS-0002")
+      await page.route(
+        "**/api/wms/orders?**",
+        (route) =>
+          route.fulfill({
+            status: 503,
+            json: { error: "Kontrolowana awaria odczytu" },
+          }),
+        { times: 1 },
+      );
     await page.locator('#wms-step [name="barcode"]').fill(sku);
     await page.locator('#wms-step [name="quantity"]').fill(qty);
     await page
       .getByRole("button", { name: "DODAJ DO PACZKI", exact: true })
       .click();
-    await expect(page.locator("#wms-message")).toContainText("Zapisano");
+    if (sku === "WMS-0001") {
+      await packRefreshEntered;
+      try {
+        await expect(page.locator('#wms-step [name="barcode"]')).toBeDisabled();
+      } finally {
+        releasePackRefresh();
+      }
+      await expect(page.locator("#wms-step")).toContainText(
+        "Sprawdzono 2 z 3 szt.",
+      );
+      await expect(page.locator('#wms-step [name="barcode"]')).toBeFocused();
+    } else {
+      await expect(
+        page.getByRole("button", { name: "PONÓW ODCZYT", exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('#wms-step [name="barcode"]')).toHaveCount(0);
+      await page
+        .getByRole("button", { name: "PONÓW ODCZYT", exact: true })
+        .click();
+    }
   }
   await page.locator('#wms-step [name="carrier"]').fill("TEST");
   await page.locator('#wms-step [name="tracking"]').fill("TRACK-E2E-0001");
@@ -256,16 +305,11 @@ try {
   await page
     .locator('#wms-stock-preview [name="reference"]')
     .fill("PZ-E2E-BULK");
-  await page
-    .locator("#wms-stock-file")
-    .setInputFiles({
-      name: "dostawa.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        "WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3",
-        "utf8",
-      ),
-    });
+  await page.locator("#wms-stock-file").setInputFiles({
+    name: "dostawa.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3", "utf8"),
+  });
   await expect(page.locator("#wms-stock-data")).toHaveValue(
     "WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3",
   );
@@ -493,6 +537,8 @@ try {
           "lost response and reload",
           "expired session preserves pending scan",
           "pack",
+          "packing stays locked until refreshed state arrives",
+          "failed refresh removes stale scan form and recovers committed packing",
           "ship",
           "receive",
           "stock movement history",

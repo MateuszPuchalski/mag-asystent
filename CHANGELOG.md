@@ -34,6 +34,16 @@ historii nie przepisujemy.
 ---
 
 
+## 0.271.1 — 11 września 2026
+
+Formularz kompletacji i pakowania pozostaje zablokowany do zakończenia odczytu po zapisie.
+Szybki kolejny skan nie trafia już do starego formularza, który odświeżenie mogłoby zastąpić.
+Błąd odczytu usuwa nieaktualny formularz i pozwala ponowić sam odczyt, bez powtarzania ruchu.
+Test przeglądarki wymusza opóźniony odczyt oraz jego awarię po zatwierdzeniu pakowania.
+
+Indeksy raportów uwzględniają historię ponad miliona ruchów.
+Próba 90 dni obejmuje teraz także zbilansowany dziennik przyjęć, rezerwacji i pobrań oraz audyt.
+
 ## 0.271.0 — 11 września 2026
 
 Otwarcie zapasu i przyjęcia z arkusza w WMS obsługują do 5000 par SKU i lokalizacji.

@@ -13,6 +13,8 @@ window.Wms = (() => {
     low = false,
     generation = 0;
   let selectedWave = null;
+  let lockDepth = 0,
+    nextFocus = null;
   const root = () => document.getElementById("widokWms");
   const el = (id) => document.getElementById(id);
   const html = (value) =>
@@ -84,21 +86,36 @@ window.Wms = (() => {
     }
   }
   async function read(path) {
-    return (await api(path)).json();
+    return (await api(path, { signal: AbortSignal.timeout(20000) })).json();
   }
   function lock(value) {
-    busy = value;
+    // Zapis i zagnieżdżone odczyty trzymają wspólną blokadę aż nowy formularz będzie gotowy.
+    const wasBusy = busy;
+    lockDepth = Math.max(0, lockDepth + (value ? 1 : -1));
+    busy = lockDepth > 0;
+    root().inert = busy;
+    root().setAttribute("aria-busy", String(busy));
+    if (wasBusy === busy) return;
     root()
       .querySelectorAll("button,input,select,textarea")
       .forEach((e) => {
-        if (value) {
+        if (busy) {
           e.dataset.wasDisabled = String(e.disabled);
           e.disabled = true;
-        } else {
+        } else if (e.dataset.wasDisabled !== undefined) {
           e.disabled = e.dataset.wasDisabled === "true";
           delete e.dataset.wasDisabled;
         }
       });
+    if (!busy && nextFocus) {
+      if (nextFocus.isConnected) nextFocus.focus({ preventScroll: true });
+      nextFocus = null;
+    }
+  }
+  function focusWhenReady(input) {
+    if (!input) return;
+    if (busy) nextFocus = input;
+    else input.focus({ preventScroll: true });
   }
   async function mutate(path, body, retry = null) {
     if (busy) return null;
@@ -116,6 +133,7 @@ window.Wms = (() => {
     // Zapis przed wysłaniem: odświeżenie strony nie może zgubić klucza ruchu.
     sessionStorage.setItem(storageKey, JSON.stringify(job));
     lock(true);
+    message("Zapisuję operację…");
     try {
       const response = await fetch(job.path, {
         method: "POST",
@@ -157,6 +175,7 @@ window.Wms = (() => {
         : "";
   }
   async function open() {
+    lock(true);
     try {
       user = (await read("/api/auth/me")).user;
       if (!office() && ["analytics", "import", "integration"].includes(view))
@@ -165,6 +184,8 @@ window.Wms = (() => {
       await refresh();
     } catch (e) {
       root().textContent = e.message;
+    } finally {
+      lock(false);
     }
   }
   function shell() {
@@ -188,6 +209,7 @@ window.Wms = (() => {
   }
   async function refresh() {
     const turn = ++generation;
+    lock(true);
     try {
       if (view === "orders") await orders(turn);
       if (view === "waves") await waves(turn);
@@ -197,8 +219,23 @@ window.Wms = (() => {
       if (view === "import") importForm();
       if (view === "integration") await integration(turn);
     } catch (e) {
-      if (turn === generation) message(e.message, true);
+      readFailure(e, turn);
+    } finally {
+      lock(false);
     }
+  }
+  function readFailure(error, turn) {
+    if (turn !== generation) return;
+    current = null;
+    root()._waveTask = null;
+    el("wms-content").innerHTML =
+      '<section class="wms-surface"><p>Nie udało się odczytać aktualnego stanu. Ponów odczyt przed kolejnym skanem.</p><button data-do-wms="refresh">PONÓW ODCZYT</button></section>';
+    message(
+      error.name === "TimeoutError"
+        ? "Odczyt trwał zbyt długo. Sprawdź połączenie i ponów."
+        : error.message,
+      true,
+    );
   }
   function pager(total) {
     return `<div class="wms-footer"><span class="wms-muted">${total ? `${offset + 1}–${Math.min(offset + 50, total)} z ${number(total)}` : "0 pozycji"}</span><div class="wms-actions"><button data-do-wms="prev" ${offset === 0 ? "disabled" : ""} aria-label="Poprzednia strona">←</button><button data-do-wms="next" ${offset + 50 >= total ? "disabled" : ""} aria-label="Następna strona">→</button></div></div>`;
@@ -225,37 +262,45 @@ window.Wms = (() => {
     if (selected) await detail(selected, turn);
   }
   async function detail(orderId, turn = generation) {
-    const o = await read(`/api/wms/orders/${orderId}`);
-    if (turn !== generation || selected !== orderId) return;
-    current = o;
-    el("wms-work").closest(".wms-split").classList.add("has-order");
-    const stages = [
-      "new",
-      "allocated",
-      "picking",
-      "picked",
-      "packing",
-      "packed",
-      "shipped",
-    ];
-    const idx = stages.indexOf(o.status);
-    el("wms-work").innerHTML =
-      `<button class="wms-queue-toggle" data-do-wms="queue">${root().classList.contains("wms-queue") ? "WRÓĆ DO SKANOWANIA" : "POKAŻ KOLEJKĘ"}</button><div class="wms-eyebrow">${html(o.channel)} · termin ${date(o.due_at)}</div><div class="wms-toolbar"><h2>${html(o.reference)}</h2>${badge(o)}</div>
+    lock(true);
+    try {
+      const o = await read(`/api/wms/orders/${orderId}`);
+      if (turn !== generation || selected !== orderId) return;
+      current = o;
+      el("wms-work").closest(".wms-split").classList.add("has-order");
+      const stages = [
+        "new",
+        "allocated",
+        "picking",
+        "picked",
+        "packing",
+        "packed",
+        "shipped",
+      ];
+      const idx = stages.indexOf(o.status);
+      el("wms-work").innerHTML =
+        `<button class="wms-queue-toggle" data-do-wms="queue">${root().classList.contains("wms-queue") ? "WRÓĆ DO SKANOWANIA" : "POKAŻ KOLEJKĘ"}</button><div class="wms-eyebrow">${html(o.channel)} · termin ${date(o.due_at)}</div><div class="wms-toolbar"><h2>${html(o.reference)}</h2>${badge(o)}</div>
       <div class="wms-progress" aria-label="Etap: ${states[o.status]}">${stages.map((_, i) => `<span class="${i <= idx ? "done" : ""}"></span>`).join("")}</div>
       ${o.hold_reason ? `<div class="wms-message error">${html(o.hold_reason)}</div>` : ""}
       ${o.tote ? `<p class="wms-muted">Pojemnik <strong>${html(o.tote)}</strong></p>` : ""}
       <div id="wms-step">${step(o)}</div>
       <table class="wms-lines"><thead><tr><th>Towar</th><th>Zebrano</th><th>Sprawdzono</th></tr></thead><tbody>${o.lines.map((l) => `<tr><td><strong>${html(l.sku)}</strong><br><span class="wms-muted">${html(l.name)}</span></td><td class="num">${l.picked}/${l.quantity}</td><td class="num">${l.packed}/${l.quantity}</td></tr>`).join("")}</tbody></table>
       ${!["shipped", "cancelled"].includes(o.status) ? exceptionsForm(o) : `<p class="wms-muted">Zamknięto ${date(o.shipped_at || o.updated_at)}</p>`}`;
-    root()
-      .querySelectorAll("[data-order-wms]")
-      .forEach((b) =>
-        b.setAttribute(
-          "aria-pressed",
-          String(Number(b.dataset.orderWms) === o.id),
-        ),
-      );
-    el("wms-step")?.querySelector("input")?.focus({ preventScroll: true });
+      root()
+        .querySelectorAll("[data-order-wms]")
+        .forEach((b) =>
+          b.setAttribute(
+            "aria-pressed",
+            String(Number(b.dataset.orderWms) === o.id),
+          ),
+        );
+      focusWhenReady(el("wms-step")?.querySelector("input"));
+    } catch (e) {
+      readFailure(e, turn);
+      throw e;
+    } finally {
+      lock(false);
+    }
   }
   function field(name, label, type = "text", value = "", extra = "") {
     return `<label>${label}<input name="${name}" type="${type}" value="${html(value)}" required ${extra}></label>`;
@@ -414,18 +459,24 @@ window.Wms = (() => {
         .join("")}<button class="primary">ROZPOCZNIJ TRASĘ</button></form>`;
   }
   async function waveDetail(waveId, turn = generation) {
-    const wave = await read(`/api/wms/waves/${waveId}`);
-    if (turn !== generation || selectedWave !== waveId) return;
-    const task = wave.tasks.find(
-      (t) => !t.hold_reason && t.picker_id === user.userId,
-    );
-    root()._waveTask = task;
-    el("wms-work").closest(".wms-split").classList.add("has-order");
-    el("wms-work").innerHTML =
-      `<button class="wms-queue-toggle" data-do-wms="queue">POKAŻ KOLEJKĘ</button><h2>${html(wave.name)}</h2>${task ? `<div class="wms-eyebrow">Lokalizacja → towar → pojemnik</div><div class="wms-location">${html(task.bin)}</div><strong>${html(task.sku)}</strong> · ${task.remaining} szt.<p>${html(task.name)}<br>Zamówienie ${html(task.reference)} → <strong>${html(task.tote)}</strong></p><form id="wms-wave-pick" class="wms-form"><div class="wms-fields">${field("bin", "1. Lokalizacja", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, `min="1" max="${task.remaining}"`)}</div>${field("barcode", "2. Towar", "text", "", 'autocomplete="off"')}${field("tote", "3. Pojemnik", "text", "", 'autocomplete="off"')}<button class="primary">ODŁOŻONO DO POJEMNIKA</button></form>` : `<p class="wms-message">${wave.tasks.length ? "Pozostałe zamówienia są wstrzymane lub przypisane innej osobie. Wyjaśnij je w kolejce zamówień." : "Trasa zebrana. Przekaż pojemniki do pakowania."}</p>`}<details><summary>Pojemniki i zamówienia (${wave.orders.length})</summary>${wave.orders.map((o) => `<p><strong>${html(o.tote)}</strong> · ${html(o.reference)} · ${badge(o)}</p>`).join("")}</details>`;
-    el("wms-wave-pick")
-      ?.elements.namedItem("bin")
-      ?.focus({ preventScroll: true });
+    lock(true);
+    try {
+      const wave = await read(`/api/wms/waves/${waveId}`);
+      if (turn !== generation || selectedWave !== waveId) return;
+      const task = wave.tasks.find(
+        (t) => !t.hold_reason && t.picker_id === user.userId,
+      );
+      root()._waveTask = task;
+      el("wms-work").closest(".wms-split").classList.add("has-order");
+      el("wms-work").innerHTML =
+        `<button class="wms-queue-toggle" data-do-wms="queue">POKAŻ KOLEJKĘ</button><h2>${html(wave.name)}</h2>${task ? `<div class="wms-eyebrow">Lokalizacja → towar → pojemnik</div><div class="wms-location">${html(task.bin)}</div><strong>${html(task.sku)}</strong> · ${task.remaining} szt.<p>${html(task.name)}<br>Zamówienie ${html(task.reference)} → <strong>${html(task.tote)}</strong></p><form id="wms-wave-pick" class="wms-form"><div class="wms-fields">${field("bin", "1. Lokalizacja", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, `min="1" max="${task.remaining}"`)}</div>${field("barcode", "2. Towar", "text", "", 'autocomplete="off"')}${field("tote", "3. Pojemnik", "text", "", 'autocomplete="off"')}<button class="primary">ODŁOŻONO DO POJEMNIKA</button></form>` : `<p class="wms-message">${wave.tasks.length ? "Pozostałe zamówienia są wstrzymane lub przypisane innej osobie. Wyjaśnij je w kolejce zamówień." : "Trasa zebrana. Przekaż pojemniki do pakowania."}</p>`}<details><summary>Pojemniki i zamówienia (${wave.orders.length})</summary>${wave.orders.map((o) => `<p><strong>${html(o.tote)}</strong> · ${html(o.reference)} · ${badge(o)}</p>`).join("")}</details>`;
+      focusWhenReady(el("wms-wave-pick")?.elements.namedItem("bin"));
+    } catch (e) {
+      readFailure(e, turn);
+      throw e;
+    } finally {
+      lock(false);
+    }
   }
   function stockForm(index) {
     const s = root()._stockRows[index];

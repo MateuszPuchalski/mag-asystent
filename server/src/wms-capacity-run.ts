@@ -15,7 +15,7 @@ process.env.WERTIS_ENV_FILE = path.join(
   "wms-capacity-no-env.local",
 );
 process.env.SGT_MODE = "seeded";
-process.env.WMS_SELLASIST_ENABLED = '0';
+process.env.WMS_SELLASIST_ENABLED = "0";
 process.env.LOG_LEVEL = "silent";
 const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");
@@ -64,7 +64,7 @@ const started = performance.now();
 let next = 0,
   completed = 0;
 type Detail = ReturnType<typeof W.getOrder>;
-async function request(route: string, body?: unknown): Promise<Detail> {
+async function request<T = Detail>(route: string, body?: unknown): Promise<T> {
   const start = performance.now();
   const r = await fetch(base + route, {
     method: body ? "POST" : "GET",
@@ -83,7 +83,7 @@ async function request(route: string, body?: unknown): Promise<Detail> {
   const value = await r.json();
   timings.push(performance.now() - start);
   assert.equal(r.status, 200, JSON.stringify(value));
-  return value as Detail;
+  return value as T;
 }
 try {
   await Promise.all(
@@ -190,41 +190,176 @@ try {
   );
   console.log(JSON.stringify(report, null, 2));
   if (process.argv.includes("--history")) {
-    console.log("Seeding 90 days of reporting history (135000 orders / 405000 lines)...");
+    console.log(
+      "Seeding 90 days of reporting history (135000 orders / 405000 lines)...",
+    );
     const historicalOrders = 90 * orders;
-    const insertOrder = d.prepare(`INSERT INTO wms_order(reference,channel,status,due_at,created_at,updated_at,
+    const historyDays = Array.from({ length: 90 }, (_, i) =>
+      new Date(Date.now() - (i + 1) * 86400000).toISOString().slice(0, 10),
+    );
+    const insertOrder =
+      d.prepare(`INSERT INTO wms_order(reference,channel,status,due_at,created_at,updated_at,
       allocated_at,picked_at,packed_at,shipped_at) VALUES (?,?,'shipped',?,?,?,?,?,?,?)`);
-    const insertLine = d.prepare(`INSERT INTO wms_line(order_id,tw_id,sku,name,quantity,picked,packed)
+    const insertLine =
+      d.prepare(`INSERT INTO wms_line(order_id,tw_id,sku,name,quantity,picked,packed)
       VALUES (?,?,?,?,1,1,1)`);
+    const withLedger = process.argv.includes("--ledger-history");
+    const insertMovement =
+      d.prepare(`INSERT INTO wms_movement(tw_id,bin,delta,reserved_delta,kind,order_id,reason,user_id,created_at)
+      VALUES (?,'A01-01-02',?,?,?,?, 'Historical capacity fixture',?,?)`);
+    const insertEvent = d.prepare(
+      `INSERT INTO events(type,payload,user_id,user_ref,created_at) VALUES (?,?,?,?,?)`,
+    );
+    const auditActions = [
+      "create",
+      "order_allocate",
+      "order_pick-start",
+      "order_pick",
+      "order_pick",
+      "order_pick",
+      "order_pack-start",
+      "order_pack",
+      "order_pack",
+      "order_pack",
+      "order_ship",
+    ];
     // Historia jest fixture raportowym. Fizyczny zapas zaczyna się od spisu
     // otwarcia próby i nie jest wyliczany z tych dawnych dokumentów.
     d.exec("BEGIN IMMEDIATE");
     try {
       for (let i = 0; i < historicalOrders; i++) {
-        const day = new Date(Date.now() - (1 + Math.floor(i / orders)) * 86_400_000).toISOString().slice(0,10);
+        const day = historyDays[Math.floor(i / orders)];
         const shipped = `${day}T12:00:00.000Z`;
-        const result = insertOrder.run(`HISTORY-${i}`, i % 2 ? "sklep" : "allegro",`${day}T16:00:00.000Z`,
-          `${day}T08:00:00.000Z`,shipped,`${day}T09:00:00.000Z`,`${day}T10:00:00.000Z`,`${day}T11:00:00.000Z`,shipped);
+        const result = insertOrder.run(
+          `HISTORY-${i}`,
+          i % 2 ? "sklep" : "allegro",
+          `${day}T16:00:00.000Z`,
+          `${day}T08:00:00.000Z`,
+          shipped,
+          `${day}T09:00:00.000Z`,
+          `${day}T10:00:00.000Z`,
+          `${day}T11:00:00.000Z`,
+          shipped,
+        );
+        const orderId = Number(result.lastInsertRowid);
         for (let j = 0; j < 3; j++) {
-          const twId = (i * 3 + j) % products + 1;
-          insertLine.run(result.lastInsertRowid,twId,`SKU-${twId}`,`Część kosiarki ${twId}`);
+          const twId = ((i * 3 + j) % products) + 1;
+          insertLine.run(
+            result.lastInsertRowid,
+            twId,
+            `SKU-${twId}`,
+            `Część kosiarki ${twId}`,
+          );
+          if (withLedger) {
+            // Zbilansowana historia nie zmienia otwarcia zapasu, ale obciąża indeksy i agregacje dziennika.
+            insertMovement.run(
+              twId,
+              1,
+              0,
+              "receive",
+              null,
+              actor.id,
+              `${day}T07:00:00.000Z`,
+            );
+            insertMovement.run(
+              twId,
+              0,
+              1,
+              "reserve",
+              orderId,
+              actor.id,
+              `${day}T09:00:00.000Z`,
+            );
+            insertMovement.run(
+              twId,
+              -1,
+              -1,
+              "pick",
+              orderId,
+              actor.id,
+              `${day}T10:00:00.000Z`,
+            );
+          }
         }
+        if (withLedger)
+          for (const action of auditActions)
+            insertEvent.run(
+              `wms_${action}`,
+              JSON.stringify({ orderId, action, fixture: true }),
+              actor.name,
+              actor.id,
+              shipped,
+            );
       }
       d.exec("COMMIT");
-    } catch(e) {d.exec("ROLLBACK");throw e;}
-    const probes = ["/api/wms/analytics?days=90","/api/wms/analytics?days=30","/api/wms/orders?status=allocated",
-      "/api/wms/inventory?q=SKU-4","/api/wms/reconciliation"];
+    } catch (e) {
+      d.exec("ROLLBACK");
+      throw e;
+    }
+    const probes = [
+      "/api/wms/analytics?days=90",
+      "/api/wms/analytics?days=30",
+      "/api/wms/orders?status=allocated",
+      "/api/wms/inventory?q=SKU-4",
+      "/api/wms/reconciliation",
+      "/api/wms/integrity",
+    ];
     const results = [];
     for (const url of probes) {
       const start = performance.now();
-      await request(url);
-      results.push({url,milliseconds:Math.round((performance.now()-start)*100)/100});
+      const response = await request<
+        ReturnType<typeof A.analytics> & ReturnType<typeof A.integrity>
+      >(url);
+      if (url.includes("/integrity"))
+        assert.equal(response.ok, true, JSON.stringify(response));
+      if (withLedger && url.includes("/analytics")) {
+        const picked = response.productivity.reduce(
+          (sum, row) => sum + Number(row.scans),
+          0,
+        );
+        const expected =
+          orders * 3 +
+          historyDays.filter(
+            (day) =>
+              `${day}T10:00:00.000Z` >= response.since &&
+              `${day}T10:00:00.000Z` <= response.now,
+          ).length *
+            orders *
+            3;
+        assert.equal(
+          picked,
+          expected,
+          "Historical picks must respect their scan timestamps, including a partial boundary day",
+        );
+      }
+      results.push({
+        url,
+        milliseconds: Math.round((performance.now() - start) * 100) / 100,
+      });
     }
-    assert.ok(results.every(r=>r.milliseconds<2000),JSON.stringify(results));
-    const historyReport = {orders:orders+historicalOrders,lines:(orders+historicalOrders)*3,results,
-      limitations:"Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths."};
-    fs.writeFileSync(path.join(output,"history-capacity.json"),JSON.stringify(historyReport,null,2));
-    console.log(JSON.stringify(historyReport,null,2));
+    const historyReport = {
+      orders: orders + historicalOrders,
+      lines: (orders + historicalOrders) * 3,
+      results,
+      movementRows: Number(
+        d.prepare("SELECT count(*) AS n FROM wms_movement").get()!.n,
+      ),
+      auditRows: Number(d.prepare("SELECT count(*) AS n FROM events").get()!.n),
+      withLedger,
+      limitations:
+        "Historical rows are synthetic reporting fixtures; balanced receive/reserve/pick entries and audit rows are included when withLedger=true. The preceding 1500-order run exercises real write paths.",
+    };
+    fs.writeFileSync(
+      path.join(output, "history-capacity.json"),
+      JSON.stringify(historyReport, null, 2),
+    );
+    console.log(JSON.stringify(historyReport, null, 2));
+    assert.ok(
+      results.every(
+        (r) => r.milliseconds < (r.url.includes("/integrity") ? 5000 : 2000),
+      ),
+      JSON.stringify(results),
+    );
   }
 } finally {
   loop.disable();

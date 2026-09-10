@@ -38,9 +38,9 @@ Test kopii odtwarza całą bazę i sprawdza dziennik.
 Test przeglądarki przechodzi od logowania do wysyłki, także po utracie odpowiedzi i odświeżeniu strony.
 Widok 390 px nie ma poziomego przepełnienia.
 Próba pojemności: 5000 SKU i 1500 pełnych zamówień; 16650 żądań przy 16 klientach.
-Wynik próby wersji 0.270.0: 77,15 s, p95 90,4 ms, zgodny dziennik.
-Raport 90 dni przy 136500 zamówieniach i 409500 pozycjach: 628 ms.
-Pełny zestaw serwera wersji 0.271.0: 2065 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
+Wynik próby wersji 0.271.1: 76,97 s, p95 90,5 ms, zgodny dziennik.
+Raport 90 dni przy 136500 zamówieniach, 1229000 ruchów i 1506501 zdarzeń audytu: 1337 ms.
+Pełny zestaw serwera wersji 0.271.1: 2065 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
 Build produkcyjny przechodzi również test przeglądarki, wraz z wygaśnięciem sesji podczas ponowienia skanu.
 Aktualny audyt zależności produkcyjnych: zero zgłoszonych podatności.
 Zapis wyników: `docs/wms-evidence.json`; scenariusze i zrzuty można odtworzyć przez `tools/wms-e2e.mjs`.
@@ -53,7 +53,7 @@ Nie wykonano połączeń z rzeczywistym kontem sklepu. Konfiguracja i odbiór: `
 Otwarcie 5000 SKU przechodzi jako jeden dokument przyjęcia lub spisu z arkusza.
 Testy sprawdzają wycofanie całej partii po błędzie ruchu oraz po zmianie wersji zapasu.
 Przeglądarka odrzuca stary podgląd po edycji i rozpoznaje już zapisany numer dokumentu.
-Ostatni pomiar wydajności realizacji zamówień pochodzi z wersji 0.270.0; zapis wyników wskazuje tę granicę.
+Ostatni pomiar wydajności pochodzi z wersji 0.271.1 i obejmuje również historię ruchów oraz audytu.
 
 ## CI i przegląd zmiany
 
@@ -63,6 +63,11 @@ Przeszły też pełne bramki serwera, panelu, instalatora, workera Sfery i Andro
 Źródło: [WMS CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559134)
 i [serwer/panel CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099).
 Szkic pozostaje otwarty do odbioru rzeczywistych integracji i sprzętu.
+
+Powtórzony przebieg Windows dla `6b117d2` ujawnił wyścig formularza pakowania z odczytem po zapisie.
+Wersja 0.271.1 utrzymuje blokadę formularza do końca odczytu i usuwa stary formularz po błędzie odczytu.
+Kontrolowane opóźnienie odtworzyło błąd przed poprawką; po poprawce przechodzi wraz z próbą awarii odczytu.
+Aktualny stan kolejnych przebiegów jest widoczny w kontrolach PR.
 
 Ograniczenia integracji i instrukcja odbioru stoją w `docs/wms.md`.
 Odbiór produkcyjny pozostaje otwarty: rzeczywiste pliki sklepu, dokumenty ERP i sprzęt nie zostały przetestowane.
