@@ -8,11 +8,19 @@ import { Kafel } from "../towar/Kafel";
 import { Tokeny } from "./Tokeny";
 
 /**
- * „Z opisów" (E3): sekcje „Modele:" wycięte z opisów kartotek po imporcie.
- * Decyzja właściciela: automat NIE proponuje z opisu — `FS350 FS400` nie
- * mówi, czyja to maszyna. Człowiek wskazuje markę i model, dopiero to tworzy
- * propozycję (źródło „z opisu kartoteki", dowód „decyzja biura"). Odrzucony
+ * „Z opisów i ofert" (E3, rozszerzone w 0.264.0): teksty, z których człowiek
+ * składa klucz modelu. Dwa źródła, jedna kolejka — sekcje „Modele:" wycięte
+ * z opisów kartotek po imporcie oraz pozycje listy zgodności z NASZYCH ofert
+ * Allegro, odłożone tu przy układaniu szkicu Copilota.
+ *
+ * Decyzja właściciela: automat NIE proponuje z tekstu — `FS350 FS400` nie mówi,
+ * czyja to maszyna. Człowiek wskazuje markę i model, dopiero to tworzy
+ * propozycję (dowód „decyzja biura", źródło zależne od wiersza). Odrzucony
  * wiersz nie wraca po kolejnym imporcie.
+ *
+ * Nowego widoku dla ofert NIE MA i to jest decyzja, nie skrót: robota jest ta
+ * sama co do joty, a rozdzielenie jej na dwa ekrany kazałoby człowiekowi
+ * pamiętać o dwóch kolejkach zamiast o jednej.
  */
 export function ZOpisow() {
   const lista = useModeleZOpisow();
@@ -24,8 +32,9 @@ export function ZOpisow() {
 
   return <div className="space-y-3">
     <p className="text-xs text-slate-500">
-      Sekcje „Modele:" z opisów kartotek. Wskaż markę i model — powstanie propozycja do kolejki.
-      Odrzuć, gdy to nie jest lista modeli; odrzucone nie wracają po imporcie.
+      Teksty z opisów kartotek i z list zgodności naszych ofert. Wskaż markę i model —
+      powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;
+      odrzucone nie wracają po imporcie.
     </p>
     <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     {ostatnie && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{ostatnie}</p>}
@@ -69,7 +78,14 @@ function Wiersz({ m, trwa, onPrzerob, onOdrzuc }: {
           <b className="font-mono">{m.symbol}</b>
           <span className="text-sm text-slate-700">{m.nazwa ?? ""}</span>
         </div>
-        <p className="mt-1 rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-800">Modele: {m.tekst}</p>
+        {/* ZNACZNIK ŹRÓDŁA (0.264.0). Człowiek rozstrzygający ma prawo
+            wiedzieć, na co patrzy: opis kartoteki pisał magazyn, listę
+            zgodności — sprzedawca w aukcji. To różnej wagi świadectwa,
+            a decyzja bywa inna przy jednym i drugim. */}
+        <p className="mt-1 rounded bg-slate-50 px-2 py-1 font-mono text-xs text-slate-800">
+          {m.zrodlo === "oferta" ? "Lista zgodności oferty" : "Modele"}: {m.tekst}</p>
+        {m.zrodlo === "oferta" && <p className="mt-1 text-podpis text-sky-800">
+          z naszej oferty Allegro{m.ofertaId ? ` ${m.ofertaId}` : ""}</p>}
       </div>
     </div>
     <div className="mt-2 space-y-2">

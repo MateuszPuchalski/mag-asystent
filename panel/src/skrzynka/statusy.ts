@@ -119,6 +119,9 @@ export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
   reczne: "wpis ręczny",
   opis: "z opisu kartoteki",
   copilot: "propozycja Copilota",
+  /* Nie „z oferty" samo w sobie: chodzi o NASZĄ ofertę Allegro, a nie
+     o ofertę dostawcy — na ekranie Wiedzy jedno i drugie brzmi tak samo. */
+  oferta: "z naszej oferty Allegro",
 };
 
 /* Rola części w pasowaniu (§11.2). To własność CZĘŚCI zapisana w relacji,

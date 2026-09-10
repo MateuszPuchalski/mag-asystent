@@ -1714,6 +1714,54 @@ z wszystkim, co już wiemy. Lista braków wyliczana przez model raz by była,
 a raz nie — i przestałaby być listą braków. Do faktów NIE wchodzi, więc model
 nie ma jak jej klientowi napisać; agent widzi ją paskiem pod szkicem.
 
+**Wiedza z ofert przestaje ginąć razem z rozmową (0.264.0).** Właściciel:
+„w jaki sposób można lepiej wykorzystać wiedzę, która jest zapisana w ofertach
+w doborze części". Rozpoznanie odpowiedziało: dziś prawie wcale. Lista
+zgodności miała w całym repozytorium jednego czytelnika i trafiała stamtąd do
+polecenia modelu, obcięta do trzydziestu pozycji. Treść oferty jest cache'em
+na tydzień, nadpisywanym. Pasek luk wypisywał braki i przy następnym szkicu
+liczył tę samą listę od zera — system zauważał lukę za każdym razem i za
+każdym razem o niej zapominał.
+
+Odtąd zapisuje. `services/wiedza-z-oferty.ts` woła się z `ulozSzkic`, PRZED
+wywołaniem modelu, i dzieli wiedzę na dwie drogi, bo są to dwa różne rodzaje
+danych:
+
+- **numery** (z pól parametrów o nazwie obiecującej numer katalogowy oraz
+  z opisu oferty, spod etykiety z dwukropkiem) idą wprost do
+  `towar_identyfikator` ze źródłem `oferta`. Są wyszukiwalne same z siebie,
+  szczeblem OEM — trzecim z jedenastu — i nie wymagają niczyjej decyzji;
+- **pozycje listy zgodności** idą do kolejki Wiedzy, w CAŁOŚCI, z marką.
+  Klucz modelu składa człowiek: automat nie zgaduje marki od 0.186.0,
+  a `FS250` bez „STIHL" jest nie do złożenia.
+
+Trzy granice, każda kupiona osobnym rozumowaniem. **Bramka pewności
+kartoteki**: zapis idzie tylko przy dopasowaniu oferty do kartoteki
+o pewności `sku` albo `pamiec`, bo numer wpisany do CUDZEJ kartoteki wraca do
+klienta jako zły towar. **Filtr nazw pól** węższy niż dawny filtr
+wyświetlania: „Moc [KM]: 204" w tabeli przeszukiwanej szczeblem OEM znaczy,
+że pytanie o numer 204 prowadzi do kosiarki; EAN odpada, bo ma własny
+szczebel. **Porcja dwudziestu na kliknięcie**: lista zgodności bywa na
+dwieście pozycji, a kolejka Wiedzy jest wspólna dla całego magazynu. Reszta
+dochodzi przy następnym szkicu, bo zapisane przestaje być luką.
+
+Zapis stoi PRZED wywołaniem modelu i to jest cała treść tej zmiany: wiedza
+zostaje także wtedy, gdy dostawca odmówi albo szkic padnie na walidacji. Za
+nieudanym szkicem stoi jedno kliknięcie, za utratą tych numerów nie stoi nic.
+Miejsce przed asercją maskowania jest bezpieczne, bo zapisywane dane pochodzą
+wyłącznie z NASZEJ oferty i NASZEJ kartoteki — ani jeden znak nie idzie tędy
+z wiadomości klienta. `kontekstSzkicu` zostaje przy tym czystym odczytem:
+samo otwarcie rozmowy dalej niczego nie mutuje.
+
+Pasek pod szkicem przestaje być listą braków i staje się POKWITOWANIEM: co
+dopisano do kartoteki, co poszło do kolejki, ile pozycji tej kartoteki tam
+czeka. Bez przycisku — rozstrzygnięcie modelu wymaga marki i wariantu, czyli
+ekranu Wiedza, a przycisk „dopisz" przy szkicu udawałby, że da się to zrobić
+w rozmowie. Cofnięcie numeru z oferty ma własną, wąską trasę i przycisk przy
+czipie w „Sprawdź kartotekę": wpis `opis` cofa się poprawką w Subiekcie, wpis
+`reczne` napisał człowiek, a wpisu z oferty nie cofa nic — przebudowa po
+imporcie go omija, bo nie ma z czego go odtworzyć.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
@@ -3519,6 +3567,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
+| Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
 | Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |
 | Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu, kolumny `dane_doboru`/`dane_ocena` w `szkic_copilota`, karta „Copilot rozpoznał w rozmowie" w `skrzynka/Dobor.tsx`; wpisuje agent, tylko w puste pola |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |

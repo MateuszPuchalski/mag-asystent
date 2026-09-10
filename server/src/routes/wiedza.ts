@@ -6,6 +6,7 @@ import {
 } from "../services/wiedza.js";
 import {
   dodajIdentyfikator, identyfikatoryTowaru, listaModeliZOpisow, odrzucModelZOpisu, przerobModelZOpisu,
+  usunIdentyfikatorZOferty,
 } from "../services/identyfikatory.js";
 import {
   aliasySilnikow, dodajAliasSilnika, kolejkaZabudow, lukiSilnikow, rozstrzygnijZabudowe, usunAliasSilnika,
@@ -18,7 +19,7 @@ import {
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   OSIEMNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DZIEWIĘTNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -30,6 +31,9 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    (zapis ręki biura, nie propozycja automatu). Rozstrzygnięcie tokenu to
    JEDNA trasa dla listy, bo decyzja dotyczy kartotek przejrzanych naraz;
    osobne wywołanie na kartotekę zamieniłoby jedno kliknięcie w trzydzieści.
+   Dziewiętnasty doszedł w 0.264.0 i jest cofnięciem numeru dopisanego
+   z oferty — jedynego wpisu, którego nie cofa ani poprawka w Subiekcie,
+   ani przebudowa po imporcie.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -285,5 +289,19 @@ export async function wiedzaRoutes(app: FastifyInstance) {
         const b = req.body ?? {};
         return dodajIdentyfikator(Number(b.twId), String(b.rodzaj ?? ""), String(b.wartosc ?? ""), ja().userId);
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* DZIEWIĘTNASTY ZAPIS (0.264.0): cofnięcie numeru dopisanego z oferty.
+     Wąsko, i to jest treść tej trasy: wiersz `opis` cofa się poprawką opisu
+     w Subiekcie i najbliższą przebudową, wiersz `reczne` napisał człowiek,
+     który wie, co napisał — a wpisu z oferty nie cofa nic, bo przebudowa go
+     omija (i musi omijać, nie ma z czego go odtworzyć). Serwis odmawia dla
+     pozostałych źródeł: trasa kasująca „identyfikator" bez rozróżnienia
+     byłaby drogą do wycięcia wiedzy z opisów jednym żądaniem. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/wiedza/identyfikatory/:id/cofnij-z-oferty", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return usunIdentyfikatorZOferty(Number(req.params.id), ja().userId); }
+      catch (e) { return konflikt(reply, e); }
     });
 }

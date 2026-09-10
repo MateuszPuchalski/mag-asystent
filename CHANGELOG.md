@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.264.0 — 10 września 2026
+
+**Wiedza z ofert przestaje ginąć razem z rozmową.** Właściciel zapytał, jak
+lepiej wykorzystać w doborze części to, co stoi w naszych ofertach. Odpowiedź
+brzmiała: dziś prawie wcale.
+
+Lista zgodności miała w całym kodzie jednego czytelnika — polecenie dla modelu,
+i to obcięte do trzydziestu pozycji. Treść oferty jest cache'em na tydzień,
+nadpisywanym. Numer wpisany przez sprzedawcę w opisie oferty nie był
+wyszukiwalny w ogóle, bo indeks numerów czyta opisy KARTOTEK.
+
+**Pasek luk zauważał to samo za każdym razem i za każdym razem zapominał.**
+Od 0.254.0 pod szkicem stał akapit z oznaczeniami, których kartoteka nie zna.
+Przy następnym kliknięciu wyliczał tę samą listę od zera. Był akapitem, nie
+przyciskiem, więc nie prowadził donikąd.
+
+**Teraz zapisuje, i to przed wywołaniem modelu.** Numery katalogowe z pól
+parametrów i z opisu oferty idą wprost do identyfikatorów kartoteki, więc
+pytanie klienta o taki numer zaczyna prowadzić do towaru — szczeblem, który
+stoi trzeci z jedenastu. Pozycje listy zgodności idą do kolejki Wiedzy,
+w całości i z marką, bo klucz modelu składa człowiek.
+
+Kolejność jest tu treścią, nie szczegółem: wiedza zostaje także wtedy, gdy
+dostawca odmówi albo szkic padnie na sprawdzeniu. Za nieudanym szkicem stoi
+jedno kliknięcie, za utratą tych numerów nie stoi nic.
+
+**Trzy granice.** Zapis idzie tylko przy pewnym dopasowaniu oferty do
+kartoteki, bo numer wpisany do cudzej kartoteki wraca do klienta jako zły
+towar. Do identyfikatorów wchodzą wyłącznie pola obiecujące numer katalogowy,
+bo „Moc [KM]: 204" w tej tabeli znaczyłoby, że pytanie o numer 204 prowadzi do
+kosiarki. Bierzemy po dwadzieścia pozycji na kliknięcie; reszta dochodzi przy
+następnym szkicu, bo zapisane przestaje być luką.
+
+Pasek pod szkicem jest odtąd pokwitowaniem: co dopisano, co poszło do kolejki,
+ile pozycji tej kartoteki tam czeka. Zły numer cofa krzyżyk przy czipie
+w „Sprawdź kartotekę" — wyłącznie przy wpisach z ofert, bo tylko ich nie cofa
+nic innego.
+
+**Aktualizacja przebudowuje dwie tabele.** Przed pierwszym startem zrób kopię
+`wertis.db`; szczegóły w `DEPLOY.md`. Panel obsługi trzeba przebudować.
+
 ## 0.263.0 — 10 września 2026
 
 **Trafienie po numerze producenta przestaje przegrywać z domysłem.** Klient

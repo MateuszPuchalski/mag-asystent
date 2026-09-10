@@ -21,6 +21,8 @@ import { silnikZTekstu } from "./silniki.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
 import { bezPodpisu, zwin } from "../tekst.js";
+import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
+import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -85,8 +87,44 @@ export interface KontekstSzkicu {
    * Oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka (0.254.0).
    * Dla agenta, nie dla klienta — do faktów NIE wchodzą, więc model nie ma
    * jak ich zdradzić. To lista okazji do uzupełnienia bazy, nie lista błędów.
+   *
+   * Od 0.264.0 STRUKTURA, nie płaska lista: numery da się zapisać od razu,
+   * pozycje listy zgodności idą do kolejki, bo klucz modelu składa człowiek.
    */
-  luki: string[];
+  luki: WiedzaZOferty;
+  /**
+   * Kartoteka, do której wolno dopisać wiedzę z tej oferty — albo `null`.
+   *
+   * `null` znaczy „nie wiadomo, o czyj towar chodzi": oferty bez SKU, SKU
+   * niecelującego w żadną kartotekę, symbolu zdublowanego. Numer wpisany do
+   * CUDZEJ kartoteki jest najdroższą awarią tego wydania, bo wraca do klienta
+   * jako zły towar — więc bramka stoi TU, przy źródle, nie przy przycisku.
+   */
+  docelowaKartoteka: { twId: number; symbol: string; ofertaId: string } | null;
+}
+
+/** Surowa treść oferty — trzy pola, z których liczy się luki i wiedzę do zapisu. */
+export interface TrescOferty {
+  parametry: Array<{ nazwa: string; wartosci: string[] }>;
+  zgodnosc: string[];
+  opis: string;
+}
+
+/**
+ * Wiedza z oferty w kształcie, który DA SIĘ ZAPISAĆ (0.264.0).
+ *
+ * Do 0.263.0 była to płaska lista oznaczeń: pasek pod szkicem wypisywał ją
+ * i na tym się kończyło, a przy następnym szkicu liczyła się od zera. System
+ * zauważał lukę za każdym razem i za każdym razem o niej zapominał.
+ *
+ * Dwa pola, bo dwie różne drogi. Numer trafia do `towar_identyfikator` OD RAZU
+ * — jest wyszukiwalny sam z siebie i nie wymaga niczyjej decyzji. Pozycja
+ * listy zgodności idzie do kolejki Wiedzy, bo klucz modelu (marka + nazwa)
+ * składa CZŁOWIEK; automat nie zgaduje marki od 0.186.0.
+ */
+export interface WiedzaZOferty {
+  numery: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string }>;
+  modele: string[];
 }
 
 /**
@@ -246,10 +284,54 @@ export interface SzkicCopilota {
    */
   twierdzenia: Twierdzenie[];
   /**
-   * Oznaczenia znane OFERCIE, a nieznane kartotece (0.254.0) — okazja do
-   * uzupełnienia bazy, którą widzi WYŁĄCZNIE agent. Do faktów nie wchodzą.
+   * POKWITOWANIE wiedzy z oferty (0.264.0), widziane WYŁĄCZNIE przez agenta.
+   *
+   * Do 0.263.0 stała tu lista braków: oznaczenia znane ofercie, nieznane
+   * kartotece. Powstawała przy każdym szkicu od nowa i nic z niej nie
+   * wynikało. Teraz mówi, co przy tym szkicu FAKTYCZNIE dopisano do kartoteki
+   * i ile pozycji czeka w kolejce Wiedzy — a lista braków skróciła się o to,
+   * co właśnie przestało być brakiem.
+   *
+   * Szkice sprzed 0.264.0 trzymają w tej kolumnie gołą tablicę oznaczeń;
+   * odczyt czyta ją jako `modele`, bo tym była. Dorabianie im `rodzaju`
+   * byłoby zmyśleniem danych.
    */
-  lukiKartoteki: string[];
+  lukiKartoteki: PokwitowanieSzkicu;
+}
+
+/**
+ * Co przy tym szkicu poszło do bazy. `symbol` mówi DO KTÓREJ kartoteki —
+ * bez niego pokwitowanie jest zdaniem bez podmiotu, a numer wpisany do
+ * cudzej kartoteki wraca do klienta jako zły towar.
+ */
+export interface PokwitowanieSzkicu {
+  symbol: string | null;
+  numery: Array<{ rodzaj: string; wartosc: string }>;
+  modele: string[];
+  czeka: number;
+}
+
+const PUSTE_POKWITOWANIE: PokwitowanieSzkicu = { symbol: null, numery: [], modele: [], czeka: 0 };
+
+/**
+ * Odczyt kolumny `luki_kartoteki` w obu kształtach, jakie tam stoją.
+ *
+ * Gołą tablicę zostawiły szkice sprzed 0.264.0 i była listą OZNACZEŃ, więc
+ * wraca jako `modele` — z zerowym licznikiem kolejki, bo wtedy nikt niczego
+ * do kolejki nie odkładał.
+ */
+function czytajPokwitowanie(json: string | null): PokwitowanieSzkicu {
+  let v: unknown;
+  try { v = JSON.parse(json ?? "[]"); } catch { return PUSTE_POKWITOWANIE; }
+  if (Array.isArray(v)) return { ...PUSTE_POKWITOWANIE, modele: v.map(String) };
+  if (!v || typeof v !== "object") return PUSTE_POKWITOWANIE;
+  const o = v as Partial<PokwitowanieSzkicu>;
+  return {
+    symbol: o.symbol == null ? null : String(o.symbol),
+    numery: Array.isArray(o.numery) ? o.numery : [],
+    modele: Array.isArray(o.modele) ? o.modele.map(String) : [],
+    czeka: Number(o.czeka ?? 0),
+  };
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -504,11 +586,11 @@ const LIMIT_ZGODNOSCI = 30;
 function faktyZTresciOferty(
   database: DatabaseSync, konto: number, ofertaId: string,
   dodaj: (rodzaj: RodzajFaktu, zdanie: string) => void,
-): { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] } {
+): TrescOferty {
   const w = database.prepare(`SELECT opis, parametry_json, pasuje_do_json FROM offer_snapshot
       WHERE channel_account_id=? AND external_id=?`).get(konto, ofertaId) as
     { opis: string | null; parametry_json: string | null; pasuje_do_json: string | null } | undefined;
-  if (!w) return { parametry: [], zgodnosc: [] };
+  if (!w) return { parametry: [], zgodnosc: [], opis: "" };
 
   const parametry = czytajListe<{ nazwa: string; wartosci: string[] }>(w.parametry_json);
   if (parametry.length) {
@@ -533,8 +615,12 @@ function faktyZTresciOferty(
   }
   /* Surowe listy wracają do wołającego po jedno: policzenie luk w kartotece
      (0.254.0). Robi się to na KOŃCU kontekstu, bo korpus porównania to
-     wszystko, co już wiemy — także wiedza i kandydaci, którzy dochodzą niżej. */
-  return { parametry, zgodnosc };
+     wszystko, co już wiemy — także wiedza i kandydaci, którzy dochodzą niżej.
+     Od 0.264.0 wraca też OPIS w całości, nie przycięty do promptu: numery
+     stoją w nim po etykietach („OEM: 698083"), a `identyfikatoryZOpisu`
+     czyta dokładnie takie etykiety. Przycięcie do 1200 znaków gubiłoby te
+     spod końca opisu, i to bez śladu. */
+  return { parametry, zgodnosc, opis };
 }
 
 /**
@@ -565,29 +651,70 @@ function faktyZTresciOferty(
  * Porównanie po `zwin`, tak jak przy danych doboru: „STIHL FS 120" i „FS120"
  * to ten sam model, a spacja sprzedawcy nie jest brakiem w naszej bazie.
  */
-export function lukiZOferty(
-  zrodla: { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] },
-  kartotekaTekst: string,
-): string[] {
+export function lukiZOferty(zrodla: TrescOferty, kartotekaTekst: string): WiedzaZOferty {
   const korpus = zwin(kartotekaTekst).toUpperCase();
-  const braki = new Map<string, string>();
-  const dodaj = (oznaczenie: string) => {
-    const klucz = zwin(oznaczenie).toUpperCase();
-    if (!klucz || korpus.includes(klucz)) return;
-    if (!braki.has(klucz)) braki.set(klucz, oznaczenie.trim());
+  const zna = (tekst: string) => {
+    const klucz = zwin(tekst).toUpperCase();
+    return !klucz || korpus.includes(klucz);
   };
 
-  /* Parametr: cała wartość pola, bez rozbierania. */
+  const numery = new Map<string, { rodzaj: RodzajIdentyfikatora; wartosc: string }>();
+  const dodajNumer = (rodzaj: RodzajIdentyfikatora, wartosc: string) => {
+    const klucz = zwin(wartosc).toUpperCase();
+    if (!klucz || korpus.includes(klucz) || numery.has(klucz)) return;
+    numery.set(klucz, { rodzaj, wartosc: wartosc.trim() });
+  };
+
+  /* Parametr: cała wartość pola, bez rozbierania — ale TYLKO z pola, którego
+     nazwa obiecuje numer katalogowy. */
   for (const p of zrodla.parametry) {
-    for (const w of p.wartosci) if (/\d/.test(w)) dodaj(w);
+    const rodzaj = rodzajPola(p.nazwa);
+    if (!rodzaj) continue;
+    for (const w of p.wartosci) if (/\d/.test(w)) dodajNumer(rodzaj, w);
   }
-  /* Pozycja zgodności: tokeny z cyfrą I literą, wyjęte ze zdania. */
+  /* Numery z OPISU oferty — tym samym parserem, którym czytamy opisy kartotek.
+     Wymaga etykiety z dwukropkiem, więc na prozie sprzedażowej („najlepszy
+     filtr w tej cenie") nie znajduje nic. `wlasnySymbol` pusty, bo opis
+     oferty nie jest autoreferencyjny w tym sensie co opis kartoteki. */
+  for (const i of identyfikatoryZOpisu(zrodla.opis, "")) dodajNumer(i.rodzaj, i.wartosc);
+
+  /* Pozycja zgodności wchodzi W CAŁOŚCI, nie tokenami. Człowiek w kolejce
+     Wiedzy potrzebuje MARKI, żeby złożyć klucz modelu: `FS250` sam z siebie
+     nie mówi, czyj to model, a decyzja z 0.186.0 („automat nie zgaduje marki")
+     zostaje nietknięta. Wykrywanie zostaje tokenowe — pozycja jest luką, gdy
+     choć jeden jej token z cyfrą I literą jest korpusowi nieznany. */
+  const modele: string[] = [];
+  const widziane = new Set<string>();
   for (const z of zrodla.zgodnosc) {
-    for (const m of z.match(NUMER) ?? []) {
-      if (/\d/.test(m) && /[A-Za-z]/.test(m)) dodaj(m);
-    }
+    const tokeny = (z.match(NUMER) ?? []).filter((m) => /\d/.test(m) && /[A-Za-z]/.test(m));
+    if (!tokeny.length || tokeny.every(zna)) continue;
+    const calosc = z.trim().replace(/\s+/g, " ").slice(0, 200);
+    const klucz = zwin(calosc).toUpperCase();
+    if (!klucz || widziane.has(klucz)) continue;
+    widziane.add(klucz);
+    modele.push(calosc);
   }
-  return [...braki.values()];
+  return { numery: [...numery.values()], modele };
+}
+
+/**
+ * Czy nazwa pola parametru obiecuje NUMER KATALOGOWY — i jaki.
+ *
+ * Filtr zapisu MUSI być węższy od dzisiejszego filtru wyświetlania. Do 0.263.0
+ * na pasek luk wchodziła każda wartość z cyfrą, bo pasek był akapitem i nic
+ * z niego nie wynikało. Od 0.264.0 z tej samej listy powstają wiersze
+ * `towar_identyfikator`, przeszukiwane szczeblem OEM — a „Moc [KM]: 204"
+ * w tej tabeli znaczy, że pytanie o numer 204 prowadzi do kosiarki.
+ *
+ * `ean` i `gtin` odpadają, choć są numerami: EAN ma własną drogę do kartoteki
+ * i własny szczebel doboru, drugi z jedenastu. Wpisanie go tutaj jako `oem`
+ * osłabiłoby trafienie, zamiast je dodać.
+ */
+function rodzajPola(nazwa: string): RodzajIdentyfikatora | null {
+  const n = (nazwa ?? "").toLowerCase();
+  if (/ean|gtin/.test(n)) return null;
+  if (!/num|kod|katalog|indeks|symbol|oem|part/.test(n)) return null;
+  return /oryg/.test(n) ? "nr_oryg" : "oem";
 }
 
 /** Lista z kolumny JSON. Uszkodzony wpis to pusta lista, nie wywrócony szkic. */
@@ -637,8 +764,8 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const zapamietaj = (k: Kartoteka | null | undefined) => { if (k) kartoteki.set(zwin(k.symbol), k); };
 
   /* Treść oferty przechwycona do policzenia luk w kartotece — patrz niżej. */
-  let trescOferty: { parametry: Array<{ nazwa: string; wartosci: string[] }>; zgodnosc: string[] } =
-    { parametry: [], zgodnosc: [] };
+  let trescOferty: TrescOferty = { parametry: [], zgodnosc: [], opis: "" };
+  let docelowaKartoteka: KontekstSzkicu["docelowaKartoteka"] = null;
   /* Oferta i jej kartoteka — tą samą regułą, którą czyta je dobór. */
   const oferta = ofertaRozmowy(db(), conversationId);
   let kartotekaTwId: number | null = null;
@@ -653,6 +780,13 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       const karta = buildProductCard(subiekt, k.twId);
       if (karta) {
         kartotekaTwId = k.twId;
+        /* BRAMKA ZAPISU WIEDZY Z OFERTY (0.264.0). Tylko dopasowanie po
+           sygnaturze albo wcześniejsze wskazanie człowieka — domysł po nazwie
+           wystarcza, żeby POKAZAĆ kartotekę obok oferty, ale nie żeby dopisać
+           jej cudzy numer. */
+        if (k.pewnosc === "sku" || k.pewnosc === "pamiec") {
+          docelowaKartoteka = { twId: k.twId, symbol: karta.sym, ofertaId: oferta.ofertaId };
+        }
         zapamietaj({ twId: k.twId, symbol: karta.sym, nazwa: karta.name });
         const numery = karta.identyfikatory.map((i) => i.wartosc).join(", ");
         dodaj("kartoteka", `Kartoteka oferty: ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
@@ -745,7 +879,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
 
   const tekstFaktow = fakty.map((f) => `${f.id}: ${f.zdanie}`).join("\n") as FaktyBezpieczne;
   return {
-    fakty, tekstFaktow, luki,
+    fakty, tekstFaktow, luki, docelowaKartoteka,
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
     doborWersja: dobor.wersja,
@@ -774,6 +908,32 @@ export async function ulozSzkic(
   if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
 
   const k = kontekstSzkicu(conversationId, subiekt);
+
+  /* ZAPIS WIEDZY Z OFERTY PRZED WYWOŁANIEM MODELU (0.264.0) — i to jest cała
+     treść tego wydania. Wiedza ma zostać w bazie także wtedy, gdy dostawca
+     odmówi, gdy model wyjdzie poza fakty albo gdy szkic padnie na walidacji.
+     Za tamtymi porażkami stoi jedno kliknięcie i agent kliknie ponownie;
+     za utratą tych numerów nie stoi nic — nie ma z czego ich odtworzyć.
+
+     MASKOWANIE. Zapis stoi PRZED asercją danych osobowych i to jest bezpieczne
+     z powodu, który trzeba napisać, bo jest pierwszym pytaniem recenzenta:
+     zapisywane dane pochodzą wyłącznie z NASZEJ oferty i z NASZEJ kartoteki.
+     Ani jeden znak nie przechodzi tędy z wiadomości klienta, więc nie ma tu
+     drogi wycieku, którą asercja miałaby zamknąć.
+
+     `kontekstSzkicu` zostaje przy tym CZYSTYM ODCZYTEM — otwarcie rozmowy
+     dalej niczego nie mutuje (blizna 0.18.0). Zapis wisi na kliknięciu
+     „Ułóż odpowiedź", tam gdzie zapis i tak już był. */
+  let pokwitowanie: PokwitowanieSzkicu = PUSTE_POKWITOWANIE;
+  if (k.docelowaKartoteka) {
+    const cel = k.docelowaKartoteka;
+    const zapis = zapiszWiedzeZOferty(cel, k.luki, kto, db());
+    pokwitowanie = { symbol: cel.symbol, ...zapis };
+  }
+  /* Bez pewnej kartoteki nie zapisujemy NIC i nie pokwitowujemy niczego.
+     Licznik kolejki „przy tej kartotece" wymagałby wskazania kartoteki, a to
+     jest dokładnie to, czego w tym przypadku nie wiemy. */
+
   /* Asercja przed siecią — na WĄTKU, bo tam jest tekst klienta. Faktów nie
      sprawdzamy tymi wzorcami celowo: dziewięć cyfr numeru OEM zapaliłoby
      „telefon" i to byłby fałszywy alarm, a nie zepsute maskowanie. */
@@ -846,7 +1006,7 @@ export async function ulozSzkic(
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
         para.propozycja ? JSON.stringify(para.propozycja) : null,
-        JSON.stringify(twierdzenia), JSON.stringify(k.luki));
+        JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie));
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -855,6 +1015,9 @@ export async function ulozSzkic(
       polDoboru: propozycja.dane ? liczbaPol(propozycja.dane) : 0,
       polOdrzuconych: propozycja.odrzuconych,
       pasowanie: para.propozycja ? 1 : 0, pasowanieOdrzucone: para.powod,
+      /* Ile wiedzy odzyskaliśmy z oferty przy tym kliknięciu — jedyna liczba
+         mówiąca, czy to wydanie robi cokolwiek. */
+      zOfertyNumerow: pokwitowanie.numery.length, zOfertyModeli: pokwitowanie.modele.length,
     }, kto.id, db());
     db().prepare("INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)")
       .run(conversationId, "copilot_szkic",
@@ -1010,7 +1173,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
       ? null : JSON.parse(String(w.pasowanie_propozycja)) as PropozycjaPasowaniaCopilota,
     pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
     twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
-    lukiKartoteki: JSON.parse(String(w.luki_kartoteki ?? "[]")) as string[],
+    lukiKartoteki: czytajPokwitowanie(w.luki_kartoteki == null ? null : String(w.luki_kartoteki)),
   };
 }
 

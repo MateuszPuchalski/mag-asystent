@@ -202,6 +202,15 @@ export function migrate(database: DatabaseSync) {
      w `schema.sql`. Stare szkice mają pustą listę: powstały, zanim ktokolwiek
      zestawił obie listy obok siebie. */
   addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
+  /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
+     w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
+     powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza
+     `addColumn`, choć dwa CHECK-i wyżej wymagały przebudowy tabeli — bo nowa
+     kolumna z CHECK-iem jest legalna, a POSZERZENIE CHECK-a na kolumnie
+     istniejącej nie. */
+  addColumn("model_z_opisu", "zrodlo",
+    "TEXT NOT NULL DEFAULT 'opis' CHECK (zrodlo IN ('opis','oferta'))");
+  addColumn("model_z_opisu", "oferta_id", "TEXT");
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
      jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */
@@ -638,6 +647,8 @@ export function migrate(database: DatabaseSync) {
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
+  identyfikatorZOferty(database);
+  zrodloPropozycjiZOferty(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);
@@ -766,6 +777,192 @@ function typZakonczeniaWSkrzynce(database: DatabaseSync) {
         ON reklamacja_outbox(reklamacja_id, id);
     `);
   })();
+}
+
+/**
+ * Szóste źródło identyfikatora: `oferta` (0.264.0) plus `oferta_id`.
+ *
+ * Druga przebudowa tej tabeli i z tego samego powodu co pierwsza: CHECK na
+ * `zrodlo` był zamknięty na `('opis','reczne')`, a SQLite nie rozszerza go
+ * w miejscu. Powód rozszerzenia stoi w `schema.sql`: numer wpisany przez
+ * sprzedawcę w opisie OFERTY nie był wyszukiwalny, bo indeks czyta opisy
+ * KARTOTEK. Kolumna `oferta_id` dochodzi w tej samej przebudowie, a nie
+ * osobnym `addColumn`, bo przebudowa i tak przepisuje całą definicję —
+ * dwie drogi do jednej tabeli rozjeżdżają się przy pierwszej poprawce.
+ *
+ * Kluczy obcych wyłączać nie trzeba: do `towar_identyfikator` nie prowadzi
+ * żaden. To jedyna różnica wobec przebudowy `zastosowanie` niżej i cała
+ * przyczyna, dla której tamta wygląda inaczej.
+ *
+ * Wiersze przepisujemy WSZYSTKIE, z `id`. Przebudowa identyfikatorów po
+ * imporcie kasuje wyłącznie `zrodlo='opis'`, więc wpis biura zgubiony tutaj
+ * nie wróciłby już nigdy.
+ */
+function identyfikatorZOferty(database: DatabaseSync) {
+  const wiersz = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+  ).get() as { sql: string } | undefined;
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'oferta'")) return;
+
+  transaction(database, () => {
+    /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+       przy żywym serwerze, a obie strony wołają `migrate()`. */
+    const teraz = database.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+    ).get() as { sql: string } | undefined;
+    if (!teraz || teraz.sql.includes("'oferta'")) return;
+    database.exec(`
+      CREATE TABLE towar_identyfikator_nowa (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        tw_id           INTEGER NOT NULL,
+        tw_symbol       TEXT NOT NULL,
+        rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku','zamiennik')),
+        wartosc         TEXT NOT NULL,
+        wartosc_norm    TEXT NOT NULL,
+        zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta')),
+        dodal           TEXT NOT NULL,
+        dodal_user_id   INTEGER REFERENCES app_user(user_id),
+        oferta_id       TEXT,
+        at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (tw_id, rodzaj, wartosc_norm)
+      );
+      INSERT INTO towar_identyfikator_nowa
+        (id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at)
+        SELECT id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at
+        FROM towar_identyfikator;
+      DROP TABLE towar_identyfikator;
+      ALTER TABLE towar_identyfikator_nowa RENAME TO towar_identyfikator;
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+    `);
+  })();
+}
+
+/**
+ * Szóste źródło propozycji zastosowania: `oferta` (0.264.0).
+ *
+ * ── DLACZEGO TA PRZEBUDOWA WYGLĄDA INACZEJ NIŻ POPRZEDNIE ─────────────────
+ * Do `zastosowanie` prowadzą CZTERY klucze obce, a jeden z nich —
+ * `dowod_zastosowania.zastosowanie_id` — ma `ON DELETE CASCADE`. `DROP TABLE`
+ * przy włączonych kluczach skasowałby kaskadowo cały rejestr dowodów: tabelę
+ * APPEND-ONLY, której nie ma z czego odtworzyć. Dlatego klucze schodzą
+ * `PRAGMA foreign_keys = OFF` PRZED transakcją (w transakcji pragma jest
+ * ignorowana PO CICHU) i wracają w `finally`, także gdy przebudowa rzuci.
+ * Ten sam wzór co `pozycjaZwrotuBezReadModelu`.
+ *
+ * `id` zachowujemy, bo wskazują na nie `dowod_zastosowania`,
+ * `model_z_opisu.zastosowanie_id`, `token_silnika_kartoteka.zastosowanie_id`
+ * i `zastepuje_id` w tej samej tabeli. Przenumerowanie zerwałoby historię
+ * poprawek wiedzy — a to jest jedyny zapis tego, kto co rozstrzygnął.
+ *
+ * Na koniec `PRAGMA foreign_key_check`: przy wyłączonych kluczach SQLite
+ * niczego nie sprawdza, więc jedyną kontrolą jest ta jawna. Niezerowy wynik
+ * musi być GŁOŚNY — cicha niespójność w rejestrze dowodów jest gorsza od
+ * wywróconego startu, bo ujawni się dopiero jako zła odpowiedź do klienta.
+ */
+function zrodloPropozycjiZOferty(database: DatabaseSync) {
+  const wiersz = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zastosowanie'"
+  ).get() as { sql: string } | undefined;
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'copilot','oferta'")) return;
+
+  /* Rejestr dowodów bywa nieobecny w bazach testowych, więc liczymy go tylko
+     wtedy, gdy jest. Brak tabeli nie jest awarią migracji; brak WIERSZY po
+     przebudowie — jest. */
+  const dowody = () => (database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dowod_zastosowania'"
+  ).get()
+    ? Number((database.prepare("SELECT COUNT(*) AS ile FROM dowod_zastosowania")
+        .get() as { ile: number }).ile)
+    : null);
+  const przed = dowody();
+
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+         przy żywym serwerze, a obie strony wołają `migrate()`. */
+      const teraz = database.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='zastosowanie'"
+      ).get() as { sql: string } | undefined;
+      if (!teraz || teraz.sql.includes("'copilot','oferta'")) return;
+      database.exec(`
+        CREATE TABLE zastosowanie_nowa (
+          id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+          tw_id                 INTEGER NOT NULL,
+          tw_symbol             TEXT NOT NULL,
+          model_id              INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
+          polaryzacja           TEXT NOT NULL CHECK (polaryzacja IN ('pasuje','nie_pasuje')),
+          powod_negatywny       TEXT CHECK (powod_negatywny IS NULL OR powod_negatywny IN (
+                                  'nie_pasuje','tylko_inny_wariant','niewlasciwy_rozstaw',
+                                  'srednica_ok_inne_mocowanie','mylace_oznaczenie','wymaga_pomiaru')),
+          stan                  TEXT NOT NULL DEFAULT 'propozycja'
+                                  CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
+          zrodlo_propozycji     TEXT NOT NULL
+                                  CHECK (zrodlo_propozycji IN ('dobor','pomiar','reczne','opis','copilot','oferta')),
+          komentarz             TEXT,
+          conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+          zastepuje_id          INTEGER REFERENCES zastosowanie(id),
+          zaproponowal          TEXT NOT NULL,
+          zaproponowal_user_id  INTEGER REFERENCES app_user(user_id),
+          zaproponowano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          rozstrzygnal          TEXT,
+          rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
+          rozstrzygnieto_at     TEXT,
+          powod_rozstrzygniecia TEXT,
+          CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
+        );
+        INSERT INTO zastosowanie_nowa
+          (id,tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,stan,zrodlo_propozycji,
+           komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
+           zaproponowano_at,rozstrzygnal,rozstrzygnal_user_id,rozstrzygnieto_at,
+           powod_rozstrzygniecia)
+          SELECT id,tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,stan,zrodlo_propozycji,
+                 komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
+                 zaproponowano_at,rozstrzygnal,rozstrzygnal_user_id,rozstrzygnieto_at,
+                 powod_rozstrzygniecia
+          FROM zastosowanie;
+        DROP TABLE zastosowanie;
+        ALTER TABLE zastosowanie_nowa RENAME TO zastosowanie;
+        CREATE INDEX IF NOT EXISTS ix_zastosowanie_towar ON zastosowanie(tw_id, stan);
+        CREATE INDEX IF NOT EXISTS ix_zastosowanie_model ON zastosowanie(model_id, stan);
+        CREATE INDEX IF NOT EXISTS ix_zastosowanie_stan  ON zastosowanie(stan, zaproponowano_at);
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+
+  /* Rejestr dowodów SPRAWDZANY, nie zakładany. `ON DELETE CASCADE` przy
+     włączonych kluczach zabrałby go razem z `DROP TABLE`, a objawem byłaby
+     wiedza bez uzasadnienia — czyli wiedza, której nie wolno użyć. */
+  const po = dowody();
+  if (przed !== null && po !== null && przed !== po) {
+    throw new Error(
+      `[migracja] przebudowa zastosowanie zabrała dowody: było ${przed}, ` +
+      `jest ${po}. Rejestr jest append-only i nie ma z czego go odtworzyć ` +
+      "— przywróć kopię wertis.db sprzed aktualizacji.");
+  }
+  /* Sprawdzenie ZAWĘŻONE do czterech tabel, które wskazują na `zastosowanie`.
+     Gołe `PRAGMA foreign_key_check` skanuje całą bazę i doniosłoby o zwisach,
+     których ta przebudowa nie tknęła — ostrzeżenie o cudzej sprawie uczy
+     ignorowania ostrzeżeń. */
+  for (const tabela of ["dowod_zastosowania", "model_z_opisu",
+                        "token_silnika_kartoteka", "zastosowanie"]) {
+    if (!database.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(tabela)) continue;
+    const zwisy = database.prepare(`PRAGMA foreign_key_check(${tabela})`).all() as unknown[];
+    if (zwisy.length) {
+      console.warn(
+        `[migracja] po przebudowie zastosowanie ${tabela} ma ${zwisy.length} ` +
+        "zwisających odnośników. Klucze były wyłączone na czas podmiany, więc " +
+        "to jedyna kontrola — sprawdź je, zanim baza pójdzie dalej.");
+    }
+  }
 }
 
 /**

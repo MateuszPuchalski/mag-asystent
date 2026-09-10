@@ -250,7 +250,7 @@ export type KartaTowaru = {
   desc?: string;
   zamienniki?: { znane: Array<{ id: number; sym: string; name: string }>; obce: string[] };
   /** Identyfikatory części (E3): z opisu po imporcie albo wpisane ręcznie. Pole addytywne. */
-  identyfikatory?: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string; zrodlo: "opis" | "reczne" }>;
+  identyfikatory?: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string; zrodlo: ZrodloIdentyfikatora }>;
   locs: string[];
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
@@ -316,15 +316,30 @@ export type SzkicCopilota = {
    */
   twierdzenia: TwierdzenieCopilota[];
   /**
-   * Oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka (0.254.0).
+   * POKWITOWANIE wiedzy odzyskanej z oferty (0.264.0).
    *
-   * Właściciel: „jeśli jakieś numery są w ofercie, a nie ma w kartotece,
-   * zaznacz — to jest organiczna okazja do uzupełnienia danych". Liczy je
-   * serwer, nie model, i nie wchodzą do faktów: czego nam brakuje w danych,
-   * to zdanie o NAS, a nie o maszynie klienta.
+   * Właściciel w 0.254.0: „jeśli jakieś numery są w ofercie, a nie ma
+   * w kartotece, zaznacz — to jest organiczna okazja do uzupełnienia danych".
+   * Do 0.263.0 był to sam akapit z listą braków, liczony od zera przy każdym
+   * kliknięciu. Teraz mówi, co przy tym szkicu FAKTYCZNIE trafiło do bazy
+   * i ile pozycji tej kartoteki czeka w kolejce Wiedzy.
+   *
+   * Liczy je serwer, nie model, i do faktów nie wchodzą: czego nam brakuje
+   * w danych, to zdanie o NAS, a nie o maszynie klienta.
    */
-  lukiKartoteki: string[];
+  lukiKartoteki: PokwitowanieZOferty;
 };
+
+export type PokwitowanieZOferty = {
+  /** Do KTÓREJ kartoteki to poszło; `null`, gdy oferta nie wskazuje pewnej kartoteki. */
+  symbol: string | null;
+  numery: Array<{ rodzaj: string; wartosc: string }>;
+  modele: string[];
+  czeka: number;
+};
+
+/** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0. */
+export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
 
 /** Skąd wzięło się twierdzenie: nasza baza, opis oferty, wiedza własna modelu. */
 export type ZrodloTwierdzenia = "fakty" | "oferta" | "model";
@@ -414,7 +429,10 @@ export type PowodNegatywny =
 export type RodzajDowodu =
   | "producent" | "katalog_dostawcy" | "pomiar_wlasny" | "sprzedaz_weryfikacja" | "decyzja_biura" | "rozmowa";
 export type StanZastosowania = "propozycja" | "zatwierdzone" | "odrzucone" | "wycofane";
-export type ZrodloPropozycji = "dobor" | "pomiar" | "reczne" | "opis" | "copilot";
+/* `oferta` (0.264.0): propozycja z pozycji listy zgodności NASZEJ oferty
+   Allegro, złożona ręką biura w kolejce Wiedzy. Osobno od `opis`, bo to inne
+   świadectwo — deklaracja sprzedawcy w aukcji, nie opis towaru z magazynu. */
+export type ZrodloPropozycji = "dobor" | "pomiar" | "reczne" | "opis" | "copilot" | "oferta";
 
 export type ModelUrzadzenia = {
   id: number; rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string;
@@ -445,19 +463,31 @@ export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_s
 export type Identyfikator = {
   id: number; twId: number; symbol: string; nazwa: string | null;
   rodzaj: RodzajIdentyfikatora; nazwaRodzaju: string; wartosc: string;
-  zrodlo: "opis" | "reczne"; dodal: string; at: string;
+  zrodlo: ZrodloIdentyfikatora; dodal: string; at: string;
+  /** Z KTÓREJ oferty; `null` dla `opis` i `reczne`. */
+  ofertaId: string | null;
 };
 
-/** Sekcja „Modele:" z opisu kartoteki, którą człowiek zamienia na propozycję albo odrzuca. */
+/**
+ * Tekst, z którego CZŁOWIEK składa klucz modelu, i który zamienia na
+ * propozycję albo odrzuca. Od 0.264.0 kolejka niesie dwa źródła: sekcję
+ * „Modele:" z opisu kartoteki i pozycję listy zgodności z naszej oferty.
+ * Zadanie człowieka jest to samo, więc kolejka jedna — ale wiersz mówi,
+ * na co człowiek patrzy: na wycinek opisu magazynu czy na deklarację
+ * sprzedawcy z aukcji.
+ */
 export type ModelZOpisu = {
   id: number; twId: number; symbol: string; nazwa: string | null; tekst: string;
   stan: "nowy" | "przerobiony" | "odrzucony"; zastosowanieId: number | null;
   rozstrzygnal: string | null; rozstrzygnietoAt: string | null; at: string;
+  zrodlo: "opis" | "oferta"; ofertaId: string | null;
 };
 
 export type PokrycieWiedzy = {
   kartotek: number; zOpisem: number; zIdentyfikatorem: number;
   identyfikatorow: number; identyfikatorowRecznych: number;
+  /** Numery odzyskane z opisów NASZYCH ofert Allegro (0.264.0). */
+  identyfikatorowZOfert: number;
   modeleZOpisu: { nowych: number; przerobionych: number; odrzuconych: number };
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
   /** Tokeny silników w nazwach kartotek (0.239.0): ile słów, ile kartotek czeka, ile zatwierdzono. */

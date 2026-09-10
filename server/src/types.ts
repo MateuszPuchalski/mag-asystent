@@ -71,11 +71,13 @@ export interface ProductCard {
   zamienniki: Zamienniki;
   /**
    * Identyfikatory części (OEM, numer oryginału, katalog obcy, stare SKU) —
-   * z opisu po imporcie albo wpisane ręcznie przez biuro (E3,
-   * `services/identyfikatory.ts`). Pole ADDYTYWNE obok `zamienniki.obce`:
-   * kolektor renderuje `obce` i nie ma prawa stracić tej sekcji.
+   * z opisu po imporcie, wpisane ręcznie przez biuro albo odzyskane z opisu
+   * naszej oferty Allegro (E3, `services/identyfikatory.ts`). Pole ADDYTYWNE
+   * obok `zamienniki.obce`: kolektor renderuje `obce` i nie ma prawa stracić
+   * tej sekcji. Trzecia wartość `zrodlo` doszła w 0.264.0 i jest bezpieczna
+   * dla zastanych APK: kolektor tego pola nie czyta wcale.
    */
-  identyfikatory: Array<{ rodzaj: string; wartosc: string; zrodlo: "opis" | "reczne" }>;
+  identyfikatory: Array<{ rodzaj: string; wartosc: string; zrodlo: "opis" | "reczne" | "oferta" }>;
   /**
    * Podpowiedź przeslotowania z danych o zbiórkach (`services/zbiorki.ts`).
    * Obecne TYLKO gdy towar jest w górnych 15% rotacji, a jego adres pickingowy

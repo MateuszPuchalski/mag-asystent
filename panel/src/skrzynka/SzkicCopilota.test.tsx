@@ -14,7 +14,7 @@ import type { SzkicCopilota } from "../api/typy";
 
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
-  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], lukiKartoteki: [], messageId: 41, model: "claude-opus-5",
+  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], lukiKartoteki: { symbol: null, numery: [], modele: [], czeka: 0 }, messageId: 41, model: "claude-opus-5",
   at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
   daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
 });
@@ -136,16 +136,33 @@ describe("Szkic Copilota w edytorze", () => {
   });
 });
 
-describe("okazja do uzupełnienia kartoteki (0.254.0)", () => {
-  it("oznaczenia z oferty spoza kartoteki widzi AGENT, jako okazję", () => {
-    edytor(copilot({ szkic: szkic({ lukiKartoteki: ["FS250", "BT120C"] }) }));
+describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
+  it("pasek mówi, CO POSZŁO DO BAZY — nie czego brakuje", () => {
+    /* Do 0.263.0 wypisywał listę braków i przy następnym szkicu liczył ją od
+       zera. Teraz kwituje: numery dopisane do kartoteki i teksty odłożone
+       do kolejki, gdzie model wskaże człowiek. */
+    edytor(copilot({ szkic: szkic({ lukiKartoteki: {
+      symbol: "W09-0211", numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],
+      modele: ["HONDA GX999"], czeka: 3,
+    } }) }));
     const pasek = screen.getByTestId("luki-kartoteki");
-    expect(pasek.textContent).toContain("FS250, BT120C");
-    expect(pasek.textContent).toContain("okazja");
+    expect(pasek.textContent).toContain("W09-0211");
+    expect(pasek.textContent).toContain("16100-ZH8-W61");
+    expect(pasek.textContent).toContain("HONDA GX999");
+    expect(pasek.textContent).toContain("3");
   });
 
-  it("bez luk nie ma paska — plakietka należy się wyjątkowi, nie normie", () => {
-    edytor(copilot({ szkic: szkic({ lukiKartoteki: [] }) }));
+  it("sam licznik kolejki wystarcza na pasek — drugi szkic już nic nie dopisuje", () => {
+    /* Samowygaszanie: przy drugim kliknięciu numery są już zapisane, więc
+       pokwitowanie jest puste. Licznik kolejki jest STANEM, nie przyrostem,
+       i agent ma go widzieć dalej. */
+    edytor(copilot({ szkic: szkic({ lukiKartoteki:
+      { symbol: "W09-0211", numery: [], modele: [], czeka: 2 } }) }));
+    expect(screen.getByTestId("luki-kartoteki").textContent).toContain("2");
+  });
+
+  it("bez zapisu i bez kolejki nie ma paska — plakietka należy się wyjątkowi, nie normie", () => {
+    edytor(copilot({ szkic: szkic() }));
     expect(screen.queryByTestId("luki-kartoteki")).toBeNull();
   });
 });

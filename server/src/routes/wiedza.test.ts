@@ -97,6 +97,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/wiedza/z-opisow/${zOpisu}/odrzuc` },
   { method: "GET" as const, url: `/api/obsluga/wiedza/identyfikatory/${SZR}` },
   { method: "POST" as const, url: "/api/obsluga/wiedza/identyfikatory", payload: { twId: SZR, rodzaj: "katalog_obcy", wartosc: "AB-1234" } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/identyfikatory/1/cofnij-z-oferty" },
   { method: "GET" as const, url: "/api/obsluga/wiedza/silniki" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/silniki",
     payload: { maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 51" },
@@ -133,7 +134,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest osiemnaście — licznik jest umową", () => {
+test("tras zapisu jest dziewiętnaście — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -147,8 +148,17 @@ test("tras zapisu jest osiemnaście — licznik jest umową", () => {
      Trzy przy tokenach w nazwach kartotek (0.239.0): dodanie, rozstrzygnięcie
      listy i usunięcie. Rozstrzygnięcie to JEDNA trasa dla listy, bo decyzja
      dotyczy kartotek przejrzanych naraz — osobne wywołanie na kartotekę
-     zamieniłoby jedno kliknięcie w trzydzieści. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 18);
+     zamieniłoby jedno kliknięcie w trzydzieści.
+
+     DZIEWIĘTNASTA (0.264.0): cofnięcie numeru dopisanego z oferty. Uzasadnienie
+     jest wąskie i takie ma być. Wiersz `zrodlo='opis'` cofa się poprawką opisu
+     w Subiekcie i najbliższą przebudową; wiersz `reczne` napisał człowiek,
+     który wie, co napisał. Wpisu z oferty nie cofa NIC: przebudowa go omija,
+     bo nie ma z czego go odtworzyć. Bez tej trasy zły numer wpisany jednym
+     kliknięciem zostawałby przy kartotece na zawsze i wracał do klienta jako
+     zły towar. Serwis odmawia dla pozostałych źródeł, więc trasa nie jest
+     drogą do wycięcia wiedzy z opisów jednym żądaniem. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 19);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {

@@ -13,8 +13,11 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
   if (!dane) return null;
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="text-naglowek mr-auto">Wiedza z opisów kartotek</b>
-      <span className="text-xs text-slate-500">odbudowa po każdym imporcie</span>
+      <b className="text-naglowek mr-auto">Wiedza z opisów kartotek i ofert</b>
+      {/* „poza wpisami z ofert", bo one przebudowy NIE przeżywają jako
+          odtwarzane — one ją przeżywają jako nieruszane, i to jest różnica
+          warta jednego słowa: nie ma z czego ich odtworzyć. */}
+      <span className="text-xs text-slate-500">odbudowa po każdym imporcie, poza wpisami z ofert</span>
     </header>
 
     <div className="flex flex-wrap gap-8 p-4">
@@ -23,11 +26,16 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
       <Liczba etykieta="z identyfikatorem" ile={dane.zIdentyfikatorem} ton="text-ranga-ok" />
       <Liczba etykieta="identyfikatorów" ile={dane.identyfikatorow} />
       <Liczba etykieta="wpisanych ręcznie" ile={dane.identyfikatorowRecznych} />
+      {/* Osobno od ręcznych, bo mierzy CO INNEGO: ile wiedzy odzyskaliśmy
+          z miejsca, które do 0.264.0 kończyło się na akapicie pod szkicem. */}
+      <Liczba etykieta="odzyskanych z ofert" ile={dane.identyfikatorowZOfert} ton="text-ranga-ok" />
     </div>
 
     <div className="flex flex-wrap gap-8 border-t p-4">
-      {/* „Do przerobienia" to lista roboty na ekranie Wiedza → Z opisów. */}
-      <Liczba etykieta="sekcji „Modele:” do przerobienia" ile={dane.modeleZOpisu.nowych}
+      {/* „Do przerobienia" to lista roboty na ekranie Wiedza → Z opisów i ofert.
+          Od 0.264.0 liczy OBA źródła, bo kolejka jest jedna: robota człowieka
+          jest ta sama, a rozdzielenie licznika kazałoby patrzeć w dwa miejsca. */}
+      <Liczba etykieta="tekstów do przerobienia" ile={dane.modeleZOpisu.nowych}
         ton={dane.modeleZOpisu.nowych > 0 ? "text-ranga-uwaga" : ""} />
       <Liczba etykieta="przerobionych" ile={dane.modeleZOpisu.przerobionych} />
       <Liczba etykieta="odrzuconych" ile={dane.modeleZOpisu.odrzuconych} />
@@ -37,7 +45,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
     </div>
 
     <div className="flex flex-wrap gap-8 border-t p-4">
-      {/* Tokeny silników (0.239.0): „do decyzji" to lista na ekranie Wiedza → Z opisów. */}
+      {/* Tokeny silników (0.239.0): „do decyzji" to lista na ekranie Wiedza → Z opisów i ofert. */}
       <Liczba etykieta="tokenów silników w nazwach" ile={dane.tokeny.tokenow} />
       <Liczba etykieta="kartotek z tokenem do decyzji" ile={dane.tokeny.nowych}
         ton={dane.tokeny.nowych > 0 ? "text-ranga-uwaga" : ""} />

@@ -118,16 +118,35 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
     <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
-    {/* OKAZJA, NIE BŁĄD (0.254.0). Oferta wymienia oznaczenia, których nasza
-        kartoteka nie zna — właściciel nazwał to „organiczną okazją do
-        uzupełnienia danych", bo obie listy stoją tu obok siebie pierwszy
-        i jedyny raz. Pasek jest dla AGENTA: do faktów ta lista nie wchodzi,
-        więc klient nie ma jak jej zobaczyć. */}
-    {s.lukiKartoteki.length > 0 &&
+    {/* POKWITOWANIE, NIE LISTA BRAKÓW (0.264.0). Do 0.263.0 stał tu akapit
+        wypisujący oznaczenia, których kartoteka nie zna — i przy następnym
+        szkicu wypisywał je od nowa. System zauważał lukę za każdym razem
+        i za każdym razem o niej zapominał.
+
+        Teraz mówi, co POSZŁO DO BAZY. Bez przycisku, i to nie jest
+        oszczędność: rozstrzygnięcie modelu wymaga marki i wariantu, czyli
+        ekranu Wiedza, a przycisk „dopisz" przy szkicu udawałby, że da się to
+        zrobić w rozmowie. Numery dopisują się same, bo są wyszukiwalne
+        bez niczyjej decyzji.
+
+        `data-testid` zostaje HISTORYCZNY. Zmiana nazwy kosztowałaby tyle,
+        co przeszukanie testów, a zyskiem byłoby wyłącznie ładniejsze słowo.
+
+        Pasek jest dla AGENTA: do faktów ta wiedza nie wchodzi, więc klient
+        nie ma jak jej zobaczyć. */}
+    {(s.lukiKartoteki.numery.length > 0 || s.lukiKartoteki.modele.length > 0
+      || s.lukiKartoteki.czeka > 0) &&
       <p className="mt-2 rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900"
         data-testid="luki-kartoteki">
-        W ofercie są oznaczenia, których nie ma w kartotece: <b>{s.lukiKartoteki.join(", ")}</b>
-        {" "}— okazja, żeby je dopisać.
+        {s.lukiKartoteki.numery.length > 0 && <>
+          Z oferty dopisano do kartoteki {s.lukiKartoteki.symbol}:{" "}
+          <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
+        </>}
+        {s.lukiKartoteki.modele.length > 0 && <>
+          Do kolejki Wiedzy poszło:{" "}<b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
+        </>}
+        {s.lukiKartoteki.czeka > 0 &&
+          <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka} — model wskazuje człowiek.</>}
       </p>}
     <p className="mt-1 text-podpis text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
   </section>;

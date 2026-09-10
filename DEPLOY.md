@@ -1645,6 +1645,43 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.264.0 przebudowuje DWIE tabele — zrób kopię bazy.**
+
+To jedyna czynność ręką, ale nie warto jej pominąć. Migracja przepisuje
+`towar_identyfikator` i `zastosowanie`, bo SQLite nie umie rozszerzyć listy
+dozwolonych wartości w miejscu. Druga z tych tabel niesie klucze obce
+z rejestru dowodów, a rejestr jest append-only i nie ma z czego go odtworzyć.
+Migracja liczy dowody przed przebudową i po niej. Gdyby liczba się nie
+zgadzała, **przerywa start z komunikatem** — a kopia jest tym, co pozwala
+wtedy wrócić.
+
+Przy zatrzymanych usługach:
+
+```powershell
+Copy-Item 'C:\wertis\server\data\wertis.db' 'C:\wertis\server\data\wertis-przed-0264.db'
+```
+
+Poza tym migracja dokłada kolumny sama, a przebudowa wykonuje się raz: drugi
+start zastaje tabele w docelowym kształcie i ich nie rusza.
+
+Co się zmienia w pracy biura: układanie szkicu Copilota zapisuje odtąd wiedzę
+z opisu NASZEJ oferty do kartoteki. Numery katalogowe trafiają wprost do
+identyfikatorów, więc pytanie klienta o taki numer zaczyna prowadzić do towaru.
+Pozycje listy zgodności lądują w kolejce Wiedzy, na zakładce „Z opisów
+i ofert" — markę i model wskazuje tam człowiek, jak dotąd.
+
+Zapis idzie tylko wtedy, gdy oferta wskazuje kartotekę pewnie: po sygnaturze
+SKU albo po wcześniejszym wskazaniu ręką. Przy ofercie bez SKU nie dzieje się
+nic i to jest zamierzone. Bierzemy po dwadzieścia pozycji na kliknięcie;
+reszta dochodzi przy następnym szkicu pod tą samą ofertą.
+
+Zły numer da się cofnąć: krzyżyk przy czipie w „Sprawdź kartotekę". Krzyżyk
+stoi wyłącznie przy wpisach z ofert — numer z opisu kartoteki poprawia się
+w Subiekcie, a ręczny zna swojego autora.
+
+**Panel obsługi trzeba przebudować** (`npm run build`) — pokwitowanie pod
+szkicem i znacznik źródła w kolejce żyją po jego stronie.
+
 **Aktualizacja do 0.166.0 nie wymaga niczego ręką, ale ma opóźnienie.**
 
 Kolejka skrzynki pokazuje od tej wersji ostatnią wiadomość KLIENTA, a rozmowa
