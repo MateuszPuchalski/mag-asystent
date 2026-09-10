@@ -1688,6 +1688,39 @@ użył; odrzucony — że napisał sam. Ten odsetek, nie liczba wywołań, mówi
 przycisk jest wart pieniędzy. „Confidence bez konsekwencji to dekoracja" —
 z tej samej krytyki.
 
+**SZKIC PRZESTAJE BRZMIEĆ JAK MASZYNA (0.259.0).** Właściciel pokazał szkic
+o sprzęgło do Mini Pocket i powiedział, że wygląda zbyt mocno na AI. Nie
+chodziło o słownictwo. W tamtym tekście nie było ani jednego podejrzanego
+słowa, a mimo to widać było maszynę. Trzy z czterech śladów brały się wprost
+z naszego polecenia, więc to nie jest skarga na model.
+
+**Przypis źródłowy wyciekał do klienta.** Szkic zawierał „(opis oferty)".
+Reguła 1 każe legitymować każde twierdzenie źródłem, reguła 1a każe znakować
+je w tekście, więc model uogólnił i zaczął nazywać źródło słowami. Kod zdejmuje
+z treści wyłącznie kształt „(F3)", więc przypis napisany słowami przechodził
+przez wszystkie sita. To łamało decyzję z 0.253.0: rachunek źródeł czyta agent
+w oknie „Skąd to wiem", bo klient ma dostać gładką odpowiedź. Reguła 1c nazywa
+teraz te nawiasy wprost i ich zakazuje.
+
+**Odpowiedź ma być proporcjonalna do pytania.** Klient zadał pytanie zamknięte
+i dostał pięć próśb o dane oraz dwie listy po trzy pozycje. Reguła 3 filtrowała
+tylko powtórki i nie miała żadnego sufitu. To jest wada handlowa, nie
+stylistyczna: klient gotowy kupić wychodził z zadaniem domowym. Reguły 3c i 3d
+mówią teraz, żeby prosić o dane wyłącznie wtedy, gdy bez nich nie da się
+odpowiedzieć, i żeby nie dopisywać porad, o które nikt nie prosił.
+
+**Lista dostaje hamulec, myślnik zakaz.** Polecenie z 0.253.0 kazało robić listę
+przy wyliczaniu części i kroków; reguła zostaje, ale tylko gdy zdanie pozycji
+nie pomieści. Półpauza jest osobno zakazana, bo nie ma jej na klawiaturze
+i sprzedawca jej nie stawia.
+
+**Czego to wydanie NIE robi i ile to kosztuje.** Decyzja właściciela brzmiała
+„tylko polecenie". Nie ma więc ani strażnika pilnującego, że te zakazy
+zostaną w pliku, ani czyszczenia wyniku. Zakaz półpauzy jest z całej piątki
+najsłabszy, bo plik polecenia ma kilkadziesiąt półpauz we własnym tekście
+i model czyta je jako wzorzec. Gdy myślnik będzie wracał, to jest pierwsze
+miejsce do sprawdzenia.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki

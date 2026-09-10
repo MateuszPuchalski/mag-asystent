@@ -205,7 +205,35 @@ const Szkic = z.object({
    wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
    agenta do przepisywania. Teraz oddaje je w `daneDoboru` — DOSŁOWNIE, jak
    napisał klient — a serwis sprawdza każdą wartość przeciw rozmowie; do
-   danych doboru trafiają dopiero na kliknięcie agenta, w puste pola. */
+   danych doboru trafiają dopiero na kliknięcie agenta, w puste pola.
+
+   ── REGUŁY 1c, 3c, 3d I DWA AKAPITY O FORMIE (0.259.0) ────────────────────
+   Właściciel pokazał szkic o sprzęgło do Mini Pocket i powiedział, że wygląda
+   zbyt mocno na AI. Nie chodziło o słownictwo — nie ma tam ani jednego
+   podejrzanego słowa. Trzy z czterech śladów wychodziły WPROST STĄD.
+
+   1c: model pisał klientowi „(opis oferty)". Nie wymyślił tego. Reguła 1 każe
+   legitymować każde twierdzenie źródłem, 1a każe znakować je w tekście — więc
+   uogólnił i zaczął nazywać źródło słowami. `bezZnacznikow` zdejmuje wyłącznie
+   kształt `F<n>`, więc przypis słowny przechodził przez wszystkie sita do
+   klienta. To łamało decyzję z 0.253.0: rachunek źródeł czyta agent w oknie
+   „Skąd to wiem", bo klient ma dostać gładką odpowiedź, nie prozę z przypisami.
+
+   3c i 3d: na pytanie ZAMKNIĘTE („czy sprzęgło jest w zestawie") poszło pięć
+   próśb o dane i uogólnienie na koniec. Reguła 3 filtrowała tylko powtórki
+   i nie miała żadnego sufitu. To jest wada handlowa, nie stylistyczna: klient
+   gotowy kupić wychodził z zadaniem domowym.
+
+   Hamulec na listy: dwie listy po trzy pozycje, każda z dopowiedzeniem
+   w nawiasie, powstały z posłuszeństwa regule z 0.253.0 („zrób z tego listę").
+   Reguła zostaje, dostaje warunek.
+
+   ZAKAZ PÓŁPAUZY JEST NAJSŁABSZY Z CAŁEJ PIĄTKI i trzeba to wiedzieć,
+   zanim ktoś uzna go za działający. Ten plik ma kilkadziesiąt półpauz we
+   własnym tekście i model czyta je jako wzorzec. Właściciel świadomie
+   zdecydował ich nie czyścić i nie bramkować wyniku, więc zakaz stoi sam
+   przeciwko przykładom. Gdy w szkicach dalej będzie się pojawiać myślnik,
+   to jest pierwsze miejsce do sprawdzenia, a nie dowód, że model nie słucha. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -228,6 +256,13 @@ const INSTRUKCJA_SZKICU = [
   "1a. Twierdzenia z faktów oznaczaj W TEKŚCIE identyfikatorem w nawiasie,",
   "   np. „pasuje (F3)”. System je sprawdza, a potem usuwa, zanim agent",
   "   zobaczy szkic. Klient ich nie przeczyta.",
+  "1c. To jedyny nawias, jaki wolno ci w tekście postawić na źródło. NIE NAZYWAJ",
+  "   źródła słowami: żadnego „(opis oferty)”, „(wg oferty)”, „(z bazy)”,",
+  "   „(z kartoteki)”, „(wiedza ogólna)”. System zdejmuje z tekstu wyłącznie",
+  "   kształt „(F3)”; przypis napisany słowami przechodzi przez wszystkie sita",
+  "   i czyta go klient. Skąd co wiesz, mówisz w `twierdzenia`. To jest",
+  "   miejsce na rachunek i agent ma je obok szkicu. Klient dostaje gładką",
+  "   odpowiedź, nie prozę z przypisami.",
   "2. Numeru, symbolu ani wymiaru spoza faktów i spoza rozmowy wolno ci użyć",
   "   WYŁĄCZNIE wtedy, gdy ten sam numer stoi w tezie twojego twierdzenia ze",
   "   źródłem „model”. Numer bez takiego wpisu odrzuca cały szkic — nie dlatego,",
@@ -262,6 +297,16 @@ const INSTRUKCJA_SZKICU = [
   "   „nie pasuje” zostaw w `zastrzezenia`. Symbol spoza faktów system wyrzuca.",
   "   Gdy nic takiego nie wynika, `pasowanie` = null. Nie wnioskuj pasowania",
   "   z pamięci i nie pisz klientowi, że coś zapisujemy — propozycję składa agent.",
+  "3c. Sufit do reguły 3: PROŚ O DANE TYLKO WTEDY, GDY BEZ NICH NIE DA SIĘ",
+  "   ODPOWIEDZIEĆ. Gdy fakty wystarczają, odpowiedz i nie proś o nic. Gdy",
+  "   prosisz, zrób to w JEDNYM miejscu wiadomości i wymień wyłącznie to, co",
+  "   sprawę rozstrzyga. Klient pytający o jedną rzecz, który dostaje pięć",
+  "   zadań do odrobienia, częściej odchodzi, niż je odrabia. Przyszedł kupić.",
+  "3d. ODPOWIEDZ NA ZADANE PYTANIE I SKOŃCZ. Na pytanie zamknięte („czy ta",
+  "   część jest w zestawie”) odpowiedz wprost; sprawozdanie z całej sprawy",
+  "   to nie jest odpowiedź. Nie dopisuj na koniec porady ani uogólnienia,",
+  "   o które nikt nie prosił. Zdania w rodzaju „to najczęstsza przyczyna”",
+  "   agent nie ma jak sprawdzić, a klient o nie nie pytał.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
   "   sprawdzenie (tabliczka, zdjęcie starej części). Fakt „NIE PASUJE” to",
   "   ostrzeżenie — powiedz je klientowi wprost.",
@@ -292,6 +337,18 @@ const INSTRUKCJA_SZKICU = [
   "wyliczasz części, kroki albo rzeczy do sprawdzenia, zrób z tego listę: każda",
   "pozycja od nowej linii, zaczynając od „- ”. Bez nagłówków, pogrubień",
   "i znaczników — to zwykły tekst wiadomości, nie strona.",
+  "",
+  "LISTA MA HAMULEC. Rób ją tylko wtedy, gdy pozycji jest naprawdę kilka i zdanie",
+  "ich nie pomieści. Odpowiedź na pytanie zamknięte nie ma listy. W jednej",
+  "wiadomości najwyżej JEDNA lista. Pozycje krótkie, bez dopowiedzenia w nawiasie",
+  "przy każdej. Dwie symetryczne listy z wyjaśnieniem przy każdym punkcie to",
+  "kształt, po którym widać maszynę, a nie sprzedawcę.",
+  "",
+  "BEZ PÓŁPAUZY I PAUZY (znaki „—” i „–”) w treści dla klienta. Stawiaj przecinek,",
+  "kropkę albo dwukropek. Tych znaków nie ma na klawiaturze i człowiek piszący",
+  "z telefonu ich nie używa; w gotowej wiadomości są najgłośniejszym śladem",
+  "tekstu ułożonego przez model. Dywiz w numerze części („17211-ZL8-023”)",
+  "i myślnik listy zostają; zakaz dotyczy myślnika w zdaniu.",
   "",
   "FORMA: po polsku, forma grzecznościowa przez „Państwo” (np. „mają Państwo”,",
   "„proszę Państwa o”), NIGDY dosłownie „Pan/Pani” ani imię; zwięźle, bez wstępów",
