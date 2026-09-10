@@ -39,7 +39,7 @@ export function ZOpisow() {
     <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     {ostatnie && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{ostatnie}</p>}
     {!lista.isLoading && wiersze.length === 0 &&
-      <Pusto ikona={<FileText size={38} />}>Nic do przerobienia. Nowe sekcje pojawią się po imporcie kartotek.</Pusto>}
+      <Pusto ikona={FileText}>Nic do przerobienia. Nowe sekcje pojawią się po imporcie kartotek.</Pusto>}
     {lista.data && lista.data.liczba > wiersze.length && <p className="text-xs text-slate-500">
       Pokazuję {wiersze.length} z {lista.data.liczba} — reszta po przerobieniu tych.</p>}
     <ul className="space-y-3">

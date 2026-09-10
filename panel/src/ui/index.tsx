@@ -208,10 +208,55 @@ export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
   </div>;
 }
 
-export const Pusto = ({ ikona, children }: { ikona: React.ReactNode; children: React.ReactNode }) =>
-  <div className="grid flex-1 place-items-center p-16 text-center text-slate-500">
-    {ikona}<p className="mt-3 font-semibold">{children}</p>
+/* ── PUSTKA MA DWIE WAGI, BO ODPOWIADA NA DWA PYTANIA (0.267.0) ────────────────
+   Ustalenie 10 z audytu. Puste stany stały w panelu w kilku kształtach naraz:
+   `Pusto` obsługiwał dziesięć miejsc, a obok stały akapity sklejone ręcznie —
+   `p-6 text-center text-sm`, `p-4 text-sm` i gołe `text-sm` — czyli trzy
+   zapisy jednej roli.
+
+   DWIE WAGI, NIE JEDNA. „Wybierz rozmowę z listy" wypełnia całą kolumnę i jest
+   jedyną rzeczą na ekranie. „Ten kubełek jest pusty" opisuje LISTĘ wewnątrz
+   kolumny, w której nagłówek, filtry i pole szukania dalej stoją. Zrównanie
+   ich zrobiłoby z pustej listy drugi ekran powitalny — a ekran powitalny
+   z ikoną 38 px w miejscu wiersza kolejki zjadłby pół kolumny.
+
+   CZEGO `Pusto` NIE OBEJMUJE: drobnych podpisów w kartach („brak
+   identyfikatorów w opisie"). To są etykiety WARTOŚCI, nie puste stany —
+   stoją obok pól, które wartości mają, i mają własną rolę od 0.256.0
+   (`EtykietaWartosci`). Pierwsze podejście do tego wydania wciągnęło je tutaj
+   wzorcem po klasach i dało czterdzieści sześć zamian zamiast dziewiętnastu.
+
+   `Pusto` NIE MIAŁ KLASY ROZMIARU i dziedziczył 16 px z `body` — jedyny taki
+   w panelu po 0.258.0. Wchodzi na drabinę: `text-tresc`, bo to jest zdanie,
+   które się CZYTA, a nie etykieta, którą się rozpoznaje.
+
+   IKONA IDZIE REFERENCJĄ, NIE ELEMENTEM. Do 0.265.0 wywołujący podawał gotowy
+   `<Inbox size={38} />` i przez to rozmiar rozjechał się na 32, 38 i 40 px,
+   a `text-slate-300` trafiło na trzy ikony z dziesięciu. Referencja komponentu
+   odbiera tę możliwość: rozmiar i barwę ustala jedno miejsce.               */
+
+/** Ile miejsca zajmuje pustka: cała kolumna czy lista w jej środku. */
+type WagaPustki = "ekran" | "lista";
+
+const KSZTALT_PUSTKI: Record<WagaPustki, string> = {
+  ekran: "grid flex-1 place-items-center p-16 text-center text-tresc font-semibold",
+  lista: "p-4 text-center text-sm",
+};
+
+/** Rozmiar ikony pustego ekranu. Jedna wartość, bo do 0.265.0 były trzy. */
+const IKONA_PUSTKI = 38;
+
+export function Pusto({ waga = "ekran", ikona: Ikona, children }: {
+  waga?: WagaPustki;
+  /** Komponent ikony, nie gotowy element — rozmiar i barwę ustala `Pusto`. */
+  ikona?: React.ComponentType<{ size?: number; className?: string }>;
+  children: React.ReactNode;
+}) {
+  return <div className={`text-slate-500 ${KSZTALT_PUSTKI[waga]}`}>
+    {Ikona && <Ikona size={IKONA_PUSTKI} className="text-slate-300" />}
+    <p className={Ikona ? "mt-3" : ""}>{children}</p>
   </div>;
+}
 
 export const Blad = ({ children }: { children: React.ReactNode }) =>
   children ? <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{children}</p> : null;

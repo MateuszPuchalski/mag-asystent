@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { MessageSquareWarning, Headset, Lock, CircleHelp, Scale, Hourglass } from "lucide-react";
 import type { Dyskusja, KubelekDyskusji, SygnalDyskusji } from "../api/typy";
+import { Pusto } from "../ui";
 
 /* ── Kolejka dyskusji ────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU i niesie PIĘĆ rzeczy: temat, kupującego, numer
@@ -85,10 +86,10 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz }: {
   useEffect(() => { aktywnyWiersz.current?.scrollIntoView({ block: "nearest" }); }, [wybrana]);
 
   if (!dyskusje.length) {
-    return <p className="p-6 text-center text-sm text-slate-500">
+    return <Pusto waga="lista">
       {zKubelkiem
         ? "Żadna dyskusja nie pasuje do tego, czego szukasz."
-        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</p>;
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
   }
   return <ul className="divide-y divide-slate-200">
     {dyskusje.map((d) => {
