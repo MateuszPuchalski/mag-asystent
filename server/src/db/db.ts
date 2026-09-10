@@ -198,6 +198,10 @@ export function migrate(database: DatabaseSync) {
      `szkic_copilota` w `schema.sql`. Stare szkice dostają pustą listę, i to
      jest o nich prawda: powstały, zanim model musiał się legitymować. */
   addColumn("szkic_copilota", "twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
+  /* Luki w kartotece wobec oferty (0.254.0) — patrz `szkic_copilota`
+     w `schema.sql`. Stare szkice mają pustą listę: powstały, zanim ktokolwiek
+     zestawił obie listy obok siebie. */
+  addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
      jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */

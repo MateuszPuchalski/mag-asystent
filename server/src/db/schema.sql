@@ -369,7 +369,17 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   --
   -- Przy szkicu, nie w osobnej tabeli: lista rodzi się z tego samego wywołania
   -- i ginie z następnym, tak samo jak zastrzeżenia.
-  twierdzenia          TEXT NOT NULL DEFAULT '[]'
+  twierdzenia          TEXT NOT NULL DEFAULT '[]',
+  -- ── LUKI W KARTOTECE (0.254.0) ─────────────────────────────────────────
+  -- JSON: oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka.
+  -- Właściciel: „jeśli jakieś numery są w ofercie, a nie ma w kartotece,
+  -- zaznacz — to jest organiczna okazja do uzupełnienia danych".
+  --
+  -- Liczy je KOD, nie model: to porównanie dwóch list, a lista braków, która
+  -- raz jest a raz jej nie ma, przestaje być listą braków. Do faktów nie
+  -- wchodzi, więc model nie ma jak jej zdradzić klientowi — czego nam brakuje
+  -- w danych, to zdanie o nas, nie o jego maszynie.
+  luki_kartoteki       TEXT NOT NULL DEFAULT '[]'
 );
 
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────

@@ -315,6 +315,15 @@ export type SzkicCopilota = {
    * wyżej, niż wolno przy tym źródle.
    */
   twierdzenia: TwierdzenieCopilota[];
+  /**
+   * Oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka (0.254.0).
+   *
+   * Właściciel: „jeśli jakieś numery są w ofercie, a nie ma w kartotece,
+   * zaznacz — to jest organiczna okazja do uzupełnienia danych". Liczy je
+   * serwer, nie model, i nie wchodzą do faktów: czego nam brakuje w danych,
+   * to zdanie o NAS, a nie o maszynie klienta.
+   */
+  lukiKartoteki: string[];
 };
 
 /** Skąd wzięło się twierdzenie: nasza baza, opis oferty, wiedza własna modelu. */

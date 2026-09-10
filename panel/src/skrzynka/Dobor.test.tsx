@@ -99,7 +99,7 @@ const pokaz = (d: DoborTyp, uchwyty: Partial<{
     onWstawDoSzkicu={uchwyty.onWstawDoSzkicu ?? vi.fn()} onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
 
 const propozycja = (dane: Partial<SzkicCopilota["daneDoboru"] & object>, n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
-  tresc: "Dzień dobry…", zastrzezenia: [], uzyteFakty: [], twierdzenia: [], messageId: 41, model: "claude-opus-5",
+  tresc: "Dzień dobry…", zastrzezenia: [], uzyteFakty: [], twierdzenia: [], lukiKartoteki: [], messageId: 41, model: "claude-opus-5",
   at: "2026-09-08T12:00:00Z", przez: "A. Lewandowska", ocena: null, daneOcena: null, doborWersja: 1,
   daneDoboru: { ...dobor().dane, ...dane }, pasowanie: null, pasowanieOcena: null, ...n,
 });

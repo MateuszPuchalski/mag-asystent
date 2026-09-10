@@ -1542,6 +1542,30 @@ zależy od źródła: baza może być „pewna", opis oferty najwyżej
 „prawdopodobny", wiedza modelu zawsze „niepewna". W dół model może zawsze.
 Bez sufitu ocena byłaby jego zdaniem o sobie samym.
 
+**Granica: co należy do klienta, a co do biura (0.254.0).** Pierwszy szkic
+z prawdziwej rozmowy o cewce do FS56 był rzeczowy i mówił klientowi trzy
+rzeczy, które go nie dotyczą: że zapisujemy jego model, że nie mamy czegoś
+potwierdzonego w kartotece i ile sztuk leży dziś na półce.
+
+Każde z tych zdań jest zdaniem o NAS. Klient pyta, czy część pasuje; nie prosił
+o sprawozdanie z naszej pracy ani o stan magazynu, a „dla informacji: dostępne
+8 szt." przy części, która może nie pasować, brzmi jak namawianie do zakupu.
+Wniosek zostaje, uzasadnienie się skraca: zamiast „nie mamy potwierdzenia
+w kartotece" idzie zdanie o tym, co rozstrzygnie sprawę. Stan naszej wiedzy
+opisuje `zastrzezenia`, które czyta wyłącznie agent. Dostępność podajemy, gdy
+klient o nią PYTA.
+
+**Okazja do uzupełnienia kartoteki (0.254.0).** Ta sama rozmowa pokazała drugą
+rzecz. Oferta wymieniała jedenaście modeli zgodnych, a kartoteka znała dwa —
+i był to jedyny moment, w którym obie listy stanęły obok siebie. Właściciel:
+„jeśli jakieś numery są w ofercie, a nie ma w kartotece, zaznacz — to jest
+organiczna okazja do uzupełnienia danych".
+
+Liczy to KOD, nie model: `lukiZOferty` porównuje oznaczenia z oferty
+z wszystkim, co już wiemy. Lista braków wyliczana przez model raz by była,
+a raz nie — i przestałaby być listą braków. Do faktów NIE wchodzi, więc model
+nie ma jak jej klientowi napisać; agent widzi ją paskiem pod szkicem.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
