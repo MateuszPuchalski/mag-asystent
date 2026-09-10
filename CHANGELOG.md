@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.252.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Odnośniki na zewnątrz mówią teraz, DOKĄD prowadzą.** Cztery odnośniki „Otwórz
+w Allegro" — przy ofercie, przy zamówieniu, przy zwrocie w rozmowie i w dowodach
+zwrotu — wyglądały jak każdy inny odnośnik w panelu. Dostają znak słowny Allegro.
+
+Znak ZASTĘPUJE wyraz „Allegro", a nie staje obok niego. To jest logotyp słowny,
+czyli napis „allegro"; postawiony obok tego wyrazu czytałby się jako „allegro
+Otwórz w Allegro". Nazwa odnośnika dla czytnika ekranu zostaje bez zmian —
+niesie ją teraz `aria-label` na kotwicy, a nie kolejność węzłów tekstowych.
+
+**Materiał jest cudzy i tak go traktujemy.** Ścieżka pochodzi z pakietu
+`simple-icons` w wersji 16.30.0, barwa `#FF5A00` z jego pliku danych, źródło
+podane tam jako allegro.pl. Nie rysujemy znaku z pamięci i nie poprawiamy go:
+ta sama reguła, przez którą kształt Allegro czyta się z `swagger.yaml`.
+
+Znak jest WKLEJONY, nie pobierany. Zakaz hotlinkowania do serwerów Allegro stoi
+w tym panelu od 0.210.0 i dotyczy znaku tak samo jak zdjęć ofert. Adres z ich
+serwera wyprowadzałby przeglądarkę biura poza własną sieć. Zależność npm
+oznaczałaby trzy tysiące ikon dla jednej; wklejona ścieżka waży 2,2 kB.
+
+Kadrowany `viewBox` bierze się z pomiaru, nie z oka: w kratce 24×24 napis
+zajmuje pasek 24 × 8,038, więc dwie trzecie wysokości to pustka. Po kadrze prop
+`wysokosc` jest wysokością NAPISU i znak sam siada na linii pisma.
+
+Cztery testy odnośników przeszły bez zmian, bo nazwa została ta sama. Doszły
+cztery nowe na sam znak: nazwa marki, proporcje, barwa i to, że ścieżka jest
+prawdziwa, a nie atrapą narysowaną na oko.
+
 ## 0.251.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

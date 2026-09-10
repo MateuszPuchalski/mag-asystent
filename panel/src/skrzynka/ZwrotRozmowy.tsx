@@ -5,6 +5,7 @@ import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { czas } from "../ui";
 import { KUBELKI, SYGNALY } from "../zwroty/Kolejka";
+import { ZnakAllegro } from "../ui/ZnakAllegro";
 
 /**
  * Zwrot tego zamówienia przy rozmowie (0.221.0).
@@ -45,8 +46,13 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
         className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
         Otwórz w Zwrotach</Link>
       {zwrot.linkZwrotu && <a href={zwrot.linkZwrotu} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-        Otwórz w Allegro<ExternalLink size={12} /></a>}
+        aria-label="Otwórz w Allegro"
+        className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:text-sky-900">
+        {/* Bez podkreślenia (0.252.0): kreska pod znakiem graficznym wygląda
+            jak usterka. Sąsiedni „Otwórz w Zwrotach" ZOSTAJE podkreślony i to
+            jest rozróżnienie, nie niekonsekwencja — tamten prowadzi w GŁĄB
+            panelu i ma wyglądać jak tekst, ten wychodzi na zewnątrz. */}
+        Otwórz w <ZnakAllegro wysokosc={11} /><ExternalLink size={12} /></a>}
     </div>
 
     {/* Trzy daty, na które klient pyta najczęściej: kiedy zgłosił, czy paczka

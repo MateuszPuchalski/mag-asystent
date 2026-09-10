@@ -4,6 +4,7 @@ import type { OfertaRozmowy as Dane } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { KafelOferty } from "../towar/Kafel";
 import { NaglowekSekcji } from "../ui";
+import { ZnakAllegro } from "../ui/ZnakAllegro";
 
 /**
  * Oferta, pod którą padło pytanie (0.178.0).
@@ -57,10 +58,14 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
       {oferta.zrodlo === "zamowienie" && <span className="text-[10px] text-slate-400">
         z jedynej pozycji zamówienia</span>}
       {oferta.link && <a href={oferta.link} target="_blank" rel="noopener noreferrer"
+        aria-label="Otwórz w Allegro"
         /* Odnośnik CICHNIE (0.249.0): był jedynym błękitem w kolumnie, więc
            ciągnął wzrok mocniej niż nazwa towaru — a to nawigacja, nie treść. */
         className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
-        Otwórz w Allegro<ExternalLink size={11} /></a>}
+        {/* Znak ZASTĘPUJE wyraz „Allegro" (0.252.0): to logotyp słowny, więc
+            obok tego wyrazu byłby jego powtórzeniem. Dostępna nazwa odnośnika
+            zostaje ta sama — niesie ją `aria-label` znaku. */}
+        Otwórz w <ZnakAllegro wysokosc={10} /><ExternalLink size={11} /></a>}
     </div>
 
     {o

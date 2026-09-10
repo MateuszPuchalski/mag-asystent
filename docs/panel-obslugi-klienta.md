@@ -715,6 +715,14 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Znak Allegro zastępuje wyraz w odnośnikach (0.252.0).** Cztery odnośniki
+„Otwórz w Allegro" dostają znak słowny marki. Zastępuje on wyraz, bo jest
+napisem — obok tego wyrazu byłby jego powtórzeniem. Nazwę dla czytnika ekranu
+niesie `aria-label` na kotwicy. Ścieżka pochodzi z pakietu `simple-icons`
+w wersji 16.30.0 i jest materiałem cudzym: nie rysujemy jej z pamięci i nie
+poprawiamy. Jest wklejona, bo hotlink do serwerów Allegro jest tu zakazany
+od 0.210.0.
+
 **Plakietka należy się WYJĄTKOWI, nie normie (0.251.0).** Wiersz zaczynał się od
 plakietki statusu, a w kubełkach roboczych status jest praktycznie stały. „CZEKA
 NA NAS" stało w każdym wierszu z rzędu, czyli emfaza szła na słowo, które niczego
