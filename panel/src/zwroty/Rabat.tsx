@@ -29,7 +29,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
 }) {
   const kolor = rabat.stan === "przyznany" ? "text-ranga-ok"
     : rabat.stan === "odrzucony" ? "text-ranga-zle"
-    : rabat.stan === "nie_wiadomo" ? "text-slate-400" : "text-slate-600";
+    : rabat.stan === "nie_wiadomo" ? "text-slate-500" : "text-slate-600";
 
   return <div className="mt-1 text-xs">
     <div className="flex flex-wrap items-center gap-1.5">
@@ -39,7 +39,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
         {zlote(rabat.prowizjaGrosze, rabat.waluta ?? "PLN")}</b>}
       {/* `MANUAL` czy `AUTOMATIC` — czyli czy ktoś musiał kliknąć, czy Allegro
           zrobiło to samo. To ta liczba mówi, ile pracy zdejmuje przycisk. */}
-      {rabat.typ === "AUTOMATIC" && <span className="text-slate-400">· automat Allegro</span>}
+      {rabat.typ === "AUTOMATIC" && <span className="text-slate-500">· automat Allegro</span>}
 
       {rabat.stan === "brak" && <Przycisk className="ml-auto text-xs" disabled={trwa}
         onClick={onZglos}>ZGŁOŚ RABAT</Przycisk>}
@@ -48,7 +48,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
     {/* Brak dopasowania mówi POWÓD — milczenie wygląda jak usterka panelu,
         a jest zerwanym ogniwem w danych (ten sam wzorzec co przy kartotekach). */}
     {rabat.stan === "nie_wiadomo" && rabat.powod &&
-      <p className="mt-0.5 text-slate-400">{rabat.powod}</p>}
+      <p className="mt-0.5 text-slate-500">{rabat.powod}</p>}
 
     {/* WNIOSEK SPOZA PANELU (0.176.0). Złożony ręcznie w panelu Allegro albo
         przez ich automat nie ma prawa być w naszym lustrze, dopóki nie
@@ -56,7 +56,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
         i to on tu mówi — a ekran przyznaje się, ile z tego wie: numeru
         wniosku ani kwoty prowizji zwrot nie podaje. */}
     {rabat.zrodlo === "zwrot" && rabat.powod &&
-      <p className="mt-0.5 text-slate-400">
+      <p className="mt-0.5 text-slate-500">
         {rabat.powod} Samego wniosku jeszcze nie pobraliśmy, więc numeru
         i kwoty prowizji nie znamy.</p>}
 

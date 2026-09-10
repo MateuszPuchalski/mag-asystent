@@ -65,7 +65,7 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
         i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane. */}
     {podglad && url === undefined &&
       <span className="mb-1 flex h-32 w-48 items-center justify-center rounded border border-dashed
-        border-slate-300 text-xs text-slate-400">wczytuję…</span>}
+        border-slate-300 text-xs text-slate-500">wczytuję…</span>}
     {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
         i rozpychałoby oś na cały ekran. Przycisk, bo obraz jest też wejściem
         do powiększenia — a `Powiekszenie` montuje się WYŁĄCZNIE z adresem,

@@ -24,7 +24,7 @@ export function PropozycjaPasowania({ p, trwa, onDecyzja }: {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <b className="font-mono">{p.czesc.symbol}</b>
-          <span className="text-slate-400">{negatyw ? "⇏" : "→"}</span>
+          <span className="text-slate-500">{negatyw ? "⇏" : "→"}</span>
           <b className="font-mono">{p.doCzego.symbol}</b>
           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{p.nazwaRoli}{p.pozycja ? ` · ${p.pozycja}` : ""}</span>
           {/* Tylko dla `copilot` (przyrost czwarty): `reczne` i `dobor` to para

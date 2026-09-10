@@ -159,7 +159,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                   wpisany na ślepo kazałby wystawić niewłaściwą korektę. */}
               <dt className="text-slate-500">Klient chciał</dt>
               <dd>{zam.fakturaZadana == null
-                ? <span className="text-slate-400">nie wiadomo</span>
+                ? <span className="text-slate-500">nie wiadomo</span>
                 : zam.fakturaZadana ? "faktury" : "paragonu"}</dd>
             </dl>
             {/* CAŁE zamówienie, nie tylko zwracane pozycje: „kupił trzy,
@@ -233,7 +233,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           jego pobrana treść: dokument bywa znany, zanim ticker dociągnie
           pozycje. */}
       {onFaktura && <div className="mt-3 border-t border-slate-200 pt-2">
-        <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           {ikonaDokumentu} Dokument sprzedaży</p>
         <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
           trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />

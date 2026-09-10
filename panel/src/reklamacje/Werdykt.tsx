@@ -222,7 +222,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
         Wiadomość do kupującego — wymagana przez Allegro, klient ją przeczyta
         <textarea className="field mt-1 min-h-20 w-full text-sm" value={wiadomosc}
           aria-label="Wiadomość do kupującego" onChange={(e) => setWiadomosc(e.target.value)} />
-        <span className={`mt-1 block font-normal tabular-nums ${zaDlugo ? "text-ranga-zle" : "text-slate-400"}`}>
+        <span className={`mt-1 block font-normal tabular-nums ${zaDlugo ? "text-ranga-zle" : "text-slate-500"}`}>
           {znakow} znaków{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}</span>
       </label>
 

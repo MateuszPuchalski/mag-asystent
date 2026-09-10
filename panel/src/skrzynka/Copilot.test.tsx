@@ -135,7 +135,11 @@ describe("plakietka i werdykt człowieka", () => {
       kopilot={kopilot({ nieaktualna: true })} />);
     const plakietka = container.querySelector("[title]") as HTMLElement;
     expect(plakietka.getAttribute("title")).toMatch(/starszą wiadomość/);
-    expect(plakietka.className).toContain("text-slate-400");
+    /* slate-600 od 0.255.0. Ta plakietka siedzi na `bg-slate-100`, a tam nawet
+       slate-500 daje 4.34:1 przy progu 4.5 — to jedyne miejsce w panelu, które
+       wymaga aż slate-600. Przygaszenie ZOSTAJE: świeża etykieta jest fioletowa
+       i nadal wygląda inaczej, co pilnuje test niżej. */
+    expect(plakietka.className).toContain("text-slate-600");
   });
 
   it("świeża etykieta jest wyraźna, a dwa kciuki są jedynym pomiarem", async () => {

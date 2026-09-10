@@ -86,7 +86,7 @@ function Dowody({ zastosowanie, wczytuje }: { zastosowanie: Zastosowanie | null;
     <ul className="mt-1 space-y-1">
       {zastosowanie.dowody.map((d) => <li key={d.id} className="rounded border border-slate-200 p-1.5 text-[11px]">
         <span className="rounded bg-slate-100 px-1 font-semibold text-slate-700">{d.nazwaRodzaju}</span>
-        <span className="ml-1 text-slate-400">{czas(d.at)}</span>
+        <span className="ml-1 text-slate-500">{czas(d.at)}</span>
         <p className="mt-0.5 text-slate-800">{d.tresc}</p>
         <p className="text-slate-500">{d.autor}{d.link && <> · <a className="underline" href={d.link} target="_blank" rel="noreferrer">źródło</a></>}</p>
       </li>)}

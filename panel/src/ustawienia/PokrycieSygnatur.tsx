@@ -11,6 +11,15 @@ import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
    znaczy jedno kliknięcie w Allegro albo jedną kartotekę w Subiekcie —
    i o tyle mniej zatwierdzania przy zwrotach.                              */
 
+/* ── TON OSTRZEGAWCZY TO `ranga-uwaga`, NIE BARWA MARKI (0.255.0) ────────────
+   Do 0.254.0 liczby wymagające reakcji dostawały `text-wertis-amber`. Zmierzone
+   w przeglądarce: #F7A600 przy 24 px i wadze 700 daje na bieli 2.02:1, przy
+   progu 3:1 dla tekstu tej wielkości. Ta barwa jest tłem pod ciemnym pismem
+   (tak działa `.btn-primary`) i nie nadaje się na samo pismo.
+
+   `ranga-uwaga` (#92400e) daje 7.09:1 i znaczy dokładnie „uwaga" — sąsiednie
+   liczby biorą już `ranga-ok` z tej samej rodziny. Przy okazji realizuje
+   decyzję właściciela o rozdzieleniu barwy MARKI od barwy OSTRZEŻENIA. */
 export const Liczba = ({ etykieta, ile, ton = "" }: { etykieta: string; ile: number; ton?: string }) =>
   <div className="flex flex-col">
     <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
@@ -28,7 +37,7 @@ const Lista = ({ tytul, opis, wiersze }: {
       {wiersze.map((w) => <li key={w.sygnatura} className="flex gap-3">
         <code className="rounded bg-slate-100 px-1.5 py-0.5 font-bold">{w.sygnatura}</code>
         <span className="mr-auto truncate text-slate-500">{w.nazwa}</span>
-        <span className="shrink-0 text-slate-400">{w.pozycji} poz.</span>
+        <span className="shrink-0 text-slate-500">{w.pozycji} poz.</span>
       </li>)}
     </ul>
   </div>;
@@ -41,7 +50,7 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
       <b className="mr-auto">Sygnatura → kartoteka Subiekta</b>
-      <span className="text-xs text-slate-400">pozycje pobranych zamówień</span>
+      <span className="text-xs text-slate-500">pozycje pobranych zamówień</span>
     </header>
 
     <div className="flex flex-wrap gap-8 p-4">

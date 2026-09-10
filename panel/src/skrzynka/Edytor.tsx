@@ -156,7 +156,7 @@ export function Edytor({
               {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
             <PrzyciskZalacznika dodaje={dodajeZalacznik}
               onDodaj={onDodajZalacznik} wylaczone={cudza} />
-            <span className="ml-auto text-[11px] text-slate-400">{szkic.length} znaków</span>
+            <span className="ml-auto text-[11px] text-slate-500">{szkic.length} znaków</span>
           </div>
           {copilot && <KartaSzkicu p={copilot} />}
         </>}

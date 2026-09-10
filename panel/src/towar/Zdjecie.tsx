@@ -50,6 +50,7 @@ function Plytka({ url, rozmiar, nazwa, tytul, brakTytul, brakSlowo, brakIkona, p
   const wspolne = "shrink-0 rounded-lg border border-slate-200 bg-slate-50";
 
   if (puste) {
+    /* kontrast: kafel pusty pokazuje ikonę, nie tekst */
     return <div style={styl} title={pusteTytul}
       className={`${wspolne} grid place-items-center border-dashed text-slate-400`}>{pusteIkona}</div>;
   }
@@ -58,7 +59,7 @@ function Plytka({ url, rozmiar, nazwa, tytul, brakTytul, brakSlowo, brakIkona, p
   }
   if (url === null) {
     return <div style={styl} title={brakTytul}
-      className={`${wspolne} grid place-items-center border-dashed text-[9px] font-bold uppercase leading-tight text-slate-400`}>
+      className={`${wspolne} grid place-items-center border-dashed text-[9px] font-bold uppercase leading-tight text-slate-500`}>
       {rozmiar >= 44 ? brakSlowo : brakIkona}
     </div>;
   }

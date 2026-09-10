@@ -78,7 +78,7 @@ export function DialogKonfliktu({
         <span className="font-mono text-xs text-slate-500">
           klucz idempotencji {szczegoly.kluczIdempotencji ?? "—"}
         </span>
-        <span className="text-xs text-slate-400">podwójne kliknięcie nie utworzy drugiej odpowiedzi</span>
+        <span className="text-xs text-slate-500">podwójne kliknięcie nie utworzy drugiej odpowiedzi</span>
         <div className="ml-auto flex gap-2">
           <Przycisk onClick={onWyslijMimoTo} disabled={!zgoda || wysyla}>
             {wysyla ? "WYSYŁAM…" : "WYŚLIJ MIMO TO"}

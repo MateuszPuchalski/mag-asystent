@@ -104,7 +104,7 @@ function Wpis({ wpis, onOtworzRozmowe }: {
   wpis: WpisHistorii; onOtworzRozmowe: (id: number) => void;
 }) {
   return <li className="flex gap-2 border-t border-slate-100 py-1.5 text-xs first:border-t-0">
-    <span className="w-20 shrink-0 pt-0.5 text-[11px] text-slate-400">{czas(wpis.at)}</span>
+    <span className="w-20 shrink-0 pt-0.5 text-[11px] text-slate-500">{czas(wpis.at)}</span>
     <span className="min-w-0 flex-1">
       {wpis.rodzaj === "zakup"
         ? <>

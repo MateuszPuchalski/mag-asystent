@@ -54,7 +54,7 @@ export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilo
       <span className="text-slate-500">{twierdzenia.length} twierdzeń</span>
       {ile > 0 && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         {ile} do sprawdzenia</span>}
-      <span className="ml-auto text-slate-400">{otwarte ? "zwiń" : "rozwiń"}</span>
+      <span className="ml-auto text-slate-500">{otwarte ? "zwiń" : "rozwiń"}</span>
     </button>
     <ul className="border-t border-slate-100 p-2 text-xs" aria-label="Twierdzenia szkicu ze źródłem" hidden={!otwarte}>
       {twierdzenia.map((t, i) => {
@@ -67,7 +67,7 @@ export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilo
           <span className={`ml-1.5 ${PEWNOSC[t.pewnosc]}`}>· {t.pewnosc}</span>
           {/* Obniżenie mówi agentowi coś o MODELU, nie o części: model uznał
               to zdanie za mocniejsze, niż pozwala jego źródło. */}
-          {t.obnizona && <span className="ml-1 text-slate-400">(pewność obniżona przez serwer)</span>}
+          {t.obnizona && <span className="ml-1 text-slate-500">(pewność obniżona przez serwer)</span>}
         </li>;
       })}
     </ul>

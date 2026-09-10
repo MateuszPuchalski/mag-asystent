@@ -96,7 +96,7 @@ export function Wyszukiwarka(
             <div className="truncate font-semibold">{t.name}</div>
             <div className="truncate text-xs">
               <span className="font-mono text-slate-600">{t.sym}</span>
-              <span className="text-slate-400"> · {t.locs?.join(", ") || "brak lokalizacji"}</span>
+              <span className="text-slate-500"> · {t.locs?.join(", ") || "brak lokalizacji"}</span>
             </div>
           </div>
         </button>

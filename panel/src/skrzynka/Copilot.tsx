@@ -170,7 +170,7 @@ export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
     ? "Rozpoznano starszą wiadomość — klient dopisał później"
     : `Copilot: ${NAZWA_PEWNOSCI[kopilot.pewnosc]}`}
     className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold ${
-      szara ? "bg-slate-100 text-slate-400" : "bg-violet-100 text-violet-800"}`}>
+      szara ? "bg-slate-100 text-slate-600" : "bg-violet-100 text-violet-800"}`}>
     <Sparkles size={11} />{NAZWA_KATEGORII[kopilot.kategoria]}</span>;
 }
 

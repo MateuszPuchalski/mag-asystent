@@ -53,7 +53,9 @@ describe("Zamówienie przy rozmowie", () => {
   it("po dociągnięciu: pozycje z nazwą, SKU i ceną oraz suma", () => {
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([pozycja()]) })} rozmowaId={1} />);
     expect(screen.getByText("Szarpak do NAC LS 46-450")).toBeInTheDocument();
-    expect(screen.getByText("SZR-NAC-46", { selector: ".text-slate-400" })).toBeInTheDocument();
+    /* Selektor niesie barwę, bo SKU ma być drugoplanowe wobec nazwy towaru.
+       Od 0.255.0 to slate-500 — slate-400 nie przechodziło progu kontrastu. */
+    expect(screen.getByText("SZR-NAC-46", { selector: ".text-slate-500" })).toBeInTheDocument();
     expect(screen.getByText(/1 × 45,99/)).toBeInTheDocument();
     expect(screen.getByText(/zapłacono 60,98/)).toBeInTheDocument();
     expect(screen.queryByText(/jeszcze nie pobrano/)).toBeNull();

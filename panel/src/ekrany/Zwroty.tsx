@@ -361,15 +361,26 @@ export function Zwroty() {
 
       {/* Filtr przewoźnika i kolejność. Oba liczą się w pamięci ekranu, tak
           samo jak kubełek — lista i tak przyjeżdża w całości. */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-2 py-1.5 text-xs">
-        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
+      {/* ── CAŁE PASMO PONAD PRÓG NARAZ (0.255.0) ────────────────────────────
+          Audyt wskazał w tym pasku pole wyboru i „Pobierz CSV". Przy pomiarze
+          okazało się, że `select` i „Synchronizuj" mają po 22 px, czyli też są
+          pod progiem 24×24 z WCAG 2.2 AA. O wysokości pasma decyduje najwyższy
+          element, więc podniesienie jednego celu kosztuje dokładnie tyle samo,
+          co podniesienie wszystkich — a zostawienie dwóch pod progiem w paśmie,
+          które się właśnie naprawia, nie miałoby sensu. */}
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-2 py-1 text-xs">
+        <select className="min-h-6 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
           aria-label="Przewoźnik" value={przewoznik}
           onChange={(e) => setPrzewoznik(e.target.value)}>
           <option value="">Każdy przewoźnik</option>
           {przewoznicy.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
-        <label className="flex items-center gap-1 text-slate-600">
-          <input type="checkbox" checked={poNadaniu}
+        {/* Pole trafienia to CAŁA etykieta, nie sam kwadracik (0.255.0). Kwadrat
+            miał 13×13 px — jedyna nieostylowana kontrolka w panelu, przy progu
+            24×24 z WCAG 2.2 AA. `h-4 w-4` to wzorzec z `wiedza/Tokeny.tsx`,
+            a `py-1` na etykiecie podnosi sam cel do 24 px. */}
+        <label className="flex min-h-6 cursor-pointer items-center gap-1.5 text-slate-600">
+          <input type="checkbox" checked={poNadaniu} className="h-4 w-4 shrink-0"
             onChange={() => setPoNadaniu((v) => !v)} />
           Od daty nadania
         </label>
@@ -386,15 +397,19 @@ export function Zwroty() {
           onClick={() => { setBladSync(""); synchronizuj.mutate(undefined,
             { onError: (e) => setBladSync((e as Error).message) }); }}
           title="Pobierz nowe zwroty z Allegro teraz"
-          className="ml-auto inline-flex items-center gap-1 rounded border border-slate-300
+          className="ml-auto inline-flex min-h-6 items-center gap-1 rounded border border-slate-300
             bg-white px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
           <RefreshCw size={12} className={synchronizuj.isPending ? "animate-spin" : ""} />
           {synchronizuj.isPending ? "Pobieram…" : "Synchronizuj"}
         </button>
         {/* Eksport zostawia ŚLAD w dzienniku, bo wynosi loginy kupujących —
             ta sama zasada co przy analizie i audycie. */}
-        <a href="/api/obsluga/zwroty/csv" className="text-slate-500 underline
-          underline-offset-2 hover:text-slate-800">Pobierz CSV</a>
+        {/* Postać przycisku, ale nadal ODNOŚNIK (0.255.0). Miał 69×16 px, czyli
+            poniżej progu 24×24, i był jedynym działaniem-odnośnikiem w pasku
+            samych przycisków. `href` zostaje — pobranie ma działać ze środkowego
+            kliknięcia i z menu przeglądarki, czego `onClick` by nie dał. */}
+        <a href="/api/obsluga/zwroty/csv"
+          className="btn-secondary min-h-6 px-2 py-0.5 text-xs">Pobierz CSV</a>
         {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token,
             uprawnienie, przerwę — a sam kod HTTP nie mówi nic. */}
         {bladSync && <span className="w-full text-red-700">{bladSync}</span>}

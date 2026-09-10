@@ -34,6 +34,65 @@ historii nie przepisujemy.
 ---
 
 
+## 0.255.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Trzy ustalenia audytu wizualnego, w tym dwie moje regresje z 0.251.0.**
+Audyt ośmiu ekranów obsługi znalazł cztery miejsca poniżej progu kontrastu
+WCAG AA. Dwa z nich weszły przy wydaniu, które NAZYWAŁO SIĘ poprawą
+czytelności — czyli wtedy, gdy uwagi było najwięcej.
+
+**Ramka bierze token, nie domyślną szarość Tailwinda.** Bez podanej barwy
+Tailwind rysuje `gray-200`, a projekt ma własny `slate-200`. W panelu stało
+320 gołych `border` naprzeciw 77 jawnych — cztery na pięć ramek miały barwę,
+której nikt nie wybrał. Jedna linia w konfiguracji zamiast 320 edycji.
+
+Powiedzmy wprost, czym to NIE jest: `#E5E7EB` daje na bieli 1.24:1, a
+`#E2E8F0` — 1.23:1. To ujednolicenie odcienia, nie poprawka kontrastu.
+Widać je tam, gdzie krawędzie się stykają: karta z obwódką z tokenu i
+jedenaście linii w innej szarości w środku.
+
+**Kontrast: cztery uchybienia, zero po poprawce.** Zmierzone w przeglądarce,
+ze składaniem alfy przez cały stos tła.
+
+```
+#F7A600  24 px/700 na bieli     2.02:1   próg 3.0   → ranga-uwaga  7.09:1
+slate-400  11 px na bieli        2.56:1   próg 4.5   → slate-500    4.76:1
+slate-500  14 px na slate-100    4.34:1   próg 4.5   → slate-600    6.92:1
+```
+
+Reguła jest dwustopniowa i to jest jej sedno. `body` ma `bg-slate-100`, więc
+tekst poza kartą siedzi na szarym — a tam nawet `slate-500` nie przechodzi.
+Na bieli wystarcza `slate-500`, na szarym musi być `slate-600`. Zamiana
+w jedną barwę naprawiłaby jedno miejsce i zepsuła drugie po cichu.
+
+Bursztyn zostaje barwą marki. `bg-wertis-amber` pod ciemnym pismem daje
+7.10:1 i nie jest ruszony; usterką było użycie barwy TŁA jako barwy liter.
+
+**Cele klikalne: próg 24×24 z WCAG 2.2 AA.** Pigułki kubełków skrzynki miały
+20 px, bo 0.251.0 ścisnęło je, żeby odzyskać wysokość dla listy pytań.
+Odzyskane piksele nie były moje do wzięcia. Wracają, a rachunek pokrywa
+wypełnienie pasma: zmierzone 145 → 149 px chromu, lista 682 → 678 px.
+Cztery piksele za próg dostępności.
+
+W pasku zwrotów audyt wskazał pole wyboru i „Pobierz CSV". Przy pomiarze
+okazało się, że `select` i „Synchronizuj" też mają po 22 px. O wysokości pasma
+decyduje najwyższy element, więc podniesienie jednego celu kosztuje tyle samo,
+co podniesienie wszystkich — poszły wszystkie cztery.
+
+**Bramek jest siedem, nie sześć, i to była dziura.** `npm test` w `server/`
+uruchamia wyłącznie testy serwera. Dało się przejść wszystkie bramki na
+zielono i wypchnąć panel z czerwonymi testami; CI je łapało, ale po fakcie.
+
+Nowy strażnik `panel/src/Kontrast.test.ts` pilnuje trzech par barw i jednej
+klasy odstępu. Czyta źródła przez `?raw`, tak jak strażnik ramy okna, i tak
+jak on potyka się o własne komentarze — dlatego zeruje je przed skanowaniem.
+Zwolnienie wymaga komentarza `kontrast: <powód>` z co najmniej trzema
+wyrazami, tym samym mechanizmem co `ergonomia: <powód>` na kolektorze.
+Każdą z czterech reguł sprawdzono, wstawiając naruszenie z powrotem: bramka,
+której nikt nie widział odmawiającej, nie jest bramką.
+
 ## 0.254.0 — 10 września 2026
 
 **Copilot przestaje opowiadać klientowi o naszej kuchni i zaczyna wskazywać

@@ -85,7 +85,7 @@ export function Silniki() {
       </p>
       <div className="space-y-1">
         {aliasy.map((a) => <div key={a.id} className="flex flex-wrap items-center gap-2 rounded border px-3 py-1.5 text-sm">
-          <span>„{a.tekst}" <span className="text-slate-400">=</span> <b>{a.silnik.etykieta}</b></span>
+          <span>„{a.tekst}" <span className="text-slate-500">=</span> <b>{a.silnik.etykieta}</b></span>
           <span className="text-xs text-slate-500">{a.dodal}</span>
           <Przycisk className="ml-auto" wariant="drugi" disabled={usunAlias.isPending}
             onClick={() => { setBlad(""); usunAlias.mutate({ id: a.id }, naBlad); }}>Usuń</Przycisk>
@@ -114,7 +114,7 @@ function PropozycjaPary({ z, trwa, onDecyzja }: {
   return <div className="rounded-lg border p-3">
     <div className="flex flex-wrap items-center gap-2">
       <b>{z.maszyna.etykieta}</b>
-      <span className="text-slate-400">→</span>
+      <span className="text-slate-500">→</span>
       <b>{z.silnik.etykieta}</b>
       <span className="ml-auto text-xs text-slate-500">{z.zaproponowal}</span>
     </div>
@@ -138,7 +138,7 @@ function Zatwierdzona({ z, trwa, onWycofaj }: {
   const [powod, setPowod] = useState("");
   const [wycofuje, setWycofuje] = useState(false);
   return <div className="flex flex-wrap items-center gap-2 rounded border px-3 py-2 text-sm">
-    <span>{z.maszyna.etykieta} <span className="text-slate-400">→</span> <b>{z.silnik.etykieta}</b></span>
+    <span>{z.maszyna.etykieta} <span className="text-slate-500">→</span> <b>{z.silnik.etykieta}</b></span>
     <span className="text-xs text-slate-500">{z.zdanieZrodla}</span>
     {!wycofuje && <Przycisk className="ml-auto" wariant="drugi" disabled={trwa}
       onClick={() => setWycofuje(true)}>Wycofaj</Przycisk>}

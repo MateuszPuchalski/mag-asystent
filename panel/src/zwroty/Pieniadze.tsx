@@ -109,7 +109,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
           onClick={() => onOdmow(kod, powod.trim() === "" ? null : powod.trim())}>
           {trwa ? "WYSYŁAM…" : "WYŚLIJ ODMOWĘ"}</Przycisk>
         <Przycisk className="text-xs" onClick={() => setOdmawiam(false)}>Anuluj</Przycisk>
-        <span className="ml-auto text-xs text-slate-400">{powod.length}/{LIMIT_POWODU}</span>
+        <span className="ml-auto text-xs text-slate-500">{powod.length}/{LIMIT_POWODU}</span>
       </div>
       {/* Klient przeczyta ten powód w Allegro — to nie jest notatka wewnętrzna. */}
       <p className="text-[11px] text-slate-500">Powód trafia do klienta w Allegro.</p>

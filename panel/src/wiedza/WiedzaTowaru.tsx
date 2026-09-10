@@ -183,7 +183,7 @@ function Trafienia({ tytul, lista, pusto, strona }: {
 
 function WpisPasowania({ p, negatyw }: { p: Pasowanie; negatyw: boolean }) {
   return <li className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1 text-sm ${negatyw ? "border-red-200" : "border-slate-200"}`}>
-    <b className="font-mono">{p.czesc.symbol}</b><span className="text-slate-400">⇏</span><b className="font-mono">{p.doCzego.symbol}</b>
+    <b className="font-mono">{p.czesc.symbol}</b><span className="text-slate-500">⇏</span><b className="font-mono">{p.doCzego.symbol}</b>
     {p.zdaniePowodu && <span className="text-red-900">{p.zdaniePowodu}</span>}
     <span className="basis-full text-[11px] text-slate-500">{p.zdanieZrodla}</span>
     <Wycofanie p={p} />

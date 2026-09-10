@@ -32,13 +32,13 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
       <b className="mr-auto">Copilot — rozpoznawanie kategorii</b>
-      <span className="text-xs text-slate-400">tokeny liczone od pierwszego wywołania</span>
+      <span className="text-xs text-slate-500">tokeny liczone od pierwszego wywołania</span>
     </header>
 
     <div className="flex flex-wrap gap-8 p-4">
       <Liczba etykieta="wywołań" ile={dane.wywolan} />
       <Liczba etykieta="nieudanych" ile={dane.bledow}
-        ton={dane.bledow > 0 ? "text-wertis-amber" : ""} />
+        ton={dane.bledow > 0 ? "text-ranga-uwaga" : ""} />
       <Liczba etykieta="tokenów wejścia" ile={dane.tokeny.wej} />
       <Liczba etykieta="tokenów wyjścia" ile={dane.tokeny.wyj} />
       <Liczba etykieta="z cache" ile={dane.tokeny.cacheOdczyt} />
@@ -50,7 +50,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         ? "—" : `${Math.round(dane.udzialCache * 100)} %`}</b>.
       {/* Zero przy niezerowej liczbie wywołań to objaw, nie stan spoczynku. */}
       {dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0 &&
-        <span className="font-semibold text-wertis-amber"> Cache się nie włączył —
+        <span className="font-semibold text-ranga-uwaga"> Cache się nie włączył —
           prefiks instrukcji jest krótszy niż minimum modelu albo coś go rozbija.</span>}
     </p>
 
@@ -73,7 +73,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
       const ocenionych = uzyte + dane.szkice.odrzuconych;
       return <p className="border-t p-4 text-sm text-slate-600" aria-label="Szkice odpowiedzi">
         Szkice odpowiedzi: <b>{sz?.wywolan ?? 0}</b> wywołań
-        {sz && sz.bledow > 0 && <>, <b className="text-wertis-amber">{sz.bledow}</b> nieudanych</>},
+        {sz && sz.bledow > 0 && <>, <b className="text-ranga-uwaga">{sz.bledow}</b> nieudanych</>},
         {" "}rachunek <b>{(sz?.kosztUsd ?? 0).toFixed(2)} USD</b> ({zl(sz?.kosztUsd ?? 0)}).
         {" "}Użytych: <b>{proc(uzyte, ocenionych)}</b> z {ocenionych} ocenionych
         {" "}(wstawionych {dane.szkice.wstawionych}, zastąpionych {dane.szkice.zastapionych},
@@ -91,7 +91,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
 
     {dane.wgKategorii.length > 0 && <div className="border-t p-4">
       <table className="w-full text-sm">
-        <thead><tr className="text-left text-xs uppercase text-slate-400">
+        <thead><tr className="text-left text-xs uppercase text-slate-500">
           <th className="pb-1">kategoria</th><th className="pb-1">rozmów</th>
           <th className="pb-1">ocen</th><th className="pb-1">trafnych</th>
         </tr></thead>

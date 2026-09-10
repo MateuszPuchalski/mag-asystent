@@ -715,6 +715,17 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Szarość tekstu ma DWA stopnie, bo tło rozstrzyga (0.255.0).** `body` ma
+`bg-slate-100`, więc tekst poza kartą siedzi na szarym. Na bieli wystarcza
+`slate-500` (4.76:1), na `slate-100` musi być `slate-600` (6.92:1) — tam
+`slate-500` daje 4.34:1 przy progu 4.5. `slate-400` nie przechodzi nigdzie
+i zostaje wyłącznie na ikonach, które progu dla pisma nie mają. Pilnuje tego
+`panel/src/Kontrast.test.ts`; zwolnienie wymaga komentarza `kontrast: <powód>`.
+
+**Bursztyn marki jest TŁEM, nie pismem (0.255.0).** `#F7A600` na bieli daje
+2.02:1, a pod ciemnym pismem — 7.10:1. `bg-wertis-amber` zostaje;
+`text-wertis-amber` jest zakazane, a ostrzeżenia biorą `ranga-uwaga`.
+
 **Znak Allegro zastępuje wyraz w odnośnikach (0.252.0).** Cztery odnośniki
 „Otwórz w Allegro" dostają znak słowny marki. Zastępuje on wyraz, bo jest
 napisem — obok tego wyrazu byłby jego powtórzeniem. Nazwę dla czytnika ekranu

@@ -52,6 +52,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
       <span className="font-mono text-[11px] text-slate-500" title={zamowienie.externalId}>
         {zamowienie.externalId.slice(0, 8)}…</span>
       {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach. */}
+      {/* kontrast: to przycisk ikonowy, ikona nie niesie pisma */}
       <button type="button" title="Kopiuj numer zamówienia"
         className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
         onClick={() => {
@@ -87,7 +88,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
                   <span className="truncate">{p.nazwa}</span>
-                  {p.sku && <span className="shrink-0 text-slate-400">{p.sku}</span>}
+                  {p.sku && <span className="shrink-0 text-slate-500">{p.sku}</span>}
                   <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
@@ -108,7 +109,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
           </ul>
           {/* Podpis źródeł obu kafli (§4.3): dwa obrazy obok siebie bez podpisu
               wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-500">
             {/* JEDNA LINIA, oba źródła nadal nazwane (0.249.0). §4.3 żąda, żeby
                 przy każdym fakcie było widać źródło — nie żąda zdania złożonego.
                 Dwa wiersze szarej prozy pod każdą pozycją ważyły więcej niż

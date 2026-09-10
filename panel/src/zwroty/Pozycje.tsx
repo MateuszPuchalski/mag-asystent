@@ -255,7 +255,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           <p className="mt-0.5 text-xs">
             {p.url
               ? <Link href={p.url}>Zobacz ofertę</Link>
-              : <span className="text-slate-400">Allegro nie podało adresu oferty</span>}
+              : <span className="text-slate-500">Allegro nie podało adresu oferty</span>}
           </p>
           {p.powodKomentarz && <p className="mt-1 text-xs italic text-slate-600">
             „{p.powodKomentarz}"</p>}
