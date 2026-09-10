@@ -11,7 +11,7 @@ describe("Powiązanie wiadomości na osi", () => {
     id: "msg-1", rodzaj: "wiadomosc", autor: "kupujacy_7", odKlienta: true,
     tresc: "Ta sztuka pasuje?", at: "2026-09-01T10:00:00Z", ofertaId: null, ...n,
   });
-  const os = (w: WpisOsi) => render(<Os wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
+  const os = (w: WpisOsi) => render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
   it("oferta z nazwą z zamówienia, gdy nazwę znamy", () => {
@@ -47,7 +47,7 @@ describe("Rodzaj wpisu widać, zanim się go przeczyta", () => {
     id: "msg-1", rodzaj: "wiadomosc", autor: "kupujacy_7", odKlienta: true,
     tresc: "Ta sztuka pasuje?", at: "2026-09-01T10:00:00Z", ofertaId: null, ...n,
   });
-  const os = (wpisy: WpisOsi[]) => render(<Os wpisy={wpisy} zrodloPomiaru={null}
+  const os = (wpisy: WpisOsi[]) => render(<Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null}
     mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
   it("wiadomość klienta i nasza odpowiedź mają RÓŻNE podpisy rodzaju", () => {

@@ -753,6 +753,28 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Oś rozmowy zjeżdża na dół sama (0.260.0).** Serwer oddaje wpisy od
+najstarszego, a panel do 0.259.0 nie przewijał osi ani razu: w `panel/src`
+nie było ani jednego `scrollTop`. Otwarcie rozmowy dłuższej niż okno stawiało
+agenta na jej najstarszej wiadomości. Celem zjazdu jest DÓŁ listy, nie ostatnie
+pytanie klienta — skok na pytanie chowałby wszystko, co po nim padło. Przycisk
+„Pokaż" pod banerem nowej wiadomości zjeżdża osobnym licznikiem, bo sam nowy
+wpis dogania wyłącznie agenta, który i tak stał na dole.
+
+**Pytanie klienta przypina się nad edytorem, ale tylko poza kadrem (0.260.0).**
+W kolumnie rozmowy przewija się jedynie oś; nagłówek, pasek zdarzeń i edytor
+stoją. Pasek (`skrzynka/PrzypietePytanie.tsx`) pokazuje ostatnią wypowiedź
+KLIENTA przyciętą do dwóch wierszy. Wchodzi wyłącznie wtedy, gdy tamta
+wypowiedź wypadła z kadru: widoczny zawsze dublowałby zdanie o krok wyżej,
+a warunkowy sam niesie treść „odjechałeś od pytania". Decyduje o tym
+`IntersectionObserver`, którego jsdom nie ma — atrapa stoi
+w `panel/src/test/kadr.ts` i nie udaje układu.
+
+**Notatka wewnętrzna nazywa się notatką (0.260.0).** Edytor mówił „Komentarz
+wewnętrzny" i „Dodaj komentarz", a oś rozmowy w tym samym oknie — „NOTATKA
+WEWNĘTRZNA". Reklamacje i dyskusje mają `notatka` w API od dawna. Decyzja
+właściciela: notatka. Nazwy w kodzie zostają, bo ekran ich nie pokazuje.
+
 **Drabina typograficzna ma cztery szczeble nazwane ROLĄ (0.258.0).**
 `text-podpis` 11/16 (metadane, plakietka), `text-tresc` 15/22 (to, co się
 czyta), `text-naglowek` 17/24 (nagłówek karty i sekcji), `text-tytul` 24/30

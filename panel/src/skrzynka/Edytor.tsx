@@ -81,7 +81,16 @@ export function Edytor({
         <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${wKomentarzu
           ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-500"}`}
           onClick={() => setTryb("komentarz")}>
-          <MessageSquare size={13} />Komentarz wewnętrzny
+          {/* ── JEDNA NAZWA, NIE DWIE (0.260.0) ──────────────────────────────
+              Edytor mówił „Komentarz wewnętrzny" i „Dodaj komentarz", a oś
+              rozmowy dwa centymetry wyżej — „NOTATKA WEWNĘTRZNA". To samo
+              okno, ta sama rzecz, dwa słowa. Decyzja właściciela: notatka.
+              Reklamacje i dyskusje mają zresztą `notatka` już w API, więc
+              „komentarz" był tu ostatnim śladem, nie regułą. Nazwy w kodzie
+              (`komentarz`, `onDodajKomentarz`, token `os-komentarz`) zostają:
+              ekran ich nie pokazuje, a przemianowanie ich w tym samym wydaniu
+              utopiłoby trzy widoczne zmiany w diffie bez jednej widocznej. */}
+          <MessageSquare size={13} />Notatka wewnętrzna
         </button>
       </div>
       {/* ── COPILOT W TYM SAMYM RZĘDZIE (0.249.0) ────────────────────────────
@@ -97,7 +106,7 @@ export function Edytor({
     {wKomentarzu
       ? <>
           <textarea className="field min-h-[88px] text-tresc" value={komentarz}
-            aria-label="Komentarz wewnętrzny — zobaczy go tylko zespół"
+            aria-label="Notatka wewnętrzna — zobaczy ją tylko zespół"
             onChange={(e) => onKomentarz(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
           {agenci.length > 0 && <fieldset className="mt-2">
@@ -116,9 +125,9 @@ export function Edytor({
                 wczoraj" bez przejmowania sprawy. */}
             <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
               onClick={onDodajKomentarz} className="px-5 py-2.5 text-tresc shadow-sm">
-              <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj komentarz"}
+              <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj notatkę"}
             </Przycisk>
-            <span className="text-xs text-amber-800">Widoczne tylko dla zespołu.</span>
+            <span className="text-xs text-amber-800">Widoczna tylko dla zespołu.</span>
             <span className="ml-auto text-podpis text-amber-700/70">{komentarz.length} znaków</span>
           </div>
         </>

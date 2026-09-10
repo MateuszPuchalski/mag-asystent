@@ -119,7 +119,7 @@ describe("Szkic Copilota w edytorze", () => {
 
   it("w trybie komentarza nie ma ani przycisku, ani karty — szkic jest dla klienta", async () => {
     edytor(copilot({ szkic: szkic() }));
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
     expect(screen.queryByRole("button", { name: /Ułóż odpowiedź/ })).toBeNull();
     expect(screen.queryByRole("region", { name: "Szkic Copilota" })).toBeNull();
   });
