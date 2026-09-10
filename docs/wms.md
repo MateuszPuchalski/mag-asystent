@@ -29,6 +29,7 @@ $env:WMS_DEMO_PASSWORD = 'wybrane-przez-ciebie-haslo'
 npm -w server run wms:demo
 $env:WERTIS_ENV_FILE = Join-Path $env:TEMP 'nieistniejacy-wms-demo.local'
 $env:SGT_MODE = 'seeded'
+$env:SRODOWISKO = 'DEMO WMS'
 $env:WMS_SELLASIST_ENABLED = '0'
 npm run dev:api
 ```

@@ -55,6 +55,15 @@ Testy sprawdzają wycofanie całej partii po błędzie ruchu oraz po zmianie wer
 Przeglądarka odrzuca stary podgląd po edycji i rozpoznaje już zapisany numer dokumentu.
 Ostatni pomiar wydajności realizacji zamówień pochodzi z wersji 0.270.0; zapis wyników wskazuje tę granicę.
 
+## CI i przegląd zmiany
+
+Zmiana jest dostępna w [szkicu PR #415](https://github.com/MateuszPuchalski/mag-asystent/pull/415).
+Commit `5698856` przeszedł testy WMS, build i przeglądarkę na Windows oraz Linux.
+Przeszły też pełne bramki serwera, panelu, instalatora, workera Sfery i Androida z budową APK debug.
+Źródło: [WMS CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559134)
+i [serwer/panel CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099).
+Szkic pozostaje otwarty do odbioru rzeczywistych integracji i sprzętu.
+
 Ograniczenia integracji i instrukcja odbioru stoją w `docs/wms.md`.
 Odbiór produkcyjny pozostaje otwarty: rzeczywiste pliki sklepu, dokumenty ERP i sprzęt nie zostały przetestowane.
 Nowy WMS pracuje w przeglądarce; natywne ekrany kompletacji Androida nie zostały dodane.

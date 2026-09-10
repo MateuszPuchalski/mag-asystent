@@ -120,8 +120,7 @@
   "unverified": [
     "Live order platform import and carrier handoff",
     "Physical scanners, printers and production hardware",
-    "Opening inventory and reconciliation with actual ERP documents",
-    "Remote CI has not been run"
+    "Opening inventory and reconciliation with actual ERP documents"
   ],
   "sellasist": {
     "passed": 11,
@@ -149,5 +148,20 @@
       "5000-SKU opening with ledger verification"
     ],
     "passed": 4
+  },
+  "remoteCi": {
+    "androidRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559082",
+    "wmsRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559134",
+    "commit": "5698856ec7cded49de1a763de0e924f550bff4de",
+    "pullRequest": "https://github.com/MateuszPuchalski/mag-asystent/pull/415",
+    "conclusions": {
+      "WMS Windows": "success",
+      "Installer": "success",
+      "Server and panel": "success",
+      "WMS Linux": "success",
+      "Android tests and debug APK": "success",
+      "Sfera worker": "success"
+    },
+    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099"
   }
 }
