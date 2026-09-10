@@ -44,6 +44,20 @@ vi.mock("../api/rozmowy", async () => {
         tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, wymiary: { kartotek: 0, wymiarow: 0 },
         fts: { dostepne: false, wpisow: 0 } },
     }),
+    /* Skuteczność doboru (0.267.0): jedenaście dróg i dziewięć statusów, bo
+       karta wypisuje je co do jednego — także te z zerem. */
+    useSkutecznoscDoboru: () => ({
+      data: {
+        dni: 30, granicaHistorii: "2026-08-31T22:00:00Z", wyborow: 4,
+        drogi: ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie",
+          "silnik", "pasowanie", "oem", "pelnotekst", "wymiar"]
+          .map((droga) => ({ droga, wybranych: droga === "oem" ? 4 : 0, zatwierdzonych: 0 })),
+        medianaDoWyboruMin: 12, wyborowZCzasem: 4,
+        osoby: [], bezKonta: 0,
+        naStole: { doborow: 0, statusy: [] },
+        progWiarygodnosci: 20, podstawaPrawna: "Monitoring pracowniczy (Kodeks pracy art. 22² i nast.).",
+      },
+    }),
   };
 });
 
@@ -66,6 +80,9 @@ describe("Ustawienia obsługi", () => {
     expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
     /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
     expect(screen.getByText("Wiedza z opisów kartotek i ofert")).toBeInTheDocument();
+    /* Ekran bez drzwi to ekran, którego nie ma — nagłówek nowej karty
+       jest jedynym dowodem, że wpięcie doszło do skutku. */
+    expect(screen.getByText(/Skuteczność doboru/)).toBeInTheDocument();
     expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
     /* Wyłączony Copilot nie zostawia po sobie pustej karty na ekranie. */
     expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).not.toBeInTheDocument();

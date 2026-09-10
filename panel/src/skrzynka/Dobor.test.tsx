@@ -64,16 +64,22 @@ const PUSTE: KandydaciDoboru = {
   kotwice: [],
   kandydaci: [], negatywne: [],
   drogi: [
-    { droga: "symbol", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu" },
-    { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN" },
-    { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM" },
+    /* `akcja` od 0.267.0 — nadaje ją serwis w tej samej gałęzi, w której pisze
+       powód; szczeble, których nie da się odblokować w rozmowie, jej nie mają. */
+    { droga: "symbol", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu",
+      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
+    { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN",
+      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
+    { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM",
+      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
     { droga: "zastosowanie", sprawdzona: false, wynikow: 0, powod: "etap E2" },
     { droga: "silnik", sprawdzona: false, wynikow: 0, powod: "nie wiadomo, jaki silnik stoi w maszynie" },
     { droga: "pasowanie", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty" },
     { droga: "oferta", sprawdzona: false, wynikow: 0, powod: "rozmowa nie jest powiązana z ofertą" },
     { droga: "zamiennik", sprawdzona: false, wynikow: 0, powod: "bez kartoteki oferty" },
     { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał nazwy części ani maszyny" },
-    { droga: "wymiar", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)" },
+    { droga: "wymiar", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)",
+      akcja: { rodzaj: "wymiar", etykieta: "Wpisz wymiar z jednostką" } },
     { droga: "wyszukiwarka", sprawdzona: false, wynikow: 0, powod: "wybór ręczny" },
   ],
 };
@@ -127,6 +133,34 @@ describe("zakładka doboru", () => {
     /* Bez wyboru nie ma czego zatwierdzać. */
     expect(screen.queryByRole("button", { name: /ZATWIERDŹ DOBÓR/ })).not.toBeInTheDocument();
     expect(kandydaci).toHaveBeenCalledWith(4821);
+  });
+
+  it("przy pustej liście powody stoją w WIDOCZNYM tekście, nie tylko w tooltipie", () => {
+    /* Do 0.266.0 jedyne, co agent widział, to ogólnik „Uzupełnij dane wejściowe
+       albo wskaż kartotekę z wyszukiwarki", a konkretne zdania serwisu siedziały
+       w `title` czipów. Jedenaście czipów, jedenaście tooltipów. */
+    pokaz(dobor());
+    const lista = screen.getByLabelText("Czego brakuje do doboru");
+    expect(lista.textContent).toContain("agent nie wpisał numeru OEM");
+    expect(lista.textContent).toContain("nie wiadomo, jaki silnik stoi w maszynie");
+    expect(lista.textContent).toContain("wpisał wymiarów w parametrach doboru");
+  });
+
+  it("szczebel z akcją dostaje przycisk, a szczebel bez akcji zostaje samym zdaniem", async () => {
+    /* Przycisk, który nie pomaga, uczy klikania w nic — dlatego brak akcji jest
+       treścią. „Rozmowa nie jest powiązana z ofertą" nie da się naprawić na tym
+       ekranie i nie udaje, że się da. */
+    pokaz(dobor());
+    const lista = screen.getByLabelText("Czego brakuje do doboru");
+    expect(lista.textContent).toContain("rozmowa nie jest powiązana z ofertą");
+    const wiersze = [...lista.querySelectorAll("li")];
+    const zOferta = wiersze.find((w) => w.textContent?.includes("nie jest powiązana z ofertą"))!;
+    expect(zOferta.querySelector("button")).toBeNull();
+
+    /* Akcja „dane" wchodzi w tryb edycji danych wejściowych — bez opuszczania
+       rozmowy, zgodnie z rozstrzygnięciem właściciela. */
+    await userEvent.click(screen.getAllByRole("button", { name: "Wpisz symbol lub numer" })[0]);
+    expect(screen.getByLabelText("Marka")).toBeInTheDocument();
   });
 
   it("czip „zgodne wymiary” pominięty niesie powód, a kandydat z tej drogi nazywa ją po polsku", () => {

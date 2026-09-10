@@ -1347,6 +1347,23 @@ Kandydat dalej **nie wpisuje się sam** do zakładki Dobór. Automatyczny wybór
 łamałby wzorzec trzymany w całym module: dane trafiają tam na kliknięcie
 agenta i tylko w puste pola, a propozycję składa człowiek.
 
+**Powód pominięcia przestaje być tooltipem (0.267.0).** Każdy pominięty
+szczebel produkuje zdanie mówiące, co zrobić dalej. Do 0.266.0 panel wsadzał je
+w atrybut `title` czipa: jedenaście czipów, jedenaście tooltipów, a agent
+z pustą listą czytał jeden ogólnik.
+
+Przy pustej liście kandydatów te zdania stoją teraz jako widoczna lista,
+a szczeble, których brak da się zamknąć bez opuszczania rozmowy, dostają
+przycisk. Rodzaj akcji nadaje SERWIS, w tej samej gałęzi, w której pisze powód
+— panel nie rozbiera polskiego zdania, żeby zgadnąć przycisk. Etykieta mówi,
+CO wpisać („Wpisz numer OEM"), a nie „wpisz dane".
+
+Rodzaje są trzy, bo tyle da się zrobić na tym ekranie: uzupełnienie danych
+wejściowych, wpisanie wymiaru z jednostką i zaproponowanie zabudowy silnika,
+gdy alias stoi już w słowniku. Szczebel bez akcji zostaje samym zdaniem
+i to jest treść, nie niedoróbka: przycisk, który nie pomaga, uczy klikania
+w nic.
+
 ### 11.3. Poziomy pewności
 
 Dopasowanie bywa potwierdzone przez producenta, katalogiem dostawcy, pomiarem
@@ -2161,6 +2178,44 @@ niejednoznaczny timeout, konflikt świeżości, wymuszone przejęcie i eksport
 danych.
 
 **Treść wiadomości nie trafia do ogólnego dziennika zdarzeń.**
+
+### 19a. Skuteczność doboru — raport za zębatką (0.267.0)
+
+`dobor_rozmowy.wybrany_droga` zapisuje, którym z jedenastu szczebli §11.2
+przyszedł kandydat wybrany przez agenta. Kolumna stała w bazie od 0.229.0
+i miała w całym repozytorium dwóch czytelników: odczyt jednego wiersza do
+ekranu oraz dwa zapisy. Nie dało się więc odpowiedzieć na pytanie, od którego
+zależy każda decyzja o rozwoju doboru — czy szczebel „zgodne wymiary" dał
+kiedykolwiek wybraną część.
+
+Raport liczy z KSIĘGI ZDARZEŃ, nie ze stanu tabeli, i to jest jego główna
+decyzja projektowa. Tabela pamięta ostatni wybór, więc agent, który zmienił
+zdanie, kasuje z niej pierwszą drogę bez śladu. Status `confirmed` też jest
+cofalny. Do tego retencja kasuje rozmowy sprzed progu skrzynki, a dobór wisi
+na kaskadzie — raport z tabeli potrafiłby zmienić liczby między dwoma
+odświeżeniami strony. Księga zdarzeń nie ma klucza obcego do rozmowy
+i przeżywa sprzątanie.
+
+Zatwierdzenie kredytuje wyłącznie wybór bezpośrednio je poprzedzający. Agent,
+który wziął kandydata z pełnego tekstu, zmienił zdanie na trafienie po numerze
+i dopiero to zatwierdził, nie dopisuje punktu pełnemu tekstowi.
+
+Szczebel bez ani jednego wyboru **zostaje na liście**, z zerem i z osobnym
+zdaniem pod tabelą. To jest najcenniejsze ustalenie tego raportu: droga,
+którą utrzymujemy w kodzie, a która nikomu jeszcze nie odpowiedziała.
+
+**Oś osobowa i Kodeks pracy.** Decyzja właściciela: raport pokazuje, kto jak
+pracuje. Pomiar per osoba to monitoring pracowniczy wg art. 22² Kodeksu pracy
+— wymaga zapisu w regulaminie albo obwieszczeniu oraz uprzedzenia pracowników
+dwa tygodnie wcześniej. Zdanie o tym jedzie z serwera w ładunku i stoi pod
+tabelą osób, więc karta nie ma jak go zgubić.
+
+Trzy hamulce, wprost z precedensu raportu wydajności magazynu. Mediana czasu
+pokazuje się dopiero od progu wiarygodności, bo mediana z czterech doborów
+przy nazwisku i tak zostanie przeczytana jako werdykt. Każda liczba pochodna
+niesie swoje `n`. I nie ma tu ŻADNEJ kolumny rankingowej: „najczęściej kończy
+na" mówi, JAK ktoś pracuje, czyli komu warto pokazać bazę wiedzy, a nie kto
+jest lepszy.
 
 ## 20. Bezpieczeństwo
 
@@ -3654,6 +3709,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
 | Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
+| Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |

@@ -1653,6 +1653,35 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.268.0 nie wymaga niczego ręcznego — poza jedną decyzją.**
+
+Migracji nie ma, kolumn nie przybywa. **Panel obsługi trzeba przebudować**
+(`npm run build`), bo obie zmiany żyją po jego stronie.
+
+Pierwsza zmiana jest w zakładce Dobór. Gdy żaden szczebel nic nie znalazł,
+agent widzi teraz listę konkretnych braków zamiast jednego ogólnika. Część
+z nich ma przy sobie przycisk, który załatwia sprawę bez opuszczania rozmowy.
+
+Druga to nowa karta w ustawieniach za zębatką: **skuteczność doboru**. Mówi,
+którym z jedenastu szczebli przyszedł kandydat faktycznie wybrany przez agenta,
+i ile z tych wyborów doszło do zatwierdzenia. Szczebel bez ani jednego wyboru
+zostaje na liście z zerem — to jest odpowiedź, nie brak danych.
+
+**DECYZJA, KTÓRĄ TRZEBA PODJĄĆ PRZED WŁĄCZENIEM.** Karta ma tabelę z podziałem
+na osoby. To jest monitoring pracowniczy w rozumieniu art. 22² Kodeksu pracy.
+Wymaga zapisu w regulaminie pracy albo w obwieszczeniu oraz uprzedzenia
+pracowników na dwa tygodnie przed uruchomieniem. Bez tego dane nie nadają się
+do zastosowań kadrowych. Zdanie o tym stoi pod tabelą w panelu.
+
+Raport nie liczy tempa ani skuteczności pojedynczych osób. Pokazuje, którą
+drogą kto najczęściej kończy — czyli komu warto pokazać bazę wiedzy. Mediana
+czasu pojawia się dopiero od dwudziestu wyborów, bo niżej byłaby szumem
+postawionym przy nazwisku.
+
+Okno raportu sięga najwyżej tam, gdzie sięgają rozmowy. Sprzątanie kasuje
+wątki sprzed `ALLEGRO_INBOX_OD`, więc świeża instalacja pokaże krótszą
+historię, niż obiecuje selektor. Karta wypisuje ten próg pod liczbami.
+
 **Aktualizacja do 0.264.0 przebudowuje DWIE tabele — zrób kopię bazy.**
 
 To jedyna czynność ręką, ale nie warto jej pominąć. Migracja przepisuje

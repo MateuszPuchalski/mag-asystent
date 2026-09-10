@@ -15,7 +15,7 @@ import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka"
 import { Kafel } from "../towar/Kafel";
 import { PasowanieForm } from "../wiedza/PasowanieForm";
 import { useZaproponujPasowanie, useZaproponujZabudowe } from "../api/wiedza";
-import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_ROLI } from "./statusy";
+import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_DROGI, NAZWA_ROLI } from "./statusy";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1) — trzecia zakładka kolumny
@@ -45,12 +45,6 @@ const POLA: Array<{ klucz: keyof Omit<DaneDoboru, "parametry">; nazwa: string; p
   { klucz: "oem", nazwa: "Numer OEM / symbol", przyklad: "532 19 93-77" },
   { klucz: "nazwaCzesci", nazwa: "Część", przyklad: "szarpak rozrusznika" },
 ];
-
-const NAZWA_DROGI: Record<DrogaDoboru, string> = {
-  symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
-  pasowanie: "pasuje do części", zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst",
-  wyszukiwarka: "wyszukiwarka", wymiar: "zgodne wymiary",
-};
 
 const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: string }> = {
   potwierdzone: { etykieta: "potwierdzone", klasa: "bg-emerald-100 text-emerald-800" },
@@ -361,8 +355,10 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
       {kandydaci.isLoading && <p className="mt-2 text-xs text-slate-500">Szukam…</p>}
       {kandydaci.error && <p className="mt-2 text-xs text-red-700">{(kandydaci.error as Error).message}</p>}
       {kandydaci.data && kandydaci.data.kandydaci.length === 0 &&
-        <p className="mt-2 text-xs text-slate-500">Żadna sprawdzona droga nic nie dała. Uzupełnij dane
-          wejściowe albo wskaż kartotekę z wyszukiwarki.</p>}
+        <CzegoBrakuje drogi={kandydaci.data.drogi}
+          onDane={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}
+          onZabudowa={zPola ? zaproponujZPola : null}
+          trwa={zaproponujZabudowe.isPending} />}
       <ul className="mt-2 space-y-2">
         {kandydaci.data?.kandydaci.map((k) => {
           /* Kandydat bez kartoteki (E3): numer OEM, którego nie ma w żadnym
@@ -558,6 +554,62 @@ function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
  * milczący ekran każe zgadywać, czy automat szukał i nie znalazł, czy nie
  * miał czego szukać.
  */
+/**
+ * CZEGO BRAKUJE — powody pominięcia jako WIDOCZNY tekst, z przyciskiem (0.267.0).
+ *
+ * Do 0.266.0 stał tu jeden ogólnik: „Żadna sprawdzona droga nic nie dała.
+ * Uzupełnij dane wejściowe albo wskaż kartotekę z wyszukiwarki". Tymczasem
+ * serwis produkuje zdania konkretne — „nie wiadomo, jaki silnik stoi w NAC
+ * LS 46-450", „parametry nie mają wymiaru z jednostką" — i wsadzał je
+ * wyłącznie w `title` czipa. Jedenaście czipów, jedenaście tooltipów.
+ *
+ * TYLKO PRZY PUSTEJ LIŚCIE. Wypisywanie jedenastu powodów, gdy kandydaci są,
+ * byłoby hałasem; zdanie jest warte miejsca dokładnie wtedy, gdy agent utknął.
+ *
+ * AKTYWNE PIERWSZE. Szczeble z przyciskiem stoją na górze, bo to one prowadzą
+ * o krok dalej. Reszta zostaje tekstem — i to jest treść, nie niedoróbka:
+ * przycisk, który nie pomaga, uczy klikania w nic.
+ *
+ * Czipy `Szczeble` zostają nietknięte nad listą. Są przeglądem gęstości
+ * („jedenaście dróg, dwie sprawdzone"), a to inne pytanie niż „co teraz zrobić".
+ */
+function CzegoBrakuje({ drogi, onDane, onZabudowa, trwa }: {
+  drogi: SzczebelDoboru[];
+  onDane: () => void;
+  /** `null`, gdy w polu Silnik nie ma nic, co da się zaproponować jednym kliknięciem. */
+  onZabudowa: (() => void) | null;
+  trwa: boolean;
+}) {
+  const pominiete = drogi.filter((d) => !d.sprawdzona && d.powod);
+  if (pominiete.length === 0) {
+    return <p className="mt-2 text-xs text-slate-500">Żadna sprawdzona droga nic nie dała
+      — wskaż kartotekę z wyszukiwarki.</p>;
+  }
+  const uchwyt = (d: SzczebelDoboru) => {
+    if (d.akcja?.rodzaj === "dane" || d.akcja?.rodzaj === "wymiar") return onDane;
+    if (d.akcja?.rodzaj === "zabudowa") return onZabudowa;
+    return null;
+  };
+  const zAkcja = pominiete.filter((d) => uchwyt(d));
+  const bezAkcji = pominiete.filter((d) => !uchwyt(d));
+  return <div className="mt-2" aria-label="Czego brakuje do doboru">
+    <p className="text-xs font-semibold text-slate-700">Żadna sprawdzona droga nic nie dała. Brakuje:</p>
+    <ul className="mt-1 space-y-1">
+      {[...zAkcja, ...bezAkcji].map((d) => {
+        const klik = uchwyt(d);
+        return <li key={d.droga} className="flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600">
+          <span className="font-semibold text-slate-500">{NAZWA_DROGI[d.droga]}:</span>
+          <span className="flex-1">{d.powod}</span>
+          {klik && d.akcja && <button type="button" disabled={trwa} onClick={klik}
+            className="rounded border border-slate-300 px-1.5 py-0.5 font-semibold
+              text-slate-700 hover:border-slate-500 disabled:opacity-50">
+            {d.akcja.etykieta}</button>}
+        </li>;
+      })}
+    </ul>
+  </div>;
+}
+
 function Szczeble({ drogi }: { drogi: SzczebelDoboru[] }) {
   return <div className="mt-1 flex flex-wrap gap-1" aria-label="Sprawdzone drogi">
     {drogi.map((d) => <span key={d.droga} title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}

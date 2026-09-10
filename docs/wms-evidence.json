@@ -3,13 +3,13 @@
   "date": "2026-09-10",
   "branch": "codex/robust-wms",
   "serverTests": {
-    "passed": 2037,
+    "passed": 2049,
     "failed": 0
   },
   "panelTests": {
-    "passed": 640,
+    "passed": 649,
     "failed": 0,
-    "note": "Baseline verification; panel source unchanged"
+    "note": "Verified after merging origin/main c92af74"
   },
   "build": {
     "passed": true,

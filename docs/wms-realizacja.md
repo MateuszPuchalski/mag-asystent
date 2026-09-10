@@ -40,7 +40,7 @@ Widok 390 px nie ma poziomego przepełnienia.
 Próba pojemności: 5000 SKU i 1500 pełnych zamówień; 16650 żądań przy 16 klientach.
 Wynik próby: 78,26 s, p95 93,18 ms, zgodny dziennik.
 Raport 90 dni przy 136500 zamówieniach i 409500 pozycjach: 613 ms.
-Pełny zestaw serwera: 2037 testów, zero błędów. Panel: 640 testów, bez zmian w jego źródłach.
+Pełny zestaw serwera: 2049 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
 Build produkcyjny przechodzi również test przeglądarki, wraz z wygaśnięciem sesji podczas ponowienia skanu.
 Aktualny audyt zależności produkcyjnych: zero zgłoszonych podatności.
 Zapis wyników: `docs/wms-evidence.json`; scenariusze i zrzuty można odtworzyć przez `tools/wms-e2e.mjs`.
