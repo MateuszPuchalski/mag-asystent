@@ -64,6 +64,8 @@ beforeEach(() => {
   db().prepare("DELETE FROM delivery").run();
   db().prepare("DELETE FROM zwrot_klienta_pozycja").run();
   db().prepare("DELETE FROM zwrot_klienta").run();
+  db().prepare("DELETE FROM kosz_pozycja").run();
+  db().prepare("DELETE FROM kosz").run();
 });
 
 /** Zwrot w pracy, zgłoszony `dni` dni temu. Termin ustawowy to czternaście. */
@@ -164,6 +166,37 @@ test("dokument, który nie wyszedł z bufora przez trzy dni", () => {
   assert.match(r.rozjazdy[0].opis, /77/);
 });
 
+
+test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
+  /* Towar leży na półce, a stan wisi na regale zwrotów — czyli nie jest
+     sprzedawalny, choć fizycznie jest na miejscu. Do 0.264.0 ten stan nie
+     miał ani automatu, ani alarmu. */
+  const kosz = (dni: number, kod: string): number => {
+    const at = new Date(Date.now() - dni * 86400_000).toISOString();
+    const id = Number(db().prepare(
+      `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez, rozlozono_at, rozlozono_przez)
+       VALUES (?, 'rozlozony', 'zwroty', ?, 'Biuro', ?, 'Magazynier')`).run(kod, at, at).lastInsertRowid);
+    db().prepare(
+      `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, status)
+       VALUES (?, 1, 'X', 'Towar', 1, 'done')`).run(id);
+    return id;
+  };
+
+  kosz(0, "Z-1");
+  assert.equal(reconcile().rozjazdy.length, 0, "świeżo rozłożony kosz czeka na adresy w spokoju");
+
+  kosz(2, "Z-2");
+  const r = reconcile();
+  assert.equal(r.rozjazdy.length, 1);
+  assert.equal(r.rozjazdy[0].rodzaj, "kosz_bez_powrotu");
+  assert.match(r.rozjazdy[0].opis, /Z-2/);
+
+  /* Kosz z dokumentu MM z Subiekta się NIE zgłasza: tam dokument powrotny
+     jest robotą biura z założenia, a alarm uczyłby przewijać raport. */
+  const zDokumentu = kosz(3, "KZ-9");
+  db().prepare("UPDATE kosz SET mm_dok_id=1209 WHERE id=?").run(zDokumentu);
+  assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-9").length, 0);
+});
 
 test("CSV otwiera się w Excelu PL bez kreatora", () => {
   towar("B02-02-02");

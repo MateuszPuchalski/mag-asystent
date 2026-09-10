@@ -338,3 +338,31 @@ test("duplikat zastany BEZ przebudowy też nie kładzie startu", () => {
   assert.equal(Number(roznych.n), 2);
   d.close();
 });
+
+test("migracja zostawia bez powrotu kosze rozłożone przed 0.266.0", () => {
+  /* Od 0.266.0 aplikacja sama zamawia MM ZWROTY→MAG po rozłożeniu kosza.
+     Zastane kosze rozliczyło biuro ręką — stempel odróżnia jedne od drugich,
+     a idzie WYŁĄCZNIE w przebiegu dokładającym kolumnę. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  const teraz = new Date().toISOString();
+  const wstaw = (kod: string, status: string) => d.prepare(
+    `INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez) VALUES (?,?,?,'Biuro')`)
+    .run(kod, status, teraz);
+  wstaw("Z-STARY", "rozlozony");
+  wstaw("Z-CZEKA", "zamkniety");
+
+  migrate(d);
+
+  const stempel = (kod: string) => Number((d.prepare(
+    "SELECT powrot_poza_aplikacja AS p FROM kosz WHERE kod=?").get(kod) as { p: number }).p);
+  assert.equal(stempel("Z-STARY"), 1, "rozłożony przed wydaniem — powrót zrobiło biuro");
+  assert.equal(stempel("Z-CZEKA"), 0, "zamknięty czeka na halę i powrót mu się należy");
+
+  /* Drugi przebieg NIE stempluje niczego nowego: kosz rozłożony po wdrożeniu
+     czeka na swój dokument, a nie na oznaczenie historią. */
+  d.prepare("UPDATE kosz SET status='rozlozony' WHERE kod='Z-CZEKA'").run();
+  migrate(d);
+  assert.equal(stempel("Z-CZEKA"), 0);
+  d.close();
+});

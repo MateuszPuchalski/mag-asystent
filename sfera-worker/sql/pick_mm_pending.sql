@@ -27,9 +27,15 @@
 --    na bufor: 'korekta_zwrot' oraz MM koszyka zwrotów (MAG→ZWROTY,
 --    services/kosze-zwrotow.ts). Guard ich nie dotyczy i nie ma czego
 --    pilnować — żadne z nich nie czyni towaru sprzedawalnym, tylko zabiera
---    go ze sprzedaży. Pilnowania wymaga ruch w drugą stronę: odkładanie
---    i powrót z bufora (kosz_pozycja.mm_queue_id) są jednopozycyjne
---    z ustawionym tw_id i tu właśnie wpadają w NOT EXISTS.
+--    go ze sprzedaży. Pilnowania wymaga ruch w drugą stronę — odkładanie
+--    z przesunięcia (services/przesuniecie.ts) jest jednopozycyjne
+--    z ustawionym tw_id i tu właśnie wpada w NOT EXISTS;
+--  • POWRÓT KOSZA Z BUFORA (ZWROTY→MAG, services/kosze.ts) jest od 0.266.0
+--    JEDNYM dokumentem na kosz, więc guard go nie widzi — i nie musi.
+--    Niezmiennik pilnuje tam KOD: zadanie powstaje dopiero wtedy, gdy każdy
+--    adres z tego kosza siedzi już w Subiekcie (`zakolejkujPowrot`), czyli
+--    zależność jest rozstrzygnięta przed wstawieniem wiersza, a nie przy
+--    jego wyborze.
 SELECT q.id, q.type, q.payload, q.attempts, q.source_doc_id, q.tw_id,
        q.created_by, q.created_by_ref
 FROM sfera_queue q

@@ -600,6 +600,14 @@ export function migrate(database: DatabaseSync) {
      w panelu (0.192.0). `kosz_pozycja.mm_queue_id` to co INNEGO: tamto jest
      przesunięciem powrotnym ZWROTY→MAG dla jednej rozłożonej pozycji. */
   addColumn("kosz", "mm_queue_id", "INTEGER REFERENCES sfera_queue(id)");
+  /* MM POWROTNE z bufora (0.266.0). Kosz złożony w aplikacji sam wysłał towar
+     na regał zwrotów, więc sam ma go stamtąd zdjąć po rozłożeniu. Kolumna
+     mówi, czy dokument już zamówiono: pusta przy koszu rozłożonym znaczy
+     „stan wisi na regale, choć towar leży na półce" i pilnuje tego
+     rekoncyliacja. Kosz z dokumentu MM z Subiekta jej nie wypełnia — tam
+     dokument powrotny wystawia biuro (DEPLOY §6a). */
+  addColumn("kosz", "powrot_queue_id", "INTEGER REFERENCES sfera_queue(id)");
+  powrotKoszaPozaAplikacja(database);
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
@@ -657,6 +665,39 @@ export function migrate(database: DatabaseSync) {
   zalacznikiBezDubli(database);
   dosypZalacznikiZLadowiska(database);
   tabelaFts(database);
+}
+
+/**
+ * Kosze rozłożone PRZED 0.266.0 powrotu nie dostają (0.266.0).
+ *
+ * Od tego wydania aplikacja zamawia MM ZWROTY→MAG sama, gdy kosz z panelu
+ * zostanie rozłożony. Kosze rozłożone WCZEŚNIEJ rozliczyło biuro ręką
+ * w Subiekcie — wystawienie im dokumentu dziś przesunęłoby stan drugi raz,
+ * po miesiącach, na towar, którego nikt nie ruszał. Tak samo kłamałaby
+ * rekoncyliacja: wypisałaby historię jako pracę do zrobienia.
+ *
+ * Stempel idzie WYŁĄCZNIE w przebiegu, który dokłada kolumnę. Powtarzany przy
+ * każdym starcie oznaczałby świeżo rozłożone kosze, zanim worker zdąży
+ * wypuścić im powrót — czyli kasowałby dokument, o który tu chodzi.
+ */
+function powrotKoszaPozaAplikacja(database: DatabaseSync) {
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kosz'").get();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!jest) return;
+  const kolumny = (database.prepare("PRAGMA table_info(kosz)").all() as Array<{ name: string }>)
+    .map((c) => c.name);
+  if (kolumny.includes("powrot_poza_aplikacja")) return;
+  transaction(database, () => {
+    database.exec(
+      "ALTER TABLE kosz ADD COLUMN powrot_poza_aplikacja INTEGER NOT NULL DEFAULT 0");
+    const n = Number(database.prepare(
+      "UPDATE kosz SET powrot_poza_aplikacja=1 WHERE status='rozlozony'").run().changes ?? 0);
+    if (n) {
+      console.warn(`[migracja] ${n} rozłożonych koszy zostaje bez powrotu z bufora ` +
+        "— rozliczyło je biuro przed 0.266.0.");
+    }
+  })();
 }
 
 /**

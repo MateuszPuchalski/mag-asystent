@@ -3063,6 +3063,32 @@ spoza dokumentu.
 co rozkładać, nie czekając na Subiekta. Kolektor bierze kosz tą samą drogą co
 kosze z dokumentu — po statusie, bez zmian po swojej stronie.
 
+**Powrót z bufora zamyka pętlę (0.266.0).** Do 0.264.0 łańcuch kończył się
+na zapisie adresów: hala rozkładała kosz na półki, a stan zostawał na regale
+zwrotów. Towar leżał w hali i nie był sprzedawalny, dopóki biuro nie wystawiło
+drugiego dokumentu ręką w Subiekcie — i nic o tym nie przypominało. Kosz
+złożony w aplikacji sam wysłał towar na regał, więc od tego wydania sam go
+stamtąd zdejmuje: ZAKOŃCZ na kolektorze zamawia JEDNO MM ZWROTY→MAG na cały
+kosz. Kosz z dokumentu MM z Subiekta zostaje przy dawnej regule, bo tam
+przesunięcie na regał wystawiło biuro.
+
+Dokument powstaje dopiero wtedy, gdy każdy adres z tego kosza siedzi już
+w Subiekcie. Niezmiennik „adres przed sprzedawalnością" pilnuje w kolejce po
+kolumnie `tw_id`, a dokument na cały kosz przechodzi obok tej bramki —
+zależność rozstrzyga się więc PRZED wstawieniem zadania, nie przy jego
+wyborze. Kosz czekający dłużej niż dobę wypisuje rekoncyliacja
+(`kosz_bez_powrotu`), a kartę kosza w biurze zamyka trzeci etap: „powrót MM".
+
+**Z bufora schodzi tylko to, co magazynier odłożył.** Pozycja pominięta
+została zgłoszona jako nieobecna w koszu — przesunięcie zdjęłoby z regału stan,
+którego nikt nie przeniósł.
+
+**Koszyk odpadu nie jest pracą hali (0.266.0).** Utylizacja ma ze stanu ZEJŚĆ,
+więc kosz odpadu na listę kolektora nie wchodzi: odłożony na regał wróciłby do
+sprzedaży, a przy okazji wpisałby złomowi adres pickingowy do kartoteki. Do
+0.264.0 lista odsiewała wyłącznie kartony. Co dalej dzieje się z odpadem,
+zostaje decyzją biura — dokumentu zejścia ze stanu ta aplikacja nie wystawia.
+
 **Dlaczego to wraca dopiero teraz.** Ścieżka koszyków istniała i wypadła
 w 0.17.0 z jednym twardym powodem: *„domknięcie koszyka kolejkuje MM,
 a dokumentów MM na produkcji nie da się dziś wystawić"*. Ten powód wygasł —
@@ -3631,7 +3657,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sygnał rozjazdu kwoty z pozycjami | **działa** od 0.210.0 | `kwotaRozjechana`; synchronizator nadpisuje ilość i cenę, kwoty nie przelicza nic |
 | Powód odmowy widoczny na zwrocie | **działa** od 0.210.0 | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
 | Odmowa zwrotu dociera do klienta | **działa** przez ODMÓW WYPŁATY | werdykt biura jest wewnętrzny; klienta zawiadamia Allegro po zgłoszeniu odmowy wypłaty |
-| Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone |
+| Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone; od 0.266.0 nie wchodzi na listę kolektora |
+| Powrót towaru z regału zwrotów na halę | **działa** od 0.266.0 | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza z aplikacji, po zapisaniu adresów |
+| Dokument zejścia ze stanu dla odpadu (RW) | **nie działa** | po MM na magazyn odpadu stan zostaje; decyzja procesowa biura |
 | Ślad po zwrocie pieniędzy przy pobraniu | **nie działa** | `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro |
 | Rozjazd ilości zgłoszonej i zwróconej | **działa** od 0.212.0 | `zapiszIloscZwrocona`, `ilosc_zwrocona`; liczy biuro przy rozpakowaniu |
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |

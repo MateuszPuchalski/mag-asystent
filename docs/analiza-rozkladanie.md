@@ -101,7 +101,10 @@ Zniknęły od tego czasu:
   wyłącznie w sesji i nie ma dokąd jej przenieść,
 - **rozkładanie zwrotów koszykami** — wejścia do tej ścieżki nie było od
   d131f75. Jej finał wymagał workera Sfery, którego wtedy nie było. Zwroty
-  rozlicza biuro w Subiekcie (0.17.0).
+  rozlicza biuro w Subiekcie (0.17.0). **Wróciło w 0.192.0**: koszyk składa
+  się w panelu obsługi, a MM na regał zwrotów wystawia Sfera. Od 0.266.0
+  wraca też druga połowa drogi — po rozłożeniu kosza aplikacja zamawia jedno
+  MM ZWROTY→MAG, więc stan schodzi z bufora bez ręki biura.
 
 Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
 

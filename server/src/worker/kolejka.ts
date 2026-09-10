@@ -2,6 +2,7 @@ import { db, nowIso } from "../db/db.js";
 import { config } from "../config.js";
 import { TYPY_SFERY, type MmItem, type SferaAdapter } from "../adapters/sfera.js";
 import { logEvent } from "../services/events.js";
+import { wypuscPowrotyKoszy } from "../services/kosze.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
    Wydzielone z `worker.ts`, bo tamten moduł przy imporcie startuje pętlę
@@ -167,6 +168,17 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
        się" — a różnica między nimi jest właśnie tym, o co pyta reklamacja. */
     zdarzenieZadania(task, "queue_applied", { docNo, wynik, proby: task.attempts });
     console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
+    /* ADRES ZAPISANY — może zwolnił kosz czekający na powrót z bufora
+       (0.266.0). To JEDYNY moment, w którym ten warunek się zmienia, więc
+       osobnego tickera nie zakładamy. Pod parasolem, bo kolejka ma chodzić
+       dalej także wtedy, gdy kosz jest zepsuty. */
+    if (task.type === "set_location") {
+      try {
+        wypuscPowrotyKoszy();
+      } catch (e) {
+        console.error("[worker] powroty koszy:", e instanceof Error ? e.message : e);
+      }
+    }
   } catch (e) {
     oznaczBlad(task, e instanceof Error ? e.message : String(e));
   }

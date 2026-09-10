@@ -20,7 +20,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 
 export interface Rozjazd {
   rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
-    | "kosz_czeka_na_korekte" | "zwrot_po_terminie";
+    | "kosz_czeka_na_korekte" | "kosz_bez_powrotu" | "zwrot_po_terminie";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -172,7 +172,48 @@ function koszeBezKorekty(): Rozjazd[] {
 }
 
 /**
- * 6. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
+ * 6. Kosze rozłożone ponad dobę temu, którym nie wyszedł powrót z bufora.
+ *
+ * Towar leży wtedy na półce w hali, a stan wisi na regale zwrotów — czyli
+ * nie jest sprzedawalny, choć fizycznie jest na miejscu. Do 0.264.0 ten stan
+ * nie miał ani automatu, ani alarmu: dokument powrotny wystawiało biuro ręką
+ * w Subiekcie i nikt nie liczył, ile razy o nim zapomniano.
+ *
+ * Od 0.266.0 dokument zamawia aplikacja, ale czeka na zapisanie adresów —
+ * i to czekanie może stanąć, gdy zadanie adresu wisi w błędzie. Ten wiersz
+ * jest właśnie o tym: warunek, który miał trwać sekundy, trwa dobę.
+ *
+ * Kosze z dokumentu MM z Subiekta tu NIE wchodzą — tam dokument powrotny jest
+ * robotą biura z założenia (DEPLOY §6a) i alarm uczyłby przewijać raport. Tak
+ * samo kosze rozłożone przed 0.266.0: rozliczyło je biuro ręką, więc raport
+ * wypisywałby historię jako pracę do zrobienia (`powrot_poza_aplikacja`).
+ */
+function koszeBezPowrotu(): Rozjazd[] {
+  const rows = db()
+    .prepare(
+      `SELECT kod, rozlozono_at FROM kosz
+        WHERE status='rozlozony' AND powrot_queue_id IS NULL AND mm_dok_id IS NULL
+          AND powrot_poza_aplikacja = 0
+          AND rodzaj NOT IN ('karton','odpad')
+          AND rozlozono_at < ?
+          AND EXISTS (SELECT 1 FROM kosz_pozycja p
+                       WHERE p.kosz_id = kosz.id AND p.status='done')
+        ORDER BY rozlozono_at`
+    )
+    .all(new Date(Date.now() - 86400_000).toISOString()) as
+    Array<{ kod: string; rozlozono_at: string }>;
+  return rows.map((k) => ({
+    rodzaj: "kosz_bez_powrotu" as const,
+    klucz: k.kod,
+    opis:
+      `Kosz ${k.kod} rozłożono ponad dobę temu, a stan wisi na regale zwrotów — ` +
+      "towar leży na półce i nie jest sprzedawalny. Sprawdź zadania adresów w błędzie.",
+    odKiedy: k.rozlozono_at,
+  }));
+}
+
+/**
+ * 7. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
  *
  * DO 0.210.0 TERMINU PILNOWAŁ WYŁĄCZNIE KOLOR WIERSZA. Sygnał „termin" zapala
  * się przy trzech dniach, ale zapala się NA EKRANIE — a rekoncyliacja
@@ -209,15 +250,17 @@ export function reconcile(): Rekoncyliacja {
   const bufor = utknieteWBuforze();
   const mm = mmCzekajace();
   const kosze = koszeBezKorekty();
+  const powroty = koszeBezPowrotu();
   const terminy = zwrotyPoTerminie();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
-      zadan: bledy.length + bufor.length + mm.length + kosze.length + terminy.length,
+      zadan: bledy.length + bufor.length + mm.length + kosze.length + powroty.length
+        + terminy.length,
     },
     /* Terminy PIERWSZE: mają skutek prawny, a raport czyta się od góry. */
-    rozjazdy: [...terminy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze],
+    rozjazdy: [...terminy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze, ...powroty],
   };
 }
 

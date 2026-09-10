@@ -9,14 +9,16 @@ import path from "node:path";
 
    1. ADRES PRZED SPRZEDAWALNOŚCIĄ. Zapis lokalizacji z odkładania musi stanąć
       w kolejce PRZED zadaniem MM tego samego towaru.
-   2. ZAKOŃCZENIE NIE WYSTAWIA DOKUMENTU. Kosz przyjechał dokumentem MM
-      z Subiekta i dokument powrotny też wystawia biuro — drugie MM z aplikacji
-      przesuwałoby towar, którego nikt nie ruszał.
+   2. DOKUMENT WYSTAWIA TEN, KTO GO ZAMÓWIŁ. Kosz z dokumentu MM z Subiekta
+      powrotu nie kolejkuje — tam przesunięcie na regał wystawiło biuro ręką
+      i powrotne też wystawia biuro. Kosz złożony w aplikacji (0.192.0) sam
+      wysłał towar na regał, więc od 0.266.0 sam go stamtąd zdejmuje jednym
+      MM ZWROTY→MAG.
 
-   Trzeci niezmiennik — „kosz wiąże się z dokumentem korekty" — zniknął
-   w 0.140.0 razem z rejestrem zwrotów. Kosz powstaje teraz WYŁĄCZNIE
-   z dokumentu MM ZWROTY wystawionego w Subiekcie (`otworzPrzyjecie`), więc
-   dokument jest warunkiem jego istnienia, a nie regułą do pilnowania.      */
+   3. POWRÓT CZEKA NA ADRESY. MM na magazyn sprzedażowy czyni towar
+      sprzedawalnym, a guard workera pilnuje kolejności po kolumnie `tw_id` —
+      dokument wielopozycyjny przechodzi obok niego. Dlatego zadanie powstaje
+      dopiero wtedy, gdy każdy adres z tego kosza siedzi już w Subiekcie.  */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-kosz-")), "t.db");
 process.env.SGT_MODE = "seeded";
@@ -153,6 +155,143 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
   const nastepny = koszDoRozkladania("KZ-01");
   assert.equal(nastepny.kod, "KZ-01");
   assert.equal(K.listaKoszy().filter((k) => k.kod === "KZ-01").length, 2);
+});
+
+/**
+ * Kosz złożony w APLIKACJI: bez `mm_dok_id`, bo przesunięcie na regał zamówił
+ * panel (`kosze-zwrotow.ts`). To ten kosz zdejmuje towar z bufora po
+ * rozłożeniu — i tylko ten.
+ */
+function koszAplikacji(kod = "Z-7", rodzaj = "zwroty"): ReturnType<typeof K.szczegolKosza> {
+  const d = db();
+  const teraz = new Date().toISOString();
+  const kosz = d
+    .prepare(
+      `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez,
+                        zamknieto_at, zamknieto_przez)
+       VALUES (?, 'zamkniety', ?, ?, 'Biuro', ?, 'Biuro')`
+    )
+    .run(kod, rodzaj, teraz, teraz);
+  const koszId = Number(kosz.lastInsertRowid);
+  const ins = d.prepare(
+    "INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)"
+  );
+  /* Ten sam towar dwa razy — dwie pozycje z dwóch zwrotów. Dokument ma je
+     ZSUMOWAĆ w jedną linię, tak samo jak MM na bufor. */
+  ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", 1);
+  ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Ta sama kartoteka z drugiego zwrotu", 2);
+  ins.run(koszId, 900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", 1);
+  return K.szczegolKosza(koszId);
+}
+
+test("kosz z aplikacji cofa bufor JEDNYM MM ZWROTY→MAG", async () => {
+  /* Blizna: do 0.264.0 łańcuch kończył się na zapisie adresów. Towar leżał
+     na półce, a stan wisiał na regale zwrotów — sprzedawalny nie był, dopóki
+     biuro nie wystawiło drugiego dokumentu ręką. */
+  const kosz = koszAplikacji();
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
+  /* Adresy muszą wejść do Subiekta PRZED dokumentem — tu udajemy workera. */
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+
+  K.zakonczKosz(kosz.id, "Magazynier");
+
+  const mm = db()
+    .prepare("SELECT payload, tw_id FROM sfera_queue WHERE type='mm'")
+    .all() as Array<{ payload: string; tw_id: number | null }>;
+  assert.equal(mm.length, 1, "jeden kosz to jeden dokument — decyzja właściciela");
+  const p = JSON.parse(mm[0].payload) as { magFrom: number; magTo: number; items: Array<{ twId: number; qty: number }> };
+  assert.equal(p.magFrom, 3, "z regału zwrotów");
+  assert.equal(p.magTo, 1, "na halę");
+  assert.deepEqual(
+    p.items.map((i) => [i.twId, i.qty]).sort((a, b) => a[0] - b[0]),
+    [[900_036, 3], [900_037, 1]],
+    "ta sama kartoteka z dwóch zwrotów to JEDNA linia dokumentu"
+  );
+
+  const szczegol = K.szczegolKosza(kosz.id);
+  assert.equal(szczegol.powrot?.status, "pending", "biuro czyta stan powrotu z karty kosza");
+
+  /* Drugie ZAKOŃCZ nie wystawia drugiego dokumentu — kolumna `powrot_queue_id`
+     jest tu pamięcią, nie ozdobą. */
+  K.zakonczKosz(kosz.id, "Magazynier");
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    1
+  );
+});
+
+test("powrót czeka na zapis adresów i wychodzi dopiero po nim", async () => {
+  /* Niezmiennik „adres przed sprzedawalnością". Guard workera pilnuje go po
+     kolumnie `tw_id`, a ten dokument jest wielopozycyjny — więc pilnuje go
+     kod, nie SQL: dopóki adres wisi w kolejce, dokumentu nie ma wcale. */
+  const kosz = koszAplikacji("Z-8");
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "B02-01-01", "Magazynier");
+  K.zakonczKosz(kosz.id, "Magazynier");
+
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    0,
+    "adresy jeszcze nie weszły — dokument nie ma prawa powstać"
+  );
+  assert.equal(K.szczegolKosza(kosz.id).powrot, null);
+
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+  assert.equal(K.wypuscPowrotyKoszy(), 1, "adres zapisany — powrót wychodzi");
+  assert.equal(K.wypuscPowrotyKoszy(), 0, "i tylko raz");
+  assert.equal(K.szczegolKosza(kosz.id).powrot?.status, "pending");
+});
+
+test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async () => {
+  const kosz = koszAplikacji("Z-9");
+  K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
+  K.pominPozycjeKosza(kosz.pozycje[1].id, "brak_w_koszu", "Magazynier");
+  K.pominPozycjeKosza(kosz.pozycje[2].id, "brak_w_koszu", "Magazynier");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+
+  K.zakonczKosz(kosz.id, "Magazynier");
+
+  const mm = db().prepare("SELECT payload FROM sfera_queue WHERE type='mm'").all() as
+    Array<{ payload: string }>;
+  assert.equal(mm.length, 1);
+  const items = (JSON.parse(mm[0].payload) as { items: Array<{ twId: number; qty: number }> }).items;
+  assert.deepEqual(items.map((i) => [i.twId, i.qty]), [[900_036, 1]],
+    "z bufora schodzi WYŁĄCZNIE to, co magazynier naprawdę odłożył");
+});
+
+test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
+  /* Rozliczyło go biuro ręką w Subiekcie. Dokument wystawiony dziś przesunąłby
+     stan DRUGI raz, po miesiącach, na towar, którego nikt nie ruszał — więc
+     migracja stempluje zastane kosze, a serwis ten stempel czyta. */
+  const kosz = koszAplikacji("Z-11");
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+  db().prepare("UPDATE kosz SET status='rozlozony', powrot_poza_aplikacja=1 WHERE id=?")
+    .run(kosz.id);
+
+  assert.equal(K.zakolejkujPowrot(kosz.id, "Magazynier"), null);
+  assert.equal(K.wypuscPowrotyKoszy(), 0);
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    0
+  );
+});
+
+test("koszyk odpadu nie jest pracą hali i nie cofa bufora", async () => {
+  /* 0.211.0 dołożyło rodzaj koszy i nie ruszyło listy dla kolektora, więc
+     kosz odpadu wyglądał tam jak każdy inny. Magazynier odłożyłby złom na
+     regał i wpisał mu adres pickingowy do kartoteki. */
+  const odpad = koszAplikacji("Z-10", "odpad");
+  assert.equal(
+    K.koszeDlaKolektora().some((k) => k.id === odpad.id),
+    false,
+    "utylizacja ma ze stanu ZEJŚĆ, a nie wrócić na półkę"
+  );
+  /* Nawet postawiony na siłę w stanie „rozłożony" powrotu nie dostaje —
+     bramka stoi na RODZAJU, nie na tym, że kosz odpadu nie trafia na halę. */
+  db().prepare("UPDATE kosz SET status='rozlozony' WHERE id=?").run(odpad.id);
+  db().prepare("UPDATE kosz_pozycja SET status='done' WHERE kosz_id=?").run(odpad.id);
+  assert.equal(K.zakolejkujPowrot(odpad.id, "Magazynier"), null);
+  assert.equal(K.wypuscPowrotyKoszy(), 0);
 });
 
 test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {

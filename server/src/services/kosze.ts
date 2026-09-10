@@ -1,7 +1,7 @@
 import { db, nowIso, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
-import { enqueueSetLocation } from "./queue.js";
+import { enqueueMM, enqueueSetLocation } from "./queue.js";
 import {
   adresyOczekiwane,
   adresyWszystkie,
@@ -23,12 +23,20 @@ import { logEvent } from "./events.js";
      biuro: zamyka kosz → SNAPSHOT pozycji (co fizycznie leży w środku)
      hala:  kolektor pokazuje zamknięte kosze; skan towaru wskazuje pozycję,
             skan regału ją odkłada — jak przy dostawach
-     hala:  ZAKOŃCZ → MM ZWROTY→MAG per pozycja cofa bufor automatycznie
+     hala:  ZAKOŃCZ → JEDNO MM ZWROTY→MAG cofa bufor (kosz z aplikacji)
 
-   MM cofające są JEDNOPOZYCYJNE świadomie: guard „adres przed
-   sprzedawalnością" w obu workerach porządkuje zadania po tw_id, a MM
-   wielopozycyjne wypadałoby spod niego. Zapis adresu z odkładania MUSI wejść
-   do Subiekta przed zadaniem, które czyni towar sprzedawalnym.               */
+   POWRÓT Z BUFORA JEST JEDNYM DOKUMENTEM (0.266.0, decyzja właściciela).
+   Wersja z 0.59.0 zakładała MM jednopozycyjne, bo guard „adres przed
+   sprzedawalnością" w obu workerach porządkuje zadania po kolumnie `tw_id`,
+   a wielopozycyjne wypada spod niego. Niezmiennik zostaje w mocy, tylko
+   pilnuje go teraz KOD, a nie guard: zadanie powstaje dopiero wtedy, gdy
+   wszystkie adresy z tego kosza są już zapisane w Subiekcie
+   (`zakolejkujPowrot`). Zależność jest więc rozstrzygnięta przed wstawieniem
+   wiersza, a nie przy jego wyborze — i dlatego jeden dokument wystarczy.
+
+   Kosz Z DOKUMENTU MM z Subiekta powrotu nie kolejkuje: tam przesunięcie na
+   regał wystawiło biuro ręką i dokument powrotny też wystawia biuro
+   (DEPLOY §6a). Karton nie przesuwa niczego, bo towar nie opuścił magazynu. */
 
 export class BladKosza extends Error {
   constructor(
@@ -52,6 +60,10 @@ interface WierszKosza {
   /** Dokument MM, z którego kosz powstał; NULL = kosz złożony w aplikacji. */
   mm_dok_id: number | null;
   mm_numer: string | null;
+  /** Zadanie MM powrotnego (ZWROTY→MAG); NULL = jeszcze nie zamówione. */
+  powrot_queue_id: number | null;
+  /** 1 = powrót rozliczyło biuro poza aplikacją (kosz sprzed 0.266.0). */
+  powrot_poza_aplikacja: number | null;
   /** `zwroty` albo `karton` — patrz `RODZAJ_KARTON`. */
   rodzaj: string;
   anulowano_at: string | null;
@@ -68,6 +80,14 @@ interface WierszKosza {
  * dokument — towar nie opuścił magazynu, więc nie ma czego przesuwać.
  */
 export const RODZAJ_KARTON = "karton";
+
+/**
+ * Odpad (0.211.0) — koszyk oceniony „utylizacja", z własnym magazynem
+ * docelowym (`services/kosze-zwrotow.ts`). Hala go NIE rozkłada; stała stoi
+ * tu, bo to ten sam byt w tej samej tabeli, a lista kolektora musi umieć go
+ * nazwać, żeby odsiać.
+ */
+export const RODZAJ_ODPAD = "odpad";
 
 export interface PozycjaKosza {
   id: number;
@@ -134,6 +154,13 @@ export interface SzczegolKosza {
    * żadnego dokumentu do obiecywania — ten wystawia biuro.
    */
   mmNumer: string | null;
+  /**
+   * Powrót z bufora (0.266.0): stan zadania MM ZWROTY→MAG i numer dokumentu,
+   * gdy już wyszedł. `null` znaczy „temu koszowi powrót się nie należy albo
+   * jeszcze nie wyszedł" — biuro czyta to na karcie kosza, bo inaczej pytanie
+   * „czy stan wrócił na halę" wymagałoby zajrzenia do Subiekta.
+   */
+  powrot: { status: string; numer: string | null } | null;
   /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
   rodzaj: string;
   /** Kto i kiedy anulował karton (0.123.0); NULL przy każdym innym koszu. */
@@ -248,8 +275,23 @@ export function listaKoszy(): WierszListyKoszy[] {
 }
 
 /** Kosze do rozłożenia — to, co widzi kolektor na zakładce ZWROTY. */
+/**
+ * Co hala ma dziś do rozłożenia.
+ *
+ * ODPAD NIE JEST PRACĄ HALI (0.266.0). Koszyk oceniony „utylizacja" jedzie MM
+ * na magazyn odpadu i ma ze stanu ZEJŚĆ — odłożony na regał wróciłby do
+ * sprzedaży, a przy okazji wpisałby złomowi adres pickingowy do kartoteki.
+ * Do 0.264.0 lista odsiewała wyłącznie kartony, więc kosz odpadu wyglądał na
+ * kolektorze jak każdy inny: usterka z 0.211.0, która dołożyła rodzaj koszy
+ * i nie ruszyła tej jednej linijki.
+ *
+ * Co dalej dzieje się z odpadem, zostaje decyzją procesową biura: dokumentu
+ * zejścia ze stanu (RW) ta aplikacja nie wystawia.
+ */
 export function koszeDlaKolektora(): WierszListyKoszy[] {
-  return listaKoszy().filter((k) => k.status === "zamkniety" && k.rodzaj !== RODZAJ_KARTON);
+  return listaKoszy().filter(
+    (k) => k.status === "zamkniety" && k.rodzaj !== RODZAJ_KARTON && k.rodzaj !== RODZAJ_ODPAD
+  );
 }
 
 /**
@@ -358,8 +400,14 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
       { locExpected: b.lokOczekiwana, sym: b.symbol }
     );
   });
+  const powrot = kosz.powrot_queue_id
+    ? (db()
+        .prepare("SELECT status, sgt_doc_number AS numer FROM sfera_queue WHERE id=?")
+        .get(kosz.powrot_queue_id) as { status: string; numer: string | null } | undefined)
+    : undefined;
   return {
     mmNumer: kosz.mm_numer ?? null,
+    powrot: powrot ? { status: powrot.status, numer: powrot.numer ?? null } : null,
     rodzaj: kosz.rodzaj ?? "zwroty",
     anulowanoAt: kosz.anulowano_at ?? null,
     anulowanoPrzez: kosz.anulowano_przez ?? null,
@@ -781,6 +829,124 @@ export function pominPozycjeKosza(
  * o dokumencie cofającym. Teraz zatwierdzenie rozłożenia na kolektorze
  * kolejkuje MM ZWROTY→MAG per pozycja i nikt niczego nie pilnuje ręką.
  */
+/* ── Powrót z bufora: MM ZWROTY→MAG (0.266.0) ────────────────────────────────
+   Do 0.264.0 łańcuch urywał się na przedostatnim kroku. Kosz złożony
+   w panelu wysyłał towar na regał zwrotów własnym MM (0.192.0), hala
+   rozkładała go na półki i zapisywała adresy — a STAN zostawał na regale
+   zwrotów. Towar leżał w hali i nie był sprzedawalny, dopóki biuro nie
+   wystawiło drugiego dokumentu ręką w Subiekcie. Nic o tym nie
+   przypominało: rekoncyliacja znała sześć rozjazdów i tego wśród nich
+   nie było.
+
+   ZADANIE POWSTAJE PO ADRESACH, nie przed nimi. Niezmiennik „adres przed
+   sprzedawalnością" (`services/queue.ts`, `sfera-worker/sql/pick_mm_*.sql`)
+   pilnuje po kolumnie `tw_id`, więc MM wielopozycyjne przechodzi obok
+   bramki. Dlatego zależność rozstrzygamy WCZEŚNIEJ: dopóki choć jedno
+   zadanie adresu z tego kosza czeka, jest w robocie albo stoi w błędzie,
+   dokument nie powstaje wcale. Kosz czeka wtedy na `wypuscPowrotyKoszy`.
+
+   `cancelled` NIE blokuje — człowiek świadomie wycofał zapis adresu, tak samo
+   jak w guardzie workera.
+
+   POMINIĘTE POZYCJE NIE WRACAJĄ. Magazynier zgłosił, że towaru w koszu nie
+   było; przesunięcie zdjęłoby z regału zwrotów stan, którego nikt nie
+   przeniósł. Zostają na regale i na liście pominięć dla biura. */
+
+/** Zadania adresów z tego kosza, które jeszcze nie weszły do Subiekta. */
+function adresyWDrodze(koszId: number): number {
+  return Number(
+    (
+      db()
+        .prepare(
+          `SELECT COUNT(*) AS n FROM kosz_pozycja p
+             JOIN sfera_queue q ON q.id = p.loc_queue_id
+            WHERE p.kosz_id = ? AND q.status IN ('pending','processing','error')`
+        )
+        .get(koszId) as { n: number }
+    ).n
+  );
+}
+
+/**
+ * Zamawia MM powrotne dla rozłożonego kosza z aplikacji.
+ *
+ * Oddaje `id` zadania albo `null`, gdy powrót temu koszowi się nie należy
+ * (kosz z dokumentu, karton, odpad, sam pominięty towar) albo gdy adresy
+ * jeszcze nie weszły. Idempotentne: drugi przebieg widzi `powrot_queue_id`.
+ */
+export function zakolejkujPowrot(koszId: number, autor: string): number | null {
+  const k = wierszKosza(koszId);
+  if (k.powrot_queue_id) return k.powrot_queue_id;
+  if (k.powrot_poza_aplikacja) return null;
+  if (k.status !== "rozlozony") return null;
+  /* Kosz z dokumentu MM: przesunięcie na regał wystawiło biuro i powrotne też
+     wystawia biuro. Drugi dokument z aplikacji przesuwałby towar, którego
+     nikt nie przesuwał (DEPLOY §6a, punkt 4). */
+  if (k.mm_dok_id !== null) return null;
+  if (k.rodzaj === RODZAJ_KARTON || k.rodzaj === RODZAJ_ODPAD) return null;
+  if (adresyWDrodze(koszId) > 0) return null;
+
+  const odlozone = db()
+    .prepare("SELECT tw_id, ilosc FROM kosz_pozycja WHERE kosz_id = ? AND status='done'")
+    .all(koszId) as Array<{ tw_id: number; ilosc: number }>;
+  if (odlozone.length === 0) return null;
+
+  /* Pozycje SUMUJĄ SIĘ po kartotece — ten sam towar z dwóch zwrotów to jedna
+     linia dokumentu, tak samo jak przy MM na bufor (`kosze-zwrotow.ts`). */
+  const wgTowaru = new Map<number, number>();
+  for (const p of odlozone) {
+    wgTowaru.set(Number(p.tw_id), (wgTowaru.get(Number(p.tw_id)) ?? 0) + Number(p.ilosc));
+  }
+  const items = [...wgTowaru].map(([twId, qty]) => ({ twId, qty }));
+
+  const queueId = enqueueMM(config.magId.ZWROTY, config.magId.MAG, items, {
+    createdBy: autor,
+    label: `MM powrót · kosz ${k.kod}`,
+    detail: `${items.length} kartotek z regału zwrotów na halę`,
+  });
+  db().prepare("UPDATE kosz SET powrot_queue_id=? WHERE id=?").run(queueId, koszId);
+  logEvent("kosz_powrot_mm", autor, null, {
+    koszId,
+    kod: k.kod,
+    queueId,
+    kartotek: items.length,
+  });
+  return queueId;
+}
+
+/** Kto podpisuje powrót wypuszczony po zapisaniu adresów. Nie człowiek. */
+export const AUTOMAT_POWROTU = "automat (adresy zapisane)";
+
+/**
+ * Kosze rozłożone, którym powrót jeszcze się nie należał — próba druga.
+ *
+ * Woła to worker po każdym zapisanym adresie: to jedyny moment, w którym
+ * warunek może się zmienić. Osobnego tickera nie zakładamy, bo zależność
+ * jest zdarzeniem, a nie upływem czasu.
+ */
+export function wypuscPowrotyKoszy(autor = AUTOMAT_POWROTU): number {
+  const kosze = db()
+    .prepare(
+      `SELECT id FROM kosz
+        WHERE status='rozlozony' AND powrot_queue_id IS NULL
+          AND powrot_poza_aplikacja = 0
+          AND mm_dok_id IS NULL AND rodzaj NOT IN (?, ?)`
+    )
+    .all(RODZAJ_KARTON, RODZAJ_ODPAD) as Array<{ id: number }>;
+  let wypuszczonych = 0;
+  for (const k of kosze) {
+    /* Kosz idzie WŁASNĄ próbą: jeden wywrócony (skasowana kartoteka, zepsuty
+       wiersz) nie ma prawa zabrać pozostałych — ta sama lekcja co przy
+       wiązaniu zaległości w 0.220.0. */
+    try {
+      if (zakolejkujPowrot(k.id, autor) !== null) wypuszczonych++;
+    } catch (e) {
+      console.error(`[kosz] powrót ${k.id} nie doszedł:`, e instanceof Error ? e.message : e);
+    }
+  }
+  return wypuszczonych;
+}
+
 export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const kosz = wierszKosza(koszId);
   if (kosz.status === "rozlozony") return szczegolKosza(koszId); // drugie kliknięcie
@@ -799,7 +965,7 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
   const pominiete = pozycje.length - odlozone.length;
 
   const d = db();
-  /* ŻADEN kosz nie kolejkuje już dokumentu (0.140.0) i to nie jest przeoczenie.
+  /* KTÓRY KOSZ KOLEJKUJE DOKUMENT — trzy drogi, trzy różne odpowiedzi.
 
      Kosz z dokumentu MM (0.75.0): przesunięcie na regał zwrotów wystawiło
      biuro i dokument powrotny (ZWR→MAG) też wystawia biuro — kolektor zapisał
@@ -809,10 +975,11 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
      KARTON (0.122.0): towar w ogóle nie opuścił magazynu. Ktoś zebrał go pod
      zamówienie, pakujący odłożył do pudła, a teraz wraca na półkę.
 
-     Trzecia droga — kosz złożony w aplikacji z przypiętych zwrotów — miała
-     tu własne MM ZWROTY→MAG. Zniknęła razem z rejestrem zwrotów, więc gałąź
-     kolejkująca była już nieosiągalna; trzymanie jej udawałoby, że kosz
-     powstaje jeszcze jakoś inaczej. */
+     Kosz złożony w aplikacji (0.192.0): sam wysłał towar na regał własnym MM,
+     więc sam go stamtąd zdejmuje — od 0.266.0, jednym dokumentem. Zamówienie
+     idzie PO zapisaniu koszyka jako rozłożonego i POZA transakcją: wstawienie
+     wiersza kolejki nie ma prawa wywrócić zamknięcia pracy hali, a gdy adresy
+     jeszcze nie weszły, dokument zamówi `wypuscPowrotyKoszy`. */
   transaction(d, () => {
     d.prepare("UPDATE kosz SET status='rozlozony', rozlozono_at=?, rozlozono_przez=? WHERE id=?")
       .run(nowIso(), autor, koszId);
@@ -824,6 +991,14 @@ export function zakonczKosz(koszId: number, autor: string): SzczegolKosza {
       mmDokId: kosz.mm_dok_id,
     });
   })();
+  /* Poza transakcją i pod parasolem: kosz jest już rozłożony, a nieudane
+     zamówienie dokumentu ma zostawić ślad w logu, nie cofnąć pracy hali.
+     Rekoncyliacja i tak wypisze kosz bez powrotu. */
+  try {
+    zakolejkujPowrot(koszId, autor);
+  } catch (e) {
+    console.error(`[kosz] powrót ${koszId} nie doszedł:`, e instanceof Error ? e.message : e);
+  }
   return szczegolKosza(koszId);
 }
 
