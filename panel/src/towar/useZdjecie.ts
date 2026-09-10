@@ -71,14 +71,16 @@ function pchnij() {
 
    `null` w `pamiec` zostaje dla ODPOWIEDZI: 404 (zdjęcia nie ma) i 415 (plik
    nie jest obrazem). Reszta trafia tutaj, ze zdaniem z serwera i z czasem —
-   po minucie ponowne zamontowanie pyta znowu, a `ponow()` od razu.        */
+   po minucie następne przerysowanie pyta znowu, a `ponow()` od razu.      */
 const BLAD_TTL_MS = 60_000;
 const bledy = new Map<string, { zdanie: string; at: number }>();
 
+/* Czysty ODCZYT: wygasły wpis to `null`, ale mapa zostaje nietknięta —
+   kasowanie w renderze sprawiało, że ten sam render widział już „bez błędu",
+   a nikt nie zamawiał obrazu na nowo. Wpis nadpisze `zamow`, a skasuje `ponow`. */
 const bladSwiezy = (sciezka: string): string | null => {
   const b = bledy.get(sciezka);
-  if (!b) return null;
-  if (Date.now() - b.at > BLAD_TTL_MS) { bledy.delete(sciezka); return null; }
+  if (!b || Date.now() - b.at > BLAD_TTL_MS) return null;
   return b.zdanie;
 };
 
@@ -147,20 +149,30 @@ function useObraz(sciezka: string | null): string | null | undefined {
     const zbior = nasluchy.get(sciezka) ?? new Set<() => void>();
     zbior.add(f);
     nasluchy.set(sciezka, zbior);
-    /* Świeża porażka NIE pyta drugi raz — dopiero po minucie albo po `ponow()`. */
-    if (!pamiec.has(sciezka) && bladSwiezy(sciezka) === null) void zamow(sciezka);
     return () => {
       zbior.delete(f);
       if (!zbior.size) nasluchy.delete(sciezka);
     };
   }, [sciezka]);
 
-  if (sciezka == null) return null;
-  if (pamiec.has(sciezka)) return pamiec.get(sciezka);
-  /* Porażka wygląda dla odbiorców jak brak (`null`) — kafel kartoteki,
-     oferty i reklamacji zachowują się jak dotąd. Kto chce zdania i ponowienia,
-     bierze `useZdjecieZalacznika`. */
-  return bladSwiezy(sciezka) !== null ? null : undefined;
+  const stan: string | null | undefined = sciezka == null ? null
+    : pamiec.has(sciezka) ? pamiec.get(sciezka)
+    /* Porażka wygląda dla odbiorców jak brak (`null`) — kafel kartoteki,
+       oferty i reklamacji zachowują się jak dotąd. Kto chce zdania i ponowienia,
+       bierze `useZdjecieZalacznika`. */
+    : bladSwiezy(sciezka) !== null ? null : undefined;
+
+  /* Zamówienie idzie za STANEM, nie za montażem. Do 0.248.0 pytał tylko efekt
+     montażu, więc gdy po minucie wpis porażki wygasł, a komponent przerysował
+     się z innego powodu (błąd pobrania w stanie lokalnym), hak oddawał
+     `undefined` i nikt nie pytał serwera — ramka „wczytuję…" stała na stałe,
+     bez ponowienia. Zrzut właściciela z 10 września to dokładnie ten stan.
+     Świeża porażka dalej NIE pyta drugi raz — `stan` jest wtedy `null`. */
+  useEffect(() => {
+    if (sciezka != null && stan === undefined && !wToku.has(sciezka)) void zamow(sciezka);
+  }, [sciezka, stan]);
+
+  return stan;
 }
 
 /** Zdanie ostatniej porażki dla ścieżki albo `null`; `ponow` kasuje ją i pyta od razu. */

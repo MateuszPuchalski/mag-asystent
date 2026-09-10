@@ -8,9 +8,10 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-za
 process.env.LOG_LEVEL = "silent";
 
 /* ── Pobranie załącznika Centrum Wiadomości z podstawionym `fetch` ───────────
-   Pilnujemy KOLEJNOŚCI prób i tego, co idzie w nagłówkach: droga API z `Accept`
-   wersją zasobu, zapisany adres bez niego; 401 kończy od razu (token jest
-   jeden); odmowa każdej drogi wraca jednym zdaniem z kodami, bez adresów
+   Pilnujemy KOLEJNOŚCI prób i tego, co idzie w nagłówkach: droga API BEZ
+   `Accept` (swagger: `downloadAttachmentGET` oddaje plik dowolnego typu; JSON w `Accept`
+   dawał na żywo 406), zapisany adres też bez niego; 401 kończy od razu (token
+   jest jeden); odmowa każdej drogi wraca jednym zdaniem z kodami, bez adresów
    i bez UUID — zdanie idzie na ekran agenta.                                 */
 
 let pobierzZalacznikWiadomosci: typeof import("./allegro.http.js").pobierzZalacznikWiadomosci;
@@ -47,32 +48,32 @@ function podstaw(regula: (url: string, accept: string | undefined) => { status: 
   return zebrane;
 }
 
-test("droga API działa: jedna próba, Accept public.v1, Bearer, bajty wracają z drogą 'api'", async () => {
+test("droga API działa: jedna próba, BEZ Accept, Bearer, bajty wracają z drogą 'api'", async () => {
   const zebrane = podstaw(() => ({ status: 200 }));
   const w = await pobierzZalacznikWiadomosci(API, URL_ZAL);
   assert.equal(w.droga, "api");
   assert.equal(w.bajty.byteLength, PNG.byteLength);
   assert.equal(zebrane.length, 1);
   assert.equal(zebrane[0]!.url, `${API}/messaging/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6`);
-  assert.equal(zebrane[0]!.accept, "application/vnd.allegro.public.v1+json");
+  /* Bez `Accept`: końcówka oddaje plik dowolnego typu, a JSON w nagłówku dawał 406. */
+  assert.equal(zebrane[0]!.accept, undefined);
   assert.equal(zebrane[0]!.auth, "Bearer tok");
 });
 
-test("API odmawia 403 → beta → zapisany adres BEZ Accept oddaje plik (droga 'url')", async () => {
+test("API odmawia 403 → zapisany adres BEZ Accept oddaje plik (droga 'url')", async () => {
   const zebrane = podstaw((url) => ({ status: url.startsWith(API) ? 403 : 200 }));
   const w = await pobierzZalacznikWiadomosci(API, URL_ZAL);
   assert.equal(w.droga, "url");
   assert.deepEqual(zebrane.map((z) => [z.url.startsWith(API) ? "api" : "url", z.accept ?? null]), [
-    ["api", "application/vnd.allegro.public.v1+json"],
-    ["api", "application/vnd.allegro.beta.v1+json"],
+    ["api", null],
     ["url", null],
-  ], "zapisany adres idzie jak od 0.155.0 — bez wersji zasobu");
+  ], "dwie próby, obie bez wersji zasobu");
 });
 
-test("406 przy public.v1 → beta.v1 wygrywa bez sięgania po zapas", async () => {
-  const zebrane = podstaw((_url, accept) => ({ status: accept?.includes("beta") ? 200 : 406 }));
+test("406 z API (gdyby wrócił) też przepuszcza do zapasu", async () => {
+  const zebrane = podstaw((url) => ({ status: url.startsWith(API) ? 406 : 200 }));
   const w = await pobierzZalacznikWiadomosci(API, URL_ZAL);
-  assert.equal(w.droga, "api");
+  assert.equal(w.droga, "url");
   assert.equal(zebrane.length, 2);
 });
 
@@ -88,8 +89,7 @@ test("wszystkie drogi 403: jedno zdanie z kodem każdej próby, bez adresów i b
   await assert.rejects(() => pobierzZalacznikWiadomosci(API, URL_ZAL), (e: unknown) => {
     assert.ok(e instanceof BladOdpowiedziAllegro);
     assert.equal(e.status, 403);
-    assert.match(e.message, /końcówka API \(public\.v1\+json\): 403/);
-    assert.match(e.message, /końcówka API \(beta\.v1\+json\): 403/);
+    assert.match(e.message, /końcówka API: 403/);
     assert.match(e.message, /zapisany adres: 403/);
     assert.match(e.message, /allegro:api:messaging/);
     assert.equal(/https?:\/\//.test(e.message), false, "adresy nie idą na ekran");
@@ -107,16 +107,17 @@ test("adres bez ogona UUID (reklamacje) idzie jedną drogą, jak dotąd", async 
 });
 
 test("sonda oddaje kody i typy każdej próby, nigdy bajtów", async () => {
-  podstaw((url, accept) => ({ status: url.startsWith(API) && accept ? 200 : 403 }));
+  /* Jak u właściciela 10 września: bez Accept 200, z Accept 406, zapisany adres 403. */
+  podstaw((url, accept) => ({ status: accept ? 406 : url.startsWith(API) ? 200 : 403 }));
   const w = await sondujZalacznik(API, URL_ZAL);
-  assert.equal(w.length, 5, "trzy próby z listy plus dwie kontrolne");
+  assert.equal(w.length, 4, "dwie próby z listy plus dwie kontrolne z Accept");
   assert.deepEqual(w.map((x) => [x.droga, x.akcept === null ? null : x.akcept.replace("application/vnd.allegro.", ""), x.status]), [
-    ["api", "public.v1+json", 200], ["api", "beta.v1+json", 200], ["url", null, 403],
-    ["api", null, 403], ["url", "public.v1+json", 403],
+    ["api", null, 200], ["url", null, 403],
+    ["api", "public.v1+json", 406], ["url", "public.v1+json", 406],
   ]);
   assert.equal(w[0]!.typ, "image/png");
   assert.equal(w[0]!.bajtow, PNG.byteLength);
-  assert.equal(w[2]!.bajtow, null);
+  assert.equal(w[1]!.bajtow, null);
   assert.equal(w[0]!.hostKoncowy, "api.allegro.pl");
   assert.equal(JSON.stringify(w).includes("97dc0b60"), false, "UUID nie wychodzi z sondy");
 });

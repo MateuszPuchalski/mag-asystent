@@ -490,13 +490,13 @@ test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 5
     url: `/api/obsluga/zalaczniki/${zdjecie}`, headers: biuro.naglowki });
 
   /* 403 z KAŻDEJ drogi: zdanie wymienia próby, nie adresy. */
-  const trzy = allegroOddaje({ status: 403 });
+  const dwie = allegroOddaje({ status: 403 });
   const odmowa = await podglad();
   assert.equal(odmowa.statusCode, 502);
   assert.match(odmowa.json().error, /końcówka API.*403.*zapisany adres: 403/);
   assert.match(odmowa.json().error, /allegro:api:messaging/);
   assert.equal(/https?:\/\//.test(odmowa.json().error), false);
-  assert.equal(trzy.strzalow, 3, "public, beta, zapisany adres — i koniec");
+  assert.equal(dwie.strzalow, 2, "końcówka API bez Accept, zapisany adres — i koniec");
   assert.equal((await pobranie()).statusCode, 502, "pobranie na dysk mówi tym samym zdaniem");
 
   allegroOddaje(new Error("fetch failed: timeout"));

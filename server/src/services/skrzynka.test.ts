@@ -366,10 +366,12 @@ test("oś rozmowy pokazuje wiadomości i numer oferty", () => {
   assert.equal(os[1].odKlienta, false);
 });
 
-test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy przy pustym polu", () => {
-  /* `mimeType` jest w schemacie Allegro opcjonalne. Do tego wydania brak pola
-     znaczył „nie obraz" i zdjęcie z telefonu zostawało samą nazwą. Nazwa
-     decyduje o UKŁADZIE; o wydaniu rozstrzygają bajty na trasie podglądu. */
+test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy pliku", () => {
+  /* `mimeType` jest w schemacie Allegro opcjonalne i bywa kłamliwe: telefony
+     przysyłają `image/jpg` i `application/octet-stream` przy `IMG_….jpg`.
+     0.244.0 patrzyło na nazwę tylko przy PUSTYM polu, więc takie zdjęcie
+     zostawało samą nazwą. Nazwa decyduje o UKŁADZIE; o wydaniu rozstrzygają
+     bajty na trasie podglądu, a 415 panel zapamiętuje. */
   const msg = Number((db().prepare("SELECT id FROM message WHERE conversation_id=? ORDER BY id LIMIT 1")
     .get(rozmowaId) as { id: number }).id);
   const url = "https://upload.allegro.pl/message-center/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6";
@@ -379,7 +381,11 @@ test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy przy pus
     ["b.jpg", null, "SAFE", url, true],
     ["c.webp", null, "SAFE", url, true],
     ["d.pdf", null, "SAFE", url, false],
-    ["e.jpg", "application/octet-stream", "SAFE", url, false],
+    ["e.jpg", "application/octet-stream", "SAFE", url, true],
+    ["e2.jpg", "image/jpg", "SAFE", url, true],
+    ["e3.jpg", "", "SAFE", url, true],
+    ["e4.pdf", "application/octet-stream", "SAFE", url, false],
+    ["e5.svg", "image/svg+xml", "SAFE", url, false],
     ["f.jpg", "image/jpeg", "NEW", url, false],
     ["g.jpg", "image/jpeg", "SAFE", null, false],
   ];

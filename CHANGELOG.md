@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.248.0 — 10 września 2026
+
+**Zdjęcia w rozmowach skrzynki: droga API po specyfikacji, bez nagłówka
+`Accept`.** Właściciel po wdrożeniu 0.244.0 przysłał zrzuty: portal
+deweloperski Allegro z 403 `EDGE_CLIENT_ERROR` na `message-center/message-attachments`,
+panel ze zdaniem „końcówka API (public.v1+json): 406; (beta.v1+json): 406;
+zapisany adres: 403" i ramkę „wczytuję…" stojącą na stałe. Sonda
+(`npm run sonda:zalacznik`, załącznik #63) rozstrzygnęła: API BEZ `Accept`
+oddaje 200 `image/jpeg` (2,6 MB), z `Accept` 406, zapisany adres 403.
+
+0.244.0 przeczytało plik źle. `docs/allegro/swagger.yaml` MA operację
+`downloadAttachmentGET` na `/messaging/message-attachments/{attachmentId}`
+z odpowiedzią `*/*` — plik binarny bez wersji zasobu, jak przy załącznikach
+reklamacji. Nagłówek `Accept` z JSON-em, dodany „z pamięci" pod `[WERYFIKUJ]`,
+był jedynym powodem 406. Znacznik schodzi (licznik dwadzieścia trzy).
+
+- **Adapter**: `kandydaciPobrania` = końcówka API bez `Accept`, potem zapisany
+  `url` jako zapas. Warianty `public.v1`/`beta.v1` znikają. Sonda ma dwie próby
+  kontrolne Z nagłówkiem — mają pokazać 406. Werdykt sondy liczy 200 z API
+  niezależnie od nagłówka; do dziś czytał 200 „bez Accept" jako „żadna droga
+  nie oddała pliku" i tak właśnie skłamał właścicielowi.
+- **Panel**: `useObraz` zamawia obraz za STANEM, nie za montażem. Po minucie
+  wpis porażki wygasał, a przerysowanie z innego powodu (błąd pobrania w stanie
+  lokalnym) oddawało `undefined` bez żądania — ramka na stałe, bez ponowienia.
+  `bladSwiezy` to czysty odczyt, nie kasuje w renderze.
+- **`podglad` z nazwy pliku zawsze**: `image/jpg`, `application/octet-stream`
+  i pusty ciąg przy `IMG_….jpg` zostawiały zdjęcie samą nazwą, bo nazwa liczyła
+  się tylko przy pustym polu. Bajty na trasie dalej rozstrzygają wydanie.
+- Dokumenty: sekcja w `allegro-ksztalt.md` przepisana pod specyfikację, §28
+  („kandydat" → działa), §4.2, `DEPLOY.md`.
+
+Poza wydaniem: portal pokazał też 432 × 404 na `GET /order/checkout-forms/{id}`
+— synchronizacja zamówień pyta co 10 minut o te same nieistniejące numery.
+Osobne zadanie z pamięcią negatywu.
+
+Do potwierdzenia u właściciela po aktualizacji: `cd /c/wertis/server && npm run
+sonda:zalacznik` — wiersz „końcówka API | bez Accept | 200 | image/jpeg",
+potem rozmowa ze zdjęciem: obraz w linii, kliknięcie powiększa.
+
 ## 0.247.0 — 9 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

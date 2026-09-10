@@ -606,15 +606,24 @@ export function idZalacznikaZUrl(url: string): string | null {
 /**
  * Kandydaci pobrania w kolejności prób — czysta funkcja, żeby test sprawdził
  * ją bez sieci. Bez ogona UUID zostaje sam zapisany `url`.
+ *
+ * ── KSZTAŁT Z PLIKU, drugi raz ───────────────────────────────────────────────
+ * 0.244.0 zapisało, że „w `swagger.yaml` tej operacji nie ma", i dało drodze
+ * API nagłówek `Accept` z JSON-em z pamięci. Nieprawda: `docs/allegro/swagger.yaml`
+ * ma `downloadAttachmentGET` na `/messaging/message-attachments/{attachmentId}`
+ * (scope `allegro:api:messaging`), a odpowiedź 200 deklaruje jako plik binarny
+ * dowolnego typu (gwiazdka, ukośnik, gwiazdka), bez wersji zasobu, dokładnie jak `GET /sale/issues/attachments/{id}`,
+ * który reklamacje wołają bez `Accept` od 0.223.0. Sonda właściciela
+ * (10 września) potwierdziła: bez `Accept` 200 `image/jpeg`, z `public.v1`
+ * i `beta.v1` 406, zapisany adres na `upload.allegro.pl` 403 na brzegu.
+ * Droga API idzie więc BEZ `Accept`; zapisany `url` zostaje zapasem.
  */
 export function kandydaciPobrania(apiUrl: string, url: string): KandydatPobrania[] {
   const id = idZalacznikaZUrl(url);
   const zapas: KandydatPobrania = { droga: "url", adres: url };
   if (!id) return [zapas];
-  const api = `${apiUrl}/messaging/message-attachments/${encodeURIComponent(id)}`;
   return [
-    { droga: "api", adres: api, akcept: AKCEPTY[0] },
-    { droga: "api", adres: api, akcept: AKCEPTY[1] },
+    { droga: "api", adres: `${apiUrl}/messaging/message-attachments/${encodeURIComponent(id)}` },
     zapas,
   ];
 }
@@ -677,16 +686,17 @@ export interface WynikSondyZalacznika {
 
 /**
  * Sonda JEDNEGO załącznika na żywym koncie (`npm run sonda:zalacznik`):
- * kandydaci plus dwie próby kontrolne (API bez `Accept`, `url` z `Accept`).
- * Oddaje kody i typy, nigdy bajtów ani adresów — raport ma zdjąć
- * `[WERYFIKUJ]`, nie przenieść zdjęcia klienta do dziennika.
+ * kandydaci plus dwie próby kontrolne Z nagłówkiem `Accept` (API i `url`).
+ * Kontrole mają pokazać 406 — dowód, że odmowa była naszym nagłówkiem, nie
+ * brakiem uprawnienia. Oddaje kody i typy, nigdy bajtów ani adresów — raport
+ * potwierdza specyfikację na żywo, nie przenosi zdjęcia klienta do dziennika.
  */
 export async function sondujZalacznik(apiUrl: string, url: string): Promise<WynikSondyZalacznika[]> {
   const kandydaci = kandydaciPobrania(apiUrl, url);
   const api = kandydaci.find((k) => k.droga === "api");
   const proby: KandydatPobrania[] = [
     ...kandydaci,
-    ...(api ? [{ droga: "api" as const, adres: api.adres }] : []),
+    ...(api ? [{ droga: "api" as const, adres: api.adres, akcept: AKCEPTY[0] }] : []),
     { droga: "url", adres: url, akcept: AKCEPTY[0] },
   ];
   const bearer = await wazneBearer();

@@ -29,23 +29,31 @@ export function tabelaSondy(wyniki: WynikSondyZalacznika[]): string {
 }
 
 /**
- * Zdanie-werdykt. Droga API z `Accept` i 200 → znacznik do zdjęcia; sam
- * zapisany adres → zostajemy przy zapasie; wszystko 403 → uprawnienie.
+ * Zdanie-werdykt. Droga API z 200 — NIEZALEŻNIE od `Accept` — potwierdza
+ * specyfikację (`downloadAttachmentGET` oddaje plik dowolnego typu); sam zapisany adres →
+ * zostajemy przy zapasie; wszystko 403 → uprawnienie; API 406 → to nasz
+ * nagłówek, nie Allegro. Do 0.248.0 werdykt liczył wyłącznie wiersze API
+ * Z nagłówkiem i przy 200 „bez Accept" mówił „żadna droga nie oddała pliku" —
+ * sonda właściciela pokazała 200 i przeczytała to jako porażkę.
  */
 export function werdyktSondy(wyniki: WynikSondyZalacznika[]): string {
-  const api = wyniki.find((w) => w.droga === "api" && w.akcept !== null && w.status === 200);
+  const api = wyniki.find((w) => w.droga === "api" && w.status === 200);
   const url = wyniki.find((w) => w.droga === "url" && w.akcept === null && w.status === 200);
   if (api) {
     return `Droga API działa (${nazwaAkceptu(api.akcept)}, ${api.typ ?? "bez typu"}) — ` +
-      "zdejmij `[WERYFIKUJ]` przy pobraniu załącznika Centrum Wiadomości w `docs/allegro-ksztalt.md`.";
+      "zgodnie ze specyfikacją (`downloadAttachmentGET`, odpowiedź `*/*`); panel idzie tą drogą.";
   }
   if (url) {
     return "Działa WYŁĄCZNIE zapisany adres — panel zostaje przy zapasie; " +
-      "znacznik `[WERYFIKUJ]` zostaje, a sekcja w `docs/allegro-ksztalt.md` ma dostać kody z tej tabeli.";
+      "kody z tej tabeli idą do sekcji w `docs/allegro-ksztalt.md`.";
   }
   if (wyniki.every((w) => w.status === 403)) {
     return "Obie drogi 403 — sprawdź uprawnienie `allegro:api:messaging` w aplikacji na developer.allegro.pl " +
       "i sparuj konto ponownie (token wydany pod stary zakres sam się nie rozszerzy).";
+  }
+  if (wyniki.some((w) => w.droga === "api" && w.akcept === null && w.status === 406)) {
+    return "Końcówka API odrzuca nagłówek Accept (406) — to nasze żądanie, nie brak uprawnienia; " +
+      "kody z tabeli idą do zgłoszenia razem z wersją serwera.";
   }
   return "Żadna droga nie oddała pliku — kody w tabeli wyżej idą do zgłoszenia.";
 }
