@@ -258,6 +258,24 @@ test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async
     "z bufora schodzi WYŁĄCZNIE to, co magazynier naprawdę odłożył");
 });
 
+test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
+  /* Rozliczyło go biuro ręką w Subiekcie. Dokument wystawiony dziś przesunąłby
+     stan DRUGI raz, po miesiącach, na towar, którego nikt nie ruszał — więc
+     migracja stempluje zastane kosze, a serwis ten stempel czyta. */
+  const kosz = koszAplikacji("Z-11");
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+  db().prepare("UPDATE kosz SET status='rozlozony', powrot_poza_aplikacja=1 WHERE id=?")
+    .run(kosz.id);
+
+  assert.equal(K.zakolejkujPowrot(kosz.id, "Magazynier"), null);
+  assert.equal(K.wypuscPowrotyKoszy(), 0);
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    0
+  );
+});
+
 test("koszyk odpadu nie jest pracą hali i nie cofa bufora", async () => {
   /* 0.211.0 dołożyło rodzaj koszy i nie ruszyło listy dla kolektora, więc
      kosz odpadu wyglądał tam jak każdy inny. Magazynier odłożyłby złom na

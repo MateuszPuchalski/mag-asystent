@@ -2105,6 +2105,8 @@ CREATE TABLE IF NOT EXISTS kosz (
   zamknieto_przez TEXT,
   rozlozono_at  TEXT,
   rozlozono_przez TEXT
+  -- Reszta kolumn (mm_dok_id, rodzaj, powrot_queue_id, powrot_poza_aplikacja)
+  -- dochodzi migracją: tabela stoi na produkcji od 0.59.0.
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod)
   WHERE status NOT IN ('rozlozony', 'anulowany');

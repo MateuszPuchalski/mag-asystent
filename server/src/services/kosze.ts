@@ -62,6 +62,8 @@ interface WierszKosza {
   mm_numer: string | null;
   /** Zadanie MM powrotnego (ZWROTY→MAG); NULL = jeszcze nie zamówione. */
   powrot_queue_id: number | null;
+  /** 1 = powrót rozliczyło biuro poza aplikacją (kosz sprzed 0.266.0). */
+  powrot_poza_aplikacja: number | null;
   /** `zwroty` albo `karton` — patrz `RODZAJ_KARTON`. */
   rodzaj: string;
   anulowano_at: string | null;
@@ -875,6 +877,7 @@ function adresyWDrodze(koszId: number): number {
 export function zakolejkujPowrot(koszId: number, autor: string): number | null {
   const k = wierszKosza(koszId);
   if (k.powrot_queue_id) return k.powrot_queue_id;
+  if (k.powrot_poza_aplikacja) return null;
   if (k.status !== "rozlozony") return null;
   /* Kosz z dokumentu MM: przesunięcie na regał wystawiło biuro i powrotne też
      wystawia biuro. Drugi dokument z aplikacji przesuwałby towar, którego
@@ -926,6 +929,7 @@ export function wypuscPowrotyKoszy(autor = AUTOMAT_POWROTU): number {
     .prepare(
       `SELECT id FROM kosz
         WHERE status='rozlozony' AND powrot_queue_id IS NULL
+          AND powrot_poza_aplikacja = 0
           AND mm_dok_id IS NULL AND rodzaj NOT IN (?, ?)`
     )
     .all(RODZAJ_KARTON, RODZAJ_ODPAD) as Array<{ id: number }>;

@@ -68,6 +68,12 @@ magazynier odłożyłby złom na regał i wpisał mu adres pickingowy do kartote
 Utylizacja ma ze stanu ZEJŚĆ. Co dalej dzieje się z odpadem, zostaje decyzją
 biura: dokumentu zejścia ze stanu (RW) ta aplikacja nie wystawia.
 
+**Kosze rozłożone przed tym wydaniem powrotu nie dostają.** Rozliczyło je
+biuro ręką w Subiekcie, więc dokument wystawiony dziś przesunąłby stan drugi
+raz, po miesiącach, na towar, którego nikt nie ruszał. Migracja stempluje je
+raz — wyłącznie w przebiegu dokładającym kolumnę, bo powtarzany przy każdym
+starcie kasowałby dokument świeżo rozłożonego kosza.
+
 **Siódmy rozjazd w rekoncyliacji:** kosz rozłożony ponad dobę temu, któremu
 powrót nie wyszedł. Zdanie mówi wprost, co to znaczy — towar leży na półce
 i nie jest sprzedawalny — i gdzie szukać przyczyny. Kartę kosza w biurze zamyka
