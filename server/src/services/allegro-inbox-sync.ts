@@ -4,7 +4,7 @@ import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.ht
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
-import { obudzPrzychodzaca } from "./conversations.js";
+import { flagaAutoodpowiedzi, obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { zapiszZalaczniki } from "./zalaczniki-wiadomosci.js";
@@ -379,34 +379,54 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
   ).get(konto, thread.id) as { id: number }).id);
 
   for (const message of messages) {
+    /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
+       więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
+       z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
+       odpowiedzi rzucało `TypeError`.
+
+       Liczone RAZ, do zmiennej: ta sama flaga rozstrzyga o kierunku, o budzeniu
+       rozmowy i o tym, czy zdarzenie ma zapalić pasek w panelu. Trzy odczyty
+       tego samego pola dawałyby trzy okazje, żeby któryś się rozjechał. */
+    const przychodzaca = flaga(message.author.isInterlocutor, "author.isInterlocutor");
+    const kierunek = przychodzaca ? "incoming" as const : "outgoing" as const;
+    const tresc = odkodujEncje(message.text);
+    const auto = flagaAutoodpowiedzi(kierunek, tresc);
     /* Wiadomości NIE kasujemy i nie nadpisujemy, inaczej niż w lądowisku:
        wiszą na nich szkic (`expected_last_message_id`) i zadania terenowe.
        Konflikt na unikalnym kluczu jest tu poprawnym końcem pracy. */
     const wynik = database.prepare(`INSERT INTO message(conversation_id, channel_account_id,
       external_message_id, direction, body, related_object_type, related_object_id,
-      related_order_id, sent_at)
-      VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
+      related_order_id, sent_at, auto_odpowiedz)
+      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
       rozmowa, konto, message.id,
-      /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
-         więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
-         z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej
-         odpowiedzi rzucało `TypeError`. */
-      flaga(message.author.isInterlocutor, "author.isInterlocutor") ? "incoming" : "outgoing",
-      odkodujEncje(message.text), oferta(message)[0], oferta(message)[1], zamowienie(message),
+      kierunek,
+      tresc, oferta(message)[0], oferta(message)[1], zamowienie(message),
       /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
          dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
          daty wiadomości nie podaje. Podaje: `createdAt`. */
-      message.createdAt);
+      message.createdAt,
+      /* AUTOODPOWIEDŹ ZNACZONA OD RAZU (0.256.0). Do tego wydania kolumny tu
+         nie było, więc zostawało `DEFAULT 0`, a flagę dosypywała dopiero
+         migracja przy starcie procesu. Między restartami nasze „Dziękujemy
+         za kontakt" liczyło się jako ruch biura i przestawiało rozmowę na
+         „czeka na klienta" — pytanie klienta gasło przez to, że skrzynka
+         grzecznie potwierdziła jego odbiór. */
+      auto);
     if (wynik.changes > 0) {
       /* PRZYCHODZĄCA BUDZI ROZMOWĘ (§7, 0.158.0). Klient dopisujący pytanie do
          sprawy uznanej za załatwioną musi ją z powrotem otworzyć — inaczej
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
-      if (flaga(message.author.isInterlocutor, "author.isInterlocutor")) {
-        obudzPrzychodzaca(database, rozmowa);
-      }
+      if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
+      /* ZDARZENIE NIESIE KIERUNEK (0.256.0, dług z 0.228.0). Panel zapala pasek
+         „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
+         pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
+         synchronizator nie woła — więc pasek nie zapalił się ani razu na
+         prawdziwej wiadomości z Allegro. */
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
+        odKlienta: przychodzaca,
+        automatyczna: auto === 1,
       });
     }
     /* ZAŁĄCZNIKI PRZY KAŻDYM PRZEBIEGU, także przy wiadomości już znanej.

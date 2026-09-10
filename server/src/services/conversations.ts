@@ -30,16 +30,37 @@ export interface NowaWiadomosc {
   sentAt: string;
 }
 
+/**
+ * AUTOODPOWIEDŹ ROZPOZNAJEMY RAZ, PRZY ZAPISIE (0.227.0).
+ *
+ * Reguła zna jedno miejsce, a kolumna niesie wynik dalej — do kolejki i do
+ * wyliczenia stanu. Liczenie tego przy odczycie kazałoby powtórzyć regułę
+ * w SQL-u, a dwie kopie rozjechałyby się przy pierwszej poprawce.
+ *
+ * Kierunek jest CZĘŚCIĄ reguły, nie warunkiem przed nią: tylko WYCHODZĄCE,
+ * bo klient cytujący nasze potwierdzenie niesie ten sam podpis, a jego list
+ * jest pytaniem, nie odbiciem. Dlatego funkcja bierze oba pola — wołający,
+ * który dostałby samą treść, musiałby dopisać sobie drugą połowę reguły.
+ * Kierunek jest ZAWĘŻONY do dwóch wartości, bo goły `string` przepuściłby
+ * literówkę, a ta dałaby ciche zero — czyli dokładnie tę usterkę, którą
+ * ta funkcja zamyka.
+ *
+ * Osobna funkcja, bo wołających jest dwóch: `zapiszWiadomosc` i synchronizator
+ * skrzynki. Do 0.255.0 synchronizator wstawiał wiersz BEZ tej kolumny, więc
+ * zostawało `DEFAULT 0` i nasza własna autoodpowiedź liczyła się jako ruch
+ * biura — aż do najbliższego restartu, kiedy flagę dosypywała migracja.
+ * Rozmowa z pytaniem klienta przechodziła przez to na „czeka na klienta"
+ * i znikała z listy tych, które czekają na odpowiedź.
+ */
+export function flagaAutoodpowiedzi(
+  direction: NowaWiadomosc["direction"], tresc: string,
+): 0 | 1 {
+  return direction === "outgoing" && czyAutoresponder(tresc) ? 1 : 0;
+}
+
 /** Zapis z synchronizacji. Unikalny klucz robi z ponownego przebiegu no-op. */
 export function zapiszWiadomosc(dane: NowaWiadomosc, database: DatabaseSync = db()): number | null {
-  /* AUTOODPOWIEDŹ ROZPOZNAJEMY RAZ, PRZY ZAPISIE (0.227.0). Reguła zna jedno
-     miejsce (`czyAutoresponder`), a kolumna niesie wynik dalej — do kolejki
-     i do wyliczenia stanu. Liczenie tego przy odczycie kazałoby powtórzyć
-     regułę w SQL-u, a dwie kopie rozjechałyby się przy pierwszej poprawce.
-
-     Tylko WYCHODZĄCE: klient cytujący nasze potwierdzenie niesie ten sam
-     podpis, a jego list jest pytaniem, nie odbiciem. */
-  const auto = dane.direction === "outgoing" && czyAutoresponder(dane.body) ? 1 : 0;
+  const auto = flagaAutoodpowiedzi(dane.direction, dane.body);
   const wynik = database.prepare(`
     INSERT INTO message(
       conversation_id, channel_account_id, external_message_id, direction, body, sent_at,
@@ -454,18 +475,42 @@ export function statusZKierunku(
 /**
  * Stany, z których PRZYCHODZĄCA wiadomość budzi rozmowę.
  *
- * To jest sedno całego wydania. Klient dopisuje pytanie do sprawy, którą biuro
+ * To jest sedno wydania 0.158.0. Klient dopisuje pytanie do sprawy, którą biuro
  * uznało za załatwioną; bez tego przejścia rozmowa zostaje na liście
  * „rozwiązane" i nikt do niej nie zagląda. Status, który nie wraca sam, jest
  * gorszy od jego braku — wygląda jak porządek i nim nie jest.
  *
- * `closed` i `spam` NIE budzą się. To są jawne werdykty człowieka, a automat,
- * który je cofa, kazałby zamykać tę samą rozmowę w kółko.
+ * `closed` DOŁĄCZYŁO W 0.256.0 i to jest odwrócenie tamtej decyzji. Stał tu
+ * argument, że werdykt cofnięty automatem kazałby zamykać tę samą rozmowę
+ * w kółko. Argument mylił dwa koszty: ponowne zamknięcie to jedno kliknięcie,
+ * a przepadłe pytanie klienta to sprawa, o której nikt się nie dowie. Rozmowa
+ * zamknięta wypadała ze WSZYSTKICH kubełków roboczych kolejki i stała już
+ * tylko w „Wszystkie", gdzie się nie pracuje. Klient, który pisze dalej,
+ * mówi wprost, że sprawa nie jest skończona.
+ *
+ * `spam` zostaje POZA tym zbiorem i jest teraz jedynym takim werdyktem —
+ * to po niego sięga się, gdy ktoś zasypuje skrzynkę. Gdyby wracał, biuro
+ * nie miałoby czym uciszyć natręta.
  */
 const BUDZONE: ReadonlySet<string> = new Set([
   "new", "open", "waiting_for_customer", "waiting_for_us", "waiting_for_internal",
-  "snoozed", "resolved",
+  "snoozed", "resolved", "closed",
 ]);
+
+/**
+ * Stany, z których obudzenie ODDAJE ROZMOWĘ DO PULI (0.256.0).
+ *
+ * Decyzja właściciela: „Zamknięta" wraca do „Nieprzypisanych", nie do biurka
+ * tego, kto ją zamknął. To jedyna rzecz, którą oba werdykty się różnią po
+ * 0.256.0, i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem,
+ * wraca do mnie", „Zamknięta" — „skończyłem z tym, bierze kto wolny". Bez tej
+ * różnicy zostałyby dwie pozycje w menu robiące dokładnie to samo.
+ *
+ * Zbiór, a nie porównanie w miejscu użycia, bo o zwolnieniu decyduje ta sama
+ * lista, którą tu widać — kolejny werdykt oddający rozmowę dopisuje się
+ * wyłącznie tutaj.
+ */
+const ZWALNIA_PROWADZACEGO: ReadonlySet<string> = new Set(["closed"]);
 
 /**
  * Status WYLICZANY, nie tylko odczytany.
@@ -611,6 +656,45 @@ export function obudzPrzychodzaca(
   /* Autorem jest KLIENT, nie agent: to jego wiadomość zmieniła stan sprawy.
      Podpisanie tego agentem kłamałoby w audycie o tym, kto co zrobił. */
   zapiszZmianeStatusu(database, conversationId, przed, "open", "klient", undefined);
+  if (ZWALNIA_PROWADZACEGO.has(przed)) zwolnijProwadzacego(database, conversationId);
+}
+
+/**
+ * Rozmowa wraca do puli: pole prowadzącego pustoszeje, historia zostaje.
+ *
+ * `version` rośnie, bo przypisanie NAPRAWDĘ się zmieniło. Panel trzyma ten
+ * numer przy przejęciu (`WHERE assigned_user_id IS NULL AND version=?`)
+ * i przy wysyłce; zostawienie go bez ruchu znaczyłoby, że ekran sprzed
+ * zwolnienia dalej uchodzi za świeży.
+ *
+ * Wiersz historii się ZAMYKA, a nie znika — tak samo jak przy wymuszonym
+ * przekazaniu. Audyt ma pokazać, że sprawę ktoś prowadził i kiedy przestał,
+ * inaczej rozmowa wyglądałaby na nigdy nieprzypisaną.
+ */
+function zwolnijProwadzacego(database: DatabaseSync, conversationId: number): void {
+  const kto = database.prepare("SELECT assigned_user_id FROM conversation WHERE id=?")
+    .get(conversationId) as { assigned_user_id: number | null } | undefined;
+  /* Rozmowa zamknięta bez prowadzącego nie ma czego oddawać. Wyjście TUTAJ,
+     a nie po `UPDATE`, oszczędza fałszywy wpis w audycie i podbicie `version`
+     bez zmiany — a ten podbity numer unieważniłby cudzy ekran z niczego. */
+  if (!kto?.assigned_user_id) return;
+  database.prepare(`UPDATE conversation
+    SET assigned_user_id=NULL, version=version+1,
+        updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE id=?`).run(conversationId);
+  database.prepare(`UPDATE conversation_assignment
+    SET unassigned_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    WHERE conversation_id=? AND unassigned_at IS NULL`).run(conversationId);
+  /* Autor „klient" z tego samego powodu, co przy zmianie statusu: to jego
+     wiadomość otworzyła sprawę na nowo. `userId` zostaje pusty, bo żaden
+     pracownik tego nie kliknął. */
+  logEvent("rozmowa_zwolniona", "klient", null,
+    { conversationId, poprzedniProwadzacy: kto.assigned_user_id, powod: "obudzona z zamkniętej" },
+    undefined, database);
+  /* Kolejka w panelu przelicza kubełki z listy, którą trzyma w cache. Bez tego
+     zdarzenia rozmowa wpadłaby do „Nieprzypisanych" dopiero przy następnym
+     odświeżeniu ręką. */
+  publishConversationEvent("assignment.changed", conversationId, { zwolniona: true });
 }
 
 function zapiszZmianeStatusu(
