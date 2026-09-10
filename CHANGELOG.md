@@ -35,6 +35,53 @@ historii nie przepisujemy.
 
 
 <<<<<<< HEAD
+## 0.269.0 — 10 września 2026
+
+**Zwrot zostawia ślad w dwóch miejscach, w których dotąd milczał.** Właściciel
+wybrał obie rzeczy z listy otwartych luk: ślad po przelewie przy pobraniu
+i ślad rozłożenia na osi zwrotu.
+
+### Pobranie: wypłata przestaje być tylko wyciągiem bankowym
+
+Przy pobraniu klient nigdy nie zapłacił Allegro, więc Allegro nie ma czego
+oddawać — pieniądze wracają przelewem z banku firmy. Panel mówił o tym zdaniem
+od 0.190.0 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka
+Allegro, więc zwrot domykał się korektą BEZ zapisu, czy klient dostał
+pieniądze. W kolejce klient bez wypłaty wyglądał tak samo jak rozliczony,
+a przy sporze odpowiedź „oddaliśmy" nie miała się o co oprzeć.
+
+Pasek pieniędzy dostaje ZAPISZ PRZELEW: data, imię i numer, po którym da się
+przelew znaleźć w banku. Numer jest opcjonalny, bo bywa znany dopiero
+z wyciągu — wymóg kazałby wpisać cokolwiek albo odłożyć zapis, czyli zostawić
+ten sam brak śladu.
+
+To NOTATKA o ruchu pieniędzy, nie sam ruch: aplikacja niczego nie wysyła.
+Dlatego wolno ją cofnąć — §25a.5 potwierdzeniem obwarowuje rzeczy
+nieodwracalne, a literówka w numerze odwracalna jest. Zapis nie patrzy na to,
+czy zwrot jest zamknięty: zamyka go korekta, a przelew idzie zwykle po niej.
+
+Dopóki śladu nie ma, wiersz kolejki niesie sygnał „przelew?" — świecący także
+na zwrocie zamkniętym, z tego samego powodu co niepotwierdzony przelew.
+Rekoncyliacja wypisuje taki zwrot po dobie od wyceny, zaraz za terminami
+ustawowymi: to pieniądze klienta, nie porządek w bazie.
+
+### Hala pisze na osi zwrotu
+
+Kosz wie, z której pozycji zwrotu wziął towar, od 0.192.0 — ale nikt nie czytał
+tego w drugą stronę. Rozłożenie zostawiało wyłącznie wpis w dzienniku, więc
+biuro patrzące na zwrot nie widziało ani tego, że towar wrócił na półkę, ani
+tego, że go w koszu nie było. Pytanie „gdzie leży ten towar" kończyło się
+w Subiekcie albo telefonem na halę.
+
+Odłożenie dopisuje teraz na oś zwrotu zdanie z adresem półki i kodem kosza,
+a pominięcie — zdanie z powodem, który podała hala. Reguła stoi w osobnym
+pliku (`services/zwrot-slad.ts`): rozkładanie jest pracą hali, oś zwrotu sprawą
+biura, a import całego serwisu zwrotów do modułu kolektora po jeden INSERT
+ciągnąłby za sobą pół aplikacji. Kosz bez zwrotu — z dokumentu MM albo karton —
+nie ma gdzie tego dopisać i milczy; brak osi nie jest awarią rozkładania.
+
+Licznik umowy tras POST: 22 → 24.
+
 ## 0.268.0 — 10 września 2026
 
 **Widać, dlaczego pusto.** Każdy pominięty szczebel doboru produkuje zdanie

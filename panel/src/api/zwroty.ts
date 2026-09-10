@@ -451,6 +451,38 @@ export function useZwrocPieniadze() {
   });
 }
 
+/**
+ * Zapis przelewu oddanego poza Allegro i jego cofnięcie (0.269.0).
+ *
+ * Przy pobraniu Allegro nie trzymało tych pieniędzy, więc `useZwrocPieniadze`
+ * jest tam zamknięte z definicji, a zwrot zamykał się bez śladu po wypłacie.
+ */
+export function useZapiszPrzelew() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number; referencja: string | null }) =>
+      api<{ kiedy: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/przelew`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja, referencja: v.referencja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+export function useCofnijPrzelew() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/przelew/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
 export function useOdmowPlatnosci() {
   const qc = useQueryClient();
   return useMutation({

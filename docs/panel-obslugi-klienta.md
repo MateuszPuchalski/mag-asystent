@@ -2546,9 +2546,27 @@ Numer magazynu stoi w `MAG_ID_ODP` i **nie ma domyślnej wartości**. Zero znacz
 wyłączone: zgadnięty numer wystawiłby dokument przesuwający złom w cudze
 miejsce, a MM się nie cofa jednym kliknięciem.
 
-**Pobranie nie ma gdzie zostawić śladu.** Panel mówi „oddaj przelewem"
-i kończy; `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro. Zwrot
-domyka się korektą, ale bez zapisu, czy klient dostał pieniądze.
+**Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
+i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
+zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym
+dowodem był wyciąg bankowy poza aplikacją, a klient bez wypłaty wyglądał
+w kolejce dokładnie tak samo jak rozliczony.
+
+Biuro zapisuje teraz przy pasku pieniędzy, że przelew poszedł: datę, swoje imię
+i numer, po którym da się go znaleźć w banku. Numer jest OPCJONALNY — bywa
+znany dopiero z wyciągu, a wymóg kazałby wpisać cokolwiek albo odłożyć zapis,
+czyli zostawić ten sam brak śladu.
+
+To NOTATKA o ruchu pieniędzy, nie sam ruch: aplikacja niczego nie wysyła,
+tylko zapisuje, co człowiek zrobił w banku. Dlatego wolno ją cofnąć — §25a.5
+potwierdzeniem obwarowuje rzeczy nieodwracalne, a literówka w numerze
+odwracalna jest. Cofnięcie zostawia własne zdanie na osi.
+
+Zapis NIE PATRZY na to, czy zwrot jest zamknięty. Zamyka go korekta, a przelew
+idzie zwykle po niej; bramka na stanie końcowym kazałaby wybierać między
+poprawną kolejnością pracy a zapisaniem prawdy. Dopóki śladu nie ma, wiersz
+kolejki niesie sygnał „przelew?", a raport rekoncyliacji wypisuje zwrot po
+dobie od wyceny.
 
 **Rozjazd ilości liczy BIURO od 0.212.0.** Decyzja właściciela: „biuro zajmuje
 się otwieraniem i procesowaniem zwrotów". Przy pozycji z więcej niż jedną sztuką
@@ -3156,6 +3174,14 @@ zależność rozstrzyga się więc PRZED wstawieniem zadania, nie przy jego
 wyborze. Kosz czekający dłużej niż dobę wypisuje rekoncyliacja
 (`kosz_bez_powrotu`), a kartę kosza w biurze zamyka trzeci etap: „powrót MM".
 
+**Hala pisze na osi zwrotu (0.269.0).** Kosz wie, z której pozycji zwrotu
+wziął towar, od 0.192.0 — ale do 0.268.0 nikt nie czytał tego w drugą stronę.
+Rozłożenie zostawiało wyłącznie wpis w dzienniku, więc biuro patrzące na zwrot
+nie widziało ani tego, że towar wrócił na półkę, ani tego, że go w koszu nie
+było. Odłożenie dopisuje teraz zdanie z adresem półki, a pominięcie — zdanie
+z powodem, który podała hala. Kosz bez zwrotu (z dokumentu MM, karton) nie ma
+gdzie tego dopisać i milczy.
+
 **Z bufora schodzi tylko to, co magazynier odłożył.** Pozycja pominięta
 została zgłoszona jako nieobecna w koszu — przesunięcie zdjęłoby z regału stan,
 którego nikt nie przeniósł.
@@ -3738,7 +3764,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone; od 0.266.0 nie wchodzi na listę kolektora |
 | Powrót towaru z regału zwrotów na halę | **działa** od 0.266.0 | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza z aplikacji, po zapisaniu adresów |
 | Dokument zejścia ze stanu dla odpadu (RW) | **nie działa** | po MM na magazyn odpadu stan zostaje; decyzja procesowa biura |
-| Ślad po zwrocie pieniędzy przy pobraniu | **nie działa** | `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro |
+| Ślad po zwrocie pieniędzy przy pobraniu | **działa** od 0.269.0 | `zapiszPrzelew`/`cofnijPrzelew`, kolumny `przelew_*`; sygnał `przelew_czeka` i rozjazd `zwrot_bez_przelewu` |
+| Ślad rozłożenia towaru na osi zwrotu | **działa** od 0.269.0 | `services/zwrot-slad.ts`; odłożenie i pominięcie w koszu dopisują zdarzenie zwrotu |
 | Rozjazd ilości zgłoszonej i zwróconej | **działa** od 0.212.0 | `zapiszIloscZwrocona`, `ilosc_zwrocona`; liczy biuro przy rozpakowaniu |
 | Werdykt biura przy zwrocie | **działa** od 0.156.0 | `rozstrzygnijZwrot`, odmowa wymaga powodu |
 | Ocena towaru przy zwrocie | **działa** od 0.156.0 | `ocenPozycje`, `stan`/`utylizacja` — przecena zdjęta w 0.209.0 |

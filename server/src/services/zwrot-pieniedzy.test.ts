@@ -4,8 +4,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  KODY_ODMOWY, odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zwrocPieniadze,
-  ZwrotPieniedzyConflict,
+  cofnijPrzelew, KODY_ODMOWY, odmowZwrotuPieniedzy, stanZwrotuPieniedzy,
+  zapiszPrzelew, zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "./zwrot-pieniedzy.js";
 
 /* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
@@ -255,4 +255,90 @@ test("po odmowie nie da się oddać pieniędzy tym samym zwrotem", async () => {
   const s = stanZwrotuPieniedzy(d, id);
   assert.equal(s.moznaZwrocic, false);
   assert.match(String(s.powod), /Odmowa/);
+});
+
+/* ── Ślad po przelewie oddanym poza Allegro (0.269.0) ────────────────────────
+   Przy pobraniu Allegro nigdy nie trzymało tych pieniędzy, więc trasa zwrotu
+   jest zamknięta z definicji. Do 0.268.0 zwrot zamykał się korektą BEZ ŚLADU
+   po wypłacie — klient bez pieniędzy wyglądał tak samo jak rozliczony.     */
+
+test("pobranie: zapis przelewu zostawia ślad, oś i podniesioną wersję", () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", platnoscId: null });
+  const przed = stanZwrotuPieniedzy(d, id);
+  assert.equal(przed.moznaZwrocic, false, "Allegro tych pieniędzy nie odda");
+  assert.equal(przed.moznaZapisacPrzelew, true, "…ale zapisać, że oddaliśmy je sami, wolno");
+
+  const w = zapiszPrzelew(d, id, 1, KTO, "  PRZ/2026/09/14  ");
+  assert.equal(w.wersja, 2);
+
+  const po = stanZwrotuPieniedzy(d, id);
+  assert.equal(po.przelew?.referencja, "PRZ/2026/09/14", "referencja idzie przycięta z białych znaków");
+  assert.equal(po.przelew?.przez, KTO.name);
+  assert.equal(po.moznaZapisacPrzelew, false, "drugi zapis nie ma czego zapisać");
+  assert.match(String(po.powodPrzelewu), /cofnij/i);
+
+  const os = d.prepare("SELECT rodzaj, tresc FROM zwrot_zdarzenie WHERE zwrot_id=?")
+    .all(id) as Array<{ rodzaj: string; tresc: string }>;
+  assert.deepEqual(os.map((z) => z.rodzaj), ["przelew"]);
+  assert.match(os[0].tresc, /PRZ\/2026\/09\/14/);
+});
+
+test("referencja jest OPCJONALNA — numer bywa znany dopiero z wyciągu", () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", platnoscId: null });
+  zapiszPrzelew(d, id, 1, KTO, "   ");
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.przelew?.referencja, null);
+  assert.ok(s.przelew?.kiedy, "sam fakt wypłaty zapisuje się i bez numeru");
+});
+
+test("cofnięcie zamiast potwierdzenia — notatka o przelewie jest odwracalna", () => {
+  /* §25a.5: potwierdzenia dostają rzeczy NIEODWRACALNE. To nie jest ruch
+     pieniędzy, tylko zdanie o nim, więc literówkę w numerze prostuje się
+     cofnięciem — a obie decyzje zostają na osi. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", platnoscId: null });
+  zapiszPrzelew(d, id, 1, KTO, "PRZ/1");
+  cofnijPrzelew(d, id, 2, KTO);
+
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.przelew, null);
+  assert.equal(s.moznaZapisacPrzelew, true, "po cofnięciu da się zapisać poprawny numer");
+  const os = d.prepare("SELECT rodzaj FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(id) as Array<{ rodzaj: string }>;
+  assert.deepEqual(os.map((z) => z.rodzaj), ["przelew", "przelew_cofniety"]);
+
+  assert.throws(() => cofnijPrzelew(d, id, 3, KTO), /nie ma zapisanego przelewu/);
+});
+
+test("stara wersja przegrywa, a przelew po zwrocie przez Allegro nie ma sensu", () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", platnoscId: null });
+  assert.throws(() => zapiszPrzelew(d, id, 99, KTO, null), ZwrotPieniedzyConflict);
+
+  const d2 = stanowisko();
+  const oddany = zwrotGotowy(d2);
+  d2.prepare("UPDATE zwrot_klienta SET zwrot_pieniedzy_id='ref-1' WHERE id=?").run(oddany);
+  const s = stanZwrotuPieniedzy(d2, oddany);
+  assert.equal(s.moznaZapisacPrzelew, false);
+  assert.match(String(s.powodPrzelewu), /panel Allegro/);
+});
+
+test("bez werdyktu i bez kwoty przelewu też nie ma czego zapisywać", () => {
+  const d = stanowisko();
+  const bezWerdyktu = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", werdykt: null });
+  assert.match(String(stanZwrotuPieniedzy(d, bezWerdyktu).powodPrzelewu), /przyjmij zwrot/i);
+
+  const d2 = stanowisko();
+  const bezKwoty = zwrotGotowy(d2, { platnoscTyp: "CASH_ON_DELIVERY", kwota: null });
+  assert.match(String(stanZwrotuPieniedzy(d2, bezKwoty).powodPrzelewu), /zaznacz/i);
+});
+
+test("zamknięty zwrot NIE blokuje zapisu — przelew idzie zwykle po korekcie", () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { platnoscTyp: "CASH_ON_DELIVERY", platnoscId: null });
+  d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-03T10:00:00Z' WHERE id=?").run(id);
+  assert.equal(stanZwrotuPieniedzy(d, id).moznaZapisacPrzelew, true);
+  assert.ok(zapiszPrzelew(d, id, 1, KTO, null).kiedy);
 });

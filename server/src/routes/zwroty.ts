@@ -18,7 +18,8 @@ import {
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
 import {
-  odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zwrocPieniadze, ZwrotPieniedzyConflict,
+  cofnijPrzelew, odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zapiszPrzelew,
+  zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
@@ -473,6 +474,44 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return await odmowZwrotuPieniedzy(db(), Number(req.params.id), req.body?.kod ?? "",
           req.body?.powod ?? null, Number(req.body?.wersja), kto(),
           (zwrotId, kod, powod) => wyslijOdmowe(config.allegro.apiUrl, zwrotId, kod, powod));
+      } catch (e) {
+        if (e instanceof ZwrotPieniedzyConflict) {
+          return reply.code(409).send({ error: e.message });
+        }
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────
+     Przy pobraniu Allegro nie trzymało pieniędzy, więc trasa wyżej jest
+     zamknięta z definicji, a zwrot zamykał się bez śladu po wypłacie. Te dwie
+     trasy zapisują NOTATKĘ o przelewie i ją cofają.
+
+     BEZ `autoryzuj()`, inaczej niż zwrot przez Allegro. Tamta trasa RUSZA
+     cudze pieniądze; ta zapisuje, że ruszył je człowiek w banku. Bramka roli
+     zostaje, bo to dane sprawy klienta — ale wpis `privileged` przy notatce
+     zrównywałby ją z przelewem i nauczyłby przewijać dziennik. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number; referencja?: string } }>(
+    "/api/obsluga/zwroty/:id/przelew", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return zapiszPrzelew(db(), Number(req.params.id), Number(req.body?.wersja),
+          kto(), req.body?.referencja ?? null);
+      } catch (e) {
+        if (e instanceof ZwrotPieniedzyConflict) {
+          return reply.code(409).send({ error: e.message });
+        }
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/przelew/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return cofnijPrzelew(db(), Number(req.params.id), Number(req.body?.wersja), kto());
       } catch (e) {
         if (e instanceof ZwrotPieniedzyConflict) {
           return reply.code(409).send({ error: e.message });

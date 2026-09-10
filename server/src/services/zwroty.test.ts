@@ -211,6 +211,33 @@ test("sygnały o pieniądzach mówią, W KTÓRĄ STRONĘ patrzeć", () => {
     "na zamkniętym nie ma już czego zapłacić drugi raz");
 });
 
+test("pobranie prosi o przelew, dopóki nie ma po nim śladu", () => {
+  /* Allegro tych pieniędzy nie trzymało, więc przycisk ODDAJ PIENIĄDZE jest
+     zamknięty z definicji, a zwrot zamyka się korektą i schodzi z kolejki.
+     Bez tego sygnału klient bez pieniędzy wyglądał jak rozliczony. */
+  const TERAZ = Date.parse("2026-09-05T12:00:00Z");
+  const w = (o: Record<string, unknown>) => sygnalyZwrotu({
+    kubelek: "korekta", dni: 10, paczkaAt: "2026-08-30T00:00:00Z",
+    dostarczonoAt: "2026-08-31T00:00:00Z", przesylkaStatus: "DELIVERED",
+    rejectionCode: null, pieniadzeAt: null, statusAllegro: "DELIVERED",
+    platnoscTyp: "CASH_ON_DELIVERY", przyjety: true, kwotaUstalona: true,
+    przelewAt: null, ...o,
+  } as Parameters<typeof sygnalyZwrotu>[0], TERAZ);
+
+  assert.ok(w({}).includes("przelew_czeka"));
+  assert.equal(w({ przelewAt: "2026-09-04T10:00:00Z" }).includes("przelew_czeka"), false,
+    "zapisany przelew gasi sygnał");
+  assert.equal(w({ platnoscTyp: "ONLINE" }).includes("przelew_czeka"), false,
+    "przy płatności online pieniądze oddaje Allegro");
+  assert.equal(w({ przyjety: false }).includes("przelew_czeka"), false,
+    "odrzucony zwrot nie prosi o pieniądze");
+  assert.equal(w({ kwotaUstalona: false }).includes("przelew_czeka"), false,
+    "bez kwoty nie wiadomo, ile miało wyjść");
+  /* Świeci TAKŻE na zamkniętym: przelew idzie zwykle PO korekcie, a gaszenie
+     razem z kubełkiem wyciszałoby sygnał w chwili, gdy zaczyna być prawdziwy. */
+  assert.ok(w({ kubelek: "zamkniety" }).includes("przelew_czeka"));
+});
+
 test("suma pozycji mnoży cenę przez ilość i zostaje w groszach", () => {
   assert.equal(sumaPozycji([{ cenaGrosze: 4999, ilosc: 2 }, { cenaGrosze: 100, ilosc: 3 }]), 10298);
   assert.equal(sumaPozycji([]), 0);

@@ -730,7 +730,7 @@ export type SzczegolyWysylki = {
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci";
+  | "rozjazd_ilosci" | "przelew_czeka";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -1013,6 +1013,13 @@ export type StanZwrotuPieniedzy = {
     potwierdzone: boolean;
   } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  /**
+   * Ślad po przelewie oddanym POZA Allegro (0.269.0). Przy pobraniu jedyny,
+   * jaki może istnieć — to notatka biura o ruchu pieniędzy, nie sam ruch.
+   */
+  przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
+  moznaZapisacPrzelew: boolean;
+  powodPrzelewu: string | null;
 };
 
 /**

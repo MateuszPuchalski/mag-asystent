@@ -467,6 +467,17 @@ export function migrate(database: DatabaseSync) {
      otwieraniem i procesowaniem zwrotów". */
   addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
+  /* ŚLAD PO PRZELEWIE ODDANYM POZA ALLEGRO (0.269.0). Przy pobraniu Allegro
+     nigdy nie trzymało tych pieniędzy — wracają przelewem z banku firmy, więc
+     `zwrot_pieniedzy_id` zostaje pusty i zwrot zamyka się bez śladu po
+     wypłacie. Biuro zapisuje tu, że przelew poszedł: kiedy, kto i pod jakim
+     numerem da się go znaleźć w banku. To NIE jest ruch pieniędzy, tylko
+     nasza notatka o nim — dlatego wolno ją cofnąć, inaczej niż zwrot przez
+     Allegro (§25a.5). */
+  addColumn("zwrot_klienta", "przelew_at", "TEXT");
+  addColumn("zwrot_klienta", "przelew_przez", "TEXT");
+  addColumn("zwrot_klienta", "przelew_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("zwrot_klienta", "przelew_referencja", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do

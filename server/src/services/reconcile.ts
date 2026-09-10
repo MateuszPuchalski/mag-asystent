@@ -20,7 +20,8 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 
 export interface Rozjazd {
   rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
-    | "kosz_czeka_na_korekte" | "kosz_bez_powrotu" | "zwrot_po_terminie";
+    | "kosz_czeka_na_korekte" | "kosz_bez_powrotu" | "zwrot_bez_przelewu"
+    | "zwrot_po_terminie";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -213,7 +214,47 @@ function koszeBezPowrotu(): Rozjazd[] {
 }
 
 /**
- * 7. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
+ * 7. Zwroty za pobraniem, przy których nie ma śladu po przelewie.
+ *
+ * Allegro tych pieniędzy nigdy nie trzymało, więc przycisk ODDAJ PIENIĄDZE
+ * jest tam zamknięty z definicji — wypłata idzie przelewem z banku firmy.
+ * Do 0.268.0 aplikacja nie miała gdzie tego zapisać, a zwrot zamykał się
+ * korektą i schodził z kolejki: klient bez pieniędzy wyglądał wtedy dokładnie
+ * jak klient rozliczony.
+ *
+ * Sygnał `przelew_czeka` mówi to na ekranie, ale ekran trzeba otworzyć — ten
+ * wiersz mówi to raportowi, który biuro czyta rano. Próg doby jest ten sam co
+ * przy pozostałych kontrolach; przelew zlecony wczoraj nie jest zaległością.
+ */
+function zwrotyBezPrzelewu(): Rozjazd[] {
+  const rows = db()
+    .prepare(
+      `SELECT z.reference_number AS numer, z.external_id, z.kwota_at, z.kwota_grosze
+         FROM zwrot_klienta z
+         JOIN zamowienie_klienta o ON o.external_id = z.order_id
+          AND o.channel_account_id = z.channel_account_id
+        WHERE o.platnosc_typ = 'CASH_ON_DELIVERY'
+          AND z.werdykt = 'przyjety' AND z.kwota_grosze IS NOT NULL
+          AND z.kwota_grosze > 0
+          AND z.przelew_at IS NULL AND z.zwrot_pieniedzy_id IS NULL
+          AND z.odmowa_kod IS NULL
+          AND z.kwota_at < ?
+        ORDER BY z.kwota_at`
+    )
+    .all(new Date(Date.now() - 86400_000).toISOString()) as
+    Array<{ numer: string | null; external_id: string; kwota_at: string; kwota_grosze: number }>;
+  return rows.map((z) => ({
+    rodzaj: "zwrot_bez_przelewu" as const,
+    klucz: z.numer ?? z.external_id,
+    opis:
+      `Zwrot ${z.numer ?? z.external_id} za pobraniem czeka na przelew ` +
+      `(${(z.kwota_grosze / 100).toFixed(2)} zł) — Allegro tych pieniędzy nie odda za nas.`,
+    odKiedy: z.kwota_at,
+  }));
+}
+
+/**
+ * 8. Zwroty w pracy, którym termin ustawowy minął albo mija w ciągu doby.
  *
  * DO 0.210.0 TERMINU PILNOWAŁ WYŁĄCZNIE KOLOR WIERSZA. Sygnał „termin" zapala
  * się przy trzech dniach, ale zapala się NA EKRANIE — a rekoncyliacja
@@ -251,16 +292,19 @@ export function reconcile(): Rekoncyliacja {
   const mm = mmCzekajace();
   const kosze = koszeBezKorekty();
   const powroty = koszeBezPowrotu();
+  const przelewy = zwrotyBezPrzelewu();
   const terminy = zwrotyPoTerminie();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
       zadan: bledy.length + bufor.length + mm.length + kosze.length + powroty.length
-        + terminy.length,
+        + przelewy.length + terminy.length,
     },
     /* Terminy PIERWSZE: mają skutek prawny, a raport czyta się od góry. */
-    rozjazdy: [...terminy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm, ...kosze, ...powroty],
+    /* Terminy PIERWSZE (skutek prawny), zaraz za nimi pieniądze klienta. */
+    rozjazdy: [...terminy, ...przelewy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm,
+      ...kosze, ...powroty],
   };
 }
 

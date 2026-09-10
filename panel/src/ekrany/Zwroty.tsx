@@ -11,6 +11,7 @@ import {
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
+  useZapiszPrzelew, useCofnijPrzelew,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -195,6 +196,8 @@ export function Zwroty() {
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
   const synchronizuj = useSynchronizujZwroty();
+  const przelew = useZapiszPrzelew();
+  const cofnijPrzelew = useCofnijPrzelew();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
@@ -471,11 +474,22 @@ export function Zwroty() {
                 patrzy, a nie o kolumnę dalej. */}
             {szczegol.data?.pieniadze && <Pieniadze
               stan={szczegol.data.pieniadze}
-              trwa={pieniadze.isPending || odmowaPlatnosci.isPending}
+              trwa={pieniadze.isPending || odmowaPlatnosci.isPending
+                || przelew.isPending || cofnijPrzelew.isPending}
               blad={bladPieniedzy}
               onZwroc={() => {
                 setBladPieniedzy("");
                 pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }}
+              onPrzelew={(referencja) => {
+                setBladPieniedzy("");
+                przelew.mutate({ id: zwrot.id, wersja: zwrot.wersja, referencja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }}
+              onCofnijPrzelew={() => {
+                setBladPieniedzy("");
+                cofnijPrzelew.mutate({ id: zwrot.id, wersja: zwrot.wersja },
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }}
               onOdmow={(kod, powod) => {

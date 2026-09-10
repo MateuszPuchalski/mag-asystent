@@ -78,6 +78,8 @@ type Wiersz = {
   zwrot_pieniedzy_status: string | null; zwrot_pieniedzy_at: string | null;
   odmowa_kod: string | null; odmowa_powod: string | null; odmowa_at: string | null;
   status_allegro: string | null;
+  przelew_at: string | null; przelew_przez: string | null;
+  przelew_referencja: string | null;
 };
 
 const wczytaj = (database: Db, zwrotId: number): Wiersz => {
@@ -86,6 +88,7 @@ const wczytaj = (database: Db, zwrotId: number): Wiersz => {
       z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id,
       z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
       z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro,
+      z.przelew_at, z.przelew_przez, z.przelew_referencja,
       o.platnosc_id, o.platnosc_typ, o.waluta
     FROM zwrot_klienta z
     LEFT JOIN zamowienie_klienta o
@@ -116,7 +119,43 @@ export type StanZwrotuPieniedzy = {
     potwierdzone: boolean;
   } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  /**
+   * Ślad po przelewie oddanym POZA Allegro (0.269.0) — przy pobraniu jedyny,
+   * jaki może istnieć. To notatka biura o ruchu pieniędzy, nie sam ruch:
+   * dlatego wolno ją cofnąć, inaczej niż zwrot przez Allegro.
+   */
+  przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
+  /** Czy da się zapisać taki ślad; `powodPrzelewu` mówi, czego brakuje. */
+  moznaZapisacPrzelew: boolean;
+  powodPrzelewu: string | null;
 };
+
+/**
+ * Czy wolno zapisać ślad po przelewie oddanym poza Allegro (0.269.0).
+ *
+ * Osobna bramka od `moznaZwrocic`, bo to DRUGA DROGA, nie wariant pierwszej.
+ * Przy pobraniu Allegro nie trzymało tych pieniędzy i pierwsza droga jest
+ * zamknięta z definicji; przy pozostałych płatnościach ta droga jest wyjściem
+ * awaryjnym — przelew ręką zdarza się, gdy Allegro odmówi.
+ *
+ * NIE PATRZY na `zamkniety_at`. Zwrot zamyka korekta, a przelew idzie zwykle
+ * PO niej; bramka na stanie końcowym kazałaby wybierać między poprawną
+ * kolejnością pracy a zapisaniem prawdy.
+ *
+ * Werdykt i kwota są wymagane, bo bez nich zdanie „oddaliśmy" nie ma o czym
+ * mówić: nie wiadomo, ile miało wyjść ani czy w ogóle przyjęliśmy zwrot.
+ */
+function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelewu: string | null } {
+  const nie = (powod: string) => ({ moznaZapisacPrzelew: false, powodPrzelewu: powod });
+  if (w.przelew_at) return nie("Przelew jest już zapisany — cofnij go, żeby poprawić.");
+  if (w.zwrot_pieniedzy_id) return nie("Pieniądze oddano przez panel Allegro.");
+  if (w.odmowa_kod) return nie("Odmowa wypłaty jest zgłoszona — nie ma czego oddawać.");
+  if (w.werdykt !== "przyjety") {
+    return nie("Najpierw przyjmij zwrot — przelew zapisuje się po werdykcie.");
+  }
+  if (w.kwota_grosze == null) return nie("Najpierw zaznacz, co oddajemy.");
+  return { moznaZapisacPrzelew: true, powodPrzelewu: null };
+}
 
 /**
  * Czy da się oddać pieniądze przez API i czego brakuje.
@@ -147,6 +186,10 @@ export function stanZwrotuPieniedzy(
       : null,
     odmowa: w.odmowa_kod
       ? { kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at } : null,
+    przelew: w.przelew_at
+      ? { kiedy: w.przelew_at, przez: w.przelew_przez, referencja: w.przelew_referencja }
+      : null,
+    ...bramkaPrzelewu(w),
   };
   const nie = (powod: string) =>
     ({ ...podstawa, moznaZwrocic: false, moznaOdmowic: false, powod });
@@ -335,4 +378,88 @@ export async function odmowZwrotuPieniedzy(
   })();
 
   return { kod, wersja: wersja + 1 };
+}
+
+/* ── Przelew oddany poza Allegro (0.269.0) ───────────────────────────────────
+   Przy pobraniu klient nigdy nie zapłacił Allegro, więc Allegro nie ma czego
+   oddawać: pieniądze wracają przelewem z banku firmy. Panel mówił o tym
+   zdaniem od 0.190.0 i na tym kończył — zwrot zamykał się bez ŚLADU po
+   wypłacie, a jedynym dowodem był wyciąg bankowy poza aplikacją. Przy sporze
+   z klientem odpowiedź „oddaliśmy" nie miała się o co oprzeć.
+
+   TO NOTATKA O RUCHU PIENIĘDZY, NIE SAM RUCH. Aplikacja niczego tu nie
+   wysyła; zapisuje, co zrobił człowiek w banku. Dlatego wolno ją cofnąć —
+   §25a.5 potwierdzeniem obwarowuje rzeczy NIEODWRACALNE, a pomyłka
+   w numerze przelewu odwracalna jest. Cofnięcie zostawia własny ślad na osi,
+   więc audyt widzi obie decyzje.
+
+   REFERENCJA JEST OPCJONALNA. Numer przelewu bywa znany dopiero z wyciągu,
+   a wymóg zmusiłby do wpisania czegokolwiek albo do odłożenia zapisu na
+   później — czyli do stanu, który to wydanie usuwa.                        */
+
+/** Ile znaków referencji zapisujemy. Tytuł przelewu w banku bywa długi. */
+export const LIMIT_REFERENCJI = 140;
+
+export function zapiszPrzelew(
+  database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
+  referencja: string | null, teraz = new Date(),
+): { kiedy: string; wersja: number } {
+  const w = wczytaj(database, zwrotId);
+  const bramka = bramkaPrzelewu(w);
+  if (!bramka.moznaZapisacPrzelew) {
+    throw new ZwrotPieniedzyConflict(bramka.powodPrzelewu ?? "Nie da się zapisać przelewu");
+  }
+  if (Number(w.wersja) !== wersja) {
+    throw new ZwrotPieniedzyConflict(
+      "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.");
+  }
+  const ref = (referencja ?? "").trim().slice(0, LIMIT_REFERENCJI) || null;
+  const at = teraz.toISOString();
+  transaction(database, () => {
+    database.prepare(`UPDATE zwrot_klienta
+      SET przelew_at=?, przelew_przez=?, przelew_user_id=?, przelew_referencja=?,
+          wersja=wersja+1
+      WHERE id=?`).run(at, kto.name, kto.id, ref, zwrotId);
+    database.prepare(`INSERT INTO zwrot_zdarzenie
+      (zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id) VALUES (?,?,?,?,?,?,?)`)
+      .run(zwrotId, "przelew",
+        ref ? `Pieniądze oddane przelewem (${ref})` : "Pieniądze oddane przelewem",
+        JSON.stringify({ referencja: ref, kwotaGrosze: w.kwota_grosze }), at, kto.name, kto.id);
+    logEvent("zwrot_przelew", kto.name, null,
+      { zwrotId, referencja: ref, kwotaGrosze: w.kwota_grosze }, kto.id, database);
+  })();
+  return { kiedy: at, wersja: wersja + 1 };
+}
+
+/**
+ * Cofnięcie zapisu — droga wyjścia z pomyłki, nie brak funkcji (§25a.5).
+ *
+ * Nie pyta o wersję zwrotu w drugą stronę niż zapis: ten sam wzorzec co przy
+ * cofaniu kwoty i korekty, bo cofa się TĘ decyzję, a nie stan całego zwrotu.
+ */
+export function cofnijPrzelew(
+  database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
+  teraz = new Date(),
+): { wersja: number } {
+  const w = wczytaj(database, zwrotId);
+  if (!w.przelew_at) throw new ZwrotPieniedzyConflict("Ten zwrot nie ma zapisanego przelewu.");
+  if (Number(w.wersja) !== wersja) {
+    throw new ZwrotPieniedzyConflict(
+      "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.");
+  }
+  const at = teraz.toISOString();
+  transaction(database, () => {
+    database.prepare(`UPDATE zwrot_klienta
+      SET przelew_at=NULL, przelew_przez=NULL, przelew_user_id=NULL,
+          przelew_referencja=NULL, wersja=wersja+1
+      WHERE id=?`).run(zwrotId);
+    database.prepare(`INSERT INTO zwrot_zdarzenie
+      (zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto,kto_user_id) VALUES (?,?,?,?,?,?,?)`)
+      .run(zwrotId, "przelew_cofniety", "Cofnięto zapis o przelewie",
+        JSON.stringify({ bylo: w.przelew_at, referencja: w.przelew_referencja }),
+        at, kto.name, kto.id);
+    logEvent("zwrot_przelew_cofniety", kto.name, null,
+      { zwrotId, bylo: w.przelew_at }, kto.id, database);
+  })();
+  return { wersja: wersja + 1 };
 }

@@ -66,6 +66,7 @@ beforeEach(() => {
   db().prepare("DELETE FROM zwrot_klienta").run();
   db().prepare("DELETE FROM kosz_pozycja").run();
   db().prepare("DELETE FROM kosz").run();
+  db().prepare("DELETE FROM zamowienie_klienta").run();
 });
 
 /** Zwrot w pracy, zgłoszony `dni` dni temu. Termin ustawowy to czternaście. */
@@ -196,6 +197,44 @@ test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
   const zDokumentu = kosz(3, "KZ-9");
   db().prepare("UPDATE kosz SET mm_dok_id=1209 WHERE id=?").run(zDokumentu);
   assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-9").length, 0);
+});
+
+test("pobranie bez śladu po przelewie zgłasza się po dobie", () => {
+  /* Allegro tych pieniędzy nie odda za nas, a zwrot zamyka się korektą
+     i schodzi z kolejki. Raport jest drugim miejscem, w którym to widać —
+     pierwszym jest sygnał na wierszu, ale ekran trzeba otworzyć. */
+  const zwrotZPobraniem = (dni: number, numer: string, n: Record<string, unknown> = {}) => {
+    const at = new Date(Date.now() - dni * 86400_000).toISOString();
+    db().prepare(`INSERT INTO channel_account(channel, external_account_id)
+      VALUES ('allegro','rec-pob') ON CONFLICT DO NOTHING`).run();
+    const konto = Number((db().prepare(
+      "SELECT id FROM channel_account WHERE external_account_id='rec-pob'")
+      .get() as { id: number }).id);
+    db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,
+      platnosc_typ,waluta,synced_at) VALUES (?,?,'READY_FOR_PROCESSING',?,'PLN',?)`)
+      .run(konto, `ord-${numer}`, (n.platnoscTyp as string) ?? "CASH_ON_DELIVERY", at);
+    db().prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+      order_id,created_at,synced_at,werdykt,kwota_grosze,kwota_at,przelew_at)
+      VALUES (?,?,?,?,?,?,'przyjety',6498,?,?)`)
+      .run(konto, `zw-${numer}`, numer, `ord-${numer}`, at, at, at,
+        (n.przelewAt as string) ?? null);
+  };
+
+  zwrotZPobraniem(0, "N1/2026");
+  assert.equal(reconcile().rozjazdy.length, 0, "wycena sprzed godziny nie jest zaległością");
+
+  zwrotZPobraniem(2, "N2/2026");
+  const r = reconcile();
+  assert.equal(r.rozjazdy.length, 1);
+  assert.equal(r.rozjazdy[0].rodzaj, "zwrot_bez_przelewu");
+  assert.match(r.rozjazdy[0].opis, /N2\/2026/);
+  assert.match(r.rozjazdy[0].opis, /64,98|64\.98/);
+
+  /* Zapisany przelew i płatność online milczą — jedno jest rozliczone,
+     drugie odda Allegro. */
+  zwrotZPobraniem(3, "N3/2026", { przelewAt: "2026-09-01T10:00:00Z" });
+  zwrotZPobraniem(3, "N4/2026", { platnoscTyp: "ONLINE" });
+  assert.deepEqual(reconcile().rozjazdy.map((x) => x.klucz), ["N2/2026"]);
 });
 
 test("CSV otwiera się w Excelu PL bez kreatora", () => {
