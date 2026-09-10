@@ -753,6 +753,28 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Pusty stan ma DWIE wagi (0.267.0).** `Pusto` w `panel/src/ui/index.tsx`
+przyjmuje `waga`: „ekran" wypełnia całą kolumnę (15/22 px, waga 600, ikona
+38 px, wyśrodkowany), „lista" opisuje listę wewnątrz kolumny jednym wierszem
+(14/20 px, waga 400, bez ikony). To są dwa różne pytania: „nic nie wybrano"
+kontra „ta lista jest pusta, a filtry nad nią dalej stoją". Do 0.265.0 obok
+komponentu stało dziewiętnaście akapitów sklejonych ręcznie w dwóch
+wariantach. Pilnuje tego `panel/src/ui/Pusto.test.tsx`; zwolnienie wymaga
+komentarza `pustka: <powód>`.
+
+**Ikona pustki idzie REFERENCJĄ komponentu (0.267.0).** `ikona={Inbox}`, nie
+`ikona={<Inbox size={38} />}`. Swoboda podania gotowego elementu rozjechała
+rozmiar na 32, 38 i 40 px, a wyszarzenie trafiło na trzy ikony z dziesięciu.
+`NaglowekSekcji` i `Sekcja` dalej biorą gotowy element i mają prawo: ich ikona
+stoi w rzędzie z tekstem i ma 13 albo 14 px, czyli rozmiar dobierany do sąsiada.
+
+**Drobny podpis w karcie NIE jest pustym stanem (0.267.0).** „brak
+identyfikatorów w opisie" stoi obok pól, które wartości mają — to etykieta
+WARTOŚCI z 0.256.0, nie komunikat „tu nic nie ma". Pierwsze podejście do
+ustalenia 10 wciągnęło te podpisy do `Pusto` wzorcem po klasach i dało
+czterdzieści sześć zamian zamiast dziewiętnastu. Rola rozstrzyga się
+czytaniem miejsca, nie łańcuchem klas.
+
 **Zaznaczenie jest SZARE, nie bursztynowe (0.265.0).** Wybrany wiersz kolejki
 to `bg-slate-200` plus belka `border-l-[3px] border-l-wertis-amber`, jednakowo
 w skrzynce, zwrotach, reklamacjach i dyskusjach. Do 0.264.0 był bursztynowy,

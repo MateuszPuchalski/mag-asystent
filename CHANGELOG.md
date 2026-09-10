@@ -34,6 +34,7 @@ historii nie przepisujemy.
 ---
 
 
+<<<<<<< HEAD
 ## 0.268.0 — 10 września 2026
 
 **Widać, dlaczego pusto.** Każdy pominięty szczebel doboru produkuje zdanie
@@ -71,6 +72,68 @@ tabelą. Mediana pojawia się od dwudziestu wyborów, a kolumny rankingowej nie
 ma żadnej: raport mówi, JAK ktoś pracuje, nie jak dobrze.
 
 Panel obsługi trzeba przebudować. Migracji nie ma.
+=======
+## 0.267.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Pusty stan dostaje dwie wagi.** Ustalenie **10** z audytu. Do 0.265.0 komponent
+`Pusto` obsługiwał dziesięć miejsc, a obok stało **dziewiętnaście akapitów
+sklejonych ręcznie** w dwóch wariantach — `p-4 text-sm text-slate-500`
+i `p-6 text-center text-sm text-slate-500`. Trzy zapisy jednej roli, czyli ten
+sam wzór, co przy nagłówku sekcji w 0.256.0 i przy filtrze w 0.262.0.
+
+**Dwie wagi, nie jedna, i to jest decyzja.** „Wybierz rozmowę z listy" wypełnia
+całą kolumnę i jest jedyną rzeczą na ekranie. „Ten kubełek jest pusty" opisuje
+LISTĘ wewnątrz kolumny, w której nagłówek, kubełki i pole szukania dalej stoją.
+Zrównanie ich zrobiłoby z pustej listy drugi ekran powitalny — ikona 38 px
+w miejscu pierwszego wiersza kolejki zjadłaby pół kolumny.
+
+```
+waga „ekran"   15/22 px, waga 600, ikona 38 px, wyśrodkowany, wypełnia kolumnę
+waga „lista"   14/20 px, waga 400, bez ikony, jeden wiersz pod filtrami
+```
+
+**`Pusto` nie miał klasy rozmiaru** i dziedziczył 16 px z `body` — jedyne takie
+miejsce w panelu po 0.258.0, czyli po wydaniu, które drabinę zakładało. Wchodzi
+na `text-tresc`, bo to jest zdanie, które się CZYTA.
+
+**Ikona idzie referencją komponentu, nie gotowym elementem.** Wywołujący podawał
+`<Inbox size={38} />` i przez tę swobodę rozmiar rozjechał się na **32, 38
+i 40 px**, a wyszarzenie `text-slate-300` trafiło na **trzy ikony z dziesięciu**.
+`ikona={Inbox}` odbiera tę możliwość: rozmiar i barwę ustala jedno miejsce.
+
+**Czego to wydanie NIE robi i dlaczego.** Drobne podpisy w kartach — „brak
+identyfikatorów w opisie", „nie wiadomo jeszcze, o jaką maszynę chodzi" —
+zostają tam, gdzie są. To są etykiety WARTOŚCI stojące obok pól, które wartości
+mają, a nie puste stany; własną rolę dostały w 0.256.0.
+
+Pierwsze podejście wciągnęło je tutaj wzorcem po klasach i dało **czterdzieści
+sześć zamian zamiast dziewiętnastu** — czyli zamieniło każdy drobny szary
+akapit w panelu na komunikat „tu nic nie ma". Wycofane w całości i powtórzone
+z listą miejsc obejrzanych po kolei.
+
+**Zmierzone w przeglądarce** na pięciu pustych stanach:
+
+```
+rozmiary pisma   15 px (ekran) i 14 px (lista)   — dwie wartości, obie z drabiny
+ikona            38 px, jedna wartość            (przed: 32, 38 i 40 px)
+wyszarzenie      wszystkie                       (przed: trzy z dziesięciu)
+kontrast         4.76:1                          (próg 4.5:1)
+przepełnienia    zero
+```
+
+**Nowy strażnik** `panel/src/ui/Pusto.test.tsx` — siedem testów. Ręczny pusty
+stan listy nie odradza się poza `ui/index.tsx`, ikona nie wraca jako element,
+waga „ekran" nie gubi rozmiaru z drabiny ani wypełnienia kolumny. Zwolnienie
+komentarzem `pustka: <powód>` z progiem trzech wyrazów.
+
+Reguła o ikonie przy pierwszym podejściu zgłaszała **osiem miejsc, w których
+wszystko jest w porządku**: `NaglowekSekcji` i `Sekcja` też mają prop `ikona`
+i też biorą gotowy element — słusznie, bo ich ikona stoi w rzędzie z tekstem
+i ma 13 albo 14 px, czyli rozmiar dobierany do sąsiada. Reguła celuje teraz
+wyłącznie w `Pusto`.
+>>>>>>> origin/main
 
 ## 0.266.0 — 10 września 2026
 

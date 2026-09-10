@@ -152,7 +152,7 @@ export function Zadania() {
       </Karta>)}
     </div>
     {!widoczne.length && <Karta className="grid place-items-center p-16">
-      <Pusto ikona={<ClipboardList size={38} />}>Brak zadań w tym widoku</Pusto></Karta>}
+      <Pusto ikona={ClipboardList}>Brak zadań w tym widoku</Pusto></Karta>}
     {modal && <NoweZadanie zamknij={() => setModal(false)} />}
   </div>;
 }

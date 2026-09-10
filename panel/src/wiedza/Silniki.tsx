@@ -52,7 +52,7 @@ export function Silniki() {
     <section aria-label="Czeka na rozstrzygnięcie">
       <h3 className="mb-2 text-naglowek font-bold">Czeka na rozstrzygnięcie ({propozycje.length})</h3>
       {!dane.isLoading && propozycje.length === 0 &&
-        <Pusto ikona={<Cog size={32} />}>Nic nie czeka. Pary biorą się stąd i z zatwierdzonych doborów.</Pusto>}
+        <Pusto ikona={Cog}>Nic nie czeka. Pary biorą się stąd i z zatwierdzonych doborów.</Pusto>}
       <div className="space-y-2">
         {propozycje.map((z) => <PropozycjaPary key={z.id} z={z} trwa={rozstrzygnij.isPending}
           onDecyzja={(decyzja, powod) => { setBlad("");
@@ -67,7 +67,7 @@ export function Silniki() {
         Kolejność liczy się z pól wpisanych przez agentów w zakładce Dobór — nie z treści wiadomości klientów.
       </p>
       {!dane.isLoading && luki.length === 0 &&
-        <Pusto ikona={<Cog size={32} />}>Żaden dobór nie wskazał jeszcze maszyny.</Pusto>}
+        <Pusto ikona={Cog}>Żaden dobór nie wskazał jeszcze maszyny.</Pusto>}
       <div className="space-y-3">
         {luki.map((l) => <Luka key={l.klucz} l={l} trwa={zaproponuj.isPending || dodajAlias.isPending}
           onWyslij={(v, alias) => { setBlad("");

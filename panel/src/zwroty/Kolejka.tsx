@@ -3,6 +3,7 @@ import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown } from "luc
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
+import { Pusto } from "../ui";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej
@@ -106,10 +107,10 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
   useEffect(() => { aktywnyWiersz.current?.scrollIntoView({ block: "nearest" }); }, [wybrany]);
 
   if (!zwroty.length) {
-    return <p className="p-6 text-center text-sm text-slate-500">
+    return <Pusto waga="lista">
       {zKubelkiem
         ? "Żaden zwrot nie pasuje do tego, czego szukasz."
-        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</p>;
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
   }
   return <ul className="divide-y divide-slate-200">
     {zwroty.map((z) => {

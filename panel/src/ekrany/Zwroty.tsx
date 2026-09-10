@@ -440,7 +440,7 @@ export function Zwroty() {
       </p>}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
-          ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
+          ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
           : <Kolejka zwroty={widoczne} wybrany={wybrany} zKubelkiem={Boolean(pasujace) || kubelek === null}
               onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
       </div>
@@ -448,7 +448,7 @@ export function Zwroty() {
 
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {!zwrot
-        ? <Pusto ikona={<Undo2 size={40} className="text-slate-300" />}>
+        ? <Pusto ikona={Undo2}>
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
             <Naglowek zwrot={zwrot} />
@@ -532,8 +532,8 @@ export function Zwroty() {
               faktura.mutate({ id: zwrot.id, dokId },
                 { onError: (e) => setBladFaktury((e as Error).message) });
             }} />
-        : <p className="p-6 text-center text-sm text-slate-500">
-            Dowody pokażą się po wybraniu zwrotu.</p>}
+        : <Pusto waga="lista">
+            Dowody pokażą się po wybraniu zwrotu.</Pusto>}
       </div>
     </Karta>
     </div>

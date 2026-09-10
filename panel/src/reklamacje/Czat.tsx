@@ -3,7 +3,7 @@ import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../ap
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
-import { NaglowekSekcji, czas } from "../ui";
+import { czas, NaglowekSekcji, Pusto } from "../ui";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
    Treść zgłoszenia i czat są tym, po co agent otwiera ten ekran, więc stoją
@@ -117,8 +117,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     </p>}
 
     {czat.length === 0
-      ? <p className="p-6 text-center text-sm text-slate-500">
-          Rozmowy jeszcze nie pobrano.</p>
+      ? <Pusto waga="lista">
+          Rozmowy jeszcze nie pobrano.</Pusto>
       : <ol className="flex flex-col gap-2">
           {czat.map((w) => {
             const rola = ROLE[w.autorRola ?? ""] ?? {

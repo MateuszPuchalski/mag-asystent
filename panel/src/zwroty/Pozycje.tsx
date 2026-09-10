@@ -3,7 +3,7 @@ import { Check, X as Krzyzyk } from "lucide-react";
 import type { DoDopisania, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import { Przycisk, Blad } from "../ui";
+import { Blad, Przycisk, Pusto } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { Rabat } from "./Rabat";
 import { Link } from "./Link";
@@ -191,7 +191,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   });
 
   if (!zwrot.pozycje.length) {
-    return <p className="p-4 text-sm text-slate-500">Zwrot bez pozycji — nie ma czego wycenić.</p>;
+    return <Pusto waga="lista">Zwrot bez pozycji — nie ma czego wycenić.</Pusto>;
   }
 
   return <div className="p-4">
