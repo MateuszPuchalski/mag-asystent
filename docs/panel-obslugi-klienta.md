@@ -753,6 +753,37 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Filtr segmentowy ma JEDEN kształt (0.262.0).** Rząd pigułek, z których jedna
+jest wybrana, stał w panelu sześć razy w trzech kształtach. Wygrał atrament na
+szarej bieżni: `bg-wertis-ink` przy wybranej, `bg-slate-100` przy niewybranej,
+`rounded px-2 py-1 text-xs`. Niewybrana pigułka Z TŁEM mówi „wybiera się jeden
+z tych", a bez tła mówi „oto kilka rzeczy do kliknięcia". Kształt mieszka
+w `FiltrSegmentowy` (`panel/src/ui/index.tsx`) i pilnuje go
+`panel/src/ui/FiltrSegmentowy.test.tsx`; zwolnienie wymaga komentarza
+`segment: <powód>`. `Zakladki` biorą stamtąd pigułkę i różnią się jednym:
+równą szerokością.
+
+**Próg dotyku mieszka odtąd w komponencie (0.262.0).** `py-1` przy interlinii
+12/16 daje 24 px, czyli próg 2.5.8 z WCAG 2.2 AA. Do 0.261.0 pilnowała tego
+bramka osobno w każdym pliku i przegapiła kategorie Copilota: szukała znacznika
+`<button` trzy linie nad klasą, a tam stał cztery. Okno urosło do sześciu linii
+i rozpoznaje `min-h-6` jako spełnienie progu.
+
+**Fiolet Copilota to wyjątek BARWY, nie kształtu (0.262.0).** Kategoria niesie
+przypuszczenie maszyny, a nie fakt, i tylko dlatego nie jest atramentowa.
+Wchodzi przez prop `ton`, tak jak `ton` w `NaglowekSekcji`. Kształt, rozmiar
+i wysokość bierze wspólne. Przełącznik edytora `Odpowiedź / Notatka` zostaje
+osobno: wybiera tryb PISANIA, a nie widok listy, i 0.247.0 dało mu własny
+kształt świadomie.
+
+**Licznik kubełka niesie `tabular-nums` i spację (0.262.0).** Spacja, bo `ml-1`
+rysuje odstęp, ale nie wchodzi do nazwy dostępnej — czytnik ekranu czytał „Do
+decyzji3". `tabular-nums`, bo Barlow ma cyfry proporcjonalne: dwucyfrowy licznik
+waha się o 4,8 px zależnie od tego, które cyfry pokazuje. Klasa NIE ratuje
+przejścia 9 → 10; tam przybywa cyfra. Pomiar czegokolwiek zależnego od fontu
+wymaga w podglądzie podstawienia pliku: serwer deweloperski nie serwuje
+`/biuro/fonty/`, więc bez tego mierzy się fallback.
+
 **Oś rozmowy zjeżdża na dół sama (0.260.0).** Serwer oddaje wpisy od
 najstarszego, a panel do 0.259.0 nie przewijał osi ani razu: w `panel/src`
 nie było ani jednego `scrollTop`. Otwarcie rozmowy dłuższej niż okno stawiało

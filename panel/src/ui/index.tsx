@@ -95,6 +95,92 @@ export const Plakietka = ({ status, children, className = "" }:
   <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${
     KLASA_STATUSU[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
 
+/* ── JEDEN KSZTAŁT WYBORU NA CAŁY PANEL ──────────────────────────────────────
+   Rząd pigułek, z których jedna jest wybrana, stał w panelu SZEŚĆ RAZY
+   w TRZECH kształtach. Atrament na szarej bieżni (kubełki skrzynki, zakładki
+   kontekstu), atrament bez tła nieaktywnego na własnej białej bieżni (filtr
+   zadań) i bursztyn bez tła nieaktywnego (kubełki zwrotów, reklamacji
+   i dyskusji — ten sam kod przepisany trzy razy, znak w znak). Do tego trzy
+   rozmiary pisma, dwa promienie i dwie wagi.
+
+   Agent przechodzący ze Skrzynki na Zwroty musiał za każdym razem odczytać na
+   nowo, co tu znaczy „wybrane". Trzy zapisy jednej roli to nie są warianty,
+   tylko brak decyzji — ta sama diagnoza, co przy nagłówku sekcji w 0.256.0.
+
+   WYGRAŁ ATRAMENT NA SZAREJ BIEŻNI i to nie jest wybór większościowy, tylko
+   dwa argumenty. Po pierwsze, nieaktywna pigułka Z TŁEM mówi „wybiera się
+   JEDEN z tych", a bez tła mówi „oto kilka rzeczy do kliknięcia" — dokładnie
+   ten argument postawiło 0.247.0 przy przełączniku edytora. Po drugie,
+   bursztyn niesie już markę, akcję główną, kropkę nieprzeczytanego i pasmo
+   ostrzeżenia; zdjęcie mu piątego znaczenia jest zaliczką na ustalenie 02.
+
+   PRÓG DOTYKU WCHODZI DO KOMPONENTU. `py-1` przy interlinii 12/16 daje 24 px,
+   czyli próg 2.5.8 z WCAG 2.2 AA. Do 0.261.0 pilnowała tego bramka osobno
+   w każdym pliku — i przegapiła kategorie Copilota, bo szukała znacznika
+   `<button` trzy linie nad klasą, a tam stał cztery. Wysokość wpisana raz,
+   w jednym miejscu, nie ma jak się rozjechać.
+
+   KOMPONENT ODDAJE SAME PIGUŁKI, nie pasmo. Pojemniki są w każdym miejscu
+   inne — `<nav>` z obwódką, pasmo z polem szukania obok, rząd z przyciskiem
+   „pokaż wszystkie" na końcu — a wspólna jest PIGUŁKA. Opakowanie zostaje
+   tam, gdzie zna swoich sąsiadów.                                            */
+
+/** Barwy stanu: [wybrana, niewybrana]. */
+const TON_FILTRA: [string, string] =
+  ["bg-wertis-ink text-white", "bg-slate-100 text-slate-600 hover:bg-slate-200"];
+
+export type PozycjaFiltra<T> = {
+  klucz: T;
+  etykieta: string;
+  /** Licznik obok etykiety. `undefined` znaczy „bez licznika", `0` znaczy zero. */
+  ile?: number;
+  /** Podpowiedź pod kursorem — pytanie kubełka i jego klawisz skrótu. */
+  podpowiedz?: string;
+};
+
+export function FiltrSegmentowy<T extends string | null>({
+  wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA,
+}: {
+  wybrany: T;
+  onWybierz: (v: T) => void;
+  pozycje: Array<PozycjaFiltra<T>>;
+  /** Równa szerokość pozycji — dla dwóch zakładek dzielących kolumnę na pół. */
+  rowne?: boolean;
+  /**
+   * Podmiana samych barw. To jest WYJĄTEK, nie wariant — dziś ma go jedno
+   * miejsce: kategorie Copilota są fioletowe, bo niosą PRZYPUSZCZENIE maszyny,
+   * a nie fakt. Kształt, rozmiar i próg dotyku zostają te same, bo wyjątkiem
+   * jest znaczenie barwy, a nie prawo do własnej pigułki.
+   */
+  ton?: [string, string];
+}) {
+  const [wybrana, niewybrana] = ton;
+  return <>
+    {pozycje.map((p) => <button key={String(p.klucz)} type="button"
+      aria-pressed={wybrany === p.klucz}
+      title={p.podpowiedz}
+      onClick={() => onWybierz(p.klucz)}
+      className={`rounded px-2 py-1 text-xs font-semibold ${rowne ? "flex-1" : ""} ${
+        wybrany === p.klucz ? wybrana : niewybrana}`}>
+      {p.etykieta}
+      {/* SPACJA, nie `ml-1`: margines rysuje odstęp, ale nie wchodzi do nazwy
+          dostępnej — czytnik ekranu przeczytałby wtedy „Do decyzji3". Kubełki
+          zwrotów robiły dokładnie to od 0.209.0.
+
+          `tabular-nums`, bo Barlow ma cyfry PROPORCJONALNE. Zmierzone na
+          wczytanym foncie, przy 12 px: dwucyfrowy licznik zajmuje od 8,44 px
+          („11") do 13,23 px („44"), czyli waha się o 4,8 px zależnie wyłącznie
+          od tego, KTÓRE cyfry pokazuje. Z tabularnymi każda dwucyfrowa wartość
+          ma 12,66 px i rząd stoi.
+
+          Czego ta klasa NIE robi: nie ratuje przejścia 9 → 10. Tam przybywa
+          cyfra, więc pigułka rośnie i tak ma być. */}
+      {p.ile !== undefined && <>{" "}
+        <span className="font-normal tabular-nums">{p.ile}</span></>}
+    </button>)}
+  </>;
+}
+
 /**
  * Zakładki jednej kolumny (0.180.0).
  *
@@ -106,6 +192,11 @@ export const Plakietka = ({ status, children, className = "" }:
  * `aria-pressed` zamiast roli `tab`: pełny wzorzec zakładek żąda strzałek,
  * `aria-controls` i zarządzania ogniskiem, a to są dwa przyciski przełączające
  * treść pod spodem. Ta sama decyzja co przy kubełkach kolejki.
+ *
+ * ZOSTAJE jako osobna nazwa, choć pigułki bierze z `FiltrSegmentowy`: dwa
+ * wywołania czytają się lepiej przez „zakładki" niż przez „filtr", bo tu
+ * wybiera się WIDOK, a nie zawężenie listy. Różnica kształtu jest jedna —
+ * równa szerokość — i mieszka w `rowne`.
  */
 export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
   wybrana: T;
@@ -113,11 +204,7 @@ export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
   pozycje: Array<{ klucz: T; etykieta: string }>;
 }) {
   return <div className="flex gap-1 border-b border-slate-200 px-2 py-2">
-    {pozycje.map((z) => <button key={z.klucz} type="button" aria-pressed={wybrana === z.klucz}
-      onClick={() => onWybierz(z.klucz)}
-      className={`flex-1 rounded px-2 py-1 text-xs font-semibold ${wybrana === z.klucz
-        ? "bg-wertis-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-      {z.etykieta}</button>)}
+    <FiltrSegmentowy<T> wybrany={wybrana} onWybierz={onWybierz} pozycje={pozycje} rowne />
   </div>;
 }
 

@@ -34,6 +34,105 @@ historii nie przepisujemy.
 ---
 
 
+## 0.262.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Filtr segmentowy dostaje jeden kształt.** To ustalenie **03** z audytu
+wizualnego. Rząd pigułek, z których jedna jest wybrana, stał w panelu
+**sześć razy w trzech kształtach**:
+
+```
+kubełki skrzynki      atrament na szarej bieżni    12 px  aria-pressed
+zakładki kontekstu    atrament na szarej bieżni    12 px  aria-pressed
+filtr zadań           atrament na białej bieżni    14 px  bez
+kubełki zwrotów       bursztyn, niewybrana bez tła 12 px  bez
+kubełki reklamacji    ↑ ten sam kod, znak w znak   12 px  bez
+kubełki dyskusji      ↑ ten sam kod, znak w znak   12 px  bez
+```
+
+Audyt naliczył pięć miejsc, bo trzy ostatnie policzył jako jedno. To rzeczywiście
+jest jeden kod — przepisany trzy razy, z osobnym przyciskiem „Wszystkie"
+doklejonym pod pętlą w każdym z nich.
+
+**Wygrał atrament na szarej bieżni i to nie jest wybór większościowy.** Stoją za
+nim dwa argumenty. Niewybrana pigułka Z TŁEM mówi „wybiera się JEDEN z tych",
+a bez tła mówi „oto kilka rzeczy do kliknięcia" — dokładnie ten argument
+postawiło 0.247.0 przy przełączniku edytora. Drugi: bursztyn niesie już markę,
+akcję główną, kropkę nieprzeczytanego i pasmo ostrzeżenia. Zdjęcie mu piątego
+znaczenia jest zaliczką na ustalenie 02.
+
+**Próg dotyku wchodzi do komponentu.** `py-1` przy interlinii 12/16 daje 24 px,
+czyli próg 2.5.8 z WCAG 2.2 AA. Wysokość wpisana raz nie ma jak się rozjechać.
+
+**Bramka z 0.255.0 miała dziurę i przez nią przeszła prawdziwa usterka.**
+`Kontrast.test.ts` szukał znacznika `<button` w oknie TRZECH linii nad klasą
+`py-0.5`. Kategorie Copilota mają między znacznikiem a `className` dwa atrybuty,
+więc `<button` stoi cztery linie wyżej. Pigułka miała **20 px** i stała
+dwadzieścia linii pod tą, którą 0.255.0 podniosło do 24 px — w tym samym pliku.
+Bramka pilnowała sąsiada i nie widziała tego obok.
+
+Okno rośnie do sześciu linii, czyli tyle samo co okno zwolnień. Przy okazji
+bramka uczy się rozpoznawać `min-h-6`: to 24 px, więc `py-0.5` obok niego nie
+jest usterką. Tak właśnie 0.255.0 uratowało przycisk „Synchronizuj" i to jest
+poprawka, a nie obejście.
+
+**Fiolet zostaje wyjątkiem BARWY, nie kształtu.** Kategorie Copilota niosą
+przypuszczenie maszyny, a nie fakt, i tylko dlatego nie są atramentowe. Wchodzą
+przez prop `ton`, wzorem `ton` w `NaglowekSekcji`. Kształt, rozmiar i wysokość
+biorą wspólne — bo wyjątkiem jest znaczenie barwy, a nie prawo do własnej
+pigułki.
+
+**Przełącznik edytora ZOSTAJE osobno.** `Odpowiedź do klienta / Notatka
+wewnętrzna` wybiera tryb pisania, a nie widok listy. To inna rola i 0.247.0
+dało jej własny kształt świadomie.
+
+**Licznik dostaje spację zamiast marginesu.** `ml-1` rysuje odstęp, ale nie
+wchodzi do nazwy dostępnej — czytnik ekranu czytał „Do decyzji3".
+
+**Pomiar wywrócił własne uzasadnienie i to warto zapisać.** Komentarz mówił
+najpierw, że `tabular-nums` chroni przed drganiem przy liczniku 9 → 10. To
+nieprawda: tam przybywa cyfra i pigułka rośnie o 7 px, czego żadna klasa nie
+cofnie. Pierwszy pomiar pokazał przy tym, że klasa nie robi NIC — ale to był
+artefakt serwera deweloperskiego, który nie serwuje `/biuro/fonty/`, więc
+Barlow się nie wczytał.
+
+Po podstawieniu prawdziwego pliku fontu przez `page.route` widać, po co ta klasa
+jest. Barlow ma cyfry proporcjonalne:
+
+```
+licznik   z tabular-nums   bez
+   11        12,66 px      8,44 px
+   18        12,66 px     10,45 px
+   44        12,66 px     13,23 px
+   90        12,66 px     13,05 px
+```
+
+Dwucyfrowy licznik waha się o **4,8 px** zależnie wyłącznie od tego, KTÓRE cyfry
+pokazuje. Wniosek na przyszłość: pomiar czegokolwiek zależnego od fontu wymaga
+w podglądzie podstawienia pliku, bo inaczej mierzy się fallback.
+
+**Zmierzone w przeglądarce** na dwudziestu pigułkach z pięciu rzędów:
+
+```
+wysokości       24 px — wszystkie, jedna wartość  (przed: 20, 24 i 38 px)
+rozmiary pisma  12 px — jeden                     (przed: 11, 12 i 14 px)
+kontrast        6.92 – 14.32:1                    (próg 4.5:1)
+fiolet wybrany  7.10:1
+przepełnienia   zero przy 980, 900, 640 i 420 px
+```
+
+**Nowy strażnik** `panel/src/ui/FiltrSegmentowy.test.tsx` — dwanaście testów.
+Dwa czytają źródła: para `bg-wertis-ink` z `bg-slate-100` nie odradza się poza
+`ui/index.tsx`, a bursztyn nie wraca jako stan wybrany. Zwolnienie komentarzem
+`segment: <powód>` z progiem trzech wyrazów, wzorem `kontrast:` i `skala:`.
+
+Pierwsza wersja tych dwóch reguł **przepuszczała wszystko** i wyszło to dopiero
+przy sprawdzaniu, czy bramka odmawia. Wzorzec skopiowany z `NaglowekSekcji`
+zabraniał cudzysłowu między klasami, a tutaj klasy stoją w dwóch gałęziach
+warunku i cudzysłów jest dokładnie między nimi. Bramka, której się nie
+sprawdziło na odmowę, jest zielonym kwadratem, a nie bramką.
+
 ## 0.261.0 — 10 września 2026
 
 **Szkic przestaje prostować własną aukcję.** Właściciel pokazał szkic o filtr
