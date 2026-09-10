@@ -82,6 +82,16 @@ export const stockInput = z.discriminatedUnion("action", [
     .strict(),
 ]);
 export const actionInput = z.discriminatedUnion("action", [
+  z
+    .object({
+      action: z.literal("amend"),
+      version,
+      reason,
+      lines: orderInput.shape.lines,
+      dueAt: orderInput.shape.dueAt,
+      priority: orderInput.shape.priority,
+    })
+    .strict(),
   z.object({ action: z.literal("allocate"), version }).strict(),
   z.object({ action: z.literal("pick-start"), version, tote: bin }).strict(),
   z
@@ -421,11 +431,20 @@ function insertOrder(input: z.infer<typeof orderInput>) {
     )
     .run(input.reference, input.channel, input.priority, input.dueAt, now, now);
   const orderId = Number(result.lastInsertRowid);
+  writeOrderLines(orderId, input.lines);
+  return getOrder(orderId);
+}
+
+function writeOrderLines(
+  orderId: number,
+  lines: z.infer<typeof orderInput>["lines"],
+) {
+  const d = db();
   const merged = new Map<
     number,
     { sku: string; name: string; barcode: string | null; quantity: number }
   >();
-  for (const line of input.lines) {
+  for (const line of lines) {
     const found = d
       .prepare(
         "SELECT tw_id,symbol,nazwa,ean FROM sgt_towar WHERE symbol=? COLLATE NOCASE LIMIT 2",
@@ -455,7 +474,6 @@ function insertOrder(input: z.infer<typeof orderInput>) {
     d.prepare(
       "INSERT INTO wms_line(order_id,tw_id,sku,name,barcode,quantity) VALUES (?,?,?,?,?,?)",
     ).run(orderId, twId, p.sku, p.name, p.barcode, p.quantity);
-  return getOrder(orderId);
 }
 
 export const batchInput = z
@@ -645,15 +663,52 @@ export function actOnOrder(
 ) {
   id.parse(orderId);
   const input = actionInput.parse(raw);
-  if (["allocate", "cancel", "resume", "takeover"].includes(input.action))
+  if (
+    ["allocate", "cancel", "resume", "takeover", "amend"].includes(input.action)
+  )
     manager(actor);
   return command(
     key,
     actor,
     `order_${input.action}`,
     { orderId, ...input },
-    () => applyOrderAction(actor, orderId, input),
+    () => {
+      if (
+        input.action === "ship" &&
+        db()
+          .prepare("SELECT 1 FROM wms_sellasist_link WHERE order_id=?")
+          .get(orderId)
+      ) {
+        if (
+          !db()
+            .prepare(
+              "SELECT 1 FROM wms_sellasist_check WHERE key=? AND order_id=? AND fingerprint=? AND checked_at>=?",
+            )
+            .get(
+              key,
+              orderId,
+              shipmentFingerprint(actor, orderId, input),
+              Date.now() - 60000,
+            )
+        )
+          fail("Najpierw potwierdź zgodność przesyłki z Sellasist");
+      }
+      const result = applyOrderAction(actor, orderId, input);
+      if (input.action === "ship")
+        db().prepare("DELETE FROM wms_sellasist_check WHERE key=?").run(key);
+      return result;
+    },
   );
+}
+
+export function shipmentFingerprint(
+  actor: Actor,
+  orderId: number,
+  input: unknown,
+) {
+  return createHash("sha256")
+    .update(JSON.stringify([actor.id, orderId, input]))
+    .digest("hex");
 }
 
 // Wywoływane wyłącznie wewnątrz command: skan pojedynczy i wózek mają te same reguły.
@@ -670,7 +725,7 @@ function applyOrderAction(
     fail("To zamówienie jest już zamknięte");
   if (
     order.hold_reason &&
-    !["resume", "cancel", "return", "takeover"].includes(input.action)
+    !["resume", "cancel", "return", "takeover", "amend"].includes(input.action)
   )
     fail(`Zamówienie wstrzymane: ${order.hold_reason}`);
   const requireState = (...states: string[]) => {
@@ -679,6 +734,49 @@ function applyOrderAction(
   };
   if (input.action === "allocate") {
     allocate(actor, order);
+  }
+  if (input.action === "amend") {
+    requireState("new", "allocated", "picking");
+    if (
+      order.lines.some((l) => l.picked > 0) ||
+      (order.status === "picking" && !order.hold_reason)
+    )
+      fail("Najpierw wstrzymaj zamówienie i odłóż wszystkie pobrane sztuki");
+    logEvent(
+      "wms_order_amend_before",
+      actor.name,
+      null,
+      {
+        orderId,
+        lines: order.lines.map((l) => ({ sku: l.sku, quantity: l.quantity })),
+        dueAt: order.due_at,
+        priority: order.priority,
+        waveId: order.wave_id,
+      },
+      actor.id,
+    );
+    for (const a of order.allocations) {
+      const line = order.lines.find((l) => l.id === a.line_id)!;
+      move(
+        actor,
+        line.tw_id,
+        a.bin,
+        0,
+        -a.quantity,
+        "release",
+        input.reason,
+        orderId,
+      );
+    }
+    d.prepare(
+      "DELETE FROM wms_allocation WHERE line_id IN (SELECT id FROM wms_line WHERE order_id=?)",
+    ).run(orderId);
+    d.prepare("DELETE FROM wms_line WHERE order_id=?").run(orderId);
+    d.prepare("DELETE FROM wms_wave_order WHERE order_id=?").run(orderId);
+    writeOrderLines(orderId, input.lines);
+    d.prepare(
+      `UPDATE wms_order SET status='new',due_at=?,priority=?,allocated_at=NULL,picked_at=NULL,packed_at=NULL,picker_id=NULL,packer_id=NULL,tote=NULL WHERE id=?`,
+    ).run(input.dueAt, input.priority, orderId);
   }
   if (input.action === "pick-start") {
     requireState("allocated");

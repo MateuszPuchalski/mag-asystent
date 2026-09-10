@@ -15,6 +15,7 @@ process.env.WERTIS_ENV_FILE = path.join(
   "wms-capacity-no-env.local",
 );
 process.env.SGT_MODE = "seeded";
+process.env.WMS_SELLASIST_ENABLED = '0';
 process.env.LOG_LEVEL = "silent";
 const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");

@@ -65,6 +65,8 @@ import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { uruchomTakt } from "./services/takt.js";
+import { sellasistSettings } from './adapters/sellasist-wms.js';
+import { syncSellasist } from './services/wms-sellasist.js';
 import { powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
@@ -340,6 +342,7 @@ export async function buildApp() {
 }
 
 async function main() {
+  const sellasist=sellasistSettings();
   db(); // migracja schematu przy starcie
   /* Konto demo admin/admin — tylko seeded, tylko pusta baza. Tu, nie
      w buildApp(): testy tras sprawdzają bootstrap „pierwsze konto bez
@@ -423,6 +426,8 @@ async function main() {
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });
+  // Import zamówień startuje dopiero po przygotowaniu katalogu i uruchomieniu API.
+  if(sellasist)uruchomTakt('wms-sellasist',sellasist.intervalMs,async()=>{await syncSellasist(sellasist);});
   console.log(`[api] WERTIS serwer na http://${config.host}:${config.port} · SGT_MODE=${config.sgtMode}`);
 }
 

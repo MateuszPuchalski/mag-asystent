@@ -18,6 +18,7 @@ const env = {
   PORT: port,
   HOST: "127.0.0.1",
   SGT_MODE: "seeded",
+  WMS_SELLASIST_ENABLED: "0",
   LOG_LEVEL: "silent",
   WERTIS_ENV_FILE: path.join(tmpdir(), "wms-test-no-env.local"),
 };
@@ -59,6 +60,10 @@ try {
   await expect(page.locator("#wms-content")).toContainText(
     "Wybierz zamówienie",
   );
+  await page.locator('[data-tab-wms="integration"]').click();
+  await expect(page.locator("#wms-content")).toContainText(
+    "synchronizacja Sellasist jest wyłączona",
+  );
   await page.locator('[data-tab-wms="import"]').click();
   await page.locator('#wms-create [name="reference"]').fill("E2E-FULL-ORDER");
   await page.locator('#wms-create [name="dueAt"]').fill("2026-12-31T14:00");
@@ -67,6 +72,32 @@ try {
     .fill("WMS-0001;2\nWMS-0002;1");
   await page
     .getByRole("button", { name: "UTWÓRZ ZAMÓWIENIE", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
+    .click();
+  const proposalOrderId = Number(await page.locator('[data-order-wms][aria-pressed="true"]').getAttribute("data-order-wms"));
+  // Odpowiedź sklepu jest atrapą; otwarcie i zapis zmiany używają prawdziwego WMS.
+  await page.route("**/api/wms/sellasist", (route) => route.fulfill({
+    json: {
+      enabled: true, account: "test-shop", intervalMs: 60000, shippedStatus: 9,
+      state: null, issues: [{ external_id: 123, stage: "source", message: "Zmiana priorytetu w sklepie", updated_at: new Date().toISOString(),
+        proposal: { orderId: proposalOrderId, order: { priority: 1, dueAt: "2026-12-31T13:00:00Z", lines: [{ sku: "WMS-0001", quantity: 2 }, { sku: "WMS-0002", quantity: 1 }] } } }],
+    },
+  }), { times: 1 });
+  await page.locator('[data-tab-wms="integration"]').click();
+  await page.getByRole("button", { name: "OTWÓRZ ZMIANY DO SPRAWDZENIA", exact: true }).click();
+  await expect(page.locator('#wms-amend [name="priority"]')).toHaveValue("1");
+  await expect(page.locator('#wms-amend [name="lines"]')).toHaveValue("WMS-0001;2\nWMS-0002;1");
+  await expect(page.locator('#wms-amend [name="reason"]')).toHaveValue("Uzgodnienie zmiany Sellasist");
+  await page
+    .locator('#wms-amend [name="reason"]')
+    .fill("Klient potrzebuje pilnej realizacji");
+  await page
+    .getByRole("button", {
+      name: "ZAPISZ ZMIANY I ZWOLNIJ REZERWACJE",
+      exact: true,
+    })
     .click();
   await page
     .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
@@ -354,6 +385,9 @@ try {
           "login",
           "create",
           "allocate",
+          "amend and release reservations",
+          "integration status",
+          "source proposal review (mocked connector response)",
           "pick",
           "wrong scan",
           "lost response and reload",

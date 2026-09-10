@@ -29,6 +29,7 @@ $env:WMS_DEMO_PASSWORD = 'wybrane-przez-ciebie-haslo'
 npm -w server run wms:demo
 $env:WERTIS_ENV_FILE = Join-Path $env:TEMP 'nieistniejacy-wms-demo.local'
 $env:SGT_MODE = 'seeded'
+$env:WMS_SELLASIST_ENABLED = '0'
 npm run dev:api
 ```
 
@@ -157,6 +158,10 @@ Biuro może przejąć pojedyncze zamówienie w jego karcie; skan pojemnika nadal
 
 ## Integracja sklepu i wysyłki
 
+Automatyczny konektor Sellasist opisuje [`wms-sellasist.md`](wms-sellasist.md).
+Obsługuje import, wykrywanie zmian, kontrolę paczek przed wysłaniem i potwierdzanie statusu.
+Jest domyślnie wyłączony i wymaga rzeczywistych identyfikatorów statusów oraz klucza API.
+
 API używa istniejącej sesji w nagłówku `x-session`.
 Każdy zapis wymaga `Idempotency-Key`: 16–100 znaków ASCII, liter, cyfr, podkreśleń lub myślników.
 Klucz musi pozostać taki sam przy ponowieniu tego samego żądania.
@@ -182,6 +187,7 @@ Nowa operacja wymaga nowego klucza.
 | `POST /api/wms/waves/:id/pick` | Kontrola pojemnika i pobranie na wózku |
 | `GET /api/wms/integrity` | Zgodność dziennika i rezerwacji |
 | `GET /api/wms/reconciliation` | Różnice względem Subiekta |
+| `GET /api/wms/sellasist` | Stan synchronizacji i propozycje zmian zamówień |
 
 Przykładowa czynność: `{"action":"allocate","version":1}`.
 Odpowiedź zawiera nową wersję zamówienia.

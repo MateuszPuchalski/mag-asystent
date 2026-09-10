@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.269.0 — 10 września 2026
+## 0.270.0 — 11 września 2026
 
 Realizacja WMS w istniejącym biurze: od rezerwacji części przez skan lokalizacji,
 zbiórkę pojedynczą lub wózkiem do kontroli pakowania i wysyłki wielu paczek.
@@ -44,6 +44,11 @@ Wózek prowadzi do 12 zamówień po jednej trasie i wymaga potwierdzenia docelow
   minima i niezmienny dziennik. Kwarantanna oraz zaplecze nie zasilają zbiórki.
 - Import partii zamówień, kolejki według priorytetu i terminu, wstrzymanie,
   przejęcie, odłożenie pobranego towaru i anulowanie bez utraty rezerwacji.
+- Konektor Sellasist: import statusów gotowych, wykrywanie zmian i kontrola
+  numerów paczek przed wysyłką. Utracona odpowiedź nie powoduje ponownego
+  potwierdzenia tego samego statusu. Złe przesyłki nie blokują kolejnych.
+- Jawna zmiana zamówienia zwalnia rezerwacje atomowo. Po pobraniu wymaga
+  najpierw odłożenia towaru. Interfejs pokazuje propozycje zmian ze sklepu.
 - Powtórzenie żądania odtwarza wynik; konflikty wersji i transakcje chronią ostatnią sztukę.
   Interfejs zachowuje nierozstrzygnięty zapis po odświeżeniu strony.
 - Raporty wysyłek, terminowości, zaległości, etapów, SKU, osób, ruchów,
@@ -57,7 +62,9 @@ Wózek prowadzi do 12 zamówień po jednej trasie i wymaga potwierdzenia docelow
 **Wymaga działania:** Node.js co najmniej 24.15.0, `npm ci`, build i restart usług.
 Otwarcie ewidencji WMS wymaga policzenia i zapisania rzeczywistego zapasu.
 Lustro Subiekta nie nadpisuje ilości WMS. Integracja nie wystawia automatycznie
-dokumentów wydania ani etykiet przewoźnika. Instrukcja, demo i granice odbioru: `docs/wms.md`.
+dokumentów wydania ani etykiet przewoźnika. Konektor Sellasist jest domyślnie
+wyłączony; konfigurację konta i statusów opisuje `docs/wms-sellasist.md`.
+Instrukcja, demo i granice odbioru: `docs/wms.md`.
 
 ## 0.268.0 — 10 września 2026
 

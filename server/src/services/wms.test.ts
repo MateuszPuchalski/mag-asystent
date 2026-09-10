@@ -333,6 +333,52 @@ test("niedobór drugiej pozycji wycofuje wszystkie rezerwacje i audyt", () => {
   assert.equal(A.integrity().ok, true);
 });
 
+test("zmiana zamówienia zwalnia rezerwacje atomowo i wymaga odłożenia pobranego towaru", () => {
+  const p = product(10),
+    replacement = product(10);
+  let o = action(order(p.sku, 2), "allocate");
+  const amendment = {
+    lines: [{ sku: replacement.sku, quantity: 3 }],
+    dueAt: o.due_at,
+    priority: 1,
+    reason: "Klient wybrał inną część",
+  };
+  assert.throws(() => action(o, "amend", amendment, picker), /uprawnień/);
+  assert.throws(
+    () =>
+      action(o, "amend", {
+        ...amendment,
+        lines: [{ sku: "UNKNOWN", quantity: 3 }],
+      }),
+    /brak kartoteki/,
+  );
+  assert.equal(W.getOrder(o.id).status, "allocated");
+  assert.equal(W.inventory({ q: p.sku }).rows[0].reserved, 2);
+  o = action(o, "amend", amendment);
+  assert.equal(o.status, "new");
+  assert.equal(o.lines[0].sku, replacement.sku);
+  assert.equal(W.inventory({ q: p.sku }).rows[0].reserved, 0);
+  o = pick(o);
+  assert.throws(() => action(o, "amend", amendment), /etapie/);
+  o = action(o, "hold", { reason: "Kolejna zmiana klienta" });
+  const a = o.allocations[0];
+  o = action(o, "return", {
+    allocationId: a.id,
+    bin: a.bin,
+    barcode: replacement.sku,
+    quantity: 3,
+    reason: "Odłożono przed zmianą",
+  });
+  o = action(o, "amend", {
+    ...amendment,
+    lines: [{ sku: p.sku, quantity: 1 }],
+  });
+  assert.equal(o.status, "new");
+  assert.ok(o.hold_reason);
+  assert.equal(o.tote, null);
+  assert.equal(A.integrity().ok, true);
+});
+
 test("ponowienie po utracie odpowiedzi nie podwaja pobrania, a inny payload jest konfliktem", () => {
   const p = product();
   let o = action(order(p.sku), "allocate");

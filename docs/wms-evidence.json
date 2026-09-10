@@ -1,9 +1,9 @@
 {
-  "version": "0.269.0",
-  "date": "2026-09-10",
+  "version": "0.270.0",
+  "date": "2026-09-11",
   "branch": "codex/robust-wms",
   "serverTests": {
-    "passed": 2049,
+    "passed": 2061,
     "failed": 0
   },
   "panelTests": {
@@ -25,7 +25,7 @@
     "kt_imports_check.py"
   ],
   "capacity": {
-    "at": "2026-09-10T21:24:41.807Z",
+    "at": "2026-09-10T22:14:12.245Z",
     "node": "v24.15.0",
     "sqlite": "3.51.3",
     "platform": "win32",
@@ -34,15 +34,15 @@
     "orders": 1500,
     "concurrency": 16,
     "requests": 16650,
-    "elapsedSeconds": 78.26,
-    "ordersPerHour": 69003,
+    "elapsedSeconds": 77.15,
+    "ordersPerHour": 69993,
     "httpMs": {
-      "p50": 70.87,
-      "p95": 93.18,
-      "p99": 112.3,
-      "max": 165.87
+      "p50": 70.73,
+      "p95": 90.4,
+      "p99": 101.61,
+      "max": 127.08
     },
-    "eventLoopMaxMs": 166,
+    "eventLoopMaxMs": 106,
     "integrity": {
       "ok": true,
       "balances": [],
@@ -56,23 +56,23 @@
     "results": [
       {
         "url": "/api/wms/analytics?days=90",
-        "milliseconds": 612.64
+        "milliseconds": 628.29
       },
       {
         "url": "/api/wms/analytics?days=30",
-        "milliseconds": 240.73
+        "milliseconds": 244.7
       },
       {
         "url": "/api/wms/orders?status=allocated",
-        "milliseconds": 1.51
+        "milliseconds": 3.38
       },
       {
         "url": "/api/wms/inventory?q=SKU-4",
-        "milliseconds": 8.62
+        "milliseconds": 9.65
       },
       {
         "url": "/api/wms/reconciliation",
-        "milliseconds": 140.05
+        "milliseconds": 147.53
       }
     ],
     "limitations": "Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths."
@@ -83,6 +83,9 @@
       "login",
       "create",
       "allocate",
+      "amend and release reservations",
+      "integration status",
+      "source proposal review (mocked connector response)",
       "pick",
       "wrong scan",
       "lost response and reload",
@@ -116,5 +119,19 @@
     "Physical scanners, printers and production hardware",
     "Opening inventory and reconciliation with actual ERP documents",
     "Remote CI has not been run"
-  ]
+  ],
+  "sellasist": {
+    "passed": 11,
+    "coverage": [
+      "1500 orders with pagination",
+      "late release of old order",
+      "crash recovery",
+      "rate-limit cooldown and process lease",
+      "source and local amendments",
+      "parcel verification",
+      "lost status response",
+      "export queue fairness"
+    ],
+    "transport": "Controlled responses matching official OpenAPI; no live account calls"
+  }
 }

@@ -5,7 +5,10 @@ Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
 `http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
 wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skanerem.
-Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md). Zero chmury.
+Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md).
+
+API i baza WMS pracują lokalnie. Włączone integracje Allegro i Sellasist korzystają z Internetu.
+Konfiguracja automatycznego importu i kontroli wysyłek: [`docs/wms-sellasist.md`](docs/wms-sellasist.md).
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001

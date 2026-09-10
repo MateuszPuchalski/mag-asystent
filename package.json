@@ -1,7 +1,7 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.269.0",
+  "version": "0.270.0",
   "description": "WERTIS — WMS z kompletacją i pakowaniem, biuro, obsługa klienta i kolektor Android; integracje Subiekta GT.",
   "workspaces": [
     "server",
@@ -21,10 +21,11 @@
     "reconcile": "npm -w server run reconcile",
     "reslot": "npm -w server run reslot --",
     "dev:panel": "npm -w @wertis/panel-obslugi run dev",
-    "test:wms": "node --import tsx --test server/src/services/wms.test.ts server/src/routes/wms.test.ts",
+    "test:wms": "node --import tsx --test server/src/services/wms.test.ts server/src/services/wms-sellasist.test.ts server/src/routes/wms.test.ts",
     "test:wms:e2e": "node tools/wms-e2e.mjs",
     "test:wms:capacity": "node --import tsx server/src/wms-capacity-run.ts",
-    "wms:backup": "node --import tsx server/src/wms-backup-run.ts"
+    "wms:backup": "node --import tsx server/src/wms-backup-run.ts",
+    "wms:sellasist": "node --import tsx server/src/wms-sellasist-run.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

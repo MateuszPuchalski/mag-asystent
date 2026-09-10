@@ -50,6 +50,10 @@ window.Wms = (() => {
           minute: "2-digit",
         })
       : "—";
+  const localDateInput = (value) =>
+    new Date(Date.parse(value) - new Date(value).getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
   const office = () => user && ["admin", "biuro"].includes(user.role);
   const binModes = {
     pick: "Kompletacja",
@@ -155,7 +159,8 @@ window.Wms = (() => {
   async function open() {
     try {
       user = (await read("/api/auth/me")).user;
-      if (!office() && ["analytics", "import"].includes(view)) view = "orders";
+      if (!office() && ["analytics", "import", "integration"].includes(view))
+        view = "orders";
       shell();
       await refresh();
     } catch (e) {
@@ -172,6 +177,7 @@ window.Wms = (() => {
         ? [
             ["analytics", "Analityka"],
             ["import", "Nowe zamówienie"],
+            ["integration", "Integracja"],
           ]
         : []),
     ];
@@ -189,6 +195,7 @@ window.Wms = (() => {
       if (view === "bins") await bins(turn);
       if (view === "analytics") await report(turn);
       if (view === "import") importForm();
+      if (view === "integration") await integration(turn);
     } catch (e) {
       if (turn === generation) message(e.message, true);
     }
@@ -356,7 +363,19 @@ window.Wms = (() => {
             "POTWIERDŹ ODŁOŻENIE",
           )
         : "";
-    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>`;
+    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
+  }
+  function amendForm(o) {
+    if (
+      !office() ||
+      o.lines.some((l) => l.picked > 0) ||
+      !(
+        ["new", "allocated"].includes(o.status) ||
+        (o.status === "picking" && o.hold_reason)
+      )
+    )
+      return "";
+    return `<details id="wms-amend"><summary>Zmień pozycje i termin zamówienia</summary>${form("amend", `<p class="wms-help">Zmiana zwolni dotychczasowe rezerwacje i odłączy zamówienie od wózka. Po sprawdzeniu treści zarezerwuj towar ponownie. Wstrzymanie pozostaje do decyzji biura.</p>${field("dueAt", "Termin wysyłki", "datetime-local", localDateInput(o.due_at))}<label>Priorytet<select name="priority">${[0, 1, 2].map((n) => `<option value="${n}" ${o.priority === n ? "selected" : ""}>${["Standard", "Pilne", "Krytyczne"][n]}</option>`).join("")}</select></label><label>SKU;ilość — pozycje po zmianie<textarea name="lines" required>${html(o.lines.map((l) => `${l.sku};${l.quantity}`).join("\n"))}</textarea></label>${field("reason", "Powód zmiany", "text", "", 'minlength="3" maxlength="500"')}`, "ZAPISZ ZMIANY I ZWOLNIJ REZERWACJE")}</details>`;
   }
   async function stocks(turn) {
     const result = await read(
@@ -484,6 +503,20 @@ window.Wms = (() => {
       <section class="wms-surface"><h2>Operacje zbiórki według osoby</h2><p class="wms-muted">Zatwierdzone pobrania w okresie. Sztuki i skany nie mierzą czasu pracy.</p><table class="wms-lines"><thead><tr><th>Osoba</th><th>Skany</th><th>Sztuki</th><th>Zamówienia</th></tr></thead><tbody>${a.productivity.map((p) => `<tr><td>${html(p.name)}</td><td>${p.scans}</td><td>${p.units}</td><td>${p.orders}</td></tr>`).join("")}</tbody></table></section>`,
       );
   }
+  async function integration(turn) {
+    const data = await read("/api/wms/sellasist");
+    if (turn !== generation) return;
+    if (!data.enabled) {
+      el("wms-content").innerHTML =
+        '<section class="wms-surface"><h2>Połączenie ze sklepem</h2><p>Automatyczna synchronizacja Sellasist jest wyłączona. Administrator musi wskazać konto sklepu, użytkownika integracji i statusy zamówień gotowych do realizacji.</p><p>Do tego czasu zamówienia można dodawać przez import pliku w zakładce Nowe zamówienie.</p></section>';
+      return;
+    }
+    const s = data.state,
+      r = s?.last_result;
+    root()._sourceIssues = data.issues;
+    el("wms-content").innerHTML =
+      `<section class="wms-surface"><div class="wms-toolbar"><h2>Sellasist · ${html(data.account)}</h2><button data-do-wms="refresh">ODŚWIEŻ STAN</button></div>${data.configurationError ? `<div class="wms-message error">${html(data.configurationError)}</div>` : ""}<p>Ostatni zakończony przebieg: ${date(s?.last_finished)}. Synchronizacja co około ${Math.round(data.intervalMs / 1000)} s.</p>${s?.last_error ? `<div class="wms-message error">${html(s.last_error)}. Kolejna próba nie wcześniej niż ${date(s.retry_at)}.</div>` : ""}<p>${r ? `Nowe zamówienia: ${r.created} · rozpoznane: ${r.existing} · wymagające wyjaśnienia: ${r.held} · wysyłki potwierdzone: ${r.exported}.` : "Nie ukończono jeszcze pierwszego przebiegu."}</p><p class="wms-help">${data.shippedStatus ? "Potwierdzenie wysyłki wymaga zgodności zeskanowanych numerów z listami przewozowymi tego zamówienia w Sellasist." : "Automatyczne potwierdzanie wysyłek jest wyłączone."} Zmiany w sklepie wstrzymują otwarte zamówienie. Po wyjaśnieniu biuro wznawia je w kolejce WMS.</p><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>Zamówienie</th><th>Etap</th><th>Co wymaga wyjaśnienia</th><th>Aktualizacja</th></tr></thead><tbody>${data.issues.map((i, index) => `<tr><td>SA-${i.external_id}</td><td>${{ import: "Import", source: "Zgodność ze sklepem", export: "Wysyłka" }[i.stage]}</td><td>${html(i.message)}${i.proposal ? `<button data-source-wms="${index}">OTWÓRZ ZMIANY DO SPRAWDZENIA</button>` : ""}</td><td>${date(i.updated_at)}</td></tr>`).join("") || '<tr><td colspan="4">Brak zgłoszonych problemów synchronizacji.</td></tr>'}</tbody></table></div><p class="wms-muted">Lista pokazuje maksymalnie 100 ostatnich problemów.</p></section>`;
+  }
   function importForm() {
     el("wms-content").innerHTML =
       `<section class="wms-surface wms-import"><h2>Nowe zamówienie</h2><form class="wms-form" id="wms-create"><div class="wms-fields">${field("reference", "Numer zamówienia")}${field("channel", "Kanał", "text", "sklep")}</div>${field("dueAt", "Termin wysyłki", "datetime-local")}<label>Priorytet<select name="priority"><option value="0">Standard</option><option value="1">Pilne</option><option value="2">Krytyczne</option></select></label><label>Pozycje — jeden SKU i ilość w wierszu<textarea name="lines" required placeholder="W32-0203;2&#10;50-111;1"></textarea></label><p class="wms-help">Format: SKU;ilość. Symbol musi istnieć w kartotece. Powtarzające się SKU zostaną zsumowane.</p><button class="primary">UTWÓRZ ZAMÓWIENIE</button></form>
@@ -493,6 +526,35 @@ window.Wms = (() => {
     const button = event.target.closest("button");
     if (!button || !root().contains(button) || busy) return;
     try {
+      if (button.dataset.sourceWms) {
+        const proposal =
+          root()._sourceIssues[Number(button.dataset.sourceWms)].proposal;
+        selected = proposal.orderId;
+        view = "orders";
+        query = "";
+        offset = 0;
+        shell();
+        await refresh();
+        const form = el("wms-amend")?.querySelector("form");
+        if (!form)
+          throw new Error(
+            "Najpierw wstrzymaj zamówienie i odłóż wszystkie pobrane sztuki.",
+          );
+        form.elements.namedItem("lines").value = proposal.order.lines
+          .map((l) => `${l.sku};${l.quantity}`)
+          .join("\n");
+        form.elements.namedItem("dueAt").value = localDateInput(
+          proposal.order.dueAt,
+        );
+        form.elements.namedItem("priority").value = String(
+          proposal.order.priority,
+        );
+        form.elements.namedItem("reason").value =
+          "Uzgodnienie zmiany Sellasist";
+        el("wms-amend").open = true;
+        el("wms-amend").scrollIntoView({ block: "nearest" });
+        message("Sprawdź propozycję ze sklepu przed zapisaniem zmian.");
+      }
       if (button.dataset.tabWms) {
         view = button.dataset.tabWms;
         query = "";
@@ -729,6 +791,19 @@ window.Wms = (() => {
       const action = f.dataset.actionWms || values.action;
       if (action && current) {
         const body = { ...values, action, version: current.version };
+        if (action === "amend") {
+          body.lines = String(values.lines)
+            .split(/\r?\n/)
+            .filter((s) => s.trim())
+            .map((s) => {
+              const parts = s.split(";");
+              if (parts.length !== 2)
+                throw new Error("Każdy wiersz musi mieć format SKU;ilość");
+              return { sku: parts[0].trim(), quantity: Number(parts[1]) };
+            });
+          body.dueAt = new Date(String(values.dueAt)).toISOString();
+          body.priority = Number(values.priority);
+        }
         for (const n of ["quantity", "allocationId", "weightG"])
           if (n in body) body[n] = Number(body[n]);
         if (action === "ship")

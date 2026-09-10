@@ -26,6 +26,11 @@ import {
   integrity,
 } from "../services/wms-analytics.js";
 import { db } from "../db/db.js";
+import { sellasistSettings } from "../adapters/sellasist-wms.js";
+import {
+  sellasistStatus,
+  verifySellasistShipment,
+} from "../services/wms-sellasist.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
 
 function actor(): Actor {
@@ -105,13 +110,19 @@ export async function wmsRoutes(app: FastifyInstance) {
   );
   app.post<{ Params: { id: string } }>(
     "/api/wms/orders/:id/actions",
-    async (req) =>
-      actOnOrder(
-        actor(),
-        String(req.headers["idempotency-key"] ?? ""),
-        orderId(req.params.id),
+    async (req) => {
+      const user = actor(),
+        key = String(req.headers["idempotency-key"] ?? ""),
+        id = orderId(req.params.id);
+      await verifySellasistShipment(
+        user,
+        key,
+        id,
         req.body,
-      ),
+        sellasistSettings(),
+      );
+      return actOnOrder(user, key, id, req.body);
+    },
   );
   app.get("/api/wms/inventory", async (req) => {
     actor();
@@ -138,6 +149,10 @@ export async function wmsRoutes(app: FastifyInstance) {
   app.get("/api/wms/analytics", async (req) => {
     manager(actor());
     return analytics(req.query);
+  });
+  app.get("/api/wms/sellasist", async () => {
+    manager(actor());
+    return sellasistStatus(sellasistSettings());
   });
   app.get("/api/wms/integrity", async () => {
     manager(actor());

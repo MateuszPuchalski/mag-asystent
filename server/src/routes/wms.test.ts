@@ -11,6 +11,7 @@ process.env.DB_PATH = path.join(
   "wms.db",
 );
 process.env.LOG_LEVEL = "silent";
+process.env.WMS_SELLASIST_ENABLED = '0';
 let app: FastifyInstance;
 let adminToken: string, workerToken: string;
 before(async () => {
@@ -46,6 +47,7 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/waves/1",
     "/api/wms/analytics",
     "/api/wms/integrity",
+    "/api/wms/sellasist",
   ])
     assert.equal(
       (await app.inject({ method: "GET", url })).statusCode,
@@ -55,6 +57,7 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/analytics",
     "/api/wms/analytics/csv",
+    "/api/wms/sellasist",
     "/api/wms/integrity",
     "/api/wms/reconciliation",
     "/api/wms/shipments",
