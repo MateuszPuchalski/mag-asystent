@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
 import type { PomiarRozmowy, PowodNegatywny, Zastosowanie } from "../api/typy";
 import { usePomiarDoWiedzy, useWiedzaDoboru } from "../api/rozmowy";
-import { Przycisk, czas } from "../ui";
+import { NaglowekSekcji, Przycisk, czas } from "../ui";
 import { NAZWA_POWODU } from "./statusy";
 
 /**
@@ -51,7 +51,7 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
         producenta jest dokładnie tym, co ta zakładka ma pokazywać. */}
     {pomiary.length > 0 &&
       <section className="mt-3" aria-label="Pomiary z tej rozmowy">
-        <b className="text-xs uppercase tracking-wide text-slate-500">Pomiary z tej rozmowy</b>
+        <NaglowekSekcji>Pomiary z tej rozmowy</NaglowekSekcji>
         <p className="mt-1 text-[11px] text-slate-500">Wynik z hali nie staje się wiedzą sam. Zaproponowany
           trafia do kolejki jako dowód „pomiar własny” i czeka na zatwierdzenie.</p>
         <ul className="mt-2 space-y-2">

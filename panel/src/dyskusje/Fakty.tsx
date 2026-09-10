@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji } from "../api/typy";
-import { czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
    Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
@@ -23,13 +23,13 @@ import { czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
 const Wiersz = ({ etykieta, children }: { etykieta: string; children: React.ReactNode }) =>
   <div className="flex items-baseline gap-2 py-1 text-sm">
-    <span className="w-32 shrink-0 text-xs uppercase tracking-wide text-slate-500">{etykieta}</span>
+    <EtykietaWartosci className="w-32 shrink-0">{etykieta}</EtykietaWartosci>
     <span className="min-w-0 flex-1 text-slate-800">{children}</span>
   </div>;
 
 const Sekcja = ({ tytul, children }: { tytul: string; children: React.ReactNode }) =>
   <section className="border-t border-slate-200 px-4 py-3 first:border-t-0">
-    <h3 className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{tytul}</h3>
+    <NaglowekSekcji jako="h3" className="mb-1">{tytul}</NaglowekSekcji>
     {children}
   </section>;
 

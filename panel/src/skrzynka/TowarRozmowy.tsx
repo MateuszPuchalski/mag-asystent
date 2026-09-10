@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
-import { NaglowekSekcji } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji } from "../ui";
 import type { KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
@@ -220,8 +220,7 @@ function OpisKartoteki({ desc }: { desc?: string }) {
   if (!tresc) return null;
 
   return <div className="rounded-lg border border-slate-200 p-3">
-    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-      Opis kartoteki</p>
+    <NaglowekSekcji jako="p" className="mb-1">Opis kartoteki</NaglowekSekcji>
     <p className={`whitespace-pre-wrap text-xs text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
       {tresc}</p>
     {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
@@ -271,7 +270,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
   return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
     <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dostępny</div>
+        <EtykietaWartosci className="block">Dostępny</EtykietaWartosci>
         <div className={`flex items-baseline gap-1 tabular-nums ${
           brakStanu ? "text-ranga-zle" : "text-slate-900"}`}>
           <span className="text-2xl font-bold leading-none">{karta.mag.avail}</span>
@@ -322,7 +321,7 @@ function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
       <p className="text-[11px] text-slate-500">{t.zdanie}</p>
     </li>;
   return <div className="rounded-lg border border-emerald-200 p-3">
-    <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-emerald-800">Wiedza: pasowania części</p>
+    <NaglowekSekcji jako="p" ton="text-emerald-800" className="mb-1">Wiedza: pasowania części</NaglowekSekcji>
     {dane.pasujace.length > 0 && <>
       <p className="text-[11px] font-semibold text-slate-600">Do tej części pasują</p>
       <ul className="mb-1 space-y-1">{dane.pasujace.map((t) => wiersz(t, "czesc"))}</ul></>}

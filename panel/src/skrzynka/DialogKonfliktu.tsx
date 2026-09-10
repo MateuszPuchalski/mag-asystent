@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { SzczegolyWysylki } from "../api/typy";
-import { Przycisk, czas } from "../ui";
+import { NaglowekSekcji, Przycisk, czas } from "../ui";
 
 /**
  * Konflikt świeżości przy wysyłce (§8.5, blizna 0.110.0).
@@ -48,13 +48,13 @@ export function DialogKonfliktu({
 
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         <section className="rounded-lg border border-os-klient-ramka bg-os-firma p-3">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Twój szkic</div>
+          <NaglowekSekcji jako="div">Twój szkic</NaglowekSekcji>
           <p className="mt-2 whitespace-pre-wrap text-sm">{szkic}</p>
         </section>
         <section className="rounded-lg border border-os-komentarz-ramka bg-os-komentarz p-3">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-ranga-uwaga">
+          <NaglowekSekcji jako="div" ton="text-ranga-uwaga">
             Nowa wiadomość — {ktoDopisal}{nowa ? ` · ${czas(nowa.at)}` : ""}
-          </div>
+          </NaglowekSekcji>
           <p className="mt-2 whitespace-pre-wrap text-sm">{nowa?.tresc ?? "—"}</p>
           {nowa && <p className="mt-2 text-xs text-slate-500">wiadomość #{nowa.id}</p>}
         </section>

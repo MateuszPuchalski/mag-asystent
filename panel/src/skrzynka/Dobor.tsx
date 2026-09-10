@@ -10,7 +10,7 @@ import {
 } from "../api/rozmowy";
 import { useOcenDaneDoboru, useOcenPasowanie } from "../api/copilot";
 import { propozycjaDoboru } from "./propozycjaDoboru";
-import { Przycisk } from "../ui";
+import { NaglowekSekcji, Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PasowanieForm } from "../wiedza/PasowanieForm";
@@ -227,7 +227,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
     {/* ── Dane wejściowe (§11.1) ─────────────────────────────────────────── */}
     <section className="border-b p-3" aria-label="Dane wejściowe">
       <div className="mb-2 flex items-center gap-2">
-        <b className="text-xs uppercase tracking-wide text-slate-500">Dane wejściowe</b>
+        <NaglowekSekcji>Dane wejściowe</NaglowekSekcji>
         <span className="text-[11px] text-slate-500">wersja {dobor.wersja}</span>
         {!edycja && <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
           onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
@@ -356,7 +356,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
 
     {/* ── Kandydaci (§11.2) ──────────────────────────────────────────────── */}
     <section className="border-b p-3" aria-label="Kandydaci">
-      <b className="text-xs uppercase tracking-wide text-slate-500">Kandydaci</b>
+      <NaglowekSekcji>Kandydaci</NaglowekSekcji>
       {kandydaci.data && <Szczeble drogi={kandydaci.data.drogi} />}
       {kandydaci.isLoading && <p className="mt-2 text-xs text-slate-500">Szukam…</p>}
       {kandydaci.error && <p className="mt-2 text-xs text-red-700">{(kandydaci.error as Error).message}</p>}
