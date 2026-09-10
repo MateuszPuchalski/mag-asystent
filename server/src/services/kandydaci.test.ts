@@ -230,7 +230,8 @@ test("numer OEM z opisu trafia w kartotekę drogą `oem`, a ta sama kartoteka z 
   const ftc = kandydaci.find((k) => k.twId === FTC272)!;
   assert.equal(ftc.droga, "oem", "OEM bije kontekst oferty");
   assert.equal(ftc.pewnosc, "prawdopodobne");
-  assert.match(ftc.zrodlo, /^numer OEM 41307131600 z opisu kartoteki „FTC272”$/);
+  assert.match(ftc.zrodlo,
+    /^numer OEM 41307131600 z opisu kartoteki „FTC272” — trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie$/);
   /* Zamiennik z opisu FTC272 ma ten sam numer w SWOIM opisie: jedna karta, mocniejsza droga. */
   assert.equal(kandydaci.filter((k) => k.twId === ZAMIENNIK_FTC272).length, 1);
   assert.equal(kandydaci.find((k) => k.twId === ZAMIENNIK_FTC272)!.droga, "oem");
@@ -554,4 +555,35 @@ test("kotwica bez pasowań to sprawdzony szczebel z zerem; negatyw pasowania lą
   const { negatywne } = kandydaciDoboru(rozmowa, subiekt);
   assert.deepEqual(negatywne.map((n) => n.symbol), ["170430138-0001"]);
   assert.match(negatywne[0].zrodlo, /nie pasuje do W09-0211/);
+});
+
+/* ── Siła szczebla stoi w ZDANIU, nie tylko w kolejności (0.263.0) ───────────
+   Do 0.262.0 `RANGA` była jedynym zapisem siły drogi, a tej liczby nie czyta
+   nikt poza sortowaniem. Zdania źródła nazywały za to SŁABOŚĆ dwóch najniższych
+   dróg. Model dostawał listę, na której najsłabsze wpisy były opisane jako
+   słabe, a najmocniejsze nie miały przy sobie nic — i odradził klientowi zakup
+   koła pasowego, choć trafienie po numerze producenta stało pierwsze.
+
+   Drugiego końca symetrii NIE dublujemy tutaj: „nie dowód" przy pełnym tekście
+   i przy wymiarze pilnują testy wyżej w tym pliku, przypięte kotwicą. */
+
+test("trafienie po numerze OEM mówi w zdaniu, że idzie po identyfikatorze", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { oem: "41307131600" }, 1, biuro);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  const ftc = kandydaci.find((k) => k.twId === FTC272)!;
+  assert.match(ftc.zrodlo, /trafienie po IDENTYFIKATORZE/,
+    "mocna droga nie mówi o sobie, że jest mocna");
+});
+
+test("numer OEM BEZ kartoteki nie dostaje znacznika — nie ma czym trafić", () => {
+  /* Karta „bez wiersza" jest odpowiedzią „nie mamy tego u siebie", a nie
+     trafieniem. Znacznik przy niej kłamałby o sile dokładnie w tę stronę,
+     którą to wydanie zamyka. */
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { oem: "999999999" }, 1, biuro);
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
+  const bez = kandydaci.find((k) => k.twId === null)!;
+  assert.equal(bez.pewnosc, "wymaga_danych");
+  assert.doesNotMatch(bez.zrodlo, /trafienie po IDENTYFIKATORZE/);
 });

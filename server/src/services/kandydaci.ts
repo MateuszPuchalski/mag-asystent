@@ -76,6 +76,27 @@ const RANGA: Record<DrogaDoboru, number> = {
   wymiar: 9, pelnotekst: 10, wyszukiwarka: 11,
 };
 
+/**
+ * ZNACZNIK MOCNEJ PRZESŁANKI — dopisek do zdania źródła trzech pierwszych dróg.
+ *
+ * Do 0.263.0 siła szczebla była zapisana WYŁĄCZNIE w `RANGA`, czyli w liczbie,
+ * której nikt poza sortowaniem nie czyta. Zdania źródła nazywały za to słabość
+ * dwóch najniższych dróg („— nie dowód" przy wymiarze i pełnym tekście).
+ * Model dostawał więc listę, na której DWA najsłabsze wpisy były opisane jako
+ * słabe, a trzy najmocniejsze nie miały przy sobie nic.
+ *
+ * Kosztowało to szkic o koło pasowe do Husqvarny TC38. Klient podał numer
+ * producenta 197473, kartoteka 20-05006 miała ten numer w opisie, kandydat
+ * stanął pierwszy na liście — a model odradził zakup, bo z NAZWY kartoteki
+ * („DECK 46") wywnioskował inną szerokość kosiska niż zgadywana dla TC38.
+ * Domysł o maszynie pobił trafienie po numerze, bo nic nie mówiło, że to
+ * trafienie jest mocne.
+ *
+ * Jedna stała, nie trzy łańcuchy: dopisek stoi przy trzech drogach i przy
+ * pierwszej poprawce sformułowania trzy kopie by się rozjechały.
+ */
+const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
+
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
   wyszukiwarka: "wyszukiwarka to wybór ręczny, nie kandydat",
 };
@@ -163,12 +184,12 @@ export function kandydaciDoboru(
           const w = towar(database, t.id); if (!w) continue;
           poSymbolu++; trafioneNumery.add(zwin(q)); kotwica(w);
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "symbol",
-            pewnosc: "prawdopodobne", zrodlo: `Dokładny symbol „${q}” z danych wejściowych`, ostrzezenia: [] });
+            pewnosc: "prawdopodobne", zrodlo: `Dokładny symbol „${q}” z danych wejściowych ${PO_IDENTYFIKATORZE}`, ostrzezenia: [] });
         } else if (cyfry.length >= 8 && t.ean === cyfry) {
           const w = towar(database, t.id); if (!w) continue;
           poEan++; trafioneNumery.add(zwin(q)); kotwica(w);
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "ean",
-            pewnosc: "prawdopodobne", zrodlo: `Kod EAN ${cyfry} z danych wejściowych`, ostrzezenia: [] });
+            pewnosc: "prawdopodobne", zrodlo: `Kod EAN ${cyfry} z danych wejściowych ${PO_IDENTYFIKATORZE}`, ostrzezenia: [] });
         }
       }
     }
@@ -242,8 +263,8 @@ export function kandydaciDoboru(
         dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oem",
           pewnosc: "prawdopodobne", ostrzezenia: [],
           zrodlo: t.zrodlo === "reczne"
-            ? `numer ${t.nazwaRodzaju} ${t.wartosc} wpisany ręcznie przez ${t.dodal}`
-            : `numer ${t.nazwaRodzaju} ${t.wartosc} z opisu kartoteki „${w.symbol}”` });
+            ? `numer ${t.nazwaRodzaju} ${t.wartosc} wpisany ręcznie przez ${t.dodal} ${PO_IDENTYFIKATORZE}`
+            : `numer ${t.nazwaRodzaju} ${t.wartosc} z opisu kartoteki „${w.symbol}” ${PO_IDENTYFIKATORZE}` });
       }
       /* Karta „bez kartoteki" tylko dla pola OEM: numer wpisany jako NAZWA
          części to nie deklaracja „mam numer producenta". */
