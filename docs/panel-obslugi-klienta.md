@@ -819,7 +819,56 @@ Blok niesie tytuł, instrukcję słowo w słowo, kafel kartoteki (§25a.6a), zna
 bo po niej widać, czy wynik odpowiada na zadane pytanie. Blok NIE ma przycisku
 „wstaw do szkicu" — do szkicu wstawia się wynik, nie prośbę o niego.
 
+### 10.3c. Kolumna kontekstu (0.249.0)
+
+Kolumna odpowiada na jedno pytanie: **czy mamy to na półce i gdzie**. Odpowiedź
+— `Dostępny` i `Lokalizacja` — leżała w ośmiowierszowej tabeli 12 px, w tej
+samej wadze co `Identyfikatory brak`. Jedno jest decyzją, drugie zapasową
+ścieżką wyszukiwania.
+
+**Dostępny jest liczbą, nie wierszem tabeli.** Rozstrzyga, czy odpowiedź brzmi
+„wysyłamy dziś", więc ma być widoczny z drugiego końca biurka. Lokalizacja
+stoi obok jako plakietka — to jedyna wartość z tej grupy, którą ktoś przepisuje
+na kartkę i niesie na halę. Stan i rezerwacje schodzą pod spód drobnym drukiem:
+one tę liczbę TŁUMACZĄ, nie zastępują. Reszta zostaje w całości, bo §4.3 nie
+pozwala chować faktów, ale wartości „brak" gasną — brak identyfikatorów jest
+normą, a norma nie ma prawa wyglądać jak ustalenie.
+
+**Trzy nagłówki tej samej rangi mają jeden kształt.** „Oferta" i „Zamówienie"
+były `<b>` w 14 px przy ikonie 15 px, „Źródło: Subiekt GT" — plakietką
+z obwódką. Nagłówek CICHNIE do etykiety zamiast rosnąć: treścią sekcji jest
+nazwa towaru i to ona ma być w niej najgłośniejsza. Wspólny kształt niesie
+`NaglowekSekcji` w `ui/index.tsx`.
+
+**Dwa odnośniki „Otwórz w Allegro" przestały być jedynym błękitem w kolumnie.**
+Ciągnęły wzrok mocniej niż nazwa towaru, a to nawigacja, nie treść. UUID
+zamówienia jest skrócony do ośmiu znaków — całość zostaje w podpowiedzi
+i pod przyciskiem kopiowania.
+
+**Podpis źródeł zdjęć mieści się w jednej linii**, nadal nazywając oba źródła.
+§4.3 żąda, żeby przy każdym fakcie było widać źródło — nie żąda zdania
+złożonego. Dwa wiersze szarej prozy ważyły więcej niż sama pozycja zamówienia.
+
 ### 10.4. Edytor odpowiedzi
+
+**Rzędy edytora (0.249.0).** Właściciel: „niepotrzebnie ułóż odpowiedź i add
+attachment mają swój własny rząd". Miał rację — dwa rzędy szły na pomoc przy
+pisaniu i na czynność od święta. Copilot wraca do rzędu przełącznika trybu,
+spinacz do rzędu działań: pięć rzędów schodzi do trzech.
+
+0.247.0 próbowało już przenieść Copilota i **zostało wycofane**, bo z Copilotem
+wyłączonym komponent renderuje zdanie z serwera, nie przycisk, i łamało rząd
+na dwa wiersze. Wycofanie leczyło objaw. Przyczyną było to, że jeden komponent
+zwracał raz przycisk, raz akapit, więc wołający nie miał jak wiedzieć, ile
+miejsca zajmie. Teraz `PrzyciskSzkicu` nie zajmuje nigdy więcej niż jednej
+linii — zdanie się ucina, a całość zostaje w podpowiedzi.
+
+Spinacz wymagał rozdzielenia `ZalacznikiWysylki` na dwa komponenty: przycisk
+z ukrytym polem pliku (należy do rzędu działań) i listę dołożonych plików
+(należy do komponowanej wiadomości). Do 0.248.0 stały razem, więc przycisk
+ciągnął listę ze sobą i musiał zająć własny rząd.
+
+Zmierzone: edytor 288 → 222 px, oś rozmowy 247 → 313 px. **66 px dla rozmowy.**
 
 **Hierarchia panelu odpowiedzi (0.247.0).** Właściciel: „improve answering
 question panel in terms of visual hierarchy, get some principles from

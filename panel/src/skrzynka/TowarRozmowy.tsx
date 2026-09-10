@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Check, PackageSearch, X as Krzyzyk } from "lucide-react";
+import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
+import { NaglowekSekcji } from "../ui";
 import type { KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
@@ -55,9 +56,11 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
 
   return <div className="space-y-3 p-4">
     <div className="flex items-center gap-2">
-      <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
-        Źródło: Subiekt GT
-      </span>
+      {/* Ten sam kształt, co „Oferta" i „Zamówienie" wyżej (0.249.0): trzy
+          sekcje tej samej rangi miały trzy różne kształty, więc nie było jak
+          odczytać, że stoją na jednym poziomie. Plakietka z obwódką ważyła
+          przy tym więcej niż nazwa towaru pod nią. */}
+      <NaglowekSekcji ikona={<Database size={13} />}>Subiekt GT</NaglowekSekcji>
       {/* OSOBNA plakietka, poza blokiem Subiekta: §4.3 nie miesza źródeł, a to
           jest nasza baza wiedzy, nie dane z ERP. */}
       {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
@@ -232,11 +235,9 @@ function OpisKartoteki({ desc }: { desc?: string }) {
 }
 
 function StanTowaru({ karta }: { karta: KartaTowaru }) {
-  const wiersze: Array<[string, string]> = [
-    ["Stan", `${karta.mag.stan} ${karta.unit ?? "szt."}`],
-    ["Rezerwacje", `${karta.mag.rez} ${karta.unit ?? "szt."}`],
-    ["Dostępny", `${karta.mag.avail} ${karta.unit ?? "szt."}`],
-    ["Lokalizacja", karta.locs.length ? karta.locs.join(" · ") : "brak"],
+  /* Stan, rezerwacje, dostępny i lokalizacja wyszły z tej listy do nagłówka
+     bloku — zostają fakty do WYSZUKANIA, nie do decyzji. */
+  const pozostale: Array<[string, string]> = [
     ["EAN", karta.ean || "brak"],
     /* Identyfikatory z opisu (E3): to, po czym klient pyta, gdy nie zna naszego symbolu. */
     ["Identyfikatory", karta.identyfikatory?.length ? karta.identyfikatory.map((i) => i.wartosc).join(" · ") : "brak"],
@@ -249,15 +250,55 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         + (karta.zamienniki.obce.length ? ` (+${karta.zamienniki.obce.length} numery obce w opisie)` : "")
       : karta.zamienniki?.obce.length ? `brak naszych; ${karta.zamienniki.obce.length} numery obce w opisie` : "brak"],
   ];
-  return <div className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
-    {wiersze.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">
-      <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
-      <span className={`font-semibold ${nazwa === "Dostępny" && karta.mag.avail <= 0
-        ? "text-ranga-zle" : "text-slate-900"}`}>{wartosc}</span>
-    </div>)}
-    {karta.magazyny.length > 0 && <p className="pt-1 text-[11px] text-slate-500">
-      Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
-    </p>}
+  /* ── ODPOWIEDŹ WYCHODZI PRZED DANE (0.249.0) ────────────────────────────────
+     Osiem wierszy stało w jednej wadze 12 px, a dwa z nich są odpowiedzią na
+     pytanie, po które agent w ogóle otwiera tę kolumnę: CZY MAMY i GDZIE.
+     „Identyfikatory brak" ważyło tyle samo co „Dostępny 1 szt." — a jedno jest
+     decyzją, drugie zapasową ścieżką wyszukiwania.
+
+     `Dostępny` staje się liczbą, którą widać z drugiego końca biurka, bo to
+     ona rozstrzyga, czy odpowiedź brzmi „wysyłamy dziś". Lokalizacja stoi
+     obok, bo pytanie „gdzie" pada zaraz po „czy". `Stan` i `Rezerwacje`
+     schodzą pod spód drobnym drukiem: one tę liczbę TŁUMACZĄ, nie zastępują.
+
+     Reszta zostaje w całości — §4.3 nie pozwala chować faktów — ale wartości
+     „brak" gasną. Brak identyfikatorów jest normą, a norma nie ma prawa
+     wyglądać jak ustalenie. */
+  const jednostka = karta.unit ?? "szt.";
+  const brakStanu = karta.mag.avail <= 0;
+  const lokalizacje = karta.locs.length ? karta.locs.join(" · ") : null;
+
+  return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dostępny</div>
+        <div className={`flex items-baseline gap-1 tabular-nums ${
+          brakStanu ? "text-ranga-zle" : "text-slate-900"}`}>
+          <span className="text-2xl font-bold leading-none">{karta.mag.avail}</span>
+          <span className="text-xs font-semibold">{jednostka}</span>
+        </div>
+      </div>
+      {/* Lokalizacja jako plakietka, nie wiersz tabeli: to jedyna wartość z tej
+          grupy, którą ktoś przepisuje na kartkę i niesie na halę. */}
+      {lokalizacje
+        ? <span className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm">
+            {lokalizacje}</span>
+        : <span className="text-xs text-slate-400">bez lokalizacji</span>}
+      <span className="ml-auto text-[11px] text-slate-500">
+        stan {karta.mag.stan} · rezerwacje {karta.mag.rez}
+      </span>
+    </div>
+
+    <div className="mt-2.5 space-y-1 border-t border-slate-200 pt-2.5">
+      {pozostale.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">
+        <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
+        <span className={wartosc === "brak" ? "text-slate-400" : "font-semibold text-slate-900"}>
+          {wartosc}</span>
+      </div>)}
+      {karta.magazyny.length > 0 && <p className="pt-0.5 text-[11px] text-slate-500">
+        Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
+      </p>}
+    </div>
   </div>;
 }
 

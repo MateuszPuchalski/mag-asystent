@@ -29,20 +29,29 @@ export function poLudzku(bajtow: number): string {
   return `${(bajtow / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function ZalacznikiWysylki({ lista, dodaje, blad, onDodaj, onUsun, wylaczone }: {
-  lista: ZalacznikSzkicu[];
+/**
+ * Sam spinacz razem z jego ukrytym polem pliku (0.249.0).
+ *
+ * ROZDZIELONY OD LISTY, bo mają różne miejsca na ekranie: przycisk należy do
+ * rzędu działań pod polem, lista dołożonych plików — do wiadomości, którą się
+ * komponuje. Do 0.247.0 stały razem i przycisk ciągnął listę ze sobą, więc
+ * musiał zająć własny rząd. Zgłoszenie właściciela: „niepotrzebnie ułóż
+ * odpowiedź i add attachment mają swój własny rząd".
+ *
+ * Pole `<input type="file">` jedzie z przyciskiem, nie z listą: bez niego
+ * przycisk nie ma czego otworzyć.
+ */
+export function PrzyciskZalacznika({ dodaje, onDodaj, wylaczone }: {
   dodaje: boolean;
-  blad: string;
   /** Dostaje plik; kodowanie i wysyłkę robi wołający, bo tam mieszka klient HTTP. */
   onDodaj: (plik: File) => void;
-  onUsun: (id: number) => void;
   /** Cudza rozmowa — szkicu ani załączników nie ruszamy. */
   wylaczone: boolean;
 }) {
   const wejscie = useRef<HTMLInputElement>(null);
   const [nazwaWToku, setNazwaWToku] = useState("");
 
-  return <div className="mt-2">
+  return <>
     <input ref={wejscie} type="file" accept={PRZYJMOWANE} className="hidden"
       aria-label="Wybierz plik do odpowiedzi"
       onChange={(e) => {
@@ -53,6 +62,31 @@ export function ZalacznikiWysylki({ lista, dodaje, blad, onDodaj, onUsun, wylacz
            za pierwszym coś poszło nie tak. */
         e.target.value = "";
       }} />
+    {/* Nazwa nie ginie: niesie ją `aria-label`, a ograniczenie formatu —
+        podpowiedź, czyli tam, gdzie szuka się go w chwili wątpliwości.
+        Wgrywanie ODZYSKUJE słowa: sama ikona nie powiedziałaby, że coś trwa
+        ani KTÓRY plik idzie. */}
+    {dodaje
+      ? <span className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+          <Paperclip size={13} className="shrink-0" />
+          <span className="truncate">Wgrywam {nazwaWToku}…</span></span>
+      : <button type="button" disabled={wylaczone}
+          aria-label="Dołącz plik" title="Dołącz plik — zdjęcie albo PDF, najwyżej 4 MB"
+          className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 disabled:opacity-40"
+          onClick={() => wejscie.current?.click()}>
+          <Paperclip size={16} />
+        </button>}
+  </>;
+}
+
+/** Lista dołożonych plików. Stoi przy wiadomości, nie przy przyciskach. */
+export function ZalacznikiWysylki({ lista, blad, onUsun, wylaczone }: {
+  lista: ZalacznikSzkicu[];
+  blad: string;
+  onUsun: (id: number) => void;
+  wylaczone: boolean;
+}) {
+  return <div>
 
     {/* ── NIE KAŻDE DZIAŁANIE ZASŁUGUJE NA PRZYCISK (0.247.0) ─────────────────
         Pełny przycisk z obwódką i zdanie o dozwolonych formatach zajmowały
@@ -63,18 +97,11 @@ export function ZalacznikiWysylki({ lista, dodaje, blad, onDodaj, onUsun, wylacz
         formatu — podpowiedź, czyli tam, gdzie szuka się go w chwili wątpliwości,
         a nie przy każdym otwarciu rozmowy. Wgrywanie ODZYSKUJE słowa, bo wtedy
         sama ikona nie powiedziałaby, że coś trwa. */}
-    <div className="flex flex-wrap items-center gap-2">
-      {dodaje
-        ? <span className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Paperclip size={13} />Wgrywam {nazwaWToku}…</span>
-        : <button type="button" disabled={wylaczone}
-            aria-label="Dołącz plik" title="Dołącz plik — zdjęcie albo PDF, najwyżej 4 MB"
-            className="grid h-[34px] w-[34px] place-items-center rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 disabled:opacity-40"
-            onClick={() => wejscie.current?.click()}>
-            <Paperclip size={16} />
-          </button>}
-    </div>
 
+    {/* SPINACZ WYPROWADZONY DO RZĘDU DZIAŁAŃ (0.249.0). Stał we własnym
+        rzędzie nad wysyłką i kosztował 34 px wysokości na czynność, która
+        zdarza się przy co którejś odpowiedzi. Lista dołożonych plików zostaje
+        TUTAJ — należy do wiadomości, nie do przycisków. */}
     {lista.length > 0 && <ul className="mt-2 flex flex-wrap gap-2">
       {lista.map((z) => <li key={z.id}
         className="flex items-center gap-1.5 rounded-lg border bg-white px-2 py-1 text-xs">

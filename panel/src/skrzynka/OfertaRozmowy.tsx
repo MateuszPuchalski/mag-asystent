@@ -3,6 +3,7 @@ import { ExternalLink, Package, Tag } from "lucide-react";
 import type { OfertaRozmowy as Dane } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { KafelOferty } from "../towar/Kafel";
+import { NaglowekSekcji } from "../ui";
 
 /**
  * Oferta, pod którą padło pytanie (0.178.0).
@@ -38,9 +39,8 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
   const o = oferta.pobrana;
   return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Oferta">
     <div className="flex flex-wrap items-center gap-2">
-      <Package size={15} className="text-slate-500" />
-      <b>Oferta</b>
-      <span className="font-mono text-xs text-slate-600">{oferta.externalId}</span>
+      <NaglowekSekcji ikona={<Package size={13} />}>Oferta</NaglowekSekcji>
+      <span className="font-mono text-[11px] text-slate-500">{oferta.externalId}</span>
       {/* Status oferty stoi przy numerze, nie przy tytule: „zakończona” zmienia
           sens całej odpowiedzi, a agent czyta tę linijkę pierwszą. */}
       {o?.status && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
@@ -48,13 +48,19 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
       {/* Skąd numer (0.215.0). Numer z wiadomości klienta jest faktem z Allegro
           i nie potrzebuje podpisu; dwa pozostałe to wnioski — agenta albo
           serwera z jedynej pozycji zamówienia — i §4.3 każe je podpisać. */}
-      {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+      {/* Plakietka PODPISUJE wniosek, nie ogłasza go (0.249.0). W bursztynie
+          i półgrubej ważyła więcej niż numer oferty obok, choć mówi tylko,
+          skąd ten numer wiemy. Bursztyn zostaje przy wskazaniu człowieka —
+          tam jest decyzją; wywód serwera z jedynej pozycji jest rutyną. */}
+      {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
         wskazana przez agenta</span>}
-      {oferta.zrodlo === "zamowienie" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-900">
+      {oferta.zrodlo === "zamowienie" && <span className="text-[10px] text-slate-400">
         z jedynej pozycji zamówienia</span>}
       {oferta.link && <a href={oferta.link} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-        Otwórz w Allegro<ExternalLink size={12} /></a>}
+        /* Odnośnik CICHNIE (0.249.0): był jedynym błękitem w kolumnie, więc
+           ciągnął wzrok mocniej niż nazwa towaru — a to nawigacja, nie treść. */
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
+        Otwórz w Allegro<ExternalLink size={11} /></a>}
     </div>
 
     {o

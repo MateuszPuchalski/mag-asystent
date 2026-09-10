@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Lock, MessageSquare, Send } from "lucide-react";
 import { Przycisk } from "../ui";
-import { ZalacznikiWysylki } from "./ZalacznikiWysylki";
+import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
 import { KartaSzkicu, PrzyciskSzkicu, type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
@@ -84,6 +84,14 @@ export function Edytor({
           <MessageSquare size={13} />Komentarz wewnętrzny
         </button>
       </div>
+      {/* ── COPILOT W TYM SAMYM RZĘDZIE (0.249.0) ────────────────────────────
+          Zgłoszenie właściciela: „niepotrzebnie ułóż odpowiedź i add
+          attachment mają swój własny rząd". 0.247.0 próbowało już tego i
+          zostało wycofane, bo z Copilotem WYŁĄCZONYM komponent renderował
+          akapit, nie przycisk, i łamał rząd. Naprawiona jest przyczyna:
+          `PrzyciskSzkicu` nie zajmuje już nigdy więcej niż jednej linii. */}
+      {!wKomentarzu && copilot && <div className="ml-auto flex min-w-0 justify-end">
+        <PrzyciskSzkicu p={copilot} /></div>}
     </div>
 
     {wKomentarzu
@@ -117,12 +125,6 @@ export function Edytor({
       : <>
           {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
-          {/* Copilot zostaje we WŁASNYM wierszu nad polem. Próba wciągnięcia go
-              do rzędu przełącznika trybu wyglądała dobrze z włączonym Copilotem
-              i rozpadała się z wyłączonym: wtedy komponent renderuje ZDANIE
-              z serwera („Copilot jest wyłączony…"), nie przycisk, a zdanie
-              w rzędzie przełącznika łamało go na dwa wiersze. */}
-          {copilot && <PrzyciskSzkicu p={copilot} />}
           {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
               wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
               choć agent spędza w nim najwięcej czasu z całego panelu. */}
@@ -140,11 +142,11 @@ export function Edytor({
 
               Wersaliki znikają, bo spowalniają czytanie: „WYŚLIJ DO KLIENTA"
               to ciąg prostokątów bez wydźwięku liter wystających nad linię. */}
-          {/* Załączniki stoją NAD rzędem działań (0.247.0): należą do
-              komponowanej wiadomości, nie do przycisków, a rząd działań ma być
-              ostatnią rzeczą na ekranie — wtedy wzrok kończy na wysyłce. */}
-          <ZalacznikiWysylki lista={zalaczniki} dodaje={dodajeZalacznik} blad={bladZalacznika}
-            onDodaj={onDodajZalacznik} onUsun={onUsunZalacznik} wylaczone={cudza} />
+          {/* Lista dołożonych plików stoi NAD rzędem działań (0.247.0): należy
+              do komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
+              niżej, w rzędzie działań — nie zasługuje na własny rząd. */}
+          <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
+            onUsun={onUsunZalacznik} wylaczone={cudza} />
           <div className="mt-3 flex items-center gap-3">
             <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
               className="px-5 py-2.5 text-[15px] shadow-sm">
@@ -152,6 +154,8 @@ export function Edytor({
             <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
               className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
               {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
+            <PrzyciskZalacznika dodaje={dodajeZalacznik}
+              onDodaj={onDodajZalacznik} wylaczone={cudza} />
             <span className="ml-auto text-[11px] text-slate-400">{szkic.length} znaków</span>
           </div>
           {copilot && <KartaSzkicu p={copilot} />}

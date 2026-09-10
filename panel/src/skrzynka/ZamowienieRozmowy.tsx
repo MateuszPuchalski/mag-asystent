@@ -3,7 +3,7 @@ import { Copy, ExternalLink, ShoppingCart } from "lucide-react";
 import type { ZamowienieRozmowy as Dane } from "../api/typy";
 import { useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
-import { czas } from "../ui";
+import { NaglowekSekcji, czas } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 
 /**
@@ -44,10 +44,12 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
   const doWskazania = Boolean(z && z.pozycje.length > 1 && ofertaRozmowy === null);
   return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Zamówienie">
     <div className="flex flex-wrap items-center gap-2">
-      <ShoppingCart size={15} className="text-slate-500" />
-      <b>Zamówienie</b>
-      <span className="font-mono text-xs text-slate-600" title={zamowienie.externalId}>
-        {zamowienie.externalId}</span>
+      <NaglowekSekcji ikona={<ShoppingCart size={13} />}>Zamówienie</NaglowekSekcji>
+      {/* UUID SKRÓCONY (0.249.0). Pełne trzydzieści sześć znaków w wadze treści
+          zajmowało pół wiersza nagłówka, a nikt ich nie czyta — od przepisania
+          jest przycisk kopiowania obok, a od sprawdzenia podpowiedź. */}
+      <span className="font-mono text-[11px] text-slate-500" title={zamowienie.externalId}>
+        {zamowienie.externalId.slice(0, 8)}…</span>
       {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach. */}
       <button type="button" title="Kopiuj numer zamówienia"
         className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
@@ -61,7 +63,10 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
         <span className="sr-only">{skopiowano ? "Skopiowano" : "Kopiuj"}</span>
       </button>
       {zamowienie.link && <a href={zamowienie.link} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        /* Cichnie jak bliźniak przy ofercie (0.249.0): dwa identyczne błękitne
+           odnośniki były jedynym błękitem w kolumnie i ciągnęły wzrok mocniej
+           niż nazwa towaru — a to nawigacja, nie treść. */
+        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
         Otwórz w Allegro<ExternalLink size={12} /></a>}
     </div>
 
@@ -102,7 +107,11 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
           {/* Podpis źródeł obu kafli (§4.3): dwa obrazy obok siebie bez podpisu
               wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
           <p className="mt-1 text-[11px] text-slate-400">
-            Zdjęcia: pierwsze z oferty Allegro (to widział klient), drugie z kartoteki Subiekta (to mamy na półce).
+            {/* JEDNA LINIA, oba źródła nadal nazwane (0.249.0). §4.3 żąda, żeby
+                przy każdym fakcie było widać źródło — nie żąda zdania złożonego.
+                Dwa wiersze szarej prozy pod każdą pozycją ważyły więcej niż
+                sama pozycja. */}
+            Zdjęcia: oferta Allegro (widział klient) · kartoteka Subiekta (mamy na półce)
           </p>
           {wskaz.error && <p className="mt-1 text-xs text-red-700">{(wskaz.error as Error).message}</p>}
           <p className="mt-1 text-xs text-slate-500">
