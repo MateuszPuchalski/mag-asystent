@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.253.1 — 10 września 2026
+
+**Copilot przestaje się wywracać przed wysyłką.** Właściciel kliknął „Ułóż
+odpowiedź" pod pytaniem o cewkę zapłonową i zobaczył zdanie „Copilot wywrócił
+się przed wysyłką — to usterka po naszej stronie". Zdanie było prawdziwe.
+Było też bezużyteczne: nie mówiło ani co się stało, ani co zrobić.
+
+Przyczyny są dwie i obie przyszły z 0.253.0. Pierwsza: wyjście modelu dostało
+wtedy nową, wymaganą listę twierdzeń, a sufit `max_tokens` został na wartości
+policzonej dla samego szkicu i danych doboru. Odpowiedź urywała się w połowie
+i przestawała być poprawnym JSON-em. Sufit idzie na 3000, a instrukcja mówi
+teraz wprost: najwyżej osiem twierdzeń, każde jednym zdaniem.
+
+Druga jest starsza i dopiero teraz się odsłoniła. Biblioteka dostawcy rzuca
+przy nieudanym odczycie GOŁYM błędem `AnthropicError`, a nasze rozpoznawanie
+błędów sprawdzało wyłącznie `APIError`. Ponieważ `APIError` dziedziczy po tym
+pierwszym, a nie odwrotnie, każdy błąd odczytu spadał na koniec funkcji do
+gałęzi „coś u nas". Ma teraz własną gałąź i własne zdanie: model nie zmieścił
+się w limicie, kliknij ponownie. Surowy tekst błędu idzie do księgi, bo tam
+się szuka przyczyny, a nie na ekran agenta.
+
+Wdrożenie bez pracy ręcznej.
+
+---
+
+
 ## 0.253.0 — 10 września 2026
 
 **Copilot dostaje treść oferty i legitymuje każde zdanie.** Dwie decyzje
