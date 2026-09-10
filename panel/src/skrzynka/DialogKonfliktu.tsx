@@ -49,13 +49,13 @@ export function DialogKonfliktu({
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         <section className="rounded-lg border border-os-klient-ramka bg-os-firma p-3">
           <NaglowekSekcji jako="div">Twój szkic</NaglowekSekcji>
-          <p className="mt-2 whitespace-pre-wrap text-sm">{szkic}</p>
+          <p className="mt-2 whitespace-pre-wrap text-tresc">{szkic}</p>
         </section>
         <section className="rounded-lg border border-os-komentarz-ramka bg-os-komentarz p-3">
           <NaglowekSekcji jako="div" ton="text-ranga-uwaga">
             Nowa wiadomość — {ktoDopisal}{nowa ? ` · ${czas(nowa.at)}` : ""}
           </NaglowekSekcji>
-          <p className="mt-2 whitespace-pre-wrap text-sm">{nowa?.tresc ?? "—"}</p>
+          <p className="mt-2 whitespace-pre-wrap text-tresc">{nowa?.tresc ?? "—"}</p>
           {nowa && <p className="mt-2 text-xs text-slate-500">wiadomość #{nowa.id}</p>}
         </section>
       </div>

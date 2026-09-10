@@ -126,7 +126,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 {w.autorLogin && <span className="text-slate-500">{w.autorLogin}</span>}
                 <span className="ml-auto text-slate-500">{czas(w.utworzonoAt)}</span>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{w.tresc}</p>
+              <p className="mt-1 whitespace-pre-wrap text-tresc text-slate-800">{w.tresc}</p>
               <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
             </li>;
           })}

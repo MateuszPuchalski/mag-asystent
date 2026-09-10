@@ -30,7 +30,7 @@ export function Tokeny() {
   const trwa = dodaj.isPending || rozstrzygnij.isPending || usun.isPending;
 
   return <section className="mt-6 space-y-3 border-t pt-4" aria-label="Tokeny silników w nazwach kartotek">
-    <h3 className="flex items-center gap-2 text-sm font-bold"><Tag size={16} /> Tokeny silników w nazwach kartotek</h3>
+    <h3 className="flex items-center gap-2 text-naglowek font-bold"><Tag size={16} /> Tokeny silników w nazwach kartotek</h3>
     <p className="text-xs text-slate-500">
       Słowo z nazwy kartoteki i silnik, który ono oznacza — np. „GX160” to Honda GX160.
       Kartoteki z tym słowem w nazwie czekają niżej: odznacz te, które nie pasują, i zatwierdź resztę.
@@ -120,7 +120,7 @@ function Kartoteka({ k, zaznaczona, onPrzelacz }: { k: KartotekaTokenu; zaznaczo
       checked={zaznaczona} onChange={onPrzelacz} />
     <Kafel twId={k.twId} rozmiar={40} nazwa={k.nazwa ?? k.symbol} symbol={k.symbol} />
     <div className="min-w-0 flex-1">
-      <b className="block truncate text-sm">{k.nazwa ?? k.symbol}</b>
+      <b className="block truncate text-tresc">{k.nazwa ?? k.symbol}</b>
       <span className="font-mono text-xs text-slate-500">{k.symbol}</span>
     </div>
   </li>;

@@ -34,6 +34,75 @@ historii nie przepisujemy.
 ---
 
 
+## 0.258.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Panel dostaje drabinę typograficzną.** To druga połowa ustalenia 04 z audytu
+i przyczyna, a nie objaw. Zmierzone przed zmianą: 664 wystąpienia klas rozmiaru
+w `panel/src`, z czego **95,2% w paśmie 11–14 px**. Powyżej 16 px było
+**dziewięć wystąpień na 664** — a cztery z nich to liczby, nie tekst.
+
+Skutkiem był rozjazd RÓL, nie rozmiarów. `text-xs` niosło jednocześnie
+kontrolkę (98×), metadane (101×), komunikat błędu (38×) i **treść czytaną
+(30×)** — łącznie z sześciowierszowym opisem towaru w kolumnie kontekstu.
+Kiedy treść ma ten sam rozmiar co jej podpis, hierarchię trzeba budować czymś
+innym. Stąd 70% pogrubionego tekstu i sześć odcieni szarości na „tekst
+poboczny": to były objawy braku drabiny, nie osobne usterki.
+
+Cztery szczeble, nazwane ROLĄ, nie rozmiarem:
+
+```
+text-podpis     11 / 16   metadane, plakietka, etykieta wartości
+text-tresc      15 / 22   to, co się CZYTA
+text-naglowek   17 / 24   nagłówek karty i sekcji
+text-tytul      24 / 30   tytuł ekranu
+```
+
+Nazwa jest tu połową roboty. Piszący ma wybierać „to jest treść", a nie „to
+jest 15 px" — inaczej za pół roku będzie tu znowu osiem rozmiarów.
+
+**Para z interlinią nie jest ozdobą.** Arbitralne `text-[NNpx]` nie mają
+w Tailwindzie domyślnej interlinii, więc 82 wystąpienia `text-[11px]`
+dziedziczyły 1,5 z przeglądarki zamiast pary przypisanej do klasy. Nazwany
+szczebel naprawia to przy okazji, w 95 miejscach.
+
+**Czego na drabinie NIE MA, i to są decyzje.** `text-xs` zostaje szczeblem
+KONTROLKI — przycisku, chipa, komunikatu przy polu — bo tam 12 px jest
+właściwe; 373 zmiany bez różnicy wizualnej dałyby diff nie do przejrzenia.
+Liczby (`text-2xl`, `text-lg`) też zostają: liczba nie jest tekstem, a jej
+rozmiar wynika z odległości, z jakiej ma być czytelna.
+
+Wynik w kodzie:
+
+```
+                          PRZED    PO
+razem wystąpień             664   673
+arbitralnych text-[NNpx]    105     1
+na nazwanych szczeblach       0   142
+różnych rozmiarów            12     9
+```
+
+Jedyna pozostała wartość arbitralna jest jawnie zwolniona komentarzem
+`skala: <powód>`: napis „bez zdjęcia" musi zmieścić się w kafelku 44 px,
+a najniższy szczebel go rozsadza. To jedyne miejsce w panelu, gdzie rozmiar
+dyktuje POJEMNIK, a nie rola tekstu.
+
+**Jedna decyzja cofnięta świadomie.** Wiadomość na osi rozmowy miała od
+0.247.0 dwa rozmiary: 15 px dla pytania klienta i 14 px dla naszej odpowiedzi.
+Obie strony schodzą na jeden szczebel treści. Wyciszenie tego, co już
+przeczytane, zostaje — niesie je sama barwa. Dwa rozmiary dla jednej roli to
+był ten sam błąd, który to wydanie naprawia w siedemnastu innych miejscach.
+
+Nowy strażnik `panel/src/Skala.test.ts` pilnuje, że nie wracają arbitralne
+rozmiary i że drabina w konfiguracji istnieje, ma pary z interlinią, idzie
+w górę i nie ma duplikatów. Cztery reguły sprawdzone przez wstawienie
+naruszenia z powrotem. Mówi też o sobie wprost, czego NIE sprawdza: doboru
+szczebla do roli nie zastąpi żadna bramka.
+
+Zmierzone w przeglądarce na ośmiu ekranach: zero nowych przepełnień, zero
+poziomego przewijania. Nagłówek 17 px w kolumnie 400 px się nie zawija.
+
 ## 0.257.0 — 10 września 2026
 
 **Zamknięta rozmowa wraca do kolejki, gdy klient dopisze.** Do 0.256.0 wracała

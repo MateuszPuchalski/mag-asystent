@@ -753,6 +753,20 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Drabina typograficzna ma cztery szczeble nazwane ROLĄ (0.258.0).**
+`text-podpis` 11/16 (metadane, plakietka), `text-tresc` 15/22 (to, co się
+czyta), `text-naglowek` 17/24 (nagłówek karty i sekcji), `text-tytul` 24/30
+(tytuł ekranu). Wybiera się rolę, nie rozmiar. Para z interlinią jest
+obowiązkowa: arbitralne `text-[NNpx]` nie mają w Tailwindzie domyślnej
+interlinii i dziedziczą 1,5 z przeglądarki.
+
+**Poza drabiną zostają dwie rzeczy i to są decyzje (0.258.0).** `text-xs`
+to szczebel KONTROLKI — przycisku, chipa, komunikatu przy polu — bo tam 12 px
+jest właściwe. Liczby (`text-2xl`, `text-lg`) też zostają: liczba nie jest
+tekstem, a jej rozmiar wynika z odległości, z jakiej ma być czytelna.
+Nowe arbitralne `text-[NNpx]` bramkuje `panel/src/Skala.test.ts`; zwolnienie
+wymaga komentarza `skala: <powód>`.
+
 **Nagłówek sekcji i etykieta wartości to DWIE role (0.256.0).** Nagłówek nazywa
 blok i jest pogrubiony (`NaglowekSekcji`); etykieta nazywa jedną wartość stojącą
 obok i pogrubiona nie jest (`EtykietaWartosci`). Waga to jedyne, co je rozróżnia,

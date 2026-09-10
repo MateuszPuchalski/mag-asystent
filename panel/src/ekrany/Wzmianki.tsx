@@ -28,7 +28,7 @@ export function Wzmianki() {
   /* Własny scroller — patrz `Zadania`; rama panelu nie przewija za ekrany. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <AtSign size={18} /><b className="mr-auto">Wspomniano o mnie</b>
+      <AtSign size={18} /><b className="text-naglowek mr-auto">Wspomniano o mnie</b>
       <span className="text-sm text-slate-500">
         {dane.data ? `${dane.data.nowe} do zajęcia się` : "Wczytuję…"}</span>
       {/* Cel klikalny to CAŁA etykieta (0.255.0). Sam kwadracik miał 13×13 px
@@ -57,7 +57,7 @@ export function Wzmianki() {
         {w.odhaczona && <span className="font-semibold text-ranga-ok">
           odhaczone {czas(w.odhaczonaAt)}</span>}
       </div>
-      <p className="mt-2 whitespace-pre-wrap text-sm">{w.fragment}</p>
+      <p className="mt-2 whitespace-pre-wrap text-tresc">{w.fragment}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Przycisk wariant="glowny"
           onClick={() => nawiguj(`/obsluga/skrzynka/${w.conversationId}`)}>

@@ -58,7 +58,7 @@ export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWy
     </div>
 
     {otwarte && <div className="mt-3 rounded-lg border border-amber-300 bg-white p-3">
-      <b className="text-sm">Wymuszone przekazanie wymaga powodu</b>
+      <b className="text-naglowek">Wymuszone przekazanie wymaga powodu</b>
       <p className="mt-1 text-xs text-slate-500">
         Powód trafia do dziennika razem z autorem, czasem oraz wersją rozmowy przed i po.
         Bez powodu operacja nie przejdzie.

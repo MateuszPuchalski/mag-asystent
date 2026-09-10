@@ -57,6 +57,38 @@ export default {
          stanu integracji stoi właśnie na `divide-y`. */
       borderColor: { DEFAULT: "#e2e8f0" },
 
+      /* ── DRABINA TYPOGRAFICZNA (0.258.0) ──────────────────────────────────
+         Zmierzone przed tą zmianą: 664 wystąpienia klas rozmiaru w panelu,
+         z czego 95,2% w paśmie 11–14 px. Powyżej 16 px było DZIEWIĘĆ
+         wystąpień na 664 — a cztery z nich to liczby, nie tekst.
+
+         Skutkiem był rozjazd RÓL, nie rozmiarów. `text-xs` niosło naraz
+         kontrolkę, metadane, komunikat błędu i sześciowierszowy opis towaru.
+         Kiedy treść ma ten sam rozmiar co jej podpis, hierarchię trzeba budować
+         czymś innym — i stąd 70% pogrubionego tekstu oraz sześć odcieni
+         szarości na „tekst poboczny". To były objawy braku drabiny.
+
+         SZCZEBLE NAZYWAJĄ ROLĘ, NIE ROZMIAR. Piszący ma wybierać „to jest
+         treść", a nie „to jest 15 px" — inaczej za pół roku będzie tu znowu
+         osiem rozmiarów.
+
+         PARA [rozmiar, interlinia] jest tu istotna, a nie ozdobna. Arbitralne
+         `text-[NNpx]` NIE MAJĄ w Tailwindzie domyślnej interlinii, więc
+         82 wystąpienia `text-[11px]` dziedziczyły 1,5 z przeglądarki zamiast
+         pary przypisanej do klasy. Nazwany szczebel naprawia to przy okazji.
+
+         CZEGO TU NIE MA. `text-xs` (12 px) zostaje szczeblem KONTROLKI —
+         przycisku, chipa, komunikatu przy polu — bo tam ten rozmiar jest
+         właściwy. `text-sm` zostaje przy gęstych rzędach danych. Liczby
+         (`text-2xl`, `text-lg`) też zostają: liczba nie jest tekstem, a jej
+         rozmiar wynika z odległości, z jakiej ma być czytelna. */
+      fontSize: {
+        podpis: ["11px", "16px"],
+        tresc: ["15px", "22px"],
+        naglowek: ["17px", "24px"],
+        tytul: ["24px", "30px"],
+      },
+
       fontFamily: { sans: ["Barlow", "sans-serif"] },
     },
   },

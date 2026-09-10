@@ -123,7 +123,7 @@ export function Rozmowa(p: {
     <header className="shrink-0 border-b px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <LoginKlienta login={rozmowa.klient}
-          className="mr-auto text-[19px] font-bold tracking-tight text-wertis-ink" />
+          className="mr-auto text-naglowek font-bold tracking-tight text-wertis-ink" />
         {!rozmowa.wlasciciel && <Przycisk wariant="glowny" onClick={p.onPrzejmij}>
           <UserCheck size={16} />PRZEJMIJ ROZMOWĘ</Przycisk>}
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co

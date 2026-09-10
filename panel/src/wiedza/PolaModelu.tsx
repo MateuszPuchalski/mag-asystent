@@ -50,7 +50,7 @@ export function PolaModelu({ dane, onZmiana, zwarte = false, rodzajStaly = false
     {/* Podpowiedzi z bazy: jedna kosiarka = jeden wiersz, więc pisownia z pierwszego wpisu wygrywa. */}
     <datalist id={`${id}-marka`}>{[...new Set(modele.data?.modele.map((m) => m.marka) ?? [])].map((m) => <option key={m} value={m} />)}</datalist>
     <datalist id={`${id}-nazwa`}>{(modele.data?.modele ?? []).map((m) => <option key={m.id} value={m.nazwa}>{m.etykieta}</option>)}</datalist>
-    {modele.data && modele.data.modele.length > 0 && <p className="text-[11px] text-slate-500">
+    {modele.data && modele.data.modele.length > 0 && <p className="text-podpis text-slate-500">
       Znane modele: {modele.data.modele.map((m) => m.etykieta).join(" · ")}</p>}
   </>;
 }

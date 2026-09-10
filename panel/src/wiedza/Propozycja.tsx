@@ -37,7 +37,7 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
         <b className="font-mono">{z.symbol}</b>
         <span className="text-slate-500">→</span>
         <b>{z.model.etykieta}</b>
-        <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase ${negatyw
+        <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase ${negatyw
           ? "bg-red-100 text-ranga-zle" : "bg-emerald-100 text-emerald-800"}`}>
           {negatyw ? "nie pasuje" : "pasuje"}</span>
         <span className="ml-auto text-xs text-slate-500">
@@ -57,7 +57,7 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
         <p className="text-slate-500">{d.autor}{d.link && <> · <a className="underline" href={d.link} target="_blank" rel="noreferrer">źródło</a></>}</p>
       </li>)}
     </ul>
-    <p className="mt-1 text-[11px] text-slate-500">
+    <p className="mt-1 text-podpis text-slate-500">
       Po zatwierdzeniu pewność: <b>{z.pewnosc}</b>
       {z.pewnosc === "prawdopodobne" && " — sam ślad rozmowy to nie dowód techniczny; dopisz katalog albo pomiar"}
     </p>

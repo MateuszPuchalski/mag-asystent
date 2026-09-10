@@ -190,7 +190,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
   return <div className="flex min-h-0 flex-col text-sm">
     {/* ── Status ─────────────────────────────────────────────────────────── */}
     <div className="flex flex-wrap items-center gap-2 border-b p-3">
-      <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+      <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${
         KLASA_STATUSU[dobor.status] ?? "bg-slate-100 text-slate-600"}`}>{NAZWA_DOBORU[dobor.status]}</span>
       {dobor.updatedBy && <span className="text-xs text-slate-500">· {dobor.updatedBy}</span>}
       <label className="ml-auto flex items-center gap-1 text-xs text-slate-500">
@@ -228,7 +228,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
     <section className="border-b p-3" aria-label="Dane wejściowe">
       <div className="mb-2 flex items-center gap-2">
         <NaglowekSekcji>Dane wejściowe</NaglowekSekcji>
-        <span className="text-[11px] text-slate-500">wersja {dobor.wersja}</span>
+        <span className="text-podpis text-slate-500">wersja {dobor.wersja}</span>
         {!edycja && <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
           onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
           <Pencil size={12} />{wypelnione.length ? "Popraw" : "Wpisz dane"}</button>}
@@ -255,9 +255,9 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           {zRozmowy.nowe.map((p) => <span key={p.klucz} className="rounded border border-violet-200 bg-white px-2 py-0.5 text-xs">
             <span className="text-slate-500">{p.nazwa}: </span><b>{p.wartosc}</b></span>)}
         </div>
-        {zRozmowy.inaczej.length > 0 && <p className="mt-1 text-[11px] text-slate-600">
+        {zRozmowy.inaczej.length > 0 && <p className="mt-1 text-podpis text-slate-600">
           Inaczej niż wpisano (zostaje Twoje): {zRozmowy.inaczej.map((p) => `${p.nazwa} „${p.wartosc}"`).join(", ")}.</p>}
-        <p className="mt-1 text-[11px] text-slate-500">Wartości dosłownie z rozmowy klienta — sprawdzone przez serwer, wpisane dopiero po kliknięciu.</p>
+        <p className="mt-1 text-podpis text-slate-500">Wartości dosłownie z rozmowy klienta — sprawdzone przez serwer, wpisane dopiero po kliknięciu.</p>
         {konflikt && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
           <AlertTriangle size={13} />{konflikt}</p>}
       </section>}
@@ -286,7 +286,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               <b className="font-mono">{para.czesc.symbol}</b>
               <span className="text-slate-500">→</span>
               <b className="font-mono">{para.doCzego.symbol}</b>
-              <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-[11px]">
+              <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-podpis">
                 {NAZWA_ROLI[para.rola]}{para.pozycja ? ` · ${para.pozycja}` : ""}</span>
             </div>
             <p className="truncate text-slate-600">{para.czesc.nazwa} → {para.doCzego.nazwa}</p>
@@ -294,9 +294,9 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           <Kafel twId={para.doCzego.twId} rozmiar={40} nazwa={para.doCzego.nazwa} symbol={para.doCzego.symbol} />
         </div>
         {paraOcena === "zaproponowane"
-          ? <p className="mt-1 text-[11px] text-emerald-800">
+          ? <p className="mt-1 text-podpis text-emerald-800">
               Propozycja „{para.czesc.symbol} pasuje do {para.doCzego.symbol}” czeka w kolejce wiedzy — rozstrzyga biuro.</p>
-          : <p className="mt-1 text-[11px] text-slate-500">
+          : <p className="mt-1 text-podpis text-slate-500">
               Oba końce to kartoteki z tej rozmowy, sprawdzone przez serwer; do kolejki trafia po kliknięciu,
               rozstrzyga biuro. Zła rola albo pozycja: Odrzuć i użyj „Pasuje do…” przy wybranym kandydacie.</p>}
       </section>}
@@ -316,7 +316,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           a żaden szczebel go nie czytał. Szczebel „przez silnik" idzie przez
           ZATWIERDZONĄ zabudowę, więc ekran musi powiedzieć, czy taka jest —
           inaczej wpisany tekst dalej wygląda na coś, co działa. */}
-      {!edycja && dobor.dane.marka && dobor.dane.model && <p className="mt-1 text-[11px] text-slate-500">
+      {!edycja && dobor.dane.marka && dobor.dane.model && <p className="mt-1 text-podpis text-slate-500">
         {silniki.length > 0
           ? <>Silnik z bazy: <b>{silniki.map((z) => z.silnik.etykieta).join(" · ")}</b>
             {silniki.length > 1 && " — ta maszyna bywa z kilkoma silnikami, potwierdź z tabliczki"}</>
@@ -337,11 +337,11 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
       </p>}
 
       {edycja && <form className="grid grid-cols-2 gap-2" onSubmit={(e) => { e.preventDefault(); zapiszDane(); }}>
-        {POLA.map((p) => <label key={p.klucz} className="text-[11px] text-slate-500">{p.nazwa}
+        {POLA.map((p) => <label key={p.klucz} className="text-podpis text-slate-500">{p.nazwa}
           <input className="field mt-0.5 py-1 text-xs" value={formularz[p.klucz]} placeholder={p.przyklad}
             aria-label={p.nazwa}
             onChange={(e) => setFormularz({ ...formularz, [p.klucz]: e.target.value })} /></label>)}
-        <label className="col-span-2 text-[11px] text-slate-500">Parametry i wymiary (wiersz: nazwa: wartość)
+        <label className="col-span-2 text-podpis text-slate-500">Parametry i wymiary (wiersz: nazwa: wartość)
           <textarea className="field mt-0.5 py-1 text-xs" rows={2} value={formularz.parametry}
             aria-label="Parametry" placeholder={"rozstaw: 82 mm\nśrednica: 148 mm"}
             onChange={(e) => setFormularz({ ...formularz, parametry: e.target.value })} /></label>
@@ -394,24 +394,24 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">{k.nr}</span>
-                  <b className="min-w-0 flex-1 text-sm leading-snug text-slate-900">{k.nazwa}</b>
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-podpis font-bold text-slate-600">{k.nr}</span>
+                  <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
                   {k.stan === null
-                    ? <span className="shrink-0 text-[11px] font-bold text-slate-500">brak w kartotece</span>
-                    : <span className={`shrink-0 text-[11px] font-bold ${k.stan <= 0
+                    ? <span className="shrink-0 text-podpis font-bold text-slate-500">brak w kartotece</span>
+                    : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
                         ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
                     {PEWNOSC[k.pewnosc].etykieta}</span>
                 </div>
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-podpis text-slate-500">
                   <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
                   {" "}{k.zrodlo}</p>
               </div>
             </div>
-            {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
+            {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
               <AlertTriangle size={12} />{o}</p>)}
             {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
               onClick={() => wybierzTowar(k.twId, k.droga)}
@@ -486,7 +486,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               const cel = kotwice.find((k) => k.twId === pasujeDo);
               if (kotwice.length === 0) return null;
               return <div className="mt-2">
-                {!cel && <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
+                {!cel && <div className="flex flex-wrap items-center gap-1 text-podpis text-slate-600">
                   <span>pasowanie:</span>
                   {kotwice.map((k) => <Przycisk key={k.twId} className="text-xs" onClick={() => { setPasujeDo(k.twId); setPasowanieOk(""); }}>
                     Pasuje do {k.symbol}</Przycisk>)}
@@ -503,7 +503,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               </div>;
             })()}
             {dobor.status !== "confirmed" && silniki.length > 0 &&
-              <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+              <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-podpis text-slate-600">
                 <legend className="sr-only">Gdzie zapisać zastosowanie</legend>
                 <span>zastosowanie zapisz do:</span>
                 <label className="flex items-center gap-1">
@@ -531,7 +531,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
  */
 function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
   return <div className="mt-3 rounded-lg border border-red-200" aria-label="Negatywne dopasowania">
-    <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-[11px] font-bold text-red-900">
+    <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-podpis font-bold text-red-900">
       {/* „Nie pasuje", nie „do tej maszyny": negatyw pasowania dotyczy części klienta. */}
       <AlertTriangle size={12} />Nie pasuje
       <span className="font-normal text-red-800">· ostrzeżenie, nie brak danych</span></p>
@@ -544,7 +544,7 @@ function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
         <div className="min-w-0 flex-1">
           <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}
           <p className="text-red-900">{n.powod}</p>
-          <p className="text-[11px] text-slate-500">{n.zrodlo}</p>
+          <p className="text-podpis text-slate-500">{n.zrodlo}</p>
         </div>
       </li>)}
     </ul>
@@ -559,7 +559,7 @@ function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
 function Szczeble({ drogi }: { drogi: SzczebelDoboru[] }) {
   return <div className="mt-1 flex flex-wrap gap-1" aria-label="Sprawdzone drogi">
     {drogi.map((d) => <span key={d.droga} title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}
-      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${d.sprawdzona
+      className={`rounded px-1.5 py-0.5 text-podpis font-semibold ${d.sprawdzona
         ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-500 line-through"}`}>
       {NAZWA_DROGI[d.droga]}{d.sprawdzona ? ` ${d.wynikow}` : ""}</span>)}
   </div>;

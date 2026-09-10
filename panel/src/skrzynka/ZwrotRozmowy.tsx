@@ -33,14 +33,14 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       <Undo2 size={15} className="text-slate-500" />
       <b>Zwrot</b>
       {zwrot.numer && <span className="font-mono text-xs text-slate-600">{zwrot.numer}</span>}
-      {zwrot.zrodlo === "nieodebrana" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
+      {zwrot.zrodlo === "nieodebrana" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
         paczka nieodebrana</span>}
       {/* Kubełek i sygnały tymi samymi słowami, co w kolejce zwrotów: agent ma
           rozpoznać stan, nie uczyć się drugiego słownika. */}
-      {kubelek && <span className="rounded bg-wertis-ink px-1.5 py-0.5 text-[11px] font-bold text-white">
+      {kubelek && <span className="rounded bg-wertis-ink px-1.5 py-0.5 text-podpis font-bold text-white">
         {kubelek.etykieta}</span>}
       {zwrot.sygnaly.map((s) => <span key={s} title={SYGNALY[s].tytul}
-        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-bold ${SYGNALY[s].klasa}`}>
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-podpis font-bold ${SYGNALY[s].klasa}`}>
         {SYGNALY[s].ikona}{SYGNALY[s].krotko}</span>)}
       <Link to={`/obsluga/zwroty/${zwrot.id}`}
         className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">

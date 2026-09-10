@@ -31,7 +31,7 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
       zapisz.mutate({ ...d, twId: towar ? towar.id : null },
         { onSuccess: zamknij, onError: (e) => setBlad((e as Error).message) }))}>
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl font-bold">Nowe zadanie dla magazynu</h2>
+        <h2 className="text-naglowek font-bold">Nowe zadanie dla magazynu</h2>
         <button type="button" onClick={zamknij} className="text-slate-500" aria-label="Zamknij">✕</button>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -81,7 +81,7 @@ export function Zadania() {
   return <div className="lg:h-full lg:overflow-y-auto">
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold">Zadania terenowe</h1>
+        <h1 className="text-tytul font-bold">Zadania terenowe</h1>
         {/* slate-600, nie slate-500 (0.255.0): ten akapit stoi na TLE STRONY
             (`body` ma `bg-slate-100`), a tam slate-500 daje 4.34:1 przy progu
             4.5. W kartach, czyli na bieli, slate-500 wystarcza. */}
@@ -113,7 +113,7 @@ export function Zadania() {
               {t.priorytet === "pilny" &&
                 <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">PILNE</span>}
             </div>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{t.instrukcja}</p>
+            <p className="mt-2 whitespace-pre-wrap text-tresc text-slate-600">{t.instrukcja}</p>
           </div>
         </div>
         {/* ── PASEK TOWARU ZE ZDJĘCIEM (0.203.0) ────────────────────────
@@ -141,7 +141,7 @@ export function Zadania() {
             <b>{t.status === "wykonane" ? t.wykonanoPrzez : t.przypisanoPrzez}</b></p>}
           {t.wynik && <div className="rounded-lg bg-os-wynik p-3">
             <div className="mb-1 text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu</div>
-            <p className="whitespace-pre-wrap">{t.wynik}</p></div>}
+            <p className="whitespace-pre-wrap text-tresc">{t.wynik}</p></div>}
           <p className="text-xs text-slate-500">Zlecił(a) {t.utworzonoPrzez} · {czas(t.utworzonoAt)}</p>
         </div>
       </Karta>)}

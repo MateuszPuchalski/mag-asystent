@@ -13,7 +13,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
   if (!dane) return null;
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="mr-auto">Wiedza z opisów kartotek</b>
+      <b className="text-naglowek mr-auto">Wiedza z opisów kartotek</b>
       <span className="text-xs text-slate-500">odbudowa po każdym imporcie</span>
     </header>
 

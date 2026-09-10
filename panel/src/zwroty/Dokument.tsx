@@ -33,7 +33,7 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz }: {
           na stanowisku, nie serwer. Do czasu, aż taki program stanie
           (`docs/architektura.md` §4), schowek jest najkrótszą drogą — numer
           wkleja się w „Znajdź dokument" Subiekta. */}
-      <p className="flex items-center gap-1 text-base font-bold">
+      <p className="flex items-center gap-1 text-naglowek font-bold">
         {faktura.numer}
         {faktura.numer && <Skopiuj tekst={faktura.numer}
           tytul="Kopiuj numer dokumentu — wklej w wyszukiwanie Subiekta" />}</p>

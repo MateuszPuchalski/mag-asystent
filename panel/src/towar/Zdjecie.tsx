@@ -58,6 +58,9 @@ function Plytka({ url, rozmiar, nazwa, tytul, brakTytul, brakSlowo, brakIkona, p
     return <div style={styl} className={`${wspolne} animate-pulse`} aria-hidden="true" />;
   }
   if (url === null) {
+    /* skala: napis „bez zdjęcia" musi zmieścić się w kafelku 44 px, a najniższy
+       szczebel drabiny (11 px) rozsadza go nawet po zawinięciu. To jedyne
+       miejsce w panelu, gdzie rozmiar dyktuje pojemnik, a nie rola tekstu. */
     return <div style={styl} title={brakTytul}
       className={`${wspolne} grid place-items-center border-dashed text-[9px] font-bold uppercase leading-tight text-slate-500`}>
       {rozmiar >= 44 ? brakSlowo : brakIkona}
