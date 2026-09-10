@@ -26,12 +26,52 @@ export const Przycisk = ({ wariant = "drugi", className = "", ...p }: PrzyciskPr
  * treścią sekcji i to ona ma być w niej najgłośniejsza; nagłówek mówi tylko,
  * czyje to dane — a §4.3 żąda, żeby to było widać przy każdym fakcie.
  */
-export const NaglowekSekcji = ({ ikona, children }: {
-  ikona: React.ReactNode; children: React.ReactNode;
+/**
+ * Etykieta pojedynczej WARTOŚCI (0.256.0).
+ *
+ * To nie jest nagłówek sekcji, choć wygląda podobnie i dlatego rozjechało się
+ * na cztery zapisy: dwa razy 12 px bez wagi, raz 11 px bez wagi, raz 10 px
+ * półgrubo. Nagłówek nazywa BLOK, ta etykieta nazywa jedną liczbę albo jedno
+ * zdanie stojące tuż obok.
+ *
+ * Dlatego NIE jest pogrubiona, a nagłówek sekcji jest: waga to jedyne, co je
+ * na ekranie rozróżnia, gdy obie są drobne i w wersalikach. Przy „Dostępny"
+ * pogrubienie było wręcz szkodliwe — etykieta konkurowała z liczbą 24 px,
+ * którą podpisuje.
+ */
+export const EtykietaWartosci = ({ className = "", children }: {
+  className?: string; children: React.ReactNode;
 }) =>
-  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+  <span className={`text-[11px] uppercase tracking-wide text-slate-500 ${className}`}>
+    {children}</span>;
+
+/* ── ROZSZERZONY NA CAŁY PANEL (0.256.0) ─────────────────────────────────────
+   Do 0.255.0 używały go trzy pliki, a obok stało SIEDEMNAŚCIE ręcznie
+   sklejonych nagłówków tej samej rangi, w pięciu wagach (`font-bold`,
+   `font-semibold`, gołe) i dwóch rozmiarach (11 px i 12 px). Pięć zapisów
+   jednej roli to nie jest wariant — to brak decyzji.
+
+   `jako` istnieje, bo znacznik niesie ZNACZENIE, nie tylko wygląd: tam, gdzie
+   stało `<h3>`, czytnik ekranu ma dalej słyszeć nagłówek. Domyślny `<span>`
+   zostaje dla nagłówków, które siedzą w rzędzie obok numeru i plakietek.
+
+   `ton` bierze wyłącznie barwę, nie resztę łańcucha — nagłówek „Wiedza:
+   pasowania części" jest zielony, bo mówi o innym źródle danych, a nie
+   dlatego, że jest ważniejszy. */
+export function NaglowekSekcji({ ikona, ton = "text-slate-500", jako: Znacznik = "span",
+  className = "", children }: {
+  ikona?: React.ReactNode;
+  /** Sama barwa. Domyślnie szara; zielona i bursztynowa mówią o źródle. */
+  ton?: string;
+  /** Znacznik HTML — `h3` tam, gdzie to naprawdę nagłówek dokumentu. */
+  jako?: "span" | "h3" | "p" | "div";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return <Znacznik className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${ton} ${className}`}>
     {ikona}{children}
-  </span>;
+  </Znacznik>;
+}
 
 export const Pole = ({ className = "", ...p }: React.InputHTMLAttributes<HTMLInputElement>) =>
   <input className={`field ${className}`} {...p} />;

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Lock, UserX } from "lucide-react";
 import type { SzczegolyKonfliktu } from "../api/typy";
-import { Przycisk } from "../ui";
+import { EtykietaWartosci, Przycisk } from "../ui";
 
 /**
  * Przegrany wyścig o przejęcie (§6.2).
@@ -44,7 +44,7 @@ export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWy
         ["Przejęcie o", czasPrzejecia ?? "—"],
         ["Wersja rozmowy", `${szczegoly.version ?? "?"} · Twoje żądanie niosło ${mojaWersja}`],
       ].map(([nazwa, wartosc]) => <div key={nazwa} className="rounded-lg border border-amber-200 bg-white p-2">
-        <dt className="text-[11px] uppercase tracking-wide text-slate-500">{nazwa}</dt>
+        <dt><EtykietaWartosci>{nazwa}</EtykietaWartosci></dt>
         <dd className="text-sm font-semibold">{wartosc}</dd>
       </div>)}
     </dl>

@@ -715,6 +715,14 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Nagłówek sekcji i etykieta wartości to DWIE role (0.256.0).** Nagłówek nazywa
+blok i jest pogrubiony (`NaglowekSekcji`); etykieta nazywa jedną wartość stojącą
+obok i pogrubiona nie jest (`EtykietaWartosci`). Waga to jedyne, co je rozróżnia,
+gdy obie są drobne i w wersalikach. Oba mieszkają w `panel/src/ui/index.tsx`
+i tam jest jedyne prawowite miejsce na ten łańcuch klas — pilnuje tego
+`panel/src/ui/NaglowekSekcji.test.tsx`. Plakietka, etykieta na osi rozmowy
+i nagłówek tabeli mają wersaliki, ale są osobnymi rolami.
+
 **Szarość tekstu ma DWA stopnie, bo tło rozstrzyga (0.255.0).** `body` ma
 `bg-slate-100`, więc tekst poza kartą siedzi na szarym. Na bieli wystarcza
 `slate-500` (4.76:1), na `slate-100` musi być `slate-600` (6.92:1) — tam

@@ -5,7 +5,7 @@ import {
 import type { KandydatFaktury, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
-import { czas, Plakietka, Skopiuj } from "../ui";
+import { czas, NaglowekSekcji, Plakietka, Skopiuj } from "../ui";
 import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
@@ -54,8 +54,7 @@ const ODRZUCENIA: Record<string, string> = {
 const Sekcja = ({ ikona, tytul, children }: {
   ikona: React.ReactNode; tytul: string; children: React.ReactNode;
 }) => <section className="border-b border-slate-200 p-4 last:border-0">
-  <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-    {ikona}{tytul}</h3>
+  <NaglowekSekcji jako="h3" ikona={ikona} className="mb-2">{tytul}</NaglowekSekcji>
   {children}
 </section>;
 
@@ -233,8 +232,8 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           jego pobrana treść: dokument bywa znany, zanim ticker dociągnie
           pozycje. */}
       {onFaktura && <div className="mt-3 border-t border-slate-200 pt-2">
-        <p className="mb-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          {ikonaDokumentu} Dokument sprzedaży</p>
+        <NaglowekSekcji jako="p" ikona={ikonaDokumentu} className="mb-1">
+          Dokument sprzedaży</NaglowekSekcji>
         <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
           trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />
       </div>}
