@@ -240,14 +240,17 @@ export function progLiterowki(dlugosc: number): number | null {
    Moduł tekst.ts, nie adapter: migrację woła db/db.ts, a db → adapters
    odwracałoby warstwy.                                                       */
 
-/** Słownik encji nazwanych widywanych w tekstach Allegro. Nieznana ZOSTAJE —
- *  zgadywanie zamieniłoby cudzy tekst po cichu, a dosłowna encja jest
- *  przynajmniej widoczna jako usterka. */
+/** Słownik encji nazwanych. Nieznana ZOSTAJE dosłownie — zgadywanie zamieniłoby
+ *  cudzy tekst po cichu, a widoczna encja jest przynajmniej widoczną usterką. */
 const ENCJE: Readonly<Record<string, string>> = {
   amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
   /* Zwykła spacja, nie U+00A0: niełamliwa w bazie psułaby porównania
      i zawijanie, a nikt jej tu świadomie nie użył. */
   nbsp: " ",
+  /* ── Polskie znaki (0.152.0) ─────────────────────────────────────────────
+     Zostają wypisane osobno, choć mieszczą się w bloku niżej: to one były
+     powodem powstania tej tablicy (blizna 0.127.0) i pierwsze, czego się tu
+     szuka. */
   aogon: "ą", Aogon: "Ą", cacute: "ć", Cacute: "Ć",
   eogon: "ę", Eogon: "Ę", lstrok: "ł", Lstrok: "Ł",
   nacute: "ń", Nacute: "Ń", oacute: "ó", Oacute: "Ó",
@@ -256,6 +259,63 @@ const ENCJE: Readonly<Record<string, string>> = {
   ndash: "–", mdash: "—", hellip: "…", laquo: "«", raquo: "»",
   bdquo: "„", ldquo: "“", rdquo: "”",
   deg: "°", sect: "§", copy: "©", reg: "®", trade: "™", euro: "€",
+
+  /* ── Reszta alfabetów łacińskich ─────────────────────────────────────────
+     Do 0.249.1 tablica znała WYŁĄCZNIE polskie znaki, bo tylko po polsku do
+     nas pisano. Zgłoszenie właściciela: „często piszą do nas Węgrzy, Słowacy
+     i Czesi i dostajemy takie znaki `Z&aacute;silka nebyla doručena`".
+     `&aacute;` nie było w tablicy, więc zostawało dosłownie — dokładnie tak,
+     jak przewiduje komentarz wyżej. Zdanie z tego zgłoszenia jest przy okazji
+     dowodem, że Allegro koduje NIEKONSEKWENTNIE: `á` przyszło jako encja,
+     a `č` w tym samym zdaniu jako zwykły znak UTF-8.
+
+     ZAKRES JEST ZAMKNIĘTY I DA SIĘ GO NAZWAĆ: każda encja nazwana, której
+     rozwinięciem jest jeden znak z Latin-1 Supplement (U+00A0–U+00FF) albo
+     Latin Extended-A (U+0100–U+017F). To pokrywa czeski, słowacki, węgierski,
+     niemiecki, rumuński, litewski i resztę Europy Środkowej — bez wracania
+     tu przy każdym nowym kraju.
+
+     TABLICA JEST WYGENEROWANA, NIE PRZEPISANA Z PAMIĘCI. Kandydatów złożono
+     systematycznie (litera × przyrostek akcentu, oba przypadki), a rozwinięcie
+     każdego dał PARSER HTML przeglądarki — fałszywy kandydat po prostu się nie
+     zdekodował. Sposób opisuje `docs/obsluga-klienta.md`; pilnuje go test
+     pokrycia alfabetów w `tekst.test.ts`.
+
+     `&shy;` (U+00AD, miękki dywiz) NIE WCHODZI świadomie. Jest niewidoczny,
+     a w bazie psułby porównania i wyszukiwanie tak samo jak `&nbsp;` — ten
+     sam powód, dla którego niełamliwa spacja jest wyżej zamieniana na zwykłą. */
+  Aacute: "Á", aacute: "á", Abreve: "Ă", abreve: "ă", Acirc: "Â", acirc: "â",
+  AElig: "Æ", aelig: "æ", Agrave: "À", agrave: "à", Amacr: "Ā", amacr: "ā",
+  Aring: "Å", aring: "å", Atilde: "Ã", atilde: "ã", Auml: "Ä", auml: "ä",
+  Ccaron: "Č", ccaron: "č", Ccedil: "Ç", ccedil: "ç", Ccirc: "Ĉ", ccirc: "ĉ",
+  Cdot: "Ċ", cdot: "ċ", cent: "¢", curren: "¤", Dcaron: "Ď", dcaron: "ď",
+  divide: "÷", Dstrok: "Đ", dstrok: "đ", Eacute: "É", eacute: "é",
+  Ecaron: "Ě", ecaron: "ě", Ecirc: "Ê", ecirc: "ê", Edot: "Ė", edot: "ė",
+  Egrave: "È", egrave: "è", Emacr: "Ē", emacr: "ē", ENG: "Ŋ", eng: "ŋ",
+  ETH: "Ð", eth: "ð", Euml: "Ë", euml: "ë", frac12: "½", frac14: "¼",
+  frac34: "¾", Gbreve: "Ğ", gbreve: "ğ", Gcedil: "Ģ", Gcirc: "Ĝ", gcirc: "ĝ",
+  Gdot: "Ġ", gdot: "ġ", Hcirc: "Ĥ", hcirc: "ĥ", Hstrok: "Ħ", hstrok: "ħ",
+  Iacute: "Í", iacute: "í", Icirc: "Î", icirc: "î", Idot: "İ", iexcl: "¡",
+  Igrave: "Ì", igrave: "ì", IJlig: "Ĳ", ijlig: "ĳ", Imacr: "Ī", imacr: "ī",
+  Iogon: "Į", iogon: "į", iquest: "¿", Itilde: "Ĩ", itilde: "ĩ", Iuml: "Ï",
+  iuml: "ï", Jcirc: "Ĵ", jcirc: "ĵ", Kcedil: "Ķ", kcedil: "ķ", kgreen: "ĸ",
+  Lacute: "Ĺ", lacute: "ĺ", Lcaron: "Ľ", lcaron: "ľ", Lcedil: "Ļ",
+  lcedil: "ļ", Lmidot: "Ŀ", lmidot: "ŀ", macr: "¯", micro: "µ", middot: "·",
+  napos: "ŉ", Ncaron: "Ň", ncaron: "ň", Ncedil: "Ņ", ncedil: "ņ", not: "¬",
+  Ntilde: "Ñ", ntilde: "ñ", Ocirc: "Ô", ocirc: "ô", Odblac: "Ő", odblac: "ő",
+  OElig: "Œ", oelig: "œ", Ograve: "Ò", ograve: "ò", Omacr: "Ō", omacr: "ō",
+  ordf: "ª", ordm: "º", Oslash: "Ø", oslash: "ø", Otilde: "Õ", otilde: "õ",
+  Ouml: "Ö", ouml: "ö", para: "¶", plusmn: "±", pound: "£", Racute: "Ŕ",
+  racute: "ŕ", Rcaron: "Ř", rcaron: "ř", Rcedil: "Ŗ", rcedil: "ŗ",
+  Scaron: "Š", scaron: "š", Scedil: "Ş", scedil: "ş", Scirc: "Ŝ", scirc: "ŝ",
+  sup1: "¹", sup2: "²", sup3: "³", szlig: "ß", Tcaron: "Ť", tcaron: "ť",
+  Tcedil: "Ţ", tcedil: "ţ", THORN: "Þ", thorn: "þ", times: "×", Tstrok: "Ŧ",
+  tstrok: "ŧ", Uacute: "Ú", uacute: "ú", Ubreve: "Ŭ", ubreve: "ŭ",
+  Ucirc: "Û", ucirc: "û", Udblac: "Ű", udblac: "ű", Ugrave: "Ù", ugrave: "ù",
+  Umacr: "Ū", umacr: "ū", Uogon: "Ų", uogon: "ų", Uring: "Ů", uring: "ů",
+  Utilde: "Ũ", utilde: "ũ", Uuml: "Ü", uuml: "ü", Wcirc: "Ŵ", wcirc: "ŵ",
+  Yacute: "Ý", yacute: "ý", Ycirc: "Ŷ", ycirc: "ŷ", yen: "¥", Yuml: "Ÿ",
+  yuml: "ÿ", Zcaron: "Ž", zcaron: "ž",
 };
 
 /**
