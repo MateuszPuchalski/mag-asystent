@@ -163,6 +163,23 @@ export function useDodajIdentyfikator() {
   });
 }
 
+/**
+ * Cofnięcie numeru dopisanego z oferty (0.264.0) — WYŁĄCZNIE takiego.
+ *
+ * Wiersz `opis` cofa się poprawką opisu w Subiekcie i najbliższą przebudową,
+ * wiersz `reczne` napisał człowiek. Wpisu z oferty nie cofa nic: przebudowa
+ * go omija, bo nie ma z czego go odtworzyć. Serwer odmawia dla innych źródeł.
+ */
+export function useCofnijIdentyfikatorZOferty() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; twId: number }) =>
+      api<{ id: number; twId: number; wartosc: string }>(
+        `/api/obsluga/wiedza/identyfikatory/${v.id}/cofnij-z-oferty`, { method: "POST", body: "{}" }),
+    onSettled: (_d, _e, v) => poWiedzy(qc, v.twId),
+  });
+}
+
 export type { PowodNegatywny };
 
 /* ── Zabudowa silnika (§11.2) ────────────────────────────────────────────────

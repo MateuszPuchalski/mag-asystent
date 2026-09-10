@@ -59,7 +59,11 @@ export const NAZWA_DOWODU: Record<RodzajDowodu, string> = {
    a ich liczba pewności nie podnosi. */
 export const DOWODY_TECHNICZNE: RodzajDowodu[] = RODZAJE_DOWODU.filter((r) => r !== "rozmowa");
 
-export const ZRODLA_PROPOZYCJI = ["dobor", "pomiar", "reczne", "opis", "copilot"] as const;
+/* `oferta` (0.264.0): propozycja z pozycji listy zgodności NASZEJ oferty
+   Allegro, złożona ręką biura w kolejce Wiedzy. Osobno od `opis`, bo to inne
+   świadectwo — sprzedawca deklarujący zgodność w opisie aukcji, nie magazyn
+   opisujący towar — a ekran ma to mówić wprost (§11.3). */
+export const ZRODLA_PROPOZYCJI = ["dobor", "pomiar", "reczne", "opis", "copilot", "oferta"] as const;
 export type ZrodloPropozycji = (typeof ZRODLA_PROPOZYCJI)[number];
 export const STANY_ZASTOSOWANIA = ["propozycja", "zatwierdzone", "odrzucone", "wycofane"] as const;
 export type StanZastosowania = (typeof STANY_ZASTOSOWANIA)[number];

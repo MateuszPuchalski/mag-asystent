@@ -63,7 +63,10 @@ export function Wiedza() {
         { klucz: "kolejka", etykieta: "Kolejka" },
         { klucz: "nowa", etykieta: "Nowa propozycja" },
         { klucz: "kartoteka", etykieta: "Sprawdź kartotekę" },
-        { klucz: "z-opisow", etykieta: zOpisowRazem ? `Z opisów (${zOpisowRazem})` : "Z opisów" },
+        /* „i ofert" od 0.264.0: ta sama kolejka niesie odtąd pozycje list
+           zgodności z naszych ofert Allegro, a etykieta mówiąca tylko o opisach
+           kazałaby szukać ich gdzie indziej. */
+        { klucz: "z-opisow", etykieta: zOpisowRazem ? `Z opisów i ofert (${zOpisowRazem})` : "Z opisów i ofert" },
         /* Zakładka liczy LUKI, nagłówek — propozycje. Dwie różne prawdy: luka
            to praca do zrobienia, propozycja to decyzja do podjęcia. */
         { klucz: "silniki", etykieta: silniki.data?.lukiRazem ? `Silniki (${silniki.data.lukiRazem})` : "Silniki" },

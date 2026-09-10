@@ -130,24 +130,39 @@ const kartoteki = (database: DatabaseSync) => database.prepare(
   Array<{ tw_id: number; symbol: string; opis: string }>;
 
 /**
+ * NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.234.0).
+ *
+ * Sekcja zamienników miesza jedno z drugim: `Zamiennie: 15-06002 / RO1205 /
+ * W28-0503`. Nasze kartoteki czyta stamtąd `zamienniki.ts` i pokazuje jako
+ * zamienniki — wpisanie ich tutaj drugi raz mnożyłoby ten sam fakt w dwóch
+ * tabelach, a szukanie po numerze i tak znajdzie kartotekę po symbolu.
+ *
+ * Filtr stoi po stronie ZAPISU, nie w parserze: parser jest czystą funkcją
+ * i o kartotece nic nie wie. Wspólny od 0.264.0, bo zapisujących jest odtąd
+ * dwóch — przebudowa po imporcie i `wiedza-z-oferty.ts`. Druga kopia tej
+ * reguły rozjechałaby się przy pierwszej poprawce.
+ */
+export function naszeSymbole(database: DatabaseSync): Set<string> {
+  return new Set((database.prepare("SELECT symbol FROM sgt_towar").all() as
+    Array<{ symbol: string }>).map((t) => zwin(t.symbol)));
+}
+
+/**
  * Wiersze `zrodlo='opis'` giną i powstają od nowa; `reczne` przebudowa omija.
  * `INSERT OR IGNORE` po `(tw_id, rodzaj, wartosc_norm)`: gdy biuro dopisało
  * ręcznie to, co stoi w opisie, zostaje wpis ręczny — z podpisem człowieka.
+ *
+ * Od 0.264.0 omija także `zrodlo='oferta'`, i to bez żadnej poprawki tutaj:
+ * `DELETE` był zawężony do `'opis'` od początku. Zdanie stoi w komentarzu,
+ * bo zdanie wyżej wymienia dwa źródła i wygląda na wyczerpujące — a numeru
+ * z oferty ta funkcja nie umiałaby odtworzyć: czyta opisy KARTOTEK.
  */
 export function przebudujIdentyfikatory(database: DatabaseSync = db()): { kartotek: number; identyfikatorow: number; ms: number } {
   const start = Date.now();
   let kartotek = 0; let identyfikatorow = 0;
   transaction(database, () => {
     database.prepare("DELETE FROM towar_identyfikator WHERE zrodlo='opis'").run();
-    /* NASZ SYMBOL NIE JEST IDENTYFIKATOREM OBCYM (0.234.0). Sekcja
-       zamienników miesza jedno z drugim: `Zamiennie: 15-06002 / RO1205 /
-       W28-0503`. Nasze kartoteki czyta stamtąd `zamienniki.ts` i pokazuje
-       jako zamienniki — wpisanie ich tutaj drugi raz mnożyłoby ten sam fakt
-       w dwóch tabelach, a szukanie po numerze i tak znajdzie kartotekę po
-       symbolu. Filtr stoi w PRZEBUDOWIE, nie w parserze: parser jest czystą
-       funkcją i o kartotece nic nie wie. */
-    const nasze = new Set((database.prepare("SELECT symbol FROM sgt_towar").all() as
-      Array<{ symbol: string }>).map((t) => zwin(t.symbol)));
+    const nasze = naszeSymbole(database);
     const ins = database.prepare(`INSERT OR IGNORE INTO towar_identyfikator
       (tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal) VALUES (?,?,?,?,?,'opis','import')`);
     for (const t of kartoteki(database)) {
@@ -181,7 +196,12 @@ export function przebudujModeleZOpisu(database: DatabaseSync = db()): { nowych: 
         nowych += Number(ins.run(t.tw_id, t.symbol, tekst, norm).changes);
       }
     }
-    database.prepare(`DELETE FROM model_z_opisu WHERE stan='nowy'
+    /* `AND zrodlo='opis'` jest KONIECZNE od 0.264.0. Ta funkcja jest
+       odświeżaczem tabeli pochodnej od opisów kartotek: kasuje wiersze
+       `nowy`, których nie ma w świeżym zbiorze. Wiersz z OFERTY nigdy w tym
+       zbiorze nie stanie, więc bez tego warunku ginąłby przy pierwszym
+       imporcie po zapisie — bezpowrotnie, bo nie ma z czego się odrodzić. */
+    database.prepare(`DELETE FROM model_z_opisu WHERE stan='nowy' AND zrodlo='opis'
       AND NOT EXISTS (SELECT 1 FROM swieze_modele s WHERE s.tw_id=model_z_opisu.tw_id AND s.tekst_norm=model_z_opisu.tekst_norm)`).run();
     database.exec("DELETE FROM swieze_modele");
   })();
@@ -190,10 +210,15 @@ export function przebudujModeleZOpisu(database: DatabaseSync = db()): { nowych: 
 
 /* ── Odczyt ────────────────────────────────────────────────────────────── */
 
+/** Skąd wziął się wiersz. `oferta` doszło w 0.264.0 — patrz `wiedza-z-oferty.ts`. */
+export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
+
 export interface WierszIdentyfikatora {
   id: number; twId: number; symbol: string; nazwa: string | null;
   rodzaj: RodzajIdentyfikatora; nazwaRodzaju: string; wartosc: string;
-  zrodlo: "opis" | "reczne"; dodal: string; at: string;
+  zrodlo: ZrodloIdentyfikatora; dodal: string; at: string;
+  /** Z KTÓREJ oferty; NULL dla `opis` i `reczne`. Bez tego „skąd to się wzięło" nie ma odpowiedzi. */
+  ofertaId: string | null;
 }
 
 const SELECT = `SELECT i.*, t.nazwa FROM towar_identyfikator i LEFT JOIN sgt_towar t ON t.tw_id = i.tw_id`;
@@ -203,8 +228,9 @@ const naWiersz = (w: Record<string, unknown>): WierszIdentyfikatora => ({
   nazwa: w.nazwa == null ? null : String(w.nazwa),
   rodzaj: String(w.rodzaj) as RodzajIdentyfikatora,
   nazwaRodzaju: NAZWA_RODZAJU[String(w.rodzaj) as RodzajIdentyfikatora],
-  wartosc: String(w.wartosc), zrodlo: String(w.zrodlo) as "opis" | "reczne",
+  wartosc: String(w.wartosc), zrodlo: String(w.zrodlo) as ZrodloIdentyfikatora,
   dodal: String(w.dodal), at: String(w.at),
+  ofertaId: w.oferta_id == null ? null : String(w.oferta_id),
 });
 
 /** Kartoteki, w których stoi ten numer — po formie zwiniętej, więc `532 16 56-30` = `5321656-30`. */
@@ -240,12 +266,50 @@ export function dodajIdentyfikator(
   return naWiersz(database.prepare(`${SELECT} WHERE i.id=?`).get(id) as Record<string, unknown>);
 }
 
+/**
+ * Cofnięcie wpisu z oferty (0.264.0) — WYŁĄCZNIE dla źródła `oferta`.
+ *
+ * Dlaczego akurat to źródło ma własną drogę wyjścia: wiersz `opis` cofa się
+ * poprawką opisu w Subiekcie i najbliższą przebudową, wiersz `reczne` napisał
+ * człowiek, który wie, co napisał. Wpisu z oferty nie cofa NIC — przebudowa
+ * go omija (i musi omijać, bo nie ma z czego go odtworzyć), a klikającemu
+ * agentowi zostaje wtedy zły numer prowadzący do złego towaru.
+ *
+ * Odmowa dla pozostałych źródeł jest tu treścią, nie ostrożnością: trasa
+ * kasująca „identyfikator" bez rozróżnienia byłaby drogą do wycięcia wiedzy
+ * z opisów jednym żądaniem.
+ */
+export function usunIdentyfikatorZOferty(
+  id: number, userId: number, database: DatabaseSync = db(),
+): { id: number; twId: number; wartosc: string } {
+  const autor = czlowiekZBiura(database, userId);
+  return transaction(database, () => {
+    const w = database.prepare(
+      "SELECT id, tw_id, rodzaj, wartosc, zrodlo, oferta_id FROM towar_identyfikator WHERE id=?")
+      .get(id) as Record<string, unknown> | undefined;
+    if (!w) throw new Error("Nie ma takiego identyfikatora");
+    if (String(w.zrodlo) !== "oferta") {
+      throw new WiedzaConflict(
+        "Ten wpis nie pochodzi z oferty — cofa się go tam, skąd się wziął",
+        { zrodlo: String(w.zrodlo) });
+    }
+    database.prepare("DELETE FROM towar_identyfikator WHERE id=?").run(id);
+    logEvent("wiedza_identyfikator_z_oferty_cofniety", autor, Number(w.tw_id),
+      { id, rodzaj: String(w.rodzaj), wartosc: String(w.wartosc),
+        ofertaId: w.oferta_id == null ? null : String(w.oferta_id) }, userId, database);
+    return { id, twId: Number(w.tw_id), wartosc: String(w.wartosc) };
+  })();
+}
+
 /* ── Modele z opisów do przerobienia ───────────────────────────────────── */
 
 export interface ModelZOpisu {
   id: number; twId: number; symbol: string; nazwa: string | null; tekst: string;
   stan: "nowy" | "przerobiony" | "odrzucony"; zastosowanieId: number | null;
   rozstrzygnal: string | null; rozstrzygnietoAt: string | null; at: string;
+  /** `opis` = sekcja „Modele:" z kartoteki, `oferta` = pozycja listy zgodności (0.264.0). */
+  zrodlo: "opis" | "oferta";
+  ofertaId: string | null;
 }
 
 const naModelZOpisu = (w: Record<string, unknown>): ModelZOpisu => ({
@@ -256,6 +320,8 @@ const naModelZOpisu = (w: Record<string, unknown>): ModelZOpisu => ({
   rozstrzygnal: w.rozstrzygnal == null ? null : String(w.rozstrzygnal),
   rozstrzygnietoAt: w.rozstrzygnieto_at == null ? null : String(w.rozstrzygnieto_at),
   at: String(w.at),
+  zrodlo: String(w.zrodlo ?? "opis") as ModelZOpisu["zrodlo"],
+  ofertaId: w.oferta_id == null ? null : String(w.oferta_id),
 });
 
 const SELECT_MODEL = `SELECT m.*, t.nazwa FROM model_z_opisu m LEFT JOIN sgt_towar t ON t.tw_id = m.tw_id`;
@@ -278,10 +344,16 @@ function zaladujNowy(database: DatabaseSync, id: number): ModelZOpisu {
 }
 
 /**
- * Człowiek wskazał markę i model → propozycja zastosowania ze źródłem `opis`
+ * Człowiek wskazał markę i model → propozycja zastosowania ze źródłem wiersza
  * i dowodem `decyzja_biura` (to jest decyzja biura: sekcja opisu sama w sobie
  * nie mówi, do jakiej marki należy `FS450`). Wiersz schodzi na `przerobiony`
  * w tej samej transakcji, więc drugie kliknięcie dostaje 409, nie dubel.
+ *
+ * Źródło propozycji BIERZE SIĘ Z WIERSZA, nie jest wpisane na sztywno
+ * (0.264.0). Kolejka niesie dwa świadectwa: sekcję „Modele:" z opisu naszej
+ * kartoteki i pozycję listy zgodności z naszej oferty Allegro. Zrównanie ich
+ * podpisem kosztowałoby dokładnie to, co §11.3 każe pokazywać — a przy okazji
+ * uniemożliwiło zmierzenie, które z dwóch źródeł daje lepszą wiedzę.
  */
 export function przerobModelZOpisu(
   id: number, model: DaneModelu, userId: number, database: DatabaseSync = db(),
@@ -289,15 +361,22 @@ export function przerobModelZOpisu(
   const autor = czlowiekZBiura(database, userId);
   return transaction(database, () => {
     const m = zaladujNowy(database, id);
+    const zOferty = m.zrodlo === "oferta";
     const z = zaproponujZastosowanie({
-      twId: m.twId, model, polaryzacja: "pasuje", zrodlo: "opis",
-      komentarz: `Modele: ${m.tekst}`,
-      dowod: { rodzaj: "decyzja_biura", tresc: `z opisu kartoteki „${m.symbol}”: Modele: ${m.tekst}` },
+      twId: m.twId, model, polaryzacja: "pasuje", zrodlo: zOferty ? "oferta" : "opis",
+      komentarz: zOferty ? `Lista zgodności oferty: ${m.tekst}` : `Modele: ${m.tekst}`,
+      dowod: {
+        rodzaj: "decyzja_biura",
+        tresc: zOferty
+          ? `z listy zgodności naszej oferty${m.ofertaId ? ` ${m.ofertaId}` : ""} przy kartotece „${m.symbol}”: ${m.tekst}`
+          : `z opisu kartoteki „${m.symbol}”: Modele: ${m.tekst}`,
+      },
     }, { userId, name: autor }, database);
     if (!z) throw new WiedzaConflict("Ta para kartoteka–model już czeka w kolejce albo jest zatwierdzona", {});
     database.prepare(`UPDATE model_z_opisu SET stan='przerobiony', zastosowanie_id=?, rozstrzygnal=?, rozstrzygnal_user_id=?,
       rozstrzygnieto_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`).run(z.id, autor, userId, id);
-    logEvent("wiedza_model_z_opisu_przerobiony", autor, m.twId, { id, zastosowanieId: z.id, model: z.model.etykieta }, userId, database);
+    logEvent("wiedza_model_z_opisu_przerobiony", autor, m.twId,
+      { id, zastosowanieId: z.id, model: z.model.etykieta, zrodlo: m.zrodlo }, userId, database);
     return z;
   })();
 }
@@ -319,6 +398,8 @@ export function odrzucModelZOpisu(id: number, userId: number, database: Database
 export interface PokrycieWiedzy {
   kartotek: number; zOpisem: number; zIdentyfikatorem: number;
   identyfikatorow: number; identyfikatorowRecznych: number;
+  /** Numery odzyskane z opisów NASZYCH ofert (0.264.0) — patrz `wiedza-z-oferty.ts`. */
+  identyfikatorowZOfert: number;
   modeleZOpisu: { nowych: number; przerobionych: number; odrzuconych: number };
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
   /** Tokeny silników w nazwach (0.239.0): ile słownik ma wpisów i ile kartotek czeka na decyzję. */
@@ -336,6 +417,10 @@ export function pokrycieWiedzy(database: DatabaseSync = db()): PokrycieWiedzy {
     zIdentyfikatorem: n("SELECT count(DISTINCT tw_id) n FROM towar_identyfikator"),
     identyfikatorow: n("SELECT count(*) n FROM towar_identyfikator"),
     identyfikatorowRecznych: n("SELECT count(*) n FROM towar_identyfikator WHERE zrodlo='reczne'"),
+    /* Osobno od ręcznych, bo mierzy CO INNEGO: ile numerów przyszło z naszych
+       ofert Allegro, czyli ile wiedzy odzyskaliśmy z miejsca, które do 0.264.0
+       kończyło się na jednym akapicie pod szkicem. */
+    identyfikatorowZOfert: n("SELECT count(*) n FROM towar_identyfikator WHERE zrodlo='oferta'"),
     modeleZOpisu: {
       nowych: n("SELECT count(*) n FROM model_z_opisu WHERE stan='nowy'"),
       przerobionych: n("SELECT count(*) n FROM model_z_opisu WHERE stan='przerobiony'"),

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
-import type { Pasowanie, PasowaniaTowaru, RodzajDowodu, RodzajIdentyfikatora, TrafieniePasowania, Zastosowanie } from "../api/typy";
+import type {
+  Identyfikator, Pasowanie, PasowaniaTowaru, RodzajDowodu, RodzajIdentyfikatora,
+  TrafieniePasowania, Zastosowanie,
+} from "../api/typy";
 import {
-  useDodajDowod, useDodajIdentyfikator, useIdentyfikatory, useWiedzaTowaru, useWycofajPasowanie,
-  useWycofajZastosowanie, useZaproponujPasowanie,
+  useCofnijIdentyfikatorZOferty, useDodajDowod, useDodajIdentyfikator, useIdentyfikatory,
+  useWiedzaTowaru, useWycofajPasowanie, useWycofajZastosowanie, useZaproponujPasowanie,
 } from "../api/wiedza";
 import { PasowanieForm } from "./PasowanieForm";
 import { NaglowekSekcji, Pole, Przycisk, czas } from "../ui";
@@ -34,22 +37,45 @@ export function WiedzaTowaru() {
 }
 
 /**
- * Identyfikatory części (E3): z opisu po imporcie (przebudowa je odtwarza)
- * albo ręczne z katalogu, którego w opisie nie ma (przebudowa je omija).
+ * Identyfikatory części (E3): z opisu po imporcie (przebudowa je odtwarza),
+ * ręczne z katalogu, którego w opisie nie ma (przebudowa je omija), albo
+ * odzyskane z opisu NASZEJ oferty przy szkicu Copilota (0.264.0).
  * Duplikat serwer odbija 409 — ta sama wartość po zwinięciu spacji i wielkości liter.
+ *
+ * Krzyżyk stoi WYŁĄCZNIE przy wpisie z oferty i to jest cała jego treść.
+ * Numer z opisu cofa się poprawką opisu w Subiekcie, ręczny napisał człowiek,
+ * który wie, co napisał — a wpisu z oferty nie cofa nic, bo przebudowa go
+ * omija. Bez tego przycisku zły numer dopisany jednym kliknięciem zostawałby
+ * przy kartotece na zawsze i wracał do klienta jako zły towar.
  */
+/* TRZY kolory, bo trzy różnej wagi świadectwa (§11.3). Zrównanie oferty
+   z opisem kartoteki jednym tłem kosztowałoby dokładnie to rozróżnienie. */
+const KOLOR_ZRODLA: Record<Identyfikator["zrodlo"], string> = {
+  opis: "bg-slate-100 text-slate-800",
+  reczne: "bg-amber-50 text-amber-900",
+  oferta: "bg-sky-50 text-sky-900",
+};
+
+const OPIS_ZRODLA = (i: Identyfikator) => i.zrodlo === "opis" ? "z opisu kartoteki"
+  : i.zrodlo === "reczne" ? `ręcznie: ${i.dodal}`
+  : `z naszej oferty Allegro${i.ofertaId ? ` ${i.ofertaId}` : ""}`;
+
 function Identyfikatory({ twId }: { twId: number }) {
   const lista = useIdentyfikatory(twId);
   const dodaj = useDodajIdentyfikator();
+  const cofnij = useCofnijIdentyfikatorZOferty();
   const [rodzaj, setRodzaj] = useState<RodzajIdentyfikatora>("oem");
   const [wartosc, setWartosc] = useState("");
   return <section aria-label="Identyfikatory">
     <NaglowekSekcji>Identyfikatory</NaglowekSekcji>
     {lista.data && lista.data.length === 0 && <p className="text-sm text-slate-500">brak identyfikatorów w opisie</p>}
     {lista.data && lista.data.length > 0 && <ul className="mt-1 flex flex-wrap gap-1">
-      {lista.data.map((i) => <li key={i.id} title={`${i.nazwaRodzaju} · ${i.zrodlo === "opis" ? "z opisu" : `ręcznie: ${i.dodal}`}`}
-        className={`rounded px-1.5 py-0.5 font-mono text-xs ${i.zrodlo === "reczne" ? "bg-amber-50 text-amber-900" : "bg-slate-100 text-slate-800"}`}>
-        <span className="mr-1 text-podpis font-semibold text-slate-500">{i.nazwaRodzaju}</span>{i.wartosc}</li>)}
+      {lista.data.map((i) => <li key={i.id} title={`${i.nazwaRodzaju} · ${OPIS_ZRODLA(i)}`}
+        className={`rounded px-1.5 py-0.5 font-mono text-xs ${KOLOR_ZRODLA[i.zrodlo]}`}>
+        <span className="mr-1 text-podpis font-semibold text-slate-500">{i.nazwaRodzaju}</span>{i.wartosc}
+        {i.zrodlo === "oferta" && <button type="button" className="ml-1 text-sky-700 hover:text-red-700"
+          aria-label={`Cofnij ${i.wartosc} z oferty`} disabled={cofnij.isPending}
+          onClick={() => cofnij.mutate({ id: i.id, twId })}>×</button>}</li>)}
     </ul>}
     <div className="mt-2 flex flex-wrap items-end gap-2">
       <select className="field w-auto" aria-label="Rodzaj identyfikatora" value={rodzaj}
@@ -62,6 +88,7 @@ function Identyfikatory({ twId }: { twId: number }) {
         Dodaj identyfikator</Przycisk>
     </div>
     {dodaj.error && <p className="mt-1 text-xs text-red-700">{(dodaj.error as Error).message}</p>}
+    {cofnij.error && <p className="mt-1 text-xs text-red-700">{(cofnij.error as Error).message}</p>}
   </section>;
 }
 

@@ -95,6 +95,26 @@ const RANGA: Record<DrogaDoboru, number> = {
  * Jedna stała, nie trzy łańcuchy: dopisek stoi przy trzech drogach i przy
  * pierwszej poprawce sformułowania trzy kopie by się rozjechały.
  */
+/**
+ * Skąd wzięliśmy numer, który trafił w tę kartotekę. Osobna funkcja, nie
+ * wybór w miejscu wywołania: gałęzi jest trzy, a czwarta wartość `zrodlo`
+ * ma się nie przemycić jako „z opisu kartoteki" bez ani jednego błędu.
+ */
+function zdanieZrodlaNumeru(
+  t: { zrodlo: string; nazwaRodzaju: string; wartosc: string; dodal: string; ofertaId: string | null },
+  symbol: string,
+): string {
+  const czolo = `numer ${t.nazwaRodzaju} ${t.wartosc}`;
+  if (t.zrodlo === "reczne") {
+    return `${czolo} wpisany ręcznie przez ${t.dodal} ${PO_IDENTYFIKATORZE}`;
+  }
+  if (t.zrodlo === "oferta") {
+    return `${czolo} z opisu NASZEJ oferty${t.ofertaId ? ` ${t.ofertaId}` : ""}`
+      + ` przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
+  }
+  return `${czolo} z opisu kartoteki „${symbol}” ${PO_IDENTYFIKATORZE}`;
+}
+
 const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
 
 const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
@@ -262,9 +282,13 @@ export function kandydaciDoboru(
         ile++; kotwica(w);
         dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oem",
           pewnosc: "prawdopodobne", ostrzezenia: [],
-          zrodlo: t.zrodlo === "reczne"
-            ? `numer ${t.nazwaRodzaju} ${t.wartosc} wpisany ręcznie przez ${t.dodal} ${PO_IDENTYFIKATORZE}`
-            : `numer ${t.nazwaRodzaju} ${t.wartosc} z opisu kartoteki „${w.symbol}” ${PO_IDENTYFIKATORZE}` });
+          /* TRZY źródła, trzy zdania (0.264.0). Do 0.263.0 stał tu wybór
+             dwugałęziowy i wiersz z oferty wpadłby w gałąź „z opisu
+             kartoteki" — ekran powiedziałby nieprawdę o pochodzeniu numeru,
+             a kompilator by tego nie złapał. Zdanie źródła jest przy §11.3
+             treścią, nie ozdobą: deklaracja sprzedawcy w opisie aukcji
+             i numer z katalogu magazynu to różnej wagi świadectwa. */
+          zrodlo: zdanieZrodlaNumeru(t, w.symbol) });
       }
       /* Karta „bez kartoteki" tylko dla pola OEM: numer wpisany jako NAZWA
          części to nie deklaracja „mam numer producenta". */

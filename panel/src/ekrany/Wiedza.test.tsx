@@ -129,11 +129,11 @@ describe("Ekran wiedzy", () => {
     expect(rozstrzygnij).toHaveBeenLastCalledWith({ id: 3, decyzja: "odrzuc", powod: "to LS 51" }, expect.anything());
   });
 
-  it("zakładka „Z opisów” liczy sekcje „Modele:” RAZEM z kartotekami z tokenem", () => {
+  it("zakładka „Z opisów i ofert” liczy teksty do przerobienia RAZEM z kartotekami z tokenem", () => {
     /* Jedna liczba pracy: 2 sekcje + 3 kartoteki z tokenem = 5. Oba czekają
        na tego samego człowieka w tym samym widoku. */
     pokaz();
-    expect(screen.getByRole("button", { name: "Z opisów (5)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Z opisów i ofert (5)" })).toBeInTheDocument();
   });
 
   it("pusta kolejka mówi, skąd biorą się propozycje", () => {

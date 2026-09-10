@@ -436,8 +436,12 @@ CREATE TABLE IF NOT EXISTS zastosowanie (
                           'srednica_ok_inne_mocowanie','mylace_oznaczenie','wymaga_pomiaru')),
   stan                  TEXT NOT NULL DEFAULT 'propozycja'
                           CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
+  -- `oferta` (0.264.0): propozycja zrodzona z pozycji listy zgodności oferty,
+  -- przerobionej ręką biura w kolejce Wiedzy. Osobno od `opis`, bo ekran
+  -- tłumaczy te wartości na zdania („z opisu kartoteki" kontra „z oferty
+  -- Allegro") i bo po tym polu liczy się skuteczność źródeł.
   zrodlo_propozycji     TEXT NOT NULL
-                          CHECK (zrodlo_propozycji IN ('dobor','pomiar','reczne','opis','copilot')),
+                          CHECK (zrodlo_propozycji IN ('dobor','pomiar','reczne','opis','copilot','oferta')),
   komentarz             TEXT,
   conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
   zastepuje_id          INTEGER REFERENCES zastosowanie(id),
@@ -660,9 +664,18 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
   wartosc         TEXT NOT NULL,
   -- `zwin(wartosc)`: `532 16 56-30`, `5321656-30` i `532165630` to jeden numer.
   wartosc_norm    TEXT NOT NULL,
-  zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne')),
+  -- `oferta` doszło w 0.264.0 i kosztowało drugą przebudowę tej tabeli.
+  -- Numery, które sprzedawca wpisał w opisie oferty Allegro, nie były
+  -- wyszukiwalne: indeks czyta opisy KARTOTEK, nie ofert. Osobne źródło,
+  -- a nie `opis`, bo tamte wiersze kasuje przebudowa po każdym imporcie
+  -- z Subiekta, a numeru z oferty nie ma z czego odtworzyć. I nie `reczne`,
+  -- bo agent go nie napisał — kliknął przycisk, a to mówi dziennik.
+  zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta')),
   dodal           TEXT NOT NULL,
   dodal_user_id   INTEGER REFERENCES app_user(user_id),
+  -- Z KTÓREJ oferty. NULL dla `opis` i `reczne`. Bez tego nie da się
+  -- odpowiedzieć na pytanie „skąd to się wzięło", gdy numer okaże się błędny.
+  oferta_id       TEXT,
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (tw_id, rodzaj, wartosc_norm)
 );
@@ -698,6 +711,19 @@ CREATE TABLE IF NOT EXISTS model_z_opisu (
   tw_symbol           TEXT NOT NULL,
   tekst               TEXT NOT NULL,
   tekst_norm          TEXT NOT NULL,
+  -- SKĄD wziął się tekst (0.264.0). Tabela nazywa się `z_opisu`, ale niesie
+  -- teraz dwa źródła: sekcje „Modele:" z opisów kartotek Subiekta oraz pozycje
+  -- listy zgodności z ofert Allegro. To jedno zadanie — tekst, z którego
+  -- CZŁOWIEK składa klucz modelu — więc jedna tabela i jedna kolejka.
+  --
+  -- Kolumna jest KONIECZNA, nie ozdobna: przebudowa po imporcie kasuje wiersze
+  -- `stan='nowy'`, których nie ma w świeżym zbiorze z opisów kartotek. Wiersz
+  -- z oferty nigdy w tym zbiorze nie stanie, więc bez tego rozróżnienia ginąłby
+  -- przy pierwszym imporcie — bezpowrotnie, bo nie ma z czego się odrodzić.
+  zrodlo              TEXT NOT NULL DEFAULT 'opis' CHECK (zrodlo IN ('opis','oferta')),
+  -- Z KTÓREJ oferty; NULL dla `opis`. Człowiek w kolejce ma prawo wiedzieć,
+  -- czy patrzy na wycinek opisu magazynu, czy na deklarację sprzedawcy.
+  oferta_id           TEXT,
   stan                TEXT NOT NULL DEFAULT 'nowy' CHECK (stan IN ('nowy','przerobiony','odrzucony')),
   zastosowanie_id     INTEGER REFERENCES zastosowanie(id) ON DELETE SET NULL,
   rozstrzygnal        TEXT,

@@ -11,10 +11,22 @@ import type { ModelZOpisu } from "../api/typy";
 
 const przerob = vi.fn();
 const odrzuc = vi.fn();
-const WIERSZE: ModelZOpisu[] = [
+const Z_OPISU: ModelZOpisu =
   { id: 7, twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni", tekst: "FS200 FS250", stan: "nowy",
-    zastosowanieId: null, rozstrzygnal: null, rozstrzygnietoAt: null, at: "2026-09-01T07:00:00Z" },
-];
+    zastosowanieId: null, rozstrzygnal: null, rozstrzygnietoAt: null, at: "2026-09-01T07:00:00Z",
+    zrodlo: "opis", ofertaId: null };
+const WIERSZE: ModelZOpisu[] = [Z_OPISU];
+
+/* Wiersz z NASZEJ oferty (0.264.0): ta sama kolejka i ta sama robota, ale
+   człowiek ma poznać, na co patrzy — opis kartoteki pisał magazyn, listę
+   zgodności sprzedawca w aukcji. Dokładany w SWOIM teście, nie do listy
+   domyślnej: dwa wiersze naraz zrobiłyby z „Zaproponuj" zapytanie
+   niejednoznaczne w testach, które o źródło nie pytają. */
+const Z_OFERTY: ModelZOpisu = {
+  id: 8, twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni", tekst: "STIHL FS250", stan: "nowy",
+  zastosowanieId: null, rozstrzygnal: null, rozstrzygnietoAt: null, at: "2026-09-01T07:05:00Z",
+  zrodlo: "oferta", ofertaId: "14023867457",
+};
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),
   usePrzerobModelZOpisu: () => ({ mutate: przerob, isPending: false }),
@@ -49,5 +61,22 @@ describe("sekcje Modele: z opisów", () => {
     render(<ZOpisow />);
     await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
     expect(odrzuc).toHaveBeenCalledWith({ id: 7 }, expect.anything());
+  });
+
+  it("wiersz z oferty mówi, SKĄD jest — inna waga świadectwa, inna decyzja", () => {
+    /* Bez tego znacznika kolejka zrównywałaby opis magazynu z deklaracją
+       sprzedawcy w aukcji, a człowiek rozstrzygający bywa przy nich innego
+       zdania. Numer oferty stoi obok, bo „skąd to się wzięło" musi mieć
+       odpowiedź, gdy pozycja okaże się błędna. */
+    WIERSZE.length = 0;
+    WIERSZE.push(Z_OFERTY);
+    try {
+      render(<ZOpisow />);
+      expect(screen.getByText("Lista zgodności oferty: STIHL FS250")).toBeInTheDocument();
+      expect(screen.getByText(/z naszej oferty Allegro 14023867457/)).toBeInTheDocument();
+    } finally {
+      WIERSZE.length = 0;
+      WIERSZE.push(Z_OPISU);
+    }
   });
 });

@@ -65,7 +65,7 @@ describe("Ustawienia obsługi", () => {
     expect(screen.getByText("Połączenie Allegro")).toBeInTheDocument();
     expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
     /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
-    expect(screen.getByText("Wiedza z opisów kartotek")).toBeInTheDocument();
+    expect(screen.getByText("Wiedza z opisów kartotek i ofert")).toBeInTheDocument();
     expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
     /* Wyłączony Copilot nie zostawia po sobie pustej karty na ekranie. */
     expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).not.toBeInTheDocument();

@@ -52,7 +52,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator", "model_z_opisu",
+    "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
     "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -104,9 +105,14 @@ test("luki w kartotece liczy KOD i to na przykładzie właściciela", () => {
   const luki = S.lukiZOferty({
     parametry: [{ nazwa: "Kod producenta", wartosci: ["4134 400 1306"] }],
     zgodnosc: ["STIHL FS120", "STIHL FS200", "STIHL FS250", "STIHL FR450", "STIHL BT120C"],
+    opis: "",
   }, "Kartoteka oferty: W02-0401 — CEWKA ZAPŁONOWA DO STIHL FS120 FS200; EAN brak");
 
-  assert.deepEqual(luki, ["4134 400 1306", "FS250", "FR450", "BT120C"],
+  assert.deepEqual(luki.numery, [{ rodzaj: "oem", wartosc: "4134 400 1306" }]);
+  /* CAŁE pozycje, z MARKĄ (0.264.0). Człowiek w kolejce Wiedzy składa klucz
+     modelu i bez marki nie ma z czego: `FS250` nie mówi, czyj to model,
+     a automat marki nie zgaduje od 0.186.0. */
+  assert.deepEqual(luki.modele, ["STIHL FS250", "STIHL FR450", "STIHL BT120C"],
     "kartoteka zna FS120 i FS200, reszta jest okazją do uzupełnienia");
 });
 
@@ -114,23 +120,50 @@ test("numer katalogowy z pola parametru zostaje W CAŁOŚCI, nie w kawałkach", 
   /* „4134 400 1306" rozbite na trzy liczby przestaje być numerem, po którym
      szuka człowiek. Pole to jedna wartość — czytamy je jako jedną. */
   assert.deepEqual(S.lukiZOferty(
-    { parametry: [{ nazwa: "Numer katalogowy", wartosci: ["4134 400 1306"] }], zgodnosc: [] }, "nic"),
-  ["4134 400 1306"]);
+    { parametry: [{ nazwa: "Numer katalogowy", wartosci: ["4134 400 1306"] }], zgodnosc: [], opis: "" },
+    "nic").numery, [{ rodzaj: "oem", wartosc: "4134 400 1306" }]);
+});
+
+test("pole, które nie obiecuje numeru katalogowego, do tabeli numerów nie wchodzi", () => {
+  /* Filtr zapisu MUSI być węższy od dawnego filtru wyświetlania (0.264.0).
+     „Moc [KM]: 204" w `towar_identyfikator` znaczy, że pytanie o numer 204
+     prowadzi do kosiarki. EAN odpada mimo że jest numerem: ma własny szczebel
+     doboru, drugi z jedenastu, i wpisanie go jako `oem` osłabia trafienie. */
+  const luki = S.lukiZOferty({
+    parametry: [
+      { nazwa: "Moc [KM]", wartosci: ["204"] },
+      { nazwa: "EAN (GTIN)", wartosci: ["5901234123457"] },
+      { nazwa: "Numer katalogowy części oryginalnej", wartosci: ["698083"] },
+    ],
+    zgodnosc: [], opis: "",
+  }, "nic");
+  assert.deepEqual(luki.numery, [{ rodzaj: "nr_oryg", wartosc: "698083" }]);
+});
+
+test("numery z OPISU oferty wchodzą, ale tylko spod etykiety z dwukropkiem", () => {
+  /* Ten sam parser, którym czytamy opisy kartotek. Wymaga etykiety, więc na
+     prozie sprzedażowej nie znajduje nic — a to jest cała jego obrona przed
+     wciągnięciem numeru telefonu z podpisu sprzedawcy. */
+  const luki = S.lukiZOferty({ parametry: [], zgodnosc: [],
+    opis: "Najlepszy filtr w tej cenie, 12345678 sztuk sprzedanych. OEM: 698083 // 794422",
+  }, "nic");
+  assert.deepEqual(luki.numery.map((n) => n.wartosc), ["698083", "794422"]);
 });
 
 test("rok i sama liczba nie są oznaczeniem części", () => {
   /* Bez tego każda oferta motoryzacyjna zgłaszałaby zakres lat jako brak. */
   const luki = S.lukiZOferty(
-    { parametry: [], zgodnosc: ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"] }, "nic");
-  assert.equal(luki.includes("2005/09-2011/12"), false);
-  assert.deepEqual(luki, ["204KM/150kW"], "oznaczenie z literami zostaje, sam rok wypada");
+    { parametry: [], zgodnosc: ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"], opis: "" }, "nic");
+  assert.deepEqual(luki.modele, ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"],
+    "pozycja wraca w całości — wykrywa ją token z literą, nie sam zakres lat");
+  assert.deepEqual(luki.numery, [], "zdanie zgodności to nie jest numer katalogowy");
 });
 
 test("oznaczenie zapisane inaczej niż w kartotece nie jest brakiem", () => {
   /* „STIHL FS 120" i „FS120" to ten sam model. Porównanie po `zwin`, tak jak
      przy danych doboru — inaczej spacja sprzedawcy robiłaby fałszywy brak. */
   assert.deepEqual(S.lukiZOferty(
-    { parametry: [], zgodnosc: ["STIHL FS 120"] }, "CEWKA DO FS120"), []);
+    { parametry: [], zgodnosc: ["STIHL FS 120"], opis: "" }, "CEWKA DO FS120").modele, []);
 });
 
 test("luki NIE wchodzą do faktów, bo to zdanie o nas, nie o maszynie klienta", () => {
@@ -139,7 +172,7 @@ test("luki NIE wchodzą do faktów, bo to zdanie o nas, nie o maszynie klienta",
     .run(JSON.stringify(["HONDA GX160", "HONDA GX999"]));
 
   const k = S.kontekstSzkicu(rozmowa, subiekt);
-  assert.ok(k.luki.includes("GX999"), "brak nie został policzony");
+  assert.ok(k.luki.modele.some((m) => m.includes("GX999")), "brak nie został policzony");
   const f = String(k.tekstFaktow);
   assert.equal(/brak w kartotece|luk|uzupełni/i.test(f), false,
     "lista braków poszła do modelu — ma ją widzieć wyłącznie agent");
@@ -244,10 +277,91 @@ test("intake dobiera pytania po nazwie części z danych doboru", () => {
 });
 
 test("kontekst niczego nie zapisuje", () => {
-  const przed = [liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"), liczba("conversation_event")];
+  /* Także po 0.264.0, i to jest tu treść, nie formalność. Zapis wiedzy
+     z oferty wisi na `ulozSzkic`, czyli na kliknięciu, gdzie zapis i tak był.
+     Przeniesienie go do `kontekstSzkicu` sprawiłoby, że SAMO OTWARCIE rozmowy
+     mutuje bazę wiedzy — to jest blizna 0.18.0 z gorszą ceną. */
+  db().prepare("UPDATE offer_snapshot SET pasuje_do_json=?, tresc_synced_at='2026-09-10T10:00:00Z' WHERE external_id='of-1'")
+    .run(JSON.stringify(["HONDA GX999"]));
+  const przed = [liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"),
+    liczba("conversation_event"), liczba("towar_identyfikator"), liczba("model_z_opisu")];
   S.kontekstSzkicu(rozmowa, subiekt);
   S.kontekstSzkicu(rozmowa, subiekt);
-  assert.deepEqual([liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"), liczba("conversation_event")], przed);
+  assert.deepEqual([liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"),
+    liczba("conversation_event"), liczba("towar_identyfikator"), liczba("model_z_opisu")], przed);
+});
+
+/* ── Wiedza z oferty przestaje ginąć razem z rozmową (0.264.0) ───────────── */
+
+const zOferty = (pasujeDo: string[], opis = "") => db().prepare(
+  `UPDATE offer_snapshot SET pasuje_do_json=?, opis=?, tresc_synced_at='2026-09-10T10:00:00Z'
+   WHERE external_id='of-1'`).run(JSON.stringify(pasujeDo), opis);
+
+test("wiedza z oferty zostaje w bazie, choć dostawca ODMÓWIŁ — to cała treść wydania", async () => {
+  /* Za nieudanym szkicem stoi jedno kliknięcie i agent kliknie ponownie.
+     Za utratą tych numerów nie stoi nic: opis oferty jest cache'em na tydzień,
+     nadpisywanym, a `przebudujIdentyfikatory` czyta opisy KARTOTEK. Dlatego
+     zapis idzie PRZED wywołaniem modelu, nie po nim. */
+  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
+  const odmowa: import("./copilot-szkic.js").NadawcaSzkicu =
+    async () => { throw new Error("dostawca odmówił"); };
+
+  await assert.rejects(S.ulozSzkic(rozmowa, KTO(), odmowa, subiekt));
+
+  const numer = db().prepare(
+    "SELECT zrodlo, dodal, oferta_id FROM towar_identyfikator WHERE wartosc='16100-ZH8-W61'")
+    .get() as Record<string, unknown> | undefined;
+  assert.ok(numer, "numer z opisu oferty miał zostać mimo odmowy dostawcy");
+  assert.equal(numer!.zrodlo, "oferta");
+  assert.equal(numer!.oferta_id, "of-1");
+  assert.equal(liczba("model_z_opisu"), 1, "pozycja zgodności miała trafić do kolejki Wiedzy");
+  assert.equal(liczba("szkic_copilota"), 0, "szkic ma nie powstać — odmowa to odmowa");
+});
+
+test("numer zapisany przy pierwszym szkicu przestaje być luką przy drugim", async () => {
+  /* Samowygaszanie zamiast paska postępu. Do 0.263.0 pasek liczył tę samą
+     listę od zera przy każdym kliknięciu: system zauważał lukę za każdym
+     razem i za każdym razem o niej zapominał. */
+  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
+  const pierwszy = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  assert.deepEqual(pierwszy.lukiKartoteki.numery, [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }]);
+  assert.deepEqual(pierwszy.lukiKartoteki.modele, ["HONDA GX999"]);
+  assert.equal(pierwszy.lukiKartoteki.symbol, "W09-0211", "pokwitowanie bez kartoteki jest zdaniem bez podmiotu");
+  assert.equal(pierwszy.lukiKartoteki.czeka, 1);
+
+  const drugi = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  assert.deepEqual(drugi.lukiKartoteki.numery, [], "zapisane przestało być luką");
+  assert.deepEqual(drugi.lukiKartoteki.modele, []);
+  assert.equal(drugi.lukiKartoteki.czeka, 1, "licznik kolejki to stan, nie przyrost — widać go i tak");
+  assert.equal(liczba("towar_identyfikator"), 1, "drugie kliknięcie nie mnoży wierszy");
+});
+
+test("bez PEWNEJ kartoteki oferty nie zapisujemy NIC", async () => {
+  /* Numer wpisany do CUDZEJ kartoteki jest najdroższą awarią tego wydania,
+     bo wraca do klienta jako zły towar. Domysł po nazwie wystarcza, żeby
+     pokazać kartotekę obok oferty, ale nie żeby dopisać jej cudzy numer. */
+  db().prepare("UPDATE offer_snapshot SET sku=NULL WHERE external_id='of-1'").run();
+  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
+
+  /* Treść bez numeru kartoteki: bez SKU nie ma faktu o kartotece, więc
+     domyślny szkic wywróciłby się na sprawdzeniu numerów, a nie na tym, o co
+     tu chodzi. */
+  const s = await S.ulozSzkic(rozmowa, KTO(),
+    nadawca({ tresc: "Dzień dobry, proszę o numer z tabliczki (F1).", uzyteFakty: ["F1"] }), subiekt);
+
+  assert.equal(liczba("towar_identyfikator"), 0, "oferta bez SKU nie wskazuje kartoteki");
+  assert.equal(liczba("model_z_opisu"), 0);
+  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: [], czeka: 0 });
+});
+
+test("szkic sprzed 0.264.0 czyta się jako lista MODELI, bez dorabiania rodzaju", () => {
+  /* Gołą tablicę zostawiły szkice z 0.254.0 i była listą OZNACZEŃ. Dorobienie
+     im `rodzaju` byłoby zmyśleniem danych o tym, czym te oznaczenia są. */
+  db().prepare(`INSERT INTO szkic_copilota(conversation_id,tresc,zastrzezenia,uzyte_fakty,model,at,przez,
+    przez_user_id,luki_kartoteki) VALUES (?,'x','[]','[]','m','2026-09-01T00:00:00Z','Ala',?,?)`)
+    .run(rozmowa, biuro, JSON.stringify(["FS250", "FR450"]));
+  const s = S.szkicCopilota(rozmowa)!;
+  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: ["FS250", "FR450"], czeka: 0 });
 });
 
 test("odwołania (F…) znikają z treści PO sprawdzeniu, uzyteFakty zostaje", async () => {
