@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.269.0 — 10 września 2026
+
+Realizacja WMS w istniejącym biurze: od rezerwacji części przez skan lokalizacji,
+zbiórkę pojedynczą lub wózkiem do kontroli pakowania i wysyłki wielu paczek.
+Wózek prowadzi do 12 zamówień po jednej trasie i wymaga potwierdzenia docelowego pojemnika.
+
+- Fizyczny zapas na lokalizacjach, rezerwacje, przyjęcia, przesunięcia, spisy,
+  minima i niezmienny dziennik. Kwarantanna oraz zaplecze nie zasilają zbiórki.
+- Import partii zamówień, kolejki według priorytetu i terminu, wstrzymanie,
+  przejęcie, odłożenie pobranego towaru i anulowanie bez utraty rezerwacji.
+- Powtórzenie żądania odtwarza wynik; konflikty wersji i transakcje chronią ostatnią sztukę.
+  Interfejs zachowuje nierozstrzygnięty zapis po odświeżeniu strony.
+- Raporty wysyłek, terminowości, zaległości, etapów, SKU, osób, ruchów,
+  spisów i różnic z ERP; eksport CSV i kursor wysyłek dla integratora.
+- Kopia działającej bazy SQLite ze sprawdzeniem spójności i manifestem SHA-256.
+  Testy usług, API, dwóch procesów, odtworzenia oraz prawdziwej przeglądarki.
+  Próba 5000 SKU / 1500 zamówień oraz raportów na 90 dniach historii.
+- Fastify z poprawkami bezpieczeństwa, CSP biura i odtwarzanie sesji po odświeżeniu.
+  Naprawione przenośne uruchamianie testów na Windows; treść specyfikacji Allegro bez zmian.
+
+**Wymaga działania:** Node.js co najmniej 24.15.0, `npm ci`, build i restart usług.
+Otwarcie ewidencji WMS wymaga policzenia i zapisania rzeczywistego zapasu.
+Lustro Subiekta nie nadpisuje ilości WMS. Integracja nie wystawia automatycznie
+dokumentów wydania ani etykiet przewoźnika. Instrukcja, demo i granice odbioru: `docs/wms.md`.
+
 ## 0.267.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

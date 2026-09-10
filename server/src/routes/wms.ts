@@ -1,0 +1,197 @@
+import type { FastifyInstance } from "fastify";
+import { ZodError, z } from "zod";
+import { sesjaZadania } from "../context.js";
+import {
+  actOnOrder,
+  changeStock,
+  configureBin,
+  listBins,
+  createWave,
+  getWave,
+  listWaves,
+  pickWave,
+  createOrder,
+  getOrder,
+  importOrders,
+  inventory,
+  listOrders,
+  manager,
+  releaseBatch,
+  WmsError,
+  type Actor,
+} from "../services/wms.js";
+import {
+  analytics,
+  erpReconciliation,
+  integrity,
+} from "../services/wms-analytics.js";
+import { db } from "../db/db.js";
+import { wierszCsv, zbudujCsv } from "../services/csv.js";
+
+function actor(): Actor {
+  const s = sesjaZadania();
+  if (!s) throw new WmsError(401, "Zaloguj się ponownie");
+  return { id: s.user.userId, name: s.user.name, role: s.user.role };
+}
+const orderId = (raw: string) =>
+  z.coerce.number().int().positive().max(2_147_483_647).parse(raw);
+
+export async function wmsRoutes(app: FastifyInstance) {
+  app.addHook("onRequest", async (_req, reply) => {
+    reply
+      .header("cache-control", "no-store")
+      .header("x-content-type-options", "nosniff");
+  });
+  // Enkapsulacja Fastify zachowuje dotychczasowe błędy pozostałych modułów.
+  app.setErrorHandler((error, req, reply) => {
+    if (error instanceof WmsError)
+      return reply.code(error.statusCode).send({ error: error.message });
+    if (error instanceof ZodError)
+      return reply.code(400).send({
+        error: "Sprawdź dane formularza",
+        details: error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+      });
+    const status = (error as { statusCode?: number }).statusCode;
+    if (status && status >= 400 && status < 500)
+      return reply.code(status).send({ error: "Niepoprawne żądanie" });
+    req.log.error({ err: error }, "WMS request failed");
+    return reply
+      .code(500)
+      .send({ error: "Nie zapisano operacji. Ponów z tym samym kluczem" });
+  });
+  app.get("/api/wms/orders", async (req) => {
+    actor();
+    return listOrders(req.query);
+  });
+  app.get("/api/wms/waves", async (req) => listWaves(actor(), req.query));
+  app.post("/api/wms/waves", async (req) =>
+    createWave(actor(), String(req.headers["idempotency-key"] ?? ""), req.body),
+  );
+  app.get<{ Params: { id: string } }>("/api/wms/waves/:id", async (req) =>
+    getWave(actor(), orderId(req.params.id)),
+  );
+  app.post<{ Params: { id: string } }>("/api/wms/waves/:id/pick", async (req) =>
+    pickWave(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      orderId(req.params.id),
+      req.body,
+    ),
+  );
+  app.get<{ Params: { id: string } }>("/api/wms/orders/:id", async (req) => {
+    actor();
+    return getOrder(orderId(req.params.id));
+  });
+  app.post("/api/wms/orders", { bodyLimit: 128 * 1024 }, async (req) =>
+    createOrder(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.post("/api/wms/import", { bodyLimit: 2 * 1024 * 1024 }, async (req) =>
+    importOrders(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.post("/api/wms/release", async (req) =>
+    releaseBatch(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.post<{ Params: { id: string } }>(
+    "/api/wms/orders/:id/actions",
+    async (req) =>
+      actOnOrder(
+        actor(),
+        String(req.headers["idempotency-key"] ?? ""),
+        orderId(req.params.id),
+        req.body,
+      ),
+  );
+  app.get("/api/wms/inventory", async (req) => {
+    actor();
+    return inventory(req.query);
+  });
+  app.get("/api/wms/bins", async (req) => {
+    actor();
+    return listBins(req.query);
+  });
+  app.post("/api/wms/bins", async (req) =>
+    configureBin(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.post("/api/wms/inventory", async (req) =>
+    changeStock(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.get("/api/wms/analytics", async (req) => {
+    manager(actor());
+    return analytics(req.query);
+  });
+  app.get("/api/wms/integrity", async () => {
+    manager(actor());
+    return integrity();
+  });
+  app.get("/api/wms/reconciliation", async () => {
+    manager(actor());
+    return erpReconciliation();
+  });
+  app.get<{ Querystring: { after?: string } }>(
+    "/api/wms/shipments",
+    async (req) => {
+      manager(actor());
+      const after = z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(2_147_483_647)
+        .parse(req.query.after ?? 0);
+      const rows = db()
+        .prepare(
+          `SELECT s.*,o.reference,o.channel FROM wms_shipment s JOIN wms_order o ON o.id=s.order_id
+      WHERE s.id>? ORDER BY s.id LIMIT 100`,
+        )
+        .all(after);
+      return { rows, next: rows.length ? rows[rows.length - 1].id : after };
+    },
+  );
+  app.get<{ Querystring: { twId?: string; before?: string } }>(
+    "/api/wms/movements",
+    async (req) => {
+      manager(actor());
+      const twId = orderId(req.query.twId ?? "0");
+      const before = req.query.before
+        ? orderId(req.query.before)
+        : 2_147_483_647;
+      return {
+        rows: db()
+          .prepare(
+            "SELECT * FROM wms_movement WHERE tw_id=? AND id<? ORDER BY id DESC LIMIT 100",
+          )
+          .all(twId, before),
+      };
+    },
+  );
+  app.get("/api/wms/analytics/csv", async (req, reply) => {
+    manager(actor());
+    const a = analytics(req.query);
+    const rows = [wierszCsv(["Dzień UTC", "Wysłane", "W terminie"], ";")];
+    for (const r of a.daily)
+      rows.push(wierszCsv([r.day, r.shipped, r.on_time], ";"));
+    return reply
+      .type("text/csv; charset=utf-8")
+      .header("content-disposition", 'attachment; filename="wms-wysylki.csv"')
+      .send(zbudujCsv(rows));
+  });
+}

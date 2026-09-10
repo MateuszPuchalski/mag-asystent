@@ -4,7 +4,8 @@ Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
 magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
 `http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
-wydruku; operacje wykonuje się wyłącznie na kolektorze. Zero chmury.
+wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skanerem.
+Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md). Zero chmury.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
@@ -40,7 +41,7 @@ Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
 - **kasuje `AppEnvironment` i `AppEnvironmentExtra` obu usług**, bo zmienne
   środowiskowe przykrywają `wertis.env` (§2a) — pozostałość po starszej
   instalacji wygrałaby po cichu z nowymi ustawieniami;
-- **sprawdza wersję Node** (aplikacja wymaga ≥ 22.5, §1) zamiast pozwolić jej
+- **sprawdza wersję Node** (aplikacja wymaga ≥ 24.15, §1) zamiast pozwolić jej
   wywalić się dopiero przy starcie usługi.
 
 Instalacja pilotażowa bez dotykania Subiekta (Etap 0 z §6):
@@ -120,7 +121,7 @@ w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
-- [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`).
+- [Node.js LTS 24](https://nodejs.org) — **wymagane ≥ 24.15** (`node -v`).
   Serwer używa wbudowanego `node:sqlite`, którego starsze wersje nie mają;
   w zamian **nie kompiluje już żadnego modułu natywnego**, więc `npm ci`
   nie potrzebuje build tools. Pełny tekst w panelu obsługi (0.186.0) używa

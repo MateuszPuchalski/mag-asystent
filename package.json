@@ -1,14 +1,14 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.267.0",
-  "description": "WERTIS — asystent magazyniera (Subiekt GT). Monorepo: server (Fastify/SQLite/worker) + android (kolektor Kotlin/Compose) — jedynym interfejsem człowieka jest kolektor.",
+  "version": "0.269.0",
+  "description": "WERTIS — WMS z kompletacją i pakowaniem, biuro, obsługa klienta i kolektor Android; integracje Subiekta GT.",
   "workspaces": [
     "server",
     "panel"
   ],
   "engines": {
-    "node": ">=22.5"
+    "node": ">=24.15.0"
   },
   "scripts": {
     "dev": "concurrently -n api,worker,panel -c green,magenta,cyan \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:panel\"",
@@ -20,7 +20,11 @@
     "start": "npm -w server run start",
     "reconcile": "npm -w server run reconcile",
     "reslot": "npm -w server run reslot --",
-    "dev:panel": "npm -w @wertis/panel-obslugi run dev"
+    "dev:panel": "npm -w @wertis/panel-obslugi run dev",
+    "test:wms": "node --import tsx --test server/src/services/wms.test.ts server/src/routes/wms.test.ts",
+    "test:wms:e2e": "node tools/wms-e2e.mjs",
+    "test:wms:capacity": "node --import tsx server/src/wms-capacity-run.ts",
+    "wms:backup": "node --import tsx server/src/wms-backup-run.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -92,6 +92,8 @@ export function db(): DatabaseSync {
   fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
   const database = new DatabaseSync(config.dbPath);
   database.exec("PRAGMA journal_mode = WAL");
+  // Potwierdzony skan WMS musi trafić na dysk przed odpowiedzią, także przy zaniku zasilania.
+  database.exec("PRAGMA synchronous = FULL");
   database.exec("PRAGMA foreign_keys = ON");
   /* Bazę otwierają DWA procesy: API i worker. WAL rozdziela czytających od
      piszących, ale NIE dwóch piszących — a piszą obaj: API przy każdym

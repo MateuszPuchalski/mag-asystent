@@ -1,0 +1,120 @@
+{
+  "version": "0.269.0",
+  "date": "2026-09-10",
+  "branch": "codex/robust-wms",
+  "serverTests": {
+    "passed": 2037,
+    "failed": 0
+  },
+  "panelTests": {
+    "passed": 640,
+    "failed": 0,
+    "note": "Baseline verification; panel source unchanged"
+  },
+  "build": {
+    "passed": true,
+    "notes": [
+      "Existing Vite chunk-size warning",
+      "Fonts are served by the API at runtime"
+    ]
+  },
+  "repositoryChecks": [
+    "docs_check.py",
+    "styl_check.py",
+    "ergonomia_check.py",
+    "kt_imports_check.py"
+  ],
+  "capacity": {
+    "at": "2026-09-10T21:24:41.807Z",
+    "node": "v24.15.0",
+    "sqlite": "3.51.3",
+    "platform": "win32",
+    "cpu": "AMD Ryzen 7 7730U with Radeon Graphics         ",
+    "products": 5000,
+    "orders": 1500,
+    "concurrency": 16,
+    "requests": 16650,
+    "elapsedSeconds": 78.26,
+    "ordersPerHour": 69003,
+    "httpMs": {
+      "p50": 70.87,
+      "p95": 93.18,
+      "p99": 112.3,
+      "max": 165.87
+    },
+    "eventLoopMaxMs": 166,
+    "integrity": {
+      "ok": true,
+      "balances": [],
+      "reservations": []
+    },
+    "limitations": "Localhost, synthetic 3-line orders, warm database, one API process. Excludes ERP, carrier, physical scanners and production hardware."
+  },
+  "retainedHistory": {
+    "orders": 136500,
+    "lines": 409500,
+    "results": [
+      {
+        "url": "/api/wms/analytics?days=90",
+        "milliseconds": 612.64
+      },
+      {
+        "url": "/api/wms/analytics?days=30",
+        "milliseconds": 240.73
+      },
+      {
+        "url": "/api/wms/orders?status=allocated",
+        "milliseconds": 1.51
+      },
+      {
+        "url": "/api/wms/inventory?q=SKU-4",
+        "milliseconds": 8.62
+      },
+      {
+        "url": "/api/wms/reconciliation",
+        "milliseconds": 140.05
+      }
+    ],
+    "limitations": "Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths."
+  },
+  "browser": {
+    "passed": true,
+    "scenarios": [
+      "login",
+      "create",
+      "allocate",
+      "pick",
+      "wrong scan",
+      "lost response and reload",
+      "expired session preserves pending scan",
+      "pack",
+      "ship",
+      "receive",
+      "stock movement history",
+      "quarantine location",
+      "batch import",
+      "bulk allocation",
+      "mobile scan targets",
+      "cart route with tote verification",
+      "analytics",
+      "ledger integrity",
+      "390px viewport"
+    ],
+    "browserErrors": [],
+    "server": "Compiled production server (server/dist/index.js)"
+  },
+  "productionDependencyVulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "unverified": [
+    "Live order platform import and carrier handoff",
+    "Physical scanners, printers and production hardware",
+    "Opening inventory and reconciliation with actual ERP documents",
+    "Remote CI has not been run"
+  ]
+}

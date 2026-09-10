@@ -6,6 +6,127 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
+-- WMS prowadzi fizyczny zapas niezależnie od odświeżanego lustra ERP.
+-- Snapshot kartoteki w pozycji przeżywa usunięcie lub zmianę symbolu w ERP.
+CREATE TABLE IF NOT EXISTS wms_product (
+  tw_id INTEGER PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  nazwa TEXT NOT NULL,
+  ean TEXT
+);
+CREATE TABLE IF NOT EXISTS wms_stock (
+  tw_id INTEGER NOT NULL,
+  bin TEXT NOT NULL,
+  on_hand INTEGER NOT NULL DEFAULT 0 CHECK(on_hand >= 0),
+  reserved INTEGER NOT NULL DEFAULT 0 CHECK(reserved >= 0 AND reserved <= on_hand),
+  minimum INTEGER NOT NULL DEFAULT 0 CHECK(minimum >= 0),
+  version INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY(tw_id, bin)
+);
+CREATE INDEX IF NOT EXISTS ix_wms_stock_bin ON wms_stock(bin, tw_id);
+-- Zapas kwarantanny i zapas zaplecza są widoczne, ale nie trafiają do zbiórki.
+CREATE TABLE IF NOT EXISTS wms_bin (
+  bin TEXT PRIMARY KEY,
+  mode TEXT NOT NULL CHECK(mode IN ('pick','reserve','quarantine')),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0)
+);
+CREATE TABLE IF NOT EXISTS wms_order (
+  id INTEGER PRIMARY KEY,
+  reference TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new','allocated','picking','picked','packing','packed','shipped','cancelled')),
+  priority INTEGER NOT NULL DEFAULT 0 CHECK(priority BETWEEN 0 AND 2),
+  due_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  allocated_at TEXT,
+  picked_at TEXT,
+  packed_at TEXT,
+  shipped_at TEXT,
+  picker_id INTEGER,
+  packer_id INTEGER,
+  tote TEXT,
+  hold_reason TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(channel, reference)
+);
+CREATE INDEX IF NOT EXISTS ix_wms_order_queue ON wms_order(status, priority DESC, due_at, id);
+CREATE INDEX IF NOT EXISTS ix_wms_order_open ON wms_order(priority DESC, due_at, id)
+  WHERE status NOT IN ('shipped','cancelled');
+CREATE INDEX IF NOT EXISTS ix_wms_order_created ON wms_order(created_at);
+CREATE INDEX IF NOT EXISTS ix_wms_order_shipped ON wms_order(shipped_at);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_active_tote ON wms_order(tote)
+  WHERE tote IS NOT NULL AND status NOT IN ('shipped','cancelled');
+CREATE TABLE IF NOT EXISTS wms_wave (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  picker_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wms_wave_picker ON wms_wave(picker_id,id);
+CREATE TABLE IF NOT EXISTS wms_wave_order (
+  wave_id INTEGER NOT NULL REFERENCES wms_wave(id),
+  order_id INTEGER NOT NULL UNIQUE REFERENCES wms_order(id),
+  PRIMARY KEY(wave_id,order_id)
+);
+CREATE TABLE IF NOT EXISTS wms_line (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  tw_id INTEGER NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  barcode TEXT,
+  quantity INTEGER NOT NULL CHECK(quantity > 0),
+  picked INTEGER NOT NULL DEFAULT 0 CHECK(picked >= 0 AND picked <= quantity),
+  packed INTEGER NOT NULL DEFAULT 0 CHECK(packed >= 0 AND packed <= picked),
+  UNIQUE(order_id, tw_id)
+);
+CREATE INDEX IF NOT EXISTS ix_wms_line_tw ON wms_line(tw_id, order_id);
+CREATE TABLE IF NOT EXISTS wms_allocation (
+  id INTEGER PRIMARY KEY,
+  line_id INTEGER NOT NULL REFERENCES wms_line(id),
+  bin TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity > 0),
+  picked INTEGER NOT NULL DEFAULT 0 CHECK(picked >= 0 AND picked <= quantity),
+  UNIQUE(line_id, bin)
+);
+CREATE TABLE IF NOT EXISTS wms_movement (
+  id INTEGER PRIMARY KEY,
+  tw_id INTEGER NOT NULL,
+  bin TEXT NOT NULL,
+  delta INTEGER NOT NULL,
+  reserved_delta INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  order_id INTEGER REFERENCES wms_order(id),
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wms_movement_stock ON wms_movement(tw_id, bin, id);
+CREATE INDEX IF NOT EXISTS ix_wms_movement_time ON wms_movement(created_at, kind);
+CREATE TRIGGER IF NOT EXISTS wms_movement_no_update BEFORE UPDATE ON wms_movement
+BEGIN SELECT RAISE(ABORT, 'WMS movement is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_movement_no_delete BEFORE DELETE ON wms_movement
+BEGIN SELECT RAISE(ABORT, 'WMS movement is immutable'); END;
+CREATE TABLE IF NOT EXISTS wms_shipment (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  package_no INTEGER NOT NULL DEFAULT 1 CHECK(package_no>0),
+  carrier TEXT NOT NULL,
+  tracking TEXT NOT NULL,
+  weight_g INTEGER NOT NULL CHECK(weight_g > 0),
+  created_at TEXT NOT NULL,
+  UNIQUE(carrier, tracking),
+  UNIQUE(order_id, package_no)
+);
+-- Odpowiedź i zmiana stanu zatwierdzają się razem, także po utracie sieci.
+CREATE TABLE IF NOT EXISTS wms_command (
+  key TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,

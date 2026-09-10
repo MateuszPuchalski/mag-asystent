@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
@@ -45,8 +46,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function biuroRoutes(app: FastifyInstance) {
   const html = fs.readFileSync(path.join(__dirname, "../web/biuro.html"), "utf8");
+  const script=/<script>([\s\S]*?)<\/script>/.exec(html)?.[1];
+  if(!script)throw new Error("Brak skryptu biura do polityki CSP");
+  const hash=(value:string)=>createHash("sha256").update(value.replace(/\r\n/g,"\n")).digest("base64");
+  // Styl inline jest częścią dotychczasowego biura. Skrypty dopuszczamy po
+  // sumie treści, a jedyny stary handler druku ma osobną, wąską sumę.
+  const csp=`default-src 'self'; script-src 'self' 'sha256-${hash(script)}' 'unsafe-hashes' 'sha256-${hash("print()") }'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'`;
+  app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8")
+    .header("content-security-policy",csp).header("x-content-type-options","nosniff")
+    .header("referrer-policy","same-origin").header("cache-control","no-store").send(html));
 
-  app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8").send(html));
+  for (const [plik, mime] of [["wms.js", "text/javascript"], ["wms.css", "text/css"]]) {
+    const content = fs.readFileSync(path.join(__dirname, "../web", plik), "utf8");
+    app.get(`/biuro/${plik}`, async (_req, reply) => reply.type(mime).header("cache-control", "no-cache").send(content));
+  }
 
   /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
      Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez

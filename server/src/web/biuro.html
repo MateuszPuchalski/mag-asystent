@@ -819,6 +819,10 @@
     <div class="grupa">
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
+        <button data-widok="wms" title="Zamówienia, kompletacja i pakowanie">
+          <svg viewBox="0 0 24 24"><path d="M3 7l9-5 9 5v14H3zM3 7l9 5 9-5M12 12v9"/></svg>
+          <span class="et">REALIZACJA WMS</span>
+        </button>
         <button data-widok="dostawy" aria-current="true" title="Dostawy i reklamacje">
           <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           <span class="et">DOSTAWY</span>
@@ -889,6 +893,7 @@
 </main>
 
 <main id="panel" hidden>
+  <section id="widokWms" class="widok" hidden aria-label="Realizacja zamówień"></section>
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
   <div id="widokDostawy" class="widok">
     <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
@@ -1526,6 +1531,8 @@
      oddałoby `null` i położyło cały panel. -->
 <div id="lupa" hidden><img alt=""></div>
 
+<link rel="stylesheet" href="/biuro/wms.css">
+<script src="/biuro/wms.js"></script>
 <script>
 "use strict";
 /* Jedna strona, zero zależności, zero builda. Token sesji żyje w localStorage,
@@ -1704,6 +1711,8 @@ function pokaz(nowy) {
      samego powodu stan panelu NIE idzie do localStorage. */
   zamknijDokument();
   $("widokDostawy").hidden = nowy !== "dostawy";
+  $("widokWms").hidden = nowy !== "wms";
+  if (nowy === "wms") window.Wms.open();
   $("widokMagazyn").hidden = nowy !== "magazyn";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
@@ -5318,6 +5327,14 @@ document.addEventListener("click", (e) => {
   if (widok) ustawSzuflade(widok.id, szufladaW !== widok.id);
 });
 
+// Odświeżenie strony zachowuje sesję i pozwala odzyskać wynik skanu WMS.
+// Uruchamiamy po inicjalizacji wszystkich stałych używanych przez start().
+if (token) {
+  api("/api/auth/me").then(r => r.json()).then(d => {
+    kto = d.user.name;
+    start();
+  }).catch(e => { $("loginBlad").textContent = e.message; });
+}
 </script>
 <dialog id="dialogW"></dialog>
 <div id="toasty"></div>

@@ -35,6 +35,7 @@ import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
+import { wmsRoutes } from "./routes/wms.js";
 import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
@@ -132,6 +133,7 @@ export async function buildApp() {
   withRequestContext(app);
   // ETag/304 dla odpytywanych odczytów — kolektor rewaliduje zamiast pobierać
   withEtag(app);
+  await app.register(wmsRoutes);
 
   /* Health ma odpowiadać na pytanie „czy wdrożenie jest poprawne", a nie tylko
      „czy proces API odpowiada". Do tej pory raportował wyłącznie własny config,

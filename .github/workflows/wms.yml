@@ -1,0 +1,27 @@
+name: WMS
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/robust-wms']
+jobs:
+  workflow:
+    name: WMS (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/zaleznosci
+      - run: npm run test:wms
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:wms:e2e -- --built
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wms-${{ matrix.os }}
+          path: .wms-artifacts/
+          include-hidden-files: true
