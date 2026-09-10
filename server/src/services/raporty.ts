@@ -13,7 +13,15 @@ import { czasLokalny, dataLokalna } from "../czas.js";
    `raportWydajnosci()` o LUDZIACH — i tylko ten drugi niesie obowiązek
    formalny z Kodeksu pracy.                                                  */
 
-const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
+/**
+ * Klamra okna raportu: 1–365 dni, w formacie modyfikatora SQLite.
+ *
+ * Eksportowane od 0.267.0, bo czytelników jest dwóch: raporty magazynu tutaj
+ * i `skutecznosc-doboru.ts`. Druga kopia tej klamry rozjechałaby się przy
+ * pierwszej poprawce granic, a wtedy dwa raporty na jednym ekranie liczyłyby
+ * różne „ostatnie 30 dni".
+ */
+export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
 
 /** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów. */
 const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];

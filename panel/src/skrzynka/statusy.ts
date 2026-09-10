@@ -1,5 +1,5 @@
 import type {
-  Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
+  DrogaDoboru, Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
   StatusRozmowy, ZrodloPropozycji, RolaPasowania } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
@@ -113,6 +113,16 @@ export const DOWODY_DO_WYBORU: RodzajDowodu[] = [
 ];
 
 /* Skąd propozycja (E2/E3). Surowy klucz `opis` na ekranie mówił tyle, co nic. */
+/* Etykiety jedenastu dróg §11.2. Stały do 0.266.0 lokalnie w `Dobor.tsx`,
+   a od 0.267.0 czyta je także karta skuteczności doboru w ustawieniach.
+   Druga kopia rozjechałaby się przy pierwszej nowej drodze — a wtedy ekran
+   pracy i raport o tej pracy nazywałyby tę samą rzecz inaczej. */
+export const NAZWA_DROGI: Record<DrogaDoboru, string> = {
+  symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
+  pasowanie: "pasuje do części", zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst",
+  wyszukiwarka: "wyszukiwarka", wymiar: "zgodne wymiary",
+};
+
 export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
   dobor: "z zatwierdzonego doboru",
   pomiar: "z pomiaru hali",

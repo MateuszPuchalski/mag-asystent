@@ -1,12 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { Settings } from "lucide-react";
-import { usePokrycieSygnatur, usePokrycieWiedzy, useZdrowie } from "../api/rozmowy";
+import { usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useZdrowie } from "../api/rozmowy";
 import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { Karta } from "../ui";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
+import { SkutecznoscDoboru } from "../ustawienia/SkutecznoscDoboru";
 
 /* ── Ustawienia obsługi klienta (0.168.0) ────────────────────────────────────
    Decyzja właściciela: stan integracji schodzi ze Skrzynki za zębatkę.
@@ -35,6 +36,10 @@ export function Ustawienia() {
      tabela zer nie mówi „wyłączony", tylko „nikt tego nie używa". */
   const copilot = useCopilot();
   const pomiar = usePomiarCopilota(copilot.data?.wlaczony === true);
+  /* Okno raportu trzyma EKRAN, nie karta: wchodzi do klucza cache, więc
+     przełączenie ma pobrać inne dane, a nie przemalować te same. */
+  const [dniDoboru, setDniDoboru] = useState(30);
+  const skutecznosc = useSkutecznoscDoboru(dniDoboru);
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -49,5 +54,6 @@ export function Ustawienia() {
     <PokrycieSygnatur dane={sygnatury.data} />
     <PokrycieWiedzy dane={wiedza.data} />
     <PomiarCopilota dane={pomiar.data} />
+    <SkutecznoscDoboru dane={skutecznosc.data} dni={dniDoboru} onDni={setDniDoboru} />
   </div>;
 }
