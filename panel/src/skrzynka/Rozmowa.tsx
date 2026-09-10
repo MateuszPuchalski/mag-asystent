@@ -102,7 +102,7 @@ export function Rozmowa(p: {
 
   if (!p.dane) {
     return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
-      <Pusto ikona={<Inbox size={38} />}>Wybierz rozmowę z listy</Pusto>
+      <Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>
     </section>;
   }
   const { rozmowa, os } = p.dane;

@@ -43,7 +43,7 @@ export function Wzmianki() {
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
 
     {!dane.isLoading && !widoczne.length && <Karta className="flex">
-      <Pusto ikona={<AtSign size={38} />}>
+      <Pusto ikona={AtSign}>
         {wszystkie.length ? "Wszystko odhaczone." : "Nikt Cię jeszcze nie wzmiankował."}
       </Pusto></Karta>}
 

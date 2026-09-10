@@ -274,7 +274,7 @@ export function Dyskusje() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading
-            ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
+            ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka dyskusje={widoczne} wybrana={wybrana}
                 zKubelkiem={Boolean(pasujace) || kubelek === null}
                 onWybierz={(d) => nawiguj(`/obsluga/dyskusje/${d}`)} />}
@@ -302,7 +302,7 @@ export function Dyskusje() {
                   czatAktywny={szczegol.data.dyskusja.czatAktywny}
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
             </>
-          : <Pusto ikona={<MessagesSquare size={40} className="text-slate-300" />}>
+          : <Pusto ikona={MessagesSquare}>
               {wybrana ? "Wczytuję dyskusję…" : "Wybierz dyskusję z kolejki po lewej"}
             </Pusto>}
       </Karta>
@@ -323,8 +323,8 @@ export function Dyskusje() {
                   wersja: szczegol.data!.dyskusja.wersja,
                 }, { onError: (e) => setBladZapisu((e as Error).message) });
               }} />
-          : <p className="p-6 text-center text-sm text-slate-500">
-              Fakty o sprawie pokażą się po wybraniu dyskusji.</p>}
+          : <Pusto waga="lista">
+              Fakty o sprawie pokażą się po wybraniu dyskusji.</Pusto>}
       </Karta>
     </div>
 

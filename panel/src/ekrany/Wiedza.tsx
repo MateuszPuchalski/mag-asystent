@@ -76,7 +76,7 @@ export function Wiedza() {
 
         {widok === "kolejka" && <>
           {!kolejka.isLoading && propozycje.length === 0 && pasowania.length === 0 &&
-            <Pusto ikona={<BookMarked size={38} />}>
+            <Pusto ikona={BookMarked}>
               Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
             </Pusto>}
           <div className="space-y-3">

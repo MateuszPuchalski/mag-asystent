@@ -6,6 +6,7 @@ import {
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
+import { Pusto } from "../ui";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej więcej:
@@ -126,10 +127,10 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
   useEffect(() => { aktywnyWiersz.current?.scrollIntoView({ block: "nearest" }); }, [wybrana]);
 
   if (!reklamacje.length) {
-    return <p className="p-6 text-center text-sm text-slate-500">
+    return <Pusto waga="lista">
       {zKubelkiem
         ? "Żadna reklamacja nie pasuje do tego, czego szukasz."
-        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</p>;
+        : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
   }
   return <ul className="divide-y divide-slate-200">
     {reklamacje.map((r) => {

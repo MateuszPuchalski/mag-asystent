@@ -5,7 +5,7 @@ import {
 import type {
   Kategoria, Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { FiltrSegmentowy, Plakietka, czas } from "../ui";
+import { czas, FiltrSegmentowy, Plakietka, Pusto } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
 import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
@@ -268,9 +268,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         onClick={() => setKategoria(null)}>pokaż wszystkie</button>}
     </div>}
     <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
-      {laduje && <p className="p-4 text-sm text-slate-500">Wczytuję…</p>}
+      {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
       {!laduje && !rozmowy.length &&
-        <p className="p-4 text-sm text-slate-500">Brak rozmów w zsynchronizowanej skrzynce.</p>}
+        <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>}
       {/* Pusty KUBEŁEK to co innego niż pusta skrzynka: „nic nie czeka na
           mnie" nie znaczy „nic nie przyszło", a jedno zdanie mniej kazałoby
           agentowi zgadywać, czy synchronizacja stanęła. */}
@@ -281,15 +281,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           rozmowy są, tylko żadna nie pasuje do frazy. Zdanie mówi frazę, bo
           literówki w polu wyszukiwania widać dopiero wtedy, gdy się je zacytuje. */}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane !== "" &&
-        <p className="p-4 text-sm text-slate-500">
+        <Pusto waga="lista">
           Nic nie pasuje do „{fraza.trim()}" w tym kubełku.{" "}
           <button type="button" className="underline" onClick={() => setFraza("")}>
-            Wyczyść szukanie</button></p>}
+            Wyczyść szukanie</button></Pusto>}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria !== null &&
-        <p className="p-4 text-sm text-slate-500">
-          Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</p>}
+        <Pusto waga="lista">
+          Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</Pusto>}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria === null &&
-        <p className="p-4 text-sm text-slate-500">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</p>}
+        <Pusto waga="lista">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</Pusto>}
       {widoczne.map((r) => {
         /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY (0.251.0) ───────────
            `czekaOdMs` liczy się od ostatniej wiadomości KLIENTA. Przy statusie

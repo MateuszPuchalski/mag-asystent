@@ -2,7 +2,7 @@ import React from "react";
 import { ExternalLink, MessageSquare, Tractor, UserRound } from "lucide-react";
 import type { MaszynaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
-import { NaglowekSekcji, czas, LoginKlienta } from "../ui";
+import { czas, LoginKlienta, NaglowekSekcji, Pusto } from "../ui";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -29,7 +29,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
 }) {
   const h = useHistoriaKlienta(rozmowaId);
 
-  if (h.isLoading) return <p className="p-4 text-sm text-slate-500">Szukam historii klienta…</p>;
+  if (h.isLoading) return <Pusto waga="lista">Szukam historii klienta…</Pusto>;
 
   /* Wątek bez rozmówcy to „nie wiem, kto to", a nie „klient bez historii".
      Różnica jest cała: drugie zdanie byłoby kłamstwem o kliencie, który kupuje

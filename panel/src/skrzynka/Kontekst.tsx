@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { PackageSearch } from "lucide-react";
 import type { OsRozmowy } from "../api/typy";
-import { Zakladki } from "../ui";
+import { Pusto, Zakladki } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
@@ -94,14 +94,14 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
           : kilkaPozycji
             /* Zamówienie z kilku pozycji (0.215.0): oferta jest do WSKAZANIA
                przy pozycji niżej, nie do wpisania z ręki i nie do zgadnięcia. */
-            ? <p className="p-4 text-sm text-slate-500">
+            ? <Pusto waga="lista">
                 Zamówienie ma {kilkaPozycji} pozycje — wskaż niżej tę, o którą pyta klient,
                 a oferta i kartoteka pojawią się tutaj.
-              </p>
-            : <p className="p-4 text-sm text-slate-500">
+              </Pusto>
+            : <Pusto waga="lista">
                 Ta rozmowa nie jest powiązana z ofertą. Panel nie zgaduje towaru
                 z treści pytania — numer wskazuje agent albo dopytuje klienta.
-              </p>}
+              </Pusto>}
         {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
           ofertaRozmowy={oferta?.externalId ?? null} />}
         {/* Zwrot POD zamówieniem, bo to zwrot tego zakupu (0.221.0). Jeden

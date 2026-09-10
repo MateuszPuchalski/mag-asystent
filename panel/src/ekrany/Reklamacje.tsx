@@ -343,7 +343,7 @@ export function Reklamacje() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading
-            ? <p className="p-6 text-center text-sm text-slate-500">Wczytuję kolejkę…</p>
+            ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka reklamacje={widoczne} wybrana={wybrana}
                 zKubelkiem={Boolean(pasujace) || kubelek === null}
                 onWybierz={(r) => nawiguj(`/obsluga/reklamacje/${r}`)} />}
@@ -372,7 +372,7 @@ export function Reklamacje() {
               edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
                 czatAktywny={szczegol.data.reklamacja.czatAktywny}
                 onZmiana={setTresc} onWyslij={() => wyslij()} />} />
-          : <Pusto ikona={<ShieldQuestion size={40} className="text-slate-300" />}>
+          : <Pusto ikona={ShieldQuestion}>
               {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
             </Pusto>}
       </Karta>
@@ -393,8 +393,8 @@ export function Reklamacje() {
                   wersja: szczegol.data!.reklamacja.wersja,
                 }, { onError: (e) => setBladZapisu((e as Error).message) });
               }} />
-          : <p className="p-6 text-center text-sm text-slate-500">
-              Dowody o sprawie pokażą się po wybraniu reklamacji.</p>}
+          : <Pusto waga="lista">
+              Dowody o sprawie pokażą się po wybraniu reklamacji.</Pusto>}
       </Karta>
     </div>
 
