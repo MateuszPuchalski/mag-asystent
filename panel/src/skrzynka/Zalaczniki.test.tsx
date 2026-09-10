@@ -28,7 +28,7 @@ const wiadomosc = (zalaczniki: WpisOsi["zalaczniki"]): WpisOsi => ({
   messageId: 1, zalaczniki,
 });
 
-const os = (w: WpisOsi) => render(<Os wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
+const os = (w: WpisOsi) => render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
   onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
 /* Hak oddaje OBIEKT: adres, zdanie porażki i ponowienie. */

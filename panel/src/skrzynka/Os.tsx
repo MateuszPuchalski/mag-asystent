@@ -7,6 +7,7 @@ import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
+import { PrzypietePytanie } from "./PrzypietePytanie";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -139,8 +140,49 @@ function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
    Godzina wpisu doszła przy okazji: `at` jechał w kontrakcie od początku,
    a oś go nie pokazywała wcale — czytało się rozmowę bez wiedzy, czy między
    pytaniem a odpowiedzią minęła minuta, czy trzy dni. */
-export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu }: {
+/* ── OŚ ZJEŻDŻA NA DÓŁ SAMA (0.260.0) ────────────────────────────────────────
+   Serwer oddaje wpisy od najstarszego (`services/skrzynka.ts`, `ORDER BY m.id`),
+   a panel do 0.259.0 nie przewijał osi ani razu: w całym `panel/src` nie było
+   ani jednego `scrollTop`. Otwarcie rozmowy dłuższej niż okno stawiało agenta
+   na jej NAJSTARSZEJ wiadomości i kazało szukać pytania ręcznie — za każdym
+   razem. Nawet przycisk „Pokaż" pod banerem nowej wiadomości tylko odświeżał
+   dane i zostawiał widok tam, gdzie stał, czyli obiecywał ruch, którego nie
+   robił. Trzy inne kolejki tego panelu doganiają kursor od 0.165.0
+   (`zwroty/`, `reklamacje/`, `dyskusje/`); oś rozmowy po prostu nigdy tego
+   nie dostała.
+
+   CELEM JEST DÓŁ LISTY, a nie ostatnie pytanie klienta. Skok na pytanie
+   chowałby pod krawędzią wszystko, co po nim padło — naszą odpowiedź, notatkę
+   kolegi, wynik z hali — czyli najświeższą część wątku. Za „gdzie jest
+   pytanie" odpowiada pasek przypięty nad edytorem, nie przewijanie.          */
+
+/** Ile pikseli od dołu jeszcze znaczy „agent stoi na dole". */
+const PROG_DOLU = 80;
+
+/**
+ * Czy nowy wpis ma dogonić dół listy.
+ *
+ * Agent przewinięty w górę CZYTA — ściągnięcie go na dół przy każdej nowej
+ * wiadomości gubiłoby miejsce, w którym był. Doganiamy więc tylko wtedy, gdy
+ * i tak stał na dole. Reguła jest osobną funkcją, bo jsdom nie liczy układu:
+ * tak da się ją sprawdzić testem, a nie wyłącznie okiem w przeglądarce.
+ */
+export function dogonicDol(el: { scrollHeight: number; scrollTop: number; clientHeight: number }): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= PROG_DOLU;
+}
+
+export function Os({
+  wpisy, rozmowaId, skokNaDol = 0, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu,
+}: {
   wpisy: WpisOsi[];
+  /** Która rozmowa. Zmiana tej wartości zjeżdża oś na dół bez pytania. */
+  rozmowaId: number;
+  /**
+   * Licznik JAWNYCH żądań zjazdu — rośnie przy „Pokaż" pod banerem nowej
+   * wiadomości. Liczba, nie `boolean`: dwa kliknięcia pod rząd mają dać dwa
+   * zjazdy, a `true → true` nie jest zmianą i nie odpaliłoby efektu.
+   */
+  skokNaDol?: number;
   zrodloPomiaru: number | null;
   mozeZlecac: boolean;
   onZrodlo: (messageId: number | null) => void;
@@ -150,6 +192,68 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
 
   const { wypowiedzi, zdarzenia } = React.useMemo(() => rozdziel(wpisy), [wpisy]);
+
+  /* Szukanie po DZIECIACH, nie selektorem `[data-wpis="..."]`: identyfikator
+     wpisu jest ciągiem z serwera, a wstawiony do selektora wymagałby ucieczki.
+     Lista dzieci to dokładnie owijki wypowiedzi — porównanie wartości nie ma
+     jak się pomylić i nie zależy od `CSS.escape`. */
+  const znajdzWpis = React.useCallback((celId: string) =>
+    Array.from(listaRef.current?.children ?? [])
+      .find((c) => (c as HTMLElement).dataset.wpis === celId) as HTMLElement | undefined, []);
+
+  /* Gdzie agent stał, ZANIM lista urosła. Ref, nie stan: odczytuje to efekt
+     po renderze, a przerysowanie przy każdym przewinięciu byłoby marnotrawstwem
+     przy liście, która i tak nic od tej wartości nie rysuje. */
+  const naDole = React.useRef(true);
+
+  const zjedzNaDol = React.useCallback(() => {
+    const el = listaRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    naDole.current = true;
+  }, []);
+
+  /* Otwarcie rozmowy i jawne „Pokaż" — zawsze na dół, bez pytania o pozycję.
+     To są dwa momenty, w których agent SAM prosi o najświeższą treść. */
+  React.useEffect(() => { zjedzNaDol(); }, [rozmowaId, skokNaDol, zjedzNaDol]);
+
+  /* Nowy wpis w otwartej rozmowie — tylko gdy agent i tak stał na dole. */
+  React.useEffect(() => {
+    if (naDole.current) zjedzNaDol();
+  }, [wypowiedzi.length, zjedzNaDol]);
+
+  /** Ostatnia wypowiedź KLIENTA — to, na co agent właśnie odpowiada. */
+  const pytanie = React.useMemo(() => {
+    for (let i = wypowiedzi.length - 1; i >= 0; i--) {
+      const w = wypowiedzi[i];
+      if (w.rodzaj === "wiadomosc" && w.odKlienta) return w;
+    }
+    return null;
+  }, [wypowiedzi]);
+
+  /* `true` na starcie, żeby pasek nie mrugnął przed pierwszym pomiarem:
+     `IntersectionObserver` oddaje wynik dopiero po renderze. */
+  const [pytanieWKadrze, setPytanieWKadrze] = React.useState(true);
+
+  React.useEffect(() => {
+    const lista = listaRef.current;
+    const cel = pytanie ? znajdzWpis(pytanie.id) : undefined;
+    /* Bez obserwatora (jsdom) i bez celu pasek ma NIE istnieć. Domyślne
+       „w kadrze" jest tu bezpieczniejsze niż domyślne „poza": fałszywy pasek
+       zabiera wysokość osi i dubluje zdanie, a fałszywy jego brak zostawia
+       ekran taki, jaki był przez dwieście wydań. */
+    if (!lista || !cel || typeof IntersectionObserver === "undefined") {
+      setPytanieWKadrze(true);
+      return;
+    }
+    /* Ujemny margines od dołu: wypowiedź wystająca zza krawędzi na kilka
+       pikseli jest formalnie „w kadrze", a przeczytać się jej nie da. */
+    const obserwator = new IntersectionObserver(
+      ([w]) => setPytanieWKadrze(w.isIntersecting),
+      { root: lista, rootMargin: "0px 0px -32px 0px" });
+    obserwator.observe(cel);
+    return () => obserwator.disconnect();
+  }, [pytanie?.id, znajdzWpis]);
 
   /* Podświetlenie GAŚNIE SAMO. Trwałe zostawiłoby na osi ślad po nawigacji,
      czyli stan, którego nikt nie zdejmuje i który po chwili kłamie o tym,
@@ -161,15 +265,9 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
   }, [podswietlony]);
 
   const skocz = (celId: string) => {
-    /* Szukamy po DZIECIACH, nie selektorem `[data-wpis="..."]`: identyfikator
-       wpisu jest ciągiem z serwera, a wstawiony do selektora wymagałby
-       ucieczki. Lista dzieci to dokładnie owijki wypowiedzi — porównanie
-       wartości nie ma jak się pomylić i nie zależy od `CSS.escape`. */
-    const el = Array.from(listaRef.current?.children ?? [])
-      .find((c) => (c as HTMLElement).dataset.wpis === celId);
     /* `center`, nie `start`: wypowiedź wepchnięta pod górną krawędź traci
        kontekst tego, co ją poprzedza, a po to właśnie się tu skacze. */
-    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    znajdzWpis(celId)?.scrollIntoView({ behavior: "smooth", block: "center" });
     setPodswietlony(celId);
   };
 
@@ -177,7 +275,9 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
      jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
      czytelna przy każdej wysokości edytora — to ona jest powodem ekranu. */
   return <div className="flex min-h-0 flex-1 flex-col">
-  <div ref={listaRef} className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
+  <div ref={listaRef}
+    onScroll={() => { const el = listaRef.current; if (el) naDole.current = dogonicDol(el); }}
+    className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
     {wypowiedzi.map((w) => <div key={w.id} data-wpis={w.id}
       className={podswietlony === w.id
         ? "rounded-lg ring-2 ring-amber-400 ring-offset-2 transition-shadow" : "transition-shadow"}>
@@ -282,6 +382,11 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
     {/* Pasek stoi POD oknem wiadomości, nad edytorem — czyli tam, gdzie kończy
         się czytanie, a zaczyna pisanie odpowiedzi. */}
     <PasekZdarzen zdarzenia={zdarzenia} onSkocz={skocz} />
+
+    {/* Przypięte pytanie stoi PONIŻEJ paska zdarzeń, czyli najbliżej edytora:
+        odpowiada na „na co odpowiadam", a to jest ostatnia myśl przed pisaniem. */}
+    {pytanie && !pytanieWKadrze
+      && <PrzypietePytanie wpis={pytanie} onPokaz={() => skocz(pytanie.id)} />}
   </div>;
 }
 

@@ -34,6 +34,75 @@ historii nie przepisujemy.
 ---
 
 
+## 0.260.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Oś rozmowy zjeżdża na dół sama.** Serwer oddaje wpisy od najstarszego
+(`services/skrzynka.ts`, `ORDER BY m.id`). Panel nie przewijał ich ani razu:
+w całym `panel/src` nie było **ani jednego** `scrollTop`. Otwarcie rozmowy
+dłuższej niż okno stawiało agenta na jej NAJSTARSZEJ wiadomości. Pytanie
+trzeba było znaleźć ręcznie, za każdym razem.
+
+Trzy inne kolejki tego panelu doganiają kursor od 0.165.0: zwroty, reklamacje
+i dyskusje. Wzorzec leżał w repo od stu wydań. Oś rozmowy po prostu nigdy
+go nie dostała.
+
+**Przycisk „Pokaż" obiecywał ruch, którego nie robił.** Stoi pod banerem
+„Klient dopisał nową wiadomość". Do 0.259.0 odświeżał dane i zostawiał widok
+tam, gdzie stał. Teraz zjeżdża na dół.
+
+Agent czytający historię nie jest przy tym ściągany. Nowy wpis dogania
+wyłącznie tego, kto i tak stał na dole. Ściąganie czytającego gubiłoby
+miejsce, w którym był.
+
+**Celem jest DÓŁ listy, a nie ostatnie pytanie klienta.** Skok na pytanie
+chowałby pod krawędzią wszystko, co po nim padło. Najświeższa część wątku
+zniknęłaby przy każdym otwarciu.
+
+**Pytanie klienta przypina się nad edytorem.** W tej kolumnie przewija się
+tylko oś: nagłówek, pasek zdarzeń i edytor są nieruchome. Przy dłuższym wątku
+albo rozepchniętym edytorze agent pisał odpowiedź, nie widząc zdania, na które
+odpowiada. Pasek pokazuje ostatnią wypowiedź klienta, przyciętą do dwóch
+wierszy. Przycisk „Pokaż w rozmowie" prowadzi na oś i podświetla wypowiedź.
+
+Pasek wchodzi WYŁĄCZNIE wtedy, gdy tamta wypowiedź wypadła z kadru. Widoczny
+zawsze dublowałby zdanie o krok wyżej. Przez to samo jego pojawienie się niesie
+treść: „odjechałeś od pytania". Pasek stojący zawsze nie mówiłby nic.
+
+Przypinamy ostatnią wypowiedź KLIENTA, nie ostatni wpis osi. Dół bywa naszą
+autoodpowiedzią, notatką kolegi albo wynikiem z hali.
+
+**„Komentarz" znika z ekranu, zostaje „notatka".** Edytor mówił „Komentarz
+wewnętrzny" i „Dodaj komentarz". Oś rozmowy dwa centymetry wyżej mówiła
+„NOTATKA WEWNĘTRZNA". Jedno okno, jedna rzecz, dwa słowa. Reklamacje
+i dyskusje mają `notatka` w API od dawna. Decyzja właściciela: notatka.
+
+Nazwy w kodzie zostają — `komentarz`, `onDodajKomentarz`, token
+`os-komentarz`. Ekran ich nie pokazuje. Przemianowanie ich tutaj utopiłoby
+trzy widoczne zmiany w diffie bez ani jednej widocznej korzyści.
+
+**Zmierzone w przeglądarce**, bo jsdom nie liczy układu:
+
+```
+otwarcie rozmowy      0 px do dołu listy (przed: 2049 px od dołu)
+wysokość paska        85 px
+przycisk paska        105 × 24 px   (próg WCAG 2.2 AA 2.5.8: 24 × 24)
+kontrast na pasku     4.76 – 10.35:1 (próg 4.5:1)
+przepełnienie poziome zero przy 900, 640 i 420 px
+```
+
+**Nowy strażnik i nowa atrapa.** `panel/src/skrzynka/OsPytanie.test.tsx` niesie
+czternaście testów: regułę doganiania dołu, pięć zachowań przewijania i sześć
+zachowań paska. Sprawdzono, że odmawiają — zdjęcie efektu przewijania wywala
+cztery, zdjęcie warunku paska dwa, a zamiana „ostatnie pytanie" na „ostatni
+wpis" kolejne dwa.
+
+jsdom nie ma `IntersectionObserver` i mieć go nie może. Atrapa stoi
+w `panel/src/test/kadr.ts` i nie udaje układu. Ona daje testowi prawo
+POWIEDZIEĆ, co obserwator zobaczył. Prawdziwe przecięcie mierzy przeglądarka —
+tak samo jak prawdziwe przewijanie.
+
 ## 0.259.0 — 10 września 2026
 
 **Szkic Copilota przestaje brzmieć jak maszyna.** Właściciel pokazał prawdziwy

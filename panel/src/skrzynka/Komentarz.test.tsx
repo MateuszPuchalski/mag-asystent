@@ -30,16 +30,16 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
   it("domyślnie jest trybem odpowiedzi do klienta", () => {
     edytor({ szkic: "Dzień dobry" });
     expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Dodaj komentarz/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Dodaj notatkę/ })).toBeNull();
   });
 
   it("w trybie komentarza przycisku wysyłki NIE MA — nie da się go kliknąć", async () => {
     edytor({ szkic: "Dzień dobry" });
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
 
     expect(screen.queryByRole("button", { name: /Wyślij do klienta/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Zapisz szkic/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Dodaj notatkę/ })).toBeInTheDocument();
   });
 
   it("komentarz ma WŁASNE pole — przełączenie trybu nie przenosi tekstu do szkicu", async () => {
@@ -50,8 +50,8 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
     edytor({ szkic: "Odpowiedź dla klienta", komentarz: "Uwaga wewnętrzna",
       onZmiana, onKomentarz });
 
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
-    const pole = screen.getByLabelText(/Komentarz wewnętrzny/) as HTMLTextAreaElement;
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
+    const pole = screen.getByLabelText(/Notatka wewnętrzna/) as HTMLTextAreaElement;
     expect(pole.value).toBe("Uwaga wewnętrzna");
 
     await userEvent.type(pole, "!");
@@ -62,7 +62,7 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
   it("wzmianka wybiera się z listy kont, nie wpisuje z palca", async () => {
     const onWzmianki = vi.fn();
     edytor({ komentarz: "Zerknij proszę", onWzmianki });
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
 
     await userEvent.click(screen.getByRole("checkbox", { name: /Ala/ }));
     expect(onWzmianki).toHaveBeenCalledWith([7]);
@@ -70,22 +70,22 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
 
   it("pusty komentarz nie wychodzi", async () => {
     edytor({ komentarz: "   " });
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
-    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
+    expect(screen.getByRole("button", { name: /Dodaj notatkę/ })).toBeDisabled();
   });
 
   it("cudza rozmowa nie blokuje komentowania — blokuje tylko odpowiedź", async () => {
     /* Komentarz jest notatką zespołu, nie odpowiedzią. Kolega ma prawo dopisać
        „to ten sam klient co wczoraj" bez przejmowania rozmowy. */
     edytor({ cudza: true, wlasciciel: "Ala", komentarz: "Uwaga" });
-    await userEvent.click(screen.getByRole("button", { name: /Komentarz wewnętrzny/ }));
-    expect(screen.getByRole("button", { name: /Dodaj komentarz/ })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
+    expect(screen.getByRole("button", { name: /Dodaj notatkę/ })).toBeEnabled();
   });
 });
 
 describe("Komentarz na osi rozmowy", () => {
   it("wygląda inaczej niż wiadomość klienta i mówi, że klient go nie widzi", () => {
-    render(<Os wpisy={[{
+    render(<Os rozmowaId={1} wpisy={[{
       id: "komentarz-1", rodzaj: "komentarz", autor: "Ala", odKlienta: false,
       tresc: "To ten sam klient co wczoraj.", at: "2026-09-01T10:00:00Z",
       ofertaId: null, wzmianki: [{ userId: 7, name: "Bogdan" }],
@@ -100,7 +100,7 @@ describe("Komentarz na osi rozmowy", () => {
   it("nie proponuje zlecenia pomiaru — to nie jest pytanie klienta", () => {
     /* Zlecenie idzie z wiadomości KLIENTA, bo to ona niesie pytanie. Notatka
        zespołu nie ma czego zlecić, a przycisk sugerowałby, że ma. */
-    render(<Os wpisy={[{
+    render(<Os rozmowaId={1} wpisy={[{
       id: "komentarz-2", rodzaj: "komentarz", autor: "Ala", odKlienta: false,
       tresc: "Uwaga", at: "2026-09-01T10:00:00Z", ofertaId: null,
     }]} zrodloPomiaru={null} mozeZlecac onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);

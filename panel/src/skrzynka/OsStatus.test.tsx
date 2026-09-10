@@ -25,7 +25,7 @@ const status = (n: Record<string, unknown> = {}): WpisOsi => ({
 });
 
 const pokaz = (wpisy: WpisOsi[]) => render(
-  <Os wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
+  <Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
 describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
@@ -44,7 +44,7 @@ describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
     /* To jest cały powód zmiany: przy siedmiu zdarzeniach kreski zajmowały
        więcej miejsca niż rozmowa i dyktowały długość przewijania. */
     const { container } = render(
-      <Os wpisy={[wiadomosc(), status(), status({ id: "status-10", tresc: "open → closed" })]}
+      <Os rozmowaId={1} wpisy={[wiadomosc(), status(), status({ id: "status-10", tresc: "open → closed" })]}
         zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
     const lista = container.querySelector("[data-wpis]")!.parentElement!;
     expect(within(lista as HTMLElement).queryByText(/resolved → open/)).toBeNull();
