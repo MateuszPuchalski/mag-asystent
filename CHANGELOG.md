@@ -117,6 +117,36 @@ skasowane: przycisku bez mocy dalej nie ma, powód dalej stoi na ekranie.
 Doszły cztery nowe na rangę statusu w wierszu. Czterdzieści testów kolejki
 przeszło bez zmian, bo żaden fakt nie wyszedł z wiersza.
 
+## 0.250.0 — 10 września 2026
+
+**Czeskie, słowackie i węgierskie litery przestają przyjeżdżać jako kod.**
+Właściciel pokazał zdanie z prawdziwej sprawy: `Z&aacute;silka nebyla
+doručena.` Zamiast litery `á` na ekranie stało siedem znaków.
+
+Usterki były trzy. Tablica encji w `server/src/tekst.ts` znała wyłącznie
+polskie litery, więc `&aacute;` wracało dosłownie nawet tam, gdzie dekoder
+był wołany od 0.152.0. Synchronizator spraw posprzedażowych
+(`services/allegro-reklamacje-sync.ts`) nie dekodował niczego. Komentarz
+klienta do pozycji zwrotu też przechodził surowy.
+
+Tablica ma teraz 185 wpisów: cały Latin-1 Supplement i Latin Extended-A,
+czyli wszystkie alfabety, którymi piszą do nas sąsiedzi. **Wygenerował ją
+parser HTML przeglądarki, nie pamięć** — to ta sama zasada co przy kształcie
+Allegro. `&shy;` celowo został poza tablicą, bo jest niewidzialny
+i zatruwałby porównania tekstu tak samo jak `&nbsp;`.
+
+Zastane wiersze naprawiają się same przy najbliższym starcie. Migracja
+`odkodujEncjeWZastanych` bierze teraz także tematy, opisy i powody spraw,
+treści czatu reklamacyjnego, nazwy załączników i komentarze do pozycji
+zwrotów. Warunek `LIKE '%&%'` pilnuje, żeby tekst z `&`, który encją nie
+jest, przetrwał drugie wejście w całości.
+
+To jest encjowa blizna trzeci raz, po 0.127.0 i 0.152.0. Poprzednie dwie
+kosztował brak wołającego; tę — tablica zbudowana pod jeden alfabet.
+
+---
+
+
 ## 0.249.1 — 10 września 2026
 
 **Zamówienie, którego Allegro nie zna, przestaje być pytane w kółko.** Portal

@@ -184,6 +184,64 @@ test("odkodujEncje: nbsp na zwykłą spację, typografia dekodowana", () => {
   assert.equal(odkodujEncje("&bdquo;x&rdquo; &ndash; 5&deg;"), "„x” – 5°");
 });
 
+/* ── Alfabety spoza polskiego (0.250.0) ──────────────────────────────────────
+   Zgłoszenie właściciela: „często piszą do nas Węgrzy, Słowacy i Czesi
+   i dostajemy takie znaki `Z&aacute;silka nebyla doručena`". Do 0.249.1
+   tablica znała WYŁĄCZNIE polskie znaki, więc `&aacute;` zostawało dosłownie.
+
+   Zdanie ze zgłoszenia jest przy okazji dowodem, że Allegro koduje
+   NIEKONSEKWENTNIE: `á` przyszło jako encja, a `č` w tym samym zdaniu jako
+   zwykły znak UTF-8. Test bierze je oba naraz, bo tak właśnie przychodzą. */
+
+test("odkodujEncje: zdanie ze zgłoszenia właściciela, encja obok gołego UTF-8", () => {
+  assert.equal(odkodujEncje("Z&aacute;silka nebyla doručena."), "Zásilka nebyla doručena.");
+});
+
+test("odkodujEncje: czeski, słowacki, węgierski i niemiecki", () => {
+  assert.equal(
+    odkodujEncje("&Scaron;koda, &zcaron;e &scaron;t&iacute;tek chyb&iacute;"),
+    "Škoda, že štítek chybí");
+  assert.equal(
+    odkodujEncje("Ko&scaron;&iacute;k je pr&aacute;zdny, &ccaron;ak&aacute;m na v&yacute;menu"),
+    "Košík je prázdny, čakám na výmenu");
+  assert.equal(
+    odkodujEncje("A csomagot m&eacute;g nem kaptam meg, k&ouml;sz&ouml;n&ouml;m"),
+    "A csomagot még nem kaptam meg, köszönöm");
+  assert.equal(odkodujEncje("Gr&uuml;&szlig;e, Ma&szlig;band fehlt"), "Grüße, Maßband fehlt");
+});
+
+test("odkodujEncje: POKRYCIE ALFABETÓW — litera, po której poznaje się język", () => {
+  /* Strażnik, nie ozdoba, i deklaruje wymaganie SAM — nie zagląda do tablicy
+     w `tekst.ts`. Test, który czyta implementację, przechodzi także wtedy, gdy
+     implementacja jest zła; ten ma paść, gdy ktoś przytnie tablicę „bo za
+     duża", i paść na literze, której brak widać w zdaniu klienta. */
+  const ALFABETY: Record<string, Array<[string, string]>> = {
+    czeski: [["ccaron", "č"], ["dcaron", "ď"], ["ecaron", "ě"], ["ncaron", "ň"],
+      ["rcaron", "ř"], ["scaron", "š"], ["tcaron", "ť"], ["uring", "ů"],
+      ["zcaron", "ž"], ["aacute", "á"], ["yacute", "ý"]],
+    słowacki: [["lacute", "ĺ"], ["lcaron", "ľ"], ["racute", "ŕ"],
+      ["ocirc", "ô"], ["auml", "ä"]],
+    węgierski: [["odblac", "ő"], ["udblac", "ű"], ["ouml", "ö"], ["uuml", "ü"],
+      ["eacute", "é"], ["iacute", "í"]],
+    niemiecki: [["szlig", "ß"], ["auml", "ä"], ["ouml", "ö"], ["uuml", "ü"]],
+    polski: [["aogon", "ą"], ["cacute", "ć"], ["eogon", "ę"], ["lstrok", "ł"],
+      ["nacute", "ń"], ["oacute", "ó"], ["sacute", "ś"], ["zacute", "ź"],
+      ["zdot", "ż"]],
+    rumuński: [["abreve", "ă"], ["acirc", "â"], ["icirc", "î"]],
+  };
+  for (const [jezyk, pary] of Object.entries(ALFABETY)) {
+    for (const [nazwa, znak] of pary) {
+      assert.equal(odkodujEncje(`&${nazwa};`), znak, `${jezyk}: &${nazwa};`);
+    }
+  }
+});
+
+test("odkodujEncje: miękki dywiz NIE jest dekodowany", () => {
+  /* `&shy;` (U+00AD) jest niewidoczny, a w bazie psułby porównania
+     i wyszukiwanie tak samo jak `&nbsp;`. Zostaje dosłownie, czyli widocznie. */
+  assert.equal(odkodujEncje("ge&shy;trennt"), "ge&shy;trennt");
+});
+
 /* ── Podpis bez nazwiska (0.232.1) ──────────────────────────────────────── */
 import { bezPodpisu } from "./tekst.js";
 

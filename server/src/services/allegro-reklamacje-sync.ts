@@ -7,6 +7,7 @@ import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js
 import { kontoKanalu } from "./kanal-konto.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
+import { odkodujEncje } from "../tekst.js";
 
 /* ── Synchronizator reklamacji klienckich (0.222.0) ──────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -332,6 +333,24 @@ async function uzupelnijCzaty(
  * to jest blizna 0.128.0 rozszerzona o pracę biura, dokładnie jak przy
  * zwrotach.
  */
+/**
+ * Tekst od człowieka — z encjami HTML zamienionymi na znaki.
+ *
+ * ALLEGRO KODUJE NIEKONSEKWENTNIE i to nie jest przypuszczenie: w jednym
+ * zdaniu ze zgłoszenia właściciela — „Z&aacute;silka nebyla doručena" — `á`
+ * przyszło jako encja, a `č` jako zwykły znak UTF-8. Dekodujemy więc KAŻDE
+ * pole niosące słowa klienta, a nie tylko te, w których encję kiedyś widziano.
+ *
+ * Do 0.249.1 ten synchronizator nie dekodował NICZEGO. Skrzynka robi to od
+ * 0.152.0 (blizna 0.127.0), a rodzina `/sale/issues` powstała później i tę
+ * lekcję pominęła — więc temat i opis reklamacji stały na ekranie dosłownie.
+ *
+ * Pola słownikowe (`type`, `status`, `right`) NIE przechodzą tędy: to kody
+ * z enumów Allegro, w których encji nie ma i być nie może.
+ */
+const ludzki = (s: string | null | undefined): string | null =>
+  typeof s === "string" && s !== "" ? odkodujEncje(s) : null;
+
 function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
   const otwarto = sprawa.openedDate ?? at;
   database.prepare(`INSERT INTO allegro_reklamacja(id,created_at,surowe_json,synced_at)
@@ -368,8 +387,8 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
     konto, sprawa.id, sprawa.referenceNumber ?? null, sprawa.checkoutForm?.id ?? null,
     sprawa.offer?.id ?? null, sprawa.buyer?.login ?? null,
     sprawa.type ?? "CLAIM", sprawa.right ?? null,
-    sprawa.reason?.type ?? null, sprawa.reason?.description ?? null,
-    sprawa.subject ?? null, sprawa.description ?? null,
+    sprawa.reason?.type ?? null, ludzki(sprawa.reason?.description),
+    ludzki(sprawa.subject), ludzki(sprawa.description),
     oczek.nazwa, oczek.grosze, oczek.waluta,
     stan.status ?? null, sprawa.decisionDueDate ?? null, stan.statusDueDate ?? null,
     stan.returnRequired == null ? null : (stan.returnRequired ? 1 : 0),
@@ -455,7 +474,7 @@ function zapiszWiadomosc(database: Db, reklamacjaId: number, w: Wiadomosc): void
       autor_login=excluded.autor_login, autor_rola=excluded.autor_rola,
       tresc=excluded.tresc, utworzono_at=excluded.utworzono_at`).run(
     reklamacjaId, w.id, w.author?.login ?? null, w.author?.role ?? null,
-    w.text ?? "", w.createdAt ?? null);
+    ludzki(w.text) ?? "", w.createdAt ?? null);
 
   const id = Number((database.prepare(
     "SELECT id FROM reklamacja_wiadomosc WHERE reklamacja_id=? AND external_id=?",
@@ -473,5 +492,7 @@ function zapiszZalacznik(
     ON CONFLICT(reklamacja_id, url) DO UPDATE SET
       wiadomosc_id=COALESCE(excluded.wiadomosc_id, reklamacja_zalacznik.wiadomosc_id),
       nazwa=excluded.nazwa`).run(
-    reklamacjaId, wiadomoscId, z.fileName ?? "", z.url);
+    /* Nazwa pliku też bywa zakodowana — skrzynka dekoduje ją od 0.244.0
+       (`zalaczniki-wiadomosci.ts`), bo po niej rozpoznaje się załącznik. */
+    reklamacjaId, wiadomoscId, ludzki(z.fileName) ?? "", z.url);
 }

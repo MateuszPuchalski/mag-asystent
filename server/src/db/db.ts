@@ -1768,8 +1768,18 @@ function sprzatnijSprzedGranicy(database: DatabaseSync) {
  * Poprawka w synchronizatorze naprawia tylko to, co przyjdzie od teraz — ta
  * migracja bierze to, co już leży.
  *
- * Dotyka WYŁĄCZNIE modelu pracy (`message.body`, `conversation.subject`).
- * Lądowisko `allegro_inbox_*` zostaje surowe, bo taka jest jego rola.
+ * Dotyka WYŁĄCZNIE modelu pracy. Lądowiska (`allegro_inbox_*`,
+ * `allegro_reklamacja`, `allegro_zwrot`) zostają surowe, bo taka jest ich rola:
+ * są dowodem tego, co Allegro przysłało.
+ *
+ * OD 0.250.0 BIERZE TEŻ SPRAWY POSPRZEDAŻOWE I ZWROTY. Powód jest podwójny.
+ * Po pierwsze, tamte synchronizatory nie dekodowały niczego, więc encje leżą
+ * w bazie od pierwszego dnia. Po drugie — i to dotyczy także skrzynki —
+ * tablica encji znała do 0.249.1 wyłącznie polskie znaki, więc `&aacute;`
+ * przetrwało nawet tam, gdzie dekoder był wołany.
+ *
+ * Ta funkcja chodzi PRZY KAŻDYM STARCIE i nie ma znacznika wersji, więc
+ * poszerzenie tablicy naprawia zastane wiersze samo — bez osobnej migracji.
  *
  * Warunek `LIKE '%&%'` nie jest optymalizacją, tylko warunkiem POPRAWNOŚCI:
  * bez niego funkcja przepisywałaby wszystkie wiersze przy każdym starcie, a na
@@ -1792,4 +1802,12 @@ function odkodujEncjeWZastanych(database: DatabaseSync) {
   };
   napraw("message", "body");
   napraw("conversation", "subject");
+  /* Sprawy posprzedażowe: reklamacje i dyskusje leżą w jednej tabeli. */
+  for (const kolumna of ["temat", "opis", "powod_opis"]) {
+    napraw("reklamacja_klienta", kolumna);
+  }
+  napraw("reklamacja_wiadomosc", "tresc");
+  napraw("reklamacja_zalacznik", "nazwa");
+  /* Zwroty: komentarz klienta do pozycji. */
+  napraw("zwrot_klienta_pozycja", "powod_komentarz");
 }

@@ -5,6 +5,7 @@ import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js
 import { kontoKanalu } from "./kanal-konto.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
+import { odkodujEncje } from "../tekst.js";
 import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
@@ -106,6 +107,17 @@ function liczba(value: unknown): number | null {
   const n = (value as Record<string, unknown> | null)?.count;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Tekst od klienta z odkodowanymi encjami HTML.
+ *
+ * Ta sama decyzja i ten sam powód co w `allegro-reklamacje-sync.ts` (0.250.0):
+ * Allegro koduje niekonsekwentnie, więc dekodujemy każde pole niosące słowa
+ * człowieka. Komentarz do zwrotu jest jedynym takim polem w tym pliku —
+ * reszta to kody z enumów, w których encji nie ma i być nie może.
+ */
+const ludzkiZwrot = (s: string | null | undefined): string | null =>
+  typeof s === "string" && s !== "" ? odkodujEncje(s) : null;
 
 /**
  * Kwota Allegro na grosze.
@@ -429,7 +441,9 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
         url=excluded.url`).run(
       id, poz.offerId ?? null, nazwa, Number(poz.quantity ?? 0),
       naGrosze(poz.price?.amount), poz.price?.currency ?? "PLN",
-      poz.reason?.type ?? null, poz.reason?.userComment ?? null,
+      /* `userComment` to zdanie KLIENTA własnymi słowami, więc przechodzi przez
+         dekoder; `reason.type` zostaje surowy, bo to kod z enumu Allegro. */
+      poz.reason?.type ?? null, ludzkiZwrot(poz.reason?.userComment),
       poz.url ?? null, klucz);
   }
 
