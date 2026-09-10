@@ -34,6 +34,58 @@ historii nie przepisujemy.
 ---
 
 
+## 0.251.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Kolejka pytań: najgłośniejszy element wiersza nie rozróżniał niczego.**
+Zgłoszenie właściciela dotyczyło ekranu, na który agent patrzy cały dzień.
+
+Wiersz zaczynał się od plakietki statusu. W kubełkach roboczych status jest
+praktycznie stały — „CZEKA NA NAS" stało w każdym wierszu z rzędu. Emfaza
+wydana na stałą nie rozróżnia niczego, a innej już nie zostaje. Rzecz, która
+wiersze RÓŻNI — czas oczekiwania — stała drobnym drukiem na końcu skanowania.
+
+To była też ta sama informacja dwa razy. Serwer zwraca `waiting_for_us` wtedy
+i tylko wtedy, gdy ostatnia wiadomość jest przychodząca (`statusZKierunku`).
+Zegar liczy się dokładnie od ostatniej wiadomości przychodzącej. Jeden fakt,
+dwa miejsca; zostaje ten, który niesie liczbę.
+
+Górny rząd pojawia się teraz tylko przy WYJĄTKU. Wyjątek to ręczna flaga „pilne"
+albo status, którego z reszty wiersza odczytać się nie da: „Odłożona",
+„Rozwiązana", „Czeka na halę", „Zamknięta", „Spam". Zwykły wiersz zaczyna się od pytania
+klienta. Status bez plakietki nie znika: schodzi do podpisu, obok loginu.
+§4.3 pozwala fakt wyciszyć, nie pozwala go schować.
+
+**Zegar przestał kłamać.** `czekaOdMs` liczy się od wiadomości KLIENTA, więc po
+naszej odpowiedzi dalej rośnie. Wiersz pisał wtedy „czeka 15 g" o rozmowie,
+w której piłka jest po drugiej stronie. Zegar chodzi teraz tylko wtedy, gdy dług
+jest nasz. Data ostatniej wiadomości ustępuje mu miejsca, bo przy „czeka na nas"
+oba znaczniki opisują TĘ SAMĄ wiadomość — a data robiła to gorzej, z sekundami.
+Gdy zegara nie ma, data wraca jako jedyny czas w wierszu.
+
+**Dwa pasma znikły, bo donosiły o niezdarzeniach.** Wyłączony Copilot zajmował
+pełne pasmo nad listą zdaniem o pliku konfiguracyjnym — przy każdym otwarciu
+skrzynki, na zawsze. Rozpoznany kubełek zajmował drugie tyle martwym przyciskiem
+„Wszystkie rozmowy w tym kubełku są rozpoznane". Oba fakty zostają: niesie je
+znak w nagłówku kolejki, w podpowiedzi i w `aria-label`. Pasmo wraca, gdy jest
+co rozpoznać, gdy partia trwa i gdy ma wynik do rozliczenia.
+
+Zmierzone w przeglądarce na tych samych danych, kolumna 420 px:
+
+```
+             pasm   chrom    lista    zwykły wiersz
+PRZED          5    271 px   703 px      126 px
+PO             4    175 px   800 px       94 px
+```
+
+Widocznych pytań bez przewijania: 5,6 → 8,5. O połowę więcej.
+
+**Testy.** Dwa padły, oba trzymały starą formę paska Copilota — przepisane, nie
+skasowane: przycisku bez mocy dalej nie ma, powód dalej stoi na ekranie.
+Doszły cztery nowe na rangę statusu w wierszu. Czterdzieści testów kolejki
+przeszło bez zmian, bo żaden fakt nie wyszedł z wiersza.
+
 ## 0.249.1 — 10 września 2026
 
 **Zamówienie, którego Allegro nie zna, przestaje być pytane w kółko.** Portal

@@ -715,6 +715,25 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Plakietka należy się WYJĄTKOWI, nie normie (0.251.0).** Wiersz zaczynał się od
+plakietki statusu, a w kubełkach roboczych status jest praktycznie stały. „CZEKA
+NA NAS" stało w każdym wierszu z rzędu, czyli emfaza szła na słowo, które niczego
+nie rozróżnia. Górny rząd pojawia się teraz tylko przy fladze „pilne" albo przy
+statusie, którego z reszty wiersza odczytać się nie da. Status bez plakietki
+schodzi do podpisu — §4.3 pozwala fakt wyciszyć, nie pozwala go schować.
+
+**Zegar mierzy NASZ dług, nie wiek rozmowy (0.251.0).** `czekaOdMs` liczy się od
+ostatniej wiadomości klienta, więc po naszej odpowiedzi dalej rośnie. Wiersz
+pisał „czeka 15 g" o rozmowie, w której piłka jest po drugiej stronie. Zegar
+chodzi teraz tylko przy statusach naszego ruchu. Data ostatniej wiadomości
+ustępuje mu miejsca, bo przy „czeka na nas" oba znaczniki opisują tę samą
+wiadomość. Gdy zegara nie ma, data wraca.
+
+**Stan spoczynku Copilota nie dostaje pasma (0.251.0).** Wyłączony Copilot i
+rozpoznany kubełek zajmowały po pełnym paśmie, żeby donieść o braku roboty.
+Oba fakty niesie teraz znak w nagłówku kolejki, w podpowiedzi i w `aria-label`.
+Pasmo wraca, gdy jest co rozpoznać, gdy partia trwa i gdy ma wynik.
+
 **Data synchronizacji jest podpisem, nie pasmem (0.193.0).** Pasm sterujących
 nad listą było pięć i zjadały ćwierć wysokości kolumny. Tę samą datę niesie
 pigułka w pasku górnym, na każdym ekranie panelu.

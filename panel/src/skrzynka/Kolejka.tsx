@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import {
   AlarmClock, Eye, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
-import type { Kategoria, Rozmowa, StanCopilota, StanSkrzynki, WynikPartii } from "../api/typy";
+import type {
+  Kategoria, Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
+} from "../api/typy";
 import { Plakietka, czas } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
-import { PasekCopilota, PlakietkaKategorii, doRozpoznania } from "./Copilot";
+import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
 /* Kubełki kolejki wprost z §10.1: „Nieprzypisane, Moje, Oczekujące, Po
    terminie". Filtr jest po stronie EKRANU, bo lista i tak przyjeżdża w
@@ -67,6 +69,33 @@ export function czekaOd(ms: number): string {
   if (godziny < 24) return `${godziny} g ${minuty % 60} min`;
   return `${Math.floor(godziny / 24)} d ${godziny % 24} g`;
 }
+
+/* ── KTÓRY STATUS ZASŁUGUJE NA PLAKIETKĘ (0.251.0) ───────────────────────────
+   Do 0.249.1 każdy wiersz zaczynał się od plakietki statusu — a w kubełkach
+   roboczych („Nieprzypisane", „Moje") status jest praktycznie STAŁY. Najgłośniejszy
+   element wiersza powtarzał więc w kółko to samo słowo i nie rozróżniał niczego,
+   podczas gdy rzecz, która wiersze RÓŻNI — czas oczekiwania — stała drobnym
+   drukiem na końcu skanowania.
+
+   `waiting_for_us` niesie dokładnie ten sam fakt co zegar: serwer zwraca ten
+   status wtedy i tylko wtedy, gdy ostatnia wiadomość jest przychodząca
+   (`statusZKierunku`), a zegar liczy się od ostatniej wiadomości przychodzącej.
+   Jeden fakt, dwa miejsca; zostaje to, które niesie LICZBĘ.
+
+   Statusy poniżej wynikają za to z decyzji człowieka albo z ruchu hali i nie
+   da się ich odczytać z niczego innego w wierszu — te zostają plakietkami. */
+const WYJATKOWE: ReadonlySet<StatusRozmowy> = new Set([
+  "waiting_for_internal", "snoozed", "resolved", "closed", "spam",
+]);
+
+/* Statusy, przy których piłka jest PO NASZEJ STRONIE. Tylko przy nich zegar
+   mierzy dług — patrz komentarz przy wierszu. */
+const NASZ_RUCH: ReadonlySet<StatusRozmowy> = new Set([
+  "new", "waiting_for_us",
+  /* Zlecenie pomiaru leży na HALI, ale klient czeka tak samo — i to jego czas
+     mierzy zegar. Plakietka mówi DLACZEGO, zegar ILE; jedno nie zastępuje drugiego. */
+  "waiting_for_internal",
+]);
 
 function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean {
   if (kubelek === "wszystkie") return true;
@@ -156,24 +185,28 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         Dlaczego data w ogóle tu jest: pusta lista o 9:00 znaczy co innego, gdy
         synchronizator stanął o 6:00, a co innego, gdy przebiegł minutę temu.
         Tego zdania nie usuwamy — schodzi obok tytułu, w rozmiar podpisu. */}
-    <header className="flex shrink-0 items-center gap-2 border-b p-4">
-      <Inbox size={18} />
-      <div className="mr-auto min-w-0">
-        <b>Rozmowy</b>
-        <p className="truncate text-xs font-normal text-slate-500">
-          synchronizacja {czas(stan.ostatniaSynchronizacja)}
-          {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
-        </p>
-      </div>
+    {/* NAGŁÓWEK W JEDNYM WIERSZU (0.251.0). Tytuł i data synchronizacji stały
+        jeden pod drugim i kosztowały 73 px — czyli więcej niż wiersz z pytaniem
+        klienta. Data ZOSTAJE (patrz akapit wyżej: pusta lista o 9:00 znaczy co
+        innego przy stojącym synchronizatorze), tylko schodzi obok tytułu,
+        w rozmiar podpisu, i ustępuje mu miejsca przy wąskiej kolumnie. */}
+    <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
+      <Inbox size={16} className="shrink-0" />
+      <b className="shrink-0">Rozmowy</b>
+      <p className="mr-auto min-w-0 truncate text-[11px] font-normal text-slate-400">
+        synchronizacja {czas(stan.ostatniaSynchronizacja)}
+        {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
+      </p>
+      <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
         STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
       <button className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
-    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-2">
+    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-1.5">
       {KUBELKI.map((k) => <button key={k.klucz} onClick={() => setKubelek(k.klucz)}
         aria-pressed={kubelek === k.klucz}
-        className={`rounded px-2 py-1 text-xs font-semibold ${kubelek === k.klucz
+        className={`rounded px-2 py-0.5 text-xs font-semibold ${kubelek === k.klucz
           ? "bg-wertis-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
         {k.etykieta} <span className="font-normal">
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
@@ -182,7 +215,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
         pola, w tym samym paśmie: to trzecie sito na tę samą listę, a osobny
         rząd zjadałby wysokość kolumny, która ma pokazywać PYTANIA. */}
-    <div className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
+    <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
       <div className="relative min-w-0 flex-1">
         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={fraza} onChange={(e) => setFraza(e.target.value)}
@@ -210,7 +243,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         że nikt by tego nie zauważył. Agent widzi skład skrzynki i sam wybiera,
         co bierze. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
         trafności ją uzasadni (etap G). */}
-    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1.5 text-xs">
+    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-[11px]">
       {wgLiczby.map(([k, ile]) => <button key={k} type="button"
         aria-pressed={kategoria === k}
         onClick={() => setKategoria(kategoria === k ? null : k)}
@@ -243,87 +276,108 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</p>}
       {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria === null &&
         <p className="p-4 text-sm text-slate-500">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</p>}
-      {widoczne.map((r) => <button key={r.id} onClick={() => onWybierz(r.id)}
-        aria-current={wybranaId === r.id}
-        className={`block w-full border-b p-4 text-left hover:bg-slate-50 ${
-          wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
-        {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0) ────────────────────────────
-            Do 0.192.0 najgrubszym drukiem w wierszu stał LOGIN KUPUJĄCEGO,
-            a pytanie leżało pod nim, mniejsze i szare. Login Allegro nie mówi
-            nic — „Kupujący 44300444" to nie jest osoba, którą się zna. Triaż
-            robi się po TREŚCI, więc treść dostała pierwszy plan, a login zszedł
-            do podpisu obok czasu. Makieta rysowała to tak od początku: klient
-            13,5 px, a nad nim temat rozmowy.
+      {widoczne.map((r) => {
+        /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY (0.251.0) ───────────
+           `czekaOdMs` liczy się od ostatniej wiadomości KLIENTA. Przy statusie
+           „Czeka na klienta" znaczy to, że odpisaliśmy — a wiersz i tak pisał
+           „czeka 15 g", czyli mierzył czas komuś, kto na nic nie czeka. Słowo
+           „czeka" musi być prawdziwe, bo po nim układa się kolejność pracy
+           (§10.2) i po nim serwer sortuje domyślną listę. */
+        const zegar = NASZ_RUCH.has(r.status) ? r.czekaOdMs : null;
+        const wyjatkowy = WYJATKOWE.has(r.status);
+        const glosne = r.priorytet === "pilny" || wyjatkowy;
+        return <button key={r.id} onClick={() => onWybierz(r.id)}
+          aria-current={wybranaId === r.id}
+          className={`block w-full border-b px-4 py-3 text-left hover:bg-slate-50 ${
+            wybranaId === r.id ? "border-l-[3px] border-l-wertis-amber bg-amber-50" : ""}`}>
+          {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0, doprecyzowane w 0.251.0) ────
+              0.193.0 oddało pierwszy plan TREŚCI: login Allegro nie mówi nic,
+              a triaż robi się po pytaniu. Ta decyzja zostaje. Zepsuł ją górny
+              rząd plakietek: nad treścią stał status, czyli słowo, które
+              w kubełku roboczym powtarza się w KAŻDYM wierszu. Emfaza wydana
+              na stałą nie rozróżnia niczego, a innej już nie zostaje.
 
-            Plakietki zostają na górze, bo odpowiadają na pytanie zadawane
-            PRZED czytaniem: czy tę rozmowę w ogóle brać. */}
-        <div className="flex items-center gap-2">
-          {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
-              zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
-          {r.priorytet === "pilny" &&
-            <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
-              PILNE</span>}
-          {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
-              statusu, „NOWA" — dwa różne fakty jednym wyrazem. „Nowa" znaczy
-              „sprawy nikt nie tknął", „nowe" znaczyło „Allegro trzyma wątek
-              jako nieodczytany". Czytało się to jak powtórzenie, a przy okazji
-              zjadało szerokość, przez którą plakietka statusu łamała się na
-              dwie linie. Kropka to znak nieprzeczytanego znany ze wszystkich
-              skrzynek — nazwę niesie `title` i tekst dla czytnika ekranu. */}
-          {r.nieprzeczytana && <span title="Nieprzeczytana wiadomość"
-            className="h-2 w-2 shrink-0 rounded-full bg-wertis-amber">
-            <span className="sr-only">NOWE</span></span>}
-          <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>
-          {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
-              „za co się wziąć", a data każe je dopiero policzyć w głowie.
-              Stoi w prawym rogu górnej linii, bo razem z PILNE tworzy jedyną
-              parę sygnałów, po której układa się kolejność pracy (§10.2). */}
-          {r.czekaOdMs !== null && <span className={`ml-auto shrink-0 text-xs font-bold ${
-            r.poTerminie ? "text-ranga-zle" : "text-slate-600"}`}>
-            czeka {czekaOd(r.czekaOdMs)}</span>}
-        </div>
-        {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
-            nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
-            pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
-        <p className="mt-1.5 line-clamp-2 text-sm font-medium text-slate-800">
-          {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
-            <span className="font-semibold text-slate-400">Biuro: </span>}
-          {r.ostatniaWiadomosc}</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-          <span className="font-semibold text-slate-500">{r.klient}</span>
-          <span>{czas(r.ostatniaWiadomoscAt)}</span>
-          {/* Liczba DOPISKÓW klienta od naszej odpowiedzi. Nie nazywamy jej
-              „nieprzeczytane": tego Allegro nie podaje, a ekran nie ma prawa
-              obiecywać pomiaru, którego nie robi. */}
-          {r.nowychOdOdpowiedzi > 1 &&
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">
-              {r.nowychOdOdpowiedzi} dopiski klienta</span>}
-          {r.zadanieWToku && <span className="flex items-center gap-1 font-semibold text-slate-600">
-            <Ruler size={12} />zadanie w toku</span>}
-          {/* Status DOBORU (§10.2, E1). `not_started` i `not_applicable` milczą:
-              plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby niczego,
-              a „nie dotyczy" to wiersz, przy którym doboru NIE trzeba robić. */}
-          {r.dobor !== "not_started" && r.dobor !== "not_applicable" &&
-            <span className={`flex items-center gap-1 font-semibold ${
-              r.dobor === "confirmed" ? "text-emerald-700"
-                : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
-              <Wrench size={12} />{NAZWA_DOBORU[r.dobor]}</span>}
-          {/* Plakietka Copilota PO statusie doboru: dobór jest faktem
-              zapisanym przez człowieka, kategoria — przypuszczeniem maszyny,
-              a kolejność na wierszu ma odpowiadać wadze. */}
-          {r.kopilot && <PlakietkaKategorii kopilot={r.kopilot} />}
-          {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
-            <UserCheck size={12} />{r.wlasciciel}</span>}
-          {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
-            <AlarmClock size={12} />po terminie</span>}
-          {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
-              agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
-              przy wysyłce — czyli po straconej pracy. */}
-          {r.oglada && r.oglada.userId !== mojeId &&
-            <span className="flex items-center gap-1 font-semibold text-violet-700">
-              <Eye size={12} />{r.oglada.name}</span>}
-        </div>
-      </button>)}
+              Górny rząd pojawia się więc tylko wtedy, gdy niesie WYJĄTEK:
+              ręczną flagę „pilne" albo status, którego z reszty wiersza nie
+              da się odczytać. Zwykły wiersz zaczyna się od pytania klienta. */}
+          {glosne && <div className="mb-1.5 flex items-center gap-2">
+            {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
+                zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
+            {r.priorytet === "pilny" &&
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
+                PILNE</span>}
+            {wyjatkowy && <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>}
+          </div>}
+          {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
+              nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
+              pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
+          <p className="line-clamp-2 text-[15px] font-medium leading-[21px] text-slate-800">
+            {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
+                statusu, „NOWA" — dwa różne fakty jednym wyrazem. Kropka to znak
+                nieprzeczytanego znany ze wszystkich skrzynek; nazwę niesie
+                `title` i tekst dla czytnika ekranu.
+
+                Od 0.251.0 stoi PRZED pierwszym słowem podglądu, a nie w rzędzie
+                plakietek: rząd znika na zwykłym wierszu, a znak nieprzeczytanego
+                należy do miejsca, w którym wzrok wchodzi w wiersz. */}
+            {r.nieprzeczytana && <span title="Nieprzeczytana wiadomość"
+              className="mr-1.5 inline-block h-2 w-2 rounded-full bg-wertis-amber align-middle">
+              <span className="sr-only">NOWE</span></span>}
+            {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
+              <span className="font-semibold text-slate-400">Biuro: </span>}
+            {r.ostatniaWiadomosc}</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+            {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
+                „za co się wziąć", a data każe je dopiero policzyć w głowie.
+                Otwiera podpis, bo to jedyna liczba w wierszu, po której układa
+                się kolejność pracy — i jedyna, która wiersze RÓŻNI. */}
+            {zegar !== null && <span className={`shrink-0 text-xs font-bold tabular-nums ${
+              r.poTerminie ? "text-ranga-zle" : "text-wertis-ink"}`}>
+              czeka {czekaOd(zegar)}</span>}
+            {/* Status bez plakietki nie znika — schodzi do podpisu. §4.3: fakt
+                wolno wyciszyć, nie wolno schować. Milczy tylko tam, gdzie zegar
+                mówi to samo innymi słowami. */}
+            {zegar === null && !wyjatkowy &&
+              <span className="shrink-0 text-slate-500">{NAZWA[r.status]}</span>}
+            <span className="font-semibold text-slate-500">{r.klient}</span>
+            {/* Data ustępuje ZEGAROWI (0.251.0). Przy „czeka na nas" oba znaczniki
+                mierzą TĘ SAMĄ wiadomość, więc data była drugim zapisem jednego
+                faktu — i to gorszym, bo z sekundami. Gdy zegara nie ma, data
+                zostaje jedynym czasem w wierszu i wraca. */}
+            {zegar === null && <span>{czas(r.ostatniaWiadomoscAt)}</span>}
+            {/* Liczba DOPISKÓW klienta od naszej odpowiedzi. Nie nazywamy jej
+                „nieprzeczytane": tego Allegro nie podaje, a ekran nie ma prawa
+                obiecywać pomiaru, którego nie robi. */}
+            {r.nowychOdOdpowiedzi > 1 &&
+              <span className="font-semibold text-slate-600">
+                {r.nowychOdOdpowiedzi} dopiski klienta</span>}
+            {r.zadanieWToku && <span className="flex items-center gap-1 font-semibold text-slate-600">
+              <Ruler size={12} />zadanie w toku</span>}
+            {/* Status DOBORU (§10.2, E1). `not_started` i `not_applicable` milczą:
+                plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby niczego,
+                a „nie dotyczy" to wiersz, przy którym doboru NIE trzeba robić. */}
+            {r.dobor !== "not_started" && r.dobor !== "not_applicable" &&
+              <span className={`flex items-center gap-1 font-semibold ${
+                r.dobor === "confirmed" ? "text-emerald-700"
+                  : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
+                <Wrench size={12} />{NAZWA_DOBORU[r.dobor]}</span>}
+            {/* Plakietka Copilota PO statusie doboru: dobór jest faktem
+                zapisanym przez człowieka, kategoria — przypuszczeniem maszyny,
+                a kolejność na wierszu ma odpowiadać wadze. */}
+            {r.kopilot && <PlakietkaKategorii kopilot={r.kopilot} />}
+            {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
+              <UserCheck size={12} />{r.wlasciciel}</span>}
+            {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
+              <AlarmClock size={12} />po terminie</span>}
+            {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
+                agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
+                przy wysyłce — czyli po straconej pracy. */}
+            {r.oglada && r.oglada.userId !== mojeId &&
+              <span className="flex items-center gap-1 font-semibold text-violet-700">
+                <Eye size={12} />{r.oglada.name}</span>}
+          </div>
+        </button>;
+      })}
       {nieswieza && <p className="border-t bg-red-50 px-4 py-2 text-xs text-red-800">
         Dalsze wiersze mogą istnieć w Allegro i nie zostały jeszcze pobrane.</p>}
     </div>

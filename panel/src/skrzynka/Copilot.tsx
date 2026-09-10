@@ -62,16 +62,26 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
 }) {
   const [pyta, setPyta] = useState(false);
 
-  /* Zdanie zamiast przycisku. Przycisk, który nie może zadziałać, uczy nie
-     klikać — a to jest nauka, która zostaje także wtedy, gdy zacznie działać. */
-  if (stan && !stan.wlaczony) {
-    return <p className="shrink-0 border-b bg-slate-50 px-4 py-2 text-xs text-slate-500">
-      {stan.powod}</p>;
-  }
-  if (!stan) return null;
+  /* ── PASMO POJAWIA SIĘ, GDY MA CO POWIEDZIEĆ (0.251.0) ────────────────────
+     Do 0.249.1 pasek stał ZAWSZE. Wyłączony Copilot zajmował pełne pasmo
+     zdaniem o pliku konfiguracyjnym — przy każdym otwarciu skrzynki, na
+     zawsze, bo to fakt wdrożenia, nie treść kolejki. Rozpoznany kubełek
+     zajmował drugie tyle martwym przyciskiem „Wszystkie rozmowy w tym
+     kubełku są rozpoznane", czyli pasmem na donos o BRAKU roboty.
+
+     Dwa pasma na dwa niezdarzenia, w kolumnie, która istnieje po to, żeby
+     pokazywać PYTANIA (dekalog ergonomii, punkt 2: pierwszeństwo ma to, co
+     rozstrzyga bieżącą czynność). Fakt nie ginie — niesie go `ZnakCopilota`
+     w nagłówku kolejki, w tym samym miejscu co zawsze i za darmo. */
+  if (!stan || !stan.wlaczony) return null;
 
   const partia = kandydaci.slice(0, stan.maxPartia).map((r) => r.id);
   const nadmiar = kandydaci.length - partia.length;
+
+  /* Nie ma czego rozpoznawać i nie ma czego rozliczyć — cisza. Wynik i błąd
+     ostatniej partii ZOSTAJĄ, bo za nie zapłacono i agent ma prawo wiedzieć,
+     co dostał; to jest zdarzenie, a nie jego brak. */
+  if (partia.length === 0 && !wynik && !blad && !trwa) return null;
 
   if (trwa) {
     return <p className="shrink-0 border-b bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900">
@@ -94,14 +104,11 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
   }
 
   return <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 text-xs">
-    <button type="button" className="btn-secondary flex items-center gap-1 text-xs"
-      disabled={partia.length === 0}
+    {partia.length > 0 && <button type="button" className="btn-secondary flex items-center gap-1 text-xs"
       onClick={() => setPyta(true)}>
       <Sparkles size={14} />
-      {partia.length === 0
-        ? "Wszystkie rozmowy w tym kubełku są rozpoznane"
-        : `Rozpoznaj ${partia.length} ${partia.length === 1 ? "rozmowę" : "rozmów"}`}
-    </button>
+      Rozpoznaj {partia.length} {partia.length === 1 ? "rozmowę" : "rozmów"}
+    </button>}
     {/* Reszta kubełka nie znika po cichu: limit jest hamulcem na wydatek,
         a nie obietnicą, że to już wszystko. */}
     {nadmiar > 0 && <span className="text-slate-500">
@@ -115,6 +122,35 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
     {wynik && <span className="text-slate-600">{podsumowanie(wynik)}</span>}
     {blad && <span className="font-semibold text-ranga-zle">{blad}</span>}
   </div>;
+}
+
+/**
+ * Znak Copilota w NAGŁÓWKU kolejki (0.251.0).
+ *
+ * Przejmuje to, co do 0.249.1 zajmowało całe pasmo nad listą: powód, dla
+ * którego Copilot nie działa, oraz wiadomość, że w kubełku nie ma już czego
+ * rozpoznawać. Obie rzeczy są STANAMI SPOCZYNKU — mówią, że nic się nie
+ * dzieje — a stan spoczynku nie ma prawa zajmować pasma w kolumnie, która
+ * pokazuje pytania klientów.
+ *
+ * Nie jest przyciskiem, bo nie ma czego wywołać. Klikalny znak, który nic nie
+ * robi, uczy nie klikać — tę naukę plik nosi od 0.191.1 i ona zostaje.
+ *
+ * Milczy, gdy JEST co rozpoznawać: wtedy mówi pasmo, i to głośniej, bo tam
+ * stoi liczba i przycisk.
+ */
+export function ZnakCopilota({ stan, kandydaci }: {
+  stan: StanCopilota | undefined;
+  kandydaci: Rozmowa[];
+}) {
+  if (!stan) return null;
+  if (stan.wlaczony && kandydaci.length > 0) return null;
+  const powod = stan.wlaczony
+    ? "Wszystkie rozmowy w tym kubełku są rozpoznane"
+    : stan.powod ?? "Copilot jest wyłączony";
+  return <span role="img" title={powod} aria-label={powod}
+    className="shrink-0 text-slate-400">
+    <Sparkles size={15} /></span>;
 }
 
 /**
