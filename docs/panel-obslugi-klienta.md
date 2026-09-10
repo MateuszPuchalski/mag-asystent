@@ -1721,6 +1721,41 @@ najsłabszy, bo plik polecenia ma kilkadziesiąt półpauz we własnym tekście
 i model czyta je jako wzorzec. Gdy myślnik będzie wracał, to jest pierwsze
 miejsce do sprawdzenia.
 
+**KARTOTEKA NIE MÓWI, CO JEST W PACZCE (0.261.0).** Szkic o filtr powietrza
+do Craftsmana LT2000 napisał klientowi sprostowanie: pod tą ofertą jest sam
+filtr główny, mimo że opis wspomina o komplecie z przedfiltrem. Opis aukcji
+deklaruje komplet filtr plus przedfiltr.
+
+**Model nie zmyślił faktu, tylko podpisał faktem swój wniosek.** Twierdzenie
+brzmiało „przedfiltr jest osobną pozycją 04-01015, a nie częścią tej oferty",
+źródło `fakty`, odwołanie F6, pewność `pewne`. Pierwszy człon stoi w F6.
+Drugiego F6 nie mówi wcale.
+
+**To jest dziura w danych, nie w modelu.** W bazie nie ma pojęcia „co jest
+w pudełku". Oferta ma jedną kartotekę, kandydaci to części alternatywne,
+a tabela pasowań opisuje relację część do części, nie skład zestawu
+sprzedażowego. Kartoteka opisująca jedną część nie może zaprzeczyć zdaniu
+o zawartości aukcji, bo się o niej nie wypowiada. Reguła 2b kazała uznać to
+za sprzeczność i powiedzieć klientowi wprost.
+
+**Koszt był handlowy.** Powiedzieliśmy kupującemu, że w paczce jest mniej,
+niż deklaruje nasza własna aukcja. Opis oferty jest częścią tego, co
+sprzedajemy, więc wiadomość obsługi mówiąca co innego jest problemem,
+a nie sprostowaniem. Co jest w paczce, wie magazyn.
+
+**Reguła 2b dostaje granicę, 2c mówi resztę.** Kartoteka wygrywa, gdy przeczy
+opisowi w tej samej właściwości tej samej części: wymiar, numer, dopasowanie.
+O zawartości oferty milczy. Rozbieżność o skład zestawu idzie wyłącznie do
+zastrzeżeń dla agenta i szkic nie prostuje jej klientowi. Gdy klient pyta
+wprost o zawartość, odpowiada tym, co deklaruje oferta.
+
+**Sufit pewności liczy się ze źródła, nie z treści.** `ustalPewnosc` porównuje
+zadeklarowany poziom z sufitem dla źródła i nie sprawdza, czy teza wynika
+z faktu. Zdanie sklejone z faktu i z wniosku bierze przez to pewność faktu dla
+obu członów. Reguła 1b każe teraz rozbić takie zdanie na dwa twierdzenia.
+Kod tego nie sprawdzi tanio, bo musiałby ocenić wynikanie; miarą jest
+`obnizona`, która liczy, jak często model zawyża.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki

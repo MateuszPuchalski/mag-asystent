@@ -34,6 +34,62 @@ historii nie przepisujemy.
 ---
 
 
+## 0.261.0 — 10 września 2026
+
+**Szkic przestaje prostować własną aukcję.** Właściciel pokazał szkic o filtr
+powietrza do Craftsmana LT2000. Szkic napisał klientowi sprostowanie: pod tą
+ofertą jest sam filtr główny, mimo że opis wspomina o komplecie z przedfiltrem.
+Opis tej aukcji deklaruje komplet filtr plus przedfiltr.
+
+**Model nie zmyślił faktu. Podpisał faktem swój wniosek.** Twierdzenie brzmiało
+„przedfiltr jest osobną pozycją 04-01015, a nie częścią tej oferty", źródło
+`fakty`, odwołanie F6, pewność `pewne`. Pierwszy człon stoi w F6. Drugiego
+F6 nie mówi wcale i nie ma jak powiedzieć.
+
+**To była dziura w danych, nie w modelu.** W bazie nie ma pojęcia „co jest
+w pudełku". Oferta ma jedną kartotekę, kandydaci to części alternatywne,
+a tabela pasowań opisuje relację część do części, nie skład zestawu
+sprzedażowego. Kartoteka opisująca jedną część nie może zaprzeczyć zdaniu
+o zawartości aukcji, bo się o niej w ogóle nie wypowiada.
+
+Reguła 2b kazała mu uznać to za sprzeczność i powiedzieć klientowi wprost.
+Reguła jest dobra tam, gdzie powstała: opis mówi 225 mm, kartoteka mówi 180 mm.
+Obie mówią wtedy o tej samej właściwości tej samej części.
+
+**Koszt był handlowy, nie stylistyczny.** Powiedzieliśmy kupującemu, że w paczce
+jest mniej, niż deklaruje nasza własna aukcja. Opis oferty jest częścią tego,
+co sprzedajemy, więc wiadomość obsługi mówiąca co innego jest problemem, a nie
+sprostowaniem. Co jest w paczce, wie magazyn, i to on ma tę sprawę rozstrzygnąć.
+
+**Reguła 2b dostaje granicę, nowa 2c mówi resztę.** Kartoteka wygrywa, gdy
+przeczy opisowi w tej samej właściwości tej samej części: wymiar, numer,
+dopasowanie. O zawartości oferty milczy. Rozbieżność o skład zestawu idzie
+wyłącznie do zastrzeżeń dla agenta, a szkic nie prostuje jej klientowi.
+Gdy klient pyta wprost o zawartość, odpowiada tym, co deklaruje oferta.
+
+**Sufit pewności liczy się ze źródła, nie z treści.** Serwer porównuje
+zadeklarowany poziom z sufitem dla źródła i nie sprawdza, czy teza wynika
+z faktu, na który się powołuje. Zdanie sklejone z faktu i z wniosku bierze
+przez to pewność faktu dla obu członów. Reguła 1b każe teraz rozbić takie
+zdanie na dwa twierdzenia: człon z faktu ze źródłem `fakty`, wniosek ze
+źródłem `model`.
+
+Kod tego nie sprawdzi tanio, bo musiałby ocenić wynikanie. Miarę już mamy:
+`obnizona` liczy, jak często model zawyża pewność, i po tym wydaniu warto na
+tę liczbę patrzeć.
+
+**Dwie mniejsze rzeczy z tego samego szkicu.** Model wstawił klientowi
+przykładowy kod silnika jako ilustrację formatu; wymyślony numer w wiadomości
+czyta się jak numer tej maszyny, więc kształt oznaczenia opisuje się teraz
+słowami. Drugą było zastrzeżenie mówiące, czego model NIE zrobił zgodnie
+z regułą. Lista zastrzeżeń niesie od tego wydania sprzeczności o zawartość
+oferty, więc opisy posłuszeństwa zabierają w niej miejsce czemuś ważnemu.
+
+**Wdrożenie nie wymaga żadnego działania.** Zmienia się wyłącznie tekst
+instrukcji dla modelu; kod, schemat odpowiedzi i baza zostają bez zmian.
+Instrukcja stoi w cache'owanym prefiksie, więc pierwsze wywołanie po wdrożeniu
+zapisze cache od nowa i zapłaci pełną stawkę.
+
 ## 0.259.0 — 10 września 2026
 
 **Szkic Copilota przestaje brzmieć jak maszyna.** Właściciel pokazał prawdziwy
