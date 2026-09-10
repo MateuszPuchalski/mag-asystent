@@ -203,8 +203,8 @@ test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () =
   }
 });
 
-/* ── Zamknięta wraca do puli (0.256.0) ───────────────────────────────────────
-   Do 0.255.0 stał tu jeden test mówiący, że NIE budzą się ani `closed`, ani
+/* ── Zamknięta wraca do puli (0.257.0) ───────────────────────────────────────
+   Do 0.256.0 stał tu jeden test mówiący, że NIE budzą się ani `closed`, ani
    `spam`, z uzasadnieniem „automat, który cofa werdykt, kazałby zamykać tę
    samą rozmowę w kółko". Właściciel to odwołał, bo argument mylił dwa koszty:
    ponowne zamknięcie to jedno kliknięcie, a przepadłe pytanie klienta to

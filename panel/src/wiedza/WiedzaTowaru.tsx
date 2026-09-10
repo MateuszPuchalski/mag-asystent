@@ -5,7 +5,7 @@ import {
   useWycofajZastosowanie, useZaproponujPasowanie,
 } from "../api/wiedza";
 import { PasowanieForm } from "./PasowanieForm";
-import { Pole, Przycisk, czas } from "../ui";
+import { NaglowekSekcji, Pole, Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import {
   DOWODY_DO_WYBORU, NAZWA_DOWODU, NAZWA_RODZAJU_IDENTYFIKATORA, RODZAJE_IDENTYFIKATORA,
@@ -44,7 +44,7 @@ function Identyfikatory({ twId }: { twId: number }) {
   const [rodzaj, setRodzaj] = useState<RodzajIdentyfikatora>("oem");
   const [wartosc, setWartosc] = useState("");
   return <section aria-label="Identyfikatory">
-    <b className="text-xs uppercase tracking-wide text-slate-500">Identyfikatory</b>
+    <NaglowekSekcji>Identyfikatory</NaglowekSekcji>
     {lista.data && lista.data.length === 0 && <p className="text-sm text-slate-500">brak identyfikatorów w opisie</p>}
     {lista.data && lista.data.length > 0 && <ul className="mt-1 flex flex-wrap gap-1">
       {lista.data.map((i) => <li key={i.id} title={`${i.nazwaRodzaju} · ${i.zrodlo === "opis" ? "z opisu" : `ręcznie: ${i.dodal}`}`}
@@ -69,7 +69,7 @@ function Sekcja({ tytul, lista, pusto, negatyw = false, tylkoOdczyt = false }: {
   tytul: string; lista: Zastosowanie[]; pusto: string; negatyw?: boolean; tylkoOdczyt?: boolean;
 }) {
   return <section aria-label={tytul}>
-    <b className={`text-xs uppercase tracking-wide ${negatyw ? "text-red-800" : "text-slate-500"}`}>{tytul}</b>
+    <NaglowekSekcji ton={negatyw ? "text-red-800" : "text-slate-500"}>{tytul}</NaglowekSekcji>
     {lista.length === 0
       ? <p className="text-sm text-slate-500">{pusto}</p>
       : <ul className="mt-1 space-y-2">{lista.map((z) => <Wpis key={z.id} z={z} tylkoOdczyt={tylkoOdczyt} />)}</ul>}
@@ -140,7 +140,7 @@ function Pasowania({ towar, dane }: { towar: { twId: number; symbol: string; naz
   const [dopisuje, setDopisuje] = useState(false);
   const [ok, setOk] = useState("");
   return <section aria-label="Pasowania">
-    <b className="text-xs uppercase tracking-wide text-slate-500">Pasowania części</b>
+    <NaglowekSekcji>Pasowania części</NaglowekSekcji>
     <Trafienia tytul="Ta część pasuje do" lista={dane.pasujeDo} pusto="nie wiemy, do czego pasuje" strona="doCzego" />
     <Trafienia tytul="Do tej części pasują" lista={dane.pasujace} pusto="nie wiemy, co do niej pasuje" strona="czesc" />
     {dane.negatywne.length > 0 && <ul className="mt-1 space-y-1">

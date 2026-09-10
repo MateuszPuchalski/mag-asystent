@@ -405,7 +405,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
          daty wiadomości nie podaje. Podaje: `createdAt`. */
       message.createdAt,
-      /* AUTOODPOWIEDŹ ZNACZONA OD RAZU (0.256.0). Do tego wydania kolumny tu
+      /* AUTOODPOWIEDŹ ZNACZONA OD RAZU (0.257.0). Do tego wydania kolumny tu
          nie było, więc zostawało `DEFAULT 0`, a flagę dosypywała dopiero
          migracja przy starcie procesu. Między restartami nasze „Dziękujemy
          za kontakt" liczyło się jako ruch biura i przestawiało rozmowę na
@@ -418,7 +418,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
       if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
-      /* ZDARZENIE NIESIE KIERUNEK (0.256.0, dług z 0.228.0). Panel zapala pasek
+      /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
          „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
          pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
          synchronizator nie woła — więc pasek nie zapalił się ani razu na

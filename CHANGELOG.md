@@ -34,9 +34,9 @@ historii nie przepisujemy.
 ---
 
 
-## 0.256.0 — 10 września 2026
+## 0.257.0 — 10 września 2026
 
-**Zamknięta rozmowa wraca do kolejki, gdy klient dopisze.** Do 0.255.0 wracała
+**Zamknięta rozmowa wraca do kolejki, gdy klient dopisze.** Do 0.256.0 wracała
 z „Rozwiązanej", „Odłożonej" i „Czeka na klienta", ale nie z „Zamkniętej".
 Klient pisał, rozmowa zostawała zamknięta i wypadała ze WSZYSTKICH kubełków
 roboczych — stała już tylko w „Wszystkie", gdzie się nie pracuje. Pytanie
@@ -76,8 +76,43 @@ w środku. Wołają ją obie drogi zapisu.
 **Wdrożenie nie wymaga żadnego działania.** Migracji nie ma: zmiana dotyczy
 wyłącznie kodu, a kolumny, o które chodzi, stoją w bazie od 0.158.0 i 0.227.0.
 
----
+## 0.256.0 — 10 września 2026
 
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Jedna ranga, jeden kształt.** `NaglowekSekcji` powstał w 0.249.0 i przez sześć
+wydań używały go trzy pliki. Obok stało **siedemnaście ręcznie sklejonych
+nagłówków tej samej rangi**: w pięciu wagach i dwóch rozmiarach. Pięć zapisów
+jednej roli to nie wariant, tylko brak decyzji — czytelnik nie ma jak poznać,
+że to jeden poziom.
+
+Komponent dostaje dwie rzeczy. `jako` wybiera znacznik, bo znacznik niesie
+ZNACZENIE, nie tylko wygląd: cztery miejsca miały `<h3>` i po ujednoliceniu
+kształtu nie wolno im było zejść do `<span>`, bo czytnik ekranu straciłby punkt
+zaczepienia. `ton` bierze wyłącznie barwę — zielony nagłówek mówi o innym
+źródle danych, a nie o wyższej randze.
+
+**Strażnik znalazł CZWARTĄ rolę, której nie rozdzieliłem.** Etykieta pojedynczej
+wartości — „Dostępny" nad liczbą, „Kupujący" obok loginu — wygląda podobnie
+i dlatego też rozjechała się na cztery zapisy. To nie jest nagłówek: nagłówek
+nazywa BLOK, ta etykieta nazywa jedną liczbę stojącą tuż obok.
+
+`EtykietaWartosci` jest więc celowo NIEPOGRUBIONA, a nagłówek sekcji jest.
+Waga to jedyne, co je na ekranie rozróżnia, gdy obie są drobne i w wersalikach.
+Przy „Dostępny" pogrubienie było wręcz szkodliwe — etykieta konkurowała
+z liczbą 24 px, którą podpisuje.
+
+**Czego to NIE dotyczy.** Plakietka, etykieta na osi rozmowy i nagłówek tabeli
+też mają wersaliki, ale to inne role z własnymi kształtami. Bramka celuje
+w parę „wersaliki + rozstrzelenie + szarość nagłówka", nie w wersaliki w ogóle.
+
+Strażnik `panel/src/ui/NaglowekSekcji.test.tsx` czyta źródła przez `?raw` i tak
+jak dwa poprzednie zeruje komentarze przed skanowaniem, bo uzasadnienie zakazu
+zawiera zakazany łańcuch. Sprawdzony przez wstawienie ręcznego nagłówka
+z powrotem.
+
+To jest pierwsza połowa ustalenia 04 z audytu. Druga — drabina typograficzna,
+przez której brak hierarchię buduje się tu wagą i barwą — zostaje otwarta.
 
 ## 0.255.0 — 10 września 2026
 

@@ -662,7 +662,7 @@ test("strona, która przeszła, ZOSTAJE w bazie mimo awarii następnej", async (
   assert.equal(stan.d, null, "do dna nie zeszliśmy, więc sufit dalej nie obowiązuje");
 });
 
-/* ── Czego synchronizator nie mówił panelowi (0.256.0) ───────────────────────
+/* ── Czego synchronizator nie mówił panelowi (0.257.0) ───────────────────────
    Skrzynka nie woła `zapiszWiadomosc`, więc omijała wszystko, co tamta funkcja
    robi poza samym `INSERT`-em. Dwa wydania okazały się przez to puste:
    0.228.0 dołożyło pasek „Klient dopisał nową wiadomość", który na prawdziwej
@@ -709,7 +709,7 @@ test("wiadomość WYCHODZĄCA ogłasza się jako nie-klient", async () => {
 });
 
 test("nasza autoodpowiedź dostaje flagę PRZY ZAPISIE, bez czekania na restart", async () => {
-  /* Do 0.255.0 kolumny w tej wstawce nie było, więc zostawało `DEFAULT 0`,
+  /* Do 0.256.0 kolumny w tej wstawce nie było, więc zostawało `DEFAULT 0`,
      a flagę dosypywała dopiero migracja przy starcie procesu. Między
      restartami „Dziękujemy za kontakt" liczyło się jako ruch biura
      i przestawiało rozmowę na „czeka na klienta". */

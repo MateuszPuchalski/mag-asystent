@@ -361,7 +361,7 @@ przez `czyAutoresponder`. Odczyt go tylko czyta, a SQL nie powtarza reguły —
 dwie kopie rozjechałyby się przy pierwszej poprawce. Migracja wypełnia kolumnę
 wstecz i mówi w dzienniku, ile wiadomości oznaczyła.
 
-**TO WYDANIE BYŁO PUSTE PRZEZ SIEDEM MIESIĘCY (sprostowanie z 0.256.0).**
+**TO WYDANIE BYŁO PUSTE PRZEZ SIEDEM MIESIĘCY (sprostowanie z 0.257.0).**
 Znacznik ustawiał wyłącznie `zapiszWiadomosc`, a synchronizator skrzynki tej
 funkcji nie woła i nigdy nie wołał — ma własną wstawkę, z kolumnami powiązań.
 Wiersz wchodził więc bez `auto_odpowiedz`, czyli z `DEFAULT 0`, i flagę
@@ -376,12 +376,12 @@ z synchronizacji i na autoodpowiedź. Agent odpisywał i po chwili dostawał od
 panelu wiadomość, że odpisał mu klient. Zdarzenie niesie odtąd kierunek
 i znacznik odbicia; nasze wiadomości dociągają rozmowę po cichu, bez alarmu.
 
-**TEN PASEK NIE ZAPALIŁ SIĘ ANI RAZU (sprostowanie z 0.256.0).** Ta sama
+**TEN PASEK NIE ZAPALIŁ SIĘ ANI RAZU (sprostowanie z 0.257.0).** Ta sama
 przyczyna, co wyżej. Panel zapala go wyłącznie przy `odKlienta` w zdarzeniu,
 a pole ustawiał tylko `zapiszWiadomosc`. Synchronizator publikował
 `message.created` z samymi identyfikatorami, więc warunek był fałszywy dla
 KAŻDEJ prawdziwej wiadomości z Allegro i zostawało ciche odświeżenie rozmowy.
-Wydanie 0.228.0 zawęziło alarm, którego nie było. Od 0.256.0 zdarzenie
+Wydanie 0.228.0 zawęziło alarm, którego nie było. Od 0.257.0 zdarzenie
 z synchronizatora niesie `odKlienta` i `automatyczna`, liczone z tej samej
 flagi `isInterlocutor`, która wyznacza kierunek wiadomości.
 
@@ -391,7 +391,7 @@ się domknąć żadnej sprawy. Przebija je także `waiting_for_internal`: nie
 wynika z wiadomości, tylko ze zlecenia pomiaru, i zdejmuje go dopiero wynik
 z hali.
 
-**NOWA WIADOMOŚĆ BUDZI TEŻ ZAMKNIĘTĄ (0.256.0).** Do 0.255.0 `closed` i `spam`
+**NOWA WIADOMOŚĆ BUDZI TEŻ ZAMKNIĘTĄ (0.257.0).** Do 0.256.0 `closed` i `spam`
 stały poza zbiorem `BUDZONE`, z argumentem, że werdykt cofnięty automatem
 kazałby zamykać tę samą rozmowę w kółko. Argument mylił dwa koszty. Ponowne
 zamknięcie to jedno kliknięcie. Przepadłe pytanie klienta to sprawa, o której
@@ -752,6 +752,14 @@ aktywne obserwacje tak samo.
 nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
+
+**Nagłówek sekcji i etykieta wartości to DWIE role (0.256.0).** Nagłówek nazywa
+blok i jest pogrubiony (`NaglowekSekcji`); etykieta nazywa jedną wartość stojącą
+obok i pogrubiona nie jest (`EtykietaWartosci`). Waga to jedyne, co je rozróżnia,
+gdy obie są drobne i w wersalikach. Oba mieszkają w `panel/src/ui/index.tsx`
+i tam jest jedyne prawowite miejsce na ten łańcuch klas — pilnuje tego
+`panel/src/ui/NaglowekSekcji.test.tsx`. Plakietka, etykieta na osi rozmowy
+i nagłówek tabeli mają wersaliki, ale są osobnymi rolami.
 
 **Szarość tekstu ma DWA stopnie, bo tło rozstrzyga (0.255.0).** `body` ma
 `bg-slate-100`, więc tekst poza kartą siedzi na szarym. Na bieli wystarcza

@@ -3,7 +3,7 @@ import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../ap
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
-import { czas } from "../ui";
+import { NaglowekSekcji, czas } from "../ui";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
    Treść zgłoszenia i czat są tym, po co agent otwiera ten ekran, więc stoją
@@ -96,7 +96,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
   return <div className="flex min-h-0 flex-col gap-3">
     {/* Zgłoszenie: powód, oczekiwanie i opis własnymi słowami klienta. */}
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Zgłoszenie</h3>
+      <NaglowekSekcji jako="h3">Zgłoszenie</NaglowekSekcji>
       <p className="mt-1 text-sm text-slate-800">
         {sprawa.opisZgloszenia ?? "Klient nie opisał sprawy własnymi słowami."}
       </p>

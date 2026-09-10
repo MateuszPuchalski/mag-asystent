@@ -46,7 +46,7 @@ export interface NowaWiadomosc {
  * ta funkcja zamyka.
  *
  * Osobna funkcja, bo wołających jest dwóch: `zapiszWiadomosc` i synchronizator
- * skrzynki. Do 0.255.0 synchronizator wstawiał wiersz BEZ tej kolumny, więc
+ * skrzynki. Do 0.256.0 synchronizator wstawiał wiersz BEZ tej kolumny, więc
  * zostawało `DEFAULT 0` i nasza własna autoodpowiedź liczyła się jako ruch
  * biura — aż do najbliższego restartu, kiedy flagę dosypywała migracja.
  * Rozmowa z pytaniem klienta przechodziła przez to na „czeka na klienta"
@@ -480,7 +480,7 @@ export function statusZKierunku(
  * „rozwiązane" i nikt do niej nie zagląda. Status, który nie wraca sam, jest
  * gorszy od jego braku — wygląda jak porządek i nim nie jest.
  *
- * `closed` DOŁĄCZYŁO W 0.256.0 i to jest odwrócenie tamtej decyzji. Stał tu
+ * `closed` DOŁĄCZYŁO W 0.257.0 i to jest odwrócenie tamtej decyzji. Stał tu
  * argument, że werdykt cofnięty automatem kazałby zamykać tę samą rozmowę
  * w kółko. Argument mylił dwa koszty: ponowne zamknięcie to jedno kliknięcie,
  * a przepadłe pytanie klienta to sprawa, o której nikt się nie dowie. Rozmowa
@@ -498,11 +498,11 @@ const BUDZONE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Stany, z których obudzenie ODDAJE ROZMOWĘ DO PULI (0.256.0).
+ * Stany, z których obudzenie ODDAJE ROZMOWĘ DO PULI (0.257.0).
  *
  * Decyzja właściciela: „Zamknięta" wraca do „Nieprzypisanych", nie do biurka
  * tego, kto ją zamknął. To jedyna rzecz, którą oba werdykty się różnią po
- * 0.256.0, i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem,
+ * 0.257.0, i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem,
  * wraca do mnie", „Zamknięta" — „skończyłem z tym, bierze kto wolny". Bez tej
  * różnicy zostałyby dwie pozycje w menu robiące dokładnie to samo.
  *
