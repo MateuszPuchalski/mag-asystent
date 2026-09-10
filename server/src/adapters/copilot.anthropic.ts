@@ -228,6 +228,40 @@ const Szkic = z.object({
    w nawiasie, powstały z posłuszeństwa regule z 0.253.0 („zrób z tego listę").
    Reguła zostaje, dostaje warunek.
 
+   ── REGUŁA 2c: KARTOTEKA NIE MÓWI, CO JEST W PACZCE (0.261.0) ─────────────
+   Szkic o filtr powietrza do Craftsmana LT2000 NAPISAŁ KLIENTOWI SPROSTOWANIE:
+   „pod tą ofertą jest sam filtr główny, mimo że opis wspomina o komplecie
+   z przedfiltrem". Opis aukcji deklaruje komplet filtr plus przedfiltr.
+
+   Model nie zmyślił faktu. Zrobił WNIOSEK i podpisał go faktem. Twierdzenie
+   brzmiało „przedfiltr jest osobną pozycją 04-01015, A NIE CZĘŚCIĄ TEJ OFERTY",
+   źródło `fakty`, odwołanie F6, pewność `pewne`. Pierwszy człon stoi w F6.
+   Drugiego F6 nie mówi wcale — i nie ma jak powiedzieć.
+
+   TO JEST DZIURA W DANYCH, NIE W MODELU. W bazie nie ma pojęcia „co jest
+   w pudełku": oferta ma JEDNĄ kartotekę, kandydaci to części alternatywne,
+   a `pasowania` opisują relację część-część, nie skład zestawu sprzedażowego.
+   Kartoteka opisująca jedną część nie może zaprzeczyć zdaniu „ta aukcja
+   zawiera dwie rzeczy", bo się o tym nie wypowiada. Reguła 2b kazała mu
+   uznać to za sprzeczność i powiedzieć klientowi wprost.
+
+   Koszt był handlowy, nie stylistyczny: powiedzieliśmy kupującemu, że w paczce
+   jest MNIEJ, niż deklaruje nasza własna aukcja. Opis oferty jest częścią tego,
+   co sprzedajemy, a wiadomość obsługi mówiąca co innego jest problemem, nie
+   sprostowaniem. Co jest w paczce, wie magazyn.
+
+   Decyzja właściciela: przy rozbieżności o ZAWARTOŚĆ szkic milczy wobec
+   klienta, a rozbieżność idzie do `zastrzezenia`. Zdanie w rodzaju
+   „potwierdzimy zawartość przed wysyłką" odpada, bo sieje wątpliwość co do
+   naszej aukcji bez pytania klienta. Gdy klient PYTA wprost, odpowiadamy tym,
+   co deklaruje oferta.
+
+   1b dostało przy okazji drugą połowę: sufit pewności liczy się ze ŹRÓDŁA,
+   nie z treści (`ustalPewnosc`), więc zdanie sklejone z faktu i z wniosku
+   bierze pewność faktu dla obu członów. Kod tego nie sprawdzi tanio — musiałby
+   ocenić, czy teza wynika z faktu. Miarę mamy: `obnizona` liczy, jak często
+   model zawyża, i to jest liczba warta oglądania po tym wydaniu.
+
    ZAKAZ PÓŁPAUZY JEST NAJSŁABSZY Z CAŁEJ PIĄTKI i trzeba to wiedzieć,
    zanim ktoś uzna go za działający. Ten plik ma kilkadziesiąt półpauz we
    własnym tekście i model czyta je jako wzorzec. Właściciel świadomie
@@ -253,6 +287,14 @@ const INSTRUKCJA_SZKICU = [
   "1b. NAJWYŻEJ OSIEM twierdzeń, każde jednym zdaniem. Lista jest rachunkiem",
   "   dla agenta, nie streszczeniem szkicu: gdy twierdzeń wychodzi więcej,",
   "   zostaw te, których agent nie sprawdzi jednym spojrzeniem w kartotekę.",
+  "   JEDNO ZDANIE ZNACZY JEDNĄ TEZĘ, i to jest ważniejsze niż zwięzłość.",
+  "   Sufit pewności liczy się ze ŹRÓDŁA, nie z treści, więc zdanie sklejone",
+  "   z faktu i z wniosku bierze pewność faktu dla obu członów. Tak przeszło",
+  "   „przedfiltr jest pozycją 04-01015, A NIE CZĘŚCIĄ TEJ OFERTY” jako „pewne”",
+  "   z faktu, który mówił tylko pierwszy człon. Gdy drugi człon nie stoi",
+  "   w faktach, rozbij zdanie na dwa twierdzenia: człon z faktu ze źródłem",
+  "   „fakty”, wniosek ze źródłem „model”. Wniosek zbudowany NA faktach jest",
+  "   twoim wnioskiem, nie faktem.",
   "1a. Twierdzenia z faktów oznaczaj W TEKŚCIE identyfikatorem w nawiasie,",
   "   np. „pasuje (F3)”. System je sprawdza, a potem usuwa, zanim agent",
   "   zobaczy szkic. Klient ich nie przeczyta.",
@@ -267,18 +309,37 @@ const INSTRUKCJA_SZKICU = [
   "   WYŁĄCZNIE wtedy, gdy ten sam numer stoi w tezie twojego twierdzenia ze",
   "   źródłem „model”. Numer bez takiego wpisu odrzuca cały szkic — nie dlatego,",
   "   że jest zmyślony, tylko dlatego, że agent nie ma jak go sprawdzić.",
+  "   NIE WSTAWIAJ TEŻ NUMERU JAKO PRZYKŁADU FORMATU. „Na przykład 31P777",
+  "   0158 E1” czyta się jak numer TEJ maszyny, a jest ilustracją kształtu.",
+  "   Powiedz, ile członów ma oznaczenie, jak się nazywają i gdzie ich szukać.",
   "2a. `pewnosc` oceniaj SUROWO i nie licz, że przejdzie: system obniża ją do",
   "   sufitu źródła. Fakty z bazy mogą być „pewne”; oferta najwyżej",
   "   „prawdopodobne”, bo opis bywa starszy od towaru; twoja wiedza własna",
   "   zawsze „niepewne”. W dół możesz zawsze i to jest uczciwe.",
-  "2b. Gdy opis oferty przeczy kartotece, rację ma KARTOTEKA. Powiedz to",
-  "   klientowi wprost i wpisz sprzeczność do `zastrzezenia`.",
+  "2b. Gdy opis oferty przeczy kartotece W TEJ SAMEJ WŁAŚCIWOŚCI tej samej",
+  "   części (wymiar, numer katalogowy, dopasowanie), rację ma KARTOTEKA.",
+  "   Powiedz to klientowi wprost i wpisz sprzeczność do `zastrzezenia`.",
+  "2c. KARTOTEKA NIE MÓWI NIC O TYM, CO OFERTA ZAWIERA. Opisuje JEDNĄ pozycję,",
+  "   więc nie ma jak zaprzeczyć zdaniu „ta aukcja zawiera dwie rzeczy”. Brak",
+  "   drugiej części w kartotece oferty NIE JEST dowodem, że oferta jej nie",
+  "   zawiera; to samo dotyczy części, która stoi obok jako osobny kandydat.",
+  "   Skład zestawu, liczbę sztuk i to, co jest w paczce, wie MAGAZYN.",
+  "   Rozbieżność o zawartość idzie WYŁĄCZNIE do `zastrzezenia`. NIE PROSTUJ",
+  "   jej klientowi: opis oferty jest naszym zobowiązaniem, a wiadomość mówiąca",
+  "   coś innego odradza zakup na podstawie zgadywania. Gdy klient PYTA wprost",
+  "   o zawartość zestawu, odpowiedz tym, co deklaruje oferta, i zostaw",
+  "   zastrzeżenie dla agenta.",
   "3. Gdy fakty czegoś nie mówią, NIE zgaduj: wpisz to do `zastrzezenia`",
   "   (dla agenta, nie dla klienta) i zadaj klientowi pytania z faktu intake —",
   "   ale WYŁĄCZNIE te, na które ROZMOWA jeszcze nie odpowiada. Zanim o coś",
   "   poprosisz, sprawdź wiersze KLIENT:. Jeśli klient podał już model,",
   "   dane z tabliczki, wymiary albo zdjęcie, nie proś o nie ponownie —",
   "   potwierdź jednym zdaniem, co masz, i pytaj tylko o resztę.",
+  "   `zastrzezenia` to lista LUK I ROZBIEŻNOŚCI, nie sprawozdanie z tego, że",
+  "   przestrzegałeś reguł. „Nie podałem stanów magazynowych, bo klient nie",
+  "   pytał” opisuje posłuszeństwo i zabiera agentowi uwagę tym, co się NIE",
+  "   stało. Ta lista niesie teraz sprzeczności o zawartość oferty (reguła 2c),",
+  "   więc każdy wiersz w niej musi coś kosztować.",
   "3a. Dane maszyny i części, które stoją w ROZMOWIE (marka, model, wariant,",
   "   rocznik, numer seryjny, silnik, numer OEM lub symbol, nazwa części,",
   "   wymiary i parametry), wpisz do `daneDoboru` DOKŁADNIE tak, jak napisał",
