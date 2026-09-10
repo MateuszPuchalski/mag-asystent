@@ -47,14 +47,17 @@ describe("Pasek sprawy", () => {
 
   it("rozmowa bez sprawy nie udaje, że jakąś ma", () => {
     pasek();
-    expect(screen.getByText(/nie należy do żadnej sprawy/)).toBeInTheDocument();
+    /* Od 0.247.0 brak sprawy mówi o sobie DWOMA SŁOWAMI w wierszu metadanych,
+       a nie pełnym pasem z obramowanym przyciskiem: to stan domyślny, więc
+       ekran informował o normie w wadze zarezerwowanej dla wyjątku. */
+    expect(screen.getByText("bez sprawy")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /ODKLEJ/ })).toBeNull();
   });
 
   it("nowa sprawa wymaga tytułu — klamra bez nazwy nic nie skleja", async () => {
     const onZaloz = vi.fn();
     pasek({ onZaloz });
-    await userEvent.click(screen.getByRole("button", { name: /PRZYPISZ DO SPRAWY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /przypisz do sprawy/ }));
     expect(screen.getByRole("button", { name: "ZAŁÓŻ" })).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText(/Tytuł nowej sprawy/), "Szarpak");
@@ -67,7 +70,7 @@ describe("Pasek sprawy", () => {
        czy dzisiejsza. Dwie sprawy o podobnym tytule zdarzają się co tydzień. */
     const onDolacz = vi.fn();
     pasek({ onDolacz });
-    await userEvent.click(screen.getByRole("button", { name: /PRZYPISZ DO SPRAWY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /przypisz do sprawy/ }));
     await userEvent.selectOptions(screen.getByLabelText(/Istniejąca sprawa/), "3");
     expect(onDolacz).toHaveBeenCalledWith(3);
     expect(screen.getByRole("option", { name: /Szarpak do NAC LS 46-450 \(2\)/ }))

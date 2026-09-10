@@ -26,7 +26,11 @@ describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
   it("bez plików mówi, CO wolno dołączyć", () => {
     /* Puste miejsce nie odpowiada na pytanie „czy tu w ogóle można". */
     pasek();
-    expect(screen.getByText(/Zdjęcie albo PDF/)).toBeInTheDocument();
+    /* Ograniczenie formatu ZOSTAJE, ale w podpowiedzi (0.247.0) — czyli tam,
+       gdzie się go szuka w chwili wątpliwości, a nie w osobnym zdaniu przy
+       każdym otwarciu rozmowy. Test pilnuje, że nie zniknęło z ekranu. */
+    expect(screen.getByRole("button", { name: /Dołącz plik/ }))
+      .toHaveAttribute("title", expect.stringMatching(/zdjęcie albo PDF/i));
   });
 
   it("plik niesie nazwę, rozmiar i autora", () => {
@@ -48,7 +52,7 @@ describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
   it("przy cudzej rozmowie nie da się ani dodać, ani zdjąć", () => {
     /* Ta sama reguła co przy szkicu: rozmowę prowadzi kto inny. */
     pasek({ lista: [plik()], wylaczone: true });
-    expect(screen.getByRole("button", { name: /DOŁĄCZ PLIK/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Dołącz plik/ })).toBeDisabled();
     expect(screen.getByRole("button", { name: /Zdejmij/ })).toBeDisabled();
   });
 
@@ -60,7 +64,9 @@ describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
       new File(["x"], "tabliczka.png", { type: "image/png" }));
     rerender(<ZalacznikiWysylki lista={[]} dodaje blad="" wylaczone={false}
       onDodaj={vi.fn()} onUsun={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /WGRYWAM tabliczka.png/ })).toBeInTheDocument();
+    /* W trakcie wgrywania spinacz ODZYSKUJE słowa: sama ikona nie powiedziałaby,
+       że coś trwa i który plik idzie. */
+    expect(screen.getByText(/Wgrywam tabliczka\.png/)).toBeInTheDocument();
   });
 
   it("odmowa Allegro staje przy pasku, nie w konsoli", () => {

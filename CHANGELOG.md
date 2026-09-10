@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.247.0 — 9 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Hierarchia wizualna panelu odpowiedzi.** Właściciel: „improve answering
+question panel in terms of visual hierarchy, get some principles from
+Refactoring UI". Panel niósł wszystko w dwóch stopniach pisma i pięciu
+obramowanych przyciskach o równej wadze — żadna rzecz nie była pierwsza, więc
+oko zaczynało od lewego górnego rogu, nie od tego, co ważne.
+
+Zmian jest siedem i żadna nie dokłada funkcji. Login rośnie do 19 px i staje
+się tematem ekranu; „Twoja rozmowa" schodzi do drugiego wiersza. Pytanie
+klienta zostaje jedyną kartą z cieniem — nie dało się go rozjaśnić, bo jest
+już białe, więc COFA SIĘ nasza odpowiedź. Wysyłka staje się jedynym głośnym
+działaniem, a „zapisz szkic", „przypisz do sprawy" i „dołącz plik" przestają
+być przyciskami. Przełącznik trybu staje się jednym elementem zamiast dwóch
+luźnych przycisków. Pole rośnie z 80 na 88 px, a tekst z 14 na 15 px.
+Załączniki idą nad rząd działań, żeby wzrok kończył na wysyłce.
+
+Wersaliki znikają z przycisków panelu: „WYŚLIJ DO KLIENTA" to ciąg
+prostokątów bez wydźwięku liter wystających nad linię, a to jest jedyna droga,
+którą treść wychodzi z WERTIS na zewnątrz — ma się czytać od razu.
+
+Zmierzone na żywym panelu, nie oszacowane: nagłówek, pasy i edytor zajmowały
+554 px, teraz 532 px. Rozmowa zyskuje 22 px MIMO większego pola do pisania —
+oszczędność z pasa sprawy i rzędu załączników poszła w znacznej części w to
+pole, i tak miało być.
+
+Jedna próba została wycofana w trakcie i warto ją zapisać: przeniesienie
+przycisku Copilota do rzędu przełącznika trybu wyglądało dobrze z Copilotem
+włączonym i rozpadało się z wyłączonym, bo wtedy komponent renderuje ZDANIE
+z serwera, nie przycisk. Złapał to zrzut ekranu, nie test.
+
+Testy nie zostały skasowane, tylko przepisane na nową umowę: bronią tej samej
+intencji w nowej formie — że ograniczenie formatu pliku dalej jest na ekranie
+(w podpowiedzi), że wgrywanie dalej mówi, KTÓRY plik idzie, i że brak sprawy
+dalej mówi o sobie, tylko dwoma słowami zamiast pasem.
+
+**Globalny `.btn-primary` NIE został ruszony.** Prośba dotyczyła panelu
+odpowiedzi, a ten przycisk stoi na każdym ekranie obsługi — pogrubienie go
+w jednym miejscu zrobiono klasą przy wywołaniu, nie w arkuszu.
+
 ## 0.246.0 — 9 września 2026
 
 **Jeden załącznik rozmowy dla skrzynki i reklamacji.** Właściciel po 0.244.0:

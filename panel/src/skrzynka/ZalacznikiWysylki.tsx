@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
 import { FileText, ImageIcon, Paperclip, X } from "lucide-react";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
-import { Przycisk } from "../ui";
 
 /* ── Załączniki DO WYSYŁKI (0.195.0) ─────────────────────────────────────────
    Nazwa rozróżnia strony: `Os.tsx` rysuje załączniki PRZYCHODZĄCE (od 0.155.0,
@@ -55,13 +54,25 @@ export function ZalacznikiWysylki({ lista, dodaje, blad, onDodaj, onUsun, wylacz
         e.target.value = "";
       }} />
 
+    {/* ── NIE KAŻDE DZIAŁANIE ZASŁUGUJE NA PRZYCISK (0.247.0) ─────────────────
+        Pełny przycisk z obwódką i zdanie o dozwolonych formatach zajmowały
+        własny rząd pod wysyłką — dwa elementy w tej samej wadze co „Wyślij do
+        klienta", dla czynności, która zdarza się przy co którejś odpowiedzi.
+
+        Zostaje spinacz. Nazwa nie ginie: niesie ją `aria-label`, a ograniczenie
+        formatu — podpowiedź, czyli tam, gdzie szuka się go w chwili wątpliwości,
+        a nie przy każdym otwarciu rozmowy. Wgrywanie ODZYSKUJE słowa, bo wtedy
+        sama ikona nie powiedziałaby, że coś trwa. */}
     <div className="flex flex-wrap items-center gap-2">
-      <Przycisk className="text-xs" disabled={wylaczone || dodaje}
-        onClick={() => wejscie.current?.click()}>
-        <Paperclip size={14} />{dodaje ? `WGRYWAM ${nazwaWToku}…` : "DOŁĄCZ PLIK"}
-      </Przycisk>
-      {lista.length === 0 && !dodaje &&
-        <span className="text-xs text-slate-400">Zdjęcie albo PDF — najwyżej 4 MB.</span>}
+      {dodaje
+        ? <span className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Paperclip size={13} />Wgrywam {nazwaWToku}…</span>
+        : <button type="button" disabled={wylaczone}
+            aria-label="Dołącz plik" title="Dołącz plik — zdjęcie albo PDF, najwyżej 4 MB"
+            className="grid h-[34px] w-[34px] place-items-center rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 disabled:opacity-40"
+            onClick={() => wejscie.current?.click()}>
+            <Paperclip size={16} />
+          </button>}
     </div>
 
     {lista.length > 0 && <ul className="mt-2 flex flex-wrap gap-2">

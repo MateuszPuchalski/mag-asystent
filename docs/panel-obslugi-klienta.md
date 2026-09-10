@@ -821,6 +821,53 @@ bo po niej widać, czy wynik odpowiada na zadane pytanie. Blok NIE ma przycisku
 
 ### 10.4. Edytor odpowiedzi
 
+**Hierarchia panelu odpowiedzi (0.247.0).** Właściciel: „improve answering
+question panel in terms of visual hierarchy, get some principles from
+Refactoring UI". Panel niósł wszystko w dwóch stopniach pisma (12 i 14 px)
+i pięciu obramowanych przyciskach o równej wadze — żadna rzecz nie była
+pierwsza, więc oko zaczynało od lewego górnego rogu, nie od tego, co ważne.
+Poniżej to, co zmieniono, i zasada, która za tym stoi. Żadna nie dokłada
+funkcji: każda zmienia wagę tego, co już było.
+
+**Login jest tematem ekranu.** Rośnie do 19 px i ciemnieje do `wertis-ink`;
+„Twoja rozmowa" schodzi do drugiego wiersza w 12 px. Skala urosła z dwóch
+stopni do czterech. Przejęcie ZOSTAJE przyciskiem w pierwszym wierszu — przy
+rozmowie niczyjej to jest działanie główne ekranu, nie metadana.
+
+**Pytanie klienta jest jedyną kartą z cieniem.** Wypowiedzi różniły się tłem
+`#ffffff` kontra `#f8fafc` przy identycznej obwódce — różnica na granicy
+widoczności, choć to rozróżnienie jest jedynym powodem, dla którego oś ma dwie
+strony. Nie dało się rozjaśnić pytania (jest już białe), więc COFA SIĘ nasza
+odpowiedź: traci obwódkę, tekst schodzi na szarość.
+
+**Jedno działanie jest najgłośniejsze.** Wysyłka to jedyna droga, którą treść
+wychodzi z WERTIS na zewnątrz, a wyglądała jak sąsiad „ZAPISZ SZKIC" — ta sama
+wysokość, waga i krój. Dostaje większy stopień pisma, wyższy padding i cień;
+zapis szkicu schodzi do zwykłego tekstu. Wersaliki znikają: „WYŚLIJ DO KLIENTA"
+to ciąg prostokątów bez wydźwięku liter wystających nad linię.
+
+**Trzy przyciski przestają być przyciskami.** „Przypisz do sprawy" to odnośnik
+w wierszu metadanych, „zapisz szkic" — tekst, „dołącz plik" — spinacz 34 × 34
+z nazwą w `aria-label` i ograniczeniem formatu w podpowiedzi. Zdanie „Rozmowa
+nie należy do żadnej sprawy" zajmowało pełny pas, żeby powiedzieć, czego NIE MA;
+brak sprawy jest stanem domyślnym, więc ekran informował o normie.
+
+**Przełącznik trybu jest JEDNYM elementem.** Dwa luźne przyciski o równej wadze
+nie mówiły, że wybiera się jeden z dwóch. Bieżnia z wyniesionym kafelkiem
+aktywnym to kształt znany z każdego innego programu, więc nie wymaga czytania.
+
+**Pole ma wyglądać na miejsce do pisania**: 80 → 88 px, tekst 14 → 15 px.
+Załączniki przenoszą się NAD rząd działań — należą do komponowanej wiadomości,
+a rząd działań ma być ostatni, żeby wzrok kończył na wysyłce.
+
+Zmierzone na żywym panelu: nagłówek, pasy i edytor zajmowały 554 px, teraz 532 px
+— rozmowa zyskuje 22 px MIMO większego pola do pisania. Oszczędność z pasa
+sprawy i rzędu załączników poszła w znacznej części w to pole, i tak miało być.
+
+Jedna próba została WYCOFANA w trakcie: przeniesienie przycisku Copilota do
+rzędu przełącznika wyglądało dobrze z Copilotem włączonym i rozpadało się
+z wyłączonym, bo wtedy komponent renderuje zdanie z serwera, nie przycisk.
+
 **Rozdzielenie trybów (0.157.0).** Przełącznik ma dwa tryby i każdy ma WŁASNE
 pole oraz własny przycisk. W trybie komentarza przycisk wysyłki nie istnieje
 w drzewie — wyłączony da się kliknąć, gdy stan rozjedzie się o ułamek sekundy;
