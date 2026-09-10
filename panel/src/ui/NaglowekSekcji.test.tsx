@@ -69,7 +69,11 @@ describe("Nagłówek sekcji: znacznik i barwa", () => {
     expect(k).toContain("text-emerald-800");
     expect(k).not.toContain("text-slate-500");
     expect(k).toContain("uppercase");
-    expect(k).toContain("text-[11px]");
+    /* Od 0.258.0 szczebel nazywa się `text-podpis` — 11 px z interlinią 16 px.
+       Arbitralne `text-[11px]` nie miało w Tailwindzie żadnej interlinii, więc
+       82 miejsca dziedziczyły 1,5 z przeglądarki. Intencja testu bez zmian:
+       nagłówek jest DROBNY i to jest jego cała siła. */
+    expect(k).toContain("text-podpis");
   });
 
   it("ikona jest opcjonalna — większość nagłówków jej nie ma", () => {

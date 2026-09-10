@@ -54,7 +54,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
     aria-label="Pieniądze">
     <div className="flex flex-wrap items-center gap-2">
       <Banknote size={15} className="shrink-0 text-slate-400" />
-      <b className="text-sm">Pieniądze</b>
+      <b className="text-naglowek">Pieniądze</b>
       {stan.kwotaGrosze !== null && !stan.oddane &&
         <span className="text-sm tabular-nums">{zlote(stan.kwotaGrosze, stan.waluta)}</span>}
 
@@ -112,7 +112,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
         <span className="ml-auto text-xs text-slate-500">{powod.length}/{LIMIT_POWODU}</span>
       </div>
       {/* Klient przeczyta ten powód w Allegro — to nie jest notatka wewnętrzna. */}
-      <p className="text-[11px] text-slate-500">Powód trafia do klienta w Allegro.</p>
+      <p className="text-podpis text-slate-500">Powód trafia do klienta w Allegro.</p>
     </div>}
 
     {blad && <p className="mt-2 text-xs font-semibold text-ranga-zle">{blad}</p>}

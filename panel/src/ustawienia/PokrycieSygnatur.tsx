@@ -31,7 +31,7 @@ const Lista = ({ tytul, opis, wiersze }: {
 }) => {
   if (!wiersze.length) return null;
   return <div className="border-t p-4">
-    <b className="text-sm">{tytul}</b>
+    <b className="text-naglowek">{tytul}</b>
     <p className="mb-2 text-xs text-slate-500">{opis}</p>
     <ul className="space-y-1 text-sm">
       {wiersze.map((w) => <li key={w.sygnatura} className="flex gap-3">
@@ -49,7 +49,7 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
 
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="mr-auto">Sygnatura → kartoteka Subiekta</b>
+      <b className="text-naglowek mr-auto">Sygnatura → kartoteka Subiekta</b>
       <span className="text-xs text-slate-500">pozycje pobranych zamówień</span>
     </header>
 

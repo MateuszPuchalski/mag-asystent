@@ -75,10 +75,10 @@ export function Edytor({
         się zacznie pisać. */}
     <div className="mb-2.5 flex items-center gap-2">
       <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
-        <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] ${!wKomentarzu
+        <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${!wKomentarzu
           ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-500"}`}
           onClick={() => setTryb("odpowiedz")}>Odpowiedź do klienta</button>
-        <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] ${wKomentarzu
+        <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${wKomentarzu
           ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-500"}`}
           onClick={() => setTryb("komentarz")}>
           <MessageSquare size={13} />Komentarz wewnętrzny
@@ -96,7 +96,7 @@ export function Edytor({
 
     {wKomentarzu
       ? <>
-          <textarea className="field min-h-[88px] text-[15px] leading-[23px]" value={komentarz}
+          <textarea className="field min-h-[88px] text-tresc" value={komentarz}
             aria-label="Komentarz wewnętrzny — zobaczy go tylko zespół"
             onChange={(e) => onKomentarz(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
@@ -115,11 +115,11 @@ export function Edytor({
                 nie odpowiedź, a kolega ma prawo dopisać „to ten sam klient co
                 wczoraj" bez przejmowania sprawy. */}
             <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
-              onClick={onDodajKomentarz} className="px-5 py-2.5 text-[15px] shadow-sm">
+              onClick={onDodajKomentarz} className="px-5 py-2.5 text-tresc shadow-sm">
               <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj komentarz"}
             </Przycisk>
             <span className="text-xs text-amber-800">Widoczne tylko dla zespołu.</span>
-            <span className="ml-auto text-[11px] text-amber-700/70">{komentarz.length} znaków</span>
+            <span className="ml-auto text-podpis text-amber-700/70">{komentarz.length} znaków</span>
           </div>
         </>
       : <>
@@ -128,7 +128,7 @@ export function Edytor({
           {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
               wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
               choć agent spędza w nim najwięcej czasu z całego panelu. */}
-          <textarea className="field min-h-[88px] text-[15px] leading-[23px]" value={szkic}
+          <textarea className="field min-h-[88px] text-tresc" value={szkic}
             aria-label="Szkic odpowiedzi"
             onChange={(e) => onZmiana(e.target.value)}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
@@ -149,14 +149,14 @@ export function Edytor({
             onUsun={onUsunZalacznik} wylaczone={cudza} />
           <div className="mt-3 flex items-center gap-3">
             <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
-              className="px-5 py-2.5 text-[15px] shadow-sm">
+              className="px-5 py-2.5 text-tresc shadow-sm">
               <Send size={17} />{wysyla ? "Wysyłam…" : "Wyślij do klienta"}</Przycisk>
             <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
               className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
               {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
             <PrzyciskZalacznika dodaje={dodajeZalacznik}
               onDodaj={onDodajZalacznik} wylaczone={cudza} />
-            <span className="ml-auto text-[11px] text-slate-500">{szkic.length} znaków</span>
+            <span className="ml-auto text-podpis text-slate-500">{szkic.length} znaków</span>
           </div>
           {copilot && <KartaSzkicu p={copilot} />}
         </>}

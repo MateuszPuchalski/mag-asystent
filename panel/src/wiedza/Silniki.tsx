@@ -50,7 +50,7 @@ export function Silniki() {
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
 
     <section aria-label="Czeka na rozstrzygnięcie">
-      <h3 className="mb-2 text-sm font-bold">Czeka na rozstrzygnięcie ({propozycje.length})</h3>
+      <h3 className="mb-2 text-naglowek font-bold">Czeka na rozstrzygnięcie ({propozycje.length})</h3>
       {!dane.isLoading && propozycje.length === 0 &&
         <Pusto ikona={<Cog size={32} />}>Nic nie czeka. Pary biorą się stąd i z zatwierdzonych doborów.</Pusto>}
       <div className="space-y-2">
@@ -62,8 +62,8 @@ export function Silniki() {
     </section>
 
     <section aria-label="Luki">
-      <h3 className="mb-1 text-sm font-bold">Maszyny z doborów, od najczęstszych ({luki.length})</h3>
-      <p className="mb-2 text-[11px] text-slate-500">
+      <h3 className="mb-1 text-naglowek font-bold">Maszyny z doborów, od najczęstszych ({luki.length})</h3>
+      <p className="mb-2 text-podpis text-slate-500">
         Kolejność liczy się z pól wpisanych przez agentów w zakładce Dobór — nie z treści wiadomości klientów.
       </p>
       {!dane.isLoading && luki.length === 0 &&
@@ -79,8 +79,8 @@ export function Silniki() {
     </section>
 
     <section aria-label="Słownik silników">
-      <h3 className="mb-1 text-sm font-bold">Słownik silników ({aliasy.length})</h3>
-      <p className="mb-2 text-[11px] text-slate-500">
+      <h3 className="mb-1 text-naglowek font-bold">Słownik silników ({aliasy.length})</h3>
+      <p className="mb-2 text-podpis text-slate-500">
         Co znaczy tekst wpisywany w pole „Silnik". Dopasowanie dokładne po zwinięciu pisowni — bez zgadywania literówek.
       </p>
       <div className="space-y-1">
@@ -96,7 +96,7 @@ export function Silniki() {
     </section>
 
     {zatwierdzone.length > 0 && <section aria-label="Zatwierdzone">
-      <h3 className="mb-2 text-sm font-bold">Zatwierdzone ({zatwierdzone.length})</h3>
+      <h3 className="mb-2 text-naglowek font-bold">Zatwierdzone ({zatwierdzone.length})</h3>
       <div className="space-y-1">
         {zatwierdzone.map((z) => <Zatwierdzona key={z.id} z={z} trwa={wycofaj.isPending}
           onWycofaj={(powod) => { setBlad("");
@@ -202,7 +202,7 @@ function Luka({ l, trwa, onWyslij }: {
       <b>{maszyna}</b>
       <span className="text-xs text-slate-500">{l.pytan} {l.pytan === 1 ? "dobór" : "doborów"}</span>
       {l.zabudowy.length === 0
-        ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800">brak silnika</span>
+        ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis text-amber-800">brak silnika</span>
         : <span className="text-xs text-slate-600">
             silniki: {l.zabudowy.map((z) => z.silnik.etykieta).join(" · ")}</span>}
       <Przycisk className="ml-auto" wariant="drugi" onClick={() => setOtwarte(!otwarte)}>
@@ -210,16 +210,16 @@ function Luka({ l, trwa, onWyslij }: {
     </div>
 
     {l.wpisaneSilniki.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1">
-      <span className="text-[11px] text-slate-500">agenci wpisywali:</span>
+      <span className="text-podpis text-slate-500">agenci wpisywali:</span>
       {l.wpisaneSilniki.map((s) => s.silnik
         /* Czip ZE słownika: model wchodzi do formularza gotowy — zostaje dowód. */
         ? <button key={s.tekst} type="button"
-            className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-900 hover:bg-emerald-100"
+            className="rounded bg-emerald-50 px-1.5 py-0.5 text-podpis text-emerald-900 hover:bg-emerald-100"
             title="Ze słownika — wypełnia formularz tym silnikiem"
             onClick={() => { setOtwarte(true); setSilnik(zModelu(s.silnik!)); setTekstAliasu(null); }}>
             {s.tekst} ×{s.ile} = {s.silnik.etykieta}</button>
         : <button key={s.tekst} type="button"
-            className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] hover:bg-slate-200"
+            className="rounded bg-slate-100 px-1.5 py-0.5 text-podpis hover:bg-slate-200"
             title="Wstaw do pola Model — do poprawki"
             onClick={() => { setOtwarte(true); setSilnik((p) => ({ ...p, nazwa: s.tekst })); setTekstAliasu(s.tekst); }}>
             {s.tekst} ×{s.ile}</button>)}

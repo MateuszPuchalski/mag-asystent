@@ -41,10 +41,10 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
   return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Oferta">
     <div className="flex flex-wrap items-center gap-2">
       <NaglowekSekcji ikona={<Package size={13} />}>Oferta</NaglowekSekcji>
-      <span className="font-mono text-[11px] text-slate-500">{oferta.externalId}</span>
+      <span className="font-mono text-podpis text-slate-500">{oferta.externalId}</span>
       {/* Status oferty stoi przy numerze, nie przy tytule: „zakończona” zmienia
           sens całej odpowiedzi, a agent czyta tę linijkę pierwszą. */}
-      {o?.status && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-700">
+      {o?.status && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
         {o.status}</span>}
       {/* Skąd numer (0.215.0). Numer z wiadomości klienta jest faktem z Allegro
           i nie potrzebuje podpisu; dwa pozostałe to wnioski — agenta albo
@@ -53,15 +53,15 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
           i półgrubej ważyła więcej niż numer oferty obok, choć mówi tylko,
           skąd ten numer wiemy. Bursztyn zostaje przy wskazaniu człowieka —
           tam jest decyzją; wywód serwera z jedynej pozycji jest rutyną. */}
-      {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
+      {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis font-semibold text-amber-900">
         wskazana przez agenta</span>}
-      {oferta.zrodlo === "zamowienie" && <span className="text-[10px] text-slate-500">
+      {oferta.zrodlo === "zamowienie" && <span className="text-podpis text-slate-500">
         z jedynej pozycji zamówienia</span>}
       {oferta.link && <a href={oferta.link} target="_blank" rel="noopener noreferrer"
         aria-label="Otwórz w Allegro"
         /* Odnośnik CICHNIE (0.249.0): był jedynym błękitem w kolumnie, więc
            ciągnął wzrok mocniej niż nazwa towaru — a to nawigacja, nie treść. */
-        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
+        className="inline-flex items-center gap-1 text-podpis font-semibold text-slate-500 hover:text-slate-800">
         {/* Znak ZASTĘPUJE wyraz „Allegro" (0.252.0): to logotyp słowny, więc
             obok tego wyrazu byłby jego powtórzeniem. Dostępna nazwa odnośnika
             zostaje ta sama — niesie ją `aria-label` znaku. */}
@@ -86,7 +86,7 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
             {/* PODPIS ŹRÓDŁA. Blok towaru niżej pokazuje zdjęcie z Subiekta,
                 a §4.3 nie pozwala mieszać źródeł — bez tej linijki dwa obrazy
                 obok siebie wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
-            {o.zdjecie === "jest" && <span className="w-full text-[11px] text-slate-500">
+            {o.zdjecie === "jest" && <span className="w-full text-podpis text-slate-500">
               Zdjęcie z oferty Allegro — to widział klient.</span>}
             {/* ── MILCZENIE WYGLĄDAŁO JAK BRAK (0.214.0) ────────────────────
                 Snapshot sprzed 0.213.0 nie ma jeszcze kolumny z adresem, więc
@@ -94,7 +94,7 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
                 nie ma obrazu". Bez tego zdania ekran kłamał: właściciel
                 przysłał zrzut oferty, która na Allegro zdjęcie miała.
                 Naprawia się samo, więc zdanie mówi KIEDY. */}
-            {o.zdjecie === "nieznane" && <span className="w-full text-[11px] text-slate-500">
+            {o.zdjecie === "nieznane" && <span className="w-full text-podpis text-slate-500">
               Zdjęcie oferty dociągnie najbliższa synchronizacja (do 7 min).</span>}
           </div>
         </div>

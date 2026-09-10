@@ -49,7 +49,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
       {/* UUID SKRÓCONY (0.249.0). Pełne trzydzieści sześć znaków w wadze treści
           zajmowało pół wiersza nagłówka, a nikt ich nie czyta — od przepisania
           jest przycisk kopiowania obok, a od sprawdzenia podpowiedź. */}
-      <span className="font-mono text-[11px] text-slate-500" title={zamowienie.externalId}>
+      <span className="font-mono text-podpis text-slate-500" title={zamowienie.externalId}>
         {zamowienie.externalId.slice(0, 8)}…</span>
       {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach. */}
       {/* kontrast: to przycisk ikonowy, ikona nie niesie pisma */}
@@ -69,7 +69,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
         /* Cichnie jak bliźniak przy ofercie (0.249.0): dwa identyczne błękitne
            odnośniki były jedynym błękitem w kolumnie i ciągnęły wzrok mocniej
            niż nazwa towaru — a to nawigacja, nie treść. */
-        className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
+        className="inline-flex items-center gap-1 text-podpis font-semibold text-slate-500 hover:text-slate-800">
         Otwórz w <ZnakAllegro wysokosc={10} /><ExternalLink size={11} /></a>}
     </div>
 
@@ -91,7 +91,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
                   {p.sku && <span className="shrink-0 text-slate-500">{p.sku}</span>}
                   <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
                 </div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-podpis text-slate-500">
                   {/* Kartoteka z podpisem źródła: SKU albo wskazanie człowieka — zdanie z serwera. */}
                   {p.twId !== null
                     ? <span title={p.twZrodlo ?? undefined}>
@@ -109,7 +109,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
           </ul>
           {/* Podpis źródeł obu kafli (§4.3): dwa obrazy obok siebie bez podpisu
               wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-podpis text-slate-500">
             {/* JEDNA LINIA, oba źródła nadal nazwane (0.249.0). §4.3 żąda, żeby
                 przy każdym fakcie było widać źródło — nie żąda zdania złożonego.
                 Dwa wiersze szarej prozy pod każdą pozycją ważyły więcej niż

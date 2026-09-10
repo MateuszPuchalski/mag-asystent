@@ -202,7 +202,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                     jako „wracają dwie" przy zwrocie jednej. Przy zwrocie
                     całości „z 2" byłoby szumem — dlatego pada tylko wtedy,
                     gdy część zakupu zostaje u klienta. */}
-                    {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-[10px] uppercase">
+                    {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-podpis uppercase">
                       wraca {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
                   </span>
                 </span>

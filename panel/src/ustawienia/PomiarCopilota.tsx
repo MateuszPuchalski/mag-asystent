@@ -31,7 +31,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   const proc = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)} %` : "—");
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="mr-auto">Copilot — rozpoznawanie kategorii</b>
+      <b className="text-naglowek mr-auto">Copilot — rozpoznawanie kategorii</b>
       <span className="text-xs text-slate-500">tokeny liczone od pierwszego wywołania</span>
     </header>
 

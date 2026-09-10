@@ -39,7 +39,7 @@ export function Ustawienia() {
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <Settings size={18} /><b className="mr-auto">Ustawienia</b>
+      <Settings size={18} /><b className="text-naglowek mr-auto">Ustawienia</b>
       {/* Zdanie mówi wprost, że ten ekran niczego nie zmienia: reguła „zero
           zapisu przy patrzeniu" obowiązuje panel tak samo jak biuro. */}
       <span className="text-sm text-slate-500">Tło pracy obsługi · sam odczyt</span>

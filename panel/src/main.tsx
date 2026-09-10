@@ -63,14 +63,14 @@ const ZAKLADKI = [
 function LicznikWiedzy() {
   const { data } = useKolejkaWiedzy();
   if (!data?.liczba) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-[11px] font-bold text-wertis-ink"
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
     aria-label={`propozycji wiedzy do rozstrzygnięcia: ${data.liczba}`}>{data.liczba}</span>;
 }
 
 function LicznikWzmianek() {
   const { data } = useWzmianki();
   if (!data?.nowe) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-[11px] font-bold text-wertis-ink"
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
     aria-label={`nieodhaczonych wzmianek: ${data.nowe}`}>{data.nowe}</span>;
 }
 

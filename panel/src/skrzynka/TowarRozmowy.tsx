@@ -64,7 +64,7 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
       {/* OSOBNA plakietka, poza blokiem Subiekta: §4.3 nie miesza źródeł, a to
           jest nasza baza wiedzy, nie dane z ERP. */}
       {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
-        <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+        <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide text-emerald-800">
           Wiedza: {wiedza.data.potwierdzone.length} potwierdzonych · {wiedza.data.negatywne.length} negatywnych
         </span>}
     </div>
@@ -221,7 +221,7 @@ function OpisKartoteki({ desc }: { desc?: string }) {
 
   return <div className="rounded-lg border border-slate-200 p-3">
     <NaglowekSekcji jako="p" className="mb-1">Opis kartoteki</NaglowekSekcji>
-    <p className={`whitespace-pre-wrap text-xs text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
+    <p className={`whitespace-pre-wrap text-tresc text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
       {tresc}</p>
     {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
         — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
@@ -283,7 +283,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         ? <span className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm">
             {lokalizacje}</span>
         : <span className="text-xs text-slate-500">bez lokalizacji</span>}
-      <span className="ml-auto text-[11px] text-slate-500">
+      <span className="ml-auto text-podpis text-slate-500">
         stan {karta.mag.stan} · rezerwacje {karta.mag.rez}
       </span>
     </div>
@@ -294,7 +294,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         <span className={wartosc === "brak" ? "text-slate-500" : "font-semibold text-slate-900"}>
           {wartosc}</span>
       </div>)}
-      {karta.magazyny.length > 0 && <p className="pt-0.5 text-[11px] text-slate-500">
+      {karta.magazyny.length > 0 && <p className="pt-0.5 text-podpis text-slate-500">
         Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
       </p>}
     </div>
@@ -314,24 +314,24 @@ function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
     strona: "czesc" | "doCzego") =>
     <li key={`${t.czesc.symbol}>${t.doCzego.symbol}`} className="text-xs">
       <b className="font-mono">{t[strona].symbol}</b> <span className="text-slate-600">{t[strona].nazwa}</span>
-      <span className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-[10px]">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
-      <span className={`ml-1 rounded px-1 py-0.5 text-[10px] font-bold ${t.pewnosc === "potwierdzone"
+      <span className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-podpis">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
+      <span className={`ml-1 rounded px-1 py-0.5 text-podpis font-bold ${t.pewnosc === "potwierdzone"
         ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.pewnosc}</span>
-      {t.przezZamiennik && <span className="ml-1 text-[10px] text-slate-500">przez zamiennik</span>}
-      <p className="text-[11px] text-slate-500">{t.zdanie}</p>
+      {t.przezZamiennik && <span className="ml-1 text-podpis text-slate-500">przez zamiennik</span>}
+      <p className="text-podpis text-slate-500">{t.zdanie}</p>
     </li>;
   return <div className="rounded-lg border border-emerald-200 p-3">
     <NaglowekSekcji jako="p" ton="text-emerald-800" className="mb-1">Wiedza: pasowania części</NaglowekSekcji>
     {dane.pasujace.length > 0 && <>
-      <p className="text-[11px] font-semibold text-slate-600">Do tej części pasują</p>
+      <p className="text-podpis font-semibold text-slate-600">Do tej części pasują</p>
       <ul className="mb-1 space-y-1">{dane.pasujace.map((t) => wiersz(t, "czesc"))}</ul></>}
     {dane.pasujeDo.length > 0 && <>
-      <p className="text-[11px] font-semibold text-slate-600">Ta część pasuje do</p>
+      <p className="text-podpis font-semibold text-slate-600">Ta część pasuje do</p>
       <ul className="mb-1 space-y-1">{dane.pasujeDo.map((t) => wiersz(t, "doCzego"))}</ul></>}
     {dane.negatywne.length > 0 && <ul className="space-y-1">
       {dane.negatywne.map((p) => <li key={p.id} className="text-xs text-red-900">
         <b className="font-mono">{p.czesc.symbol}</b> ⇏ <b className="font-mono">{p.doCzego.symbol}</b>: {p.zdaniePowodu}
-        <span className="block text-[11px] text-slate-500">{p.zdanieZrodla}</span></li>)}
+        <span className="block text-podpis text-slate-500">{p.zdanieZrodla}</span></li>)}
     </ul>}
   </div>;
 }

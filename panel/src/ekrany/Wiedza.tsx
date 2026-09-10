@@ -49,7 +49,7 @@ export function Wiedza() {
   /* Własny scroller — patrz `Wzmianki`; rama panelu nie przewija za ekrany. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <BookMarked size={18} /><b className="mr-auto">Baza wiedzy zastosowań</b>
+      <BookMarked size={18} /><b className="text-naglowek mr-auto">Baza wiedzy zastosowań</b>
       {/* DWIE kolejki, dwa liczniki. Sam licznik zastosowań kłamałby przez
           pominięcie: para maszyna–silnik czeka na tę samą decyzję człowieka. */}
       <span className="text-sm text-slate-500">
@@ -85,7 +85,7 @@ export function Wiedza() {
               każdej `flex-1` w jednym wierszu, a szósta łamie etykiety. Ważniejsze:
               to ta sama decyzja („rozstrzygnij") tego samego człowieka. */}
           {pasowania.length > 0 && <section className="mt-4" aria-label="Pasowania części">
-            <h3 className="mb-2 text-sm font-bold">Pasowania części ({pasowania.length})</h3>
+            <h3 className="mb-2 text-naglowek font-bold">Pasowania części ({pasowania.length})</h3>
             <div className="space-y-3">
               {pasowania.map((p) => <PropozycjaPasowania key={p.id} p={p} trwa={rozstrzygnijPasowanie.isPending}
                 onDecyzja={(decyzja, powod) => { setBlad("");

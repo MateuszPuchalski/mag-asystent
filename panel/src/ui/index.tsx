@@ -42,7 +42,7 @@ export const Przycisk = ({ wariant = "drugi", className = "", ...p }: PrzyciskPr
 export const EtykietaWartosci = ({ className = "", children }: {
   className?: string; children: React.ReactNode;
 }) =>
-  <span className={`text-[11px] uppercase tracking-wide text-slate-500 ${className}`}>
+  <span className={`text-podpis uppercase tracking-wide text-slate-500 ${className}`}>
     {children}</span>;
 
 /* ── ROZSZERZONY NA CAŁY PANEL (0.256.0) ─────────────────────────────────────
@@ -68,7 +68,7 @@ export function NaglowekSekcji({ ikona, ton = "text-slate-500", jako: Znacznik =
   className?: string;
   children: React.ReactNode;
 }) {
-  return <Znacznik className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${ton} ${className}`}>
+  return <Znacznik className={`flex items-center gap-1.5 text-podpis font-bold uppercase tracking-wider ${ton} ${className}`}>
     {ikona}{children}
   </Znacznik>;
 }
@@ -92,7 +92,7 @@ export const KLASA_STATUSU: Record<string, string> = {
 };
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>
-  <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+  <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${
     KLASA_STATUSU[status ?? ""] ?? "bg-slate-100 text-slate-600"} ${className}`}>{children}</span>;
 
 /**

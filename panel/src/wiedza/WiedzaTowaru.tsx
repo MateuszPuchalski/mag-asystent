@@ -49,7 +49,7 @@ function Identyfikatory({ twId }: { twId: number }) {
     {lista.data && lista.data.length > 0 && <ul className="mt-1 flex flex-wrap gap-1">
       {lista.data.map((i) => <li key={i.id} title={`${i.nazwaRodzaju} · ${i.zrodlo === "opis" ? "z opisu" : `ręcznie: ${i.dodal}`}`}
         className={`rounded px-1.5 py-0.5 font-mono text-xs ${i.zrodlo === "reczne" ? "bg-amber-50 text-amber-900" : "bg-slate-100 text-slate-800"}`}>
-        <span className="mr-1 text-[10px] font-semibold text-slate-500">{i.nazwaRodzaju}</span>{i.wartosc}</li>)}
+        <span className="mr-1 text-podpis font-semibold text-slate-500">{i.nazwaRodzaju}</span>{i.wartosc}</li>)}
     </ul>}
     <div className="mt-2 flex flex-wrap items-end gap-2">
       <select className="field w-auto" aria-label="Rodzaj identyfikatora" value={rodzaj}
@@ -90,7 +90,7 @@ function Wpis({ z, tylkoOdczyt }: { z: Zastosowanie; tylkoOdczyt: boolean }) {
   return <li className={`rounded-lg border p-3 text-sm ${negatyw ? "border-red-200" : "border-slate-200"}`}>
     <div className="flex flex-wrap items-center gap-2">
       <b>{z.model.etykieta}</b>
-      <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${z.pewnosc === "potwierdzone"
+      <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${z.pewnosc === "potwierdzone"
         ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{z.pewnosc}</span>
       <span className="ml-auto text-xs text-slate-500">{z.zdanieZrodla}</span>
     </div>
@@ -171,11 +171,11 @@ function Trafienia({ tytul, lista, pusto, strona }: {
           className="flex flex-wrap items-center gap-2 rounded border border-slate-200 px-2 py-1 text-sm">
           <b className="font-mono">{t[strona].symbol}</b>
           <span className="text-slate-600">{t[strona].nazwa}</span>
-          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px]">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
-          <span className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${t.pewnosc === "potwierdzone"
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-podpis">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
+          <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${t.pewnosc === "potwierdzone"
             ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.pewnosc}</span>
-          {t.przezZamiennik && <span className="text-[11px] text-slate-500">przez zamiennik</span>}
-          <span className="basis-full text-[11px] text-slate-500">{t.zdanie}</span>
+          {t.przezZamiennik && <span className="text-podpis text-slate-500">przez zamiennik</span>}
+          <span className="basis-full text-podpis text-slate-500">{t.zdanie}</span>
           {!t.przezZamiennik && <Wycofanie p={t.pasowanie} />}
         </li>)}</ul>}
   </div>;
@@ -185,7 +185,7 @@ function WpisPasowania({ p, negatyw }: { p: Pasowanie; negatyw: boolean }) {
   return <li className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1 text-sm ${negatyw ? "border-red-200" : "border-slate-200"}`}>
     <b className="font-mono">{p.czesc.symbol}</b><span className="text-slate-500">⇏</span><b className="font-mono">{p.doCzego.symbol}</b>
     {p.zdaniePowodu && <span className="text-red-900">{p.zdaniePowodu}</span>}
-    <span className="basis-full text-[11px] text-slate-500">{p.zdanieZrodla}</span>
+    <span className="basis-full text-podpis text-slate-500">{p.zdanieZrodla}</span>
     <Wycofanie p={p} />
   </li>;
 }

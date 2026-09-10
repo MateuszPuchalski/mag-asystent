@@ -18,7 +18,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
   const nieodebrana = zwrot.zrodlo === "nieodebrana";
 
   return <header className="shrink-0 border-b border-slate-200 p-4">
-    <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-bold">
+    <h2 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-naglowek font-bold">
       {nieodebrana
         /* Paczka nieodebrana nie ma zwrotu w Allegro, więc nie ma czego
            otwierać — serwer oddaje wtedy `linkZwrotu = null`. */

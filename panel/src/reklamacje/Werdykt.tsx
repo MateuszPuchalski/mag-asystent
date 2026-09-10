@@ -98,7 +98,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
     return <section aria-label="Werdykt" className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Gavel size={15} className="shrink-0 text-slate-400" />
-        <b className="text-sm">Werdykt</b>
+        <b className="text-naglowek">Werdykt</b>
         {r.werdykt
           ? <span className="text-sm font-semibold">{r.werdyktNazwa ?? r.werdykt}
               {r.werdyktKwotaGrosze !== null && <span className="ml-1 tabular-nums">
@@ -117,7 +117,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
           {r.werdyktPrzez ?? "?"}{r.werdyktAt ? `, ${czas(r.werdyktAt)}` : ""}
         </p>
         {r.werdyktWiadomosc && <div className="mt-2 flex items-start gap-2 rounded bg-slate-50 p-2">
-          <p className="flex-1 whitespace-pre-wrap text-sm text-slate-800">{r.werdyktWiadomosc}</p>
+          <p className="flex-1 whitespace-pre-wrap text-tresc text-slate-800">{r.werdyktWiadomosc}</p>
           <Skopiuj tekst={r.werdyktWiadomosc} tytul="Kopiuj wiadomość werdyktu" />
         </div>}
       </>}
@@ -129,7 +129,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
       {uznana && status !== "sending" && <div className="mt-3 border-t pt-2">
         <div className="flex flex-wrap items-center gap-2">
           <PackageSearch size={15} className="shrink-0 text-slate-400" />
-          <b className="text-sm">Towar do odesłania?</b>
+          <b className="text-naglowek">Towar do odesłania?</b>
           {r.zwrotTowaru
             ? <span className="text-sm">Kupującemu powiedziano: <b>{r.zwrotTowaru === "wymagany"
                 ? "odesłać" : "zostaje u klienta"}</b>
@@ -177,7 +177,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   return <section aria-label="Werdykt" className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
     <div className="flex flex-wrap items-center gap-2">
       <Gavel size={15} className="shrink-0 text-slate-400" />
-      <b className="text-sm">Werdykt</b>
+      <b className="text-naglowek">Werdykt</b>
       {nieudany && <span className="text-xs font-semibold text-ranga-zle">
         Nieudany: {r.werdyktBlad ?? "Allegro odmówiło"}</span>}
       {galaz === null && <>

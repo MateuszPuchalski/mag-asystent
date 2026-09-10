@@ -77,7 +77,7 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
 function Stopka({ tresc }: { tresc: string }) {
   const [otwarte, setOtwarte] = React.useState(false);
   return <div className="mt-1">
-    <button type="button" className="text-[11px] text-slate-500 underline hover:text-slate-600"
+    <button type="button" className="text-podpis text-slate-500 underline hover:text-slate-600"
       aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
       {otwarte ? "ukryj stopkę firmową" : "stopka firmowa"}
     </button>
@@ -110,7 +110,7 @@ function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
       <span>{czas(wpis.at)}</span>
       <span className="ml-auto underline">{otwarte ? "zwiń" : "pokaż treść"}</span>
     </button>
-    {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-sm text-slate-500">
+    {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-tresc text-slate-500">
       {wpis.tresc}</p>}
   </article>;
 }
@@ -191,7 +191,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {w.wzmianki?.length ? <span className="font-normal">
               · dla: {w.wzmianki.map((m) => m.name).join(", ")}</span> : null}
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+          <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
         </article>
       /* Zwinięcie stoi PRZED gałęzią zwykłej wiadomości, bo autoodpowiedź jest
          wiadomością wychodzącą i inaczej wpadłaby w tamtą gałąź. */
@@ -203,7 +203,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
       ? <article key={w.id} className="ml-6 rounded-lg border border-os-wynik-ramka bg-os-wynik p-3">
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase text-ranga-ok">
             <Ruler size={12} />Wynik z magazynu · {w.autor}</div>
-          <p className="mt-1 whitespace-pre-wrap text-sm">{w.tresc}</p>
+          <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
           {/* Wynik nie staje się odpowiedzią sam — do szkicu trafia wyłącznie
               na jawne kliknięcie agenta. */}
           <Przycisk className="mt-2 text-xs" onClick={() => onWstawDoSzkicu(w.tresc)}>
@@ -260,8 +260,14 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {w.ofertaId && <span>· oferta {w.ofertaId}{w.nazwaOferty && ` — ${w.nazwaOferty}`}</span>}
             {w.zamowienieId && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
-          <p className={`mt-1 whitespace-pre-wrap ${w.odKlienta
-            ? "text-[15px] leading-[23px]" : "text-sm text-slate-600"}`}>{w.tresc}</p>
+          {/* JEDEN SZCZEBEL PO OBU STRONACH (0.258.0). Do 0.257.0 pytanie klienta
+              miało 15 px, a nasza odpowiedź 14 — różnica rozmiaru wyciszała to,
+              co już przeczytane. Wyciszenie zostaje, tylko niesie je sama barwa:
+              treść jest treścią po obu stronach wątku, a drabina ma na tę rolę
+              jeden szczebel. Dwa rozmiary dla jednej roli to był ten sam błąd,
+              który to wydanie naprawia w siedemnastu innych miejscach. */}
+          <p className={`mt-1 whitespace-pre-wrap text-tresc ${
+            w.odKlienta ? "" : "text-slate-600"}`}>{w.tresc}</p>
           {w.stopka && <Stopka tresc={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
           {w.odKlienta && mozeZlecac && <button
@@ -385,7 +391,7 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
         <button type="button" disabled={z.cel === null}
           onClick={() => z.cel !== null && onSkocz(z.cel)}
           title={`${z.tresc} · ${z.autor} · ${czas(z.at)}`}
-          className={`max-w-[14rem] truncate rounded-full px-2.5 py-0.5 text-[11px] ${
+          className={`max-w-[14rem] truncate rounded-full px-2.5 py-0.5 text-podpis ${
             BARWA_ZDARZENIA[z.zdarzenie?.rodzaj ?? "status"] ?? BARWA_ZDARZENIA.status} ${
             z.cel === null ? "cursor-default opacity-60" : "hover:ring-2 hover:ring-amber-300"}`}>
           {etykieta(z)}
@@ -446,10 +452,10 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
           wydarzyło, a otwarte zlecenie ma WIEK — „czeka na halę" od dziesięciu
           minut i od wczoraj to dwie różne decyzje agenta wobec klienta. */}
       <span className="font-normal normal-case text-slate-500">{czas(wpis.at)}</span>
-      <span className={`rounded px-1.5 py-0.5 text-[10px] ${stan.klasa}`}>{stan.etykieta}</span>
+      <span className={`rounded px-1.5 py-0.5 text-podpis ${stan.klasa}`}>{stan.etykieta}</span>
       {/* PILNE mówi o tym, jak zlecenie stoi w kolejce hali, nie o rozmowie. */}
       {z.priorytet === "pilny" &&
-        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] text-ranga-zle">pilne</span>}
+        <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis text-ranga-zle">pilne</span>}
     </div>
     <p className="mt-1 text-sm font-semibold">{z.tytul}</p>
     {/* Instrukcja słowo w słowo: to ona pojechała na kolektor i po niej widać,

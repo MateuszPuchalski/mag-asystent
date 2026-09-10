@@ -112,7 +112,7 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         aria-label="Czego model nie znalazł w faktach">
         {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}
       </ul>}
-      <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800">{s.tresc}</pre>
+      <pre className="whitespace-pre-wrap font-sans text-tresc text-slate-800">{s.tresc}</pre>
     </div>
     {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
@@ -129,6 +129,6 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         W ofercie są oznaczenia, których nie ma w kartotece: <b>{s.lukiKartoteki.join(", ")}</b>
         {" "}— okazja, żeby je dopisać.
       </p>}
-    <p className="mt-1 text-[11px] text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
+    <p className="mt-1 text-podpis text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
   </section>;
 }

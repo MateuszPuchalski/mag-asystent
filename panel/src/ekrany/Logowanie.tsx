@@ -34,7 +34,7 @@ export function Logowanie({ zalogowano }: { zalogowano: () => void }) {
       <div className="mb-7 flex items-center gap-3">
         <div className="rounded-xl bg-wertis-amber p-3"><Warehouse /></div>
         <div>
-          <h1 className="text-2xl font-bold">WERTIS</h1>
+          <h1 className="text-tytul font-bold">WERTIS</h1>
           <p className="text-sm text-slate-500">Obsługa klienta</p>
         </div>
       </div>

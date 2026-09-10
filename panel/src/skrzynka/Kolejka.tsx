@@ -192,13 +192,13 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         w rozmiar podpisu, i ustępuje mu miejsca przy wąskiej kolumnie. */}
     <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
       <Inbox size={16} className="shrink-0" />
-      <b className="shrink-0">Rozmowy</b>
-      <p className="mr-auto min-w-0 truncate text-[11px] font-normal text-slate-500">
+      <b className="text-naglowek shrink-0">Rozmowy</b>
+      <p className="mr-auto min-w-0 truncate text-podpis font-normal text-slate-500">
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)} />
-      {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
+      {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
         STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
@@ -252,7 +252,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         że nikt by tego nie zauważył. Agent widzi skład skrzynki i sam wybiera,
         co bierze. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
         trafności ją uzasadni (etap G). */}
-    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-[11px]">
+    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-podpis">
       {wgLiczby.map(([k, ile]) => <button key={k} type="button"
         aria-pressed={kategoria === k}
         onClick={() => setKategoria(kategoria === k ? null : k)}
@@ -313,14 +313,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
                 zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
             {r.priorytet === "pilny" &&
-              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
                 PILNE</span>}
             {wyjatkowy && <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>}
           </div>}
           {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
               nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
               pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
-          <p className="line-clamp-2 text-[15px] font-medium leading-[21px] text-slate-800">
+          <p className="line-clamp-2 text-tresc font-medium text-slate-800">
             {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
                 statusu, „NOWA" — dwa różne fakty jednym wyrazem. Kropka to znak
                 nieprzeczytanego znany ze wszystkich skrzynek; nazwę niesie
@@ -335,7 +335,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
               <span className="font-semibold text-slate-500">Biuro: </span>}
             {r.ostatniaWiadomosc}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-podpis text-slate-500">
             {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
                 „za co się wziąć", a data każe je dopiero policzyć w głowie.
                 Otwiera podpis, bo to jedyna liczba w wierszu, po której układa
