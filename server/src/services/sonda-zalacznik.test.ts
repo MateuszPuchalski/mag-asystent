@@ -27,10 +27,15 @@ test("host końcowy pokazuje się WYŁĄCZNIE przy przekierowaniu — to odpowie
   assert.match(t, /tak → cdn\.example/);
 });
 
-test("werdykt: API zdejmuje znacznik, sam zapas go zostawia, wszystko 403 mówi o uprawnieniu", () => {
-  assert.match(werdyktSondy([w({})]), /Droga API działa \(public\.v1, image\/jpeg\).*zdejmij `\[WERYFIKUJ\]`/);
-  assert.match(werdyktSondy([w({ status: 403 }), w({ droga: "url", akcept: null })]), /WYŁĄCZNIE zapisany adres/);
-  assert.match(werdyktSondy([w({ status: 403 }), w({ droga: "url", akcept: null, status: 403 })]), /allegro:api:messaging/);
-  /* Kontrolna próba API bez Accept z 200 nie liczy się jako droga API — panel jej nie używa. */
-  assert.match(werdyktSondy([w({ status: 404 }), w({ akcept: null, status: 200 })]), /Żadna droga/);
+test("werdykt: API 200 bez Accept potwierdza specyfikację, sam zapas zostaje, wszystko 403 mówi o uprawnieniu", () => {
+  /* Tabela właściciela z 10 września — 200 stało w wierszu „bez Accept",
+     a stary werdykt mówił „żadna droga nie oddała pliku". */
+  assert.match(werdyktSondy([
+    w({ status: 406 }), w({ akcept: "application/vnd.allegro.beta.v1+json", status: 406 }),
+    w({ droga: "url", akcept: null, status: 403 }), w({ akcept: null, status: 200 }),
+  ]), /Droga API działa \(bez Accept, image\/jpeg\).*specyfikacją/);
+  assert.match(werdyktSondy([w({ akcept: null, status: 403 }), w({ droga: "url", akcept: null })]), /WYŁĄCZNIE zapisany adres/);
+  assert.match(werdyktSondy([w({ akcept: null, status: 403 }), w({ droga: "url", akcept: null, status: 403 })]), /allegro:api:messaging/);
+  assert.match(werdyktSondy([w({ akcept: null, status: 406 }), w({ droga: "url", akcept: null, status: 403 })]), /odrzuca nagłówek Accept/);
+  assert.match(werdyktSondy([w({ akcept: null, status: 404 }), w({ droga: "url", akcept: null, status: 500 })]), /Żadna droga/);
 });

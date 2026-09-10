@@ -538,15 +538,17 @@ export function osRozmowy(id: number): {
          wystarcza — `UNSAFE` znaczy, że plik jest podejrzany, a rysowanie go
          na osi byłoby wpuszczeniem go do biura tylnymi drzwiami.
 
-         `mimeType` jest w schemacie Allegro OPCJONALNE. Gdy go nie ma, o UKŁADZIE
-         decyduje nazwa pliku (jak w reklamacjach od 0.223.0), a o WYDANIU —
-         sygnatura bajtów na trasie podglądu; plik nazwany `usterka.jpg` bez
-         sygnatury obrazu dostaje 415 i spada na przycisk pobrania. Do tego
-         wydania brak pola znaczył „nie obraz" i zdjęcie z telefonu zostawało
-         samą nazwą, bez zdania dlaczego. */
+         `mimeType` jest w schemacie Allegro OPCJONALNE i bywa kłamliwe:
+         telefony przysyłają `image/jpg`, `application/octet-stream` albo pusty
+         ciąg przy `IMG_….jpg`. O UKŁADZIE decyduje więc typ ALBO nazwa pliku
+         (jak w reklamacjach od 0.223.0), a o WYDANIU — sygnatura bajtów na
+         trasie podglądu; plik nazwany `usterka.jpg` bez sygnatury obrazu
+         dostaje 415, panel to zapamiętuje i zostaje przy nazwie z pobraniem.
+         0.244.0 patrzyło na nazwę tylko przy PUSTYM polu, więc `image/jpg`
+         zostawiało zdjęcie samą nazwą i trasa z bajtami nie była pytana. */
       podglad: String(z.status) === "SAFE" && z.url != null
         && (typPodgladu(z.mime_type as string | null) !== null
-          || (z.mime_type == null && czyObrazZNazwy(String(z.file_name)))),
+          || czyObrazZNazwy(String(z.file_name))),
     });
     zalaczniki.set(Number(z.message_id), lista);
   }

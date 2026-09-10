@@ -500,30 +500,30 @@ specyfikacja wymienia `image/png`, `image/gif`, `image/bmp`, `image/tiff`,
 `image/jpeg` i `application/pdf`. To jedyny nasz zapis, przy którym 415 znaczy
 „zły plik", a nie „zła wersja zasobu".
 
-### Pobranie załącznika Centrum Wiadomości — kształt spoza specyfikacji (0.244.0)
+### Pobranie załącznika Centrum Wiadomości — `GET` bez `Accept` (0.244.0, poprawione w 0.248.0)
 
-Specyfikacja zna deklarację (`POST`) i wgranie (`PUT`), a do ODCZYTU daje
-wyłącznie pole `url` w `MessageAttachmentInfo` — w przykładzie
-`https://upload.allegro.pl/message-center/message-attachments/{uuid}`.
-Ten adres z Bearerem konta odpowiada u właściciela **403**, a ten sam
-`pobierzZalacznik` oddaje zdjęcia reklamacji z `api.allegro.pl` bez zarzutu.
-Odmawia więc host, nie token. 0.219.2 zapisało ten stan jako nienaprawiony.
+Do ODCZYTU specyfikacja daje dwie rzeczy: pole `url` w `MessageAttachmentInfo`
+(w przykładzie `https://upload.allegro.pl/message-center/message-attachments/{uuid}`)
+oraz operację `downloadAttachmentGET` na `/messaging/message-attachments/{attachmentId}`
+(scope `allegro:api:messaging`). Ta druga deklaruje odpowiedź 200 jako `*/*`
+z nagłówkami `Content-Type` i `Content-Disposition` — plik binarny, bez wersji
+zasobu, dokładnie jak `GET /sale/issues/attachments/{attachmentId}`, z którego
+reklamacje czytają zdjęcia bez `Accept` od 0.223.0.
 
-Od 0.244.0 adapter próbuje KANDYDATÓW po kolei (`kandydaciPobrania`):
-`GET {api}/messaging/message-attachments/{uuid}` z `Accept` `public.v1`, to
-samo z `beta.v1`, na końcu zapisany `url` bez `Accept` — dzisiejsza droga
-jako zapas. UUID bierzemy z OGONA `url`; `MessageAttachmentInfoVBeta1` ma go
-w `id`, a oba przykłady w swaggerze niosą ten sam ciąg. 401 kończy próby od
-razu, bo token jest jeden. Odmowa każdej drogi wraca jednym zdaniem z kodem
-każdej próby, bez adresów i bez identyfikatora.
+0.244.0 przeczytało plik źle: zapisało, że „operacji w swaggerze nie ma", i dało
+drodze API nagłówek `Accept` z JSON-em z pamięci. Sonda właściciela (10 września
+2026, `npm run sonda:zalacznik`) pokazała skutek: API z `public.v1` i `beta.v1`
+odpowiada **406**, API bez `Accept` **200 `image/jpeg`**, a zapisany adres na
+`upload.allegro.pl` **403** na brzegu (portal deweloperski: `EDGE_CLIENT_ERROR`,
+którego specyfikacja nie zna). Odmawiał nasz nagłówek, nie Allegro.
 
-`[WERYFIKUJ]` czy `GET /messaging/message-attachments/{attachmentId}`
-z `Accept: application/vnd.allegro.public.v1+json` oddaje bajty. Tutorial
-Allegro, na który swagger odsyła przy deklaracji, tak to opisuje — z PAMIĘCI,
-bo z maszyny roboczej nie da się go otworzyć, a w `swagger.yaml` tej operacji
-nie ma. Rozstrzyga `cd server && npm run sonda:zalacznik`: tabela kodów dla
-każdej drogi i zdanie, czy znacznik wolno zdjąć. Do tego czasu panel ma zapas
-i zdanie na ekranie, nie pustą linię.
+Od 0.248.0 adapter idzie KANDYDATAMI (`kandydaciPobrania`): `GET {api}/messaging/message-attachments/{uuid}`
+bez `Accept`, a gdy odmówi — zapisany `url` bez `Accept` jako zapas. UUID
+bierzemy z OGONA `url`; `MessageAttachmentInfoVBeta1` ma go w `id`, a oba
+przykłady w swaggerze niosą ten sam ciąg. 401 kończy próby od razu, bo token
+jest jeden. Odmowa każdej drogi wraca jednym zdaniem z kodem każdej próby, bez
+adresów i bez identyfikatora. Sonda zostaje jako potwierdzenie na żywo po
+aktualizacji: dwie próby kontrolne Z nagłówkiem mają pokazać 406.
 
 Gotowe identyfikatory idą w `NewMessageInThread.attachments` jako lista
 `{ id }`. Deklaracji nie da się cofnąć — nie ma takiej końcówki — więc plik
