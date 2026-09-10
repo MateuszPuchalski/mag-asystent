@@ -303,6 +303,7 @@ ale nie ma prawa kupić ich drugi raz.
 | 0.224.1 | flaga jawnej zgody ginęła na trasie, choć serwis ją obsługiwał i panel ją wysyłał | pole nieopisane w typie `Body` znika po cichu; flagi ciała testuje się na TRASIE, nie tylko w serwisie |
 | 0.250.0 | encje HTML TRZECI RAZ — czeskie, słowackie i węgierskie litery wracały dosłownie, a sprawy posprzedażowe nie przechodziły przez dekoder w ogóle | tablicę encji GENERUJE się parserem przeglądarki, nie pisze z pamięci pod jeden alfabet; nowy synchronizator dostaje dekoder razem z mapowaniem, nie później |
 | 0.253.0 | zakaz wiedzy własnej dawał szkic suchy, a opis oferty z wymiarami i listą zgodności leżał nietknięty | swobodę modelu kupuje się JAWNOŚCIĄ, nie zaufaniem: źródło przy każdym twierdzeniu, pewność przyznaje serwer wg źródła, a agent widzi rachunek przed wysłaniem |
+| 0.253.1 | nowe pole w wyjściu modelu przy starym suficie `max_tokens` ucinało JSON, a błąd odczytu SDK spadał do gałęzi „coś u nas" | rosnąc o pole w wyjściu, rośnij o sufit; `APIError` dziedziczy po `AnthropicError`, więc kolejność `instanceof` jest logiką, nie stylem |
 | 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy, które zostają) |
 
 ## Polityka danych skrzynki (0.143.0)

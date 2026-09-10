@@ -222,6 +222,9 @@ const INSTRUKCJA_SZKICU = [
   "   albo listy zgodności oferty) albo „model” (z twojej wiedzy, bez pokrycia",
   "   w naszych danych). W `odwolanie` wpisz identyfikator faktu („F3”), nazwę",
   "   parametru oferty albo null, gdy mówisz z siebie.",
+  "1b. NAJWYŻEJ OSIEM twierdzeń, każde jednym zdaniem. Lista jest rachunkiem",
+  "   dla agenta, nie streszczeniem szkicu: gdy twierdzeń wychodzi więcej,",
+  "   zostaw te, których agent nie sprawdzi jednym spojrzeniem w kartotekę.",
   "1a. Twierdzenia z faktów oznaczaj W TEKŚCIE identyfikatorem w nawiasie,",
   "   np. „pasuje (F3)”. System je sprawdza, a potem usuwa, zanim agent",
   "   zobaczy szkic. Klient ich nie przeczyta.",
@@ -295,9 +298,17 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
       model: config.copilot.model,
       /* Szkic ma do 1800 znaków polskiego tekstu plus JSON wokół — 1200 tokenów
          było sufitem z zapasem; `daneDoboru` dokłada kilkadziesiąt tokenów
-         kluczy i wartości, stąd 1500. To nadal nie jest zaproszenie do
-         rozwlekłości (limit stoi też w instrukcji). */
-      max_tokens: 1500,
+         kluczy i wartości, stąd 1500.
+         ── BLIZNA 0.253.1 ────────────────────────────────────────────────────
+         0.253.0 dołożyło do wyjścia WYMAGANĄ listę `twierdzenia`, a ten sufit
+         został na 1500 — czyli na liczbie policzonej dla szkicu i danych
+         doboru. Osiem twierdzeń po zdaniu to kilkaset tokenów więcej, więc
+         JSON urywał się w połowie i przestawał być JSON-em. SDK rzuca wtedy
+         `AnthropicError`, a agent czytał „usterka po naszej stronie" bez
+         jednego słowa o tym, co się stało.
+         Rosnąc o pole w wyjściu, rośnij o sufit — inaczej limit obcina nie to
+         pole, które dołożyłeś, tylko całą odpowiedź. */
+      max_tokens: 3000,
       system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta. */
@@ -370,6 +381,26 @@ function naNasz(e: unknown): Error {
       "Nie ma połączenia z Anthropic — sprawdź internet i zaporę na serwerze. "
       + "Nic nie wyszło na zewnątrz.",
       `polaczenie: ${e.message}`);
+  }
+
+  /* PRZED `APIError`, bo obie dziedziczą po `AnthropicError`, a ta gałąź ma
+     złapać WYŁĄCZNIE tę pierwszą — dlatego wyklucza `APIError` wprost.
+
+     BLIZNA 0.253.1. `lib/parser.js` rzuca gołym `AnthropicError`, gdy tekstu
+     modelu nie da się sparsować albo nie przechodzi on schematu. Goły
+     `AnthropicError` nie jest `APIError`, więc do 0.253.0 spadał na sam koniec
+     tej funkcji i meldował się jako „usterka po naszej stronie" — zdanie
+     prawdziwe, ale bezużyteczne: nie mówiło ani co się stało, ani co zrobić.
+     Kosztowało zgłoszenie od właściciela zamiast drugiego kliknięcia.
+
+     Powód jest prawie zawsze jeden: odpowiedź urwał sufit `max_tokens`, więc
+     JSON nie domknął się nawiasem. Dlatego zdanie mówi o ponowieniu — a surowy
+     tekst błędu idzie do księgi, gdzie szuka się przyczyny. */
+  if (e instanceof Anthropic.AnthropicError && !(e instanceof Anthropic.APIError)) {
+    return new BladOdpowiedziCopilota(
+      "Model oddał odpowiedź, której nie dało się odczytać — zwykle znaczy to, "
+      + "że nie zmieścił się w limicie. Kliknij ponownie albo napisz sam.",
+      200, `parsowanie: ${e.message.slice(0, 200)}`);
   }
 
   if (e instanceof Anthropic.APIError) {

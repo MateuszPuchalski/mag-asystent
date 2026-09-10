@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
-import { _ustawKlienta, nadawcaAnthropic } from "./copilot.anthropic.js";
+import { _ustawKlienta, nadawcaAnthropic, nadawcaSzkicuAnthropic } from "./copilot.anthropic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "./copilot.js";
 import type { TrescBezpieczna } from "../services/copilot-maskowanie.js";
+import type { FaktyBezpieczne } from "../services/copilot-szkic.js";
 
 /* ── Mapowanie błędów dostawcy (§14, etap F) ─────────────────────────────────
    Ten plik istnieje przez 529 z pierwszego kliknięcia na produkcji. Testy
@@ -97,4 +98,43 @@ test("brak sieci mówi o SIECI, choć SDK opakowuje go w APIError", async () => 
   assert.match(e.message, /internet i zaporę na serwerze/);
   assert.match((e as BladLacznosciCopilota).slad, /ENOTFOUND/,
     "przyczyna techniczna należy do księgi, nie do zdania na ekranie");
+});
+
+/* ── Odpowiedź, której nie da się odczytać (blizna 0.253.1) ──────────────────
+   Zgłoszenie właściciela: „Copilot wywrócił się przed wysyłką — to usterka po
+   naszej stronie". Zdanie prawdziwe i bezużyteczne — nie mówiło ani co się
+   stało, ani co zrobić.
+
+   Mechanizm: `lib/parser.js` rzuca GOŁYM `AnthropicError`, gdy tekst modelu
+   nie daje się sparsować. `APIError` dziedziczy po `AnthropicError`, więc
+   sprawdzenie musi iść w tę stronę, a nie odwrotnie — i to jest cała pułapka
+   tej poprawki.
+
+   Przyczyną po tamtej stronie był sufit `max_tokens` zderzony z nową listą
+   `twierdzenia` z 0.253.0: JSON urywał się w połowie.                       */
+
+const FAKTY = "F1: Gaźnik W09-0211 dostępny dziś" as FaktyBezpieczne;
+
+test("nieodczytana odpowiedź modelu mówi o LIMICIE, nie o usterce bez wskazówki", async () => {
+  klientRzucajacy(new Anthropic.AnthropicError(
+    "Failed to parse structured output: SyntaxError: Unexpected end of JSON input"));
+
+  const e = await nadawcaSzkicuAnthropic(TRESC, FAKTY).then(() => null, (b) => b);
+  assert.ok(e instanceof BladOdpowiedziCopilota,
+    `dostał klasę ${(e as Error)?.constructor.name}`);
+  const b = e as BladOdpowiedziCopilota;
+  assert.match(b.message, /nie zmieścił się w limicie/);
+  assert.equal(/usterka po naszej stronie/.test(b.message), false,
+    "wróciło zdanie bez wskazówki, czyli blizna 0.253.1 od nowa");
+  /* Surowy tekst do KSIĘGI, nie na ekran — tam się szuka przyczyny. */
+  assert.match(b.slad, /^parsowanie: Failed to parse structured output/);
+});
+
+test("błąd SDK ze statusem dalej idzie swoją gałęzią, mimo wspólnego przodka", async () => {
+  /* `APIError` też jest `AnthropicError`. Gdyby nowa gałąź stała bez wyjątku
+     na `APIError`, przykryłaby wszystkie odmowy dostawcy naraz. */
+  klientRzucajacy(odpowiedzDostawcy(529, "overloaded_error", "Overloaded"));
+  const e = await nadawcaSzkicuAnthropic(TRESC, FAKTY).then(() => null, (b) => b);
+  assert.ok(e instanceof BladPrzeciazeniaCopilota,
+    `529 przykryte przez gałąź parsowania: ${(e as Error)?.constructor.name}`);
 });
