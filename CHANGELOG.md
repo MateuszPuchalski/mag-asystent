@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.266.0 — 10 września 2026
+
+**Zwrot dochodzi wreszcie do półki — ze stanem, nie tylko z towarem.**
+Pytanie właściciela brzmiało: czego brakuje, żeby domknąć zwrot od klienta aż
+po rozłożenie na magazyn. Odpowiedź była jedna i niemiła: przedostatniego
+kroku. Kosz złożony w panelu wysyłał towar na regał zwrotów własnym MM
+(0.192.0), hala rozkładała go na półki i zapisywała adresy — a STAN zostawał na
+regale. Towar leżał w hali i nie był sprzedawalny, dopóki biuro nie wystawiło
+drugiego dokumentu ręką w Subiekcie. Nic o tym nie przypominało: rekoncyliacja
+znała sześć rozjazdów i tego wśród nich nie było.
+
+ZAKOŃCZ na kolektorze zamawia teraz **jedno MM ZWROTY→MAG na cały kosz** —
+decyzja właściciela. Kosz z dokumentu MM z Subiekta zostaje przy dawnej regule
+(tam przesunięcie wystawiło biuro, więc powrotne też wystawia biuro), a karton
+nie przesuwa niczego, bo towar nie opuścił magazynu.
+
+**Dokument powstaje PO adresach, nie przed nimi.** Niezmiennik „adres przed
+sprzedawalnością" pilnuje w kolejce po kolumnie `tw_id`, a dokument na cały
+kosz przechodzi obok tej bramki. Dlatego zależność rozstrzyga się przed
+wstawieniem zadania: dopóki choć jeden adres z kosza czeka, jest w robocie albo
+stoi w błędzie, MM nie powstaje wcale. Wypuszcza je worker w chwili, gdy zapisze
+ostatni adres — to jedyny moment, w którym warunek się zmienia, więc osobnego
+tickera nie ma.
+
+**Z bufora schodzi wyłącznie to, co magazynier odłożył.** Pozycja pominięta
+została zgłoszona jako nieobecna w koszu; przesunięcie zdjęłoby z regału stan,
+którego nikt nie przeniósł.
+
+**Koszyk odpadu znika z kolektora.** 0.211.0 dołożyło rodzaje koszy i nie
+ruszyło listy dla hali, więc kosz utylizacji wyglądał tam jak każdy inny —
+magazynier odłożyłby złom na regał i wpisał mu adres pickingowy do kartoteki.
+Utylizacja ma ze stanu ZEJŚĆ. Co dalej dzieje się z odpadem, zostaje decyzją
+biura: dokumentu zejścia ze stanu (RW) ta aplikacja nie wystawia.
+
+**Siódmy rozjazd w rekoncyliacji:** kosz rozłożony ponad dobę temu, któremu
+powrót nie wyszedł. Zdanie mówi wprost, co to znaczy — towar leży na półce
+i nie jest sprzedawalny — i gdzie szukać przyczyny. Kartę kosza w biurze zamyka
+trzeci etap: „powrót MM 1247/MAG/2026" albo „powrót MM w błędzie".
+
 ## 0.264.0 — 10 września 2026
 
 **Wiedza z ofert przestaje ginąć razem z rozmową.** Właściciel zapytał, jak

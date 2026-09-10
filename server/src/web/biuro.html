@@ -4314,9 +4314,17 @@ async function pokazPodgladKosza(id, cichy) {
     /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione
        i przez kogo"; podgląd odpowiada przy sprawie „co się z tym działo".
        Kosz otwarty nie pokazuje niczego, bo nic się jeszcze nie stało. */
+    /* Powrót z bufora dopisany jako trzeci etap (0.266.0). Bez niego karta
+       kończyła się na „rozłożył" i nie odpowiadała na pytanie, po którym
+       biuro sięgało do Subiekta: czy stan wrócił z regału zwrotów na halę. */
+    const powrot = !k.powrot ? null
+      : k.powrot.numer ? `powrót MM ${esc(k.powrot.numer)}`
+      : k.powrot.status === "error" ? "powrót MM w błędzie — sprawdź kolejkę"
+      : "powrót MM zamówiony, czeka na dokument";
     const etapy = [
       k.zamknietoPrzez && `zamknął ${esc(k.zamknietoPrzez)} · ${esc(stempelLokalny(k.zamknietoAt))}`,
       k.rozlozonoPrzez && `rozłożył ${esc(k.rozlozonoPrzez)} · ${esc(stempelLokalny(k.rozlozonoAt))}`,
+      powrot,
     ].filter(Boolean);
     cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
         KOSZ ${esc(k.kod)} ${badgeKosza(k.status)}

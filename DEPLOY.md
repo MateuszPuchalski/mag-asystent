@@ -1155,6 +1155,13 @@ Kolektor w tym obiegu **nie wystawia żadnego dokumentu** — zapisuje wyłączn
 adresy półek. Punkt 4 jest w całości robotą biura i tak ma zostać: przesunięcie
 zrobione drugi raz zabrałoby ze stanu towar, który nigdzie nie pojechał.
 
+**Kosz złożony w panelu obsługi jest pod tym względem inny (0.266.0).** Tam
+przesunięcie na regał zamówiła aplikacja, więc powrót ZWROTY→MAG zamawia też
+ona — jednym dokumentem na kosz, po ZAKOŃCZ i po zapisaniu wszystkich adresów.
+Biuro nie wystawia wtedy niczego ręką, a kartę kosza zamyka etap „powrót MM".
+Kosze odpadu na listę kolektora nie wchodzą wcale: utylizacja ma ze stanu
+zejść, a dokumentu zejścia (RW) ta aplikacja nie wystawia.
+
 Zawartość kosza bierze się z **pozycji dokumentu MM**, więc zakładka wymaga
 odczytu dokumentów magazynowych. Importer dokłada do zapytań jedno nowe:
 `dok__Dokument` z `dok_Typ = 9` (MM), którego **odbiorcą jest magazyn zwrotów**.

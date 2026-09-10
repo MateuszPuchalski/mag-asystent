@@ -600,6 +600,13 @@ export function migrate(database: DatabaseSync) {
      w panelu (0.192.0). `kosz_pozycja.mm_queue_id` to co INNEGO: tamto jest
      przesunięciem powrotnym ZWROTY→MAG dla jednej rozłożonej pozycji. */
   addColumn("kosz", "mm_queue_id", "INTEGER REFERENCES sfera_queue(id)");
+  /* MM POWROTNE z bufora (0.266.0). Kosz złożony w aplikacji sam wysłał towar
+     na regał zwrotów, więc sam ma go stamtąd zdjąć po rozłożeniu. Kolumna
+     mówi, czy dokument już zamówiono: pusta przy koszu rozłożonym znaczy
+     „stan wisi na regale, choć towar leży na półce" i pilnuje tego
+     rekoncyliacja. Kosz z dokumentu MM z Subiekta jej nie wypełnia — tam
+     dokument powrotny wystawia biuro (DEPLOY §6a). */
+  addColumn("kosz", "powrot_queue_id", "INTEGER REFERENCES sfera_queue(id)");
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
