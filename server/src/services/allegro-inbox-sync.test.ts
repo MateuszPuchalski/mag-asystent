@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { synchronizujAllegroInbox } from "./allegro-inbox-sync.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
+import { onConversationEvent } from "./conversation-realtime.js";
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 /* Schemat PLUS dostawki: `events.user_ref` i część indeksów dochodzą dopiero
@@ -659,4 +660,84 @@ test("strona, która przeszła, ZOSTAJE w bazie mimo awarii następnej", async (
     .get() as { c: string | null; d: string | null };
   assert.equal(stan.c, null, "przebieg się nie udał, więc kursor stoi");
   assert.equal(stan.d, null, "do dna nie zeszliśmy, więc sufit dalej nie obowiązuje");
+});
+
+/* ── Czego synchronizator nie mówił panelowi (0.257.0) ───────────────────────
+   Skrzynka nie woła `zapiszWiadomosc`, więc omijała wszystko, co tamta funkcja
+   robi poza samym `INSERT`-em. Dwa wydania okazały się przez to puste:
+   0.228.0 dołożyło pasek „Klient dopisał nową wiadomość", który na prawdziwej
+   wiadomości z Allegro nie zapalił się ani razu, a 0.227.0 dołożyło kolumnę
+   `auto_odpowiedz`, która tą drogą zostawała zerem do najbliższego restartu.
+
+   Oba testy patrzą na TĘ ścieżkę, nie na `zapiszWiadomosc` — usterka polegała
+   właśnie na tym, że strażnik pilnował funkcji, której produkcja nie woła. */
+
+test("zdarzenie o nowej wiadomości niesie KIERUNEK, inaczej pasek nie zapala się nigdy", async () => {
+  const database = mkDb();
+  const zdarzenia: Array<{ type: string; data: unknown }> = [];
+  const odepnij = onConversationEvent((z) => zdarzenia.push({ type: z.type, data: z.data }));
+  try {
+    await synchronizujAllegroInbox({
+      database, apiUrl: "https://api.test",
+      query: fake([[thread(1)]], new Map([["t-1", ["m-1", "m-2"]]])).query,
+    });
+  } finally { odepnij(); }
+
+  const nowe = zdarzenia.filter((z) => z.type === "message.created")
+    .map((z) => z.data as { odKlienta?: boolean });
+  assert.equal(nowe.length, 2, "synchronizator nie ogłosił obu wiadomości");
+  assert.ok(nowe.every((d) => d.odKlienta === true),
+    "zdarzenie nie niosło `odKlienta`, więc panel nie miał czym zapalić paska");
+});
+
+test("wiadomość WYCHODZĄCA ogłasza się jako nie-klient", async () => {
+  const database = mkDb();
+  const zdarzenia: Array<{ type: string; data: unknown }> = [];
+  const odepnij = onConversationEvent((z) => zdarzenia.push({ type: z.type, data: z.data }));
+  try {
+    await synchronizujAllegroInbox({
+      database, apiUrl: "https://api.test",
+      query: fake([[thread(1)]], new Map(),
+        { author: { login: "wertis", isInterlocutor: false } }).query,
+    });
+  } finally { odepnij(); }
+
+  const nowe = zdarzenia.filter((z) => z.type === "message.created")
+    .map((z) => z.data as { odKlienta?: boolean });
+  assert.equal(nowe.length, 1);
+  assert.equal(nowe[0]!.odKlienta, false, "nasza odpowiedź ogłosiła się jako dopisek klienta");
+});
+
+test("nasza autoodpowiedź dostaje flagę PRZY ZAPISIE, bez czekania na restart", async () => {
+  /* Do 0.256.0 kolumny w tej wstawce nie było, więc zostawało `DEFAULT 0`,
+     a flagę dosypywała dopiero migracja przy starcie procesu. Między
+     restartami „Dziękujemy za kontakt" liczyło się jako ruch biura
+     i przestawiało rozmowę na „czeka na klienta". */
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map(), {
+      author: { login: "wertis", isInterlocutor: false },
+      text: "Dziękujemy za kontakt. Wiadomość jest generowana automatycznie.",
+    }).query,
+  });
+
+  assert.equal((database.prepare("SELECT auto_odpowiedz a FROM message").get() as { a: number }).a, 1,
+    "odbicie naszego autorespondera weszło jako zwykła odpowiedź biura");
+});
+
+test("klient CYTUJĄCY nasz autoresponder nie jest autoodpowiedzią", async () => {
+  /* Kierunek rozstrzyga, treść nie rozstrzyga wcale: pod pytaniem klienta
+     wisi zwykle cały nasz poprzedni list razem z podpisem. Zwinięcie takiej
+     wiadomości byłoby zgubieniem sprawy. */
+  const database = mkDb();
+  await synchronizujAllegroInbox({
+    database, apiUrl: "https://api.test",
+    query: fake([[thread(1)]], new Map(), {
+      text: "To dalej nie działa.\n> Wiadomość jest generowana automatycznie.",
+    }).query,
+  });
+
+  assert.equal((database.prepare("SELECT auto_odpowiedz a FROM message").get() as { a: number }).a, 0,
+    "pytanie klienta zwinięto jako nasze echo");
 });

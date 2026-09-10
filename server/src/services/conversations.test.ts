@@ -203,18 +203,113 @@ test("PRZYCHODZĄCA wiadomość budzi rozmowę rozwiązaną i odłożoną", () =
   }
 });
 
-test("`closed` i `spam` NIE budzą się same — to decyzja człowieka", () => {
-  /* Zamknięcie i spam są jawnymi werdyktami biura. Automat, który je cofa,
-     kazałby ręcznie zamykać tę samą rozmowę w kółko. */
-  for (const koniec of ["closed", "spam"] as const) {
-    const { d, ala, rozmowa } = stanowisko();
-    przejmijRozmowe(rozmowa, ala, 1, d);
-    ustawStatus(d, rozmowa, koniec, ala, null);
+/* ── Zamknięta wraca do puli (0.257.0) ───────────────────────────────────────
+   Do 0.256.0 stał tu jeden test mówiący, że NIE budzą się ani `closed`, ani
+   `spam`, z uzasadnieniem „automat, który cofa werdykt, kazałby zamykać tę
+   samą rozmowę w kółko". Właściciel to odwołał, bo argument mylił dwa koszty:
+   ponowne zamknięcie to jedno kliknięcie, a przepadłe pytanie klienta to
+   sprawa, o której nikt się nie dowie.
 
-    obudzPrzychodzaca(d, rozmowa);
+   Test nie znika — dzieli się na dwa. `spam` zostaje przy dawnym założeniu
+   i dostaje własnego strażnika niżej; `closed` budzi się, ale ODDAJE ROZMOWĘ
+   DO PULI, i to jest jedyna rzecz, którą oba werdykty się teraz różnią. */
 
-    assert.equal(statusRozmowy(d, rozmowa), koniec, `${koniec} obudziło się samo`);
-  }
+test("`closed` budzi się i oddaje rozmowę do puli", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  ustawStatus(d, rozmowa, "closed", ala, null);
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  /* Kolumna wraca do `open`, a ekran mówi konkretnie: ostatnia wiadomość jest
+     klienta, więc piłka stoi u nas. */
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us", "zamknięta nie wróciła do żywych");
+  /* Sedno decyzji: rozmowa ląduje w „Nieprzypisanych", nie na biurku tego,
+     kto ją zamknął. Kubełek w panelu liczy się właśnie z tego pola. */
+  assert.equal((d.prepare("SELECT assigned_user_id FROM conversation WHERE id=?").get(rozmowa) as
+    { assigned_user_id: number | null }).assigned_user_id, null, "prowadzący został przy sprawie");
+});
+
+test("zwolnienie ZAMYKA wiersz historii przypisań, nie kasuje go", () => {
+  /* Audyt ma pokazać, że sprawę ktoś prowadził i kiedy przestał. Skasowany
+     wiersz kłamałby, że rozmowa nigdy nie była przypisana. */
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  ustawStatus(d, rozmowa, "closed", ala, null);
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  const wiersz = d.prepare(`SELECT assigned_to, unassigned_at FROM conversation_assignment
+    WHERE conversation_id=?`).get(rozmowa) as { assigned_to: number; unassigned_at: string | null };
+  assert.equal(wiersz.assigned_to, ala, "historia zgubiła, kto prowadził");
+  assert.ok(wiersz.unassigned_at, "wiersz historii został otwarty");
+});
+
+test("zwolnienie podbija `version` i zostawia ślad w dzienniku", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  const przed = (d.prepare("SELECT version FROM conversation WHERE id=?").get(rozmowa) as
+    { version: number }).version;
+  ustawStatus(d, rozmowa, "closed", ala, null);
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  /* Panel trzyma `version` przy przejęciu i przy wysyłce. Numer bez ruchu
+     znaczyłby, że ekran sprzed zwolnienia dalej uchodzi za świeży. */
+  assert.equal((d.prepare("SELECT version FROM conversation WHERE id=?").get(rozmowa) as
+    { version: number }).version, przed + 1, "wersja stoi w miejscu mimo zmiany przypisania");
+  const wpis = d.prepare("SELECT user_id FROM events WHERE type='rozmowa_zwolniona'").get() as
+    { user_id: string } | undefined;
+  /* Autorem jest KLIENT: to jego wiadomość otworzyła sprawę na nowo. */
+  assert.equal(wpis?.user_id, "klient", "zwolnienie nie zostawiło śladu albo podpisało je agentem");
+});
+
+test("budzenie z `resolved` NIE zabiera prowadzącego — zwalnia tylko `closed`", () => {
+  /* Tu stoi cała różnica między werdyktami. „Rozwiązana" znaczy „załatwiłem,
+     wraca do mnie"; gdyby też zwalniała, obie pozycje w menu robiłyby to samo. */
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  ustawStatus(d, rozmowa, "resolved", ala, null);
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  assert.equal((d.prepare("SELECT assigned_user_id FROM conversation WHERE id=?").get(rozmowa) as
+    { assigned_user_id: number | null }).assigned_user_id, ala, "rozwiązana oddała rozmowę do puli");
+  assert.equal((d.prepare("SELECT count(*) n FROM events WHERE type='rozmowa_zwolniona'")
+    .get() as { n: number }).n, 0, "rozwiązana zapisała zwolnienie");
+});
+
+test("`spam` NIE budzi się sam — to jedyny werdykt broniący skrzynki", () => {
+  /* Po tego się sięga, gdy ktoś zasypuje skrzynkę. Gdyby wracał, biuro nie
+     miałoby czym uciszyć natręta — a prowadzący ma zostać, bo sprawy nikt
+     nie oddaje do puli. */
+  const { d, ala, rozmowa } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  ustawStatus(d, rozmowa, "spam", ala, null);
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  assert.equal(statusRozmowy(d, rozmowa), "spam", "spam obudził się sam");
+  assert.equal((d.prepare("SELECT assigned_user_id FROM conversation WHERE id=?").get(rozmowa) as
+    { assigned_user_id: number | null }).assigned_user_id, ala, "spam oddał rozmowę do puli");
+});
+
+test("zamknięta BEZ prowadzącego budzi się bez pustego wpisu o zwolnieniu", () => {
+  /* Rozmowa zamknięta przez kogoś, kto jej nie prowadził, nie ma czego oddawać.
+     Wpis „zwolniona" i podbita wersja byłyby wtedy zmyślone, a podbity numer
+     unieważniłby cudzy ekran z niczego. */
+  const { d, ala, rozmowa } = stanowisko();
+  ustawStatus(d, rozmowa, "closed", ala, null);
+  const przed = (d.prepare("SELECT version FROM conversation WHERE id=?").get(rozmowa) as
+    { version: number }).version;
+
+  obudzPrzychodzaca(d, rozmowa);
+
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us", "nieprzypisana zamknięta nie wróciła");
+  assert.equal((d.prepare("SELECT version FROM conversation WHERE id=?").get(rozmowa) as
+    { version: number }).version, przed, "wersja urosła bez zmiany przypisania");
+  assert.equal((d.prepare("SELECT count(*) n FROM events WHERE type='rozmowa_zwolniona'")
+    .get() as { n: number }).n, 0, "powstał wpis o zwolnieniu nikogo");
 });
 
 test("odłożenie wymaga terminu, a po nim rozmowa wraca sama", () => {

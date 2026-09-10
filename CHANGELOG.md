@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.257.0 — 10 września 2026
+
+**Zamknięta rozmowa wraca do kolejki, gdy klient dopisze.** Do 0.256.0 wracała
+z „Rozwiązanej", „Odłożonej" i „Czeka na klienta", ale nie z „Zamkniętej".
+Klient pisał, rozmowa zostawała zamknięta i wypadała ze WSZYSTKICH kubełków
+roboczych — stała już tylko w „Wszystkie", gdzie się nie pracuje. Pytanie
+przepadało bez śladu.
+
+Stał za tym argument z 0.158.0: werdykt cofnięty automatem kazałby zamykać tę
+samą rozmowę w kółko. Argument mylił dwa koszty. Ponowne zamknięcie to jedno
+kliknięcie. Przepadłe pytanie klienta to sprawa, o której nikt się nie dowie.
+
+**„Zamknięta" wraca do puli, „Rozwiązana" do prowadzącego.** Obudzenie
+z „Zamkniętej" zdejmuje prowadzącego, więc rozmowa ląduje w „Nieprzypisanych"
+i bierze ją, kto wolny. To jedyna rzecz, którą oba werdykty się teraz różnią,
+i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem, wraca do mnie",
+„Zamknięta" — „skończyłem z tym, bierze kto inny". Wiersz historii przypisań
+się przy tym zamyka, a nie znika.
+
+„Spam" zostaje jedynym werdyktem, którego nic nie cofa. To po niego sięga się,
+gdy ktoś zasypuje skrzynkę.
+
+**Przy okazji: dwa wydania okazały się puste.** Oba z tego samego powodu —
+synchronizator skrzynki ma własną wstawkę i nie woła `zapiszWiadomosc`, więc
+omijał wszystko, co tamta funkcja robi poza samym `INSERT`-em.
+
+Pasek „Klient dopisał nową wiadomość" nie zapalił się ani razu na prawdziwej
+wiadomości z Allegro. Panel wymaga w zdarzeniu pola `odKlienta`, a tą drogą
+pole nie jechało nigdy. Wydanie 0.228.0 zawęziło alarm, którego nie było.
+
+Znacznik autoodpowiedzi zostawał zerem do najbliższego restartu procesu, bo
+kolumny w tej wstawce nie było, a flagę dosypywała dopiero migracja przy
+starcie. Między restartami nasze „Dziękujemy za kontakt" liczyło się jako ruch
+biura i przestawiało rozmowę na „czeka na klienta" — czyli usterka z 0.227.0
+działała dokładnie tak, jak przed poprawką.
+
+Regułę trzyma teraz jedna funkcja, `flagaAutoodpowiedzi`, z kierunkiem
+w środku. Wołają ją obie drogi zapisu.
+
+**Wdrożenie nie wymaga żadnego działania.** Migracji nie ma: zmiana dotyczy
+wyłącznie kodu, a kolumny, o które chodzi, stoją w bazie od 0.158.0 i 0.227.0.
+
 ## 0.256.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

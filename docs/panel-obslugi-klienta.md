@@ -361,17 +361,55 @@ przez `czyAutoresponder`. Odczyt go tylko czyta, a SQL nie powtarza reguły —
 dwie kopie rozjechałyby się przy pierwszej poprawce. Migracja wypełnia kolumnę
 wstecz i mówi w dzienniku, ile wiadomości oznaczyła.
 
+**TO WYDANIE BYŁO PUSTE PRZEZ SIEDEM MIESIĘCY (sprostowanie z 0.257.0).**
+Znacznik ustawiał wyłącznie `zapiszWiadomosc`, a synchronizator skrzynki tej
+funkcji nie woła i nigdy nie wołał — ma własną wstawkę, z kolumnami powiązań.
+Wiersz wchodził więc bez `auto_odpowiedz`, czyli z `DEFAULT 0`, i flagę
+dosypywała dopiero migracja przy najbliższym starcie procesu. Między
+restartami usterka z 0.227.0 działała dokładnie tak, jak przed poprawką.
+Regułę trzyma teraz `flagaAutoodpowiedzi` w `conversations.ts` — jedna funkcja
+z kierunkiem w środku, wołana przez obie drogi zapisu.
+
 **PASEK O NOWEJ WIADOMOŚCI TYLKO PRZY KLIENCIE (0.228.0).** Panel zapalał go
 na każde zdarzenie `message.created` — także na naszą odpowiedź wracającą
 z synchronizacji i na autoodpowiedź. Agent odpisywał i po chwili dostawał od
 panelu wiadomość, że odpisał mu klient. Zdarzenie niesie odtąd kierunek
 i znacznik odbicia; nasze wiadomości dociągają rozmowę po cichu, bez alarmu.
 
+**TEN PASEK NIE ZAPALIŁ SIĘ ANI RAZU (sprostowanie z 0.257.0).** Ta sama
+przyczyna, co wyżej. Panel zapala go wyłącznie przy `odKlienta` w zdarzeniu,
+a pole ustawiał tylko `zapiszWiadomosc`. Synchronizator publikował
+`message.created` z samymi identyfikatorami, więc warunek był fałszywy dla
+KAŻDEJ prawdziwej wiadomości z Allegro i zostawało ciche odświeżenie rozmowy.
+Wydanie 0.228.0 zawęziło alarm, którego nie było. Od 0.257.0 zdarzenie
+z synchronizatora niesie `odKlienta` i `automatyczna`, liczone z tej samej
+flagi `isInterlocutor`, która wyznacza kierunek wiadomości.
+
 **Werdykty człowieka przebijają wyliczenie.** `snoozed`, `resolved`, `closed`
 i `spam` zostają, choćby ostatnia wiadomość była klienta — inaczej nie dałoby
 się domknąć żadnej sprawy. Przebija je także `waiting_for_internal`: nie
 wynika z wiadomości, tylko ze zlecenia pomiaru, i zdejmuje go dopiero wynik
 z hali.
+
+**NOWA WIADOMOŚĆ BUDZI TEŻ ZAMKNIĘTĄ (0.257.0).** Do 0.256.0 `closed` i `spam`
+stały poza zbiorem `BUDZONE`, z argumentem, że werdykt cofnięty automatem
+kazałby zamykać tę samą rozmowę w kółko. Argument mylił dwa koszty. Ponowne
+zamknięcie to jedno kliknięcie. Przepadłe pytanie klienta to sprawa, o której
+nikt się nie dowie: rozmowa wypadała ze wszystkich kubełków roboczych i stała
+już tylko w „Wszystkie", gdzie się nie pracuje. Klient, który pisze dalej,
+mówi wprost, że sprawa nie jest skończona.
+
+**„Zamknięta" wraca do puli, „Rozwiązana" do prowadzącego.** Obudzenie
+z `closed` zdejmuje `assigned_user_id`, więc rozmowa ląduje w kubełku
+„Nieprzypisane" i bierze ją, kto wolny. To jedyna rzecz, którą oba werdykty
+się różnią, i dlatego oba mają dalej sens: „Rozwiązana" znaczy „załatwiłem,
+wraca do mnie", „Zamknięta" — „skończyłem z tym, bierze kto inny". Wiersz
+w `conversation_assignment` się przy tym ZAMYKA, a nie znika, a `version`
+rośnie, bo ekran sprzed zwolnienia przestał być świeży.
+
+`spam` zostaje jedynym werdyktem, którego nic nie cofa. To po niego sięga się,
+gdy ktoś zasypuje skrzynkę; gdyby wracał, biuro nie miałoby czym uciszyć
+natręta.
 
 **Trasa przyjmuje TYLKO statusy ręczne** (`STATUSY_RECZNE`): cztery werdykty
 plus `open` jako droga powrotna, znacząca „oddaj sterowanie rozmowie". Bez tej

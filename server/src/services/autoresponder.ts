@@ -40,7 +40,8 @@ const PODPISY = [
  * z cytatem naszego potwierdzenia pod spodem, niesie ten sam podpis w treści —
  * a jego wiadomość jest pytaniem, nie odbiciem, i zwinięcie jej byłoby
  * zgubieniem sprawy. Kierunek rozstrzyga o tym pewnie, treść nie rozstrzyga
- * wcale, więc warunek stoi po stronie wołającego (`skrzynka.ts`).
+ * wcale, więc warunek stoi po stronie wołającego — od 0.257.0 w jednym
+ * miejscu, `flagaAutoodpowiedzi` w `conversations.ts`.
  */
 export function czyAutoresponder(tresc: string): boolean {
   /* `zloz` zdejmuje wielkość liter i polskie znaki: autoresponder bywa
