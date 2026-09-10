@@ -386,6 +386,12 @@ window.Wms = (() => {
       `<form id="wms-filter" class="wms-toolbar"><label class="wms-search">Towar lub lokalizacja<input name="q" value="${html(query)}" placeholder="SKU, EAN, nazwa, lokalizacja"></label><label>Zakres<select name="low"><option value="0">Cały magazyn</option><option value="1" ${low ? "selected" : ""}>Poniżej minimum</option></select></label><button>Szukaj</button></form>
       <div class="wms-surface"><h2>Zapasy na lokalizacjach</h2><p class="wms-muted">Dostępne do zbiórki = wolne sztuki na lokalizacjach kompletacji. Kwarantanna i zapas zaplecza wymagają zwolnienia lub przesunięcia.</p><div class="wms-scroll"><table class="wms-lines wms-stock-table"><thead><tr><th>SKU / towar</th><th>Lokalizacja</th><th>Na półce</th><th>Rezerwacja</th><th>Dostępne</th><th>Minimum</th><th>Operacja</th></tr></thead><tbody>${result.rows.map((s, i) => `<tr><td><strong>${html(s.symbol)}</strong><br>${html(s.nazwa)}${s.active ? "" : "<br><strong>Brak kartoteki ERP</strong>"}</td><td>${html(s.bin || "Brak spisu")}<br><small>${binModes[s.mode]}</small></td><td class="num">${s.on_hand}</td><td class="num">${s.reserved}</td><td class="num ${s.on_hand - s.reserved < s.minimum ? "wms-late" : ""}">${s.available}</td><td class="num">${s.minimum}</td><td><button data-stock-wms="${i}">Zmień</button>${office() ? `<button data-movements-wms="${i}">Historia</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak pasujących towarów.</td></tr>'}</tbody></table></div>${pager(result.total)}<div id="wms-stock-form"></div></div>`;
     root()._stockRows = result.rows;
+    root()._stockImport = null;
+    if (office())
+      el("wms-content").insertAdjacentHTML("beforeend", stockImportForm());
+  }
+  function stockImportForm() {
+    return `<details class="wms-surface" id="wms-stock-import"><summary>Przyjęcie lub spis z arkusza</summary><p class="wms-help">Do 5000 wierszy SKU;lokalizacja;ilość. Możesz wkleić kolumny z arkusza albo wybrać plik CSV. Bez nagłówka. Numer dokumentu chroni przed podwójnym przyjęciem.</p><form id="wms-stock-preview" class="wms-form">${field("reference", "Numer dokumentu / protokołu", "text", "", 'maxlength="120"')}<label>Rodzaj dokumentu<select name="mode"><option value="receive">Przyjęcie — dodaj dostarczone sztuki</option><option value="count">Spis — ustaw policzony stan półek</option></select></label><p class="wms-help">Spis obejmuje wyłącznie wymienione lokalizacje. Na czas liczenia zatrzymaj ich obsługę. Puste wiersze nie zerują pozostałego zapasu.</p><label>Plik CSV / tekstowy<input type="file" id="wms-stock-file" accept=".csv,.txt,text/csv,text/plain"></label><label>SKU;lokalizacja;ilość<textarea id="wms-stock-data" name="rows" required placeholder="WMS-0001;A01-01-02;20"></textarea></label><button>PODGLĄD RUCHÓW</button></form><div id="wms-stock-preview-result"></div></details>`;
   }
   async function waves(turn) {
     const result = await read(`/api/wms/waves?offset=${offset}`);
@@ -616,6 +622,18 @@ window.Wms = (() => {
           );
         }
       }
+      if (action === "stock-import") {
+        const input = root()._stockImport;
+        if (!input)
+          throw new Error("Najpierw przygotuj aktualny podgląd ruchów.");
+        const r = await mutate("/api/wms/inventory/import", input);
+        if (r) {
+          await refresh();
+          message(
+            `${r.alreadyApplied ? "Dokument był już zapisany" : "Zapisano dokument"}: ${r.reference}. Pozycje: ${r.rows}. Zmiana zapasu: ${r.delta} szt.`,
+          );
+        }
+      }
       if (action === "prev" || action === "next") {
         offset = Math.max(0, offset + (action === "next" ? 50 : -50));
         await refresh();
@@ -663,6 +681,68 @@ window.Wms = (() => {
     if (busy) return;
     try {
       const values = Object.fromEntries(new FormData(f));
+      if (f.id === "wms-stock-preview") {
+        root()._stockImport = null;
+        el("wms-stock-preview-result").textContent = "";
+        const rows = String(values.rows)
+          .split(/\r?\n/)
+          .filter((line) => line.trim())
+          .map((line, i) => {
+            const parts = line.split(/[;\t]/);
+            if (parts.length !== 3 || !/^\d+$/.test(parts[2].trim()))
+              throw new Error(
+                `Wiersz ${i + 1}: wymagane SKU, lokalizacja i całkowita ilość.`,
+              );
+            return {
+              sku: parts[0].trim(),
+              bin: parts[1].trim(),
+              quantity: Number(parts[2]),
+            };
+          });
+        if (!rows.length || rows.length > 5000)
+          throw new Error("Dokument wymaga od 1 do 5000 wierszy.");
+        const input = { reference: values.reference, mode: values.mode, rows },
+          turn = generation;
+        lock(true);
+        try {
+          const result = await (
+            await api("/api/wms/inventory/preview", {
+              method: "POST",
+              body: JSON.stringify(input),
+              signal: AbortSignal.timeout(20000),
+            })
+          ).json();
+          if (turn !== generation) return;
+          if (result.completed) {
+            el("wms-stock-preview-result").textContent =
+              `Dokument ${result.completed.reference} był już zapisany. Zapas nie zostanie zmieniony ponownie.`;
+            return;
+          }
+          root()._stockImport = {
+            ...input,
+            rows: result.rows.map(({ sku, bin, quantity, version }) => ({
+              sku,
+              bin,
+              quantity,
+              version,
+            })),
+          };
+          const delta = result.rows.reduce((sum, row) => sum + row.delta, 0);
+          el("wms-stock-preview-result").innerHTML =
+            `<h2>${html(values.reference)} · ${result.rows.length} pozycji</h2><p>Zmiana zapasu: ${number(delta)} szt. ${rows.length > 100 ? "Tabela pokazuje pierwsze 100 wierszy; zapis obejmie cały dokument." : ""}</p><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>SKU</th><th>Lokalizacja</th><th>Teraz</th><th>Rezerwacja</th><th>Po zapisie</th><th>Zmiana</th></tr></thead><tbody>${result.rows
+              .slice(0, 100)
+              .map(
+                (row) =>
+                  `<tr><td>${html(row.sku)}</td><td>${html(row.bin)}</td><td>${row.before}</td><td>${row.reserved}</td><td>${row.after}</td><td>${row.delta}</td></tr>`,
+              )
+              .join(
+                "",
+              )}</tbody></table></div><p class="wms-help">Sprawdź dokument i ilości. Całość zapisze się razem; zmiana stanu od podglądu zatrzyma cały import.</p><button class="primary" data-do-wms="stock-import">ZATWIERDŹ RUCHY Z DOKUMENTU</button>`;
+        } finally {
+          lock(false);
+        }
+        return;
+      }
       if (f.id === "wms-wave-create") {
         const orders = root()
           ._waveCandidates.filter((o) => String(values[`tote-${o.id}`]).trim())
@@ -838,6 +918,22 @@ window.Wms = (() => {
   document.addEventListener("click", click);
   document.addEventListener("submit", submit);
   document.addEventListener("change", async (event) => {
+    if (event.target.id === "wms-stock-file") {
+      root()._stockImport = null;
+      el("wms-stock-preview-result").textContent = "";
+      const turn = generation;
+      try {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024)
+          throw new Error("Plik przekracza 2 MB.");
+        const contents = await file.text();
+        if (turn === generation)
+          el("wms-stock-data").value = contents.replace(/^\uFEFF/, "");
+      } catch (e) {
+        message(e.message, true);
+      }
+    }
     if (event.target.id === "wms-days") {
       days = Number(event.target.value);
       refresh();
@@ -856,6 +952,10 @@ window.Wms = (() => {
       }
   });
   document.addEventListener("input", (event) => {
+    if (event.target.closest("#wms-stock-preview")) {
+      root()._stockImport = null;
+      el("wms-stock-preview-result").textContent = "";
+    }
     if (event.target.id === "wms-import-json") {
       root()._import = null;
       el("wms-import-result").textContent = "";

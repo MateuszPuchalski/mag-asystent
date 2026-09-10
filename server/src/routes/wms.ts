@@ -4,6 +4,8 @@ import { sesjaZadania } from "../context.js";
 import {
   actOnOrder,
   changeStock,
+  previewStockBatch,
+  importStockBatch,
   configureBin,
   listBins,
   createWave,
@@ -145,6 +147,21 @@ export async function wmsRoutes(app: FastifyInstance) {
       String(req.headers["idempotency-key"] ?? ""),
       req.body,
     ),
+  );
+  app.post(
+    "/api/wms/inventory/preview",
+    { bodyLimit: 2 * 1024 * 1024 },
+    async (req) => previewStockBatch(actor(), req.body),
+  );
+  app.post(
+    "/api/wms/inventory/import",
+    { bodyLimit: 2 * 1024 * 1024 },
+    async (req) =>
+      importStockBatch(
+        actor(),
+        String(req.headers["idempotency-key"] ?? ""),
+        req.body,
+      ),
   );
   app.get("/api/wms/analytics", async (req) => {
     manager(actor());

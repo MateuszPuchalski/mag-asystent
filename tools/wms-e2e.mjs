@@ -76,20 +76,56 @@ try {
   await page
     .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
     .click();
-  const proposalOrderId = Number(await page.locator('[data-order-wms][aria-pressed="true"]').getAttribute("data-order-wms"));
+  const proposalOrderId = Number(
+    await page
+      .locator('[data-order-wms][aria-pressed="true"]')
+      .getAttribute("data-order-wms"),
+  );
   // Odpowiedź sklepu jest atrapą; otwarcie i zapis zmiany używają prawdziwego WMS.
-  await page.route("**/api/wms/sellasist", (route) => route.fulfill({
-    json: {
-      enabled: true, account: "test-shop", intervalMs: 60000, shippedStatus: 9,
-      state: null, issues: [{ external_id: 123, stage: "source", message: "Zmiana priorytetu w sklepie", updated_at: new Date().toISOString(),
-        proposal: { orderId: proposalOrderId, order: { priority: 1, dueAt: "2026-12-31T13:00:00Z", lines: [{ sku: "WMS-0001", quantity: 2 }, { sku: "WMS-0002", quantity: 1 }] } } }],
-    },
-  }), { times: 1 });
+  await page.route(
+    "**/api/wms/sellasist",
+    (route) =>
+      route.fulfill({
+        json: {
+          enabled: true,
+          account: "test-shop",
+          intervalMs: 60000,
+          shippedStatus: 9,
+          state: null,
+          issues: [
+            {
+              external_id: 123,
+              stage: "source",
+              message: "Zmiana priorytetu w sklepie",
+              updated_at: new Date().toISOString(),
+              proposal: {
+                orderId: proposalOrderId,
+                order: {
+                  priority: 1,
+                  dueAt: "2026-12-31T13:00:00Z",
+                  lines: [
+                    { sku: "WMS-0001", quantity: 2 },
+                    { sku: "WMS-0002", quantity: 1 },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+    { times: 1 },
+  );
   await page.locator('[data-tab-wms="integration"]').click();
-  await page.getByRole("button", { name: "OTWÓRZ ZMIANY DO SPRAWDZENIA", exact: true }).click();
+  await page
+    .getByRole("button", { name: "OTWÓRZ ZMIANY DO SPRAWDZENIA", exact: true })
+    .click();
   await expect(page.locator('#wms-amend [name="priority"]')).toHaveValue("1");
-  await expect(page.locator('#wms-amend [name="lines"]')).toHaveValue("WMS-0001;2\nWMS-0002;1");
-  await expect(page.locator('#wms-amend [name="reason"]')).toHaveValue("Uzgodnienie zmiany Sellasist");
+  await expect(page.locator('#wms-amend [name="lines"]')).toHaveValue(
+    "WMS-0001;2\nWMS-0002;1",
+  );
+  await expect(page.locator('#wms-amend [name="reason"]')).toHaveValue(
+    "Uzgodnienie zmiany Sellasist",
+  );
   await page
     .locator('#wms-amend [name="reason"]')
     .fill("Klient potrzebuje pilnej realizacji");
@@ -216,6 +252,70 @@ try {
     "historia ruchów",
   );
   await expect(page.locator("#wms-stock-form")).toContainText("Przyjęcie");
+  await page.locator("#wms-stock-import summary").click();
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK");
+  await page
+    .locator("#wms-stock-file")
+    .setInputFiles({
+      name: "dostawa.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        "WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3",
+        "utf8",
+      ),
+    });
+  await expect(page.locator("#wms-stock-data")).toHaveValue(
+    "WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3",
+  );
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "2 pozycji",
+  );
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "Zmiana zapasu: 5 szt.",
+  );
+  // Edycja po podglądzie musi zdjąć możliwość zatwierdzenia starej treści.
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK-UPDATED");
+  await expect(
+    page.getByRole("button", {
+      name: "ZATWIERDŹ RUCHY Z DOKUMENTU",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "ZATWIERDŹ RUCHY Z DOKUMENTU", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText(
+    "Zapisano dokument: PZ-E2E-BULK-UPDATED",
+  );
+  await page.locator("#wms-stock-import summary").click();
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK-UPDATED");
+  await page
+    .locator("#wms-stock-data")
+    .fill("WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3");
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "był już zapisany",
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "ZATWIERDŹ RUCHY Z DOKUMENTU",
+      exact: true,
+    }),
+  ).toHaveCount(0);
   await page.locator('[data-tab-wms="bins"]').click();
   await page
     .getByRole("button", { name: "DODAJ LOKALIZACJĘ", exact: true })
@@ -396,6 +496,7 @@ try {
           "ship",
           "receive",
           "stock movement history",
+          "stock CSV preview, changed-input invalidation and duplicate document protection",
           "quarantine location",
           "batch import",
           "bulk allocation",

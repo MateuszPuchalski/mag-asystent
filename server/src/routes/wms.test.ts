@@ -11,7 +11,7 @@ process.env.DB_PATH = path.join(
   "wms.db",
 );
 process.env.LOG_LEVEL = "silent";
-process.env.WMS_SELLASIST_ENABLED = '0';
+process.env.WMS_SELLASIST_ENABLED = "0";
 let app: FastifyInstance;
 let adminToken: string, workerToken: string;
 before(async () => {
@@ -85,7 +85,13 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     ).statusCode,
     403,
   );
-  for (const url of ["/api/wms/import", "/api/wms/release", "/api/wms/bins"]) {
+  for (const url of [
+    "/api/wms/import",
+    "/api/wms/release",
+    "/api/wms/bins",
+    "/api/wms/inventory/preview",
+    "/api/wms/inventory/import",
+  ]) {
     assert.equal(
       (
         await app.inject({

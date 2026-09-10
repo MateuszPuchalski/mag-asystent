@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.271.0 — 11 września 2026
+
+Otwarcie zapasu i przyjęcia z arkusza w WMS obsługują do 5000 par SKU i lokalizacji.
+Podgląd pokazuje stan przed zmianą, rezerwacje i planowany wynik.
+Spis ustawia policzony stan, a przyjęcie dodaje fizycznie dostarczone sztuki.
+
+Cały dokument zapisuje się atomowo razem z dziennikiem i audytem.
+Zmiana stanu od podglądu zatrzymuje partię. Numer dokumentu chroni przed ponownym przyjęciem.
+Testy obejmują otwarcie 5000 SKU, awarię w środku zapisu, rezerwacje i powtórny import z przeglądarki.
+Instrukcja: `docs/wms.md`, sekcja otwarcia i dostaw z arkusza.
+
 ## 0.270.0 — 11 września 2026
 
 Realizacja WMS w istniejącym biurze: od rezerwacji części przez skan lokalizacji,

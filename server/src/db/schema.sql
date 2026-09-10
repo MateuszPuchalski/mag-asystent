@@ -127,6 +127,19 @@ CREATE TABLE IF NOT EXISTS wms_command (
   created_at TEXT NOT NULL
 );
 -- Integracja przechowuje identyfikatory i stan ponowień; klucz API zostaje w konfiguracji serwera.
+CREATE TABLE IF NOT EXISTS wms_stock_document (
+  reference TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL,
+  response TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL
+);
+-- Usunięcie numeru pozwoliłoby przyjąć drugi raz ten sam dokument.
+CREATE TRIGGER IF NOT EXISTS wms_stock_document_no_update BEFORE UPDATE ON wms_stock_document
+BEGIN SELECT RAISE(ABORT, 'WMS stock document is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_stock_document_no_delete BEFORE DELETE ON wms_stock_document
+BEGIN SELECT RAISE(ABORT, 'WMS stock document is immutable'); END;
+
 CREATE TABLE IF NOT EXISTS wms_sellasist_link (
   account TEXT NOT NULL,
   external_id INTEGER NOT NULL,

@@ -48,6 +48,32 @@ W powodzie podaj numer protokołu otwarcia.
 Kolejne dostawy zapisuj z numerem dokumentu przyjęcia, raz dla każdej faktycznie odłożonej partii.
 WMS nie pobiera automatycznie ilości z historycznych dokumentów przyjęcia.
 
+### Otwarcie i dostawy z arkusza
+
+**Zapasy → Przyjęcie lub spis z arkusza** przyjmuje do 5000 wierszy i plik do 2 MB.
+Wklej trzy kolumny z arkusza lub wybierz plik UTF-8 ze średnikami, bez nagłówka:
+
+```text
+W32-0203;A01-01-02;20
+50-111;B01-02-03;5
+```
+
+Podaj jednoznaczny numer, np. `OTWARCIE/2026-09-11` lub `DOSTAWCA/PZ/123/2026`.
+Numer jest wspólny dla wszystkich dokumentów stanów; wielkość liter nie rozróżnia dokumentów.
+**Przyjęcie** dodaje dostarczone sztuki. **Spis** ustawia policzone ilości wyłącznie na wymienionych półkach.
+Brak wiersza nie zeruje stanu. Powtórzona para SKU i lokalizacji zatrzymuje dokument.
+
+Na czas liczenia zatrzymaj obsługę liczonych lokalizacji.
+Podgląd niczego nie zapisuje: pokazuje bieżący stan, rezerwację i wynik po zatwierdzeniu.
+Tabela pokazuje pierwsze 100 pozycji; zatwierdzenie obejmuje cały wskazany dokument.
+Zmiana formularza usuwa wcześniejszy podgląd.
+
+Wszystkie ruchy, audyt i numer dokumentu zapisują się w jednej transakcji.
+Zmiana zapasu od podglądu zatrzymuje całość i wymaga ponownego sprawdzenia.
+Spis poniżej ilości zarezerwowanej wymaga wcześniejszego wyjaśnienia zamówień.
+Ponowny import identycznego dokumentu nie zmienia zapasu, także z nowej karty przeglądarki.
+Inna treść pod użytym numerem jest odrzucana; poprawkę wykonaj osobnym, opisanym dokumentem.
+
 Na półce znajdują się `on_hand` sztuki, z czego `reserved` są przypisane do zamówień.
 Dostępne wynosi `on_hand - reserved`.
 Pobranie zmniejsza obie wartości i zwiększa ilość w pojemniku zamówienia.
@@ -177,6 +203,8 @@ Nowa operacja wymaga nowego klucza.
 | `POST /api/wms/release` | Rezerwacja partii wskazanych numerów i wersji |
 | `GET /api/wms/inventory?q=SKU` | Zapas i wersje lokalizacji |
 | `POST /api/wms/inventory` | Przyjęcie, spis, minimum lub przesunięcie |
+| `POST /api/wms/inventory/preview` | Podgląd dokumentu stanów; wyłącznie odczyt |
+| `POST /api/wms/inventory/import` | Atomowy zapis dokumentu przyjęcia lub spisu |
 | `GET /api/wms/shipments?after=0` | Eksport wysyłek z trwałym kursorem |
 | `GET /api/wms/analytics?days=30` | Metryki operacyjne |
 | `GET /api/wms/analytics/csv?days=30` | Dzienne wysyłki do arkusza |
@@ -193,6 +221,12 @@ Przykładowa czynność: `{"action":"allocate","version":1}`.
 Odpowiedź zawiera nową wersję zamówienia.
 Konflikt `409` wymaga odczytania aktualnego stanu przed nową decyzją.
 Przy błędzie sieci najpierw ponów pierwotne żądanie z pierwotnym kluczem.
+
+Podgląd dokumentu stanów przyjmuje `reference`, `mode` (`receive` albo `count`) i tablicę `rows`.
+Każdy wiersz zawiera `sku`, `bin` i `quantity`.
+Zapis wymaga dodatkowo `version` z podglądu przy każdym wierszu, bez pozostałych pól informacyjnych.
+Jeśli podgląd zwrócił `completed`, identyczny dokument został już zapisany.
+Obie trasy wymagają uprawnień biura. Podgląd nie wymaga klucza ponowienia.
 
 Eksporter wysyłek zwraca do 100 rekordów oraz `next`.
 Integrator zapisuje ten kursor dopiero po obsłużeniu całej odpowiedzi.

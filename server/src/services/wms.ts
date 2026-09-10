@@ -331,81 +331,237 @@ function move(
 export function changeStock(actor: Actor, key: string, raw: unknown) {
   const input = stockInput.parse(raw);
   if (input.action === "count" || input.action === "minimum") manager(actor);
-  return command(key, actor, "stock", input, () => {
-    const d = db();
-    const catalog = d
-      .prepare("SELECT tw_id,symbol,nazwa,ean FROM sgt_towar WHERE tw_id=?")
-      .get(input.twId);
-    if (catalog)
-      d.prepare(
-        `INSERT INTO wms_product(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)
+  return command(key, actor, "stock", input, () => applyStock(actor, input));
+}
+
+function applyStock(actor: Actor, input: z.infer<typeof stockInput>) {
+  const d = db();
+  const catalog = d
+    .prepare("SELECT tw_id,symbol,nazwa,ean FROM sgt_towar WHERE tw_id=?")
+    .get(input.twId);
+  if (catalog)
+    d.prepare(
+      `INSERT INTO wms_product(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)
       ON CONFLICT(tw_id) DO UPDATE SET symbol=excluded.symbol,nazwa=excluded.nazwa,ean=excluded.ean`,
-      ).run(catalog.tw_id, catalog.symbol, catalog.nazwa, catalog.ean);
-    else if (
-      !d.prepare("SELECT 1 FROM wms_product WHERE tw_id=?").get(input.twId)
+    ).run(catalog.tw_id, catalog.symbol, catalog.nazwa, catalog.ean);
+  else if (
+    !d.prepare("SELECT 1 FROM wms_product WHERE tw_id=?").get(input.twId)
+  )
+    fail("Nie ma takiego towaru", 404);
+  const current = stock(input.twId, input.bin);
+  if ("version" in input && (current?.version ?? 1) !== input.version)
+    fail("Stan zmienił się. Odśwież i przelicz ponownie");
+  if (input.action === "receive")
+    move(
+      actor,
+      input.twId,
+      input.bin,
+      input.quantity,
+      0,
+      "receive",
+      input.reason,
+    );
+  if (input.action === "count")
+    move(
+      actor,
+      input.twId,
+      input.bin,
+      input.quantity - (current?.on_hand ?? 0),
+      0,
+      "count",
+      input.reason,
+    );
+  if (input.action === "transfer") {
+    if (
+      d
+        .prepare("SELECT 1 FROM wms_bin WHERE bin=? AND mode='quarantine'")
+        .get(input.bin)
     )
-      fail("Nie ma takiego towaru", 404);
-    const current = stock(input.twId, input.bin);
-    if ("version" in input && (current?.version ?? 1) !== input.version)
-      fail("Stan zmienił się. Odśwież i przelicz ponownie");
-    if (input.action === "receive")
-      move(
-        actor,
-        input.twId,
-        input.bin,
-        input.quantity,
-        0,
-        "receive",
-        input.reason,
+      manager(actor);
+    if (input.bin === input.target)
+      fail("Wybierz inną lokalizację docelową", 400);
+    move(
+      actor,
+      input.twId,
+      input.bin,
+      -input.quantity,
+      0,
+      "transfer",
+      input.reason,
+    );
+    move(
+      actor,
+      input.twId,
+      input.target,
+      input.quantity,
+      0,
+      "transfer",
+      input.reason,
+    );
+  }
+  if (input.action === "minimum") {
+    d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
+      input.twId,
+      input.bin,
+    );
+    d.prepare(
+      "UPDATE wms_stock SET minimum=?,version=version+1 WHERE tw_id=? AND bin=?",
+    ).run(input.quantity, input.twId, input.bin);
+  }
+  return stock(input.twId, input.bin)!;
+}
+
+const stockBatchRow = z
+  .object({ sku: label, bin, quantity: z.number().int().min(0).max(1_000_000) })
+  .strict();
+const stockBatchInput = z
+  .object({
+    reference: label.transform((value) => value.toUpperCase()),
+    mode: z.enum(["receive", "count"]),
+    rows: z.array(stockBatchRow).min(1).max(5000),
+  })
+  .strict();
+const stockBatchCommitInput = stockBatchInput.extend({
+  rows: z.array(stockBatchRow.extend({ version })).min(1).max(5000),
+});
+type StockBatch = z.infer<typeof stockBatchInput>;
+
+function stockDocumentHash(input: StockBatch) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        mode: input.mode,
+        rows: input.rows
+          .map((r) => [r.sku.toUpperCase(), r.bin, r.quantity])
+          .sort(
+            (a, b) =>
+              String(a[0]).localeCompare(String(b[0])) ||
+              String(a[1]).localeCompare(String(b[1])),
+          ),
+      }),
+    )
+    .digest("hex");
+}
+function existingStockDocument(input: StockBatch) {
+  const found = db()
+    .prepare(
+      "SELECT fingerprint,response FROM wms_stock_document WHERE reference=?",
+    )
+    .get(input.reference);
+  if (!found) return null;
+  if (found.fingerprint !== stockDocumentHash(input))
+    fail(
+      "Dokument o tym numerze ma już inną treść. Sprawdź numer i zapisane ruchy",
+    );
+  return JSON.parse(String(found.response)) as {
+    reference: string;
+    rows: number;
+    units: number;
+    delta: number;
+  };
+}
+function stockBatchRows(input: StockBatch) {
+  const d = db(),
+    seen = new Set<string>();
+  const lookup = d.prepare(
+    "SELECT tw_id,symbol,nazwa FROM sgt_towar WHERE symbol=? COLLATE NOCASE LIMIT 2",
+  );
+  return input.rows.map((row, i) => {
+    const found = lookup.all(row.sku);
+    if (found.length !== 1)
+      fail(`Wiersz ${i + 1}: SKU ${row.sku} nie wskazuje jednego towaru`, 400);
+    const product = found[0],
+      twId = Number(product.tw_id),
+      identity = `${twId}/${row.bin}`;
+    if (seen.has(identity))
+      fail(`Wiersz ${i + 1}: powtórzona para SKU i lokalizacji`, 400);
+    seen.add(identity);
+    if (input.mode === "receive" && row.quantity === 0)
+      fail(`Wiersz ${i + 1}: przyjęcie wymaga dodatniej ilości`, 400);
+    const current = stock(twId, row.bin),
+      before = current?.on_hand ?? 0;
+    const after = input.mode === "count" ? row.quantity : before + row.quantity;
+    if (after < (current?.reserved ?? 0))
+      fail(
+        `Wiersz ${i + 1}: policzony stan jest mniejszy niż rezerwacja. Wyjaśnij zamówienia przed spisem`,
       );
-    if (input.action === "count")
-      move(
+    return {
+      sku: row.sku,
+      name: String(product.nazwa),
+      twId,
+      bin: row.bin,
+      quantity: row.quantity,
+      version: current?.version ?? 1,
+      before,
+      reserved: current?.reserved ?? 0,
+      after,
+      delta: after - before,
+    };
+  });
+}
+
+// Podgląd jest odczytem. Wersje chronią spis przed pobraniem towaru między podglądem a zapisem.
+export function previewStockBatch(actor: Actor, raw: unknown) {
+  manager(actor);
+  const input = stockBatchInput.parse(raw),
+    existing = existingStockDocument(input);
+  if (existing) return { completed: existing, rows: [] };
+  return { completed: null, rows: stockBatchRows(input) };
+}
+
+export function importStockBatch(actor: Actor, key: string, raw: unknown) {
+  manager(actor);
+  const input = stockBatchCommitInput.parse(raw);
+  return command(key, actor, "stock_document", input, () => {
+    const existing = existingStockDocument(input);
+    if (existing) return { ...existing, alreadyApplied: true };
+    const rows = stockBatchRows(input);
+    // Sprawdzamy całą partię przed pierwszym ruchem, w tej samej transakcji SQLite.
+    rows.forEach((row, i) => {
+      if (row.version !== input.rows[i].version)
+        fail(
+          `Wiersz ${i + 1}: stan zmienił się od podglądu. Odśwież podgląd i sprawdź ilości`,
+        );
+    });
+    for (const row of rows) {
+      applyStock(
         actor,
-        input.twId,
-        input.bin,
-        input.quantity - (current?.on_hand ?? 0),
-        0,
-        "count",
-        input.reason,
+        input.mode === "count"
+          ? {
+              action: "count",
+              twId: row.twId,
+              bin: row.bin,
+              quantity: row.quantity,
+              version: row.version,
+              reason: input.reference,
+            }
+          : {
+              action: "receive",
+              twId: row.twId,
+              bin: row.bin,
+              quantity: row.quantity,
+              reason: input.reference,
+            },
       );
-    if (input.action === "transfer") {
-      if (
-        d
-          .prepare("SELECT 1 FROM wms_bin WHERE bin=? AND mode='quarantine'")
-          .get(input.bin)
+    }
+    const result = {
+      reference: input.reference,
+      rows: rows.length,
+      units: rows.reduce((sum, row) => sum + row.quantity, 0),
+      delta: rows.reduce((sum, row) => sum + row.delta, 0),
+    };
+    db()
+      .prepare(
+        "INSERT INTO wms_stock_document(reference,fingerprint,response,created_at,user_id) VALUES (?,?,?,?,?)",
       )
-        manager(actor);
-      if (input.bin === input.target)
-        fail("Wybierz inną lokalizację docelową", 400);
-      move(
-        actor,
-        input.twId,
-        input.bin,
-        -input.quantity,
-        0,
-        "transfer",
-        input.reason,
+      .run(
+        input.reference,
+        stockDocumentHash(input),
+        JSON.stringify(result),
+        nowIso(),
+        actor.id,
       );
-      move(
-        actor,
-        input.twId,
-        input.target,
-        input.quantity,
-        0,
-        "transfer",
-        input.reason,
-      );
-    }
-    if (input.action === "minimum") {
-      d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
-        input.twId,
-        input.bin,
-      );
-      d.prepare(
-        "UPDATE wms_stock SET minimum=?,version=version+1 WHERE tw_id=? AND bin=?",
-      ).run(input.quantity, input.twId, input.bin);
-    }
-    return stock(input.twId, input.bin)!;
+    return { ...result, alreadyApplied: false };
   });
 }
 

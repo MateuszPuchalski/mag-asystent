@@ -1,9 +1,9 @@
 {
-  "version": "0.270.0",
+  "version": "0.271.0",
   "date": "2026-09-11",
   "branch": "codex/robust-wms",
   "serverTests": {
-    "passed": 2061,
+    "passed": 2065,
     "failed": 0
   },
   "panelTests": {
@@ -48,7 +48,8 @@
       "balances": [],
       "reservations": []
     },
-    "limitations": "Localhost, synthetic 3-line orders, warm database, one API process. Excludes ERP, carrier, physical scanners and production hardware."
+    "limitations": "Localhost, synthetic 3-line orders, warm database, one API process. Excludes ERP, carrier, physical scanners and production hardware.",
+    "testedVersion": "0.270.0"
   },
   "retainedHistory": {
     "orders": 136500,
@@ -75,7 +76,8 @@
         "milliseconds": 147.53
       }
     ],
-    "limitations": "Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths."
+    "limitations": "Historical rows are synthetic reporting fixtures; the preceding 1500-order run exercises real write paths.",
+    "testedVersion": "0.270.0"
   },
   "browser": {
     "passed": true,
@@ -94,6 +96,7 @@
       "ship",
       "receive",
       "stock movement history",
+      "stock CSV preview, changed-input invalidation and duplicate document protection",
       "quarantine location",
       "batch import",
       "bulk allocation",
@@ -133,5 +136,18 @@
       "export queue fairness"
     ],
     "transport": "Controlled responses matching official OpenAPI; no live account calls"
+  },
+  "stockDocuments": {
+    "browser": "CSV import, invalidation after editing and duplicate-document recognition",
+    "openingSkuCount": 5000,
+    "coverage": [
+      "read-only preview",
+      "stale version rollback",
+      "duplicate reference across sessions and case",
+      "mid-transaction failure rollback",
+      "reservation protection",
+      "5000-SKU opening with ledger verification"
+    ],
+    "passed": 4
   }
 }

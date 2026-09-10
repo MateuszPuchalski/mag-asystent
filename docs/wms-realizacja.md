@@ -40,7 +40,7 @@ Widok 390 px nie ma poziomego przepełnienia.
 Próba pojemności: 5000 SKU i 1500 pełnych zamówień; 16650 żądań przy 16 klientach.
 Wynik próby wersji 0.270.0: 77,15 s, p95 90,4 ms, zgodny dziennik.
 Raport 90 dni przy 136500 zamówieniach i 409500 pozycjach: 628 ms.
-Pełny zestaw serwera: 2061 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
+Pełny zestaw serwera wersji 0.271.0: 2065 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
 Build produkcyjny przechodzi również test przeglądarki, wraz z wygaśnięciem sesji podczas ponowienia skanu.
 Aktualny audyt zależności produkcyjnych: zero zgłoszonych podatności.
 Zapis wyników: `docs/wms-evidence.json`; scenariusze i zrzuty można odtworzyć przez `tools/wms-e2e.mjs`.
@@ -49,6 +49,11 @@ Konektor Sellasist ma 11 testów z kontrolowanymi odpowiedziami według oficjaln
 Obejmują 1500 zamówień, ponowienia po awarii, zmiany zamówień i weryfikację numerów paczek.
 Przeglądarka sprawdza też otwarcie propozycji zmian oraz jawny zapis z ponowną rezerwacją.
 Nie wykonano połączeń z rzeczywistym kontem sklepu. Konfiguracja i odbiór: `docs/wms-sellasist.md`.
+
+Otwarcie 5000 SKU przechodzi jako jeden dokument przyjęcia lub spisu z arkusza.
+Testy sprawdzają wycofanie całej partii po błędzie ruchu oraz po zmianie wersji zapasu.
+Przeglądarka odrzuca stary podgląd po edycji i rozpoznaje już zapisany numer dokumentu.
+Ostatni pomiar wydajności realizacji zamówień pochodzi z wersji 0.270.0; zapis wyników wskazuje tę granicę.
 
 Ograniczenia integracji i instrukcja odbioru stoją w `docs/wms.md`.
 Odbiór produkcyjny pozostaje otwarty: rzeczywiste pliki sklepu, dokumenty ERP i sprzęt nie zostały przetestowane.

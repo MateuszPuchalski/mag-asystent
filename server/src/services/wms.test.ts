@@ -24,6 +24,229 @@ before(async () => {
   ({ db } = await import("../db/db.js"));
 });
 
+function stockBatchPayload(input: {
+  reference: string;
+  mode: "receive" | "count";
+  rows: { sku: string; bin: string; quantity: number }[];
+}) {
+  return {
+    ...input,
+    rows: W.previewStockBatch(admin, input).rows.map(
+      ({ sku, bin, quantity, version }) => ({ sku, bin, quantity, version }),
+    ),
+  };
+}
+
+test("podgląd dokumentu stanów nie zapisuje; spis jest atomowy i odrzuca nieaktualne wersje", () => {
+  const p = product(10),
+    q = product(20);
+  const input = {
+    reference: "SPIS-TEST-001",
+    mode: "count" as const,
+    rows: [
+      { sku: p.sku, bin: "A01-01-02", quantity: 8 },
+      { sku: q.sku, bin: "A01-01-02", quantity: 19 },
+    ],
+  };
+  const before = db().prepare("SELECT total_changes() AS n").get()!.n;
+  const body = stockBatchPayload(input);
+  assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, before);
+  assert.throws(() => W.previewStockBatch(picker, input), /uprawnień/);
+  assert.throws(
+    () => W.importStockBatch(picker, randomUUID(), body),
+    /uprawnień/,
+  );
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: q.twId,
+    bin: "A01-01-02",
+    quantity: 1,
+    reason: "Nowa dostawa",
+  });
+  assert.throws(
+    () => W.importStockBatch(admin, randomUUID(), body),
+    /Wiersz 2: stan zmienił/,
+  );
+  assert.equal(W.inventory({ q: p.sku }).rows[0].on_hand, 10);
+  const key = randomUUID(),
+    refreshed = stockBatchPayload(input),
+    result = W.importStockBatch(admin, key, refreshed);
+  assert.equal(result.delta, -4);
+  assert.deepEqual(W.importStockBatch(admin, key, refreshed), result);
+  const replay = W.importStockBatch(admin, randomUUID(), {
+    ...refreshed,
+    rows: [...refreshed.rows].reverse(),
+  });
+  assert.equal(replay.alreadyApplied, true);
+  assert.equal(
+    W.importStockBatch(admin, randomUUID(), {
+      ...refreshed,
+      reference: refreshed.reference.toLowerCase(),
+    }).alreadyApplied,
+    true,
+  );
+  assert.throws(
+    () =>
+      db()
+        .prepare("DELETE FROM wms_stock_document WHERE reference=?")
+        .run(input.reference),
+    /immutable/,
+  );
+  assert.equal(W.inventory({ q: p.sku }).rows[0].on_hand, 8);
+  assert.equal(
+    W.previewStockBatch(admin, input).completed?.reference,
+    input.reference,
+  );
+  assert.throws(
+    () =>
+      W.previewStockBatch(admin, {
+        ...input,
+        rows: [{ ...input.rows[0], quantity: 7 }],
+      }),
+    /inną treść/,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
+test("dokument przyjęcia odrzuca błędne i powtórzone SKU; awaria drugiego ruchu wycofuje cały dokument", () => {
+  const p = product(10),
+    q = product(20);
+  const input = {
+    reference: "PZ-TEST-002",
+    mode: "receive" as const,
+    rows: [
+      { sku: p.sku, bin: "B01-01-01", quantity: 3 },
+      { sku: q.sku, bin: "B01-01-01", quantity: 4 },
+    ],
+  };
+  assert.throws(
+    () =>
+      W.previewStockBatch(admin, {
+        ...input,
+        rows: [input.rows[0], { ...input.rows[0], sku: p.sku.toLowerCase() }],
+      }),
+    /powtórzona para/,
+  );
+  assert.throws(
+    () =>
+      W.previewStockBatch(admin, {
+        ...input,
+        rows: [{ ...input.rows[0], sku: "UNKNOWN-STOCK-SKU" }],
+      }),
+    /nie wskazuje/,
+  );
+  assert.throws(
+    () =>
+      W.previewStockBatch(admin, {
+        ...input,
+        rows: [{ ...input.rows[0], quantity: 0 }],
+      }),
+    /dodatniej ilości/,
+  );
+  const body = stockBatchPayload(input),
+    key = randomUUID();
+  db().exec(
+    `CREATE TRIGGER fail_stock_document BEFORE INSERT ON wms_movement WHEN NEW.tw_id=${q.twId} AND NEW.bin='B01-01-01' BEGIN SELECT RAISE(ABORT,'test disk failure'); END;`,
+  );
+  try {
+    assert.throws(
+      () => W.importStockBatch(admin, key, body),
+      /test disk failure/,
+    );
+  } finally {
+    db().exec("DROP TRIGGER fail_stock_document");
+  }
+  assert.equal(
+    db()
+      .prepare("SELECT 1 FROM wms_stock_document WHERE reference=?")
+      .get(input.reference),
+    undefined,
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT 1 FROM wms_stock WHERE tw_id=? AND bin='B01-01-01'")
+      .get(p.twId),
+    undefined,
+  );
+  const result = W.importStockBatch(admin, key, body);
+  assert.equal(result.delta, 7);
+  assert.equal(
+    W.importStockBatch(admin, randomUUID(), body).alreadyApplied,
+    true,
+  );
+  assert.equal(
+    W.inventory({ q: p.sku }).rows.find((r) => r.bin === "B01-01-01")?.on_hand,
+    3,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
+test("spis z dokumentu nie narusza rezerwacji; brakująca lokalizacja i zero są jawne", () => {
+  const p = product(10);
+  action(order(p.sku, 5), "allocate");
+  const input = {
+    reference: "SPIS-TEST-003",
+    mode: "count" as const,
+    rows: [{ sku: p.sku, bin: "A01-01-02", quantity: 4 }],
+  };
+  assert.throws(
+    () => W.previewStockBatch(admin, input),
+    /mniejszy niż rezerwacja/,
+  );
+  const zero = {
+    ...input,
+    rows: [{ sku: p.sku, bin: "EMPTY-COUNT", quantity: 0 }],
+  };
+  W.importStockBatch(admin, randomUUID(), stockBatchPayload(zero));
+  assert.equal(
+    W.inventory({ q: p.sku }).rows.find((r) => r.bin === "EMPTY-COUNT")
+      ?.on_hand,
+    0,
+  );
+  assert.equal(
+    W.inventory({ q: p.sku }).rows.find((r) => r.bin === "A01-01-02")?.on_hand,
+    10,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
+test("otwarcie 5000 SKU zapisuje jeden dokument i zgodny dziennik", () => {
+  const d = db(),
+    rows = [];
+  const insert = d.prepare(
+    "INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)",
+  );
+  d.exec("BEGIN IMMEDIATE");
+  try {
+    for (let i = 0; i < 5000; i++) {
+      const sku = `OPENING-${i}`;
+      insert.run(100000 + i, sku, `Część otwarcia ${i}`);
+      rows.push({ sku, bin: "OPENING-BIN", quantity: 10 });
+    }
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
+  const input = { reference: "SPIS-5000-SKU", mode: "count" as const, rows };
+  const result = W.importStockBatch(
+    admin,
+    randomUUID(),
+    stockBatchPayload(input),
+  );
+  assert.equal(result.rows, 5000);
+  assert.equal(result.delta, 50000);
+  assert.equal(
+    d
+      .prepare(
+        "SELECT sum(on_hand) AS n FROM wms_stock WHERE bin='OPENING-BIN'",
+      )
+      .get()!.n,
+    50000,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
 test("kwarantanna i zaplecze nie zasilają zbiórki; uwolnienie zapasu wymaga biura", () => {
   const p = product(10),
     address = `QUAR-${p.twId}`,
