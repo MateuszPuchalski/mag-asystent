@@ -302,6 +302,32 @@ export type SzkicCopilota = {
    */
   pasowanie: PropozycjaPasowaniaCopilota | null;
   pasowanieOcena: OcenaPasowania | null;
+  /**
+   * SKĄD MODEL TO WIE (0.253.0) — rachunek za tekst, który agent zaraz wyśle.
+   *
+   * Do 0.252.0 model nie miał prawa użyć własnej wiedzy: numer spoza faktów
+   * wywracał cały szkic. Właściciel zdjął ten zakaz pod jednym warunkiem —
+   * „pełna swoboda, ale niech przy tym załącza źródła". Ta lista jest tym
+   * warunkiem, a okno „Skąd to wiem" w panelu jest miejscem, w którym agent
+   * ją czyta, ZANIM kliknie „Wstaw".
+   *
+   * Pewność przyznaje SERWER, nie model: `obnizona` znaczy, że model chciał
+   * wyżej, niż wolno przy tym źródle.
+   */
+  twierdzenia: TwierdzenieCopilota[];
+};
+
+/** Skąd wzięło się twierdzenie: nasza baza, opis oferty, wiedza własna modelu. */
+export type ZrodloTwierdzenia = "fakty" | "oferta" | "model";
+export type PoziomPewnosci = "pewne" | "prawdopodobne" | "niepewne";
+export type TwierdzenieCopilota = {
+  teza: string;
+  zrodlo: ZrodloTwierdzenia;
+  /** `F3`, nazwa parametru oferty albo `null`, gdy model mówi z siebie. */
+  odwolanie: string | null;
+  pewnosc: PoziomPewnosci;
+  /** Serwer obniżył pewność do sufitu źródła — model chciał wyżej. */
+  obnizona: boolean;
 };
 export type OcenaDanych = "wpisane" | "odrzucone";
 export type OcenaPasowania = "zaproponowane" | "odrzucone";

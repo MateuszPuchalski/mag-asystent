@@ -1517,18 +1517,47 @@ guzik, który konstruuje odpowiedź z pomocą AI, kartotek etc.". Przycisk
 kliknięcie. Nie ma kroku „to kosztuje": agent prosi o pracę dla siebie,
 a nie uruchamia partię na dwadzieścia rozmów.
 
-**Model nie zna dopasowań z pamięci.** To zdanie z krytyki promptu doboru jest
-tu mechanizmem, nie życzeniem, i ma trzy ogniwa. Serwer układa FAKTY (F1,
-F2, …) ze zdań, które już pisze dla ekranu: kartoteka oferty z dostępnością
-dziś, dane doboru wpisane przez agenta, kandydaci i negatywy ze zdaniem
-źródła, zastosowania, silniki, pasowania, pomiary z tej rozmowy. Model pisze
-prozę wyłącznie z faktów i cytuje ich identyfikatory. Serwer SPRAWDZA wynik
-w kodzie: każdy numer w szkicu musi stać w faktach albo w rozmowie, każdy
-cytowany fakt musi istnieć, a długość nie może przekroczyć limitu wysyłki.
+**Serwer układa FAKTY, model pisze prozę, serwer sprawdza wynik.** Fakty (F1,
+F2, …) powstają ze zdań, które serwer już pisze dla ekranu: kartoteka oferty
+z dostępnością dziś, treść oferty od 0.253.0, dane doboru wpisane przez
+agenta, kandydaci i negatywy ze zdaniem źródła, zastosowania, silniki,
+pasowania, pomiary z tej rozmowy. Model cytuje identyfikatory faktów, a serwer
+SPRAWDZA wynik w kodzie: każdy cytowany fakt musi istnieć, a długość nie może
+przekroczyć limitu wysyłki.
 Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
 model pisze je zawsze, klient nie widzi ich nigdy.
-Szkic, który to łamie, jest odrzucony ze zdaniem dla agenta i wierszem
-`blad` w księdze. Zła proza kosztuje „brzmi nieładnie"; wymyślony numer
+**Wiedza własna modelu: swoboda kupiona jawnością (0.253.0).** Do 0.252.0
+reguła brzmiała „model nie zna dopasowań z pamięci", a każdy numer spoza
+faktów odrzucał cały szkic. Właściciel zdjął ten zakaz i postawił warunek:
+„pełna swoboda, ale niech przy tym załącza źródła, sztywno oceniany poziom
+pewności".
+
+Zakaz zamienił się w rachunek. Każde twierdzenie techniczne stoi w polu
+`twierdzenia` z podpisem źródła: baza, opis oferty albo wiedza modelu. Numer
+niepokryty żadnym zadeklarowanym twierdzeniem dalej odrzuca szkic — powodem
+nie jest już „wymyślony", tylko „agent nie ma jak go sprawdzić".
+
+Pewność przyznaje serwer, nie model, i tu leży cała sztywność tej oceny. Sufit
+zależy od źródła: baza może być „pewna", opis oferty najwyżej
+„prawdopodobny", wiedza modelu zawsze „niepewna". W dół model może zawsze.
+Bez sufitu ocena byłaby jego zdaniem o sobie samym.
+
+**Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
+odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
+(`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
+wtedy, gdy pada choć jedno zdanie spoza bazy. Szkic w całości oparty o bazę
+nie zabiera agentowi ani jednego ruchu — plakietka należy się wyjątkowi,
+nie normie.
+
+**Treść oferty w faktach (0.253.0).** Właściciel: „często oferta ma w sobie
+opis, do jakich wersji pasuje, wymiary z oferty, dane techniczne". Opis,
+parametry i lista zgodności dociągają się leniwie, przy kliknięciu „Ułóż
+odpowiedź", i trzymają tydzień — ta końcówka kosztuje żądanie na ofertę.
+Fakt z oferty mówi o sobie, że jest SŁOWEM SPRZEDAWCY: gdy przeczy
+kartotece, rację ma kartoteka, bo opis bywa starszy od towaru.
+
+Szkic, który łamie te reguły, jest odrzucony ze zdaniem dla agenta i wierszem
+`blad` w księdze. Zła proza kosztuje „brzmi nieładnie"; numer bez źródła
 kosztowałby zwrot — i tego drugiego kod nie przepuszcza.
 
 **Gdy fakty nie rozstrzygają, szkic pyta.** Serwer dokłada do faktów pytania
@@ -3249,7 +3278,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
 | Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
-| Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; numery spoza faktów odrzuca kod |
+| Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |
 | Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu, kolumny `dane_doboru`/`dane_ocena` w `szkic_copilota`, karta „Copilot rozpoznał w rozmowie" w `skrzynka/Dobor.tsx`; wpisuje agent, tylko w puste pola |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |

@@ -194,6 +194,16 @@ export function migrate(database: DatabaseSync) {
   addColumn("szkic_copilota", "pasowanie_ocena",
     "TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone'))");
   addColumn("szkic_copilota", "pasowanie_ocena_at", "TEXT");
+  /* Twierdzenia szkicu ze źródłem i pewnością (0.253.0) — patrz
+     `szkic_copilota` w `schema.sql`. Stare szkice dostają pustą listę, i to
+     jest o nich prawda: powstały, zanim model musiał się legitymować. */
+  addColumn("szkic_copilota", "twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
+  /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
+     sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
+     jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */
+  for (const kol of ["opis", "parametry_json", "pasuje_do_json", "tresc_synced_at"]) {
+    addColumn("offer_snapshot", kol, "TEXT");
+  }
   /* Werdykt reklamacji (przyrost trzeci) — patrz `reklamacja_klienta`
      w `schema.sql`. Tabela stoi na produkcji od 0.222.0, więc kolumny dochodzą
      migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to

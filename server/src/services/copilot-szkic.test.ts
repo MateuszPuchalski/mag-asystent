@@ -82,7 +82,8 @@ const odpowiedz = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}
   tresc: "Dzień dobry, gaźnik W09-0211 jest dziś dostępny (F1).",
   /* `daneDoboru: null` domyślnie — testy propozycji dokładają dane świadomie,
      a reszta nie zmienia znaczenia przez sam fakt, że model coś rozpoznał. */
-  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, pasowanie: null, model: "claude-opus-5", ms: 800,
+  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, pasowanie: null, twierdzenia: [],
+  model: "claude-opus-5", ms: 800,
   zuzycie: { wej: 2000, wyj: 300, cacheZapis: 0, cacheOdczyt: 1500 }, ...n,
 });
 const nadawca = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}): import("./copilot-szkic.js").NadawcaSzkicu =>
@@ -95,6 +96,41 @@ const zatwierdzPasowanie = () => P.rozstrzygnijPasowanie(P.zaproponujPasowanie({
 }, { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
 
 /* ── Co idzie do dostawcy ──────────────────────────────────────────────── */
+
+test("treść oferty wchodzi do faktów i mówi o sobie, że jest słowem SPRZEDAWCY", () => {
+  /* Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje,
+     wymiary z oferty, dane techniczne". Fakt musi jednak nieść też to, że
+     opis bywa starszy od towaru — inaczej model zrówna go z kartoteką. */
+  db().prepare(`UPDATE offer_snapshot SET opis=?, parametry_json=?, pasuje_do_json=?,
+      tresc_synced_at='2026-09-10T10:00:00Z' WHERE external_id='of-1'`)
+    .run("Uszczelka o średnicy 46 mm, wysokość 12 mm.",
+      JSON.stringify([{ nazwa: "Kod producenta", wartosci: ["16211-ZE1-000"] }]),
+      JSON.stringify(["HONDA GX160", "HONDA GX200"]));
+
+  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
+  assert.match(f, /średnicy 46 mm/);
+  assert.match(f, /SŁOWA SPRZEDAWCY/, "opis nie mówi, skąd pochodzi");
+  assert.match(f, /rację ma kartoteka/, "brak rozstrzygnięcia sporu opisu z kartoteką");
+  assert.match(f, /Kod producenta: 16211-ZE1-000/);
+  assert.match(f, /HONDA GX160 \| HONDA GX200/);
+});
+
+test("długa lista zgodności wchodzi przycięta i mówi, ile jej było", () => {
+  const wersje = Array.from({ length: 214 }, (_, i) => `HONDA GX${100 + i}`);
+  db().prepare("UPDATE offer_snapshot SET pasuje_do_json=? WHERE external_id='of-1'")
+    .run(JSON.stringify(wersje));
+
+  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
+  assert.match(f, /lista ma 214 pozycji, to są pierwsze 30/);
+  assert.equal(f.includes("HONDA GX313"), false, "cała lista weszła do promptu");
+});
+
+test("uszkodzony JSON w snapshocie nie wywraca faktów", () => {
+  db().prepare("UPDATE offer_snapshot SET parametry_json='to nie jest json' WHERE external_id='of-1'").run();
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.ok(k.fakty.length > 0);
+  assert.equal(k.fakty.some((x) => x.rodzaj === "oferta_parametry"), false);
+});
 
 test("fakty niosą kartotekę oferty z dostępnością, pasowanie z pozycją i intake — bez nazwiska i loginu", () => {
   zatwierdzPasowanie();
@@ -198,14 +234,57 @@ test("ścieżka szczęśliwa: wiersz, księga „szkic”, zdarzenie bez treści
   assert.deepEqual(S.szkicCopilota(rozmowa)?.uzyteFakty, ["F1", "F3"]);
 });
 
-test("numer spoza faktów odrzuca szkic: księga notuje błąd, wiersza nie ma", async () => {
+test("numer BEZ deklaracji źródła odrzuca szkic: księga notuje błąd, wiersza nie ma", async () => {
+  /* Do 0.252.0 odrzucał tu sam fakt, że numeru nie ma w bazie. Od 0.253.0
+     odrzuca CISZA: model wolno sięgnąć do własnej wiedzy, ale nie wolno mu
+     podać numeru, którego agent nie ma jak sprawdzić przed wysłaniem. */
   await assert.rejects(
     S.ulozSzkic(rozmowa, KTO(), nadawca({ tresc: "Pasuje uszczelka XYZ-9999 (F1)." }), subiekt),
     (e: Error) => /XYZ-9999/.test(e.message) && /odrzucony/.test(e.message));
   assert.equal(liczba("szkic_copilota"), 0);
   const ks = db().prepare("SELECT wynik, blad FROM copilot_wywolanie").get() as Record<string, string>;
   assert.equal(ks.wynik, "blad");
-  assert.match(ks.blad, /^numer_spoza_faktow: XYZ-9999/);
+  assert.match(ks.blad, /^numer_niezadeklarowany: XYZ-9999/);
+});
+
+test("ten sam numer Z DEKLARACJĄ przechodzi i ląduje w oknie „skąd to wiem”", async () => {
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
+    tresc: "Pasuje uszczelka XYZ-9999 (F1).",
+    twierdzenia: [{
+      teza: "Uszczelka XYZ-9999 bywa stosowana w tej serii gaźników",
+      zrodlo: "model", odwolanie: null, pewnosc: "prawdopodobne",
+    }],
+  }), subiekt);
+  assert.match(s.tresc, /XYZ-9999/);
+  assert.equal(s.twierdzenia.length, 1);
+  /* Model chciał „prawdopodobne", ale mówił z pamięci — serwer obniża. */
+  assert.equal(s.twierdzenia[0].pewnosc, "niepewne");
+  assert.equal(s.twierdzenia[0].obnizona, true);
+});
+
+test("pewność nie przeskoczy sufitu źródła, a w dół model może zawsze", () => {
+  const f = S.ustalPewnosc({ teza: "W09-0211 jest na stanie", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne" });
+  assert.equal(f.pewnosc, "pewne");
+  assert.equal(f.obnizona, false);
+
+  /* Opis oferty to słowa sprzedawcy sprzed lat — najwyżej „prawdopodobne". */
+  const o = S.ustalPewnosc({ teza: "Pasuje do 340", zrodlo: "oferta", odwolanie: "F4", pewnosc: "pewne" });
+  assert.equal(o.pewnosc, "prawdopodobne");
+  assert.equal(o.obnizona, true);
+
+  /* Zejście niżej niż sufit to uczciwość, nie błąd — zostaje jak było. */
+  const w = S.ustalPewnosc({ teza: "Zwykle ma gwint M10", zrodlo: "oferta", odwolanie: null, pewnosc: "niepewne" });
+  assert.equal(w.pewnosc, "niepewne");
+  assert.equal(w.obnizona, false);
+});
+
+test("twierdzenie bez tezy wypada, bo pusty wiersz wygląda na urwaną informację", () => {
+  const l = S.ocenTwierdzenia([
+    { teza: "  ", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne" },
+    { teza: "Gaźnik jest na stanie", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne" },
+  ]);
+  assert.equal(l.length, 1);
+  assert.equal(l[0].teza, "Gaźnik jest na stanie");
 });
 
 test("numer, który KLIENT napisał w rozmowie, wolno powtórzyć", async () => {

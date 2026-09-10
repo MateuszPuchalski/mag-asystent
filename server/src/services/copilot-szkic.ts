@@ -11,6 +11,7 @@ import type { Tokeny } from "./copilot-koszt.js";
 import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor.js";
 import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
+import { dociagnijTresc } from "./allegro-oferta-tresc.js";
 import { buildProductCard } from "./stock.js";
 import {
   aktywnePasowanie, pasowaniaTowaru, ROLE_PASOWANIA, zaproponujPasowanie, type Kartoteka, type RolaPasowania,
@@ -45,7 +46,11 @@ import { bezPodpisu, zwin } from "../tekst.js";
    danych skrzynki: „wynik nie staje się odpowiedzią sam".                    */
 
 export type RodzajFaktu =
-  | "oferta" | "kartoteka" | "dobor" | "kandydat" | "negatyw" | "wiedza" | "pasowanie" | "intake";
+  | "oferta" | "kartoteka" | "dobor" | "kandydat" | "negatyw" | "wiedza" | "pasowanie" | "intake"
+  /* Treść oferty (0.253.0). TRZY rodzaje, nie jeden, bo mają różną wagę:
+     parametr stoi w polu formularza, zgodność na liście Allegro, a opis to
+     proza sprzedawcy, w której wymiar bywa sprzed dwóch wersji towaru. */
+  | "oferta_opis" | "oferta_parametry" | "oferta_zgodnosc";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -84,6 +89,77 @@ export interface KontekstSzkicu {
  */
 export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: string; pozycja: string | null }
 
+/* ── SKĄD MODEL TO WIE (0.253.0) ─────────────────────────────────────────────
+   Do 0.252.0 reguła brzmiała „nie znasz dopasowań z pamięci", a `numery
+   SpozaFaktow` odrzucał CAŁY szkic za jeden numer spoza faktów. Właściciel
+   zdjął ten zakaz i postawił w jego miejsce warunek: „pełna swoboda, ale niech
+   przy tym załącza źródła, sztywno oceniany poziom pewności".
+
+   Zamiana zakazu na RACHUNEK. Model wolno korzysta z własnej wiedzy, ale
+   każde twierdzenie techniczne musi stanąć na liście z podpisem, skąd je ma.
+   Zdanie bez wpisu dalej wywraca szkic — bo szkic, którego nie da się
+   sprawdzić, kosztuje dokładnie tyle, co szkic zmyślony.                    */
+
+/** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
+export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "model"] as const;
+export type ZrodloTwierdzenia = (typeof ZRODLA_TWIERDZENIA)[number];
+
+/** Ile temu twierdzeniu wolno ufać. Też od najmocniejszej. */
+export const POZIOMY_PEWNOSCI = ["pewne", "prawdopodobne", "niepewne"] as const;
+export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
+
+/**
+ * SUFIT PEWNOŚCI NA ŹRÓDŁO — i to jest cała „sztywność" oceny.
+ *
+ * Model deklaruje pewność sam, ale nie może się nią wywyższyć ponad źródło,
+ * z którego czerpie. Bez sufitu ocena byłaby jego zdaniem o sobie samym:
+ * „pewne", bo brzmi pewnie. Z sufitem jest funkcją tego, na czym stoi.
+ *
+ * `fakty` — nasza baza: kartoteka, pasowania, pomiary z hali. Wolno „pewne".
+ * `oferta` — słowa sprzedawcy sprzed lat; najwyżej „prawdopodobne", bo towar
+ *   u dostawcy zmienia się bez zmiany opisu.
+ * `model` — wiedza własna modelu, bez pokrycia w naszych danych; „niepewne"
+ *   i ani stopnia wyżej. To nie jest opinia o modelu, tylko o tym, że nikt
+ *   tego u nas nie sprawdził.
+ *
+ * W dół model może zawsze — kto sam mówi „nie jestem pewien", ten mówi prawdę,
+ * której nie mamy powodu poprawiać.
+ */
+const SUFIT_PEWNOSCI: Record<ZrodloTwierdzenia, PoziomPewnosci> = {
+  fakty: "pewne", oferta: "prawdopodobne", model: "niepewne",
+};
+
+/** Twierdzenie tak, jak oddał je model — przed obcięciem pewności do sufitu. */
+export interface TwierdzenieSurowe {
+  teza: string;
+  zrodlo: ZrodloTwierdzenia;
+  /** `F3`, nazwa parametru z oferty albo `null`, gdy model mówi z siebie. */
+  odwolanie: string | null;
+  pewnosc: PoziomPewnosci;
+}
+
+/** Twierdzenie po ocenie serwera. `obnizona` = model chciał wyżej, niż wolno. */
+export interface Twierdzenie extends TwierdzenieSurowe { obnizona: boolean }
+
+/**
+ * Sztywna ocena pewności: bierze niższą z dwóch — deklarowanej i sufitu źródła.
+ * Zwraca też, czy trzeba było obniżyć, bo to jest miara warta dziennika:
+ * model, który regularnie zawyża, mówi coś o sobie.
+ */
+export function ustalPewnosc(t: TwierdzenieSurowe): Twierdzenie {
+  const sufit = SUFIT_PEWNOSCI[t.zrodlo];
+  const wyzej = POZIOMY_PEWNOSCI.indexOf(t.pewnosc) < POZIOMY_PEWNOSCI.indexOf(sufit);
+  return { ...t, pewnosc: wyzej ? sufit : t.pewnosc, obnizona: wyzej };
+}
+
+/**
+ * Twierdzenia po ocenie. Wpis bez tezy wypada — pusty wiersz w oknie „skąd to
+ * wiem" byłby gorszy niż jego brak, bo wygląda na urwaną informację.
+ */
+export function ocenTwierdzenia(surowe: TwierdzenieSurowe[]): Twierdzenie[] {
+  return surowe.filter((t) => t.teza.trim()).map(ustalPewnosc);
+}
+
 /** Surowa odpowiedź modelu. Walidacja jest niżej, w `ulozSzkic`. */
 export interface OdpowiedzSzkicu {
   tresc: string;
@@ -97,6 +173,11 @@ export interface OdpowiedzSzkicu {
   daneDoboru: DaneDoboru | null;
   /** Para część→część z rozmowy (przyrost czwarty); `null` = nic albo nadawca nie oddaje. */
   pasowanie: PasowanieZRozmowy | null;
+  /**
+   * Skąd model wie to, co napisał (0.253.0). Surowe — pewność obcina do sufitu
+   * źródła `ocenTwierdzenia`, nie adapter. Pusta lista przy nadawcy-atrapie.
+   */
+  twierdzenia: TwierdzenieSurowe[];
   model: string;
   zuzycie: Tokeny;
   ms: number;
@@ -151,6 +232,13 @@ export interface SzkicCopilota {
    */
   pasowanie: PropozycjaPasowaniaCopilota | null;
   pasowanieOcena: OcenaPasowania | null;
+  /**
+   * SKĄD MODEL TO WIE (0.253.0) — po ocenie serwera, czyli z pewnością już
+   * obciętą do sufitu źródła. Panel pokazuje tę listę agentowi OBOK szkicu:
+   * tekst dla klienta ma być gładki, a rachunek za niego stoi osobno.
+   * Pusta lista przy szkicach sprzed tego wydania — i to o nich prawda.
+   */
+  twierdzenia: Twierdzenie[];
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -218,6 +306,30 @@ export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
     if (!korpus.includes(m.toUpperCase())) obce.add(m);
   }
   return [...obce];
+}
+
+/**
+ * Numery, których model użył NIE DEKLARUJĄC, skąd je ma (0.253.0).
+ *
+ * Następca zakazu z 0.252.0. Tamten odrzucał szkic za każdy numer spoza
+ * faktów; ten odrzuca za numer, którego nie pokrywa żadne twierdzenie ze
+ * źródłem `model`. Różnica jest cała: model wolno powiedzieć „to zwykle
+ * ma numer 503 28 32-08", ale musi się pod tym podpisać, a agent musi to
+ * zobaczyć w oknie „skąd to wiem", zanim wyśle.
+ *
+ * Porównanie po `zwin`, tak jak przy danych doboru: „503 28 32-08" w szkicu
+ * i „503283208" w tezie to ten sam numer, a różnica w spacjach nie jest
+ * powodem do odrzucenia dobrego szkicu.
+ */
+export function numeryNiezadeklarowane(
+  tresc: string, dozwolone: string, twierdzenia: TwierdzenieSurowe[],
+): string[] {
+  const zWiedzy = twierdzenia
+    .filter((t) => t.zrodlo === "model")
+    .map((t) => zwin(t.teza).toUpperCase())
+    .join(" ");
+  return numerySpozaFaktow(tresc, dozwolone)
+    .filter((n) => !zWiedzy.includes(zwin(n).toUpperCase()));
 }
 
 /* ── Dane doboru z rozmowy: sprawdzenie przeciw temu, co model widział ──────
@@ -341,6 +453,86 @@ const zdanieSilnika = (tekst: string | null): string | null => {
   return alias ? `${tekst} (wg słownika: ${alias.silnik.etykieta})` : tekst;
 };
 
+/**
+ * Ile znaków opisu oferty wchodzi do faktów.
+ *
+ * W bazie opis bywa na osiem tysięcy znaków (patrz `allegro-oferta-tresc.ts`),
+ * a to jest tekst SPRZEDAŻOWY: gwarancja, wysyłka, „zapraszamy do zakupów".
+ * Dane techniczne stoją zwykle na początku, więc bierzemy początek i mówimy
+ * wprost, że reszta została ucięta — model, który nie wie o przycięciu,
+ * odpowiada „w opisie nie ma", zamiast poprosić agenta o zajrzenie.
+ */
+const LIMIT_OPISU_W_FAKTACH = 1200;
+
+/**
+ * Ile pozycji listy zgodności wchodzi do faktów.
+ *
+ * Lista „pasuje do" bywa na setki wierszy (jeden na wersję silnika). Model
+ * dostaje jej POCZĄTEK i informację o długości: „pasuje do 214 pozycji, oto
+ * pierwsze 30" mówi mu prawdę, a wysłanie wszystkich 214 zjadłoby prompt
+ * i utopiło w nim resztę faktów.
+ */
+const LIMIT_ZGODNOSCI = 30;
+
+/**
+ * Fakty z TREŚCI oferty (0.253.0): opis, parametry, lista zgodności.
+ *
+ * Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje, wymiary
+ * z oferty, dane techniczne". To jest wiedza, którą sprzedawca już zapisał,
+ * a Copilot do 0.252.0 odpowiadał bez niej.
+ *
+ * KAŻDY z tych faktów mówi o sobie, że pochodzi z OFERTY, a nie z kartoteki
+ * — i to nie jest ozdoba zdania. Kartoteka Subiekta jest stanem magazynu
+ * z dzisiaj; opis oferty bywa sprzed trzech lat i opisuje towar, który
+ * dostawca w międzyczasie zmienił. Gdy się rozjeżdżają, rację ma kartoteka,
+ * a model musi mieć z czego to poznać.
+ *
+ * Czysty ODCZYT ze snapshotu. Do sieci po treść idzie `ulozSzkic`, PRZED
+ * złożeniem kontekstu — tu nie ma prawa być ani jednego żądania.
+ */
+function faktyZTresciOferty(
+  database: DatabaseSync, konto: number, ofertaId: string,
+  dodaj: (rodzaj: RodzajFaktu, zdanie: string) => void,
+): void {
+  const w = database.prepare(`SELECT opis, parametry_json, pasuje_do_json FROM offer_snapshot
+      WHERE channel_account_id=? AND external_id=?`).get(konto, ofertaId) as
+    { opis: string | null; parametry_json: string | null; pasuje_do_json: string | null } | undefined;
+  if (!w) return;
+
+  const parametry = czytajListe<{ nazwa: string; wartosci: string[] }>(w.parametry_json);
+  if (parametry.length) {
+    dodaj("oferta_parametry", "Parametry Z OFERTY (pola wypełnione przez sprzedawcę): "
+      + parametry.map((p) => `${p.nazwa}: ${p.wartosci.join(", ")}`).join("; "));
+  }
+
+  const zgodnosc = czytajListe<string>(w.pasuje_do_json);
+  if (zgodnosc.length) {
+    const ile = zgodnosc.length;
+    const pokazane = zgodnosc.slice(0, LIMIT_ZGODNOSCI);
+    const ogon = ile > pokazane.length ? ` (lista ma ${ile} pozycji, to są pierwsze ${pokazane.length})` : "";
+    dodaj("oferta_zgodnosc", `Lista zgodności Z OFERTY${ogon}: ${pokazane.join(" | ")}`);
+  }
+
+  const opis = (w.opis ?? "").trim();
+  if (opis) {
+    const przyciety = opis.slice(0, LIMIT_OPISU_W_FAKTACH);
+    const ogon = przyciety.length < opis.length ? " […opis ucięty, dalszy ciąg w ofercie]" : "";
+    dodaj("oferta_opis", `Opis oferty — SŁOWA SPRZEDAWCY, nie kartoteka; gdy przeczy `
+      + `kartotece, rację ma kartoteka: ${przyciety}${ogon}`);
+  }
+}
+
+/** Lista z kolumny JSON. Uszkodzony wpis to pusta lista, nie wywrócony szkic. */
+function czytajListe<T>(json: string | null): T[] {
+  if (!json) return [];
+  try {
+    const v = JSON.parse(json) as unknown;
+    return Array.isArray(v) ? (v as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
@@ -384,6 +576,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
         WHERE channel_account_id=? AND external_id=?`).get(oferta.konto, oferta.ofertaId) as
       { nazwa: string; sku: string | null } | undefined;
     if (snap) dodaj("oferta", `Oferta, o którą pyta klient: „${snap.nazwa}"`);
+    faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
     const k = kartotekaOferty(db(), oferta.konto, oferta.ofertaId, snap?.sku ?? undefined);
     if (k.twId !== null) {
       const karta = buildProductCard(subiekt, k.twId);
@@ -485,6 +678,17 @@ export async function ulozSzkic(
   conversationId: number, kto: { id: number; name: string },
   nadaj: NadawcaSzkicu, subiekt: SubiektAdapter, teraz = new Date(),
 ): Promise<SzkicCopilota> {
+  /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
+     zgodności kosztują żądanie NA OFERTĘ, więc idą po nie wyłącznie stąd:
+     z kliknięcia „Ułóż odpowiedź", gdzie zapis i tak już jest. `kontekstSzkicu`
+     zostaje czystym odczytem — inaczej samo otwarcie rozmowy strzelałoby do
+     Allegro, a to jest ta reguła, którą 0.18.0 kupiło blizną.
+
+     Odmowa nie przerywa szkicu: bez opisu jest on wart tyle, ile był wart
+     do 0.252.0. Limit z Allegro przerywa, bo drugie żądanie pogłębia przerwę. */
+  const oferta = ofertaRozmowy(db(), conversationId);
+  if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
+
   const k = kontekstSzkicu(conversationId, subiekt);
   /* Asercja przed siecią — na WĄTKU, bo tam jest tekst klienta. Faktów nie
      sprawdzamy tymi wzorcami celowo: dziewięć cyfr numeru OEM zapaliłoby
@@ -505,12 +709,16 @@ export async function ulozSzkic(
 
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
      wywołanie jest zapłacone, agent widzi zdanie i klika drugi raz, jeśli chce. */
-  const obce = numerySpozaFaktow(odp.tresc, `${k.tekstFaktow}\n${k.watek}`);
+  const twierdzenia = ocenTwierdzenia(odp.twierdzenia);
+  /* Numer wolno wziąć z własnej wiedzy — ale nie po cichu. Niezadeklarowany
+     jest tym samym, czym był każdy numer spoza faktów do 0.252.0: zdaniem,
+     którego agent nie ma jak sprawdzić przed wysłaniem do klienta. */
+  const obce = numeryNiezadeklarowane(odp.tresc, `${k.tekstFaktow}\n${k.watek}`, odp.twierdzenia);
   if (obce.length) {
-    zapiszWywolanie(conversationId, odp, "blad", `numer_spoza_faktow: ${obce.join(", ")}`, kto, teraz);
+    zapiszWywolanie(conversationId, odp, "blad", `numer_niezadeklarowany: ${obce.join(", ")}`, kto, teraz);
     throw new BladOdpowiedziCopilota(
-      `Model użył numeru ${obce[0]}, którego nie ma w faktach — szkic odrzucony. `
-      + "Kliknij ponownie albo napisz odpowiedź sam.", 200, "numer_spoza_faktow");
+      `Model użył numeru ${obce[0]}, nie mówiąc, skąd go ma — szkic odrzucony. `
+      + "Kliknij ponownie albo napisz odpowiedź sam.", 200, "numer_niezadeklarowany");
   }
   const znane = new Set(k.fakty.map((f) => f.id));
   const nieznane = odp.uzyteFakty.filter((f) => !znane.has(f));
@@ -538,21 +746,23 @@ export async function ulozSzkic(
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja,pasowanie_propozycja)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
         dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
         pasowanie_propozycja=excluded.pasowanie_propozycja,
+        twierdzenia=excluded.twierdzenia,
         /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
         ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
         pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
-        para.propozycja ? JSON.stringify(para.propozycja) : null);
+        para.propozycja ? JSON.stringify(para.propozycja) : null,
+        JSON.stringify(twierdzenia));
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -698,7 +908,7 @@ export function odrzucPasowanie(
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
-      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena
+      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena, twierdzenia
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -714,6 +924,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     pasowanie: w.pasowanie_propozycja == null
       ? null : JSON.parse(String(w.pasowanie_propozycja)) as PropozycjaPasowaniaCopilota,
     pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
+    twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
   };
 }
 

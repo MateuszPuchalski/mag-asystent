@@ -302,6 +302,7 @@ ale nie ma prawa kupić ich drugi raz.
 | 0.152.0 | 62 przebiegi pod słowem `failed`, gdy serwer znał zdanie „konto niepołączone" | powód zapisuje się SŁOWEM, nie tylko kodem HTTP; wiersz nazwany „połączenie" pokazuje połączenie |
 | 0.224.1 | flaga jawnej zgody ginęła na trasie, choć serwis ją obsługiwał i panel ją wysyłał | pole nieopisane w typie `Body` znika po cichu; flagi ciała testuje się na TRASIE, nie tylko w serwisie |
 | 0.250.0 | encje HTML TRZECI RAZ — czeskie, słowackie i węgierskie litery wracały dosłownie, a sprawy posprzedażowe nie przechodziły przez dekoder w ogóle | tablicę encji GENERUJE się parserem przeglądarki, nie pisze z pamięci pod jeden alfabet; nowy synchronizator dostaje dekoder razem z mapowaniem, nie później |
+| 0.253.0 | zakaz wiedzy własnej dawał szkic suchy, a opis oferty z wymiarami i listą zgodności leżał nietknięty | swobodę modelu kupuje się JAWNOŚCIĄ, nie zaufaniem: źródło przy każdym twierdzeniu, pewność przyznaje serwer wg źródła, a agent widzi rachunek przed wysłaniem |
 | 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy, które zostają) |
 
 ## Polityka danych skrzynki (0.143.0)
@@ -373,7 +374,8 @@ w treści zostawał odsłonięty. Od 0.232.1 tak samo robi klasyfikacja; temat
 jest zapasem tylko dla rozmów bez wątku.
 
 Obok rozmowy idą FAKTY, które układa serwer: kartoteka oferty (symbol, nazwa,
-EAN, numery, dostępność dziś), dane doboru wpisane przez agenta, kandydaci
+EAN, numery, dostępność dziś), TREŚĆ OFERTY od 0.253.0 (opis, parametry
+i lista zgodności), dane doboru wpisane przez agenta, kandydaci
 i negatywy ze zdaniami źródła, wiedza o zastosowaniach, silnikach, pasowaniach
 i pomiarach z tej rozmowy. Podpisy dowodów jadą BEZ nazwiska pracownika —
 model go nie potrzebuje, a klient nie ma go dostać. Nie idą: półka,
@@ -392,6 +394,39 @@ Z tego samego wywołania wracają DANE DOBORU rozpoznane w rozmowie: marka,
 model, silnik, numer, nazwa części, parametry. Serwer sprawdza każdą wartość
 przeciw zamaskowanemu wątkowi i wyrzuca te, których tam nie ma. Do pól doboru
 wchodzą dopiero na kliknięcie agenta, wyłącznie w puste pola.
+
+### Treść oferty i wiedza własna modelu (0.253.0)
+
+Właściciel postawił dwie rzeczy naraz. Pierwsza: „często oferta ma w sobie
+opis, do jakich wersji pasuje, wymiary z oferty, dane techniczne". Druga:
+„Copilot powinien też korzystać z wiedzy ogólnej modelu AI".
+
+Treść oferty dociągamy z `GET /sale/product-offers/{offerId}`. Ta końcówka
+kosztuje jedno żądanie NA OFERTĘ, więc nie synchronizujemy jej hurtem. Idziemy
+po nią leniwie, dla oferty tej jednej rozmowy, przy kliknięciu „Ułóż
+odpowiedź", i trzymamy tydzień. Do dostawcy modelu jedzie od tej pory także
+opis oferty — czyli tekst, który sprzedawca sam opublikował. Nie zmienia to
+polityki wobec danych KLIENTA: te są maskowane jak dotąd.
+
+Wiedza własna modelu przestała być zakazana. Do 0.252.0 numer spoza faktów
+odrzucał cały szkic, więc szkic był suchy i sprawdzalny bez czytania.
+Właściciel zdjął ten zakaz pod warunkiem: „pełna swoboda, ale niech przy tym
+załącza źródła, sztywno oceniany poziom pewności".
+
+Zakaz zamienił się więc w rachunek. Każde twierdzenie techniczne stoi na
+liście `twierdzenia` z podpisem, skąd pochodzi: z bazy, z opisu oferty albo
+z wiedzy modelu. Numer, którego nie pokrywa żadne zadeklarowane twierdzenie,
+dalej odrzuca szkic — nie dlatego, że jest zmyślony, ale dlatego, że agent
+nie ma jak go sprawdzić przed wysłaniem.
+
+Pewność przyznaje SERWER, nie model, i to jest cała sztywność tej oceny. Sufit
+zależy od źródła: baza może być „pewna", opis oferty najwyżej
+„prawdopodobny", wiedza modelu zawsze „niepewna". W dół model może zawsze.
+Bez sufitu ocena byłaby jego zdaniem o sobie samym.
+
+Agent czyta to w osobnym oknie „Skąd to wiem", pod szkicem. Klient dostaje
+gładki tekst, agent — rachunek za ten tekst. Okno stoi otwarte tylko wtedy,
+gdy pada choć jedno zdanie spoza bazy.
 
 **Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
 loginem rozmówcy nie są pobierane.
