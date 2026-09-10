@@ -34,6 +34,53 @@ historii nie przepisujemy.
 ---
 
 
+## 0.259.0 — 10 września 2026
+
+**Szkic Copilota przestaje brzmieć jak maszyna.** Właściciel pokazał prawdziwy
+szkic o sprzęgło do Mini Pocket i powiedział, że wygląda zbyt mocno na AI.
+Nie chodziło o słownictwo. W tamtym tekście nie ma ani jednego podejrzanego
+słowa, a mimo to widać maszynę. Trzy z czterech śladów wychodziły wprost
+z naszego polecenia, więc to nie jest skarga na model.
+
+**Przypis źródłowy wyciekał do klienta.** Szkic pisał „(opis oferty)". Model
+tego nie wymyślił: reguła 1 każe mu legitymować każde twierdzenie źródłem,
+a reguła 1a każe znakować je w tekście, więc uogólnił i zaczął nazywać źródło
+słowami. Kod zdejmuje z treści wyłącznie kształt „(F3)", więc przypis napisany
+słowami przechodził przez wszystkie sita. To łamało decyzję z 0.253.0, która
+mówi wprost, że rachunek źródeł czyta agent w oknie „Skąd to wiem", bo klient
+ma dostać gładką odpowiedź, a nie prozę z przypisami.
+
+**Odpowiedź ma być proporcjonalna do pytania.** Klient zadał pytanie zamknięte,
+czy sprzęgło jest w zestawie. Dostał trzy pozycje spisu zawartości, trzy rzeczy
+do przysłania i dwie dodatkowe na koniec: pięć próśb za jedno słowo pytania.
+Reguła 3 filtrowała tylko powtórki i nie miała żadnego sufitu.
+
+To jest wada handlowa, nie stylistyczna. Klient gotowy kupić wychodził z takiej
+wiadomości z zadaniem domowym, a część z nich go nie odrobi. Szkic prosi teraz
+o dane wyłącznie wtedy, gdy bez nich nie da się odpowiedzieć, robi to w jednym
+miejscu i nie dopisuje na koniec porad, o które nikt nie prosił.
+
+**Lista dostaje hamulec, myślnik zakaz.** Dwie symetryczne listy po trzy
+pozycje, każda z dopowiedzeniem w nawiasie, powstały z posłuszeństwa regule
+z 0.253.0. Reguła zostaje, ale lista ma sens tylko wtedy, gdy zdanie pozycji
+nie pomieści. Półpauza jest zakazana osobno: nie ma jej na klawiaturze
+i sprzedawca jej nie stawia.
+
+**Czego to wydanie NIE robi.** Decyzja właściciela brzmiała „tylko polecenie",
+więc nie ma ani strażnika pilnującego tych zakazów w pliku, ani czyszczenia
+wyniku modelu. Zakaz półpauzy jest z całej piątki najsłabszy, bo plik polecenia
+ma kilkadziesiąt półpauz we własnym tekście i model czyta je jako wzorzec.
+Zapisane tutaj, żeby przy następnym myślniku w szkicu wiadomo było, gdzie
+patrzeć najpierw.
+
+**Wdrożenie nie wymaga żadnego działania.** Zmienia się wyłącznie tekst
+instrukcji dla modelu; kod, schemat odpowiedzi i baza zostają bez zmian.
+
+Jeden skutek uboczny wart odnotowania: instrukcja stoi w cache'owanym prefiksie,
+więc pierwsze wywołanie po wdrożeniu zapisze cache od nowa i zapłaci pełną
+stawkę. Następne wracają do zniżki. Sprawdzisz to w księdze po
+`cache_read_input_tokens`.
+
 ## 0.258.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
