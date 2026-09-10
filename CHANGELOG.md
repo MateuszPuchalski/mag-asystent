@@ -79,6 +79,85 @@ powrót nie wyszedł. Zdanie mówi wprost, co to znaczy — towar leży na pół
 i nie jest sprzedawalny — i gdzie szukać przyczyny. Kartę kosza w biurze zamyka
 trzeci etap: „powrót MM 1247/MAG/2026" albo „powrót MM w błędzie".
 
+## 0.265.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Zaznaczenie przestaje być bursztynowe.** To ustalenie **02** z audytu — bursztyn
+niósł siedem ról naraz. Najostrzejszy przypadek dało się pokazać na jednej
+wartości. `bg-amber-50`, czyli `#FFFBEB`, malowało jednocześnie:
+
+```
+wybrany wiersz      cztery kolejki: skrzynka, zwroty, reklamacje, dyskusje
+ostrzeżenie         brak powiązania z ofertą, konflikt przejęcia, Copilot
+notatkę wewnętrzną  blok komentarza na osi rozmowy
+formularz pomiaru   pasmo pod osią rozmowy
+```
+
+Pierwsze dwa znaczenia są **przeciwstawne**. „To jest to, co wybrałeś" i „tu coś
+jest nie tak" miały ten sam piksel, więc agent nie miał ich jak rozróżnić.
+
+**Zaznaczenie schodzi na szarość, bo jest stanem STRUKTURALNYM.** Nie ma dla
+niego wolnej rodziny barw i to jest policzone, nie przeczute: czerwień ma
+101 wystąpień i znaczy błąd, zieleń 67 i znaczy powodzenie, fiolet 45 i znaczy
+przypuszczenie Copilota, błękit 37 i znaczy zdarzenie doboru. Bursztyn miał
+około 150. Wolna była wyłącznie neutralna szarość — i słusznie, bo wybór wiersza
+nie jest znaczeniem, tylko stanem.
+
+Marka zostaje na belce trzech pikseli, gdzie nie udaje pasma.
+
+**Stopień szarości zmierzony, nie dobrany okiem.** Pierwsza wersja brała
+`slate-100` i było to o krok za jasno:
+
+```
+                            ΔE vs biel   ΔE vs najechanie   ΔE vs ostrzeżenie
+slate-100                       4,40             2,20               10,77
+slate-200  ← wybrane            9,43             7,25               14,42
+slate-300                      16,75            14,58               20,45
+```
+
+Próg zauważalności dla dużych płaszczyzn to około **2,3**. Przy `slate-100`
+wiersz wybrany różniłby się od wiersza pod kursorem o 2,2 — czyli o mniej, niż
+oko rozróżnia. `slate-300` z kolei wygląda już jak wiersz wyłączony. Kontrast
+tekstu na wybranym: 8,4:1.
+
+**Belka stoi przy KAŻDYM wierszu, nie tylko przy wybranym.** Dokładana dopiero
+przy zaznaczeniu przesuwała treść o trzy piksele w prawo i kliknięcie szarpało
+tekstem. Zmierzone po poprawce: lewa krawędź tytułu stoi na 36 px niezależnie
+od tego, który wiersz jest wybrany.
+
+**Bursztyn w czacie reklamacji znaczył dokładnie odwrotność siebie.** Nasza
+wypowiedź była tam **bursztynowa**, a klienta biała. Na osi skrzynki jest na
+odwrót: bursztyn to podpis KLIENTA, a naszą odpowiedź 0.247.0 świadomie
+wygasiło, żeby pytanie zostało jedyną kartą z cieniem. Ta sama barwa znaczyła
+w dwóch oknach dwie przeciwne strony rozmowy. Czat wyrównuje się do skrzynki,
+bo tam decyzja ma uzasadnienie i pomiar.
+
+**Co ZOSTAJE bursztynowe i dlaczego.** Ostrzeżenia, notatka wewnętrzna, tryb
+pomiaru, stan „niepotwierdzone" i pozycja wracająca w zwrocie. To jest jedna
+rodzina znaczeń — „uwaga" — a nie pięć osobnych. Marką zostaje `#F7A600`:
+akcja główna, obwódka pola, dwa logotypy, zakładka nawigacji, liczniki
+i kropka nieprzeczytanego.
+
+**Jedna liczba, która nie wyszła, i zapisuję ją tu jawnie.** Belka zaznaczenia
+`#F7A600` daje **2,02:1** na bieli i 1,84:1 na własnym tle wiersza, przy progu
+**3:1** z WCAG 1.4.11 dla elementów nietekstowych. Atramentowa belka dałaby
+14,32:1. Barwa belki była decyzją właściciela podjętą, zanim ten pomiar
+istniał. Zaznaczenie niesie oprócz belki tło i `aria-current`, więc nie jest
+to jedyny sygnał — ale próg jest progiem i podmiana to jedna linia.
+
+**Nowy strażnik** `panel/src/Bursztyn.test.ts` — bursztyn nie wraca jako TŁO
+zaznaczenia, a belka nie chowa się do gałęzi warunku. Zwolnienie komentarzem
+`bursztyn: <powód>` z progiem trzech wyrazów. Dziś jest jedno i jest prawdziwe:
+zakładka paska nawigacji stoi na ciemnym tle, gdzie żadnego ostrzeżenia nie ma.
+
+Obie reguły **przy pierwszym podejściu nie odmówiły** i wyszło to dopiero przy
+sprawdzaniu. Warunek trójkowy łamie się przed gałęziami, więc `aktywna` zostaje
+w linii wyżej niż `bg-amber-50`, a reguła szukała obu w jednej linii. Druga
+sprawdzała tekst przed `${` i przepuszczała wszystko, bo w gałęzi warunku
+żadnego `${` nie ma. Ta sama pomyłka co w 0.262.0 przy filtrze segmentowym.
+
+
 ## 0.264.0 — 10 września 2026
 
 **Wiedza z ofert przestaje ginąć razem z rozmową.** Właściciel zapytał, jak

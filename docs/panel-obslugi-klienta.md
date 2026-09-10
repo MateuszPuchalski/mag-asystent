@@ -753,6 +753,33 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Zaznaczenie jest SZARE, nie bursztynowe (0.265.0).** Wybrany wiersz kolejki
+to `bg-slate-200` plus belka `border-l-[3px] border-l-wertis-amber`, jednakowo
+w skrzynce, zwrotach, reklamacjach i dyskusjach. Do 0.264.0 był bursztynowy,
+czyli miał tło `bg-amber-50` — dokładnie to samo, którym panel maluje
+ostrzeżenia, notatkę wewnętrzną i formularz pomiaru. „To jest to, co wybrałeś"
+i „tu coś jest nie tak" nie mogą mieć jednego piksela.
+
+Zaznaczenie jest stanem STRUKTURALNYM i dlatego bierze neutralną szarość. Wolnej
+rodziny barw i tak nie było: czerwień to błąd, zieleń powodzenie, fiolet
+przypuszczenie Copilota, błękit zdarzenie doboru. Pilnuje tego
+`panel/src/Bursztyn.test.ts`; zwolnienie wymaga komentarza `bursztyn: <powód>`.
+
+**Stopień szarości i belka są zmierzone (0.265.0).** `slate-100` różni się od
+`slate-50`, czyli od najechania kursorem, o ΔE 2,2 przy progu zauważalności
+około 2,3 — wiersz wybrany wyglądałby jak wiersz pod kursorem. `slate-200` daje
+ΔE 7,3 wobec najechania i 14,4 wobec pasma ostrzeżenia. Belka stoi przy KAŻDYM
+wierszu, a warunkowa jest sama jej barwa: dokładana przy zaznaczeniu przesuwała
+treść o trzy piksele. Belka `#F7A600` daje 2,02:1 na bieli przy progu 3:1
+z WCAG 1.4.11 — atrament dałby 14,32:1 i podmiana to jedna linia.
+
+**Bursztyn ma po 0.265.0 dwie rodziny ról.** MARKA: akcja główna, obwódka pola,
+logotypy, zakładka nawigacji, liczniki i kropka nieprzeczytanego. UWAGA:
+ostrzeżenia, notatka wewnętrzna, tryb pomiaru, stan „niepotwierdzone", pozycja
+wracająca w zwrocie. Zaznaczenie wypadło z obu. W czacie reklamacji nasza
+wypowiedź przestała być bursztynowa: na osi skrzynki bursztyn to podpis
+KLIENTA, więc ta sama barwa znaczyła w dwóch oknach przeciwne strony rozmowy.
+
 **Filtr segmentowy ma JEDEN kształt (0.262.0).** Rząd pigułek, z których jedna
 jest wybrana, stał w panelu sześć razy w trzech kształtach. Wygrał atrament na
 szarej bieżni: `bg-wertis-ink` przy wybranej, `bg-slate-100` przy niewybranej,
