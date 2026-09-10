@@ -23,7 +23,7 @@ const wpis = (n: Partial<WpisOsi> = {}): WpisOsi => ({
   automatyczna: true, ...n,
 });
 
-const os = (w: WpisOsi) => render(<Os wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
+const os = (w: WpisOsi) => render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
   onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
 describe("Autoodpowiedź na osi rozmowy", () => {

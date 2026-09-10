@@ -31,7 +31,7 @@ const zlecenie = (n: Record<string, unknown> = {}): WpisOsi => ({
 });
 
 const pokaz = (wpisy: WpisOsi[]) => render(
-  <Os wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
+  <Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
 describe("Zlecenie dla hali na osi", () => {
@@ -59,7 +59,7 @@ describe("Zlecenie dla hali na osi", () => {
     /* Rola prośby kończy się w chwili, gdy przyszła odpowiedź. Gdyby oba bloki
        świeciły tak samo, oś czytałaby się jak dwa równorzędne fakty. */
     const { container } = render(
-      <Os wpisy={[zlecenie({ zlecenie: { ...zlecenie().zlecenie!, status: "wykonane" } })]}
+      <Os rozmowaId={1} wpisy={[zlecenie({ zlecenie: { ...zlecenie().zlecenie!, status: "wykonane" } })]}
         zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
     expect(screen.getByText("wykonane")).toBeInTheDocument();
     expect(container.querySelector("article")?.className).not.toMatch(/bg-amber-50/);
@@ -78,7 +78,7 @@ describe("Zlecenie dla hali na osi", () => {
        sam kształt, trzeba by przeczytać nagłówek, żeby je rozróżnić. */
     const ikona = (rodzaj: string) => {
       const { container } = render(
-        <Os wpisy={[zlecenie({ zlecenie: { ...zlecenie().zlecenie!, rodzaj } })]}
+        <Os rozmowaId={1} wpisy={[zlecenie({ zlecenie: { ...zlecenie().zlecenie!, rodzaj } })]}
           zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
       return container.querySelector("article svg")?.getAttribute("class") ?? "";
     };

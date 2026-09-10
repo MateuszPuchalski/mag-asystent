@@ -93,6 +93,13 @@ export function Rozmowa(p: {
   bladStatusu: string;
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
+  /* Licznik jawnych zjazdów osi na dół (0.260.0). „Pokaż" pod banerem nowej
+     wiadomości do 0.259.0 tylko odświeżał dane i nie ruszał widoku — obiecywał
+     pokazanie i nie pokazywał. Licznik, nie `boolean`: dwa kliknięcia pod rząd
+     mają dać dwa zjazdy. Hak stoi PRZED wczesnym `return`, bo rozmowa niewybrana
+     wychodzi z tej funkcji wcześniej, a hak warunkowy to złamana zasada haków. */
+  const [zjazdy, setZjazdy] = React.useState(0);
+
   if (!p.dane) {
     return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
       <Pusto ikona={<Inbox size={38} />}>Wybierz rozmowę z listy</Pusto>
@@ -169,7 +176,12 @@ export function Rozmowa(p: {
 
     {p.nowaWiadomosc && <p className="flex shrink-0 items-center gap-2 border-b bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-900">
       <Bell size={16} />Klient dopisał nową wiadomość.
-      <button className="underline" onClick={p.onPokazNowa}>Pokaż</button></p>}
+      {/* Zjazd IDZIE OBOK odświeżenia, a nie zamiast niego: `onPokazNowa`
+          dociąga wpis z serwera, a licznik zjeżdża oś na dół. Kolejność jest
+          bez znaczenia — odpowiedź serwera dorzuci wpis i efekt „nowy wpis"
+          dogoni dół po raz drugi, bo agent po tym kliknięciu już tam stoi. */}
+      <button className="underline"
+        onClick={() => { setZjazdy((n) => n + 1); p.onPokazNowa(); }}>Pokaż</button></p>}
 
     {p.konflikt && <KonfliktPrzejecia
       szczegoly={p.konflikt}
@@ -188,7 +200,8 @@ export function Rozmowa(p: {
       zapisuje={p.zapisujeOferte} blad={p.bladOferty}
       onWskaz={p.onWskazOferte} onDopytaj={p.onDopytajOOferte} />}
 
-    <Os wpisy={os} zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
+    <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
+      zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}
       onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)} />
 
