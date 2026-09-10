@@ -26,7 +26,11 @@ const dane = (n: Partial<Dane> = {}): Dane => ({
 describe("Zamówienie przy rozmowie", () => {
   it("przed dociągnięciem: numer, odnośnik i zdanie o synchronizacji, bez przycisku zapisu", () => {
     render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
-    expect(screen.getByText("2f8c1a3e-9b7d-4c1e-8a2b-000000000001")).toBeInTheDocument();
+    /* UUID jest SKRÓCONY od 0.249.0: pełne trzydzieści sześć znaków zjadało
+       pół wiersza nagłówka, a nikt ich z ekranu nie przepisuje. Całość zostaje
+       w podpowiedzi i pod przyciskiem kopiowania — nie znika. */
+    expect(screen.getByText("2f8c1a3e…")).toHaveAttribute(
+      "title", "2f8c1a3e-9b7d-4c1e-8a2b-000000000001");
     expect(screen.getByRole("link", { name: /Otwórz w Allegro/ }))
       .toHaveAttribute("href", "https://salescenter.allegro.com/orders/2f8c1a3e");
     expect(screen.getByText(/jeszcze nie pobrano/)).toBeInTheDocument();
@@ -65,7 +69,10 @@ describe("Zamówienie przy rozmowie", () => {
     const subiekt = screen.getAllByTestId("kafel-subiekt");
     expect(oferty.map((k) => k.dataset.oferta)).toEqual(["17235726715", "999"]);
     expect(subiekt.map((k) => k.dataset.tw)).toEqual(["501", "brak"]);
-    expect(screen.getByText(/Zdjęcia: pierwsze z oferty Allegro/)).toBeInTheDocument();
+    expect(/* §4.3 żąda, żeby przy każdym fakcie było widać źródło. Od 0.249.0 podpis
+       mieści się w jednej linii, ale NADAL nazywa oba źródła — bo to one,
+       nie długość zdania, są tu wymaganiem. */
+    screen.getByText(/oferta Allegro .*kartoteka Subiekta/)).toBeInTheDocument();
     /* Kartoteka podpisana symbolem, brak — słowem; oferta rozmowy oznaczona przy pozycji. */
     expect(screen.getByText("SZR-NAC-46", { selector: ".font-mono" })).toBeInTheDocument();
     expect(screen.getByText("bez kartoteki w Subiekcie")).toBeInTheDocument();

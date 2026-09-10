@@ -15,6 +15,24 @@ type PrzyciskProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 export const Przycisk = ({ wariant = "drugi", className = "", ...p }: PrzyciskProps) =>
   <button className={`${wariant === "glowny" ? "btn-primary" : "btn-secondary"} ${className}`} {...p} />;
 
+/**
+ * Nagłówek sekcji w kolumnie kontekstu (0.249.0).
+ *
+ * Trzy sekcje tej samej rangi — Oferta, Zamówienie, Subiekt GT — miały trzy
+ * różne kształty: dwie `<b>` w 14 px przy ikonie 15 px, trzecia plakietkę
+ * z wersalikami. Czytelnik nie ma jak wiedzieć, że to jeden poziom.
+ *
+ * Nagłówek CICHNIE do etykiety, zamiast rosnąć. Nazwa towaru pod nim jest
+ * treścią sekcji i to ona ma być w niej najgłośniejsza; nagłówek mówi tylko,
+ * czyje to dane — a §4.3 żąda, żeby to było widać przy każdym fakcie.
+ */
+export const NaglowekSekcji = ({ ikona, children }: {
+  ikona: React.ReactNode; children: React.ReactNode;
+}) =>
+  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+    {ikona}{children}
+  </span>;
+
 export const Pole = ({ className = "", ...p }: React.InputHTMLAttributes<HTMLInputElement>) =>
   <input className={`field ${className}`} {...p} />;
 

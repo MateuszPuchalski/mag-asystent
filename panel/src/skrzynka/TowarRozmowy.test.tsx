@@ -53,7 +53,11 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(7701);
     expect(screen.queryByRole("button", { name: /Zatwierdź/ })).toBeNull();
     expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-    expect(screen.getByText("5 szt.")).toBeInTheDocument();
+    /* Od 0.249.0 dostępny stan jest LICZBĄ w nagłówku bloku, nie wierszem
+       tabeli: to on rozstrzyga, czy odpowiedź brzmi „wysyłamy dziś". Liczba
+       i jednostka są osobnymi elementami, bo mają różną wagę. */
+    expect(screen.getByText("Dostępny")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
     /* Powiązania po sygnaturze nie da się „zdjąć" — wróciłoby; można wskazać inną. */
     expect(screen.queryByTitle("Zdejmij powiązanie")).toBeNull();
     expect(screen.getByRole("button", { name: /wskaż inną kartotekę/ })).toBeInTheDocument();
@@ -86,8 +90,15 @@ describe("towar przy rozmowie", () => {
     })} />);
     expect(karta).toHaveBeenCalledWith(7701);
     expect(screen.getByText("Nóż do kosiarki 43 cm")).toBeInTheDocument();
+    /* Lokalizacja to plakietka obok liczby (0.249.0) — jedyna wartość z tej
+       grupy, którą ktoś przepisuje na kartkę i niesie na halę. */
     expect(screen.getByText("R12-B3")).toBeInTheDocument();
-    expect(screen.getByText("5 szt.")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("szt.")).toBeInTheDocument();
+    /* Stan i rezerwacje ZOSTAJĄ — tłumaczą tę liczbę, więc schodzą pod nią
+       drobnym drukiem, a nie znikają. */
+    expect(screen.getByText((_, el) => el?.textContent === "stan 7 · rezerwacje 2"))
+      .toBeInTheDocument();
     /* Identyfikatory z opisu (E3) — po nich klient pyta, gdy nie zna naszego symbolu. */
     expect(screen.getByText("181004341/0 · AB-1234")).toBeInTheDocument();
     /* Wskazanie człowieka jest podpisane człowiekiem (§4.3). */

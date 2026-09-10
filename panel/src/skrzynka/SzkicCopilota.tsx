@@ -39,16 +39,35 @@ export interface PropsSzkicuCopilota {
   onOdrzuc: () => void;
 }
 
+/**
+ * Copilot W JEDNEJ LINII, bez własnego rzędu (0.249.0).
+ *
+ * Zgłoszenie właściciela: „niepotrzebnie ułóż odpowiedź i add attachment mają
+ * swój własny rząd". Miał rację — dwa rzędy szły na dwie rzeczy, z których
+ * jedna jest pomocą przy pisaniu, a druga czynnością od święta.
+ *
+ * 0.247.0 próbowało już wciągnąć ten przycisk do rzędu przełącznika trybu
+ * i zostało WYCOFANE, bo z Copilotem wyłączonym komponent renderuje ZDANIE
+ * z serwera, nie przycisk, a zdanie łamało rząd na dwa wiersze. Wycofanie
+ * leczyło objaw. Przyczyną było to, że jeden komponent zwracał raz przycisk,
+ * raz akapit — więc wołający nie miał jak wiedzieć, ile miejsca zajmie.
+ *
+ * Teraz nie zajmuje NIGDY więcej niż jedną linię: zdanie się ucina, a całość
+ * zostaje w podpowiedzi. `truncate` wymaga `min-w-0` u rodzica we flexie.
+ */
 export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
   if (!p.stan) return null;
-  return <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-    {p.stan.wlaczony
-      ? <Przycisk className="text-xs" disabled={p.uklada || p.wylaczony} onClick={p.onUloz}>
-          <Sparkles size={14} />{p.uklada ? "Układam szkic z faktów…" : "Ułóż odpowiedź"}</Przycisk>
-      /* Przycisk, który nie może zadziałać, uczy nie klikać — zamiast niego zdanie z serwera. */
-      : <span className="text-slate-500">{p.stan.powod}</span>}
-    {p.blad && <span className="text-red-700">{p.blad}</span>}
-  </div>;
+  if (!p.stan.wlaczony) {
+    /* Przycisk, który nie może zadziałać, uczy nie klikać — zamiast niego
+       zdanie z serwera, ale skrócone do jednej linii. */
+    return <span className="min-w-0 truncate text-xs text-slate-400" title={p.stan.powod ?? undefined}>
+      {p.stan.powod}</span>;
+  }
+  return <span className="flex min-w-0 items-center gap-2">
+    <Przycisk className="shrink-0 text-xs" disabled={p.uklada || p.wylaczony} onClick={p.onUloz}>
+      <Sparkles size={14} />{p.uklada ? "Układam szkic z faktów…" : "Ułóż odpowiedź"}</Przycisk>
+    {p.blad && <span className="min-w-0 truncate text-xs text-red-700" title={p.blad}>{p.blad}</span>}
+  </span>;
 }
 
 export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {

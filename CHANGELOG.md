@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.249.0 — 10 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Edytor: pięć rzędów schodzi do trzech.** Właściciel: „niepotrzebnie ułóż
+odpowiedź i add attachment mają swój własny rząd". Copilot wraca do rzędu
+przełącznika trybu, spinacz do rzędu działań.
+
+0.247.0 próbowało już przenieść Copilota i zostało wycofane, bo z Copilotem
+WYŁĄCZONYM komponent renderuje zdanie z serwera, nie przycisk, i łamało rząd
+na dwa wiersze. Wycofanie leczyło objaw. Przyczyną było to, że jeden komponent
+zwracał raz przycisk, raz akapit — wołający nie miał jak wiedzieć, ile miejsca
+zajmie. Teraz nie zajmuje nigdy więcej niż jednej linii: zdanie się ucina,
+a całość zostaje w podpowiedzi.
+
+Spinacz wymagał rozdzielenia `ZalacznikiWysylki` na dwa komponenty: przycisk
+z ukrytym polem pliku należy do rzędu działań, lista dołożonych plików — do
+komponowanej wiadomości. Stały razem, więc przycisk ciągnął listę ze sobą.
+
+Zmierzone: edytor 288 → 222 px, oś rozmowy 247 → 313 px. **66 px dla rozmowy** —
+trzy razy więcej niż całe 0.247.0.
+
+**Kolumna kontekstu: odpowiedź wychodzi przed dane.** Kolumna odpowiada na
+jedno pytanie — czy mamy to na półce i gdzie — a odpowiedź leżała
+w ośmiowierszowej tabeli 12 px, w tej samej wadze co „Identyfikatory brak".
+
+`Dostępny` jest teraz liczbą widoczną z drugiego końca biurka, lokalizacja
+plakietką obok. Stan i rezerwacje schodzą pod spód drobnym drukiem: one tę
+liczbę tłumaczą, nie zastępują. Reszta zostaje w całości (§4.3 nie pozwala
+chować faktów), ale wartości „brak" gasną — brak identyfikatorów jest normą,
+a norma nie ma prawa wyglądać jak ustalenie.
+
+Trzy nagłówki tej samej rangi dostają jeden kształt (`NaglowekSekcji`) i cichną
+do etykiety: treścią sekcji jest nazwa towaru i to ona ma być najgłośniejsza.
+Dwa odnośniki „Otwórz w Allegro" przestają być jedynym błękitem w kolumnie,
+UUID zamówienia skraca się do ośmiu znaków, a podpis źródeł zdjęć mieści się
+w jednej linii — nadal nazywając oba źródła, bo to one są wymaganiem §4.3,
+nie długość zdania.
+
+Numer wydania: 0.248.0 zajmował otwarty #392, stąd 0.249.0.
 ## 0.248.0 — 10 września 2026
 
 **Zdjęcia w rozmowach skrzynki: droga API po specyfikacji, bez nagłówka

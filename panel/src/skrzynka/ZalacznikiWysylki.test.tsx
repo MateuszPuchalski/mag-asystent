@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ZalacznikiWysylki, poLudzku } from "./ZalacznikiWysylki";
+import { PrzyciskZalacznika, ZalacznikiWysylki, poLudzku } from "./ZalacznikiWysylki";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
 /* ── Załączniki do odpowiedzi (0.195.0) ──────────────────────────────────────
@@ -18,9 +18,22 @@ const plik = (n: Partial<ZalacznikSzkicu> = {}): ZalacznikSzkicu => ({
   dodal: "A. Lewandowska", ...n,
 });
 
-const pasek = (n: Partial<Parameters<typeof ZalacznikiWysylki>[0]> = {}) => render(
-  <ZalacznikiWysylki lista={[]} dodaje={false} blad="" wylaczone={false}
-    onDodaj={vi.fn()} onUsun={vi.fn()} {...n} />);
+/* Od 0.249.0 spinacz i lista to DWA komponenty, bo mają różne miejsca na
+   ekranie: przycisk w rzędzie działań, lista przy komponowanej wiadomości.
+   Test renderuje oba razem, bo tak stoją w edytorze — rozdzielenie było
+   o układ, nie o zachowanie. */
+type Props = {
+  lista: ZalacznikSzkicu[]; dodaje: boolean; blad: string; wylaczone: boolean;
+  onDodaj: (p: File) => void; onUsun: (id: number) => void;
+};
+const oba = (p: Props) => <>
+  <ZalacznikiWysylki lista={p.lista} blad={p.blad} onUsun={p.onUsun} wylaczone={p.wylaczone} />
+  <PrzyciskZalacznika dodaje={p.dodaje} onDodaj={p.onDodaj} wylaczone={p.wylaczone} />
+</>;
+const domyslne = (): Props => ({
+  lista: [], dodaje: false, blad: "", wylaczone: false, onDodaj: vi.fn(), onUsun: vi.fn(),
+});
+const pasek = (n: Partial<Props> = {}) => render(oba({ ...domyslne(), ...n }));
 
 describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
   it("bez plików mówi, CO wolno dołączyć", () => {
@@ -62,8 +75,7 @@ describe("Załączniki DO WYSYŁKI (pasek pod edytorem)", () => {
     const wejscie = screen.getByLabelText(/Wybierz plik/);
     await userEvent.upload(wejscie,
       new File(["x"], "tabliczka.png", { type: "image/png" }));
-    rerender(<ZalacznikiWysylki lista={[]} dodaje blad="" wylaczone={false}
-      onDodaj={vi.fn()} onUsun={vi.fn()} />);
+    rerender(oba({ ...domyslne(), dodaje: true }));
     /* W trakcie wgrywania spinacz ODZYSKUJE słowa: sama ikona nie powiedziałaby,
        że coś trwa i który plik idzie. */
     expect(screen.getByText(/Wgrywam tabliczka\.png/)).toBeInTheDocument();
