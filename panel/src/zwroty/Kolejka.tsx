@@ -122,7 +122,12 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
           aria-current={aktywny ? "true" : undefined}
           ref={aktywny ? aktywnyWiersz : null}
           onClick={() => onWybierz(z.id)}
-          className={`flex w-full gap-3 px-4 py-3 text-left ${aktywny ? "bg-amber-50" : "hover:bg-slate-50"}`}>
+          /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
+             klauzuli w `skrzynka/Kolejka.tsx`. Belka stoi przy KAŻDYM wierszu,
+             bo dokładana przy zaznaczeniu przesuwałaby treść o trzy piksele. */
+          className={`flex w-full gap-3 border-l-[3px] px-4 py-3 text-left ${aktywny
+            ? "border-l-wertis-amber bg-slate-200"
+            : "border-l-transparent hover:bg-slate-50"}`}>
           {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
               rozstrzyga się w kolumnie dowodów, a rząd czterech kafli
               zrobiłby z wiersza tabelę. */}

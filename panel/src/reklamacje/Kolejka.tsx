@@ -139,8 +139,11 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
           aria-current={aktywna ? "true" : undefined}
           ref={aktywna ? aktywnyWiersz : null}
           onClick={() => onWybierz(r.id)}
-          className={`flex w-full gap-3 px-4 py-3 text-left ${
-            aktywna ? "bg-amber-50" : "hover:bg-slate-50"}`}>
+          /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
+             klauzuli w `skrzynka/Kolejka.tsx`. */
+          className={`flex w-full gap-3 border-l-[3px] px-4 py-3 text-left ${aktywna
+            ? "border-l-wertis-amber bg-slate-200"
+            : "border-l-transparent hover:bg-slate-50"}`}>
           <ZdjecieOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={44}
             nazwa={r.ofertaNazwa ?? r.numer ?? r.externalId} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">

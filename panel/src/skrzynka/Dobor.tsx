@@ -371,7 +371,9 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           const bezKartoteki = k.twId === null;
           const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
           return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
-            ? "border-wertis-amber bg-amber-50" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
+            /* Wypełnienie szare, obwódka marki zostaje: to jest ZAZNACZENIE,
+               a bursztynowe tło myliło je z ostrzeżeniem (0.265.0). */
+            ? "border-wertis-amber bg-slate-200" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
             {/* ── CO CZYTA SIĘ PIERWSZE (0.203.0) ─────────────────────────
                 Wiersz kandydata zaczynał się od symbolu, a nazwa leżała pod
                 nim, w tym samym rozmiarze co źródło i droga. Cztery linijki
