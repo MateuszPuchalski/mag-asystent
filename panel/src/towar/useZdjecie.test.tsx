@@ -129,6 +129,29 @@ describe("Załącznik wiadomości — zdanie i ponowienie", () => {
     await waitFor(() => expect(screen.getByRole("img")).toHaveAttribute("src", expect.stringContaining("blob:")));
   });
 
+  it("po minucie wygasła porażka pyta znowu przy PRZERYSOWANIU, nie tylko przy zamontowaniu", async () => {
+    /* Zrzut właściciela z 10 września: ramka „wczytuję…" na stałe obok zdania
+       błędu pobrania. Wpis wygasł, komponent przerysował się z innego powodu,
+       a serwera nikt nie zapytał. */
+    const teraz = Date.now();
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(teraz);
+    const { rerender } = render(<Zalacznik id={11} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    odpowiedzi[0].rozwiaz(false, 503, { error: "Konto Allegro niepołączone." });
+    await waitFor(() => expect(screen.getByText(/niepołączone/)).toBeInTheDocument());
+    /* Przed upływem minuty przerysowanie NIE pyta drugi raz. */
+    rerender(<Zalacznik id={11} />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(odpowiedzi).toHaveLength(1);
+    /* Po minucie — pyta, a ramka „wczytuję" nie zostaje na zawsze. */
+    zegar.mockReturnValue(teraz + 61_000);
+    rerender(<Zalacznik id={11} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(2));
+    odpowiedzi[1].rozwiaz(true);
+    await waitFor(() => expect(screen.getByRole("img")).toBeInTheDocument());
+    zegar.mockRestore();
+  });
+
   it("415 to odpowiedź „nie obraz”: brak bez zdania, zapamiętany jak 404", async () => {
     const { unmount } = render(<Zalacznik id={8} />);
     await waitFor(() => expect(odpowiedzi).toHaveLength(1));

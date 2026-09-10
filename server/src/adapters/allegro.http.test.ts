@@ -362,13 +362,14 @@ test("załącznik Centrum Wiadomości: droga API z UUID z ogona `url`, zapisany 
   const url = "https://upload.allegro.pl/message-center/message-attachments/97DC0B60-2da4-4247-92ba-b748630ba0f6";
   assert.equal(idZalacznikaZUrl(url), "97dc0b60-2da4-4247-92ba-b748630ba0f6", "UUID małymi literami");
   const k = kandydaciPobrania("https://api.allegro.pl", url);
+  /* Droga API BEZ `Accept`: `downloadAttachmentGET` w swaggerze oddaje plik dowolnego typu,
+     a `Accept` z JSON-em dawał na żywo 406 (sonda właściciela, 10 września). */
   assert.deepEqual(k.map((x) => [x.droga, x.akcept ?? null]), [
-    ["api", "application/vnd.allegro.public.v1+json"],
-    ["api", "application/vnd.allegro.beta.v1+json"],
+    ["api", null],
     ["url", null],
   ]);
   assert.equal(k[0]!.adres, "https://api.allegro.pl/messaging/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6");
-  assert.equal(k[2]!.adres, url, "zapas to DOKŁADNIE zapisany adres");
+  assert.equal(k[1]!.adres, url, "zapas to DOKŁADNIE zapisany adres");
   /* Sandbox dziedziczy `apiUrl`, więc droga API idzie na sandbox. */
   assert.match(kandydaciPobrania("https://api.allegro.pl.allegrosandbox.pl", url)[0]!.adres, /^https:\/\/api\.allegro\.pl\.allegrosandbox\.pl\//);
   /* Bez ogona UUID (reklamacje, adres innego kształtu) — tylko zapisany adres. */

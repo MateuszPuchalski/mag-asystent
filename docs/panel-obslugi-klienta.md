@@ -97,6 +97,10 @@ od 0.155.0 i wyglądało, jakby działało. Poprawka 0.219.1 wpina podgląd we
 wspólną kolejkę obrazów (`useZdjecieZalacznika`), a pobranie w `pobierzPlik` —
 token do adresu nie wchodzi, bo ścieżki lądują w logach i w historii.
 
+Układ (`podglad`) podpowiada typ z Allegro ALBO nazwa pliku — od 0.248.0 nazwa
+liczy się zawsze, bo telefony przysyłają `image/jpg` i `application/octet-stream`
+przy `IMG_….jpg`; o wydaniu rozstrzyga sygnatura bajtów, a 415 panel zapamiętuje.
+
 Podgląd ma WŁASNĄ trasę i węższą bramkę niż pobranie. Oddaje wyłącznie cztery
 typy rastrowe (`image/jpeg`, `image/png`, `image/webp`, `image/gif`) i wyłącznie
 przy stanie `SAFE`; `image/svg+xml` jest obrazem i dokumentem ze skryptem
@@ -3225,7 +3229,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zakładka WSZYSTKIE, filtr przewoźnika, eksport CSV | **działa** od 0.169.0 | `csvZwrotow`, `GET /api/obsluga/zwroty/csv` |
 | Załączniki wiadomości — ODCZYT | **działa** od 0.155.0 | `message_attachment`, `GET /api/obsluga/zalaczniki/:id` |
 | Zdjęcie klienta widoczne wprost na osi | **działa** od 0.218.0, naprawione w 0.244.0 | `GET /api/obsluga/zalaczniki/:id/podglad` — typ z SYGNATURY bajtów (`rozpoznajMime` × `TYPY_PODGLADU`, także WebP), tylko `SAFE`; odmowa Allegro to 502 ze zdaniem pod nazwą pliku i „Spróbuj ponownie", nie pusta linia; od 0.246.0 kliknięcie powiększa (`towar/Zalacznik.tsx`, wspólne z reklamacjami) |
-| Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **kandydat** od 0.244.0 | `kandydaciPobrania`: końcówka API z `Accept` przed zapisanym `url`; `[WERYFIKUJ]` w `allegro-ksztalt.md`, `npm run sonda:zalacznik` zdejmuje |
+| Pobranie załącznika Centrum Wiadomości z `api.allegro.pl` | **działa** od 0.248.0 (kandydat od 0.244.0) | `kandydaciPobrania`: `downloadAttachmentGET` BEZ `Accept` (swagger: odpowiedź `*/*`), zapisany `url` jako zapas; sonda właściciela 10 września: 200 `image/jpeg`, z `Accept` 406, `upload.allegro.pl` 403 |
 | Załączniki odświeżane przy każdym przebiegu | **działa** od 0.244.0 | `zapiszZalaczniki` upsert po `(message_id, file_name)`, dociąg wątków ze stanem `NEW` (sufit 5), dosypka z lądowiska przy starcie |
 | Autoodpowiedź biura zwinięta na osi | **działa** od 0.218.0 | `czyAutoresponder`, pole `automatyczna` w `WpisOsi` |
 | Stopka firmowa zwinięta pod odpowiedzią | **działa** od 0.219.1 | `podzielStopke`, pole `stopka` w `WpisOsi` |
