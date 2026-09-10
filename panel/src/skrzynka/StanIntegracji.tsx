@@ -64,7 +64,7 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
       <b className="mr-auto">Stan integracji</b>
-      <span className="text-xs text-slate-400">/api/health · odczyt {czas(
+      <span className="text-xs text-slate-500">/api/health · odczyt {czas(
         odczyt ? new Date(odczyt).toISOString() : null)}</span>
     </header>
     <dl className="divide-y text-sm">

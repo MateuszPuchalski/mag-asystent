@@ -109,6 +109,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
     <div className="flex flex-wrap items-center gap-4 px-5 py-3">
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
       <div className="mr-auto min-w-0"><b>WERTIS</b>
+        {/* kontrast: pasek stoi na #2A2A2C, gdzie slate-400 daje 5.59:1 */}
         <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {

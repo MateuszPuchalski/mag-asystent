@@ -193,20 +193,29 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
       <Inbox size={16} className="shrink-0" />
       <b className="shrink-0">Rozmowy</b>
-      <p className="mr-auto min-w-0 truncate text-[11px] font-normal text-slate-400">
+      <p className="mr-auto min-w-0 truncate text-[11px] font-normal text-slate-500">
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-ranga-zle">
         STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
-      <button className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
+      <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
-    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-1.5">
-      {KUBELKI.map((k) => <button key={k.klucz} onClick={() => setKubelek(k.klucz)}
+    {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO (0.255.0) ─────────
+        0.251.0 ścisnęło pigułki z `py-1` do `py-0.5`, żeby odzyskać wysokość
+        dla listy pytań. Zmierzone: dało to cele 20 px przy progu 24×24 z WCAG
+        2.2 AA (2.5.8). Odzyskane piksele nie były moje do wzięcia.
+
+        Pigułka wraca na `py-1`, a rachunek pokrywa własne wypełnienie pasma:
+        `py-1.5` → `py-1`. Kubełki zawijają się na dwa rzędy przy kolumnie
+        400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
+        chromu — cena, której próg dostępności jest wart. */}
+    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-1">
+      {KUBELKI.map((k) => <button key={k.klucz} type="button" onClick={() => setKubelek(k.klucz)}
         aria-pressed={kubelek === k.klucz}
-        className={`rounded px-2 py-0.5 text-xs font-semibold ${kubelek === k.klucz
+        className={`rounded px-2 py-1 text-xs font-semibold ${kubelek === k.klucz
           ? "bg-wertis-ink text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
         {k.etykieta} <span className="font-normal">
           {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</span></button>)}
@@ -324,9 +333,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               className="mr-1.5 inline-block h-2 w-2 rounded-full bg-wertis-amber align-middle">
               <span className="sr-only">NOWE</span></span>}
             {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
-              <span className="font-semibold text-slate-400">Biuro: </span>}
+              <span className="font-semibold text-slate-500">Biuro: </span>}
             {r.ostatniaWiadomosc}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
             {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
                 „za co się wziąć", a data każe je dopiero policzyć w głowie.
                 Otwiera podpis, bo to jedyna liczba w wierszu, po której układa

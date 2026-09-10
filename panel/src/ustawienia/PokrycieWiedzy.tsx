@@ -14,7 +14,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
       <b className="mr-auto">Wiedza z opisów kartotek</b>
-      <span className="text-xs text-slate-400">odbudowa po każdym imporcie</span>
+      <span className="text-xs text-slate-500">odbudowa po każdym imporcie</span>
     </header>
 
     <div className="flex flex-wrap gap-8 p-4">
@@ -28,7 +28,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
     <div className="flex flex-wrap gap-8 border-t p-4">
       {/* „Do przerobienia" to lista roboty na ekranie Wiedza → Z opisów. */}
       <Liczba etykieta="sekcji „Modele:” do przerobienia" ile={dane.modeleZOpisu.nowych}
-        ton={dane.modeleZOpisu.nowych > 0 ? "text-wertis-amber" : ""} />
+        ton={dane.modeleZOpisu.nowych > 0 ? "text-ranga-uwaga" : ""} />
       <Liczba etykieta="przerobionych" ile={dane.modeleZOpisu.przerobionych} />
       <Liczba etykieta="odrzuconych" ile={dane.modeleZOpisu.odrzuconych} />
       <Liczba etykieta="zastosowań zatwierdzonych" ile={dane.zastosowania.zatwierdzonych} ton="text-ranga-ok" />
@@ -40,7 +40,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
       {/* Tokeny silników (0.239.0): „do decyzji" to lista na ekranie Wiedza → Z opisów. */}
       <Liczba etykieta="tokenów silników w nazwach" ile={dane.tokeny.tokenow} />
       <Liczba etykieta="kartotek z tokenem do decyzji" ile={dane.tokeny.nowych}
-        ton={dane.tokeny.nowych > 0 ? "text-wertis-amber" : ""} />
+        ton={dane.tokeny.nowych > 0 ? "text-ranga-uwaga" : ""} />
       <Liczba etykieta="zatwierdzonych z tokenu" ile={dane.tokeny.zatwierdzonych} ton="text-ranga-ok" />
     </div>
 

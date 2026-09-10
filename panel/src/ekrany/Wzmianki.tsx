@@ -31,8 +31,11 @@ export function Wzmianki() {
       <AtSign size={18} /><b className="mr-auto">Wspomniano o mnie</b>
       <span className="text-sm text-slate-500">
         {dane.data ? `${dane.data.nowe} do zajęcia się` : "Wczytuję…"}</span>
-      <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={zHistoria}
+      {/* Cel klikalny to CAŁA etykieta (0.255.0). Sam kwadracik miał 13×13 px
+          przy progu 24×24 z WCAG 2.2 AA — ta sama usterka co w pasku zwrotów
+          i ta sama naprawa, żeby nie było dwóch wzorców na jedno. */}
+      <label className="flex min-h-6 cursor-pointer items-center gap-2 text-sm text-slate-600">
+        <input type="checkbox" checked={zHistoria} className="h-4 w-4 shrink-0"
           onChange={(e) => setZHistoria(e.target.checked)} />
         Pokaż odhaczone</label>
     </Karta>

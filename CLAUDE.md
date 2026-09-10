@@ -95,11 +95,16 @@ wyrzucenia.
 
 ```bash
 cd server && npx tsc --noEmit && npm test
+cd panel  && npx tsc -b --noEmit && npm test   # panel obsługi — patrz niżej
 python3 tools/docs_check.py && python3 tools/styl_check.py   # ≤25 słów/zdanie
 python3 tools/ergonomia_check.py && python3 tools/kt_imports_check.py   # kolektor
 ```
 
-Wszystkie sześć musi być czystych. Dwie ostatnie dotyczą Kotlina i biegną
+Wszystkie siedem musi być czystych. **Wiersz z `panel` doszedł w 0.255.0 i to
+była dziura, nie przeoczenie w zapisie:** `npm test` w `server/` uruchamia
+wyłącznie testy serwera, więc dało się przejść wszystkie bramki na zielono
+i wypchnąć panel z czerwonymi testami. CI je łapało (`server.yml`, krok „Testy
+panelu obsługi"), ale dopiero po wypchnięciu. Dwie ostatnie dotyczą Kotlina i biegną
 w sekundy — moduł `:app` nie kompiluje się poza CI, więc to jedyne, co łapie
 mały cel dotyku i brakujący import przed wypchnięciem. `npm test` to także testy-strażnicy
 struktury `biuro.html` — ich odmowa zwykle znaczy, że łamiesz jedną

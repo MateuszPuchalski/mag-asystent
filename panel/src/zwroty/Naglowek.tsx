@@ -56,7 +56,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
           drugim celem dotyku dla tej samej czynności. */}
       {zwrot.kupujacyLogin
         ? <LoginKlienta login={zwrot.kupujacyLogin} className="font-semibold text-slate-700" />
-        : <span className="text-slate-400">kupujący: Allegro nie podało</span>}
+        : <span className="text-slate-500">kupujący: Allegro nie podało</span>}
     </p>
 
     {nieodebrana && <p className="mt-1 text-xs text-violet-800">

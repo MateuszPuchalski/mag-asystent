@@ -58,7 +58,7 @@ export function Edytor({ tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij }:
       {/* Licznik mówi, dopiero gdy ma co powiedzieć. Kolor przy progu, a nie
           zawsze — czerwony napis stojący cały czas przestaje być czytany. */}
       <span className={`text-xs tabular-nums ${
-        zaDlugo ? "font-bold text-ranga-zle" : blisko ? "text-ranga-uwaga" : "text-slate-400"}`}>
+        zaDlugo ? "font-bold text-ranga-zle" : blisko ? "text-ranga-uwaga" : "text-slate-500"}`}>
         {znakow} znaków{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}
       </span>
       <Przycisk className="ml-auto" wariant="glowny" onClick={onWyslij}

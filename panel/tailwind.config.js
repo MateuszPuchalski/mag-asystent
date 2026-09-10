@@ -40,6 +40,23 @@ export default {
           wynik: "#ecfdf5", "wynik-ramka": "#a7f3d0",
         },
       },
+      /* ── RAMKA BIERZE TOKEN, NIE DOMYŚLNĄ SZAROŚĆ TAILWINDA (0.255.0) ───────
+         Tailwind bez podanej barwy rysuje ramkę w `gray-200` (#E5E7EB), a ten
+         projekt ma własny token `slate-200` (#E2E8F0). W panelu stało 320
+         gołych `border` naprzeciw 77 jawnych `border-slate-*` — czyli cztery
+         na pięć ramek miały barwę, której nikt nie wybrał, a token był barwą
+         ramek wyłącznie w klasie `.card`.
+
+         Różnicy nie widać na jednej krawędzi (1.24:1 kontra 1.23:1 na bieli)
+         i właśnie dlatego przeżyła. Widać ją tam, gdzie krawędzie się stykają:
+         karta z obwódką `slate-200` i jedenaście linii `gray-200` w środku,
+         na jednym ekranie ustawień.
+
+         `divideColor` dziedziczy w Tailwindzie 3 z `borderColor`, więc gołe
+         `divide-y` wchodzi tu razem z ramkami. To jest zamierzone — tabela
+         stanu integracji stoi właśnie na `divide-y`. */
+      borderColor: { DEFAULT: "#e2e8f0" },
+
       fontFamily: { sans: ["Barlow", "sans-serif"] },
     },
   },

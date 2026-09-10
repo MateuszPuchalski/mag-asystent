@@ -109,10 +109,10 @@ export function ZalacznikiWysylki({ lista, blad, onUsun, wylaczone }: {
           ? <FileText size={13} className="shrink-0 text-slate-400" />
           : <ImageIcon size={13} className="shrink-0 text-slate-400" />}
         <span className="max-w-52 truncate font-semibold">{z.nazwa}</span>
-        <span className="tabular-nums text-slate-400">{poLudzku(z.rozmiar)}</span>
+        <span className="tabular-nums text-slate-500">{poLudzku(z.rozmiar)}</span>
         {/* Kto dołożył — bo szkic jest wspólny, a plik kolegi wygląda inaczej
             niż własny dopiero wtedy, gdy przy nim stoi imię. */}
-        {z.dodal && <span className="text-slate-400">· {z.dodal}</span>}
+        {z.dodal && <span className="text-slate-500">· {z.dodal}</span>}
         <button type="button" disabled={wylaczone}
           onClick={() => onUsun(z.id)} aria-label={`Zdejmij ${z.nazwa}`}
           className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40">

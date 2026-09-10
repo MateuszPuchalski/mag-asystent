@@ -124,7 +124,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 {/* Login bywa PUSTY i to jest udokumentowane: schemat mówi „not
                     present if role is ADMIN, SYSTEM or FULFILLMENT". */}
                 {w.autorLogin && <span className="text-slate-500">{w.autorLogin}</span>}
-                <span className="ml-auto text-slate-400">{czas(w.utworzonoAt)}</span>
+                <span className="ml-auto text-slate-500">{czas(w.utworzonoAt)}</span>
               </div>
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{w.tresc}</p>
               <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />

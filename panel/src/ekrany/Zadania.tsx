@@ -82,7 +82,10 @@ export function Zadania() {
     <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 className="text-2xl font-bold">Zadania terenowe</h1>
-        <p className="text-sm text-slate-500">Pomiary i weryfikacje wracają bezpośrednio z kolektorów.</p>
+        {/* slate-600, nie slate-500 (0.255.0): ten akapit stoi na TLE STRONY
+            (`body` ma `bg-slate-100`), a tam slate-500 daje 4.34:1 przy progu
+            4.5. W kartach, czyli na bieli, slate-500 wystarcza. */}
+        <p className="text-sm text-slate-600">Pomiary i weryfikacje wracają bezpośrednio z kolektorów.</p>
       </div>
       <div className="flex items-center gap-3">
         <div className="flex rounded-lg border bg-white p-1">
@@ -139,7 +142,7 @@ export function Zadania() {
           {t.wynik && <div className="rounded-lg bg-os-wynik p-3">
             <div className="mb-1 text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu</div>
             <p className="whitespace-pre-wrap">{t.wynik}</p></div>}
-          <p className="text-xs text-slate-400">Zlecił(a) {t.utworzonoPrzez} · {czas(t.utworzonoAt)}</p>
+          <p className="text-xs text-slate-500">Zlecił(a) {t.utworzonoPrzez} · {czas(t.utworzonoAt)}</p>
         </div>
       </Karta>)}
     </div>

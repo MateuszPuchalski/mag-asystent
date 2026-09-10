@@ -61,7 +61,7 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
   if (!p.stan.wlaczony) {
     /* Przycisk, który nie może zadziałać, uczy nie klikać — zamiast niego
        zdanie z serwera, ale skrócone do jednej linii. */
-    return <span className="min-w-0 truncate text-xs text-slate-400" title={p.stan.powod ?? undefined}>
+    return <span className="min-w-0 truncate text-xs text-slate-500" title={p.stan.powod ?? undefined}>
       {p.stan.powod}</span>;
   }
   return <span className="flex min-w-0 items-center gap-2">

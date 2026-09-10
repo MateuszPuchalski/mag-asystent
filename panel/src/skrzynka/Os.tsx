@@ -77,7 +77,7 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
 function Stopka({ tresc }: { tresc: string }) {
   const [otwarte, setOtwarte] = React.useState(false);
   return <div className="mt-1">
-    <button type="button" className="text-[11px] text-slate-400 underline hover:text-slate-600"
+    <button type="button" className="text-[11px] text-slate-500 underline hover:text-slate-600"
       aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
       {otwarte ? "ukryj stopkę firmową" : "stopka firmowa"}
     </button>
@@ -252,7 +252,7 @@ export function Os({ wpisy, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu
             {/* Nazwisko OSOBNO tylko przy nas: przy kliencie stoi już wyżej,
                 a powtórzone dwa razy w jednym wierszu jest szumem. */}
             {!w.odKlienta && <b>{w.autor}</b>}
-            <span className="text-slate-400">{czas(w.at)}</span>
+            <span className="text-slate-500">{czas(w.at)}</span>
             {/* Nazwa przy ofercie jest Z ZAMÓWIENIA (§4.3) — mail Allegro
                 „Wiadomość dotyczy" pokazuje tytuł, goły numer kazał agentowi
                 szukać towaru drugi raz. Zamówienie skracamy: UUID w całości

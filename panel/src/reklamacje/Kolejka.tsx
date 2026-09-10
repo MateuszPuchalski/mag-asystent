@@ -100,7 +100,7 @@ export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
  */
 function Termin({ dni }: { dni: number | null }) {
   if (dni === null) {
-    return <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500"
+    return <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"
       title="Allegro nie podało terminu decyzji przy tej sprawie">bez terminu</span>;
   }
   const pilne = dni <= 3;

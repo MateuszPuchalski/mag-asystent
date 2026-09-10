@@ -283,7 +283,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
       {lokalizacje
         ? <span className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm">
             {lokalizacje}</span>
-        : <span className="text-xs text-slate-400">bez lokalizacji</span>}
+        : <span className="text-xs text-slate-500">bez lokalizacji</span>}
       <span className="ml-auto text-[11px] text-slate-500">
         stan {karta.mag.stan} · rezerwacje {karta.mag.rez}
       </span>
@@ -292,7 +292,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
     <div className="mt-2.5 space-y-1 border-t border-slate-200 pt-2.5">
       {pozostale.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">
         <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
-        <span className={wartosc === "brak" ? "text-slate-400" : "font-semibold text-slate-900"}>
+        <span className={wartosc === "brak" ? "text-slate-500" : "font-semibold text-slate-900"}>
           {wartosc}</span>
       </div>)}
       {karta.magazyny.length > 0 && <p className="pt-0.5 text-[11px] text-slate-500">

@@ -45,7 +45,11 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     /* Próg to 500 znaków przed limitem. Poniżej licznik ma być tłem, nie
        ostrzeżeniem — inaczej ostrzeżenie przestaje cokolwiek znaczyć. */
     const { rerender } = render(<Edytor {...props({ tresc: "x".repeat(100) })} />);
-    expect(screen.getByText(/^100 znaków$/)).toHaveClass("text-slate-400");
+    /* slate-500 od 0.255.0, nie slate-400: intencja („licznik ma być tłem”)
+       zostaje, zmienia się barwa. slate-400 dawało 2.56:1 na bieli przy progu
+       4.5 — wyciszenie zeszło poniżej czytelności, a to już nie jest tło,
+       tylko brak informacji. */
+    expect(screen.getByText(/^100 znaków$/)).toHaveClass("text-slate-500");
     rerender(<Edytor {...props({ tresc: "x".repeat(LIMIT_ZNAKOW - 10) })} />);
     expect(screen.getByText(/znaków$/)).toHaveClass("text-ranga-uwaga");
   });

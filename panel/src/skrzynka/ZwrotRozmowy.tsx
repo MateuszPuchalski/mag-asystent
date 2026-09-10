@@ -87,7 +87,7 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       {wracaja.map((p) => <li key={p.id} className="flex items-baseline gap-2 rounded bg-white px-2 py-1 text-xs">
         <span className="truncate">{p.nazwa}</span>
         {p.twSymbol && <span className="shrink-0 font-mono text-slate-500">{p.twSymbol}</span>}
-        {p.powod && <span className="shrink-0 text-slate-400">{p.powod}</span>}
+        {p.powod && <span className="shrink-0 text-slate-500">{p.powod}</span>}
         <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
       </li>)}
     </ul>

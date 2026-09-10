@@ -57,7 +57,7 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
       className={`ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold disabled:opacity-50 ${
         rozmowa.priorytet === "pilny"
           ? "bg-red-100 text-ranga-zle hover:bg-red-200"
-          : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+          : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
       <Flame size={13} />{rozmowa.priorytet === "pilny" ? "PILNE" : "Oznacz jako pilne"}
     </button>
 

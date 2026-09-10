@@ -228,7 +228,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
     <section className="border-b p-3" aria-label="Dane wejściowe">
       <div className="mb-2 flex items-center gap-2">
         <b className="text-xs uppercase tracking-wide text-slate-500">Dane wejściowe</b>
-        <span className="text-[11px] text-slate-400">wersja {dobor.wersja}</span>
+        <span className="text-[11px] text-slate-500">wersja {dobor.wersja}</span>
         {!edycja && <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
           onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
           <Pencil size={12} />{wypelnione.length ? "Popraw" : "Wpisz dane"}</button>}
@@ -284,7 +284,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           <div className="min-w-0 flex-1 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <b className="font-mono">{para.czesc.symbol}</b>
-              <span className="text-slate-400">→</span>
+              <span className="text-slate-500">→</span>
               <b className="font-mono">{para.doCzego.symbol}</b>
               <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-[11px]">
                 {NAZWA_ROLI[para.rola]}{para.pozycja ? ` · ${para.pozycja}` : ""}</span>
@@ -560,7 +560,7 @@ function Szczeble({ drogi }: { drogi: SzczebelDoboru[] }) {
   return <div className="mt-1 flex flex-wrap gap-1" aria-label="Sprawdzone drogi">
     {drogi.map((d) => <span key={d.droga} title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}
       className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${d.sprawdzona
-        ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-400 line-through"}`}>
+        ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-500 line-through"}`}>
       {NAZWA_DROGI[d.droga]}{d.sprawdzona ? ` ${d.wynikow}` : ""}</span>)}
   </div>;
 }
