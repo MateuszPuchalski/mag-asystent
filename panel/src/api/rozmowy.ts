@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
   DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
+  SkutecznoscDoboru,
   PowodNegatywny,
   HistoriaKlienta,
   Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
@@ -22,6 +23,7 @@ export const klucze = {
   sprawy: ["sprawy"] as const,
   sygnatury: ["sygnatury"] as const,
   pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
+  skutecznoscDoboru: (dni: number) => ["skutecznosc-doboru", dni] as const,
   towar: (twId: number) => ["towar", twId] as const,
   zalaczniki: (id: number) => ["zalaczniki", id] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
@@ -535,6 +537,20 @@ export function usePokrycieWiedzy() {
   return useQuery({
     queryKey: klucze.pokrycieWiedzy,
     queryFn: () => api<PokrycieWiedzy>("/api/obsluga/pokrycie-wiedzy"),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Skuteczność doboru (0.267.0) — obraz PRACY, nie katalogu, ale i tak bez
+ * `refetchInterval`: to jest tabela czytana raz na tydzień, a nie licznik,
+ * który ma drgać pod okiem. Okno w kluczu cache, bo przełączenie selektora
+ * ma pobrać inne dane, a nie podmienić te same.
+ */
+export function useSkutecznoscDoboru(dni: number) {
+  return useQuery({
+    queryKey: klucze.skutecznoscDoboru(dni),
+    queryFn: () => api<SkutecznoscDoboru>(`/api/obsluga/skutecznosc-doboru?dni=${dni}`),
     staleTime: 60_000,
   });
 }

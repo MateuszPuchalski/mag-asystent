@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.268.0 — 10 września 2026
+
+**Widać, dlaczego pusto.** Każdy pominięty szczebel doboru produkuje zdanie
+mówiące agentowi, co zrobić dalej: „nie wiadomo, jaki silnik stoi w NAC
+LS 46-450 — dopisz go w Wiedza → Silniki", „parametry nie mają wymiaru
+z jednostką". Panel wsadzał je w tooltip czipa. Jedenaście czipów, jedenaście
+tooltipów, a agent z pustą listą czytał jeden ogólnik: „Uzupełnij dane
+wejściowe albo wskaż kartotekę z wyszukiwarki".
+
+Teraz przy pustej liście kandydatów te zdania stoją widoczne, a te, których
+brak da się zamknąć w rozmowie, mają przy sobie przycisk. Etykieta mówi, CO
+wpisać — „Wpisz numer OEM", „Wpisz markę i model" — a nie „wpisz dane".
+Szczebel, którego na tym ekranie nie da się odblokować, zostaje samym zdaniem:
+przycisk, który nie pomaga, uczy klikania w nic.
+
+**Wiadomo, które szczeble pracują.** Kolumna zapisująca, którą z jedenastu
+dróg przyszedł wybrany kandydat, stała w bazie od 0.229.0 i nie czytał jej
+nikt. Nie dało się powiedzieć, czy szczebel „zgodne wymiary" dał kiedykolwiek
+wybraną część, ani czy dziewięć dróg nie jest teatrem wokół trzech.
+
+Nowa karta w ustawieniach za zębatką pokazuje ten rozkład, medianę czasu od
+pytania klienta do wyboru i podział na osoby. Szczebel bez ani jednego wyboru
+zostaje na liście z zerem i osobnym zdaniem — to jest najcenniejsze ustalenie
+tego raportu, a nie luka w danych.
+
+**Raport liczy z księgi zdarzeń, nie ze stanu tabeli**, i to jest jego główna
+decyzja. Tabela pamięta ostatni wybór, więc agent, który zmienił zdanie,
+kasował z niej pierwszą drogę bez śladu. Zatwierdzenie też bywa cofane.
+Do tego sprzątanie kasuje stare rozmowy razem z ich doborami. Zatwierdzenie
+kredytuje wyłącznie wybór bezpośrednio je poprzedzający.
+
+**Podział na osoby to monitoring pracowniczy** (art. 22² Kodeksu pracy) —
+wymaga zapisu w regulaminie i uprzedzenia pracowników; zdanie o tym stoi pod
+tabelą. Mediana pojawia się od dwudziestu wyborów, a kolumny rankingowej nie
+ma żadnej: raport mówi, JAK ktoś pracuje, nie jak dobrze.
+
+Panel obsługi trzeba przebudować. Migracji nie ma.
+
 ## 0.266.0 — 10 września 2026
 
 **Zwrot dochodzi wreszcie do półki — ze stanem, nie tylko z towarem.**

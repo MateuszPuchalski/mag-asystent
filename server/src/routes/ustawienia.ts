@@ -3,6 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
 import { pokrycieSygnatur } from "../services/sygnatury.js";
 import { pokrycieWiedzy } from "../services/identyfikatory.js";
+import { skutecznoscDoboru } from "../services/skutecznosc-doboru.js";
 
 /* ── Trasy ekranu ustawień obsługi (0.169.0) ─────────────────────────────────
    ZERO ZAPISÓW i to jest umowa, tak samo jak licznik `method:` w biurze.
@@ -10,7 +11,9 @@ import { pokrycieWiedzy } from "../services/identyfikatory.js";
    razem ze zdaniem w uzasadnieniu, dlaczego musi.
 
    Bramka roli jak przy skrzynce i zwrotach: pokrycie sygnatur mówi o
-   kartotekach i zamówieniach, czyli o danych biura.                         */
+   kartotekach i zamówieniach, czyli o danych biura. Od 0.267.0 stoi tu także
+   raport z osią osobową, więc bramka przestała być wyłącznie kwestią tego,
+   komu te liczby są potrzebne.                                              */
 
 const BIURO = ["biuro", "admin"];
 
@@ -34,4 +37,22 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
      tłumaczą, DLACZEGO szczebel doboru był pominięty. Odczyt bez zapisu. */
   app.get("/api/obsluga/pokrycie-wiedzy", async (_req, reply) =>
     odmowa(reply) ?? pokrycieWiedzy(db()));
+
+  /* Skuteczność doboru (0.267.0): którym z jedenastu szczebli §11.2 przyszedł
+     kandydat, którego agent naprawdę wybrał. Liczone z księgi zdarzeń, nie
+     z `dobor_rozmowy` — tamta pamięta ostatni wybór, a pytanie brzmi „która
+     droga dała trafienie". Uzasadnienie w nagłówku serwisu.
+
+     Ta trasa niesie OŚ OSOBOWĄ, więc jest tu jedyną, przy której bramka roli
+     znaczy więcej niż wygodę: raport per osoba to monitoring pracowniczy.
+     Zdanie o podstawie prawnej jedzie w ładunku, żeby panel nie mógł go
+     zgubić po drodze. */
+  app.get<{ Querystring: { dni?: string } }>("/api/obsluga/skutecznosc-doboru", async (req, reply) =>
+    odmowa(reply) ?? skutecznoscDoboru(dniZQuery(req.query.dni), db()));
+}
+
+/** Okno przycinane do trzech wartości, które oferuje selektor karty. */
+function dniZQuery(v: string | undefined): number {
+  const n = Number(v);
+  return n === 30 || n === 90 ? n : 7;
 }

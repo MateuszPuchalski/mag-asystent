@@ -59,13 +59,44 @@ export interface NegatywDoboru {
   powod: string; zrodlo: string; at: string;
 }
 
+/**
+ * CO AGENT MOŻE Z TYM ZROBIĆ — bez opuszczania rozmowy (0.267.0).
+ *
+ * Powody pominięcia są instruktażem („dopisz go w Wiedza → Silniki", „wpisz
+ * mm, cm albo m"), ale do 0.266.0 panel wsadzał je w atrybut `title` czipa.
+ * Jedenaście czipów, jedenaście tooltipów, ani jednego widocznego zdania.
+ *
+ * Rodzaj akcji nadaje SERWIS, w tej samej gałęzi, w której pisze powód. Panel
+ * nie parsuje ani jednego łańcucha: rozbiór polskiego zdania, żeby zgadnąć
+ * przycisk, rozjechałby się przy pierwszej poprawce sformułowania.
+ *
+ * Trzy rodzaje, bo tyle da się zrobić na ekranie doboru. Brak `akcji` jest
+ * TREŚCIĄ, nie niedoróbką: przy braku FTS5 albo niepowiązanej ofercie żaden
+ * przycisk w rozmowie nie pomoże, a przycisk, który nie pomaga, uczy klikania
+ * w nic.
+ */
+export interface AkcjaSzczebla {
+  rodzaj: "dane" | "wymiar" | "zabudowa";
+  etykieta: string;
+}
+
 export interface SzczebelDoboru {
   droga: DrogaDoboru;
   sprawdzona: boolean;
   wynikow: number;
   /** Dlaczego pominięty. Tylko przy `sprawdzona: false`. */
   powod?: string;
+  /** Czym agent może ten brak zamknąć TU I TERAZ; brak = nie da się w rozmowie. */
+  akcja?: AkcjaSzczebla;
 }
+
+/* Etykieta mówi, CO WPISAĆ, nie „wpisz dane". Agent czytający listę braków ma
+   po niej poznać, którego pola dotyczy przycisk, bez wracania do zdania obok —
+   a przy okazji dwa przyciski otwierające ten sam formularz przestają być
+   nierozróżnialne. */
+const DANE = (co: string): AkcjaSzczebla => ({ rodzaj: "dane", etykieta: `Wpisz ${co}` });
+const WYMIAR: AkcjaSzczebla = { rodzaj: "wymiar", etykieta: "Wpisz wymiar z jednostką" };
+const ZABUDOWA: AkcjaSzczebla = { rodzaj: "zabudowa", etykieta: "Zaproponuj zabudowę" };
 
 /* Kolejność §11.2: dokładny symbol i EAN biją wszystko, oferta jest kontekstem
    pytania, zamiennik idzie z opisu. Zgodny wymiar stoi za zamiennikiem, a przed
@@ -165,8 +196,8 @@ export function kandydaciDoboru(
   const oferta = ofertaRozmowy(database, conversationId);
   const znalezione = new Map<number, Omit<KandydatDoboru, "nr">>();
   const drogi = new Map<DrogaDoboru, SzczebelDoboru>();
-  const pomin = (droga: DrogaDoboru, powod: string) =>
-    drogi.set(droga, { droga, sprawdzona: false, wynikow: 0, powod });
+  const pomin = (droga: DrogaDoboru, powod: string, akcja?: AkcjaSzczebla) =>
+    drogi.set(droga, { droga, sprawdzona: false, wynikow: 0, powod, ...(akcja ? { akcja } : {}) });
   const dodaj = (k: Omit<KandydatDoboru, "nr">) => {
     // Mapa jest kluczowana po kartotece; kandydat bez niej (twId null) ma osobną
     // listę `bezKartoteki`, więc tu nigdy nie wchodzi — strażnik przed pomyłką.
@@ -192,8 +223,8 @@ export function kandydaciDoboru(
   const kotwica = (w: { tw_id: number; symbol: string; nazwa: string }) =>
     kotwice.set(w.tw_id, { twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa });
   if (zapytania.length === 0) {
-    pomin("symbol", "agent nie wpisał symbolu ani numeru w danych wejściowych");
-    pomin("ean", "agent nie wpisał kodu EAN w danych wejściowych");
+    pomin("symbol", "agent nie wpisał symbolu ani numeru w danych wejściowych", DANE("symbol lub numer"));
+    pomin("ean", "agent nie wpisał kodu EAN w danych wejściowych", DANE("symbol lub numer"));
   } else {
     let poSymbolu = 0; let poEan = 0;
     for (const q of zapytania) {
@@ -268,7 +299,7 @@ export function kandydaciDoboru(
   const bezKartoteki: Array<Omit<KandydatDoboru, "nr">> = [];
   const numery = [dobor.dane.oem, dobor.dane.nazwaCzesci].filter(wygladaNaNumer) as string[];
   if (numery.length === 0) {
-    pomin("oem", "agent nie wpisał numeru OEM w danych wejściowych");
+    pomin("oem", "agent nie wpisał numeru OEM w danych wejściowych", DANE("numer OEM"));
   } else {
     let ile = 0;
     const widziane = new Set<string>();
@@ -307,7 +338,7 @@ export function kandydaciDoboru(
      a zdanie źródła pisze serwis wiedzy — kandydat i szkic mówią to samo. */
   const negatywne: NegatywDoboru[] = [];
   if (!dobor.dane.marka || !dobor.dane.model) {
-    pomin("zastosowanie", "agent nie wpisał marki i modelu maszyny");
+    pomin("zastosowanie", "agent nie wpisał marki i modelu maszyny", DANE("markę i model"));
   } else {
     const klucz = kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant);
     let ile = 0;
@@ -342,7 +373,7 @@ export function kandydaciDoboru(
      klient zna model kosiarki, nie wersję silnika, a milcząca pewność w tym
      miejscu kończy się zwrotem „nie pasuje". */
   if (!dobor.dane.marka || !dobor.dane.model) {
-    pomin("silnik", "agent nie wpisał marki i modelu maszyny");
+    pomin("silnik", "agent nie wpisał marki i modelu maszyny", DANE("markę i model"));
   } else {
     const maszyna = [dobor.dane.marka, dobor.dane.model, dobor.dane.wariant].filter(Boolean).join(" ");
     const zabudowy = zabudowyMaszyny(
@@ -360,7 +391,12 @@ export function kandydaciDoboru(
         : tekst
           ? `nie wiadomo, jaki silnik stoi w ${maszyna} — „${tekst}” nie ma w słowniku silników,`
             + " dopisz go w Wiedza → Silniki"
-          : `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`);
+          : `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`,
+        /* Akcję dostaje TYLKO przypadek z aliasem w słowniku: para maszyna–silnik
+           jest wtedy gotowa do zaproponowania jednym kliknięciem. Bez aliasu
+           przycisk „zaproponuj" nie miałby czego wysłać, więc zdanie zostaje
+           samym zdaniem i prowadzi do ekranu Wiedzy. */
+        alias ? ZABUDOWA : undefined);
     } else {
       /* Ostrzeżenie przy KAŻDYM kandydacie tej drogi, nie raz na liście:
          kandydat wędruje do szkicu osobno i ma nieść swoje zastrzeżenie. */
@@ -432,9 +468,9 @@ export function kandydaciDoboru(
      poczekać na odbudowę indeksu. */
   const wymiary = wymiaryZParametrow(dobor.dane.parametry);
   if (Object.keys(dobor.dane.parametry).length === 0) {
-    pomin("wymiar", "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)");
+    pomin("wymiar", "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)", WYMIAR);
   } else if (wymiary.length === 0) {
-    pomin("wymiar", "parametry nie mają wymiaru z jednostką — wpisz mm, cm albo m");
+    pomin("wymiar", "parametry nie mają wymiaru z jednostką — wpisz mm, cm albo m", WYMIAR);
   } else if (indeksWymiarowPusty(database)) {
     pomin("wymiar", "indeks wymiarów pusty — odbuduje się przy starcie serwera albo po imporcie");
   } else {
@@ -459,7 +495,7 @@ export function kandydaciDoboru(
   if (!ftsDostepne()) {
     pomin("pelnotekst", "wyszukiwanie pełnotekstowe niedostępne — SQLite bez FTS5");
   } else if (!fraza) {
-    pomin("pelnotekst", "agent nie wpisał nazwy części ani maszyny");
+    pomin("pelnotekst", "agent nie wpisał nazwy części ani maszyny", DANE("nazwę części"));
   } else {
     let ile = 0;
     for (const t of szukajPelnotekst(dobor.dane.nazwaCzesci ?? "", 5, database, [dobor.dane.marka ?? "", dobor.dane.model ?? ""])) {

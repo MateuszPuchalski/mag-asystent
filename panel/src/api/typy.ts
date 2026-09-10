@@ -408,7 +408,18 @@ export type KandydatDoboru = {
 };
 
 /** Szczebel §11.2: sprawdzony z liczbą wyników albo pominięty Z POWODEM. */
-export type SzczebelDoboru = { droga: DrogaDoboru; sprawdzona: boolean; wynikow: number; powod?: string };
+/**
+ * Czym agent może zamknąć brak TU I TERAZ, bez opuszczania rozmowy (0.267.0).
+ * Rodzaj nadaje serwer, w tej samej gałęzi, w której pisze powód — panel nie
+ * rozbiera zdania po polsku, żeby zgadnąć przycisk.
+ */
+export type AkcjaSzczebla = { rodzaj: "dane" | "wymiar" | "zabudowa"; etykieta: string };
+
+export type SzczebelDoboru = {
+  droga: DrogaDoboru; sprawdzona: boolean; wynikow: number; powod?: string;
+  /** Brak akcji znaczy „tego nie da się załatwić w rozmowie" — i tak ma zostać. */
+  akcja?: AkcjaSzczebla;
+};
 
 /* Negatyw jest widoczny także dla kartoteki, której NIE MA wśród kandydatów (§11.4). */
 export type NegatywDoboru = {
@@ -481,6 +492,32 @@ export type ModelZOpisu = {
   stan: "nowy" | "przerobiony" | "odrzucony"; zastosowanieId: number | null;
   rozstrzygnal: string | null; rozstrzygnietoAt: string | null; at: string;
   zrodlo: "opis" | "oferta"; ofertaId: string | null;
+};
+
+/**
+ * Skuteczność doboru (0.267.0) — którym z jedenastu szczebli §11.2 przyszedł
+ * kandydat, którego agent naprawdę wybrał. Liczone z KSIĘGI ZDARZEŃ, nie ze
+ * stanu tabeli: tamta pamięta ostatni wybór, a pytanie brzmi „która droga dała
+ * trafienie". `naStole` jest jedyną częścią liczoną ze stanu i dlatego stoi
+ * osobno — to inne pytanie i inna populacja.
+ */
+export type SkutecznoscDoboru = {
+  dni: number;
+  /** Próg, przed którym rozmów w bazie nie ma; bez niego selektor „90 dni" obiecuje kwartał. */
+  granicaHistorii: string | null;
+  wyborow: number;
+  drogi: Array<{ droga: DrogaDoboru; wybranych: number; zatwierdzonych: number }>;
+  medianaDoWyboruMin: number | null;
+  wyborowZCzasem: number;
+  osoby: Array<{
+    userId: number | null; osoba: string; wybranych: number; zatwierdzonych: number;
+    najczestszaDroga: DrogaDoboru | null; medianaMin: number | null;
+  }>;
+  bezKonta: number;
+  naStole: { doborow: number; statusy: Array<{ status: StatusDoboru; ile: number }> };
+  progWiarygodnosci: number;
+  /** Art. 22² Kodeksu pracy — jedzie w ładunku, żeby karta nie mogła go zgubić. */
+  podstawaPrawna: string;
 };
 
 export type PokrycieWiedzy = {

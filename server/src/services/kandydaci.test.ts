@@ -89,8 +89,32 @@ function pytaniePodOferta(ofertaId: string, sku: string | null) {
     VALUES (?,?,'Podkładka STIHL',?,'2026-09-01T07:05:00Z')`).run(konto, ofertaId, sku);
 }
 
-const szczebel = (drogi: Array<{ droga: string; sprawdzona: boolean; wynikow: number; powod?: string }>, droga: string) =>
+/* Typ Z SERWISU, nie przepisany w miejscu: kopia rozjechała się przy pierwszym
+   nowym polu (`akcja` w 0.267.0) i test przestał widzieć to, co sprawdza. */
+const szczebel = (drogi: import("./kandydaci.js").SzczebelDoboru[], droga: string) =>
   drogi.find((d) => d.droga === droga)!;
+
+test("pominięty szczebel niesie AKCJĘ tam, gdzie da się ją zamknąć w rozmowie", () => {
+  /* Powód pominięcia jest instruktażem i do 0.266.0 kończył się w tooltipie.
+     Rodzaj akcji nadaje SERWIS, w tej samej gałęzi, w której pisze powód —
+     panel nie ma prawa rozbierać polskiego zdania, żeby zgadnąć przycisk. */
+  const { drogi } = kandydaciDoboru(rozmowa, subiekt);
+  for (const droga of ["symbol", "ean", "oem", "zastosowanie", "silnik", "pelnotekst"]) {
+    assert.equal(szczebel(drogi, droga).akcja?.rodzaj, "dane", `${droga} bez akcji „dane”`);
+  }
+  assert.equal(szczebel(drogi, "wymiar").akcja?.rodzaj, "wymiar");
+  assert.ok(szczebel(drogi, "wymiar").akcja?.etykieta, "przycisk bez etykiety jest przyciskiem bez nazwy");
+});
+
+test("szczebel, którego w rozmowie NIE DA SIĘ odblokować, akcji nie dostaje", () => {
+  /* Brak akcji jest treścią, nie niedoróbką. Przy niepowiązanej ofercie żaden
+     przycisk na tym ekranie nie pomoże, a przycisk, który nie pomaga, uczy
+     klikania w nic. */
+  const { drogi } = kandydaciDoboru(rozmowa, subiekt);
+  for (const droga of ["oferta", "zamiennik", "pasowanie", "wyszukiwarka"]) {
+    assert.equal(szczebel(drogi, droga).akcja, undefined, `${droga} obiecuje przycisk bez pokrycia`);
+  }
+});
 
 test("bez oferty i bez danych każdy szczebel jest POMINIĘTY z powodem, nie „zero”", () => {
   const przed = (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
