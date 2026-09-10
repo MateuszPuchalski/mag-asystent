@@ -1274,6 +1274,30 @@ pasowanie rodzi się z pracy. Kierunek jest narzucony: wybrany pasuje DO
 kotwicy. Automatu przy ZATWIERDŹ DOBÓR nie ma: rola części jest nieznana,
 a kotwica bywa samą częścią, gdy klient pyta o dostępność gaźnika.
 
+**SIŁA SZCZEBLA STOI W ZDANIU, NIE TYLKO W KOLEJNOŚCI (0.263.0).** Ranga dróg
+porządkowała listę, ale ta liczba nie wychodziła poza sortowanie. Zdania źródła
+nazywały za to słabość dwóch najniższych dróg dopiskiem „nie dowód". Model
+dostawał więc listę, na której najsłabsze wpisy były opisane jako słabe,
+a najmocniejsze nie miały przy sobie nic.
+
+Kosztowało to szkic o koło pasowe do Husqvarny TC38. Klient podał numer
+producenta ze starej części, kartoteka miała ten numer w opisie, kandydat
+stanął pierwszy z jedenastoma sztukami na stanie. Szkic nie wymienił go ani
+razu: odradził ofertę i poprosił o zdjęcie na tle linijki, bo z nazwy kartoteki
+wywnioskował inną szerokość kosiska. Domysł o maszynie pobił trafienie po
+numerze, bo nic nie mówiło, że to trafienie jest mocne.
+
+Trzy mocne drogi, czyli dokładny symbol, kod EAN i numer producenta, niosą
+teraz w zdaniu źródła dopisek o trafieniu po identyfikatorze. Karta „numer bez
+wiersza w kartotece" go nie dostaje, bo jest odpowiedzią „nie mamy tego
+u siebie", a nie trafieniem. Reguły 7a do 7c instrukcji szkicu mówią modelowi,
+co z tym zrobić: trafienie po identyfikatorze bije wniosek z nazwy maszyny,
+takiego kandydata się nie przemilcza, a rozbieżność idzie do zastrzeżeń.
+
+Kandydat dalej **nie wpisuje się sam** do zakładki Dobór. Automatyczny wybór
+łamałby wzorzec trzymany w całym module: dane trafiają tam na kliknięcie
+agenta i tylko w puste pola, a propozycję składa człowiek.
+
 ### 11.3. Poziomy pewności
 
 Dopasowanie bywa potwierdzone przez producenta, katalogiem dostawcy, pomiarem

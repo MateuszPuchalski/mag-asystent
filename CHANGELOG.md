@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.263.0 — 10 września 2026
+
+**Trafienie po numerze producenta przestaje przegrywać z domysłem.** Klient
+podał numer 197473 ze starego koła pasowego do Husqvarny TC38. Kartoteka
+20-05006 miała ten numer w opisie, więc kandydat wszedł drogą OEM i stanął
+pierwszy na liście, z jedenastoma sztukami na stanie.
+
+Szkic nie wymienił go ani razu. Odradził ofertę i poprosił o zdjęcie na tle
+linijki, opierając wniosek na dwóch twierdzeniach z własnej wiedzy modelu,
+obu oznaczonych jako niepewne: że TC38 ma kosisko około 38 cali i że wobec
+tego ta pozycja nie pasuje.
+
+**Oznaczaliśmy własne słabe przesłanki, a mocnych nie.** Siła szczebla stała
+wyłącznie w tabeli rang, czyli w liczbie, której nikt poza sortowaniem nie
+czyta. Zdania źródła nazywały za to słabość dwóch najniższych dróg dopiskiem
+„nie dowód". Model dostawał listę, na której najsłabsze wpisy były opisane
+jako słabe, a najmocniejsze nie miały przy sobie nic. Wtedy wygrywał jego
+własny domysł o maszynie.
+
+**Trzy mocne drogi mówią teraz o sobie.** Dokładny symbol, kod EAN i numer
+producenta niosą w zdaniu źródła dopisek o trafieniu po identyfikatorze.
+Karta „numer bez wiersza w kartotece" go nie dostaje, bo jest odpowiedzią
+„nie mamy tego u siebie", a nie trafieniem.
+
+**Instrukcja szkicu wie, co z tym zrobić.** Numer producenta jest tożsamością
+części, a nazwa kartoteki bywa niepełnym opisem handlowym, bo jedna część
+obsługuje kilka maszyn. Trafienie po identyfikatorze bije wniosek z nazwy
+maszyny, takiego kandydata się nie przemilcza, a rozbieżność między nazwą
+a wnioskiem idzie do zastrzeżeń dla agenta. Nie prosimy też o zdjęcie ani
+pomiar tego, co trafienie po numerze już rozstrzyga.
+
+**Czego to wydanie NIE robi.** Kandydat nie wpisuje się sam do zakładki Dobór.
+Właściciel pytał o to wprost i to jest osobna decyzja, bo automatyczny wybór
+łamałby wzorzec trzymany w całym module: dane trafiają tam na kliknięcie
+agenta i tylko w puste pola, a propozycję składa człowiek. Trafienie po
+numerze ma przy tym pewność „prawdopodobne", nie „potwierdzone", bo numer
+siedzi w opisie kartoteki, a nie w polu identyfikatora.
+
+**Wdrożenie nie wymaga żadnego działania.** Zmienia się zdanie źródła
+kandydatów i tekst instrukcji; baza i schemat zostają bez zmian. Instrukcja
+stoi w cache'owanym prefiksie, więc pierwsze wywołanie po wdrożeniu zapisze
+cache od nowa.
+
 ## 0.262.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

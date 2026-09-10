@@ -262,6 +262,33 @@ const Szkic = z.object({
    ocenić, czy teza wynika z faktu. Miarę mamy: `obnizona` liczy, jak często
    model zawyża, i to jest liczba warta oglądania po tym wydaniu.
 
+   ── REGUŁY 7a-7c: TRAFIENIE PO NUMERZE BIJE DOMYSŁ (0.263.0) ──────────────
+   Klient podał numer producenta 197473 ze starego koła pasowego do Husqvarny
+   TC38. Kartoteka 20-05006 miała ten numer w opisie, więc kandydat wszedł
+   drogą `oem` i stanął PIERWSZY na liście, z jedenastoma sztukami na stanie.
+   Szkic nie wymienił go ani razu. Odradził za to ofertę i poprosił o zdjęcie
+   na tle linijki, opierając wniosek na dwóch twierdzeniach ze źródłem `model`,
+   oba `niepewne`: że TC38 ma kosisko około 38 cali i że wobec tego nie pasuje.
+
+   Siła szczebla była zapisana WYŁĄCZNIE w `RANGA` w `kandydaci.ts`, czyli
+   w liczbie, której nikt poza sortowaniem nie czyta. Zdania źródła nazywały
+   za to słabość dwóch najniższych dróg („— nie dowód"). Model dostawał listę,
+   na której najsłabsze wpisy były opisane jako słabe, a najmocniejsze nie
+   miały przy sobie nic — i wtedy wygrywał jego własny domysł.
+
+   To wydanie domyka symetrię z dwóch stron. `PO_IDENTYFIKATORZE` dopisuje
+   znacznik do trzech mocnych dróg (symbol, EAN, OEM), a reguły 7a-7c mówią
+   modelowi, co z tym znacznikiem zrobić. Karta „numer bez wiersza w kartotece"
+   znacznika NIE dostaje: ona jest odpowiedzią „nie mamy tego u siebie",
+   a nie trafieniem.
+
+   CZEGO TO NIE ROBI: kandydat nie wpisuje się sam do zakładki Dobór. Właściciel
+   pytał o to wprost („matchować dobór od razu") i to jest osobna decyzja, bo
+   automatyczny wybór łamie wzorzec trzymany w całym module — dane doboru
+   trafiają tam na kliknięcie agenta i tylko w puste pola, a propozycję składa
+   człowiek. Trafienie OEM ma przy tym pewność `prawdopodobne`, nie
+   `potwierdzone`, bo numer siedzi w opisie kartoteki, nie w polu identyfikatora.
+
    ZAKAZ PÓŁPAUZY JEST NAJSŁABSZY Z CAŁEJ PIĄTKI i trzeba to wiedzieć,
    zanim ktoś uzna go za działający. Ten plik ma kilkadziesiąt półpauz we
    własnym tekście i model czyta je jako wzorzec. Właściciel świadomie
@@ -392,6 +419,22 @@ const INSTRUKCJA_SZKICU = [
   "7. Alternatywy DO SPRZEDANIA proponuj wyłącznie spośród kandydatów z faktów;",
   "   towaru, którego nie ma w kartotece, nie obiecuj. Wiedza własna służy tu do",
   "   czego innego: wyjaśnić, czym te części się różnią i co klient ma sprawdzić.",
+  "7a. KANDYDACI NIE SĄ RÓWNI i mówią o tym w swoim zdaniu źródła. Kandydat",
+  "   z dopiskiem „trafienie po IDENTYFIKATORZE” stoi na dokładnym symbolu,",
+  "   kodzie EAN albo numerze producenta znalezionym W NASZEJ kartotece. To jest",
+  "   najmocniejsza przesłanka, jaką masz. Kandydat z dopiskiem „nie dowód”",
+  "   stoi na zgodnym wymiarze albo na trafieniu po treści i jest najsłabszy.",
+  "   Kolejność na liście też nie jest przypadkowa: pierwszy jest najmocniejszy.",
+  "7b. TRAFIENIE PO IDENTYFIKATORZE BIJE TWÓJ WNIOSEK Z NAZWY MASZYNY. Numer",
+  "   producenta jest tożsamością części; nazwa kartoteki („DECK 46”) to opis",
+  "   handlowy, często niepełny, bo jedna część obsługuje kilka maszyn. Gdy",
+  "   klient podał numer ze swojej starej części i ten numer trafił w kartotekę,",
+  "   NIE odrzucaj tego kandydata dlatego, że z modelu maszyny wnioskujesz co",
+  "   innego, i NIE przemilczaj go. Wymień go klientowi. Rozbieżność między",
+  "   nazwą a twoim wnioskiem wpisz do `zastrzezenia`.",
+  "7c. Nie proś o zdjęcie ani o pomiar tego, co trafienie po identyfikatorze już",
+  "   rozstrzyga (patrz reguła 3c). Klient, który podał numer producenta, zrobił",
+  "   już swoją część roboty.",
   "",
   "FORMA ODPOWIEDZI DLA KLIENTA — pisz ją tak, żeby dała się przeczytać na",
   "telefonie: krótkie akapity po jednej myśli, pusta linia między nimi. Gdy",
