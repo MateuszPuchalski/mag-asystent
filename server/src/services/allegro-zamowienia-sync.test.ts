@@ -12,6 +12,11 @@ import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 
+/* Konto kanału, które `stanowisko()` zakłada jako pierwsze i jedyne.
+   `brakujaceZamowienia` bierze je PARAMETREM od 0.249.1: pamięć negatywu
+   musi odsiewać tym samym kluczem, którym zapisuje. */
+const KONTO = 1;
+
 function stanowisko() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
@@ -54,7 +59,7 @@ test("dociągamy tylko zamówienia, do których prowadzi zwrot", () => {
   zwrot(d, "z2", "ord-2");
   zwrot(d, "z3", null);
   zwrot(d, "z4", "");
-  assert.deepEqual(brakujaceZamowienia(d, 10).sort(), ["ord-1", "ord-2"],
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10).sort(), ["ord-1", "ord-2"],
     "zwrot bez numeru zamówienia nie generuje żądania");
 });
 
@@ -62,7 +67,7 @@ test("to samo zamówienie przy dwóch zwrotach pobiera się raz", () => {
   const d = stanowisko();
   zwrot(d, "z1", "ord-1");
   zwrot(d, "z2", "ord-1");
-  assert.deepEqual(brakujaceZamowienia(d, 10), ["ord-1"]);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10), ["ord-1"]);
 });
 
 /* Numer zamówienia prowadzi tu także z WIADOMOŚCI (0.166.0, gałąź
@@ -83,7 +88,7 @@ test("zamówienie wskazane w wiadomości klienta też idzie do pobrania", () => 
   wiadomosc(d, "m1", "ord-7");
   wiadomosc(d, "m2", null);
   zwrot(d, "z1", "ord-1");
-  assert.deepEqual(brakujaceZamowienia(d, 10).sort(), ["ord-1", "ord-7"],
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10).sort(), ["ord-1", "ord-7"],
     "wiadomość bez numeru zamówienia nie generuje żądania");
 });
 
@@ -94,7 +99,7 @@ test("zamówienie z wiadomości, które już mamy, nie wraca na listę", () => {
     VALUES (1,'ord-7','2026-09-01T09:00:00Z')`).run();
   d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
     VALUES (1,'111','Sekator NAC','SEK-NAC-46',1,8999,'PLN')`).run();
-  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), []);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-09-01T10:00:00Z")), []);
 });
 
 test("bezpiecznik ogranicza liczbę żądań w jednym przebiegu", async () => {
@@ -203,9 +208,9 @@ test("zamówienie bez ani jednego SKU wraca do pobrania — po dobie", () => {
     (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
     VALUES (1,'111','Sekator',NULL,1,8999,'PLN')`).run();
 
-  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"],
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"],
     "puste SKU po dobie kwalifikuje do ponownego pobrania");
-  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-08-30T12:00:00Z")), [],
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-08-30T12:00:00Z")), [],
     "ale nie w kółko co dziesięć minut");
 });
 
@@ -222,7 +227,7 @@ test("zamówienie z choćby jednym SKU zostaje w spokoju", () => {
   d.prepare(`INSERT INTO zamowienie_klienta_pozycja
     (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
     VALUES (1,'222','Zraszacz',NULL,1,3490,'PLN')`).run();
-  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), []);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-09-01T10:00:00Z")), []);
 });
 
 test("SKU z samych spacji liczy się jak brak", () => {
@@ -233,5 +238,150 @@ test("SKU z samych spacji liczy się jak brak", () => {
   d.prepare(`INSERT INTO zamowienie_klienta_pozycja
     (zamowienie_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
     VALUES (1,'111','Sekator','   ',1,8999,'PLN')`).run();
-  assert.deepEqual(brakujaceZamowienia(d, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"]);
+  assert.deepEqual(brakujaceZamowienia(d, KONTO, 10, new Date("2026-09-01T10:00:00Z")), ["ord-1"]);
+});
+
+/* ── Pamięć negatywu (0.249.1) ───────────────────────────────────────────────
+   Portal deweloperski Allegro pokazał 432 wywołania `GET /order/checkout-forms/{id}`
+   zakończone 404 w krótkim czasie. Numer, którego Allegro nie zna, nie
+   dostawał wiersza w `zamowienie_klienta` NIGDY, więc `k.id IS NULL` było
+   prawdą na zawsze i ten sam zbiór ≤20 numerów wracał w każdym przebiegu.  */
+
+const brak404 = async () => { throw new BladOdpowiedziAllegro("nie ma", 404); };
+
+function liczneBraki(d: Db) {
+  return (d.prepare("SELECT COUNT(*) c FROM zamowienie_klienta_brak").get() as { c: number }).c;
+}
+
+test("po 404 numer nie wraca w kolejnym przebiegu", async () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  let wywolan = 0;
+  const opts = {
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async () => { wywolan++; return brak404(); },
+  };
+  await uzupelnijZamowienia(opts);
+  assert.equal(wywolan, 1);
+  await uzupelnijZamowienia(opts);
+  assert.equal(wywolan, 1, "drugi przebieg NIE pyta ponownie — to jest cała ta poprawka");
+  assert.equal(liczneBraki(d), 1);
+});
+
+test("po okresie negatywu numer wraca — raz, i tylko raz", async () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  let wywolan = 0;
+  const przebieg = (kiedy: string) => uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k", now: () => new Date(kiedy),
+    query: async () => { wywolan++; return brak404(); },
+  });
+
+  await przebieg("2026-09-01T10:00:00Z");
+  assert.equal(wywolan, 1);
+  await przebieg("2026-09-07T10:00:00Z");
+  assert.equal(wywolan, 1, "przed upływem tygodnia numer milczy");
+
+  await przebieg("2026-09-09T10:00:00Z");
+  assert.equal(wywolan, 2, "po tygodniu dostaje JEDNĄ ponowną próbę");
+  await przebieg("2026-09-09T10:10:00Z");
+  assert.equal(wywolan, 2, "i zaraz po niej znowu milczy");
+
+  const b = d.prepare("SELECT * FROM zamowienie_klienta_brak").get() as Record<string, unknown>;
+  assert.equal(b.prob, 2, "druga próba podbija licznik");
+  /* Odstęp rośnie z liczbą prób: druga próba odsuwa pytanie o czternaście dni,
+     nie o siedem. Numer sprzed lat nie wróci, a my mamy o nim nie pamiętać
+     częściej, niż to komukolwiek do czegoś służy. */
+  assert.equal(b.ponow_po_at, "2026-09-23T10:00:00.000Z");
+});
+
+test("500 nie tworzy negatywu — to nie jest „nie ma”, tylko „nie wiadomo”", async () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  let wywolan = 0;
+  const opts = {
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async () => { wywolan++; throw new BladOdpowiedziAllegro("padło", 500); },
+  };
+  await uzupelnijZamowienia(opts);
+  await uzupelnijZamowienia(opts);
+  assert.equal(liczneBraki(d), 0, "awaria Allegro nie ma prawa zabrać zamówienia na tydzień");
+  assert.equal(wywolan, 2, "numer wraca do kolejki jak dotąd");
+});
+
+test("timeout nie tworzy negatywu", async () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  let wywolan = 0;
+  const opts = {
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async () => { wywolan++; throw new Error("Brak połączenia z Allegro"); },
+  };
+  await uzupelnijZamowienia(opts);
+  await uzupelnijZamowienia(opts);
+  assert.equal(liczneBraki(d), 0, "minuta bez internetu to nie jest brak zamówienia");
+  assert.equal(wywolan, 2);
+});
+
+test("429 po 404 NIE gubi zapamiętanego braku", async () => {
+  /* Pętla, którą ta zmiana zamyka, sama tworzy warunki do 429: 404 podbijają
+     ruch, ruch wywołuje limit. Gdyby limit kasował pamięć braków, poprawka
+     nie działałaby dokładnie w tym przypadku, dla którego powstała. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1", "2026-08-30T09:00:00Z");
+  zwrot(d, "z2", "ord-2", "2026-08-30T08:00:00Z");
+  await assert.rejects(() => uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async (u) => {
+      if (u.endsWith("ord-1")) throw new BladOdpowiedziAllegro("nie ma", 404);
+      throw new BladLimituAllegro("limit", 900_000);
+    },
+  }));
+  const b = d.prepare("SELECT external_id FROM zamowienie_klienta_brak").all() as Array<{ external_id: string }>;
+  assert.deepEqual(b.map((r) => r.external_id), ["ord-1"],
+    "negatyw sprzed limitu zostaje zapisany, mimo że przebieg się wywrócił");
+});
+
+test("pobrane zamówienie kasuje swój negatyw", async () => {
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  const opts = { database: d, apiUrl: "https://api", accountId: "k" };
+  await uzupelnijZamowienia({ ...opts, query: brak404, now: () => new Date("2026-09-01T10:00:00Z") });
+  assert.equal(liczneBraki(d), 1);
+  await uzupelnijZamowienia({
+    ...opts, now: () => new Date("2026-09-09T10:00:00Z"), query: async () => zamowienie("ord-1"),
+  });
+  assert.equal(liczneBraki(d), 0, "numer, który się pobrał, przestał być brakiem");
+});
+
+test("ręczne dociągnięcie omija pamięć negatywu", async () => {
+  /* Przycisk „dociągnij zamówienia" istnieje po to, żeby ktoś patrzący na
+     produkcję rozstrzygnął, czy problem jest w danych, czy w kodzie. Taki,
+     który przez tydzień cicho oddaje `pobrano: 0`, nie rozstrzyga niczego. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  let wywolan = 0;
+  const query = async () => { wywolan++; return brak404(); };
+  await uzupelnijZamowienia({ database: d, apiUrl: "https://api", accountId: "k", query });
+  assert.equal(wywolan, 1);
+  await uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k", query, ignorujBrak: true,
+  });
+  assert.equal(wywolan, 2, "ręczne kliknięcie pyta mimo zapamiętanego braku");
+});
+
+test("zapamiętany brak zostawia ślad w events", async () => {
+  /* 432 wywołania nie zostawiły w bazie ANI JEDNEGO śladu i właśnie dlatego
+     awarię widać było wyłącznie w portalu Allegro. Jedno zdarzenie na
+     przebieg, nie jedno na numer. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  zwrot(d, "z2", "ord-2");
+  await uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k", query: brak404,
+  });
+  const zd = d.prepare("SELECT payload FROM events WHERE type='allegro_zamowienie_brak'")
+    .all() as Array<{ payload: string }>;
+  assert.equal(zd.length, 1, "jeden wiersz na przebieg");
+  assert.equal((JSON.parse(zd[0].payload) as { ile: number }).ile, 2);
 });

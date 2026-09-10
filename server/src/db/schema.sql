@@ -1883,6 +1883,46 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta_pozycja (
 CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_pozycja_zam
   ON zamowienie_klienta_pozycja(zamowienie_id);
 
+-- Pamięć NEGATYWU: numery zamówień, których Allegro nie zna (0.249.1).
+--
+-- Portal deweloperski pokazał 432 wywołania `GET /order/checkout-forms/{id}`
+-- zakończone 404 w krótkim czasie. To nie był skok ruchu, tylko pętla bez
+-- wyjścia: numer prowadzący ze zwrotu albo z wiadomości nigdy nie dostawał
+-- wiersza w `zamowienie_klienta`, więc warunek `k.id IS NULL` był prawdą na
+-- zawsze i ten sam zbiór ≤20 numerów wracał w KAŻDYM przebiegu tickera.
+-- Brak odpowiedzi JEST odpowiedzią i trzeba go zapamiętać.
+--
+-- OSOBNA TABELA, a nie kolumna `brak_u_allegro_at` z wierszem-szkieletem
+-- w `zamowienie_klienta`: tamta tabela jest MODELEM PRACY, który czytają
+-- ekrany. Szkielet bez statusu i bez pozycji pokazałby się jako zamówienie,
+-- którego nie ma, a `synced_at NOT NULL` kazałby wpisać datę czegoś, co się
+-- nie wydarzyło.
+--
+-- NAZWA z członem `klienta`: `sgt_zamowienie` to zamówienia DO DOSTAWCY
+-- z Subiekta, więc samo `zamowienie_brak` kosztowałoby czytelnika godzinę.
+-- Ta sama zasada, dla której wyżej stoi `zamowienie_klienta`, nie `zamowienie`.
+CREATE TABLE IF NOT EXISTS zamowienie_klienta_brak (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  external_id TEXT NOT NULL,
+  -- Kiedy Allegro ostatni raz powiedziało „nie ma".
+  sprawdzono_at TEXT NOT NULL,
+  -- Kiedy wolno zapytać PONOWNIE. Liczone w JS i zapisywane przez
+  -- `toISOString()`, a nie wyprowadzane w SQL z `sprawdzono_at`: SQLite-owe
+  -- `datetime(x,'+7 days')` oddaje `'RRRR-MM-DD HH:MM:SS'` bez `T` i bez `Z`,
+  -- więc porównanie napisów z resztą dat w tej bazie by kłamało. Wzór stoi
+  -- obok — `allegro_zwroty_sync_state.next_attempt_at`.
+  --
+  -- Porównanie jest NAPISOWE i poprawne tylko dopóki każdy piszący używa
+  -- `toISOString()`, czyli UTC z `Z`. Data z przesunięciem strefy przeszłaby
+  -- tędy po cichu i źle.
+  ponow_po_at TEXT NOT NULL,
+  -- Który to raz z rzędu. Nie jest ozdobą: wydłuża odstęp (7, 14, 21, 28 dni)
+  -- i mówi operatorowi, że numer przy `prob = 10` to nie martwe zamówienie,
+  -- tylko błąd mapowania po NASZEJ stronie.
+  prob INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (channel_account_id, external_id)
+);
+
 -- Snapshot OFERTY kanału (0.178.0). Wiadomość niesie sam numer oferty
 -- (`relatesTo.offer.id`), a mail powiadamiający z Allegro pokazuje obok niego
 -- tytuł, cenę i zdjęcie. Panel pokazywał do 0.177.1 goły numer, więc agent

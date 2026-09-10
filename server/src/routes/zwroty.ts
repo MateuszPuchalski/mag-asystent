@@ -130,7 +130,13 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const s = sesjaZadania()!;
     logEvent("zwroty_zamowienia_reczne", s.user.name);
     try {
-      const pobrano = await uzupelnijZamowienia();
+      /* `ignorujBrak`: ten przycisk pyta o WSZYSTKO, także o numery, które
+         Allegro odesłało już z 404. Pamięć negatywu zamyka pętlę tickera
+         i tylko jego — przycisk istnieje po to, żeby rozstrzygnąć, czy
+         problem jest w danych, czy w kodzie, a taki, który przez tydzień
+         cicho oddaje `pobrano: 0`, nie rozstrzyga niczego. Ryzyka pętli tu
+         nie ma: klika człowiek, a limit `NA_PRZEBIEG` obowiązuje tak samo. */
+      const pobrano = await uzupelnijZamowienia({ ignorujBrak: true });
       /* Powiązanie ZARAZ PO dociągnięciu: to zamówienie niesie sygnaturę,
          więc dopiero teraz jest z czego wiązać. Bez tego operator klikałby
          „dociągnij" i dalej patrzył na „Bez kartoteki" do następnego taktu.

@@ -1,8 +1,9 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { urlZamowienia, zapytajAllegro } from "../adapters/allegro.http.js";
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
+import { logEvent } from "./events.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
 
@@ -39,6 +40,20 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
  */
 const NA_PRZEBIEG = 20;
 
+/**
+ * Na ile czekamy, zanim zapytamy o numer, którego Allegro nie zna.
+ *
+ * Siedem dni, bo tyle dzieli dwa jedyne sensowne wyjaśnienia 404. Zamówienie
+ * sprzed lat nie wróci NIGDY i tydzień jest przy nim liczbą dowolnie małą.
+ * Pomyłka w naszym mapowaniu naprawia się WYDANIEM, nie czekaniem, więc
+ * krótszy odstęp niczego by nie przyspieszył — kosztowałby tylko ruch.
+ *
+ * Odstęp rośnie z liczbą prób (7, 14, 21, 28 dni), ale nie w nieskończoność:
+ * numer ma wracać na tyle często, żeby dało się zauważyć, że jednak istnieje.
+ */
+const OKRES_NEGATYWU_MS = 7 * 86_400_000;
+const MAKS_MNOZNIK = 4;
+
 type Kwota = { amount?: string; currency?: string };
 type Pozycja = {
   id?: string; quantity?: number; price?: Kwota; boughtAt?: string;
@@ -62,11 +77,24 @@ type Zamowienie = {
 
 export interface ZamowieniaSyncDeps {
   database?: Db;
-  query?: (url: string) => Promise<unknown | null>;
+  /* Cały klient, nie zwężona sygnatura: `blad404` jest drugim argumentem
+     `zapytajAllegro`, a własna kopia kształtu opcji rozjechałaby się przy
+     pierwszej nowej opcji. Wzór stoi w `allegro-rabaty-sync.ts`. */
+  query?: typeof zapytajAllegro;
   now?: () => Date;
   apiUrl?: string;
   accountId?: string;
   naPrzebieg?: number;
+  /**
+   * Pomiń pamięć negatywu i zapytaj o WSZYSTKO, co brakuje.
+   *
+   * Wyłącznie dla ręcznego „dociągnij zamówienia" (`routes/zwroty.ts`).
+   * Ten przycisk istnieje po to, żeby ktoś patrzący na produkcję rozstrzygnął,
+   * czy problem jest w danych, czy w kodzie — a przycisk, który przez tydzień
+   * cicho oddaje `pobrano: 0`, nie rozstrzyga niczego. Ticker chodzi bez tej
+   * flagi, więc pętla i tak zostaje zamknięta.
+   */
+  ignorujBrak?: boolean;
 }
 
 /**
@@ -85,8 +113,24 @@ export interface ZamowieniaSyncDeps {
  * gałąź `relatesTo.order` z Allegro): rozmowa pokazuje zamówienie, którego
  * dotyczy, i bez tej unii pokazywałaby wyłącznie numer. Ten sam limit
  * i takt — zamówienia z rozmów są tak samo nieliczne jak te ze zwrotów.
+ *
+ * TRZECI warunek to pamięć negatywu (`zamowienie_klienta_brak`). Bez niego
+ * numer, którego Allegro nie zna, nie dostawał wiersza NIGDY, więc `k.id IS
+ * NULL` było prawdą na zawsze i ten sam zbiór ≤20 numerów wracał w KAŻDYM
+ * przebiegu — 432 wywołania zakończone 404 w krótkim czasie, bez końca.
+ *
+ * `konto` jest PARAMETREM, a nie odczytem z `z.channel_account_id`, i to jest
+ * cała gwarancja tej poprawki: negatyw odsiewa się tym samym kluczem, którym
+ * się go pisze. Klucz filtra wzięty skądinąd niż klucz zapisu nie trafiałby
+ * w nic i wyglądałoby to dokładnie tak, jak ta awaria — czyli wcale.
  */
-export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date()): string[] {
+export function brakujaceZamowienia(
+  database: Db,
+  konto: number,
+  ile: number,
+  teraz = new Date(),
+  ignorujBrak = false,
+): string[] {
   const doba = new Date(teraz.getTime() - 86_400_000).toISOString();
   return (database.prepare(`SELECT DISTINCT z.id
     FROM (
@@ -104,8 +148,15 @@ export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date(
               WHERE p.zamowienie_id = k.id AND p.sku IS NOT NULL AND TRIM(p.sku) <> ''
             ))
       )
+      AND (? OR NOT EXISTS (
+            SELECT 1 FROM zamowienie_klienta_brak b
+            WHERE b.channel_account_id = ? AND b.external_id = z.id
+              AND b.ponow_po_at > ?
+          ))
     ORDER BY z.at DESC
-    LIMIT ?`).all(doba, ile) as Array<{ id: string }>).map((r) => r.id);
+    LIMIT ?`).all(
+      doba, ignorujBrak ? 1 : 0, konto, teraz.toISOString(), ile) as Array<{ id: string }>
+  ).map((r) => r.id);
 }
 
 /**
@@ -115,6 +166,10 @@ export function brakujaceZamowienia(database: Db, ile: number, teraz = new Date(
  * bywa nieosiągalne, a jedno 404 nie ma prawa zabrać kontekstu pozostałym
  * dziewiętnastu. Limit z Allegro (429) przerywa jednak od razu — dalsze
  * żądania tylko pogłębiłyby przerwę.
+ *
+ * `blad404: true` jest tu NOWE i konieczne. Bez tej opcji adapter oddaje przy
+ * 404 `null`, więc „Allegro nie zna tego numeru" było nieodróżnialne od pustej
+ * odpowiedzi i nie zostawiało po sobie nic — ani wiersza, ani śladu.
  */
 export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promise<number> {
   const database = deps.database ?? defaultDb();
@@ -123,26 +178,89 @@ export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promis
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const ile = deps.naPrzebieg ?? NA_PRZEBIEG;
 
-  const doPobrania = brakujaceZamowienia(database, ile, now());
+  /* Konto rozwiązujemy PRZED wyborem numerów, a nie dopiero w transakcji
+     zapisu. Powód jest jeden: negatyw ma się odsiewać tym samym kluczem,
+     którym się go pisze — patrz nagłówek `brakujaceZamowienia`. */
+  const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
+  const doPobrania = brakujaceZamowienia(database, konto, ile, now(), deps.ignorujBrak);
   if (!doPobrania.length) return 0;
 
   const pobrane: Zamowienie[] = [];
+  const brakujace: string[] = [];
+  let limit: BladLimituAllegro | null = null;
   for (const id of doPobrania) {
     try {
-      const body = (await query(urlZamowienia(apiUrl, id))) as Zamowienie | null;
+      const body = (await query(urlZamowienia(apiUrl, id), { blad404: true })) as Zamowienie | null;
       if (body && typeof body.id === "string") pobrane.push(body);
     } catch (e) {
-      if (e instanceof BladLimituAllegro) throw e;
+      /* 429 kończy przebieg, ale dopiero PO zapisaniu negatywów zebranych
+         wcześniej — dlatego `break`, a nie `throw` w miejscu. Rzucenie stąd
+         zostawiłoby tę pętlę żywą dokładnie w przypadku, który sama tworzy:
+         404 podbijają ruch, ruch wywołuje 429, 429 kasuje pamięć braków
+         i następny takt zaczyna od zera. */
+      if (e instanceof BladLimituAllegro) { limit = e; break; }
+      if (e instanceof BladOdpowiedziAllegro && e.status === 404) { brakujace.push(id); continue; }
+      /* Timeout i 5xx NIE tworzą negatywu. One nie mówią „nie ma", tylko
+         „nie wiadomo", a zapamiętany brak zabrałby zamówienie na tydzień
+         z powodu jednej minuty bez internetu. */
       console.warn(`[allegro-zamowienia] ${id}: ${e instanceof Error ? e.message : e}`);
     }
   }
 
+  /* Negatywy WŁASNĄ transakcją i PRZED zapisem zamówień. Wspólna transakcja
+     znaczyłaby, że jedno wywrócone zamówienie wycofuje także pamięć braków,
+     czyli że pętla wraca przy pierwszym błędzie mapowania. */
+  if (brakujace.length) zapiszBraki(database, konto, brakujace, now());
+  if (limit) throw limit;
+
   const at = now().toISOString();
   transaction(database, () => {
-    const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
     for (const z of pobrane) zapisz(database, z, konto, at);
   })();
   return pobrane.length;
+}
+
+/**
+ * Zapamiętanie braku: numer, o który pytaliśmy i którego Allegro nie zna.
+ *
+ * Odstęp rośnie z liczbą prób, więc `prob` trzeba ODCZYTAĆ przed zapisem —
+ * `ON CONFLICT` nie policzyłby daty z kolumny, którą sam dopiero podbija.
+ * To ≤20 odczytów po kluczu głównym raz na takt, czyli koszt, którego nie ma.
+ *
+ * Zdarzenie jest ZBIORCZE, jedno na przebieg. Nie dlatego, że tak taniej:
+ * te 432 wywołania nie zostawiły w bazie ANI JEDNEGO śladu i właśnie dlatego
+ * awarię widać było wyłącznie w portalu Allegro. Wiersz na numer zalewałby
+ * `events` tym samym co `console.warn`, a jeden wiersz na takt wystarczy,
+ * żeby odtworzyć przebieg.
+ */
+function zapiszBraki(database: Db, konto: number, numery: string[], teraz: Date): void {
+  const at = teraz.toISOString();
+  transaction(database, () => {
+    const czytaj = database.prepare(
+      "SELECT prob FROM zamowienie_klienta_brak WHERE channel_account_id=? AND external_id=?");
+    const pisz = database.prepare(`INSERT INTO zamowienie_klienta_brak
+      (channel_account_id,external_id,sprawdzono_at,ponow_po_at,prob)
+      VALUES (?,?,?,?,?)
+      ON CONFLICT(channel_account_id,external_id) DO UPDATE SET
+        sprawdzono_at=excluded.sprawdzono_at,
+        ponow_po_at=excluded.ponow_po_at,
+        prob=excluded.prob`);
+
+    const opis: Array<{ id: string; prob: number }> = [];
+    for (const id of numery) {
+      const byl = czytaj.get(konto, id) as { prob: number } | undefined;
+      const prob = Number(byl?.prob ?? 0) + 1;
+      const ponow = new Date(
+        teraz.getTime() + OKRES_NEGATYWU_MS * Math.min(prob, MAKS_MNOZNIK)).toISOString();
+      pisz.run(konto, id, at, ponow, prob);
+      opis.push({ id, prob });
+      console.warn(
+        `[allegro-zamowienia] ${id}: Allegro nie zna tego numeru (404, próba ${prob}) `
+        + `— nie pytamy ponownie przed ${ponow}`);
+    }
+    logEvent("allegro_zamowienie_brak", "system", null,
+      { ile: opis.length, numery: opis }, null, database);
+  })();
 }
 
 function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
@@ -200,4 +318,11 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
       p.offer?.external?.id ?? null, Number(p.quantity ?? 0),
       naGrosze(p.price?.amount), p.price?.currency ?? waluta);
   }
+
+  /* Numer, który się pobrał, przestał być brakiem. Bez tego kasowania negatyw
+     sprzed tygodnia przeżywałby prawdę i blokował dobowe odświeżanie zamówień
+     bez ani jednego SKU. */
+  database.prepare(
+    "DELETE FROM zamowienie_klienta_brak WHERE channel_account_id=? AND external_id=?",
+  ).run(konto, z.id);
 }

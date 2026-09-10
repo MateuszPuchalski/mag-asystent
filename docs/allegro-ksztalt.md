@@ -859,6 +859,29 @@ pozycję i nie dałby ani kosztu dostawy, ani pozycji, których klient nie
 zwraca. `/sale/product-offers/{offerId}/parts` NIE jest tańszym zamiennikiem:
 schemat dopuszcza w `include` wyłącznie `stock` i `price`.
 
+### Numer, którego Allegro nie zna
+
+404 na `GET /order/checkout-forms/{id}` jest ODPOWIEDZIĄ, a nie awarią.
+Numer prowadzi tu ze zwrotu albo z wiadomości i bywa numerem zamówienia
+sprzed lat, skasowanego albo z innego środowiska.
+
+Do 0.249.0 nie było tego gdzie zapisać. Adapter oddawał przy 404 `null`,
+`zamowienie_klienta` nie dostawało wiersza, a warunek „nie mamy tego
+zamówienia" był prawdą na zawsze — ten sam zbiór najwyżej dwudziestu numerów
+wracał w każdym przebiegu tickera. Portal deweloperski pokazał 432 takie
+wywołania w krótkim czasie.
+
+Od 0.249.1 `server/src/services/allegro-zamowienia-sync.ts` woła tę końcówkę
+z `blad404`, a odmowę zapisuje w `zamowienie_klienta_brak`. Numer wraca do
+kolejki po tygodniu, na jedną próbę; każda kolejna odmowa wydłuża odstęp do
+czternastu, dwudziestu jeden i dwudziestu ośmiu dni.
+
+Timeout i 5xx nie tworzą takiego wpisu i to jest różnica, o którą tu chodzi.
+Allegro mówi wtedy „nie wiadomo", a nie „nie ma", a zapamiętany brak
+zabrałby zamówienie na tydzień z powodu jednej minuty bez internetu.
+Ręczne „dociągnij zamówienia" w panelu pyta o wszystko, także o zapamiętane
+braki — inaczej przycisk do diagnozy przez tydzień milczałby.
+
 ### Czego z zamówienia NIE bierzemy
 
 `CheckoutForm.buyer` niesie `email`, `firstName`, `lastName`, `companyName`,

@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.249.1 — 10 września 2026
+
+**Zamówienie, którego Allegro nie zna, przestaje być pytane w kółko.** Portal
+deweloperski pokazał 432 wywołania `GET /order/checkout-forms/{id}` zakończone
+404 w krótkim czasie. To nie był skok ruchu, tylko pętla bez wyjścia.
+
+Numer zamówienia prowadzi do synchronizatora ze zwrotu albo z wiadomości
+klienta. Jeżeli Allegro go nie zna — bo jest sprzed lat, bo został skasowany
+albo bo pochodzi z innego środowiska — to `zamowienie_klienta` nie dostawało
+wiersza, warunek „nie mamy tego zamówienia" był prawdą na zawsze i ten sam
+zbiór najwyżej dwudziestu numerów wracał w KAŻDYM przebiegu tickera, sześć
+razy na godzinę, bez końca. Brak odpowiedzi jest odpowiedzią i trzeba go było
+zapamiętać.
+
+Odmowa ląduje teraz w nowej tabeli `zamowienie_klienta_brak`
+(`server/src/db/schema.sql`, zakłada się sama przy starcie). Numer wraca do
+kolejki po tygodniu, na jedną próbę; każda kolejna odmowa wydłuża odstęp do
+czternastu, dwudziestu jeden i dwudziestu ośmiu dni.
+
+Rozróżnienie kosztowało jedną opcję w kliencie HTTP. Do teraz 404 wracało jako
+puste ciało, więc „Allegro nie zna tego numeru" było nieodróżnialne od pustej
+odpowiedzi. Timeout i 5xx nadal NIE tworzą wpisu: one mówią „nie wiadomo",
+a nie „nie ma", a zapamiętany brak zabrałby zamówienie na tydzień z powodu
+jednej minuty bez internetu.
+
+Dwie rzeczy, które przy tym musiały zostać nienaruszone. Ręczne „dociągnij
+zamówienia" omija pamięć braków — ten przycisk istnieje po to, żeby ktoś
+patrzący na produkcję rozstrzygnął, czy problem jest w danych, czy w kodzie,
+a taki, który przez tydzień cicho oddaje zero, nie rozstrzyga niczego.
+I limit Allegro (429) w połowie przebiegu zapisuje braki zebrane wcześniej,
+zanim przerwie: pętla, którą ta zmiana zamyka, sama tworzy warunki do 429,
+więc limit kasujący pamięć zostawiłby awarię żywą dokładnie tam, gdzie
+zaczyna boleć.
+
+Ślad w bazie jest nowy i celowy: zdarzenie `allegro_zamowienie_brak`, jedno na
+przebieg. Tamte 432 wywołania nie zostawiły po sobie ani jednego wiersza
+i właśnie dlatego awarię widać było wyłącznie w portalu Allegro.
+
+Wdrożenie nie wymaga żadnego działania.
+
 ## 0.249.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
