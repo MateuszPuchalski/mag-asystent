@@ -7,6 +7,7 @@ import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
 import { czas, Plakietka, Skopiuj } from "../ui";
 import { Link } from "./Link";
+import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
@@ -134,7 +135,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           </>
         : <>
             <div className="flex items-center gap-1">
-              <Link href={zam.link}>Otwórz w Allegro</Link>
+              <Link href={zam.link}>Otwórz w <ZnakAllegro wysokosc={11} /></Link>
               <Skopiuj tekst={zam.externalId} />
             </div>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">

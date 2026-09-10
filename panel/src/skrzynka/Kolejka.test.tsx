@@ -166,6 +166,57 @@ const pokaz = (rozmowy: Rozmowa[]) =>
   render(<Kolejka rozmowy={rozmowy} stan={STAN} wybranaId={null} laduje={false}
     onWybierz={() => {}} onOdswiez={() => {}} />);
 
+/* ── RANGA STATUSU W WIERSZU (0.251.0) ───────────────────────────────────────
+   Najgłośniejszym elementem wiersza była plakietka statusu — a w kubełkach
+   roboczych status jest praktycznie stały, więc emfaza szła na słowo, które
+   niczego nie rozróżnia. Te cztery testy pilnują nowego podziału: głośne są
+   wyjątki, wyciszone — fakty, które wiersz mówi już czym innym. Żaden fakt
+   nie znika (§4.3); zmienia się WAGA.                                       */
+describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
+  it("„czeka na nas” nie dostaje plakietki, bo zegar mówi to samo", () => {
+    /* Serwer zwraca ten status wtedy i tylko wtedy, gdy ostatnia wiadomość
+       jest przychodząca (`statusZKierunku`) — a zegar liczy się dokładnie od
+       ostatniej wiadomości przychodzącej. Jeden fakt, dwa miejsca. */
+    pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })]);
+    expect(screen.queryByText("Czeka na nas")).not.toBeInTheDocument();
+    expect(screen.getByText(/czeka 3 g 0 min/)).toBeInTheDocument();
+  });
+
+  it("„czeka na klienta” NIE dostaje zegara, bo nikt nie czeka", () => {
+    /* `czekaOdMs` liczy się od wiadomości KLIENTA, więc po naszej odpowiedzi
+       dalej rośnie. Wiersz pisał wtedy „czeka 15 g” o rozmowie, w której
+       piłka jest po drugiej stronie. Słowo „czeka” musi być prawdziwe. */
+    pokaz([rozmowa({ status: "waiting_for_customer", czekaOdMs: 15 * 3600_000 })]);
+    expect(screen.queryByText(/czeka 15 g/)).not.toBeInTheDocument();
+    /* Ale sam status ZOSTAJE — zszedł do podpisu, nie zniknął. */
+    expect(screen.getByText("Czeka na klienta")).toBeInTheDocument();
+  });
+
+  it("werdykt człowieka i ruch hali dalej krzyczą plakietką", () => {
+    /* Tych dwóch nie da się odczytać z niczego innego w wierszu: „Odłożona”
+       to decyzja agenta, „Czeka na halę” — wystawione zlecenie pomiaru. */
+    pokaz([rozmowa({ id: 1, status: "snoozed" }), rozmowa({ id: 2, status: "waiting_for_internal" })]);
+    expect(screen.getByText("Odłożona")).toBeInTheDocument();
+    expect(screen.getByText("Czeka na halę")).toBeInTheDocument();
+  });
+
+  it("data ustępuje zegarowi, bo mierzą TĘ SAMĄ wiadomość", () => {
+    /* Przy „czeka na nas” znacznik czasu i zegar opisują jedno zdarzenie.
+       Zostaje ten, który odpowiada na pytanie „za co się wziąć” — a data
+       wraca wtedy, gdy zegara nie ma i jest jedynym czasem w wierszu. */
+    /* Pytamy WIERSZ, nie ekran: data synchronizacji stoi w nagłówku kolejki
+       i ma tam zostać — to inny fakt niż wiek ostatniej wiadomości. */
+    const wiersz = (r: Rozmowa) => {
+      const w = pokaz([r]).container.querySelector("button[aria-current]");
+      return w?.textContent ?? "";
+    };
+    expect(wiersz(rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })))
+      .not.toMatch(/2026/);
+    expect(wiersz(rozmowa({ status: "closed", czekaOdMs: 3 * 3600_000 })))
+      .toMatch(/2026/);
+  });
+});
+
 describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
   it("czas oczekiwania czyta się bez liczenia w głowie", () => {
     pokaz([rozmowa({ czekaOdMs: 2 * 3600_000 + 14 * 60_000 })]);

@@ -5,6 +5,7 @@ import { useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
 import { NaglowekSekcji, czas } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
+import { ZnakAllegro } from "../ui/ZnakAllegro";
 
 /**
  * Zamówienie, którego dotyczy rozmowa (0.166.0).
@@ -63,11 +64,12 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
         <span className="sr-only">{skopiowano ? "Skopiowano" : "Kopiuj"}</span>
       </button>
       {zamowienie.link && <a href={zamowienie.link} target="_blank" rel="noopener noreferrer"
+        aria-label="Otwórz w Allegro"
         /* Cichnie jak bliźniak przy ofercie (0.249.0): dwa identyczne błękitne
            odnośniki były jedynym błękitem w kolumnie i ciągnęły wzrok mocniej
            niż nazwa towaru — a to nawigacja, nie treść. */
         className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
-        Otwórz w Allegro<ExternalLink size={12} /></a>}
+        Otwórz w <ZnakAllegro wysokosc={10} /><ExternalLink size={11} /></a>}
     </div>
 
     {z

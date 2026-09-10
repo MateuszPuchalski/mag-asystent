@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { OcenaKategorii, PasekCopilota, doRozpoznania } from "./Copilot";
+import { OcenaKategorii, PasekCopilota, ZnakCopilota, doRozpoznania } from "./Copilot";
 import type { Kopilot, Rozmowa, StanCopilota } from "../api/typy";
 
 /* Trzy rzeczy, po których poznaje się, że pasek nadaje się do hali biurowej:
@@ -53,20 +53,42 @@ describe("pasek Copilota nad kolejką", () => {
     expect(onRozpoznaj).toHaveBeenCalledWith([7, 9]);
   });
 
-  it("wyłączony Copilot daje ZDANIE zamiast przycisku", () => {
+  /* ── STAN SPOCZYNKU NIE DOSTAJE PASMA (0.251.0) ────────────────────────────
+     Do 0.249.1 oba stany „nic się nie dzieje" — Copilot wyłączony i kubełek
+     rozpoznany — zajmowały pełne pasmo nad listą pytań. Przycisku bez mocy nie
+     ma dalej i to zostaje; zmienia się miejsce, w którym stoi POWÓD.        */
+
+  it("wyłączony Copilot nie zajmuje pasma nad kolejką", () => {
     const onRozpoznaj = vi.fn();
-    render(<PasekCopilota onRozpoznaj={onRozpoznaj} kandydaci={[rozmowa()]}
+    const { container } = render(<PasekCopilota onRozpoznaj={onRozpoznaj} kandydaci={[rozmowa()]}
       stan={{ ...WLACZONY, wlaczony: false, powod: "Copilot nie ma klucza." }} />);
     /* Przycisk, który nie może zadziałać, uczy nie klikać — a ta nauka
        zostaje także wtedy, gdy zacznie działać. */
     expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.getByText("Copilot nie ma klucza.")).toBeTruthy();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("nie ma czego rozpoznawać — przycisk martwy i mówi to wprost", () => {
-    render(<PasekCopilota stan={WLACZONY} kandydaci={[]} onRozpoznaj={vi.fn()} />);
-    const b = screen.getByRole("button", { name: /Wszystkie rozmowy w tym kubełku/ });
-    expect((b as HTMLButtonElement).disabled).toBe(true);
+  it("powód wyłączenia NIE GINIE — niesie go znak w nagłówku", () => {
+    /* §4.3: fakt wolno wyciszyć, nie wolno schować. Zdanie zeszło z pasma do
+       podpowiedzi, ale dalej stoi na ekranie i dalej mówi PRZYCZYNĘ. */
+    render(<ZnakCopilota kandydaci={[rozmowa()]}
+      stan={{ ...WLACZONY, wlaczony: false, powod: "Copilot nie ma klucza." }} />);
+    expect(screen.getByLabelText("Copilot nie ma klucza.")).toBeTruthy();
+  });
+
+  it("nie ma czego rozpoznawać — pasmo milczy, a znak mówi to wprost", () => {
+    const { container } = render(
+      <PasekCopilota stan={WLACZONY} kandydaci={[]} onRozpoznaj={vi.fn()} />);
+    expect(container).toBeEmptyDOMElement();
+    render(<ZnakCopilota stan={WLACZONY} kandydaci={[]} />);
+    expect(screen.getByLabelText(/Wszystkie rozmowy w tym kubełku/)).toBeTruthy();
+  });
+
+  it("znak milczy, gdy JEST co rozpoznawać — wtedy mówi pasmo", () => {
+    /* Dwa głosy o jednej rzeczy to ten sam błąd, który ten przyrost naprawia
+       w wierszu kolejki. Liczba i przycisk stoją w paśmie; znak ustępuje. */
+    const { container } = render(<ZnakCopilota stan={WLACZONY} kandydaci={[rozmowa()]} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("limit partii nie zjada reszty kubełka po cichu", () => {
