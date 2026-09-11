@@ -753,6 +753,27 @@ nie było jak. Pole zawęża po loginie, treści ostatniej wiadomości i po
 prowadzącym; liczy się w pamięci ekranu, jak kubełki. Pusty wynik cytuje
 frazę — literówkę widać dopiero wtedy, gdy się ją zobaczy.
 
+**Znacznik czasu nie ma sekund (0.272.0).** `czas()` w `panel/src/ui/index.tsx`
+oddaje „10.09.2026, 14:23", a `godzina()` — samo „14:23". Sekunda nie
+rozstrzyga w tym panelu niczego. Do 0.269.0 trzy miejsca obcinały ją przez
+`czas(...).slice(-8, -3)`, czyli wycinek od końca napisu; po zdjęciu sekund ten
+sam wycinek daje „6, 14", więc obie zmiany musiały wejść razem. Formatowania
+daty nie wolno pisać poza `ui/index.tsx` — pilnuje tego `panel/src/Czas.test.ts`,
+zwolnienie wymaga komentarza `czas: <powód>`.
+
+**Promień kafelka = promień bieżni minus jej wypełnienie (0.272.0).** Kafelek
+w bieżni `rounded-lg p-1` ma 8 − 4 = 4 px, czyli `rounded`; w bieżni
+`rounded-lg p-0.5` ma 8 − 2 = 6 px, czyli `rounded-md`. Audyt naliczył 215
+zaokrągleń w pięciu wartościach i nazwał to rozrzutem — rozrzutu nie ma, jest
+ta jedna reguła, spełniona do 0.269.0 raz na dwa miejsca. Kafelek nawigacji
+rozjeżdżał się z łukiem bieżni o 2 px w każdym rogu; zmierzone, nie ocenione.
+`rounded-xl` (12 px) należy do `.card` i pasmo alarmu nie ma prawa go brać.
+
+**Arbitralnych odstępów w panelu nie ma i to jest wynik (0.272.0).** Ustalenie
+12 z audytu zapowiadało „odstępy odstające". `p-[…]`, `gap-[…]`, `m-[…]`
+i `mt-[…]`: zero. Wszystkie 22 wartości w nawiasach kwadratowych to wymiary
+i siatki, których skala Tailwinda nie obejmuje.
+
 **Pusty stan ma DWIE wagi (0.267.0).** `Pusto` w `panel/src/ui/index.tsx`
 przyjmuje `waga`: „ekran" wypełnia całą kolumnę (15/22 px, waga 600, ikona
 38 px, wyśrodkowany), „lista" opisuje listę wewnątrz kolumny jednym wierszem
