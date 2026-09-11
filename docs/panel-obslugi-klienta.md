@@ -1849,6 +1849,40 @@ czipie w „Sprawdź kartotekę": wpis `opis` cofa się poprawką w Subiekcie, w
 `reczne` napisał człowiek, a wpisu z oferty nie cofa nic — przebudowa po
 imporcie go omija, bo nie ma z czego go odtworzyć.
 
+**Link do naszej oferty zamiast pracy domowej dla klienta (0.270.0).**
+Właściciel, czytając szkic o presostacie: „model powinien proponować oferty,
+jeśli jest pewny linki do ofert". Szkic pisał wtedy: „proszę o wyszukanie po
+nazwie albo po kodzie EAN, to prowadzi prosto do właściwej oferty", czyli
+zadawał klientowi pracę, którą mamy zrobioną.
+
+Powód nie leżał w instrukcji modelu. **System nie miał katalogu własnych
+ofert.** `offer_snapshot` zna wyłącznie aukcje, pod którymi ktoś napisał, bo
+`allegro-oferty-sync.ts` dociąga tylko te, na które wskazuje wiadomość.
+Odwrotnego wyszukania, czyli „która nasza oferta sprzedaje kartotekę X", nie
+było w całym repozytorium. Model nie dostawał ani jednego adresu.
+
+Od 0.270.0 `ulozSzkic` pyta Allegro o oferty po SYGNATURZE. `external.id`
+w specyfikacji jest tablicą, więc komplet kandydatów kosztuje JEDNO żądanie,
+a `publication.status=ACTIVE` odsiewa aukcje wygaszone. Adresy wchodzą do
+faktów jako osobny rodzaj `oferta_link`, a reguły 7d i 7e mówią modelowi, co
+z nimi zrobić: podaj adres zamiast opisywać, jak szukać, i nigdy go nie składaj
+samodzielnie.
+
+Świadomie NIE budujemy katalogu ofert w bazie. Katalog trzeba by odświeżać,
+a nieświeży produkuje linki do aukcji, których już nie ma, czyli tę awarię,
+której ta funkcja ma zapobiec. Pytanie na żądanie wraca zawsze aktualne.
+
+Warunek działania: sygnatura na aukcji musi być równa symbolowi kartoteki.
+Jak bardzo jest, mierzy karta „Pokrycie sygnatur" w ustawieniach. Brak faktu
+z adresem znaczy „nie wiemy o aktywnej aukcji", a nie „zgadnij", i model ma
+wtedy zakaz twierdzenia, że aukcja istnieje.
+
+Błąd Allegro, także limit 429, **nie przerywa szkicu**. To odwrotnie niż przy
+dociąganiu treści oferty, i z konkretnego powodu: tamta reguła chroni przed
+pogłębianiem przerwy drugim żądaniem, a to jest ostatnie żądanie na drodze
+szkicu. Szkic bez linku jest wart tyle, ile był wart do 0.269.0; szkic, który
+nie powstał, nie jest wart nic.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
@@ -3756,6 +3790,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
 | Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
+| Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |

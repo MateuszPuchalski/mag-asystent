@@ -291,6 +291,54 @@ test("kontekst niczego nie zapisuje", () => {
     liczba("conversation_event"), liczba("towar_identyfikator"), liczba("model_z_opisu")], przed);
 });
 
+/* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */
+
+test("link do NASZEJ oferty wchodzi do faktów, z numeracją biegnącą dalej", () => {
+  /* Do 0.269.0 model nie dostawał ani jednego adresu, więc zamiast wskazać
+     ofertę pisał klientowi, żeby poszukał po nazwie albo po EAN-ie. Fakt
+     dokłada się PO `kontekstSzkicu`, bo wymaga sieci — a numeracja musi biec
+     dalej, bo „F12" w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa. */
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const symbol = [...k.kartoteki.values()][0].symbol;
+  const z = S.dopiszLinkiOfert(k, new Map([[symbol.toLowerCase().replace(/[^a-z0-9]/g, ""), {
+    symbol, ofertaId: "12345", nazwa: "Gaźnik Honda GX160 z kranikiem",
+    link: "https://allegro.pl/oferta/12345",
+  }]]));
+
+  assert.equal(z.fakty.length, k.fakty.length + 1);
+  const nowy = z.fakty[z.fakty.length - 1];
+  assert.equal(nowy.id, `F${k.fakty.length + 1}`, "numeracja ma biec dalej, nie od nowa");
+  assert.equal(nowy.rodzaj, "oferta_link");
+  assert.match(nowy.zdanie, /NASZA AKTYWNA OFERTA na kartotekę/);
+  assert.match(nowy.zdanie, /https:\/\/allegro\.pl\/oferta\/12345/);
+  /* Bez półpauzy: `copilot.anthropic.ts` przyznaje, że zakaz myślnika jest
+     najsłabszą regułą, bo model czyta nasz tekst jako wzorzec. */
+  assert.doesNotMatch(nowy.zdanie, /—/, "fakt uczy modelu półpauzy");
+  assert.equal(String(z.tekstFaktow).includes(nowy.zdanie), true, "fakt ma dojechać do modelu");
+});
+
+test("brak linku to CISZA, nie zdanie zachęcające do zgadywania", () => {
+  /* Pusta mapa nie dokłada niczego i oddaje ten sam obiekt. „Nie wiemy
+     o aktywnej aukcji" nie ma prawa wyglądać jak zaproszenie. */
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.equal(S.dopiszLinkiOfert(k, new Map()), k);
+  /* Kartoteka spoza białej listy też nic nie wnosi. */
+  const obca = S.dopiszLinkiOfert(k, new Map([["czegotuniema", {
+    symbol: "XX-0000", ofertaId: "1", nazwa: "n", link: "https://allegro.pl/oferta/1",
+  }]]));
+  assert.equal(obca.fakty.length, k.fakty.length);
+});
+
+test("odmowa Allegro przy linkach NIE przerywa szkicu", async () => {
+  /* W testach konto Allegro jest niepołączone, więc `ofertyPoSygnaturze`
+     odmawia przy każdym z tych wywołań — a szkic i tak ma powstać. To jest
+     ta różnica wobec `dociagnijTresc`: tam limit przerywa, bo chroni przed
+     drugim żądaniem, a tu żadnego drugiego już nie ma. */
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  assert.ok(s.tresc.length > 0);
+  assert.equal(liczba("szkic_copilota"), 1);
+});
+
 /* ── Wiedza z oferty przestaje ginąć razem z rozmową (0.264.0) ───────────── */
 
 const zOferty = (pasujeDo: string[], opis = "") => db().prepare(

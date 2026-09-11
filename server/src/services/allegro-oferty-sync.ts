@@ -49,7 +49,7 @@ const NA_PRZEBIEG = 20;
  */
 const SWIEZOSC_MS = 86_400_000;
 
-type Oferta = {
+export type Oferta = {
   id?: string;
   name?: string;
   sellingMode?: { price?: { amount?: string; currency?: string } | null } | null;
@@ -169,12 +169,20 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
   const at = now().toISOString();
   transaction(database, () => {
     const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-    for (const o of pobrane) zapisz(database, o, konto, at);
+    for (const o of pobrane) zapiszSnapshotOferty(database, o, konto, at);
   })();
   return pobrane.length;
 }
 
-function zapisz(database: Db, o: Oferta, konto: number, at: string): void {
+/**
+ * Snapshot jednej oferty z `/sale/offers`. Eksportowany od 0.270.0, bo
+ * czytelników tej samej odpowiedzi jest odtąd dwóch: ten przebieg (pytanie
+ * po `offer.id`) i `allegro-oferty-po-sygnaturze.ts` (pytanie po
+ * `external.id`). Ta sama odpowiedź zapisywana dwoma kawałkami kodu
+ * rozjechałaby się przy pierwszym nowym polu — a rozjazd byłby cichy, bo obie
+ * ścieżki piszą do tej samej tabeli.
+ */
+export function zapiszSnapshotOferty(database: Db, o: Oferta, konto: number, at: string): void {
   const kwota = o.sellingMode?.price;
   /* ── PUSTY ŁAŃCUCH ZNACZY „PYTALIŚMY, NIE MA" (0.214.0) ──────────────────
      Do 0.213.0 brak adresu schodził na `NULL` — ten sam znak, którym wiersz
