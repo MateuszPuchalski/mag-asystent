@@ -11,6 +11,11 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Od 0.291.0 zapis etykiety pozostawia zamówienie spakowane. Fizyczny odbiór paczek
+potwierdza się w **Realizacja WMS → Wydania** przez skanowanie i zamknięcie przekazania.
+Dopiero odbiór wszystkich paczek oznacza wysłanie zamówienia. Aktualizacja nie dopisuje
+dat odbioru do dawnej historii. Korekta etykiety w WMS nie anuluje jej u przewoźnika.
+
 Tryb wózków 20/30 wymaga rejestracji kodów wózków, stałych pozycji skrzynek i stanowisk pakowania.
 Biuro wykonuje tę konfigurację w **Realizacja WMS → Wózki 20 / 30**.
 Aktualizacja dodaje tabele i indeksy; nie przypisuje istniejących zamówień ani nie zmienia zapasu.

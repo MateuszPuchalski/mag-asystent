@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { exerciseCarts } from "./wms-cart-e2e.mjs";
 import { exerciseDesign } from "./wms-design-e2e.mjs";
 import { exerciseInbound } from "./wms-inbound-e2e.mjs";
+import { exerciseHandoff } from "./wms-handoff-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -257,7 +258,7 @@ try {
   await page.locator('#wms-step [name="weightG"]').fill("750");
   await page
     .getByRole("button", {
-      name: "POTWIERDŹ PRZEKAZANIE DO WYSYŁKI",
+      name: "ZAPISZ PRZYGOTOWANE PACZKI",
       exact: true,
     })
     .click();
@@ -266,6 +267,8 @@ try {
     path: path.join(output, "fulfillment-desktop.png"),
     fullPage: true,
   });
+  await page.locator('[data-tab-wms="dispatch"]').click();
+  await exerciseHandoff(page, output);
   await page.locator('[data-tab-wms="dispatch"]').click();
   await page.locator('#wms-dispatch-filter [name="q"]').fill("TRACK-E2E-0001");
   await page

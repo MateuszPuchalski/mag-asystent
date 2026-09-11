@@ -13,6 +13,7 @@ process.env.DB_PATH = path.join(
 );
 let W: typeof import("./wms.js");
 let A: typeof import("./wms-analytics.js");
+let D: typeof import("./wms-dispatch.js");
 let db: typeof import("../db/db.js").db;
 const admin = { id: 1, name: "Biuro", role: "admin" as const };
 const picker = { id: 2, name: "Zbierający", role: "magazynier" as const };
@@ -21,6 +22,7 @@ let nextSku = 1;
 before(async () => {
   W = await import("./wms.js");
   A = await import("./wms-analytics.js");
+  D = await import("./wms-dispatch.js");
   ({ db } = await import("../db/db.js"));
 });
 
@@ -418,6 +420,16 @@ test("pełny przebieg: rezerwacja → skan → kontrola paczki → wysyłka → 
     { carrier: "DPD", tracking: "123", weightG: 500 },
     packer,
   );
+  assert.equal(o.status, "packed");
+  const batch = D.createHandoff(packer, randomUUID(), { carrier: "DPD" });
+  const scanned = D.scanHandoff(packer, randomUUID(), batch.id, {
+    tracking: "123",
+  });
+  D.closeHandoff(packer, randomUUID(), batch.id, {
+    version: scanned.version,
+    parcels: 1,
+  });
+  o = W.getOrder(o.id);
   assert.equal(o.status, "shipped");
   assert.throws(
     () => action(o, "cancel", { reason: "Anulowanie" }),

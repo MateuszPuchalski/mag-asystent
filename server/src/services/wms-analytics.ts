@@ -34,6 +34,13 @@ export function analytics(raw: unknown) {
       FROM wms_order o LEFT JOIN wms_order_timing t ON t.order_id=o.id WHERE shipped_at>=? AND shipped_at<=?`,
       )
       .get(since, now);
+    const dispatchCoverage = d
+      .prepare(
+        `SELECT count(*) AS orders,
+      coalesce(sum(EXISTS(SELECT 1 FROM wms_shipment s JOIN wms_parcel_state p ON p.shipment_id=s.id WHERE s.order_id=o.id AND p.status='handed')),0) AS confirmed_orders
+      FROM wms_order o WHERE o.status='shipped' AND o.shipped_at>=? AND o.shipped_at<=?`,
+      )
+      .get(since, now);
     const dailyRows = d
       .prepare(
         `SELECT substr(shipped_at,1,10) AS day,count(*) AS shipped,
@@ -137,6 +144,7 @@ export function analytics(raw: unknown) {
       aging,
       channels,
       adjustments,
+      dispatchCoverage,
     };
   } catch (e) {
     d.exec("ROLLBACK");
@@ -148,13 +156,17 @@ export function erpReconciliation() {
   const rows = db()
     .prepare(
       `WITH physical AS (SELECT tw_id,sum(on_hand) AS shelf FROM wms_stock GROUP BY tw_id),
-    staged AS (SELECT l.tw_id,sum(l.picked) AS picked FROM wms_line l JOIN wms_order o ON o.id=l.order_id
+    staged AS (SELECT l.tw_id,sum(l.picked) AS picked,
+      max(EXISTS(SELECT 1 FROM wms_shipment s JOIN wms_parcel_state ps ON ps.shipment_id=s.id WHERE s.order_id=o.id AND ps.status='handed')) AS partial_dispatch
+      FROM wms_line l JOIN wms_order o ON o.id=l.order_id
       WHERE o.status NOT IN ('shipped','cancelled') GROUP BY l.tw_id)
-    SELECT p.tw_id,p.symbol,p.nazwa,coalesce(s.shelf,0) AS shelf,coalesce(g.picked,0) AS staged,
-      e.stan AS erp,coalesce(s.shelf,0)+coalesce(g.picked,0)-e.stan AS difference
+    SELECT p.tw_id,p.symbol,p.nazwa,coalesce(s.shelf,0) AS shelf,
+      CASE WHEN g.partial_dispatch=1 THEN NULL ELSE coalesce(g.picked,0) END AS staged,
+      coalesce(g.partial_dispatch,0) AS partial_dispatch,
+      e.stan AS erp,CASE WHEN g.partial_dispatch=1 THEN NULL ELSE coalesce(s.shelf,0)+coalesce(g.picked,0)-e.stan END AS difference
     FROM wms_product p LEFT JOIN physical s ON s.tw_id=p.tw_id LEFT JOIN staged g ON g.tw_id=p.tw_id
     LEFT JOIN sgt_stan e ON e.tw_id=p.tw_id AND e.mag_id=?
-    WHERE e.stan IS NULL OR coalesce(s.shelf,0)+coalesce(g.picked,0)<>e.stan
+    WHERE g.partial_dispatch=1 OR e.stan IS NULL OR coalesce(s.shelf,0)+coalesce(g.picked,0)<>e.stan
     ORDER BY abs(difference) DESC,p.symbol LIMIT 100`,
     )
     .all(config.magId.MAG);
@@ -163,7 +175,7 @@ export function erpReconciliation() {
     warehouseId: config.magId.MAG,
     limit: 100,
     explanation:
-      "WMS obejmuje półki i pobrane, niewysłane sztuki. ERP pochodzi z ostatniej synchronizacji. Raport nie zmienia żadnej ewidencji.",
+      "WMS obejmuje półki i pobrane, niewysłane sztuki. Częściowy odbiór wielopaczkowy nie ma jeszcze podziału SKU na paczki, więc różnica pozostaje nieznana. ERP pochodzi z ostatniej synchronizacji. Raport nie zmienia ewidencji.",
   };
 }
 

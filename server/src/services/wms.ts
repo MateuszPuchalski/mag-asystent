@@ -857,7 +857,9 @@ function readOrder(orderId: number) {
     )
     .all(orderId) as Allocation[];
   const shipments = d
-    .prepare("SELECT * FROM wms_shipment WHERE order_id=? ORDER BY package_no")
+    .prepare(
+      "SELECT s.*,coalesce(p.status,'legacy') AS dispatch_status,coalesce(p.version,1) AS version,p.handed_at FROM wms_shipment s LEFT JOIN wms_parcel_state p ON p.shipment_id=s.id WHERE s.order_id=? AND coalesce(p.status,'legacy')<>'void' ORDER BY s.package_no",
+    )
     .all(orderId);
   return {
     ...order,
@@ -935,6 +937,13 @@ export function applyOrderAction(
     fail("Zamówienie zmieniło się. Odśwież przed kolejną operacją");
   if (["shipped", "cancelled"].includes(order.status))
     fail("To zamówienie jest już zamknięte");
+  if (
+    order.shipments.length &&
+    !["hold", "resume", "takeover"].includes(input.action)
+  )
+    fail(
+      "Zamówienie ma przygotowane paczki. Najpierw wycofaj je do ponownej kontroli w Wydaniach",
+    );
   if (
     order.hold_reason &&
     !["resume", "cancel", "return", "takeover", "amend"].includes(input.action)
@@ -1200,33 +1209,52 @@ export function applyOrderAction(
     const now = nowIso();
     const parcels = [
       {
-        carrier: input.carrier,
-        tracking: input.tracking,
+        carrier: input.carrier.toUpperCase(),
+        tracking: input.tracking.toUpperCase(),
         weightG: input.weightG,
       },
-      ...input.extraParcels,
+      ...input.extraParcels.map((p) => ({
+        ...p,
+        carrier: p.carrier.toUpperCase(),
+        tracking: p.tracking.toUpperCase(),
+      })),
     ];
-    for (const [index, parcel] of parcels.entries()) {
+    for (const parcel of parcels) {
       if (
         d
-          .prepare("SELECT 1 FROM wms_shipment WHERE carrier=? AND tracking=?")
+          .prepare(
+            "SELECT 1 FROM wms_shipment WHERE upper(carrier)=? AND upper(tracking)=?",
+          )
           .get(parcel.carrier, parcel.tracking)
       )
         fail("Ten numer przesyłki jest już użyty");
-      d.prepare(
-        "INSERT INTO wms_shipment(order_id,package_no,carrier,tracking,weight_g,created_at) VALUES (?,?,?,?,?,?)",
-      ).run(
-        orderId,
-        index + 1,
-        parcel.carrier,
-        parcel.tracking,
-        parcel.weightG,
-        now,
+      const saved = d
+        .prepare(
+          "INSERT INTO wms_shipment(order_id,package_no,carrier,tracking,weight_g,created_at) VALUES (?,?,?,?,?,?)",
+        )
+        .run(
+          orderId,
+          Number(
+            d
+              .prepare(
+                "SELECT coalesce(max(package_no),0)+1 AS n FROM wms_shipment WHERE order_id=?",
+              )
+              .get(orderId)!.n,
+          ),
+          parcel.carrier,
+          parcel.tracking,
+          parcel.weightG,
+          now,
+        );
+      d.prepare("INSERT INTO wms_parcel_state(shipment_id) VALUES (?)").run(
+        Number(saved.lastInsertRowid),
       );
     }
+    // Pusta skrzynka wraca do pracy przed przyjazdem kuriera; jej przypisanie zostaje w historii.
+    d.prepare("UPDATE wms_order SET tote=NULL WHERE id=?").run(orderId);
     d.prepare(
-      "UPDATE wms_order SET status='shipped',shipped_at=? WHERE id=?",
-    ).run(now, orderId);
+      "UPDATE wms_cart_assignment SET released_at=coalesce(released_at,?),ended_at=coalesce(ended_at,?) WHERE order_id=? AND ended_at IS NULL",
+    ).run(now, now, orderId);
   }
   if (input.action === "hold")
     d.prepare("UPDATE wms_order SET hold_reason=? WHERE id=?").run(

@@ -14,6 +14,7 @@ const { createUser } = await import("./services/users.js");
 const W = await import("./services/wms.js");
 const C = await import("./services/wms-carts.js");
 const I = await import("./services/wms-inbound.js");
+const D = await import("./services/wms-dispatch.js");
 const { zapiszWlasne } = await import("./services/zdjecia-wlasne.js");
 const { logEvent } = await import("./services/events.js");
 const password = process.env.WMS_DEMO_PASSWORD;
@@ -100,6 +101,7 @@ I.createInbound(actor, randomUUID(), {
     { sku: "WMS-0002", quantity: 8 },
   ],
 });
+let demoHandoff = D.createHandoff(actor, randomUUID(), { carrier: "DEMO" });
 for (let i = 1; i <= orderCount; i++) {
   let o = W.createOrder(actor, randomUUID(), {
     reference: `SKLEP-${String(i).padStart(5, "0")}`,
@@ -141,8 +143,16 @@ for (let i = 1; i <= orderCount; i++) {
       tracking: `DEMO-${i}`,
       weightG: 500,
     });
+    demoHandoff = D.scanHandoff(actor, randomUUID(), demoHandoff.id, {
+      tracking: `DEMO-${i}`,
+    });
   }
 }
+if (demoHandoff.totals.parcels)
+  D.closeHandoff(actor, randomUUID(), demoHandoff.id, {
+    version: demoHandoff.version,
+    parcels: Number(demoHandoff.totals.parcels),
+  });
 console.log(
   `Demo gotowe: ${path.resolve(target)}. ${skuCount} SKU, ${orderCount} zamówień. Login: wms-demo. Hasło pobrano z WMS_DEMO_PASSWORD.`,
 );

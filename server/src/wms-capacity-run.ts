@@ -88,6 +88,13 @@ async function request<T = Detail>(route: string, body?: unknown): Promise<T> {
 try {
   await Promise.all(
     Array.from({ length: concurrency }, async () => {
+      let dispatch = await request<{
+        id: number;
+        version: number;
+        totals: { parcels: number };
+      }>("/api/wms/handoffs", {
+        carrier: "CAPACITY",
+      });
       while (next < orders) {
         const index = next++;
         const lines = Array.from({ length: 3 }, (_, i) => ({
@@ -130,7 +137,10 @@ try {
           tracking: `CAP-${index}`,
           weightG: 500,
         });
-        assert.equal(o.status, "shipped");
+        assert.equal(o.status, "packed");
+        dispatch = await request(`/api/wms/handoffs/${dispatch.id}/scan`, {
+          tracking: `CAP-${index}`,
+        });
         completed++;
         if (completed % 300 === 0)
           console.log(`Completed ${completed}/${orders}`);
@@ -140,6 +150,11 @@ try {
           await request("/api/wms/analytics?days=30");
         }
       }
+      if (dispatch.totals.parcels)
+        await request(`/api/wms/handoffs/${dispatch.id}/close`, {
+          version: dispatch.version,
+          parcels: dispatch.totals.parcels,
+        });
     }),
   );
   const elapsedMs = performance.now() - started;

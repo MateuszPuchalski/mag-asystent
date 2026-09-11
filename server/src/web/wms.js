@@ -43,6 +43,12 @@ window.Wms = (() => {
     cancelled: "Anulowane",
     held: "Wstrzymane",
   };
+  const parcelStates = {
+    ready: "Czeka na odbiór",
+    handed: "Odebrana",
+    void: "Wycofana",
+    legacy: "Historia — brak skanu odbioru",
+  };
   const number = (n) =>
     new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 1 }).format(n ?? 0);
   const metric = (title, value, note) =>
@@ -111,6 +117,34 @@ window.Wms = (() => {
     message,
     photo: photos.markup,
     mountPhotos: () => photos.mount(root()),
+  });
+  const handoffUi = window.WmsHandoff({
+    html,
+    field,
+    read,
+    mutate,
+    focus: focusWhenReady,
+    office,
+    refresh,
+    message,
+    metric,
+    number,
+    download: async (path, name) => {
+      const response = await api(path);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    openOrder: async (id) => {
+      selected = id;
+      view = "orders";
+      shell();
+      await refresh();
+    },
   });
   const badge = (o) =>
     `<span class="wms-status ${o.hold_reason ? "held" : html(o.status)}">${o.hold_reason ? "Wstrzymane" : states[o.status]}</span>`;
@@ -266,6 +300,7 @@ window.Wms = (() => {
       ["stockwork", "Zadania zapasu"],
       ["carts", "Wózki 20 / 30"],
       ["packing", "Pakowanie skrzynek"],
+      ["handoff", "Wydania"],
       ["waves", "Zbiórka ręczna"],
       ["bins", "Lokalizacje"],
       ...(office()
@@ -302,6 +337,7 @@ window.Wms = (() => {
       if (view === "stock") await stocks(turn);
       if (view === "stockwork") await stockWorkUi.render();
       if (view === "inbound") await inboundUi.render();
+      if (view === "handoff") await handoffUi.render();
       if (view === "bins") await bins(turn);
       if (view === "analytics") await report(turn);
       if (view === "dispatch") await dispatch(turn);
@@ -398,6 +434,11 @@ window.Wms = (() => {
     return `<form class="wms-form" data-action-wms="${action}">${content}<button class="primary" type="submit">${button}</button></form>`;
   }
   function step(o) {
+    if (o.shipments.length && o.status === "packed")
+      return (
+        `<div class="wms-message">Paczki przygotowane. Odbiór przez kuriera wymaga potwierdzenia w Wydaniach.</div>${o.shipments.map((s) => `<p>${html(s.carrier)} · <strong>${html(s.tracking)}</strong> · ${s.dispatch_status === "handed" ? "Odebrana" : "Czeka na odbiór"}</p>`).join("")}<button data-tab-wms="handoff">PRZEJDŹ DO WYDAŃ</button>` +
+        handoffUi.repackForm(o)
+      );
     if (o.hold_reason)
       return '<p class="wms-help">Wyjaśnij przyczynę wstrzymania. Pobrany towar można odłożyć poniżej.</p>';
     if (o.status === "new")
@@ -465,11 +506,11 @@ window.Wms = (() => {
             form(
               "ship",
               `${field("carrier", "Przewoźnik", "text", "", 'maxlength="120"')}${field("tracking", "Zeskanuj numer przesyłki", "text", "", 'autocomplete="off"')}${field("weightG", "Masa paczki (g)", "number", "", 'min="1" max="1000000"')}<details><summary>Dodatkowe paczki tego zamówienia</summary><label>Przewoźnik; numer przesyłki; masa w gramach<textarea name="extraParcels" placeholder="DPD;123456789;1200"></textarea></label><p class="wms-help">Jedna dodatkowa paczka w wierszu. Łącznie do 20 paczek.</p></details>`,
-              "POTWIERDŹ PRZEKAZANIE DO WYSYŁKI",
+              "ZAPISZ PRZYGOTOWANE PACZKI",
             )
         : "Paczka czeka na wysyłkę przez osobę pakującą.";
     if (o.status === "shipped")
-      return `<div class="wms-message">${o.shipments.map((s) => `Paczka ${s.package_no}: ${html(s.carrier)} · <strong>${html(s.tracking)}</strong>`).join("<br>")}</div><button data-do-wms="print">DRUKUJ LISTĘ PAKOWĄ</button>`;
+      return `<div class="wms-message">${o.shipments.some((s) => s.dispatch_status === "legacy") ? "Historia sprzed skanowanego odbioru kuriera.<br>" : "Odbiór kuriera potwierdzony.<br>"}${o.shipments.map((s) => `Paczka ${s.package_no}: ${html(s.carrier)} · <strong>${html(s.tracking)}</strong>`).join("<br>")}</div><button data-do-wms="print">DRUKUJ LISTĘ PAKOWĄ</button>`;
     return "<p>Zamówienie anulowane. Rezerwacje zwolnione.</p>";
   }
   function exceptionsForm(o) {
@@ -635,7 +676,7 @@ window.Wms = (() => {
     el("wms-content").innerHTML =
       `<div class="wms-toolbar"><label>Okres<select id="wms-days">${[1, 7, 30, 90].map((n) => `<option value="${n}" ${days === n ? "selected" : ""}>Ostatnie ${n} dni</option>`).join("")}</select></label><button data-do-wms="csv">EKSPORT CSV</button><button data-do-wms="integrity">SPRAWDŹ ZGODNOŚĆ STANÓW</button></div>
       <div class="wms-stats">${metric("Wysłane zamówienia", number(a.throughput.shipped), "w wybranym okresie")}${metric("Wysłane w terminie", a.throughput.shipped ? `${number((100 * a.throughput.on_time) / a.throughput.shipped)}%` : "—", "wg terminu zamówienia")}${metric("Do realizacji teraz", number(totals.open), `${totals.overdue} po terminie · ${totals.held} wstrzymanych`)}${metric("Średni czas realizacji", duration(a.throughput.cycle_minutes), "od utworzenia do wysyłki")}</div>
-      <div class="wms-stats">${metric("Oczekiwanie na pakowanie", duration(a.throughput.pack_queue_minutes), "od końca zbiórki do otwarcia pakowania")}${metric("Sesja pakowania", duration(a.throughput.pack_session_minutes), "od otwarcia do ostatniego potwierdzenia")}${metric("Zamówienia z pomiarem", number(a.throughput.timed_packed_orders), `z ${number(a.throughput.shipped)} wysłanych`)}</div><p class="wms-help">Czas sesji może obejmować przerwy. Brak historycznych zdarzeń oznacza brak pomiaru, nie zero minut pracy.</p>
+      <div class="wms-stats">${metric("Oczekiwanie na pakowanie", duration(a.throughput.pack_queue_minutes), "od końca zbiórki do otwarcia pakowania")}${metric("Sesja pakowania", duration(a.throughput.pack_session_minutes), "od otwarcia do ostatniego potwierdzenia")}${metric("Zamówienia z pomiarem", number(a.throughput.timed_packed_orders), `z ${number(a.throughput.shipped)} wysłanych`)}</div><p class="wms-help">${a.dispatchCoverage.confirmed_orders} zamówień ma potwierdzony odbiór kuriera. ${a.dispatchCoverage.orders - a.dispatchCoverage.confirmed_orders} pochodzi z historii bez skanu odbioru; raport zachowuje pierwotne daty. Czas sesji może obejmować przerwy. Brak historycznych zdarzeń oznacza brak pomiaru, nie zero minut pracy.</p>
       <div class="wms-grid"><section class="wms-surface"><h2>Wysyłki dziennie</h2><p class="wms-muted">Dni kalendarzowe UTC · ${a.since.slice(0, 10)} — ${a.now.slice(0, 10)}</p><div class="wms-chart" role="img" aria-label="Wysyłki w kolejnych dniach">${a.daily.map((d) => `<div class="wms-bar" style="height:${(100 * d.shipped) / max}%" title="${d.day}: ${d.shipped} wysłanych, ${d.on_time} w terminie"></div>`).join("")}</div><details><summary>Dane wykresu</summary><table class="wms-lines"><thead><tr><th>Dzień UTC</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.daily.map((d) => `<tr><td>${d.day}</td><td>${d.shipped}</td><td>${d.on_time}</td></tr>`).join("")}</tbody></table></details></section>
       <section class="wms-surface"><h2>Praca w toku</h2><table class="wms-lines"><thead><tr><th>Etap</th><th>Zamówienia</th><th>Po terminie</th></tr></thead><tbody>${a.backlog.map((r) => `<tr><td>${states[r.status]}</td><td class="num">${r.orders}</td><td class="num">${r.overdue}</td></tr>`).join("")}</tbody></table><p class="wms-muted">Otwarte ponad 48 h: ${number(a.aging.over_48h)} · Wstrzymania i odrzucone operacje w okresie: ${number(a.exceptions.total)}</p></section>
       <section class="wms-surface"><h2>Najczęściej wysyłane części</h2><table class="wms-lines"><thead><tr><th>SKU</th><th>Zamówienia</th><th>Sztuki</th></tr></thead><tbody>${a.top.map((r) => `<tr><td><strong>${html(r.sku)}</strong><br>${html(r.name)}</td><td class="num">${r.orders}</td><td class="num">${r.units}</td></tr>`).join("") || '<tr><td colspan="3">Brak wysyłek w tym okresie.</td></tr>'}</tbody></table></section>
@@ -661,7 +702,7 @@ window.Wms = (() => {
     el("wms-content").innerHTML =
       `<form id="wms-dispatch-filter" class="wms-toolbar"><label>Dzień wysyłki (UTC)<input name="day" type="date" required min="2000-01-01" max="2099-12-31" value="${html(dispatchDay)}"></label><label class="wms-search">Zamówienie, przesyłka, przewoźnik lub kanał<input name="q" maxlength="120" value="${html(query)}" placeholder="Zeskanuj numer przesyłki"></label><button>SZUKAJ PACZEK</button><button type="button" data-do-wms="dispatch-csv">EKSPORTUJ REJESTR CSV</button></form>
       <div class="wms-stats">${metric("Paczki", number(t.parcels), "w wybranym dniu i filtrze")}${metric("Zamówienia", number(t.orders), "potwierdzone w WMS")}${metric("Łączna masa", `${new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 }).format(t.weightG / 1000)} kg`, "według zapisanych pomiarów")}</div>
-      <section class="wms-surface"><h2>Potwierdzone wysyłki</h2><p class="wms-help">Eksport obejmuje wszystkie paczki pasujące do filtra. Otwarcie rejestru i pobranie CSV nie zmieniają wysyłek.</p><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>Zamówienie</th><th>Kanał</th><th>Paczka</th><th>Przewoźnik</th><th>Numer przesyłki</th><th>Masa</th><th>Potwierdzono</th></tr></thead><tbody>${data.rows.map((r) => `<tr><td><button data-dispatch-order-wms="${r.order_id}">${html(r.reference)}</button></td><td>${html(r.channel)}</td><td>${r.package_no}</td><td>${html(r.carrier)}</td><td><strong>${html(r.tracking)}</strong></td><td>${number(r.weight_g)} g</td><td>${date(r.created_at)}</td></tr>`).join("") || '<tr><td colspan="7">Brak paczek. Zmień dzień lub wyszukiwanie.</td></tr>'}</tbody></table></div>${pager(t.parcels)}</section>`;
+      <section class="wms-surface"><h2>Zarejestrowane paczki</h2><p class="wms-help">Eksport obejmuje wszystkie paczki pasujące do filtra. Otwarcie rejestru i pobranie CSV nie zmieniają wysyłek.</p><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>Zamówienie</th><th>Kanał</th><th>Paczka</th><th>Przewoźnik</th><th>Numer przesyłki</th><th>Masa</th><th>Przygotowano / odbiór</th></tr></thead><tbody>${data.rows.map((r) => `<tr><td><button data-dispatch-order-wms="${r.order_id}">${html(r.reference)}</button></td><td>${html(r.channel)}</td><td>${r.package_no}</td><td>${html(r.carrier)}</td><td><strong>${html(r.tracking)}</strong></td><td>${number(r.weight_g)} g</td><td>${date(r.created_at)}<br>${html(parcelStates[r.dispatch_status])}${r.handed_at ? `<br>${date(r.handed_at)}` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak paczek. Zmień dzień lub wyszukiwanie.</td></tr>'}</tbody></table></div>${pager(t.parcels)}</section>`;
     const scan = el("wms-dispatch-filter").elements.namedItem("q");
     scan.addEventListener("focus", () => scan.select(), { once: true });
     focusWhenReady(scan);
@@ -678,6 +719,7 @@ window.Wms = (() => {
       if (await cartUi.click(button)) return;
       if (await stockWorkUi.click(button)) return;
       if (await inboundUi.click(button)) return;
+      if (await handoffUi.click(button)) return;
       if (button.dataset.dispatchOrderWms) {
         selected = Number(button.dataset.dispatchOrderWms);
         view = "orders";
@@ -789,7 +831,7 @@ window.Wms = (() => {
       if (action === "reconcile") {
         const r = await read("/api/wms/reconciliation");
         el("wms-erp").innerHTML =
-          `<p class="wms-help">${html(r.explanation)} Maksymalnie ${r.limit} różnic.</p><table class="wms-lines"><thead><tr><th>SKU</th><th>WMS</th><th>ERP</th><th>Różnica</th></tr></thead><tbody>${r.rows.map((p) => `<tr><td>${html(p.symbol)}</td><td>${p.shelf + p.staged}</td><td>${p.erp === null ? "Brak danych" : p.erp}</td><td>${p.difference === null ? "—" : p.difference}</td></tr>`).join("") || '<tr><td colspan="4">Brak różnic.</td></tr>'}</tbody></table>`;
+          `<p class="wms-help">${html(r.explanation)} Maksymalnie ${r.limit} różnic.</p><table class="wms-lines"><thead><tr><th>SKU</th><th>WMS</th><th>ERP</th><th>Różnica</th></tr></thead><tbody>${r.rows.map((p) => `<tr><td>${html(p.symbol)}</td><td>${p.staged === null ? "Częściowy odbiór — do wyjaśnienia" : p.shelf + p.staged}</td><td>${p.erp === null ? "Brak danych" : p.erp}</td><td>${p.difference === null ? "—" : p.difference}</td></tr>`).join("") || '<tr><td colspan="4">Brak różnic.</td></tr>'}</tbody></table>`;
       }
       if (action === "retry") {
         const p = pending();
@@ -815,6 +857,7 @@ window.Wms = (() => {
       if (await cartUi.submit(f, values)) return;
       if (await stockWorkUi.submit(f, values)) return;
       if (await inboundUi.submit(f, values)) return;
+      if (await handoffUi.submit(f, values)) return;
       if (f.id === "wms-dispatch-filter") {
         dispatchDay = values.day;
         query = values.q;

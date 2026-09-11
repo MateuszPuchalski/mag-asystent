@@ -458,3 +458,24 @@ Dotychczasowy obszar **Dostawy** obsługuje proces Subiekta; jego odłożenia ni
 automatycznie WMS. Dla samodzielnego WMS używaj **Przyjęć**.
 
 Demo zawiera oczekiwaną dostawę `DEMO-PZ-001`, jeszcze bez ruchów przyjęcia.
+## Wydania kurierowi
+
+Po kontroli pakowania zapisz numery i masy przygotowanych paczek. Zamówienie nadal
+czeka na odbiór; skrzynka zbiórkowa jest już wolna. W **Wydaniach** otwórz
+przekazanie dla przewoźnika i skanuj etykiety podczas fizycznego przekazywania.
+Powtórzenie tego samego skanu nie dodaje drugiej paczki.
+
+Usuń z listy paczki, które zostają na hali. Przed zamknięciem potwierdź, że kurier
+odebrał wszystkie paczki wskazane na liście. Dopiero odbiór całego zamówienia
+ustawia stan **Wysłane**. Możesz pobrać pełną listę przekazania jako CSV.
+
+Korektę numeru lub masy wykonuje biuro w kolejce paczek oczekujących.
+Najpierw usuń paczkę z otwartego przekazania. Poprzednia etykieta pozostaje w historii.
+Korekta zmienia ewidencję WMS; nie kupuje ani nie anuluje etykiety u przewoźnika.
+
+Gdy trzeba otworzyć paczkę i sprawdzić zawartość, użyj **Wycofaj paczki do ponownej kontroli**
+w zamówieniu. Usuń stare etykiety, zeskanuj pojemnik poza wózkiem i wpisz powód.
+Wszystkie paczki muszą pozostać w magazynie. Po zmianie zawartość wymaga ponownej kontroli.
+
+Historia starsza od skanowanych odbiorów pozostaje oznaczona jako niepotwierdzona.
+Wszystkie operacje i obecny odbiór funkcjonalny dotyczą danych seeded.

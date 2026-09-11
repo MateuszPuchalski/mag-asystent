@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import * as Carts from "../services/wms-carts.js";
 import * as StockWork from "../services/wms-stock-work.js";
 import * as Inbound from "../services/wms-inbound.js";
+import * as Handoff from "../services/wms-dispatch.js";
 import { ZodError, z } from "zod";
 import { sesjaZadania } from "../context.js";
 import {
@@ -73,6 +74,69 @@ export async function wmsRoutes(app: FastifyInstance) {
     actor();
     return listOrders(req.query);
   });
+  app.get("/api/wms/handoffs", async (req) => {
+    actor();
+    return Handoff.handoffQueue(req.query);
+  });
+  app.get<{ Params: { id: string } }>("/api/wms/handoffs/:id", async (req) => {
+    actor();
+    return Handoff.getHandoff(orderId(req.params.id));
+  });
+  app.post("/api/wms/handoffs", async (req) =>
+    Handoff.createHandoff(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  for (const [path, action] of Object.entries({
+    scan: Handoff.scanHandoff,
+    remove: Handoff.removeHandoff,
+    close: Handoff.closeHandoff,
+  }))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/handoffs/:id/${path}`,
+      async (req) =>
+        action(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
+  app.post<{ Params: { id: string } }>(
+    "/api/wms/parcels/:id/correct",
+    async (req) =>
+      Handoff.correctParcel(
+        actor(),
+        String(req.headers["idempotency-key"] ?? ""),
+        orderId(req.params.id),
+        req.body,
+      ),
+  );
+  app.post<{ Params: { id: string } }>(
+    "/api/wms/orders/:id/reopen-packing",
+    async (req) =>
+      Handoff.reopenPacking(
+        actor(),
+        String(req.headers["idempotency-key"] ?? ""),
+        orderId(req.params.id),
+        req.body,
+      ),
+  );
+  app.get<{ Params: { id: string } }>(
+    "/api/wms/handoffs/:id/csv",
+    async (req, reply) => {
+      actor();
+      return reply
+        .type("text/csv; charset=utf-8")
+        .header(
+          "content-disposition",
+          'attachment; filename="wms-przekazanie.csv"',
+        )
+        .send(Handoff.handoffCsv(orderId(req.params.id)));
+    },
+  );
   app.get("/api/wms/inbound", async (req) => {
     actor();
     return Inbound.listInbound(req.query);
@@ -298,7 +362,7 @@ export async function wmsRoutes(app: FastifyInstance) {
         .parse(req.query.after ?? 0);
       const rows = db()
         .prepare(
-          `SELECT s.*,o.reference,o.channel FROM wms_shipment s JOIN wms_order o ON o.id=s.order_id
+          `SELECT s.*,o.reference,o.channel,coalesce(p.status,'legacy') AS dispatch_status,p.handed_at FROM wms_shipment s JOIN wms_order o ON o.id=s.order_id LEFT JOIN wms_parcel_state p ON p.shipment_id=s.id
       WHERE s.id>? ORDER BY s.id LIMIT 100`,
         )
         .all(after);

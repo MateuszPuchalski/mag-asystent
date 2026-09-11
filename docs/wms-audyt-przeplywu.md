@@ -13,7 +13,7 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 | Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Bezpośrednie odłożenie obsługuje nowy SKU na zarejestrowanej półce. Plan uzupełnień nadal wymaga istniejącego miejsca kompletacji. |
 | Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Odtworzono i naprawiono oba błędy. Testy regresji opisano niżej. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
-| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Podstawowy przebieg i duplikaty numerów są testowane; wyjątki wymagają dalszego przeglądu. |
+| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Oddzielono paczkę gotową od odbioru kuriera. Korekta etykiety, ponowna kontrola, częściowy odbiór i wstrzymanie mają testy. Podział SKU na paczki pozostaje otwarty. |
 | UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Usunięto dodatkowe otwieranie przyjętego zadania uzupełnienia; dalszy przegląd całej ścieżki pozostaje otwarty. |
 | Analityka i skala | Czas od przyjęcia do dostępności, blokady i wiek zadań; skala z historią i współbieżnymi operatorami | Istnieją raporty WMS i testy przepustowości. Pełna zgodność z zakresem wymaga dalszego pomiaru. |
 | Utrzymanie | Aktualizacja, kopia i odtworzenie, role, dziennik, awaria sieci, restart procesu | Dotychczasowe testy są punktem wyjścia; końcowy odbiór dotyczy finalnego kodu. |
@@ -133,3 +133,46 @@ na aktywnym formularzu przy 320, 390 i 1440 px. Nie stwierdzono przewijania cał
 Dalszy zakres celu: przyjęcia na strefę buforową z późniejszym odłożeniem, fizyczne
 próby organizacji hali, powiązanie kolektora Android oraz pełna analityka przyjęcie–wysyłka.
 WMS obsługuje obecnie bezpośrednie odłożenie przez przeglądarkę i dane seeded.
+
+## Pakowanie i odbiór kuriera
+
+Odtworzony błąd: zapis numeru przesyłki ustawiał zamówienie jako wysłane, chociaż
+nie istniał dowód odbioru kuriera. Test przed zmianą oczekiwał `packed`, otrzymał `shipped`.
+
+W nowym przepływie zapis etykiet pozostawia zamówienie spakowane. Pusta skrzynka
+wraca do użycia i zachowuje historię przydziału. Pracownik otwiera przekazanie dla
+przewoźnika, skanuje przekazywane paczki i potwierdza odbiór widocznej liczby paczek.
+Dopiero odebranie wszystkich paczek ustawia datę wysyłki zamówienia.
+
+[Oracle: outbound](https://docs.oracle.com/cloud/owm20b/owmcs_gs-cloud/OWMSU/outbound.html)
+opisuje osobne przetrzymywanie spakowanych pojemników i przekazania według przewoźnika.
+[FedEx: przygotowanie etykiety](https://www.fedex.com/en-us/shipping/create-shipping-label.html)
+oddziela przygotowanie etykiety od dalszego oddania paczki lub odbioru.
+Wnioskiem dla WMS jest osobny dowód fizycznego opuszczenia magazynu.
+
+Kontrole obejmują powtórzenie skanu, obce przekazanie, innego przewoźnika,
+wstrzymanie po skanie, nieaktualną liczbę paczek oraz awarię podczas zamknięcia.
+Paczka pozostawiona na hali wraca do kolejki po usunięciu z przekazania.
+Zamknięta lista i tożsamość skanu mają ochronę przed nadpisaniem i usunięciem.
+
+Biuro poprawia etykietę przed odbiorem, po usunięciu paczki z otwartego przekazania.
+Zmiana zachowuje poprzednie dane. Ponowna kontrola wycofuje cały zestaw etykiet,
+przydziela osobny pojemnik i wymaga ponownego sprawdzenia zawartości. Nie można
+zwrócić części do zapasu, pozostawiając ważne etykiety na wysyłkę.
+
+Historia sprzed tej zmiany nie otrzymuje wymyślonych dat odbioru. Rejestr pokazuje
+ją osobno, a analityka podaje pokrycie potwierdzonymi odbiorami. Przy częściowym
+odbiorze wielu paczek porównanie fizycznego zapasu z ERP pozostaje nieznane,
+ponieważ nie ma jeszcze podziału SKU pomiędzy paczki. Zapas półek i rezerwacje
+pozostają prowadzone w dzienniku; tego ograniczenia raport nie ukrywa.
+
+Próba obciążenia objęła 5000 SKU, 2000 zamówień, 84 trasy i 8 klientów.
+Po dodaniu odbiorów wykonała 14 274 żądania w 82,88 s; p95 HTTP wyniosło
+66,90 ms, a p95 przydziału wózka 376,77 ms. Wszystkie zamówienia miały potwierdzony
+odbiór, a ewidencja pozostała zgodna. To test lokalnego obciążenia syntetycznego.
+
+Weryfikacja 0.291.0: 2199 testów serwera i 727 testów panelu przeszło.
+Oba sprawdzenia TypeScript oraz kompilacja zakończyły się powodzeniem.
+Próba przeglądarki sprawdziła skan paczki, duplikat, nieznaną etykietę, eksport
+oraz ponowienie po utracie odpowiedzi zatwierdzonego odbioru. Kontrola układu
+obejmuje 12 obszarów przy szerokościach 320, 390, 768 i 1440 px.

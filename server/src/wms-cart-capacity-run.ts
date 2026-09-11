@@ -132,6 +132,11 @@ loop.enable();
 try {
   await Promise.all(
     Array.from({ length: concurrency }, async (_, worker) => {
+      let dispatch = await request<{
+        id: number;
+        version: number;
+        totals: { parcels: number };
+      }>("/api/wms/handoffs", { carrier: "SEEDED" });
       for (;;) {
         const start = performance.now();
         const assigned = await request<ReturnType<typeof C.startCart>>(
@@ -139,7 +144,14 @@ try {
           { barcode: `CAP-${worker}` },
         );
         cartTimings.push(performance.now() - start);
-        if (!assigned.run) return;
+        if (!assigned.run) {
+          if (dispatch.totals.parcels)
+            await request(`/api/wms/handoffs/${dispatch.id}/close`, {
+              version: dispatch.version,
+              parcels: dispatch.totals.parcels,
+            });
+          return;
+        }
         const run = assigned.run;
         runs++;
         let wave: ReturnType<typeof W.getWave> = run;
@@ -179,6 +191,9 @@ try {
             weightG: 500,
           });
           completed++;
+          dispatch = await request(`/api/wms/handoffs/${dispatch.id}/scan`, {
+            tracking: `CAP-TRACK-${o.id}`,
+          });
         }
         await request(`/api/wms/cart-runs/${run.id}/release`, {
           cart: run.cart_code,

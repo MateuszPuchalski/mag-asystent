@@ -899,3 +899,40 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
     grid-template-columns: 88px minmax(0, 1fr);
   }
 }
+@media (max-width: 700px) {
+  /* Kod paczki pozostaje czytelny bez ściskania czterech kolumn pod kciukiem. */
+  .wms-handoff-table thead {
+    display: none;
+  }
+  .wms-handoff-table tbody {
+    display: block;
+  }
+  .wms-handoff-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--ui-space-2);
+    padding: var(--ui-space-3) 0;
+    border-bottom: 1px solid var(--ui-subtle);
+  }
+  .wms-handoff-table td {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+  }
+  .wms-handoff-table td:first-child {
+    grid-column: 1;
+    font-size: var(--ui-size-body);
+  }
+  .wms-handoff-table td:nth-child(2) {
+    grid-column: 1;
+  }
+  .wms-handoff-table td:nth-child(3) {
+    grid-column: 1;
+    color: var(--ui-caption);
+  }
+  .wms-handoff-table td:last-child {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    align-self: center;
+  }
+}

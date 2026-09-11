@@ -43,6 +43,9 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/orders",
     "/api/wms/inbound",
     "/api/wms/inbound/1",
+    "/api/wms/handoffs",
+    "/api/wms/handoffs/1",
+    "/api/wms/handoffs/1/csv",
     "/api/wms/orders/1",
     "/api/wms/inventory",
     "/api/wms/bins",
@@ -304,6 +307,19 @@ test("pełne zamówienie i rejestr wielu paczek działają bez dostępu do zewn�
     await post(`/api/wms/orders/${order.id}/actions`, shipping, key),
     order,
   );
+  assert.equal(order.status, "packed");
+  let batch = await post("/api/wms/handoffs", { carrier: "DEMO" });
+  for (const parcel of order.shipments)
+    batch = await post(`/api/wms/handoffs/${batch.id}/scan`, {
+      tracking: parcel.tracking,
+    });
+  await post(`/api/wms/handoffs/${batch.id}/close`, {
+    version: batch.version,
+    parcels: 2,
+  });
+  order = (
+    await app.inject({ url: `/api/wms/orders/${order.id}`, headers: headers() })
+  ).json();
   assert.equal(order.status, "shipped");
   const day = order.shipped_at.slice(0, 10);
   const { db } = await import("../db/db.js");

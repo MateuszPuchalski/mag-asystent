@@ -282,6 +282,61 @@ CREATE TABLE IF NOT EXISTS wms_shipment (
   UNIQUE(order_id, package_no)
 );
 CREATE INDEX IF NOT EXISTS ix_wms_shipment_dispatch ON wms_shipment(created_at, id);
+CREATE INDEX IF NOT EXISTS ix_wms_shipment_identity ON wms_shipment(upper(carrier),upper(tracking));
+-- Etykieta nie dowodzi odbioru. Nowe paczki czekają na skan i zamknięcie przekazania.
+CREATE TABLE IF NOT EXISTS wms_parcel_state (
+  shipment_id INTEGER PRIMARY KEY REFERENCES wms_shipment(id),
+  status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready','handed','void')),
+  version INTEGER NOT NULL DEFAULT 1,
+  handed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_wms_parcel_ready ON wms_parcel_state(status,shipment_id);
+CREATE TABLE IF NOT EXISTS wms_dispatch_batch (
+  id INTEGER PRIMARY KEY,
+  carrier TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  closed_at TEXT,
+  closed_by INTEGER,
+  version INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS wms_dispatch_entry (
+  id INTEGER PRIMARY KEY,
+  batch_id INTEGER NOT NULL REFERENCES wms_dispatch_batch(id),
+  shipment_id INTEGER NOT NULL REFERENCES wms_shipment(id),
+  tracking TEXT NOT NULL,
+  weight_g INTEGER NOT NULL,
+  scanned_at TEXT NOT NULL,
+  scanned_by INTEGER NOT NULL,
+  removed_at TEXT,
+  removed_reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_dispatch_entry_active ON wms_dispatch_entry(shipment_id) WHERE removed_at IS NULL;
+CREATE INDEX IF NOT EXISTS ix_wms_dispatch_entry_batch ON wms_dispatch_entry(batch_id,id);
+CREATE TRIGGER IF NOT EXISTS wms_dispatch_entry_no_delete BEFORE DELETE ON wms_dispatch_entry
+BEGIN SELECT RAISE(ABORT, 'dispatch history is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_dispatch_entry_closed BEFORE UPDATE ON wms_dispatch_entry
+WHEN (SELECT closed_at FROM wms_dispatch_batch WHERE id=OLD.batch_id) IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'closed dispatch is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_dispatch_entry_identity BEFORE UPDATE OF batch_id,shipment_id,tracking,weight_g,scanned_at,scanned_by ON wms_dispatch_entry
+BEGIN SELECT RAISE(ABORT, 'dispatch scan is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_dispatch_batch_no_delete BEFORE DELETE ON wms_dispatch_batch
+BEGIN SELECT RAISE(ABORT, 'dispatch history is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_dispatch_batch_closed BEFORE UPDATE ON wms_dispatch_batch WHEN OLD.closed_at IS NOT NULL
+BEGIN SELECT RAISE(ABORT, 'closed dispatch is immutable'); END;
+CREATE TABLE IF NOT EXISTS wms_parcel_revision (
+  id INTEGER PRIMARY KEY,
+  shipment_id INTEGER NOT NULL REFERENCES wms_shipment(id),
+  previous TEXT NOT NULL,
+  next TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS wms_parcel_revision_no_update BEFORE UPDATE ON wms_parcel_revision
+BEGIN SELECT RAISE(ABORT, 'parcel revision is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_parcel_revision_no_delete BEFORE DELETE ON wms_parcel_revision
+BEGIN SELECT RAISE(ABORT, 'parcel revision is immutable'); END;
 -- Odpowiedź i zmiana stanu zatwierdzają się razem, także po utracie sieci.
 CREATE TABLE IF NOT EXISTS wms_command (
   key TEXT PRIMARY KEY,

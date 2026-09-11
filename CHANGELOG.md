@@ -34,6 +34,19 @@ historii nie przepisujemy.
 ---
 
 
+## 0.291.0 — 12 września 2026
+
+- **Wydania kurierowi.** Zapis etykiety nie oznacza wysyłki. Zamówienie zamyka się
+  dopiero po skanowanym odbiorze wszystkich paczek. Pusta skrzynka wraca wcześniej do zbiórki.
+- Przekazania według przewoźnika obsługują powtórzone skany, paczki pozostawione na hali,
+  wstrzymania, częściowy odbiór, zamknięcie pustej listy i eksport CSV.
+- Biuro może poprawić etykietę lub wycofać paczki do ponownej kontroli zawartości.
+  Historia zostaje zachowana, a odebranych paczek nie można zmienić.
+- Rejestr rozróżnia przygotowanie, odbiór, wycofanie i historię bez skanu kuriera.
+  Analityka pokazuje pokrycie potwierdzeniami. Częściowy odbiór nie udaje pełnego porównania z ERP.
+- **Zmiana procesu:** pakujący zapisuje paczki, a wydający zamyka przekazanie kurierowi.
+  Szczegóły w `docs/wms.md`. Nie zmieniamy historycznych dat ani nie kupujemy etykiet.
+
 ## 0.290.0 — 12 września 2026
 
 - **Przyjęcia WMS.** Oczekiwany dokument, skan SKU, ilość i skan półki zastępują
