@@ -2482,6 +2482,25 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   -- kosztowałyby dwa złączenia przy każdym otwarciu sprawy i nic nie dawały.
   dowody             TEXT NOT NULL DEFAULT '[]',
   brakuje            TEXT NOT NULL DEFAULT '[]',
+  -- ── Rada maszyny (0.276.0) ────────────────────────────────────────────────
+  -- Do 0.275.0 tych kolumn nie było, bo Copilot miał wyłącznie zbierać fakty.
+  -- Właściciel odwrócił tę decyzję: „copilot powinien też radzić w reklamacji".
+  -- BEZ `CHECK` na wartość, z tego samego powodu co przy `zadanie` w księdze:
+  -- dwunasta wartość (`POPROSIC_O_DOWODY`) jest nasza, a lista Allegro może
+  -- urosnąć — strażnik stoi w `REKOMENDACJE` w `services/copilot-reklamacja.ts`
+  -- i w schemacie zod adaptera, czyli tam, gdzie da się go poszerzyć bez
+  -- przebudowy tabeli (blizna 0.135.0).
+  rekomendacja       TEXT,
+  pewnosc            TEXT,
+  uzasadnienie       TEXT,
+  uzasadnienie_zrodlo TEXT,
+  -- Czego maszyna NIE WIE. Przeciwwaga dla `pewnosc`, nie ozdoba: deklaracja
+  -- „wysoka" bez ani jednej pozycji tutaj jest odrzucana przy zapisie.
+  czego_nie_wiem     TEXT NOT NULL DEFAULT '[]',
+  -- Trafność liczona z FAKTU: rada kontra werdykt, który agent naprawdę
+  -- wysłał. Żadnej ankiety — rekomendacja jest typowana tym samym słownikiem.
+  ocena              TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
+  ocena_at           TEXT,
   model              TEXT NOT NULL DEFAULT '',
   przez              TEXT,
   przez_user_id      INTEGER REFERENCES app_user(user_id),

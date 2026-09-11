@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
-import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
+import type { RadaMaszyny, Reklamacja, SzczegolReklamacji, Werdykt } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
+import { NAZWA_WERDYKTU } from "./statusy";
 
 /* ── Kolumna dowodów o reklamacji ────────────────────────────────────────────
    Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
@@ -85,6 +86,7 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
   return <Sekcja tytul="Co wyczytał Copilot">
     {blad && <p className="py-1 text-xs text-red-700">{blad}</p>}
     {karta ? <>
+      {karta.rada && <Rada rada={karta.rada} ocena={karta.ocena} />}
       {karta.usterka && <Wiersz etykieta="Usterka">
         {karta.usterka.tresc} <Cytat z={karta.usterka.zrodlo} /></Wiersz>}
       {karta.kiedy && <Wiersz etykieta="Od kiedy">
@@ -112,6 +114,45 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
       {trwa ? "CZYTAM…" : karta ? "PRZECZYTAJ JESZCZE RAZ" : "PRZECZYTAJ SPRAWĘ"}
     </Przycisk>
   </Sekcja>;
+}
+
+/**
+ * Rada maszyny (0.276.0) — PODPISANA, żeby nie pomylić autora.
+ *
+ * Do 0.275.0 Copilot nie radził wcale; właściciel odwrócił tę decyzję.
+ * Rada stoi więc na ekranie, ale w ramce z własnym nagłówkiem i nigdy nie
+ * dotyka formularza werdyktu: agent klika „UZNAJĘ" sam i sam potwierdza
+ * zgodę. Allegro nie przyjmie drugiego werdyktu w sprawie, więc różnica
+ * między „przeczytaj i zdecyduj" a „potwierdź" jest tu nieodwracalna.
+ *
+ * „Czego nie wiem" stoi PRZY pewności, nie pod spodem: deklaracja pewności
+ * bez tej listy byłaby brawurą, a serwer odrzuca takie karty.
+ */
+function Rada({ rada, ocena }: { rada: RadaMaszyny; ocena: string | null }) {
+  const nazwa = rada.co === "POPROSIC_O_DOWODY"
+    ? "Poprosić o dowody — nie ma jeszcze czego rozstrzygać"
+    : NAZWA_WERDYKTU[rada.co as Werdykt] ?? rada.co;
+  return <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 p-3">
+    <div className="flex flex-wrap items-baseline gap-2">
+      <EtykietaWartosci>Copilot radzi</EtykietaWartosci>
+      <b className="text-sm text-slate-800">{nazwa}</b>
+      <span className="text-podpis text-slate-600">pewność {rada.pewnosc}</span>
+      {/* Trafność liczy się z werdyktu, który agent naprawdę wysłał — nie
+          z ankiety. Przed werdyktem nie ma jej wcale i tak ma być. */}
+      {ocena && <span className={`rounded px-1 text-podpis ${
+        ocena === "trafna" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+        rada {ocena}</span>}
+    </div>
+    <p className="mt-1 text-sm text-slate-800">
+      {rada.uzasadnienie.tresc} <Cytat z={rada.uzasadnienie.zrodlo} />
+    </p>
+    {rada.czegoNieWiem.length > 0 && <p className="mt-1 text-podpis text-slate-600">
+      Czego nie wie: {rada.czegoNieWiem.join(", ")}
+    </p>}
+    <p className="mt-2 text-podpis text-slate-600">
+      Werdykt wydajesz Ty — ta rada nie wypełnia formularza.
+    </p>
+  </div>;
 }
 
 /**

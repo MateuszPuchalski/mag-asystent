@@ -648,9 +648,14 @@ ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmie
 po ZNANEJ wartości, nie po wzorcu. Nie wychodzi nic spoza rozmowy: ani notatka
 biura, ani znacznik „kto prowadzi", ani kartoteka, ani kwoty.
 
-Co wraca i gdzie ląduje: karta faktów przy sprawie. Werdyktu w niej nie ma
-i nie będzie — karta z sugestią rozstrzygnięcia jest odrzucana w całości przez
-bramkę w kodzie, nie przez prompt.
+Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
+co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
+których nie wie. Właściciel odwrócił 11 września wcześniejszą regułę „maszyna
+nie radzi"; bramka w kodzie pilnuje teraz czego innego: żeby opinia nie trafiła
+do pól opisujących słowa klienta.
+
+Rada nie wychodzi do kupującego i nie dotyka formularza werdyktu. Werdykt
+wysyła człowiek, osobnym kliknięciem i z jawną zgodą, tak samo jak przedtem.
 
 Do dziennika idą liczby: ile braków, ile dowodów, ile pól odsiano jako
 niepokryte cytatem. Rachunek u dostawcy zapisuje się w księdze Copilota razem

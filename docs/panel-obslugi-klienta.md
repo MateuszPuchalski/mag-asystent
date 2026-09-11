@@ -3525,12 +3525,40 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
 reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
 
-**Maszyna NIE dotyka werdyktu i to nie jest kwestia promptu.** Uznanie
-i odrzucenie są nieodwracalne wobec kupującego, stoją za `autoryzuj()` i za
-jawną zgodą. Zdanie „ta reklamacja wygląda na zasadną" przesuwałoby decyzję,
-nie pomagając jej podjąć — więc karta, w której padnie słowo z rodziny
-werdyktu, leci w całości, a odrzuca ją DETERMINISTYCZNA bramka w kodzie.
-Prompt jest prośbą; bramka jest regułą.
+**Od 0.276.0 Copilot także RADZI.** Do 0.275.0 karta z jakimkolwiek słowem
+z rodziny werdyktu leciała w całości — decyzja agenta piszącego kod, nie
+właściciela. Właściciel odwrócił ją tego samego dnia: „copilot powinien też
+radzić w reklamacji". Wie to lepiej: to on wydaje te werdykty i płaci za ich
+skutki.
+
+**Bramka nie znika, tylko zmienia cel.** Rada mieszka WYŁĄCZNIE w polu
+`rada` — typowanym i podpisanym na ekranie. Pola opisowe (`usterka`, `kiedy`,
+`oczekiwanie`, `dowody`) mają zostać tym, co powiedział klient, i pilnuje tego
+ta sama deterministyczna bramka. Bez niej model przemyciłby werdykt w polu,
+które wygląda jak cytat z kupującego, a agent czytałby to jako słowa klienta.
+
+**Rada jest TYPOWANA, nie prozą**: jedna z jedenastu wartości werdyktu Allegro
+albo dwunasta, nasza — `POPROSIC_O_DOWODY`, znacząca „nie ma jeszcze czego
+rozstrzygać". Prozą byłoby ładniej i nie dałoby się tego zmierzyć.
+
+**Pewność bez nazwanej niewiedzy jest odrzucana.** Model deklarujący „wysoką"
+musi wymienić co najmniej jedną rzecz, której nie wie, a która zmieniłaby radę.
+Deklaracja pewności bez tego nie jest pewnością, tylko brawurą — i karta z nią
+nie zapisuje się wcale.
+
+**Rada NIE dotyka formularza werdyktu.** Nie zaznacza opcji, nie otwiera
+dialogu, nie podstawia wiadomości. Agent klika „UZNAJĘ" sam i sam potwierdza
+zgodę. Powód jest wąski i techniczny: Allegro nie przyjmie drugiego werdyktu
+w sprawie, więc różnica między „przeczytaj i zdecyduj" a „potwierdź" jest tu
+nieodwracalna — a podstawiony formularz zamienia jedno w drugie jednym
+kliknięciem mniej.
+
+**Trafność liczy się z FAKTU, nie z ankiety.** Gdy werdykt wychodzi, serwis
+porównuje go z radą i dopisuje `trafna`/`nietrafna`. Rekomendacja jest typowana
+tym samym słownikiem, więc porównanie to równość dwóch napisów — nikogo nie
+trzeba o nic pytać. `POPROSIC_O_DOWODY` zostaje bez oceny i to nie luka: ta
+rada mówi „jeszcze nie rozstrzygaj", więc każdy późniejszy werdykt może być
+słuszny.
 
 **Co karta niesie.** Cztery rzeczy, których agent szuka w rozmowie za każdym
 razem ręcznie: co się zepsuło, od kiedy, czego klient chce i co już przysłał.
@@ -3939,6 +3967,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
 | Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
 | Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
+| Copilot RADZI w reklamacji | **działa** od 0.276.0 | rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; wysoka pewność wymaga listy „czego nie wiem”; trafność z porównania z wysłanym werdyktem |
 | Copilot reklamacyjny: karta faktów | **działa** od 0.275.0 | `services/copilot-reklamacja.ts`; cytat przy każdym polu, bramka słów werdyktu, karta w kolumnie dowodów |
 | Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |

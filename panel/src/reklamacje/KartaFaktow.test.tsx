@@ -46,7 +46,18 @@ const KARTA: SzczegolReklamacji["karta"] = {
   oczekiwanie: { tresc: "wymiana", zrodlo: "W1" },
   dowody: [{ tresc: "zdjęcie noża", zrodlo: "W3" }],
   brakuje: ["data zakupu", "numer seryjny"],
+  rada: null, ocena: null,
   model: "claude-test", przez: "Ala", at: "2026-09-11T09:00:00.000Z",
+};
+
+/** Karta z radą — 0.276.0, gdy właściciel odwrócił regułę „maszyna nie radzi". */
+const Z_RADA: SzczegolReklamacji["karta"] = {
+  ...KARTA,
+  rada: {
+    co: "ACCEPTED_REFUND", pewnosc: "srednia",
+    uzasadnienie: { tresc: "Usterka zgłoszona w pierwszym tygodniu", zrodlo: "W1" },
+    czegoNieWiem: ["czy towar był używany zgodnie z instrukcją"],
+  },
 };
 
 describe("Karta faktów Copilota", () => {
@@ -84,5 +95,33 @@ describe("Karta faktów Copilota", () => {
        da się zrobić, tego nie ma na ekranie. */
     render(<Dowody {...props(KARTA, { onRozpoznaj: undefined })} />);
     expect(screen.queryByText("Co wyczytał Copilot")).not.toBeInTheDocument();
+  });
+
+  it("rada jest PODPISANA i mówi, że nie wypełnia formularza (0.276.0)", () => {
+    /* Do 0.275.0 Copilot nie radził wcale — to była moja decyzja, którą
+       właściciel odwrócił. Rada stoi więc na ekranie, ale w ramce z własnym
+       nagłówkiem: agent ma wiedzieć, czyje to zdanie. */
+    render(<Dowody {...props(Z_RADA)} />);
+    expect(screen.getByText("Copilot radzi")).toBeInTheDocument();
+    expect(screen.getByText("Uznana — zwrot pieniędzy")).toBeInTheDocument();
+    expect(screen.getByText(/pewność srednia/)).toBeInTheDocument();
+    expect(screen.getByText(/Czego nie wie/)).toBeInTheDocument();
+    expect(screen.getByText(/Werdykt wydajesz Ty/)).toBeInTheDocument();
+  });
+
+  it("rada NIE dotyka formularza werdyktu — to jedyna linia, której bronię", () => {
+    /* Allegro nie przyjmie drugiego werdyktu w sprawie, więc różnica między
+       „przeczytaj i zdecyduj" a „potwierdź" jest tu nieodwracalna. Kolumna
+       dowodów nie ma prawa zaznaczyć niczego w pasku werdyktu. */
+    render(<Dowody {...props(Z_RADA)} />);
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /UZNAJĘ|ODRZUCAM|WYŚLIJ WERDYKT/ }))
+      .not.toBeInTheDocument();
+  });
+
+  it("bez rady karta pokazuje same fakty, bez pustej ramki", () => {
+    render(<Dowody {...props(KARTA)} />);
+    expect(screen.queryByText("Copilot radzi")).not.toBeInTheDocument();
+    expect(screen.getByText("Brakuje do rozstrzygnięcia")).toBeInTheDocument();
   });
 });
