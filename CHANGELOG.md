@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.276.2 — 11 września 2026
+
+**Karta Copilota znów zapisuje się na bazie, która widziała 0.275.0.**
+Właściciel zgłosił z żywego panelu: „Co wyczytał Copilot" kończyło się zdaniem
+`table reklamacja_karta has no column named rekomendacja`. Rozpoznanie sprawy
+padało za każdym razem, na każdej reklamacji.
+
+Winna była decyzja z planu 0.276.0, nie kod. Rada maszyny dołożyła do
+`reklamacja_karta` siedem kolumn WYŁĄCZNIE w `schema.sql`, bo plan założył, że
+tabela z 0.275.0 „na produkcji jeszcze nie stoi". Stała — 0.275.0 zostało
+wdrożone dzień wcześniej. `CREATE TABLE IF NOT EXISTS` nie dokłada kolumn do
+tabeli, która już jest, więc baza została w kształcie sprzed rady, a kod pytał
+o kolumny z rady.
+
+Kolumny dochodzą teraz migracją, tak jak wszystkie inne. Zasada, którą to
+wydanie przywraca, nie ma wyjątków: **kolumna dołożona do tabeli wydanej
+w jakimkolwiek wydaniu dostaje `addColumn`**. Wiek tabeli nie jest argumentem,
+bo nie wiemy, które wydanie u kogo stoi.
+
+Doszedł test, który odtwarza zgłoszenie wiernie: buduje bazę w kształcie
+0.275.0, przepuszcza przez migrację i zapisuje kartę z radą. Druga asercja jest
+ogólna — zbiór kolumn `reklamacja_karta` po migracji starej bazy musi być taki
+sam jak w bazie zbudowanej od zera. Następna kolumna dopisana bez migracji
+przewróci testy, a nie ekran właściciela.
+
+
 ## 0.276.1 — 11 września 2026
 
 **Raport skuteczności doboru przestaje przy remisie kredytować złą drogę.**

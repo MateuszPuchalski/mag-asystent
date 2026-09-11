@@ -227,6 +227,25 @@ export function migrate(database: DatabaseSync) {
      dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
      prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
   addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
+  /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
+     w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
+     za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0
+     „na produkcji jeszcze nie stoi". Stała. `CREATE TABLE IF NOT EXISTS` nie
+     dokłada kolumn do tabeli, która już jest, więc wdrożenie 0.276.0 na bazie
+     po 0.275.0 wywracało KAŻDE rozpoznanie sprawy zdaniem „table
+     reklamacja_karta has no column named rekomendacja".
+
+     Zasada jest bez wyjątków: kolumna dołożona do tabeli, która wyszła
+     w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. Wiek tabeli nie jest
+     argumentem — nie wiemy, które wydanie wdrożono. */
+  addColumn("reklamacja_karta", "rekomendacja", "TEXT");
+  addColumn("reklamacja_karta", "pewnosc", "TEXT");
+  addColumn("reklamacja_karta", "uzasadnienie", "TEXT");
+  addColumn("reklamacja_karta", "uzasadnienie_zrodlo", "TEXT");
+  addColumn("reklamacja_karta", "czego_nie_wiem", "TEXT NOT NULL DEFAULT '[]'");
+  addColumn("reklamacja_karta", "ocena",
+    "TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna'))");
+  addColumn("reklamacja_karta", "ocena_at", "TEXT");
   /* Księga Copilota zna od 0.275.0 także sprawy posprzedażowe. `conversation_id`
      się do tego nie nadaje: reklamacja nie ma wiersza w `conversation`, a klucz
      obcy wywróciłby zapis. Tabela stoi na produkcji od etapu F, więc kolumna
