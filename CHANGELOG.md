@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.276.1 — 11 września 2026
+
+**Raport skuteczności doboru przestaje przy remisie kredytować złą drogę.**
+Raport odpowiada na jedno pytanie: który szczebel doboru zapracował na
+zatwierdzenie. Odpowiadał na nie po samym znaczniku czasu, a to za mało.
+
+`events.created_at` ma rozdzielczość milisekundy, a `wybierzKandydata`
+i `ustawStatusDoboru` piszą po kilka wierszy w jednym przebiegu. Gdy wybór,
+zatwierdzenie i kolejny wybór trafiały w tę samą milisekundę, warunek „wybór
+nie późniejszy niż zatwierdzenie" był prawdziwy dla OBU wyborów, a szukanie
+od końca brało ten późniejszy. Punkt szedł do drogi, po której zatwierdzenie
+nie nastąpiło — dokładnie odwrotnie, niż mówi reguła zapisana w komentarzu
+obok.
+
+Remis rozstrzyga teraz `events.id`: `INTEGER PRIMARY KEY AUTOINCREMENT`, więc
+jedyny w tej tabeli porządek ściśle rosnący. Dane były pod ręką od początku —
+oba zapytania sortowały po `created_at, id`, tylko `id` nie wychodziło poza
+SQL. Porównanie idzie po parze `(at, id)`.
+
+**Znalazł to migoczący test, nie człowiek przy ekranie.** Test „zatwierdzenie
+liczy się z PRZEJŚCIA" padał z `0 !== 1` raz na kilka pełnych przebiegów
+`npm test`, a uruchomiony sam przechodził, bo bez obciążenia od innych plików
+zapisy rozjeżdżały się o kilka milisekund. Dlatego dowodem jest test, który
+remis WYMUSZA: stan pisze mechanizm, a znacznik wszystkich zdarzeń zostaje
+potem nadpisany najmniejszym z nich. Na starym kodzie pada za każdym razem.
+
+Na produkcji objaw był łagodniejszy, bo człowiek klika w odstępach sekund.
+Nie znaczy to, że go nie było — znaczy, że przy tym jednym raporcie nikt by
+się nie zorientował, że liczba stoi przy złym szczeblu.
+
+Wdrożenie bez pracy ręcznej.
+
+---
+
+
 ## 0.276.0 — Copilot radzi w reklamacji
 
 **Właściciel odwrócił regułę z wydania sprzed kilku godzin.** 0.275.0 odrzucało

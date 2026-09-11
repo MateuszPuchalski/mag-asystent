@@ -138,6 +138,38 @@ test("zatwierdzenie liczy się z PRZEJŚCIA, więc cofnięcie go nie kasuje", ()
     "…a na stole dziś nie stoi — i raport mówi obie te rzeczy osobno");
 });
 
+test("REMIS co do milisekundy rozstrzyga kolejność zapisu, nie sam znacznik", () => {
+  /* Ten sam przebieg co wyżej, tylko z zegarem zatrzymanym — i to jest cały
+     test. `events.created_at` ma rozdzielczość milisekundy, a mechanizm pisze
+     wybór, zatwierdzenie i kolejny wybór w jednym przebiegu, więc remis jest
+     tu regułą, nie wyjątkiem. Korelacja szła po samym `at`: przy remisie
+     `w.at <= chwila` było prawdziwe dla OBU wyborów, a `.reverse().find()`
+     brało PÓŹNIEJSZY — czyli kredytowało drogę, która zatwierdzenia nie
+     poprzedzała. Objaw był najgorszy z możliwych: test wyżej padał raz na
+     kilka pełnych przebiegów, pod obciążeniem od innych plików testowych,
+     a uruchomiony sam przechodził.
+
+     Zegar podstawiamy PO fakcie, bo `logEvent` (`services/events.ts`) nie
+     przyjmuje `created_at` — stan nadal pisze mechanizm, test zmienia wyłącznie
+     znacznik. Wartość bierzemy Z BAZY, nie z zaszytej daty: reguła `temuMinut`
+     wyżej obowiązuje też tutaj. Nadpisujemy WSZYSTKIE wiersze, bo to najgorszy
+     możliwy remis i nie wymaga znajomości numerów zdarzeń. */
+  D.wybierzKandydata(rozmowa, FTC272, "zastosowanie", 1, ala, db());
+  D.ustawStatusDoboru(rozmowa, "confirmed", null, ala, db());
+  const dobor = D.doborRozmowy(rozmowa, db());
+  D.wybierzKandydata(rozmowa, INNA, "symbol", dobor.wersja, ala, db());
+
+  const chwila = String((db().prepare("SELECT MIN(created_at) v FROM events")
+    .get() as { v: string }).v);
+  db().prepare("UPDATE events SET created_at=?").run(chwila);
+
+  const r = S.skutecznoscDoboru(30, db());
+  assert.equal(wiersz(r, "zastosowanie").zatwierdzonych, 1,
+    "kredyt należy się drodze, po której PRZYSZŁO zatwierdzenie");
+  assert.equal(wiersz(r, "symbol").zatwierdzonych, 0,
+    "wybór zapisany PO zatwierdzeniu nie mógł go zapracować");
+});
+
 test("czas liczy się od OSTATNIEGO pytania klienta, nie od początku wątku", () => {
   /* Definicja zegara jest już w repo, przy `pytanieAt` w `skrzynka.ts`:
      liczenie od pierwszej wiadomości mierzyłoby wiek relacji z klientem,
