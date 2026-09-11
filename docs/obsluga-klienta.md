@@ -624,6 +624,12 @@ nie widzi. Do dziennika trafia nazwa tagu razem z numerem sprawy — tak samo
 jak nazwa załącznika, i z tą samą świadomością: `events` nie ma retencji.
 Kto wpisuje tam treść zamiast etykiety, zapisuje ją na zawsze.
 
+**Poprzednia treść notatki (0.280.0).** Żeby zmianę dało się cofnąć, wiersz
+sprawy trzyma JEDNĄ poprzednią wersję notatki obok bieżącej. Ginie razem ze
+sprawą i nie trafia do `events` ani przed cofnięciem, ani po nim. Dziennik
+dostaje samą długość, tak jak dotąd. Jednego szczebla, a nie tabeli historii,
+użyliśmy właśnie dlatego: druga tabela byłaby drugim miejscem na te same dane.
+
 **Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
 niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
 prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po

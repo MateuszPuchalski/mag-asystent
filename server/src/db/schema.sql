@@ -2338,6 +2338,23 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   prowadzi_user_id INTEGER REFERENCES app_user(user_id),
   prowadzi_at TEXT,
   notatka TEXT,
+  -- ── Droga powrotna z notatki (0.280.0) ────────────────────────────────────
+  -- Notatka jest polem SWOBODNYM, które nadpisuje ten, kto pisze ostatni.
+  -- Do 0.280.0 poprzedniego zdania nie dało się odzyskać niczym: do dziennika
+  -- idzie świadomie sama DŁUGOŚĆ, bo treść bywa zdaniem o kliencie,
+  -- a `events` nie ma retencji (§9 architektury).
+  --
+  -- JEDEN SZCZEBEL, nie tabela historii. Cofnięcie jest ZAMIANĄ: bieżąca treść
+  -- ląduje tutaj, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii
+  -- dla pola, którego nikt nie audytuje, byłaby drugim miejscem na te same
+  -- dane osobowe — i drugim miejscem do sprzątania.
+  --
+  -- Poprzednia treść mieszka NA WIERSZU i ginie razem ze sprawą. Do `events`
+  -- nie trafia ani przed cofnięciem, ani po nim.
+  notatka_poprzednia TEXT,
+  notatka_at TEXT,
+  notatka_przez TEXT,
+  notatka_user_id INTEGER REFERENCES app_user(user_id),
   -- ── Werdykt biura (przyrost trzeci) ────────────────────────────────────────
   -- OSOBNE KOLUMNY, nie `status_allegro`. Tamta kolumna należy do Allegro
   -- i przestawia ją wyłącznie synchronizacja; tu stoi to, co MY wysłaliśmy.

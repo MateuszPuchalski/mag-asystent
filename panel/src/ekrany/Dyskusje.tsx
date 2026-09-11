@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare } from "lucide-react";
 import {
   useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
-  useProwadzeDyskusje, useZakoncz,
+  useProwadzeDyskusje, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -74,6 +74,7 @@ export function Dyskusje() {
   const przypnij = usePrzypnijTag();
   const odepnij = useOdepnijTag();
   const [bladTagu, setBladTagu] = useState("");
+  const cofnijNotatke = useCofnijNotatkeDyskusji();
   const [bladZapisu, setBladZapisu] = useState("");
 
   const { data, isLoading, error } = useDyskusje();
@@ -366,6 +367,14 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Fakty szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              onCofnijNotatke={szczegol.data.dyskusja.maPoprzedniaNotatke
+                ? () => {
+                  setBladZapisu("");
+                  cofnijNotatke.mutate(
+                    { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
+                    { onError: (e) => setBladZapisu((e as Error).message) });
+                }
+                : undefined}
               tagi={{
                 slownik: slownikTagow.data?.tagi ?? [],
                 trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,

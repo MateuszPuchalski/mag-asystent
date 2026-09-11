@@ -3420,6 +3420,37 @@ Barwa czipa jest łupkowa, nie fioletowa i nie bursztynowa. Fiolet znaczy w tym
 panelu przypuszczenie maszyny, a tag jest zdaniem człowieka; bursztyn jest
 tłem marki i zaznaczeniem wiersza.
 
+### 25b.3c. Notatka i jej droga powrotna (0.280.0)
+
+§25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
+Przy reklamacji ta zasada stała dotąd odwrócona (§25b.8), bo wszystko, co
+z tego ekranu wychodzi, wychodzi do kupującego przez Allegro.
+
+**Notatka jest wyjątkiem i jedynym.** Zostaje wyłącznie u nas i niczego
+kupującemu nie obiecuje. Jest przy tym polem swobodnym, które nadpisuje ten,
+kto pisze ostatni — a do 0.280.0 skasowanego zdania nie dało się odzyskać
+niczym, bo do dziennika idzie świadomie sama długość.
+
+Pod polem stoi jedno zdanie: kto zmienił, kiedy, i odnośnik „cofnij zmianę".
+Zdanie, nie ramka z decyzją — tak samo jak przy cofnięciu przyjęcia w zwrotach.
+
+**Cofnięcie jest ZAMIANĄ, jeden szczebel.** Bieżąca treść ląduje w miejscu
+poprzedniej, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii dla
+pola, którego nikt nie audytuje, byłaby drugim miejscem na te same dane
+osobowe i drugim miejscem do sprzątania.
+
+Poprzednia treść mieszka na wierszu i ginie razem ze sprawą. Do `events` nie
+trafia ani przed cofnięciem, ani po nim.
+
+Wiersz zastany sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej
+nie zapisywał. Przycisku wtedy NIE MA — martwy obiecywałby drogę, której nie
+ma.
+
+**Czego cofnięcie nie dotyczy i nie dotknie:** werdyktu, odpowiedzi w rozmowie,
+stanowiska o towarze i prośby o zakończenie dyskusji. Allegro ich nie cofnie,
+więc przycisk byłby obietnicą bez pokrycia. Tam zostaje potwierdzenie i to się
+w tym wydaniu nie zmienia.
+
 ### 25b.4. Zegar
 
 **Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo
@@ -3747,6 +3778,10 @@ pytania byłyby dwoma nawykami zamiast jednego.
 **Tagi też są wspólne** (§25b.3b) — jeden słownik, jedna para tabel, ten sam
 pasek filtra. Osobny słownik dla dyskusji rozjechałby się z tym przy pierwszej
 zmianie nazwy, a sprawa przenoszona między ekranami gubiłaby opis.
+
+**Notatka ma drogę powrotną** (§25b.3c) — ten sam mechanizm, własna nazwa
+zdarzenia w dzienniku. Prośba o zakończenie jej NIE MA i mieć nie może: idzie
+do kupującego i Allegro jej nie cofnie.
 
 ### 25c.4. Pilność bez zegara
 

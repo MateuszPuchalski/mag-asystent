@@ -86,6 +86,27 @@ export function useNotatka() {
 }
 
 /**
+ * Cofnięcie ZMIANY notatki (0.280.0).
+ *
+ * §25a.5: cofnięcie zamiast potwierdzenia. Notatka jest jedynym zapisem w tym
+ * module, który zostaje wyłącznie u nas i niczego nie obiecuje kupującemu —
+ * dlatego jako jedyny dostaje drogę powrotną. Werdykt, odpowiedź i stanowisko
+ * o towarze cofnięcia nie dostaną: Allegro ich nie cofnie.
+ */
+export function useCofnijNotatke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
+  });
+}
+
+/**
  * Pobranie załącznika.
  *
  * Idzie przez `pobierzPlik`, a nie przez `<a href>`: sesja jedzie nagłówkiem

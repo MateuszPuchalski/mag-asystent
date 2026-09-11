@@ -4,7 +4,7 @@ import { ShieldQuestion } from "lucide-react";
 import {
   useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
   useRozpoznaj, useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
-  useWerdykt, useZwrotTowaru,
+  useWerdykt, useZwrotTowaru, useCofnijNotatke
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -128,6 +128,7 @@ export function Reklamacje() {
   const przypnij = usePrzypnijTag();
   const odepnij = useOdepnijTag();
   const [bladTagu, setBladTagu] = useState("");
+  const cofnijNotatke = useCofnijNotatke();
   const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
@@ -481,6 +482,14 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Dowody szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              onCofnijNotatke={szczegol.data.reklamacja.maPoprzedniaNotatke
+                ? () => {
+                  setBladZapisu("");
+                  cofnijNotatke.mutate(
+                    { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
+                    { onError: (e) => setBladZapisu((e as Error).message) });
+                }
+                : undefined}
               tagi={{
                 slownik: slownikTagow.data?.tagi ?? [],
                 trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,

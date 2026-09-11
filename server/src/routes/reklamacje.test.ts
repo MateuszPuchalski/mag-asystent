@@ -98,6 +98,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zwrot-towaru` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka/cofnij` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
   { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
 ];
@@ -118,7 +119,7 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("DZIEWIĘĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => {
+test("DZIESIĘĆ ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową", () => {
   /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
      z odpowiedzią w czacie (0.224.0) i z trzech na pięć z werdyktem: czwarty
      zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
@@ -138,6 +139,12 @@ test("DZIEWIĘĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => 
      i zdjęcie to jedno kliknięcie w każdą stronę, czyli własna droga
      powrotna.
 
+     Dziesiąty to COFNIĘCIE zmiany notatki (0.280.0). Jest zapisem u nas
+     i jedynym w tym module z drogą powrotną — notatka jako jedyna zostaje
+     wyłącznie u nas i niczego nie obiecuje kupującemu. Werdykt, odpowiedź
+     i stanowisko o towarze cofnięcia NIE DOSTANĄ: Allegro ich nie cofnie,
+     więc przycisk byłby obietnicą bez pokrycia (§25b.8).
+
      `synchronizuj` i `odswiez` NIE SĄ zapisami do Allegro: to odczyty na
      żądanie, które zapisują wynik u nas. `POST`-em idą dlatego, że `GET`
      z takim skutkiem ubocznym łamałby „zero zapisu przy patrzeniu" ciszej,
@@ -146,8 +153,8 @@ test("DZIEWIĘĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => 
   const DOCIAGNIECIA = ["synchronizuj", "odswiez"];
   const zapisy = TRASY().filter((t) => (t.method === "POST" || t.method === "DELETE")
     && !DOCIAGNIECIA.some((d) => t.url.endsWith(d)));
-  assert.equal(zapisy.length, 9,
-    "prowadzę, notatka i dwa tagi u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
+  assert.equal(zapisy.length, 10,
+    "prowadzę, notatka z cofnięciem i dwa tagi u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
 });
 
 test("werdykt: wersja obowiązkowa, wpis `privileged` z nazwą operacji, dziennik bez treści", async () => {

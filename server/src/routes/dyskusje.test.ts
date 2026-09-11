@@ -80,6 +80,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/zakoncz` },
+  { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/notatka/cofnij` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
   { method: "DELETE" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
 ];
@@ -100,7 +101,7 @@ test("hala nie widzi dyskusji — bramka roli stoi też na odczycie", async () =
   }
 });
 
-test("SZEŚĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => {
+test("SIEDEM ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową", () => {
   /* Trzy zostają u nas albo są zwykłą pracą biura: „prowadzę", notatka
      i odpowiedź w rozmowie. Czwarty, PROŚBA O ZAKOŃCZENIE, wychodzi do
      kupującego i nie da się jej cofnąć — jako jedyny stoi za `autoryzuj()`
@@ -111,10 +112,14 @@ test("SZEŚĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => {
      Przypięcie i zdjęcie to jedno kliknięcie w każdą stronę, więc mają
      własną drogę powrotną i uprzywilejowane być nie mogą.
 
+     Siódmy to COFNIĘCIE zmiany notatki (0.280.0) — jedyny zapis w tym
+     module z drogą powrotną. Prośba o zakończenie jej nie dostaje i dostać
+     nie może: idzie do kupującego i Allegro jej nie cofnie.
+
      Trasy „synchronizuj" tu NIE MA i to jest decyzja: dyskusje i reklamacje
      przyjeżdżają jedną listą, więc drugi przycisk byłby drugą drogą w limit 429. */
   const zapisy = TRASY().filter((t) => t.method === "POST" || t.method === "DELETE");
-  assert.equal(zapisy.length, 6);
+  assert.equal(zapisy.length, 7);
   assert.ok(!TRASY().some((t) => t.url.endsWith("synchronizuj")),
     "synchronizacja jest wspólna z reklamacjami");
 });

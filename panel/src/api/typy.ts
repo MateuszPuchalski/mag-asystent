@@ -1122,6 +1122,12 @@ export interface Reklamacja {
   prowadziAt: string | null;
   /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
   tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `werdykt: null` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
@@ -1295,6 +1301,12 @@ export interface Dyskusja {
   prowadziAt: string | null;
   /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
   tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */
   zakonczenieStatus: "sent" | "send_uncertain" | null;

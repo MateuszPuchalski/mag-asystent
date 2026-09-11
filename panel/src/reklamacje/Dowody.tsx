@@ -42,11 +42,14 @@ const Link = ({ href, children }: { href: string | null; children: React.ReactNo
  * a zapis po każdej literze podnosiłby wersję rekordu i wywracał kontrolę
  * świeżości u kolegi przy drugim biurku.
  */
-function Notatka({ reklamacja, trwa, blad, onZapisz }: {
+function Notatka({ reklamacja, trwa, blad, onZapisz, onCofnij }: {
   reklamacja: Reklamacja;
   trwa: boolean;
   blad: string;
   onZapisz: (tekst: string) => void;
+  /* Cofnięcie jest OPCJONALNE tym samym wzorcem co reszta: czego nie da się
+     zrobić, tego nie ma na ekranie. */
+  onCofnij?: () => void;
 }) {
   const [tekst, setTekst] = useState(reklamacja.notatka ?? "");
   /* Przełączenie sprawy podmienia treść pola. Bez tego notatka poprzedniej
@@ -64,6 +67,23 @@ function Notatka({ reklamacja, trwa, blad, onZapisz }: {
       onClick={() => onZapisz(tekst)}>
       {trwa ? "Zapisuję…" : "Zapisz notatkę"}
     </Przycisk>
+    {/* ── CO SIĘ Z NIĄ STAŁO I JAK TO COFNĄĆ (0.280.0) ─────────────────────
+        §25a.5: cofnięcie zamiast potwierdzenia, i to jest ZDANIE, nie ramka
+        z decyzją. Notatka jest polem swobodnym, które nadpisuje ten, kto pisze
+        ostatni — do tego wydania skasowanego zdania nie dało się odzyskać
+        niczym, bo do dziennika idzie świadomie sama długość.
+
+        Autor i godzina stoją TU, a nie w osobnej sekcji: pytanie „kto to
+        napisał" zadaje się patrząc na notatkę, nie szukając jej autora. */}
+    {reklamacja.notatkaPrzez && <p className="text-podpis text-slate-600">
+      Zmiana: {reklamacja.notatkaPrzez}, {czas(reklamacja.notatkaAt)}
+      {onCofnij && reklamacja.maPoprzedniaNotatke && <>
+        {" · "}
+        <button type="button" disabled={trwa} onClick={onCofnij}
+          className="py-1 font-semibold text-slate-700 underline disabled:opacity-50">
+          cofnij zmianę</button>
+      </>}
+    </p>}
   </div>;
 }
 
@@ -168,7 +188,7 @@ const Cytat = ({ z }: { z: string }) =>
   <span className="rounded bg-slate-100 px-1 font-mono text-podpis text-slate-600">{z}</span>;
 
 export function Dowody({
-  szczegol, trwa, bladZapisu, onProwadze, onNotatka,
+  szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCofnijNotatke,
   rozpoznaje = false, bladRozpoznania = "", onRozpoznaj,
   tagi,
 }: {
@@ -177,6 +197,8 @@ export function Dowody({
   bladZapisu: string;
   onProwadze: () => void;
   onNotatka: (tekst: string) => void;
+  /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
+  onCofnijNotatke?: () => void;
   /* Tagi są OPCJONALNE tym samym wzorcem co Copilot: czego nie da się zrobić,
      tego nie ma na ekranie — sekcja bez obsługi byłaby obietnicą bez pokrycia. */
   tagi?: {
@@ -318,7 +340,8 @@ export function Dowody({
           onNowy={tagi.onNowy} />
       </div>}
       <div className="mt-3">
-        <Notatka reklamacja={r} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka} />
+        <Notatka reklamacja={r} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka}
+          onCofnij={onCofnijNotatke} />
       </div>
     </Sekcja>
   </div>;

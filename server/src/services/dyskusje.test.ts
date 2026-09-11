@@ -200,7 +200,7 @@ test("szczegół drugiego rodzaju sprawy oddaje 404, a nie sprawę bez połowy p
 test("mutacja przez cudzy ekran odpada, zanim cokolwiek zapisze", () => {
   const reklamacja = sprawa({ id: "r-4", typ: "CLAIM", status: "CLAIM_SUBMITTED" });
   assert.throws(() => D.stempelProwadziDyskusje(db(), reklamacja, { id: 1, name: "Ala" }), /Dyskusja .* nie istnieje/);
-  assert.throws(() => D.zapiszNotatkeDyskusji(db(), reklamacja, "cokolwiek", "Ala"),
+  assert.throws(() => D.zapiszNotatkeDyskusji(db(), reklamacja, "cokolwiek", { id: 1, name: "Ala" }),
     /Dyskusja .* nie istnieje/);
   const w = db().prepare("SELECT prowadzi, notatka, wersja FROM reklamacja_klienta WHERE id=?")
     .get(reklamacja) as { prowadzi: string | null; notatka: string | null; wersja: number };

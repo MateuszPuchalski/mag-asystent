@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.280.0 — 11 września 2026
+
+**Zmianę notatki da się cofnąć.** Notatka jest polem swobodnym, które nadpisuje
+ten, kto pisze ostatni. Do tego wydania skasowanego zdania nie dało się
+odzyskać niczym: do dziennika idzie świadomie sama DŁUGOŚĆ, bo treść bywa
+zdaniem o kliencie, a `events` nie ma retencji.
+
+Pod polem stoi teraz jedno zdanie: kto zmienił, kiedy, i odnośnik „cofnij
+zmianę". Zdanie, nie ramka z decyzją — §25a.5 mówi o cofnięciu ZAMIAST
+potwierdzenia, i tak to wygląda przy cofnięciu przyjęcia w zwrotach.
+
+Cofnięcie jest ZAMIANĄ, o jeden szczebel. Bieżąca treść ląduje w miejscu
+poprzedniej, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii dla
+pola, którego nikt nie audytuje, byłaby drugim miejscem na te same dane
+osobowe — i drugim miejscem do sprzątania. Poprzednia treść mieszka na wierszu
+sprawy, ginie razem z nią i do dziennika nie trafia ani razu.
+
+Sprawy zastane nie znają swojej poprzedniej notatki, bo nikt jej nie
+zapisywał. Przycisku przy nich po prostu nie ma: martwy obiecywałby drogę,
+której nie ma.
+
+**Czego cofnięcie NIE dotyczy i nie dotknie:** werdyktu, odpowiedzi w rozmowie,
+stanowiska o towarze i prośby o zakończenie dyskusji. Wszystkie wychodzą do
+kupującego przez Allegro, a Allegro ich nie cofnie — przycisk „cofnij" byłby
+tam obietnicą bez pokrycia. Notatka jest jedynym zapisem w tych dwóch
+modułach, który zostaje wyłącznie u nas, i dlatego jako jedyna drogę powrotną
+dostaje.
+
+Przy okazji notatka mówi wreszcie, KTO ją zmienił i kiedy. Dotąd nie mówił
+tego nikt.
+
+
 ## 0.279.0 — 11 września 2026
 
 **Tagi spraw w reklamacjach i dyskusjach, ze słownikiem, który edytuje biuro.**

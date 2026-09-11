@@ -4,8 +4,10 @@ import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js
 import { linkZamowienia } from "./allegro-linki.js";
 import {
   BladReklamacji,
+  cofnijNotatkeSprawy,
   czatReklamacji,
   doZapisu,
+  pisanieNotatki,
   kontekstZamowienia,
   zalacznikiSprawy,
   type RozmowaZakupu,
@@ -120,6 +122,10 @@ export interface WierszDyskusji {
   /** Tagi biura (0.279.0) — ten sam słownik co przy reklamacjach. */
   tagi: TagSprawy[];
   notatka: string | null;
+  /** Droga powrotna z notatki (0.280.0) — patrz `WierszReklamacji`. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   /* ── Prośba o zakończenie (`END_REQUEST`) ────────────────────────────────
      Los NASZEJ próby, nie stan Allegro. `status_allegro` należy do Allegro
      i potwierdza go dopiero synchronizacja. */
@@ -239,6 +245,9 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     /* Puste do czasu doklejenia — powód przy tym samym polu w reklamacjach. */
     tagi: [],
     notatka: tekst(w.notatka),
+    notatkaAt: tekst(w.notatka_at),
+    notatkaPrzez: tekst(w.notatka_przez),
+    maPoprzedniaNotatke: tekst(w.notatka_poprzednia) !== null,
     zakonczenieStatus: tekst(w.zakonczenie_status) as StatusZakonczenia | null,
     zakonczenieAt: tekst(w.zakonczenie_at),
     zakonczeniePrzez: tekst(w.zakonczenie_przez),
@@ -361,16 +370,30 @@ export function stempelProwadziDyskusje(
  * a `events` nie ma retencji i nie jest kasowane.
  */
 export function zapiszNotatkeDyskusji(
-  database: Db, id: number, notatka: string | null, autor: string, wersja?: number,
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, wersja?: number,
 ): WierszDyskusji {
-  const wartosc = (notatka ?? "").trim() || null;
   return transaction(database, () => {
     doZapisu(database, id, wersja, "DISPUTE");
-    database.prepare(
-      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=? AND typ='DISPUTE'",
-    ).run(wartosc, id);
-    logEvent("dyskusja_notatka", autor, null,
-      { id, znakow: wartosc?.length ?? 0 }, undefined, database);
+    pisanieNotatki(database, id, notatka, autor, "DISPUTE", "dyskusja_notatka");
+    return zWiersza(odczytaj(database, id), Date.now());
+  })();
+}
+
+/**
+ * Cofnięcie zmiany notatki przy DYSKUSJI.
+ *
+ * Mechanika jest wspólna z reklamacją, własna zostaje nazwa zdarzenia: ślad
+ * ma mówić, z którego ekranu padło kliknięcie.
+ */
+export function cofnijNotatkeDyskusji(
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
+): WierszDyskusji {
+  return transaction(database, () => {
+    doZapisu(database, id, wersja, "DISPUTE");
+    if (!cofnijNotatkeSprawy(database, id, autor, "DISPUTE", "dyskusja_notatka_cofnieta")) {
+      throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
+    }
     return zWiersza(odczytaj(database, id), Date.now());
   })();
 }

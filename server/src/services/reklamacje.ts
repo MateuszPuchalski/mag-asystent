@@ -215,6 +215,13 @@ export interface WierszReklamacji {
   /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
   tagi: TagSprawy[];
   notatka: string | null;
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje — wystarcza mu wiedza, że jest do
+     czego wracać. Cofnięcie jest zamianą, więc drugie kliknięcie i tak
+     przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `null` w `werdykt` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
      panelem" i to jest informacja, nie brak. */
@@ -393,6 +400,9 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
        w mapowaniu wiersza dałoby jedno na sprawę. */
     tagi: [],
     notatka: tekst(w.notatka),
+    notatkaAt: tekst(w.notatka_at),
+    notatkaPrzez: tekst(w.notatka_przez),
+    maPoprzedniaNotatke: tekst(w.notatka_poprzednia) !== null,
     werdykt,
     werdyktNazwa: werdykt ? (NAZWA_WERDYKTU[werdykt] ?? werdykt) : null,
     werdyktStatus,
@@ -695,16 +705,87 @@ export function stempelProwadzi(
  * a `events` nie ma retencji i nie jest kasowane (§9 architektury).
  */
 export function zapiszNotatke(
-  database: Db, id: number, notatka: string | null, autor: string, wersja?: number,
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, wersja?: number,
 ): WierszReklamacji {
-  const wartosc = (notatka ?? "").trim() || null;
   return transaction(database, () => {
     doZapisu(database, id, wersja);
-    database.prepare(
-      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=? AND typ='CLAIM'",
-    ).run(wartosc, id);
-    logEvent("reklamacja_notatka", autor, null,
-      { id, znakow: wartosc?.length ?? 0 }, undefined, database);
+    pisanieNotatki(database, id, notatka, autor, "CLAIM", "reklamacja_notatka");
+    return zWiersza(
+      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+        .get(id) as Wiersz,
+      Date.now());
+  })();
+}
+
+/**
+ * Zapis notatki wspólny dla reklamacji i dyskusji (0.280.0).
+ *
+ * POPRZEDNIA TREŚĆ ZOSTAJE NA WIERSZU, żeby zmianę dało się cofnąć. Notatka
+ * jest polem swobodnym, które nadpisuje ten, kto pisze ostatni — do tego
+ * wydania nie było jak odzyskać zdania skasowanego przez pomyłkę.
+ *
+ * Nazwa zdarzenia jest PARAMETREM, a nie wyliczeniem z `typ`: ślad audytowy ma
+ * mówić, z którego ekranu padło kliknięcie, i tę samą zasadę niesie
+ * `stempelProwadziDyskusje` od 0.245.0.
+ */
+export function pisanieNotatki(
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, typ: TypSprawy, zdarzenie: string,
+): void {
+  const wartosc = (notatka ?? "").trim() || null;
+  const w = database.prepare(
+    "SELECT notatka FROM reklamacja_klienta WHERE id=? AND typ=?")
+    .get(id, typ) as { notatka: string | null } | undefined;
+  database.prepare(`UPDATE reklamacja_klienta
+    SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+        wersja=wersja+1
+    WHERE id=? AND typ=?`)
+    .run(wartosc, w?.notatka ?? null, new Date().toISOString(), autor.name, autor.id, id, typ);
+  /* Do dziennika idzie DŁUGOŚĆ, nigdy treść — ani bieżąca, ani poprzednia.
+     `events` nie ma retencji (§9 architektury), a notatka bywa zdaniem
+     o kliencie. */
+  logEvent(zdarzenie, autor.name, null, { id, znakow: wartosc?.length ?? 0 },
+    autor.id, database);
+}
+
+/**
+ * Cofnięcie ZMIANY notatki — jeden szczebel, przez zamianę.
+ *
+ * Bieżąca treść ląduje w `notatka_poprzednia`, więc drugie kliknięcie wraca
+ * tam, gdzie było. Tabela historii dla pola, którego nikt nie audytuje, byłaby
+ * drugim miejscem na te same dane osobowe.
+ *
+ * `false` znaczy „nie ma do czego wracać" i NIE jest błędem: wiersz zastany
+ * sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej nie zapisywał.
+ */
+export function cofnijNotatkeSprawy(
+  database: Db, id: number, autor: { id: number; name: string },
+  typ: TypSprawy, zdarzenie: string,
+): boolean {
+  const w = database.prepare(
+    "SELECT notatka, notatka_poprzednia FROM reklamacja_klienta WHERE id=? AND typ=?")
+    .get(id, typ) as { notatka: string | null; notatka_poprzednia: string | null } | undefined;
+  if (!w || w.notatka_poprzednia === null) return false;
+  database.prepare(`UPDATE reklamacja_klienta
+    SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+        wersja=wersja+1
+    WHERE id=? AND typ=?`)
+    .run(w.notatka_poprzednia, w.notatka, new Date().toISOString(), autor.name, autor.id, id, typ);
+  logEvent(zdarzenie, autor.name, null,
+    { id, znakow: w.notatka_poprzednia.length }, autor.id, database);
+  return true;
+}
+
+/** Cofnięcie zmiany notatki przy REKLAMACJI. */
+export function cofnijNotatke(
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
+): WierszReklamacji {
+  return transaction(database, () => {
+    doZapisu(database, id, wersja);
+    if (!cofnijNotatkeSprawy(database, id, autor, "CLAIM", "reklamacja_notatka_cofnieta")) {
+      throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
+    }
     return zWiersza(
       database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
         .get(id) as Wiersz,

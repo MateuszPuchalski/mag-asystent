@@ -27,7 +27,8 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
   ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
   ruchNasz: kubelek === "odpowiedz", czekaOdDni: kubelek === "odpowiedz" ? 5 : null,
   dlugoCzeka: kubelek === "odpowiedz",
-  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [], prowadziAt: null, notatka: null,
+  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
+  notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
   wersja: 1, kubelek, sygnaly: [], linkZamowienia: null,
 });

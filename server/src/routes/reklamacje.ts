@@ -8,7 +8,7 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/skrzynka.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji,
-  ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
+  cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import {
@@ -65,6 +65,12 @@ function blad(reply: FastifyReply, e: unknown) {
 }
 
 const autor = () => sesjaZadania()?.user.name ?? "?";
+
+/** Autor mutacji: numer do śladu i do tożsamości, imię do zdania na ekranie. */
+const kto = () => {
+  const s = sesjaZadania()!;
+  return { id: s.user.userId, name: s.user.name };
+};
 
 /** Jedno zdanie o tym, dlaczego Copilota nie ma — pisze je SERWER (§21). */
 function czemuCopilotWylaczony(): string | null {
@@ -468,8 +474,22 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       }
       try {
         return {
-          reklamacja: zapiszNotatke(db(), Number(req.params.id), n ?? null, autor(), req.body?.wersja),
+          reklamacja: zapiszNotatke(db(), Number(req.params.id), n ?? null, kto(),
+            req.body?.wersja),
         };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Cofnięcie ZMIANY notatki — §25a.5, cofnięcie zamiast potwierdzenia.
+     Notatka jest polem swobodnym, które nadpisuje ten, kto pisze ostatni;
+     to jedyny zapis w tym module z drogą powrotną, bo jako jedyny zostaje
+     wyłącznie u nas i niczego nie obiecuje kupującemu. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/reklamacje/:id/notatka/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return { reklamacja: cofnijNotatke(db(), Number(req.params.id), kto(), req.body?.wersja) };
       } catch (e) { return blad(reply, e); }
     });
 }

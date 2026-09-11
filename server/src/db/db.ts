@@ -243,6 +243,16 @@ export function migrate(database: DatabaseSync) {
     )
     WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
       AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
+  /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
+     „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem
+     poprzedniego zdania nikt nigdzie nie zapisywał. `notatka_przez` też jest
+     puste — autora zastanej notatki nie da się odtworzyć, bo dziennik niósł
+     samą długość. */
+  addColumn("reklamacja_klienta", "notatka_poprzednia", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_at", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_przez", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
   /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
      w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
      za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0
