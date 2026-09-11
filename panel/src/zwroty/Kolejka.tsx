@@ -59,6 +59,14 @@ export const SYGNALY: Record<Sygnal,
   /* Wróciło mniej, niż klient zgłosił. Bursztyn, nie czerwień: to nie jest
      usterka, tylko fakt, który biuro już zapisało — a wypłata się z nim
      zgadza. Kolor mówi „przeczytaj przy reklamacji", nie „napraw teraz". */
+  /* Pobranie czeka na przelew (0.269.0). Bursztyn, nie czerwień: to praca do
+     zrobienia, nie usterka — Allegro tych pieniędzy nie trzymało, więc nikt
+     ich nie odda za nas. Świeci także na zwrocie zamkniętym, bo przelew idzie
+     zwykle PO korekcie. */
+  przelew_czeka: {
+    tytul: "Pobranie — pieniądze oddaje się przelewem, a śladu po nim nie ma",
+    krotko: "przelew?", klasa: "bg-amber-100 text-ranga-uwaga",
+    ikona: <BanknoteArrowDown size={13} /> },
   rozjazd_ilosci: {
     tytul: "Wróciło mniej sztuk, niż klient zgłosił",
     krotko: "mniej szt.", klasa: "bg-amber-100 text-ranga-uwaga",

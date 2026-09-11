@@ -268,15 +268,15 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      `method:` po źródle `biuro.html`. */
   const zrodlo = fs.readFileSync(new URL("./zwroty.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  /* Dwudziesta druga (0.232.0): ręczna synchronizacja zwrotów. Takt chodzi
-     rzadko, bo zwrot ma termin w dniach — a biuro po nadaniu paczki chce
-     zobaczyć zwrot teraz, nie za kwadrans. Zapis, bo woła Allegro i pisze
-     kursor; dlatego podnosi licznik i dostaje to zdanie. */
-  assert.equal(posty.length, 22,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu dwóch`);
+  /* Dwudziesta trzecia i czwarta (0.269.0): zapis przelewu oddanego poza
+     Allegro i jego cofnięcie. Przy pobraniu to JEDYNY ślad po wypłacie —
+     Allegro tych pieniędzy nie trzymało, więc trasa `pieniadze` jest tam
+     zamknięta z definicji, a zwrot zamykał się bez dowodu, że oddaliśmy. */
+  assert.equal(posty.length, 24,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu czterech`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
-    "synchronizuj",
+    "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);

@@ -14,6 +14,7 @@ import type { ZlotaStrefa } from "../types.js";
 import { aliasKodu } from "./ean-alias.js";
 import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
+import { sladZKosza } from "./zwrot-slad.js";
 
 /* ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
    Kosz zastępuje papierową kartkę wożoną z towarem. Cykl życia:
@@ -540,6 +541,16 @@ export function odlozPozycje(
     )
     .run(code, nowIso(), autor, locQueueId, pozycjaId);
 
+  /* ŚLAD NA OSI ZWROTU (0.269.0). Biuro patrzące na zwrot widzi teraz, że
+     towar wrócił na półkę i na którą — do tego wydania rozłożenie zostawiało
+     wyłącznie globalny `logEvent`, więc pytanie „gdzie to leży" kończyło się
+     w Subiekcie albo telefonem na halę. Kosz bez zwrotu (z dokumentu MM,
+     karton) nie ma gdzie tego dopisać i to nie jest awaria. */
+  sladZKosza(db(), pozycjaId, "rozlozenie",
+    `Towar wrócił na półkę ${code} (kosz ${kosz.kod})`,
+    { koszId: kosz.id, kod: kosz.kod, lokalizacja: code, twId, poprawka },
+    autor, nowIso());
+
   /* `manual_entry` WYŁĄCZNIE przy wpisie z klawiatury. To zdarzenie zasila
      dwa raporty (`services/raporty.ts`): udział wejść ręcznych per kod, czyli
      etykiety do przedruku, oraz kolumnę „ręczne" w raporcie wydajności
@@ -812,6 +823,12 @@ export function pominPozycjeKosza(
             zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
      WHERE id=?`
   ).run(tresc, nowIso(), pozycjaId);
+  /* Pominięcie mówi biuru rzecz, o którą samo by nie zapytało: towaru,
+     który zwrot zapowiadał, w koszu nie było. Na osi zwrotu stoi obok oceny
+     i kwoty — czyli tam, gdzie biuro rozstrzyga sprawę z klientem. */
+  sladZKosza(db(), pozycjaId, "kosz_pominiety",
+    `Hala nie znalazła towaru w koszu ${kosz.kod}: ${tresc}`,
+    { koszId: kosz.id, kod: kosz.kod, powod: tresc, twId: p.tw_id }, autor, nowIso());
   logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
     koszId: kosz.id,
     kod: kosz.kod,

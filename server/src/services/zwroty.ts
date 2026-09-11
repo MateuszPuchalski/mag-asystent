@@ -32,7 +32,7 @@ export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | 
 
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci";
+  | "rozjazd_ilosci" | "przelew_czeka";
 
 export interface PozycjaZwrotu {
   id: number;
@@ -249,6 +249,14 @@ export function sygnalyZwrotu(z: {
   kwotaRozjazd?: boolean;
   /** Czy któraś pozycja wróciła w innej liczbie, niż klient zgłosił (0.212.0). */
   rozjazdIlosci?: boolean;
+  /** Forma płatności zamówienia; pobranie oddaje się przelewem (0.269.0). */
+  platnoscTyp?: string | null;
+  /** Kiedy biuro zapisało, że przelew poszedł; `null` = nie ma śladu. */
+  przelewAt?: string | null;
+  /** Czy kwota jest już ustalona — bez niej nie ma czego oddawać. */
+  kwotaUstalona?: boolean;
+  /** Czy zwrot został przyjęty; odmowa nie prosi o pieniądze. */
+  przyjety?: boolean;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
@@ -294,6 +302,19 @@ export function sygnalyZwrotu(z: {
      Tylko na zwrocie w pracy. Na zamkniętych zapaliłby się na całej
      historii sprzed tego panelu — a tam nie ma już czego zapłacić drugi raz. */
   if (wPracy && oddane && !z.pieniadzeAt) s.push("pieniadze_poza_panelem");
+  /* POBRANIE CZEKA NA PRZELEW (0.269.0). Allegro tych pieniędzy nie trzymało,
+     więc przycisk ODDAJ PIENIĄDZE jest zamknięty z definicji — a zwrot zamyka
+     się korektą i schodzi z kolejki. Bez tego sygnału jedynym śladem po
+     niewykonanej wypłacie był brak wyciągu bankowego, czyli nic.
+
+     Świeci TAKŻE na zwrocie zamkniętym, z tego samego powodu co
+     niepotwierdzony przelew: pieniądze wychodzą zwykle po korekcie, więc
+     gaszenie sygnału razem z kubełkiem wyciszałoby go w chwili, w której
+     zaczyna być prawdziwy. Gaśnie dopiero, gdy biuro zapisze przelew. */
+  if (z.platnoscTyp === "CASH_ON_DELIVERY" && z.przyjety && z.kwotaUstalona
+      && !z.przelewAt && !oddane) {
+    s.push("przelew_czeka");
+  }
   /* KWOTA ROZJECHANA Z POZYCJAMI. Świeci także na zwrocie ZAMKNIĘTYM, z tego
      samego powodu co niepotwierdzony przelew: mówi o pieniądzach, które mogły
      wyjść w złej wysokości, a zwrot zamyka się zaraz po korekcie. Gaśnie
@@ -398,6 +419,10 @@ function zloz(
       kwotaRozjazd: kwotaRozjechana(z as never, surowe as never),
       rozjazdIlosci: surowe.some(
         (p) => p.ilosc_zwrocona != null && Number(p.ilosc_zwrocona) !== Number(p.ilosc)),
+      platnoscTyp: zamowienie?.platnoscTyp ?? null,
+      przelewAt: (z.przelew_at as string) ?? null,
+      kwotaUstalona: z.kwota_grosze != null,
+      przyjety: z.werdykt === "przyjety",
     }, teraz),
     terminAt,
     dniDoTerminu: dni,

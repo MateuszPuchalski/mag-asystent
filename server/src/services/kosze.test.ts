@@ -35,6 +35,9 @@ beforeEach(() => {
   const d = db();
   for (const t of ["kosz_pozycja", "kosz", "sgt_towar", "sgt_stan", "sgt_magazyn",
     "sfera_queue",
+    /* Oś zwrotu doszła w 0.269.0: rozkładanie dopisuje na nią ślad, więc
+       zdarzenia z poprzedniego testu policzyłyby się w następnym. */
+    "zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "channel_account",
   ]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -256,6 +259,52 @@ test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async
   const items = (JSON.parse(mm[0].payload) as { items: Array<{ twId: number; qty: number }> }).items;
   assert.deepEqual(items.map((i) => [i.twId, i.qty]), [[900_036, 1]],
     "z bufora schodzi WYŁĄCZNIE to, co magazynier naprawdę odłożył");
+});
+
+test("rozłożenie i pominięcie zostawiają ślad na osi ZWROTU", async () => {
+  /* Kosz wie, z której pozycji zwrotu wziął towar, od 0.192.0 — ale nikt nie
+     czytał tego w drugą stronę. Biuro patrzące na zwrot nie widziało ani
+     tego, że towar wrócił na półkę, ani tego, że go w koszu nie było. */
+  const d = db();
+  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  const zwrotId = Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id,external_id,created_at,synced_at)
+    VALUES (1,'zw-slad','2026-09-01T08:00:00Z','2026-09-01T09:00:00Z')`).run().lastInsertRowid);
+  const pozZwrotu = Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
+    VALUES (?,'111','Sekator',1,4999,'PLN','111|Sekator')`).run(zwrotId).lastInsertRowid);
+
+  const kosz = koszAplikacji("Z-12");
+  d.prepare("UPDATE kosz_pozycja SET zwrot_pozycja_id=? WHERE id=?")
+    .run(pozZwrotu, kosz.pozycje[0].id);
+
+  K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
+  K.pominPozycjeKosza(kosz.pozycje[1].id, "brak_w_koszu", "Magazynier");
+
+  const os = d.prepare("SELECT rodzaj, tresc, kto FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(zwrotId) as Array<{ rodzaj: string; tresc: string; kto: string }>;
+  assert.deepEqual(os.map((z) => z.rodzaj), ["rozlozenie"],
+    "pominięta pozycja należała do innego zwrotu — cudzej osi nie zaśmieca");
+  assert.match(os[0].tresc, /A01-02-03/, "zdanie mówi, GDZIE leży towar");
+  assert.match(os[0].tresc, /Z-12/);
+  assert.equal(os[0].kto, "Magazynier");
+
+  /* Ta sama pozycja pominięta po odłożeniu dopisuje DRUGIE zdanie: obie
+     decyzje hali są faktami o tym samym towarze. */
+  d.prepare("UPDATE kosz_pozycja SET status='todo' WHERE id=?").run(kosz.pozycje[0].id);
+  K.pominPozycjeKosza(kosz.pozycje[0].id, "jednak go nie ma", "Magazynier");
+  const po = d.prepare("SELECT rodzaj FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(zwrotId) as Array<{ rodzaj: string }>;
+  assert.deepEqual(po.map((z) => z.rodzaj), ["rozlozenie", "kosz_pominiety"]);
+});
+
+test("kosz bez zwrotu rozkłada się bez śladu — nie ma gdzie go dopisać", async () => {
+  /* Kosz z dokumentu MM z Subiekta i karton nie mają zwrotu. Brak osi nie
+     jest awarią rozkładania i nie ma prawa wywrócić odłożenia. */
+  const kosz = koszDoRozkladania("KZ-slad");
+  K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
+  assert.equal(
+    (db().prepare("SELECT COUNT(*) AS n FROM zwrot_zdarzenie").get() as { n: number }).n, 0);
 });
 
 test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
