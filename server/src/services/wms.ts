@@ -492,6 +492,14 @@ function stockDocumentHash(input: StockBatch) {
     .digest("hex");
 }
 function existingStockDocument(input: StockBatch) {
+  if (
+    db()
+      .prepare("SELECT 1 FROM wms_inbound WHERE reference=?")
+      .get(input.reference)
+  )
+    fail(
+      "Ten dokument jest obsługiwany w Przyjęciach. Odłóż towar w jego pozycjach, aby nie dodać zapasu drugi raz",
+    );
   const found = db()
     .prepare(
       "SELECT fingerprint,response FROM wms_stock_document WHERE reference=?",

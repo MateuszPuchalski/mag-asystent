@@ -11,6 +11,7 @@ export async function exerciseDesign(page) {
       "orders",
       "stock",
       "stockwork",
+      "inbound",
       "carts",
       "packing",
       "waves",

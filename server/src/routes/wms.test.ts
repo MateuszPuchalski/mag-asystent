@@ -41,6 +41,8 @@ const headers = () => ({
 test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/orders",
+    "/api/wms/inbound",
+    "/api/wms/inbound/1",
     "/api/wms/orders/1",
     "/api/wms/inventory",
     "/api/wms/bins",

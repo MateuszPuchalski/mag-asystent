@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.290.0 — 12 września 2026
+
+- **Przyjęcia WMS.** Oczekiwany dokument, skan SKU, ilość i skan półki zastępują
+  osobne wpisywanie odłożenia oraz zapasu. Sam dokument nie dodaje sztuk.
+- Częściowe dostawy, uszkodzenia w kwarantannie, nadwyżki z decyzją biura,
+  zamknięcie niedoboru i ponowne otwarcie mają wspólną historię.
+- Korekta zachowuje pierwotne odłożenie i tworzy przeciwny ruch. Chroni rezerwacje.
+- Trwałe ponowienia, wersje pozycji i kontrola numeru między Przyjęciami a importem
+  Zapasów zapobiegają podwójnemu przyjęciu. Nieznana lub przeliczana półka blokuje zapis.
+- Mobilne odłożenie pokazuje zdjęcie, ilość i lokalizację razem. Usunięto drugi skan
+  już rozpoznanego SKU oraz konflikt Enter z kolejnością zbiórki.
+- **Użycie:** dla samodzielnego WMS wybierz Przyjęcia. Dotychczasowe Dostawy dotyczą
+  Subiekta. Obecny odbiór obejmuje wyłącznie dane seeded; instrukcja w `docs/wms.md`.
+
 ## 0.289.0 — 12 września 2026
 
 **Uzupełnienie gotowe do skanu po przyjęciu zadania.** Formularz otwiera się

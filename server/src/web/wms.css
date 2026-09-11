@@ -860,3 +860,42 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
     display: none;
   }
 }
+.wms-inbound-product {
+  display: flex;
+  gap: var(--ui-space-4);
+  align-items: start;
+  flex-wrap: wrap;
+}
+.wms-inbound-product > div:not(.wms-photo) {
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  body:has(#widokWms.wms-inbound-focus:not([hidden])) #bok nav.zakladki,
+  #widokWms.wms-inbound-focus .wms-head,
+  .wms-inbound-focus #wms-content > .wms-toolbar,
+  .wms-inbound-focus #wms-content > section > h2,
+  .wms-inbound-focus #wms-content > section > p,
+  .wms-inbound-focus #wms-inbound-scan,
+  .wms-inbound-focus #wms-content > section > details,
+  .wms-inbound-focus #wms-content > details {
+    display: none;
+  }
+  .wms-inbound-product {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: var(--ui-space-3);
+    margin: var(--ui-space-3) 0;
+  }
+  .wms-inbound-product .wms-photo {
+    width: 120px;
+    height: 120px;
+  }
+  .wms-inbound-product p {
+    margin: var(--ui-space-1) 0;
+  }
+  #wms-inbound-putaway .wms-fields {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+}

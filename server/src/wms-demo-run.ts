@@ -13,6 +13,7 @@ const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");
 const W = await import("./services/wms.js");
 const C = await import("./services/wms-carts.js");
+const I = await import("./services/wms-inbound.js");
 const { zapiszWlasne } = await import("./services/zdjecia-wlasne.js");
 const { logEvent } = await import("./services/events.js");
 const password = process.env.WMS_DEMO_PASSWORD;
@@ -91,6 +92,14 @@ zapiszWlasne({
   dodaneByRef: actor.id,
 });
 logEvent("wms_demo_photo", actor.name, 30, { source: "generated-demo-wheel" });
+I.createInbound(actor, randomUUID(), {
+  reference: "DEMO-PZ-001",
+  supplier: "Dostawca demonstracyjny",
+  lines: [
+    { sku: "WMS-0030", quantity: 12 },
+    { sku: "WMS-0002", quantity: 8 },
+  ],
+});
 for (let i = 1; i <= orderCount; i++) {
   let o = W.createOrder(actor, randomUUID(), {
     reference: `SKLEP-${String(i).padStart(5, "0")}`,

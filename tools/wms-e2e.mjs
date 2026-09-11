@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { exerciseCarts } from "./wms-cart-e2e.mjs";
 import { exerciseDesign } from "./wms-design-e2e.mjs";
+import { exerciseInbound } from "./wms-inbound-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -511,6 +512,7 @@ try {
   }
   await expect(page.locator("#wms-work")).toContainText("Trasa zebrana");
   await exerciseCarts(page, output);
+  await exerciseInbound(page, output);
   await page.locator('[data-tab-wms="analytics"]').click();
   await page
     .getByRole("button", { name: "SPRAWDŹ ZGODNOŚĆ STANÓW", exact: true })

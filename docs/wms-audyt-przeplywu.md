@@ -9,8 +9,8 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 
 | Obszar | Co ma być udowodnione | Stan audytu |
 |---|---|---|
-| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Dokumentowe przyjęcie ma idempotencję. Pełny przebieg przyjęcia i odkładania wymaga dalszego przeglądu. |
-| Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Do dalszego przeglądu; plan uzupełnień pomija SKU bez istniejącego wiersza półki kompletacji. |
+| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Bezpośrednie przyjęcie WMS zweryfikowano testami, włącznie z korektą i utratą odpowiedzi. Przyjęcie na bufor i kolektor pozostają otwarte. |
+| Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Bezpośrednie odłożenie obsługuje nowy SKU na zarejestrowanej półce. Plan uzupełnień nadal wymaga istniejącego miejsca kompletacji. |
 | Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Odtworzono i naprawiono oba błędy. Testy regresji opisano niżej. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
 | Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Podstawowy przebieg i duplikaty numerów są testowane; wyjątki wymagają dalszego przeglądu. |
@@ -88,3 +88,48 @@ Trzeba ustalić i przetestować jeden przepływ, który nie wymaga ponownego wpi
 tego samego przyjęcia i nie podwaja zapasu podczas powtórzenia lub korekty odłożenia.
 Dotychczasowe funkcje korekt i nadwyżek oraz bufor offline kolektora muszą być
 uwzględnione przed połączeniem tych zapisów.
+
+## Przyjęcia WMS — wynik kolejnego przeglądu
+
+WMS ma teraz własny przepływ: dokument oczekiwany → skan SKU → ilość → skan
+lokalizacji → ruch zapasu. Samo otwarcie dokumentu nie przyjmuje towaru.
+Nie trzeba przepisywać odłożonej partii do tabeli Zapasów. Dotychczasowe Dostawy
+pozostają procesem Subiekta; ich licznik odłożenia nie jest automatycznie dodawany do WMS.
+
+To świadomy wybór bezpośredniego odłożenia, opisany również w
+[Microsoft: receiving and putaway](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse).
+Rejestracja na osobnej strefie przyjęcia i późniejszy transport pozostają innym procesem.
+Nie udajemy, że dokument oczekiwany potwierdza fizyczny przyjazd dostawy.
+
+Sprawdzone przypadki:
+
+- Brak zapasu przed odłożeniem; częściowe partie pozostają na jednym dokumencie.
+- Ten sam numer i treść wznawiają dokument. Zmieniona treść wymaga wyjaśnienia.
+- Numer przyjęcia nie może być ponownie użyty w imporcie Zapasów; kontrola działa w obu kierunkach.
+- Powtórzenie tej samej komendy odtwarza odpowiedź. Inny klucz z dawną wersją pozycji nie dodaje kolejnej partii.
+- Różne SKU mogą rozliczać różni operatorzy. Wersja pozycji chroni równoległe liczenie tego samego SKU.
+- Obcy SKU, niejednoznaczny EAN, obca pozycja dokumentu i nieznana półka nie tworzą ruchu.
+- Uszkodzenie wymaga uzasadnienia i kwarantanny. Takie sztuki nie są dostępne do zbiórki.
+- Nadwyżka wymaga biura i uzasadnienia. Zakończenie z niedoborem również wymaga decyzji biura.
+- Przeliczana półka blokuje odłożenie; pracownik może wybrać inną zarejestrowaną lokalizację.
+- Korekta zachowuje oryginalne odłożenie i dopisuje ruch przeciwny. Zarezerwowany zapas nie może zostać zabrany.
+- Zamknięte przyjęcie wymaga jawnego ponownego otwarcia z powodem przed korektą lub kolejną partią.
+- Awaria po ruchu wycofuje także licznik przyjęcia i zapis ponowienia.
+- Dokument 5000 SKU można odczytać i rozliczyć poza pierwszą stroną listy.
+
+Próba przeglądarki odtworzyła konflikt kolejności Enter z obsługą zbiórki.
+Po naprawie Enter w polu półki potwierdza odłożenie. Utrata odpowiedzi po zapisie
+została odtworzona przez przerwanie odpowiedzi HTTP; ponowienie nie podwoiło przyjęcia.
+Na ekranie 390 × 844 zdjęcie, ilość, półka i potwierdzenie mieszczą się razem,
+również przy komunikacie błędnej lokalizacji. Już zeskanowany SKU nie wymaga drugiego skanu.
+
+Weryfikacja 0.290.0: pełne 2191 testów serwera i 727 testów panelu przeszło.
+Testy przyjęć obejmują 5000 SKU w jednym dokumencie, bez tworzenia zapasu przed skanem.
+Historia ma stronicowanie, a ruchy odłożenia i korekty są niezmienne.
+Osobna próba 101 odłożeń sprawdziła przejście do starszych zapisów i korektę pierwszego ruchu.
+Lokalny axe-core 4.13.0 nie zgłosił naruszeń wybranych reguł WCAG A/AA i 2.1 AA
+na aktywnym formularzu przy 320, 390 i 1440 px. Nie stwierdzono przewijania całej strony w poziomie.
+
+Dalszy zakres celu: przyjęcia na strefę buforową z późniejszym odłożeniem, fizyczne
+próby organizacji hali, powiązanie kolektora Android oraz pełna analityka przyjęcie–wysyłka.
+WMS obsługuje obecnie bezpośrednie odłożenie przez przeglądarkę i dane seeded.

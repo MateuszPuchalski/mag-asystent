@@ -431,3 +431,30 @@ Historyczne rekordy są osobnymi danymi testowymi; właściwe operacje zapisu sp
 
 Zakres tego odbioru kończy się na danych seeded.
 Rzeczywiste kanały sprzedaży, usługi przewoźników, sprzęt i dokumenty ERP pozostają osobnym etapem wdrożenia.
+## Przyjęcia i odkładanie
+
+Obszar **Przyjęcia** prowadzi dostawę do fizycznego zapasu WMS. Biuro tworzy
+dokument z unikalnym numerem, dostawcą oraz oczekiwanymi pozycjami `SKU;ilość`.
+Można wkleić dwie kolumny z arkusza, do 5000 SKU. Numer musi być unikalny
+także między dostawcami, np. `DOSTAWCA/2026/123`.
+
+Magazynier otwiera dokument i skanuje produkt. Zdjęcie pomaga rozpoznać część.
+Wpisuje odłożoną ilość i skanuje istniejącą lokalizację. Potwierdzenie tworzy ruch
+i aktualizuje przyjęcie w jednej transakcji. Towar na kompletacji staje się dostępny,
+a odłożony na zapleczu wymaga uzupełnienia. Sam dokument nie dodaje zapasu.
+
+Uszkodzony towar wymaga kwarantanny i opisu. Nadwyżkę zatwierdza biuro z powodem.
+Częściową dostawę można pozostawić otwartą; zamknięcie z brakiem wymaga decyzji biura.
+Przy błędzie sieci użyj **PONÓW**, zachowując tę samą operację.
+
+Biuro może wycofać konkretne odłożenie w historii dokumentu, po skanie SKU,
+lokalizacji i wpisaniu powodu. Korekta cofa całe wskazane odłożenie; następnie przyjmij
+poprawną ilość. System zachowuje historię i chroni sztuki zarezerwowane dla zamówień.
+Zamknięty dokument trzeba wcześniej otworzyć ponownie z uzasadnieniem.
+
+Nie rejestruj tego samego dokumentu przez import w **Zapasach**. Wspólny numer
+jest blokowany w obu kierunkach. Nie używaj innego numeru do obejścia tej kontroli.
+Dotychczasowy obszar **Dostawy** obsługuje proces Subiekta; jego odłożenia nie zasilają
+automatycznie WMS. Dla samodzielnego WMS używaj **Przyjęć**.
+
+Demo zawiera oczekiwaną dostawę `DEMO-PZ-001`, jeszcze bez ruchów przyjęcia.

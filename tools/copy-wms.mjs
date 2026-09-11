@@ -4,6 +4,7 @@ for (const file of [
   "wms-photos.js",
   "wms-carts.js",
   "wms-stock-work.js",
+  "wms-inbound.js",
   "wms.css",
   "biuro-theme.js",
   "biuro-theme.css",

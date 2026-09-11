@@ -100,6 +100,18 @@ window.Wms = (() => {
     refresh,
     message,
   });
+  const inboundUi = window.WmsInbound({
+    html,
+    field,
+    read,
+    mutate,
+    focus: focusWhenReady,
+    office,
+    refresh,
+    message,
+    photo: photos.markup,
+    mountPhotos: () => photos.mount(root()),
+  });
   const badge = (o) =>
     `<span class="wms-status ${o.hold_reason ? "held" : html(o.status)}">${o.hold_reason ? "Wstrzymane" : states[o.status]}</span>`;
   const pendingKey = () => `wertis.wms.pending.${user?.userId}`;
@@ -246,9 +258,10 @@ window.Wms = (() => {
     }
   }
   function shell() {
-    root().classList.remove("wms-cart-focus");
+    root().classList.remove("wms-cart-focus", "wms-inbound-focus");
     const tabs = [
       ["orders", "Zamówienia"],
+      ["inbound", "Przyjęcia"],
       ["stock", "Zapasy"],
       ["stockwork", "Zadania zapasu"],
       ["carts", "Wózki 20 / 30"],
@@ -288,6 +301,7 @@ window.Wms = (() => {
       if (view === "packing") await cartUi.renderPacking();
       if (view === "stock") await stocks(turn);
       if (view === "stockwork") await stockWorkUi.render();
+      if (view === "inbound") await inboundUi.render();
       if (view === "bins") await bins(turn);
       if (view === "analytics") await report(turn);
       if (view === "dispatch") await dispatch(turn);
@@ -300,6 +314,7 @@ window.Wms = (() => {
   }
   function readFailure(error, turn) {
     if (turn !== generation) return;
+    root().classList.remove("wms-inbound-focus", "wms-cart-focus");
     current = null;
     root()._waveTask = null;
     el("wms-content").innerHTML =
@@ -662,6 +677,7 @@ window.Wms = (() => {
     try {
       if (await cartUi.click(button)) return;
       if (await stockWorkUi.click(button)) return;
+      if (await inboundUi.click(button)) return;
       if (button.dataset.dispatchOrderWms) {
         selected = Number(button.dataset.dispatchOrderWms);
         view = "orders";
@@ -798,6 +814,7 @@ window.Wms = (() => {
       const values = Object.fromEntries(new FormData(f));
       if (await cartUi.submit(f, values)) return;
       if (await stockWorkUi.submit(f, values)) return;
+      if (await inboundUi.submit(f, values)) return;
       if (f.id === "wms-dispatch-filter") {
         dispatchDay = values.day;
         query = values.q;
@@ -1087,6 +1104,7 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
+    if (inboundUi.keydown(event)) return;
     if (
       event.key === "Enter" &&
       event.target.form?.id === "wms-stockwork-complete"

@@ -23,6 +23,56 @@ CREATE TABLE IF NOT EXISTS wms_stock (
   version INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY(tw_id, bin)
 );
+-- Dokument oczekiwany nie jest zapasem. Dopiero potwierdzone odłożenie tworzy ruch.
+CREATE TABLE IF NOT EXISTS wms_inbound (
+  id INTEGER PRIMARY KEY,
+  reference TEXT NOT NULL UNIQUE,
+  supplier TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  closed_at TEXT,
+  close_reason TEXT,
+  version INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS ix_wms_inbound_open ON wms_inbound(created_at,id) WHERE closed_at IS NULL;
+CREATE TABLE IF NOT EXISTS wms_inbound_line (
+  id INTEGER PRIMARY KEY,
+  inbound_id INTEGER NOT NULL REFERENCES wms_inbound(id),
+  tw_id INTEGER NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  barcode TEXT,
+  expected INTEGER NOT NULL CHECK(expected>0),
+  received INTEGER NOT NULL DEFAULT 0 CHECK(received>=0),
+  damaged INTEGER NOT NULL DEFAULT 0 CHECK(damaged>=0 AND damaged<=received),
+  version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(inbound_id,tw_id)
+);
+CREATE TABLE IF NOT EXISTS wms_inbound_putaway (
+  id INTEGER PRIMARY KEY,
+  line_id INTEGER NOT NULL REFERENCES wms_inbound_line(id),
+  bin TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  disposition TEXT NOT NULL CHECK(disposition IN ('good','damaged')),
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wms_inbound_putaway_line ON wms_inbound_putaway(line_id,id);
+CREATE TABLE IF NOT EXISTS wms_inbound_reversal (
+  putaway_id INTEGER PRIMARY KEY REFERENCES wms_inbound_putaway(id),
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS wms_inbound_reversal_no_update BEFORE UPDATE ON wms_inbound_reversal
+BEGIN SELECT RAISE(ABORT, 'inbound reversal is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_inbound_reversal_no_delete BEFORE DELETE ON wms_inbound_reversal
+BEGIN SELECT RAISE(ABORT, 'inbound reversal is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_inbound_putaway_no_update BEFORE UPDATE ON wms_inbound_putaway
+BEGIN SELECT RAISE(ABORT, 'inbound putaway is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_inbound_putaway_no_delete BEFORE DELETE ON wms_inbound_putaway
+BEGIN SELECT RAISE(ABORT, 'inbound putaway is immutable'); END;
 CREATE INDEX IF NOT EXISTS ix_wms_stock_bin ON wms_stock(bin, tw_id);
 -- Zapas kwarantanny i zapas zaplecza są widoczne, ale nie trafiają do zbiórki.
 CREATE TABLE IF NOT EXISTS wms_bin (

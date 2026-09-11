@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import * as Carts from "../services/wms-carts.js";
 import * as StockWork from "../services/wms-stock-work.js";
+import * as Inbound from "../services/wms-inbound.js";
 import { ZodError, z } from "zod";
 import { sesjaZadania } from "../context.js";
 import {
@@ -72,6 +73,37 @@ export async function wmsRoutes(app: FastifyInstance) {
     actor();
     return listOrders(req.query);
   });
+  app.get("/api/wms/inbound", async (req) => {
+    actor();
+    return Inbound.listInbound(req.query);
+  });
+  app.get<{ Params: { id: string } }>("/api/wms/inbound/:id", async (req) => {
+    actor();
+    return Inbound.getInbound(orderId(req.params.id), req.query);
+  });
+  app.post("/api/wms/inbound", { bodyLimit: 1024 * 1024 }, async (req) =>
+    Inbound.createInbound(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  for (const [path, action] of Object.entries({
+    putaway: Inbound.putawayInbound,
+    close: Inbound.closeInbound,
+    reopen: Inbound.reopenInbound,
+    reverse: Inbound.reverseInbound,
+  }))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/inbound/:id/${path}`,
+      async (req) =>
+        action(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
   app.get("/api/wms/carts", async () => Carts.listCarts(actor()));
   app.get<{ Params: { code: string } }>("/api/wms/carts/:code", async (req) =>
     Carts.getCart(actor(), req.params.code),
