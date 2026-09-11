@@ -23,6 +23,7 @@ import { LIMIT_ZNAKOW } from "./wysylka.js";
 import { bezPodpisu, zwin } from "../tekst.js";
 import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
+import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygnaturze.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -52,7 +53,11 @@ export type RodzajFaktu =
   /* Treść oferty (0.253.0). TRZY rodzaje, nie jeden, bo mają różną wagę:
      parametr stoi w polu formularza, zgodność na liście Allegro, a opis to
      proza sprzedawcy, w której wymiar bywa sprzed dwóch wersji towaru. */
-  | "oferta_opis" | "oferta_parametry" | "oferta_zgodnosc";
+  | "oferta_opis" | "oferta_parametry" | "oferta_zgodnosc"
+  /* Adres NASZEJ aktywnej aukcji na daną kartotekę (0.270.0). Osobny rodzaj,
+     bo to jedyny fakt, który model ma prawo przepisać klientowi DOSŁOWNIE —
+     reszta jest materiałem na zdanie, a link jest linkiem albo niczym. */
+  | "oferta_link";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -60,9 +65,12 @@ export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
  * Fakty w kształcie do wysyłki. Typ OZDOBIONY jak `TrescBezpieczna`, ale
  * z INNEGO powodu: fakty nie przechodzą przez `zamaskuj()`, bo reguła „dziewięć
  * cyfr to telefon" zjadłaby numery OEM — dokładnie te dane, które szkic ma
- * cytować. Bezpieczeństwo bierze się z KONSTRUKCJI: fakty składa wyłącznie
- * `kontekstSzkicu()` z własnych danych firmy, bez tekstu klienta, bez półki,
- * bez nazwiska pracownika. Producentem tego typu jest ten jeden plik.
+ * cytować. Bezpieczeństwo bierze się z KONSTRUKCJI: fakty składa TEN PLIK z własnych
+ * danych firmy, bez tekstu klienta, bez półki, bez nazwiska pracownika.
+ * Składają je dwa miejsca i oba są tutaj: `kontekstSzkicu()` (czysty odczyt)
+ * oraz `dopiszLinkiOfert()` (0.270.0), które dokłada adresy naszych aktywnych
+ * aukcji — jedyny fakt wymagający sieci, więc jedyny, którego czysty odczyt
+ * nie mógł zebrać. Producentem tego typu jest ten jeden plik.
  */
 export type FaktyBezpieczne = string & { readonly __fakty: unique symbol };
 
@@ -888,6 +896,49 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
 }
 
 /**
+ * Dokłada do faktów adresy NASZYCH aktywnych aukcji (0.270.0).
+ *
+ * Osobno od `kontekstSzkicu`, bo wymaga SIECI, a tamten ma zostać czystym
+ * odczytem (blizna 0.18.0: otwarcie rozmowy nie strzela do Allegro). Osobno
+ * też dlatego, że numeracja faktów musi biec dalej, a nie od nowa — `F12`
+ * w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa.
+ *
+ * Pytamy o symbole z BIAŁEJ LISTY kartotek, czyli o to, co serwer sam położył
+ * na stole: kartotekę oferty, wybranego kandydata, kandydatów, kotwice. Nigdy
+ * o symbol z treści wiadomości — ta granica jest tu ta sama, co wszędzie
+ * indziej w doborze.
+ *
+ * Pusta mapa nie dokłada ani jednego faktu i to jest właściwe zachowanie:
+ * „nie znamy aktywnej aukcji na tę kartotekę" ma wyglądać jak cisza, a nie
+ * jak zdanie, które model mógłby wziąć za zaproszenie do zgadywania.
+ */
+export function dopiszLinkiOfert(
+  k: KontekstSzkicu, linki: Map<string, LinkDoOferty>,
+): KontekstSzkicu {
+  if (linki.size === 0) return k;
+  const fakty = [...k.fakty];
+  for (const kartoteka of k.kartoteki.values()) {
+    const l = linki.get(zwin(kartoteka.symbol));
+    if (!l) continue;
+    fakty.push({
+      id: `F${fakty.length + 1}`,
+      rodzaj: "oferta_link",
+      /* Bez półpauzy, i to nie jest drobiazg: `copilot.anthropic.ts` przyznaje
+         w komentarzu, że zakaz myślnika jest najsłabszą z pięciu reguł, bo
+         model czyta nasz własny tekst jako wzorzec. Fakt czyta tak samo. */
+      zdanie: `NASZA AKTYWNA OFERTA na kartotekę ${kartoteka.symbol}: „${l.nazwa}”, adres: ${l.link}`
+        .replace(/\s+/g, " ").trim(),
+    });
+  }
+  if (fakty.length === k.fakty.length) return k;
+  return {
+    ...k,
+    fakty,
+    tekstFaktow: fakty.map((f) => `${f.id}: ${f.zdanie}`).join("\n") as FaktyBezpieczne,
+  };
+}
+
+/**
  * Ułożenie szkicu: fakty → model → SPRAWDZENIE → zapis. Rzuca, gdy dostawca
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
  * płatne i ląduje w księdze jako `blad`.
@@ -907,7 +958,20 @@ export async function ulozSzkic(
   const oferta = ofertaRozmowy(db(), conversationId);
   if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
 
-  const k = kontekstSzkicu(conversationId, subiekt);
+  const kontekst = kontekstSzkicu(conversationId, subiekt);
+
+  /* LINKI DO NASZYCH AKTYWNYCH AUKCJI (0.270.0). Do 0.269.0 model nie dostawał
+     ani jednego adresu, więc zamiast wskazać ofertę pisał klientowi, żeby
+     poszukał po nazwie albo po EAN-ie — czyli zadawał mu pracę, którą mamy
+     zrobioną. Powód nie był w instrukcji: `offer_snapshot` zna wyłącznie
+     aukcje, pod którymi ktoś napisał, a odwrotnego wyszukania nie było wcale.
+
+     JEDNO żądanie na komplet kandydatów (`external.id` jest tablicą) i dopiero
+     TU, nie w `kontekstSzkicu` — tamten zostaje czystym odczytem. Błąd, także
+     limit, nie przerywa szkicu: to ostatnie żądanie do Allegro na tej drodze,
+     więc nie ma czego chronić przed pogłębieniem przerwy. */
+  const k = dopiszLinkiOfert(kontekst, await ofertyPoSygnaturze(
+    [...kontekst.kartoteki.values()].map((x) => x.symbol)));
 
   /* ZAPIS WIEDZY Z OFERTY PRZED WYWOŁANIEM MODELU (0.264.0) — i to jest cała
      treść tego wydania. Wiedza ma zostać w bazie także wtedy, gdy dostawca

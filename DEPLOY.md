@@ -1652,6 +1652,26 @@ stary `dist` z nową bazą mieszałby dwie wersje.
 proponują go same przy otwarciu aplikacji (§5). Pasek na dole ekranu pokazuje
 obie wersje i podświetla rozjazd; dotknięcie go pyta serwer od razu.
 
+**Aktualizacja do 0.270.0 nie wymaga niczego ręcznego.**
+
+Migracji nie ma, kolumn nie przybywa, **nowego uprawnienia Allegro też nie**.
+Szkic pyta o oferty tą samą końcówką `/sale/offers`, z której panel korzysta
+od 0.178.0 po tytuł i cenę — zmienia się tylko filtr.
+
+Co się zmienia w pracy biura: układanie odpowiedzi kosztuje odtąd **jedno
+dodatkowe żądanie do Allegro**. W zamian szkic potrafi wkleić adres naszej
+aktywnej aukcji, zamiast pisać klientowi, żeby poszukał po nazwie.
+
+Działa to wtedy, gdy sygnatura na aukcji jest równa symbolowi kartoteki.
+Sprawdź kartę **Pokrycie sygnatur** w ustawieniach za zębatką: im więcej
+sygnatur trafia w kartotekę, tym częściej szkic poda link. Przy pustych
+sygnaturach funkcja będzie po prostu milczeć i to jest zachowanie zamierzone.
+
+Wygaszone aukcje są odfiltrowane po stronie Allegro, więc link prowadzi do
+oferty, która stoi w chwili układania szkicu.
+
+**Panel obsługi przebudowywać nie trzeba** — ta zmiana żyje po stronie serwera.
+
 **Aktualizacja do 0.268.0 nie wymaga niczego ręcznego — poza jedną decyzją.**
 
 Migracji nie ma, kolumn nie przybywa. **Panel obsługi trzeba przebudować**

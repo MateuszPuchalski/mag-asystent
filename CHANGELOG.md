@@ -35,6 +35,47 @@ historii nie przepisujemy.
 
 
 <<<<<<< HEAD
+## 0.270.0 — 11 września 2026
+
+**Szkic podaje link do naszej oferty zamiast kazać klientowi szukać.**
+Właściciel, czytając szkic o presostacie: „model powinien proponować oferty,
+jeśli jest pewny linki do ofert". Szkic pisał wtedy „proszę o wyszukanie po
+nazwie albo po kodzie EAN" — zadawał klientowi pracę, którą mamy zrobioną.
+
+**Powód nie był w instrukcji modelu.** System nie miał katalogu własnych ofert.
+Tabela snapshotów zna wyłącznie aukcje, pod którymi ktoś kiedyś napisał, bo
+synchronizator dociąga tylko te, na które wskazuje wiadomość. Pytania „która
+nasza oferta sprzedaje tę kartotekę" nie zadawał nikt w całym repozytorium,
+więc model nie dostawał ani jednego adresu i podać go nie mógł.
+
+Od tego wydania układanie szkicu pyta Allegro o oferty po sygnaturze
+sprzedawcy. Parametr jest w specyfikacji tablicą, więc komplet kandydatów
+kosztuje **jedno** żądanie, a filtr statusu odsiewa aukcje wygaszone: link do
+zakończonej oferty jest gorszy od braku linku.
+
+**Katalogu ofert świadomie nie budujemy.** Trzeba by go odświeżać, a nieświeży
+produkuje linki do aukcji, których już nie ma, czyli dokładnie tę awarię,
+której ta funkcja ma zapobiec. Pytanie na żądanie wraca zawsze aktualne.
+
+Adres wchodzi do faktów jako osobny rodzaj i dwie nowe reguły mówią modelowi,
+co z nim zrobić: podaj go zamiast opisywać, jak szukać, i **nigdy nie składaj
+adresu samodzielnie**. Brak takiego faktu znaczy „nie wiemy o aktywnej
+aukcji", a nie „zgadnij" — twierdzenie, że aukcja istnieje, jest wtedy zakazane.
+
+Warunek działania: sygnatura na aukcji musi być równa symbolowi kartoteki. Jak
+bardzo jest, mówi karta „Pokrycie sygnatur" w ustawieniach.
+
+Odmowa Allegro, także limit, **nie przerywa szkicu**. To ostatnie żądanie na
+tej drodze, więc nie ma czego chronić przed pogłębieniem przerwy. Szkic bez
+linku jest wart tyle, ile był wart wczoraj; szkic, który nie powstał, nie jest
+wart nic.
+
+**Naprawiona bomba zegarowa z 0.268.0.** Test raportu skuteczności doboru miał
+w sobie zaszytą datę: przechodził w dniu napisania i wywrócił się nazajutrz,
+bo raport liczy okno od teraz, a test od stałej. Znaczniki idą odtąd od
+bieżącego czasu. Reguła na przyszłość stoi w komentarzu: test raportu z oknem
+czasowym nie ma prawa znać ani jednej konkretnej daty.
+
 ## 0.269.0 — 10 września 2026
 
 **Zwrot zostawia ślad w dwóch miejscach, w których dotąd milczał.** Właściciel
