@@ -11,6 +11,11 @@ import {
   ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
+import {
+  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
+} from "../services/reklamacje-zalaczniki.js";
+import { nadawcaRozpoznaniaAnthropic } from "../adapters/copilot.anthropic.js";
+import { rozpoznajSprawe } from "../services/copilot-reklamacja.js";
 import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
@@ -59,6 +64,17 @@ function blad(reply: FastifyReply, e: unknown) {
 }
 
 const autor = () => sesjaZadania()?.user.name ?? "?";
+
+/** Jedno zdanie o tym, dlaczego Copilota nie ma — pisze je SERWER (§21). */
+function czemuCopilotWylaczony(): string | null {
+  if (config.copilot.mode === "off") {
+    return "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).";
+  }
+  if (!config.copilot.klucz) {
+    return "Copilot nie ma klucza. Ustaw ANTHROPIC_API_KEY w wertis.env i zrestartuj usługę.";
+  }
+  return null;
+}
 
 export async function reklamacjeRoutes(app: FastifyInstance) {
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
@@ -248,6 +264,84 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
      `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
+  /**
+   * Copilot reklamacyjny: karta faktów ze sprawy (0.275.0).
+   *
+   * ZBIERA DANE, NIE RADZI — i to jest cała treść tej trasy. Werdykt stoi
+   * osobno, za `autoryzuj()` i za jawną zgodą; gdyby maszyna miała cokolwiek
+   * do powiedzenia o rozstrzygnięciu, byłby to ten sam przycisk, a nie ten.
+   *
+   * Zapisem jest, bo zapisuje kartę i wiersz w księdze Copilota. Dlaczego
+   * `POST`, a nie `GET` mimo braku decyzji człowieka: żądanie KOSZTUJE
+   * pieniądze u dostawcy, a przeglądarka powtarza i wstępnie pobiera `GET`-y
+   * bez pytania. Rachunek za odruch nawigacji byłby złym sposobem, żeby się
+   * o tym dowiedzieć.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/rozpoznaj", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const powod = czemuCopilotWylaczony();
+      if (powod) return reply.code(400).send({ error: powod });
+      const s = sesjaZadania()!;
+      try {
+        const karta = await rozpoznajSprawe({
+          reklamacjaId: Number(req.params.id),
+          kto: { id: s.user.userId, name: s.user.name },
+          nadaj: nadawcaRozpoznaniaAnthropic,
+        });
+        return { karta };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
+     Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
+     `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
+     Multipart wymagałby wtyczki Fastify dla jednej trasy.
+
+     Odczyt listy nie jest zapisem, więc idzie GET-em i niczego nie mutuje. */
+  app.get<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      return { zalaczniki: zalacznikiDoWyslania(db(), Number(req.params.id)) };
+    });
+
+  app.post<{ Params: { id: string }; Body: { nazwa?: string; typ?: string; dane?: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      try {
+        /* `Buffer.from(..., "base64")` MILCZY przy śmieciach — oddaje krótszy
+           bufor zamiast rzucić. Pusty wynik przy niepustym wejściu znaczy
+           więc „to nie jest base64", i tak trzeba to nazwać. */
+        const surowe = String(req.body?.dane ?? "");
+        const dane = Buffer.from(surowe, "base64");
+        if (surowe.length > 0 && dane.byteLength === 0) {
+          throw new Error("Treść pliku nie jest poprawnym base64");
+        }
+        return await dodajZalacznikSprawy({
+          reklamacjaId: Number(req.params.id),
+          nazwa: String(req.body?.nazwa ?? ""),
+          typ: String(req.body?.typ ?? ""),
+          dane,
+          autor: { id: s.user.userId, name: s.user.name },
+        });
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.delete<{ Params: { id: string; zid: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki/:zid", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      const zdjety = usunZalacznikSprawy(db(), Number(req.params.id), Number(req.params.zid),
+        { id: s.user.userId, name: s.user.name });
+      if (!zdjety) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
+      return { ok: true };
+    });
+
   app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
     "/api/obsluga/reklamacje/:id/prowadze", async (req, reply) => {
       const nie = odmowa(reply);

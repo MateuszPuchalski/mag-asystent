@@ -637,8 +637,25 @@ Sonda widziała załączniki przy 57 sprawach na 100.
 **Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
 odczycie — tak samo jak przy skrzynce i przy zwrotach.
 
-**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
-ekranu i w tym przyroście go nie dostaje.
+**Do dostawcy modelu idzie ZAMASKOWANA rozmowa (0.275.0).** Do 0.274.0 Copilot
+nie miał dostępu do tego ekranu wcale. Właściciel poprosił 11 września o wersję
+„zbierającą dane", więc rozmowa reklamacyjna wychodzi do dostawcy — ale przez
+ten sam moduł maskowania, co w skrzynce (§14.4), i pod tą samą gwarancją:
+wartość znika, ślad zostaje.
+
+Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
+ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
+po ZNANEJ wartości, nie po wzorcu. Nie wychodzi nic spoza rozmowy: ani notatka
+biura, ani znacznik „kto prowadzi", ani kartoteka, ani kwoty.
+
+Co wraca i gdzie ląduje: karta faktów przy sprawie. Werdyktu w niej nie ma
+i nie będzie — karta z sugestią rozstrzygnięcia jest odrzucana w całości przez
+bramkę w kodzie, nie przez prompt.
+
+Do dziennika idą liczby: ile braków, ile dowodów, ile pól odsiano jako
+niepokryte cytatem. Rachunek u dostawcy zapisuje się w księdze Copilota razem
+z numerem sprawy — także wtedy, gdy wywołanie skończyło się błędem, bo próba,
+która nie doszła, też bywa płatna.
 
 **Do dziennika nie idzie treść.** `logEvent` przy notatce i przy wysyłce
 zapisuje jej DŁUGOŚĆ, nigdy słowa: `events` nie ma retencji i nie jest kasowane.
@@ -649,9 +666,24 @@ znacznik „kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia. Ciało
 żądania ma dwa pola — `text` i `type: "REGULAR"` — i składa je adapter, więc
 nie ma drogi, którą dołożyłoby się trzecie.
 
-**Załączniki wychodzące nie istnieją.** Decyzja właściciela z 7 września 2026.
-Plik z naszego dysku nie ma jak trafić do Allegro tą trasą, bo panel nie ma
-czego wysłać: pola na to nie ma ani w formularzu, ani w ciele żądania.
+**Załączniki wychodzące ISTNIEJĄ od 0.274.0.** Właściciel odwrócił decyzję
+z 7 września cztery dni później. Od tego wydania plik z naszego dysku opuszcza
+maszynę i to jest zmiana w polityce danych, nie w wyglądzie ekranu.
+
+Co dokładnie wychodzi: bajty pliku, jego nazwa i rozmiar — nic więcej. Plik
+idzie do Allegro W CHWILI DODANIA, nie przy wysyłce wiadomości, więc odmowa
+typu albo rozmiaru pada, gdy jeszcze da się wybrać inny. U nas zostaje numer
+nadany przez Allegro, nazwa, typ i rozmiar; BAJTÓW NIE TRZYMAMY ani chwili
+dłużej, niż trwa żądanie.
+
+Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak samo jak przy
+załącznikach przychodzących. Do dziennika idą nazwa, typ i rozmiar — nigdy
+zawartość.
+
+Cena tej decyzji jest jawna: plik dodany i nigdy niewysłany zostaje u Allegro
+jako deklaracja bez wiadomości. To śmieć po ICH stronie i nie ma końcówki,
+którą dałoby się go sprzątnąć — ekran nie ma więc prawa obiecywać, że zdjęcie
+załącznika „usunęło go z Allegro". Kasuje wyłącznie nasz wiersz.
 
 **Kopia wysłanego tekstu zostaje u nas dwa razy.** Raz w `reklamacja_outbox`
 jako ślad PRÓBY — także tej nieudanej i tej niejednoznacznej — i raz na osi

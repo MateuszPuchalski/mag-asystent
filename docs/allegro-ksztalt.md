@@ -723,16 +723,36 @@ Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
 Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik Allegro rozjechał się
 z naszym — odświeżenie ma kosztować jedno żądanie, gdy nic nowego nie przyszło.
 
-### Zapisy rodziny `issues`: czego nadal NIE robimy
+### Załączniki WYCHODZĄCE: `POST /sale/issues/attachments` + `PUT` (0.274.0)
 
-`POST /sale/issues/attachments` (deklaracja) i `PUT /sale/issues/attachments/{id}`
-(wgranie) — czyli załączniki WYCHODZĄCE, pole `MessageRequest.attachments`.
-Decyzja właściciela z 7 września 2026 brzmiała „sam tekst" i trzyma się do dziś.
+Decyzja właściciela z 7 września brzmiała „sam tekst" i trzymała się cztery dni;
+11 września ją odwrócił. Droga jest dwukrokowa jak w Centrum Wiadomości:
+deklaracja oddaje numer, `PUT` niesie bajty, a `MessageRequest.attachments`
+wymienia numery przy wiadomości (`PostPurchaseIssueAttachmentId`, czyli `{ id }`).
 
-Wzorzec stoi gotowy: skrzynka robi dwukrokowe wgranie od 0.195.0
-(`services/zalaczniki-wysylki.ts`). Brakuje decyzji, nie kodu — razem z nią
-przyjdzie akapit polityki danych, bo od tego momentu plik z naszego dysku
-zaczyna opuszczać maszynę.
+**TO INNY KSZTAŁT NIŻ PRZY CENTRUM WIADOMOŚCI, choć robi to samo.** Deklaracja
+sprawy używa schematu `AttachmentDeclaration` z polem **`fileName`**, a
+`/messaging/message-attachments` — schematu `NewAttachmentDeclaration` z polem
+**`filename`**. Różnica jednej litery przy polu obowiązkowym w obu.
+
+To jest dokładnie ta pułapka, przed którą ostrzega `CLAUDE.md`: `public.v1`
+i `beta.v1` bywają RÓŻNYMI kształtami, nie wariantami jednego. Kształt czyta się
+z pliku, nie z pamięci o sąsiedniej końcówce — a sąsiednia końcówka stała
+gotowa i kusiła.
+
+Druga różnica: schemat spraw **nie podaje maksymalnego rozmiaru** (messaging
+podaje 5 MiB), więc granicą jest wyłącznie nasza — cztery megabajty, bo plik
+jedzie do nas base64 w JSON i rośnie o jedną trzecią.
+
+**Adres wgrania bierze się z nagłówka `Location`.** Specyfikacja mówi to wprost:
+„The URL is unique and one-time. As its format may change in time, you should
+always use the address from the header. Do not compose the address on your own".
+Adres składany z identyfikatora zostaje jako droga awaryjna i zostawia ślad
+w dzienniku — bez niej brak jednej linijki w odpowiedzi zabijałby całą funkcję,
+a z nią wiadomo, że Allegro przestało nagłówek przysyłać.
+
+Typy plików są te same, co przy Centrum Wiadomości: PNG, GIF, BMP, TIFF, JPEG
+i PDF. Innych `requestBody` wgrania NIE wymienia.
 
 ### Załącznik: typ rozstrzygają BAJTY
 

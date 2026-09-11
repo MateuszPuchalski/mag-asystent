@@ -227,6 +227,12 @@ export function migrate(database: DatabaseSync) {
      dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
      prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
   addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
+  /* Księga Copilota zna od 0.275.0 także sprawy posprzedażowe. `conversation_id`
+     się do tego nie nadaje: reklamacja nie ma wiersza w `conversation`, a klucz
+     obcy wywróciłby zapis. Tabela stoi na produkcji od etapu F, więc kolumna
+     dochodzi migracją; stare wiersze mają NULL, czyli „to było o rozmowie". */
+  addColumn("copilot_wywolanie", "reklamacja_id",
+    "INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL");
   addColumn("reklamacja_klienta", "werdykt", `TEXT CHECK (werdykt IS NULL OR werdykt IN (
     'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
     'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',

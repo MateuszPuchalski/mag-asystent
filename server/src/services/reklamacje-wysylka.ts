@@ -3,6 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { wyslijWiadomoscSprawy, type TypWiadomosciSprawy } from "../adapters/allegro.http.js";
 import { logEvent } from "./events.js";
 import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
+import { zalacznikiDoWyslania } from "./reklamacje-zalaczniki.js";
 import {
   BladReklamacji, NAZWA_SPRAWY, ReklamacjaConflict, type TypSprawy,
 } from "./reklamacje.js";
@@ -49,7 +50,7 @@ export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed
 
 /** Wysyłka wstrzykiwana, żeby test nie strzelał do Allegro (wzorzec skrzynki). */
 export type WyslijWiadomosc = (
-  issueId: string, tekst: string, typ: TypWiadomosciSprawy,
+  issueId: string, tekst: string, typ: TypWiadomosciSprawy, zalaczniki?: readonly string[],
 ) => Promise<{ id?: string; createdAt?: string } | null>;
 
 /** Typy, które panel wysyła: zwykła wiadomość i dwa stanowiska o towarze. */
@@ -140,7 +141,8 @@ const outboxPoKluczu = (database: Db, klucz: string) => database.prepare(
 export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpowiedzi> {
   const database = z.database ?? defaultDb();
   const wyslij: WyslijWiadomosc = z.wyslij
-    ?? ((id, tekst, typ) => wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst, typ));
+    ?? ((id, tekst, typ, zal) =>
+      wyslijWiadomoscSprawy(config.allegro.apiUrl, id, tekst, typ, zal ?? []));
   const typ: TypOdpowiedzi = z.typ ?? "REGULAR";
 
   const rodzaj: TypSprawy = z.rodzaj ?? "CLAIM";
@@ -175,8 +177,15 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
      zwykła wiadomość sprzed chwili, to inny zamiar — strażnik dubletu nie ma
      prawa oddać tamtej próby zamiast wysłać `RETURN_*`. Zwykła wiadomość
      trzyma klucz jak w 0.224.0, żeby stare wiersze outboxu dalej pasowały. */
+  /* ZAŁĄCZNIKI WCHODZĄ DO KLUCZA (0.274.0). Ta sama treść z dołożonym
+     zdjęciem to inna wiadomość u kupującego, więc strażnik dubletu nie ma
+     prawa oddać poprzedniej próby zamiast wysłać nową. Wspólny rdzeń
+     `kluczWysylki` przyjmuje listę i sortuje ją sam — kolejność dodawania
+     plików nie jest zamiarem agenta. */
+  const zalaczniki = zalacznikiDoWyslania(database, z.reklamacjaId);
+  const idZalacznikow = zalaczniki.map((a) => a.allegroId);
   const klucz = kluczWysylki("rkl-", z.reklamacjaId, k.lastMessageId,
-    typ === "REGULAR" ? tresc : `${typ}\u0000${tresc}`);
+    typ === "REGULAR" ? tresc : `${typ}\u0000${tresc}`, idZalacznikow);
 
   if (k.lastMessageId !== (z.expectedLastMessageId ?? null) && !z.mimoNowejWiadomosci) {
     /* Ktoś dopisał, odkąd agent zaczął pisać — klient albo doradca. Ładunek
@@ -242,7 +251,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
      HTTP blokowałoby drugi proces na tyle, ile trwa najwolniejsza odpowiedź. */
   let odp: { id?: string; createdAt?: string } | null;
   try {
-    odp = await wyslij(k.externalId, tresc, typ);
+    odp = await wyslij(k.externalId, tresc, typ, idZalacznikow);
   } catch (e) {
     const status: StatusWysylki = niejednoznaczny(e) ? "send_uncertain" : "send_failed";
     database.prepare(
@@ -299,10 +308,18 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
       ).run(z.autor.name, z.reklamacjaId);
     }
 
-    /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji. */
+    /* ZAŁĄCZNIKI ZNIKAJĄ ZE SZKICU, bo właśnie poszły (0.274.0). Wiersz, który
+       by został, wisiałby przy NASTĘPNEJ odpowiedzi i dosłałby ten sam plik
+       drugi raz — cicho, bo nikt by go tam nie szukał. */
+    database.prepare("DELETE FROM reklamacja_zalacznik_wysylki WHERE reklamacja_id=?")
+      .run(z.reklamacjaId);
+
+    /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji.
+       Załączniki liczbą i numerami — nazwy poszły już przy dodawaniu. */
     logEvent(rodzaj === "DISPUTE" ? "dyskusja_odpowiedz" : "reklamacja_odpowiedz",
       z.autor.name, null,
-      { id: z.reklamacjaId, znakow: tresc.length, externalMessageId, typ },
+      { id: z.reklamacjaId, znakow: tresc.length, externalMessageId, typ,
+        zalacznikow: idZalacznikow.length },
       undefined, database);
   })();
 

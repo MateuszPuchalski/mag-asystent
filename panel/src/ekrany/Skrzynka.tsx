@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
+import { naBase64 } from "../api/plik";
 import {
   useAgenci, useDodajKomentarz, useDolaczDoSprawy, useJa, useOdlaczOdSprawy, usePrzejmij,
   usePrzekaz, useRozmowa, useSprawy, useZalozSprawe,
@@ -278,17 +279,10 @@ export function Skrzynka() {
          cały katalog `skrzynka/`, a base64 to sprawa klienta HTTP. */
       onDodajZalacznik={(plik) => {
         setBladZalacznika("");
-        void plik.arrayBuffer().then((bufor) => {
+        void naBase64(plik).then((dane) => {
           if (!wybranaId) return;
-          /* `btoa` na wielkim napisie ze `String.fromCharCode(...tablica)`
-             przepełnia stos przy kilkuset kilobajtach — stąd porcje. */
-          const bajty = new Uint8Array(bufor);
-          let napis = "";
-          for (let i = 0; i < bajty.length; i += 8192) {
-            napis += String.fromCharCode(...bajty.subarray(i, i + 8192));
-          }
           dodajZalacznik.mutate(
-            { id: wybranaId, nazwa: plik.name, typ: plik.type, dane: btoa(napis) },
+            { id: wybranaId, nazwa: plik.name, typ: plik.type, dane },
             { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) });
         });
       }}
