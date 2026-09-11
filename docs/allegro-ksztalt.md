@@ -343,6 +343,16 @@ na liście. Sonda pokazuje, czym to pole naprawdę bywa: `COMMISSION_REFUNDED`
 stan przesyłki, więc po tym polu nie da się poznać, czy karton u nas jest.
 Z tego samego powodu kolejka bramek nie routuje po nim od 0.164.0.
 
+`[WERYFIKUJ]` **`checkoutForm.createdAt` przy sprawie posprzedażowej.**
+Schemat `PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
+i `createdAt` (`date-time`). Do 0.282.0 czytaliśmy pierwsze, a drugie ginęło
+na etapie typu — i właśnie o tę datę Copilot prosił agenta w liście braków.
+Czym dokładnie jest ten moment, nie jest potwierdzone na żywym koncie:
+schemat nie mówi, czy to złożenie koszyka, czy jego opłacenie, a `boughtAt`
+przy pozycji zamówienia bywa późniejszy. Dlatego ekran nazywa tę datę
+„zamówienie złożone", a nie „kupiono", i ustępuje dacie z zamówienia, gdy ją
+mamy.
+
 `[WERYFIKUJ]` zostaje przy jednym: końcówka trackingu jest w dokumentacji
 opisana przy przesyłkach ZAMÓWIENIA, a my pytamy o przesyłkę ZWROTNĄ. Odmowa
 albo pusta historia degraduje — data dojdzie przy następnym takcie.

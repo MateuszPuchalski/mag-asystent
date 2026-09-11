@@ -46,7 +46,7 @@ const KARTA: SzczegolReklamacji["karta"] = {
   oczekiwanie: { tresc: "wymiana", zrodlo: "W1" },
   dowody: [{ tresc: "zdjęcie noża", zrodlo: "W3" }],
   brakuje: ["data zakupu", "numer seryjny"],
-  rada: null, ocena: null,
+  rada: null, ocena: null, zdjecia: [],
   model: "claude-test", przez: "Ala", at: "2026-09-11T09:00:00.000Z",
 };
 
@@ -123,5 +123,32 @@ describe("Karta faktów Copilota", () => {
     render(<Dowody {...props(KARTA)} />);
     expect(screen.queryByText("Copilot radzi")).not.toBeInTheDocument();
     expect(screen.getByText("Brakuje do rozstrzygnięcia")).toBeInTheDocument();
+  });
+
+  it("karta MÓWI, ile zdjęć przeczytała (0.283.0)", () => {
+    /* Bez tej liczby „Copilot nic nie zobaczył na zdjęciu" i „Copilot nie
+       dostał zdjęć" wyglądają identycznie — a to dwa różne następne ruchy. */
+    render(<Dowody {...props({ ...KARTA, zdjecia: [
+      { numer: "Z1", zalacznikId: 11, nazwa: "tabliczka.jpg" },
+      { numer: "Z2", zalacznikId: 12, nazwa: "gaznik.jpg" },
+    ] })} />);
+    expect(screen.getByText(/przeczytał 2 zdjęcia/)).toBeInTheDocument();
+  });
+
+  it("bez zdjęć stopka o nich MILCZY, zamiast pisać zero", () => {
+    render(<Dowody {...props(KARTA)} />);
+    expect(screen.queryByText(/przeczytał/)).not.toBeInTheDocument();
+  });
+
+  it("cytat ze zdjęcia niesie NAZWĘ PLIKU — inaczej jest numerem donikąd", () => {
+    render(<Dowody {...props({
+      ...KARTA,
+      dowody: [{ tresc: "tabliczka NAC LS46-450", zrodlo: "Z1" }],
+      zdjecia: [{ numer: "Z1", zalacznikId: 11, nazwa: "tabliczka.jpg" }],
+    })} />);
+    expect(screen.getByTitle("Zdjęcie: tabliczka.jpg")).toHaveTextContent("Z1");
+    /* Cytat z ROZMOWY podpowiedzi nie potrzebuje: wiadomość jest obok.
+       Karta cytuje `W1` trzykrotnie, więc bierzemy pierwszy z brzegu. */
+    expect(screen.getAllByText("W1")[0]).not.toHaveAttribute("title");
   });
 });

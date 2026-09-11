@@ -663,8 +663,50 @@ wartość znika, ślad zostaje.
 
 Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
 ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
-po ZNANEJ wartości, nie po wzorcu. Nie wychodzi nic spoza rozmowy: ani notatka
-biura, ani znacznik „kto prowadzi", ani kartoteka, ani kwoty.
+po ZNANEJ wartości, nie po wzorcu.
+
+**Od 0.282.0 wychodzą też FAKTY ZE SPRAWY i to jest odwrócenie zdania, które
+stało tu wcześniej.** Do tego wydania obowiązywało „nie wychodzi nic spoza
+rozmowy". Kosztowało to konkretnie: Copilot prosił agenta o datę zakupu
+i o numer zamówienia, czyli o dane, które Allegro przysłało razem ze sprawą
+i które leżały o jedno złączenie dalej.
+
+Wychodzi blok z formularza reklamacyjnego i z danych Allegro: temat, opis
+zgłoszenia (przycięty), powód, podstawa prawna, oczekiwanie z kwotą, ilość,
+nazwa reklamowanego towaru, numery oferty i zamówienia, data zakupu, data
+otwarcia i termin decyzji. Blok przechodzi przez to samo maskowanie co rozmowa.
+
+**Granica została w tym samym miejscu, tylko przesunięta o jedno pojęcie:
+wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS.** Dalej nie wychodzi
+notatka biura, znacznik „kto prowadzi", tagi, kartoteka Subiekta ani nasze
+kwoty.
+
+**Od 0.283.0 wychodzą też ZDJĘCIA klienta i to jest największa zmiana
+w polityce danych tego modułu.** Właściciel poprosił wprost: „copilot powinien
+czytać zdjęcia". Karta, którą pokazał, prosiła agenta o zdjęcia, które
+w sprawie już były.
+
+**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Cała reszta
+tego rozdziału stoi na gwarancji „wartość znika, ślad zostaje", wymuszanej
+typem, którego nie da się wyprodukować poza modułem maskowania. Przy obrazie
+taka gwarancja nie istnieje. Zdjęcie paragonu z imieniem i adresem, etykieta
+przesyłki, ekran telefonu z numerem — wszystko to wychodzi do dostawcy
+w całości. Typ zdjęcia nazywa się więc `ZdjecieZBramki`, a nie „bezpieczne",
+i obiecuje dokładnie trzy rzeczy: bajty pochodzą z załącznika TEJ sprawy, są
+obrazem w typie rozstrzygniętym po SYGNATURZE, i mieszczą się w suficie.
+
+Bajtów nie trzymamy ani chwili dłużej, niż trwa żądanie — tak samo jak przy
+pobraniu na ekran. Do dziennika idą LICZBY: ile zdjęć poszło, ile pominięto,
+ile pobrań padło. Nazwy plików nie, bo bywają daną osobową, a `events` nie ma
+retencji.
+
+**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
+kosztu: obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
+wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
+więcej niż samo rozpoznanie tekstu. Zostaje sufit bajtów, bez którego żądanie
+nie przeszłoby technicznie, i zdanie na karcie mówiące, ile zdjęć pominięto.
+Budżetu kwotowego w konfiguracji **nie ma** — to jest znana i nazwana
+ekspozycja, nie przeoczenie.
 
 Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
 co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,

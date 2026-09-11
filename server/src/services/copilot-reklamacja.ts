@@ -2,7 +2,14 @@ import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
-import { zamaskujWatek, type TrescBezpieczna, type WiadomoscWatku } from "./copilot-maskowanie.js";
+import {
+  polacz, zamaskujBlok, zamaskujWatek,
+  type TrescBezpieczna, type WiadomoscWatku,
+} from "./copilot-maskowanie.js";
+import { faktySprawy, odsiejZnane, tekstFaktow } from "./copilot-fakty-sprawy.js";
+import {
+  przygotujZdjecia, spisZdjec, type Pobieracz, type ZdjecieZBramki,
+} from "./copilot-zdjecia.js";
 
 /* ── Copilot reklamacyjny: ZBIERA DANE, nie radzi (0.275.0) ──────────────────
 
@@ -104,7 +111,9 @@ export interface OdpowiedzRozpoznania extends KartaSprawy {
 }
 
 /** Wysyłka do dostawcy — wstrzykiwana, jak `NadawcaKlasyfikacji`. */
-export type NadawcaRozpoznania = (tresc: TrescBezpieczna) => Promise<OdpowiedzRozpoznania>;
+export type NadawcaRozpoznania = (
+  tresc: TrescBezpieczna, zdjecia?: readonly ZdjecieZBramki[],
+) => Promise<OdpowiedzRozpoznania>;
 
 /**
  * Słowa werdyktu w polach FAKTOGRAFICZNYCH (0.276.0).
@@ -160,14 +169,23 @@ export function odsiejBezPokrycia(
   karta: KartaSprawy, numery: Set<string>,
 ): { karta: KartaSprawy; odsiano: number } {
   let odsiano = 0;
+  /* NUMER BEZ NAWIASÓW (0.282.0). Model widzi w rozmowie `[W3]` i regularnie
+     tak właśnie cytuje — a wtedy `numery.has("[W3]")` jest fałszem i fakt
+     znikał z karty BEZ ŚLADU, jako rzekomo niepokryty. To było poluzowanie
+     doktryny przez literówkę, nie przez decyzję.
+
+     To NIE jest rozluźnienie sita: `"W3, Z1"` dalej wypada, bo po zdjęciu
+     nawiasów nie jest żadnym znanym numerem. Rozszerzamy zapis, nie regułę. */
+  const pokryte = (zrodlo: string) =>
+    numery.has(String(zrodlo).trim().replace(/^\[|\]$/g, "").toUpperCase());
   const pole = (p: PoleKarty | null): PoleKarty | null => {
     if (!p) return null;
-    if (numery.has(p.zrodlo)) return p;
+    if (pokryte(p.zrodlo)) return p;
     odsiano += 1;
     return null;
   };
   const dowody = karta.dowody.filter((d) => {
-    if (numery.has(d.zrodlo)) return true;
+    if (pokryte(d.zrodlo)) return true;
     odsiano += 1;
     return false;
   });
@@ -176,7 +194,7 @@ export function odsiejBezPokrycia(
      ugruntowaną. Odsiew kasuje wtedy CAŁĄ radę, nie samo uzasadnienie —
      rekomendacja bez podstawy to gołe „uznaj", a tego agent ma nie zobaczyć. */
   let rada = karta.rada;
-  if (rada && !numery.has(rada.uzasadnienie.zrodlo)) {
+  if (rada && !pokryte(rada.uzasadnienie.zrodlo)) {
     rada = null;
     odsiano += 1;
   }
@@ -207,6 +225,11 @@ export interface ZadanieRozpoznania {
   nadaj: NadawcaRozpoznania;
   database?: DatabaseSync;
   now?: () => Date;
+  /* Pobieranie zdjęć WSTRZYKIWANE, jak nadawca: test nie ma prawa iść do
+     Allegro, a rozpoznanie bez tego argumentu zachowuje się jak dotąd. */
+  pobierz?: Pobieracz;
+  /** `false` wyłącza czytanie zdjęć dla jednego wywołania. */
+  zdjecia?: boolean;
 }
 
 /**
@@ -239,11 +262,48 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     tresc: w.tresc,
   })));
 
-  const tresc = zamaskujWatek(watek, sprawa.kupujacy_login);
+  /* ── FAKTY ZE SPRAWY PRZED WĄTKIEM (0.282.0) ──────────────────────────────
+     Do tego wydania model widział wyłącznie czat i dlatego prosił o dane,
+     które Allegro przysłało razem ze sprawą: numer zamówienia, datę, model
+     towaru. Blok dostaje własny numer `S`, bo to też są SŁOWA KLIENTA —
+     z formularza reklamacyjnego zamiast z wiadomości — i fakt na nich oparty
+     musi przejść przez `odsiejBezPokrycia` tak samo jak fakt z rozmowy.
+
+     CZEGO W BLOKU NIE MA: notatki biura, znacznika „kto prowadzi", tagów,
+     kartoteki Subiekta ani naszych kwot. Wychodzą fakty o SPRAWIE i o ZAKUPIE,
+     nie fakty o nas. */
+  const f = faktySprawy(database, z.reklamacjaId);
+  const blok = f
+    ? zamaskujBlok("FAKTY ZE SPRAWY [S] — z formularza reklamacyjnego i z Allegro:",
+      tekstFaktow(f), sprawa.kupujacy_login)
+    : null;
+  if (blok) numery.add("S");
+
+  const watekBezpieczny = zamaskujWatek(watek, sprawa.kupujacy_login);
+
+  /* ── ZDJĘCIA (0.283.0) ────────────────────────────────────────────────────
+     Karta z żywego panelu prosiła o zdjęcia, które w sprawie JUŻ BYŁY.
+     Pobranie stoi PRZED wywołaniem modelu i po numeracji rozmowy, bo spis
+     zdjęć musi umieć wskazać wiadomość, przy której wisi załącznik.
+
+     Każde potknięcie jest LICZONE, nie rzucane: plik spoza typu, pobranie,
+     które padło, komplet, który się nie zmieścił. Karta bez zdjęć wie mniej,
+     ale brak karty nie mówi agentowi nic. */
+  const zdjecia = z.zdjecia === false
+    ? { zdjecia: [], nieObrazy: [], pominieto: 0, bledow: 0 }
+    : await przygotujZdjecia(database, z.reklamacjaId, z.pobierz);
+  for (const zd of zdjecia.zdjecia) numery.add(zd.numer);
+
+  const spis = spisZdjec(zdjecia);
+  const spisBezpieczny = spis
+    ? zamaskujBlok("", spis, sprawa.kupujacy_login) : null;
+
+  const tresc = polacz(...[blok, watekBezpieczny, spisBezpieczny]
+    .filter((c): c is TrescBezpieczna => c !== null));
 
   let odp: OdpowiedzRozpoznania;
   try {
-    odp = await z.nadaj(tresc);
+    odp = await z.nadaj(tresc, zdjecia.zdjecia);
   } catch (e) {
     zapiszWywolanie(database, z.reklamacjaId, null, "blad",
       (e as Error).message, z.kto, teraz);
@@ -272,7 +332,18 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
       "której nie wie — karta odrzucona.");
   }
 
-  const { karta, odsiano } = odsiejBezPokrycia(odp, numery);
+  const { karta: zPokryciem, odsiano } = odsiejBezPokrycia(odp, numery);
+
+  /* SITO NA „BRAKUJE" (0.282.0). To jedyne pole karty bez cytatu, więc
+     `odsiejBezPokrycia` go nie dotyka — a właśnie ono trzymało sprawę
+     w miejscu, prosząc agenta o datę zakupu, którą podaliśmy modelowi
+     dwadzieścia linii wyżej. Instrukcja o to prosi, kod tego pilnuje:
+     ta sama para co przy bramce słów werdyktu. */
+  const { brakuje, odsiano: znane } = f
+    ? odsiejZnane(zPokryciem.brakuje, f)
+    : { brakuje: zPokryciem.brakuje, odsiano: 0 };
+  const karta = { ...zPokryciem, brakuje };
+
   if (pustaKarta(karta)) {
     zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "karta bez pokrycia", z.kto, teraz);
     throw new Error("Copilot nie znalazł w tej rozmowie niczego, co dałoby się zacytować");
@@ -283,8 +354,8 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
       (reklamacja_id, usterka, usterka_zrodlo, kiedy, kiedy_zrodlo,
        oczekiwanie, oczekiwanie_zrodlo, dowody, brakuje,
        rekomendacja, pewnosc, uzasadnienie, uzasadnienie_zrodlo, czego_nie_wiem,
-       model, przez, przez_user_id, at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       zdjecia, model, przez, przez_user_id, at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(reklamacja_id) DO UPDATE SET
         usterka=excluded.usterka, usterka_zrodlo=excluded.usterka_zrodlo,
         kiedy=excluded.kiedy, kiedy_zrodlo=excluded.kiedy_zrodlo,
@@ -292,7 +363,8 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
         dowody=excluded.dowody, brakuje=excluded.brakuje,
         rekomendacja=excluded.rekomendacja, pewnosc=excluded.pewnosc,
         uzasadnienie=excluded.uzasadnienie, uzasadnienie_zrodlo=excluded.uzasadnienie_zrodlo,
-        czego_nie_wiem=excluded.czego_nie_wiem, model=excluded.model,
+        czego_nie_wiem=excluded.czego_nie_wiem, zdjecia=excluded.zdjecia,
+        model=excluded.model,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id, at=excluded.at,
         /* NOWA RADA KASUJE STARĄ OCENĘ. Trafność dotyczy TAMTEJ rekomendacji;
            przeniesiona na nową byłaby pomiarem czegoś, czego nikt nie ocenił. */
@@ -305,6 +377,11 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
       karta.rada?.co ?? null, karta.rada?.pewnosc ?? null,
       karta.rada?.uzasadnienie.tresc ?? null, karta.rada?.uzasadnienie.zrodlo ?? null,
       JSON.stringify(karta.rada?.czegoNieWiem ?? []),
+      /* Mapa `Z1 → plik` zostaje PRZY KARCIE. Numer bez nazwy pliku byłby
+         cytatem, którego agent nie ma jak sprawdzić. */
+      JSON.stringify(zdjecia.zdjecia.map((zd) => ({
+        numer: zd.numer, zalacznikId: zd.zalacznikId, nazwa: zd.nazwa,
+      }))),
       odp.model, z.kto.name, z.kto.id, teraz.toISOString());
 
     zapiszWywolanie(database, z.reklamacjaId, odp, "ok", null, z.kto, teraz);
@@ -312,7 +389,14 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     /* Do dziennika idą LICZBY, nigdy treść karty: `events` nie ma retencji,
        a karta niesie słowa klienta. */
     logEvent("reklamacja_rozpoznanie", z.kto.name, null,
-      { id: z.reklamacjaId, brakuje: karta.brakuje.length, dowody: karta.dowody.length, odsiano },
+      /* `znane` mierzy SITO, nie model: bez tej liczby nikt po miesiącu nie
+         odpowie, czy nie tnie za dużo. Heurystyka bez licznika to wiara. */
+      /* Zdjęcia idą do dziennika LICZBAMI. Nazwa pliku bywa daną osobową,
+         a `events` nie ma retencji — bajtów tym bardziej tu nie ma. */
+      { id: z.reklamacjaId, brakuje: karta.brakuje.length, dowody: karta.dowody.length,
+        odsiano, znane, zFaktami: Boolean(f),
+        zdjec: zdjecia.zdjecia.length, zdjecPominieto: zdjecia.pominieto,
+        zdjecNieObraz: zdjecia.nieObrazy.length, zdjecBledow: zdjecia.bledow },
       z.kto.id, database);
   })();
 
@@ -320,8 +404,12 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
 }
 
 /** Karta zapisana przy sprawie; `null`, gdy nikt jeszcze nie prosił. */
+/** Które zdjęcie było którym `Z` — mapa doklejana do karty na ekranie. */
+export interface ZdjecieKarty { numer: string; zalacznikId: number; nazwa: string }
+
 export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (KartaSprawy & {
   model: string; przez: string | null; at: string; ocena: string | null;
+  zdjecia: ZdjecieKarty[];
 }) | null {
   const w = database.prepare("SELECT * FROM reklamacja_karta WHERE reklamacja_id=?")
     .get(reklamacjaId) as Record<string, unknown> | undefined;
@@ -345,6 +433,7 @@ export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (Kart
       czegoNieWiem: lista<string>(w.czego_nie_wiem),
     },
     ocena: w.ocena == null ? null : String(w.ocena),
+    zdjecia: lista<ZdjecieKarty>(w.zdjecia),
     model: String(w.model ?? ""),
     przez: w.przez == null ? null : String(w.przez),
     at: String(w.at ?? ""),

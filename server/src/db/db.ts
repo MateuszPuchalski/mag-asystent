@@ -243,6 +243,11 @@ export function migrate(database: DatabaseSync) {
     )
     WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
       AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
+  /* Data zamówienia z ładunku sprawy (0.282.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL i wypełnią się przy najbliższej
+     synchronizacji: zapis sprawy nadpisuje tę kolumnę przy KAŻDYM przebiegu,
+     nie tylko przy pierwszym poznaniu sprawy. */
+  addColumn("reklamacja_klienta", "zamowienie_at", "TEXT");
   /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
      w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
      „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem
@@ -264,6 +269,10 @@ export function migrate(database: DatabaseSync) {
      Zasada jest bez wyjątków: kolumna dołożona do tabeli, która wyszła
      w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. Wiek tabeli nie jest
      argumentem — nie wiemy, które wydanie wdrożono. */
+  /* Mapa zdjęć przy karcie (0.283.0) — patrz `reklamacja_karta`
+     w `schema.sql`. Karty sprzed tego wydania mają pustą listę, czyli
+     prawdę o nich: powstały, zanim Copilot zobaczył pierwsze zdjęcie. */
+  addColumn("reklamacja_karta", "zdjecia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("reklamacja_karta", "rekomendacja", "TEXT");
   addColumn("reklamacja_karta", "pewnosc", "TEXT");
   addColumn("reklamacja_karta", "uzasadnienie", "TEXT");

@@ -3684,6 +3684,69 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
 reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
 
+#### Co Copilot WIDZI (0.282.0)
+
+Do 0.282.0 widział wyłącznie czat. Właściciel wkleił kartę, w której Copilot
+prosił agenta o „datę zakupu / numer zamówienia" i o „zdjęcia tabliczki w celu
+identyfikacji modelu" — o trzy rzeczy, z których numer zamówienia stał na
+wierszu sprawy, data przyszła w tej samej odpowiedzi Allegro, a model towaru
+zna oferta. **Prosił, bo nie dostał.**
+
+Przed rozmową stoi teraz blok FAKTY ZE SPRAWY z własnym numerem `S`. Numer
+jest konieczny, nie ozdobny: bez niego zdanie przepisane ze zgłoszenia
+wylatywałoby jako rzekomo niepokryte, a to są słowa klienta tak samo jak
+wiadomość.
+
+Wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS. Notatka biura, znacznik
+„kto prowadzi", tagi, kartoteka i nasze kwoty zostają u nas — granica jest ta
+sama co była, tylko przesunięta o jedno pojęcie. Pełny zapis w polityce danych.
+
+**Pole `brakuje` przechodzi przez SITO po stronie kodu.** To jedyne pole karty
+bez cytatu, więc bramka numerów go nie dotyka — a właśnie ono trzymało sprawę
+w miejscu. Sito wycina pozycje pytające o to, co przed chwilą podaliśmy, ale
+ma nad sobą STRAŻNIKA, który jest ważniejszy: dowód zakupu to dokument, a nie
+data; numer seryjny to egzemplarz, a nie model; zdjęcia to materiał, którego
+w tekście nie ma z definicji. Tych pozycji nie tnie nic. Sito, które utnie za
+dużo, kasuje najcenniejszą część karty.
+
+Licznik odsianych pozycji idzie do dziennika. Heurystyka bez pomiaru to wiara,
+a po miesiącu nikt inaczej nie odpowie, czy sito nie tnie za dużo.
+
+#### Copilot czyta ZDJĘCIA (0.283.0)
+
+Zlecenie właściciela: „copilot powinien czytać zdjęcia". Karta, którą pokazał,
+prosiła agenta o zdjęcia, które w sprawie już były — sama się do nich
+odwoływała, cytując wiadomość sprzedawcy.
+
+Obrazy idą przed tekstem, a na końcu tekstu stoi ich spis z numerami `Z1`,
+`Z2` i nazwami plików. Numery są potrzebne z tego samego powodu co `S`: bez
+własnej przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie.
+
+**Typ rozstrzyga SYGNATURA pliku, nie nazwa.** Ta sama bramka co przy podglądzie
+w panelu. Plik, który nie jest obrazem, zostaje wymieniony w spisie z nazwą —
+to pozwala modelowi napisać w `brakuje`, że przysłany dokument jest nieczytelny
+jako zdjęcie.
+
+**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik spoza
+typu, komplet, który nie zmieścił się w suficie bajtów — wszystko jest liczone,
+nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi nic.
+
+Stopka karty mówi, ile zdjęć przeczytała, a cytat `Z2` niesie w podpowiedzi
+nazwę pliku. Bez tych dwóch rzeczy „Copilot nic nie zobaczył na zdjęciu"
+i „Copilot nie dostał zdjęć" wyglądają na ekranie identycznie — a to dwie
+różne sprawy i dwa różne następne ruchy.
+
+Czego ta zmiana kosztuje po stronie danych, mówi polityka: pikseli zamaskować
+się nie da i nie udajemy, że jest inaczej.
+
+#### Numer cytatu bez nawiasów (0.282.0)
+
+Model widzi w rozmowie `[W3]` i regularnie tak właśnie cytuje. Bramka
+porównywała łańcuchy dosłownie, więc taki fakt znikał z karty BEZ ŚLADU, jako
+niepokryty. To było poluzowanie doktryny przez literówkę, nie przez decyzję.
+Numer normalizuje się teraz przed porównaniem — dwa numery naraz dalej
+wypadają, bo doktryna została ta sama.
+
 **Od 0.276.0 Copilot także RADZI.** Do 0.275.0 karta z jakimkolwiek słowem
 z rodziny werdyktu leciała w całości — decyzja agenta piszącego kod, nie
 właściciela. Właściciel odwrócił ją tego samego dnia: „copilot powinien też

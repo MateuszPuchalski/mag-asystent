@@ -29,6 +29,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z",
+  kupionoAt: null, kupionoZrodlo: null,
   prowadzi: null, prowadziId: null, tagi: [], prowadziAt: null,
   notatka: "ustalono wymianę", notatkaAt: "2026-09-11T10:04:00.000Z",
   notatkaPrzez: "A. Lewandowska", maPoprzedniaNotatke: true,
@@ -93,5 +94,28 @@ describe("Notatka i jej droga powrotna", () => {
     const cofniecia = screen.getAllByRole("button", { name: /cofnij/i });
     expect(cofniecia).toHaveLength(1);
     expect(cofniecia[0]).toHaveAccessibleName("cofnij zmianę");
+  });
+
+  it("data zakupu STOI NA EKRANIE i mówi, który to zegar (0.282.0)", () => {
+    /* Agent też jej dotąd nie widział. „Kupiono" bierze się z pozycji
+       zamówienia, „Zamówienie złożone" z ładunku sprawy i bywa wcześniejsze —
+       nazwanie jednego drugim to blizna 0.121.0. */
+    const { rerender } = render(<Dowody {...props(rek({
+      orderId: "ord-1", kupionoAt: "2026-03-15T07:00:00.000Z",
+      kupionoZrodlo: "zamowienie",
+    } as Partial<Reklamacja>))} />);
+    expect(screen.getByText("Kupiono")).toBeInTheDocument();
+
+    rerender(<Dowody {...props(rek({
+      orderId: "ord-1", kupionoAt: "2026-03-14T09:12:00.000Z", kupionoZrodlo: "sprawa",
+    } as Partial<Reklamacja>))} />);
+    expect(screen.getByText("Zamówienie złożone")).toBeInTheDocument();
+    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
+  });
+
+  it("bez daty wiersza NIE MA — pusty nie mówi nic, a zajmuje kolumnę", () => {
+    render(<Dowody {...props(rek({ orderId: "ord-1" }))} />);
+    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
   });
 });

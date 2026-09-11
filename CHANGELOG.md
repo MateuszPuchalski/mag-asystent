@@ -34,6 +34,106 @@ historii nie przepisujemy.
 ---
 
 
+## 0.283.0 — 11 września 2026
+
+**Copilot czyta zdjęcia ze sprawy.** [wymaga działania] Zlecenie właściciela:
+„copilot powinien czytać zdjęcia". Karta, którą pokazał, prosiła agenta
+o zdjęcia, które w sprawie już były — sama się do nich odwoływała, cytując
+wiadomość sprzedawcy.
+
+Obrazy idą przed tekstem, a na końcu tekstu stoi spis z numerami `Z1`, `Z2`
+i nazwami plików. Numeracja jest konieczna, nie ozdobna: bez własnej
+przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie, bo jego
+źródło nie pasowałoby do żadnego numeru wiadomości.
+
+**Typ rozstrzyga SYGNATURA pliku, nie jego nazwa** — ta sama bramka co przy
+podglądzie w panelu. Plik, który obrazem nie jest, zostaje wymieniony w spisie
+z nazwą, żeby model mógł napisać w „brakuje", że przysłany dokument jest
+nieczytelny jako zdjęcie.
+
+**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik
+spoza typu, komplet niemieszczący się w suficie bajtów — wszystko jest
+liczone, nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi
+nic. Stopka karty podaje, ile zdjęć przeczytano, a cytat `Z2` niesie
+w podpowiedzi nazwę pliku: bez tego „Copilot nic nie zobaczył" i „Copilot nie
+dostał zdjęć" wyglądałyby identycznie.
+
+**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Reszta
+polityki danych stoi na gwarancji wymuszanej typem, którego nie da się
+wyprodukować poza modułem maskowania. Przy obrazie taka gwarancja nie
+istnieje: zdjęcie paragonu z imieniem i adresem wychodzi do dostawcy
+w całości. Dlatego typ nazywa się `ZdjecieZBramki`, a nie „bezpieczne",
+i obiecuje dokładnie trzy rzeczy — pochodzenie z załącznika tej sprawy, typ
+z sygnatury i sufit bajtów.
+
+**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
+kosztu. Obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
+wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
+więcej niż samo rozpoznanie tekstu. **Budżetu kwotowego w konfiguracji nie ma
+— to jest znana ekspozycja, nie przeoczenie**, i przy zdjęciach zaczyna mieć
+cenę. [wymaga działania] Warto obserwować rachunek u dostawcy przez pierwszy
+tydzień.
+
+Pobieranie załącznika dostało wreszcie SUFIT ROZMIARU. Do tego wydania
+wciągało do pamięci wszystko, co Allegro odda, bez pytania o długość. Przy
+pobraniu na żądanie agenta było to ryzyko teoretyczne; przy komplecie
+załączników branym jednym ruchem przestaje takie być.
+
+
+## 0.282.0 — 11 września 2026
+
+**Copilot przestaje prosić o to, co system już wie.** Właściciel wkleił kartę
+z żywego panelu. Copilot poprosił agenta o „datę zakupu / numer zamówienia"
+i o „zdjęcia tabliczki znamionowej w celu identyfikacji modelu". Numer
+zamówienia stał na wierszu sprawy, data przyszła w tej samej odpowiedzi
+Allegro, a model towaru zna oferta.
+
+Prosił, bo nie dostał. Do tego wydania rozpoznanie podawało modelowi WYŁĄCZNIE
+czat — bez powodu zgłoszenia, bez oczekiwania, bez ilości, bez terminu decyzji
+i bez czegokolwiek z formularza reklamacyjnego. Model odtwarzał z prozy
+klienta pola, które leżały o jedno złączenie dalej.
+
+**Data zakupu przychodziła z Allegro i my ją wyrzucaliśmy.** Schemat
+`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id` i `createdAt`.
+Nasz typ ładunku znał jedno, więc data ginęła, zanim ktokolwiek zdecydował,
+że jej nie chce. Typ węższy od schematu potrafi ukryć dane skuteczniej niż
+ich brak.
+
+**Reklamacja nigdy nie prosiła Allegro o własny kontekst.** Kolejki dociągania
+zamówień i ofert brały numery wyłącznie ze zwrotów i wiadomości, więc przy
+typowej sprawie nie mieliśmy ani zamówienia, ani nazwy reklamowanego towaru.
+Sprawy wchodzą teraz do obu kolejek jako trzecie źródło, ZA istniejącymi:
+porządek chroni starsze źródła przed zagłodzeniem w tym samym suficie
+przebiegu, a limit 429 zostaje jeden na wszystkie.
+
+Przed rozmową stoi blok FAKTY ZE SPRAWY z własnym numerem `S`. Numer jest
+konieczny: bez niego zdanie przepisane ze zgłoszenia wylatywałoby jako rzekomo
+niepokryte, a to są słowa klienta tak samo jak wiadomość. Blok przechodzi
+przez to samo maskowanie co rozmowa — opis zgłoszenia bywa z adresem, pod
+który klient prosi o kuriera.
+
+**Pole `brakuje` dostaje SITO po stronie kodu.** To jedyne pole karty bez
+cytatu i jedyne, którego bramka numerów nie dotykała — a właśnie ono trzymało
+sprawę w miejscu. Nad sitem stoi STRAŻNIK i jest ważniejszy: dowód zakupu to
+dokument, a nie data; numer seryjny to egzemplarz, a nie model; zdjęcia to
+materiał, którego w tekście nie ma z definicji. Tych pozycji nie tnie nic.
+Licznik odsianych idzie do dziennika, bo heurystyka bez pomiaru to wiara.
+
+Instrukcja przestała podawać datę zakupu jako przykład tego, co wpisać
+w `brakuje`. Karta, którą zobaczył właściciel, wykonała polecenie co do słowa.
+
+**Naprawiony przy okazji cichy błąd.** Model widzi w rozmowie `[W3]` i tak
+cytuje; bramka porównywała łańcuchy dosłownie, więc taki fakt znikał z karty
+bez śladu, jako niepokryty. Poluzowanie doktryny przez literówkę, nie przez
+decyzję. Numer normalizuje się teraz przed porównaniem — dwa numery naraz
+dalej wypadają.
+
+Data zakupu weszła też na ekran, z etykietą mówiącą, który to zegar:
+„Kupiono" przy dacie z pozycji zamówienia, „Zamówienie złożone" przy dacie
+z ładunku sprawy. Agent nie widział jej dotąd wcale, choć zwroty i skrzynka
+mają ją od dawna.
+
+
 ## 0.281.0 — 11 września 2026
 
 **Trzy rzeczy, których brakowało zleceniu o odnajdywaniu własnych spraw.**

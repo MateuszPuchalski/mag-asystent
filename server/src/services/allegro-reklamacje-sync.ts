@@ -70,7 +70,12 @@ type Sprawa = {
   description?: string | null;
   right?: string | null;
   buyer?: { login?: string } | null;
-  checkoutForm?: { id?: string } | null;
+  /* `createdAt` CZYTAMY OD 0.282.0. `PostPurchaseIssueCheckoutForm` ma
+     dokładnie dwa pola i przez trzy wydania braliśmy jedno — a Copilot
+     wypisywał „data zakupu" w liście braków, pytając o to, co przyszło
+     z nią w tej samej odpowiedzi. Typ węższy od schematu potrafi ukryć
+     dane skuteczniej niż ich brak. */
+  checkoutForm?: { id?: string; createdAt?: string | null } | null;
   offer?: { id?: string | null; quantity?: number | null } | null;
   reason?: { type?: string; description?: string } | null;
   expectations?: Array<{ name?: string | null; refund?: Kwota | null }> | null;
@@ -470,13 +475,16 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
      wyłączyłoby odpowiadanie przy pierwszym polu, którego Allegro nie odda. */
   const czatAktywny = stan.chatActive === false ? 0 : 1;
   database.prepare(`INSERT INTO reklamacja_klienta
-    (channel_account_id,external_id,reference_number,order_id,offer_id,kupujacy_login,
+    (channel_account_id,external_id,reference_number,order_id,zamowienie_at,offer_id,kupujacy_login,
      typ,prawo,powod_typ,powod_opis,temat,opis,oczekiwanie,oczekiwana_kwota_grosze,waluta,
      status_allegro,decyzja_do,status_do,zwrot_wymagany,czat_aktywny,wiadomosci_ile,
      ostatnia_wiadomosc_status,ostatnia_wiadomosc_at,otwarto_at,synced_at,ilosc)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
+      /* Data zamówienia idzie też przy AKTUALIZACJI, nie tylko przy pierwszym
+         poznaniu sprawy — inaczej sprawy zastane zostałyby z NULL na zawsze. */
+      zamowienie_at=excluded.zamowienie_at,
       offer_id=excluded.offer_id, kupujacy_login=excluded.kupujacy_login,
       typ=excluded.typ, prawo=excluded.prawo, powod_typ=excluded.powod_typ,
       powod_opis=excluded.powod_opis, temat=excluded.temat, opis=excluded.opis,
@@ -490,6 +498,7 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
       otwarto_at=excluded.otwarto_at, synced_at=excluded.synced_at,
       ilosc=excluded.ilosc`).run(
     konto, sprawa.id, sprawa.referenceNumber ?? null, sprawa.checkoutForm?.id ?? null,
+    sprawa.checkoutForm?.createdAt ?? null,
     sprawa.offer?.id ?? null, sprawa.buyer?.login ?? null,
     sprawa.type ?? "CLAIM", sprawa.right ?? null,
     sprawa.reason?.type ?? null, ludzki(sprawa.reason?.description),

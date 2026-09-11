@@ -124,6 +124,21 @@ export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): 
         JOIN zamowienie_klienta z ON z.id = p.zamowienie_id
        WHERE p.offer_id IS NOT NULL AND TRIM(p.offer_id) <> ''
        GROUP BY z.channel_account_id, p.offer_id
+      UNION ALL
+      /* Oferty ze spraw posprzedażowych (0.282.0). Rząd 2, czyli ZA
+         wiadomościami i zamówieniami — porządek po rzędzie jest tu całą
+         ochroną przed zagłodzeniem starszych źródeł w suficie przebiegu.
+         Bez tego źródła nie znamy nawet NAZWY reklamowanego towaru, więc
+         Copilot prosi o zdjęcie tabliczki znamionowej, żeby ustalić model,
+         który Allegro nam podało numerem oferty.
+
+         BACKTICKÓW TU NIE MA ŚWIADOMIE: cały blok stoi w literale
+         szablonowym, więc odwrotny apostrof zamknąłby go w połowie SQL-a. */
+      SELECT r.channel_account_id AS konto, r.offer_id AS id,
+             2 AS rzad, MAX(r.otwarto_at) AS kiedy
+        FROM reklamacja_klienta r
+       WHERE r.offer_id IS NOT NULL AND TRIM(r.offer_id) <> ''
+       GROUP BY r.channel_account_id, r.offer_id
     )
     SELECT s.id AS id
       FROM zrodla s

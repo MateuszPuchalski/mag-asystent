@@ -137,6 +137,19 @@ export function brakujaceZamowienia(
       SELECT order_id AS id, channel_account_id, created_at AS at FROM zwrot_klienta
       UNION ALL
       SELECT related_order_id, channel_account_id, sent_at FROM message
+      UNION ALL
+      /* Sprawy posprzedażowe (0.282.0). Do tego wydania reklamacja NIE BYŁA
+         źródłem i to był cichy brak: sprawa niosła numer zamówienia,
+         a zamówienie dociągało się tylko wtedy, gdy do tego samego numeru
+         przypadkiem istniał zwrot albo wiadomość. Bez zamówienia nie ma daty
+         zakupu, więc Copilot wypisywał ją w liście braków.
+
+         Sortowanie malejące po dacie zostaje wspólne dla wszystkich trzech
+         źródeł, a sufit przebiegu chroni limit 429 tak samo jak dotąd:
+         reklamacje konkurują o ten sam budżet, nie dostają własnego.
+
+         Backticków tu nie ma świadomie — blok stoi w literale szablonowym. */
+      SELECT order_id, channel_account_id, otwarto_at FROM reklamacja_klienta
     ) z
     LEFT JOIN zamowienie_klienta k
       ON k.channel_account_id = z.channel_account_id AND k.external_id = z.id

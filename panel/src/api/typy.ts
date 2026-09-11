@@ -1116,6 +1116,15 @@ export interface Reklamacja {
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
+  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+     Dwa zegary i dwie etykiety: `zamowienie` to `boughtAt` z pełnego
+     zamówienia, `sprawa` to `checkoutForm.createdAt` z ładunku reklamacji,
+     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0.
+
+     Dyskusja tego pola NIE MA i to nie jest przeoczenie: nie ma też Copilota,
+     a bez niego data byłaby ozdobą na ekranie, którego nikt o nią nie prosił. */
+  kupionoAt: string | null;
+  kupionoZrodlo: "zamowienie" | "sprawa" | null;
   prowadzi: string | null;
   /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
   prowadziId: number | null;
@@ -1234,9 +1243,18 @@ export interface KartaSprawy {
   rada: RadaMaszyny | null;
   /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
   ocena: string | null;
+  /* Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` byłby
+     numerem, którego agent nie ma jak sprawdzić. */
+  zdjecia: ZdjecieKarty[];
   model: string;
   przez: string | null;
   at: string;
+}
+
+export interface ZdjecieKarty {
+  numer: string;
+  zalacznikId: number;
+  nazwa: string;
 }
 
 /**
