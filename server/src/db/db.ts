@@ -702,6 +702,7 @@ export function migrate(database: DatabaseSync) {
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
+  ziarnoTagowSpraw(database);
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
@@ -1717,6 +1718,27 @@ function bezObslugiKlienta(database: DatabaseSync) {
     })();
   } finally {
     database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Ziarno słownika tagów spraw (0.279.0).
+ *
+ * Trzy wartości wskazał właściciel, pytany wprost, jakimi słowami opisuje
+ * postój sprawy. Dwie pierwsze mówią, CZEGO sprawa czeka — przy sprzęcie
+ * ogrodniczym to najczęstszy powód, dla którego reklamacja leży tygodniami,
+ * a z ekranu nie było tego widać wcale. Trzecia mówi, KTO ma ruszyć.
+ *
+ * WSIEWAMY WYŁĄCZNIE DO PUSTEGO SŁOWNIKA — ta sama zasada co przy strefie
+ * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
+ * dostać wartości fabrycznych z powrotem przy restarcie procesu.
+ */
+function ziarnoTagowSpraw(database: DatabaseSync) {
+  const n = (database.prepare("SELECT COUNT(*) AS n FROM reklamacja_tag").get() as { n: number }).n;
+  if (n > 0) return;
+  const ins = database.prepare("INSERT INTO reklamacja_tag(nazwa) VALUES (?)");
+  for (const nazwa of ["u producenta / u dostawcy", "czeka na część", "do decyzji właściciela"]) {
+    ins.run(nazwa);
   }
 }
 

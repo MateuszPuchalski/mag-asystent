@@ -3375,6 +3375,51 @@ Wiersz zastany bez tożsamości traktujemy jak CUDZY. Kliknięcie go zabiera,
 zamiast zdejmować znacznik: zabranie cofa się jednym ruchem, ciche zdjęcie
 cudzego znacznika nie.
 
+### 25b.3b. Tagi spraw (0.279.0)
+
+Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
+odpowiada na pytanie „czyje to", tag na pytanie „o czym to" — najczęściej
+„czego ta sprawa czeka".
+
+**Tag NIE przestawia kolejki i to jest decyzja.** §14.5 rozstrzygnął to samo
+przy kategoriach Copilota, a powód jest identyczny. Kolejność liczy termin
+i czas czekania, czyli fakty o pilności. Jedna pomyłka biura zakopałaby sprawę
+z zegarem na dole listy tak, że nikt by tego nie zauważył.
+
+Tag nie wychodzi też do Allegro. To notatka biura o sprawie, jak `notatka`,
+tylko krótsza i policzalna.
+
+**Słownik jest edytowalny.** Właściciel wybrał tę drogę, pytany wprost. Nazwę
+dopisuje się przy sprawie, jednym ruchem: wchodzi do słownika i od razu na
+sprawę. Zmiana nazwy i wyłączenie z użycia stoją w Ustawieniach, bo dotyczą
+wszystkich spraw naraz.
+
+Cena otwartego słownika jest znana z góry: pasek z czterdziestoma pigułkami
+przestaje filtrować. Płacą ją trzy ograniczenia.
+
+| ograniczenie | po co |
+|---|---|
+| jednoznaczność po małych literach | „Gwarancja" po „gwarancja" to jeden tag w głowie i dwie pigułki w filtrze |
+| sufit dwudziestu aktywnych | prawo Hicka, Dekalog p. 5; licznik widać w Ustawieniach, zanim odmowa padnie przy sprawie |
+| wyłączanie zamiast kasowania | skasowany tag zniknąłby ze spraw historycznych, a z nim odpowiedź na pytanie „dlaczego to stało trzy tygodnie" |
+
+Wyłączony tag zostaje widoczny na sprawach, przy których już stoi, ale nie
+podpowiada się przy nowych. Wpisanie jego nazwy z palca wraca go do użytku:
+skoro ktoś ją wpisał, jest mu potrzebna.
+
+**Cofnięcia tag nie potrzebuje.** Przypięcie i zdjęcie kosztują po jednym
+kliknięciu, więc droga powrotna już jest. §25a.5 mówi o cofnięciu zamiast
+potwierdzenia, a nie obok istniejącej drogi powrotnej.
+
+Pasek filtra pokazuje **wyłącznie tagi obecne w oglądanym kubełku**, malejąco
+po liczbie — ten sam wzorzec co pasek kategorii w skrzynce. Pigułka tagu,
+którego w kubełku nie ma, obiecywałaby zawężenie do pustki. Liczniki mówią
+o składzie KUBEŁKA, nie o tym, co zostało po sitach.
+
+Barwa czipa jest łupkowa, nie fioletowa i nie bursztynowa. Fiolet znaczy w tym
+panelu przypuszczenie maszyny, a tag jest zdaniem człowieka; bursztyn jest
+tłem marki i zaznaczeniem wiersza.
+
 ### 25b.4. Zegar
 
 **Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo
@@ -3698,6 +3743,10 @@ ten sam klawisz `m`, ta sama kolumna `prowadzi_user_id`. Dyskusja i reklamacja
 to jeden wiersz `reklamacja_klienta` rozróżniany polem `typ`, a pytanie „czyje
 to" brzmi na obu ekranach identycznie. Dwa osobne mechanizmy dla jednego
 pytania byłyby dwoma nawykami zamiast jednego.
+
+**Tagi też są wspólne** (§25b.3b) — jeden słownik, jedna para tabel, ten sam
+pasek filtra. Osobny słownik dla dyskusji rozjechałby się z tym przy pierwszej
+zmianie nazwy, a sprawa przenoszona między ekranami gubiłaby opis.
 
 ### 25c.4. Pilność bez zegara
 

@@ -1,5 +1,6 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import {
   BladReklamacji,
@@ -116,6 +117,8 @@ export interface WierszDyskusji {
   /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
   prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0) — ten sam słownik co przy reklamacjach. */
+  tagi: TagSprawy[];
   notatka: string | null;
   /* ── Prośba o zakończenie (`END_REQUEST`) ────────────────────────────────
      Los NASZEJ próby, nie stan Allegro. `status_allegro` należy do Allegro
@@ -233,6 +236,8 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     prowadzi: tekst(w.prowadzi),
     prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
+    /* Puste do czasu doklejenia — powód przy tym samym polu w reklamacjach. */
+    tagi: [],
     notatka: tekst(w.notatka),
     zakonczenieStatus: tekst(w.zakonczenie_status) as StatusZakonczenia | null,
     zakonczenieAt: tekst(w.zakonczenie_at),
@@ -268,8 +273,13 @@ export function listaDyskusji(
      jest kolumną — liczy go ten plik ze statusu ostatniej wiadomości. SQL
      musiałby powtórzyć tę regułę drugi raz i rozjechać się przy pierwszej
      poprawce. Wierszy są dziesiątki, więc to nic nie kosztuje. */
+  const tagi = tagiWszystkichSpraw(database);
   return wiersze
-    .map((w) => zWiersza(w, teraz))
+    .map((w) => {
+      const d = zWiersza(w, teraz);
+      d.tagi = tagi.get(d.id) ?? [];
+      return d;
+    })
     .sort((a, b) => Number(b.ruchNasz) - Number(a.ruchNasz));
 }
 
@@ -307,6 +317,7 @@ export function szczegolDyskusji(
      pokazałoby sprawę uboższą, niż jest naprawdę. */
   if (!w) throw new BladReklamacji(`Dyskusja ${id} nie istnieje`, 404);
   const dyskusja = zWiersza(w, teraz);
+  dyskusja.tagi = tagiSprawy(database, id);
   const { zwroty, rozmowy } = kontekstZamowienia(
     database, Number(w.channel_account_id), dyskusja.orderId, teraz);
   return {

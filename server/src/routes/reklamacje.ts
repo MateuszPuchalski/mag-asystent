@@ -20,6 +20,7 @@ import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegr
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
 import { autoryzuj } from "../services/auth.js";
+import { trasyTagowSprawy } from "./tagi.js";
 import { bladPobrania } from "./pobranie.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
@@ -77,6 +78,10 @@ function czemuCopilotWylaczony(): string | null {
 }
 
 export async function reklamacjeRoutes(app: FastifyInstance) {
+  /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
+     bo klucz jest tym samym wierszem tej samej tabeli. */
+  trasyTagowSprawy(app, "/api/obsluga/reklamacje");
+
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i z tego samego powodu. */

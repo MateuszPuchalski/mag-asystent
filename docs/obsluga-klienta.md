@@ -618,6 +618,12 @@ nie o kliencie, i nigdzie nie wychodzi: sito „Moje" liczy się w pamięci
 przeglądarki, a do Allegro nie idzie żadnym polem. Imię zostaje obok, bo czip
 na wierszu ma pozostać czytelny po skasowaniu konta.
 
+**Tagi spraw (0.279.0).** Nazwa tagu jest słowem BIURA o sprawie, nie daną
+klienta, i pisze ją agent. Do Allegro nie idzie żadnym polem, a kupujący jej
+nie widzi. Do dziennika trafia nazwa tagu razem z numerem sprawy — tak samo
+jak nazwa załącznika, i z tą samą świadomością: `events` nie ma retencji.
+Kto wpisuje tam treść zamiast etykiety, zapisuje ją na zawsze.
+
 **Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
 niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
 prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po

@@ -2516,6 +2516,47 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- ── Tagi spraw posprzedażowych (0.279.0) ────────────────────────────────────
+-- Właściciel poprosił o tagi w jednym celu: „abym łatwiej mógł znaleźć
+-- reklamacje, którymi się zajmuję". Tag jest więc SITEM, nie ozdobą, i nie ma
+-- prawa przestawiać kolejki — §14.5 rozstrzygnął to przy kategoriach Copilota,
+-- a powód jest ten sam: kolejność liczy termin i czas czekania, czyli fakty.
+--
+-- JEDNA PARA TABEL NA OBA EKRANY, bo dyskusja i reklamacja to jeden wiersz
+-- `reklamacja_klienta` rozróżniany polem `typ`. Tak samo robią
+-- `reklamacja_wiadomosc` i `reklamacja_zalacznik_wysylki`.
+--
+-- NAZWA `sprawa_tag` JEST SPALONA NA ZAWSZE (`db/db.ts`) i to nie jest
+-- ciekawostka: lista spalonych nazw chodzi przy KAŻDEJ migracji, więc tabela
+-- nazwana tak powstałaby stąd i znikała sekundę później, po cichu i bez błędu.
+CREATE TABLE IF NOT EXISTS reklamacja_tag (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa            TEXT NOT NULL,
+  -- Tag się WYŁĄCZA, nigdy nie kasuje. Skasowany zniknąłby po cichu ze spraw
+  -- historycznych, a wtedy „dlaczego ta sprawa stała trzy tygodnie" traci
+  -- odpowiedź. Wyłączony nie podpowiada się przy nowej sprawie i tyle.
+  aktywny          INTEGER NOT NULL DEFAULT 1,
+  utworzyl_user_id INTEGER REFERENCES app_user(user_id),
+  utworzono_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- Jednoznaczność po MAŁYCH LITERACH: „Gwarancja" po „gwarancja" to jeden tag
+-- w głowie i dwie pigułki w filtrze. Indeks na wyrażeniu, bo `COLLATE NOCASE`
+-- w SQLite nie zna polskich znaków — „Część" i „część" przeszłyby obok siebie.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_reklamacja_tag_nazwa
+  ON reklamacja_tag(lower(nazwa));
+
+CREATE TABLE IF NOT EXISTS reklamacja_tag_sprawy (
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  tag_id        INTEGER NOT NULL REFERENCES reklamacja_tag(id) ON DELETE CASCADE,
+  dodal_user_id INTEGER REFERENCES app_user(user_id),
+  dodano_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Klucz z dwóch kolumn zamiast własnego `id`: ten sam tag na tej samej
+  -- sprawie drugi raz nie jest drugim faktem, tylko drugim kliknięciem.
+  PRIMARY KEY (reklamacja_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_tag_sprawy_tag
+  ON reklamacja_tag_sprawy(tag_id);
+
 CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,

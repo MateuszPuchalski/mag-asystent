@@ -80,6 +80,8 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/zakoncz` },
+  { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
+  { method: "DELETE" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
 ];
 
 test("bez sesji żadna trasa dyskusji nie odpowiada danymi", async () => {
@@ -98,16 +100,21 @@ test("hala nie widzi dyskusji — bramka roli stoi też na odczycie", async () =
   }
 });
 
-test("CZTERY ZAPISY — licznik jest umową", () => {
+test("SZEŚĆ ZAPISÓW po dołożeniu tagów — licznik jest umową", () => {
   /* Trzy zostają u nas albo są zwykłą pracą biura: „prowadzę", notatka
      i odpowiedź w rozmowie. Czwarty, PROŚBA O ZAKOŃCZENIE, wychodzi do
      kupującego i nie da się jej cofnąć — jako jedyny stoi za `autoryzuj()`
      z wpisem `privileged`. Każdy nowy zapis dostaje zdanie w uzasadnieniu.
 
+     Piąty i szósty doszły z tagami (0.279.0). Zostają WYŁĄCZNIE u nas: tag
+     jest zdaniem biura o sprawie i do Allegro nie idzie żadnym polem.
+     Przypięcie i zdjęcie to jedno kliknięcie w każdą stronę, więc mają
+     własną drogę powrotną i uprzywilejowane być nie mogą.
+
      Trasy „synchronizuj" tu NIE MA i to jest decyzja: dyskusje i reklamacje
      przyjeżdżają jedną listą, więc drugi przycisk byłby drugą drogą w limit 429. */
-  const zapisy = TRASY().filter((t) => t.method === "POST");
-  assert.equal(zapisy.length, 4);
+  const zapisy = TRASY().filter((t) => t.method === "POST" || t.method === "DELETE");
+  assert.equal(zapisy.length, 6);
   assert.ok(!TRASY().some((t) => t.url.endsWith("synchronizuj")),
     "synchronizacja jest wspólna z reklamacjami");
 });

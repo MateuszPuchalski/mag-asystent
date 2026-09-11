@@ -1,5 +1,6 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
@@ -211,6 +212,8 @@ export interface WierszReklamacji {
   /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
   prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `null` w `werdykt` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
@@ -385,6 +388,10 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     prowadzi: tekst(w.prowadzi),
     prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
+    /* Puste, dopóki nie dołoży ich wołający. Tagi jadą OSOBNYM zapytaniem,
+       bo kolejka bierze je jednym strzałem dla całej listy — zapytanie
+       w mapowaniu wiersza dałoby jedno na sprawę. */
+    tagi: [],
     notatka: tekst(w.notatka),
     werdykt,
     werdyktNazwa: werdykt ? (NAZWA_WERDYKTU[werdykt] ?? werdykt) : null,
@@ -453,7 +460,12 @@ export function listaReklamacji(
      WHERE r.typ = 'CLAIM'
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all() as Wiersz[];
-  return wiersze.map((w) => zWiersza(w, teraz));
+  const tagi = tagiWszystkichSpraw(database);
+  return wiersze.map((w) => {
+    const r = zWiersza(w, teraz);
+    r.tagi = tagi.get(r.id) ?? [];
+    return r;
+  });
 }
 
 export function licznikiKubelkow(lista: WierszReklamacji[]): Record<Kubelek, number> {
@@ -582,6 +594,7 @@ export function szczegolReklamacji(
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
+  reklamacja.tagi = tagiSprawy(database, id);
   const konto = Number(w.channel_account_id);
 
   const { zwroty, rozmowy } = kontekstZamowienia(database, konto, reklamacja.orderId, teraz);

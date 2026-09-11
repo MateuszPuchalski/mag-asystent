@@ -30,7 +30,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   decyzjaDo: "2026-09-20T10:00:00.000Z", dniDoTerminu: 13, poTerminie: false,
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziId: null, prowadziAt: null,
+  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [], prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
@@ -49,7 +49,8 @@ const REKLAMACJE = [
      NUMERY BEZ TRÓJKI I BEZ JEDYNKI są tu celowe: sąsiedni test wpisuje
      w pole szukania samą cyfrę i sprawdza, że NIC nie pasuje. Sprawa
      „333/2026” cicho by mu to zabrała. */
-  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7 },
+  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7,
+    tagi: [{ id: 11, nazwa: "czeka na część" }] },
   { ...rek(5, "decyzja", "555/2026"), prowadzi: "A. Lewandowska", prowadziId: 9 },
 ];
 
@@ -72,6 +73,18 @@ vi.mock("../api/rozmowy", async () => {
     useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
   };
 });
+
+/* Tagi: atrapa bez klienta zapytań, bo ten ekran stawia własny `QueryClient`
+   tylko dla haków reklamacji. */
+vi.mock("../api/tagi", () => ({
+  useTagi: () => ({ data: { tagi: [
+    { id: 11, nazwa: "czeka na część", aktywny: true },
+    { id: 12, nazwa: "u producenta", aktywny: true },
+  ] } }),
+  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
+  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
+  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
+}));
 
 vi.mock("../api/reklamacje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
@@ -428,5 +441,47 @@ describe("Ekran reklamacji", () => {
     await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "lewandowsk");
     expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
+  });
+
+  /* ── Tagi (0.279.0) ───────────────────────────────────────────────────────
+     Trzecie sito na tę samą listę: kubełek mówi „na jakim to etapie", „Moje"
+     — „czyje to", tag — „o czym to". */
+  it("czip tagu stoi na wierszu, a pasek filtra liczy skład KUBEŁKA", async () => {
+    pokaz();
+    /* Czip wiersza i pigułka filtra noszą TEN SAM napis, więc rozróżnia je
+       podpowiedź: czip mówi „Tag biura", pigułka „Sprawy z tagiem". */
+    expect(screen.getByTitle("Tag biura: czeka na część")).toBeInTheDocument();
+    const pigulka = screen.getByTitle("Sprawy z tagiem „czeka na część”");
+    expect(pigulka).toHaveTextContent("1");
+
+    await userEvent.click(pigulka);
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+  });
+
+  it("TAG NIE PRZESTAWIA KOLEJKI — to jest linia z §14.5", async () => {
+    /* Kolejność liczy serwer z terminu i czasu czekania, czyli z FAKTÓW
+       o pilności. Gdyby tag ją podnosił, jedna pomyłka biura zakopałaby
+       sprawę z zegarem na dole listy tak, że nikt by tego nie zauważył. */
+    pokaz();
+    const kolejnosc = () => screen.getAllByRole("button")
+      .map((b) => b.textContent ?? "")
+      .filter((t) => /\d{3}\/2026/.test(t))
+      .map((t) => t.match(/\d{3}\/2026/)![0]);
+    const przed = kolejnosc();
+
+    /* Otagowana jest 444, czyli NIE pierwsza w kubełku. Gdyby tag ruszał
+       kolejność, wskoczyłaby na górę. */
+    expect(przed).toEqual(["111/2026", "444/2026", "555/2026"]);
+    expect(przed.indexOf("444/2026")).toBeGreaterThan(0);
+  });
+
+  it("tag NAKŁADA SIĘ na sito „Moje”, zamiast je zastępować", async () => {
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    await userEvent.click(screen.getByTitle("Sprawy z tagiem „czeka na część”"));
+    /* 444 jest i moja, i otagowana — jedyna, która przechodzi oba sita. */
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });
 });

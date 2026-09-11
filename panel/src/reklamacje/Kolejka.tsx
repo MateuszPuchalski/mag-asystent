@@ -7,6 +7,7 @@ import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typ
 import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { Pusto } from "../ui";
+import { CzipTagu } from "../sprawy/Tagi";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej więcej:
@@ -178,6 +179,11 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
               <span title={`Werdykt z panelu${r.werdyktPrzez ? `: ${r.werdyktPrzez}` : ""}`}
                 className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
                 <Gavel size={13} />{r.werdyktNazwa}</span>}
+            {/* TAGI PRZED SYGNAŁAMI: sygnał liczy maszyna z faktu, tag pisze
+                człowiek — a przy szukaniu własnej sprawy szuka się słowa,
+                które się samemu wpisało. Kolejności wiersza to nie zmienia
+                (§14.5): czip zawęża listę, nie podnosi jej wyżej. */}
+            {r.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
             {r.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>

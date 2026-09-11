@@ -18,6 +18,8 @@ import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamac
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PigulkaMoje, ZdanieOUkrytych, mojaSprawa, useMoje } from "../sprawy/Moje";
+import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
+import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 
@@ -120,6 +122,12 @@ export function Reklamacje() {
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
   const { moje, przelacz: przelaczMoje } = useMoje();
+  const [tag, setTag] = useState<number | null>(null);
+  const slownikTagow = useTagi();
+  const nowyTag = useNowyTag();
+  const przypnij = usePrzypnijTag();
+  const odepnij = useOdepnijTag();
+  const [bladTagu, setBladTagu] = useState("");
   const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
@@ -164,11 +172,27 @@ export function Reklamacje() {
   /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
      numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
      szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
+  /* Pigułki tagów liczą skład KUBEŁKA, nie tego, co zostało po sitach.
+     Licznik malejący do zera przy każdym kliknięciu mówiłby o własnym
+     filtrze, a nie o pracy, która czeka. */
+  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
+
+  const moi = useMemo(() => (moje
+    ? wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)) : wKubelku),
+  [wKubelku, moje, mojeId]);
+
+  /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
+     i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
+     nie wykluczać. */
   const wSicie = useMemo(
-    () => (moje ? wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)) : wKubelku),
-    [wKubelku, moje, mojeId]);
+    () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
+    [moi, tag]);
+
   const widoczne = pasujace ?? wSicie;
-  const ukrytych = pasujace ? 0 : wKubelku.length - wSicie.length;
+  /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
+     tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
+     samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
+  const ukrytych = pasujace || !moje ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
@@ -376,10 +400,14 @@ export function Reklamacje() {
             odebrałoby pytanie „moje sprawy do decyzji", czyli dokładnie to,
             które właściciel zadaje najczęściej. Ten rząd weźmie też czipy
             tagów, bo one odpowiadają na trzecie pytanie: „o czym to". */}
-        {mojeId !== null && <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
-          <PigulkaMoje moje={moje} mojeId={mojeId} onPrzelacz={przelaczMoje}
-            ile={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length} />
-        </div>}
+        {(mojeId !== null || wgTagow.length > 0) &&
+          <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PigulkaMoje moje={moje} mojeId={mojeId} onPrzelacz={przelaczMoje}
+              ile={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length} />
+            {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
+                samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
+            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+          </div>}
 
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
@@ -453,6 +481,26 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Dowody szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              tagi={{
+                slownik: slownikTagow.data?.tagi ?? [],
+                trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,
+                blad: bladTagu,
+                onPrzypnij: (tagId) => {
+                  setBladTagu("");
+                  przypnij.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onOdepnij: (tagId) => {
+                  setBladTagu("");
+                  odepnij.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onNowy: (nazwa) => {
+                  setBladTagu("");
+                  nowyTag.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", nazwa },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+              }}
               rozpoznaje={rozpoznaj.isPending}
               bladRozpoznania={bladRozpoznania}
               onRozpoznaj={() => {

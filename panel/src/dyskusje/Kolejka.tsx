@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { MessageSquareWarning, Headset, Lock, CircleHelp, Scale, Hourglass } from "lucide-react";
 import type { Dyskusja, KubelekDyskusji, SygnalDyskusji } from "../api/typy";
 import { Pusto } from "../ui";
+import { CzipTagu } from "../sprawy/Tagi";
 
 /* ── Kolejka dyskusji ────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU i niesie PIĘĆ rzeczy: temat, kupującego, numer
@@ -128,6 +129,9 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz }: {
               title={`Prośba o zakończenie${d.zakonczeniePrzez ? `: ${d.zakonczeniePrzez}` : ""}`}
               className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
               <Scale size={13} />poproszono o zakończenie</span>}
+            {/* Tagi przed sygnałami — powód przy tej samej linii
+                w `reklamacje/Kolejka.tsx`. */}
+            {d.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
             {d.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>

@@ -12,6 +12,7 @@ import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { poprosOZakonczenie } from "../services/dyskusja-zakonczenie.js";
 import { autoryzuj } from "../services/auth.js";
+import { trasyTagowSprawy } from "./tagi.js";
 
 /* ── Trasy dyskusji klienckich (0.245.0) ─────────────────────────────────────
    Bliźniak `routes/reklamacje.ts`, z trzema różnicami, i każda bierze się
@@ -61,6 +62,10 @@ function blad(reply: FastifyReply, e: unknown) {
 const autor = () => sesjaZadania()?.user.name ?? "?";
 
 export async function dyskusjeRoutes(app: FastifyInstance) {
+  /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
+     bo klucz jest tym samym wierszem tej samej tabeli. */
+  trasyTagowSprawy(app, "/api/obsluga/dyskusje");
+
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i reklamacjach. */

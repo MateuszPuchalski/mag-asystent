@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.279.0 — 11 września 2026
+
+**Tagi spraw w reklamacjach i dyskusjach, ze słownikiem, który edytuje biuro.**
+Ta sama prośba właściciela, co przy sicie „Moje": łatwiej znaleźć swoje sprawy.
+Sito odpowiada na pytanie „czyje to", tag na „o czym to" — najczęściej „czego
+ta sprawa czeka".
+
+Ziarno słownika to trzy słowa właściciela: „u producenta / u dostawcy", „czeka
+na część", „do decyzji właściciela". Wsiewa się WYŁĄCZNIE do pustego słownika,
+więc biuro, które raz zmieniło nazwę, nie dostaje wartości fabrycznych z
+powrotem przy restarcie.
+
+Nazwę dopisuje się przy sprawie, jednym ruchem: wchodzi do słownika i od razu
+na sprawę. Zmiana nazwy i wyłączenie z użycia stoją w Ustawieniach, bo dotyczą
+wszystkich spraw naraz.
+
+**Tag NIE przestawia kolejki i to jest decyzja.** Kolejność liczy termin i czas
+czekania, czyli fakty o pilności. Jedna pomyłka biura zakopałaby sprawę
+z zegarem na dole listy tak, że nikt by tego nie zauważył. Tag zawęża listę
+i nic poza tym; do Allegro nie idzie żadnym polem.
+
+Cena otwartego słownika jest znana z góry: pasek z czterdziestoma pigułkami
+przestaje filtrować. Płacą ją trzy ograniczenia. Jednoznaczność po małych
+literach, bo „Gwarancja" po „gwarancja" to jeden tag w głowie i dwie pigułki
+w filtrze. Sufit dwudziestu aktywnych, z licznikiem widocznym w Ustawieniach,
+zanim odmowa padnie w biegu przy sprawie. Wyłączanie zamiast kasowania —
+skasowany tag zniknąłby ze spraw historycznych, a z nim odpowiedź na pytanie,
+dlaczego sprawa stała trzy tygodnie.
+
+Cofnięcia tag nie potrzebuje: przypięcie i zdjęcie kosztują po jednym
+kliknięciu, więc droga powrotna już jest.
+
+Nazwa tabeli nie mogła brzmieć `sprawa_tag`: ta jest na liście spalonych na
+zawsze i kasowana przy KAŻDEJ migracji. Tabela nazwana tak powstałaby ze
+schematu i znikała sekundę później, po cichu.
+
+
 ## 0.278.0 — 11 września 2026
 
 **Sito „Moje" w reklamacjach i dyskusjach.** Właściciel poprosił o jedno:

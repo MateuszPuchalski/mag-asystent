@@ -27,7 +27,7 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
   ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
   ruchNasz: kubelek === "odpowiedz", czekaOdDni: kubelek === "odpowiedz" ? 5 : null,
   dlugoCzeka: kubelek === "odpowiedz",
-  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, prowadziAt: null, notatka: null,
+  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [], prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
   wersja: 1, kubelek, sygnaly: [], linkZamowienia: null,
 });
@@ -38,7 +38,7 @@ const DYSKUSJE = [
   /* Pod sito „Moje": obie prowadzi „A. Lewandowska”, ale tylko sprawa 4
      należy do zalogowanego konta (7). Sprawę 5 ma IMIENNICZKA o numerze 9. */
   { ...dys(4, "odpowiedz", "Towar inny niż w opisie"),
-    prowadzi: "A. Lewandowska", prowadziId: 7 },
+    prowadzi: "A. Lewandowska", prowadziId: 7, tagi: [{ id: 11, nazwa: "czeka na część" }] },
   { ...dys(5, "odpowiedz", "Reklamacja ceny"),
     prowadzi: "A. Lewandowska", prowadziId: 9 },
 ];
@@ -58,6 +58,13 @@ vi.mock("../api/rozmowy", async () => {
     useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
   };
 });
+
+vi.mock("../api/tagi", () => ({
+  useTagi: () => ({ data: { tagi: [{ id: 11, nazwa: "czeka na część", aktywny: true }] } }),
+  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
+  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
+  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
+}));
 
 vi.mock("../api/dyskusje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/dyskusje")>("../api/dyskusje");
@@ -213,5 +220,13 @@ describe("Ekran dyskusji", () => {
     await userEvent.type(screen.getByLabelText("Szukaj dyskusji"), "lewandowsk");
     expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Przesyłka nie dotarła/ })).not.toBeInTheDocument();
+  });
+
+  it("tag zawęża listę także w dyskusjach — jeden słownik na oba ekrany", async () => {
+    pokaz();
+    expect(screen.getByTitle("Tag biura: czeka na część")).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("Sprawy z tagiem „czeka na część”"));
+    expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reklamacja ceny/ })).not.toBeInTheDocument();
   });
 });

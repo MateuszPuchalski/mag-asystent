@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
-import type { Dyskusja, SzczegolDyskusji } from "../api/typy";
+import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
+import { TagiSprawy } from "../sprawy/Tagi";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
@@ -72,12 +73,22 @@ function Notatka({ dyskusja, trwa, blad, onZapisz }: {
   </div>;
 }
 
-export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
+export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, tagi }: {
   szczegol: SzczegolDyskusji;
   trwa: boolean;
   bladZapisu: string;
   onProwadze: () => void;
   onNotatka: (tekst: string) => void;
+  /* Opcjonalne tym samym wzorcem co przy reklamacji: czego nie da się zrobić,
+     tego nie ma na ekranie. */
+  tagi?: {
+    slownik: Tag[];
+    trwa: boolean;
+    blad: string;
+    onPrzypnij: (tagId: number) => void;
+    onOdepnij: (tagId: number) => void;
+    onNowy: (nazwa: string) => void;
+  };
 }) {
   const d = szczegol.dyskusja;
   return <div className="flex min-h-0 flex-col">
@@ -142,6 +153,12 @@ export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
       <Przycisk className="mt-1 w-full" disabled={trwa} onClick={onProwadze}>
         {d.prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
       </Przycisk>
+      {/* Tagi nad notatką — powód przy tej samej sekcji w `reklamacje/Dowody.tsx`. */}
+      {tagi && <div className="mt-3">
+        <TagiSprawy przypiete={d.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
+          blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
+          onNowy={tagi.onNowy} />
+      </div>}
       <div className="mt-3">
         <Notatka dyskusja={d} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka} />
       </div>
