@@ -175,6 +175,7 @@ CREATE TABLE IF NOT EXISTS wms_replenishment (
   reason TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_replenishment_open ON wms_replenishment(tw_id,target) WHERE completed_at IS NULL AND cancelled_at IS NULL;
+CREATE INDEX IF NOT EXISTS ix_wms_replenishment_source ON wms_replenishment(tw_id,source) WHERE completed_at IS NULL AND cancelled_at IS NULL;
 CREATE TABLE IF NOT EXISTS wms_line (
   id INTEGER PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES wms_order(id),

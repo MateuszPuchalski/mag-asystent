@@ -29,7 +29,13 @@ window.WmsStockWork = (h) => {
         sourceVersion: p.source_version,
         targetVersion: p.target_version,
       });
-      if (result) await h.refresh();
+      if (result) {
+        await h.refresh();
+        const task = target().querySelector(
+          `[data-stockwork-task="${result.id}"]`,
+        );
+        if (task) await click(task);
+      }
       return true;
     }
     if (button.dataset.stockworkTask) {

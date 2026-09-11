@@ -265,11 +265,21 @@ export async function exerciseCarts(page, output) {
     .click();
   await expect(page.locator("[data-stockwork-claim]")).toHaveCount(1);
   await page.locator("[data-stockwork-claim]").click();
-  await page.locator("[data-stockwork-task]").click();
+  await expect(
+    page.locator('#wms-stockwork-complete [name="source"]'),
+  ).toBeFocused();
   await page.locator('#wms-stockwork-complete [name="source"]').fill("RES-E2E");
+  await page.locator('#wms-stockwork-complete [name="source"]').press("Enter");
+  await expect(
+    page.locator('#wms-stockwork-complete [name="barcode"]'),
+  ).toBeFocused();
   await page
     .locator('#wms-stockwork-complete [name="barcode"]')
     .fill("WMS-0036");
+  await page.locator('#wms-stockwork-complete [name="barcode"]').press("Enter");
+  await expect(
+    page.locator('#wms-stockwork-complete [name="target"]'),
+  ).toBeFocused();
   await page
     .locator('#wms-stockwork-complete [name="target"]')
     .fill("A05-01-02");

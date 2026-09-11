@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.289.0 — 12 września 2026
+
+**Uzupełnienie gotowe do skanu po przyjęciu zadania.** Formularz otwiera się
+automatycznie, a Enter prowadzi od źródła przez kod towaru do półki docelowej.
+Operator nie musi szukać nowego zadania i otwierać go drugim kliknięciem.
+
+Ruchy magazynowe chronią również sztuki przydzielone do otwartych uzupełnień.
+Ręczne przesunięcie ani przeliczenie nie zabierze ich z zaplecza. Dodatkowe
+przyjęcie lub przesunięcie wolnych sztuk nie wymaga anulowania poprawnego
+zadania. Zakończenie atomowo zwalnia własny przydział i przenosi zapas,
+zachowując przydziały innych operatorów. Awaria wycofuje oba kroki.
+Tabela zapasów pokazuje przydzielone uzupełnienia. Ręczny ruch nie omija
+otwartego przeliczenia źródła ani celu. Zmiana przeznaczenia lokalizacji
+wymaga zakończenia lub anulowania jej uzupełnień.
+
+Audyt całego przepływu, źródła i otwarte ustalenia:
+[przyjęcie → wysyłka](docs/wms-audyt-przeplywu.md).
+
 ## 0.288.0 — 12 września 2026
 
 **Zdjęcie części prowadzi zbiórkę.** Wózki 20/30, zbiórka ręczna i pojedyncze

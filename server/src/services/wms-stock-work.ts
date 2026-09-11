@@ -327,6 +327,10 @@ export function completeReplenishment(
           ?.mode ?? "pick") !== "pick"
       )
         fail("Przeznaczenie lokalizacji zmieniło się. Przygotuj nowy plan");
+      // W tej samej transakcji zwalniamy własny przydział; cudze sztuki nadal chroni move.
+      db()
+        .prepare("UPDATE wms_replenishment SET completed_at=? WHERE id=?")
+        .run(nowIso(), taskId);
       applyStock(actor, {
         action: "transfer",
         twId: task!.tw_id,
@@ -335,20 +339,6 @@ export function completeReplenishment(
         quantity: input.quantity,
         reason: `Uzupełnienie #${taskId}`,
       });
-      db()
-        .prepare("UPDATE wms_replenishment SET completed_at=? WHERE id=?")
-        .run(nowIso(), taskId);
-      // Własny, rozliczony ruch nie unieważnia innych zadań z tego samego źródła.
-      db()
-        .prepare(
-          "UPDATE wms_replenishment SET source_version=? WHERE tw_id=? AND source=? AND source_version=? AND completed_at IS NULL AND cancelled_at IS NULL",
-        )
-        .run(
-          stock(task!.tw_id, input.source)!.version,
-          task!.tw_id,
-          input.source,
-          task!.source_version,
-        );
       return { completed: true, id: taskId };
     },
   );

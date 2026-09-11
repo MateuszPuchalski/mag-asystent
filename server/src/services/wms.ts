@@ -266,6 +266,18 @@ export function configureBin(actor: Actor, key: string, raw: unknown) {
     if ((current?.version ?? 1) !== input.version)
       fail("Lokalizacja zmieniła się. Odśwież listę");
     if (
+      input.mode !== (current?.mode ?? "pick") &&
+      d
+        .prepare(
+          `SELECT 1 FROM wms_replenishment
+      WHERE (source=? OR target=?) AND completed_at IS NULL AND cancelled_at IS NULL LIMIT 1`,
+        )
+        .get(input.bin, input.bin)
+    )
+      fail(
+        "Lokalizacja ma otwarte uzupełnienia. Zakończ lub anuluj zadania przed zmianą przeznaczenia",
+      );
+    if (
       input.mode !== "pick" &&
       d
         .prepare("SELECT 1 FROM wms_stock WHERE bin=? AND reserved>0 LIMIT 1")
@@ -312,6 +324,17 @@ export function move(
 ): void {
   const d = db();
   if (!d.isTransaction) throw new Error("Ruch WMS wymaga transakcji command");
+  if (
+    kind === "transfer" &&
+    d
+      .prepare(
+        "SELECT 1 FROM wms_stock_check WHERE tw_id=? AND bin=? AND resolved_at IS NULL",
+      )
+      .get(twId, address)
+  )
+    fail(
+      `Lokalizacja ${address} czeka na przeliczenie. Wyjaśnij rozbieżność przed przesunięciem`,
+    );
   d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
     twId,
     address,
@@ -319,10 +342,33 @@ export function move(
   const changed = d
     .prepare(
       `UPDATE wms_stock SET on_hand=on_hand+?, reserved=reserved+?, version=version+1
-    WHERE tw_id=? AND bin=? AND on_hand+? >= 0 AND reserved+? >= 0 AND reserved+? <= on_hand+?`,
+    WHERE tw_id=? AND bin=? AND on_hand+? >= 0 AND reserved+? >= 0 AND reserved+? <= on_hand+?
+    AND on_hand+?-(reserved+?) >= coalesce((SELECT sum(quantity) FROM wms_replenishment
+      WHERE tw_id=wms_stock.tw_id AND source=wms_stock.bin AND completed_at IS NULL AND cancelled_at IS NULL),0)
+    RETURNING version`,
     )
-    .run(delta, reserved, twId, address, delta, reserved, reserved, delta);
-  if (!changed.changes) fail(`Za mało dostępnego towaru na ${address}`);
+    .get(
+      delta,
+      reserved,
+      twId,
+      address,
+      delta,
+      reserved,
+      reserved,
+      delta,
+      delta,
+      reserved,
+    ) as { version: number } | undefined;
+  if (!changed)
+    fail(
+      `Za mało dostępnego towaru na ${address}. Sprawdź rezerwacje i zadania uzupełnień`,
+    );
+  // Zwykły ruch zachowuje przydzielone sztuki. Przeliczenie nadal wymaga ponownej weryfikacji pracy.
+  if (kind === "receive" || kind === "transfer")
+    d.prepare(
+      `UPDATE wms_replenishment SET source_version=? WHERE tw_id=? AND source=?
+      AND source_version=? AND completed_at IS NULL AND cancelled_at IS NULL`,
+    ).run(changed!.version, twId, address, changed!.version - 1);
   d.prepare(
     `INSERT INTO wms_movement(tw_id,bin,delta,reserved_delta,kind,order_id,reason,user_id,created_at)
     VALUES (?,?,?,?,?,?,?,?,?)`,
@@ -1437,6 +1483,7 @@ export function inventory(raw: unknown) {
     .prepare(
       `${catalog} SELECT t.tw_id,t.symbol,t.nazwa,t.ean,t.active,s.bin,coalesce(s.on_hand,0) AS on_hand,
     coalesce(s.reserved,0) AS reserved,coalesce(s.minimum,0) AS minimum,coalesce(s.version,1) AS version,
+    coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS replenishment_reserved,
     coalesce(b.mode,'pick') AS mode,sc.reason AS stock_blocked,CASE WHEN coalesce(b.mode,'pick')='pick' AND sc.id IS NULL THEN coalesce(s.on_hand-s.reserved,0) ELSE 0 END AS available
     ${where} ORDER BY t.symbol,s.bin LIMIT ? OFFSET ?`,
     )

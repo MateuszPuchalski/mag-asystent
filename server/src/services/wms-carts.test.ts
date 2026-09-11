@@ -749,7 +749,7 @@ test("brak blokuje wspólną półkę; przeliczenie odbudowuje rezerwacje wedłu
   assert.equal((await import("./wms-analytics.js")).integrity().ok, true);
 });
 
-test("plan uzupełnień nie zapisuje, a zmieniony zapas i ponowny przydział są kontrolowane", () => {
+test("plan uzupełnień nie zapisuje, a nowe przyjęcie nie unieważnia przypisanej pracy", () => {
   const p = product(1),
     reserve = `RES-${p.twId}`;
   W.configureBin(admin, randomUUID(), {
@@ -797,18 +797,236 @@ test("plan uzupełnień nie zapisuje, a zmieniony zapas i ponowny przydział są
     quantity: 1,
     reason: "Zmiana w czasie zadania",
   });
+  S.completeReplenishment(picker, randomUUID(), task.id, {
+    source: reserve,
+    target: p.bin,
+    barcode: p.sku,
+    quantity: 4,
+  });
+  assert.equal(S.stockWork(picker, { q: p.sku }).plans.length, 0);
+});
+
+test("ręczne przesunięcie nie zabiera sztuk przydzielonych do uzupełnienia", () => {
+  const p = product(1),
+    source = `RS-${p.twId}`;
+  W.configureBin(admin, randomUUID(), {
+    bin: source,
+    mode: "reserve",
+    version: 1,
+    reason: "Zaplecze",
+  });
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: source,
+    quantity: 8,
+    reason: "Przyjęcie",
+  });
+  const task = S.claimReplenishment(picker, randomUUID(), {
+    twId: p.twId,
+    source,
+    target: p.bin,
+    quantity: 4,
+    sourceVersion: 2,
+    targetVersion: 2,
+  });
   assert.throws(
     () =>
-      S.completeReplenishment(picker, randomUUID(), task.id, {
-        source: reserve,
-        target: p.bin,
-        barcode: p.sku,
-        quantity: 4,
+      W.changeStock(admin, randomUUID(), {
+        action: "transfer",
+        twId: p.twId,
+        bin: source,
+        target: "OTHER",
+        quantity: 5,
+        reason: "Ręczny ruch",
       }),
-    /zmienił/,
+    /uzupełnień/,
   );
-  S.cancelReplenishment(picker, randomUUID(), task.id, {
-    reason: "Nowy plan po zmianie stanu",
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, source)!.on_hand,
+    8,
+  );
+  W.changeStock(admin, randomUUID(), {
+    action: "transfer",
+    twId: p.twId,
+    bin: source,
+    target: "OTHER",
+    quantity: 4,
+    reason: "Wolne sztuki",
   });
-  assert.ok(S.stockWork(picker, { q: p.sku }).plans.length);
+  const key = randomUUID(),
+    scan = { source, target: p.bin, barcode: p.sku, quantity: 4 };
+  S.completeReplenishment(picker, key, task.id, scan);
+  S.completeReplenishment(picker, key, task.id, scan);
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, source)!.on_hand,
+    0,
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, p.bin)!.on_hand,
+    5,
+  );
+});
+
+test("dwa uzupełnienia chronią wspólne źródło, a awaria wycofuje zwolnienie przydziału", () => {
+  const p = product(1),
+    source = `RS-${p.twId}`,
+    target = `PICK-${p.twId}`;
+  W.configureBin(admin, randomUUID(), {
+    bin: source,
+    mode: "reserve",
+    version: 1,
+    reason: "Zaplecze",
+  });
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: source,
+    quantity: 8,
+    reason: "Przyjęcie",
+  });
+  W.changeStock(admin, randomUUID(), {
+    action: "minimum",
+    twId: p.twId,
+    bin: target,
+    quantity: 4,
+    version: 1,
+    reason: "Druga półka",
+  });
+  const first = S.claimReplenishment(picker, randomUUID(), {
+    twId: p.twId,
+    source,
+    target: p.bin,
+    quantity: 4,
+    sourceVersion: 2,
+    targetVersion: 2,
+  });
+  const second = S.claimReplenishment(other, randomUUID(), {
+    twId: p.twId,
+    source,
+    target,
+    quantity: 4,
+    sourceVersion: 2,
+    targetVersion: 2,
+  });
+  assert.equal(
+    W.inventory({ q: p.sku }).rows.find((row) => row.bin === source)!
+      .replenishment_reserved,
+    8,
+  );
+  assert.throws(
+    () =>
+      W.configureBin(admin, randomUUID(), {
+        bin: source,
+        mode: "pick",
+        version: 2,
+        reason: "Zmiana przeznaczenia",
+      }),
+    /otwarte uzupełnienia/,
+  );
+  assert.throws(
+    () =>
+      W.changeStock(admin, randomUUID(), {
+        action: "count",
+        twId: p.twId,
+        bin: source,
+        quantity: 7,
+        version: 2,
+        reason: "Przeliczenie źródła",
+      }),
+    /uzupełnień/,
+  );
+  db()
+    .exec(`CREATE TEMP TRIGGER fail_replenishment BEFORE INSERT ON wms_movement
+    WHEN NEW.tw_id=${p.twId} AND NEW.bin='${p.bin}' AND NEW.kind='transfer'
+    BEGIN SELECT RAISE(ABORT,'replenishment rollback'); END`);
+  try {
+    assert.throws(
+      () =>
+        S.completeReplenishment(picker, randomUUID(), first.id, {
+          source,
+          target: p.bin,
+          barcode: p.sku,
+          quantity: 4,
+        }),
+      /rollback/,
+    );
+  } finally {
+    db().exec("DROP TRIGGER fail_replenishment");
+  }
+  assert.equal(
+    db()
+      .prepare("SELECT completed_at FROM wms_replenishment WHERE id=?")
+      .get(first.id)!.completed_at,
+    null,
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, source)!.on_hand,
+    8,
+  );
+  S.completeReplenishment(picker, randomUUID(), first.id, {
+    source,
+    target: p.bin,
+    barcode: p.sku,
+    quantity: 4,
+  });
+  S.completeReplenishment(other, randomUUID(), second.id, {
+    source,
+    target,
+    barcode: p.sku,
+    quantity: 4,
+  });
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, source)!.on_hand,
+    0,
+  );
+});
+
+test("ręczny ruch nie omija przeliczenia źródła ani celu", () => {
+  const p = product(10),
+    otherBin = `SAFE-${p.twId}`;
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: otherBin,
+    quantity: 2,
+    reason: "Druga półka",
+  });
+  db()
+    .prepare(
+      "INSERT INTO wms_stock_check(tw_id,bin,reason,created_at,user_id) VALUES (?,?,?,?,?)",
+    )
+    .run(p.twId, p.bin, "Rozbieżność", new Date().toISOString(), admin.id);
+  for (const [source, target] of [
+    [p.bin, otherBin],
+    [otherBin, p.bin],
+  ])
+    assert.throws(
+      () =>
+        W.changeStock(admin, randomUUID(), {
+          action: "transfer",
+          twId: p.twId,
+          bin: source,
+          target,
+          quantity: 1,
+          reason: "Próba obejścia",
+        }),
+      /przeliczenie/,
+    );
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, otherBin)!.on_hand,
+    2,
+  );
 });
