@@ -30,7 +30,7 @@ vi.mock("../api/reklamacje", () => ({
 const { Czat } = await import("./Czat");
 
 /* Kształt strukturalny z 0.245.0: czat czyta o sprawie tylko tyle. */
-const sprawa = () => ({ id: 3, opisZgloszenia: "Pękła obudowa", wiadomosciIle: 1 });
+const sprawa = () => ({ id: 3, opisZgloszenia: "Pękła obudowa", wiadomosciIle: 1, czatUrwany: false });
 const wiad = (zalaczniki: WiadomoscReklamacji["zalaczniki"]): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "kupujacy1", autorRola: "BUYER",
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z", zalaczniki,

@@ -1096,6 +1096,8 @@ export interface Reklamacja {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0), a nie takt. */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
@@ -1208,6 +1210,8 @@ export interface Dyskusja {
   statusAllegro: string | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   /** Czy ruch należy do nas — z niego biorą się kubełek i czas czekania. */

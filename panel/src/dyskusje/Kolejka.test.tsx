@@ -21,7 +21,7 @@ import { Kolejka, KUBELKI } from "./Kolejka";
 const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   id: 1, externalId: "d-1", orderId: "ZAM-1", kupujacyLogin: "kowalski",
   temat: "Przesyłka nie dotarła", opis: null,
-  statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2,
+  statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: "BUYER_REPLIED", ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
   ruchNasz: true, czekaOdDni: 5, dlugoCzeka: true,
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziAt: null, notatka: null,

@@ -85,6 +85,8 @@ export interface SprawaCzatu {
   opisZgloszenia: string | null;
   /** Ile wiadomości widzi Allegro — po tym poznaje się rozmowę niepełną. */
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron — wtedy reszta NIE dojdzie sama. */
+  czatUrwany: boolean;
 }
 
 export function Czat({ sprawa, czat, zalaczniki, edytor }: {
@@ -111,9 +113,17 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
       <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
     </section>
 
+    {/* DWA POWODY NIEPEŁNEJ ROZMOWY I DWA RÓŻNE ZDANIA (0.273.0). Do 0.272.0
+        stało tu jedno: „Reszta dojdzie następną synchronizacją". Przy rozmowie
+        urwanej naszym bezpiecznikiem stron była to nieprawda — nie dochodziła
+        nigdy, bo po drugą stronę rozmowy nikt nie szedł. Obietnica bez pokrycia
+        jest gorsza od przyznania się, czego nie mamy. */}
     {brakuje > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
       <b>Ta rozmowa jest niepełna:</b> Allegro widzi {sprawa.wiadomosciIle} wiadomości,
-      a mamy {czat.length}. Reszta dojdzie następną synchronizacją.
+      a mamy {czat.length}.{" "}
+      {sprawa.czatUrwany
+        ? "To rozmowa wyjątkowo długa — resztę przeczytasz w Centrum Sprzedaży."
+        : "Reszta dojdzie następną synchronizacją."}
     </p>}
 
     {czat.length === 0

@@ -89,6 +89,7 @@ const TRASY = () => [
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}` },
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad` },
   { method: "POST" as const, url: "/api/obsluga/reklamacje/synchronizuj" },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odswiez` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
@@ -118,9 +119,16 @@ test("PIĘĆ ZAPISÓW po przyroście trzecim — licznik jest umową", () => {
      zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
      o towarze po uznaniu. Oba są nieodwracalne wobec kupującego i jako
      jedyne w module stoją za `autoryzuj()` z wpisem `privileged`. Każdy nowy
-     zapis dostaje zdanie w uzasadnieniu. `synchronizuj` NIE JEST zapisem do
-     Allegro: to odczyt na żądanie, który zapisuje wynik u nas. */
-  const zapisy = TRASY().filter((t) => t.method === "POST" && !t.url.endsWith("synchronizuj"));
+     zapis dostaje zdanie w uzasadnieniu.
+
+     `synchronizuj` i `odswiez` NIE SĄ zapisami do Allegro: to odczyty na
+     żądanie, które zapisują wynik u nas. `POST`-em idą dlatego, że `GET`
+     z takim skutkiem ubocznym łamałby „zero zapisu przy patrzeniu" ciszej,
+     niż gdyby łamał ją jawnie — przeglądarka powtarza i wstępnie pobiera
+     `GET`-y bez pytania. */
+  const DOCIAGNIECIA = ["synchronizuj", "odswiez"];
+  const zapisy = TRASY().filter((t) => t.method === "POST"
+    && !DOCIAGNIECIA.some((d) => t.url.endsWith(d)));
   assert.equal(zapisy.length, 5,
     "prowadzę i notatka u nas; odpowiedź, werdykt i towar wychodzą do Allegro");
 });
@@ -294,6 +302,26 @@ test("synchronizacja bez sparowanego konta mówi zdaniem, a nie kodem", async ()
     method: "POST", url: "/api/obsluga/reklamacje/synchronizuj", headers: naglowki });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /sparowane/);
+});
+
+test("odświeżenie sprawy bez sparowanego konta też mówi zdaniem", async () => {
+  /* Ta sama ścieżka co przy synchronizacji i ten sam powód: 502 z gołym kodem
+     kazałby szukać awarii tam, gdzie jej nie ma. */
+  const { naglowki } = login("biuro", "Ala dziewiąta");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odswiez`, headers: naglowki });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /sparowane/);
+});
+
+test("odświeżenie NIE jest operacją uprzywilejowaną — to dociągnięcie cudzego stanu", async () => {
+  /* Werdykt i decyzja o towarze stoją za `autoryzuj()`, bo są nieodwracalne
+     wobec kupującego. Odświeżenie nie zmienia u kupującego niczego, więc
+     bramka roli biura wystarcza — inaczej zwykła praca wymagałaby admina. */
+  const { naglowki } = login("biuro", "Ala dziesiąta");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odswiez`, headers: naglowki });
+  assert.notEqual(r.statusCode, 403, "biuro ma prawo odświeżyć sprawę");
 });
 
 test("podgląd rozstrzygają BAJTY, nie pole, którego Allegro nie przysyła", () => {

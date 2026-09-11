@@ -119,3 +119,27 @@ test("415 przy BINARIACH nie chodzi po wersjach — to odmowa typu pliku", async
 
   assert.equal(zebrane.length, 1, "jedna próba, bez chodzenia po wersjach zasobu");
 });
+
+test("prosimy o POLSKI — `accept-language` jedzie przy każdym żądaniu (0.273.0)", async () => {
+  /* Do 0.272.0 tego nagłówka nie było w serwerze NIGDZIE, więc pola zależne od
+     języka przychodziły w domyślnym Allegro. Specyfikacja wymienia go wprost
+     przy `GET /sale/issues` („Expected language of subject field") i przy
+     `GET …/chat` („Expected language of messages", z przykładem `en-US`).
+
+     Asercja obejmuje odczyt I zapis, bo rozjazd języka między listą a rozmową
+     tej samej sprawy byłby gorszy niż konsekwentna angielszczyzna. */
+  const zebrane = podstaw([
+    { status: 200, body: { issues: [] } },
+    { status: 200, body: { id: "m-1" } },
+  ]);
+
+  await zapytajAllegro("https://api.test/sale/issues?limit=100&offset=0");
+  await zapytajAllegro("https://api.test/sale/issues/i-1/message", {
+    metoda: "POST", body: { text: "Odpowiadam", type: "REGULAR" },
+  });
+
+  assert.equal(zebrane.length, 2);
+  for (const z of zebrane) {
+    assert.equal(z.headers["accept-language"], "pl-PL", `${z.url} poszedł bez języka`);
+  }
+});

@@ -180,3 +180,28 @@ export function useZwrotTowaru() {
     },
   });
 }
+
+/**
+ * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+ *
+ * Do 0.272.0 świeży stan sprawy dawał wyłącznie pełny przebieg listy, czyli
+ * takt trzech minut. Agent, który właśnie wysłał odpowiedź albo werdykt,
+ * patrzy na ekran TERAZ — i najbardziej wtedy, gdy wysyłka skończyła się
+ * niejednoznacznie: jedno żądanie rozstrzyga to, po co pasek odsyłał do
+ * Centrum Sprzedaży.
+ *
+ * Błędu NIE pokazujemy jako porażki działania agenta: odświeżenie jest
+ * dopiskiem do tego, co się właśnie udało, więc odmowa Allegro ma zostawić
+ * ekran w spokoju i poczekać na takt.
+ */
+export function useOdswiez() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<SzczegolReklamacji>(`/api/obsluga/reklamacje/${v.id}/odswiez`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+    },
+  });
+}

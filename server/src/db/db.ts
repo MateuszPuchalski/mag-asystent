@@ -222,6 +222,11 @@ export function migrate(database: DatabaseSync) {
      migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to
      jest prawda o każdej sprawie rozstrzygniętej w Centrum Sprzedaży. `CHECK`
      z PEŁNYM zbiorem od razu (blizna 0.135.0), ten sam co w `schema.sql`. */
+  /* Znak urwanej rozmowy (0.273.0) — patrz `reklamacja_klienta` w `schema.sql`.
+     Tabela stoi na produkcji od 0.222.0, więc kolumna dochodzi migracją. Zero
+     dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
+     prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
+  addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
   addColumn("reklamacja_klienta", "werdykt", `TEXT CHECK (werdykt IS NULL OR werdykt IN (
     'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
     'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',

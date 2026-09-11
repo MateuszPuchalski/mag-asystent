@@ -2312,6 +2312,11 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- ekran obiecywałby odpowiedź, którą Allegro odrzuci z 409.
   czat_aktywny INTEGER NOT NULL DEFAULT 1,
   wiadomosci_ile INTEGER NOT NULL DEFAULT 0,
+  -- Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). Rozmowa dłuższa niż
+  -- `MAKS_STRON_CZATU` × 100 wiadomości nie zmieści się w jednym przebiegu,
+  -- a bez tego znaku wiersz wracałby po nią w kółko i głodził budżet innych
+  -- spraw — ekran obiecywałby przy tym resztę, która nie ma skąd przyjść.
+  czat_urwany INTEGER NOT NULL DEFAULT 0,
   ostatnia_wiadomosc_status TEXT,
   ostatnia_wiadomosc_at TEXT,
   -- `openedDate` — moment otwarcia albo PONOWNEGO otwarcia sprawy.
