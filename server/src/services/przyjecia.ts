@@ -13,10 +13,19 @@ import { BladKosza, szczegolKosza, type SzczegolKosza } from "./kosze.js";
      4. Dokument powrotny (ZWR→MAG) wystawia BIURO, nie kolektor.
 
    Aplikacja wchodzi w ten obieg, zamiast zapraszać do nowego: jednostką pracy
-   jest dokument, listę towarów bierzemy z jego pozycji, a po rozłożeniu
-   kolektor NIE tworzy żadnego dokumentu. Kosz z dokumentu poznaje się po
-   `kosz.mm_dok_id` — i to ta kolumna rozstrzyga w `zakonczKosz`, czy cokolwiek
-   idzie do kolejki zapisów.                                                  */
+   jest dokument, a listę towarów bierzemy z jego pozycji.
+
+   PUNKT 4 ODSZEDŁ DO APLIKACJI W 0.277.0 (decyzja właściciela). Powrót jest
+   odwrotnością tego dokumentu, więc ZAKOŃCZ na kolektorze zamawia MM
+   ZWROTY→magazyn źródłowy — tak samo jak przy koszu z panelu i z tych samych
+   powodów (`services/kosze.ts`). Biuro nie wystawia już niczego ręką, a gdyby
+   wystawiło, stan zjechałby dwa razy: to jest jedyna rzecz, którą przy tym
+   wydaniu trzeba odwołać w nawyku, nie w ustawieniu.
+
+   Magazyn źródłowy zapisujemy SNAPSHOTEM w `kosz.mm_mag_z`, bo lustro
+   `sgt_mm_zwrot` czyści się przy każdym imporcie i sięga tyle dni wstecz, ile
+   mówi `MM_ZWROTY_DNI_WSTECZ` — kosz rozkładany dłużej niż to okno nie miałby
+   już skąd odczytać kierunku.                                                */
 
 export interface WierszPrzyjecia {
   dokId: number;
@@ -121,8 +130,13 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
 
   const d = db();
   const dok = d
-    .prepare("SELECT dok_id, nr_pelny, numer FROM sgt_mm_zwrot WHERE numer = ? ORDER BY dok_id DESC")
-    .get(numer) as { dok_id: number; nr_pelny: string; numer: string } | undefined;
+    .prepare(
+      `SELECT dok_id, nr_pelny, numer, mag_z FROM sgt_mm_zwrot
+        WHERE numer = ? ORDER BY dok_id DESC`
+    )
+    .get(numer) as
+    | { dok_id: number; nr_pelny: string; numer: string; mag_z: number | null }
+    | undefined;
   if (!dok) {
     throw new BladKosza(
       404,
@@ -158,11 +172,11 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
     const teraz = nowIso();
     const wynik = d
       .prepare(
-        `INSERT INTO kosz(kod, status, mm_dok_id, mm_numer,
+        `INSERT INTO kosz(kod, status, mm_dok_id, mm_numer, mm_mag_z,
                           utworzono_at, utworzono_przez, zamknieto_at, zamknieto_przez)
-         VALUES (?, 'zamkniety', ?, ?, ?, ?, ?, ?)`
+         VALUES (?, 'zamkniety', ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(dok.numer, dok.dok_id, dok.numer, teraz, autor, teraz, autor);
+      .run(dok.numer, dok.dok_id, dok.numer, dok.mag_z ?? null, teraz, autor, teraz, autor);
     koszId = Number(wynik.lastInsertRowid);
     const ins = d.prepare(
       `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc)

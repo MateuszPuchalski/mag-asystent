@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.277.0 — 11 września 2026
+
+**Kosz z kartki sam cofa stan z regału zwrotów.** Zgłoszenie właściciela:
+„przesunięcia magazynowe nie robią się automatycznie, gdy zamyka się rozłożony
+koszyk na magazyn główny". Tak było i tak to było zapisane: powrót ZWROTY→MAG
+zamawiała aplikacja wyłącznie dla koszy złożonych w panelu obsługi (0.266.0),
+a kosz otwarty numerem z kartki kończył się zapisaniem adresów. Drugi dokument
+wystawiało biuro ręką — i nic o nim nie przypominało. Towar leżał w hali
+i nie był sprzedawalny, dopóki ktoś nie pamiętał.
+
+Od tego wydania ZAKOŃCZ na kolektorze zamawia jedno MM na cały kosz niezależnie
+od tego, skąd kosz się wziął. Reguły są te same co przy koszu z panelu: dokument
+powstaje dopiero po zapisaniu wszystkich adresów, schodzi z regału wyłącznie to,
+co magazynier naprawdę odłożył, a drugie ZAKOŃCZ nie wystawia drugiego
+dokumentu.
+
+**Powrót wraca tam, skąd towar przyjechał.** Magazynem docelowym jest nadawca
+tamtego przesunięcia, nie domyślny główny: filtr importu pilnuje wyłącznie
+odbiorcy dokumentu, o nadawcy nie mówi nic. Aplikacja zapisuje go w chwili
+otwarcia kosza, bo lustro dokumentów sięga tylko `MM_ZWROTY_DNI_WSTECZ` dni
+wstecz. Kosz otwarty przed wdrożeniem, którego dokument z tego okna wypadł,
+powrotu nie dostaje — zgadnięty magazyn przesuwa towar naprawdę, a MM nie cofa
+się jednym kliknięciem. Takie kosze wypisuje rekoncyliacja.
+
+Rekoncyliacja przestała też przemilczać kosze z dokumentu: brak powrotu po
+dobie jest przy nich takim samym rozjazdem jak przy koszach z panelu.
+
+**[wymaga działania] Biuro przestaje wystawiać powrót ręką.** Przełącznika nie
+ma: dokument wystawiony dodatkowo w Subiekcie zdejmie z regału stan drugi raz.
+Kosze rozłożone przed wdrożeniem migracja stempluje jako rozliczone poza
+aplikacją, więc historia zostaje historią. Przy wyłączonym workerze Sfery
+(DEPLOY etap 1a) zadanie MM stanie w błędzie — wtedy powrót wystawia biuro,
+tak jak dotąd, a karta kosza mówi o tym wprost.
+
+
 ## 0.276.2 — 11 września 2026
 
 **Karta Copilota znów zapisuje się na bazie, która widziała 0.275.0.**

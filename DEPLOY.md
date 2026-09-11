@@ -1142,7 +1142,9 @@ opisanym wyżej. W firmie wygląda on tak:
    przypiętej do kosza: `1209`.
 3. Kosz jedzie na halę, magazynier wpisuje albo skanuje ten numer na
    kolektorze i rozkłada zawartość na regały.
-4. Dokument powrotny (ZWR→MAG) wystawia **biuro**, nie kolektor.
+4. Dokument powrotny (ZWR→MAG) zamawia **aplikacja** po ZAKOŃCZ — od 0.277.0.
+   Do 0.276.x wystawiało go biuro ręką i to był ostatni krok tego obiegu, który
+   nikomu się nie przypominał.
 
 Od 0.189.0 **drugi skan tego samego towaru kończy odłożenie** pod adresem
 widocznym na ekranie. Robi to samo co dotknięcie ODŁÓŻ TUTAJ, tylko bez
@@ -1151,14 +1153,29 @@ weryfikuje fizycznie; dziennik zapisuje przy każdym odłożeniu, czym adres
 potwierdzono. Uzbraja wyłącznie skan, a między pierwszym a drugim musi minąć
 800 ms — dubel ze spustu skanera niczego nie odłoży.
 
-Kolektor w tym obiegu **nie wystawia żadnego dokumentu** — zapisuje wyłącznie
-adresy półek. Punkt 4 jest w całości robotą biura i tak ma zostać: przesunięcie
-zrobione drugi raz zabrałoby ze stanu towar, który nigdzie nie pojechał.
+**PRZY WDROŻENIU 0.277.0 BIURO PRZESTAJE WYSTAWIAĆ POWRÓT RĘKĄ.** To jedyna
+rzecz, którą trzeba odwołać w nawyku, i jest to zmiana bez przełącznika:
+dokument wystawiony dodatkowo w Subiekcie zdejmie z regału stan drugi raz.
+Kosz rozłożony po wdrożeniu dostaje powrót sam, po ZAKOŃCZ i po zapisaniu
+wszystkich adresów, jednym dokumentem na kosz. Kosze rozłożone WCZEŚNIEJ
+migracja stempluje jako rozliczone poza aplikacją — historii nikt nie przesuwa
+drugi raz.
 
-**Kosz złożony w panelu obsługi jest pod tym względem inny (0.266.0).** Tam
-przesunięcie na regał zamówiła aplikacja, więc powrót ZWROTY→MAG zamawia też
-ona — jednym dokumentem na kosz, po ZAKOŃCZ i po zapisaniu wszystkich adresów.
-Biuro nie wystawia wtedy niczego ręką, a kartę kosza zamyka etap „powrót MM".
+Powrót wraca na **magazyn, który towar wysłał** — ten z pola nadawcy tamtego
+przesunięcia, a nie domyślny główny. Aplikacja zapisuje go w chwili otwarcia
+kosza, bo lustro dokumentów sięga tylko `MM_ZWROTY_DNI_WSTECZ` dni wstecz.
+Kosz otwarty przed wdrożeniem, którego dokument z tego okna już wypadł, powrotu
+nie dostanie: kierunku się nie zgaduje. Takie kosze wypisuje rekoncyliacja
+(`kosz_bez_powrotu`) i zamyka je biuro ręką, tak jak dotąd.
+
+Stan powrotu widać na karcie kosza w `/biuro` jako trzeci etap: „powrót MM
+1241/ZWR/2026", „powrót MM zamówiony, czeka na dokument" albo „powrót MM
+w błędzie". Dokument wychodzi z kolejki, więc przy wyłączonym workerze Sfery
+(etap 1a wyżej) zadanie stanie w błędzie i powrót trzeba wystawić ręką.
+
+**Kosz złożony w panelu obsługi działa tak samo od 0.266.0.** Różnica jest
+jedna: tam przesunięcie na regał zamówiła aplikacja, więc i kierunek powrotu
+bierze z konfiguracji (`MAG_ID_ZWROTY` → `MAG_ID_MAG`), a nie z dokumentu.
 Kosze odpadu na listę kolektora nie wchodzą wcale: utylizacja ma ze stanu
 zejść, a dokumentu zejścia (RW) ta aplikacja nie wystawia.
 
