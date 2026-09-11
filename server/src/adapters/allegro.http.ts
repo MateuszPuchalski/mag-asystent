@@ -119,6 +119,32 @@ export function urlOfertSprzedawcy(apiUrl: string, ids: readonly string[]): stri
 }
 
 /**
+ * Oferty SPRZEDAWCY po SYGNATURZE (`/sale/offers?external.id=…`).
+ *
+ * Ta sama końcówka co wyżej, drugi filtr i odwrotny kierunek pytania. Tamta
+ * odpowiada „co to za oferta o tym numerze"; ta — „którą z NASZYCH ofert
+ * sprzedajemy tę kartotekę". Do 0.270.0 na drugie pytanie nie odpowiadał
+ * nikt, bo `offer_snapshot` zna wyłącznie oferty, pod którymi ktoś napisał
+ * (patrz nagłówek `allegro-oferty-sync.ts`), a odwrotnego wyszukania nie było
+ * w całym repozytorium.
+ *
+ * `external.id` w specyfikacji to „The ID from the client's external system"
+ * i jest TABLICĄ, więc komplet kandydatów szkicu kosztuje jedno żądanie —
+ * ta sama sztuczka, co przy `offer.id` obok.
+ *
+ * `publication.status=ACTIVE` NIE JEST oszczędnością, tylko warunkiem
+ * poprawności: link do zakończonej aukcji jest gorszy od braku linku, bo
+ * klient klika i widzi, że u nas tego nie ma. Enum ze specyfikacji ma cztery
+ * wartości (`INACTIVE`, `ACTIVE`, `ACTIVATING`, `ENDED`), a domyślnie
+ * wchodzą WSZYSTKIE — pominięcie tego filtru dawałoby linki do wygaszonych.
+ */
+export function urlOfertPoSygnaturze(apiUrl: string, sygnatury: readonly string[]): string {
+  const filtr = sygnatury.map((s) => `external.id=${encodeURIComponent(s)}`).join("&");
+  return `${apiUrl}/sale/offers?${filtr}&publication.status=ACTIVE`
+    + `&limit=${Math.max(1, sygnatury.length)}`;
+}
+
+/**
  * Historia statusów przesyłki u przewoźnika (0.187.0).
  *
  * `GET /order/carriers/{carrierId}/tracking?waybill=…`. To JEDYNE miejsce

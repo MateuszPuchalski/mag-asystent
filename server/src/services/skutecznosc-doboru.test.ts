@@ -52,8 +52,23 @@ beforeEach(() => {
   rozmowa = nowaRozmowa("w-1");
 });
 
+/**
+ * Znacznik LICZONY OD TERAZ, nigdy zaszyty.
+ *
+ * Blizna 0.270.0: pierwsza wersja tego pliku sadziła pytanie klienta na
+ * „2026-09-10T08:00" i sprawdzała, że mediana mieści się w dobie. Przeszło
+ * w dniu napisania i wywróciło się NAZAJUTRZ, bo raport liczy okno od
+ * `now()`, a test od stałej. Czerwony `main` z bomby zegarowej blokuje
+ * wszystkich, nie tylko autora.
+ *
+ * Reguła na przyszłość: test raportu z oknem czasowym nie ma prawa znać
+ * ANI JEDNEJ konkretnej daty.
+ */
+const temuMinut = (minut: number) =>
+  new Date(Date.now() - minut * 60_000).toISOString();
+
 /** Rozmowa z jednym pytaniem klienta — punkt zero zegara. */
-function nowaRozmowa(zewn: string, pytanieAt = "2026-09-10T08:00:00.000Z"): number {
+function nowaRozmowa(zewn: string, pytanieAt = temuMinut(30)): number {
   const d = db();
   const id = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id)
     VALUES (?,?)`).run(konto, zewn).lastInsertRowid);
@@ -130,14 +145,16 @@ test("czas liczy się od OSTATNIEGO pytania klienta, nie od początku wątku", (
      medianę tym mocniej, im dłużej jesteśmy z klientem. */
   const d = db();
   d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
-    VALUES (?,?,'m-stary','incoming','pierwsze pytanie sprzed miesiąca','2026-08-15T08:00:00.000Z')`)
-    .run(rozmowa, konto);
+    VALUES (?,?,'m-stary','incoming','pierwsze pytanie sprzed miesiąca',?)`)
+    .run(rozmowa, konto, temuMinut(26 * 24 * 60));
   D.wybierzKandydata(rozmowa, FTC272, "oem", 1, ala, db());
 
   const r = S.skutecznoscDoboru(30, db());
   assert.equal(r.wyborowZCzasem, 1);
+  /* Próg z ZAPASEM wobec obu znaczników: pytanie stoi 30 minut temu, starsze
+     26 dni temu. Cokolwiek poniżej doby dowodzi, że zegar ruszył od nowszego. */
   assert.ok(r.medianaDoWyboruMin !== null && r.medianaDoWyboruMin < 60 * 24,
-    `mediana ${r.medianaDoWyboruMin} min — liczona od sierpnia zamiast od dzisiejszego pytania`);
+    `mediana ${r.medianaDoWyboruMin} min — liczona od starszego pytania zamiast od najnowszego`);
 });
 
 test("podział na osoby idzie po KONCIE i nie niesie żadnej liczby rankingowej", () => {
