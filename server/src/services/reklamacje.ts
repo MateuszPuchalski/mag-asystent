@@ -208,6 +208,15 @@ export interface WierszReklamacji {
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
+  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+     DWA ŹRÓDŁA I JEDNA ETYKIETA BYŁABY KŁAMSTWEM. `zrodlo: "zamowienie"`
+     znaczy `LineItem.boughtAt` z pełnego zamówienia — kanoniczna data zakupu.
+     `zrodlo: "sprawa"` znaczy `checkoutForm.createdAt` z ładunku reklamacji,
+     czyli moment złożenia koszyka; bywa wcześniejszy, gdy koszyk zbierano
+     kilka dni. Ekran nazywa je różnie, bo to różne zegary — blizna 0.121.0
+     wzięła się z nazwania jednego drugim. */
+  kupionoAt: string | null;
+  kupionoZrodlo: "zamowienie" | "sprawa" | null;
   prowadzi: string | null;
   /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
   prowadziId: number | null;
@@ -392,6 +401,9 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     otwartoAt: String(w.otwarto_at),
+    kupionoAt: tekst(w.kupiono_at) ?? tekst(w.zamowienie_at),
+    kupionoZrodlo: tekst(w.kupiono_at) ? "zamowienie"
+      : tekst(w.zamowienie_at) ? "sprawa" : null,
     prowadzi: tekst(w.prowadzi),
     prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
@@ -461,12 +473,19 @@ export function listaReklamacji(
      otwartej sprawie (szczegół). */
   const wiersze = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol
+           k.tw_id, k.tw_symbol, zk.kupiono_at
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
+         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
+         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
+         własna retencja. Wtedy zostaje data z ładunku sprawy.
+         Backticków tu nie ma — blok stoi w literale szablonowym. */
+      LEFT JOIN zamowienie_klienta zk
+        ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
      WHERE r.typ = 'CLAIM'
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all() as Wiersz[];
@@ -592,12 +611,19 @@ export function szczegolReklamacji(
      w rozmowie (0.221.0). */
   const w = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol
+           k.tw_id, k.tw_symbol, zk.kupiono_at
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
+         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
+         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
+         własna retencja. Wtedy zostaje data z ładunku sprawy.
+         Backticków tu nie ma — blok stoi w literale szablonowym. */
+      LEFT JOIN zamowienie_klienta zk
+        ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
      WHERE r.id=? AND r.typ = 'CLAIM'`).get(id) as Wiersz | undefined;
   /* Dyskusja pod tym identyfikatorem to dla TEGO ekranu brak, a nie sprawa
      bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie

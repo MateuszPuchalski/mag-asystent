@@ -295,6 +295,16 @@ export function Dowody({
               <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" /></>
           : "reklamacja bez numeru zamówienia"}
       </Wiersz>
+      {/* ── DATA ZAKUPU NA EKRANIE (0.282.0) ────────────────────────────────
+          Agent też jej dotąd nie widział — zwroty i skrzynka mają ją od dawna,
+          reklamacje nie miały wcale. ETYKIETA MÓWI, KTÓRY TO ZEGAR: „Kupiono"
+          bierze się z pozycji zamówienia, „Zamówienie złożone" z ładunku
+          sprawy i bywa wcześniejsze. Blizna 0.121.0 wzięła się z nazwania
+          jednego zegara drugim, więc nie sklejamy ich pod jedną etykietą. */}
+      {r.kupionoAt && <Wiersz
+        etykieta={r.kupionoZrodlo === "zamowienie" ? "Kupiono" : "Zamówienie złożone"}>
+        {czas(r.kupionoAt)}
+      </Wiersz>}
       <Wiersz etykieta="Oferta">
         {r.offerId ? <Link href={r.linkOferty}>{r.offerId}</Link> : "—"}
       </Wiersz>

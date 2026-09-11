@@ -243,6 +243,11 @@ export function migrate(database: DatabaseSync) {
     )
     WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
       AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
+  /* Data zamówienia z ładunku sprawy (0.282.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL i wypełnią się przy najbliższej
+     synchronizacji: zapis sprawy nadpisuje tę kolumnę przy KAŻDYM przebiegu,
+     nie tylko przy pierwszym poznaniu sprawy. */
+  addColumn("reklamacja_klienta", "zamowienie_at", "TEXT");
   /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
      w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
      „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem

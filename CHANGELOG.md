@@ -34,6 +34,60 @@ historii nie przepisujemy.
 ---
 
 
+## 0.282.0 — 11 września 2026
+
+**Copilot przestaje prosić o to, co system już wie.** Właściciel wkleił kartę
+z żywego panelu. Copilot poprosił agenta o „datę zakupu / numer zamówienia"
+i o „zdjęcia tabliczki znamionowej w celu identyfikacji modelu". Numer
+zamówienia stał na wierszu sprawy, data przyszła w tej samej odpowiedzi
+Allegro, a model towaru zna oferta.
+
+Prosił, bo nie dostał. Do tego wydania rozpoznanie podawało modelowi WYŁĄCZNIE
+czat — bez powodu zgłoszenia, bez oczekiwania, bez ilości, bez terminu decyzji
+i bez czegokolwiek z formularza reklamacyjnego. Model odtwarzał z prozy
+klienta pola, które leżały o jedno złączenie dalej.
+
+**Data zakupu przychodziła z Allegro i my ją wyrzucaliśmy.** Schemat
+`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id` i `createdAt`.
+Nasz typ ładunku znał jedno, więc data ginęła, zanim ktokolwiek zdecydował,
+że jej nie chce. Typ węższy od schematu potrafi ukryć dane skuteczniej niż
+ich brak.
+
+**Reklamacja nigdy nie prosiła Allegro o własny kontekst.** Kolejki dociągania
+zamówień i ofert brały numery wyłącznie ze zwrotów i wiadomości, więc przy
+typowej sprawie nie mieliśmy ani zamówienia, ani nazwy reklamowanego towaru.
+Sprawy wchodzą teraz do obu kolejek jako trzecie źródło, ZA istniejącymi:
+porządek chroni starsze źródła przed zagłodzeniem w tym samym suficie
+przebiegu, a limit 429 zostaje jeden na wszystkie.
+
+Przed rozmową stoi blok FAKTY ZE SPRAWY z własnym numerem `S`. Numer jest
+konieczny: bez niego zdanie przepisane ze zgłoszenia wylatywałoby jako rzekomo
+niepokryte, a to są słowa klienta tak samo jak wiadomość. Blok przechodzi
+przez to samo maskowanie co rozmowa — opis zgłoszenia bywa z adresem, pod
+który klient prosi o kuriera.
+
+**Pole `brakuje` dostaje SITO po stronie kodu.** To jedyne pole karty bez
+cytatu i jedyne, którego bramka numerów nie dotykała — a właśnie ono trzymało
+sprawę w miejscu. Nad sitem stoi STRAŻNIK i jest ważniejszy: dowód zakupu to
+dokument, a nie data; numer seryjny to egzemplarz, a nie model; zdjęcia to
+materiał, którego w tekście nie ma z definicji. Tych pozycji nie tnie nic.
+Licznik odsianych idzie do dziennika, bo heurystyka bez pomiaru to wiara.
+
+Instrukcja przestała podawać datę zakupu jako przykład tego, co wpisać
+w `brakuje`. Karta, którą zobaczył właściciel, wykonała polecenie co do słowa.
+
+**Naprawiony przy okazji cichy błąd.** Model widzi w rozmowie `[W3]` i tak
+cytuje; bramka porównywała łańcuchy dosłownie, więc taki fakt znikał z karty
+bez śladu, jako niepokryty. Poluzowanie doktryny przez literówkę, nie przez
+decyzję. Numer normalizuje się teraz przed porównaniem — dwa numery naraz
+dalej wypadają.
+
+Data zakupu weszła też na ekran, z etykietą mówiącą, który to zegar:
+„Kupiono" przy dacie z pozycji zamówienia, „Zamówienie złożone" przy dacie
+z ładunku sprawy. Agent nie widział jej dotąd wcale, choć zwroty i skrzynka
+mają ją od dawna.
+
+
 ## 0.281.0 — 11 września 2026
 
 **Trzy rzeczy, których brakowało zleceniu o odnajdywaniu własnych spraw.**

@@ -282,3 +282,78 @@ test("licznik trafności oddziela rady OCENIONE od wszystkich", async () => {
   ocenRekomendacje(d, id, "ACCEPTED_REFUND");
   assert.deepEqual(trafnoscRad(d), { rad: 1, ocenionych: 1, trafnych: 1 });
 });
+
+test("do modelu idzie BLOK FAKTÓW przed rozmową, zamaskowany tak samo (0.282.0)", async () => {
+  /* Karta z żywego panelu prosiła agenta o „datę zakupu / numer zamówienia" —
+     o dane, które Allegro przysłało razem ze sprawą. Prosiła, bo model ich
+     nie dostawał: widział wyłącznie czat. */
+  const { d, id } = stanowisko();
+  d.prepare(`UPDATE reklamacja_klienta SET order_id='ord-1',
+    zamowienie_at='2026-03-14T09:12:00Z', oczekiwanie='EXCHANGE',
+    powod_typ='DEFECT_FOUND_DURING_USE', opis='kontakt: jan@example.com' WHERE id=?`).run(id);
+
+  let wyslane = "";
+  await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async (tresc) => { wyslane = String(tresc); return karta(); },
+  });
+
+  assert.ok(wyslane.includes("FAKTY ZE SPRAWY [S]"), "blok stoi przed rozmową");
+  assert.ok(wyslane.includes("Zamówienie złożone: 2026-03-14"));
+  assert.ok(wyslane.includes("Numer zamówienia: ord-1"));
+  assert.ok(wyslane.includes("Czego klient żąda: EXCHANGE"));
+  assert.ok(wyslane.indexOf("FAKTY ZE SPRAWY") < wyslane.indexOf("KLIENT:"));
+
+  /* Blok przechodzi przez maskowanie tą samą drogą co wątek: opis zgłoszenia
+     bywa z adresem e-mail, pod który klient prosi o kontakt. */
+  assert.ok(!wyslane.includes("jan@example.com"), "opis też jest maskowany");
+  assert.ok(wyslane.includes("[e-mail]"));
+});
+
+test("fakt oparty na FORMULARZU przeżywa odsiew — blok ma własny numer `S`", async () => {
+  /* Bez numeru `S` każde zdanie przepisane ze zgłoszenia wylatywałoby jako
+     rzekomo niepokryte, a to są słowa klienta tak samo jak wiadomość. */
+  const { d, id } = stanowisko();
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async () => karta({ usterka: { tresc: "Pękła obudowa", zrodlo: "S" } }),
+  });
+  assert.equal(wynik.usterka?.zrodlo, "S");
+});
+
+test("cytat W NAWIASACH przeżywa odsiew — dotąd znikał bez śladu", async () => {
+  /* Model widzi w rozmowie `[W1]` i regularnie tak cytuje. `numery.has("[W1]")`
+     było fałszem, więc fakt znikał jako niepokryty — poluzowanie doktryny
+     przez literówkę, nie przez decyzję. */
+  const { d, id } = stanowisko();
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async () => karta({ usterka: { tresc: "Kosiarka nie tnie", zrodlo: "[W1]" } }),
+  });
+  assert.equal(wynik.usterka?.tresc, "Kosiarka nie tnie");
+
+  /* Ale sito NIE zostało poluzowane: dwa numery naraz dalej wypadają. */
+  const drugi = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async () => karta({ usterka: { tresc: "Zmyślone", zrodlo: "W1, W2" } }),
+  });
+  assert.equal(drugi.usterka, null);
+});
+
+test("„brakuje” przestaje prosić o to, co podaliśmy, i ZOSTAWIA resztę", async () => {
+  const { d, id } = stanowisko();
+  d.prepare("UPDATE reklamacja_klienta SET zamowienie_at='2026-03-14T09:12:00Z' WHERE id=?")
+    .run(id);
+
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async () => karta({ brakuje: ["data zakupu", "zdjęcie tabliczki znamionowej"] }),
+  });
+  assert.deepEqual(wynik.brakuje, ["zdjęcie tabliczki znamionowej"]);
+
+  const slad = d.prepare(
+    "SELECT payload FROM events WHERE type='reklamacja_rozpoznanie'").get() as
+    { payload: string };
+  const p = JSON.parse(slad.payload) as Record<string, unknown>;
+  assert.equal(p.znane, 1, "licznik sita idzie do dziennika — heurystyka bez pomiaru to wiara");
+});

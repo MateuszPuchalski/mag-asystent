@@ -1116,6 +1116,15 @@ export interface Reklamacja {
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
+  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+     Dwa zegary i dwie etykiety: `zamowienie` to `boughtAt` z pełnego
+     zamówienia, `sprawa` to `checkoutForm.createdAt` z ładunku reklamacji,
+     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0.
+
+     Dyskusja tego pola NIE MA i to nie jest przeoczenie: nie ma też Copilota,
+     a bez niego data byłaby ozdobą na ekranie, którego nikt o nią nie prosił. */
+  kupionoAt: string | null;
+  kupionoZrodlo: "zamowienie" | "sprawa" | null;
   prowadzi: string | null;
   /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
   prowadziId: number | null;

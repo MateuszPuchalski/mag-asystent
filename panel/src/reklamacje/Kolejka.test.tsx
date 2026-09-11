@@ -21,6 +21,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   dniDoTerminu: 13, poTerminie: false, zwrotWymagany: null, czatAktywny: true, czatUrwany: false,
   wiadomosciIle: 3, ostatniaWiadomoscStatus: "BUYER_REPLIED",
   ostatniaWiadomoscAt: "2026-09-07T08:00:00.000Z", otwartoAt: "2026-09-06T10:00:00.000Z",
+  kupionoAt: null, kupionoZrodlo: null,
   prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null, wersja: 1,
   kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,

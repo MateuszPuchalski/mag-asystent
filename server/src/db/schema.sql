@@ -2283,6 +2283,18 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- `checkoutForm.id`. To jest MOSTEK do reszty danych: zamówienia, zwrotów
   -- i wiadomości ze skrzynki. Innego wiązania nie budujemy (§3 planu).
   order_id TEXT,
+  -- `checkoutForm.createdAt` — JEDYNA data zamówienia, jaką niesie ładunek
+  -- sprawy (`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
+  -- i `createdAt`). Do 0.282.0 wyrzucaliśmy ją na etapie typu, a Copilot
+  -- wypisywał „data zakupu" w liście braków — pytał o to, co przyszło z nią
+  -- w tej samej odpowiedzi.
+  --
+  -- TO NIE JEST `boughtAt`. Kanoniczna data zakupu stoi przy POZYCJI
+  -- zamówienia (`LineItem.boughtAt`) i bywa inna, gdy koszyk zbierano przez
+  -- kilka dni. Gdy mamy wiersz `zamowienie_klienta`, wygrywa tamta; ta jest
+  -- zawsze dostępna i dlatego zostaje. Ekran nazywa je RÓŻNIE i to jest
+  -- sedno: blizna 0.121.0 wzięła się z nazwania jednego zegara drugim.
+  zamowienie_at TEXT,
   offer_id TEXT,
   kupujacy_login TEXT,
   typ TEXT NOT NULL DEFAULT 'CLAIM',

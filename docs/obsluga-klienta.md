@@ -663,8 +663,23 @@ wartość znika, ślad zostaje.
 
 Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
 ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
-po ZNANEJ wartości, nie po wzorcu. Nie wychodzi nic spoza rozmowy: ani notatka
-biura, ani znacznik „kto prowadzi", ani kartoteka, ani kwoty.
+po ZNANEJ wartości, nie po wzorcu.
+
+**Od 0.282.0 wychodzą też FAKTY ZE SPRAWY i to jest odwrócenie zdania, które
+stało tu wcześniej.** Do tego wydania obowiązywało „nie wychodzi nic spoza
+rozmowy". Kosztowało to konkretnie: Copilot prosił agenta o datę zakupu
+i o numer zamówienia, czyli o dane, które Allegro przysłało razem ze sprawą
+i które leżały o jedno złączenie dalej.
+
+Wychodzi blok z formularza reklamacyjnego i z danych Allegro: temat, opis
+zgłoszenia (przycięty), powód, podstawa prawna, oczekiwanie z kwotą, ilość,
+nazwa reklamowanego towaru, numery oferty i zamówienia, data zakupu, data
+otwarcia i termin decyzji. Blok przechodzi przez to samo maskowanie co rozmowa.
+
+**Granica została w tym samym miejscu, tylko przesunięta o jedno pojęcie:
+wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS.** Dalej nie wychodzi
+notatka biura, znacznik „kto prowadzi", tagi, kartoteka Subiekta ani nasze
+kwoty.
 
 Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
 co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
