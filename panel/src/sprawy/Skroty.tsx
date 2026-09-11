@@ -19,18 +19,30 @@ const Klawisz = ({ children }: { children: React.ReactNode }) =>
   <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-mono text-podpis text-slate-700">
     {children}</kbd>;
 
-export function SkrotyKlawiszy({ zMoje, kubelkow }: {
+export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, dodatkowe = [] }: {
   /** `false` przy nieznanej tożsamości — wtedy `m` nic nie robi i nie kłamiemy. */
   zMoje: boolean;
   /** Ile jest kubełków; ostatnia cyfra to „Wszystkie". */
   kubelkow: number;
+  /**
+   * Czy ekran ma sita „Moje"/„Niczyje" (0.284.0).
+   *
+   * Zwroty ich nie mają — nie noszą prowadzącego — a pasek obiecujący `m`
+   * i `n` na ekranie, który ich nie obsługuje, byłby dokładnie tym błędem,
+   * który ten komponent naprawiał: klawiszem widocznym i martwym.
+   */
+  sita?: boolean;
+  /** Klawisze WŁASNE ekranu: `[klawisz, co robi]`, w kolejności użycia. */
+  dodatkowe?: ReadonlyArray<readonly [string, string]>;
 }) {
   return <p className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-2 py-1 text-podpis text-slate-600">
     <span className="flex items-center gap-1">
       <Klawisz>j</Klawisz><Klawisz>k</Klawisz> ruch po liście</span>
     <span className="flex items-center gap-1">
       <Klawisz>1</Klawisz>–<Klawisz>{kubelkow + 1}</Klawisz> kubełek</span>
-    {zMoje && <span className="flex items-center gap-1"><Klawisz>m</Klawisz> moje</span>}
-    <span className="flex items-center gap-1"><Klawisz>n</Klawisz> niczyje</span>
+    {sita && zMoje && <span className="flex items-center gap-1"><Klawisz>m</Klawisz> moje</span>}
+    {sita && <span className="flex items-center gap-1"><Klawisz>n</Klawisz> niczyje</span>}
+    {dodatkowe.map(([klawisz, opis]) => <span key={klawisz} className="flex items-center gap-1">
+      <Klawisz>{klawisz}</Klawisz> {opis}</span>)}
   </p>;
 }

@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, type MutableRefObject } from "react";
 import type { Zwrot } from "../api/typy";
 import { Przycisk, Pole, Blad, Skopiuj } from "../ui";
 import { zlote } from "../api/zwroty";
+import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
 /* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
    Do tego wydania klawisze z §25a.2 stały tu jako PODPISY: `kubelekZwrotu`
@@ -27,12 +28,17 @@ type Props = {
   onCofnijWerdykt: () => void;
   trwa: boolean;
   blad: string;
+  /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
+  akcje?: MutableRefObject<AkcjeKlawiszy>;
 };
 
 export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
-  onCofnijWerdykt, trwa, blad }: Props) {
+  onCofnijWerdykt, trwa, blad, akcje }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
+  /* PRZED gałęziami kubełków, bo to hak — a gałęzie kończą się `return`.
+     Klawisz `O` otwiera pole powodu; pole samo łapie kursor (`autoFocus`). */
+  useAkcjaKlawisza(akcje, "odmow", () => setOdmowa(true));
   /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
      z niczego, bo read-model zna tylko dokumenty zakupu (FZ, PZ). */
   const [numer, setNumer] = useState("");

@@ -2396,14 +2396,32 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 
 | kubełek | pytanie | klawisze |
 |---|---|---|
-| DO DECYZJI | przyjąć czy odrzucić? | `P` `O` `J` |
-| DO OCENY | co z towarem? | `S` `C` `U` |
+| DO DECYZJI | przyjąć czy odrzucić? | `P` `O` |
+| DO OCENY | co z towarem? | `S` `U`, hurtem `Shift+S` |
 | DO ZWROTU | ile oddać? | zaznaczenie + `Enter` |
-| DO KOREKTY | jaki numer korekty? | `Enter` `R` |
-| ODRZUCONE, ZAMKNIĘTE | — | tylko wgląd |
+| DO KOREKTY | jaki numer korekty? | `Enter` |
+| ZAMKNIĘTE | — | wgląd i `R` (cofnij korektę) |
+| ODRZUCONE | — | tylko wgląd |
 
-Po decyzji kursor schodzi na następny wiersz. Strzałki chodzą po kolejce,
-cyfry przełączają kubełek.
+**Te klawisze DZIAŁAJĄ od 0.284.0 i wcześniej nie działały.** Ekran rysował je
+przy przyciskach jako podpowiedzi, a nasłuch znał wyłącznie ruch po liście
+i cyfry kubełków. Tabela wyżej mówiła przy tym o trzech ocenach, choć od
+0.209.0 są dwie. Obietnicę „typowy zwrot to jeden klawisz" składał więc ekran
+i ten dokument naraz, a dotrzymywała jej mysz.
+
+`O` otwiera POLE POWODU, a nie zapisuje odmowy: odmowa jest nieodwracalna
+i §25a.5 daje takim rzeczom potwierdzenie. Utylizacja nie ma wariantu
+hurtowego z tego samego powodu — jeden ruch wysyłałby cały zwrot na złom.
+
+Kursor schodzi na następny wiersz po ODMOWIE i po zapisaniu numeru korekty,
+czyli wtedy, gdy zwrot wychodzi z drabiny. Po „przyjmij" i po ocenie zostaje
+na miejscu: zwrot schodzi wtedy o szczebel niżej, a kolumna środkowa pokazuje
+pytanie następnego kubełka. Skakanie na następny wiersz kazałoby wracać do
+sprawy, której się jeszcze nie skończyło.
+
+Strzałki chodzą po kolejce, cyfry przełączają kubełek, a pasek nad listą
+wypisuje klawisze OGLĄDANEGO kubełka — rozpoznanie jest tańsze od pamiętania
+(Dekalog p. 2).
 
 Przełączenie kubełka przestawia też kursor na jego pierwszy zwrot. Bez tego
 jeden klawisz zmieniałby listę, a zaznaczenie zostawałoby na zwrocie
@@ -4164,6 +4182,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
+| Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
+| Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
 | Potrącenie za utratę wartości pozycji | **działa** od 0.170.0 | `zapiszPotracenie`, `panel/src/zwroty/Potracenie.tsx` |
 | EAN i SKU na wierszu produktu | **działa** od 0.169.0 | `sgt_towar.ean`, `zamowienie_klienta_pozycja.sku` |

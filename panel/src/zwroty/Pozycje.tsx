@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
 import type { DoDopisania, PozycjaZwrotu, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
@@ -40,6 +40,8 @@ const POWODY: Record<string, string> = {
   TOO_LARGE: "za duży", TOO_SMALL: "za mały", NOT_AS_EXPECTED: "inny niż oczekiwany",
   ORDERED_FOR_COMPARISON: "zamówiony na przymiarkę",
 };
+
+import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
 /* DWA PRZYCISKI, NIE TRZY (0.209.0). „Na przecenę" nie prowadziła donikąd:
    nie dokładała do koszyka, nie ruszała stanu, nie zakładała zadania. Trzeci
@@ -131,7 +133,8 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   doDopisania = [], bladDopisania = "",
-  onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij }: {
+  onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij,
+  onWszystkieNaStan, akcje }: {
   zwrot: Zwrot;
   trwa: boolean;
   blad: string;
@@ -148,6 +151,10 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   onIlosc?: (pozycjaId: number, ilosc: number | null) => void;
   onDopisz?: (zamPozycjaId: number) => void;
   onZdejmij?: (pozycjaId: number) => void;
+  /** Ocena WSZYSTKICH nieocenionych naraz (0.284.0) — patrz `onOcena`. */
+  onWszystkieNaStan?: () => void;
+  /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
+  akcje?: MutableRefObject<AkcjeKlawiszy>;
 }) {
   /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
      o niej decyduje człowiek, bo zależy od tego, czy klient odstępuje od
@@ -190,11 +197,35 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
     return n;
   });
 
+  /* Klawisz `Enter` w kubełku DO ZWROTU zapisuje TO zaznaczenie — rejestr
+     opisuje `zwroty/klawisze.ts`. Rejestrujemy zawsze, a nie tylko przy
+     wycenie: ekran woła akcję wyłącznie we właściwym kubełku, a warunek tutaj
+     byłby drugą kopią tej samej reguły. */
+  useAkcjaKlawisza(akcje, "zapiszKwote", () => { if (!trwa) onKwota(wybrane, dostawa); });
+
+  const nieocenione = zwrot.pozycje.filter((p) => !p.ocena);
+
   if (!zwrot.pozycje.length) {
     return <Pusto waga="lista">Zwrot bez pozycji — nie ma czego wycenić.</Pusto>;
   }
 
   return <div className="p-4">
+    {/* OCENA HURTEM (0.284.0). Zwrot bywa wielopozycyjny, a ocena jest tu
+        naciskana najczęściej ze wszystkiego — przy pięciu pozycjach to pięć
+        kliknięć w to samo. Przycisk staje TYLKO przy więcej niż jednej
+        nieocenionej pozycji: przy jednej byłby drugim przyciskiem o tym samym
+        znaczeniu, a Dekalog p. 5 każe ograniczać decyzje, nie mnożyć drogi.
+
+        Wyłącznie „na stan". Utylizacja hurtem to jeden ruch, który wysyła cały
+        zwrot na złom — a tej pomyłki nie widać na ekranie, dopóki koszyk nie
+        pojedzie. Cofnięcie stoi przy pozycji i tam ma zostać. */}
+    {ocenianie && nieocenione.length > 1 && onWszystkieNaStan &&
+      <div className="mb-2 flex items-center gap-2">
+        <Przycisk className="text-xs" disabled={trwa} onClick={onWszystkieNaStan}>
+          <kbd className="rounded border border-slate-300 px-1">Shift+S</kbd>
+          {" "}Wszystkie na stan ({nieocenione.length})
+        </Przycisk>
+      </div>}
     <ul className="space-y-2">
       {zwrot.pozycje.map((p) => <li key={p.id} className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
         {/* Pole zaznaczenia stoi PRZED zdjęciem, w jednej kolumnie dla całej
