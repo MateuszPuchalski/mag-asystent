@@ -5,7 +5,7 @@ import {
 import type {
   Kategoria, Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { czas, FiltrSegmentowy, Plakietka, Pusto } from "../ui";
+import { czas, FiltrSegmentowy, godzina, Plakietka, Pusto } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
 import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
@@ -199,7 +199,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       </p>
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
-        STAN Z {czas(stan.ostatniaSynchronizacja).slice(-8, -3) || "—"}</span>}
+        STAN Z {godzina(stan.ostatniaSynchronizacja)}</span>}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>

@@ -22,10 +22,11 @@ import { Zakonczenie } from "./Zakonczenie";
 const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   id: 1, externalId: "d-1", orderId: "ZAM-1", kupujacyLogin: "kowalski",
   temat: "Przesyłka nie dotarła", opis: null,
-  statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2,
+  statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: "BUYER_REPLIED", ostatniaWiadomoscAt: null,
   ruchNasz: true, czekaOdDni: 2, dlugoCzeka: false,
-  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziAt: null, notatka: null,
+  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
+  notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
   wersja: 1, kubelek: "odpowiedz", sygnaly: [], linkZamowienia: null,
   ...n,

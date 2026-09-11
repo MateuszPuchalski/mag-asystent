@@ -465,6 +465,9 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   -- (ekstrakcja, szkic, OCR) dopiszą tu swoje zadania.
   zadanie         TEXT NOT NULL,
   conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  -- Sprawa posprzedażowa (0.275.0). Reklamacja nie ma wiersza w `conversation`,
+  -- więc rozpoznanie karty faktów wisi tutaj, a nie tam.
+  reklamacja_id   INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL,
   model           TEXT NOT NULL,
   tokeny_wej      INTEGER NOT NULL DEFAULT 0,
   tokeny_wyj      INTEGER NOT NULL DEFAULT 0,
@@ -2457,6 +2460,18 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- `checkoutForm.id`. To jest MOSTEK do reszty danych: zamówienia, zwrotów
   -- i wiadomości ze skrzynki. Innego wiązania nie budujemy (§3 planu).
   order_id TEXT,
+  -- `checkoutForm.createdAt` — JEDYNA data zamówienia, jaką niesie ładunek
+  -- sprawy (`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
+  -- i `createdAt`). Do 0.282.0 wyrzucaliśmy ją na etapie typu, a Copilot
+  -- wypisywał „data zakupu" w liście braków — pytał o to, co przyszło z nią
+  -- w tej samej odpowiedzi.
+  --
+  -- TO NIE JEST `boughtAt`. Kanoniczna data zakupu stoi przy POZYCJI
+  -- zamówienia (`LineItem.boughtAt`) i bywa inna, gdy koszyk zbierano przez
+  -- kilka dni. Gdy mamy wiersz `zamowienie_klienta`, wygrywa tamta; ta jest
+  -- zawsze dostępna i dlatego zostaje. Ekran nazywa je RÓŻNIE i to jest
+  -- sedno: blizna 0.121.0 wzięła się z nazwania jednego zegara drugim.
+  zamowienie_at TEXT,
   offer_id TEXT,
   kupujacy_login TEXT,
   typ TEXT NOT NULL DEFAULT 'CLAIM',
@@ -2489,15 +2504,46 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   -- ekran obiecywałby odpowiedź, którą Allegro odrzuci z 409.
   czat_aktywny INTEGER NOT NULL DEFAULT 1,
   wiadomosci_ile INTEGER NOT NULL DEFAULT 0,
+  -- Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). Rozmowa dłuższa niż
+  -- `MAKS_STRON_CZATU` × 100 wiadomości nie zmieści się w jednym przebiegu,
+  -- a bez tego znaku wiersz wracałby po nią w kółko i głodził budżet innych
+  -- spraw — ekran obiecywałby przy tym resztę, która nie ma skąd przyjść.
+  czat_urwany INTEGER NOT NULL DEFAULT 0,
   ostatnia_wiadomosc_status TEXT,
   ostatnia_wiadomosc_at TEXT,
   -- `openedDate` — moment otwarcia albo PONOWNEGO otwarcia sprawy.
   otwarto_at TEXT NOT NULL,
   -- Kto wziął sprawę. ZNACZNIK dla reszty biura, nie zamek: reklamacja przed
   -- werdyktem nie ma żadnego zapisu, przy którym nazwisko pojawiłoby się samo.
+  --
+  -- DWIE KOLUMNY NA JEDNĄ RZECZ I TO JEST ŚWIADOME. `prowadzi` niesie imię
+  -- i służy OKU: czip na wierszu ma zostać czytelny także wtedy, gdy ktoś
+  -- zmieni nazwisko albo konto zniknie. `prowadzi_user_id` niesie tożsamość
+  -- i służy MASZYNIE: po nim rozstrzyga się przełącznik znacznika oraz filtr
+  -- „Moje". Porównywanie imion działa do dnia, w którym w biurze są dwie Ale —
+  -- wtedy jedna zdejmuje znacznik drugiej, a objawem jest cudza sprawa
+  -- w moim kubełku.
   prowadzi TEXT,
+  prowadzi_user_id INTEGER REFERENCES app_user(user_id),
   prowadzi_at TEXT,
   notatka TEXT,
+  -- ── Droga powrotna z notatki (0.280.0) ────────────────────────────────────
+  -- Notatka jest polem SWOBODNYM, które nadpisuje ten, kto pisze ostatni.
+  -- Do 0.280.0 poprzedniego zdania nie dało się odzyskać niczym: do dziennika
+  -- idzie świadomie sama DŁUGOŚĆ, bo treść bywa zdaniem o kliencie,
+  -- a `events` nie ma retencji (§9 architektury).
+  --
+  -- JEDEN SZCZEBEL, nie tabela historii. Cofnięcie jest ZAMIANĄ: bieżąca treść
+  -- ląduje tutaj, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii
+  -- dla pola, którego nikt nie audytuje, byłaby drugim miejscem na te same
+  -- dane osobowe — i drugim miejscem do sprzątania.
+  --
+  -- Poprzednia treść mieszka NA WIERSZU i ginie razem ze sprawą. Do `events`
+  -- nie trafia ani przed cofnięciem, ani po nim.
+  notatka_poprzednia TEXT,
+  notatka_at TEXT,
+  notatka_przez TEXT,
+  notatka_user_id INTEGER REFERENCES app_user(user_id),
   -- ── Werdykt biura (przyrost trzeci) ────────────────────────────────────────
   -- OSOBNE KOLUMNY, nie `status_allegro`. Tamta kolumna należy do Allegro
   -- i przestawia ją wyłącznie synchronizacja; tu stoi to, co MY wysłaliśmy.
@@ -2630,6 +2676,113 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
 -- `CHECK` z PEŁNYM zbiorem od razu — blizna 0.135.0: SQLite nie rozszerza
 -- `CHECK` bez przebudowy tabeli, więc dokładanie wartości po jednej
 -- kosztowałoby migrację za każdym razem.
+-- Załączniki WYCHODZĄCE przy odpowiedzi w sprawie (0.274.0). Lustro
+-- `wysylka_zalacznik` ze skrzynki: plik leży u Allegro od chwili dodania,
+-- u nas zostaje sam numer, nazwa i rozmiar. BAJTÓW NIE TRZYMAMY.
+-- ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+-- ZBIERA DANE, NIE RADZI. Kolumny opisują to, czego agent szuka w rozmowie za
+-- każdym razem ręcznie; werdyktu wśród nich nie ma i nie będzie — uznanie
+-- i odrzucenie są nieodwracalne wobec kupującego i należą do człowieka.
+-- Każde pole niesie CYTAT (numer wiadomości), bo zdanie bez pokrycia w rozmowie
+-- jest zgadywaniem, a nie faktem.
+CREATE TABLE IF NOT EXISTS reklamacja_karta (
+  reklamacja_id      INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  usterka            TEXT,
+  usterka_zrodlo     TEXT,
+  kiedy              TEXT,
+  kiedy_zrodlo       TEXT,
+  oczekiwanie        TEXT,
+  oczekiwanie_zrodlo TEXT,
+  -- Listy jako JSON: to są dane DO POKAZANIA, nie do zapytań. Osobne tabele
+  -- kosztowałyby dwa złączenia przy każdym otwarciu sprawy i nic nie dawały.
+  dowody             TEXT NOT NULL DEFAULT '[]',
+  brakuje            TEXT NOT NULL DEFAULT '[]',
+  -- ── Rada maszyny (0.276.0) ────────────────────────────────────────────────
+  -- Do 0.275.0 tych kolumn nie było, bo Copilot miał wyłącznie zbierać fakty.
+  -- Właściciel odwrócił tę decyzję: „copilot powinien też radzić w reklamacji".
+  -- BEZ `CHECK` na wartość, z tego samego powodu co przy `zadanie` w księdze:
+  -- dwunasta wartość (`POPROSIC_O_DOWODY`) jest nasza, a lista Allegro może
+  -- urosnąć — strażnik stoi w `REKOMENDACJE` w `services/copilot-reklamacja.ts`
+  -- i w schemacie zod adaptera, czyli tam, gdzie da się go poszerzyć bez
+  -- przebudowy tabeli (blizna 0.135.0).
+  rekomendacja       TEXT,
+  pewnosc            TEXT,
+  uzasadnienie       TEXT,
+  uzasadnienie_zrodlo TEXT,
+  -- Czego maszyna NIE WIE. Przeciwwaga dla `pewnosc`, nie ozdoba: deklaracja
+  -- „wysoka" bez ani jednej pozycji tutaj jest odrzucana przy zapisie.
+  czego_nie_wiem     TEXT NOT NULL DEFAULT '[]',
+  -- Trafność liczona z FAKTU: rada kontra werdykt, który agent naprawdę
+  -- wysłał. Żadnej ankiety — rekomendacja jest typowana tym samym słownikiem.
+  ocena              TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
+  ocena_at           TEXT,
+  -- Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` na karcie
+  -- jest niesprawdzalny: agent widzi numer i nie ma jak dojść, o który plik
+  -- chodziło. Sprawdzalny cytat jest całą doktryną tego modułu, więc mapa
+  -- zostaje przy karcie, a nie tylko w pamięci jednego wywołania.
+  -- JSON, bo to dane DO POKAZANIA, nie do zapytań — tak samo jak `dowody`.
+  zdjecia            TEXT NOT NULL DEFAULT '[]',
+  model              TEXT NOT NULL DEFAULT '',
+  przez              TEXT,
+  przez_user_id      INTEGER REFERENCES app_user(user_id),
+  at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- ── Tagi spraw posprzedażowych (0.279.0) ────────────────────────────────────
+-- Właściciel poprosił o tagi w jednym celu: „abym łatwiej mógł znaleźć
+-- reklamacje, którymi się zajmuję". Tag jest więc SITEM, nie ozdobą, i nie ma
+-- prawa przestawiać kolejki — §14.5 rozstrzygnął to przy kategoriach Copilota,
+-- a powód jest ten sam: kolejność liczy termin i czas czekania, czyli fakty.
+--
+-- JEDNA PARA TABEL NA OBA EKRANY, bo dyskusja i reklamacja to jeden wiersz
+-- `reklamacja_klienta` rozróżniany polem `typ`. Tak samo robią
+-- `reklamacja_wiadomosc` i `reklamacja_zalacznik_wysylki`.
+--
+-- NAZWA `sprawa_tag` JEST SPALONA NA ZAWSZE (`db/db.ts`) i to nie jest
+-- ciekawostka: lista spalonych nazw chodzi przy KAŻDEJ migracji, więc tabela
+-- nazwana tak powstałaby stąd i znikała sekundę później, po cichu i bez błędu.
+CREATE TABLE IF NOT EXISTS reklamacja_tag (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  nazwa            TEXT NOT NULL,
+  -- Tag się WYŁĄCZA, nigdy nie kasuje. Skasowany zniknąłby po cichu ze spraw
+  -- historycznych, a wtedy „dlaczego ta sprawa stała trzy tygodnie" traci
+  -- odpowiedź. Wyłączony nie podpowiada się przy nowej sprawie i tyle.
+  aktywny          INTEGER NOT NULL DEFAULT 1,
+  utworzyl_user_id INTEGER REFERENCES app_user(user_id),
+  utworzono_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- Jednoznaczność po MAŁYCH LITERACH: „Gwarancja" po „gwarancja" to jeden tag
+-- w głowie i dwie pigułki w filtrze. Indeks na wyrażeniu, bo `COLLATE NOCASE`
+-- w SQLite nie zna polskich znaków — „Część" i „część" przeszłyby obok siebie.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_reklamacja_tag_nazwa
+  ON reklamacja_tag(lower(nazwa));
+
+CREATE TABLE IF NOT EXISTS reklamacja_tag_sprawy (
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  tag_id        INTEGER NOT NULL REFERENCES reklamacja_tag(id) ON DELETE CASCADE,
+  dodal_user_id INTEGER REFERENCES app_user(user_id),
+  dodano_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Klucz z dwóch kolumn zamiast własnego `id`: ten sam tag na tej samej
+  -- sprawie drugi raz nie jest drugim faktem, tylko drugim kliknięciem.
+  PRIMARY KEY (reklamacja_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_tag_sprawy_tag
+  ON reklamacja_tag_sprawy(tag_id);
+
+CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  allegro_id     TEXT NOT NULL,
+  nazwa          TEXT NOT NULL,
+  typ            TEXT NOT NULL,
+  rozmiar        INTEGER NOT NULL,
+  dodal_user_id  INTEGER REFERENCES app_user(user_id),
+  dodano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (reklamacja_id, allegro_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_zalacznik_wysylki_sprawa
+  ON reklamacja_zalacznik_wysylki(reklamacja_id);
+
 CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,

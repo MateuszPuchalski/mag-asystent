@@ -66,6 +66,20 @@ export function useNotatkaDyskusji() {
   });
 }
 
+/** Cofnięcie zmiany notatki — powód przy `useCofnijNotatke` w reklamacjach. */
+export function useCofnijNotatkeDyskusji() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ dyskusja: Dyskusja }>(`/api/obsluga/dyskusje/${v.id}/notatka/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
+    },
+  });
+}
+
 /**
  * Odpowiedź w rozmowie.
  *

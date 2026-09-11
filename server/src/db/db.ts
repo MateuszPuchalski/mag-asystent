@@ -224,6 +224,71 @@ export function migrate(database: DatabaseSync) {
      migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to
      jest prawda o każdej sprawie rozstrzygniętej w Centrum Sprzedaży. `CHECK`
      z PEŁNYM zbiorem od razu (blizna 0.135.0), ten sam co w `schema.sql`. */
+  /* Znak urwanej rozmowy (0.273.0) — patrz `reklamacja_klienta` w `schema.sql`.
+     Tabela stoi na produkcji od 0.222.0, więc kolumna dochodzi migracją. Zero
+     dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
+     prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
+  addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
+  /* Tożsamość prowadzącego sprawę (0.278.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Do tej pory znacznik był SAMYM IMIENIEM, a przełącznik
+     porównywał łańcuchy. Dwie osoby o tym samym imieniu zdejmowały sobie
+     nawzajem znacznik i nikt tego nie widział.
+
+     Wsteczne wypełnienie dopasowuje imię do `app_user.name` i celowo omija
+     imiona NIEJEDNOZNACZNE: konto wskazane zgadywaniem byłoby gorsze od
+     pustki, bo filtr „Moje" pokazywałby wtedy cudzą sprawę jako moją. Wiersz
+     bez dopasowania zostaje z NULL, a naprawia go pierwsze kliknięcie. */
+  addColumn("reklamacja_klienta", "prowadzi_user_id",
+    "INTEGER REFERENCES app_user(user_id)");
+  database.exec(`UPDATE reklamacja_klienta SET prowadzi_user_id = (
+      SELECT u.user_id FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi
+    )
+    WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
+      AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
+  /* Data zamówienia z ładunku sprawy (0.282.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL i wypełnią się przy najbliższej
+     synchronizacji: zapis sprawy nadpisuje tę kolumnę przy KAŻDYM przebiegu,
+     nie tylko przy pierwszym poznaniu sprawy. */
+  addColumn("reklamacja_klienta", "zamowienie_at", "TEXT");
+  /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
+     „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem
+     poprzedniego zdania nikt nigdzie nie zapisywał. `notatka_przez` też jest
+     puste — autora zastanej notatki nie da się odtworzyć, bo dziennik niósł
+     samą długość. */
+  addColumn("reklamacja_klienta", "notatka_poprzednia", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_at", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_przez", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
+  /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
+     w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
+     za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0
+     „na produkcji jeszcze nie stoi". Stała. `CREATE TABLE IF NOT EXISTS` nie
+     dokłada kolumn do tabeli, która już jest, więc wdrożenie 0.276.0 na bazie
+     po 0.275.0 wywracało KAŻDE rozpoznanie sprawy zdaniem „table
+     reklamacja_karta has no column named rekomendacja".
+
+     Zasada jest bez wyjątków: kolumna dołożona do tabeli, która wyszła
+     w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. Wiek tabeli nie jest
+     argumentem — nie wiemy, które wydanie wdrożono. */
+  /* Mapa zdjęć przy karcie (0.283.0) — patrz `reklamacja_karta`
+     w `schema.sql`. Karty sprzed tego wydania mają pustą listę, czyli
+     prawdę o nich: powstały, zanim Copilot zobaczył pierwsze zdjęcie. */
+  addColumn("reklamacja_karta", "zdjecia", "TEXT NOT NULL DEFAULT '[]'");
+  addColumn("reklamacja_karta", "rekomendacja", "TEXT");
+  addColumn("reklamacja_karta", "pewnosc", "TEXT");
+  addColumn("reklamacja_karta", "uzasadnienie", "TEXT");
+  addColumn("reklamacja_karta", "uzasadnienie_zrodlo", "TEXT");
+  addColumn("reklamacja_karta", "czego_nie_wiem", "TEXT NOT NULL DEFAULT '[]'");
+  addColumn("reklamacja_karta", "ocena",
+    "TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna'))");
+  addColumn("reklamacja_karta", "ocena_at", "TEXT");
+  /* Księga Copilota zna od 0.275.0 także sprawy posprzedażowe. `conversation_id`
+     się do tego nie nadaje: reklamacja nie ma wiersza w `conversation`, a klucz
+     obcy wywróciłby zapis. Tabela stoi na produkcji od etapu F, więc kolumna
+     dochodzi migracją; stare wiersze mają NULL, czyli „to było o rozmowie". */
+  addColumn("copilot_wywolanie", "reklamacja_id",
+    "INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL");
   addColumn("reklamacja_klienta", "werdykt", `TEXT CHECK (werdykt IS NULL OR werdykt IN (
     'ACCEPTED_REPAIR','ACCEPTED_REFUND','ACCEPTED_EXCHANGE','ACCEPTED_PARTIAL_REFUND',
     'REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED','REJECTED_PRODUCT_NOT_RETURNED',
@@ -469,6 +534,17 @@ export function migrate(database: DatabaseSync) {
      otwieraniem i procesowaniem zwrotów". */
   addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
+  /* ŚLAD PO PRZELEWIE ODDANYM POZA ALLEGRO (0.269.0). Przy pobraniu Allegro
+     nigdy nie trzymało tych pieniędzy — wracają przelewem z banku firmy, więc
+     `zwrot_pieniedzy_id` zostaje pusty i zwrot zamyka się bez śladu po
+     wypłacie. Biuro zapisuje tu, że przelew poszedł: kiedy, kto i pod jakim
+     numerem da się go znaleźć w banku. To NIE jest ruch pieniędzy, tylko
+     nasza notatka o nim — dlatego wolno ją cofnąć, inaczej niż zwrot przez
+     Allegro (§25a.5). */
+  addColumn("zwrot_klienta", "przelew_at", "TEXT");
+  addColumn("zwrot_klienta", "przelew_przez", "TEXT");
+  addColumn("zwrot_klienta", "przelew_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("zwrot_klienta", "przelew_referencja", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -606,10 +682,11 @@ export function migrate(database: DatabaseSync) {
      na regał zwrotów, więc sam ma go stamtąd zdjąć po rozłożeniu. Kolumna
      mówi, czy dokument już zamówiono: pusta przy koszu rozłożonym znaczy
      „stan wisi na regale, choć towar leży na półce" i pilnuje tego
-     rekoncyliacja. Kosz z dokumentu MM z Subiekta jej nie wypełnia — tam
-     dokument powrotny wystawia biuro (DEPLOY §6a). */
+     rekoncyliacja. Od 0.277.0 wypełnia ją TAK SAMO kosz z dokumentu MM —
+     powód przy `powrotKoszaZDokumentu`. */
   addColumn("kosz", "powrot_queue_id", "INTEGER REFERENCES sfera_queue(id)");
   powrotKoszaPozaAplikacja(database);
+  powrotKoszaZDokumentu(database);
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
@@ -646,6 +723,7 @@ export function migrate(database: DatabaseSync) {
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
+  ziarnoTagowSpraw(database);
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
@@ -698,6 +776,63 @@ function powrotKoszaPozaAplikacja(database: DatabaseSync) {
     if (n) {
       console.warn(`[migracja] ${n} rozłożonych koszy zostaje bez powrotu z bufora ` +
         "— rozliczyło je biuro przed 0.266.0.");
+    }
+  })();
+}
+
+/**
+ * Powrót z regału dla koszy Z DOKUMENTU MM (0.277.0).
+ *
+ * Do 0.276.x dokument powrotny ZWROTY→MAG zamawiała aplikacja wyłącznie dla
+ * koszy złożonych w panelu obsługi. Kosz z kartki — czyli droga, którą idzie
+ * większość zwrotów — kończył się zapisaniem adresów, a przesunięcie wystawiało
+ * biuro ręką w Subiekcie (DEPLOY §6a punkt 4). Kosztowało to dokładnie to samo,
+ * co przed 0.266.0 kosze z panelu: towar leżał na półce i nie był sprzedawalny,
+ * dopóki ktoś nie pamiętał o drugim dokumencie. Decyzja właściciela z 11
+ * września 2026 zdejmuje punkt 4 z biura i oddaje go aplikacji.
+ *
+ * `mm_mag_z` jest SNAPSHOTEM magazynu źródłowego dokumentu, bo powrót ma wrócić
+ * dokładnie tam, skąd towar przyjechał. Odczytanie tego z lustra `sgt_mm_zwrot`
+ * dopiero przy zamawianiu dokumentu bywałoby odczytem z pustki: lustro czyści
+ * się przy każdym imporcie i sięga tyle dni wstecz, ile mówi
+ * `MM_ZWROTY_DNI_WSTECZ`.
+ *
+ * STEMPEL IDZIE WYŁĄCZNIE W PRZEBIEGU DOKŁADAJĄCYM KOLUMNĘ — ta sama zasada co
+ * przy `powrotKoszaPozaAplikacja` i ten sam powód. Kosze z dokumentu rozłożone
+ * wcześniej rozliczyło biuro; wystawienie im dokumentu dziś przesunęłoby stan
+ * drugi raz, a rekoncyliacja wypisałaby historię jako pracę do zrobienia.
+ * Stempel powtarzany przy każdym starcie trafiałby w kosze rozłożone przed
+ * chwilą, którym worker nie zdążył jeszcze wypuścić powrotu.
+ */
+function powrotKoszaZDokumentu(database: DatabaseSync) {
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kosz'").get();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!jest) return;
+  const kolumny = (database.prepare("PRAGMA table_info(kosz)").all() as Array<{ name: string }>)
+    .map((c) => c.name);
+  if (kolumny.includes("mm_mag_z")) return;
+  transaction(database, () => {
+    database.exec("ALTER TABLE kosz ADD COLUMN mm_mag_z INTEGER");
+    /* Kosze W ROBOCIE dostają snapshot z lustra, póki dokument jeszcze w nim
+       stoi. Bez tego kosz otwarty przed wdrożeniem, a zakończony po nim,
+       zostałby bez powrotu — czyli dokładnie z usterką, którą to wydanie
+       zamyka. Czego w lustrze nie ma, tego nie zgadujemy. */
+    const lustro = database.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sgt_mm_zwrot'").get();
+    if (lustro) {
+      database.prepare(
+        `UPDATE kosz SET mm_mag_z =
+           (SELECT m.mag_z FROM sgt_mm_zwrot m WHERE m.dok_id = kosz.mm_dok_id)
+          WHERE mm_dok_id IS NOT NULL`).run();
+    }
+    const n = Number(database.prepare(
+      `UPDATE kosz SET powrot_poza_aplikacja=1
+        WHERE status='rozlozony' AND mm_dok_id IS NOT NULL
+          AND powrot_poza_aplikacja=0`).run().changes ?? 0);
+    if (n) {
+      console.warn(`[migracja] ${n} koszy z dokumentu MM zostaje bez powrotu ` +
+        "z regału — rozliczyło je biuro przed 0.277.0.");
     }
   })();
 }
@@ -1604,6 +1739,27 @@ function bezObslugiKlienta(database: DatabaseSync) {
     })();
   } finally {
     database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Ziarno słownika tagów spraw (0.279.0).
+ *
+ * Trzy wartości wskazał właściciel, pytany wprost, jakimi słowami opisuje
+ * postój sprawy. Dwie pierwsze mówią, CZEGO sprawa czeka — przy sprzęcie
+ * ogrodniczym to najczęstszy powód, dla którego reklamacja leży tygodniami,
+ * a z ekranu nie było tego widać wcale. Trzecia mówi, KTO ma ruszyć.
+ *
+ * WSIEWAMY WYŁĄCZNIE DO PUSTEGO SŁOWNIKA — ta sama zasada co przy strefie
+ * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
+ * dostać wartości fabrycznych z powrotem przy restarcie procesu.
+ */
+function ziarnoTagowSpraw(database: DatabaseSync) {
+  const n = (database.prepare("SELECT COUNT(*) AS n FROM reklamacja_tag").get() as { n: number }).n;
+  if (n > 0) return;
+  const ins = database.prepare("INSERT INTO reklamacja_tag(nazwa) VALUES (?)");
+  for (const nazwa of ["u producenta / u dostawcy", "czeka na część", "do decyzji właściciela"]) {
+    ins.run(nazwa);
   }
 }
 

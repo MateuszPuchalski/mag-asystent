@@ -75,6 +75,16 @@ test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", 
     [["TEST-LINIA-TODO", 3], ["TEST-LINIA-DONE", 1], ["TEST-WYCOFANY", 2]]
   );
 
+  /* Magazyn źródłowy dokumentu idzie do kosza SNAPSHOTEM (0.277.0): powrót
+     z regału ma wrócić dokładnie tam, skąd towar przyjechał, a lustro
+     `sgt_mm_zwrot` czyści się przy każdym imporcie i sięga tylko
+     MM_ZWROTY_DNI_WSTECZ dni wstecz. */
+  assert.equal(
+    Number((db().prepare("SELECT mm_mag_z AS m FROM kosz WHERE id=?").get(kosz.id) as
+      { m: number }).m),
+    1
+  );
+
   // drugi skan tej samej kartki — ten sam kosz, nie drugi
   const drugi = P.otworzPrzyjecie("MM 1209/MAG/2026", "Ewa");
   assert.equal(drugi.id, kosz.id);

@@ -277,3 +277,48 @@ test("nieistniejąca reklamacja to 404, nie cicha porażka", async () => {
     return true;
   });
 });
+
+test("załączniki jadą z wiadomością i ZNIKAJĄ ze szkicu po wysłaniu", async () => {
+  /* Wiersz, który by został, wisiałby przy NASTĘPNEJ odpowiedzi i dosłałby ten
+     sam plik drugi raz — cicho, bo nikt by go tam nie szukał (0.274.0). */
+  const { d, id, pytanie } = stanowisko();
+  d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (9,'ola','Ola','biuro')").run();
+  for (const a of ["att-1", "att-2"]) {
+    d.prepare(`INSERT INTO reklamacja_zalacznik_wysylki
+      (reklamacja_id,allegro_id,nazwa,typ,rozmiar,dodal_user_id)
+      VALUES (?,?,'usterka.jpg','image/jpeg',64,9)`).run(id, a);
+  }
+
+  let poszly: readonly string[] | undefined;
+  const w = await odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    wyslij: async (_i: string, _t: string, _typ: string, zal?: readonly string[]) => {
+      poszly = zal;
+      return { id: "m-1", createdAt: "2026-09-07T12:00:00.000Z" };
+    },
+  }));
+
+  assert.equal(w.status, "sent");
+  assert.deepEqual([...(poszly ?? [])].sort(), ["att-1", "att-2"]);
+  const zostalo = d.prepare(
+    "SELECT count(*) n FROM reklamacja_zalacznik_wysylki WHERE reklamacja_id=?")
+    .get(id) as { n: number };
+  assert.equal(Number(zostalo.n), 0, "po wysłaniu szkic nie trzyma plików");
+});
+
+test("ten sam tekst z załącznikiem i bez to DWIE różne wiadomości", async () => {
+  /* Strażnik dubletu nie ma prawa oddać próby bez pliku zamiast wysłać tę
+     z plikiem: u kupującego to inna wiadomość. */
+  const { d, id, pytanie } = stanowisko();
+  const bez = await odpowiedzWSprawie(zadanie(d, id, pytanie));
+
+  d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (9,'ola','Ola','biuro')").run();
+  d.prepare(`INSERT INTO reklamacja_zalacznik_wysylki
+    (reklamacja_id,allegro_id,nazwa,typ,rozmiar,dodal_user_id)
+    VALUES (?,'att-9','usterka.jpg','image/jpeg',64,9)`).run(id);
+  const zPlikiem = await odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    expectedLastMessageId: pytanie, mimoNowejWiadomosci: true,
+  }));
+
+  assert.notEqual(zPlikiem.kluczIdempotencji, bez.kluczIdempotencji,
+    "załącznik zmienia klucz, więc druga wysyłka naprawdę wychodzi");
+});

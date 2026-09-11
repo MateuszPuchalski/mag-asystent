@@ -34,6 +34,705 @@ historii nie przepisujemy.
 ---
 
 
+## 0.284.0 — 11 września 2026
+
+**Klawisze zwrotów wreszcie coś robią.** Ekran rysował je przy przyciskach od
+0.156.0: `P` przy „Przyjmij", `S` i `U` przy ocenie, `Enter` przy kwocie, `R`
+przy cofnięciu korekty. Żaden z nich nie miał nasłuchu — nasłuch znał wyłącznie
+ruch po liście i cyfry kubełków. Doktryna obiecywała przy tym, że „typowy zwrot
+to jeden klawisz", więc obietnicę składał ekran i dokument naraz, a dotrzymywała
+jej mysz. Audyt zamówiony przez właściciela wyciągnął to jako pierwszą pozycję.
+
+Od tego wydania tabela §25a.2 jest prawdziwa. Klawisz nie jest przy tym skrótem
+do wszystkiego: `O` OTWIERA pole powodu, zamiast zapisywać odmowę, bo odmowa
+jest nieodwracalna i §25a.5 daje takim rzeczom potwierdzenie.
+
+**Ocena hurtem przy zwrocie wielopozycyjnym.** `Shift+S` albo jeden przycisk
+ocenia wszystkie nieocenione pozycje „na stan"; przy pięciu pozycjach to jedno
+kliknięcie zamiast pięciu. Idzie PO KOLEI, każde żądanie z wersją oddaną przez
+poprzednie — pięć żądań naraz odbiłoby się od blokady optymistycznej
+i zostawiło zwrot oceniony w połowie. Utylizacja wariantu hurtowego nie
+dostaje: jeden ruch wysyłałby cały zwrot na złom.
+
+**Pasek klawiszy nad kolejką**, wzorem reklamacji z 0.281.0 i z tego samego
+powodu (Dekalog p. 2: rozpoznanie jest tańsze od pamiętania). Pokazuje klawisze
+OGLĄDANEGO kubełka. Sit „moje"/„niczyje" tam nie ma, bo zwrot nie nosi
+prowadzącego — wspólny komponent dostał na to przełącznik, żeby nie obiecywać
+klawisza, którego ten ekran nie obsługuje.
+
+Kursor schodzi na następny wiersz po odmowie i po zapisanym numerze korekty,
+czyli wtedy, gdy zwrot wychodzi z drabiny. Po „przyjmij" i po ocenie zostaje na
+miejscu: zwrot schodzi o szczebel, a kolumna środkowa pokazuje następne
+pytanie. Tabela w §25a.2 mówiła o trzech ocenach, choć od 0.209.0 są dwie —
+poprawione przy okazji.
+
+Serwer bez zmian: zero nowych tras, zero migracji. Cała zmiana mieszka
+w panelu obsługi.
+
+
+## 0.283.0 — 11 września 2026
+
+**Copilot czyta zdjęcia ze sprawy.** [wymaga działania] Zlecenie właściciela:
+„copilot powinien czytać zdjęcia". Karta, którą pokazał, prosiła agenta
+o zdjęcia, które w sprawie już były — sama się do nich odwoływała, cytując
+wiadomość sprzedawcy.
+
+Obrazy idą przed tekstem, a na końcu tekstu stoi spis z numerami `Z1`, `Z2`
+i nazwami plików. Numeracja jest konieczna, nie ozdobna: bez własnej
+przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie, bo jego
+źródło nie pasowałoby do żadnego numeru wiadomości.
+
+**Typ rozstrzyga SYGNATURA pliku, nie jego nazwa** — ta sama bramka co przy
+podglądzie w panelu. Plik, który obrazem nie jest, zostaje wymieniony w spisie
+z nazwą, żeby model mógł napisać w „brakuje", że przysłany dokument jest
+nieczytelny jako zdjęcie.
+
+**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik
+spoza typu, komplet niemieszczący się w suficie bajtów — wszystko jest
+liczone, nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi
+nic. Stopka karty podaje, ile zdjęć przeczytano, a cytat `Z2` niesie
+w podpowiedzi nazwę pliku: bez tego „Copilot nic nie zobaczył" i „Copilot nie
+dostał zdjęć" wyglądałyby identycznie.
+
+**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Reszta
+polityki danych stoi na gwarancji wymuszanej typem, którego nie da się
+wyprodukować poza modułem maskowania. Przy obrazie taka gwarancja nie
+istnieje: zdjęcie paragonu z imieniem i adresem wychodzi do dostawcy
+w całości. Dlatego typ nazywa się `ZdjecieZBramki`, a nie „bezpieczne",
+i obiecuje dokładnie trzy rzeczy — pochodzenie z załącznika tej sprawy, typ
+z sygnatury i sufit bajtów.
+
+**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
+kosztu. Obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
+wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
+więcej niż samo rozpoznanie tekstu. **Budżetu kwotowego w konfiguracji nie ma
+— to jest znana ekspozycja, nie przeoczenie**, i przy zdjęciach zaczyna mieć
+cenę. [wymaga działania] Warto obserwować rachunek u dostawcy przez pierwszy
+tydzień.
+
+Pobieranie załącznika dostało wreszcie SUFIT ROZMIARU. Do tego wydania
+wciągało do pamięci wszystko, co Allegro odda, bez pytania o długość. Przy
+pobraniu na żądanie agenta było to ryzyko teoretyczne; przy komplecie
+załączników branym jednym ruchem przestaje takie być.
+
+
+## 0.282.0 — 11 września 2026
+
+**Copilot przestaje prosić o to, co system już wie.** Właściciel wkleił kartę
+z żywego panelu. Copilot poprosił agenta o „datę zakupu / numer zamówienia"
+i o „zdjęcia tabliczki znamionowej w celu identyfikacji modelu". Numer
+zamówienia stał na wierszu sprawy, data przyszła w tej samej odpowiedzi
+Allegro, a model towaru zna oferta.
+
+Prosił, bo nie dostał. Do tego wydania rozpoznanie podawało modelowi WYŁĄCZNIE
+czat — bez powodu zgłoszenia, bez oczekiwania, bez ilości, bez terminu decyzji
+i bez czegokolwiek z formularza reklamacyjnego. Model odtwarzał z prozy
+klienta pola, które leżały o jedno złączenie dalej.
+
+**Data zakupu przychodziła z Allegro i my ją wyrzucaliśmy.** Schemat
+`PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id` i `createdAt`.
+Nasz typ ładunku znał jedno, więc data ginęła, zanim ktokolwiek zdecydował,
+że jej nie chce. Typ węższy od schematu potrafi ukryć dane skuteczniej niż
+ich brak.
+
+**Reklamacja nigdy nie prosiła Allegro o własny kontekst.** Kolejki dociągania
+zamówień i ofert brały numery wyłącznie ze zwrotów i wiadomości, więc przy
+typowej sprawie nie mieliśmy ani zamówienia, ani nazwy reklamowanego towaru.
+Sprawy wchodzą teraz do obu kolejek jako trzecie źródło, ZA istniejącymi:
+porządek chroni starsze źródła przed zagłodzeniem w tym samym suficie
+przebiegu, a limit 429 zostaje jeden na wszystkie.
+
+Przed rozmową stoi blok FAKTY ZE SPRAWY z własnym numerem `S`. Numer jest
+konieczny: bez niego zdanie przepisane ze zgłoszenia wylatywałoby jako rzekomo
+niepokryte, a to są słowa klienta tak samo jak wiadomość. Blok przechodzi
+przez to samo maskowanie co rozmowa — opis zgłoszenia bywa z adresem, pod
+który klient prosi o kuriera.
+
+**Pole `brakuje` dostaje SITO po stronie kodu.** To jedyne pole karty bez
+cytatu i jedyne, którego bramka numerów nie dotykała — a właśnie ono trzymało
+sprawę w miejscu. Nad sitem stoi STRAŻNIK i jest ważniejszy: dowód zakupu to
+dokument, a nie data; numer seryjny to egzemplarz, a nie model; zdjęcia to
+materiał, którego w tekście nie ma z definicji. Tych pozycji nie tnie nic.
+Licznik odsianych idzie do dziennika, bo heurystyka bez pomiaru to wiara.
+
+Instrukcja przestała podawać datę zakupu jako przykład tego, co wpisać
+w `brakuje`. Karta, którą zobaczył właściciel, wykonała polecenie co do słowa.
+
+**Naprawiony przy okazji cichy błąd.** Model widzi w rozmowie `[W3]` i tak
+cytuje; bramka porównywała łańcuchy dosłownie, więc taki fakt znikał z karty
+bez śladu, jako niepokryty. Poluzowanie doktryny przez literówkę, nie przez
+decyzję. Numer normalizuje się teraz przed porównaniem — dwa numery naraz
+dalej wypadają.
+
+Data zakupu weszła też na ekran, z etykietą mówiącą, który to zegar:
+„Kupiono" przy dacie z pozycji zamówienia, „Zamówienie złożone" przy dacie
+z ładunku sprawy. Agent nie widział jej dotąd wcale, choć zwroty i skrzynka
+mają ją od dawna.
+
+
+## 0.281.0 — 11 września 2026
+
+**Trzy rzeczy, których brakowało zleceniu o odnajdywaniu własnych spraw.**
+
+**Czip mówi „Ty".** Właściciel pytał wprost: „które reklamacje są moje".
+Sito z 0.278.0 odpowiada po WŁĄCZENIU, a to pytanie zadaje się też przy
+przeglądaniu całej kolejki. Czip prowadzącego pokazuje więc „Ty" przy
+własnej sprawie, a imię przy cudzej. Rozstrzyga numer konta, nie imię: dwie
+osoby w biurze bywają imienniczkami, a przy własnym nazwisku i tak trzeba je
+przeczytać, zamiast rozpoznać.
+
+**Sito „Niczyje" obok „Moje".** To druga połowa tego samego pytania i bez
+niej pierwsza nie domyka pracy. Sprawa nieprzypisana nie trafia do nikogo
+sama — ktoś musi ją zobaczyć i wziąć; sito pokazujące wyłącznie moje robiło
+z niej ślepą plamkę, w dodatku pamiętaną między otwarciami ekranu. Klawisz
+`n`, obok `m`.
+
+Jedno sito o TRZECH stanach, nie dwa przełączniki: „moje i niczyje naraz" nie
+znaczy nic, a „ani moje, ani niczyje" znaczy „cudze" — o cudze nikt tu nie
+pyta. Zdanie o ukrytych sprawach nazywa teraz sito, które je chowa.
+
+**Skróty klawiszowe widać na ekranie.** Kolejka chodzi z klawiatury od
+0.245.0, a od 0.278.0 także po sitach. Do tego wydania nie było tego nigdzie
+widać: klawisz stał wyłącznie w podpowiedzi pod kursorem, czyli tam, gdzie
+trafia się przypadkiem. Dekalog p. 2 mówi to wprost — rozpoznanie jest tańsze
+od pamiętania, a skrót, o którym nikt nie wie, nie skraca niczyjej pracy.
+
+Legenda kosztuje około 22 px wysokości kolumny i bierzemy tę cenę raz.
+Schowana pod znakiem zapytania kosztowałaby dwa kliknięcia przy każdym
+przypomnieniu, a schowane przypomnienie to znowu pamiętanie.
+
+
+## 0.280.0 — 11 września 2026
+
+**Zmianę notatki da się cofnąć.** Notatka jest polem swobodnym, które nadpisuje
+ten, kto pisze ostatni. Do tego wydania skasowanego zdania nie dało się
+odzyskać niczym: do dziennika idzie świadomie sama DŁUGOŚĆ, bo treść bywa
+zdaniem o kliencie, a `events` nie ma retencji.
+
+Pod polem stoi teraz jedno zdanie: kto zmienił, kiedy, i odnośnik „cofnij
+zmianę". Zdanie, nie ramka z decyzją — §25a.5 mówi o cofnięciu ZAMIAST
+potwierdzenia, i tak to wygląda przy cofnięciu przyjęcia w zwrotach.
+
+Cofnięcie jest ZAMIANĄ, o jeden szczebel. Bieżąca treść ląduje w miejscu
+poprzedniej, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii dla
+pola, którego nikt nie audytuje, byłaby drugim miejscem na te same dane
+osobowe — i drugim miejscem do sprzątania. Poprzednia treść mieszka na wierszu
+sprawy, ginie razem z nią i do dziennika nie trafia ani razu.
+
+Sprawy zastane nie znają swojej poprzedniej notatki, bo nikt jej nie
+zapisywał. Przycisku przy nich po prostu nie ma: martwy obiecywałby drogę,
+której nie ma.
+
+**Czego cofnięcie NIE dotyczy i nie dotknie:** werdyktu, odpowiedzi w rozmowie,
+stanowiska o towarze i prośby o zakończenie dyskusji. Wszystkie wychodzą do
+kupującego przez Allegro, a Allegro ich nie cofnie — przycisk „cofnij" byłby
+tam obietnicą bez pokrycia. Notatka jest jedynym zapisem w tych dwóch
+modułach, który zostaje wyłącznie u nas, i dlatego jako jedyna drogę powrotną
+dostaje.
+
+Przy okazji notatka mówi wreszcie, KTO ją zmienił i kiedy. Dotąd nie mówił
+tego nikt.
+
+
+## 0.279.0 — 11 września 2026
+
+**Tagi spraw w reklamacjach i dyskusjach, ze słownikiem, który edytuje biuro.**
+Ta sama prośba właściciela, co przy sicie „Moje": łatwiej znaleźć swoje sprawy.
+Sito odpowiada na pytanie „czyje to", tag na „o czym to" — najczęściej „czego
+ta sprawa czeka".
+
+Ziarno słownika to trzy słowa właściciela: „u producenta / u dostawcy", „czeka
+na część", „do decyzji właściciela". Wsiewa się WYŁĄCZNIE do pustego słownika,
+więc biuro, które raz zmieniło nazwę, nie dostaje wartości fabrycznych z
+powrotem przy restarcie.
+
+Nazwę dopisuje się przy sprawie, jednym ruchem: wchodzi do słownika i od razu
+na sprawę. Zmiana nazwy i wyłączenie z użycia stoją w Ustawieniach, bo dotyczą
+wszystkich spraw naraz.
+
+**Tag NIE przestawia kolejki i to jest decyzja.** Kolejność liczy termin i czas
+czekania, czyli fakty o pilności. Jedna pomyłka biura zakopałaby sprawę
+z zegarem na dole listy tak, że nikt by tego nie zauważył. Tag zawęża listę
+i nic poza tym; do Allegro nie idzie żadnym polem.
+
+Cena otwartego słownika jest znana z góry: pasek z czterdziestoma pigułkami
+przestaje filtrować. Płacą ją trzy ograniczenia. Jednoznaczność po małych
+literach, bo „Gwarancja" po „gwarancja" to jeden tag w głowie i dwie pigułki
+w filtrze. Sufit dwudziestu aktywnych, z licznikiem widocznym w Ustawieniach,
+zanim odmowa padnie w biegu przy sprawie. Wyłączanie zamiast kasowania —
+skasowany tag zniknąłby ze spraw historycznych, a z nim odpowiedź na pytanie,
+dlaczego sprawa stała trzy tygodnie.
+
+Cofnięcia tag nie potrzebuje: przypięcie i zdjęcie kosztują po jednym
+kliknięciu, więc droga powrotna już jest.
+
+Nazwa tabeli nie mogła brzmieć `sprawa_tag`: ta jest na liście spalonych na
+zawsze i kasowana przy KAŻDEJ migracji. Tabela nazwana tak powstałaby ze
+schematu i znikała sekundę później, po cichu.
+
+
+## 0.278.0 — 11 września 2026
+
+**Sito „Moje" w reklamacjach i dyskusjach.** Właściciel poprosił o jedno:
+„abym łatwiej mógł znaleźć reklamacje, którymi się zajmuję". Do tego wydania
+nie dało się tego zrobić wcale. Kubełki mówiły, na jakim etapie stoi sprawa,
+pole szukania znało numer, zamówienie i login, a po prowadzącym nie szukało
+nic. Znacznik „prowadzę" był samym czipem na wierszu.
+
+Sito stoi we własnym rzędzie pod pasmem kubełków, na obu ekranach. Przełącza
+je kliknięcie albo klawisz `m`. To **sito, nie czwarty kubełek**, i to jest
+decyzja: kubełek odpowiada na pytanie „na jakim to etapie", sito na „czyje
+to". Zlanie obu w jeden rząd odebrałoby pytanie zadawane najczęściej — „moje
+sprawy do decyzji".
+
+**Sito liczy po tożsamości, nie po imieniu, i to naprawia cichy błąd.** Do
+tego wydania przełącznik znacznika porównywał łańcuchy, więc dwie osoby o tym
+samym imieniu zdejmowały sobie znacznik nawzajem. Bez komunikatu i bez śladu
+w oczach obu — objawem była własna sprawa znikająca z kubełka. Doszła kolumna
+`prowadzi_user_id`; imię zostaje obok dla oka, bo czip ma być czytelny także
+po skasowaniu konta.
+
+Migracja czyta tożsamość z imienia tam, gdzie imię wskazuje jedno konto.
+Imię wieloznaczne zostaje bez tożsamości i naprawia je pierwsze kliknięcie:
+sprawa ma przez chwilę nie wpaść do nikogo, zamiast wpaść do niewłaściwej
+osoby.
+
+**Sito mówi, ile chowa.** Wybór jest pamiętany między otwarciami ekranu, bo
+„czyje to" jest nawykiem stanowiska. Milczący filtr z pamięcią zagłodziłby
+sprawy nieprzypisane, więc nad listą stoi zdanie z liczbą ukrytych spraw
+i droga powrotna jednym kliknięciem.
+
+Szukanie przebija sito tak samo, jak przebija kubełek: wpisany numer znajduje
+sprawę również wtedy, gdy prowadzi ją kolega. Do pola szukania wchodzi przy
+okazji prowadzący — skrzynka szuka po nim od 0.195.0, reklamacje i dyskusje
+nie szukały dotąd nijak.
+
+
+## 0.277.0 — 11 września 2026
+
+**Kosz z kartki sam cofa stan z regału zwrotów.** Zgłoszenie właściciela:
+„przesunięcia magazynowe nie robią się automatycznie, gdy zamyka się rozłożony
+koszyk na magazyn główny". Tak było i tak to było zapisane: powrót ZWROTY→MAG
+zamawiała aplikacja wyłącznie dla koszy złożonych w panelu obsługi (0.266.0),
+a kosz otwarty numerem z kartki kończył się zapisaniem adresów. Drugi dokument
+wystawiało biuro ręką — i nic o nim nie przypominało. Towar leżał w hali
+i nie był sprzedawalny, dopóki ktoś nie pamiętał.
+
+Od tego wydania ZAKOŃCZ na kolektorze zamawia jedno MM na cały kosz niezależnie
+od tego, skąd kosz się wziął. Reguły są te same co przy koszu z panelu: dokument
+powstaje dopiero po zapisaniu wszystkich adresów, schodzi z regału wyłącznie to,
+co magazynier naprawdę odłożył, a drugie ZAKOŃCZ nie wystawia drugiego
+dokumentu.
+
+**Powrót wraca tam, skąd towar przyjechał.** Magazynem docelowym jest nadawca
+tamtego przesunięcia, nie domyślny główny: filtr importu pilnuje wyłącznie
+odbiorcy dokumentu, o nadawcy nie mówi nic. Aplikacja zapisuje go w chwili
+otwarcia kosza, bo lustro dokumentów sięga tylko `MM_ZWROTY_DNI_WSTECZ` dni
+wstecz. Kosz otwarty przed wdrożeniem, którego dokument z tego okna wypadł,
+powrotu nie dostaje — zgadnięty magazyn przesuwa towar naprawdę, a MM nie cofa
+się jednym kliknięciem. Takie kosze wypisuje rekoncyliacja.
+
+Rekoncyliacja przestała też przemilczać kosze z dokumentu: brak powrotu po
+dobie jest przy nich takim samym rozjazdem jak przy koszach z panelu.
+
+**[wymaga działania] Biuro przestaje wystawiać powrót ręką.** Przełącznika nie
+ma: dokument wystawiony dodatkowo w Subiekcie zdejmie z regału stan drugi raz.
+Kosze rozłożone przed wdrożeniem migracja stempluje jako rozliczone poza
+aplikacją, więc historia zostaje historią. Przy wyłączonym workerze Sfery
+(DEPLOY etap 1a) zadanie MM stanie w błędzie — wtedy powrót wystawia biuro,
+tak jak dotąd, a karta kosza mówi o tym wprost.
+
+
+## 0.276.2 — 11 września 2026
+
+**Karta Copilota znów zapisuje się na bazie, która widziała 0.275.0.**
+Właściciel zgłosił z żywego panelu: „Co wyczytał Copilot" kończyło się zdaniem
+`table reklamacja_karta has no column named rekomendacja`. Rozpoznanie sprawy
+padało za każdym razem, na każdej reklamacji.
+
+Winna była decyzja z planu 0.276.0, nie kod. Rada maszyny dołożyła do
+`reklamacja_karta` siedem kolumn WYŁĄCZNIE w `schema.sql`, bo plan założył, że
+tabela z 0.275.0 „na produkcji jeszcze nie stoi". Stała — 0.275.0 zostało
+wdrożone dzień wcześniej. `CREATE TABLE IF NOT EXISTS` nie dokłada kolumn do
+tabeli, która już jest, więc baza została w kształcie sprzed rady, a kod pytał
+o kolumny z rady.
+
+Kolumny dochodzą teraz migracją, tak jak wszystkie inne. Zasada, którą to
+wydanie przywraca, nie ma wyjątków: **kolumna dołożona do tabeli wydanej
+w jakimkolwiek wydaniu dostaje `addColumn`**. Wiek tabeli nie jest argumentem,
+bo nie wiemy, które wydanie u kogo stoi.
+
+Doszedł test, który odtwarza zgłoszenie wiernie: buduje bazę w kształcie
+0.275.0, przepuszcza przez migrację i zapisuje kartę z radą. Druga asercja jest
+ogólna — zbiór kolumn `reklamacja_karta` po migracji starej bazy musi być taki
+sam jak w bazie zbudowanej od zera. Następna kolumna dopisana bez migracji
+przewróci testy, a nie ekran właściciela.
+
+
+## 0.276.1 — 11 września 2026
+
+**Raport skuteczności doboru przestaje przy remisie kredytować złą drogę.**
+Raport odpowiada na jedno pytanie: który szczebel doboru zapracował na
+zatwierdzenie. Odpowiadał na nie po samym znaczniku czasu, a to za mało.
+
+`events.created_at` ma rozdzielczość milisekundy, a `wybierzKandydata`
+i `ustawStatusDoboru` piszą po kilka wierszy w jednym przebiegu. Gdy wybór,
+zatwierdzenie i kolejny wybór trafiały w tę samą milisekundę, warunek „wybór
+nie późniejszy niż zatwierdzenie" był prawdziwy dla OBU wyborów, a szukanie
+od końca brało ten późniejszy. Punkt szedł do drogi, po której zatwierdzenie
+nie nastąpiło — dokładnie odwrotnie, niż mówi reguła zapisana w komentarzu
+obok.
+
+Remis rozstrzyga teraz `events.id`: `INTEGER PRIMARY KEY AUTOINCREMENT`, więc
+jedyny w tej tabeli porządek ściśle rosnący. Dane były pod ręką od początku —
+oba zapytania sortowały po `created_at, id`, tylko `id` nie wychodziło poza
+SQL. Porównanie idzie po parze `(at, id)`.
+
+**Znalazł to migoczący test, nie człowiek przy ekranie.** Test „zatwierdzenie
+liczy się z PRZEJŚCIA" padał z `0 !== 1` raz na kilka pełnych przebiegów
+`npm test`, a uruchomiony sam przechodził, bo bez obciążenia od innych plików
+zapisy rozjeżdżały się o kilka milisekund. Dlatego dowodem jest test, który
+remis WYMUSZA: stan pisze mechanizm, a znacznik wszystkich zdarzeń zostaje
+potem nadpisany najmniejszym z nich. Na starym kodzie pada za każdym razem.
+
+Na produkcji objaw był łagodniejszy, bo człowiek klika w odstępach sekund.
+Nie znaczy to, że go nie było — znaczy, że przy tym jednym raporcie nikt by
+się nie zorientował, że liczba stoi przy złym szczeblu.
+
+Wdrożenie bez pracy ręcznej.
+
+---
+
+
+## 0.276.0 — Copilot radzi w reklamacji
+
+**Właściciel odwrócił regułę z wydania sprzed kilku godzin.** 0.275.0 odrzucało
+kartę, w której padło słowo z rodziny werdyktu — moja decyzja, uzasadniona tym,
+że uznanie jest nieodwracalne. Zgłoszenie: „copilot powinien też radzić
+w reklamacji". Wie to lepiej ode mnie: to on wydaje te werdykty i on płaci za
+ich skutki.
+
+**Bramka nie znika, tylko zmienia cel.** Rada mieszka wyłącznie w polu `rada`,
+typowanym i podpisanym na ekranie. Pola opisowe — usterka, kiedy, oczekiwanie,
+dowody — mają zostać tym, co powiedział klient, i pilnuje tego ta sama
+deterministyczna bramka co wcześniej. Bez niej model przemyciłby werdykt w polu,
+które wygląda jak cytat z kupującego, a agent czytałby „reklamacja zasadna"
+jako słowa klienta, nie jako opinię maszyny.
+
+**Rada jest typowana, nie prozą**: jedna z jedenastu wartości werdyktu Allegro
+albo dwunasta, nasza — `POPROSIC_O_DOWODY`, czyli „nie ma jeszcze czego
+rozstrzygać". Prozą byłoby ładniej i nie dałoby się tego zmierzyć.
+
+**Pewność bez nazwanej niewiedzy jest odrzucana.** Model deklarujący „wysoką"
+musi wymienić co najmniej jedną rzecz, której nie wie, a która zmieniłaby radę.
+Deklaracja pewności bez tego nie jest pewnością, tylko brawurą — a karta z nią
+nie zapisuje się wcale. Uzasadnienie rady ma cytat i jest sprawdzane jak reszta;
+rada z numerem wiadomości, której nie ma, znika CAŁA, bo rekomendacja bez
+podstawy to gołe „uznaj", a takie zdanie wygląda na ugruntowane.
+
+**Trafność liczy się z faktu, nie z ankiety.** Gdy werdykt wychodzi, serwis
+porównuje go z radą i dopisuje `trafna`/`nietrafna`. Rekomendacja jest typowana
+tym samym słownikiem, więc porównanie to równość dwóch napisów — nikogo nie
+trzeba pytać, czy maszyna trafiła. `schema.sql` nosi przy klasyfikacji zdanie
+z wcześniejszej krytyki właściciela: „confidence bez konsekwencji to…"; tutaj
+domyka się samo.
+
+**Czego rada NIE robi: nie dotyka formularza werdyktu.** Nie zaznacza opcji,
+nie otwiera dialogu, nie podstawia wiadomości. Powód jest wąski i techniczny,
+nie moralny: Allegro nie przyjmie drugiego werdyktu w sprawie, więc różnica
+między „przeczytaj i zdecyduj" a „potwierdź" jest tu nieodwracalna. Gdyby
+właściciel chciał także podstawienia, jest to inna decyzja i osobne wydanie.
+
+Werdykt działa dalej bez Copilota — ocena rady jest cicha przy braku karty.
+Copilot jest dodatkiem, a werdykt podstawową pracą biura.
+
+---
+
+
+## 0.275.0 — 11 września 2026
+
+**Copilot czyta sprawę reklamacyjną i wypisuje, czego w niej brakuje.**
+Zgłoszenie właściciela: „zintegruj z copilotem, wersja do reklamacji zbierająca
+dane". Słowo „zbierająca" jest tu całym projektem.
+
+**Maszyna nie dotyka werdyktu — i nie jest to kwestia promptu.** Uznanie
+i odrzucenie są nieodwracalne wobec kupującego, stoją za operacją
+uprzywilejowaną i za jawną zgodą. Zdanie „ta reklamacja wygląda na zasadną"
+przesuwałoby decyzję, nie pomagając jej podjąć, więc karta, w której padnie
+słowo z rodziny werdyktu, leci w całości. Odrzuca ją bramka w kodzie, nie
+instrukcja dla modelu: prompt jest prośbą, bramka jest regułą.
+
+Karta niesie cztery rzeczy, których agent szuka w rozmowie za każdym razem
+ręcznie — co się zepsuło, od kiedy, czego klient chce, co już przysłał —
+i piątą, najcenniejszą: **czego brakuje, żeby dało się rozstrzygnąć**. Sprawy
+stoją tygodniami nie dlatego, że nikt nie umie zdecydować, tylko dlatego, że
+nikt nie zapytał o zdjęcie tabliczki.
+
+**Każde zdanie ma cytat.** Model dostaje rozmowę ponumerowaną i przy każdym
+polu podaje numer wiadomości; serwer sprawdza numery przed zapisem, a pole
+z numerem, którego nie ma, znika. Inaczej niż przy szkicu, gdzie wymyślona
+liczba kasuje całość — tam liczba wchodzi do zdania wysyłanego kupującemu,
+tutaj karta jest notatką dla agenta, który ma rozmowę przed oczami. Licznik
+odsianych idzie do dziennika, żeby dało się zmierzyć, jak często model zmyśla.
+
+Do dostawcy idzie rozmowa **zamaskowana** tym samym modułem co w skrzynce,
+a pilnuje tego kompilator: nadawca przyjmuje wyłącznie `TrescBezpieczna`.
+Rozpoznanie jest jawnym kliknięciem, bo żądanie kosztuje — i dlatego trasa jest
+`POST`em mimo braku decyzji człowieka: przeglądarka powtarza i wstępnie pobiera
+`GET`-y bez pytania.
+
+Przy okazji dwie rzeczy wyłapały strażnice panelu, zanim zobaczył je człowiek:
+cytat miał `text-slate-500` na `slate-100` (4,34:1 przy progu 4,5) i arbitralne
+`text-[11px]` spoza drabiny typograficznej. Obie poprawione, obie z komentarzem,
+żeby następny nie sprawdzał tego drugi raz.
+
+---
+
+
+## 0.274.0 — 11 września 2026
+
+**Załącznik wychodzi razem z odpowiedzią w reklamacji.** Decyzja właściciela
+z 7 września brzmiała „sam tekst" i trzymała się cztery dni; 11 września ją
+odwrócił. Przy reklamacji zdjęcie liczy się bardziej niż przy pytaniu, bo
+rozmowa reklamacyjna bywa sporem o to, co dokładnie widać.
+
+Droga jest dwukrokowa jak w Centrum Wiadomości — deklaracja, potem bajty — ale
+**kształt jest INNY, choć robi to samo**. Deklaracja sprawy to schemat
+`AttachmentDeclaration` z polem `fileName`; Centrum Wiadomości to
+`NewAttachmentDeclaration` z polem `filename`. Różnica jednej litery przy polu
+obowiązkowym w obu. Dokładnie ta pułapka, przed którą ostrzega `CLAUDE.md` —
+a sąsiednia końcówka stała gotowa i kusiła, żeby wziąć kształt z pamięci.
+
+**Adres wgrania bierze się z nagłówka `Location`**, bo specyfikacja mówi to
+wprost i dodaje, że format może się zmienić. Adres składany z identyfikatora
+zostaje jako droga awaryjna i zostawia ślad w dzienniku: bez niej brak jednej
+linijki w odpowiedzi zabijałby całą funkcję, a z nią wiadomo, kiedy Allegro
+przestało nagłówek przysyłać.
+
+**Wzorzec jest ze skrzynki i świadomie go POWTARZAMY, nie uogólniamy.** Plik
+idzie do Allegro w chwili dodania, nie przy wysyłce — odmowa typu albo rozmiaru
+ma paść, gdy jeszcze da się wybrać inny plik. Bajtów nie trzymamy u siebie ani
+chwili dłużej. Wiersz powstaje wyłącznie po udanym wgraniu: wiersz bez pliku po
+tamtej stronie obiecywałby wysyłce załącznik, którego Allegro nie zna. Wspólne
+są LICZBY i walidacja — te same cztery megabajty i te same sześć typów, żeby
+agent nie uczył się dwóch limitów dla dwóch ekranów tej samej pracy.
+
+**Spinacz i lista plików to TEN SAM komponent co w skrzynce**, nie kopia —
+ta sama racja, dla której właściciel kazał scalić załącznik przychodzący
+w 0.246.0. Przy okazji kodowanie base64 przeszło do jednego miejsca
+(`api/plik.ts`): robiły to już dwa ekrany, a druga kopia rozjechałaby się przy
+pierwszej poprawce.
+
+**Załączniki wchodzą do klucza idempotencji.** Ta sama treść z dołożonym
+zdjęciem to inna wiadomość u kupującego, więc strażnik dubletu nie ma prawa
+oddać poprzedniej próby zamiast wysłać nową. Po udanej wysyłce lista się
+czyści — wiersz, który by został, dosłałby ten sam plik przy następnej
+odpowiedzi, cicho.
+
+Polityka danych dostała akapit, bo to jest zmiana W NIEJ, nie w wyglądzie
+ekranu: od tego wydania plik z naszego dysku opuszcza maszynę.
+
+---
+
+
+## 0.273.0 — 11 września 2026
+
+**Cztery rozjazdy między panelem reklamacji a tym, co rodzina `/sale/issues`
+naprawdę oferuje.** Moduł był funkcjonalnie kompletny od 0.242.0 — kolejka,
+rozmowa, odpowiedź, werdykt. Kompletny nie znaczy zgodny.
+
+**Rozmowa dłuższa niż sto wiadomości ginęła na zawsze.** Adres czatu umiał
+`offset` od 0.222.0, ale nikt go nigdy nie podał: braliśmy pierwszą setkę
+i koniec. Pod spodem stało zdanie „Reszta dojdzie następną synchronizacją" —
+nieprawdziwe od pierwszego dnia, bo po drugą stronę rozmowy nikt nie szedł.
+
+Gorsze było to, czego nie było widać. Sprawa z taką rozmową spełniała warunek
+dociągania po KAŻDYM przebiegu i — przy sortowaniu po terminie decyzji — stała
+na czele budżetu w kółko. Jedna gruba rozmowa głodziła dziewiętnaście
+pozostałych, w nieskończoność. Rozmowa stronicuje się teraz do pięciuset
+wiadomości; dłuższa dostaje znak `czat_urwany`, wypada z kolejki dociągania,
+a ekran mówi wprost, że resztę widać w Centrum Sprzedaży.
+
+**Kolejka ucinała najstarsze, czyli najbardziej spóźnione.** Lista spraw jedzie
+malejąco po dacie otwarcia, a nasz bezpiecznik stron ucina jej ogon — dokładnie
+te sprawy, dla których ten ekran powstał. Specyfikacja ma na to filtr `status`
+i nie używaliśmy go wcale. Przebieg pyta teraz najpierw o trzy statusy spraw
+żywych, a dopiero potem o całą listę; otwartych jest garść, więc mieszczą się
+przed bezpiecznikiem niezależnie od długości archiwum.
+
+**Nie prosiliśmy Allegro o język.** `Accept-Language` nie występował w serwerze
+ani razu, choć specyfikacja wymienia go przy liście („Expected language of
+subject field") i przy rozmowie („Expected language of messages", z przykładem
+`en-US`). Teraz jedzie `pl-PL` z jednego miejsca, dla całej rodziny końcówek:
+rozjazd języka między listą a rozmową tej samej sprawy byłby gorszy niż
+konsekwentna angielszczyzna.
+
+**Czwarta końcówka rodziny była nieużywana wcale.** `GET /sale/issues/{id}`
+oddaje ten sam kształt co wiersz listy, więc zapisuje ją ta sama funkcja. Panel
+woła ją po wysyłce odpowiedzi i po werdykcie, zamiast czekać trzy minuty na
+takt — a najbardziej liczy się to przy wysyłce niejednoznacznej, bo pasek
+odsyłał wtedy do Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
+Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik się rozjechał.
+
+Nowy `[WERYFIKUJ]`: w jakiej KOLEJNOŚCI Allegro oddaje wiadomości rozmowy. Przy
+liście spraw specyfikacja mówi „ordered by descending opened date", przy `/chat`
+nie mówi nic — a to rozstrzyga, co widzi agent przy rozmowie uciętej
+bezpiecznikiem. Z listy niewiadomych zeszło za to pytanie, czy rozmowa mieści
+się w stu wiadomościach: przestało mieć znaczenie.
+
+Poza zakresem zostają załączniki WYCHODZĄCE (`POST /sale/issues/attachments`
+plus `PUT`). To nie przeoczenie: decyzja właściciela z 7 września brzmiała „sam
+tekst", a odwrócenie jej jest jego, nie moje. Wzorzec stoi gotowy w skrzynce
+od 0.195.0 — brakuje decyzji, nie kodu.
+
+---
+
+
+## 0.272.0 — 11 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Znacznik czasu traci sekundy.** Ustalenie **13** z audytu. `czas()` oddawał
+„10.09.2026, 14:23:05" we wszystkich **52 wywołaniach**, bo
+`toLocaleString("pl")` bez opcji tak robi. Sekunda nie rozstrzyga w tym panelu
+niczego: ani kiedy klient napisał, ani kiedy przebiegła synchronizacja, ani
+kiedy hala oddała pomiar.
+
+**Kod wiedział o tym przed audytem i radził sobie najgorszym sposobem.** Trzy
+miejsca obcinały sekundy przez `czas(...).slice(-8, -3)` — wycinek liczony od
+KOŃCA sformatowanego napisu. To nie jest odczyt godziny, tylko zakład o to, ile
+znaków ma data. Zakład przestawał wychodzić dokładnie w chwili, w której `czas()`
+przestaje dawać sekundy: na „10.09.2026, 14:23" ten sam wycinek daje **„6, 14"**.
+Dlatego obie zmiany musiały wejść jednym wydaniem.
+
+Powstała `godzina()`, która pyta o godzinę wprost. Przy okazji znika `|| "—"`
+doklejane w trzech miejscach: wycinek z myślnika dawał pusty napis, więc
+zapasowa wartość mieszkała w wywołującym. Teraz mieszka w funkcji.
+
+**Promień kafelka równa się promieniowi bieżni minus jej wypełnienie.**
+Ustalenie **11**, i wyszło z niego coś innego, niż zapowiadał audyt. Audyt
+naliczył 215 zaokrągleń w pięciu wartościach i nazwał to rozrzutem. Rozrzutu
+nie ma — jest jedna reguła, spełniona raz na dwa miejsca.
+
+```
+przełącznik edytora   bieżnia rounded-lg p-0.5   8 − 2 = 6 px   rounded-md   ✓
+pasek nawigacji       bieżnia rounded-lg p-1     8 − 4 = 4 px   rounded-md   ✗
+```
+
+Zmierzone w przeglądarce: kafelek nawigacji miał 6 px przy współśrodkowych
+4 px, czyli **rozjeżdżał się z łukiem bieżni o 2 px w każdym rogu**. Po zmianie
+różnica wynosi zero. `rounded-md` nie jest odpadem do zamiecenia — jest
+poprawną wartością tam, gdzie odstęp bieżni wynosi 2 px.
+
+**Jedno pasmo alarmu udawało kartę.** `AlarmSynchronizacji` miało `rounded-xl`,
+czyli 12 px — promień `.card` z `index.css`. Pozostałych jedenaście pasm
+ostrzeżeń i błędów ma `rounded-lg` albo `rounded`. Wyrównane.
+
+**Ustalenie 12 jest puste i to też jest wynik.** Audyt zapowiadał „odstępy
+odstające". Arbitralnych `p-[…]`, `gap-[…]`, `m-[…]` i `mt-[…]` w `panel/src`
+jest **zero**. Wszystkie 22 wartości w nawiasach kwadratowych to wymiary
+i siatki — wysokości pól, progi czytelności, `grid-cols-[…]` — czyli rzeczy,
+których skala Tailwinda nie obejmuje. Nie ma czego naprawiać.
+
+**Nowy strażnik** `panel/src/Czas.test.ts` — pięć testów. Nikt nie kroi wyniku
+`czas()` nożyczkami, formatowanie daty nie powstaje poza `ui/index.tsx`,
+`czas()` nie oddaje sekund, `godzina()` oddaje samą godzinę, brak wartości to
+myślnik. Zwolnienie komentarzem `czas: <powód>` z progiem trzech wyrazów.
+
+**Strażnik bursztynu z 0.265.0 zapalił się przy tym wydaniu i miał rację.**
+Nowy komentarz o promieniu wepchnął znacznik zwolnienia `bursztyn:` poza okno
+sześciu linii — zwolnienie przestało sąsiadować z tym, co zwalnia. To nie była
+regresja barwy, tylko dryf komentarza, a bramka i tak go złapała. Kolejność
+komentarzy odwrócona: zwolnienie stoi najbliżej linii, której dotyczy.
+
+## 0.270.0 — 11 września 2026
+
+**Szkic podaje link do naszej oferty zamiast kazać klientowi szukać.**
+Właściciel, czytając szkic o presostacie: „model powinien proponować oferty,
+jeśli jest pewny linki do ofert". Szkic pisał wtedy „proszę o wyszukanie po
+nazwie albo po kodzie EAN" — zadawał klientowi pracę, którą mamy zrobioną.
+
+**Powód nie był w instrukcji modelu.** System nie miał katalogu własnych ofert.
+Tabela snapshotów zna wyłącznie aukcje, pod którymi ktoś kiedyś napisał, bo
+synchronizator dociąga tylko te, na które wskazuje wiadomość. Pytania „która
+nasza oferta sprzedaje tę kartotekę" nie zadawał nikt w całym repozytorium,
+więc model nie dostawał ani jednego adresu i podać go nie mógł.
+
+Od tego wydania układanie szkicu pyta Allegro o oferty po sygnaturze
+sprzedawcy. Parametr jest w specyfikacji tablicą, więc komplet kandydatów
+kosztuje **jedno** żądanie, a filtr statusu odsiewa aukcje wygaszone: link do
+zakończonej oferty jest gorszy od braku linku.
+
+**Katalogu ofert świadomie nie budujemy.** Trzeba by go odświeżać, a nieświeży
+produkuje linki do aukcji, których już nie ma, czyli dokładnie tę awarię,
+której ta funkcja ma zapobiec. Pytanie na żądanie wraca zawsze aktualne.
+
+Adres wchodzi do faktów jako osobny rodzaj i dwie nowe reguły mówią modelowi,
+co z nim zrobić: podaj go zamiast opisywać, jak szukać, i **nigdy nie składaj
+adresu samodzielnie**. Brak takiego faktu znaczy „nie wiemy o aktywnej
+aukcji", a nie „zgadnij" — twierdzenie, że aukcja istnieje, jest wtedy zakazane.
+
+Warunek działania: sygnatura na aukcji musi być równa symbolowi kartoteki. Jak
+bardzo jest, mówi karta „Pokrycie sygnatur" w ustawieniach.
+
+Odmowa Allegro, także limit, **nie przerywa szkicu**. To ostatnie żądanie na
+tej drodze, więc nie ma czego chronić przed pogłębieniem przerwy. Szkic bez
+linku jest wart tyle, ile był wart wczoraj; szkic, który nie powstał, nie jest
+wart nic.
+
+**Naprawiona bomba zegarowa z 0.268.0.** Test raportu skuteczności doboru miał
+w sobie zaszytą datę: przechodził w dniu napisania i wywrócił się nazajutrz,
+bo raport liczy okno od teraz, a test od stałej. Znaczniki idą odtąd od
+bieżącego czasu. Reguła na przyszłość stoi w komentarzu: test raportu z oknem
+czasowym nie ma prawa znać ani jednej konkretnej daty.
+
+## 0.269.0 — 10 września 2026
+
+**Zwrot zostawia ślad w dwóch miejscach, w których dotąd milczał.** Właściciel
+wybrał obie rzeczy z listy otwartych luk: ślad po przelewie przy pobraniu
+i ślad rozłożenia na osi zwrotu.
+
+### Pobranie: wypłata przestaje być tylko wyciągiem bankowym
+
+Przy pobraniu klient nigdy nie zapłacił Allegro, więc Allegro nie ma czego
+oddawać — pieniądze wracają przelewem z banku firmy. Panel mówił o tym zdaniem
+od 0.190.0 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka
+Allegro, więc zwrot domykał się korektą BEZ zapisu, czy klient dostał
+pieniądze. W kolejce klient bez wypłaty wyglądał tak samo jak rozliczony,
+a przy sporze odpowiedź „oddaliśmy" nie miała się o co oprzeć.
+
+Pasek pieniędzy dostaje ZAPISZ PRZELEW: data, imię i numer, po którym da się
+przelew znaleźć w banku. Numer jest opcjonalny, bo bywa znany dopiero
+z wyciągu — wymóg kazałby wpisać cokolwiek albo odłożyć zapis, czyli zostawić
+ten sam brak śladu.
+
+To NOTATKA o ruchu pieniędzy, nie sam ruch: aplikacja niczego nie wysyła.
+Dlatego wolno ją cofnąć — §25a.5 potwierdzeniem obwarowuje rzeczy
+nieodwracalne, a literówka w numerze odwracalna jest. Zapis nie patrzy na to,
+czy zwrot jest zamknięty: zamyka go korekta, a przelew idzie zwykle po niej.
+
+Dopóki śladu nie ma, wiersz kolejki niesie sygnał „przelew?" — świecący także
+na zwrocie zamkniętym, z tego samego powodu co niepotwierdzony przelew.
+Rekoncyliacja wypisuje taki zwrot po dobie od wyceny, zaraz za terminami
+ustawowymi: to pieniądze klienta, nie porządek w bazie.
+
+### Hala pisze na osi zwrotu
+
+Kosz wie, z której pozycji zwrotu wziął towar, od 0.192.0 — ale nikt nie czytał
+tego w drugą stronę. Rozłożenie zostawiało wyłącznie wpis w dzienniku, więc
+biuro patrzące na zwrot nie widziało ani tego, że towar wrócił na półkę, ani
+tego, że go w koszu nie było. Pytanie „gdzie leży ten towar" kończyło się
+w Subiekcie albo telefonem na halę.
+
+Odłożenie dopisuje teraz na oś zwrotu zdanie z adresem półki i kodem kosza,
+a pominięcie — zdanie z powodem, który podała hala. Reguła stoi w osobnym
+pliku (`services/zwrot-slad.ts`): rozkładanie jest pracą hali, oś zwrotu sprawą
+biura, a import całego serwisu zwrotów do modułu kolektora po jeden INSERT
+ciągnąłby za sobą pół aplikacji. Kosz bez zwrotu — z dokumentu MM albo karton —
+nie ma gdzie tego dopisać i milczy; brak osi nie jest awarią rozkładania.
+
+Licznik umowy tras POST: 22 → 24.
+
 ## 0.271.1 — 11 września 2026
 
 Formularz kompletacji i pakowania pozostaje zablokowany do zakończenia odczytu po zapisie.
@@ -124,6 +823,7 @@ tabelą. Mediana pojawia się od dwudziestu wyborów, a kolumny rankingowej nie
 ma żadnej: raport mówi, JAK ktoś pracuje, nie jak dobrze.
 
 Panel obsługi trzeba przebudować. Migracji nie ma.
+
 
 ## 0.267.0 — 10 września 2026
 

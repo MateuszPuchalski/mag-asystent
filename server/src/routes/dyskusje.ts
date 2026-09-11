@@ -6,12 +6,13 @@ import {
 } from "../services/reklamacje.js";
 import {
   licznikiDyskusji, listaDyskusji, szczegolDyskusji,
-  stempelProwadziDyskusje, zapiszNotatkeDyskusji,
+  cofnijNotatkeDyskusji, stempelProwadziDyskusje, zapiszNotatkeDyskusji,
 } from "../services/dyskusje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { poprosOZakonczenie } from "../services/dyskusja-zakonczenie.js";
 import { autoryzuj } from "../services/auth.js";
+import { trasyTagowSprawy } from "./tagi.js";
 
 /* ── Trasy dyskusji klienckich (0.245.0) ─────────────────────────────────────
    Bliźniak `routes/reklamacje.ts`, z trzema różnicami, i każda bierze się
@@ -58,9 +59,12 @@ function blad(reply: FastifyReply, e: unknown) {
   return reply.code(400).send({ error: (e as Error).message });
 }
 
-const autor = () => sesjaZadania()?.user.name ?? "?";
 
 export async function dyskusjeRoutes(app: FastifyInstance) {
+  /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
+     bo klucz jest tym samym wierszem tej samej tabeli. */
+  trasyTagowSprawy(app, "/api/obsluga/dyskusje");
+
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i reklamacjach. */
@@ -90,8 +94,11 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
+        /* Tożsamość, nie imię — powód przy tej samej trasie w reklamacjach. */
+        const s = sesjaZadania()!;
         return {
-          dyskusja: stempelProwadziDyskusje(db(), Number(req.params.id), autor(), req.body?.wersja),
+          dyskusja: stempelProwadziDyskusje(db(), Number(req.params.id),
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
         };
       } catch (e) { return blad(reply, e); }
     });
@@ -175,9 +182,26 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Pole `notatka` musi być tekstem albo `null`" });
       }
       try {
+        const s = sesjaZadania()!;
         return {
-          dyskusja: zapiszNotatkeDyskusji(
-            db(), Number(req.params.id), n ?? null, autor(), req.body?.wersja),
+          dyskusja: zapiszNotatkeDyskusji(db(), Number(req.params.id), n ?? null,
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
+        };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Cofnięcie ZMIANY notatki — powód przy tej samej trasie w reklamacjach.
+     Prośba o zakończenie drogi powrotnej NIE dostaje i dostać nie może:
+     idzie do kupującego i Allegro jej nie cofnie. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/dyskusje/:id/notatka/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        const s = sesjaZadania()!;
+        return {
+          dyskusja: cofnijNotatkeDyskusji(db(), Number(req.params.id),
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
         };
       } catch (e) { return blad(reply, e); }
     });

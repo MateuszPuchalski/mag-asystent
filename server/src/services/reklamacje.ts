@@ -1,6 +1,8 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
+import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
@@ -201,12 +203,34 @@ export interface WierszReklamacji {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0) — patrz `czat_urwany`. */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
+  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+     DWA ŹRÓDŁA I JEDNA ETYKIETA BYŁABY KŁAMSTWEM. `zrodlo: "zamowienie"`
+     znaczy `LineItem.boughtAt` z pełnego zamówienia — kanoniczna data zakupu.
+     `zrodlo: "sprawa"` znaczy `checkoutForm.createdAt` z ładunku reklamacji,
+     czyli moment złożenia koszyka; bywa wcześniejszy, gdy koszyk zbierano
+     kilka dni. Ekran nazywa je różnie, bo to różne zegary — blizna 0.121.0
+     wzięła się z nazwania jednego drugim. */
+  kupionoAt: string | null;
+  kupionoZrodlo: "zamowienie" | "sprawa" | null;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
   notatka: string | null;
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje — wystarcza mu wiedza, że jest do
+     czego wracać. Cofnięcie jest zamianą, więc drugie kliknięcie i tak
+     przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `null` w `werdykt` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
      panelem" i to jest informacja, nie brak. */
@@ -373,12 +397,24 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     zwrotWymagany,
     czatAktywny,
     wiadomosciIle: Number(w.wiadomosci_ile ?? 0),
+    czatUrwany: Number(w.czat_urwany ?? 0) === 1,
     ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     otwartoAt: String(w.otwarto_at),
+    kupionoAt: tekst(w.kupiono_at) ?? tekst(w.zamowienie_at),
+    kupionoZrodlo: tekst(w.kupiono_at) ? "zamowienie"
+      : tekst(w.zamowienie_at) ? "sprawa" : null,
     prowadzi: tekst(w.prowadzi),
+    prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
+    /* Puste, dopóki nie dołoży ich wołający. Tagi jadą OSOBNYM zapytaniem,
+       bo kolejka bierze je jednym strzałem dla całej listy — zapytanie
+       w mapowaniu wiersza dałoby jedno na sprawę. */
+    tagi: [],
     notatka: tekst(w.notatka),
+    notatkaAt: tekst(w.notatka_at),
+    notatkaPrzez: tekst(w.notatka_przez),
+    maPoprzedniaNotatke: tekst(w.notatka_poprzednia) !== null,
     werdykt,
     werdyktNazwa: werdykt ? (NAZWA_WERDYKTU[werdykt] ?? werdykt) : null,
     werdyktStatus,
@@ -437,16 +473,28 @@ export function listaReklamacji(
      otwartej sprawie (szczegół). */
   const wiersze = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol
+           k.tw_id, k.tw_symbol, zk.kupiono_at
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
+         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
+         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
+         własna retencja. Wtedy zostaje data z ładunku sprawy.
+         Backticków tu nie ma — blok stoi w literale szablonowym. */
+      LEFT JOIN zamowienie_klienta zk
+        ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
      WHERE r.typ = 'CLAIM'
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all() as Wiersz[];
-  return wiersze.map((w) => zWiersza(w, teraz));
+  const tagi = tagiWszystkichSpraw(database);
+  return wiersze.map((w) => {
+    const r = zWiersza(w, teraz);
+    r.tagi = tagi.get(r.id) ?? [];
+    return r;
+  });
 }
 
 export function licznikiKubelkow(lista: WierszReklamacji[]): Record<Kubelek, number> {
@@ -506,6 +554,11 @@ export interface SzczegolReklamacji {
   rozmowy: RozmowaZakupu[];
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
+  /* Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił.
+     Jedzie razem ze szczegółem, bo jest CZYTANIEM sprawy, a nie osobnym
+     ekranem — a drugie zapytanie przy każdym otwarciu byłoby kosztem bez
+     zysku (spraw w pracy są dziesiątki). */
+  karta: ReturnType<typeof kartaSprawy>;
 }
 
 /**
@@ -558,18 +611,26 @@ export function szczegolReklamacji(
      w rozmowie (0.221.0). */
   const w = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol
+           k.tw_id, k.tw_symbol, zk.kupiono_at
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
+         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
+         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
+         własna retencja. Wtedy zostaje data z ładunku sprawy.
+         Backticków tu nie ma — blok stoi w literale szablonowym. */
+      LEFT JOIN zamowienie_klienta zk
+        ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
      WHERE r.id=? AND r.typ = 'CLAIM'`).get(id) as Wiersz | undefined;
   /* Dyskusja pod tym identyfikatorem to dla TEGO ekranu brak, a nie sprawa
      bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
+  reklamacja.tagi = tagiSprawy(database, id);
   const konto = Number(w.channel_account_id);
 
   const { zwroty, rozmowy } = kontekstZamowienia(database, konto, reklamacja.orderId, teraz);
@@ -591,6 +652,7 @@ export function szczegolReklamacji(
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, kartoteka,
+    karta: kartaSprawy(database, id),
   };
 }
 
@@ -612,8 +674,10 @@ export function doZapisu(
   database: Db, id: number, wersja: number | undefined, typ: TypSprawy = "CLAIM",
 ) {
   const w = database.prepare(
-    "SELECT id, wersja, prowadzi FROM reklamacja_klienta WHERE id=? AND typ=?",
-  ).get(id, typ) as { id: number; wersja: number; prowadzi: string | null } | undefined;
+    "SELECT id, wersja, prowadzi, prowadzi_user_id FROM reklamacja_klienta WHERE id=? AND typ=?",
+  ).get(id, typ) as
+    { id: number; wersja: number; prowadzi: string | null; prowadzi_user_id: number | null }
+    | undefined;
   if (!w) throw new BladReklamacji(`${NAZWA_SPRAWY[typ]} ${id} nie istnieje`, 404);
   if (wersja !== undefined && Number(w.wersja) !== Number(wersja)) {
     throw new ReklamacjaConflict({ wersja: Number(w.wersja), prowadzi: w.prowadzi });
@@ -632,18 +696,27 @@ export function doZapisu(
  *
  * Ponowne kliknięcie ZDEJMUJE znacznik. Bez tego jedyną drogą wyjścia
  * z pomyłkowego przejęcia byłby cudzy werdykt.
+ *
+ * ZDEJMOWANIE ROZSTRZYGA TOŻSAMOŚĆ, NIE IMIĘ (0.278.0). Do tego wydania
+ * przełącznik porównywał łańcuchy, więc dwie osoby o tym samym imieniu
+ * zdejmowały sobie znacznik nawzajem — po cichu, bo objawem jest cudza sprawa
+ * we własnym kubełku. Wiersz zastany bez `prowadzi_user_id` (migracja nie
+ * umiała dopasować imienia) traktujemy jako CUDZY: zabranie sprawy jest
+ * odwracalne jednym kliknięciem, ciche zdjęcie cudzego znacznika nie.
  */
 export function stempelProwadzi(
-  database: Db, id: number, autor: string, wersja?: number,
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
 ): WierszReklamacji {
   return transaction(database, () => {
     const w = doZapisu(database, id, wersja);
-    const zdejmuje = w.prowadzi === autor;
+    const zdejmuje = w.prowadzi_user_id !== null && Number(w.prowadzi_user_id) === autor.id;
     database.prepare(`UPDATE reklamacja_klienta
-      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1
+      SET prowadzi=?, prowadzi_user_id=?, prowadzi_at=?, wersja=wersja+1
       WHERE id=? AND typ='CLAIM'`).run(
-      zdejmuje ? null : autor, zdejmuje ? null : new Date().toISOString(), id);
-    logEvent("reklamacja_prowadzi", autor, null, { id, zdjete: zdejmuje }, undefined, database);
+      zdejmuje ? null : autor.name, zdejmuje ? null : autor.id,
+      zdejmuje ? null : new Date().toISOString(), id);
+    logEvent("reklamacja_prowadzi", autor.name, null, { id, zdjete: zdejmuje },
+      autor.id, database);
     return zWiersza(
       database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
         .get(id) as Wiersz,
@@ -658,16 +731,87 @@ export function stempelProwadzi(
  * a `events` nie ma retencji i nie jest kasowane (§9 architektury).
  */
 export function zapiszNotatke(
-  database: Db, id: number, notatka: string | null, autor: string, wersja?: number,
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, wersja?: number,
 ): WierszReklamacji {
-  const wartosc = (notatka ?? "").trim() || null;
   return transaction(database, () => {
     doZapisu(database, id, wersja);
-    database.prepare(
-      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=? AND typ='CLAIM'",
-    ).run(wartosc, id);
-    logEvent("reklamacja_notatka", autor, null,
-      { id, znakow: wartosc?.length ?? 0 }, undefined, database);
+    pisanieNotatki(database, id, notatka, autor, "CLAIM", "reklamacja_notatka");
+    return zWiersza(
+      database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+        .get(id) as Wiersz,
+      Date.now());
+  })();
+}
+
+/**
+ * Zapis notatki wspólny dla reklamacji i dyskusji (0.280.0).
+ *
+ * POPRZEDNIA TREŚĆ ZOSTAJE NA WIERSZU, żeby zmianę dało się cofnąć. Notatka
+ * jest polem swobodnym, które nadpisuje ten, kto pisze ostatni — do tego
+ * wydania nie było jak odzyskać zdania skasowanego przez pomyłkę.
+ *
+ * Nazwa zdarzenia jest PARAMETREM, a nie wyliczeniem z `typ`: ślad audytowy ma
+ * mówić, z którego ekranu padło kliknięcie, i tę samą zasadę niesie
+ * `stempelProwadziDyskusje` od 0.245.0.
+ */
+export function pisanieNotatki(
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, typ: TypSprawy, zdarzenie: string,
+): void {
+  const wartosc = (notatka ?? "").trim() || null;
+  const w = database.prepare(
+    "SELECT notatka FROM reklamacja_klienta WHERE id=? AND typ=?")
+    .get(id, typ) as { notatka: string | null } | undefined;
+  database.prepare(`UPDATE reklamacja_klienta
+    SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+        wersja=wersja+1
+    WHERE id=? AND typ=?`)
+    .run(wartosc, w?.notatka ?? null, new Date().toISOString(), autor.name, autor.id, id, typ);
+  /* Do dziennika idzie DŁUGOŚĆ, nigdy treść — ani bieżąca, ani poprzednia.
+     `events` nie ma retencji (§9 architektury), a notatka bywa zdaniem
+     o kliencie. */
+  logEvent(zdarzenie, autor.name, null, { id, znakow: wartosc?.length ?? 0 },
+    autor.id, database);
+}
+
+/**
+ * Cofnięcie ZMIANY notatki — jeden szczebel, przez zamianę.
+ *
+ * Bieżąca treść ląduje w `notatka_poprzednia`, więc drugie kliknięcie wraca
+ * tam, gdzie było. Tabela historii dla pola, którego nikt nie audytuje, byłaby
+ * drugim miejscem na te same dane osobowe.
+ *
+ * `false` znaczy „nie ma do czego wracać" i NIE jest błędem: wiersz zastany
+ * sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej nie zapisywał.
+ */
+export function cofnijNotatkeSprawy(
+  database: Db, id: number, autor: { id: number; name: string },
+  typ: TypSprawy, zdarzenie: string,
+): boolean {
+  const w = database.prepare(
+    "SELECT notatka, notatka_poprzednia FROM reklamacja_klienta WHERE id=? AND typ=?")
+    .get(id, typ) as { notatka: string | null; notatka_poprzednia: string | null } | undefined;
+  if (!w || w.notatka_poprzednia === null) return false;
+  database.prepare(`UPDATE reklamacja_klienta
+    SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+        wersja=wersja+1
+    WHERE id=? AND typ=?`)
+    .run(w.notatka_poprzednia, w.notatka, new Date().toISOString(), autor.name, autor.id, id, typ);
+  logEvent(zdarzenie, autor.name, null,
+    { id, znakow: w.notatka_poprzednia.length }, autor.id, database);
+  return true;
+}
+
+/** Cofnięcie zmiany notatki przy REKLAMACJI. */
+export function cofnijNotatke(
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
+): WierszReklamacji {
+  return transaction(database, () => {
+    doZapisu(database, id, wersja);
+    if (!cofnijNotatkeSprawy(database, id, autor, "CLAIM", "reklamacja_notatka_cofnieta")) {
+      throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
+    }
     return zWiersza(
       database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
         .get(id) as Wiersz,

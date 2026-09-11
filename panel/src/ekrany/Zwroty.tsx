@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
@@ -11,6 +11,7 @@ import {
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
+  useZapiszPrzelew, useCofnijPrzelew,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -19,6 +20,8 @@ import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
 import { Koszyk } from "../zwroty/Koszyk";
 import { useSkaner } from "../skaner";
+import { SkrotyKlawiszy } from "../sprawy/Skroty";
+import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
@@ -33,6 +36,21 @@ import { useSkaner } from "../skaner";
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się
    od pierwszego wydania, a nie po dołożeniu zapisu.                        */
+
+/**
+ * Co robi klawisz w danym kubełku — jedna tabela dla paska i dla doktryny.
+ *
+ * Stoi TUTAJ, a nie przy `KUBELKI`: to jest wiedza EKRANU o jego własnym
+ * nasłuchu, a `KUBELKI` opisują kolejkę, którą czyta także `Kolejka.tsx`.
+ * Zmiana klawisza ma się rozjechać z paskiem najwyżej o jedną linijkę.
+ */
+const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
+  decyzja: [["P", "przyjmij"], ["O", "odrzuć"]],
+  ocena: [["S", "na stan"], ["U", "utylizacja"], ["Shift+S", "wszystkie na stan"]],
+  zwrot: [["Enter", "zapisz kwotę"]],
+  korekta: [["Enter", "zapisz numer korekty"]],
+  zamkniety: [["R", "cofnij korektę"]],
+};
 
 /* Krótkie etykiety do LICZNIKA. Pełne zdania pisze serwer i stoją przy
    pozycji (`Dowody`); tutaj muszą się zmieścić w jednym pasku, więc panel ma
@@ -195,6 +213,8 @@ export function Zwroty() {
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
   const synchronizuj = useSynchronizujZwroty();
+  const przelew = useZapiszPrzelew();
+  const cofnijPrzelew = useCofnijPrzelew();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
@@ -303,6 +323,80 @@ export function Zwroty() {
     if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
   };
 
+  /* Rejestr akcji dla klawiszy, które sięgają do stanu kolumny środkowej
+     (powód odmowy, zaznaczenie pozycji) — powód w `zwroty/klawisze.ts`. */
+  const akcje = useRef<AkcjeKlawiszy>({});
+
+  /**
+   * Wszystkie nieocenione pozycje „na stan" — jednym ruchem.
+   *
+   * PO KOLEI, NIE RÓWNOLEGLE, i z wersją oddaną przez poprzedni zapis: każda
+   * ocena podnosi wersję zwrotu, więc pięć żądań wysłanych naraz odbiłoby się
+   * od blokady optymistycznej i zostawiło zwrot oceniony w połowie. Błąd
+   * zatrzymuje pętlę i pokazuje się tą samą drogą co przy ocenie pojedynczej.
+   */
+  const wszystkieNaStan = async () => {
+    if (!zwrot) return;
+    let wersja = zwrot.wersja;
+    for (const p of zwrot.pozycje.filter((x) => !x.ocena)) {
+      const w = await ocena2.mutateAsync({ pozycjaId: p.id, ocena: "stan", wersja });
+      wersja = w.wersja;
+    }
+  };
+
+  /**
+   * Klawisze KUBEŁKA — tabela §25a.2 wreszcie z nasłuchem (0.284.0).
+   *
+   * Do 0.283.0 ekran rysował te litery przy przyciskach jako `<kbd>`, a żadna
+   * z nich nic nie robiła. Doktryna obiecywała przy tym, że „typowy zwrot to
+   * jeden klawisz" (§25a.3) — więc obietnicę składał i ekran, i dokument,
+   * a dotrzymywała jej wyłącznie mysz.
+   *
+   * Klawisz NIE JEST skrótem do wszystkiego: `O` otwiera pole powodu zamiast
+   * zapisywać odmowę, bo odmowa jest nieodwracalna (§25a.5). Utylizacja nie ma
+   * wariantu hurtowego z tego samego powodu.
+   */
+  const klawiszKubelka = (e: KeyboardEvent) => {
+    if (!zwrot || trwa) return;
+    const wersja = zwrot.wersja;
+    if (zwrot.kubelek === "decyzja") {
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        werdykt.mutate({ id: zwrot.id, decyzja: "przyjety", powod: null, wersja });
+      } else if (e.key === "o" || e.key === "O") {
+        e.preventDefault();
+        akcje.current.odmow?.();
+      }
+      return;
+    }
+    if (zwrot.kubelek === "ocena") {
+      /* WIELKA LITERA TO HURT — czyli `Shift+S`. Osobnego sprawdzania modyfikatora
+         nie ma po co pisać: przeglądarka oddaje tu gotowy znak. */
+      if (e.key === "S") { e.preventDefault(); void wszystkieNaStan().catch(() => {}); return; }
+      const ocena = e.key === "s" ? "stan" : e.key === "u" || e.key === "U" ? "utylizacja" : null;
+      if (!ocena) return;
+      /* PIERWSZA NIEOCENIONA, potem następna — kolejność z ekranu, więc klawisz
+         idzie tą samą drogą, którą wędruje wzrok. Przy zwrocie jednopozycyjnym
+         to dokładnie jeden klawisz, tak jak mówi §25a.3. */
+      const pozycja = zwrot.pozycje.find((x) => !x.ocena);
+      if (!pozycja) return;
+      e.preventDefault();
+      ocena2.mutate({ pozycjaId: pozycja.id, ocena, wersja });
+      return;
+    }
+    if (zwrot.kubelek === "zwrot" && e.key === "Enter") {
+      e.preventDefault();
+      akcje.current.zapiszKwote?.();
+      return;
+    }
+    /* `R` stoi przy numerze korekty, czyli na zwrocie ZAMKNIĘTYM — tam, gdzie
+       ekran rysuje ten klawisz od 0.162.0 (`Decyzje.tsx`). */
+    if (zwrot.korektaNumer && (e.key === "r" || e.key === "R")) {
+      e.preventDefault();
+      cofnijKorekte.mutate({ id: zwrot.id, wersja });
+    }
+  };
+
   /* Skróty idą TĄ SAMĄ drogą co czytnik (0.163.0). Dwa niezależne nasłuchy
      nie umiałyby się dogadać, który klawisz jest czyj — a numer listu
      `600000367616070023174201` zawiera wszystkie cyfry kubełków. */
@@ -313,6 +407,7 @@ export function Zwroty() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "7") przelacz(null);
+      else klawiszKubelka(e);
     },
   );
 
@@ -438,6 +533,13 @@ export function Zwroty() {
       {!pasujace && kubelek !== null && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
         {opis?.pytanie}
       </p>}
+      {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
+          rozpoznanie jest tańsze od pamiętania. Pasek pokazuje klawisze
+          OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
+          uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
+          Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
+      <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
+        dodatkowe={KLAWISZE_KUBELKA[kubelek ?? "wszystkie"] ?? []} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
@@ -455,11 +557,20 @@ export function Zwroty() {
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
                 operator zjechał na dziewiątą pozycję. */}
-            <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+            <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji} akcje={akcje}
+              /* KURSOR SCHODZI PO TYCH DWÓCH DECYZJACH, i tylko po nich
+                 (§25a.2). Odmowa i zapisany numer korekty WYPROWADZAJĄ zwrot
+                 z drabiny — nie ma przy nim następnego pytania, więc trzymanie
+                 go na ekranie kazałoby odklikać się z gotowej sprawy. Werdykt
+                 „przyjmij" i ocena zostawiają zwrot w pracy: kolumna środkowa
+                 pokazuje wtedy pytanie następnego kubełka i to jest cała
+                 droga, której operator ma nie szukać. */
               onWerdykt={(decyzja, powod) =>
-                werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja })}
+                werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja },
+                  { onSuccess: () => { if (decyzja === "odrzucony") idz(1); } })}
               onKorekta={(numer) =>
-                korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja })}
+                korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja },
+                  { onSuccess: () => idz(1) })}
               onCofnijKorekte={() =>
                 cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
               onCofnijKwote={() =>
@@ -471,11 +582,22 @@ export function Zwroty() {
                 patrzy, a nie o kolumnę dalej. */}
             {szczegol.data?.pieniadze && <Pieniadze
               stan={szczegol.data.pieniadze}
-              trwa={pieniadze.isPending || odmowaPlatnosci.isPending}
+              trwa={pieniadze.isPending || odmowaPlatnosci.isPending
+                || przelew.isPending || cofnijPrzelew.isPending}
               blad={bladPieniedzy}
               onZwroc={() => {
                 setBladPieniedzy("");
                 pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }}
+              onPrzelew={(referencja) => {
+                setBladPieniedzy("");
+                przelew.mutate({ id: zwrot.id, wersja: zwrot.wersja, referencja },
+                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+              }}
+              onCofnijPrzelew={() => {
+                setBladPieniedzy("");
+                cofnijPrzelew.mutate({ id: zwrot.id, wersja: zwrot.wersja },
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }}
               onOdmow={(kod, powod) => {
@@ -489,6 +611,7 @@ export function Zwroty() {
                   zaznaczenie pozycji i haczyk przy koszcie dostawy — a zapis
                   kwoty szedł z cudzymi identyfikatorami. */}
               <Pozycje key={zwrot.id} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+                akcje={akcje} onWszystkieNaStan={() => void wszystkieNaStan().catch(() => {})}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
                 onOcena={(pozycjaId, ocena) =>
                   ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}

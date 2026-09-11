@@ -1,6 +1,8 @@
 import React from "react";
 import { Send } from "lucide-react";
 import { Przycisk } from "../ui";
+import type { ZalacznikSzkicu } from "../api/rozmowy";
+import { PrzyciskZalacznika, ZalacznikiWysylki } from "../skrzynka/ZalacznikiWysylki";
 
 /* ── Edytor odpowiedzi w reklamacji (0.224.0) ────────────────────────────────
    OSOBNY komponent, nie `skrzynka/Edytor.tsx`, i to nie jest kopia z lenistwa.
@@ -22,10 +24,27 @@ export const LIMIT_ZNAKOW = 20_000;
 /** Od ilu znaków przed sufitem licznik przestaje być szary. */
 const PROG_OSTRZEZENIA = 500;
 
-export function Edytor({ tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij }: {
+export function Edytor({
+  tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij,
+  zalaczniki = [], dodajeZalacznik = false, bladZalacznika = "",
+  onDodajZalacznik, onUsunZalacznik,
+}: {
   tresc: string;
   wysyla: boolean;
   blad: string;
+  /* ── Załączniki wychodzące (0.274.0) ──────────────────────────────────────
+     KOMPONENT JEST TEN SAM CO W SKRZYNCE, nie kopia: decyzja właściciela
+     z 0.246.0 o wspólnym załączniku dotyczyła strony przychodzącej, a ta sama
+     racja obowiązuje po drugiej stronie. Spinacz i lista mają wyglądać
+     i zachowywać się identycznie, bo to ta sama czynność.
+
+     Propsy są OPCJONALNE, żeby dyskusja mogła wołać edytor bez plików, gdyby
+     kiedyś tego chciała — a nie żeby ktoś zapomniał ich podać. */
+  zalaczniki?: ZalacznikSzkicu[];
+  dodajeZalacznik?: boolean;
+  bladZalacznika?: string;
+  onDodajZalacznik?: (plik: File) => void;
+  onUsunZalacznik?: (id: number) => void;
   /** `false` znaczy, że Allegro nie przyjmie już wiadomości w tej sprawie. */
   czatAktywny: boolean;
   onZmiana: (v: string) => void;
@@ -54,7 +73,14 @@ export function Edytor({ tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij }:
 
     {blad && <p className="text-xs text-red-700">{blad}</p>}
 
+    {/* Lista dołożonych plików stoi PRZY wiadomości, którą się komponuje —
+        pokazuje rzeczy, które naprawdę są już u Allegro. */}
+    {onUsunZalacznik && <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
+      onUsun={onUsunZalacznik} wylaczone={wysyla} />}
+
     <div className="flex items-center gap-2">
+      {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
+        onDodaj={onDodajZalacznik} wylaczone={wysyla} />}
       {/* Licznik mówi, dopiero gdy ma co powiedzieć. Kolor przy progu, a nie
           zawsze — czerwony napis stojący cały czas przestaje być czytany. */}
       <span className={`text-xs tabular-nums ${

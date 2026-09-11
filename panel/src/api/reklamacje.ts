@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
+import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
+  KartaSprawy,
   KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
@@ -11,6 +13,7 @@ import type {
 export const kluczeReklamacji = {
   kolejka: ["reklamacje"] as const,
   reklamacja: (id: number) => ["reklamacja", id] as const,
+  zalacznikiWysylki: (id: number) => ["reklamacja-zalaczniki-wysylki", id] as const,
 };
 
 export function useReklamacje() {
@@ -75,6 +78,27 @@ export function useNotatka() {
     mutationFn: (v: { id: number; notatka: string | null; wersja: number }) =>
       api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka`,
         { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
+  });
+}
+
+/**
+ * Cofnięcie ZMIANY notatki (0.280.0).
+ *
+ * §25a.5: cofnięcie zamiast potwierdzenia. Notatka jest jedynym zapisem w tym
+ * module, który zostaje wyłącznie u nas i niczego nie obiecuje kupującemu —
+ * dlatego jako jedyny dostaje drogę powrotną. Werdykt, odpowiedź i stanowisko
+ * o towarze cofnięcia nie dostaną: Allegro ich nie cofnie.
+ */
+export function useCofnijNotatke() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
@@ -178,5 +202,85 @@ export function useZwrotTowaru() {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
     },
+  });
+}
+
+/**
+ * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+ *
+ * Do 0.272.0 świeży stan sprawy dawał wyłącznie pełny przebieg listy, czyli
+ * takt trzech minut. Agent, który właśnie wysłał odpowiedź albo werdykt,
+ * patrzy na ekran TERAZ — i najbardziej wtedy, gdy wysyłka skończyła się
+ * niejednoznacznie: jedno żądanie rozstrzyga to, po co pasek odsyłał do
+ * Centrum Sprzedaży.
+ *
+ * Błędu NIE pokazujemy jako porażki działania agenta: odświeżenie jest
+ * dopiskiem do tego, co się właśnie udało, więc odmowa Allegro ma zostawić
+ * ekran w spokoju i poczekać na takt.
+ */
+export function useOdswiez() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<SzczegolReklamacji>(`/api/obsluga/reklamacje/${v.id}/odswiez`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+    },
+  });
+}
+
+/* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ─────────────────────────
+   Kształt `ZalacznikSzkicu` jest wspólny ze skrzynką i to nie przypadek:
+   ekran rysuje je TYM SAMYM komponentem (`skrzynka/ZalacznikiWysylki.tsx`),
+   zgodnie z decyzją właściciela z 0.246.0 o wspólnym załączniku.            */
+
+export function useZalacznikiSprawy(id: number | null) {
+  return useQuery({
+    queryKey: kluczeReklamacji.zalacznikiWysylki(id ?? 0),
+    queryFn: () => api<{ zalaczniki: ZalacznikSzkicu[] }>(
+      `/api/obsluga/reklamacje/${id}/zalaczniki-wysylki`),
+    enabled: id !== null,
+  });
+}
+
+export function useDodajZalacznikSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; nazwa: string; typ: string; dane: string }) =>
+      api<ZalacznikSzkicu>(`/api/obsluga/reklamacje/${v.id}/zalaczniki-wysylki`, {
+        method: "POST",
+        body: JSON.stringify({ nazwa: v.nazwa, typ: v.typ, dane: v.dane }),
+      }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) }),
+  });
+}
+
+export function useUsunZalacznikSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zalacznikId: number }) =>
+      api(`/api/obsluga/reklamacje/${v.id}/zalaczniki-wysylki/${v.zalacznikId}`,
+        { method: "DELETE" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) }),
+  });
+}
+
+/**
+ * Rozpoznanie sprawy przez Copilota (0.275.0).
+ *
+ * Kliknięcie JAWNE, nigdy przy otwarciu ekranu: żądanie kosztuje pieniądze
+ * u dostawcy, a karta jest pomocą w czytaniu, nie warunkiem pracy.
+ */
+export function useRozpoznaj() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ karta: KartaSprawy }>(`/api/obsluga/reklamacje/${v.id}/rozpoznaj`,
+        { method: "POST" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
   });
 }

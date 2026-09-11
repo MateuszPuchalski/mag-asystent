@@ -8,13 +8,19 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/skrzynka.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji,
-  ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
+  cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
-import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
+import {
+  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
+} from "../services/reklamacje-zalaczniki.js";
+import { nadawcaRozpoznaniaAnthropic } from "../adapters/copilot.anthropic.js";
+import { rozpoznajSprawe } from "../services/copilot-reklamacja.js";
+import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
 import { autoryzuj } from "../services/auth.js";
+import { trasyTagowSprawy } from "./tagi.js";
 import { bladPobrania } from "./pobranie.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
@@ -60,7 +66,28 @@ function blad(reply: FastifyReply, e: unknown) {
 
 const autor = () => sesjaZadania()?.user.name ?? "?";
 
+/** Autor mutacji: numer do śladu i do tożsamości, imię do zdania na ekranie. */
+const kto = () => {
+  const s = sesjaZadania()!;
+  return { id: s.user.userId, name: s.user.name };
+};
+
+/** Jedno zdanie o tym, dlaczego Copilota nie ma — pisze je SERWER (§21). */
+function czemuCopilotWylaczony(): string | null {
+  if (config.copilot.mode === "off") {
+    return "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).";
+  }
+  if (!config.copilot.klucz) {
+    return "Copilot nie ma klucza. Ustaw ANTHROPIC_API_KEY w wertis.env i zrestartuj usługę.";
+  }
+  return null;
+}
+
 export async function reklamacjeRoutes(app: FastifyInstance) {
+  /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
+     bo klucz jest tym samym wierszem tej samej tabeli. */
+  trasyTagowSprawy(app, "/api/obsluga/reklamacje");
+
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i z tego samego powodu. */
@@ -100,6 +127,38 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       return szczegolReklamacji(db(), Number(req.params.id));
     } catch (e) { return blad(reply, e); }
   });
+
+  /**
+   * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+   *
+   * ZAPIS, który u nas niczego nie postanawia: dociąga cudzy stan i tyle.
+   * Stoi tu, bo `GET` z takim skutkiem ubocznym łamałby regułę „zero zapisu
+   * przy patrzeniu" ciszej, niż gdyby ją łamał jawnie — a przeglądarka wolno
+   * powtarza `GET`-y i sama je wstępnie pobiera.
+   *
+   * Powód istnienia: po wysyłce odpowiedzi albo werdyktu stan sprawy po
+   * stronie Allegro zmieniał się dopiero z pełnym przebiegiem, czyli za
+   * trzy minuty. Agent patrzy na ekran teraz.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/odswiez", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const id = Number(req.params.id);
+      try {
+        if (!await odswiezSprawe(id)) {
+          return reply.code(404).send({ error: "Nie znaleziono reklamacji" });
+        }
+        logEvent("reklamacja_odswiezenie", autor(), null, { id });
+        return szczegolReklamacji(db(), id);
+      } catch (e) {
+        /* Zdanie z adaptera mówi, co naprawić — token, uprawnienie, limit. */
+        return reply.code(502).send({ error: (e as Error).message });
+      }
+    });
 
   /**
    * Pobranie załącznika PRZEZ NAS.
@@ -216,12 +275,96 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
      `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
+  /**
+   * Copilot reklamacyjny: karta faktów ze sprawy (0.275.0).
+   *
+   * ZBIERA DANE, NIE RADZI — i to jest cała treść tej trasy. Werdykt stoi
+   * osobno, za `autoryzuj()` i za jawną zgodą; gdyby maszyna miała cokolwiek
+   * do powiedzenia o rozstrzygnięciu, byłby to ten sam przycisk, a nie ten.
+   *
+   * Zapisem jest, bo zapisuje kartę i wiersz w księdze Copilota. Dlaczego
+   * `POST`, a nie `GET` mimo braku decyzji człowieka: żądanie KOSZTUJE
+   * pieniądze u dostawcy, a przeglądarka powtarza i wstępnie pobiera `GET`-y
+   * bez pytania. Rachunek za odruch nawigacji byłby złym sposobem, żeby się
+   * o tym dowiedzieć.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/rozpoznaj", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const powod = czemuCopilotWylaczony();
+      if (powod) return reply.code(400).send({ error: powod });
+      const s = sesjaZadania()!;
+      try {
+        const karta = await rozpoznajSprawe({
+          reklamacjaId: Number(req.params.id),
+          kto: { id: s.user.userId, name: s.user.name },
+          nadaj: nadawcaRozpoznaniaAnthropic,
+        });
+        return { karta };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
+     Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
+     `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
+     Multipart wymagałby wtyczki Fastify dla jednej trasy.
+
+     Odczyt listy nie jest zapisem, więc idzie GET-em i niczego nie mutuje. */
+  app.get<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      return { zalaczniki: zalacznikiDoWyslania(db(), Number(req.params.id)) };
+    });
+
+  app.post<{ Params: { id: string }; Body: { nazwa?: string; typ?: string; dane?: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      try {
+        /* `Buffer.from(..., "base64")` MILCZY przy śmieciach — oddaje krótszy
+           bufor zamiast rzucić. Pusty wynik przy niepustym wejściu znaczy
+           więc „to nie jest base64", i tak trzeba to nazwać. */
+        const surowe = String(req.body?.dane ?? "");
+        const dane = Buffer.from(surowe, "base64");
+        if (surowe.length > 0 && dane.byteLength === 0) {
+          throw new Error("Treść pliku nie jest poprawnym base64");
+        }
+        return await dodajZalacznikSprawy({
+          reklamacjaId: Number(req.params.id),
+          nazwa: String(req.body?.nazwa ?? ""),
+          typ: String(req.body?.typ ?? ""),
+          dane,
+          autor: { id: s.user.userId, name: s.user.name },
+        });
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.delete<{ Params: { id: string; zid: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki/:zid", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      const zdjety = usunZalacznikSprawy(db(), Number(req.params.id), Number(req.params.zid),
+        { id: s.user.userId, name: s.user.name });
+      if (!zdjety) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
+      return { ok: true };
+    });
+
   app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
     "/api/obsluga/reklamacje/:id/prowadze", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        return { reklamacja: stempelProwadzi(db(), Number(req.params.id), autor(), req.body?.wersja) };
+        /* Znacznik bierze TOŻSAMOŚĆ, nie samo imię (0.278.0): po niej
+           rozstrzyga się zdjęcie własnego znacznika i filtr „Moje". */
+        const s = sesjaZadania()!;
+        return {
+          reklamacja: stempelProwadzi(db(), Number(req.params.id),
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
+        };
       } catch (e) { return blad(reply, e); }
     });
 
@@ -331,8 +474,22 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       }
       try {
         return {
-          reklamacja: zapiszNotatke(db(), Number(req.params.id), n ?? null, autor(), req.body?.wersja),
+          reklamacja: zapiszNotatke(db(), Number(req.params.id), n ?? null, kto(),
+            req.body?.wersja),
         };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Cofnięcie ZMIANY notatki — §25a.5, cofnięcie zamiast potwierdzenia.
+     Notatka jest polem swobodnym, które nadpisuje ten, kto pisze ostatni;
+     to jedyny zapis w tym module z drogą powrotną, bo jako jedyny zostaje
+     wyłącznie u nas i niczego nie obiecuje kupującemu. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/reklamacje/:id/notatka/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return { reklamacja: cofnijNotatke(db(), Number(req.params.id), kto(), req.body?.wersja) };
       } catch (e) { return blad(reply, e); }
     });
 }

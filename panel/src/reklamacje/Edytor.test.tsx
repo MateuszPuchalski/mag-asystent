@@ -82,4 +82,27 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     render(<Edytor {...props({ blad: "Allegro zamknęło rozmowę w tej sprawie" })} />);
     expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
   });
+
+  it("spinacz i lista plików są TYM SAMYM komponentem co w skrzynce (0.274.0)", async () => {
+    /* Decyzja właściciela z 0.246.0 o wspólnym załączniku dotyczyła strony
+       przychodzącej; ta sama racja obowiązuje po drugiej stronie. Ta sama
+       czynność ma wyglądać i zachowywać się identycznie na obu ekranach. */
+    const onDodajZalacznik = vi.fn();
+    const onUsunZalacznik = vi.fn();
+    render(<Edytor {...props({
+      zalaczniki: [{ id: 4, allegroId: "att-1", nazwa: "nowy-noz.jpg",
+        typ: "image/jpeg", rozmiar: 2048, dodal: "Ala" }],
+      onDodajZalacznik, onUsunZalacznik,
+    })} />);
+
+    expect(screen.getByText("nowy-noz.jpg")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wybierz plik do odpowiedzi")).toBeInTheDocument();
+  });
+
+  it("bez obsługi plików edytor NIE pokazuje spinacza — obietnica bez pokrycia", () => {
+    /* Ten sam wzorzec co przy zamkniętej rozmowie: czego nie da się zrobić,
+       tego nie ma na ekranie. */
+    render(<Edytor {...props()} />);
+    expect(screen.queryByLabelText("Wybierz plik do odpowiedzi")).not.toBeInTheDocument();
+  });
 });

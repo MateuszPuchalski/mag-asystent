@@ -37,7 +37,7 @@ const { Czat } = await import("./Czat");
 /* Czat czyta ze sprawy TRZY pola i tyle bierze — od 0.245.0 ten sam komponent
    rysuje dyskusję, która nie ma ani powodu, ani oferty, ani terminu. */
 const sprawa = (n: Partial<React.ComponentProps<typeof Czat>["sprawa"]> = {}) => ({
-  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu", wiadomosciIle: 1, ...n,
+  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu", wiadomosciIle: 1, czatUrwany: false, ...n,
 });
 
 const zal = (id: number, nazwa: string, podglad: boolean): ZalacznikReklamacji =>
@@ -105,6 +105,23 @@ describe("Oś rozmowy reklamacyjnej", () => {
     scena.obrazy = {};
     render(<Czat sprawa={sprawa({ wiadomosciIle: 5 })} zalaczniki={[]} czat={[wiad()]} />);
     expect(screen.getByText(/Ta rozmowa jest niepełna/)).toBeInTheDocument();
+  });
+
+  it("urwana rozmowa NIE obiecuje, że reszta dojdzie sama (0.273.0)", () => {
+    /* Dwa powody niepełnej rozmowy i dwa różne zdania. Do 0.272.0 stało tu
+       jedno — „Reszta dojdzie następną synchronizacją" — i przy rozmowie
+       urwanej naszym bezpiecznikiem stron było nieprawdą: po drugą stronę
+       rozmowy nikt nie szedł, więc nie dochodziła nigdy. */
+    scena.obrazy = {};
+    const { rerender } = render(
+      <Czat sprawa={sprawa({ wiadomosciIle: 900 })} zalaczniki={[]} czat={[wiad()]} />);
+    expect(screen.getByText(/Reszta dojdzie następną synchronizacją/)).toBeInTheDocument();
+
+    rerender(
+      <Czat sprawa={sprawa({ wiadomosciIle: 900, czatUrwany: true })}
+        zalaczniki={[]} czat={[wiad()]} />);
+    expect(screen.queryByText(/Reszta dojdzie następną synchronizacją/)).not.toBeInTheDocument();
+    expect(screen.getByText(/przeczytasz w Centrum Sprzedaży/)).toBeInTheDocument();
   });
 
   it("edytor jest WSTRZYKIWANY i stoi POD rozmową, a nie nad nią", () => {

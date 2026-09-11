@@ -32,6 +32,7 @@ import { copilotRoutes } from "./routes/copilot.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
 import { reklamacjeRoutes } from "./routes/reklamacje.js";
 import { dyskusjeRoutes } from "./routes/dyskusje.js";
+import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
@@ -333,6 +334,7 @@ export async function buildApp() {
   await app.register(zwrotyRoutes);
   await app.register(reklamacjeRoutes);
   await app.register(dyskusjeRoutes);
+  await app.register(tagiRoutes);
   await app.register(ustawieniaRoutes);
   await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);

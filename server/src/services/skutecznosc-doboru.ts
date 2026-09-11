@@ -120,10 +120,30 @@ export interface SkutecznoscDoboru {
   podstawaPrawna: string;
 }
 
-interface ZdarzenieWyboru {
+/**
+ * Punkt w księdze: znacznik ORAZ numer wiersza.
+ *
+ * Sam znacznik nie wystarcza. `created_at` ma rozdzielczość milisekundy,
+ * a `wybierzKandydata` i `ustawStatusDoboru` piszą po kilka wierszy w jednym
+ * przebiegu — remis jest tu regułą, nie wyjątkiem. `events.id` to
+ * `INTEGER PRIMARY KEY AUTOINCREMENT`: jedyny w tej tabeli porządek ściśle
+ * rosnący i bez ponownego użycia, więc to on rozstrzyga remis.
+ */
+interface Chwila {
+  at: string;
+  id: number;
+}
+
+/* `at` to ISO o stałej szerokości, więc porównanie tekstowe jest
+   chronologicznym — to samo założenie, na którym stoi `ORDER BY created_at`
+   w obu zapytaniach niżej. `id` porównujemy OSTRO, bo wybór i zmiana statusu
+   nigdy nie dzielą wiersza, a zdarzenie nie poprzedza samo siebie. */
+const wczesniej = (a: Chwila, b: Chwila) =>
+  a.at < b.at || (a.at === b.at && a.id < b.id);
+
+interface ZdarzenieWyboru extends Chwila {
   conversationId: number;
   droga: DrogaDoboru | null;
-  at: string;
   userRef: number | null;
   osoba: string;
 }
@@ -138,41 +158,52 @@ export function skutecznoscDoboru(
   const wybory = (database.prepare(
     `SELECT CAST(json_extract(e.payload,'$.conversationId') AS INTEGER) AS rozmowa,
             json_extract(e.payload,'$.droga') AS droga,
-            e.created_at AS at, e.user_ref AS uref,
+            e.id AS id, e.created_at AS at, e.user_ref AS uref,
             COALESCE(u.name, e.user_id) AS osoba
      FROM events e LEFT JOIN app_user u ON u.user_id = e.user_ref
      WHERE e.type=? AND e.created_at >= ${GRANICA} AND json_valid(e.payload)
        AND json_extract(e.payload,'$.conversationId') IS NOT NULL
      ORDER BY e.created_at, e.id`).all(WYBOR, okno) as
-    Array<{ rozmowa: number; droga: string | null; at: string; uref: number | null; osoba: string }>)
+    Array<{ rozmowa: number; id: number; droga: string | null; at: string;
+            uref: number | null; osoba: string }>)
     .map((r): ZdarzenieWyboru => ({
-      conversationId: Number(r.rozmowa),
+      conversationId: Number(r.rozmowa), id: Number(r.id),
       droga: DROGI_DOBORU.includes(r.droga as DrogaDoboru) ? r.droga as DrogaDoboru : null,
       at: String(r.at), userRef: r.uref == null ? null : Number(r.uref), osoba: String(r.osoba),
     }));
 
   /* Zatwierdzenia liczymy z PRZEJŚĆ statusu, nie ze stanu tabeli: `po='confirmed'`
      zdarzyło się i zostaje w księdze, choćby agent potem zmienił zdanie. */
-  const zatwierdzenia = new Map<number, string[]>();
+  const zatwierdzenia = new Map<number, Chwila[]>();
   for (const r of database.prepare(
-    `SELECT CAST(json_extract(payload,'$.conversationId') AS INTEGER) AS rozmowa, created_at AS at
+    `SELECT CAST(json_extract(payload,'$.conversationId') AS INTEGER) AS rozmowa,
+            id AS id, created_at AS at
      FROM events
      WHERE type=? AND created_at >= ${GRANICA} AND json_valid(payload)
        AND json_extract(payload,'$.po')='confirmed'
-     ORDER BY created_at, id`).all(STATUS, okno) as Array<{ rozmowa: number; at: string }>) {
-    const id = Number(r.rozmowa);
-    zatwierdzenia.set(id, [...(zatwierdzenia.get(id) ?? []), String(r.at)]);
+     ORDER BY created_at, id`).all(STATUS, okno) as
+    Array<{ rozmowa: number; id: number; at: string }>) {
+    const rozmowa = Number(r.rozmowa);
+    zatwierdzenia.set(rozmowa,
+      [...(zatwierdzenia.get(rozmowa) ?? []), { at: String(r.at), id: Number(r.id) }]);
   }
 
   /* Zatwierdzenie kredytuje WYŁĄCZNIE wybór bezpośrednio je poprzedzający.
      Agent, który wziął kandydata z pełnego tekstu, zmienił zdanie na trafienie
      po OEM i dopiero to zatwierdził, nie ma prawa dopisać punktu pełnemu
-     tekstowi — a tak liczyłby każdy prostszy sposób. */
+     tekstowi — a tak liczyłby każdy prostszy sposób.
+
+     „Poprzedzający" idzie po PARZE (at, id), nie po samym znaczniku. Po samym
+     `at` remis milisekundy przewracał tę regułę do góry nogami: `w.at <= chwila`
+     było prawdziwe także dla wyboru zapisanego PO zatwierdzeniu, a `.reverse()`
+     stawiało go pierwszym — kredyt szedł do drogi, która zatwierdzenia nie
+     poprzedzała. Wychodziło to migotaniem testu raz na kilka przebiegów, więc
+     na produkcji nie wyszłoby wcale. */
   const trafione = new Set<ZdarzenieWyboru>();
   for (const [rozmowa, chwile] of zatwierdzenia) {
     const wTejRozmowie = wybory.filter((w) => w.conversationId === rozmowa);
     for (const chwila of chwile) {
-      const poprzedzajacy = [...wTejRozmowie].reverse().find((w) => w.at <= chwila);
+      const poprzedzajacy = [...wTejRozmowie].reverse().find((w) => wczesniej(w, chwila));
       if (poprzedzajacy) trafione.add(poprzedzajacy);
     }
   }

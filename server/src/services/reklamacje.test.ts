@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
   adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, kubelek,
-  licznikiKubelkow, listaReklamacji, ReklamacjaConflict, stempelProwadzi, sygnaly,
+  cofnijNotatke, licznikiKubelkow, listaReklamacji, ReklamacjaConflict, stempelProwadzi, sygnaly,
   szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
@@ -17,10 +17,24 @@ const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "ut
 
 const TERAZ = Date.parse("2026-09-07T12:00:00.000Z");
 
+/** Trzy konta biura; ALA i ALA_IMIENNICZKA mają TO SAMO imię i różne numery. */
+const ALA = { id: 1, name: "A. Lewandowska" };
+const MAREK = { id: 2, name: "M. Wójcik" };
+const ALA_IMIENNICZKA = { id: 3, name: "A. Lewandowska" };
+
 function stanowisko() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
   migrate(d);
+  /* Konta PRZED sprawami: od 0.278.0 znacznik „prowadzę" niesie `user_id`,
+     a klucz obcy nie wybacza. Dwie Ale stoją tu celowo — to jest scenariusz,
+     dla którego kolumna w ogóle powstała. */
+  for (const [uid, login, imie] of [
+    [1, "ala", "A. Lewandowska"], [2, "marek", "M. Wójcik"], [3, "ala2", "A. Lewandowska"],
+  ] as Array<[number, string, string]>) {
+    d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (?,?,?,'biuro')")
+      .run(uid, login, imie);
+  }
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
     .run().lastInsertRowid);
@@ -129,15 +143,15 @@ test("„prowadzę” jest ZNACZNIKIEM: drugie kliknięcie tej samej osoby je zd
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
 
-  const po = stempelProwadzi(d, id, "A. Lewandowska");
+  const po = stempelProwadzi(d, id, ALA);
   assert.equal(po.prowadzi, "A. Lewandowska");
   assert.equal(po.wersja, 2, "każda mutacja podnosi wersję");
 
-  const zdjete = stempelProwadzi(d, id, "A. Lewandowska");
+  const zdjete = stempelProwadzi(d, id, ALA);
   assert.equal(zdjete.prowadzi, null, "droga wyjścia z pomyłkowego przejęcia");
 
   /* Kolega bierze sprawę po sobie — to znacznik, nie zamek, więc przechodzi. */
-  const kolega = stempelProwadzi(d, id, "M. Wójcik");
+  const kolega = stempelProwadzi(d, id, MAREK);
   assert.equal(kolega.prowadzi, "M. Wójcik");
 
   const slad = zdarzenia(d, "reklamacja_prowadzi");
@@ -145,11 +159,44 @@ test("„prowadzę” jest ZNACZNIKIEM: drugie kliknięcie tej samej osoby je zd
   assert.equal(slad[0].user_id, "A. Lewandowska");
 });
 
+test("imienniczka NIE zdejmuje cudzego znacznika — cała racja bytu kolumny", () => {
+  /* To jest błąd, którego do 0.278.0 nie dało się zauważyć. Przełącznik
+     porównywał IMIONA, więc druga A. Lewandowska klikała „prowadzę" i zamiast
+     wziąć sprawę — zdejmowała znacznik pierwszej. Bez komunikatu, bez śladu
+     w oczach obu, a objawem była sprawa znikająca z cudzego kubełka. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+
+  stempelProwadzi(d, id, ALA);
+  const po = stempelProwadzi(d, id, ALA_IMIENNICZKA);
+
+  assert.equal(po.prowadzi, "A. Lewandowska", "imię na ekranie zostaje to samo");
+  assert.equal(po.prowadziId, ALA_IMIENNICZKA.id, "ale sprawę ma teraz DRUGA Ala");
+
+  /* I dopiero ONA ją zdejmuje — pierwsza Ala już nie ma czego zdejmować. */
+  assert.equal(stempelProwadzi(d, id, ALA).prowadziId, ALA.id,
+    "kliknięcie pierwszej Ali BIERZE sprawę, a nie zdejmuje cudzy znacznik");
+});
+
+test("wiersz zastany bez tożsamości traktujemy jak CUDZY, nie jak własny", () => {
+  /* Migracja nie dopasowała imienia (dwa konta, jedno imię), więc znacznik
+     został z samym `prowadzi`. Kliknięcie ma wtedy ZABRAĆ sprawę, bo zabranie
+     cofa się jednym kliknięciem, a ciche zdjęcie cudzego znacznika nie. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare(`UPDATE reklamacja_klienta
+    SET prowadzi='A. Lewandowska', prowadzi_user_id=NULL WHERE id=?`).run(id);
+
+  const po = stempelProwadzi(d, id, ALA);
+  assert.equal(po.prowadziId, ALA.id, "bierze sprawę");
+  assert.equal(po.prowadzi, "A. Lewandowska");
+});
+
 test("notatka zapisuje się, a do dziennika idzie DŁUGOŚĆ, nie treść", () => {
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
 
-  const po = zapiszNotatke(d, id, "  klient dzwonił, oddzwonić w piątek  ", "A. Lewandowska");
+  const po = zapiszNotatke(d, id, "  klient dzwonił, oddzwonić w piątek  ", ALA);
   assert.equal(po.notatka, "klient dzwonił, oddzwonić w piątek");
 
   const slad = zdarzenia(d, "reklamacja_notatka");
@@ -160,15 +207,69 @@ test("notatka zapisuje się, a do dziennika idzie DŁUGOŚĆ, nie treść", () =
     "treść notatki nie ma prawa trafić do `events` — ta tabela nie ma retencji");
 
   /* Pusta notatka ZDEJMUJE wpis, a nie zapisuje pustego łańcucha. */
-  assert.equal(zapiszNotatke(d, id, "   ", "A. Lewandowska").notatka, null);
+  assert.equal(zapiszNotatke(d, id, "   ", ALA).notatka, null);
+});
+
+test("zmianę notatki da się COFNĄĆ, a drugie kliknięcie wraca tam, gdzie było", () => {
+  /* Notatka jest polem swobodnym, które nadpisuje ten, kto pisze ostatni.
+     Do 0.280.0 skasowanego zdania nie dało się odzyskać niczym: do dziennika
+     idzie świadomie sama DŁUGOŚĆ. Cofnięcie jest ZAMIANĄ, nie tabelą historii —
+     jeden szczebel, bo drugi szczebel to drugie miejsce na te same dane. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+
+  zapiszNotatke(d, id, "klient prosi o wymianę", ALA);
+  zapiszNotatke(d, id, "pomyłka, chodziło o zwrot", MAREK);
+
+  const cofniete = cofnijNotatke(d, id, MAREK);
+  assert.equal(cofniete.notatka, "klient prosi o wymianę");
+
+  /* I z powrotem, tym samym przyciskiem. */
+  assert.equal(cofnijNotatke(d, id, MAREK).notatka, "pomyłka, chodziło o zwrot");
+});
+
+test("notatka mówi, KTO ją zmienił i kiedy — dotąd nie mówiła tego nikt", () => {
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+
+  const po = zapiszNotatke(d, id, "oddzwonić w piątek", ALA);
+  assert.equal(po.notatkaPrzez, "A. Lewandowska");
+  assert.ok(po.notatkaAt, "bez godziny zdanie o zmianie byłoby połową zdania");
+  assert.equal(po.maPoprzedniaNotatke, false, "pierwsza notatka nie ma do czego wracać");
+
+  assert.equal(zapiszNotatke(d, id, "jednak w poniedziałek", MAREK).maPoprzedniaNotatke, true);
+});
+
+test("cofnięcie NIE WYNOSI treści do dziennika, ani przed, ani po", () => {
+  /* `events` nie ma retencji (§9 architektury), a notatka bywa zdaniem
+     o kliencie. Poprzednia treść mieszka NA WIERSZU i ginie razem ze sprawą. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  zapiszNotatke(d, id, "klient bywa nieuprzejmy", ALA);
+  zapiszNotatke(d, id, "ustalono wymianę", ALA);
+  cofnijNotatke(d, id, ALA);
+
+  const wszystko = JSON.stringify(d.prepare("SELECT payload FROM events").all());
+  assert.equal(wszystko.includes("nieuprzejmy"), false);
+  assert.equal(wszystko.includes("ustalono"), false);
+  const slad = zdarzenia(d, "reklamacja_notatka_cofnieta");
+  assert.equal(slad.length, 1, "cofnięcie zostawia własny ślad, nie udaje zapisu");
+});
+
+test("notatka bez poprzedniej wersji odmawia cofnięcia zdaniem, nie ciszą", () => {
+  /* Wiersz zastany sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt
+     jej nie zapisywał. Przycisk ma być wtedy martwy, a trasa — mówić dlaczego. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  assert.throws(() => cofnijNotatke(d, id, ALA), /poprzedniej wersji/);
 });
 
 test("konflikt wersji wraca jako 409 z ładunkiem, a nie jako ciche nadpisanie", () => {
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
-  stempelProwadzi(d, id, "M. Wójcik");
+  stempelProwadzi(d, id, MAREK);
 
-  assert.throws(() => zapiszNotatke(d, id, "moja wersja", "A. Lewandowska", 1), (e: unknown) => {
+  assert.throws(() => zapiszNotatke(d, id, "moja wersja", ALA, 1), (e: unknown) => {
     assert.ok(e instanceof ReklamacjaConflict);
     assert.equal(e.szczegoly.wersja, 2);
     assert.equal(e.szczegoly.prowadzi, "M. Wójcik", "panel ma pokazać, kto był szybszy");

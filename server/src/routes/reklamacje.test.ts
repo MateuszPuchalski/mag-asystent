@@ -89,11 +89,18 @@ const TRASY = () => [
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}` },
   { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki/${zalacznik}/podglad` },
   { method: "POST" as const, url: "/api/obsluga/reklamacje/synchronizuj" },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odswiez` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
+  { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki` },
+  { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki/1` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zwrot-towaru` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka/cofnij` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
+  { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
 ];
 
 test("bez sesji żadna trasa reklamacji nie odpowiada danymi", async () => {
@@ -112,17 +119,42 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("PIĘĆ ZAPISÓW po przyroście trzecim — licznik jest umową", () => {
+test("DZIESIĘĆ ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową", () => {
   /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
      z odpowiedzią w czacie (0.224.0) i z trzech na pięć z werdyktem: czwarty
      zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
      o towarze po uznaniu. Oba są nieodwracalne wobec kupującego i jako
      jedyne w module stoją za `autoryzuj()` z wpisem `privileged`. Każdy nowy
-     zapis dostaje zdanie w uzasadnieniu. `synchronizuj` NIE JEST zapisem do
-     Allegro: to odczyt na żądanie, który zapisuje wynik u nas. */
-  const zapisy = TRASY().filter((t) => t.method === "POST" && !t.url.endsWith("synchronizuj"));
-  assert.equal(zapisy.length, 5,
-    "prowadzę i notatka u nas; odpowiedź, werdykt i towar wychodzą do Allegro");
+     zapis dostaje zdanie w uzasadnieniu.
+
+     Szósty i siódmy doszły z załącznikami wychodzącymi (0.274.0): dodanie
+     WGRYWA plik do Allegro od razu, więc jest zapisem wychodzącym mimo braku
+     wiadomości; zdjęcie kasuje wyłącznie NASZ wiersz, bo deklaracji po tamtej
+     stronie cofnąć się nie da. Uprzywilejowane nie są: plik bez wiadomości
+     nie dociera do kupującego.
+
+     Ósmy i dziewiąty doszły z tagami (0.279.0) i są zapisami WYŁĄCZNIE
+     u nas: tag jest zdaniem biura o sprawie i do Allegro nie idzie żadnym
+     polem. Uprzywilejowane nie są i mieć tego nie mogą — przypięcie
+     i zdjęcie to jedno kliknięcie w każdą stronę, czyli własna droga
+     powrotna.
+
+     Dziesiąty to COFNIĘCIE zmiany notatki (0.280.0). Jest zapisem u nas
+     i jedynym w tym module z drogą powrotną — notatka jako jedyna zostaje
+     wyłącznie u nas i niczego nie obiecuje kupującemu. Werdykt, odpowiedź
+     i stanowisko o towarze cofnięcia NIE DOSTANĄ: Allegro ich nie cofnie,
+     więc przycisk byłby obietnicą bez pokrycia (§25b.8).
+
+     `synchronizuj` i `odswiez` NIE SĄ zapisami do Allegro: to odczyty na
+     żądanie, które zapisują wynik u nas. `POST`-em idą dlatego, że `GET`
+     z takim skutkiem ubocznym łamałby „zero zapisu przy patrzeniu" ciszej,
+     niż gdyby łamał ją jawnie — przeglądarka powtarza i wstępnie pobiera
+     `GET`-y bez pytania. */
+  const DOCIAGNIECIA = ["synchronizuj", "odswiez"];
+  const zapisy = TRASY().filter((t) => (t.method === "POST" || t.method === "DELETE")
+    && !DOCIAGNIECIA.some((d) => t.url.endsWith(d)));
+  assert.equal(zapisy.length, 10,
+    "prowadzę, notatka z cofnięciem i dwa tagi u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
 });
 
 test("werdykt: wersja obowiązkowa, wpis `privileged` z nazwą operacji, dziennik bez treści", async () => {
@@ -294,6 +326,26 @@ test("synchronizacja bez sparowanego konta mówi zdaniem, a nie kodem", async ()
     method: "POST", url: "/api/obsluga/reklamacje/synchronizuj", headers: naglowki });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /sparowane/);
+});
+
+test("odświeżenie sprawy bez sparowanego konta też mówi zdaniem", async () => {
+  /* Ta sama ścieżka co przy synchronizacji i ten sam powód: 502 z gołym kodem
+     kazałby szukać awarii tam, gdzie jej nie ma. */
+  const { naglowki } = login("biuro", "Ala dziewiąta");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odswiez`, headers: naglowki });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /sparowane/);
+});
+
+test("odświeżenie NIE jest operacją uprzywilejowaną — to dociągnięcie cudzego stanu", async () => {
+  /* Werdykt i decyzja o towarze stoją za `autoryzuj()`, bo są nieodwracalne
+     wobec kupującego. Odświeżenie nie zmienia u kupującego niczego, więc
+     bramka roli biura wystarcza — inaczej zwykła praca wymagałaby admina. */
+  const { naglowki } = login("biuro", "Ala dziesiąta");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/reklamacje/${reklamacja}/odswiez`, headers: naglowki });
+  assert.notEqual(r.statusCode, 403, "biuro ma prawo odświeżyć sprawę");
 });
 
 test("podgląd rozstrzygają BAJTY, nie pole, którego Allegro nie przysyła", () => {

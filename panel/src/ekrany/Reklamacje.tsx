@@ -2,10 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
-  useNotatka, useOdpowiedz, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
-  useWerdykt, useZwrotTowaru,
+  useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
+  useRozpoznaj, useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useWerdykt, useZwrotTowaru, useCofnijNotatke
 } from "../api/reklamacje";
+import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
+import { naBase64 } from "../api/plik";
 import type {
   KubelekReklamacji, Reklamacja, StanReklamacji, SzczegolyWysylki, WiadomoscReklamacji,
 } from "../api/typy";
@@ -14,6 +17,10 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
+import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
+import { SkrotyKlawiszy } from "../sprawy/Skroty";
+import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 
@@ -101,14 +108,28 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
     ? (e.szczegoly as SzczegolyWysylki) : null;
 
 /** Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie. */
-const kody = (r: Reklamacja) => [r.numer, r.externalId, r.orderId, r.kupujacyLogin]
-  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+const kody = (r: Reklamacja) =>
+  /* Prowadzący WCHODZI do szukania (0.278.0). Skrzynka szuka po nim od
+     0.195.0, a tutaj „gdzie jest sprawa, którą wzięła Ala" nie miało dotąd
+     żadnej drogi — ani sita, ani pola. */
+  [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Reklamacje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekReklamacji | null>("decyzja");
   const [fraza, setFraza] = useState("");
+  const ja = useJa();
+  const mojeId = ja.data?.user.userId ?? null;
+  const { sito, przelacz: przelaczSito } = useSito();
+  const [tag, setTag] = useState<number | null>(null);
+  const slownikTagow = useTagi();
+  const nowyTag = useNowyTag();
+  const przypnij = usePrzypnijTag();
+  const odepnij = useOdepnijTag();
+  const [bladTagu, setBladTagu] = useState("");
+  const cofnijNotatke = useCofnijNotatke();
   const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
@@ -117,6 +138,12 @@ export function Reklamacje() {
   const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
   const odpowiedz = useOdpowiedz();
+  const odswiez = useOdswiez();
+  const dodajZalacznik = useDodajZalacznikSprawy();
+  const usunZalacznik = useUsunZalacznikSprawy();
+  const rozpoznaj = useRozpoznaj();
+  const [bladRozpoznania, setBladRozpoznania] = useState("");
+  const [bladZalacznika, setBladZalacznika] = useState("");
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
   const trwa = prowadze.isPending || notatka.isPending;
@@ -144,10 +171,36 @@ export function Reklamacje() {
     return (data?.reklamacje ?? []).filter((r) => kody(r).some((k) => k.includes(f)));
   }, [data, fraza]);
 
-  const widoczne = pasujace ?? wKubelku;
+  /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
+     numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
+     szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
+  /* Pigułki tagów liczą skład KUBEŁKA, nie tego, co zostało po sitach.
+     Licznik malejący do zera przy każdym kliknięciu mówiłby o własnym
+     filtrze, a nie o pracy, która czeka. */
+  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
+
+  const moi = useMemo(
+    () => wKubelku.filter((r) => wSicie(r.prowadziId, mojeId, sito)),
+    [wKubelku, sito, mojeId]);
+
+  /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
+     i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
+     nie wykluczać. */
+  const poSitach = useMemo(
+    () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
+    [moi, tag]);
+
+  const widoczne = pasujace ?? poSitach;
+  /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
+     tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
+     samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
+  const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
+  /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce —
+     odświeżenie karty niczego nie gubi, a kolega widzi to samo. */
+  const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -224,6 +277,11 @@ export function Reklamacje() {
         if (w.status === "sent") setTresc("");
         else setBladWysylki(
           "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+        /* Stan sprawy po stronie Allegro ZMIENIŁ SIĘ przed chwilą, a takt
+           przyjdzie za trzy minuty (0.273.0). Przy wyniku niejednoznacznym to
+           jedno żądanie rozstrzyga, czy wiadomość poszła — czyli dokładnie to,
+           po co pasek odsyłał do Centrum Sprzedaży. */
+        odswiez.mutate({ id: d.reklamacja.id });
       },
       onError: (e) => {
         /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
@@ -244,7 +302,13 @@ export function Reklamacje() {
     if (!d) return;
     setBladWerdyktu("");
     werdykt.mutate({ id: d.reklamacja.id, ...z, wersja: d.reklamacja.wersja }, {
-      onSuccess: (w) => { if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło"); },
+      onSuccess: (w) => {
+        if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło");
+        /* Werdykt zmienia `status_allegro`, a zieleń „Potwierdzony przez
+           Allegro" należy się dopiero statusowi z synchronizacji — więc
+           dociągamy go od razu, zamiast kazać czekać na takt. */
+        odswiez.mutate({ id: d.reklamacja.id });
+      },
       onError: (e) => setBladWerdyktu((e as Error).message),
     });
   };
@@ -286,6 +350,11 @@ export function Reklamacje() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "4") przelacz(null);
+      /* `m` jak „moje" — sito ma być jednym ruchem, bo o to właściciel
+         prosił. Litera, nie cyfra: cyfry należą do kubełków i piąta z nich
+         obiecywałaby piąty kubełek. */
+      else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
+      else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
     };
     window.addEventListener("keydown", nasluch);
     return () => window.removeEventListener("keydown", nasluch);
@@ -328,6 +397,23 @@ export function Reklamacje() {
             ]} />
         </nav>
 
+        {/* ── SITO „MOJE" (0.278.0) ────────────────────────────────────────
+            WŁASNY RZĄD, nie czwarta pigułka wśród kubełków. Kubełek mówi
+            „na jakim to etapie", sito „czyje to" — zlanie tego w jeden rząd
+            odebrałoby pytanie „moje sprawy do decyzji", czyli dokładnie to,
+            które właściciel zadaje najczęściej. Ten rząd weźmie też czipy
+            tagów, bo one odpowiadają na trzecie pytanie: „o czym to". */}
+        <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+              moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
+              niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
+            {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
+                samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
+            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+          </div>
+
+        <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
+
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
           <input id="szukaj-reklamacji" className="field !py-1 text-xs" value={fraza}
@@ -341,10 +427,14 @@ export function Reklamacje() {
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
             {opis?.pytanie}</p>}
 
+        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+          onPokazWszystkie={() => przelaczSito(null)} />
+
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading
             ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka reklamacje={widoczne} wybrana={wybrana}
+                mojeId={mojeId}
                 zKubelkiem={Boolean(pasujace) || kubelek === null}
                 onWybierz={(r) => nawiguj(`/obsluga/reklamacje/${r}`)} />}
         </div>
@@ -366,10 +456,28 @@ export function Reklamacje() {
                    wie, jaki rodzaj sprawy trzyma. */
                 opisZgloszenia: szczegol.data.reklamacja.powodOpis ?? szczegol.data.reklamacja.opis,
                 wiadomosciIle: szczegol.data.reklamacja.wiadomosciIle,
+                czatUrwany: szczegol.data.reklamacja.czatUrwany,
               }}
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
               edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                dodajeZalacznik={dodajZalacznik.isPending}
+                bladZalacznika={bladZalacznika}
+                /* Plik czytamy TU, nie w komponencie: katalog `reklamacje/`
+                   trzyma komponenty czyste, a base64 to sprawa klienta HTTP. */
+                onDodajZalacznik={(plik) => {
+                  setBladZalacznika("");
+                  void naBase64(plik).then((dane) => {
+                    if (!wybrana) return;
+                    dodajZalacznik.mutate(
+                      { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                      { onError: (e) => setBladZalacznika((e as Error).message) });
+                  });
+                }}
+                onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                  { id: wybrana, zalacznikId: zid },
+                  { onError: (e) => setBladZalacznika((e as Error).message) })}
                 czatAktywny={szczegol.data.reklamacja.czatAktywny}
                 onZmiana={setTresc} onWyslij={() => wyslij()} />} />
           : <Pusto ikona={ShieldQuestion}>
@@ -380,6 +488,41 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Dowody szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              onCofnijNotatke={szczegol.data.reklamacja.maPoprzedniaNotatke
+                ? () => {
+                  setBladZapisu("");
+                  cofnijNotatke.mutate(
+                    { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
+                    { onError: (e) => setBladZapisu((e as Error).message) });
+                }
+                : undefined}
+              tagi={{
+                slownik: slownikTagow.data?.tagi ?? [],
+                trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,
+                blad: bladTagu,
+                onPrzypnij: (tagId) => {
+                  setBladTagu("");
+                  przypnij.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onOdepnij: (tagId) => {
+                  setBladTagu("");
+                  odepnij.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onNowy: (nazwa) => {
+                  setBladTagu("");
+                  nowyTag.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", nazwa },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+              }}
+              rozpoznaje={rozpoznaj.isPending}
+              bladRozpoznania={bladRozpoznania}
+              onRozpoznaj={() => {
+                setBladRozpoznania("");
+                rozpoznaj.mutate({ id: szczegol.data!.reklamacja.id },
+                  { onError: (e) => setBladRozpoznania((e as Error).message) });
+              }}
               onProwadze={() => {
                 setBladZapisu("");
                 prowadze.mutate(

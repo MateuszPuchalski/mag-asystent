@@ -6,7 +6,7 @@ import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, MessagesSquare, Setti
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { useKolejkaWiedzy } from "./api/wiedza";
-import { czas } from "./ui";
+import { czas, godzina } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
@@ -86,8 +86,8 @@ function PigulkaSynchronizacji() {
     zle ? "bg-red-500/20 text-red-100" : "bg-white/10 text-slate-300"}`}>
     <span className={`h-2 w-2 rounded-full ${zle ? "bg-red-400" : "bg-emerald-400"}`} />
     {i.alarm
-      ? `Synchronizacja stanęła ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3)}`
-      : `Synchronizacja ${czas(i.ostatniaUdanaSynchronizacja).slice(-8, -3) || "—"} · ${
+      ? `Synchronizacja stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}`
+      : `Synchronizacja ${godzina(i.ostatniaUdanaSynchronizacja)} · ${
           i.liczbaBledow} błędów`}
   </div>;
 }
@@ -115,13 +115,24 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
           return <Link key={z.do} to={z.do}
+            /* ── PROMIEŃ KAFELKA = PROMIEŃ BIEŻNI MINUS JEJ WYPEŁNIENIE (0.272.0) ──
+               Bieżnia wyżej ma `rounded-lg p-1`, czyli 8 px zaokrąglenia i 4 px
+               odstępu. Kafelek współśrodkowy z nią ma więc 8 − 4 = 4 px, czyli
+               `rounded`. Stało tu `rounded-md` (6 px) i łuk kafelka rozjeżdżał
+               się z łukiem bieżni o dwa piksele w każdym rogu.
+
+               Ta sama reguła obowiązuje w przełączniku edytora i TAM JEST
+               SPEŁNIONA: bieżnia `rounded-lg p-0.5` to 8 − 2 = 6 px, czyli
+               `rounded-md`. Audyt policzył pięć promieni w panelu i uznał to za
+               rozrzut; rozrzutu nie ma, jest jedna reguła spełniona raz na dwa
+               miejsca. `rounded-md` nie jest odpadem do zamiecenia. */
             /* Kolizja, którą naprawia ustalenie 02, dotyczy pasm `bg-amber-50`
                na BIAŁYCH listach: tam zaznaczenie myli się z ostrzeżeniem, bo
                ostrzeżenia też są bursztynowe i też mają biel dookoła.
                Na ciemnym pasku żadnego ostrzeżenia nie ma i nie będzie.
 
                bursztyn: zakładka na ciemnym tle jest marką */
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold ${
+            className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
             {z.ikona}{z.etykieta}
             {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}

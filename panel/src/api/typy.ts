@@ -730,7 +730,7 @@ export type SzczegolyWysylki = {
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci";
+  | "rozjazd_ilosci" | "przelew_czeka";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -972,6 +972,21 @@ export interface KolejkaZwrotow {
   stan: StanZwrotow;
 }
 
+/* ── Tagi spraw posprzedażowych (0.279.0) ──────────────────────────────────
+   Tag na wierszu niesie TYLE, ile mieści czip: numer do zdjęcia i nazwę do
+   przeczytania. Stan „aktywny" należy do słownika w Ustawieniach, nie do
+   wiersza — na starej sprawie wyłączony tag ma być widoczny tak samo. */
+export interface TagSprawy {
+  id: number;
+  nazwa: string;
+}
+
+/** Wiersz słownika tagów — to, czym zarządza ekran ustawień. */
+export interface Tag extends TagSprawy {
+  /** Wyłączony nie podpowiada się przy nowej sprawie, ale na starych zostaje. */
+  aktywny: boolean;
+}
+
 /** Sygnatura, która nie prowadzi do jednej kartoteki (§ pokrycie sygnatur). */
 export interface WierszSygnatury {
   sygnatura: string;
@@ -1013,6 +1028,13 @@ export type StanZwrotuPieniedzy = {
     potwierdzone: boolean;
   } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  /**
+   * Ślad po przelewie oddanym POZA Allegro (0.269.0). Przy pobraniu jedyny,
+   * jaki może istnieć — to notatka biura o ruchu pieniędzy, nie sam ruch.
+   */
+  przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
+  moznaZapisacPrzelew: boolean;
+  powodPrzelewu: string | null;
 };
 
 /**
@@ -1089,11 +1111,32 @@ export interface Reklamacja {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0), a nie takt. */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
+  /* ── Kiedy to kupiono (0.282.0) ──────────────────────────────────────────
+     Dwa zegary i dwie etykiety: `zamowienie` to `boughtAt` z pełnego
+     zamówienia, `sprawa` to `checkoutForm.createdAt` z ładunku reklamacji,
+     czyli złożenie koszyka. Nazwanie jednego drugim to blizna 0.121.0.
+
+     Dyskusja tego pola NIE MA i to nie jest przeoczenie: nie ma też Copilota,
+     a bez niego data byłaby ozdobą na ekranie, którego nikt o nią nie prosił. */
+  kupionoAt: string | null;
+  kupionoZrodlo: "zamowienie" | "sprawa" | null;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `werdykt: null` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
@@ -1175,6 +1218,60 @@ export interface SzczegolReklamacji {
     pewnosc: string; twId: number | null; symbol: string | null;
     zrodlo: string | null; powod: string | null;
   } | null;
+  /** Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił. */
+  karta: KartaSprawy | null;
+}
+
+/** Pole karty z cytatem — numer wiadomości, z której model to wziął. */
+export interface PoleKarty { tresc: string; zrodlo: string }
+
+/**
+ * Karta faktów ze sprawy — co maszyna WYCZYTAŁA, nigdy co radzi.
+ *
+ * Werdyktu tu nie ma i nie będzie: uznanie i odrzucenie są nieodwracalne wobec
+ * kupującego i należą do człowieka. Najcenniejsze pole to `brakuje` — sprawa
+ * stoi tygodniami nie dlatego, że nikt nie umie zdecydować, tylko dlatego, że
+ * nikt nie zapytał o zdjęcie tabliczki.
+ */
+export interface KartaSprawy {
+  usterka: PoleKarty | null;
+  kiedy: PoleKarty | null;
+  oczekiwanie: PoleKarty | null;
+  dowody: PoleKarty[];
+  brakuje: string[];
+  /** Co maszyna RADZI zrobić (0.276.0); `null`, gdy nie miała z czego. */
+  rada: RadaMaszyny | null;
+  /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
+  ocena: string | null;
+  /* Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` byłby
+     numerem, którego agent nie ma jak sprawdzić. */
+  zdjecia: ZdjecieKarty[];
+  model: string;
+  przez: string | null;
+  at: string;
+}
+
+export interface ZdjecieKarty {
+  numer: string;
+  zalacznikId: number;
+  nazwa: string;
+}
+
+/**
+ * Rada maszyny: co zrobić, dlaczego, jak pewnie i CZEGO NIE WIE.
+ *
+ * `co` to jedna z jedenastu wartości werdyktu Allegro albo `POPROSIC_O_DOWODY`
+ * — nasza dwunasta, znacząca „nie ma jeszcze czego rozstrzygać".
+ *
+ * `czegoNieWiem` jest przeciwwagą dla `pewnosc`, nie ozdobą: serwer odrzuca
+ * kartę, w której model deklaruje wysoką pewność i nie umie nazwać ani jednej
+ * rzeczy, której nie wie.
+ */
+export interface RadaMaszyny {
+  co: string;
+  uzasadnienie: PoleKarty;
+  pewnosc: string;
+  czegoNieWiem: string[];
 }
 
 /* ── Dyskusje (0.245.0) ──────────────────────────────────────────────────────
@@ -1201,6 +1298,8 @@ export interface Dyskusja {
   statusAllegro: string | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0). */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   /** Czy ruch należy do nas — z niego biorą się kubełek i czas czekania. */
@@ -1215,7 +1314,17 @@ export interface Dyskusja {
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */
   zakonczenieStatus: "sent" | "send_uncertain" | null;

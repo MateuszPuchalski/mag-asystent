@@ -4316,8 +4316,12 @@ async function pokazPodgladKosza(id, cichy) {
   try {
     const k = (await (await api(`/api/biuro/kosze/${id}`)).json()).kosz;
     if (koszPodgladId !== id) return; // ktoś w międzyczasie otworzył inny
+    /* Zdanie o źródle mówiło do 0.276.x, że powrót wystawia biuro. Od 0.277.0
+       nie wystawia — dokument zamawia aplikacja, a etap „powrót MM" niżej mówi,
+       na czym stanął. Zdanie, które zostało nieprawdą, jest gorsze niż jego
+       brak: uczy chodzić do Subiekta po robotę, której tam już nie ma. */
     const zrodlo = k.mmNumer
-      ? `z przesunięcia MM ${esc(k.mmNumer)} — dokument powrotny wystawia biuro`
+      ? `z przesunięcia MM ${esc(k.mmNumer)}`
       : `${k.zwroty.length} zwr. przypiętych w aplikacji`;
     const pominiete = k.pozycje.filter((p) => p.status === "skipped");
     /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione

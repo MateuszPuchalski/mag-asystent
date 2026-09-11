@@ -343,6 +343,16 @@ na liście. Sonda pokazuje, czym to pole naprawdę bywa: `COMMISSION_REFUNDED`
 stan przesyłki, więc po tym polu nie da się poznać, czy karton u nas jest.
 Z tego samego powodu kolejka bramek nie routuje po nim od 0.164.0.
 
+`[WERYFIKUJ]` **`checkoutForm.createdAt` przy sprawie posprzedażowej.**
+Schemat `PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
+i `createdAt` (`date-time`). Do 0.282.0 czytaliśmy pierwsze, a drugie ginęło
+na etapie typu — i właśnie o tę datę Copilot prosił agenta w liście braków.
+Czym dokładnie jest ten moment, nie jest potwierdzone na żywym koncie:
+schemat nie mówi, czy to złożenie koszyka, czy jego opłacenie, a `boughtAt`
+przy pozycji zamówienia bywa późniejszy. Dlatego ekran nazywa tę datę
+„zamówienie złożone", a nie „kupiono", i ustępuje dacie z zamówienia, gdy ją
+mamy.
+
 `[WERYFIKUJ]` zostaje przy jednym: końcówka trackingu jest w dokumentacji
 opisana przy przesyłkach ZAMÓWIENIA, a my pytamy o przesyłkę ZWROTNĄ. Odmowa
 albo pusta historia degraduje — data dojdzie przy następnym takcie.
@@ -600,6 +610,33 @@ pola mówi wyłącznie ta lista, więc kod traktuje każde pole jako opcjonalne 
 poza `id`, bez którego nie ma czego zapisać. Tak samo potraktowaliśmy
 `OfferListingDto` w 0.214.0 i to nie była wtedy usterka Allegro.
 
+### Filtr statusów: przebieg bierze NAJPIERW sprawy otwarte (0.273.0)
+
+`getListOfIssuesUsingGET` przyjmuje `status` — tablicę `PostPurchaseIssueStatus`
+(`CLAIM_SUBMITTED`, `CLAIM_ACCEPTED`, `CLAIM_REJECTED`, `DISPUTE_ONGOING`,
+`DISPUTE_CLOSED`, `DISPUTE_UNRESOLVED`). Do 0.272.0 nie używaliśmy go wcale.
+
+Lista jedzie MALEJĄCO PO DACIE OTWARCIA, a bezpiecznik stron ucina jej ogon —
+czyli sprawy najstarsze, czyli najbardziej spóźnione, czyli dokładnie te, dla
+których panel reklamacji powstał. Przebieg pyta więc najpierw o trzy statusy
+spraw żywych, a dopiero potem o całą listę. Spraw otwartych jest garść, więc
+mieszczą się przed bezpiecznikiem niezależnie od tego, jak długie jest archiwum.
+
+Przelot pełny ZOSTAJE nietknięty: to on zamyka sprawy rozstrzygnięte poza
+panelem i z niego liczy się ogon (`pozostalo`). Sprawa widziana w obu przelotach
+zapisuje się raz — przebieg trzyma je w mapie po identyfikatorze.
+
+### Język: `Accept-Language` przy każdym żądaniu (0.273.0)
+
+Specyfikacja wymienia ten nagłówek przy `GET /sale/issues` („Expected language
+of subject field") i przy `GET …/chat` („Expected language of messages",
+z przykładem `en-US`). Do 0.272.0 nie było go w serwerze NIGDZIE, więc pola
+zależne od języka przychodziły w domyślnym Allegro.
+
+Wysyłamy `pl-PL` z jednego miejsca — bloku nagłówków `zapytajAllegro` — dla
+całej rodziny końcówek. Rozjazd języka między listą a rozmową tej samej sprawy
+byłby gorszy niż konsekwentna angielszczyzna.
+
 ### Co mapujemy
 
 | pole Allegro | kolumna | po co |
@@ -652,11 +689,27 @@ to **10**, nie 100 jak przy listach obok, więc podajemy go jawnie.
 „not present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro
 (`ADMIN`) odpisał w 61 sprawach na 100, więc to jest przypadek typowy.
 
+**Rozmowa STRONICUJE SIĘ od 0.273.0.** Do 0.272.0 to żądanie szło raz, bez
+`offset`, choć adres umiał go od początku — więc rozmowa dłuższa niż sto
+wiadomości była przycięta na zawsze, a ekran obiecywał przy niej resztę, która
+nie miała skąd przyjść. Bezpiecznik stoi na pięciu stronach; rozmowa dłuższa
+dostaje znak `czat_urwany` i wtedy ekran mówi co innego, zamiast obiecywać.
+
+Bezpiecznik był potrzebny z osobnego powodu niż przy liście: budżet rozmów na
+przebieg liczy SPRAWY, nie żądania, więc bez granicy jedna rozmowa o tysiącu
+wiadomości zjadłaby cały takt sama.
+
 `[WERYFIKUJ]` Kształt rozmowy na ŻYWYM koncie. `docs/allegro-sonda.md` ma tę
 sekcję pustą, bo próbkę zdjęto przed poprawką klucza. Kolumna „niepuste" dla
-`chat[].text`, `chat[].author.login` i `chat[].attachments` jest więc nieznana,
-a razem z nią odpowiedź na pytanie, czy rozmowa mieści się w stu wiadomościach.
+`chat[].text`, `chat[].author.login` i `chat[].attachments` jest więc nieznana.
 Sprawdza się to jednym `npm run sonda`.
+
+`[WERYFIKUJ]` KOLEJNOŚĆ wiadomości w rozmowie. Przy liście spraw specyfikacja
+mówi wprost „ordered by descending opened date"; przy `/chat` nie mówi nic.
+Dopóki tego nie wiemy, nie wiadomo, czy pierwsza strona to najstarsze sto
+wiadomości, czy najnowsze — a to rozstrzyga, co widzi agent przy rozmowie
+uciętej bezpiecznikiem. Stronicowanie czyni pytanie bezprzedmiotowym dla
+kompletu danych, ale nie dla tego jednego przypadku.
 
 `[WERYFIKUJ]` Do której przestrzeni należy `PostPurchaseIssue.offer.id`. Przykład
 w specyfikacji pokazuje UUID (`54b50cb5-2dd3-4ce0-9c41-57ac5981d2ab`), a sonda
@@ -664,6 +717,52 @@ z żywego konta zapisała zwykły tekst przy sześćdziesięciu pięciu sprawach
 Typem jest `string`, więc rozstrzyga to dopiero pierwsze trafienie w
 `offer_snapshot` — to jest ta sama otwarta sprawa dwóch przestrzeni
 identyfikatora oferty, co przy pozycji zwrotu.
+
+### `GET /sale/issues/{issueId}` — odświeżenie jednej sprawy (0.273.0)
+
+Czwarta końcówka rodziny i do 0.272.0 jedyna nieużywana wcale. Oddaje ten sam
+kształt `PostPurchaseIssue`, co wiersz listy, więc zapisuje ją ta sama funkcja —
+jedna droga zapisu, nie dwie.
+
+Powód istnienia jest po stronie człowieka, nie danych: bez niej świeży stan
+sprawy dawał wyłącznie PEŁNY przebieg listy, czyli takt trzech minut. Agent,
+który właśnie wysłał odpowiedź albo werdykt, patrzy na ekran teraz — i najbardziej
+wtedy, gdy wysyłka skończyła się niejednoznacznie, bo pasek odsyłał go wtedy do
+Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
+
+Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik Allegro rozjechał się
+z naszym — odświeżenie ma kosztować jedno żądanie, gdy nic nowego nie przyszło.
+
+### Załączniki WYCHODZĄCE: `POST /sale/issues/attachments` + `PUT` (0.274.0)
+
+Decyzja właściciela z 7 września brzmiała „sam tekst" i trzymała się cztery dni;
+11 września ją odwrócił. Droga jest dwukrokowa jak w Centrum Wiadomości:
+deklaracja oddaje numer, `PUT` niesie bajty, a `MessageRequest.attachments`
+wymienia numery przy wiadomości (`PostPurchaseIssueAttachmentId`, czyli `{ id }`).
+
+**TO INNY KSZTAŁT NIŻ PRZY CENTRUM WIADOMOŚCI, choć robi to samo.** Deklaracja
+sprawy używa schematu `AttachmentDeclaration` z polem **`fileName`**, a
+`/messaging/message-attachments` — schematu `NewAttachmentDeclaration` z polem
+**`filename`**. Różnica jednej litery przy polu obowiązkowym w obu.
+
+To jest dokładnie ta pułapka, przed którą ostrzega `CLAUDE.md`: `public.v1`
+i `beta.v1` bywają RÓŻNYMI kształtami, nie wariantami jednego. Kształt czyta się
+z pliku, nie z pamięci o sąsiedniej końcówce — a sąsiednia końcówka stała
+gotowa i kusiła.
+
+Druga różnica: schemat spraw **nie podaje maksymalnego rozmiaru** (messaging
+podaje 5 MiB), więc granicą jest wyłącznie nasza — cztery megabajty, bo plik
+jedzie do nas base64 w JSON i rośnie o jedną trzecią.
+
+**Adres wgrania bierze się z nagłówka `Location`.** Specyfikacja mówi to wprost:
+„The URL is unique and one-time. As its format may change in time, you should
+always use the address from the header. Do not compose the address on your own".
+Adres składany z identyfikatora zostaje jako droga awaryjna i zostawia ślad
+w dzienniku — bez niej brak jednej linijki w odpowiedzi zabijałby całą funkcję,
+a z nią wiadomo, że Allegro przestało nagłówek przysyłać.
+
+Typy plików są te same, co przy Centrum Wiadomości: PNG, GIF, BMP, TIFF, JPEG
+i PDF. Innych `requestBody` wgrania NIE wymienia.
 
 ### Załącznik: typ rozstrzygają BAJTY
 

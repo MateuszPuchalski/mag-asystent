@@ -11,6 +11,10 @@ import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import type {
+  NadawcaRozpoznania, OdpowiedzRozpoznania,
+} from "../services/copilot-reklamacja.js";
+import { PEWNOSCI_RADY, REKOMENDACJE } from "../services/copilot-reklamacja.js";
 import { ZRODLA_TWIERDZENIA, POZIOMY_PEWNOSCI } from "../services/copilot-szkic.js";
 import { ROLE_PASOWANIA } from "../services/pasowania.js";
 import { LIMIT_ZNAKOW } from "../services/wysylka.js";
@@ -435,6 +439,17 @@ const INSTRUKCJA_SZKICU = [
   "7c. Nie proś o zdjęcie ani o pomiar tego, co trafienie po identyfikatorze już",
   "   rozstrzyga (patrz reguła 3c). Klient, który podał numer producenta, zrobił",
   "   już swoją część roboty.",
+  "7d. GDY FAKT NIESIE ADRES NASZEJ AKTYWNEJ OFERTY, PODAJ GO. Fakt zaczynający",
+  "   się od „NASZA AKTYWNA OFERTA na kartotekę” niesie adres aukcji, która stoi",
+  "   u nas w tej chwili. Wklej ten adres w zdaniu o proponowanej części, zamiast",
+  "   opisywać klientowi, jak ma jej szukać. Prośba „proszę wyszukać po nazwie",
+  "   albo po kodzie EAN” zadaje mu pracę, którą mamy zrobioną, i jest błędem",
+  "   wtedy, gdy adres masz w faktach.",
+  "7e. ADRESU NIE SKŁADAJ I NIE ZGADUJ. Przepisz go z faktu znak w znak. Numeru",
+  "   oferty z innego miejsca nie zamieniaj na adres, nawet gdy wygląda znajomo.",
+  "   Brak takiego faktu znaczy „nie wiemy o aktywnej aukcji na tę kartotekę”,",
+  "   a nie „poszukaj adresu sam”. Wtedy wolno podać nazwę i numer katalogowy,",
+  "   ale nie wolno twierdzić, że aukcja istnieje.",
   "",
   "FORMA ODPOWIEDZI DLA KLIENTA — pisz ją tak, żeby dała się przeczytać na",
   "telefonie: krótkie akapity po jednej myśli, pusta linia między nimi. Gdy",
@@ -620,3 +635,143 @@ function czytajNaglowek(e: unknown, nazwa: string): string | null {
   const rec = h as Record<string, string | undefined>;
   return rec[nazwa] ?? rec[nazwa.toLowerCase()] ?? null;
 }
+
+/* ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+   Zadanie jest CELOWO WĄSKIE: wyciągnij z rozmowy to, co w niej stoi, i nazwij
+   to, czego w niej NIE MA. Model nie rozstrzyga sprawy — instrukcja mówi to
+   wprost, a serwis sprawdza deterministycznie i odrzuca kartę, w której padnie
+   słowo z rodziny werdyktu.                                                  */
+
+const PoleKartyZ = z.object({
+  tresc: z.string(),
+  /** Numer wiadomości w podanej rozmowie, np. `W3`. Serwer go sprawdza. */
+  zrodlo: z.string(),
+});
+
+const Karta = z.object({
+  usterka: PoleKartyZ.nullable(),
+  kiedy: PoleKartyZ.nullable(),
+  oczekiwanie: PoleKartyZ.nullable(),
+  dowody: z.array(PoleKartyZ),
+  brakuje: z.array(z.string()),
+  /* RADA JEST TYPOWANA (0.276.0). Prozą byłoby ładniej i nie dałoby się tego
+     zmierzyć — a rada bez pomiaru to nie rada. Enum trzyma te same wartości,
+     co werdykt wysyłany do Allegro, więc trafność liczy się porównaniem
+     dwóch napisów, bez ankiety dla agenta. */
+  rada: z.object({
+    co: z.enum(REKOMENDACJE),
+    uzasadnienie: PoleKartyZ,
+    pewnosc: z.enum(PEWNOSCI_RADY),
+    czegoNieWiem: z.array(z.string()),
+  }).nullable(),
+});
+
+const INSTRUKCJA_KARTY = [
+  "Jesteś asystentem biura obsługi w sklepie z częściami do sprzętu ogrodniczego.",
+  "Dostajesz rozmowę reklamacyjną. Każda wiadomość ma numer w nawiasie, np. [W3].",
+  "Przed rozmową stoi blok FAKTY ZE SPRAWY [S] — dane z formularza",
+  "reklamacyjnego i z Allegro. Cytuj je jako zrodlo \u201eS\u201d.",
+  "Numer podawaj BEZ nawiasów i zawsze dokładnie jeden.",
+  "",
+  "Czasem dostajesz ZDJĘCIA. Stoją przed tekstem, a na końcu tekstu jest ich",
+  "spis z numerami [Z1], [Z2] i nazwami plików. Fakt odczytany ze zdjęcia",
+  "cytuj numerem ZDJĘCIA, nie numerem wiadomości.",
+  "Opisuj to, co WIDAĆ. Nie zgaduj marki, daty ani numeru, którego na zdjęciu",
+  "nie widać — zdjęcie nieczytelne albo nie na temat wpisz do `brakuje`.",
+  "",
+  "Masz dwa zadania: ZEBRAĆ FAKTY i PORADZIĆ, co z nimi zrobić.",
+  "",
+  "Fakty i rada stoją w OSOBNYCH polach i nie wolno ich mieszać.",
+  "W polach opisowych (usterka, kiedy, oczekiwanie, dowody) pisz WYŁĄCZNIE to,",
+  "co powiedział klient. Zdanie w rodzaju \u201ereklamacja zasadna\u201d w tych polach",
+  "jest błędem: wygląda jak cytat z kupującego, a jest Twoją opinią.",
+  "Karta z opinią w polu opisowym zostanie odrzucona w całości.",
+  "",
+  "Wypełnij pola WYŁĄCZNIE tym, co pada w rozmowie:",
+  "- usterka: co jest zepsute, słowami klienta;",
+  "- kiedy: od kiedy, data zakupu albo moment awarii;",
+  "- oczekiwanie: czego klient chce (naprawa, wymiana, zwrot pieniędzy);",
+  "- dowody: co klient już przysłał albo opisał jako dowód.",
+  "Przy każdym z tych pól podaj `zrodlo` — numer wiadomości, z której to masz.",
+  "Pole, którego w rozmowie nie ma, zostaw puste. Nie zgaduj i nie uzupełniaj.",
+  "",
+  "- rada: co zrobić ze sprawą.",
+  "  `co` wybierz z listy; `POPROSIC_O_DOWODY` znaczy \u201enie ma jeszcze czego",
+  "  rozstrzygać\u201d i jest właściwą odpowiedzią częściej, niż się wydaje.",
+  "  `uzasadnienie` musi mieć `zrodlo` — numer wiadomości, na której się opierasz.",
+  "  `pewnosc` to wysoka, srednia albo niska.",
+  "  `czegoNieWiem` wymień rzeczy, których w rozmowie nie ma, a które zmieniłyby",
+  "  Twoją radę. Deklarując wysoką pewność, MUSISZ wymienić co najmniej jedną —",
+  "  inaczej karta zostanie odrzucona. Pewność bez nazwanej niewiedzy to brawura.",
+  "  Radę zobaczy człowiek, który sam kliknie werdykt; nic nie wysyła się samo.",
+  "",
+  "- brakuje: czego BRAKUJE, żeby dało się rozstrzygnąć sprawę.",
+  "To jedyne pole bez cytatu, bo mówi o tym, czego w materiale nie ma.",
+  "NIE WPISUJ TU NICZEGO, co stoi w rozmowie albo w bloku FAKTY ZE SPRAWY.",
+  "Jeśli coś tam jest, to już to masz — prośba o to kosztuje agenta wiadomość",
+  "do klienta i kilka dni postoju sprawy.",
+  "Wymieniaj tylko to, czego naprawdę nie ma; nie przepisuj przykładów",
+  "z tej instrukcji odruchowo. Jedna rzecz w jednej pozycji, rzeczownikowo,",
+  "na przykład: zdjęcie tabliczki znamionowej, numer seryjny, paragon.",
+  "Nie pisz, co z tego wyniknie.",
+  "",
+  "Odpowiadaj po polsku, krótko, bez uprzejmości i bez wstępu.",
+].join("\n");
+
+export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
+  async (tresc, zdjecia = []): Promise<OdpowiedzRozpoznania> => {
+    const start = Date.now();
+    try {
+      const odp = await anthropic().messages.parse({
+        model: config.copilot.model,
+        /* Karta to kilkanaście krótkich zdań. Limit z zapasem na listę braków,
+           bo to ona bywa najdłuższa i to ona jest tu najcenniejsza. */
+        max_tokens: 1024,
+        system: [{ type: "text", text: INSTRUKCJA_KARTY, cache_control: { type: "ephemeral" } }],
+        output_config: {
+          /* Wyżej niż przy klasyfikacji: to czytanie ze zrozumieniem długiej,
+             bywa że trójstronnej rozmowy, a nie przypisanie etykiety. */
+          effort: "medium",
+          format: zodOutputFormat(Karta),
+        },
+        /* ── OBRAZY PRZED TEKSTEM (0.283.0) ──────────────────────────────
+           `content` przestaje być gołym łańcuchem. Obrazy idą PIERWSZE, a spis
+           na końcu tekstu mówi, który jest którym `Z` — bez tego cytat `Z2`
+           w karcie byłby niesprawdzalny, a sprawdzalny cytat to cała doktryna
+           tego modułu. */
+        messages: [{
+          role: "user",
+          content: [
+            ...zdjecia.map((z) => ({
+              type: "image" as const,
+              source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+            })),
+            { type: "text" as const, text: String(tresc) },
+          ],
+        }],
+      });
+
+      const u = odp.usage;
+      const zuzycie = {
+        wej: u?.input_tokens ?? 0,
+        wyj: u?.output_tokens ?? 0,
+        cacheZapis: u?.cache_creation_input_tokens ?? 0,
+        cacheOdczyt: u?.cache_read_input_tokens ?? 0,
+      };
+
+      const w = odp.parsed_output;
+      if (!w) {
+        throw new BladOdpowiedziCopilota(
+          `Model nie oddał karty (stop: ${odp.stop_reason ?? "?"})`, 200);
+      }
+
+      return {
+        usterka: w.usterka, kiedy: w.kiedy, oczekiwanie: w.oczekiwanie,
+        dowody: w.dowody, brakuje: w.brakuje, rada: w.rada,
+        model: odp.model ?? config.copilot.model,
+        zuzycie, ms: Date.now() - start,
+      };
+    } catch (e) {
+      throw naNasz(e);
+    }
+  };

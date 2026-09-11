@@ -8,6 +8,8 @@ import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
 import { SkutecznoscDoboru } from "../ustawienia/SkutecznoscDoboru";
+import { SlownikTagow } from "../ustawienia/SlownikTagow";
+import { useTagi, useZmienTag } from "../api/tagi";
 
 /* ── Ustawienia obsługi klienta (0.168.0) ────────────────────────────────────
    Decyzja właściciela: stan integracji schodzi ze Skrzynki za zębatkę.
@@ -40,6 +42,9 @@ export function Ustawienia() {
      przełączenie ma pobrać inne dane, a nie przemalować te same. */
   const [dniDoboru, setDniDoboru] = useState(30);
   const skutecznosc = useSkutecznoscDoboru(dniDoboru);
+  const tagi = useTagi();
+  const zmienTag = useZmienTag();
+  const [bladTagu, setBladTagu] = useState("");
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -47,7 +52,10 @@ export function Ustawienia() {
       <Settings size={18} /><b className="text-naglowek mr-auto">Ustawienia</b>
       {/* Zdanie mówi wprost, że ten ekran niczego nie zmienia: reguła „zero
           zapisu przy patrzeniu" obowiązuje panel tak samo jak biuro. */}
-      <span className="text-sm text-slate-500">Tło pracy obsługi · sam odczyt</span>
+      {/* „Sam odczyt" przestało być prawdą w 0.279.0: słownik tagów jest
+          jedyną rzeczą, którą ten ekran ZMIENIA. Zdanie mówi to wprost,
+          zamiast obiecywać niezmienność, której już nie ma. */}
+      <span className="text-sm text-slate-500">Tło pracy obsługi · zmienia się tu tylko słownik tagów</span>
     </Karta>
 
     <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
@@ -55,5 +63,16 @@ export function Ustawienia() {
     <PokrycieWiedzy dane={wiedza.data} />
     <PomiarCopilota dane={pomiar.data} />
     <SkutecznoscDoboru dane={skutecznosc.data} dni={dniDoboru} onDni={setDniDoboru} />
+    <SlownikTagow tagi={tagi.data?.tagi ?? []} trwa={zmienTag.isPending} blad={bladTagu}
+      onNazwa={(tagId, nazwa) => {
+        setBladTagu("");
+        zmienTag.mutate({ tagId, nazwa },
+          { onError: (e) => setBladTagu((e as Error).message) });
+      }}
+      onAktywny={(tagId, aktywny) => {
+        setBladTagu("");
+        zmienTag.mutate({ tagId, aktywny },
+          { onError: (e) => setBladTagu((e as Error).message) });
+      }} />
   </div>;
 }

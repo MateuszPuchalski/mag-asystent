@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { zmienStatusSprawy, type Werdykt as CialoWerdyktu } from "../adapters/allegro.http.js";
 import { BladOdpowiedziAllegro } from "../adapters/allegro.js";
+import { ocenRekomendacje } from "./copilot-reklamacja.js";
 import { logEvent } from "./events.js";
 import { niejednoznaczny } from "./idempotencja.js";
 import {
@@ -235,6 +236,14 @@ export async function wydajWerdykt(
       "UPDATE reklamacja_klienta SET werdykt_status=?, werdykt_blad=? WHERE id=?",
     ).run(status, blad, id);
     logEvent("reklamacja_werdykt", kto.name, null, { id, werdykt, status, kod }, undefined, database);
+    /* TRAFNOŚĆ RADY LICZY SIĘ Z FAKTU (0.276.0): porównujemy rekomendację
+       Copilota z werdyktem, który agent naprawdę wysłał. Bez ankiety, bo
+       rekomendacja jest typowana tym samym słownikiem.
+
+       Tylko przy `sent`: werdykt, który nie wyszedł, nie jest decyzją, więc
+       nie ma czym oceniać rady. Funkcja jest CICHA przy braku karty — Copilot
+       jest dodatkiem, a werdykt podstawową pracą biura. */
+    if (status === "sent") ocenRekomendacje(database, id, werdykt);
     /* bez typu: sam numer wersji do odpowiedzi, po zapisie wyżej. */
     return Number((database.prepare("SELECT wersja FROM reklamacja_klienta WHERE id=?")
       .get(id) as { wersja: number }).wersja);

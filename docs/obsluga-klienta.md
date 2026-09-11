@@ -612,6 +612,24 @@ nasze własne notatki i znacznik „kto prowadzi". Rozmowa reklamacyjna jest
 dowodem w sporze i jej kopia lokalna jest ceną za działający ekran — dokładnie
 tak samo, jak przy skrzynce w 0.143.0.
 
+**Tożsamość prowadzącego (0.278.0).** Przy znaczniku „kto prowadzi" stoi od
+tego wydania także numer konta z `app_user`, a nie samo imię. To dana o NAS,
+nie o kliencie, i nigdzie nie wychodzi: sito „Moje" liczy się w pamięci
+przeglądarki, a do Allegro nie idzie żadnym polem. Imię zostaje obok, bo czip
+na wierszu ma pozostać czytelny po skasowaniu konta.
+
+**Tagi spraw (0.279.0).** Nazwa tagu jest słowem BIURA o sprawie, nie daną
+klienta, i pisze ją agent. Do Allegro nie idzie żadnym polem, a kupujący jej
+nie widzi. Do dziennika trafia nazwa tagu razem z numerem sprawy — tak samo
+jak nazwa załącznika, i z tą samą świadomością: `events` nie ma retencji.
+Kto wpisuje tam treść zamiast etykiety, zapisuje ją na zawsze.
+
+**Poprzednia treść notatki (0.280.0).** Żeby zmianę dało się cofnąć, wiersz
+sprawy trzyma JEDNĄ poprzednią wersję notatki obok bieżącej. Ginie razem ze
+sprawą i nie trafia do `events` ani przed cofnięciem, ani po nim. Dziennik
+dostaje samą długość, tak jak dotąd. Jednego szczebla, a nie tabeli historii,
+użyliśmy właśnie dlatego: druga tabela byłaby drugim miejscem na te same dane.
+
 **Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
 niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
 prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po
@@ -637,8 +655,72 @@ Sonda widziała załączniki przy 57 sprawach na 100.
 **Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
 odczycie — tak samo jak przy skrzynce i przy zwrotach.
 
-**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
-ekranu i w tym przyroście go nie dostaje.
+**Do dostawcy modelu idzie ZAMASKOWANA rozmowa (0.275.0).** Do 0.274.0 Copilot
+nie miał dostępu do tego ekranu wcale. Właściciel poprosił 11 września o wersję
+„zbierającą dane", więc rozmowa reklamacyjna wychodzi do dostawcy — ale przez
+ten sam moduł maskowania, co w skrzynce (§14.4), i pod tą samą gwarancją:
+wartość znika, ślad zostaje.
+
+Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
+ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
+po ZNANEJ wartości, nie po wzorcu.
+
+**Od 0.282.0 wychodzą też FAKTY ZE SPRAWY i to jest odwrócenie zdania, które
+stało tu wcześniej.** Do tego wydania obowiązywało „nie wychodzi nic spoza
+rozmowy". Kosztowało to konkretnie: Copilot prosił agenta o datę zakupu
+i o numer zamówienia, czyli o dane, które Allegro przysłało razem ze sprawą
+i które leżały o jedno złączenie dalej.
+
+Wychodzi blok z formularza reklamacyjnego i z danych Allegro: temat, opis
+zgłoszenia (przycięty), powód, podstawa prawna, oczekiwanie z kwotą, ilość,
+nazwa reklamowanego towaru, numery oferty i zamówienia, data zakupu, data
+otwarcia i termin decyzji. Blok przechodzi przez to samo maskowanie co rozmowa.
+
+**Granica została w tym samym miejscu, tylko przesunięta o jedno pojęcie:
+wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS.** Dalej nie wychodzi
+notatka biura, znacznik „kto prowadzi", tagi, kartoteka Subiekta ani nasze
+kwoty.
+
+**Od 0.283.0 wychodzą też ZDJĘCIA klienta i to jest największa zmiana
+w polityce danych tego modułu.** Właściciel poprosił wprost: „copilot powinien
+czytać zdjęcia". Karta, którą pokazał, prosiła agenta o zdjęcia, które
+w sprawie już były.
+
+**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Cała reszta
+tego rozdziału stoi na gwarancji „wartość znika, ślad zostaje", wymuszanej
+typem, którego nie da się wyprodukować poza modułem maskowania. Przy obrazie
+taka gwarancja nie istnieje. Zdjęcie paragonu z imieniem i adresem, etykieta
+przesyłki, ekran telefonu z numerem — wszystko to wychodzi do dostawcy
+w całości. Typ zdjęcia nazywa się więc `ZdjecieZBramki`, a nie „bezpieczne",
+i obiecuje dokładnie trzy rzeczy: bajty pochodzą z załącznika TEJ sprawy, są
+obrazem w typie rozstrzygniętym po SYGNATURZE, i mieszczą się w suficie.
+
+Bajtów nie trzymamy ani chwili dłużej, niż trwa żądanie — tak samo jak przy
+pobraniu na ekran. Do dziennika idą LICZBY: ile zdjęć poszło, ile pominięto,
+ile pobrań padło. Nazwy plików nie, bo bywają daną osobową, a `events` nie ma
+retencji.
+
+**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
+kosztu: obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
+wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
+więcej niż samo rozpoznanie tekstu. Zostaje sufit bajtów, bez którego żądanie
+nie przeszłoby technicznie, i zdanie na karcie mówiące, ile zdjęć pominięto.
+Budżetu kwotowego w konfiguracji **nie ma** — to jest znana i nazwana
+ekspozycja, nie przeoczenie.
+
+Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
+co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
+których nie wie. Właściciel odwrócił 11 września wcześniejszą regułę „maszyna
+nie radzi"; bramka w kodzie pilnuje teraz czego innego: żeby opinia nie trafiła
+do pól opisujących słowa klienta.
+
+Rada nie wychodzi do kupującego i nie dotyka formularza werdyktu. Werdykt
+wysyła człowiek, osobnym kliknięciem i z jawną zgodą, tak samo jak przedtem.
+
+Do dziennika idą liczby: ile braków, ile dowodów, ile pól odsiano jako
+niepokryte cytatem. Rachunek u dostawcy zapisuje się w księdze Copilota razem
+z numerem sprawy — także wtedy, gdy wywołanie skończyło się błędem, bo próba,
+która nie doszła, też bywa płatna.
 
 **Do dziennika nie idzie treść.** `logEvent` przy notatce i przy wysyłce
 zapisuje jej DŁUGOŚĆ, nigdy słowa: `events` nie ma retencji i nie jest kasowane.
@@ -649,9 +731,24 @@ znacznik „kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia. Ciało
 żądania ma dwa pola — `text` i `type: "REGULAR"` — i składa je adapter, więc
 nie ma drogi, którą dołożyłoby się trzecie.
 
-**Załączniki wychodzące nie istnieją.** Decyzja właściciela z 7 września 2026.
-Plik z naszego dysku nie ma jak trafić do Allegro tą trasą, bo panel nie ma
-czego wysłać: pola na to nie ma ani w formularzu, ani w ciele żądania.
+**Załączniki wychodzące ISTNIEJĄ od 0.274.0.** Właściciel odwrócił decyzję
+z 7 września cztery dni później. Od tego wydania plik z naszego dysku opuszcza
+maszynę i to jest zmiana w polityce danych, nie w wyglądzie ekranu.
+
+Co dokładnie wychodzi: bajty pliku, jego nazwa i rozmiar — nic więcej. Plik
+idzie do Allegro W CHWILI DODANIA, nie przy wysyłce wiadomości, więc odmowa
+typu albo rozmiaru pada, gdy jeszcze da się wybrać inny. U nas zostaje numer
+nadany przez Allegro, nazwa, typ i rozmiar; BAJTÓW NIE TRZYMAMY ani chwili
+dłużej, niż trwa żądanie.
+
+Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak samo jak przy
+załącznikach przychodzących. Do dziennika idą nazwa, typ i rozmiar — nigdy
+zawartość.
+
+Cena tej decyzji jest jawna: plik dodany i nigdy niewysłany zostaje u Allegro
+jako deklaracja bez wiadomości. To śmieć po ICH stronie i nie ma końcówki,
+którą dałoby się go sprzątnąć — ekran nie ma więc prawa obiecywać, że zdjęcie
+załącznika „usunęło go z Allegro". Kasuje wyłącznie nasz wiersz.
 
 **Kopia wysłanego tekstu zostaje u nas dwa razy.** Raz w `reklamacja_outbox`
 jako ślad PRÓBY — także tej nieudanej i tej niejednoznacznej — i raz na osi

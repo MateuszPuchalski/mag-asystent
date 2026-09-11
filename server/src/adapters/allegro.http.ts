@@ -119,6 +119,32 @@ export function urlOfertSprzedawcy(apiUrl: string, ids: readonly string[]): stri
 }
 
 /**
+ * Oferty SPRZEDAWCY po SYGNATURZE (`/sale/offers?external.id=…`).
+ *
+ * Ta sama końcówka co wyżej, drugi filtr i odwrotny kierunek pytania. Tamta
+ * odpowiada „co to za oferta o tym numerze"; ta — „którą z NASZYCH ofert
+ * sprzedajemy tę kartotekę". Do 0.270.0 na drugie pytanie nie odpowiadał
+ * nikt, bo `offer_snapshot` zna wyłącznie oferty, pod którymi ktoś napisał
+ * (patrz nagłówek `allegro-oferty-sync.ts`), a odwrotnego wyszukania nie było
+ * w całym repozytorium.
+ *
+ * `external.id` w specyfikacji to „The ID from the client's external system"
+ * i jest TABLICĄ, więc komplet kandydatów szkicu kosztuje jedno żądanie —
+ * ta sama sztuczka, co przy `offer.id` obok.
+ *
+ * `publication.status=ACTIVE` NIE JEST oszczędnością, tylko warunkiem
+ * poprawności: link do zakończonej aukcji jest gorszy od braku linku, bo
+ * klient klika i widzi, że u nas tego nie ma. Enum ze specyfikacji ma cztery
+ * wartości (`INACTIVE`, `ACTIVE`, `ACTIVATING`, `ENDED`), a domyślnie
+ * wchodzą WSZYSTKIE — pominięcie tego filtru dawałoby linki do wygaszonych.
+ */
+export function urlOfertPoSygnaturze(apiUrl: string, sygnatury: readonly string[]): string {
+  const filtr = sygnatury.map((s) => `external.id=${encodeURIComponent(s)}`).join("&");
+  return `${apiUrl}/sale/offers?${filtr}&publication.status=ACTIVE`
+    + `&limit=${Math.max(1, sygnatury.length)}`;
+}
+
+/**
  * Historia statusów przesyłki u przewoźnika (0.187.0).
  *
  * `GET /order/carriers/{carrierId}/tracking?waybill=…`. To JEDYNE miejsce
@@ -177,9 +203,33 @@ export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
   return `${apiUrl}/order/refund-claims/${encodeURIComponent(claimId)}`;
 }
 
-/** URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1). */
-export function urlDyskusji(apiUrl: string, offset: number): string {
-  return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
+/**
+ * URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1).
+ *
+ * `statusy` zawężają przebieg do spraw, które jeszcze żyją (0.273.0).
+ * Specyfikacja wymienia ten parametr przy `getListOfIssuesUsingGET` jako
+ * tablicę `PostPurchaseIssueStatus`, a lista bez niego jedzie MALEJĄCO PO
+ * DACIE OTWARCIA — więc bezpiecznik stron ucina najstarsze, czyli najbardziej
+ * spóźnione, czyli dokładnie te, dla których ten ekran powstał.
+ *
+ * Serializacja tablicy: `form` z `explode`, czyli parametr powtórzony —
+ * OpenAPI 3 nie każe jej deklarować, bo to wartość domyślna.
+ */
+export function urlDyskusji(apiUrl: string, offset: number, statusy: readonly string[] = []): string {
+  const filtr = statusy.map((s) => `&status=${encodeURIComponent(s)}`).join("");
+  return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
+}
+
+/**
+ * Pojedyncza sprawa posprzedażowa (`GET /sale/issues/{issueId}`, 0.273.0).
+ *
+ * Do 0.272.0 tej końcówki nie wołaliśmy wcale, więc jedyną drogą do świeżego
+ * stanu sprawy był PEŁNY przebieg listy — takt trzy minuty. Najgorzej wychodziło
+ * to przy wysyłce niejednoznacznej: pasek kazał sprawdzić w Centrum Sprzedaży
+ * coś, co jedno żądanie rozstrzyga w sekundę.
+ */
+export function urlSprawy(apiUrl: string, id: string): string {
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}`;
 }
 
 /**
@@ -264,9 +314,40 @@ export function urlDeklaracjiZalacznika(apiUrl: string): string {
   return `${apiUrl}/messaging/message-attachments`;
 }
 
+/**
+ * Deklaracja załącznika WYCHODZĄCEGO w sprawie posprzedażowej (0.274.0).
+ *
+ * INNY ZASÓB I INNY KSZTAŁT niż przy Centrum Wiadomości, choć robią to samo.
+ * Ciało opisuje tu schemat `AttachmentDeclaration` z polem **`fileName`**,
+ * a przy `/messaging/message-attachments` — `NewAttachmentDeclaration` z polem
+ * **`filename`**. Różnica jednej litery, a pole obowiązkowe w obu.
+ *
+ * To jest dokładnie ta klasa pułapki, o której mówi `CLAUDE.md`: `public.v1`
+ * i `beta.v1` bywają RÓŻNYMI kształtami, nie wariantami jednego. Kształt czyta
+ * się z pliku, nie z pamięci o sąsiedniej końcówce.
+ *
+ * Schemat spraw NIE podaje też maksymalnego rozmiaru (messaging podaje
+ * 5 MiB), więc granicą jest wyłącznie nasza.
+ */
+export function urlDeklaracjiZalacznikaSprawy(apiUrl: string): string {
+  return `${apiUrl}/sale/issues/attachments`;
+}
+
 /** Wgranie binariów zadeklarowanego załącznika (`PUT .../{attachmentId}`). */
 export function urlWgraniaZalacznika(apiUrl: string, attachmentId: string): string {
   return `${apiUrl}/messaging/message-attachments/${encodeURIComponent(attachmentId)}`;
+}
+
+/**
+ * Wgranie załącznika sprawy — DROGA AWARYJNA (0.274.0).
+ *
+ * Normalnie adres bierze się z nagłówka `Location` deklaracji, bo tak każe
+ * specyfikacja. Ten składany zostaje na wypadek, gdyby nagłówka zabrakło:
+ * bez niego brak jednej linijki w odpowiedzi Allegro zabijałby całą funkcję.
+ * Użycie tej drogi zostawia ślad w dzienniku, żeby nie było ciche.
+ */
+export function urlWgraniaZalacznikaSprawy(apiUrl: string, attachmentId: string): string {
+  return `${apiUrl}/sale/issues/attachments/${encodeURIComponent(attachmentId)}`;
 }
 
 /* Wersje zasobu, po kolei. `public.v1` to zasoby stabilne, `beta.v1` — te
@@ -366,6 +447,18 @@ export async function zapytajAllegro(
      * bez tej opcji „sprawa nie istnieje" wyglądałoby jak „werdykt przyjęty".
      */
     blad404?: boolean;
+    /**
+     * Oddaj też nagłówek `Location` (0.274.0).
+     *
+     * Potrzebne przy deklaracji załącznika sprawy: specyfikacja mówi wprost
+     * „The URL is unique and one-time. As its format may change in time, you
+     * should always use the address from the header. Do not compose the
+     * address on your own". Adres złożony z identyfikatora działałby DZIŚ
+     * i przestał w dniu, w którym Allegro zmieni format — po cichu.
+     *
+     * Wynikiem jest wtedy `{ dane, location }`, a nie samo ciało.
+     */
+    zLokalizacja?: boolean;
   } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
@@ -386,6 +479,18 @@ export async function zapytajAllegro(
           /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
              zablokowaniem klucza API (ekran po rejestracji aplikacji). */
           "user-agent": allegroUserAgent(),
+          /* JĘZYK, O KTÓRY PROSIMY (0.273.0). Do 0.272.0 nie było tego
+             nagłówka nigdzie w serwerze, więc pola zależne od języka
+             przychodziły w domyślnym Allegro — a specyfikacja wymienia
+             `Accept-Language` wprost przy `GET /sale/issues` („Expected
+             language of subject field") i przy `GET …/chat` („Expected
+             language of messages", z przykładem `en-US`).
+
+             Jedno miejsce dla całej rodziny końcówek, bo rozjazd języka
+             między listą a rozmową tej samej sprawy byłby gorszy niż
+             konsekwentna angielszczyzna. Sklep jest polski i biuro czyta
+             po polsku. */
+          "accept-language": "pl-PL",
           /* CIAŁO IDZIE TĄ SAMĄ WERSJĄ ZASOBU, którą negocjujemy w `accept`
              (0.173.0). Do 0.172.0 stało tu `application/json` — typ, którego
              specyfikacja NIE WYMIENIA przy żadnym z naszych dwóch zapisów:
@@ -478,13 +583,16 @@ export async function zapytajAllegro(
     dzialajacyAccept.set(rodzina, accept);
     /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
        pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
-    if (odp.status === 204) return null;
+    const location = opcje.zLokalizacja ? odp.headers.get("location") : null;
+    const zwroc = (dane: unknown | null) =>
+      opcje.zLokalizacja ? { dane, location } : dane;
+    if (odp.status === 204) return zwroc(null);
     const surowa = await odp.text();
-    if (surowa.trim() === "") return null;
+    if (surowa.trim() === "") return zwroc(null);
     try {
-      return JSON.parse(surowa);
+      return zwroc(JSON.parse(surowa));
     } catch {
-      return null;
+      return zwroc(null);
     }
   }
 
@@ -512,7 +620,7 @@ export async function zapytajAllegro(
 const HOSTY_ZALACZNIKOW = ["allegro.pl", "allegro.pl.allegrosandbox.pl"];
 
 export async function pobierzZalacznik(
-  url: string, opcje: { akcept?: string } = {},
+  url: string, opcje: { akcept?: string; maksBajtow?: number } = {},
 ): Promise<ArrayBuffer> {
   let host: string;
   try {
@@ -565,7 +673,31 @@ export async function pobierzZalacznik(
         (powod ? ` Odpowiedź Allegro: ${powod}` : ""),
       odp.status);
   }
-  return odp.arrayBuffer();
+  /* ── SUFIT ROZMIARU (0.283.0) ──────────────────────────────────────────
+     Do tego wydania `arrayBuffer()` wciągał do pamięci WSZYSTKO, co Allegro
+     odda — bez pytania o rozmiar. Przy pobraniu na żądanie agenta było to
+     ryzyko teoretyczne: klika jeden człowiek, jeden plik naraz. Copilot
+     czytający zdjęcia bierze komplet załączników sprawy jednym ruchem,
+     więc przestaje być teoretyczne.
+
+     NAGŁÓWEK SPRAWDZAMY PRZED POBRANIEM, a długość PO nim: `content-length`
+     bywa go brak, a wtedy jedyną prawdą jest to, co naprawdę przyszło.
+     Wołający bez `maksBajtow` dostaje zachowanie sprzed tego wydania. */
+  if (opcje.maksBajtow !== undefined) {
+    const zapowiedziane = Number(odp.headers.get("content-length") ?? NaN);
+    if (Number.isFinite(zapowiedziane) && zapowiedziane > opcje.maksBajtow) {
+      throw new Error(
+        `Załącznik ma ${(zapowiedziane / 1024 / 1024).toFixed(1)} MB, ` +
+        `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+    }
+  }
+  const bajty = await odp.arrayBuffer();
+  if (opcje.maksBajtow !== undefined && bajty.byteLength > opcje.maksBajtow) {
+    throw new Error(
+      `Załącznik ma ${(bajty.byteLength / 1024 / 1024).toFixed(1)} MB, ` +
+      `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+  }
+  return bajty;
 }
 
 /* ── Załącznik CENTRUM WIADOMOŚCI: droga API z zapasem (przyrost „zdjęcia w rozmowach") ──
@@ -814,10 +946,18 @@ export type TypWiadomosciSprawy =
  */
 export async function wyslijWiadomoscSprawy(
   apiUrl: string, issueId: string, tekst: string, typ: TypWiadomosciSprawy = "REGULAR",
+  zalaczniki: readonly string[] = [],
 ): Promise<{ id?: string; createdAt?: string } | null> {
   return await zapytajAllegro(urlNowejWiadomosciSprawy(apiUrl, issueId), {
     metoda: "POST",
-    body: { text: tekst, type: typ },
+    /* `attachments` to lista `{ id }` (`PostPurchaseIssueAttachmentId`).
+       PUSTEJ NIE WYSYŁAMY: wiadomość bez plików ma wyglądać dokładnie tak, jak
+       wyglądała przez pięćdziesiąt wydań — nowa funkcja nie zmienia kształtu
+       żądań, które jej nie używają. Ta sama zasada co przy Centrum
+       Wiadomości w 0.195.0. */
+    body: zalaczniki.length === 0
+      ? { text: tekst, type: typ }
+      : { text: tekst, type: typ, attachments: zalaczniki.map((id) => ({ id })) },
   }) as { id?: string; createdAt?: string } | null;
 }
 

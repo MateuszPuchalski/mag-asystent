@@ -49,7 +49,7 @@ const NA_PRZEBIEG = 20;
  */
 const SWIEZOSC_MS = 86_400_000;
 
-type Oferta = {
+export type Oferta = {
   id?: string;
   name?: string;
   sellingMode?: { price?: { amount?: string; currency?: string } | null } | null;
@@ -124,6 +124,21 @@ export function brakujaceOferty(database: Db, ile: number, teraz = new Date()): 
         JOIN zamowienie_klienta z ON z.id = p.zamowienie_id
        WHERE p.offer_id IS NOT NULL AND TRIM(p.offer_id) <> ''
        GROUP BY z.channel_account_id, p.offer_id
+      UNION ALL
+      /* Oferty ze spraw posprzedażowych (0.282.0). Rząd 2, czyli ZA
+         wiadomościami i zamówieniami — porządek po rzędzie jest tu całą
+         ochroną przed zagłodzeniem starszych źródeł w suficie przebiegu.
+         Bez tego źródła nie znamy nawet NAZWY reklamowanego towaru, więc
+         Copilot prosi o zdjęcie tabliczki znamionowej, żeby ustalić model,
+         który Allegro nam podało numerem oferty.
+
+         BACKTICKÓW TU NIE MA ŚWIADOMIE: cały blok stoi w literale
+         szablonowym, więc odwrotny apostrof zamknąłby go w połowie SQL-a. */
+      SELECT r.channel_account_id AS konto, r.offer_id AS id,
+             2 AS rzad, MAX(r.otwarto_at) AS kiedy
+        FROM reklamacja_klienta r
+       WHERE r.offer_id IS NOT NULL AND TRIM(r.offer_id) <> ''
+       GROUP BY r.channel_account_id, r.offer_id
     )
     SELECT s.id AS id
       FROM zrodla s
@@ -169,12 +184,20 @@ export async function uzupelnijOferty(deps: OfertySyncDeps = {}): Promise<number
   const at = now().toISOString();
   transaction(database, () => {
     const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-    for (const o of pobrane) zapisz(database, o, konto, at);
+    for (const o of pobrane) zapiszSnapshotOferty(database, o, konto, at);
   })();
   return pobrane.length;
 }
 
-function zapisz(database: Db, o: Oferta, konto: number, at: string): void {
+/**
+ * Snapshot jednej oferty z `/sale/offers`. Eksportowany od 0.270.0, bo
+ * czytelników tej samej odpowiedzi jest odtąd dwóch: ten przebieg (pytanie
+ * po `offer.id`) i `allegro-oferty-po-sygnaturze.ts` (pytanie po
+ * `external.id`). Ta sama odpowiedź zapisywana dwoma kawałkami kodu
+ * rozjechałaby się przy pierwszym nowym polu — a rozjazd byłby cichy, bo obie
+ * ścieżki piszą do tej samej tabeli.
+ */
+export function zapiszSnapshotOferty(database: Db, o: Oferta, konto: number, at: string): void {
   const kwota = o.sellingMode?.price;
   /* ── PUSTY ŁAŃCUCH ZNACZY „PYTALIŚMY, NIE MA" (0.214.0) ──────────────────
      Do 0.213.0 brak adresu schodził na `NULL` — ten sam znak, którym wiersz

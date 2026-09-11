@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Banknote, Ban, Check } from "lucide-react";
+import { Banknote, Ban, Check, Undo2 } from "lucide-react";
 import type { StanZwrotuPieniedzy } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
@@ -36,17 +36,23 @@ const KODY: Array<{ kod: string; etykieta: string }> = [
 ];
 const WYMAGA_POWODU = "REFUND_REJECTED";
 const LIMIT_POWODU = 250;
+/** `LIMIT_REFERENCJI` z `services/zwrot-pieniedzy.ts` — tytuł przelewu bywa długi. */
+const LIMIT_REFERENCJI = 140;
 
-export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
+export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew }: {
   stan: StanZwrotuPieniedzy;
   trwa: boolean;
   blad: string;
   onZwroc: () => void;
   onOdmow: (kod: string, powod: string | null) => void;
+  /** Zapis przelewu oddanego poza Allegro (0.269.0) i jego cofnięcie. */
+  onPrzelew?: (referencja: string | null) => void;
+  onCofnijPrzelew?: () => void;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   const [kod, setKod] = useState(KODY[0].kod);
   const [powod, setPowod] = useState("");
+  const [referencja, setReferencja] = useState("");
 
   const powodPusty = kod === WYMAGA_POWODU && powod.trim() === "";
 
@@ -90,6 +96,43 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow }: {
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. */}
     {stan.powod && !stan.oddane && !stan.odmowa &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
+
+    {/* ── PRZELEW ODDANY POZA ALLEGRO (0.269.0) ────────────────────────────
+        Przy pobraniu klient nigdy nie zapłacił Allegro, więc przycisk wyżej
+        jest zamknięty z definicji, a zwrot zamykał się BEZ ŚLADU po wypłacie:
+        jedynym dowodem był wyciąg bankowy poza aplikacją. Ten blok zapisuje
+        notatkę o przelewie — kiedy poszedł, kto go zlecił i pod jakim numerem
+        da się go znaleźć.
+
+        Cofnięcie zamiast potwierdzenia (§25a.5): to notatka o ruchu pieniędzy,
+        nie sam ruch, więc pomyłka w numerze jest odwracalna. */}
+    {stan.przelew && <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-slate-600">
+      <Check size={13} className="text-ranga-ok" />
+      <span>Oddano przelewem{stan.przelew.przez ? ` · ${stan.przelew.przez}` : ""}</span>
+      {stan.przelew.referencja && <span className="font-mono text-slate-500">
+        {stan.przelew.referencja}</span>}
+      {onCofnijPrzelew && <button type="button" disabled={trwa} onClick={onCofnijPrzelew}
+        title="Cofnij zapis o przelewie"
+        className="ml-1 inline-flex items-center gap-1 text-slate-500 underline
+          underline-offset-2 hover:text-slate-800 disabled:opacity-50">
+        <Undo2 size={12} />cofnij</button>}
+    </p>}
+
+    {!stan.przelew && stan.moznaZapisacPrzelew && onPrzelew &&
+      <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+        <label className="flex flex-1 items-center gap-2 text-xs font-semibold text-slate-600">
+          Numer przelewu
+          {/* OPCJONALNY: numer bywa znany dopiero z wyciągu, a wymóg kazałby
+              wpisać cokolwiek albo odłożyć zapis — czyli zostawić ten sam brak
+              śladu, który to wydanie usuwa. */}
+          <input className="field w-full text-sm" maxLength={LIMIT_REFERENCJI}
+            aria-label="Numer przelewu" placeholder="opcjonalny — z wyciągu"
+            value={referencja} onChange={(e) => setReferencja(e.target.value)} />
+        </label>
+        <Przycisk className="text-xs" disabled={trwa}
+          onClick={() => onPrzelew(referencja.trim() === "" ? null : referencja.trim())}>
+          {trwa ? "ZAPISUJĘ…" : "ZAPISZ PRZELEW"}</Przycisk>
+      </div>}
 
     {odmawiam && <div className="mt-2 space-y-2 border-t pt-2">
       <label className="block text-xs font-semibold text-slate-600">Powód odmowy

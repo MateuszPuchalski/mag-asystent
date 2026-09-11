@@ -12,7 +12,8 @@ import type { StanZwrotuPieniedzy } from "../api/typy";
 
 const stan = (n: Partial<StanZwrotuPieniedzy> = {}): StanZwrotuPieniedzy => ({
   moznaZwrocic: true, moznaOdmowic: true, powod: null,
-  kwotaGrosze: 6498, waluta: "PLN", oddane: null, odmowa: null, ...n,
+  kwotaGrosze: 6498, waluta: "PLN", oddane: null, odmowa: null,
+  przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null, ...n,
 });
 
 const ekran = (n: Partial<Parameters<typeof Pieniadze>[0]> = {}) =>
@@ -90,5 +91,52 @@ describe("Pieniądze przy zwrocie", () => {
   it("w trakcie żądania przycisk jest zablokowany", () => {
     ekran({ trwa: true });
     expect(screen.getByRole("button", { name: /ODDAJĘ…/ })).toBeDisabled();
+  });
+
+  /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────
+     Przy pobraniu to JEDYNY ślad po wypłacie, jaki może powstać. */
+  it("przy pobraniu daje pole na numer przelewu i zapisuje ślad", async () => {
+    const onPrzelew = vi.fn();
+    ekran({
+      stan: stan({
+        moznaZwrocic: false, powod: "Zamówienie za pobraniem — oddaj przelewem.",
+        moznaZapisacPrzelew: true,
+      }),
+      onPrzelew,
+    });
+    await userEvent.type(screen.getByLabelText("Numer przelewu"), "PRZ/2026/09/14");
+    await userEvent.click(screen.getByRole("button", { name: /ZAPISZ PRZELEW/ }));
+    expect(onPrzelew).toHaveBeenCalledWith("PRZ/2026/09/14");
+  });
+
+  /* Numer bywa znany dopiero z wyciągu — wymóg kazałby wpisać cokolwiek. */
+  it("pusty numer nie blokuje zapisu, a idzie jako brak", async () => {
+    const onPrzelew = vi.fn();
+    ekran({ stan: stan({ moznaZwrocic: false, moznaZapisacPrzelew: true }), onPrzelew });
+    await userEvent.click(screen.getByRole("button", { name: /ZAPISZ PRZELEW/ }));
+    expect(onPrzelew).toHaveBeenCalledWith(null);
+  });
+
+  it("zapisany przelew widać z numerem i da się go cofnąć", async () => {
+    const onCofnijPrzelew = vi.fn();
+    ekran({
+      stan: stan({
+        moznaZwrocic: false, moznaZapisacPrzelew: false,
+        przelew: { kiedy: "2026-09-14T10:00:00Z", przez: "Ala", referencja: "PRZ/1" },
+      }),
+      onCofnijPrzelew,
+    });
+    expect(screen.getByText(/Oddano przelewem/)).toBeInTheDocument();
+    expect(screen.getByText("PRZ/1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ZAPISZ PRZELEW/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /cofnij/i }));
+    expect(onCofnijPrzelew).toHaveBeenCalled();
+  });
+
+  /* Przy płatności online ten blok nie ma po co stać: pieniądze oddaje
+     Allegro, a druga droga obok pierwszej kazałaby wybierać. */
+  it("bez zgody serwera pola przelewu nie ma wcale", () => {
+    ekran({ stan: stan({ moznaZapisacPrzelew: false }), onPrzelew: vi.fn() });
+    expect(screen.queryByLabelText("Numer przelewu")).toBeNull();
   });
 });

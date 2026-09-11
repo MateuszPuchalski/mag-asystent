@@ -148,6 +148,31 @@ export function zamaskujWatek(wiadomosci: WiadomoscWatku[], login: string | null
 }
 
 /**
+ * Blok z nagłówkiem jako jeden bezpieczny tekst (0.282.0).
+ *
+ * Fakty ze sprawy idą tą samą drogą co wątek i to nie jest formalność: tytuł
+ * aukcji bywa wklejony z nazwiskiem, a opis zgłoszenia z adresem, pod który
+ * klient prosi o kuriera. Nagłówek NIE przechodzi przez maskowanie — piszemy
+ * go my, nie klient — ale treść tak.
+ */
+export function zamaskujBlok(
+  naglowek: string, tresc: string, login: string | null,
+): TrescBezpieczna {
+  return `${naglowek}\n${String(zamaskuj(tresc, login))}` as TrescBezpieczna;
+}
+
+/**
+ * Sklejenie kilku bezpiecznych kawałków.
+ *
+ * Bezpieczne z definicji: łańcuch złożony z samych zamaskowanych łańcuchów nie
+ * może zawierać nic, czego nie było w żadnym z nich. Rzut typu zostaje
+ * WEWNĄTRZ strażnika, więc wołający dalej nie umie wyprodukować marki sam.
+ */
+export function polacz(...czesci: TrescBezpieczna[]): TrescBezpieczna {
+  return czesci.filter((c) => String(c).trim() !== "").join("\n\n") as TrescBezpieczna;
+}
+
+/**
  * Czy w tekście ZOSTAŁY dane osobowe rozpoznawalne naszymi wzorcami.
  *
  * Drugi zamek, wołany PO maskowaniu i PRZED wyjściem w sieć. Fałszywy alarm

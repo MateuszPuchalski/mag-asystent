@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import {
-  urlDyskusji, urlWiadomosciDyskusji, zapytajAllegro,
+  urlDyskusji, urlSprawy, urlWiadomosciDyskusji, zapytajAllegro,
 } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
@@ -70,7 +70,12 @@ type Sprawa = {
   description?: string | null;
   right?: string | null;
   buyer?: { login?: string } | null;
-  checkoutForm?: { id?: string } | null;
+  /* `createdAt` CZYTAMY OD 0.282.0. `PostPurchaseIssueCheckoutForm` ma
+     dokładnie dwa pola i przez trzy wydania braliśmy jedno — a Copilot
+     wypisywał „data zakupu" w liście braków, pytając o to, co przyszło
+     z nią w tej samej odpowiedzi. Typ węższy od schematu potrafi ukryć
+     dane skuteczniej niż ich brak. */
+  checkoutForm?: { id?: string; createdAt?: string | null } | null;
   offer?: { id?: string | null; quantity?: number | null } | null;
   reason?: { type?: string; description?: string } | null;
   expectations?: Array<{ name?: string | null; refund?: Kwota | null }> | null;
@@ -112,6 +117,29 @@ const NA_STRONE = 100;
  * normalnej pracy wystarcza na wszystko, co się zmieniło od ostatniego taktu.
  */
 export const CZATOW_NA_PRZEBIEG = 20;
+
+/**
+ * Ile STRON rozmowy wolno przejść przy jednej sprawie (0.273.0).
+ *
+ * Bezpiecznik tego samego gatunku co `MAKS_STRON`, ale z innym powodem:
+ * budżet `CZATOW_NA_PRZEBIEG` liczy SPRAWY, nie żądania, więc bez tej
+ * granicy jedna rozmowa o tysiącu wiadomości zjadłaby cały takt sama.
+ * Pięć stron to pięćset wiadomości — więcej niż widziała sonda w całej
+ * historii konta.
+ */
+const MAKS_STRON_CZATU = 5;
+
+/**
+ * Statusy spraw, które jeszcze żyją (0.273.0).
+ *
+ * Wartości z `PostPurchaseIssueStatus`; pozostałe trzy — `CLAIM_ACCEPTED`,
+ * `CLAIM_REJECTED`, `DISPUTE_CLOSED` — są końcowe i po nich nikt już nie czeka
+ * na ruch biura. Ta sama trójka końcowa rządzi doborem rozmów do uzupełnienia,
+ * ale tam stoi w SQL-u: lista jedzie do Allegro, tamto pytanie do naszej bazy.
+ */
+const STATUSY_OTWARTE = [
+  "CLAIM_SUBMITTED", "DISPUTE_ONGOING", "DISPUTE_UNRESOLVED",
+] as const;
 
 export interface ReklamacjeSyncDeps {
   database?: Db;
@@ -183,28 +211,53 @@ export async function synchronizujAllegroReklamacje(
   const budzetCzatow = deps.czatow ?? CZATOW_NA_PRZEBIEG;
 
   /* JEDNA lista do zapisu, nie dwie. `typ` rozróżnia je w bazie, a rozdzielenie
-     ich tutaj kazałoby pamiętać o obu przy każdej zmianie zapisu. */
-  const sprawy: Sprawa[] = [];
+     ich tutaj kazałoby pamiętać o obu przy każdej zmianie zapisu.
+
+     MAPA, nie tablica (0.273.0): przebieg spraw otwartych i przebieg pełny
+     widzą te same wiersze, a licznik dyskusji ma liczyć sprawy, nie trafienia. */
+  const sprawy = new Map<string, Sprawa>();
   let pobrano = 0;
-  let dyskusji = 0;
   let wszystkich: number | null = null;
   /* Czy lista skończyła się sama. `false` znaczy, że urwał ją bezpiecznik
      stron — i wtedy reszta spraw zostaje po tamtej stronie. */
   let komplet = false;
 
-  try {
+  /** Jeden przelot listy; oddaje, czy skończyła się własnym końcem. */
+  const przelot = async (statusy: readonly string[]): Promise<{
+    komplet: boolean; pobrano: number; wszystkich: number | null;
+  }> => {
+    let ile = 0;
+    let count: number | null = null;
     for (let strona = 0; strona < MAKS_STRON; strona++) {
-      const body = await query(urlDyskusji(apiUrl, strona * NA_STRONE));
+      const body = await query(urlDyskusji(apiUrl, strona * NA_STRONE, statusy));
       const partia = tablica<Sprawa>(body, "issues");
-      if (strona === 0) wszystkich = liczba(body);
-      pobrano += partia.length;
+      if (strona === 0) count = liczba(body);
+      ile += partia.length;
       for (const sprawa of partia) {
         if (typeof sprawa?.id !== "string") continue;
-        sprawy.push(sprawa);
-        if (!czyReklamacja(sprawa)) dyskusji += 1;
+        sprawy.set(sprawa.id, sprawa);
       }
-      if (partia.length < NA_STRONE) { komplet = true; break; }
+      if (partia.length < NA_STRONE) return { komplet: true, pobrano: ile, wszystkich: count };
     }
+    return { komplet: false, pobrano: ile, wszystkich: count };
+  };
+
+  try {
+    /* NAJPIERW SPRAWY OTWARTE (0.273.0). Lista jedzie malejąco po dacie
+       otwarcia, a bezpiecznik stron ucina jej ogon — czyli sprawy NAJSTARSZE,
+       czyli najbardziej spóźnione, czyli dokładnie te, dla których ten ekran
+       powstał. Filtr `status` ze specyfikacji zawęża przelot do garści spraw
+       żywych, więc mieszczą się przed bezpiecznikiem niezależnie od tego, jak
+       długie jest archiwum.
+
+       Przelot pełny zostaje NIETKNIĘTY zaraz za nim: to on zamyka sprawy
+       rozstrzygnięte poza panelem i to z niego liczy się ogon. */
+    await przelot(STATUSY_OTWARTE);
+    const pelny = await przelot([]);
+    komplet = pelny.komplet;
+    pobrano = pelny.pobrano;
+    wszystkich = pelny.wszystkich;
+    const dyskusji = [...sprawy.values()].filter((s) => !czyReklamacja(s)).length;
 
     /* OGON, czyli czego ten przebieg NIE wziął. Lista domknięta własnym końcem
        nie ma ogona z definicji — nawet gdyby `count` mówił inaczej, bo między
@@ -216,7 +269,7 @@ export async function synchronizujAllegroReklamacje(
     let konto = 0;
     transaction(database, () => {
       konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
-      for (const sprawa of sprawy) zapisz(database, sprawa, konto, at);
+      for (const sprawa of sprawy.values()) zapisz(database, sprawa, konto, at);
       database.prepare(`INSERT INTO allegro_reklamacje_sync_state
         (id,last_success_at,last_attempt_at,last_error_code,error_count,
          next_attempt_at,pozostalo,dyskusji)
@@ -233,7 +286,7 @@ export async function synchronizujAllegroReklamacje(
     const czatow = await uzupelnijCzaty(database, konto, {
       query, apiUrl, limit: budzetCzatow,
     });
-    return { reklamacji: sprawy.length - dyskusji, dyskusji, czatow };
+    return { reklamacji: sprawy.size - dyskusji, dyskusji, czatow };
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
@@ -286,6 +339,12 @@ export function czatyDoUzupelnienia(
            ('CLAIM_ACCEPTED','CLAIM_REJECTED','DISPUTE_CLOSED')
        AND r.wiadomosci_ile >
            (SELECT COUNT(*) FROM reklamacja_wiadomosc w WHERE w.reklamacja_id = r.id)
+       /* Sprawa z rozmową urwaną przez NASZ bezpiecznik odpada (0.273.0):
+          warunek licznika będzie przy niej prawdziwy zawsze, więc bez tego
+          stałaby na czele budżetu w kółko i wypychała z niego sprawy, które
+          dałoby się domknąć. Jedna gruba rozmowa głodziła dziewiętnaście
+          pozostałych. */
+       AND COALESCE(r.czat_urwany, 0) = 0
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC,
               r.ostatnia_wiadomosc_at IS NULL, r.ostatnia_wiadomosc_at ASC, r.id ASC
      LIMIT ?`).all(konto, Math.max(0, limit)) as Array<{ id: number; external_id: string }>;
@@ -307,22 +366,73 @@ async function uzupelnijCzaty(
   if (opcje.limit <= 0) return 0;
   let ile = 0;
   for (const sprawa of czatyDoUzupelnienia(database, konto, opcje.limit)) {
-    let body: unknown | null;
-    try {
-      body = await opcje.query(urlWiadomosciDyskusji(opcje.apiUrl, sprawa.externalId));
-    } catch (e) {
-      if (e instanceof BladLimituAllegro) throw e;
-      continue;
-    }
-    const wiadomosci = Array.isArray((body as Record<string, unknown> | null)?.chat)
-      ? ((body as Record<string, unknown>).chat as Wiadomosc[]) : [];
-    if (!wiadomosci.length) continue;
-    transaction(database, () => {
-      for (const w of wiadomosci) zapiszWiadomosc(database, sprawa.id, w);
-    })();
-    ile += 1;
+    if (await pobierzCzat(database, sprawa, opcje)) ile += 1;
   }
   return ile;
+}
+
+/**
+ * Rozmowa JEDNEJ sprawy, wszystkie strony (0.273.0).
+ *
+ * Wydzielone, bo tę samą drogę przechodzi przebieg zbiorczy i odświeżenie
+ * pojedynczej sprawy z ekranu. Dwie kopie stronicowania rozjechałyby się przy
+ * pierwszej poprawce jednej z nich, a objawem byłaby rozmowa kompletna po
+ * kliknięciu i przycięta po takcie.
+ *
+ * Oddaje `true`, gdy cokolwiek zapisano.
+ */
+async function pobierzCzat(
+  database: Db, sprawa: { id: number; externalId: string },
+  opcje: { query: (url: string) => Promise<unknown | null>; apiUrl: string },
+): Promise<boolean> {
+  {
+    /* STRONICUJEMY, a nie bierzemy pierwszej setki (0.273.0). Do 0.272.0 to
+       żądanie szło RAZ, bez offsetu, choć `urlWiadomosciDyskusji` umiał go od
+       początku. Rozmowa dłuższa niż sto wiadomości była przez to przycięta na
+       zawsze — a ekran obiecywał przy niej, że „reszta dojdzie następną
+       synchronizacją". Nie dochodziła nigdy.
+
+       Gorzej: taka sprawa spełniała warunek `czatyDoUzupelnienia` po KAŻDYM
+       przebiegu i stała na czele budżetu w kółko, wypychając z niego sprawy,
+       które dałoby się domknąć. Jedna gruba rozmowa głodziła dziewiętnaście
+       pozostałych. */
+    let wzieto = 0;
+    let urwane = false;
+    for (let strona = 0; strona < MAKS_STRON_CZATU; strona++) {
+      let body: unknown | null;
+      try {
+        body = await opcje.query(
+          urlWiadomosciDyskusji(opcje.apiUrl, sprawa.externalId, strona * NA_STRONE));
+      } catch (e) {
+        if (e instanceof BladLimituAllegro) throw e;
+        /* Błąd przy JEDNEJ stronie kończy tę sprawę, nie przebieg — reszta
+           kolejki ma prawo się dociągnąć (ta sama zasada co przy 404). */
+        urwane = true;
+        break;
+      }
+      const wiadomosci = Array.isArray((body as Record<string, unknown> | null)?.chat)
+        ? ((body as Record<string, unknown>).chat as Wiadomosc[]) : [];
+      if (!wiadomosci.length) break;
+      transaction(database, () => {
+        for (const w of wiadomosci) zapiszWiadomosc(database, sprawa.id, w);
+      })();
+      wzieto += wiadomosci.length;
+      /* Strona niepełna znaczy koniec rozmowy — po nią nie wracamy. */
+      if (wiadomosci.length < NA_STRONE) break;
+      /* Ostatnia dozwolona strona była pełna: rozmowa ma dalszy ciąg, którego
+         ten przebieg nie weźmie. */
+      if (strona === MAKS_STRON_CZATU - 1) urwane = true;
+    }
+    if (!wzieto) return false;
+    /* ZNAK TRWAŁEGO OGONA. Bez niego wiersz wracałby do kolejki uzupełnień po
+       każdym przebiegu, a ekran obiecywałby resztę, która nie ma skąd przyjść. */
+    if (urwane) {
+      database.prepare("UPDATE reklamacja_klienta SET czat_urwany=1 WHERE id=?").run(sprawa.id);
+    } else {
+      database.prepare("UPDATE reklamacja_klienta SET czat_urwany=0 WHERE id=?").run(sprawa.id);
+    }
+    return true;
+  }
 }
 
 /**
@@ -365,13 +475,16 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
      wyłączyłoby odpowiadanie przy pierwszym polu, którego Allegro nie odda. */
   const czatAktywny = stan.chatActive === false ? 0 : 1;
   database.prepare(`INSERT INTO reklamacja_klienta
-    (channel_account_id,external_id,reference_number,order_id,offer_id,kupujacy_login,
+    (channel_account_id,external_id,reference_number,order_id,zamowienie_at,offer_id,kupujacy_login,
      typ,prawo,powod_typ,powod_opis,temat,opis,oczekiwanie,oczekiwana_kwota_grosze,waluta,
      status_allegro,decyzja_do,status_do,zwrot_wymagany,czat_aktywny,wiadomosci_ile,
      ostatnia_wiadomosc_status,ostatnia_wiadomosc_at,otwarto_at,synced_at,ilosc)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
+      /* Data zamówienia idzie też przy AKTUALIZACJI, nie tylko przy pierwszym
+         poznaniu sprawy — inaczej sprawy zastane zostałyby z NULL na zawsze. */
+      zamowienie_at=excluded.zamowienie_at,
       offer_id=excluded.offer_id, kupujacy_login=excluded.kupujacy_login,
       typ=excluded.typ, prawo=excluded.prawo, powod_typ=excluded.powod_typ,
       powod_opis=excluded.powod_opis, temat=excluded.temat, opis=excluded.opis,
@@ -385,6 +498,7 @@ function zapisz(database: Db, sprawa: Sprawa, konto: number, at: string): void {
       otwarto_at=excluded.otwarto_at, synced_at=excluded.synced_at,
       ilosc=excluded.ilosc`).run(
     konto, sprawa.id, sprawa.referenceNumber ?? null, sprawa.checkoutForm?.id ?? null,
+    sprawa.checkoutForm?.createdAt ?? null,
     sprawa.offer?.id ?? null, sprawa.buyer?.login ?? null,
     sprawa.type ?? "CLAIM", sprawa.right ?? null,
     sprawa.reason?.type ?? null, ludzki(sprawa.reason?.description),
@@ -495,4 +609,60 @@ function zapiszZalacznik(
     /* Nazwa pliku też bywa zakodowana — skrzynka dekoduje ją od 0.244.0
        (`zalaczniki-wiadomosci.ts`), bo po niej rozpoznaje się załącznik. */
     reklamacjaId, wiadomoscId, ludzki(z.fileName) ?? "", z.url);
+}
+
+/**
+ * Odświeżenie JEDNEJ sprawy — `GET /sale/issues/{issueId}` (0.273.0).
+ *
+ * Czwarta końcówka rodziny i do 0.272.0 jedyna nieużywana wcale. Bez niej
+ * świeży stan sprawy dawał wyłącznie PEŁNY przebieg listy, czyli takt trzech
+ * minut — a agent, który właśnie wysłał odpowiedź albo werdykt, patrzy na
+ * ekran teraz. Najgorzej wychodziło to przy wysyłce niejednoznacznej: pasek
+ * kazał sprawdzić w Centrum Sprzedaży coś, co jedno żądanie rozstrzyga.
+ *
+ * PRACA CZŁOWIEKA ZOSTAJE NIETKNIĘTA, bo zapis idzie tym samym `zapisz()`, co
+ * przebieg zbiorczy — `prowadzi`, `notatka`, `wersja` i werdykt są poza jego
+ * zasięgiem (blizna 0.128.0). Rozmowa dociąga się przy okazji i tą samą drogą
+ * co w takcie, więc stronicowanie jest jedno.
+ *
+ * Oddaje `false`, gdy sprawy nie ma w bazie; błędy sieci idą wyjątkiem do
+ * trasy, bo to ONA ma je nazwać człowiekowi.
+ */
+export async function odswiezSprawe(
+  reklamacjaId: number, deps: ReklamacjeSyncDeps = {},
+): Promise<boolean> {
+  const database = deps.database ?? defaultDb();
+  const query = deps.query ?? zapytajAllegro;
+  const now = deps.now ?? (() => new Date());
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+
+  const wiersz = database.prepare(
+    "SELECT external_id, channel_account_id FROM reklamacja_klienta WHERE id=?",
+  ).get(reklamacjaId) as { external_id: string; channel_account_id: number } | undefined;
+  if (!wiersz) return false;
+
+  const body = await query(urlSprawy(apiUrl, String(wiersz.external_id)));
+  /* Ładunek to POJEDYNCZA sprawa, nie tablica — `tablica()` z listy tu nie
+     pasuje, a brak `id` znaczy, że nie ma czego zapisać (ta sama zasada, co
+     przy przebiegu: schemat `PostPurchaseIssue` nie ma listy `required`). */
+  const sprawa = body as Sprawa | null;
+  if (typeof sprawa?.id !== "string") {
+    throw new Error("Allegro nie oddało sprawy w kształcie opisanym w docs/allegro-ksztalt.md");
+  }
+  transaction(database, () => {
+    zapisz(database, sprawa, Number(wiersz.channel_account_id), now().toISOString());
+  })();
+
+  /* Rozmowa PO transakcji i tylko wtedy, gdy licznik Allegro rozjechał się
+     z tym, co mamy — odświeżenie ma kosztować jedno żądanie, gdy nic nowego
+     nie przyszło. */
+  const braki = database.prepare(`SELECT
+      r.wiadomosci_ile - (SELECT COUNT(*) FROM reklamacja_wiadomosc w
+                           WHERE w.reklamacja_id = r.id) AS brakuje
+    FROM reklamacja_klienta r WHERE r.id=?`).get(reklamacjaId) as { brakuje: number } | undefined;
+  if ((braki?.brakuje ?? 0) > 0) {
+    await pobierzCzat(database, { id: reklamacjaId, externalId: String(wiersz.external_id) },
+      { query, apiUrl });
+  }
+  return true;
 }
