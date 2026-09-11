@@ -34,6 +34,51 @@ historii nie przepisujemy.
 ---
 
 
+## 0.276.0 — Copilot radzi w reklamacji
+
+**Właściciel odwrócił regułę z wydania sprzed kilku godzin.** 0.275.0 odrzucało
+kartę, w której padło słowo z rodziny werdyktu — moja decyzja, uzasadniona tym,
+że uznanie jest nieodwracalne. Zgłoszenie: „copilot powinien też radzić
+w reklamacji". Wie to lepiej ode mnie: to on wydaje te werdykty i on płaci za
+ich skutki.
+
+**Bramka nie znika, tylko zmienia cel.** Rada mieszka wyłącznie w polu `rada`,
+typowanym i podpisanym na ekranie. Pola opisowe — usterka, kiedy, oczekiwanie,
+dowody — mają zostać tym, co powiedział klient, i pilnuje tego ta sama
+deterministyczna bramka co wcześniej. Bez niej model przemyciłby werdykt w polu,
+które wygląda jak cytat z kupującego, a agent czytałby „reklamacja zasadna"
+jako słowa klienta, nie jako opinię maszyny.
+
+**Rada jest typowana, nie prozą**: jedna z jedenastu wartości werdyktu Allegro
+albo dwunasta, nasza — `POPROSIC_O_DOWODY`, czyli „nie ma jeszcze czego
+rozstrzygać". Prozą byłoby ładniej i nie dałoby się tego zmierzyć.
+
+**Pewność bez nazwanej niewiedzy jest odrzucana.** Model deklarujący „wysoką"
+musi wymienić co najmniej jedną rzecz, której nie wie, a która zmieniłaby radę.
+Deklaracja pewności bez tego nie jest pewnością, tylko brawurą — a karta z nią
+nie zapisuje się wcale. Uzasadnienie rady ma cytat i jest sprawdzane jak reszta;
+rada z numerem wiadomości, której nie ma, znika CAŁA, bo rekomendacja bez
+podstawy to gołe „uznaj", a takie zdanie wygląda na ugruntowane.
+
+**Trafność liczy się z faktu, nie z ankiety.** Gdy werdykt wychodzi, serwis
+porównuje go z radą i dopisuje `trafna`/`nietrafna`. Rekomendacja jest typowana
+tym samym słownikiem, więc porównanie to równość dwóch napisów — nikogo nie
+trzeba pytać, czy maszyna trafiła. `schema.sql` nosi przy klasyfikacji zdanie
+z wcześniejszej krytyki właściciela: „confidence bez konsekwencji to…"; tutaj
+domyka się samo.
+
+**Czego rada NIE robi: nie dotyka formularza werdyktu.** Nie zaznacza opcji,
+nie otwiera dialogu, nie podstawia wiadomości. Powód jest wąski i techniczny,
+nie moralny: Allegro nie przyjmie drugiego werdyktu w sprawie, więc różnica
+między „przeczytaj i zdecyduj" a „potwierdź" jest tu nieodwracalna. Gdyby
+właściciel chciał także podstawienia, jest to inna decyzja i osobne wydanie.
+
+Werdykt działa dalej bez Copilota — ocena rady jest cicha przy braku karty.
+Copilot jest dodatkiem, a werdykt podstawową pracą biura.
+
+---
+
+
 ## 0.275.0 — 11 września 2026
 
 **Copilot czyta sprawę reklamacyjną i wypisuje, czego w niej brakuje.**

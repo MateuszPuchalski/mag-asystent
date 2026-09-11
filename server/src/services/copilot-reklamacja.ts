@@ -9,12 +9,23 @@ import { zamaskujWatek, type TrescBezpieczna, type WiadomoscWatku } from "./copi
    Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
    reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
 
-   CZEGO TEN MODUŁ NIE ROBI I NIGDY NIE BĘDZIE ROBIŁ: nie podpowiada werdyktu.
-   Uznanie i odrzucenie są nieodwracalne wobec kupującego, stoją za
-   `autoryzuj()` i za jawną zgodą — a zdanie „ta reklamacja wygląda na
-   zasadną" przesuwałoby decyzję, nie pomagając jej podjąć. Model, który
-   napisze cokolwiek z tej rodziny słów, dostaje odmowę od DETERMINISTYCZNEJ
-   bramki niżej, nie od promptu. Prompt jest prośbą; bramka jest regułą.
+   OD 0.276.0 COPILOT TAKŻE RADZI. Do 0.275.0 ten moduł odrzucał kartę,
+   w której padło słowo z rodziny werdyktu — moja decyzja, uzasadniona tym, że
+   uznanie jest nieodwracalne. Właściciel odwrócił ją tego samego dnia:
+   „copilot powinien też radzić w reklamacji". Wie to lepiej: to on wydaje te
+   werdykty i on płaci za ich skutki.
+
+   BRAMKA NIE ZNIKA, TYLKO ZMIENIA CEL. Rada mieszka WYŁĄCZNIE w polu
+   `rekomendacja` — typowanym, podpisanym na ekranie jako zdanie maszyny.
+   Pola faktograficzne (`usterka`, `kiedy`, `oczekiwanie`, `dowody`) mają
+   zostać opisem tego, co powiedział klient, i pilnuje tego ta sama
+   deterministyczna bramka co wcześniej. Bez niej model przemyciłby werdykt
+   w polu, które wygląda jak cytat z kupującego, a agent czytałby to jako
+   słowa klienta.
+
+   REKOMENDACJA JEST TYPOWANA, NIE PROZĄ. Prozą byłoby ładniej i nie dałoby
+   się tego zmierzyć — a rada bez pomiaru to nie rada. Trafność liczy się
+   z FAKTU: porównujemy radę z werdyktem, który agent naprawdę wysłał.
 
    Co robi: czyta rozmowę, która bywa długa i wielojęzyczna, i wyciąga z niej
    cztery rzeczy, których agent szuka za każdym razem ręcznie — co się zepsuło,
@@ -36,6 +47,41 @@ import { zamaskujWatek, type TrescBezpieczna, type WiadomoscWatku } from "./copi
 /** Pole karty razem z cytatem — numer wiadomości, z której pochodzi. */
 export interface PoleKarty { tresc: string; zrodlo: string }
 
+/**
+ * Co maszyna radzi zrobić (0.276.0).
+ *
+ * Jedenaście wartości `ClaimStatusChangeRequest.status` plus dwunasta, NASZA:
+ * `POPROSIC_O_DOWODY` znaczy „nie ma jeszcze czego rozstrzygać". Bez niej
+ * model musiałby wybrać werdykt nawet wtedy, gdy w rozmowie brakuje podstaw —
+ * czyli zgadywać, i to zgadywać w najgorszym możliwym miejscu.
+ */
+export const REKOMENDACJE = [
+  "ACCEPTED_REPAIR", "ACCEPTED_REFUND", "ACCEPTED_EXCHANGE", "ACCEPTED_PARTIAL_REFUND",
+  "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED", "REJECTED_PRODUCT_NOT_RETURNED",
+  "REJECTED_PRODUCT_DAMAGED_BY_USER", "REJECTED_PRODUCT_CONFORMS_TO_CONTRACT",
+  "REJECTED_MINOR_DEFECT", "REJECTED_OTHER", "REJECTED_CLAIM_WITHDRAWN_BY_BUYER",
+  "POPROSIC_O_DOWODY",
+] as const;
+export type Rekomendacja = (typeof REKOMENDACJE)[number];
+
+/** Trzy poziomy, te same co przy klasyfikacji — jeden słownik w głowie agenta. */
+export const PEWNOSCI_RADY = ["wysoka", "srednia", "niska"] as const;
+export type PewnoscRady = (typeof PEWNOSCI_RADY)[number];
+
+/**
+ * Rada maszyny: co zrobić, dlaczego, jak pewnie i CZEGO NIE WIE.
+ *
+ * `czegoNieWiem` jest przeciwwagą dla `pewnosc`, a nie ozdobą: model, który
+ * nie umie nazwać własnej niewiedzy, nie ma prawa deklarować wysokiej
+ * pewności — i serwis mu na to nie pozwala.
+ */
+export interface RadaMaszyny {
+  co: Rekomendacja;
+  uzasadnienie: PoleKarty;
+  pewnosc: PewnoscRady;
+  czegoNieWiem: string[];
+}
+
 export interface KartaSprawy {
   /** Co jest zepsute, słowami klienta. */
   usterka: PoleKarty | null;
@@ -47,6 +93,8 @@ export interface KartaSprawy {
   dowody: PoleKarty[];
   /** Czego BRAKUJE, żeby dało się rozstrzygnąć. Najcenniejsza pozycja. */
   brakuje: string[];
+  /** Co maszyna radzi (0.276.0); `null`, gdy nie miała z czego poradzić. */
+  rada: RadaMaszyny | null;
 }
 
 export interface OdpowiedzRozpoznania extends KartaSprawy {
@@ -59,12 +107,21 @@ export interface OdpowiedzRozpoznania extends KartaSprawy {
 export type NadawcaRozpoznania = (tresc: TrescBezpieczna) => Promise<OdpowiedzRozpoznania>;
 
 /**
- * Słowa werdyktu. Karta, w której padnie którekolwiek, jest ODRZUCANA w całości.
+ * Słowa werdyktu w polach FAKTOGRAFICZNYCH (0.276.0).
+ *
+ * Do 0.275.0 ta lista odrzucała całą kartę, bo maszyna nie miała radzić wcale.
+ * Od 0.276.0 radzi — ale wyłącznie w polu `rada`, typowanym i podpisanym na
+ * ekranie. `usterka`, `kiedy`, `oczekiwanie` i `dowody` mają zostać OPISEM
+ * tego, co powiedział klient.
+ *
+ * Bez tej bramki model przemyciłby werdykt w polu, które wygląda jak cytat
+ * z kupującego — a agent czytałby „reklamacja zasadna" jako słowa klienta,
+ * nie jako opinię maszyny. Podpis pod radą chroni przed pomyleniem autora
+ * tylko wtedy, gdy rada stoi tam, gdzie ma stać.
  *
  * Lista jest krótka i celowo nie próbuje być kompletna — nie da się wyliczyć
  * wszystkich sposobów, na jakie da się zasugerować decyzję. Łapie przypadek
- * typowy, czyli model, który „pomaga" wnioskiem; reszta zostaje przy
- * człowieku, bo to on klika przycisk z jawną zgodą.
+ * typowy: model, który „pomaga" wnioskiem wciśniętym w opis usterki.
  */
 const SLOWA_WERDYKTU = [
   "uzna", "odrzu", "zasadn", "niezasadn", "bezpodstawn", "przyzna", "odmów", "odmow",
@@ -114,6 +171,15 @@ export function odsiejBezPokrycia(
     odsiano += 1;
     return false;
   });
+  /* UZASADNIENIE RADY TEŻ MA CYTAT i jest sprawdzane tak samo. Rada oparta na
+     wiadomości, której nie ma, jest gorsza od braku rady: wygląda na
+     ugruntowaną. Odsiew kasuje wtedy CAŁĄ radę, nie samo uzasadnienie —
+     rekomendacja bez podstawy to gołe „uznaj", a tego agent ma nie zobaczyć. */
+  let rada = karta.rada;
+  if (rada && !numery.has(rada.uzasadnienie.zrodlo)) {
+    rada = null;
+    odsiano += 1;
+  }
   return {
     karta: {
       usterka: pole(karta.usterka),
@@ -123,6 +189,7 @@ export function odsiejBezPokrycia(
       /* `brakuje` NIE MA cytatu z natury rzeczy: mówi o tym, czego w rozmowie
          NIE MA. Sprawdza je bramka słów werdyktu, nie bramka numerów. */
       brakuje: karta.brakuje,
+      rada,
     },
     odsiano,
   };
@@ -131,7 +198,7 @@ export function odsiejBezPokrycia(
 /** Czy z karty cokolwiek zostało — pusta nie ma po co trafiać na ekran. */
 export function pustaKarta(k: KartaSprawy): boolean {
   return !k.usterka && !k.kiedy && !k.oczekiwanie && k.dowody.length === 0
-    && k.brakuje.length === 0;
+    && k.brakuje.length === 0 && !k.rada;
 }
 
 export interface ZadanieRozpoznania {
@@ -183,15 +250,26 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     throw e;
   }
 
-  /* BRAMKA WERDYKTU stoi PRZED zapisem i obejmuje całą kartę naraz: model,
-     który podpowiada rozstrzygnięcie w jednym polu, podpowiada je w tej
-     karcie, a nie w tym polu. */
-  const caly = JSON.stringify(odp);
-  if (sugerujeWerdykt(caly)) {
-    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "sugestia werdyktu", z.kto, teraz);
+  /* BRAMKA WERDYKTU obejmuje POLA FAKTOGRAFICZNE, nie całą kartę (0.276.0).
+     Rada jest teraz dozwolona, ale ma stać w swoim polu — w `usterka` czy
+     `dowody` byłaby podpisana słowami klienta. */
+  const fakty = JSON.stringify([odp.usterka, odp.kiedy, odp.oczekiwanie, odp.dowody]);
+  if (sugerujeWerdykt(fakty)) {
+    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "werdykt w faktach", z.kto, teraz);
     throw new Error(
-      "Copilot próbował podpowiedzieć rozstrzygnięcie — karta odrzucona. " +
-      "Werdykt wydaje człowiek, a maszyna zbiera fakty.");
+      "Copilot wpisał rozstrzygnięcie w pole opisujące słowa klienta — karta " +
+      "odrzucona. Rada ma stać w swoim polu i być podpisana jako rada.");
+  }
+
+  /* PEWNOŚĆ BEZ NAZWANEJ NIEWIEDZY TO BRAWURA, nie pewność. Model, który
+     deklaruje „wysoka" i nie umie powiedzieć, co by go przekonało do zmiany
+     zdania, nie zważył sprawy — zgadł. Karta leci, a nie sama rada: taka
+     odpowiedź podważa też resztę. */
+  if (odp.rada && odp.rada.pewnosc === "wysoka" && odp.rada.czegoNieWiem.length === 0) {
+    zapiszWywolanie(database, z.reklamacjaId, odp, "blad", "pewnosc bez niewiedzy", z.kto, teraz);
+    throw new Error(
+      "Copilot zadeklarował wysoką pewność, nie nazywając ani jednej rzeczy, " +
+      "której nie wie — karta odrzucona.");
   }
 
   const { karta, odsiano } = odsiejBezPokrycia(odp, numery);
@@ -203,19 +281,30 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
   transaction(database, () => {
     database.prepare(`INSERT INTO reklamacja_karta
       (reklamacja_id, usterka, usterka_zrodlo, kiedy, kiedy_zrodlo,
-       oczekiwanie, oczekiwanie_zrodlo, dowody, brakuje, model, przez, przez_user_id, at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+       oczekiwanie, oczekiwanie_zrodlo, dowody, brakuje,
+       rekomendacja, pewnosc, uzasadnienie, uzasadnienie_zrodlo, czego_nie_wiem,
+       model, przez, przez_user_id, at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(reklamacja_id) DO UPDATE SET
         usterka=excluded.usterka, usterka_zrodlo=excluded.usterka_zrodlo,
         kiedy=excluded.kiedy, kiedy_zrodlo=excluded.kiedy_zrodlo,
         oczekiwanie=excluded.oczekiwanie, oczekiwanie_zrodlo=excluded.oczekiwanie_zrodlo,
-        dowody=excluded.dowody, brakuje=excluded.brakuje, model=excluded.model,
-        przez=excluded.przez, przez_user_id=excluded.przez_user_id, at=excluded.at`).run(
+        dowody=excluded.dowody, brakuje=excluded.brakuje,
+        rekomendacja=excluded.rekomendacja, pewnosc=excluded.pewnosc,
+        uzasadnienie=excluded.uzasadnienie, uzasadnienie_zrodlo=excluded.uzasadnienie_zrodlo,
+        czego_nie_wiem=excluded.czego_nie_wiem, model=excluded.model,
+        przez=excluded.przez, przez_user_id=excluded.przez_user_id, at=excluded.at,
+        /* NOWA RADA KASUJE STARĄ OCENĘ. Trafność dotyczy TAMTEJ rekomendacji;
+           przeniesiona na nową byłaby pomiarem czegoś, czego nikt nie ocenił. */
+        ocena=NULL, ocena_at=NULL`).run(
       z.reklamacjaId,
       karta.usterka?.tresc ?? null, karta.usterka?.zrodlo ?? null,
       karta.kiedy?.tresc ?? null, karta.kiedy?.zrodlo ?? null,
       karta.oczekiwanie?.tresc ?? null, karta.oczekiwanie?.zrodlo ?? null,
       JSON.stringify(karta.dowody), JSON.stringify(karta.brakuje),
+      karta.rada?.co ?? null, karta.rada?.pewnosc ?? null,
+      karta.rada?.uzasadnienie.tresc ?? null, karta.rada?.uzasadnienie.zrodlo ?? null,
+      JSON.stringify(karta.rada?.czegoNieWiem ?? []),
       odp.model, z.kto.name, z.kto.id, teraz.toISOString());
 
     zapiszWywolanie(database, z.reklamacjaId, odp, "ok", null, z.kto, teraz);
@@ -232,7 +321,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
 
 /** Karta zapisana przy sprawie; `null`, gdy nikt jeszcze nie prosił. */
 export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (KartaSprawy & {
-  model: string; przez: string | null; at: string;
+  model: string; przez: string | null; at: string; ocena: string | null;
 }) | null {
   const w = database.prepare("SELECT * FROM reklamacja_karta WHERE reklamacja_id=?")
     .get(reklamacjaId) as Record<string, unknown> | undefined;
@@ -242,12 +331,20 @@ export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (Kart
   const lista = <T>(v: unknown): T[] => {
     try { return JSON.parse(String(v ?? "[]")) as T[]; } catch { return []; }
   };
+  const uzasadnienie = pole(w.uzasadnienie, w.uzasadnienie_zrodlo);
   return {
     usterka: pole(w.usterka, w.usterka_zrodlo),
     kiedy: pole(w.kiedy, w.kiedy_zrodlo),
     oczekiwanie: pole(w.oczekiwanie, w.oczekiwanie_zrodlo),
     dowody: lista<PoleKarty>(w.dowody),
     brakuje: lista<string>(w.brakuje),
+    rada: w.rekomendacja == null || !uzasadnienie ? null : {
+      co: String(w.rekomendacja) as Rekomendacja,
+      uzasadnienie,
+      pewnosc: String(w.pewnosc ?? "niska") as PewnoscRady,
+      czegoNieWiem: lista<string>(w.czego_nie_wiem),
+    },
+    ocena: w.ocena == null ? null : String(w.ocena),
     model: String(w.model ?? ""),
     przez: w.przez == null ? null : String(w.przez),
     at: String(w.at ?? ""),
@@ -269,3 +366,57 @@ function zapiszWywolanie(
 
 /** Koszt jednego rozpoznania — do paska na ekranie ustawień. */
 export const kosztRozpoznania = (model: string, t: Tokeny): number => kosztUsd(model, t);
+
+/**
+ * Trafność rady — liczona z FAKTU, nie z ankiety (0.276.0).
+ *
+ * `schema.sql` niesie przy klasyfikacji zdanie z krytyki właściciela:
+ * „confidence bez konsekwencji to…". Tutaj domyka się ono samo, bo nie trzeba
+ * nikogo pytać: rekomendacja jest typowana tym samym słownikiem, co werdykt,
+ * więc porównanie jest równością dwóch napisów.
+ *
+ * Wołane PO udanym werdykcie i nigdy przed. Funkcja jest CICHA przy braku
+ * karty: Copilot jest dodatkiem, a werdykt podstawową pracą biura — reklamacja
+ * rozstrzygnięta bez rady ma zapaść dokładnie tak samo.
+ *
+ * `POPROSIC_O_DOWODY` NIE JEST porównywane z werdyktem i to nie jest luka.
+ * Ta rada mówi „jeszcze nie rozstrzygaj", więc każdy werdykt po niej może być
+ * słuszny — zapadł później i na innym materiale. Ocena zostaje `null`, czyli
+ * „nie ma z czym porównać", zamiast udawać pomiar.
+ */
+export function ocenRekomendacje(
+  database: DatabaseSync, reklamacjaId: number, werdykt: string, teraz = new Date(),
+): "trafna" | "nietrafna" | null {
+  const w = database.prepare(
+    "SELECT rekomendacja FROM reklamacja_karta WHERE reklamacja_id=?").get(reklamacjaId) as
+    { rekomendacja: string | null } | undefined;
+  const rada = w?.rekomendacja ?? null;
+  if (!rada || rada === "POPROSIC_O_DOWODY") return null;
+
+  const ocena = rada === werdykt ? "trafna" : "nietrafna";
+  database.prepare("UPDATE reklamacja_karta SET ocena=?, ocena_at=? WHERE reklamacja_id=?")
+    .run(ocena, teraz.toISOString(), reklamacjaId);
+  return ocena;
+}
+
+/**
+ * Ile rad, ile trafnych — do karty Copilota na ekranie ustawień.
+ *
+ * Bez tej liczby po miesiącu nikt nie będzie umiał powiedzieć, czy rada pomaga.
+ * `ocenionych` jest osobno od `rad`, bo sprawy bez werdyktu nie są ani
+ * sukcesem, ani porażką modelu — są niedokończone.
+ */
+export function trafnoscRad(database: DatabaseSync): {
+  rad: number; ocenionych: number; trafnych: number;
+} {
+  const w = database.prepare(`SELECT
+      COUNT(rekomendacja) AS rad,
+      COUNT(ocena) AS ocenionych,
+      SUM(CASE WHEN ocena='trafna' THEN 1 ELSE 0 END) AS trafnych
+    FROM reklamacja_karta`).get() as Record<string, number | null>;
+  return {
+    rad: Number(w.rad ?? 0),
+    ocenionych: Number(w.ocenionych ?? 0),
+    trafnych: Number(w.trafnych ?? 0),
+  };
+}

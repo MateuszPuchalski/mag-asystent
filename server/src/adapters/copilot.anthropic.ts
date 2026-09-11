@@ -14,6 +14,7 @@ import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.j
 import type {
   NadawcaRozpoznania, OdpowiedzRozpoznania,
 } from "../services/copilot-reklamacja.js";
+import { PEWNOSCI_RADY, REKOMENDACJE } from "../services/copilot-reklamacja.js";
 import { ZRODLA_TWIERDZENIA, POZIOMY_PEWNOSCI } from "../services/copilot-szkic.js";
 import { ROLE_PASOWANIA } from "../services/pasowania.js";
 import { LIMIT_ZNAKOW } from "../services/wysylka.js";
@@ -653,15 +654,29 @@ const Karta = z.object({
   oczekiwanie: PoleKartyZ.nullable(),
   dowody: z.array(PoleKartyZ),
   brakuje: z.array(z.string()),
+  /* RADA JEST TYPOWANA (0.276.0). Prozą byłoby ładniej i nie dałoby się tego
+     zmierzyć — a rada bez pomiaru to nie rada. Enum trzyma te same wartości,
+     co werdykt wysyłany do Allegro, więc trafność liczy się porównaniem
+     dwóch napisów, bez ankiety dla agenta. */
+  rada: z.object({
+    co: z.enum(REKOMENDACJE),
+    uzasadnienie: PoleKartyZ,
+    pewnosc: z.enum(PEWNOSCI_RADY),
+    czegoNieWiem: z.array(z.string()),
+  }).nullable(),
 });
 
 const INSTRUKCJA_KARTY = [
   "Jesteś asystentem biura obsługi w sklepie z częściami do sprzętu ogrodniczego.",
   "Dostajesz rozmowę reklamacyjną. Każda wiadomość ma numer w nawiasie, np. [W3].",
   "",
-  "Twoim zadaniem jest ZEBRAĆ FAKTY, nie ocenić sprawy.",
-  "NIE WOLNO CI sugerować, czy reklamację uznać, czy odrzucić, ani czy jest zasadna.",
-  "Decyzję podejmuje człowiek; karta z taką sugestią zostanie odrzucona w całości.",
+  "Masz dwa zadania: ZEBRAĆ FAKTY i PORADZIĆ, co z nimi zrobić.",
+  "",
+  "Fakty i rada stoją w OSOBNYCH polach i nie wolno ich mieszać.",
+  "W polach opisowych (usterka, kiedy, oczekiwanie, dowody) pisz WYŁĄCZNIE to,",
+  "co powiedział klient. Zdanie w rodzaju \u201ereklamacja zasadna\u201d w tych polach",
+  "jest błędem: wygląda jak cytat z kupującego, a jest Twoją opinią.",
+  "Karta z opinią w polu opisowym zostanie odrzucona w całości.",
   "",
   "Wypełnij pola WYŁĄCZNIE tym, co pada w rozmowie:",
   "- usterka: co jest zepsute, słowami klienta;",
@@ -670,6 +685,16 @@ const INSTRUKCJA_KARTY = [
   "- dowody: co klient już przysłał albo opisał jako dowód.",
   "Przy każdym z tych pól podaj `zrodlo` — numer wiadomości, z której to masz.",
   "Pole, którego w rozmowie nie ma, zostaw puste. Nie zgaduj i nie uzupełniaj.",
+  "",
+  "- rada: co zrobić ze sprawą.",
+  "  `co` wybierz z listy; `POPROSIC_O_DOWODY` znaczy \u201enie ma jeszcze czego",
+  "  rozstrzygać\u201d i jest właściwą odpowiedzią częściej, niż się wydaje.",
+  "  `uzasadnienie` musi mieć `zrodlo` — numer wiadomości, na której się opierasz.",
+  "  `pewnosc` to wysoka, srednia albo niska.",
+  "  `czegoNieWiem` wymień rzeczy, których w rozmowie nie ma, a które zmieniłyby",
+  "  Twoją radę. Deklarując wysoką pewność, MUSISZ wymienić co najmniej jedną —",
+  "  inaczej karta zostanie odrzucona. Pewność bez nazwanej niewiedzy to brawura.",
+  "  Radę zobaczy człowiek, który sam kliknie werdykt; nic nie wysyła się samo.",
   "",
   "- brakuje: czego BRAKUJE, żeby dało się rozstrzygnąć sprawę.",
   "To jedyne pole bez cytatu, bo mówi o tym, czego w rozmowie nie ma.",
@@ -714,7 +739,7 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
 
       return {
         usterka: w.usterka, kiedy: w.kiedy, oczekiwanie: w.oczekiwanie,
-        dowody: w.dowody, brakuje: w.brakuje,
+        dowody: w.dowody, brakuje: w.brakuje, rada: w.rada,
         model: odp.model ?? config.copilot.model,
         zuzycie, ms: Date.now() - start,
       };

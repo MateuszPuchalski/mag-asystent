@@ -1205,9 +1205,30 @@ export interface KartaSprawy {
   oczekiwanie: PoleKarty | null;
   dowody: PoleKarty[];
   brakuje: string[];
+  /** Co maszyna RADZI zrobić (0.276.0); `null`, gdy nie miała z czego. */
+  rada: RadaMaszyny | null;
+  /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
+  ocena: string | null;
   model: string;
   przez: string | null;
   at: string;
+}
+
+/**
+ * Rada maszyny: co zrobić, dlaczego, jak pewnie i CZEGO NIE WIE.
+ *
+ * `co` to jedna z jedenastu wartości werdyktu Allegro albo `POPROSIC_O_DOWODY`
+ * — nasza dwunasta, znacząca „nie ma jeszcze czego rozstrzygać".
+ *
+ * `czegoNieWiem` jest przeciwwagą dla `pewnosc`, nie ozdobą: serwer odrzuca
+ * kartę, w której model deklaruje wysoką pewność i nie umie nazwać ani jednej
+ * rzeczy, której nie wie.
+ */
+export interface RadaMaszyny {
+  co: string;
+  uzasadnienie: PoleKarty;
+  pewnosc: string;
+  czegoNieWiem: string[];
 }
 
 /* ── Dyskusje (0.245.0) ──────────────────────────────────────────────────────
