@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -44,6 +44,13 @@ const scena = vi.hoisted(() => ({
   /* Ręczna synchronizacja jedzie do Allegro, więc w teście stoi atrapa:
      inaczej kliknięcie strzelałoby `fetch`-em w nieistniejący serwer. */
   synchronizuj: { wolano: 0, blad: "" as string },
+  /* Lista wymienna, bo klawisze kubełka DO OCENY potrzebują zwrotu
+     dwupozycyjnego, a dokładanie go do stałej listy przestawiłoby liczniki
+     w testach szukania („2 pasujących zwrotów"). */
+  zwroty: null as unknown[] | null,
+  /* Decyzje z klawiatury MUSZĄ mieć atrapę: prawdziwa mutacja strzela
+     `fetch`-em, a test sprawdza właśnie to, czy klawisz ją woła. */
+  wolano: [] as Array<{ co: string; dane: Record<string, unknown> }>,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -58,13 +65,41 @@ vi.mock("../api/zwroty", async () => {
       },
     }),
     useZwroty: () => ({
-      data: { zwroty: ZWROTY, liczniki: { decyzja: 1, ocena: 0, zwrot: 1, korekta: 0,
-        zamkniety: 0, odrzucony: 0 },
+      data: { zwroty: scena.zwroty ?? ZWROTY,
+        liczniki: { decyzja: 1, ocena: 0, zwrot: 1, korekta: 0,
+          zamkniety: 0, odrzucony: 0 },
         kartoteki: scena.kartoteki, stan: scena.stan },
       isLoading: false, error: null,
     }),
+    useWerdykt: () => atrapa("werdykt"),
+    useOcena: () => atrapa("ocena"),
+    useKorekta: () => atrapa("korekta"),
+    useKwota: () => atrapa("kwota"),
+    useCofnijKorekte: () => atrapa("cofnijKorekte"),
   };
 });
+
+/**
+ * Atrapa mutacji: zapisuje wołanie i oddaje wersję o jeden wyższą.
+ *
+ * Wersja rośnie, bo ocena hurtem chodzi PO KOLEI i podaje następnemu żądaniu
+ * wersję oddaną przez poprzednie — atrapa zwracająca ciągle tę samą przepuściłaby
+ * kod, który na serwerze odbiłby się od blokady optymistycznej.
+ */
+function atrapa(co: string) {
+  const zapisz = (dane: Record<string, unknown>) => {
+    scena.wolano.push({ co, dane });
+    return { wersja: Number(dane.wersja ?? 1) + 1, koszyk: null };
+  };
+  return {
+    isPending: false, error: null,
+    mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+      const w = zapisz(dane);
+      opcje?.onSuccess?.(w);
+    },
+    mutateAsync: async (dane: Record<string, unknown>) => zapisz(dane),
+  };
+}
 
 const { Zwroty } = await import("./Zwroty");
 
@@ -258,5 +293,102 @@ describe("Ekran zwrotów", () => {
     scena.stan = { status: "current", kodOstatniegoBledu: null, pozostaloDoPobrania: null };
     pokaz();
     expect(screen.queryByText(/Wiązanie idzie taktem/)).not.toBeInTheDocument();
+  });
+});
+
+/* ── Klawisze kubełka (0.284.0) ──────────────────────────────────────────────
+   Do 0.283.0 ekran rysował te litery przy przyciskach jako `<kbd>`, a żadna
+   z nich nic nie robiła: nasłuch znał wyłącznie `j`/`k` i cyfry kubełków.
+   Doktryna §25a.2 wypisywała je w tabeli, a §25a.3 obiecywał, że „typowy zwrot
+   to jeden klawisz" — więc obietnicę składał ekran i dokument naraz, a
+   dotrzymywała jej mysz.                                                     */
+describe("Klawisze kubełka", () => {
+  const dwiePozycje = (id: number) => {
+    const z = zwrot(id, "ocena", `ZO-${id}`);
+    return { ...z, pozycje: [
+      { ...z.pozycje[0], id: id * 10 + 1, ocena: null },
+      { ...z.pozycje[0], id: id * 10 + 2, ocena: null },
+    ] };
+  };
+
+  it("`P` w DO DECYZJI przyjmuje zwrot", async () => {
+    scena.wolano = [];
+    pokaz("/obsluga/zwroty/1");
+    await userEvent.keyboard("p");
+    /* `waitFor`, bo pierwszy znak serii czeka 40 ms na drugi: nasłuch nie wie
+       w chwili naciśnięcia, czy to skrót, czy początek kodu z czytnika. */
+    await waitFor(() => expect(scena.wolano).toEqual([{ co: "werdykt",
+      dane: { id: 1, decyzja: "przyjety", powod: null, wersja: 1 } }]));
+  });
+
+  it("`O` OTWIERA POWÓD, a nie zapisuje odmowy", async () => {
+    /* Odmowa jest nieodwracalna, więc §25a.5 daje jej potwierdzenie. Klawisz
+       ma skracać drogę do pytania, nie omijać samo pytanie. */
+    scena.wolano = [];
+    pokaz("/obsluga/zwroty/1");
+    await userEvent.keyboard("o");
+    expect(await screen.findByLabelText(/Powód odmowy/)).toBeInTheDocument();
+    expect(scena.wolano).toEqual([]);
+  });
+
+  it("`S` ocenia PIERWSZĄ nieocenioną pozycję, nie cały zwrot", async () => {
+    scena.wolano = [];
+    scena.zwroty = [dwiePozycje(3)];
+    try {
+      pokaz("/obsluga/zwroty/3");
+      await userEvent.keyboard("s");
+      await waitFor(() => expect(scena.wolano).toEqual([{ co: "ocena",
+        dane: { pozycjaId: 31, ocena: "stan", wersja: 1 } }]));
+    } finally { scena.zwroty = null; }
+  });
+
+  it("`Shift+S` ocenia wszystkie nieocenione, każdą z nową wersją", async () => {
+    /* Równoległe żądania z tą samą wersją odbiłyby się od blokady
+       optymistycznej i zostawiły zwrot oceniony w połowie. */
+    scena.wolano = [];
+    scena.zwroty = [dwiePozycje(4)];
+    try {
+      pokaz("/obsluga/zwroty/4");
+      await userEvent.keyboard("{Shift>}S{/Shift}");
+      await waitFor(() => expect(scena.wolano.map((w) => w.dane)).toEqual([
+        { pozycjaId: 41, ocena: "stan", wersja: 1 },
+        { pozycjaId: 42, ocena: "stan", wersja: 2 },
+      ]));
+    } finally { scena.zwroty = null; }
+  });
+
+  it("przycisk „wszystkie na stan” stoi dopiero przy drugiej nieocenionej pozycji", async () => {
+    scena.zwroty = [dwiePozycje(5)];
+    try {
+      pokaz("/obsluga/zwroty/5");
+      expect(await screen.findByRole("button", { name: /Wszystkie na stan \(2\)/ }))
+        .toBeInTheDocument();
+    } finally { scena.zwroty = null; }
+  });
+
+  it("`Enter` w DO ZWROTU zapisuje kwotę z zaznaczenia", async () => {
+    /* Zaznaczenie mieszka w `Pozycje.tsx` i ma tam zostać (0.216.0), więc
+       klawisz sięga po nie rejestrem z `zwroty/klawisze.ts`. */
+    scena.wolano = [];
+    pokaz("/obsluga/zwroty/2");
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(scena.wolano).toEqual([{ co: "kwota",
+      dane: { id: 2, pozycjeIds: [2], dostawa: false, wersja: 1 } }]));
+  });
+
+  it("klawisz w polu tekstowym nie jest skrótem", async () => {
+    /* Numer listu wpisywany ręcznie ma iść do pola, a nie przyjmować zwrot. */
+    scena.wolano = [];
+    pokaz("/obsluga/zwroty/1");
+    await userEvent.type(szukajka(), "po");
+    expect(scena.wolano).toEqual([]);
+  });
+
+  it("pasek pokazuje klawisze OGLĄDANEGO kubełka", async () => {
+    pokaz("/obsluga/zwroty/1");
+    expect(screen.getByText("przyjmij")).toBeInTheDocument();
+    expect(screen.queryByText("zapisz kwotę")).toBeNull();
+    /* Sit „moje"/„niczyje" tu nie ma — zwrot nie nosi prowadzącego. */
+    expect(screen.queryByText("niczyje")).toBeNull();
   });
 });

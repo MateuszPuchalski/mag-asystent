@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.284.0 — 11 września 2026
+
+**Klawisze zwrotów wreszcie coś robią.** Ekran rysował je przy przyciskach od
+0.156.0: `P` przy „Przyjmij", `S` i `U` przy ocenie, `Enter` przy kwocie, `R`
+przy cofnięciu korekty. Żaden z nich nie miał nasłuchu — nasłuch znał wyłącznie
+ruch po liście i cyfry kubełków. Doktryna obiecywała przy tym, że „typowy zwrot
+to jeden klawisz", więc obietnicę składał ekran i dokument naraz, a dotrzymywała
+jej mysz. Audyt zamówiony przez właściciela wyciągnął to jako pierwszą pozycję.
+
+Od tego wydania tabela §25a.2 jest prawdziwa. Klawisz nie jest przy tym skrótem
+do wszystkiego: `O` OTWIERA pole powodu, zamiast zapisywać odmowę, bo odmowa
+jest nieodwracalna i §25a.5 daje takim rzeczom potwierdzenie.
+
+**Ocena hurtem przy zwrocie wielopozycyjnym.** `Shift+S` albo jeden przycisk
+ocenia wszystkie nieocenione pozycje „na stan"; przy pięciu pozycjach to jedno
+kliknięcie zamiast pięciu. Idzie PO KOLEI, każde żądanie z wersją oddaną przez
+poprzednie — pięć żądań naraz odbiłoby się od blokady optymistycznej
+i zostawiło zwrot oceniony w połowie. Utylizacja wariantu hurtowego nie
+dostaje: jeden ruch wysyłałby cały zwrot na złom.
+
+**Pasek klawiszy nad kolejką**, wzorem reklamacji z 0.281.0 i z tego samego
+powodu (Dekalog p. 2: rozpoznanie jest tańsze od pamiętania). Pokazuje klawisze
+OGLĄDANEGO kubełka. Sit „moje"/„niczyje" tam nie ma, bo zwrot nie nosi
+prowadzącego — wspólny komponent dostał na to przełącznik, żeby nie obiecywać
+klawisza, którego ten ekran nie obsługuje.
+
+Kursor schodzi na następny wiersz po odmowie i po zapisanym numerze korekty,
+czyli wtedy, gdy zwrot wychodzi z drabiny. Po „przyjmij" i po ocenie zostaje na
+miejscu: zwrot schodzi o szczebel, a kolumna środkowa pokazuje następne
+pytanie. Tabela w §25a.2 mówiła o trzech ocenach, choć od 0.209.0 są dwie —
+poprawione przy okazji.
+
+Serwer bez zmian: zero nowych tras, zero migracji. Cała zmiana mieszka
+w panelu obsługi.
+
+
 ## 0.283.0 — 11 września 2026
 
 **Copilot czyta zdjęcia ze sprawy.** [wymaga działania] Zlecenie właściciela:
