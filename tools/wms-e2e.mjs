@@ -123,6 +123,9 @@ try {
     .getByRole("button", { name: "ROZPOCZNIJ ZBIÓRKĘ", exact: true })
     .click();
   await page.locator('#wms-step [name="bin"]').fill("A01-01-02");
+  await expect(page.locator("#wms-step .wms-photo")).toContainText(
+    "Brak zdjęcia produktu",
+  );
   await page.locator('#wms-step [name="bin"]').press("Enter");
   await expect(page.locator('#wms-step [name="barcode"]')).toBeFocused();
   await page.locator('#wms-step [name="barcode"]').fill("WRONG-SKU");

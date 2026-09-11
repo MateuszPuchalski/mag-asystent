@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.288.0 — 12 września 2026
+
+**Zdjęcie części prowadzi zbiórkę.** Wózki 20/30, zbiórka ręczna i pojedyncze
+zamówienie pokazują zdjęcie bieżącego SKU. Powiększenie otwiera się bez zmiany
+etapu pracy, a zamknięcie przywraca ostatnie pole skanera. Na telefonie zdjęcie,
+stała pozycja skrzynki i formularz mieszczą się w widoku roboczym.
+
+Zdjęcia korzystają z istniejącej kartoteki i sesji użytkownika. Pobieranie nie
+blokuje skanowania; kolejne skrzynki tego samego SKU współdzielą pobranie.
+Cache ma limit 24 obrazów i jest czyszczony przy wylogowaniu. Brak zdjęcia
+odróżnia się od awarii pobrania. Awaria źródła bez zapasowego obrazu zwraca
+503 zamiast 404. Zdjęcie wspiera identyfikację, a skan nadal potwierdza towar.
+
+Demo otrzymuje jeden wygenerowany obraz fikcyjnego koła `WMS-0030`.
+Nie używa rzeczywistych danych katalogowych. Testy przeglądarkowe sprawdzają
+powiększenie, fokus, brak zdjęcia, ponowienie po awarii i współdzielenie
+obrazu podczas całej zbiórki wózków 20/30.
+
 ## 0.287.1 — 12 września 2026
 
 **Biuro i WMS: poprawki po audycie systemu wizualnego ECC.** Wspólne tokeny

@@ -715,3 +715,148 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
     display: none !important;
   }
 }
+
+/* Stały wymiar zapobiega przesunięciu skanu po dociągnięciu zdjęcia przez Wi-Fi. */
+.wms-photo {
+  width: 240px;
+  height: 240px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--ui-muted);
+}
+#widokWms .wms-photo-open {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 4px;
+  border: 0;
+  font-size: 12px;
+}
+.wms-photo img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.wms-photo-status {
+  padding: 8px;
+}
+#widokWms .wms-photo-retry {
+  padding: 4px;
+  font-size: 12px;
+}
+.wms-cart-next {
+  grid-template-columns: minmax(110px, 1fr) minmax(0, 2fr) 240px;
+}
+.wms-pick-product {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.wms-pick-product > div {
+  min-width: 0;
+}
+.wms-pick-product .wms-photo {
+  flex: none;
+}
+.wms-photo-dialog {
+  width: min(960px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-card);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+.wms-photo-dialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.wms-photo-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.wms-photo-dialog h2 {
+  font: 700 20px/1.3 var(--font-sans);
+  text-transform: none;
+  color: var(--ui-text);
+  overflow-wrap: anywhere;
+}
+.wms-photo-dialog button {
+  min-height: 48px;
+  padding: 8px 16px;
+  cursor: pointer;
+  flex: none;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.wms-photo-dialog > img {
+  display: block;
+  width: 100%;
+  height: min(65dvh, 720px);
+  object-fit: contain;
+}
+@media (max-width: 700px) {
+  body:has(#widokWms.wms-cart-focus:not([hidden])) #bok nav.zakladki {
+    display: none;
+  }
+  .wms-cart-next {
+    grid-template-columns: 140px minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+  .wms-cart-next > div:first-child {
+    grid-area: 2 / 1;
+    padding: 0;
+    border: 0;
+  }
+  .wms-cart-product {
+    grid-area: 1 / 2 / 3 / 3;
+  }
+  .wms-cart-next .wms-photo {
+    grid-area: 1 / 1;
+  }
+  .wms-photo {
+    width: 140px;
+    height: 140px;
+  }
+  .wms-cart-position {
+    font-size: 40px;
+  }
+  .wms-cart-next .wms-location {
+    font-size: 23px;
+    overflow-wrap: anywhere;
+  }
+  .wms-pick-product {
+    align-items: start;
+    gap: 12px;
+  }
+  .wms-pick-product .wms-location {
+    font-size: 24px;
+    overflow-wrap: anywhere;
+  }
+  .wms-pick-product .wms-part {
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+  .wms-photo-dialog-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media print {
+  .wms-photo-dialog {
+    display: none;
+  }
+}

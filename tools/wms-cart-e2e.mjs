@@ -2,6 +2,21 @@ import { expect } from "@playwright/test";
 import path from "node:path";
 
 export async function exerciseCarts(page, output) {
+  let photoRequests = 0;
+  const countPhoto = (request) => {
+    if (request.url().endsWith("/api/products/30/zdjecie")) photoRequests++;
+  };
+  page.on("request", countPhoto);
+  await page.route(
+    "**/api/products/30/zdjecie",
+    (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: '{"error":"temporary"}',
+      }),
+    { times: 1 },
+  );
   const post = (url, body) =>
     page.evaluate(
       async ({ url, body }) => {
@@ -48,6 +63,30 @@ export async function exerciseCarts(page, output) {
       .fill(`CART-${capacity}`);
     await page.locator('#wms-cart-start [name="barcode"]').press("Enter");
     await expect(page.locator("#wms-cart-pick")).toBeVisible();
+    if (capacity === 20) {
+      await expect(page.locator(".wms-photo")).toContainText(
+        "Nie udało się wczytać",
+      );
+      await expect(page.locator('#wms-cart-pick [name="bin"]')).toBeEnabled();
+      await page.getByRole("button", { name: "Ponów zdjęcie" }).click();
+    }
+    await expect(page.locator(".wms-photo img")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.locator(".wms-photo img").evaluate((img) => img.naturalWidth),
+      )
+      .toBeGreaterThan(100);
+    await page.locator('#wms-cart-pick [name="barcode"]').focus();
+    await page
+      .getByRole("button", { name: "Powiększ zdjęcie WMS-0030" })
+      .click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.locator(".wms-photo-dialog h2")).toContainText(
+      "WMS-0030",
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.locator('#wms-cart-pick [name="barcode"]')).toBeFocused();
     await expect(page.locator(".wms-cart h2")).toContainText(
       `${capacity}/${capacity}`,
     );
@@ -77,9 +116,7 @@ export async function exerciseCarts(page, output) {
       .evaluate((e) => e.getBoundingClientRect().width);
     expect(boxWidth).toBeGreaterThan(quantityWidth);
     // Długi symbol części nie może wyciąć kodu skrzynki ani pola skanu.
-    const name = page.locator(
-      ".wms-cart-next > div:last-child > strong:not(.wms-location)",
-    );
+    const name = page.locator(".wms-cart-product > strong:not(.wms-location)");
     const originalSku = await name.textContent();
     await name.evaluate((e) => {
       e.textContent = "SKU-".repeat(30);
@@ -242,4 +279,6 @@ export async function exerciseCarts(page, output) {
     path: path.join(output, "stock-work-desktop.png"),
     fullPage: true,
   });
+  expect(photoRequests).toBe(2);
+  page.off("request", countPhoto);
 }

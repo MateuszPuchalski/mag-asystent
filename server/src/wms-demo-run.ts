@@ -13,6 +13,8 @@ const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");
 const W = await import("./services/wms.js");
 const C = await import("./services/wms-carts.js");
+const { zapiszWlasne } = await import("./services/zdjecia-wlasne.js");
+const { logEvent } = await import("./services/events.js");
 const password = process.env.WMS_DEMO_PASSWORD;
 if (!password || password.length < 10)
   throw new Error("Ustaw WMS_DEMO_PASSWORD (co najmniej 10 znaków)");
@@ -77,6 +79,18 @@ for (let i = 1; i <= skuCount; i++) {
     reason: "Spis otwarcia DEMO",
   });
 }
+// Obraz wygenerowany wyłącznie dla fikcyjnego koła WMS-0030, nigdy wzorzec części klienta.
+zapiszWlasne({
+  twId: 30,
+  obraz: fs.readFileSync(
+    new URL("../../tools/fixtures/wms-demo-wheel.png", import.meta.url),
+  ),
+  mime: "image/png",
+  tloUsuniete: false,
+  dodaneBy: actor.name,
+  dodaneByRef: actor.id,
+});
+logEvent("wms_demo_photo", actor.name, 30, { source: "generated-demo-wheel" });
 for (let i = 1; i <= orderCount; i++) {
   let o = W.createOrder(actor, randomUUID(), {
     reference: `SKLEP-${String(i).padStart(5, "0")}`,

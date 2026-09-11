@@ -1523,6 +1523,7 @@
 <link rel="stylesheet" href="/biuro/wms.css">
 <link rel="stylesheet" href="/biuro/biuro-theme.css">
 <script src="/biuro/biuro-theme.js"></script>
+<script src="/biuro/wms-photos.js"></script>
 <script src="/biuro/wms-carts.js"></script>
 <script src="/biuro/wms-stock-work.js"></script>
 <script src="/biuro/wms.js"></script>
@@ -1655,6 +1656,7 @@ async function pobierz(sciezka, nazwa) {
 
 function wyloguj() {
   token = ""; kto = "";
+  window.Wms?.clearPhotos();
   // blob-URL-e zdjęć trzymamy przez całą sesję (patrz `dolozZdjecia`), więc to
   // jest jedyne miejsce, w którym wolno je zwolnić
   for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);

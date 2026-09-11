@@ -18,6 +18,24 @@ Wybrane zamówienie przełącza ekran na skanowanie; **Pokaż kolejkę** przywra
 Pola i przyciski skanowania zachowują co najmniej 48 px wysokości.
 Logo jest lokalnym zasobem, więc nie potrzebuje połączenia z serwerem zewnętrznym.
 
+### Zdjęcie podczas zbiórki
+
+Wózek 20/30, zbiórka ręczna i pojedyncze zamówienie pokazują zdjęcie aktualnej części
+obok lokalizacji, SKU i ilości. Dotknij zdjęcia, aby powiększyć je bez utraty etapu pracy.
+Zamknięcie przyciskiem lub Escape przywraca ostatnie pole skanu. Kod nadal potwierdza towar;
+zdjęcie pomaga odróżnić podobne części, ale nie zastępuje skanowania.
+
+Obrazy korzystają z istniejącej, chronionej sesją trasy zdjęć kartotek.
+Nie potrzeba Sellasist. Pobieranie działa niezależnie od skanera.
+Brak obrazu i błąd pobrania mają różne komunikaty oraz przycisk ponowienia.
+Cache przeglądarki mieści 24 obrazy; wylogowanie zwalnia je wszystkie.
+Przejście do kolejnego SKU usuwa poprzedni obraz od razu.
+Kolejna skrzynka z tym samym SKU korzysta z tego samego pobrania.
+
+Demo zawiera jeden wygenerowany obraz fikcyjnego koła `WMS-0030`.
+Nie przypisujemy tego obrazu do innych części. Pozostałe SKU bez zdjęć pokazują jawny brak.
+Rzeczywiste zdjęcia katalogowe pozostają poza obecnym odbiorem na danych seeded.
+
 ## Uruchomienie
 
 Wymagany Node.js co najmniej 24.15.0.

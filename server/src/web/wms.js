@@ -66,7 +66,9 @@ window.Wms = (() => {
     reserve: "Zapas zaplecza",
     quarantine: "Kwarantanna",
   };
+  const photos = window.WmsPhotos({ html, session: () => token });
   const cartUi = window.WmsCarts({
+    photo: photos.markup,
     html,
     field,
     read,
@@ -164,6 +166,7 @@ window.Wms = (() => {
       if (nextFocus.isConnected) nextFocus.focus({ preventScroll: true });
       nextFocus = null;
     }
+    if (!busy) photos.mount(root());
   }
   function focusWhenReady(input) {
     if (!input) return;
@@ -408,7 +411,7 @@ window.Wms = (() => {
       const a = o.allocations.find((a) => a.picked < a.quantity),
         l = o.lines.find((l) => l.id === a.line_id);
       return (
-        `<div class="wms-eyebrow">Idź do lokalizacji</div><div class="wms-location">${html(a.bin)}</div><p class="wms-part">${html(l.sku)}</p><p>${html(l.name)}</p><div class="wms-quantity">Pozostało ${a.quantity - a.picked} szt.</div>` +
+        `<div class="wms-pick-product">${photos.markup(l)}<div><div class="wms-eyebrow">Idź do lokalizacji</div><div class="wms-location">${html(a.bin)}</div><p class="wms-part">${html(l.sku)}</p><p>${html(l.name)}</p><div class="wms-quantity">Pozostało ${a.quantity - a.picked} szt.</div></div></div>` +
         form(
           "pick",
           `<input type="hidden" name="allocationId" value="${a.id}">${field("bin", "1. Zeskanuj lokalizację", "text", "", 'autocomplete="off"')}<div class="wms-fields">${field("barcode", "2. Zeskanuj towar", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, `min="1" max="${a.quantity - a.picked}"`)}</div>${o.wave_id ? field("tote", "3. Zeskanuj pojemnik " + html(o.tote), "text", "", 'autocomplete="off"') : ""}`,
@@ -541,7 +544,7 @@ window.Wms = (() => {
       root()._waveTask = task;
       el("wms-work").closest(".wms-split").classList.add("has-order");
       el("wms-work").innerHTML =
-        `<button class="wms-queue-toggle" data-do-wms="queue">POKAŻ KOLEJKĘ</button><h2>${html(wave.name)}</h2>${task ? `<div class="wms-eyebrow">Lokalizacja → towar → pojemnik</div><div class="wms-location">${html(task.bin)}</div><strong>${html(task.sku)}</strong> · ${task.remaining} szt.<p>${html(task.name)}<br>Zamówienie ${html(task.reference)} → <strong>${html(task.tote)}</strong></p><form id="wms-wave-pick" class="wms-form"><div class="wms-fields">${field("bin", "1. Lokalizacja", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, `min="1" max="${task.remaining}"`)}</div>${field("barcode", "2. Towar", "text", "", 'autocomplete="off"')}${field("tote", "3. Pojemnik", "text", "", 'autocomplete="off"')}<button class="primary">ODŁOŻONO DO POJEMNIKA</button></form>` : `<p class="wms-message">${wave.tasks.length ? "Pozostałe zamówienia są wstrzymane lub przypisane innej osobie. Wyjaśnij je w kolejce zamówień." : "Trasa zebrana. Przekaż pojemniki do pakowania."}</p>`}<details><summary>Pojemniki i zamówienia (${wave.orders.length})</summary>${wave.orders.map((o) => `<p><strong>${html(o.tote)}</strong> · ${html(o.reference)} · ${badge(o)}</p>`).join("")}</details>`;
+        `<button class="wms-queue-toggle" data-do-wms="queue">POKAŻ KOLEJKĘ</button><h2>${html(wave.name)}</h2>${task ? `<div class="wms-pick-product">${photos.markup(task)}<div><div class="wms-eyebrow">Lokalizacja → towar → pojemnik</div><div class="wms-location">${html(task.bin)}</div><strong>${html(task.sku)}</strong> · ${task.remaining} szt.<p>${html(task.name)}<br>Zamówienie ${html(task.reference)} → <strong>${html(task.tote)}</strong></p></div></div><form id="wms-wave-pick" class="wms-form"><div class="wms-fields">${field("bin", "1. Lokalizacja", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, `min="1" max="${task.remaining}"`)}</div>${field("barcode", "2. Towar", "text", "", 'autocomplete="off"')}${field("tote", "3. Pojemnik", "text", "", 'autocomplete="off"')}<button class="primary">ODŁOŻONO DO POJEMNIKA</button></form>` : `<p class="wms-message">${wave.tasks.length ? "Pozostałe zamówienia są wstrzymane lub przypisane innej osobie. Wyjaśnij je w kolejce zamówień." : "Trasa zebrana. Przekaż pojemniki do pakowania."}</p>`}<details><summary>Pojemniki i zamówienia (${wave.orders.length})</summary>${wave.orders.map((o) => `<p><strong>${html(o.tote)}</strong> · ${html(o.reference)} · ${badge(o)}</p>`).join("")}</details>`;
       focusWhenReady(el("wms-wave-pick")?.elements.namedItem("bin"));
     } catch (e) {
       readFailure(e, turn);
@@ -1112,5 +1115,5 @@ window.Wms = (() => {
       next.focus();
     }
   });
-  return { open };
+  return { open, clearPhotos: photos.clear };
 })();

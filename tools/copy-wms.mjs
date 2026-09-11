@@ -1,6 +1,7 @@
 import { copyFileSync } from "node:fs";
 for (const file of [
   "wms.js",
+  "wms-photos.js",
   "wms-carts.js",
   "wms-stock-work.js",
   "wms.css",

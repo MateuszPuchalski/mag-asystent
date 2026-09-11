@@ -351,6 +351,9 @@ export async function productRoutes(app: FastifyInstance) {
    */
   app.get<{ Params: { twId: string } }>("/api/products/:twId/zdjecie", async (req, reply) => {
     const wpis = await zapewnijZdjecie(Number(req.params.twId));
+    // Awaria źródła nie może zostać zapamiętana przez klienta jako brak zdjęcia.
+    if (wpis?.blad && (!wpis.plik || !wpis.etag))
+      return reply.code(503).header("cache-control", "no-store").send({ error: "Nie udało się pobrać zdjęcia. Ponów później." });
     if (!wpis?.plik || !wpis.etag) return reply.code(404).send({ error: "Brak zdjęcia" });
 
     const etag = `"${wpis.etag}"`;

@@ -462,6 +462,11 @@ test("wózek atomowo przypisuje zamówienia i wymaga właściwego pojemnika przy
   assert.throws(() => W.getWave(packer, Number(wave.id)), /uprawnień/);
   assert.throws(() => W.createWave(packer, randomUUID(), input), /wózka/);
   const task = wave.tasks[0];
+  assert.equal(
+    task.tw_id,
+    W.getOrder(Number(task.order_id)).lines.find((l) => l.sku === task.sku)
+      ?.tw_id,
+  );
   const scan = {
     orderId: task.order_id,
     version: task.version,
