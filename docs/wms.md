@@ -6,6 +6,18 @@ Przyjęcia dokumentowe, zwroty i obsługa klienta zachowują dotychczasowe ekran
 WMS prowadzi cały przebieg samodzielnie, bez konta, abonamentu ani API Sellasist.
 Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłącznie dane seeded.
 
+## Wygląd i nawigacja
+
+Biuro korzysta z tego samego języka wizualnego co panel obsługi klienta.
+Poziomy grafitowy nagłówek, jasne powierzchnie i neutralne zaznaczenia ułatwiają zmianę stanowiska.
+Oba panele pokazują oryginalne logo WERTIS.
+Kolory marki to #FF9100 i #303030; statusy zachowują osobne, czytelne oznaczenia.
+
+Na telefonie nawigacja przewija się poziomo.
+Wybrane zamówienie przełącza ekran na skanowanie; **Pokaż kolejkę** przywraca pozostałe widoki.
+Pola i przyciski skanowania zachowują co najmniej 48 px wysokości.
+Logo jest lokalnym zasobem, więc nie potrzebuje połączenia z serwerem zewnętrznym.
+
 ## Uruchomienie
 
 Wymagany Node.js co najmniej 24.15.0.

@@ -215,7 +215,13 @@ test("wyszukiwanie traktuje znaki SQL jak dane, statyki WMS dostępne w biurze",
   });
   assert.equal(result.statusCode, 200);
   assert.equal(result.json().total, 0);
-  for (const url of ["/biuro/wms.js", "/biuro/wms.css"])
+  for (const url of [
+    "/biuro/wms.js",
+    "/biuro/wms.css",
+    "/biuro/biuro-theme.js",
+    "/biuro/biuro-theme.css",
+    "/biuro/wertis-logo.png",
+  ])
     assert.equal((await app.inject({ method: "GET", url })).statusCode, 200);
   const { analytics } = await import("../services/wms-analytics.js");
   assert.doesNotThrow(

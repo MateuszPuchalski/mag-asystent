@@ -56,10 +56,35 @@ try {
   await page.locator("#poleLogin").fill("wms-demo");
   await page.locator("#poleHaslo").fill(env.WMS_DEMO_PASSWORD);
   await page.locator("#zaloguj").click();
+  await expect(page.locator("#bok .wertis-logo")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator("#bok .wertis-logo").evaluate((img) => img.naturalWidth),
+    )
+    .toBe(1600);
   await page.locator('[data-widok="wms"]').click();
   await expect(page.locator("#wms-content")).toContainText(
     "Wybierz zamówienie",
   );
+  for (const width of [768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      )
+      .toBe(true);
+    for (const selector of [
+      '#bok [data-widok="wms"]',
+      "#bok #ustawienia",
+      "#bok #wyloguj",
+    ]) {
+      const bounds = await page.locator(selector).boundingBox();
+      if (!bounds || bounds.x < 0 || bounds.x + bounds.width > width + 1)
+        throw new Error(`Navigation outside viewport at ${width}: ${selector}`);
+    }
+  }
   await page.locator('[data-tab-wms="import"]').click();
   await page.locator('#wms-create [name="reference"]').fill("E2E-FULL-ORDER");
   await page.locator('#wms-create [name="dueAt"]').fill("2026-12-31T14:00");
@@ -504,6 +529,7 @@ try {
         passed: true,
         scenarios: [
           "login",
+          "original WERTIS logo and responsive header at 768, 1024 and 1440px",
           "create",
           "allocate",
           "amend and release reservations",

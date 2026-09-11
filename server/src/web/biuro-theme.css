@@ -1,0 +1,387 @@
+/* Wspólny język panelu obsługi: grafitowy nagłówek, jasne listy i spokojne
+   zaznaczenie. Pomarańcz pochodzi z dostarczonego znaku, nie z koloru ostrzeżeń. */
+:root {
+  --brand-orange: #ff9100;
+  --brand-charcoal: #303030;
+  --amber: var(--brand-orange);
+  --amber-dark: #d97500;
+  --amber-ink: #984900;
+  --amber-bg: #fff4e5;
+  --amber-line: #ffd29a;
+  --ink: var(--brand-charcoal);
+  --ink-soft: #475569;
+  --ink-mute: #64748b;
+  --paper: #f1f5f9;
+  --secondary: #e2e8f0;
+  --border: #cbd5e1;
+  --card-border: #e2e8f0;
+  --font-cond: Barlow, system-ui, "Segoe UI", sans-serif;
+  --cien: 0 1px 2px rgb(15 23 42 / 5%);
+  --bok: 0px;
+}
+body {
+  display: block;
+}
+aside#bok {
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  overflow: visible;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #475569;
+}
+#bok .marka {
+  flex: none;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.wertis-logo {
+  display: block;
+  width: 126px;
+  height: auto;
+}
+#bok .marka .wertis-logo {
+  width: 120px;
+  background: white;
+  padding: 7px 9px;
+  border-radius: 8px;
+}
+#bok .marka span {
+  display: block;
+  font: 400 14px/1.4 var(--font-sans);
+  color: #cbd5e1;
+  letter-spacing: 0;
+}
+#bok .marka .brand-area {
+  display: block;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+#bok nav.zakladki {
+  flex: 1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 8%);
+}
+#bok nav.zakladki .grupa,
+#bok nav.zakladki .grupa-btny {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+}
+#bok nav.zakladki .grupa-nazwa {
+  display: none;
+}
+#bok nav.zakladki button {
+  width: auto;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font: 600 14px/1.4 var(--font-sans);
+  letter-spacing: 0;
+  color: #cbd5e1;
+}
+#bok nav.zakladki button .et {
+  display: inline;
+}
+#bok nav.zakladki button[aria-current="true"] {
+  color: var(--ink);
+  background: var(--amber);
+}
+#bok nav.zakladki .kropka {
+  position: static;
+  margin-left: 2px;
+}
+#bok .sesja {
+  margin: 0 0 0 auto;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#bok .sesjaRzad {
+  flex-direction: row;
+  gap: 6px;
+}
+#bok .kto {
+  display: block;
+  max-width: 96px;
+  color: #cbd5e1;
+}
+#bok .sesja button {
+  border-radius: 8px;
+  min-height: 40px;
+}
+#bok button.ikona,
+#bok #wyloguj {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+#bok #wyloguj .et {
+  display: none;
+}
+#bok #wyloguj .tylkoIkona {
+  display: block;
+}
+#bok .ikonaStanu .et {
+  display: none;
+}
+main#panel {
+  padding-top: 20px;
+}
+body:has(#login:not([hidden])) {
+  background: var(--ink);
+}
+body:has(#login:not([hidden])) #bok {
+  display: none;
+}
+#login {
+  width: min(384px, calc(100% - 32px));
+  margin: min(12vh, 100px) auto 32px;
+  padding: 28px;
+  border-radius: 12px;
+  gap: 16px;
+}
+#login .wertis-logo {
+  width: 224px;
+  max-width: 100%;
+  margin: 0 auto 8px;
+}
+#login h2 {
+  font: 700 22px/1.3 var(--font-sans);
+  text-transform: none;
+}
+#login label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+#login input {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  margin: 0;
+}
+#login button {
+  min-height: 48px;
+  border-radius: 8px;
+}
+.card {
+  box-shadow: var(--cien);
+}
+button.akcja,
+input,
+textarea,
+select {
+  border-radius: 8px;
+}
+
+/* Magazyn ma tę samą gęstość i hierarchię co obsługa; skan pozostaje duży. */
+#widokWms {
+  color: #0f172a;
+}
+.wms-head {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-color: #e2e8f0;
+}
+.wms-head h1 {
+  font-size: 24px;
+  letter-spacing: -0.4px;
+}
+.wms-eyebrow {
+  letter-spacing: 0.7px;
+  color: #64748b;
+}
+.wms-tabs {
+  background: #e2e8f0;
+  border-radius: 8px;
+}
+#widokWms .wms-tabs button {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+#widokWms .wms-tabs button[aria-selected="true"] {
+  color: white;
+  background: var(--ink);
+}
+#widokWms button {
+  border-color: #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+}
+#widokWms button.primary {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--ink);
+}
+#widokWms button.primary:hover:not(:disabled) {
+  background: #f58400;
+  border-color: #f58400;
+}
+#widokWms
+  button:not(.primary):not([aria-selected="true"]):hover:not(:disabled) {
+  background: #f8fafc;
+}
+#widokWms :focus-visible {
+  outline: 3px solid var(--amber-ink);
+  outline-offset: 3px;
+}
+#widokWms input,
+#widokWms select,
+#widokWms textarea {
+  border-radius: 8px;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+.wms-list,
+.wms-work,
+.wms-surface,
+.wms-stat {
+  border-color: #e2e8f0;
+  border-radius: 12px;
+  box-shadow: var(--cien);
+}
+.wms-work {
+  top: calc(var(--hChrome, 76px) + 16px);
+}
+.wms-row {
+  border-bottom-color: #e2e8f0 !important;
+}
+.wms-row[aria-pressed="true"] {
+  background: #e2e8f0 !important;
+  box-shadow: inset 4px 0 var(--amber);
+}
+.wms-row small,
+.wms-muted,
+.wms-help,
+.wms-stat span,
+.wms-lines th {
+  color: #475569;
+}
+.wms-work h2,
+.wms-surface h2 {
+  font: 700 20px/1.35 var(--font-sans);
+  letter-spacing: -0.2px;
+}
+.wms-bar {
+  background: #475569;
+}
+.wms-bar:hover {
+  background: var(--amber);
+}
+.wms-status {
+  background: #f1f5f9;
+  color: #475569;
+}
+.wms-lines th,
+.wms-lines td {
+  border-bottom-color: #e2e8f0;
+}
+.wms-progress span {
+  background: #e2e8f0;
+}
+.wms-progress span.done {
+  background: #347b50;
+}
+
+@media (max-width: 1100px) {
+  #bok nav.zakladki {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .wms-work {
+    position: static;
+  }
+}
+@media (max-width: 700px) {
+  aside#bok {
+    position: static;
+    min-height: 64px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  #bok .marka .wertis-logo {
+    width: 104px;
+    padding: 5px 7px;
+  }
+  #bok .marka .brand-area,
+  #bok .kto {
+    display: none;
+  }
+  #bok nav.zakladki {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  #bok nav.zakladki .grupa,
+  #bok nav.zakladki .grupa-btny {
+    flex-wrap: nowrap;
+  }
+  #bok nav.zakladki button,
+  #bok .sesja button {
+    min-height: 48px;
+    flex-shrink: 0;
+  }
+  #bok button.ikona,
+  #bok #wyloguj {
+    width: 48px;
+    height: 48px;
+  }
+  #bok .ikonaStanu {
+    display: none;
+  }
+  main#panel {
+    padding: 12px 12px 24px;
+  }
+  .wms-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    width: 100%;
+  }
+  #widokWms .wms-tabs button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .wms-head h1 {
+    font-size: 23px;
+  }
+  body:has(#widokWms:not([hidden]):not(.wms-queue) .has-order)
+    #bok
+    nav.zakladki {
+    display: none;
+  }
+}
+@media print {
+  aside#bok {
+    display: none !important;
+  }
+  main#panel {
+    padding: 0;
+  }
+  .wms-work {
+    position: static;
+    box-shadow: none;
+  }
+}

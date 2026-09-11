@@ -1,15 +1,17 @@
 {
-  "version": "0.285.0",
+  "version": "0.286.0",
   "date": "2026-09-11",
   "branch": "codex/robust-wms",
   "serverTests": {
     "passed": 2160,
-    "failed": 0
+    "failed": 0,
+    "testedVersion": "0.286.0"
   },
   "panelTests": {
     "passed": 727,
     "failed": 0,
-    "note": "Verified after merging origin/main 9dd4000"
+    "note": "Verified after merging origin/main 9dd4000",
+    "testedVersion": "0.286.0"
   },
   "build": {
     "passed": true,
@@ -90,6 +92,7 @@
     "passed": true,
     "scenarios": [
       "login",
+      "original WERTIS logo and responsive header at 768, 1024 and 1440px",
       "create",
       "allocate",
       "amend and release reservations",
@@ -144,9 +147,9 @@
     "passed": 4
   },
   "remoteCi": {
-    "androidRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559082",
-    "wmsRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559134",
-    "commit": "5698856ec7cded49de1a763de0e924f550bff4de",
+    "androidRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575707",
+    "wmsRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575712",
+    "commit": "79e883f7912f04561bd13637aec36dbfe5fad4b3",
     "pullRequest": "https://github.com/MateuszPuchalski/mag-asystent/pull/415",
     "conclusions": {
       "WMS Windows": "success",
@@ -156,7 +159,7 @@
       "Android tests and debug APK": "success",
       "Sfera worker": "success"
     },
-    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099",
+    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575701",
     "regression": {
       "run": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34538316280",
       "fixedVersion": "0.271.1",
@@ -186,5 +189,23 @@
       "no writes on reads"
     ],
     "legacyConnector": "Removed from application, routes, CLI, UI, and fresh schema; existing database rows are retained but unused."
+  },
+  "brand": {
+    "asset": "server/src/web/wertis-logo.png",
+    "originalAssetPreserved": true,
+    "orange": "#FF9100",
+    "charcoal": "#303030",
+    "designReference": "Existing customer service panel (obsluga)",
+    "surfaces": [
+      "warehouse header and login",
+      "customer service header and login",
+      "WMS workflow and reports"
+    ],
+    "navigationWidths": [
+      768,
+      1024,
+      1440
+    ],
+    "scanViewport": "390 x 844"
   }
 }

@@ -205,7 +205,7 @@ window.Wms = (() => {
           ]
         : []),
     ];
-    root().innerHTML = `<header class="wms-head"><div><div class="wms-eyebrow">Magazyn · realizacja zamówień</div><h1>Od półki do paczki</h1></div>
+    root().innerHTML = `<header class="wms-head"><div><div class="wms-eyebrow">WMS · magazyn części</div><h1>Realizacja zamówień</h1></div>
       <nav class="wms-tabs" aria-label="Obszary WMS">${tabs.map(([v, t]) => `<button data-tab-wms="${v}" aria-selected="${view === v}">${t}</button>`).join("")}</nav></header>
       <div id="wms-message" class="wms-message" role="status" aria-live="polite"></div><div id="wms-retry"></div><div id="wms-content"></div>`;
     showRetry();

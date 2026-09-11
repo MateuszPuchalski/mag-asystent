@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.286.0 — 11 września 2026
+
+Biuro otrzymuje poziomy nagłówek oraz jasne powierzchnie, typografię i przyciski spójne z panelem obsługi klienta.
+Oryginalne logo WERTIS jest widoczne przy logowaniu i w nagłówkach obu paneli.
+Pomarańcz #FF9100 i grafit #303030 pochodzą z przekazanego znaku.
+
+Zaznaczona pozycja kolejki ma neutralne tło i pomarańczowy brzeg.
+Skanowanie zachowuje duże pola, cele 48 px oraz przycisk potwierdzenia widoczny na telefonie.
+Nagłówek dopasowuje się do szerokości; szuflady uwzględniają jego aktualną wysokość.
+Test przeglądarki sprawdza logo i dostępność nawigacji przy 768, 1024 i 1440 px oraz zbiórkę przy 390 px.
+
 ## 0.285.0 — 11 września 2026
 
 Samodzielny WMS zastępuje zależność od Sellasist. Zamówienie przechodzi od importu do wysyłki w lokalnej aplikacji.

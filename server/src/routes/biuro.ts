@@ -56,10 +56,15 @@ export async function biuroRoutes(app: FastifyInstance) {
     .header("content-security-policy",csp).header("x-content-type-options","nosniff")
     .header("referrer-policy","same-origin").header("cache-control","no-store").send(html));
 
-  for (const [plik, mime] of [["wms.js", "text/javascript"], ["wms.css", "text/css"]]) {
+  for (const [plik, mime] of [["wms.js", "text/javascript"], ["wms.css", "text/css"],
+    ["biuro-theme.js", "text/javascript"], ["biuro-theme.css", "text/css"]]) {
     const content = fs.readFileSync(path.join(__dirname, "../web", plik), "utf8");
     app.get(`/biuro/${plik}`, async (_req, reply) => reply.type(mime).header("cache-control", "no-cache").send(content));
   }
+  const logo = fs.readFileSync(path.join(__dirname, "../web/wertis-logo.png"));
+  app.get("/biuro/wertis-logo.png", async (_req, reply) =>
+    reply.type("image/png").header("cache-control", "no-cache")
+      .header("x-content-type-options", "nosniff").send(logo));
 
   /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
      Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez
