@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -27,7 +27,8 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
   ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
   ruchNasz: kubelek === "odpowiedz", czekaOdDni: kubelek === "odpowiedz" ? 5 : null,
   dlugoCzeka: kubelek === "odpowiedz",
-  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziAt: null, notatka: null,
+  otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
+  notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
   wersja: 1, kubelek, sygnaly: [], linkZamowienia: null,
 });
@@ -35,6 +36,12 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
 const DYSKUSJE = [
   dys(1, "odpowiedz", "Przesyłka nie dotarła"),
   dys(2, "zamknieta", "Sprawa wyjaśniona"),
+  /* Pod sito „Moje": obie prowadzi „A. Lewandowska”, ale tylko sprawa 4
+     należy do zalogowanego konta (7). Sprawę 5 ma IMIENNICZKA o numerze 9. */
+  { ...dys(4, "odpowiedz", "Towar inny niż w opisie"),
+    prowadzi: "A. Lewandowska", prowadziId: 7, tagi: [{ id: 11, nazwa: "czeka na część" }] },
+  { ...dys(5, "odpowiedz", "Reklamacja ceny"),
+    prowadzi: "A. Lewandowska", prowadziId: 9 },
 ];
 
 /* `vi.hoisted`, bo fabryka `vi.mock` jedzie przed resztą pliku. */
@@ -42,6 +49,22 @@ const scena = vi.hoisted(() => ({
   mutacje: [] as string[],
   stan: {} as Record<string, unknown>,
   czat: [] as unknown[],
+}));
+
+/* Tożsamość zalogowanego — bez niej sita „Moje" nie ma w drzewie. */
+vi.mock("../api/rozmowy", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
+  return {
+    ...rzeczywisty,
+    useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
+  };
+});
+
+vi.mock("../api/tagi", () => ({
+  useTagi: () => ({ data: { tagi: [{ id: 11, nazwa: "czeka na część", aktywny: true }] } }),
+  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
+  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
+  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
 }));
 
 vi.mock("../api/dyskusje", async () => {
@@ -55,7 +78,7 @@ vi.mock("../api/dyskusje", async () => {
     useDyskusje: () => ({
       data: {
         dyskusje: DYSKUSJE,
-        liczniki: { odpowiedz: 1, klient: 0, zamknieta: 1 },
+        liczniki: { odpowiedz: 3, klient: 0, zamknieta: 1 },
         stan: scena.stan,
       },
       isLoading: false, error: null,
@@ -103,6 +126,10 @@ function pokaz(adres = "/obsluga/dyskusje", czat: WiadomoscReklamacji[] = [wiad(
     </QueryClientProvider>);
 }
 
+/* Sito „Moje" pamięta wybór w przeglądarce — bez sprzątania jeden test
+   włączałby filtr następnemu. */
+afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
+
 describe("Ekran dyskusji", () => {
   it("otwarcie ekranu i wybranie sprawy NIE wywołują żadnej mutacji", async () => {
     pokaz();
@@ -113,7 +140,7 @@ describe("Ekran dyskusji", () => {
 
   it("kubełki niosą pytanie i licznik, a pytanie stoi nad listą", () => {
     pokaz();
-    expect(screen.getByRole("button", { name: /Do odpowiedzi\s*1/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Do odpowiedzi\s*3/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Czeka na klienta\s*0/ })).toBeInTheDocument();
     expect(screen.getByText("Co odpisać?")).toBeInTheDocument();
   });
@@ -165,5 +192,60 @@ describe("Ekran dyskusji", () => {
     expect(screen.queryByLabelText("Odpowiedź w sprawie")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ })).not.toBeInTheDocument();
     expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
+  });
+
+  /* ── Sito „Moje" (0.278.0) ────────────────────────────────────────────────
+     Dyskusja i reklamacja to jeden wiersz i jedno sito. Ekran dyskusji dostaje
+     je tym samym ruchem, bo „czyje to" jest tym samym pytaniem. */
+  it("sito zawęża kubełek do MOICH spraw, po numerze konta, nie po imieniu", async () => {
+    pokaz();
+    expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Reklamacja ceny/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+
+    expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reklamacja ceny/ })).not.toBeInTheDocument();
+  });
+
+  it("sito mówi, ile chowa, a klawisz `m` je przełącza", async () => {
+    pokaz();
+    await userEvent.keyboard("m");
+    expect(screen.getByText(/chowa 2 sprawy/)).toBeInTheDocument();
+    await userEvent.keyboard("m");
+    expect(screen.queryByText(/chowa/)).not.toBeInTheDocument();
+  });
+
+  it("szukanie po PROWADZĄCYM działa też w dyskusjach", async () => {
+    pokaz();
+    await userEvent.type(screen.getByLabelText("Szukaj dyskusji"), "lewandowsk");
+    expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Przesyłka nie dotarła/ })).not.toBeInTheDocument();
+  });
+
+  it("tag zawęża listę także w dyskusjach — jeden słownik na oba ekrany", async () => {
+    pokaz();
+    expect(screen.getByTitle("Tag biura: czeka na część")).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("Sprawy z tagiem „czeka na część”"));
+    expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Reklamacja ceny/ })).not.toBeInTheDocument();
+  });
+
+  it("czip „Ty” i sito „Niczyje” działają tak samo w dyskusjach", async () => {
+    /* Dyskusja i reklamacja to jeden wiersz i jedno pytanie „czyje to" —
+       dwa mechanizmy byłyby dwoma nawykami zamiast jednego. */
+    pokaz();
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Niczyje/ }));
+    expect(screen.getByRole("button", { name: /Przesyłka nie dotarła/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Towar inny niż w opisie/ }))
+      .not.toBeInTheDocument();
+  });
+
+  it("skróty klawiszowe są widoczne także tutaj", () => {
+    pokaz();
+    expect(screen.getByText("n", { selector: "kbd" })).toBeInTheDocument();
+    expect(screen.getByText(/kubełek$/)).toBeInTheDocument();
   });
 });

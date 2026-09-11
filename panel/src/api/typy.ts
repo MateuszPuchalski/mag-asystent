@@ -972,6 +972,21 @@ export interface KolejkaZwrotow {
   stan: StanZwrotow;
 }
 
+/* ── Tagi spraw posprzedażowych (0.279.0) ──────────────────────────────────
+   Tag na wierszu niesie TYLE, ile mieści czip: numer do zdjęcia i nazwę do
+   przeczytania. Stan „aktywny" należy do słownika w Ustawieniach, nie do
+   wiersza — na starej sprawie wyłączony tag ma być widoczny tak samo. */
+export interface TagSprawy {
+  id: number;
+  nazwa: string;
+}
+
+/** Wiersz słownika tagów — to, czym zarządza ekran ustawień. */
+export interface Tag extends TagSprawy {
+  /** Wyłączony nie podpowiada się przy nowej sprawie, ale na starych zostaje. */
+  aktywny: boolean;
+}
+
 /** Sygnatura, która nie prowadzi do jednej kartoteki (§ pokrycie sygnatur). */
 export interface WierszSygnatury {
   sygnatura: string;
@@ -1102,7 +1117,17 @@ export interface Reklamacja {
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
      `werdykt: null` przy `CLAIM_ACCEPTED` znaczy „rozstrzygnięte poza
@@ -1271,7 +1296,17 @@ export interface Dyskusja {
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0). Zawężają listę, NIGDY nie przestawiają kolejki. */
+  tagi: TagSprawy[];
+  /* ── Droga powrotna z notatki (0.280.0) ──────────────────────────────────
+     Poprzedniej TREŚCI panel nie dostaje i nie potrzebuje: cofnięcie jest
+     zamianą, więc drugie kliknięcie przywraca stan sprzed pierwszego. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   notatka: string | null;
   /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */
   zakonczenieStatus: "sent" | "send_uncertain" | null;

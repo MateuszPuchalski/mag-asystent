@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare } from "lucide-react";
 import {
   useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
-  useProwadzeDyskusje, useZakoncz,
+  useProwadzeDyskusje, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
+import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
 import type {
   Dyskusja, KubelekDyskusji, SzczegolyWysylki, WiadomoscReklamacji,
@@ -14,6 +15,10 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
+import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
+import { SkrotyKlawiszy } from "../sprawy/Skroty";
+import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
 
@@ -50,14 +55,27 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
     ? (e.szczegoly as SzczegolyWysylki) : null;
 
 /** Kody, po których człowiek szuka dyskusji — wszystkie, jakie sprawa niesie. */
-const kody = (d: Dyskusja) => [d.externalId, d.orderId, d.kupujacyLogin, d.temat]
-  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+const kody = (d: Dyskusja) =>
+  /* Prowadzący wchodzi do szukania — powód przy tej samej funkcji
+     w `ekrany/Reklamacje.tsx`. */
+  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Dyskusje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekDyskusji | null>("odpowiedz");
   const [fraza, setFraza] = useState("");
+  const ja = useJa();
+  const mojeId = ja.data?.user.userId ?? null;
+  const { sito, przelacz: przelaczSito } = useSito();
+  const [tag, setTag] = useState<number | null>(null);
+  const slownikTagow = useTagi();
+  const nowyTag = useNowyTag();
+  const przypnij = usePrzypnijTag();
+  const odepnij = useOdepnijTag();
+  const [bladTagu, setBladTagu] = useState("");
+  const cofnijNotatke = useCofnijNotatkeDyskusji();
   const [bladZapisu, setBladZapisu] = useState("");
 
   const { data, isLoading, error } = useDyskusje();
@@ -85,7 +103,30 @@ export function Dyskusje() {
     return (data?.dyskusje ?? []).filter((d) => kody(d).some((k) => k.includes(f)));
   }, [data, fraza]);
 
-  const widoczne = pasujace ?? wKubelku;
+  /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
+     numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
+     szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
+  /* Pigułki tagów liczą skład KUBEŁKA, nie tego, co zostało po sitach.
+     Licznik malejący do zera przy każdym kliknięciu mówiłby o własnym
+     filtrze, a nie o pracy, która czeka. */
+  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
+
+  const moi = useMemo(
+    () => wKubelku.filter((d) => wSicie(d.prowadziId, mojeId, sito)),
+    [wKubelku, sito, mojeId]);
+
+  /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
+     i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
+     nie wykluczać. */
+  const poSitach = useMemo(
+    () => (tag === null ? moi : moi.filter((d) => d.tagi.some((t) => t.id === tag))),
+    [moi, tag]);
+
+  const widoczne = pasujace ?? poSitach;
+  /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
+     tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
+     samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
+  const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
@@ -211,6 +252,10 @@ export function Dyskusje() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "4") przelacz(null);
+      /* `m` jak „moje" — litera, nie cyfra: cyfry należą do kubełków,
+         a piąta obiecywałaby piąty kubełek. */
+      else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
+      else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
     };
     window.addEventListener("keydown", nasluch);
     return () => window.removeEventListener("keydown", nasluch);
@@ -259,6 +304,19 @@ export function Dyskusje() {
             ]} />
         </nav>
 
+        {/* Sito „Moje" — własny rząd, powód przy tym samym paśmie
+            w `ekrany/Reklamacje.tsx`. */}
+        <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+              moich={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length}
+              niczyich={wKubelku.filter((d) => d.prowadziId === null).length} />
+            {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
+                samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
+            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+          </div>
+
+        <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
+
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
           <input id="szukaj-dyskusji" className="field !py-1 text-xs" value={fraza}
@@ -272,10 +330,14 @@ export function Dyskusje() {
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
             {opis?.pytanie}</p>}
 
+        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+          onPokazWszystkie={() => przelaczSito(null)} />
+
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading
             ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka dyskusje={widoczne} wybrana={wybrana}
+                mojeId={mojeId}
                 zKubelkiem={Boolean(pasujace) || kubelek === null}
                 onWybierz={(d) => nawiguj(`/obsluga/dyskusje/${d}`)} />}
         </div>
@@ -311,6 +373,34 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Fakty szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              onCofnijNotatke={szczegol.data.dyskusja.maPoprzedniaNotatke
+                ? () => {
+                  setBladZapisu("");
+                  cofnijNotatke.mutate(
+                    { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
+                    { onError: (e) => setBladZapisu((e as Error).message) });
+                }
+                : undefined}
+              tagi={{
+                slownik: slownikTagow.data?.tagi ?? [],
+                trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,
+                blad: bladTagu,
+                onPrzypnij: (tagId) => {
+                  setBladTagu("");
+                  przypnij.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onOdepnij: (tagId) => {
+                  setBladTagu("");
+                  odepnij.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", tagId },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+                onNowy: (nazwa) => {
+                  setBladTagu("");
+                  nowyTag.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", nazwa },
+                    { onError: (e) => setBladTagu((e as Error).message) });
+                },
+              }}
               onProwadze={() => {
                 setBladZapisu("");
                 prowadze.mutate(

@@ -138,7 +138,11 @@ export type PozycjaFiltra<T> = {
   podpowiedz?: string;
 };
 
-export function FiltrSegmentowy<T extends string | null>({
+/* `number` w ograniczeniu od 0.279.0: tagi identyfikuje NUMER wiersza, a nie
+   nazwa — nazwa jest edytowalna i zmiana literki nie ma prawa zgubić filtru.
+   Komponent i tak wołał już `String(p.klucz)` na klucz Reacta, więc to jest
+   poszerzenie deklaracji, a nie zachowania. */
+export function FiltrSegmentowy<T extends string | number | null>({
   wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA,
 }: {
   wybrany: T;

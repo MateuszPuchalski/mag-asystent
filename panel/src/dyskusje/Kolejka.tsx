@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { MessageSquareWarning, Headset, Lock, CircleHelp, Scale, Hourglass } from "lucide-react";
 import type { Dyskusja, KubelekDyskusji, SygnalDyskusji } from "../api/typy";
 import { Pusto } from "../ui";
+import { CzipTagu } from "../sprawy/Tagi";
+import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka dyskusji ────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU i niesie PIĘĆ rzeczy: temat, kupującego, numer
@@ -71,11 +73,14 @@ function Czeka({ dni, dlugo }: { dni: number | null; dlugo: boolean }) {
     <Hourglass size={12} />{dni === 0 ? "dziś" : dniSlowo(dni)}</span>;
 }
 
-export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz }: {
+export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, mojeId = null }: {
   dyskusje: Dyskusja[];
   wybrana: number | null;
   /** Przy szukaniu lista miesza kubełki, więc wiersz musi powiedzieć swój. */
   zKubelkiem?: boolean;
+  /* Tożsamość zalogowanego (0.281.0). Bez niej czip „Ty" nie ma jak powstać,
+     a lista wygląda dokładnie tak, jak wyglądała. */
+  mojeId?: number | null;
   onWybierz: (id: number) => void;
 }) {
   const aktywnyWiersz = useRef<HTMLButtonElement | null>(null);
@@ -108,9 +113,22 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz }: {
             {/* TEMAT jest tożsamością sprawy — wpisał go kupujący i to jego
                 szuka się oczami. Numer zamówienia stoi niżej. */}
             <span className="truncate font-bold">{d.temat ?? d.externalId}</span>
-            {d.prowadzi && <span title={`Prowadzi: ${d.prowadzi}`}
-              className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
-              {d.prowadzi}</span>}
+            {/* ── CZIP MÓWI „TY", GDY SPRAWA JEST MOJA (0.281.0) ─────────────
+                Właściciel pytał wprost: „które reklamacje są moje". Samo imię
+                na to nie odpowiada — dwie osoby w biurze bywają imienniczkami,
+                a przy własnym nazwisku i tak trzeba je przeczytać. Rozstrzyga
+                NUMER KONTA, ten sam, po którym liczy się sito.
+
+                Odpowiedź stoi na wierszu, bez włączania jakiegokolwiek filtru:
+                sito zawęża listę, a to jest pytanie zadawane przy przeglądaniu
+                całej kolejki. */}
+            {d.prowadzi && <span
+              title={mojaSprawa(d.prowadziId, mojeId)
+                ? `Prowadzisz tę sprawę (${d.prowadzi})` : `Prowadzi: ${d.prowadzi}`}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${
+                mojaSprawa(d.prowadziId, mojeId)
+                  ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+              {mojaSprawa(d.prowadziId, mojeId) ? "Ty" : d.prowadzi}</span>}
             <span className="ml-auto" />
             {zKubelkiem && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
               {KUBELKI.find((k) => k.id === d.kubelek)?.etykieta}</span>}
@@ -128,6 +146,9 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz }: {
               title={`Prośba o zakończenie${d.zakonczeniePrzez ? `: ${d.zakonczeniePrzez}` : ""}`}
               className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
               <Scale size={13} />poproszono o zakończenie</span>}
+            {/* Tagi przed sygnałami — powód przy tej samej linii
+                w `reklamacje/Kolejka.tsx`. */}
+            {d.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
             {d.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>

@@ -34,6 +34,144 @@ historii nie przepisujemy.
 ---
 
 
+## 0.281.0 — 11 września 2026
+
+**Trzy rzeczy, których brakowało zleceniu o odnajdywaniu własnych spraw.**
+
+**Czip mówi „Ty".** Właściciel pytał wprost: „które reklamacje są moje".
+Sito z 0.278.0 odpowiada po WŁĄCZENIU, a to pytanie zadaje się też przy
+przeglądaniu całej kolejki. Czip prowadzącego pokazuje więc „Ty" przy
+własnej sprawie, a imię przy cudzej. Rozstrzyga numer konta, nie imię: dwie
+osoby w biurze bywają imienniczkami, a przy własnym nazwisku i tak trzeba je
+przeczytać, zamiast rozpoznać.
+
+**Sito „Niczyje" obok „Moje".** To druga połowa tego samego pytania i bez
+niej pierwsza nie domyka pracy. Sprawa nieprzypisana nie trafia do nikogo
+sama — ktoś musi ją zobaczyć i wziąć; sito pokazujące wyłącznie moje robiło
+z niej ślepą plamkę, w dodatku pamiętaną między otwarciami ekranu. Klawisz
+`n`, obok `m`.
+
+Jedno sito o TRZECH stanach, nie dwa przełączniki: „moje i niczyje naraz" nie
+znaczy nic, a „ani moje, ani niczyje" znaczy „cudze" — o cudze nikt tu nie
+pyta. Zdanie o ukrytych sprawach nazywa teraz sito, które je chowa.
+
+**Skróty klawiszowe widać na ekranie.** Kolejka chodzi z klawiatury od
+0.245.0, a od 0.278.0 także po sitach. Do tego wydania nie było tego nigdzie
+widać: klawisz stał wyłącznie w podpowiedzi pod kursorem, czyli tam, gdzie
+trafia się przypadkiem. Dekalog p. 2 mówi to wprost — rozpoznanie jest tańsze
+od pamiętania, a skrót, o którym nikt nie wie, nie skraca niczyjej pracy.
+
+Legenda kosztuje około 22 px wysokości kolumny i bierzemy tę cenę raz.
+Schowana pod znakiem zapytania kosztowałaby dwa kliknięcia przy każdym
+przypomnieniu, a schowane przypomnienie to znowu pamiętanie.
+
+
+## 0.280.0 — 11 września 2026
+
+**Zmianę notatki da się cofnąć.** Notatka jest polem swobodnym, które nadpisuje
+ten, kto pisze ostatni. Do tego wydania skasowanego zdania nie dało się
+odzyskać niczym: do dziennika idzie świadomie sama DŁUGOŚĆ, bo treść bywa
+zdaniem o kliencie, a `events` nie ma retencji.
+
+Pod polem stoi teraz jedno zdanie: kto zmienił, kiedy, i odnośnik „cofnij
+zmianę". Zdanie, nie ramka z decyzją — §25a.5 mówi o cofnięciu ZAMIAST
+potwierdzenia, i tak to wygląda przy cofnięciu przyjęcia w zwrotach.
+
+Cofnięcie jest ZAMIANĄ, o jeden szczebel. Bieżąca treść ląduje w miejscu
+poprzedniej, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii dla
+pola, którego nikt nie audytuje, byłaby drugim miejscem na te same dane
+osobowe — i drugim miejscem do sprzątania. Poprzednia treść mieszka na wierszu
+sprawy, ginie razem z nią i do dziennika nie trafia ani razu.
+
+Sprawy zastane nie znają swojej poprzedniej notatki, bo nikt jej nie
+zapisywał. Przycisku przy nich po prostu nie ma: martwy obiecywałby drogę,
+której nie ma.
+
+**Czego cofnięcie NIE dotyczy i nie dotknie:** werdyktu, odpowiedzi w rozmowie,
+stanowiska o towarze i prośby o zakończenie dyskusji. Wszystkie wychodzą do
+kupującego przez Allegro, a Allegro ich nie cofnie — przycisk „cofnij" byłby
+tam obietnicą bez pokrycia. Notatka jest jedynym zapisem w tych dwóch
+modułach, który zostaje wyłącznie u nas, i dlatego jako jedyna drogę powrotną
+dostaje.
+
+Przy okazji notatka mówi wreszcie, KTO ją zmienił i kiedy. Dotąd nie mówił
+tego nikt.
+
+
+## 0.279.0 — 11 września 2026
+
+**Tagi spraw w reklamacjach i dyskusjach, ze słownikiem, który edytuje biuro.**
+Ta sama prośba właściciela, co przy sicie „Moje": łatwiej znaleźć swoje sprawy.
+Sito odpowiada na pytanie „czyje to", tag na „o czym to" — najczęściej „czego
+ta sprawa czeka".
+
+Ziarno słownika to trzy słowa właściciela: „u producenta / u dostawcy", „czeka
+na część", „do decyzji właściciela". Wsiewa się WYŁĄCZNIE do pustego słownika,
+więc biuro, które raz zmieniło nazwę, nie dostaje wartości fabrycznych z
+powrotem przy restarcie.
+
+Nazwę dopisuje się przy sprawie, jednym ruchem: wchodzi do słownika i od razu
+na sprawę. Zmiana nazwy i wyłączenie z użycia stoją w Ustawieniach, bo dotyczą
+wszystkich spraw naraz.
+
+**Tag NIE przestawia kolejki i to jest decyzja.** Kolejność liczy termin i czas
+czekania, czyli fakty o pilności. Jedna pomyłka biura zakopałaby sprawę
+z zegarem na dole listy tak, że nikt by tego nie zauważył. Tag zawęża listę
+i nic poza tym; do Allegro nie idzie żadnym polem.
+
+Cena otwartego słownika jest znana z góry: pasek z czterdziestoma pigułkami
+przestaje filtrować. Płacą ją trzy ograniczenia. Jednoznaczność po małych
+literach, bo „Gwarancja" po „gwarancja" to jeden tag w głowie i dwie pigułki
+w filtrze. Sufit dwudziestu aktywnych, z licznikiem widocznym w Ustawieniach,
+zanim odmowa padnie w biegu przy sprawie. Wyłączanie zamiast kasowania —
+skasowany tag zniknąłby ze spraw historycznych, a z nim odpowiedź na pytanie,
+dlaczego sprawa stała trzy tygodnie.
+
+Cofnięcia tag nie potrzebuje: przypięcie i zdjęcie kosztują po jednym
+kliknięciu, więc droga powrotna już jest.
+
+Nazwa tabeli nie mogła brzmieć `sprawa_tag`: ta jest na liście spalonych na
+zawsze i kasowana przy KAŻDEJ migracji. Tabela nazwana tak powstałaby ze
+schematu i znikała sekundę później, po cichu.
+
+
+## 0.278.0 — 11 września 2026
+
+**Sito „Moje" w reklamacjach i dyskusjach.** Właściciel poprosił o jedno:
+„abym łatwiej mógł znaleźć reklamacje, którymi się zajmuję". Do tego wydania
+nie dało się tego zrobić wcale. Kubełki mówiły, na jakim etapie stoi sprawa,
+pole szukania znało numer, zamówienie i login, a po prowadzącym nie szukało
+nic. Znacznik „prowadzę" był samym czipem na wierszu.
+
+Sito stoi we własnym rzędzie pod pasmem kubełków, na obu ekranach. Przełącza
+je kliknięcie albo klawisz `m`. To **sito, nie czwarty kubełek**, i to jest
+decyzja: kubełek odpowiada na pytanie „na jakim to etapie", sito na „czyje
+to". Zlanie obu w jeden rząd odebrałoby pytanie zadawane najczęściej — „moje
+sprawy do decyzji".
+
+**Sito liczy po tożsamości, nie po imieniu, i to naprawia cichy błąd.** Do
+tego wydania przełącznik znacznika porównywał łańcuchy, więc dwie osoby o tym
+samym imieniu zdejmowały sobie znacznik nawzajem. Bez komunikatu i bez śladu
+w oczach obu — objawem była własna sprawa znikająca z kubełka. Doszła kolumna
+`prowadzi_user_id`; imię zostaje obok dla oka, bo czip ma być czytelny także
+po skasowaniu konta.
+
+Migracja czyta tożsamość z imienia tam, gdzie imię wskazuje jedno konto.
+Imię wieloznaczne zostaje bez tożsamości i naprawia je pierwsze kliknięcie:
+sprawa ma przez chwilę nie wpaść do nikogo, zamiast wpaść do niewłaściwej
+osoby.
+
+**Sito mówi, ile chowa.** Wybór jest pamiętany między otwarciami ekranu, bo
+„czyje to" jest nawykiem stanowiska. Milczący filtr z pamięcią zagłodziłby
+sprawy nieprzypisane, więc nad listą stoi zdanie z liczbą ukrytych spraw
+i droga powrotna jednym kliknięciem.
+
+Szukanie przebija sito tak samo, jak przebija kubełek: wpisany numer znajduje
+sprawę również wtedy, gdy prowadzi ją kolega. Do pola szukania wchodzi przy
+okazji prowadzący — skrzynka szuka po nim od 0.195.0, reklamacje i dyskusje
+nie szukały dotąd nijak.
+
+
 ## 0.277.0 — 11 września 2026
 
 **Kosz z kartki sam cofa stan z regału zwrotów.** Zgłoszenie właściciela:

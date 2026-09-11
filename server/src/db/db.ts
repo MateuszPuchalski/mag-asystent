@@ -227,6 +227,32 @@ export function migrate(database: DatabaseSync) {
      dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
      prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
   addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
+  /* Tożsamość prowadzącego sprawę (0.278.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Do tej pory znacznik był SAMYM IMIENIEM, a przełącznik
+     porównywał łańcuchy. Dwie osoby o tym samym imieniu zdejmowały sobie
+     nawzajem znacznik i nikt tego nie widział.
+
+     Wsteczne wypełnienie dopasowuje imię do `app_user.name` i celowo omija
+     imiona NIEJEDNOZNACZNE: konto wskazane zgadywaniem byłoby gorsze od
+     pustki, bo filtr „Moje" pokazywałby wtedy cudzą sprawę jako moją. Wiersz
+     bez dopasowania zostaje z NULL, a naprawia go pierwsze kliknięcie. */
+  addColumn("reklamacja_klienta", "prowadzi_user_id",
+    "INTEGER REFERENCES app_user(user_id)");
+  database.exec(`UPDATE reklamacja_klienta SET prowadzi_user_id = (
+      SELECT u.user_id FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi
+    )
+    WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
+      AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
+  /* Droga powrotna z notatki (0.280.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Zastane wiersze mają NULL w `notatka_poprzednia`, czyli
+     „nie ma do czego wracać", i to jest o nich prawda: przed tym wydaniem
+     poprzedniego zdania nikt nigdzie nie zapisywał. `notatka_przez` też jest
+     puste — autora zastanej notatki nie da się odtworzyć, bo dziennik niósł
+     samą długość. */
+  addColumn("reklamacja_klienta", "notatka_poprzednia", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_at", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_przez", "TEXT");
+  addColumn("reklamacja_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
   /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
      w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
      za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0
@@ -686,6 +712,7 @@ export function migrate(database: DatabaseSync) {
   naLoginIHaslo(database);
   bezBrygadzisty(database);
   ziarnoStrefyZlotej(database);
+  ziarnoTagowSpraw(database);
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
@@ -1701,6 +1728,27 @@ function bezObslugiKlienta(database: DatabaseSync) {
     })();
   } finally {
     database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Ziarno słownika tagów spraw (0.279.0).
+ *
+ * Trzy wartości wskazał właściciel, pytany wprost, jakimi słowami opisuje
+ * postój sprawy. Dwie pierwsze mówią, CZEGO sprawa czeka — przy sprzęcie
+ * ogrodniczym to najczęstszy powód, dla którego reklamacja leży tygodniami,
+ * a z ekranu nie było tego widać wcale. Trzecia mówi, KTO ma ruszyć.
+ *
+ * WSIEWAMY WYŁĄCZNIE DO PUSTEGO SŁOWNIKA — ta sama zasada co przy strefie
+ * złotej. Biuro, które raz zmieniło nazwę albo wyłączyło tag, nie ma prawa
+ * dostać wartości fabrycznych z powrotem przy restarcie procesu.
+ */
+function ziarnoTagowSpraw(database: DatabaseSync) {
+  const n = (database.prepare("SELECT COUNT(*) AS n FROM reklamacja_tag").get() as { n: number }).n;
+  if (n > 0) return;
+  const ins = database.prepare("INSERT INTO reklamacja_tag(nazwa) VALUES (?)");
+  for (const nazwa of ["u producenta / u dostawcy", "czeka na część", "do decyzji właściciela"]) {
+    ins.run(nazwa);
   }
 }
 

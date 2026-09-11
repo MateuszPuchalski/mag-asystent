@@ -3338,6 +3338,156 @@ Strzałki chodzą po kolejce, cyfry przełączają kubełek, a przełączenie ku
 przestawia też kursor na jego pierwszą sprawę. Skróty milkną, gdy ognisko stoi
 w polu tekstowym: inaczej cyfra wpisana w notatkę zmieniałaby listę.
 
+### 25b.3a. Sito „Moje" (0.278.0)
+
+Właściciel poprosił o jedno: „abym łatwiej mógł znaleźć reklamacje, którymi
+się zajmuję". Do 0.278.0 nie dało się tego zrobić wcale. Kubełki mówiły
+o etapie sprawy, pole szukania znało numer, zamówienie i login, a po
+prowadzącym nie szukało nic.
+
+**Sito, nie czwarty kubełek, i to jest decyzja.** Kubełek odpowiada na pytanie
+„na jakim to etapie", sito na pytanie „czyje to". Zlanie obu w jeden rząd
+odebrałoby pytanie zadawane najczęściej: „moje sprawy do decyzji". Ten sam
+podział rządzi skrzynką, tylko role są tam odwrócone.
+
+Sito stoi we własnym rzędzie pod pasmem kubełków. Przełącza je kliknięcie
+albo klawisz `m` — litera, nie cyfra, bo cyfry należą do kubełków, a piąta
+z nich obiecywałaby piąty kubełek.
+
+**Szukanie przebija sito**, tak samo jak przebija kubełek (§25a.9). Wpisany
+numer ma znaleźć sprawę również wtedy, gdy prowadzi ją kolega. Do pola
+szukania wchodzi przy okazji prowadzący — skrzynka szuka po nim od 0.195.0.
+
+**Sito mówi, ile chowa.** Wybór jest pamiętany między otwarciami ekranu, bo
+„czyje to" jest nawykiem stanowiska. Milczący filtr z pamięcią zagłodziłby
+sprawy nieprzypisane: leżałyby tygodniami, nie pokazując się nikomu. Zdanie
+nad listą podaje liczbę ukrytych spraw i daje drogę powrotną jednym
+kliknięciem.
+
+**Sito liczy po tożsamości, nie po imieniu.** Znacznik „prowadzę" niósł do
+tego wydania samo imię, a przełącznik porównywał łańcuchy. Dwie osoby o tym
+samym imieniu zdejmowały sobie znacznik nawzajem — po cichu, bo objawem była
+cudza sprawa we własnym kubełku. Kolumna `prowadzi_user_id` rozstrzyga to
+liczbą; imię zostaje na wierszu dla oka, bo czip ma być czytelny także wtedy,
+gdy konto zniknie.
+
+Wiersz zastany bez tożsamości traktujemy jak CUDZY. Kliknięcie go zabiera,
+zamiast zdejmować znacznik: zabranie cofa się jednym ruchem, ciche zdjęcie
+cudzego znacznika nie.
+
+#### Druga połowa pytania: „Niczyje" (0.281.0)
+
+„Które sprawy są moje" ma bliźniacze pytanie, bez którego pierwsze nie domyka
+pracy: **które są niczyje**. Sprawa nieprzypisana nie trafia do nikogo sama —
+ktoś musi ją zobaczyć i wziąć. Sito pokazujące wyłącznie moje robiło z tego
+ślepą plamkę, i to plamkę pamiętaną między otwarciami ekranu.
+
+**Jedno sito o trzech stanach, nie dwa przełączniki.** Dwie osobne pigułki
+dałyby stan „moje i niczyje naraz", który nie znaczy nic, oraz „ani moje, ani
+niczyje", czyli „cudze" — a o cudze nikt tu nie pyta. Klawisz „Niczyich" to `n`.
+
+Przy nieznanej tożsamości „Moje" na ekranie NIE MA, a „Niczyje" zostaje: do
+policzenia spraw bez prowadzącego tożsamość nie jest potrzebna.
+
+#### Odpowiedź bez włączania filtru: czip „Ty" (0.281.0)
+
+Sito odpowiada po włączeniu, a pytanie „czyje to" zadaje się też przy
+przeglądaniu całej kolejki. Czip prowadzącego mówi więc **„Ty"**, gdy sprawa
+jest moja, i imię, gdy cudza.
+
+Rozstrzyga NUMER KONTA, ten sam, po którym liczy się sito. Samo imię na to
+pytanie nie odpowiada: dwie osoby w biurze bywają imienniczkami, a przy
+własnym nazwisku i tak trzeba je przeczytać, zamiast rozpoznać.
+
+#### Skróty widać na ekranie (0.281.0)
+
+Kolejka chodzi z klawiatury od 0.245.0, a od 0.278.0 także po sitach. Do
+0.281.0 nie było tego nigdzie widać — klawisz stał wyłącznie w podpowiedzi pod
+kursorem, czyli tam, gdzie trafia się przypadkiem.
+
+Dekalog p. 2 mówi wprost: rozpoznanie jest tańsze od pamiętania. Skrót,
+o którym nikt nie wie, nie skraca niczyjej pracy; jest kodem, nie funkcją.
+Legenda stoi więc pod pasmem sit, jednym wierszem, i kosztuje około 22 px
+wysokości kolumny. Bierzemy tę cenę raz i świadomie: pomoc schowana pod
+znakiem zapytania kosztowałaby dwa kliknięcia przy każdym przypomnieniu,
+a schowane przypomnienie to znowu pamiętanie.
+
+### 25b.3b. Tagi spraw (0.279.0)
+
+Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
+odpowiada na pytanie „czyje to", tag na pytanie „o czym to" — najczęściej
+„czego ta sprawa czeka".
+
+**Tag NIE przestawia kolejki i to jest decyzja.** §14.5 rozstrzygnął to samo
+przy kategoriach Copilota, a powód jest identyczny. Kolejność liczy termin
+i czas czekania, czyli fakty o pilności. Jedna pomyłka biura zakopałaby sprawę
+z zegarem na dole listy tak, że nikt by tego nie zauważył.
+
+Tag nie wychodzi też do Allegro. To notatka biura o sprawie, jak `notatka`,
+tylko krótsza i policzalna.
+
+**Słownik jest edytowalny.** Właściciel wybrał tę drogę, pytany wprost. Nazwę
+dopisuje się przy sprawie, jednym ruchem: wchodzi do słownika i od razu na
+sprawę. Zmiana nazwy i wyłączenie z użycia stoją w Ustawieniach, bo dotyczą
+wszystkich spraw naraz.
+
+Cena otwartego słownika jest znana z góry: pasek z czterdziestoma pigułkami
+przestaje filtrować. Płacą ją trzy ograniczenia.
+
+| ograniczenie | po co |
+|---|---|
+| jednoznaczność po małych literach | „Gwarancja" po „gwarancja" to jeden tag w głowie i dwie pigułki w filtrze |
+| sufit dwudziestu aktywnych | prawo Hicka, Dekalog p. 5; licznik widać w Ustawieniach, zanim odmowa padnie przy sprawie |
+| wyłączanie zamiast kasowania | skasowany tag zniknąłby ze spraw historycznych, a z nim odpowiedź na pytanie „dlaczego to stało trzy tygodnie" |
+
+Wyłączony tag zostaje widoczny na sprawach, przy których już stoi, ale nie
+podpowiada się przy nowych. Wpisanie jego nazwy z palca wraca go do użytku:
+skoro ktoś ją wpisał, jest mu potrzebna.
+
+**Cofnięcia tag nie potrzebuje.** Przypięcie i zdjęcie kosztują po jednym
+kliknięciu, więc droga powrotna już jest. §25a.5 mówi o cofnięciu zamiast
+potwierdzenia, a nie obok istniejącej drogi powrotnej.
+
+Pasek filtra pokazuje **wyłącznie tagi obecne w oglądanym kubełku**, malejąco
+po liczbie — ten sam wzorzec co pasek kategorii w skrzynce. Pigułka tagu,
+którego w kubełku nie ma, obiecywałaby zawężenie do pustki. Liczniki mówią
+o składzie KUBEŁKA, nie o tym, co zostało po sitach.
+
+Barwa czipa jest łupkowa, nie fioletowa i nie bursztynowa. Fiolet znaczy w tym
+panelu przypuszczenie maszyny, a tag jest zdaniem człowieka; bursztyn jest
+tłem marki i zaznaczeniem wiersza.
+
+### 25b.3c. Notatka i jej droga powrotna (0.280.0)
+
+§25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
+Przy reklamacji ta zasada stała dotąd odwrócona (§25b.8), bo wszystko, co
+z tego ekranu wychodzi, wychodzi do kupującego przez Allegro.
+
+**Notatka jest wyjątkiem i jedynym.** Zostaje wyłącznie u nas i niczego
+kupującemu nie obiecuje. Jest przy tym polem swobodnym, które nadpisuje ten,
+kto pisze ostatni — a do 0.280.0 skasowanego zdania nie dało się odzyskać
+niczym, bo do dziennika idzie świadomie sama długość.
+
+Pod polem stoi jedno zdanie: kto zmienił, kiedy, i odnośnik „cofnij zmianę".
+Zdanie, nie ramka z decyzją — tak samo jak przy cofnięciu przyjęcia w zwrotach.
+
+**Cofnięcie jest ZAMIANĄ, jeden szczebel.** Bieżąca treść ląduje w miejscu
+poprzedniej, więc drugie kliknięcie wraca tam, gdzie było. Tabela historii dla
+pola, którego nikt nie audytuje, byłaby drugim miejscem na te same dane
+osobowe i drugim miejscem do sprzątania.
+
+Poprzednia treść mieszka na wierszu i ginie razem ze sprawą. Do `events` nie
+trafia ani przed cofnięciem, ani po nim.
+
+Wiersz zastany sprzed 0.280.0 nie zna swojej poprzedniej treści, bo nikt jej
+nie zapisywał. Przycisku wtedy NIE MA — martwy obiecywałby drogę, której nie
+ma.
+
+**Czego cofnięcie nie dotyczy i nie dotknie:** werdyktu, odpowiedzi w rozmowie,
+stanowiska o towarze i prośby o zakończenie dyskusji. Allegro ich nie cofnie,
+więc przycisk byłby obietnicą bez pokrycia. Tam zostaje potwierdzenie i to się
+w tym wydaniu nie zmienia.
+
 ### 25b.4. Zegar
 
 **Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo
@@ -3655,6 +3805,20 @@ przestawia kursor na pierwszą sprawę. Skróty milkną w polu tekstowym.
 która różni ten ekran od reklamacji. Tam `ALLEGRO_ADVISOR_REPLIED` jest samym
 sygnałem. Gdyby tak zostało tutaj, większość dyskusji siedziałaby w CZEKA NA
 KLIENTA, podczas gdy czeka Allegro.
+
+**Sito „Moje" jest TO SAMO co przy reklamacjach** (§25b.3a) — ten sam rząd,
+ten sam klawisz `m`, ta sama kolumna `prowadzi_user_id`. Dyskusja i reklamacja
+to jeden wiersz `reklamacja_klienta` rozróżniany polem `typ`, a pytanie „czyje
+to" brzmi na obu ekranach identycznie. Dwa osobne mechanizmy dla jednego
+pytania byłyby dwoma nawykami zamiast jednego.
+
+**Tagi też są wspólne** (§25b.3b) — jeden słownik, jedna para tabel, ten sam
+pasek filtra. Osobny słownik dla dyskusji rozjechałby się z tym przy pierwszej
+zmianie nazwy, a sprawa przenoszona między ekranami gubiłaby opis.
+
+**Notatka ma drogę powrotną** (§25b.3c) — ten sam mechanizm, własna nazwa
+zdarzenia w dzienniku. Prośba o zakończenie jej NIE MA i mieć nie może: idzie
+do kupującego i Allegro jej nie cofnie.
 
 ### 25c.4. Pilność bez zegara
 

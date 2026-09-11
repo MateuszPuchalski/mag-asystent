@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -30,7 +30,8 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   decyzjaDo: "2026-09-20T10:00:00.000Z", dniDoTerminu: 13, poTerminie: false,
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
+  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
+  notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
@@ -42,6 +43,16 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
 const REKLAMACJE = [
   rek(1, "decyzja", "111/2026"),
   rek(2, "zamknieta", "222/2026"),
+  /* Dwie sprawy pod sito „Moje": obie prowadzi „A. Lewandowska”, ale tylko
+     444 należy do zalogowanego konta (7). 555 ma IMIENNICZKA o numerze 9
+     i to jest cały sens kolumny `prowadzi_user_id`.
+
+     NUMERY BEZ TRÓJKI I BEZ JEDYNKI są tu celowe: sąsiedni test wpisuje
+     w pole szukania samą cyfrę i sprawdza, że NIC nie pasuje. Sprawa
+     „333/2026” cicho by mu to zabrała. */
+  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7,
+    tagi: [{ id: 11, nazwa: "czeka na część" }] },
+  { ...rek(5, "decyzja", "555/2026"), prowadzi: "A. Lewandowska", prowadziId: 9 },
 ];
 
 /* `vi.hoisted`, bo fabryka `vi.mock` jedzie przed resztą pliku. */
@@ -52,6 +63,28 @@ const scena = vi.hoisted(() => ({
   /* Czym kończy się wysyłka w danym teście: `Error` idzie do `onError`,
      cokolwiek innego do `onSuccess`, `null` nie woła żadnego z nich. */
   wynikWysylki: null as unknown,
+}));
+
+/* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
+   dający zawsze pustkę byłby gorszy od braku filtru. */
+vi.mock("../api/rozmowy", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
+  return {
+    ...rzeczywisty,
+    useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
+  };
+});
+
+/* Tagi: atrapa bez klienta zapytań, bo ten ekran stawia własny `QueryClient`
+   tylko dla haków reklamacji. */
+vi.mock("../api/tagi", () => ({
+  useTagi: () => ({ data: { tagi: [
+    { id: 11, nazwa: "czeka na część", aktywny: true },
+    { id: 12, nazwa: "u producenta", aktywny: true },
+  ] } }),
+  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
+  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
+  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
 }));
 
 vi.mock("../api/reklamacje", async () => {
@@ -65,7 +98,7 @@ vi.mock("../api/reklamacje", async () => {
     useReklamacje: () => ({
       data: {
         reklamacje: REKLAMACJE,
-        liczniki: { decyzja: 1, odpowiedz: 0, zamknieta: 1 },
+        liczniki: { decyzja: 3, odpowiedz: 0, zamknieta: 1 },
         stan: scena.stan,
       },
       isLoading: false, error: null,
@@ -129,6 +162,11 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
       </MemoryRouter>
     </QueryClientProvider>);
 }
+
+/* Sito „Moje" PAMIĘTA wybór w przeglądarce, więc bez tego sprzątania jeden
+   test włączałby filtr następnemu — a objawem byłaby lista, która „gubi"
+   sprawy w teście nie mającym z sitem nic wspólnego. */
+afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
 describe("Ekran reklamacji", () => {
   it("otwarcie ekranu i wybranie sprawy NIE wywołują żadnej mutacji", async () => {
@@ -344,5 +382,149 @@ describe("Ekran reklamacji", () => {
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
     expect(scena.mutacje.some((m) => m.startsWith("odswiez:"))).toBe(false);
+  });
+
+  /* ── Sito „Moje" (0.278.0) ────────────────────────────────────────────────
+     Powstało z jednego zdania właściciela: „chodziło mi, abym łatwiej mógł
+     znaleźć reklamacje, którymi się zajmuję". */
+  it("sito zawęża kubełek do MOICH spraw, po numerze konta, nie po imieniu", async () => {
+    pokaz();
+    /* Obie sprawy w kubełku „Do decyzji" prowadzi „A. Lewandowska” — tyle że
+       jedna z nich to imienniczka o innym numerze konta. */
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+  });
+
+  it("sito MÓWI, ile chowa, i oddaje drogę powrotną", async () => {
+    /* Wybór jest pamiętany między otwarciami ekranu, więc milczące sito
+       zagłodziłoby sprawy nieprzypisane — ta sama klasa błędu co rozmowa
+       urwana bez znaku w 0.273.0. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    /* Kubełek „Do decyzji" ma trzy sprawy, moja jest jedna — sito chowa dwie.
+       Liczebnik w formie 2–4, bo „chowa 2 spraw" czyta się jak usterka. */
+    expect(screen.getByText(/chowa 2 sprawy/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("klawisz `m` przełącza sito, ale MILCZY w polu tekstowym", async () => {
+    pokaz();
+    await userEvent.keyboard("m");
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+    await userEvent.keyboard("m");
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+
+    /* Litera wpisana w pole szukania ma szukać, a nie przestawiać sito —
+       ta sama zasada co cyfry kubełków. */
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "m");
+    expect(screen.queryByText(/chowa/)).not.toBeInTheDocument();
+  });
+
+  it("szukanie PRZEBIJA sito — numer znajduje też cudzą sprawę", async () => {
+    /* §25a.9: szukanie przebija kubełek. Sito rządzi się tą samą regułą,
+       bo pole, które kłamie pustką przy sprawie tuż obok, jest gorsze
+       od braku pola. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "555");
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("szukanie po PROWADZĄCYM znajduje sprawę, której numeru nikt nie pamięta", async () => {
+    pokaz();
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "lewandowsk");
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
+  });
+
+  /* ── Tagi (0.279.0) ───────────────────────────────────────────────────────
+     Trzecie sito na tę samą listę: kubełek mówi „na jakim to etapie", „Moje"
+     — „czyje to", tag — „o czym to". */
+  it("czip tagu stoi na wierszu, a pasek filtra liczy skład KUBEŁKA", async () => {
+    pokaz();
+    /* Czip wiersza i pigułka filtra noszą TEN SAM napis, więc rozróżnia je
+       podpowiedź: czip mówi „Tag biura", pigułka „Sprawy z tagiem". */
+    expect(screen.getByTitle("Tag biura: czeka na część")).toBeInTheDocument();
+    const pigulka = screen.getByTitle("Sprawy z tagiem „czeka na część”");
+    expect(pigulka).toHaveTextContent("1");
+
+    await userEvent.click(pigulka);
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+  });
+
+  it("TAG NIE PRZESTAWIA KOLEJKI — to jest linia z §14.5", async () => {
+    /* Kolejność liczy serwer z terminu i czasu czekania, czyli z FAKTÓW
+       o pilności. Gdyby tag ją podnosił, jedna pomyłka biura zakopałaby
+       sprawę z zegarem na dole listy tak, że nikt by tego nie zauważył. */
+    pokaz();
+    const kolejnosc = () => screen.getAllByRole("button")
+      .map((b) => b.textContent ?? "")
+      .filter((t) => /\d{3}\/2026/.test(t))
+      .map((t) => t.match(/\d{3}\/2026/)![0]);
+    const przed = kolejnosc();
+
+    /* Otagowana jest 444, czyli NIE pierwsza w kubełku. Gdyby tag ruszał
+       kolejność, wskoczyłaby na górę. */
+    expect(przed).toEqual(["111/2026", "444/2026", "555/2026"]);
+    expect(przed.indexOf("444/2026")).toBeGreaterThan(0);
+  });
+
+  it("tag NAKŁADA SIĘ na sito „Moje”, zamiast je zastępować", async () => {
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    await userEvent.click(screen.getByTitle("Sprawy z tagiem „czeka na część”"));
+    /* 444 jest i moja, i otagowana — jedyna, która przechodzi oba sita. */
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
+  });
+
+  /* ── „Które są moje" bez włączania filtru (0.281.0) ───────────────────────
+     Właściciel pytał wprost. Sito odpowiada po włączeniu; czip odpowiada
+     od razu, przy przeglądaniu całej kolejki. */
+  it("czip mówi „Ty”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
+    pokaz();
+    /* 444 prowadzę ja (konto 7), 555 — imienniczka o koncie 9. Obie noszą
+       to samo imię, więc imię na wierszu na to pytanie nie odpowiada. */
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+    expect(screen.getByTitle("Prowadzi: A. Lewandowska")).toHaveTextContent("A. Lewandowska");
+  });
+
+  it("sito „Niczyje” pokazuje sprawy, których nikt nie wziął", async () => {
+    /* Druga połowa pytania: sprawa nieprzypisana nie trafia do nikogo sama.
+       Sito pokazujące wyłącznie moje robiło z niej ślepą plamkę. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Niczyje/ }));
+    expect(screen.getByRole("button", { name: /111\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /444\/2026/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Niczyje.*chowa 2 sprawy/)).toBeInTheDocument();
+  });
+
+  it("klawisz `n` przełącza „Niczyje”, a `m` je ZASTĘPUJE, nie dokłada", async () => {
+    /* Trzy stany, nie dwa przełączniki: „moje i niczyje naraz" nie znaczy nic. */
+    pokaz();
+    await userEvent.keyboard("n");
+    expect(screen.getByRole("button", { name: /^Niczyje/ })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.keyboard("m");
+    expect(screen.getByRole("button", { name: /^Moje/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Niczyje/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("skróty klawiszowe SĄ WIDOCZNE, a nie tylko w podpowiedzi pod kursorem", () => {
+    /* Dekalog p. 2: rozpoznanie jest tańsze od pamiętania. Skrót, o którym
+       nikt nie wie, nie skraca niczyjej pracy. */
+    pokaz();
+    for (const k of ["j", "k", "m", "n"]) {
+      expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
+    }
+    expect(screen.getByText("ruch po liście")).toBeInTheDocument();
   });
 });

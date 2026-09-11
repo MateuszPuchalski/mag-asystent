@@ -1,10 +1,13 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import {
   BladReklamacji,
+  cofnijNotatkeSprawy,
   czatReklamacji,
   doZapisu,
+  pisanieNotatki,
   kontekstZamowienia,
   zalacznikiSprawy,
   type RozmowaZakupu,
@@ -113,8 +116,16 @@ export interface WierszDyskusji {
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
+  /** Tagi biura (0.279.0) — ten sam słownik co przy reklamacjach. */
+  tagi: TagSprawy[];
   notatka: string | null;
+  /** Droga powrotna z notatki (0.280.0) — patrz `WierszReklamacji`. */
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzedniaNotatke: boolean;
   /* ── Prośba o zakończenie (`END_REQUEST`) ────────────────────────────────
      Los NASZEJ próby, nie stan Allegro. `status_allegro` należy do Allegro
      i potwierdza go dopiero synchronizacja. */
@@ -229,8 +240,14 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     dlugoCzeka: czeka !== null && czeka >= PROG_CZEKANIA_DNI,
     otwartoAt: String(w.otwarto_at),
     prowadzi: tekst(w.prowadzi),
+    prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
+    /* Puste do czasu doklejenia — powód przy tym samym polu w reklamacjach. */
+    tagi: [],
     notatka: tekst(w.notatka),
+    notatkaAt: tekst(w.notatka_at),
+    notatkaPrzez: tekst(w.notatka_przez),
+    maPoprzedniaNotatke: tekst(w.notatka_poprzednia) !== null,
     zakonczenieStatus: tekst(w.zakonczenie_status) as StatusZakonczenia | null,
     zakonczenieAt: tekst(w.zakonczenie_at),
     zakonczeniePrzez: tekst(w.zakonczenie_przez),
@@ -265,8 +282,13 @@ export function listaDyskusji(
      jest kolumną — liczy go ten plik ze statusu ostatniej wiadomości. SQL
      musiałby powtórzyć tę regułę drugi raz i rozjechać się przy pierwszej
      poprawce. Wierszy są dziesiątki, więc to nic nie kosztuje. */
+  const tagi = tagiWszystkichSpraw(database);
   return wiersze
-    .map((w) => zWiersza(w, teraz))
+    .map((w) => {
+      const d = zWiersza(w, teraz);
+      d.tagi = tagi.get(d.id) ?? [];
+      return d;
+    })
     .sort((a, b) => Number(b.ruchNasz) - Number(a.ruchNasz));
 }
 
@@ -304,6 +326,7 @@ export function szczegolDyskusji(
      pokazałoby sprawę uboższą, niż jest naprawdę. */
   if (!w) throw new BladReklamacji(`Dyskusja ${id} nie istnieje`, 404);
   const dyskusja = zWiersza(w, teraz);
+  dyskusja.tagi = tagiSprawy(database, id);
   const { zwroty, rozmowy } = kontekstZamowienia(
     database, Number(w.channel_account_id), dyskusja.orderId, teraz);
   return {
@@ -323,15 +346,19 @@ export function szczegolDyskusji(
  * nieprawdziwym, a `events` nie ma retencji.
  */
 export function stempelProwadziDyskusje(
-  database: Db, id: number, autor: string, wersja?: number,
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
 ): WierszDyskusji {
   return transaction(database, () => {
     const w = doZapisu(database, id, wersja, "DISPUTE");
-    const zdejmuje = w.prowadzi === autor;
+    /* Po TOŻSAMOŚCI, nie po imieniu — powód przy `stempelProwadzi`. */
+    const zdejmuje = w.prowadzi_user_id !== null && Number(w.prowadzi_user_id) === autor.id;
     database.prepare(`UPDATE reklamacja_klienta
-      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1 WHERE id=? AND typ='DISPUTE'`).run(
-      zdejmuje ? null : autor, zdejmuje ? null : new Date().toISOString(), id);
-    logEvent("dyskusja_prowadzi", autor, null, { id, zdjete: zdejmuje }, undefined, database);
+      SET prowadzi=?, prowadzi_user_id=?, prowadzi_at=?, wersja=wersja+1
+      WHERE id=? AND typ='DISPUTE'`).run(
+      zdejmuje ? null : autor.name, zdejmuje ? null : autor.id,
+      zdejmuje ? null : new Date().toISOString(), id);
+    logEvent("dyskusja_prowadzi", autor.name, null, { id, zdjete: zdejmuje },
+      autor.id, database);
     return zWiersza(odczytaj(database, id), Date.now());
   })();
 }
@@ -343,16 +370,30 @@ export function stempelProwadziDyskusje(
  * a `events` nie ma retencji i nie jest kasowane.
  */
 export function zapiszNotatkeDyskusji(
-  database: Db, id: number, notatka: string | null, autor: string, wersja?: number,
+  database: Db, id: number, notatka: string | null,
+  autor: { id: number; name: string }, wersja?: number,
 ): WierszDyskusji {
-  const wartosc = (notatka ?? "").trim() || null;
   return transaction(database, () => {
     doZapisu(database, id, wersja, "DISPUTE");
-    database.prepare(
-      "UPDATE reklamacja_klienta SET notatka=?, wersja=wersja+1 WHERE id=? AND typ='DISPUTE'",
-    ).run(wartosc, id);
-    logEvent("dyskusja_notatka", autor, null,
-      { id, znakow: wartosc?.length ?? 0 }, undefined, database);
+    pisanieNotatki(database, id, notatka, autor, "DISPUTE", "dyskusja_notatka");
+    return zWiersza(odczytaj(database, id), Date.now());
+  })();
+}
+
+/**
+ * Cofnięcie zmiany notatki przy DYSKUSJI.
+ *
+ * Mechanika jest wspólna z reklamacją, własna zostaje nazwa zdarzenia: ślad
+ * ma mówić, z którego ekranu padło kliknięcie.
+ */
+export function cofnijNotatkeDyskusji(
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
+): WierszDyskusji {
+  return transaction(database, () => {
+    doZapisu(database, id, wersja, "DISPUTE");
+    if (!cofnijNotatkeSprawy(database, id, autor, "DISPUTE", "dyskusja_notatka_cofnieta")) {
+      throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
+    }
     return zWiersza(odczytaj(database, id), Date.now());
   })();
 }

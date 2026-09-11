@@ -70,6 +70,17 @@ vi.mock("../api/copilot", () => ({
   usePomiarCopilota: () => ({ data: undefined }),
 }));
 
+/* Piąta karta (0.279.0): słownik tagów. To jedyne miejsce na tym ekranie,
+   które coś ZMIENIA, więc atrapa niesie także mutację — bez niej `useMutation`
+   szuka klienta zapytań, którego ten test świadomie nie stawia. */
+vi.mock("../api/tagi", () => ({
+  useTagi: () => ({ data: { tagi: [
+    { id: 1, nazwa: "u producenta / u dostawcy", aktywny: true },
+    { id: 2, nazwa: "stary tag", aktywny: false },
+  ] } }),
+  useZmienTag: () => ({ mutate: () => {}, isPending: false }),
+}));
+
 const { Ustawienia } = await import("./Ustawienia");
 
 describe("Ustawienia obsługi", () => {
@@ -86,6 +97,27 @@ describe("Ustawienia obsługi", () => {
     expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
     /* Wyłączony Copilot nie zostawia po sobie pustej karty na ekranie. */
     expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).not.toBeInTheDocument();
+    /* Piąta karta (0.279.0) — słownik tagów. */
+    expect(screen.getByText("Tagi spraw")).toBeInTheDocument();
+  });
+
+  it("słownik tagów pokazuje WYŁĄCZONE i mówi, że kasowania nie ma", () => {
+    /* Skasowany tag zniknąłby po cichu ze spraw historycznych, a wtedy
+       pytanie „dlaczego ta sprawa stała trzy tygodnie" traci odpowiedź. */
+    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
+    expect(screen.getByText("stary tag")).toBeInTheDocument();
+    expect(screen.getByText("wyłączony")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Włącz z powrotem" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Usuń|Skasuj/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/nie ma kasowania/)).toBeInTheDocument();
+  });
+
+  it("sufit aktywnych jest WIDOCZNY, nie tylko pilnowany przez serwer", () => {
+    /* Odmowa przy dwudziestym pierwszym tagu, wpisanym w biegu przy sprawie,
+       byłaby ścianą w połowie czynności. */
+    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
+    expect(screen.getByText(/Aktywnych:/)).toBeInTheDocument();
+    expect(screen.getByText(/z 20/)).toBeInTheDocument();
   });
 
   it("SKRZYNKA już jej nie renderuje, ale alarm na niej ZOSTAJE", () => {
