@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.287.1 — 12 września 2026
+
+**Biuro i WMS: poprawki po audycie systemu wizualnego ECC.** Wspólne tokeny
+WERTIS zastępują dwie konkurujące palety. Nagłówki, karty, formularze i stany
+przycisków mają spójne role. Nazwa obszaru odpowiada aktualnej czynności,
+a aktywny przycisk pozostaje widoczny w przewijanym pasku na telefonie.
+Pole kodu skrzynki jest szersze niż ilość; długie SKU nie rozpychają ekranu.
+
+Poprawiono kontrast podpisów i pól, fokus klawiatury, nazwę przycisku
+wylogowania oraz semantykę nawigacji. Rozwijane sekcje mają cel 48 px.
+Wolny odczyt pokazuje komunikat poza blokowanym formularzem. Systemowa
+preferencja ograniczenia ruchu obejmuje ramę Biura. Jawny jasny schemat
+utrzymuje spójność natywnych kontrolek; nie dodaje trybu ciemnego.
+
+Audyt i zakres pomiarów: [system wizualny WMS](docs/audyt-design-system-wms.md).
+Test przeglądarkowy sprawdza dziesięć obszarów przy szerokościach
+320/390/768/1440 px, klawiaturę, wolną odpowiedź i formularze wózków 20/30.
+
 ## 0.287.0 — 11 września 2026
 
 WMS przydziela zamówienia po skanie wózka z 20 albo 30 stałymi pozycjami skrzynek.

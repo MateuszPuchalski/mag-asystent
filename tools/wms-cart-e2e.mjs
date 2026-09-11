@@ -69,6 +69,29 @@ export async function exerciseCarts(page, output) {
       .locator("#wms-cart-pick button.primary")
       .boundingBox();
     expect(confirmation.y + confirmation.height).toBeLessThanOrEqual(844);
+    const boxWidth = await page
+      .locator('#wms-cart-pick [name="tote"]')
+      .evaluate((e) => e.getBoundingClientRect().width);
+    const quantityWidth = await page
+      .locator('#wms-cart-pick [name="quantity"]')
+      .evaluate((e) => e.getBoundingClientRect().width);
+    expect(boxWidth).toBeGreaterThan(quantityWidth);
+    // Długi symbol części nie może wyciąć kodu skrzynki ani pola skanu.
+    const name = page.locator(
+      ".wms-cart-next > div:last-child > strong:not(.wms-location)",
+    );
+    const originalSku = await name.textContent();
+    await name.evaluate((e) => {
+      e.textContent = "SKU-".repeat(30);
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await name.evaluate((e, value) => {
+      e.textContent = value;
+    }, originalSku);
     let scans = 0;
     while (await page.locator("#wms-cart-pick").count()) {
       const task = await page.evaluate(
@@ -138,12 +161,17 @@ export async function exerciseCarts(page, output) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.locator('[data-cart-new="20"]').click();
   await page.locator('#wms-cart-configure [name="code"]').fill("STOCK-20");
-  await page.locator('#wms-cart-configure [name="name"]').fill("Kontrola zapasu");
+  await page
+    .locator('#wms-cart-configure [name="name"]')
+    .fill("Kontrola zapasu");
   for (let position = 1; position <= 20; position++) {
     const input = page.locator(`#wms-cart-configure [name="box-${position}"]`);
     await input.fill(`STOCK-BOX-${position}`);
     await input.press("Enter");
-    if (position < 20) await expect(page.locator(`#wms-cart-configure [name="box-${position+1}"]`)).toBeFocused();
+    if (position < 20)
+      await expect(
+        page.locator(`#wms-cart-configure [name="box-${position + 1}"]`),
+      ).toBeFocused();
   }
   await expect(page.locator("#wms-cart-start")).toBeVisible();
   for (let i = 0; i < 20; i++)

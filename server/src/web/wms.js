@@ -15,7 +15,8 @@ window.Wms = (() => {
   let selectedWave = null;
   let dispatchDay = new Date().toISOString().slice(0, 10);
   let lockDepth = 0,
-    nextFocus = null;
+    nextFocus = null,
+    busyNoticeTimer = null;
   const root = () => document.getElementById("widokWms");
   const el = (id) => document.getElementById(id);
   const html = (value) =>
@@ -118,6 +119,7 @@ window.Wms = (() => {
       box.textContent = text;
       box.className = `wms-message${error ? " error" : ""}`;
       box.setAttribute("role", error ? "alert" : "status");
+      box.setAttribute("aria-live", error ? "assertive" : "polite");
     }
   }
   async function read(path) {
@@ -131,6 +133,22 @@ window.Wms = (() => {
     root().inert = busy;
     root().setAttribute("aria-busy", String(busy));
     if (wasBusy === busy) return;
+    // Komunikat poza inert dociera do czytnika; zwłoka nie miga przy szybkim skanie.
+    let notice = el("wms-busy");
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.id = "wms-busy";
+      notice.className = "wms-busy";
+      notice.setAttribute("role", "status");
+      notice.setAttribute("aria-live", "polite");
+      root().before(notice);
+    }
+    clearTimeout(busyNoticeTimer);
+    if (busy) {
+      busyNoticeTimer = setTimeout(() => {
+        notice.textContent = "Trwa operacja. Poczekaj na gotowość do skanu…";
+      }, 300);
+    } else notice.textContent = "";
     root()
       .querySelectorAll("button,input,select,textarea")
       .forEach((e) => {
@@ -242,9 +260,16 @@ window.Wms = (() => {
           ]
         : []),
     ];
-    root().innerHTML = `<header class="wms-head"><div><div class="wms-eyebrow">WMS · magazyn części</div><h1>Realizacja zamówień</h1></div>
-      <nav class="wms-tabs" aria-label="Obszary WMS">${tabs.map(([v, t]) => `<button data-tab-wms="${v}" aria-selected="${view === v}">${t}</button>`).join("")}</nav></header>
+    root().innerHTML = `<header class="wms-head"><div><div class="wms-eyebrow">WMS · magazyn części</div><h1>${html(tabs.find(([v]) => v === view)?.[1] || "Realizacja zamówień")}</h1></div>
+      <nav class="wms-tabs" aria-label="Obszary WMS">${tabs.map(([v, t]) => `<button data-tab-wms="${v}" ${view === v ? 'aria-current="page"' : ""}>${t}</button>`).join("")}</nav></header>
       <div id="wms-message" class="wms-message" role="status" aria-live="polite"></div><div id="wms-retry"></div><div id="wms-content"></div>`;
+    const activeTab = root().querySelector('[aria-current="page"]');
+    if (activeTab) {
+      // Przewijamy tylko pasek, żeby wybór obszaru nie przesuwał formularza.
+      const nav = activeTab.parentElement;
+      nav.scrollLeft = activeTab.offsetLeft - nav.offsetLeft - 4;
+      nextFocus = activeTab;
+    }
     showRetry();
   }
   async function refresh() {
@@ -1059,9 +1084,19 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && event.target.form?.id === "wms-cart-configure" && /^box-\d+$/.test(event.target.name)) {
-      const next = event.target.form.elements.namedItem(`box-${Number(event.target.name.slice(4)) + 1}`);
-      if (next) { event.preventDefault(); next.focus(); return; }
+    if (
+      event.key === "Enter" &&
+      event.target.form?.id === "wms-cart-configure" &&
+      /^box-\d+$/.test(event.target.name)
+    ) {
+      const next = event.target.form.elements.namedItem(
+        `box-${Number(event.target.name.slice(4)) + 1}`,
+      );
+      if (next) {
+        event.preventDefault();
+        next.focus();
+        return;
+      }
     }
     if (
       event.key !== "Enter" ||

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { exerciseCarts } from "./wms-cart-e2e.mjs";
+import { exerciseDesign } from "./wms-design-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -55,6 +56,7 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${base}/biuro`);
   await page.locator("#poleLogin").fill("wms-demo");
+  await expect(page.locator("#poleLogin")).toHaveCSS("outline-style", "solid");
   await page.locator("#poleHaslo").fill(env.WMS_DEMO_PASSWORD);
   await page.locator("#zaloguj").click();
   await expect(page.locator("#bok .wertis-logo")).toBeVisible();
@@ -67,6 +69,7 @@ try {
   await expect(page.locator("#wms-content")).toContainText(
     "Wybierz zamówienie",
   );
+  await exerciseDesign(page);
   for (const width of [768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect
@@ -532,6 +535,7 @@ try {
         scenarios: [
           "login",
           "original WERTIS logo and responsive header at 768, 1024 and 1440px",
+          "design audit: all ten WMS areas at 320, 390, 768 and 1440px, keyboard navigation, delayed loading feedback and reduced motion",
           "create",
           "allocate",
           "amend and release reservations",
