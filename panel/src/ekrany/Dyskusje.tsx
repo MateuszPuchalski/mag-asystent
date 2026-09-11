@@ -15,8 +15,9 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
-import { PigulkaMoje, ZdanieOUkrytych, mojaSprawa, useMoje } from "../sprawy/Moje";
+import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
+import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
@@ -67,7 +68,7 @@ export function Dyskusje() {
   const [fraza, setFraza] = useState("");
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
-  const { moje, przelacz: przelaczMoje } = useMoje();
+  const { sito, przelacz: przelaczSito } = useSito();
   const [tag, setTag] = useState<number | null>(null);
   const slownikTagow = useTagi();
   const nowyTag = useNowyTag();
@@ -110,22 +111,22 @@ export function Dyskusje() {
      filtrze, a nie o pracy, która czeka. */
   const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
 
-  const moi = useMemo(() => (moje
-    ? wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)) : wKubelku),
-  [wKubelku, moje, mojeId]);
+  const moi = useMemo(
+    () => wKubelku.filter((d) => wSicie(d.prowadziId, mojeId, sito)),
+    [wKubelku, sito, mojeId]);
 
   /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
      i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
      nie wykluczać. */
-  const wSicie = useMemo(
+  const poSitach = useMemo(
     () => (tag === null ? moi : moi.filter((d) => d.tagi.some((t) => t.id === tag))),
     [moi, tag]);
 
-  const widoczne = pasujace ?? wSicie;
+  const widoczne = pasujace ?? poSitach;
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
      tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
      samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
-  const ukrytych = pasujace || !moje ? 0 : wKubelku.length - moi.length;
+  const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
@@ -253,7 +254,8 @@ export function Dyskusje() {
       else if (e.key === "4") przelacz(null);
       /* `m` jak „moje" — litera, nie cyfra: cyfry należą do kubełków,
          a piąta obiecywałaby piąty kubełek. */
-      else if (e.key === "m" && mojeId !== null) przelaczMoje(!moje);
+      else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
+      else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
     };
     window.addEventListener("keydown", nasluch);
     return () => window.removeEventListener("keydown", nasluch);
@@ -304,14 +306,16 @@ export function Dyskusje() {
 
         {/* Sito „Moje" — własny rząd, powód przy tym samym paśmie
             w `ekrany/Reklamacje.tsx`. */}
-        {(mojeId !== null || wgTagow.length > 0) &&
-          <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
-            <PigulkaMoje moje={moje} mojeId={mojeId} onPrzelacz={przelaczMoje}
-              ile={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length} />
+        <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+              moich={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length}
+              niczyich={wKubelku.filter((d) => d.prowadziId === null).length} />
             {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
                 samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
             <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
-          </div>}
+          </div>
+
+        <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
 
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
@@ -326,12 +330,14 @@ export function Dyskusje() {
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
             {opis?.pytanie}</p>}
 
-        <ZdanieOUkrytych ile={ukrytych} onPokazWszystkie={() => przelaczMoje(false)} />
+        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+          onPokazWszystkie={() => przelaczSito(null)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading
             ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
             : <Kolejka dyskusje={widoczne} wybrana={wybrana}
+                mojeId={mojeId}
                 zKubelkiem={Boolean(pasujace) || kubelek === null}
                 onWybierz={(d) => nawiguj(`/obsluga/dyskusje/${d}`)} />}
         </div>

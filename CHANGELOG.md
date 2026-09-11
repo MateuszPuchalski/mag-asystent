@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.281.0 — 11 września 2026
+
+**Trzy rzeczy, których brakowało zleceniu o odnajdywaniu własnych spraw.**
+
+**Czip mówi „Ty".** Właściciel pytał wprost: „które reklamacje są moje".
+Sito z 0.278.0 odpowiada po WŁĄCZENIU, a to pytanie zadaje się też przy
+przeglądaniu całej kolejki. Czip prowadzącego pokazuje więc „Ty" przy
+własnej sprawie, a imię przy cudzej. Rozstrzyga numer konta, nie imię: dwie
+osoby w biurze bywają imienniczkami, a przy własnym nazwisku i tak trzeba je
+przeczytać, zamiast rozpoznać.
+
+**Sito „Niczyje" obok „Moje".** To druga połowa tego samego pytania i bez
+niej pierwsza nie domyka pracy. Sprawa nieprzypisana nie trafia do nikogo
+sama — ktoś musi ją zobaczyć i wziąć; sito pokazujące wyłącznie moje robiło
+z niej ślepą plamkę, w dodatku pamiętaną między otwarciami ekranu. Klawisz
+`n`, obok `m`.
+
+Jedno sito o TRZECH stanach, nie dwa przełączniki: „moje i niczyje naraz" nie
+znaczy nic, a „ani moje, ani niczyje" znaczy „cudze" — o cudze nikt tu nie
+pyta. Zdanie o ukrytych sprawach nazywa teraz sito, które je chowa.
+
+**Skróty klawiszowe widać na ekranie.** Kolejka chodzi z klawiatury od
+0.245.0, a od 0.278.0 także po sitach. Do tego wydania nie było tego nigdzie
+widać: klawisz stał wyłącznie w podpowiedzi pod kursorem, czyli tam, gdzie
+trafia się przypadkiem. Dekalog p. 2 mówi to wprost — rozpoznanie jest tańsze
+od pamiętania, a skrót, o którym nikt nie wie, nie skraca niczyjej pracy.
+
+Legenda kosztuje około 22 px wysokości kolumny i bierzemy tę cenę raz.
+Schowana pod znakiem zapytania kosztowałaby dwa kliknięcia przy każdym
+przypomnieniu, a schowane przypomnienie to znowu pamiętanie.
+
+
 ## 0.280.0 — 11 września 2026
 
 **Zmianę notatki da się cofnąć.** Notatka jest polem swobodnym, które nadpisuje

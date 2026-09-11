@@ -230,4 +230,22 @@ describe("Ekran dyskusji", () => {
     expect(screen.getByRole("button", { name: /Towar inny niż w opisie/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Reklamacja ceny/ })).not.toBeInTheDocument();
   });
+
+  it("czip „Ty” i sito „Niczyje” działają tak samo w dyskusjach", async () => {
+    /* Dyskusja i reklamacja to jeden wiersz i jedno pytanie „czyje to" —
+       dwa mechanizmy byłyby dwoma nawykami zamiast jednego. */
+    pokaz();
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+
+    await userEvent.click(screen.getByRole("button", { name: /^Niczyje/ }));
+    expect(screen.getByRole("button", { name: /Przesyłka nie dotarła/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Towar inny niż w opisie/ }))
+      .not.toBeInTheDocument();
+  });
+
+  it("skróty klawiszowe są widoczne także tutaj", () => {
+    pokaz();
+    expect(screen.getByText("n", { selector: "kbd" })).toBeInTheDocument();
+    expect(screen.getByText(/kubełek$/)).toBeInTheDocument();
+  });
 });

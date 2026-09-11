@@ -485,4 +485,46 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });
+
+  /* ── „Które są moje" bez włączania filtru (0.281.0) ───────────────────────
+     Właściciel pytał wprost. Sito odpowiada po włączeniu; czip odpowiada
+     od razu, przy przeglądaniu całej kolejki. */
+  it("czip mówi „Ty”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
+    pokaz();
+    /* 444 prowadzę ja (konto 7), 555 — imienniczka o koncie 9. Obie noszą
+       to samo imię, więc imię na wierszu na to pytanie nie odpowiada. */
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+    expect(screen.getByTitle("Prowadzi: A. Lewandowska")).toHaveTextContent("A. Lewandowska");
+  });
+
+  it("sito „Niczyje” pokazuje sprawy, których nikt nie wziął", async () => {
+    /* Druga połowa pytania: sprawa nieprzypisana nie trafia do nikogo sama.
+       Sito pokazujące wyłącznie moje robiło z niej ślepą plamkę. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Niczyje/ }));
+    expect(screen.getByRole("button", { name: /111\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /444\/2026/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Niczyje.*chowa 2 sprawy/)).toBeInTheDocument();
+  });
+
+  it("klawisz `n` przełącza „Niczyje”, a `m` je ZASTĘPUJE, nie dokłada", async () => {
+    /* Trzy stany, nie dwa przełączniki: „moje i niczyje naraz" nie znaczy nic. */
+    pokaz();
+    await userEvent.keyboard("n");
+    expect(screen.getByRole("button", { name: /^Niczyje/ })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.keyboard("m");
+    expect(screen.getByRole("button", { name: /^Moje/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Niczyje/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("skróty klawiszowe SĄ WIDOCZNE, a nie tylko w podpowiedzi pod kursorem", () => {
+    /* Dekalog p. 2: rozpoznanie jest tańsze od pamiętania. Skrót, o którym
+       nikt nie wie, nie skraca niczyjej pracy. */
+    pokaz();
+    for (const k of ["j", "k", "m", "n"]) {
+      expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
+    }
+    expect(screen.getByText("ruch po liście")).toBeInTheDocument();
+  });
 });

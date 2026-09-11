@@ -3375,6 +3375,43 @@ Wiersz zastany bez tożsamości traktujemy jak CUDZY. Kliknięcie go zabiera,
 zamiast zdejmować znacznik: zabranie cofa się jednym ruchem, ciche zdjęcie
 cudzego znacznika nie.
 
+#### Druga połowa pytania: „Niczyje" (0.281.0)
+
+„Które sprawy są moje" ma bliźniacze pytanie, bez którego pierwsze nie domyka
+pracy: **które są niczyje**. Sprawa nieprzypisana nie trafia do nikogo sama —
+ktoś musi ją zobaczyć i wziąć. Sito pokazujące wyłącznie moje robiło z tego
+ślepą plamkę, i to plamkę pamiętaną między otwarciami ekranu.
+
+**Jedno sito o trzech stanach, nie dwa przełączniki.** Dwie osobne pigułki
+dałyby stan „moje i niczyje naraz", który nie znaczy nic, oraz „ani moje, ani
+niczyje", czyli „cudze" — a o cudze nikt tu nie pyta. Klawisz „Niczyich" to `n`.
+
+Przy nieznanej tożsamości „Moje" na ekranie NIE MA, a „Niczyje" zostaje: do
+policzenia spraw bez prowadzącego tożsamość nie jest potrzebna.
+
+#### Odpowiedź bez włączania filtru: czip „Ty" (0.281.0)
+
+Sito odpowiada po włączeniu, a pytanie „czyje to" zadaje się też przy
+przeglądaniu całej kolejki. Czip prowadzącego mówi więc **„Ty"**, gdy sprawa
+jest moja, i imię, gdy cudza.
+
+Rozstrzyga NUMER KONTA, ten sam, po którym liczy się sito. Samo imię na to
+pytanie nie odpowiada: dwie osoby w biurze bywają imienniczkami, a przy
+własnym nazwisku i tak trzeba je przeczytać, zamiast rozpoznać.
+
+#### Skróty widać na ekranie (0.281.0)
+
+Kolejka chodzi z klawiatury od 0.245.0, a od 0.278.0 także po sitach. Do
+0.281.0 nie było tego nigdzie widać — klawisz stał wyłącznie w podpowiedzi pod
+kursorem, czyli tam, gdzie trafia się przypadkiem.
+
+Dekalog p. 2 mówi wprost: rozpoznanie jest tańsze od pamiętania. Skrót,
+o którym nikt nie wie, nie skraca niczyjej pracy; jest kodem, nie funkcją.
+Legenda stoi więc pod pasmem sit, jednym wierszem, i kosztuje około 22 px
+wysokości kolumny. Bierzemy tę cenę raz i świadomie: pomoc schowana pod
+znakiem zapytania kosztowałaby dwa kliknięcia przy każdym przypomnieniu,
+a schowane przypomnienie to znowu pamiętanie.
+
 ### 25b.3b. Tagi spraw (0.279.0)
 
 Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito

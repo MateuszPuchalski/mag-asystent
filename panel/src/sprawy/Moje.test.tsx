@@ -2,75 +2,107 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, renderHook, act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PigulkaMoje, ZdanieOUkrytych, mojaSprawa, sprawSlowo, useMoje } from "./Moje";
+import {
+  PasekSita, ZdanieOUkrytych, mojaSprawa, sprawSlowo, useSito, wSicie,
+} from "./Moje";
 
-/* ── Sito „Moje" (0.278.0) ───────────────────────────────────────────────────
-   Cztery rzeczy warte testu, bo każda kosztowałaby to, o co właściciel prosił:
+/* ── Sito spraw (0.278.0, „Niczyje" od 0.281.0) ──────────────────────────────
+   Pięć rzeczy warte testu, bo każda kosztowałaby to, o co właściciel prosił:
 
    1. SITO ZAWĘŻA PO TOŻSAMOŚCI, nie po imieniu. Imienniczka nie ma prawa
       zobaczyć cudzej sprawy jako własnej.
-   2. NIEZNANA TOŻSAMOŚĆ ZNACZY BRAK PIGUŁKI. Filtr, który zawsze daje pustkę,
-      jest gorszy od braku filtru.
-   3. SITO MÓWI, CO CHOWA. Pamięta wybór między otwarciami, więc bez tego
-      zdania sprawa nieprzypisana mogłaby nie pokazać się nikomu.
-   4. ODMIANA LICZEBNIKA. „2 spraw" to nie literówka, tylko zdanie, które
-      czyta się jak usterka — a polszczyzna ma tu trzy formy, nie dwie.      */
+   2. NIEZNANA TOŻSAMOŚĆ ZNACZY BRAK „MOJE". Filtr, który zawsze daje pustkę,
+      jest gorszy od braku filtru. „Niczyje" zostaje — do jego policzenia
+      tożsamość nie jest potrzebna.
+   3. TRZY STANY, NIE DWA PRZEŁĄCZNIKI. „Moje i niczyje naraz" nie znaczy nic.
+   4. SITO MÓWI, CO CHOWA, i nazywa SIEBIE. Pamięta wybór między otwarciami,
+      więc bez tego zdania sprawa spoza sita mogłaby nie pokazać się nikomu.
+   5. ODMIANA LICZEBNIKA. „2 spraw" to nie literówka, tylko zdanie, które
+      czyta się jak usterka — a polszczyzna ma tu trzy formy, nie dwie.     */
 
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
-describe("Sito „Moje”", () => {
+describe("Sito spraw", () => {
   it("moja jest sprawa o MOIM numerze, nie o moim imieniu", () => {
     expect(mojaSprawa(7, 7)).toBe(true);
     expect(mojaSprawa(3, 7)).toBe(false);
     expect(mojaSprawa(null, 7)).toBe(false);
   });
 
-  it("przy nieznanej tożsamości żadna sprawa nie jest moja i pigułki NIE MA", () => {
-    /* `mojeId === null` to „nie wiem, kim jestem" — zapytanie o konto jeszcze
-       nie wróciło albo wróciło błędem. Pigułka obiecywałaby wtedy filtr,
-       który zawsze daje pustą listę. */
-    expect(mojaSprawa(7, null)).toBe(false);
-    const { container } = render(
-      <PigulkaMoje moje={false} mojeId={null} ile={0} onPrzelacz={() => {}} />);
-    expect(container).toBeEmptyDOMElement();
+  it("„Niczyje” to sprawy BEZ prowadzącego, nie sprawy cudze", () => {
+    expect(wSicie(null, 7, "niczyje")).toBe(true);
+    expect(wSicie(9, 7, "niczyje")).toBe(false);
+    expect(wSicie(7, 7, "niczyje")).toBe(false);
+    expect(wSicie(7, 7, "moje")).toBe(true);
+    expect(wSicie(9, 7, "moje")).toBe(false);
+    /* Bez sita przechodzi wszystko — także sprawa bez prowadzącego. */
+    expect(wSicie(null, 7, null)).toBe(true);
+    expect(wSicie(9, 7, null)).toBe(true);
   });
 
-  it("pigułka niesie licznik i przełącza się w obie strony", async () => {
+  it("przy nieznanej tożsamości „Moje” NIE MA, ale „Niczyje” zostaje", () => {
+    /* `mojeId === null` to „nie wiem, kim jestem" — zapytanie o konto jeszcze
+       nie wróciło albo wróciło błędem. */
+    expect(mojaSprawa(7, null)).toBe(false);
+    render(<PasekSita sito={null} mojeId={null} moich={0} niczyich={2}
+      onPrzelacz={() => {}} />);
+    expect(screen.queryByRole("button", { name: /Moje/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Niczyje/ })).toBeInTheDocument();
+  });
+
+  it("pigułka niesie licznik, a kliknięcie w WYBRANĄ zdejmuje sito", async () => {
     const onPrzelacz = vi.fn();
     const { rerender } = render(
-      <PigulkaMoje moje={false} mojeId={7} ile={3} onPrzelacz={onPrzelacz} />);
+      <PasekSita sito={null} mojeId={7} moich={3} niczyich={2} onPrzelacz={onPrzelacz} />);
     const p = screen.getByRole("button", { name: /Moje/ });
     expect(p).toHaveTextContent("3");
     expect(p).toHaveAttribute("aria-pressed", "false");
 
     await userEvent.click(p);
-    expect(onPrzelacz).toHaveBeenCalledWith(true);
+    expect(onPrzelacz).toHaveBeenCalledWith("moje");
 
-    /* Kliknięcie we WYBRANE sito je zdejmuje — to zawężenie listy,
-       a nie kubełek. */
-    rerender(<PigulkaMoje moje={true} mojeId={7} ile={3} onPrzelacz={onPrzelacz} />);
+    rerender(<PasekSita sito="moje" mojeId={7} moich={3} niczyich={2}
+      onPrzelacz={onPrzelacz} />);
     await userEvent.click(screen.getByRole("button", { name: /Moje/ }));
-    expect(onPrzelacz).toHaveBeenLastCalledWith(false);
+    expect(onPrzelacz).toHaveBeenLastCalledWith(null);
+  });
+
+  it("sito ma TRZY stany, nie dwa przełączniki", async () => {
+    /* Dwie osobne pigułki dałyby stan „moje i niczyje naraz", który nie znaczy
+       nic, oraz „ani moje, ani niczyje", czyli „cudze" — a o cudze nikt tu
+       nie pyta. */
+    const onPrzelacz = vi.fn();
+    render(<PasekSita sito="moje" mojeId={7} moich={3} niczyich={2} onPrzelacz={onPrzelacz} />);
+    expect(screen.getByRole("button", { name: /Moje/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Niczyje/ })).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: /Niczyje/ }));
+    expect(onPrzelacz).toHaveBeenCalledWith("niczyje");
   });
 
   it("wybór PRZEŻYWA zamknięcie ekranu, bo to nawyk stanowiska", () => {
-    const { result } = renderHook(() => useMoje());
-    expect(result.current.moje).toBe(false);
-    act(() => { result.current.przelacz(true); });
-    expect(result.current.moje).toBe(true);
+    const { result } = renderHook(() => useSito());
+    expect(result.current.sito).toBe(null);
+    act(() => { result.current.przelacz("niczyje"); });
+    expect(result.current.sito).toBe("niczyje");
 
-    const drugie = renderHook(() => useMoje());
-    expect(drugie.result.current.moje).toBe(true);
+    expect(renderHook(() => useSito()).result.current.sito).toBe("niczyje");
+
+    /* Zdjęcie sita KASUJE wpis, zamiast zapisywać „nic" — inaczej stan
+       domyślny zależałby od tego, czy ktoś kiedyś kliknął. */
+    act(() => { result.current.przelacz(null); });
+    expect(renderHook(() => useSito()).result.current.sito).toBe(null);
   });
 
-  it("zdanie o ukrytych sprawach pojawia się TYLKO wtedy, gdy sito coś chowa", async () => {
+  it("zdanie o ukrytych sprawach NAZYWA sito, które je chowa", async () => {
     const { container, rerender } = render(
-      <ZdanieOUkrytych ile={0} onPokazWszystkie={() => {}} />);
+      <ZdanieOUkrytych ile={0} nazwa="Moje" onPokazWszystkie={() => {}} />);
     expect(container).toBeEmptyDOMElement();
 
     const pokaz = vi.fn();
-    rerender(<ZdanieOUkrytych ile={7} onPokazWszystkie={pokaz} />);
-    expect(screen.getByText(/chowa 7 spraw/)).toBeInTheDocument();
+    rerender(<ZdanieOUkrytych ile={7} nazwa="Niczyje" onPokazWszystkie={pokaz} />);
+    /* „Jakiś filtr" kazałby szukać przełącznika po całym ekranie. */
+    expect(screen.getByText(/Niczyje.*chowa 7 spraw/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
     expect(pokaz).toHaveBeenCalledTimes(1);
   });

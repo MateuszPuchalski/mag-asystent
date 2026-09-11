@@ -8,6 +8,7 @@ import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { Pusto } from "../ui";
 import { CzipTagu } from "../sprawy/Tagi";
+import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej więcej:
@@ -112,11 +113,14 @@ function Termin({ dni }: { dni: number | null }) {
     title={`Termin decyzji: ${dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
 }
 
-export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: {
+export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mojeId = null }: {
   reklamacje: Reklamacja[];
   wybrana: number | null;
   /** Przy szukaniu lista miesza kubełki, więc wiersz musi powiedzieć swój. */
   zKubelkiem?: boolean;
+  /* Tożsamość zalogowanego (0.281.0). Bez niej czip „Ty" nie ma jak powstać,
+     a lista wygląda dokładnie tak, jak wyglądała. */
+  mojeId?: number | null;
   onWybierz: (id: number) => void;
 }) {
   const aktywnyWiersz = useRef<HTMLButtonElement | null>(null);
@@ -151,9 +155,22 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz }: 
           <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-bold">{r.numer ?? r.externalId}</span>
-            {r.prowadzi && <span title={`Prowadzi: ${r.prowadzi}`}
-              className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
-              {r.prowadzi}</span>}
+            {/* ── CZIP MÓWI „TY", GDY SPRAWA JEST MOJA (0.281.0) ─────────────
+                Właściciel pytał wprost: „które reklamacje są moje". Samo imię
+                na to nie odpowiada — dwie osoby w biurze bywają imienniczkami,
+                a przy własnym nazwisku i tak trzeba je przeczytać. Rozstrzyga
+                NUMER KONTA, ten sam, po którym liczy się sito.
+
+                Odpowiedź stoi na wierszu, bez włączania jakiegokolwiek filtru:
+                sito zawęża listę, a to jest pytanie zadawane przy przeglądaniu
+                całej kolejki. */}
+            {r.prowadzi && <span
+              title={mojaSprawa(r.prowadziId, mojeId)
+                ? `Prowadzisz tę sprawę (${r.prowadzi})` : `Prowadzi: ${r.prowadzi}`}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${
+                mojaSprawa(r.prowadziId, mojeId)
+                  ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+              {mojaSprawa(r.prowadziId, mojeId) ? "Ty" : r.prowadzi}</span>}
             <span className="ml-auto" />
             {zKubelkiem && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
               {KUBELKI.find((k) => k.id === r.kubelek)?.etykieta}</span>}
