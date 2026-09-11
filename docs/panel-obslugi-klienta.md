@@ -3387,6 +3387,33 @@ Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
 przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
 jak całą.
 
+### 25b.6a. Kompletność: kolejka i rozmowa (0.273.0)
+
+Dwie rzeczy, które ekran przez trzy wydania pokazywał niepełne, nie mówiąc
+o tym prawdy.
+
+**Kolejka.** Lista spraw jedzie z Allegro malejąco po dacie otwarcia, a nasz
+bezpiecznik stron ucina jej ogon — czyli sprawy najstarsze, czyli najbardziej
+spóźnione, czyli dokładnie te, dla których ten ekran powstał. Przebieg pyta
+więc NAJPIERW o sprawy otwarte (filtr `status` ze specyfikacji), a dopiero
+potem o całą listę. Otwartych jest garść, więc mieszczą się przed
+bezpiecznikiem niezależnie od tego, jak długie jest archiwum.
+
+**Rozmowa.** Do 0.272.0 pobieraliśmy pierwszą setkę wiadomości i tyle, a pod
+spodem stało zdanie „Reszta dojdzie następną synchronizacją". Nie dochodziła
+nigdy. Rozmowa stronicuje się teraz do pięciuset wiadomości; dłuższa dostaje
+znak `czat_urwany` i wtedy ekran mówi wprost, że resztę widać w Centrum
+Sprzedaży.
+
+Ten sam znak leczy drugą, niewidoczną usterkę: sprawa z rozmową dłuższą niż
+budżet spełniała warunek dociągania po KAŻDYM przebiegu i stała na czele
+kolejki w kółko. Jedna gruba rozmowa głodziła dziewiętnaście pozostałych.
+
+**Odświeżenie jednej sprawy.** Po wysyłce odpowiedzi i po werdykcie ekran
+dociąga sprawę jednym żądaniem (`GET /sale/issues/{id}`), zamiast czekać trzy
+minuty na takt. Najbardziej liczy się to przy wysyłce niejednoznacznej: pasek
+odsyłał wtedy do Centrum Sprzedaży po coś, co to żądanie rozstrzyga.
+
 ### 25b.7. Odpowiedź w rozmowie (0.224.0)
 
 Przyrost drugi zamyka połowę pętli: **odpowiedź wychodzi z panelu**. Agent
@@ -3493,10 +3520,15 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 
 ### 25b.9. Czego panel nie wie
 
-Czy rozmowa mieści się w stu wiadomościach — sonda tej sekcji nie zdjęła
-(`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Do której przestrzeni należy
-`offer.id` przy sprawie: przykład w specyfikacji pokazuje UUID, a sonda zwykły
-tekst.
+Do której przestrzeni należy `offer.id` przy sprawie: przykład w specyfikacji
+pokazuje UUID, a sonda zwykły tekst. I w jakiej KOLEJNOŚCI Allegro oddaje
+wiadomości rozmowy — przy liście spraw specyfikacja mówi „ordered by descending
+opened date", przy `/chat` nie mówi nic (`[WERYFIKUJ]`).
+
+Z tej listy zeszło w 0.273.0 pytanie „czy rozmowa mieści się w stu
+wiadomościach". Przestało być pytaniem, bo przestało mieć znaczenie: rozmowa
+dociąga się stronami, a dłuższa niż pięćset wiadomości dostaje na ekranie
+własne zdanie zamiast obietnicy.
 
 Z tej listy zeszło w 0.226.1 pytanie o adres sprawy w Centrum Sprzedaży.
 Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
@@ -3866,6 +3898,11 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź w czacie reklamacji | **działa** od 0.224.0 | `services/reklamacje-wysylka.ts`, `reklamacja_outbox`, `reklamacje/Edytor.tsx`; `type: "REGULAR"`, sam tekst, limit 20 000 znaków |
 | Klucz idempotencji wspólny dla skrzynki i reklamacji | **działa** od 0.224.0 | `services/idempotencja.ts`; liczy go SERWER, format `snd-` nietknięty |
 | Świeżość liczona od ostatniej NIE naszej wiadomości | **działa** od 0.224.0 | rola inna niż `SELLER`, więc także doradcy Allegro |
+| Rozmowa sprawy dociąga się STRONAMI | **działa** od 0.273.0 | `offset` do pięciu stron; dłuższa dostaje `czat_urwany` i własne zdanie na ekranie zamiast obietnicy |
+| Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
+| Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
+| Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
+| Załączniki WYCHODZĄCE w sprawie | **projekt** | dwukrokowe wgranie `/sale/issues/attachments`; decyzja właściciela z 7 września to sam tekst |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |

@@ -28,7 +28,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   oczekiwanie: "REFUND", oczekiwanaKwotaGrosze: 5000, waluta: "PLN",
   statusAllegro: kubelek === "decyzja" ? "CLAIM_SUBMITTED" : "CLAIM_ACCEPTED",
   decyzjaDo: "2026-09-20T10:00:00.000Z", dniDoTerminu: 13, poTerminie: false,
-  zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1,
+  zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
@@ -91,6 +91,7 @@ vi.mock("../api/reklamacje", async () => {
       },
       isPending: false, error: null,
     }),
+    useOdswiez: mutacja("odswiez"),
     useProwadze: mutacja("prowadze"),
     useNotatka: mutacja("notatka"),
     useSynchronizuj: mutacja("synchronizuj"),
@@ -323,5 +324,25 @@ describe("Ekran reklamacji", () => {
     } finally {
       REKLAMACJE[1].czatAktywny = true;
     }
+  });
+
+  it("po udanej wysyłce ekran DOCIĄGA sprawę, zamiast czekać na takt", async () => {
+    /* Stan sprawy po stronie Allegro zmienił się przed chwilą, a takt przyjdzie
+       za trzy minuty (0.273.0). Przy wyniku niejednoznacznym to jedno żądanie
+       rozstrzyga, czy wiadomość poszła — czyli dokładnie to, po co pasek
+       odsyłał do Centrum Sprzedaży. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = { status: "sent" };
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(scena.mutacje).toContain(`odswiez:${JSON.stringify({ id: 1 })}`);
+  });
+
+  it("nieudana wysyłka NIE dociąga sprawy — nie ma czego dociągać", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = new Konflikt("Allegro zamknęło rozmowę w tej sprawie", {});
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    expect(scena.mutacje.some((m) => m.startsWith("odswiez:"))).toBe(false);
   });
 });

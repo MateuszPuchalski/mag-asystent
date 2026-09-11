@@ -600,6 +600,33 @@ pola mówi wyłącznie ta lista, więc kod traktuje każde pole jako opcjonalne 
 poza `id`, bez którego nie ma czego zapisać. Tak samo potraktowaliśmy
 `OfferListingDto` w 0.214.0 i to nie była wtedy usterka Allegro.
 
+### Filtr statusów: przebieg bierze NAJPIERW sprawy otwarte (0.273.0)
+
+`getListOfIssuesUsingGET` przyjmuje `status` — tablicę `PostPurchaseIssueStatus`
+(`CLAIM_SUBMITTED`, `CLAIM_ACCEPTED`, `CLAIM_REJECTED`, `DISPUTE_ONGOING`,
+`DISPUTE_CLOSED`, `DISPUTE_UNRESOLVED`). Do 0.272.0 nie używaliśmy go wcale.
+
+Lista jedzie MALEJĄCO PO DACIE OTWARCIA, a bezpiecznik stron ucina jej ogon —
+czyli sprawy najstarsze, czyli najbardziej spóźnione, czyli dokładnie te, dla
+których panel reklamacji powstał. Przebieg pyta więc najpierw o trzy statusy
+spraw żywych, a dopiero potem o całą listę. Spraw otwartych jest garść, więc
+mieszczą się przed bezpiecznikiem niezależnie od tego, jak długie jest archiwum.
+
+Przelot pełny ZOSTAJE nietknięty: to on zamyka sprawy rozstrzygnięte poza
+panelem i z niego liczy się ogon (`pozostalo`). Sprawa widziana w obu przelotach
+zapisuje się raz — przebieg trzyma je w mapie po identyfikatorze.
+
+### Język: `Accept-Language` przy każdym żądaniu (0.273.0)
+
+Specyfikacja wymienia ten nagłówek przy `GET /sale/issues` („Expected language
+of subject field") i przy `GET …/chat` („Expected language of messages",
+z przykładem `en-US`). Do 0.272.0 nie było go w serwerze NIGDZIE, więc pola
+zależne od języka przychodziły w domyślnym Allegro.
+
+Wysyłamy `pl-PL` z jednego miejsca — bloku nagłówków `zapytajAllegro` — dla
+całej rodziny końcówek. Rozjazd języka między listą a rozmową tej samej sprawy
+byłby gorszy niż konsekwentna angielszczyzna.
+
 ### Co mapujemy
 
 | pole Allegro | kolumna | po co |
@@ -652,11 +679,27 @@ to **10**, nie 100 jak przy listach obok, więc podajemy go jawnie.
 „not present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro
 (`ADMIN`) odpisał w 61 sprawach na 100, więc to jest przypadek typowy.
 
+**Rozmowa STRONICUJE SIĘ od 0.273.0.** Do 0.272.0 to żądanie szło raz, bez
+`offset`, choć adres umiał go od początku — więc rozmowa dłuższa niż sto
+wiadomości była przycięta na zawsze, a ekran obiecywał przy niej resztę, która
+nie miała skąd przyjść. Bezpiecznik stoi na pięciu stronach; rozmowa dłuższa
+dostaje znak `czat_urwany` i wtedy ekran mówi co innego, zamiast obiecywać.
+
+Bezpiecznik był potrzebny z osobnego powodu niż przy liście: budżet rozmów na
+przebieg liczy SPRAWY, nie żądania, więc bez granicy jedna rozmowa o tysiącu
+wiadomości zjadłaby cały takt sama.
+
 `[WERYFIKUJ]` Kształt rozmowy na ŻYWYM koncie. `docs/allegro-sonda.md` ma tę
 sekcję pustą, bo próbkę zdjęto przed poprawką klucza. Kolumna „niepuste" dla
-`chat[].text`, `chat[].author.login` i `chat[].attachments` jest więc nieznana,
-a razem z nią odpowiedź na pytanie, czy rozmowa mieści się w stu wiadomościach.
+`chat[].text`, `chat[].author.login` i `chat[].attachments` jest więc nieznana.
 Sprawdza się to jednym `npm run sonda`.
+
+`[WERYFIKUJ]` KOLEJNOŚĆ wiadomości w rozmowie. Przy liście spraw specyfikacja
+mówi wprost „ordered by descending opened date"; przy `/chat` nie mówi nic.
+Dopóki tego nie wiemy, nie wiadomo, czy pierwsza strona to najstarsze sto
+wiadomości, czy najnowsze — a to rozstrzyga, co widzi agent przy rozmowie
+uciętej bezpiecznikiem. Stronicowanie czyni pytanie bezprzedmiotowym dla
+kompletu danych, ale nie dla tego jednego przypadku.
 
 `[WERYFIKUJ]` Do której przestrzeni należy `PostPurchaseIssue.offer.id`. Przykład
 w specyfikacji pokazuje UUID (`54b50cb5-2dd3-4ce0-9c41-57ac5981d2ab`), a sonda
@@ -664,6 +707,32 @@ z żywego konta zapisała zwykły tekst przy sześćdziesięciu pięciu sprawach
 Typem jest `string`, więc rozstrzyga to dopiero pierwsze trafienie w
 `offer_snapshot` — to jest ta sama otwarta sprawa dwóch przestrzeni
 identyfikatora oferty, co przy pozycji zwrotu.
+
+### `GET /sale/issues/{issueId}` — odświeżenie jednej sprawy (0.273.0)
+
+Czwarta końcówka rodziny i do 0.272.0 jedyna nieużywana wcale. Oddaje ten sam
+kształt `PostPurchaseIssue`, co wiersz listy, więc zapisuje ją ta sama funkcja —
+jedna droga zapisu, nie dwie.
+
+Powód istnienia jest po stronie człowieka, nie danych: bez niej świeży stan
+sprawy dawał wyłącznie PEŁNY przebieg listy, czyli takt trzech minut. Agent,
+który właśnie wysłał odpowiedź albo werdykt, patrzy na ekran teraz — i najbardziej
+wtedy, gdy wysyłka skończyła się niejednoznacznie, bo pasek odsyłał go wtedy do
+Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
+
+Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik Allegro rozjechał się
+z naszym — odświeżenie ma kosztować jedno żądanie, gdy nic nowego nie przyszło.
+
+### Zapisy rodziny `issues`: czego nadal NIE robimy
+
+`POST /sale/issues/attachments` (deklaracja) i `PUT /sale/issues/attachments/{id}`
+(wgranie) — czyli załączniki WYCHODZĄCE, pole `MessageRequest.attachments`.
+Decyzja właściciela z 7 września 2026 brzmiała „sam tekst" i trzyma się do dziś.
+
+Wzorzec stoi gotowy: skrzynka robi dwukrokowe wgranie od 0.195.0
+(`services/zalaczniki-wysylki.ts`). Brakuje decyzji, nie kodu — razem z nią
+przyjdzie akapit polityki danych, bo od tego momentu plik z naszego dysku
+zaczyna opuszczać maszynę.
 
 ### Załącznik: typ rozstrzygają BAJTY
 

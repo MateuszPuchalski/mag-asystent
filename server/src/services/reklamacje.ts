@@ -201,6 +201,8 @@ export interface WierszReklamacji {
   zwrotWymagany: boolean | null;
   czatAktywny: boolean;
   wiadomosciIle: number;
+  /** Czy rozmowę urwał NASZ bezpiecznik stron (0.273.0) — patrz `czat_urwany`. */
+  czatUrwany: boolean;
   ostatniaWiadomoscStatus: string | null;
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
@@ -373,6 +375,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     zwrotWymagany,
     czatAktywny,
     wiadomosciIle: Number(w.wiadomosci_ile ?? 0),
+    czatUrwany: Number(w.czat_urwany ?? 0) === 1,
     ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     otwartoAt: String(w.otwarto_at),

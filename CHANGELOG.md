@@ -34,6 +34,59 @@ historii nie przepisujemy.
 ---
 
 
+## 0.273.0 — 11 września 2026
+
+**Cztery rozjazdy między panelem reklamacji a tym, co rodzina `/sale/issues`
+naprawdę oferuje.** Moduł był funkcjonalnie kompletny od 0.242.0 — kolejka,
+rozmowa, odpowiedź, werdykt. Kompletny nie znaczy zgodny.
+
+**Rozmowa dłuższa niż sto wiadomości ginęła na zawsze.** Adres czatu umiał
+`offset` od 0.222.0, ale nikt go nigdy nie podał: braliśmy pierwszą setkę
+i koniec. Pod spodem stało zdanie „Reszta dojdzie następną synchronizacją" —
+nieprawdziwe od pierwszego dnia, bo po drugą stronę rozmowy nikt nie szedł.
+
+Gorsze było to, czego nie było widać. Sprawa z taką rozmową spełniała warunek
+dociągania po KAŻDYM przebiegu i — przy sortowaniu po terminie decyzji — stała
+na czele budżetu w kółko. Jedna gruba rozmowa głodziła dziewiętnaście
+pozostałych, w nieskończoność. Rozmowa stronicuje się teraz do pięciuset
+wiadomości; dłuższa dostaje znak `czat_urwany`, wypada z kolejki dociągania,
+a ekran mówi wprost, że resztę widać w Centrum Sprzedaży.
+
+**Kolejka ucinała najstarsze, czyli najbardziej spóźnione.** Lista spraw jedzie
+malejąco po dacie otwarcia, a nasz bezpiecznik stron ucina jej ogon — dokładnie
+te sprawy, dla których ten ekran powstał. Specyfikacja ma na to filtr `status`
+i nie używaliśmy go wcale. Przebieg pyta teraz najpierw o trzy statusy spraw
+żywych, a dopiero potem o całą listę; otwartych jest garść, więc mieszczą się
+przed bezpiecznikiem niezależnie od długości archiwum.
+
+**Nie prosiliśmy Allegro o język.** `Accept-Language` nie występował w serwerze
+ani razu, choć specyfikacja wymienia go przy liście („Expected language of
+subject field") i przy rozmowie („Expected language of messages", z przykładem
+`en-US`). Teraz jedzie `pl-PL` z jednego miejsca, dla całej rodziny końcówek:
+rozjazd języka między listą a rozmową tej samej sprawy byłby gorszy niż
+konsekwentna angielszczyzna.
+
+**Czwarta końcówka rodziny była nieużywana wcale.** `GET /sale/issues/{id}`
+oddaje ten sam kształt co wiersz listy, więc zapisuje ją ta sama funkcja. Panel
+woła ją po wysyłce odpowiedzi i po werdykcie, zamiast czekać trzy minuty na
+takt — a najbardziej liczy się to przy wysyłce niejednoznacznej, bo pasek
+odsyłał wtedy do Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
+Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik się rozjechał.
+
+Nowy `[WERYFIKUJ]`: w jakiej KOLEJNOŚCI Allegro oddaje wiadomości rozmowy. Przy
+liście spraw specyfikacja mówi „ordered by descending opened date", przy `/chat`
+nie mówi nic — a to rozstrzyga, co widzi agent przy rozmowie uciętej
+bezpiecznikiem. Z listy niewiadomych zeszło za to pytanie, czy rozmowa mieści
+się w stu wiadomościach: przestało mieć znaczenie.
+
+Poza zakresem zostają załączniki WYCHODZĄCE (`POST /sale/issues/attachments`
+plus `PUT`). To nie przeoczenie: decyzja właściciela z 7 września brzmiała „sam
+tekst", a odwrócenie jej jest jego, nie moje. Wzorzec stoi gotowy w skrzynce
+od 0.195.0 — brakuje decyzji, nie kodu.
+
+---
+
+
 ## 0.272.0 — 11 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

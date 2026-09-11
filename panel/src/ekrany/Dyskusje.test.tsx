@@ -22,7 +22,7 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
   id, externalId: `d-${id}`, orderId: `ord-${id}`, kupujacyLogin: `klient${id}`,
   temat, opis: `Opis sprawy ${id}`,
   statusAllegro: kubelek === "zamknieta" ? "DISPUTE_CLOSED" : "DISPUTE_ONGOING",
-  czatAktywny: kubelek !== "zamknieta", wiadomosciIle: 1,
+  czatAktywny: kubelek !== "zamknieta", wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: kubelek === "klient" ? "SELLER_REPLIED" : "BUYER_REPLIED",
   ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
   ruchNasz: kubelek === "odpowiedz", czekaOdDni: kubelek === "odpowiedz" ? 5 : null,

@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  czatyDoUzupelnienia, czyReklamacja, pierwszeOczekiwanie,
+  czatyDoUzupelnienia, czyReklamacja, odswiezSprawe, pierwszeOczekiwanie,
   synchronizujAllegroReklamacje,
 } from "./allegro-reklamacje-sync.js";
 import { stanReklamacji } from "./allegro-reklamacje-sync-state.js";
@@ -332,4 +332,167 @@ test("błąd Allegro podnosi licznik i zapisuje kod, a nie znika", async () => {
   const s = stanReklamacji(d);
   assert.equal(s.errorCount, 1);
   assert.ok(s.nextAttemptAt, "następna próba ma termin, a nie „kiedyś”");
+});
+
+/* ── Stronicowanie rozmowy i filtr statusów (0.273.0) ────────────────────────
+   Do 0.272.0 rozmowa jechała JEDNYM żądaniem bez offsetu, choć adres umiał go
+   od początku. Sprawy dłuższe niż sto wiadomości były przez to przycięte na
+   zawsze — a ekran obiecywał przy nich, że reszta dojdzie następną
+   synchronizacją. Gorzej: taka sprawa spełniała warunek doboru rozmów po
+   KAŻDYM przebiegu i głodziła budżet pozostałych.                           */
+
+/** Wiadomość czatu o zadanym numerze — tyle, ile trzeba, żeby ją zapisać. */
+const wiad = (n: number) => ({
+  id: `w-${n}`, text: `wiadomość ${n}`,
+  author: { login: "kupujacy1", role: "BUYER" },
+  createdAt: "2026-09-06T10:01:00.000Z",
+});
+
+/**
+ * Atrapa, w której rozmowa ma ZADANĄ długość i stronicuje się naprawdę.
+ *
+ * `czaty` mapuje identyfikator sprawy na liczbę wiadomości; adres z `offset`
+ * dostaje właściwy wycinek, więc test sprawdza zachowanie, a nie atrapę.
+ */
+function apiZeStronami(issues: unknown[], czaty: Record<string, number>) {
+  const wywolania: string[] = [];
+  const query = async (url: string) => {
+    wywolania.push(url);
+    const m = /\/sale\/issues\/([^/?]+)\/chat/.exec(url);
+    if (m) {
+      const ile = czaty[m[1]] ?? 0;
+      const offset = Number(/offset=(\d+)/.exec(url)?.[1] ?? 0);
+      return { chat: Array.from({ length: Math.max(0, Math.min(100, ile - offset)) },
+        (_, i) => wiad(offset + i + 1)) };
+    }
+    return url.includes("offset=0") ? { issues } : { issues: [] };
+  };
+  return { query, wywolania };
+}
+
+const ileWiadomosci = (d: DatabaseSync, ext: string) => Number((d.prepare(
+  `SELECT COUNT(*) n FROM reklamacja_wiadomosc w JOIN reklamacja_klienta r ON r.id=w.reklamacja_id
+    WHERE r.external_id=?`).get(ext) as { n: number }).n);
+
+test("rozmowa dłuższa niż sto wiadomości dociąga się W CAŁOŚCI, stronami", async () => {
+  const d = baza();
+  const { query, wywolania } = apiZeStronami(
+    [sprawa({ chat: { messagesCount: 150, lastMessage: null, initialMessage: wiad(1) } })],
+    { "i-1": 150 });
+
+  await synchronizujAllegroReklamacje({ database: d, query });
+
+  assert.equal(ileWiadomosci(d, "i-1"), 150, "druga strona rozmowy też jest zapisana");
+  const strony = wywolania.filter((u) => u.includes("/chat"));
+  assert.equal(strony.length, 2, "dwie strony, nie jedna i nie trzy");
+  assert.match(strony[1], /offset=100/);
+  /* Rozmowa kompletna, więc sprawa NIE wraca po nią następnym przebiegiem. */
+  assert.deepEqual(czatyDoUzupelnienia(d, 1), []);
+});
+
+test("bezpiecznik stron urywa rozmowę JAWNIE — i sprawa przestaje głodzić budżet", async () => {
+  /* Pięć stron to pięćset wiadomości. Rozmowa dłuższa zostaje niepełna, ale
+     wiersz mówi to wprost, zamiast wracać po resztę w każdym takcie. */
+  const d = baza();
+  const { query, wywolania } = apiZeStronami(
+    [sprawa({ chat: { messagesCount: 10_000, lastMessage: null, initialMessage: wiad(1) } })],
+    { "i-1": 10_000 });
+
+  await synchronizujAllegroReklamacje({ database: d, query });
+
+  assert.equal(wywolania.filter((u) => u.includes("/chat")).length, 5, "bezpiecznik trzyma");
+  assert.equal(ileWiadomosci(d, "i-1"), 500);
+  assert.equal(Number((d.prepare("SELECT czat_urwany FROM reklamacja_klienta WHERE external_id='i-1'")
+    .get() as { czat_urwany: number }).czat_urwany), 1, "urwanie jest ZAPISANE, nie domyślane");
+  assert.deepEqual(czatyDoUzupelnienia(d, 1), [],
+    "sprawa z urwaną rozmową nie wraca do kolejki — inaczej głodziłaby resztę");
+});
+
+test("jedna gruba rozmowa NIE wypycha z budżetu spraw, które da się domknąć", async () => {
+  /* Blizna 0.273.0 w czystej postaci: przy budżecie trzech rozmów sprawa
+     gruba stała na czele kolejki w kółko, bo sortowanie idzie po terminie
+     decyzji, a jej warunek był prawdziwy zawsze. */
+  const d = baza();
+  const sprawy = [
+    sprawa({ id: "gruba", decisionDueDate: "2026-09-08T10:00:00.000Z",
+      chat: { messagesCount: 10_000, lastMessage: null, initialMessage: wiad(1) } }),
+    ...[1, 2, 3].map((n) => sprawa({
+      id: `chuda-${n}`, decisionDueDate: `2026-09-1${n}T10:00:00.000Z`,
+      chat: { messagesCount: 3, lastMessage: null, initialMessage: wiad(1) },
+    })),
+  ];
+  const { query } = apiZeStronami(sprawy,
+    { gruba: 10_000, "chuda-1": 3, "chuda-2": 3, "chuda-3": 3 });
+
+  /* Dwa przebiegi z budżetem trzech: w pierwszym gruba zjada swoje strony,
+     w drugim NIE ma jej już w kolejce i chude schodzą do zera. */
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 3 });
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 3 });
+
+  for (const n of [1, 2, 3]) {
+    assert.equal(ileWiadomosci(d, `chuda-${n}`), 3, `chuda-${n} została domknięta`);
+  }
+});
+
+test("przebieg pyta NAJPIERW o sprawy otwarte, potem o całą listę", async () => {
+  /* Lista jedzie malejąco po dacie otwarcia, a bezpiecznik stron ucina jej
+     ogon — czyli sprawy najstarsze, czyli najbardziej spóźnione. Filtr
+     `status` ze specyfikacji zawęża pierwszy przelot do spraw żywych. */
+  const d = baza();
+  const { query, wywolania } = apiZeStronami([sprawa()], { "i-1": 3 });
+
+  await synchronizujAllegroReklamacje({ database: d, query, czatow: 0 });
+
+  const listy = wywolania.filter((u) => u.includes("/sale/issues?"));
+  assert.match(listy[0], /status=CLAIM_SUBMITTED/);
+  assert.match(listy[0], /status=DISPUTE_ONGOING/);
+  assert.match(listy[0], /status=DISPUTE_UNRESOLVED/);
+  assert.ok(!listy[listy.length - 1].includes("status="),
+    "przelot pełny zostaje bez filtra — to on domyka sprawy rozstrzygnięte");
+  /* Sprawa widziana w obu przelotach zapisuje się RAZ i liczy się raz. */
+  assert.equal(Number((d.prepare("SELECT COUNT(*) n FROM reklamacja_klienta")
+    .get() as { n: number }).n), 1);
+});
+
+test("odświeżenie JEDNEJ sprawy nie rusza pracy człowieka", async () => {
+  /* Blizna 0.128.0 rozszerzona o pracę biura: ponowne pobranie uzupełnia pola
+     z Allegro, ale `prowadzi`, `notatka` i `wersja` należą do nas. */
+  const d = baza();
+  const { query } = apiZeStronami([sprawa()], { "i-1": 3 });
+  /* Pierwszy przebieg Z rozmową, żeby licznik zgadzał się przed odświeżeniem —
+     inaczej test sprawdzałby dociąganie braków, a nie oszczędność żądań. */
+  await synchronizujAllegroReklamacje({ database: d, query });
+  d.prepare(`UPDATE reklamacja_klienta SET prowadzi='Ala', notatka='moje ustalenia', wersja=7
+    WHERE external_id='i-1'`).run();
+  const id = Number((d.prepare("SELECT id FROM reklamacja_klienta WHERE external_id='i-1'")
+    .get() as { id: number }).id);
+
+  const wywolania: string[] = [];
+  const pojedyncza = async (url: string) => {
+    wywolania.push(url);
+    if (url.includes("/chat")) return { chat: [wiad(1), wiad(2), wiad(3)] };
+    return sprawa({ currentState: { status: "CLAIM_ACCEPTED", chatActive: false } });
+  };
+
+  assert.equal(await odswiezSprawe(id, { database: d, query: pojedyncza }), true);
+
+  const w = d.prepare(`SELECT status_allegro, czat_aktywny, prowadzi, notatka, wersja
+    FROM reklamacja_klienta WHERE id=?`).get(id) as Record<string, unknown>;
+  assert.equal(w.status_allegro, "CLAIM_ACCEPTED", "stan z Allegro jest świeży");
+  assert.equal(Number(w.czat_aktywny), 0);
+  assert.equal(w.prowadzi, "Ala");
+  assert.equal(w.notatka, "moje ustalenia");
+  assert.equal(Number(w.wersja), 7, "wersja jest nasza — odświeżenie jej nie podnosi");
+  assert.ok(!wywolania.some((u) => u.includes("/chat")),
+    "licznik się zgadza, więc po rozmowę nie idziemy");
+});
+
+test("odświeżenie sprawy, której nie ma, mówi to zamiast strzelać do Allegro", async () => {
+  const d = baza();
+  let strzalow = 0;
+  const wynik = await odswiezSprawe(999, {
+    database: d, query: async () => { strzalow += 1; return null; },
+  });
+  assert.equal(wynik, false);
+  assert.equal(strzalow, 0);
 });

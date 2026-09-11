@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
-  useNotatka, useOdpowiedz, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useNotatka, useOdpowiedz, useOdswiez, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
   useWerdykt, useZwrotTowaru,
 } from "../api/reklamacje";
 import { Konflikt } from "../api/klient";
@@ -117,6 +117,7 @@ export function Reklamacje() {
   const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
   const odpowiedz = useOdpowiedz();
+  const odswiez = useOdswiez();
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
   const trwa = prowadze.isPending || notatka.isPending;
@@ -224,6 +225,11 @@ export function Reklamacje() {
         if (w.status === "sent") setTresc("");
         else setBladWysylki(
           "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+        /* Stan sprawy po stronie Allegro ZMIENIŁ SIĘ przed chwilą, a takt
+           przyjdzie za trzy minuty (0.273.0). Przy wyniku niejednoznacznym to
+           jedno żądanie rozstrzyga, czy wiadomość poszła — czyli dokładnie to,
+           po co pasek odsyłał do Centrum Sprzedaży. */
+        odswiez.mutate({ id: d.reklamacja.id });
       },
       onError: (e) => {
         /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
@@ -244,7 +250,13 @@ export function Reklamacje() {
     if (!d) return;
     setBladWerdyktu("");
     werdykt.mutate({ id: d.reklamacja.id, ...z, wersja: d.reklamacja.wersja }, {
-      onSuccess: (w) => { if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło"); },
+      onSuccess: (w) => {
+        if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło");
+        /* Werdykt zmienia `status_allegro`, a zieleń „Potwierdzony przez
+           Allegro" należy się dopiero statusowi z synchronizacji — więc
+           dociągamy go od razu, zamiast kazać czekać na takt. */
+        odswiez.mutate({ id: d.reklamacja.id });
+      },
       onError: (e) => setBladWerdyktu((e as Error).message),
     });
   };
@@ -366,6 +378,7 @@ export function Reklamacje() {
                    wie, jaki rodzaj sprawy trzyma. */
                 opisZgloszenia: szczegol.data.reklamacja.powodOpis ?? szczegol.data.reklamacja.opis,
                 wiadomosciIle: szczegol.data.reklamacja.wiadomosciIle,
+                czatUrwany: szczegol.data.reklamacja.czatUrwany,
               }}
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}

@@ -18,7 +18,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   powodOpis: "Pękła obudowa", temat: null, opis: null,
   oczekiwanie: "PARTIAL_REFUND", oczekiwanaKwotaGrosze: 5000, waluta: "PLN",
   statusAllegro: "CLAIM_SUBMITTED", decyzjaDo: "2026-09-20T10:00:00.000Z",
-  dniDoTerminu: 13, poTerminie: false, zwrotWymagany: null, czatAktywny: true,
+  dniDoTerminu: 13, poTerminie: false, zwrotWymagany: null, czatAktywny: true, czatUrwany: false,
   wiadomosciIle: 1, ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null, notatka: null,
   werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,

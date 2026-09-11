@@ -203,9 +203,33 @@ export function urlWnioskuORabat(apiUrl: string, claimId: string): string {
   return `${apiUrl}/order/refund-claims/${encodeURIComponent(claimId)}`;
 }
 
-/** URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1). */
-export function urlDyskusji(apiUrl: string, offset: number): string {
-  return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}`;
+/**
+ * URL listy dyskusji i reklamacji (`/sale/issues`, Accept beta.v1).
+ *
+ * `statusy` zawężają przebieg do spraw, które jeszcze żyją (0.273.0).
+ * Specyfikacja wymienia ten parametr przy `getListOfIssuesUsingGET` jako
+ * tablicę `PostPurchaseIssueStatus`, a lista bez niego jedzie MALEJĄCO PO
+ * DACIE OTWARCIA — więc bezpiecznik stron ucina najstarsze, czyli najbardziej
+ * spóźnione, czyli dokładnie te, dla których ten ekran powstał.
+ *
+ * Serializacja tablicy: `form` z `explode`, czyli parametr powtórzony —
+ * OpenAPI 3 nie każe jej deklarować, bo to wartość domyślna.
+ */
+export function urlDyskusji(apiUrl: string, offset: number, statusy: readonly string[] = []): string {
+  const filtr = statusy.map((s) => `&status=${encodeURIComponent(s)}`).join("");
+  return `${apiUrl}/sale/issues?limit=100&offset=${Math.max(0, Math.trunc(offset))}${filtr}`;
+}
+
+/**
+ * Pojedyncza sprawa posprzedażowa (`GET /sale/issues/{issueId}`, 0.273.0).
+ *
+ * Do 0.272.0 tej końcówki nie wołaliśmy wcale, więc jedyną drogą do świeżego
+ * stanu sprawy był PEŁNY przebieg listy — takt trzy minuty. Najgorzej wychodziło
+ * to przy wysyłce niejednoznacznej: pasek kazał sprawdzić w Centrum Sprzedaży
+ * coś, co jedno żądanie rozstrzyga w sekundę.
+ */
+export function urlSprawy(apiUrl: string, id: string): string {
+  return `${apiUrl}/sale/issues/${encodeURIComponent(id)}`;
 }
 
 /**
@@ -412,6 +436,18 @@ export async function zapytajAllegro(
           /* Obowiązkowy wg Allegro — brak prawidłowego User-Agenta grozi
              zablokowaniem klucza API (ekran po rejestracji aplikacji). */
           "user-agent": allegroUserAgent(),
+          /* JĘZYK, O KTÓRY PROSIMY (0.273.0). Do 0.272.0 nie było tego
+             nagłówka nigdzie w serwerze, więc pola zależne od języka
+             przychodziły w domyślnym Allegro — a specyfikacja wymienia
+             `Accept-Language` wprost przy `GET /sale/issues` („Expected
+             language of subject field") i przy `GET …/chat` („Expected
+             language of messages", z przykładem `en-US`).
+
+             Jedno miejsce dla całej rodziny końcówek, bo rozjazd języka
+             między listą a rozmową tej samej sprawy byłby gorszy niż
+             konsekwentna angielszczyzna. Sklep jest polski i biuro czyta
+             po polsku. */
+          "accept-language": "pl-PL",
           /* CIAŁO IDZIE TĄ SAMĄ WERSJĄ ZASOBU, którą negocjujemy w `accept`
              (0.173.0). Do 0.172.0 stało tu `application/json` — typ, którego
              specyfikacja NIE WYMIENIA przy żadnym z naszych dwóch zapisów:

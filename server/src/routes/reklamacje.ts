@@ -11,7 +11,7 @@ import {
   ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
-import { synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
+import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
 import { autoryzuj } from "../services/auth.js";
@@ -100,6 +100,38 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       return szczegolReklamacji(db(), Number(req.params.id));
     } catch (e) { return blad(reply, e); }
   });
+
+  /**
+   * Odświeżenie JEDNEJ sprawy z Allegro (0.273.0).
+   *
+   * ZAPIS, który u nas niczego nie postanawia: dociąga cudzy stan i tyle.
+   * Stoi tu, bo `GET` z takim skutkiem ubocznym łamałby regułę „zero zapisu
+   * przy patrzeniu" ciszej, niż gdyby ją łamał jawnie — a przeglądarka wolno
+   * powtarza `GET`-y i sama je wstępnie pobiera.
+   *
+   * Powód istnienia: po wysyłce odpowiedzi albo werdyktu stan sprawy po
+   * stronie Allegro zmieniał się dopiero z pełnym przebiegiem, czyli za
+   * trzy minuty. Agent patrzy na ekran teraz.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/odswiez", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const id = Number(req.params.id);
+      try {
+        if (!await odswiezSprawe(id)) {
+          return reply.code(404).send({ error: "Nie znaleziono reklamacji" });
+        }
+        logEvent("reklamacja_odswiezenie", autor(), null, { id });
+        return szczegolReklamacji(db(), id);
+      } catch (e) {
+        /* Zdanie z adaptera mówi, co naprawić — token, uprawnienie, limit. */
+        return reply.code(502).send({ error: (e as Error).message });
+      }
+    });
 
   /**
    * Pobranie załącznika PRZEZ NAS.
