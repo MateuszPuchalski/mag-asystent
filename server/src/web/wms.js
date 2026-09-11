@@ -65,6 +65,38 @@ window.Wms = (() => {
     reserve: "Zapas zaplecza",
     quarantine: "Kwarantanna",
   };
+  const cartUi = window.WmsCarts({
+    html,
+    field,
+    read,
+    mutate,
+    focus: focusWhenReady,
+    message,
+    lock,
+    office,
+    number,
+    metric,
+    userId: () => user?.userId,
+    active: () => ["carts", "packing"].includes(view),
+    refresh,
+    openOrder: async (id) => {
+      selected = id;
+      view = "orders";
+      root().classList.remove("wms-queue");
+      shell();
+      await refresh();
+    },
+  });
+  const stockWorkUi = window.WmsStockWork({
+    html,
+    field,
+    read,
+    mutate,
+    focus: focusWhenReady,
+    office,
+    refresh,
+    message,
+  });
   const badge = (o) =>
     `<span class="wms-status ${o.hold_reason ? "held" : html(o.status)}">${o.hold_reason ? "Wstrzymane" : states[o.status]}</span>`;
   const pendingKey = () => `wertis.wms.pending.${user?.userId}`;
@@ -156,6 +188,7 @@ window.Wms = (() => {
         throw new Error([result.error, ...(result.details || [])].join(" · "));
       }
       sessionStorage.removeItem(storageKey);
+      message("Zapisano operację.");
       return result;
     } catch (e) {
       message(
@@ -192,10 +225,14 @@ window.Wms = (() => {
     }
   }
   function shell() {
+    root().classList.remove("wms-cart-focus");
     const tabs = [
       ["orders", "Zamówienia"],
       ["stock", "Zapasy"],
-      ["waves", "Zbiórka wózkiem"],
+      ["stockwork", "Zadania zapasu"],
+      ["carts", "Wózki 20 / 30"],
+      ["packing", "Pakowanie skrzynek"],
+      ["waves", "Zbiórka ręczna"],
       ["bins", "Lokalizacje"],
       ...(office()
         ? [
@@ -216,7 +253,13 @@ window.Wms = (() => {
     try {
       if (view === "orders") await orders(turn);
       if (view === "waves") await waves(turn);
+      if (view === "carts") {
+        root().classList.remove("has-order");
+        await cartUi.render();
+      }
+      if (view === "packing") await cartUi.renderPacking();
       if (view === "stock") await stocks(turn);
+      if (view === "stockwork") await stockWorkUi.render();
       if (view === "bins") await bins(turn);
       if (view === "analytics") await report(turn);
       if (view === "dispatch") await dispatch(turn);
@@ -467,7 +510,8 @@ window.Wms = (() => {
       const wave = await read(`/api/wms/waves/${waveId}`);
       if (turn !== generation || selectedWave !== waveId) return;
       const task = wave.tasks.find(
-        (t) => !t.hold_reason && t.picker_id === user.userId,
+        (t) =>
+          !t.hold_reason && !t.stock_blocked && t.picker_id === user.userId,
       );
       root()._waveTask = task;
       el("wms-work").closest(".wms-split").classList.add("has-order");
@@ -548,6 +592,7 @@ window.Wms = (() => {
     el("wms-content").innerHTML =
       `<div class="wms-toolbar"><label>Okres<select id="wms-days">${[1, 7, 30, 90].map((n) => `<option value="${n}" ${days === n ? "selected" : ""}>Ostatnie ${n} dni</option>`).join("")}</select></label><button data-do-wms="csv">EKSPORT CSV</button><button data-do-wms="integrity">SPRAWDŹ ZGODNOŚĆ STANÓW</button></div>
       <div class="wms-stats">${metric("Wysłane zamówienia", number(a.throughput.shipped), "w wybranym okresie")}${metric("Wysłane w terminie", a.throughput.shipped ? `${number((100 * a.throughput.on_time) / a.throughput.shipped)}%` : "—", "wg terminu zamówienia")}${metric("Do realizacji teraz", number(totals.open), `${totals.overdue} po terminie · ${totals.held} wstrzymanych`)}${metric("Średni czas realizacji", duration(a.throughput.cycle_minutes), "od utworzenia do wysyłki")}</div>
+      <div class="wms-stats">${metric("Oczekiwanie na pakowanie", duration(a.throughput.pack_queue_minutes), "od końca zbiórki do otwarcia pakowania")}${metric("Sesja pakowania", duration(a.throughput.pack_session_minutes), "od otwarcia do ostatniego potwierdzenia")}${metric("Zamówienia z pomiarem", number(a.throughput.timed_packed_orders), `z ${number(a.throughput.shipped)} wysłanych`)}</div><p class="wms-help">Czas sesji może obejmować przerwy. Brak historycznych zdarzeń oznacza brak pomiaru, nie zero minut pracy.</p>
       <div class="wms-grid"><section class="wms-surface"><h2>Wysyłki dziennie</h2><p class="wms-muted">Dni kalendarzowe UTC · ${a.since.slice(0, 10)} — ${a.now.slice(0, 10)}</p><div class="wms-chart" role="img" aria-label="Wysyłki w kolejnych dniach">${a.daily.map((d) => `<div class="wms-bar" style="height:${(100 * d.shipped) / max}%" title="${d.day}: ${d.shipped} wysłanych, ${d.on_time} w terminie"></div>`).join("")}</div><details><summary>Dane wykresu</summary><table class="wms-lines"><thead><tr><th>Dzień UTC</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.daily.map((d) => `<tr><td>${d.day}</td><td>${d.shipped}</td><td>${d.on_time}</td></tr>`).join("")}</tbody></table></details></section>
       <section class="wms-surface"><h2>Praca w toku</h2><table class="wms-lines"><thead><tr><th>Etap</th><th>Zamówienia</th><th>Po terminie</th></tr></thead><tbody>${a.backlog.map((r) => `<tr><td>${states[r.status]}</td><td class="num">${r.orders}</td><td class="num">${r.overdue}</td></tr>`).join("")}</tbody></table><p class="wms-muted">Otwarte ponad 48 h: ${number(a.aging.over_48h)} · Wstrzymania i odrzucone operacje w okresie: ${number(a.exceptions.total)}</p></section>
       <section class="wms-surface"><h2>Najczęściej wysyłane części</h2><table class="wms-lines"><thead><tr><th>SKU</th><th>Zamówienia</th><th>Sztuki</th></tr></thead><tbody>${a.top.map((r) => `<tr><td><strong>${html(r.sku)}</strong><br>${html(r.name)}</td><td class="num">${r.orders}</td><td class="num">${r.units}</td></tr>`).join("") || '<tr><td colspan="3">Brak wysyłek w tym okresie.</td></tr>'}</tbody></table></section>
@@ -587,6 +632,8 @@ window.Wms = (() => {
     const button = event.target.closest("button");
     if (!button || !root().contains(button) || busy) return;
     try {
+      if (await cartUi.click(button)) return;
+      if (await stockWorkUi.click(button)) return;
       if (button.dataset.dispatchOrderWms) {
         selected = Number(button.dataset.dispatchOrderWms);
         view = "orders";
@@ -721,6 +768,8 @@ window.Wms = (() => {
     if (busy) return;
     try {
       const values = Object.fromEntries(new FormData(f));
+      if (await cartUi.submit(f, values)) return;
+      if (await stockWorkUi.submit(f, values)) return;
       if (f.id === "wms-dispatch-filter") {
         dispatchDay = values.day;
         query = values.q;
@@ -1010,6 +1059,10 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.form?.id === "wms-cart-configure" && /^box-\d+$/.test(event.target.name)) {
+      const next = event.target.form.elements.namedItem(`box-${Number(event.target.name.slice(4)) + 1}`);
+      if (next) { event.preventDefault(); next.focus(); return; }
+    }
     if (
       event.key !== "Enter" ||
       !root()?.contains(event.target) ||

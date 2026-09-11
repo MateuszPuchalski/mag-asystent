@@ -12,11 +12,38 @@ process.env.WERTIS_ENV_FILE = path.resolve("wms-demo-no-env.local");
 const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");
 const W = await import("./services/wms.js");
+const C = await import("./services/wms-carts.js");
 const password = process.env.WMS_DEMO_PASSWORD;
 if (!password || password.length < 10)
   throw new Error("Ustaw WMS_DEMO_PASSWORD (co najmniej 10 znaków)");
 const user = createUser("Demo WMS", "admin", "wms-demo", password);
 const actor = { id: user.userId, name: user.name, role: user.role };
+for (const capacity of [20, 30] as const) {
+  C.configureCart(actor, randomUUID(), {
+    code: `CART-${capacity}`,
+    name: `Wózek ${capacity}`,
+    capacity,
+    version: 0,
+    boxes: Array.from({ length: capacity }, (_, i) => ({
+      position: i + 1,
+      barcode: `BOX${capacity}-${String(i + 1).padStart(2, "0")}`,
+    })),
+  });
+}
+C.configureStation(actor, randomUUID(), {
+  code: "PACK-01",
+  name: "Pakowanie 1",
+  kind: "pack",
+  active: true,
+  version: 0,
+});
+C.configureStation(actor, randomUUID(), {
+  code: "EXCEPT-01",
+  name: "Wyjaśnienia",
+  kind: "exception",
+  active: true,
+  version: 0,
+});
 const scale = process.argv.includes("--scale");
 const skuCount = scale ? 5000 : 40;
 const orderCount = scale ? 1500 : 32;

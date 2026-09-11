@@ -19,6 +19,8 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:wms:e2e -- --built
+      - if: runner.os == 'Linux'
+        run: npm run test:wms:cart-capacity
       - uses: actions/upload-artifact@v4
         if: always()
         with:

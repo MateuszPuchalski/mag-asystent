@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { exerciseCarts } from "./wms-cart-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -503,6 +504,7 @@ try {
     if (++cartScans > 50) throw new Error("Wózek nie kończy zbiórki");
   }
   await expect(page.locator("#wms-work")).toContainText("Trasa zebrana");
+  await exerciseCarts(page, output);
   await page.locator('[data-tab-wms="analytics"]').click();
   await page
     .getByRole("button", { name: "SPRAWDŹ ZGODNOŚĆ STANÓW", exact: true })

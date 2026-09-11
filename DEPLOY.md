@@ -11,6 +11,12 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Tryb wózków 20/30 wymaga rejestracji kodów wózków, stałych pozycji skrzynek i stanowisk pakowania.
+Biuro wykonuje tę konfigurację w **Realizacja WMS → Wózki 20 / 30**.
+Aktualizacja dodaje tabele i indeksy; nie przypisuje istniejących zamówień ani nie zmienia zapasu.
+Po kompilacji wymagany jest restart API oraz odświeżenie przeglądarki.
+Przed pracą na rzeczywistej hali należy uzupełnić kolejność lokalizacji i sprawdzić dopasowanie części do skrzynek.
+
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
         ▼

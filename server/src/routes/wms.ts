@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import * as Carts from "../services/wms-carts.js";
+import * as StockWork from "../services/wms-stock-work.js";
 import { ZodError, z } from "zod";
 import { sesjaZadania } from "../context.js";
 import {
@@ -70,6 +72,74 @@ export async function wmsRoutes(app: FastifyInstance) {
     actor();
     return listOrders(req.query);
   });
+  app.get("/api/wms/carts", async () => Carts.listCarts(actor()));
+  app.get<{ Params: { code: string } }>("/api/wms/carts/:code", async (req) =>
+    Carts.getCart(actor(), req.params.code),
+  );
+  app.get<{ Params: { id: string } }>("/api/wms/cart-runs/:id", async (req) =>
+    Carts.getCartRun(actor(), orderId(req.params.id)),
+  );
+  app.get("/api/wms/cart-analytics", async (req) =>
+    Carts.cartAnalytics(actor(), req.query),
+  );
+  app.get("/api/wms/pick-route", async () => {
+    manager(actor());
+    return {
+      rows: db()
+        .prepare("SELECT * FROM wms_pick_route ORDER BY sequence,bin")
+        .all(),
+    };
+  });
+  const cartCommands = {
+    "/api/wms/replenishments": StockWork.claimReplenishment,
+    "/api/wms/reservation-repair": StockWork.repairReservations,
+    "/api/wms/carts": Carts.configureCart,
+    "/api/wms/cart-start": Carts.startCart,
+    "/api/wms/cart-box-bind": Carts.bindCartBox,
+    "/api/wms/cart-box-pack": Carts.packCartBox,
+    "/api/wms/stations": Carts.configureStation,
+    "/api/wms/pick-route": Carts.configurePickRoute,
+    "/api/wms/pick-exceptions": Carts.reportPickException,
+    "/api/wms/pick-exceptions/resolve": Carts.resolvePickException,
+  };
+  for (const [path, action] of Object.entries(cartCommands))
+    app.post(path, { bodyLimit: 512 * 1024 }, async (req) =>
+      action(actor(), String(req.headers["idempotency-key"] ?? ""), req.body),
+    );
+  const runCommands = {
+    handoff: Carts.handoffCart,
+    release: Carts.releaseCart,
+    detach: Carts.detachCartBox,
+    replace: Carts.replaceCartBox,
+    takeover: Carts.takeoverCart,
+  };
+  for (const [path, action] of Object.entries(runCommands))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/cart-runs/:id/${path}`,
+      async (req) =>
+        action(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
+  app.get("/api/wms/stock-work", async (req) =>
+    StockWork.stockWork(actor(), req.query),
+  );
+  for (const [path, action] of Object.entries({
+    "/api/wms/replenishments/:id/complete": StockWork.completeReplenishment,
+    "/api/wms/replenishments/:id/cancel": StockWork.cancelReplenishment,
+    "/api/wms/stock-checks/:id/count": StockWork.countStockCheck,
+  }))
+    app.post<{ Params: { id: string } }>(path, async (req) =>
+      action(
+        actor(),
+        String(req.headers["idempotency-key"] ?? ""),
+        orderId(req.params.id),
+        req.body,
+      ),
+    );
   app.get("/api/wms/waves", async (req) => listWaves(actor(), req.query));
   app.post("/api/wms/waves", async (req) =>
     createWave(actor(), String(req.headers["idempotency-key"] ?? ""), req.body),

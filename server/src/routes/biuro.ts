@@ -56,7 +56,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     .header("content-security-policy",csp).header("x-content-type-options","nosniff")
     .header("referrer-policy","same-origin").header("cache-control","no-store").send(html));
 
-  for (const [plik, mime] of [["wms.js", "text/javascript"], ["wms.css", "text/css"],
+  for (const [plik, mime] of [["wms.js", "text/javascript"], ["wms-carts.js", "text/javascript"], ["wms-stock-work.js", "text/javascript"], ["wms.css", "text/css"],
     ["biuro-theme.js", "text/javascript"], ["biuro-theme.css", "text/css"]]) {
     const content = fs.readFileSync(path.join(__dirname, "../web", plik), "utf8");
     app.get(`/biuro/${plik}`, async (_req, reply) => reply.type(mime).header("cache-control", "no-cache").send(content));

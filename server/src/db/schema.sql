@@ -55,6 +55,16 @@ CREATE INDEX IF NOT EXISTS ix_wms_order_open ON wms_order(priority DESC, due_at,
   WHERE status NOT IN ('shipped','cancelled');
 CREATE INDEX IF NOT EXISTS ix_wms_order_created ON wms_order(created_at);
 CREATE INDEX IF NOT EXISTS ix_wms_order_shipped ON wms_order(shipped_at);
+-- Brak pomiaru pozostaje NULL. Nie odtwarzamy czasu pakowania z daty zakończenia zbiórki.
+CREATE TABLE IF NOT EXISTS wms_order_timing (
+  order_id INTEGER PRIMARY KEY REFERENCES wms_order(id),
+  first_pick_scan_at TEXT,
+  last_pick_scan_at TEXT,
+  pack_started_at TEXT,
+  first_pack_scan_at TEXT,
+  last_pack_scan_at TEXT,
+  pack_completed_at TEXT
+);
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_active_tote ON wms_order(tote)
   WHERE tote IS NOT NULL AND status NOT IN ('shipped','cancelled');
 CREATE TABLE IF NOT EXISTS wms_wave (
@@ -64,11 +74,107 @@ CREATE TABLE IF NOT EXISTS wms_wave (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_wms_wave_picker ON wms_wave(picker_id,id);
+CREATE INDEX IF NOT EXISTS ix_wms_wave_created ON wms_wave(created_at,id);
 CREATE TABLE IF NOT EXISTS wms_wave_order (
   wave_id INTEGER NOT NULL REFERENCES wms_wave(id),
   order_id INTEGER NOT NULL UNIQUE REFERENCES wms_order(id),
   PRIMARY KEY(wave_id,order_id)
 );
+-- Skrzynka i stała pozycja są oddzielne: wymiana skrzynki nie zmienia numeru miejsca.
+CREATE TABLE IF NOT EXISTS wms_cart (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  capacity INTEGER NOT NULL CHECK(capacity IN (20,30)),
+  selection TEXT NOT NULL DEFAULT 'all' CHECK(selection IN ('all','single','multi')),
+  max_units INTEGER NOT NULL DEFAULT 1000000 CHECK(max_units>0),
+  active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0)
+);
+CREATE TABLE IF NOT EXISTS wms_cart_slot (
+  cart_code TEXT NOT NULL REFERENCES wms_cart(code),
+  position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 30),
+  box_barcode TEXT UNIQUE,
+  PRIMARY KEY(cart_code,position)
+);
+CREATE TABLE IF NOT EXISTS wms_station (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK(kind IN ('pack','exception')),
+  active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0)
+);
+CREATE TABLE IF NOT EXISTS wms_cart_run (
+  id INTEGER PRIMARY KEY REFERENCES wms_wave(id),
+  cart_code TEXT NOT NULL REFERENCES wms_cart(code),
+  capacity INTEGER NOT NULL CHECK(capacity IN (20,30)),
+  assigned_count INTEGER NOT NULL DEFAULT 0 CHECK(assigned_count BETWEEN 0 AND 30),
+  arrived_at TEXT,
+  station_code TEXT REFERENCES wms_station(code),
+  closed_at TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_cart_active_run ON wms_cart_run(cart_code) WHERE closed_at IS NULL;
+CREATE TABLE IF NOT EXISTS wms_cart_assignment (
+  run_id INTEGER NOT NULL REFERENCES wms_cart_run(id),
+  position INTEGER NOT NULL CHECK(position BETWEEN 1 AND 30),
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  box_barcode TEXT NOT NULL,
+  handed_at TEXT,
+  station_code TEXT REFERENCES wms_station(code),
+  released_at TEXT,
+  ended_at TEXT,
+  PRIMARY KEY(run_id,position)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_cart_assignment_order ON wms_cart_assignment(order_id) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS ix_wms_cart_assignment_box ON wms_cart_assignment(box_barcode,ended_at);
+-- Kolejność przejścia jest konfiguracją hali, a nie sortowaniem nazw regałów.
+CREATE TABLE IF NOT EXISTS wms_pick_route (
+  bin TEXT PRIMARY KEY,
+  sequence INTEGER NOT NULL CHECK(sequence>=0),
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version>0)
+);
+CREATE TABLE IF NOT EXISTS wms_pick_exception (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  allocation_id INTEGER REFERENCES wms_allocation(id) ON DELETE SET NULL,
+  run_id INTEGER REFERENCES wms_cart_run(id),
+  kind TEXT NOT NULL CHECK(kind IN ('missing','damaged','box_full')),
+  tw_id INTEGER NOT NULL,
+  bin TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  resolved_at TEXT,
+  resolution TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_wms_pick_exception_open ON wms_pick_exception(order_id) WHERE resolved_at IS NULL;
+-- Podejrzenie braku blokuje nowe pobrania tego SKU na półce do zweryfikowania stanu.
+CREATE TABLE IF NOT EXISTS wms_stock_check (
+  id INTEGER PRIMARY KEY,
+  tw_id INTEGER NOT NULL,
+  bin TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  resolved_at TEXT,
+  counted INTEGER CHECK(counted>=0),
+  resolution TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_stock_check_open ON wms_stock_check(tw_id,bin) WHERE resolved_at IS NULL;
+CREATE TABLE IF NOT EXISTS wms_replenishment (
+  id INTEGER PRIMARY KEY,
+  tw_id INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  target TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  source_version INTEGER NOT NULL,
+  target_version INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  completed_at TEXT,
+  cancelled_at TEXT,
+  reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_replenishment_open ON wms_replenishment(tw_id,target) WHERE completed_at IS NULL AND cancelled_at IS NULL;
 CREATE TABLE IF NOT EXISTS wms_line (
   id INTEGER PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES wms_order(id),
@@ -103,6 +209,7 @@ CREATE TABLE IF NOT EXISTS wms_movement (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_wms_movement_stock ON wms_movement(tw_id, bin, id);
+CREATE INDEX IF NOT EXISTS ix_wms_movement_order ON wms_movement(order_id,id);
 -- Pokrycie agregacji ogranicza odczyty tabeli przy ponad milionie ruchów w raporcie 90 dni.
 CREATE INDEX IF NOT EXISTS ix_wms_movement_time_cover ON wms_movement(created_at, kind, delta);
 DROP INDEX IF EXISTS ix_wms_movement_time;

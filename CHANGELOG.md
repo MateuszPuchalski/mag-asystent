@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.287.0 — 11 września 2026
+
+WMS przydziela zamówienia po skanie wózka z 20 albo 30 stałymi pozycjami skrzynek.
+Każda skrzynka ma własny kod; powtórzony skan wznawia trasę bez podwójnego przydziału.
+Priorytety, terminy i dostępny zapas decydują o przydziale; braki nie blokują dalszych gotowych zamówień.
+Przystanki grupują lokalizację i SKU, a duży numer pozycji prowadzi odkładanie.
+
+Przekazanie do pakowania, odłączenie i wymiana skrzynki zachowują historię oraz kontrolę właściciela pracy.
+Brak lub uszkodzenie blokuje pobrania danego SKU z półki do weryfikacji.
+Przeliczenie odbudowuje rezerwacje według priorytetów; zadania uzupełnień wymagają skanów źródła, towaru i celu.
+Analityka oddziela czas trasy, oczekiwanie na pakowanie i sesję pakowania; brak historycznych pomiarów pozostaje jawny.
+
+Odbiór obejmuje 2176 testów serwera, 727 testów panelu oraz przeglądarkową zbiórkę wózkami 20 i 30 pozycji.
+Próba z 5000 SKU zakończyła 2000 zamówień na 84 trasach bez rozbieżności ewidencji.
+Eksport Sellasist służył wyłącznie lokalnej analizie; aplikacja i odbiór nadal korzystają z danych seeded.
+
+**[wymaga działania]** Po aktualizacji i kompilacji zrestartuj API.
+Biuro rejestruje wózki, kody skrzynek, stanowiska pakowania i kolejność lokalizacji przed pracą tym trybem.
+Migracja dodaje tabele i indeksy bez zmiany istniejących stanów i zamówień.
+
 ## 0.286.0 — 11 września 2026
 
 Biuro otrzymuje poziomy nagłówek oraz jasne powierzchnie, typografię i przyciski spójne z panelem obsługi klienta.

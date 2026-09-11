@@ -300,7 +300,7 @@ export function listBins(raw: unknown) {
   return { rows, total, ...f };
 }
 
-function move(
+export function move(
   actor: Actor,
   twId: number,
   address: string,
@@ -311,6 +311,7 @@ function move(
   orderId: number | null = null,
 ): void {
   const d = db();
+  if (!d.isTransaction) throw new Error("Ruch WMS wymaga transakcji command");
   d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
     twId,
     address,
@@ -334,8 +335,10 @@ export function changeStock(actor: Actor, key: string, raw: unknown) {
   return command(key, actor, "stock", input, () => applyStock(actor, input));
 }
 
-function applyStock(actor: Actor, input: z.infer<typeof stockInput>) {
+export function applyStock(actor: Actor, input: z.infer<typeof stockInput>) {
   const d = db();
+  if (!d.isTransaction)
+    throw new Error("Zmiana zapasu wymaga transakcji command");
   const catalog = d
     .prepare("SELECT tw_id,symbol,nazwa,ean FROM sgt_towar WHERE tw_id=?")
     .get(input.twId);
@@ -692,7 +695,8 @@ function allocate(actor: Actor, order: ReturnType<typeof getOrder>) {
     const bins = d
       .prepare(
         `SELECT s.* FROM wms_stock s LEFT JOIN wms_bin b ON b.bin=s.bin
-        WHERE s.tw_id=? AND s.on_hand>s.reserved AND coalesce(b.mode,'pick')='pick' ORDER BY s.bin`,
+        WHERE s.tw_id=? AND s.on_hand>s.reserved AND coalesce(b.mode,'pick')='pick'
+        AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL) ORDER BY s.bin`,
       )
       .all(line.tw_id) as Stock[];
     for (const b of bins) {
@@ -765,7 +769,25 @@ export function releaseBatch(actor: Actor, key: string, raw: unknown) {
   });
 }
 
+// Zewnętrzny proces może zatwierdzić ruch między SELECT-ami. Ekran musi otrzymać jeden spójny stan.
+export function readSnapshot<T>(read: () => T): T {
+  const d = db();
+  if (d.isTransaction) return read();
+  d.exec("BEGIN");
+  try {
+    const result = read();
+    d.exec("COMMIT");
+    return result;
+  } catch (error) {
+    d.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function getOrder(orderId: number) {
+  return readSnapshot(() => readOrder(orderId));
+}
+function readOrder(orderId: number) {
   const d = db();
   const order = d.prepare("SELECT * FROM wms_order WHERE id=?").get(orderId) as
     | Order
@@ -796,7 +818,10 @@ export function getOrder(orderId: number) {
   };
 }
 
-function checkBarcode(line: Line, scan: string): void {
+export function checkBarcode(
+  line: Pick<Line, "sku" | "barcode">,
+  scan: string,
+): void {
   if (line.sku.toUpperCase() === scan.toUpperCase()) return;
   if (line.barcode !== scan)
     fail("Inny towar. Zeskanuj kod oczekiwanej pozycji", 400);
@@ -820,6 +845,16 @@ export function actOnOrder(
   id.parse(orderId);
   const input = actionInput.parse(raw);
   if (
+    input.action === "takeover" &&
+    db()
+      .prepare(
+        `SELECT 1 FROM wms_cart_assignment a JOIN wms_cart_run r ON r.id=a.run_id
+    WHERE a.order_id=? AND a.ended_at IS NULL AND a.released_at IS NULL AND r.closed_at IS NULL`,
+      )
+      .get(orderId)
+  )
+    fail("Przejmij cały wózek, aby zachować wspólną trasę zbiórki");
+  if (
     ["allocate", "cancel", "resume", "takeover", "amend"].includes(input.action)
   )
     manager(actor);
@@ -833,12 +868,14 @@ export function actOnOrder(
 }
 
 // Wywoływane wyłącznie wewnątrz command: skan pojedynczy i wózek mają te same reguły.
-function applyOrderAction(
+export function applyOrderAction(
   actor: Actor,
   orderId: number,
   input: z.infer<typeof actionInput>,
 ) {
   const d = db();
+  if (!d.isTransaction)
+    throw new Error("Operacja WMS wymaga transakcji command");
   const order = getOrder(orderId);
   if (order.version !== input.version)
     fail("Zamówienie zmieniło się. Odśwież przed kolejną operacją");
@@ -857,6 +894,24 @@ function applyOrderAction(
     allocate(actor, order);
   }
   if (input.action === "amend") {
+    if (
+      d
+        .prepare(
+          "SELECT 1 FROM wms_pick_exception WHERE order_id=? AND resolved_at IS NULL",
+        )
+        .get(orderId)
+    )
+      fail("Najpierw rozwiąż zgłoszenie zbiórki i rozlicz pobrany towar");
+    if (
+      d
+        .prepare(
+          "SELECT 1 FROM wms_cart_assignment WHERE order_id=? AND ended_at IS NULL",
+        )
+        .get(orderId)
+    )
+      fail(
+        "Najpierw odłóż pobrania i odłącz zamówienie od skrzynki w obsłudze wyjątku",
+      );
     requireState("new", "allocated", "picking");
     if (
       order.lines.some((l) => l.picked > 0) ||
@@ -904,6 +959,17 @@ function applyOrderAction(
     if (
       d
         .prepare(
+          `SELECT 1 FROM wms_cart_slot s WHERE s.box_barcode=?
+      AND NOT EXISTS(SELECT 1 FROM wms_cart_assignment a WHERE a.order_id=? AND a.box_barcode=s.box_barcode AND a.ended_at IS NULL)`,
+        )
+        .get(input.tote, orderId)
+    )
+      fail(
+        "Skrzynka jest przypisana do wózka. Rozpocznij zbiórkę skanem wózka",
+      );
+    if (
+      d
+        .prepare(
           "SELECT 1 FROM wms_order WHERE tote=? AND status NOT IN ('shipped','cancelled') AND id<>?",
         )
         .get(input.tote, orderId)
@@ -915,6 +981,16 @@ function applyOrderAction(
   }
   if (input.action === "pick" || input.action === "return") {
     if (input.action === "pick") {
+      if (
+        d
+          .prepare(
+            "SELECT 1 FROM wms_cart_assignment WHERE order_id=? AND handed_at IS NOT NULL AND ended_at IS NULL",
+          )
+          .get(orderId)
+      )
+        fail(
+          "Skrzynka została przekazana. Biuro musi przywrócić ją do zbiórki",
+        );
       if (order.wave_id && input.tote !== order.tote)
         fail("Zeskanuj pojemnik zamówienia z wózka", 400);
       requireState("picking");
@@ -934,6 +1010,17 @@ function applyOrderAction(
     if (!a) fail("Pozycja nie należy do tego zamówienia", 404);
     const allocation = a!;
     const line = order.lines.find((l) => l.id === allocation.line_id)!;
+    if (
+      input.action === "pick" &&
+      d
+        .prepare(
+          "SELECT 1 FROM wms_stock_check WHERE tw_id=? AND bin=? AND resolved_at IS NULL",
+        )
+        .get(line.tw_id, allocation.bin)
+    )
+      fail(
+        "Lokalizacja tego SKU czeka na przeliczenie. Kontynuuj inne pobrania",
+      );
     checkBarcode(line, input.barcode);
     if (allocation.bin !== input.bin)
       fail(`Zeskanuj lokalizację ${allocation.bin}`, 400);
@@ -944,6 +1031,17 @@ function applyOrderAction(
     )
       fail("Ilość przekracza pozostałą liczbę sztuk", 400);
     const amount = returning ? -input.quantity : input.quantity;
+    if (!returning) {
+      const stamp = nowIso();
+      d.prepare(
+        `INSERT INTO wms_order_timing(order_id,first_pick_scan_at,last_pick_scan_at) VALUES (?,?,?)
+        ON CONFLICT(order_id) DO UPDATE SET first_pick_scan_at=coalesce(first_pick_scan_at,excluded.first_pick_scan_at),last_pick_scan_at=excluded.last_pick_scan_at`,
+      ).run(orderId, stamp, stamp);
+    } else {
+      d.prepare(
+        "UPDATE wms_order_timing SET pack_started_at=NULL,first_pack_scan_at=NULL,last_pack_scan_at=NULL,pack_completed_at=NULL WHERE order_id=?",
+      ).run(orderId);
+    }
     move(
       actor,
       line.tw_id,
@@ -982,7 +1080,20 @@ function applyOrderAction(
   }
   if (input.action === "pack-start") {
     requireState("picked");
+    if (
+      d
+        .prepare(
+          `SELECT 1 FROM wms_cart_assignment a LEFT JOIN wms_station s ON s.code=a.station_code
+      WHERE a.order_id=? AND a.ended_at IS NULL AND (a.handed_at IS NULL OR coalesce(s.kind,'')<>'pack')`,
+        )
+        .get(orderId)
+    )
+      fail("Najpierw przekaż skrzynkę na stanowisko pakowania");
     if (input.tote !== order.tote) fail("To pojemnik innego zamówienia", 400);
+    d.prepare(
+      `INSERT INTO wms_order_timing(order_id,pack_started_at) VALUES (?,?)
+      ON CONFLICT(order_id) DO UPDATE SET pack_started_at=excluded.pack_started_at,first_pack_scan_at=NULL,last_pack_scan_at=NULL,pack_completed_at=NULL`,
+    ).run(orderId, nowIso());
     d.prepare(
       "UPDATE wms_order SET status='packing',packer_id=? WHERE id=?",
     ).run(actor.id, orderId);
@@ -1010,6 +1121,10 @@ function applyOrderAction(
       input.quantity,
       line.id,
     );
+    const stamp = nowIso();
+    d.prepare(
+      "UPDATE wms_order_timing SET first_pack_scan_at=coalesce(first_pack_scan_at,?),last_pack_scan_at=? WHERE order_id=?",
+    ).run(stamp, stamp, orderId);
     if (
       !d
         .prepare("SELECT 1 FROM wms_line WHERE order_id=? AND packed<quantity")
@@ -1018,6 +1133,9 @@ function applyOrderAction(
       d.prepare(
         "UPDATE wms_order SET status='packed',packed_at=? WHERE id=?",
       ).run(nowIso(), orderId);
+      d.prepare(
+        "UPDATE wms_order_timing SET pack_completed_at=? WHERE order_id=?",
+      ).run(stamp, orderId);
     }
   }
   if (input.action === "ship") {
@@ -1063,6 +1181,24 @@ function applyOrderAction(
     );
   if (input.action === "resume") {
     if (!order.hold_reason) fail("Zamówienie nie jest wstrzymane");
+    if (
+      d
+        .prepare(
+          "SELECT 1 FROM wms_pick_exception WHERE order_id=? AND resolved_at IS NULL",
+        )
+        .get(orderId)
+    )
+      fail("Najpierw rozwiąż zgłoszenie wyjątku zbiórki");
+    if (
+      order.lines.some(
+        (l) =>
+          order.allocations
+            .filter((a) => a.line_id === l.id)
+            .reduce((sum, a) => sum + a.quantity, 0) < l.quantity,
+      ) &&
+      order.status !== "new"
+    )
+      fail("Najpierw napraw rezerwację po przeliczeniu w zadaniach zapasu");
     d.prepare("UPDATE wms_order SET hold_reason=NULL WHERE id=?").run(orderId);
   }
   if (input.action === "takeover") {
@@ -1097,6 +1233,9 @@ function applyOrderAction(
     d.prepare(
       "UPDATE wms_order SET status='cancelled',hold_reason=NULL WHERE id=?",
     ).run(orderId);
+    d.prepare(
+      "UPDATE wms_pick_exception SET resolved_at=?,resolution=? WHERE order_id=? AND resolved_at IS NULL",
+    ).run(nowIso(), input.reason, orderId);
   }
   d.prepare(
     "UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?",
@@ -1144,6 +1283,9 @@ export function createWave(actor: Actor, key: string, raw: unknown) {
 }
 
 export function getWave(actor: Actor, waveId: number) {
+  return readSnapshot(() => readWave(actor, waveId));
+}
+function readWave(actor: Actor, waveId: number) {
   id.parse(waveId);
   const wave = db().prepare("SELECT * FROM wms_wave WHERE id=?").get(waveId) as
     | { id: number; name: string; picker_id: number; created_at: string }
@@ -1158,10 +1300,16 @@ export function getWave(actor: Actor, waveId: number) {
   const tasks = db()
     .prepare(
       `SELECT a.id AS allocation_id,a.bin,a.quantity-a.picked AS remaining,
-    l.sku,l.name,o.id AS order_id,o.reference,o.tote,o.version,o.picker_id,o.hold_reason
+    l.sku,l.name,o.id AS order_id,o.reference,o.tote,o.version,o.picker_id,o.hold_reason,ca.position,
+    sc.reason AS stock_blocked,
+    sum(CASE WHEN o.hold_reason IS NULL AND sc.id IS NULL THEN a.quantity-a.picked ELSE 0 END) OVER (PARTITION BY a.bin,l.tw_id) AS stop_quantity
     FROM wms_wave_order w JOIN wms_order o ON o.id=w.order_id JOIN wms_line l ON l.order_id=o.id
-    JOIN wms_allocation a ON a.line_id=l.id WHERE w.wave_id=? AND o.status='picking' AND a.picked<a.quantity
-    ORDER BY a.bin,l.sku,o.id`,
+    JOIN wms_allocation a ON a.line_id=l.id
+    LEFT JOIN wms_pick_route r ON r.bin=a.bin
+    LEFT JOIN wms_stock_check sc ON sc.tw_id=l.tw_id AND sc.bin=a.bin AND sc.resolved_at IS NULL
+    LEFT JOIN wms_cart_assignment ca ON ca.run_id=w.wave_id AND ca.order_id=o.id AND ca.ended_at IS NULL
+    WHERE w.wave_id=? AND o.status='picking' AND a.picked<a.quantity
+    ORDER BY coalesce(r.sequence,1000001),a.bin,l.sku,ca.position,o.id`,
     )
     .all(waveId);
   return { ...wave, orders, tasks };
@@ -1281,6 +1429,7 @@ export function inventory(raw: unknown) {
     UNION ALL SELECT p.tw_id,p.symbol,p.nazwa,p.ean,0 AS active FROM wms_product p
     WHERE NOT EXISTS(SELECT 1 FROM sgt_towar t WHERE t.tw_id=p.tw_id))`;
   const where = `FROM catalog t LEFT JOIN wms_stock s ON s.tw_id=t.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin
+    LEFT JOIN wms_stock_check sc ON sc.tw_id=s.tw_id AND sc.bin=s.bin AND sc.resolved_at IS NULL
     WHERE (instr(lower(t.symbol || ' ' || t.nazwa),lower(?))>0 OR t.ean=? OR s.bin=?)
     AND (?='0' OR s.on_hand-s.reserved<s.minimum)`;
   const args = [f.q, f.q, f.q.toUpperCase(), f.low];
@@ -1288,7 +1437,7 @@ export function inventory(raw: unknown) {
     .prepare(
       `${catalog} SELECT t.tw_id,t.symbol,t.nazwa,t.ean,t.active,s.bin,coalesce(s.on_hand,0) AS on_hand,
     coalesce(s.reserved,0) AS reserved,coalesce(s.minimum,0) AS minimum,coalesce(s.version,1) AS version,
-    coalesce(b.mode,'pick') AS mode,CASE WHEN coalesce(b.mode,'pick')='pick' THEN coalesce(s.on_hand-s.reserved,0) ELSE 0 END AS available
+    coalesce(b.mode,'pick') AS mode,sc.reason AS stock_blocked,CASE WHEN coalesce(b.mode,'pick')='pick' AND sc.id IS NULL THEN coalesce(s.on_hand-s.reserved,0) ELSE 0 END AS available
     ${where} ORDER BY t.symbol,s.bin LIMIT ? OFFSET ?`,
     )
     .all(...args, f.limit, f.offset);

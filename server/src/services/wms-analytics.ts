@@ -27,8 +27,11 @@ export function analytics(raw: unknown) {
       coalesce(sum(CASE WHEN shipped_at<=due_at THEN 1 ELSE 0 END),0) AS on_time,
       avg((julianday(shipped_at)-julianday(created_at))*24*60) AS cycle_minutes,
       avg((julianday(picked_at)-julianday(allocated_at))*24*60) AS pick_minutes,
-      avg((julianday(packed_at)-julianday(picked_at))*24*60) AS pack_minutes
-      FROM wms_order WHERE shipped_at>=? AND shipped_at<=?`,
+      avg((julianday(packed_at)-julianday(picked_at))*24*60) AS pack_minutes,
+      avg((julianday(t.pack_started_at)-julianday(o.picked_at))*24*60) AS pack_queue_minutes,
+      avg((julianday(t.pack_completed_at)-julianday(t.pack_started_at))*24*60) AS pack_session_minutes,
+      count(t.pack_completed_at) AS timed_packed_orders
+      FROM wms_order o LEFT JOIN wms_order_timing t ON t.order_id=o.id WHERE shipped_at>=? AND shipped_at<=?`,
       )
       .get(since, now);
     const dailyRows = d
@@ -50,13 +53,14 @@ export function analytics(raw: unknown) {
     }
     const stock = d
       .prepare(
-        `SELECT count(DISTINCT tw_id) AS skus,coalesce(sum(on_hand),0) AS on_hand,
+        `SELECT count(DISTINCT s.tw_id) AS skus,coalesce(sum(on_hand),0) AS on_hand,
       coalesce(sum(reserved),0) AS reserved,
-      coalesce(sum(CASE WHEN coalesce(b.mode,'pick')='pick' THEN on_hand-reserved ELSE 0 END),0) AS available,
+      coalesce(sum(CASE WHEN coalesce(b.mode,'pick')='pick' AND sc.id IS NULL THEN on_hand-reserved ELSE 0 END),0) AS available,
       coalesce(sum(CASE WHEN b.mode='quarantine' THEN on_hand ELSE 0 END),0) AS quarantined,
       coalesce(sum(CASE WHEN b.mode='reserve' THEN on_hand ELSE 0 END),0) AS reserve_stock,
       coalesce(sum(CASE WHEN on_hand-reserved<minimum THEN 1 ELSE 0 END),0) AS low_bins
-      FROM wms_stock s LEFT JOIN wms_bin b ON b.bin=s.bin`,
+      FROM wms_stock s LEFT JOIN wms_bin b ON b.bin=s.bin
+      LEFT JOIN wms_stock_check sc ON sc.tw_id=s.tw_id AND sc.bin=s.bin AND sc.resolved_at IS NULL`,
       )
       .get();
     const top = d

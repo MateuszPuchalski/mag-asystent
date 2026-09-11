@@ -193,16 +193,74 @@ Jeżeli odczyt zawiedzie, **Ponów odczyt** przywraca formularz bez ponawiania z
 
 ### Kompletacja kilku zamówień wózkiem
 
-**Zbiórka wózkiem → Przygotuj wózek** pokazuje zarezerwowane zamówienia według priorytetu i terminu.
-Zeskanuj pojemniki przy wybranych zamówieniach; jedna trasa obejmuje od 1 do 12 zamówień.
+**Wózki 20 / 30** rozpoczynają zbiórkę skanem stałego kodu wózka.
+Biuro rejestruje 20 albo 30 numerowanych pozycji oraz indywidualne kody skrzynek.
+WMS automatycznie przydziela jedno gotowe zamówienie do każdej dostępnej skrzynki.
+Kolejność wynika z priorytetu, terminu wysyłki i identyfikatora zamówienia.
+Zamówienia z brakami lub blokadami nie zatrzymują przydziału dalszych gotowych zamówień.
+Nie trzeba czekać na pełny wózek; niewykorzystane pozycje pozostają wolne.
+
+Profil może obejmować wszystkie zamówienia, jedno SKU albo wiele SKU, z limitem sztuk.
+Limit sztuk nie zastępuje sprawdzonych wymiarów części, skrzynek i udźwigu wózka.
+Nie stosujemy automatycznego dopasowania gabarytów bez danych pomiarowych.
+
+Duży numer wskazuje stałą pozycję odkładania.
+Ekran sumuje pozostałą ilość wspólnego SKU w tej samej lokalizacji.
+Pierwsze odłożenie wymaga skanu lokalizacji, towaru i skrzynki.
+Kolejne skrzynki tego przystanku wymagają własnego kodu i potwierdzenia ilości.
+Odświeżenie ekranu ponownie wymaga lokalizacji i towaru.
+**Kolejność lokalizacji** pozwala zapisać kolejność przejścia właściwą dla hali.
+Jest to skonfigurowana trasa; system nie wylicza najkrótszej drogi bez planu regałów.
+
+Ponowny skan wózka przywraca otwartą trasę tego samego operatora.
+Biuro może jawnie przejąć całą zbiórkę, podając powód.
+Zmiana osoby pakującej pozostaje osobną operacją zamówienia.
+
+Po zbiórce zeskanuj wózek oraz stanowisko pakowania.
+**Pakowanie skrzynek** otwiera zamówienie po skanie stanowiska i skrzynki.
+Nie można rozpocząć pakowania skrzynki, która nie została przekazana.
+Można odłączyć pojedynczą skrzynkę na stanowisko, zachowując jej zamówienie.
+Po odłączeniu pozycja wymaga nowej pustej skrzynki przed kolejną trasą.
+Zwolnienie pustego wózka wymaga osobnego skanu; niezakończone zamówienia muszą wcześniej opuścić wózek.
+Pełną skrzynkę można wymienić po skanach obu kodów i potwierdzeniu przełożenia zawartości.
+Numer pozycji pozostaje stały; historia wymiany trafia do dziennika.
+
+**Zbiórka ręczna → Przygotuj wózek** zachowuje starszy wybór od 1 do 12 zamówień.
+To osobna metoda pracy; nie zastępuje automatycznego przydziału do zarejestrowanych wózków.
 Rozpoczęcie przypisuje wszystkie zamówienia razem albo wycofuje całą operację, jeżeli ktoś zdążył przejąć zamówienie lub pojemnik.
-Trasa porządkuje zadania według kodu lokalizacji, następnie SKU i zamówienia.
+Trasa uwzględnia skonfigurowaną kolejność lokalizacji, następnie SKU i zamówienia.
 Stosuj kody o stałej szerokości, np. `A01-02-03`, aby kolejność odpowiadała układowi magazynu.
 Każde pobranie wymaga skanu lokalizacji, towaru i docelowego pojemnika.
 Enter przechodzi między polami; ostatni skan zatwierdza sztuki.
 Wstrzymane zamówienia pozostają widoczne, a pozostałą trasę można dokończyć.
 Po zakończeniu pojemniki trafiają do tej samej niezależnej kontroli pakowania co zwykła zbiórka.
 Biuro może przejąć pojedyncze zamówienie w jego karcie; skan pojemnika nadal jest wymagany.
+
+### Braki, przeliczenia i uzupełnienia
+
+Na trasie można zgłosić brak, uszkodzenie albo pełną skrzynkę.
+Brak i uszkodzenie blokują pobrania danego SKU z tej półki do przeliczenia.
+Samo zgłoszenie nie zmienia zapasu ani nie zamyka zamówienia.
+
+**Zadania zapasu** pokazują otwarte przeliczenia i plan uzupełnień z zaplecza.
+Plan wynika z minimów półek oraz niezarezerwowanego zapotrzebowania otwartych zamówień.
+Nie jest prognozą sezonową; nie wykorzystuje importowanego raportu Sellasist.
+Otwieranie listy nie tworzy zadań i nie przesuwa sztuk.
+
+Operator przyjmuje zadanie, następnie skanuje źródło, towar i cel oraz potwierdza przydzieloną ilość.
+Druga osoba nie może zakończyć tego samego zadania.
+Zmiana zapasu źródła może wymagać anulowania zadania i przygotowania aktualnego planu.
+Przed anulowaniem towar musi fizycznie pozostać na źródle.
+Zwykłe pobranie z półki docelowej nie blokuje addytywnego uzupełnienia.
+
+Biuro przelicza sprawne sztuki fizycznie na półce, bez towaru znajdującego się w skrzynkach.
+Odczyt wersji chroni przed zapisaniem nieaktualnego spisu.
+Przed przeliczeniem trzeba rozliczyć otwarte zadania uzupełnień danej lokalizacji i SKU.
+System zwalnia niezebrane rezerwacje tej półki, zapisuje stan i odbudowuje przydziały według priorytetu.
+Zamówienia bez wystarczającego zapasu pozostają wstrzymane.
+Po uzupełnieniu biuro naprawia rezerwację lub rozwiązuje zgłoszenie wózka.
+Przeliczenie półki nie potwierdza zawartości skrzynki.
+Anulowanie zebranego zamówienia nadal wymaga wcześniejszych skanów zwrotu wszystkich pobrań.
 
 ## Integracja sklepu i wysyłki
 
@@ -273,6 +331,17 @@ Formuły arkusza w tekstowych numerach są neutralizowane.
 Odczyt oraz eksport nie zmieniają zamówień ani stanów.
 
 ## Analityka
+
+Raport wózków pokazuje wykorzystanie pozycji, przydzielone zamówienia, przystanki lokalizacja/SKU oraz potwierdzone pobrania.
+Przebieg liczony jest od przydziału do przekazania i obejmuje postoje oraz oczekiwanie.
+Pobrane sztuki obejmują także ponowne pobrania po zwrocie.
+Historia skrzynek pozwala odróżnić fizyczne odłączenie od zakończenia zamówienia.
+
+Raport główny oddziela oczekiwanie na pakowanie od zarejestrowanej sesji pakowania.
+Sesja zaczyna się przy otwarciu pakowania, a kończy potwierdzeniem ostatniej wymaganej sztuki.
+Może obejmować przerwy; nie jest rozliczeniem roboczogodzin pracownika.
+Stare zamówienia bez zdarzeń pozostają bez pomiaru.
+System nie zastępuje brakujących timestampów umowną jedną minutą.
 
 Raport obejmuje wysyłki, terminowość, czas realizacji, czas zbiórki z oczekiwaniem oraz oczekiwanie na kontrolę paczki.
 Pokazuje kolejkę według etapów, zaległości, zapas dostępny, rezerwacje i lokalizacje poniżej minimum.
