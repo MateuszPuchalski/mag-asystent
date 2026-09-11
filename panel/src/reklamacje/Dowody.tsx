@@ -65,15 +65,85 @@ function Notatka({ reklamacja, trwa, blad, onZapisz }: {
   </div>;
 }
 
-export function Dowody({ szczegol, trwa, bladZapisu, onProwadze, onNotatka }: {
+/**
+ * Karta faktów Copilota (0.275.0) — CO WYCZYTAŁ, nigdy co radzi.
+ *
+ * Werdyktu tu nie ma i nie będzie: uznanie i odrzucenie są nieodwracalne wobec
+ * kupującego i należą do człowieka. Najcenniejsza pozycja to „brakuje" —
+ * sprawa stoi tygodniami nie dlatego, że nikt nie umie zdecydować, tylko
+ * dlatego, że nikt nie zapytał o zdjęcie tabliczki.
+ *
+ * Każde zdanie niesie CYTAT, czyli numer wiadomości. Bez niego karta byłaby
+ * drugą wersją rozmowy, a nie skrótem tej, którą agent ma przed oczami.
+ */
+function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
+  karta: SzczegolReklamacji["karta"];
+  trwa: boolean;
+  blad: string;
+  onRozpoznaj: () => void;
+}) {
+  return <Sekcja tytul="Co wyczytał Copilot">
+    {blad && <p className="py-1 text-xs text-red-700">{blad}</p>}
+    {karta ? <>
+      {karta.usterka && <Wiersz etykieta="Usterka">
+        {karta.usterka.tresc} <Cytat z={karta.usterka.zrodlo} /></Wiersz>}
+      {karta.kiedy && <Wiersz etykieta="Od kiedy">
+        {karta.kiedy.tresc} <Cytat z={karta.kiedy.zrodlo} /></Wiersz>}
+      {karta.oczekiwanie && <Wiersz etykieta="Klient chce">
+        {karta.oczekiwanie.tresc} <Cytat z={karta.oczekiwanie.zrodlo} /></Wiersz>}
+      {karta.dowody.length > 0 && <Wiersz etykieta="Dowody">
+        {karta.dowody.map((d, i) => <span key={i} className="mr-2">
+          {d.tresc} <Cytat z={d.zrodlo} /></span>)}
+      </Wiersz>}
+      {karta.brakuje.length > 0 && <div className="mt-1 rounded-lg bg-amber-50 px-3 py-2">
+        <EtykietaWartosci>Brakuje do rozstrzygnięcia</EtykietaWartosci>
+        <ul className="mt-1 list-disc pl-5 text-sm text-amber-900">
+          {karta.brakuje.map((b, i) => <li key={i}>{b}</li>)}
+        </ul>
+      </div>}
+      <p className="pt-2 text-xs text-slate-500">
+        {karta.przez ?? "—"}, {czas(karta.at)} · {karta.model}
+      </p>
+    </> : <p className="py-1 text-sm text-slate-500">
+      Copilot może wyciągnąć z rozmowy usterkę, oczekiwanie klienta i to, czego
+      brakuje do rozstrzygnięcia. Werdykt zostaje przy Tobie.
+    </p>}
+    <Przycisk className="mt-2 !px-2 !py-1 !text-xs" disabled={trwa} onClick={onRozpoznaj}>
+      {trwa ? "CZYTAM…" : karta ? "PRZECZYTAJ JESZCZE RAZ" : "PRZECZYTAJ SPRAWĘ"}
+    </Przycisk>
+  </Sekcja>;
+}
+
+/**
+ * Numer wiadomości, z której model wziął zdanie.
+ *
+ * Szczebel `podpis` z drabiny, nie arbitralne piksele — i `text-slate-600`,
+ * bo `slate-500` na `slate-100` daje 4,34:1 przy progu 4,5. Obie rzeczy
+ * wyłapały strażnice panelu, zanim zobaczył je człowiek; zostawiam to zdanie,
+ * żeby następny nie sprawdzał tego drugi raz.
+ */
+const Cytat = ({ z }: { z: string }) =>
+  <span className="rounded bg-slate-100 px-1 font-mono text-podpis text-slate-600">{z}</span>;
+
+export function Dowody({
+  szczegol, trwa, bladZapisu, onProwadze, onNotatka,
+  rozpoznaje = false, bladRozpoznania = "", onRozpoznaj,
+}: {
   szczegol: SzczegolReklamacji;
   trwa: boolean;
   bladZapisu: string;
   onProwadze: () => void;
   onNotatka: (tekst: string) => void;
+  /* Copilot jest OPCJONALNY w propsach, bo ten sam komponent rysuje sprawę
+     także tam, gdzie rozpoznania nie ma po co wołać. */
+  rozpoznaje?: boolean;
+  bladRozpoznania?: string;
+  onRozpoznaj?: () => void;
 }) {
   const r = szczegol.reklamacja;
   return <div className="flex min-h-0 flex-col">
+    {onRozpoznaj && <KartaFaktow karta={szczegol.karta} trwa={rozpoznaje}
+      blad={bladRozpoznania} onRozpoznaj={onRozpoznaj} />}
     <Sekcja tytul="Sprawa">
       <Wiersz etykieta="Numer">
         <Link href={r.link}>{r.numer ?? r.externalId}</Link>

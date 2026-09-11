@@ -12,8 +12,10 @@ import {
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import {
-  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiSprawy,
+  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
 } from "../services/reklamacje-zalaczniki.js";
+import { nadawcaRozpoznaniaAnthropic } from "../adapters/copilot.anthropic.js";
+import { rozpoznajSprawe } from "../services/copilot-reklamacja.js";
 import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
@@ -62,6 +64,17 @@ function blad(reply: FastifyReply, e: unknown) {
 }
 
 const autor = () => sesjaZadania()?.user.name ?? "?";
+
+/** Jedno zdanie o tym, dlaczego Copilota nie ma — pisze je SERWER (§21). */
+function czemuCopilotWylaczony(): string | null {
+  if (config.copilot.mode === "off") {
+    return "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).";
+  }
+  if (!config.copilot.klucz) {
+    return "Copilot nie ma klucza. Ustaw ANTHROPIC_API_KEY w wertis.env i zrestartuj usługę.";
+  }
+  return null;
+}
 
 export async function reklamacjeRoutes(app: FastifyInstance) {
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
@@ -251,6 +264,36 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
      `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
+  /**
+   * Copilot reklamacyjny: karta faktów ze sprawy (0.275.0).
+   *
+   * ZBIERA DANE, NIE RADZI — i to jest cała treść tej trasy. Werdykt stoi
+   * osobno, za `autoryzuj()` i za jawną zgodą; gdyby maszyna miała cokolwiek
+   * do powiedzenia o rozstrzygnięciu, byłby to ten sam przycisk, a nie ten.
+   *
+   * Zapisem jest, bo zapisuje kartę i wiersz w księdze Copilota. Dlaczego
+   * `POST`, a nie `GET` mimo braku decyzji człowieka: żądanie KOSZTUJE
+   * pieniądze u dostawcy, a przeglądarka powtarza i wstępnie pobiera `GET`-y
+   * bez pytania. Rachunek za odruch nawigacji byłby złym sposobem, żeby się
+   * o tym dowiedzieć.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/rozpoznaj", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const powod = czemuCopilotWylaczony();
+      if (powod) return reply.code(400).send({ error: powod });
+      const s = sesjaZadania()!;
+      try {
+        const karta = await rozpoznajSprawe({
+          reklamacjaId: Number(req.params.id),
+          kto: { id: s.user.userId, name: s.user.name },
+          nadaj: nadawcaRozpoznaniaAnthropic,
+        });
+        return { karta };
+      } catch (e) { return blad(reply, e); }
+    });
+
   /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
      Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
      `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
@@ -261,7 +304,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
-      return { zalaczniki: zalacznikiSprawy(db(), Number(req.params.id)) };
+      return { zalaczniki: zalacznikiDoWyslania(db(), Number(req.params.id)) };
     });
 
   app.post<{ Params: { id: string }; Body: { nazwa?: string; typ?: string; dane?: string } }>(

@@ -1184,6 +1184,30 @@ export interface SzczegolReklamacji {
     pewnosc: string; twId: number | null; symbol: string | null;
     zrodlo: string | null; powod: string | null;
   } | null;
+  /** Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił. */
+  karta: KartaSprawy | null;
+}
+
+/** Pole karty z cytatem — numer wiadomości, z której model to wziął. */
+export interface PoleKarty { tresc: string; zrodlo: string }
+
+/**
+ * Karta faktów ze sprawy — co maszyna WYCZYTAŁA, nigdy co radzi.
+ *
+ * Werdyktu tu nie ma i nie będzie: uznanie i odrzucenie są nieodwracalne wobec
+ * kupującego i należą do człowieka. Najcenniejsze pole to `brakuje` — sprawa
+ * stoi tygodniami nie dlatego, że nikt nie umie zdecydować, tylko dlatego, że
+ * nikt nie zapytał o zdjęcie tabliczki.
+ */
+export interface KartaSprawy {
+  usterka: PoleKarty | null;
+  kiedy: PoleKarty | null;
+  oczekiwanie: PoleKarty | null;
+  dowody: PoleKarty[];
+  brakuje: string[];
+  model: string;
+  przez: string | null;
+  at: string;
 }
 
 /* ── Dyskusje (0.245.0) ──────────────────────────────────────────────────────

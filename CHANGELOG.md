@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.275.0 — 11 września 2026
+
+**Copilot czyta sprawę reklamacyjną i wypisuje, czego w niej brakuje.**
+Zgłoszenie właściciela: „zintegruj z copilotem, wersja do reklamacji zbierająca
+dane". Słowo „zbierająca" jest tu całym projektem.
+
+**Maszyna nie dotyka werdyktu — i nie jest to kwestia promptu.** Uznanie
+i odrzucenie są nieodwracalne wobec kupującego, stoją za operacją
+uprzywilejowaną i za jawną zgodą. Zdanie „ta reklamacja wygląda na zasadną"
+przesuwałoby decyzję, nie pomagając jej podjąć, więc karta, w której padnie
+słowo z rodziny werdyktu, leci w całości. Odrzuca ją bramka w kodzie, nie
+instrukcja dla modelu: prompt jest prośbą, bramka jest regułą.
+
+Karta niesie cztery rzeczy, których agent szuka w rozmowie za każdym razem
+ręcznie — co się zepsuło, od kiedy, czego klient chce, co już przysłał —
+i piątą, najcenniejszą: **czego brakuje, żeby dało się rozstrzygnąć**. Sprawy
+stoją tygodniami nie dlatego, że nikt nie umie zdecydować, tylko dlatego, że
+nikt nie zapytał o zdjęcie tabliczki.
+
+**Każde zdanie ma cytat.** Model dostaje rozmowę ponumerowaną i przy każdym
+polu podaje numer wiadomości; serwer sprawdza numery przed zapisem, a pole
+z numerem, którego nie ma, znika. Inaczej niż przy szkicu, gdzie wymyślona
+liczba kasuje całość — tam liczba wchodzi do zdania wysyłanego kupującemu,
+tutaj karta jest notatką dla agenta, który ma rozmowę przed oczami. Licznik
+odsianych idzie do dziennika, żeby dało się zmierzyć, jak często model zmyśla.
+
+Do dostawcy idzie rozmowa **zamaskowana** tym samym modułem co w skrzynce,
+a pilnuje tego kompilator: nadawca przyjmuje wyłącznie `TrescBezpieczna`.
+Rozpoznanie jest jawnym kliknięciem, bo żądanie kosztuje — i dlatego trasa jest
+`POST`em mimo braku decyzji człowieka: przeglądarka powtarza i wstępnie pobiera
+`GET`-y bez pytania.
+
+Przy okazji dwie rzeczy wyłapały strażnice panelu, zanim zobaczył je człowiek:
+cytat miał `text-slate-500` na `slate-100` (4,34:1 przy progu 4,5) i arbitralne
+`text-[11px]` spoza drabiny typograficznej. Obie poprawione, obie z komentarzem,
+żeby następny nie sprawdzał tego drugi raz.
+
+---
+
+
 ## 0.274.0 — 11 września 2026
 
 **Załącznik wychodzi razem z odpowiedzią w reklamacji.** Decyzja właściciela

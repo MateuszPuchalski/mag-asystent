@@ -1,6 +1,7 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
+import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
@@ -509,6 +510,11 @@ export interface SzczegolReklamacji {
   rozmowy: RozmowaZakupu[];
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
+  /* Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił.
+     Jedzie razem ze szczegółem, bo jest CZYTANIEM sprawy, a nie osobnym
+     ekranem — a drugie zapytanie przy każdym otwarciu byłoby kosztem bez
+     zysku (spraw w pracy są dziesiątki). */
+  karta: ReturnType<typeof kartaSprawy>;
 }
 
 /**
@@ -594,6 +600,7 @@ export function szczegolReklamacji(
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, kartoteka,
+    karta: kartaSprawy(database, id),
   };
 }
 

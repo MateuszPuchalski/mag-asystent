@@ -637,8 +637,25 @@ Sonda widziała załączniki przy 57 sprawach na 100.
 **Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
 odczycie — tak samo jak przy skrzynce i przy zwrotach.
 
-**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
-ekranu i w tym przyroście go nie dostaje.
+**Do dostawcy modelu idzie ZAMASKOWANA rozmowa (0.275.0).** Do 0.274.0 Copilot
+nie miał dostępu do tego ekranu wcale. Właściciel poprosił 11 września o wersję
+„zbierającą dane", więc rozmowa reklamacyjna wychodzi do dostawcy — ale przez
+ten sam moduł maskowania, co w skrzynce (§14.4), i pod tą samą gwarancją:
+wartość znika, ślad zostaje.
+
+Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
+ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
+po ZNANEJ wartości, nie po wzorcu. Nie wychodzi nic spoza rozmowy: ani notatka
+biura, ani znacznik „kto prowadzi", ani kartoteka, ani kwoty.
+
+Co wraca i gdzie ląduje: karta faktów przy sprawie. Werdyktu w niej nie ma
+i nie będzie — karta z sugestią rozstrzygnięcia jest odrzucana w całości przez
+bramkę w kodzie, nie przez prompt.
+
+Do dziennika idą liczby: ile braków, ile dowodów, ile pól odsiano jako
+niepokryte cytatem. Rachunek u dostawcy zapisuje się w księdze Copilota razem
+z numerem sprawy — także wtedy, gdy wywołanie skończyło się błędem, bo próba,
+która nie doszła, też bywa płatna.
 
 **Do dziennika nie idzie treść.** `logEvent` przy notatce i przy wysyłce
 zapisuje jej DŁUGOŚĆ, nigdy słowa: `events` nie ma retencji i nie jest kasowane.

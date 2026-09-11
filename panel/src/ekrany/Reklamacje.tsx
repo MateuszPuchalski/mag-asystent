@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
   useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
-  useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useRozpoznaj, useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
   useWerdykt, useZwrotTowaru,
 } from "../api/reklamacje";
 import { Konflikt } from "../api/klient";
@@ -122,6 +122,8 @@ export function Reklamacje() {
   const odswiez = useOdswiez();
   const dodajZalacznik = useDodajZalacznikSprawy();
   const usunZalacznik = useUsunZalacznikSprawy();
+  const rozpoznaj = useRozpoznaj();
+  const [bladRozpoznania, setBladRozpoznania] = useState("");
   const [bladZalacznika, setBladZalacznika] = useState("");
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
@@ -418,6 +420,13 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Dowody szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              rozpoznaje={rozpoznaj.isPending}
+              bladRozpoznania={bladRozpoznania}
+              onRozpoznaj={() => {
+                setBladRozpoznania("");
+                rozpoznaj.mutate({ id: szczegol.data!.reklamacja.id },
+                  { onError: (e) => setBladRozpoznania((e as Error).message) });
+              }}
               onProwadze={() => {
                 setBladZapisu("");
                 prowadze.mutate(

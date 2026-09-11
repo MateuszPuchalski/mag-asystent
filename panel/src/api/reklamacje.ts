@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
 import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
+  KartaSprawy,
   KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
@@ -243,5 +244,22 @@ export function useUsunZalacznikSprawy() {
         { method: "DELETE" }),
     onSettled: (_d, _e, v) =>
       qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) }),
+  });
+}
+
+/**
+ * Rozpoznanie sprawy przez Copilota (0.275.0).
+ *
+ * Kliknięcie JAWNE, nigdy przy otwarciu ekranu: żądanie kosztuje pieniądze
+ * u dostawcy, a karta jest pomocą w czytaniu, nie warunkiem pracy.
+ */
+export function useRozpoznaj() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ karta: KartaSprawy }>(`/api/obsluga/reklamacje/${v.id}/rozpoznaj`,
+        { method: "POST" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
   });
 }

@@ -11,6 +11,9 @@ import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import type {
+  NadawcaRozpoznania, OdpowiedzRozpoznania,
+} from "../services/copilot-reklamacja.js";
 import { ZRODLA_TWIERDZENIA, POZIOMY_PEWNOSCI } from "../services/copilot-szkic.js";
 import { ROLE_PASOWANIA } from "../services/pasowania.js";
 import { LIMIT_ZNAKOW } from "../services/wysylka.js";
@@ -631,3 +634,91 @@ function czytajNaglowek(e: unknown, nazwa: string): string | null {
   const rec = h as Record<string, string | undefined>;
   return rec[nazwa] ?? rec[nazwa.toLowerCase()] ?? null;
 }
+
+/* ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+   Zadanie jest CELOWO WĄSKIE: wyciągnij z rozmowy to, co w niej stoi, i nazwij
+   to, czego w niej NIE MA. Model nie rozstrzyga sprawy — instrukcja mówi to
+   wprost, a serwis sprawdza deterministycznie i odrzuca kartę, w której padnie
+   słowo z rodziny werdyktu.                                                  */
+
+const PoleKartyZ = z.object({
+  tresc: z.string(),
+  /** Numer wiadomości w podanej rozmowie, np. `W3`. Serwer go sprawdza. */
+  zrodlo: z.string(),
+});
+
+const Karta = z.object({
+  usterka: PoleKartyZ.nullable(),
+  kiedy: PoleKartyZ.nullable(),
+  oczekiwanie: PoleKartyZ.nullable(),
+  dowody: z.array(PoleKartyZ),
+  brakuje: z.array(z.string()),
+});
+
+const INSTRUKCJA_KARTY = [
+  "Jesteś asystentem biura obsługi w sklepie z częściami do sprzętu ogrodniczego.",
+  "Dostajesz rozmowę reklamacyjną. Każda wiadomość ma numer w nawiasie, np. [W3].",
+  "",
+  "Twoim zadaniem jest ZEBRAĆ FAKTY, nie ocenić sprawy.",
+  "NIE WOLNO CI sugerować, czy reklamację uznać, czy odrzucić, ani czy jest zasadna.",
+  "Decyzję podejmuje człowiek; karta z taką sugestią zostanie odrzucona w całości.",
+  "",
+  "Wypełnij pola WYŁĄCZNIE tym, co pada w rozmowie:",
+  "- usterka: co jest zepsute, słowami klienta;",
+  "- kiedy: od kiedy, data zakupu albo moment awarii;",
+  "- oczekiwanie: czego klient chce (naprawa, wymiana, zwrot pieniędzy);",
+  "- dowody: co klient już przysłał albo opisał jako dowód.",
+  "Przy każdym z tych pól podaj `zrodlo` — numer wiadomości, z której to masz.",
+  "Pole, którego w rozmowie nie ma, zostaw puste. Nie zgaduj i nie uzupełniaj.",
+  "",
+  "- brakuje: czego BRAKUJE, żeby dało się rozstrzygnąć sprawę.",
+  "To jedyne pole bez cytatu, bo mówi o tym, czego w rozmowie nie ma.",
+  "Pisz konkretnie i rzeczowo, na przykład: zdjęcie tabliczki znamionowej,",
+  "data zakupu, numer seryjny. Nie pisz, co z tego wyniknie.",
+  "",
+  "Odpowiadaj po polsku, krótko, bez uprzejmości i bez wstępu.",
+].join("\n");
+
+export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
+  async (tresc): Promise<OdpowiedzRozpoznania> => {
+    const start = Date.now();
+    try {
+      const odp = await anthropic().messages.parse({
+        model: config.copilot.model,
+        /* Karta to kilkanaście krótkich zdań. Limit z zapasem na listę braków,
+           bo to ona bywa najdłuższa i to ona jest tu najcenniejsza. */
+        max_tokens: 1024,
+        system: [{ type: "text", text: INSTRUKCJA_KARTY, cache_control: { type: "ephemeral" } }],
+        output_config: {
+          /* Wyżej niż przy klasyfikacji: to czytanie ze zrozumieniem długiej,
+             bywa że trójstronnej rozmowy, a nie przypisanie etykiety. */
+          effort: "medium",
+          format: zodOutputFormat(Karta),
+        },
+        messages: [{ role: "user", content: String(tresc) }],
+      });
+
+      const u = odp.usage;
+      const zuzycie = {
+        wej: u?.input_tokens ?? 0,
+        wyj: u?.output_tokens ?? 0,
+        cacheZapis: u?.cache_creation_input_tokens ?? 0,
+        cacheOdczyt: u?.cache_read_input_tokens ?? 0,
+      };
+
+      const w = odp.parsed_output;
+      if (!w) {
+        throw new BladOdpowiedziCopilota(
+          `Model nie oddał karty (stop: ${odp.stop_reason ?? "?"})`, 200);
+      }
+
+      return {
+        usterka: w.usterka, kiedy: w.kiedy, oczekiwanie: w.oczekiwanie,
+        dowody: w.dowody, brakuje: w.brakuje,
+        model: odp.model ?? config.copilot.model,
+        zuzycie, ms: Date.now() - start,
+      };
+    } catch (e) {
+      throw naNasz(e);
+    }
+  };

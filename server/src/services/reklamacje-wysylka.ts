@@ -3,7 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { wyslijWiadomoscSprawy, type TypWiadomosciSprawy } from "../adapters/allegro.http.js";
 import { logEvent } from "./events.js";
 import { kluczWysylki, niejednoznaczny } from "./idempotencja.js";
-import { zalacznikiSprawy } from "./reklamacje-zalaczniki.js";
+import { zalacznikiDoWyslania } from "./reklamacje-zalaczniki.js";
 import {
   BladReklamacji, NAZWA_SPRAWY, ReklamacjaConflict, type TypSprawy,
 } from "./reklamacje.js";
@@ -182,7 +182,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
      prawa oddać poprzedniej próby zamiast wysłać nową. Wspólny rdzeń
      `kluczWysylki` przyjmuje listę i sortuje ją sam — kolejność dodawania
      plików nie jest zamiarem agenta. */
-  const zalaczniki = zalacznikiSprawy(database, z.reklamacjaId);
+  const zalaczniki = zalacznikiDoWyslania(database, z.reklamacjaId);
   const idZalacznikow = zalaczniki.map((a) => a.allegroId);
   const klucz = kluczWysylki("rkl-", z.reklamacjaId, k.lastMessageId,
     typ === "REGULAR" ? tresc : `${typ}\u0000${tresc}`, idZalacznikow);

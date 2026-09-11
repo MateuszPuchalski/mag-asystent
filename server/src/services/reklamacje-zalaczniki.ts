@@ -73,7 +73,15 @@ export const wgrajZalacznikSprawy: WgrajZalacznik = async (nazwa, typ, dane) => 
   return { id };
 };
 
-export function zalacznikiSprawy(
+/**
+ * Pliki czekające na wysłanie przy TEJ sprawie.
+ *
+ * Nazwa rozróżnia strony, tak samo jak w skrzynce: `zalacznikiSprawy`
+ * w `services/reklamacje.ts` oddaje załączniki PRZYCHODZĄCE — te od klienta.
+ * Dwie funkcje o jednej nazwie w tej samej rodzinie modułów byłyby pułapką na
+ * następnego czytelnika, a podpowiedź edytora nie mówi, którą wybiera.
+ */
+export function zalacznikiDoWyslania(
   database: DatabaseSync, reklamacjaId: number,
 ): ZalacznikSprawy[] {
   return (database.prepare(`SELECT z.id, z.allegro_id, z.nazwa, z.typ, z.rozmiar, u.name AS dodal

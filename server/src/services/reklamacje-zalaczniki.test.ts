@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiSprawy,
+  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
 } from "./reklamacje-zalaczniki.js";
 
 /* ── Załączniki wychodzące w sprawie (0.274.0) ───────────────────────────────
@@ -63,7 +63,7 @@ test("plik idzie do Allegro OD RAZU, a wiersz powstaje po udanym wgraniu", async
 
   assert.deepEqual(w.wywolania, [{ nazwa: "usterka.jpg", typ: "image/jpeg", bajtow: 128 }]);
   assert.equal(z.allegroId, "att-1");
-  assert.equal(zalacznikiSprawy(d, reklamacja).length, 1);
+  assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 1);
 
   /* Dziennik: nazwa, typ i rozmiar — nigdy bajty. */
   const zdarzenie = d.prepare(
@@ -92,7 +92,7 @@ test("odmowa typu i rozmiaru pada PRZED siecią, bez wiersza i bez żądania", a
   await assert.rejects(() => dodajZalacznikSprawy(zadanie({ nazwa: "   " })), /nazwy pliku/);
 
   assert.deepEqual(w.wywolania, [], "żaden odrzucony plik nie poszedł do Allegro");
-  assert.equal(zalacznikiSprawy(d, reklamacja).length, 0);
+  assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 0);
 });
 
 test("piąty plik wchodzi, szósty dostaje zdanie z liczbą", async () => {
@@ -118,7 +118,7 @@ test("zdjęcie kasuje NASZ wiersz i mówi, gdy nie ma czego zdejmować", async (
   });
 
   assert.equal(usunZalacznikSprawy(d, reklamacja, z.id, autor), true);
-  assert.equal(zalacznikiSprawy(d, reklamacja).length, 0);
+  assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 0);
   assert.equal(usunZalacznikSprawy(d, reklamacja, z.id, autor), false);
   const sladow = d.prepare(
     "SELECT count(*) n FROM events WHERE type='reklamacja_zalacznik_zdjety'").get() as { n: number };
@@ -138,5 +138,5 @@ test("cudzej sprawy nie da się okraść z załącznika po samym numerze", async
 
   assert.equal(usunZalacznikSprawy(d, obca, z.id, autor), false,
     "numer załącznika nie wystarcza za uprawnienie do sprawy");
-  assert.equal(zalacznikiSprawy(d, reklamacja).length, 1);
+  assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 1);
 });

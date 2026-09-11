@@ -288,6 +288,9 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   -- (ekstrakcja, szkic, OCR) dopiszą tu swoje zadania.
   zadanie         TEXT NOT NULL,
   conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+  -- Sprawa posprzedażowa (0.275.0). Reklamacja nie ma wiersza w `conversation`,
+  -- więc rozpoznanie karty faktów wisi tutaj, a nie tam.
+  reklamacja_id   INTEGER REFERENCES reklamacja_klienta(id) ON DELETE SET NULL,
   model           TEXT NOT NULL,
   tokeny_wej      INTEGER NOT NULL DEFAULT 0,
   tokeny_wyj      INTEGER NOT NULL DEFAULT 0,
@@ -2461,6 +2464,30 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
 -- Załączniki WYCHODZĄCE przy odpowiedzi w sprawie (0.274.0). Lustro
 -- `wysylka_zalacznik` ze skrzynki: plik leży u Allegro od chwili dodania,
 -- u nas zostaje sam numer, nazwa i rozmiar. BAJTÓW NIE TRZYMAMY.
+-- ── Copilot reklamacyjny: karta faktów ze sprawy (0.275.0) ──────────────────
+-- ZBIERA DANE, NIE RADZI. Kolumny opisują to, czego agent szuka w rozmowie za
+-- każdym razem ręcznie; werdyktu wśród nich nie ma i nie będzie — uznanie
+-- i odrzucenie są nieodwracalne wobec kupującego i należą do człowieka.
+-- Każde pole niesie CYTAT (numer wiadomości), bo zdanie bez pokrycia w rozmowie
+-- jest zgadywaniem, a nie faktem.
+CREATE TABLE IF NOT EXISTS reklamacja_karta (
+  reklamacja_id      INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  usterka            TEXT,
+  usterka_zrodlo     TEXT,
+  kiedy              TEXT,
+  kiedy_zrodlo       TEXT,
+  oczekiwanie        TEXT,
+  oczekiwanie_zrodlo TEXT,
+  -- Listy jako JSON: to są dane DO POKAZANIA, nie do zapytań. Osobne tabele
+  -- kosztowałyby dwa złączenia przy każdym otwarciu sprawy i nic nie dawały.
+  dowody             TEXT NOT NULL DEFAULT '[]',
+  brakuje            TEXT NOT NULL DEFAULT '[]',
+  model              TEXT NOT NULL DEFAULT '',
+  przez              TEXT,
+  przez_user_id      INTEGER REFERENCES app_user(user_id),
+  at                 TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
 CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,

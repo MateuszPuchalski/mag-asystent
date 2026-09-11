@@ -3520,6 +3520,41 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 (werdykt, liczba znaków, kwota), `reklamacja_werdykt` (los, kod HTTP),
 `reklamacja_zwrot_towaru` (decyzja, liczba znaków), `privileged` (operacja).
 
+### 25b.8a. Copilot reklamacyjny: zbiera dane, nie radzi (0.275.0)
+
+Zgłoszenie właściciela z 11 września: „zintegruj z copilotem, wersja do
+reklamacji zbierająca dane". Słowo „zbierająca" jest tu całym projektem.
+
+**Maszyna NIE dotyka werdyktu i to nie jest kwestia promptu.** Uznanie
+i odrzucenie są nieodwracalne wobec kupującego, stoją za `autoryzuj()` i za
+jawną zgodą. Zdanie „ta reklamacja wygląda na zasadną" przesuwałoby decyzję,
+nie pomagając jej podjąć — więc karta, w której padnie słowo z rodziny
+werdyktu, leci w całości, a odrzuca ją DETERMINISTYCZNA bramka w kodzie.
+Prompt jest prośbą; bramka jest regułą.
+
+**Co karta niesie.** Cztery rzeczy, których agent szuka w rozmowie za każdym
+razem ręcznie: co się zepsuło, od kiedy, czego klient chce i co już przysłał.
+Piąta pozycja jest najcenniejsza — **czego BRAKUJE**, żeby dało się
+rozstrzygnąć. Sprawy stoją tygodniami nie dlatego, że nikt nie umie
+zdecydować, tylko dlatego, że nikt nie zapytał o zdjęcie tabliczki.
+
+**Każde zdanie ma cytat.** Model dostaje rozmowę ponumerowaną (`W1`, `W2`, …)
+i przy każdym polu podaje numer wiadomości. Serwer sprawdza numery przed
+zapisem: pole z numerem, którego nie ma, znika, a licznik odsianych idzie do
+dziennika. Inaczej niż przy szkicu, gdzie wymyślony numer kasuje całość —
+tam liczba wchodzi do zdania wysyłanego kupującemu, a tutaj karta jest notatką
+dla agenta, który ma rozmowę przed oczami.
+
+**Kliknięcie jest jawne.** Żądanie kosztuje u dostawcy, więc nie wychodzi
+z samego otwarcia ekranu — ta sama zasada, co przy całym Copilocie od etapu F.
+Trasa jest `POST`em mimo braku decyzji człowieka właśnie dlatego: przeglądarka
+powtarza i wstępnie pobiera `GET`-y bez pytania.
+
+**Do dostawcy idzie rozmowa ZAMASKOWANA**, tym samym modułem co w skrzynce
+(§14.4), a pilnuje tego kompilator: nadawca przyjmuje wyłącznie
+`TrescBezpieczna`. Do dziennika idą liczby — ile braków, ile dowodów, ile pól
+odsiano — nigdy słowa klienta.
+
 ### 25b.9. Czego panel nie wie
 
 Do której przestrzeni należy `offer.id` przy sprawie: przykład w specyfikacji
@@ -3904,6 +3939,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
 | Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
 | Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
+| Copilot reklamacyjny: karta faktów | **działa** od 0.275.0 | `services/copilot-reklamacja.ts`; cytat przy każdym polu, bramka słów werdyktu, karta w kolumnie dowodów |
 | Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
