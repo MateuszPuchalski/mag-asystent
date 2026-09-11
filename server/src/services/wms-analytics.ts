@@ -102,11 +102,11 @@ export function analytics(raw: unknown) {
       );
     const channels = d
       .prepare(
-        `SELECT coalesce(sl.sales_channel,o.channel) AS channel,count(*) AS shipped,
+        `SELECT o.channel AS channel,count(*) AS shipped,
       sum(CASE WHEN shipped_at<=due_at THEN 1 ELSE 0 END) AS on_time,
       avg((julianday(shipped_at)-julianday(created_at))*24*60) AS cycle_minutes
-      FROM wms_order o LEFT JOIN wms_sellasist_link sl ON sl.order_id=o.id
-      WHERE shipped_at>=? AND shipped_at<=? GROUP BY coalesce(sl.sales_channel,o.channel) ORDER BY shipped DESC`,
+      FROM wms_order o
+      WHERE shipped_at>=? AND shipped_at<=? GROUP BY o.channel ORDER BY shipped DESC`,
       )
       .all(since, now);
     const adjustments = d

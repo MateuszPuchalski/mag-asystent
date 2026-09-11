@@ -1,6 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,7 @@ const env = {
   PORT: port,
   HOST: "127.0.0.1",
   SGT_MODE: "seeded",
-  WMS_SELLASIST_ENABLED: "0",
+  ALLEGRO_MODE: "dev",
   LOG_LEVEL: "silent",
   WERTIS_ENV_FILE: path.join(tmpdir(), "wms-test-no-env.local"),
 };
@@ -60,10 +60,6 @@ try {
   await expect(page.locator("#wms-content")).toContainText(
     "Wybierz zamówienie",
   );
-  await page.locator('[data-tab-wms="integration"]').click();
-  await expect(page.locator("#wms-content")).toContainText(
-    "synchronizacja Sellasist jest wyłączona",
-  );
   await page.locator('[data-tab-wms="import"]').click();
   await page.locator('#wms-create [name="reference"]').fill("E2E-FULL-ORDER");
   await page.locator('#wms-create [name="dueAt"]').fill("2026-12-31T14:00");
@@ -76,55 +72,10 @@ try {
   await page
     .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
     .click();
-  const proposalOrderId = Number(
-    await page
-      .locator('[data-order-wms][aria-pressed="true"]')
-      .getAttribute("data-order-wms"),
-  );
-  // Odpowiedź sklepu jest atrapą; otwarcie i zapis zmiany używają prawdziwego WMS.
-  await page.route(
-    "**/api/wms/sellasist",
-    (route) =>
-      route.fulfill({
-        json: {
-          enabled: true,
-          account: "test-shop",
-          intervalMs: 60000,
-          shippedStatus: 9,
-          state: null,
-          issues: [
-            {
-              external_id: 123,
-              stage: "source",
-              message: "Zmiana priorytetu w sklepie",
-              updated_at: new Date().toISOString(),
-              proposal: {
-                orderId: proposalOrderId,
-                order: {
-                  priority: 1,
-                  dueAt: "2026-12-31T13:00:00Z",
-                  lines: [
-                    { sku: "WMS-0001", quantity: 2 },
-                    { sku: "WMS-0002", quantity: 1 },
-                  ],
-                },
-              },
-            },
-          ],
-        },
-      }),
-    { times: 1 },
-  );
-  await page.locator('[data-tab-wms="integration"]').click();
-  await page
-    .getByRole("button", { name: "OTWÓRZ ZMIANY DO SPRAWDZENIA", exact: true })
-    .click();
-  await expect(page.locator('#wms-amend [name="priority"]')).toHaveValue("1");
+  await page.locator("#wms-amend summary").click();
+  await page.locator('#wms-amend [name="priority"]').selectOption("1");
   await expect(page.locator('#wms-amend [name="lines"]')).toHaveValue(
     "WMS-0001;2\nWMS-0002;1",
-  );
-  await expect(page.locator('#wms-amend [name="reason"]')).toHaveValue(
-    "Uzgodnienie zmiany Sellasist",
   );
   await page
     .locator('#wms-amend [name="reason"]')
@@ -282,6 +233,32 @@ try {
     path: path.join(output, "fulfillment-desktop.png"),
     fullPage: true,
   });
+  await page.locator('[data-tab-wms="dispatch"]').click();
+  await page.locator('#wms-dispatch-filter [name="q"]').fill("TRACK-E2E-0001");
+  await page
+    .getByRole("button", { name: "SZUKAJ PACZEK", exact: true })
+    .click();
+  await expect(page.locator("#wms-content tbody tr")).toHaveCount(1);
+  await expect(page.locator("#wms-content")).toContainText("E2E-FULL-ORDER");
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "EKSPORTUJ REJESTR CSV", exact: true })
+    .click();
+  const download = await downloadPromise;
+  const registerCsv = readFileSync(await download.path(), "utf8");
+  if (
+    !registerCsv.includes("TRACK-E2E-0001") ||
+    !registerCsv.includes("E2E-FULL-ORDER")
+  )
+    throw new Error("Rejestr CSV nie zawiera wysłanej paczki");
+  await page.screenshot({
+    path: path.join(output, "dispatch-desktop.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "E2E-FULL-ORDER", exact: true })
+    .click();
+  await expect(page.locator("#wms-step")).toContainText("TRACK-E2E-0001");
   await page.locator('[data-tab-wms="stock"]').click();
   await page.locator('#wms-filter [name="q"]').fill("WMS-0040");
   await page.locator("#wms-filter button").click();
@@ -530,8 +507,6 @@ try {
           "create",
           "allocate",
           "amend and release reservations",
-          "integration status",
-          "source proposal review (mocked connector response)",
           "pick",
           "wrong scan",
           "lost response and reload",
@@ -540,6 +515,7 @@ try {
           "packing stays locked until refreshed state arrives",
           "failed refresh removes stale scan form and recovers committed packing",
           "ship",
+          "shipment register, search, CSV download and return to order",
           "receive",
           "stock movement history",
           "stock CSV preview, changed-input invalidation and duplicate document protection",

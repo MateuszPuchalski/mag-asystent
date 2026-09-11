@@ -7,6 +7,7 @@ const target = process.env.DB_PATH;
 if (!target || fs.existsSync(path.resolve(target)))
   throw new Error("Podaj DB_PATH wskazujący NOWY plik bazy demonstracyjnej");
 process.env.SGT_MODE = "seeded";
+process.env.ALLEGRO_MODE = "dev";
 process.env.WERTIS_ENV_FILE = path.resolve("wms-demo-no-env.local");
 const { db } = await import("./db/db.js");
 const { createUser } = await import("./services/users.js");
@@ -16,6 +17,9 @@ if (!password || password.length < 10)
   throw new Error("Ustaw WMS_DEMO_PASSWORD (co najmniej 10 znaków)");
 const user = createUser("Demo WMS", "admin", "wms-demo", password);
 const actor = { id: user.userId, name: user.name, role: user.role };
+const scale = process.argv.includes("--scale");
+const skuCount = scale ? 5000 : 40;
+const orderCount = scale ? 1500 : 32;
 const names = [
   "Nóż kosiarki 46 cm",
   "Filtr powietrza silnika",
@@ -26,7 +30,7 @@ const names = [
   "Łożysko piasty",
   "Uszczelka gaźnika",
 ];
-for (let i = 1; i <= 40; i++) {
+for (let i = 1; i <= skuCount; i++) {
   db()
     .prepare(
       "INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean,lokalizacja) VALUES (?,?,?,?,?)",
@@ -46,7 +50,7 @@ for (let i = 1; i <= 40; i++) {
     reason: "Spis otwarcia DEMO",
   });
 }
-for (let i = 1; i <= 32; i++) {
+for (let i = 1; i <= orderCount; i++) {
   let o = W.createOrder(actor, randomUUID(), {
     reference: `SKLEP-${String(i).padStart(5, "0")}`,
     channel: i % 3 ? "sklep" : "Allegro",
@@ -90,5 +94,5 @@ for (let i = 1; i <= 32; i++) {
   }
 }
 console.log(
-  `Demo gotowe: ${path.resolve(target)}. Login: wms-demo. Hasło pobrano z WMS_DEMO_PASSWORD.`,
+  `Demo gotowe: ${path.resolve(target)}. ${skuCount} SKU, ${orderCount} zamówień. Login: wms-demo. Hasło pobrano z WMS_DEMO_PASSWORD.`,
 );

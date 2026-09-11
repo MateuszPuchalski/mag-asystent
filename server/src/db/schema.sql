@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS wms_shipment (
   UNIQUE(carrier, tracking),
   UNIQUE(order_id, package_no)
 );
+CREATE INDEX IF NOT EXISTS ix_wms_shipment_dispatch ON wms_shipment(created_at, id);
 -- Odpowiedź i zmiana stanu zatwierdzają się razem, także po utracie sieci.
 CREATE TABLE IF NOT EXISTS wms_command (
   key TEXT PRIMARY KEY,
@@ -130,7 +131,7 @@ CREATE TABLE IF NOT EXISTS wms_command (
   response TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
--- Integracja przechowuje identyfikatory i stan ponowień; klucz API zostaje w konfiguracji serwera.
+-- Numer dokumentu chroni zapas przed ponownym przyjęciem z innej sesji.
 CREATE TABLE IF NOT EXISTS wms_stock_document (
   reference TEXT PRIMARY KEY,
   fingerprint TEXT NOT NULL,
@@ -143,45 +144,6 @@ CREATE TRIGGER IF NOT EXISTS wms_stock_document_no_update BEFORE UPDATE ON wms_s
 BEGIN SELECT RAISE(ABORT, 'WMS stock document is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS wms_stock_document_no_delete BEFORE DELETE ON wms_stock_document
 BEGIN SELECT RAISE(ABORT, 'WMS stock document is immutable'); END;
-
-CREATE TABLE IF NOT EXISTS wms_sellasist_link (
-  account TEXT NOT NULL,
-  external_id INTEGER NOT NULL,
-  order_id INTEGER NOT NULL UNIQUE REFERENCES wms_order(id),
-  fingerprint TEXT NOT NULL,
-  sales_channel TEXT NOT NULL,
-  exported_at TEXT,
-  PRIMARY KEY(account,external_id)
-);
-CREATE TABLE IF NOT EXISTS wms_sellasist_state (
-  account TEXT PRIMARY KEY,
-  cursors TEXT NOT NULL DEFAULT '{}',
-  status_cursor INTEGER NOT NULL DEFAULT 0,
-  watch_cursor INTEGER NOT NULL DEFAULT 0,
-  export_cursor INTEGER NOT NULL DEFAULT 0,
-  lease_until INTEGER NOT NULL DEFAULT 0,
-  lease_token TEXT,
-  retry_at INTEGER NOT NULL DEFAULT 0,
-  last_started TEXT,
-  last_finished TEXT,
-  last_result TEXT,
-  last_error TEXT
-);
-CREATE TABLE IF NOT EXISTS wms_sellasist_issue (
-  account TEXT NOT NULL,
-  external_id INTEGER NOT NULL,
-  stage TEXT NOT NULL CHECK(stage IN ('import','source','export')),
-  message TEXT NOT NULL,
-  proposal TEXT,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY(account,external_id,stage)
-);
-CREATE TABLE IF NOT EXISTS wms_sellasist_check (
-  key TEXT PRIMARY KEY,
-  order_id INTEGER NOT NULL REFERENCES wms_order(id),
-  fingerprint TEXT NOT NULL,
-  checked_at INTEGER NOT NULL
-);
 
 -- ── Kolejka zadań dla workera Sfery (spec §7) ─────────────────────────────
 CREATE TABLE IF NOT EXISTS sfera_queue (

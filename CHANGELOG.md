@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.285.0 — 11 września 2026
+
+Samodzielny WMS zastępuje zależność od Sellasist. Zamówienie przechodzi od importu do wysyłki w lokalnej aplikacji.
+Usunięto konektor, zadania synchronizacji i zewnętrzną bramkę wysyłki.
+Dotychczasowe kontrole skanów, ról, rezerwacji i powtórzeń pozostają częścią każdego zapisu.
+
+Rejestr paczek pokazuje dzienne wysyłki, liczbę zamówień i masę.
+Wyszukuje po przesyłce, zamówieniu, kanale lub przewoźniku i eksportuje cały filtr do CSV.
+Numery zamówień prowadzą do szczegółów oraz wydruku listy pakowej.
+
+Demo z opcją `--scale` tworzy 5000 SKU i 1500 zamówień w osobnej bazie.
+Odbiór obejmuje wyłącznie seeded, zgodnie z decyzją właściciela.
+Gałąź scalono z main `9dd4000`, zachowując zmiany zwrotów i obsługi klienta do wersji 0.284.0.
+
+Wpisy WMS 0.270.0–0.271.1 poniżej opisują historię gałęzi przed scaleniem.
+Bieżącą instrukcją samodzielnego modułu jest `docs/wms.md`.
+
 ## 0.284.0 — 11 września 2026
 
 **Klawisze zwrotów wreszcie coś robią.** Ekran rysował je przy przyciskach od
@@ -783,7 +800,7 @@ Wózek prowadzi do 12 zamówień po jednej trasie i wymaga potwierdzenia docelow
 Otwarcie ewidencji WMS wymaga policzenia i zapisania rzeczywistego zapasu.
 Lustro Subiekta nie nadpisuje ilości WMS. Integracja nie wystawia automatycznie
 dokumentów wydania ani etykiet przewoźnika. Konektor Sellasist jest domyślnie
-wyłączony; konfigurację konta i statusów opisuje `docs/wms-sellasist.md`.
+wyłączony. Ten wariant konektora został wycofany przy wydaniu samodzielnego WMS 0.285.0.
 Instrukcja, demo i granice odbioru: `docs/wms.md`.
 
 ## 0.268.0 — 10 września 2026

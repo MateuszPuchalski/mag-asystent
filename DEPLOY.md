@@ -7,8 +7,9 @@ magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **pod
 wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skanerem.
 Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md).
 
-API i baza WMS pracują lokalnie. Włączone integracje Allegro i Sellasist korzystają z Internetu.
-Konfiguracja automatycznego importu i kontroli wysyłek: [`docs/wms-sellasist.md`](docs/wms-sellasist.md).
+API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłącznie dane seeded.
+Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
+Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001

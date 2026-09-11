@@ -828,43 +828,8 @@ export function actOnOrder(
     actor,
     `order_${input.action}`,
     { orderId, ...input },
-    () => {
-      if (
-        input.action === "ship" &&
-        db()
-          .prepare("SELECT 1 FROM wms_sellasist_link WHERE order_id=?")
-          .get(orderId)
-      ) {
-        if (
-          !db()
-            .prepare(
-              "SELECT 1 FROM wms_sellasist_check WHERE key=? AND order_id=? AND fingerprint=? AND checked_at>=?",
-            )
-            .get(
-              key,
-              orderId,
-              shipmentFingerprint(actor, orderId, input),
-              Date.now() - 60000,
-            )
-        )
-          fail("Najpierw potwierdź zgodność przesyłki z Sellasist");
-      }
-      const result = applyOrderAction(actor, orderId, input);
-      if (input.action === "ship")
-        db().prepare("DELETE FROM wms_sellasist_check WHERE key=?").run(key);
-      return result;
-    },
+    () => applyOrderAction(actor, orderId, input),
   );
-}
-
-export function shipmentFingerprint(
-  actor: Actor,
-  orderId: number,
-  input: unknown,
-) {
-  return createHash("sha256")
-    .update(JSON.stringify([actor.id, orderId, input]))
-    .digest("hex");
 }
 
 // Wywoływane wyłącznie wewnątrz command: skan pojedynczy i wózek mają te same reguły.

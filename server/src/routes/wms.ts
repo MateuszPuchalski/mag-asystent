@@ -28,12 +28,12 @@ import {
   integrity,
 } from "../services/wms-analytics.js";
 import { db } from "../db/db.js";
-import { sellasistSettings } from "../adapters/sellasist-wms.js";
-import {
-  sellasistStatus,
-  verifySellasistShipment,
-} from "../services/wms-sellasist.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
+import {
+  dispatchRegister,
+  dispatchCsv,
+  dispatchToday,
+} from "../services/wms-dispatch.js";
 
 function actor(): Actor {
   const s = sesjaZadania();
@@ -116,13 +116,6 @@ export async function wmsRoutes(app: FastifyInstance) {
       const user = actor(),
         key = String(req.headers["idempotency-key"] ?? ""),
         id = orderId(req.params.id);
-      await verifySellasistShipment(
-        user,
-        key,
-        id,
-        req.body,
-        sellasistSettings(),
-      );
       return actOnOrder(user, key, id, req.body);
     },
   );
@@ -167,14 +160,26 @@ export async function wmsRoutes(app: FastifyInstance) {
     manager(actor());
     return analytics(req.query);
   });
-  app.get("/api/wms/sellasist", async () => {
-    manager(actor());
-    return sellasistStatus(sellasistSettings());
-  });
   app.get("/api/wms/integrity", async () => {
     manager(actor());
     return integrity();
   });
+  app.get<{ Querystring: { day?: string } }>("/api/wms/dispatch", async (req) =>
+    dispatchRegister(actor(), { day: dispatchToday(), ...req.query }),
+  );
+  app.get<{ Querystring: { day?: string } }>(
+    "/api/wms/dispatch/csv",
+    async (req, reply) => {
+      const csv = dispatchCsv(actor(), { day: dispatchToday(), ...req.query });
+      return reply
+        .type("text/csv; charset=utf-8")
+        .header(
+          "content-disposition",
+          'attachment; filename="wms-rejestr-paczek.csv"',
+        )
+        .send(csv);
+    },
+  );
   app.get("/api/wms/reconciliation", async () => {
     manager(actor());
     return erpReconciliation();

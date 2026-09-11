@@ -11,7 +11,8 @@ process.env.DB_PATH = path.join(
   "wms.db",
 );
 process.env.LOG_LEVEL = "silent";
-process.env.WMS_SELLASIST_ENABLED = "0";
+process.env.SGT_MODE = "seeded";
+process.env.ALLEGRO_MODE = "dev";
 let app: FastifyInstance;
 let adminToken: string, workerToken: string;
 before(async () => {
@@ -47,7 +48,8 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/waves/1",
     "/api/wms/analytics",
     "/api/wms/integrity",
-    "/api/wms/sellasist",
+    "/api/wms/dispatch",
+    "/api/wms/dispatch/csv",
   ])
     assert.equal(
       (await app.inject({ method: "GET", url })).statusCode,
@@ -57,7 +59,8 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/analytics",
     "/api/wms/analytics/csv",
-    "/api/wms/sellasist",
+    "/api/wms/dispatch",
+    "/api/wms/dispatch/csv",
     "/api/wms/integrity",
     "/api/wms/reconciliation",
     "/api/wms/shipments",
@@ -154,6 +157,9 @@ test("walidacja odrzuca złe identyfikatory, ilości, filtry i brak klucza ponow
     "/api/wms/orders?limit=1000000",
     "/api/wms/analytics?days=-1",
     "/api/wms/inventory?offset=-1",
+    "/api/wms/dispatch?day=2026-02-30",
+    "/api/wms/dispatch?limit=100000",
+    "/api/wms/dispatch/csv?day=bad",
   ])
     assert.equal(
       (await app.inject({ method: "GET", url, headers: headers() })).statusCode,
@@ -223,4 +229,107 @@ test("wyszukiwanie traktuje znaki SQL jak dane, statyki WMS dostępne w biurze",
   });
   assert.equal(csv.statusCode, 200);
   assert.match(String(csv.headers["content-type"]), /text\/csv/);
+});
+
+test("pełne zamówienie i rejestr wielu paczek działają bez dostępu do zewnętrznych usług", async (t) => {
+  const network = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("Test nie zezwala na połączenia zewnętrzne");
+  });
+  const post = async (url: string, payload: unknown, key = randomUUID()) => {
+    const result = await app.inject({
+      method: "POST",
+      url,
+      payload: payload as object,
+      headers: { ...headers(), "idempotency-key": key },
+    });
+    assert.equal(result.statusCode, 200, result.body);
+    return result.json();
+  };
+  await post("/api/wms/inventory", {
+    action: "receive",
+    twId: 1,
+    bin: "A01-01-02",
+    quantity: 5,
+    reason: "Przyjęcie DEMO",
+  });
+  let order = await post("/api/wms/orders", {
+    reference: '=DEMO;"PACZKA"',
+    channel: "sklep",
+    dueAt: "2026-12-31T12:00:00Z",
+    lines: [{ sku: "NOZ-01", quantity: 2 }],
+  });
+  const action = async (input: object) => {
+    order = await post(`/api/wms/orders/${order.id}/actions`, {
+      version: order.version,
+      ...input,
+    });
+  };
+  await action({ action: "allocate" });
+  await action({ action: "pick-start", tote: "DEMO-OFFLINE" });
+  for (const a of order.allocations)
+    await action({
+      action: "pick",
+      allocationId: a.id,
+      bin: a.bin,
+      barcode: "NOZ-01",
+      quantity: a.quantity,
+    });
+  await action({ action: "pack-start", tote: "DEMO-OFFLINE" });
+  await action({ action: "pack", barcode: "NOZ-01", quantity: 2 });
+  const shipping = {
+    action: "ship",
+    version: order.version,
+    carrier: "DEMO",
+    tracking: "DEMO-001",
+    weightG: 500,
+    extraParcels: [{ carrier: "DEMO", tracking: "DEMO-002", weightG: 750 }],
+  };
+  const key = randomUUID();
+  order = await post(`/api/wms/orders/${order.id}/actions`, shipping, key);
+  assert.deepEqual(
+    await post(`/api/wms/orders/${order.id}/actions`, shipping, key),
+    order,
+  );
+  assert.equal(order.status, "shipped");
+  const day = order.shipped_at.slice(0, 10);
+  const { db } = await import("../db/db.js");
+  const changes = db().prepare("SELECT total_changes() AS n").get()!.n;
+  const get = async (suffix: string) => {
+    const r = await app.inject({
+      method: "GET",
+      url: suffix,
+      headers: headers(),
+    });
+    assert.equal(r.statusCode, 200, r.body);
+    assert.equal(r.headers["cache-control"], "no-store");
+    return r;
+  };
+  const first = (
+    await get(`/api/wms/dispatch?day=${day}&q=DEMO&limit=1`)
+  ).json();
+  assert.deepEqual(first.totals, { parcels: 2, orders: 1, weightG: 1250 });
+  const second = (
+    await get(`/api/wms/dispatch?day=${day}&q=DEMO&limit=1&offset=1`)
+  ).json();
+  assert.notEqual(first.rows[0].id, second.rows[0].id);
+  const csv = await get(
+    `/api/wms/dispatch/csv?day=${day}&q=DEMO&limit=1&offset=1`,
+  );
+  assert.match(csv.body, /DEMO-001/);
+  assert.match(csv.body, /DEMO-002/);
+  assert.match(csv.body, /"'=DEMO;""PACZKA"""/);
+  for (const q of ["%", "_", "' OR 1=1 --"])
+    assert.equal(
+      (
+        await get(`/api/wms/dispatch?day=${day}&q=${encodeURIComponent(q)}`)
+      ).json().totals.parcels,
+      0,
+    );
+  assert.equal(
+    (await get("/api/wms/dispatch?day=2000-01-01")).json().totals.parcels,
+    0,
+  );
+  assert.equal((await get("/api/wms/integrity")).json().ok, true);
+  assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, changes);
+  assert.equal(network.mock.calls.length, 0);
 });

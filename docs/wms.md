@@ -3,6 +3,8 @@
 Moduł działa pod `/biuro`, w zakładce **REALIZACJA WMS**.
 Wykorzystuje istniejące konta, katalog Subiekta i dziennik zdarzeń.
 Przyjęcia dokumentowe, zwroty i obsługa klienta zachowują dotychczasowe ekrany.
+WMS prowadzi cały przebieg samodzielnie, bez konta, abonamentu ani API Sellasist.
+Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłącznie dane seeded.
 
 ## Uruchomienie
 
@@ -30,12 +32,15 @@ npm -w server run wms:demo
 $env:WERTIS_ENV_FILE = Join-Path $env:TEMP 'nieistniejacy-wms-demo.local'
 $env:SGT_MODE = 'seeded'
 $env:SRODOWISKO = 'DEMO WMS'
-$env:WMS_SELLASIST_ENABLED = '0'
+$env:ALLEGRO_MODE = 'dev'
 npm run dev:api
 ```
 
 Adres: `http://localhost:3001/biuro`. Login: `wms-demo`.
 Demo zawiera 40 części i 32 zamówienia na różnych etapach realizacji.
+Opcja `npm -w server run wms:demo -- --scale` tworzy 5000 SKU i 1500 zamówień.
+Wymaga nowego pliku bazy, tak samo jak mniejszy wariant.
+Numery przesyłek DEMO służą do ćwiczeń i nie zamawiają usług przewoźnika.
 
 ## Ewidencja fizyczna i ERP
 
@@ -189,9 +194,9 @@ Biuro może przejąć pojedyncze zamówienie w jego karcie; skan pojemnika nadal
 
 ## Integracja sklepu i wysyłki
 
-Automatyczny konektor Sellasist opisuje [`wms-sellasist.md`](wms-sellasist.md).
-Obsługuje import, wykrywanie zmian, kontrolę paczek przed wysłaniem i potwierdzanie statusu.
-Jest domyślnie wyłączony i wymaga rzeczywistych identyfikatorów statusów oraz klucza API.
+Zamówienia można tworzyć, zmieniać i importować bezpośrednio w WMS.
+Przebieg od rezerwacji do wysyłki nie wykonuje połączeń z platformą pośrednią.
+Odbiór korzysta z lokalnego katalogu seeded i przykładowych numerów przesyłek.
 
 API używa istniejącej sesji w nagłówku `x-session`.
 Każdy zapis wymaga `Idempotency-Key`: 16–100 znaków ASCII, liter, cyfr, podkreśleń lub myślników.
@@ -220,7 +225,8 @@ Nowa operacja wymaga nowego klucza.
 | `POST /api/wms/waves/:id/pick` | Kontrola pojemnika i pobranie na wózku |
 | `GET /api/wms/integrity` | Zgodność dziennika i rezerwacji |
 | `GET /api/wms/reconciliation` | Różnice względem Subiekta |
-| `GET /api/wms/sellasist` | Stan synchronizacji i propozycje zmian zamówień |
+| `GET /api/wms/dispatch?day=2026-09-11&q=DEMO` | Rejestr paczek z wyszukiwaniem i stronicowaniem |
+| `GET /api/wms/dispatch/csv?day=2026-09-11&q=DEMO` | Cały przefiltrowany rejestr dzienny w CSV |
 
 Przykładowa czynność: `{"action":"allocate","version":1}`.
 Odpowiedź zawiera nową wersję zamówienia.
@@ -235,11 +241,24 @@ Obie trasy wymagają uprawnień biura. Podgląd nie wymaga klucza ponowienia.
 
 Eksporter wysyłek zwraca do 100 rekordów oraz `next`.
 Integrator zapisuje ten kursor dopiero po obsłużeniu całej odpowiedzi.
-Numer przesyłki musi pochodzić z systemu przewoźnika.
+W demonstracji używamy przykładowych numerów przesyłek.
+Rzeczywisty numer przed przekazaniem fizycznej paczki musi pochodzić od przewoźnika.
 Jedno zamówienie może mieć do 20 paczek, każda z osobnym numerem i masą.
 Wszystkie paczki zamówienia zatwierdzają się razem.
 WMS nie kupuje etykiet ani nie przesyła automatycznie dokumentów wydania do Subiekta.
 Nie przechowuje adresów odbiorców w nowych tabelach realizacji.
+
+## Rejestr paczek
+
+Biuro otwiera **Rejestr paczek**, wybiera dzień UTC i skanuje numer przesyłki.
+Wyszukiwanie obejmuje także zamówienie, kanał i przewoźnika.
+Każda paczka ma własny wiersz; liczniki pokazują paczki, zamówienia oraz masę.
+Przycisk z numerem zamówienia otwiera jego kartę i listę pakową do wydruku.
+
+Eksport CSV obejmuje cały filtr, niezależnie od strony na ekranie.
+Limit wynosi 30000 paczek; większy zbiór wymaga zawężenia wyszukiwania.
+Formuły arkusza w tekstowych numerach są neutralizowane.
+Odczyt oraz eksport nie zmieniają zamówień ani stanów.
 
 ## Analityka
 
@@ -299,8 +318,8 @@ Telefon przełącza wybrane zamówienie w skupiony widok skanowania.
 Przy 390 × 844 px potwierdzenie pobrania mieści się bez przewijania.
 Przycisk **Pokaż kolejkę** przywraca filtry i pozostałe zamówienia.
 
-Pomiar wersji 0.271.1: 5000 SKU, 1500 zamówień po trzy pozycje i 16 równoległych klientów.
-16650 żądań ukończyło pracę w 76,97 s. Opóźnienie p95 wyniosło 90,5 ms.
+Pomiar wersji 0.285.0: 5000 SKU, 1500 zamówień po trzy pozycje i 16 równoległych klientów.
+16650 żądań ukończyło pracę w 80,92 s. Opóźnienie p95 wyniosło 95,63 ms.
 Stan i rezerwacje zgodziły się z dziennikiem po wszystkich wysyłkach.
 Sprzęt: Windows, Ryzen 7 7730U, Node 24.15.0, SQLite 3.51.3.
 Pomiar dotyczy localhost oraz syntetycznych danych. Nie obejmuje usług przewoźników, Subiekta i fizycznych urządzeń.
@@ -308,7 +327,8 @@ Pomiar dotyczy localhost oraz syntetycznych danych. Nie obejmuje usług przewoź
 Opcja `npm run test:wms:capacity -- --history` dodaje 90 dni danych raportowych.
 Pełniejsza próba: `npm run test:wms:capacity -- --history --ledger-history`.
 Obejmuje 136500 zamówień, 409500 pozycji, 1229000 ruchów i 1506501 zdarzeń audytu.
-Raport 90-dniowy zajął 1337 ms, a 30-dniowy 435 ms. Kontrola dziennika zakończyła się poprawnie w 1009 ms.
+Raport 90-dniowy zajął 1331 ms, a 30-dniowy 428 ms. Kontrola dziennika zakończyła się poprawnie w 995 ms.
 Historyczne rekordy są osobnymi danymi testowymi; właściwe operacje zapisu sprawdza wcześniejszy przebieg 1500 zamówień.
 
-Pełny odbiór produkcyjny wymaga próby z rzeczywistym eksportem sklepu, drukarką, skanerami i uzgodnionymi dokumentami ERP.
+Zakres tego odbioru kończy się na danych seeded.
+Rzeczywiste kanały sprzedaży, usługi przewoźników, sprzęt i dokumenty ERP pozostają osobnym etapem wdrożenia.

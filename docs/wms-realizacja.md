@@ -38,22 +38,30 @@ Test kopii odtwarza całą bazę i sprawdza dziennik.
 Test przeglądarki przechodzi od logowania do wysyłki, także po utracie odpowiedzi i odświeżeniu strony.
 Widok 390 px nie ma poziomego przepełnienia.
 Próba pojemności: 5000 SKU i 1500 pełnych zamówień; 16650 żądań przy 16 klientach.
-Wynik próby wersji 0.271.1: 76,97 s, p95 90,5 ms, zgodny dziennik.
-Raport 90 dni przy 136500 zamówieniach, 1229000 ruchów i 1506501 zdarzeń audytu: 1337 ms.
-Pełny zestaw serwera wersji 0.271.1: 2065 testów, zero błędów. Panel: 649 testów po scaleniu aktualnego main (`c92af74`).
+Wynik próby wersji 0.285.0: 80,92 s, p95 95,63 ms, zgodny dziennik.
+Raport 90 dni przy 136500 zamówieniach, 1229000 ruchów i 1506501 zdarzeń audytu: 1331 ms.
+Pełny zestaw serwera wersji 0.285.0: 2160 testów, zero błędów. Panel: 727 testów po scaleniu main (`9dd4000`).
 Build produkcyjny przechodzi również test przeglądarki, wraz z wygaśnięciem sesji podczas ponowienia skanu.
 Aktualny audyt zależności produkcyjnych: zero zgłoszonych podatności.
 Zapis wyników: `docs/wms-evidence.json`; scenariusze i zrzuty można odtworzyć przez `tools/wms-e2e.mjs`.
 
-Konektor Sellasist ma 11 testów z kontrolowanymi odpowiedziami według oficjalnego kontraktu API.
-Obejmują 1500 zamówień, ponowienia po awarii, zmiany zamówień i weryfikację numerów paczek.
-Przeglądarka sprawdza też otwarcie propozycji zmian oraz jawny zapis z ponowną rezerwacją.
-Nie wykonano połączeń z rzeczywistym kontem sklepu. Konfiguracja i odbiór: `docs/wms-sellasist.md`.
+## Samodzielny WMS i zakres seeded
+
+Decyzja właściciela: system ma zastąpić Sellasist, a obecny odbiór używa wyłącznie danych seeded.
+Usunięto konektor, zadania synchronizacji, ekran integracji oraz warunek zewnętrznego potwierdzenia wysyłki.
+Zamówienia powstają i zmieniają się bezpośrednio w WMS.
+Rejestr paczek zapewnia wyszukiwanie, masę, liczniki oraz eksport dzienny CSV.
+Test API przechodzi całe zamówienie wielopaczkowe przy zabronionych wywołaniach sieciowych.
+
+Nowa baza nie tworzy tabel dawnego konektora.
+Istniejące tabele testowych baz pozostają nieaktywne; migracja nie kasuje zapisanych danych.
+Historyczne wstrzymania wymagają jawnego wznowienia przez biuro, tak jak inne blokady.
+Demo z opcją `--scale` zawiera 5000 SKU i 1500 zamówień na różnych etapach.
 
 Otwarcie 5000 SKU przechodzi jako jeden dokument przyjęcia lub spisu z arkusza.
 Testy sprawdzają wycofanie całej partii po błędzie ruchu oraz po zmianie wersji zapasu.
 Przeglądarka odrzuca stary podgląd po edycji i rozpoznaje już zapisany numer dokumentu.
-Ostatni pomiar wydajności pochodzi z wersji 0.271.1 i obejmuje również historię ruchów oraz audytu.
+Ostatni pomiar wydajności pochodzi z wersji 0.285.0 i obejmuje również historię ruchów oraz audytu.
 
 ## CI i przegląd zmiany
 
@@ -62,7 +70,7 @@ Commit `5698856` przeszedł testy WMS, build i przeglądarkę na Windows oraz Li
 Przeszły też pełne bramki serwera, panelu, instalatora, workera Sfery i Androida z budową APK debug.
 Źródło: [WMS CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559134)
 i [serwer/panel CI](https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34537559099).
-Szkic pozostaje otwarty do odbioru rzeczywistych integracji i sprzętu.
+Szkic służy przeglądowi samodzielnego WMS na danych seeded.
 
 Powtórzony przebieg Windows dla `6b117d2` ujawnił wyścig formularza pakowania z odczytem po zapisie.
 Wersja 0.271.1 utrzymuje blokadę formularza do końca odczytu i usuwa stary formularz po błędzie odczytu.
@@ -70,5 +78,5 @@ Kontrolowane opóźnienie odtworzyło błąd przed poprawką; po poprawce przech
 Aktualny stan kolejnych przebiegów jest widoczny w kontrolach PR.
 
 Ograniczenia integracji i instrukcja odbioru stoją w `docs/wms.md`.
-Odbiór produkcyjny pozostaje otwarty: rzeczywiste pliki sklepu, dokumenty ERP i sprzęt nie zostały przetestowane.
+Rzeczywiste integracje, dokumenty ERP i sprzęt pozostają poza bieżącym zakresem seeded.
 Nowy WMS pracuje w przeglądarce; natywne ekrany kompletacji Androida nie zostały dodane.
