@@ -287,8 +287,29 @@ export const SIATKA_TRZECH_KOLUMN =
   "2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
 
 /** Czas w formacie, który czyta biuro — jedna funkcja na cały panel. */
+/* ── ZNACZNIK CZASU BEZ SEKUND (0.272.0) ───────────────────────────────────────
+   Ustalenie 13 z audytu. `toLocaleString("pl")` bez opcji oddaje
+   „10.09.2026, 14:23:05" — z sekundami, zawsze, we wszystkich 52 wywołaniach.
+   Sekunda nie rozstrzyga w tym panelu NICZEGO: ani kiedy klient napisał, ani
+   kiedy przebiegła synchronizacja, ani kiedy hala oddała pomiar.
+
+   Kod wiedział o tym wcześniej niż audyt. TRZY miejsca obcinały sekundy ręcznie
+   przez `czas(...).slice(-8, -3)` — wycinek liczony od KOŃCA sformatowanego
+   napisu, czyli zakład o to, ile znaków ma data. Zakład przestawał wychodzić
+   dokładnie w chwili, w której ta funkcja przestaje dawać sekundy: na
+   „10.09.2026, 14:23" ten sam wycinek daje „6, 14". Dlatego jedno i drugie
+   musiało wejść jednym wydaniem.
+
+   `godzina()` istnieje właśnie po to i pyta o godzinę WPROST, zamiast wycinać
+   ją z dłuższego napisu.                                                     */
+
+/** Data i godzina, bez sekund — „10.09.2026, 14:23". */
 export const czas = (v: string | null | undefined) =>
-  v ? new Date(v).toLocaleString("pl") : "—";
+  v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
+
+/** Sama godzina — „14:23". Tam, gdzie data jest oczywista z kontekstu. */
+export const godzina = (v: string | null | undefined) =>
+  v ? new Date(v).toLocaleTimeString("pl", { timeStyle: "short" }) : "—";
 
 /**
  * Kopiowanie tekstu, którego nikt nie przepisuje z ekranu ręcznie:

@@ -34,7 +34,63 @@ historii nie przepisujemy.
 ---
 
 
-<<<<<<< HEAD
+## 0.272.0 — 11 września 2026
+
+**[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
+
+**Znacznik czasu traci sekundy.** Ustalenie **13** z audytu. `czas()` oddawał
+„10.09.2026, 14:23:05" we wszystkich **52 wywołaniach**, bo
+`toLocaleString("pl")` bez opcji tak robi. Sekunda nie rozstrzyga w tym panelu
+niczego: ani kiedy klient napisał, ani kiedy przebiegła synchronizacja, ani
+kiedy hala oddała pomiar.
+
+**Kod wiedział o tym przed audytem i radził sobie najgorszym sposobem.** Trzy
+miejsca obcinały sekundy przez `czas(...).slice(-8, -3)` — wycinek liczony od
+KOŃCA sformatowanego napisu. To nie jest odczyt godziny, tylko zakład o to, ile
+znaków ma data. Zakład przestawał wychodzić dokładnie w chwili, w której `czas()`
+przestaje dawać sekundy: na „10.09.2026, 14:23" ten sam wycinek daje **„6, 14"**.
+Dlatego obie zmiany musiały wejść jednym wydaniem.
+
+Powstała `godzina()`, która pyta o godzinę wprost. Przy okazji znika `|| "—"`
+doklejane w trzech miejscach: wycinek z myślnika dawał pusty napis, więc
+zapasowa wartość mieszkała w wywołującym. Teraz mieszka w funkcji.
+
+**Promień kafelka równa się promieniowi bieżni minus jej wypełnienie.**
+Ustalenie **11**, i wyszło z niego coś innego, niż zapowiadał audyt. Audyt
+naliczył 215 zaokrągleń w pięciu wartościach i nazwał to rozrzutem. Rozrzutu
+nie ma — jest jedna reguła, spełniona raz na dwa miejsca.
+
+```
+przełącznik edytora   bieżnia rounded-lg p-0.5   8 − 2 = 6 px   rounded-md   ✓
+pasek nawigacji       bieżnia rounded-lg p-1     8 − 4 = 4 px   rounded-md   ✗
+```
+
+Zmierzone w przeglądarce: kafelek nawigacji miał 6 px przy współśrodkowych
+4 px, czyli **rozjeżdżał się z łukiem bieżni o 2 px w każdym rogu**. Po zmianie
+różnica wynosi zero. `rounded-md` nie jest odpadem do zamiecenia — jest
+poprawną wartością tam, gdzie odstęp bieżni wynosi 2 px.
+
+**Jedno pasmo alarmu udawało kartę.** `AlarmSynchronizacji` miało `rounded-xl`,
+czyli 12 px — promień `.card` z `index.css`. Pozostałych jedenaście pasm
+ostrzeżeń i błędów ma `rounded-lg` albo `rounded`. Wyrównane.
+
+**Ustalenie 12 jest puste i to też jest wynik.** Audyt zapowiadał „odstępy
+odstające". Arbitralnych `p-[…]`, `gap-[…]`, `m-[…]` i `mt-[…]` w `panel/src`
+jest **zero**. Wszystkie 22 wartości w nawiasach kwadratowych to wymiary
+i siatki — wysokości pól, progi czytelności, `grid-cols-[…]` — czyli rzeczy,
+których skala Tailwinda nie obejmuje. Nie ma czego naprawiać.
+
+**Nowy strażnik** `panel/src/Czas.test.ts` — pięć testów. Nikt nie kroi wyniku
+`czas()` nożyczkami, formatowanie daty nie powstaje poza `ui/index.tsx`,
+`czas()` nie oddaje sekund, `godzina()` oddaje samą godzinę, brak wartości to
+myślnik. Zwolnienie komentarzem `czas: <powód>` z progiem trzech wyrazów.
+
+**Strażnik bursztynu z 0.265.0 zapalił się przy tym wydaniu i miał rację.**
+Nowy komentarz o promieniu wepchnął znacznik zwolnienia `bursztyn:` poza okno
+sześciu linii — zwolnienie przestało sąsiadować z tym, co zwalnia. To nie była
+regresja barwy, tylko dryf komentarza, a bramka i tak go złapała. Kolejność
+komentarzy odwrócona: zwolnienie stoi najbliżej linii, której dotyczy.
+
 ## 0.270.0 — 11 września 2026
 
 **Szkic podaje link do naszej oferty zamiast kazać klientowi szukać.**
@@ -160,7 +216,6 @@ tabelą. Mediana pojawia się od dwudziestu wyborów, a kolumny rankingowej nie
 ma żadnej: raport mówi, JAK ktoś pracuje, nie jak dobrze.
 
 Panel obsługi trzeba przebudować. Migracji nie ma.
-=======
 ## 0.267.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).
@@ -221,7 +276,6 @@ wszystko jest w porządku**: `NaglowekSekcji` i `Sekcja` też mają prop `ikona`
 i też biorą gotowy element — słusznie, bo ich ikona stoi w rzędzie z tekstem
 i ma 13 albo 14 px, czyli rozmiar dobierany do sąsiada. Reguła celuje teraz
 wyłącznie w `Pusto`.
->>>>>>> origin/main
 
 ## 0.266.0 — 10 września 2026
 
