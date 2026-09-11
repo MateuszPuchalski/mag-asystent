@@ -3219,8 +3219,17 @@ zwrotów. Towar leżał w hali i nie był sprzedawalny, dopóki biuro nie wystaw
 drugiego dokumentu ręką w Subiekcie — i nic o tym nie przypominało. Kosz
 złożony w aplikacji sam wysłał towar na regał, więc od tego wydania sam go
 stamtąd zdejmuje: ZAKOŃCZ na kolektorze zamawia JEDNO MM ZWROTY→MAG na cały
-kosz. Kosz z dokumentu MM z Subiekta zostaje przy dawnej regule, bo tam
-przesunięcie na regał wystawiło biuro.
+kosz.
+
+**Kosz z dokumentu MM dołączył w 0.277.0.** Do 0.276.x zostawał przy dawnej
+regule, bo przesunięcie na regał wystawiło biuro — i kosztowało to dokładnie
+tyle samo, co kosze z panelu przed 0.266.0. Zgłoszenie właściciela z 11 września
+2026 nazwało to wprost: przesunięcia nie robią się same. Różnica została jedna,
+kierunek: powrót kosza z dokumentu jest odwrotnością TEGO dokumentu, więc wraca
+na magazyn, który towar wysłał (`kosz.mm_mag_z`, snapshot z importu), a nie na
+domyślny główny. Kosza, którego kierunku aplikacja nie zna — bo dokument wypadł
+już z okna importu — nie dotyka wcale: zgadnięty magazyn przesuwa towar
+naprawdę. Taki kosz zgłasza rekoncyliacja i zamyka go biuro ręką.
 
 Dokument powstaje dopiero wtedy, gdy każdy adres z tego kosza siedzi już
 w Subiekcie. Niezmiennik „adres przed sprzedawalnością" pilnuje w kolejce po
@@ -3915,7 +3924,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Powód odmowy widoczny na zwrocie | **działa** od 0.210.0 | `werdyktPowod`; zapisywał się do bazy i nikt go nie czytał |
 | Odmowa zwrotu dociera do klienta | **działa** przez ODMÓW WYPŁATY | werdykt biura jest wewnętrzny; klienta zawiadamia Allegro po zgłoszeniu odmowy wypłaty |
 | Utylizacja schodzi ze stanu | **działa** od 0.211.0 | koszyk odpadu, MM z magazynu głównego na `MAG_ID_ODP`; bez tego wpisu wyłączone; od 0.266.0 nie wchodzi na listę kolektora |
-| Powrót towaru z regału zwrotów na halę | **działa** od 0.266.0 | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza z aplikacji, po zapisaniu adresów |
+| Powrót towaru z regału zwrotów na halę | **działa** od 0.266.0 | `zakolejkujPowrot` w `services/kosze.ts`; jedno MM ZWROTY→MAG po rozłożeniu kosza, po zapisaniu adresów; od 0.277.0 także kosz z dokumentu MM, na magazyn z tamtego dokumentu |
 | Dokument zejścia ze stanu dla odpadu (RW) | **nie działa** | po MM na magazyn odpadu stan zostaje; decyzja procesowa biura |
 | Ślad po zwrocie pieniędzy przy pobraniu | **działa** od 0.269.0 | `zapiszPrzelew`/`cofnijPrzelew`, kolumny `przelew_*`; sygnał `przelew_czeka` i rozjazd `zwrot_bez_przelewu` |
 | Ślad rozłożenia towaru na osi zwrotu | **działa** od 0.269.0 | `services/zwrot-slad.ts`; odłożenie i pominięcie w koszu dopisują zdarzenie zwrotu |

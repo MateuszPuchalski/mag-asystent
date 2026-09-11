@@ -184,16 +184,19 @@ function koszeBezKorekty(): Rozjazd[] {
  * i to czekanie może stanąć, gdy zadanie adresu wisi w błędzie. Ten wiersz
  * jest właśnie o tym: warunek, który miał trwać sekundy, trwa dobę.
  *
- * Kosze z dokumentu MM z Subiekta tu NIE wchodzą — tam dokument powrotny jest
- * robotą biura z założenia (DEPLOY §6a) i alarm uczyłby przewijać raport. Tak
- * samo kosze rozłożone przed 0.266.0: rozliczyło je biuro ręką, więc raport
- * wypisywałby historię jako pracę do zrobienia (`powrot_poza_aplikacja`).
+ * Od 0.277.0 wchodzą tu TAKŻE kosze z dokumentu MM: dokument powrotny przestał
+ * być robotą biura, więc jego brak przestał być stanem normalnym. Kosz, którego
+ * kierunku aplikacja nie zna (dokument poza oknem importu), zgłasza się tym
+ * samym wierszem i to jest jedyne miejsce, w którym biuro się o nim dowie.
+ *
+ * Nie wchodzą kosze rozłożone przed tymi wydaniami: rozliczyło je biuro ręką,
+ * więc raport wypisywałby historię jako pracę (`powrot_poza_aplikacja`).
  */
 function koszeBezPowrotu(): Rozjazd[] {
   const rows = db()
     .prepare(
       `SELECT kod, rozlozono_at FROM kosz
-        WHERE status='rozlozony' AND powrot_queue_id IS NULL AND mm_dok_id IS NULL
+        WHERE status='rozlozony' AND powrot_queue_id IS NULL
           AND powrot_poza_aplikacja = 0
           AND rodzaj NOT IN ('karton','odpad')
           AND rozlozono_at < ?

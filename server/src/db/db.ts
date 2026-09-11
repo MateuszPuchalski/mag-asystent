@@ -645,10 +645,11 @@ export function migrate(database: DatabaseSync) {
      na regał zwrotów, więc sam ma go stamtąd zdjąć po rozłożeniu. Kolumna
      mówi, czy dokument już zamówiono: pusta przy koszu rozłożonym znaczy
      „stan wisi na regale, choć towar leży na półce" i pilnuje tego
-     rekoncyliacja. Kosz z dokumentu MM z Subiekta jej nie wypełnia — tam
-     dokument powrotny wystawia biuro (DEPLOY §6a). */
+     rekoncyliacja. Od 0.277.0 wypełnia ją TAK SAMO kosz z dokumentu MM —
+     powód przy `powrotKoszaZDokumentu`. */
   addColumn("kosz", "powrot_queue_id", "INTEGER REFERENCES sfera_queue(id)");
   powrotKoszaPozaAplikacja(database);
+  powrotKoszaZDokumentu(database);
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
@@ -737,6 +738,63 @@ function powrotKoszaPozaAplikacja(database: DatabaseSync) {
     if (n) {
       console.warn(`[migracja] ${n} rozłożonych koszy zostaje bez powrotu z bufora ` +
         "— rozliczyło je biuro przed 0.266.0.");
+    }
+  })();
+}
+
+/**
+ * Powrót z regału dla koszy Z DOKUMENTU MM (0.277.0).
+ *
+ * Do 0.276.x dokument powrotny ZWROTY→MAG zamawiała aplikacja wyłącznie dla
+ * koszy złożonych w panelu obsługi. Kosz z kartki — czyli droga, którą idzie
+ * większość zwrotów — kończył się zapisaniem adresów, a przesunięcie wystawiało
+ * biuro ręką w Subiekcie (DEPLOY §6a punkt 4). Kosztowało to dokładnie to samo,
+ * co przed 0.266.0 kosze z panelu: towar leżał na półce i nie był sprzedawalny,
+ * dopóki ktoś nie pamiętał o drugim dokumencie. Decyzja właściciela z 11
+ * września 2026 zdejmuje punkt 4 z biura i oddaje go aplikacji.
+ *
+ * `mm_mag_z` jest SNAPSHOTEM magazynu źródłowego dokumentu, bo powrót ma wrócić
+ * dokładnie tam, skąd towar przyjechał. Odczytanie tego z lustra `sgt_mm_zwrot`
+ * dopiero przy zamawianiu dokumentu bywałoby odczytem z pustki: lustro czyści
+ * się przy każdym imporcie i sięga tyle dni wstecz, ile mówi
+ * `MM_ZWROTY_DNI_WSTECZ`.
+ *
+ * STEMPEL IDZIE WYŁĄCZNIE W PRZEBIEGU DOKŁADAJĄCYM KOLUMNĘ — ta sama zasada co
+ * przy `powrotKoszaPozaAplikacja` i ten sam powód. Kosze z dokumentu rozłożone
+ * wcześniej rozliczyło biuro; wystawienie im dokumentu dziś przesunęłoby stan
+ * drugi raz, a rekoncyliacja wypisałaby historię jako pracę do zrobienia.
+ * Stempel powtarzany przy każdym starcie trafiałby w kosze rozłożone przed
+ * chwilą, którym worker nie zdążył jeszcze wypuścić powrotu.
+ */
+function powrotKoszaZDokumentu(database: DatabaseSync) {
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='kosz'").get();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!jest) return;
+  const kolumny = (database.prepare("PRAGMA table_info(kosz)").all() as Array<{ name: string }>)
+    .map((c) => c.name);
+  if (kolumny.includes("mm_mag_z")) return;
+  transaction(database, () => {
+    database.exec("ALTER TABLE kosz ADD COLUMN mm_mag_z INTEGER");
+    /* Kosze W ROBOCIE dostają snapshot z lustra, póki dokument jeszcze w nim
+       stoi. Bez tego kosz otwarty przed wdrożeniem, a zakończony po nim,
+       zostałby bez powrotu — czyli dokładnie z usterką, którą to wydanie
+       zamyka. Czego w lustrze nie ma, tego nie zgadujemy. */
+    const lustro = database.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sgt_mm_zwrot'").get();
+    if (lustro) {
+      database.prepare(
+        `UPDATE kosz SET mm_mag_z =
+           (SELECT m.mag_z FROM sgt_mm_zwrot m WHERE m.dok_id = kosz.mm_dok_id)
+          WHERE mm_dok_id IS NOT NULL`).run();
+    }
+    const n = Number(database.prepare(
+      `UPDATE kosz SET powrot_poza_aplikacja=1
+        WHERE status='rozlozony' AND mm_dok_id IS NOT NULL
+          AND powrot_poza_aplikacja=0`).run().changes ?? 0);
+    if (n) {
+      console.warn(`[migracja] ${n} koszy z dokumentu MM zostaje bez powrotu ` +
+        "z regału — rozliczyło je biuro przed 0.277.0.");
     }
   })();
 }

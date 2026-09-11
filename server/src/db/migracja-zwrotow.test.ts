@@ -366,3 +366,45 @@ test("migracja zostawia bez powrotu kosze rozłożone przed 0.266.0", () => {
   assert.equal(stempel("Z-CZEKA"), 0);
   d.close();
 });
+
+test("migracja stempluje kosze z dokumentu rozłożone przed 0.277.0", () => {
+  /* Od 0.277.0 powrót z regału zamawia aplikacja także dla koszy z dokumentu
+     MM. Bez stempla pierwszy przebieg wypuściłby dokumenty na WSZYSTKIE takie
+     kosze rozłożone od 0.266.0 — stan zjechałby drugi raz z regału, po
+     miesiącach, a rekoncyliacja wypisałaby historię jako pracę. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  /* Baza w kształcie 0.276.x: pełna migracja, z której zdejmujemy jedną
+     kolumnę. Wstawić kosz z `mm_dok_id` przed migracją się nie da — tamtej
+     kolumny też nie ma w `schema.sql`, bo tabela stoi na produkcji od 0.59.0. */
+  migrate(d);
+  d.exec("ALTER TABLE kosz DROP COLUMN mm_mag_z");
+
+  const teraz = new Date().toISOString();
+  const wstaw = (kod: string, status: string, dokId: number | null) => d.prepare(
+    `INSERT INTO kosz(kod, status, mm_dok_id, mm_numer, utworzono_at, utworzono_przez)
+     VALUES (?,?,?,?,?,'Biuro')`).run(kod, status, dokId, kod, teraz);
+  wstaw("1209", "rozlozony", 1209);   // rozliczyło biuro ręką
+  wstaw("1240", "zamkniety", 1240);   // jedzie na halę, powrót mu się należy
+  wstaw("Z-5", "rozlozony", null);    // kosz z panelu — ma już swój stempel
+  d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+             VALUES (1240, 'MM 1240/MGP/2026', '1240', '2026-09-10', 2, 3)`).run();
+
+  migrate(d);
+
+  const kosz = (kod: string) => d.prepare(
+    "SELECT powrot_poza_aplikacja AS p, mm_mag_z AS mag FROM kosz WHERE kod=?")
+    .get(kod) as { p: number; mag: number | null };
+  assert.equal(Number(kosz("1209").p), 1, "rozłożony przed wydaniem — powrót zrobiło biuro");
+  assert.equal(Number(kosz("1240").p), 0, "czeka na halę i dokument mu się należy");
+  assert.equal(Number(kosz("1240").mag), 2,
+    "kierunek powrotu bierze się z dokumentu, a lustro jeszcze go pamięta");
+  assert.equal(kosz("1209").mag, null, "dokumentu sprzed okna importu nie zgadujemy");
+
+  /* Drugi przebieg nie stempluje niczego: kosz rozłożony po wdrożeniu czeka
+     na swój dokument, a nie na oznaczenie historią. */
+  d.prepare("UPDATE kosz SET status='rozlozony' WHERE kod='1240'").run();
+  migrate(d);
+  assert.equal(Number(kosz("1240").p), 0);
+  d.close();
+});

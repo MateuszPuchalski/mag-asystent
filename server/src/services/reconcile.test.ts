@@ -192,11 +192,19 @@ test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
   assert.equal(r.rozjazdy[0].rodzaj, "kosz_bez_powrotu");
   assert.match(r.rozjazdy[0].opis, /Z-2/);
 
-  /* Kosz z dokumentu MM z Subiekta się NIE zgłasza: tam dokument powrotny
-     jest robotą biura z założenia, a alarm uczyłby przewijać raport. */
+  /* Kosz z dokumentu MM zgłasza się TAK SAMO od 0.277.0: powrót przestał być
+     robotą biura, więc jego brak przestał być stanem normalnym. Do 0.276.x ten
+     sam wiersz był celowo przemilczany. */
   const zDokumentu = kosz(3, "KZ-9");
-  db().prepare("UPDATE kosz SET mm_dok_id=1209 WHERE id=?").run(zDokumentu);
-  assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-9").length, 0);
+  db().prepare("UPDATE kosz SET mm_dok_id=1209, mm_mag_z=1 WHERE id=?").run(zDokumentu);
+  assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-9").length, 1);
+
+  /* Kosz rozliczony ręką przed wydaniem milczy dalej — inaczej pierwszy raport
+     po wdrożeniu byłby listą historii, nie pracy. */
+  const historia = kosz(4, "KZ-8");
+  db().prepare(
+    "UPDATE kosz SET mm_dok_id=1208, powrot_poza_aplikacja=1 WHERE id=?").run(historia);
+  assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-8").length, 0);
 });
 
 test("pobranie bez śladu po przelewie zgłasza się po dobie", () => {
