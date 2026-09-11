@@ -314,9 +314,40 @@ export function urlDeklaracjiZalacznika(apiUrl: string): string {
   return `${apiUrl}/messaging/message-attachments`;
 }
 
+/**
+ * Deklaracja załącznika WYCHODZĄCEGO w sprawie posprzedażowej (0.274.0).
+ *
+ * INNY ZASÓB I INNY KSZTAŁT niż przy Centrum Wiadomości, choć robią to samo.
+ * Ciało opisuje tu schemat `AttachmentDeclaration` z polem **`fileName`**,
+ * a przy `/messaging/message-attachments` — `NewAttachmentDeclaration` z polem
+ * **`filename`**. Różnica jednej litery, a pole obowiązkowe w obu.
+ *
+ * To jest dokładnie ta klasa pułapki, o której mówi `CLAUDE.md`: `public.v1`
+ * i `beta.v1` bywają RÓŻNYMI kształtami, nie wariantami jednego. Kształt czyta
+ * się z pliku, nie z pamięci o sąsiedniej końcówce.
+ *
+ * Schemat spraw NIE podaje też maksymalnego rozmiaru (messaging podaje
+ * 5 MiB), więc granicą jest wyłącznie nasza.
+ */
+export function urlDeklaracjiZalacznikaSprawy(apiUrl: string): string {
+  return `${apiUrl}/sale/issues/attachments`;
+}
+
 /** Wgranie binariów zadeklarowanego załącznika (`PUT .../{attachmentId}`). */
 export function urlWgraniaZalacznika(apiUrl: string, attachmentId: string): string {
   return `${apiUrl}/messaging/message-attachments/${encodeURIComponent(attachmentId)}`;
+}
+
+/**
+ * Wgranie załącznika sprawy — DROGA AWARYJNA (0.274.0).
+ *
+ * Normalnie adres bierze się z nagłówka `Location` deklaracji, bo tak każe
+ * specyfikacja. Ten składany zostaje na wypadek, gdyby nagłówka zabrakło:
+ * bez niego brak jednej linijki w odpowiedzi Allegro zabijałby całą funkcję.
+ * Użycie tej drogi zostawia ślad w dzienniku, żeby nie było ciche.
+ */
+export function urlWgraniaZalacznikaSprawy(apiUrl: string, attachmentId: string): string {
+  return `${apiUrl}/sale/issues/attachments/${encodeURIComponent(attachmentId)}`;
 }
 
 /* Wersje zasobu, po kolei. `public.v1` to zasoby stabilne, `beta.v1` — te
@@ -416,6 +447,18 @@ export async function zapytajAllegro(
      * bez tej opcji „sprawa nie istnieje" wyglądałoby jak „werdykt przyjęty".
      */
     blad404?: boolean;
+    /**
+     * Oddaj też nagłówek `Location` (0.274.0).
+     *
+     * Potrzebne przy deklaracji załącznika sprawy: specyfikacja mówi wprost
+     * „The URL is unique and one-time. As its format may change in time, you
+     * should always use the address from the header. Do not compose the
+     * address on your own". Adres złożony z identyfikatora działałby DZIŚ
+     * i przestał w dniu, w którym Allegro zmieni format — po cichu.
+     *
+     * Wynikiem jest wtedy `{ dane, location }`, a nie samo ciało.
+     */
+    zLokalizacja?: boolean;
   } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
@@ -540,13 +583,16 @@ export async function zapytajAllegro(
     dzialajacyAccept.set(rodzina, accept);
     /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
        pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
-    if (odp.status === 204) return null;
+    const location = opcje.zLokalizacja ? odp.headers.get("location") : null;
+    const zwroc = (dane: unknown | null) =>
+      opcje.zLokalizacja ? { dane, location } : dane;
+    if (odp.status === 204) return zwroc(null);
     const surowa = await odp.text();
-    if (surowa.trim() === "") return null;
+    if (surowa.trim() === "") return zwroc(null);
     try {
-      return JSON.parse(surowa);
+      return zwroc(JSON.parse(surowa));
     } catch {
-      return null;
+      return zwroc(null);
     }
   }
 
@@ -876,10 +922,18 @@ export type TypWiadomosciSprawy =
  */
 export async function wyslijWiadomoscSprawy(
   apiUrl: string, issueId: string, tekst: string, typ: TypWiadomosciSprawy = "REGULAR",
+  zalaczniki: readonly string[] = [],
 ): Promise<{ id?: string; createdAt?: string } | null> {
   return await zapytajAllegro(urlNowejWiadomosciSprawy(apiUrl, issueId), {
     metoda: "POST",
-    body: { text: tekst, type: typ },
+    /* `attachments` to lista `{ id }` (`PostPurchaseIssueAttachmentId`).
+       PUSTEJ NIE WYSYŁAMY: wiadomość bez plików ma wyglądać dokładnie tak, jak
+       wyglądała przez pięćdziesiąt wydań — nowa funkcja nie zmienia kształtu
+       żądań, które jej nie używają. Ta sama zasada co przy Centrum
+       Wiadomości w 0.195.0. */
+    body: zalaczniki.length === 0
+      ? { text: tekst, type: typ }
+      : { text: tekst, type: typ, attachments: zalaczniki.map((id) => ({ id })) },
   }) as { id?: string; createdAt?: string } | null;
 }
 

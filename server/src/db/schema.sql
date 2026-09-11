@@ -2458,6 +2458,23 @@ CREATE TABLE IF NOT EXISTS allegro_reklamacje_sync_state (
 -- `CHECK` z PEŁNYM zbiorem od razu — blizna 0.135.0: SQLite nie rozszerza
 -- `CHECK` bez przebudowy tabeli, więc dokładanie wartości po jednej
 -- kosztowałoby migrację za każdym razem.
+-- Załączniki WYCHODZĄCE przy odpowiedzi w sprawie (0.274.0). Lustro
+-- `wysylka_zalacznik` ze skrzynki: plik leży u Allegro od chwili dodania,
+-- u nas zostaje sam numer, nazwa i rozmiar. BAJTÓW NIE TRZYMAMY.
+CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  allegro_id     TEXT NOT NULL,
+  nazwa          TEXT NOT NULL,
+  typ            TEXT NOT NULL,
+  rozmiar        INTEGER NOT NULL,
+  dodal_user_id  INTEGER REFERENCES app_user(user_id),
+  dodano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (reklamacja_id, allegro_id)
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_zalacznik_wysylki_sprawa
+  ON reklamacja_zalacznik_wysylki(reklamacja_id);
+
 CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,

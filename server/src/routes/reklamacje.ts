@@ -11,6 +11,9 @@ import {
   ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
+import {
+  dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiSprawy,
+} from "../services/reklamacje-zalaczniki.js";
 import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
@@ -248,6 +251,54 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
 
   /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
      `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
+  /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
+     Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
+     `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
+     Multipart wymagałby wtyczki Fastify dla jednej trasy.
+
+     Odczyt listy nie jest zapisem, więc idzie GET-em i niczego nie mutuje. */
+  app.get<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      return { zalaczniki: zalacznikiSprawy(db(), Number(req.params.id)) };
+    });
+
+  app.post<{ Params: { id: string }; Body: { nazwa?: string; typ?: string; dane?: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      try {
+        /* `Buffer.from(..., "base64")` MILCZY przy śmieciach — oddaje krótszy
+           bufor zamiast rzucić. Pusty wynik przy niepustym wejściu znaczy
+           więc „to nie jest base64", i tak trzeba to nazwać. */
+        const surowe = String(req.body?.dane ?? "");
+        const dane = Buffer.from(surowe, "base64");
+        if (surowe.length > 0 && dane.byteLength === 0) {
+          throw new Error("Treść pliku nie jest poprawnym base64");
+        }
+        return await dodajZalacznikSprawy({
+          reklamacjaId: Number(req.params.id),
+          nazwa: String(req.body?.nazwa ?? ""),
+          typ: String(req.body?.typ ?? ""),
+          dane,
+          autor: { id: s.user.userId, name: s.user.name },
+        });
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.delete<{ Params: { id: string; zid: string } }>(
+    "/api/obsluga/reklamacje/:id/zalaczniki-wysylki/:zid", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const s = sesjaZadania()!;
+      const zdjety = usunZalacznikSprawy(db(), Number(req.params.id), Number(req.params.zid),
+        { id: s.user.userId, name: s.user.name });
+      if (!zdjety) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
+      return { ok: true };
+    });
+
   app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
     "/api/obsluga/reklamacje/:id/prowadze", async (req, reply) => {
       const nie = odmowa(reply);

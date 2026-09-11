@@ -649,9 +649,24 @@ znacznik „kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia. Ciało
 żądania ma dwa pola — `text` i `type: "REGULAR"` — i składa je adapter, więc
 nie ma drogi, którą dołożyłoby się trzecie.
 
-**Załączniki wychodzące nie istnieją.** Decyzja właściciela z 7 września 2026.
-Plik z naszego dysku nie ma jak trafić do Allegro tą trasą, bo panel nie ma
-czego wysłać: pola na to nie ma ani w formularzu, ani w ciele żądania.
+**Załączniki wychodzące ISTNIEJĄ od 0.274.0.** Właściciel odwrócił decyzję
+z 7 września cztery dni później. Od tego wydania plik z naszego dysku opuszcza
+maszynę i to jest zmiana w polityce danych, nie w wyglądzie ekranu.
+
+Co dokładnie wychodzi: bajty pliku, jego nazwa i rozmiar — nic więcej. Plik
+idzie do Allegro W CHWILI DODANIA, nie przy wysyłce wiadomości, więc odmowa
+typu albo rozmiaru pada, gdy jeszcze da się wybrać inny. U nas zostaje numer
+nadany przez Allegro, nazwa, typ i rozmiar; BAJTÓW NIE TRZYMAMY ani chwili
+dłużej, niż trwa żądanie.
+
+Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak samo jak przy
+załącznikach przychodzących. Do dziennika idą nazwa, typ i rozmiar — nigdy
+zawartość.
+
+Cena tej decyzji jest jawna: plik dodany i nigdy niewysłany zostaje u Allegro
+jako deklaracja bez wiadomości. To śmieć po ICH stronie i nie ma końcówki,
+którą dałoby się go sprzątnąć — ekran nie ma więc prawa obiecywać, że zdjęcie
+załącznika „usunęło go z Allegro". Kasuje wyłącznie nasz wiersz.
 
 **Kopia wysłanego tekstu zostaje u nas dwa razy.** Raz w `reklamacja_outbox`
 jako ślad PRÓBY — także tej nieudanej i tej niejednoznacznej — i raz na osi

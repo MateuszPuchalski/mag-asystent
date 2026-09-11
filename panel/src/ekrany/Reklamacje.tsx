@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
-  useNotatka, useOdpowiedz, useOdswiez, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
+  useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
   useWerdykt, useZwrotTowaru,
 } from "../api/reklamacje";
 import { Konflikt } from "../api/klient";
+import { naBase64 } from "../api/plik";
 import type {
   KubelekReklamacji, Reklamacja, StanReklamacji, SzczegolyWysylki, WiadomoscReklamacji,
 } from "../api/typy";
@@ -118,6 +120,9 @@ export function Reklamacje() {
   const synchronizuj = useSynchronizuj();
   const odpowiedz = useOdpowiedz();
   const odswiez = useOdswiez();
+  const dodajZalacznik = useDodajZalacznikSprawy();
+  const usunZalacznik = useUsunZalacznikSprawy();
+  const [bladZalacznika, setBladZalacznika] = useState("");
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
   const trwa = prowadze.isPending || notatka.isPending;
@@ -149,6 +154,9 @@ export function Reklamacje() {
   const wybrana = id ? Number(id) : null;
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
+  /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce —
+     odświeżenie karty niczego nie gubi, a kolega widzi to samo. */
+  const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -383,6 +391,23 @@ export function Reklamacje() {
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
               edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                dodajeZalacznik={dodajZalacznik.isPending}
+                bladZalacznika={bladZalacznika}
+                /* Plik czytamy TU, nie w komponencie: katalog `reklamacje/`
+                   trzyma komponenty czyste, a base64 to sprawa klienta HTTP. */
+                onDodajZalacznik={(plik) => {
+                  setBladZalacznika("");
+                  void naBase64(plik).then((dane) => {
+                    if (!wybrana) return;
+                    dodajZalacznik.mutate(
+                      { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                      { onError: (e) => setBladZalacznika((e as Error).message) });
+                  });
+                }}
+                onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                  { id: wybrana, zalacznikId: zid },
+                  { onError: (e) => setBladZalacznika((e as Error).message) })}
                 czatAktywny={szczegol.data.reklamacja.czatAktywny}
                 onZmiana={setTresc} onWyslij={() => wyslij()} />} />
           : <Pusto ikona={ShieldQuestion}>

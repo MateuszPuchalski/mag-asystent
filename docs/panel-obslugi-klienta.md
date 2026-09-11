@@ -3420,8 +3420,10 @@ Przyrost drugi zamyka połowę pętli: **odpowiedź wychodzi z panelu**. Agent
 widzi sprawę, termin, towar i zdjęcie usterki w jednym oknie, więc nie ma po
 co otwierać Centrum Sprzedaży, żeby napisać jedno zdanie.
 
-Wysyłamy `type: "REGULAR"` i sam tekst. Bez załączników wychodzących i bez
-typów `RETURN_*` — te są formalnym stanowiskiem sprzedawcy wobec kupującego
+Wysyłamy `type: "REGULAR"`, tekst i — od 0.274.0 — załączniki. Plik idzie do
+Allegro w chwili dodania, nie przy wysyłce, więc odmowa typu albo rozmiaru pada
+wtedy, gdy jeszcze da się wybrać inny; spinacz i lista plików to TEN SAM
+komponent co w skrzynce. Bez typów `RETURN_*` — te są formalnym stanowiskiem sprzedawcy wobec kupującego
 i idą razem z werdyktem, nie przed nim (§25b.8).
 
 **Klucz idempotencji liczy SERWER, nigdy panel.** Gdyby podawał go klient,
@@ -3902,7 +3904,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
 | Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
 | Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
-| Załączniki WYCHODZĄCE w sprawie | **projekt** | dwukrokowe wgranie `/sale/issues/attachments`; decyzja właściciela z 7 września to sam tekst |
+| Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |

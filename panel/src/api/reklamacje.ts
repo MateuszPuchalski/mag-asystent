@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
+import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
   KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
@@ -11,6 +12,7 @@ import type {
 export const kluczeReklamacji = {
   kolejka: ["reklamacje"] as const,
   reklamacja: (id: number) => ["reklamacja", id] as const,
+  zalacznikiWysylki: (id: number) => ["reklamacja-zalaczniki-wysylki", id] as const,
 };
 
 export function useReklamacje() {
@@ -203,5 +205,43 @@ export function useOdswiez() {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
     },
+  });
+}
+
+/* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ─────────────────────────
+   Kształt `ZalacznikSzkicu` jest wspólny ze skrzynką i to nie przypadek:
+   ekran rysuje je TYM SAMYM komponentem (`skrzynka/ZalacznikiWysylki.tsx`),
+   zgodnie z decyzją właściciela z 0.246.0 o wspólnym załączniku.            */
+
+export function useZalacznikiSprawy(id: number | null) {
+  return useQuery({
+    queryKey: kluczeReklamacji.zalacznikiWysylki(id ?? 0),
+    queryFn: () => api<{ zalaczniki: ZalacznikSzkicu[] }>(
+      `/api/obsluga/reklamacje/${id}/zalaczniki-wysylki`),
+    enabled: id !== null,
+  });
+}
+
+export function useDodajZalacznikSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; nazwa: string; typ: string; dane: string }) =>
+      api<ZalacznikSzkicu>(`/api/obsluga/reklamacje/${v.id}/zalaczniki-wysylki`, {
+        method: "POST",
+        body: JSON.stringify({ nazwa: v.nazwa, typ: v.typ, dane: v.dane }),
+      }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) }),
+  });
+}
+
+export function useUsunZalacznikSprawy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; zalacznikId: number }) =>
+      api(`/api/obsluga/reklamacje/${v.id}/zalaczniki-wysylki/${v.zalacznikId}`,
+        { method: "DELETE" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) }),
   });
 }

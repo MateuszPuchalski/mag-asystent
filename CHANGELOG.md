@@ -34,6 +34,52 @@ historii nie przepisujemy.
 ---
 
 
+## 0.274.0 — 11 września 2026
+
+**Załącznik wychodzi razem z odpowiedzią w reklamacji.** Decyzja właściciela
+z 7 września brzmiała „sam tekst" i trzymała się cztery dni; 11 września ją
+odwrócił. Przy reklamacji zdjęcie liczy się bardziej niż przy pytaniu, bo
+rozmowa reklamacyjna bywa sporem o to, co dokładnie widać.
+
+Droga jest dwukrokowa jak w Centrum Wiadomości — deklaracja, potem bajty — ale
+**kształt jest INNY, choć robi to samo**. Deklaracja sprawy to schemat
+`AttachmentDeclaration` z polem `fileName`; Centrum Wiadomości to
+`NewAttachmentDeclaration` z polem `filename`. Różnica jednej litery przy polu
+obowiązkowym w obu. Dokładnie ta pułapka, przed którą ostrzega `CLAUDE.md` —
+a sąsiednia końcówka stała gotowa i kusiła, żeby wziąć kształt z pamięci.
+
+**Adres wgrania bierze się z nagłówka `Location`**, bo specyfikacja mówi to
+wprost i dodaje, że format może się zmienić. Adres składany z identyfikatora
+zostaje jako droga awaryjna i zostawia ślad w dzienniku: bez niej brak jednej
+linijki w odpowiedzi zabijałby całą funkcję, a z nią wiadomo, kiedy Allegro
+przestało nagłówek przysyłać.
+
+**Wzorzec jest ze skrzynki i świadomie go POWTARZAMY, nie uogólniamy.** Plik
+idzie do Allegro w chwili dodania, nie przy wysyłce — odmowa typu albo rozmiaru
+ma paść, gdy jeszcze da się wybrać inny plik. Bajtów nie trzymamy u siebie ani
+chwili dłużej. Wiersz powstaje wyłącznie po udanym wgraniu: wiersz bez pliku po
+tamtej stronie obiecywałby wysyłce załącznik, którego Allegro nie zna. Wspólne
+są LICZBY i walidacja — te same cztery megabajty i te same sześć typów, żeby
+agent nie uczył się dwóch limitów dla dwóch ekranów tej samej pracy.
+
+**Spinacz i lista plików to TEN SAM komponent co w skrzynce**, nie kopia —
+ta sama racja, dla której właściciel kazał scalić załącznik przychodzący
+w 0.246.0. Przy okazji kodowanie base64 przeszło do jednego miejsca
+(`api/plik.ts`): robiły to już dwa ekrany, a druga kopia rozjechałaby się przy
+pierwszej poprawce.
+
+**Załączniki wchodzą do klucza idempotencji.** Ta sama treść z dołożonym
+zdjęciem to inna wiadomość u kupującego, więc strażnik dubletu nie ma prawa
+oddać poprzedniej próby zamiast wysłać nową. Po udanej wysyłce lista się
+czyści — wiersz, który by został, dosłałby ten sam plik przy następnej
+odpowiedzi, cicho.
+
+Polityka danych dostała akapit, bo to jest zmiana W NIEJ, nie w wyglądzie
+ekranu: od tego wydania plik z naszego dysku opuszcza maszynę.
+
+---
+
+
 ## 0.273.0 — 11 września 2026
 
 **Cztery rozjazdy między panelem reklamacji a tym, co rodzina `/sale/issues`

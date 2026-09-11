@@ -92,6 +92,9 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odswiez` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/prowadze` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka` },
+  { method: "GET" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki` },
+  { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zalaczniki-wysylki/1` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/werdykt` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/zwrot-towaru` },
@@ -113,7 +116,7 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("PIĘĆ ZAPISÓW po przyroście trzecim — licznik jest umową", () => {
+test("SIEDEM ZAPISÓW po dołożeniu załączników — licznik jest umową", () => {
   /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
      z odpowiedzią w czacie (0.224.0) i z trzech na pięć z werdyktem: czwarty
      zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
@@ -121,16 +124,22 @@ test("PIĘĆ ZAPISÓW po przyroście trzecim — licznik jest umową", () => {
      jedyne w module stoją za `autoryzuj()` z wpisem `privileged`. Każdy nowy
      zapis dostaje zdanie w uzasadnieniu.
 
+     Szósty i siódmy doszły z załącznikami wychodzącymi (0.274.0): dodanie
+     WGRYWA plik do Allegro od razu, więc jest zapisem wychodzącym mimo braku
+     wiadomości; zdjęcie kasuje wyłącznie NASZ wiersz, bo deklaracji po tamtej
+     stronie cofnąć się nie da. Uprzywilejowane nie są: plik bez wiadomości
+     nie dociera do kupującego.
+
      `synchronizuj` i `odswiez` NIE SĄ zapisami do Allegro: to odczyty na
      żądanie, które zapisują wynik u nas. `POST`-em idą dlatego, że `GET`
      z takim skutkiem ubocznym łamałby „zero zapisu przy patrzeniu" ciszej,
      niż gdyby łamał ją jawnie — przeglądarka powtarza i wstępnie pobiera
      `GET`-y bez pytania. */
   const DOCIAGNIECIA = ["synchronizuj", "odswiez"];
-  const zapisy = TRASY().filter((t) => t.method === "POST"
+  const zapisy = TRASY().filter((t) => (t.method === "POST" || t.method === "DELETE")
     && !DOCIAGNIECIA.some((d) => t.url.endsWith(d)));
-  assert.equal(zapisy.length, 5,
-    "prowadzę i notatka u nas; odpowiedź, werdykt i towar wychodzą do Allegro");
+  assert.equal(zapisy.length, 7,
+    "prowadzę i notatka u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
 });
 
 test("werdykt: wersja obowiązkowa, wpis `privileged` z nazwą operacji, dziennik bez treści", async () => {
