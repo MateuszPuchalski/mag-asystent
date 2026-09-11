@@ -3712,6 +3712,33 @@ dużo, kasuje najcenniejszą część karty.
 Licznik odsianych pozycji idzie do dziennika. Heurystyka bez pomiaru to wiara,
 a po miesiącu nikt inaczej nie odpowie, czy sito nie tnie za dużo.
 
+#### Copilot czyta ZDJĘCIA (0.283.0)
+
+Zlecenie właściciela: „copilot powinien czytać zdjęcia". Karta, którą pokazał,
+prosiła agenta o zdjęcia, które w sprawie już były — sama się do nich
+odwoływała, cytując wiadomość sprzedawcy.
+
+Obrazy idą przed tekstem, a na końcu tekstu stoi ich spis z numerami `Z1`,
+`Z2` i nazwami plików. Numery są potrzebne z tego samego powodu co `S`: bez
+własnej przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie.
+
+**Typ rozstrzyga SYGNATURA pliku, nie nazwa.** Ta sama bramka co przy podglądzie
+w panelu. Plik, który nie jest obrazem, zostaje wymieniony w spisie z nazwą —
+to pozwala modelowi napisać w `brakuje`, że przysłany dokument jest nieczytelny
+jako zdjęcie.
+
+**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik spoza
+typu, komplet, który nie zmieścił się w suficie bajtów — wszystko jest liczone,
+nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi nic.
+
+Stopka karty mówi, ile zdjęć przeczytała, a cytat `Z2` niesie w podpowiedzi
+nazwę pliku. Bez tych dwóch rzeczy „Copilot nic nie zobaczył na zdjęciu"
+i „Copilot nie dostał zdjęć" wyglądają na ekranie identycznie — a to dwie
+różne sprawy i dwa różne następne ruchy.
+
+Czego ta zmiana kosztuje po stronie danych, mówi polityka: pikseli zamaskować
+się nie da i nie udajemy, że jest inaczej.
+
 #### Numer cytatu bez nawiasów (0.282.0)
 
 Model widzi w rozmowie `[W3]` i regularnie tak właśnie cytuje. Bramka

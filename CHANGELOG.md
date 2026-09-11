@@ -34,6 +34,52 @@ historii nie przepisujemy.
 ---
 
 
+## 0.283.0 — 11 września 2026
+
+**Copilot czyta zdjęcia ze sprawy.** [wymaga działania] Zlecenie właściciela:
+„copilot powinien czytać zdjęcia". Karta, którą pokazał, prosiła agenta
+o zdjęcia, które w sprawie już były — sama się do nich odwoływała, cytując
+wiadomość sprzedawcy.
+
+Obrazy idą przed tekstem, a na końcu tekstu stoi spis z numerami `Z1`, `Z2`
+i nazwami plików. Numeracja jest konieczna, nie ozdobna: bez własnej
+przestrzeni każdy fakt odczytany ze zdjęcia wylatywałby w odsiewie, bo jego
+źródło nie pasowałoby do żadnego numeru wiadomości.
+
+**Typ rozstrzyga SYGNATURA pliku, nie jego nazwa** — ta sama bramka co przy
+podglądzie w panelu. Plik, który obrazem nie jest, zostaje wymieniony w spisie
+z nazwą, żeby model mógł napisać w „brakuje", że przysłany dokument jest
+nieczytelny jako zdjęcie.
+
+**Żadne potknięcie nie wywraca rozpoznania.** Pobranie, które padło, plik
+spoza typu, komplet niemieszczący się w suficie bajtów — wszystko jest
+liczone, nie rzucane. Karta bez zdjęć wie mniej; brak karty nie mówi agentowi
+nic. Stopka karty podaje, ile zdjęć przeczytano, a cytat `Z2` niesie
+w podpowiedzi nazwę pliku: bez tego „Copilot nic nie zobaczył" i „Copilot nie
+dostał zdjęć" wyglądałyby identycznie.
+
+**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Reszta
+polityki danych stoi na gwarancji wymuszanej typem, którego nie da się
+wyprodukować poza modułem maskowania. Przy obrazie taka gwarancja nie
+istnieje: zdjęcie paragonu z imieniem i adresem wychodzi do dostawcy
+w całości. Dlatego typ nazywa się `ZdjecieZBramki`, a nie „bezpieczne",
+i obiecuje dokładnie trzy rzeczy — pochodzenie z załącznika tej sprawy, typ
+z sygnatury i sufit bajtów.
+
+**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
+kosztu. Obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
+wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
+więcej niż samo rozpoznanie tekstu. **Budżetu kwotowego w konfiguracji nie ma
+— to jest znana ekspozycja, nie przeoczenie**, i przy zdjęciach zaczyna mieć
+cenę. [wymaga działania] Warto obserwować rachunek u dostawcy przez pierwszy
+tydzień.
+
+Pobieranie załącznika dostało wreszcie SUFIT ROZMIARU. Do tego wydania
+wciągało do pamięci wszystko, co Allegro odda, bez pytania o długość. Przy
+pobraniu na żądanie agenta było to ryzyko teoretyczne; przy komplecie
+załączników branym jednym ruchem przestaje takie być.
+
+
 ## 0.282.0 — 11 września 2026
 
 **Copilot przestaje prosić o to, co system już wie.** Właściciel wkleił kartę

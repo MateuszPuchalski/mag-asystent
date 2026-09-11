@@ -620,7 +620,7 @@ export async function zapytajAllegro(
 const HOSTY_ZALACZNIKOW = ["allegro.pl", "allegro.pl.allegrosandbox.pl"];
 
 export async function pobierzZalacznik(
-  url: string, opcje: { akcept?: string } = {},
+  url: string, opcje: { akcept?: string; maksBajtow?: number } = {},
 ): Promise<ArrayBuffer> {
   let host: string;
   try {
@@ -673,7 +673,31 @@ export async function pobierzZalacznik(
         (powod ? ` Odpowiedź Allegro: ${powod}` : ""),
       odp.status);
   }
-  return odp.arrayBuffer();
+  /* ── SUFIT ROZMIARU (0.283.0) ──────────────────────────────────────────
+     Do tego wydania `arrayBuffer()` wciągał do pamięci WSZYSTKO, co Allegro
+     odda — bez pytania o rozmiar. Przy pobraniu na żądanie agenta było to
+     ryzyko teoretyczne: klika jeden człowiek, jeden plik naraz. Copilot
+     czytający zdjęcia bierze komplet załączników sprawy jednym ruchem,
+     więc przestaje być teoretyczne.
+
+     NAGŁÓWEK SPRAWDZAMY PRZED POBRANIEM, a długość PO nim: `content-length`
+     bywa go brak, a wtedy jedyną prawdą jest to, co naprawdę przyszło.
+     Wołający bez `maksBajtow` dostaje zachowanie sprzed tego wydania. */
+  if (opcje.maksBajtow !== undefined) {
+    const zapowiedziane = Number(odp.headers.get("content-length") ?? NaN);
+    if (Number.isFinite(zapowiedziane) && zapowiedziane > opcje.maksBajtow) {
+      throw new Error(
+        `Załącznik ma ${(zapowiedziane / 1024 / 1024).toFixed(1)} MB, ` +
+        `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+    }
+  }
+  const bajty = await odp.arrayBuffer();
+  if (opcje.maksBajtow !== undefined && bajty.byteLength > opcje.maksBajtow) {
+    throw new Error(
+      `Załącznik ma ${(bajty.byteLength / 1024 / 1024).toFixed(1)} MB, ` +
+      `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+  }
+  return bajty;
 }
 
 /* ── Załącznik CENTRUM WIADOMOŚCI: droga API z zapasem (przyrost „zdjęcia w rozmowach") ──

@@ -357,3 +357,63 @@ test("„brakuje” przestaje prosić o to, co podaliśmy, i ZOSTAWIA resztę", 
   const p = JSON.parse(slad.payload) as Record<string, unknown>;
   assert.equal(p.znane, 1, "licznik sita idzie do dziennika — heurystyka bez pomiaru to wiara");
 });
+
+test("zdjęcia jadą do nadawcy, a ich numery pokrywają cytat `Z` (0.283.0)", async () => {
+  /* Bez własnej przestrzeni numerów każdy fakt odczytany ze zdjęcia wylatywałby
+     w odsiewie — `zrodlo` nie pasowałoby do żadnego `W`. */
+  const { d, id } = stanowisko();
+  d.prepare(`INSERT INTO reklamacja_zalacznik (reklamacja_id,nazwa,url)
+    VALUES (?,'tabliczka.png','https://allegro.pl/plik/tabliczka.png')`).run(id);
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+  let dostal: readonly { numer: string }[] = [];
+  let wyslane = "";
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    pobierz: async () => PNG.buffer.slice(
+      PNG.byteOffset, PNG.byteOffset + PNG.byteLength) as ArrayBuffer,
+    nadaj: async (tresc, zdjecia = []) => {
+      dostal = zdjecia; wyslane = String(tresc);
+      return karta({ dowody: [{ tresc: "tabliczka NAC LS46-450", zrodlo: "Z1" }] });
+    },
+  });
+
+  assert.deepEqual(dostal.map((z) => z.numer), ["Z1"]);
+  assert.ok(wyslane.includes("[Z1] plik: tabliczka.png"), "spis mówi, który obraz to Z1");
+  assert.deepEqual(wynik.dowody, [{ tresc: "tabliczka NAC LS46-450", zrodlo: "Z1" }]);
+
+  /* Mapa zostaje PRZY KARCIE — numer bez nazwy pliku byłby cytatem,
+     którego agent nie ma jak sprawdzić. */
+  const zapisana = kartaSprawy(d, id)!;
+  assert.deepEqual(zapisana.zdjecia.map((z) => [z.numer, z.nazwa]), [["Z1", "tabliczka.png"]]);
+});
+
+test("cytat ze zdjęcia, którego NIE MA, dalej wypada", async () => {
+  const { d, id } = stanowisko();
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async () => karta({ dowody: [{ tresc: "zmyślone", zrodlo: "Z9" }] }),
+  });
+  assert.deepEqual(wynik.dowody, []);
+});
+
+test("sprawa bez zdjęć działa jak dotąd — to większość spraw", async () => {
+  /* Ważniejsze od reszty testów tego wydania: zdjęcie jest dodatkiem,
+     rozpoznanie podstawową pracą. */
+  const { d, id } = stanowisko();
+  let dostal: unknown = "nie wołano";
+  const wynik = await rozpoznajSprawe({
+    reklamacjaId: id, kto: KTO, database: d,
+    nadaj: async (_t, zdjecia) => { dostal = zdjecia; return karta(); },
+  });
+  assert.deepEqual(dostal, []);
+  assert.equal(wynik.usterka?.tresc, "Kosiarka przestała ciąć");
+
+  const slad = d.prepare(
+    "SELECT payload FROM events WHERE type='reklamacja_rozpoznanie'").get() as
+    { payload: string };
+  const p = JSON.parse(slad.payload) as Record<string, unknown>;
+  assert.equal(p.zdjec, 0);
+  /* Dziennik niesie LICZBY, nigdy nazw plików ani bajtów. */
+  assert.ok(!JSON.stringify(p).includes("plik"));
+});

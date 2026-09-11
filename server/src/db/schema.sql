@@ -2539,6 +2539,12 @@ CREATE TABLE IF NOT EXISTS reklamacja_karta (
   -- wysłał. Żadnej ankiety — rekomendacja jest typowana tym samym słownikiem.
   ocena              TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
   ocena_at           TEXT,
+  -- Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` na karcie
+  -- jest niesprawdzalny: agent widzi numer i nie ma jak dojść, o który plik
+  -- chodziło. Sprawdzalny cytat jest całą doktryną tego modułu, więc mapa
+  -- zostaje przy karcie, a nie tylko w pamięci jednego wywołania.
+  -- JSON, bo to dane DO POKAZANIA, nie do zapytań — tak samo jak `dowody`.
+  zdjecia            TEXT NOT NULL DEFAULT '[]',
   model              TEXT NOT NULL DEFAULT '',
   przez              TEXT,
   przez_user_id      INTEGER REFERENCES app_user(user_id),

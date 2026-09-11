@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
-import type { RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt } from "../api/typy";
+import type {
+  RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt, ZdjecieKarty,
+} from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { zlote } from "../api/zwroty";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
@@ -109,14 +111,14 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
     {karta ? <>
       {karta.rada && <Rada rada={karta.rada} ocena={karta.ocena} />}
       {karta.usterka && <Wiersz etykieta="Usterka">
-        {karta.usterka.tresc} <Cytat z={karta.usterka.zrodlo} /></Wiersz>}
+        {karta.usterka.tresc} <Cytat z={karta.usterka.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
       {karta.kiedy && <Wiersz etykieta="Od kiedy">
-        {karta.kiedy.tresc} <Cytat z={karta.kiedy.zrodlo} /></Wiersz>}
+        {karta.kiedy.tresc} <Cytat z={karta.kiedy.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
       {karta.oczekiwanie && <Wiersz etykieta="Klient chce">
-        {karta.oczekiwanie.tresc} <Cytat z={karta.oczekiwanie.zrodlo} /></Wiersz>}
+        {karta.oczekiwanie.tresc} <Cytat z={karta.oczekiwanie.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
       {karta.dowody.length > 0 && <Wiersz etykieta="Dowody">
         {karta.dowody.map((d, i) => <span key={i} className="mr-2">
-          {d.tresc} <Cytat z={d.zrodlo} /></span>)}
+          {d.tresc} <Cytat z={d.zrodlo} zdjecia={karta.zdjecia} /></span>)}
       </Wiersz>}
       {karta.brakuje.length > 0 && <div className="mt-1 rounded-lg bg-amber-50 px-3 py-2">
         <EtykietaWartosci>Brakuje do rozstrzygnięcia</EtykietaWartosci>
@@ -124,8 +126,13 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
           {karta.brakuje.map((b, i) => <li key={i}>{b}</li>)}
         </ul>
       </div>}
+      {/* ── CO KARTA PRZECZYTAŁA (0.283.0) ──────────────────────────────────
+          Bez tej liczby „Copilot nic nie zobaczył na zdjęciu" i „Copilot nie
+          dostał zdjęć" wyglądają na ekranie identycznie — a to dwie zupełnie
+          różne sprawy i dwa różne następne ruchy agenta. */}
       <p className="pt-2 text-xs text-slate-500">
         {karta.przez ?? "—"}, {czas(karta.at)} · {karta.model}
+        {karta.zdjecia.length > 0 && ` · przeczytał ${zdjecSlowo(karta.zdjecia.length)}`}
       </p>
     </> : <p className="py-1 text-sm text-slate-500">
       Copilot może wyciągnąć z rozmowy usterkę, oczekiwanie klienta i to, czego
@@ -184,8 +191,24 @@ function Rada({ rada, ocena }: { rada: RadaMaszyny; ocena: string | null }) {
  * wyłapały strażnice panelu, zanim zobaczył je człowiek; zostawiam to zdanie,
  * żeby następny nie sprawdzał tego drugi raz.
  */
-const Cytat = ({ z }: { z: string }) =>
-  <span className="rounded bg-slate-100 px-1 font-mono text-podpis text-slate-600">{z}</span>;
+/** „1 zdjęcie", „2 zdjęcia", „5 zdjęć" — trzy formy, jak przy sprawach. */
+function zdjecSlowo(n: number): string {
+  const ostatnia = n % 10;
+  const dwie = n % 100;
+  if (n === 1) return "1 zdjęcie";
+  if (ostatnia >= 2 && ostatnia <= 4 && !(dwie >= 12 && dwie <= 14)) return `${n} zdjęcia`;
+  return `${n} zdjęć`;
+}
+
+const Cytat = ({ z, zdjecia = [] }: { z: string; zdjecia?: ZdjecieKarty[] }) => {
+  /* ── CYTAT ZE ZDJĘCIA MUSI DAĆ SIĘ SPRAWDZIĆ (0.283.0) ────────────────────
+     `W3` agent znajdzie w rozmowie obok. `Z2` bez nazwy pliku jest numerem
+     donikąd, a sprawdzalny cytat jest całą doktryną tej karty — dlatego
+     podpowiedź mówi, o który plik chodziło. */
+  const plik = zdjecia.find((p) => p.numer === z);
+  return <span title={plik ? `Zdjęcie: ${plik.nazwa}` : undefined}
+    className="rounded bg-slate-100 px-1 font-mono text-podpis text-slate-600">{z}</span>;
+};
 
 export function Dowody({
   szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCofnijNotatke,

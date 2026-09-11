@@ -269,6 +269,10 @@ export function migrate(database: DatabaseSync) {
      Zasada jest bez wyjątków: kolumna dołożona do tabeli, która wyszła
      w JAKIMKOLWIEK wydaniu, dostaje `addColumn`. Wiek tabeli nie jest
      argumentem — nie wiemy, które wydanie wdrożono. */
+  /* Mapa zdjęć przy karcie (0.283.0) — patrz `reklamacja_karta`
+     w `schema.sql`. Karty sprzed tego wydania mają pustą listę, czyli
+     prawdę o nich: powstały, zanim Copilot zobaczył pierwsze zdjęcie. */
+  addColumn("reklamacja_karta", "zdjecia", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("reklamacja_karta", "rekomendacja", "TEXT");
   addColumn("reklamacja_karta", "pewnosc", "TEXT");
   addColumn("reklamacja_karta", "uzasadnienie", "TEXT");

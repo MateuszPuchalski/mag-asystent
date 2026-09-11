@@ -7,6 +7,9 @@ import {
   type TrescBezpieczna, type WiadomoscWatku,
 } from "./copilot-maskowanie.js";
 import { faktySprawy, odsiejZnane, tekstFaktow } from "./copilot-fakty-sprawy.js";
+import {
+  przygotujZdjecia, spisZdjec, type Pobieracz, type ZdjecieZBramki,
+} from "./copilot-zdjecia.js";
 
 /* ── Copilot reklamacyjny: ZBIERA DANE, nie radzi (0.275.0) ──────────────────
 
@@ -108,7 +111,9 @@ export interface OdpowiedzRozpoznania extends KartaSprawy {
 }
 
 /** Wysyłka do dostawcy — wstrzykiwana, jak `NadawcaKlasyfikacji`. */
-export type NadawcaRozpoznania = (tresc: TrescBezpieczna) => Promise<OdpowiedzRozpoznania>;
+export type NadawcaRozpoznania = (
+  tresc: TrescBezpieczna, zdjecia?: readonly ZdjecieZBramki[],
+) => Promise<OdpowiedzRozpoznania>;
 
 /**
  * Słowa werdyktu w polach FAKTOGRAFICZNYCH (0.276.0).
@@ -220,6 +225,11 @@ export interface ZadanieRozpoznania {
   nadaj: NadawcaRozpoznania;
   database?: DatabaseSync;
   now?: () => Date;
+  /* Pobieranie zdjęć WSTRZYKIWANE, jak nadawca: test nie ma prawa iść do
+     Allegro, a rozpoznanie bez tego argumentu zachowuje się jak dotąd. */
+  pobierz?: Pobieracz;
+  /** `false` wyłącza czytanie zdjęć dla jednego wywołania. */
+  zdjecia?: boolean;
 }
 
 /**
@@ -270,11 +280,30 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
   if (blok) numery.add("S");
 
   const watekBezpieczny = zamaskujWatek(watek, sprawa.kupujacy_login);
-  const tresc = blok ? polacz(blok, watekBezpieczny) : watekBezpieczny;
+
+  /* ── ZDJĘCIA (0.283.0) ────────────────────────────────────────────────────
+     Karta z żywego panelu prosiła o zdjęcia, które w sprawie JUŻ BYŁY.
+     Pobranie stoi PRZED wywołaniem modelu i po numeracji rozmowy, bo spis
+     zdjęć musi umieć wskazać wiadomość, przy której wisi załącznik.
+
+     Każde potknięcie jest LICZONE, nie rzucane: plik spoza typu, pobranie,
+     które padło, komplet, który się nie zmieścił. Karta bez zdjęć wie mniej,
+     ale brak karty nie mówi agentowi nic. */
+  const zdjecia = z.zdjecia === false
+    ? { zdjecia: [], nieObrazy: [], pominieto: 0, bledow: 0 }
+    : await przygotujZdjecia(database, z.reklamacjaId, z.pobierz);
+  for (const zd of zdjecia.zdjecia) numery.add(zd.numer);
+
+  const spis = spisZdjec(zdjecia);
+  const spisBezpieczny = spis
+    ? zamaskujBlok("", spis, sprawa.kupujacy_login) : null;
+
+  const tresc = polacz(...[blok, watekBezpieczny, spisBezpieczny]
+    .filter((c): c is TrescBezpieczna => c !== null));
 
   let odp: OdpowiedzRozpoznania;
   try {
-    odp = await z.nadaj(tresc);
+    odp = await z.nadaj(tresc, zdjecia.zdjecia);
   } catch (e) {
     zapiszWywolanie(database, z.reklamacjaId, null, "blad",
       (e as Error).message, z.kto, teraz);
@@ -325,8 +354,8 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
       (reklamacja_id, usterka, usterka_zrodlo, kiedy, kiedy_zrodlo,
        oczekiwanie, oczekiwanie_zrodlo, dowody, brakuje,
        rekomendacja, pewnosc, uzasadnienie, uzasadnienie_zrodlo, czego_nie_wiem,
-       model, przez, przez_user_id, at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       zdjecia, model, przez, przez_user_id, at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(reklamacja_id) DO UPDATE SET
         usterka=excluded.usterka, usterka_zrodlo=excluded.usterka_zrodlo,
         kiedy=excluded.kiedy, kiedy_zrodlo=excluded.kiedy_zrodlo,
@@ -334,7 +363,8 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
         dowody=excluded.dowody, brakuje=excluded.brakuje,
         rekomendacja=excluded.rekomendacja, pewnosc=excluded.pewnosc,
         uzasadnienie=excluded.uzasadnienie, uzasadnienie_zrodlo=excluded.uzasadnienie_zrodlo,
-        czego_nie_wiem=excluded.czego_nie_wiem, model=excluded.model,
+        czego_nie_wiem=excluded.czego_nie_wiem, zdjecia=excluded.zdjecia,
+        model=excluded.model,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id, at=excluded.at,
         /* NOWA RADA KASUJE STARĄ OCENĘ. Trafność dotyczy TAMTEJ rekomendacji;
            przeniesiona na nową byłaby pomiarem czegoś, czego nikt nie ocenił. */
@@ -347,6 +377,11 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
       karta.rada?.co ?? null, karta.rada?.pewnosc ?? null,
       karta.rada?.uzasadnienie.tresc ?? null, karta.rada?.uzasadnienie.zrodlo ?? null,
       JSON.stringify(karta.rada?.czegoNieWiem ?? []),
+      /* Mapa `Z1 → plik` zostaje PRZY KARCIE. Numer bez nazwy pliku byłby
+         cytatem, którego agent nie ma jak sprawdzić. */
+      JSON.stringify(zdjecia.zdjecia.map((zd) => ({
+        numer: zd.numer, zalacznikId: zd.zalacznikId, nazwa: zd.nazwa,
+      }))),
       odp.model, z.kto.name, z.kto.id, teraz.toISOString());
 
     zapiszWywolanie(database, z.reklamacjaId, odp, "ok", null, z.kto, teraz);
@@ -356,8 +391,12 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
     logEvent("reklamacja_rozpoznanie", z.kto.name, null,
       /* `znane` mierzy SITO, nie model: bez tej liczby nikt po miesiącu nie
          odpowie, czy nie tnie za dużo. Heurystyka bez licznika to wiara. */
+      /* Zdjęcia idą do dziennika LICZBAMI. Nazwa pliku bywa daną osobową,
+         a `events` nie ma retencji — bajtów tym bardziej tu nie ma. */
       { id: z.reklamacjaId, brakuje: karta.brakuje.length, dowody: karta.dowody.length,
-        odsiano, znane, zFaktami: Boolean(f) },
+        odsiano, znane, zFaktami: Boolean(f),
+        zdjec: zdjecia.zdjecia.length, zdjecPominieto: zdjecia.pominieto,
+        zdjecNieObraz: zdjecia.nieObrazy.length, zdjecBledow: zdjecia.bledow },
       z.kto.id, database);
   })();
 
@@ -365,8 +404,12 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
 }
 
 /** Karta zapisana przy sprawie; `null`, gdy nikt jeszcze nie prosił. */
+/** Które zdjęcie było którym `Z` — mapa doklejana do karty na ekranie. */
+export interface ZdjecieKarty { numer: string; zalacznikId: number; nazwa: string }
+
 export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (KartaSprawy & {
   model: string; przez: string | null; at: string; ocena: string | null;
+  zdjecia: ZdjecieKarty[];
 }) | null {
   const w = database.prepare("SELECT * FROM reklamacja_karta WHERE reklamacja_id=?")
     .get(reklamacjaId) as Record<string, unknown> | undefined;
@@ -390,6 +433,7 @@ export function kartaSprawy(database: DatabaseSync, reklamacjaId: number): (Kart
       czegoNieWiem: lista<string>(w.czego_nie_wiem),
     },
     ocena: w.ocena == null ? null : String(w.ocena),
+    zdjecia: lista<ZdjecieKarty>(w.zdjecia),
     model: String(w.model ?? ""),
     przez: w.przez == null ? null : String(w.przez),
     at: String(w.at ?? ""),

@@ -1243,9 +1243,18 @@ export interface KartaSprawy {
   rada: RadaMaszyny | null;
   /** `trafna`/`nietrafna` — liczone z werdyktu, nie z ankiety; `null` przed nim. */
   ocena: string | null;
+  /* Które zdjęcie było którym `Z` (0.283.0). Bez tej mapy cytat `Z2` byłby
+     numerem, którego agent nie ma jak sprawdzić. */
+  zdjecia: ZdjecieKarty[];
   model: string;
   przez: string | null;
   at: string;
+}
+
+export interface ZdjecieKarty {
+  numer: string;
+  zalacznikId: number;
+  nazwa: string;
 }
 
 /**

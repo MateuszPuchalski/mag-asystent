@@ -673,6 +673,12 @@ const INSTRUKCJA_KARTY = [
   "reklamacyjnego i z Allegro. Cytuj je jako zrodlo \u201eS\u201d.",
   "Numer podawaj BEZ nawiasów i zawsze dokładnie jeden.",
   "",
+  "Czasem dostajesz ZDJĘCIA. Stoją przed tekstem, a na końcu tekstu jest ich",
+  "spis z numerami [Z1], [Z2] i nazwami plików. Fakt odczytany ze zdjęcia",
+  "cytuj numerem ZDJĘCIA, nie numerem wiadomości.",
+  "Opisuj to, co WIDAĆ. Nie zgaduj marki, daty ani numeru, którego na zdjęciu",
+  "nie widać — zdjęcie nieczytelne albo nie na temat wpisz do `brakuje`.",
+  "",
   "Masz dwa zadania: ZEBRAĆ FAKTY i PORADZIĆ, co z nimi zrobić.",
   "",
   "Fakty i rada stoją w OSOBNYCH polach i nie wolno ich mieszać.",
@@ -713,7 +719,7 @@ const INSTRUKCJA_KARTY = [
 ].join("\n");
 
 export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
-  async (tresc): Promise<OdpowiedzRozpoznania> => {
+  async (tresc, zdjecia = []): Promise<OdpowiedzRozpoznania> => {
     const start = Date.now();
     try {
       const odp = await anthropic().messages.parse({
@@ -728,7 +734,21 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
           effort: "medium",
           format: zodOutputFormat(Karta),
         },
-        messages: [{ role: "user", content: String(tresc) }],
+        /* ── OBRAZY PRZED TEKSTEM (0.283.0) ──────────────────────────────
+           `content` przestaje być gołym łańcuchem. Obrazy idą PIERWSZE, a spis
+           na końcu tekstu mówi, który jest którym `Z` — bez tego cytat `Z2`
+           w karcie byłby niesprawdzalny, a sprawdzalny cytat to cała doktryna
+           tego modułu. */
+        messages: [{
+          role: "user",
+          content: [
+            ...zdjecia.map((z) => ({
+              type: "image" as const,
+              source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+            })),
+            { type: "text" as const, text: String(tresc) },
+          ],
+        }],
       });
 
       const u = odp.usage;
