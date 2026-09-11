@@ -1102,6 +1102,8 @@ export interface Reklamacja {
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
@@ -1271,6 +1273,8 @@ export interface Dyskusja {
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
   notatka: string | null;
   /** Los NASZEJ prośby o zakończenie. Stan dyskusji mówi `statusAllegro`. */

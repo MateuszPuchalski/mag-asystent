@@ -5,6 +5,7 @@ import {
   useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
   useProwadzeDyskusje, useZakoncz,
 } from "../api/dyskusje";
+import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
 import type {
   Dyskusja, KubelekDyskusji, SzczegolyWysylki, WiadomoscReklamacji,
@@ -14,6 +15,7 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
+import { PigulkaMoje, ZdanieOUkrytych, mojaSprawa, useMoje } from "../sprawy/Moje";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
 
@@ -50,14 +52,20 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
     ? (e.szczegoly as SzczegolyWysylki) : null;
 
 /** Kody, po których człowiek szuka dyskusji — wszystkie, jakie sprawa niesie. */
-const kody = (d: Dyskusja) => [d.externalId, d.orderId, d.kupujacyLogin, d.temat]
-  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+const kody = (d: Dyskusja) =>
+  /* Prowadzący wchodzi do szukania — powód przy tej samej funkcji
+     w `ekrany/Reklamacje.tsx`. */
+  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Dyskusje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekDyskusji | null>("odpowiedz");
   const [fraza, setFraza] = useState("");
+  const ja = useJa();
+  const mojeId = ja.data?.user.userId ?? null;
+  const { moje, przelacz: przelaczMoje } = useMoje();
   const [bladZapisu, setBladZapisu] = useState("");
 
   const { data, isLoading, error } = useDyskusje();
@@ -85,7 +93,14 @@ export function Dyskusje() {
     return (data?.dyskusje ?? []).filter((d) => kody(d).some((k) => k.includes(f)));
   }, [data, fraza]);
 
-  const widoczne = pasujace ?? wKubelku;
+  /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
+     numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
+     szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
+  const wSicie = useMemo(
+    () => (moje ? wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)) : wKubelku),
+    [wKubelku, moje, mojeId]);
+  const widoczne = pasujace ?? wSicie;
+  const ukrytych = pasujace ? 0 : wKubelku.length - wSicie.length;
   const wybrana = id ? Number(id) : null;
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
@@ -211,6 +226,9 @@ export function Dyskusje() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "4") przelacz(null);
+      /* `m` jak „moje" — litera, nie cyfra: cyfry należą do kubełków,
+         a piąta obiecywałaby piąty kubełek. */
+      else if (e.key === "m" && mojeId !== null) przelaczMoje(!moje);
     };
     window.addEventListener("keydown", nasluch);
     return () => window.removeEventListener("keydown", nasluch);
@@ -259,6 +277,13 @@ export function Dyskusje() {
             ]} />
         </nav>
 
+        {/* Sito „Moje" — własny rząd, powód przy tym samym paśmie
+            w `ekrany/Reklamacje.tsx`. */}
+        {mojeId !== null && <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+          <PigulkaMoje moje={moje} mojeId={mojeId} onPrzelacz={przelaczMoje}
+            ile={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length} />
+        </div>}
+
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
           <input id="szukaj-dyskusji" className="field !py-1 text-xs" value={fraza}
@@ -271,6 +296,8 @@ export function Dyskusje() {
         {!pasujace && kubelek !== null &&
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
             {opis?.pytanie}</p>}
+
+        <ZdanieOUkrytych ile={ukrytych} onPokazWszystkie={() => przelaczMoje(false)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading

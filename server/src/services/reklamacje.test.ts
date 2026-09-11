@@ -17,10 +17,24 @@ const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "ut
 
 const TERAZ = Date.parse("2026-09-07T12:00:00.000Z");
 
+/** Trzy konta biura; ALA i ALA_IMIENNICZKA mają TO SAMO imię i różne numery. */
+const ALA = { id: 1, name: "A. Lewandowska" };
+const MAREK = { id: 2, name: "M. Wójcik" };
+const ALA_IMIENNICZKA = { id: 3, name: "A. Lewandowska" };
+
 function stanowisko() {
   const d = new DatabaseSync(":memory:");
   d.exec(schema);
   migrate(d);
+  /* Konta PRZED sprawami: od 0.278.0 znacznik „prowadzę" niesie `user_id`,
+     a klucz obcy nie wybacza. Dwie Ale stoją tu celowo — to jest scenariusz,
+     dla którego kolumna w ogóle powstała. */
+  for (const [uid, login, imie] of [
+    [1, "ala", "A. Lewandowska"], [2, "marek", "M. Wójcik"], [3, "ala2", "A. Lewandowska"],
+  ] as Array<[number, string, string]>) {
+    d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (?,?,?,'biuro')")
+      .run(uid, login, imie);
+  }
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
     .run().lastInsertRowid);
@@ -129,20 +143,53 @@ test("„prowadzę” jest ZNACZNIKIEM: drugie kliknięcie tej samej osoby je zd
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
 
-  const po = stempelProwadzi(d, id, "A. Lewandowska");
+  const po = stempelProwadzi(d, id, ALA);
   assert.equal(po.prowadzi, "A. Lewandowska");
   assert.equal(po.wersja, 2, "każda mutacja podnosi wersję");
 
-  const zdjete = stempelProwadzi(d, id, "A. Lewandowska");
+  const zdjete = stempelProwadzi(d, id, ALA);
   assert.equal(zdjete.prowadzi, null, "droga wyjścia z pomyłkowego przejęcia");
 
   /* Kolega bierze sprawę po sobie — to znacznik, nie zamek, więc przechodzi. */
-  const kolega = stempelProwadzi(d, id, "M. Wójcik");
+  const kolega = stempelProwadzi(d, id, MAREK);
   assert.equal(kolega.prowadzi, "M. Wójcik");
 
   const slad = zdarzenia(d, "reklamacja_prowadzi");
   assert.equal(slad.length, 3, "każda mutacja zostawia ślad (blizna 0.137.1)");
   assert.equal(slad[0].user_id, "A. Lewandowska");
+});
+
+test("imienniczka NIE zdejmuje cudzego znacznika — cała racja bytu kolumny", () => {
+  /* To jest błąd, którego do 0.278.0 nie dało się zauważyć. Przełącznik
+     porównywał IMIONA, więc druga A. Lewandowska klikała „prowadzę" i zamiast
+     wziąć sprawę — zdejmowała znacznik pierwszej. Bez komunikatu, bez śladu
+     w oczach obu, a objawem była sprawa znikająca z cudzego kubełka. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+
+  stempelProwadzi(d, id, ALA);
+  const po = stempelProwadzi(d, id, ALA_IMIENNICZKA);
+
+  assert.equal(po.prowadzi, "A. Lewandowska", "imię na ekranie zostaje to samo");
+  assert.equal(po.prowadziId, ALA_IMIENNICZKA.id, "ale sprawę ma teraz DRUGA Ala");
+
+  /* I dopiero ONA ją zdejmuje — pierwsza Ala już nie ma czego zdejmować. */
+  assert.equal(stempelProwadzi(d, id, ALA).prowadziId, ALA.id,
+    "kliknięcie pierwszej Ali BIERZE sprawę, a nie zdejmuje cudzy znacznik");
+});
+
+test("wiersz zastany bez tożsamości traktujemy jak CUDZY, nie jak własny", () => {
+  /* Migracja nie dopasowała imienia (dwa konta, jedno imię), więc znacznik
+     został z samym `prowadzi`. Kliknięcie ma wtedy ZABRAĆ sprawę, bo zabranie
+     cofa się jednym kliknięciem, a ciche zdjęcie cudzego znacznika nie. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare(`UPDATE reklamacja_klienta
+    SET prowadzi='A. Lewandowska', prowadzi_user_id=NULL WHERE id=?`).run(id);
+
+  const po = stempelProwadzi(d, id, ALA);
+  assert.equal(po.prowadziId, ALA.id, "bierze sprawę");
+  assert.equal(po.prowadzi, "A. Lewandowska");
 });
 
 test("notatka zapisuje się, a do dziennika idzie DŁUGOŚĆ, nie treść", () => {
@@ -166,7 +213,7 @@ test("notatka zapisuje się, a do dziennika idzie DŁUGOŚĆ, nie treść", () =
 test("konflikt wersji wraca jako 409 z ładunkiem, a nie jako ciche nadpisanie", () => {
   const { d, dodaj } = stanowisko();
   const id = dodaj({ ext: "a" });
-  stempelProwadzi(d, id, "M. Wójcik");
+  stempelProwadzi(d, id, MAREK);
 
   assert.throws(() => zapiszNotatke(d, id, "moja wersja", "A. Lewandowska", 1), (e: unknown) => {
     assert.ok(e instanceof ReklamacjaConflict);

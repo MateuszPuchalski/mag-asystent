@@ -20,7 +20,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   statusAllegro: "CLAIM_SUBMITTED", decyzjaDo: "2026-09-20T10:00:00.000Z",
   dniDoTerminu: 13, poTerminie: false, zwrotWymagany: null, czatAktywny: true, czatUrwany: false,
   wiadomosciIle: 1, ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null, notatka: null,
+  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziId: null, prowadziAt: null, notatka: null,
   werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
   werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
   zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,

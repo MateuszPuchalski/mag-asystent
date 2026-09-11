@@ -227,6 +227,22 @@ export function migrate(database: DatabaseSync) {
      dla starych wierszy znaczy „nie urwaliśmy", czyli dokładnie to, co było
      prawdą do tego wydania: nikt nigdy nie prosił o drugą stronę rozmowy. */
   addColumn("reklamacja_klienta", "czat_urwany", "INTEGER NOT NULL DEFAULT 0");
+  /* Tożsamość prowadzącego sprawę (0.278.0) — patrz `reklamacja_klienta`
+     w `schema.sql`. Do tej pory znacznik był SAMYM IMIENIEM, a przełącznik
+     porównywał łańcuchy. Dwie osoby o tym samym imieniu zdejmowały sobie
+     nawzajem znacznik i nikt tego nie widział.
+
+     Wsteczne wypełnienie dopasowuje imię do `app_user.name` i celowo omija
+     imiona NIEJEDNOZNACZNE: konto wskazane zgadywaniem byłoby gorsze od
+     pustki, bo filtr „Moje" pokazywałby wtedy cudzą sprawę jako moją. Wiersz
+     bez dopasowania zostaje z NULL, a naprawia go pierwsze kliknięcie. */
+  addColumn("reklamacja_klienta", "prowadzi_user_id",
+    "INTEGER REFERENCES app_user(user_id)");
+  database.exec(`UPDATE reklamacja_klienta SET prowadzi_user_id = (
+      SELECT u.user_id FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi
+    )
+    WHERE prowadzi IS NOT NULL AND prowadzi_user_id IS NULL
+      AND (SELECT count(*) FROM app_user u WHERE u.name = reklamacja_klienta.prowadzi) = 1`);
   /* Rada maszyny w karcie faktów (0.276.0) — patrz `reklamacja_karta`
      w `schema.sql`. TE KOLUMNY MIAŁY NIE POTRZEBOWAĆ MIGRACJI i to był błąd,
      za który zapłacił właściciel: plan 0.276.0 założył, że tabela z 0.275.0

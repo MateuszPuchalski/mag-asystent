@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -30,7 +30,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   decyzjaDo: "2026-09-20T10:00:00.000Z", dniDoTerminu: 13, poTerminie: false,
   zwrotWymagany: null, czatAktywny: true, wiadomosciIle: 1, czatUrwany: false,
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
+  otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziId: null, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
@@ -42,6 +42,15 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
 const REKLAMACJE = [
   rek(1, "decyzja", "111/2026"),
   rek(2, "zamknieta", "222/2026"),
+  /* Dwie sprawy pod sito „Moje": obie prowadzi „A. Lewandowska”, ale tylko
+     444 należy do zalogowanego konta (7). 555 ma IMIENNICZKA o numerze 9
+     i to jest cały sens kolumny `prowadzi_user_id`.
+
+     NUMERY BEZ TRÓJKI I BEZ JEDYNKI są tu celowe: sąsiedni test wpisuje
+     w pole szukania samą cyfrę i sprawdza, że NIC nie pasuje. Sprawa
+     „333/2026” cicho by mu to zabrała. */
+  { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7 },
+  { ...rek(5, "decyzja", "555/2026"), prowadzi: "A. Lewandowska", prowadziId: 9 },
 ];
 
 /* `vi.hoisted`, bo fabryka `vi.mock` jedzie przed resztą pliku. */
@@ -54,6 +63,16 @@ const scena = vi.hoisted(() => ({
   wynikWysylki: null as unknown,
 }));
 
+/* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
+   dający zawsze pustkę byłby gorszy od braku filtru. */
+vi.mock("../api/rozmowy", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
+  return {
+    ...rzeczywisty,
+    useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
+  };
+});
+
 vi.mock("../api/reklamacje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
   const mutacja = (nazwa: string) => () => ({
@@ -65,7 +84,7 @@ vi.mock("../api/reklamacje", async () => {
     useReklamacje: () => ({
       data: {
         reklamacje: REKLAMACJE,
-        liczniki: { decyzja: 1, odpowiedz: 0, zamknieta: 1 },
+        liczniki: { decyzja: 3, odpowiedz: 0, zamknieta: 1 },
         stan: scena.stan,
       },
       isLoading: false, error: null,
@@ -129,6 +148,11 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
       </MemoryRouter>
     </QueryClientProvider>);
 }
+
+/* Sito „Moje" PAMIĘTA wybór w przeglądarce, więc bez tego sprzątania jeden
+   test włączałby filtr następnemu — a objawem byłaby lista, która „gubi"
+   sprawy w teście nie mającym z sitem nic wspólnego. */
+afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
 describe("Ekran reklamacji", () => {
   it("otwarcie ekranu i wybranie sprawy NIE wywołują żadnej mutacji", async () => {
@@ -344,5 +368,65 @@ describe("Ekran reklamacji", () => {
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
     expect(scena.mutacje.some((m) => m.startsWith("odswiez:"))).toBe(false);
+  });
+
+  /* ── Sito „Moje" (0.278.0) ────────────────────────────────────────────────
+     Powstało z jednego zdania właściciela: „chodziło mi, abym łatwiej mógł
+     znaleźć reklamacje, którymi się zajmuję". */
+  it("sito zawęża kubełek do MOICH spraw, po numerze konta, nie po imieniu", async () => {
+    pokaz();
+    /* Obie sprawy w kubełku „Do decyzji" prowadzi „A. Lewandowska” — tyle że
+       jedna z nich to imienniczka o innym numerze konta. */
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+  });
+
+  it("sito MÓWI, ile chowa, i oddaje drogę powrotną", async () => {
+    /* Wybór jest pamiętany między otwarciami ekranu, więc milczące sito
+       zagłodziłoby sprawy nieprzypisane — ta sama klasa błędu co rozmowa
+       urwana bez znaku w 0.273.0. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    /* Kubełek „Do decyzji" ma trzy sprawy, moja jest jedna — sito chowa dwie.
+       Liczebnik w formie 2–4, bo „chowa 2 spraw" czyta się jak usterka. */
+    expect(screen.getByText(/chowa 2 sprawy/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("klawisz `m` przełącza sito, ale MILCZY w polu tekstowym", async () => {
+    pokaz();
+    await userEvent.keyboard("m");
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+    await userEvent.keyboard("m");
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+
+    /* Litera wpisana w pole szukania ma szukać, a nie przestawiać sito —
+       ta sama zasada co cyfry kubełków. */
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "m");
+    expect(screen.queryByText(/chowa/)).not.toBeInTheDocument();
+  });
+
+  it("szukanie PRZEBIJA sito — numer znajduje też cudzą sprawę", async () => {
+    /* §25a.9: szukanie przebija kubełek. Sito rządzi się tą samą regułą,
+       bo pole, które kłamie pustką przy sprawie tuż obok, jest gorsze
+       od braku pola. */
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "555");
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("szukanie po PROWADZĄCYM znajduje sprawę, której numeru nikt nie pamięta", async () => {
+    pokaz();
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "lewandowsk");
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
   });
 });

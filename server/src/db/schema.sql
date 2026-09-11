@@ -2326,7 +2326,16 @@ CREATE TABLE IF NOT EXISTS reklamacja_klienta (
   otwarto_at TEXT NOT NULL,
   -- Kto wziął sprawę. ZNACZNIK dla reszty biura, nie zamek: reklamacja przed
   -- werdyktem nie ma żadnego zapisu, przy którym nazwisko pojawiłoby się samo.
+  --
+  -- DWIE KOLUMNY NA JEDNĄ RZECZ I TO JEST ŚWIADOME. `prowadzi` niesie imię
+  -- i służy OKU: czip na wierszu ma zostać czytelny także wtedy, gdy ktoś
+  -- zmieni nazwisko albo konto zniknie. `prowadzi_user_id` niesie tożsamość
+  -- i służy MASZYNIE: po nim rozstrzyga się przełącznik znacznika oraz filtr
+  -- „Moje". Porównywanie imion działa do dnia, w którym w biurze są dwie Ale —
+  -- wtedy jedna zdejmuje znacznik drugiej, a objawem jest cudza sprawa
+  -- w moim kubełku.
   prowadzi TEXT,
+  prowadzi_user_id INTEGER REFERENCES app_user(user_id),
   prowadzi_at TEXT,
   notatka TEXT,
   -- ── Werdykt biura (przyrost trzeci) ────────────────────────────────────────

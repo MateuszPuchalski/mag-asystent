@@ -6,6 +6,7 @@ import {
   useRozpoznaj, useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
   useWerdykt, useZwrotTowaru,
 } from "../api/reklamacje";
+import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import type {
@@ -16,6 +17,7 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
+import { PigulkaMoje, ZdanieOUkrytych, mojaSprawa, useMoje } from "../sprawy/Moje";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 
@@ -103,14 +105,21 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
     ? (e.szczegoly as SzczegolyWysylki) : null;
 
 /** Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie. */
-const kody = (r: Reklamacja) => [r.numer, r.externalId, r.orderId, r.kupujacyLogin]
-  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+const kody = (r: Reklamacja) =>
+  /* Prowadzący WCHODZI do szukania (0.278.0). Skrzynka szuka po nim od
+     0.195.0, a tutaj „gdzie jest sprawa, którą wzięła Ala" nie miało dotąd
+     żadnej drogi — ani sita, ani pola. */
+  [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Reklamacje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekReklamacji | null>("decyzja");
   const [fraza, setFraza] = useState("");
+  const ja = useJa();
+  const mojeId = ja.data?.user.userId ?? null;
+  const { moje, przelacz: przelaczMoje } = useMoje();
   const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
@@ -152,7 +161,14 @@ export function Reklamacje() {
     return (data?.reklamacje ?? []).filter((r) => kody(r).some((k) => k.includes(f)));
   }, [data, fraza]);
 
-  const widoczne = pasujace ?? wKubelku;
+  /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
+     numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
+     szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
+  const wSicie = useMemo(
+    () => (moje ? wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)) : wKubelku),
+    [wKubelku, moje, mojeId]);
+  const widoczne = pasujace ?? wSicie;
+  const ukrytych = pasujace ? 0 : wKubelku.length - wSicie.length;
   const wybrana = id ? Number(id) : null;
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
@@ -308,6 +324,10 @@ export function Reklamacje() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "4") przelacz(null);
+      /* `m` jak „moje" — sito ma być jednym ruchem, bo o to właściciel
+         prosił. Litera, nie cyfra: cyfry należą do kubełków i piąta z nich
+         obiecywałaby piąty kubełek. */
+      else if (e.key === "m" && mojeId !== null) przelaczMoje(!moje);
     };
     window.addEventListener("keydown", nasluch);
     return () => window.removeEventListener("keydown", nasluch);
@@ -350,6 +370,17 @@ export function Reklamacje() {
             ]} />
         </nav>
 
+        {/* ── SITO „MOJE" (0.278.0) ────────────────────────────────────────
+            WŁASNY RZĄD, nie czwarta pigułka wśród kubełków. Kubełek mówi
+            „na jakim to etapie", sito „czyje to" — zlanie tego w jeden rząd
+            odebrałoby pytanie „moje sprawy do decyzji", czyli dokładnie to,
+            które właściciel zadaje najczęściej. Ten rząd weźmie też czipy
+            tagów, bo one odpowiadają na trzecie pytanie: „o czym to". */}
+        {mojeId !== null && <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+          <PigulkaMoje moje={moje} mojeId={mojeId} onPrzelacz={przelaczMoje}
+            ile={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length} />
+        </div>}
+
         <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
           <input id="szukaj-reklamacji" className="field !py-1 text-xs" value={fraza}
@@ -362,6 +393,8 @@ export function Reklamacje() {
         {!pasujace && kubelek !== null &&
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
             {opis?.pytanie}</p>}
+
+        <ZdanieOUkrytych ile={ukrytych} onPokazWszystkie={() => przelaczMoje(false)} />
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading

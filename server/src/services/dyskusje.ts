@@ -113,6 +113,8 @@ export interface WierszDyskusji {
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
   notatka: string | null;
   /* ── Prośba o zakończenie (`END_REQUEST`) ────────────────────────────────
@@ -229,6 +231,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     dlugoCzeka: czeka !== null && czeka >= PROG_CZEKANIA_DNI,
     otwartoAt: String(w.otwarto_at),
     prowadzi: tekst(w.prowadzi),
+    prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
     notatka: tekst(w.notatka),
     zakonczenieStatus: tekst(w.zakonczenie_status) as StatusZakonczenia | null,
@@ -323,15 +326,19 @@ export function szczegolDyskusji(
  * nieprawdziwym, a `events` nie ma retencji.
  */
 export function stempelProwadziDyskusje(
-  database: Db, id: number, autor: string, wersja?: number,
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
 ): WierszDyskusji {
   return transaction(database, () => {
     const w = doZapisu(database, id, wersja, "DISPUTE");
-    const zdejmuje = w.prowadzi === autor;
+    /* Po TOŻSAMOŚCI, nie po imieniu — powód przy `stempelProwadzi`. */
+    const zdejmuje = w.prowadzi_user_id !== null && Number(w.prowadzi_user_id) === autor.id;
     database.prepare(`UPDATE reklamacja_klienta
-      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1 WHERE id=? AND typ='DISPUTE'`).run(
-      zdejmuje ? null : autor, zdejmuje ? null : new Date().toISOString(), id);
-    logEvent("dyskusja_prowadzi", autor, null, { id, zdjete: zdejmuje }, undefined, database);
+      SET prowadzi=?, prowadzi_user_id=?, prowadzi_at=?, wersja=wersja+1
+      WHERE id=? AND typ='DISPUTE'`).run(
+      zdejmuje ? null : autor.name, zdejmuje ? null : autor.id,
+      zdejmuje ? null : new Date().toISOString(), id);
+    logEvent("dyskusja_prowadzi", autor.name, null, { id, zdjete: zdejmuje },
+      autor.id, database);
     return zWiersza(odczytaj(database, id), Date.now());
   })();
 }

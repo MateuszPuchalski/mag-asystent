@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.278.0 — 11 września 2026
+
+**Sito „Moje" w reklamacjach i dyskusjach.** Właściciel poprosił o jedno:
+„abym łatwiej mógł znaleźć reklamacje, którymi się zajmuję". Do tego wydania
+nie dało się tego zrobić wcale. Kubełki mówiły, na jakim etapie stoi sprawa,
+pole szukania znało numer, zamówienie i login, a po prowadzącym nie szukało
+nic. Znacznik „prowadzę" był samym czipem na wierszu.
+
+Sito stoi we własnym rzędzie pod pasmem kubełków, na obu ekranach. Przełącza
+je kliknięcie albo klawisz `m`. To **sito, nie czwarty kubełek**, i to jest
+decyzja: kubełek odpowiada na pytanie „na jakim to etapie", sito na „czyje
+to". Zlanie obu w jeden rząd odebrałoby pytanie zadawane najczęściej — „moje
+sprawy do decyzji".
+
+**Sito liczy po tożsamości, nie po imieniu, i to naprawia cichy błąd.** Do
+tego wydania przełącznik znacznika porównywał łańcuchy, więc dwie osoby o tym
+samym imieniu zdejmowały sobie znacznik nawzajem. Bez komunikatu i bez śladu
+w oczach obu — objawem była własna sprawa znikająca z kubełka. Doszła kolumna
+`prowadzi_user_id`; imię zostaje obok dla oka, bo czip ma być czytelny także
+po skasowaniu konta.
+
+Migracja czyta tożsamość z imienia tam, gdzie imię wskazuje jedno konto.
+Imię wieloznaczne zostaje bez tożsamości i naprawia je pierwsze kliknięcie:
+sprawa ma przez chwilę nie wpaść do nikogo, zamiast wpaść do niewłaściwej
+osoby.
+
+**Sito mówi, ile chowa.** Wybór jest pamiętany między otwarciami ekranu, bo
+„czyje to" jest nawykiem stanowiska. Milczący filtr z pamięcią zagłodziłby
+sprawy nieprzypisane, więc nad listą stoi zdanie z liczbą ukrytych spraw
+i droga powrotna jednym kliknięciem.
+
+Szukanie przebija sito tak samo, jak przebija kubełek: wpisany numer znajduje
+sprawę również wtedy, gdy prowadzi ją kolega. Do pola szukania wchodzi przy
+okazji prowadzący — skrzynka szuka po nim od 0.195.0, reklamacje i dyskusje
+nie szukały dotąd nijak.
+
+
 ## 0.277.0 — 11 września 2026
 
 **Kosz z kartki sam cofa stan z regału zwrotów.** Zgłoszenie właściciela:

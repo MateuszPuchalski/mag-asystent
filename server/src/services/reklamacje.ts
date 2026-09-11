@@ -208,6 +208,8 @@ export interface WierszReklamacji {
   ostatniaWiadomoscAt: string | null;
   otwartoAt: string;
   prowadzi: string | null;
+  /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
+  prowadziId: number | null;
   prowadziAt: string | null;
   notatka: string | null;
   /* ── Werdykt z panelu (przyrost trzeci) — NASZ, nie `statusAllegro` ───────
@@ -381,6 +383,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     otwartoAt: String(w.otwarto_at),
     prowadzi: tekst(w.prowadzi),
+    prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
     notatka: tekst(w.notatka),
     werdykt,
@@ -622,8 +625,10 @@ export function doZapisu(
   database: Db, id: number, wersja: number | undefined, typ: TypSprawy = "CLAIM",
 ) {
   const w = database.prepare(
-    "SELECT id, wersja, prowadzi FROM reklamacja_klienta WHERE id=? AND typ=?",
-  ).get(id, typ) as { id: number; wersja: number; prowadzi: string | null } | undefined;
+    "SELECT id, wersja, prowadzi, prowadzi_user_id FROM reklamacja_klienta WHERE id=? AND typ=?",
+  ).get(id, typ) as
+    { id: number; wersja: number; prowadzi: string | null; prowadzi_user_id: number | null }
+    | undefined;
   if (!w) throw new BladReklamacji(`${NAZWA_SPRAWY[typ]} ${id} nie istnieje`, 404);
   if (wersja !== undefined && Number(w.wersja) !== Number(wersja)) {
     throw new ReklamacjaConflict({ wersja: Number(w.wersja), prowadzi: w.prowadzi });
@@ -642,18 +647,27 @@ export function doZapisu(
  *
  * Ponowne kliknięcie ZDEJMUJE znacznik. Bez tego jedyną drogą wyjścia
  * z pomyłkowego przejęcia byłby cudzy werdykt.
+ *
+ * ZDEJMOWANIE ROZSTRZYGA TOŻSAMOŚĆ, NIE IMIĘ (0.278.0). Do tego wydania
+ * przełącznik porównywał łańcuchy, więc dwie osoby o tym samym imieniu
+ * zdejmowały sobie znacznik nawzajem — po cichu, bo objawem jest cudza sprawa
+ * we własnym kubełku. Wiersz zastany bez `prowadzi_user_id` (migracja nie
+ * umiała dopasować imienia) traktujemy jako CUDZY: zabranie sprawy jest
+ * odwracalne jednym kliknięciem, ciche zdjęcie cudzego znacznika nie.
  */
 export function stempelProwadzi(
-  database: Db, id: number, autor: string, wersja?: number,
+  database: Db, id: number, autor: { id: number; name: string }, wersja?: number,
 ): WierszReklamacji {
   return transaction(database, () => {
     const w = doZapisu(database, id, wersja);
-    const zdejmuje = w.prowadzi === autor;
+    const zdejmuje = w.prowadzi_user_id !== null && Number(w.prowadzi_user_id) === autor.id;
     database.prepare(`UPDATE reklamacja_klienta
-      SET prowadzi=?, prowadzi_at=?, wersja=wersja+1
+      SET prowadzi=?, prowadzi_user_id=?, prowadzi_at=?, wersja=wersja+1
       WHERE id=? AND typ='CLAIM'`).run(
-      zdejmuje ? null : autor, zdejmuje ? null : new Date().toISOString(), id);
-    logEvent("reklamacja_prowadzi", autor, null, { id, zdjete: zdejmuje }, undefined, database);
+      zdejmuje ? null : autor.name, zdejmuje ? null : autor.id,
+      zdejmuje ? null : new Date().toISOString(), id);
+    logEvent("reklamacja_prowadzi", autor.name, null, { id, zdjete: zdejmuje },
+      autor.id, database);
     return zWiersza(
       database.prepare("SELECT * FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
         .get(id) as Wiersz,

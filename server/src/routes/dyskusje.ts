@@ -90,8 +90,11 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
+        /* Tożsamość, nie imię — powód przy tej samej trasie w reklamacjach. */
+        const s = sesjaZadania()!;
         return {
-          dyskusja: stempelProwadziDyskusje(db(), Number(req.params.id), autor(), req.body?.wersja),
+          dyskusja: stempelProwadziDyskusje(db(), Number(req.params.id),
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
         };
       } catch (e) { return blad(reply, e); }
     });

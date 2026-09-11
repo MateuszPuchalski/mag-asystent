@@ -347,7 +347,13 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        return { reklamacja: stempelProwadzi(db(), Number(req.params.id), autor(), req.body?.wersja) };
+        /* Znacznik bierze TOŻSAMOŚĆ, nie samo imię (0.278.0): po niej
+           rozstrzyga się zdjęcie własnego znacznika i filtr „Moje". */
+        const s = sesjaZadania()!;
+        return {
+          reklamacja: stempelProwadzi(db(), Number(req.params.id),
+            { id: s.user.userId, name: s.user.name }, req.body?.wersja),
+        };
       } catch (e) { return blad(reply, e); }
     });
 

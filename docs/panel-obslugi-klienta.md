@@ -3338,6 +3338,43 @@ Strzałki chodzą po kolejce, cyfry przełączają kubełek, a przełączenie ku
 przestawia też kursor na jego pierwszą sprawę. Skróty milkną, gdy ognisko stoi
 w polu tekstowym: inaczej cyfra wpisana w notatkę zmieniałaby listę.
 
+### 25b.3a. Sito „Moje" (0.278.0)
+
+Właściciel poprosił o jedno: „abym łatwiej mógł znaleźć reklamacje, którymi
+się zajmuję". Do 0.278.0 nie dało się tego zrobić wcale. Kubełki mówiły
+o etapie sprawy, pole szukania znało numer, zamówienie i login, a po
+prowadzącym nie szukało nic.
+
+**Sito, nie czwarty kubełek, i to jest decyzja.** Kubełek odpowiada na pytanie
+„na jakim to etapie", sito na pytanie „czyje to". Zlanie obu w jeden rząd
+odebrałoby pytanie zadawane najczęściej: „moje sprawy do decyzji". Ten sam
+podział rządzi skrzynką, tylko role są tam odwrócone.
+
+Sito stoi we własnym rzędzie pod pasmem kubełków. Przełącza je kliknięcie
+albo klawisz `m` — litera, nie cyfra, bo cyfry należą do kubełków, a piąta
+z nich obiecywałaby piąty kubełek.
+
+**Szukanie przebija sito**, tak samo jak przebija kubełek (§25a.9). Wpisany
+numer ma znaleźć sprawę również wtedy, gdy prowadzi ją kolega. Do pola
+szukania wchodzi przy okazji prowadzący — skrzynka szuka po nim od 0.195.0.
+
+**Sito mówi, ile chowa.** Wybór jest pamiętany między otwarciami ekranu, bo
+„czyje to" jest nawykiem stanowiska. Milczący filtr z pamięcią zagłodziłby
+sprawy nieprzypisane: leżałyby tygodniami, nie pokazując się nikomu. Zdanie
+nad listą podaje liczbę ukrytych spraw i daje drogę powrotną jednym
+kliknięciem.
+
+**Sito liczy po tożsamości, nie po imieniu.** Znacznik „prowadzę" niósł do
+tego wydania samo imię, a przełącznik porównywał łańcuchy. Dwie osoby o tym
+samym imieniu zdejmowały sobie znacznik nawzajem — po cichu, bo objawem była
+cudza sprawa we własnym kubełku. Kolumna `prowadzi_user_id` rozstrzyga to
+liczbą; imię zostaje na wierszu dla oka, bo czip ma być czytelny także wtedy,
+gdy konto zniknie.
+
+Wiersz zastany bez tożsamości traktujemy jak CUDZY. Kliknięcie go zabiera,
+zamiast zdejmować znacznik: zabranie cofa się jednym ruchem, ciche zdjęcie
+cudzego znacznika nie.
+
 ### 25b.4. Zegar
 
 **Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo
@@ -3655,6 +3692,12 @@ przestawia kursor na pierwszą sprawę. Skróty milkną w polu tekstowym.
 która różni ten ekran od reklamacji. Tam `ALLEGRO_ADVISOR_REPLIED` jest samym
 sygnałem. Gdyby tak zostało tutaj, większość dyskusji siedziałaby w CZEKA NA
 KLIENTA, podczas gdy czeka Allegro.
+
+**Sito „Moje" jest TO SAMO co przy reklamacjach** (§25b.3a) — ten sam rząd,
+ten sam klawisz `m`, ta sama kolumna `prowadzi_user_id`. Dyskusja i reklamacja
+to jeden wiersz `reklamacja_klienta` rozróżniany polem `typ`, a pytanie „czyje
+to" brzmi na obu ekranach identycznie. Dwa osobne mechanizmy dla jednego
+pytania byłyby dwoma nawykami zamiast jednego.
 
 ### 25c.4. Pilność bez zegara
 
