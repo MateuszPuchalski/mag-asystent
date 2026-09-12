@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import pl.wertis.kolektor.core.product.photoBitmapKey
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,18 +58,18 @@ import pl.wertis.kolektor.ui.theme.InkMute
 private const val BOK_DP = 76
 private const val MINIATURA_PX = 220
 
-/* Zdekodowane miniatury, klucz "twId:px". Wiersze list w Column+forEach mają
-   POZYCYJNY `remember` — przetasowanie wierszy (nowy wynik wyszukiwania, zmiana
-   kolejności na półce) przypisuje stan do złych towarów i wymusza ponowne
-   dekodowanie. Ta mapa robi z tego tanią wpadkę: trafienie to zero sieci
-   i zero BitmapFactory. 32 × ~120 px w ARGB_8888 ≈ 1,8 MB. */
-private val zdekodowane = android.util.LruCache<String, android.graphics.Bitmap>(32)
-
-private suspend fun miniaturaZCache(bajty: ByteArray, twId: Long, px: Int): android.graphics.Bitmap? {
-    val klucz = "$twId:$px"
-    zdekodowane.get(klucz)?.let { return it }
-    return dekodujDo(bajty, px)?.also { zdekodowane.put(klucz, it) }
+/* Klucz zawiera skrót bajtów: inne źródło albo zmienione zdjęcie nie może
+   odziedziczyć bitmapy poprzedniej części. Limit dotyczy bajtów bitmap,
+   bo miniatura 124 dp zajmuje więcej niż ikona w wierszu listy. */
+private val zdekodowane = object : android.util.LruCache<String, android.graphics.Bitmap>(12 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: android.graphics.Bitmap): Int = value.byteCount
 }
+
+private suspend fun miniaturaZCache(bajty: ByteArray, twId: Long, px: Int): android.graphics.Bitmap? =
+    withContext(Dispatchers.IO) {
+        val klucz = photoBitmapKey(twId, px, bajty)
+        zdekodowane.get(klucz) ?: dekodujDo(bajty, px)?.also { zdekodowane.put(klucz, it) }
+    }
 
 /**
  * Wyrzucenie zdekodowanych miniatur JEDNEGO towaru (0.88.0).
@@ -98,25 +103,29 @@ fun ZdjecieKartoteki(
     odswiez: Int = 0,
     onDodaj: (() -> Unit)? = null,
 ) {
-    var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
-    var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var pelnyEkran by remember(twId) { mutableStateOf(false) }
+    val settings by graph.settings.settings.collectAsStateWithLifecycle()
+    val source = settings.serverUrl
+    var stale by remember(twId, source) { mutableStateOf(false) }
+    var bajty by remember(twId, source) { mutableStateOf<ByteArray?>(null) }
+    var miniatura by remember(twId, source) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var pelnyEkran by remember(twId, source) { mutableStateOf(false) }
     /* Trzeci stan, dopisany w 0.88.0. Do tej pory `miniatura == null` znaczyło
        naraz „jeszcze nie wiem" i „zdjęcia nie ma" — dla samego rysowania szarego
        kwadratu to bez różnicy, ale przycisk „+" musi się pojawić DOPIERO po
        potwierdzonym braku. Inaczej mignąłby przy każdym wejściu na kartę, także
        na kartotece, która zdjęcie ma, i przesuwał cel dotyku pod kciukiem.
        Reguła i jej test siedzą w `:core` (`DodanieZdjecia.kt`). */
-    var stan by remember(twId) { mutableStateOf(StanSlotu.LADOWANIE) }
+    var stan by remember(twId, source) { mutableStateOf(StanSlotu.LADOWANIE) }
 
     /* Pobranie RAZ na wejście na kartę, nie w cyklu odświeżania karty (2 s).
        Repozytorium i tak nie ruszy sieci, gdy plik jest świeży — ale nie ma
        powodu wołać go kilkanaście razy na minutę. */
-    LaunchedEffect(twId, odswiez) {
+    LaunchedEffect(twId, source, odswiez) {
         stan = StanSlotu.LADOWANIE
         val dane = graph.zdjeciaRepo.zdjecie(twId)
-        bajty = dane
-        miniatura = dane?.let { miniaturaZCache(it, twId, MINIATURA_PX) }
+        bajty = dane?.bytes
+        stale = dane?.stale == true
+        miniatura = dane?.let { miniaturaZCache(it.bytes, twId, MINIATURA_PX) }
         stan = if (miniatura != null) StanSlotu.ZDJECIE else StanSlotu.BRAK
     }
 
@@ -166,7 +175,7 @@ fun ZdjecieKartoteki(
     }
 
     if (pelnyEkran) {
-        PelnyEkranZdjecia(bajty) { pelnyEkran = false }
+        PelnyEkranZdjecia(bajty, stale) { pelnyEkran = false }
     }
 }
 
@@ -198,19 +207,24 @@ fun MiniaturaTowaru(
     modifier: Modifier = Modifier,
     zamiast: (@Composable () -> Unit)? = null,
     contentScale: ContentScale = ContentScale.Crop,
+    refreshKey: Long = 0,
 ) {
-    var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
-    var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var pelnyEkran by remember(twId) { mutableStateOf(false) }
+    val settings by graph.settings.settings.collectAsStateWithLifecycle()
+    val source = settings.serverUrl
+    var stale by remember(twId, source) { mutableStateOf(false) }
+    var bajty by remember(twId, source) { mutableStateOf<ByteArray?>(null) }
+    var miniatura by remember(twId, source) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var pelnyEkran by remember(twId, source) { mutableStateOf(false) }
 
     // stały mnożnik zamiast LocalDensity — klucz cache'a dekodowania nie może
     // zależeć od ekranu, na którym akurat rysujemy
     val px = bok.value.toInt() * 3
 
-    LaunchedEffect(twId) {
+    LaunchedEffect(twId, source, refreshKey) {
         val dane = graph.zdjeciaRepo.zdjecie(twId)
-        bajty = dane
-        miniatura = dane?.let { miniaturaZCache(it, twId, px) }
+        bajty = dane?.bytes
+        stale = dane?.stale == true
+        miniatura = dane?.let { miniaturaZCache(it.bytes, twId, px) }
     }
 
     val bmp = miniatura
@@ -222,18 +236,21 @@ fun MiniaturaTowaru(
         zamiast?.invoke()
         return
     }
-    Image(
-        bitmap = bmp.asImageBitmap(),
-        contentDescription = "Zdjęcie towaru",
-        contentScale = contentScale,
-        modifier = modifier
-            .size(bok)
-            .clip(RoundedCornerShape(8.dp))
-            .then(if (powieksz) Modifier.clickable { pelnyEkran = true } else Modifier),
-    )
+    Column(modifier) {
+        Image(
+            bitmap = bmp.asImageBitmap(),
+            contentDescription = if (stale) "Zdjęcie towaru — zapisana kopia" else "Zdjęcie towaru",
+            contentScale = contentScale,
+            modifier = Modifier
+                .size(bok)
+                .clip(RoundedCornerShape(8.dp))
+                .then(if (powieksz) Modifier.clickable { pelnyEkran = true } else Modifier),
+        )
+        if (stale && powieksz) Text("Zapisana kopia", fontSize = 12.sp, color = InkMute)
+    }
 
     if (pelnyEkran) {
-        PelnyEkranZdjecia(bajty) { pelnyEkran = false }
+        PelnyEkranZdjecia(bajty, stale) { pelnyEkran = false }
     }
 }
 
@@ -253,7 +270,7 @@ fun MiniaturaTowaru(
  * odruch, a dotąd cofał cały ekran.
  */
 @Composable
-private fun PelnyEkranZdjecia(bajty: ByteArray?, onZamknij: () -> Unit) {
+private fun PelnyEkranZdjecia(bajty: ByteArray?, stale: Boolean, onZamknij: () -> Unit) {
     // Pod zdjęciem nie widać aktualnego kroku. Skan nie może zatwierdzić
     // niewidocznej skrzynki ani uruchomić globalnej zmiany kartoteki.
     ScanHandlerEffect { true }
@@ -288,6 +305,8 @@ private fun PelnyEkranZdjecia(bajty: ByteArray?, onZamknij: () -> Unit) {
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                 )
             }
+            if (stale) Text("Zapisana kopia — nie udało się odświeżyć zdjęcia", color = Color.White,
+                modifier = Modifier.align(Alignment.TopCenter).background(Color.Black).padding(16.dp))
         }
     }
 }

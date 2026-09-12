@@ -34,6 +34,16 @@ historii nie przepisujemy.
 ---
 
 
+## 0.295.0 — wiarygodne zdjęcia części na kolektorze
+
+- Pamięć zdjęć rozdziela serwery. Żądanie zachowuje pierwotny adres i sesję; spóźniona odpowiedź nie zasila ekranu innego magazynu.
+- Zdjęcia w RAM podlegają dotychczasowej kontroli świeżości. Nowe bajty zmieniają klucz miniatury, a potwierdzony brak usuwa stary obraz.
+- Nieudane odświeżenie może pokazać oznaczoną zapisaną kopię. Odświeżenie trasy ponawia sprawdzenie zdjęcia, także przy niezmienionym SKU.
+- Pobieranie ma limit rozmiaru i zamyka strumienie. Zapis pliku jest atomowy; nowy ETag nie zostaje przypisany do starej zawartości po odmowie dysku.
+- Limit cache obejmuje również brakujące zdjęcia i wszystkie serwery. Sprzątanie zaczyna się dopiero po przekroczeniu limitu.
+- Dodano 14 testów logiki zdjęć, w tym zmianę serwera, 304, 404, 503, odmowę dostępu, anulowanie, przerwany zapis indeksu i cofnięcie zegara.
+- **[wymaga działania]** Pierwszy podgląd po aktualizacji potrzebuje sieci: stare kopie bez zapisanego źródła są pomijane i usuwane z cache aplikacji.
+
 ## 0.294.0 — jeden przystanek zbiórki dla wielu skrzynek
 
 - Kolektor skanuje półkę i część raz dla kolejnych skrzynek tego samego SKU w tej samej lokalizacji. Każda skrzynka nadal wymaga własnego skanu.

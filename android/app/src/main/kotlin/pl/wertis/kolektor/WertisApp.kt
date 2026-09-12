@@ -88,7 +88,7 @@ class AppGraph(context: Context) {
     val locationsRepo = LocationsRepository(context, api)
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
-    val zdjeciaRepo = ZdjeciaRepository(context, api)
+    val zdjeciaRepo = ZdjeciaRepository(context, apiClient, settings) { session.token }
     val wmsRepo = WmsRepository(context, settings, session)
     val logoRepo = LogoRepository(context, api)
     /* Bierze `apiClient`, a nie `api`: pobranie APK musi iść tą samą drogą co

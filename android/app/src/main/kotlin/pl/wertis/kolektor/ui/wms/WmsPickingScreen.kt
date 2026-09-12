@@ -167,7 +167,7 @@ fun WmsPickingScreen(graph: AppGraph) {
         if (task != null && stage !in setOf(WmsStage.DONE, WmsStage.WAIT)) {
             Text(task.bin, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = Ink)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                MiniaturaTowaru(graph, task.tw_id, 124.dp, powieksz = true, contentScale = ContentScale.Fit,
+                MiniaturaTowaru(graph, task.tw_id, 124.dp, powieksz = true, contentScale = ContentScale.Fit, refreshKey = view.generation,
                     zamiast = {
                         Box(Modifier.size(124.dp).background(Amber.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
                             Text("Brak podglądu\nSprawdź SKU i kod", fontSize = 13.sp, modifier = Modifier.padding(8.dp))

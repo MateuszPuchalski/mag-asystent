@@ -87,3 +87,27 @@ Wynik dotyczy liczby czynności w syntetycznym przystanku, bez skanu rozpoczęci
 
 Podstawa procesu: [Microsoft — system-directed cluster picking](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/system-directed-cluster-pick).
 Źródło opisuje wspólne pobranie części i potwierdzenie pozycji; reguły przerwania oraz trwały dziennik są decyzjami WERTIS.
+
+
+## Wiarygodność zdjęć od 0.295.0
+
+Audyt wykrył pomijanie kontroli świeżości przy trafieniu w RAM oraz brak rozdzielenia serwerów w plikach zdjęć.
+Klucz zdekodowanej miniatury również nie zawierał wersji obrazu. Nowe bajty mogły więc pozostawiać poprzedni podgląd.
+
+Cache uwzględnia źródło i kontroluje świeżość także przy trafieniu w pamięć. Miniatura używa skrótu zawartości.
+Żądanie zachowuje pierwotny adres i token, a ekran odrzuca wynik po zmianie serwera. Token nie trafia do indeksu zdjęć.
+Odświeżenie trasy ponawia odczyt obrazu również przy niezmienionym SKU. Świeży wpis nadal oszczędza żądanie sieciowe.
+
+Dotychczasowe okresy pozostają jawne: sześć godzin dla obrazu i doba dla potwierdzonego braku. Cofnięcie zegara wymusza ponowne sprawdzenie.
+Nieudana rewalidacja może wyświetlić oznaczoną zapisaną kopię. Potwierdzone 404 usuwa obraz; 401 i 403 nie udają braku zdjęcia.
+Przerwanie korutyny nie zamienia się w udany podgląd offline. Odpowiedzi i strumienie są zamykane, również przy błędzie.
+
+Wspólny limit plików wynosi 32 MiB i 300 wpisów; obejmuje wszystkie serwery oraz wpisy o braku obrazu.
+Pamięć bajtów ma limit 4 MiB oraz 32 obrazy, a zdekodowanych miniatur — 12 MiB. Pojedyncze pobranie ma limit 4 MiB.
+Plik zapisuje się atomowo przed nowym ETagiem. Odmowa dysku nie pozwala potwierdzić starego obrazu nowym ETagiem.
+
+Kopie sprzed aktualizacji nie zawierają źródła. Są usuwane wyłącznie z rozpoznanego katalogu cache zdjęć aplikacji; pierwszy podgląd wymaga sieci.
+Podejście zachowuje pamięć oraz dysk zgodnie z [zaleceniami Android dotyczącymi bitmap](https://developer.android.com/topic/performance/graphics/cache-bitmap).
+Klucze źródła, kontrola świeżości i zasady błędów są decyzjami WERTIS sprawdzanymi w testach JVM.
+
+Skrót SHA-256 wiąże zapisany plik z jego ETag. Przerwany zapis indeksu wymusza pełne pobranie zamiast potwierdzania niezgodnej pary odpowiedzią 304.

@@ -11,6 +11,9 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Od 0.295.0 cache zdjęć kolektora rozdziela serwery. Pierwsze podglądy po aktualizacji APK należy otworzyć przy działającej sieci.
+Poprzednie kopie nie zawierają źródła, dlatego nie są przenoszone do nowego indeksu. Zmiana dotyczy wyłącznie lokalnych zdjęć, bez zmian zapasu i skanów.
+
 Od 0.293.0 istniejący kolektor Android ma przycisk **ZBIÓRKA WMS — SKANUJ WÓZEK**.
 Serwer musi obsługiwać EAN w zadaniach trasy. Najpierw zaktualizować API, następnie APK.
 Niedokończonego zapisu na kolektorze nie wolno usuwać przez czyszczenie danych aplikacji.
