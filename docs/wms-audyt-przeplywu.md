@@ -239,6 +239,10 @@ Zdjęcie części pozostaje widoczne podczas zapisu. Nieznany wynik nadal blokuj
 
 ## Rozdzielenie przyjęcia i odkładania od 0.297.0
 
+Kontrola aktualizacji wykryła odrzucanie starszej bazy przez nowe zapytanie spójności bufora. Poprawka 0.297.1 nie migruje źródła podczas kopii.
+Brak obu tabel oznacza poprzedni schemat; brak jednej nadal powoduje błąd. Trzy regresje i pełny zestaw 2224 testów serwera przeszły.
+Sprawdzona kopia aktualnego demo zachowała 1501 zamówień oraz otwarte zadanie: 12 sztuk w BUF-01, właściciela i wersję 2.
+
 Audyt wykazał wymuszone łączenie liczenia z potwierdzeniem półki docelowej. Dostawa nie miała własnej kolejki pozostałych odłożeń.
 Dodano przyjęcie do bufora zaplecza, osobne podjęcie pracy i częściowe odłożenia. Zapas pozostaje niedostępny dla zbiórki do potwierdzenia półki kompletacji.
 Przydziały odkładania są uwzględnione w ruchach, spisie, zmianach lokalizacji, planie uzupełnień i kontroli spójności.

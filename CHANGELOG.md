@@ -34,6 +34,12 @@ historii nie przepisujemy.
 ---
 
 
+## 0.297.1 — kopia bezpieczeństwa przed aktualizacją bufora
+
+Kontrola kopii obsługuje bazę sprzed dodania kolejki odkładania bez migrowania źródła. Brak jednej z dwóch nowych tabel nadal odrzuca kopię.
+Trzy regresje sprawdzają dawny schemat, niezmienność pliku źródłowego i oba warianty niepełnego schematu.
+Dedykowana bramka WMS obejmuje teraz także testy kolejki odkładania i kopii na Windows oraz Ubuntu.
+
 ## 0.297.0 — przyjęcie do bufora i osobna kolejka odkładania
 
 - Dostawę można policzyć do bufora zaplecza i odłożyć później. Sposób przyjęcia wybiera się przed serią skanów.

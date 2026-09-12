@@ -207,17 +207,29 @@ export function integrity(database: Db = db()) {
     WHERE coalesce(s.reserved,0)<>coalesce(a.allocated,0)`,
       )
       .all();
-    const putaway = database
-      .prepare(
-        `SELECT w.id,w.tw_id,w.source AS bin,'rozliczenie zadania' AS problem
+    // Kopię przed aktualizacją sprawdzamy bez migracji; połowa nowego schematu oznacza uszkodzenie.
+    const putawayTables = Number(
+      database
+        .prepare(
+          "SELECT count(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('wms_putaway_work','wms_putaway_step')",
+        )
+        .get()?.n,
+    );
+    if (putawayTables === 1) throw new Error("Niepełny schemat odkładania WMS");
+    const putaway =
+      putawayTables === 0
+        ? []
+        : database
+            .prepare(
+              `SELECT w.id,w.tw_id,w.source AS bin,'rozliczenie zadania' AS problem
       FROM wms_putaway_work w WHERE w.quantity<>w.remaining+coalesce((SELECT sum(s.quantity) FROM wms_putaway_step s WHERE s.task_id=w.id),0)
       OR (w.remaining>0 AND w.completed_at IS NOT NULL) OR (w.remaining=0 AND w.completed_at IS NULL)
       UNION ALL SELECT NULL,w.tw_id,w.source,'ochrona bufora' FROM wms_putaway_work w
       LEFT JOIN wms_stock s ON s.tw_id=w.tw_id AND s.bin=w.source LEFT JOIN wms_bin b ON b.bin=w.source
       WHERE w.remaining>0 GROUP BY w.tw_id,w.source HAVING coalesce(b.mode,'pick')<>'reserve'
       OR sum(w.remaining)+coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=w.tw_id AND r.source=w.source AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)>coalesce(s.on_hand-s.reserved,0)`,
-      )
-      .all();
+            )
+            .all();
     database.exec("COMMIT");
     return {
       ok:
