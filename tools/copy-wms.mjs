@@ -8,6 +8,7 @@ for (const file of [
   "wms-putaway.js",
   "wms-handoff.js",
   "wms-packing.js",
+  "wms-pack-recovery.js",
   "wms.css",
   "biuro-theme.js",
   "biuro-theme.css",

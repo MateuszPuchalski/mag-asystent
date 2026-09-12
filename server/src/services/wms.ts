@@ -430,6 +430,19 @@ export function move(
     fail(
       "Spis wymaga rozliczenia uzupełnień tej lokalizacji. Przy anulowaniu zwróć niepotwierdzone sztuki na źródło",
     );
+  if (
+    kind === "count" &&
+    d
+      .prepare(
+        `SELECT 1 FROM wms_pack_recovery r JOIN wms_line l ON l.order_id=r.order_id
+    JOIN wms_allocation a ON a.line_id=l.id WHERE r.completed_at IS NULL AND r.cancelled_at IS NULL AND r.user_id IS NOT NULL
+    AND l.tw_id=? AND a.bin=? AND a.quantity>a.picked`,
+      )
+      .get(twId, address)
+  )
+    fail(
+      "Spis wymaga rozliczenia wymiany przy pakowaniu. Zwróć niepotwierdzone sztuki przed zwolnieniem zadania",
+    );
   // Spis i zwrot zapisują stan rzeczywisty, także ponad limitem; nowej dostawy nie wolno tam upychać.
   if (delta > 0 && (kind === "receive" || kind === "transfer"))
     assertDestinationSpace(twId, address, delta);
@@ -1024,6 +1037,13 @@ function readOrder(orderId: number) {
     shipment: shipments[0] ?? null,
     shipments,
     packingContents: packingContents(orderId),
+    packingRecovery:
+      d
+        .prepare(
+          `SELECT r.*,(SELECT sum(quantity-replaced) FROM wms_pack_damage WHERE recovery_id=r.id) AS remaining
+      FROM wms_pack_recovery r WHERE r.order_id=? AND r.completed_at IS NULL AND r.cancelled_at IS NULL`,
+        )
+        .get(orderId) ?? null,
   };
 }
 
@@ -1106,6 +1126,13 @@ export function applyOrderAction(
     !["resume", "cancel", "return", "takeover", "amend"].includes(input.action)
   )
     fail(`Zamówienie wstrzymane: ${order.hold_reason}`);
+  if (
+    ["return", "cancel", "amend", "ship"].includes(input.action) &&
+    order.packingRecovery
+  )
+    fail(
+      "Najpierw zakończ wymianę przy pakowaniu albo przerwij ją w biurze po zwrocie niepotwierdzonych pobrań",
+    );
   const requireState = (...states: string[]) => {
     if (!states.includes(order.status))
       fail("Operacja niedostępna na tym etapie zamówienia");
@@ -1378,6 +1405,11 @@ export function applyOrderAction(
     } else {
       if (input.quantity > line.quantity - line.packed)
         fail("Nadmiar w paczce. Odłóż dodatkowe sztuki", 400);
+      if (input.quantity > line.picked - line.packed)
+        fail(
+          "Ilość przekracza pobrane, niesprawdzone sztuki. Poczekaj na brakujące pobranie lub odłóż nadmiar",
+          400,
+        );
       d.prepare("UPDATE wms_line SET packed=packed+? WHERE id=?").run(
         input.quantity,
         line.id,

@@ -119,7 +119,33 @@ window.Wms = (() => {
     photo: photos.markup,
     mountPhotos: () => photos.mount(root()),
   });
-  const packingUi = window.WmsPacking({ html, field, form });
+  const recoveryUi = window.WmsPackRecovery({
+    html,
+    field,
+    read,
+    mutate,
+    office,
+    userId: () => user?.userId,
+    focus: focusWhenReady,
+    refresh,
+    openView: async () => {
+      view = "recovery";
+      shell();
+      await refresh();
+    },
+    openOrder: async (id) => {
+      selected = id;
+      view = "orders";
+      shell();
+      await refresh();
+    },
+  });
+  const packingUi = window.WmsPacking({
+    html,
+    field,
+    form,
+    recovery: recoveryUi.damage,
+  });
   const handoffUi = window.WmsHandoff({
     html,
     field,
@@ -306,6 +332,7 @@ window.Wms = (() => {
       ["stockwork", "Zadania zapasu"],
       ["carts", "Wózki 20 / 30"],
       ["packing", "Pakowanie skrzynek"],
+      ["recovery", "Wymiany części"],
       ["handoff", "Wydania"],
       ["waves", "Zbiórka ręczna"],
       ["bins", "Lokalizacje"],
@@ -341,6 +368,7 @@ window.Wms = (() => {
       }
       if (view === "packing") await cartUi.renderPacking();
       if (view === "stock") await stocks(turn);
+      if (view === "recovery") await recoveryUi.render();
       if (view === "stockwork") await stockWorkUi.render();
       if (view === "inbound") await inboundUi.render();
       if (view === "handoff") await handoffUi.render();
@@ -745,6 +773,7 @@ window.Wms = (() => {
     const button = event.target.closest("button");
     if (!button || !root().contains(button) || busy) return;
     try {
+      if (await recoveryUi.click(button)) return;
       if (await cartUi.click(button)) return;
       if (await stockWorkUi.click(button)) return;
       if (await inboundUi.click(button)) return;
@@ -907,6 +936,7 @@ window.Wms = (() => {
     if (busy) return;
     try {
       const values = Object.fromEntries(new FormData(f));
+      if (await recoveryUi.submit(f, values)) return;
       if (await cartUi.submit(f, values)) return;
       if (await stockWorkUi.submit(f, values)) return;
       if (await inboundUi.submit(f, values)) return;
@@ -1217,6 +1247,7 @@ window.Wms = (() => {
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
     if (inboundUi.keydown(event)) return;
+    if (recoveryUi.keydown(event)) return;
     if (
       event.key === "Enter" &&
       ["wms-stockwork-complete", "wms-stockwork-space-finish"].includes(

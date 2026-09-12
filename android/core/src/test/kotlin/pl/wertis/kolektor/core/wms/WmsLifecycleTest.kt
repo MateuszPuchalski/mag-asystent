@@ -12,7 +12,7 @@ import org.junit.Test
 private val lifecycleActor = WmsContext("http://seeded/", 2)
 private class LifecycleStore : WmsStore {
     var journal = WmsJournal(active = WmsActive(lifecycleActor, 1), putaway = WmsActivePutaway(lifecycleActor, 1),
-        receiving = WmsActiveInbound(lifecycleActor, 1), counting = WmsActiveCount(lifecycleActor, 1), replenishing = WmsActiveReplenishment(lifecycleActor, 1))
+        receiving = WmsActiveInbound(lifecycleActor, 1), counting = WmsActiveCount(lifecycleActor, 1), replenishing = WmsActiveReplenishment(lifecycleActor, 1), recovering = WmsActiveRecovery(lifecycleActor, 1))
     var beforeRead: suspend () -> Unit = {}
     var beforeWrite: suspend (WmsJournal) -> Unit = {}
     override suspend fun read(): WmsJournal { beforeRead(); return journal }
@@ -78,6 +78,19 @@ private class LifecycleHarness(val workflow: String) {
                 submit = { controller.submit(lifecycleActor, WmsInboundDraft(1, null, "api/wms/test", body, "Przyjęcie")) }
                 retry = { controller.retry(lifecycleActor) }; ready = { controller.state.value.ready }
             }
+            "pack-recovery" -> {
+                val controller = WmsRecoveryController(store, { object : WmsRecoveryTransport {
+                    override suspend fun queue(query: String, offset: Int): WmsRecoveryQueue = error("Unexpected queue")
+                    override suspend fun recoveringTask(id: Long): WmsRecoveryTask {
+                        get(); return WmsRecoveryTask(1,1,2,1,"ORDER",box="BOX",lines=listOf(WmsRecoveryLine(1,"SKU",1,0,"QUAR")),picks=emptyList())
+                    }
+                    override suspend fun send(command: WmsPending): Long { transmit(command); return 1 }
+                } }, lock = lock)
+                open = { controller.open(lifecycleActor) }; pause = controller::invalidateVerification
+                activate = controller::activateVerification
+                submit = { controller.submit(lifecycleActor, WmsRecoveryDraft(1, "api/wms/test", body, "Wymiana")) }
+                retry = { controller.retry(lifecycleActor) }; ready = { controller.state.value.ready }
+            }
             "replenishment" -> {
                 val controller = WmsReplenishmentController(store, { object : WmsReplenishmentTransport {
                     override suspend fun queue(view: String, query: String, offset: Int): WmsReplenishmentQueue = error("Unexpected queue")
@@ -109,7 +122,7 @@ private class LifecycleHarness(val workflow: String) {
 }
 
 class WmsLifecycleTest {
-    private val workflows = listOf("picking", "putaway", "receiving", "counting", "replenishment")
+    private val workflows = listOf("picking", "putaway", "receiving", "counting", "replenishment", "pack-recovery")
     @Test fun `uspienie blokuje zapis nawet przy gotowym ekranie`() = runTest {
         for (workflow in workflows) {
             val h = LifecycleHarness(workflow); h.open(); assertTrue(workflow, h.ready())

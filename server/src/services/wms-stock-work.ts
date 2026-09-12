@@ -49,8 +49,7 @@ function product(twId: number) {
     SELECT symbol AS sku,ean AS barcode FROM wms_product WHERE tw_id=? AND NOT EXISTS(SELECT 1 FROM sgt_towar WHERE tw_id=?) LIMIT 1`,
     )
     .get(twId, twId, twId) as
-    | { sku: string; barcode: string | null }
-    | undefined;
+    { sku: string; barcode: string | null } | undefined;
   return p ?? fail("Nie ma kartoteki towaru", 404);
 }
 function stock(twId: number, bin: string) {
@@ -115,7 +114,7 @@ const replenishmentPlanSql = `WITH order_needs AS (
     SELECT l.tw_id,o.id,o.priority,o.due_at,
       sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS missing
     FROM wms_line l JOIN wms_order o ON o.id=l.order_id
-    WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new')
+    WHERE (o.status IN ('new','allocated','picking') OR (o.status='packing' AND o.hold_reason IS NULL AND EXISTS(SELECT 1 FROM wms_pack_recovery r WHERE r.order_id=o.id AND r.completed_at IS NULL AND r.cancelled_at IS NULL))) AND (o.hold_reason IS NULL OR o.status<>'new')
     GROUP BY l.tw_id,o.id HAVING missing>0
   ), pick_stock AS (
     SELECT s.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,
@@ -648,6 +647,19 @@ export function applyStockCheckCount(
     fail("Zeskanuj lokalizację otwartego przeliczenia", 400);
   const twId = Number(check!.tw_id),
     current = stock(twId, input.bin);
+  // Sprawdzenie poprzedza zwolnienie rezerwacji, bo operator może już nieść niepotwierdzony zamiennik.
+  if (
+    db()
+      .prepare(
+        `SELECT 1 FROM wms_pack_recovery r JOIN wms_line l ON l.order_id=r.order_id
+    JOIN wms_allocation a ON a.line_id=l.id WHERE r.completed_at IS NULL AND r.cancelled_at IS NULL
+    AND r.user_id IS NOT NULL AND l.tw_id=? AND a.bin=? AND a.quantity>a.picked`,
+      )
+      .get(twId, input.bin)
+  )
+    fail(
+      "Najpierw zwróć niepotwierdzone zamienniki i zwolnij zadanie wymiany przy pakowaniu",
+    );
   if (
     db()
       .prepare(

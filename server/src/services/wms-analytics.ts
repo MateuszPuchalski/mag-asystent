@@ -233,15 +233,45 @@ export function integrity(database: Db = db()) {
       OR sum(w.remaining)+coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=w.tw_id AND r.source=w.source AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)>coalesce(s.on_hand-s.reserved,0)`,
             )
             .all();
+    const recoveryTables = Number(
+      database
+        .prepare(
+          "SELECT count(*) n FROM sqlite_master WHERE type='table' AND name IN ('wms_pack_recovery','wms_pack_damage')",
+        )
+        .get()?.n,
+    );
+    if (recoveryTables === 1)
+      throw new Error("Niepełny schemat wymian przy pakowaniu WMS");
+    // Starsza kopia nie ma zadań wymiany. W nowszej brakująca sztuka musi mieć otwartą sprawę albo zamknięte rozliczenie.
+    const packingRecovery =
+      recoveryTables === 0
+        ? []
+        : database
+            .prepare(
+              `
+      SELECT r.id,r.order_id,'stan zadania wymiany' AS problem FROM wms_pack_recovery r JOIN wms_order o ON o.id=r.order_id
+      WHERE NOT EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id)
+      OR (r.completed_at IS NOT NULL AND (r.cancelled_at IS NOT NULL OR EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
+      OR (r.completed_at IS NULL AND r.cancelled_at IS NULL AND (o.status<>'packing' OR o.tote IS NULL
+        OR NOT EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
+      UNION ALL SELECT r.id,r.order_id,'brak zamiennika nie zgadza się z pobraniem' FROM wms_pack_recovery r
+      JOIN wms_pack_damage d ON d.recovery_id=r.id LEFT JOIN wms_line l ON l.id=d.line_id
+      WHERE r.completed_at IS NULL AND r.cancelled_at IS NULL GROUP BY r.id,d.line_id
+      HAVING l.id IS NULL OR l.order_id<>r.order_id OR sum(d.quantity-d.replaced)<>l.quantity-l.picked
+    `,
+            )
+            .all();
     database.exec("COMMIT");
     return {
       ok:
         balances.length === 0 &&
         reservations.length === 0 &&
-        putaway.length === 0,
+        putaway.length === 0 &&
+        packingRecovery.length === 0,
       balances,
       reservations,
       putaway,
+      packingRecovery,
     };
   } catch (e) {
     database.exec("ROLLBACK");

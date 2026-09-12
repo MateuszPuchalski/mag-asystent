@@ -3,6 +3,7 @@ import * as Carts from "../services/wms-carts.js";
 import * as StockWork from "../services/wms-stock-work.js";
 import * as Counting from "../services/wms-counting.js";
 import * as Inbound from "../services/wms-inbound.js";
+import * as Recovery from "../services/wms-pack-recovery.js";
 import * as Putaway from "../services/wms-putaway.js";
 import * as Handoff from "../services/wms-dispatch.js";
 import { ZodError, z } from "zod";
@@ -74,6 +75,36 @@ export async function wmsRoutes(app: FastifyInstance) {
       .code(500)
       .send({ error: "Nie zapisano operacji. Ponów z tym samym kluczem" });
   });
+  app.get("/api/wms/packing-recovery", async (req) =>
+    Recovery.recoveryWork(actor(), req.query),
+  );
+  app.get<{ Params: { id: string } }>(
+    "/api/wms/packing-recovery/:id",
+    async (req) => Recovery.recoveryTask(actor(), orderId(req.params.id)),
+  );
+  app.post("/api/wms/packing-damage", async (req) =>
+    Recovery.quarantinePacking(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  for (const [action, handler] of Object.entries({
+    claim: Recovery.claimRecovery,
+    pick: Recovery.pickRecovery,
+    release: Recovery.releaseRecovery,
+    abort: Recovery.abortRecovery,
+  }))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/packing-recovery/:id/${action}`,
+      async (req) =>
+        handler(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
   app.get("/api/wms/orders", async (req) => {
     actor();
     return listOrders(req.query);

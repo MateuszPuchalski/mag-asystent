@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.307.0 — kwarantanna i wymiana części przy pakowaniu
+
+- Uszkodzone sztuki trafiają do skanowanej kwarantanny. Dobre pobrania i potwierdzenia pozostają przy stanowisku.
+- Nowa kolejka Biura i kolektora rezerwuje zamienniki: źródło → część → faktyczna ilość → skrzynka oczekującego zamówienia.
+- Pakujący sprawdza tylko dostarczone zamienniki. Brak zapasu nie cofa kwarantanny; tworzy potrzebę uzupełnienia i widoczną kolejkę analityki.
+- Zwolnienie podjętej wymiany wymaga zwrotu niepotwierdzonych części i skanów źródeł. Spis czeka na rozliczenie, także przed przebudową rezerwacji.
+- Trwały dziennik kolektora odzyskuje podjęcie i dostarczenie po utracie odpowiedzi. Wspólna kontrola cyklu życia obejmuje sześć procesów.
+- Kontrola kopii wykrywa niespójność spraw wymiany i niepełny schemat. Obsługuje również kopie sprzed dodania funkcji.
+- Weryfikacja: 2298 testów serwera, 727 panelu, 433 core. E2E sprawdza utracone odpowiedzi i jeden ponowny skan pakowania.
+- **[wymaga działania]** Zaktualizować i zrestartować API wraz z plikami Biura, następnie APK. Start dodaje dwie puste tabele historii wymian.
+
 ## 0.306.0 — korekta pojedynczego potwierdzenia pakowania
 
 - Pakujący może cofnąć kontrolę wybranego SKU i ilości z konkretnej paczki, ze skanem oraz uzasadnieniem.

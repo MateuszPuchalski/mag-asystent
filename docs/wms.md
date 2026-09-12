@@ -6,6 +6,31 @@ Przyjęcia dokumentowe, zwroty i obsługa klienta zachowują dotychczasowe ekran
 WMS prowadzi cały przebieg samodzielnie, bez konta, abonamentu ani API Sellasist.
 Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłącznie dane seeded.
 
+## Uszkodzona część przy pakowaniu
+
+Pakujący otwiera **Uszkodzona część — odłóż do kwarantanny** w zamówieniu.
+Skanuje skrzynkę oraz część, wpisuje uszkodzoną ilość i wybiera paczkę albo sztuki jeszcze niesprawdzone.
+Odkłada uszkodzone sztuki, skanuje kwarantannę i opisuje uszkodzenie.
+Zapis odejmuje tylko te pobrania i potwierdzenia. Dobre sztuki oraz ich potwierdzenia zostają przy stanowisku.
+
+Kolektor ma **WYMIANY WMS — ZAMIENNIK DO SKRZYNKI**. Operator wybiera zadanie i podejmuje brakujące części.
+Skanuje źródło → część → wpisuje faktyczną ilość → dostarcza i skanuje skrzynkę zamówienia.
+Ostatni skan potwierdza pobranie. Pakujący musi jeszcze zeskanować zamiennik; dopiero kompletna kontrola pozwala przygotować etykiety.
+Zdjęcie korzysta z istniejącego podglądu kartoteki. Enter w pomocniczym formularzu Biura prowadzi przez te same pola.
+
+Brak zapasu odrzuca samo podjęcie, bez cofania kwarantanny. Niepokryta potrzeba pojawia się w uzupełnieniach przed rutynowymi minimami.
+Analityka pokazuje wiek kolejki **Wymiany części przy pakowaniu** i przejście do zadań.
+Jedno zamówienie ma jedną otwartą wymianę. Kolejne uszkodzenie można dopisać, dopóki operator nie podjął zadania.
+
+Przed odświeżeniem lub wyjściem operator zwraca niepotwierdzone sztuki na źródło.
+Jeśli wynik zapisu jest nieznany, używa **PONÓW** z trwałego dziennika, bez ponownego przenoszenia części.
+Zwolnienie podjętego zadania wymaga zwrotu i skanu wszystkich źródeł. Dostarczone zamienniki zostają przy pakowaniu.
+Spis źródła czeka na zwolnienie zadania. Biuro może następnie przerwać wymianę z uzasadnieniem.
+Przerwanie wstrzymuje zamówienie i zeruje kontrolę paczek; dobre pobrania trzeba rozliczyć przed anulowaniem zamówienia.
+Historia uszkodzenia i jego kwarantanny pozostaje także po zmianie pozycji anulowanego zamówienia.
+
+Ta operacja dotyczy faktycznie obecnej uszkodzonej części. Brakującej fizycznie sztuki nie zapisuj jako przyjętej do kwarantanny.
+
 ## Wygląd i nawigacja
 
 Biuro korzysta z tego samego języka wizualnego co panel obsługi klienta.

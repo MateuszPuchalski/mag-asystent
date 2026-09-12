@@ -40,7 +40,10 @@ data class WmsActiveCount(val context: WmsContext, val taskId: Long)
 data class WmsActiveReplenishment(val context: WmsContext, val taskId: Long)
 
 @Serializable
-data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null, val putaway: WmsActivePutaway? = null, val receiving: WmsActiveInbound? = null, val counting: WmsActiveCount? = null, val replenishing: WmsActiveReplenishment? = null)
+data class WmsActiveRecovery(val context: WmsContext, val taskId: Long)
+
+@Serializable
+data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null, val putaway: WmsActivePutaway? = null, val receiving: WmsActiveInbound? = null, val counting: WmsActiveCount? = null, val replenishing: WmsActiveReplenishment? = null, val recovering: WmsActiveRecovery? = null)
 
 fun definitiveWmsRejection(error: ApiError): Boolean = error.status in setOf(400, 404, 409, 422) ||
     (error.status == 403 && error.kod == "WMS_COMMAND_REJECTED")

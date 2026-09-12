@@ -18,6 +18,10 @@ import okhttp3.OkHttpClient
 import pl.wertis.kolektor.core.net.WertisJson
 import pl.wertis.kolektor.core.net.naglowekHttp
 import pl.wertis.kolektor.core.session.userId
+import pl.wertis.kolektor.core.wms.WmsRecoveryController
+import pl.wertis.kolektor.core.wms.WmsRecoveryTransport
+import pl.wertis.kolektor.core.wms.WmsRecoveryTask
+import pl.wertis.kolektor.core.wms.WmsRecoveryQueue
 import pl.wertis.kolektor.core.wms.WmsContext
 import pl.wertis.kolektor.core.wms.WmsController
 import pl.wertis.kolektor.core.wms.WmsJournal
@@ -60,6 +64,12 @@ interface WmsApi {
 
     @GET("api/wms/cart-runs/{id}")
     suspend fun run(@Path("id") id: Long): WmsRun
+
+    @GET("api/wms/packing-recovery")
+    suspend fun recoveryQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsRecoveryQueue
+
+    @GET("api/wms/packing-recovery/{id}")
+    suspend fun recoveryTask(@Path("id") id: Long): WmsRecoveryTask
 
     @GET("api/wms/replenishment-work")
     suspend fun replenishmentQueue(@Query("view") view: String, @Query("q") query: String, @Query("offset") offset: Int): WmsReplenishmentQueue
@@ -195,6 +205,18 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
         object : WmsReplenishmentTransport {
             override suspend fun queue(view: String, query: String, offset: Int) = apiCall { api.replenishmentQueue(view, query, offset) }
             override suspend fun replenishingTask(id: Long) = apiCall { api.replenishmentTask(id) }
+            override suspend fun send(command: WmsPending): Long {
+                val result = apiCall { api.command(command.path, command.key, command.body) }
+                return result["id"]?.jsonPrimitive?.longOrNull ?: error("Brak numeru zadania w odpowiedzi")
+            }
+        }
+    })
+
+    val recovering = WmsRecoveryController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsRecoveryTransport {
+            override suspend fun queue(query: String, offset: Int) = apiCall { api.recoveryQueue(query, offset) }
+            override suspend fun recoveringTask(id: Long) = apiCall { api.recoveryTask(id) }
             override suspend fun send(command: WmsPending): Long {
                 val result = apiCall { api.command(command.path, command.key, command.body) }
                 return result["id"]?.jsonPrimitive?.longOrNull ?: error("Brak numeru zadania w odpowiedzi")

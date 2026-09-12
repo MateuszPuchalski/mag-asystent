@@ -128,6 +128,13 @@ export function flowAnalytics(d: Db, since: string, now: string) {
   });
   const queues = [
     {
+      id: "packing_recovery",
+      label: "Wymiany części przy pakowaniu",
+      unit: "zamówienia",
+      view: "recovery",
+      source: `SELECT r.created_at AS started,1 AS held FROM wms_pack_recovery r WHERE r.completed_at IS NULL AND r.cancelled_at IS NULL`,
+    },
+    {
       id: "expected",
       label: "Otwarte dokumenty dostaw",
       unit: "dokumenty",

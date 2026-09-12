@@ -33,6 +33,22 @@ Zdjęcia produktów są już obsługiwane przez `ZdjeciaRepository`, z trwałym 
 na urządzeniu i powiększeniem. Należy użyć tego mechanizmu w kompletacji.
 Router `ScannerBus` przekazuje skan aktywnemu ekranowi przed globalnym otwarciem kartoteki.
 
+## Wymiana uszkodzonej części przy pakowaniu
+
+Nowy ekran **WYMIANY WMS — ZAMIENNIK DO SKRZYNKI** korzysta z istniejących skanerów i zdjęć.
+Kolejka ma strony po 50 zadań i wyszukiwanie zamówienia lub skrzynki.
+Podjęcie rezerwuje brakujące części. Źródło → część → faktyczna ilość → skrzynka potwierdzają dostarczenie.
+Ilość jest początkowo pusta. Zła skrzynka i pominięte kroki nie tworzą komendy.
+
+Zadanie korzysta ze wspólnego dziennika przed POST oraz wspólnej blokady zapisu.
+Restart, utracona odpowiedź, awaria dysku, inne konto lub serwer nie pozwalają wysłać drugiego ruchu.
+Pauza i spóźniony odczyt nie przywracają gotowości; obowiązuje wspólna weryfikacja po powrocie.
+Zwolnienie wymaga zwrotu niepotwierdzonych części i skanów wszystkich źródeł. Potwierdzone dostarczenia pozostają przy pakowaniu.
+Pakujący oddzielnie sprawdza zamiennik. Kolektor nie potwierdza za niego zawartości paczki.
+
+Do odbioru sprzętowego dodano: uszkodzenie jednej z trzech sztuk, podjęcie wymiany, utratę Wi-Fi po dostarczeniu oraz restart.
+Oczekiwany wynik: jedna sztuka w kwarantannie, trzy dobre przy zamówieniu i tylko jeden dodatkowy skan pakowania.
+
 ## Natywna zbiórka dodana w gałęzi
 
 - Natywny ekran WMS: skan wózka, wznowienie trasy, lokalizacja, zdjęcie, SKU i stała pozycja skrzynki.

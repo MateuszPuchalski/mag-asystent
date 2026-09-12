@@ -3086,3 +3086,33 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
 );
 CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
   ON reklamacja_outbox(reklamacja_id, id);
+
+
+-- Wymiana przy pakowaniu zachowuje dobrą zawartość i oddziela kwarantannę od pobrania zamiennika.
+CREATE TABLE IF NOT EXISTS wms_pack_recovery (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  user_id INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  completed_at TEXT,
+  cancelled_at TEXT,
+  reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_pack_recovery_open ON wms_pack_recovery(order_id) WHERE completed_at IS NULL AND cancelled_at IS NULL;
+CREATE TABLE IF NOT EXISTS wms_pack_damage (
+  id INTEGER PRIMARY KEY,
+  recovery_id INTEGER NOT NULL REFERENCES wms_pack_recovery(id),
+  line_id INTEGER REFERENCES wms_line(id) ON DELETE SET NULL,
+  tw_id INTEGER NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  replaced INTEGER NOT NULL DEFAULT 0 CHECK(replaced>=0 AND replaced<=quantity),
+  quarantine TEXT NOT NULL,
+  parcel_no INTEGER NOT NULL CHECK(parcel_no BETWEEN 0 AND 20),
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wms_pack_damage_recovery ON wms_pack_damage(recovery_id,id);

@@ -33,6 +33,7 @@ import pl.wertis.kolektor.ui.chrome.WersjaBar
 import pl.wertis.kolektor.ui.update.AktualizacjaSheet
 import pl.wertis.kolektor.ui.home.HomeScreen
 import pl.wertis.kolektor.ui.wms.WmsPickingScreen
+import pl.wertis.kolektor.ui.wms.WmsRecoveryScreen
 import pl.wertis.kolektor.ui.wms.WmsReplenishmentScreen
 import pl.wertis.kolektor.ui.wms.WmsCountScreen
 import pl.wertis.kolektor.ui.wms.WmsPutawayScreen
@@ -166,10 +167,10 @@ fun AppRoot(graph: AppGraph) {
             scope.launch { graph.offlineQueue.flush() }
         }
         // wyjątki wiszą przed oczami, dopóki ktoś ich nie zamknie (D8)
-        if (screen != Screen.PROBLEMS && screen !in setOf(Screen.WMS_PICKING, Screen.WMS_PUTAWAY, Screen.WMS_RECEIVING, Screen.WMS_COUNTING, Screen.WMS_REPLENISHMENT)) {
+        if (screen != Screen.PROBLEMS && screen !in setOf(Screen.WMS_PICKING, Screen.WMS_PUTAWAY, Screen.WMS_RECEIVING, Screen.WMS_COUNTING, Screen.WMS_REPLENISHMENT, Screen.WMS_RECOVERY)) {
             ProblemsBanner(problems.size) { graph.nav.openProblems() }
         }
-        if (screen != Screen.FIELD_TASKS && screen !in setOf(Screen.WMS_PICKING, Screen.WMS_PUTAWAY, Screen.WMS_RECEIVING, Screen.WMS_COUNTING, Screen.WMS_REPLENISHMENT)) {
+        if (screen != Screen.FIELD_TASKS && screen !in setOf(Screen.WMS_PICKING, Screen.WMS_PUTAWAY, Screen.WMS_RECEIVING, Screen.WMS_COUNTING, Screen.WMS_REPLENISHMENT, Screen.WMS_RECOVERY)) {
             FieldTasksBanner(graph) { graph.nav.openFieldTasks() }
         }
         Box(Modifier.weight(1f).fillMaxSize()) {
@@ -177,6 +178,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.HOME -> HomeScreen(graph)
                 Screen.WMS_PICKING -> WmsPickingScreen(graph)
                 Screen.WMS_REPLENISHMENT -> WmsReplenishmentScreen(graph)
+                Screen.WMS_RECOVERY -> WmsRecoveryScreen(graph)
                 Screen.WMS_COUNTING -> WmsCountScreen(graph)
                 Screen.WMS_PUTAWAY -> WmsPutawayScreen(graph)
                 Screen.WMS_RECEIVING -> WmsInboundScreen(graph)

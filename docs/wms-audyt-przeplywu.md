@@ -419,3 +419,29 @@ Korekta WERTIS dotyczy potwierdzenia tej kontroli. Faktyczny brak lub uszkodzeni
 
 Regresje sprawdzają częściowe cofnięcie, usunięcie pustej pozycji, błędną paczkę, kod, ilość, właściciela i wersję.
 Wymuszona awaria przywraca zawartość i pozwala ponowić ten sam klucz. E2E sprawdza korektę po utracie odpowiedzi i ponowne pakowanie jednej sztuki.
+
+### Uszkodzona część na stanowisku pakowania
+
+Stary zwrot kierował część na źródłową półkę i zerował całą kontrolę pakowania.
+Nie rozdzielał uszkodzenia od omyłkowego potwierdzenia. Przekazany wózek nie zapewniał też prostej drogi ponownego pobrania.
+
+Nowa ścieżka zachowuje dobre sztuki, a uszkodzone przyjmuje do skanowanej kwarantanny.
+Jedno otwarte zadanie zamówienia rezerwuje zamienniki i prowadzi operatora kolektora do tej samej skrzynki.
+Fizyczny brak zamiennika nie wycofuje kwarantanny. Powstaje widoczna potrzeba uzupełnienia oraz kolejka w analityce.
+Pakujący sprawdza tylko dostarczone zamienniki. Wersje, właściciel, kod źródła, części i skrzynki zabezpieczają potwierdzenie.
+
+Spis źródła nie może zwolnić rezerwacji niesionego zamiennika. Blokadę sprawdza także zatwierdzanie przeliczenia, przed usunięciem przydziałów.
+Po fizycznym zwrocie wszystkich niepotwierdzonych sztuk operator zwalnia zadanie; biuro może potem przerwać wymianę i rozliczyć zamówienie.
+Kontrola kopii sprawdza zgodność otwartych spraw z brakującymi pobraniami. Odrzuca częściowy schemat i nadal czyta kopię sprzed tej funkcji.
+
+Punkt odniesienia: [Microsoft — Cancel warehouse work](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/cancel-warehouse-work).
+Dokument rozdziela anulowanie pracy od fizycznego przeniesienia zapasu.
+[Konfiguracja urządzeń mobilnych](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse) opisuje oddzielne potwierdzanie kwarantanny.
+WERTIS stosuje te zasady do uszkodzenia wykrytego podczas pakowania części, bez ręcznej naprawy bazy.
+
+Dziewięć testów serwera obejmuje ilości, paczki, właścicieli, brak zapasu, przydział, częściową wymianę, zwrot, spis, anulowanie oraz kopię.
+Wymuszone awarie wycofują całą transakcję; ponowienie odtwarza ten sam wynik.
+Pięć testów JVM sprawdza skany, jawne ilości, restart, dysk, nieudany odczyt oraz izolację konta, serwera i procesu.
+Osiem wspólnych prób cyklu życia obejmuje teraz sześć procesów, łącznie 48 przypadków.
+E2E gubi odpowiedzi po kwarantannie oraz dostarczeniu, odzyskuje zapis i pakuje zamiennik jednym skanem.
+Formularze oraz przejście Enter sprawdzono przy 320, 390 i 1440 px. Fizyczny kolektor wymaga osobnego odbioru.

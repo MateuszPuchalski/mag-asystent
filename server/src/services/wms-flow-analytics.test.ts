@@ -38,7 +38,7 @@ function close(actual: unknown, expected: number) {
 test("pusty raport nie zapisuje; brak obserwacji pozostaje NULL zamiast zera czasu", () => {
   const before = d.prepare("SELECT total_changes() AS n").get()!.n;
   const r = report();
-  assert.equal(r.queues.length, 11);
+  assert.equal(r.queues.length, 12);
   for (const q of r.queues) {
     assert.equal(q.count, 0);
     assert.equal(q.oldest_minutes, null);
