@@ -13,7 +13,7 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 | Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Bezpośrednie odłożenie obsługuje nowy SKU na zarejestrowanej półce. Plan uzupełnień nadal wymaga istniejącego miejsca kompletacji. |
 | Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Odtworzono i naprawiono oba błędy. Testy regresji opisano niżej. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
-| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Oddzielono paczkę gotową od odbioru kuriera. Korekta etykiety, ponowna kontrola, częściowy odbiór i wstrzymanie mają testy. Podział SKU na paczki pozostaje otwarty. |
+| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Oddzielono paczkę gotową od odbioru kuriera. Skan zapisuje podział SKU na paczki; częściowy odbiór odejmuje tylko ich zawartość. Historia bez podziału pozostaje oznaczona. |
 | UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Usunięto dodatkowe otwieranie przyjętego zadania uzupełnienia; dalszy przegląd całej ścieżki pozostaje otwarty. |
 | Analityka i skala | Czas od przyjęcia do dostępności, blokady i wiek zadań; skala z historią i współbieżnymi operatorami | Istnieją raporty WMS i testy przepustowości. Pełna zgodność z zakresem wymaga dalszego pomiaru. |
 | Utrzymanie | Aktualizacja, kopia i odtworzenie, role, dziennik, awaria sieci, restart procesu | Dotychczasowe testy są punktem wyjścia; końcowy odbiór dotyczy finalnego kodu. |
@@ -176,3 +176,50 @@ Oba sprawdzenia TypeScript oraz kompilacja zakończyły się powodzeniem.
 Próba przeglądarki sprawdziła skan paczki, duplikat, nieznaną etykietę, eksport
 oraz ponowienie po utracie odpowiedzi zatwierdzonego odbioru. Kontrola układu
 obejmuje 12 obszarów przy szerokościach 320, 390, 768 i 1440 px.
+
+## Zawartość poszczególnych paczek
+
+Kolejny test ujawnił brak zawartości przy zapisanej przesyłce: zamiast SKU i ilości
+otrzymał `undefined`. Sam licznik sprawdzenia zamówienia nie pozwalał ustalić,
+które części pozostały na hali po częściowym odbiorze.
+
+[Microsoft: pakowanie kontenerów](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/packing-containers)
+opisuje wkładanie pozycji do konkretnego kontenera. Dla WERTIS oznacza to zapis
+numeru paczki przy dotychczasowym skanie części. Zwykłe zamówienie używa paczki 1
+bez dodatkowego skanu. Numer pozostaje wybrany pomiędzy kolejnymi potwierdzeniami.
+
+Zamiast tekstowej listy dodatkowych etykiet formularz pokazuje paczki i ich zawartość.
+Każda wymaga etykiety i masy. Brakujące numery, puste paczki i niepełny podział
+blokują zapis. Przełożenie sprawdzonych sztuk nie podwaja licznika kontroli.
+Powtórzenie kontroli czyści roboczy podział, pozostawiając pobrania przy stanowisku.
+
+Zapis etykiet utrwala SKU, nazwę i ilość każdej paczki. Wycofanie etykiety,
+korekta numeru i późniejsza zmiana zamówienia nie zmieniają tego dowodu.
+Częściowy odbiór odejmuje tylko odebrane sztuki od towaru oczekującego na hali.
+Stare przesyłki bez podziału nadal mają nieznaną zawartość; nie dopisujemy jej historycznie.
+
+Stara kontrola może potwierdzić jedną paczkę obejmującą całe zamówienie.
+Podział na wiele paczek wymaga kompletnego zapisu albo ponownego sprawdzenia.
+Testy obejmują utratę odpowiedzi, wersje, właściciela pracy, awarię drugiego zapisu,
+niezmienność historii i zmianę zamówienia po wycofaniu paczek.
+
+Weryfikacja 0.292.0: 2208 testów serwera i 727 testów panelu przeszło.
+TypeScript, kompilacja oraz pełny scenariusz przeglądarki zakończyły się poprawnie.
+Skanowanie dwóch paczek zachowuje wybór numeru, a przełożenie usuwa wykrytą lukę w numeracji.
+Test utraty odpowiedzi po zapisie etykiet zachował jedną zawartość każdej przesyłki.
+
+Kontrola wizualna ujawniła kolejkę nad skanerem po wybraniu zamówienia na telefonie.
+Wybór otwiera teraz od razu skanowanie; przycisk potwierdzenia mieści się na ekranie 390 × 844.
+Axe wykrył niedozwolony podpis ARIA na pasku etapów; dodano właściwą rolę.
+Ponowna kontrola przy 320, 390 i 1440 px nie zgłosiła naruszeń wybranych reguł WCAG.
+Przy 1440 px część kontroli kontrastu wymaga oceny ręcznej; automat nie potwierdza całej dostępności.
+
+Próba 5000 SKU i 2000 zamówień wykonała 14 274 żądania w 82,08 s, przy 8 klientach i 84 trasach.
+P95 HTTP wyniosło 63,95 ms, a p95 przydziału wózka 365,36 ms.
+Każda z 2000 paczek zachowała zgodną zawartość; dziennik i rezerwacje pozostały zgodne.
+Zweryfikowana kopia tej bazy zachowała 2000 zamówień, 2000 paczek i 3999 sztuk zawartości.
+Są to pomiary syntetyczne, nie tempo pracy ludzi ani próba skanerów sprzętowych.
+
+Zbiórka docelowo odbywa się w istniejącym APK na Zebra lub Honeywell.
+Audyt rzeczywistych plików wydania i gałęzi: [kolektor WMS](wms-kolektor-audyt.md).
+Natywne powiązanie z WMS pozostaje otwartym, priorytetowym zakresem celu.

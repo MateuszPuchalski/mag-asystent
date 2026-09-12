@@ -7,6 +7,36 @@
 #widokWms[hidden] {
   display: none;
 }
+.wms-parcel-label {
+  display: grid;
+  gap: var(--ui-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+}
+.wms-parcel-label legend {
+  font-weight: 700;
+  padding: 0 var(--ui-space-2);
+}
+.wms-parcel-items {
+  margin: 0;
+  padding-left: var(--ui-space-5);
+  overflow-wrap: anywhere;
+}
+.wms-parcel-items li + li {
+  margin-top: var(--ui-space-2);
+}
+.wms-parcel-selector {
+  padding: var(--ui-space-3);
+  background: var(--ui-selected);
+  border-left: 4px solid var(--brand-orange);
+}
+.wms-parcel-corrections,
+.wms-parcel-contents {
+  margin-top: var(--ui-space-4);
+}
 .wms-head,
 .wms-toolbar,
 .wms-tabs,

@@ -292,7 +292,8 @@ test("pełne zamówienie i rejestr wielu paczek działają bez dostępu do zewn�
       quantity: a.quantity,
     });
   await action({ action: "pack-start", tote: "DEMO-OFFLINE" });
-  await action({ action: "pack", barcode: "NOZ-01", quantity: 2 });
+  await action({ action: "pack", barcode: "NOZ-01", quantity: 1 });
+  await action({ action: "pack", barcode: "NOZ-01", quantity: 1, parcelNo: 2 });
   const shipping = {
     action: "ship",
     version: order.version,

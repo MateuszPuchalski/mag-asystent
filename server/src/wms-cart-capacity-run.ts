@@ -209,9 +209,32 @@ try {
       .prepare("SELECT count(*) AS n FROM wms_order WHERE status='shipped'")
       .get()!.n,
   );
-  if (completed !== orderCount || shipped !== orderCount || !integrity.ok)
+  const contentsMismatch = db()
+    .prepare(
+      `WITH sent AS (
+    SELECT c.line_id,sum(c.quantity) AS quantity FROM wms_shipment_content c
+    JOIN wms_parcel_state p ON p.shipment_id=c.shipment_id WHERE p.status='handed' GROUP BY c.line_id)
+    SELECT l.id FROM wms_line l LEFT JOIN sent s ON s.line_id=l.id WHERE l.quantity<>coalesce(s.quantity,0)`,
+    )
+    .all();
+  const parcelContents = {
+    ok: contentsMismatch.length === 0,
+    parcels: Number(
+      db()
+        .prepare(
+          "SELECT count(DISTINCT shipment_id) AS n FROM wms_shipment_content",
+        )
+        .get()!.n,
+    ),
+  };
+  if (
+    completed !== orderCount ||
+    shipped !== orderCount ||
+    !integrity.ok ||
+    !parcelContents.ok
+  )
     throw new Error(
-      `Niespójny wynik: ${completed}/${shipped}, ledger=${integrity.ok}`,
+      `Niespójny wynik: ${completed}/${shipped}, ledger=${integrity.ok}, contents=${parcelContents.ok}`,
     );
   const stats = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
@@ -234,6 +257,7 @@ try {
     cartAssignment: stats(cartTimings),
     eventLoopP95Ms: loop.percentile(95) / 1e6,
     integrity,
+    parcelContents,
     cartAnalytics: C.cartAnalytics(actor, { days: 1 }),
     boundary:
       "Seeded HTTP test. 2000 orders is an explicit stress scenario above the observed 1690-order peak. SKU overlap and 1–3 lines/order are synthetic assumptions; elapsed time measures software throughput, not staff productivity.",
@@ -251,6 +275,7 @@ try {
       requests: result.requests,
       cartAssignment: result.cartAssignment,
       integrity: integrity.ok,
+      parcelContents,
     }),
   );
 } finally {

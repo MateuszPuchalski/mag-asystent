@@ -9,6 +9,7 @@ import {
   type Actor,
 } from "./wms.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
+import { clearPackingContents } from "./wms-packing.js";
 
 const filters = z.object({
   day: z.iso.date().refine((v) => v >= "2000-01-01" && v <= "2099-12-31"),
@@ -484,6 +485,7 @@ export function reopenPacking(
         .run(p.id);
     }
     db().prepare("UPDATE wms_line SET packed=0 WHERE order_id=?").run(id);
+    clearPackingContents(id);
     db()
       .prepare(
         "UPDATE wms_order SET status='picked',packer_id=NULL,packed_at=NULL,tote=?,version=version+1,updated_at=? WHERE id=?",

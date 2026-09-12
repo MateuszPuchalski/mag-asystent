@@ -1014,9 +1014,10 @@ test("usunięta kartoteka ERP nie ukrywa fizycznego zapasu ani jego ruchów", ()
 
 test("wielopaczkowa wysyłka jest atomowa; ponowny numer paczki nie zamyka zamówienia", () => {
   const p = product();
-  let o = pick(order(p.sku, 1));
+  let o = pick(order(p.sku, 2));
   o = action(o, "pack-start", { tote: o.tote }, packer);
   o = action(o, "pack", { barcode: p.sku, quantity: 1 }, packer);
+  o = action(o, "pack", { barcode: p.sku, quantity: 1, parcelNo: 2 }, packer);
   const shipment = {
     carrier: "MULTI",
     tracking: "BOX-1",

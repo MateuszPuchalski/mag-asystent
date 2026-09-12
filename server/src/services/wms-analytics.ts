@@ -156,9 +156,13 @@ export function erpReconciliation() {
   const rows = db()
     .prepare(
       `WITH physical AS (SELECT tw_id,sum(on_hand) AS shelf FROM wms_stock GROUP BY tw_id),
-    staged AS (SELECT l.tw_id,sum(l.picked) AS picked,
-      max(EXISTS(SELECT 1 FROM wms_shipment s JOIN wms_parcel_state ps ON ps.shipment_id=s.id WHERE s.order_id=o.id AND ps.status='handed')) AS partial_dispatch
+    handed AS (SELECT c.line_id,sum(c.quantity) AS quantity FROM wms_shipment_content c JOIN wms_parcel_state ps ON ps.shipment_id=c.shipment_id
+      WHERE ps.status='handed' GROUP BY c.line_id),
+    staged AS (SELECT l.tw_id,sum(l.picked-coalesce(h.quantity,0)) AS picked,
+      max(EXISTS(SELECT 1 FROM wms_shipment s JOIN wms_parcel_state ps ON ps.shipment_id=s.id WHERE s.order_id=o.id AND ps.status='handed'
+        AND NOT EXISTS(SELECT 1 FROM wms_shipment_content c WHERE c.shipment_id=s.id))) AS partial_dispatch
       FROM wms_line l JOIN wms_order o ON o.id=l.order_id
+      LEFT JOIN handed h ON h.line_id=l.id
       WHERE o.status NOT IN ('shipped','cancelled') GROUP BY l.tw_id)
     SELECT p.tw_id,p.symbol,p.nazwa,coalesce(s.shelf,0) AS shelf,
       CASE WHEN g.partial_dispatch=1 THEN NULL ELSE coalesce(g.picked,0) END AS staged,
@@ -175,7 +179,7 @@ export function erpReconciliation() {
     warehouseId: config.magId.MAG,
     limit: 100,
     explanation:
-      "WMS obejmuje półki i pobrane, niewysłane sztuki. Częściowy odbiór wielopaczkowy nie ma jeszcze podziału SKU na paczki, więc różnica pozostaje nieznana. ERP pochodzi z ostatniej synchronizacji. Raport nie zmienia ewidencji.",
+      "WMS obejmuje półki i pobrane sztuki pomniejszone o zawartość odebranych paczek. Dawny częściowy odbiór bez zapisanej zawartości pozostawia różnicę nieznaną. ERP pochodzi z ostatniej synchronizacji. Raport nie zmienia ewidencji.",
   };
 }
 

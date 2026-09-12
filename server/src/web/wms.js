@@ -118,6 +118,7 @@ window.Wms = (() => {
     photo: photos.markup,
     mountPhotos: () => photos.mount(root()),
   });
+  const packingUi = window.WmsPacking({ html, field, form });
   const handoffUi = window.WmsHandoff({
     html,
     field,
@@ -405,7 +406,7 @@ window.Wms = (() => {
       const idx = stages.indexOf(o.status);
       el("wms-work").innerHTML =
         `<button class="wms-queue-toggle" data-do-wms="queue">${root().classList.contains("wms-queue") ? "WRÓĆ DO SKANOWANIA" : "POKAŻ KOLEJKĘ"}</button><div class="wms-eyebrow">${html(o.channel)} · termin ${date(o.due_at)}</div><div class="wms-toolbar"><h2>${html(o.reference)}</h2>${badge(o)}</div>
-      <div class="wms-progress" aria-label="Etap: ${states[o.status]}">${stages.map((_, i) => `<span class="${i <= idx ? "done" : ""}"></span>`).join("")}</div>
+      <div class="wms-progress" role="img" aria-label="Etap: ${states[o.status]}">${stages.map((_, i) => `<span class="${i <= idx ? "done" : ""}"></span>`).join("")}</div>
       ${o.hold_reason ? `<div class="wms-message error">${html(o.hold_reason)}</div>` : ""}
       ${o.tote ? `<p class="wms-muted">Pojemnik <strong>${html(o.tote)}</strong></p>` : ""}
       <div id="wms-step">${step(o)}</div>
@@ -436,7 +437,7 @@ window.Wms = (() => {
   function step(o) {
     if (o.shipments.length && o.status === "packed")
       return (
-        `<div class="wms-message">Paczki przygotowane. Odbiór przez kuriera wymaga potwierdzenia w Wydaniach.</div>${o.shipments.map((s) => `<p>${html(s.carrier)} · <strong>${html(s.tracking)}</strong> · ${s.dispatch_status === "handed" ? "Odebrana" : "Czeka na odbiór"}</p>`).join("")}<button data-tab-wms="handoff">PRZEJDŹ DO WYDAŃ</button>` +
+        `<div class="wms-message">Paczki przygotowane. Odbiór przez kuriera wymaga potwierdzenia w Wydaniach.</div>${o.shipments.map(packingUi.saved).join("")}<button data-tab-wms="handoff">PRZEJDŹ DO WYDAŃ</button>` +
         handoffUi.repackForm(o)
       );
     if (o.hold_reason)
@@ -495,22 +496,27 @@ window.Wms = (() => {
         `<div class="wms-quantity">Sprawdzono ${done} z ${total} szt.</div><progress value="${done}" max="${total}" aria-label="Postęp kontroli paczki"></progress>` +
         form(
           "pack",
-          `<div class="wms-fields">${field("barcode", "Zeskanuj wkładany towar", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, 'min="1"')}</div>`,
+          `${packingUi.controls(o)}<div class="wms-fields">${field("barcode", "Zeskanuj wkładany towar", "text", "", 'autocomplete="off"')}${field("quantity", "Sztuki", "number", 1, 'min="1"')}</div>`,
           "DODAJ DO PACZKI",
-        )
+        ) +
+        packingUi.contents(o) +
+        packingUi.corrections(o)
       );
     }
+    if (
+      o.status === "packed" &&
+      o.packer_id === user.userId &&
+      packingUi.problem(o)
+    )
+      return `<p class="wms-message error">${html(packingUi.problem(o))}</p>${packingUi.contents(o)}${packingUi.corrections(o)}`;
     if (o.status === "packed")
       return o.packer_id === user.userId
-        ? `<div class="wms-message">Wszystkie pozycje sprawdzone. Paczka gotowa do wysłania.</div>` +
-            form(
-              "ship",
-              `${field("carrier", "Przewoźnik", "text", "", 'maxlength="120"')}${field("tracking", "Zeskanuj numer przesyłki", "text", "", 'autocomplete="off"')}${field("weightG", "Masa paczki (g)", "number", "", 'min="1" max="1000000"')}<details><summary>Dodatkowe paczki tego zamówienia</summary><label>Przewoźnik; numer przesyłki; masa w gramach<textarea name="extraParcels" placeholder="DPD;123456789;1200"></textarea></label><p class="wms-help">Jedna dodatkowa paczka w wierszu. Łącznie do 20 paczek.</p></details>`,
-              "ZAPISZ PRZYGOTOWANE PACZKI",
-            )
+        ? `<div class="wms-message">Wszystkie pozycje sprawdzone. Zeskanuj etykiety przygotowanych paczek.</div>` +
+            form("ship", packingUi.labels(o), "ZAPISZ PRZYGOTOWANE PACZKI") +
+            packingUi.corrections(o)
         : "Paczka czeka na wysyłkę przez osobę pakującą.";
     if (o.status === "shipped")
-      return `<div class="wms-message">${o.shipments.some((s) => s.dispatch_status === "legacy") ? "Historia sprzed skanowanego odbioru kuriera.<br>" : "Odbiór kuriera potwierdzony.<br>"}${o.shipments.map((s) => `Paczka ${s.package_no}: ${html(s.carrier)} · <strong>${html(s.tracking)}</strong>`).join("<br>")}</div><button data-do-wms="print">DRUKUJ LISTĘ PAKOWĄ</button>`;
+      return `<div class="wms-message">${o.shipments.some((s) => s.dispatch_status === "legacy") ? "Historia sprzed skanowanego odbioru kuriera." : "Odbiór kuriera potwierdzony."}</div>${o.shipments.map(packingUi.saved).join("")}<button data-do-wms="print">DRUKUJ LISTĘ PAKOWĄ</button>`;
     return "<p>Zamówienie anulowane. Rezerwacje zwolnione.</p>";
   }
   function exceptionsForm(o) {
@@ -738,6 +744,7 @@ window.Wms = (() => {
       }
       if (button.dataset.orderWms) {
         selected = Number(button.dataset.orderWms);
+        root().classList.remove("wms-queue");
         await detail(selected);
       }
       if (button.dataset.waveWms) {
@@ -806,7 +813,19 @@ window.Wms = (() => {
         offset = Math.max(0, offset + (action === "next" ? 50 : -50));
         await refresh();
       }
-      if (action === "print") window.print();
+      if (action === "print") {
+        // Wydruk zawiera podział SKU także wtedy, gdy operator zwinął podgląd paczek.
+        const closed = [
+          ...root().querySelectorAll(".wms-saved-parcel:not([open])"),
+        ];
+        closed.forEach((d) => (d.open = true));
+        window.addEventListener(
+          "afterprint",
+          () => closed.forEach((d) => (d.open = false)),
+          { once: true },
+        );
+        window.print();
+      }
       if (action === "queue") {
         const showing = root().classList.toggle("wms-queue");
         button.textContent = showing ? "WRÓĆ DO SKANOWANIA" : "POKAŻ KOLEJKĘ";
@@ -1054,7 +1073,7 @@ window.Wms = (() => {
       }
       const action = f.dataset.actionWms || values.action;
       if (action && current) {
-        const body = { ...values, action, version: current.version };
+        let body = { ...values, action, version: current.version };
         if (action === "amend") {
           body.lines = String(values.lines)
             .split(/\r?\n/)
@@ -1068,24 +1087,21 @@ window.Wms = (() => {
           body.dueAt = new Date(String(values.dueAt)).toISOString();
           body.priority = Number(values.priority);
         }
-        for (const n of ["quantity", "allocationId", "weightG"])
+        for (const n of [
+          "quantity",
+          "allocationId",
+          "weightG",
+          "parcelNo",
+          "fromParcel",
+          "toParcel",
+        ])
           if (n in body) body[n] = Number(body[n]);
         if (action === "ship")
-          body.extraParcels = String(values.extraParcels || "")
-            .split(/\r?\n/)
-            .filter((s) => s.trim())
-            .map((s) => {
-              const p = s.split(";");
-              if (p.length !== 3)
-                throw new Error(
-                  "Paczka wymaga przewoźnika, numeru i masy oddzielonych średnikiem.",
-                );
-              return {
-                carrier: p[0].trim(),
-                tracking: p[1].trim(),
-                weightG: Number(p[2]),
-              };
-            });
+          body = {
+            action,
+            version: current.version,
+            ...packingUi.shippingValues(values),
+          };
         const result = await mutate(
           `/api/wms/orders/${current.id}/actions`,
           body,
@@ -1102,6 +1118,7 @@ window.Wms = (() => {
   document.addEventListener("click", click);
   document.addEventListener("submit", submit);
   document.addEventListener("change", async (event) => {
+    packingUi.change(event.target);
     if (event.target.id === "wms-stock-file") {
       root()._stockImport = null;
       el("wms-stock-preview-result").textContent = "";

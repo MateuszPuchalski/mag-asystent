@@ -239,6 +239,13 @@ CREATE TABLE IF NOT EXISTS wms_line (
   UNIQUE(order_id, tw_id)
 );
 CREATE INDEX IF NOT EXISTS ix_wms_line_tw ON wms_line(tw_id, order_id);
+-- Roboczy podział powstaje przy skanie; po etykiecie dowodem jest niezmienna zawartość przesyłki.
+CREATE TABLE IF NOT EXISTS wms_pack_content (
+  line_id INTEGER NOT NULL REFERENCES wms_line(id),
+  parcel_no INTEGER NOT NULL CHECK(parcel_no BETWEEN 1 AND 20),
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  PRIMARY KEY(line_id,parcel_no)
+);
 CREATE TABLE IF NOT EXISTS wms_allocation (
   id INTEGER PRIMARY KEY,
   line_id INTEGER NOT NULL REFERENCES wms_line(id),
@@ -283,6 +290,21 @@ CREATE TABLE IF NOT EXISTS wms_shipment (
 );
 CREATE INDEX IF NOT EXISTS ix_wms_shipment_dispatch ON wms_shipment(created_at, id);
 CREATE INDEX IF NOT EXISTS ix_wms_shipment_identity ON wms_shipment(upper(carrier),upper(tracking));
+CREATE TABLE IF NOT EXISTS wms_shipment_content (
+  shipment_id INTEGER NOT NULL REFERENCES wms_shipment(id),
+  -- Po wycofaniu etykiet biuro może zmienić pozycje zamówienia; migawka pozostaje niezależna.
+  line_id INTEGER NOT NULL,
+  tw_id INTEGER NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  PRIMARY KEY(shipment_id,line_id)
+);
+CREATE INDEX IF NOT EXISTS ix_wms_shipment_content_line ON wms_shipment_content(line_id,shipment_id);
+CREATE TRIGGER IF NOT EXISTS wms_shipment_content_no_update BEFORE UPDATE ON wms_shipment_content
+BEGIN SELECT RAISE(ABORT, 'WMS parcel content is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_shipment_content_no_delete BEFORE DELETE ON wms_shipment_content
+BEGIN SELECT RAISE(ABORT, 'WMS parcel content is immutable'); END;
 -- Etykieta nie dowodzi odbioru. Nowe paczki czekają na skan i zamknięcie przekazania.
 CREATE TABLE IF NOT EXISTS wms_parcel_state (
   shipment_id INTEGER PRIMARY KEY REFERENCES wms_shipment(id),

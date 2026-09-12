@@ -479,3 +479,22 @@ Wszystkie paczki muszą pozostać w magazynie. Po zmianie zawartość wymaga pon
 
 Historia starsza od skanowanych odbiorów pozostaje oznaczona jako niepotwierdzona.
 Wszystkie operacje i obecny odbiór funkcjonalny dotyczą danych seeded.
+
+## Zawartość paczek
+
+Kontrola zaczyna się od **Paczki 1**. Skanowany towar trafia do paczki wskazanej
+nad polem skanera. Dla kolejnego kartonu wybierz następny numer przed skanowaniem.
+Wybór pozostaje aktywny pomiędzy skanami. **Zawartość paczek** pokazuje SKU i ilości.
+
+Przed zapisem etykiet można fizycznie przełożyć sprawdzone sztuki, używając
+**Przełóż towar lub powtórz kontrolę**. Wskaż SKU, ilość, paczkę źródłową i docelową.
+W razie niepewności rozpocznij całą kontrolę od nowa z podaniem powodu.
+Zapas nie wraca wtedy automatycznie na półkę.
+
+Po sprawdzeniu wszystkich sztuk formularz pokazuje etykietę i masę dla każdej paczki.
+Używaj kolejnych numerów od 1. Nie można zapisać pustej paczki ani pominąć jej etykiety.
+Zapisana zawartość pozostaje przy przesyłce także po korekcie lub wycofaniu etykiet.
+Po częściowym odbiorze w magazynie pozostają tylko sztuki z nieodebranych paczek.
+
+Historia sprzed tej funkcji nie ma automatycznie odtworzonej zawartości.
+Stare, trwające pakowanie wielopaczkowe wymaga pełnego podziału lub ponownej kontroli.

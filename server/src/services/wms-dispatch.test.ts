@@ -58,7 +58,8 @@ function prepared(parcels = 1) {
     quantity: 2,
   });
   act({ action: "pack-start", tote: order.tote });
-  act({ action: "pack", barcode: sku, quantity: 2 });
+  for (let i = 1; i <= parcels; i++)
+    act({ action: "pack", barcode: sku, quantity: 2 / parcels, parcelNo: i });
   act({
     action: "ship",
     carrier: "DEMO",
@@ -77,6 +78,20 @@ test("numer przesyłki kończy pakowanie, ale nie potwierdza odbioru kuriera", (
   assert.equal(order.status, "packed");
   assert.equal(order.shipped_at, null);
   assert.equal(order.tote, null);
+});
+
+test("zapisana paczka zachowuje sprawdzoną zawartość SKU", () => {
+  const order = prepared();
+  const contents = (order.shipments[0] as Record<string, unknown>).contents;
+  assert.deepEqual(contents, [
+    {
+      line_id: order.lines[0].id,
+      tw_id: order.lines[0].tw_id,
+      sku: order.lines[0].sku,
+      name: order.lines[0].name,
+      quantity: 2,
+    },
+  ]);
 });
 test("skan jest odporny na powtórzenie, a zamówienie wielopaczkowe czeka na wszystkie odbiory", () => {
   const o = prepared(2),
@@ -108,9 +123,8 @@ test("skan jest odporny na powtórzenie, a zamówienie wielopaczkowe czeka na ws
   const physical = A.erpReconciliation().rows.find(
     (r) => r.tw_id === o.lines[0].tw_id,
   )!;
-  assert.equal(physical.partial_dispatch, 1);
-  assert.equal(physical.staged, null);
-  assert.equal(physical.difference, null);
+  assert.equal(physical.partial_dispatch, 0);
+  assert.equal(physical.staged, 1);
   const second = D.createHandoff(worker, randomUUID(), { carrier: "DEMO" });
   const next = D.scanHandoff(worker, randomUUID(), second.id, {
     tracking: q.tracking,

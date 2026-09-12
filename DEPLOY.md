@@ -16,6 +16,11 @@ potwierdza się w **Realizacja WMS → Wydania** przez skanowanie i zamknięcie 
 Dopiero odbiór wszystkich paczek oznacza wysłanie zamówienia. Aktualizacja nie dopisuje
 dat odbioru do dawnej historii. Korekta etykiety w WMS nie anuluje jej u przewoźnika.
 
+Zawartość paczek zapisuje się podczas kontroli pakowania. Aktualizacja dodaje osobne
+tabele robocze i historyczne, bez zmiany zapasu ani dawnych przesyłek.
+Przy trwającym pakowaniu wielopaczkowym sprzed aktualizacji wymagana jest ponowna kontrola,
+jeśli brakuje podziału SKU. Jedna paczka może objąć całe sprawdzone zamówienie.
+
 Tryb wózków 20/30 wymaga rejestracji kodów wózków, stałych pozycji skrzynek i stanowisk pakowania.
 Biuro wykonuje tę konfigurację w **Realizacja WMS → Wózki 20 / 30**.
 Aktualizacja dodaje tabele i indeksy; nie przypisuje istniejących zamówień ani nie zmienia zapasu.

@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.292.0 — 12 września 2026
+
+- Skan kontroli zapisuje SKU i ilość w wybranej paczce; zwykłe zamówienie zaczyna od paczki 1.
+- Przełożenie sprawdzonych sztuk między paczkami oraz ponowna kontrola nie zmieniają zapasu półek.
+- Formularz etykiet pokazuje zawartość każdej paczki. Zastępuje tekstową listę dodatkowych numerów przesyłek.
+- Puste paczki, brakujące numery i niepełny podział blokują zapis. Wersja i właściciel pracy chronią równoległe zmiany.
+- Częściowy odbiór odejmuje tylko zawartość odebranych paczek od towaru oczekującego na hali.
+- Historyczna zawartość pozostaje niezmienna także po wycofaniu etykiety i późniejszej zmianie zamówienia.
+- Wybranie zamówienia na telefonie otwiera skanowanie bez dodatkowego zamykania kolejki.
+- **[wymaga działania]** Stare pakowanie wielopaczkowe bez zapisanego podziału wymaga ponownej kontroli. Dawne przesyłki nie otrzymują wymyślonej zawartości.
+- Weryfikacja na danych seeded: 2208 testów serwera, 727 testów panelu, TypeScript oraz scenariusz dwóch paczek w przeglądarce.
+
 ## 0.291.0 — 12 września 2026
 
 - **Wydania kurierowi.** Zapis etykiety nie oznacza wysyłki. Zamówienie zamyka się

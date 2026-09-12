@@ -9,6 +9,7 @@ import { exerciseCarts } from "./wms-cart-e2e.mjs";
 import { exerciseDesign } from "./wms-design-e2e.mjs";
 import { exerciseInbound } from "./wms-inbound-e2e.mjs";
 import { exerciseHandoff } from "./wms-handoff-e2e.mjs";
+import { exercisePacking } from "./wms-packing-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -227,27 +228,33 @@ try {
           }),
         { times: 1 },
       );
-    await page.locator('#wms-step [name="barcode"]').fill(sku);
-    await page.locator('#wms-step [name="quantity"]').fill(qty);
+    await page.locator('[data-action-wms="pack"] [name="barcode"]').fill(sku);
+    await page.locator('[data-action-wms="pack"] [name="quantity"]').fill(qty);
     await page
       .getByRole("button", { name: "DODAJ DO PACZKI", exact: true })
       .click();
     if (sku === "WMS-0001") {
       await packRefreshEntered;
       try {
-        await expect(page.locator('#wms-step [name="barcode"]')).toBeDisabled();
+        await expect(
+          page.locator('[data-action-wms="pack"] [name="barcode"]'),
+        ).toBeDisabled();
       } finally {
         releasePackRefresh();
       }
       await expect(page.locator("#wms-step")).toContainText(
         "Sprawdzono 2 z 3 szt.",
       );
-      await expect(page.locator('#wms-step [name="barcode"]')).toBeFocused();
+      await expect(
+        page.locator('[data-action-wms="pack"] [name="barcode"]'),
+      ).toBeFocused();
     } else {
       await expect(
         page.getByRole("button", { name: "PONÓW ODCZYT", exact: true }),
       ).toBeVisible();
-      await expect(page.locator('#wms-step [name="barcode"]')).toHaveCount(0);
+      await expect(
+        page.locator('[data-action-wms="pack"] [name="barcode"]'),
+      ).toHaveCount(0);
       await page
         .getByRole("button", { name: "PONÓW ODCZYT", exact: true })
         .click();
@@ -515,6 +522,7 @@ try {
   }
   await expect(page.locator("#wms-work")).toContainText("Trasa zebrana");
   await exerciseCarts(page, output);
+  await exercisePacking(page, output);
   await exerciseInbound(page, output);
   await page.locator('[data-tab-wms="analytics"]').click();
   await page

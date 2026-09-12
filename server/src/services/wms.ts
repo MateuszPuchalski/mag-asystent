@@ -3,6 +3,15 @@ import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
 import { logEvent } from "./events.js";
 import type { Rola } from "./users.js";
+import {
+  addPackedContent,
+  clearPackingContents,
+  movePackedContent,
+  packingContents,
+  parcelContents,
+  saveParcelContents,
+  validatePackingContents,
+} from "./wms-packing.js";
 
 export type Actor = { id: number; name: string; role: Rola };
 export class WmsError extends Error {
@@ -26,6 +35,7 @@ const bin = z
   .regex(/^[A-Z0-9][A-Z0-9-]{0,29}$/, "Niepoprawny kod lokalizacji");
 const reason = z.string().trim().min(3).max(500);
 const version = z.number().int().positive();
+const parcelNo = z.number().int().min(1).max(20);
 export const orderInput = z
   .object({
     reference: label,
@@ -112,8 +122,20 @@ export const actionInput = z.discriminatedUnion("action", [
       version,
       barcode: label,
       quantity: qty,
+      parcelNo: parcelNo.default(1),
     })
     .strict(),
+  z
+    .object({
+      action: z.literal("pack-move"),
+      version,
+      barcode: label,
+      quantity: qty,
+      fromParcel: parcelNo,
+      toParcel: parcelNo,
+    })
+    .strict(),
+  z.object({ action: z.literal("pack-reset"), version, reason }).strict(),
   z
     .object({
       action: z.literal("ship"),
@@ -860,7 +882,15 @@ function readOrder(orderId: number) {
     .prepare(
       "SELECT s.*,coalesce(p.status,'legacy') AS dispatch_status,coalesce(p.version,1) AS version,p.handed_at FROM wms_shipment s LEFT JOIN wms_parcel_state p ON p.shipment_id=s.id WHERE s.order_id=? AND coalesce(p.status,'legacy')<>'void' ORDER BY s.package_no",
     )
-    .all(orderId);
+    .all(orderId)
+    .map((s) => ({
+      ...s,
+      id: Number(s.id),
+      package_no: Number(s.package_no),
+      tracking: String(s.tracking),
+      dispatch_status: String(s.dispatch_status),
+      contents: parcelContents(Number(s.id)),
+    }));
   return {
     ...order,
     wave_id:
@@ -871,6 +901,7 @@ function readOrder(orderId: number) {
     allocations,
     shipment: shipments[0] ?? null,
     shipments,
+    packingContents: packingContents(orderId),
   };
 }
 
@@ -1122,6 +1153,7 @@ export function applyOrderAction(
     if (returning) {
       // Po fizycznym wyjęciu z paczki kontrola całego zamówienia zaczyna się od nowa.
       d.prepare("UPDATE wms_line SET packed=0 WHERE order_id=?").run(orderId);
+      clearPackingContents(orderId);
       d.prepare(
         "UPDATE wms_order SET status='picking',picked_at=NULL,packed_at=NULL WHERE id=?",
       ).run(orderId);
@@ -1161,8 +1193,21 @@ export function applyOrderAction(
       "UPDATE wms_order SET status='packing',packer_id=? WHERE id=?",
     ).run(actor.id, orderId);
   }
-  if (input.action === "pack") {
-    requireState("packing");
+  if (input.action === "pack-reset") {
+    requireState("packing", "packed");
+    owner(order.packer_id, actor);
+    clearPackingContents(orderId);
+    d.prepare("UPDATE wms_line SET packed=0 WHERE order_id=?").run(orderId);
+    d.prepare(
+      "UPDATE wms_order SET status='packing',packed_at=NULL WHERE id=?",
+    ).run(orderId);
+    d.prepare(
+      "UPDATE wms_order_timing SET first_pack_scan_at=NULL,last_pack_scan_at=NULL,pack_completed_at=NULL WHERE order_id=?",
+    ).run(orderId);
+  }
+  if (input.action === "pack" || input.action === "pack-move") {
+    if (input.action === "pack") requireState("packing");
+    else requireState("packing", "packed");
     owner(order.packer_id, actor);
     const matches = order.lines.filter(
       (l) =>
@@ -1178,27 +1223,39 @@ export function applyOrderAction(
       );
     const line = matches[0];
     checkBarcode(line, input.barcode);
-    if (input.quantity > line.quantity - line.packed)
-      fail("Nadmiar w paczce. Odłóż dodatkowe sztuki", 400);
-    d.prepare("UPDATE wms_line SET packed=packed+? WHERE id=?").run(
-      input.quantity,
-      line.id,
-    );
-    const stamp = nowIso();
-    d.prepare(
-      "UPDATE wms_order_timing SET first_pack_scan_at=coalesce(first_pack_scan_at,?),last_pack_scan_at=? WHERE order_id=?",
-    ).run(stamp, stamp, orderId);
-    if (
-      !d
-        .prepare("SELECT 1 FROM wms_line WHERE order_id=? AND packed<quantity")
-        .get(orderId)
-    ) {
+    if (input.action === "pack-move") {
+      movePackedContent(
+        line.id,
+        input.fromParcel,
+        input.toParcel,
+        input.quantity,
+      );
+    } else {
+      if (input.quantity > line.quantity - line.packed)
+        fail("Nadmiar w paczce. Odłóż dodatkowe sztuki", 400);
+      d.prepare("UPDATE wms_line SET packed=packed+? WHERE id=?").run(
+        input.quantity,
+        line.id,
+      );
+      addPackedContent(line.id, input.parcelNo, input.quantity);
+      const stamp = nowIso();
       d.prepare(
-        "UPDATE wms_order SET status='packed',packed_at=? WHERE id=?",
-      ).run(nowIso(), orderId);
-      d.prepare(
-        "UPDATE wms_order_timing SET pack_completed_at=? WHERE order_id=?",
-      ).run(stamp, orderId);
+        "UPDATE wms_order_timing SET first_pack_scan_at=coalesce(first_pack_scan_at,?),last_pack_scan_at=? WHERE order_id=?",
+      ).run(stamp, stamp, orderId);
+      if (
+        !d
+          .prepare(
+            "SELECT 1 FROM wms_line WHERE order_id=? AND packed<quantity",
+          )
+          .get(orderId)
+      ) {
+        d.prepare(
+          "UPDATE wms_order SET status='packed',packed_at=? WHERE id=?",
+        ).run(nowIso(), orderId);
+        d.prepare(
+          "UPDATE wms_order_timing SET pack_completed_at=? WHERE order_id=?",
+        ).run(stamp, orderId);
+      }
     }
   }
   if (input.action === "ship") {
@@ -1219,7 +1276,8 @@ export function applyOrderAction(
         tracking: p.tracking.toUpperCase(),
       })),
     ];
-    for (const parcel of parcels) {
+    validatePackingContents(orderId, parcels.length);
+    for (const [parcelIndex, parcel] of parcels.entries()) {
       if (
         d
           .prepare(
@@ -1248,6 +1306,11 @@ export function applyOrderAction(
         );
       d.prepare("INSERT INTO wms_parcel_state(shipment_id) VALUES (?)").run(
         Number(saved.lastInsertRowid),
+      );
+      saveParcelContents(
+        orderId,
+        Number(saved.lastInsertRowid),
+        parcelIndex + 1,
       );
     }
     // Pusta skrzynka wraca do pracy przed przyjazdem kuriera; jej przypisanie zostaje w historii.
