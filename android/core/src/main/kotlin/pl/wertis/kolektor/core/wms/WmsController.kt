@@ -39,6 +39,7 @@ interface WmsTransport {
 
 data class WmsView(
     val generation: Long = 0,
+    val initialScan: WmsScanState? = null,
     val context: WmsContext? = null,
     val journal: WmsJournal = WmsJournal(),
     val run: WmsRun? = null,
@@ -57,10 +58,17 @@ class WmsController(
 ) {
     private val lock = Mutex()
     private var generation = 0L
+    private var verificationEpoch = 0L
     private val mutable = MutableStateFlow(WmsView())
     val state: StateFlow<WmsView> = mutable
 
+    fun invalidateVerification() {
+        verificationEpoch++
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = null)
+    }
+
     suspend fun open(context: WmsContext) = lock.withLock {
+        verificationEpoch++
         mutable.value = WmsView(generation = ++generation, context = context, busy = true)
         try {
             val journal = store.read()
@@ -83,13 +91,14 @@ class WmsController(
         try {
             val view = mutable.value
             if (!view.ready || view.context != context || view.journal.pending != null) return
+            val epoch = verificationEpoch
             mutable.value = view.copy(busy = true, ready = false, message = null)
             val pending = WmsPending(newKey(), context, draft.path, draft.body, draft.description, draft.runId)
             val journal = view.journal.copy(pending = pending)
             // Jeśli dysk odmawia zapisu, żądanie NIE wychodzi w sieć.
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal)
-            send(context, pending)
+            send(context, pending, continuationEpoch = epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -101,7 +110,7 @@ class WmsController(
             val pending = mutable.value.journal.pending ?: return
             if (pending.context != context || mutable.value.context != context) return
             mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
-            send(context, pending)
+            send(context, pending, continuationEpoch = null)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -117,7 +126,8 @@ class WmsController(
         } catch (e: Exception) { problem(e) }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, continuationEpoch: Long?) {
+        val before = mutable.value.run
         val client = transport(context)
         val runId = try { client.send(pending) } catch (e: ApiError) {
             // Odmowa biznesowa jest atomowa. Brak autoryzacji, limit i błąd
@@ -133,19 +143,26 @@ class WmsController(
         }
         val journal = WmsJournal(active = runId?.let { WmsActive(context, it) })
         store.write(journal)
-        mutable.value = mutable.value.copy(journal = journal, run = null)
-        if (runId != null) load(context, runId, client)
+        mutable.value = mutable.value.copy(journal = journal)
+        if (runId != null) load(context, runId, client) { after ->
+            if (continuationEpoch == verificationEpoch) continueWmsStop(before, after, pending) else null
+        }
         else mutable.value = mutable.value.copy(ready = true, message = "Brak zamówień do zebrania dla tego wózka")
     }
 
-    private suspend fun load(context: WmsContext, id: Long, client: WmsTransport = transport(context)) {
+    private suspend fun load(
+        context: WmsContext,
+        id: Long,
+        client: WmsTransport = transport(context),
+        continuation: ((WmsRun) -> WmsScanState?)? = null,
+    ) {
         val run = client.run(id)
         require(run.id == id && run.picker_id == context.actorId) { "Trasa należy do innej osoby. Skontaktuj się z biurem." }
-        mutable.value = mutable.value.copy(generation = ++generation, run = run, ready = true)
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = continuation?.invoke(run), run = run, ready = true)
     }
 
     private fun problem(error: Exception) {
-        mutable.value = mutable.value.copy(ready = false, message =
+        mutable.value = mutable.value.copy(initialScan = null, ready = false, message =
             if (error is ApiError) error.message else "Nie udało się potwierdzić stanu. Sprawdź Wi-Fi i ponów odczyt lub zapis.")
     }
 }

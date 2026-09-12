@@ -51,7 +51,7 @@ Zdjęcie zachowuje proporcje, a dotknięcie otwiera pełny ekran. Podczas podgl�
 Brak zdjęcia nie zastępuje części podobnym obrazem; widoczne pozostają SKU i nazwa.
 
 Ilość początkowa odpowiada pozostałej ilości dla wskazanej skrzynki. Przyciski plus i minus pozwalają potwierdzić część pobrania.
-Wszystkie cele dotykowe mają co najmniej 48 dp. Po zapisie ekran pobiera aktualną trasę i wymaga ponownego sprawdzenia lokalizacji oraz towaru.
+Wszystkie cele dotykowe mają co najmniej 48 dp. Po zapisie ekran pobiera aktualną trasę. Kolejna skrzynka tej samej części na tej samej półce zachowuje weryfikację przystanku.
 Zgłoszenie braku, uszkodzenia lub pełnej skrzynki wymaga zweryfikowanej lokalizacji i skanu właściwej skrzynki.
 Biuro rozpatruje zgłoszenie przez istniejący panel WMS. Gotowy wózek przekazuje się przez skan wózka i stanowiska pakowania.
 
@@ -69,3 +69,21 @@ Debug APK z PR nie zastępuje podpisanego wydania dla hali; dotychczasowy proces
 
 Od poprawki 0.293.1 WMS sprawdza oryginalny kod części i skrzynki, sprzed klasyfikacji lokalizacji.
 Prefiks lokalizacji działa wyłącznie w kroku półki. W tym trybie skaner klawiaturowy przyjmuje także krótkie kody, np. A1.
+
+
+## Kontynuacja przystanku od 0.294.0
+
+Kolejne skrzynki tej samej części wymagają tylko skanu skrzynki. Ilość jest zawsze pobierana z nowego zadania potwierdzonego przez serwer.
+Nowa część, półka, kod EAN, właściciel, blokada albo przekazanie wózka kończą ten przystanek.
+Częściowe pobranie wymaga zgodnego ubytku ilości i nowszej wersji zamówienia.
+
+Weryfikacja nie trafia do dziennika. Ponowienie po utracie odpowiedzi, odświeżenie, restart i wyjście z aplikacji wymagają nowych skanów.
+Wyjście podczas zapisu na dysku lub serwerze również usuwa prawo kontynuacji. Powrót odczytuje aktualną trasę.
+Przycisk **SPRAWDŹ PÓŁKĘ I TOWAR PONOWNIE** pozwala ręcznie zacząć weryfikację od nowa.
+
+Podczas zapisu zdjęcie i pozycja pozostają widoczne, ale skany oraz przyciski czekają na sygnał potwierdzenia.
+Test 30 skrzynek jednego SKU potwierdza 32 skany: półka, część i 30 skrzynek. Poprzedni wariant wymagał 90 skanów.
+Wynik dotyczy liczby czynności w syntetycznym przystanku, bez skanu rozpoczęcia wózka i przekazania. Nie określa wydajności pracownika.
+
+Podstawa procesu: [Microsoft — system-directed cluster picking](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/system-directed-cluster-pick).
+Źródło opisuje wspólne pobranie części i potwierdzenie pozycji; reguły przerwania oraz trwały dziennik są decyzjami WERTIS.

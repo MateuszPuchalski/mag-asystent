@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.294.0 — jeden przystanek zbiórki dla wielu skrzynek
+
+- Kolektor skanuje półkę i część raz dla kolejnych skrzynek tego samego SKU w tej samej lokalizacji. Każda skrzynka nadal wymaga własnego skanu.
+- Kontynuacja wymaga potwierdzonego zapisu i aktualnej trasy. Zmiana części, półki, właściciela, blokada, ponowienie i odświeżenie wymagają nowych skanów.
+- Wyjście z aplikacji usuwa weryfikację także podczas zapisu na dysku lub serwerze. Powrót odczytuje aktualną trasę.
+- Zdjęcie i pozycja skrzynki pozostają widoczne podczas zapisu; przyciski i skany czekają na potwierdzenie.
+- Osiem testów obejmuje przerwania i częściowe pobrania. Syntetyczny przystanek z 30 skrzynkami wymaga 32 zamiast 90 skanów; nie jest to pomiar czasu pracownika.
+
 ## 0.293.1 — oryginalne kody części w skanerze kolektora
 
 - Kompletacja sprawdza niezmieniony kod części i skrzynki. Starsza klasyfikacja lokalizacji nie może obciąć prefiksu z symbolu produktu.

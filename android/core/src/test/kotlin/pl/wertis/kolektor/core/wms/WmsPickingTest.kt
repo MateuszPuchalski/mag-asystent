@@ -256,3 +256,151 @@ class WmsRecoveryTest {
         assertNull(controller.state.value.run)
     }
 }
+
+class WmsStopTest {
+    private val next = task.copy(allocation_id = 8, order_id = 13, tote = "BOX-20-02", position = 2)
+    private val before = route.copy(tasks = listOf(task, next))
+    private val after = before.copy(tasks = listOf(next))
+    private fun pending(): WmsPending {
+        val draft = wmsScan(before, 2, WmsScanState(true, task.barcode, 3), task.tote).command!!
+        return WmsPending("stop-key", who, draft.path, draft.body, draft.description, draft.runId)
+    }
+
+    @Test fun `trzydziesci skrzynek tej samej czesci wymaga 32 skanow zamiast 90`() = runTest {
+        val store = MemoryStore()
+        val client = FakeTransport(store)
+        var current = route.copy(tasks = (1..30).map {
+            task.copy(allocation_id = it.toLong(), order_id = it.toLong(), position = it, tote = "BOX-$it", remaining = 1, stop_quantity = 30)
+        })
+        client.readAction = { current }
+        client.sendAction = {
+            current = current.copy(tasks = current.tasks.drop(1).map { t -> t.copy(stop_quantity = current.tasks.size - 1) })
+            route.id
+        }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        var scans = 0
+        while (controller.state.value.run!!.tasks.isNotEmpty()) {
+            val view = controller.state.value
+            val run = view.run!!
+            val target = run.nextTask(2)!!
+            var scan = view.initialScan ?: WmsScanState(quantity = target.remaining)
+            if (!scan.location) { scan = wmsScan(run, 2, scan, target.bin).state; scans++ }
+            if (scan.barcode == null) { scan = wmsScan(run, 2, scan, target.barcode!!).state; scans++ }
+            val result = wmsScan(run, 2, scan, target.tote)
+            assertNull(result.error)
+            controller.submit(who, result.command!!)
+            scans++
+        }
+        assertEquals(32, scans)
+        assertEquals(30, client.sent.size)
+        assertEquals(30, client.sent.map { it.body["tote"] }.distinct().size)
+        assertNull(controller.state.value.initialScan)
+    }
+
+    @Test fun `inna polka czesc kod wlasciciel lub blokada przerywa kontynuacje`() {
+        val variants = listOf(
+            after.copy(tasks = listOf(next.copy(bin = "B-01"))),
+            after.copy(tasks = listOf(next.copy(tw_id = 31))),
+            after.copy(tasks = listOf(next.copy(sku = "OTHER"))),
+            after.copy(tasks = listOf(next.copy(barcode = "OTHER"))),
+            after.copy(tasks = listOf(next.copy(name = "Inna część"))),
+            after.copy(tasks = listOf(next.copy(stock_blocked = "Spis"))),
+            after.copy(tasks = listOf(next.copy(hold_reason = "Wstrzymane"))),
+            after.copy(tasks = listOf(next.copy(position = null))),
+            after.copy(picker_id = 3), after.copy(cart_code = "OTHER"),
+            after.copy(arrived_at = "2026-09-12"), after.copy(id = 6),
+        )
+        variants.forEach { assertNull(continueWmsStop(before, it, pending())) }
+        assertEquals(WmsScanState(true, task.barcode, next.remaining), continueWmsStop(before, after, pending()))
+    }
+
+    @Test fun `czesciowe pobranie wymaga potwierdzonego ubytku i nowej wersji`() {
+        val draft = pickDraft()
+        val command = WmsPending("partial", who, draft.path, draft.body, draft.description, draft.runId)
+        assertNull(continueWmsStop(route, route, command))
+        val fresh = route.copy(tasks = listOf(task.copy(remaining = 1, version = 5)))
+        assertEquals(WmsScanState(true, task.barcode, 1), continueWmsStop(route, fresh, command))
+        assertNull(continueWmsStop(route, fresh.copy(tasks = listOf(task.copy(remaining = 2, version = 5))), command))
+    }
+
+    @Test fun `odswiezenie nawet identycznej trasy usuwa weryfikacje przystanku`() = runTest {
+        val store = MemoryStore()
+        val client = FakeTransport(store)
+        client.readAction = { before }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.readAction = { after }
+        val p = pending()
+        controller.submit(who, WmsDraft(p.path, p.body, p.description, p.runId))
+        assertNotNull(controller.state.value.initialScan)
+        controller.open(who)
+        assertNull(controller.state.value.initialScan)
+    }
+
+    @Test fun `ponowienie po utracie odpowiedzi wymaga nowych skanow`() = runTest {
+        val store = MemoryStore()
+        val client = FakeTransport(store)
+        client.readAction = { before }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.readAction = { after }
+        client.sendAction = { throw IOException() }
+        val p = pending()
+        controller.submit(who, WmsDraft(p.path, p.body, p.description, p.runId))
+        client.sendAction = { route.id }
+        controller.retry(who)
+        assertTrue(controller.state.value.ready)
+        assertNull(controller.state.value.initialScan)
+    }
+
+    @Test fun `wyjscie podczas zapisu na serwerze odbiera prawo kontynuacji`() = runTest {
+        val store = MemoryStore()
+        val client = FakeTransport(store)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        client.readAction = { before }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.readAction = { after }
+        client.sendAction = { entered.complete(Unit); release.await(); route.id }
+        val p = pending()
+        val job = launch { controller.submit(who, WmsDraft(p.path, p.body, p.description, p.runId)) }
+        entered.await()
+        controller.invalidateVerification()
+        release.complete(Unit)
+        job.join()
+        assertNull(controller.state.value.initialScan)
+    }
+
+    @Test fun `wyjscie podczas zapisu na dysku takze wymaga nowych skanow`() = runTest {
+        val memory = MemoryStore()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val store = object : WmsStore {
+            override suspend fun read() = memory.read()
+            override suspend fun write(journal: WmsJournal) {
+                if (journal.pending != null) { entered.complete(Unit); release.await() }
+                memory.write(journal)
+            }
+        }
+        val client = FakeTransport(memory)
+        client.readAction = { before }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.readAction = { after }
+        val p = pending()
+        val job = launch { controller.submit(who, WmsDraft(p.path, p.body, p.description, p.runId)) }
+        entered.await()
+        controller.invalidateVerification()
+        release.complete(Unit)
+        job.join()
+        assertNull(controller.state.value.initialScan)
+    }
+
+    @Test fun `zgloszenie i niezgodne dane polecenia nie potwierdzaja przystanku`() {
+        assertNull(continueWmsStop(before, after, pending().copy(path = "api/wms/pick-exceptions")))
+        assertNull(continueWmsStop(before, after, pending().copy(context = who.copy(actorId = 3))))
+        assertNull(continueWmsStop(before, after, pending().copy(runId = 99)))
+    }
+}

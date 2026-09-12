@@ -222,4 +222,16 @@ Są to pomiary syntetyczne, nie tempo pracy ludzi ani próba skanerów sprzętow
 
 Zbiórka docelowo odbywa się w istniejącym APK na Zebra lub Honeywell.
 Audyt rzeczywistych plików wydania i gałęzi: [kolektor WMS](wms-kolektor-audyt.md).
-Natywne powiązanie z WMS pozostaje otwartym, priorytetowym zakresem celu.
+Natywne powiązanie z WMS wdrożono w 0.293.0. Odbiór na fizycznych modelach kolektorów pozostaje otwarty.
+
+
+## Powtórzone skany przy jednej półce
+
+Audyt kolektora wykazał trzy skany na każdą skrzynkę, również przy kolejnych zamówieniach tego samego SKU.
+[Microsoft — system-directed cluster picking](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/system-directed-cluster-pick) opisuje potwierdzenie wspólnego pobrania oraz osobne potwierdzanie pozycji.
+W 0.294.0 kolektor zachowuje zweryfikowany przystanek wyłącznie między potwierdzonymi zapisami tej samej części i półki.
+
+Każda skrzynka nadal wymaga skanu. Ilości pochodzą z aktualnej trasy, a nie z lokalnego odejmowania.
+Przerwanie aplikacji, zmiana kontekstu, ponowienie i odświeżenie usuwają weryfikację. Testy obejmują przerwanie podczas zapisu dziennika i żądania sieciowego.
+Syntetyczny przystanek 30 skrzynek wymaga 32 zamiast 90 skanów, bez przypisywania temu wynikowi oszczędności czasu pracy.
+Zdjęcie części pozostaje widoczne podczas zapisu. Nieznany wynik nadal blokuje następne pobranie.
