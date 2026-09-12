@@ -11,6 +11,12 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Od 0.293.0 istniejący kolektor Android ma przycisk **ZBIÓRKA WMS — SKANUJ WÓZEK**.
+Serwer musi obsługiwać EAN w zadaniach trasy. Najpierw zaktualizować API, następnie APK.
+Niedokończonego zapisu na kolektorze nie wolno usuwać przez czyszczenie danych aplikacji.
+Należy zalogować pierwotną osobę na pierwotnym serwerze i użyć **SPRAWDŹ OSTATNI ZAPIS**.
+Odbiór sprzętowy odbywa się na danych seeded; zakres próby opisuje [`docs/wms-kolektor-audyt.md`](docs/wms-kolektor-audyt.md).
+
 Od 0.291.0 zapis etykiety pozostawia zamówienie spakowane. Fizyczny odbiór paczek
 potwierdza się w **Realizacja WMS → Wydania** przez skanowanie i zamknięcie przekazania.
 Dopiero odbiór wszystkich paczek oznacza wysłanie zamówienia. Aktualizacja nie dopisuje

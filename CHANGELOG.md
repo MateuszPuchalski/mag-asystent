@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.293.0 — zbiórka WMS w istniejącym kolektorze Android
+
+- Natywny ekran zbiórki: uruchomienie i wznowienie wózka, lokalizacja, kod towaru, zdjęcie, ilość i stała pozycja skrzynki.
+- Skan skrzynki zapisuje pobranie. Braki, uszkodzenia i pełne skrzynki trafiają do biura; gotowy wózek wymaga skanu stanowiska pakowania.
+- Trwały dziennik chroni przed powtórnym pobraniem po utracie odpowiedzi, restarcie aplikacji i awarii dysku.
+- Oczekujący zapis pozostaje związany z pierwotnym kontem i serwerem. Nieznany wynik blokuje kolejne pobrania.
+- Zdjęcia korzystają z istniejącego cache. Podgląd zachowuje proporcje; pełnoekranowe zdjęcie przechwytuje skany bez wykonywania operacji.
+- Wyjście z aktywnego pola tekstowego oddaje skaner klawiaturowy; usunięcie pola nie pozostawia blokady skanowania.
+- API trasy udostępnia EAN pozycji, zachowując wiodące zera. Dodano test serwera i 17 testów logiki oraz odzyskiwania w `:core`.
+- **[wymaga działania]** Zaktualizować serwer i APK. Próby skanerów Zebra/Honeywell wykonywać na danych seeded; model urządzenia wymaga potwierdzenia.
+
 ## 0.292.0 — 12 września 2026
 
 - Skan kontroli zapisuje SKU i ilość w wybranej paczce; zwykłe zamówienie zaczyna od paczki 1.

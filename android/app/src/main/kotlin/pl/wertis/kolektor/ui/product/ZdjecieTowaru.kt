@@ -33,6 +33,7 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.product.StanSlotu
 import pl.wertis.kolektor.core.product.pokazacDodanie
 import pl.wertis.kolektor.data.dekodujDo
+import pl.wertis.kolektor.scan.ScanHandlerEffect
 import pl.wertis.kolektor.ui.components.WIcons
 import pl.wertis.kolektor.ui.theme.CardBorder
 import pl.wertis.kolektor.ui.theme.Ink
@@ -196,6 +197,7 @@ fun MiniaturaTowaru(
     powieksz: Boolean = false,
     modifier: Modifier = Modifier,
     zamiast: (@Composable () -> Unit)? = null,
+    contentScale: ContentScale = ContentScale.Crop,
 ) {
     var bajty by remember(twId) { mutableStateOf<ByteArray?>(null) }
     var miniatura by remember(twId) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -223,7 +225,7 @@ fun MiniaturaTowaru(
     Image(
         bitmap = bmp.asImageBitmap(),
         contentDescription = "Zdjęcie towaru",
-        contentScale = ContentScale.Crop,
+        contentScale = contentScale,
         modifier = modifier
             .size(bok)
             .clip(RoundedCornerShape(8.dp))
@@ -252,6 +254,9 @@ fun MiniaturaTowaru(
  */
 @Composable
 private fun PelnyEkranZdjecia(bajty: ByteArray?, onZamknij: () -> Unit) {
+    // Pod zdjęciem nie widać aktualnego kroku. Skan nie może zatwierdzić
+    // niewidocznej skrzynki ani uruchomić globalnej zmiany kartoteki.
+    ScanHandlerEffect { true }
     var duze by remember(bajty) { mutableStateOf<android.graphics.Bitmap?>(null) }
 
     LaunchedEffect(bajty) {

@@ -32,6 +32,7 @@ import pl.wertis.kolektor.ui.chrome.TopBar
 import pl.wertis.kolektor.ui.chrome.WersjaBar
 import pl.wertis.kolektor.ui.update.AktualizacjaSheet
 import pl.wertis.kolektor.ui.home.HomeScreen
+import pl.wertis.kolektor.ui.wms.WmsPickingScreen
 import pl.wertis.kolektor.ui.location.LocationScreen
 import pl.wertis.kolektor.ui.product.ProductScreen
 import pl.wertis.kolektor.ui.delivery.DeliveryDocumentsScreen
@@ -161,15 +162,16 @@ fun AppRoot(graph: AppGraph) {
             scope.launch { graph.offlineQueue.flush() }
         }
         // wyjątki wiszą przed oczami, dopóki ktoś ich nie zamknie (D8)
-        if (screen != Screen.PROBLEMS) {
+        if (screen != Screen.PROBLEMS && screen != Screen.WMS_PICKING) {
             ProblemsBanner(problems.size) { graph.nav.openProblems() }
         }
-        if (screen != Screen.FIELD_TASKS) {
+        if (screen != Screen.FIELD_TASKS && screen != Screen.WMS_PICKING) {
             FieldTasksBanner(graph) { graph.nav.openFieldTasks() }
         }
         Box(Modifier.weight(1f).fillMaxSize()) {
             when (screen) {
                 Screen.HOME -> HomeScreen(graph)
+                Screen.WMS_PICKING -> WmsPickingScreen(graph)
                 Screen.PRODUCT -> ProductScreen(graph)
                 Screen.SCAN_LOC -> ScanLocScreen(graph)
                 Screen.QUEUE -> QueueScreen(graph)

@@ -50,6 +50,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.scan.routeScan
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
@@ -145,6 +146,9 @@ fun HomeScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        PrimaryButton("ZBIÓRKA WMS — SKANUJ WÓZEK", modifier = Modifier.fillMaxWidth(), tall = true) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PICKING)
+        }
         WertisTextField(
             value = query,
             onValueChange = { newValue ->

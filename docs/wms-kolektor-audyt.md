@@ -33,14 +33,36 @@ Zdjęcia produktów są już obsługiwane przez `ZdjeciaRepository`, z trwałym 
 na urządzeniu i powiększeniem. Należy użyć tego mechanizmu w kompletacji.
 Router `ScannerBus` przekazuje skan aktywnemu ekranowi przed globalnym otwarciem kartoteki.
 
-## Wymagany dalszy zakres
+## Natywna zbiórka dodana w gałęzi
 
 - Natywny ekran WMS: skan wózka, wznowienie trasy, lokalizacja, zdjęcie, SKU i stała pozycja skrzynki.
 - Skan lokalizacji → towaru → skrzynki, bez zależności od fokusu pola tekstowego.
 - Trwałe ponowienie tego samego zapisu po utracie odpowiedzi, restarcie aplikacji lub zmianie zasięgu Wi-Fi.
 - Ochrona kontekstu użytkownika i serwera przy zmianie sesji; brak cichego wysłania zapisu do innej instancji.
 - Zgłoszenie braku oraz przekazanie wózka na stanowisko przez obecne API WMS.
-- Testy logiki w `:core`, kompilacja APK oraz próba fizycznego skanera na wskazanych modelach.
+- Testy logiki w `:core`: zła skrzynka, ilość, blokada zapasu, restart, awaria dysku, odpowiedź utracona po zapisie oraz zmiana konta.
 
 Nie tworzymy osobnej aplikacji ani drugiego mechanizmu zdjęć.
 Stan magazynu potwierdza serwer; brak sieci nie może udawać zakończonego pobrania.
+
+
+Wejście z ekranu głównego: **ZBIÓRKA WMS — SKANUJ WÓZEK**. Podstawowy cykl nie wymaga pola tekstowego ani dotykania ekranu.
+Zdjęcie zachowuje proporcje, a dotknięcie otwiera pełny ekran. Podczas podglądu skany są przechwytywane bez wykonania operacji.
+Brak zdjęcia nie zastępuje części podobnym obrazem; widoczne pozostają SKU i nazwa.
+
+Ilość początkowa odpowiada pozostałej ilości dla wskazanej skrzynki. Przyciski plus i minus pozwalają potwierdzić część pobrania.
+Wszystkie cele dotykowe mają co najmniej 48 dp. Po zapisie ekran pobiera aktualną trasę i wymaga ponownego sprawdzenia lokalizacji oraz towaru.
+Zgłoszenie braku, uszkodzenia lub pełnej skrzynki wymaga zweryfikowanej lokalizacji i skanu właściwej skrzynki.
+Biuro rozpatruje zgłoszenie przez istniejący panel WMS. Gotowy wózek przekazuje się przez skan wózka i stanowiska pakowania.
+
+Dziennik zapisuje się atomowo w `noBackupFilesDir`, przed wysłaniem operacji. Nie przechowuje tokenu sesji.
+Nieznany wynik blokuje dalsze pobrania; przycisk **SPRAWDŹ OSTATNI ZAPIS** ponawia ten sam klucz i treść.
+Zmiana konta lub serwera wymaga powrotu do kontekstu oczekującego zapisu. Żądanie w locie zachowuje pierwotny adres i token.
+Po potwierdzonym zapisie awaria odczytu wymaga tylko odświeżenia trasy. Nie wysyła ponownie pobrania pod nowym kluczem.
+
+## Odbiór na urządzeniu
+
+Kompilacja APK nie zastępuje próby fizycznego skanera. Modele Zebra i Honeywell pozostają nieustalone.
+Należy sprawdzić profil DataWedge lub wyjście klawiaturowe z Enterem, rękawice, czytelność zdjęć, utratę Wi-Fi oraz restart po zapisie.
+Testować wyłącznie na serwerze seeded, z kontem testowym. Nie podłączać kolektora testowego do rzeczywistych zamówień.
+Debug APK z PR nie zastępuje podpisanego wydania dla hali; dotychczasowy proces aktualizacji pozostaje bez zmian.

@@ -20,6 +20,7 @@ import pl.wertis.kolektor.data.SetupRepository
 import pl.wertis.kolektor.data.SettingsRepository
 import pl.wertis.kolektor.data.LogoRepository
 import pl.wertis.kolektor.data.ZdjeciaRepository
+import pl.wertis.kolektor.data.WmsRepository
 import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
 import pl.wertis.kolektor.device.Feedback
@@ -88,6 +89,7 @@ class AppGraph(context: Context) {
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
     val zdjeciaRepo = ZdjeciaRepository(context, api)
+    val wmsRepo = WmsRepository(context, settings, session)
     val logoRepo = LogoRepository(context, api)
     /* Bierze `apiClient`, a nie `api`: pobranie APK musi iść tą samą drogą co
        reszta wywołań, żeby złapać podmianę adresu serwera z ustawień. */
@@ -143,7 +145,7 @@ class AppGraph(context: Context) {
         /* Przeskok między punktami dostępowymi w hali zostawia w puli OkHttp
            gniazda do poprzedniego AP — z pozoru żywe, w praktyce nieme.
            Bez tego magazynier ratował się rozłączeniem i połączeniem Wi-Fi. */
-        connectivity.onZmianaSieci = { apiClient.zerwijPolaczenia() }
+        connectivity.onZmianaSieci = { apiClient.zerwijPolaczenia(); wmsRepo.resetConnections() }
         wireOfflineFlush(context, offlineQueue, connectivity, appScope)
         // nierozwiązane wyjątki od razu przy starcie (D8) — inaczej nikt ich nie ruszy
         problemsRepo.refresh()

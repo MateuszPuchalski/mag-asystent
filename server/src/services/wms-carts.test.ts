@@ -143,6 +143,30 @@ for (const capacity of [20, 30] as const)
     assert.equal(result.run!.tasks[0].stop_quantity, capacity);
   });
 
+test("kolektor otrzymuje kod EAN z pozycji zamówienia i potwierdza nim właściwą skrzynkę", () => {
+  const p = product();
+  db()
+    .prepare("UPDATE sgt_towar SET ean=? WHERE tw_id=?")
+    .run("0590123456789", p.twId);
+  order(p.sku, 2);
+  const run = start(cart().code),
+    t = run.tasks[0];
+  assert.equal(t.barcode, "0590123456789");
+  assert.equal(t.position, 1);
+  assert.equal(t.tw_id, p.twId);
+  const picked = W.pickWave(picker, randomUUID(), run.id, {
+    orderId: t.order_id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    bin: t.bin,
+    barcode: t.barcode,
+    tote: t.tote,
+    quantity: 2,
+  });
+  assert.equal(picked.tasks.length, 0);
+  assert.equal(picked.orders[0].status, "picked");
+});
+
 test("braki na pierwszych 75 pozycjach nie blokują gotowych zamówień; priorytet i zapas są wiążące", () => {
   const missing = product(0),
     available = product(2),

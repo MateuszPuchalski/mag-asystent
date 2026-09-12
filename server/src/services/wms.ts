@@ -1445,7 +1445,7 @@ function readWave(actor: Actor, waveId: number) {
   const tasks = db()
     .prepare(
       `SELECT a.id AS allocation_id,a.bin,a.quantity-a.picked AS remaining,
-    l.tw_id,l.sku,l.name,o.id AS order_id,o.reference,o.tote,o.version,o.picker_id,o.hold_reason,ca.position,
+    l.tw_id,l.sku,l.name,l.barcode,o.id AS order_id,o.reference,o.tote,o.version,o.picker_id,o.hold_reason,ca.position,
     sc.reason AS stock_blocked,
     sum(CASE WHEN o.hold_reason IS NULL AND sc.id IS NULL THEN a.quantity-a.picked ELSE 0 END) OVER (PARTITION BY a.bin,l.tw_id) AS stop_quantity
     FROM wms_wave_order w JOIN wms_order o ON o.id=w.order_id JOIN wms_line l ON l.order_id=o.id

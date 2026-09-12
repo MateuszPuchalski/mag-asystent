@@ -35,6 +35,8 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +109,12 @@ fun WertisTextField(
     onFokus: (Boolean) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
+    val ownsScannerFocus = remember { AtomicBoolean(false) }
+    DisposableEffect(Unit) {
+        // Wyjście z aktywnego pola (np. do zbiórki) musi oddać skaner także
+        // wtedy, gdy Compose usuwa pole bez osobnego zdarzenia utraty fokusu.
+        onDispose { if (ownsScannerFocus.getAndSet(false)) WedgeKeySource.ustawFokus(false) }
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -114,7 +122,9 @@ fun WertisTextField(
             .fillMaxWidth()
             .heightIn(min = MinTap)
             .onFocusChanged {
-                WedgeKeySource.ustawFokus(it.isFocused)
+                if (ownsScannerFocus.getAndSet(it.isFocused) != it.isFocused) {
+                    WedgeKeySource.ustawFokus(it.isFocused)
+                }
                 onFokus(it.isFocused)
             },
         placeholder = { Text(placeholder, color = InkMute) },
