@@ -735,3 +735,12 @@ Zeskanuj część, wpisz numer paczki, ilość i powód. Pozostałe potwierdzeni
 Towar pozostaje przy stanowisku. Operacja nie zwraca go na półkę ani nie rozlicza braku lub uszkodzenia; taki problem wymaga wstrzymania zamówienia.
 Przygotowanie etykiet czeka na ponowne potwierdzenie wszystkich sztuk. Gotowych etykiet nie można zmieniać tą korektą.
 Po utracie odpowiedzi użyj **PONÓW**. Powtórzenie odzyskuje wynik tej samej korekty, bez kolejnego odejmowania.
+
+
+### Miejsce przy przyjęciu i odkładaniu
+
+Podpowiedzi pomijają pełne półki, kwarantannę i otwarte blokady. Najpierw pokazują kompletację, potem zaplecze, do ośmiu znanych adresów.
+Ilość „do … szt.” uwzględnia zapas fizyczny oraz przydzielone uzupełnienia. „Sprawdź miejsce” oznacza brak zapisanego limitu.
+Na kolektorze podpowiedź jest widoczna przed wpisaniem ilości. Policz tylko partię odkładaną teraz; reszta zadania pozostaje w buforze.
+Podpowiedź pochodzi z ostatniego odczytu i nie rezerwuje półki. Zapis ponownie sprawdza miejsce i blokady.
+Brak podpowiedzi nie oznacza zakazu innych zarejestrowanych lokalizacji. Sprawdź fizyczne miejsce i zeskanuj właściwy cel.

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
+import { destinationHints } from "./wms-destination-hints.js";
 import {
   checkBarcode,
   command,
@@ -79,14 +80,7 @@ export function listPutaway(actor: Actor, raw: unknown) {
 export function getPutaway(taskId: number) {
   return readSnapshot(() => {
     const task = work(taskId);
-    const bins = db()
-      .prepare(
-        `SELECT s.bin,s.on_hand,coalesce(b.mode,'pick') AS mode FROM wms_stock s
-      LEFT JOIN wms_bin b ON b.bin=s.bin WHERE s.tw_id=? AND s.bin<>? AND coalesce(b.mode,'pick')<>'quarantine'
-      AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
-      ORDER BY (coalesce(b.mode,'pick')='pick') DESC,s.bin LIMIT 8`,
-      )
-      .all(task.tw_id, task.source);
+    const bins = destinationHints([task.tw_id], task.source);
     const steps = db()
       .prepare(
         "SELECT * FROM wms_putaway_step WHERE task_id=? ORDER BY id DESC LIMIT 100",

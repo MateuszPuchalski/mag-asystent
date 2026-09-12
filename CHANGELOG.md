@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.309.0 — odkładanie według miejsca na półce
+
+- Przyjęcie i odkładanie korzystają z jednej reguły podpowiedzi. Pełne półki, kwarantanna oraz otwarte blokady nie wypierają użytecznych adresów.
+- Wolne miejsce uwzględnia fizyczny zapas i przydzielone uzupełnienia. Brak limitu wymaga sprawdzenia miejsca, bez obietnicy nieograniczonej pojemności.
+- Kolektor pokazuje miejsce przed wpisaniem partii. Odczyt nie rezerwuje półki; równoległa dostawa nadal podlega końcowej kontroli transakcji.
+- Regresje obejmują trzy odczyty, limit listy, blokady, uzupełnienia, brak zapisów i równoległe przyjęcie. E2E sprawdza malejące miejsce po ponowieniu odłożenia.
+- **[wymaga działania]** Wykonać build i restart API oraz zaktualizować APK, aby widzieć ilości na kolektorze. Nie ma migracji danych.
+
 ## 0.308.0 — rozliczenie brakującej części przy pakowaniu
 
 - Biuro potwierdza brak po przeliczeniu wskazanej paczki lub niesprawdzonych sztuk. Wybiera część z zamówienia, skanuje skrzynkę i wpisuje faktyczną ilość.

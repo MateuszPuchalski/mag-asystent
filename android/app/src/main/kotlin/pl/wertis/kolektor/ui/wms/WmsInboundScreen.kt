@@ -167,6 +167,10 @@ fun WmsInboundScreen(graph: AppGraph) {
                     Text("Policzono ${line.received} / ${line.expected}", color = InkMute)
                 }
             }
+            if (!view.buffer && !damaged && stage in setOf(WmsInboundStage.QUANTITY, WmsInboundStage.DESTINATION)) {
+                Text(if (line.bins.isEmpty()) "Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce."
+                    else "Miejsca według ostatniego odczytu:\n${line.bins.joinToString("\n") { it.hint }}", color = InkMute)
+            }
             when (stage) {
                 WmsInboundStage.QUANTITY -> if (allowed) {
                     Text("Teraz przyjmujesz · pozostało ${line.remaining} szt.", fontWeight = FontWeight.Bold)
@@ -175,7 +179,6 @@ fun WmsInboundScreen(graph: AppGraph) {
                 }
                 WmsInboundStage.DESTINATION -> {
                     Text("${scan.quantity} szt. · ${if (damaged) "USZKODZONE" else "PEŁNOWARTOŚCIOWE"}", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                    if (!view.buffer && !damaged && line.bins.isNotEmpty()) Text("Znane półki: ${line.bins.joinToString { it.bin }}", color = InkMute)
                     Text("Skan lokalizacji zapisze pokazaną ilość.")
                 }
                 WmsInboundStage.COMPLETE -> Text("Skan nie dopisał towaru ponownie. Zeskanuj kolejną część; nadwyżkę zgłoś biuru.")

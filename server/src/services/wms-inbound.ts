@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
 import {
+  destinationHints,
+  type DestinationHint,
+} from "./wms-destination-hints.js";
+import {
   applyStock,
   checkBarcode,
   command,
@@ -47,8 +51,7 @@ type Line = {
 function header(inboundId: number) {
   return (
     (db().prepare("SELECT * FROM wms_inbound WHERE id=?").get(inboundId) as
-      | Header
-      | undefined) ?? fail("Nie ma takiego przyjęcia", 404)
+      Header | undefined) ?? fail("Nie ma takiego przyjęcia", 404)
   );
 }
 
@@ -65,17 +68,7 @@ export function getInbound(inboundId: number, raw: unknown = {}) {
         `SELECT l.*,coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w JOIN wms_inbound_putaway p ON p.id=w.receipt_id WHERE p.line_id=l.id),0) AS awaiting_putaway FROM wms_inbound_line l WHERE inbound_id=? ORDER BY (received>=expected),sku`,
       )
       .all(inboundId) as Line[];
-    // Podpowiedź pokazuje istniejące miejsca, nie udaje dowodu zeskanowania półki.
-    const bins = db()
-      .prepare(
-        `SELECT * FROM (SELECT s.tw_id,s.bin,coalesce(b.mode,'pick') AS mode,s.on_hand,
-      row_number() OVER(PARTITION BY s.tw_id ORDER BY (coalesce(b.mode,'pick')='pick') DESC,s.bin) AS rank FROM wms_stock s
-      JOIN wms_inbound_line l ON l.tw_id=s.tw_id AND l.inbound_id=?
-      LEFT JOIN wms_bin b ON b.bin=s.bin WHERE coalesce(b.mode,'pick')<>'quarantine'
-      AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
-      ) WHERE rank<=8 ORDER BY tw_id,rank`,
-      )
-      .all(inboundId);
+    const bins = destinationHints(lines.map((l) => l.tw_id));
     const byProduct = new Map<number, typeof bins>();
     for (const bin of bins) {
       const key = Number(bin.tw_id);
@@ -156,8 +149,7 @@ export function getInboundCollector(inboundId: number, raw: unknown = {}) {
       .get(inboundId)!;
     const filter =
       "inbound_id=? AND instr(lower(sku||' '||name||' '||coalesce(barcode,'')),lower(?))>0";
-    type BinHint = { bin: string; on_hand: number; mode: string };
-    let selected: (Line & { bins: BinHint[] }) | null = null;
+    let selected: (Line & { bins: DestinationHint[] }) | null = null;
     if (input.barcode || input.lineId) {
       const matches = (
         input.barcode
@@ -183,14 +175,7 @@ export function getInboundCollector(inboundId: number, raw: unknown = {}) {
           "Kod wskazuje kilka części na przyjęciu. Wybierz pozycję po SKU i zgłoś kolizję biuru",
         );
       const line = matches[0];
-      const bins = db()
-        .prepare(
-          `SELECT s.bin,s.on_hand,coalesce(b.mode,'pick') AS mode FROM wms_stock s
-        LEFT JOIN wms_bin b ON b.bin=s.bin WHERE s.tw_id=? AND coalesce(b.mode,'pick')<>'quarantine'
-        AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
-        ORDER BY (coalesce(b.mode,'pick')='pick') DESC,s.bin LIMIT 8`,
-        )
-        .all(line.tw_id) as BinHint[];
+      const bins = destinationHints([line.tw_id]);
       selected = { ...line, bins };
     }
     const total = input.q

@@ -8,7 +8,10 @@ import pl.wertis.kolektor.core.scan.Scan
 import pl.wertis.kolektor.core.scan.ScanKind
 
 @Serializable
-data class WmsPutawayBin(val bin: String, val on_hand: Int, val mode: String)
+data class WmsPutawayBin(val bin: String, val on_hand: Int, val mode: String, val room: Int? = null) {
+    // Brak limitu w starszym API nie dowodzi wolnego miejsca na fizycznej półce.
+    val hint: String get() = "$bin · ${if (mode == "pick") "kompletacja" else "zaplecze"} · ${room?.let { "do $it szt." } ?: "sprawdź miejsce"}"
+}
 
 @Serializable
 data class WmsPutawayTask(

@@ -167,6 +167,10 @@ fun WmsPutawayScreen(graph: AppGraph) {
             }
         }
         Text("Pozostało w buforze: ${task.remaining} szt.", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        if (!damaged && stage in setOf(WmsPutawayStage.QUANTITY, WmsPutawayStage.TARGET)) {
+            Text(if (task.bins.isEmpty()) "Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce."
+                else "Miejsca według ostatniego odczytu:\n${task.bins.joinToString("\n") { it.hint }}", color = InkMute)
+        }
         when (stage) {
             WmsPutawayStage.CLAIM -> PrimaryButton("PODEJMIJ ODKŁADANIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
                 submit(putawayClaim(task))
@@ -178,7 +182,6 @@ fun WmsPutawayScreen(graph: AppGraph) {
             }
             WmsPutawayStage.TARGET -> {
                 Text("${scan.quantity} szt. → ${if (damaged) "KWARANTANNA" else "PÓŁKA"}", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                if (!damaged && task.bins.isNotEmpty()) Text("Znane półki: ${task.bins.joinToString { it.bin }}", color = InkMute)
                 Text("Skan celu zapisze tę ilość. Częściowe odłożenie pozostawi resztę w buforze.")
             }
             WmsPutawayStage.OTHER -> Text("Przekaż towar właścicielowi zadania lub poproś biuro o przejęcie.")

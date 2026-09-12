@@ -82,6 +82,125 @@ function state(twId: number, bin: string) {
     .get(twId, bin)!;
 }
 
+test("podpowiedzi przyjęcia i odkładania pomijają pełne oraz zablokowane półki przed limitem ośmiu", () => {
+  const r = receipt();
+  for (let n = 0; n < 10; n++) {
+    const bin = `FULL-${n}`;
+    W.changeStock(office, randomUUID(), {
+      action: "receive",
+      twId: r.twId,
+      bin,
+      quantity: 2,
+      reason: "Zapas seeded",
+    });
+    W.changeStock(office, randomUUID(), {
+      action: "limits",
+      twId: r.twId,
+      bin,
+      capacity: 2,
+      minimum: 0,
+      version: state(r.twId, bin).version,
+      reason: "Pełna półka seeded",
+    });
+  }
+  for (const bin of ["SHELF-1", "SHELF-2", "QUAR-1", "BLOCKED", "COUNTING"])
+    W.changeStock(office, randomUUID(), {
+      action: "receive",
+      twId: r.twId,
+      bin,
+      quantity: 4,
+      reason: "Zapas seeded",
+    });
+  W.changeStock(office, randomUUID(), {
+    action: "limits",
+    twId: r.twId,
+    bin: "SHELF-1",
+    capacity: 9,
+    minimum: 0,
+    version: state(r.twId, "SHELF-1").version,
+    reason: "Pojemność seeded",
+  });
+  db()
+    .prepare(
+      "INSERT INTO wms_capacity_issue(tw_id,bin,reason,user_id,created_at) VALUES(?,'BLOCKED','Pełny regał',1,?)",
+    )
+    .run(r.twId, new Date().toISOString());
+  db()
+    .prepare(
+      "INSERT INTO wms_stock_check(tw_id,bin,reason,user_id,created_at) VALUES(?,'COUNTING','Przelicz półkę',1,?)",
+    )
+    .run(r.twId, new Date().toISOString());
+  S.claimReplenishment(worker, randomUUID(), {
+    twId: r.twId,
+    source: "SHELF-2",
+    target: "SHELF-1",
+    quantity: 3,
+    sourceVersion: state(r.twId, "SHELF-2").version,
+    targetVersion: state(r.twId, "SHELF-1").version,
+  });
+  const before = db().prepare("SELECT total_changes() AS n").get()!.n;
+  const hints = P.getPutaway(r.taskId).bins;
+  assert.deepEqual(
+    hints.map((b) => [b.bin, b.room]),
+    [
+      ["SHELF-1", 2],
+      ["SHELF-2", null],
+    ],
+  );
+  for (const bins of [
+    I.getInbound(r.id).lines[0].bins,
+    I.getInboundCollector(r.id, { barcode: r.sku }).selected!.bins,
+  ]) {
+    assert.deepEqual(
+      bins.filter((b) => b.bin !== "BUF-1"),
+      hints,
+    );
+  }
+  assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, before);
+});
+
+test("podpowiedź nie rezerwuje miejsca; równoległe przyjęcie odrzuca odłożenie bez utraty bufora", () => {
+  const r = receipt();
+  W.changeStock(office, randomUUID(), {
+    action: "receive",
+    twId: r.twId,
+    bin: "SHELF-1",
+    quantity: 1,
+    reason: "Zapas seeded",
+  });
+  W.changeStock(office, randomUUID(), {
+    action: "limits",
+    twId: r.twId,
+    bin: "SHELF-1",
+    capacity: 5,
+    minimum: 0,
+    version: state(r.twId, "SHELF-1").version,
+    reason: "Pojemność seeded",
+  });
+  const task = P.claimPutaway(worker, randomUUID(), r.taskId, {
+    version: P.getPutaway(r.taskId).version,
+  });
+  assert.equal(task.bins[0].room, 4);
+  W.changeStock(office, randomUUID(), {
+    action: "receive",
+    twId: r.twId,
+    bin: "SHELF-1",
+    quantity: 4,
+    reason: "Równoległa dostawa",
+  });
+  assert.throws(
+    () => P.finishPutaway(worker, randomUUID(), task.id, finish(task, 4)),
+    /zmieści się jeszcze 0/,
+  );
+  const refreshed = P.getPutaway(task.id);
+  assert.equal(refreshed.remaining, 10);
+  assert.equal(refreshed.version, task.version);
+  assert.equal(refreshed.steps.length, 0);
+  assert.equal(state(r.twId, "BUF-1").on_hand, 10);
+  assert.equal(refreshed.bins.length, 0);
+  assert.equal(A.integrity().ok, true);
+});
+
 test("bufor nie trafia do zbiórki; częściowe odłożenie i ponowienie działają po zamknięciu dostawy", () => {
   const r = receipt();
   assert.equal(state(r.twId, "BUF-1").on_hand, 10);
@@ -321,7 +440,10 @@ test("podgląd i stronicowanie kolejki nie zapisują danych", () => {
   assert.equal(list.rows.length, 1);
   assert.equal(list.totals.units, 10);
   assert.equal(P.listPutaway(worker, { q: r.sku, offset: 50 }).rows.length, 0);
-  assert.equal(P.listPutaway(worker, { q: `0590${r.twId}` }).rows[0].id, r.taskId);
+  assert.equal(
+    P.listPutaway(worker, { q: `0590${r.twId}` }).rows[0].id,
+    r.taskId,
+  );
   P.getPutaway(r.taskId);
   assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, before);
 });

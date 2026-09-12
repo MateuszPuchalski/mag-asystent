@@ -17,6 +17,9 @@ export async function exerciseInbound(page, output) {
   const form = page.locator("#wms-inbound-putaway");
   await expect(form.locator('[name="quantity"]')).toBeFocused();
   await expect(page.locator('[data-photo-id="30"] img')).toBeVisible();
+  await expect(page.locator("#wms-inbound-task")).toContainText(
+    "sprawdź miejsce",
+  );
   await form.locator('[name="quantity"]').fill("2");
   await form.locator('[name="quantity"]').press("Enter");
   await expect(form.locator('[name="bin"]')).toBeFocused();
@@ -102,10 +105,40 @@ export async function exerciseInbound(page, output) {
   await form.locator('[name="bin"]').fill("RES-E2E");
   await form.locator('[name="bin"]').press("Enter");
   await expect(page.locator("#wms-content")).toContainText("5 szt. w buforze");
+  await page.evaluate(async () => {
+    const response = await fetch("/api/wms/inventory?q=WMS-0030", {
+      headers: { "x-session": token },
+    });
+    if (!response.ok) throw new Error("Nie odczytano półki seeded");
+    const shelf = (await response.json()).rows.find(
+      (row) => row.bin === "A04-01-02",
+    );
+    const result = await fetch("/api/wms/inventory", {
+      method: "POST",
+      headers: {
+        "x-session": token,
+        "content-type": "application/json",
+        "idempotency-key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        action: "limits",
+        twId: 30,
+        bin: shelf.bin,
+        capacity: shelf.on_hand + 5,
+        minimum: 0,
+        version: shelf.version,
+        reason: "Miejsce na pięć sztuk seeded",
+      }),
+    });
+    if (!result.ok) throw new Error(await result.text());
+  });
   await page.locator('[data-inbound="putaway"]').click();
   await page.locator("[data-putaway-open]").first().click();
   await page.locator("#wms-putaway-claim button").click();
   const putaway = page.locator("#wms-putaway-finish");
+  await expect(page.locator("#wms-content")).toContainText(
+    "A04-01-02 (do 5 szt.)",
+  );
   await expect(putaway.locator('[name="source"]')).toBeFocused();
   await putaway.locator('[name="source"]').fill("RES-E2E");
   await putaway.locator('[name="source"]').press("Enter");
@@ -129,6 +162,9 @@ export async function exerciseInbound(page, output) {
   await page.locator('[data-do-wms="retry"]').click();
   await expect(page.locator("#wms-content")).toContainText(
     "3 szt. do odłożenia",
+  );
+  await expect(page.locator("#wms-content")).toContainText(
+    "A04-01-02 (do 3 szt.)",
   );
   await page.evaluate(() => window.scrollTo(0, 0));
   expect(

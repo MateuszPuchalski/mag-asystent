@@ -471,3 +471,22 @@ Trzy regresje serwera obejmują rzeczywiste ilości, paczki, role, wersje, zacho
 Trzy testy migracji sprawdzają starą historię, częściowy postęp, rollback, starszą kopię oraz sprzeczne schematy.
 Test core odczytuje stare uszkodzenie i nowy brak przez ten sam proces pobrania.
 E2E obejmuje wstrzymane zamówienie, pustą ilość, utraconą odpowiedź, analitykę, zamiennik oraz ponowny skan jednej sztuki w drugiej paczce.
+
+
+### Pełne półki w podpowiedziach odkładania
+
+Końcowy ruch sprawdzał pojemność, lecz trzy odczyty nadal podpowiadały pełne lub zablokowane miejsca.
+Osiem wcześniejszych pełnych adresów mogło ukryć właściwą półkę. Operator poznawał odmowę dopiero przy odłożeniu.
+Przyjęcie biura, przyjęcie kolektora i zadanie odkładania korzystają teraz z jednej reguły podpowiedzi.
+Reguła odrzuca kwarantannę, otwarte przeliczenie, zgłoszony brak miejsca oraz wyczerpany limit przed wyborem ośmiu adresów.
+Wolne miejsce to pojemność pomniejszona o fizyczny stan oraz przydzielone uzupełnienia. Rezerwacje zamówień nadal zajmują półkę.
+Brak limitu oznacza potrzebę sprawdzenia miejsca, nie obietnicę nieograniczonej pojemności.
+Kolektor pokazuje ilość przed wpisaniem partii; podpowiedź nie ustawia ilości ani nie zastępuje skanu.
+Odczyt nie rezerwuje miejsca. Równoległe przyjęcie może zmienić sytuację, więc końcowy ruch ponownie kontroluje cel.
+
+Punkt odniesienia: [Microsoft — lokalizacje i szablony pracy](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/control-warehouse-location-directives).
+Dokument opisuje reguły wyboru celu, ograniczenia ilości oraz podział pomiędzy lokalizacjami.
+Wniosek dla WERTIS: znane ograniczenia należy pokazać przed drogą do półki i wyborem odkładanej partii.
+
+Dwie regresje najpierw odtworzyły wadliwe podpowiedzi. Sprawdzają wspólny wynik trzech odczytów, brak zapisów i wycofanie odłożenia po równoległej dostawie.
+Test JVM odczytuje nowe oraz starsze API. Starsza odpowiedź nie udaje wiedzy o pojemności.

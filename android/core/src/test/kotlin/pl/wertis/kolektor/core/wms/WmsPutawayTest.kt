@@ -19,6 +19,17 @@ private val part = WmsPutawayTask(1, 30, "BUF-01", 12, 12, 2, 1, "WMS0030", "Ko�
 private fun draft() = putawayScan(part, 2, WmsPutawayScan(true, part.barcode, 3), "A-01").command!!
 
 class WmsPutawayScanTest {
+    @Test fun `podpowiedz czyta pojemnosc i starsze API nie obiecuje miejsca`() {
+        val old = WertisJson.decodeFromString<WmsPutawayBin>("""{"bin":"A-01","on_hand":8,"mode":"pick"}""")
+        assertNull(old.room)
+        assertTrue(old.hint.contains("sprawdź miejsce"))
+        val current = WertisJson.decodeFromString<WmsPutawayBin>("""{"tw_id":30,"bin":"A-01","on_hand":8,"mode":"pick","room":2}""")
+        assertEquals(2, current.room)
+        assertTrue(current.hint.contains("do 2 szt."))
+        // Podpowiedź może się zdezaktualizować; dopiero serwer zatwierdza faktyczny skan.
+        val task = part.copy(bins = listOf(current))
+        assertNotNull(putawayScan(task, 2, WmsPutawayScan(true, part.barcode, 3), "A-01").command)
+    }
     @Test fun `bufor czesc policzona ilosc i polka dopiero tworza zapis`() {
         var scan = WmsPutawayScan()
         assertNotNull(putawayScan(part, 2, scan, "A-01").error)
