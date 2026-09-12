@@ -132,7 +132,8 @@ function readStockWork(actor: Actor, raw: unknown) {
   ), needs AS (
     SELECT *,max(0,minimum-(on_hand-reserved),CASE WHEN rank=1 THEN needed-available ELSE 0 END) AS quantity FROM pick
   ) SELECT n.tw_id,n.sku,n.name,n.bin AS target,n.version AS target_version,n.quantity,s.bin AS source,s.version AS source_version,
-      s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS source_available
+      s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
+      -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
     FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
     WHERE n.quantity>0 AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
     AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
@@ -247,9 +248,10 @@ export function claimReplenishment(actor: Actor, key: string, raw: unknown) {
     const assigned = Number(
       db()
         .prepare(
-          "SELECT coalesce(sum(quantity),0) AS n FROM wms_replenishment WHERE tw_id=? AND source=? AND completed_at IS NULL AND cancelled_at IS NULL",
+          `SELECT coalesce((SELECT sum(quantity) FROM wms_replenishment WHERE tw_id=? AND source=? AND completed_at IS NULL AND cancelled_at IS NULL),0)
+          + coalesce((SELECT sum(remaining) FROM wms_putaway_work WHERE tw_id=? AND source=? AND remaining>0),0) AS n`,
         )
-        .get(input.twId, input.source)!.n,
+        .get(input.twId, input.source, input.twId, input.source)!.n,
     );
     if (input.quantity > from!.on_hand - from!.reserved - assigned)
       fail("Zapas zaplecza jest już potrzebny w innych zadaniach");

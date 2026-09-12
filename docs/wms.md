@@ -498,3 +498,26 @@ Po częściowym odbiorze w magazynie pozostają tylko sztuki z nieodebranych pac
 
 Historia sprzed tej funkcji nie ma automatycznie odtworzonej zawartości.
 Stare, trwające pakowanie wielopaczkowe wymaga pełnego podziału lub ponownej kontroli.
+
+
+## Przyjęcie do bufora i odkładanie
+
+Przed skanowaniem pozycji wybierz **Do bufora — odkładanie później**. Policz towar i zeskanuj lokalizację zaplecza, np. **BUF-01** w demo.
+Wybór pozostaje aktywny dla kolejnych pozycji. Uszkodzenia przyjmuj bezpośrednio do kwarantanny, z opisem.
+Policzone sztuki są widoczne w zapasie, ale czekają na odłożenie. Zamknięcie dokumentu przyjęcia nie zamyka kolejki odkładania.
+
+Otwórz **Odkładanie z bufora**, wybierz zadanie i podejmij je na swoje konto.
+Zeskanuj bufor oraz część, potwierdź przenoszoną ilość, odłóż i zeskanuj półkę docelową.
+Możesz odłożyć część ilości albo rozdzielić partię między półki. Każdy ruch zachowuje historię.
+Kolejka pokazuje najstarszą pracę oraz pozostałe sztuki. Filtr pozwala znaleźć SKU, dokument lub bufor i wyświetlić własne zadania.
+
+Po utracie odpowiedzi ponów tę samą operację. Nie wykonuj drugiego fizycznego odłożenia tylko dlatego, że odpowiedź nie dotarła.
+Inna osoba nie może zakończyć podjętego zadania. Biuro przejmuje je na swoje konto z uzasadnieniem.
+
+Brak policzonych sztuk rozlicza biuro przez **Brakuje policzonych sztuk — korekta**.
+Korekta dotyczy wyłącznie pozostałej ilości w buforze; zamknięte przyjęcie trzeba najpierw otworzyć ponownie.
+Uszkodzenie wykryte później wybierz w formularzu odkładania, podaj opis i zeskanuj kwarantannę.
+Odłożone sztuki rozliczaj przez właściwy spis lub zwrot. Nie wycofuj całej pierwotnej partii przez historię bezpośrednich odłożeń.
+
+Odkładanie chroni swoje ilości przed równoległym ruchem, spisem i uzupełnieniem. Samo podjęcie zadania nie zmienia fizycznego zapasu.
+Zapas staje się dostępny do zbiórki po potwierdzeniu półki kompletacji. Odłożenie na zaplecze pozostawia go zapasem rezerwowym.

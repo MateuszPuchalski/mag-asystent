@@ -1,0 +1,72 @@
+{
+  "version": "0.297.0",
+  "date": "2026-09-12",
+  "branch": "codex/robust-wms",
+  "scope": "Receiving buffer and putaway on seeded data; native Android receiving remains outstanding",
+  "serverTests": {
+    "passed": 2221,
+    "failed": 0
+  },
+  "panelTests": {
+    "passed": 727,
+    "failed": 0
+  },
+  "typescript": "server and panel passed",
+  "build": "passed",
+  "newPutawayCases": 10,
+  "browserE2E": "passed: receiving buffer, claim, partial putaway, lost response and same-key retry, shortage correction, completion",
+  "accessibility": [
+    {
+      "width": 320,
+      "overflow": false,
+      "confirmationVisible": true,
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "confirmationVisible": true,
+      "violations": [],
+      "incomplete": []
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "confirmationVisible": true,
+      "violations": [],
+      "incomplete": []
+    }
+  ],
+  "capacity": {
+    "completed": 2000,
+    "runs": 84,
+    "elapsedMs": 108536.1925,
+    "requests": {
+      "count": 14274,
+      "p50Ms": 48.932199999995646,
+      "p95Ms": 139.5630999999994,
+      "p99Ms": 192.30430000000342,
+      "maxMs": 576.2396000000008
+    },
+    "cartAssignment": {
+      "count": 92,
+      "p50Ms": 162.27990000000864,
+      "p95Ms": 573.9288999999999,
+      "p99Ms": 576.2683000000006,
+      "maxMs": 576.2683000000006
+    },
+    "integrity": true,
+    "parcelContents": {
+      "ok": true,
+      "parcels": 2000
+    }
+  },
+  "limitations": [
+    "Synthetic API workload; not a measurement of warehouse staff throughput",
+    "Other local checks ran concurrently with capacity test",
+    "Axe coverage is limited to the active putaway page and chosen WCAG tags; not certification",
+    "No physical Zebra/Honeywell test",
+    "Receiving and putaway are currently browser workflows"
+  ]
+}

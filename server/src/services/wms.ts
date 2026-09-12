@@ -290,6 +290,15 @@ export function configureBin(actor: Actor, key: string, raw: unknown) {
     const current = d
       .prepare("SELECT * FROM wms_bin WHERE bin=?")
       .get(input.bin);
+    if (
+      input.mode !== (current?.mode ?? "pick") &&
+      d
+        .prepare(
+          "SELECT 1 FROM wms_putaway_work WHERE source=? AND remaining>0 LIMIT 1",
+        )
+        .get(input.bin)
+    )
+      fail("Najpierw zakończ odkładanie z tej lokalizacji");
     if ((current?.version ?? 1) !== input.version)
       fail("Lokalizacja zmieniła się. Odśwież listę");
     if (
@@ -372,6 +381,7 @@ export function move(
     WHERE tw_id=? AND bin=? AND on_hand+? >= 0 AND reserved+? >= 0 AND reserved+? <= on_hand+?
     AND on_hand+?-(reserved+?) >= coalesce((SELECT sum(quantity) FROM wms_replenishment
       WHERE tw_id=wms_stock.tw_id AND source=wms_stock.bin AND completed_at IS NULL AND cancelled_at IS NULL),0)
+      + coalesce((SELECT sum(remaining) FROM wms_putaway_work WHERE tw_id=wms_stock.tw_id AND source=wms_stock.bin AND remaining>0),0)
     RETURNING version`,
     )
     .get(
@@ -388,7 +398,7 @@ export function move(
     ) as { version: number } | undefined;
   if (!changed)
     fail(
-      `Za mało dostępnego towaru na ${address}. Sprawdź rezerwacje i zadania uzupełnień`,
+      `Za mało dostępnego towaru na ${address}. Sprawdź rezerwacje, odkładanie i zadania uzupełnień`,
     );
   // Zwykły ruch zachowuje przydzielone sztuki. Przeliczenie nadal wymaga ponownej weryfikacji pracy.
   if (kind === "receive" || kind === "transfer")
@@ -1588,6 +1598,7 @@ export function inventory(raw: unknown) {
       `${catalog} SELECT t.tw_id,t.symbol,t.nazwa,t.ean,t.active,s.bin,coalesce(s.on_hand,0) AS on_hand,
     coalesce(s.reserved,0) AS reserved,coalesce(s.minimum,0) AS minimum,coalesce(s.version,1) AS version,
     coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS replenishment_reserved,
+    coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS putaway_reserved,
     coalesce(b.mode,'pick') AS mode,sc.reason AS stock_blocked,CASE WHEN coalesce(b.mode,'pick')='pick' AND sc.id IS NULL THEN coalesce(s.on_hand-s.reserved,0) ELSE 0 END AS available
     ${where} ORDER BY t.symbol,s.bin LIMIT ? OFFSET ?`,
     )

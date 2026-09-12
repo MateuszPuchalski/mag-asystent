@@ -113,6 +113,7 @@ window.Wms = (() => {
     mutate,
     focus: focusWhenReady,
     office,
+    userId: () => user?.userId,
     refresh,
     message,
     photo: photos.markup,
@@ -293,7 +294,11 @@ window.Wms = (() => {
     }
   }
   function shell() {
-    root().classList.remove("wms-cart-focus", "wms-inbound-focus");
+    root().classList.remove(
+      "wms-cart-focus",
+      "wms-inbound-focus",
+      "wms-putaway-focus",
+    );
     const tabs = [
       ["orders", "Zamówienia"],
       ["inbound", "Przyjęcia"],
@@ -351,7 +356,11 @@ window.Wms = (() => {
   }
   function readFailure(error, turn) {
     if (turn !== generation) return;
-    root().classList.remove("wms-inbound-focus", "wms-cart-focus");
+    root().classList.remove(
+      "wms-inbound-focus",
+      "wms-cart-focus",
+      "wms-putaway-focus",
+    );
     current = null;
     root()._waveTask = null;
     el("wms-content").innerHTML =
@@ -565,7 +574,7 @@ window.Wms = (() => {
     if (turn !== generation) return;
     el("wms-content").innerHTML =
       `<form id="wms-filter" class="wms-toolbar"><label class="wms-search">Towar lub lokalizacja<input name="q" value="${html(query)}" placeholder="SKU, EAN, nazwa, lokalizacja"></label><label>Zakres<select name="low"><option value="0">Cały magazyn</option><option value="1" ${low ? "selected" : ""}>Poniżej minimum</option></select></label><button>Szukaj</button></form>
-      <div class="wms-surface"><h2>Zapasy na lokalizacjach</h2><p class="wms-muted">Dostępne do zbiórki = wolne sztuki na lokalizacjach kompletacji. Kwarantanna i zapas zaplecza wymagają zwolnienia lub przesunięcia.</p><div class="wms-scroll"><table class="wms-lines wms-stock-table"><thead><tr><th>SKU / towar</th><th>Lokalizacja</th><th>Na półce</th><th>Rezerwacja</th><th>Dostępne</th><th>Minimum</th><th>Operacja</th></tr></thead><tbody>${result.rows.map((s, i) => `<tr><td><strong>${html(s.symbol)}</strong><br>${html(s.nazwa)}${s.active ? "" : "<br><strong>Brak kartoteki ERP</strong>"}</td><td>${html(s.bin || "Brak spisu")}<br><small>${binModes[s.mode]}</small></td><td class="num">${s.on_hand}</td><td class="num">${s.reserved}${s.replenishment_reserved ? `<br><small>${s.replenishment_reserved} do uzupełnień</small>` : ""}</td><td class="num ${s.on_hand - s.reserved < s.minimum ? "wms-late" : ""}">${s.available}</td><td class="num">${s.minimum}</td><td><button data-stock-wms="${i}">Zmień</button>${office() ? `<button data-movements-wms="${i}">Historia</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak pasujących towarów.</td></tr>'}</tbody></table></div>${pager(result.total)}<div id="wms-stock-form"></div></div>`;
+      <div class="wms-surface"><h2>Zapasy na lokalizacjach</h2><p class="wms-muted">Dostępne do zbiórki = wolne sztuki na lokalizacjach kompletacji. Kwarantanna i zapas zaplecza wymagają zwolnienia lub przesunięcia.</p><div class="wms-scroll"><table class="wms-lines wms-stock-table"><thead><tr><th>SKU / towar</th><th>Lokalizacja</th><th>Na półce</th><th>Rezerwacja</th><th>Dostępne</th><th>Minimum</th><th>Operacja</th></tr></thead><tbody>${result.rows.map((s, i) => `<tr><td><strong>${html(s.symbol)}</strong><br>${html(s.nazwa)}${s.active ? "" : "<br><strong>Brak kartoteki ERP</strong>"}</td><td>${html(s.bin || "Brak spisu")}<br><small>${binModes[s.mode]}</small></td><td class="num">${s.on_hand}</td><td class="num">${s.reserved}${s.putaway_reserved ? `<br><small>${s.putaway_reserved} do odłożenia</small>` : ""}${s.replenishment_reserved ? `<br><small>${s.replenishment_reserved} do uzupełnień</small>` : ""}</td><td class="num ${s.on_hand - s.reserved < s.minimum ? "wms-late" : ""}">${s.available}</td><td class="num">${s.minimum}</td><td><button data-stock-wms="${i}">Zmień</button>${office() ? `<button data-movements-wms="${i}">Historia</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak pasujących towarów.</td></tr>'}</tbody></table></div>${pager(result.total)}<div id="wms-stock-form"></div></div>`;
     root()._stockRows = result.rows;
     root()._stockImport = null;
     if (office())

@@ -565,6 +565,7 @@ try {
           "ship",
           "shipment register, search, CSV download and return to order",
           "receive",
+          "receiving buffer, claimed partial putaway, lost response recovery and quantity correction",
           "stock movement history",
           "stock CSV preview, changed-input invalidation and duplicate document protection",
           "quarantine location",

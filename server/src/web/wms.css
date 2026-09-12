@@ -907,6 +907,7 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
   .wms-inbound-focus #wms-content > .wms-toolbar,
   .wms-inbound-focus #wms-content > section > h2,
   .wms-inbound-focus #wms-content > section > p,
+  .wms-inbound-focus .wms-receiving-mode,
   .wms-inbound-focus #wms-inbound-scan,
   .wms-inbound-focus #wms-content > section > details,
   .wms-inbound-focus #wms-content > details {
@@ -966,3 +967,17 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
     align-self: center;
   }
 }
+
+@media (max-width: 700px) {
+  /* Aktywne odkładanie musi mieścić potwierdzenie pod kciukiem. Powrót do
+     kolejki pozostaje widoczny; nawigacja całego biura wraca po wyjściu. */
+  body:has(#widokWms.wms-putaway-focus:not([hidden])) #bok nav.zakladki,
+  #widokWms.wms-putaway-focus .wms-head,
+  .wms-putaway-focus #wms-content > .wms-toolbar [data-inbound="receiving"] {
+    display: none;
+  }
+  .wms-putaway-focus #wms-content > section > p { margin-block: 4px; }
+}
+
+.wms-putaway-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-3); }
+@media (max-width: 700px) { .wms-putaway-fields { grid-template-columns: minmax(0, 1fr); } }

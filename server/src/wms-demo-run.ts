@@ -48,6 +48,16 @@ C.configureStation(actor, randomUUID(), {
   active: true,
   version: 0,
 });
+for (const [bin, mode] of [
+  ["BUF-01", "reserve"],
+  ["QUAR-01", "quarantine"],
+])
+  W.configureBin(actor, randomUUID(), {
+    bin,
+    mode,
+    version: 1,
+    reason: "Strefy przyjęcia DEMO",
+  });
 const scale = process.argv.includes("--scale");
 const skuCount = scale ? 5000 : 40;
 const orderCount = scale ? 1500 : 32;

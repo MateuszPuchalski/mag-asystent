@@ -62,7 +62,7 @@ export function getInbound(inboundId: number, raw: unknown = {}) {
     const document = header(inboundId);
     const lines = db()
       .prepare(
-        `SELECT l.* FROM wms_inbound_line l WHERE inbound_id=? ORDER BY (received>=expected),sku`,
+        `SELECT l.*,coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w JOIN wms_inbound_putaway p ON p.id=w.receipt_id WHERE p.line_id=l.id),0) AS awaiting_putaway FROM wms_inbound_line l WHERE inbound_id=? ORDER BY (received>=expected),sku`,
       )
       .all(inboundId) as Line[];
     // Podpowiedź pokazuje istniejące miejsca, nie udaje dowodu zeskanowania półki.
@@ -94,8 +94,8 @@ export function getInbound(inboundId: number, raw: unknown = {}) {
       ),
       putaways: db()
         .prepare(
-          `SELECT p.*,l.sku,r.created_at AS reversed_at,r.reason AS reversal_reason FROM wms_inbound_putaway p JOIN wms_inbound_line l ON l.id=p.line_id
-        LEFT JOIN wms_inbound_reversal r ON r.putaway_id=p.id WHERE l.inbound_id=? ORDER BY p.id DESC LIMIT 100 OFFSET ?`,
+          `SELECT p.*,l.sku,w.id AS work_id,w.remaining,r.created_at AS reversed_at,r.reason AS reversal_reason FROM wms_inbound_putaway p JOIN wms_inbound_line l ON l.id=p.line_id
+        LEFT JOIN wms_putaway_work w ON w.receipt_id=p.id LEFT JOIN wms_inbound_reversal r ON r.putaway_id=p.id WHERE l.inbound_id=? ORDER BY p.id DESC LIMIT 100 OFFSET ?`,
         )
         .all(inboundId, input.historyOffset),
     };
@@ -226,101 +226,136 @@ export function putawayInbound(
       bin: code,
       quantity,
       disposition: z.enum(["good", "damaged"]),
+      staged: z.boolean().default(false),
       reason: z.string().trim().max(500).default(""),
     })
     .strict()
     .parse(raw);
-  return command(key, actor, `inbound_putaway:${inboundId}`, input, () => {
-    const document = header(inboundId);
-    if (document.closed_at)
-      fail("Przyjęcie jest zamknięte. Otwórz dokument kolejnej dostawy");
-    const line = db()
-      .prepare("SELECT * FROM wms_inbound_line WHERE id=? AND inbound_id=?")
-      .get(input.lineId, inboundId) as Line | undefined;
-    if (!line) fail("Pozycja nie należy do tego przyjęcia", 404);
-    if (line!.version !== input.version)
-      fail("Ilość przyjęta zmieniła się. Odśwież i sprawdź pozostałe sztuki");
-    checkBarcode(line!, input.barcode);
-    const bin = db()
-      .prepare(
-        `SELECT mode FROM wms_bin WHERE bin=? UNION ALL SELECT 'pick' AS mode
-      WHERE EXISTS(SELECT 1 FROM wms_stock WHERE bin=?) AND NOT EXISTS(SELECT 1 FROM wms_bin WHERE bin=?) LIMIT 1`,
-      )
-      .get(input.bin, input.bin, input.bin);
-    if (!bin)
-      fail(
-        "Nieznana lokalizacja. Zeskanuj istniejącą półkę lub zarejestruj ją w Lokalizacjach",
-        400,
-      );
-    if ((input.disposition === "damaged") !== (bin!.mode === "quarantine"))
-      fail(
-        input.disposition === "damaged"
-          ? "Uszkodzony towar odłóż do kwarantanny"
-          : "Ta lokalizacja jest kwarantanną. Wybierz stan Uszkodzone lub inną półkę",
-      );
-    if (
-      db()
+  // Stare ponowienia nie zawierały pola staged. Ich odcisk musi pozostać taki sam.
+  const { staged, ...legacyInput } = input;
+  return command(
+    key,
+    actor,
+    `inbound_putaway:${inboundId}`,
+    staged ? input : legacyInput,
+    () => {
+      const document = header(inboundId);
+      if (document.closed_at)
+        fail("Przyjęcie jest zamknięte. Otwórz dokument kolejnej dostawy");
+      const line = db()
+        .prepare("SELECT * FROM wms_inbound_line WHERE id=? AND inbound_id=?")
+        .get(input.lineId, inboundId) as Line | undefined;
+      if (!line) fail("Pozycja nie należy do tego przyjęcia", 404);
+      if (line!.version !== input.version)
+        fail("Ilość przyjęta zmieniła się. Odśwież i sprawdź pozostałe sztuki");
+      checkBarcode(line!, input.barcode);
+      const bin = db()
         .prepare(
-          "SELECT 1 FROM wms_stock_check WHERE tw_id=? AND bin=? AND resolved_at IS NULL",
+          `SELECT mode FROM wms_bin WHERE bin=? UNION ALL SELECT 'pick' AS mode
+      WHERE EXISTS(SELECT 1 FROM wms_stock WHERE bin=?) AND NOT EXISTS(SELECT 1 FROM wms_bin WHERE bin=?) LIMIT 1`,
         )
-        .get(line!.tw_id, input.bin)
-    )
-      fail("Półka czeka na przeliczenie. Odłóż towar na inną lokalizację");
-    if (input.disposition === "damaged") reason.parse(input.reason);
-    if (line!.received + input.quantity > line!.expected) {
-      manager(actor);
-      if (input.reason.length < 3)
+        .get(input.bin, input.bin, input.bin);
+      if (!bin)
         fail(
-          "Nadwyżka wymaga uzasadnienia biura. Sprawdź ilość i dokument",
+          "Nieznana lokalizacja. Zeskanuj istniejącą półkę lub zarejestruj ją w Lokalizacjach",
           400,
         );
-    }
-    // Zachowujemy kartotekę nawet gdy lustro ERP zmieniło się po otwarciu dokumentu.
-    db()
-      .prepare(
-        "INSERT OR IGNORE INTO wms_product(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)",
+      if (
+        input.staged &&
+        (bin!.mode !== "reserve" || input.disposition !== "good")
       )
-      .run(line!.tw_id, line!.sku, line!.name, line!.barcode);
-    applyStock(actor, {
-      action: "receive",
-      twId: line!.tw_id,
-      bin: input.bin,
-      quantity: input.quantity,
-      reason: `Przyjęcie ${document.reference}`,
-    });
-    db()
-      .prepare(
-        `UPDATE wms_inbound_line SET received=received+?,damaged=damaged+?,version=version+1 WHERE id=?`,
+        fail(
+          "Przyjęcie do bufora wymaga pełnowartościowego towaru i lokalizacji zaplecza",
+          400,
+        );
+      if ((input.disposition === "damaged") !== (bin!.mode === "quarantine"))
+        fail(
+          input.disposition === "damaged"
+            ? "Uszkodzony towar odłóż do kwarantanny"
+            : "Ta lokalizacja jest kwarantanną. Wybierz stan Uszkodzone lub inną półkę",
+        );
+      if (
+        db()
+          .prepare(
+            "SELECT 1 FROM wms_stock_check WHERE tw_id=? AND bin=? AND resolved_at IS NULL",
+          )
+          .get(line!.tw_id, input.bin)
       )
-      .run(
-        input.quantity,
-        input.disposition === "damaged" ? input.quantity : 0,
-        line!.id,
-      );
-    db()
-      .prepare("UPDATE wms_inbound SET version=version+1 WHERE id=?")
-      .run(inboundId);
-    const putawayId = Number(
+        fail("Półka czeka na przeliczenie. Odłóż towar na inną lokalizację");
+      if (input.disposition === "damaged") reason.parse(input.reason);
+      if (line!.received + input.quantity > line!.expected) {
+        manager(actor);
+        if (input.reason.length < 3)
+          fail(
+            "Nadwyżka wymaga uzasadnienia biura. Sprawdź ilość i dokument",
+            400,
+          );
+      }
+      // Zachowujemy kartotekę nawet gdy lustro ERP zmieniło się po otwarciu dokumentu.
       db()
         .prepare(
-          "INSERT INTO wms_inbound_putaway(line_id,bin,quantity,disposition,reason,user_id,created_at) VALUES (?,?,?,?,?,?,?)",
+          "INSERT OR IGNORE INTO wms_product(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)",
+        )
+        .run(line!.tw_id, line!.sku, line!.name, line!.barcode);
+      applyStock(actor, {
+        action: "receive",
+        twId: line!.tw_id,
+        bin: input.bin,
+        quantity: input.quantity,
+        reason: `Przyjęcie ${document.reference}`,
+      });
+      db()
+        .prepare(
+          `UPDATE wms_inbound_line SET received=received+?,damaged=damaged+?,version=version+1 WHERE id=?`,
         )
         .run(
-          line!.id,
-          input.bin,
           input.quantity,
-          input.disposition,
-          input.reason,
-          actor.id,
-          nowIso(),
-        ).lastInsertRowid,
-    );
-    return {
-      id: inboundId,
-      putawayId,
-      received: line!.received + input.quantity,
-    };
-  });
+          input.disposition === "damaged" ? input.quantity : 0,
+          line!.id,
+        );
+      db()
+        .prepare("UPDATE wms_inbound SET version=version+1 WHERE id=?")
+        .run(inboundId);
+      const putawayId = Number(
+        db()
+          .prepare(
+            "INSERT INTO wms_inbound_putaway(line_id,bin,quantity,disposition,reason,user_id,created_at) VALUES (?,?,?,?,?,?,?)",
+          )
+          .run(
+            line!.id,
+            input.bin,
+            input.quantity,
+            input.disposition,
+            input.reason,
+            actor.id,
+            nowIso(),
+          ).lastInsertRowid,
+      );
+      return {
+        id: inboundId,
+        putawayId,
+        ...(input.staged
+          ? {
+              workId: Number(
+                db()
+                  .prepare(
+                    "INSERT INTO wms_putaway_work(receipt_id,tw_id,source,quantity,remaining,created_at) VALUES (?,?,?,?,?,?)",
+                  )
+                  .run(
+                    putawayId,
+                    line!.tw_id,
+                    input.bin,
+                    input.quantity,
+                    input.quantity,
+                    nowIso(),
+                  ).lastInsertRowid,
+              ),
+            }
+          : {}),
+        received: line!.received + input.quantity,
+      };
+    },
+  );
 }
 
 export function closeInbound(
@@ -415,6 +450,14 @@ export function reverseInbound(
       | undefined;
     if (!original) fail("Odłożenie nie należy do tego przyjęcia", 404);
     const p = original!;
+    if (
+      db()
+        .prepare("SELECT 1 FROM wms_putaway_work WHERE receipt_id=?")
+        .get(p.id)
+    )
+      fail(
+        "Przyjęcie do bufora koryguj w zadaniu odkładania. Odłożone sztuki rozlicz przez spis lub zwrot",
+      );
     checkBarcode(p, input.barcode);
     if (input.bin !== p.bin)
       fail("Zeskanuj lokalizację pierwotnego odłożenia", 400);

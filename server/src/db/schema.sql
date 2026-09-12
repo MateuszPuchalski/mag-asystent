@@ -74,6 +74,36 @@ BEGIN SELECT RAISE(ABORT, 'inbound putaway is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS wms_inbound_putaway_no_delete BEFORE DELETE ON wms_inbound_putaway
 BEGIN SELECT RAISE(ABORT, 'inbound putaway is immutable'); END;
 CREATE INDEX IF NOT EXISTS ix_wms_stock_bin ON wms_stock(bin, tw_id);
+-- Przyjęcie na zaplecze odkłada się później. Otwarte zadanie chroni policzone
+-- sztuki przed drugim pracownikiem, uzupełnieniem i ręcznym przesunięciem.
+CREATE TABLE IF NOT EXISTS wms_putaway_work (
+  id INTEGER PRIMARY KEY,
+  receipt_id INTEGER NOT NULL UNIQUE REFERENCES wms_inbound_putaway(id),
+  tw_id INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  remaining INTEGER NOT NULL CHECK(remaining>=0 AND remaining<=quantity),
+  user_id INTEGER,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_wms_putaway_work_source ON wms_putaway_work(tw_id,source) WHERE remaining>0;
+CREATE TABLE IF NOT EXISTS wms_putaway_step (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES wms_putaway_work(id),
+  kind TEXT NOT NULL CHECK(kind IN ('putaway','correction','quarantine')),
+  target TEXT,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_wms_putaway_step_task ON wms_putaway_step(task_id,id);
+CREATE TRIGGER IF NOT EXISTS wms_putaway_step_no_update BEFORE UPDATE ON wms_putaway_step
+BEGIN SELECT RAISE(ABORT, 'putaway history is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS wms_putaway_step_no_delete BEFORE DELETE ON wms_putaway_step
+BEGIN SELECT RAISE(ABORT, 'putaway history is immutable'); END;
 -- Zapas kwarantanny i zapas zaplecza są widoczne, ale nie trafiają do zbiórki.
 CREATE TABLE IF NOT EXISTS wms_bin (
   bin TEXT PRIMARY KEY,

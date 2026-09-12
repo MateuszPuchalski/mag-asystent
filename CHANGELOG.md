@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.297.0 — przyjęcie do bufora i osobna kolejka odkładania
+
+- Dostawę można policzyć do bufora zaplecza i odłożyć później. Sposób przyjęcia wybiera się przed serią skanów.
+- Kolejka pokazuje pozostałe sztuki, najstarsze zadanie, dokument i stan przypisania. Podjęcie chroni pracę przed drugim kolektorem.
+- Odłożenie wymaga skanu bufora, części, ilości i półki. Częściowe partie, ponowienie i przejęcie zachowują historię.
+- Oczekujące sztuki nie trafiają do zbiórki ani uzupełnienia. Ruch, spis i zmiana przeznaczenia lokalizacji respektują odkładanie.
+- Brak policzonych sztuk koryguje biuro z uzasadnieniem. Uszkodzenia wykryte przy odkładaniu trafiają do skanowanej kwarantanny.
+- Kontrola spójności sprawdza rozliczenie zadań oraz ochronę bufora. Zapas i dokument zmieniają się w jednej transakcji z historią.
+- Potwierdzenie odkładania mieści się przy 320, 390 i 1440 px. Rozszerzone E2E obejmuje bufor, częściowy ruch, utratę odpowiedzi i korektę.
+- Aktualizacja tworzy nowe tabele bez przenoszenia dawnego zapasu. Bufor wymaga zarejestrowanej lokalizacji zaplecza; demo zawiera BUF-01 i QUAR-01.
+
 ## 0.296.0 — kolektor wraca do pracy po przejęciu wózka
 
 - Potwierdzone przejęcie trasy pokazuje przycisk rozpoczęcia kolejnego wózka. Zamknięcie lokalnego widoku nie zmienia zamówień ani właściciela na serwerze.

@@ -11,6 +11,10 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Od 0.297.0 **Przyjęcia → Odkładanie z bufora** rozdzielają liczenie i odłożenie. Bufor zarejestrować w Lokalizacjach jako zapas zaplecza.
+Nie zmieniać go na lokalizację kompletacji podczas otwartej pracy. Aktualizacja dodaje tabele zadań oraz historii bez zmiany dawnych przyjęć.
+Funkcja działa w biurze i mobilnej przeglądarce. Natywne przyjęcie WMS na Androidzie pozostaje kolejnym etapem.
+
 Od 0.296.0 kolektor rozpoznaje potwierdzone przejęcie wózka i pozwala rozpocząć kolejny. Najpierw zaktualizować serwer, następnie APK.
 Starszy serwer nie podaje jednoznacznego kodu odmowy; kolektor zachowuje wtedy niedokończony zapis do wyjaśnienia.
 

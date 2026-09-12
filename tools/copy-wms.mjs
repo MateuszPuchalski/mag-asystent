@@ -5,6 +5,7 @@ for (const file of [
   "wms-carts.js",
   "wms-stock-work.js",
   "wms-inbound.js",
+  "wms-putaway.js",
   "wms-handoff.js",
   "wms-packing.js",
   "wms.css",

@@ -435,7 +435,12 @@ test("pełny przebieg: rezerwacja → skan → kontrola paczki → wysyłka → 
     () => action(o, "cancel", { reason: "Anulowanie" }),
     /zamknięte/,
   );
-  assert.deepEqual(A.integrity(), { ok: true, balances: [], reservations: [] });
+  assert.deepEqual(A.integrity(), {
+    ok: true,
+    balances: [],
+    reservations: [],
+    putaway: [],
+  });
   assert.equal(
     (A.analytics({ days: 1 }).throughput as { shipped: number }).shipped,
     1,

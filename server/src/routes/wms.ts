@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import * as Carts from "../services/wms-carts.js";
 import * as StockWork from "../services/wms-stock-work.js";
 import * as Inbound from "../services/wms-inbound.js";
+import * as Putaway from "../services/wms-putaway.js";
 import * as Handoff from "../services/wms-dispatch.js";
 import { ZodError, z } from "zod";
 import { sesjaZadania } from "../context.js";
@@ -56,12 +57,10 @@ export async function wmsRoutes(app: FastifyInstance) {
   // Enkapsulacja Fastify zachowuje dotychczasowe błędy pozostałych modułów.
   app.setErrorHandler((error, req, reply) => {
     if (error instanceof WmsError)
-      return reply
-        .code(error.statusCode)
-        .send({
-          error: error.message,
-          ...(error.kod ? { kod: error.kod } : {}),
-        });
+      return reply.code(error.statusCode).send({
+        error: error.message,
+        ...(error.kod ? { kod: error.kod } : {}),
+      });
     if (error instanceof ZodError)
       return reply.code(400).send({
         error: "Sprawdź dane formularza",
@@ -146,6 +145,31 @@ export async function wmsRoutes(app: FastifyInstance) {
     actor();
     return Inbound.listInbound(req.query);
   });
+  app.get("/api/wms/putaway-work", async (req) =>
+    Putaway.listPutaway(actor(), req.query),
+  );
+  app.get<{ Params: { id: string } }>(
+    "/api/wms/putaway-work/:id",
+    async (req) => {
+      actor();
+      return Putaway.getPutaway(orderId(req.params.id));
+    },
+  );
+  for (const [path, action] of Object.entries({
+    claim: Putaway.claimPutaway,
+    finish: Putaway.finishPutaway,
+    correct: Putaway.correctPutaway,
+  }))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/putaway-work/:id/${path}`,
+      async (req) =>
+        action(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
   app.get<{ Params: { id: string } }>("/api/wms/inbound/:id", async (req) => {
     actor();
     return Inbound.getInbound(orderId(req.params.id), req.query);

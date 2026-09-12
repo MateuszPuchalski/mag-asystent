@@ -9,7 +9,7 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 
 | Obszar | Co ma być udowodnione | Stan audytu |
 |---|---|---|
-| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Bezpośrednie przyjęcie WMS zweryfikowano testami, włącznie z korektą i utratą odpowiedzi. Przyjęcie na bufor i kolektor pozostają otwarte. |
+| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Bezpośrednie przyjęcie WMS zweryfikowano testami, włącznie z korektą i utratą odpowiedzi. Bufor z kolejką odkładania wdrożono; natywny kolektor przyjęć pozostaje otwarty. |
 | Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Bezpośrednie odłożenie obsługuje nowy SKU na zarejestrowanej półce. Plan uzupełnień nadal wymaga istniejącego miejsca kompletacji. |
 | Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Odtworzono i naprawiono oba błędy. Testy regresji opisano niżej. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
@@ -130,7 +130,7 @@ Osobna próba 101 odłożeń sprawdziła przejście do starszych zapisów i kore
 Lokalny axe-core 4.13.0 nie zgłosił naruszeń wybranych reguł WCAG A/AA i 2.1 AA
 na aktywnym formularzu przy 320, 390 i 1440 px. Nie stwierdzono przewijania całej strony w poziomie.
 
-Dalszy zakres celu: przyjęcia na strefę buforową z późniejszym odłożeniem, fizyczne
+Dalszy zakres celu: natywne przyjęcia Android, fizyczne
 próby organizacji hali, powiązanie kolektora Android oraz pełna analityka przyjęcie–wysyłka.
 WMS obsługuje obecnie bezpośrednie odłożenie przez przeglądarkę i dane seeded.
 
@@ -235,3 +235,20 @@ Każda skrzynka nadal wymaga skanu. Ilości pochodzą z aktualnej trasy, a nie z
 Przerwanie aplikacji, zmiana kontekstu, ponowienie i odświeżenie usuwają weryfikację. Testy obejmują przerwanie podczas zapisu dziennika i żądania sieciowego.
 Syntetyczny przystanek 30 skrzynek wymaga 32 zamiast 90 skanów, bez przypisywania temu wynikowi oszczędności czasu pracy.
 Zdjęcie części pozostaje widoczne podczas zapisu. Nieznany wynik nadal blokuje następne pobranie.
+
+
+## Rozdzielenie przyjęcia i odkładania od 0.297.0
+
+Audyt wykazał wymuszone łączenie liczenia z potwierdzeniem półki docelowej. Dostawa nie miała własnej kolejki pozostałych odłożeń.
+Dodano przyjęcie do bufora zaplecza, osobne podjęcie pracy i częściowe odłożenia. Zapas pozostaje niedostępny dla zbiórki do potwierdzenia półki kompletacji.
+Przydziały odkładania są uwzględnione w ruchach, spisie, zmianach lokalizacji, planie uzupełnień i kontroli spójności.
+Braki oraz uszkodzenia mają odmienne rozliczenie; powtórzenie nie podwaja ilości. Podgląd nie podejmuje pracy.
+
+Podstawą rozdzielenia jest [Microsoft: mobile receiving and putaway](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse).
+Dokumentacja opisuje przyjęcie tworzące pracę odkładania dla innej osoby. Ochrona bufora i sposób korekt są decyzjami WERTIS.
+Nie zmierzono jeszcze czasu pracowników; testy dowodzą poprawności przepływu i liczników. Natywne przyjęcia Android oraz pełna analityka przepływu pozostają w zakresie.
+
+Dowody: [wyniki przyjęcia i odkładania](wms-putaway-evidence.json). Przeszło 2221 testów serwera, 727 panelu, oba sprawdzenia TypeScript i build.
+E2E obejmuje bufor, podjęcie, częściowe odłożenie, utratę odpowiedzi oraz korektę. Aktywny formularz sprawdzono przy 320, 390 i 1440 px.
+Przy tych szerokościach potwierdzenie pozostaje widoczne, bez przewijania poziomego. Wybrane reguły axe-core nie zgłosiły naruszeń; nie jest to certyfikat całego systemu.
+Próba 5000 SKU i 2000 zamówień zachowała zgodny dziennik oraz zawartość wszystkich paczek. Inne lokalne sprawdzenia działały równolegle.
