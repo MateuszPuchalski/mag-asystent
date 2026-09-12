@@ -478,7 +478,14 @@ window.Wms = (() => {
         handoffUi.repackForm(o)
       );
     if (o.hold_reason)
-      return '<p class="wms-help">Wyjaśnij przyczynę wstrzymania. Pobrany towar można odłożyć poniżej.</p>';
+      return (
+        '<p class="wms-help">Wyjaśnij przyczynę wstrzymania. Zwracaj tylko fizycznie obecne sztuki.</p>' +
+        (office() &&
+        ["packing", "packed"].includes(o.status) &&
+        !o.shipments.length
+          ? recoveryUi.damage(o)
+          : "")
+      );
     if (o.status === "new")
       return office()
         ? form(
@@ -526,7 +533,11 @@ window.Wms = (() => {
         "ROZPOCZNIJ KONTROLĘ PACZKI",
       );
     if (o.status === "packing") {
-      if (o.packer_id !== user.userId) return "Pakowanie prowadzi inna osoba.";
+      if (o.packer_id !== user.userId)
+        return (
+          "Pakowanie prowadzi inna osoba." +
+          (office() ? recoveryUi.damage(o) : "")
+        );
       const done = o.lines.reduce((n, l) => n + l.packed, 0),
         total = o.lines.reduce((n, l) => n + l.quantity, 0);
       return (
@@ -551,7 +562,8 @@ window.Wms = (() => {
         ? `<div class="wms-message">Wszystkie pozycje sprawdzone. Zeskanuj etykiety przygotowanych paczek.</div>` +
             form("ship", packingUi.labels(o), "ZAPISZ PRZYGOTOWANE PACZKI") +
             packingUi.corrections(o)
-        : "Paczka czeka na wysyłkę przez osobę pakującą.";
+        : "Paczka czeka na wysyłkę przez osobę pakującą." +
+            (office() ? recoveryUi.damage(o) : "");
     if (o.status === "shipped")
       return `<div class="wms-message">${o.shipments.some((s) => s.dispatch_status === "legacy") ? "Historia sprzed skanowanego odbioru kuriera." : "Odbiór kuriera potwierdzony."}</div>${o.shipments.map(packingUi.saved).join("")}<button data-do-wms="print">DRUKUJ LISTĘ PAKOWĄ</button>`;
     return "<p>Zamówienie anulowane. Rezerwacje zwolnione.</p>";
@@ -743,7 +755,7 @@ window.Wms = (() => {
       .insertAdjacentHTML(
         "beforeend",
         `<section class="wms-surface"><h2>Kanały sprzedaży</h2><table class="wms-lines"><thead><tr><th>Kanał</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.channels.map((c) => `<tr><td>${html(c.channel)}</td><td>${c.shipped}</td><td>${number((c.on_time * 100) / c.shipped)}%</td></tr>`).join("")}</tbody></table></section>
-      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
+      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności przy pakowaniu</summary><p>Potwierdzone w wybranym okresie. Brak oznacza ubytek przy stanowisku, bez przyjęcia zapasu. Kwarantanna zawiera fizycznie odłożone uszkodzenia.</p>${(a.packingIssues || []).map((r) => `<p><strong>${r.kind === "shortage" ? "Potwierdzone braki" : "Uszkodzenia do kwarantanny"}</strong>: ${number(r.units)} szt. · ${number(r.cases)} zgłoszeń · nadal czeka na zamiennik ${number(r.waiting_units)} szt.</p>`).join("") || "Brak potwierdzonych rozbieżności w okresie."}</details><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
       <section class="wms-surface"><h2>Operacje zbiórki według osoby</h2><p class="wms-muted">Zatwierdzone pobrania w okresie. Operacja może wymagać kilku skanów. Sztuki i operacje nie mierzą czasu pracy.</p><table class="wms-lines"><thead><tr><th>Osoba</th><th>Pobrania</th><th>Sztuki</th><th>Zamówienia</th></tr></thead><tbody>${a.productivity.map((p) => `<tr><td>${html(p.name)}</td><td>${p.scans}</td><td>${p.units}</td><td>${p.orders}</td></tr>`).join("")}</tbody></table></section>`,
       );
   }

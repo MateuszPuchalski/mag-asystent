@@ -131,6 +131,195 @@ function balance(twId: number, bin: string) {
     .get(twId, bin);
 }
 
+function shortage(
+  f: ReturnType<typeof fixture>,
+  observedQuantity: number,
+  parcelNo = 1,
+  key = randomUUID(),
+) {
+  const o = W.getOrder(f.order.id);
+  return R.confirmPackingShortage(admin, key, {
+    orderId: o.id,
+    version: o.version,
+    box: o.tote,
+    lineId: o.lines[0].id,
+    observedQuantity,
+    parcelNo,
+    reason: "Brak potwierdzony po sprawdzeniu skrzynki i stanowiska",
+  });
+}
+
+test("potwierdzony brak usuwa tylko nieobecną zawartość, bez pozornego przyjęcia, a zamiennik wymaga kontroli", () => {
+  const f = fixture();
+  packAll(f);
+  const original = W.getOrder(f.order.id),
+    shelf = balance(original.lines[0].tw_id, "PICK");
+  const movements = db().prepare("SELECT count(*) n FROM wms_movement").get()!
+    .n;
+  let t = shortage(f, 2);
+  let o = W.getOrder(original.id);
+  assert.deepEqual(
+    o.lines.map((l) => [l.picked, l.packed]),
+    [
+      [2, 2],
+      [1, 1],
+    ],
+  );
+  assert.deepEqual(balance(original.lines[0].tw_id, "PICK"), shelf);
+  assert.equal(
+    db().prepare("SELECT count(*) n FROM wms_movement").get()!.n,
+    movements,
+  );
+  assert.equal(t.lines[0].kind, "shortage");
+  assert.equal(t.lines[0].quarantine, "");
+  assert.equal(
+    db()
+      .prepare("SELECT quarantine FROM wms_pack_issue WHERE id=?")
+      .get(t.lines[0].id)!.quarantine,
+    null,
+  );
+  assert.equal(t.lines[0].quantity, 1);
+  assert.equal(t.lines[0].user_id, admin.id);
+  t = R.claimRecovery(worker, randomUUID(), t.id, { version: t.version });
+  t = R.pickRecovery(worker, randomUUID(), t.id, pickup(t));
+  o = W.getOrder(original.id);
+  assert.ok(t.completed_at);
+  assert.equal(o.lines[0].packed, 2);
+  assert.equal(o.lines[0].picked, 3);
+  o = W.actOnOrder(worker, randomUUID(), o.id, {
+    version: o.version,
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+  });
+  o = W.actOnOrder(worker, randomUUID(), o.id, {
+    version: o.version,
+    ...shipping(),
+  });
+  assert.equal(
+    o.shipments[0].contents.reduce((n, c) => n + Number(c.quantity), 0),
+    4,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
+test("brak wymaga biura, faktycznej ilości, właściwej skrzynki i wersji; ponowienie oraz awaria są atomowe", () => {
+  const f = fixture();
+  packAll(f);
+  const o = W.getOrder(f.order.id);
+  const body = {
+    orderId: o.id,
+    version: o.version,
+    box: o.tote,
+    lineId: o.lines[0].id,
+    observedQuantity: 2,
+    parcelNo: 1,
+    reason: "Potwierdzone wyjaśnienie",
+  };
+  assert.throws(() => R.confirmPackingShortage(worker, randomUUID(), body));
+  for (const patch of [
+    { observedQuantity: -1 },
+    { observedQuantity: 3 },
+    { observedQuantity: 4 },
+    { observedQuantity: 0.5 },
+    { observedQuantity: "" },
+    { parcelNo: 2 },
+    { parcelNo: 0 },
+    { lineId: o.lines[1].id + 10000 },
+    { box: "WRONG" },
+    { version: o.version - 1 },
+    { reason: "" },
+  ])
+    assert.throws(() =>
+      R.confirmPackingShortage(admin, randomUUID(), { ...body, ...patch }),
+    );
+  assert.deepEqual(W.getOrder(o.id), o);
+  const key = randomUUID();
+  db().exec(
+    "CREATE TEMP TRIGGER fail_shortage BEFORE INSERT ON wms_pack_issue BEGIN SELECT RAISE(ABORT,'shortage rollback'); END",
+  );
+  assert.throws(
+    () => R.confirmPackingShortage(admin, key, body),
+    /shortage rollback/,
+  );
+  assert.deepEqual(W.getOrder(o.id), o);
+  db().exec("DROP TRIGGER fail_shortage");
+  const result = R.confirmPackingShortage(admin, key, body);
+  assert.deepEqual(
+    R.confirmPackingShortage(admin, key, body),
+    JSON.parse(JSON.stringify(result)),
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
+test("brak w niesprawdzonych sztukach i brak w jednej paczce zachowują pozostałą zawartość oraz niezależne wstrzymanie", () => {
+  const f = fixture();
+  f.act({
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+    parcelNo: 1,
+  });
+  let t = shortage(f, 1, 0);
+  assert.equal(t.lines[0].quantity, 1);
+  let o = W.getOrder(f.order.id);
+  assert.equal(o.lines[0].packed, 1);
+  assert.equal(o.lines[0].picked, 2);
+  W.actOnOrder(worker, randomUUID(), o.id, {
+    version: o.version,
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+    parcelNo: 2,
+  });
+  o = W.getOrder(o.id);
+  W.actOnOrder(worker, randomUUID(), o.id, {
+    version: o.version,
+    action: "hold",
+    reason: "Klient zmienia adres",
+  });
+  t = shortage(f, 0, 2);
+  o = W.getOrder(o.id);
+  assert.equal(o.lines[0].picked, 1);
+  assert.equal(o.lines[0].packed, 1);
+  assert.equal(o.packingContents.length, 1);
+  assert.equal(o.packingContents[0].parcel_no, 1);
+  assert.equal(o.hold_reason, "Klient zmienia adres");
+  assert.throws(
+    () => R.claimRecovery(worker, randomUUID(), t.id, { version: t.version }),
+    /wstrzymane/,
+  );
+  db()
+    .prepare("UPDATE wms_pack_issue SET quantity=quantity+1 WHERE id=?")
+    .run(t.lines[0].id);
+  assert.throws(
+    () =>
+      W.actOnOrder(admin, randomUUID(), o.id, {
+        version: o.version,
+        action: "resume",
+        reason: "Kontrola ochrony rezerwacji",
+      }),
+    /napraw rezerwację/,
+  );
+  db()
+    .prepare("UPDATE wms_pack_issue SET quantity=quantity-1 WHERE id=?")
+    .run(t.lines[0].id);
+  o = W.actOnOrder(admin, randomUUID(), o.id, {
+    version: o.version,
+    action: "resume",
+    reason: "Adres wyjaśniony; potrzeba zamiennika pozostaje",
+  });
+  assert.equal(o.hold_reason, null);
+  assert.equal(o.lines[0].picked, 1);
+  assert.equal(o.packingRecovery!.remaining, 2);
+  assert.equal(
+    R.claimRecovery(worker, randomUUID(), t.id, { version: t.version }).picks[0]
+      .quantity,
+    2,
+  );
+  assert.equal(A.integrity().ok, true);
+});
+
 test("uszkodzenie w paczce zachowuje dobre potwierdzenia i wymienia tylko jedną sztukę", () => {
   const f = fixture();
   packAll(f);
@@ -378,7 +567,7 @@ test("utrata odpowiedzi nie podwaja kwarantanny ani pobrania, a błąd zapisu co
     tw = before.lines[0].tw_id,
     quar = Number(balance(tw, "QUAR")?.on_hand ?? 0);
   db().exec(
-    "CREATE TEMP TRIGGER fail_damage BEFORE INSERT ON wms_pack_damage BEGIN SELECT RAISE(ABORT,'damage rollback'); END",
+    "CREATE TEMP TRIGGER fail_damage BEFORE INSERT ON wms_pack_issue BEGIN SELECT RAISE(ABORT,'damage rollback'); END",
   );
   try {
     assert.throws(() => damage(f), /damage rollback/);
@@ -412,7 +601,7 @@ test("utrata odpowiedzi nie podwaja kwarantanny ani pobrania, a błąd zapisu co
   const pickKey = randomUUID(),
     body = pickup(a);
   db().exec(
-    "CREATE TEMP TRIGGER fail_replacement BEFORE UPDATE ON wms_pack_damage BEGIN SELECT RAISE(ABORT,'replacement rollback'); END",
+    "CREATE TEMP TRIGGER fail_replacement BEFORE UPDATE ON wms_pack_issue BEGIN SELECT RAISE(ABORT,'replacement rollback'); END",
   );
   try {
     assert.throws(
@@ -531,12 +720,12 @@ test("kontrola kopii wykrywa niepełny schemat i utracone rozliczenie wymiany, a
   try {
     copy
       .prepare(
-        "UPDATE wms_pack_damage SET replaced=quantity WHERE recovery_id=?",
+        "UPDATE wms_pack_issue SET replaced=quantity WHERE recovery_id=?",
       )
       .run(t.id);
     assert.equal(A.integrity(copy).ok, false);
     assert.ok(A.integrity(copy).packingRecovery.some((r) => r.id === t.id));
-    copy.exec("PRAGMA foreign_keys=OFF; DROP TABLE wms_pack_damage");
+    copy.exec("PRAGMA foreign_keys=OFF; DROP TABLE wms_pack_issue");
     assert.throws(() => A.integrity(copy), /Niepełny schemat wymian/);
     copy.exec("DROP TABLE wms_pack_recovery");
     assert.equal(A.integrity(copy).ok, true);

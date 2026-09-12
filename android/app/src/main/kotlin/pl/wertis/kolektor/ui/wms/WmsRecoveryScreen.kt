@@ -124,7 +124,7 @@ fun WmsRecoveryScreen(graph: AppGraph) {
         Text(prompt,Modifier.fillMaxWidth().background(Amber,RoundedCornerShape(10.dp)).padding(12.dp),color=Ink,fontWeight=FontWeight.ExtraBold,fontSize=20.sp)
         if(stage==WmsRecoveryStage.AVAILABLE){
             task.lines.filter{it.replaced<it.quantity}.forEach{Text("${it.sku} · ${it.quantity-it.replaced} szt.")}
-            Text("Podjęcie rezerwuje tylko brakujące zamienniki. Brak zapasu nie cofa kwarantanny.")
+            Text("Podjęcie rezerwuje tylko brakujące zamienniki. Rozliczona rozbieżność pozostaje zapisana także przy braku zapasu.")
             PrimaryButton("PODEJMIJ WYMIANĘ",enabled=allowed,modifier=Modifier.fillMaxWidth()){submit(recoveryClaim(task,context.actorId))}
         } else if(releasing){
             Text("Potwierdzone zamienniki zostają przy pakowaniu. Zwróć pozostałe pobrane sztuki na każde źródło i zeskanuj je.")

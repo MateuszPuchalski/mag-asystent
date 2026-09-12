@@ -1,7 +1,7 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.307.1",
+  "version": "0.308.0",
   "description": "WERTIS — WMS z kompletacją i pakowaniem, biuro, obsługa klienta i kolektor Android; integracje Subiekta GT.",
   "workspaces": [
     "server",
@@ -21,7 +21,7 @@
     "reconcile": "npm -w server run reconcile",
     "reslot": "npm -w server run reslot --",
     "dev:panel": "npm -w @wertis/panel-obslugi run dev",
-    "test:wms": "node --import tsx --test server/src/services/wms.test.ts server/src/services/wms-carts.test.ts server/src/services/wms-inbound.test.ts server/src/services/wms-putaway.test.ts server/src/services/wms-backup.test.ts server/src/services/wms-flow-analytics.test.ts server/src/services/wms-analytics-reader.test.ts server/src/services/wms-dispatch.test.ts server/src/services/wms-packing.test.ts server/src/services/wms-pack-recovery.test.ts server/src/routes/wms.test.ts",
+    "test:wms": "node --import tsx --test server/src/services/wms.test.ts server/src/services/wms-carts.test.ts server/src/services/wms-inbound.test.ts server/src/services/wms-putaway.test.ts server/src/services/wms-backup.test.ts server/src/services/wms-flow-analytics.test.ts server/src/services/wms-analytics-reader.test.ts server/src/services/wms-dispatch.test.ts server/src/services/wms-packing.test.ts server/src/services/wms-pack-recovery.test.ts server/src/db/wms-pack-issues.test.ts server/src/routes/wms.test.ts",
     "test:wms:e2e": "node tools/wms-e2e.mjs",
     "test:wms:capacity": "node --import tsx server/src/wms-capacity-run.ts",
     "test:wms:cart-capacity": "node --import tsx server/src/wms-cart-capacity-run.ts",

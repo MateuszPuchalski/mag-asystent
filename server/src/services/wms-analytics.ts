@@ -128,6 +128,14 @@ export function analytics(raw: unknown, database: Db = db()) {
       GROUP BY m.tw_id HAVING sum(abs(m.delta))>0 ORDER BY sum(abs(m.delta)) DESC LIMIT 20`,
       )
       .all(since, now);
+    const packingIssues = d
+      .prepare(
+        `SELECT i.kind,count(*) AS cases,sum(i.quantity) AS units,
+      sum(CASE WHEN r.completed_at IS NULL AND r.cancelled_at IS NULL THEN i.quantity-i.replaced ELSE 0 END) AS waiting_units
+      FROM wms_pack_issue i JOIN wms_pack_recovery r ON r.id=i.recovery_id
+      WHERE i.created_at>=? AND i.created_at<=? GROUP BY i.kind ORDER BY i.kind`,
+      )
+      .all(since, now);
     const flow = flowAnalytics(d, since, now);
     d.exec("COMMIT");
     return {
@@ -147,6 +155,7 @@ export function analytics(raw: unknown, database: Db = db()) {
       aging,
       channels,
       adjustments,
+      packingIssues,
       dispatchCoverage,
     };
   } catch (e) {
@@ -233,29 +242,35 @@ export function integrity(database: Db = db()) {
       OR sum(w.remaining)+coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=w.tw_id AND r.source=w.source AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)>coalesce(s.on_hand-s.reserved,0)`,
             )
             .all();
-    const recoveryTables = Number(
-      database
-        .prepare(
-          "SELECT count(*) n FROM sqlite_master WHERE type='table' AND name IN ('wms_pack_recovery','wms_pack_damage')",
-        )
-        .get()?.n,
-    );
-    if (recoveryTables === 1)
+    const recoveryTables = database
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('wms_pack_recovery','wms_pack_damage','wms_pack_issue')",
+      )
+      .all()
+      .map((row) => row.name);
+    if (
+      recoveryTables.length !== 0 &&
+      (recoveryTables.length !== 2 ||
+        !recoveryTables.includes("wms_pack_recovery"))
+    )
       throw new Error("Niepełny schemat wymian przy pakowaniu WMS");
+    const issuesTable = recoveryTables.includes("wms_pack_issue")
+      ? "wms_pack_issue"
+      : "wms_pack_damage";
     // Starsza kopia nie ma zadań wymiany. W nowszej brakująca sztuka musi mieć otwartą sprawę albo zamknięte rozliczenie.
     const packingRecovery =
-      recoveryTables === 0
+      recoveryTables.length === 0
         ? []
         : database
             .prepare(
               `
       SELECT r.id,r.order_id,'stan zadania wymiany' AS problem FROM wms_pack_recovery r JOIN wms_order o ON o.id=r.order_id
-      WHERE NOT EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id)
-      OR (r.completed_at IS NOT NULL AND (r.cancelled_at IS NOT NULL OR EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
+      WHERE NOT EXISTS(SELECT 1 FROM ${issuesTable} d WHERE d.recovery_id=r.id)
+      OR (r.completed_at IS NOT NULL AND (r.cancelled_at IS NOT NULL OR EXISTS(SELECT 1 FROM ${issuesTable} d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
       OR (r.completed_at IS NULL AND r.cancelled_at IS NULL AND (o.status<>'packing' OR o.tote IS NULL
-        OR NOT EXISTS(SELECT 1 FROM wms_pack_damage d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
+        OR NOT EXISTS(SELECT 1 FROM ${issuesTable} d WHERE d.recovery_id=r.id AND d.replaced<d.quantity)))
       UNION ALL SELECT r.id,r.order_id,'brak zamiennika nie zgadza się z pobraniem' FROM wms_pack_recovery r
-      JOIN wms_pack_damage d ON d.recovery_id=r.id LEFT JOIN wms_line l ON l.id=d.line_id
+      JOIN ${issuesTable} d ON d.recovery_id=r.id LEFT JOIN wms_line l ON l.id=d.line_id
       WHERE r.completed_at IS NULL AND r.cancelled_at IS NULL GROUP BY r.id,d.line_id
       HAVING l.id IS NULL OR l.order_id<>r.order_id OR sum(d.quantity-d.replaced)<>l.quantity-l.picked
     `,

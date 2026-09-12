@@ -8,6 +8,7 @@ import { zapiszZalaczniki, type ZalacznikAllegro } from "../services/zalaczniki-
 /* Serwis, nie odwrotnie: `autoresponder.ts` zna tylko `tekst.ts`, więc
    import w tę stronę nie zapętla modułów. */
 import { czyAutoresponder } from "../services/autoresponder.js";
+import { migratePackIssues } from "./wms-pack-issues.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -171,6 +172,7 @@ export function transaction<A extends unknown[], R>(
  * Test stawiający bazę bez niej sprawdza kształt, którego nie ma na produkcji.
  */
 export function migrate(database: DatabaseSync) {
+  migratePackIssues(database);
   const addColumn = (table: string, column: string, decl: string) => {
     const cols = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === column)) {

@@ -1001,8 +1001,7 @@ export function getOrder(orderId: number) {
 function readOrder(orderId: number) {
   const d = db();
   const order = d.prepare("SELECT * FROM wms_order WHERE id=?").get(orderId) as
-    | Order
-    | undefined;
+    Order | undefined;
   if (!order) return fail("Zamówienie nie istnieje", 404);
   const lines = d
     .prepare("SELECT * FROM wms_line WHERE order_id=? ORDER BY id")
@@ -1040,7 +1039,7 @@ function readOrder(orderId: number) {
     packingRecovery:
       d
         .prepare(
-          `SELECT r.*,(SELECT sum(quantity-replaced) FROM wms_pack_damage WHERE recovery_id=r.id) AS remaining
+          `SELECT r.*,(SELECT sum(quantity-replaced) FROM wms_pack_issue WHERE recovery_id=r.id) AS remaining
       FROM wms_pack_recovery r WHERE r.order_id=? AND r.completed_at IS NULL AND r.cancelled_at IS NULL`,
         )
         .get(orderId) ?? null,
@@ -1511,12 +1510,27 @@ export function applyOrderAction(
         .get(orderId)
     )
       fail("Najpierw rozwiąż zgłoszenie wyjątku zbiórki");
+    // Wymiana rezerwuje dopiero po wznowieniu. Tylko udokumentowany brak pobrań może oczekiwać na tę pracę.
+    const replacements = new Map(
+      (order.status === "packing" && order.packingRecovery
+        ? d
+            .prepare(
+              "SELECT line_id,sum(quantity-replaced) AS remaining FROM wms_pack_issue WHERE recovery_id=? GROUP BY line_id",
+            )
+            .all(order.packingRecovery.id)
+        : []
+      ).map((r) => [Number(r.line_id), Number(r.remaining)]),
+    );
     if (
       order.lines.some(
         (l) =>
           order.allocations
             .filter((a) => a.line_id === l.id)
-            .reduce((sum, a) => sum + a.quantity, 0) < l.quantity,
+            .reduce((sum, a) => sum + a.quantity, 0) < l.quantity &&
+          !(
+            (replacements.get(l.id) ?? 0) > 0 &&
+            l.picked + (replacements.get(l.id) ?? 0) === l.quantity
+          ),
       ) &&
       order.status !== "new"
     )

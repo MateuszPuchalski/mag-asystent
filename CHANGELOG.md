@@ -34,6 +34,16 @@ historii nie przepisujemy.
 ---
 
 
+## 0.308.0 — rozliczenie brakującej części przy pakowaniu
+
+- Biuro potwierdza brak po przeliczeniu wskazanej paczki lub niesprawdzonych sztuk. Wybiera część z zamówienia, skanuje skrzynkę i wpisuje faktyczną ilość.
+- Korekta odejmuje tylko nieobecne pobrania i potwierdzenia. Nie tworzy przyjęcia na półkę ani kwarantannę; dobre zawartości pozostają.
+- Zamiennik korzysta ze wspólnej kolejki i istniejącego procesu kolektora. Starszy format odpowiedzi uszkodzenia pozostaje czytelny.
+- Naprawiono wznowienie udokumentowanej wymiany: nie wymaga rezerwacji zamiennika przed podjęciem zadania. Inne niedobory nadal wymagają naprawy przydziału.
+- Analityka rozdziela potwierdzone braki oraz uszkodzenia w kwarantannie. Nowa wspólna historia spraw zastępuje tabelę samych uszkodzeń.
+- Regresje obejmują role, ilości, paczki, zapas, awarie, wznowienie i migrację. E2E odzyskuje zapis braku i kończy kontrolę jednym skanem zamiennika.
+- **[wymaga działania]** Zatrzymać API i worker, zaktualizować pliki, wykonać build oraz restart. Migracja przenosi historię wymian atomowo; APK aktualizuje opis rozbieżności.
+
 ## 0.307.1 — połączenie ekranu wymiany ze skanerem i dziennikiem
 
 - Callback nowego ekranu kolektora potwierdza obsłużenie skanu, także podczas wstrzymania. Skan nie przechodzi wtedy do globalnej kartoteki.

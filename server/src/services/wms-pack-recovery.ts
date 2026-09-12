@@ -66,7 +66,10 @@ export function recoveryTask(actor: Actor, taskId: number) {
     if (task.user_id !== null && task.user_id !== actor.id) manager(actor);
     const order = getOrder(task.order_id);
     const lines = db()
-      .prepare("SELECT * FROM wms_pack_damage WHERE recovery_id=? ORDER BY id")
+      // Starsze APK oczekuje tekstu. Pusty adres oznacza brak kwarantanny; rodzaj i NULL w bazie rozróżniają ubytek.
+      .prepare(
+        "SELECT id,recovery_id,line_id,tw_id,sku,name,quantity,replaced,kind,coalesce(quarantine,'') AS quarantine,parcel_no,reason,user_id,created_at FROM wms_pack_issue WHERE recovery_id=? ORDER BY id",
+      )
       .all(task.id);
     const picks = db()
       .prepare(
@@ -108,7 +111,7 @@ export function recoveryWork(actor: Actor, raw: unknown) {
       rows: db()
         .prepare(
           `SELECT r.*,o.reference,o.tote AS box,o.hold_reason,
-      (SELECT sum(quantity-replaced) FROM wms_pack_damage WHERE recovery_id=r.id) AS remaining ${where}
+      (SELECT sum(quantity-replaced) FROM wms_pack_issue WHERE recovery_id=r.id) AS remaining ${where}
       ORDER BY o.priority DESC,o.due_at,r.id LIMIT 50 OFFSET ?`,
         )
         .all(...args, input.offset),
@@ -134,61 +137,128 @@ export function quarantinePacking(actor: Actor, key: string, raw: unknown) {
     })
     .strict()
     .parse(raw);
-  return command(key, actor, "pack_quarantine", input, () => {
+  return command(key, actor, "pack_quarantine", input, () =>
+    recordPackingIssue(actor, input, "damage"),
+  );
+}
+
+export function confirmPackingShortage(
+  actor: Actor,
+  key: string,
+  raw: unknown,
+) {
+  manager(actor);
+  const input = z
+    .object({
+      orderId: id,
+      version: id,
+      box: code,
+      lineId: id,
+      observedQuantity: z.number().int().min(0).max(1000000),
+      parcelNo: z.number().int().min(0).max(20),
+      reason,
+    })
+    .strict()
+    .parse(raw);
+  return command(key, actor, "pack_shortage", input, () => {
     const order = getOrder(input.orderId);
-    if (order.version !== input.version || order.tote !== input.box)
-      fail("Odśwież zamówienie i zeskanuj jego skrzynkę");
-    if (!["packing", "packed"].includes(order.status) || order.shipments.length)
-      fail("Najpierw wycofaj etykiety i rozpocznij kontrolę pakowania");
-    if (order.packer_id !== actor.id) manager(actor);
-    let task = db()
-      .prepare(
-        "SELECT * FROM wms_pack_recovery WHERE order_id=? AND completed_at IS NULL AND cancelled_at IS NULL",
-      )
-      .get(order.id) as Recovery | undefined;
-    if (task?.user_id != null)
+    const line = order.lines.find((l) => l.id === input.lineId);
+    if (!line) fail("Wybierz część z tego zamówienia", 400);
+    // Liczymy wskazaną paczkę lub niesprawdzone sztuki. Nie trzeba skanować nieobecnej części ani udawać jej zwrotu.
+    const expected = input.parcelNo
+      ? Number(
+          order.packingContents.find(
+            (c) => c.line_id === line!.id && c.parcel_no === input.parcelNo,
+          )?.quantity ?? 0,
+        )
+      : line!.picked - line!.packed;
+    const quantity = expected - input.observedQuantity;
+    if (quantity <= 0)
       fail(
-        "Najpierw rozlicz aktywną wymianę; kolejne uszkodzenie dodaj po jej zakończeniu lub zwrocie niepotwierdzonych pobrań",
+        "Wpisz faktyczną ilość mniejszą od zapisanej dla wskazanej zawartości. Nadwyżkę wyjaśnij oddzielnie",
+        400,
       );
-    const matches = order.lines.filter(
-      (l) =>
-        l.sku.toUpperCase() === input.barcode.toUpperCase() ||
-        l.barcode === input.barcode,
+    return recordPackingIssue(
+      actor,
+      { ...input, barcode: line!.sku, quantity, quarantine: null },
+      "shortage",
     );
-    if (matches.length !== 1)
-      fail("Zeskanuj jednoznaczny kod części z zamówienia", 400);
-    const line = matches[0];
-    if (
-      db().prepare("SELECT mode FROM wms_bin WHERE bin=?").get(input.quarantine)
-        ?.mode !== "quarantine"
+  });
+}
+
+type PackingIssueInput = {
+  orderId: number;
+  version: number;
+  box: string;
+  barcode: string;
+  quantity: number;
+  parcelNo: number;
+  quarantine: string | null;
+  reason: string;
+  lineId?: number;
+};
+function recordPackingIssue(
+  actor: Actor,
+  input: PackingIssueInput,
+  kind: "damage" | "shortage",
+) {
+  const order = getOrder(input.orderId);
+  if (order.version !== input.version || order.tote !== input.box)
+    fail("Odśwież zamówienie i zeskanuj jego skrzynkę");
+  if (!["packing", "packed"].includes(order.status) || order.shipments.length)
+    fail("Najpierw wycofaj etykiety i rozpocznij kontrolę pakowania");
+  if (order.packer_id !== actor.id) manager(actor);
+  let task = db()
+    .prepare(
+      "SELECT * FROM wms_pack_recovery WHERE order_id=? AND completed_at IS NULL AND cancelled_at IS NULL",
     )
-      fail("Zeskanuj lokalizację kwarantanny", 400);
-    if (
-      input.quantity > line.picked ||
-      (!input.parcelNo && input.quantity > line.picked - line.packed)
-    )
-      fail("Tyle niesprawdzonych sztuk nie znajduje się przy stanowisku", 400);
-    if (input.parcelNo)
-      removePackedContent(line.id, input.parcelNo, input.quantity);
-    // Uszkodzona sztuka nie wraca na półkę sprzedażową. Zmniejszamy tylko jej udział w pobraniach zamówienia.
-    let left = input.quantity;
-    for (const a of order.allocations.filter(
-      (a) => a.line_id === line.id && a.picked > 0,
-    )) {
-      const take = Math.min(left, a.picked);
-      if (a.quantity === take)
-        db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
-      else
-        db()
-          .prepare(
-            "UPDATE wms_allocation SET quantity=quantity-?,picked=picked-? WHERE id=?",
-          )
-          .run(take, take, a.id);
-      left -= take;
-      if (!left) break;
-    }
-    if (left)
-      fail("Niespójna historia pobrań. Wstrzymaj zamówienie i wyjaśnij zapas");
+    .get(order.id) as Recovery | undefined;
+  if (task?.user_id != null)
+    fail(
+      "Najpierw rozlicz aktywną wymianę; kolejny brak lub uszkodzenie dodaj po jej zakończeniu lub zwrocie niepotwierdzonych pobrań",
+    );
+  const matches = order.lines.filter((l) =>
+    input.lineId
+      ? l.id === input.lineId
+      : l.sku.toUpperCase() === input.barcode.toUpperCase() ||
+        l.barcode === input.barcode,
+  );
+  if (matches.length !== 1)
+    fail("Zeskanuj jednoznaczny kod części z zamówienia", 400);
+  const line = matches[0];
+  if (
+    kind === "damage" &&
+    db().prepare("SELECT mode FROM wms_bin WHERE bin=?").get(input.quarantine)
+      ?.mode !== "quarantine"
+  )
+    fail("Zeskanuj lokalizację kwarantanny", 400);
+  if (
+    input.quantity > line.picked ||
+    (!input.parcelNo && input.quantity > line.picked - line.packed)
+  )
+    fail("Tyle niesprawdzonych sztuk nie znajduje się przy stanowisku", 400);
+  if (input.parcelNo)
+    removePackedContent(line.id, input.parcelNo, input.quantity);
+  // Zmniejszamy pobrania; uszkodzona sztuka trafia do kwarantanny, a nieobecna nie tworzy żadnego przyjęcia.
+  let left = input.quantity;
+  for (const a of order.allocations.filter(
+    (a) => a.line_id === line.id && a.picked > 0,
+  )) {
+    const take = Math.min(left, a.picked);
+    if (a.quantity === take)
+      db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
+    else
+      db()
+        .prepare(
+          "UPDATE wms_allocation SET quantity=quantity-?,picked=picked-? WHERE id=?",
+        )
+        .run(take, take, a.id);
+    left -= take;
+    if (!left) break;
+  }
+  if (left)
+    fail("Niespójna historia pobrań. Wstrzymaj zamówienie i wyjaśnij zapas");
+  if (input.quarantine !== null)
     move(
       actor,
       line.tw_id,
@@ -199,51 +269,49 @@ export function quarantinePacking(actor: Actor, key: string, raw: unknown) {
       input.reason,
       order.id,
     );
-    db()
-      .prepare("UPDATE wms_line SET picked=picked-?,packed=packed-? WHERE id=?")
-      .run(input.quantity, input.parcelNo ? input.quantity : 0, line.id);
-    const stamp = nowIso();
-    if (!task) {
-      const saved = db()
-        .prepare(
-          "INSERT INTO wms_pack_recovery(order_id,created_at) VALUES (?,?)",
-        )
-        .run(order.id, stamp);
-      task = recovery(Number(saved.lastInsertRowid));
-    } else
-      db()
-        .prepare("UPDATE wms_pack_recovery SET version=version+1 WHERE id=?")
-        .run(task.id);
-    db()
+  db()
+    .prepare("UPDATE wms_line SET picked=picked-?,packed=packed-? WHERE id=?")
+    .run(input.quantity, input.parcelNo ? input.quantity : 0, line.id);
+  const stamp = nowIso();
+  if (!task) {
+    const saved = db()
       .prepare(
-        "INSERT INTO wms_pack_damage(recovery_id,line_id,tw_id,sku,name,quantity,quarantine,parcel_no,reason,user_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO wms_pack_recovery(order_id,created_at) VALUES (?,?)",
       )
-      .run(
-        task.id,
-        line.id,
-        line.tw_id,
-        line.sku,
-        line.name,
-        input.quantity,
-        input.quarantine,
-        input.parcelNo,
-        input.reason,
-        actor.id,
-        stamp,
-      );
+      .run(order.id, stamp);
+    task = recovery(Number(saved.lastInsertRowid));
+  } else
     db()
-      .prepare(
-        "UPDATE wms_order SET status='packing',packed_at=NULL WHERE id=?",
-      )
-      .run(order.id);
-    db()
-      .prepare(
-        "UPDATE wms_order_timing SET pack_completed_at=NULL WHERE order_id=?",
-      )
-      .run(order.id);
-    touchOrder(order.id);
-    return recoveryTask(actor, task.id);
-  });
+      .prepare("UPDATE wms_pack_recovery SET version=version+1 WHERE id=?")
+      .run(task.id);
+  db()
+    .prepare(
+      "INSERT INTO wms_pack_issue(recovery_id,line_id,tw_id,sku,name,quantity,kind,quarantine,parcel_no,reason,user_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    )
+    .run(
+      task.id,
+      line.id,
+      line.tw_id,
+      line.sku,
+      line.name,
+      input.quantity,
+      kind,
+      input.quarantine,
+      input.parcelNo,
+      input.reason,
+      actor.id,
+      stamp,
+    );
+  db()
+    .prepare("UPDATE wms_order SET status='packing',packed_at=NULL WHERE id=?")
+    .run(order.id);
+  db()
+    .prepare(
+      "UPDATE wms_order_timing SET pack_completed_at=NULL WHERE order_id=?",
+    )
+    .run(order.id);
+  touchOrder(order.id);
+  return recoveryTask(actor, task.id);
 }
 export function claimRecovery(
   actor: Actor,
@@ -265,7 +333,7 @@ export function claimRecovery(
       fillOrderReservations(
         actor,
         order.id,
-        "Zamiennik uszkodzenia przy pakowaniu",
+        "Zamiennik rozbieżności przy pakowaniu",
       );
       db()
         .prepare(
@@ -327,7 +395,7 @@ export function pickRecovery(
       fail("Źródło czeka na przeliczenie; zwróć niepotwierdzone sztuki");
     const cases = db()
       .prepare(
-        "SELECT id,quantity-replaced AS remaining FROM wms_pack_damage WHERE recovery_id=? AND line_id=? AND replaced<quantity ORDER BY id",
+        "SELECT id,quantity-replaced AS remaining FROM wms_pack_issue WHERE recovery_id=? AND line_id=? AND replaced<quantity ORDER BY id",
       )
       .all(task.id, line.id);
     if (cases.reduce((n, c) => n + Number(c.remaining), 0) < input.quantity)
@@ -352,14 +420,14 @@ export function pickRecovery(
     for (const c of cases) {
       const take = Math.min(left, Number(c.remaining));
       db()
-        .prepare("UPDATE wms_pack_damage SET replaced=replaced+? WHERE id=?")
+        .prepare("UPDATE wms_pack_issue SET replaced=replaced+? WHERE id=?")
         .run(take, c.id);
       left -= take;
       if (!left) break;
     }
     db()
       .prepare(
-        "UPDATE wms_pack_recovery SET version=version+1,completed_at=CASE WHEN NOT EXISTS(SELECT 1 FROM wms_pack_damage WHERE recovery_id=? AND replaced<quantity) THEN ? END WHERE id=?",
+        "UPDATE wms_pack_recovery SET version=version+1,completed_at=CASE WHEN NOT EXISTS(SELECT 1 FROM wms_pack_issue WHERE recovery_id=? AND replaced<quantity) THEN ? END WHERE id=?",
       )
       .run(task.id, nowIso(), task.id);
     touchOrder(order.id);

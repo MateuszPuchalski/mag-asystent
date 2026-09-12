@@ -3100,7 +3100,7 @@ CREATE TABLE IF NOT EXISTS wms_pack_recovery (
   reason TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_pack_recovery_open ON wms_pack_recovery(order_id) WHERE completed_at IS NULL AND cancelled_at IS NULL;
-CREATE TABLE IF NOT EXISTS wms_pack_damage (
+CREATE TABLE IF NOT EXISTS wms_pack_issue (
   id INTEGER PRIMARY KEY,
   recovery_id INTEGER NOT NULL REFERENCES wms_pack_recovery(id),
   line_id INTEGER REFERENCES wms_line(id) ON DELETE SET NULL,
@@ -3109,10 +3109,12 @@ CREATE TABLE IF NOT EXISTS wms_pack_damage (
   name TEXT NOT NULL,
   quantity INTEGER NOT NULL CHECK(quantity>0),
   replaced INTEGER NOT NULL DEFAULT 0 CHECK(replaced>=0 AND replaced<=quantity),
-  quarantine TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'damage' CHECK(kind IN ('damage','shortage')),
+  quarantine TEXT,
   parcel_no INTEGER NOT NULL CHECK(parcel_no BETWEEN 0 AND 20),
   reason TEXT NOT NULL,
   user_id INTEGER NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  CHECK((kind='damage' AND quarantine IS NOT NULL AND length(trim(quarantine))>0) OR (kind='shortage' AND quarantine IS NULL))
 );
-CREATE INDEX IF NOT EXISTS ix_wms_pack_damage_recovery ON wms_pack_damage(recovery_id,id);
+CREATE INDEX IF NOT EXISTS ix_wms_pack_issue_recovery ON wms_pack_issue(recovery_id,id);

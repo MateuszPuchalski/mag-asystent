@@ -38,6 +38,13 @@ private class RecoveryClient(val store:RecoveryStore):WmsRecoveryTransport {
     }
 }
 class WmsPackingReplacementTest {
+    @Test fun `nowy brak bez kwarantanny i stara odpowiedz uszkodzenia maja wspolne pobranie`() {
+        val old=WertisJson.decodeFromString<WmsRecoveryLine>("""{"id":1,"sku":"SKU","quantity":1,"replaced":0,"quarantine":"QUAR"}""")
+        val missing=WertisJson.decodeFromString<WmsRecoveryLine>("""{"id":2,"sku":"SKU","quantity":1,"replaced":0,"quarantine":"","kind":"shortage"}""")
+        assertEquals("damage",old.kind);assertEquals("shortage",missing.kind);assertEquals("",missing.quarantine)
+        val task=replacementTask.copy(lines=listOf(missing))
+        assertEquals(WmsRecoveryStage.SOURCE,recoveryStage(task,2,WmsRecoveryScan()))
+    }
     @Test fun `skany wymagaja zrodla czesci jawnej ilosci i wlasciwej skrzynki`() {
         var scan=WmsRecoveryScan()
         assertThrows(IllegalArgumentException::class.java){recoveryScan(replacementTask,2,scan,classify("BAD"))}

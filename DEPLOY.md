@@ -24,6 +24,14 @@ Start tworzy `wms_pack_recovery` oraz `wms_pack_damage`; istniejące zamówienia
 Przygotować oznaczoną lokalizację kwarantanny. Przed aktualizacją rozliczyć oczekujące zapisy urządzeń; nie usuwać ich dziennika.
 Odbiór seeded: uszkodzona sztuka → kwarantanna → zamiennik do tej samej skrzynki → ponowny skan wyłącznie zamiennika.
 
+Od 0.308.0 biuro rozlicza również potwierdzony brak fizyczny, bez przyjęcia nieobecnej sztuki do zapasu.
+Na czas aktualizacji zatrzymać API i worker. Po kopii bezpieczeństwa zaktualizować pliki, wykonać build i uruchomić nową wersję.
+Start przenosi `wms_pack_damage` do `wms_pack_issue`, zachowując identyfikatory, postęp i kwarantannę. Starą tabelę usuwa w tej samej transakcji.
+
+Kopia starszej wersji nadal podlega kontroli bez migracji. Dwie niepuste historie zatrzymują migrację i wymagają wyjaśnienia.
+Nowy APK rozpoznaje rodzaj rozbieżności. API zachowuje tekstowy adres kwarantanny; pusty oznacza brak fizycznej kwarantanny przy potwierdzonym ubytku.
+Odbiór seeded: wstrzymanie → przeliczenie jednej paczki → potwierdzenie braku w biurze → wznowienie → zamiennik → ponowny skan pakowania.
+
 Od 0.305.0 propozycje uzupełnienia uwzględniają priorytet i termin niepokrytych zamówień. API i APK pokazują powód pracy.
 Zaktualizować API oraz APK; nie ma migracji ani dodatkowej konfiguracji. Starszy kolektor zachowuje kolejność serwera bez opisu powodu.
 

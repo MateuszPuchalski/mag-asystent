@@ -31,6 +31,23 @@ Historia uszkodzenia i jego kwarantanny pozostaje także po zmianie pozycji anul
 
 Ta operacja dotyczy faktycznie obecnej uszkodzonej części. Brakującej fizycznie sztuki nie zapisuj jako przyjętej do kwarantanny.
 
+### Potwierdzony brak przy pakowaniu
+
+Pakujący wstrzymuje zamówienie i opisuje rozbieżność. Sprawdź skrzynkę, stanowisko oraz możliwą pomyłkę przy odkładaniu.
+Biuro otwiera **Potwierdzony brak — rozlicz po przeliczeniu**, także na wstrzymanym zamówieniu innego pakującego.
+Skanuje skrzynkę, wybiera część z listy oraz paczkę albo niesprawdzone sztuki poza paczkami.
+Wpisuje faktycznie obecne sztuki tej części wyłącznie we wskazanej zawartości. Pole jest puste; zero trzeba wpisać świadomie.
+Nie trzeba skanować nieobecnej części. Ilość równa zapisanej lub większa nie jest brakiem i nie tworzy korekty.
+
+Zapis odejmuje różnicę z pobrań i potwierdzeń wybranej zawartości. Dobre sztuki, inne paczki i półki pozostają bez zmian.
+Brak nie tworzy przyjęcia na półkę ani kwarantannę. Historia zachowuje ilość, autora oraz wynik wyjaśnienia.
+Powstaje zwykłe zadanie zamiennika do tej samej skrzynki. Kolektor pobiera go dotychczasową sekwencją.
+Niezależne wstrzymanie pozostaje; biuro wznawia zamówienie po wyjaśnieniu, bez wymogu uprzedniego zarezerwowania udokumentowanego zamiennika.
+Niepełny przydział niezwiązany z wymianą nadal wymaga naprawy rezerwacji.
+
+W analityce **Ruchy i rozbieżności → Rozbieżności przy pakowaniu** pokazują osobno potwierdzone braki i fizyczne uszkodzenia w kwarantannie.
+Liczby dotyczą zgłoszeń zapisanych w wybranym okresie. Pozostała potrzeba zamienników dotyczy nadal otwartych zadań tych zgłoszeń.
+
 ## Wygląd i nawigacja
 
 Biuro korzysta z tego samego języka wizualnego co panel obsługi klienta.

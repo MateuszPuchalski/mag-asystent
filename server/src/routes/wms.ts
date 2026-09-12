@@ -89,6 +89,13 @@ export async function wmsRoutes(app: FastifyInstance) {
       req.body,
     ),
   );
+  app.post("/api/wms/packing-shortage", async (req) =>
+    Recovery.confirmPackingShortage(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
   for (const [action, handler] of Object.entries({
     claim: Recovery.claimRecovery,
     pick: Recovery.pickRecovery,

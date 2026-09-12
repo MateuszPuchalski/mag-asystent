@@ -445,3 +445,29 @@ Pięć testów JVM sprawdza skany, jawne ilości, restart, dysk, nieudany odczyt
 Osiem wspólnych prób cyklu życia obejmuje teraz sześć procesów, łącznie 48 przypadków.
 E2E gubi odpowiedzi po kwarantannie oraz dostarczeniu, odzyskuje zapis i pakuje zamiennik jednym skanem.
 Formularze oraz przejście Enter sprawdzono przy 320, 390 i 1440 px. Fizyczny kolektor wymaga osobnego odbioru.
+
+### Nieobecna część przy pakowaniu
+
+Fizyczny zwrot lub kwarantanna nie rozlicza braku: tworzyłby zapas, którego nie ma.
+Biuro potwierdza brak po przeliczeniu wskazanej zawartości i wyjaśnieniu stanowiska. Pakujący ma dotychczasowe wstrzymanie z opisem.
+Wybór pozycji zamówienia zastępuje niemożliwy skan nieobecnej części. Rzeczywista ilość dotyczy wybranej paczki albo jeszcze niesprawdzonych sztuk.
+Puste pole nie oznacza zera. Dobre zawartości pozostają, a korekta nie zmienia półki ani kwarantanny.
+Wspólna kolejka prowadzi zamiennik na stanowisko; pakujący sprawdza tylko dostarczone sztuki.
+
+Historia wymian ma teraz jeden format spraw, z rodzajem uszkodzenia albo potwierdzonego braku.
+Migracja zachowuje identyfikatory, częściowe dostarczenia, autora i kwarantannę; usuwa starą tabelę dopiero po udanym przeniesieniu całej historii.
+Awaria wycofuje migrację. Dwie niepuste historie zatrzymują start zamiast nadpisywać dane. Kopia starego formatu nadal jest sprawdzana bez migracji.
+API pozostawia pusty tekst adresu przy braku, aby starsze APK przyjmowało zadanie. W bazie brak lokalizacji jest zapisany jako NULL.
+
+E2E ujawniło zakleszczenie procesu: wznowienie wymagało pełnej rezerwacji, a podjęcie wymiany wymagało wcześniejszego wznowienia.
+Regresja najpierw odtworzyła odmowę. Teraz wznowienie rozpoznaje dokładnie udokumentowany brak pobrań; nie powstaje przy tym rezerwacja ani ruch.
+Niepowiązane niedobory i niespójna ilość sprawy nadal odrzucają wznowienie. Niezależne wstrzymanie zachowuje powód do decyzji biura.
+
+Punkt odniesienia: [Microsoft — Work exceptions log](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/work-exceptions-log).
+Opis rozróżnia zgłoszenie rozbieżności, decyzję dotyczącą zapasu oraz dalszy przydział pracy.
+Wniosek dla WERTIS: rozliczenie nieobecnej sztuki należy oddzielić od jej fizycznego zwrotu, zachowując historię i uprawnienia.
+
+Trzy regresje serwera obejmują rzeczywiste ilości, paczki, role, wersje, zachowany zapas, ponowienie, awarię i wznowienie.
+Trzy testy migracji sprawdzają starą historię, częściowy postęp, rollback, starszą kopię oraz sprzeczne schematy.
+Test core odczytuje stare uszkodzenie i nowy brak przez ten sam proces pobrania.
+E2E obejmuje wstrzymane zamówienie, pustą ilość, utraconą odpowiedź, analitykę, zamiennik oraz ponowny skan jednej sztuki w drugiej paczce.

@@ -11,6 +11,7 @@ import { exerciseInbound } from "./wms-inbound-e2e.mjs";
 import { exerciseHandoff } from "./wms-handoff-e2e.mjs";
 import { exercisePacking } from "./wms-packing-e2e.mjs";
 import { exercisePackingRecovery } from "./wms-pack-recovery-e2e.mjs";
+import { exercisePackingShortage } from "./wms-pack-shortage-e2e.mjs";
 import { exerciseCapacity } from "./wms-capacity-e2e.mjs";
 import { exerciseReplenishment } from "./wms-replenishment-e2e.mjs";
 import { exerciseReroute } from "./wms-reroute-e2e.mjs";
@@ -528,6 +529,7 @@ try {
   await exerciseCarts(page, output);
   await exercisePacking(page, output);
   await exercisePackingRecovery(page, output);
+  await exercisePackingShortage(page, output);
   await exerciseInbound(page, output);
   await exerciseReroute(page, output);
   await exerciseReplenishment(page, output);

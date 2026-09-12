@@ -10,7 +10,7 @@ import pl.wertis.kolektor.core.scan.Scan
 import pl.wertis.kolektor.core.scan.ScanKind
 
 @Serializable
-data class WmsRecoveryLine(val id: Long, val sku: String, val quantity: Int, val replaced: Int, val quarantine: String)
+data class WmsRecoveryLine(val id: Long, val sku: String, val quantity: Int, val replaced: Int, val quarantine: String? = null, val kind: String = "damage")
 @Serializable
 data class WmsRecoveryPick(val allocation_id: Long, val tw_id: Long, val sku: String, val name: String, val barcode: String? = null,
     val bin: String, val quantity: Int, val stock_version: Int, val blocked: String? = null)
