@@ -31,7 +31,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
-import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.wms.WmsPutawayDraft
 import pl.wertis.kolektor.core.wms.WmsPutawayScan
 import pl.wertis.kolektor.core.wms.WmsPutawayStage
@@ -138,17 +137,8 @@ fun WmsPutawayScreen(graph: AppGraph) {
             Text(if (view.busy) "Potwierdzam na serwerze…" else "Odkładanie wstrzymane", fontWeight = FontWeight.Bold, fontSize = 22.sp)
             Text(view.message ?: "Odczytuję zadania…")
             if (pending != null) {
-                Text(pending.description, fontWeight = FontWeight.Bold)
-                if (pending.context != context) Text("Wróć do konta i serwera użytych przy tym zapisie.")
-                if (pending.workflow == "picking") {
-                    PrimaryButton("WRÓĆ DO ZBIÓRKI WMS", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
-                        graph.nav.go(Screen.WMS_PICKING)
-                    }
-                } else {
-                    Text("Nie przenoś kolejnych sztuk. Ponowienie sprawdzi ten sam zapis.")
-                    PrimaryButton("SPRAWDŹ OSTATNI ZAPIS", enabled = !view.busy && pending.context == context && pending.workflow == "putaway", modifier = Modifier.fillMaxWidth()) {
-                        graph.appScope.launch { controller.retry(context) }
-                    }
+                WmsPendingNotice(graph, pending, context, "putaway", view.busy) {
+                    graph.appScope.launch { controller.retry(context) }
                 }
             } else {
                 PrimaryButton("ODŚWIEŻ", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {

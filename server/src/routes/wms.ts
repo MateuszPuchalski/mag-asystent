@@ -174,6 +174,13 @@ export async function wmsRoutes(app: FastifyInstance) {
     actor();
     return Inbound.getInbound(orderId(req.params.id), req.query);
   });
+  app.get<{ Params: { id: string } }>(
+    "/api/wms/inbound/:id/collector",
+    async (req) => {
+      actor();
+      return Inbound.getInboundCollector(orderId(req.params.id), req.query);
+    },
+  );
   app.post("/api/wms/inbound", { bodyLimit: 1024 * 1024 }, async (req) =>
     Inbound.createInbound(
       actor(),

@@ -43,6 +43,7 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/orders",
     "/api/wms/inbound",
     "/api/wms/inbound/1",
+    "/api/wms/inbound/1/collector",
     "/api/wms/putaway-work",
     "/api/wms/putaway-work/1",
     "/api/wms/handoffs",

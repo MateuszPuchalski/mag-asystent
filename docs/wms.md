@@ -534,4 +534,21 @@ Przycisk powrotu do kolejki nie zwalnia przypisania na serwerze. Podjęte zadani
 
 Nieznany wynik blokuje zarówno zbiórkę, jak i odkładanie. Przycisk wskazuje właściwy proces; tam użyj **SPRAWDŹ OSTATNI ZAPIS**.
 Nie przenoś towaru drugi raz. Zmiana konta lub serwera wymaga powrotu do pierwotnej tożsamości przed ponowieniem.
-Natywne liczenie nowych dostaw pozostaje do wdrożenia. Nowe przyjęcie do bufora nadal rejestruje ekran Przyjęcia w biurze.
+Natywne liczenie dostaw jest dostępne od 0.299.0. Oczekiwany dokument nadal przygotowuje biuro.
+
+### Liczenie dostawy na kolektorze
+
+Wybierz **PRZYJĘCIE WMS — POLICZ DOSTAWĘ**, wyszukaj dokument lub zeskanuj jego numer i otwórz przyjęcie.
+Domyślnie liczysz do bufora. W opcjach możesz wybrać przyjęcie od razu na półkę; tryb pozostaje aktywny po restarcie.
+Zeskanuj SKU lub EAN części. Policz faktycznie przyjmowane sztuki, potwierdź ilość i zeskanuj bufor lub półkę, na której je zostawiasz.
+
+Sygnał sukcesu oznacza zapis i świeży odczyt licznika. Zeskanuj kolejną część albo tę samą dla następnej partii.
+Ten sam kod po pełnym policzeniu pokazuje zakończoną pozycję i nie dopisuje zapasu. Zmiana trybu wymaga ponownego skanu części.
+Uszkodzenia wybierz w opcjach, potwierdź ich ilość i zeskanuj kwarantannę. Nie są rejestrowane jako dobry towar czekający w buforze.
+
+Nieznaną część, nadwyżkę lub kolizję EAN zgłoś biuru. Przy nieczytelnym albo wspólnym EAN wpisz w opcjach SKU odczytany z etykiety części.
+Brakującą partię pozostaw nieprzyjętą. Biuro rozstrzyga zamknięcie z niedoborem; kolektor kończy dokument dopiero po rozliczeniu oczekiwanych sztuk.
+Zamknięcie przyjęcia nie usuwa oczekującej pracy odkładania z bufora.
+
+Po utracie odpowiedzi użyj **SPRAWDŹ OSTATNI ZAPIS**, bez ponownego fizycznego odkładania tej partii.
+Przerwane liczenie blokuje zbiórkę i odkładanie do rozliczenia na pierwotnym koncie i serwerze. Restart nie tworzy nowego klucza zapisu.

@@ -411,6 +411,21 @@ test("5000 SKU w dostawie: odczyt i wybór ostatniej pozycji bez generowania zap
   });
   const doc = I.getInbound(created.id);
   assert.equal(doc.lines.length, 5000);
+  const snapshotChanges = db().prepare("SELECT total_changes() AS n").get()!.n;
+  const page = I.getInboundCollector(created.id, { offset: 4950 });
+  assert.equal(page.lines.length, 50);
+  assert.equal(page.total, 5000);
+  const scanned = I.getInboundCollector(created.id, {
+    barcode: "SCALE-EAN-4999",
+  });
+  assert.equal(scanned.selected!.sku, "SCALE-IN-4999");
+  assert.equal(scanned.summary.remaining, 5000);
+  assert.equal(scanned.lines.length, 0);
+  assert.ok(Buffer.byteLength(JSON.stringify(scanned)) < 4096);
+  assert.equal(
+    db().prepare("SELECT total_changes() AS n").get()!.n,
+    snapshotChanges,
+  );
   assert.equal(
     db()
       .prepare("SELECT count(*) AS n FROM wms_stock WHERE tw_id>=10000")
@@ -432,6 +447,56 @@ test("5000 SKU w dostawie: odczyt i wybór ostatniej pozycji bez generowania zap
   console.log(
     `Przyjęcie 5000 SKU: utworzenie, dwa odczyty i odłożenie ${Math.round(performance.now() - started)} ms`,
   );
+});
+test("kolektor po przyjęciu pokazuje świeżą wersję i nie wybiera obcej pozycji", () => {
+  const { doc } = delivery();
+  const other = delivery();
+  const selected = I.getInboundCollector(doc.id, {
+    lineId: doc.lines[0].id,
+  }).selected!;
+  I.putawayInbound(worker, randomUUID(), doc.id, put(doc, 2, "RES-1"));
+  const fresh = I.getInboundCollector(doc.id, { barcode: selected.barcode! });
+  assert.equal(fresh.selected!.received, 2);
+  assert.equal(fresh.selected!.version, selected.version + 1);
+  assert.equal(fresh.summary.remaining, 3);
+  assert.throws(
+    () => I.getInboundCollector(doc.id, { lineId: other.doc.lines[0].id }),
+    /Części nie ma/,
+  );
+  assert.throws(
+    () => I.getInboundCollector(doc.id, { barcode: "nieznany" }),
+    /Części nie ma/,
+  );
+  assert.throws(() =>
+    I.getInboundCollector(doc.id, {
+      barcode: selected.sku,
+      lineId: selected.id,
+    }),
+  );
+});
+
+test("kolizja EAN nie przeskakuje na inną część po pełnym policzeniu pierwszej", () => {
+  const first = delivery(),
+    second = delivery();
+  db()
+    .prepare("UPDATE sgt_towar SET ean='COLLISION-EAN' WHERE tw_id IN (?,?)")
+    .run(first.twId, second.twId);
+  const created = I.createInbound(admin, randomUUID(), {
+    reference: `COLLISION-${seq}`,
+    supplier: "Seeded",
+    lines: [
+      { sku: first.sku, quantity: 1 },
+      { sku: second.sku, quantity: 1 },
+    ],
+  });
+  const doc = I.getInbound(created.id);
+  I.putawayInbound(worker, randomUUID(), doc.id, put(doc));
+  assert.throws(
+    () => I.getInboundCollector(doc.id, { barcode: "COLLISION-EAN" }),
+    /kilka części/,
+  );
+  const chosen = I.getInboundCollector(doc.id, { barcode: doc.lines[0].sku });
+  assert.equal(chosen.selected!.received, 1);
 });
 test("otwarte przeliczenie blokuje odłożenie na tę półkę bez utraty partii", () => {
   const { doc, twId } = delivery();

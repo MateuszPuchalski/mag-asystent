@@ -11,8 +11,8 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **367 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (18 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **390 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (19 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi

@@ -130,6 +130,89 @@ export function listInbound(raw: unknown) {
   });
 }
 
+/** Kolektor pobiera tylko stronę dokumentu i skanowaną część. Tysiące pozycji
+ * nie mogą wracać przez Wi-Fi po każdej policzonej partii. */
+export function getInboundCollector(inboundId: number, raw: unknown = {}) {
+  const input = z
+    .object({
+      q: z.string().trim().max(120).default(""),
+      offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+      barcode: text.optional(),
+      lineId: z.coerce.number().int().positive().optional(),
+    })
+    .refine(
+      (value) => !(value.barcode && value.lineId),
+      "Wybierz skan albo pozycję",
+    )
+    .parse(raw);
+  return readSnapshot(() => {
+    const document = header(id.parse(inboundId));
+    const summary = db()
+      .prepare(
+        `SELECT count(*) AS lines,coalesce(sum(expected),0) AS expected,
+      coalesce(sum(received),0) AS received,coalesce(sum(damaged),0) AS damaged,
+      coalesce(sum(max(0,expected-received)),0) AS remaining FROM wms_inbound_line WHERE inbound_id=?`,
+      )
+      .get(inboundId)!;
+    const filter =
+      "inbound_id=? AND instr(lower(sku||' '||name||' '||coalesce(barcode,'')),lower(?))>0";
+    type BinHint = { bin: string; on_hand: number; mode: string };
+    let selected: (Line & { bins: BinHint[] }) | null = null;
+    if (input.barcode || input.lineId) {
+      const matches = (
+        input.barcode
+          ? db()
+              .prepare(
+                "SELECT * FROM wms_inbound_line WHERE inbound_id=? AND (sku=? COLLATE NOCASE OR barcode=?) LIMIT 2",
+              )
+              .all(inboundId, input.barcode, input.barcode)
+          : db()
+              .prepare(
+                "SELECT * FROM wms_inbound_line WHERE inbound_id=? AND id=?",
+              )
+              .all(inboundId, input.lineId!)
+      ) as Line[];
+      if (matches.length === 0)
+        fail(
+          "Części nie ma na tym przyjęciu. Sprawdź dokument lub zgłoś ją biuru",
+          404,
+        );
+      // Pełna pozycja też bierze udział: kod nie może przeskoczyć na drugi towar po policzeniu pierwszego.
+      if (matches.length !== 1)
+        fail(
+          "Kod wskazuje kilka części na przyjęciu. Wybierz pozycję po SKU i zgłoś kolizję biuru",
+        );
+      const line = matches[0];
+      const bins = db()
+        .prepare(
+          `SELECT s.bin,s.on_hand,coalesce(b.mode,'pick') AS mode FROM wms_stock s
+        LEFT JOIN wms_bin b ON b.bin=s.bin WHERE s.tw_id=? AND coalesce(b.mode,'pick')<>'quarantine'
+        AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
+        ORDER BY (coalesce(b.mode,'pick')='pick') DESC,s.bin LIMIT 8`,
+        )
+        .all(line.tw_id) as BinHint[];
+      selected = { ...line, bins };
+    }
+    const total = input.q
+      ? Number(
+          db()
+            .prepare(
+              `SELECT count(*) AS n FROM wms_inbound_line WHERE ${filter}`,
+            )
+            .get(inboundId, input.q)!.n,
+        )
+      : Number(summary.lines);
+    const lines = selected
+      ? []
+      : db()
+          .prepare(
+            `SELECT * FROM wms_inbound_line WHERE ${filter} ORDER BY (received>=expected),sku,id LIMIT 50 OFFSET ?`,
+          )
+          .all(inboundId, input.q, input.offset);
+    return { document, summary, lines, total, selected };
+  });
+}
+
 const createInput = z
   .object({
     reference: text.transform((v) => v.toUpperCase()),

@@ -21,7 +21,7 @@ enum class Screen {
     PROBLEMS,
     // zadania pomiarowe i weryfikacje z panelu obsługi klienta
     FIELD_TASKS,
-    WMS_PICKING, WMS_PUTAWAY,
+    WMS_PICKING, WMS_PUTAWAY, WMS_RECEIVING,
     // zakładanie kont: pierwsze uruchomienie ORAZ dopisywanie osób przez biuro
     SETUP,
 }
@@ -38,6 +38,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.FIELD_TASKS to Screen.HOME,
     Screen.WMS_PICKING to Screen.HOME,
     Screen.WMS_PUTAWAY to Screen.HOME,
+    Screen.WMS_RECEIVING to Screen.HOME,
     // z kreatora wraca się do ustawień; przy pustej instalacji nie ma dokąd
     Screen.SETUP to Screen.SETTINGS,
 )
@@ -65,5 +66,6 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.FIELD_TASKS to "ZADANIA Z BIURA",
     Screen.WMS_PICKING to "ZBIÓRKA WMS",
     Screen.WMS_PUTAWAY to "ODKŁADANIE WMS",
+    Screen.WMS_RECEIVING to "PRZYJĘCIE WMS",
     Screen.SETUP to "KONTA",
 )

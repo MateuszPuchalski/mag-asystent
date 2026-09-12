@@ -148,3 +148,20 @@ Natywne liczenie nowej dostawy pozostaje otwartym zakresem. Nie potwierdzono fiz
 Próba seeded na kolektorze: podejmij zadanie w BUF-01, odłóż część ilości, następnie odłącz Wi-Fi po skanie celu.
 Uruchom aplikację ponownie i sprawdź ten sam zapis; licznik nie może maleć drugi raz. Zbiórka powinna wskazać powrót do odkładania.
 Sprawdź również przejęcie zadania w biurze, skan niewłaściwego bufora, brakującą sztukę oraz kwarantannę.
+
+## Liczenie dostaw od 0.299.0
+
+Nowy ekran obsługuje oczekiwane przyjęcia WMS bez Subiekta i Sellasist. Biuro tworzy dokument, a kolektor rejestruje policzone partie.
+Przebieg: część, ilość, bufor albo półka. Domyślny bufor oddziela liczenie od późniejszego odkładania; tryb jest zapamiętany dla dokumentu.
+Uszkodzenie trafia do kwarantanny. Zamknięcie z brakiem i nadwyżki wymagają rozstrzygnięcia biura, zamiast przypadkowego zatwierdzenia przez skaner.
+
+Audyt wykrył pobieranie całej dostawy po każdym skanie. Nowy odczyt zwraca stronę do 50 pozycji albo pojedynczą część z sumami dokumentu.
+Próba 5000 SKU sprawdza ostatnią pozycję i odpowiedź skanowania poniżej 4 KB. Odczyty nie zmieniają stanów ani dziennika serwera.
+Kolizja EAN bierze pod uwagę także pozycje już policzone. Pełne policzenie jednej części nie przekierowuje następnego skanu na inną.
+
+Przyjęcie współdzieli plik i blokadę z pozostałymi procesami WMS. Wspólny komunikat zastępuje powielone fragmenty ekranów odzyskania.
+Dodano 23 testy JVM i dwa testy serwera. Kontrole obejmują utratę odpowiedzi, dysk, konto, serwer, zamknięcie i szybki drugi skan.
+Odpowiedź wyszukiwania po pauzie nie przywraca potwierdzenia części. Stan ekranu zmienia się po otrzymaniu pozycji, aby ilość odpowiadała świeżemu skanowi.
+
+Źródłem rozdzielenia procesów jest wcześniejsza dokumentacja Microsoft wskazana powyżej. Reguły kolizji, wersji i odzyskiwania są decyzjami WERTIS.
+Próba fizycznego urządzenia pozostaje do wykonania. Pełna analityka przyjęcie–wysyłka i dalsze wyjątki realizacji nadal należą do celu.

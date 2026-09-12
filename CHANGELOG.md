@@ -34,6 +34,19 @@ historii nie przepisujemy.
 ---
 
 
+## 0.299.0 — natywne liczenie dostaw na kolektorze
+
+Kolektor otwiera oczekiwane przyjęcia WMS i prowadzi przez skan części, policzoną ilość oraz skan bufora lub półki.
+Tryb przyjęcia pozostaje przypisany do dokumentu po restarcie. Uszkodzenie trafia bezpośrednio do kwarantanny; nadwyżki i braki rozlicza biuro.
+Kolejny skan części wybiera pozycję tego dokumentu. Zamknięcie jest dostępne po rozliczeniu całej oczekiwanej ilości.
+
+Nowy odczyt kolektora zwraca stronę do 50 pozycji albo jedną zeskanowaną część, z sumami całej dostawy.
+Próba 5000 SKU potwierdza odpowiedź skanowania poniżej 4 KB bez zapisu do bazy. Kolizja EAN nie pomija pozycji już policzonych.
+Przyjęcie współdzieli trwały dziennik i blokadę ze zbiórką oraz odkładaniem. Wspólny komunikat kieruje do właściwego ponowienia.
+Dodano 23 testy JVM oraz dwa testy serwera. Pełny zestaw kolektora obejmuje 390 testów.
+
+**[wymaga działania]** Zaktualizować API, następnie APK. Nie cofać aplikacji ani nie czyścić jej danych z oczekującym zapisem przyjęcia.
+
 ## 0.298.0 — natywne odkładanie WMS na kolektorze
 
 Kolektor otwiera kolejkę odkładania z bufora, wyszukuje zadania skanem SKU lub EAN i pozwala je podjąć.

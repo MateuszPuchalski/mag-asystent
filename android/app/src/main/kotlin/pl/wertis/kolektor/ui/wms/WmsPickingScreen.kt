@@ -135,16 +135,8 @@ fun WmsPickingScreen(graph: AppGraph) {
             Text(if (view.busy) "Potwierdzam na serwerze…" else "Zbiórka wstrzymana", fontWeight = FontWeight.Bold, fontSize = 22.sp)
             Text(view.message ?: "Odczytuję trasę…")
             if (pending != null) {
-                Text(pending.description, fontWeight = FontWeight.Bold)
-                Text("Nie odkładaj kolejnej sztuki. Ponowienie sprawdzi ten sam zapis.")
-                if (pending.workflow == "putaway") {
-                    PrimaryButton("WRÓĆ DO ODKŁADANIA WMS", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
-                        graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PUTAWAY)
-                    }
-                } else {
-                    PrimaryButton("SPRAWDŹ OSTATNI ZAPIS", enabled = !view.busy && pending.context == context && pending.workflow == "picking", modifier = Modifier.fillMaxWidth()) {
-                        graph.appScope.launch { controller.retry(context) }
-                    }
+                WmsPendingNotice(graph, pending, context, "picking", view.busy) {
+                    graph.appScope.launch { controller.retry(context) }
                 }
             } else if (view.reassigned) {
                 PrimaryButton("ROZPOCZNIJ KOLEJNY WÓZEK", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {

@@ -29,6 +29,10 @@ import pl.wertis.kolektor.core.wms.WmsPutawayController
 import pl.wertis.kolektor.core.wms.WmsPutawayQueue
 import pl.wertis.kolektor.core.wms.WmsPutawayTask
 import pl.wertis.kolektor.core.wms.WmsPutawayTransport
+import pl.wertis.kolektor.core.wms.WmsInboundController
+import pl.wertis.kolektor.core.wms.WmsInboundDocument
+import pl.wertis.kolektor.core.wms.WmsInboundList
+import pl.wertis.kolektor.core.wms.WmsInboundTransport
 import pl.wertis.kolektor.net.apiCall
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -52,6 +56,13 @@ interface WmsApi {
 
     @GET("api/wms/putaway-work/{id}")
     suspend fun putawayTask(@Path("id") id: Long): WmsPutawayTask
+
+    @GET("api/wms/inbound")
+    suspend fun inboundList(@Query("q") query: String, @Query("offset") offset: Int): WmsInboundList
+
+    @GET("api/wms/inbound/{id}/collector")
+    suspend fun inboundDocument(@Path("id") id: Long, @Query("q") query: String, @Query("offset") offset: Int,
+        @Query("lineId") lineId: Long?, @Query("barcode") barcode: String?): WmsInboundDocument
 }
 
 class WmsFileStore(context: Context) : WmsStore {
@@ -128,6 +139,18 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
         object : WmsPutawayTransport {
             override suspend fun queue(query: String, offset: Int) = apiCall { api.putawayQueue(query, offset) }
             override suspend fun putawayTask(id: Long) = apiCall { api.putawayTask(id) }
+            override suspend fun send(command: WmsPending) {
+                apiCall { api.command(command.path, command.key, command.body) }
+            }
+        }
+    })
+
+    val receiving = WmsInboundController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsInboundTransport {
+            override suspend fun documents(query: String, offset: Int) = apiCall { api.inboundList(query, offset) }
+            override suspend fun receiveDocument(id: Long, query: String, offset: Int, lineId: Long?, barcode: String?) =
+                apiCall { api.inboundDocument(id, query, offset, lineId, barcode) }
             override suspend fun send(command: WmsPending) {
                 apiCall { api.command(command.path, command.key, command.body) }
             }

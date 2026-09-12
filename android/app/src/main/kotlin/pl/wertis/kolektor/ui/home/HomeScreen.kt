@@ -152,6 +152,9 @@ fun HomeScreen(graph: AppGraph) {
         OutlineButton("ODKŁADANIE WMS — Z BUFORA", modifier = Modifier.fillMaxWidth()) {
             graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PUTAWAY)
         }
+        OutlineButton("PRZYJĘCIE WMS — POLICZ DOSTAWĘ", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_RECEIVING)
+        }
         WertisTextField(
             value = query,
             onValueChange = { newValue ->

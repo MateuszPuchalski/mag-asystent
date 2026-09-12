@@ -13,7 +13,11 @@ Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
 Od 0.297.0 **Przyjęcia → Odkładanie z bufora** rozdzielają liczenie i odłożenie. Bufor zarejestrować w Lokalizacjach jako zapas zaplecza.
 Nie zmieniać go na lokalizację kompletacji podczas otwartej pracy. Aktualizacja dodaje tabele zadań oraz historii bez zmiany dawnych przyjęć.
-Funkcja działa w biurze i mobilnej przeglądarce. Natywne liczenie nowej dostawy WMS na Androidzie pozostaje kolejnym etapem.
+Funkcja działa w biurze i mobilnej przeglądarce. Od 0.299.0 liczenie dostawy działa również natywnie na Androidzie.
+
+Kolektor ma **PRZYJĘCIE WMS — POLICZ DOSTAWĘ**. Najpierw zaktualizować API, następnie APK.
+Oczekiwany dokument tworzy biuro; kolektor liczy i odkłada partie. Domyślnym celem jest bufor, a tryb można zmienić przed kolejnym skanem części.
+Kolizje kodów, nieoczekiwane części i rozliczenie braków pozostają zadaniem biura. Oczekujący zapis przyjęcia blokuje pozostałe procesy WMS.
 
 Od 0.298.0 kolektor ma **ODKŁADANIE WMS — Z BUFORA**. Zaktualizować API, następnie APK.
 Skan kończy ruch dopiero po potwierdzeniu ilości i celu. Nie cofać APK ani nie czyścić danych z nierozliczonym zapisem.

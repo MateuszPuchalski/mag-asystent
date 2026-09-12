@@ -20,6 +20,8 @@ data class WmsPending(
     val runId: Long? = null,
     val workflow: String = "picking",
     val taskId: Long? = null,
+    val inboundId: Long? = null,
+    val lineId: Long? = null,
 )
 
 @Serializable
@@ -29,7 +31,10 @@ data class WmsActive(val context: WmsContext, val runId: Long)
 data class WmsActivePutaway(val context: WmsContext, val taskId: Long)
 
 @Serializable
-data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null, val putaway: WmsActivePutaway? = null)
+data class WmsActiveInbound(val context: WmsContext, val inboundId: Long, val lineId: Long? = null, val buffer: Boolean = true)
+
+@Serializable
+data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null, val putaway: WmsActivePutaway? = null, val receiving: WmsActiveInbound? = null)
 
 fun definitiveWmsRejection(error: ApiError): Boolean = error.status in setOf(400, 404, 409, 422) ||
     (error.status == 403 && error.kod == "WMS_COMMAND_REJECTED")
