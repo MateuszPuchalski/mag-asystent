@@ -118,6 +118,74 @@ private class FakeTransport(private val store: MemoryStore) : WmsTransport {
 }
 
 class WmsRecoveryTest {
+    @Test fun `potwierdzone przejecie pozwala jawnie rozpoczac kolejny wozek bez zapisu na serwerze`() = runTest {
+        val store = MemoryStore(); val client = FakeTransport(store)
+        client.readAction = { throw ApiError(403, "Przejęto", "WMS_RUN_REASSIGNED") }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        assertTrue(controller.state.value.reassigned)
+        assertNotNull(store.journal.active)
+        controller.nextCart(who.copy(actorId = 3))
+        assertNotNull(store.journal.active)
+        controller.nextCart(who)
+        assertEquals(WmsJournal(), store.journal)
+        assertTrue(controller.state.value.ready)
+        assertFalse(controller.state.value.reassigned)
+        assertTrue(client.sent.isEmpty())
+    }
+
+    @Test fun `brak sieci i zwykle 403 nie pozwalaja porzucic aktywnej trasy`() = runTest {
+        for (failure in listOf(IOException(), ApiError(403, "Sesja"), ApiError(404, "Nie ma"))) {
+            val store = MemoryStore(); val client = FakeTransport(store)
+            client.readAction = { throw failure }
+            val controller = WmsController(store, { client })
+            controller.open(who); controller.nextCart(who)
+            assertFalse(controller.state.value.reassigned)
+            assertFalse(controller.state.value.ready)
+            assertNotNull(store.journal.active)
+        }
+    }
+
+    @Test fun `odmowa po sprawdzeniu klucza i rollbacku rozlicza oczekujacy zapis po przejeciu`() = runTest {
+        val store = MemoryStore(); val client = FakeTransport(store)
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.sendAction = { throw IOException() }
+        controller.submit(who, pickDraft())
+        val pending = store.journal.pending
+        client.readAction = { throw ApiError(403, "Przejęto", "WMS_RUN_REASSIGNED") }
+        controller.nextCart(who)
+        assertEquals(pending, store.journal.pending)
+        client.sendAction = { throw ApiError(403, "Odmowa po rollbacku", "WMS_COMMAND_REJECTED") }
+        controller.retry(who)
+        assertEquals(client.sent[0], client.sent[1])
+        assertNull(store.journal.pending)
+        assertTrue(controller.state.value.reassigned)
+        controller.nextCart(who)
+        assertTrue(controller.state.value.ready)
+    }
+
+    @Test fun `zatwierdzony przed przejeciem skan odzyskuje wynik i nie wysyla nowego klucza`() = runTest {
+        val store = MemoryStore(); val client = FakeTransport(store)
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        client.sendAction = { throw IOException() }
+        controller.submit(who, pickDraft())
+        client.sendAction = { route.id }
+        client.readAction = { route.copy(picker_id = 3) }
+        controller.retry(who)
+        assertNull(store.journal.pending)
+        assertTrue(controller.state.value.reassigned)
+        assertEquals(client.sent[0], client.sent[1])
+        store.failWrite = { true }
+        controller.nextCart(who)
+        assertNotNull(store.journal.active)
+        assertFalse(controller.state.value.ready)
+        store.failWrite = { false }
+        controller.nextCart(who)
+        assertNull(store.journal.active)
+    }
+
     @Test fun `utrata odpowiedzi restart i ponowienie zachowuja dokladnie jeden klucz`() = runTest {
         val store = MemoryStore()
         val client = FakeTransport(store)

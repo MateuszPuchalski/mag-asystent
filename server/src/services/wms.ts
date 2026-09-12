@@ -18,6 +18,7 @@ export class WmsError extends Error {
   constructor(
     public statusCode: number,
     message: string,
+    public kod?: string,
   ) {
     super(message);
   }
@@ -256,6 +257,10 @@ export function command<T>(
   } catch (e) {
     try {
       d.exec("ROLLBACK");
+      // Tylko odmowa po sprawdzeniu klucza i udanym rollbacku dowodzi,
+      // że zapis nie doszedł. Zwykłe 403 sesji nie daje tej gwarancji.
+      if (e instanceof WmsError && e.statusCode === 403)
+        e.kod = "WMS_COMMAND_REJECTED";
     } catch {
       /* SQLite mógł już wycofać transakcję po awarii dysku. */
     }

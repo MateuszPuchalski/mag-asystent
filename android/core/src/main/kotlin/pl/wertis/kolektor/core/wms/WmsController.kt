@@ -45,6 +45,7 @@ data class WmsView(
     val run: WmsRun? = null,
     val busy: Boolean = false,
     val ready: Boolean = false,
+    val reassigned: Boolean = false,
     val message: String? = null,
 )
 
@@ -118,12 +119,13 @@ class WmsController(
 
     suspend fun nextCart(context: WmsContext) = lock.withLock {
         val view = mutable.value
-        if (view.context != context || !view.ready || view.journal.pending != null ||
-            (view.run?.arrived_at == null && view.run?.closed_at == null)) return@withLock
+        if (view.context != context || view.busy || view.journal.pending != null ||
+            (!view.reassigned && (!view.ready || (view.run?.arrived_at == null && view.run?.closed_at == null)))) return@withLock
         try {
             store.write(WmsJournal())
             mutable.value = WmsView(generation = ++generation, context = context, ready = true)
-        } catch (e: Exception) { problem(e) }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { problem(e) }
     }
 
     private suspend fun send(context: WmsContext, pending: WmsPending, continuationEpoch: Long?) {
@@ -132,13 +134,13 @@ class WmsController(
         val runId = try { client.send(pending) } catch (e: ApiError) {
             // Odmowa biznesowa jest atomowa. Brak autoryzacji, limit i błąd
             // infrastruktury nie dowodzą, że wcześniejsza próba nie doszła.
-            if (e.status !in setOf(400, 404, 409, 422)) throw e
+            if (e.status !in setOf(400, 404, 409, 422) && !(e.status == 403 && e.kod == "WMS_COMMAND_REJECTED")) throw e
             val journal = mutable.value.journal.copy(pending = null)
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal, run = null)
             journal.active?.takeIf { it.context == context }?.let { load(context, it.runId) }
                 ?: run { mutable.value = mutable.value.copy(ready = true) }
-            mutable.value = mutable.value.copy(message = e.message)
+            mutable.value = mutable.value.copy(message = mutable.value.message ?: e.message)
             return
         }
         val journal = WmsJournal(active = runId?.let { WmsActive(context, it) })
@@ -156,9 +158,20 @@ class WmsController(
         client: WmsTransport = transport(context),
         continuation: ((WmsRun) -> WmsScanState?)? = null,
     ) {
-        val run = client.run(id)
-        require(run.id == id && run.picker_id == context.actorId) { "Trasa należy do innej osoby. Skontaktuj się z biurem." }
+        val run = try { client.run(id) } catch (e: ApiError) {
+            if (e.status != 403 || e.kod != "WMS_RUN_REASSIGNED") throw e
+            reassigned()
+            return
+        }
+        require(run.id == id) { "Serwer zwrócił inną trasę" }
+        if (run.picker_id != context.actorId) { reassigned(); return }
         mutable.value = mutable.value.copy(generation = ++generation, initialScan = continuation?.invoke(run), run = run, ready = true)
+    }
+
+    private fun reassigned() {
+        verificationEpoch++
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = null, run = null,
+            ready = false, reassigned = true, message = "Trasę przejęła inna osoba. Przekaż jej wózek i rozpocznij kolejny.")
     }
 
     private fun problem(error: Exception) {

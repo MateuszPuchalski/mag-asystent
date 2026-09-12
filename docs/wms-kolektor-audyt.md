@@ -111,3 +111,18 @@ Podejście zachowuje pamięć oraz dysk zgodnie z [zaleceniami Android dotycząc
 Klucze źródła, kontrola świeżości i zasady błędów są decyzjami WERTIS sprawdzanymi w testach JVM.
 
 Skrót SHA-256 wiąże zapisany plik z jego ETag. Przerwany zapis indeksu wymusza pełne pobranie zamiast potwierdzania niezgodnej pary odpowiedzią 304.
+
+
+## Przejęcie trasy i wznowienie pracy od 0.296.0
+
+Dotychczas przejęcie wózka przez biuro pozostawiało poprzedni kolektor w pętli odświeżania.
+Potwierdzone przejęcie pokazuje **ROZPOCZNIJ KOLEJNY WÓZEK**. Przycisk zamyka jedynie lokalny widok, po przekazaniu wózka następnej osobie.
+Nie zmienia właściciela, przydziałów ani zapasu. Brak sieci, zwykłe 403 i nieznana trasa nie udostępniają tego przycisku.
+
+Oczekujący zapis trzeba najpierw rozliczyć. Serwer sprawdza pierwotny klucz przed ponowną oceną uprawnień do trasy.
+Zatwierdzony skan zwraca zapisany wynik, również po przejęciu. Nowa odmowa 403 dostaje kod `WMS_COMMAND_REJECTED` dopiero po udanym rollbacku.
+Kod `WMS_RUN_REASSIGNED` z odczytu oznacza brak przypisania tej trasy do zalogowanej osoby; nie ujawnia listy zamówień.
+Kolektor nie rozpoznaje znaczenia błędów po treści komunikatu. Starsze API bez kodów zachowuje bezpieczną blokadę.
+
+Testy obejmują utratę odpowiedzi przed przejęciem, identyczne ponowienie, brak drugiego pobrania, odmowę dysku i zmianę konta.
+Pełny dziennik pozostaje wymagany; czyszczenie danych aplikacji nie jest sposobem wznowienia pracy.

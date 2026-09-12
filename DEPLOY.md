@@ -11,6 +11,9 @@ API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłąc
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
+Od 0.296.0 kolektor rozpoznaje potwierdzone przejęcie wózka i pozwala rozpocząć kolejny. Najpierw zaktualizować serwer, następnie APK.
+Starszy serwer nie podaje jednoznacznego kodu odmowy; kolektor zachowuje wtedy niedokończony zapis do wyjaśnienia.
+
 Od 0.295.0 cache zdjęć kolektora rozdziela serwery. Pierwsze podglądy po aktualizacji APK należy otworzyć przy działającej sieci.
 Poprzednie kopie nie zawierają źródła, dlatego nie są przenoszone do nowego indeksu. Zmiana dotyczy wyłącznie lokalnych zdjęć, bez zmian zapasu i skanów.
 

@@ -311,6 +311,22 @@ function readCartRun(actor: Actor, runId: number) {
     .prepare("SELECT * FROM wms_cart_run WHERE id=?")
     .get(id.parse(runId)) as Run | undefined;
   if (!run) fail("Nie ma takiej trasy wózka", 404);
+  const assigned = db()
+    .prepare("SELECT picker_id FROM wms_wave WHERE id=?")
+    .get(runId);
+  // Kolektor może zwolnić lokalny widok dopiero po jednoznacznej odpowiedzi.
+  // Błąd sesji lub Wi-Fi nie jest dowodem przejęcia wózka.
+  if (
+    assigned &&
+    assigned.picker_id !== actor.id &&
+    actor.role !== "admin" &&
+    actor.role !== "biuro"
+  )
+    throw new WmsError(
+      403,
+      "Trasę obsługuje już inna osoba",
+      "WMS_RUN_REASSIGNED",
+    );
   const wave = getWave(actor, runId);
   const assignments = db()
     .prepare(

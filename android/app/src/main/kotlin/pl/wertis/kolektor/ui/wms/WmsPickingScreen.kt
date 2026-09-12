@@ -140,6 +140,10 @@ fun WmsPickingScreen(graph: AppGraph) {
                 PrimaryButton("SPRAWDŹ OSTATNI ZAPIS", enabled = !view.busy && pending.context == context, modifier = Modifier.fillMaxWidth()) {
                     graph.appScope.launch { controller.retry(context) }
                 }
+            } else if (view.reassigned) {
+                PrimaryButton("ROZPOCZNIJ KOLEJNY WÓZEK", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
+                    graph.appScope.launch { controller.nextCart(context) }
+                }
             } else {
                 PrimaryButton("ODŚWIEŻ TRASĘ", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
                     graph.appScope.launch { controller.open(context) }

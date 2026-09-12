@@ -364,3 +364,65 @@ test("pełne zamówienie i rejestr wielu paczek działają bez dostępu do zewn�
   assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, changes);
   assert.equal(network.mock.calls.length, 0);
 });
+
+test("API kolektora rozróżnia cudzą trasę, odmowę zapisu i nieważną sesję", async () => {
+  const post = async (url: string, payload: unknown, token = adminToken) => {
+    return app.inject({
+      method: "POST",
+      url,
+      payload: payload as object,
+      headers: { "x-session": token, "idempotency-key": randomUUID() },
+    });
+  };
+  const c = "RECOVERY-20";
+  const configured = await post("/api/wms/carts", {
+    code: c,
+    name: c,
+    capacity: 20,
+    version: 0,
+    boxes: Array.from({ length: 20 }, (_, i) => ({
+      position: i + 1,
+      barcode: `REC-BOX-${i + 1}`,
+    })),
+  });
+  assert.equal(configured.statusCode, 200, configured.body);
+  const receipt = await post("/api/wms/inventory", {
+    action: "receive",
+    twId: 1,
+    bin: "REC-01",
+    quantity: 10,
+    reason: "Test wznowienia",
+  });
+  assert.equal(receipt.statusCode, 200, receipt.body);
+  const order = await post("/api/wms/orders", {
+    reference: randomUUID(),
+    dueAt: "2026-12-31T12:00:00Z",
+    lines: [{ sku: "NOZ-01", quantity: 1 }],
+  });
+  assert.equal(order.statusCode, 200, order.body);
+  const started = await post("/api/wms/cart-start", { barcode: c });
+  assert.equal(started.statusCode, 200, started.body);
+  const runId = started.json().run.id;
+  const read = await app.inject({
+    method: "GET",
+    url: `/api/wms/cart-runs/${runId}`,
+    headers: { "x-session": workerToken },
+  });
+  assert.equal(read.statusCode, 403);
+  assert.equal(read.json().kod, "WMS_RUN_REASSIGNED");
+  assert.equal(read.json().tasks, undefined);
+  const rejected = await post(
+    "/api/wms/cart-start",
+    { barcode: c },
+    workerToken,
+  );
+  assert.equal(rejected.statusCode, 403);
+  assert.equal(rejected.json().kod, "WMS_COMMAND_REJECTED");
+  const session = await post(
+    "/api/wms/cart-start",
+    { barcode: c },
+    "niewazna-sesja",
+  );
+  assert.equal(session.statusCode, 401);
+  assert.equal(session.json().kod, undefined);
+});

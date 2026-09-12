@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.296.0 — kolektor wraca do pracy po przejęciu wózka
+
+- Potwierdzone przejęcie trasy pokazuje przycisk rozpoczęcia kolejnego wózka. Zamknięcie lokalnego widoku nie zmienia zamówień ani właściciela na serwerze.
+- Nieznany wynik skanu nadal wymaga tego samego klucza ponowienia. Skan zatwierdzony przed przejęciem zwraca poprzedni wynik bez podwajania sztuk.
+- Odmowa 403 rozlicza zapis wyłącznie po potwierdzonym sprawdzeniu klucza oraz wycofaniu transakcji. Błąd sesji i brak sieci nie pozwalają ominąć dziennika.
+- Odmowa dysku zachowuje aktywną trasę. Zmiana konta nie pozwala zamknąć widoku poprzedniej osoby.
+- Dodano testy API, przejęcia po zatwierdzonym skanie i odzyskiwania kolektora. Najpierw aktualizować serwer, następnie APK; starsze API zachowuje blokadę bezpiecznego ponowienia.
+
 ## 0.295.0 — wiarygodne zdjęcia części na kolektorze
 
 - Pamięć zdjęć rozdziela serwery. Żądanie zachowuje pierwotny adres i sesję; spóźniona odpowiedź nie zasila ekranu innego magazynu.

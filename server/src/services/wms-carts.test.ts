@@ -1054,3 +1054,57 @@ test("ręczny ruch nie omija przeliczenia źródła ani celu", () => {
     2,
   );
 });
+
+test("przejęcie odróżnia odmowę od nieznanego wyniku i zachowuje zatwierdzony skan", async () => {
+  const p = product();
+  order(p.sku, 3);
+  const c = cart(),
+    run = start(c.code),
+    t = run.tasks[0];
+  const body = {
+    orderId: t.order_id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    bin: t.bin,
+    barcode: t.sku,
+    tote: t.tote,
+    quantity: 1,
+  };
+  const key = randomUUID();
+  const result = W.pickWave(picker, key, run.id, body);
+  C.takeoverCart(admin, randomUUID(), run.id, {
+    cart: c.code,
+    reason: "Zmiana operatora",
+  });
+  const changes = db().prepare("SELECT total_changes() AS n").get()!.n;
+  assert.throws(
+    () => C.getCartRun(picker, run.id),
+    (e: unknown) =>
+      e instanceof W.WmsError &&
+      e.statusCode === 403 &&
+      e.kod === "WMS_RUN_REASSIGNED",
+  );
+  assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, changes);
+  assert.equal(C.getCartRun(admin, run.id).picker_id, admin.id);
+  // Ta sama operacja zwraca utracony wynik sprzed przejęcia, bez drugiego ruchu.
+  assert.deepEqual(
+    W.pickWave(picker, key, run.id, body),
+    JSON.parse(JSON.stringify(result)),
+  );
+  const rejected = randomUUID();
+  assert.throws(
+    () => W.pickWave(picker, rejected, run.id, body),
+    (e: unknown) =>
+      e instanceof W.WmsError &&
+      e.statusCode === 403 &&
+      e.kod === "WMS_COMMAND_REJECTED",
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT count(*) AS n FROM wms_command WHERE key=?")
+      .get(rejected)!.n,
+    0,
+  );
+  assert.equal(W.getOrder(Number(t.order_id)).lines[0].picked, 1);
+  assert.equal((await import("./wms-analytics.js")).integrity().ok, true);
+});

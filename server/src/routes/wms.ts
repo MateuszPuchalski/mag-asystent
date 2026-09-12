@@ -56,7 +56,12 @@ export async function wmsRoutes(app: FastifyInstance) {
   // Enkapsulacja Fastify zachowuje dotychczasowe błędy pozostałych modułów.
   app.setErrorHandler((error, req, reply) => {
     if (error instanceof WmsError)
-      return reply.code(error.statusCode).send({ error: error.message });
+      return reply
+        .code(error.statusCode)
+        .send({
+          error: error.message,
+          ...(error.kod ? { kod: error.kod } : {}),
+        });
     if (error instanceof ZodError)
       return reply.code(400).send({
         error: "Sprawdź dane formularza",
