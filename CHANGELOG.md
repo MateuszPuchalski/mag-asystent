@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.300.0 — analityka kolejek bez blokowania kolektora
+
+- Bieżące kolejki pokazują wiek pracy, wstrzymania, bufor oraz przejście do właściwego obszaru.
+- Ukończone etapy mają medianę, P95, średnią i pokrycie pomiarów. Brak historii nie oznacza zera czasu pracy.
+- Przyjęcia, częściowe odłożenia, korekty i kwarantanna mają oddzielne liczniki. Potwierdzony odbiór wymaga wszystkich czynnych paczek.
+- Daty raportu dziennych wysyłek i CSV odpowiadają Warszawie. Dodano eksport czasów etapów; operacje pobrania nie są nazywane skanami.
+- Raport oblicza osobny wątek z bazą tylko do odczytu. Limit kolejki i czasu chroni obsługę operacji magazynowych.
+- Próba obejmuje 135 000 zamówień, 5000 SKU, 90 dni i równoległe zapisy. Dane są syntetyczne, bez pomiaru wydajności pracowników.
+
 ## 0.299.0 — natywne liczenie dostaw na kolektorze
 
 Kolektor otwiera oczekiwane przyjęcia WMS i prowadzi przez skan części, policzoną ilość oraz skan bufora lub półki.

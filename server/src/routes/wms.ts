@@ -27,11 +27,8 @@ import {
   WmsError,
   type Actor,
 } from "../services/wms.js";
-import {
-  analytics,
-  erpReconciliation,
-  integrity,
-} from "../services/wms-analytics.js";
+import { erpReconciliation, integrity } from "../services/wms-analytics.js";
+import { analyticsReader } from "../services/wms-analytics-reader.js";
 import { db } from "../db/db.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
 import {
@@ -49,6 +46,8 @@ const orderId = (raw: string) =>
   z.coerce.number().int().positive().max(2_147_483_647).parse(raw);
 
 export async function wmsRoutes(app: FastifyInstance) {
+  const reports = analyticsReader();
+  app.addHook("onClose", () => reports.close());
   app.addHook("onRequest", async (_req, reply) => {
     reply
       .header("cache-control", "no-store")
@@ -360,7 +359,7 @@ export async function wmsRoutes(app: FastifyInstance) {
   );
   app.get("/api/wms/analytics", async (req) => {
     manager(actor());
-    return analytics(req.query);
+    return reports.get(req.query);
   });
   app.get("/api/wms/integrity", async () => {
     manager(actor());
@@ -424,13 +423,63 @@ export async function wmsRoutes(app: FastifyInstance) {
   );
   app.get("/api/wms/analytics/csv", async (req, reply) => {
     manager(actor());
-    const a = analytics(req.query);
-    const rows = [wierszCsv(["Dzień UTC", "Wysłane", "W terminie"], ";")];
+    const a = await reports.get(req.query);
+    const rows = [
+      wierszCsv(["Dzień (Warszawa)", "Wysłane", "W terminie"], ";"),
+    ];
     for (const r of a.daily)
       rows.push(wierszCsv([r.day, r.shipped, r.on_time], ";"));
     return reply
       .type("text/csv; charset=utf-8")
       .header("content-disposition", 'attachment; filename="wms-wysylki.csv"')
+      .send(zbudujCsv(rows));
+  });
+  app.get("/api/wms/analytics/flow/csv", async (req, reply) => {
+    manager(actor());
+    const a = await reports.get(req.query);
+    const rows = [
+      wierszCsv(
+        [
+          "Etap",
+          "Jednostka",
+          "Od UTC",
+          "Do UTC",
+          "Ukończone",
+          "Z pomiarem",
+          "Brak zdarzeń",
+          "Błędne daty",
+          "Średnia min",
+          "Mediana min",
+          "P95 min",
+        ],
+        ";",
+      ),
+    ];
+    for (const r of a.flow.durations)
+      rows.push(
+        wierszCsv(
+          [
+            r.label,
+            r.unit,
+            a.since,
+            a.now,
+            r.total,
+            r.measured,
+            r.missing,
+            r.invalid,
+            r.mean_minutes,
+            r.median_minutes,
+            r.p95_minutes,
+          ],
+          ";",
+        ),
+      );
+    return reply
+      .type("text/csv; charset=utf-8")
+      .header(
+        "content-disposition",
+        'attachment; filename="wms-czasy-etapow.csv"',
+      )
       .send(zbudujCsv(rows));
   });
 }

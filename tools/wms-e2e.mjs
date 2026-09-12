@@ -525,6 +525,24 @@ try {
   await exercisePacking(page, output);
   await exerciseInbound(page, output);
   await page.locator('[data-tab-wms="analytics"]').click();
+  await expect(page.locator("#wms-flow")).toContainText("Gdzie czeka praca");
+  await expect(
+    page.getByRole("heading", { name: "Czas przejścia przez etapy" }),
+  ).toBeVisible();
+  await page.locator('[data-flow-queue="putaway"]').click();
+  await expect(page.locator('[data-inbound="receiving"]')).toBeVisible();
+  await expect(page.locator("#wms-putaway-finish")).toHaveCount(0);
+  await page.locator('[data-tab-wms="analytics"]').click();
+  const flowDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "EKSPORTUJ CZASY ETAPÓW" }).click();
+  const flowFile = await flowDownload;
+  await flowFile.saveAs(path.join(output, "flow-analytics.csv"));
+  const flowCsv = readFileSync(path.join(output, "flow-analytics.csv"), "utf8");
+  if (
+    !flowCsv.includes("Mediana min;P95 min") ||
+    !flowCsv.includes("Przyjęcie do bufora")
+  )
+    throw new Error("Eksport czasów etapów jest niekompletny");
   await page
     .getByRole("button", { name: "SPRAWDŹ ZGODNOŚĆ STANÓW", exact: true })
     .click();

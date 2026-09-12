@@ -135,5 +135,11 @@ window.WmsPutaway = (h) => {
     }
     return true;
   }
-  return { render, click, submit, keydown };
+  function openQueue() {
+    selected = null;
+    query = "";
+    mine = "0";
+    offset = 0;
+  }
+  return { render, click, submit, keydown, openQueue };
 };

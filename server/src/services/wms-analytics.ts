@@ -1,16 +1,23 @@
 import { z } from "zod";
 import { db, nowIso, type Db } from "../db/db.js";
 import { config } from "../config.js";
+import { confirmedDispatch, flowAnalytics } from "./wms-flow-analytics.js";
+import {
+  registerReportDay,
+  reportDays,
+  reportTimezone,
+} from "./wms-report-time.js";
 
 export const analyticsInput = z.object({
   days: z.coerce.number().int().min(1).max(90).default(30),
 });
 
-export function analytics(raw: unknown) {
+export function analytics(raw: unknown, database: Db = db()) {
   const { days } = analyticsInput.parse(raw);
-  const d = db();
+  const d = database;
   const now = nowIso();
   const since = new Date(Date.parse(now) - days * 86_400_000).toISOString();
+  registerReportDay(d);
   // Jeden snapshot: równoległy proces nie może zmienić stanów między kaflami.
   d.exec("BEGIN");
   try {
@@ -37,27 +44,21 @@ export function analytics(raw: unknown) {
     const dispatchCoverage = d
       .prepare(
         `SELECT count(*) AS orders,
-      coalesce(sum(EXISTS(SELECT 1 FROM wms_shipment s JOIN wms_parcel_state p ON p.shipment_id=s.id WHERE s.order_id=o.id AND p.status='handed')),0) AS confirmed_orders
+      coalesce(sum(CASE WHEN ${confirmedDispatch} THEN 1 ELSE 0 END),0) AS confirmed_orders
       FROM wms_order o WHERE o.status='shipped' AND o.shipped_at>=? AND o.shipped_at<=?`,
       )
       .get(since, now);
     const dailyRows = d
       .prepare(
-        `SELECT substr(shipped_at,1,10) AS day,count(*) AS shipped,
+        `SELECT wms_report_day(shipped_at) AS day,count(*) AS shipped,
       sum(CASE WHEN shipped_at<=due_at THEN 1 ELSE 0 END) AS on_time
       FROM wms_order WHERE shipped_at>=? AND shipped_at<=? GROUP BY day ORDER BY day`,
       )
       .all(since, now);
     const byDay = new Map(dailyRows.map((r) => [String(r.day), r]));
-    const daily = [];
-    for (
-      let day = Date.parse(since.slice(0, 10) + "T00:00:00Z");
-      day <= Date.parse(now);
-      day += 86_400_000
-    ) {
-      const key = new Date(day).toISOString().slice(0, 10);
-      daily.push(byDay.get(key) ?? { day: key, shipped: 0, on_time: 0 });
-    }
+    const daily = reportDays(since, now).map(
+      (key) => byDay.get(key) ?? { day: key, shipped: 0, on_time: 0 },
+    );
     const stock = d
       .prepare(
         `SELECT count(DISTINCT s.tw_id) AS skus,coalesce(sum(on_hand),0) AS on_hand,
@@ -127,12 +128,14 @@ export function analytics(raw: unknown) {
       GROUP BY m.tw_id HAVING sum(abs(m.delta))>0 ORDER BY sum(abs(m.delta)) DESC LIMIT 20`,
       )
       .all(since, now);
+    const flow = flowAnalytics(d, since, now);
     d.exec("COMMIT");
     return {
       days,
       since,
       now,
-      timezone: "UTC",
+      timezone: reportTimezone,
+      flow,
       backlog,
       throughput,
       daily,

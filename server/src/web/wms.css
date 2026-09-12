@@ -980,4 +980,5 @@ body:has(#widokWms:not([hidden])[aria-busy="true"]) .wms-busy:not(:empty) {
 }
 
 .wms-putaway-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-3); }
+.wms-flow-table { min-width: 700px; }
 @media (max-width: 700px) { .wms-putaway-fields { grid-template-columns: minmax(0, 1fr); } }

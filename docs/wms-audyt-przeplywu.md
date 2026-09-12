@@ -250,9 +250,33 @@ Braki oraz uszkodzenia mają odmienne rozliczenie; powtórzenie nie podwaja ilo�
 
 Podstawą rozdzielenia jest [Microsoft: mobile receiving and putaway](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse).
 Dokumentacja opisuje przyjęcie tworzące pracę odkładania dla innej osoby. Ochrona bufora i sposób korekt są decyzjami WERTIS.
-Nie zmierzono jeszcze czasu pracowników; testy dowodzą poprawności przepływu i liczników. Natywne przyjęcia Android oraz pełna analityka przepływu pozostają w zakresie.
+Nie zmierzono jeszcze czasu pracowników; testy dowodzą poprawności przepływu i liczników. Natywne przyjęcia Android są dostępne od 0.299.0.
 
 Dowody: [wyniki przyjęcia i odkładania](wms-putaway-evidence.json). Przeszło 2221 testów serwera, 727 panelu, oba sprawdzenia TypeScript i build.
 E2E obejmuje bufor, podjęcie, częściowe odłożenie, utratę odpowiedzi oraz korektę. Aktywny formularz sprawdzono przy 320, 390 i 1440 px.
 Przy tych szerokościach potwierdzenie pozostaje widoczne, bez przewijania poziomego. Wybrane reguły axe-core nie zgłosiły naruszeń; nie jest to certyfikat całego systemu.
 Próba 5000 SKU i 2000 zamówień zachowała zgodny dziennik oraz zawartość wszystkich paczek. Inne lokalne sprawdzenia działały równolegle.
+
+## Kolejki i pomiary przepływu
+
+Audyt znalazł średnie czasów wyłącznie dla wysłanych zamówień, brak wieku bufora oraz mylące określenie operacji pobrania jako skanów.
+Dodano bieżące kolejki, wiek najstarszej pracy i przejście do obszaru. Pomiary ukończonych etapów pokazują medianę, P95 oraz braki zdarzeń.
+Przyjęcia i częściowe odłożenia mają osobne liczniki; korekty nie udają odłożeń. Sesje mierzą upływ czasu, nie pracę ludzi.
+
+[ASCM: 8 KPIs for an Efficient Warehouse](https://www.ascm.org/ascm-insights/8-kpis-for-an-efficient-warehouse/) opisuje czas realizacji od zamówienia do wysyłki.
+[Microsoft: Warehouse performance](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/analytics/warehouse-power-bi-content) rozdziela między innymi wysyłki terminowe i spóźnione.
+Rozdzielenie kolejek, pokrycia zdarzeń i percentyli jest decyzją WERTIS. Bez ewidencji partii nie odtwarzamy pochodzenia części w konkretnym zamówieniu.
+
+Próba 135 000 zamówień, 5000 SKU i 90 dni ujawniła średnio 7,24 s synchronicznego raportu na głównym wątku.
+Przeniesiono obliczenie do pojedynczego wątku z połączeniem tylko do odczytu, zgodnie z mechanizmem [Node: worker threads](https://nodejs.org/api/worker_threads.html).
+Trzy odczyty trwały 7,81 s, 6,12 s i 6,23 s. Równoległe zapisy głównego wątku trwały 12,62 ms, 5,33 ms i 5,25 ms.
+Próbnik głównej pętli ustawiony na 20 ms miał P95 32,16 ms i maksimum 44,86 ms. To test syntetyczny, nie gwarancja czasu skanera.
+Odczyt zachował wszystkie 135 000 wysyłek i potwierdzeń, bez zapisów raportu. Wynik zajmował około 10,6 kB.
+
+Regresje obejmują częściowe odbiory, stare etykiety, prawdziwe zero, odwrócone daty, korekty dawnych przyjęć i zmianę czasu w Warszawie.
+Osobne testy czytnika sprawdzają wspólne obliczenie, świeżość kolejnego raportu, brak migracji, limit kolejki, awarię oraz timeout.
+
+Weryfikacja 0.300.0: 2237 testów serwera, 727 panelu, oba sprawdzenia TypeScript, build i cztery strażnice przeszły.
+E2E sprawdziło przejście z raportu do kolejki bufora i pobranie CSV. Podgląd z 5000 SKU zachował 14 sztuk w buforze.
+Ekran nie wychodzi poza widok przy 320, 390 i 1440 px; szerokie tabele przewijają się we własnym obszarze.
+Wyniki obciążenia: [dane próby analityki](wms-flow-evidence.json).

@@ -61,6 +61,7 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/stock-work",
     "/api/wms/pick-route",
     "/api/wms/analytics",
+    "/api/wms/analytics/flow/csv",
     "/api/wms/integrity",
     "/api/wms/dispatch",
     "/api/wms/dispatch/csv",
@@ -73,6 +74,7 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/analytics",
     "/api/wms/analytics/csv",
+    "/api/wms/analytics/flow/csv",
     "/api/wms/dispatch",
     "/api/wms/dispatch/csv",
     "/api/wms/integrity",
@@ -249,6 +251,15 @@ test("wyszukiwanie traktuje znaki SQL jak dane, statyki WMS dostępne w biurze",
   });
   assert.equal(csv.statusCode, 200);
   assert.match(String(csv.headers["content-type"]), /text\/csv/);
+  assert.match(csv.body, /Dzień \(Warszawa\)/);
+  const flowCsv = await app.inject({
+    method: "GET",
+    url: "/api/wms/analytics/flow/csv",
+    headers: headers(),
+  });
+  assert.equal(flowCsv.statusCode, 200);
+  assert.match(flowCsv.body, /Mediana min;P95 min/);
+  assert.match(flowCsv.body, /Przyjęcie do bufora/);
 });
 
 test("pełne zamówienie i rejestr wielu paczek działają bez dostępu do zewnętrznych usług", async (t) => {

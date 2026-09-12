@@ -665,7 +665,7 @@ window.Wms = (() => {
     );
     if (turn !== generation) return;
     el("wms-stock-form").innerHTML =
-      `<h2>${html(s.symbol)} · historia ruchów</h2><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>Czas</th><th>Lokalizacja</th><th>Operacja</th><th>Zmiana sztuk</th><th>Rezerwacja</th><th>Powód</th></tr></thead><tbody>${result.rows.map((m) => `<tr><td>${date(m.created_at)}</td><td>${html(m.bin)}</td><td>${html({ receive: "Przyjęcie", transfer: "Przesunięcie", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", count: "Spis" }[m.kind] || m.kind)}</td><td>${m.delta}</td><td>${m.reserved_delta}</td><td>${html(m.reason)}</td></tr>`).join("") || '<tr><td colspan="6">Brak ruchów.</td></tr>'}</tbody></table></div>${result.rows.length === 100 ? `<button data-movements-wms="${index}" data-before="${result.rows.at(-1).id}">STARSZE RUCHY</button>` : ""}`;
+      `<h2>${html(s.symbol)} · historia ruchów</h2><div class="wms-scroll"><table class="wms-lines"><thead><tr><th>Czas</th><th>Lokalizacja</th><th>Operacja</th><th>Zmiana sztuk</th><th>Rezerwacja</th><th>Powód</th></tr></thead><tbody>${result.rows.map((m) => `<tr><td>${date(m.created_at)}</td><td>${html(m.bin)}</td><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", transfer: "Przesunięcie", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", count: "Spis" }[m.kind] || m.kind)}</td><td>${m.delta}</td><td>${m.reserved_delta}</td><td>${html(m.reason)}</td></tr>`).join("") || '<tr><td colspan="6">Brak ruchów.</td></tr>'}</tbody></table></div>${result.rows.length === 100 ? `<button data-movements-wms="${index}" data-before="${result.rows.at(-1).id}">STARSZE RUCHY</button>` : ""}`;
     el("wms-stock-form").scrollIntoView({ block: "nearest" });
   }
   async function report(turn) {
@@ -685,14 +685,27 @@ window.Wms = (() => {
     const duration = (minutes) =>
       minutes === null
         ? "—"
-        : minutes < 60
-          ? `${number(minutes)} min`
-          : `${number(minutes / 60)} h`;
+        : minutes > 0 && minutes < 1
+          ? minutes * 60 < 1
+            ? "poniżej 1 s"
+            : `${number(minutes * 60)} s`
+          : minutes < 60
+            ? `${number(minutes)} min`
+            : `${number(minutes / 60)} h`;
+    const flow = a.flow;
+    const flowMarkup = `<section class="wms-surface" id="wms-flow"><h2>Gdzie czeka praca</h2><p class="wms-help">Stan teraz, niezależnie od wybranego okresu. Wiek liczymy od wejścia w etap; rozpoczęta praca może obejmować przerwy.</p>
+      <div class="wms-scroll" tabindex="0" role="region" aria-label="Kolejki pracy — tabela przewijana"><table class="wms-lines wms-flow-table"><thead><tr><th>Etap</th><th>W toku</th><th>Najstarsze</th><th>Ponad 24 h</th><th>Wstrzymane</th></tr></thead><tbody>${flow.queues.map((q) => `<tr><td><button data-flow-view-wms="${html(q.view)}" data-flow-queue="${html(q.id)}">${html(q.label)}</button></td><td>${number(q.count)} ${html(q.unit)}</td><td>${duration(q.oldest_minutes)}${q.unknown_age ? `<br><small>${q.unknown_age} bez poprawnej daty</small>` : ""}</td><td>${number(q.over_24h)}</td><td>${number(q.held)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="wms-muted">Otwarte dokumenty dostaw: wiek dokumentu, nie czas od przyjazdu samochodu. Pozostało ${number(flow.inbound.expected_units)} oczekiwanych sztuk. Bufor: ${number(flow.inbound.buffer_units)} szt., ${number(flow.inbound.unassigned_putaway)} zadań bez przydziału. Wiersze mają różne jednostki — nie sumuj ich.</p></section>
+      <section class="wms-surface"><h2>Czas przejścia przez etapy</h2><p class="wms-help">Mediana pokazuje typowy wynik; 95% poprawnych pomiarów nie przekracza P95. Czasy obejmują przerwy i oczekiwanie, nie są roboczogodzinami.</p>
+      <div class="wms-scroll" tabindex="0" role="region" aria-label="Czasy etapów — tabela przewijana"><table class="wms-lines wms-flow-table"><thead><tr><th>Etap</th><th>Mediana</th><th>P95</th><th>Średnia</th><th>Z pomiarem / ukończone</th><th>Brak zdarzeń / błędne daty</th></tr></thead><tbody>${flow.durations.map((r) => `<tr><td>${html(r.label)}<br><small>${html(r.unit)}</small></td><td>${duration(r.median_minutes)}</td><td>${duration(r.p95_minutes)}</td><td>${duration(r.mean_minutes)}</td><td>${r.measured} / ${r.total}</td><td>${r.missing} / ${r.invalid}</td></tr>`).join("")}</tbody></table></div>
+      <details><summary>Jak czytać pomiary</summary><p>Okres wybiera zdarzenie kończące etap: rezerwację, koniec zbiórki, koniec pakowania, wysyłkę lub częściowe odłożenie. Zamówienie może wystąpić w kilku etapach.</p><p>Brak pomiaru to kreska; zero oznacza zapisane zdarzenia w tej samej chwili. Odbiór wymaga potwierdzenia wszystkich niewycofanych paczek. Historia samych etykiet pozostaje bez pomiaru odbioru.</p><p>Bufor liczymy od przyjęcia do każdego częściowego odłożenia. Korekty i kwarantanna nie kończą tego pomiaru. Lokalizacja docelowa może być zapleczem; odłożenie nie zawsze oznacza dostępność do zbiórki.</p><p>Nie łączymy konkretnej dostawy z konkretnym zamówieniem bez ewidencji partii. Sumowanie czasów etapów nie daje czasu pracy osoby.</p></details><button data-do-wms="flow-csv">EKSPORTUJ CZASY ETAPÓW</button></section>
+      <section class="wms-surface"><h2>Przyjęcie i odkładanie w okresie</h2><div class="wms-stats">${metric("Policzone sztuki", number(flow.inbound.received_units), `w tym ${number(flow.inbound.damaged_units)} uszkodzonych`)}${metric("Odłożone z bufora", number(flow.inbound.putaway_units), "na lokalizacje docelowe")}${metric("Wycofane przyjęcia", number(flow.inbound.reversed_units), "według daty korekty")}${metric("Rozliczenie bufora", number(flow.inbound.corrected_buffer_units), `korekty · dodatkowo ${number(flow.inbound.quarantined_buffer_units)} szt. do kwarantanny`)}</div><p class="wms-muted">Przepływy brutto według daty zdarzenia. Korekta może dotyczyć przyjęcia spoza okresu. Dane obejmują dokumenty Przyjęć WMS; ruchy ręczne są w tabeli ruchów.</p></section>`;
     el("wms-content").innerHTML =
       `<div class="wms-toolbar"><label>Okres<select id="wms-days">${[1, 7, 30, 90].map((n) => `<option value="${n}" ${days === n ? "selected" : ""}>Ostatnie ${n} dni</option>`).join("")}</select></label><button data-do-wms="csv">EKSPORT CSV</button><button data-do-wms="integrity">SPRAWDŹ ZGODNOŚĆ STANÓW</button></div>
       <div class="wms-stats">${metric("Wysłane zamówienia", number(a.throughput.shipped), "w wybranym okresie")}${metric("Wysłane w terminie", a.throughput.shipped ? `${number((100 * a.throughput.on_time) / a.throughput.shipped)}%` : "—", "wg terminu zamówienia")}${metric("Do realizacji teraz", number(totals.open), `${totals.overdue} po terminie · ${totals.held} wstrzymanych`)}${metric("Średni czas realizacji", duration(a.throughput.cycle_minutes), "od utworzenia do wysyłki")}</div>
       <div class="wms-stats">${metric("Oczekiwanie na pakowanie", duration(a.throughput.pack_queue_minutes), "od końca zbiórki do otwarcia pakowania")}${metric("Sesja pakowania", duration(a.throughput.pack_session_minutes), "od otwarcia do ostatniego potwierdzenia")}${metric("Zamówienia z pomiarem", number(a.throughput.timed_packed_orders), `z ${number(a.throughput.shipped)} wysłanych`)}</div><p class="wms-help">${a.dispatchCoverage.confirmed_orders} zamówień ma potwierdzony odbiór kuriera. ${a.dispatchCoverage.orders - a.dispatchCoverage.confirmed_orders} pochodzi z historii bez skanu odbioru; raport zachowuje pierwotne daty. Czas sesji może obejmować przerwy. Brak historycznych zdarzeń oznacza brak pomiaru, nie zero minut pracy.</p>
-      <div class="wms-grid"><section class="wms-surface"><h2>Wysyłki dziennie</h2><p class="wms-muted">Dni kalendarzowe UTC · ${a.since.slice(0, 10)} — ${a.now.slice(0, 10)}</p><div class="wms-chart" role="img" aria-label="Wysyłki w kolejnych dniach">${a.daily.map((d) => `<div class="wms-bar" style="height:${(100 * d.shipped) / max}%" title="${d.day}: ${d.shipped} wysłanych, ${d.on_time} w terminie"></div>`).join("")}</div><details><summary>Dane wykresu</summary><table class="wms-lines"><thead><tr><th>Dzień UTC</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.daily.map((d) => `<tr><td>${d.day}</td><td>${d.shipped}</td><td>${d.on_time}</td></tr>`).join("")}</tbody></table></details></section>
+      ${flowMarkup}
+      <div class="wms-grid"><section class="wms-surface"><h2>Wysyłki dziennie</h2><p class="wms-muted">Dni kalendarzowe Warszawy · ${a.daily[0]?.day} — ${a.daily.at(-1)?.day}. Skrajne dni obejmują tylko część doby.</p><div class="wms-chart" role="img" aria-label="Wysyłki w kolejnych dniach">${a.daily.map((d) => `<div class="wms-bar" style="height:${(100 * d.shipped) / max}%" title="${d.day}: ${d.shipped} wysłanych, ${d.on_time} w terminie"></div>`).join("")}</div><details><summary>Dane wykresu</summary><table class="wms-lines"><thead><tr><th>Dzień (Warszawa)</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.daily.map((d) => `<tr><td>${d.day}</td><td>${d.shipped}</td><td>${d.on_time}</td></tr>`).join("")}</tbody></table></details></section>
       <section class="wms-surface"><h2>Praca w toku</h2><table class="wms-lines"><thead><tr><th>Etap</th><th>Zamówienia</th><th>Po terminie</th></tr></thead><tbody>${a.backlog.map((r) => `<tr><td>${states[r.status]}</td><td class="num">${r.orders}</td><td class="num">${r.overdue}</td></tr>`).join("")}</tbody></table><p class="wms-muted">Otwarte ponad 48 h: ${number(a.aging.over_48h)} · Wstrzymania i odrzucone operacje w okresie: ${number(a.exceptions.total)}</p></section>
       <section class="wms-surface"><h2>Najczęściej wysyłane części</h2><table class="wms-lines"><thead><tr><th>SKU</th><th>Zamówienia</th><th>Sztuki</th></tr></thead><tbody>${a.top.map((r) => `<tr><td><strong>${html(r.sku)}</strong><br>${html(r.name)}</td><td class="num">${r.orders}</td><td class="num">${r.units}</td></tr>`).join("") || '<tr><td colspan="3">Brak wysyłek w tym okresie.</td></tr>'}</tbody></table></section>
       <section class="wms-surface"><h2>Stan magazynu teraz</h2><table class="wms-lines"><tbody><tr><td>SKU w ewidencji WMS</td><td class="num">${number(a.stock.skus)}</td></tr><tr><td>Sztuki na półkach</td><td class="num">${number(a.stock.on_hand)}</td></tr><tr><td>Zarezerwowane</td><td class="num">${number(a.stock.reserved)}</td></tr><tr><td>Dostępne do zbiórki</td><td class="num">${number(a.stock.available)}</td></tr><tr><td>Kwarantanna</td><td class="num">${number(a.stock.quarantined)}</td></tr><tr><td>Zapas zaplecza</td><td class="num">${number(a.stock.reserve_stock)}</td></tr><tr><td>Lokalizacje poniżej minimum</td><td class="num">${number(a.stock.low_bins)}</td></tr></tbody></table><p class="wms-muted">Rezerwacja → koniec zbiórki: ${a.throughput.pick_minutes === null ? "—" : number(a.throughput.pick_minutes) + " min"}<br>Koniec zbiórki → kontrola paczki: ${a.throughput.pack_minutes === null ? "—" : number(a.throughput.pack_minutes) + " min"}</p></section></div>`;
@@ -701,8 +714,8 @@ window.Wms = (() => {
       .insertAdjacentHTML(
         "beforeend",
         `<section class="wms-surface"><h2>Kanały sprzedaży</h2><table class="wms-lines"><thead><tr><th>Kanał</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.channels.map((c) => `<tr><td>${html(c.channel)}</td><td>${c.shipped}</td><td>${number((c.on_time * 100) / c.shipped)}%</td></tr>`).join("")}</tbody></table></section>
-      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
-      <section class="wms-surface"><h2>Operacje zbiórki według osoby</h2><p class="wms-muted">Zatwierdzone pobrania w okresie. Sztuki i skany nie mierzą czasu pracy.</p><table class="wms-lines"><thead><tr><th>Osoba</th><th>Skany</th><th>Sztuki</th><th>Zamówienia</th></tr></thead><tbody>${a.productivity.map((p) => `<tr><td>${html(p.name)}</td><td>${p.scans}</td><td>${p.units}</td><td>${p.orders}</td></tr>`).join("")}</tbody></table></section>`,
+      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
+      <section class="wms-surface"><h2>Operacje zbiórki według osoby</h2><p class="wms-muted">Zatwierdzone pobrania w okresie. Operacja może wymagać kilku skanów. Sztuki i operacje nie mierzą czasu pracy.</p><table class="wms-lines"><thead><tr><th>Osoba</th><th>Pobrania</th><th>Sztuki</th><th>Zamówienia</th></tr></thead><tbody>${a.productivity.map((p) => `<tr><td>${html(p.name)}</td><td>${p.scans}</td><td>${p.units}</td><td>${p.orders}</td></tr>`).join("")}</tbody></table></section>`,
       );
   }
   function dispatchParams() {
@@ -744,8 +757,14 @@ window.Wms = (() => {
         shell();
         await refresh();
       }
-      if (button.dataset.tabWms) {
-        view = button.dataset.tabWms;
+      if (button.dataset.tabWms || button.dataset.flowViewWms) {
+        view = button.dataset.tabWms || button.dataset.flowViewWms;
+        if (button.dataset.flowViewWms) {
+          selected = null;
+          status = "open";
+          if (view === "inbound")
+            inboundUi.openQueue(button.dataset.flowQueue === "putaway");
+        }
         query = "";
         offset = 0;
         shell();
@@ -842,6 +861,11 @@ window.Wms = (() => {
       }
       if (action === "csv")
         await pobierz(`/api/wms/analytics/csv?days=${days}`, "wms-wysylki.csv");
+      if (action === "flow-csv")
+        await pobierz(
+          `/api/wms/analytics/flow/csv?days=${days}`,
+          "wms-czasy-etapow.csv",
+        );
       if (action === "dispatch-csv")
         await pobierz(
           `/api/wms/dispatch/csv?${dispatchParams()}`,

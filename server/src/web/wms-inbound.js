@@ -297,5 +297,13 @@ window.WmsInbound = (h) => {
     // Kolejność przyjęcia kończy się półką; ogólny handler zbiórki wracał stąd do SKU.
     return true;
   }
-  return { render, click, submit, keydown };
+  function openQueue(buffer) {
+    queue = buffer;
+    selected = null;
+    q = "";
+    offset = 0;
+    closed = "0";
+    if (buffer) putaway.openQueue();
+  }
+  return { render, click, submit, keydown, openQueue };
 };

@@ -552,3 +552,25 @@ Zamknięcie przyjęcia nie usuwa oczekującej pracy odkładania z bufora.
 
 Po utracie odpowiedzi użyj **SPRAWDŹ OSTATNI ZAPIS**, bez ponownego fizycznego odkładania tej partii.
 Przerwane liczenie blokuje zbiórkę i odkładanie do rozliczenia na pierwotnym koncie i serwerze. Restart nie tworzy nowego klucza zapisu.
+
+### Analityka przepływu
+
+W **Analityce** tabela **Gdzie czeka praca** pokazuje stan teraz, niezależnie od wybranego okresu.
+Wybierz nazwę etapu, aby przejść do odpowiedniego obszaru. Bufor otwiera kolejkę wszystkich zadań, bez wcześniejszych filtrów.
+Wiek dokumentu dostawy nie oznacza czasu od przyjazdu auta. Wiersze mają różne jednostki; nie sumuj dokumentów, zadań, zamówień i paczek.
+
+Mediana i P95 opisują ukończone etapy w wybranym okresie. Tabela podaje liczbę pomiarów, brakujących zdarzeń oraz błędnych dat.
+Okres kończy rezerwacja, zakończenie zbiórki, pakowania, wysyłka albo częściowe odłożenie. Nie trzeba czekać na wysyłkę, aby zobaczyć zakończone pakowanie.
+Kreska oznacza brak pomiaru; zero oznacza zdarzenia zapisane w tej samej chwili. Czas obejmuje przerwy, nie mierzy roboczogodzin.
+
+Potwierdzony odbiór wymaga wszystkich niewycofanych paczek. Historia samych etykiet zachowuje stare daty w dotychczasowych zestawieniach, z osobną informacją o pokryciu.
+Czas bufora kończy każde częściowe odłożenie, bez korekt i kwarantanny. Cel na zapleczu nie oznacza dostępności do zbiórki.
+Bez ewidencji partii nie przypisujemy konkretnej dostawy do konkretnego zamówienia klienta.
+
+Przyjęcia pokazują przepływy brutto według daty zdarzenia. Wycofanie lub korekta może dotyczyć towaru przyjętego przed wybranym okresem.
+Potwierdzone pobrania według osoby są operacjami, a nie liczbą fizycznych skanów.
+Wysyłki dzienne i ich CSV używają dat Warszawy; skrajne dni obejmują część doby. Rejestr paczek zachowuje osobny, opisany filtr UTC.
+**Eksportuj czasy etapów** pobiera pomiary w minutach oraz dokładny zakres UTC. Kolejki i eksporty nie podejmują ani nie zmieniają pracy.
+
+Raport działa w osobnym wątku z bazą tylko do odczytu. Równoległe prośby o ten sam okres współdzielą trwające obliczenie.
+Wynik nie jest zachowywany jako pamięć podręczna. Limit czterech okresów i 45 sekund chroni API przed narastającą kolejką raportów.
