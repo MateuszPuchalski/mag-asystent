@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.304.1 — uzupełnienie do kolejnej wolnej półki
+
+- Pełna pierwsza półka nie blokuje uzupełnienia do innych dozwolonych lokalizacji tej samej części.
+- Minima oraz już podjęte zadania pokrywają popyt przed rozdzieleniem reszty. Plan nie liczy tych sztuk drugi raz.
+- Weryfikacja: 2281 testów serwera, 727 panelu, 427 Android core. Trzy nowe regresje oraz E2E potwierdzają wybór kolejnego celu.
+- Poprawka wymaga przebudowania i restartu API; nie zmienia schematu bazy ani kontraktu kolektora.
+
 ## 0.304.0 — pojemność półek i rozliczenie pełnego celu
 
 - Pojemność SKU na lokalizacji ogranicza plan, przyjęcie, odkładanie i transfer. Uwzględnia fizyczny zapas oraz przydzielone uzupełnienia.

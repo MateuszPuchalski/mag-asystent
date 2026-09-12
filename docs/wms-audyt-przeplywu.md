@@ -375,3 +375,14 @@ Wszystkie spisy źródła oraz celu czekają teraz na rozliczenie otwartych uzup
 Testy obejmują rezerwacje zajmujące miejsce, konkurencyjne ruchy, zero i nieustalony limit, migrację, rollback oraz zwrot po utracie odpowiedzi.
 Pełny cel bez braku źródła nie otwiera przeliczenia. Scenariusz mieszany zachowuje oba niezależne problemy.
 Spis po zakończeniu zadania zachowuje faktyczną ilość ponad limitem; dalsze dokładanie nadal jest ograniczone.
+
+
+### Popyt przy kilku półkach tego samego SKU
+
+Dalsza próba wykazała, że pierwsza pełna półka mogła przejąć cały popyt i pozostawić pusty plan pomimo miejsca na drugiej.
+Przykład seeded: zaplecze ma dziesięć sztuk, pierwsza półka jedną z pojemności jednej, druga zero z pojemności dziesięciu.
+Zamówienie wymaga czterech sztuk. Poprawiony plan kieruje trzy sztuki na drugą półkę.
+
+Potrzeby minimów i otwarte przydziały pokrywają część popytu. Pozostała potrzeba jest rozdzielana według wolnego miejsca kolejnych dozwolonych celów.
+Pełny cel oraz zgłoszony brak miejsca nie zatrzymują alternatyw. Zmiana zadania na ukończone nie odtwarza pokrytej już potrzeby.
+Trzy scenariusze najpierw odtworzyły błąd, następnie przeszły po zmianie planowania. E2E podjęło zadanie na alternatywnym celu.

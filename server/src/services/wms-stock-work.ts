@@ -107,25 +107,34 @@ export function fillOrderReservations(
   }
 }
 
+// Minima i już podjęte zadania pokrywają część popytu. Resztę rozdzielamy po wolnych celach,
+// żeby pełna pierwsza półka nie zatrzymała pozostałych i nie powstało podwójne uzupełnienie.
 const replenishmentPlanSql = `WITH demand AS (
     SELECT l.tw_id,sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS needed
     FROM wms_line l JOIN wms_order o ON o.id=l.order_id WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new') GROUP BY l.tw_id
   ), pick AS (
     SELECT s.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,coalesce(d.needed,0) AS needed,
       sum(s.on_hand-s.reserved) OVER(PARTITION BY s.tw_id) AS available,
-      row_number() OVER(PARTITION BY s.tw_id ORDER BY s.bin) AS rank
+      coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.target=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS incoming
     FROM wms_stock s JOIN wms_product p ON p.tw_id=s.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin LEFT JOIN demand d ON d.tw_id=s.tw_id
     WHERE coalesce(b.mode,'pick')='pick' AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
+  ), rooms AS (
+    SELECT *,CASE WHEN incoming>0 OR EXISTS(SELECT 1 FROM wms_capacity_issue c WHERE c.tw_id=pick.tw_id AND c.bin=pick.bin AND c.resolved_at IS NULL)
+      THEN 0 ELSE max(0,min(1000000,coalesce(capacity-on_hand,1000000))) END AS room FROM pick
+  ), minimums AS (
+    SELECT *,min(room,max(0,minimum-(on_hand-reserved)-incoming)) AS minimum_need FROM rooms
+  ), distribution AS (
+    SELECT *,max(0,needed-available-sum(incoming) OVER(PARTITION BY tw_id)-sum(minimum_need) OVER(PARTITION BY tw_id)) AS demand_left,
+      coalesce(sum(room-minimum_need) OVER(PARTITION BY tw_id ORDER BY bin ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS earlier_room
+    FROM minimums
   ), needs AS (
-    SELECT *,max(0,minimum-(on_hand-reserved),CASE WHEN rank=1 THEN needed-available ELSE 0 END) AS quantity FROM pick
+    SELECT *,minimum_need+min(room-minimum_need,max(0,demand_left-earlier_room)) AS quantity FROM distribution
   ) SELECT n.tw_id,n.sku,n.name,n.barcode,n.bin AS target,n.version AS target_version,
-      min(n.quantity,max(0,coalesce(n.capacity-n.on_hand,n.quantity))) AS quantity,s.bin AS source,s.version AS source_version,
+      n.quantity,s.bin AS source,s.version AS source_version,
       s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
       -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
     FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
-    WHERE n.quantity>0 AND (n.capacity IS NULL OR n.capacity>n.on_hand)
-    AND NOT EXISTS(SELECT 1 FROM wms_capacity_issue c WHERE c.tw_id=n.tw_id AND c.bin=n.bin AND c.resolved_at IS NULL)
-    AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
+    WHERE n.quantity>0
     AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
     AND source_available>0 AND (instr(lower(n.sku||' '||n.name),lower(?))>0 OR n.bin=? OR s.bin=? OR n.barcode=?)
     ORDER BY n.quantity DESC,n.sku,n.bin,s.bin`;

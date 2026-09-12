@@ -135,6 +135,90 @@ const issue = (twId: number) =>
     )
     .get(twId);
 
+function secondTarget(
+  f: ReturnType<typeof fixture>,
+  capacity = 10,
+  minimum = 0,
+) {
+  const bin = `B-${f.twId}`;
+  W.changeStock(office, randomUUID(), {
+    action: "limits",
+    twId: f.twId,
+    bin,
+    capacity,
+    minimum,
+    version: 1,
+    reason: "Druga półka tej części",
+  });
+  return bin;
+}
+function demand(f: ReturnType<typeof fixture>, quantity: number) {
+  return W.createOrder(office, randomUUID(), {
+    reference: randomUUID(),
+    dueAt: "2026-12-31T12:00:00Z",
+    lines: [{ sku: f.sku, quantity }],
+  });
+}
+function planQuantities(f: ReturnType<typeof fixture>) {
+  return Object.fromEntries(
+    S.replenishmentWork(worker, { view: "plans", q: f.barcode }).plans.map(
+      (p) => [String(p.target), Number(p.quantity)],
+    ),
+  );
+}
+
+test("pełna pierwsza półka oddaje popyt następnej, także po zgłoszeniu braku miejsca", () => {
+  for (const reported of [false, true]) {
+    const f = fixture();
+    limits(f, reported ? null : 1);
+    const target = secondTarget(f);
+    if (reported)
+      S.completeReplenishment(worker, randomUUID(), claim(f).id, full(f, 0));
+    demand(f, 4);
+    const before = writes();
+    assert.deepEqual(planQuantities(f), { [target]: 3 });
+    assert.equal(writes(), before);
+  }
+});
+
+test("popyt dzieli się między pojemne cele a podjęte i ukończone zadania nie są planowane ponownie", () => {
+  const f = fixture();
+  limits(f, 3);
+  const target = secondTarget(f);
+  demand(f, 7);
+  assert.deepEqual(planQuantities(f), { [f.target]: 2, [target]: 4 });
+  const first = claim(f, 2);
+  assert.deepEqual(planQuantities(f), { [target]: 4 });
+  const second = S.claimReplenishment(worker, randomUUID(), {
+    ...f.claim,
+    target,
+    quantity: 4,
+    sourceVersion: stock(f.twId, f.source).version,
+    targetVersion: stock(f.twId, target).version,
+  });
+  assert.deepEqual(planQuantities(f), {});
+  S.completeReplenishment(worker, randomUUID(), first.id, {
+    ...f.input,
+    quantity: 2,
+  });
+  assert.deepEqual(planQuantities(f), {});
+  S.completeReplenishment(worker, randomUUID(), second.id, {
+    ...f.input,
+    target,
+  });
+  assert.deepEqual(planQuantities(f), {});
+  demand(f, 2);
+  assert.deepEqual(planQuantities(f), { [target]: 2 });
+});
+
+test("minimum innych półek pokrywa popyt zamiast dodawać go po raz drugi", () => {
+  const f = fixture();
+  limits(f, 4, 3);
+  const target = secondTarget(f, 5, 3);
+  demand(f, 4);
+  assert.deepEqual(planQuantities(f), { [f.target]: 2, [target]: 3 });
+});
+
 test("pojemność jest jawna, wersjonowana i wymaga biura; zero różni się od nieustalonej", () => {
   const f = fixture();
   assert.equal(stock(f.twId, f.target).capacity, null);

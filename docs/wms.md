@@ -653,6 +653,7 @@ Puste pole pozostawia limit nieustalony. Zero zatrzymuje nowe odłożenia; minim
 
 Miejsce zajmuje fizyczny stan oraz przydzielone uzupełnienia. Rezerwacja zamówienia nadal leży na półce; miejsce zwalnia dopiero pobranie.
 Plan uzupełnia najwyżej dostępne miejsce, nawet gdy popyt zamówień jest większy.
+Pełny cel oddaje potrzebę innym dozwolonym półkom części. Minima i już przydzielone dostawy pokrywają popyt przed planowaniem pozostałej ilości.
 Ten sam limit chroni bezpośrednie przyjęcie, odkładanie z bufora i ręczne przesunięcie.
 Odmowa celu wycofuje również wcześniejszą zmianę źródła. Przy odkładaniu można odczytać zadanie i wybrać inną właściwą półkę.
 

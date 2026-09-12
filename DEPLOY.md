@@ -15,6 +15,8 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Poprawka 0.304.1 rozdziela popyt między wolne półki, uwzględniając minima i podjęte zadania. Wymaga builda oraz restartu API, bez migracji.
+
 Od 0.304.0 API i APK obsługują pojemność części na lokalizacji oraz pełny cel uzupełnienia.
 Zaktualizować API przed APK. Migracja dodaje opcjonalną pojemność, historię pełnych celów oraz ilość zwróconą w zadaniu.
 Istniejące lokalizacje mają pojemność nieustaloną; ich stan nie jest zmieniany. Biuro ustala limit sztuk konkretnej części, bez zgadywania gabarytów.

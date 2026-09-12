@@ -157,6 +157,70 @@ export async function exerciseCapacity(page, output) {
       .quantity,
   ).toBe(2);
   expect((await api("/api/wms/integrity")).ok).toBe(true);
+  // Wszystkie dotychczasowe półki części są pełne; nowe zapotrzebowanie musi trafić na wolny drugi cel.
+  const alternateSku = "WMS-0037",
+    alternateTw = 37,
+    alternateTarget = "ROOM-B";
+  const existing = (
+    await api(`/api/wms/inventory?q=${alternateSku}`)
+  ).rows.filter((s) => s.mode === "pick");
+  for (const row of existing)
+    await api("/api/wms/inventory", {
+      action: "limits",
+      twId: alternateTw,
+      bin: row.bin,
+      minimum: 0,
+      capacity: row.on_hand,
+      version: row.version,
+      reason: "Test pełnych półek",
+    });
+  await api("/api/wms/bins", {
+    bin: "ROOM-RES",
+    mode: "reserve",
+    version: 1,
+    reason: "Zapas alternatywnego celu",
+  });
+  await api("/api/wms/inventory", {
+    action: "receive",
+    twId: alternateTw,
+    bin: "ROOM-RES",
+    quantity: 10,
+    reason: "Dostawa seeded",
+  });
+  await api("/api/wms/inventory", {
+    action: "limits",
+    twId: alternateTw,
+    bin: alternateTarget,
+    minimum: 0,
+    capacity: 10,
+    version: 1,
+    reason: "Wolny cel dla części",
+  });
+  await api("/api/wms/orders", {
+    reference: "CAPACITY-ALTERNATE",
+    channel: "seeded",
+    dueAt: "2026-12-31T12:00:00Z",
+    lines: [
+      {
+        sku: alternateSku,
+        quantity: existing.reduce((n, s) => n + s.available, 0) + 3,
+      },
+    ],
+  });
+  await page.locator('[data-tab-wms="stockwork"]').click();
+  await page.locator('#wms-stockwork-filter [name="q"]').fill(alternateSku);
+  await page.locator("#wms-stockwork-filter button").first().click();
+  await expect(page.locator("[data-stockwork-claim]")).toHaveCount(1);
+  await expect(page.locator("[data-stockwork-claim]")).toContainText("3 SZT.");
+  await page.locator("[data-stockwork-claim]").click();
+  await expect(page.locator("#wms-stockwork-detail")).toContainText(
+    alternateTarget,
+  );
+  expect(
+    (await api(`/api/wms/replenishment-work?view=plans&q=${alternateSku}`))
+      .total,
+  ).toBe(0);
+  expect((await api("/api/wms/integrity")).ok).toBe(true);
   writeFileSync(
     path.join(output, "capacity-e2e.json"),
     JSON.stringify(
@@ -169,6 +233,8 @@ export async function exerciseCapacity(page, output) {
         resolvedIssue: issue.id,
         widths,
         integrity: true,
+        alternateTarget,
+        alternateQuantity: 3,
       },
       null,
       2,
