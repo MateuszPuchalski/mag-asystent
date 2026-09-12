@@ -9,6 +9,7 @@ import {
   getOrder,
   getWave,
   manager,
+  move,
   WmsError,
   type Actor,
 } from "./wms.js";
@@ -644,6 +645,94 @@ export function detachCartBox(
   });
 }
 
+function rerouteMissingStock(
+  actor: Actor,
+  twId: number,
+  bin: string,
+  reportedOrder: number,
+  exceptionId: number,
+) {
+  // Wspólna półka dotyczy wielu tras. Kolejność priorytetów chroni pilne zamówienia przed wyścigiem zgłoszeń.
+  const affected = db()
+    .prepare(
+      `SELECT a.*,o.id AS order_id FROM wms_allocation a
+    JOIN wms_line l ON l.id=a.line_id JOIN wms_order o ON o.id=l.order_id
+    WHERE l.tw_id=? AND a.bin=? AND a.quantity>a.picked AND o.status IN ('allocated','picking')
+    AND (o.hold_reason IS NULL OR o.id=?)
+    AND NOT EXISTS(SELECT 1 FROM wms_pick_exception e WHERE e.order_id=o.id AND e.resolved_at IS NULL AND e.id<>?)
+    AND NOT EXISTS(SELECT 1 FROM wms_cart_assignment c WHERE c.order_id=o.id AND c.ended_at IS NULL AND (c.handed_at IS NOT NULL OR c.released_at IS NOT NULL))
+    ORDER BY o.priority DESC,o.due_at,o.id`,
+    )
+    .all(twId, bin, reportedOrder, exceptionId);
+  for (const a of affected) {
+    const orderId = Number(a.order_id);
+    db().exec("SAVEPOINT reroute_missing");
+    try {
+      move(
+        actor,
+        twId,
+        bin,
+        0,
+        -(Number(a.quantity) - Number(a.picked)),
+        "release",
+        "Przekierowanie po braku na półce",
+        orderId,
+      );
+      if (a.picked)
+        db()
+          .prepare("UPDATE wms_allocation SET quantity=picked WHERE id=?")
+          .run(a.id);
+      else db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
+      fillOrderReservations(
+        actor,
+        orderId,
+        "Przydział z innej półki po zgłoszeniu braku",
+      );
+      if (orderId === reportedOrder) {
+        db()
+          .prepare(
+            "UPDATE wms_pick_exception SET resolved_at=?,resolution=? WHERE id=?",
+          )
+          .run(
+            nowIso(),
+            "Niezebrane sztuki przydzielono z innych półek. Zgłoszona półka nadal wymaga przeliczenia.",
+            exceptionId,
+          );
+        applyOrderAction(actor, orderId, {
+          action: "resume",
+          version: getOrder(orderId).version,
+          reason: "Zapas przydzielony z innych półek",
+        });
+      } else {
+        // Kolektor na innej trasie musi odrzucić skan starego przydziału i pobrać świeżą półkę.
+        db()
+          .prepare(
+            "UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?",
+          )
+          .run(nowIso(), orderId);
+      }
+      logEvent(
+        "wms_pick_reallocated",
+        actor.name,
+        twId,
+        {
+          orderId,
+          reportedOrder,
+          source: bin,
+          quantity: Number(a.quantity) - Number(a.picked),
+        },
+        actor.id,
+      );
+      db().exec("RELEASE reroute_missing");
+    } catch (error) {
+      db().exec("ROLLBACK TO reroute_missing");
+      db().exec("RELEASE reroute_missing");
+      // Niepełny zastępczy przydział nie rozprasza operatora. Dotychczasowy przydział pozostaje zablokowany do wyjaśnienia.
+      if (!(error instanceof WmsError) || error.statusCode !== 409) throw error;
+    }
+  }
+}
+
 export function reportPickException(actor: Actor, key: string, raw: unknown) {
   const input = z
     .object({
@@ -666,9 +755,15 @@ export function reportPickException(actor: Actor, key: string, raw: unknown) {
       (a) => a.id === input.allocationId,
     );
     if (!allocation) fail("Pozycja nie należy do zamówienia", 400);
+    if (input.kind === "missing" && allocation!.quantity === allocation!.picked)
+      fail(
+        "Ta pozycja jest już zebrana. Odśwież trasę przed zgłoszeniem braku",
+      );
     const line = order.lines.find((l) => l.id === allocation!.line_id)!;
     if (order.status !== "picking")
       fail("Zgłoszenie dotyczy trwającej zbiórki");
+    if (order.hold_reason)
+      fail("Zamówienie jest już wstrzymane. Najpierw rozwiąż jego zgłoszenie");
     const assignment = db()
       .prepare(
         "SELECT run_id FROM wms_cart_assignment WHERE order_id=? AND ended_at IS NULL",
@@ -679,21 +774,23 @@ export function reportPickException(actor: Actor, key: string, raw: unknown) {
       version: input.version,
       reason: `${input.kind}: ${input.reason}`,
     });
-    db()
-      .prepare(
-        "INSERT INTO wms_pick_exception(order_id,allocation_id,run_id,kind,tw_id,bin,reason,created_at,user_id) VALUES (?,?,?,?,?,?,?,?,?)",
-      )
-      .run(
-        order.id,
-        input.allocationId,
-        assignment?.run_id ?? null,
-        input.kind,
-        line.tw_id,
-        allocation!.bin,
-        input.reason,
-        nowIso(),
-        actor.id,
-      );
+    const exceptionId = Number(
+      db()
+        .prepare(
+          "INSERT INTO wms_pick_exception(order_id,allocation_id,run_id,kind,tw_id,bin,reason,created_at,user_id) VALUES (?,?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          order.id,
+          input.allocationId,
+          assignment?.run_id ?? null,
+          input.kind,
+          line.tw_id,
+          allocation!.bin,
+          input.reason,
+          nowIso(),
+          actor.id,
+        ).lastInsertRowid,
+    );
     if (input.kind !== "box_full")
       db()
         .prepare(
@@ -709,6 +806,14 @@ export function reportPickException(actor: Actor, key: string, raw: unknown) {
           line.tw_id,
           allocation!.bin,
         );
+    if (input.kind === "missing")
+      rerouteMissingStock(
+        actor,
+        line.tw_id,
+        allocation!.bin,
+        order.id,
+        exceptionId,
+      );
     return getOrder(order.id);
   });
 }

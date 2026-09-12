@@ -1016,6 +1016,412 @@ test("dwa uzupełnienia chronią wspólne źródło, a awaria wycofuje zwolnieni
   );
 });
 
+test("brak przekierowuje tylko niezebrane sztuki; skrzynka, historia pobrań i blokada półki pozostają", async () => {
+  const p = product(10),
+    o = order(p.sku, 3),
+    run = start(cart().code),
+    t = run.tasks[0];
+  W.pickWave(picker, randomUUID(), run.id, {
+    orderId: o.id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    bin: t.bin,
+    barcode: p.sku,
+    tote: t.tote,
+    quantity: 1,
+  });
+  for (const bin of ["B-REROUTE", "C-REROUTE"])
+    W.changeStock(admin, randomUUID(), {
+      action: "receive",
+      twId: p.twId,
+      bin,
+      quantity: 1,
+      reason: "Zapas na drugiej półce",
+    });
+  const before = W.getOrder(o.id),
+    key = randomUUID();
+  const input = {
+    orderId: o.id,
+    version: before.version,
+    allocationId: t.allocation_id,
+    box: t.tote,
+    kind: "missing",
+    reason: "Nie ma dalszych sztuk",
+  };
+  const result = C.reportPickException(picker, key, input);
+  assert.equal(result.hold_reason, null);
+  assert.equal(result.status, "picking");
+  assert.equal(result.tote, before.tote);
+  assert.equal(result.lines[0].picked, 1);
+  assert.deepEqual(
+    result.allocations.map((a) => [a.bin, a.quantity, a.picked]),
+    [
+      [p.bin, 1, 1],
+      ["B-REROUTE", 1, 0],
+      ["C-REROUTE", 1, 0],
+    ],
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, p.bin)!.on_hand,
+    9,
+  );
+  assert.equal(
+    S.stockWork(admin, { q: p.sku }).checks.filter((c) => c.tw_id === p.twId)
+      .length,
+    1,
+  );
+  const current = C.getCartRun(picker, run.id);
+  assert.equal(current.assignments[0].position, run.assignments[0].position);
+  assert.ok(current.exceptions[0].resolved_at);
+  assert.match(
+    String(current.exceptions[0].resolution),
+    /nadal wymaga przeliczenia/,
+  );
+  const changes = db().prepare("SELECT total_changes() AS n").get()!.n;
+  assert.equal(
+    JSON.stringify(C.reportPickException(picker, key, input)),
+    JSON.stringify(result),
+  );
+  assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, changes);
+  assert.throws(() =>
+    W.pickWave(picker, randomUUID(), run.id, {
+      orderId: o.id,
+      version: before.version,
+      allocationId: t.allocation_id,
+      bin: t.bin,
+      barcode: p.sku,
+      tote: t.tote,
+      quantity: 1,
+    }),
+  );
+  pickAll(run.id);
+  assert.equal(W.getOrder(o.id).status, "picked");
+  assert.equal((await import("./wms-analytics.js")).integrity().ok, true);
+});
+
+test("niepełny zapas zastępczy wycofuje próbę przydziału, bez zmiany fizycznego stanu", () => {
+  const p = product(3),
+    o = order(p.sku, 3),
+    run = start(cart().code),
+    t = run.tasks[0];
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: "B-PARTIAL",
+    quantity: 2,
+    reason: "Za mało zapasu",
+  });
+  const original = W.getOrder(o.id).allocations;
+  const result = C.reportPickException(picker, randomUUID(), {
+    orderId: o.id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    box: t.tote,
+    kind: "missing",
+    reason: "Pusta półka",
+  });
+  assert.match(result.hold_reason!, /missing/);
+  assert.deepEqual(result.allocations, original);
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT reserved FROM wms_stock WHERE tw_id=? AND bin='B-PARTIAL'",
+      )
+      .get(p.twId)!.reserved,
+    0,
+  );
+  assert.equal(C.getCartRun(picker, run.id).exceptions[0].resolved_at, null);
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT count(*) AS n FROM wms_movement WHERE order_id=? AND reason LIKE '%innej półki%'",
+      )
+      .get(o.id)!.n,
+    0,
+  );
+});
+
+test("przekierowanie nie bierze zapasu z kwarantanny, zaplecza, blokady ani innego zamówienia", () => {
+  const p = product(3),
+    o = order(p.sku, 3),
+    run = start(cart().code),
+    t = run.tasks[0];
+  for (const [bin, mode] of [
+    ["B-QUAR", "quarantine"],
+    ["C-RESERVE", "reserve"],
+    ["D-BLOCKED", "pick"],
+    ["E-OTHER", "pick"],
+  ]) {
+    W.configureBin(admin, randomUUID(), {
+      bin,
+      mode,
+      version: 1,
+      reason: "Test przeznaczenia",
+    });
+    W.changeStock(admin, randomUUID(), {
+      action: "receive",
+      twId: p.twId,
+      bin,
+      quantity: 3,
+      reason: "Zapas chroniony",
+    });
+  }
+  db()
+    .prepare(
+      "INSERT INTO wms_stock_check(tw_id,bin,reason,user_id,created_at) VALUES (?,'D-BLOCKED','Test',1,?)",
+    )
+    .run(p.twId, new Date().toISOString());
+  const otherOrder = order(p.sku, 3);
+  W.actOnOrder(admin, randomUUID(), otherOrder.id, {
+    action: "allocate",
+    version: otherOrder.version,
+  });
+  const original = W.getOrder(otherOrder.id).allocations;
+  const result = C.reportPickException(picker, randomUUID(), {
+    orderId: o.id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    box: t.tote,
+    kind: "missing",
+    reason: "Brak na miejscu",
+  });
+  assert.ok(result.hold_reason);
+  assert.deepEqual(W.getOrder(otherOrder.id).allocations, original);
+  assert.equal(result.allocations[0].bin, p.bin);
+});
+
+test("uszkodzenie nie uruchamia automatycznego wznowienia, a nowe zgłoszenie nie nadpisuje istniejącego wstrzymania", () => {
+  const p = product(3),
+    o = order(p.sku, 3),
+    run = start(cart().code),
+    t = run.tasks[0];
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: "B-DAMAGE",
+    quantity: 3,
+    reason: "Dodatkowy zapas",
+  });
+  const body = {
+    orderId: o.id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    box: t.tote,
+    kind: "damaged",
+    reason: "Uszkodzenie części",
+  };
+  const result = C.reportPickException(picker, randomUUID(), body);
+  assert.match(result.hold_reason!, /damaged/);
+  assert.throws(
+    () =>
+      C.reportPickException(picker, randomUUID(), {
+        ...body,
+        version: result.version,
+        kind: "missing",
+      }),
+    /już wstrzymane/,
+  );
+  assert.equal(W.getOrder(o.id).hold_reason, result.hold_reason);
+  assert.equal(C.getCartRun(picker, run.id).exceptions.length, 1);
+});
+
+test("awaria przekierowania wycofuje również zgłoszenie, blokadę i wstrzymanie", () => {
+  const p = product(3),
+    o = order(p.sku, 3),
+    run = start(cart().code),
+    t = run.tasks[0];
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: "B-FAIL",
+    quantity: 3,
+    reason: "Zapas testowy",
+  });
+  const key = randomUUID(),
+    body = {
+      orderId: o.id,
+      version: t.version,
+      allocationId: t.allocation_id,
+      box: t.tote,
+      kind: "missing",
+      reason: "Puste miejsce",
+    };
+  db().exec(
+    `CREATE TEMP TRIGGER reroute_failure BEFORE INSERT ON wms_movement WHEN NEW.order_id=${o.id} AND NEW.kind='reserve' BEGIN SELECT RAISE(ABORT,'reroute failure'); END`,
+  );
+  try {
+    assert.throws(
+      () => C.reportPickException(picker, key, body),
+      /reroute failure/,
+    );
+  } finally {
+    db().exec("DROP TRIGGER reroute_failure");
+  }
+  assert.equal(W.getOrder(o.id).hold_reason, null);
+  assert.equal(C.getCartRun(picker, run.id).exceptions.length, 0);
+  assert.equal(
+    S.stockWork(admin, { q: p.sku }).checks.filter((c) => c.tw_id === p.twId)
+      .length,
+    0,
+  );
+  assert.equal(
+    db().prepare("SELECT 1 FROM wms_command WHERE key=?").get(key),
+    undefined,
+  );
+  assert.equal(C.reportPickException(picker, key, body).hold_reason, null);
+});
+
+test("wspólna półka przekierowuje pilne zamówienia najpierw i zachowuje niezależne wstrzymania", async () => {
+  const p = product(10),
+    reported = order(p.sku, 2),
+    urgent = order(p.sku, 2, 2),
+    normal = order(p.sku, 2, 1),
+    held = order(p.sku, 2, 2),
+    waiting = order(p.sku, 2);
+  const run = start(cart().code),
+    task = run.tasks.find((t) => t.order_id === reported.id)!;
+  const urgentTask = run.tasks.find((t) => t.order_id === urgent.id)!;
+  W.actOnOrder(admin, randomUUID(), held.id, {
+    action: "hold",
+    version: W.getOrder(held.id).version,
+    reason: "Klient zmienia zamówienie",
+  });
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: "B-PRIORITY",
+    quantity: 4,
+    reason: "Wspólny zapas zastępczy",
+  });
+  C.reportPickException(picker, randomUUID(), {
+    orderId: reported.id,
+    allocationId: task.allocation_id,
+    version: task.version,
+    box: task.tote,
+    kind: "missing",
+    reason: "Pusta półka wspólna",
+  });
+  for (const id of [urgent.id, normal.id]) {
+    assert.equal(W.getOrder(id).allocations[0].bin, "B-PRIORITY");
+    assert.equal(W.getOrder(id).hold_reason, null);
+  }
+  assert.equal(W.getOrder(held.id).hold_reason, "Klient zmienia zamówienie");
+  for (const id of [reported.id, held.id, waiting.id])
+    assert.equal(W.getOrder(id).allocations[0].bin, p.bin);
+  assert.throws(() =>
+    W.pickWave(picker, randomUUID(), run.id, {
+      orderId: urgent.id,
+      version: urgentTask.version,
+      allocationId: urgentTask.allocation_id,
+      bin: urgentTask.bin,
+      barcode: p.sku,
+      tote: urgentTask.tote,
+      quantity: 2,
+    }),
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT reserved FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(p.twId, p.bin)!.reserved,
+    6,
+  );
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT count(*) AS n FROM events WHERE type='wms_pick_reallocated' AND tw_id=?",
+      )
+      .get(p.twId)!.n,
+    2,
+  );
+  assert.equal((await import("./wms-analytics.js")).integrity().ok, true);
+});
+
+test("błąd późniejszego przekierowania wycofuje także wcześniej naprawione zamówienie", () => {
+  const p = product(4),
+    first = order(p.sku, 2, 2),
+    reported = order(p.sku, 2),
+    run = start(cart().code),
+    t = run.tasks.find((t) => t.order_id === reported.id)!;
+  W.changeStock(admin, randomUUID(), {
+    action: "receive",
+    twId: p.twId,
+    bin: "B-LATE-FAIL",
+    quantity: 4,
+    reason: "Zapas testowy",
+  });
+  const before = W.getOrder(first.id);
+  db().exec(
+    `CREATE TEMP TRIGGER later_reroute_failure BEFORE INSERT ON wms_movement WHEN NEW.order_id=${reported.id} AND NEW.kind='reserve' BEGIN SELECT RAISE(ABORT,'later reroute failure'); END`,
+  );
+  try {
+    assert.throws(
+      () =>
+        C.reportPickException(picker, randomUUID(), {
+          orderId: reported.id,
+          version: t.version,
+          allocationId: t.allocation_id,
+          box: t.tote,
+          kind: "missing",
+          reason: "Brak na półce",
+        }),
+      /later reroute failure/,
+    );
+  } finally {
+    db().exec("DROP TRIGGER later_reroute_failure");
+  }
+  assert.deepEqual(W.getOrder(first.id), before);
+  assert.equal(W.getOrder(reported.id).hold_reason, null);
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT count(*) AS n FROM events WHERE type='wms_pick_reallocated' AND tw_id=?",
+      )
+      .get(p.twId)!.n,
+    0,
+  );
+});
+
+test("brak nie może dotyczyć już zebranej pozycji w nadal otwartym zamówieniu", () => {
+  const p = product(2),
+    q = product(2);
+  const o = W.createOrder(admin, randomUUID(), {
+    reference: randomUUID(),
+    channel: "seeded",
+    dueAt: "2026-09-12T12:00:00Z",
+    lines: [
+      { sku: p.sku, quantity: 1 },
+      { sku: q.sku, quantity: 1 },
+    ],
+  });
+  const run = start(cart().code),
+    t = run.tasks.find((t) => t.sku === p.sku)!;
+  W.pickWave(picker, randomUUID(), run.id, {
+    orderId: o.id,
+    version: t.version,
+    allocationId: t.allocation_id,
+    bin: t.bin,
+    barcode: p.sku,
+    tote: t.tote,
+    quantity: 1,
+  });
+  const before = W.getOrder(o.id);
+  assert.throws(
+    () =>
+      C.reportPickException(picker, randomUUID(), {
+        orderId: o.id,
+        version: before.version,
+        allocationId: t.allocation_id,
+        box: t.tote,
+        kind: "missing",
+        reason: "Stare wskazanie",
+      }),
+    /już zebrana/,
+  );
+  assert.deepEqual(W.getOrder(o.id), before);
+});
+
 test("ręczny ruch nie omija przeliczenia źródła ani celu", () => {
   const p = product(10),
     otherBin = `SAFE-${p.twId}`;

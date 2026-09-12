@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.301.0 zgłoszenie braku może automatycznie przekierować niezebrane przydziały na inne dostępne półki, według priorytetu zamówień.
+Zaktualizować także APK, aby operator widział opis nowego zachowania. Nie jest wymagana migracja ani dodatkowa konfiguracja.
+Przeliczenie zgłoszonej półki pozostaje osobnym zadaniem; jej fizyczny stan nie jest korygowany samym zgłoszeniem.
+
 Od 0.297.0 **Przyjęcia → Odkładanie z bufora** rozdzielają liczenie i odłożenie. Bufor zarejestrować w Lokalizacjach jako zapas zaplecza.
 Nie zmieniać go na lokalizację kompletacji podczas otwartej pracy. Aktualizacja dodaje tabele zadań oraz historii bez zmiany dawnych przyjęć.
 Funkcja działa w biurze i mobilnej przeglądarce. Od 0.299.0 liczenie dostawy działa również natywnie na Androidzie.

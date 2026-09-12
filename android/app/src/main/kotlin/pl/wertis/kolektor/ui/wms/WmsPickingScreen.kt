@@ -191,7 +191,9 @@ fun WmsPickingScreen(graph: AppGraph) {
                 }
                 Text("Do tej skrzynki: ${task.remaining} szt. Skan skrzynki zapisze pokazaną ilość.", fontSize = 14.sp)
             } else {
-                Text("Nie pobieraj kolejnej sztuki. Zgłoszenie zatrzyma zamówienie do sprawdzenia przez biuro.")
+                Text(if (exception == "missing")
+                    "Nie pobieraj kolejnej sztuki. WMS poszuka wolnego zapasu na innych półkach. Jeśli wystarczy, pokaże dalszą trasę. Ta półka pozostanie do przeliczenia."
+                else "Nie pobieraj kolejnej sztuki. Zgłoszenie zatrzyma zamówienie do sprawdzenia przez biuro.")
                 OutlineButton("ANULUJ ZGŁOSZENIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) { exception = null }
             }
         } else when (stage) {

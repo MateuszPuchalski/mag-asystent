@@ -574,3 +574,21 @@ Wysyłki dzienne i ich CSV używają dat Warszawy; skrajne dni obejmują częś�
 
 Raport działa w osobnym wątku z bazą tylko do odczytu. Równoległe prośby o ten sam okres współdzielą trwające obliczenie.
 Wynik nie jest zachowywany jako pamięć podręczna. Limit czterech okresów i 45 sekund chroni API przed narastającą kolejką raportów.
+
+### Brak części na półce podczas zbiórki
+
+Potwierdź osobno sztuki już odłożone do skrzynki. Następnie wybierz **Brak**, opisz sytuację i zeskanuj skrzynkę.
+WMS blokuje pobrania tego SKU z podejrzanej półki i sprawdza wolny zapas na innych półkach kompletacji.
+Zgłoszenie nie zmniejsza fizycznego stanu. Półka pozostaje w **Zadaniach zapasu → Półki do przeliczenia**.
+
+System sprawdza również inne zamówienia z niezebranym przydziałem tego SKU na tej półce. Najpierw obsługuje priorytet, następnie termin i numer zamówienia.
+Zapas już zarezerwowany innym zamówieniom, zaplecze, kwarantanna i zablokowane półki nie są źródłem zastępczym.
+Niezależne wstrzymania pozostają do decyzji biura. Skrzynka, pozycja na wózku, właściciel oraz potwierdzone pobrania nie zmieniają się.
+
+Jeżeli wystarczy zapasu, trasa prowadzi do nowej półki. Zeskanuj jej kod i część przed następnym pobraniem do skrzynki.
+Jeżeli brakuje choć części potrzebnego przydziału, jego próba zostaje wycofana. Dotychczasowy przydział pozostaje zablokowany do wyjaśnienia.
+Uszkodzenie i pełna skrzynka nadal wymagają dotychczasowego rozstrzygnięcia; nie powodują automatycznego wznowienia.
+
+Inny kolektor może mieć otwarty stary przydział. Jego nieaktualny skan zostanie odrzucony, a trasa odczytana ponownie.
+Po komunikacie **Tego pobrania nie zapisano** odłóż tylko niepotwierdzone sztuki na wskazane źródło. Zachowaj wcześniej potwierdzoną zawartość skrzynki.
+Po utracie odpowiedzi ponów tę samą operację. WMS odtworzy wynik bez ponownego przekierowania lub zmiany zapasu.

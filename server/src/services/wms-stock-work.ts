@@ -66,7 +66,11 @@ function checkOpen(twId: number, bin: string) {
 }
 
 // Naprawa przydziału odbywa się w transakcji nadrzędnej; brak wycofuje wszystkie jej rezerwacje.
-export function fillOrderReservations(actor: Actor, orderId: number) {
+export function fillOrderReservations(
+  actor: Actor,
+  orderId: number,
+  reason = "Ponowny przydział po przeliczeniu",
+) {
   if (!db().isTransaction)
     throw new Error("Naprawa rezerwacji wymaga transakcji command");
   const order = getOrder(orderId);
@@ -86,16 +90,7 @@ export function fillOrderReservations(actor: Actor, orderId: number) {
       .all(line.tw_id) as Stock[];
     for (const bin of bins) {
       const take = Math.min(missing, bin.on_hand - bin.reserved);
-      move(
-        actor,
-        line.tw_id,
-        bin.bin,
-        0,
-        take,
-        "reserve",
-        "Ponowny przydział po przeliczeniu",
-        orderId,
-      );
+      move(actor, line.tw_id, bin.bin, 0, take, "reserve", reason, orderId);
       db()
         .prepare(
           `INSERT INTO wms_allocation(line_id,bin,quantity) VALUES (?,?,?) ON CONFLICT(line_id,bin) DO UPDATE SET quantity=wms_allocation.quantity+excluded.quantity`,

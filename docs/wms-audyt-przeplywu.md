@@ -280,3 +280,24 @@ Weryfikacja 0.300.0: 2237 testów serwera, 727 panelu, oba sprawdzenia TypeScrip
 E2E sprawdziło przejście z raportu do kolejki bufora i pobranie CSV. Podgląd z 5000 SKU zachował 14 sztuk w buforze.
 Ekran nie wychodzi poza widok przy 320, 390 i 1440 px; szerokie tabele przewijają się we własnym obszarze.
 Wyniki obciążenia: [dane próby analityki](wms-flow-evidence.json).
+
+## Brak na jednej półce, zapas na innej
+
+Audyt wykazał kierowanie zamówienia do wyjaśnień również wtedy, gdy dostępny zapas tego SKU leżał na innej półce kompletacji.
+[Microsoft: work exceptions](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/work-exceptions-log) opisuje automatyczny ponowny przydział jako możliwą reakcję na wyjątek zbiórki.
+WERTIS zachowuje osobno zgłoszenie braku i przeliczenie półki. Zgłoszenie nie koryguje fizycznego stanu.
+
+Nowy przydział obejmuje wyłącznie niezebrane sztuki, także w innych zamówieniach dotkniętych wspólną półką.
+Przetwarzanie respektuje priorytet, termin i kolejność zamówień. Nie bierze cudzych rezerwacji ani zapasu spoza dostępnych półek kompletacji.
+Niepełna próba zostaje wycofana; uszkodzenia, pełne skrzynki i niezależne wstrzymania zachowują dotychczasową obsługę.
+Pobrane sztuki, skrzynki i ich pozycje pozostają bez zmian. Podejrzana półka nadal wymaga przeliczenia.
+
+Osiem regresji obejmuje częściowe pobranie, kilka źródeł, brak pełnego przydziału, zapas chroniony, priorytety i wstrzymania.
+Sprawdzono także awarię późniejszej zmiany, powtórzenie klucza i odrzucenie zgłoszenia już zebranej pozycji.
+Dwa testy kolektora potwierdzają wymaganie nowej półki po zgłoszeniu oraz odrzucenie starego skanu po przekierowaniu przez inną osobę.
+Komunikat odróżnia niepotwierdzone sztuki od wcześniej zapisanych pobrań, aby operator nie rozliczył ich dwukrotnie.
+
+Przeszło 2245 testów serwera, 727 panelu, 392 Android core, oba sprawdzenia TypeScript, build i cztery strażnice.
+E2E sprawdziło 20 zamówień, wcześniejsze częściowe pobranie, utratę odpowiedzi, ponowienie i kontynuację w tej samej skrzynce.
+W katalogu 5000 SKU przekierowanie 30 zamówień trwało 27,01 ms. Skrajna próba 1500 zamówień jednego SKU trwała 1085,91 ms.
+Obie zachowały zgodny dziennik oraz niezmienny fizyczny stan; ponowienie nie wykonało zapisu. To test syntetyczny, nie wydajność pracowników.

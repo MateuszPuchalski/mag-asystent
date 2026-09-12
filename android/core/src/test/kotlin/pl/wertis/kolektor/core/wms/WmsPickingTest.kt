@@ -118,6 +118,43 @@ private class FakeTransport(private val store: MemoryStore) : WmsTransport {
 }
 
 class WmsRecoveryTest {
+    @Test fun `po przekierowaniu braku kolektor wymaga skanu nowej polki i czesci`() = runTest {
+        val store = MemoryStore(); val client = FakeTransport(store)
+        var current = route
+        client.readAction = { current }
+        client.sendAction = {
+            current = route.copy(tasks = listOf(task.copy(bin = "B-02", version = 6, remaining = 2)))
+            route.id
+        }
+        val controller = WmsController(store, { client })
+        controller.open(who)
+        controller.submit(who, wmsException(route, task, task.tote, "missing", "Brak na półce"))
+        assertTrue(controller.state.value.ready)
+        assertNull(controller.state.value.journal.pending)
+        assertNull(controller.state.value.initialScan)
+        assertEquals("B-02", controller.state.value.run!!.nextTask(2)!!.bin)
+        assertEquals(WmsStage.LOCATION, wmsStage(controller.state.value.run, 2, WmsScanState()))
+        assertNotNull(wmsScan(controller.state.value.run, 2, WmsScanState(), task.tote).error)
+    }
+
+    @Test fun `przekierowanie przez innego operatora odrzuca stary skan i usuwa weryfikacje przystanku`() = runTest {
+        val store = MemoryStore(); val client = FakeTransport(store)
+        var current = route
+        client.readAction = { current }
+        client.sendAction = {
+            current = route.copy(tasks = listOf(task.copy(bin = "B-02", version = 5)))
+            throw ApiError(409, "Tego pobrania nie zapisano. Odłóż niepotwierdzone sztuki na A-01.")
+        }
+        val controller = WmsController(store, { client })
+        controller.open(who); controller.submit(who, pickDraft())
+        assertTrue(controller.state.value.ready)
+        assertNull(controller.state.value.journal.pending)
+        assertNull(controller.state.value.initialScan)
+        assertEquals("B-02", controller.state.value.run!!.nextTask(2)!!.bin)
+        assertTrue(controller.state.value.message!!.contains("Odłóż niepotwierdzone sztuki"))
+        assertEquals(1, client.sent.size)
+    }
+
     @Test fun `potwierdzone przejecie pozwala jawnie rozpoczac kolejny wozek bez zapisu na serwerze`() = runTest {
         val store = MemoryStore(); val client = FakeTransport(store)
         client.readAction = { throw ApiError(403, "Przejęto", "WMS_RUN_REASSIGNED") }

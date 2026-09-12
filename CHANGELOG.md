@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.301.0 — zbiórka omija półkę ze zgłoszonym brakiem
+
+- Brak części uruchamia próbę przydziału z innych dostępnych półek, również dla pozostałych dotkniętych zamówień, według priorytetu.
+- Potwierdzone pobrania i skrzynki pozostają bez zmian. Podejrzana półka nadal wymaga przeliczenia; zgłoszenie nie zmniejsza fizycznego stanu.
+- Niepełny przydział jest wycofywany. Uszkodzenia, pełne skrzynki i niezależne wstrzymania zachowują dotychczasową obsługę.
+- Kolektor wymaga nowego skanu półki po zmianie trasy. Odrzucony stary skan wskazuje, gdzie odłożyć wyłącznie niepotwierdzone sztuki.
+- Osiem nowych testów serwera, dwa testy kolektora i E2E obejmują także utratę odpowiedzi, priorytety oraz wycofanie niepełnej operacji.
+
 ## 0.300.1 — przeglądarka respektuje limit czasu analityki
 
 - Odczyt raportu czeka do 50 sekund, aby odebrać wynik lub komunikat limitu 45 sekund z serwera.

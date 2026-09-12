@@ -201,7 +201,7 @@ window.WmsCarts = (h) => {
           .map(([k, v]) => `<option value="${k}">${v}</option>`)
           .join(
             "",
-          )}</select></label>${field("box", "Skan skrzynki")}${field("reason", "Co się wydarzyło?")}<p>Zamówienie zostanie wstrzymane. Pozostałe skrzynki można zbierać dalej. Zgłoszenie nie zmienia stanu półki.</p><button class="primary">ZGŁOŚ I KONTYNUUJ TRASĘ</button></form>`,
+          )}</select></label>${field("box", "Skan skrzynki")}${field("reason", "Co się wydarzyło?")}<p>Przy braku WMS spróbuje przydzielić niezebrane sztuki z innych półek. Jeśli zapasu wystarczy, zbiórka trwa dalej; zgłoszona półka nadal wymaga przeliczenia. Uszkodzenie lub pełna skrzynka wymagają wyjaśnienia. Zgłoszenie nie zmienia fizycznego stanu półki.</p><button class="primary">ZGŁOŚ I KONTYNUUJ TRASĘ</button></form>`,
       );
       target()._cartTask = t;
       verifiedStop = null;

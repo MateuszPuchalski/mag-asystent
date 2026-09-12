@@ -980,7 +980,11 @@ export function applyOrderAction(
     throw new Error("Operacja WMS wymaga transakcji command");
   const order = getOrder(orderId);
   if (order.version !== input.version)
-    fail("Zamówienie zmieniło się. Odśwież przed kolejną operacją");
+    fail(
+      input.action === "pick"
+        ? `Zamówienie zmieniło się. Tego pobrania nie zapisano. Odłóż tylko niepotwierdzone sztuki na ${input.bin} i odśwież trasę.`
+        : "Zamówienie zmieniło się. Odśwież przed kolejną operacją",
+    );
   if (["shipped", "cancelled"].includes(order.status))
     fail("To zamówienie jest już zamknięte");
   if (
