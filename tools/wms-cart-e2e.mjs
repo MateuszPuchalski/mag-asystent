@@ -140,7 +140,7 @@ export async function exerciseCarts(page, output) {
       }
       const bin = page.locator('#wms-cart-pick [name="bin"]');
       if (await bin.isVisible()) {
-        await bin.fill(task.bin);
+        await bin.fill("loc:" + task.bin.toLowerCase());
         await bin.press("Enter");
         await expect(
           page.locator('#wms-cart-pick [name="barcode"]'),

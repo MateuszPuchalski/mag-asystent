@@ -143,10 +143,6 @@ window.WmsStockWork = (h) => {
     }
     let url,
       body = { ...values };
-    // Prefiks etykiety lokalizacji nie może zmienić SKU o podobnym początku.
-    for (const name of ["source", "target", "returnedSource", "bin"])
-      if (typeof body[name] === "string")
-        body[name] = body[name].trim().replace(/^LOC:/i, "");
     if (form.id === "wms-stockwork-complete") {
       url = `/api/wms/replenishments/${form.dataset.task}/complete`;
       body.quantity = Number(values.quantity);

@@ -88,7 +88,7 @@ window.WmsPackRecovery = (h) => {
       const result = await mutate("/api/wms/packing-shortage", {
         orderId: Number(form.dataset.order),
         version: Number(form.dataset.version),
-        box: values.box.trim().replace(/^LOC:/i, ""),
+        box: values.box.trim(),
         lineId: Number(values.lineId),
         parcelNo: Number(values.fromParcel),
         observedQuantity: Number(values.observedQuantity),
@@ -112,8 +112,6 @@ window.WmsPackRecovery = (h) => {
         parcelNo: Number(values.fromParcel),
       };
       delete body.fromParcel;
-      for (const name of ["box", "quarantine"])
-        body[name] = body[name].trim().replace(/^LOC:/i, "");
       const result = await mutate("/api/wms/packing-damage", body);
       if (result) await h.refresh();
       return true;
@@ -129,16 +127,12 @@ window.WmsPackRecovery = (h) => {
         sourceVersion: p.stock_version,
         quantity: Number(values.quantity),
       };
-      for (const name of ["source", "box"])
-        body[name] = body[name].trim().replace(/^LOC:/i, "");
     }
     if (form.id === "wms-recovery-release") {
       action = "release";
       body = {
         version: task.version,
-        sources: sources().map((_, i) =>
-          values["source" + i].trim().replace(/^LOC:/i, ""),
-        ),
+        sources: sources().map((_, i) => values["source" + i]),
         reason: values.reason,
       };
     }

@@ -131,7 +131,7 @@ try {
   await page
     .getByRole("button", { name: "ROZPOCZNIJ ZBIÓRKĘ", exact: true })
     .click();
-  await page.locator('#wms-step [name="bin"]').fill("A01-01-02");
+  await page.locator('#wms-step [name="bin"]').fill("LOC:A01-01-02");
   await expect(page.locator("#wms-step .wms-photo")).toContainText(
     "Brak zdjęcia produktu",
   );
@@ -191,7 +191,7 @@ try {
   );
   await page.getByRole("button", { name: /E2E-FULL-ORDER/ }).click();
   await expect(page.locator(".wms-part")).toHaveText("WMS-0002");
-  await page.locator('#wms-step [name="bin"]').fill("A01-01-02");
+  await page.locator('#wms-step [name="bin"]').fill("LOC:A01-01-02");
   await page.locator('#wms-step [name="barcode"]').fill("WMS-0002");
   await page
     .getByRole("button", { name: "POTWIERDŹ POBRANIE", exact: true })
@@ -519,7 +519,7 @@ try {
     const task = await page.evaluate(
       () => document.getElementById("widokWms")._waveTask,
     );
-    await page.locator('#wms-wave-pick [name="bin"]').fill(task.bin);
+    await page.locator('#wms-wave-pick [name="bin"]').fill("LOC:" + task.bin);
     await page.locator('#wms-wave-pick [name="bin"]').press("Enter");
     await expect(page.locator('#wms-wave-pick [name="barcode"]')).toBeFocused();
     await page.locator('#wms-wave-pick [name="barcode"]').fill(task.sku);

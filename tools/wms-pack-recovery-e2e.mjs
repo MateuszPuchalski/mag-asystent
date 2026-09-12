@@ -43,6 +43,12 @@ export async function exercisePackingRecovery(page, output) {
     });
   };
   await act({ action: "allocate" });
+  await request("/api/wms/bins", {
+    bin: "RECOVERY-BOX",
+    mode: "pick",
+    version: 1,
+    reason: "Półka o kodzie takim jak skrzynka — seeded",
+  });
   await act({ action: "pick-start", tote: "RECOVERY-BOX" });
   for (const a of o.allocations)
     await act({
@@ -86,6 +92,16 @@ export async function exercisePackingRecovery(page, output) {
       fullPage: true,
     });
   }
+  const wrongBox = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/wms/packing-damage") &&
+      r.request().method() === "POST",
+  );
+  await damage.locator("button").click();
+  const rejected = await wrongBox;
+  expect(rejected.status()).toBe(400);
+  expect((await request(`/api/wms/orders/${o.id}`)).version).toBe(o.version);
+  await damage.locator('[name="box"]').fill(o.tote);
   // Odpowiedź ginie po zapisie. Ponowienie musi odtworzyć jedną kwarantannę i jedno zadanie.
   await page.route(
     "**/api/wms/packing-damage",
@@ -136,6 +152,15 @@ export async function exercisePackingRecovery(page, output) {
       fullPage: true,
     });
   }
+  await pick.locator('[name="box"]').fill("LOC:RECOVERY-BOX");
+  const wrongDelivery = page.waitForResponse(
+    (r) =>
+      /\/api\/wms\/packing-recovery\/\d+\/pick$/.test(r.url()) &&
+      r.request().method() === "POST",
+  );
+  await pick.locator('[name="box"]').press("Enter");
+  expect((await wrongDelivery).status()).toBe(400);
+  expect((await request(`/api/wms/orders/${o.id}`)).lines[0].picked).toBe(2);
   await page.route(
     "**/api/wms/packing-recovery/*/pick",
     async (route) => {
@@ -144,7 +169,7 @@ export async function exercisePackingRecovery(page, output) {
     },
     { times: 1 },
   );
-  await pick.locator('[name="box"]').fill("LOC:RECOVERY-BOX");
+  await pick.locator('[name="box"]').fill("RECOVERY-BOX");
   await pick.locator('[name="box"]').press("Enter");
   await expect(page.locator("#wms-retry")).toContainText("PONÓW");
   await page.locator('[data-do-wms="retry"]').click();

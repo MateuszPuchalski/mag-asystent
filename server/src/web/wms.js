@@ -979,6 +979,19 @@ window.Wms = (() => {
     if (busy) return;
     try {
       const values = Object.fromEntries(new FormData(f));
+      // Tylko pola półek interpretują prefiks etykiety. SKU i skrzynka zachowują
+      // literalny kod; ponowienie korzysta z już zapisanego ciała komendy.
+      for (const name of Object.keys(values))
+        if (
+          ["bin", "source", "target", "returnedSource", "quarantine"].includes(
+            name,
+          ) ||
+          /^source\d+$/.test(name)
+        )
+          values[name] = String(values[name])
+            .trim()
+            .toUpperCase()
+            .replace(/^LOC:/, "");
       if (await recoveryUi.submit(f, values)) return;
       if (await cartUi.submit(f, values)) return;
       if (await stockWorkUi.submit(f, values)) return;
@@ -1183,7 +1196,7 @@ window.Wms = (() => {
         };
         if (values.action === "transfer") body.target = values.target;
         if (["count", "minimum"].includes(values.action)) {
-          if (String(values.bin).trim().toUpperCase() !== s.bin)
+          if (body.bin !== s.bin)
             throw new Error(
               "Spis i minimum: wybierz właściwy wiersz lokalizacji z tabeli.",
             );
@@ -1200,8 +1213,6 @@ window.Wms = (() => {
       if (action && current) {
         let body = { ...values, action, version: current.version };
         if (action === "return") {
-          // Prefiks etykiety dotyczy półki, nigdy symbolu części ani kodu skrzynki.
-          body.bin = String(values.bin).trim().replace(/^LOC:/i, "");
           if (values.returnDestination === "other") {
             const allocation = current.allocations.find(
               (a) => a.id === Number(values.allocationId),

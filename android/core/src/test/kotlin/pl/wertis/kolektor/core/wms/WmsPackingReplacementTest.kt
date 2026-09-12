@@ -11,7 +11,7 @@ import pl.wertis.kolektor.core.scan.classify
 private val recoveryActor=WmsContext("http://seeded/",2)
 private val replacement=WmsRecoveryPick(1,30,"LOC:PART","Część","005901","A-01",2,3)
 private val replacementTask=WmsRecoveryTask(1,1,2,1,"ORDER",box="BOX-01",lines=listOf(WmsRecoveryLine(1,"LOC:PART",2,0,"QUAR")),picks=listOf(replacement))
-private fun replacementDraft()=recoveryFinish(replacementTask,2,WmsRecoveryScan(1,true,"LOC:PART",2),classify("LOC:BOX-01"))
+private fun replacementDraft()=recoveryFinish(replacementTask,2,WmsRecoveryScan(1,true,"LOC:PART",2),classify("BOX-01"))
 private class RecoveryStore:WmsStore {
     var journal=WmsJournal()
     var reject:(WmsJournal)->Boolean={false}
@@ -38,6 +38,12 @@ private class RecoveryClient(val store:RecoveryStore):WmsRecoveryTransport {
     }
 }
 class WmsPackingReplacementTest {
+    @Test fun `skan polki nie potwierdza dostarczenia do skrzynki o takim samym kodzie`() {
+        val scan=WmsRecoveryScan(1,true,"LOC:PART",1)
+        assertThrows(IllegalArgumentException::class.java){recoveryFinish(replacementTask,2,scan,classify("LOC:BOX-01"))}
+        assertThrows(IllegalArgumentException::class.java){recoveryFinish(replacementTask,2,scan,classify("BOX-02"))}
+        assertEquals("BOX-01",recoveryFinish(replacementTask,2,scan,classify("BOX-01")).body["box"]!!.jsonPrimitive.content)
+    }
     @Test fun `nowy brak bez kwarantanny i stara odpowiedz uszkodzenia maja wspolne pobranie`() {
         val old=WertisJson.decodeFromString<WmsRecoveryLine>("""{"id":1,"sku":"SKU","quantity":1,"replaced":0,"quarantine":"QUAR"}""")
         val missing=WertisJson.decodeFromString<WmsRecoveryLine>("""{"id":2,"sku":"SKU","quantity":1,"replaced":0,"quarantine":"","kind":"shortage"}""")
@@ -54,7 +60,7 @@ class WmsPackingReplacementTest {
         for(raw in listOf("","0","-1","3","1.5"))assertThrows(IllegalArgumentException::class.java){recoveryQuantity(replacementTask,2,scan,raw)}
         scan=recoveryQuantity(replacementTask,2,scan,"1")
         assertThrows(IllegalArgumentException::class.java){recoveryFinish(replacementTask,2,scan,classify("BOX-02"))}
-        val draft=recoveryFinish(replacementTask,2,scan,classify("LOC:BOX-01"))
+        val draft=recoveryFinish(replacementTask,2,scan,classify("BOX-01"))
         assertEquals("LOC:PART",draft.body["barcode"]!!.jsonPrimitive.content)
         assertEquals("1",draft.body["quantity"]!!.jsonPrimitive.content)
         assertEquals(WmsRecoveryStage.OTHER,recoveryStage(replacementTask,3,scan))

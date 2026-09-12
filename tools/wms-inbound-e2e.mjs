@@ -24,7 +24,7 @@ export async function exerciseInbound(page, output) {
     "sprawdź miejsce",
   );
   await form.locator('[name="quantity"]').fill("1");
-  await form.locator('[name="bin"]').fill("A04-01-02");
+  await form.locator('[name="bin"]').fill("LOC:A04-01-02");
   await form.locator('[name="disposition"]').selectOption("damaged");
   await expect(form.locator('[name="quantity"]')).toHaveValue("");
   await expect(form.locator('[name="bin"]')).toHaveValue("");
@@ -39,7 +39,7 @@ export async function exerciseInbound(page, output) {
     "Nieznana lokalizacja",
   );
   await expect(form.locator('[name="quantity"]')).toHaveValue("2");
-  await form.locator('[name="bin"]').fill("A04-01-02");
+  await form.locator('[name="bin"]').fill("LOC:A04-01-02");
   await page.screenshot({
     path: path.join(output, "inbound-mobile.png"),
     fullPage: true,
@@ -73,7 +73,7 @@ export async function exerciseInbound(page, output) {
   await expect(form.locator('[name="quantity"]')).toHaveValue("");
   await form.locator('[name="quantity"]').fill("1");
   await form.locator('[name="quantity"]').press("Enter");
-  await form.locator('[name="bin"]').fill("A04-01-02");
+  await form.locator('[name="bin"]').fill("LOC:A04-01-02");
   await form.locator('[name="bin"]').press("Enter");
   await page.getByText("Zakończenie dostawy", { exact: true }).click();
   await page.locator("#wms-inbound-close button").click();
@@ -89,7 +89,7 @@ export async function exerciseInbound(page, output) {
   await page.locator("[data-inbound-reverse]").first().click();
   const reverse = page.locator("#wms-inbound-reverse");
   await reverse.locator('[name="barcode"]').fill("WMS-0030");
-  await reverse.locator('[name="bin"]').fill("A04-01-02");
+  await reverse.locator('[name="bin"]').fill("LOC:A04-01-02");
   await reverse
     .locator('[name="reason"]')
     .fill("Przeliczono jedną sztukę za dużo");
@@ -114,7 +114,7 @@ export async function exerciseInbound(page, output) {
   await scan.press("Enter");
   await form.locator('[name="quantity"]').fill("5");
   await form.locator('[name="quantity"]').press("Enter");
-  await form.locator('[name="bin"]').fill("RES-E2E");
+  await form.locator('[name="bin"]').fill("LOC:RES-E2E");
   await form.locator('[name="bin"]').press("Enter");
   await expect(page.locator("#wms-content")).toContainText("5 szt. w buforze");
   await page.evaluate(async () => {
@@ -155,13 +155,13 @@ export async function exerciseInbound(page, output) {
   await expect(putaway.locator('[name="source"]')).toBeFocused();
   await putaway.locator("details summary").click();
   await putaway.locator('[name="quantity"]').fill("1");
-  await putaway.locator('[name="target"]').fill("A04-01-02");
+  await putaway.locator('[name="target"]').fill("LOC:A04-01-02");
   await putaway.locator('[name="disposition"]').selectOption("damaged");
   await expect(putaway.locator('[name="quantity"]')).toHaveValue("");
   await expect(putaway.locator('[name="target"]')).toHaveValue("");
   await putaway.locator('[name="disposition"]').selectOption("good");
   await putaway.locator("details summary").click();
-  await putaway.locator('[name="source"]').fill("RES-E2E");
+  await putaway.locator('[name="source"]').fill("LOC:RES-E2E");
   await putaway.locator('[name="source"]').press("Enter");
   await expect(putaway.locator('[name="barcode"]')).toBeFocused();
   await putaway.locator('[name="barcode"]').fill("WMS-0030");
@@ -174,7 +174,7 @@ export async function exerciseInbound(page, output) {
   await putaway.locator('[name="quantity"]').fill("2");
   await putaway.locator('[name="quantity"]').press("Enter");
   await expect(putaway.locator('[name="target"]')).toBeFocused();
-  await putaway.locator('[name="target"]').fill("A04-01-02");
+  await putaway.locator('[name="target"]').fill("LOC:A04-01-02");
   await page.route(
     "**/api/wms/putaway-work/*/finish",
     async (route) => {
@@ -212,7 +212,7 @@ export async function exerciseInbound(page, output) {
     .click();
   const correction = page.locator("#wms-putaway-correct");
   await expect(correction.locator('[name="quantity"]')).toHaveValue("");
-  await correction.locator('[name="source"]').fill("RES-E2E");
+  await correction.locator('[name="source"]').fill("LOC:RES-E2E");
   await correction.locator('[name="barcode"]').fill("WMS-0030");
   await correction.locator('[name="quantity"]').fill("1");
   await correction
@@ -222,11 +222,11 @@ export async function exerciseInbound(page, output) {
   await expect(page.locator("#wms-content")).toContainText(
     "2 szt. do odłożenia",
   );
-  await putaway.locator('[name="source"]').fill("RES-E2E");
+  await putaway.locator('[name="source"]').fill("LOC:RES-E2E");
   await putaway.locator('[name="barcode"]').fill("WMS-0030");
   await expect(putaway.locator('[name="quantity"]')).toHaveValue("");
   await putaway.locator('[name="quantity"]').fill("2");
-  await putaway.locator('[name="target"]').fill("A04-01-02");
+  await putaway.locator('[name="target"]').fill("LOC:A04-01-02");
   await putaway.locator('[name="target"]').press("Enter");
   await expect(page.locator("#wms-content")).toContainText(
     "Brak zadań do odłożenia.",

@@ -39,6 +39,26 @@ To wnioski projektowe zastosowane do naszego kodu, nie gwarancja optymalnej orga
 
 ## Odtworzone przypadki
 
+### Skan półki zamiast skrzynki i wspólne etykiety lokalizacji
+
+Korekta pakowania oraz wymiana usuwały `LOC:` z kodu skrzynki. Natywna wymiana korzystała z kodu po klasyfikacji lokalizacji.
+W efekcie skan półki `LOC:BOX-01` mógł potwierdzić skrzynkę `BOX-01`, mimo że zwykła zbiórka odrzucała taki skan.
+API rejestruje skrzynki bez dwukropka. Próba utworzenia skrzynki z literalnym `LOC:` została odrzucona; nie jest dowodem obsługi takiego identyfikatora.
+Właściwa regresja korzysta z dopuszczalnej półki i skrzynki o jednakowym kodzie.
+
+Komendy otrzymują teraz dokładny kod skrzynki. Test kolektora odrzuca skan półki i przyjmuje właściwy pojemnik.
+Browser E2E sprawdza odmowę przy uszkodzeniu, potwierdzonym braku oraz dostarczeniu zamiennika, bez zmiany ilości zamówienia.
+Poprawna skrzynka nadal kończy operację; utracona odpowiedź odtwarza jeden zapis.
+
+Przyjęcie, odkładanie oraz zwykła zbiórka w Biurze nie usuwały prefiksu półki, choć inne formularze robiły to osobno.
+Jedna reguła formularza normalizuje wyłącznie nazwane pola lokalizacji. Zastąpiła kopie reguły w zwrotach, wymianach i pracy magazynowej.
+Odczyty, kody SKU, skrzynki, stanowiska i zapisane komendy ponowienia zachowują wcześniejszą treść.
+Browser E2E przechodzi przez przyjęcie, korektę, bufor, odłożenie, zbiórkę pojedynczą i wózek z prefiksami półek.
+
+[Microsoft: potwierdzanie lokalizacji i pojemnika](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/batch-and-license-plate-confirmation)
+opisuje oddzielne potwierdzenia miejsca oraz jednostki magazynowej.
+Wniosek dla WERTIS: znaczenie skanu wynika z oczekiwanego kroku; nie należy zamieniać potwierdzenia półki w potwierdzenie skrzynki.
+
 ### Zwrot na półkę wyłączoną z kompletacji
 
 Próba seeded pobrała cały przydział, zmieniła pustą z rezerwacji półkę na kwarantannę i wstrzymała zamówienie.

@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.312.1 — skan półki nie potwierdza skrzynki
+
+- Korekta pakowania oraz dostarczenie zamiennika wymagają kodu skrzynki. Prefiks `LOC:` nie zamienia skanu półki w potwierdzenie pojemnika o podobnym kodzie.
+- Kolektor stosuje tę samą regułę podczas wymiany, zbiórki i zwrotu. SKU zachowuje własny prefiks.
+- Biuro rozpoznaje etykiety półek w jednym miejscu: przyjęcie, odkładanie, zbiórka, ruchy, przeliczenie, zwrot i wymiana korzystają z tej samej reguły.
+- Usunięto powielone przekształcenia skanów. Ponowienie zachowuje zapisane ciało i klucz komendy.
+- Rozszerzono test kolektora i browser E2E o skan półki zamiast skrzynki oraz prefiksy przy przejściu od dostawy do pakowania.
+- Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Nie ma zmian API ani migracji.
+
 ## 0.312.0 — zwrot pobrania na inną półkę
 
 - Kolektor i Biuro pozwalają jawnie wybrać inną półkę kompletacji. Źródło zmienione na kwarantannę lub zaplecze nie przyjmuje rezerwacji zwrotu.

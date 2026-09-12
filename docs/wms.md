@@ -116,6 +116,10 @@ Numery przesyłek DEMO służą do ćwiczeń i nie zamawiają usług przewoźnik
 
 ## Ewidencja fizyczna i ERP
 
+Etykiety półek mogą zawierać prefiks `LOC:`. Biuro i kolektor rozpoznają go wyłącznie przy skanie miejsca; kod części pozostaje niezmieniony.
+Skan skrzynki wymaga jej dokładnego kodu. Półka `LOC:BOX-01` nie potwierdza dostarczenia do skrzynki `BOX-01`.
+Ta sama reguła obowiązuje przy zbiórce, zwrocie, korekcie pakowania i dostarczeniu zamiennika.
+
 Subiekt jest źródłem kartotek i dokumentów handlowych.
 WMS prowadzi ilości na lokalizacjach oraz rezerwacje zamówień.
 

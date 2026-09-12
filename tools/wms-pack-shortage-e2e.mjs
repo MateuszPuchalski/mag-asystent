@@ -78,6 +78,17 @@ export async function exercisePackingShortage(page, output) {
       fullPage: true,
     });
   }
+  const wrongBox = page.waitForResponse(
+    (r) =>
+      r.url().endsWith("/api/wms/packing-shortage") &&
+      r.request().method() === "POST",
+  );
+  await form.locator("button").click();
+  const rejected = await wrongBox;
+  expect(rejected.status()).toBe(400);
+  expect(rejected.request().postDataJSON().box).toBe("LOC:SHORTAGE-BOX");
+  expect((await api(`/api/wms/orders/${o.id}`)).version).toBe(o.version);
+  await form.locator('[name="box"]').fill(o.tote);
   await page.route(
     "**/api/wms/packing-shortage",
     async (route) => {

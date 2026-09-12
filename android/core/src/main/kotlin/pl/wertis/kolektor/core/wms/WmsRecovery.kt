@@ -69,8 +69,9 @@ fun recoveryQuantity(task: WmsRecoveryTask, actor: Long, scan: WmsRecoveryScan, 
 }
 fun recoveryFinish(task: WmsRecoveryTask, actor: Long, scan: WmsRecoveryScan, input: Scan): WmsRecoveryDraft {
     require(recoveryStage(task,actor,scan)==WmsRecoveryStage.BOX) { "Najpierw potwierdź pobranie i ilość" }
-    val box = if(input.kind == ScanKind.LOC) input.code else input.rawCode
-    require(recoveryCode(box)==task.box) { "Zeskanuj skrzynkę ${task.box} po dostarczeniu zamiennika" }
+    // Skan półki o tym samym kodzie nie potwierdza dostarczenia do skrzynki.
+    // Weryfikacja jest taka sama jak przy zbiórce i zwrocie z wózka.
+    require(input.rawCode.trim()==task.box) { "Zeskanuj skrzynkę ${task.box} po dostarczeniu zamiennika" }
     val p = requireNotNull(recoveryPick(task,scan))
     return WmsRecoveryDraft(task.id,"api/wms/packing-recovery/${task.id}/pick",buildJsonObject {
         put("version",task.version);put("allocationId",p.allocation_id);put("sourceVersion",p.stock_version)
