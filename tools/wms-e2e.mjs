@@ -15,6 +15,7 @@ import { exercisePackingShortage } from "./wms-pack-shortage-e2e.mjs";
 import { exerciseCapacity } from "./wms-capacity-e2e.mjs";
 import { exerciseReplenishment } from "./wms-replenishment-e2e.mjs";
 import { exerciseReroute } from "./wms-reroute-e2e.mjs";
+import { exerciseReturns } from "./wms-return-e2e.mjs";
 
 const cwd = fileURLToPath(new URL("..", import.meta.url));
 const output = path.join(cwd, ".wms-artifacts");
@@ -576,6 +577,7 @@ try {
   await exerciseReroute(page, output);
   await exerciseReplenishment(page, output);
   await exerciseCapacity(page, output);
+  await exerciseReturns(page, output);
   await page.locator('[data-tab-wms="analytics"]').click();
   await expect(page.locator("#wms-flow")).toContainText("Gdzie czeka praca");
   await expect(

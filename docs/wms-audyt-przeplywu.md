@@ -39,6 +39,26 @@ To wnioski projektowe zastosowane do naszego kodu, nie gwarancja optymalnej orga
 
 ## Odtworzone przypadki
 
+### Zwrot pobrania z właściwej skrzynki
+
+Próba seeded utworzyła dwa zamówienia z tym samym SKU, pobranym z tej samej półki do różnych skrzynek.
+Stary zwrot przyjmował kod części i półki bez wskazania skrzynki. Dziennik pozostawał spójny, choć nie potwierdzał fizycznego źródła zwrotu.
+Wspólna komenda wymaga teraz zgodnego kodu skrzynki. Odrzuca brak kodu, inną skrzynkę, obcego operatora i nieaktualną wersję przed ruchem zapasu.
+
+Na kolektorze zwroty należą do istniejącego wózka i dziennika zbiórki. Operator jawnie wybiera zwrot, skanuje skrzynkę, część, wpisuje ilość i skanuje półkę po odłożeniu.
+Wybrana skrzynka prowadzi po swoich pozostałych pobraniach według kolejności lokalizacji. Inne wstrzymane skrzynki nie są automatycznie rozliczane.
+Odkładanie częściowe pozostawia resztę do pracy. Końcowy zwrot zachowuje wstrzymanie; biuro decyduje o anulowaniu lub zmianie zamówienia.
+
+Lista obejmuje pobrania obecnego operatora przed przekazaniem skrzynek. Komenda kolektora ponawia kontrolę wózka i przekazania w transakcji.
+Przekazanie nie musi zmieniać wersji zamówienia, dlatego sama wersja nie wystarczała do zatrzymania nieaktualnego zwrotu.
+Biuro ma skan skrzynki, jawną ilość i kolejność: skrzynka → część → ilość → powód → półka.
+Zmiana pozycji czyści kod części, ilość i cel. Enter nie omija pustej ilości; ponowienie zachowuje jeden ruch.
+
+[Microsoft: potwierdzanie pojemnika i lokalizacji](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/batch-and-license-plate-confirmation)
+opisuje niezależne potwierdzenia miejsc oraz identyfikatorów jednostek magazynowych.
+Wniosek dla WERTIS: przy powtarzających się częściach kod SKU nie zastępuje skanu fizycznej skrzynki.
+Odbiór na rzeczywistym kolektorze pozostaje otwarty; testy JVM sprawdzają komendy, dziennik i granice, a browser E2E sprawdza formularz Biura.
+
 ### Jawna ilość także w natywnym formularzu
 
 Przegląd Compose wykrył lukę niewidoczną dla samych testów core: odkładanie podstawiało cały pozostały przydział do pola ilości.

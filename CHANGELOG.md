@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.311.0 — zwrot pobrań z właściwej skrzynki
+
+- Kolektor prowadzi zwroty wstrzymanych zamówień z własnego wózka: skrzynka → część → policzona ilość → półka po odłożeniu.
+- Operator wybiera skrzynkę skanem. Częściowa partia zostawia resztę; biuro nadal decyduje o zmianie lub anulowaniu zamówienia.
+- Zwroty korzystają z dziennika zbiórki i jego ponowień. Zmiana właściciela lub przekazanie skrzynki blokują nieaktualny skan także bez zmiany wersji zamówienia.
+- Wspólna komenda zwrotu wymaga zgodnego kodu skrzynki. Biuro ma pustą ilość, sprawdzaną kolejność skanów i czyszczenie pól po zmianie pozycji.
+- Regresje sprawdzają identyczne SKU w dwóch skrzynkach, brak kodu, obce konto, stare wersje, przekazanie i powtórzenie jednej partii.
+- **[wymaga działania]** Rozliczyć oczekujące zapisy, wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Nie ma migracji danych.
+
 ## 0.310.1 — policzona ilość na kolektorze
 
 - Natywne odkładanie zaczyna się pustym polem. Pozostały przydział nie potwierdza ilości faktycznie odkładanej partii.

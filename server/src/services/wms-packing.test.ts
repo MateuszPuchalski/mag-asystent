@@ -361,6 +361,7 @@ test("zmiana zamówienia po wycofaniu paczek nie usuwa historycznej zawartości"
   for (const a of o.allocations)
     act({
       action: "return",
+      tote: o.tote ?? "RECHECK-1",
       allocationId: a.id,
       barcode: o.lines.find((l) => l.id === a.line_id)!.sku,
       bin: a.bin,

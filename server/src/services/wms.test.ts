@@ -609,6 +609,7 @@ test("zmiana zamówienia zwalnia rezerwacje atomowo i wymaga odłożenia pobrane
   o = action(o, "hold", { reason: "Kolejna zmiana klienta" });
   const a = o.allocations[0];
   o = action(o, "return", {
+    tote: o.tote!,
     allocationId: a.id,
     bin: a.bin,
     barcode: replacement.sku,
@@ -721,6 +722,7 @@ test("anulowanie po pobraniu wymaga fizycznego zwrotu, zwraca zapas i zwalnia re
     o,
     "return",
     {
+      tote: o.tote!,
       allocationId: o.allocations[0].id,
       bin: "A01-01-02",
       barcode: p.sku,

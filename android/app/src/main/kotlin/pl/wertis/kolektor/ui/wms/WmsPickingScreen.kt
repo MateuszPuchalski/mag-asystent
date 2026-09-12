@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,12 +31,19 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.wms.WmsDraft
 import pl.wertis.kolektor.core.wms.WmsScanState
 import pl.wertis.kolektor.core.wms.WmsStage
+import pl.wertis.kolektor.core.wms.WmsReturnScan
+import pl.wertis.kolektor.core.wms.WmsReturnStage
+import pl.wertis.kolektor.core.wms.returnCode
+import pl.wertis.kolektor.core.wms.returnQuantity
+import pl.wertis.kolektor.core.wms.returnScan
+import pl.wertis.kolektor.core.wms.returnStage
 import pl.wertis.kolektor.core.wms.wmsException
 import pl.wertis.kolektor.core.wms.wmsScan
 import pl.wertis.kolektor.core.wms.wmsScanCode
 import pl.wertis.kolektor.core.wms.wmsStage
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
+import pl.wertis.kolektor.ui.components.WertisTextField
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.theme.Amber
 import pl.wertis.kolektor.ui.theme.Ink
@@ -56,6 +64,11 @@ fun WmsPickingScreen(graph: AppGraph) {
     var error by remember(view.generation, context) { mutableStateOf<String?>(null) }
     var exception by remember(view.generation, context) { mutableStateOf<String?>(null) }
     var tools by remember(view.generation, context) { mutableStateOf(false) }
+    var returning by remember(context, run?.id) { mutableStateOf(false) }
+    var returnOrder by remember(context, run?.id) { mutableStateOf<Long?>(null) }
+    var returned by remember(view.generation, context) { mutableStateOf(WmsReturnScan()) }
+    var returnCount by remember(view.generation, context) { mutableStateOf("") }
+    val returnTask = run?.returns?.firstOrNull { it.order_id == returnOrder }
     val stage = wmsStage(run, context?.actorId ?: -1, scan)
     val allowed = view.context == context && view.ready && !view.busy && view.journal.pending == null && context != null
 
@@ -78,6 +91,17 @@ fun WmsPickingScreen(graph: AppGraph) {
         if (!allowed || controller.state.value.busy || view.generation != controller.state.value.generation) {
             graph.feedback.beep(false)
             error = "Najpierw potwierdź wynik ostatniej operacji"
+        } else if (returning) {
+            try {
+                require(run != null) { "Odśwież wózek" }
+                val target = returnTask ?: run.returns.firstOrNull { it.tote == input.rawCode.trim() }
+                require(target != null) { "Zeskanuj skrzynkę z listy zwrotów" }
+                val result = returnScan(run, target, context!!.actorId, if (returnTask == null) WmsReturnScan() else returned, returnCode(returned, input))
+                returnOrder = target.order_id
+                returned = result.state
+                error = null
+                result.command?.let(::submit) ?: graph.feedback.beep(true)
+            } catch (e: IllegalArgumentException) { error = e.message; graph.feedback.beep(false) }
         } else if (exception != null && task != null && run != null) {
             val kind = exception!!
             val reason = when (kind) {
@@ -124,6 +148,55 @@ fun WmsPickingScreen(graph: AppGraph) {
             return@Column
         }
 
+        if (returning && run != null) {
+            Text("ZWROT Z WÓZKA · ${run.cart_code}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            if (returnTask == null) {
+                if (returnOrder != null) Text("Wybrana skrzynka nie ma teraz dostępnych zwrotów. Dalszą decyzję prowadzi biuro.")
+                if (run.returns.isEmpty()) Text("Nie ma kolejnych pobrań do odłożenia.")
+                else {
+                    Text("Zeskanuj skrzynkę, z której chcesz odłożyć pobrania.")
+                    run.returns.distinctBy { it.order_id }.forEach { box ->
+                        Text("Pozycja ${box.position} · ${box.tote} · ${box.hold_reason}", color = InkMute)
+                    }
+                }
+            } else {
+                Text("POZYCJA ${returnTask.position} · ${returnTask.tote}", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text("${returnTask.sku} · ${returnTask.name}", fontSize = 18.sp)
+                Text("Do odłożenia: ${returnTask.remaining} szt. → ${returnTask.bin}")
+                Text("Powód wstrzymania: ${returnTask.hold_reason}", color = InkMute)
+                when (returnStage(returned)) {
+                    WmsReturnStage.BOX -> Text("1. Zeskanuj skrzynkę źródłową")
+                    WmsReturnStage.PRODUCT -> Text("2. Zeskanuj wyjmowaną część")
+                    WmsReturnStage.QUANTITY -> {
+                        fun confirm() {
+                            if (!allowed) return
+                            try { returned = returnQuantity(returnTask, returned, returnCount); error = null; graph.feedback.beep(true) }
+                            catch (e: IllegalArgumentException) { error = e.message; graph.feedback.beep(false) }
+                        }
+                        WertisTextField(returnCount, { returnCount = it }, placeholder = "3. Policzona ilość", keyboardType = KeyboardType.Number, onDone = ::confirm)
+                        PrimaryButton("POTWIERDŹ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth(), onClick = ::confirm)
+                    }
+                    WmsReturnStage.BIN -> {
+                        Text("4. Odłóż ${returned.quantity} szt. na ${returnTask.bin}. Skan półki zapisze zwrot.", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        OutlineButton("ZMIEŃ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { returned = returned.copy(quantity = null); error = null }
+                    }
+                }
+                Text("Odkładaj wyłącznie sprawne sztuki. Uszkodzenie pozostaw do wyjaśnienia z biurem.", color = InkMute)
+            }
+            (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
+            OutlineButton(if (returned.box) "SZTUKI Z POWROTEM DO SKRZYNKI · PRZERWIJ" else "WRÓĆ DO ZBIÓRKI", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
+                returning = false; returnOrder = null; returned = WmsReturnScan(); returnCount = ""
+                scan = WmsScanState(quantity = task?.remaining ?: 1); error = null
+            }
+            return@Column
+        }
+        if (run != null && run.arrived_at == null && run.closed_at == null && run.returns.isNotEmpty()) {
+            // Zmiana procesu nie może ukryć sztuk trzymanych przed potwierdzeniem bieżącego pobrania.
+            if (scan.location) Text("Przed zwrotem zakończ bieżące pobranie albo odłóż niepotwierdzone sztuki na ${task?.bin} i odśwież trasę.", color = InkMute)
+            OutlineButton("ODŁÓŻ POBRANIA · ${run.returns.size} POZYCJI", enabled = allowed && !scan.location, modifier = Modifier.fillMaxWidth()) {
+                returning = true; returnOrder = null; returned = WmsReturnScan(); returnCount = ""; exception = null; error = null
+            }
+        }
         if (run != null) {
             Text("${run.cart_code} · ${run.orders.count { it.status == "picked" }}/${run.orders.size} zebranych", color = InkMute, fontSize = 14.sp)
         }

@@ -41,6 +41,7 @@ data class WmsRun(
     val closed_at: String? = null,
     val orders: List<WmsOrder>,
     val tasks: List<WmsTask>,
+    val returns: List<WmsReturnTask> = emptyList(),
 ) {
     fun nextTask(userId: Long): WmsTask? = tasks.firstOrNull {
         it.picker_id == userId && it.hold_reason == null && it.stock_blocked == null

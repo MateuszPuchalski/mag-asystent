@@ -118,6 +118,11 @@ Numery przesyłek DEMO służą do ćwiczeń i nie zamawiają usług przewoźnik
 
 Subiekt jest źródłem kartotek i dokumentów handlowych.
 WMS prowadzi ilości na lokalizacjach oraz rezerwacje zamówień.
+
+Zwrot pobrania wymaga wstrzymania zamówienia i skanu jego skrzynki.
+Na kolektorze wybierz **ODŁÓŻ POBRANIA**, następnie zeskanuj skrzynkę, część, wpisz policzoną ilość i zeskanuj pierwotną półkę po odłożeniu.
+Pracujesz na wybranej skrzynce własnego wózka przed przekazaniem do pakowania. Przerwanie wymaga pozostawienia nieodłożonych sztuk w tej samej skrzynce.
+Po zapisaniu partii kolektor pokazuje resztę. Zwrot nie anuluje zamówienia i nie rozstrzyga uszkodzenia; decyzja pozostaje w biurze.
 Synchronizacja Subiekta nie nadpisuje tych ilości.
 Usunięcie kartoteki ERP nie ukrywa jej pozostałego zapasu w WMS.
 

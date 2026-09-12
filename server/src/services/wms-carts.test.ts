@@ -111,6 +111,165 @@ function pickAll(runId: number) {
   }
 }
 
+test("zwrot z wózka identyfikuje skrzynkę i zachowuje inną skrzynkę z tym samym SKU", () => {
+  const p = product(10);
+  order(p.sku, 2);
+  order(p.sku, 2);
+  const run = start(cart().code);
+  pickAll(run.id);
+  let o = W.getOrder(run.orders[0].id);
+  o = W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "hold",
+    version: o.version,
+    reason: "Rezygnacja klienta",
+  });
+  const beforeRead = db().prepare("SELECT total_changes() n").get()!.n;
+  const tasks = C.getCartRun(picker, run.id).returns;
+  assert.equal(db().prepare("SELECT total_changes() n").get()!.n, beforeRead);
+  assert.equal(tasks.length, 1);
+  assert.equal(tasks[0].tote, o.tote);
+  assert.equal(tasks[0].remaining, 2);
+  const otherOrder = W.getOrder(run.orders[1].id);
+  const body = {
+    action: "return",
+    runId: run.id,
+    version: o.version,
+    allocationId: o.allocations[0].id,
+    tote: o.tote!,
+    barcode: p.sku,
+    bin: p.bin,
+    quantity: 1,
+    reason: "Zwrot po rezygnacji",
+  };
+  const before = db()
+    .prepare("SELECT on_hand,reserved,version FROM wms_stock WHERE tw_id=?")
+    .get(p.twId);
+  assert.throws(
+    () =>
+      W.actOnOrder(picker, randomUUID(), o.id, {
+        ...body,
+        tote: otherOrder.tote,
+      }),
+    /skrzynkę/,
+  );
+  const { tote: _tote, ...withoutBox } = body;
+  assert.throws(() => W.actOnOrder(picker, randomUUID(), o.id, withoutBox));
+  assert.throws(
+    () => W.actOnOrder(other, randomUUID(), o.id, body),
+    /przypisana|właściciela/,
+  );
+  assert.deepEqual(
+    db()
+      .prepare("SELECT on_hand,reserved,version FROM wms_stock WHERE tw_id=?")
+      .get(p.twId),
+    before,
+  );
+  const key = randomUUID();
+  const first = W.actOnOrder(picker, key, o.id, body);
+  assert.equal(first.lines[0].picked, 1);
+  assert.deepEqual(
+    W.actOnOrder(picker, key, o.id, body),
+    JSON.parse(JSON.stringify(first)),
+  );
+  assert.equal(C.getCartRun(picker, run.id).returns[0].remaining, 1);
+  assert.equal(W.getOrder(otherOrder.id).lines[0].picked, 2);
+  assert.throws(
+    () => W.actOnOrder(picker, randomUUID(), o.id, body),
+    /zmieniło/,
+  );
+  const last = W.actOnOrder(picker, randomUUID(), o.id, {
+    ...body,
+    version: first.version,
+  });
+  assert.equal(C.getCartRun(picker, run.id).returns.length, 0);
+  assert.equal(last.hold_reason, "Rezygnacja klienta");
+  assert.equal(last.status, "picking");
+  const stock = db()
+    .prepare("SELECT on_hand,reserved FROM wms_stock WHERE tw_id=?")
+    .get(p.twId);
+  assert.deepEqual({ ...stock }, { on_hand: 8, reserved: 2 });
+});
+
+test("wznowienie przez biuro usuwa zwrot z kolejki i odrzuca skan po odświeżeniu wersji", () => {
+  const p = product();
+  order(p.sku, 2);
+  const run = start(cart().code);
+  pickAll(run.id);
+  let o = W.getOrder(run.orders[0].id);
+  o = W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "hold",
+    version: o.version,
+    reason: "Sprawdzenie klienta",
+  });
+  assert.equal(C.getCartRun(picker, run.id).returns.length, 1);
+  o = W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "resume",
+    version: o.version,
+    reason: "Klient potwierdził",
+  });
+  assert.equal(C.getCartRun(picker, run.id).returns.length, 0);
+  assert.throws(
+    () =>
+      W.actOnOrder(picker, randomUUID(), o.id, {
+        action: "return",
+        version: o.version,
+        tote: o.tote!,
+        allocationId: o.allocations[0].id,
+        barcode: p.sku,
+        bin: p.bin,
+        quantity: 1,
+        reason: "Stary zwrot",
+      }),
+    /wstrzymaj/,
+  );
+  assert.equal(W.getOrder(o.id).lines[0].picked, 2);
+});
+
+test("przekazanie skrzynki zatrzymuje stary zwrot kolektora mimo niezmienionej wersji zamówienia", () => {
+  const p = product();
+  order(p.sku, 2);
+  const run = start(cart().code);
+  pickAll(run.id);
+  let o = W.getOrder(run.orders[0].id);
+  o = W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "hold",
+    version: o.version,
+    reason: "Sprawdzenie zamówienia",
+  });
+  const body = {
+    action: "return",
+    runId: run.id,
+    version: o.version,
+    tote: o.tote!,
+    allocationId: o.allocations[0].id,
+    barcode: p.sku,
+    bin: p.bin,
+    quantity: 1,
+    reason: "Zwrot z wózka",
+  };
+  assert.equal(C.getCartRun(picker, run.id).returns.length, 1);
+  C.handoffCart(picker, randomUUID(), run.id, {
+    cart: run.cart_code,
+    station: "PACK-01",
+  });
+  assert.equal(C.getCartRun(picker, run.id).returns.length, 0);
+  assert.equal(W.getOrder(o.id).version, o.version);
+  const before = db()
+    .prepare("SELECT on_hand,reserved,version FROM wms_stock WHERE tw_id=?")
+    .get(p.twId);
+  assert.throws(
+    () => W.actOnOrder(picker, randomUUID(), o.id, body),
+    /przekazana/,
+  );
+  assert.deepEqual(
+    db()
+      .prepare("SELECT on_hand,reserved,version FROM wms_stock WHERE tw_id=?")
+      .get(p.twId),
+    before,
+  );
+  assert.equal(W.getOrder(o.id).lines[0].picked, 2);
+});
+
 for (const capacity of [20, 30] as const)
   test(`skan wózka ${capacity}: automatyczny przydział, stałe pozycje i odtworzenie po przerwaniu`, () => {
     const p = product();
@@ -429,6 +588,7 @@ test("wyjątek nie koryguje zapasu; usunięcie wymaga zwrotu pobranych sztuk", (
   );
   o = W.actOnOrder(picker, randomUUID(), o.id, {
     action: "return",
+    tote: o.tote ?? "RECHECK-1",
     version: o.version,
     allocationId: t.allocation_id,
     bin: t.bin,

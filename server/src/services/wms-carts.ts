@@ -58,8 +58,7 @@ type Assignment = {
 function cartByCode(value: string) {
   return (
     (db().prepare("SELECT * FROM wms_cart WHERE code=?").get(value) as
-      | Cart
-      | undefined) ?? fail("Nieznany kod wózka", 404)
+      Cart | undefined) ?? fail("Nieznany kod wózka", 404)
   );
 }
 function activeRun(value: string) {
@@ -337,7 +336,25 @@ function readCartRun(actor: Actor, runId: number) {
   const exceptions = db()
     .prepare("SELECT * FROM wms_pick_exception WHERE run_id=? ORDER BY id DESC")
     .all(runId);
-  return { ...wave, ...run!, assignments, exceptions };
+  // Zwrot jest pracą obecnego właściciela przed przekazaniem skrzynki. Samo wstrzymanie nie zleca zwrotu.
+  const returns = db()
+    .prepare(
+      `
+    SELECT a.id AS allocation_id,a.picked AS remaining,a.bin,l.tw_id,l.sku,l.name,l.barcode,
+      o.id AS order_id,o.version,o.tote,o.hold_reason,ca.position
+    FROM wms_cart_assignment ca JOIN wms_order o ON o.id=ca.order_id
+    JOIN wms_line l ON l.order_id=o.id JOIN wms_allocation a ON a.line_id=l.id
+    LEFT JOIN wms_pick_route r ON r.bin=a.bin
+    WHERE ca.run_id=? AND ca.ended_at IS NULL AND ca.released_at IS NULL AND ca.handed_at IS NULL
+      AND o.hold_reason IS NOT NULL AND o.status IN ('picking','picked') AND a.picked>0
+      AND o.picker_id=? AND o.tote=ca.box_barcode
+      AND NOT EXISTS(SELECT 1 FROM wms_shipment s WHERE s.order_id=o.id)
+      AND NOT EXISTS(SELECT 1 FROM wms_pack_recovery p WHERE p.order_id=o.id AND p.completed_at IS NULL AND p.cancelled_at IS NULL)
+    ORDER BY coalesce(r.sequence,1000001),a.bin,l.sku,ca.position,a.id
+  `,
+    )
+    .all(runId, actor.id);
+  return { ...wave, ...run!, assignments, exceptions, returns };
 }
 
 export function startCart(actor: Actor, key: string, raw: unknown) {

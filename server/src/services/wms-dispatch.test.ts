@@ -261,6 +261,7 @@ test("ponowna kontrola wycofuje etykiety i wymaga ponownego sprawdzenia zawartoÅ
     () =>
       W.actOnOrder(admin, randomUUID(), o.id, {
         action: "return",
+        tote: o.tote ?? "RECHECK-1",
         version: o.version,
         allocationId: o.allocations[0].id,
         barcode: o.lines[0].sku,

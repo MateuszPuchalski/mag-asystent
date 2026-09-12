@@ -590,7 +590,7 @@ window.Wms = (() => {
       o.hold_reason && o.allocations.some((a) => a.picked > 0)
         ? form(
             "return",
-            `<label>Odłóż pozycję<select name="allocationId">${o.allocations
+            `<p>Zwrot z ${html(o.tote)}. Odłóż tylko sprawne sztuki; uszkodzenie rozlicz osobno.</p>${field("tote", "1. Skan skrzynki źródłowej")}<label>Odłóż pozycję<select name="allocationId">${o.allocations
               .filter((a) => a.picked > 0)
               .map(
                 (a) =>
@@ -598,7 +598,7 @@ window.Wms = (() => {
               )
               .join(
                 "",
-              )}</select></label>${field("bin", "Zeskanuj lokalizację")}${field("barcode", "Zeskanuj towar")}${field("quantity", "Odkładana ilość", "number", 1, 'min="1"')}${field("reason", "Powód odłożenia")}`,
+              )}</select></label>${field("barcode", "2. Skan części")}${field("quantity", "3. Policzona ilość", "number", "", `min="1" max="${o.allocations.find((a) => a.picked > 0).picked}" step="1"`)}${field("reason", "4. Powód odłożenia", "text", "", 'minlength="3" maxlength="500"')}${field("bin", "5. Skan półki po odłożeniu")}`,
             "POTWIERDŹ ODŁOŻENIE",
           )
         : "";
@@ -1242,6 +1242,18 @@ window.Wms = (() => {
   document.addEventListener("submit", submit);
   document.addEventListener("change", async (event) => {
     packingUi.change(event.target);
+    const returnForm = event.target.closest('[data-action-wms="return"]');
+    if (returnForm && event.target.name === "allocationId") {
+      // Nowa pozycja nie dziedziczy skanów części, ilości ani miejsca odłożenia.
+      for (const name of ["barcode", "quantity", "bin"])
+        returnForm.elements.namedItem(name).value = "";
+      const allocation = current?.allocations.find(
+        (a) => a.id === Number(event.target.value),
+      );
+      returnForm.elements.namedItem("quantity").max = String(
+        allocation?.picked ?? 0,
+      );
+    }
     if (event.target.id === "wms-stock-file") {
       root()._stockImport = null;
       el("wms-stock-preview-result").textContent = "";
@@ -1276,6 +1288,12 @@ window.Wms = (() => {
       }
   });
   document.addEventListener("input", (event) => {
+    const returnForm = event.target.closest('[data-action-wms="return"]');
+    if (
+      returnForm &&
+      ["tote", "barcode", "quantity"].includes(event.target.name)
+    )
+      returnForm.elements.namedItem("bin").value = "";
     if (event.target.closest("#wms-stock-preview")) {
       root()._stockImport = null;
       el("wms-stock-preview-result").textContent = "";
@@ -1287,6 +1305,22 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Enter" &&
+      event.target.form?.dataset.actionWms === "return"
+    ) {
+      const next = {
+        tote: "barcode",
+        barcode: "quantity",
+        quantity: "reason",
+        reason: "bin",
+      }[event.target.name];
+      if (next) {
+        advanceScan(event, next);
+      }
+      // Końcowy skan półki zatwierdza zwrot; reguła zwykłej zbiórki wracałaby do SKU.
+      return;
+    }
     if (inboundUi.keydown(event)) return;
     if (recoveryUi.keydown(event)) return;
     if (

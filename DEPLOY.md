@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.311.0 zwrot pobrania wymaga kodu skrzynki. Przed aktualizacją rozliczyć oczekujące zapisy urządzeń i Biura; nie usuwać ich dzienników.
+Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Brak migracji danych; starszy APK nie ma ścieżki zwrotu.
+Odbiór seeded: wstrzymana skrzynka własnego wózka → skan skrzynki → część → ilość → półka. Przekazanie skrzynki w trakcie blokuje zapis.
+
 Poprawka 0.310.1 wymaga aktualizacji APK dla pustego pola odłożenia i kasowania ilości po zmianie dobry/uszkodzony.
 Nie zmienia API ani bazy. Odbiór seeded: wpisana ilość → zmiana dyspozycji → puste pole; za długa liczba pozostaje widoczna i jest odrzucana.
 

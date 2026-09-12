@@ -181,6 +181,8 @@ export const actionInput = z.discriminatedUnion("action", [
     .object({
       action: z.literal("return"),
       version,
+      tote: label,
+      runId: id.optional(),
       allocationId: id,
       barcode: label,
       bin,
@@ -1245,6 +1247,29 @@ export function applyOrderAction(
       requireState("picking", "picked", "packing", "packed");
       if (!order.hold_reason)
         fail("Najpierw wstrzymaj zamówienie przed odkładaniem towaru");
+      // Ten sam SKU z tej samej półki może leżeć w wielu skrzynkach wózka.
+      if (!order.tote || input.tote !== order.tote)
+        fail(
+          `Zeskanuj skrzynkę ${order.tote ?? "przypisaną do zamówienia"}`,
+          400,
+        );
+      if (
+        input.runId !== undefined &&
+        !d
+          .prepare(
+            `
+        SELECT 1 FROM wms_cart_assignment a JOIN wms_cart_run r ON r.id=a.run_id
+        JOIN wms_wave w ON w.id=r.id
+        WHERE a.run_id=? AND a.order_id=? AND a.box_barcode=? AND w.picker_id=?
+          AND r.arrived_at IS NULL AND r.closed_at IS NULL
+          AND a.handed_at IS NULL AND a.released_at IS NULL AND a.ended_at IS NULL
+      `,
+          )
+          .get(input.runId, orderId, input.tote, actor.id)
+      )
+        fail(
+          "Skrzynka została przekazana lub wózek zmienił właściciela. Odśwież trasę",
+        );
       if (
         actor.role === "magazynier" &&
         actor.id !== order.picker_id &&
