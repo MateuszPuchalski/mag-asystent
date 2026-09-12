@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import * as Carts from "../services/wms-carts.js";
 import * as StockWork from "../services/wms-stock-work.js";
+import * as Counting from "../services/wms-counting.js";
 import * as Inbound from "../services/wms-inbound.js";
 import * as Putaway from "../services/wms-putaway.js";
 import * as Handoff from "../services/wms-dispatch.js";
@@ -258,10 +259,18 @@ export async function wmsRoutes(app: FastifyInstance) {
   app.get("/api/wms/stock-work", async (req) =>
     StockWork.stockWork(actor(), req.query),
   );
+  app.get("/api/wms/count-work", async (req) =>
+    Counting.countQueue(actor(), req.query),
+  );
+  app.get<{ Params: { id: string } }>("/api/wms/count-work/:id", async (req) =>
+    Counting.countTask(actor(), orderId(req.params.id)),
+  );
   for (const [path, action] of Object.entries({
     "/api/wms/replenishments/:id/complete": StockWork.completeReplenishment,
     "/api/wms/replenishments/:id/cancel": StockWork.cancelReplenishment,
     "/api/wms/stock-checks/:id/count": StockWork.countStockCheck,
+    "/api/wms/stock-checks/:id/observe": Counting.observeCount,
+    "/api/wms/stock-checks/:id/review": Counting.reviewCount,
   }))
     app.post<{ Params: { id: string } }>(path, async (req) =>
       action(

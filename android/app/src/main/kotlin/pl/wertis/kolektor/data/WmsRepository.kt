@@ -44,12 +44,23 @@ import retrofit2.http.Path
 import retrofit2.http.Url
 import retrofit2.http.Query
 
+import pl.wertis.kolektor.core.wms.WmsCountController
+import pl.wertis.kolektor.core.wms.WmsCountQueue
+import pl.wertis.kolektor.core.wms.WmsCountTask
+import pl.wertis.kolektor.core.wms.WmsCountTransport
+
 interface WmsApi {
     @POST
     suspend fun command(@Url path: String, @Header("idempotency-key") key: String, @Body body: JsonObject): JsonObject
 
     @GET("api/wms/cart-runs/{id}")
     suspend fun run(@Path("id") id: Long): WmsRun
+
+    @GET("api/wms/count-work")
+    suspend fun countingQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsCountQueue
+
+    @GET("api/wms/count-work/{id}")
+    suspend fun countingTask(@Path("id") id: Long): WmsCountTask
 
     @GET("api/wms/putaway-work")
     suspend fun putawayQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsPutawayQueue
@@ -139,6 +150,17 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
         object : WmsPutawayTransport {
             override suspend fun queue(query: String, offset: Int) = apiCall { api.putawayQueue(query, offset) }
             override suspend fun putawayTask(id: Long) = apiCall { api.putawayTask(id) }
+            override suspend fun send(command: WmsPending) {
+                apiCall { api.command(command.path, command.key, command.body) }
+            }
+        }
+    })
+
+    val counting = WmsCountController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsCountTransport {
+            override suspend fun queue(query: String, offset: Int) = apiCall { api.countingQueue(query, offset) }
+            override suspend fun countingTask(id: Long) = apiCall { api.countingTask(id) }
             override suspend fun send(command: WmsPending) {
                 apiCall { api.command(command.path, command.key, command.body) }
             }

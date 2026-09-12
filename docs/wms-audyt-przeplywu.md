@@ -301,3 +301,20 @@ Przeszło 2245 testów serwera, 727 panelu, 392 Android core, oba sprawdzenia Ty
 E2E sprawdziło 20 zamówień, wcześniejsze częściowe pobranie, utratę odpowiedzi, ponowienie i kontynuację w tej samej skrzynce.
 W katalogu 5000 SKU przekierowanie 30 zamówień trwało 27,01 ms. Skrajna próba 1500 zamówień jednego SKU trwała 1085,91 ms.
 Obie zachowały zgodny dziennik oraz niezmienny fizyczny stan; ponowienie nie wykonało zapisu. To test syntetyczny, nie wydajność pracowników.
+
+
+### Liczenie na hali i decyzja biura
+
+Audyt wykazał, że otwarte przeliczenia można było zakończyć wyłącznie kontem biura. Kolektor nie miał procesu liczenia półek.
+Dodano ślepe liczenie z pustym polem ilości oraz osobną decyzją biura. Stan oczekiwany nie trafia do odpowiedzi procesu kolektora.
+Wynik oczekuje bez korekty stanu. Jedna oczekująca obserwacja chroni przed nadpisaniem przez drugą osobę.
+Wersja zapasu łączy odczyt, obserwację i akceptację. Zmiana zapasu albo otwarte uzupełnienie wymagają ponownej weryfikacji fizycznej.
+Historia zachowuje autora, ilość, czas, wersję i decyzję. Akceptacja nie pozwala podmienić ilości w formularzu.
+Wspólny dziennik APK chroni przed zgubieniem odpowiedzi i ponowieniem na innym koncie lub serwerze.
+
+Źródło procesu: [Microsoft — Cycle counting](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/cycle-counting).
+Dokument opisuje rejestrowanie liczenia na urządzeniu mobilnym oraz rozstrzyganie różnic oczekujących na przegląd.
+W naszym wdrożeniu każda obserwacja wymaga biura. Nie wprowadzono automatycznego progu tolerancji różnic.
+Testy obejmują zerowy wynik, brak skanów, kolizję operatorów, utratę odpowiedzi, nieaktualne dane i awarię transakcji.
+Próba przeglądarki prowadzi od zgłoszonego braku przez ponowne liczenie do akceptacji z utraconą odpowiedzią.
+Fizyczny odbiór na Zebra/Honeywell pozostaje do wykonania.

@@ -59,6 +59,8 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/cart-runs/1",
     "/api/wms/cart-analytics",
     "/api/wms/stock-work",
+    "/api/wms/count-work",
+    "/api/wms/count-work/1",
     "/api/wms/pick-route",
     "/api/wms/analytics",
     "/api/wms/analytics/flow/csv",
@@ -439,4 +441,87 @@ test("API kolektora rozróżnia cudzą trasę, odmowę zapisu i nieważną sesj�
   );
   assert.equal(session.statusCode, 401);
   assert.equal(session.json().kod, undefined);
+});
+
+test("hala przesyła ślepe liczenie, a wyłącznie biuro zatwierdza wynik", async () => {
+  const { db } = await import("../db/db.js");
+  const { changeStock } = await import("../services/wms.js");
+  changeStock({ id: 1, name: "Biuro", role: "admin" }, randomUUID(), {
+    action: "receive",
+    twId: 1,
+    bin: "COUNT-API",
+    quantity: 5,
+    reason: "Test liczenia",
+  });
+  const checkId = Number(
+    db()
+      .prepare(
+        "INSERT INTO wms_stock_check(tw_id,bin,reason,user_id,created_at) VALUES (1,'COUNT-API','Brak',2,?)",
+      )
+      .run(new Date().toISOString()).lastInsertRowid,
+  );
+  const task = (
+    await app.inject({
+      url: `/api/wms/count-work/${checkId}`,
+      headers: { "x-session": workerToken },
+    })
+  ).json();
+  assert.equal(task.on_hand, undefined);
+  const url = `/api/wms/stock-checks/${checkId}/observe`;
+  const payload = {
+    bin: task.bin,
+    barcode: task.sku,
+    quantity: 3,
+    version: task.version,
+  };
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url,
+        headers: { "idempotency-key": randomUUID() },
+        payload,
+      })
+    ).statusCode,
+    401,
+  );
+  const observed = await app.inject({
+    method: "POST",
+    url,
+    headers: { "x-session": workerToken, "idempotency-key": randomUUID() },
+    payload,
+  });
+  assert.equal(observed.statusCode, 200, observed.body);
+  const review = {
+    observationId: observed.json().observationId,
+    decision: "accept",
+    reason: "Zweryfikowano",
+  };
+  const reviewUrl = `/api/wms/stock-checks/${checkId}/review`;
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url: reviewUrl,
+        headers: { "x-session": workerToken, "idempotency-key": randomUUID() },
+        payload: review,
+      })
+    ).statusCode,
+    403,
+  );
+  const accepted = await app.inject({
+    method: "POST",
+    url: reviewUrl,
+    headers: headers(),
+    payload: review,
+  });
+  assert.equal(accepted.statusCode, 200, accepted.body);
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT on_hand FROM wms_stock WHERE tw_id=1 AND bin='COUNT-API'",
+      )
+      .get()!.on_hand,
+    3,
+  );
 });

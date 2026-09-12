@@ -240,6 +240,24 @@ CREATE TABLE IF NOT EXISTS wms_stock_check (
   resolution TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_stock_check_open ON wms_stock_check(tw_id,bin) WHERE resolved_at IS NULL;
+-- Wynik z hali nie zmienia zapasu przed decyzją biura; odrzucone liczenia pozostają w historii.
+CREATE TABLE IF NOT EXISTS wms_stock_observation (
+  id INTEGER PRIMARY KEY,
+  check_id INTEGER NOT NULL REFERENCES wms_stock_check(id),
+  quantity INTEGER NOT NULL CHECK(quantity BETWEEN 0 AND 1000000),
+  stock_version INTEGER NOT NULL CHECK(stock_version>0),
+  barcode TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  reviewed_at TEXT,
+  reviewer_id INTEGER,
+  decision TEXT CHECK(decision IN ('accept','recount')),
+  reason TEXT,
+  CHECK((reviewed_at IS NULL AND reviewer_id IS NULL AND decision IS NULL AND reason IS NULL)
+    OR (reviewed_at IS NOT NULL AND reviewer_id IS NOT NULL AND decision IS NOT NULL AND reason IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_stock_observation_pending ON wms_stock_observation(check_id) WHERE reviewed_at IS NULL;
+CREATE INDEX IF NOT EXISTS ix_wms_stock_observation_check ON wms_stock_observation(check_id,id);
 CREATE TABLE IF NOT EXISTS wms_replenishment (
   id INTEGER PRIMARY KEY,
   tw_id INTEGER NOT NULL,

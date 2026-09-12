@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.302.0 kolektor ma **PRZELICZENIA WMS**. Zaktualizować API i APK; restart API dodaje tabelę obserwacji bez zmiany istniejących przeliczeń.
+Wyniki z hali zatwierdza biuro w **Zadaniach zapasu**. Do akceptacji lub ponownego liczenia półka pozostaje zablokowana.
+Nie cofać APK podczas oczekującej operacji liczenia. Najpierw rozliczyć jej wynik na pierwotnym koncie i serwerze.
+
 Od 0.301.0 zgłoszenie braku może automatycznie przekierować niezebrane przydziały na inne dostępne półki, według priorytetu zamówień.
 Zaktualizować także APK, aby operator widział opis nowego zachowania. Nie jest wymagana migracja ani dodatkowa konfiguracja.
 Przeliczenie zgłoszonej półki pozostaje osobnym zadaniem; jej fizyczny stan nie jest korygowany samym zgłoszeniem.

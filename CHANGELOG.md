@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.302.0 — ślepe przeliczenie półki na kolektorze
+
+Kolektor zapisuje wynik liczenia po skanie półki i części, bez pokazywania stanu oczekiwanego.
+Ilość zaczyna pusta; zero wymaga jawnego wpisania. Wynik czeka na decyzję biura bez zmiany zapasu.
+Biuro zatwierdza niezmienioną ilość albo zleca ponowne liczenie z uzasadnieniem. Zmiana stanu od liczenia blokuje akceptację.
+Historia zachowuje kolejne obserwacje. Akceptacja koryguje zapas i rezerwacje w jednej transakcji.
+APK korzysta ze wspólnego dziennika odzyskiwania operacji. Testy obejmują restart, utratę odpowiedzi, współbieżność i odmowę zapisu.
+Walidacja: 2254 testy serwera, 727 panelu, 403 Android core; E2E ponownego liczenia i odzyskania odpowiedzi na decyzję.
+
 ## 0.301.0 — zbiórka omija półkę ze zgłoszonym brakiem
 
 - Brak części uruchamia próbę przydziału z innych dostępnych półek, również dla pozostałych dotkniętych zamówień, według priorytetu.

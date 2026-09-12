@@ -21,6 +21,7 @@ fun WmsPendingNotice(graph: AppGraph, pending: WmsPending, context: WmsContext, 
     val target = when (pending.workflow) {
         "picking" -> Screen.WMS_PICKING to "WRÓĆ DO ZBIÓRKI WMS"
         "putaway" -> Screen.WMS_PUTAWAY to "WRÓĆ DO ODKŁADANIA WMS"
+        "counting" -> Screen.WMS_COUNTING to "WRÓĆ DO PRZELICZENIA WMS"
         "receiving" -> Screen.WMS_RECEIVING to "WRÓĆ DO PRZYJĘCIA WMS"
         else -> null
     }

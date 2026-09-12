@@ -155,7 +155,11 @@ function readStockWork(actor: Actor, raw: unknown) {
       .all(Number(actor.role !== "magazynier"), actor.id),
     checks: db()
       .prepare(
-        `SELECT c.*,p.symbol AS sku,p.nazwa AS name,s.version AS stock_version,s.on_hand,s.reserved FROM wms_stock_check c
+        `SELECT c.*,p.symbol AS sku,p.nazwa AS name,s.version AS stock_version,s.on_hand,s.reserved,
+      v.id AS observation_id,v.quantity AS observed_quantity,v.stock_version AS observed_version,
+      v.created_at AS observed_at,u.name AS counter_name FROM wms_stock_check c
+      LEFT JOIN wms_stock_observation v ON v.check_id=c.id AND v.reviewed_at IS NULL
+      LEFT JOIN app_user u ON u.user_id=v.user_id
       JOIN wms_stock s ON s.tw_id=c.tw_id AND s.bin=c.bin JOIN wms_product p ON p.tw_id=c.tw_id WHERE c.resolved_at IS NULL ORDER BY c.created_at LIMIT 100`,
       )
       .all(),
@@ -388,92 +392,113 @@ export function countStockCheck(
     .strict()
     .parse(raw);
   return command(key, actor, "stock_check_count", { checkId, ...input }, () => {
-    const check = db()
-      .prepare(
-        "SELECT * FROM wms_stock_check WHERE id=? AND resolved_at IS NULL",
-      )
-      .get(id.parse(checkId));
-    if (!check || check.bin !== input.bin)
-      fail("Zeskanuj lokalizację otwartego przeliczenia", 400);
-    const twId = Number(check!.tw_id),
-      current = stock(twId, input.bin);
     if (
       db()
         .prepare(
-          "SELECT 1 FROM wms_replenishment WHERE tw_id=? AND (source=? OR target=?) AND completed_at IS NULL AND cancelled_at IS NULL",
+          "SELECT 1 FROM wms_stock_observation WHERE check_id=? AND reviewed_at IS NULL",
         )
-        .get(twId, input.bin, input.bin)
+        .get(checkId)
     )
-      fail(
-        "Najpierw rozlicz uzupełnienie tej półki. Przy anulowaniu odłóż towar na źródło przed przeliczeniem",
-      );
-    if (!current || current.version !== input.version)
-      fail("Stan zmienił się. Odśwież dane i przelicz ponownie");
-    checkBarcode(product(twId), input.barcode);
-    const affected = db()
-      .prepare(
-        `SELECT a.*,l.order_id FROM wms_allocation a JOIN wms_line l ON l.id=a.line_id
-      JOIN wms_order o ON o.id=l.order_id WHERE l.tw_id=? AND a.bin=? AND a.quantity>a.picked ORDER BY o.priority DESC,o.due_at,o.id`,
-      )
-      .all(twId, input.bin);
-    const orderIds = [...new Set(affected.map((a) => Number(a.order_id)))];
-    // Liczymy stan fizyczny na półce. Rezerwacje niezebranych sztuk wracają dopiero po zweryfikowaniu rzeczywistego zapasu.
-    for (const a of affected) {
-      move(
-        actor,
-        twId,
-        input.bin,
-        0,
-        -(Number(a.quantity) - Number(a.picked)),
-        "release",
-        input.reason,
-        Number(a.order_id),
-      );
-      if (a.picked)
-        db()
-          .prepare("UPDATE wms_allocation SET quantity=picked WHERE id=?")
-          .run(a.id);
-      else db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
-    }
-    applyStock(actor, {
-      action: "count",
-      twId,
-      bin: input.bin,
-      quantity: input.quantity,
-      version: stock(twId, input.bin)!.version,
-      reason: input.reason,
-    });
+      fail("Najpierw zatwierdź wynik z kolektora albo zleć ponowne liczenie");
+    return applyStockCheckCount(actor, checkId, input);
+  });
+}
+
+// Tylko wewnątrz command: akceptacja obserwacji i korekta zapasu muszą mieć wspólny wynik.
+export function applyStockCheckCount(
+  actor: Actor,
+  checkId: number,
+  input: {
+    bin: string;
+    barcode: string;
+    quantity: number;
+    version: number;
+    reason: string;
+  },
+) {
+  manager(actor);
+  if (!db().isTransaction)
+    throw new Error("Przeliczenie wymaga transakcji command");
+  const check = db()
+    .prepare("SELECT * FROM wms_stock_check WHERE id=? AND resolved_at IS NULL")
+    .get(id.parse(checkId));
+  if (!check || check.bin !== input.bin)
+    fail("Zeskanuj lokalizację otwartego przeliczenia", 400);
+  const twId = Number(check!.tw_id),
+    current = stock(twId, input.bin);
+  if (
     db()
       .prepare(
-        "UPDATE wms_stock_check SET resolved_at=?,counted=?,resolution=? WHERE id=?",
+        "SELECT 1 FROM wms_replenishment WHERE tw_id=? AND (source=? OR target=?) AND completed_at IS NULL AND cancelled_at IS NULL",
       )
-      .run(nowIso(), input.quantity, input.reason, checkId);
-    const results: { orderId: number; reserved: boolean; error?: string }[] =
-      [];
-    for (const orderId of orderIds) {
-      db().exec("SAVEPOINT repair_order");
-      try {
-        fillOrderReservations(actor, orderId);
-        db().exec("RELEASE repair_order");
-        results.push({ orderId, reserved: true });
-      } catch (error) {
-        db().exec("ROLLBACK TO repair_order");
-        db().exec("RELEASE repair_order");
-        if (!(error instanceof WmsError)) throw error;
-        db()
-          .prepare(
-            "UPDATE wms_order SET hold_reason=coalesce(hold_reason,?) WHERE id=?",
-          )
-          .run(`Brak po przeliczeniu: ${error.message}`, orderId);
-        results.push({ orderId, reserved: false, error: error.message });
-      }
+      .get(twId, input.bin, input.bin)
+  )
+    fail(
+      "Najpierw rozlicz uzupełnienie tej półki. Przy anulowaniu odłóż towar na źródło przed przeliczeniem",
+    );
+  if (!current || current.version !== input.version)
+    fail("Stan zmienił się. Odśwież dane i przelicz ponownie");
+  checkBarcode(product(twId), input.barcode);
+  const affected = db()
+    .prepare(
+      `SELECT a.*,l.order_id FROM wms_allocation a JOIN wms_line l ON l.id=a.line_id
+      JOIN wms_order o ON o.id=l.order_id WHERE l.tw_id=? AND a.bin=? AND a.quantity>a.picked ORDER BY o.priority DESC,o.due_at,o.id`,
+    )
+    .all(twId, input.bin);
+  const orderIds = [...new Set(affected.map((a) => Number(a.order_id)))];
+  // Liczymy stan fizyczny na półce. Rezerwacje niezebranych sztuk wracają dopiero po zweryfikowaniu rzeczywistego zapasu.
+  for (const a of affected) {
+    move(
+      actor,
+      twId,
+      input.bin,
+      0,
+      -(Number(a.quantity) - Number(a.picked)),
+      "release",
+      input.reason,
+      Number(a.order_id),
+    );
+    if (a.picked)
+      db()
+        .prepare("UPDATE wms_allocation SET quantity=picked WHERE id=?")
+        .run(a.id);
+    else db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
+  }
+  applyStock(actor, {
+    action: "count",
+    twId,
+    bin: input.bin,
+    quantity: input.quantity,
+    version: stock(twId, input.bin)!.version,
+    reason: input.reason,
+  });
+  db()
+    .prepare(
+      "UPDATE wms_stock_check SET resolved_at=?,counted=?,resolution=? WHERE id=?",
+    )
+    .run(nowIso(), input.quantity, input.reason, checkId);
+  const results: { orderId: number; reserved: boolean; error?: string }[] = [];
+  for (const orderId of orderIds) {
+    db().exec("SAVEPOINT repair_order");
+    try {
+      fillOrderReservations(actor, orderId);
+      db().exec("RELEASE repair_order");
+      results.push({ orderId, reserved: true });
+    } catch (error) {
+      db().exec("ROLLBACK TO repair_order");
+      db().exec("RELEASE repair_order");
+      if (!(error instanceof WmsError)) throw error;
       db()
         .prepare(
-          "UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?",
+          "UPDATE wms_order SET hold_reason=coalesce(hold_reason,?) WHERE id=?",
         )
-        .run(nowIso(), orderId);
+        .run(`Brak po przeliczeniu: ${error.message}`, orderId);
+      results.push({ orderId, reserved: false, error: error.message });
     }
-    // Zgłoszenie pozostaje do decyzji biura. Przeliczenie półki nie potwierdza zawartości skrzynki.
-    return { checkId, counted: input.quantity, results };
-  });
+    db()
+      .prepare("UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?")
+      .run(nowIso(), orderId);
+  }
+  // Zgłoszenie pozostaje do decyzji biura. Przeliczenie półki nie potwierdza zawartości skrzynki.
+  return { checkId, counted: input.quantity, results };
 }

@@ -143,4 +143,85 @@ export async function exerciseReroute(page, output) {
       2,
     ),
   );
+  // Ten sam zgłoszony brak kończy się wynikiem z hali i decyzją biura.
+  const check = checks.checks.find((c) => c.bin === "00-REROUTE");
+  const countTask = await api(`/api/wms/count-work/${check.id}`);
+  expect(countTask.on_hand).toBeUndefined();
+  await api(`/api/wms/stock-checks/${check.id}/observe`, {
+    bin: countTask.bin,
+    barcode: countTask.sku,
+    quantity: 0,
+    version: countTask.version,
+  });
+  expect(
+    (await api("/api/wms/inventory?q=WMS-0040")).rows.find(
+      (r) => r.bin === "00-REROUTE",
+    ).on_hand,
+  ).toBe(59);
+  await page.locator('[data-tab-wms="stockwork"]').click();
+  await page.locator(`[data-stockwork-check="${check.id}"]`).click();
+  await expect(page.locator("#wms-stockwork-detail")).toContainText(
+    "Policzono 0 szt.",
+  );
+  await page
+    .locator('#wms-stockwork-review [name="decision"]')
+    .selectOption("recount");
+  await page
+    .locator('#wms-stockwork-review [name="reason"]')
+    .fill("Sprawdź także tył półki");
+  await page.locator("#wms-stockwork-review button").click();
+  await expect
+    .poll(async () => (await api(`/api/wms/count-work/${check.id}`)).pending)
+    .toBe(0);
+  const again = await api(`/api/wms/count-work/${check.id}`);
+  expect(again.recount_reason).toBe("Sprawdź także tył półki");
+  await api(`/api/wms/stock-checks/${check.id}/observe`, {
+    bin: again.bin,
+    barcode: again.sku,
+    quantity: 0,
+    version: again.version,
+  });
+  await page.locator('[data-tab-wms="stockwork"]').click();
+  await page.locator(`[data-stockwork-check="${check.id}"]`).click();
+  await page
+    .locator('#wms-stockwork-review [name="reason"]')
+    .fill("Powtórne liczenie potwierdziło brak");
+  await page.route(
+    `**/api/wms/stock-checks/${check.id}/review`,
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await page.locator("#wms-stockwork-review button").click();
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  await expect(
+    page.locator(`[data-stockwork-check="${check.id}"]`),
+  ).toHaveCount(0);
+  expect(
+    (await api(`/api/wms/count-work/${check.id}`)).resolved_at,
+  ).toBeTruthy();
+  expect(
+    (await api("/api/wms/inventory?q=WMS-0040")).rows.find(
+      (r) => r.bin === "00-REROUTE",
+    ).on_hand,
+  ).toBe(0);
+  expect((await api("/api/wms/integrity")).ok).toBe(true);
+  writeFileSync(
+    path.join(output, "counting-e2e.json"),
+    JSON.stringify(
+      {
+        passed: true,
+        seeded: true,
+        blindRead: true,
+        recount: true,
+        approvalResponseLossRecovered: true,
+        integrity: true,
+      },
+      null,
+      2,
+    ),
+  );
 }

@@ -592,3 +592,22 @@ Uszkodzenie i pełna skrzynka nadal wymagają dotychczasowego rozstrzygnięcia; 
 Inny kolektor może mieć otwarty stary przydział. Jego nieaktualny skan zostanie odrzucony, a trasa odczytana ponownie.
 Po komunikacie **Tego pobrania nie zapisano** odłóż tylko niepotwierdzone sztuki na wskazane źródło. Zachowaj wcześniej potwierdzoną zawartość skrzynki.
 Po utracie odpowiedzi ponów tę samą operację. WMS odtworzy wynik bez ponownego przekierowania lub zmiany zapasu.
+
+
+### Przeliczenie półki z kolektora
+
+Na kolektorze wybierz **PRZELICZENIA WMS — SPRAWDŹ PÓŁKĘ**. Skan półki lub części filtruje kolejkę po 50 zadań.
+Wybierz zadanie, zeskanuj jego półkę i SKU albo EAN. Policz sprawne sztuki fizycznie na półce, bez zawartości skrzynek.
+Wpisz rzeczywistą ilość; pole zaczyna puste. Pusta półka wymaga jawnego wpisania **0**. Ekran nie pokazuje stanu oczekiwanego.
+Uszkodzenia pozostaw oddzielnie do wyjaśnienia z biurem. Nie przesuwaj zapasu podczas liczenia.
+
+**WYŚLIJ WYNIK DO BIURA** zapisuje obserwację. Nie zmienia stanu, rezerwacji ani blokady półki.
+Druga osoba nie może przykryć wyniku oczekującego na decyzję. Możesz przejść do kolejnego zadania.
+Po utracie odpowiedzi wybierz **SPRAWDŹ OSTATNI ZAPIS**. Restart zachowuje klucz, konto i serwer.
+Nierozliczona operacja blokuje inne procesy WMS. Powrót z tła i odświeżenie wymagają nowych skanów.
+
+W biurze otwórz **Zadania zapasu → SPRAWDŹ WYNIK LICZENIA**.
+Widzisz ilość operatora, autora, czas oraz bieżący stan. Zatwierdź wynik z uzasadnieniem albo zleć ponowne liczenie.
+Nie edytujesz ilości przesłanej przez operatora. Powód ponownego liczenia pojawi się na kolektorze; poprzedni wynik pozostaje w historii.
+Zmiana wersji zapasu od liczenia blokuje akceptację i wymaga ponownego liczenia. Najpierw rozlicz także otwarte uzupełnienie tej półki.
+Akceptacja koryguje stan i odbudowuje rezerwacje w jednej transakcji. Zgłoszenia zawartości skrzynek wymagają osobnego wyjaśnienia.
