@@ -16,10 +16,20 @@ export async function exerciseInbound(page, output) {
   await scan.press("Enter");
   const form = page.locator("#wms-inbound-putaway");
   await expect(form.locator('[name="quantity"]')).toBeFocused();
+  await expect(form.locator('[name="quantity"]')).toHaveValue("");
+  await form.locator('[name="quantity"]').press("Enter");
+  await expect(form.locator('[name="quantity"]')).toBeFocused();
   await expect(page.locator('[data-photo-id="30"] img')).toBeVisible();
   await expect(page.locator("#wms-inbound-task")).toContainText(
     "sprawdź miejsce",
   );
+  await form.locator('[name="quantity"]').fill("1");
+  await form.locator('[name="bin"]').fill("A04-01-02");
+  await form.locator('[name="disposition"]').selectOption("damaged");
+  await expect(form.locator('[name="quantity"]')).toHaveValue("");
+  await expect(form.locator('[name="bin"]')).toHaveValue("");
+  await form.locator('[name="disposition"]').selectOption("good");
+  await form.locator("details summary").click();
   await form.locator('[name="quantity"]').fill("2");
   await form.locator('[name="quantity"]').press("Enter");
   await expect(form.locator('[name="bin"]')).toBeFocused();
@@ -60,6 +70,8 @@ export async function exerciseInbound(page, output) {
   await expect(page.locator("#wms-inbound-task")).toContainText(
     "Policzono 2 / 3",
   );
+  await expect(form.locator('[name="quantity"]')).toHaveValue("");
+  await form.locator('[name="quantity"]').fill("1");
   await form.locator('[name="quantity"]').press("Enter");
   await form.locator('[name="bin"]').fill("A04-01-02");
   await form.locator('[name="bin"]').press("Enter");
@@ -136,15 +148,29 @@ export async function exerciseInbound(page, output) {
   await page.locator("[data-putaway-open]").first().click();
   await page.locator("#wms-putaway-claim button").click();
   const putaway = page.locator("#wms-putaway-finish");
+  await expect(putaway.locator('[name="quantity"]')).toHaveValue("");
   await expect(page.locator("#wms-content")).toContainText(
     "A04-01-02 (do 5 szt.)",
   );
   await expect(putaway.locator('[name="source"]')).toBeFocused();
+  await putaway.locator("details summary").click();
+  await putaway.locator('[name="quantity"]').fill("1");
+  await putaway.locator('[name="target"]').fill("A04-01-02");
+  await putaway.locator('[name="disposition"]').selectOption("damaged");
+  await expect(putaway.locator('[name="quantity"]')).toHaveValue("");
+  await expect(putaway.locator('[name="target"]')).toHaveValue("");
+  await putaway.locator('[name="disposition"]').selectOption("good");
+  await putaway.locator("details summary").click();
   await putaway.locator('[name="source"]').fill("RES-E2E");
   await putaway.locator('[name="source"]').press("Enter");
   await expect(putaway.locator('[name="barcode"]')).toBeFocused();
   await putaway.locator('[name="barcode"]').fill("WMS-0030");
   await putaway.locator('[name="barcode"]').press("Enter");
+  for (const invalid of ["", "0", "1.5", "6"]) {
+    await putaway.locator('[name="quantity"]').fill(invalid);
+    await putaway.locator('[name="quantity"]').press("Enter");
+    await expect(putaway.locator('[name="quantity"]')).toBeFocused();
+  }
   await putaway.locator('[name="quantity"]').fill("2");
   await putaway.locator('[name="quantity"]').press("Enter");
   await expect(putaway.locator('[name="target"]')).toBeFocused();
@@ -185,6 +211,7 @@ export async function exerciseInbound(page, output) {
     .getByText("Brakuje policzonych sztuk — korekta", { exact: true })
     .click();
   const correction = page.locator("#wms-putaway-correct");
+  await expect(correction.locator('[name="quantity"]')).toHaveValue("");
   await correction.locator('[name="source"]').fill("RES-E2E");
   await correction.locator('[name="barcode"]').fill("WMS-0030");
   await correction.locator('[name="quantity"]').fill("1");
@@ -197,6 +224,8 @@ export async function exerciseInbound(page, output) {
   );
   await putaway.locator('[name="source"]').fill("RES-E2E");
   await putaway.locator('[name="barcode"]').fill("WMS-0030");
+  await expect(putaway.locator('[name="quantity"]')).toHaveValue("");
+  await putaway.locator('[name="quantity"]').fill("2");
   await putaway.locator('[name="target"]').fill("A04-01-02");
   await putaway.locator('[name="target"]').press("Enter");
   await expect(page.locator("#wms-content")).toContainText(

@@ -78,7 +78,7 @@ window.WmsInbound = (h) => {
       .classList.add("wms-inbound-focus");
     window.document.getElementById("wms-inbound-task").innerHTML =
       `<section class="wms-surface"><div class="wms-inbound-product">${h.photo(line)}<div><h3>${html(line.sku)}</h3><p>${html(line.name)}</p><p>Policzono ${line.received} / ${line.expected} szt. · Pozostało ${Math.max(0, line.expected - line.received)}</p><p class="wms-help">${line.bins.length ? `Miejsca według ostatniego odczytu: ${line.bins.map((b) => `${html(b.bin)} (${b.mode === "pick" ? "kompletacja" : "zaplecze"}, ${b.room == null ? "sprawdź miejsce" : `do ${b.room} szt.`})`).join(", ")}` : "Brak podpowiedzi miejsca. Zeskanuj zarejestrowaną lokalizację po odłożeniu."}</p></div></div>
-      <form id="wms-inbound-putaway" class="wms-form"><input type="hidden" name="mode" value="${receivingMode}">${field("barcode", "Kod towaru / SKU", "text", scanned)}<div class="wms-fields">${field("quantity", "Przeliczona ilość", "number", 1, 'min="1" max="1000000" step="1"')}<label>Stan towaru<select name="disposition"><option value="good">Pełnowartościowy</option><option value="damaged">Uszkodzony → kwarantanna</option></select></label></div>${field("bin", "Zeskanuj półkę lub bufor zaplecza")}<details><summary>Uszkodzenie / nadwyżka — uzasadnienie</summary><label>Co stwierdzono?<textarea name="reason" maxlength="500"></textarea></label><p class="wms-help">Uszkodzenie wymaga opisu i kwarantanny. Nadwyżkę zatwierdza biuro z uzasadnieniem.</p></details><button class="primary">POTWIERDŹ ODŁOŻENIE</button></form></section>`;
+      <form id="wms-inbound-putaway" class="wms-form"><input type="hidden" name="mode" value="${receivingMode}">${field("barcode", "Kod towaru / SKU", "text", scanned)}<div class="wms-fields">${field("quantity", "Przeliczona ilość", "number", "", 'min="1" max="1000000" step="1"')}<label>Stan towaru<select name="disposition"><option value="good">Pełnowartościowy</option><option value="damaged">Uszkodzony → kwarantanna</option></select></label></div>${field("bin", "Zeskanuj półkę lub bufor zaplecza")}<details><summary>Uszkodzenie / nadwyżka — uzasadnienie</summary><label>Co stwierdzono?<textarea name="reason" maxlength="500"></textarea></label><p class="wms-help">Uszkodzenie wymaga opisu i kwarantanny. Nadwyżkę zatwierdza biuro z uzasadnieniem.</p></details><button class="primary">POTWIERDŹ ODŁOŻENIE</button></form></section>`;
     const task = window.document.getElementById("wms-inbound-task");
     task.querySelector("section").classList.remove("wms-surface");
     task.insertAdjacentHTML(
@@ -117,7 +117,13 @@ window.WmsInbound = (h) => {
     };
     form()
       .elements.namedItem("disposition")
-      .addEventListener("change", updateMode);
+      .addEventListener("change", () => {
+        // Uszkodzone sztuki trzeba policzyć osobno i potwierdzić ich rzeczywistą kwarantannę.
+        form().elements.namedItem("quantity").value = "";
+        form().elements.namedItem("bin").value = "";
+        updateMode();
+        updateException();
+      });
     updateMode();
     h.mountPhotos();
     h.focus(form().elements.namedItem(scanned ? "quantity" : "barcode"));
@@ -283,16 +289,13 @@ window.WmsInbound = (h) => {
       )
     )
       return false;
-    const fields = event.target.form.elements;
     const next = (
       event.target.form.id === "wms-inbound-putaway"
         ? { barcode: "quantity", quantity: "bin" }
         : { barcode: "bin", bin: "reason" }
     )[event.target.name];
     if (next) {
-      event.preventDefault();
-      fields.namedItem(next).focus();
-      fields.namedItem(next).select();
+      h.advanceScan(event, next);
     }
     // Kolejność przyjęcia kończy się półką; ogólny handler zbiórki wracał stąd do SKU.
     return true;

@@ -314,6 +314,48 @@ try {
     page.getByRole("button", { name: "Zmień", exact: true }),
   ).toHaveCount(1);
   await page.getByRole("button", { name: "Zmień", exact: true }).click();
+  const stockEdit = page.locator("#wms-stock-edit");
+  const stockQuantity = stockEdit.locator('[name="quantity"]');
+  const stockAction = stockEdit.locator('[name="action"]');
+  let uncountedWrites = 0;
+  const countStockWrite = (request) => {
+    if (
+      request.method() === "POST" &&
+      request.url().endsWith("/api/wms/inventory")
+    )
+      uncountedWrites++;
+  };
+  page.on("request", countStockWrite);
+  await expect(stockQuantity).toHaveValue("");
+  await stockEdit.locator('[name="reason"]').fill("Próba pustej ilości seeded");
+  await stockEdit.locator("button").click();
+  await expect(stockQuantity).toBeFocused();
+  await stockQuantity.fill("7");
+  await stockAction.selectOption("transfer");
+  await expect(stockQuantity).toHaveValue("");
+  await stockQuantity.fill("3");
+  await stockEdit.locator('[name="target"]').fill("INNY-CEL");
+  await stockAction.selectOption("count");
+  await expect(stockQuantity).toHaveValue("");
+  await expect(stockEdit.locator('[name="target"]')).toBeDisabled();
+  await expect(stockEdit).toContainText("Cały policzony stan na półce");
+  await stockEdit.locator("button").click();
+  await expect(stockQuantity).toBeFocused();
+  expect(
+    await stockQuantity.evaluate((input) => input.validity.valueMissing),
+  ).toBe(true);
+  await stockQuantity.fill("0");
+  expect(await stockQuantity.evaluate((input) => input.checkValidity())).toBe(
+    true,
+  );
+  await stockAction.selectOption("receive");
+  await expect(stockQuantity).toHaveValue("");
+  await stockQuantity.fill("0");
+  expect(await stockQuantity.evaluate((input) => input.checkValidity())).toBe(
+    false,
+  );
+  expect(uncountedWrites).toBe(0);
+  page.off("request", countStockWrite);
   await page.locator('#wms-stock-edit [name="quantity"]').fill("5");
   await page.locator('#wms-stock-edit [name="reason"]').fill("PZ E2E 5 sztuk");
   await page.getByRole("button", { name: "ZAPISZ RUCH", exact: true }).click();

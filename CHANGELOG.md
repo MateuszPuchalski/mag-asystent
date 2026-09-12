@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.309.1 — jawna ilość przy ruchach magazynowych
+
+- Przyjęcie, odkładanie, korekta bufora i uzupełnienie wymagają wpisania policzonej ilości. Formularz nie podstawia jednej sztuki ani całego planu.
+- Zmiana ręcznego ruchu na spis czyści ilość i cel. Spis opisuje cały stan półki i dopuszcza jawne zero.
+- Zmiana dobry/uszkodzony czyści ilość oraz skan lokalizacji. Poprzednia partia nie potwierdza kwarantanny kolejnych sztuk.
+- Uzupełnienie prowadzi przez źródło, część, ilość, ewentualny powód braku i skan celu. Enter zatrzymuje się na pustych lub nieprawidłowych polach.
+- Browser E2E sprawdza brak zapisu bez ilości, zmianę czynności, granice, kolejność skanów i ponowienie po utracie odpowiedzi.
+- Wykonać build i restart API oraz odświeżyć Biuro. Brak migracji; dotychczasowy APK zachowuje własne potwierdzanie policzonych ilości.
+
 ## 0.309.0 — odkładanie według miejsca na półce
 
 - Przyjęcie i odkładanie korzystają z jednej reguły podpowiedzi. Pełne półki, kwarantanna oraz otwarte blokady nie wypierają użytecznych adresów.

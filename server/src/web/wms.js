@@ -107,6 +107,7 @@ window.Wms = (() => {
     message,
   });
   const inboundUi = window.WmsInbound({
+    advanceScan,
     html,
     field,
     read,
@@ -465,6 +466,14 @@ window.Wms = (() => {
       lock(false);
     }
   }
+  function advanceScan(event, nextName) {
+    event.preventDefault();
+    // Enter skanera nie może przeskoczyć pustej lub nieprawidłowej policzonej ilości.
+    if (!event.target.reportValidity()) return;
+    const next = event.target.form.elements.namedItem(nextName);
+    next.focus();
+    next.select?.();
+  }
   function field(name, label, type = "text", value = "", extra = "") {
     return `<label>${label}<input name="${name}" type="${type}" value="${html(value)}" required ${extra}></label>`;
   }
@@ -668,7 +677,27 @@ window.Wms = (() => {
     const s = root()._stockRows[index];
     root()._stock = s;
     el("wms-stock-form").innerHTML =
-      `<h2>${html(s.symbol)} · operacja magazynowa</h2><form class="wms-form" id="wms-stock-edit"><label>Czynność<select name="action"><option value="receive">Przyjęcie na lokalizację</option><option value="transfer">Przesunięcie / uzupełnienie</option>${office() ? '<option value="count">Spis — stan policzony na półce</option>' : ""}</select></label><div class="wms-fields">${field("bin", "Lokalizacja / źródło", "text", s.bin || "")}${field("quantity", "Ilość", "number", 1, 'min="0"')}</div><label>Lokalizacja docelowa (tylko przesunięcie)<input name="target"></label>${field("reason", "Dokument / powód", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAPISZ RUCH</button></form><p class="wms-help">Spis dotyczy wybranej lokalizacji. Przesunięcie obejmuje wyłącznie sztuki bez rezerwacji.</p>${office() && s.bin ? `<details class="wms-surface"><summary>Minimum i pojemność tej części na ${html(s.bin)}</summary><p>Limit dotyczy sztuk tego SKU, nie łącznej objętości wszystkich części. Puste pole oznacza pojemność nieustaloną. Zero zamyka półkę dla nowych sztuk.</p><form id="wms-stock-limits" class="wms-form">${field("minimum", "Minimum wolnego zapasu", "number", s.minimum, 'min="0" max="1000000" step="1"')}<label>Pojemność tej części w sztukach<input name="capacity" type="number" min="0" max="1000000" step="1" value="${s.capacity ?? ""}"></label>${field("reason", "Powód zmiany", "text", "", 'minlength="3" maxlength="500"')}<button> ZAPISZ PARAMETRY PÓŁKI </button></form></details>` : ""}`;
+      `<h2>${html(s.symbol)} · operacja magazynowa</h2><form class="wms-form" id="wms-stock-edit"><label>Czynność<select name="action"><option value="receive">Przyjęcie na lokalizację</option><option value="transfer">Przesunięcie / uzupełnienie</option>${office() ? '<option value="count">Spis — stan policzony na półce</option>' : ""}</select></label><div class="wms-fields">${field("bin", "Lokalizacja / źródło", "text", s.bin || "")}${field("quantity", "<span data-stock-quantity-label>Przyjmowane sztuki</span>", "number", "", 'min="1" max="1000000" step="1"')}</div><label>Lokalizacja docelowa (tylko przesunięcie)<input name="target"></label>${field("reason", "Dokument / powód", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAPISZ RUCH</button></form><p class="wms-help">Spis dotyczy wybranej lokalizacji. Przesunięcie obejmuje wyłącznie sztuki bez rezerwacji.</p>${office() && s.bin ? `<details class="wms-surface"><summary>Minimum i pojemność tej części na ${html(s.bin)}</summary><p>Limit dotyczy sztuk tego SKU, nie łącznej objętości wszystkich części. Puste pole oznacza pojemność nieustaloną. Zero zamyka półkę dla nowych sztuk.</p><form id="wms-stock-limits" class="wms-form">${field("minimum", "Minimum wolnego zapasu", "number", s.minimum, 'min="0" max="1000000" step="1"')}<label>Pojemność tej części w sztukach<input name="capacity" type="number" min="0" max="1000000" step="1" value="${s.capacity ?? ""}"></label>${field("reason", "Powód zmiany", "text", "", 'minlength="3" maxlength="500"')}<button> ZAPISZ PARAMETRY PÓŁKI </button></form></details>` : ""}`;
+    const form = el("wms-stock-edit");
+    const action = form.elements.namedItem("action");
+    const target = form.elements.namedItem("target");
+    const updateAction = () => {
+      const quantity = form.elements.namedItem("quantity");
+      // Spis jest stanem całej półki; ilość przyjęcia albo przesunięcia nie może stać się wynikiem liczenia.
+      quantity.value = "";
+      quantity.min = action.value === "count" ? "0" : "1";
+      form.querySelector("[data-stock-quantity-label]").textContent = {
+        receive: "Przyjmowane sztuki",
+        transfer: "Przesuwane sztuki",
+        count: "Cały policzony stan na półce (zero = pusto)",
+      }[action.value];
+      target.value = "";
+      target.required = action.value === "transfer";
+      target.disabled = !target.required;
+      target.closest("label").hidden = !target.required;
+    };
+    action.addEventListener("change", updateAction);
+    updateAction();
     el("wms-stock-form").scrollIntoView({ block: "nearest" });
   }
   async function bins(turn) {
@@ -1276,11 +1305,17 @@ window.Wms = (() => {
               target: "returnedSource",
               returnedSource: "reason",
             }
-          : { source: "barcode", barcode: "target" };
+          : {
+              source: "barcode",
+              barcode: "quantity",
+              quantity: event.target.form.elements.namedItem("reason").required
+                ? "reason"
+                : "target",
+              reason: "target",
+            };
       const nextName = sequence[event.target.name];
       if (nextName) {
-        event.preventDefault();
-        event.target.form.elements.namedItem(nextName).focus();
+        advanceScan(event, nextName);
         return;
       }
     }

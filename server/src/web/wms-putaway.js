@@ -24,11 +24,11 @@ window.WmsPutaway = (h) => {
         task.remaining
           ? own
             ? `<p class="wms-help">${task.bins.length ? `Miejsca według ostatniego odczytu: ${task.bins.map((b) => `${html(b.bin)} (${b.room == null ? "sprawdź miejsce" : `do ${b.room} szt.`})`).join(", ")}` : "Zeskanuj zarejestrowaną półkę docelową."}</p>
-      <form id="wms-putaway-finish" class="wms-form"><div class="wms-putaway-fields">${field("source", "1 · Zeskanuj bufor")}${field("barcode", "2 · Zeskanuj towar / SKU")}${field("quantity", "Ilość do odłożenia", "number", task.remaining, `min="1" max="${task.remaining}" step="1"`)}${field("target", "3 · Odłóż i zeskanuj półkę")}</div><button class="primary">POTWIERDŹ ODŁOŻENIE</button><details><summary>Uszkodzenie — odłóż do kwarantanny</summary><label>Stan towaru<select name="disposition"><option value="good">Pełnowartościowy</option><option value="damaged">Uszkodzony</option></select></label><label>Co stwierdzono?<textarea name="reason" maxlength="500"></textarea></label><p>Uszkodzony towar wymaga opisu i skanu lokalizacji kwarantanny.</p></details></form>`
+      <form id="wms-putaway-finish" class="wms-form"><div class="wms-putaway-fields">${field("source", "1 · Zeskanuj bufor")}${field("barcode", "2 · Zeskanuj towar / SKU")}${field("quantity", "3 · Policzona ilość do odłożenia", "number", "", `min="1" max="${task.remaining}" step="1"`)}${field("target", "4 · Odłóż i zeskanuj półkę")}</div><button class="primary">POTWIERDŹ ODŁOŻENIE</button><details><summary>Uszkodzenie — odłóż do kwarantanny</summary><label>Stan towaru<select name="disposition"><option value="good">Pełnowartościowy</option><option value="damaged">Uszkodzony</option></select></label><label>Co stwierdzono?<textarea name="reason" maxlength="500"></textarea></label><p>Uszkodzony towar wymaga opisu i skanu lokalizacji kwarantanny.</p></details></form>`
             : `<p>${task.user_id === null ? "Zadanie czeka na podjęcie." : "Zadanie ma już operatora. Biuro może przejąć je z uzasadnieniem."}</p>${task.user_id === null || h.office() ? `<form id="wms-putaway-claim" class="wms-form">${task.user_id !== null ? field("reason", "Powód przejęcia") : ""}<button class="primary">${task.user_id === null ? "PODEJMIJ ODKŁADANIE" : "PRZEJMIJ ZADANIE"}</button></form>` : ""}`
           : "<p>Wszystkie sztuki rozliczone. Wybierz następne zadanie.</p>"
       }
-      ${task.remaining && h.office() ? `<details><summary>Brakuje policzonych sztuk — korekta</summary>${task.closed_at ? "<p>Najpierw otwórz dokument ponownie w Przyjęciach.</p>" : `<p>Korygujesz wyłącznie brakujące sztuki w buforze. Odłożone sztuki pozostają bez zmian.</p><form id="wms-putaway-correct" class="wms-form">${field("source", "Zeskanuj bufor")}${field("barcode", "Zeskanuj towar / SKU")}${field("quantity", "Brakująca ilość", "number", 1, `min="1" max="${task.remaining}" step="1"`)}${field("reason", "Przyczyna rozbieżności")}<button>ZAPISZ KOREKTĘ PRZYJĘCIA</button></form>`}</details>` : ""}
+      ${task.remaining && h.office() ? `<details><summary>Brakuje policzonych sztuk — korekta</summary>${task.closed_at ? "<p>Najpierw otwórz dokument ponownie w Przyjęciach.</p>" : `<p>Korygujesz wyłącznie brakujące sztuki w buforze. Odłożone sztuki pozostają bez zmian.</p><form id="wms-putaway-correct" class="wms-form">${field("source", "Zeskanuj bufor")}${field("barcode", "Zeskanuj towar / SKU")}${field("quantity", "Brakująca ilość", "number", "", `min="1" max="${task.remaining}" step="1"`)}${field("reason", "Przyczyna rozbieżności")}<button>ZAPISZ KOREKTĘ PRZYJĘCIA</button></form>`}</details>` : ""}
       <details><summary>Historia odkładania i korekt</summary><p>Ostatnie 100 potwierdzeń.</p>${task.steps.map((s) => `<p>${html(age(s.created_at))} · ${s.quantity} szt. · ${s.kind === "correction" ? `Korekta: ${html(s.reason)}` : `${s.kind === "quarantine" ? "Kwarantanna: " : "→ "}${html(s.target)}${s.reason ? ` · ${html(s.reason)}` : ""}`}</p>`).join("") || "<p>Brak potwierdzeń.</p>"}</details></section>`;
       const finish = document.getElementById("wms-putaway-finish");
       if (finish)
@@ -37,6 +37,9 @@ window.WmsPutaway = (h) => {
           .addEventListener("change", () => {
             const damaged =
               finish.elements.namedItem("disposition").value === "damaged";
+            // Zmiana stanu dotyczy innej partii; poprzednia ilość i skan celu nie potwierdzają kwarantanny.
+            finish.elements.namedItem("quantity").value = "";
+            finish.elements.namedItem("target").value = "";
             const notes = finish.elements.namedItem("reason");
             notes.required = damaged;
             notes.minLength = damaged ? 3 : 0;
@@ -129,9 +132,7 @@ window.WmsPutaway = (h) => {
       quantity: e.target.form.id === "wms-putaway-finish" ? "target" : "reason",
     }[e.target.name];
     if (next) {
-      e.preventDefault();
-      e.target.form.elements.namedItem(next).focus();
-      e.target.form.elements.namedItem(next).select();
+      h.advanceScan(e, next);
     }
     return true;
   }

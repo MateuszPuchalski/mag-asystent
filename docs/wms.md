@@ -744,3 +744,12 @@ Ilość „do … szt.” uwzględnia zapas fizyczny oraz przydzielone uzupełni
 Na kolektorze podpowiedź jest widoczna przed wpisaniem ilości. Policz tylko partię odkładaną teraz; reszta zadania pozostaje w buforze.
 Podpowiedź pochodzi z ostatniego odczytu i nie rezerwuje półki. Zapis ponownie sprawdza miejsce i blokady.
 Brak podpowiedzi nie oznacza zakazu innych zarejestrowanych lokalizacji. Sprawdź fizyczne miejsce i zeskanuj właściwy cel.
+
+
+### Ilość w przeglądarce
+
+Przy przyjęciu, odkładaniu, korekcie bufora i uzupełnieniu wpisz ilość fizycznie obsługiwanej partii. Puste pole nie oznacza jednej sztuki ani całego planu.
+Enter nie przejdzie dalej bez poprawnej liczby. Uzupełnienie wymaga powodu przy braku sztuk, a dopiero potem skanu półki docelowej.
+Zmiana ilości uzupełnienia usuwa poprzedni skan celu. Zmiana stanu dobry/uszkodzony usuwa ilość i lokalizację z poprzedniej partii.
+W ręcznych ruchach zmiana czynności czyści pola do ponownego wpisania, bez zapisu zera do zapasu.
+Spis oznacza cały fizyczny stan półki. Zero trzeba wpisać jawnie; przyjęcie i przesunięcie wymagają dodatniej ilości.

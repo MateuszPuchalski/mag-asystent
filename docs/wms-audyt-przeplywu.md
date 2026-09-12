@@ -9,14 +9,14 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 
 | Obszar | Co ma być udowodnione | Stan audytu |
 |---|---|---|
-| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Bezpośrednie przyjęcie WMS zweryfikowano testami, włącznie z korektą i utratą odpowiedzi. Bufor z kolejką odkładania wdrożono; natywny kolektor przyjęć pozostaje otwarty. |
-| Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Bezpośrednie odłożenie obsługuje nowy SKU na zarejestrowanej półce. Plan uzupełnień nadal wymaga istniejącego miejsca kompletacji. |
-| Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Odtworzono i naprawiono oba błędy. Testy regresji opisano niżej. |
+| Przyjęcie | Właściwy produkt i ilość, częściowe dostawy, nadwyżki, uszkodzenia, duplikat dokumentu, ponowienie skanu | Natywne przyjęcie i bufor działają ze wspólnym dziennikiem. Sprawdzono częściowe dostawy, korekty, kwarantannę, utratę odpowiedzi i dokument 5000 SKU. Fizyczny kolektor wymaga odbioru. |
+| Odkładanie | Towar staje się dostępny dopiero we właściwej lokalizacji; nowy SKU i brak miejsca mają obsługę | Natywne odkładanie rozlicza partie, kwarantannę i pozostały bufor. Podpowiedzi uwzględniają pojemność i blokady; końcowy ruch ponawia kontrolę. Nowy SKU wymaga zarejestrowanego celu. |
+| Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Natywna kolejka rozróżnia popyt zamówień i minima. Obsługuje brak źródła, pełny cel, częściowe odłożenie i zwrot. Przydział chroni zapas oraz miejsce. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
-| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Oddzielono paczkę gotową od odbioru kuriera. Skan zapisuje podział SKU na paczki; częściowy odbiór odejmuje tylko ich zawartość. Historia bez podziału pozostaje oznaczona. |
-| UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Usunięto dodatkowe otwieranie przyjętego zadania uzupełnienia; dalszy przegląd całej ścieżki pozostaje otwarty. |
-| Analityka i skala | Czas od przyjęcia do dostępności, blokady i wiek zadań; skala z historią i współbieżnymi operatorami | Istnieją raporty WMS i testy przepustowości. Pełna zgodność z zakresem wymaga dalszego pomiaru. |
-| Utrzymanie | Aktualizacja, kopia i odtworzenie, role, dziennik, awaria sieci, restart procesu | Dotychczasowe testy są punktem wyjścia; końcowy odbiór dotyczy finalnego kodu. |
+| Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Sprawdzono podział na paczki, częściowy odbiór, cofnięcie kontroli oraz wymianę uszkodzenia lub potwierdzonego braku. Rzeczywiste etykiety i odbiór kurierów pozostają do sprawdzenia. |
+| UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Sześć procesów kolektora współdzieli dziennik i ochronę po pauzie. Browser E2E sprawdza kolejność skanów oraz jawne ilości. Dalszy odbiór ergonomii wymaga fizycznej pracy. |
+| Analityka i skala | Czas od przyjęcia do dostępności, blokady i wiek zadań; skala z historią i współbieżnymi operatorami | Raport pokazuje kolejki, ich wiek, medianę, P95 i pokrycie. Próba 135000 zamówień działała w osobnym wątku. Pomiar rzeczywistej hali pozostaje otwarty. |
+| Utrzymanie | Aktualizacja, kopia i odtworzenie, role, dziennik, awaria sieci, restart procesu | Kopie seeded przed i po migracji rozbieżności przeszły kontrolę historii, zapasu i relacji. Ponowienia oraz restart mają regresje. Produkcyjne odtworzenie pozostaje do odbioru. |
 
 ## Źródła i wnioski projektowe
 
@@ -490,3 +490,29 @@ Wniosek dla WERTIS: znane ograniczenia należy pokazać przed drogą do półki 
 
 Dwie regresje najpierw odtworzyły wadliwe podpowiedzi. Sprawdzają wspólny wynik trzech odczytów, brak zapisów i wycofanie odłożenia po równoległej dostawie.
 Test JVM odczytuje nowe oraz starsze API. Starsza odpowiedź nie udaje wiedzy o pojemności.
+
+
+### Policzone sztuki zamiast domyślnej ilości
+
+Próba przeglądarki odtworzyła trzy niejawne wartości: całe pozostałe odłożenie, jedną sztukę przyjęcia i tę samą jedynkę po przełączeniu na spis.
+Ostatnia wartość oznaczała stan całej półki, więc zwykła zmiana czynności mogła przygotować niezamierzoną korektę zapasu.
+
+Przyjęcie, odkładanie, korekta bufora, uzupełnienie i ręczny ruch wymagają teraz jawnej ilości.
+Oczekiwana ilość pozostaje instrukcją na ekranie, lecz nie zastępuje policzonej partii w formularzu.
+Enter zatrzymuje się na pustym lub nieprawidłowym polu. Zmiana czynności usuwa poprzednią ilość i cel.
+Spis jasno opisuje cały stan półki i dopuszcza jawne zero. Przyjęcie oraz przesunięcie wymagają dodatniej liczby.
+Zmiana dobrego towaru na uszkodzony usuwa ilość i skan celu, aby operator potwierdził właściwą partię oraz kwarantannę.
+
+Uzupełnienie prowadzi teraz przez źródło, część, policzoną ilość i końcowy skan półki.
+Częściowa ilość ujawnia wymagany powód przed skanem celu; pełna partia pomija to pole.
+Zmiana ilości wymaga ponownego skanu celu. Błąd walidacji pozostawia wpisane dane do poprawienia.
+Nie dodano pytania potwierdzającego po końcowym skanie ani drugiego procesu dla kolektora.
+
+Punkty odniesienia:
+[Microsoft — potwierdzenie ilości i lokalizacji](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse)
+oraz [NN/g — zapobieganie pomyłkom przy powtarzalnej pracy](https://www.nngroup.com/articles/slips/).
+Wniosek dla WERTIS: stan policzony nie powinien dziedziczyć wartości z innej operacji, a walidacja powinna zatrzymywać pomyłkę przed ruchem zapasu.
+
+Browser E2E sprawdza brak POST przy pustej ilości, zmianę przyjęcie → przesunięcie → spis, jawne zero oraz poprawne przyjęcie pięciu sztuk.
+Przyjęcie i odkładanie sprawdzają także zmianę stanu towaru, ułamek, przekroczenie pozostałej ilości i pusty wynik po odświeżeniu.
+Uzupełnienie sprawdza pełną i częściową partię, wymagany powód, kolejność Enter oraz utratę odpowiedzi po końcowym skanie.

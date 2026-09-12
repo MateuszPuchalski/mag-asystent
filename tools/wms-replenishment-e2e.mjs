@@ -64,9 +64,16 @@ export async function exerciseReplenishment(page, output) {
   const id = Number(await form.getAttribute("data-task"));
   await form.locator('[name="source"]').fill(source);
   await form.locator('[name="barcode"]').fill(sku);
-  await form.locator('[name="target"]').fill(target);
+  await expect(form.locator('[name="quantity"]')).toHaveValue("");
   await form.locator('[name="quantity"]').fill("2");
+  await form.locator('[name="quantity"]').press("Enter");
+  await expect(form.locator('[name="reason"]')).toBeFocused();
+  await form.locator('[name="reason"]').press("Enter");
+  await expect(form.locator('[name="reason"]')).toBeFocused();
   await form.locator('[name="reason"]').fill("Znaleziono tylko dwie sztuki");
+  await form.locator('[name="reason"]').press("Enter");
+  await expect(form.locator('[name="target"]')).toBeFocused();
+  await form.locator('[name="target"]').fill(target);
   await page.route(
     `**/api/wms/replenishments/${id}/complete`,
     async (route) => {

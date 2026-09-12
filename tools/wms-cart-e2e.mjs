@@ -277,6 +277,13 @@ export async function exerciseCarts(page, output) {
     .locator('#wms-stockwork-complete [name="barcode"]')
     .fill("WMS-0036");
   await page.locator('#wms-stockwork-complete [name="barcode"]').press("Enter");
+  const counted = page.locator('#wms-stockwork-complete [name="quantity"]');
+  await expect(counted).toBeFocused();
+  await expect(counted).toHaveValue("");
+  await counted.press("Enter");
+  await expect(counted).toBeFocused();
+  await counted.fill(await counted.getAttribute("max"));
+  await counted.press("Enter");
   await expect(
     page.locator('#wms-stockwork-complete [name="target"]'),
   ).toBeFocused();
