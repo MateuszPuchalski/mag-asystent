@@ -77,6 +77,61 @@ export async function exercisePacking(page, output) {
   await expect(page.locator(".wms-parcel-label").nth(1)).toContainText(
     "2 szt.",
   );
+  // Korekta jednej sztuki nie może wymagać ponownego skanowania drugiej paczki.
+  await page.locator(".wms-parcel-corrections > summary").click();
+  await page
+    .getByText("Cofnij kontrolę wybranych sztuk", { exact: true })
+    .click();
+  const unpack = page.locator('[data-action-wms="pack-unpack"]');
+  await unpack.locator('[name="barcode"]').fill("WMS-0030");
+  await unpack.locator('[name="fromParcel"]').fill("2");
+  await unpack.locator('[name="quantity"]').fill("1");
+  await unpack
+    .locator('[name="reason"]')
+    .fill("Omyłkowe potwierdzenie jednej sztuki");
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await unpack.scrollIntoViewIfNeeded();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: path.join(output, `packing-unpack-${width}.png`),
+    });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route(
+    "**/api/wms/orders/*/actions",
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await unpack.locator('button[type="submit"]').click();
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  await expect(scan).toBeVisible();
+  await expect(page.locator(".wms-parcel-label")).toHaveCount(0);
+  const corrected = await page.evaluate(
+    async (id) =>
+      (
+        await fetch(`/api/wms/orders/${id}`, {
+          headers: { "x-session": token },
+        })
+      ).json(),
+    o.id,
+  );
+  expect(corrected.lines[0].packed).toBe(2);
+  expect(corrected.packingContents.map((c) => c.quantity)).toEqual([1, 1]);
+  await expect(
+    page.locator('[data-action-wms="pack"] [name="parcelNo"]'),
+  ).toHaveValue("2");
+  await scan.fill("WMS-0030");
+  await scan.press("Enter");
+  await expect(page.locator(".wms-parcel-label")).toHaveCount(2);
   const ship = page.locator('[data-action-wms="ship"]');
   for (const [from, to] of [
     [1, 3],

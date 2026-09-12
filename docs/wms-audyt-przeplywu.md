@@ -401,3 +401,21 @@ W WERTIS oba powody pozostają w jednej kolejce, z pierwszeństwem braków i jaw
 
 Pięć regresji sprawdza wielkość minimum, priorytet, termin, pokrycie zapasem, zadania w drodze oraz wyłączenie zamówień wstrzymanych i anulowanych.
 Cztery początkowe scenariusze zawodziły przed poprawką. Test kolektora sprawdza także odczyt starszego API i zachowanie niezmienionej komendy podjęcia.
+
+
+### Omyłkowe potwierdzenie jednej sztuki przy pakowaniu
+
+Dotychczas korekta ilości wymagała wyzerowania kontroli całego zamówienia. Przy kilku paczkach operator musiał ponownie skanować również prawidłowo sprawdzoną zawartość.
+Dodano cofnięcie potwierdzenia wybranego SKU i ilości w jednej paczce, ze skanem części oraz uzasadnieniem.
+Pozostała zawartość, pobrane sztuki i fizyczny zapas pozostają bez zmian. Ostatnia cofnięta sztuka usuwa wyłącznie jej wpis z paczki.
+
+Kontrola gotowości wraca do pakowania; historia zachowuje korektę. Ponowny skan brakujących potwierdzeń pozwala przygotować etykiety.
+Wysłanie z brakującym potwierdzeniem pozostaje niemożliwe. Zapisane etykiety i ich niezmienna zawartość wymagają dotychczasowego procesu wycofania.
+Wspólne odejmowanie z paczki obsługuje teraz także przełożenie, usuwając zduplikowaną logikę granic ilości.
+
+Punktem odniesienia jest [Microsoft — Pack containers for shipment](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/packing-containers).
+Dokument opisuje weryfikację typu i ilości części oraz przypisanie zawartości do fizycznych pojemników.
+Korekta WERTIS dotyczy potwierdzenia tej kontroli. Faktyczny brak lub uszkodzenie nadal wymaga wstrzymania i wyjaśnienia, bez pozornego zwrotu zapasu.
+
+Regresje sprawdzają częściowe cofnięcie, usunięcie pustej pozycji, błędną paczkę, kod, ilość, właściciela i wersję.
+Wymuszona awaria przywraca zawartość i pozwala ponowić ten sam klucz. E2E sprawdza korektę po utracie odpowiedzi i ponowne pakowanie jednej sztuki.

@@ -7,6 +7,7 @@ import {
   addPackedContent,
   clearPackingContents,
   movePackedContent,
+  removePackedContent,
   packingContents,
   parcelContents,
   saveParcelContents,
@@ -145,6 +146,16 @@ export const actionInput = z.discriminatedUnion("action", [
       quantity: qty,
       fromParcel: parcelNo,
       toParcel: parcelNo,
+    })
+    .strict(),
+  z
+    .object({
+      action: z.literal("pack-unpack"),
+      version,
+      barcode: label,
+      quantity: qty,
+      fromParcel: parcelNo,
+      reason,
     })
     .strict(),
   z.object({ action: z.literal("pack-reset"), version, reason }).strict(),
@@ -1320,7 +1331,11 @@ export function applyOrderAction(
       "UPDATE wms_order_timing SET first_pack_scan_at=NULL,last_pack_scan_at=NULL,pack_completed_at=NULL WHERE order_id=?",
     ).run(orderId);
   }
-  if (input.action === "pack" || input.action === "pack-move") {
+  if (
+    input.action === "pack" ||
+    input.action === "pack-move" ||
+    input.action === "pack-unpack"
+  ) {
     if (input.action === "pack") requireState("packing");
     else requireState("packing", "packed");
     owner(order.packer_id, actor);
@@ -1338,7 +1353,22 @@ export function applyOrderAction(
       );
     const line = matches[0];
     checkBarcode(line, input.barcode);
-    if (input.action === "pack-move") {
+    if (input.action === "pack-unpack") {
+      removePackedContent(line.id, input.fromParcel, input.quantity);
+      if (input.quantity > line.packed)
+        fail("Niespójna kontrola pakowania. Powtórz kontrolę zamówienia");
+      // Cofamy wyłącznie potwierdzenie paczki; sztuki nadal są przy stanowisku, bez zwrotu na półkę.
+      d.prepare("UPDATE wms_line SET packed=packed-? WHERE id=?").run(
+        input.quantity,
+        line.id,
+      );
+      d.prepare(
+        "UPDATE wms_order SET status='packing',packed_at=NULL WHERE id=?",
+      ).run(orderId);
+      d.prepare(
+        "UPDATE wms_order_timing SET pack_completed_at=NULL WHERE order_id=?",
+      ).run(orderId);
+    } else if (input.action === "pack-move") {
       movePackedContent(
         line.id,
         input.fromParcel,

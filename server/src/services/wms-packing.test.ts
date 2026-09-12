@@ -384,3 +384,160 @@ test("zmiana zamówienia po wycofaniu paczek nie usuwa historycznej zawartości"
   assert.equal(historical.n, 4);
   assert.equal(A.integrity().ok, true);
 });
+
+test("cofnięcie jednej sztuki zachowuje pozostałe paczki, zapas i pozwala skontrolować tylko brak", () => {
+  const f = fixture();
+  f.act({
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+    parcelNo: 1,
+  });
+  f.act({
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 2,
+    parcelNo: 2,
+  });
+  f.act({
+    action: "pack",
+    barcode: f.products[1].sku,
+    quantity: 1,
+    parcelNo: 2,
+  });
+  const movements = db().prepare("SELECT count(*) n FROM wms_movement").get()!
+    .n;
+  const before = f.order;
+  const key = randomUUID(),
+    body = {
+      action: "pack-unpack",
+      barcode: f.products[0].sku,
+      quantity: 1,
+      fromParcel: 2,
+      reason: "Omyłkowe potwierdzenie sztuki",
+      version: before.version,
+    };
+  const changed = W.actOnOrder(worker, key, before.id, body);
+  assert.equal(changed.status, "packing");
+  assert.equal(changed.packed_at, null);
+  assert.deepEqual(
+    changed.lines.map((l) => l.packed),
+    [2, 1],
+  );
+  assert.deepEqual(
+    changed.lines.map((l) => l.picked),
+    [3, 1],
+  );
+  assert.equal(
+    changed.packingContents.find((c) => c.parcel_no === 1)!.quantity,
+    1,
+  );
+  assert.equal(
+    db().prepare("SELECT count(*) n FROM wms_movement").get()!.n,
+    movements,
+  );
+  assert.equal(
+    db()
+      .prepare(
+        "SELECT pack_completed_at FROM wms_order_timing WHERE order_id=?",
+      )
+      .get(before.id)!.pack_completed_at,
+    null,
+  );
+  const writes = db().prepare("SELECT total_changes() n").get()!.n;
+  assert.deepEqual(
+    W.actOnOrder(worker, key, before.id, body),
+    JSON.parse(JSON.stringify(changed)),
+  );
+  assert.equal(db().prepare("SELECT total_changes() n").get()!.n, writes);
+  assert.throws(() =>
+    W.actOnOrder(worker, randomUUID(), before.id, {
+      ...shipping(2),
+      version: changed.version,
+    }),
+  );
+  const checked = W.actOnOrder(worker, randomUUID(), before.id, {
+    action: "pack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+    parcelNo: 2,
+    version: changed.version,
+  });
+  assert.equal(checked.status, "packed");
+  const shipped = W.actOnOrder(worker, randomUUID(), before.id, {
+    ...shipping(2),
+    version: checked.version,
+  });
+  assert.deepEqual(
+    shipped.shipments.map((s) =>
+      s.contents.reduce((n, c) => n + Number(c.quantity), 0),
+    ),
+    [1, 3],
+  );
+  assert.throws(() =>
+    W.actOnOrder(worker, randomUUID(), before.id, {
+      ...body,
+      version: shipped.version,
+    }),
+  );
+});
+
+test("cofnięcie kontroli sprawdza paczkę, kod, ilość, właściciela i wersję", () => {
+  const f = fixture();
+  packAll(f);
+  const body = {
+    action: "pack-unpack",
+    barcode: f.products[0].sku,
+    quantity: 1,
+    fromParcel: 1,
+    reason: "Powtórna kontrola",
+  };
+  for (const patch of [
+    { fromParcel: 2 },
+    { barcode: "WRONG" },
+    { quantity: 4 },
+    { quantity: 0 },
+    { quantity: 1.5 },
+    { reason: "" },
+  ]) {
+    assert.throws(() => f.act({ ...body, ...patch }));
+    assert.equal(W.getOrder(f.order.id).status, "packed");
+  }
+  assert.throws(() =>
+    W.actOnOrder(worker, randomUUID(), f.order.id, {
+      ...body,
+      version: f.order.version - 1,
+    }),
+  );
+  assert.throws(() => f.act(body, randomUUID(), { ...worker, id: 3 }));
+  const changed = f.act({ ...body, quantity: 3 });
+  assert.equal(
+    changed.packingContents.some((c) => c.line_id === changed.lines[0].id),
+    false,
+  );
+  assert.equal(changed.lines[1].packed, 1);
+});
+
+test("błąd zapisu cofnięcia przywraca zawartość oraz pozwala powtórzyć ten sam klucz", () => {
+  const f = fixture();
+  packAll(f);
+  const before = f.order,
+    key = randomUUID();
+  const body = {
+    action: "pack-unpack",
+    barcode: f.products[0].sku,
+    quantity: 3,
+    fromParcel: 1,
+    reason: "Ponowne liczenie",
+  };
+  db().exec(
+    "CREATE TEMP TRIGGER fail_unpack BEFORE UPDATE OF packed ON wms_line BEGIN SELECT RAISE(ABORT,'unpack rollback'); END",
+  );
+  try {
+    assert.throws(() => f.act(body, key), /unpack rollback/);
+  } finally {
+    db().exec("DROP TRIGGER fail_unpack");
+  }
+  assert.deepEqual(W.getOrder(before.id), before);
+  assert.equal(f.act(body, key).lines[0].packed, 0);
+});

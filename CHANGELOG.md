@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.306.0 — korekta pojedynczego potwierdzenia pakowania
+
+- Pakujący może cofnąć kontrolę wybranego SKU i ilości z konkretnej paczki, ze skanem oraz uzasadnieniem.
+- Pozostałe potwierdzenia zostają. Zapas i zebrane sztuki nie zmieniają się; przygotowanie etykiet czeka na ponowną kontrolę wskazanej ilości.
+- Wspólna operacja odejmowania z paczki obsługuje również przełożenie. Gotowe etykiety zachowują dotychczasową procedurę wycofania.
+- Regresje sprawdzają role, wersje, granice ilości, transakcję i ponowienie. E2E potwierdza odzyskanie korekty po utracie odpowiedzi oraz ponowny skan jednej sztuki.
+- Weryfikacja: 2289 testów serwera i 727 panelu. Widoki 320, 390 i 1440 px pozostają czytelne.
+- **[wymaga działania]** Przebudować i zrestartować API wraz z plikami Biura. Zmiana nie wymaga migracji bazy.
+
 ## 0.305.1 — czytelny plan uzupełnień na wąskim ekranie
 
 - Propozycje w Biurze przechodzą na małym ekranie w wiersze z pełną szerokością nazwy i powodu pracy.

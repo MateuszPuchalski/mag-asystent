@@ -684,3 +684,12 @@ Wolny zapas i otwarte uzupełnienia pokrywają najpierw pilniejsze potrzeby tego
 Biuro i kolektor pokazują powód: zamówienia albo minimum półki. Liczba brakujących sztuk dotyczy całego SKU, nie pojedynczego celu.
 Jedno uzupełnienie może pokryć tylko część potrzeby. Nie obiecuje gotowości całego zamówienia, które może czekać na inne części.
 Odczyt propozycji nie rezerwuje zapasu; dopiero podjęcie zadania zabezpiecza jego sztuki.
+
+
+### Korekta pojedynczej kontroli pakowania
+
+W sekcji **Popraw zawartość lub kontrolę** można cofnąć potwierdzenie wybranych sztuk z konkretnej paczki.
+Zeskanuj część, wpisz numer paczki, ilość i powód. Pozostałe potwierdzenia zostają; wskazane sztuki wymagają ponownego skanu.
+Towar pozostaje przy stanowisku. Operacja nie zwraca go na półkę ani nie rozlicza braku lub uszkodzenia; taki problem wymaga wstrzymania zamówienia.
+Przygotowanie etykiet czeka na ponowne potwierdzenie wszystkich sztuk. Gotowych etykiet nie można zmieniać tą korektą.
+Po utracie odpowiedzi użyj **PONÓW**. Powtórzenie odzyskuje wynik tej samej korekty, bez kolejnego odejmowania.

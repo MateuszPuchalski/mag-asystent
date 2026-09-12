@@ -47,6 +47,15 @@ export function movePackedContent(
   quantity: number,
 ) {
   if (from === to) fail("Wybierz inną paczkę docelową");
+  removePackedContent(lineId, from, quantity);
+  addPackedContent(lineId, to, quantity);
+}
+// Cofnięcie kontroli i przełożenie mają tę samą granicę ilości w paczce źródłowej.
+export function removePackedContent(
+  lineId: number,
+  from: number,
+  quantity: number,
+) {
   const old = db()
     .prepare(
       "SELECT quantity FROM wms_pack_content WHERE line_id=? AND parcel_no=?",
@@ -64,7 +73,6 @@ export function movePackedContent(
         "UPDATE wms_pack_content SET quantity=quantity-? WHERE line_id=? AND parcel_no=?",
       )
       .run(quantity, lineId, from);
-  addPackedContent(lineId, to, quantity);
 }
 export function validatePackingContents(orderId: number, parcelCount: number) {
   const d = db();
