@@ -48,12 +48,18 @@ fun replenishmentStage(task: WmsReplenishmentTask, actor: Long, scan: WmsRepleni
 fun replenishmentCode(stage: WmsReplenishmentStage?, input: Scan): String =
     if (stage in setOf(WmsReplenishmentStage.SOURCE, WmsReplenishmentStage.TARGET, WmsReplenishmentStage.SPACE_TARGET, WmsReplenishmentStage.SPACE_RETURN) && input.kind == ScanKind.LOC) input.code else input.rawCode
 
-fun replenishmentClaim(plan: WmsReplenishmentPlan): WmsReplenishmentDraft {
+fun replenishmentClaim(plan: WmsReplenishmentPlan, quantity: Int = plan.take): WmsReplenishmentDraft {
     require(plan.take > 0) { "Odśwież dostępny zapas" }
+    require(quantity in 1..plan.take) { "Wpisz partię od 1 do ${plan.take} szt." }
     return WmsReplenishmentDraft(null, "api/wms/replenishments", buildJsonObject {
-        put("twId", plan.tw_id); put("source", plan.source); put("target", plan.target); put("quantity", plan.take)
+        put("twId", plan.tw_id); put("source", plan.source); put("target", plan.target); put("quantity", quantity)
         put("sourceVersion", plan.source_version); put("targetVersion", plan.target_version)
-    }, "Podjęcie ${plan.take} × ${plan.sku}: ${plan.source} → ${plan.target}")
+    }, "Podjęcie $quantity × ${plan.sku}: ${plan.source} → ${plan.target}")
+}
+fun replenishmentBatch(plan: WmsReplenishmentPlan, raw: String): WmsReplenishmentDraft {
+    val quantity = raw.trim().toIntOrNull()
+    require(quantity != null) { "Wpisz liczbę sztuk w tej partii" }
+    return replenishmentClaim(plan, quantity)
 }
 fun replenishmentScan(task: WmsReplenishmentTask, actor: Long, scan: WmsReplenishmentScan, raw: String): WmsReplenishmentScan {
     val code = raw.trim()

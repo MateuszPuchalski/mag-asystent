@@ -516,3 +516,24 @@ Wniosek dla WERTIS: stan policzony nie powinien dziedziczyć wartości z innej o
 Browser E2E sprawdza brak POST przy pustej ilości, zmianę przyjęcie → przesunięcie → spis, jawne zero oraz poprawne przyjęcie pięciu sztuk.
 Przyjęcie i odkładanie sprawdzają także zmianę stanu towaru, ułamek, przekroczenie pozostałej ilości i pusty wynik po odświeżeniu.
 Uzupełnienie sprawdza pełną i częściową partię, wymagany powód, kolejność Enter oraz utratę odpowiedzi po końcowym skanie.
+
+
+### Mniejsza planowana partia uzupełnienia
+
+Kolektor i Biuro podejmowały zawsze całą propozycję. Operator nie mógł zaplanować krótszego przejścia dla większych lub cięższych części.
+Wpisanie mniejszej ilości dopiero po pobraniu oznaczało brak na źródle i uruchamiało przeliczenie.
+
+Pełna propozycja nadal wymaga jednego naciśnięcia. Opcja mniejszej partii pozwala przed podjęciem wpisać dodatnią ilość w granicach propozycji.
+Przydział chroni tylko tę partię oraz odpowiadające jej miejsce. Po ukończeniu pozostała potrzeba wraca do planu bez zgłoszenia rozbieżności.
+Ilość planowana nie potwierdza pobrania. Natywne pole faktycznej ilości zaczyna się puste, również po porzuceniu skanów przez opcję anulowania.
+Liczby spoza zakresu są odrzucane, bez obcinania cyfr. Zmiana konta, odczytu lub planu zamyka poprzedni wybór partii.
+
+Nie założono masy części ani dopuszczalnego ciężaru. Operator dobiera partię do rzeczywistych warunków; fizyczny odbiór nadal jest potrzebny.
+Punkt odniesienia: [Microsoft — ograniczenia i podział pracy](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/control-warehouse-location-directives).
+Dokument opisuje ograniczanie pracy według ilości, jednostki, objętości i masy.
+Wniosek dla WERTIS: ilość pojedynczego przejścia należy oddzielić od całkowitej potrzeby półki oraz stwierdzonego braku zapasu.
+
+Regresja serwera obejmuje potrzebę dwudziestu, podjęcie i odłożenie pięciu, powrót piętnastu do planu oraz odrzucenie starych wersji.
+Nie powstaje fałszywe przeliczenie. Ponowienie podjęcia i zakończenia nie zmienia ilości drugi raz.
+Testy JVM obejmują zakres, stare szybkie podjęcie, mniejszą partię, brak powodu niedoboru oraz zachowanie partii w dzienniku po restarcie.
+Browser E2E sprawdza błędne ilości, utraconą odpowiedź podjęcia, skany pięciu sztuk i pozostały plan.

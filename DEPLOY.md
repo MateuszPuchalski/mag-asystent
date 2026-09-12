@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.310.0 kolektor i Biuro oferują mniejszą partię przed podjęciem uzupełnienia.
+Wykonać build i restart API oraz zaktualizować APK. Istniejące zadania zachowują swoje przydziały; nie ma migracji.
+Odbiór seeded: potrzeba dwudziestu → podjęcie pięciu → faktyczne pięć na celu → piętnaście ponownie w planie, bez przeliczenia źródła.
+
 Od 0.309.1 formularze Biura wymagają jawnej ilości przy ruchach oraz korekcie bufora. Zmiana czynności czyści poprzedni wynik i cel.
 Wykonać build i restart API oraz odświeżyć Biuro. Nie ma migracji ani wymogu nowego APK dla tej poprawki formularzy.
 

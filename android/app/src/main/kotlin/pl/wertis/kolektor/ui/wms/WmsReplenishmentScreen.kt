@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,11 +28,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.wms.WmsReplenishmentDraft
+import pl.wertis.kolektor.core.wms.WmsReplenishmentPlan
 import pl.wertis.kolektor.core.wms.WmsReplenishmentScan
 import pl.wertis.kolektor.core.wms.WmsReplenishmentStage
 import pl.wertis.kolektor.core.wms.replenishmentFinish
 import pl.wertis.kolektor.core.wms.replenishmentCancel
 import pl.wertis.kolektor.core.wms.replenishmentClaim
+import pl.wertis.kolektor.core.wms.replenishmentBatch
 import pl.wertis.kolektor.core.wms.replenishmentCode
 import pl.wertis.kolektor.core.wms.replenishmentQuantity
 import pl.wertis.kolektor.core.wms.replenishmentScan
@@ -57,7 +60,8 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
     val view by controller.state.collectAsStateWithLifecycle()
     val task = view.task.takeIf { view.context == context }
     var scan by remember(view.generation, context) { mutableStateOf(WmsReplenishmentScan()) }
-    var quantity by remember(view.generation, context) { mutableStateOf(task?.quantity?.toString().orEmpty()) }
+    // Planowana partia nie dowodzi, ile sztuk operator faktycznie znalazł na źródle.
+    var quantity by remember(view.generation, context) { mutableStateOf("") }
     var reason by remember(view.generation, context) { mutableStateOf("") }
     var cancel by remember(view.generation, context) { mutableStateOf(false) }
     var error by remember(view.generation, context) { mutableStateOf<String?>(null) }
@@ -137,7 +141,9 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
             }
             if (view.mode == "plans") Text("Najpierw braki zamówień: priorytet, potem termin. Brak obejmuje wszystkie półki SKU.", color = InkMute)
             view.queue?.plans?.forEach { plan ->
-                OutlineButton("${plan.purpose}\nPODEJMIJ ${plan.take} × ${plan.sku}\n${plan.source} → ${plan.target}\n${plan.name}", enabled = allowed && plan.take > 0, modifier = Modifier.fillMaxWidth()) { submit(replenishmentClaim(plan)) }
+                key(context, view.generation, plan.tw_id, plan.source, plan.target) {
+                    ReplenishmentBatch(plan, allowed, ::submit) { graph.feedback.beep(false) }
+                }
             }
             if (view.queue?.total == 0) Text(if (view.mode == "tasks") "Nie masz otwartych zadań. Sprawdź propozycje do uzupełnienia." else "Brak dostępnych propozycji. Sprawdź filtr, przyjęcia i minima półek.")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -170,7 +176,7 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
             Text("Po wpisaniu powodu skan źródła zapisze anulowanie.")
         } else when (stage) {
             WmsReplenishmentStage.QUANTITY -> if (allowed) {
-                WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Faktycznie pobrane sztuki", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
+                WertisTextField(quantity, { quantity = it }, placeholder = "Faktycznie pobrane sztuki", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
                 if ((quantity.toIntOrNull() ?: task.quantity) < task.quantity) {
                     Text("Zgłaszasz brak. Źródło pozostanie do przeliczenia. Nie koryguj jego stanu ręcznie.")
                     WertisTextField(reason, { reason = it.take(500) }, placeholder = "Opis brakujących sztuk")
@@ -180,7 +186,7 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
             WmsReplenishmentStage.TARGET -> Text("${scan.quantity} szt. → ${task.target}. Skan celu zapisze przesunięcie.", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             WmsReplenishmentStage.SPACE_QUANTITY -> if (allowed) {
                 Text("Pobrano ${scan.quantity} szt. Wpisz, ile faktycznie mieści się na celu. Pozostałe sztuki wrócą na źródło.")
-                WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Odłożone sztuki, także 0", keyboardType = KeyboardType.Number)
+                WertisTextField(quantity, { quantity = it }, placeholder = "Odłożone sztuki, także 0", keyboardType = KeyboardType.Number)
                 WertisTextField(reason, { reason = it.take(500) }, placeholder = "Opis braku miejsca")
                 PrimaryButton("POTWIERDŹ ODŁOŻONĄ ILOŚĆ", modifier = Modifier.fillMaxWidth()) {
                     try { scan = replenishmentSpaceQuantity(task, context.actorId, scan, quantity, reason); error = null }
@@ -196,13 +202,35 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
         if (stage !in setOf(WmsReplenishmentStage.DONE, WmsReplenishmentStage.OTHER)) {
-            OutlineButton(if (cancel) "WRÓĆ DO UZUPEŁNIANIA" else "PROBLEM / ANULOWANIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) { cancel = !cancel; scan = WmsReplenishmentScan(); reason = "" }
+            OutlineButton(if (cancel) "WRÓĆ DO UZUPEŁNIANIA" else "PROBLEM / ANULOWANIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) { cancel = !cancel; scan = WmsReplenishmentScan(); quantity = ""; reason = "" }
             if (!cancel && stage == WmsReplenishmentStage.TARGET) OutlineButton("BRAK MIEJSCA NA CELU", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
                 scan = replenishmentSpaceStart(task, context.actorId, scan); quantity = ""; reason = ""; error = null
             }
             if (!cancel && stage == WmsReplenishmentStage.TARGET) OutlineButton("ZMIENIAM ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { scan = scan.copy(quantity = null) }
         }
         OutlineButton("WRÓĆ DO KOLEJKI", enabled = allowed, modifier = Modifier.fillMaxWidth()) { queue() }
+    }
+}
+
+@Composable
+private fun ReplenishmentBatch(plan: WmsReplenishmentPlan, enabled: Boolean, submit: (WmsReplenishmentDraft) -> Unit, reject: () -> Unit) {
+    var batch by remember(plan) { mutableStateOf<String?>(null) }
+    var error by remember(plan) { mutableStateOf<String?>(null) }
+    if (batch == null) {
+        OutlineButton("${plan.purpose}\nPODEJMIJ ${plan.take} × ${plan.sku}\n${plan.source} → ${plan.target}\n${plan.name}", enabled = enabled && plan.take > 0, modifier = Modifier.fillMaxWidth()) { submit(replenishmentClaim(plan)) }
+        if (plan.take > 1) OutlineButton("MNIEJSZA PARTIA · ${plan.sku}", enabled = enabled, modifier = Modifier.fillMaxWidth()) { batch = "" }
+    } else {
+        Text("${plan.sku} · ${plan.source} → ${plan.target}", fontWeight = FontWeight.Bold)
+        Text("Teraz do ${plan.take} szt. Reszta pozostanie do zaplanowania, bez zgłoszenia braku.")
+        fun claimBatch() {
+            if (!enabled) return
+            try { submit(replenishmentBatch(plan, batch.orEmpty())) }
+            catch (e: IllegalArgumentException) { error = e.message; reject() }
+        }
+        WertisTextField(batch.orEmpty(), { batch = it; error = null }, placeholder = "Sztuki w tej partii", keyboardType = KeyboardType.Number, onDone = ::claimBatch)
+        error?.let { Text(it, fontWeight = FontWeight.Bold) }
+        PrimaryButton("PODEJMIJ TĘ PARTIĘ", enabled = enabled, modifier = Modifier.fillMaxWidth(), onClick = ::claimBatch)
+        OutlineButton("WRÓĆ DO CAŁEJ PARTII", enabled = enabled, modifier = Modifier.fillMaxWidth()) { batch = null; error = null }
     }
 }
 

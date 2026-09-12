@@ -753,3 +753,12 @@ Enter nie przejdzie dalej bez poprawnej liczby. Uzupełnienie wymaga powodu przy
 Zmiana ilości uzupełnienia usuwa poprzedni skan celu. Zmiana stanu dobry/uszkodzony usuwa ilość i lokalizację z poprzedniej partii.
 W ręcznych ruchach zmiana czynności czyści pola do ponownego wpisania, bez zapisu zera do zapasu.
 Spis oznacza cały fizyczny stan półki. Zero trzeba wpisać jawnie; przyjęcie i przesunięcie wymagają dodatniej ilości.
+
+
+### Wielkość partii uzupełnienia
+
+Pełną propozycję podejmiesz jednym naciśnięciem. Dla mniejszego przejścia wybierz „Mniejsza partia” i wpisz ilość przed podjęciem.
+Po podjęciu policz faktycznie pobrane sztuki. Cała wybrana partia nie wymaga opisu braku; mniejsza faktyczna ilość oznacza rozbieżność źródła.
+Przykład: potrzeba dwudziestu, planujesz pięć i odkładasz pięć. Pozostałe piętnaście wraca do planu, a źródło nie wymaga przeliczenia.
+Jeśli po podjęciu pięciu znajdziesz tylko trzy, opisz brak dwóch. Pełny cel ma osobną opcję odłożenia i zwrotu.
+Wybór partii nie określa masy ani bezpieczeństwa transportu. Uwzględnij rzeczywiste części, sposób przenoszenia i warunki magazynu.

@@ -142,6 +142,7 @@ export async function exerciseReplenishment(page, output) {
   expect(after.rows.find((r) => r.bin === source).on_hand).toBe(4);
   expect(after.rows.find((r) => r.bin === target).on_hand).toBe(3);
   expect((await api("/api/wms/integrity")).ok).toBe(true);
+  await exerciseSmallerBatch(page, api, output);
   writeFileSync(
     path.join(output, "replenishment-e2e.json"),
     JSON.stringify(
@@ -149,6 +150,124 @@ export async function exerciseReplenishment(page, output) {
         partial: { task: id, moved: 2, lostResponseRecovered: true },
         empty: { task: empty.id, moved: 0, sourceUnchanged: 4 },
         integrity: true,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function exerciseSmallerBatch(page, api, output) {
+  const twId = 39,
+    sku = "WMS-0039",
+    source = "BATCH-RES",
+    target = "BATCH-PICK";
+  await api("/api/wms/bins", {
+    bin: source,
+    mode: "reserve",
+    version: 1,
+    reason: "Zaplecze partii seeded",
+  });
+  for (const [bin, quantity] of [
+    [source, 20],
+    [target, 1],
+  ])
+    await api("/api/wms/inventory", {
+      action: "receive",
+      twId,
+      bin,
+      quantity,
+      reason: "Zapas partii seeded",
+    });
+  await api("/api/wms/inventory", {
+    action: "limits",
+    twId,
+    bin: target,
+    minimum: 21,
+    capacity: 21,
+    version: 2,
+    reason: "Miejsce na dwadzieścia sztuk",
+  });
+  await page.locator('[data-tab-wms="stockwork"]').click();
+  await page.locator('#wms-stockwork-filter [name="q"]').fill(target);
+  await page.locator("#wms-stockwork-filter button").first().click();
+  await expect(page.locator("[data-stockwork-claim]")).toHaveText(
+    "PRZYJMIJ 20 SZT.",
+  );
+  await page.getByText("Mniejsza partia", { exact: true }).click();
+  const batch = page.locator(".wms-stockwork-batch");
+  await expect(batch.locator('[name="quantity"]')).toHaveValue("");
+  for (const invalid of ["", "0", "1.5", "21"]) {
+    await batch.locator('[name="quantity"]').fill(invalid);
+    await batch.locator("button").click();
+    await expect(batch.locator('[name="quantity"]')).toBeFocused();
+  }
+  await batch.locator('[name="quantity"]').fill("5");
+  const widths = [];
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const fits = await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    );
+    expect(fits).toBe(true);
+    widths.push({ width, fits });
+    await page.screenshot({
+      path: path.join(output, `replenishment-batch-${width}.png`),
+      fullPage: true,
+    });
+  }
+  await page.route(
+    "**/api/wms/replenishments",
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await batch.locator("button").click();
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  const tasks = (
+    await api("/api/wms/replenishment-work?view=tasks&q=" + target)
+  ).tasks;
+  expect(tasks).toHaveLength(1);
+  expect(tasks[0].quantity).toBe(5);
+  await page.locator(`[data-stockwork-task="${tasks[0].id}"]`).click();
+  const form = page.locator("#wms-stockwork-complete");
+  await form.locator('[name="source"]').fill(source);
+  await form.locator('[name="source"]').press("Enter");
+  await form.locator('[name="barcode"]').fill(sku);
+  await form.locator('[name="barcode"]').press("Enter");
+  await expect(form.locator('[name="quantity"]')).toHaveValue("");
+  await form.locator('[name="quantity"]').fill("5");
+  await form.locator('[name="quantity"]').press("Enter");
+  await expect(form.locator('[name="target"]')).toBeFocused();
+  await expect(form.locator('[name="reason"]')).toBeHidden();
+  await form.locator('[name="target"]').fill(target);
+  await form.locator('[name="target"]').press("Enter");
+  await expect(page.locator("[data-stockwork-claim]")).toHaveText(
+    "PRZYJMIJ 15 SZT.",
+  );
+  const inventory = (await api("/api/wms/inventory?q=" + sku)).rows;
+  expect(inventory.find((s) => s.bin === source).on_hand).toBe(15);
+  expect(inventory.find((s) => s.bin === target).on_hand).toBe(6);
+  expect(
+    (await api("/api/wms/stock-work")).checks.some(
+      (c) => c.tw_id === twId && c.bin === source,
+    ),
+  ).toBe(false);
+  expect((await api("/api/wms/integrity")).ok).toBe(true);
+  writeFileSync(
+    path.join(output, "replenishment-batch-e2e.json"),
+    JSON.stringify(
+      {
+        planned: 20,
+        claimed: 5,
+        completed: 5,
+        remaining: 15,
+        lostClaimResponseRecovered: true,
+        falseStockCheck: false,
+        widths,
       },
       null,
       2,

@@ -15,6 +15,26 @@ private val replenishPlan = WmsReplenishmentPlan(30, "LOC:PART", "Nóż", "00590
 private fun replenishCommand() = replenishmentFinish(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4), "A-01")
 
 class WmsReplenishmentScanTest {
+    @Test fun `mniejsza planowana partia nie jest brakiem pobranych sztuk`() {
+        val plan = replenishPlan.copy(quantity = 20, source_available = 20)
+        val draft = replenishmentBatch(plan, " 5 ")
+        assertEquals("5", draft.body["quantity"]!!.jsonPrimitive.content)
+        assertEquals(plan.source_version.toString(), draft.body["sourceVersion"]!!.jsonPrimitive.content)
+        assertTrue(draft.description.contains("5 ×"))
+        val task = replenishTask.copy(quantity = 5)
+        val counted = replenishmentQuantity(task, 2, WmsReplenishmentScan(true, task.sku), "5", "")
+        assertNull(counted.reason)
+        assertNull(replenishmentFinish(task, 2, counted, task.target).body["reason"])
+        assertEquals("20", replenishmentClaim(plan).body["quantity"]!!.jsonPrimitive.content)
+    }
+    @Test fun `partia odrzuca pusty tekst ulamki nadmiar i nieaktualny zapas`() {
+        val plan = replenishPlan.copy(quantity = 20, source_available = 20)
+        for (raw in listOf("", " ", "0", "-1", "1.5", "21", "999999999999999999")) {
+            assertThrows(IllegalArgumentException::class.java) { replenishmentBatch(plan, raw) }
+        }
+        assertThrows(IllegalArgumentException::class.java) { replenishmentBatch(plan.copy(source_available = 3), "5") }
+        assertThrows(IllegalArgumentException::class.java) { replenishmentBatch(plan.copy(quantity = 0), "1") }
+    }
     @Test fun `powod propozycji zachowuje brak SKU oraz zgodnosc ze starszym API`() {
         val legacy = WertisJson.encodeToString(WmsReplenishmentPlan.serializer(), replenishPlan)
         assertEquals("PLAN UZUPEŁNIENIA", WertisJson.decodeFromString<WmsReplenishmentPlan>(legacy).purpose)
@@ -140,6 +160,7 @@ private class ReplenishClient(val store: ReplenishStore) : WmsReplenishmentTrans
         assertEquals(command, store.journal.pending); sent += command
         failure?.let { throw it }
         if (commits.add(command.key)) {
+            if (command.path == "api/wms/replenishments") task = task.copy(quantity = command.body["quantity"]!!.jsonPrimitive.content.toInt())
             if (command.path.endsWith("/complete")) {
                 val placed = command.body["quantity"]!!.jsonPrimitive.content.toInt()
                 val picked = command.body["pickedQuantity"]?.jsonPrimitive?.content?.toInt() ?: placed
@@ -168,13 +189,15 @@ class WmsReplenishmentRecoveryTest {
     }
     @Test fun `utracone podjecie po restarcie odzyskuje numer tym samym kluczem`() = runTest {
         val store = ReplenishStore(); val client = ReplenishClient(store); val controller = WmsReplenishmentController(store, { client })
-        controller.queue(replenisher, "plans"); client.lost = true; controller.submit(replenisher, replenishmentClaim(replenishPlan))
+        controller.queue(replenisher, "plans"); client.lost = true; controller.submit(replenisher, replenishmentBatch(replenishPlan, "2"))
         val pending = store.journal.pending!!
+        assertEquals("2", pending.body["quantity"]!!.jsonPrimitive.content)
         assertNull(pending.taskId); assertEquals("replenishment", pending.workflow)
         assertEquals(WmsActive(replenisher, 5), store.journal.active)
         val restart = WmsReplenishmentController(store, { client }); restart.open(replenisher)
         assertFalse(restart.state.value.ready); client.lost = false; restart.retry(replenisher)
         assertEquals(pending, client.sent.last()); assertEquals(1, client.commits.size)
+        assertEquals(2, restart.state.value.task!!.quantity)
         assertNull(store.journal.pending); assertEquals(1L, store.journal.replenishing!!.taskId)
         assertEquals(WmsReplenishmentStage.SOURCE, replenishmentStage(restart.state.value.task!!, 2, WmsReplenishmentScan()))
     }

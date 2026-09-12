@@ -9,10 +9,33 @@ window.WmsStockWork = (h) => {
     state = await read(`/api/wms/stock-work?q=${encodeURIComponent(query)}`);
     target().innerHTML = `<section class="wms-surface"><h2>Zadania zapasu</h2><p>Najpierw braki zamówień: priorytet, potem termin. Następnie minima półek. Brak dotyczy całego SKU po uwzględnieniu wolnego zapasu i podjętych zadań. Listy pokazują do 100 pozycji.</p>
       <h3>Moje uzupełnienia${office() ? " i zadania zespołu" : ""}</h3>${state.tasks.map((t) => `<article class="wms-stock-task"><strong>${html(t.sku)} · ${t.quantity} szt.</strong><p>${html(t.source)} → ${html(t.target)}</p><button data-stockwork-task="${t.id}">OTWÓRZ ZADANIE #${t.id}</button></article>`).join("") || "<p>Brak otwartych zadań.</p>"}
-      <h3>Plan uzupełnień</h3><form id="wms-stockwork-filter" class="wms-toolbar">${field("q", "Szukaj w planie", "text", query)}<button>SZUKAJ</button><button type="button" data-stockwork-action="all">CAŁY PLAN</button></form><div class="wms-scroll"><table class="wms-lines wms-replenishment-plan"><thead><tr><th>SKU</th><th>Zaplecze → półka</th><th>Plan / zapas</th><th>Operacja</th></tr></thead><tbody>${state.plans.map((p, i) => `<tr><td><strong>${html(p.sku)}</strong><br>${html(p.name)}<br><strong>${p.order_shortage > 0 ? `ZAMÓWIENIA · brak ${p.order_shortage} szt. SKU` : "MINIMUM PÓŁKI"}</strong></td><td data-label="Zaplecze → półka">${html(p.source)} → ${html(p.target)}</td><td data-label="Plan / dostępne">${p.quantity} / ${p.source_available} szt.</td><td><button data-stockwork-claim="${i}">PRZYJMIJ ${Math.min(p.quantity, p.source_available, 1000000)} SZT.</button></td></tr>`).join("") || '<tr><td colspan="4">Brak propozycji z dostępnym zapasem zaplecza. Sprawdź przyjęcia i minima półek.</td></tr>'}</tbody></table></div>
+      <h3>Plan uzupełnień</h3><form id="wms-stockwork-filter" class="wms-toolbar">${field("q", "Szukaj w planie", "text", query)}<button>SZUKAJ</button><button type="button" data-stockwork-action="all">CAŁY PLAN</button></form><div class="wms-scroll"><table class="wms-lines wms-replenishment-plan"><thead><tr><th>SKU</th><th>Zaplecze → półka</th><th>Plan / zapas</th><th>Operacja</th></tr></thead><tbody>${state.plans.map((p, i) => `<tr><td><strong>${html(p.sku)}</strong><br>${html(p.name)}<br><strong>${p.order_shortage > 0 ? `ZAMÓWIENIA · brak ${p.order_shortage} szt. SKU` : "MINIMUM PÓŁKI"}</strong></td><td data-label="Zaplecze → półka">${html(p.source)} → ${html(p.target)}</td><td data-label="Plan / dostępne">${p.quantity} / ${p.source_available} szt.</td><td><button data-stockwork-claim="${i}">PRZYJMIJ ${Math.min(p.quantity, p.source_available, 1000000)} SZT.</button>${Math.min(p.quantity, p.source_available, 1000000) > 1 ? `<details><summary>Mniejsza partia</summary><form id="wms-stockwork-batch-${i}" class="wms-form wms-stockwork-batch" data-plan="${i}">${field("quantity", "Sztuki w tej partii", "number", "", `min="1" max="${Math.min(p.quantity, p.source_available, 1000000)}" step="1"`)}<p>Reszta pozostanie do zaplanowania, bez zgłoszenia braku.</p><button>PODEJMIJ TĘ PARTIĘ</button></form></details>` : ""}</td></tr>`).join("") || '<tr><td colspan="4">Brak propozycji z dostępnym zapasem zaplecza. Sprawdź przyjęcia i minima półek.</td></tr>'}</tbody></table></div>
       <h3>Brak miejsca na dokładanie</h3><p>Z tych półek można nadal zbierać towar. Biuro potwierdza zwolnienie miejsca przed kolejnym odłożeniem.</p>${state.capacityIssues.map((c) => `<article class="wms-stock-task"><strong>${html(c.bin)} · ${html(c.sku)}</strong><p>${html(c.reason)}</p>${office() ? `<button data-stockwork-space="${c.id}">POTWIERDŹ ZWOLNIENIE MIEJSCA</button>` : "<p>Zgłoszenie czeka na biuro.</p>"}</article>`).join("") || "<p>Brak zgłoszeń pełnej półki.</p>"}
       <h3>Półki do przeliczenia</h3><p>Zgłoszony brak lub uszkodzenie blokuje pobrania tego SKU z tej lokalizacji. Inne pobrania pozostają dostępne.</p>${state.checks.map((c) => `<article class="wms-stock-task"><strong>${html(c.bin)} · ${html(c.sku)}</strong><p>${html(c.reason)}</p>${office() ? `<button data-stockwork-check="${c.id}">${c.observation_id ? "SPRAWDŹ WYNIK LICZENIA" : "PRZELICZ PÓŁKĘ"}</button>` : `<p>${c.observation_id ? "Wynik czeka na biuro." : "Otwórz Przeliczenia WMS na kolektorze i policz półkę."}</p>`}</article>`).join("") || "<p>Brak otwartych przeliczeń.</p>"}
       ${office() && state.repairs.length ? `<h3>Zamówienia czekające na rezerwację po przeliczeniu</h3>${state.repairs.map((o) => `<form id="wms-stockwork-repair-${o.id}" data-order="${o.id}" class="wms-form"><strong>${html(o.reference)}</strong>${field("reason", "Powód wznowienia")}<button>SPRAWDŹ ZAPAS I WZNÓW</button></form>`).join("")}` : ""}<div id="wms-stockwork-detail"></div></section>`;
+  }
+  async function claim(plan, quantity) {
+    if (
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > Math.min(plan.quantity, plan.source_available, 1000000)
+    )
+      throw new Error("Wpisz ilość w granicach aktualnej propozycji.");
+    const result = await mutate("/api/wms/replenishments", {
+      twId: plan.tw_id,
+      source: plan.source,
+      target: plan.target,
+      quantity,
+      sourceVersion: plan.source_version,
+      targetVersion: plan.target_version,
+    });
+    if (result) {
+      await h.refresh();
+      const task = target().querySelector(
+        `[data-stockwork-task="${result.id}"]`,
+      );
+      if (task) await click(task);
+    }
   }
   async function click(button) {
     if (button.dataset.stockworkAction === "all") {
@@ -22,21 +45,7 @@ window.WmsStockWork = (h) => {
     }
     if (button.dataset.stockworkClaim !== undefined) {
       const p = state.plans[Number(button.dataset.stockworkClaim)];
-      const result = await mutate("/api/wms/replenishments", {
-        twId: p.tw_id,
-        source: p.source,
-        target: p.target,
-        quantity: Math.min(p.quantity, p.source_available, 1000000),
-        sourceVersion: p.source_version,
-        targetVersion: p.target_version,
-      });
-      if (result) {
-        await h.refresh();
-        const task = target().querySelector(
-          `[data-stockwork-task="${result.id}"]`,
-        );
-        if (task) await click(task);
-      }
+      await claim(p, Math.min(p.quantity, p.source_available, 1000000));
       return true;
     }
     if (button.dataset.stockworkTask) {
@@ -123,6 +132,13 @@ window.WmsStockWork = (h) => {
     if (form.id === "wms-stockwork-filter") {
       query = values.q;
       await h.refresh();
+      return true;
+    }
+    if (form.classList.contains("wms-stockwork-batch")) {
+      await claim(
+        state.plans[Number(form.dataset.plan)],
+        Number(values.quantity),
+      );
       return true;
     }
     let url,

@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.310.0 — mniejsza partia uzupełnienia
+
+- Kolektor i Biuro pozwalają wybrać mniejszą partię przed podjęciem uzupełnienia. Cała propozycja nadal wymaga jednego naciśnięcia.
+- Po ukończeniu partii pozostała potrzeba wraca do planu. Mniejsza planowana partia nie zgłasza braku źródła ani nie uruchamia przeliczenia.
+- Natywne pole faktycznej ilości zaczyna się puste. Plan nie potwierdza pobrania, a liczby spoza zakresu są odrzucane bez obcinania cyfr.
+- Testy obejmują partię pięciu z dwudziestu, powrót piętnastu do planu, granice, wersje oraz dziennik po utracie odpowiedzi i restarcie.
+- **[wymaga działania]** Wykonać build i restart API oraz zaktualizować APK dla wyboru partii na kolektorze. Nie ma migracji danych.
+
 ## 0.309.1 — jawna ilość przy ruchach magazynowych
 
 - Przyjęcie, odkładanie, korekta bufora i uzupełnienie wymagają wpisania policzonej ilości. Formularz nie podstawia jednej sztuki ani całego planu.

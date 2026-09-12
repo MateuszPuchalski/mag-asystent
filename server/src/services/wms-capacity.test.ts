@@ -88,6 +88,58 @@ const stock = (twId: number, bin: string) =>
 const movements = (twId: number) =>
   db().prepare("SELECT count(*) n FROM wms_movement WHERE tw_id=?").get(twId)!
     .n;
+
+test("partia pięciu z dwudziestu nie zgłasza braku, a kolejne piętnaście wraca do planu", () => {
+  const f = fixture();
+  W.changeStock(office, randomUUID(), {
+    action: "receive",
+    twId: f.twId,
+    bin: f.source,
+    quantity: 10,
+    reason: "Zapas na kilka przejść",
+  });
+  limits(f, 21, 21);
+  const plan = S.replenishmentWork(worker, { view: "plans", q: f.sku })
+    .plans[0];
+  assert.equal(plan.quantity, 20);
+  const body = {
+    ...f.claim,
+    quantity: 5,
+    sourceVersion: plan.source_version,
+    targetVersion: plan.target_version,
+  };
+  const key = randomUUID();
+  const task = S.claimReplenishment(worker, key, body);
+  assert.deepEqual(S.claimReplenishment(worker, key, body), task);
+  assert.equal(
+    W.inventory({ q: f.sku }).rows.find((s) => s.bin === f.target)!.incoming,
+    5,
+  );
+  const completeKey = randomUUID();
+  const result = S.completeReplenishment(worker, completeKey, task.id, {
+    ...f.input,
+    quantity: 5,
+  });
+  assert.deepEqual(
+    S.completeReplenishment(worker, completeKey, task.id, {
+      ...f.input,
+      quantity: 5,
+    }),
+    result,
+  );
+  assert.equal(result.shortage, 0);
+  assert.equal(check(f.twId), undefined);
+  assert.equal(stock(f.twId, f.source).on_hand, 15);
+  assert.equal(stock(f.twId, f.target).on_hand, 6);
+  assert.equal(
+    S.replenishmentWork(worker, { view: "plans", q: f.sku }).plans[0].quantity,
+    15,
+  );
+  assert.throws(
+    () => S.claimReplenishment(worker, randomUUID(), body),
+    /zmienił/,
+  );
+});
 const check = (twId: number) =>
   db()
     .prepare(
