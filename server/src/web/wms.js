@@ -574,7 +574,7 @@ window.Wms = (() => {
     if (turn !== generation) return;
     el("wms-content").innerHTML =
       `<form id="wms-filter" class="wms-toolbar"><label class="wms-search">Towar lub lokalizacja<input name="q" value="${html(query)}" placeholder="SKU, EAN, nazwa, lokalizacja"></label><label>Zakres<select name="low"><option value="0">Cały magazyn</option><option value="1" ${low ? "selected" : ""}>Poniżej minimum</option></select></label><button>Szukaj</button></form>
-      <div class="wms-surface"><h2>Zapasy na lokalizacjach</h2><p class="wms-muted">Dostępne do zbiórki = wolne sztuki na lokalizacjach kompletacji. Kwarantanna i zapas zaplecza wymagają zwolnienia lub przesunięcia.</p><div class="wms-scroll"><table class="wms-lines wms-stock-table"><thead><tr><th>SKU / towar</th><th>Lokalizacja</th><th>Na półce</th><th>Rezerwacja</th><th>Dostępne</th><th>Minimum</th><th>Operacja</th></tr></thead><tbody>${result.rows.map((s, i) => `<tr><td><strong>${html(s.symbol)}</strong><br>${html(s.nazwa)}${s.active ? "" : "<br><strong>Brak kartoteki ERP</strong>"}</td><td>${html(s.bin || "Brak spisu")}<br><small>${binModes[s.mode]}</small></td><td class="num">${s.on_hand}</td><td class="num">${s.reserved}${s.putaway_reserved ? `<br><small>${s.putaway_reserved} do odłożenia</small>` : ""}${s.replenishment_reserved ? `<br><small>${s.replenishment_reserved} do uzupełnień</small>` : ""}</td><td class="num ${s.on_hand - s.reserved < s.minimum ? "wms-late" : ""}">${s.available}</td><td class="num">${s.minimum}</td><td><button data-stock-wms="${i}">Zmień</button>${office() ? `<button data-movements-wms="${i}">Historia</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak pasujących towarów.</td></tr>'}</tbody></table></div>${pager(result.total)}<div id="wms-stock-form"></div></div>`;
+      <div class="wms-surface"><h2>Zapasy na lokalizacjach</h2><p class="wms-muted">Dostępne do zbiórki = wolne sztuki na lokalizacjach kompletacji. Kwarantanna i zapas zaplecza wymagają zwolnienia lub przesunięcia.</p><div class="wms-scroll"><table class="wms-lines wms-stock-table"><thead><tr><th>SKU / towar</th><th>Lokalizacja</th><th>Na półce</th><th>Rezerwacja</th><th>Dostępne</th><th>Minimum / pojemność SKU</th><th>Operacja</th></tr></thead><tbody>${result.rows.map((s, i) => `<tr><td><strong>${html(s.symbol)}</strong><br>${html(s.nazwa)}${s.active ? "" : "<br><strong>Brak kartoteki ERP</strong>"}</td><td>${html(s.bin || "Brak spisu")}<br><small>${binModes[s.mode]}</small></td><td class="num">${s.on_hand}</td><td class="num">${s.reserved}${s.putaway_reserved ? `<br><small>${s.putaway_reserved} do odłożenia</small>` : ""}${s.replenishment_reserved ? `<br><small>${s.replenishment_reserved} do uzupełnień</small>` : ""}</td><td class="num ${s.on_hand - s.reserved < s.minimum ? "wms-late" : ""}">${s.available}</td><td class="num">${s.minimum} / ${s.capacity ?? "nieustalona"}${s.incoming ? `<br><small>${s.incoming} w drodze</small>` : ""}${s.capacity_blocked ? "<br><strong>Brak miejsca</strong>" : ""}${s.capacity !== null && s.on_hand > s.capacity ? "<br><strong>Powyżej pojemności</strong>" : ""}</td><td><button data-stock-wms="${i}">Zmień</button>${office() ? `<button data-movements-wms="${i}">Historia</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Brak pasujących towarów.</td></tr>'}</tbody></table></div>${pager(result.total)}<div id="wms-stock-form"></div></div>`;
     root()._stockRows = result.rows;
     root()._stockImport = null;
     if (office())
@@ -628,7 +628,7 @@ window.Wms = (() => {
     const s = root()._stockRows[index];
     root()._stock = s;
     el("wms-stock-form").innerHTML =
-      `<h2>${html(s.symbol)} · operacja magazynowa</h2><form class="wms-form" id="wms-stock-edit"><label>Czynność<select name="action"><option value="receive">Przyjęcie na lokalizację</option><option value="transfer">Przesunięcie / uzupełnienie</option>${office() ? '<option value="count">Spis — stan policzony na półce</option><option value="minimum">Ustaw minimum lokalizacji</option>' : ""}</select></label><div class="wms-fields">${field("bin", "Lokalizacja / źródło", "text", s.bin || "")}${field("quantity", "Ilość", "number", 1, 'min="0"')}</div><label>Lokalizacja docelowa (tylko przesunięcie)<input name="target"></label>${field("reason", "Dokument / powód", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAPISZ RUCH</button></form><p class="wms-help">Spis i minimum dotyczą wybranej lokalizacji. Przesunięcie obejmuje wyłącznie sztuki bez rezerwacji.</p>`;
+      `<h2>${html(s.symbol)} · operacja magazynowa</h2><form class="wms-form" id="wms-stock-edit"><label>Czynność<select name="action"><option value="receive">Przyjęcie na lokalizację</option><option value="transfer">Przesunięcie / uzupełnienie</option>${office() ? '<option value="count">Spis — stan policzony na półce</option>' : ""}</select></label><div class="wms-fields">${field("bin", "Lokalizacja / źródło", "text", s.bin || "")}${field("quantity", "Ilość", "number", 1, 'min="0"')}</div><label>Lokalizacja docelowa (tylko przesunięcie)<input name="target"></label>${field("reason", "Dokument / powód", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAPISZ RUCH</button></form><p class="wms-help">Spis dotyczy wybranej lokalizacji. Przesunięcie obejmuje wyłącznie sztuki bez rezerwacji.</p>${office() && s.bin ? `<details class="wms-surface"><summary>Minimum i pojemność tej części na ${html(s.bin)}</summary><p>Limit dotyczy sztuk tego SKU, nie łącznej objętości wszystkich części. Puste pole oznacza pojemność nieustaloną. Zero zamyka półkę dla nowych sztuk.</p><form id="wms-stock-limits" class="wms-form">${field("minimum", "Minimum wolnego zapasu", "number", s.minimum, 'min="0" max="1000000" step="1"')}<label>Pojemność tej części w sztukach<input name="capacity" type="number" min="0" max="1000000" step="1" value="${s.capacity ?? ""}"></label>${field("reason", "Powód zmiany", "text", "", 'minlength="3" maxlength="500"')}<button> ZAPISZ PARAMETRY PÓŁKI </button></form></details>` : ""}`;
     el("wms-stock-form").scrollIntoView({ block: "nearest" });
   }
   async function bins(turn) {
@@ -1081,6 +1081,24 @@ window.Wms = (() => {
         }
         return;
       }
+      if (f.id === "wms-stock-limits") {
+        const s = root()._stock;
+        const result = await mutate("/api/wms/inventory", {
+          action: "limits",
+          twId: s.tw_id,
+          bin: s.bin,
+          minimum: Number(values.minimum),
+          capacity:
+            values.capacity.trim() === "" ? null : Number(values.capacity),
+          version: s.version,
+          reason: values.reason,
+        });
+        if (result) {
+          await refresh();
+          message("Zapisano minimum i pojemność części na półce.");
+        }
+        return;
+      }
       if (f.id === "wms-stock-edit") {
         const s = root()._stock;
         const body = {
@@ -1201,11 +1219,22 @@ window.Wms = (() => {
     if (inboundUi.keydown(event)) return;
     if (
       event.key === "Enter" &&
-      event.target.form?.id === "wms-stockwork-complete"
+      ["wms-stockwork-complete", "wms-stockwork-space-finish"].includes(
+        event.target.form?.id,
+      )
     ) {
-      const nextName = { source: "barcode", barcode: "target" }[
-        event.target.name
-      ];
+      const sequence =
+        event.target.form.id === "wms-stockwork-space-finish"
+          ? {
+              source: "barcode",
+              barcode: "pickedQuantity",
+              pickedQuantity: "quantity",
+              quantity: "target",
+              target: "returnedSource",
+              returnedSource: "reason",
+            }
+          : { source: "barcode", barcode: "target" };
+      const nextName = sequence[event.target.name];
       if (nextName) {
         event.preventDefault();
         event.target.form.elements.namedItem(nextName).focus();

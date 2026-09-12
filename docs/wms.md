@@ -643,3 +643,34 @@ Dopiero wtedy można policzyć źródło i zatwierdzić wynik w biurze.
 Utrata odpowiedzi nie wymaga ponownego podjęcia. **PONÓW ZAPIS** odzyskuje pierwotny numer zadania i wynik tym samym kluczem.
 Wspólny dziennik blokuje inne procesy WMS do wyjaśnienia wyniku. Powrót po pauzie wymaga świeżego odczytu i skanów.
 Biuro udostępnia częściową ilość, zgłoszenie pustego źródła i anulowanie w **Zadaniach zapasu**.
+
+
+### Pojemność półki i pełny cel
+
+W **Zapasach** wybierz wiersz części i lokalizacji, następnie **Minimum i pojemność**.
+Pojemność oznacza sztuki konkretnego SKU w tym miejscu. Nie jest sumą gabarytów wszystkich części ani automatycznym pomiarem regału.
+Puste pole pozostawia limit nieustalony. Zero zatrzymuje nowe odłożenia; minimum nie może być większe od pojemności.
+
+Miejsce zajmuje fizyczny stan oraz przydzielone uzupełnienia. Rezerwacja zamówienia nadal leży na półce; miejsce zwalnia dopiero pobranie.
+Plan uzupełnia najwyżej dostępne miejsce, nawet gdy popyt zamówień jest większy.
+Ten sam limit chroni bezpośrednie przyjęcie, odkładanie z bufora i ręczne przesunięcie.
+Odmowa celu wycofuje również wcześniejszą zmianę źródła. Przy odkładaniu można odczytać zadanie i wybrać inną właściwą półkę.
+
+Spis zapisuje rzeczywiście policzony stan, także ponad limitem. Tabela pokazuje przekroczenie i blokuje kolejne dokładanie.
+Spis źródła i celu czeka na rozliczenie otwartego uzupełnienia, aby nie policzyć dwa razy części będących w drodze.
+
+Na kolektorze, po potwierdzeniu pobranej ilości, użyj **BRAK MIEJSCA NA CELU**, jeśli część towaru nie mieści się na półce.
+
+1. Wpisz liczbę sztuk pozostawionych na celu, także zero, oraz opis braku miejsca.
+2. Zeskanuj wskazany cel.
+3. Zwróć pozostałe pobrane sztuki na źródło i zeskanuj źródło.
+
+Dopiero ostatni skan rozlicza ruch. Historia zadania rozdziela odłożenie, zwrot oraz ewentualny brak na źródle.
+Przykład: przydzielono cztery, pobrano cztery, odłożono dwie i zwrócono dwie. Nie powstaje zgłoszenie braku na źródle.
+Jeżeli znaleziono tylko dwie, odłożono jedną i zwrócono jedną, źródło wymaga przeliczenia dwóch brakujących sztuk.
+
+Pełny cel trafia do **Zadań zapasu → Brak miejsca na dokładanie** i osobnej kolejki analityki.
+Zbiórka pozostaje dostępna. Biuro po sprawdzeniu miejsca skanuje lokalizację i uzasadnia odblokowanie dokładania; limit oraz historia pozostają.
+Biuro ma także formularz **Cel pełny — odłożenie i zwrot reszty** do tego samego rozliczenia.
+Po przerwie przed zapisem wróć z wszystkimi niepotwierdzonymi sztukami z celu i wózka na źródło, zanim rozpoczniesz ponownie.
+Nieznany wynik już wysłanej operacji rozlicz przez ponowienie, bez powtarzania fizycznego ruchu.

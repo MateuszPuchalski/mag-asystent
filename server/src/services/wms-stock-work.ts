@@ -3,6 +3,7 @@ import { db, nowIso } from "../db/db.js";
 import { readSnapshot } from "./wms.js";
 import {
   applyStock,
+  assertDestinationSpace,
   checkBarcode,
   command,
   getOrder,
@@ -117,11 +118,14 @@ const replenishmentPlanSql = `WITH demand AS (
     WHERE coalesce(b.mode,'pick')='pick' AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
   ), needs AS (
     SELECT *,max(0,minimum-(on_hand-reserved),CASE WHEN rank=1 THEN needed-available ELSE 0 END) AS quantity FROM pick
-  ) SELECT n.tw_id,n.sku,n.name,n.barcode,n.bin AS target,n.version AS target_version,n.quantity,s.bin AS source,s.version AS source_version,
+  ) SELECT n.tw_id,n.sku,n.name,n.barcode,n.bin AS target,n.version AS target_version,
+      min(n.quantity,max(0,coalesce(n.capacity-n.on_hand,n.quantity))) AS quantity,s.bin AS source,s.version AS source_version,
       s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
       -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
     FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
-    WHERE n.quantity>0 AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
+    WHERE n.quantity>0 AND (n.capacity IS NULL OR n.capacity>n.on_hand)
+    AND NOT EXISTS(SELECT 1 FROM wms_capacity_issue c WHERE c.tw_id=n.tw_id AND c.bin=n.bin AND c.resolved_at IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
     AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
     AND source_available>0 AND (instr(lower(n.sku||' '||n.name),lower(?))>0 OR n.bin=? OR s.bin=? OR n.barcode=?)
     ORDER BY n.quantity DESC,n.sku,n.bin,s.bin`;
@@ -144,6 +148,11 @@ function readStockWork(actor: Actor, raw: unknown) {
   const plans = replenishmentPlans(input.q);
   return {
     plans,
+    capacityIssues: db()
+      .prepare(
+        `SELECT c.*,p.symbol AS sku,p.nazwa AS name FROM wms_capacity_issue c JOIN wms_product p ON p.tw_id=c.tw_id WHERE c.resolved_at IS NULL ORDER BY c.created_at,c.id LIMIT 100`,
+      )
+      .all(),
     repairs:
       actor.role === "magazynier"
         ? []
@@ -208,6 +217,8 @@ const replenishmentTaskSql = `SELECT r.*,p.symbol AS sku,p.nazwa AS name,p.ean A
   coalesce(r.completed_quantity,CASE WHEN r.completed_at IS NOT NULL THEN r.quantity END) AS moved,
   CASE WHEN EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=r.tw_id AND c.bin IN (r.source,r.target) AND c.resolved_at IS NULL)
     THEN 'Lokalizacja czeka na przeliczenie. Odłóż pobrane sztuki na źródło i anuluj zadanie.'
+    WHEN EXISTS(SELECT 1 FROM wms_capacity_issue c WHERE c.tw_id=r.tw_id AND c.bin=r.target AND c.resolved_at IS NULL)
+    THEN 'Cel czeka na zwolnienie miejsca. Zwróć niepotwierdzone sztuki na źródło i anuluj zadanie.'
     WHEN s.version<>r.source_version THEN 'Stan źródła zmienił się. Odłóż pobrane sztuki i przygotuj nowy plan.' END AS blocked
   FROM wms_replenishment r JOIN wms_product p ON p.tw_id=r.tw_id
   JOIN wms_stock s ON s.tw_id=r.tw_id AND s.bin=r.source`;
@@ -329,6 +340,7 @@ export function claimReplenishment(actor: Actor, key: string, raw: unknown) {
     );
     if (input.quantity > from!.on_hand - from!.reserved - assigned)
       fail("Zapas zaplecza jest już potrzebny w innych zadaniach");
+    assertDestinationSpace(input.twId, input.target, input.quantity);
     const taskId = Number(
       db()
         .prepare(
@@ -362,6 +374,9 @@ export function completeReplenishment(
       barcode: z.string().trim().min(1).max(120),
       quantity: z.number().int().min(0).max(1000000),
       reason: reason.optional(),
+      targetFull: z.boolean().optional(),
+      pickedQuantity: z.number().int().min(1).max(1000000).optional(),
+      returnedSource: code.optional(),
     })
     .strict()
     .parse(raw);
@@ -377,6 +392,24 @@ export function completeReplenishment(
       if (!task || task.completed_at || task.cancelled_at)
         fail("Zadanie jest już zamknięte albo nie istnieje");
       if (task!.user_id !== actor.id) fail("Zadanie obsługuje inna osoba", 403);
+      const picked = input.targetFull ? input.pickedQuantity : input.quantity;
+      if (input.targetFull) {
+        if (
+          picked === undefined ||
+          picked > task!.quantity ||
+          input.quantity >= picked ||
+          input.returnedSource !== task!.source ||
+          !input.reason
+        )
+          fail(
+            "Potwierdź ilość na celu, opis braku miejsca i zwrot pozostałych sztuk na źródło",
+            400,
+          );
+      } else if (
+        input.pickedQuantity !== undefined ||
+        input.returnedSource !== undefined
+      )
+        fail("Zwrot nadmiaru wymaga zgłoszenia pełnego celu", 400);
       if (
         task!.source !== input.source ||
         task!.target !== input.target ||
@@ -408,9 +441,16 @@ export function completeReplenishment(
       // W tej samej transakcji zwalniamy własny przydział; cudze sztuki nadal chroni move.
       db()
         .prepare(
-          "UPDATE wms_replenishment SET completed_at=?,completed_quantity=?,reason=? WHERE id=?",
+          "UPDATE wms_replenishment SET completed_at=?,completed_quantity=?,reason=?,returned_quantity=?,target_full=? WHERE id=?",
         )
-        .run(nowIso(), input.quantity, input.reason ?? null, taskId);
+        .run(
+          nowIso(),
+          input.quantity,
+          input.reason ?? null,
+          picked! - input.quantity,
+          Number(input.targetFull === true),
+          taskId,
+        );
       if (input.quantity > 0)
         applyStock(actor, {
           action: "transfer",
@@ -420,7 +460,7 @@ export function completeReplenishment(
           quantity: input.quantity,
           reason: `Uzupełnienie #${taskId}`,
         });
-      if (input.quantity < task!.quantity)
+      if (picked! < task!.quantity)
         db()
           .prepare(
             `INSERT INTO wms_stock_check(tw_id,bin,reason,created_at,user_id)
@@ -435,12 +475,60 @@ export function completeReplenishment(
             task!.tw_id,
             task!.source,
           );
+      if (input.targetFull)
+        db()
+          .prepare(
+            `INSERT INTO wms_capacity_issue(tw_id,bin,reason,user_id,created_at)
+          SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM wms_capacity_issue WHERE tw_id=? AND bin=? AND resolved_at IS NULL)`,
+          )
+          .run(
+            task!.tw_id,
+            task!.target,
+            `Pełny cel uzupełnienia #${taskId}: ${input.reason}`,
+            actor.id,
+            nowIso(),
+            task!.tw_id,
+            task!.target,
+          );
       return {
         completed: true,
         id: taskId,
         quantity: input.quantity,
-        shortage: task!.quantity - input.quantity,
+        shortage: task!.quantity - picked!,
+        returned: picked! - input.quantity,
+        targetFull: input.targetFull === true,
       };
+    },
+  );
+}
+
+export function resolveCapacityIssue(
+  actor: Actor,
+  key: string,
+  issueId: number,
+  raw: unknown,
+) {
+  manager(actor);
+  const input = z.object({ bin: code, reason }).strict().parse(raw);
+  return command(
+    key,
+    actor,
+    "capacity_issue_resolve",
+    { issueId, ...input },
+    () => {
+      const issue = db()
+        .prepare(
+          "SELECT * FROM wms_capacity_issue WHERE id=? AND resolved_at IS NULL",
+        )
+        .get(id.parse(issueId));
+      if (!issue || issue.bin !== input.bin)
+        fail("Zeskanuj lokalizację otwartego zgłoszenia braku miejsca", 400);
+      db()
+        .prepare(
+          "UPDATE wms_capacity_issue SET resolved_at=?,resolved_by=?,resolution=? WHERE id=?",
+        )
+        .run(nowIso(), actor.id, input.reason, issueId);
+      return { resolved: true, id: issueId };
     },
   );
 }

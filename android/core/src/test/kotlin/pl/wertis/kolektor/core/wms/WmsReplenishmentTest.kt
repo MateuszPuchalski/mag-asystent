@@ -15,6 +15,43 @@ private val replenishPlan = WmsReplenishmentPlan(30, "LOC:PART", "Nóż", "00590
 private fun replenishCommand() = replenishmentFinish(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4), "A-01")
 
 class WmsReplenishmentScanTest {
+    @Test fun `pelny cel wymaga ilosci na celu jego skanu i zwrotu pozostalych sztuk`() {
+        var scan = replenishmentSpaceStart(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4))
+        for (raw in listOf("", "-1", "1.5", "4", "5"))
+            assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceQuantity(replenishTask, 2, scan, raw, "Brak miejsca") }
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceQuantity(replenishTask, 2, scan, "2", "") }
+        scan = replenishmentSpaceQuantity(replenishTask, 2, scan, "2", "Brak miejsca")
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceFinish(replenishTask, 2, scan, "RES-01") }
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceTarget(replenishTask, 2, scan, "BAD") }
+        scan = replenishmentSpaceTarget(replenishTask, 2, scan, "a-01")
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceFinish(replenishTask, 2, scan, "A-01") }
+        val draft = replenishmentSpaceFinish(replenishTask, 2, scan, "res-01")
+        assertEquals("2", draft.body["quantity"]!!.jsonPrimitive.content)
+        assertEquals("4", draft.body["pickedQuantity"]!!.jsonPrimitive.content)
+        assertEquals("true", draft.body["targetFull"]!!.jsonPrimitive.content)
+        assertEquals("RES-01", draft.body["returnedSource"]!!.jsonPrimitive.content)
+    }
+    @Test fun `brak zrodla i miejsca zachowuje osobne ilosci oraz oba opisy`() {
+        var scan = replenishmentQuantity(replenishTask, 2, WmsReplenishmentScan(true, "005901"), "2", "Brak na źródle")
+        scan = replenishmentSpaceStart(replenishTask, 2, scan)
+        scan = replenishmentSpaceQuantity(replenishTask, 2, scan, "1", "Brak miejsca")
+        scan = replenishmentSpaceTarget(replenishTask, 2, scan, "A-01")
+        val draft = replenishmentSpaceFinish(replenishTask, 2, scan, "RES-01")
+        assertEquals("2", draft.body["pickedQuantity"]!!.jsonPrimitive.content)
+        assertEquals("1", draft.body["quantity"]!!.jsonPrimitive.content)
+        assertEquals("Brak na źródle; Brak miejsca", draft.body["reason"]!!.jsonPrimitive.content)
+        assertEquals(WmsReplenishmentStage.SOURCE, replenishmentStage(replenishTask, 2, WmsReplenishmentScan()))
+    }
+    @Test fun `zero na pelnym celu wciaz wymaga zwrotu a lokalizacje rozpoznaja prefiks`() {
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceStart(replenishTask, 2, WmsReplenishmentScan()) }
+        var scan = replenishmentSpaceStart(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4))
+        scan = replenishmentSpaceQuantity(replenishTask, 2, scan, "0", "Cel pełny")
+        scan = replenishmentSpaceTarget(replenishTask, 2, scan, replenishmentCode(WmsReplenishmentStage.SPACE_TARGET, classify("LOC:A-01")))
+        val draft = replenishmentSpaceFinish(replenishTask, 2, scan, replenishmentCode(WmsReplenishmentStage.SPACE_RETURN, classify("LOC:RES-01")))
+        assertEquals("0", draft.body["quantity"]!!.jsonPrimitive.content)
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceFinish(replenishTask.copy(blocked = "Przelicz"), 2, scan, "RES-01") }
+        assertThrows(IllegalArgumentException::class.java) { replenishmentSpaceFinish(replenishTask, 3, scan, "RES-01") }
+    }
     @Test fun `zrodlo czesc ilosc cel chronia przed zlym odlozeniem`() {
         assertThrows(IllegalArgumentException::class.java) { replenishmentScan(replenishTask, 2, WmsReplenishmentScan(), "A-01") }
         var scan = replenishmentScan(replenishTask, 2, WmsReplenishmentScan(), "res-01")
@@ -92,7 +129,12 @@ private class ReplenishClient(val store: ReplenishStore) : WmsReplenishmentTrans
         assertEquals(command, store.journal.pending); sent += command
         failure?.let { throw it }
         if (commits.add(command.key)) {
-            if (command.path.endsWith("/complete")) task = task.copy(completed_at = "done", moved = 4)
+            if (command.path.endsWith("/complete")) {
+                val placed = command.body["quantity"]!!.jsonPrimitive.content.toInt()
+                val picked = command.body["pickedQuantity"]?.jsonPrimitive?.content?.toInt() ?: placed
+                task = task.copy(completed_at = "done", moved = placed, returned_quantity = picked - placed,
+                    target_full = if (command.body["targetFull"]?.jsonPrimitive?.content == "true") 1 else 0)
+            }
             if (command.path.endsWith("/cancel")) task = task.copy(cancelled_at = "done")
         }
         if (lost) throw IOException("Utracona odpowiedź")
@@ -100,6 +142,19 @@ private class ReplenishClient(val store: ReplenishStore) : WmsReplenishmentTrans
     }
 }
 class WmsReplenishmentRecoveryTest {
+    @Test fun `utracone potwierdzenie zwrotu zachowuje ilosci i nie wymaga ponownego ruchu`() = runTest {
+        val store = ReplenishStore(); val client = ReplenishClient(store); val controller = WmsReplenishmentController(store, { client })
+        controller.select(replenisher, 1)
+        var scan = replenishmentSpaceStart(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4))
+        scan = replenishmentSpaceQuantity(replenishTask, 2, scan, "2", "Cel pełny")
+        scan = replenishmentSpaceTarget(replenishTask, 2, scan, "A-01")
+        client.lost = true; controller.submit(replenisher, replenishmentSpaceFinish(replenishTask, 2, scan, "RES-01"))
+        val pending = store.journal.pending!!
+        client.lost = false; val restart = WmsReplenishmentController(store, { client }); restart.open(replenisher); restart.retry(replenisher)
+        assertEquals(pending, client.sent.last()); assertEquals(1, client.commits.size)
+        assertEquals(2, restart.state.value.task!!.returned_quantity); assertEquals(2, restart.state.value.task!!.moved)
+        assertEquals(1, restart.state.value.task!!.target_full); assertNull(store.journal.pending)
+    }
     @Test fun `utracone podjecie po restarcie odzyskuje numer tym samym kluczem`() = runTest {
         val store = ReplenishStore(); val client = ReplenishClient(store); val controller = WmsReplenishmentController(store, { client })
         controller.queue(replenisher, "plans"); client.lost = true; controller.submit(replenisher, replenishmentClaim(replenishPlan))

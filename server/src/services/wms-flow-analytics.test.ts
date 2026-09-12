@@ -38,7 +38,7 @@ function close(actual: unknown, expected: number) {
 test("pusty raport nie zapisuje; brak obserwacji pozostaje NULL zamiast zera czasu", () => {
   const before = d.prepare("SELECT total_changes() AS n").get()!.n;
   const r = report();
-  assert.equal(r.queues.length, 10);
+  assert.equal(r.queues.length, 11);
   for (const q of r.queues) {
     assert.equal(q.count, 0);
     assert.equal(q.oldest_minutes, null);
@@ -52,6 +52,22 @@ test("pusty raport nie zapisuje; brak obserwacji pozostaje NULL zamiast zera cza
     assert.equal(s.p95_minutes, null);
   }
   assert.equal(d.prepare("SELECT total_changes() AS n").get()!.n, before);
+});
+
+test("pełne cele mają własną kolejkę z wiekiem i nie udają braków do liczenia", () => {
+  d.prepare(
+    "INSERT INTO wms_capacity_issue(tw_id,bin,reason,user_id,created_at) VALUES(1,'A-01','Pełna półka',2,?)",
+  ).run(since);
+  const before = d.prepare("SELECT total_changes() n").get()!.n;
+  assert.equal(queue("capacity").count, 1);
+  assert.equal(queue("capacity").held, 1);
+  close(queue("capacity").oldest_minutes, 2160);
+  assert.equal(queue("counts").count, 0);
+  assert.equal(d.prepare("SELECT total_changes() n").get()!.n, before);
+  d.prepare(
+    "UPDATE wms_capacity_issue SET resolved_at=?,resolved_by=1,resolution='Zwolniono miejsce'",
+  ).run(now);
+  assert.equal(queue("capacity").count, 0);
 });
 
 test("mediana i P95 uwzględniają prawdziwe zero; brak, błędna i odwrócona data nie zaniżają wyników", () => {

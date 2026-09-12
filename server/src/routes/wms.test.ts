@@ -130,6 +130,108 @@ test("kolektor podejmuje uzupełnienie i po częściowym odłożeniu otrzymuje t
     2,
   );
 });
+test("hala zgłasza pełny cel, a tylko biuro ustala pojemność i odblokowuje dokładanie", async () => {
+  const W = await import("../services/wms.js"),
+    actor = { id: 1, name: "Biuro", role: "admin" as const };
+  W.configureBin(actor, randomUUID(), {
+    bin: "CAP-API",
+    mode: "reserve",
+    version: 1,
+    reason: "Zaplecze testu",
+  });
+  for (const [bin, quantity] of [
+    ["CAP-API", 10],
+    ["CAP-TARGET", 1],
+  ] as const)
+    W.changeStock(actor, randomUUID(), {
+      action: "receive",
+      twId: 1,
+      bin,
+      quantity,
+      reason: "Dostawa testowa",
+    });
+  const post = (
+    url: string,
+    payload: Record<string, unknown>,
+    token = workerToken,
+  ) =>
+    app.inject({
+      method: "POST",
+      url,
+      headers: { "x-session": token, "idempotency-key": randomUUID() },
+      payload,
+    });
+  const limits = {
+    action: "limits",
+    twId: 1,
+    bin: "CAP-TARGET",
+    minimum: 5,
+    capacity: 5,
+    version: 2,
+    reason: "Sprawdzono pojemność",
+  };
+  assert.equal((await post("/api/wms/inventory", limits)).statusCode, 403);
+  assert.equal(
+    (await post("/api/wms/inventory", limits, adminToken)).statusCode,
+    200,
+  );
+  const plans = (
+    await app.inject({
+      url: "/api/wms/replenishment-work?view=plans&q=CAP-TARGET",
+      headers: { "x-session": workerToken },
+    })
+  ).json();
+  const p = plans.plans[0],
+    taken = await post("/api/wms/replenishments", {
+      twId: 1,
+      source: p.source,
+      target: p.target,
+      quantity: 4,
+      sourceVersion: p.source_version,
+      targetVersion: p.target_version,
+    });
+  assert.equal(taken.statusCode, 200, taken.body);
+  const done = await post(
+    `/api/wms/replenishments/${taken.json().id}/complete`,
+    {
+      source: p.source,
+      target: p.target,
+      barcode: "59001",
+      quantity: 2,
+      pickedQuantity: 4,
+      targetFull: true,
+      returnedSource: p.source,
+      reason: "Cel pełny",
+    },
+  );
+  assert.equal(done.statusCode, 200, done.body);
+  assert.equal(done.json().shortage, 0);
+  assert.equal(done.json().returned, 2);
+  const queue = (
+    await app.inject({
+      url: "/api/wms/stock-work",
+      headers: { "x-session": workerToken },
+    })
+  ).json();
+  const issue = queue.capacityIssues.find(
+      (c: { bin: string }) => c.bin === "CAP-TARGET",
+    ),
+    url = `/api/wms/capacity-issues/${issue.id}/resolve`,
+    body = { bin: "CAP-TARGET", reason: "Przeniesiono przeszkodę" };
+  assert.equal(
+    (
+      await app.inject({
+        method: "POST",
+        url,
+        payload: body,
+        headers: { "idempotency-key": randomUUID() },
+      })
+    ).statusCode,
+    401,
+  );
+  assert.equal((await post(url, body)).statusCode, 403);
+  assert.equal((await post(url, body, adminToken)).statusCode, 200);
+});
 test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/orders",

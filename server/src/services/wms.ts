@@ -54,6 +54,17 @@ export const orderInput = z
 export const stockInput = z.discriminatedUnion("action", [
   z
     .object({
+      action: z.literal("limits"),
+      twId: id,
+      bin,
+      minimum: z.number().int().min(0).max(1000000),
+      capacity: z.number().int().min(0).max(1000000).nullable(),
+      version,
+      reason,
+    })
+    .strict(),
+  z
+    .object({
       action: z.literal("receive"),
       twId: id,
       bin,
@@ -174,6 +185,7 @@ type Stock = {
   on_hand: number;
   reserved: number;
   minimum: number;
+  capacity: number | null;
   version: number;
 };
 export type Order = {
@@ -348,6 +360,39 @@ export function listBins(raw: unknown) {
   return { rows, total, ...f };
 }
 
+export function assertDestinationSpace(
+  twId: number,
+  address: string,
+  quantity: number,
+) {
+  if (
+    db()
+      .prepare(
+        "SELECT 1 FROM wms_capacity_issue WHERE tw_id=? AND bin=? AND resolved_at IS NULL",
+      )
+      .get(twId, address)
+  )
+    fail(
+      `Na ${address} zgłoszono brak miejsca. Wybierz inną półkę albo wyjaśnij zgłoszenie w biurze`,
+    );
+  const row = db()
+    .prepare(
+      `SELECT s.capacity,s.on_hand,
+    coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.target=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS incoming
+    FROM wms_stock s WHERE tw_id=? AND bin=?`,
+    )
+    .get(twId, address);
+  // Rezerwacja dla zamówienia nadal leży na półce; miejsce zwalnia dopiero pobranie.
+  if (
+    row &&
+    row.capacity !== null &&
+    Number(row.on_hand) + Number(row.incoming) + quantity > Number(row.capacity)
+  )
+    fail(
+      `Na ${address} zmieści się jeszcze ${Math.max(0, Number(row.capacity) - Number(row.on_hand) - Number(row.incoming))} szt. Uwzględniono przydzielone uzupełnienia`,
+    );
+}
+
 export function move(
   actor: Actor,
   twId: number,
@@ -360,6 +405,23 @@ export function move(
 ): void {
   const d = db();
   if (!d.isTransaction) throw new Error("Ruch WMS wymaga transakcji command");
+  // Towar może już być na wózku lub celu, lecz czekać na końcowy skan zwrotu.
+  // Spis w tym oknie policzyłby niepotwierdzone sztuki drugi raz.
+  if (
+    kind === "count" &&
+    d
+      .prepare(
+        `SELECT 1 FROM wms_replenishment WHERE tw_id=? AND (source=? OR target=?)
+    AND completed_at IS NULL AND cancelled_at IS NULL`,
+      )
+      .get(twId, address, address)
+  )
+    fail(
+      "Spis wymaga rozliczenia uzupełnień tej lokalizacji. Przy anulowaniu zwróć niepotwierdzone sztuki na źródło",
+    );
+  // Spis i zwrot zapisują stan rzeczywisty, także ponad limitem; nowej dostawy nie wolno tam upychać.
+  if (delta > 0 && (kind === "receive" || kind === "transfer"))
+    assertDestinationSpace(twId, address, delta);
   if (
     kind === "transfer" &&
     d
@@ -414,7 +476,12 @@ export function move(
 
 export function changeStock(actor: Actor, key: string, raw: unknown) {
   const input = stockInput.parse(raw);
-  if (input.action === "count" || input.action === "minimum") manager(actor);
+  if (
+    input.action === "count" ||
+    input.action === "minimum" ||
+    input.action === "limits"
+  )
+    manager(actor);
   return command(key, actor, "stock", input, () => applyStock(actor, input));
 }
 
@@ -486,6 +553,8 @@ export function applyStock(actor: Actor, input: z.infer<typeof stockInput>) {
     );
   }
   if (input.action === "minimum") {
+    if (current?.capacity != null && input.quantity > current.capacity)
+      fail("Minimum przekracza pojemność tej części na półce", 400);
     d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
       input.twId,
       input.bin,
@@ -493,6 +562,33 @@ export function applyStock(actor: Actor, input: z.infer<typeof stockInput>) {
     d.prepare(
       "UPDATE wms_stock SET minimum=?,version=version+1 WHERE tw_id=? AND bin=?",
     ).run(input.quantity, input.twId, input.bin);
+  }
+  if (input.action === "limits") {
+    manager(actor);
+    if (input.capacity !== null && input.minimum > input.capacity)
+      fail("Minimum nie może przekraczać pojemności", 400);
+    const incoming = Number(
+      d
+        .prepare(
+          "SELECT coalesce(sum(quantity),0) n FROM wms_replenishment WHERE tw_id=? AND target=? AND completed_at IS NULL AND cancelled_at IS NULL",
+        )
+        .get(input.twId, input.bin)!.n,
+    );
+    if (
+      input.capacity !== null &&
+      incoming > 0 &&
+      input.capacity < (current?.on_hand ?? 0) + incoming
+    )
+      fail(
+        "Najpierw rozlicz przydzielone uzupełnienie przed zmniejszeniem pojemności",
+      );
+    d.prepare("INSERT OR IGNORE INTO wms_stock(tw_id,bin) VALUES (?,?)").run(
+      input.twId,
+      input.bin,
+    );
+    d.prepare(
+      "UPDATE wms_stock SET minimum=?,capacity=?,version=version+1 WHERE tw_id=? AND bin=?",
+    ).run(input.minimum, input.capacity, input.twId, input.bin);
   }
   return stock(input.twId, input.bin)!;
 }
@@ -1600,7 +1696,9 @@ export function inventory(raw: unknown) {
   const rows = db()
     .prepare(
       `${catalog} SELECT t.tw_id,t.symbol,t.nazwa,t.ean,t.active,s.bin,coalesce(s.on_hand,0) AS on_hand,
-    coalesce(s.reserved,0) AS reserved,coalesce(s.minimum,0) AS minimum,coalesce(s.version,1) AS version,
+    coalesce(s.reserved,0) AS reserved,coalesce(s.minimum,0) AS minimum,s.capacity,coalesce(s.version,1) AS version,
+    (SELECT c.reason FROM wms_capacity_issue c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL) AS capacity_blocked,
+    coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.target=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS incoming,
     coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS replenishment_reserved,
     coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS putaway_reserved,
     coalesce(b.mode,'pick') AS mode,sc.reason AS stock_blocked,CASE WHEN coalesce(b.mode,'pick')='pick' AND sc.id IS NULL THEN coalesce(s.on_hand-s.reserved,0) ELSE 0 END AS available

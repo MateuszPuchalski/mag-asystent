@@ -275,6 +275,7 @@ export async function wmsRoutes(app: FastifyInstance) {
   for (const [path, action] of Object.entries({
     "/api/wms/replenishments/:id/complete": StockWork.completeReplenishment,
     "/api/wms/replenishments/:id/cancel": StockWork.cancelReplenishment,
+    "/api/wms/capacity-issues/:id/resolve": StockWork.resolveCapacityIssue,
     "/api/wms/stock-checks/:id/count": StockWork.countStockCheck,
     "/api/wms/stock-checks/:id/observe": Counting.observeCount,
     "/api/wms/stock-checks/:id/review": Counting.reviewCount,

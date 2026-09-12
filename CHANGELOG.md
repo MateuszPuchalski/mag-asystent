@@ -34,6 +34,16 @@ historii nie przepisujemy.
 ---
 
 
+## 0.304.0 — pojemność półek i rozliczenie pełnego celu
+
+- Pojemność SKU na lokalizacji ogranicza plan, przyjęcie, odkładanie i transfer. Uwzględnia fizyczny zapas oraz przydzielone uzupełnienia.
+- Biuro ustala minimum i opcjonalną pojemność. Puste pole oznacza limit nieustalony; zero zatrzymuje nowe dokładanie.
+- Kolektor rozdziela ilość odłożoną, zwróconą i brakującą. Pełny cel wymaga potwierdzenia ilości, skanu celu oraz źródła po zwrocie reszty.
+- Brak miejsca blokuje dokładanie, lecz pozwala zbierać towar. Biuro zwalnia blokadę z uzasadnieniem; analityka pokazuje osobną kolejkę.
+- Ręczny spis obu końców czeka na zakończenie uzupełnienia. Spis po rozliczeniu zachowuje faktyczną ilość, także ponad limitem.
+- **[wymaga działania]** Zaktualizować API przed APK. Migracja zachowuje istniejący zapas; pojemności trzeba ustalić z rzeczywistych warunków półek.
+- Weryfikacja: 2278 testów serwera, 727 panelu, 427 Android core. E2E potwierdza zwrot po utracie odpowiedzi i odblokowanie celu.
+
 ## 0.303.0 — uzupełnianie półek na kolektorze z obsługą braków
 
 - **UZUPEŁNIENIA WMS**: własna kolejka, propozycje, podjęcie oraz skany źródła, części i celu. Ilość wymaga jawnego potwierdzenia.

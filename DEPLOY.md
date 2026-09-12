@@ -15,6 +15,12 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.304.0 API i APK obsługują pojemność części na lokalizacji oraz pełny cel uzupełnienia.
+Zaktualizować API przed APK. Migracja dodaje opcjonalną pojemność, historię pełnych celów oraz ilość zwróconą w zadaniu.
+Istniejące lokalizacje mają pojemność nieustaloną; ich stan nie jest zmieniany. Biuro ustala limit sztuk konkretnej części, bez zgadywania gabarytów.
+
+Nie cofać API ani APK przy oczekującym rozliczeniu zwrotu. Najpierw sprawdzić zapis na pierwotnym koncie i serwerze.
+
 Od 0.303.0 kolektor ma **UZUPEŁNIENIA WMS**. Zaktualizować API przed APK; restart dodaje pole potwierdzonej ilości do istniejących zadań.
 Dawne pełne uzupełnienia pozostają poprawne. Mniejsza ilość wymaga opisu i kieruje źródło do liczenia; zero nie przesuwa zapasu.
 Przed aktualizacją lub cofnięciem APK rozliczyć oczekujący zapis WMS na pierwotnym koncie i serwerze. Nie czyścić dziennika.

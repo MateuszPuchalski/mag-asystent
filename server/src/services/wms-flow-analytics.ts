@@ -156,6 +156,13 @@ export function flowAnalytics(d: Db, since: string, now: string) {
       source: `SELECT created_at AS started,0 AS held FROM wms_stock_check WHERE resolved_at IS NULL`,
     },
     {
+      id: "capacity",
+      label: "Pełne cele odłożenia",
+      unit: "lokalizacje części",
+      view: "stockwork",
+      source: `SELECT created_at AS started,1 AS held FROM wms_capacity_issue WHERE resolved_at IS NULL`,
+    },
+    {
       id: "allocation",
       label: "Zamówienia do rezerwacji",
       unit: "zamówienia",

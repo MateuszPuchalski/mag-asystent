@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS wms_stock (
   on_hand INTEGER NOT NULL DEFAULT 0 CHECK(on_hand >= 0),
   reserved INTEGER NOT NULL DEFAULT 0 CHECK(reserved >= 0 AND reserved <= on_hand),
   minimum INTEGER NOT NULL DEFAULT 0 CHECK(minimum >= 0),
+  capacity INTEGER CHECK(capacity>=0 AND capacity<=1000000),
   version INTEGER NOT NULL DEFAULT 1,
   PRIMARY KEY(tw_id, bin)
 );
@@ -110,6 +111,21 @@ CREATE TABLE IF NOT EXISTS wms_bin (
   mode TEXT NOT NULL CHECK(mode IN ('pick','reserve','quarantine')),
   version INTEGER NOT NULL DEFAULT 1 CHECK(version>0)
 );
+-- Brak miejsca blokuje dokładanie, ale pobranie musi móc zwolnić półkę.
+CREATE TABLE IF NOT EXISTS wms_capacity_issue (
+  id INTEGER PRIMARY KEY,
+  tw_id INTEGER NOT NULL,
+  bin TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  resolved_by INTEGER,
+  resolution TEXT,
+  CHECK((resolved_at IS NULL AND resolved_by IS NULL AND resolution IS NULL)
+    OR (resolved_at IS NOT NULL AND resolved_by IS NOT NULL AND resolution IS NOT NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS wms_capacity_issue_open ON wms_capacity_issue(tw_id,bin) WHERE resolved_at IS NULL;
 CREATE TABLE IF NOT EXISTS wms_order (
   id INTEGER PRIMARY KEY,
   reference TEXT NOT NULL,
@@ -270,6 +286,8 @@ CREATE TABLE IF NOT EXISTS wms_replenishment (
   created_at TEXT NOT NULL,
   completed_at TEXT,
   completed_quantity INTEGER CHECK(completed_quantity>=0 AND completed_quantity<=quantity),
+  returned_quantity INTEGER NOT NULL DEFAULT 0 CHECK(returned_quantity>=0 AND returned_quantity<=quantity),
+  target_full INTEGER NOT NULL DEFAULT 0 CHECK(target_full IN (0,1)),
   cancelled_at TEXT,
   reason TEXT
 );

@@ -35,6 +35,10 @@ import pl.wertis.kolektor.core.wms.replenishmentClaim
 import pl.wertis.kolektor.core.wms.replenishmentCode
 import pl.wertis.kolektor.core.wms.replenishmentQuantity
 import pl.wertis.kolektor.core.wms.replenishmentScan
+import pl.wertis.kolektor.core.wms.replenishmentSpaceStart
+import pl.wertis.kolektor.core.wms.replenishmentSpaceQuantity
+import pl.wertis.kolektor.core.wms.replenishmentSpaceTarget
+import pl.wertis.kolektor.core.wms.replenishmentSpaceFinish
 import pl.wertis.kolektor.core.wms.replenishmentStage
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
@@ -90,6 +94,11 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
             } else if (cancel) {
                 val code = if (input.kind == pl.wertis.kolektor.core.scan.ScanKind.LOC) input.code else input.rawCode
                 submit(replenishmentCancel(task, context!!.actorId, code, reason))
+            } else if (stage == WmsReplenishmentStage.SPACE_TARGET) {
+                scan = replenishmentSpaceTarget(task, context!!.actorId, scan, replenishmentCode(stage, input))
+                error = null; graph.feedback.beep(true)
+            } else if (stage == WmsReplenishmentStage.SPACE_RETURN) {
+                submit(replenishmentSpaceFinish(task, context!!.actorId, scan, replenishmentCode(stage, input)))
             } else if (stage == WmsReplenishmentStage.TARGET) {
                 submit(replenishmentFinish(task, context!!.actorId, scan, replenishmentCode(stage, input)))
             } else {
@@ -142,6 +151,9 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
             WmsReplenishmentStage.PRODUCT -> "2 · SKANUJ KOD CZĘŚCI"
             WmsReplenishmentStage.QUANTITY -> "3 · POTWIERDŹ POBRANĄ ILOŚĆ"
             WmsReplenishmentStage.TARGET -> "4 · ODŁÓŻ I SKANUJ ${task.target}"
+            WmsReplenishmentStage.SPACE_QUANTITY -> "BRAK MIEJSCA — ILE ODŁOŻONO?"
+            WmsReplenishmentStage.SPACE_TARGET -> "POTWIERDŹ CEL ${task.target}"
+            WmsReplenishmentStage.SPACE_RETURN -> "ZWRÓĆ RESZTĘ NA ${task.source}"
             WmsReplenishmentStage.DONE -> "ZADANIE ROZLICZONE"
             else -> "ZADANIE DO WYJAŚNIENIA"
         }
@@ -165,14 +177,28 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
                 PrimaryButton(if (quantity.toIntOrNull() == 0) "ZGŁOŚ PUSTE ŹRÓDŁO" else "POTWIERDŹ ILOŚĆ", modifier = Modifier.fillMaxWidth(), onClick = ::confirmQuantity)
             }
             WmsReplenishmentStage.TARGET -> Text("${scan.quantity} szt. → ${task.target}. Skan celu zapisze przesunięcie.", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            WmsReplenishmentStage.SPACE_QUANTITY -> if (allowed) {
+                Text("Pobrano ${scan.quantity} szt. Wpisz, ile faktycznie mieści się na celu. Pozostałe sztuki wrócą na źródło.")
+                WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Odłożone sztuki, także 0", keyboardType = KeyboardType.Number)
+                WertisTextField(reason, { reason = it.take(500) }, placeholder = "Opis braku miejsca")
+                PrimaryButton("POTWIERDŹ ODŁOŻONĄ ILOŚĆ", modifier = Modifier.fillMaxWidth()) {
+                    try { scan = replenishmentSpaceQuantity(task, context.actorId, scan, quantity, reason); error = null }
+                    catch (e: IllegalArgumentException) { error = e.message; graph.feedback.beep(false) }
+                }
+            }
+            WmsReplenishmentStage.SPACE_TARGET -> Text("${scan.placed} szt. na ${task.target}. Skan potwierdza cel; zapas rozliczy się po zwrocie reszty.")
+            WmsReplenishmentStage.SPACE_RETURN -> Text("Zwróć ${(scan.quantity ?: 0) - (scan.placed ?: 0)} szt. na ${task.source} i zeskanuj źródło. Cel pozostanie zamknięty dla dokładania do decyzji biura.")
             WmsReplenishmentStage.BLOCKED -> Text(task.blocked.orEmpty())
             WmsReplenishmentStage.OTHER -> Text("Zadanie wykonuje inna osoba. Przekaż jej towar i wróć do kolejki.")
-            WmsReplenishmentStage.DONE -> Text(if (task.cancelled_at != null) "Anulowano bez przesunięcia zapasu." else "Przesunięto ${task.moved ?: task.quantity} szt.${if ((task.moved ?: task.quantity) < task.quantity) " Źródło czeka na przeliczenie." else ""}")
-            else -> Text("Po przerwie odłóż niepotwierdzone sztuki na źródło, zanim zaczniesz sekwencję ponownie.", color = InkMute)
+            WmsReplenishmentStage.DONE -> Text(if (task.cancelled_at != null) "Anulowano bez przesunięcia zapasu." else "Przesunięto ${task.moved ?: task.quantity} szt.${if (task.target_full == 1) " Zwrócono ${task.returned_quantity} szt. Cel czeka na zwolnienie miejsca." else ""}${if ((task.moved ?: task.quantity) + task.returned_quantity < task.quantity) " Źródło czeka na przeliczenie." else ""}")
+            else -> Text("Po przerwie zbierz wszystkie niepotwierdzone sztuki z celu i wózka na źródło, zanim zaczniesz ponownie.", color = InkMute)
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
         if (stage !in setOf(WmsReplenishmentStage.DONE, WmsReplenishmentStage.OTHER)) {
             OutlineButton(if (cancel) "WRÓĆ DO UZUPEŁNIANIA" else "PROBLEM / ANULOWANIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) { cancel = !cancel; scan = WmsReplenishmentScan(); reason = "" }
+            if (!cancel && stage == WmsReplenishmentStage.TARGET) OutlineButton("BRAK MIEJSCA NA CELU", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
+                scan = replenishmentSpaceStart(task, context.actorId, scan); quantity = ""; reason = ""; error = null
+            }
             if (!cancel && stage == WmsReplenishmentStage.TARGET) OutlineButton("ZMIENIAM ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { scan = scan.copy(quantity = null) }
         }
         OutlineButton("WRÓĆ DO KOLEJKI", enabled = allowed, modifier = Modifier.fillMaxWidth()) { queue() }

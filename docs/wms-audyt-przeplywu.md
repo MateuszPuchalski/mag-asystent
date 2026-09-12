@@ -352,3 +352,26 @@ Awaria zapisu przeliczenia wycofuje również wcześniejszy transfer i zamknięc
 Przeglądarka sprawdza częściowe odłożenie z utratą odpowiedzi, przeliczenie oraz osobne zgłoszenie pustego źródła.
 Test migracji zachowuje dawne pełne zadania. Osiem scenariuszy cyklu życia obejmuje teraz wszystkie pięć procesów kolektora.
 Fizyczny odbiór na Zebra/Honeywell nadal pozostaje wymagany.
+
+
+### Pełny cel i części będące w drodze
+
+Audyt wykazał brak limitu pojemności części na półce. Minimum oraz popyt mogły wywołać plan większy od fizycznie dostępnego miejsca.
+Dodano opcjonalny limit sztuk SKU na lokalizacji. Stan fizyczny i otwarte uzupełnienia zajmują miejsce; rezerwacja zamówienia go nie zwalnia.
+Plan, przyjęcie, odkładanie i transfer korzystają z tego samego ograniczenia. Nie odgadujemy gabarytów ani pojemności starych lokalizacji.
+
+Źródło odniesienia: [Microsoft — Replenishment over location capacity](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/replenishment-over-location-capacity).
+Dokument opisuje udostępnianie uzupełnień zależnie od zajętości celu i blokowanie pracy przekraczającej jego pojemność.
+W WERTIS przyjęto prosty limit sztuk dla części, bez jednostek paletowych i szacowania objętości.
+
+Pełny cel jest osobnym zgłoszeniem, które blokuje dokładanie, lecz pozwala zbierać towar.
+Operator potwierdza odłożoną ilość, skanuje cel i zwraca nadmiar na skanowane źródło.
+Jeden zapis przechowuje ruch, ilość zwróconą oraz ewentualny rzeczywisty brak źródła. Biuro rozstrzyga zgłoszenie miejsca z zachowaniem historii.
+Analityka pokazuje liczbę i wiek pełnych celów, niezależnie od przeliczeń.
+
+Przy okazji ujawniono możliwość ręcznego spisu podczas uzupełnienia. Części mogły znajdować się fizycznie na celu przed ostatnim potwierdzeniem.
+Wszystkie spisy źródła oraz celu czekają teraz na rozliczenie otwartych uzupełnień. Chroni to przed podwójnym policzeniem niepotwierdzonego odłożenia.
+
+Testy obejmują rezerwacje zajmujące miejsce, konkurencyjne ruchy, zero i nieustalony limit, migrację, rollback oraz zwrot po utracie odpowiedzi.
+Pełny cel bez braku źródła nie otwiera przeliczenia. Scenariusz mieszany zachowuje oba niezależne problemy.
+Spis po zakończeniu zadania zachowuje faktyczną ilość ponad limitem; dalsze dokładanie nadal jest ograniczone.

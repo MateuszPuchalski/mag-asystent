@@ -182,6 +182,10 @@ export function migrate(database: DatabaseSync) {
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
   // Stare uzupełnienia dopuszczały wyłącznie pełny przydział; NULL pozostaje zgodnym zapisem tej historii.
   addColumn("wms_replenishment", "completed_quantity", "INTEGER CHECK(completed_quantity>=0 AND completed_quantity<=quantity)");
+  // Nie zgadujemy pojemności starych półek na podstawie dotychczasowego zapasu.
+  addColumn("wms_stock", "capacity", "INTEGER CHECK(capacity>=0 AND capacity<=1000000)");
+  addColumn("wms_replenishment", "returned_quantity", "INTEGER NOT NULL DEFAULT 0 CHECK(returned_quantity>=0 AND returned_quantity<=quantity)");
+  addColumn("wms_replenishment", "target_full", "INTEGER NOT NULL DEFAULT 0 CHECK(target_full IN (0,1))");
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
   /* Dane doboru rozpoznane w rozmowie przy szkicu Copilota (etap F, przyrost
      trzeci) — patrz `szkic_copilota` w `schema.sql`. Tabela stoi na produkcji

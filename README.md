@@ -608,7 +608,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 423 testów jednostkowych; buduje się bez Android SDK
+                           + 427 testów jednostkowych; buduje się bez Android SDK
   app/                     aplikacja Compose: 21 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
