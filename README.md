@@ -1,4 +1,9 @@
-# WERTIS · Asystent magazyniera (kolektor) — aplikacja full-stack
+# WERTIS · System magazynowy i obsługa klienta
+
+**Realizacja WMS:** zamówienia, rezerwacje, kompletacja i pakowanie działają w zakładce
+**REALIZACJA WMS** pod `/biuro`. Moduł ma osobną ewidencję lokalizacji i raporty operacyjne.
+Instrukcja uruchomienia, integracji, kopii i ograniczeń: [`docs/wms.md`](docs/wms.md).
+Wymagany Node.js ≥ 24.15.0.
 
 System dla magazynu części ogrodniczych pracującego na **Subiekcie GT**,
 z **prawdziwymi danymi** (3415 kartotek z eksportu `magmat.xlsx`). Dwa klienty,
@@ -20,8 +25,10 @@ każdy do swojej roli:
   import zbiórek z Sellasist i kandydaci do strefy złotej z edytorem reguł
   strefy, a od 0.87.0 przy dostawcy stoi jego logo. Dostawca z własnym drukiem
   reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
-  bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
-  na kolektorze.
+  bez bundlera i logowanie loginem.
+
+  Realizacja WMS w tym samym biurze obsługuje
+  przyjęcia na lokalizacje, kompletację, wózki i pakowanie w przeglądarce.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -601,8 +608,8 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 ```
 android/                   KOLEKTOR — natywna aplikacja (Kotlin/Compose), android/README.md
   core/                    czysta logika JVM (skan, DTO, nawigacja, wyjątki, offline)
-                           + 300 testów jednostkowych; buduje się bez Android SDK
-  app/                     aplikacja Compose: 16 ekranów, skanery, czujniki
+                           + 443 testów jednostkowych; buduje się bez Android SDK
+  app/                     aplikacja Compose: 22 ekranów, skanery, czujniki
 server/                    backend (Fastify + SQLite + worker)
   seed/products.json       3415 kartotek z magmat.xlsx (źródło seedu)
   src/db/schema.sql        tabele aplikacji (§7) + read-model sgt_*

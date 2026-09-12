@@ -34,6 +34,408 @@ historii nie przepisujemy.
 ---
 
 
+## 0.312.1 — skan półki nie potwierdza skrzynki
+
+- Korekta pakowania oraz dostarczenie zamiennika wymagają kodu skrzynki. Prefiks `LOC:` nie zamienia skanu półki w potwierdzenie pojemnika o podobnym kodzie.
+- Kolektor stosuje tę samą regułę podczas wymiany, zbiórki i zwrotu. SKU zachowuje własny prefiks.
+- Biuro rozpoznaje etykiety półek w jednym miejscu: przyjęcie, odkładanie, zbiórka, ruchy, przeliczenie, zwrot i wymiana korzystają z tej samej reguły.
+- Usunięto powielone przekształcenia skanów. Ponowienie zachowuje zapisane ciało i klucz komendy.
+- Rozszerzono test kolektora i browser E2E o skan półki zamiast skrzynki oraz prefiksy przy przejściu od dostawy do pakowania.
+- Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Nie ma zmian API ani migracji.
+
+## 0.312.0 — zwrot pobrania na inną półkę
+
+- Kolektor i Biuro pozwalają jawnie wybrać inną półkę kompletacji. Źródło zmienione na kwarantannę lub zaplecze nie przyjmuje rezerwacji zwrotu.
+- Zapas oraz rezerwacja trafiają razem na rzeczywisty cel. Częściowe partie dzielą i scalają przydział bez pozornych ruchów na starej półce.
+- Nowy cel sprawdza pojemność i aktywne przeliczenie. Awaria cofa całą operację; ponowienie zachowuje jeden zwrot.
+- Trasa i komenda zbiórki blokują pobranie spoza kompletacji. Raport spójności wykrywa także dawne nieprawidłowe rezerwacje.
+- Biuro przyjmuje prefiks `LOC:` w polu półki zwrotu, zachowując niezmienione kody części i skrzynki.
+- **[wymaga działania]** Build, restart API, odświeżenie Biura i nowy APK dla wyboru celu. Nie ma migracji danych.
+
+## 0.311.0 — zwrot pobrań z właściwej skrzynki
+
+- Kolektor prowadzi zwroty wstrzymanych zamówień z własnego wózka: skrzynka → część → policzona ilość → półka po odłożeniu.
+- Operator wybiera skrzynkę skanem. Częściowa partia zostawia resztę; biuro nadal decyduje o zmianie lub anulowaniu zamówienia.
+- Zwroty korzystają z dziennika zbiórki i jego ponowień. Zmiana właściciela lub przekazanie skrzynki blokują nieaktualny skan także bez zmiany wersji zamówienia.
+- Wspólna komenda zwrotu wymaga zgodnego kodu skrzynki. Biuro ma pustą ilość, sprawdzaną kolejność skanów i czyszczenie pól po zmianie pozycji.
+- Regresje sprawdzają identyczne SKU w dwóch skrzynkach, brak kodu, obce konto, stare wersje, przekazanie i powtórzenie jednej partii.
+- **[wymaga działania]** Rozliczyć oczekujące zapisy, wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Nie ma migracji danych.
+
+## 0.310.1 — policzona ilość na kolektorze
+
+- Natywne odkładanie zaczyna się pustym polem. Pozostały przydział nie potwierdza ilości faktycznie odkładanej partii.
+- Zmiana dobry/uszkodzony w przyjęciu i odkładaniu czyści poprzednią ilość oraz jej potwierdzenie.
+- Przyjęcie, odkładanie, spis i wymiana przekazują całą wpisaną liczbę do walidacji. Zbyt długie liczby nie tracą końcowych cyfr.
+- Rozszerzono granice testu spisu: dziesięć milionów jest odrzucane, milion pozostaje milionem. Testy core nie zastępują odbioru formularzy na fizycznym urządzeniu.
+- Poprawka wymaga nowego APK. Brak zmian API i migracji danych.
+
+## 0.310.0 — mniejsza partia uzupełnienia
+
+- Kolektor i Biuro pozwalają wybrać mniejszą partię przed podjęciem uzupełnienia. Cała propozycja nadal wymaga jednego naciśnięcia.
+- Po ukończeniu partii pozostała potrzeba wraca do planu. Mniejsza planowana partia nie zgłasza braku źródła ani nie uruchamia przeliczenia.
+- Natywne pole faktycznej ilości zaczyna się puste. Plan nie potwierdza pobrania, a liczby spoza zakresu są odrzucane bez obcinania cyfr.
+- Testy obejmują partię pięciu z dwudziestu, powrót piętnastu do planu, granice, wersje oraz dziennik po utracie odpowiedzi i restarcie.
+- **[wymaga działania]** Wykonać build i restart API oraz zaktualizować APK dla wyboru partii na kolektorze. Nie ma migracji danych.
+
+## 0.309.1 — jawna ilość przy ruchach magazynowych
+
+- Przyjęcie, odkładanie, korekta bufora i uzupełnienie wymagają wpisania policzonej ilości. Formularz nie podstawia jednej sztuki ani całego planu.
+- Zmiana ręcznego ruchu na spis czyści ilość i cel. Spis opisuje cały stan półki i dopuszcza jawne zero.
+- Zmiana dobry/uszkodzony czyści ilość oraz skan lokalizacji. Poprzednia partia nie potwierdza kwarantanny kolejnych sztuk.
+- Uzupełnienie prowadzi przez źródło, część, ilość, ewentualny powód braku i skan celu. Enter zatrzymuje się na pustych lub nieprawidłowych polach.
+- Browser E2E sprawdza brak zapisu bez ilości, zmianę czynności, granice, kolejność skanów i ponowienie po utracie odpowiedzi.
+- Wykonać build i restart API oraz odświeżyć Biuro. Brak migracji; dotychczasowy APK zachowuje własne potwierdzanie policzonych ilości.
+
+## 0.309.0 — odkładanie według miejsca na półce
+
+- Przyjęcie i odkładanie korzystają z jednej reguły podpowiedzi. Pełne półki, kwarantanna oraz otwarte blokady nie wypierają użytecznych adresów.
+- Wolne miejsce uwzględnia fizyczny zapas i przydzielone uzupełnienia. Brak limitu wymaga sprawdzenia miejsca, bez obietnicy nieograniczonej pojemności.
+- Kolektor pokazuje miejsce przed wpisaniem partii. Odczyt nie rezerwuje półki; równoległa dostawa nadal podlega końcowej kontroli transakcji.
+- Regresje obejmują trzy odczyty, limit listy, blokady, uzupełnienia, brak zapisów i równoległe przyjęcie. E2E sprawdza malejące miejsce po ponowieniu odłożenia.
+- **[wymaga działania]** Wykonać build i restart API oraz zaktualizować APK, aby widzieć ilości na kolektorze. Nie ma migracji danych.
+
+## 0.308.0 — rozliczenie brakującej części przy pakowaniu
+
+- Biuro potwierdza brak po przeliczeniu wskazanej paczki lub niesprawdzonych sztuk. Wybiera część z zamówienia, skanuje skrzynkę i wpisuje faktyczną ilość.
+- Korekta odejmuje tylko nieobecne pobrania i potwierdzenia. Nie tworzy przyjęcia na półkę ani kwarantannę; dobre zawartości pozostają.
+- Zamiennik korzysta ze wspólnej kolejki i istniejącego procesu kolektora. Starszy format odpowiedzi uszkodzenia pozostaje czytelny.
+- Naprawiono wznowienie udokumentowanej wymiany: nie wymaga rezerwacji zamiennika przed podjęciem zadania. Inne niedobory nadal wymagają naprawy przydziału.
+- Analityka rozdziela potwierdzone braki oraz uszkodzenia w kwarantannie. Nowa wspólna historia spraw zastępuje tabelę samych uszkodzeń.
+- Regresje obejmują role, ilości, paczki, zapas, awarie, wznowienie i migrację. E2E odzyskuje zapis braku i kończy kontrolę jednym skanem zamiennika.
+- **[wymaga działania]** Zatrzymać API i worker, zaktualizować pliki, wykonać build oraz restart. Migracja przenosi historię wymian atomowo; APK aktualizuje opis rozbieżności.
+
+## 0.307.1 — połączenie ekranu wymiany ze skanerem i dziennikiem
+
+- Callback nowego ekranu kolektora potwierdza obsłużenie skanu, także podczas wstrzymania. Skan nie przechodzi wtedy do globalnej kartoteki.
+- Komunikat ponowienia korzysta z oczekującej komendy we wspólnym dzienniku. Poprawiono dwa błędy typów wykryte przez kompilację APK w CI.
+- Logika zapasu i API pozostają z 0.307.0. Aktualizacja wymaga nowego APK.
+
+## 0.307.0 — kwarantanna i wymiana części przy pakowaniu
+
+- Uszkodzone sztuki trafiają do skanowanej kwarantanny. Dobre pobrania i potwierdzenia pozostają przy stanowisku.
+- Nowa kolejka Biura i kolektora rezerwuje zamienniki: źródło → część → faktyczna ilość → skrzynka oczekującego zamówienia.
+- Pakujący sprawdza tylko dostarczone zamienniki. Brak zapasu nie cofa kwarantanny; tworzy potrzebę uzupełnienia i widoczną kolejkę analityki.
+- Zwolnienie podjętej wymiany wymaga zwrotu niepotwierdzonych części i skanów źródeł. Spis czeka na rozliczenie, także przed przebudową rezerwacji.
+- Trwały dziennik kolektora odzyskuje podjęcie i dostarczenie po utracie odpowiedzi. Wspólna kontrola cyklu życia obejmuje sześć procesów.
+- Kontrola kopii wykrywa niespójność spraw wymiany i niepełny schemat. Obsługuje również kopie sprzed dodania funkcji.
+- Weryfikacja: 2298 testów serwera, 727 panelu, 433 core. E2E sprawdza utracone odpowiedzi i jeden ponowny skan pakowania.
+- **[wymaga działania]** Zaktualizować i zrestartować API wraz z plikami Biura, następnie APK. Start dodaje dwie puste tabele historii wymian.
+
+## 0.306.0 — korekta pojedynczego potwierdzenia pakowania
+
+- Pakujący może cofnąć kontrolę wybranego SKU i ilości z konkretnej paczki, ze skanem oraz uzasadnieniem.
+- Pozostałe potwierdzenia zostają. Zapas i zebrane sztuki nie zmieniają się; przygotowanie etykiet czeka na ponowną kontrolę wskazanej ilości.
+- Wspólna operacja odejmowania z paczki obsługuje również przełożenie. Gotowe etykiety zachowują dotychczasową procedurę wycofania.
+- Regresje sprawdzają role, wersje, granice ilości, transakcję i ponowienie. E2E potwierdza odzyskanie korekty po utracie odpowiedzi oraz ponowny skan jednej sztuki.
+- Weryfikacja: 2289 testów serwera i 727 panelu. Widoki 320, 390 i 1440 px pozostają czytelne.
+- **[wymaga działania]** Przebudować i zrestartować API wraz z plikami Biura. Zmiana nie wymaga migracji bazy.
+
+## 0.305.1 — czytelny plan uzupełnień na wąskim ekranie
+
+- Propozycje w Biurze przechodzą na małym ekranie w wiersze z pełną szerokością nazwy i powodu pracy.
+- Kody źródła i celu oraz opis ilości pozostają czytelne. Przycisk podjęcia stoi obok szczegółów, bez ściskania czterech kolumn.
+- Sprawdzono widoki 320, 390 i 1440 px oraz E2E podjęcia zadania. Wymaga aktualizacji plików web i restartu API.
+
+## 0.305.0 — uzupełnienia według potrzeb zamówień
+
+- Braki zamówień wyprzedzają rutynowe minima półek. Kolejność uwzględnia priorytet, następnie termin wysyłki.
+- Wolny zapas i podjęte zadania pokrywają najpierw pilniejsze potrzeby. Pokryte zamówienia nie zawyżają pilności pozostałych braków.
+- Biuro i kolektor pokazują powód propozycji oraz brak dla całego SKU. Odczyt nadal nie rezerwuje zapasu.
+- Pięć regresji serwera i test kolektora sprawdzają kolejność, pokrycie, wykluczenia oraz zgodność ze starszym API. E2E potwierdza kolejność w Biurze.
+- **[wymaga działania]** Zaktualizować API i APK dla opisu celu na kolektorze. Zmiana nie wymaga migracji bazy ani konfiguracji.
+
+## 0.304.1 — uzupełnienie do kolejnej wolnej półki
+
+- Pełna pierwsza półka nie blokuje uzupełnienia do innych dozwolonych lokalizacji tej samej części.
+- Minima oraz już podjęte zadania pokrywają popyt przed rozdzieleniem reszty. Plan nie liczy tych sztuk drugi raz.
+- Weryfikacja: 2281 testów serwera, 727 panelu, 427 Android core. Trzy nowe regresje oraz E2E potwierdzają wybór kolejnego celu.
+- Poprawka wymaga przebudowania i restartu API; nie zmienia schematu bazy ani kontraktu kolektora.
+
+## 0.304.0 — pojemność półek i rozliczenie pełnego celu
+
+- Pojemność SKU na lokalizacji ogranicza plan, przyjęcie, odkładanie i transfer. Uwzględnia fizyczny zapas oraz przydzielone uzupełnienia.
+- Biuro ustala minimum i opcjonalną pojemność. Puste pole oznacza limit nieustalony; zero zatrzymuje nowe dokładanie.
+- Kolektor rozdziela ilość odłożoną, zwróconą i brakującą. Pełny cel wymaga potwierdzenia ilości, skanu celu oraz źródła po zwrocie reszty.
+- Brak miejsca blokuje dokładanie, lecz pozwala zbierać towar. Biuro zwalnia blokadę z uzasadnieniem; analityka pokazuje osobną kolejkę.
+- Ręczny spis obu końców czeka na zakończenie uzupełnienia. Spis po rozliczeniu zachowuje faktyczną ilość, także ponad limitem.
+- **[wymaga działania]** Zaktualizować API przed APK. Migracja zachowuje istniejący zapas; pojemności trzeba ustalić z rzeczywistych warunków półek.
+- Weryfikacja: 2278 testów serwera, 727 panelu, 427 Android core. E2E potwierdza zwrot po utracie odpowiedzi i odblokowanie celu.
+
+## 0.303.0 — uzupełnianie półek na kolektorze z obsługą braków
+
+- **UZUPEŁNIENIA WMS**: własna kolejka, propozycje, podjęcie oraz skany źródła, części i celu. Ilość wymaga jawnego potwierdzenia.
+- Częściowe pobranie przesuwa tylko znalezione sztuki. Zero nie tworzy ruchu; źródło pozostaje do przeliczenia bez automatycznego odpisu.
+- Anulowanie wymaga zwrotu towaru i skanu źródła. Wspólne zadania trzeba rozliczyć przed spisem tego źródła.
+- Trwałe ponowienie odzyskuje także numer podjęcia. Nowy proces korzysta ze wspólnego dziennika i ochrony podczas pauzy.
+- Biuro obsługuje częściową ilość i puste źródło. Kolektor stronicuje propozycje oraz zadania po 50 pozycji.
+- **[wymaga działania]** Zaktualizować API i APK. Migracja dodaje ilość zakończonego zadania, zachowując stare pełne uzupełnienia.
+- Weryfikacja lokalna: 2265 testów serwera, 727 panelu i 423 Android core. E2E obejmuje utratę odpowiedzi oraz pustą lokalizację.
+
+## 0.302.1 — przerwa na kolektorze blokuje spóźnione skany
+
+Wszystkie cztery procesy WMS mają wspólną obsługę uśpienia i powrotu na ekran.
+Pauza blokuje komendy, także podczas odczytu dziennika lub oczekiwania na wspólną blokadę.
+Spóźniona odpowiedź rozlicza rozpoczęty zapis, ale nie odblokowuje kolejnego skanu. Szybki powrót wymaga świeżego odczytu.
+Usunięto cztery kopie obsługi cyklu życia ekranów. Skan sprzętowy poza stanem RESUMED jest konsumowany bez działania.
+Osiem nowych scenariuszy sprawdza cztery procesy. Android core ma 411 testów.
+
+## 0.302.0 — ślepe przeliczenie półki na kolektorze
+
+Kolektor zapisuje wynik liczenia po skanie półki i części, bez pokazywania stanu oczekiwanego.
+Ilość zaczyna pusta; zero wymaga jawnego wpisania. Wynik czeka na decyzję biura bez zmiany zapasu.
+Biuro zatwierdza niezmienioną ilość albo zleca ponowne liczenie z uzasadnieniem. Zmiana stanu od liczenia blokuje akceptację.
+Historia zachowuje kolejne obserwacje. Akceptacja koryguje zapas i rezerwacje w jednej transakcji.
+APK korzysta ze wspólnego dziennika odzyskiwania operacji. Testy obejmują restart, utratę odpowiedzi, współbieżność i odmowę zapisu.
+Walidacja: 2254 testy serwera, 727 panelu, 403 Android core; E2E ponownego liczenia i odzyskania odpowiedzi na decyzję.
+
+## 0.301.0 — zbiórka omija półkę ze zgłoszonym brakiem
+
+- Brak części uruchamia próbę przydziału z innych dostępnych półek, również dla pozostałych dotkniętych zamówień, według priorytetu.
+- Potwierdzone pobrania i skrzynki pozostają bez zmian. Podejrzana półka nadal wymaga przeliczenia; zgłoszenie nie zmniejsza fizycznego stanu.
+- Niepełny przydział jest wycofywany. Uszkodzenia, pełne skrzynki i niezależne wstrzymania zachowują dotychczasową obsługę.
+- Kolektor wymaga nowego skanu półki po zmianie trasy. Odrzucony stary skan wskazuje, gdzie odłożyć wyłącznie niepotwierdzone sztuki.
+- Osiem nowych testów serwera, dwa testy kolektora i E2E obejmują także utratę odpowiedzi, priorytety oraz wycofanie niepełnej operacji.
+
+## 0.300.1 — przeglądarka respektuje limit czasu analityki
+
+- Odczyt raportu czeka do 50 sekund, aby odebrać wynik lub komunikat limitu 45 sekund z serwera.
+- Pozostałe odczyty i zapisy zachowują limit 20 sekund.
+
+## 0.300.0 — analityka kolejek bez blokowania kolektora
+
+- Bieżące kolejki pokazują wiek pracy, wstrzymania, bufor oraz przejście do właściwego obszaru.
+- Ukończone etapy mają medianę, P95, średnią i pokrycie pomiarów. Brak historii nie oznacza zera czasu pracy.
+- Przyjęcia, częściowe odłożenia, korekty i kwarantanna mają oddzielne liczniki. Potwierdzony odbiór wymaga wszystkich czynnych paczek.
+- Daty raportu dziennych wysyłek i CSV odpowiadają Warszawie. Dodano eksport czasów etapów; operacje pobrania nie są nazywane skanami.
+- Raport oblicza osobny wątek z bazą tylko do odczytu. Limit kolejki i czasu chroni obsługę operacji magazynowych.
+- Próba obejmuje 135 000 zamówień, 5000 SKU, 90 dni i równoległe zapisy. Dane są syntetyczne, bez pomiaru wydajności pracowników.
+
+## 0.299.0 — natywne liczenie dostaw na kolektorze
+
+Kolektor otwiera oczekiwane przyjęcia WMS i prowadzi przez skan części, policzoną ilość oraz skan bufora lub półki.
+Tryb przyjęcia pozostaje przypisany do dokumentu po restarcie. Uszkodzenie trafia bezpośrednio do kwarantanny; nadwyżki i braki rozlicza biuro.
+Kolejny skan części wybiera pozycję tego dokumentu. Zamknięcie jest dostępne po rozliczeniu całej oczekiwanej ilości.
+
+Nowy odczyt kolektora zwraca stronę do 50 pozycji albo jedną zeskanowaną część, z sumami całej dostawy.
+Próba 5000 SKU potwierdza odpowiedź skanowania poniżej 4 KB bez zapisu do bazy. Kolizja EAN nie pomija pozycji już policzonych.
+Przyjęcie współdzieli trwały dziennik i blokadę ze zbiórką oraz odkładaniem. Wspólny komunikat kieruje do właściwego ponowienia.
+Dodano 23 testy JVM oraz dwa testy serwera. Pełny zestaw kolektora obejmuje 390 testów.
+
+**[wymaga działania]** Zaktualizować API, następnie APK. Nie cofać aplikacji ani nie czyścić jej danych z oczekującym zapisem przyjęcia.
+
+## 0.298.0 — natywne odkładanie WMS na kolektorze
+
+Kolektor otwiera kolejkę odkładania z bufora, wyszukuje zadania skanem SKU lub EAN i pozwala je podjąć.
+Proces wymaga skanu bufora, części, potwierdzenia ilości oraz skanu docelowej półki. Obsługuje częściowe odłożenia i uszkodzenia kierowane do kwarantanny.
+Zmianę właściciela pokazuje po odświeżeniu; korekty braków i przejęcia pozostają w biurze.
+
+Zbiórka i odkładanie współdzielą trwały dziennik oraz blokadę zapisów. Nieznany wynik jednego procesu blokuje drugi i wskazuje właściwy ekran odzyskania.
+Restart, przerwa i potwierdzone odłożenie wymagają świeżego odczytu oraz ponownych skanów. Dawny dziennik zbiórki zachowuje zgodność.
+Dodano 22 testy JVM; pozostałe 345 również przechodzą. Natywne liczenie nowej dostawy nadal pozostaje do wdrożenia.
+
+**[wymaga działania]** Zaktualizować API i APK. Nie cofać APK ani nie czyścić danych aplikacji z oczekującym zapisem odkładania.
+
+## 0.297.1 — kopia bezpieczeństwa przed aktualizacją bufora
+
+Kontrola kopii obsługuje bazę sprzed dodania kolejki odkładania bez migrowania źródła. Brak jednej z dwóch nowych tabel nadal odrzuca kopię.
+Trzy regresje sprawdzają dawny schemat, niezmienność pliku źródłowego i oba warianty niepełnego schematu.
+Dedykowana bramka WMS obejmuje teraz także testy kolejki odkładania i kopii na Windows oraz Ubuntu.
+
+## 0.297.0 — przyjęcie do bufora i osobna kolejka odkładania
+
+- Dostawę można policzyć do bufora zaplecza i odłożyć później. Sposób przyjęcia wybiera się przed serią skanów.
+- Kolejka pokazuje pozostałe sztuki, najstarsze zadanie, dokument i stan przypisania. Podjęcie chroni pracę przed drugim kolektorem.
+- Odłożenie wymaga skanu bufora, części, ilości i półki. Częściowe partie, ponowienie i przejęcie zachowują historię.
+- Oczekujące sztuki nie trafiają do zbiórki ani uzupełnienia. Ruch, spis i zmiana przeznaczenia lokalizacji respektują odkładanie.
+- Brak policzonych sztuk koryguje biuro z uzasadnieniem. Uszkodzenia wykryte przy odkładaniu trafiają do skanowanej kwarantanny.
+- Kontrola spójności sprawdza rozliczenie zadań oraz ochronę bufora. Zapas i dokument zmieniają się w jednej transakcji z historią.
+- Potwierdzenie odkładania mieści się przy 320, 390 i 1440 px. Rozszerzone E2E obejmuje bufor, częściowy ruch, utratę odpowiedzi i korektę.
+- Aktualizacja tworzy nowe tabele bez przenoszenia dawnego zapasu. Bufor wymaga zarejestrowanej lokalizacji zaplecza; demo zawiera BUF-01 i QUAR-01.
+
+## 0.296.0 — kolektor wraca do pracy po przejęciu wózka
+
+- Potwierdzone przejęcie trasy pokazuje przycisk rozpoczęcia kolejnego wózka. Zamknięcie lokalnego widoku nie zmienia zamówień ani właściciela na serwerze.
+- Nieznany wynik skanu nadal wymaga tego samego klucza ponowienia. Skan zatwierdzony przed przejęciem zwraca poprzedni wynik bez podwajania sztuk.
+- Odmowa 403 rozlicza zapis wyłącznie po potwierdzonym sprawdzeniu klucza oraz wycofaniu transakcji. Błąd sesji i brak sieci nie pozwalają ominąć dziennika.
+- Odmowa dysku zachowuje aktywną trasę. Zmiana konta nie pozwala zamknąć widoku poprzedniej osoby.
+- Dodano testy API, przejęcia po zatwierdzonym skanie i odzyskiwania kolektora. Najpierw aktualizować serwer, następnie APK; starsze API zachowuje blokadę bezpiecznego ponowienia.
+
+## 0.295.0 — wiarygodne zdjęcia części na kolektorze
+
+- Pamięć zdjęć rozdziela serwery. Żądanie zachowuje pierwotny adres i sesję; spóźniona odpowiedź nie zasila ekranu innego magazynu.
+- Zdjęcia w RAM podlegają dotychczasowej kontroli świeżości. Nowe bajty zmieniają klucz miniatury, a potwierdzony brak usuwa stary obraz.
+- Nieudane odświeżenie może pokazać oznaczoną zapisaną kopię. Odświeżenie trasy ponawia sprawdzenie zdjęcia, także przy niezmienionym SKU.
+- Pobieranie ma limit rozmiaru i zamyka strumienie. Zapis pliku jest atomowy; nowy ETag nie zostaje przypisany do starej zawartości po odmowie dysku.
+- Limit cache obejmuje również brakujące zdjęcia i wszystkie serwery. Sprzątanie zaczyna się dopiero po przekroczeniu limitu.
+- Dodano 14 testów logiki zdjęć, w tym zmianę serwera, 304, 404, 503, odmowę dostępu, anulowanie, przerwany zapis indeksu i cofnięcie zegara.
+- **[wymaga działania]** Pierwszy podgląd po aktualizacji potrzebuje sieci: stare kopie bez zapisanego źródła są pomijane i usuwane z cache aplikacji.
+
+## 0.294.0 — jeden przystanek zbiórki dla wielu skrzynek
+
+- Kolektor skanuje półkę i część raz dla kolejnych skrzynek tego samego SKU w tej samej lokalizacji. Każda skrzynka nadal wymaga własnego skanu.
+- Kontynuacja wymaga potwierdzonego zapisu i aktualnej trasy. Zmiana części, półki, właściciela, blokada, ponowienie i odświeżenie wymagają nowych skanów.
+- Wyjście z aplikacji usuwa weryfikację także podczas zapisu na dysku lub serwerze. Powrót odczytuje aktualną trasę.
+- Zdjęcie i pozycja skrzynki pozostają widoczne podczas zapisu; przyciski i skany czekają na potwierdzenie.
+- Osiem testów obejmuje przerwania i częściowe pobrania. Syntetyczny przystanek z 30 skrzynkami wymaga 32 zamiast 90 skanów; nie jest to pomiar czasu pracownika.
+
+## 0.293.1 — oryginalne kody części w skanerze kolektora
+
+- Kompletacja sprawdza niezmieniony kod części i skrzynki. Starsza klasyfikacja lokalizacji nie może obciąć prefiksu z symbolu produktu.
+- Etykiety półek zachowują obsługę prefiksów w kroku lokalizacji. Skaner klawiaturowy obsługuje w zbiórce także krótkie kody.
+- Dwa testy odtwarzają kolizję symbolu części z prefiksem lokalizacji i sprawdzają poprawne skanowanie półki.
+
+## 0.293.0 — zbiórka WMS w istniejącym kolektorze Android
+
+- Natywny ekran zbiórki: uruchomienie i wznowienie wózka, lokalizacja, kod towaru, zdjęcie, ilość i stała pozycja skrzynki.
+- Skan skrzynki zapisuje pobranie. Braki, uszkodzenia i pełne skrzynki trafiają do biura; gotowy wózek wymaga skanu stanowiska pakowania.
+- Trwały dziennik chroni przed powtórnym pobraniem po utracie odpowiedzi, restarcie aplikacji i awarii dysku.
+- Oczekujący zapis pozostaje związany z pierwotnym kontem i serwerem. Nieznany wynik blokuje kolejne pobrania.
+- Zdjęcia korzystają z istniejącego cache. Podgląd zachowuje proporcje; pełnoekranowe zdjęcie przechwytuje skany bez wykonywania operacji.
+- Wyjście z aktywnego pola tekstowego oddaje skaner klawiaturowy; usunięcie pola nie pozostawia blokady skanowania.
+- API trasy udostępnia EAN pozycji, zachowując wiodące zera. Dodano test serwera i 17 testów logiki oraz odzyskiwania w `:core`.
+- **[wymaga działania]** Zaktualizować serwer i APK. Próby skanerów Zebra/Honeywell wykonywać na danych seeded; model urządzenia wymaga potwierdzenia.
+
+## 0.292.0 — 12 września 2026
+
+- Skan kontroli zapisuje SKU i ilość w wybranej paczce; zwykłe zamówienie zaczyna od paczki 1.
+- Przełożenie sprawdzonych sztuk między paczkami oraz ponowna kontrola nie zmieniają zapasu półek.
+- Formularz etykiet pokazuje zawartość każdej paczki. Zastępuje tekstową listę dodatkowych numerów przesyłek.
+- Puste paczki, brakujące numery i niepełny podział blokują zapis. Wersja i właściciel pracy chronią równoległe zmiany.
+- Częściowy odbiór odejmuje tylko zawartość odebranych paczek od towaru oczekującego na hali.
+- Historyczna zawartość pozostaje niezmienna także po wycofaniu etykiety i późniejszej zmianie zamówienia.
+- Wybranie zamówienia na telefonie otwiera skanowanie bez dodatkowego zamykania kolejki.
+- **[wymaga działania]** Stare pakowanie wielopaczkowe bez zapisanego podziału wymaga ponownej kontroli. Dawne przesyłki nie otrzymują wymyślonej zawartości.
+- Weryfikacja na danych seeded: 2208 testów serwera, 727 testów panelu, TypeScript oraz scenariusz dwóch paczek w przeglądarce.
+
+## 0.291.0 — 12 września 2026
+
+- **Wydania kurierowi.** Zapis etykiety nie oznacza wysyłki. Zamówienie zamyka się
+  dopiero po skanowanym odbiorze wszystkich paczek. Pusta skrzynka wraca wcześniej do zbiórki.
+- Przekazania według przewoźnika obsługują powtórzone skany, paczki pozostawione na hali,
+  wstrzymania, częściowy odbiór, zamknięcie pustej listy i eksport CSV.
+- Biuro może poprawić etykietę lub wycofać paczki do ponownej kontroli zawartości.
+  Historia zostaje zachowana, a odebranych paczek nie można zmienić.
+- Rejestr rozróżnia przygotowanie, odbiór, wycofanie i historię bez skanu kuriera.
+  Analityka pokazuje pokrycie potwierdzeniami. Częściowy odbiór nie udaje pełnego porównania z ERP.
+- **Zmiana procesu:** pakujący zapisuje paczki, a wydający zamyka przekazanie kurierowi.
+  Szczegóły w `docs/wms.md`. Nie zmieniamy historycznych dat ani nie kupujemy etykiet.
+
+## 0.290.0 — 12 września 2026
+
+- **Przyjęcia WMS.** Oczekiwany dokument, skan SKU, ilość i skan półki zastępują
+  osobne wpisywanie odłożenia oraz zapasu. Sam dokument nie dodaje sztuk.
+- Częściowe dostawy, uszkodzenia w kwarantannie, nadwyżki z decyzją biura,
+  zamknięcie niedoboru i ponowne otwarcie mają wspólną historię.
+- Korekta zachowuje pierwotne odłożenie i tworzy przeciwny ruch. Chroni rezerwacje.
+- Trwałe ponowienia, wersje pozycji i kontrola numeru między Przyjęciami a importem
+  Zapasów zapobiegają podwójnemu przyjęciu. Nieznana lub przeliczana półka blokuje zapis.
+- Mobilne odłożenie pokazuje zdjęcie, ilość i lokalizację razem. Usunięto drugi skan
+  już rozpoznanego SKU oraz konflikt Enter z kolejnością zbiórki.
+- **Użycie:** dla samodzielnego WMS wybierz Przyjęcia. Dotychczasowe Dostawy dotyczą
+  Subiekta. Obecny odbiór obejmuje wyłącznie dane seeded; instrukcja w `docs/wms.md`.
+
+## 0.289.0 — 12 września 2026
+
+**Uzupełnienie gotowe do skanu po przyjęciu zadania.** Formularz otwiera się
+automatycznie, a Enter prowadzi od źródła przez kod towaru do półki docelowej.
+Operator nie musi szukać nowego zadania i otwierać go drugim kliknięciem.
+
+Ruchy magazynowe chronią również sztuki przydzielone do otwartych uzupełnień.
+Ręczne przesunięcie ani przeliczenie nie zabierze ich z zaplecza. Dodatkowe
+przyjęcie lub przesunięcie wolnych sztuk nie wymaga anulowania poprawnego
+zadania. Zakończenie atomowo zwalnia własny przydział i przenosi zapas,
+zachowując przydziały innych operatorów. Awaria wycofuje oba kroki.
+Tabela zapasów pokazuje przydzielone uzupełnienia. Ręczny ruch nie omija
+otwartego przeliczenia źródła ani celu. Zmiana przeznaczenia lokalizacji
+wymaga zakończenia lub anulowania jej uzupełnień.
+
+Audyt całego przepływu, źródła i otwarte ustalenia:
+[przyjęcie → wysyłka](docs/wms-audyt-przeplywu.md).
+
+## 0.288.0 — 12 września 2026
+
+**Zdjęcie części prowadzi zbiórkę.** Wózki 20/30, zbiórka ręczna i pojedyncze
+zamówienie pokazują zdjęcie bieżącego SKU. Powiększenie otwiera się bez zmiany
+etapu pracy, a zamknięcie przywraca ostatnie pole skanera. Na telefonie zdjęcie,
+stała pozycja skrzynki i formularz mieszczą się w widoku roboczym.
+
+Zdjęcia korzystają z istniejącej kartoteki i sesji użytkownika. Pobieranie nie
+blokuje skanowania; kolejne skrzynki tego samego SKU współdzielą pobranie.
+Cache ma limit 24 obrazów i jest czyszczony przy wylogowaniu. Brak zdjęcia
+odróżnia się od awarii pobrania. Awaria źródła bez zapasowego obrazu zwraca
+503 zamiast 404. Zdjęcie wspiera identyfikację, a skan nadal potwierdza towar.
+
+Demo otrzymuje jeden wygenerowany obraz fikcyjnego koła `WMS-0030`.
+Nie używa rzeczywistych danych katalogowych. Testy przeglądarkowe sprawdzają
+powiększenie, fokus, brak zdjęcia, ponowienie po awarii i współdzielenie
+obrazu podczas całej zbiórki wózków 20/30.
+
+## 0.287.1 — 12 września 2026
+
+**Biuro i WMS: poprawki po audycie systemu wizualnego ECC.** Wspólne tokeny
+WERTIS zastępują dwie konkurujące palety. Nagłówki, karty, formularze i stany
+przycisków mają spójne role. Nazwa obszaru odpowiada aktualnej czynności,
+a aktywny przycisk pozostaje widoczny w przewijanym pasku na telefonie.
+Pole kodu skrzynki jest szersze niż ilość; długie SKU nie rozpychają ekranu.
+
+Poprawiono kontrast podpisów i pól, fokus klawiatury, nazwę przycisku
+wylogowania oraz semantykę nawigacji. Rozwijane sekcje mają cel 48 px.
+Wolny odczyt pokazuje komunikat poza blokowanym formularzem. Systemowa
+preferencja ograniczenia ruchu obejmuje ramę Biura. Jawny jasny schemat
+utrzymuje spójność natywnych kontrolek; nie dodaje trybu ciemnego.
+
+Audyt i zakres pomiarów: [system wizualny WMS](docs/audyt-design-system-wms.md).
+Test przeglądarkowy sprawdza dziesięć obszarów przy szerokościach
+320/390/768/1440 px, klawiaturę, wolną odpowiedź i formularze wózków 20/30.
+
+## 0.287.0 — 11 września 2026
+
+WMS przydziela zamówienia po skanie wózka z 20 albo 30 stałymi pozycjami skrzynek.
+Każda skrzynka ma własny kod; powtórzony skan wznawia trasę bez podwójnego przydziału.
+Priorytety, terminy i dostępny zapas decydują o przydziale; braki nie blokują dalszych gotowych zamówień.
+Przystanki grupują lokalizację i SKU, a duży numer pozycji prowadzi odkładanie.
+
+Przekazanie do pakowania, odłączenie i wymiana skrzynki zachowują historię oraz kontrolę właściciela pracy.
+Brak lub uszkodzenie blokuje pobrania danego SKU z półki do weryfikacji.
+Przeliczenie odbudowuje rezerwacje według priorytetów; zadania uzupełnień wymagają skanów źródła, towaru i celu.
+Analityka oddziela czas trasy, oczekiwanie na pakowanie i sesję pakowania; brak historycznych pomiarów pozostaje jawny.
+
+Odbiór obejmuje 2176 testów serwera, 727 testów panelu oraz przeglądarkową zbiórkę wózkami 20 i 30 pozycji.
+Próba z 5000 SKU zakończyła 2000 zamówień na 84 trasach bez rozbieżności ewidencji.
+Eksport Sellasist służył wyłącznie lokalnej analizie; aplikacja i odbiór nadal korzystają z danych seeded.
+
+**[wymaga działania]** Po aktualizacji i kompilacji zrestartuj API.
+Biuro rejestruje wózki, kody skrzynek, stanowiska pakowania i kolejność lokalizacji przed pracą tym trybem.
+Migracja dodaje tabele i indeksy bez zmiany istniejących stanów i zamówień.
+
+## 0.286.0 — 11 września 2026
+
+Biuro otrzymuje poziomy nagłówek oraz jasne powierzchnie, typografię i przyciski spójne z panelem obsługi klienta.
+Oryginalne logo WERTIS jest widoczne przy logowaniu i w nagłówkach obu paneli.
+Pomarańcz #FF9100 i grafit #303030 pochodzą z przekazanego znaku.
+
+Zaznaczona pozycja kolejki ma neutralne tło i pomarańczowy brzeg.
+Skanowanie zachowuje duże pola, cele 48 px oraz przycisk potwierdzenia widoczny na telefonie.
+Nagłówek dopasowuje się do szerokości; szuflady uwzględniają jego aktualną wysokość.
+Test przeglądarki sprawdza logo i dostępność nawigacji przy 768, 1024 i 1440 px oraz zbiórkę przy 390 px.
+
+## 0.285.0 — 11 września 2026
+
+Samodzielny WMS zastępuje zależność od Sellasist. Zamówienie przechodzi od importu do wysyłki w lokalnej aplikacji.
+Usunięto konektor, zadania synchronizacji i zewnętrzną bramkę wysyłki.
+Dotychczasowe kontrole skanów, ról, rezerwacji i powtórzeń pozostają częścią każdego zapisu.
+
+Rejestr paczek pokazuje dzienne wysyłki, liczbę zamówień i masę.
+Wyszukuje po przesyłce, zamówieniu, kanale lub przewoźniku i eksportuje cały filtr do CSV.
+Numery zamówień prowadzą do szczegółów oraz wydruku listy pakowej.
+
+Demo z opcją `--scale` tworzy 5000 SKU i 1500 zamówień w osobnej bazie.
+Odbiór obejmuje wyłącznie seeded, zgodnie z decyzją właściciela.
+Gałąź scalono z main `9dd4000`, zachowując zmiany zwrotów i obsługi klienta do wersji 0.284.0.
+
+Wpisy WMS 0.270.0–0.271.1 poniżej opisują historię gałęzi przed scaleniem.
+Bieżącą instrukcją samodzielnego modułu jest `docs/wms.md`.
+
 ## 0.284.0 — 11 września 2026
 
 **Klawisze zwrotów wreszcie coś robią.** Ekran rysował je przy przyciskach od
@@ -733,6 +1135,59 @@ nie ma gdzie tego dopisać i milczy; brak osi nie jest awarią rozkładania.
 
 Licznik umowy tras POST: 22 → 24.
 
+## 0.271.1 — 11 września 2026
+
+Formularz kompletacji i pakowania pozostaje zablokowany do zakończenia odczytu po zapisie.
+Szybki kolejny skan nie trafia już do starego formularza, który odświeżenie mogłoby zastąpić.
+Błąd odczytu usuwa nieaktualny formularz i pozwala ponowić sam odczyt, bez powtarzania ruchu.
+Test przeglądarki wymusza opóźniony odczyt oraz jego awarię po zatwierdzeniu pakowania.
+
+Indeksy raportów uwzględniają historię ponad miliona ruchów.
+Próba 90 dni obejmuje teraz także zbilansowany dziennik przyjęć, rezerwacji i pobrań oraz audyt.
+
+## 0.271.0 — 11 września 2026
+
+Otwarcie zapasu i przyjęcia z arkusza w WMS obsługują do 5000 par SKU i lokalizacji.
+Podgląd pokazuje stan przed zmianą, rezerwacje i planowany wynik.
+Spis ustawia policzony stan, a przyjęcie dodaje fizycznie dostarczone sztuki.
+
+Cały dokument zapisuje się atomowo razem z dziennikiem i audytem.
+Zmiana stanu od podglądu zatrzymuje partię. Numer dokumentu chroni przed ponownym przyjęciem.
+Testy obejmują otwarcie 5000 SKU, awarię w środku zapisu, rezerwacje i powtórny import z przeglądarki.
+Instrukcja: `docs/wms.md`, sekcja otwarcia i dostaw z arkusza.
+
+## 0.270.0 — 11 września 2026
+
+Realizacja WMS w istniejącym biurze: od rezerwacji części przez skan lokalizacji,
+zbiórkę pojedynczą lub wózkiem do kontroli pakowania i wysyłki wielu paczek.
+Wózek prowadzi do 12 zamówień po jednej trasie i wymaga potwierdzenia docelowego pojemnika.
+
+- Fizyczny zapas na lokalizacjach, rezerwacje, przyjęcia, przesunięcia, spisy,
+  minima i niezmienny dziennik. Kwarantanna oraz zaplecze nie zasilają zbiórki.
+- Import partii zamówień, kolejki według priorytetu i terminu, wstrzymanie,
+  przejęcie, odłożenie pobranego towaru i anulowanie bez utraty rezerwacji.
+- Konektor Sellasist: import statusów gotowych, wykrywanie zmian i kontrola
+  numerów paczek przed wysyłką. Utracona odpowiedź nie powoduje ponownego
+  potwierdzenia tego samego statusu. Złe przesyłki nie blokują kolejnych.
+- Jawna zmiana zamówienia zwalnia rezerwacje atomowo. Po pobraniu wymaga
+  najpierw odłożenia towaru. Interfejs pokazuje propozycje zmian ze sklepu.
+- Powtórzenie żądania odtwarza wynik; konflikty wersji i transakcje chronią ostatnią sztukę.
+  Interfejs zachowuje nierozstrzygnięty zapis po odświeżeniu strony.
+- Raporty wysyłek, terminowości, zaległości, etapów, SKU, osób, ruchów,
+  spisów i różnic z ERP; eksport CSV i kursor wysyłek dla integratora.
+- Kopia działającej bazy SQLite ze sprawdzeniem spójności i manifestem SHA-256.
+  Testy usług, API, dwóch procesów, odtworzenia oraz prawdziwej przeglądarki.
+  Próba 5000 SKU / 1500 zamówień oraz raportów na 90 dniach historii.
+- Fastify z poprawkami bezpieczeństwa, CSP biura i odtwarzanie sesji po odświeżeniu.
+  Naprawione przenośne uruchamianie testów na Windows; treść specyfikacji Allegro bez zmian.
+
+**Wymaga działania:** Node.js co najmniej 24.15.0, `npm ci`, build i restart usług.
+Otwarcie ewidencji WMS wymaga policzenia i zapisania rzeczywistego zapasu.
+Lustro Subiekta nie nadpisuje ilości WMS. Integracja nie wystawia automatycznie
+dokumentów wydania ani etykiet przewoźnika. Konektor Sellasist jest domyślnie
+wyłączony. Ten wariant konektora został wycofany przy wydaniu samodzielnego WMS 0.285.0.
+Instrukcja, demo i granice odbioru: `docs/wms.md`.
+
 ## 0.268.0 — 10 września 2026
 
 **Widać, dlaczego pusto.** Każdy pominięty szczebel doboru produkuje zdanie
@@ -770,6 +1225,8 @@ tabelą. Mediana pojawia się od dwudziestu wyborów, a kolumny rankingowej nie
 ma żadnej: raport mówi, JAK ktoś pracuje, nie jak dobrze.
 
 Panel obsługi trzeba przebudować. Migracji nie ma.
+
+
 ## 0.267.0 — 10 września 2026
 
 **[wymaga działania] Panel trzeba przebudować** (`npm run build` W KORZENIU repo).

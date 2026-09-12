@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-12",
+  "seededOnly": true,
+  "catalogSkus": 5000,
+  "cases": [
+    { "affectedOrders": 30, "reroutedUnits": 60, "elapsedMs": 27.0107, "repeatMs": 0.7807 },
+    { "affectedOrders": 1500, "reroutedUnits": 3000, "elapsedMs": 1085.9142, "repeatMs": 1.5892 }
+  ],
+  "checks": { "integrity": true, "repeatWrites": 0, "physicalStockUnchanged": true },
+  "browser": { "orders": 20, "partialPickPreserved": true, "sameBox": true, "sourceStillBlocked": true, "responseLossRecovered": true },
+  "limitations": ["Synthetic local Windows tests with other checks running concurrently.", "The 1500-order case deliberately concentrates every order on one SKU and shelf.", "This is command execution time, not employee throughput or a physical scanner pilot."]
+}

@@ -1,0 +1,211 @@
+{
+  "version": "0.286.0",
+  "date": "2026-09-11",
+  "branch": "codex/robust-wms",
+  "serverTests": {
+    "passed": 2160,
+    "failed": 0,
+    "testedVersion": "0.286.0"
+  },
+  "panelTests": {
+    "passed": 727,
+    "failed": 0,
+    "note": "Verified after merging origin/main 9dd4000",
+    "testedVersion": "0.286.0"
+  },
+  "build": {
+    "passed": true,
+    "notes": [
+      "Existing Vite chunk-size warning",
+      "Fonts are served by the API at runtime"
+    ]
+  },
+  "repositoryChecks": [
+    "docs_check.py",
+    "styl_check.py",
+    "ergonomia_check.py",
+    "kt_imports_check.py"
+  ],
+  "capacity": {
+    "at": "2026-09-11T20:29:02.028Z",
+    "node": "v24.15.0",
+    "sqlite": "3.51.3",
+    "platform": "win32",
+    "cpu": "AMD Ryzen 7 7730U with Radeon Graphics         ",
+    "products": 5000,
+    "orders": 1500,
+    "concurrency": 16,
+    "requests": 16650,
+    "elapsedSeconds": 80.92,
+    "ordersPerHour": 66732,
+    "httpMs": {
+      "p50": 73.23,
+      "p95": 95.63,
+      "p99": 112.11,
+      "max": 1086.17
+    },
+    "eventLoopMaxMs": 1054,
+    "integrity": {
+      "ok": true,
+      "balances": [],
+      "reservations": []
+    },
+    "limitations": "Localhost, synthetic 3-line orders, warm database, one API process. Excludes ERP, carrier, physical scanners and production hardware.",
+    "testedVersion": "0.285.0"
+  },
+  "retainedHistory": {
+    "orders": 136500,
+    "lines": 409500,
+    "results": [
+      {
+        "url": "/api/wms/analytics?days=90",
+        "milliseconds": 1331.43
+      },
+      {
+        "url": "/api/wms/analytics?days=30",
+        "milliseconds": 427.76
+      },
+      {
+        "url": "/api/wms/orders?status=allocated",
+        "milliseconds": 2.08
+      },
+      {
+        "url": "/api/wms/inventory?q=SKU-4",
+        "milliseconds": 8.7
+      },
+      {
+        "url": "/api/wms/reconciliation",
+        "milliseconds": 141.71
+      },
+      {
+        "url": "/api/wms/integrity",
+        "milliseconds": 994.68
+      }
+    ],
+    "movementRows": 1229000,
+    "auditRows": 1506501,
+    "withLedger": true,
+    "limitations": "Historical rows are synthetic reporting fixtures; balanced receive/reserve/pick entries and audit rows are included when withLedger=true. The preceding 1500-order run exercises real write paths.",
+    "testedVersion": "0.285.0"
+  },
+  "browser": {
+    "passed": true,
+    "scenarios": [
+      "login",
+      "original WERTIS logo and responsive header at 768, 1024 and 1440px",
+      "create",
+      "allocate",
+      "amend and release reservations",
+      "pick",
+      "wrong scan",
+      "lost response and reload",
+      "expired session preserves pending scan",
+      "pack",
+      "packing stays locked until refreshed state arrives",
+      "failed refresh removes stale scan form and recovers committed packing",
+      "ship",
+      "shipment register, search, CSV download and return to order",
+      "receive",
+      "stock movement history",
+      "stock CSV preview, changed-input invalidation and duplicate document protection",
+      "quarantine location",
+      "batch import",
+      "bulk allocation",
+      "mobile scan targets",
+      "cart route with tote verification",
+      "analytics",
+      "ledger integrity",
+      "390px viewport"
+    ],
+    "browserErrors": [],
+    "server": "Compiled production server (server/dist/index.js)"
+  },
+  "productionDependencyVulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "unverified": [
+    "Live order platform import and carrier handoff",
+    "Physical scanners, printers and production hardware",
+    "Opening inventory and reconciliation with actual ERP documents"
+  ],
+  "stockDocuments": {
+    "browser": "CSV import, invalidation after editing and duplicate-document recognition",
+    "openingSkuCount": 5000,
+    "coverage": [
+      "read-only preview",
+      "stale version rollback",
+      "duplicate reference across sessions and case",
+      "mid-transaction failure rollback",
+      "reservation protection",
+      "5000-SKU opening with ledger verification"
+    ],
+    "passed": 4
+  },
+  "remoteCi": {
+    "androidRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575707",
+    "wmsRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575712",
+    "commit": "79e883f7912f04561bd13637aec36dbfe5fad4b3",
+    "pullRequest": "https://github.com/MateuszPuchalski/mag-asystent/pull/415",
+    "conclusions": {
+      "WMS Windows": "success",
+      "Installer": "success",
+      "Server and panel": "success",
+      "WMS Linux": "success",
+      "Android tests and debug APK": "success",
+      "Sfera worker": "success"
+    },
+    "serverRun": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34644575701",
+    "regression": {
+      "run": "https://github.com/MateuszPuchalski/mag-asystent/actions/runs/34538316280",
+      "fixedVersion": "0.271.1",
+      "verification": "Controlled delayed read fails before fix and passes after fix; failed-read recovery also passes",
+      "failure": "Windows packing form accepted input before post-save refresh completed",
+      "commit": "6b117d2030947ebbfd68d8f40c50e543b7cfce26"
+    },
+    "note": "Historical CI evidence. Latest commit checks are attached to PR #415."
+  },
+  "scope": "Standalone WMS replacing the Sellasist dependency; seeded data only, per owner decision.",
+  "mergedMain": "9dd4000",
+  "standalone": {
+    "networkForbiddenApiTest": true,
+    "seededDemo": {
+      "skus": 5000,
+      "orders": 1500,
+      "shipped": 375,
+      "ledgerConsistent": true
+    },
+    "dispatch": [
+      "role checks",
+      "date validation",
+      "pagination",
+      "literal search",
+      "complete filtered CSV",
+      "formula neutralization",
+      "no writes on reads"
+    ],
+    "legacyConnector": "Removed from application, routes, CLI, UI, and fresh schema; existing database rows are retained but unused."
+  },
+  "brand": {
+    "asset": "server/src/web/wertis-logo.png",
+    "originalAssetPreserved": true,
+    "orange": "#FF9100",
+    "charcoal": "#303030",
+    "designReference": "Existing customer service panel (obsluga)",
+    "surfaces": [
+      "warehouse header and login",
+      "customer service header and login",
+      "WMS workflow and reports"
+    ],
+    "navigationWidths": [
+      768,
+      1024,
+      1440
+    ],
+    "scanViewport": "390 x 844"
+  }
+}

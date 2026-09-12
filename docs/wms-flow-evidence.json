@@ -1,0 +1,17 @@
+{
+  "version": "0.300.0",
+  "date": "2026-09-12",
+  "seededOnly": true,
+  "workload": { "orders": 135000, "skus": 5000, "days": 90 },
+  "synchronousBaselineMs": [7669.4512, 6962.5316, 7214.1564, 7329.2906, 7036.8332],
+  "isolatedReaderMs": [7811.0259, 6122.9050, 6232.8437],
+  "concurrentWritesMs": [12.6163, 5.3290, 5.2547],
+  "mainEventLoop": { "intervalMs": 20, "ticks": 647, "p95Ms": 32.1632, "maxMs": 44.8552 },
+  "report": { "shipped": 135000, "confirmed": 135000, "payloadBytes": 10582, "noDatabaseWrites": true },
+  "limits": [
+    "Synthetic report fixture, not warehouse operator throughput.",
+    "Local Windows measurements; other development checks ran concurrently.",
+    "Report time is not scanner latency. Event-loop and write timings demonstrate isolation on this fixture.",
+    "Physical Zebra/Honeywell pilot remains outstanding."
+  ]
+}

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 
 /* ── Schemat ma JEDNEGO właściciela: serwer API (0.177.1) ────────────────────
    2 września wyjątek w `migrate()` położył API i workera naraz, bo migrację
@@ -17,7 +18,7 @@ import { DatabaseSync } from "node:sqlite";
    cichu. Każdy chodzi we WŁASNYM procesie, bo `bezMigracji()` jest stanem
    modułu — jeden test nie ma prawa zmienić warunków drugiemu.               */
 
-const tutaj = path.dirname(new URL(import.meta.url).pathname);
+const tutaj = path.dirname(fileURLToPath(import.meta.url));
 
 /** Uruchamia kod w osobnym procesie na własnej bazie; oddaje jego wyjście. */
 function wProcesie(kod: string): { out: string; ok: boolean } {
@@ -29,7 +30,7 @@ function wProcesie(kod: string): { out: string; ok: boolean } {
   fs.writeFileSync(plik,
     `process.env.DB_PATH = ${JSON.stringify(path.join(katalog, "t.db"))};\n`
     + `const { bezMigracji, db } = await import(${modul});\n${kod}`);
-  const r = spawnSync("npx", ["tsx", plik], {
+  const r = spawnSync(process.execPath, ["--import", "tsx", plik], {
     cwd: path.resolve(tutaj, "../.."), encoding: "utf8", timeout: 120_000,
   });
   return { out: `${r.stdout ?? ""}${r.stderr ?? ""}`, ok: r.status === 0 };
@@ -95,8 +96,9 @@ test("worker z niepełnym schematem CZEKA — nie pada i nie migruje", () => {
   const r = wProcesie(`
     const { spawnSync } = await import("node:child_process");
     // worker.ts sam odpala pętlę, więc puszczamy go i ubijamy po dwóch taktach
-    const modul = new URL("../worker/worker.ts", ${JSON.stringify(new URL("./db.ts", import.meta.url).href)}).pathname;
-    const w = spawnSync("npx", ["tsx", modul], {
+    const { fileURLToPath } = await import("node:url");
+    const modul = fileURLToPath(new URL("../worker/worker.ts", ${JSON.stringify(new URL("./db.ts", import.meta.url).href)}));
+    const w = spawnSync(process.execPath, ["--import", "tsx", modul], {
       encoding: "utf8", timeout: 12000,
       env: { ...process.env, WORKER_POLL_MS: "150", SGT_MODE: "seeded" },
     });
@@ -115,8 +117,9 @@ test("zdanie o czekaniu pada RAZ, nie co takt", () => {
      kopiami jednego zdania — tę cenę repo już raz zapłaciło (DEPLOY §7). */
   const r = wProcesie(`
     const { spawnSync } = await import("node:child_process");
-    const modul = new URL("../worker/worker.ts", ${JSON.stringify(new URL("./db.ts", import.meta.url).href)}).pathname;
-    const w = spawnSync("npx", ["tsx", modul], {
+    const { fileURLToPath } = await import("node:url");
+    const modul = fileURLToPath(new URL("../worker/worker.ts", ${JSON.stringify(new URL("./db.ts", import.meta.url).href)}));
+    const w = spawnSync(process.execPath, ["--import", "tsx", modul], {
       encoding: "utf8", timeout: 12000,
       env: { ...process.env, WORKER_POLL_MS: "150", SGT_MODE: "seeded" },
     });

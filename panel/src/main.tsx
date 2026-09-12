@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
+import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2 } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { useKolejkaWiedzy } from "./api/wiedza";
@@ -107,8 +107,8 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
      „WERTIS · Obsługa klienta" wolno ucinać, przyciskom nie. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="flex flex-wrap items-center gap-4 px-5 py-3">
-      <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
-      <div className="mr-auto min-w-0"><b>WERTIS</b>
+      <img src="/biuro/wertis-logo.png" width={1600} height={672} alt="WERTIS — sklep z częściami" className="h-auto w-[120px] shrink-0 rounded-lg bg-white px-2 py-1.5" />
+      <div className="mr-auto min-w-0">
         {/* kontrast: pasek stoi na #2A2A2C, gdzie slate-400 daje 5.59:1 */}
         <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">

@@ -8,6 +8,7 @@ import { zapiszZalaczniki, type ZalacznikAllegro } from "../services/zalaczniki-
 /* Serwis, nie odwrotnie: `autoresponder.ts` zna tylko `tekst.ts`, więc
    import w tę stronę nie zapętla modułów. */
 import { czyAutoresponder } from "../services/autoresponder.js";
+import { migratePackIssues } from "./wms-pack-issues.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -92,6 +93,8 @@ export function db(): DatabaseSync {
   fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
   const database = new DatabaseSync(config.dbPath);
   database.exec("PRAGMA journal_mode = WAL");
+  // Potwierdzony skan WMS musi trafić na dysk przed odpowiedzią, także przy zaniku zasilania.
+  database.exec("PRAGMA synchronous = FULL");
   database.exec("PRAGMA foreign_keys = ON");
   /* Bazę otwierają DWA procesy: API i worker. WAL rozdziela czytających od
      piszących, ale NIE dwóch piszących — a piszą obaj: API przy każdym
@@ -169,6 +172,7 @@ export function transaction<A extends unknown[], R>(
  * Test stawiający bazę bez niej sprawdza kształt, którego nie ma na produkcji.
  */
 export function migrate(database: DatabaseSync) {
+  migratePackIssues(database);
   const addColumn = (table: string, column: string, decl: string) => {
     const cols = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === column)) {
@@ -178,6 +182,12 @@ export function migrate(database: DatabaseSync) {
   usunSesjeRozkladania(database);
   /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
+  // Stare uzupełnienia dopuszczały wyłącznie pełny przydział; NULL pozostaje zgodnym zapisem tej historii.
+  addColumn("wms_replenishment", "completed_quantity", "INTEGER CHECK(completed_quantity>=0 AND completed_quantity<=quantity)");
+  // Nie zgadujemy pojemności starych półek na podstawie dotychczasowego zapasu.
+  addColumn("wms_stock", "capacity", "INTEGER CHECK(capacity>=0 AND capacity<=1000000)");
+  addColumn("wms_replenishment", "returned_quantity", "INTEGER NOT NULL DEFAULT 0 CHECK(returned_quantity>=0 AND returned_quantity<=quantity)");
+  addColumn("wms_replenishment", "target_full", "INTEGER NOT NULL DEFAULT 0 CHECK(target_full IN (0,1))");
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
   /* Dane doboru rozpoznane w rozmowie przy szkicu Copilota (etap F, przyrost
      trzeci) — patrz `szkic_copilota` w `schema.sql`. Tabela stoi na produkcji

@@ -1,0 +1,674 @@
+import { chromium, expect } from "@playwright/test";
+import { spawn, execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { exerciseCarts } from "./wms-cart-e2e.mjs";
+import { exerciseDesign } from "./wms-design-e2e.mjs";
+import { exerciseInbound } from "./wms-inbound-e2e.mjs";
+import { exerciseHandoff } from "./wms-handoff-e2e.mjs";
+import { exercisePacking } from "./wms-packing-e2e.mjs";
+import { exercisePackingRecovery } from "./wms-pack-recovery-e2e.mjs";
+import { exercisePackingShortage } from "./wms-pack-shortage-e2e.mjs";
+import { exerciseCapacity } from "./wms-capacity-e2e.mjs";
+import { exerciseReplenishment } from "./wms-replenishment-e2e.mjs";
+import { exerciseReroute } from "./wms-reroute-e2e.mjs";
+import { exerciseReturns } from "./wms-return-e2e.mjs";
+
+const cwd = fileURLToPath(new URL("..", import.meta.url));
+const output = path.join(cwd, ".wms-artifacts");
+mkdirSync(output, { recursive: true });
+const port = process.env.WMS_TEST_PORT || "3012";
+const base = `http://127.0.0.1:${port}`;
+const env = {
+  ...process.env,
+  DB_PATH: path.join(mkdtempSync(path.join(tmpdir(), "wms-e2e-")), "demo.db"),
+  WMS_DEMO_PASSWORD: randomUUID(),
+  PORT: port,
+  HOST: "127.0.0.1",
+  SGT_MODE: "seeded",
+  ALLEGRO_MODE: "dev",
+  LOG_LEVEL: "silent",
+  WERTIS_ENV_FILE: path.join(tmpdir(), "wms-test-no-env.local"),
+};
+execFileSync(
+  process.execPath,
+  ["--import", "tsx", "server/src/wms-demo-run.ts"],
+  { cwd, env, stdio: "pipe" },
+);
+const api = spawn(
+  process.execPath,
+  process.argv.includes("--built")
+    ? ["server/dist/index.js"]
+    : ["--import", "tsx", "server/src/index.ts"],
+  { cwd, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+);
+let serverLog = "";
+api.stdout.on("data", (d) => (serverLog += d));
+api.stderr.on("data", (d) => (serverLog += d));
+let browser;
+try {
+  for (let i = 0; i < 100; i++) {
+    if (api.exitCode !== null) throw new Error(serverLog);
+    try {
+      if ((await fetch(`${base}/biuro`)).ok) break;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(`${base}/biuro`);
+  await page.locator("#poleLogin").fill("wms-demo");
+  await expect(page.locator("#poleLogin")).toHaveCSS("outline-style", "solid");
+  await page.locator("#poleHaslo").fill(env.WMS_DEMO_PASSWORD);
+  await page.locator("#zaloguj").click();
+  await expect(page.locator("#bok .wertis-logo")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.locator("#bok .wertis-logo").evaluate((img) => img.naturalWidth),
+    )
+    .toBe(1600);
+  await page.locator('[data-widok="wms"]').click();
+  await expect(page.locator("#wms-content")).toContainText(
+    "Wybierz zamówienie",
+  );
+  await exerciseDesign(page);
+  for (const width of [768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      )
+      .toBe(true);
+    for (const selector of [
+      '#bok [data-widok="wms"]',
+      "#bok #ustawienia",
+      "#bok #wyloguj",
+    ]) {
+      const bounds = await page.locator(selector).boundingBox();
+      if (!bounds || bounds.x < 0 || bounds.x + bounds.width > width + 1)
+        throw new Error(`Navigation outside viewport at ${width}: ${selector}`);
+    }
+  }
+  await page.locator('[data-tab-wms="import"]').click();
+  await page.locator('#wms-create [name="reference"]').fill("E2E-FULL-ORDER");
+  await page.locator('#wms-create [name="dueAt"]').fill("2026-12-31T14:00");
+  await page
+    .locator('#wms-create [name="lines"]')
+    .fill("WMS-0001;2\nWMS-0002;1");
+  await page
+    .getByRole("button", { name: "UTWÓRZ ZAMÓWIENIE", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
+    .click();
+  await page.locator("#wms-amend summary").click();
+  await page.locator('#wms-amend [name="priority"]').selectOption("1");
+  await expect(page.locator('#wms-amend [name="lines"]')).toHaveValue(
+    "WMS-0001;2\nWMS-0002;1",
+  );
+  await page
+    .locator('#wms-amend [name="reason"]')
+    .fill("Klient potrzebuje pilnej realizacji");
+  await page
+    .getByRole("button", {
+      name: "ZAPISZ ZMIANY I ZWOLNIJ REZERWACJE",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("button", { name: "ZAREZERWUJ TOWAR", exact: true })
+    .click();
+  await page.locator('#wms-step [name="tote"]').fill("E2E-BOX");
+  await page
+    .getByRole("button", { name: "ROZPOCZNIJ ZBIÓRKĘ", exact: true })
+    .click();
+  await page.locator('#wms-step [name="bin"]').fill("LOC:A01-01-02");
+  await expect(page.locator("#wms-step .wms-photo")).toContainText(
+    "Brak zdjęcia produktu",
+  );
+  await page.locator('#wms-step [name="bin"]').press("Enter");
+  await expect(page.locator('#wms-step [name="barcode"]')).toBeFocused();
+  await page.locator('#wms-step [name="barcode"]').fill("WRONG-SKU");
+  await page
+    .getByRole("button", { name: "POTWIERDŹ POBRANIE", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText("Inny towar");
+  await page.locator('#wms-step [name="barcode"]').fill("WMS-0001");
+  await page.locator('#wms-step [name="quantity"]').fill("2");
+  // Serwer zatwierdza skan, ale odpowiedź ginie: UI musi odtworzyć wynik.
+  await page.route(
+    "**/api/wms/orders/*/actions",
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await page
+    .getByRole("button", { name: "POTWIERDŹ POBRANIE", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "PONÓW POPRZEDNIĄ OPERACJĘ",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.reload();
+  // Wygaśnięcie sesji nie może zgubić klucza wcześniej zatwierdzonego skanu.
+  await page.route(
+    "**/api/wms/orders/*/actions",
+    (route) =>
+      route.continue({
+        headers: {
+          ...route.request().headers(),
+          "x-session": "expired-test-session",
+        },
+      }),
+    { times: 1 },
+  );
+  await page
+    .getByRole("button", { name: "PONÓW POPRZEDNIĄ OPERACJĘ", exact: true })
+    .click();
+  await expect(page.locator("#poleLogin")).toBeVisible();
+  await page.locator("#poleLogin").fill("wms-demo");
+  await page.locator("#poleHaslo").fill(env.WMS_DEMO_PASSWORD);
+  await page.locator("#zaloguj").click();
+  await page.locator('[data-widok="wms"]').click();
+  await page
+    .getByRole("button", { name: "PONÓW POPRZEDNIĄ OPERACJĘ", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText(
+    "Potwierdzono poprzednią operację",
+  );
+  await page.getByRole("button", { name: /E2E-FULL-ORDER/ }).click();
+  await expect(page.locator(".wms-part")).toHaveText("WMS-0002");
+  await page.locator('#wms-step [name="bin"]').fill("LOC:A01-01-02");
+  await page.locator('#wms-step [name="barcode"]').fill("WMS-0002");
+  await page
+    .getByRole("button", { name: "POTWIERDŹ POBRANIE", exact: true })
+    .click();
+  await page.locator('#wms-step [name="tote"]').fill("E2E-BOX");
+  await page
+    .getByRole("button", { name: "ROZPOCZNIJ KONTROLĘ PACZKI", exact: true })
+    .click();
+  await expect(page.locator("#wms-step")).toContainText(
+    "Sprawdzono 0 z 3 szt.",
+  );
+  let signalPackRefresh, releasePackRefresh;
+  const packRefreshEntered = new Promise((resolve) => {
+    signalPackRefresh = resolve;
+  });
+  const packRefreshGate = new Promise((resolve) => {
+    releasePackRefresh = resolve;
+  });
+  // Wolny odczyt po zapisie odsłania okno, w którym stary formularz gubił następny skan.
+  await page.route(
+    "**/api/wms/orders?**",
+    async (route) => {
+      signalPackRefresh();
+      await packRefreshGate;
+      await route.continue();
+    },
+    { times: 1 },
+  );
+  for (const [sku, qty] of [
+    ["WMS-0001", "2"],
+    ["WMS-0002", "1"],
+  ]) {
+    if (sku === "WMS-0002")
+      await page.route(
+        "**/api/wms/orders?**",
+        (route) =>
+          route.fulfill({
+            status: 503,
+            json: { error: "Kontrolowana awaria odczytu" },
+          }),
+        { times: 1 },
+      );
+    await page.locator('[data-action-wms="pack"] [name="barcode"]').fill(sku);
+    await page.locator('[data-action-wms="pack"] [name="quantity"]').fill(qty);
+    await page
+      .getByRole("button", { name: "DODAJ DO PACZKI", exact: true })
+      .click();
+    if (sku === "WMS-0001") {
+      await packRefreshEntered;
+      try {
+        await expect(
+          page.locator('[data-action-wms="pack"] [name="barcode"]'),
+        ).toBeDisabled();
+      } finally {
+        releasePackRefresh();
+      }
+      await expect(page.locator("#wms-step")).toContainText(
+        "Sprawdzono 2 z 3 szt.",
+      );
+      await expect(
+        page.locator('[data-action-wms="pack"] [name="barcode"]'),
+      ).toBeFocused();
+    } else {
+      await expect(
+        page.getByRole("button", { name: "PONÓW ODCZYT", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.locator('[data-action-wms="pack"] [name="barcode"]'),
+      ).toHaveCount(0);
+      await page
+        .getByRole("button", { name: "PONÓW ODCZYT", exact: true })
+        .click();
+    }
+  }
+  await page.locator('#wms-step [name="carrier"]').fill("TEST");
+  await page.locator('#wms-step [name="tracking"]').fill("TRACK-E2E-0001");
+  await page.locator('#wms-step [name="weightG"]').fill("750");
+  await page
+    .getByRole("button", {
+      name: "ZAPISZ PRZYGOTOWANE PACZKI",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("#wms-step")).toContainText("TRACK-E2E-0001");
+  await page.screenshot({
+    path: path.join(output, "fulfillment-desktop.png"),
+    fullPage: true,
+  });
+  await page.locator('[data-tab-wms="dispatch"]').click();
+  await exerciseHandoff(page, output);
+  await page.locator('[data-tab-wms="dispatch"]').click();
+  await page.locator('#wms-dispatch-filter [name="q"]').fill("TRACK-E2E-0001");
+  await page
+    .getByRole("button", { name: "SZUKAJ PACZEK", exact: true })
+    .click();
+  await expect(page.locator("#wms-content tbody tr")).toHaveCount(1);
+  await expect(page.locator("#wms-content")).toContainText("E2E-FULL-ORDER");
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "EKSPORTUJ REJESTR CSV", exact: true })
+    .click();
+  const download = await downloadPromise;
+  const registerCsv = readFileSync(await download.path(), "utf8");
+  if (
+    !registerCsv.includes("TRACK-E2E-0001") ||
+    !registerCsv.includes("E2E-FULL-ORDER")
+  )
+    throw new Error("Rejestr CSV nie zawiera wysłanej paczki");
+  await page.screenshot({
+    path: path.join(output, "dispatch-desktop.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "E2E-FULL-ORDER", exact: true })
+    .click();
+  await expect(page.locator("#wms-step")).toContainText("TRACK-E2E-0001");
+  await page.locator('[data-tab-wms="stock"]').click();
+  await page.locator('#wms-filter [name="q"]').fill("WMS-0040");
+  await page.locator("#wms-filter button").click();
+  await expect(
+    page.getByRole("button", { name: "Zmień", exact: true }),
+  ).toHaveCount(1);
+  await page.getByRole("button", { name: "Zmień", exact: true }).click();
+  const stockEdit = page.locator("#wms-stock-edit");
+  const stockQuantity = stockEdit.locator('[name="quantity"]');
+  const stockAction = stockEdit.locator('[name="action"]');
+  let uncountedWrites = 0;
+  const countStockWrite = (request) => {
+    if (
+      request.method() === "POST" &&
+      request.url().endsWith("/api/wms/inventory")
+    )
+      uncountedWrites++;
+  };
+  page.on("request", countStockWrite);
+  await expect(stockQuantity).toHaveValue("");
+  await stockEdit.locator('[name="reason"]').fill("Próba pustej ilości seeded");
+  await stockEdit.locator("button").click();
+  await expect(stockQuantity).toBeFocused();
+  await stockQuantity.fill("7");
+  await stockAction.selectOption("transfer");
+  await expect(stockQuantity).toHaveValue("");
+  await stockQuantity.fill("3");
+  await stockEdit.locator('[name="target"]').fill("INNY-CEL");
+  await stockAction.selectOption("count");
+  await expect(stockQuantity).toHaveValue("");
+  await expect(stockEdit.locator('[name="target"]')).toBeDisabled();
+  await expect(stockEdit).toContainText("Cały policzony stan na półce");
+  await stockEdit.locator("button").click();
+  await expect(stockQuantity).toBeFocused();
+  expect(
+    await stockQuantity.evaluate((input) => input.validity.valueMissing),
+  ).toBe(true);
+  await stockQuantity.fill("0");
+  expect(await stockQuantity.evaluate((input) => input.checkValidity())).toBe(
+    true,
+  );
+  await stockAction.selectOption("receive");
+  await expect(stockQuantity).toHaveValue("");
+  await stockQuantity.fill("0");
+  expect(await stockQuantity.evaluate((input) => input.checkValidity())).toBe(
+    false,
+  );
+  expect(uncountedWrites).toBe(0);
+  page.off("request", countStockWrite);
+  await page.locator('#wms-stock-edit [name="quantity"]').fill("5");
+  await page.locator('#wms-stock-edit [name="reason"]').fill("PZ E2E 5 sztuk");
+  await page.getByRole("button", { name: "ZAPISZ RUCH", exact: true }).click();
+  await expect(page.locator("#wms-content")).toContainText("105");
+  await page
+    .getByRole("button", { name: "Historia", exact: true })
+    .first()
+    .click();
+  await expect(page.locator("#wms-stock-form")).toContainText(
+    "historia ruchów",
+  );
+  await expect(page.locator("#wms-stock-form")).toContainText("Przyjęcie");
+  await page.locator("#wms-stock-import summary").click();
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK");
+  await page.locator("#wms-stock-file").setInputFiles({
+    name: "dostawa.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3", "utf8"),
+  });
+  await expect(page.locator("#wms-stock-data")).toHaveValue(
+    "WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3",
+  );
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "2 pozycji",
+  );
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "Zmiana zapasu: 5 szt.",
+  );
+  // Edycja po podglądzie musi zdjąć możliwość zatwierdzenia starej treści.
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK-UPDATED");
+  await expect(
+    page.getByRole("button", {
+      name: "ZATWIERDŹ RUCHY Z DOKUMENTU",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "ZATWIERDŹ RUCHY Z DOKUMENTU", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText(
+    "Zapisano dokument: PZ-E2E-BULK-UPDATED",
+  );
+  await page.locator("#wms-stock-import summary").click();
+  await page
+    .locator('#wms-stock-preview [name="reference"]')
+    .fill("PZ-E2E-BULK-UPDATED");
+  await page
+    .locator("#wms-stock-data")
+    .fill("WMS-0040;RECEIPT-01;2\nWMS-0038;RECEIPT-01;3");
+  await page
+    .getByRole("button", { name: "PODGLĄD RUCHÓW", exact: true })
+    .click();
+  await expect(page.locator("#wms-stock-preview-result")).toContainText(
+    "był już zapisany",
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "ZATWIERDŹ RUCHY Z DOKUMENTU",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.locator('[data-tab-wms="bins"]').click();
+  await page
+    .getByRole("button", { name: "DODAJ LOKALIZACJĘ", exact: true })
+    .click();
+  await page.locator('#wms-bin-edit [name="bin"]').fill("KONTROLA-01");
+  await page.locator('#wms-bin-edit [name="mode"]').selectOption("quarantine");
+  await page
+    .locator('#wms-bin-edit [name="reason"]')
+    .fill("Kontrola jakości dostawy");
+  await page
+    .getByRole("button", { name: "ZAPISZ LOKALIZACJĘ", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText(
+    "Zapisano przeznaczenie",
+  );
+  await expect(page.locator("#wms-content")).toContainText("KONTROLA-01");
+  await page.locator('[data-tab-wms="import"]').click();
+  await page
+    .getByText("Import wielu zamówień z pliku", { exact: true })
+    .click();
+  await page.locator("#wms-import-json").fill(
+    JSON.stringify({
+      orders: [1, 2].map((n) => ({
+        reference: `BATCH-E2E-${n}`,
+        dueAt: "2026-12-31T12:00:00Z",
+        lines: [{ sku: "WMS-0039", quantity: 1 }],
+      })),
+    }),
+  );
+  await page
+    .getByRole("button", { name: "PODGLĄD IMPORTU", exact: true })
+    .click();
+  await expect(page.locator("#wms-import-result")).toContainText("2 zamówień");
+  await page
+    .getByRole("button", { name: "IMPORTUJ ZAMÓWIENIA", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText("Dodano 2");
+  await page
+    .getByRole("button", { name: "ZAREZERWUJ NOWE Z TEJ STRONY", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText("Zarezerwowano");
+  await page.locator('#wms-filter [name="status"]').selectOption("allocated");
+  await page.locator('#wms-filter [name="q"]').fill("BATCH-E2E-1");
+  await page.locator('#wms-filter button[type="submit"]').click();
+  await page.getByRole("button", { name: /BATCH-E2E-1/ }).click();
+  await page.locator('#wms-step [name="tote"]').fill("BATCH-BOX");
+  await page
+    .getByRole("button", { name: "ROZPOCZNIJ ZBIÓRKĘ", exact: true })
+    .click();
+  await expect(page.locator(".wms-part")).toContainText("WMS-0039");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: path.join(output, "picking-mobile.png"),
+    fullPage: true,
+  });
+  const scanTargets = await page
+    .locator("#wms-step input:not([type=hidden]), #wms-step button")
+    .evaluateAll((elements) =>
+      elements.map((e) => ({
+        height: e.getBoundingClientRect().height,
+        width: e.getBoundingClientRect().width,
+      })),
+    );
+  if (scanTargets.some((e) => e.height < 48 || e.width < 48))
+    throw new Error("Scanner controls smaller than 48px");
+  const scanButton = await page
+    .getByRole("button", { name: "POTWIERDŹ POBRANIE", exact: true })
+    .boundingBox();
+  if (!scanButton || scanButton.y + scanButton.height > 844)
+    throw new Error("Mobile picking requires scrolling to confirm");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('[data-tab-wms="waves"]').click();
+  await page
+    .getByRole("button", { name: "PRZYGOTUJ WÓZEK", exact: true })
+    .click();
+  await page.locator('#wms-wave-create [name="name"]').fill("Wózek E2E");
+  const cartInputs = page.locator('#wms-wave-create input[name^="tote-"]');
+  if ((await cartInputs.count()) < 2)
+    throw new Error("Brak dwóch zamówień do próby wózka");
+  await cartInputs.nth(0).fill("CART-E2E-1");
+  await cartInputs.nth(1).fill("CART-E2E-2");
+  await page
+    .getByRole("button", { name: "ROZPOCZNIJ TRASĘ", exact: true })
+    .click();
+  await expect(page.locator("#wms-wave-pick")).toBeVisible();
+  let cartScans = 0;
+  while (await page.locator("#wms-wave-pick").count()) {
+    const task = await page.evaluate(
+      () => document.getElementById("widokWms")._waveTask,
+    );
+    await page.locator('#wms-wave-pick [name="bin"]').fill("LOC:" + task.bin);
+    await page.locator('#wms-wave-pick [name="bin"]').press("Enter");
+    await expect(page.locator('#wms-wave-pick [name="barcode"]')).toBeFocused();
+    await page.locator('#wms-wave-pick [name="barcode"]').fill(task.sku);
+    await page.locator('#wms-wave-pick [name="barcode"]').press("Enter");
+    await expect(page.locator('#wms-wave-pick [name="tote"]')).toBeFocused();
+    await page
+      .locator('#wms-wave-pick [name="quantity"]')
+      .fill(String(task.remaining));
+    if (cartScans === 0) {
+      await page.locator('#wms-wave-pick [name="tote"]').fill("WRONG-CART");
+      await page
+        .getByRole("button", { name: "ODŁOŻONO DO POJEMNIKA", exact: true })
+        .click();
+      await expect(page.locator("#wms-message")).toContainText("pojemnik");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({
+        path: path.join(output, "cart-mobile.png"),
+        fullPage: true,
+      });
+      if (
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > window.innerWidth + 1,
+        )
+      )
+        throw new Error("Cart overflows mobile viewport");
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
+    await page.locator('#wms-wave-pick [name="tote"]').fill(task.tote);
+    await page
+      .getByRole("button", { name: "ODŁOŻONO DO POJEMNIKA", exact: true })
+      .click();
+    await expect(page.locator("#wms-message")).toContainText(
+      "Potwierdzono odłożenie",
+    );
+    await expect
+      .poll(() =>
+        page.evaluate((previous) => {
+          const next = document.getElementById("widokWms")._waveTask;
+          return (
+            !next ||
+            next.allocation_id !== previous.allocation_id ||
+            next.version !== previous.version
+          );
+        }, task),
+      )
+      .toBe(true);
+    if (++cartScans > 50) throw new Error("Wózek nie kończy zbiórki");
+  }
+  await expect(page.locator("#wms-work")).toContainText("Trasa zebrana");
+  await exerciseCarts(page, output);
+  await exercisePacking(page, output);
+  await exercisePackingRecovery(page, output);
+  await exercisePackingShortage(page, output);
+  await exerciseInbound(page, output);
+  await exerciseReroute(page, output);
+  await exerciseReplenishment(page, output);
+  await exerciseCapacity(page, output);
+  await exerciseReturns(page, output);
+  await page.locator('[data-tab-wms="analytics"]').click();
+  await expect(page.locator("#wms-flow")).toContainText("Gdzie czeka praca");
+  await expect(
+    page.getByRole("heading", { name: "Czas przejścia przez etapy" }),
+  ).toBeVisible();
+  await page.locator('[data-flow-queue="putaway"]').click();
+  await expect(page.locator('[data-inbound="receiving"]')).toBeVisible();
+  await expect(page.locator("#wms-putaway-finish")).toHaveCount(0);
+  await page.locator('[data-tab-wms="analytics"]').click();
+  const flowDownload = page.waitForEvent("download");
+  await page.getByRole("button", { name: "EKSPORTUJ CZASY ETAPÓW" }).click();
+  const flowFile = await flowDownload;
+  await flowFile.saveAs(path.join(output, "flow-analytics.csv"));
+  const flowCsv = readFileSync(path.join(output, "flow-analytics.csv"), "utf8");
+  if (
+    !flowCsv.includes("Mediana min;P95 min") ||
+    !flowCsv.includes("Przyjęcie do bufora")
+  )
+    throw new Error("Eksport czasów etapów jest niekompletny");
+  await page
+    .getByRole("button", { name: "SPRAWDŹ ZGODNOŚĆ STANÓW", exact: true })
+    .click();
+  await expect(page.locator("#wms-message")).toContainText("są zgodne");
+  await page.screenshot({
+    path: path.join(output, "analytics-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: path.join(output, "analytics-mobile.png"),
+    fullPage: true,
+  });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  );
+  if (overflow) throw new Error("Mobile viewport overflows horizontally");
+  if (errors.length) throw new Error(`Browser errors: ${errors.join("; ")}`);
+  writeFileSync(
+    path.join(output, "e2e-result.json"),
+    JSON.stringify(
+      {
+        passed: true,
+        scenarios: [
+          "login",
+          "original WERTIS logo and responsive header at 768, 1024 and 1440px",
+          "design audit: all ten WMS areas at 320, 390, 768 and 1440px, keyboard navigation, delayed loading feedback and reduced motion",
+          "create",
+          "allocate",
+          "amend and release reservations",
+          "pick",
+          "wrong scan",
+          "lost response and reload",
+          "expired session preserves pending scan",
+          "pack",
+          "packing stays locked until refreshed state arrives",
+          "failed refresh removes stale scan form and recovers committed packing",
+          "ship",
+          "shipment register, search, CSV download and return to order",
+          "receive",
+          "receiving buffer, claimed partial putaway, lost response recovery and quantity correction",
+          "stock movement history",
+          "stock CSV preview, changed-input invalidation and duplicate document protection",
+          "quarantine location",
+          "batch import",
+          "bulk allocation",
+          "mobile scan targets",
+          "cart route with tote verification",
+          "analytics",
+          "ledger integrity",
+          "390px viewport",
+        ],
+        browserErrors: errors,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`WMS E2E passed. Evidence: ${output}`);
+} catch (e) {
+  writeFileSync(path.join(output, "server.log"), serverLog);
+  if (browser)
+    for (const context of browser.contexts())
+      for (const page of context.pages())
+        await page
+          .screenshot({
+            path: path.join(output, "failure.png"),
+            fullPage: true,
+          })
+          .catch(() => {});
+  throw e;
+} finally {
+  await browser?.close();
+  api.kill();
+}

@@ -50,6 +50,7 @@ import pl.wertis.kolektor.net.apiCall
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
 import pl.wertis.kolektor.ui.scan.routeScan
 import pl.wertis.kolektor.ui.components.OutlineButton
+import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.ProductRowCard
 import pl.wertis.kolektor.ui.components.SectionLabel
 import pl.wertis.kolektor.ui.components.WIcons
@@ -145,6 +146,24 @@ fun HomeScreen(graph: AppGraph) {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        PrimaryButton("ZBIÓRKA WMS — SKANUJ WÓZEK", modifier = Modifier.fillMaxWidth(), tall = true) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PICKING)
+        }
+        OutlineButton("ODKŁADANIE WMS — Z BUFORA", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PUTAWAY)
+        }
+        OutlineButton("PRZYJĘCIE WMS — POLICZ DOSTAWĘ", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_RECEIVING)
+        }
+        OutlineButton("UZUPEŁNIENIA WMS — ZAPLECZE → PÓŁKA", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_REPLENISHMENT)
+        }
+        OutlineButton("WYMIANY WMS — ZAMIENNIK DO SKRZYNKI", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_RECOVERY)
+        }
+        OutlineButton("PRZELICZENIA WMS — SPRAWDŹ PÓŁKĘ", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_COUNTING)
+        }
         WertisTextField(
             value = query,
             onValueChange = { newValue ->

@@ -356,7 +356,7 @@ if ($Aktualizuj) {
 if (-not $TylkoKonfiguracja) {
     Write-Krok "Zależności: Node.js i Git"
     $okNode = Install-WertisNarzedzie -Polecenie "node" -IdWinget "OpenJS.NodeJS.LTS" `
-        -Opis "Node.js LTS" -UrlAwaryjny "https://nodejs.org/dist/v22.11.0/node-v22.11.0-x64.msi"
+        -Opis "Node.js LTS" -UrlAwaryjny "https://nodejs.org/dist/v24.15.0/node-v24.15.0-x64.msi"
     $okGit = Install-WertisNarzedzie -Polecenie "git" -IdWinget "Git.Git" -Opis "Git"
     if (-not ($okNode -and $okGit)) { exit 1 }
     if (-not (Test-WertisNode)) { exit 1 }

@@ -425,7 +425,8 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "magazyn", "analiza", "dziennik", "nadzor"],
+    // Realizacja WMS jest pracą operacyjną: prowadzi kompletację i pakowanie.
+    ["wms", "dostawy", "magazyn", "analiza", "dziennik", "nadzor"],
     "pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
       "pustą zakładką — konto Allegro mieszka w STANIE SYSTEMU. " +
@@ -575,7 +576,8 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
      ciało. Bramka o szerokości całego pliku wywalałaby się na poprawnym
      kodzie, a taka uczy tylko obchodzenia jej. */
   const od = html.indexOf("async function api(");
-  const api = html.slice(od, html.indexOf("\n}\n", od));
+  const koniec = /\r?\n}\r?\n/.exec(html.slice(od));
+  const api = html.slice(od, od + (koniec?.index ?? 0));
   assert.ok(od > 0 && api.includes("await fetch"), "nie znalazłem ciała api()");
   assert.ok(
     /opts\.body !== undefined/.test(api),

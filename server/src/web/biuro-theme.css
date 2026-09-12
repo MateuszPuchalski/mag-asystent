@@ -1,0 +1,314 @@
+/* Wspólny język panelu obsługi: grafitowy nagłówek, jasne listy i spokojne
+   zaznaczenie. Pomarańcz pochodzi z dostarczonego znaku, nie z koloru ostrzeżeń. */
+:root {
+  --brand-orange: #ff9100;
+  --brand-charcoal: #303030;
+  /* Role kolorów odpowiadają panelowi obsługi. Pomarańcz nie zastępuje
+     tekstu ani obwódki fokusu: na bieli ma zbyt mały kontrast. */
+  color-scheme: light;
+  --ui-text: #0f172a;
+  --ui-muted: #475569;
+  --ui-caption: var(--ui-muted);
+  --ui-surface: #ffffff;
+  --ui-canvas: #f1f5f9;
+  --ui-subtle: #e2e8f0;
+  --ui-hover: #f8fafc;
+  --ui-border: #cbd5e1;
+  --ui-input-border: #64748b;
+  --ui-brand-hover: #f58400;
+  --ui-focus: #984900;
+  --ui-selected: #fff4e5;
+  --ui-selected-border: #ffd29a;
+  --ui-success: #226040;
+  --ui-success-bg: #e3f1e7;
+  --ui-danger: #a42620;
+  --ui-danger-bg: #fdebe7;
+  --ui-danger-border: #d9aaa5;
+  --ui-info: #19526f;
+  --ui-info-bg: #e2eff6;
+  --ui-radius-control: 8px;
+  --ui-radius-card: 12px;
+  --ui-radius-small: 4px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 24px;
+  --ui-size-caption: 12px;
+  --ui-size-body: 14px;
+  --ui-size-section: 20px;
+  --ui-size-title: 24px;
+  --ui-target: 48px;
+  --amber: var(--brand-orange);
+  --amber-dark: #d97500;
+  --amber-ink: var(--ui-focus);
+  --amber-bg: var(--ui-selected);
+  --amber-line: var(--ui-selected-border);
+  --ink: var(--brand-charcoal);
+  --ink-soft: var(--ui-muted);
+  --ink-mute: var(--ui-caption);
+  --paper: var(--ui-canvas);
+  --secondary: var(--ui-subtle);
+  --border: var(--ui-border);
+  --card-border: var(--ui-subtle);
+  --font-cond: Barlow, system-ui, "Segoe UI", sans-serif;
+  --cien: 0 1px 2px rgb(15 23 42 / 5%);
+  --bok: 0px;
+}
+body {
+  display: block;
+}
+aside#bok {
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  overflow: visible;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #475569;
+}
+#bok .marka {
+  flex: none;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.wertis-logo {
+  display: block;
+  width: 126px;
+  height: auto;
+}
+#bok .marka .wertis-logo {
+  width: 120px;
+  background: white;
+  padding: 7px 9px;
+  border-radius: 8px;
+}
+#bok .marka span {
+  display: block;
+  font: 400 14px/1.4 var(--font-sans);
+  color: #cbd5e1;
+  letter-spacing: 0;
+}
+#bok .marka .brand-area {
+  display: block;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+#bok nav.zakladki {
+  flex: 1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 8%);
+}
+#bok nav.zakladki .grupa,
+#bok nav.zakladki .grupa-btny {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+}
+#bok nav.zakladki .grupa-nazwa {
+  display: none;
+}
+#bok nav.zakladki button {
+  width: auto;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font: 600 14px/1.4 var(--font-sans);
+  letter-spacing: 0;
+  color: #cbd5e1;
+}
+#bok nav.zakladki button .et {
+  display: inline;
+}
+#bok nav.zakladki button[aria-current="true"] {
+  color: var(--ink);
+  background: var(--amber);
+}
+#bok nav.zakladki .kropka {
+  position: static;
+  margin-left: 2px;
+}
+#bok .sesja {
+  margin: 0 0 0 auto;
+  padding: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+#bok .sesjaRzad {
+  flex-direction: row;
+  gap: 6px;
+}
+#bok .kto {
+  display: block;
+  max-width: 96px;
+  color: #cbd5e1;
+}
+#bok .sesja button {
+  border-radius: 8px;
+  min-height: 40px;
+}
+#bok button.ikona,
+#bok #wyloguj {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+#bok #wyloguj .et {
+  display: none;
+}
+#bok #wyloguj .tylkoIkona {
+  display: block;
+}
+#bok .ikonaStanu .et {
+  display: none;
+}
+main#panel {
+  padding-top: 20px;
+}
+body:has(#login:not([hidden])) {
+  background: var(--ink);
+}
+body:has(#login:not([hidden])) #bok {
+  display: none;
+}
+#login {
+  width: min(384px, calc(100% - 32px));
+  margin: min(12vh, 100px) auto 32px;
+  padding: 28px;
+  border-radius: 12px;
+  gap: 16px;
+}
+#login .wertis-logo {
+  width: 224px;
+  max-width: 100%;
+  margin: 0 auto 8px;
+}
+#login h2 {
+  font: 700 22px/1.3 var(--font-sans);
+  text-transform: none;
+}
+#login label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+#login input {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  margin: 0;
+}
+#login button {
+  min-height: 48px;
+  border-radius: 8px;
+}
+.card {
+  box-shadow: var(--cien);
+}
+button.akcja,
+input,
+textarea,
+select {
+  border-radius: 8px;
+}
+
+@media (max-width: 1100px) {
+  #bok nav.zakladki {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 700px) {
+  aside#bok {
+    position: static;
+    min-height: 64px;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  #bok .marka .wertis-logo {
+    width: 104px;
+    padding: 5px 7px;
+  }
+  #bok .marka .brand-area,
+  #bok .kto {
+    display: none;
+  }
+  #bok nav.zakladki {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  #bok nav.zakladki .grupa,
+  #bok nav.zakladki .grupa-btny {
+    flex-wrap: nowrap;
+  }
+  #bok nav.zakladki button,
+  #bok .sesja button {
+    min-height: 48px;
+    flex-shrink: 0;
+  }
+  #bok button.ikona,
+  #bok #wyloguj {
+    width: 48px;
+    height: 48px;
+  }
+  #bok .ikonaStanu {
+    display: none;
+  }
+  main#panel {
+    padding: 12px 12px 24px;
+  }
+  body:has(#widokWms:not([hidden]):not(.wms-queue) .has-order)
+    #bok
+    nav.zakladki {
+    display: none;
+  }
+}
+@media print {
+  aside#bok {
+    display: none !important;
+  }
+  main#panel {
+    padding: 0;
+  }
+}
+
+/* Widoczny fokus obejmuje również logowanie i główną nawigację. */
+:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+#bok :focus-visible {
+  outline-color: var(--brand-orange);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}

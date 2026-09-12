@@ -4,7 +4,129 @@ Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
 magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
 `http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
-wydruku; operacje wykonuje się wyłącznie na kolektorze. Zero chmury.
+wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skanerem.
+Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md).
+
+API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłącznie dane seeded.
+Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
+Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
+
+Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `services/wms-analytics-worker.js`.
+Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
+Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
+
+Poprawka 0.312.1 wymaga builda, restartu API, odświeżenia Biura i aktualizacji APK. Nie zmienia API ani bazy.
+Etykieta skrzynki ma zawierać dokładny kod przypisanej skrzynki; `LOC:` oznacza półkę. Wymiana nie przyjmuje już prefiksu półki przy potwierdzeniu skrzynki.
+Odbiór seeded: półka i skrzynka o jednakowym kodzie → skan `LOC:` odrzucony w polu skrzynki → właściwa skrzynka przyjęta.
+
+Od 0.312.0 zwrot pobrania może kierować rezerwację na inną półkę kompletacji. Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK.
+Brak migracji. Starszy APK może zwracać na prawidłowe źródło; wybór innego celu wymaga nowego APK i API.
+
+Odbiór seeded: pobranie → wstrzymanie → zmiana źródła na kwarantannę → częściowy zwrot na inną półkę → kontrola zapasu i rezerwacji.
+Raport spójności wykrywa również dawne rezerwacje poza kompletacją. Nie naprawia ich automatycznie bez sprawdzenia fizycznego zapasu.
+
+Od 0.311.0 zwrot pobrania wymaga kodu skrzynki. Przed aktualizacją rozliczyć oczekujące zapisy urządzeń i Biura; nie usuwać ich dzienników.
+Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Brak migracji danych; starszy APK nie ma ścieżki zwrotu.
+Odbiór seeded: wstrzymana skrzynka własnego wózka → skan skrzynki → część → ilość → półka. Przekazanie skrzynki w trakcie blokuje zapis.
+
+Poprawka 0.310.1 wymaga aktualizacji APK dla pustego pola odłożenia i kasowania ilości po zmianie dobry/uszkodzony.
+Nie zmienia API ani bazy. Odbiór seeded: wpisana ilość → zmiana dyspozycji → puste pole; za długa liczba pozostaje widoczna i jest odrzucana.
+
+Od 0.310.0 kolektor i Biuro oferują mniejszą partię przed podjęciem uzupełnienia.
+Wykonać build i restart API oraz zaktualizować APK. Istniejące zadania zachowują swoje przydziały; nie ma migracji.
+Odbiór seeded: potrzeba dwudziestu → podjęcie pięciu → faktyczne pięć na celu → piętnaście ponownie w planie, bez przeliczenia źródła.
+
+Od 0.309.1 formularze Biura wymagają jawnej ilości przy ruchach oraz korekcie bufora. Zmiana czynności czyści poprzedni wynik i cel.
+Wykonać build i restart API oraz odświeżyć Biuro. Nie ma migracji ani wymogu nowego APK dla tej poprawki formularzy.
+
+Od 0.309.0 przyjęcie i odkładanie pomijają pełne lub zablokowane cele w podpowiedziach.
+Wykonać build i restart API, następnie zaktualizować APK, aby wyświetlał miejsce przed wyborem ilości. Nie ma migracji danych.
+Starszy kolektor otrzymuje przefiltrowane adresy; nowy czyta także starsze API bez obietnicy wolnego miejsca.
+
+Od 0.306.0 Biuro pozwala cofnąć kontrolę wybranych sztuk w jednej paczce. Wdrożyć razem API i pliki web, wykonać build oraz restart.
+Nie ma migracji. Korekta potwierdzenia nie rozlicza fizycznego braku ani uszkodzenia.
+
+Od 0.307.0 uszkodzenie przy pakowaniu ma osobną kwarantannę i kolejkę wymian, także w natywnym kolektorze.
+Najpierw zaktualizować API oraz pliki Biura, wykonać build i restart, następnie APK.
+Start tworzy `wms_pack_recovery` oraz `wms_pack_damage`; istniejące zamówienia i zawartości paczek pozostają bez zmian.
+Przygotować oznaczoną lokalizację kwarantanny. Przed aktualizacją rozliczyć oczekujące zapisy urządzeń; nie usuwać ich dziennika.
+Odbiór seeded: uszkodzona sztuka → kwarantanna → zamiennik do tej samej skrzynki → ponowny skan wyłącznie zamiennika.
+
+Od 0.308.0 biuro rozlicza również potwierdzony brak fizyczny, bez przyjęcia nieobecnej sztuki do zapasu.
+Na czas aktualizacji zatrzymać API i worker. Po kopii bezpieczeństwa zaktualizować pliki, wykonać build i uruchomić nową wersję.
+Start przenosi `wms_pack_damage` do `wms_pack_issue`, zachowując identyfikatory, postęp i kwarantannę. Starą tabelę usuwa w tej samej transakcji.
+
+Kopia starszej wersji nadal podlega kontroli bez migracji. Dwie niepuste historie zatrzymują migrację i wymagają wyjaśnienia.
+Nowy APK rozpoznaje rodzaj rozbieżności. API zachowuje tekstowy adres kwarantanny; pusty oznacza brak fizycznej kwarantanny przy potwierdzonym ubytku.
+Odbiór seeded: wstrzymanie → przeliczenie jednej paczki → potwierdzenie braku w biurze → wznowienie → zamiennik → ponowny skan pakowania.
+
+Od 0.305.0 propozycje uzupełnienia uwzględniają priorytet i termin niepokrytych zamówień. API i APK pokazują powód pracy.
+Zaktualizować API oraz APK; nie ma migracji ani dodatkowej konfiguracji. Starszy kolektor zachowuje kolejność serwera bez opisu powodu.
+
+Poprawka 0.304.1 rozdziela popyt między wolne półki, uwzględniając minima i podjęte zadania. Wymaga builda oraz restartu API, bez migracji.
+
+Od 0.304.0 API i APK obsługują pojemność części na lokalizacji oraz pełny cel uzupełnienia.
+Zaktualizować API przed APK. Migracja dodaje opcjonalną pojemność, historię pełnych celów oraz ilość zwróconą w zadaniu.
+Istniejące lokalizacje mają pojemność nieustaloną; ich stan nie jest zmieniany. Biuro ustala limit sztuk konkretnej części, bez zgadywania gabarytów.
+
+Nie cofać API ani APK przy oczekującym rozliczeniu zwrotu. Najpierw sprawdzić zapis na pierwotnym koncie i serwerze.
+
+Od 0.303.0 kolektor ma **UZUPEŁNIENIA WMS**. Zaktualizować API przed APK; restart dodaje pole potwierdzonej ilości do istniejących zadań.
+Dawne pełne uzupełnienia pozostają poprawne. Mniejsza ilość wymaga opisu i kieruje źródło do liczenia; zero nie przesuwa zapasu.
+Przed aktualizacją lub cofnięciem APK rozliczyć oczekujący zapis WMS na pierwotnym koncie i serwerze. Nie czyścić dziennika.
+
+Poprawka 0.302.1 wymaga aktualizacji APK dla poprawnego blokowania skanów podczas pauzy i powrotu.
+Nie zmienia bazy ani kontraktu API. Rozlicz oczekującą operację przed aktualizacją; nie czyść dziennika kolektora.
+
+Od 0.302.0 kolektor ma **PRZELICZENIA WMS**. Zaktualizować API i APK; restart API dodaje tabelę obserwacji bez zmiany istniejących przeliczeń.
+Wyniki z hali zatwierdza biuro w **Zadaniach zapasu**. Do akceptacji lub ponownego liczenia półka pozostaje zablokowana.
+Nie cofać APK podczas oczekującej operacji liczenia. Najpierw rozliczyć jej wynik na pierwotnym koncie i serwerze.
+
+Od 0.301.0 zgłoszenie braku może automatycznie przekierować niezebrane przydziały na inne dostępne półki, według priorytetu zamówień.
+Zaktualizować także APK, aby operator widział opis nowego zachowania. Nie jest wymagana migracja ani dodatkowa konfiguracja.
+Przeliczenie zgłoszonej półki pozostaje osobnym zadaniem; jej fizyczny stan nie jest korygowany samym zgłoszeniem.
+
+Od 0.297.0 **Przyjęcia → Odkładanie z bufora** rozdzielają liczenie i odłożenie. Bufor zarejestrować w Lokalizacjach jako zapas zaplecza.
+Nie zmieniać go na lokalizację kompletacji podczas otwartej pracy. Aktualizacja dodaje tabele zadań oraz historii bez zmiany dawnych przyjęć.
+Funkcja działa w biurze i mobilnej przeglądarce. Od 0.299.0 liczenie dostawy działa również natywnie na Androidzie.
+
+Kolektor ma **PRZYJĘCIE WMS — POLICZ DOSTAWĘ**. Najpierw zaktualizować API, następnie APK.
+Oczekiwany dokument tworzy biuro; kolektor liczy i odkłada partie. Domyślnym celem jest bufor, a tryb można zmienić przed kolejnym skanem części.
+Kolizje kodów, nieoczekiwane części i rozliczenie braków pozostają zadaniem biura. Oczekujący zapis przyjęcia blokuje pozostałe procesy WMS.
+
+Od 0.298.0 kolektor ma **ODKŁADANIE WMS — Z BUFORA**. Zaktualizować API, następnie APK.
+Skan kończy ruch dopiero po potwierdzeniu ilości i celu. Nie cofać APK ani nie czyścić danych z nierozliczonym zapisem.
+Zbiórka i odkładanie współdzielą dziennik: przerwana operacja blokuje drugi proces do ponowienia na właściwym koncie i serwerze.
+
+Od 0.297.1 narzędzie kopii sprawdza również bazę sprzed dodania bufora, bez jej migracji. Niepełny schemat kolejki pozostaje błędem kontroli.
+
+Od 0.296.0 kolektor rozpoznaje potwierdzone przejęcie wózka i pozwala rozpocząć kolejny. Najpierw zaktualizować serwer, następnie APK.
+Starszy serwer nie podaje jednoznacznego kodu odmowy; kolektor zachowuje wtedy niedokończony zapis do wyjaśnienia.
+
+Od 0.295.0 cache zdjęć kolektora rozdziela serwery. Pierwsze podglądy po aktualizacji APK należy otworzyć przy działającej sieci.
+Poprzednie kopie nie zawierają źródła, dlatego nie są przenoszone do nowego indeksu. Zmiana dotyczy wyłącznie lokalnych zdjęć, bez zmian zapasu i skanów.
+
+Od 0.293.0 istniejący kolektor Android ma przycisk **ZBIÓRKA WMS — SKANUJ WÓZEK**.
+Serwer musi obsługiwać EAN w zadaniach trasy. Najpierw zaktualizować API, następnie APK.
+Niedokończonego zapisu na kolektorze nie wolno usuwać przez czyszczenie danych aplikacji.
+Należy zalogować pierwotną osobę na pierwotnym serwerze i użyć **SPRAWDŹ OSTATNI ZAPIS**.
+Odbiór sprzętowy odbywa się na danych seeded; zakres próby opisuje [`docs/wms-kolektor-audyt.md`](docs/wms-kolektor-audyt.md).
+
+Od 0.291.0 zapis etykiety pozostawia zamówienie spakowane. Fizyczny odbiór paczek
+potwierdza się w **Realizacja WMS → Wydania** przez skanowanie i zamknięcie przekazania.
+Dopiero odbiór wszystkich paczek oznacza wysłanie zamówienia. Aktualizacja nie dopisuje
+dat odbioru do dawnej historii. Korekta etykiety w WMS nie anuluje jej u przewoźnika.
+
+Zawartość paczek zapisuje się podczas kontroli pakowania. Aktualizacja dodaje osobne
+tabele robocze i historyczne, bez zmiany zapasu ani dawnych przesyłek.
+Przy trwającym pakowaniu wielopaczkowym sprzed aktualizacji wymagana jest ponowna kontrola,
+jeśli brakuje podziału SKU. Jedna paczka może objąć całe sprawdzone zamówienie.
+
+Tryb wózków 20/30 wymaga rejestracji kodów wózków, stałych pozycji skrzynek i stanowisk pakowania.
+Biuro wykonuje tę konfigurację w **Realizacja WMS → Wózki 20 / 30**.
+Aktualizacja dodaje tabele i indeksy; nie przypisuje istniejących zamówień ani nie zmienia zapasu.
+Po kompilacji wymagany jest restart API oraz odświeżenie przeglądarki.
+Przed pracą na rzeczywistej hali należy uzupełnić kolejność lokalizacji i sprawdzić dopasowanie części do skrzynek.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
@@ -40,7 +162,7 @@ Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
 - **kasuje `AppEnvironment` i `AppEnvironmentExtra` obu usług**, bo zmienne
   środowiskowe przykrywają `wertis.env` (§2a) — pozostałość po starszej
   instalacji wygrałaby po cichu z nowymi ustawieniami;
-- **sprawdza wersję Node** (aplikacja wymaga ≥ 22.5, §1) zamiast pozwolić jej
+- **sprawdza wersję Node** (aplikacja wymaga ≥ 24.15, §1) zamiast pozwolić jej
   wywalić się dopiero przy starcie usługi.
 
 Instalacja pilotażowa bez dotykania Subiekta (Etap 0 z §6):
@@ -120,7 +242,7 @@ w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 ## 1. Wymagania
 
 - Windows z zainstalowanym Subiektem GT i licencją Sfery,
-- [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`).
+- [Node.js LTS 24](https://nodejs.org) — **wymagane ≥ 24.15** (`node -v`).
   Serwer używa wbudowanego `node:sqlite`, którego starsze wersje nie mają;
   w zamian **nie kompiluje już żadnego modułu natywnego**, więc `npm ci`
   nie potrzebuje build tools. Pełny tekst w panelu obsługi (0.186.0) używa

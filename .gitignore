@@ -48,6 +48,9 @@ __pycache__/
 
 # TypeScript build cache
 *.tsbuildinfo
+*-baseline.log
+.wms-artifacts/
+.wms-build.log
 
 # makiety: kanwa złożona z payloadu edytora (2 MB) i zrzuty do przeglądu.
 # Źródłem są pliki .dc.html w docs/projekt-widokow, kanwę składa się z nich
