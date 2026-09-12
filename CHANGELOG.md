@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.298.0 — natywne odkładanie WMS na kolektorze
+
+Kolektor otwiera kolejkę odkładania z bufora, wyszukuje zadania skanem SKU lub EAN i pozwala je podjąć.
+Proces wymaga skanu bufora, części, potwierdzenia ilości oraz skanu docelowej półki. Obsługuje częściowe odłożenia i uszkodzenia kierowane do kwarantanny.
+Zmianę właściciela pokazuje po odświeżeniu; korekty braków i przejęcia pozostają w biurze.
+
+Zbiórka i odkładanie współdzielą trwały dziennik oraz blokadę zapisów. Nieznany wynik jednego procesu blokuje drugi i wskazuje właściwy ekran odzyskania.
+Restart, przerwa i potwierdzone odłożenie wymagają świeżego odczytu oraz ponownych skanów. Dawny dziennik zbiórki zachowuje zgodność.
+Dodano 22 testy JVM; pozostałe 345 również przechodzą. Natywne liczenie nowej dostawy nadal pozostaje do wdrożenia.
+
+**[wymaga działania]** Zaktualizować API i APK. Nie cofać APK ani nie czyścić danych aplikacji z oczekującym zapisem odkładania.
+
 ## 0.297.1 — kopia bezpieczeństwa przed aktualizacją bufora
 
 Kontrola kopii obsługuje bazę sprzed dodania kolejki odkładania bez migrowania źródła. Brak jednej z dwóch nowych tabel nadal odrzuca kopię.

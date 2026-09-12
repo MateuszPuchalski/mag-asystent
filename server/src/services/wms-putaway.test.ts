@@ -321,6 +321,7 @@ test("podgląd i stronicowanie kolejki nie zapisują danych", () => {
   assert.equal(list.rows.length, 1);
   assert.equal(list.totals.units, 10);
   assert.equal(P.listPutaway(worker, { q: r.sku, offset: 50 }).rows.length, 0);
+  assert.equal(P.listPutaway(worker, { q: `0590${r.twId}` }).rows[0].id, r.taskId);
   P.getPutaway(r.taskId);
   assert.equal(db().prepare("SELECT total_changes() AS n").get()!.n, before);
 });

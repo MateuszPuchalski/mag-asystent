@@ -60,7 +60,7 @@ export function listPutaway(actor: Actor, raw: unknown) {
     .parse(raw);
   return readSnapshot(() => {
     const where =
-      " WHERE w.remaining>0 AND (?='0' OR w.user_id=?) AND instr(lower(l.sku||' '||l.name||' '||d.reference||' '||w.source),lower(?))>0";
+      " WHERE w.remaining>0 AND (?='0' OR w.user_id=?) AND instr(lower(l.sku||' '||coalesce(l.barcode,'')||' '||l.name||' '||d.reference||' '||w.source),lower(?))>0";
     const args = [f.mine, actor.id, f.q];
     const rows = db()
       .prepare(select + where + " ORDER BY w.created_at,w.id LIMIT 50 OFFSET ?")

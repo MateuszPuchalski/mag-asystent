@@ -18,13 +18,21 @@ data class WmsPending(
     val body: JsonObject,
     val description: String,
     val runId: Long? = null,
+    val workflow: String = "picking",
+    val taskId: Long? = null,
 )
 
 @Serializable
 data class WmsActive(val context: WmsContext, val runId: Long)
 
 @Serializable
-data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null)
+data class WmsActivePutaway(val context: WmsContext, val taskId: Long)
+
+@Serializable
+data class WmsJournal(val pending: WmsPending? = null, val active: WmsActive? = null, val putaway: WmsActivePutaway? = null)
+
+fun definitiveWmsRejection(error: ApiError): Boolean = error.status in setOf(400, 404, 409, 422) ||
+    (error.status == 403 && error.kod == "WMS_COMMAND_REJECTED")
 
 interface WmsStore {
     suspend fun read(): WmsJournal
@@ -56,8 +64,8 @@ class WmsController(
     private val store: WmsStore,
     private val transport: (WmsContext) -> WmsTransport,
     private val newKey: () -> String = { UUID.randomUUID().toString() },
+    private val lock: Mutex = Mutex(),
 ) {
-    private val lock = Mutex()
     private var generation = 0L
     private var verificationEpoch = 0L
     private val mutable = MutableStateFlow(WmsView())
@@ -92,10 +100,16 @@ class WmsController(
         try {
             val view = mutable.value
             if (!view.ready || view.context != context || view.journal.pending != null) return
+            // Inny proces WMS mógł zostawić zapis od ostatniego wejścia na ekran.
+            val latest = store.read()
+            if (latest.pending != null) {
+                mutable.value = view.copy(journal = latest, ready = false, message = "Najpierw rozlicz ostatni zapis WMS")
+                return
+            }
             val epoch = verificationEpoch
             mutable.value = view.copy(busy = true, ready = false, message = null)
             val pending = WmsPending(newKey(), context, draft.path, draft.body, draft.description, draft.runId)
-            val journal = view.journal.copy(pending = pending)
+            val journal = latest.copy(pending = pending)
             // Jeśli dysk odmawia zapisu, żądanie NIE wychodzi w sieć.
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal)
@@ -108,7 +122,10 @@ class WmsController(
     suspend fun retry(context: WmsContext) {
         if (!lock.tryLock()) return
         try {
-            val pending = mutable.value.journal.pending ?: return
+            val latest = store.read()
+            mutable.value = mutable.value.copy(journal = latest)
+            val pending = latest.pending ?: return
+            if (pending.workflow != "picking") return
             if (pending.context != context || mutable.value.context != context) return
             mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
             send(context, pending, continuationEpoch = null)
@@ -122,8 +139,14 @@ class WmsController(
         if (view.context != context || view.busy || view.journal.pending != null ||
             (!view.reassigned && (!view.ready || (view.run?.arrived_at == null && view.run?.closed_at == null)))) return@withLock
         try {
-            store.write(WmsJournal())
-            mutable.value = WmsView(generation = ++generation, context = context, ready = true)
+            val latest = store.read()
+            if (latest.pending != null) {
+                mutable.value = view.copy(journal = latest, ready = false)
+                return@withLock
+            }
+            val journal = latest.copy(active = null)
+            store.write(journal)
+            mutable.value = WmsView(generation = ++generation, context = context, journal = journal, ready = true)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
     }
@@ -134,7 +157,7 @@ class WmsController(
         val runId = try { client.send(pending) } catch (e: ApiError) {
             // Odmowa biznesowa jest atomowa. Brak autoryzacji, limit i błąd
             // infrastruktury nie dowodzą, że wcześniejsza próba nie doszła.
-            if (e.status !in setOf(400, 404, 409, 422) && !(e.status == 403 && e.kod == "WMS_COMMAND_REJECTED")) throw e
+            if (!definitiveWmsRejection(e)) throw e
             val journal = mutable.value.journal.copy(pending = null)
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal, run = null)
@@ -143,7 +166,7 @@ class WmsController(
             mutable.value = mutable.value.copy(message = mutable.value.message ?: e.message)
             return
         }
-        val journal = WmsJournal(active = runId?.let { WmsActive(context, it) })
+        val journal = mutable.value.journal.copy(pending = null, active = runId?.let { WmsActive(context, it) })
         store.write(journal)
         mutable.value = mutable.value.copy(journal = journal)
         if (runId != null) load(context, runId, client) { after ->

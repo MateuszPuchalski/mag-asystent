@@ -6,6 +6,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
@@ -24,6 +25,10 @@ import pl.wertis.kolektor.core.wms.WmsPending
 import pl.wertis.kolektor.core.wms.WmsRun
 import pl.wertis.kolektor.core.wms.WmsStore
 import pl.wertis.kolektor.core.wms.WmsTransport
+import pl.wertis.kolektor.core.wms.WmsPutawayController
+import pl.wertis.kolektor.core.wms.WmsPutawayQueue
+import pl.wertis.kolektor.core.wms.WmsPutawayTask
+import pl.wertis.kolektor.core.wms.WmsPutawayTransport
 import pl.wertis.kolektor.net.apiCall
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -33,6 +38,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Url
+import retrofit2.http.Query
 
 interface WmsApi {
     @POST
@@ -40,6 +46,12 @@ interface WmsApi {
 
     @GET("api/wms/cart-runs/{id}")
     suspend fun run(@Path("id") id: Long): WmsRun
+
+    @GET("api/wms/putaway-work")
+    suspend fun putawayQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsPutawayQueue
+
+    @GET("api/wms/putaway-work/{id}")
+    suspend fun putawayTask(@Path("id") id: Long): WmsPutawayTask
 }
 
 class WmsFileStore(context: Context) : WmsStore {
@@ -68,6 +80,8 @@ class WmsFileStore(context: Context) : WmsStore {
 }
 
 class WmsRepository(context: Context, private val settings: SettingsRepository, private val session: SessionRepository) {
+    private val store = WmsFileStore(context)
+    private val writeLock = Mutex()
     private val http = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).writeTimeout(10, TimeUnit.SECONDS)
         // Przekierowanie nie może przenieść tokenu magazyniera na inny host.
@@ -77,7 +91,7 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
         WmsContext(settings.current.serverUrl.toHttpUrl().newBuilder().encodedPath("/").query(null).fragment(null).build().toString(), it)
     }
 
-    val controller = WmsController(WmsFileStore(context), transport = { bound ->
+    private fun api(bound: WmsContext): WmsApi {
         check(context() == bound) { "Zmieniło się konto lub serwer" }
         val token = checkNotNull(session.token) { "Zaloguj się ponownie" }
         // W przeciwieństwie do klienta ekranów informacyjnych ten klient nie
@@ -88,9 +102,13 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
                 .header("x-session", naglowekHttp(token))
                 .header("x-device", naglowekHttp(settings.deviceId)).build())
         }.build()
-        val api = Retrofit.Builder().baseUrl(bound.server).client(client)
+        return Retrofit.Builder().baseUrl(bound.server).client(client)
             .addConverterFactory(WertisJson.asConverterFactory("application/json".toMediaType()))
             .build().create(WmsApi::class.java)
+    }
+
+    val controller = WmsController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
         object : WmsTransport {
             override suspend fun send(command: WmsPending): Long? {
                 val response = apiCall { api.command(command.path, command.key, command.body) }
@@ -102,6 +120,17 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
                 }
             }
             override suspend fun run(id: Long) = apiCall { api.run(id) }
+        }
+    })
+
+    val putaway = WmsPutawayController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsPutawayTransport {
+            override suspend fun queue(query: String, offset: Int) = apiCall { api.putawayQueue(query, offset) }
+            override suspend fun putawayTask(id: Long) = apiCall { api.putawayTask(id) }
+            override suspend fun send(command: WmsPending) {
+                apiCall { api.command(command.path, command.key, command.body) }
+            }
         }
     })
 

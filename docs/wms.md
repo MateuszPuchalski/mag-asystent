@@ -521,3 +521,17 @@ Odłożone sztuki rozliczaj przez właściwy spis lub zwrot. Nie wycofuj całej 
 
 Odkładanie chroni swoje ilości przed równoległym ruchem, spisem i uzupełnieniem. Samo podjęcie zadania nie zmienia fizycznego zapasu.
 Zapas staje się dostępny do zbiórki po potwierdzeniu półki kompletacji. Odłożenie na zaplecze pozostawia go zapasem rezerwowym.
+
+### Odkładanie na kolektorze Android
+
+Na ekranie głównym wybierz **ODKŁADANIE WMS — Z BUFORA**. Zeskanuj SKU, EAN lub kod bufora; możesz też wpisać numer przyjęcia.
+Wybierz wiersz, podejmij zadanie i wykonaj cztery kroki: bufor, część, policzona ilość, półka docelowa.
+Potwierdzenie ilości jest osobnym krokiem. Skan półki zapisuje ruch; sygnał sukcesu oznacza potwierdzony zapis i świeży odczyt pozostałych sztuk.
+
+Po częściowym odłożeniu ponownie zeskanuj bufor i część dla kolejnej partii. Po powrocie z tła lub odświeżeniu obowiązują te same kontrole.
+W opcjach wybierz uszkodzony towar, potwierdź jego ilość i zeskanuj kwarantannę. Brakującą ilość zostaw w zadaniu i zgłoś biuru.
+Przycisk powrotu do kolejki nie zwalnia przypisania na serwerze. Podjęte zadanie nadal pokazuje właściciela i można je wznowić.
+
+Nieznany wynik blokuje zarówno zbiórkę, jak i odkładanie. Przycisk wskazuje właściwy proces; tam użyj **SPRAWDŹ OSTATNI ZAPIS**.
+Nie przenoś towaru drugi raz. Zmiana konta lub serwera wymaga powrotu do pierwotnej tożsamości przed ponowieniem.
+Natywne liczenie nowych dostaw pozostaje do wdrożenia. Nowe przyjęcie do bufora nadal rejestruje ekran Przyjęcia w biurze.

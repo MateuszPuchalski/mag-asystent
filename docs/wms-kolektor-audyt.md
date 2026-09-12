@@ -126,3 +126,25 @@ Kolektor nie rozpoznaje znaczenia błędów po treści komunikatu. Starsze API b
 
 Testy obejmują utratę odpowiedzi przed przejęciem, identyczne ponowienie, brak drugiego pobrania, odmowę dysku i zmianę konta.
 Pełny dziennik pozostaje wymagany; czyszczenie danych aplikacji nie jest sposobem wznowienia pracy.
+
+## Natywne odkładanie od 0.298.0
+
+Kolektor korzysta z kolejki WMS utworzonej podczas przyjęcia do bufora. Lista ma strony po 50 zadań i wyszukiwanie SKU, EAN, dokumentu lub bufora.
+Odczyt nie podejmuje pracy. Operator wybiera zadanie, podejmuje je, skanuje bufor i część, potwierdza ilość oraz skanuje docelową półkę.
+Wspólne komponenty zachowują cele dotyku co najmniej 48 dp. Znane półki pomagają wybrać cel; serwer sprawdza rejestrację, przeznaczenie i blokady.
+
+Potwierdzenie lokalizacji przy odłożeniu opisuje [Microsoft — work confirmation](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/tasks/set-up-mobile-device-menu).
+Oddzielenie przyjęcia od późniejszej pracy opisuje [Microsoft — mobile warehouse work](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/configure-mobile-devices-warehouse).
+Wspólny dziennik, jawne potwierdzenie ilości i blokada między procesami są decyzjami WERTIS.
+
+Audyt wykrył ryzyko zastąpienia oczekującego zapisu po przejściu między procesami. Zbiórka i odkładanie współdzielą plik oraz jedną blokadę.
+Przed zapisem oba procesy ponownie czytają dziennik. Ponowienie jest dostępne tylko we właściwym procesie, na pierwotnym koncie i serwerze.
+Dawny dziennik bez nazwy procesu nadal oznacza zbiórkę. Zakończenie wózka nie usuwa wskaźnika wznowienia odkładania.
+
+Dodano 22 testy JVM. Obejmują kolejność skanów, ilości, właściciela, uszkodzenie, restart, odmowę dysku, utratę odpowiedzi, zmianę konta i równoległe procesy.
+Pełny zestaw obejmuje 367 testów. Kompilacja aplikacji oraz fizyczna próba Zebra/Honeywell są osobnymi dowodami odbioru.
+Natywne liczenie nowej dostawy pozostaje otwartym zakresem. Nie potwierdzono fizycznej ergonomii na urządzeniu użytkownika.
+
+Próba seeded na kolektorze: podejmij zadanie w BUF-01, odłóż część ilości, następnie odłącz Wi-Fi po skanie celu.
+Uruchom aplikację ponownie i sprawdź ten sam zapis; licznik nie może maleć drugi raz. Zbiórka powinna wskazać powrót do odkładania.
+Sprawdź również przejęcie zadania w biurze, skan niewłaściwego bufora, brakującą sztukę oraz kwarantannę.

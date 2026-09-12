@@ -137,8 +137,14 @@ fun WmsPickingScreen(graph: AppGraph) {
             if (pending != null) {
                 Text(pending.description, fontWeight = FontWeight.Bold)
                 Text("Nie odkładaj kolejnej sztuki. Ponowienie sprawdzi ten sam zapis.")
-                PrimaryButton("SPRAWDŹ OSTATNI ZAPIS", enabled = !view.busy && pending.context == context, modifier = Modifier.fillMaxWidth()) {
-                    graph.appScope.launch { controller.retry(context) }
+                if (pending.workflow == "putaway") {
+                    PrimaryButton("WRÓĆ DO ODKŁADANIA WMS", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
+                        graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_PUTAWAY)
+                    }
+                } else {
+                    PrimaryButton("SPRAWDŹ OSTATNI ZAPIS", enabled = !view.busy && pending.context == context && pending.workflow == "picking", modifier = Modifier.fillMaxWidth()) {
+                        graph.appScope.launch { controller.retry(context) }
+                    }
                 }
             } else if (view.reassigned) {
                 PrimaryButton("ROZPOCZNIJ KOLEJNY WÓZEK", enabled = !view.busy, modifier = Modifier.fillMaxWidth()) {
