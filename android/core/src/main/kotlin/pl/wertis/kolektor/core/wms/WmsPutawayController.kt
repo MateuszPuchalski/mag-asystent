@@ -30,10 +30,17 @@ class WmsPutawayController(
     private val newKey: () -> String = { UUID.randomUUID().toString() },
 ) {
     private var generation = 0L
+    private val verification = WmsVerification()
     private val mutable = MutableStateFlow(WmsPutawayView())
     val state: StateFlow<WmsPutawayView> = mutable
 
+    fun activateVerification() {
+        verification.activate()
+        mutable.value = mutable.value.copy(generation = ++generation, ready = false)
+    }
+
     fun invalidateVerification() {
+        verification.invalidate()
         mutable.value = mutable.value.copy(generation = ++generation, ready = false)
     }
 
@@ -41,7 +48,8 @@ class WmsPutawayController(
     suspend fun select(context: WmsContext, id: Long) = read(context, taskId = id)
     suspend fun queue(context: WmsContext, query: String = "", offset: Int = 0) = read(context, query = query, offset = offset)
 
-    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String = "", offset: Int = 0) = lock.withLock {
+    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String = "", offset: Int = 0, epoch: Long? = verification.capture()) = lock.withLock {
+        if (!verification.matches(epoch)) return@withLock
         mutable.value = WmsPutawayView(generation = ++generation, context = context, busy = true, query = query, offset = offset)
         try {
             require(query.length <= 120 && offset in 0..1000000) { "Zbyt długi filtr kolejki" }
@@ -54,7 +62,7 @@ class WmsPutawayController(
             val selected = if (resume) journal.putaway?.takeIf { it.context == context }?.taskId else taskId
             val client = transport(context)
             if (selected != null) {
-                load(context, selected, client)
+                load(context, selected, client, epoch)
                 val next = journal.copy(putaway = WmsActivePutaway(context, selected))
                 store.write(next)
                 mutable.value = mutable.value.copy(journal = next)
@@ -62,7 +70,7 @@ class WmsPutawayController(
                 val queue = client.queue(query, offset)
                 val next = journal.copy(putaway = null)
                 store.write(next)
-                mutable.value = mutable.value.copy(journal = next, queue = queue, ready = true)
+                mutable.value = mutable.value.copy(journal = next, queue = queue, ready = verification.matches(epoch))
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
@@ -74,7 +82,9 @@ class WmsPutawayController(
         try {
             val view = mutable.value
             if (view.context != context || !view.ready || view.busy || view.task?.id != draft.taskId) return
+            val epoch = verification.capture() ?: return
             val latest = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = view.copy(journal = latest, ready = false)
             if (latest.pending != null) {
                 mutable.value = mutable.value.copy(message = "Najpierw rozlicz ostatni zapis WMS")
@@ -85,7 +95,7 @@ class WmsPutawayController(
             val next = latest.copy(pending = pending, putaway = WmsActivePutaway(context, draft.taskId))
             store.write(next)
             mutable.value = mutable.value.copy(journal = next)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -95,18 +105,20 @@ class WmsPutawayController(
         if (!lock.tryLock()) return
         try {
             if (mutable.value.context != context) return
+            val epoch = verification.capture() ?: return
             val journal = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = mutable.value.copy(journal = journal)
             val pending = journal.pending ?: return
             if (pending.context != context || pending.workflow != "putaway") return
             mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?) {
         val client = transport(context)
         val id = requireNotNull(pending.taskId) { "Brak numeru zadania w dzienniku" }
         var rejection: String? = null
@@ -117,14 +129,14 @@ class WmsPutawayController(
         val journal = mutable.value.journal.copy(pending = null, putaway = WmsActivePutaway(context, id))
         store.write(journal)
         mutable.value = mutable.value.copy(journal = journal)
-        load(context, id, client)
+        load(context, id, client, epoch)
         mutable.value = mutable.value.copy(message = rejection)
     }
 
-    private suspend fun load(context: WmsContext, id: Long, client: WmsPutawayTransport) {
+    private suspend fun load(context: WmsContext, id: Long, client: WmsPutawayTransport, epoch: Long?) {
         val task = client.putawayTask(id)
         require(task.id == id && task.remaining >= 0 && task.version > 0) { "Nieznana odpowiedź zadania" }
-        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = true)
+        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = verification.matches(epoch))
     }
 
     private fun problem(error: Exception) {

@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.302.1 — przerwa na kolektorze blokuje spóźnione skany
+
+Wszystkie cztery procesy WMS mają wspólną obsługę uśpienia i powrotu na ekran.
+Pauza blokuje komendy, także podczas odczytu dziennika lub oczekiwania na wspólną blokadę.
+Spóźniona odpowiedź rozlicza rozpoczęty zapis, ale nie odblokowuje kolejnego skanu. Szybki powrót wymaga świeżego odczytu.
+Usunięto cztery kopie obsługi cyklu życia ekranów. Skan sprzętowy poza stanem RESUMED jest konsumowany bez działania.
+Osiem nowych scenariuszy sprawdza cztery procesy. Android core ma 411 testów.
+
 ## 0.302.0 — ślepe przeliczenie półki na kolektorze
 
 Kolektor zapisuje wynik liczenia po skanie półki i części, bez pokazywania stanu oczekiwanego.

@@ -75,17 +75,23 @@ class WmsController(
     private val lock: Mutex = Mutex(),
 ) {
     private var generation = 0L
-    private var verificationEpoch = 0L
+    private val verification = WmsVerification()
     private val mutable = MutableStateFlow(WmsView())
     val state: StateFlow<WmsView> = mutable
 
+    fun activateVerification() {
+        verification.activate()
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = null, ready = false)
+    }
     fun invalidateVerification() {
-        verificationEpoch++
-        mutable.value = mutable.value.copy(generation = ++generation, initialScan = null)
+        verification.invalidate()
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = null, ready = false)
     }
 
-    suspend fun open(context: WmsContext) = lock.withLock {
-        verificationEpoch++
+    suspend fun open(context: WmsContext) = read(context, verification.capture())
+
+    private suspend fun read(context: WmsContext, epoch: Long?) = lock.withLock {
+        if (!verification.matches(epoch)) return@withLock
         mutable.value = WmsView(generation = ++generation, context = context, busy = true)
         try {
             val journal = store.read()
@@ -94,8 +100,8 @@ class WmsController(
                 journal.pending != null -> mutable.value = mutable.value.copy(message =
                     if (journal.pending.context == context) "Sprawdź wynik ostatniego zapisu przed kolejnym skanem"
                     else "Niedokończony zapis innej osoby lub serwera. Wróć do poprzedniego konta i adresu serwera.")
-                journal.active?.context == context -> load(context, journal.active.runId)
-                else -> mutable.value = mutable.value.copy(ready = true)
+                journal.active?.context == context -> load(context, journal.active.runId, epoch = epoch)
+                else -> mutable.value = mutable.value.copy(ready = verification.matches(epoch))
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
@@ -109,19 +115,20 @@ class WmsController(
             val view = mutable.value
             if (!view.ready || view.context != context || view.journal.pending != null) return
             // Inny proces WMS mógł zostawić zapis od ostatniego wejścia na ekran.
+            val epoch = verification.capture() ?: return
             val latest = store.read()
+            if (!verification.matches(epoch)) return
             if (latest.pending != null) {
                 mutable.value = view.copy(journal = latest, ready = false, message = "Najpierw rozlicz ostatni zapis WMS")
                 return
             }
-            val epoch = verificationEpoch
             mutable.value = view.copy(busy = true, ready = false, message = null)
             val pending = WmsPending(newKey(), context, draft.path, draft.body, draft.description, draft.runId)
             val journal = latest.copy(pending = pending)
             // Jeśli dysk odmawia zapisu, żądanie NIE wychodzi w sieć.
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal)
-            send(context, pending, continuationEpoch = epoch)
+            send(context, pending, epoch, continuationEpoch = epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -130,36 +137,42 @@ class WmsController(
     suspend fun retry(context: WmsContext) {
         if (!lock.tryLock()) return
         try {
+            val epoch = verification.capture() ?: return
             val latest = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = mutable.value.copy(journal = latest)
             val pending = latest.pending ?: return
             if (pending.workflow != "picking") return
             if (pending.context != context || mutable.value.context != context) return
             mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
-            send(context, pending, continuationEpoch = null)
+            send(context, pending, epoch, continuationEpoch = null)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
     }
 
-    suspend fun nextCart(context: WmsContext) = lock.withLock {
+    suspend fun nextCart(context: WmsContext) = clearCart(context, verification.capture())
+
+    private suspend fun clearCart(context: WmsContext, epoch: Long?) = lock.withLock {
+        if (!verification.matches(epoch)) return@withLock
         val view = mutable.value
         if (view.context != context || view.busy || view.journal.pending != null ||
             (!view.reassigned && (!view.ready || (view.run?.arrived_at == null && view.run?.closed_at == null)))) return@withLock
         try {
             val latest = store.read()
+            if (!verification.matches(epoch)) return@withLock
             if (latest.pending != null) {
                 mutable.value = view.copy(journal = latest, ready = false)
                 return@withLock
             }
             val journal = latest.copy(active = null)
             store.write(journal)
-            mutable.value = WmsView(generation = ++generation, context = context, journal = journal, ready = true)
+            mutable.value = WmsView(generation = ++generation, context = context, journal = journal, ready = verification.matches(epoch))
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending, continuationEpoch: Long?) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?, continuationEpoch: Long?) {
         val before = mutable.value.run
         val client = transport(context)
         val runId = try { client.send(pending) } catch (e: ApiError) {
@@ -169,24 +182,25 @@ class WmsController(
             val journal = mutable.value.journal.copy(pending = null)
             store.write(journal)
             mutable.value = mutable.value.copy(journal = journal, run = null)
-            journal.active?.takeIf { it.context == context }?.let { load(context, it.runId) }
-                ?: run { mutable.value = mutable.value.copy(ready = true) }
+            journal.active?.takeIf { it.context == context }?.let { load(context, it.runId, epoch = epoch) }
+                ?: run { mutable.value = mutable.value.copy(ready = verification.matches(epoch)) }
             mutable.value = mutable.value.copy(message = mutable.value.message ?: e.message)
             return
         }
         val journal = mutable.value.journal.copy(pending = null, active = runId?.let { WmsActive(context, it) })
         store.write(journal)
         mutable.value = mutable.value.copy(journal = journal)
-        if (runId != null) load(context, runId, client) { after ->
-            if (continuationEpoch == verificationEpoch) continueWmsStop(before, after, pending) else null
+        if (runId != null) load(context, runId, client, epoch) { after ->
+            if (verification.matches(continuationEpoch)) continueWmsStop(before, after, pending) else null
         }
-        else mutable.value = mutable.value.copy(ready = true, message = "Brak zamówień do zebrania dla tego wózka")
+        else mutable.value = mutable.value.copy(ready = verification.matches(epoch), message = "Brak zamówień do zebrania dla tego wózka")
     }
 
     private suspend fun load(
         context: WmsContext,
         id: Long,
         client: WmsTransport = transport(context),
+        epoch: Long?,
         continuation: ((WmsRun) -> WmsScanState?)? = null,
     ) {
         val run = try { client.run(id) } catch (e: ApiError) {
@@ -196,11 +210,10 @@ class WmsController(
         }
         require(run.id == id) { "Serwer zwrócił inną trasę" }
         if (run.picker_id != context.actorId) { reassigned(); return }
-        mutable.value = mutable.value.copy(generation = ++generation, initialScan = continuation?.invoke(run), run = run, ready = true)
+        mutable.value = mutable.value.copy(generation = ++generation, initialScan = continuation?.invoke(run), run = run, ready = verification.matches(epoch))
     }
 
     private fun reassigned() {
-        verificationEpoch++
         mutable.value = mutable.value.copy(generation = ++generation, initialScan = null, run = null,
             ready = false, reassigned = true, message = "Trasę przejęła inna osoba. Przekaż jej wózek i rozpocznij kolejny.")
     }

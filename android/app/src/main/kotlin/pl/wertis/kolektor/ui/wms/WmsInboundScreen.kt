@@ -12,8 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,9 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
@@ -39,8 +34,6 @@ import pl.wertis.kolektor.core.wms.inboundDestinationCode
 import pl.wertis.kolektor.core.wms.inboundQuantity
 import pl.wertis.kolektor.core.wms.inboundReceive
 import pl.wertis.kolektor.core.wms.inboundStage
-import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.scan.WedgeKeySource
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WertisTextField
@@ -69,21 +62,7 @@ fun WmsInboundScreen(graph: AppGraph) {
     val stage = document?.let { inboundStage(it, scan) }
     val allowed = context != null && view.context == context && view.ready && !view.busy && view.journal.pending == null
 
-    LaunchedEffect(context) { context?.let { controller.open(it) } }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle, context) {
-        var paused = false
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) { paused = true; controller.invalidateVerification() }
-            else if (event == Lifecycle.Event.ON_RESUME && paused) {
-                paused = false
-                context?.let { bound -> graph.appScope.launch { controller.open(bound) } }
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); controller.invalidateVerification() }
-    }
-    DisposableEffect(Unit) { WedgeKeySource.wmsMode(true); onDispose { WedgeKeySource.wmsMode(false) } }
+    WmsLifecycleEffect(graph, context, controller::activateVerification, controller::invalidateVerification, controller::open)
 
     fun submit(draft: WmsInboundDraft) {
         val bound = context ?: return
@@ -116,7 +95,7 @@ fun WmsInboundScreen(graph: AppGraph) {
         }
     }
 
-    ScanHandlerEffect { input ->
+    WmsScanHandlerEffect { input ->
         // Skan identyfikuje część w dokumencie, a nie zapamiętany wcześniej wiersz.
         if (!allowed || controller.state.value.busy || view.generation != controller.state.value.generation) {
             error = "Najpierw potwierdź wynik ostatniej operacji"; graph.feedback.beep(false)

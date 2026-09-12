@@ -199,7 +199,7 @@ class WmsPutawayRecoveryTest {
         controller.invalidateVerification()
         assertFalse(controller.state.value.ready)
         controller.submit(putawayActor, draft()); assertTrue(client.sent.isEmpty())
-        controller.open(putawayActor); controller.submit(putawayActor, draft())
+        controller.activateVerification(); controller.open(putawayActor); controller.submit(putawayActor, draft())
         assertTrue(controller.state.value.generation > first)
         assertEquals(WmsPutawayStage.SOURCE, putawayStage(controller.state.value.task!!, 2, WmsPutawayScan()))
     }

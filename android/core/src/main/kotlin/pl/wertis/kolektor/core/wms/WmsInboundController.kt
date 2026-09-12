@@ -30,12 +30,16 @@ class WmsInboundController(
     private val newKey: () -> String = { UUID.randomUUID().toString() },
 ) {
     private var generation = 0L
-    private var verificationEpoch = 0L
+    private val verification = WmsVerification()
     private val mutable = MutableStateFlow(WmsInboundView())
     val state: StateFlow<WmsInboundView> = mutable
 
+    fun activateVerification() {
+        verification.activate()
+        mutable.value = mutable.value.copy(generation = ++generation, confirmedBarcode = null, ready = false)
+    }
     fun invalidateVerification() {
-        verificationEpoch++
+        verification.invalidate()
         mutable.value = mutable.value.copy(generation = ++generation, confirmedBarcode = null, ready = false)
     }
     suspend fun open(context: WmsContext) = read(context, resume = true)
@@ -55,9 +59,9 @@ class WmsInboundController(
     }
 
     private suspend fun read(context: WmsContext, resume: Boolean = false, inboundId: Long? = null,
-        lineId: Long? = null, barcode: String? = null, query: String = "", offset: Int = 0, bufferMode: Boolean? = null) = lock.withLock {
+        lineId: Long? = null, barcode: String? = null, query: String = "", offset: Int = 0, bufferMode: Boolean? = null, epoch: Long? = verification.capture()) = lock.withLock {
+        if (!verification.matches(epoch)) return@withLock
         val previous = mutable.value
-        val epoch = verificationEpoch
         mutable.value = WmsInboundView(generation = ++generation, context = context, busy = true, query = query, offset = offset)
         try {
             require(query.length <= 120 && offset in 0..1000000 && (barcode == null || barcode.length in 1..120)) { "Nieprawidłowy kod lub filtr" }
@@ -77,15 +81,15 @@ class WmsInboundController(
                 val rows = client.documents(query, offset)
                 val next = journal.copy(receiving = null)
                 store.write(next)
-                mutable.value = mutable.value.copy(journal = next, documents = rows, ready = true)
+                mutable.value = mutable.value.copy(journal = next, documents = rows, ready = verification.matches(epoch))
             } else {
                 val result = client.receiveDocument(selected, query, offset, selectedLine, barcode)
                 validate(result, selected, selectedLine)
                 if (barcode != null) inboundProduct(requireNotNull(result.selected), barcode)
                 val next = journal.copy(receiving = WmsActiveInbound(context, selected, result.selected?.id, buffer))
                 store.write(next)
-                mutable.value = mutable.value.copy(generation = ++generation, journal = next, document = result, ready = true,
-                    confirmedBarcode = barcode.takeIf { epoch == verificationEpoch })
+                mutable.value = mutable.value.copy(generation = ++generation, journal = next, document = result, ready = verification.matches(epoch),
+                    confirmedBarcode = barcode.takeIf { verification.matches(epoch) })
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) {
@@ -93,7 +97,7 @@ class WmsInboundController(
             if (barcode != null && previous.context == context && previous.document != null && previous.document.document.id == inboundId &&
                 e is ApiError && e.status in setOf(404, 409) && mutable.value.journal.pending == null) {
                 mutable.value = mutable.value.copy(document = previous.document.copy(selected = null), buffer = previous.buffer,
-                    ready = true, message = e.message)
+                    ready = verification.matches(epoch), message = e.message)
             } else problem(e)
         } finally { mutable.value = mutable.value.copy(busy = false) }
     }
@@ -104,7 +108,9 @@ class WmsInboundController(
             val view = mutable.value
             if (view.context != context || !view.ready || view.busy || view.document?.document?.id != draft.inboundId ||
                 (draft.lineId != null && view.document.selected?.id != draft.lineId)) return
+            val epoch = verification.capture() ?: return
             val latest = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = view.copy(journal = latest, ready = false, confirmedBarcode = null)
             if (latest.pending != null) {
                 mutable.value = mutable.value.copy(message = "Najpierw rozlicz ostatni zapis WMS")
@@ -116,7 +122,7 @@ class WmsInboundController(
             val next = latest.copy(pending = pending, receiving = WmsActiveInbound(context, draft.inboundId, draft.lineId, view.buffer))
             store.write(next)
             mutable.value = mutable.value.copy(journal = next)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -126,19 +132,21 @@ class WmsInboundController(
         if (!lock.tryLock()) return
         try {
             if (mutable.value.context != context) return
+            val epoch = verification.capture() ?: return
             val journal = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = mutable.value.copy(journal = journal)
             val pending = journal.pending ?: return
             if (pending.context != context || pending.workflow != "receiving") return
             mutable.value = mutable.value.copy(busy = true, ready = false, confirmedBarcode = null, message = null,
                 buffer = journal.receiving?.buffer ?: true)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?) {
         val id = requireNotNull(pending.inboundId) { "Brak numeru przyjęcia w dzienniku" }
         val client = transport(context)
         var rejection: String? = null
@@ -151,7 +159,7 @@ class WmsInboundController(
         mutable.value = mutable.value.copy(journal = next)
         val result = client.receiveDocument(id, "", 0, pending.lineId, null)
         validate(result, id, pending.lineId)
-        mutable.value = mutable.value.copy(generation = ++generation, document = result, ready = true, confirmedBarcode = null, message = rejection)
+        mutable.value = mutable.value.copy(generation = ++generation, document = result, ready = verification.matches(epoch), confirmedBarcode = null, message = rejection)
     }
 
     private fun validate(result: WmsInboundDocument, id: Long, lineId: Long?) {

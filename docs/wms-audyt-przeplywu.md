@@ -318,3 +318,21 @@ W naszym wdrożeniu każda obserwacja wymaga biura. Nie wprowadzono automatyczne
 Testy obejmują zerowy wynik, brak skanów, kolizję operatorów, utratę odpowiedzi, nieaktualne dane i awarię transakcji.
 Próba przeglądarki prowadzi od zgłoszonego braku przez ponowne liczenie do akceptacji z utraconą odpowiedzią.
 Fizyczny odbiór na Zebra/Honeywell pozostaje do wykonania.
+
+
+### Uśpienie kolektora podczas operacji
+
+Odczyt kończący się po pauzie mógł ponownie ustawić gotowość przyjęcia lub odkładania. Zbiórka usuwała skany bez wyłączenia komend.
+Cztery ekrany miały oddzielne kopie obsługi powrotu. Zastąpiono je wspólną obsługą widoczności i jedną bramką wersji wejścia.
+Skan sprzętowy jest konsumowany bez działania poza stanem RESUMED. Kontroler sprawdza uprawnienie do kontynuacji także po odczycie dziennika.
+Pauza anuluje odczyt uruchomiony przy wejściu, ale nie anuluje rozpoczętego utrwalania komendy ani potwierdzania jej wyniku.
+Zapis rozpoczęty przed pauzą może się rozliczyć. Jego odpowiedź nie uruchamia kolejnych skanów po wyjściu lub szybkim powrocie.
+Po powrocie każdy proces odczytuje świeży stan. Nieznany wynik nadal wymaga pierwotnego klucza, konta i serwera.
+
+Osiem scenariuszy JVM obejmuje cztery procesy: zbiórkę, przyjęcie, odkładanie i liczenie półki.
+Sprawdzają pauzę przed zapisem, podczas odczytu dziennika, utrwalania komendy, odpowiedzi sieciowej oraz oczekiwania na wspólną blokadę.
+Sprawdzają także ponowienie i szybki powrót przed odpowiedzią. Pierwsze sześć scenariuszy odtworzyło błędy przed poprawką.
+
+Źródło: [Android — cykl życia i korutyny](https://developer.android.com/topic/libraries/architecture/coroutines).
+Dokument opisuje wiązanie pracy interfejsu z cyklem życia. Dziennik mutacji WMS zachowuje osobną odpowiedzialność za nieznany wynik zapisu.
+Fizyczne testy uśpienia, DataWedge i klawiatury na docelowym kolektorze pozostają wymagane.

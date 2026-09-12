@@ -611,3 +611,11 @@ Widzisz ilość operatora, autora, czas oraz bieżący stan. Zatwierdź wynik z 
 Nie edytujesz ilości przesłanej przez operatora. Powód ponownego liczenia pojawi się na kolektorze; poprzedni wynik pozostaje w historii.
 Zmiana wersji zapasu od liczenia blokuje akceptację i wymaga ponownego liczenia. Najpierw rozlicz także otwarte uzupełnienie tej półki.
 Akceptacja koryguje stan i odbudowuje rezerwacje w jednej transakcji. Zgłoszenia zawartości skrzynek wymagają osobnego wyjaśnienia.
+
+
+### Przerwa i powrót do kolektora
+
+Zablokowanie urządzenia, wyjście z aplikacji lub przejście na inny ekran odbiera prawo wykonywania kolejnych skanów WMS.
+Nie skanuj następnej części podczas przerwy. Po powrocie poczekaj na świeży stan i rozpocznij wskazaną sekwencję skanów.
+Wynik już rozpoczętego zapisu może zostać potwierdzony w tle. Nie oznacza to utraty operacji.
+Gdy odpowiedź pozostaje nieznana, wybierz **SPRAWDŹ OSTATNI ZAPIS**. Nie czyść danych kolektora ani nie twórz drugiej operacji.

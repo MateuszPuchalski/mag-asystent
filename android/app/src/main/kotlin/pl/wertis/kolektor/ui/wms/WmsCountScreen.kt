@@ -12,8 +12,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,9 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
@@ -38,8 +33,6 @@ import pl.wertis.kolektor.core.wms.countCode
 import pl.wertis.kolektor.core.wms.countDraft
 import pl.wertis.kolektor.core.wms.countScan
 import pl.wertis.kolektor.core.wms.countStage
-import pl.wertis.kolektor.scan.ScanHandlerEffect
-import pl.wertis.kolektor.scan.WedgeKeySource
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.components.WertisTextField
@@ -62,26 +55,8 @@ fun WmsCountScreen(graph: AppGraph) {
     var query by remember(view.query, context) { mutableStateOf(view.query) }
     val stage = task?.let { countStage(it, scan) }
     val allowed = view.context == context && context != null && view.ready && !view.busy && view.journal.pending == null
-    LaunchedEffect(context) { context?.let { controller.open(it) } }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    DisposableEffect(lifecycle, context) {
-        var paused = false
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                paused = true
-                controller.invalidateVerification()
-            } else if (event == Lifecycle.Event.ON_RESUME && paused) {
-                paused = false
-                context?.let { bound -> graph.appScope.launch { controller.open(bound) } }
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); controller.invalidateVerification() }
-    }
-    DisposableEffect(Unit) {
-        WedgeKeySource.wmsMode(true)
-        onDispose { WedgeKeySource.wmsMode(false) }
-    }
+    WmsLifecycleEffect(graph, context, controller::activateVerification, controller::invalidateVerification, controller::open)
+
     fun search() {
         context?.let { bound -> graph.appScope.launch { controller.queue(bound, query) } }
     }
@@ -99,7 +74,7 @@ fun WmsCountScreen(graph: AppGraph) {
         try { error = null; submit(countDraft(task, scan, quantity)) }
         catch (e: IllegalArgumentException) { error = e.message; graph.feedback.beep(false) }
     }
-    ScanHandlerEffect { input ->
+    WmsScanHandlerEffect { input ->
         if (allowed) {
             if (task == null) {
                 query = if (input.kind == pl.wertis.kolektor.core.scan.ScanKind.LOC) input.code else input.rawCode

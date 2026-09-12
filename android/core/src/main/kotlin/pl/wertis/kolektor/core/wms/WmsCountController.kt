@@ -30,12 +30,17 @@ class WmsCountController(
     private val newKey: () -> String = { UUID.randomUUID().toString() },
 ) {
     private var generation = 0L
-    private var visible = true
+    private val verification = WmsVerification()
     private val mutable = MutableStateFlow(WmsCountView())
     val state: StateFlow<WmsCountView> = mutable
 
+    fun activateVerification() {
+        verification.activate()
+        mutable.value = mutable.value.copy(generation = ++generation, ready = false)
+    }
+
     fun invalidateVerification() {
-        visible = false
+        verification.invalidate()
         mutable.value = mutable.value.copy(generation = ++generation, ready = false)
     }
 
@@ -43,8 +48,8 @@ class WmsCountController(
     suspend fun select(context: WmsContext, id: Long) = read(context, taskId = id)
     suspend fun queue(context: WmsContext, query: String = "", offset: Int = 0) = read(context, query = query, offset = offset)
 
-    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String = "", offset: Int = 0) = lock.withLock {
-        visible = true
+    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String = "", offset: Int = 0, epoch: Long? = verification.capture()) = lock.withLock {
+        if (!verification.matches(epoch)) return@withLock
         mutable.value = WmsCountView(generation = ++generation, context = context, busy = true, query = query, offset = offset)
         try {
             require(query.length <= 120 && offset in 0..1000000) { "Zbyt długi filtr kolejki" }
@@ -57,7 +62,7 @@ class WmsCountController(
             val selected = if (resume) journal.counting?.takeIf { it.context == context }?.taskId else taskId
             val client = transport(context)
             if (selected != null) {
-                load(context, selected, client)
+                load(context, selected, client, epoch)
                 val next = journal.copy(counting = WmsActiveCount(context, selected))
                 store.write(next)
                 mutable.value = mutable.value.copy(journal = next)
@@ -65,7 +70,7 @@ class WmsCountController(
                 val queue = client.queue(query, offset)
                 val next = journal.copy(counting = null)
                 store.write(next)
-                mutable.value = mutable.value.copy(journal = next, queue = queue, ready = visible)
+                mutable.value = mutable.value.copy(journal = next, queue = queue, ready = verification.matches(epoch))
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
@@ -77,7 +82,9 @@ class WmsCountController(
         try {
             val view = mutable.value
             if (view.context != context || !view.ready || view.busy || view.task?.id != draft.taskId) return
+            val epoch = verification.capture() ?: return
             val latest = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = view.copy(journal = latest, ready = false)
             if (latest.pending != null) {
                 mutable.value = mutable.value.copy(message = "Najpierw rozlicz ostatni zapis WMS")
@@ -88,7 +95,7 @@ class WmsCountController(
             val next = latest.copy(pending = pending, counting = WmsActiveCount(context, draft.taskId))
             store.write(next)
             mutable.value = mutable.value.copy(journal = next)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -98,18 +105,20 @@ class WmsCountController(
         if (!lock.tryLock()) return
         try {
             if (mutable.value.context != context) return
+            val epoch = verification.capture() ?: return
             val journal = store.read()
+            if (!verification.matches(epoch)) return
             mutable.value = mutable.value.copy(journal = journal)
             val pending = journal.pending ?: return
             if (pending.context != context || pending.workflow != "counting") return
             mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
-            send(context, pending)
+            send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?) {
         val client = transport(context)
         val id = requireNotNull(pending.taskId) { "Brak numeru zadania w dzienniku" }
         var rejection: String? = null
@@ -120,14 +129,14 @@ class WmsCountController(
         val journal = mutable.value.journal.copy(pending = null, counting = WmsActiveCount(context, id))
         store.write(journal)
         mutable.value = mutable.value.copy(journal = journal)
-        load(context, id, client)
+        load(context, id, client, epoch)
         mutable.value = mutable.value.copy(message = rejection)
     }
 
-    private suspend fun load(context: WmsContext, id: Long, client: WmsCountTransport) {
+    private suspend fun load(context: WmsContext, id: Long, client: WmsCountTransport, epoch: Long?) {
         val task = client.countingTask(id)
         require(task.id == id && task.version > 0) { "Nieznana odpowiedź zadania" }
-        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = visible)
+        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = verification.matches(epoch))
     }
 
     private fun problem(error: Exception) {
