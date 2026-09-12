@@ -38,6 +38,98 @@ const headers = () => ({
   "x-session": adminToken,
   "idempotency-key": randomUUID(),
 });
+test("kolektor podejmuje uzupełnienie i po częściowym odłożeniu otrzymuje trwały wynik", async () => {
+  const W = await import("../services/wms.js");
+  const { db } = await import("../db/db.js");
+  const actor = { id: 1, name: "Biuro", role: "admin" as const };
+  W.configureBin(actor, randomUUID(), {
+    bin: "REPL-API",
+    mode: "reserve",
+    version: 1,
+    reason: "Zaplecze testu",
+  });
+  for (const [bin, quantity] of [
+    ["REPL-API", 10],
+    ["REPL-TARGET", 1],
+  ] as const)
+    W.changeStock(actor, randomUUID(), {
+      action: "receive",
+      twId: 1,
+      bin,
+      quantity,
+      reason: "Dostawa testowa",
+    });
+  W.changeStock(actor, randomUUID(), {
+    action: "minimum",
+    twId: 1,
+    bin: "REPL-TARGET",
+    quantity: 5,
+    version: 2,
+    reason: "Minimum półki",
+  });
+  const session = { "x-session": workerToken };
+  const before = db().prepare("SELECT total_changes() n").get()!.n;
+  const plans = await app.inject({
+    url: "/api/wms/replenishment-work?view=plans&q=REPL-TARGET",
+    headers: session,
+  });
+  assert.equal(plans.statusCode, 200, plans.body);
+  assert.equal(plans.json().total, 1);
+  assert.equal(db().prepare("SELECT total_changes() n").get()!.n, before);
+  const plan = plans.json().plans[0],
+    key = randomUUID();
+  const claim = {
+    method: "POST" as const,
+    url: "/api/wms/replenishments",
+    headers: { ...session, "idempotency-key": key },
+    payload: {
+      twId: plan.tw_id,
+      source: plan.source,
+      target: plan.target,
+      quantity: 4,
+      sourceVersion: plan.source_version,
+      targetVersion: plan.target_version,
+    },
+  };
+  const task = await app.inject(claim);
+  assert.equal(task.statusCode, 200, task.body);
+  assert.deepEqual((await app.inject(claim)).json(), task.json());
+  const id = task.json().id;
+  assert.equal(
+    (
+      await app.inject({
+        url: `/api/wms/replenishment-work/${id}`,
+        headers: session,
+      })
+    ).json().barcode,
+    "59001",
+  );
+  const complete = {
+    method: "POST" as const,
+    url: `/api/wms/replenishments/${id}/complete`,
+    headers: { ...session, "idempotency-key": randomUUID() },
+    payload: {
+      source: plan.source,
+      target: plan.target,
+      barcode: "59001",
+      quantity: 2,
+      reason: "Brak dwóch sztuk",
+    },
+  };
+  const result = await app.inject(complete);
+  assert.equal(result.statusCode, 200, result.body);
+  assert.equal(result.json().shortage, 2);
+  assert.deepEqual((await app.inject(complete)).json(), result.json());
+  assert.equal(
+    (
+      await app.inject({
+        url: `/api/wms/replenishment-work/${id}`,
+        headers: session,
+      })
+    ).json().moved,
+    2,
+  );
+});
 test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
   for (const url of [
     "/api/wms/orders",
@@ -59,6 +151,8 @@ test("WMS wymaga sesji; raporty, import i spis wymagają biura", async () => {
     "/api/wms/cart-runs/1",
     "/api/wms/cart-analytics",
     "/api/wms/stock-work",
+    "/api/wms/replenishment-work",
+    "/api/wms/replenishment-work/1",
     "/api/wms/count-work",
     "/api/wms/count-work/1",
     "/api/wms/pick-route",

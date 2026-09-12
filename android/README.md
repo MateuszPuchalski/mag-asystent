@@ -11,8 +11,8 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **411 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (20 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **423 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (21 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
@@ -450,3 +450,13 @@ przed którą ta pozycja broni.
   karta towaru i sesja rozkładania 2 s — jak `refetchInterval` w PWA.
 - **Kiosk**: aplikację można przypiąć przez Android lock-task/MDM — nie
   potrzeba Fully Kiosk Browser ani lokalnego CA (brak service workera).
+
+
+## Natywne uzupełnienia WMS
+
+**UZUPEŁNIENIA WMS** prowadzą od propozycji przez podjęcie, skan źródła i części, potwierdzenie ilości oraz skan celu.
+Plan chroni przydziały innych operatorów i zapas oczekujący na odłożenie. Kolejka jest stronicowana po 50 pozycji.
+Częściowe pobranie wymaga opisu braku; zero zgłasza puste źródło bez ruchu. Źródło pozostaje do liczenia i decyzji biura.
+
+Anulowanie wymaga zwrotu pobranych sztuk oraz skanu źródła. Trwały dziennik odzyskuje także numer podjęcia po utracie odpowiedzi.
+Testy cyklu życia obejmują teraz pięć procesów WMS. Nowy proces wymaga aktualnego API i APK oraz odbioru na docelowym skanerze.

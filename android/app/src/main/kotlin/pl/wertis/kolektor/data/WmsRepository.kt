@@ -49,12 +49,23 @@ import pl.wertis.kolektor.core.wms.WmsCountQueue
 import pl.wertis.kolektor.core.wms.WmsCountTask
 import pl.wertis.kolektor.core.wms.WmsCountTransport
 
+import pl.wertis.kolektor.core.wms.WmsReplenishmentController
+import pl.wertis.kolektor.core.wms.WmsReplenishmentQueue
+import pl.wertis.kolektor.core.wms.WmsReplenishmentTask
+import pl.wertis.kolektor.core.wms.WmsReplenishmentTransport
+
 interface WmsApi {
     @POST
     suspend fun command(@Url path: String, @Header("idempotency-key") key: String, @Body body: JsonObject): JsonObject
 
     @GET("api/wms/cart-runs/{id}")
     suspend fun run(@Path("id") id: Long): WmsRun
+
+    @GET("api/wms/replenishment-work")
+    suspend fun replenishmentQueue(@Query("view") view: String, @Query("q") query: String, @Query("offset") offset: Int): WmsReplenishmentQueue
+
+    @GET("api/wms/replenishment-work/{id}")
+    suspend fun replenishmentTask(@Path("id") id: Long): WmsReplenishmentTask
 
     @GET("api/wms/count-work")
     suspend fun countingQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsCountQueue
@@ -175,6 +186,18 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
                 apiCall { api.inboundDocument(id, query, offset, lineId, barcode) }
             override suspend fun send(command: WmsPending) {
                 apiCall { api.command(command.path, command.key, command.body) }
+            }
+        }
+    })
+
+    val replenishing = WmsReplenishmentController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsReplenishmentTransport {
+            override suspend fun queue(view: String, query: String, offset: Int) = apiCall { api.replenishmentQueue(view, query, offset) }
+            override suspend fun replenishingTask(id: Long) = apiCall { api.replenishmentTask(id) }
+            override suspend fun send(command: WmsPending): Long {
+                val result = apiCall { api.command(command.path, command.key, command.body) }
+                return result["id"]?.jsonPrimitive?.longOrNull ?: error("Brak numeru zadania w odpowiedzi")
             }
         }
     })

@@ -155,6 +155,9 @@ fun HomeScreen(graph: AppGraph) {
         OutlineButton("PRZYJĘCIE WMS — POLICZ DOSTAWĘ", modifier = Modifier.fillMaxWidth()) {
             graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_RECEIVING)
         }
+        OutlineButton("UZUPEŁNIENIA WMS — ZAPLECZE → PÓŁKA", modifier = Modifier.fillMaxWidth()) {
+            graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_REPLENISHMENT)
+        }
         OutlineButton("PRZELICZENIA WMS — SPRAWDŹ PÓŁKĘ", modifier = Modifier.fillMaxWidth()) {
             graph.nav.go(pl.wertis.kolektor.core.nav.Screen.WMS_COUNTING)
         }

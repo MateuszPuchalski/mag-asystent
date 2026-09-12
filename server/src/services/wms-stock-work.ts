@@ -106,6 +106,34 @@ export function fillOrderReservations(
   }
 }
 
+const replenishmentPlanSql = `WITH demand AS (
+    SELECT l.tw_id,sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS needed
+    FROM wms_line l JOIN wms_order o ON o.id=l.order_id WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new') GROUP BY l.tw_id
+  ), pick AS (
+    SELECT s.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,coalesce(d.needed,0) AS needed,
+      sum(s.on_hand-s.reserved) OVER(PARTITION BY s.tw_id) AS available,
+      row_number() OVER(PARTITION BY s.tw_id ORDER BY s.bin) AS rank
+    FROM wms_stock s JOIN wms_product p ON p.tw_id=s.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin LEFT JOIN demand d ON d.tw_id=s.tw_id
+    WHERE coalesce(b.mode,'pick')='pick' AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
+  ), needs AS (
+    SELECT *,max(0,minimum-(on_hand-reserved),CASE WHEN rank=1 THEN needed-available ELSE 0 END) AS quantity FROM pick
+  ) SELECT n.tw_id,n.sku,n.name,n.barcode,n.bin AS target,n.version AS target_version,n.quantity,s.bin AS source,s.version AS source_version,
+      s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
+      -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
+    FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
+    WHERE n.quantity>0 AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
+    AND source_available>0 AND (instr(lower(n.sku||' '||n.name),lower(?))>0 OR n.bin=? OR s.bin=? OR n.barcode=?)
+    ORDER BY n.quantity DESC,n.sku,n.bin,s.bin`;
+function planArgs(q: string) {
+  return [q, q.toUpperCase(), q.toUpperCase(), q];
+}
+function replenishmentPlans(q: string, offset = 0, limit = 100) {
+  return db()
+    .prepare(replenishmentPlanSql + " LIMIT ? OFFSET ?")
+    .all(...planArgs(q), limit, offset);
+}
+
 export function stockWork(actor: Actor, raw: unknown) {
   return readSnapshot(() => readStockWork(actor, raw));
 }
@@ -113,29 +141,7 @@ function readStockWork(actor: Actor, raw: unknown) {
   const input = z
     .object({ q: z.string().trim().max(120).default("") })
     .parse(raw);
-  const plans = db()
-    .prepare(
-      `WITH demand AS (
-    SELECT l.tw_id,sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS needed
-    FROM wms_line l JOIN wms_order o ON o.id=l.order_id WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new') GROUP BY l.tw_id
-  ), pick AS (
-    SELECT s.*,p.symbol AS sku,p.nazwa AS name,coalesce(d.needed,0) AS needed,
-      sum(s.on_hand-s.reserved) OVER(PARTITION BY s.tw_id) AS available,
-      row_number() OVER(PARTITION BY s.tw_id ORDER BY s.bin) AS rank
-    FROM wms_stock s JOIN wms_product p ON p.tw_id=s.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin LEFT JOIN demand d ON d.tw_id=s.tw_id
-    WHERE coalesce(b.mode,'pick')='pick' AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
-  ), needs AS (
-    SELECT *,max(0,minimum-(on_hand-reserved),CASE WHEN rank=1 THEN needed-available ELSE 0 END) AS quantity FROM pick
-  ) SELECT n.tw_id,n.sku,n.name,n.bin AS target,n.version AS target_version,n.quantity,s.bin AS source,s.version AS source_version,
-      s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
-      -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
-    FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
-    WHERE n.quantity>0 AND NOT EXISTS(SELECT 1 FROM wms_replenishment r WHERE r.tw_id=n.tw_id AND r.target=n.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
-    AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
-    AND source_available>0 AND (instr(lower(n.sku||' '||n.name),lower(?))>0 OR n.bin=? OR s.bin=?)
-    ORDER BY n.quantity DESC,n.sku,n.bin,s.bin LIMIT 100`,
-    )
-    .all(input.q, input.q.toUpperCase(), input.q.toUpperCase());
+  const plans = replenishmentPlans(input.q);
   return {
     plans,
     repairs:
@@ -195,6 +201,75 @@ export function repairReservations(actor: Actor, key: string, raw: unknown) {
       )
       .run(nowIso(), order.id);
     return getOrder(order.id);
+  });
+}
+
+const replenishmentTaskSql = `SELECT r.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,
+  coalesce(r.completed_quantity,CASE WHEN r.completed_at IS NOT NULL THEN r.quantity END) AS moved,
+  CASE WHEN EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=r.tw_id AND c.bin IN (r.source,r.target) AND c.resolved_at IS NULL)
+    THEN 'Lokalizacja czeka na przeliczenie. Odłóż pobrane sztuki na źródło i anuluj zadanie.'
+    WHEN s.version<>r.source_version THEN 'Stan źródła zmienił się. Odłóż pobrane sztuki i przygotuj nowy plan.' END AS blocked
+  FROM wms_replenishment r JOIN wms_product p ON p.tw_id=r.tw_id
+  JOIN wms_stock s ON s.tw_id=r.tw_id AND s.bin=r.source`;
+
+export function replenishmentTask(actor: Actor, taskId: number) {
+  const row = db()
+    .prepare(replenishmentTaskSql + " WHERE r.id=?")
+    .get(id.parse(taskId));
+  if (!row) fail("Nie ma zadania uzupełnienia", 404);
+  if (row!.user_id !== actor.id) manager(actor);
+  return row!;
+}
+
+export function replenishmentWork(actor: Actor, raw: unknown) {
+  const input = z
+    .object({
+      q: z.string().trim().max(120).default(""),
+      offset: z.coerce.number().int().min(0).max(1000000).default(0),
+      view: z.enum(["tasks", "plans"]).default("tasks"),
+    })
+    .strict()
+    .parse(raw);
+  return readSnapshot(() => {
+    if (input.view === "plans")
+      return {
+        view: input.view,
+        plans: replenishmentPlans(input.q, input.offset, 50),
+        tasks: [],
+        total: Number(
+          db()
+            .prepare(`SELECT count(*) n FROM (${replenishmentPlanSql})`)
+            .get(...planArgs(input.q))!.n,
+        ),
+      };
+    // Kolektor prowadzi własne fizyczne zadania; podgląd całego zespołu pozostaje w biurze.
+    const where = ` WHERE r.user_id=? AND r.completed_at IS NULL AND r.cancelled_at IS NULL
+      AND (instr(lower(p.symbol||' '||p.nazwa),lower(?))>0 OR r.source=? OR r.target=? OR p.ean=?)`;
+    const args = [
+      actor.id,
+      input.q,
+      input.q.toUpperCase(),
+      input.q.toUpperCase(),
+      input.q,
+    ];
+    return {
+      view: input.view,
+      plans: [],
+      tasks: db()
+        .prepare(
+          replenishmentTaskSql +
+            where +
+            " ORDER BY r.created_at,r.id LIMIT 50 OFFSET ?",
+        )
+        .all(...args, input.offset),
+      total: Number(
+        db()
+          .prepare(
+            `SELECT count(*) n FROM wms_replenishment r JOIN wms_product p ON p.tw_id=r.tw_id${where}`,
+          )
+          .get(...args)!.n,
+      ),
+    };
   });
 }
 
@@ -285,7 +360,8 @@ export function completeReplenishment(
       source: code,
       target: code,
       barcode: z.string().trim().min(1).max(120),
-      quantity,
+      quantity: z.number().int().min(0).max(1000000),
+      reason: reason.optional(),
     })
     .strict()
     .parse(raw);
@@ -304,7 +380,8 @@ export function completeReplenishment(
       if (
         task!.source !== input.source ||
         task!.target !== input.target ||
-        task!.quantity !== input.quantity
+        input.quantity > task!.quantity ||
+        (input.quantity < task!.quantity && !input.reason)
       )
         fail("Zeskanuj źródło, cel i potwierdź przydzieloną ilość", 400);
       checkBarcode(product(task!.tw_id), input.barcode);
@@ -330,17 +407,40 @@ export function completeReplenishment(
         fail("Przeznaczenie lokalizacji zmieniło się. Przygotuj nowy plan");
       // W tej samej transakcji zwalniamy własny przydział; cudze sztuki nadal chroni move.
       db()
-        .prepare("UPDATE wms_replenishment SET completed_at=? WHERE id=?")
-        .run(nowIso(), taskId);
-      applyStock(actor, {
-        action: "transfer",
-        twId: task!.tw_id,
-        bin: input.source,
-        target: input.target,
+        .prepare(
+          "UPDATE wms_replenishment SET completed_at=?,completed_quantity=?,reason=? WHERE id=?",
+        )
+        .run(nowIso(), input.quantity, input.reason ?? null, taskId);
+      if (input.quantity > 0)
+        applyStock(actor, {
+          action: "transfer",
+          twId: task!.tw_id,
+          bin: input.source,
+          target: input.target,
+          quantity: input.quantity,
+          reason: `Uzupełnienie #${taskId}`,
+        });
+      if (input.quantity < task!.quantity)
+        db()
+          .prepare(
+            `INSERT INTO wms_stock_check(tw_id,bin,reason,created_at,user_id)
+        SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM wms_stock_check WHERE tw_id=? AND bin=? AND resolved_at IS NULL)`,
+          )
+          .run(
+            task!.tw_id,
+            task!.source,
+            `Brak przy uzupełnieniu #${taskId}: ${input.reason}`,
+            nowIso(),
+            actor.id,
+            task!.tw_id,
+            task!.source,
+          );
+      return {
+        completed: true,
+        id: taskId,
         quantity: input.quantity,
-        reason: `Uzupełnienie #${taskId}`,
-      });
-      return { completed: true, id: taskId };
+        shortage: task!.quantity - input.quantity,
+      };
     },
   );
 }
@@ -351,7 +451,10 @@ export function cancelReplenishment(
   taskId: number,
   raw: unknown,
 ) {
-  const input = z.object({ reason }).strict().parse(raw);
+  const input = z
+    .object({ reason, source: code.optional() })
+    .strict()
+    .parse(raw);
   return command(
     key,
     actor,
@@ -364,6 +467,8 @@ export function cancelReplenishment(
       if (!task || task.completed_at || task.cancelled_at)
         fail("Zadanie jest zamknięte albo nie istnieje");
       if (task!.user_id !== actor.id) manager(actor);
+      if (input.source && input.source !== task!.source)
+        fail("Odłóż towar na źródło i zeskanuj jego kod", 400);
       db()
         .prepare(
           "UPDATE wms_replenishment SET cancelled_at=?,reason=? WHERE id=?",

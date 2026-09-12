@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.303.0 kolektor ma **UZUPEŁNIENIA WMS**. Zaktualizować API przed APK; restart dodaje pole potwierdzonej ilości do istniejących zadań.
+Dawne pełne uzupełnienia pozostają poprawne. Mniejsza ilość wymaga opisu i kieruje źródło do liczenia; zero nie przesuwa zapasu.
+Przed aktualizacją lub cofnięciem APK rozliczyć oczekujący zapis WMS na pierwotnym koncie i serwerze. Nie czyścić dziennika.
+
 Poprawka 0.302.1 wymaga aktualizacji APK dla poprawnego blokowania skanów podczas pauzy i powrotu.
 Nie zmienia bazy ani kontraktu API. Rozlicz oczekującą operację przed aktualizacją; nie czyść dziennika kolektora.
 

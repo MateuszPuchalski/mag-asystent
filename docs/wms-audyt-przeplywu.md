@@ -336,3 +336,19 @@ Sprawdzają także ponowienie i szybki powrót przed odpowiedzią. Pierwsze sze�
 Źródło: [Android — cykl życia i korutyny](https://developer.android.com/topic/libraries/architecture/coroutines).
 Dokument opisuje wiązanie pracy interfejsu z cyklem życia. Dziennik mutacji WMS zachowuje osobną odpowiedzialność za nieznany wynik zapisu.
 Fizyczne testy uśpienia, DataWedge i klawiatury na docelowym kolektorze pozostają wymagane.
+
+
+### Uzupełnienie bez pełnej ilości na źródle
+
+Dotychczas uzupełnienie wymagało całego przydziału, a natywny kolektor nie miał tego procesu.
+Dodano kolejkę własnych zadań i propozycji, podjęcie oraz sekwencję źródło → część → ilość → cel.
+Plan i kolejka są stronicowane. Odczyt nie zapisuje zadania ani rezerwacji.
+Częściowe potwierdzenie przesuwa faktyczną ilość i kieruje źródło do przeliczenia. Zero nie tworzy ruchu ani korekty zapasu.
+Otwarte zadania innych osób wymagają fizycznego zwrotu i anulowania przed liczeniem wspólnego źródła.
+Przerwane podjęcie odzyskuje numer zadania tym samym kluczem. Nieznany wynik blokuje także zbiórkę, przyjęcie, odkładanie i liczenie.
+
+Regresje obejmują stronicowanie, obcego operatora, konkurencyjne podjęcie, niepełną ilość, zero, błędne skany i brak opisu.
+Awaria zapisu przeliczenia wycofuje również wcześniejszy transfer i zamknięcie przydziału.
+Przeglądarka sprawdza częściowe odłożenie z utratą odpowiedzi, przeliczenie oraz osobne zgłoszenie pustego źródła.
+Test migracji zachowuje dawne pełne zadania. Osiem scenariuszy cyklu życia obejmuje teraz wszystkie pięć procesów kolektora.
+Fizyczny odbiór na Zebra/Honeywell nadal pozostaje wymagany.

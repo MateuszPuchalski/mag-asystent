@@ -180,6 +180,8 @@ export function migrate(database: DatabaseSync) {
   usunSesjeRozkladania(database);
   /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
+  // Stare uzupełnienia dopuszczały wyłącznie pełny przydział; NULL pozostaje zgodnym zapisem tej historii.
+  addColumn("wms_replenishment", "completed_quantity", "INTEGER CHECK(completed_quantity>=0 AND completed_quantity<=quantity)");
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
   /* Dane doboru rozpoznane w rozmowie przy szkicu Copilota (etap F, przyrost
      trzeci) — patrz `szkic_copilota` w `schema.sql`. Tabela stoi na produkcji

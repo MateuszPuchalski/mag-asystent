@@ -34,6 +34,16 @@ historii nie przepisujemy.
 ---
 
 
+## 0.303.0 — uzupełnianie półek na kolektorze z obsługą braków
+
+- **UZUPEŁNIENIA WMS**: własna kolejka, propozycje, podjęcie oraz skany źródła, części i celu. Ilość wymaga jawnego potwierdzenia.
+- Częściowe pobranie przesuwa tylko znalezione sztuki. Zero nie tworzy ruchu; źródło pozostaje do przeliczenia bez automatycznego odpisu.
+- Anulowanie wymaga zwrotu towaru i skanu źródła. Wspólne zadania trzeba rozliczyć przed spisem tego źródła.
+- Trwałe ponowienie odzyskuje także numer podjęcia. Nowy proces korzysta ze wspólnego dziennika i ochrony podczas pauzy.
+- Biuro obsługuje częściową ilość i puste źródło. Kolektor stronicuje propozycje oraz zadania po 50 pozycji.
+- **[wymaga działania]** Zaktualizować API i APK. Migracja dodaje ilość zakończonego zadania, zachowując stare pełne uzupełnienia.
+- Weryfikacja lokalna: 2265 testów serwera, 727 panelu i 423 Android core. E2E obejmuje utratę odpowiedzi oraz pustą lokalizację.
+
 ## 0.302.1 — przerwa na kolektorze blokuje spóźnione skany
 
 Wszystkie cztery procesy WMS mają wspólną obsługę uśpienia i powrotu na ekran.

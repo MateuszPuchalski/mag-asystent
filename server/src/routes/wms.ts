@@ -259,6 +259,13 @@ export async function wmsRoutes(app: FastifyInstance) {
   app.get("/api/wms/stock-work", async (req) =>
     StockWork.stockWork(actor(), req.query),
   );
+  app.get("/api/wms/replenishment-work", async (req) =>
+    StockWork.replenishmentWork(actor(), req.query),
+  );
+  app.get<{ Params: { id: string } }>(
+    "/api/wms/replenishment-work/:id",
+    async (req) => StockWork.replenishmentTask(actor(), orderId(req.params.id)),
+  );
   app.get("/api/wms/count-work", async (req) =>
     Counting.countQueue(actor(), req.query),
   );

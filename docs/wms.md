@@ -619,3 +619,27 @@ Zablokowanie urządzenia, wyjście z aplikacji lub przejście na inny ekran odbi
 Nie skanuj następnej części podczas przerwy. Po powrocie poczekaj na świeży stan i rozpocznij wskazaną sekwencję skanów.
 Wynik już rozpoczętego zapisu może zostać potwierdzony w tle. Nie oznacza to utraty operacji.
 Gdy odpowiedź pozostaje nieznana, wybierz **SPRAWDŹ OSTATNI ZAPIS**. Nie czyść danych kolektora ani nie twórz drugiej operacji.
+
+
+### Uzupełnianie zaplecze → półka na kolektorze
+
+**UZUPEŁNIENIA WMS** pokazują własne zadania oraz propozycje wynikające z minimów i niezarezerwowanego popytu.
+Kolejka pokazuje po 50 pozycji. Można skanować lub wpisać SKU, EAN albo lokalizację.
+Podjęcie propozycji zabezpiecza dostępne sztuki zaplecza. Nie zmienia jeszcze fizycznego zapasu.
+
+1. Zeskanuj źródło zaplecza i kod części.
+2. Potwierdź faktycznie pobraną ilość, nie większą od przydziału.
+3. Odłóż towar na wskazanej półce kompletacji i zeskanuj jej kod.
+
+Mniejsza ilość wymaga opisu braku. Potwierdzenie przesuwa wyłącznie znalezione sztuki i zamyka cały przydział.
+Źródło tego SKU zostaje zablokowane do przeliczenia. Brakujące sztuki nie są automatycznie odpisywane ze stanu.
+Dla zera zeskanuj etykietę źródła i kod części, wpisz opis oraz wybierz **ZGŁOŚ PUSTE ŹRÓDŁO**.
+Nie trzeba iść do pustego celu: nie powstaje żaden ruch zapasu.
+
+**PROBLEM / ANULOWANIE** wymaga odłożenia wszystkich niepotwierdzonych sztuk na źródło, opisu i skanu źródła.
+Jeśli inni operatorzy mają przydziały tego SKU z zablokowanego źródła, muszą je najpierw zwrócić i anulować.
+Dopiero wtedy można policzyć źródło i zatwierdzić wynik w biurze.
+
+Utrata odpowiedzi nie wymaga ponownego podjęcia. **PONÓW ZAPIS** odzyskuje pierwotny numer zadania i wynik tym samym kluczem.
+Wspólny dziennik blokuje inne procesy WMS do wyjaśnienia wyniku. Powrót po pauzie wymaga świeżego odczytu i skanów.
+Biuro udostępnia częściową ilość, zgłoszenie pustego źródła i anulowanie w **Zadaniach zapasu**.

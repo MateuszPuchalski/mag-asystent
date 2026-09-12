@@ -269,6 +269,7 @@ CREATE TABLE IF NOT EXISTS wms_replenishment (
   user_id INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   completed_at TEXT,
+  completed_quantity INTEGER CHECK(completed_quantity>=0 AND completed_quantity<=quantity),
   cancelled_at TEXT,
   reason TEXT
 );
