@@ -34,6 +34,12 @@ historii nie przepisujemy.
 ---
 
 
+## 0.307.1 — połączenie ekranu wymiany ze skanerem i dziennikiem
+
+- Callback nowego ekranu kolektora potwierdza obsłużenie skanu, także podczas wstrzymania. Skan nie przechodzi wtedy do globalnej kartoteki.
+- Komunikat ponowienia korzysta z oczekującej komendy we wspólnym dzienniku. Poprawiono dwa błędy typów wykryte przez kompilację APK w CI.
+- Logika zapasu i API pozostają z 0.307.0. Aktualizacja wymaga nowego APK.
+
 ## 0.307.0 — kwarantanna i wymiana części przy pakowaniu
 
 - Uszkodzone sztuki trafiają do skanowanej kwarantanny. Dobre pobrania i potwierdzenia pozostają przy stanowisku.

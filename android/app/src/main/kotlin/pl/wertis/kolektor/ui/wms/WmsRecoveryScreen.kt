@@ -84,13 +84,17 @@ fun WmsRecoveryScreen(graph: AppGraph) {
             } else if(stage==WmsRecoveryStage.BOX)submit(recoveryFinish(task,context!!.actorId,scan,input))
             else {scan=recoveryScan(task,context!!.actorId,scan,input);error=null;graph.feedback.beep(true)}
         }catch(e:IllegalArgumentException){error=e.message;graph.feedback.beep(false)}
+        // Skan na wstrzymanym ekranie też jest obsłużony, aby nie otwierał globalnej kartoteki.
+        true
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         if(context==null){Text("Zaloguj się ponownie.");return@Column}
         if(view.context!=context || view.busy || !view.ready){
             Text(if(view.busy)"Potwierdzam na serwerze…" else "Wymiana wstrzymana",fontSize=22.sp,fontWeight=FontWeight.Bold)
             Text(view.message ?: "Czekam na świeży stan zadania.")
-            WmsPendingNotice(graph,context,view.journal,"pack-recovery",view.busy) { graph.appScope.launch { controller.retry(context) } }
+            view.journal.pending?.let { pending ->
+                WmsPendingNotice(graph,pending,context,"pack-recovery",view.busy) { graph.appScope.launch { controller.retry(context) } }
+            }
             OutlineButton("SPRAWDŹ STAN",enabled=!view.busy,modifier=Modifier.fillMaxWidth()){graph.appScope.launch{controller.open(context)}}
             return@Column
         }
