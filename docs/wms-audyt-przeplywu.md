@@ -39,6 +39,18 @@ To wnioski projektowe zastosowane do naszego kodu, nie gwarancja optymalnej orga
 
 ## Odtworzone przypadki
 
+### Jawna ilość także w natywnym formularzu
+
+Przegląd Compose wykrył lukę niewidoczną dla samych testów core: odkładanie podstawiało cały pozostały przydział do pola ilości.
+Przyjęcie i odkładanie usuwały potwierdzenie po zmianie dobry/uszkodzony, lecz zachowywały tekst poprzedniej ilości.
+Teraz odkładanie zaczyna się pustym polem, a zmiana stanu towaru wymaga ponownego wpisania policzonej partii.
+Jawna edycja ilości zachowuje wpisany tekst do poprawienia. Nowy odczyt i zmiana konta nadal resetują formularz.
+
+Cztery natywne pola ilości obcinały tekst do siedmiu znaków przed walidacją.
+Przykład: `10000000` stawało się dopuszczalnym wynikiem spisu `1000000`. Usunięto obcinanie w przyjęciu, odkładaniu, spisie i wymianie.
+Walidacja otrzymuje całą wpisaną liczbę. Test graniczny core odrzuca dziesięć milionów i przyjmuje milion bez zmiany wartości.
+Testy JVM sprawdzają logikę komend, nie uruchamiają ekranów Compose. Odbiór pustego pola i zmiany dyspozycji wymaga próby APK na urządzeniu.
+
 1. **Dostawa w czasie uzupełnienia.** Pracownik ma zadanie przeniesienia 4 sztuk.
    Dodatkowa sztuka przyjęta na zaplecze zmienia wersję stanu. W 0.288.0 zakończenie
    zadania wymagało anulowania i ponownego planowania mimo wystarczającego zapasu.

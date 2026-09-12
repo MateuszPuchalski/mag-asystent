@@ -15,6 +15,9 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Poprawka 0.310.1 wymaga aktualizacji APK dla pustego pola odłożenia i kasowania ilości po zmianie dobry/uszkodzony.
+Nie zmienia API ani bazy. Odbiór seeded: wpisana ilość → zmiana dyspozycji → puste pole; za długa liczba pozostaje widoczna i jest odrzucana.
+
 Od 0.310.0 kolektor i Biuro oferują mniejszą partię przed podjęciem uzupełnienia.
 Wykonać build i restart API oraz zaktualizować APK. Istniejące zadania zachowują swoje przydziały; nie ma migracji.
 Odbiór seeded: potrzeba dwudziestu → podjęcie pięciu → faktyczne pięć na celu → piętnaście ponownie w planie, bez przeliczenia źródła.

@@ -454,6 +454,10 @@ przed którą ta pozycja broni.
 
 ## Natywne uzupełnienia WMS
 
+Przyjęcie, odkładanie, spis i wymiana wymagają wpisania faktycznej ilości bez obcinania cyfr.
+Odkładanie nie podstawia pozostałego przydziału. Zmiana dobry/uszkodzony w przyjęciu i odkładaniu czyści ilość, także przed jej potwierdzeniem.
+Próba na kolektorze: puste odłożenie nie przechodzi do celu; zmiana dyspozycji usuwa poprzednią liczbę; zbyt długa liczba pozostaje widoczna i jest odrzucana.
+
 **UZUPEŁNIENIA WMS** prowadzą od propozycji przez podjęcie, skan źródła i części, potwierdzenie ilości oraz skan celu.
 Plan chroni przydziały innych operatorów i zapas oczekujący na odłożenie. Kolejka jest stronicowana po 50 pozycji.
 Częściowe pobranie wymaga opisu braku; zero zgłasza puste źródło bez ruchu. Źródło pozostaje do liczenia i decyzji biura.

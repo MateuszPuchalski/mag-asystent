@@ -27,10 +27,12 @@ class WmsCountScanTest {
         assertEquals("api/wms/stock-checks/1/observe", command.path)
     }
     @Test fun `puste ulamkowe ujemne i zbyt duze liczenie nie wysyla zera`() {
-        for (raw in listOf("", " ", "-1", "1.5", "1000001", "999999999999999")) {
+        for (raw in listOf("", " ", "-1", "1.5", "1000001", "10000000", "999999999999999")) {
             assertThrows(IllegalArgumentException::class.java) { countDraft(countTask, WmsCountScan(true, "0590123"), raw) }
         }
         assertThrows(IllegalArgumentException::class.java) { countDraft(countTask, WmsCountScan(), "0") }
+        // Granica pozostaje prawidłowa; usunięcie końcowej cyfry z 10000000 zmieniłoby odmowę w zapis.
+        assertEquals("1000000", countDraft(countTask, WmsCountScan(true, "0590123"), "1000000").body["quantity"]!!.jsonPrimitive.content)
     }
     @Test fun `kod lokalizacji normalizuje sie tylko przy skanie polki`() {
         assertEquals("A-01", countCode(WmsCountStage.BIN, classify("LOC:A-01")))

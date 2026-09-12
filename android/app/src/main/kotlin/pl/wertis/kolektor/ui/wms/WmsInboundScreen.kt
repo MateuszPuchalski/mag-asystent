@@ -174,7 +174,7 @@ fun WmsInboundScreen(graph: AppGraph) {
             when (stage) {
                 WmsInboundStage.QUANTITY -> if (allowed) {
                     Text("Teraz przyjmujesz · pozostało ${line.remaining} szt.", fontWeight = FontWeight.Bold)
-                    WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Policzona ilość", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
+                    WertisTextField(quantity, { quantity = it }, placeholder = "Policzona ilość", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
                     PrimaryButton("POTWIERDŹ ILOŚĆ", modifier = Modifier.fillMaxWidth(), onClick = ::confirmQuantity)
                 }
                 WmsInboundStage.DESTINATION -> {
@@ -200,7 +200,12 @@ fun WmsInboundScreen(graph: AppGraph) {
                 }
                 if (line != null && scan.barcode != null && line.remaining > 0) {
                     OutlineButton(if (damaged) "PEŁNOWARTOŚCIOWY TOWAR" else "USZKODZONY TOWAR", modifier = Modifier.fillMaxWidth()) {
-                        damaged = !damaged; scan = scan.copy(quantity = null); options = false
+                        damaged = !damaged
+                        scan = scan.copy(quantity = null)
+                        // Poprzednia partia dobrego towaru nie potwierdza ilości uszkodzonych sztuk.
+                        quantity = ""
+                        error = null
+                        options = false
                     }
                     OutlineButton("ZMIEŃ ILOŚĆ", modifier = Modifier.fillMaxWidth()) { scan = scan.copy(quantity = null); options = false }
                 }

@@ -51,7 +51,8 @@ fun WmsPutawayScreen(graph: AppGraph) {
     val view by controller.state.collectAsStateWithLifecycle()
     val task = view.task.takeIf { view.context == context }
     var scan by remember(view.generation, context) { mutableStateOf(WmsPutawayScan()) }
-    var quantity by remember(view.generation, context) { mutableStateOf(task?.remaining?.toString().orEmpty()) }
+    // Pozostały przydział nie jest potwierdzeniem faktycznie policzonej partii.
+    var quantity by remember(view.generation, context) { mutableStateOf("") }
     var error by remember(view.generation, context) { mutableStateOf<String?>(null) }
     var damaged by remember(view.generation, context) { mutableStateOf(false) }
     var options by remember(view.generation, context) { mutableStateOf(false) }
@@ -177,7 +178,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
             }
             WmsPutawayStage.QUANTITY -> if (allowed) {
                 Text("Ile sztuk odkładasz teraz?")
-                WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Ilość sztuk", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
+                WertisTextField(quantity, { quantity = it }, placeholder = "Policzona ilość", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)
                 PrimaryButton("POTWIERDŹ ILOŚĆ", modifier = Modifier.fillMaxWidth(), onClick = ::confirmQuantity)
             }
             WmsPutawayStage.TARGET -> {
@@ -195,6 +196,9 @@ fun WmsPutawayScreen(graph: AppGraph) {
                 OutlineButton(if (damaged) "DOBRY TOWAR NA PÓŁKĘ" else "USZKODZONY TOWAR DO KWARANTANNY", modifier = Modifier.fillMaxWidth()) {
                     damaged = !damaged
                     scan = scan.copy(quantity = null)
+                    // Inny stan towaru wymaga osobnego liczenia, także przed potwierdzeniem pola.
+                    quantity = ""
+                    error = null
                     options = false
                 }
                 OutlineButton("ZMIENIAM ILOŚĆ", modifier = Modifier.fillMaxWidth()) { scan = scan.copy(quantity = null); options = false }

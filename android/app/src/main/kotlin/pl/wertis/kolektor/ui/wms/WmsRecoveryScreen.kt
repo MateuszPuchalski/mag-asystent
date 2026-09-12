@@ -142,7 +142,7 @@ fun WmsRecoveryScreen(graph: AppGraph) {
             }
             when(stage){
                 WmsRecoveryStage.QUANTITY -> {
-                    WertisTextField(quantity,{quantity=it.take(7)},placeholder="Faktycznie pobrane sztuki",keyboardType=KeyboardType.Number,onDone=::confirm)
+                    WertisTextField(quantity,{quantity=it},placeholder="Faktycznie pobrane sztuki",keyboardType=KeyboardType.Number,onDone=::confirm)
                     PrimaryButton("POTWIERDŹ ILOŚĆ",enabled=allowed,modifier=Modifier.fillMaxWidth(),onClick=::confirm)
                 }
                 WmsRecoveryStage.BOX -> Text("${scan.quantity} szt. → ${task.box}. Skan skrzynki po dostarczeniu zapisze ruch.",fontSize=22.sp)

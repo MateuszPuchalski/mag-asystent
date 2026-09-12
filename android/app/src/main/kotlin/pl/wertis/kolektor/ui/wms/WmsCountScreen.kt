@@ -138,7 +138,7 @@ fun WmsCountScreen(graph: AppGraph) {
         if (stage == WmsCountStage.QUANTITY && allowed) {
             Text("Policz sprawne sztuki na tej półce. Nie doliczaj skrzynek ani innych półek. Pusta półka: wpisz 0.")
             Text("Uszkodzenia pozostaw oddzielnie do wyjaśnienia z biurem. Nie przenoś zapasu podczas liczenia.", color = InkMute)
-            WertisTextField(quantity, { quantity = it.take(7) }, placeholder = "Rzeczywista ilość", keyboardType = KeyboardType.Number, onDone = ::confirm)
+            WertisTextField(quantity, { quantity = it }, placeholder = "Rzeczywista ilość", keyboardType = KeyboardType.Number, onDone = ::confirm)
             PrimaryButton("WYŚLIJ WYNIK DO BIURA", modifier = Modifier.fillMaxWidth(), onClick = ::confirm)
         }
         if (stage == WmsCountStage.PENDING) Text("Wynik zapisany. Półka pozostaje zablokowana. Możesz wybrać kolejne zadanie.")

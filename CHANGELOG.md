@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.310.1 — policzona ilość na kolektorze
+
+- Natywne odkładanie zaczyna się pustym polem. Pozostały przydział nie potwierdza ilości faktycznie odkładanej partii.
+- Zmiana dobry/uszkodzony w przyjęciu i odkładaniu czyści poprzednią ilość oraz jej potwierdzenie.
+- Przyjęcie, odkładanie, spis i wymiana przekazują całą wpisaną liczbę do walidacji. Zbyt długie liczby nie tracą końcowych cyfr.
+- Rozszerzono granice testu spisu: dziesięć milionów jest odrzucane, milion pozostaje milionem. Testy core nie zastępują odbioru formularzy na fizycznym urządzeniu.
+- Poprawka wymaga nowego APK. Brak zmian API i migracji danych.
+
 ## 0.310.0 — mniejsza partia uzupełnienia
 
 - Kolektor i Biuro pozwalają wybrać mniejszą partię przed podjęciem uzupełnienia. Cała propozycja nadal wymaga jednego naciśnięcia.
