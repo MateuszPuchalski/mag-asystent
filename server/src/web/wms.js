@@ -172,8 +172,8 @@ window.Wms = (() => {
       box.setAttribute("aria-live", error ? "assertive" : "polite");
     }
   }
-  async function read(path) {
-    return (await api(path, { signal: AbortSignal.timeout(20000) })).json();
+  async function read(path, timeoutMs = 20000) {
+    return (await api(path, { signal: AbortSignal.timeout(timeoutMs) })).json();
   }
   function lock(value) {
     // Zapis i zagnieżdżone odczyty trzymają wspólną blokadę aż nowy formularz będzie gotowy.
@@ -669,7 +669,8 @@ window.Wms = (() => {
     el("wms-stock-form").scrollIntoView({ block: "nearest" });
   }
   async function report(turn) {
-    const a = await read(`/api/wms/analytics?days=${days}`);
+    // Raport ma własny limit 45 s; przeglądarka musi odebrać wynik albo jego komunikat błędu.
+    const a = await read(`/api/wms/analytics?days=${days}`, 50000);
     if (turn !== generation) return;
     const totals = a.backlog.reduce(
       (n, r) => ({

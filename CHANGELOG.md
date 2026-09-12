@@ -34,6 +34,11 @@ historii nie przepisujemy.
 ---
 
 
+## 0.300.1 — przeglądarka respektuje limit czasu analityki
+
+- Odczyt raportu czeka do 50 sekund, aby odebrać wynik lub komunikat limitu 45 sekund z serwera.
+- Pozostałe odczyty i zapisy zachowują limit 20 sekund.
+
 ## 0.300.0 — analityka kolejek bez blokowania kolektora
 
 - Bieżące kolejki pokazują wiek pracy, wstrzymania, bufor oraz przejście do właściwego obszaru.
