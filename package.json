@@ -1,7 +1,7 @@
 {
   "name": "wertis-kolektor",
   "private": true,
-  "version": "0.305.0",
+  "version": "0.305.1",
   "description": "WERTIS — WMS z kompletacją i pakowaniem, biuro, obsługa klienta i kolektor Android; integracje Subiekta GT.",
   "workspaces": [
     "server",

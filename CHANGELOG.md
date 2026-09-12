@@ -34,6 +34,12 @@ historii nie przepisujemy.
 ---
 
 
+## 0.305.1 — czytelny plan uzupełnień na wąskim ekranie
+
+- Propozycje w Biurze przechodzą na małym ekranie w wiersze z pełną szerokością nazwy i powodu pracy.
+- Kody źródła i celu oraz opis ilości pozostają czytelne. Przycisk podjęcia stoi obok szczegółów, bez ściskania czterech kolumn.
+- Sprawdzono widoki 320, 390 i 1440 px oraz E2E podjęcia zadania. Wymaga aktualizacji plików web i restartu API.
+
 ## 0.305.0 — uzupełnienia według potrzeb zamówień
 
 - Braki zamówień wyprzedzają rutynowe minima półek. Kolejność uwzględnia priorytet, następnie termin wysyłki.
