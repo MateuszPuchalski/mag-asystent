@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.312.0 — zwrot pobrania na inną półkę
+
+- Kolektor i Biuro pozwalają jawnie wybrać inną półkę kompletacji. Źródło zmienione na kwarantannę lub zaplecze nie przyjmuje rezerwacji zwrotu.
+- Zapas oraz rezerwacja trafiają razem na rzeczywisty cel. Częściowe partie dzielą i scalają przydział bez pozornych ruchów na starej półce.
+- Nowy cel sprawdza pojemność i aktywne przeliczenie. Awaria cofa całą operację; ponowienie zachowuje jeden zwrot.
+- Trasa i komenda zbiórki blokują pobranie spoza kompletacji. Raport spójności wykrywa także dawne nieprawidłowe rezerwacje.
+- Biuro przyjmuje prefiks `LOC:` w polu półki zwrotu, zachowując niezmienione kody części i skrzynki.
+- **[wymaga działania]** Build, restart API, odświeżenie Biura i nowy APK dla wyboru celu. Nie ma migracji danych.
+
 ## 0.311.0 — zwrot pobrań z właściwej skrzynki
 
 - Kolektor prowadzi zwroty wstrzymanych zamówień z własnego wózka: skrzynka → część → policzona ilość → półka po odłożeniu.

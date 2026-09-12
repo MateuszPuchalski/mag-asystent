@@ -123,6 +123,11 @@ Zwrot pobrania wymaga wstrzymania zamówienia i skanu jego skrzynki.
 Na kolektorze wybierz **ODŁÓŻ POBRANIA**, następnie zeskanuj skrzynkę, część, wpisz policzoną ilość i zeskanuj pierwotną półkę po odłożeniu.
 Pracujesz na wybranej skrzynce własnego wózka przed przekazaniem do pakowania. Przerwanie wymaga pozostawienia nieodłożonych sztuk w tej samej skrzynce.
 Po zapisaniu partii kolektor pokazuje resztę. Zwrot nie anuluje zamówienia i nie rozstrzyga uszkodzenia; decyzja pozostaje w biurze.
+Jeżeli pierwotna półka jest pełna, wybierz **INNA PÓŁKA** przed końcowym skanem. Sprawdź miejsce i odłóż na zarejestrowaną półkę kompletacji.
+Kolektor wymaga innej półki, gdy źródło zmieniono na kwarantannę lub zaplecze. Biuro udostępnia ten sam wybór w polu **Miejsce zwrotu**.
+Zapas oraz rezerwacja wracają razem na zeskanowany cel. Nie powstaje pozorny ruch ze starej półki; częściowy zwrot rozdziela przydział.
+Nowy cel nie może czekać na przeliczenie ani przekraczać wolnego miejsca. Brak limitu pojemności wymaga fizycznego sprawdzenia miejsca.
+Pole półki zwrotu w Biurze przyjmuje również etykiety `LOC:`. Prefiks w kodzie części lub skrzynki zachowuje swoje znaczenie.
 Synchronizacja Subiekta nie nadpisuje tych ilości.
 Usunięcie kartoteki ERP nie ukrywa jej pozostałego zapasu w WMS.
 

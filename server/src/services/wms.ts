@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
 import { logEvent } from "./events.js";
 import type { Rola } from "./users.js";
+import { restorePickedAllocation } from "./wms-return-location.js";
 import {
   addPackedContent,
   clearPackingContents,
@@ -183,6 +184,7 @@ export const actionInput = z.discriminatedUnion("action", [
       version,
       tote: label,
       runId: id.optional(),
+      target: bin.optional(),
       allocationId: id,
       barcode: label,
       bin,
@@ -232,6 +234,7 @@ type Line = {
   packed: number;
 };
 type Allocation = {
+  bin_mode: string;
   id: number;
   line_id: number;
   bin: string;
@@ -1010,7 +1013,8 @@ function readOrder(orderId: number) {
     .all(orderId) as Line[];
   const allocations = d
     .prepare(
-      `SELECT a.* FROM wms_allocation a JOIN wms_line l ON l.id=a.line_id
+      `SELECT a.*,coalesce(b.mode,'pick') AS bin_mode FROM wms_allocation a JOIN wms_line l ON l.id=a.line_id
+    LEFT JOIN wms_bin b ON b.bin=a.bin
     WHERE l.order_id=? ORDER BY a.bin,a.id`,
     )
     .all(orderId) as Allocation[];
@@ -1293,6 +1297,14 @@ export function applyOrderAction(
         "Lokalizacja tego SKU czeka na przeliczenie. Kontynuuj inne pobrania",
       );
     checkBarcode(line, input.barcode);
+    if (
+      input.action === "pick" &&
+      (d.prepare("SELECT mode FROM wms_bin WHERE bin=?").get(allocation.bin)
+        ?.mode ?? "pick") !== "pick"
+    )
+      fail(
+        "Ta lokalizacja nie służy do kompletacji. Wstrzymaj zamówienie i wyjaśnij rezerwację w biurze",
+      );
     if (allocation.bin !== input.bin)
       fail(`Zeskanuj lokalizację ${allocation.bin}`, 400);
     const returning = input.action === "return";
@@ -1313,20 +1325,32 @@ export function applyOrderAction(
         "UPDATE wms_order_timing SET pack_started_at=NULL,first_pack_scan_at=NULL,last_pack_scan_at=NULL,pack_completed_at=NULL WHERE order_id=?",
       ).run(orderId);
     }
-    move(
-      actor,
-      line.tw_id,
-      allocation.bin,
-      -amount,
-      -amount,
-      returning ? "return" : "pick",
-      returning ? input.reason : order.reference,
-      orderId,
-    );
-    d.prepare("UPDATE wms_allocation SET picked=picked+? WHERE id=?").run(
-      amount,
-      allocation.id,
-    );
+    if (input.action === "return")
+      restorePickedAllocation(
+        actor,
+        allocation,
+        line.tw_id,
+        orderId,
+        input.quantity,
+        input.target ?? allocation.bin,
+        input.reason,
+      );
+    else {
+      move(
+        actor,
+        line.tw_id,
+        allocation.bin,
+        -amount,
+        -amount,
+        "pick",
+        order.reference,
+        orderId,
+      );
+      d.prepare("UPDATE wms_allocation SET picked=picked+? WHERE id=?").run(
+        amount,
+        allocation.id,
+      );
+    }
     if (returning) {
       // Po fizycznym wyjęciu z paczki kontrola całego zamówienia zaczyna się od nowa.
       d.prepare("UPDATE wms_line SET packed=0 WHERE order_id=?").run(orderId);
@@ -1662,11 +1686,12 @@ function readWave(actor: Actor, waveId: number) {
     .prepare(
       `SELECT a.id AS allocation_id,a.bin,a.quantity-a.picked AS remaining,
     l.tw_id,l.sku,l.name,l.barcode,o.id AS order_id,o.reference,o.tote,o.version,o.picker_id,o.hold_reason,ca.position,
-    sc.reason AS stock_blocked,
-    sum(CASE WHEN o.hold_reason IS NULL AND sc.id IS NULL THEN a.quantity-a.picked ELSE 0 END) OVER (PARTITION BY a.bin,l.tw_id) AS stop_quantity
+    CASE WHEN coalesce(b.mode,'pick')<>'pick' THEN 'Lokalizacja nie służy do kompletacji' ELSE sc.reason END AS stock_blocked,
+    sum(CASE WHEN o.hold_reason IS NULL AND sc.id IS NULL AND coalesce(b.mode,'pick')='pick' THEN a.quantity-a.picked ELSE 0 END) OVER (PARTITION BY a.bin,l.tw_id) AS stop_quantity
     FROM wms_wave_order w JOIN wms_order o ON o.id=w.order_id JOIN wms_line l ON l.order_id=o.id
     JOIN wms_allocation a ON a.line_id=l.id
     LEFT JOIN wms_pick_route r ON r.bin=a.bin
+    LEFT JOIN wms_bin b ON b.bin=a.bin
     LEFT JOIN wms_stock_check sc ON sc.tw_id=l.tw_id AND sc.bin=a.bin AND sc.resolved_at IS NULL
     LEFT JOIN wms_cart_assignment ca ON ca.run_id=w.wave_id AND ca.order_id=o.id AND ca.ended_at IS NULL
     WHERE w.wave_id=? AND o.status='picking' AND a.picked<a.quantity

@@ -162,7 +162,8 @@ fun WmsPickingScreen(graph: AppGraph) {
             } else {
                 Text("POZYCJA ${returnTask.position} · ${returnTask.tote}", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                 Text("${returnTask.sku} · ${returnTask.name}", fontSize = 18.sp)
-                Text("Do odłożenia: ${returnTask.remaining} szt. → ${returnTask.bin}")
+                Text("Do zwrotu: ${returnTask.remaining} szt. · pobrano z ${returnTask.bin}")
+                if (returnTask.source_mode != "pick") Text("Pierwotna półka nie służy już do kompletacji. Zwróć towar na inną półkę kompletacji.", fontWeight = FontWeight.Bold)
                 Text("Powód wstrzymania: ${returnTask.hold_reason}", color = InkMute)
                 when (returnStage(returned)) {
                     WmsReturnStage.BOX -> Text("1. Zeskanuj skrzynkę źródłową")
@@ -177,7 +178,9 @@ fun WmsPickingScreen(graph: AppGraph) {
                         PrimaryButton("POTWIERDŹ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth(), onClick = ::confirm)
                     }
                     WmsReturnStage.BIN -> {
-                        Text("4. Odłóż ${returned.quantity} szt. na ${returnTask.bin}. Skan półki zapisze zwrot.", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(if (returned.alternative || returnTask.source_mode != "pick") "4. Odłóż ${returned.quantity} szt. na inną zarejestrowaną półkę kompletacji i zeskanuj ją. Sprawdź miejsce przed odłożeniem."
+                            else "4. Odłóż ${returned.quantity} szt. na ${returnTask.bin}. Skan półki zapisze zwrot.", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        if (!returned.alternative && returnTask.source_mode == "pick") OutlineButton("INNA PÓŁKA · BRAK MIEJSCA LUB ZMIANA LOKALIZACJI", enabled = allowed, modifier = Modifier.fillMaxWidth()) { returned = returned.copy(alternative = true); error = null }
                         OutlineButton("ZMIEŃ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { returned = returned.copy(quantity = null); error = null }
                     }
                 }

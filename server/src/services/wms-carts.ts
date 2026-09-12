@@ -341,10 +341,11 @@ function readCartRun(actor: Actor, runId: number) {
     .prepare(
       `
     SELECT a.id AS allocation_id,a.picked AS remaining,a.bin,l.tw_id,l.sku,l.name,l.barcode,
-      o.id AS order_id,o.version,o.tote,o.hold_reason,ca.position
+      o.id AS order_id,o.version,o.tote,o.hold_reason,ca.position,coalesce(b.mode,'pick') AS source_mode
     FROM wms_cart_assignment ca JOIN wms_order o ON o.id=ca.order_id
     JOIN wms_line l ON l.order_id=o.id JOIN wms_allocation a ON a.line_id=l.id
     LEFT JOIN wms_pick_route r ON r.bin=a.bin
+    LEFT JOIN wms_bin b ON b.bin=a.bin
     WHERE ca.run_id=? AND ca.ended_at IS NULL AND ca.released_at IS NULL AND ca.handed_at IS NULL
       AND o.hold_reason IS NOT NULL AND o.status IN ('picking','picked') AND a.picked>0
       AND o.picker_id=? AND o.tote=ca.box_barcode

@@ -39,6 +39,28 @@ To wnioski projektowe zastosowane do naszego kodu, nie gwarancja optymalnej orga
 
 ## Odtworzone przypadki
 
+### Zwrot na półkę wyłączoną z kompletacji
+
+Próba seeded pobrała cały przydział, zmieniła pustą z rezerwacji półkę na kwarantannę i wstrzymała zamówienie.
+Poprzednia komenda przyjęła zwrot na tę półkę, a wznowienie pozwoliło ponownie pobrać towar. Kontrola samych ilości nie wykryła błędu.
+
+Zwrot wymaga teraz celu kompletacji. Operator może jawnie wybrać inną półkę; aktualny odczyt wyklucza pierwotny cel o zmienionym przeznaczeniu.
+Transakcja sprawdza przeznaczenie ponownie, więc zmiana po odczycie także zatrzymuje zapis.
+Inny cel musi mieć miejsce i nie może oczekiwać na przeliczenie. Częściowy zwrot rozdziela przydział; kolejna partia scala rezerwację na celu.
+Zapas powiększa się wyłącznie na rzeczywistym celu. Pierwotna półka nie dostaje fikcyjnego przyjęcia ani wydania.
+Zamówienie pozostaje wstrzymane. Wznowienie zbiera z nowej półki, a anulowanie zwalnia jej rezerwację.
+
+Odczyt trasy blokuje dawne rezerwacje na lokalizacjach innych niż kompletacja. Komenda pobrania ponawia kontrolę, a raport spójności wskazuje takie przydziały.
+Pięć regresji serwera obejmuje zmianę przeznaczenia, podział i scalenie, pojemność, przeliczenie, rollback, ponowienie oraz starą nieprawidłową rezerwację.
+Test core sprawdza jawny wybór i końcowy skan. Dziennik zachowuje cel po utracie odpowiedzi i restarcie.
+Browser E2E potwierdza odrzucenie błędnej części, obsługę etykiety lokalizacji `LOC:` i jeden zwrot po utracie odpowiedzi.
+Formularz mieści się przy 320, 390 i 1440 px. Odbiór na fizycznym kolektorze pozostaje otwarty.
+
+[Microsoft: kwarantanna zapasu](https://learn.microsoft.com/en-us/dynamics365/supply-chain/inventory/quarantine-orders)
+opisuje odseparowanie zapasu podlegającego kontroli od zwykłego obrotu.
+Wniosek dla WERTIS: poprawne saldo nie wystarcza, gdy rezerwacja prowadzi do lokalizacji wyłączonej z kompletacji.
+To własna reguła WMS; nie jest odwzorowaniem całego procesu kwarantanny Dynamics.
+
 ### Zwrot pobrania z właściwej skrzynki
 
 Próba seeded utworzyła dwa zamówienia z tym samym SKU, pobranym z tej samej półki do różnych skrzynek.

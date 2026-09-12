@@ -12,9 +12,10 @@ data class WmsReturnTask(
     val tw_id: Long, val sku: String, val name: String, val barcode: String? = null,
     val bin: String, val tote: String, val position: Int, val remaining: Int,
     val hold_reason: String,
+    val source_mode: String = "pick",
 )
 
-data class WmsReturnScan(val box: Boolean = false, val barcode: String? = null, val quantity: Int? = null)
+data class WmsReturnScan(val box: Boolean = false, val barcode: String? = null, val quantity: Int? = null, val alternative: Boolean = false)
 enum class WmsReturnStage { BOX, PRODUCT, QUANTITY, BIN }
 fun returnStage(scan: WmsReturnScan): WmsReturnStage = when {
     !scan.box -> WmsReturnStage.BOX
@@ -49,14 +50,18 @@ fun returnScan(run: WmsRun, task: WmsReturnTask, userId: Long, scan: WmsReturnSc
         }
         WmsReturnStage.QUANTITY -> throw IllegalArgumentException("Najpierw policz i potwierdź ilość")
         WmsReturnStage.BIN -> {
-            require(code == task.bin) { "Odłóż na ${task.bin} i zeskanuj tę półkę" }
+            val target = code.uppercase()
+            require(target.matches(Regex("[A-Z0-9][A-Z0-9-]{0,29}"))) { "Zeskanuj kod półki" }
+            require(scan.alternative || task.source_mode != "pick" || target == task.bin) { "Zeskanuj ${task.bin} albo wybierz inną półkę" }
+            require(task.source_mode == "pick" || target != task.bin) { "Pierwotna półka nie służy do kompletacji. Wybierz inną" }
             require(scan.quantity!! in 1..task.remaining) { "Ilość przekracza pozostałe pobranie" }
             // Numer trasy utrzymuje istniejący dziennik i odświeżenie bez osobnej kolejki zapisu.
             WmsReturnResult(scan, WmsDraft("api/wms/orders/${task.order_id}/actions", buildJsonObject {
                 put("action", "return"); put("version", task.version); put("allocationId", task.allocation_id); put("runId", run.id)
-                put("tote", task.tote); put("barcode", scan.barcode); put("quantity", scan.quantity); put("bin", code)
+                put("tote", task.tote); put("barcode", scan.barcode); put("quantity", scan.quantity); put("bin", task.bin)
+                if (target != task.bin) put("target", target)
                 put("reason", "Zwrot z wózka: ${task.hold_reason}".take(500))
-            }, "Zwrot ${scan.quantity} × ${task.sku}: ${task.tote} → $code", run.id))
+            }, "Zwrot ${scan.quantity} × ${task.sku}: ${task.tote} → $target", run.id))
         }
     }
 }

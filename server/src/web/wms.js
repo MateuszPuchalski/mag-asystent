@@ -586,6 +586,8 @@ window.Wms = (() => {
         : null,
       office() ? ["cancel", "Anuluj zamówienie"] : null,
     ].filter(Boolean);
+    const firstReturn = o.allocations.find((a) => a.picked > 0);
+    const originalReturnAllowed = (firstReturn?.bin_mode ?? "pick") === "pick";
     const returned =
       o.hold_reason && o.allocations.some((a) => a.picked > 0)
         ? form(
@@ -598,7 +600,7 @@ window.Wms = (() => {
               )
               .join(
                 "",
-              )}</select></label>${field("barcode", "2. Skan części")}${field("quantity", "3. Policzona ilość", "number", "", `min="1" max="${o.allocations.find((a) => a.picked > 0).picked}" step="1"`)}${field("reason", "4. Powód odłożenia", "text", "", 'minlength="3" maxlength="500"')}${field("bin", "5. Skan półki po odłożeniu")}`,
+              )}</select></label>${field("barcode", "2. Skan części")}${field("quantity", "3. Policzona ilość", "number", "", `min="1" max="${o.allocations.find((a) => a.picked > 0).picked}" step="1"`)}${field("reason", "4. Powód odłożenia", "text", "", 'minlength="3" maxlength="500"')}<label>Miejsce zwrotu<select name="returnDestination"><option value="original" ${originalReturnAllowed ? "" : "disabled"}>Pierwotna półka ${html(firstReturn?.bin || "")}</option><option value="other" ${originalReturnAllowed ? "" : "selected"}>Inna półka kompletacji</option></select></label><p>Sprawdź miejsce przed odłożeniem. Inny cel musi być zarejestrowaną półką kompletacji.</p>${field("bin", "5. Skan półki po odłożeniu")}`,
             "POTWIERDŹ ODŁOŻENIE",
           )
         : "";
@@ -1197,6 +1199,19 @@ window.Wms = (() => {
       const action = f.dataset.actionWms || values.action;
       if (action && current) {
         let body = { ...values, action, version: current.version };
+        if (action === "return") {
+          // Prefiks etykiety dotyczy półki, nigdy symbolu części ani kodu skrzynki.
+          body.bin = String(values.bin).trim().replace(/^LOC:/i, "");
+          if (values.returnDestination === "other") {
+            const allocation = current.allocations.find(
+              (a) => a.id === Number(values.allocationId),
+            );
+            if (!allocation) throw new Error("Odśwież pozycje zwrotu");
+            body.target = body.bin;
+            body.bin = allocation.bin;
+          }
+          delete body.returnDestination;
+        }
         if (action === "amend") {
           body.lines = String(values.lines)
             .split(/\r?\n/)
@@ -1250,10 +1265,19 @@ window.Wms = (() => {
       const allocation = current?.allocations.find(
         (a) => a.id === Number(event.target.value),
       );
+      const destination = returnForm.elements.namedItem("returnDestination");
+      destination.options[0].textContent = `Pierwotna półka ${allocation?.bin ?? ""}`;
+      destination.options[0].disabled =
+        (allocation?.bin_mode ?? "pick") !== "pick";
+      destination.value = destination.options[0].disabled
+        ? "other"
+        : "original";
       returnForm.elements.namedItem("quantity").max = String(
         allocation?.picked ?? 0,
       );
     }
+    if (returnForm && event.target.name === "returnDestination")
+      returnForm.elements.namedItem("bin").value = "";
     if (event.target.id === "wms-stock-file") {
       root()._stockImport = null;
       el("wms-stock-preview-result").textContent = "";

@@ -11,9 +11,21 @@ import pl.wertis.kolektor.core.scan.classify
 private val returnActor = WmsContext("http://seeded/", 2)
 private val returnPart = WmsReturnTask(7, 12, 4, 30, "LOC:PART", "Koło", "0590123", "A-01", "BOX-1", 1, 2, "Rezygnacja klienta")
 private val returnRun = WmsRun(5, "CART-20", 2, orders = listOf(WmsOrder(12, "picked", "Rezygnacja klienta")), tasks = emptyList(), returns = listOf(returnPart))
-private fun returnDraft() = returnScan(returnRun, returnPart, 2, WmsReturnScan(true, returnPart.sku, 1), "A-01").command!!
+private fun returnDraft() = returnScan(returnRun, returnPart, 2, WmsReturnScan(true, returnPart.sku, 1, alternative = true), "B-01").command!!
 
 class WmsReturnTest {
+    @Test fun `inna polka wymaga wyboru a kwarantanna nie jest celem dobrego zwrotu`() {
+        val scan = WmsReturnScan(true, returnPart.sku, 1)
+        assertThrows(IllegalArgumentException::class.java) { returnScan(returnRun, returnPart, 2, scan, "B-01") }
+        val command = returnScan(returnRun, returnPart, 2, scan.copy(alternative = true), "b-01").command!!
+        assertEquals("A-01", command.body["bin"]!!.jsonPrimitive.content)
+        assertEquals("B-01", command.body["target"]!!.jsonPrimitive.content)
+        val quarantined = returnPart.copy(source_mode = "quarantine")
+        val run = returnRun.copy(returns = listOf(quarantined))
+        assertThrows(IllegalArgumentException::class.java) { returnScan(run, quarantined, 2, scan, "A-01") }
+        assertNotNull(returnScan(run, quarantined, 2, scan, "B-01").command)
+        assertThrows(IllegalArgumentException::class.java) { returnScan(run, quarantined, 2, scan, "BAD/BIN") }
+    }
     @Test fun `skrzynka czesc jawna ilosc i polka tworza pojedynczy zwrot`() {
         var scan = WmsReturnScan()
         assertThrows(IllegalArgumentException::class.java) { returnScan(returnRun, returnPart, 2, scan, "BOX-2") }
@@ -67,6 +79,7 @@ class WmsReturnTest {
         }
         val first = WmsController(store, { client }); first.open(returnActor); first.submit(returnActor, returnDraft())
         val pending = journal.pending!!
+        assertEquals("B-01", pending.body["target"]!!.jsonPrimitive.content)
         assertEquals("picking", pending.workflow)
         val restart = WmsController(store, { client }); restart.open(returnActor)
         assertFalse(restart.state.value.ready)

@@ -156,4 +156,122 @@ export async function exerciseReturns(page, output) {
       2,
     ),
   );
+  const source = "00-RET-OLD",
+    target = "00-RET-NEW",
+    sku = "WMS-0038";
+  await api("/api/wms/inventory", {
+    action: "receive",
+    twId: 38,
+    bin: source,
+    quantity: 10,
+    reason: "Zwrot demonstracyjny",
+  });
+  await api("/api/wms/bins", {
+    bin: target,
+    mode: "pick",
+    version: 1,
+    reason: "Nowa półka",
+  });
+  let alternative = await picked(
+    "E2E-RETURN-ALTERNATIVE",
+    [{ sku, quantity: 3 }],
+    "RETURN-ALT-BOX",
+  );
+  expect(alternative.allocations[0].bin).toBe(source);
+  alternative = await api(`/api/wms/orders/${alternative.id}/actions`, {
+    action: "hold",
+    version: alternative.version,
+    reason: "Zmiana klienta",
+  });
+  await api("/api/wms/bins", {
+    bin: source,
+    mode: "quarantine",
+    version: 1,
+    reason: "Nowe przeznaczenie",
+  });
+  await page.locator('[data-tab-wms="orders"]').click();
+  await page.locator('#wms-filter [name="q"]').fill(alternative.reference);
+  await page.locator('#wms-filter [name="status"]').selectOption("all");
+  await page.locator("#wms-filter").evaluate((f) => f.requestSubmit());
+  await page.locator(`[data-order-wms="${alternative.id}"]`).click();
+  await page
+    .getByText("Problem, przejęcie lub anulowanie", { exact: true })
+    .click();
+  await expect(field("returnDestination")).toHaveValue("other");
+  await expect(
+    field("returnDestination").locator('[value="original"]'),
+  ).toHaveJSProperty("disabled", true);
+  await field("tote").fill(alternative.tote);
+  await field("barcode").fill("LOC:" + sku);
+  await field("quantity").fill("1");
+  await field("reason").fill("Powrót na inną półkę");
+  await field("bin").fill("LOC:" + target);
+  const invalidPart = page.waitForResponse(
+    (r) =>
+      r.url().endsWith(`/api/wms/orders/${alternative.id}/actions`) &&
+      r.request().method() === "POST",
+  );
+  await form.locator("button").click();
+  const invalidResponse = await invalidPart;
+  expect(invalidResponse.status()).toBe(400);
+  expect(invalidResponse.request().postDataJSON().barcode).toBe("LOC:" + sku);
+  expect(invalidResponse.request().postDataJSON().target).toBe(target);
+  await field("barcode").fill(sku);
+  await expect(field("bin")).toHaveValue("");
+  await field("bin").fill("LOC:" + target);
+  await page.route(
+    `**/api/wms/orders/${alternative.id}/actions`,
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await field("bin").press("Enter");
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  await expect(page.locator("#wms-retry")).not.toContainText("PONÓW");
+  const relocated = await api(`/api/wms/orders/${alternative.id}`);
+  expect(relocated.lines[0].picked).toBe(2);
+  expect(
+    relocated.allocations.map((a) => [a.bin, a.quantity, a.picked]).sort(),
+  ).toEqual(
+    [
+      [target, 1, 0],
+      [source, 2, 2],
+    ].sort(),
+  );
+  expect((await api("/api/wms/integrity")).ok).toBe(true);
+  await page
+    .getByText("Problem, przejęcie lub anulowanie", { exact: true })
+    .click();
+  await expect(field("returnDestination")).toHaveValue("other");
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await form.screenshot({
+      path: path.join(output, `return-location-${width}.png`),
+    });
+  }
+  writeFileSync(
+    path.join(output, "return-location-e2e.json"),
+    JSON.stringify(
+      {
+        seededOnly: true,
+        source,
+        target,
+        picked: 2,
+        returned: 1,
+        lostResponseRecovered: true,
+        prefixedLocationAccepted: true,
+        productCodePreserved: true,
+      },
+      null,
+      2,
+    ),
+  );
 }

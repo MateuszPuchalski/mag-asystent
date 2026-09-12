@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **441 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze — **442 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (22 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -456,6 +456,9 @@ przed którą ta pozycja broni.
 
 Zwroty pobrań są częścią ekranu zbiórki, bez nowej kolejki zapisu. **ODŁÓŻ POBRANIA** pokazuje wstrzymane skrzynki własnego wózka przed przekazaniem.
 Skan skrzynki wybiera zamówienie; część → jawna ilość → półka zapisują partię. Po utracie odpowiedzi użyj wspólnego ponowienia.
+
+**INNA PÓŁKA** pozwala wybrać nowy cel kompletacji, gdy na pierwotnej nie ma miejsca. Źródło zmienione na kwarantannę wymaga innego celu.
+Rezerwacja podąża za zwróconymi sztukami. Dziennik zachowuje wybraną półkę także po utracie odpowiedzi i restarcie aplikacji.
 Zmiana właściciela, wznowienie zamówienia lub przekazanie skrzynki zatrzymują nieaktualny zapis. Fizyczne sprawdzenie tego przebiegu na docelowym skanerze pozostaje wymagane.
 
 Przyjęcie, odkładanie, spis i wymiana wymagają wpisania faktycznej ilości bez obcinania cyfr.

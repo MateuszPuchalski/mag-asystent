@@ -214,9 +214,11 @@ export function integrity(database: Db = db()) {
         `WITH assigned AS (SELECT l.tw_id,a.bin,sum(a.quantity-a.picked) AS allocated
       FROM wms_allocation a JOIN wms_line l ON l.id=a.line_id JOIN wms_order o ON o.id=l.order_id
       WHERE o.status NOT IN ('shipped','cancelled') GROUP BY l.tw_id,a.bin)
-    SELECT coalesce(s.tw_id,a.tw_id) AS tw_id,coalesce(s.bin,a.bin) AS bin,s.reserved,coalesce(a.allocated,0) AS allocated
+    SELECT coalesce(s.tw_id,a.tw_id) AS tw_id,coalesce(s.bin,a.bin) AS bin,s.reserved,coalesce(a.allocated,0) AS allocated,
+    coalesce((SELECT b.mode FROM wms_bin b WHERE b.bin=coalesce(s.bin,a.bin)),'pick') AS bin_mode
     FROM wms_stock s FULL OUTER JOIN assigned a ON a.tw_id=s.tw_id AND a.bin=s.bin
-    WHERE coalesce(s.reserved,0)<>coalesce(a.allocated,0)`,
+    WHERE coalesce(s.reserved,0)<>coalesce(a.allocated,0)
+      OR (coalesce(a.allocated,0)>0 AND EXISTS(SELECT 1 FROM wms_bin b WHERE b.bin=coalesce(s.bin,a.bin) AND b.mode<>'pick'))`,
       )
       .all();
     // Kopię przed aktualizacją sprawdzamy bez migracji; połowa nowego schematu oznacza uszkodzenie.

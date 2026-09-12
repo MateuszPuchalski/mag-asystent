@@ -15,6 +15,12 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.312.0 zwrot pobrania może kierować rezerwację na inną półkę kompletacji. Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK.
+Brak migracji. Starszy APK może zwracać na prawidłowe źródło; wybór innego celu wymaga nowego APK i API.
+
+Odbiór seeded: pobranie → wstrzymanie → zmiana źródła na kwarantannę → częściowy zwrot na inną półkę → kontrola zapasu i rezerwacji.
+Raport spójności wykrywa również dawne rezerwacje poza kompletacją. Nie naprawia ich automatycznie bez sprawdzenia fizycznego zapasu.
+
 Od 0.311.0 zwrot pobrania wymaga kodu skrzynki. Przed aktualizacją rozliczyć oczekujące zapisy urządzeń i Biura; nie usuwać ich dzienników.
 Wykonać build i restart API, odświeżyć Biuro oraz zaktualizować APK. Brak migracji danych; starszy APK nie ma ścieżki zwrotu.
 Odbiór seeded: wstrzymana skrzynka własnego wózka → skan skrzynki → część → ilość → półka. Przekazanie skrzynki w trakcie blokuje zapis.
