@@ -135,8 +135,9 @@ fun WmsReplenishmentScreen(graph: AppGraph) {
                     graph.appScope.launch { controller.select(context, row.id) }
                 }
             }
+            if (view.mode == "plans") Text("Najpierw braki zamówień: priorytet, potem termin. Brak obejmuje wszystkie półki SKU.", color = InkMute)
             view.queue?.plans?.forEach { plan ->
-                OutlineButton("PODEJMIJ ${plan.take} × ${plan.sku}\n${plan.source} → ${plan.target}\n${plan.name}", enabled = allowed && plan.take > 0, modifier = Modifier.fillMaxWidth()) { submit(replenishmentClaim(plan)) }
+                OutlineButton("${plan.purpose}\nPODEJMIJ ${plan.take} × ${plan.sku}\n${plan.source} → ${plan.target}\n${plan.name}", enabled = allowed && plan.take > 0, modifier = Modifier.fillMaxWidth()) { submit(replenishmentClaim(plan)) }
             }
             if (view.queue?.total == 0) Text(if (view.mode == "tasks") "Nie masz otwartych zadań. Sprawdź propozycje do uzupełnienia." else "Brak dostępnych propozycji. Sprawdź filtr, przyjęcia i minima półek.")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

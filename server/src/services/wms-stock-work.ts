@@ -109,15 +109,35 @@ export function fillOrderReservations(
 
 // Minima i już podjęte zadania pokrywają część popytu. Resztę rozdzielamy po wolnych celach,
 // żeby pełna pierwsza półka nie zatrzymała pozostałych i nie powstało podwójne uzupełnienie.
-const replenishmentPlanSql = `WITH demand AS (
-    SELECT l.tw_id,sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS needed
-    FROM wms_line l JOIN wms_order o ON o.id=l.order_id WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new') GROUP BY l.tw_id
-  ), pick AS (
-    SELECT s.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,coalesce(d.needed,0) AS needed,
+// Pierwszeństwo wynika z niepokrytej potrzeby zamówień, nie z wielkości minimum.
+// Dostępne i przydzielone sztuki pokrywają najpierw pilniejsze zamówienia tego samego SKU.
+const replenishmentPlanSql = `WITH order_needs AS (
+    SELECT l.tw_id,o.id,o.priority,o.due_at,
+      sum(max(0,l.quantity-coalesce((SELECT sum(a.quantity) FROM wms_allocation a WHERE a.line_id=l.id),0))) AS missing
+    FROM wms_line l JOIN wms_order o ON o.id=l.order_id
+    WHERE o.status IN ('new','allocated','picking') AND (o.hold_reason IS NULL OR o.status<>'new')
+    GROUP BY l.tw_id,o.id HAVING missing>0
+  ), pick_stock AS (
+    SELECT s.*,p.symbol AS sku,p.nazwa AS name,p.ean AS barcode,
       sum(s.on_hand-s.reserved) OVER(PARTITION BY s.tw_id) AS available,
       coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.target=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0) AS incoming
-    FROM wms_stock s JOIN wms_product p ON p.tw_id=s.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin LEFT JOIN demand d ON d.tw_id=s.tw_id
+    FROM wms_stock s JOIN wms_product p ON p.tw_id=s.tw_id LEFT JOIN wms_bin b ON b.bin=s.bin
     WHERE coalesce(b.mode,'pick')='pick' AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
+  ), coverage AS (
+    SELECT tw_id,sum(on_hand-reserved+incoming) AS covered FROM pick_stock GROUP BY tw_id
+  ), order_queue AS (
+    SELECT o.*,coalesce(c.covered,0) AS covered,
+      sum(missing) OVER(PARTITION BY o.tw_id ORDER BY priority DESC,due_at,id ROWS UNBOUNDED PRECEDING) AS cumulative
+    FROM order_needs o LEFT JOIN coverage c ON c.tw_id=o.tw_id
+  ), order_shortfalls AS (
+    SELECT *,min(missing,max(0,cumulative-covered)) AS shortage FROM order_queue
+  ), demand AS (
+    SELECT tw_id,sum(missing) AS needed,sum(shortage) AS order_shortage,
+      max(CASE WHEN shortage>0 THEN priority END) AS order_priority FROM order_shortfalls GROUP BY tw_id
+  ), pick AS (
+    SELECT s.*,coalesce(d.needed,0) AS needed,coalesce(d.order_shortage,0) AS order_shortage,d.order_priority,
+      (SELECT min(o.due_at) FROM order_shortfalls o WHERE o.tw_id=s.tw_id AND o.shortage>0 AND o.priority=d.order_priority) AS order_due_at
+    FROM pick_stock s LEFT JOIN demand d ON d.tw_id=s.tw_id
   ), rooms AS (
     SELECT *,CASE WHEN incoming>0 OR EXISTS(SELECT 1 FROM wms_capacity_issue c WHERE c.tw_id=pick.tw_id AND c.bin=pick.bin AND c.resolved_at IS NULL)
       THEN 0 ELSE max(0,min(1000000,coalesce(capacity-on_hand,1000000))) END AS room FROM pick
@@ -130,14 +150,14 @@ const replenishmentPlanSql = `WITH demand AS (
   ), needs AS (
     SELECT *,minimum_need+min(room-minimum_need,max(0,demand_left-earlier_room)) AS quantity FROM distribution
   ) SELECT n.tw_id,n.sku,n.name,n.barcode,n.bin AS target,n.version AS target_version,
-      n.quantity,s.bin AS source,s.version AS source_version,
+      n.quantity,n.order_shortage,n.order_priority,n.order_due_at,s.bin AS source,s.version AS source_version,
       s.on_hand-s.reserved-coalesce((SELECT sum(r.quantity) FROM wms_replenishment r WHERE r.tw_id=s.tw_id AND r.source=s.bin AND r.completed_at IS NULL AND r.cancelled_at IS NULL),0)
       -coalesce((SELECT sum(w.remaining) FROM wms_putaway_work w WHERE w.tw_id=s.tw_id AND w.source=s.bin AND w.remaining>0),0) AS source_available
     FROM needs n JOIN wms_stock s ON s.tw_id=n.tw_id JOIN wms_bin b ON b.bin=s.bin AND b.mode='reserve'
     WHERE n.quantity>0
     AND NOT EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=s.tw_id AND c.bin=s.bin AND c.resolved_at IS NULL)
     AND source_available>0 AND (instr(lower(n.sku||' '||n.name),lower(?))>0 OR n.bin=? OR s.bin=? OR n.barcode=?)
-    ORDER BY n.quantity DESC,n.sku,n.bin,s.bin`;
+    ORDER BY (n.order_shortage>0) DESC,n.order_priority DESC,n.order_due_at,n.quantity DESC,n.sku,n.bin,s.bin`;
 function planArgs(q: string) {
   return [q, q.toUpperCase(), q.toUpperCase(), q];
 }

@@ -15,6 +15,17 @@ private val replenishPlan = WmsReplenishmentPlan(30, "LOC:PART", "Nóż", "00590
 private fun replenishCommand() = replenishmentFinish(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4), "A-01")
 
 class WmsReplenishmentScanTest {
+    @Test fun `powod propozycji zachowuje brak SKU oraz zgodnosc ze starszym API`() {
+        val legacy = WertisJson.encodeToString(WmsReplenishmentPlan.serializer(), replenishPlan)
+        assertEquals("PLAN UZUPEŁNIENIA", WertisJson.decodeFromString<WmsReplenishmentPlan>(legacy).purpose)
+        val urgent = replenishPlan.copy(order_shortage = 3, order_priority = 2, order_due_at = "2026-09-12T08:00:00.000Z")
+        val decoded = WertisJson.decodeFromString<WmsReplenishmentPlan>(WertisJson.encodeToString(WmsReplenishmentPlan.serializer(), urgent))
+        assertEquals(urgent, decoded)
+        assertEquals("ZAMÓWIENIA · brak 3 szt. SKU", decoded.purpose)
+        assertEquals("MINIMUM PÓŁKI", replenishPlan.copy(order_shortage = 0).purpose)
+        assertEquals(replenishmentClaim(replenishPlan).body, replenishmentClaim(urgent).body)
+    }
+
     @Test fun `pelny cel wymaga ilosci na celu jego skanu i zwrotu pozostalych sztuk`() {
         var scan = replenishmentSpaceStart(replenishTask, 2, WmsReplenishmentScan(true, "005901", 4))
         for (raw in listOf("", "-1", "1.5", "4", "5"))

@@ -675,3 +675,12 @@ Zbiórka pozostaje dostępna. Biuro po sprawdzeniu miejsca skanuje lokalizację 
 Biuro ma także formularz **Cel pełny — odłożenie i zwrot reszty** do tego samego rozliczenia.
 Po przerwie przed zapisem wróć z wszystkimi niepotwierdzonymi sztukami z celu i wózka na źródło, zanim rozpoczniesz ponownie.
 Nieznany wynik już wysłanej operacji rozlicz przez ponowienie, bez powtarzania fizycznego ruchu.
+
+
+### Kolejność uzupełnień
+
+Propozycje z brakami zamówień wyprzedzają rutynowe minima półek. Kolejność uwzględnia priorytet zamówienia, potem termin wysyłki.
+Wolny zapas i otwarte uzupełnienia pokrywają najpierw pilniejsze potrzeby tego SKU. Już pokryte zamówienie nie podnosi pilności pozostałych braków.
+Biuro i kolektor pokazują powód: zamówienia albo minimum półki. Liczba brakujących sztuk dotyczy całego SKU, nie pojedynczego celu.
+Jedno uzupełnienie może pokryć tylko część potrzeby. Nie obiecuje gotowości całego zamówienia, które może czekać na inne części.
+Odczyt propozycji nie rezerwuje zapasu; dopiero podjęcie zadania zabezpiecza jego sztuki.

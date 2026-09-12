@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.305.0 — uzupełnienia według potrzeb zamówień
+
+- Braki zamówień wyprzedzają rutynowe minima półek. Kolejność uwzględnia priorytet, następnie termin wysyłki.
+- Wolny zapas i podjęte zadania pokrywają najpierw pilniejsze potrzeby. Pokryte zamówienia nie zawyżają pilności pozostałych braków.
+- Biuro i kolektor pokazują powód propozycji oraz brak dla całego SKU. Odczyt nadal nie rezerwuje zapasu.
+- Pięć regresji serwera i test kolektora sprawdzają kolejność, pokrycie, wykluczenia oraz zgodność ze starszym API. E2E potwierdza kolejność w Biurze.
+- **[wymaga działania]** Zaktualizować API i APK dla opisu celu na kolektorze. Zmiana nie wymaga migracji bazy ani konfiguracji.
+
 ## 0.304.1 — uzupełnienie do kolejnej wolnej półki
 
 - Pełna pierwsza półka nie blokuje uzupełnienia do innych dozwolonych lokalizacji tej samej części.

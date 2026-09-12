@@ -212,7 +212,17 @@ export async function exerciseCapacity(page, output) {
   await page.locator("#wms-stockwork-filter button").first().click();
   await expect(page.locator("[data-stockwork-claim]")).toHaveCount(1);
   await expect(page.locator("[data-stockwork-claim]")).toContainText("3 SZT.");
-  await page.locator("[data-stockwork-claim]").click();
+  await expect(
+    page.locator("[data-stockwork-claim]").locator("xpath=ancestor::tr"),
+  ).toContainText("ZAMÓWIENIA · brak 3 szt. SKU");
+  await page.locator('[data-stockwork-action="all"]').click();
+  await expect(
+    page
+      .locator("[data-stockwork-claim]")
+      .first()
+      .locator("xpath=ancestor::tr"),
+  ).toContainText(alternateSku);
+  await page.locator("[data-stockwork-claim]").first().click();
   await expect(page.locator("#wms-stockwork-detail")).toContainText(
     alternateTarget,
   );
@@ -235,6 +245,7 @@ export async function exerciseCapacity(page, output) {
         integrity: true,
         alternateTarget,
         alternateQuantity: 3,
+        demandBeforeMinimum: true,
       },
       null,
       2,

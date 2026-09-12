@@ -10,7 +10,14 @@ import pl.wertis.kolektor.core.scan.ScanKind
 @Serializable
 data class WmsReplenishmentPlan(val tw_id: Long, val sku: String, val name: String, val barcode: String? = null,
     val source: String, val target: String, val quantity: Long, val source_available: Long,
-    val source_version: Int, val target_version: Int) {
+    val source_version: Int, val target_version: Int,
+    val order_shortage: Long? = null, val order_priority: Int? = null, val order_due_at: String? = null) {
+    // Brak dotyczy SKU we wszystkich celach; nie obiecuje zwolnienia całego zamówienia po jednym ruchu.
+    val purpose: String get() = when {
+        order_shortage == null -> "PLAN UZUPEŁNIENIA"
+        order_shortage > 0 -> "ZAMÓWIENIA · brak $order_shortage szt. SKU"
+        else -> "MINIMUM PÓŁKI"
+    }
     val take: Int get() = minOf(quantity, source_available, 1000000L).coerceAtLeast(0).toInt()
 }
 @Serializable

@@ -386,3 +386,18 @@ Zamówienie wymaga czterech sztuk. Poprawiony plan kieruje trzy sztuki na drugą
 Potrzeby minimów i otwarte przydziały pokrywają część popytu. Pozostała potrzeba jest rozdzielana według wolnego miejsca kolejnych dozwolonych celów.
 Pełny cel oraz zgłoszony brak miejsca nie zatrzymują alternatyw. Zmiana zadania na ukończone nie odtwarza pokrytej już potrzeby.
 Trzy scenariusze najpierw odtworzyły błąd, następnie przeszły po zmianie planowania. E2E podjęło zadanie na alternatywnym celu.
+
+
+### Brak zamówienia przed rutynowym minimum
+
+Sortowanie wyłącznie po ilości stawiało rutynowe uzupełnienie 499 sztuk przed jedną sztuką potrzebną do zamówienia.
+Plan teraz wyróżnia niepokryty popyt i porządkuje go według priorytetu oraz terminu zamówienia. Minima bez braków trafiają dalej.
+Dostępny zapas i podjęte zadania pokrywają potrzeby według tej samej kolejności. Pokryte pilne zamówienie nie zawyża pilności pozostałego braku.
+Nie powstaje nowa rezerwacja ani przypisanie fizycznej sztuki do zamówienia podczas odczytu.
+
+Punktem odniesienia jest [Microsoft — Replenishment overview](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/replenishment).
+Dokument rozróżnia minima i popyt zamówień oraz opisuje wykorzystanie istniejących prac uzupełnienia do pokrycia popytu.
+W WERTIS oba powody pozostają w jednej kolejce, z pierwszeństwem braków i jawnym opisem na kolektorze oraz w Biurze.
+
+Pięć regresji sprawdza wielkość minimum, priorytet, termin, pokrycie zapasem, zadania w drodze oraz wyłączenie zamówień wstrzymanych i anulowanych.
+Cztery początkowe scenariusze zawodziły przed poprawką. Test kolektora sprawdza także odczyt starszego API i zachowanie niezmienionej komendy podjęcia.
