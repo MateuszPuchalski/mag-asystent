@@ -9,6 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.WertisJson
+import pl.wertis.kolektor.core.scan.classify
 
 private val who = WmsContext("http://warehouse/", 2)
 private val task = WmsTask(7, 12, 4, 30, "WMS0030", "Koło kosiarki", "0590123456789", "A-01", "BOX-20-01", 1, 3, 9, 2)
@@ -16,6 +17,22 @@ private val route = WmsRun(5, "CART-20", 2, orders = listOf(WmsOrder(12, "pickin
 private fun pickDraft() = wmsScan(route, 2, WmsScanState(true, task.barcode, 2), task.tote).command!!
 
 class WmsPickingTest {
+    @Test fun `prefiks lokalizacji w kodzie czesci nie podmienia towaru`() {
+        val input = classify("LOC:WMS0030")
+        val code = wmsScanCode(WmsStage.PRODUCT, input)
+        assertEquals("LOC:WMS0030", code)
+        assertNotNull(wmsScan(route, 2, WmsScanState(location = true), code).error)
+        val actual = route.copy(tasks = listOf(task.copy(sku = "LOC:WMS0030")))
+        assertNull(wmsScan(actual, 2, WmsScanState(location = true), code).error)
+        assertEquals("LOC:WMS0030", wmsScanCode(WmsStage.BOX, input))
+    }
+
+    @Test fun `etykieta lokalizacji zachowuje obsluge prefiksu w kroku polki`() {
+        val code = wmsScanCode(WmsStage.LOCATION, classify("LOC:a-01"))
+        assertEquals("A-01", code)
+        assertTrue(wmsScan(route, 2, WmsScanState(), code).state.location)
+    }
+
     @Test fun `polka czesc skrzynka a ilosc dopiero po potwierdzeniu`() {
         var scan = WmsScanState(quantity = 2)
         assertNotNull(wmsScan(route, 2, scan, task.tote).error)

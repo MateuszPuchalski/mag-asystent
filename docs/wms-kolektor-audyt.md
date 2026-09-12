@@ -66,3 +66,6 @@ Kompilacja APK nie zastępuje próby fizycznego skanera. Modele Zebra i Honeywel
 Należy sprawdzić profil DataWedge lub wyjście klawiaturowe z Enterem, rękawice, czytelność zdjęć, utratę Wi-Fi oraz restart po zapisie.
 Testować wyłącznie na serwerze seeded, z kontem testowym. Nie podłączać kolektora testowego do rzeczywistych zamówień.
 Debug APK z PR nie zastępuje podpisanego wydania dla hali; dotychczasowy proces aktualizacji pozostaje bez zmian.
+
+Od poprawki 0.293.1 WMS sprawdza oryginalny kod części i skrzynki, sprzed klasyfikacji lokalizacji.
+Prefiks lokalizacji działa wyłącznie w kroku półki. W tym trybie skaner klawiaturowy przyjmuje także krótkie kody, np. A1.

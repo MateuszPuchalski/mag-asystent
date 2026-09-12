@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import pl.wertis.kolektor.core.scan.Scan
+import pl.wertis.kolektor.core.scan.ScanKind
 
 @Serializable
 data class WmsContext(val server: String, val actorId: Long)
@@ -51,6 +53,11 @@ data class WmsRun(
 data class WmsDraft(val path: String, val body: JsonObject, val description: String, val runId: Long? = null)
 
 enum class WmsStage { CART, LOCATION, PRODUCT, BOX, HANDOFF_CART, STATION, DONE, WAIT }
+
+/** Tylko krok półki korzysta z prefiksu etykiety lokalizacji. Symbol części
+ * może wyglądać jak lokalizacja, ale nie wolno obcinać mu początku. */
+fun wmsScanCode(stage: WmsStage, scan: Scan): String =
+    if (stage == WmsStage.LOCATION && scan.kind == ScanKind.LOC) scan.code else scan.rawCode
 
 data class WmsScanState(
     val location: Boolean = false,

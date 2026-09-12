@@ -34,6 +34,12 @@ historii nie przepisujemy.
 ---
 
 
+## 0.293.1 — oryginalne kody części w skanerze kolektora
+
+- Kompletacja sprawdza niezmieniony kod części i skrzynki. Starsza klasyfikacja lokalizacji nie może obciąć prefiksu z symbolu produktu.
+- Etykiety półek zachowują obsługę prefiksów w kroku lokalizacji. Skaner klawiaturowy obsługuje w zbiórce także krótkie kody.
+- Dwa testy odtwarzają kolizję symbolu części z prefiksem lokalizacji i sprawdzają poprawne skanowanie półki.
+
 ## 0.293.0 — zbiórka WMS w istniejącym kolektorze Android
 
 - Natywny ekran zbiórki: uruchomienie i wznowienie wózka, lokalizacja, kod towaru, zdjęcie, ilość i stała pozycja skrzynki.

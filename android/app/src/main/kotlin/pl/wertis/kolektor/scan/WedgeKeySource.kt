@@ -29,6 +29,14 @@ object WedgeKeySource {
 
     private val buf = StringBuilder()
     private var last = 0L
+    private var wms = false
+
+    fun wmsMode(enabled: Boolean) {
+        wms = enabled
+        // Zmiana ekranu nie może dopisać końcówki starego kodu do nowego skanu.
+        buf.setLength(0)
+        last = 0L
+    }
 
     /** @return true = zdarzenie skonsumowane (Enter kończący skan). */
     fun onKeyDown(event: KeyEvent): Boolean {
@@ -41,7 +49,9 @@ object WedgeKeySource {
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_TAB -> {
                 val code = buf.toString()
                 buf.setLength(0)
-                if (code.length >= MIN_LEN) {
+                // WMS dopuszcza krótkie adresy (A1) i kody skrzynek. Jego
+                // aktywny krok sprawdza dokładną wartość przed każdym zapisem.
+                if (code.length >= if (wms) 1 else MIN_LEN) {
                     ScannerBus.dispatch(classify(code))
                     return true
                 }

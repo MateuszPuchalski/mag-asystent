@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +34,10 @@ import pl.wertis.kolektor.core.wms.WmsScanState
 import pl.wertis.kolektor.core.wms.WmsStage
 import pl.wertis.kolektor.core.wms.wmsException
 import pl.wertis.kolektor.core.wms.wmsScan
+import pl.wertis.kolektor.core.wms.wmsScanCode
 import pl.wertis.kolektor.core.wms.wmsStage
 import pl.wertis.kolektor.scan.ScanHandlerEffect
+import pl.wertis.kolektor.scan.WedgeKeySource
 import pl.wertis.kolektor.ui.components.OutlineButton
 import pl.wertis.kolektor.ui.components.PrimaryButton
 import pl.wertis.kolektor.ui.product.MiniaturaTowaru
@@ -61,6 +64,10 @@ fun WmsPickingScreen(graph: AppGraph) {
     val allowed = view.context == context && view.ready && !view.busy && view.journal.pending == null && context != null
 
     LaunchedEffect(context) { context?.let { controller.open(it) } }
+    DisposableEffect(Unit) {
+        WedgeKeySource.wmsMode(true)
+        onDispose { WedgeKeySource.wmsMode(false) }
+    }
 
     fun submit(draft: WmsDraft) {
         val bound = context ?: return
@@ -86,10 +93,10 @@ fun WmsPickingScreen(graph: AppGraph) {
                 "damaged" -> "Towar na półce jest uszkodzony"
                 else -> "Brak miejsca w przypisanej skrzynce"
             }
-            try { submit(wmsException(run, task, input.code.trim(), kind, reason)) }
+            try { submit(wmsException(run, task, input.rawCode.trim(), kind, reason)) }
             catch (e: IllegalArgumentException) { error = e.message; graph.feedback.beep(false) }
         } else {
-            val result = wmsScan(run, context!!.actorId, scan, input.code)
+            val result = wmsScan(run, context!!.actorId, scan, wmsScanCode(stage, input))
             error = result.error
             scan = result.state
             result.command?.let(::submit) ?: graph.feedback.beep(result.error == null)
