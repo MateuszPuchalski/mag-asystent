@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
 import { destinationHints } from "./wms-destination-hints.js";
+import { orderDemandCtes } from "./wms-order-demand.js";
 import {
   checkBarcode,
   command,
@@ -63,8 +64,22 @@ export function listPutaway(actor: Actor, raw: unknown) {
     const where =
       " WHERE w.remaining>0 AND (?='0' OR w.user_id=?) AND instr(lower(l.sku||' '||coalesce(l.barcode,'')||' '||l.name||' '||d.reference||' '||w.source),lower(?))>0";
     const args = [f.mine, actor.id, f.q];
+    // Kolejność uwzględnia realny brak po rezerwacjach i podjętych uzupełnieniach, nie sam fakt sprzedaży SKU.
+    const prioritized =
+      select.replace(
+        "SELECT w.*",
+        `SELECT w.*,coalesce(dem.order_shortage,0) AS order_shortage,dem.order_priority,
+      (SELECT min(due_at) FROM order_shortfalls WHERE tw_id=w.tw_id AND shortage>0 AND priority=dem.order_priority) AS order_due_at`,
+      ) + " LEFT JOIN demand dem ON dem.tw_id=w.tw_id";
     const rows = db()
-      .prepare(select + where + " ORDER BY w.created_at,w.id LIMIT 50 OFFSET ?")
+      .prepare(
+        "WITH " +
+          orderDemandCtes +
+          " " +
+          prioritized +
+          where +
+          " ORDER BY (coalesce(dem.order_shortage,0)>0) DESC,dem.order_priority DESC,order_due_at,w.created_at,w.id LIMIT 50 OFFSET ?",
+      )
       .all(...args, f.offset);
     const totals = db()
       .prepare(

@@ -143,7 +143,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
             PrimaryButton("SZUKAJ", enabled = allowed, modifier = Modifier.fillMaxWidth(), onClick = ::search)
             if (queue?.rows?.isEmpty() == true) Text("Brak otwartych zadań dla tego filtra.")
             queue?.rows?.forEach { row ->
-                OutlineButton("${row.source} · ${row.sku} · ${row.remaining} szt.\n${row.name}\n${row.reference} · ${if (row.user_id == context.actorId) "Twoje" else if (row.user_id == null) "Wolne" else "W trakcie u innej osoby"}", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
+                OutlineButton("${row.source} · ${row.sku} · ${row.remaining} szt.${row.demandHint?.let { "\n$it" } ?: ""}\n${row.name}\n${row.reference} · ${if (row.user_id == context.actorId) "Twoje" else if (row.user_id == null) "Wolne" else "W trakcie u innej osoby"}", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
                     graph.appScope.launch { controller.select(context, row.id) }
                 }
             }

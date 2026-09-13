@@ -19,6 +19,13 @@ private val part = WmsPutawayTask(1, 30, "BUF-01", 12, 12, 2, 1, "WMS0030", "Ko�
 private fun draft() = putawayScan(part, 2, WmsPutawayScan(true, part.barcode, 3), "A-01").command!!
 
 class WmsPutawayScanTest {
+    @Test fun `pilnosc kolejki podaje brak SKU bez obietnicy kompletnego zamowienia`() {
+        assertNull(part.demandHint)
+        assertNull(part.copy(order_shortage = 0).demandHint)
+        assertEquals("ZAMÓWIENIA · brak 3000000000 szt. SKU", part.copy(order_shortage = 3000000000L).demandHint)
+        val old = WertisJson.decodeFromString<WmsPutawayTask>("""{"id":1,"tw_id":30,"source":"BUF-01","quantity":12,"remaining":12,"version":1,"sku":"WMS0030","name":"Koło","reference":"PZ-1"}""")
+        assertNull(old.demandHint)
+    }
     @Test fun `skan bufora podejmuje wolne zadanie bez przycisku`() {
         val free = part.copy(user_id = null)
         val result = putawayScan(free, 2, WmsPutawayScan(), "BUF-01")

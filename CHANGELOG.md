@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.325.0 — odkładanie według braków zamówień
+
+- Kolejka odkładania daje pierwszeństwo częściom z niepokrytym zapotrzebowaniem zamówień, następnie priorytetowi i terminowi. Pozostałe zadania zachowują kolejność przyjęcia.
+- Odkładanie i uzupełnienia współdzielą obliczenie popytu. Dostępne sztuki oraz podjęte uzupełnienia pokrywają najpierw pilniejsze zamówienia.
+- Biuro i kolektor pokazują brak SKU przy zadaniu. To informacja o zapotrzebowaniu, bez automatycznej rezerwacji lub potwierdzenia odłożenia.
+- Cztery nowe regresje serwera obejmują pokrycie zapasem, wstrzymania, terminy, stronicowanie i spadek pilności po odłożeniu.
+- Odczyt kolejki 5002 zadań przy 5000 SKU i 1512 zamówieniach miał P95 około 34 ms w izolowanej próbie syntetycznej.
+
 ## 0.324.0 — wspólny kolektor WMS i diagnostyka łączności
 
 - Scalono main `ef9237e2` z diagnostyką połączenia, zachowując siedem procesów WMS i trwały dziennik zapisów.

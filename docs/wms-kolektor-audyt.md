@@ -4,6 +4,20 @@ Użytkownik potwierdził, że zbiórka odbywa się na kolektorach Zebra lub Hone
 Podstawowym klientem zbiórki jest istniejąca aplikacja Android. Przeglądarka pozostaje
 narzędziem biura, stanowiska pakowania oraz pomocniczym klientem WMS.
 
+## Kolejność odkładania według zapotrzebowania
+
+Kolejka wcześniej sortowała wyłącznie według czasu przyjęcia. Nowsza dostawa brakującej części mogła czekać za rutynowym zatowarowaniem.
+Serwer teraz wylicza niepokryte potrzeby wspólnie z uzupełnieniami. Priorytet zamówienia i termin rozstrzygają kolejność braków, potem decyduje wiek zadania.
+Zapas i podjęte uzupełnienia pokrywają najpierw pilniejsze zamówienia. Wstrzymane nowe zamówienia nie podnoszą pilności.
+Kolektor i Biuro podają brak SKU przy zadaniu. Liczba dotyczy całego zapotrzebowania SKU, bez obietnicy skompletowania zamówienia z tej partii.
+Nie zmieniają się właściciel, przydział ani wymagane skany. Kolejka pozostaje odczytem; odłożenie do zaplecza samo nie udostępnia części zbiórce.
+
+Kierunek usprawnienia: [Microsoft — planowane przeładunki bez składowania](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/planned-cross-docking).
+Bezpośredni przeładunek wymaga powiązania dostawy z zamówieniem. Ta zmiana porządkuje istniejące odkładanie; nie dodaje takiego przeładunku.
+Regresje sprawdzają pierwszeństwo, zapas, wstrzymania, terminy, zmianę pilności po odłożeniu i sortowanie przed limitem 50.
+Próba zapytania obejmowała 5000 SKU, 1512 zamówień oraz 5002 zadania: mediana 31 ms, P95 34 ms, maksimum 49 ms.
+Wiersze zadań utworzono syntetycznie w izolowanej kopii. Wynik dotyczy odczytu kolejki, nie kompletnego księgowania dostawy ani przepustowości hali.
+
 ## Hierarchia odkładania na małym ekranie
 
 Audyt źródła wykazał listę do ośmiu miejsc przed polem i potwierdzeniem ilości. Problem obejmował odkładanie oraz przyjęcie bezpośrednio na półkę.

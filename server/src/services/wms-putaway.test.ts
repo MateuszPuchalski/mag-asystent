@@ -82,6 +82,128 @@ function state(twId: number, bin: string) {
     .get(twId, bin)!;
 }
 
+test("odkładanie części dla czekającego zamówienia wyprzedza starszą dostawę", () => {
+  const routine = receipt(),
+    urgent = receipt();
+  W.createOrder(office, randomUUID(), {
+    reference: randomUUID(),
+    priority: 2,
+    dueAt: "2026-09-13T10:00:00Z",
+    lines: [{ sku: urgent.sku, quantity: 2 }],
+  });
+  const before = db().prepare("SELECT total_changes() n").get()!.n;
+  const rows = P.listPutaway(worker, {}).rows.filter((r) =>
+    [routine.taskId, urgent.taskId].includes(Number(r.id)),
+  );
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    [urgent.taskId, routine.taskId],
+  );
+  assert.equal(rows[0].order_shortage, 2);
+  assert.equal(rows[0].order_priority, 2);
+  assert.equal(rows[1].order_shortage, 0);
+  assert.equal(db().prepare("SELECT total_changes() n").get()!.n, before);
+});
+
+test("dostępny zapas pokrywa pilne zamówienie przed ustaleniem priorytetu odkładania", () => {
+  const covered = receipt(),
+    urgent = receipt();
+  for (const [sku, quantity, priority] of [
+    [covered.sku, 2, 2],
+    [covered.sku, 1, 0],
+    [urgent.sku, 1, 1],
+  ] as const) {
+    W.createOrder(office, randomUUID(), {
+      reference: randomUUID(),
+      priority,
+      dueAt: "2026-09-20T10:00:00Z",
+      lines: [{ sku, quantity }],
+    });
+  }
+  W.changeStock(office, randomUUID(), {
+    action: "receive",
+    twId: covered.twId,
+    bin: "SHELF-1",
+    quantity: 2,
+    reason: "Zapas seeded",
+  });
+  const rows = P.listPutaway(worker, {}).rows.filter((r) =>
+    [covered.taskId, urgent.taskId].includes(Number(r.id)),
+  );
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    [urgent.taskId, covered.taskId],
+  );
+  assert.equal(rows[1].order_shortage, 1);
+  assert.equal(rows[1].order_priority, 0);
+  const owned = P.claimPutaway(worker, randomUUID(), covered.taskId, {
+    version: 1,
+  });
+  P.finishPutaway(worker, randomUUID(), owned.id, finish(owned, 1));
+  const refreshed = P.listPutaway(worker, { q: covered.sku }).rows.find(
+    (r) => r.id === covered.taskId,
+  )!;
+  assert.equal(refreshed.order_shortage, 0);
+  assert.equal(refreshed.order_priority, null);
+});
+
+test("wstrzymane nowe zamówienie nie podnosi priorytetu; kolejność równych priorytetów wynika z terminu", () => {
+  const held = receipt(),
+    later = receipt(),
+    earlier = receipt();
+  for (const [f, priority, dueAt] of [
+    [held, 2, "2026-09-10T10:00:00Z"],
+    [later, 1, "2026-09-15T10:00:00Z"],
+    [earlier, 1, "2026-09-14T10:00:00Z"],
+  ] as const) {
+    const order = W.createOrder(office, randomUUID(), {
+      reference: randomUUID(),
+      priority,
+      dueAt,
+      lines: [{ sku: f.sku, quantity: 1 }],
+    });
+    if (f === held)
+      db()
+        .prepare(
+          "UPDATE wms_order SET hold_reason='Wyjaśnienie płatności' WHERE id=?",
+        )
+        .run(order.id);
+  }
+  const rows = P.listPutaway(worker, {}).rows.filter((r) =>
+    [held.taskId, later.taskId, earlier.taskId].includes(Number(r.id)),
+  );
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    [earlier.taskId, later.taskId, held.taskId],
+  );
+  assert.equal(rows[2].order_shortage, 0);
+});
+
+test("priorytet odkładania działa przed stronicowaniem i zachowuje filtr właściciela", () => {
+  const earlier = Array.from({ length: 51 }, () => receipt());
+  const urgent = receipt();
+  W.createOrder(office, randomUUID(), {
+    reference: randomUUID(),
+    priority: 2,
+    dueAt: "2026-01-01T00:00:00Z",
+    lines: [{ sku: urgent.sku, quantity: 1 }],
+  });
+  assert.equal(P.listPutaway(worker, {}).rows[0].id, urgent.taskId);
+  P.claimPutaway(worker, randomUUID(), urgent.taskId, { version: 1 });
+  const mine = P.listPutaway(worker, { q: urgent.sku, mine: "1" });
+  assert.equal(mine.rows[0].id, urgent.taskId);
+  assert.equal(mine.totals.units, 10);
+  assert.equal(
+    P.listPutaway(other, { q: urgent.sku, mine: "1" }).rows.length,
+    0,
+  );
+  const first = P.listPutaway(worker, {}).rows.map((r) => r.id);
+  const next = P.listPutaway(worker, { offset: 50 }).rows.map((r) => r.id);
+  assert.equal(first.length, 50);
+  assert.ok(next.some((id) => earlier.some((r) => r.taskId === id)));
+  assert.ok(!next.some((id) => first.includes(id)));
+});
+
 test("skan źródła podejmuje tylko właściwy bufor i zachowuje jeden przydział bez ruchu zapasu", () => {
   const r = receipt();
   const before = P.getPutaway(r.taskId);

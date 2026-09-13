@@ -19,7 +19,11 @@ data class WmsPutawayTask(
     val user_id: Long? = null, val version: Int, val sku: String, val name: String,
     val barcode: String? = null, val reference: String, val completed_at: String? = null,
     val bins: List<WmsPutawayBin> = emptyList(),
-)
+    val order_shortage: Long? = null,
+) {
+    // To brak SKU we wszystkich zamówieniach, nie obietnica zakończenia jednego zamówienia tą partią.
+    val demandHint: String? get() = order_shortage?.takeIf { it > 0 }?.let { "ZAMÓWIENIA · brak $it szt. SKU" }
+}
 
 @Serializable
 data class WmsPutawayTotals(val tasks: Int, val units: Int, val oldest: String? = null)
