@@ -6,10 +6,11 @@ narzędziem biura, stanowiska pakowania oraz pomocniczym klientem WMS.
 
 ## Hierarchia odkładania na małym ekranie
 
-Audyt źródła wykazał listę do ośmiu miejsc przed polem i potwierdzeniem ilości.
+Audyt źródła wykazał listę do ośmiu miejsc przed polem i potwierdzeniem ilości. Problem obejmował odkładanie oraz przyjęcie bezpośrednio na półkę.
 Każda dodatkowa podpowiedź odsuwała bieżącą czynność. To ustalenie z kodu, bez pomiaru ekranu fizycznego kolektora.
 
-Pole, potwierdzenie i błąd stoją teraz przed podpowiedziami. Pierwsze miejsce pozostaje widoczne, pozostałe rozwija przycisk z liczbą alternatyw.
+Pole, potwierdzenie i błąd stoją teraz przed podpowiedziami. Oba ekrany używają wspólnego komponentu `WmsLocationHints`.
+Pierwsze miejsce pozostaje widoczne, pozostałe rozwija przycisk z liczbą alternatyw.
 Zmiana kroku zwija alternatywy i przewija do bieżącej instrukcji. Nowy odczyt i partia również resetują ten widok.
 Podpowiedzi zachowują pojemność oraz informację o ostatnim odczycie. Skan innej zarejestrowanej półki nadal podlega regułom serwera.
 Nie zmienia się kolejność źródło → część → policzona ilość → cel. Nie dodano automatycznego fokusu pola, który przejmowałby skaner klawiaturowy.

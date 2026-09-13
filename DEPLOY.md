@@ -16,6 +16,7 @@ Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
 W 0.322.1 APK pokazuje bieżący krok przed listą miejsc odkładania. Dalsze miejsca rozwija przycisk; przejście kroku wraca do instrukcji.
+To samo zachowanie obowiązuje przy przyjęciu bezpośrednio na półkę. Przyjęcie do bufora i kwarantanny nie pokazuje podpowiedzi półek.
 Brak zmiany API lub bazy względem 0.322.0. Odbiór seeded: ilość, błąd, osiem miejsc, rozwinięcie, kolejny skan oraz częściowe odłożenie.
 
 Od 0.322.0 skan bufora podejmuje wybrane zadanie odkładania na kolektorze. Najpierw zaktualizować API, potem APK; starszy serwer odrzuca dodatkowe pole źródła.

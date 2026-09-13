@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +61,14 @@ fun WmsInboundScreen(graph: AppGraph) {
     var manualCode by remember(view.generation, context) { mutableStateOf("") }
     var query by remember(view.query, context) { mutableStateOf(view.query) }
     val stage = document?.let { inboundStage(it, scan) }
+    // Każda partia zaczyna od czynności, nie od rozwiniętej listy poprzedniego towaru.
+    var locationsExpanded by remember(view.generation, context, stage) { mutableStateOf(false) }
     val allowed = context != null && view.context == context && view.ready && !view.busy && view.journal.pending == null
+    val scrollState = rememberScrollState()
+    LaunchedEffect(view.generation, context, stage) {
+        // Kolejny skan ma odsłonić instrukcję również po przewinięciu alternatywnych miejsc.
+        scrollState.scrollTo(0)
+    }
 
     WmsLifecycleEffect(graph, context, controller::activateVerification, controller::invalidateVerification, controller::open)
 
@@ -113,7 +121,7 @@ fun WmsInboundScreen(graph: AppGraph) {
         true
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(scrollState).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (context == null) { Text("Zaloguj się, aby przyjmować dostawy."); return@Column }
         if ((!allowed && !view.busy) || (view.busy && document == null)) {
             Text(if (view.busy) "Potwierdzam na serwerze…" else "Przyjęcie wstrzymane", fontSize = 22.sp, fontWeight = FontWeight.Bold)
@@ -167,10 +175,6 @@ fun WmsInboundScreen(graph: AppGraph) {
                     Text("Policzono ${line.received} / ${line.expected}", color = InkMute)
                 }
             }
-            if (!view.buffer && !damaged && stage in setOf(WmsInboundStage.QUANTITY, WmsInboundStage.DESTINATION)) {
-                Text(if (line.bins.isEmpty()) "Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce."
-                    else "Miejsca według ostatniego odczytu:\n${line.bins.joinToString("\n") { it.hint }}", color = InkMute)
-            }
             when (stage) {
                 WmsInboundStage.QUANTITY -> if (allowed) {
                     Text("Teraz przyjmujesz · pozostało ${line.remaining} szt.", fontWeight = FontWeight.Bold)
@@ -187,6 +191,9 @@ fun WmsInboundScreen(graph: AppGraph) {
             }
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
+        if (line != null && !view.buffer && !damaged && stage in setOf(WmsInboundStage.QUANTITY, WmsInboundStage.DESTINATION)) {
+            WmsLocationHints(line.bins, locationsExpanded, allowed) { locationsExpanded = !locationsExpanded }
+        }
         if (document.summary.remaining == 0L && stage != WmsInboundStage.CLOSED) {
             PrimaryButton("ZAKOŃCZ PRZYJĘCIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) { submit(inboundClose(document)) }
         }

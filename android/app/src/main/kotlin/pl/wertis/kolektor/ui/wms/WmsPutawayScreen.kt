@@ -194,22 +194,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
         if (!damaged && stage in setOf(WmsPutawayStage.QUANTITY, WmsPutawayStage.TARGET)) {
-            // Ilość i błąd mają pierwszeństwo przed nawet ośmioma podpowiedziami miejsc.
-            val firstBin = task.bins.firstOrNull()
-            if (firstBin == null) {
-                Text("Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce.", color = InkMute)
-            } else {
-                Text("Miejsce według ostatniego odczytu:", color = InkMute)
-                Text(firstBin.hint, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                if (task.bins.size > 1) {
-                    OutlineButton(if (locationsExpanded) "ZWIŃ INNE MIEJSCA" else "INNE MIEJSCA (${task.bins.size - 1})", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
-                        locationsExpanded = !locationsExpanded
-                    }
-                    if (locationsExpanded) {
-                        task.bins.drop(1).forEach { Text(it.hint, color = InkMute) }
-                    }
-                }
-            }
+            WmsLocationHints(task.bins, locationsExpanded, allowed) { locationsExpanded = !locationsExpanded }
         }
         if (stage !in setOf(WmsPutawayStage.DONE, WmsPutawayStage.OTHER, WmsPutawayStage.CLAIM)) {
             OutlineButton(if (options) "ZAMKNIJ OPCJE" else "PROBLEM / ZMIEŃ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { options = !options }

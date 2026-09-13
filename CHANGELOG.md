@@ -37,6 +37,7 @@ historii nie przepisujemy.
 ## 0.322.1 — bieżący krok przed listą miejsc odkładania
 
 - Kolektor pokazuje ilość, potwierdzenie i błąd przed podpowiedziami półek. Pierwsze miejsce pozostaje widoczne, pozostałe rozwija przycisk.
+- Odkładanie i przyjęcie bezpośrednio na półkę współdzielą ten sam widok podpowiedzi.
 - Przejście do następnego kroku zwija alternatywy i przewija do instrukcji. Nowa partia nie dziedziczy rozwiniętej listy.
 - Podpowiedzi nadal podają pojemność z ostatniego odczytu. Zmiana nie potwierdza ilości ani miejsca za operatora.
 - Odbiór na fizycznym kolektorze pozostaje otwarty. Poprawka dotyczy układu Compose, bez zmiany API i bazy.
