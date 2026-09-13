@@ -77,6 +77,7 @@ android {
         targetSdk = 35
         versionCode = kodWersji
         versionName = wersjaMonorepo
+        testInstrumentationRunner = "pl.wertis.kolektor.wms.WmsTestRunner"
 
         resourceConfigurations += "pl"
     }
@@ -159,6 +160,11 @@ dependencies {
     }
 
     testImplementation(libs.junit)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 /* Odmowa PRZY URUCHOMIENIU zadania, nie przy konfiguracji projektu. Gradle

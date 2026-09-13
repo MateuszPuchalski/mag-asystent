@@ -9,7 +9,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        wertis: { amber: "#F7A600", ink: "#2A2A2C", paper: "#F6F5F2", tlo: "#f1f5f9" },
+        wertis: { amber: "#FF9100", ink: "#303030", paper: "#F6F5F2", tlo: "#f1f5f9" },
 
         /* Statusy rozmowy z §7. Para tło–tekst, żeby plakietki nie dobierało
            się ręcznie przy każdym użyciu. */

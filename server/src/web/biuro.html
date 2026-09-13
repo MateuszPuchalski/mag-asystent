@@ -3,17 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WERTIS · Podgląd biura</title>
+<title>WERTIS · Magazyn i biuro</title>
 <!-- Ikona wprost w dokumencie: strona jest JEDNYM plikiem bez builda, więc
      osobny `/favicon.ico` byłby drugim zasobem do serwowania i 404 w logu
      przy każdym otwarciu. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232A2A2C'/%3E%3Cpath d='M5 10h4l2 8 2-8h3l2 8 2-8h4l-4 14h-4l-1.5-6-1.5 6H9z' fill='%23F7A600'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23303030'/%3E%3Cpath d='M5 10h4l2 8 2-8h3l2 8 2-8h4l-4 14h-4l-1.5-6-1.5 6H9z' fill='%23FF9100'/%3E%3C/svg%3E">
 <style>
-  /* ── Język wizualny WERTIS — LUSTRO kolektora ──────────────────────────────
-     Tokeny przepisane 1:1 z android/ui/theme/Color.kt, fonty to TE SAME pliki
-     Barlow, którymi rysuje kolektor (trasa /biuro/fonty/*). Biuro i hala mają
-     wyglądać jak jedna aplikacja: człowiek przechodzący między ekranami nie
-     powinien uczyć się dwóch systemów znaczeń kolorów i wag. */
+  /* Barlow pozostaje wspólnym krojem magazynu i obsługi klienta.
+     Warstwa biuro-theme.css dopasowuje kolory i nawigację do panelu obsługi
+     oraz oryginalnego logo przekazanego przez właściciela. */
   @font-face { font-family: Barlow; font-weight: 400; src: url('/biuro/fonty/barlow_regular.ttf') format('truetype'); font-display: swap; }
   @font-face { font-family: Barlow; font-weight: 600; src: url('/biuro/fonty/barlow_semibold.ttf') format('truetype'); font-display: swap; }
   @font-face { font-family: Barlow; font-weight: 700; src: url('/biuro/fonty/barlow_bold.ttf') format('truetype'); font-display: swap; }
@@ -802,33 +800,28 @@
 </head>
 <body>
 <aside id="bok">
-  <!-- NAWIGACJA BOCZNA (0.125.0). Do 0.123.0 zakładki, marka i sesja stały
-       w górnym pasku 52 px — a zakładek przybywa: rozprężenie SPRAW dodaje
-       MAGAZYN ZWROTÓW, i w jednym rzędzie przestały się mieścić
-       razem z sesją już przy 1180 px (zawijanie do 93 px, zmierzone przy
-       0.119.1). Pion po lewej ma miejsce na wzrost, a górne 52 px wraca
-       treści: konsole liczą odtąd pełne 100dvh.
-
-       MECHANIZM NIETKNIĘTY — to przeprowadzka domu, jak 0.95.0 i 0.119.1:
-       te same `data-widok`, ta sama delegacja, ta sama pętla `aria-current`.
-       Poniżej 1280 px pasek zwęża się do samych ikon (podpis w `title`) —
-       ikona bez podpisu wystarcza, bo pozycji jest sześć, nie sześćdziesiąt. -->
-  <div class="marka"><b>WERTIS</b><span id="podtytul">Podgląd biura</span></div>
+  <!-- Te same identyfikatory i delegacja utrzymują obsługę ekranów po zmianie
+       pionowej nawigacji na wspólny z panelem obsługi pasek poziomy. -->
+  <div class="marka"><img class="wertis-logo" src="/biuro/wertis-logo.png" width="1600" height="672" alt="WERTIS — sklep z częściami"><span class="brand-area">Magazyn i biuro</span><span id="podtytul" hidden></span></div>
 
   <nav class="zakladki" hidden>
     <div class="grupa">
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
+        <button data-widok="wms" title="Zamówienia, kompletacja i pakowanie">
+          <svg viewBox="0 0 24 24"><path d="M3 7l9-5 9 5v14H3zM3 7l9 5 9-5M12 12v9"/></svg>
+          <span class="et">Realizacja WMS</span>
+        </button>
         <button data-widok="dostawy" aria-current="true" title="Dostawy i reklamacje">
           <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          <span class="et">DOSTAWY</span>
+          <span class="et">Dostawy</span>
         </button>
         <!-- Praca FIZYCZNA przy zwrotach: kosze z dokumentu MM i pominięte
              pozycje. Kropka alarmu zamiast pigułki: tu nie liczy się ILE,
              tylko CZY coś czeka. -->
         <button data-widok="magazyn" title="Magazyn zwrotów">
           <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1z"/><path d="M3.3 7.4L12 12l8.7-4.6M12 12v9"/></svg>
-          <span class="et">MAGAZYN ZWROTÓW</span><i class="kropka" id="magazynKropka" hidden></i>
+          <span class="et">Magazyn zwrotów</span><i class="kropka" id="magazynKropka" hidden></i>
         </button>
       </div>
     </div>
@@ -837,15 +830,15 @@
       <div class="grupa-btny">
         <button data-widok="analiza" title="Analiza">
           <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
-          <span class="et">ANALIZA</span>
+          <span class="et">Analiza</span>
         </button>
         <button data-widok="dziennik" title="Dziennik zdarzeń">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
-          <span class="et">DZIENNIK</span>
+          <span class="et">Dziennik</span>
         </button>
         <button data-widok="nadzor" title="Stan systemu">
           <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 8L9 4l-3 8H2"/></svg>
-          <span class="et">STAN SYSTEMU</span>
+          <span class="et">Stan systemu</span>
         </button>
       </div>
     </div>
@@ -872,23 +865,24 @@
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
       </button>
-      <button id="wyloguj" hidden><span class="et">Wyloguj</span><svg class="tylkoIkona" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+      <button id="wyloguj" aria-label="Wyloguj" hidden><span class="et">Wyloguj</span><svg class="tylkoIkona" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
     </div>
   </div>
 </aside>
 <main id="login" class="card">
-  <h2>LOGOWANIE</h2>
-  <p class="mute">Zaloguj się kontem WERTIS. Konto zakłada admin albo biuro —
-     patrz DEPLOY §5a.</p>
+  <img class="wertis-logo" src="/biuro/wertis-logo.png" width="1600" height="672" alt="WERTIS — sklep z częściami">
+  <h2>Magazyn i biuro</h2>
+  <p class="mute">Zaloguj się kontem WERTIS, aby rozpocząć pracę.</p>
   <!-- `autocomplete` włączony celowo: to komputer w biurze, a menedżer haseł
        jest tu sojusznikiem — inaczej hasło ląduje na kartce pod klawiaturą -->
-  <input id="poleLogin" placeholder="login" autocomplete="username" autofocus>
-  <input id="poleHaslo" type="password" placeholder="hasło" autocomplete="current-password">
+  <label>Login<input id="poleLogin" placeholder="login" autocomplete="username" autofocus></label>
+  <label>Hasło<input id="poleHaslo" type="password" placeholder="hasło" autocomplete="current-password"></label>
   <div class="blad" id="loginBlad"></div>
   <button class="akcja" id="zaloguj">ZALOGUJ</button>
 </main>
 
 <main id="panel" hidden>
+  <section id="widokWms" class="widok" hidden aria-label="Realizacja zamówień"></section>
   <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
   <div id="widokDostawy" class="widok">
     <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
@@ -1526,6 +1520,18 @@
      oddałoby `null` i położyło cały panel. -->
 <div id="lupa" hidden><img alt=""></div>
 
+<link rel="stylesheet" href="/biuro/wms.css">
+<link rel="stylesheet" href="/biuro/biuro-theme.css">
+<script src="/biuro/biuro-theme.js"></script>
+<script src="/biuro/wms-photos.js"></script>
+<script src="/biuro/wms-carts.js"></script>
+<script src="/biuro/wms-stock-work.js"></script>
+<script src="/biuro/wms-putaway.js"></script>
+<script src="/biuro/wms-inbound.js"></script>
+<script src="/biuro/wms-handoff.js"></script>
+<script src="/biuro/wms-pack-recovery.js"></script>
+<script src="/biuro/wms-packing.js"></script>
+<script src="/biuro/wms.js"></script>
 <script>
 "use strict";
 /* Jedna strona, zero zależności, zero builda. Token sesji żyje w localStorage,
@@ -1655,6 +1661,7 @@ async function pobierz(sciezka, nazwa) {
 
 function wyloguj() {
   token = ""; kto = "";
+  window.Wms?.clearPhotos();
   // blob-URL-e zdjęć trzymamy przez całą sesję (patrz `dolozZdjecia`), więc to
   // jest jedyne miejsce, w którym wolno je zwolnić
   for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
@@ -1704,6 +1711,8 @@ function pokaz(nowy) {
      samego powodu stan panelu NIE idzie do localStorage. */
   zamknijDokument();
   $("widokDostawy").hidden = nowy !== "dostawy";
+  $("widokWms").hidden = nowy !== "wms";
+  if (nowy === "wms") window.Wms.open();
   $("widokMagazyn").hidden = nowy !== "magazyn";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
@@ -5322,6 +5331,14 @@ document.addEventListener("click", (e) => {
   if (widok) ustawSzuflade(widok.id, szufladaW !== widok.id);
 });
 
+// Odświeżenie strony zachowuje sesję i pozwala odzyskać wynik skanu WMS.
+// Uruchamiamy po inicjalizacji wszystkich stałych używanych przez start().
+if (token) {
+  api("/api/auth/me").then(r => r.json()).then(d => {
+    kto = d.user.name;
+    start();
+  }).catch(e => { $("loginBlad").textContent = e.message; });
+}
 </script>
 <dialog id="dialogW"></dialog>
 <div id="toasty"></div>

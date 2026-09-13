@@ -63,13 +63,13 @@ class ClassifyTest {
     }
 
     @Test fun `prefiks i wzorzec daja ten sam znormalizowany kod`() {
-        assertEquals(Scan("A01-02-03", ScanKind.LOC), classify("LOC:a01-02-03", cfg))
-        assertEquals(Scan("A01-02-03", ScanKind.LOC), classify("a01-02-03", cfg))
+        assertEquals(Scan("A01-02-03", ScanKind.LOC, "LOC:a01-02-03"), classify("LOC:a01-02-03", cfg))
+        assertEquals(Scan("A01-02-03", ScanKind.LOC, "a01-02-03"), classify("a01-02-03", cfg))
     }
 
     @Test fun `wlasny prefiks lokalizacji`() {
         val inny = ScanConfig.of(emptyList(), locPrefix = "MAG:")
-        assertEquals(Scan("A1-2", ScanKind.LOC), classify("MAG:A1-2", inny))
+        assertEquals(Scan("A1-2", ScanKind.LOC, "MAG:A1-2"), classify("MAG:A1-2", inny))
     }
 
     @Test fun `bez reguly z serwera dziala tryb ostrozny`() {
