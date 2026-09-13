@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.319.0 — 13 września 2026
+
+**Pasek rozjazdów zjadał ekran zwrotów.** Właściciel wszedł w zakładkę ZWROTY
+i zobaczył wyłącznie jego: czterysta trzydzieści trzy wiersze „po terminie
+ustawowym", a pod nimi ani kolejki, ani kolumny decyzji, ani dowodów. Pasek
+doszedł w 0.313.0 i rysował każdy rozjazd osobno — na bazie testowej wyglądało
+to niewinnie, bo rozjazdów było kilka.
+
+Czterysta razy to samo zdanie to nie informacja, tylko szum. Pasek liczy teraz
+RODZAJAMI („433 po terminie ustawowym"), a numery pokazuje po kliknięciu,
+w liście z własnym scrollerem i sufitem wysokości. Dekalog p. 2: pokazuj to,
+co rozstrzyga bieżącą czynność.
+
+Sama liczba nie jest usterką aplikacji — to zaległość do przejrzenia. Raport
+mówi o niej prawdę, tylko że dotąd mówił ją kosztem całego ekranu.
+
+
 ## 0.317.0 — 13 września 2026
 
 **Szkic czeka na agenta, zanim ten zdąży przeczytać pytanie.** Do tej wersji

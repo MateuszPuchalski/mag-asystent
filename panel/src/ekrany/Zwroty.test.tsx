@@ -412,19 +412,29 @@ describe("Pasek rozjazdów", () => {
     expect(screen.queryByLabelText("Rozjazdy zwrotów")).toBeNull();
   });
 
-  it("wypisuje KLUCZ przy każdym wierszu, bo bez niego alarm nie mówi, od czego zacząć", () => {
+  it("liczy RODZAJAMI, a numery pokazuje dopiero po kliknięciu", async () => {
+    /* NAPRAWA Z 0.319.0. Pierwsza wersja rysowała każdy wiersz z osobna;
+       na żywej bazie wyszło ich czterysta trzydzieści trzy i pasek zjadł cały
+       ekran — kolejki nie było widać wcale. Czterysta razy to samo zdanie to
+       nie informacja, tylko szum: rozstrzyga LICZBA i RODZAJ. */
     scena.rozjazdy = [
       { rodzaj: "zwrot_po_terminie", klucz: "ZW-1",
         opis: "Zwrot ZW-1 po terminie ustawowym", odKiedy: "2026-09-01T09:00:00Z" },
+      { rodzaj: "zwrot_po_terminie", klucz: "ZW-2",
+        opis: "Zwrot ZW-2 po terminie ustawowym", odKiedy: "2026-09-01T09:00:00Z" },
       { rodzaj: "kosz_bez_powrotu", klucz: "Z-7",
         opis: "Kosz Z-7 rozłożono ponad dobę temu", odKiedy: "2026-09-02T09:00:00Z" },
     ];
     try {
       pokaz();
       const pasek = screen.getByLabelText("Rozjazdy zwrotów");
-      expect(pasek).toHaveTextContent("Do sprawdzenia (2)");
-      expect(pasek).toHaveTextContent("ZW-1");
-      expect(pasek).toHaveTextContent("Z-7");
+      expect(pasek).toHaveTextContent("Do sprawdzenia (3)");
+      expect(pasek).toHaveTextContent("2 po terminie ustawowym");
+      expect(pasek).toHaveTextContent("1 kosz bez powrotu z regału");
+      expect(pasek).not.toHaveTextContent("ZW-1");
+
+      await userEvent.click(screen.getByRole("button", { name: /pokaż numery/ }));
+      expect(screen.getByLabelText("Rozjazdy zwrotów")).toHaveTextContent("ZW-1");
     } finally { scena.rozjazdy = []; }
   });
 });
