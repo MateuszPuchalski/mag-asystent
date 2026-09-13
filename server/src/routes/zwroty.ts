@@ -25,6 +25,7 @@ import {
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
+import { skladPozycji } from "../services/komplety.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -676,6 +677,14 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       /* Czego jeszcze z tego zamówienia nie ma w zwrocie. Liczone tutaj,
          a nie w kolejce: lista jest potrzebna dopiero przy otwartym zwrocie. */
       doDopisania: doDopisania(id, db()),
+      /* CO NAPRAWDĘ WEJDZIE DO KOSZYKA (0.328.0). Komplet sprzedany jedną
+         ofertą leży na magazynie osobno, a rozbicie ma tylko paragon.
+
+         TYLKO W SZCZEGÓLE, nigdy w kolejce: `skladPozycji` pyta o dokument,
+         o zamówienie i o mapowanie każdej oferty, a kolejka liczy naraz
+         wszystkie zwroty. Ta sama zasada co przy liście wyżej. */
+      sklady: Object.fromEntries(
+        zwrot.pozycje.map((p) => [p.id, skladPozycji(db(), p.id)])),
     };
   });
 

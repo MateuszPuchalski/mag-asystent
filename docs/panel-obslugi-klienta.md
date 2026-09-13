@@ -3461,6 +3461,44 @@ Wniosek automatu podpisuje się na osi zwrotu jako „automat (odstąpienie)"
 i nie ma konta w aplikacji. Odmowa Allegro zostaje w dzienniku ze zdaniem —
 bez niego pytanie „dlaczego nie ma wniosku" nie ma odpowiedzi.
 
+### 25a.21. Komplet rozbity na paragonie (0.328.0)
+
+Zgłoszenie właściciela: część ofert sprzedaje się jako komplet, a na magazynie
+leżą osobno. Do koszyka zwrotów mają więc iść kartoteki **z paragonu**, bo to
+on ma je rozbite na wiersze.
+
+Powód jest w schemacie. `oferta_kartoteka` ma klucz `(konto, oferta)`, czyli
+jedna oferta wskazuje DOKŁADNIE jedną kartotekę. Komplet nie ma jak wskazać
+trzech i nie jest to przeoczenie — tak zaprojektowano, gdy kompletów nie było.
+Drugie mapowanie znaczyłoby drugie miejsce do utrzymania. Dokument sprzedaży
+rozbicie już ma, bo Subiekt wystawia komplet osobnymi wierszami.
+
+**Reguła właściciela, zapisana dosłownie: „kartotekę tak, z paragonu, ale ilość
+bierze ze zwrotu".** Paragon mówi CO wraca na półkę, zwrot mówi ILE. Odwrotnie
+być nie może: paragon niesie całe zamówienie, więc przy zwrocie częściowym jego
+ilości wrzuciłyby na stan sztuki, które zostały u klienta.
+
+**Jak wiersze paragonu trafiają do oferty.** Odejmowaniem, bo dokument nie mówi,
+z której oferty pochodzi wiersz. Oferty zamówienia, które mają kartotekę,
+zabierają swoje sztuki. Reszta dokumentu należy do oferty, która kartoteki nie
+ma — czyli do kompletu. Odejmujemy SZTUKI, nie całe wiersze: ten sam sekator
+bywa i w komplecie, i dokupiony osobno.
+
+**Przy dwóch ofertach bez kartoteki automat milczy.** Zgadnięty podział kładzie
+na półkę cudzy towar i podnosi stan o sztuki, których nikt nie oddał; widać to
+dopiero przy inwentaryzacji. Ekran mówi wtedy, czego nie zrobił, a pozycja do
+koszyka nie wchodzi. Zwykle wystarczy wskazać kartotekę TEJ DRUGIEJ oferty —
+przycisk stoi przy pozycji od 0.174.0 — i niejednoznaczność znika.
+
+**Skład policzony raz zapamiętuje się przy ofercie** (`oferta_komplet`).
+Następny zwrot tego kompletu idzie bez liczenia, także wtedy, gdy tamto
+zamówienie byłoby niejednoznaczne. Kolumna `zrodlo` mówi, czy policzył to
+automat, czy wskazał człowiek — wynik automatu nie udaje decyzji (§4.3).
+
+Skład liczy się **wyłącznie w szczególe zwrotu**, nigdy w kolejce: każde
+liczenie pyta o dokument, o zamówienie i o mapowanie każdej oferty, a kolejka
+bierze naraz wszystkie zwroty.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4395,6 +4433,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
 | Rabat transakcyjny — wniosek składany sam | **działa** od 0.320.0 | `services/rabaty-automat.ts`; karencja 30 min, sufit 20 na takt, zastane pozycje poza automatem |
+| Komplet rozbity na paragonie | **działa** od 0.328.0 | `services/komplety.ts`, `oferta_komplet`; kartoteka z dokumentu, ilość ze zwrotu |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
 | Dyskusje (`type: "DISPUTE"`) | **działa** od 0.245.0 | §25c; `services/dyskusje.ts`, `panel/src/dyskusje/` |

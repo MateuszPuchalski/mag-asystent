@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.328.0 — 13 września 2026
+
+**Komplet wchodzi do koszyka rozbity, tak jak leży na magazynie.** Zgłoszenie
+właściciela: część ofert sprzedaje się jako komplet, a zbiera osobno — więc
+produkty idące do koszyka zwrotów mają być brane z paragonu, bo tam pozycje są
+rozbite.
+
+- **Kartoteki z dokumentu sprzedaży, ilość ze zwrotu.** Reguła właściciela
+  zapisana dosłownie. Paragon mówi CO wraca na półkę, zwrot mówi ILE — paragon
+  niesie całe zamówienie, więc jego ilości przy zwrocie częściowym wrzuciłyby
+  na stan sztuki, które zostały u klienta.
+- **Wiersze paragonu przypisują się ofertom przez odejmowanie.** Oferty, które
+  mają kartotekę, zabierają swoje SZTUKI (nie całe wiersze — ten sam towar bywa
+  i w komplecie, i dokupiony osobno). Reszta należy do kompletu.
+- **Przy dwóch ofertach bez kartoteki automat milczy** i mówi dlaczego. Pozycja
+  do koszyka nie wchodzi: zgadnięty podział kładzie na półkę cudzy towar,
+  a widać to dopiero przy inwentaryzacji. Zwykle wystarczy wskazać kartotekę
+  tej drugiej oferty — przycisk stoi przy pozycji od 0.174.0.
+- **Skład policzony raz zapamiętuje się przy ofercie** (`oferta_komplet`).
+  Następny zwrot tego kompletu idzie bez liczenia.
+- **Zdjęcie oceny zabiera z koszyka WSZYSTKIE kartoteki kompletu.** Zdjęcie
+  jednej zostawiłoby resztę zestawu na dokumencie MM — towar na papierze,
+  którego nikt nie wyjął z pudła.
+- Szczegół zwrotu pokazuje, co wejdzie do koszyka, a powód niewejścia pisze
+  teraz SERWER: przyczyny są trzy i prowadzą w różne miejsca.
+
+Zwykły towar zachowuje się jak dotąd, a zwrot bez wskazanego dokumentu idzie
+starą drogą — kartoteka z mapowania oferty. Skład liczy się wyłącznie
+w szczególe zwrotu, nigdy w kolejce. Szczegóły w `docs/panel-obslugi-klienta.md`
+§25a.21.
+
 ## 0.326.0 — 13 września 2026
 
 **Przerwa w łączności kolektora trafia do dziennika biura.** Decyzja

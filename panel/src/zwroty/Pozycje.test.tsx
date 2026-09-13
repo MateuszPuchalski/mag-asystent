@@ -376,6 +376,40 @@ describe("Pozycja dopisana przez biuro", () => {
     expect(screen.getByText(/Nie weszła do koszyka/)).toBeInTheDocument();
   });
 
+  it("komplet pokazuje, CO wejdzie do koszyka z paragonu", () => {
+    /* Oferta jest jedna, a na magazynie leżą trzy kartoteki (0.328.0).
+       Bez tego wiersza biuro nie ma skąd wiedzieć, że MM poniesie trzy
+       pozycje zamiast jednej — dowiedziałoby się przy rozkładaniu. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
+    ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1 },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2 },
+    ] } } });
+    expect(screen.getByText(/SEK-01 × 1, REK-02 × 2/)).toBeInTheDocument();
+  });
+
+  it("zwykły towar NIE powtarza swojej nazwy jako składu", () => {
+    /* Jedna kartoteka to ta sama nazwa, która stoi linijkę wyżej. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
+    ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
+      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1 },
+    ] } } });
+    expect(screen.queryByText(/Do koszyka z paragonu/)).toBeNull();
+  });
+
+  it("powód niewejścia do koszyka PISZE SERWER, panel go nie układa", () => {
+    /* Przyczyny są trzy i prowadzą w różne miejsca: brak kartoteki, brak
+       dokumentu, dwie oferty bez kartoteki na jednym paragonie. Jedno zdanie
+       na wszystkie wysyłałoby biuro do poprawiania nie tej rzeczy. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
+    ] }), { sklady: { 1: { zrodlo: null, skladniki: [],
+      powod: "W zamówieniu są 2 oferty bez kartoteki na tym dokumencie" } } });
+    expect(screen.getByText(/2 oferty bez kartoteki/)).toBeInTheDocument();
+  });
+
   it("pozycja, która do koszyka weszła, mówi o tym przy ocenie", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),

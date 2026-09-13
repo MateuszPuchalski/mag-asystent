@@ -911,6 +911,19 @@ export interface FakturaZwrotu {
 
 /** Dokument, którym MOŻE być ta sprzedaż — z jawnym uzasadnieniem. */
 /** Pozycja zamówienia, której NIE MA jeszcze w zwrocie (0.184.0). */
+/**
+ * Co naprawdę wejdzie do koszyka za jedną pozycję zwrotu (0.328.0).
+ *
+ * Komplet sprzedany jedną ofertą leży na magazynie osobno, a rozbicie ma
+ * wyłącznie paragon. `skladniki` puste znaczy: NIE WEJDZIE, a `powod` mówi
+ * dlaczego — zdanie pisze serwer, panel go nie układa.
+ */
+export interface SkladPozycji {
+  skladniki: Array<{ twId: number; symbol: string; nazwa: string; ilosc: number }>;
+  zrodlo: "oferta" | "paragon" | "biuro" | null;
+  powod: string | null;
+}
+
 export interface DoDopisania {
   zamPozycjaId: number;
   offerId: string | null;

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
-import type { DoDopisania, PozycjaZwrotu, Zwrot } from "../api/typy";
+import type { DoDopisania, PozycjaZwrotu, SkladPozycji, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
@@ -132,7 +132,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 }
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
-  doDopisania = [], bladDopisania = "",
+  doDopisania = [], bladDopisania = "", sklady = {},
   onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij,
   onWszystkieNaStan, akcje }: {
   zwrot: Zwrot;
@@ -143,6 +143,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   /** Pozycje zamówienia, których w zwrocie jeszcze nie ma (0.184.0). */
   doDopisania?: DoDopisania[];
   bladDopisania?: string;
+  /** Co wejdzie do koszyka za każdą pozycję (0.328.0), po identyfikatorze. */
+  sklady?: Record<number, SkladPozycji>;
   onOcena: (pozycjaId: number, ocena: "stan" | "utylizacja" | null) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
@@ -330,7 +332,21 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               ma na żadnym papierze, a magazynier zobaczyłby to dopiero przy
               rozkładaniu. */}
           {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 text-xs font-semibold text-ranga-uwaga">
-            Nie weszła do koszyka — bez kartoteki nie ma czego wpisać na MM.</p>}
+            {/* POWÓD PISZE SERWER (0.328.0). Do tego wydania stało tu jedno
+                zdanie o braku kartoteki — jedyna wtedy przyczyna. Odkąd skład
+                bierze się z paragonu, przyczyny są trzy i prowadzą w różne
+                miejsca: brak kartoteki, brak dokumentu, dwie oferty bez
+                kartoteki na jednym paragonie. */}
+            Nie weszła do koszyka — {sklady[p.id]?.powod
+              ?? "bez kartoteki nie ma czego wpisać na MM"}.</p>}
+          {/* KOMPLET ROZBITY NA PARAGONIE. Pokazujemy go tylko wtedy, gdy
+              kartotek jest więcej niż jedna: przy zwykłym towarze wiersz
+              powtarzałby nazwę stojącą linijkę wyżej. */}
+          {(sklady[p.id]?.skladniki.length ?? 0) > 1 &&
+            <p className="mt-1 text-xs text-slate-500">
+              Do koszyka z paragonu: {sklady[p.id]!.skladniki
+                .map((s) => `${s.symbol} × ${s.ilosc}`).join(", ")}
+            </p>}
 
           {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —
               i tam ją proponujemy. Zapisaną widać wszędzie, bo po zamknięciu
