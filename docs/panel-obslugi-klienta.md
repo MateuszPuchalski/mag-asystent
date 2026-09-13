@@ -1883,6 +1883,48 @@ pogłębianiem przerwy drugim żądaniem, a to jest ostatnie żądanie na drodze
 szkicu. Szkic bez linku jest wart tyle, ile był wart do 0.269.0; szkic, który
 nie powstał, nie jest wart nic.
 
+**Szkic sam dla nowego pytania pod ofertą (0.317.0).** Właściciel: „make
+copilot run automatically on new questions". Do 0.315.0 propozycja powstawała
+wyłącznie z kliknięcia, więc agent otwierał rozmowę, czytał pytanie, klikał
+i czekał kilka sekund. Teraz propozycja czeka na niego.
+
+Zakres jest wąski decyzją właściciela: **wyłącznie wiadomość przychodząca
+niosąca numer oferty**, czyli pytanie sprzed zakupu. To jest ten przypadek,
+w którym Copilot ma komplet faktów: kartotekę oferty, treść aukcji, kandydatów
+i adres naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu czy reklamacji
+szkic z faktów doboru niewiele wnosi, a kosztuje tyle samo.
+
+**Kliknięcie było hamulcem samo w sobie** — agent prosił o pracę dla siebie
+i płacił za jedną rozmowę. Takt takiego ogranicznika nie ma, więc dostał dwa
+jawne: ile szkiców na przebieg oraz twardy sufit na godzinę. Sufit liczy się
+z księgi wywołań, **razem z tymi zakończonymi błędem**, bo nieudane też
+kosztuje, i z księgi, a nie z licznika w pamięci: restart usługi zerowałby
+licznik, a rachunek u dostawcy nie.
+
+Takt ma **rytm własny**, nie doklejony do skrzynki: układanie szkicu trwa
+sekundy na rozmowę, więc wpięte tam opóźniałoby pobieranie wiadomości
+o długość partii szkiców.
+
+Rozmowy idą **od najdłużej czekającej**. Agent pracuje kolejkę od góry i gdyby
+takt układał od najnowszych, znajdowałby tam same rozmowy bez propozycji.
+
+Automatyczny szkic podpisuje **automat**, nie człowiek: `przez_user_id` zostaje
+puste. Podpisanie go kontem zalogowanego agenta zafałszowałoby jedyny pomiar,
+jaki mamy — jego ocenę przez człowieka. Ten sam wzorzec, co przy wiedzy
+z ofert w 0.264.0.
+
+Szkic odpowiadający na najnowsze pytanie **nie jest układany drugi raz**;
+świeżość mierzy to samo pole, którym ekran mówi „klient dopisał, propozycja
+jest nieświeża". Dopisek klienta czyni szkic nieświeżym i wtedy powstaje nowy.
+
+Domyślnie **wyłączone**. Przełącznik automatycznych szkiców istniał już raz,
+w 0.107.0, i stał na zerze na wyraźną prośbę właściciela. Wraca na jego
+prośbę, ale wraca wyłączony: rzecz, która wydaje pieniądze bez kliknięcia,
+ma się włączać decyzją przy `wertis.env`, a nie skutkiem ubocznym aktualizacji.
+
+Do klienta dalej **nie idzie nic** bez człowieka. Zasada nadrzędna nr 2 nie ma
+tu wyjątku.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
@@ -4226,6 +4268,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Ustawienia obsługi za zębatką (§21) | **działa** od 0.168.0 | `panel/src/ekrany/Ustawienia.tsx`, trasa `/obsluga/ustawienia` |
 | Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
+| Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |

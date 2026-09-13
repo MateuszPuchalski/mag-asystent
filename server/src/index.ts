@@ -64,6 +64,7 @@ import { synchronizujAllegroReklamacje } from "./services/allegro-reklamacje-syn
 import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
+import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { uruchomTakt } from "./services/takt.js";
 import { powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
@@ -419,6 +420,24 @@ async function main() {
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
        mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
     uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
+  }
+
+  /* SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
+     Osobny warunek od tickerów Allegro, bo to inna zależność: te potrzebują
+     konta Allegro, ten potrzebuje klucza dostawcy modelu. Wyłączony domyślnie
+     i włączany JEDNĄ zmienną w `wertis.env` — rzecz, która wydaje pieniądze
+     bez kliknięcia, ma się włączać decyzją, a nie aktualizacją.
+
+     Rytm WŁASNY, nie doklejony do taktu skrzynki: układanie szkicu trwa
+     sekundy na rozmowę, więc wpięte tam opóźniałoby pobieranie wiadomości
+     o długość partii szkiców. */
+  if (config.copilot.autoSzkic && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+    uruchomTakt("copilot-auto-szkic", config.copilot.autoMs, async () => {
+      const w = await ulozZalegleSzkice();
+      /* Głośno TYLKO wtedy, gdy takt stanął. Przebieg, który nic nie zastał,
+         jest normą i nie ma o czym mówić. */
+      if (w.przerwane) console.warn(`[copilot-auto-szkic] przebieg przerwany: ${w.przerwane}`);
+    });
   }
 
   const app = await buildApp();

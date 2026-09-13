@@ -2178,6 +2178,33 @@ najwyżej dwadzieścia rozmów; limit zmienia `COPILOT_MAX_PARTIA`. Rachunek,
 zużycie tokenów i trafność pokazuje karta „Copilot" w ustawieniach obsługi,
 za zębatką. Sprawdź ją po pierwszej partii.
 
+**Od 0.317.0 szkic może powstawać SAM** dla nowego pytania pod ofertą. Jest to
+wyłączone domyślnie i włącza się jedną linią:
+
+```
+export COPILOT_AUTO_SZKIC=1
+```
+
+Zanim to zrobisz, wiedz co włączasz. Kliknięcie było hamulcem samo w sobie:
+agent prosił o pracę dla siebie i płacił za jedną rozmowę. Takt takiego
+ogranicznika nie ma, więc ma dwa jawne. `COPILOT_AUTO_NA_PRZEBIEG` mówi, ile
+szkiców powstaje na jeden przebieg (domyślnie pięć). `COPILOT_AUTO_NA_GODZINE`
+to twardy sufit (domyślnie trzydzieści), liczony z księgi wywołań **razem
+z tymi zakończonymi błędem**, bo nieudane też kosztuje.
+
+Takt bierze wyłącznie wiadomości przychodzące niosące numer oferty, czyli
+pytania sprzed zakupu. Nie rusza rozmów, w których ostatnie słowo mamy my.
+Nie liczy autoodpowiedzi jako pytania klienta. Nie układa też drugi raz
+szkicu, który odpowiada już na najnowsze pytanie.
+
+**Do klienta dalej nie idzie nic bez człowieka.** Automat układa propozycję,
+wysyła ją agent.
+
+Pierwsze uruchomienie na koncie z zaległą skrzynką rozłoży się na wiele
+przebiegów, po pięć naraz. To jest zamierzone. Po pierwszej godzinie zajrzyj
+na kartę „Copilot" w ustawieniach i porównaj rachunek z tym, czego się
+spodziewasz, zanim podniesiesz limity.
+
 Sprawdzenie na żywym koncie idzie tak. Kliknij przycisk przy JEDNEJ rozmowie
 i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
