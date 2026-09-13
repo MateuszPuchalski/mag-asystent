@@ -3,6 +3,7 @@ import { transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
 import { enqueueMM } from "./queue.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
+import { skladPozycji, zapamietajSklad } from "./komplety.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką:
@@ -139,32 +140,54 @@ export function dolozDoKosza(
      powie, że do koszyka nie weszła. */
   if (magazynDocelowy(rodzaj) <= 0) return null;
   const p = database.prepare(
-    `SELECT p.id, p.tw_id, p.nazwa, p.ilosc, p.ilosc_zwrocona, t.symbol
+    `SELECT p.id, p.offer_id, p.tw_id, p.nazwa, p.ilosc, p.ilosc_zwrocona,
+            z.channel_account_id
        FROM zwrot_klienta_pozycja p
-       LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id
       WHERE p.id=?`).get(pozycjaId) as
-    { id: number; tw_id: number | null; nazwa: string; ilosc: number;
-      ilosc_zwrocona: number | null; symbol: string | null } | undefined;
-  if (!p || p.tw_id == null) return null;
+    { id: number; offer_id: string | null; tw_id: number | null; nazwa: string;
+      ilosc: number; ilosc_zwrocona: number | null; channel_account_id: number } | undefined;
+  if (!p) return null;
+
+  /* CO WCHODZI, ROZSTRZYGA PARAGON (0.328.0). Komplet sprzedany jako jedna
+     oferta leży na magazynie osobno, a rozbicie ma wyłącznie dokument
+     sprzedaży — patrz `services/komplety.ts`. Pozycja bez składu nie wchodzi
+     do koszyka i to nie jest awaria, tylko stan pracy: ekran mówi, czego nie
+     zrobił, zamiast po cichu dokładać jedną kartotekę zamiast trzech. */
+  const sklad = skladPozycji(database, pozycjaId);
+  if (!sklad.skladniki.length) return null;
 
   const koszId = otwartyKosz(database, kto, teraz, rodzaj);
   /* Dwa razy ta sama pozycja to jeden wiersz. Operator bywa poprawiany:
-     cofnięcie oceny i ponowne „na stan" nie ma prawa podwoić sztuk na MM. */
+     cofnięcie oceny i ponowne „na stan" nie ma prawa podwoić sztuk na MM.
+     Przy komplecie wierszy jest kilka, więc pytamy o ISTNIENIE, nie o jeden. */
   const stoi = database.prepare(
-    "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND zwrot_pozycja_id=?")
+    "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND zwrot_pozycja_id=? LIMIT 1")
     .get(koszId, pozycjaId) as { id: number } | undefined;
   if (stoi) return koszId;
 
-  /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0). Na dokument MM idzie
-     towar, który fizycznie leży w pudle — liczba z Allegro opisuje zamiar
-     klienta, a magazynier rozkłada sztuki. */
+  /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0) — `skladPozycji` liczy
+     sztuki tą samą regułą. Na dokument MM idzie towar, który fizycznie leży
+     w pudle; liczba z Allegro opisuje zamiar klienta. */
   const ile = iloscLiczona(p);
-  database.prepare(
+  const wstaw = database.prepare(
     `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
-     VALUES (?,?,?,?,?,?)`).run(koszId, Number(p.tw_id),
-      p.symbol ?? String(p.tw_id), p.nazwa, ile, pozycjaId);
+     VALUES (?,?,?,?,?,?)`);
+  for (const s of sklad.skladniki) {
+    wstaw.run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
+  }
+  /* Skład policzony z dokumentu ZAPAMIĘTUJE SIĘ dopiero tutaj, na drodze
+     zapisu. Liczenie go od nowa przy każdym zwrocie znaczyłoby, że ten sam
+     komplet raz wchodzi do koszyka, a raz nie — zależnie od tego, co klient
+     dokupił w tamtym zamówieniu. */
+  if (sklad.zrodlo === "paragon" && p.offer_id && sklad.skladniki.length > 1) {
+    zapamietajSklad(database, Number(p.channel_account_id), p.offer_id,
+      sklad.skladniki, (s) => s.ilosc / Math.max(1, ile), "paragon", kto, teraz);
+  }
   logEvent("kosz_zwrotow_dolozono", kto.name, null,
-    { koszId, pozycjaId, twId: Number(p.tw_id), ilosc: ile }, kto.id, database);
+    { koszId, pozycjaId, kartotek: sklad.skladniki.length, zrodlo: sklad.zrodlo,
+      sztuk: sklad.skladniki.reduce((a, s) => a + s.ilosc, 0), ilosc: ile },
+    kto.id, database);
   return koszId;
 }
 
@@ -202,15 +225,21 @@ export function zamknietyKoszPozycji(
 export function zdejmijZKosza(
   database: Db, pozycjaId: number, kto: { id: number; name: string },
 ): boolean {
-  const w = database.prepare(
+  /* WSZYSTKIE wiersze tej pozycji, nie pierwszy z brzegu: od 0.328.0 komplet
+     wchodzi do koszyka kilkoma kartotekami. Zdjęcie jednej zostawiłoby resztę
+     zestawu na dokumencie MM — czyli towar na papierze, którego nikt nie wyjął
+     z pudła. */
+  const wiersze = database.prepare(
     `SELECT kp.id, kp.kosz_id FROM kosz_pozycja kp
        JOIN kosz k ON k.id = kp.kosz_id
       WHERE kp.zwrot_pozycja_id=? AND k.status='otwarty'`)
-    .get(pozycjaId) as { id: number; kosz_id: number } | undefined;
-  if (!w) return false;
-  database.prepare("DELETE FROM kosz_pozycja WHERE id=?").run(w.id);
+    .all(pozycjaId) as Array<{ id: number; kosz_id: number }>;
+  if (!wiersze.length) return false;
+  const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
+  for (const w of wiersze) usun.run(w.id);
   logEvent("kosz_zwrotow_zdjeto", kto.name, null,
-    { koszId: Number(w.kosz_id), pozycjaId }, kto.id, database);
+    { koszId: Number(wiersze[0].kosz_id), pozycjaId, kartotek: wiersze.length },
+    kto.id, database);
   return true;
 }
 

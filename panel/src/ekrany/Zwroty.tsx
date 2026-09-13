@@ -750,6 +750,7 @@ export function Zwroty() {
                     { onError: (e) => setBladRabatu((e as Error).message) });
                 }}
                 doDopisania={szczegol.data?.doDopisania ?? []}
+                sklady={szczegol.data?.sklady ?? {}}
                 bladDopisania={bladDopisania}
                 onDopisz={(zamPozycjaId) => {
                   setBladDopisania("");

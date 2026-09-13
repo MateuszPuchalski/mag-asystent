@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, StanZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -26,6 +26,9 @@ export function useZwrot(id: number | null) {
     queryFn: () => api<{
       zwrot: Zwrot; os: WpisOsiZwrotu[]; kandydaciFaktury: KandydatFaktury[];
       doDopisania: DoDopisania[]; pieniadze: StanZwrotuPieniedzy;
+      /* Klucz to identyfikator pozycji. Serwer liczy to TYLKO w szczególe —
+         w kolejce byłoby kilkaset zapytań o dokumenty i mapowania ofert. */
+      sklady: Record<number, SkladPozycji>;
     }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,

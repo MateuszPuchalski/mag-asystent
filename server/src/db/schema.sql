@@ -2119,6 +2119,32 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_kosz_kod_aktywny ON kosz(kod)
 -- pracę magazyniera przed późniejszą zmianą; ADRES snapshotem nie jest —
 -- liczy się żywy, jak przy dostawach (lekcja z `adresyOczekiwane`
 -- w services/delivery.ts).
+-- ── Skład kompletu, wzięty z paragonu (0.328.0) ───────────────────────────
+-- Niektóre oferty sprzedają się jako komplet, a na magazynie leżą osobno.
+-- `oferta_kartoteka` ma klucz (konto, oferta), więc jedna oferta wskazuje
+-- DOKŁADNIE jedną kartotekę — komplet nie ma jak wskazać trzech.
+--
+-- Rozbicie bierze się z DOKUMENTU SPRZEDAŻY, bo Subiekt wystawia komplet
+-- osobnymi wierszami. Ta tabela jest wyłącznie PAMIĘCIĄ tamtego rozbicia:
+-- policzone raz, obowiązuje przy następnym zwrocie tej oferty — także wtedy,
+-- gdy tamto zamówienie było niejednoznaczne.
+--
+-- `ilosc_na_sztuke` liczy się NA JEDEN KOMPLET, nie na zamówienie: klient
+-- bywa kupuje dwa zestawy i oddaje jeden.
+CREATE TABLE IF NOT EXISTS oferta_komplet (
+  channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
+  offer_id TEXT NOT NULL,
+  tw_id INTEGER NOT NULL,
+  ilosc_na_sztuke REAL NOT NULL,
+  -- `paragon` = policzone z dokumentu, `biuro` = wskazane ręką człowieka.
+  -- Rozróżnienie jest informacją, nie ozdobą (§4.3 panelu): wynik automatu
+  -- nie ma udawać czyjejś decyzji.
+  zrodlo TEXT NOT NULL CHECK (zrodlo IN ('paragon','biuro')),
+  ustalono_at TEXT NOT NULL,
+  ustalono_przez TEXT NOT NULL,
+  PRIMARY KEY (channel_account_id, offer_id, tw_id)
+);
+
 CREATE TABLE IF NOT EXISTS kosz_pozycja (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   kosz_id       INTEGER NOT NULL REFERENCES kosz(id),
