@@ -237,6 +237,130 @@ export async function exercisePutback(page, output) {
     reason: "Pobrania zwrócone przez operatora",
   });
   expect((await api("/api/wms/integrity")).ok).toBe(true);
+  // Zamknięcie dawnej sprawy musi działać z zamówienia, gdy skrzynki nie ma już na trasie.
+  let returned = await api("/api/wms/orders", {
+    reference: "E2E-RETURNED-EXCEPTION",
+    channel: "seeded",
+    priority: 2,
+    dueAt: "2000-01-01T12:00:00Z",
+    lines: [{ sku: "WMS-0035", quantity: 3 }],
+  });
+  await api("/api/wms/carts", {
+    code: "REVIEW-CART",
+    name: "Zwrot zgłoszenia",
+    capacity: 20,
+    version: 0,
+    boxes: Array.from({ length: 20 }, (_, i) => ({
+      position: i + 1,
+      barcode: i === 0 ? "REVIEW-BOX" : null,
+    })),
+  });
+  const reviewRun = (
+    await api("/api/wms/cart-start", { barcode: "REVIEW-CART" })
+  ).run;
+  const pick = reviewRun.tasks.find((p) => p.order_id === returned.id);
+  expect(pick).toBeTruthy();
+  await api(`/api/wms/waves/${reviewRun.id}/pick`, {
+    orderId: returned.id,
+    version: pick.version,
+    allocationId: pick.allocation_id,
+    bin: pick.bin,
+    barcode: pick.sku,
+    tote: pick.tote,
+    quantity: 1,
+  });
+  returned = await api(`/api/wms/orders/${returned.id}`);
+  await api("/api/wms/pick-exceptions", {
+    orderId: returned.id,
+    version: returned.version,
+    allocationId: pick.allocation_id,
+    box: pick.tote,
+    kind: "missing",
+    reason: "Brak pozostałych części na półce",
+  });
+  await api(`/api/wms/cart-runs/${reviewRun.id}/handoff`, {
+    cart: "REVIEW-CART",
+    station: "PUTBACK-PACK",
+  });
+  returned = await api(`/api/wms/orders/${returned.id}`);
+  let rt = await api("/api/wms/putback", {
+    orderId: returned.id,
+    version: returned.version,
+    reason: "Wycofanie do zmiany zamówienia",
+  });
+  rt = await api(`/api/wms/putback/${rt.id}/claim`, {
+    version: rt.version,
+    box: rt.box,
+    station: rt.station,
+    contentsConfirmed: true,
+  });
+  rt = await api(`/api/wms/putback/${rt.id}/finish`, {
+    version: rt.version,
+    orderVersion: rt.order_version,
+    box: rt.box,
+    allocationId: rt.picks[0].allocation_id,
+    bin: pick.bin,
+    barcode: pick.sku,
+    quantity: 1,
+  });
+  expect(rt.completed_at).not.toBeNull();
+  returned = await api(`/api/wms/orders/${returned.id}`);
+  expect(returned.tote).toBeNull();
+  expect(returned.returnedPickException.stock_check_open).toBe(1);
+  await page.locator('[data-tab-wms="orders"]').click();
+  await page.locator('#wms-filter [name="q"]').fill(returned.reference);
+  await page.locator('#wms-filter [name="status"]').selectOption("all");
+  await page.locator("#wms-filter").evaluate((f) => f.requestSubmit());
+  await page.locator(`[data-order-wms="${returned.id}"]`).click();
+  const review = page.locator("#wms-returned-exception");
+  await expect(review).toBeVisible();
+  await expect(review.locator('[name="box"]')).toHaveCount(0);
+  expect(await review.evaluate((f) => f.checkValidity())).toBe(false);
+  await review
+    .locator('[name="reason"]')
+    .fill("Pobrania rozliczone; klient zmienia ilość");
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await expect(review).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await review.screenshot({
+      path: path.join(output, `returned-exception-${width}.png`),
+    });
+  }
+  await page.route(
+    "**/api/wms/pick-exceptions/resolve",
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await review.locator("button").click();
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  await expect(review).toHaveCount(0);
+  const reviewed = await api(`/api/wms/orders/${returned.id}`);
+  expect(reviewed.version).toBe(returned.version + 1);
+  expect(reviewed.hold_reason).toBe(returned.hold_reason);
+  await page.locator("#wms-amend summary").click();
+  await page.locator('#wms-amend [name="lines"]').fill("WMS-0035;1");
+  await page
+    .locator('#wms-amend [name="reason"]')
+    .fill("Klient zmienił ilość po zwrocie");
+  await page.locator("#wms-amend button").click();
+  await expect
+    .poll(
+      async () =>
+        (await api(`/api/wms/orders/${returned.id}`)).lines[0].quantity,
+    )
+    .toBe(1);
+  const work = await api("/api/wms/stock-work?q=WMS-0035");
+  expect(work.checks.some((c) => c.bin === pick.bin)).toBe(true);
+  expect((await api("/api/wms/integrity")).ok).toBe(true);
   writeFileSync(
     path.join(output, "putback-e2e.json"),
     JSON.stringify(
@@ -252,6 +376,9 @@ export async function exercisePutback(page, output) {
         repeatedDamageSavedOnce: true,
         lostShortageResponseRecovered: true,
         heldUntilOfficeDecision: true,
+        returnedPickingExceptionReviewed: true,
+        lostReviewResponseRecovered: true,
+        orderAmendedWhileShelfCheckStaysOpen: true,
         nativePhysicalDevice: false,
       },
       null,

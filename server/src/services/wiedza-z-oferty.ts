@@ -71,7 +71,10 @@ export interface PokwitowanieZapisu {
  * a dziennik milczy.
  */
 export function zapiszWiedzeZOferty(
-  cel: CelZapisu, wiedza: WiedzaZOferty, kto: { id: number; name: string },
+  /* `id: null` znaczy „zrobił to takt, nie człowiek" (0.317.0). Wiersz
+     identyfikatora i tak ma `dodal_user_id` puste — kto kliknął, mówi
+     dziennik — więc jedyne, co się zmienia, to autor ZDARZENIA. */
+  cel: CelZapisu, wiedza: WiedzaZOferty, kto: { id: number | null; name: string },
   database: DatabaseSync = db(),
 ): PokwitowanieZapisu {
   return transaction(database, () => {

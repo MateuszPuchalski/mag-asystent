@@ -943,8 +943,20 @@ export function dopiszLinkiOfert(
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
  * płatne i ląduje w księdze jako `blad`.
  */
+/**
+ * KTO POPROSIŁ O SZKIC. `id: null` znaczy „nikt, zrobił to takt" (0.317.0)
+ * i jest to decyzja o źródle wyrażona w danych, nie luka: `przez_user_id`
+ * zostaje wtedy puste, a `przez` niesie słowo „automat". Podpisanie
+ * automatycznego szkicu kontem agenta, który akurat był zalogowany,
+ * zafałszowałoby jedyny pomiar, jaki mamy — ocenę szkicu przez człowieka.
+ *
+ * Ten sam wzorzec, co przy wiedzy z ofert w 0.264.0: `dodal='oferta'`,
+ * `dodal_user_id` NULL, a kto kliknął, mówi dziennik.
+ */
+export type AutorSzkicu = { id: number | null; name: string };
+
 export async function ulozSzkic(
-  conversationId: number, kto: { id: number; name: string },
+  conversationId: number, kto: AutorSzkicu,
   nadaj: NadawcaSzkicu, subiekt: SubiektAdapter, teraz = new Date(),
 ): Promise<SzkicCopilota> {
   /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
@@ -1243,7 +1255,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
 
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzSzkicu, wynik: "ok" | "blad", blad: string | null,
-  kto: { id: number }, teraz: Date,
+  kto: { id: number | null }, teraz: Date,
 ): void {
   db().prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
@@ -1254,7 +1266,7 @@ function zapiszWywolanie(
       blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
 }
 
-function zapiszBlad(conversationId: number, powod: string, kto: { id: number }, teraz: Date): void {
+function zapiszBlad(conversationId: number, powod: string, kto: { id: number | null }, teraz: Date): void {
   db().prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,wynik,blad,przez_user_id,at)
     VALUES ('szkic',?,'',?,?,?,?)`)

@@ -641,3 +641,21 @@ Regresja serwera obejmuje potrzebę dwudziestu, podjęcie i odłożenie pięciu,
 Nie powstaje fałszywe przeliczenie. Ponowienie podjęcia i zakończenia nie zmienia ilości drugi raz.
 Testy JVM obejmują zakres, stare szybkie podjęcie, mniejszą partię, brak powodu niedoboru oraz zachowanie partii w dzienniku po restarcie.
 Browser E2E sprawdza błędne ilości, utraconą odpowiedź podjęcia, skany pięciu sztuk i pozostały plan.
+
+### Dawne zgłoszenie zbiórki po rozliczeniu całej skrzynki
+
+Odtworzono zakleszczenie: częściowe pobranie, zgłoszenie braku, przekazanie do pakowania i pełny zwrot pobrań.
+Zamówienie traciło skrzynkę, ale decyzja wymagała jej kodu zgodnego z pustym przydziałem. Zmiana pozycji pozostawała zablokowana.
+
+Biuro zamyka teraz dawne zgłoszenie bez skanu zwolnionej skrzynki. Formularz pojawia się w głównym kroku zamówienia.
+Wymaga pełnego rozliczenia po zgłoszeniu, zakończonego przydziału oraz braku aktywnej pracy, pobrań i paczek.
+Powód jest obowiązkowy. Zamówienie pozostaje wstrzymane; biuro może następnie zmienić treść albo anulować je.
+Nie powstaje ruch zapasu ani pozorne przeliczenie. Podejrzana półka nadal czeka na własną kontrolę.
+
+Punkty odniesienia: [Microsoft — dziennik wyjątków](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/work-exceptions-log)
+oraz [Microsoft — przeliczenia i przegląd różnic](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/cycle-counting).
+Wniosek dla WERTIS: rozstrzygnięcie sprawy zamówienia i potwierdzenie fizycznego stanu półki mają osobne dowody.
+Zasada blokady podejrzanej półki jest decyzją WERTIS; nie wynika z samego istnienia zadania spisu w opisanym produkcie.
+
+Regresje obejmują zwrot częściowy, uprawnienia, starą wersję, ponowienie, awarię zapisu oraz wcześniejszą lub cudzą historię zwrotu.
+Ponownie użyta skrzynka zachowuje nowe zamówienie. Browser E2E sprawdza decyzję, utraconą odpowiedź i zmianę ilości przy nadal otwartej kontroli półki.

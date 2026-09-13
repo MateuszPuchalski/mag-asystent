@@ -490,6 +490,9 @@ window.Wms = (() => {
       );
     if (o.hold_reason)
       return (
+        (office() && o.returnedPickException
+          ? `<section class="wms-surface"><h3>Pobrania rozliczone · decyzja biura</h3><p>Skrzynka została zwolniona po zwrocie. Zgłoszenie: ${html(o.returnedPickException.reason)}.</p><p>${o.returnedPickException.stock_check_open ? `Półka ${html(o.returnedPickException.bin)} nadal czeka na przeliczenie w Zadaniach zapasu.` : "Zwrot nie zmienia wyniku kontroli półki."} Zamówienie pozostanie wstrzymane do osobnej decyzji.</p><form id="wms-returned-exception" class="wms-form">${field("reason", "Uzasadnienie zamknięcia zgłoszenia", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAMKNIJ ZGŁOSZENIE PO ZWROCIE</button></form></section>`
+          : "") +
         '<p class="wms-help">Wyjaśnij przyczynę wstrzymania. Zwracaj tylko fizycznie obecne sztuki.</p>' +
         (office() &&
         ["packing", "packed"].includes(o.status) &&
@@ -585,7 +588,7 @@ window.Wms = (() => {
         ? []
         : [
             !o.hold_reason ? ["hold", "Wstrzymaj — brak / uszkodzenie"] : null,
-            office() && o.hold_reason
+            office() && o.hold_reason && !o.returnedPickException
               ? ["resume", "Wznów po wyjaśnieniu"]
               : null,
             office() &&
@@ -1052,6 +1055,16 @@ window.Wms = (() => {
       if (await stockWorkUi.submit(f, values)) return;
       if (await inboundUi.submit(f, values)) return;
       if (await handoffUi.submit(f, values)) return;
+      if (f.id === "wms-returned-exception") {
+        const result = await mutate("/api/wms/pick-exceptions/resolve", {
+          orderId: current.id,
+          version: current.version,
+          action: "review",
+          reason: values.reason,
+        });
+        if (result) await refresh();
+        return;
+      }
       if (f.id === "wms-putback-filter") {
         query = String(values.q);
         offset = 0;

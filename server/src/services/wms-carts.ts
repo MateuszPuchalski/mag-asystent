@@ -956,14 +956,32 @@ export function resolvePickException(actor: Actor, key: string, raw: unknown) {
     .object({
       orderId: id,
       version,
-      box: code,
+      box: code.optional(),
       reason,
-      action: z.enum(["continue", "remove"]),
+      action: z.enum(["continue", "remove", "review"]),
     })
     .strict()
     .parse(raw);
   return command(key, actor, "pick_exception_resolve", input, () => {
     const order = getOrder(input.orderId);
+    if (input.action === "review") {
+      if (order.version !== input.version)
+        fail("Zamówienie zmieniło się. Odśwież przed decyzją");
+      if (!order.returnedPickException || input.box !== undefined)
+        fail("Ta decyzja wymaga zakończonego zwrotu i zwolnionej skrzynki");
+      // Zakończenie sprawy zamówienia nie zastępuje przeliczenia półki ani decyzji o wznowieniu.
+      db()
+        .prepare(
+          "UPDATE wms_pick_exception SET resolved_at=?,resolution=? WHERE id=? AND resolved_at IS NULL",
+        )
+        .run(nowIso(), input.reason, Number(order.returnedPickException!.id));
+      db()
+        .prepare(
+          "UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?",
+        )
+        .run(nowIso(), order.id);
+      return getOrder(order.id);
+    }
     const hadException = !!db()
       .prepare(
         "SELECT 1 FROM wms_pick_exception WHERE order_id=? AND resolved_at IS NULL",

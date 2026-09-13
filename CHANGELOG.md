@@ -34,6 +34,51 @@ historii nie przepisujemy.
 ---
 
 
+## 0.318.0 — decyzja biura po rozliczeniu skrzynki
+
+Pełny zwrot pobrań zwalniał skrzynkę, ale dawne zgłoszenie zbiórki nadal wymagało jej skanu. Zmiana zamówienia pozostawała zablokowana.
+Biuro zamyka teraz takie zgłoszenie z głównego kroku zamówienia, wpisując uzasadnienie. WMS wymaga udokumentowanego pełnego zwrotu i zakończonych przydziałów.
+Zamówienie pozostaje wstrzymane. Kontrola podejrzanej półki nie znika; jej zapas wymaga osobnego przeliczenia.
+Ponowienie decyzji zachowuje jeden zapis. Ponownie użyta skrzynka i jej nowe zamówienie pozostają niezależne.
+Scalono main z automatycznymi szkicami Obsługi. Zachowano skrypty, wersje zależności oraz wymaganie Node dla WMS.
+
+**[wymaga działania]** Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Decyzja korzysta z istniejącego dziennika i tabel.
+Odbiór seeded obejmuje częściowe pobranie, pełny zwrot, utraconą odpowiedź decyzji oraz zmianę zamówienia przy nadal otwartej kontroli półki.
+
+## 0.317.0 — 13 września 2026
+
+**Szkic czeka na agenta, zanim ten zdąży przeczytać pytanie.** Do tej wersji
+propozycja Copilota powstawała wyłącznie z kliknięcia: agent otwierał rozmowę,
+czytał, klikał „Ułóż odpowiedź" i czekał kilka sekund. Teraz dla nowego pytania
+pod ofertą szkic jest gotowy, zanim ktokolwiek go poprosi.
+
+**Zakres jest wąski i to jest decyzja.** Takt bierze wyłącznie wiadomość
+przychodzącą niosącą numer oferty, czyli pytanie sprzed zakupu. Tam Copilot ma
+komplet faktów: kartotekę oferty, treść aukcji, kandydatów doboru i adres
+naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu czy reklamacji szkic
+z faktów doboru niewiele wnosi, a kosztuje tyle samo.
+
+**Kliknięcie było hamulcem samo w sobie** — agent prosił o pracę dla siebie
+i płacił za jedną rozmowę. Takt takiego ogranicznika nie ma, więc dostał dwa
+jawne: ile szkiców na przebieg i twardy sufit na godzinę. Sufit liczy się
+z księgi wywołań, razem z tymi zakończonymi błędem, bo nieudane też kosztuje.
+Z księgi, a nie z licznika w pamięci: restart usługi wyzerowałby licznik,
+a rachunek u dostawcy nie.
+
+Rozmowy idą od najdłużej czekającej. Agent pracuje kolejkę od góry i gdyby
+takt układał od najnowszych, znajdowałby tam same rozmowy bez propozycji.
+
+Automatyczny szkic podpisuje **automat**, nie człowiek. Podpisanie go kontem
+zalogowanego agenta zafałszowałoby jedyny pomiar, jaki mamy, czyli jego ocenę
+przez człowieka.
+
+**Wyłączone domyślnie.** Przełącznik automatycznych szkiców istniał już raz,
+w 0.107.0, i stał na zerze na wyraźną prośbę właściciela. Wraca na jego
+prośbę, ale wraca wyłączony: rzecz, która wydaje pieniądze bez kliknięcia, ma
+się włączać decyzją przy `wertis.env`. Szczegóły w `DEPLOY.md`.
+
+Do klienta dalej nie idzie nic bez człowieka.
+
 ## 0.316.0 — rozbieżność podczas zwrotu z pakowania
 
 Kolektor rozdziela sprawne i uszkodzone części podczas zwrotu. Uszkodzenie wymaga skanu części, jawnej ilości, opisu oraz skanu kwarantanny.

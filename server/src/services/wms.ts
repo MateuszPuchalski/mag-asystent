@@ -1058,6 +1058,29 @@ function readOrder(orderId: number) {
     shipment: shipments[0] ?? null,
     shipments,
     packingContents: packingContents(orderId),
+    // Rozliczony zwrot uwalnia decyzję biura, ale nie potwierdza stanu źródłowej półki.
+    returnedPickException:
+      order.status === "allocated" &&
+      order.hold_reason &&
+      !order.tote &&
+      lines.every((l) => l.picked === 0 && l.packed === 0) &&
+      allocations.every((a) => a.picked === 0) &&
+      !shipments.length
+        ? (d
+            .prepare(
+              `SELECT e.id,e.kind,e.bin,e.reason,p.id AS putback_id,p.completed_at,
+            EXISTS(SELECT 1 FROM wms_stock_check c WHERE c.tw_id=e.tw_id AND c.bin=e.bin AND c.resolved_at IS NULL) AS stock_check_open
+          FROM wms_pick_exception e JOIN wms_putback p ON p.order_id=e.order_id
+          WHERE e.order_id=? AND e.resolved_at IS NULL AND p.completed_at IS NOT NULL
+            AND p.cancelled_at IS NULL AND p.created_at>=e.created_at
+            AND NOT EXISTS(SELECT 1 FROM wms_cart_assignment a WHERE a.order_id=e.order_id AND a.ended_at IS NULL)
+            AND NOT EXISTS(SELECT 1 FROM wms_wave_order w WHERE w.order_id=e.order_id)
+            AND NOT EXISTS(SELECT 1 FROM wms_putback t WHERE t.order_id=e.order_id AND t.completed_at IS NULL AND t.cancelled_at IS NULL)
+            AND NOT EXISTS(SELECT 1 FROM wms_pack_recovery r WHERE r.order_id=e.order_id AND r.completed_at IS NULL AND r.cancelled_at IS NULL)
+          ORDER BY e.id DESC,p.id DESC LIMIT 1`,
+            )
+            .get(orderId) ?? null)
+        : null,
     putback: activePutback(orderId) ?? null,
     putbackIssues: d
       .prepare(

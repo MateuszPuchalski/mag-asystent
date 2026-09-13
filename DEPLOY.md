@@ -15,6 +15,11 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.318.0 Biuro zamyka dawne zgłoszenie zbiórki po udokumentowanym pełnym zwrocie, bez skanu odłączonej skrzynki.
+Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Nie ma nowej tabeli ani automatycznej decyzji dla istniejących zamówień.
+Odbiór: zwrócić pobrania wstrzymanego zamówienia, zamknąć zgłoszenie, zmienić ilość i sprawdzić niezależną kontrolę półki.
+Zamówienie ma pozostać wstrzymane. Ponowienie po utracie odpowiedzi nie może zamknąć sprawy ani zmienić wersji drugi raz.
+
 Od 0.316.0 zlecony zwrot rozlicza także uszkodzenia i potwierdzone braki. Rozliczyć oczekujące zapisy i wykonać zweryfikowaną kopię przed aktualizacją.
 Wykonać build, restart API, odświeżyć Biuro i zaktualizować APK. Start tworzy `wms_putback_issue` oraz indeksy historii.
 
@@ -2310,6 +2315,33 @@ To kosztuje pieniądze i wydaje je agent, klikając. Jedno kliknięcie bierze
 najwyżej dwadzieścia rozmów; limit zmienia `COPILOT_MAX_PARTIA`. Rachunek,
 zużycie tokenów i trafność pokazuje karta „Copilot" w ustawieniach obsługi,
 za zębatką. Sprawdź ją po pierwszej partii.
+
+**Od 0.317.0 szkic może powstawać SAM** dla nowego pytania pod ofertą. Jest to
+wyłączone domyślnie i włącza się jedną linią:
+
+```
+export COPILOT_AUTO_SZKIC=1
+```
+
+Zanim to zrobisz, wiedz co włączasz. Kliknięcie było hamulcem samo w sobie:
+agent prosił o pracę dla siebie i płacił za jedną rozmowę. Takt takiego
+ogranicznika nie ma, więc ma dwa jawne. `COPILOT_AUTO_NA_PRZEBIEG` mówi, ile
+szkiców powstaje na jeden przebieg (domyślnie pięć). `COPILOT_AUTO_NA_GODZINE`
+to twardy sufit (domyślnie trzydzieści), liczony z księgi wywołań **razem
+z tymi zakończonymi błędem**, bo nieudane też kosztuje.
+
+Takt bierze wyłącznie wiadomości przychodzące niosące numer oferty, czyli
+pytania sprzed zakupu. Nie rusza rozmów, w których ostatnie słowo mamy my.
+Nie liczy autoodpowiedzi jako pytania klienta. Nie układa też drugi raz
+szkicu, który odpowiada już na najnowsze pytanie.
+
+**Do klienta dalej nie idzie nic bez człowieka.** Automat układa propozycję,
+wysyła ją agent.
+
+Pierwsze uruchomienie na koncie z zaległą skrzynką rozłoży się na wiele
+przebiegów, po pięć naraz. To jest zamierzone. Po pierwszej godzinie zajrzyj
+na kartę „Copilot" w ustawieniach i porównaj rachunek z tym, czego się
+spodziewasz, zanim podniesiesz limity.
 
 Sprawdzenie na żywym koncie idzie tak. Kliknij przycisk przy JEDNEJ rozmowie
 i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:

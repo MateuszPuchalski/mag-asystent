@@ -8,6 +8,11 @@ Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłączni
 
 ## Zlecony zwrot z pakowania
 
+Po pełnym rozliczeniu zwrotu Biuro może zamknąć dawne zgłoszenie zbiórki w szczegółach zamówienia.
+Nie skanuje zwolnionej skrzynki, która może już obsługiwać inną pracę. Wpisuje uzasadnienie zamknięcia.
+Zamówienie pozostaje wstrzymane, a kontrola podejrzanej półki pozostaje otwarta. Potem Biuro zmienia zamówienie lub podejmuje osobną decyzję o dalszej realizacji.
+Formularz nie pojawia się przy częściowym zwrocie, aktywnych pobraniach, paczkach ani nowym przydziale.
+
 Samo wstrzymanie zamówienia nie oznacza zwrotu. Poprawa adresu nie powinna wymuszać ponownego zbierania wszystkich części.
 Jeśli niewysłane pobrania mają wrócić na półki, Biuro otwiera problem zamówienia i wybiera **ZLEĆ ZWROT Z PAKOWANIA**.
 Wymagane są wstrzymanie, przekazana skrzynka, pobrane sztuki oraz brak czynnych etykiet i wymiany.
