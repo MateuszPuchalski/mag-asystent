@@ -44,6 +44,7 @@ import pl.wertis.kolektor.ui.problems.ProblemsBanner
 import pl.wertis.kolektor.ui.problems.ProblemsScreen
 import pl.wertis.kolektor.ui.queue.QueueScreen
 import pl.wertis.kolektor.ui.scanloc.ScanLocScreen
+import pl.wertis.kolektor.ui.settings.PolaczenieScreen
 import pl.wertis.kolektor.ui.settings.SettingsScreen
 import pl.wertis.kolektor.ui.tasks.FieldTasksScreen
 import pl.wertis.kolektor.ui.tasks.FieldTasksBanner
@@ -181,6 +182,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.KARTON -> KartonScreen(graph)
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
+                Screen.POLACZENIE -> PolaczenieScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
                 Screen.FIELD_TASKS -> FieldTasksScreen(graph)
                 Screen.SPLASH -> {}

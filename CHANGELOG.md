@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.323.0 — 13 września 2026
+
+**Kolektor sam mówi, co widzi, gdy „nie widzi serwera".** Pytanie właściciela:
+kolektor czasem traci połączenie, choć stoi w tej samej sieci co serwer — czy
+chodzi o przeskok między punktami dostępowymi? Pytanie było dobre i nie dało
+się na nie odpowiedzieć. Cztery różne przyczyny wyglądają na ekranie
+identycznie: dziura w zasięgu, druga podsieć, izolacja klientów na punkcie
+dostępowym i zapora serwera.
+
+- **Ustawienia → DIAGNOSTYKA POŁĄCZENIA** (nowy ekran). Pyta serwer od razu po
+  wejściu i mówi, po ilu milisekundach odpowiedział i w jakiej wersji.
+- **Odmowa dostaje ZDANIE, nie kod błędu.** Każda prowadzi gdzie indziej: cisza
+  to zapora albo izolacja klientów, odrzucone połączenie to zły port, nieznana
+  nazwa to DNS, brak trasy to druga sieć.
+- **Podsieć porównuje się sama**, gdy serwer podany jest adresem IP. Przy
+  adresie podanym nazwą ekran o podsieci MILCZY — zgadnięty werdykt kazałby
+  przestawiać sieć, która jest dobra.
+- **Dziennik przerw w łączności**: od kiedy, jak długo, ile prób, z jakim
+  powodem. To odpowiedź na pytanie „czy wraca sama, czy trzeba przełączyć
+  Wi-Fi", której dotąd nikt nie umiał zapamiętać.
+- Przerwy bierze się z pytania o kolejkę Sfery, wysyłanego i tak co półtorej
+  sekundy — **ani jednego żądania więcej**. Zapis żyje w pamięci aplikacji i
+  nigdzie nie jedzie.
+
+Ekran niczego nie naprawia i nic w sieci nie przestawia — to była decyzja
+właściciela: najpierw wiedzieć, potem leczyć. Nazwa sieci (SSID) i punkt
+dostępowy (BSSID) zostają poza ekranem, bo od Androida 8 wymagają uprawnienia
+do lokalizacji. Rozpoznanie przyczyn opisuje `DEPLOY.md` §„Kilka punktów
+dostępowych w hali".
+
+Reguły diagnozy stoją w `:core` (12 nowych testów), bo `:app` nie kompiluje się
+poza CI, a zdanie źle nazywające przyczynę jest gorsze niż brak zdania.
+
 ## 0.320.0 — 13 września 2026
 
 **Wniosek o rabat transakcyjny idzie sam.** Ręczny przycisk przy pozycji zwrotu
