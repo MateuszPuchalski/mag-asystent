@@ -82,6 +82,45 @@ function state(twId: number, bin: string) {
     .get(twId, bin)!;
 }
 
+test("skan źródła podejmuje tylko właściwy bufor i zachowuje jeden przydział bez ruchu zapasu", () => {
+  const r = receipt();
+  const before = P.getPutaway(r.taskId);
+  const stock = state(r.twId, "BUF-1");
+  assert.throws(
+    () =>
+      P.claimPutaway(worker, randomUUID(), r.taskId, {
+        version: before.version,
+        source: "SHELF-1",
+      }),
+    /Zeskanuj bufor BUF-1/,
+  );
+  assert.equal(P.getPutaway(r.taskId).user_id, null);
+  const key = randomUUID(),
+    body = { version: before.version, source: "buf-1" };
+  const claimed = P.claimPutaway(worker, key, r.taskId, body);
+  assert.equal(claimed.user_id, worker.id);
+  assert.equal(claimed.version, before.version + 1);
+  assert.deepEqual(P.claimPutaway(worker, key, r.taskId, body), claimed);
+  assert.throws(() =>
+    P.claimPutaway(other, randomUUID(), r.taskId, {
+      version: claimed.version,
+      source: "BUF-1",
+    }),
+  );
+  assert.equal(P.getPutaway(r.taskId).user_id, worker.id);
+  assert.deepEqual(state(r.twId, "BUF-1"), stock);
+  const done = P.finishPutaway(worker, randomUUID(), r.taskId, finish(claimed));
+  assert.equal(done.remaining, 0);
+  assert.throws(
+    () =>
+      P.claimPutaway(worker, randomUUID(), r.taskId, {
+        version: done.version,
+        source: "BUF-1",
+      }),
+    /Zadanie zmieniło/,
+  );
+});
+
 test("podpowiedzi przyjęcia i odkładania pomijają pełne oraz zablokowane półki przed limitem ośmiu", () => {
   const r = receipt();
   for (let n = 0; n < 10; n++) {

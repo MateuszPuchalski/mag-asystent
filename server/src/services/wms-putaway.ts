@@ -96,13 +96,20 @@ export function claimPutaway(
   raw: unknown,
 ) {
   const input = z
-    .object({ version: id, reason: z.string().trim().max(500).default("") })
+    .object({
+      version: id,
+      reason: z.string().trim().max(500).default(""),
+      source: code.optional(),
+    })
     .strict()
     .parse(raw);
   return command(key, actor, "putaway_claim", { taskId, ...input }, () => {
     const task = work(taskId);
     if (!task.remaining || task.version !== input.version)
       fail("Zadanie zmieniło się. Odśwież kolejkę");
+    // Skan może jednocześnie podjąć zadanie, ale nie może wskazywać innego bufora.
+    if (input.source !== undefined && input.source !== task.source)
+      fail("Zeskanuj bufor " + task.source, 400);
     if (task.user_id !== null && task.user_id !== actor.id) {
       manager(actor);
       reason.parse(input.reason);

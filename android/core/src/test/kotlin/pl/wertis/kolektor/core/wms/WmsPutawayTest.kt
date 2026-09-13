@@ -19,6 +19,15 @@ private val part = WmsPutawayTask(1, 30, "BUF-01", 12, 12, 2, 1, "WMS0030", "Ko≈
 private fun draft() = putawayScan(part, 2, WmsPutawayScan(true, part.barcode, 3), "A-01").command!!
 
 class WmsPutawayScanTest {
+    @Test fun `skan bufora podejmuje wolne zadanie bez przycisku`() {
+        val free = part.copy(user_id = null)
+        val result = putawayScan(free, 2, WmsPutawayScan(), "BUF-01")
+        assertNotNull(result.command)
+        assertEquals("BUF-01", result.command!!.body["source"]!!.jsonPrimitive.content)
+        assertFalse(result.state.source)
+        assertNull(putawayScan(free, 2, WmsPutawayScan(), "WRONG-BUF").command)
+        assertEquals("BUF-01", putawayCode(WmsPutawayStage.CLAIM, classify("LOC:BUF-01")))
+    }
     @Test fun `podpowiedz czyta pojemnosc i starsze API nie obiecuje miejsca`() {
         val old = WertisJson.decodeFromString<WmsPutawayBin>("""{"bin":"A-01","on_hand":8,"mode":"pick"}""")
         assertNull(old.room)
@@ -119,6 +128,73 @@ private class PutawayClient(private val store: PutawayStore) : WmsPutawayTranspo
 }
 
 class WmsPutawayRecoveryTest {
+    @Test fun `potwierdzony skan podejmuje zadanie i wymaga czesci przed iloscia`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        client.current = part.copy(user_id = null)
+        val controller = WmsPutawayController(store, { client })
+        controller.select(putawayActor, 1)
+        controller.submit(putawayActor, putawayScan(client.current, 2, WmsPutawayScan(), "BUF-01").command!!)
+        val view = controller.state.value
+        assertTrue(view.sourceConfirmed)
+        var scan = WmsPutawayScan(source = view.sourceConfirmed)
+        assertEquals(WmsPutawayStage.PRODUCT, putawayStage(view.task!!, 2, scan))
+        assertNotNull(putawayQuantity(view.task, scan, "3").error)
+        scan = putawayScan(view.task, 2, scan, part.barcode!!).state
+        scan = putawayQuantity(view.task, scan, "3").state
+        controller.submit(putawayActor, putawayScan(view.task, 2, scan, "A-01").command!!)
+        assertEquals(9, client.current.remaining)
+        assertFalse(controller.state.value.sourceConfirmed)
+        assertEquals(WmsPutawayStage.SOURCE, putawayStage(controller.state.value.task!!, 2, WmsPutawayScan()))
+    }
+    @Test fun `utrata odpowiedzi podjecia zachowuje klucz lecz nie fizyczna weryfikacje`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        client.current = part.copy(user_id = null)
+        val controller = WmsPutawayController(store, { client })
+        controller.select(putawayActor, 1); client.lostResponse = true
+        controller.submit(putawayActor, putawayClaim(client.current, "BUF-01"))
+        val pending = store.journal.pending!!
+        assertFalse(controller.state.value.sourceConfirmed)
+        val restarted = WmsPutawayController(store, { client })
+        restarted.open(putawayActor); client.lostResponse = false; restarted.retry(putawayActor)
+        assertEquals(pending, client.sent.last())
+        assertEquals(1, client.committed.size)
+        assertFalse(restarted.state.value.sourceConfirmed)
+        assertEquals(WmsPutawayStage.SOURCE, putawayStage(restarted.state.value.task!!, 2, WmsPutawayScan()))
+    }
+    @Test fun `tlo podczas podjecia nie potwierdza bufora a odswiezenie czysci dowod`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        client.current = part.copy(user_id = null)
+        val controller = WmsPutawayController(store, { client })
+        controller.select(putawayActor, 1)
+        client.before = { controller.invalidateVerification() }
+        controller.submit(putawayActor, putawayClaim(client.current, "BUF-01"))
+        assertFalse(controller.state.value.ready)
+        assertFalse(controller.state.value.sourceConfirmed)
+        controller.activateVerification(); controller.open(putawayActor)
+        assertFalse(controller.state.value.sourceConfirmed)
+        client.current = part.copy(user_id = null); client.before = {}
+        controller.select(putawayActor, 1); controller.submit(putawayActor, putawayClaim(client.current, "BUF-01"))
+        assertTrue(controller.state.value.sourceConfirmed)
+        controller.open(putawayActor)
+        assertFalse(controller.state.value.sourceConfirmed)
+    }
+    @Test fun `odmowa nowsza wersja lub inne zrodlo nie przenosza potwierdzenia`() = runTest {
+        for (mode in listOf("rejected", "version", "source", "read")) {
+            val store = PutawayStore(); val client = PutawayClient(store)
+            client.current = part.copy(user_id = null)
+            val controller = WmsPutawayController(store, { client })
+            controller.select(putawayActor, 1)
+            val command = putawayClaim(client.current, "BUF-01")
+            when (mode) {
+                "rejected" -> client.failure = ApiError(409, "Zajƒôte")
+                "version" -> client.before = { client.current = client.current.copy(version = 3) }
+                "source" -> client.before = { client.current = client.current.copy(source = "BUF-02") }
+                "read" -> client.getFailure = true
+            }
+            controller.submit(putawayActor, command)
+            assertFalse(mode, controller.state.value.sourceConfirmed)
+        }
+    }
     @Test fun `skan po pelnym odlozeniu otwiera kolejna liste bez podjecia i bez odziedziczonych skanow`() = runTest {
         val store = PutawayStore(); val client = PutawayClient(store)
         val controller = WmsPutawayController(store, { client })

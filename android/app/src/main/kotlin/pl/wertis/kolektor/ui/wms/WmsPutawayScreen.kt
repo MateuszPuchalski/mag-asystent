@@ -29,7 +29,6 @@ import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.core.wms.WmsPutawayDraft
 import pl.wertis.kolektor.core.wms.WmsPutawayScan
 import pl.wertis.kolektor.core.wms.WmsPutawayStage
-import pl.wertis.kolektor.core.wms.putawayClaim
 import pl.wertis.kolektor.core.wms.putawayCode
 import pl.wertis.kolektor.core.wms.putawayQuantity
 import pl.wertis.kolektor.core.wms.putawayScan
@@ -50,7 +49,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
     val controller = graph.wmsRepo.putaway
     val view by controller.state.collectAsStateWithLifecycle()
     val task = view.task.takeIf { view.context == context }
-    var scan by remember(view.generation, context) { mutableStateOf(WmsPutawayScan()) }
+    var scan by remember(view.generation, view.sourceConfirmed, context) { mutableStateOf(WmsPutawayScan(source = view.sourceConfirmed)) }
     // Pozostały przydział nie jest potwierdzeniem faktycznie policzonej partii.
     var quantity by remember(view.generation, context) { mutableStateOf("") }
     var error by remember(view.generation, context) { mutableStateOf<String?>(null) }
@@ -152,7 +151,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
         }
 
         val prompt = if (view.busy) "ZAPISUJĘ — ZACZEKAJ NA SYGNAŁ" else when (stage) {
-            WmsPutawayStage.CLAIM -> "PODEJMIJ ZADANIE"
+            WmsPutawayStage.CLAIM -> "1 · SKANUJ BUFOR ${task.source}"
             WmsPutawayStage.SOURCE -> "1 · SKANUJ BUFOR ${task.source}"
             WmsPutawayStage.PRODUCT -> "2 · SKANUJ KOD CZĘŚCI"
             WmsPutawayStage.QUANTITY -> "3 · POLICZ I POTWIERDŹ ILOŚĆ"
@@ -175,9 +174,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
                 else "Miejsca według ostatniego odczytu:\n${task.bins.joinToString("\n") { it.hint }}", color = InkMute)
         }
         when (stage) {
-            WmsPutawayStage.CLAIM -> PrimaryButton("PODEJMIJ ODKŁADANIE", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
-                submit(putawayClaim(task))
-            }
+            WmsPutawayStage.CLAIM -> Text("Skan właściwego bufora podejmie to zadanie na Twoje konto.")
             WmsPutawayStage.QUANTITY -> if (allowed) {
                 Text("Ile sztuk odkładasz teraz?")
                 WertisTextField(quantity, { quantity = it }, placeholder = "Policzona ilość", keyboardType = KeyboardType.Number, onDone = ::confirmQuantity)

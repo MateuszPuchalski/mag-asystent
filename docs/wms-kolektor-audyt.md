@@ -165,6 +165,20 @@ Pełny dziennik pozostaje wymagany; czyszczenie danych aplikacji nie jest sposob
 
 ## Natywne odkładanie od 0.298.0
 
+### Podjęcie przez skan źródła
+
+Audyt odtworzył odrzucenie poprawnego skanu bufora przed naciśnięciem przycisku podjęcia. Operator musiał osobno dotknąć przycisku, a potem zeskanować ten sam bufor.
+Skan właściwego źródła podejmuje teraz wybrane wolne zadanie. Serwer sprawdza bufor, wersję i właściciela; sam przydział nie przenosi zapasu.
+Po potwierdzeniu tej operacji kolektor wymaga skanu części. Przycisk podjęcia usunięto z tego kroku, pozostawiając jedną wskazaną czynność.
+
+Potwierdzenie źródła żyje tylko w pamięci bieżącej, nieprzerwanej operacji. Nie wraca z dziennika po restarcie ani ponowieniu.
+Odmowa, nowsza wersja, inny bufor, błąd odczytu i powrót z tła wymagają świeżego skanu źródła.
+Po częściowym odłożeniu kolejna partia również wymaga nowych skanów. Kod części z prefiksem `LOC:` nadal pozostaje literalny w kroku produktu.
+
+Pięć nowych testów JVM i regresja serwera sprawdzają ten skrót oraz jego ograniczenia. Usunięto jedno dotknięcie na podjęcie zadania.
+Połączenie podjęcia z fizycznym potwierdzeniem lokalizacji jest decyzją WERTIS, opartą na zasadzie potwierdzania lokalizacji opisanej poniżej.
+Nie jest to dowód szybkości ani wygody fizycznego urządzenia.
+
 Audyt ciągłości pracy wykrył wymuszony powrót do listy przed skanem następnej części. Wybór zadania usuwał także filtr bufora i numer strony.
 Test odtworzył powrót z `BUF-01`, strona 50, do pustego filtra i strony zero.
 Zakończone zadanie przyjmuje teraz skan wyszukiwania następnej części lub bufora. Powrót ręczny zachowuje kontekst listy w pamięci bieżącej sesji.
@@ -179,7 +193,7 @@ oraz [powrót z zachowaniem kontekstu](https://learn.microsoft.com/en-us/dynamic
 Zastosowanie tych zasad do kolejnego zadania WERTIS jest decyzją projektową. Nie stanowi pomiaru przepustowości magazynu.
 
 Kolektor korzysta z kolejki WMS utworzonej podczas przyjęcia do bufora. Lista ma strony po 50 zadań i wyszukiwanie SKU, EAN, dokumentu lub bufora.
-Odczyt nie podejmuje pracy. Operator wybiera zadanie, podejmuje je, skanuje bufor i część, potwierdza ilość oraz skanuje docelową półkę.
+Odczyt nie podejmuje pracy. Operator wybiera zadanie, skanuje bufor i część, potwierdza ilość oraz skanuje docelową półkę.
 Wspólne komponenty zachowują cele dotyku co najmniej 48 dp. Znane półki pomagają wybrać cel; serwer sprawdza rejestrację, przeznaczenie i blokady.
 
 Potwierdzenie lokalizacji przy odłożeniu opisuje [Microsoft — work confirmation](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/tasks/set-up-mobile-device-menu).

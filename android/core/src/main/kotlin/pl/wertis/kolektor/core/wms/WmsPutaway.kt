@@ -43,13 +43,15 @@ fun putawayStage(task: WmsPutawayTask, actor: Long, scan: WmsPutawayScan): WmsPu
 }
 
 fun putawayCode(stage: WmsPutawayStage, input: Scan): String =
-    if (stage in setOf(WmsPutawayStage.SOURCE, WmsPutawayStage.TARGET) && input.kind == ScanKind.LOC) input.code
+    if (stage in setOf(WmsPutawayStage.CLAIM, WmsPutawayStage.SOURCE, WmsPutawayStage.TARGET) && input.kind == ScanKind.LOC) input.code
     else input.rawCode
 
-fun putawayClaim(task: WmsPutawayTask): WmsPutawayDraft {
+fun putawayClaim(task: WmsPutawayTask, source: String? = null): WmsPutawayDraft {
     require(task.remaining > 0 && task.completed_at == null && task.user_id == null) { "Odśwież zadanie przed podjęciem" }
+    require(source == null || source.equals(task.source, true)) { "Zeskanuj bufor ${task.source}" }
     return WmsPutawayDraft(task.id, "api/wms/putaway-work/${task.id}/claim", buildJsonObject {
         put("version", task.version)
+        source?.let { put("source", it.uppercase()) }
     }, "Podjęcie ${task.sku} z ${task.source}")
 }
 
@@ -84,7 +86,9 @@ fun putawayScan(task: WmsPutawayTask, actor: Long, scan: WmsPutawayScan, raw: St
                 }
             }, "${scan.quantity} × ${task.sku}: ${task.source} → $target${if (damaged) " · kwarantanna" else ""}"))
         }
-        WmsPutawayStage.CLAIM -> reject("Najpierw podejmij zadanie")
+        WmsPutawayStage.CLAIM -> if (code.equals(task.source, true))
+            WmsPutawayResult(WmsPutawayScan(), putawayClaim(task, code))
+            else reject("Zeskanuj bufor ${task.source}, aby rozpocząć odkładanie")
         WmsPutawayStage.OTHER -> reject("Zadanie wykonuje inna osoba. Wróć do kolejki")
         WmsPutawayStage.DONE -> reject("Zadanie zakończone. Wróć do kolejki")
     }

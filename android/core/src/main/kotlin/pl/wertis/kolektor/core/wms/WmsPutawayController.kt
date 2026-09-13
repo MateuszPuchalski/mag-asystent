@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import pl.wertis.kolektor.core.net.ApiError
 
 interface WmsPutawayTransport {
@@ -19,6 +21,7 @@ data class WmsPutawayView(
     val task: WmsPutawayTask? = null, val queue: WmsPutawayQueue? = null,
     val query: String = "", val offset: Int = 0, val busy: Boolean = false, val ready: Boolean = false,
     val message: String? = null,
+    val sourceConfirmed: Boolean = false,
 )
 
 /** Wspólny dziennik i blokada nie pozwalają przykryć nieznanej zbiórki odkładaniem.
@@ -36,12 +39,12 @@ class WmsPutawayController(
 
     fun activateVerification() {
         verification.activate()
-        mutable.value = mutable.value.copy(generation = ++generation, ready = false)
+        mutable.value = mutable.value.copy(generation = ++generation, ready = false, sourceConfirmed = false)
     }
 
     fun invalidateVerification() {
         verification.invalidate()
-        mutable.value = mutable.value.copy(generation = ++generation, ready = false)
+        mutable.value = mutable.value.copy(generation = ++generation, ready = false, sourceConfirmed = false)
     }
 
     suspend fun open(context: WmsContext) = read(context, resume = true)
@@ -99,7 +102,7 @@ class WmsPutawayController(
             val epoch = verification.capture() ?: return
             val latest = store.read()
             if (!verification.matches(epoch)) return
-            mutable.value = view.copy(journal = latest, ready = false)
+            mutable.value = view.copy(journal = latest, ready = false, sourceConfirmed = false)
             if (latest.pending != null) {
                 mutable.value = mutable.value.copy(message = "Najpierw rozlicz ostatni zapis WMS")
                 return
@@ -109,7 +112,7 @@ class WmsPutawayController(
             val next = latest.copy(pending = pending, putaway = WmsActivePutaway(context, draft.taskId))
             store.write(next)
             mutable.value = mutable.value.copy(journal = next)
-            send(context, pending, epoch)
+            send(context, pending, epoch, freshClaim = draft.path.endsWith("/claim"))
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
@@ -125,14 +128,14 @@ class WmsPutawayController(
             mutable.value = mutable.value.copy(journal = journal)
             val pending = journal.pending ?: return
             if (pending.context != context || pending.workflow != "putaway") return
-            mutable.value = mutable.value.copy(busy = true, ready = false, message = null)
+            mutable.value = mutable.value.copy(busy = true, ready = false, message = null, sourceConfirmed = false)
             send(context, pending, epoch)
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { problem(e) }
         finally { mutable.value = mutable.value.copy(busy = false); lock.unlock() }
     }
 
-    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?) {
+    private suspend fun send(context: WmsContext, pending: WmsPending, epoch: Long?, freshClaim: Boolean = false) {
         val client = transport(context)
         val id = requireNotNull(pending.taskId) { "Brak numeru zadania w dzienniku" }
         var rejection: String? = null
@@ -144,17 +147,24 @@ class WmsPutawayController(
         store.write(journal)
         mutable.value = mutable.value.copy(journal = journal)
         load(context, id, client, epoch)
-        mutable.value = mutable.value.copy(message = rejection)
+        val view = mutable.value
+        val task = view.task!!
+        // Tylko potwierdzenie bieżącego skanu zachowuje bufor. Ponowienie i nowsza wersja wymagają świeżej weryfikacji.
+        val confirmed = freshClaim && rejection == null && view.ready &&
+            task.user_id == context.actorId && task.remaining > 0 && task.completed_at == null &&
+            pending.body["source"]?.jsonPrimitive?.content == task.source &&
+            pending.body["version"]?.jsonPrimitive?.intOrNull?.let { task.version.toLong() == it.toLong() + 1 } == true
+        mutable.value = view.copy(message = rejection, sourceConfirmed = confirmed)
     }
 
     private suspend fun load(context: WmsContext, id: Long, client: WmsPutawayTransport, epoch: Long?) {
         val task = client.putawayTask(id)
         require(task.id == id && task.remaining >= 0 && task.version > 0) { "Nieznana odpowiedź zadania" }
-        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = verification.matches(epoch))
+        mutable.value = mutable.value.copy(generation = ++generation, context = context, task = task, queue = null, ready = verification.matches(epoch), sourceConfirmed = false)
     }
 
     private fun problem(error: Exception) {
-        mutable.value = mutable.value.copy(ready = false, message = if (error is ApiError) error.message
+        mutable.value = mutable.value.copy(ready = false, sourceConfirmed = false, message = if (error is ApiError) error.message
             else "Nie udało się potwierdzić stanu. Sprawdź Wi-Fi i ponów odczyt lub zapis.")
     }
 }

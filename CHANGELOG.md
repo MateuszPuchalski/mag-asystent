@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.322.0 — skan bufora rozpoczyna odkładanie
+
+Wybrane wolne zadanie kolektora rozpoczyna się skanem jego bufora. Usunięto osobny przycisk podjęcia z tego kroku.
+Serwer sprawdza źródło, wersję i właściciela. Potwierdzony skan prowadzi do części, bez dodatkowego dotknięcia ani ponownego skanowania bufora.
+Przerwanie, ponowienie, odmowa i nowszy stan zadania wymagają świeżej weryfikacji źródła. Kolejna partia po częściowym odłożeniu także zaczyna od bufora.
+Zapas zmienia dopiero potwierdzenie ilości i skan celu. Pięć nowych regresji JVM i test serwera; pełny core obejmuje 458 testów.
+
 ## 0.321.0 — następna skrzynka bez opuszczania pakowania
 
 Po zapisaniu przygotowanych paczek można od razu zeskanować kolejną skrzynkę. Wspólny formularz zachowuje stanowisko i ustawia fokus do skanu.

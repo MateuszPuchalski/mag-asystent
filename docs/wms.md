@@ -629,7 +629,9 @@ Zapas staje się dostępny do zbiórki po potwierdzeniu półki kompletacji. Od�
 ### Odkładanie na kolektorze Android
 
 Na ekranie głównym wybierz **ODKŁADANIE WMS — Z BUFORA**. Zeskanuj SKU, EAN lub kod bufora; możesz też wpisać numer przyjęcia.
-Wybierz wiersz, podejmij zadanie i wykonaj cztery kroki: bufor, część, policzona ilość, półka docelowa.
+Wybierz wiersz i wykonaj cztery kroki: bufor, część, policzona ilość, półka docelowa.
+Skan właściwego bufora podejmuje wolne zadanie na Twoje konto. Po potwierdzeniu serwera przechodzisz od razu do skanu części.
+Po utracie odpowiedzi lub powrocie z tła ponownie zeskanuj bufor. Wcześniejszy skan nie zastępuje świeżej weryfikacji po przerwaniu.
 Potwierdzenie ilości jest osobnym krokiem. Skan półki zapisuje ruch; sygnał sukcesu oznacza potwierdzony zapis i świeży odczyt pozostałych sztuk.
 
 Po częściowym odłożeniu ponownie zeskanuj bufor i część dla kolejnej partii. Po powrocie z tła lub odświeżeniu obowiązują te same kontrole.
