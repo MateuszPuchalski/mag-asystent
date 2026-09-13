@@ -3372,6 +3372,13 @@ z `/api/reconcile`: tamta nie ma bramki ról i niesie całą halę razem
 z lokalizacjami kartotek. Przy zerze pasek milczy — pas z napisem „wszystko
 w porządku" uczy przewijać wzrokiem to miejsce.
 
+**Pasek LICZY, a nie wypisuje (0.319.0).** Pierwsza wersja rysowała każdy
+rozjazd osobnym wierszem. Na żywej bazie wyszło ich czterysta trzydzieści trzy
+i pasek zjadł cały ekran: kolejki ani kolumn nie było widać wcale, więc ekran
+pracy przestał nią być. Czterysta razy to samo zdanie to nie informacja, tylko
+szum — rozstrzyga LICZBA i RODZAJ. Numery stoją o jedno kliknięcie dalej,
+w liście z własnym scrollerem i sufitem wysokości.
+
 ### 25a.19. Czyje to i o czym (0.315.0)
 
 Reklamacje dostały sito „Moje"/„Niczyje" w 0.278.0, a tagi spraw w 0.279.0.
@@ -4312,7 +4319,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
 | Przebieg sprawy na ekranie (oś zwrotu) | **działa** od 0.313.0 | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
 | Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
-| Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali |
+| Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali; od 0.319.0 pasek liczy rodzajami, a numery pokazuje po kliknięciu |
 | Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** od 0.315.0 | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
 | Tagi przy zwrocie | **działa** od 0.315.0 | `zwrot_tag_sprawy` + wspólny słownik `reklamacja_tag`; oś tagów jako parametr serwisu (`TAGI_ZWROTU`) |
 | Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |

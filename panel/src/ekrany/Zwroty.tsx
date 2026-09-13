@@ -101,20 +101,52 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
  * naprawdę coś mówi. Ta sama zasada co w `services/reconcile.ts`: zerowy wynik
  * to zero raportu.
  */
+/** Nazwa rodzaju po ludzku — w zdaniu zbiorczym, nie w wierszu. */
+const NAZWA_ROZJAZDU: Record<string, string> = {
+  zwrot_po_terminie: "po terminie ustawowym",
+  zwrot_bez_przelewu: "bez śladu po przelewie",
+  kosz_czeka_na_korekte: "koszyk czeka na korektę",
+  kosz_bez_powrotu: "kosz bez powrotu z regału",
+};
+
 function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
+  /* ZWINIĘTY DOMYŚLNIE — i to jest NAPRAWA, nie upodobanie (0.319.0).
+     Pierwsza wersja rysowała każdy wiersz z osobna. Na żywej bazie wyszło ich
+     czterysta trzydzieści trzy, więc pasek zjadł cały ekran: kolejki i kolumn
+     nie było widać wcale, a ekran zwrotów przestał być ekranem pracy.
+
+     Czterysta wierszy to nie informacja, tylko szum. Dekalog p. 2: pokazuj to,
+     co rozstrzyga bieżącą czynność — a tu rozstrzyga LICZBA i RODZAJ, nie
+     czterysta razy to samo zdanie. Klucze zostają o jedno kliknięcie dalej. */
+  const [rozwiniete, setRozwiniete] = useState(false);
   if (!rozjazdy.length) return null;
+
+  const wgRodzaju = new Map<string, number>();
+  for (const r of rozjazdy) wgRodzaju.set(r.rodzaj, (wgRodzaju.get(r.rodzaj) ?? 0) + 1);
+
   return <section aria-label="Rozjazdy zwrotów"
     className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-    <h2 className="text-xs font-bold uppercase text-amber-900">
-      Do sprawdzenia ({rozjazdy.length})
-    </h2>
-    {/* Lista, nie zdanie zbiorcze: każdy wiersz niesie KLUCZ — numer zwrotu
-        albo kod kosza — bo bez niego alarm nie mówi, od czego zacząć. */}
-    <ul className="mt-1 space-y-0.5 text-sm text-amber-900">
+    <button type="button" onClick={() => setRozwiniete((r) => !r)}
+      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-left">
+      <span className="text-xs font-bold uppercase text-amber-900">
+        Do sprawdzenia ({rozjazdy.length})
+      </span>
+      {[...wgRodzaju].map(([rodzaj, ile]) => <span key={rodzaj} className="text-sm text-amber-900">
+        <b className="font-semibold tabular-nums">{ile}</b>{" "}
+        {NAZWA_ROZJAZDU[rodzaj] ?? rodzaj}
+      </span>)}
+      <span className="ml-auto text-xs underline text-amber-900">
+        {rozwiniete ? "zwiń" : "pokaż numery"}
+      </span>
+    </button>
+    {/* Rozwinięta lista ma WŁASNY scroller i sufit wysokości. Bez niego
+        czterysta wierszy znowu wypchnęłoby kolejkę poza okno — tym razem
+        na życzenie, ale z tym samym skutkiem. */}
+    {rozwiniete && <ul className="mt-1 max-h-48 space-y-0.5 overflow-y-auto text-sm text-amber-900">
       {rozjazdy.map((r) => <li key={`${r.rodzaj}:${r.klucz}`}>
         <b className="font-semibold">{r.klucz}</b> · {r.opis}
       </li>)}
-    </ul>
+    </ul>}
   </section>;
 }
 
