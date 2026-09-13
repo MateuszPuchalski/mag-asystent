@@ -34,6 +34,11 @@ historii nie przepisujemy.
 ---
 
 
+## 0.320.1 — filtr na ekranie zgodny ze skanem
+
+Skan tego samego kodu ponownie pokazuje rzeczywisty filtr listy, także po wpisaniu niewysłanego tekstu ręcznie.
+Pole wyszukiwania resetuje się przy świeżym odczycie kolejki, zgodnie z jej generacją. Nie zmienia to skanów potwierdzających ruch zapasu.
+
 ## 0.320.0 — kolejne odłożenie bez powrotu do menu
 
 Po zakończeniu odkładania kolektor przyjmuje skan następnej części lub bufora i pokazuje pasujące zadania. Odpada osobne dotknięcie powrotu do kolejki.

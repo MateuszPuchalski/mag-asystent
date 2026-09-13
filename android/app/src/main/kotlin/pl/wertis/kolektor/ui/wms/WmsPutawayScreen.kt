@@ -56,7 +56,8 @@ fun WmsPutawayScreen(graph: AppGraph) {
     var error by remember(view.generation, context) { mutableStateOf<String?>(null) }
     var damaged by remember(view.generation, context) { mutableStateOf(false) }
     var options by remember(view.generation, context) { mutableStateOf(false) }
-    var query by remember(view.query, context) { mutableStateOf(view.query) }
+    // Skan tego samego kodu ma zastąpić także niewysłany tekst wpisany ręcznie.
+    var query by remember(view.generation, view.query, context) { mutableStateOf(view.query) }
     val stage = task?.let { putawayStage(it, context?.actorId ?: -1, scan) }
     val allowed = view.context == context && context != null && view.ready && !view.busy && view.journal.pending == null
 
