@@ -103,7 +103,23 @@ data class PrzerwaCiszy(
     val prob: Int,
     /** Powód PIERWSZEJ próby — kolejne zwykle powtarzają ten sam. */
     val powod: String,
+    /** Czy trafiła już do dziennika serwera. Trwająca przerwa nie ma czym pojechać. */
+    val wyslana: Boolean = false,
 )
+
+/**
+ * Od jak długiej przerwy warto zawracać głowę dziennikowi serwera.
+ *
+ * ZAPISUJEMY TO, CO ZOBACZYŁ CZŁOWIEK. Baner „serwer milczy" zapala się po
+ * trzech nieudanych próbach, czyli po mniej więcej pięciu sekundach — krótsza
+ * cisza nie dociera do nikogo przy regale i jest codziennością Wi-Fi w hali.
+ *
+ * Próg jest też OSTROŻNOŚCIĄ wobec dziennika: `events` nie ma retencji
+ * (§9 architektury), a kolektor w słabym miejscu potrafiłby wysłać setkę
+ * wpisów dziennie o przerwach, których nikt nie zauważył. Sto wpisów mówiących
+ * „bywa słabo" zakopuje jeden mówiący „stało trzy minuty".
+ */
+const val PROG_ZGLOSZENIA_MS = 5_000L
 
 /**
  * Dziennik przerw w łączności — zasilany pętlą kolejki, nie osobnym ruchem.
@@ -127,6 +143,25 @@ class DziennikCiszy(private val maks: Int = 20) {
     /** Przerwy od najnowszej. Kopia, żeby ekran nie czytał zmieniającej się listy. */
     fun przerwy(): List<PrzerwaCiszy> = wpisy.toList().asReversed()
 
+    /**
+     * Przerwy gotowe do wysłania: ZAKOŃCZONE, dość długie i jeszcze niewysłane.
+     *
+     * Trwająca odpada z prostego powodu — nie zna jeszcze swojego czasu, a jej
+     * wysłanie i tak nie miałoby czym pojechać. Wysyła się ją, gdy łączność
+     * wróci, czyli w tej samej chwili, w której się domyka.
+     */
+    fun doWyslania(prog: Long = PROG_ZGLOSZENIA_MS): List<PrzerwaCiszy> =
+        wpisy.filter { w ->
+            val koniec = w.doKiedy
+            !w.wyslana && koniec != null && koniec - w.odKiedy >= prog
+        }
+
+    /** Odhaczenie po UDANYM zapisie na serwerze — nigdy przed nim. */
+    fun oznaczWyslana(odKiedy: Long) {
+        val i = wpisy.indexOfFirst { it.odKiedy == odKiedy }
+        if (i >= 0) wpisy[i] = wpisy[i].copy(wyslana = true)
+    }
+
     /** Czy przerwa trwa w tej chwili. */
     fun trwaPrzerwa(): Boolean = wpisy.lastOrNull()?.doKiedy == null
 
@@ -144,9 +179,17 @@ class DziennikCiszy(private val maks: Int = 20) {
         while (wpisy.size > maks) wpisy.removeFirst()
     }
 
-    fun sukces(teraz: Long) {
-        val ostatnia = wpisy.lastOrNull() ?: return
-        if (ostatnia.doKiedy != null) return
+    /**
+     * Pierwsza udana próba zamyka przerwę.
+     *
+     * Zwraca `true`, gdy TA próba coś domknęła — wołający wysyła wtedy zaległe
+     * wpisy do dziennika serwera. Sukces w czasie normalnej pracy pada co
+     * półtorej sekundy i nie ma o czym meldować.
+     */
+    fun sukces(teraz: Long): Boolean {
+        val ostatnia = wpisy.lastOrNull() ?: return false
+        if (ostatnia.doKiedy != null) return false
         wpisy[wpisy.size - 1] = ostatnia.copy(doKiedy = teraz)
+        return true
     }
 }

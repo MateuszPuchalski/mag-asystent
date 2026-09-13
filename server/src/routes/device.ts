@@ -12,6 +12,18 @@ const ALLOWED = new Set([
   /* Skan → odpowiedź mierzone U CZŁOWIEKA (plan §10). Czas serwera pomijałby
      sieć i render, czyli akurat to, gdzie problem naprawdę siedzi. */
   "scan_timing",
+  /* Przerwa w łączności kolektora z serwerem (0.326.0).
+
+     Zgłasza ją kolektor PO jej końcu — w trakcie nie ma czym. Niesie czas
+     początku, czas trwania, liczbę prób, powód i drogę sieciową; kto pracował,
+     wiadomo i tak z nagłówków żądania.
+
+     PIERWSZE PYTANIE PRZY TAKIEJ AWARII brzmi „to jedno urządzenie czy
+     wszystkie?", a bez wspólnego zapisu nie dało się na nie odpowiedzieć:
+     dziennik żył w pamięci jednego kolektora i znikał przy zamknięciu
+     aplikacji. Biuro czyta to w zakładce DZIENNIK ZDARZEŃ, z filtrem
+     po urządzeniu. */
+  "siec_przerwa",
 ]);
 
 export async function deviceRoutes(app: FastifyInstance) {
