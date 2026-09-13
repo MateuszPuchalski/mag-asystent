@@ -27,6 +27,7 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 import pl.wertis.kolektor.AppGraph
+import pl.wertis.kolektor.core.net.PROG_ZGLOSZENIA_MS
 import pl.wertis.kolektor.core.net.PrzerwaCiszy
 import pl.wertis.kolektor.core.net.hostSerwera
 import pl.wertis.kolektor.core.net.powodOdmowy
@@ -135,7 +136,8 @@ fun PolaczenieScreen(graph: AppGraph) {
                 }
             }
             Text(
-                "Zapis żyje do zamknięcia aplikacji i nie jest nigdzie wysyłany.",
+                "Przerwy dłuższe niż pięć sekund jadą do dziennika serwera, gdy " +
+                    "łączność wróci. Lista tutaj żyje do zamknięcia aplikacji.",
                 fontSize = 11.sp, color = InkMute, modifier = Modifier.padding(top = 8.dp),
             )
         }
@@ -192,6 +194,13 @@ private fun PrzerwaWiersz(p: PrzerwaCiszy) {
             color = if (koniec == null) Ink else InkSoft,
         )
         Text("${p.prob} nieudanych prób · ${p.powod}", fontSize = 11.sp, color = InkMute)
+        /* Stan wysyłki mówi się TYLKO wtedy, gdy jest czego nie wiedzieć.
+           „Wysłano" przy każdym wpisie byłoby szumem — biuro i tak zobaczy je
+           w dzienniku; brak wysyłki jest informacją, bo znaczy, że tego wpisu
+           w dzienniku NIE MA. */
+        if (!p.wyslana && koniec != null && koniec - p.odKiedy >= PROG_ZGLOSZENIA_MS) {
+            Text("czeka na wysłanie do dziennika serwera", fontSize = 11.sp, color = InkMute)
+        }
     }
 }
 

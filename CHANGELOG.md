@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.327.0 — wspólny kolektor i odbiór ekranów WMS
+
+- Scalono main `8cf29c57`, zachowując raportowanie przerw sieciowych do dziennika biura oraz procesy WMS.
+- Odbiór przyjęcia i odkładania obejmuje rzeczywiste ekrany Compose, trwały dziennik i lokalny kontrakt HTTP na emulatorze Androida.
+- Zrzuty trafiają do dodatkowych wyników Gradle przed odinstalowaniem APK. Ich brak przerywa bramkę.
+- Bez nowej migracji WMS. Odbiór fizycznego skanera oraz pełnej nawigacji kolektora pozostaje otwarty.
+
+## 0.326.0 — 13 września 2026
+
+**Przerwa w łączności kolektora trafia do dziennika biura.** Decyzja
+właściciela po poprzednim wydaniu: zapis o przerwach ma iść do logu. Lista
+z 0.323.0 żyła wyłącznie w pamięci jednego kolektora — odpowiadała temu, kto
+trzymał to urządzenie w ręce, i znikała przy zamknięciu aplikacji. Pierwsze
+pytanie przy takiej awarii brzmi tymczasem inaczej: **to jedno urządzenie czy
+wszystkie?**
+
+- **Drogą, która już istnieje.** `POST /api/device/event` wozi upadki urządzeń
+  i niską baterię od 0.31.0, ma listę dozwolonych typów i pisze do `events`.
+  Dochodzi typ `siec_przerwa`; nowej trasy nie ma.
+- **Biuro czyta to w DZIENNIKU ZDARZEŃ**, z filtrem po urządzeniu. Wpis niesie
+  godzinę początku, czas trwania, liczbę prób, powód, rodzaj sieci, adres
+  kolektora i adres serwera z jego ustawień.
+- **Wpis powstaje PO przerwie**, bo w trakcie nie ma czym go wysłać.
+- **Krótsze niż pięć sekund nie jadą.** Tyle trwają trzy nieudane próby, czyli
+  próg banera „serwer milczy". Krótsza cisza nie dociera do nikogo przy regale,
+  a `events` nie ma retencji — sto wpisów „bywa słabo" zakopałoby jeden ważny.
+- **Nieudana wysyłka niczego nie gubi**: odhaczenie stoi PO udanej odpowiedzi
+  serwera, więc przerwa czeka i jedzie po następnej. Ekran mówi przy takim
+  wierszu, że czeka.
+- **Wyłącznik w Ustawieniach** („Log przerw w łączności"), obok logu upadków.
+
+Lista tras zapisu urządzenia dostała pierwszy własny test (`routes/device.test.ts`).
+Powód jest konkretny: kolektor wysyła zgłoszenia w `runCatching`, więc odmowa
+400 nie dociera do nikogo, a literówka w nazwie typu zostawiłaby dziennik pusty
+— stan wyglądający dokładnie jak brak problemu.
+
 ## 0.325.2 — odbiór natywnych ekranów przyjęcia i odkładania
 
 - Nowe testy Compose uruchamiają rzeczywiste ekrany, repozytorium HTTP i trwały dziennik na emulatorze Androida.

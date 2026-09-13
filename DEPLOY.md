@@ -8,10 +8,12 @@ wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skaner
 Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md).
 
 API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłącznie dane seeded.
-Wersja 0.325.2 dodaje odbiór ekranów kolektora w CI, bez migracji ani zmiany poleceń WMS.
-Testy urządzenia czyszczą jego dane testowe; uruchamiać je wyłącznie na osobnym emulatorze lub kolektorze testowym.
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
+
+Wersja 0.327.0 scala raportowanie przerw sieciowych z main oraz odbiór ekranów WMS na emulatorze.
+Nie dodaje migracji WMS. Serwer i APK aktualizować razem, aby odbierać nowy typ zdarzeń urządzenia.
+Testy urządzenia czyszczą jego dane testowe; uruchamiać je wyłącznie na osobnym emulatorze lub kolektorze testowym.
 
 Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `services/wms-analytics-worker.js`.
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
@@ -532,8 +534,34 @@ Ekran mówi trzy rzeczy i żadnej nie zmienia:
    przełączyć Wi-Fi". Zapisuje się sama, więc nikt nie musi jej pamiętać.
 
 Przerwy bierze się z pytania o kolejkę Sfery, które kolektor i tak wysyła co
-półtorej sekundy — ani jednego żądania więcej. Zapis żyje w pamięci aplikacji,
-do jej zamknięcia, i nigdzie nie jedzie.
+półtorej sekundy — ani jednego żądania więcej.
+
+#### Przerwy trafiają do dziennika biura (0.326.0)
+
+Lista w kolektorze odpowiada tylko temu, kto trzyma to urządzenie. Pierwsze
+pytanie przy takiej awarii brzmi jednak inaczej: **to jedno urządzenie czy
+wszystkie?**. Dlatego przerwa jedzie też na serwer.
+
+**Gdzie to czytać:** panel biura → **DZIENNIK ZDARZEŃ**, typ `siec_przerwa`.
+Filtr po urządzeniu stoi obok. Wpis niesie godzinę początku, czas trwania,
+liczbę prób, powód, rodzaj sieci, adres kolektora i adres serwera z jego
+ustawień.
+
+Zasady, które warto znać przy czytaniu:
+
+- **Wpis powstaje PO przerwie**, bo w jej trakcie nie ma czym go wysłać. Wpis
+  z godziny 9:12 opisuje ciszę, która skończyła się chwilę przed zapisem.
+- **Krótsze niż pięć sekund nie jadą.** Tyle trwają trzy nieudane próby, czyli
+  próg banera „serwer milczy". Krótsza cisza nie dociera do nikogo przy regale,
+  a `events` nie ma retencji: sto wpisów „bywa słabo" zakopałoby jeden ważny.
+- **Nieudana wysyłka niczego nie gubi** — przerwa czeka i jedzie po następnej.
+  Zamknięcie aplikacji ją traci, bo to zapis diagnostyczny, a nie praca.
+- **Kolektor bez zalogowanej osoby nic nie wyśle.** Nie odpytuje wtedy kolejki,
+  więc nie ma z czego złożyć przerwy.
+- Wyłącznik stoi w **Ustawieniach → Log przerw w łączności**, obok logu upadków.
+
+Lista w samym kolektorze zostaje i żyje do zamknięcia aplikacji. Przerwa, która
+czeka jeszcze na wysłanie, mówi to wprost pod swoim wierszem.
 
 **Czego ekran NIE wie.** Nazwy sieci (SSID) ani punktu dostępowego (BSSID) —
 od Androida 8 wymagają uprawnienia do lokalizacji, a pytanie o nie w alejce

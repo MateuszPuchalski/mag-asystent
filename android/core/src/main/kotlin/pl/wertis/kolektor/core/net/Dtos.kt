@@ -512,6 +512,22 @@ data class DeviceEventBody(
     val level: Double? = null,
     /** `scan_timing`: skan → odpowiedź, mierzone u człowieka (cel p95 < 150 ms). */
     val ms: Long? = null,
+    /* ── `siec_przerwa`: przerwa w łączności z serwerem ────────────────────
+       Wysyłane PO jej końcu, bo w trakcie nie ma czym. Pola opisują SIEĆ,
+       nie człowieka: kto pracował, wie i tak dziennik z nagłówków żądania.  */
+    /** Początek przerwy, ISO 8601 — dziennik szereguje po czasie serwera. */
+    val odKiedy: String? = null,
+    val trwanieMs: Long? = null,
+    /** Ile nieudanych prób złożyło się na tę przerwę. */
+    val prob: Int? = null,
+    /** Zdanie z `powodOdmowy` — mówi, CZEGO szukać. */
+    val powod: String? = null,
+    /** Rodzaj sieci w chwili zapisu: „Wi-Fi", „komórkowa", „ethernet". */
+    val siec: String? = null,
+    /** Adres kolektora — z niego widać drugą podsieć. */
+    val adres: String? = null,
+    /** Adres serwera z ustawień kolektora — bywa różny na różnych sztukach. */
+    val serwer: String? = null,
 )
 
 /* ── Odpowiedzi ───────────────────────────────────────────────────────── */

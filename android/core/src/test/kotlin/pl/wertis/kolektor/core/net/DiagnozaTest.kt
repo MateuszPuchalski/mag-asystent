@@ -100,6 +100,60 @@ class DiagnozaTest {
         assertEquals("pierwsza", d.przerwy()[1].powod)
     }
 
+    @Test fun `tylko przerwa ZAKONCZONA i dosc dluga idzie do dziennika serwera`() {
+        /* Trwająca nie zna jeszcze swojego czasu i nie ma czym pojechać.
+           Krótka nie dotarła do nikogo przy regale, a `events` nie ma
+           retencji — sto wpisów „bywa słabo" zakopuje jeden ważny. */
+        val d = DziennikCiszy()
+        d.porazka(1_000, "krótka")
+        d.sukces(1_000 + PROG_ZGLOSZENIA_MS - 1)
+        assertTrue(d.doWyslania().isEmpty())
+
+        d.porazka(50_000, "długa")
+        assertTrue("trwająca nie ma czym pojechać", d.doWyslania().isEmpty())
+        d.sukces(50_000 + PROG_ZGLOSZENIA_MS)
+        assertEquals(1, d.doWyslania().size)
+        assertEquals("długa", d.doWyslania().first().powod)
+    }
+
+    @Test fun `sukces mowi, czy WLASNIE domknal przerwe`() {
+        /* Wołający wysyła zaległości dokładnie wtedy, gdy to `true`. Sukces
+           pada co półtorej sekundy przez całą zmianę i nie ma o czym meldować. */
+        val d = DziennikCiszy()
+        assertFalse("bez przerwy nie ma czego domykać", d.sukces(1_000))
+        d.porazka(2_000, "cisza")
+        assertTrue(d.sukces(9_000))
+        assertFalse("drugi sukces z rzędu już niczego nie domyka", d.sukces(9_100))
+    }
+
+    @Test fun `odhaczona przerwa nie jedzie drugi raz`() {
+        val d = DziennikCiszy()
+        d.porazka(1_000, "cisza")
+        d.sukces(30_000)
+        val p = d.doWyslania().single()
+
+        d.oznaczWyslana(p.odKiedy)
+        assertTrue(d.doWyslania().isEmpty())
+        /* Na ekranie zostaje — wysłanie nie jest powodem do zapomnienia. */
+        assertEquals(1, d.przerwy().size)
+        assertTrue(d.przerwy().first().wyslana)
+    }
+
+    @Test fun `nieudana wysylka zostawia przerwe w kolejce`() {
+        /* Odhaczenie idzie PO udanej odpowiedzi serwera. Odwrotna kolejność
+           gubiłaby dokładnie te przerwy, które trafiły w chwiejną sieć. */
+        val d = DziennikCiszy()
+        d.porazka(1_000, "pierwsza")
+        d.sukces(30_000)
+        d.porazka(60_000, "druga")
+        d.sukces(90_000)
+
+        assertEquals(2, d.doWyslania().size)
+        d.oznaczWyslana(1_000)
+        assertEquals(1, d.doWyslania().size)
+        assertEquals("druga", d.doWyslania().first().powod)
+    }
+
     @Test fun `dziennik ma sufit i gubi NAJSTARSZE`() {
         val d = DziennikCiszy(maks = 3)
         for (i in 1..5) {
