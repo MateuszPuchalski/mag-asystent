@@ -4,6 +4,21 @@ Użytkownik potwierdził, że zbiórka odbywa się na kolektorach Zebra lub Hone
 Podstawowym klientem zbiórki jest istniejąca aplikacja Android. Przeglądarka pozostaje
 narzędziem biura, stanowiska pakowania oraz pomocniczym klientem WMS.
 
+## Hierarchia odkładania na małym ekranie
+
+Audyt źródła wykazał listę do ośmiu miejsc przed polem i potwierdzeniem ilości.
+Każda dodatkowa podpowiedź odsuwała bieżącą czynność. To ustalenie z kodu, bez pomiaru ekranu fizycznego kolektora.
+
+Pole, potwierdzenie i błąd stoją teraz przed podpowiedziami. Pierwsze miejsce pozostaje widoczne, pozostałe rozwija przycisk z liczbą alternatyw.
+Zmiana kroku zwija alternatywy i przewija do bieżącej instrukcji. Nowy odczyt i partia również resetują ten widok.
+Podpowiedzi zachowują pojemność oraz informację o ostatnim odczycie. Skan innej zarejestrowanej półki nadal podlega regułom serwera.
+Nie zmienia się kolejność źródło → część → policzona ilość → cel. Nie dodano automatycznego fokusu pola, który przejmowałby skaner klawiaturowy.
+
+Zmiana używa istniejących kolorów, typografii oraz przycisków z minimum 48 dp.
+Źródło: [Android — dostępność domyślnych komponentów Compose](https://developer.android.com/develop/ui/compose/accessibility/api-defaults).
+Do odbioru na sprzęcie: zero, jedno i osiem miejsc, długa nazwa, większa czcionka, rozwinięta lista oraz przejście skanem.
+Sprawdzić także błąd ilości, zmianę dyspozycji i częściowe odłożenie. Nie przypisujemy niezmierzonej oszczędności czasu ani oceny wizualnej.
+
 ## Dyspozycja części przy zwrocie
 
 Istniejący ekran zwrotu rozróżnia sprawne części i uszkodzenia. Zmiana dyspozycji resetuje liczbę oraz skan części.

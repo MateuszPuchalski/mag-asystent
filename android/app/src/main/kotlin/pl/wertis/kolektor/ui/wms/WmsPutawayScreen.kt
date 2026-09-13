@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +59,14 @@ fun WmsPutawayScreen(graph: AppGraph) {
     // Skan tego samego kodu ma zastąpić także niewysłany tekst wpisany ręcznie.
     var query by remember(view.generation, view.query, context) { mutableStateOf(view.query) }
     val stage = task?.let { putawayStage(it, context?.actorId ?: -1, scan) }
+    // Lista alternatyw nie może przesłaniać następnego kroku ani nowej partii.
+    var locationsExpanded by remember(view.generation, context, stage) { mutableStateOf(false) }
     val allowed = view.context == context && context != null && view.ready && !view.busy && view.journal.pending == null
+    val scrollState = rememberScrollState()
+    LaunchedEffect(view.generation, context, stage) {
+        // Skan wykonany pod listą miejsc ma pokazać nową czynność bez szukania jej przewijaniem.
+        scrollState.scrollTo(0)
+    }
 
     WmsLifecycleEffect(graph, context, controller::activateVerification, controller::invalidateVerification, controller::open)
 
@@ -103,7 +111,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
         true
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(scrollState).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (context == null) {
             Text("Zaloguj się, aby odkładać towar z bufora.")
             return@Column
@@ -169,10 +177,6 @@ fun WmsPutawayScreen(graph: AppGraph) {
             }
         }
         Text("Pozostało w buforze: ${task.remaining} szt.", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-        if (!damaged && stage in setOf(WmsPutawayStage.QUANTITY, WmsPutawayStage.TARGET)) {
-            Text(if (task.bins.isEmpty()) "Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce."
-                else "Miejsca według ostatniego odczytu:\n${task.bins.joinToString("\n") { it.hint }}", color = InkMute)
-        }
         when (stage) {
             WmsPutawayStage.CLAIM -> Text("Skan właściwego bufora podejmie to zadanie na Twoje konto.")
             WmsPutawayStage.QUANTITY -> if (allowed) {
@@ -189,6 +193,24 @@ fun WmsPutawayScreen(graph: AppGraph) {
             else -> Unit
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }
+        if (!damaged && stage in setOf(WmsPutawayStage.QUANTITY, WmsPutawayStage.TARGET)) {
+            // Ilość i błąd mają pierwszeństwo przed nawet ośmioma podpowiedziami miejsc.
+            val firstBin = task.bins.firstOrNull()
+            if (firstBin == null) {
+                Text("Brak podpowiedzi. Sprawdź miejsce na zarejestrowanej półce.", color = InkMute)
+            } else {
+                Text("Miejsce według ostatniego odczytu:", color = InkMute)
+                Text(firstBin.hint, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                if (task.bins.size > 1) {
+                    OutlineButton(if (locationsExpanded) "ZWIŃ INNE MIEJSCA" else "INNE MIEJSCA (${task.bins.size - 1})", enabled = allowed, modifier = Modifier.fillMaxWidth()) {
+                        locationsExpanded = !locationsExpanded
+                    }
+                    if (locationsExpanded) {
+                        task.bins.drop(1).forEach { Text(it.hint, color = InkMute) }
+                    }
+                }
+            }
+        }
         if (stage !in setOf(WmsPutawayStage.DONE, WmsPutawayStage.OTHER, WmsPutawayStage.CLAIM)) {
             OutlineButton(if (options) "ZAMKNIJ OPCJE" else "PROBLEM / ZMIEŃ ILOŚĆ", enabled = allowed, modifier = Modifier.fillMaxWidth()) { options = !options }
             if (options && allowed) {
