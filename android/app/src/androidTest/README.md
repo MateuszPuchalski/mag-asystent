@@ -21,6 +21,8 @@ Przygotowanie testu czyści sesję, ustawienia i dziennik aplikacji na urządzen
 Workflow `Ekrany kolektora` używa Androida 10 i ekranu 720 × 1280 px przy gęstości 320 dpi.
 To 360 × 640 dp przed odjęciem pasków systemowych.
 Raporty, zrzuty ekranów i log urządzenia trafiają do artefaktu `wms-native-screen-evidence` na 14 dni.
+Zrzuty zapisujemy w `additionalTestOutputDir`, który Gradle odbiera przed odinstalowaniem APK testowego.
+Brak zrzutów przerywa bramkę nawet przy zielonych testach.
 
 Skan produktu przechodzi przez `ScannerBus`, a skan po liczeniu przez rzeczywisty `WedgeKeySource`.
 Nie udajemy transmisji z modułu Zebra/Honeywell ani pełnej nawigacji `MainActivity`.

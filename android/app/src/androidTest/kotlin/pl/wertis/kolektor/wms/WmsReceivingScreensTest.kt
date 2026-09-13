@@ -166,8 +166,12 @@ class WmsReceivingScreensTest {
     }
 
     private fun screenshot(name: String) {
-        val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
-        val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "wms-screens").apply { mkdirs() }
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Brak zrzutu ekranu" }
+        // Gradle odbiera ten katalog przed odinstalowaniem testowej aplikacji i jej plików.
+        val output = checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")) {
+            "Uruchom test przez connectedDebugAndroidTest z odbiorem dodatkowych wyników"
+        }
+        val directory = File(output, "wms-screens").apply { check(isDirectory || mkdirs()) }
         File(directory, "${testName.methodName}-$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
