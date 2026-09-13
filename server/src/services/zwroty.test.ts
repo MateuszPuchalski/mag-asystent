@@ -11,6 +11,7 @@ import {
   cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona,
   znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
+  osZwrotu, zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, ZwrotConflict,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
 
@@ -29,6 +30,11 @@ function stanowisko() {
   d.exec(schema);
   migrate(d);
   d.prepare("INSERT INTO channel_account(channel, external_account_id) VALUES ('allegro','k')").run();
+  /* KONTO O IDENTYFIKATORZE 1 MUSI ISTNIEĆ. Testy niżej wołają serwisy ze
+     stałą `KTO = { id: 1 }`, a oś zwrotu ma klucz obcy `kto_user_id` do
+     `app_user` — tak samo jak werdykt. Baza bez tego wiersza nie jest tą
+     bazą, na której chodzi serwer, więc test na niej sprawdzałby co innego. */
+  d.prepare("INSERT INTO app_user(name,role) VALUES ('Ala z biura','biuro')").run();
   return d as unknown as Db;
 }
 
@@ -1523,4 +1529,88 @@ test("dopisana pozycja wchodzi do kwoty jak każda inna", () => {
     Array<{ id: number }>).map((r) => Number(r.id));
   const k = zapiszKwote(d, id, { pozycjeIds: wszystkie, dostawa: false }, w.wersja, agent);
   assert.equal(k.kwotaGrosze, 4999 + 2999, "obie pozycje liczą się do kwoty");
+});
+
+test("oś zwrotu opowiada DROGĘ, nie same cofnięcia", () => {
+  /* Blizna 0.284.0: na oś pisały wyłącznie cofnięcia, bo tylko one ją
+     zapisywały. Karta pokazywałaby „Cofnięto przyjęcie" nad pustką po samym
+     przyjęciu — a biuro pyta, co się ze sprawą działo, nie co odkręcono. */
+  const d = stanowisko();
+  const KTO_OSI = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(id) as { id: number }).id);
+
+  const w1 = rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO_OSI);
+  const w2 = ocenPozycje(d, poz, "stan", w1.wersja, KTO_OSI);
+  const w3 = zapiszKwote(d, id, { pozycjeIds: [poz], dostawa: false }, w2.wersja, KTO_OSI);
+
+  const os = osZwrotu(d, id);
+  assert.deepEqual(os.map((z) => z.rodzaj), ["werdykt", "ocena", "kwota"]);
+  assert.equal(os[0].tresc, "Zwrot przyjęty");
+  assert.match(os[1].tresc ?? "", /na stan/, "zdanie niesie NAZWĘ towaru i ocenę");
+  assert.match(os[2].tresc ?? "", /50\.00/, "kwota widoczna po zamknięciu sprawy");
+  /* Wariant idzie na oś PO LUDZKU: kolumna niesie `bez_wysylki`, bo to klucz,
+     ale zdanie o pieniądzach z podkreśleniem wygląda jak usterka. */
+  assert.match(os[2].tresc ?? "", /bez wysyłki/);
+  assert.equal(os[2].dane?.wariant, "bez_wysylki");
+  for (const z of os) assert.equal(z.kto, KTO_OSI.name, "autor stoi przy każdym wpisie");
+
+  /* Cofnięcie DOPISUJE wpis, nie kasuje poprzedniego: oś jest historią,
+     a nie stanem — inaczej nie odpowiadałaby na „dlaczego to stało tydzień". */
+  ocenPozycje(d, poz, null, w3.wersja, KTO_OSI);
+  assert.deepEqual(osZwrotu(d, id).map((z) => z.rodzaj),
+    ["werdykt", "ocena", "kwota", "ocena_cofnieta"]);
+});
+
+test("odmowa zostawia na osi POWÓD, a nie samo słowo „odrzucony”", () => {
+  /* Powód zapisywał się do kolumny i czytał go jeden ekran. Na osi jest tam,
+     gdzie człowiek szuka odpowiedzi „dlaczego odmówiliśmy" po miesiącu. */
+  const d = stanowisko();
+  const KTO_OSI = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+  rozstrzygnijZwrot(d, id, "odrzucony", "towar nosi ślady użycia", 1, KTO_OSI);
+  const os = osZwrotu(d, id);
+  assert.equal(os.length, 1);
+  assert.equal(os[0].tresc, "Odmowa: towar nosi ślady użycia");
+});
+
+test("notatka biura: zapis, cofnięcie i drugie cofnięcie wracające z powrotem", () => {
+  const d = stanowisko();
+  const KTO_N = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+
+  const a = zapiszNotatkeZwrotu(d, id, "  klient prosi o telefon  ", KTO_N, 1);
+  assert.equal(a.notatka, "klient prosi o telefon", "białe znaki schodzą przy zapisie");
+  assert.equal(a.maPoprzednia, false, "pierwsza notatka nie ma dokąd wracać");
+  assert.throws(() => cofnijNotatkeZwrotu(d, id, KTO_N, a.wersja), /pierwsza notatka/);
+
+  const b = zapiszNotatkeZwrotu(d, id, "jednak napisał sam", KTO_N, a.wersja);
+  assert.equal(b.maPoprzednia, true);
+  const c = cofnijNotatkeZwrotu(d, id, KTO_N, b.wersja);
+  assert.equal(c.notatka, "klient prosi o telefon");
+  /* Drugie cofnięcie wraca TAM, GDZIE BYŁO — cofnięcie jest zamianą, więc
+     człowiek, który kliknął o jeden raz za dużo, nie zostaje z niczym. */
+  assert.equal(cofnijNotatkeZwrotu(d, id, KTO_N, c.wersja).notatka, "jednak napisał sam");
+
+  /* Stara wersja przegrywa, tak samo jak przy decyzjach. */
+  assert.throws(() => zapiszNotatkeZwrotu(d, id, "z drugiego okna", KTO_N, 1),
+    (e: unknown) => e instanceof ZwrotConflict);
+});
+
+test("notatkę da się dopisać przy zwrocie ZAMKNIĘTYM", () => {
+  /* `podKlucz` odmawia przy zamkniętym i ma rację przy decyzjach: one zmieniają
+     to, co obiecaliśmy klientowi. Notatka niczego nie obiecuje, a dopisuje się
+     ją najczęściej właśnie po zamknięciu, gdy sprawa wraca pytaniem. */
+  const d = stanowisko();
+  const KTO_N = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+  d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-05T10:00:00Z' WHERE id=?").run(id);
+
+  const w = zapiszNotatkeZwrotu(d, id, "sprawa wróciła pytaniem o korektę", KTO_N);
+  assert.equal(w.notatka, "sprawa wróciła pytaniem o korektę");
+  assert.deepEqual(osZwrotu(d, id).map((z) => z.rodzaj), ["notatka"]);
+  /* Na oś idzie SAM FAKT, bez treści: notatka bywa zdaniem o kliencie,
+     a oś ogląda się z boku ekranu. */
+  assert.equal(osZwrotu(d, id)[0].tresc, "Notatka biura zmieniona");
 });

@@ -872,7 +872,12 @@ export interface Zwrot {
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
+  /** Notatka biura — od 0.313.0 przy KAŻDYM zwrocie, nie tylko przy paczce. */
   notatka: string | null;
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  /** Czy cofnięcie zmiany ma dokąd wrócić (§25a.5). */
+  maPoprzedniaNotatke: boolean;
   kupujacyLogin: string | null;
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];
@@ -930,11 +935,14 @@ export interface RozmowaZwrotu {
 }
 
 export interface WpisOsiZwrotu {
+  id: number;
   rodzaj: string;
   tresc: string | null;
-  dane_json: string | null;
-  kiedy_at: string;
+  /** ISO. Nazwa PO NASZEMU, nie kolumną bazy — od 0.313.0, gdy oś dostała ekran. */
+  kiedy: string;
   kto: string | null;
+  /** Rozpakowane przez serwer; `null` przy wierszu bez danych albo zepsutym. */
+  dane: Record<string, unknown> | null;
 }
 
 /** Kształt z `stanZwrotowHealth` — lustrzany do bloku skrzynki w §21. */

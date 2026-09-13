@@ -18,7 +18,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   sumaPozycjiGrosze: 3798, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
   werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null, korektaZrodlo: null,
-  zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  zrodlo: "allegro", notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   rejectionCode: null, wersja: 1, pozycje: [],
   ...n,
@@ -72,7 +72,10 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("ABC-1")).toBeInTheDocument();
     expect(screen.getByText("nieodebrana paczka")).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.getByText(/kurier zwrócił po 14 dniach/)).toBeInTheDocument();
+    /* NOTATKI TU JUŻ NIE MA (0.313.0): ma własną sekcję w kolumnie dowodów,
+       z autorem, godziną i cofnięciem. Cytat w nagłówku byłby tym samym
+       zdaniem po raz drugi na jednym ekranie. */
+    expect(screen.queryByText(/kurier zwrócił po 14 dniach/)).toBeNull();
   });
 
   /* Do 0.213.0 ten test pilnował, że nagłówek NIESIE pytanie kubełka. Decyzją

@@ -12,6 +12,7 @@ import {
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
+  useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -19,6 +20,7 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
 import { Koszyk } from "../zwroty/Koszyk";
+import type { RozjazdZwrotu } from "../api/zwroty";
 import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
@@ -81,6 +83,36 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
   authentication_error: "odmowa logowania do Allegro",
   failed: "nie działa",
 };
+
+/**
+ * Rozjazdy rekoncyliacji, które dotyczą zwrotów (0.313.0).
+ *
+ * Cztery kontrole — termin ustawowy, zwrot bez śladu po przelewie, koszyk
+ * czekający na korektę i kosz bez powrotu z regału — liczyły się od dawna
+ * i rysowały WYŁĄCZNIE w `/biuro`. Obsługa klienta pracuje na innym ekranie,
+ * więc raport chroniący jej pracę wisiał tam, gdzie ona nie zagląda.
+ *
+ * MILCZY PRZY ZERZE. Pas szarości z napisem „wszystko w porządku" uczy
+ * przewijać wzrokiem to miejsce — a wtedy nie zauważa się go w dniu, w którym
+ * naprawdę coś mówi. Ta sama zasada co w `services/reconcile.ts`: zerowy wynik
+ * to zero raportu.
+ */
+function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
+  if (!rozjazdy.length) return null;
+  return <section aria-label="Rozjazdy zwrotów"
+    className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+    <h2 className="text-xs font-bold uppercase text-amber-900">
+      Do sprawdzenia ({rozjazdy.length})
+    </h2>
+    {/* Lista, nie zdanie zbiorcze: każdy wiersz niesie KLUCZ — numer zwrotu
+        albo kod kosza — bo bez niego alarm nie mówi, od czego zacząć. */}
+    <ul className="mt-1 space-y-0.5 text-sm text-amber-900">
+      {rozjazdy.map((r) => <li key={`${r.rodzaj}:${r.klucz}`}>
+        <b className="font-semibold">{r.klucz}</b> · {r.opis}
+      </li>)}
+    </ul>
+  </section>;
+}
 
 /**
  * Ile pozycji czeka na kartotekę i DLACZEGO.
@@ -215,6 +247,10 @@ export function Zwroty() {
   const synchronizuj = useSynchronizujZwroty();
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
+  const notatka = useNotatkaZwrotu();
+  const cofnijNotatke = useCofnijNotatkeZwrotu();
+  const [bladNotatki, setBladNotatki] = useState("");
+  const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
@@ -430,6 +466,7 @@ export function Zwroty() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.stan && <PasekOgona stan={data.stan} />}
     {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} stan={data.stan} />}
+    <PasekRozjazdow rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
     <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -647,7 +684,19 @@ export function Zwroty() {
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
-        ? <Dowody zwrot={zwrot}
+        ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
+            trwaNotatka={notatka.isPending || cofnijNotatke.isPending}
+            bladNotatki={bladNotatki}
+            onNotatka={(tekst) => {
+              setBladNotatki("");
+              notatka.mutate({ id: zwrot.id, notatka: tekst.trim() || null, wersja: zwrot.wersja },
+                { onError: (e) => setBladNotatki((e as Error).message) });
+            }}
+            onCofnijNotatke={() => {
+              setBladNotatki("");
+              cofnijNotatke.mutate({ id: zwrot.id, wersja: zwrot.wersja },
+                { onError: (e) => setBladNotatki((e as Error).message) });
+            }}
             kandydaciFaktury={szczegol.data?.kandydaciFaktury ?? []}
             fakturaTrwa={faktura.isPending} fakturaBlad={bladFaktury}
             onFaktura={(dokId) => {

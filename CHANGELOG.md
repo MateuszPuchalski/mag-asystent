@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.313.0 — zlecony zwrot z pakowania
+## 0.314.0 — zlecony zwrot z pakowania
 
 Biuro może zlecić zwrot wstrzymanej skrzynki po przekazaniu do pakowania. Samo wstrzymanie nie powoduje zwrotu.
 Kolektor odbiera całą niewysłaną zawartość skanami stanowiska i skrzynki. Kontrola paczek jest cofana, a pozycja wózka zostaje zwolniona.
@@ -45,6 +45,48 @@ Zakończenie zostawia wstrzymanie dla decyzji biura. Analityka pokazuje wiek kol
 **[wymaga działania]** Wykonać zweryfikowaną kopię bazy, build i restart API. Odświeżyć Biuro oraz zaktualizować APK.
 Start dodaje tabelę zleconych zwrotów. Stare dane i pobrania nie są automatycznie zmieniane.
 Odbiór obejmuje wyłącznie seeded; fizyczny kolektor wymaga osobnej próby.
+
+## 0.313.0 — 13 września 2026
+
+**Zwrot opowiada, co się z nim działo.** Druga część audytu zamówionego przez
+właściciela — ta o widoczności. Ślad po każdej decyzji zapisywał się od
+0.156.0, serwer oddawał go przy szczególe sprawy, panel miał na to nawet typ
+i zostawił go nieużytym. Biuro patrzące na zamknięty zwrot nie widziało ani
+kto go przyjął, ani za co poszła kwota, ani czy towar wrócił na półkę:
+odpowiedzi szukało się w Subiekcie i w panelu Allegro, czyli tam, gdzie ich
+nie ma. Oś stoi teraz na końcu kolumny dowodów, najstarsze na górze.
+
+Przy okazji wyszła rzecz gorsza od braku ekranu. **Na oś pisały wyłącznie
+cofnięcia.** Przyjęcie zwrotu, zapisana kwota i ocena pozycji szły tylko do
+dziennika `events`, więc karta pokazywałaby „Cofnięto przyjęcie" nad pustką po
+samym przyjęciu. Te trzy zdarzenia dopisują się na oś od tego wydania.
+
+**[wymaga działania] Oś zaczyna się od tego wydania.** Zwroty sprzed niego
+pokażą tylko to, co zapisano wcześniej — korekty, pieniądze i cofnięcia.
+Historii nie dopisujemy wstecz, bo nie ma skąd: dziennik zna zdarzenia, ale nie
+zna zdań, które oś ma pokazać. Pierwszy przegląd starych zwrotów to nie
+usterka.
+
+**Notatka biura przy każdym zwrocie.** Kolumna stała w bazie od 0.172.0
+i wypełniała ją wyłącznie rejestracja paczki nieodebranej — przy zwrocie
+z Allegro nie było gdzie zapisać ustalenia. Teraz pisze się ją wszędzie,
+z cofnięciem zmiany i z autorem przy zdaniu, w tej samej kolumnie co notatka
+reklamacji. Wolno ją dopisać także przy zwrocie ZAMKNIĘTYM: właśnie wtedy
+sprawa najczęściej wraca pytaniem. Do dziennika idzie długość, nigdy treść.
+
+**Rozjazdy rekoncyliacji nad kolejką.** Cztery kontrole dotyczące zwrotów
+rysowały się wyłącznie w `/biuro`, czyli nie tam, gdzie pracuje obsługa. Pasek
+bierze je z wąskiej trasy, a nie z `/api/reconcile`: tamta nie ma bramki ról
+i niesie całą halę razem z lokalizacjami kartotek. Przy zerze milczy.
+
+Migracja dokłada cztery kolumny `notatka_*` sama. Licznik tras POST zwrotów
+rośnie z dwudziestu czterech do dwudziestu sześciu.
+
+**Numer wydania wzięty POWYŻEJ otwartego PR-a** z gałęzi `codex/robust-wms`,
+która zajmuje wszystko do 0.312.1. Kod pisał się jako 0.285.0 i został
+przenumerowany przy commicie — dokładnie tak, jak każe `CLAUDE.md`.
+
+
 
 ## 0.312.1 — skan półki nie potwierdza skrzynki
 

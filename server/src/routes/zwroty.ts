@@ -14,6 +14,7 @@ import {
   znajdzZwrotPoKodzie,
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
+  zapiszNotatkeZwrotu, cofnijNotatkeZwrotu,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
@@ -28,6 +29,7 @@ import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/a
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
+import { reconcile } from "../services/reconcile.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
    SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
@@ -52,6 +54,13 @@ function odmowa(reply: FastifyReply) {
   }
   return null;
 }
+
+/* Które rozjazdy rekoncyliacji należą do TEGO ekranu. Lista jawna, nie prefiks
+   nazwy: `kosz_bez_powrotu` dotyczy zwrotów, choć nie nosi tego w nazwie, a
+   dopisanie piątej kontroli ma być decyzją, nie skutkiem ubocznym nazewnictwa. */
+const RODZAJE_ZWROTOW = new Set([
+  "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu",
+]);
 
 export async function zwrotyRoutes(app: FastifyInstance) {
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
@@ -563,6 +572,55 @@ export async function zwrotyRoutes(app: FastifyInstance) {
    * danych na dysk — a kto wynosi zestawienia o ludziach, sam trafia do logu.
    * Ta sama zasada stoi przy `analiza_eksport` i `audyt_eksport`.
    */
+  /* ── NOTATKA BIURA (0.313.0) ────────────────────────────────────────────
+     Bez `autoryzuj()`: to zdanie zostaje U NAS i niczego nie obiecuje
+     klientowi — czyli zwykła praca biura, tak samo jak zapis przelewu.
+
+     Bramka wersji siedzi w serwisie i NIE odmawia przy zwrocie zamkniętym.
+     Notatkę najczęściej dopisuje się właśnie po zamknięciu, gdy sprawa wraca
+     pytaniem; bramka na stanie końcowym kazałaby wybierać między poprawną
+     kolejnością pracy a zapisaniem ustalenia. */
+  app.post<{ Params: { id: string }; Body: { notatka?: string | null; wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/notatka", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const n = req.body?.notatka;
+      if (n !== null && n !== undefined && typeof n !== "string") {
+        return reply.code(400).send({ error: "Pole `notatka` musi być tekstem albo `null`" });
+      }
+      try {
+        return zapiszNotatkeZwrotu(db(), Number(req.params.id), n ?? null, kto(),
+          req.body?.wersja);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Cofnięcie zamiast potwierdzenia (§25a.5) — notatka jest polem swobodnym,
+     które nadpisuje ten, kto pisze ostatni. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/notatka/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return cofnijNotatkeZwrotu(db(), Number(req.params.id), kto(), req.body?.wersja);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* ── ROZJAZDY ZWROTÓW (0.313.0) ─────────────────────────────────────────
+     Rekoncyliacja zna cztery kontrole dotyczące zwrotów i rysowała je
+     WYŁĄCZNIE w `/biuro`, czyli nie tam, gdzie pracuje obsługa. Raport, który
+     trzeba otworzyć na drugim ekranie, nie chroni przed niczym.
+
+     WĄSKA TRASA, a nie `/api/reconcile` z `routes/device.ts`: tamta nie ma
+     bramki ról i niesie całą halę razem z lokalizacjami kartotek. Panel
+     obsługi ma dostać to, co jego, i nic poza tym. */
+  app.get("/api/obsluga/zwroty/rozjazdy", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    return {
+      rozjazdy: reconcile().rozjazdy.filter((r) => RODZAJE_ZWROTOW.has(r.rodzaj)),
+    };
+  });
+
   app.get("/api/obsluga/zwroty/csv", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;

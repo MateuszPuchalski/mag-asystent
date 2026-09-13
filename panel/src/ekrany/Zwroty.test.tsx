@@ -19,7 +19,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
-  zrodlo: "allegro", notatka: null, kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  zrodlo: "allegro", notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
@@ -48,6 +48,9 @@ const scena = vi.hoisted(() => ({
      dwupozycyjnego, a dokładanie go do stałej listy przestawiłoby liczniki
      w testach szukania („2 pasujących zwrotów"). */
   zwroty: null as unknown[] | null,
+  /* Rozjazdy rekoncyliacji (0.313.0). Domyślnie PUSTE, bo pasek ma milczeć
+     przy zerze — a większość testów tego pliku sprawdza co innego. */
+  rozjazdy: [] as Array<{ rodzaj: string; klucz: string; opis: string; odKiedy: string | null }>,
   /* Decyzje z klawiatury MUSZĄ mieć atrapę: prawdziwa mutacja strzela
      `fetch`-em, a test sprawdza właśnie to, czy klawisz ją woła. */
   wolano: [] as Array<{ co: string; dane: Record<string, unknown> }>,
@@ -71,6 +74,7 @@ vi.mock("../api/zwroty", async () => {
         kartoteki: scena.kartoteki, stan: scena.stan },
       isLoading: false, error: null,
     }),
+    useRozjazdyZwrotow: () => ({ data: { rozjazdy: scena.rozjazdy } }),
     useWerdykt: () => atrapa("werdykt"),
     useOcena: () => atrapa("ocena"),
     useKorekta: () => atrapa("korekta"),
@@ -390,5 +394,34 @@ describe("Klawisze kubełka", () => {
     expect(screen.queryByText("zapisz kwotę")).toBeNull();
     /* Sit „moje"/„niczyje" tu nie ma — zwrot nie nosi prowadzącego. */
     expect(screen.queryByText("niczyje")).toBeNull();
+  });
+});
+
+/* ── Rozjazdy nad kolejką (0.313.0) ──────────────────────────────────────────
+   Cztery kontrole rekoncyliacji dotyczące zwrotów liczyły się od dawna
+   i rysowały wyłącznie w `/biuro`. Obsługa pracuje na tym ekranie, więc raport
+   chroniący jej pracę wisiał tam, gdzie ona nie zagląda.                    */
+describe("Pasek rozjazdów", () => {
+  it("milczy, gdy nie ma czego zgłosić", () => {
+    /* Pas z napisem „wszystko w porządku" uczy przewijać wzrokiem to miejsce
+       — a wtedy nie widać go w dniu, w którym naprawdę coś mówi. */
+    pokaz();
+    expect(screen.queryByLabelText("Rozjazdy zwrotów")).toBeNull();
+  });
+
+  it("wypisuje KLUCZ przy każdym wierszu, bo bez niego alarm nie mówi, od czego zacząć", () => {
+    scena.rozjazdy = [
+      { rodzaj: "zwrot_po_terminie", klucz: "ZW-1",
+        opis: "Zwrot ZW-1 po terminie ustawowym", odKiedy: "2026-09-01T09:00:00Z" },
+      { rodzaj: "kosz_bez_powrotu", klucz: "Z-7",
+        opis: "Kosz Z-7 rozłożono ponad dobę temu", odKiedy: "2026-09-02T09:00:00Z" },
+    ];
+    try {
+      pokaz();
+      const pasek = screen.getByLabelText("Rozjazdy zwrotów");
+      expect(pasek).toHaveTextContent("Do sprawdzenia (2)");
+      expect(pasek).toHaveTextContent("ZW-1");
+      expect(pasek).toHaveTextContent("Z-7");
+    } finally { scena.rozjazdy = []; }
   });
 });
