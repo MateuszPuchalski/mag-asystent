@@ -175,7 +175,7 @@ export type NadawcaWniosku = (
 ) => Promise<{ id?: string } | null>;
 
 export async function zlozWniosekORabat(
-  database: Db, pozycjaZwrotuId: number, kto: { id: number; name: string },
+  database: Db, pozycjaZwrotuId: number, kto: { id: number | null; name: string },
   nadaj: NadawcaWniosku, teraz = new Date(),
 ): Promise<{ wniosekId: string; lineItemId: string }> {
   const stan = stanRabatu(database, pozycjaZwrotuId);
