@@ -567,6 +567,16 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "prowadzi", "TEXT");
   addColumn("zwrot_klienta", "prowadzi_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("zwrot_klienta", "prowadzi_at", "TEXT");
+  /* AUTOMAT WNIOSKÓW O RABAT (0.320.0) — tylko dla zwrotów zaciągniętych po
+     wdrożeniu. Decyzja właściciela: automat rusza na nowych, a zaległości
+     zostają przy ręcznym przycisku z 0.164.0.
+
+     Stempel idzie WYŁĄCZNIE w przebiegu dokładającym kolumnę. Bez niego
+     pierwszy takt po wdrożeniu wysłałby do Allegro serię żądań o wnioski dla
+     zwrotów sprzed miesięcy — część wróciłaby odmową, a odmowy nie da się
+     cofnąć jednym kliknięciem. Ten sam wzorzec i ta sama blizna co przy
+     powrocie kosza z bufora (`powrotKoszaPozaAplikacja`). */
+  rabatPozaAutomatem(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -798,6 +808,34 @@ function powrotKoszaPozaAplikacja(database: DatabaseSync) {
     if (n) {
       console.warn(`[migracja] ${n} rozłożonych koszy zostaje bez powrotu z bufora ` +
         "— rozliczyło je biuro przed 0.266.0.");
+    }
+  })();
+}
+
+/**
+ * Pozycje zastane w chwili wdrożenia automatu rabatów (0.320.0).
+ *
+ * Automat składa wniosek zaraz po zaciągnięciu odstąpienia. Zastane pozycje
+ * odstąpienia mają sprzed miesięcy — wniosek do nich albo już jest, albo nie
+ * ma go świadomie, a seria żądań o nie zderzyłaby się z limitem Allegro
+ * i wróciła odmowami. Stempel odróżnia jedne od drugich i idzie raz.
+ */
+function rabatPozaAutomatem(database: DatabaseSync) {
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'").get();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!jest) return;
+  const kolumny = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
+    .all() as Array<{ name: string }>).map((c) => c.name);
+  if (kolumny.includes("rabat_poza_automatem")) return;
+  transaction(database, () => {
+    database.exec(
+      "ALTER TABLE zwrot_klienta_pozycja ADD COLUMN rabat_poza_automatem INTEGER NOT NULL DEFAULT 0");
+    const n = Number(database.prepare(
+      "UPDATE zwrot_klienta_pozycja SET rabat_poza_automatem=1").run().changes ?? 0);
+    if (n) {
+      console.warn(`[migracja] ${n} pozycji zwrotów zostaje poza automatem rabatów ` +
+        "— wniosek do nich składa biuro przyciskiem, jak przed 0.320.0.");
     }
   })();
 }

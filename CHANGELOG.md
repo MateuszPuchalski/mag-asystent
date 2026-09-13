@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.320.0 — 13 września 2026
+
+**Wniosek o rabat transakcyjny idzie sam.** Ręczny przycisk przy pozycji zwrotu
+stoi od 0.164.0 i działa — trzeba tylko o nim pamiętać przy każdym z kilkuset
+zwrotów. Prowizja, po którą nikt nie kliknął, zostaje u Allegro. Zgłoszenie
+właściciela: „musimy zrobić automatyczny wniosek o rabat transakcyjny do
+zwracanych przedmiotów".
+
+- **Automat składa wniosek zaraz po odstąpieniu**, jeszcze przed werdyktem
+  biura. Wniosek dotyczy PROWIZJI od wycofanej transakcji, a nie towaru, więc
+  nie czeka ani na ocenę, ani na korektę. To decyzja właściciela, zapisana
+  wprost: wniosek ma iść, jak tylko dowiemy się o odstąpieniu.
+- **Pół godziny karencji przed wysyłką.** Czterdzieści wniosków na sto zakłada
+  Allegro samo, a końcówka nie ma idempotencji: nasz wniosek złożony w tej
+  samej minucie byłby DRUGIM zgłoszeniem do tej samej prowizji. Karencja daje
+  lustrowi wniosków szansę zobaczyć ich wniosek pierwszy.
+- **Paczka nieodebrana i pozycja dopisana przez biuro odpadają.** W pierwszej
+  klient niczego nie zgłosił, w drugiej nie ma jej w zgłoszeniu klienta.
+- **Sufit dwudziestu wniosków na takt**, a limit Allegro przerywa przebieg
+  zamiast mnożyć odmowy. Odmowa jednej pozycji nie zabiera pozostałych i zostaje
+  w dzienniku ze zdaniem.
+- **Automat podpisuje się jako „automat (odstąpienie)"** na osi zwrotu i nie ma
+  konta w aplikacji — wynik automatu nie udaje decyzji człowieka.
+- **[wymaga działania] Tylko nowe zwroty.** Migracja stempluje pozycje zastane
+  w chwili wdrożenia jako `rabat_poza_automatem` i mówi w logu, ile ich było.
+  Do nich wniosek składa biuro przyciskiem, tak jak przed tym wydaniem. Bez
+  stempla pierwszy takt wysłałby serię żądań o zwroty sprzed miesięcy.
+
+Nowego uprawnienia Allegro to nie potrzebuje: `allegro:api:orders:write` jest
+w użyciu od 0.164.0. Szczegóły w `docs/panel-obslugi-klienta.md` §25a.20.
+
 ## 0.319.0 — 13 września 2026
 
 **Pasek rozjazdów zjadał ekran zwrotów.** Właściciel wszedł w zakładkę ZWROTY
