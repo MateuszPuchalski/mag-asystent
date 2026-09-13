@@ -4,6 +4,18 @@ Użytkownik potwierdził, że zbiórka odbywa się na kolektorach Zebra lub Hone
 Podstawowym klientem zbiórki jest istniejąca aplikacja Android. Przeglądarka pozostaje
 narzędziem biura, stanowiska pakowania oraz pomocniczym klientem WMS.
 
+## Zlecone zwroty z pakowania
+
+Siódmy proces WMS obsługuje odbiór wstrzymanej skrzynki po przekazaniu do pakowania.
+Biuro zleca zwrot; dowolny uprawniony magazynier podejmuje go skanami stanowiska i skrzynki.
+Kolektor prowadzi po częściach: SKU → jawna ilość → półka. Wybór innej półki korzysta ze wspólnej reguły zwrotu.
+Oddanie reszty wymaga pierwotnego stanowiska, skrzynki i powodu. Zakończenie nie wznawia zamówienia.
+
+Proces używa istniejącego trwałego dziennika oraz blokady zapisów. Nieznany wynik nie pozwala przejść do innej operacji.
+Testy obejmują utratę odpowiedzi podjęcia i częściowego odłożenia, restart, ponowienie tego samego klucza oraz błąd dysku przed POST.
+Siedem procesów przechodzi wspólną próbę cyklu życia. Ponowienie, odczyt i powrót po pauzie wymagają świeżej skrzynki.
+Potwierdzone partie w ciągłej sesji zachowują skrzynkę. Nie wykonano odbioru ekranu na fizycznym urządzeniu.
+
 ## Sprawdzone artefakty
 
 - Wydanie `v0.284.0`: `wertis-kolektor-0.284.0.apk`, pobrane z GitHub Releases.

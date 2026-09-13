@@ -441,6 +441,7 @@ test("pełny przebieg: rezerwacja → skan → kontrola paczki → wysyłka → 
     reservations: [],
     putaway: [],
     packingRecovery: [],
+    putback: [],
   });
   assert.equal(
     (A.analytics({ days: 1 }).throughput as { shipped: number }).shipped,

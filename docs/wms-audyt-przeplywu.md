@@ -5,6 +5,22 @@ docelowo 1500 zamówień dziennie. Praca i weryfikacja wyłącznie na danych see
 Poprzedni etap był postępem: wdrożył zdjęcia części i zweryfikował zbiórkę.
 Nie stanowi to dowodu ukończenia całego audytu procesów.
 
+## Zwrot po przekazaniu do pakowania
+
+Odtworzony przypadek: klient anuluje zamówienie po przekazaniu skrzynki i częściowej kontroli paczek.
+Zwroty aktywnego wózka nie obejmowały tego etapu. Przeniesienie wstrzymanej skrzynki z pakowania na stanowisko wyjątków było blokowane.
+Usunięcie blokady nie zapewniłoby rozliczenia zawartości ani przekazania odpowiedzialności trzeciemu operatorowi.
+
+Dodano jawne zlecenie Biura oraz odbiór skrzynki na kolektorze. Zwykłe wstrzymanie nadal pozwala wyjaśnić adres bez rozpakowywania.
+Odbiór zachowuje audyt zawartości paczek, cofa ich kontrolę i zwalnia wózek. Dopiero skan odłożenia przywraca fizyczny zapas.
+Wspólna reguła zwrotu przenosi rezerwację wraz z częścią; nie powstał drugi sposób księgowania zapasu.
+Otwarte zadanie blokuje równoległą zmianę zamówienia, korektę pakowania i przeniesienie skrzynki.
+
+Regresje obejmują trzeciego operatora, częściowe pakowanie, oddanie reszty, przerwanie, wycofanie transakcji i ponowienie jednej partii.
+Kontrola kopii wykrywa utratę wstrzymania oraz niepełny schemat. Starsza kopia bez obu późniejszych modułów pozostaje czytelna.
+Browser E2E sprawdza zlecenie, utraconą odpowiedź, kolejkę oraz skany API dla trzech zwróconych sztuk.
+Natywne testy sprawdzają skany, trwały dziennik i ochronę po pauzie. Fizyczny kolektor pozostaje do odbioru.
+
 ## Zakres celu i wymagane dowody
 
 | Obszar | Co ma być udowodnione | Stan audytu |
@@ -14,7 +30,7 @@ Nie stanowi to dowodu ukończenia całego audytu procesów.
 | Uzupełnienia | Praca nie ginie po przyjęciu; przydzielone sztuki nie mogą zostać zabrane innym ruchem | Natywna kolejka rozróżnia popyt zamówień i minima. Obsługuje brak źródła, pełny cel, częściowe odłożenie i zwrot. Przydział chroni zapas oraz miejsce. |
 | Rezerwacje i zbiórka | Priorytet, brak, pełna skrzynka, przerwanie pracy, współbieżność, zdjęcie i właściwa skrzynka | Istnieją testy wózków 20/30. Potrzebny dalszy przegląd zmian i anulowań zamówień podczas pracy. |
 | Pakowanie i wysyłka | Właściwa zawartość, wielopaczkowość, poprawki etykiety, błędny przewoźnik, przekazanie kurierowi | Sprawdzono podział na paczki, częściowy odbiór, cofnięcie kontroli oraz wymianę uszkodzenia lub potwierdzonego braku. Rzeczywiste etykiety i odbiór kurierów pozostają do sprawdzenia. |
-| UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Sześć procesów kolektora współdzieli dziennik i ochronę po pauzie. Browser E2E sprawdza kolejność skanów oraz jawne ilości. Dalszy odbiór ergonomii wymaga fizycznej pracy. |
+| UI/UX i uproszczenia | Mniej zbędnych decyzji, poprawna kolejność skanów, zachowana orientacja i odzyskiwanie po błędzie | Siedem procesów kolektora współdzieli dziennik i ochronę po pauzie. Browser E2E sprawdza kolejność skanów oraz jawne ilości. Dalszy odbiór ergonomii wymaga fizycznej pracy. |
 | Analityka i skala | Czas od przyjęcia do dostępności, blokady i wiek zadań; skala z historią i współbieżnymi operatorami | Raport pokazuje kolejki, ich wiek, medianę, P95 i pokrycie. Próba 135000 zamówień działała w osobnym wątku. Pomiar rzeczywistej hali pozostaje otwarty. |
 | Utrzymanie | Aktualizacja, kopia i odtworzenie, role, dziennik, awaria sieci, restart procesu | Kopie seeded przed i po migracji rozbieżności przeszły kontrolę historii, zapasu i relacji. Ponowienia oraz restart mają regresje. Produkcyjne odtworzenie pozostaje do odbioru. |
 

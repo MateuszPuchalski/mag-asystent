@@ -728,6 +728,11 @@ test("kontrola kopii wykrywa niepełny schemat i utracone rozliczenie wymiany, a
     copy.exec("PRAGMA foreign_keys=OFF; DROP TABLE wms_pack_issue");
     assert.throws(() => A.integrity(copy), /Niepełny schemat wymian/);
     copy.exec("DROP TABLE wms_pack_recovery");
+    assert.throws(
+      () => A.integrity(copy),
+      /Niepełny schemat zleconych zwrotów/,
+    );
+    copy.exec("DROP TABLE wms_putback");
     assert.equal(A.integrity(copy).ok, true);
   } finally {
     copy.close();

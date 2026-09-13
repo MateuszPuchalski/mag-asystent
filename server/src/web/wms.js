@@ -334,6 +334,7 @@ window.Wms = (() => {
       ["carts", "Wózki 20 / 30"],
       ["packing", "Pakowanie skrzynek"],
       ["recovery", "Wymiany części"],
+      ["putback", "Zwroty z pakowania"],
       ["handoff", "Wydania"],
       ["waves", "Zbiórka ręczna"],
       ["bins", "Lokalizacje"],
@@ -370,6 +371,7 @@ window.Wms = (() => {
       if (view === "packing") await cartUi.renderPacking();
       if (view === "stock") await stocks(turn);
       if (view === "recovery") await recoveryUi.render();
+      if (view === "putback") await putbacks(turn);
       if (view === "stockwork") await stockWorkUi.render();
       if (view === "inbound") await inboundUi.render();
       if (view === "handoff") await handoffUi.render();
@@ -578,18 +580,25 @@ window.Wms = (() => {
     return "<p>Zamówienie anulowane. Rezerwacje zwolnione.</p>";
   }
   function exceptionsForm(o) {
-    const options = [
-      !o.hold_reason ? ["hold", "Wstrzymaj — brak / uszkodzenie"] : null,
-      office() && o.hold_reason ? ["resume", "Wznów po wyjaśnieniu"] : null,
-      office() && ["picking", "picked", "packing", "packed"].includes(o.status)
-        ? ["takeover", "Przejmij pracę na moje konto"]
-        : null,
-      office() ? ["cancel", "Anuluj zamówienie"] : null,
-    ].filter(Boolean);
+    const options = (
+      o.putback
+        ? []
+        : [
+            !o.hold_reason ? ["hold", "Wstrzymaj — brak / uszkodzenie"] : null,
+            office() && o.hold_reason
+              ? ["resume", "Wznów po wyjaśnieniu"]
+              : null,
+            office() &&
+            ["picking", "picked", "packing", "packed"].includes(o.status)
+              ? ["takeover", "Przejmij pracę na moje konto"]
+              : null,
+            office() ? ["cancel", "Anuluj zamówienie"] : null,
+          ]
+    ).filter(Boolean);
     const firstReturn = o.allocations.find((a) => a.picked > 0);
     const originalReturnAllowed = (firstReturn?.bin_mode ?? "pick") === "pick";
     const returned =
-      o.hold_reason && o.allocations.some((a) => a.picked > 0)
+      !o.putback && o.hold_reason && o.allocations.some((a) => a.picked > 0)
         ? form(
             "return",
             `<p>Zwrot z ${html(o.tote)}. Odłóż tylko sprawne sztuki; uszkodzenie rozlicz osobno.</p>${field("tote", "1. Skan skrzynki źródłowej")}<label>Odłóż pozycję<select name="allocationId">${o.allocations
@@ -604,7 +613,30 @@ window.Wms = (() => {
             "POTWIERDŹ ODŁOŻENIE",
           )
         : "";
-    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
+    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${putbackForm(o)}${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
+  }
+  function putbackForm(o) {
+    if (o.putback)
+      return `<section class="wms-message"><strong>Zwrot z pakowania · ${o.putback.user_id ? "skrzynka odebrana przez operatora" : "czeka na odbiór kolektorem"}</strong><p>${html(o.putback.station)} · ${html(o.tote)} · ${html(o.putback.reason)}</p><p>Zamówienie pozostaje wstrzymane. Równoległe zwroty, pakowanie i zmiany są zablokowane.</p>${office() && !o.putback.user_id ? `<form id="wms-putback-abort" class="wms-form">${field("reason", "Powód przerwania zlecenia")}<button>PRZERWIJ ZLECENIE ZWROTU</button></form>` : ""}</section>`;
+    if (
+      !office() ||
+      !o.hold_reason ||
+      !o.returnStation ||
+      o.shipments.length ||
+      o.packingRecovery ||
+      !o.lines.some((l) => l.picked > 0)
+    )
+      return "";
+    return `<section class="wms-surface"><h3>Zleć zwrot kolektorem</h3><p>Operator odbierze całą niewysłaną zawartość w skrzynce ${html(o.tote)} ze stanowiska ${html(o.returnStation)}. Samo zlecenie nie zmieni zapasu ani kontroli paczek.</p><form id="wms-putback-request" class="wms-form">${field("reason", "Dlaczego pobrania mają wrócić na półki")}<button>ZLEĆ ZWROT Z PAKOWANIA</button></form></section>`;
+  }
+  async function putbacks(turn) {
+    const data = await read(
+      `/api/wms/putback?q=${encodeURIComponent(query)}&offset=${offset}`,
+    );
+    if (turn !== generation) return;
+    el("wms-content").innerHTML =
+      `<section class="wms-surface"><h2>Zlecone zwroty z pakowania</h2><p>Operator kolektora odbiera wskazaną skrzynkę i zwraca policzone sztuki. Zlecenie powstaje w szczegółach wstrzymanego zamówienia.</p><form id="wms-putback-filter" class="wms-toolbar">${field("q", "Zamówienie lub skrzynka", "text", query)}<button>SZUKAJ</button></form>${data.rows.map((t) => `<article class="wms-stock-task"><strong>${html(t.reference)} · ${t.remaining} szt.</strong><p>${html(t.station)} · ${html(t.box)} · ${t.user_id ? "W trakcie zwrotu" : "Czeka na odbiór"}</p><p>${html(t.reason)}</p><button data-putback-order="${t.order_id}">OTWÓRZ ZAMÓWIENIE</button></article>`).join("") || "<p>Brak zleconych zwrotów.</p>"}${pager(data.total)}</section>`;
+    el("wms-putback-filter").elements.namedItem("q").required = false;
   }
   function amendForm(o) {
     if (
@@ -821,6 +853,13 @@ window.Wms = (() => {
       if (await stockWorkUi.click(button)) return;
       if (await inboundUi.click(button)) return;
       if (await handoffUi.click(button)) return;
+      if (button.dataset.putbackOrder) {
+        selected = Number(button.dataset.putbackOrder);
+        view = "orders";
+        shell();
+        await refresh();
+        return;
+      }
       if (button.dataset.dispatchOrderWms) {
         selected = Number(button.dataset.dispatchOrderWms);
         view = "orders";
@@ -997,6 +1036,28 @@ window.Wms = (() => {
       if (await stockWorkUi.submit(f, values)) return;
       if (await inboundUi.submit(f, values)) return;
       if (await handoffUi.submit(f, values)) return;
+      if (f.id === "wms-putback-filter") {
+        query = String(values.q);
+        offset = 0;
+        await refresh();
+        return;
+      }
+      if (f.id === "wms-putback-request" || f.id === "wms-putback-abort") {
+        const result = await mutate(
+          f.id === "wms-putback-request"
+            ? "/api/wms/putback"
+            : `/api/wms/putback/${current.putback.id}/abort`,
+          f.id === "wms-putback-request"
+            ? {
+                orderId: current.id,
+                version: current.version,
+                reason: values.reason,
+              }
+            : { version: current.putback.version, reason: values.reason },
+        );
+        if (result) await refresh();
+        return;
+      }
       if (f.id === "wms-dispatch-filter") {
         dispatchDay = values.day;
         query = values.q;

@@ -278,17 +278,40 @@ export function integrity(database: Db = db()) {
     `,
             )
             .all();
+    // Kopie sprzed zleconych zwrotów nie mają tej tabeli. Nowa kopia musi
+    // zachować wstrzymanie, fizyczną skrzynkę i pobrania otwartego zadania.
+    const hasPutback = database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='wms_putback'",
+      )
+      .get();
+    if (hasPutback && recoveryTables.length === 0)
+      throw new Error("Niepełny schemat zleconych zwrotów WMS");
+    const putback = hasPutback
+      ? database
+          .prepare(
+            `SELECT p.id,p.order_id,'stan zleconego zwrotu' AS problem FROM wms_putback p JOIN wms_order o ON o.id=p.order_id
+        WHERE (p.completed_at IS NOT NULL AND p.cancelled_at IS NOT NULL) OR (p.completed_at IS NULL AND p.cancelled_at IS NULL AND
+        (o.hold_reason IS NULL OR o.tote IS NULL OR o.tote<>p.box OR o.status NOT IN ('picking','picked','packing','packed')
+        OR NOT EXISTS(SELECT 1 FROM wms_line l WHERE l.order_id=o.id AND l.picked>0)
+        OR EXISTS(SELECT 1 FROM wms_shipment s WHERE s.order_id=o.id)
+        OR EXISTS(SELECT 1 FROM wms_pack_recovery r WHERE r.order_id=o.id AND r.completed_at IS NULL AND r.cancelled_at IS NULL)))`,
+          )
+          .all()
+      : [];
     database.exec("COMMIT");
     return {
       ok:
         balances.length === 0 &&
         reservations.length === 0 &&
         putaway.length === 0 &&
-        packingRecovery.length === 0,
+        packingRecovery.length === 0 &&
+        putback.length === 0,
       balances,
       reservations,
       putaway,
       packingRecovery,
+      putback,
     };
   } catch (e) {
     database.exec("ROLLBACK");

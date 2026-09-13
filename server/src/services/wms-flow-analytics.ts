@@ -28,6 +28,15 @@ const orderTiming =
   "FROM wms_order o LEFT JOIN wms_order_timing t ON t.order_id=o.id";
 const stages = [
   {
+    id: "putback",
+    label: "Zlecenie zwrotu → odłożenie pobrań",
+    unit: "zwroty",
+    start: "p.created_at",
+    end: "p.completed_at",
+    cohort: "p.completed_at",
+    from: "FROM wms_putback p",
+  },
+  {
     id: "allocation",
     label: "Zamówienie → rezerwacja",
     unit: "zamówienia",
@@ -127,6 +136,14 @@ export function flowAnalytics(d: Db, since: string, now: string) {
     return { id: stage.id, label: stage.label, unit: stage.unit, ...row };
   });
   const queues = [
+    {
+      id: "putback",
+      label: "Zlecone zwroty z pakowania",
+      unit: "skrzynki",
+      view: "putback",
+      source:
+        "SELECT created_at AS started,1 AS held FROM wms_putback WHERE completed_at IS NULL AND cancelled_at IS NULL",
+    },
     {
       id: "packing_recovery",
       label: "Wymiany części przy pakowaniu",

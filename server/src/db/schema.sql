@@ -3089,6 +3089,23 @@ CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
 
 
 -- Wymiana przy pakowaniu zachowuje dobrą zawartość i oddziela kwarantannę od pobrania zamiennika.
+-- Zlecenie zwrotu powstaje jawnie; samo wstrzymanie nie poleca ruszać zawartości skrzynki.
+CREATE TABLE IF NOT EXISTS wms_putback (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES wms_order(id),
+  box TEXT NOT NULL,
+  station TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  user_id INTEGER,
+  claimed_at TEXT,
+  completed_at TEXT,
+  cancelled_at TEXT,
+  version INTEGER NOT NULL DEFAULT 1 CHECK(version > 0)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_putback_open ON wms_putback(order_id) WHERE completed_at IS NULL AND cancelled_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS wms_pack_recovery (
   id INTEGER PRIMARY KEY,
   order_id INTEGER NOT NULL REFERENCES wms_order(id),

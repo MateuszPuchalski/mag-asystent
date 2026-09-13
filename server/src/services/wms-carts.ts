@@ -5,6 +5,7 @@ import { fillOrderReservations } from "./wms-stock-work.js";
 import { readSnapshot } from "./wms.js";
 import {
   applyOrderAction,
+  activePutback,
   command,
   getOrder,
   getWave,
@@ -622,6 +623,8 @@ export function detachCartBox(
       .get(id.parse(runId), input.box) as Assignment | undefined;
     if (!row) fail("Skrzynka nie jest na wskazanym wózku");
     const order = getOrder(row!.order_id);
+    if (activePutback(order.id))
+      fail("Skrzynka ma zlecony zwrot. Rozlicz go przed zmianą stanowiska");
     if (order.version !== input.version)
       fail("Zamówienie zmieniło się. Odśwież dane");
     if (actor.id !== order.picker_id && actor.id !== order.packer_id)

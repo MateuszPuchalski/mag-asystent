@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { activePutback } from "./wms.js";
 import { db, nowIso } from "../db/db.js";
 import {
   command,
@@ -203,6 +204,7 @@ function recordPackingIssue(
   kind: "damage" | "shortage",
 ) {
   const order = getOrder(input.orderId);
+  if (activePutback(order.id)) fail("Najpierw rozlicz zlecony zwrot skrzynki");
   if (order.version !== input.version || order.tote !== input.box)
     fail("Odśwież zamówienie i zeskanuj jego skrzynkę");
   if (!["packing", "packed"].includes(order.status) || order.shipments.length)

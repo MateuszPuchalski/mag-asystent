@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.313.0 — zlecony zwrot z pakowania
+
+Biuro może zlecić zwrot wstrzymanej skrzynki po przekazaniu do pakowania. Samo wstrzymanie nie powoduje zwrotu.
+Kolektor odbiera całą niewysłaną zawartość skanami stanowiska i skrzynki. Kontrola paczek jest cofana, a pozycja wózka zostaje zwolniona.
+Dopiero część, jawna ilość i skan półki przywracają zapas. Zwrot na inną półkę przenosi również rezerwację.
+Trzeci operator, częściowe odłożenie, oddanie reszty i ponowienie korzystają ze wspólnego dziennika WMS.
+Zakończenie zostawia wstrzymanie dla decyzji biura. Analityka pokazuje wiek kolejki i czas realizacji zleceń.
+
+**[wymaga działania]** Wykonać zweryfikowaną kopię bazy, build i restart API. Odświeżyć Biuro oraz zaktualizować APK.
+Start dodaje tabelę zleconych zwrotów. Stare dane i pobrania nie są automatycznie zmieniane.
+Odbiór obejmuje wyłącznie seeded; fizyczny kolektor wymaga osobnej próby.
+
 ## 0.312.1 — skan półki nie potwierdza skrzynki
 
 - Korekta pakowania oraz dostarczenie zamiennika wymagają kodu skrzynki. Prefiks `LOC:` nie zamienia skanu półki w potwierdzenie pojemnika o podobnym kodzie.

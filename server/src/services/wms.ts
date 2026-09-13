@@ -25,6 +25,21 @@ export class WmsError extends Error {
     super(message);
   }
 }
+export function activePutback(orderId: number) {
+  return db()
+    .prepare(
+      "SELECT id,user_id,version,station,reason FROM wms_putback WHERE order_id=? AND completed_at IS NULL AND cancelled_at IS NULL",
+    )
+    .get(orderId) as
+    | {
+        id: number;
+        user_id: number | null;
+        version: number;
+        station: string;
+        reason: string;
+      }
+    | undefined;
+}
 const fail = (message: string, status = 409): never => {
   throw new WmsError(status, message);
 };
@@ -1042,6 +1057,13 @@ function readOrder(orderId: number) {
     shipment: shipments[0] ?? null,
     shipments,
     packingContents: packingContents(orderId),
+    putback: activePutback(orderId) ?? null,
+    returnStation:
+      d
+        .prepare(
+          "SELECT station_code FROM wms_cart_assignment WHERE order_id=? AND ended_at IS NULL AND handed_at IS NOT NULL",
+        )
+        .get(orderId)?.station_code ?? null,
     packingRecovery:
       d
         .prepare(
@@ -1106,11 +1128,24 @@ export function applyOrderAction(
   actor: Actor,
   orderId: number,
   input: z.infer<typeof actionInput>,
+  putbackId?: number,
 ) {
   const d = db();
   if (!d.isTransaction)
     throw new Error("Operacja WMS wymaga transakcji command");
   const order = getOrder(orderId);
+  const putback = activePutback(orderId);
+  if (
+    putback &&
+    !(
+      input.action === "return" &&
+      putbackId === putback.id &&
+      putback.user_id === actor.id
+    )
+  )
+    fail("Najpierw rozlicz zlecony zwrot z pakowania");
+  if (putbackId !== undefined && !putback)
+    fail("Zlecenie zwrotu zostało zakończone");
   if (order.version !== input.version)
     fail(
       input.action === "pick"
@@ -1277,7 +1312,8 @@ export function applyOrderAction(
       if (
         actor.role === "magazynier" &&
         actor.id !== order.picker_id &&
-        actor.id !== order.packer_id
+        actor.id !== order.packer_id &&
+        putback?.user_id !== actor.id
       )
         fail("Towar może odłożyć osoba przypisana do zamówienia", 403);
     }

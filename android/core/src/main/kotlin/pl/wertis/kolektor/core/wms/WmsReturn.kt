@@ -34,6 +34,14 @@ fun returnQuantity(task: WmsReturnTask, scan: WmsReturnScan, raw: String): WmsRe
 }
 
 data class WmsReturnResult(val state: WmsReturnScan, val command: WmsDraft? = null)
+fun returnDestination(task:WmsReturnTask,scan:WmsReturnScan,code:String):String {
+    val target=code.uppercase()
+    require(target.matches(Regex("[A-Z0-9][A-Z0-9-]{0,29}"))) { "Zeskanuj kod półki" }
+    require(scan.alternative || task.source_mode != "pick" || target == task.bin) { "Zeskanuj ${task.bin} albo wybierz inną półkę" }
+    require(task.source_mode == "pick" || target != task.bin) { "Pierwotna półka nie służy do kompletacji. Wybierz inną" }
+    require(scan.quantity != null && scan.quantity in 1..task.remaining) { "Ilość przekracza pozostałe pobranie" }
+    return target
+}
 fun returnScan(run: WmsRun, task: WmsReturnTask, userId: Long, scan: WmsReturnScan, raw: String): WmsReturnResult {
     require(run.picker_id == userId && run.arrived_at == null && run.closed_at == null && task in run.returns) { "Odśwież zwroty z własnego wózka" }
     require(task.remaining > 0 && task.position in 1..30 && task.hold_reason.isNotBlank()) { "Brak pobrań do odłożenia" }
@@ -50,11 +58,7 @@ fun returnScan(run: WmsRun, task: WmsReturnTask, userId: Long, scan: WmsReturnSc
         }
         WmsReturnStage.QUANTITY -> throw IllegalArgumentException("Najpierw policz i potwierdź ilość")
         WmsReturnStage.BIN -> {
-            val target = code.uppercase()
-            require(target.matches(Regex("[A-Z0-9][A-Z0-9-]{0,29}"))) { "Zeskanuj kod półki" }
-            require(scan.alternative || task.source_mode != "pick" || target == task.bin) { "Zeskanuj ${task.bin} albo wybierz inną półkę" }
-            require(task.source_mode == "pick" || target != task.bin) { "Pierwotna półka nie służy do kompletacji. Wybierz inną" }
-            require(scan.quantity!! in 1..task.remaining) { "Ilość przekracza pozostałe pobranie" }
+            val target = returnDestination(task,scan,code)
             // Numer trasy utrzymuje istniejący dziennik i odświeżenie bez osobnej kolejki zapisu.
             WmsReturnResult(scan, WmsDraft("api/wms/orders/${task.order_id}/actions", buildJsonObject {
                 put("action", "return"); put("version", task.version); put("allocationId", task.allocation_id); put("runId", run.id)

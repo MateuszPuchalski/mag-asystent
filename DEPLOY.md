@@ -15,6 +15,11 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.313.0 dostępne są zlecone zwroty z pakowania. Przed aktualizacją rozliczyć oczekujące zapisy i wykonać zweryfikowaną kopię bazy.
+Wykonać build, restart API, odświeżyć Biuro i zaktualizować APK. Start dodaje tabelę `wms_putback` bez automatycznego tworzenia zadań.
+Odbiór seeded: częściowe pakowanie → wstrzymanie → zlecenie Biura → odbiór skrzynki → częściowe odłożenie → zakończenie → decyzja biura.
+Sprawdzić utratę odpowiedzi i ponowienie, zwolnienie wózka, zachowanie rezerwacji oraz kontrolę kopii.
+
 Poprawka 0.312.1 wymaga builda, restartu API, odświeżenia Biura i aktualizacji APK. Nie zmienia API ani bazy.
 Etykieta skrzynki ma zawierać dokładny kod przypisanej skrzynki; `LOC:` oznacza półkę. Wymiana nie przyjmuje już prefiksu półki przy potwierdzeniu skrzynki.
 Odbiór seeded: półka i skrzynka o jednakowym kodzie → skan `LOC:` odrzucony w polu skrzynki → właściwa skrzynka przyjęta.

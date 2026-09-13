@@ -6,6 +6,28 @@ Przyjęcia dokumentowe, zwroty i obsługa klienta zachowują dotychczasowe ekran
 WMS prowadzi cały przebieg samodzielnie, bez konta, abonamentu ani API Sellasist.
 Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłącznie dane seeded.
 
+## Zlecony zwrot z pakowania
+
+Samo wstrzymanie zamówienia nie oznacza zwrotu. Poprawa adresu nie powinna wymuszać ponownego zbierania wszystkich części.
+Jeśli niewysłane pobrania mają wrócić na półki, Biuro otwiera problem zamówienia i wybiera **ZLEĆ ZWROT Z PAKOWANIA**.
+Wymagane są wstrzymanie, przekazana skrzynka, pobrane sztuki oraz brak czynnych etykiet i wymiany.
+Zlecenie zachowuje stan półek oraz kontrolę paczek do fizycznego odbioru skrzynki.
+
+Na kolektorze wybierz **ZWROTY Z PAKOWANIA — ZLECONE**. Zadanie może podjąć inny magazynier niż zbierający lub pakujący.
+Przełóż całą niewysłaną zawartość zamówienia do wskazanej skrzynki. Skan stanowiska i skrzynki potwierdza jej odbiór.
+Ten zapis cofa kontrolę paczek, zachowuje historię zawartości i zwalnia pozycję wózka. Zapas nadal pozostaje poza półkami.
+Następnie skanuj część → wpisz policzoną ilość → odłóż i zeskanuj półkę. Można wybrać inną półkę kompletacji.
+Każda partia wraca wraz z rezerwacją na rzeczywisty cel. Ostatnia partia kończy zadanie; zamówienie pozostaje wstrzymane dla biura.
+
+Nieznany wynik zapisu wymaga **PONÓW**, bez ponownego przenoszenia tej samej partii. Restart zachowuje komendę i klucz.
+Powrót po pauzie lub ponowieniu wymaga świeżego skanu skrzynki. Kolejne potwierdzone partie tej samej sesji zachowują wybór skrzynki.
+Zwolnienie zadania wymaga oddania reszty na pierwotne stanowisko, skanu stanowiska i skrzynki oraz powodu.
+Nie zabieraj już potwierdzonych partii z półek. Biuro może przerwać wyłącznie niepodjęte zlecenie; wstrzymanie i nierozliczone pobrania pozostają.
+Uszkodzeń lub brakujących fizycznie części nie odkładaj jako dobrego zapasu. Oddaj resztę i przekaż rozbieżność do biura.
+
+Kolejka pokazuje stanowisko, skrzynkę i pozostałe sztuki. Analityka mierzy wiek zleceń oraz czas zlecenie → zakończenie.
+Ten czas obejmuje oczekiwanie i przerwy; nie jest pomiarem pracy operatora.
+
 ## Uszkodzona część przy pakowaniu
 
 Pakujący otwiera **Uszkodzona część — odłóż do kwarantanny** w zamówieniu.

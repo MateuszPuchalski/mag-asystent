@@ -4,6 +4,7 @@ import * as StockWork from "../services/wms-stock-work.js";
 import * as Counting from "../services/wms-counting.js";
 import * as Inbound from "../services/wms-inbound.js";
 import * as Recovery from "../services/wms-pack-recovery.js";
+import * as Putback from "../services/wms-putback.js";
 import * as Putaway from "../services/wms-putaway.js";
 import * as Handoff from "../services/wms-dispatch.js";
 import { ZodError, z } from "zod";
@@ -78,6 +79,35 @@ export async function wmsRoutes(app: FastifyInstance) {
   app.get("/api/wms/packing-recovery", async (req) =>
     Recovery.recoveryWork(actor(), req.query),
   );
+  app.get("/api/wms/putback", async (req) =>
+    Putback.putbackQueue(actor(), req.query),
+  );
+  app.post("/api/wms/putback", async (req) =>
+    Putback.requestPutback(
+      actor(),
+      String(req.headers["idempotency-key"] ?? ""),
+      req.body,
+    ),
+  );
+  app.get<{ Params: { id: string } }>("/api/wms/putback/:id", async (req) =>
+    Putback.putbackTask(actor(), orderId(req.params.id)),
+  );
+  for (const [name, action] of Object.entries({
+    claim: Putback.claimPutback,
+    finish: Putback.finishPutback,
+    release: Putback.releasePutback,
+    abort: Putback.abortPutback,
+  }))
+    app.post<{ Params: { id: string } }>(
+      `/api/wms/putback/:id/${name}`,
+      async (req) =>
+        action(
+          actor(),
+          String(req.headers["idempotency-key"] ?? ""),
+          orderId(req.params.id),
+          req.body,
+        ),
+    );
   app.get<{ Params: { id: string } }>(
     "/api/wms/packing-recovery/:id",
     async (req) => Recovery.recoveryTask(actor(), orderId(req.params.id)),

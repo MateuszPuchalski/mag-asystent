@@ -18,6 +18,10 @@ import okhttp3.OkHttpClient
 import pl.wertis.kolektor.core.net.WertisJson
 import pl.wertis.kolektor.core.net.naglowekHttp
 import pl.wertis.kolektor.core.session.userId
+import pl.wertis.kolektor.core.wms.WmsPutbackController
+import pl.wertis.kolektor.core.wms.WmsPutbackTransport
+import pl.wertis.kolektor.core.wms.WmsPutbackTask
+import pl.wertis.kolektor.core.wms.WmsPutbackQueue
 import pl.wertis.kolektor.core.wms.WmsRecoveryController
 import pl.wertis.kolektor.core.wms.WmsRecoveryTransport
 import pl.wertis.kolektor.core.wms.WmsRecoveryTask
@@ -64,6 +68,12 @@ interface WmsApi {
 
     @GET("api/wms/cart-runs/{id}")
     suspend fun run(@Path("id") id: Long): WmsRun
+
+    @GET("api/wms/putback")
+    suspend fun putbackQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsPutbackQueue
+
+    @GET("api/wms/putback/{id}")
+    suspend fun putbackTask(@Path("id") id: Long): WmsPutbackTask
 
     @GET("api/wms/packing-recovery")
     suspend fun recoveryQueue(@Query("q") query: String, @Query("offset") offset: Int): WmsRecoveryQueue
@@ -217,6 +227,18 @@ class WmsRepository(context: Context, private val settings: SettingsRepository, 
         object : WmsRecoveryTransport {
             override suspend fun queue(query: String, offset: Int) = apiCall { api.recoveryQueue(query, offset) }
             override suspend fun recoveringTask(id: Long) = apiCall { api.recoveryTask(id) }
+            override suspend fun send(command: WmsPending): Long {
+                val result = apiCall { api.command(command.path, command.key, command.body) }
+                return result["id"]?.jsonPrimitive?.longOrNull ?: error("Brak numeru zadania w odpowiedzi")
+            }
+        }
+    })
+
+    val putback = WmsPutbackController(store, lock = writeLock, transport = { bound ->
+        val api = api(bound)
+        object : WmsPutbackTransport {
+            override suspend fun queue(query: String, offset: Int) = apiCall { api.putbackQueue(query, offset) }
+            override suspend fun putbackTask(id: Long) = apiCall { api.putbackTask(id) }
             override suspend fun send(command: WmsPending): Long {
                 val result = apiCall { api.command(command.path, command.key, command.body) }
                 return result["id"]?.jsonPrimitive?.longOrNull ?: error("Brak numeru zadania w odpowiedzi")
