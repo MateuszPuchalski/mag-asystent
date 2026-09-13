@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import pl.wertis.kolektor.core.net.DziennikCiszy
 import pl.wertis.kolektor.core.net.QueueResponse
+import pl.wertis.kolektor.core.net.powodOdmowy
 import pl.wertis.kolektor.net.ApiService
 import pl.wertis.kolektor.net.apiCall
 
@@ -21,7 +23,14 @@ import pl.wertis.kolektor.net.apiCall
    Polling działa tylko gdy aplikacja jest na wierzchu (ProcessLifecycle).
    refreshNow() po każdym zapisie = odpowiednik inwalidacji query.            */
 
-class QueueRepository(private val api: ApiService, scope: CoroutineScope) {
+/**
+ * @param dziennik zapis przerw w łączności — patrz komentarz przy pętli niżej.
+ */
+class QueueRepository(
+    private val api: ApiService,
+    scope: CoroutineScope,
+    private val dziennik: DziennikCiszy = DziennikCiszy(),
+) {
     private val _queue = MutableStateFlow<QueueResponse?>(null)
     val queue: StateFlow<QueueResponse?> = _queue
 
@@ -36,6 +45,17 @@ class QueueRepository(private val api: ApiService, scope: CoroutineScope) {
     val serwerMilczy: StateFlow<Boolean> = _serwerMilczy
     private var porazkiZRzedu = 0
 
+    /* ── Dziennik przerw (0.323.0) ───────────────────────────────────────────
+       Ta pętla jest JEDYNYM miejscem, które puka do serwera co 1,5 s przez całą
+       zmianę — czyli jedynym, które wie, kiedy łączność znika i kiedy wraca.
+       Baner mówi o tym TERAZ i gaśnie bez śladu, więc pytanie właściciela
+       („czy wraca sama, czy trzeba przełączyć Wi-Fi?") nie miało dotąd żadnej
+       odpowiedzi poza czyjąś pamięcią.
+
+       Zapis nie dokłada ANI JEDNEGO żądania: bierze wynik, który i tak tu jest.
+       Czyta go ekran POŁĄCZENIE z Ustawień. */
+    val dziennikCiszy: DziennikCiszy get() = dziennik
+
     private val kick = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     init {
@@ -46,10 +66,12 @@ class QueueRepository(private val api: ApiService, scope: CoroutineScope) {
                         _queue.value = apiCall { api.queue() }
                         porazkiZRzedu = 0
                         _serwerMilczy.value = false
-                    } catch (_: Exception) {
+                        dziennik.sukces(System.currentTimeMillis())
+                    } catch (e: Exception) {
                         /* offline / serwer w restarcie — pastylka trzyma ostatni stan */
                         porazkiZRzedu++
                         if (porazkiZRzedu >= PROG_MILCZENIA) _serwerMilczy.value = true
+                        dziennik.porazka(System.currentTimeMillis(), powodOdmowy(e))
                     }
                     // czekaj 1.5 s ALBO obudź się natychmiast po refreshNow()
                     withTimeoutOrNull(1500) { kick.first() }

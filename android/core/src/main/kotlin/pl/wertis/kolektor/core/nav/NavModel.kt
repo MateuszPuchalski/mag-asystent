@@ -24,6 +24,8 @@ enum class Screen {
     WMS_PICKING, WMS_PUTAWAY, WMS_RECEIVING, WMS_COUNTING, WMS_REPLENISHMENT, WMS_RECOVERY, WMS_PUTBACK,
     // zakładanie kont: pierwsze uruchomienie ORAZ dopisywanie osób przez biuro
     SETUP,
+    // diagnostyka łączności: co widzi kolektor, gdy „nie widzi serwera"
+    POLACZENIE,
 }
 
 private val BACK: Map<Screen, Screen> = mapOf(
@@ -45,6 +47,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     Screen.WMS_PUTBACK to Screen.HOME,
     // z kreatora wraca się do ustawień; przy pustej instalacji nie ma dokąd
     Screen.SETUP to Screen.SETTINGS,
+    Screen.POLACZENIE to Screen.SETTINGS,
 )
 
 /** Cel przycisku wstecz; null = brak (splash i home pokazują logo). */
@@ -76,4 +79,5 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.WMS_RECOVERY to "WYMIANY DO PAKOWANIA",
     Screen.WMS_PUTBACK to "ZWROTY Z PAKOWANIA",
     Screen.SETUP to "KONTA",
+    Screen.POLACZENIE to "POŁĄCZENIE",
 )

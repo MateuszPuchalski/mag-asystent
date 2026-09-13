@@ -15,6 +15,9 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+W 0.324.0 połączono WMS z diagnostyką łączności z main `ef9237e2`. Wykonać kopię, build i restart API, następnie zaktualizować APK.
+Brak migracji WMS. Przed aktualizacją rozliczyć oczekujące zapisy, bez czyszczenia danych kolektora.
+
 W 0.322.1 APK pokazuje bieżący krok przed listą miejsc odkładania. Dalsze miejsca rozwija przycisk; przejście kroku wraca do instrukcji.
 To samo zachowanie obowiązuje przy przyjęciu bezpośrednio na półkę. Przyjęcie do bufora i kwarantanny nie pokazuje podpowiedzi półek.
 Brak zmiany API lub bazy względem 0.322.0. Odbiór seeded: ilość, błąd, osiem miejsc, rozwinięcie, kolejny skan oraz częściowe odłożenie.
@@ -499,6 +502,36 @@ netsh advfirewall firewall set rule name="WERTIS kolektor" new remoteip=192.168.
 Sama aplikacja radzi sobie z przeskokiem AP od 0.60.4: przy zmianie sieci
 porzuca gniazda otwarte do poprzedniego punktu. Wcześniej trzeba było ręcznie
 rozłączyć i połączyć Wi-Fi.
+
+#### Kolektor sam mówi, co widzi (0.323.0)
+
+**Ustawienia → DIAGNOSTYKA POŁĄCZENIA.** Ekran powstał z pytania właściciela
+o przeskoki między punktami dostępowymi. Pytanie było dobre i nie dało się na
+nie odpowiedzieć: przyczyny z tego rozdziału wyglądają na ekranie identycznie.
+
+Ekran mówi trzy rzeczy i żadnej nie zmienia:
+
+1. **Serwer** — czy odpowiedział, po ilu milisekundach i w jakiej wersji.
+   Odmowa dostaje zdanie zamiast kodu błędu, bo każda prowadzi gdzie indziej.
+   Cisza to zapora albo izolacja klientów. Odrzucone połączenie to zły port
+   albo zgaszony serwer. Nieznana nazwa to DNS, brak trasy to druga sieć.
+2. **Droga do serwera** — rodzaj sieci, adres kolektora, interfejs i DNS.
+   Gdy serwer jest podany adresem IP, ekran porównuje podsieci sam i pisze
+   wprost, że są różne. Przy adresie podanym nazwą milczy, bo porównania nie
+   ma — zgadnięty werdykt kazałby przestawiać sieć, która jest dobra.
+3. **Przerwy w łączności** — kiedy się zaczęła, ile trwała, ile było prób
+   i z jakim powodem. To odpowiedź na pytanie „czy wraca sama, czy trzeba
+   przełączyć Wi-Fi". Zapisuje się sama, więc nikt nie musi jej pamiętać.
+
+Przerwy bierze się z pytania o kolejkę Sfery, które kolektor i tak wysyła co
+półtorej sekundy — ani jednego żądania więcej. Zapis żyje w pamięci aplikacji,
+do jej zamknięcia, i nigdzie nie jedzie.
+
+**Czego ekran NIE wie.** Nazwy sieci (SSID) ani punktu dostępowego (BSSID) —
+od Androida 8 wymagają uprawnienia do lokalizacji, a pytanie o nie w alejce
+kosztuje więcej, niż niesie odpowiedź. Przeskok między punktami tej samej
+podsieci jest więc dla kolektora niewidoczny; widać dopiero jego SKUTEK,
+czyli przerwę na liście.
 
 ### Sieć gościnna: adres jest, serwera nie ma
 
