@@ -832,6 +832,38 @@ export const config = {
      * na pytanie „czy da się kliknąć".
      */
     klucz: Boolean(process.env.ANTHROPIC_API_KEY),
+    /**
+     * SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
+     *
+     * Domyślnie WYŁĄCZONY, i to nie jest ostrożność na zapas. Przełącznik
+     * automatycznych szkiców istniał już raz, w 0.107.0, i stał na zerze
+     * „świadomie, bo o to poprosił właściciel" (komentarz przy migracji
+     * `ai_config`). Wraca na prośbę właściciela, ale wraca wyłączony: włączenie
+     * czegoś, co wydaje pieniądze bez kliknięcia, ma być decyzją podjętą przy
+     * `wertis.env`, a nie skutkiem ubocznym aktualizacji.
+     */
+    autoSzkic: process.env.COPILOT_AUTO_SZKIC === "1",
+    /**
+     * Rytm własny, NIE doklejony do taktu skrzynki. Układanie szkicu trwa
+     * sekundy na rozmowę (model plus dociągnięcie treści oferty), więc wpięte
+     * w takt skrzynki opóźniałoby pobieranie wiadomości o tyle, ile trwa
+     * partia szkiców. Skrzynka ma chodzić równo niezależnie od tego, ile
+     * szkiców czeka.
+     */
+    autoMs: Math.max(60_000, Number(process.env.COPILOT_AUTO_MS ?? 300_000) || 300_000),
+    /**
+     * Ile szkiców na JEDEN przebieg. Ten sam rodzaj hamulca co `maxPartia`
+     * przy klasyfikacji i z tego samego powodu: pierwsze uruchomienie na
+     * koncie z zaległą skrzynką ma do nadrobienia wszystko naraz.
+     */
+    autoNaPrzebieg: Math.max(1, Number(process.env.COPILOT_AUTO_NA_PRZEBIEG ?? 5) || 5),
+    /**
+     * Twardy sufit na godzinę, liczony z księgi wywołań — łącznie z tymi,
+     * które skończyły się BŁĘDEM, bo nieudane wywołanie też kosztuje.
+     * Bez tego sufitu awaria powtarzająca wiadomości albo fala pytań płaci
+     * się sama, a rachunek przychodzi po fakcie.
+     */
+    autoNaGodzine: Math.max(1, Number(process.env.COPILOT_AUTO_NA_GODZINE ?? 30) || 30),
   },
 
 };
