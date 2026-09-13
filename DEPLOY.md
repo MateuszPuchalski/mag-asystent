@@ -15,6 +15,11 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.319.0 Biuro wycofuje fizycznie sprawdzoną pustą skrzynkę bez anulowania zamówienia. Wymagane są skany aktualnego miejsca i skrzynki oraz uzasadnienie.
+Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Nie ma nowej tabeli ani automatycznej zmiany istniejących przydziałów.
+Odbiór seeded: brak przed pierwszym pobraniem, przekazanie pustej skrzynki, wycofanie, ponowienie i zmiana ilości.
+Zapas nie może się zmienić; zamówienie i kontrola półki pozostają wstrzymane do osobnych decyzji.
+
 Od 0.318.0 Biuro zamyka dawne zgłoszenie zbiórki po udokumentowanym pełnym zwrocie, bez skanu odłączonej skrzynki.
 Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Nie ma nowej tabeli ani automatycznej decyzji dla istniejących zamówień.
 Odbiór: zwrócić pobrania wstrzymanego zamówienia, zamknąć zgłoszenie, zmienić ilość i sprawdzić niezależną kontrolę półki.

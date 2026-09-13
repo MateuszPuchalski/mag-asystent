@@ -490,6 +490,7 @@ window.Wms = (() => {
       );
     if (o.hold_reason)
       return (
+        emptyCartBoxForm(o) +
         (office() && o.returnedPickException
           ? `<section class="wms-surface"><h3>Pobrania rozliczone · decyzja biura</h3><p>Skrzynka została zwolniona po zwrocie. Zgłoszenie: ${html(o.returnedPickException.reason)}.</p><p>${o.returnedPickException.stock_check_open ? `Półka ${html(o.returnedPickException.bin)} nadal czeka na przeliczenie w Zadaniach zapasu.` : "Zwrot nie zmienia wyniku kontroli półki."} Zamówienie pozostanie wstrzymane do osobnej decyzji.</p><form id="wms-returned-exception" class="wms-form">${field("reason", "Uzasadnienie zamknięcia zgłoszenia", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZAMKNIJ ZGŁOSZENIE PO ZWROCIE</button></form></section>`
           : "") +
@@ -588,7 +589,10 @@ window.Wms = (() => {
         ? []
         : [
             !o.hold_reason ? ["hold", "Wstrzymaj — brak / uszkodzenie"] : null,
-            office() && o.hold_reason && !o.returnedPickException
+            office() &&
+            o.hold_reason &&
+            !o.returnedPickException &&
+            !(o.status === "picking" && o.returnStation)
               ? ["resume", "Wznów po wyjaśnieniu"]
               : null,
             office() &&
@@ -617,6 +621,11 @@ window.Wms = (() => {
           )
         : "";
     return `<details><summary>Problem, przejęcie lub anulowanie</summary>${putbackHistory(o)}${putbackForm(o)}${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
+  }
+  function emptyCartBoxForm(o) {
+    const box = o.emptyCartBox;
+    if (!office() || !box) return "";
+    return `<section class="wms-surface"><h3>Wycofaj pustą skrzynkę do zmiany zamówienia</h3><p>Sprawdź skrzynkę ${html(o.tote)} ${box.at === "cart" ? `na pozycji ${box.position} wózka` : "przy stanowisku"} ${html(box.place)}. Jeśli są w niej części, przerwij wycofanie i wyjaśnij zawartość.</p><p>Zamówienie pozostanie wstrzymane. Rezerwacje oraz kontrola podejrzanej półki pozostają do osobnej decyzji.</p><form id="wms-empty-box" class="wms-form">${field("place", box.at === "cart" ? "1. Skan wózka" : "1. Skan stanowiska")}${field("box", "2. Skan pustej skrzynki")}<label><input type="checkbox" name="emptyConfirmed" required> Sprawdzono: skrzynka jest fizycznie pusta.</label>${field("reason", "3. Powód wycofania", "text", "", 'minlength="3" maxlength="500"')}<button class="primary">ZWOLNIJ SKRZYNKĘ, ZACHOWAJ ZAMÓWIENIE</button></form></section>`;
   }
   function putbackForm(o) {
     if (o.putback)
@@ -1055,6 +1064,19 @@ window.Wms = (() => {
       if (await stockWorkUi.submit(f, values)) return;
       if (await inboundUi.submit(f, values)) return;
       if (await handoffUi.submit(f, values)) return;
+      if (f.id === "wms-empty-box") {
+        const result = await mutate("/api/wms/cart-box-withdraw", {
+          orderId: current.id,
+          version: current.version,
+          at: current.emptyCartBox.at,
+          place: values.place,
+          box: values.box,
+          emptyConfirmed: values.emptyConfirmed === "on",
+          reason: values.reason,
+        });
+        if (result) await refresh();
+        return;
+      }
       if (f.id === "wms-returned-exception") {
         const result = await mutate("/api/wms/pick-exceptions/resolve", {
           orderId: current.id,
@@ -1453,6 +1475,15 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.form?.id === "wms-empty-box") {
+      const next = {
+        place: "box",
+        box: "emptyConfirmed",
+        emptyConfirmed: "reason",
+      }[event.target.name];
+      if (next) advanceScan(event, next);
+      return;
+    }
     if (
       event.key === "Enter" &&
       event.target.form?.dataset.actionWms === "return"

@@ -8,6 +8,13 @@ Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłączni
 
 ## Zlecony zwrot z pakowania
 
+Gdy niczego nie pobrano albo wszystkie pobrania już odłożono, Biuro może wycofać pustą skrzynkę bez anulowania zamówienia.
+W szczegółach wstrzymanego zamówienia skanuje obecny wózek lub stanowisko, następnie skrzynkę, potwierdza jej fizyczną pustkę i podaje powód.
+Zmiana miejsca wymaga nowych skanów. WMS odrzuca decyzję przy pobraniach, paczkach i aktywnym zadaniu zwrotu lub wymiany.
+Zamówienie pozostaje wstrzymane; rezerwacje i kontrola podejrzanej półki czekają na osobną decyzję.
+Przydział skrzynki kończy się bez ruchu zapasu. Pusta skrzynka zachowuje stałą pozycję, jeżeli nadal jest do niej przypisana.
+Historia zakończonej pozycji otwiera aktualne zamówienie. Nie pokazuje dawnych działań jako dostępnych dla nowego przydziału.
+
 Po pełnym rozliczeniu zwrotu Biuro może zamknąć dawne zgłoszenie zbiórki w szczegółach zamówienia.
 Nie skanuje zwolnionej skrzynki, która może już obsługiwać inną pracę. Wpisuje uzasadnienie zamknięcia.
 Zamówienie pozostaje wstrzymane, a kontrola podejrzanej półki pozostaje otwarta. Potem Biuro zmienia zamówienie lub podejmuje osobną decyzję o dalszej realizacji.

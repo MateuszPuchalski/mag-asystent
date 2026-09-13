@@ -112,7 +112,7 @@ window.WmsCarts = (h) => {
     const slots = run.assignments
       .map((a) => {
         const o = run.orders.find((o) => o.id === a.order_id);
-        return `<button class="wms-cart-slot ${a.order_id === task?.order_id ? "current" : ""} ${o?.hold_reason ? "held" : ""}" data-cart-position="${a.position}" ${a.order_id === task?.order_id ? 'aria-current="step"' : ""}><strong>${a.position}</strong><span>${html(a.box_barcode)}</span><small>${a.released_at ? "Przekazana" : o?.hold_reason ? "Wyjątek" : o?.status === "picked" ? "Zebrana" : o?.status === "shipped" ? "Wysłana" : "W trasie"}</small></button>`;
+        return `<button class="wms-cart-slot ${a.order_id === task?.order_id ? "current" : ""} ${o?.hold_reason ? "held" : ""}" data-cart-position="${a.position}" ${a.order_id === task?.order_id ? 'aria-current="step"' : ""}><strong>${a.position}</strong><span>${html(a.box_barcode)}</span><small>${a.ended_at ? "Zakończona" : a.released_at ? "Przekazana" : o?.hold_reason ? "Wyjątek" : o?.status === "picked" ? "Zebrana" : o?.status === "shipped" ? "Wysłana" : "W trasie"}</small></button>`;
       })
       .join("");
     panel(`<div class="wms-actions"><button data-cart-action="list">WSZYSTKIE WÓZKI</button><button data-cart-action="reload">ODŚWIEŻ TRASĘ</button></div><h2>${html(run.cart_code)} · ${run.assigned_count}/${run.capacity} pozycji</h2>
@@ -143,6 +143,13 @@ window.WmsCarts = (h) => {
   function positionDetail(position) {
     const a = run.assignments.find((a) => a.position === position),
       o = run.orders.find((o) => o.id === a.order_id);
+    // Zamówienie może już należeć do nowej trasy. Historia pozycji nie powinna udawać aktywnej skrzynki.
+    if (a.ended_at || !o) {
+      panel(
+        `<button data-cart-action="reload">WRÓĆ DO TRASY</button><h2>Pozycja ${a.position} · ${html(a.box_barcode)}</h2><p>Przydział zakończony. Otwórz aktualne zamówienie, aby sprawdzić dalszą realizację.</p><button data-cart-order="${a.order_id}">SZCZEGÓŁY ZAMÓWIENIA</button>`,
+      );
+      return;
+    }
     panel(`<button data-cart-action="reload">WRÓĆ DO TRASY</button><h2>Pozycja ${a.position} · ${html(a.box_barcode)}</h2><p>${html(o.reference)}${o.hold_reason ? ` · ${html(o.hold_reason)}` : ""}</p><button data-cart-order="${o.id}">SZCZEGÓŁY ZAMÓWIENIA</button>
       ${!a.released_at && !a.ended_at ? `<details><summary>Przekaż samą skrzynkę</summary><p>Po przekazaniu ta pozycja będzie pusta. Skrzynka zachowa przypisane zamówienie.</p><form id="wms-cart-detach" data-position="${position}" class="wms-form">${field("box", "Skan skrzynki")}${field("station", o.hold_reason ? "Skan stanowiska wyjątków" : "Skan stanowiska pakowania")}<button>PRZEKAŻ SKRZYNKĘ</button></form></details>` : ""}
       ${!a.handed_at && !a.ended_at ? `<details><summary>Wymień pełną skrzynkę</summary><form id="wms-cart-replace" data-position="${position}" class="wms-form">${field("oldBox", "Skan obecnej skrzynki")}${field("newBox", "Skan pustej, większej skrzynki")}${field("reason", "Powód wymiany")}<label><input type="checkbox" name="transferConfirmed" required> Cała zawartość została przełożona na tę samą pozycję wózka.</label><button>POTWIERDŹ WYMIANĘ</button></form></details>` : ""}

@@ -950,6 +950,59 @@ export function replaceCartBox(
   });
 }
 
+export function withdrawEmptyCartBox(actor: Actor, key: string, raw: unknown) {
+  manager(actor);
+  const input = z
+    .object({
+      orderId: id,
+      version,
+      box: code,
+      at: z.enum(["cart", "station"]),
+      place: code,
+      emptyConfirmed: z.literal(true),
+      reason,
+    })
+    .strict()
+    .parse(raw);
+  return command(key, actor, "cart_empty_withdraw", input, () => {
+    const order = getOrder(input.orderId),
+      assignment = order.emptyCartBox;
+    if (order.version !== input.version)
+      fail("Zamówienie zmieniło się. Odśwież przed sprawdzeniem skrzynki");
+    if (!assignment)
+      fail(
+        "Wycofanie wymaga wstrzymanej pustej skrzynki bez aktywnego zwrotu, wymiany ani paczek",
+      );
+    if (
+      assignment!.at !== input.at ||
+      assignment!.place !== input.place ||
+      assignment!.box_barcode !== input.box
+    )
+      fail(
+        "Skrzynka zmieniła miejsce albo zeskanowano inny kod. Odśwież i sprawdź jej aktualne miejsce",
+      );
+    const now = nowIso();
+    // Oddzielamy treść zamówienia od pustego nośnika. Rezerwacje i podejrzana półka zachowują własne rozliczenie.
+    db()
+      .prepare(
+        "UPDATE wms_cart_assignment SET released_at=coalesce(released_at,?),ended_at=? WHERE order_id=? AND ended_at IS NULL",
+      )
+      .run(now, now, order.id);
+    db().prepare("DELETE FROM wms_wave_order WHERE order_id=?").run(order.id);
+    db()
+      .prepare(
+        "UPDATE wms_pick_exception SET resolved_at=?,resolution=? WHERE order_id=? AND resolved_at IS NULL",
+      )
+      .run(now, input.reason, order.id);
+    db()
+      .prepare(
+        "UPDATE wms_order SET status='allocated',tote=NULL,picker_id=NULL,packer_id=NULL,version=version+1,updated_at=? WHERE id=?",
+      )
+      .run(now, order.id);
+    return getOrder(order.id);
+  });
+}
+
 export function resolvePickException(actor: Actor, key: string, raw: unknown) {
   manager(actor);
   const input = z

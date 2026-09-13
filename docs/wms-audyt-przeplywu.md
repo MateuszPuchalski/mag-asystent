@@ -659,3 +659,21 @@ Zasada blokady podejrzanej półki jest decyzją WERTIS; nie wynika z samego ist
 
 Regresje obejmują zwrot częściowy, uprawnienia, starą wersję, ponowienie, awarię zapisu oraz wcześniejszą lub cudzą historię zwrotu.
 Ponownie użyta skrzynka zachowuje nowe zamówienie. Browser E2E sprawdza decyzję, utraconą odpowiedź i zmianę ilości przy nadal otwartej kontroli półki.
+
+### Pusta skrzynka bez anulowania zamówienia
+
+Odtworzono brak całego SKU przed pierwszym pobraniem oraz przekazanie pustej skrzynki do pakowania.
+Nie można było zlecić zwrotu bez pobrań. Kontynuację blokowało przekazanie, a zmianę treści blokował aktywny przydział.
+Anulowanie usuwało problem techniczny kosztem zamówienia, które klient chciał tylko zmienić.
+
+Biuro otrzymuje jawną decyzję wycofania pustej skrzynki. Wymagane są skany aktualnego miejsca i skrzynki, potwierdzenie pustki oraz powód.
+Wstrzymanie i rezerwacje pozostają. Zgłoszenie zbiórki kończy się, ale kontrola podejrzanej półki nie znika.
+Nie tworzymy fikcyjnego pobrania, zwrotu ani zmiany zapasu. Zachowujemy też trwałą pozycję pustej skrzynki, jeśli nadal jest przypisana do wózka.
+
+Punkt odniesienia: [Microsoft — zakończenie pracy magazynowej w sytuacji wyjątkowej](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/cancel-warehouse-work).
+Wniosek dla WERTIS: rozliczenie pracy magazynowej nie musi usuwać zamówienia klienta. Tutaj wymagamy zera pobrań i fizycznej kontroli pustej skrzynki.
+To reguła naszego procesu, nie odtworzenie administracyjnej naprawy danych z opisanego produktu.
+
+Regresje obejmują zmianę miejsca bez podniesienia wersji zamówienia, cudzy kod, role, niepełny zwrot, awarię zapisu i ponowienie.
+Browser E2E sprawdza Enter skanera, wymagane potwierdzenie pustki, utraconą odpowiedź oraz późniejszą zmianę ilości.
+Naprawiono też odczyt zakończonej pozycji wózka: usunięte z dawnej trasy zamówienie nie powoduje błędu historii.

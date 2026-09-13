@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+import { exerciseEmptyBox } from "./wms-empty-box-e2e.mjs";
 export async function exercisePutback(page, output) {
   const api = (url, body, key) =>
     page.evaluate(
@@ -361,6 +362,7 @@ export async function exercisePutback(page, output) {
   const work = await api("/api/wms/stock-work?q=WMS-0035");
   expect(work.checks.some((c) => c.bin === pick.bin)).toBe(true);
   expect((await api("/api/wms/integrity")).ok).toBe(true);
+  await exerciseEmptyBox(page, output, api);
   writeFileSync(
     path.join(output, "putback-e2e.json"),
     JSON.stringify(

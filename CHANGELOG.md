@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.319.0 — pusta skrzynka bez anulowania zamówienia
+
+Biuro może wycofać pustą skrzynkę przed lub po przekazaniu do stanowiska. Skanuje aktualne miejsce i skrzynkę, potwierdza pustkę oraz wpisuje powód.
+Zamówienie pozostaje wstrzymane do zmiany treści albo dalszej decyzji. Nie powstaje fikcyjny zwrot ani ruch zapasu.
+Zgłoszenie zbiórki kończy się; rezerwacje i kontrola podejrzanej półki pozostają niezależne. Pusta skrzynka zachowuje przypisaną pozycję wózka.
+Nie można wznowić niepełnej zbiórki po przekazaniu skrzynki. Trzeba wycofać pustą skrzynkę albo zlecić zwrot pozostałych pobrań.
+Historia zakończonej pozycji wózka otwiera aktualne zamówienie bez błędu ani dawnych działań na skrzynce.
+
+**[wymaga działania]** Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Nowa decyzja korzysta z istniejących tabel oraz dziennika.
+Odbiór seeded obejmuje oba miejsca, powrót wszystkich pobrań, ponowienie po utracie odpowiedzi i zmianę zamówienia bez anulowania.
+
 ## 0.318.0 — decyzja biura po rozliczeniu skrzynki
 
 Pełny zwrot pobrań zwalniał skrzynkę, ale dawne zgłoszenie zbiórki nadal wymagało jej skanu. Zmiana zamówienia pozostawała zablokowana.

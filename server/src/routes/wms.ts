@@ -299,6 +299,7 @@ export async function wmsRoutes(app: FastifyInstance) {
     "/api/wms/cart-start": Carts.startCart,
     "/api/wms/cart-box-bind": Carts.bindCartBox,
     "/api/wms/cart-box-pack": Carts.packCartBox,
+    "/api/wms/cart-box-withdraw": Carts.withdrawEmptyCartBox,
     "/api/wms/stations": Carts.configureStation,
     "/api/wms/pick-route": Carts.configurePickRoute,
     "/api/wms/pick-exceptions": Carts.reportPickException,

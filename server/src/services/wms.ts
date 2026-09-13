@@ -1047,6 +1047,7 @@ function readOrder(orderId: number) {
       dispatch_status: String(s.dispatch_status),
       contents: parcelContents(Number(s.id)),
     }));
+  const contents = packingContents(orderId);
   return {
     ...order,
     wave_id:
@@ -1057,7 +1058,31 @@ function readOrder(orderId: number) {
     allocations,
     shipment: shipments[0] ?? null,
     shipments,
-    packingContents: packingContents(orderId),
+    packingContents: contents,
+    // Pusta skrzynka nie potrzebuje fikcyjnego zwrotu; jej miejsce nadal wymaga fizycznego potwierdzenia.
+    emptyCartBox:
+      order.status === "picking" &&
+      order.hold_reason &&
+      order.tote &&
+      lines.every((l) => l.picked === 0 && l.packed === 0) &&
+      allocations.every((a) => a.picked === 0) &&
+      !shipments.length &&
+      !contents.length
+        ? (d
+            .prepare(
+              `SELECT a.run_id,a.position,a.box_barcode,r.cart_code,
+            CASE WHEN a.handed_at IS NULL THEN 'cart' ELSE 'station' END AS at,
+            CASE WHEN a.handed_at IS NULL THEN r.cart_code ELSE a.station_code END AS place
+          FROM wms_cart_assignment a JOIN wms_cart_run r ON r.id=a.run_id
+          WHERE a.order_id=? AND a.box_barcode=? AND a.ended_at IS NULL
+            AND (a.handed_at IS NOT NULL OR r.closed_at IS NULL)
+            AND (a.released_at IS NULL OR a.handed_at IS NOT NULL)
+            AND (a.handed_at IS NULL OR a.station_code IS NOT NULL)
+            AND NOT EXISTS(SELECT 1 FROM wms_putback p WHERE p.order_id=a.order_id AND p.completed_at IS NULL AND p.cancelled_at IS NULL)
+            AND NOT EXISTS(SELECT 1 FROM wms_pack_recovery p WHERE p.order_id=a.order_id AND p.completed_at IS NULL AND p.cancelled_at IS NULL)`,
+            )
+            .get(orderId, order.tote) ?? null)
+        : null,
     // Rozliczony zwrot uwalnia decyzję biura, ale nie potwierdza stanu źródłowej półki.
     returnedPickException:
       order.status === "allocated" &&
@@ -1616,6 +1641,18 @@ export function applyOrderAction(
     );
   if (input.action === "resume") {
     if (!order.hold_reason) fail("Zamówienie nie jest wstrzymane");
+    // Przekazana niepełna skrzynka nie wraca do aktywnej zbiórki samym zdjęciem wstrzymania.
+    if (
+      order.status === "picking" &&
+      d
+        .prepare(
+          "SELECT 1 FROM wms_cart_assignment WHERE order_id=? AND ended_at IS NULL AND handed_at IS NOT NULL",
+        )
+        .get(orderId)
+    )
+      fail(
+        "Najpierw wycofaj pustą skrzynkę albo zleć zwrot pozostałych pobrań",
+      );
     if (
       d
         .prepare(
