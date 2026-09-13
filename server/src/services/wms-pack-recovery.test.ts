@@ -732,7 +732,7 @@ test("kontrola kopii wykrywa niepełny schemat i utracone rozliczenie wymiany, a
       () => A.integrity(copy),
       /Niepełny schemat zleconych zwrotów/,
     );
-    copy.exec("DROP TABLE wms_putback");
+    copy.exec("DROP TABLE wms_putback_issue; DROP TABLE wms_putback");
     assert.equal(A.integrity(copy).ok, true);
   } finally {
     copy.close();

@@ -2,9 +2,9 @@ import { expect } from "@playwright/test";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 export async function exercisePutback(page, output) {
-  const api = (url, body) =>
+  const api = (url, body, key) =>
     page.evaluate(
-      async ({ url, body }) => {
+      async ({ url, body, key }) => {
         const r = await fetch(url, {
           method: body ? "POST" : "GET",
           headers: {
@@ -12,7 +12,7 @@ export async function exercisePutback(page, output) {
             ...(body
               ? {
                   "content-type": "application/json",
-                  "idempotency-key": crypto.randomUUID(),
+                  "idempotency-key": key ?? crypto.randomUUID(),
                 }
               : {}),
           },
@@ -22,7 +22,7 @@ export async function exercisePutback(page, output) {
         if (!r.ok) throw Error(JSON.stringify(result));
         return result;
       },
-      { url, body },
+      { url, body, key },
     );
   await api("/api/wms/stations", {
     code: "PUTBACK-PACK",
@@ -141,18 +141,92 @@ export async function exercisePutback(page, output) {
     contentsConfirmed: true,
   });
   expect((await api(`/api/wms/orders/${o.id}`)).lines[0].packed).toBe(0);
-  for (const quantity of [1, 2]) {
-    const p = t.picks[0];
-    t = await api(`/api/wms/putback/${t.id}/finish`, {
-      version: t.version,
-      orderVersion: t.order_version,
-      box: t.box,
-      allocationId: p.allocation_id,
-      bin: p.bin,
-      barcode: p.sku,
-      quantity,
+  let p = t.picks[0];
+  t = await api(`/api/wms/putback/${t.id}/finish`, {
+    version: t.version,
+    orderVersion: t.order_version,
+    box: t.box,
+    allocationId: p.allocation_id,
+    bin: p.bin,
+    barcode: p.sku,
+    quantity: 1,
+  });
+  await api("/api/wms/bins", {
+    bin: "PUTBACK-QUAR",
+    mode: "quarantine",
+    version: 1,
+    reason: "Kwarantanna uszkodzeń zwrotu",
+  });
+  p = t.picks[0];
+  const damage = {
+    version: t.version,
+    orderVersion: t.order_version,
+    box: t.box,
+    allocationId: p.allocation_id,
+    barcode: p.sku,
+    quantity: 1,
+    quarantine: "PUTBACK-QUAR",
+    reason: "Pęknięta część przy zwrocie",
+  };
+  const damageKey = crypto.randomUUID();
+  t = await api(`/api/wms/putback/${t.id}/damage`, damage, damageKey);
+  expect(
+    await api(`/api/wms/putback/${t.id}/damage`, damage, damageKey),
+  ).toEqual(t);
+  expect(t.picks[0].remaining).toBe(1);
+  expect(t.issues).toHaveLength(1);
+  t = await api(`/api/wms/putback/${t.id}/release`, {
+    version: t.version,
+    station: t.station,
+    box: t.box,
+    reason: "Ostatniej sztuki nie znaleziono",
+  });
+  await page.locator('[data-tab-wms="orders"]').click();
+  await page.locator('#wms-filter [name="q"]').fill(o.reference);
+  await page.locator('#wms-filter [name="status"]').selectOption("all");
+  await page.locator("#wms-filter").evaluate((f) => f.requestSubmit());
+  await page.locator(`[data-order-wms="${o.id}"]`).click();
+  await page
+    .getByText("Problem, przejęcie lub anulowanie", { exact: true })
+    .click();
+  await page
+    .getByText("Po przeliczeniu nadal brakuje części", { exact: true })
+    .click();
+  const shortage = page.locator("#wms-putback-shortage");
+  await expect(shortage.locator('[name="observedQuantity"]')).toHaveValue("");
+  expect(await shortage.evaluate((f) => f.checkValidity())).toBe(false);
+  await shortage.locator('[name="station"]').fill(t.station);
+  await shortage.locator('[name="box"]').fill(t.box);
+  await shortage.locator('[name="observedQuantity"]').fill("0");
+  await shortage
+    .locator('[name="reason"]')
+    .fill("Przeliczono skrzynkę i sprawdzono stanowisko; brak części");
+  for (const width of [320, 390, 1440]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+    await shortage.screenshot({
+      path: path.join(output, `putback-shortage-${width}.png`),
     });
   }
+  await page.route(
+    `**/api/wms/putback/${t.id}/shortage`,
+    async (route) => {
+      await route.fetch();
+      await route.abort("failed");
+    },
+    { times: 1 },
+  );
+  await shortage.locator("button").click();
+  await expect(page.locator("#wms-retry")).toContainText("PONÓW");
+  await page.locator('[data-do-wms="retry"]').click();
+  await expect(page.locator("#wms-retry")).not.toContainText("PONÓW");
+  t = await api(`/api/wms/putback/${t.id}`);
+  expect(t.issues).toHaveLength(2);
+  expect(t.issues.find((i) => i.kind === "shortage").quarantine).toBeNull();
   expect(t.completed_at).not.toBeNull();
   o = await api(`/api/wms/orders/${o.id}`);
   expect(o.hold_reason).not.toBeNull();
@@ -172,7 +246,11 @@ export async function exercisePutback(page, output) {
         lostInstructionResponseRecovered: true,
         postHandoff: true,
         partialPackingClearedOnClaim: true,
-        returned: 3,
+        returned: 1,
+        quarantined: 1,
+        confirmedMissing: 1,
+        repeatedDamageSavedOnce: true,
+        lostShortageResponseRecovered: true,
         heldUntilOfficeDecision: true,
         nativePhysicalDevice: false,
       },

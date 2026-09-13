@@ -1,3 +1,4 @@
+import { removePickedAllocation } from "./wms-picked-disposition.js";
 import { z } from "zod";
 import { db, nowIso } from "../db/db.js";
 import {
@@ -32,6 +33,7 @@ type Work = {
   user_id: number | null;
   version: number;
   created_at: string;
+  claimed_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
 };
@@ -70,6 +72,7 @@ export function putbackTask(_actor: Actor, taskId: number) {
         const l = o.lines.find((l) => l.id === a.line_id)!;
         return {
           allocation_id: a.id,
+          line_id: l.id,
           order_id: o.id,
           version: o.version,
           tw_id: l.tw_id,
@@ -84,7 +87,15 @@ export function putbackTask(_actor: Actor, taskId: number) {
           source_mode: a.bin_mode,
         };
       });
-    return { ...t, reference: o.reference, order_version: o.version, picks };
+    return {
+      ...t,
+      reference: o.reference,
+      order_version: o.version,
+      picks,
+      issues: db()
+        .prepare("SELECT * FROM wms_putback_issue WHERE task_id=? ORDER BY id")
+        .all(t.id),
+    };
   });
 }
 export function putbackQueue(_actor: Actor, raw: unknown) {
@@ -279,7 +290,7 @@ export function finishPutback(
     if (t.user_id !== actor.id) fail("Zwrot należy do innego operatora");
     const o = validOrder(t);
     if (input.box !== t.box) fail("Zeskanuj skrzynkę tego zwrotu");
-    const next = applyOrderAction(
+    applyOrderAction(
       actor,
       o.id,
       {
@@ -295,19 +306,7 @@ export function finishPutback(
       },
       t.id,
     );
-    const completedAt = next.lines.every((l) => l.picked === 0) ? nowIso() : null;
-    if (completedAt) {
-      // Pusta skrzynka nie może więzić zamówienia na zakończonej trasie.
-      // Historia przydziału zostaje; biuro nadal decyduje o wznowieniu lub zmianie.
-      db().prepare("UPDATE wms_cart_assignment SET ended_at=? WHERE order_id=? AND ended_at IS NULL").run(completedAt, o.id);
-      db().prepare("DELETE FROM wms_wave_order WHERE order_id=?").run(o.id);
-      db().prepare("UPDATE wms_order SET status='allocated',tote=NULL,picker_id=NULL,packer_id=NULL WHERE id=?").run(o.id);
-    }
-    db()
-      .prepare(
-        "UPDATE wms_putback SET version=version+1,completed_at=? WHERE id=?",
-      )
-      .run(completedAt, t.id);
+    settlePutback(t);
     return putbackTask(actor, t.id);
   });
 }
@@ -332,7 +331,7 @@ export function releasePutback(
       fail("Zwróć skrzynkę na jej stanowisko i zeskanuj oba kody");
     db()
       .prepare(
-        "UPDATE wms_putback SET user_id=NULL,claimed_at=NULL,version=version+1 WHERE id=?",
+        "UPDATE wms_putback SET user_id=NULL,version=version+1 WHERE id=?",
       )
       .run(t.id);
     return putbackTask(actor, t.id);
@@ -361,5 +360,171 @@ export function abortPutback(
       .prepare("UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?")
       .run(nowIso(), t.order_id);
     return putbackTask(actor, t.id);
+  });
+}
+
+function settlePutback(t: Work) {
+  const o = getOrder(t.order_id);
+  const completedAt = o.lines.every((l) => l.picked === 0) ? nowIso() : null;
+  if (completedAt) {
+    // Historia skrzynki zostaje; pusta trasa nie może blokować decyzji biura.
+    db()
+      .prepare(
+        "UPDATE wms_cart_assignment SET ended_at=? WHERE order_id=? AND ended_at IS NULL",
+      )
+      .run(completedAt, o.id);
+    db().prepare("DELETE FROM wms_wave_order WHERE order_id=?").run(o.id);
+    db()
+      .prepare(
+        "UPDATE wms_order SET status='allocated',tote=NULL,picker_id=NULL,packer_id=NULL WHERE id=?",
+      )
+      .run(o.id);
+  }
+  db()
+    .prepare(
+      "UPDATE wms_putback SET version=version+1,completed_at=? WHERE id=?",
+    )
+    .run(completedAt, t.id);
+}
+function savePutbackIssue(
+  actor: Actor,
+  t: Work,
+  lineId: number,
+  quantity: number,
+  quarantine: string | null,
+  why: string,
+  allocationId?: number,
+) {
+  const o = validOrder(t),
+    line = o.lines.find((l) => l.id === lineId);
+  if (!line) fail("Wybierz część tego zwrotu");
+  removePickedAllocation(
+    actor,
+    o,
+    lineId,
+    quantity,
+    quarantine,
+    why,
+    allocationId,
+  );
+  db()
+    .prepare("UPDATE wms_line SET picked=picked-? WHERE id=?")
+    .run(quantity, lineId);
+  db()
+    .prepare(
+      "INSERT INTO wms_putback_issue(task_id,line_id,tw_id,sku,name,quantity,kind,quarantine,reason,user_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+    )
+    .run(
+      t.id,
+      lineId,
+      line!.tw_id,
+      line!.sku,
+      line!.name,
+      quantity,
+      quarantine === null ? "shortage" : "damage",
+      quarantine,
+      why,
+      actor.id,
+      nowIso(),
+    );
+  db()
+    .prepare("UPDATE wms_order SET version=version+1,updated_at=? WHERE id=?")
+    .run(nowIso(), o.id);
+  settlePutback(t);
+  return putbackTask(actor, t.id);
+}
+export function damagePutback(
+  actor: Actor,
+  key: string,
+  taskId: number,
+  raw: unknown,
+) {
+  const input = z
+    .object({
+      version: id,
+      orderVersion: id,
+      box: code,
+      allocationId: id,
+      barcode: z.string().trim().min(1).max(120),
+      quantity: z.number().int().min(1).max(1000000),
+      quarantine: code,
+      reason,
+    })
+    .strict()
+    .parse(raw);
+  return command(key, actor, "putback_damage", { taskId, ...input }, () => {
+    const t = open(taskId, input.version),
+      o = validOrder(t);
+    if (
+      t.user_id !== actor.id ||
+      o.version !== input.orderVersion ||
+      t.box !== input.box
+    )
+      fail("Odśwież własny zwrot i zeskanuj jego skrzynkę");
+    const a = o.allocations.find((a) => a.id === input.allocationId),
+      line = o.lines.find((l) => l.id === a?.line_id);
+    if (
+      !line ||
+      !(
+        line.sku.toUpperCase() === input.barcode.toUpperCase() ||
+        line.barcode === input.barcode
+      )
+    )
+      fail("Zeskanuj właściwą część zwrotu");
+    return savePutbackIssue(
+      actor,
+      t,
+      line.id,
+      input.quantity,
+      input.quarantine,
+      input.reason,
+      input.allocationId,
+    );
+  });
+}
+export function shortagePutback(
+  actor: Actor,
+  key: string,
+  taskId: number,
+  raw: unknown,
+) {
+  manager(actor);
+  const input = z
+    .object({
+      version: id,
+      orderVersion: id,
+      box: code,
+      station: code,
+      lineId: id,
+      observedQuantity: z.number().int().min(0).max(1000000),
+      reason,
+    })
+    .strict()
+    .parse(raw);
+  return command(key, actor, "putback_shortage", { taskId, ...input }, () => {
+    const t = open(taskId, input.version),
+      o = validOrder(t);
+    // Biuro liczy dopiero po oddaniu skrzynki; operator nie może równolegle odkładać sztuk.
+    if (t.user_id !== null || !t.claimed_at)
+      fail(
+        "Operator musi najpierw oddać skrzynkę na stanowisko i zwolnić zwrot",
+      );
+    if (
+      o.version !== input.orderVersion ||
+      t.box !== input.box ||
+      t.station !== input.station
+    )
+      fail("Odśwież zwrot i zeskanuj stanowisko oraz skrzynkę");
+    const line = o.lines.find((l) => l.id === input.lineId);
+    if (!line || input.observedQuantity >= line.picked)
+      fail("Wpisz rzeczywistą liczbę mniejszą od nierozliczonych pobrań");
+    return savePutbackIssue(
+      actor,
+      t,
+      line.id,
+      line.picked - input.observedQuantity,
+      null,
+      input.reason,
+    );
   });
 }

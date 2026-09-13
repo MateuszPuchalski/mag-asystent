@@ -28,7 +28,7 @@ export class WmsError extends Error {
 export function activePutback(orderId: number) {
   return db()
     .prepare(
-      "SELECT id,user_id,version,station,reason FROM wms_putback WHERE order_id=? AND completed_at IS NULL AND cancelled_at IS NULL",
+      "SELECT id,user_id,version,station,reason,claimed_at FROM wms_putback WHERE order_id=? AND completed_at IS NULL AND cancelled_at IS NULL",
     )
     .get(orderId) as
     | {
@@ -37,6 +37,7 @@ export function activePutback(orderId: number) {
         version: number;
         station: string;
         reason: string;
+        claimed_at: string | null;
       }
     | undefined;
 }
@@ -1058,6 +1059,11 @@ function readOrder(orderId: number) {
     shipments,
     packingContents: packingContents(orderId),
     putback: activePutback(orderId) ?? null,
+    putbackIssues: d
+      .prepare(
+        "SELECT i.* FROM wms_putback_issue i JOIN wms_putback p ON p.id=i.task_id WHERE p.order_id=? ORDER BY i.id",
+      )
+      .all(orderId),
     returnStation:
       d
         .prepare(

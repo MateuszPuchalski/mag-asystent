@@ -45,6 +45,8 @@ fun WmsPutbackScreen(graph:AppGraph) {
     val task=view.task.takeIf{view.context==context}
     val part=task?.picks?.firstOrNull()
     var scan by remember(view.generation,view.confirmedBox,context){mutableStateOf(WmsReturnScan(box=task!=null && view.confirmedBox==task.box))}
+    var damaged by remember(view.generation,context){mutableStateOf(false)}
+    var damageReason by remember(view.generation,context){mutableStateOf("")}
     var quantity by remember(view.generation,context){mutableStateOf("")}
     var station by remember(view.generation,context){mutableStateOf("")}
     var releasing by remember(view.generation,context){mutableStateOf(false)}
@@ -67,7 +69,7 @@ fun WmsPutbackScreen(graph:AppGraph) {
                 else submit(if(releasing)putbackRelease(task,context!!.actorId,station,raw,reason)else putbackClaim(task,station,raw))
             } else {
                 require(part!=null){"Odśwież zwrot"}
-                val result=putbackScan(task,context!!.actorId,part,scan,returnCode(scan,input));scan=result.first;error=null
+                val result=putbackScan(task,context!!.actorId,part,scan,returnCode(scan,input),damaged,damageReason);scan=result.first;error=null
                 result.second?.let(::submit)?:graph.feedback.beep(true)
             }
         }catch(e:IllegalArgumentException){error=e.message;graph.feedback.beep(false)}
@@ -113,6 +115,11 @@ fun WmsPutbackScreen(graph:AppGraph) {
                 part!=null -> {
                     Text("${part.sku} · ${part.name}",fontSize=18.sp)
                     Text("Pozostało ${part.remaining} szt. · pobrano z ${part.bin}")
+                    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                        OutlineButton(if(!damaged)"✓ SPRAWNE" else "SPRAWNE",enabled=damaged,modifier=Modifier.weight(1f)){damaged=false;scan=WmsReturnScan(box=scan.box);quantity="";damageReason="";error=null}
+                        OutlineButton(if(damaged)"✓ USZKODZONE" else "USZKODZONE",enabled=!damaged,modifier=Modifier.weight(1f)){damaged=true;scan=WmsReturnScan(box=scan.box);quantity="";damageReason="";error=null}
+                    }
+                    if(damaged) WertisTextField(damageReason,{damageReason=it.take(500)},placeholder="Opis uszkodzenia")
                     when(returnStage(scan)){
                         WmsReturnStage.BOX->Text("SKANUJ SKRZYNKĘ ${task.box}",fontSize=22.sp,fontWeight=FontWeight.Bold)
                         WmsReturnStage.PRODUCT->Text("SKANUJ CZĘŚĆ",fontSize=22.sp,fontWeight=FontWeight.Bold)
@@ -121,11 +128,12 @@ fun WmsPutbackScreen(graph:AppGraph) {
                             PrimaryButton("POTWIERDŹ ILOŚĆ",modifier=Modifier.fillMaxWidth(),onClick=::confirm)
                         }
                         WmsReturnStage.BIN->{
-                            Text(if(scan.alternative || part.source_mode!="pick")"Odłóż ${scan.quantity} szt. na inną półkę kompletacji. Sprawdź miejsce i zeskanuj cel." else "Odłóż ${scan.quantity} szt. na ${part.bin} i zeskanuj półkę.",fontSize=22.sp,fontWeight=FontWeight.Bold)
-                            OutlineButton("INNA PÓŁKA",modifier=Modifier.fillMaxWidth()){scan=scan.copy(alternative=true)}
+                            Text(if(damaged)"Odłóż ${scan.quantity} uszkodzonych sztuk do kwarantanny i zeskanuj jej lokalizację." else if(scan.alternative || part.source_mode!="pick")"Odłóż ${scan.quantity} szt. na inną półkę kompletacji. Sprawdź miejsce i zeskanuj cel." else "Odłóż ${scan.quantity} szt. na ${part.bin} i zeskanuj półkę.",fontSize=22.sp,fontWeight=FontWeight.Bold)
+                            if(!damaged) OutlineButton("INNA PÓŁKA",modifier=Modifier.fillMaxWidth()){scan=scan.copy(alternative=true)}
                             OutlineButton("ZMIEŃ ILOŚĆ",modifier=Modifier.fillMaxWidth()){scan=scan.copy(quantity=null)}
                         }
                     }
+                    Text("Brakuje fizycznej sztuki? Oddaj resztę na stanowisko i zwolnij zadanie do przeliczenia przez biuro.")
                     OutlineButton("ODDAJ RESZTĘ I ZWOLNIJ ZADANIE",modifier=Modifier.fillMaxWidth()){releasing=true;station="";error=null}
                 }
             }

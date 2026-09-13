@@ -4,6 +4,14 @@ Użytkownik potwierdził, że zbiórka odbywa się na kolektorach Zebra lub Hone
 Podstawowym klientem zbiórki jest istniejąca aplikacja Android. Przeglądarka pozostaje
 narzędziem biura, stanowiska pakowania oraz pomocniczym klientem WMS.
 
+## Dyspozycja części przy zwrocie
+
+Istniejący ekran zwrotu rozróżnia sprawne części i uszkodzenia. Zmiana dyspozycji resetuje liczbę oraz skan części.
+Uszkodzenie wymaga opisu i skanu kwarantanny. Wykorzystuje ten sam dziennik, blokadę zapisów oraz ochronę po pauzie.
+Normalny potwierdzony zapis zachowuje skrzynkę; ponowienie po nieznanym wyniku wymaga jej świeżego skanu.
+Brak fizyczny trafia do przeliczenia biura po oddaniu skrzynki. Kolektor nie proponuje skanowania nieobecnego produktu.
+Testy core sprawdzają walidację dyspozycji i odzyskanie kwarantanny po utracie odpowiedzi. Fizyczny odbiór ekranu pozostaje otwarty.
+
 ## Zlecone zwroty z pakowania
 
 Siódmy proces WMS obsługuje odbiór wstrzymanej skrzynki po przekazaniu do pakowania.

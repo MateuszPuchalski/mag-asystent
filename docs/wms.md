@@ -24,7 +24,15 @@ Nieznany wynik zapisu wymaga **PONÓW**, bez ponownego przenoszenia tej samej pa
 Powrót po pauzie lub ponowieniu wymaga świeżego skanu skrzynki. Kolejne potwierdzone partie tej samej sesji zachowują wybór skrzynki.
 Zwolnienie zadania wymaga oddania reszty na pierwotne stanowisko, skanu stanowiska i skrzynki oraz powodu.
 Nie zabieraj już potwierdzonych partii z półek. Biuro może przerwać wyłącznie niepodjęte zlecenie; wstrzymanie i nierozliczone pobrania pozostają.
-Uszkodzeń lub brakujących fizycznie części nie odkładaj jako dobrego zapasu. Oddaj resztę i przekaż rozbieżność do biura.
+Uszkodzone sztuki rozlicz wyborem **USZKODZONE**. Zeskanuj część, wpisz ilość oraz opis, odłóż do kwarantanny i zeskanuj jej lokalizację.
+Zmiana sprawne/uszkodzone czyści ilość i potwierdzenie produktu. Kwarantanna przyjmuje fizyczne sztuki bez rezerwacji dla zamówienia.
+Brakującej fizycznie części nie skanuj jako uszkodzonej. Oddaj znalezioną resztę na pierwotne stanowisko i zwolnij zadanie.
+Biuro otwiera **Po przeliczeniu nadal brakuje części**. Wybiera część, skanuje stanowisko i skrzynkę oraz wpisuje rzeczywiście znalezioną ilość.
+Puste pole nie oznacza zera. Jawne zero potwierdza brak wszystkich pozostałych sztuk wybranej części; ilość dodatnia pozostawia je do odłożenia.
+Zmiana części czyści liczbę i skany. Równoległe podjęcie zadania odrzuca korektę biura.
+Brak nie tworzy przyjęcia zapasu ani ruchu do kwarantanny. Obie rozbieżności zmniejszają pobrania, zachowując dobre rezerwacje.
+Nie powstaje automatyczna wymiana. Po ostatnim rozliczeniu biuro może zmienić zamówienie, anulować je lub naprawić brakującą rezerwację przed wznowieniem.
+Historia rozbieżności zachowuje SKU, ilość, powód oraz miejsce kwarantanny także po zmianie pozycji zamówienia.
 
 Kolejka pokazuje stanowisko, skrzynkę i pozostałe sztuki. Analityka mierzy wiek zleceń oraz czas zlecenie → zakończenie.
 Ten czas obejmuje oczekiwanie i przerwy; nie jest pomiarem pracy operatora.

@@ -3105,6 +3105,26 @@ CREATE TABLE IF NOT EXISTS wms_putback (
   version INTEGER NOT NULL DEFAULT 1 CHECK(version > 0)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ix_wms_putback_open ON wms_putback(order_id) WHERE completed_at IS NULL AND cancelled_at IS NULL;
+CREATE INDEX IF NOT EXISTS ix_wms_putback_order ON wms_putback(order_id,id);
+
+-- Rozbieżność podczas zwrotu nie zleca automatycznej wymiany anulowanego zamówienia.
+CREATE TABLE IF NOT EXISTS wms_putback_issue (
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES wms_putback(id),
+  line_id INTEGER REFERENCES wms_line(id) ON DELETE SET NULL,
+  tw_id INTEGER NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK(quantity>0),
+  kind TEXT NOT NULL CHECK(kind IN ('damage','shortage')),
+  quarantine TEXT,
+  reason TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  CHECK((kind='damage' AND quarantine IS NOT NULL AND length(trim(quarantine))>0) OR (kind='shortage' AND quarantine IS NULL))
+);
+CREATE INDEX IF NOT EXISTS ix_wms_putback_issue_task ON wms_putback_issue(task_id,id);
+CREATE INDEX IF NOT EXISTS ix_wms_putback_issue_created ON wms_putback_issue(created_at);
 
 CREATE TABLE IF NOT EXISTS wms_pack_recovery (
   id INTEGER PRIMARY KEY,

@@ -613,11 +613,11 @@ window.Wms = (() => {
             "POTWIERDŹ ODŁOŻENIE",
           )
         : "";
-    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${putbackForm(o)}${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
+    return `<details><summary>Problem, przejęcie lub anulowanie</summary>${putbackHistory(o)}${putbackForm(o)}${options.length ? `<form class="wms-form" id="wms-exception"><label>Czynność<select name="action">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select></label>${field("reason", "Powód / sposób rozwiązania", "text", "", 'minlength="3" maxlength="500"')}<button type="submit">ZAPISZ DECYZJĘ</button></form>` : ""}${returned}</details>${amendForm(o)}`;
   }
   function putbackForm(o) {
     if (o.putback)
-      return `<section class="wms-message"><strong>Zwrot z pakowania · ${o.putback.user_id ? "skrzynka odebrana przez operatora" : "czeka na odbiór kolektorem"}</strong><p>${html(o.putback.station)} · ${html(o.tote)} · ${html(o.putback.reason)}</p><p>Zamówienie pozostaje wstrzymane. Równoległe zwroty, pakowanie i zmiany są zablokowane.</p>${office() && !o.putback.user_id ? `<form id="wms-putback-abort" class="wms-form">${field("reason", "Powód przerwania zlecenia")}<button>PRZERWIJ ZLECENIE ZWROTU</button></form>` : ""}</section>`;
+      return `<section class="wms-surface"><strong>Zwrot z pakowania · ${o.putback.user_id ? "skrzynka odebrana przez operatora" : "czeka na odbiór kolektorem"}</strong><p>${html(o.putback.station)} · ${html(o.tote)} · ${html(o.putback.reason)}</p><p>Zamówienie pozostaje wstrzymane. Równoległe zwroty, pakowanie i zmiany są zablokowane.</p>${putbackShortageForm(o)}${office() && !o.putback.user_id ? `<form id="wms-putback-abort" class="wms-form">${field("reason", "Powód przerwania zlecenia")}<button>PRZERWIJ ZLECENIE ZWROTU</button></form>` : ""}</section>`;
     if (
       !office() ||
       !o.hold_reason ||
@@ -628,6 +628,22 @@ window.Wms = (() => {
     )
       return "";
     return `<section class="wms-surface"><h3>Zleć zwrot kolektorem</h3><p>Operator odbierze całą niewysłaną zawartość w skrzynce ${html(o.tote)} ze stanowiska ${html(o.returnStation)}. Samo zlecenie nie zmieni zapasu ani kontroli paczek.</p><form id="wms-putback-request" class="wms-form">${field("reason", "Dlaczego pobrania mają wrócić na półki")}<button>ZLEĆ ZWROT Z PAKOWANIA</button></form></section>`;
+  }
+  function putbackHistory(o) {
+    if (!o.putbackIssues?.length) return "";
+    return `<section class="wms-surface"><h3>Rozliczone części zwrotu</h3>${o.putbackIssues.map((i) => `<p><strong>${html(i.sku)} · ${i.quantity} szt. · ${i.kind === "damage" ? `kwarantanna ${html(i.quarantine)}` : "potwierdzony brak"}</strong><br>${html(i.reason)}</p>`).join("")}<p>Te sztuki nie wróciły do zapasu sprzedażowego. Wstrzymanie pozostaje dla decyzji biura.</p></section>`;
+  }
+  function putbackShortageForm(o) {
+    if (!office() || o.putback.user_id || !o.putback.claimed_at) return "";
+    return `<details><summary>Po przeliczeniu nadal brakuje części</summary><p>Przelicz wybraną część w oddanej skrzynce i sprawdź stanowisko. Zero oznacza jawnie potwierdzony brak wszystkich pozostałych sztuk tej części.</p><form id="wms-putback-shortage" class="wms-form"><label>Część do policzenia<select name="lineId">${o.lines
+      .filter((l) => l.picked > 0)
+      .map(
+        (l) =>
+          `<option value="${l.id}">${html(l.sku)} · ${l.picked} nierozliczonych szt.</option>`,
+      )
+      .join(
+        "",
+      )}</select></label>${field("station", "1. Skan stanowiska " + o.putback.station)}${field("box", "2. Skan skrzynki " + o.tote)}${field("observedQuantity", "3. Faktycznie znalezione sztuki", "number", "", 'min="0" max="1000000" step="1"')}${field("reason", "4. Co sprawdzono przed potwierdzeniem braku", "text", "", 'minlength="3" maxlength="500"')}<button>POTWIERDŹ BRAK PO PRZELICZENIU</button></form></details>`;
   }
   async function putbacks(turn) {
     const data = await read(
@@ -818,7 +834,7 @@ window.Wms = (() => {
       .insertAdjacentHTML(
         "beforeend",
         `<section class="wms-surface"><h2>Kanały sprzedaży</h2><table class="wms-lines"><thead><tr><th>Kanał</th><th>Wysłane</th><th>W terminie</th></tr></thead><tbody>${a.channels.map((c) => `<tr><td>${html(c.channel)}</td><td>${c.shipped}</td><td>${number((c.on_time * 100) / c.shipped)}%</td></tr>`).join("")}</tbody></table></section>
-      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności przy pakowaniu</summary><p>Potwierdzone w wybranym okresie. Brak oznacza ubytek przy stanowisku, bez przyjęcia zapasu. Kwarantanna zawiera fizycznie odłożone uszkodzenia.</p>${(a.packingIssues || []).map((r) => `<p><strong>${r.kind === "shortage" ? "Potwierdzone braki" : "Uszkodzenia do kwarantanny"}</strong>: ${number(r.units)} szt. · ${number(r.cases)} zgłoszeń · nadal czeka na zamiennik ${number(r.waiting_units)} szt.</p>`).join("") || "Brak potwierdzonych rozbieżności w okresie."}</details><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
+      <section class="wms-surface"><h2>Ruchy i rozbieżności</h2><table class="wms-lines"><thead><tr><th>Operacja</th><th>Liczba</th><th>Zmiana sztuk</th></tr></thead><tbody>${a.movements.map((m) => `<tr><td>${html({ receive: "Przyjęcie", "inbound.correction": "Korekta przyjęcia", "receive.correction": "Wycofanie przyjęcia", count: "Spis", pick: "Pobranie", return: "Odłożenie", reserve: "Rezerwacja", release: "Zwolnienie", transfer: "Przesunięcie" }[m.kind] || m.kind)}</td><td>${m.operations}</td><td>${m.units}</td></tr>`).join("")}</tbody></table><details><summary>Rozbieżności przy pakowaniu</summary><p>Potwierdzone w wybranym okresie. Brak oznacza ubytek przy stanowisku, bez przyjęcia zapasu. Kwarantanna zawiera fizycznie odłożone uszkodzenia.</p>${(a.packingIssues || []).map((r) => `<p><strong>${r.kind === "shortage" ? "Potwierdzone braki" : "Uszkodzenia do kwarantanny"}</strong>: ${number(r.units)} szt. · ${number(r.cases)} zgłoszeń · nadal czeka na zamiennik ${number(r.waiting_units)} szt.</p>`).join("") || "Brak potwierdzonych rozbieżności w okresie."}</details><details><summary>Rozbieżności podczas zwrotu z pakowania</summary><p>Rozliczone osobno od dobrych odłożeń. Nie uruchamiają automatycznej wymiany.</p>${(a.putbackIssues || []).map((r) => `<p><strong>${r.kind === "shortage" ? "Potwierdzone braki" : "Uszkodzenia do kwarantanny"}</strong>: ${number(r.units)} szt. · ${number(r.cases)} zgłoszeń</p>`).join("") || "Brak rozbieżności w okresie."}</details><details><summary>Rozbieżności spisów</summary>${a.adjustments.map((r) => `<p>${html(r.sku)}: ${r.variance > 0 ? "+" : ""}${r.variance} szt. (${r.counts} spisów)</p>`).join("") || "Brak rozbieżności w okresie."}</details><button data-do-wms="reconcile">PORÓWNAJ Z SUBIEKTEM</button><div id="wms-erp"></div></section>
       <section class="wms-surface"><h2>Operacje zbiórki według osoby</h2><p class="wms-muted">Zatwierdzone pobrania w okresie. Operacja może wymagać kilku skanów. Sztuki i operacje nie mierzą czasu pracy.</p><table class="wms-lines"><thead><tr><th>Osoba</th><th>Pobrania</th><th>Sztuki</th><th>Zamówienia</th></tr></thead><tbody>${a.productivity.map((p) => `<tr><td>${html(p.name)}</td><td>${p.scans}</td><td>${p.units}</td><td>${p.orders}</td></tr>`).join("")}</tbody></table></section>`,
       );
   }
@@ -1040,6 +1056,22 @@ window.Wms = (() => {
         query = String(values.q);
         offset = 0;
         await refresh();
+        return;
+      }
+      if (f.id === "wms-putback-shortage") {
+        const result = await mutate(
+          `/api/wms/putback/${current.putback.id}/shortage`,
+          {
+            version: current.putback.version,
+            orderVersion: current.version,
+            station: values.station,
+            box: values.box,
+            lineId: Number(values.lineId),
+            observedQuantity: Number(values.observedQuantity),
+            reason: values.reason,
+          },
+        );
+        if (result) await refresh();
         return;
       }
       if (f.id === "wms-putback-request" || f.id === "wms-putback-abort") {
@@ -1328,6 +1360,13 @@ window.Wms = (() => {
   document.addEventListener("click", click);
   document.addEventListener("submit", submit);
   document.addEventListener("change", async (event) => {
+    const shortageForm = event.target.closest?.("#wms-putback-shortage");
+    if (shortageForm && event.target.name === "lineId") {
+      for (const name of ["station", "box", "observedQuantity"])
+        shortageForm.elements.namedItem(name).value = "";
+      shortageForm.elements.namedItem("station").focus();
+    }
+
     packingUi.change(event.target);
     const returnForm = event.target.closest('[data-action-wms="return"]');
     if (returnForm && event.target.name === "allocationId") {

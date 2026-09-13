@@ -379,3 +379,284 @@ test("kolejka i analityka pokazują zlecony zwrot, a kontrola kopii wykrywa utra
     .run(t.order_id);
   assert.equal(A.integrity().ok, true);
 });
+
+test("uszkodzenie po częściowym zwrocie omija zakleszczenie pakowania, zachowując dobre rezerwacje", async () => {
+  const f = fixture();
+  let t = claim(f.request());
+  t = P.finishPutback(worker, randomUUID(), t.id, body(t));
+  const R = await import("./wms-pack-recovery.js");
+  t = P.releasePutback(worker, randomUUID(), t.id, {
+    version: t.version,
+    box: t.box,
+    station: t.station,
+    reason: "Oddanie do biura",
+  });
+  P.abortPutback(admin, randomUUID(), t.id, {
+    version: t.version,
+    reason: "Próba dotychczasowej korekty",
+  });
+  assert.throws(
+    () =>
+      R.quarantinePacking(admin, randomUUID(), {
+        orderId: f.order.id,
+        version: f.order.version,
+        box: t.box,
+        barcode: f.sku,
+        quantity: 1,
+        parcelNo: 0,
+        quarantine: "PUTBACK-QUAR",
+        reason: "Uszkodzenie podczas zwrotu",
+      }),
+    /kontrolę pakowania/,
+  );
+  t = claim(f.request());
+  W.configureBin(admin, randomUUID(), {
+    bin: "PUTBACK-QUAR",
+    mode: "quarantine",
+    version: 1,
+    reason: "Kontrola jakości",
+  });
+  const p = t.picks[0],
+    input = {
+      version: t.version,
+      orderVersion: t.order_version,
+      box: t.box,
+      allocationId: p.allocation_id,
+      barcode: p.sku,
+      quantity: 1,
+      quarantine: "PUTBACK-QUAR",
+      reason: "Pęknięta część podczas odkładania",
+    };
+  const key = randomUUID();
+  t = P.damagePutback(worker, key, t.id, input);
+  assert.equal(t.picks[0].remaining, 1);
+  assert.equal(t.issues[0].quantity, 1);
+  assert.deepEqual(
+    P.damagePutback(worker, key, t.id, input),
+    JSON.parse(JSON.stringify(t)),
+  );
+  assert.equal(
+    db()
+      .prepare("SELECT on_hand FROM wms_stock WHERE tw_id=? AND bin=?")
+      .get(f.n, f.bin)!.on_hand,
+    8,
+  );
+  assert.deepEqual(
+    {
+      ...db()
+        .prepare(
+          "SELECT on_hand,reserved FROM wms_stock WHERE tw_id=? AND bin='PUTBACK-QUAR'",
+        )
+        .get(f.n),
+    },
+    { on_hand: 1, reserved: 0 },
+  );
+  t = P.finishPutback(worker, randomUUID(), t.id, body(t));
+  assert.ok(t.completed_at);
+  assert.equal(f.order.lines[0].picked, 0);
+  assert.equal(
+    f.order.allocations.reduce((sum, a) => sum + a.quantity, 0),
+    2,
+  );
+  assert.throws(
+    () =>
+      W.actOnOrder(admin, randomUUID(), f.order.id, {
+        action: "resume",
+        version: f.order.version,
+        reason: "Odbiór klienta",
+      }),
+    /rezerwacj/,
+  );
+  W.actOnOrder(admin, randomUUID(), f.order.id, {
+    action: "amend",
+    version: f.order.version,
+    reason: "Klient zmniejsza ilość",
+    dueAt: "2026-09-14T12:00:00Z",
+    priority: 0,
+    lines: [{ sku: f.sku, quantity: 2 }],
+  });
+  assert.equal(P.putbackTask(worker, t.id).issues[0].line_id, null);
+  assert.equal(P.putbackTask(worker, t.id).issues[0].sku, f.sku);
+  assert.equal(A.integrity().ok, true);
+});
+
+test("brak podczas zwrotu wymaga oddania skrzynki i jawnego przeliczenia biura", () => {
+  const f = fixture();
+  let t = f.request();
+  const input = () => ({
+    version: t.version,
+    orderVersion: t.order_version,
+    station: t.station,
+    box: t.box,
+    lineId: t.picks[0].line_id,
+    observedQuantity: 0,
+    reason: "Przeliczono stanowisko i zawartość skrzynki",
+  });
+  assert.throws(
+    () => P.shortagePutback(admin, randomUUID(), t.id, input()),
+    /oddać skrzynkę/,
+  );
+  t = claim(t);
+  t = P.finishPutback(worker, randomUUID(), t.id, body(t));
+  assert.throws(
+    () => P.shortagePutback(worker, randomUUID(), t.id, input()),
+    /biur|uprawni/i,
+  );
+  assert.throws(
+    () => P.shortagePutback(admin, randomUUID(), t.id, input()),
+    /oddać skrzynkę/,
+  );
+  t = P.releasePutback(worker, randomUUID(), t.id, {
+    version: t.version,
+    box: t.box,
+    station: t.station,
+    reason: "Jednej sztuki nie znaleziono",
+  });
+  assert.throws(
+    () =>
+      P.shortagePutback(admin, randomUUID(), t.id, {
+        ...input(),
+        observedQuantity: 2,
+      }),
+    /mniejszą/,
+  );
+  assert.throws(
+    () =>
+      P.shortagePutback(admin, randomUUID(), t.id, {
+        ...input(),
+        station: "EX",
+      }),
+    /stanowisko/,
+  );
+  const before = Number(
+    db().prepare("SELECT count(*) n FROM wms_movement").get()!.n,
+  );
+  const key = randomUUID(),
+    partial = { ...input(), observedQuantity: 1 };
+  t = P.shortagePutback(admin, key, t.id, partial);
+  assert.equal(t.picks[0].remaining, 1);
+  assert.equal(t.issues[0].kind, "shortage");
+  assert.equal(t.issues[0].quarantine, null);
+  assert.deepEqual(
+    P.shortagePutback(admin, key, t.id, partial),
+    JSON.parse(JSON.stringify(t)),
+  );
+  assert.equal(
+    Number(db().prepare("SELECT count(*) n FROM wms_movement").get()!.n),
+    before,
+  );
+  t = claim(t);
+  t = P.finishPutback(worker, randomUUID(), t.id, body(t));
+  assert.ok(t.completed_at);
+  assert.equal(A.integrity().ok, true);
+});
+
+test("odmowa lub awaria kwarantanny zachowuje pobrania, zapas i dziennik bez podwójnego rozliczenia", () => {
+  const f = fixture();
+  let t = claim(f.request());
+  const p = t.picks[0];
+  const input = {
+    version: t.version,
+    orderVersion: t.order_version,
+    box: t.box,
+    allocationId: p.allocation_id,
+    barcode: p.sku,
+    quantity: 3,
+    quarantine: "PUTBACK-QUAR",
+    reason: "Cała partia uszkodzona",
+  };
+  assert.throws(
+    () => P.damagePutback(packer, randomUUID(), t.id, input),
+    /własny zwrot/,
+  );
+  assert.throws(
+    () =>
+      P.damagePutback(worker, randomUUID(), t.id, {
+        ...input,
+        quarantine: f.bin,
+      }),
+    /kwarantanny/,
+  );
+  assert.throws(
+    () =>
+      P.damagePutback(worker, randomUUID(), t.id, {
+        ...input,
+        barcode: "INNY",
+      }),
+    /właściwą część/,
+  );
+  assert.throws(
+    () =>
+      P.damagePutback(worker, randomUUID(), t.id, { ...input, quantity: 4 }),
+    /pobrania/,
+  );
+  db().exec(
+    "CREATE TRIGGER fail_putback_issue BEFORE INSERT ON wms_putback_issue BEGIN SELECT RAISE(ABORT,'issue rollback'); END",
+  );
+  const key = randomUUID();
+  assert.throws(
+    () => P.damagePutback(worker, key, t.id, input),
+    /issue rollback/,
+  );
+  assert.equal(f.order.lines[0].picked, 3);
+  assert.equal(P.putbackTask(worker, t.id).issues.length, 0);
+  assert.equal(
+    db()
+      .prepare("SELECT * FROM wms_stock WHERE tw_id=? AND bin='PUTBACK-QUAR'")
+      .get(f.n),
+    undefined,
+  );
+  db().exec("DROP TRIGGER fail_putback_issue");
+  t = P.damagePutback(worker, key, t.id, input);
+  assert.ok(t.completed_at);
+  assert.equal(t.picks.length, 0);
+  assert.equal(f.order.tote, null);
+  assert.equal(A.integrity().ok, true);
+});
+
+test("raport oddziela kwarantannę i brak, a kopia zachowuje historię również po zmianie zamówienia", async () => {
+  const report = A.analytics({ days: 90 });
+  assert.equal(report.putbackIssues.find((r) => r.kind === "damage")!.units, 4);
+  assert.equal(
+    report.putbackIssues.find((r) => r.kind === "shortage")!.units,
+    1,
+  );
+  const { verifiedBackup } = await import("./wms-backup.js");
+  const target = join(
+    mkdtempSync(join(tmpdir(), "putback-issue-backup-")),
+    "copy.db",
+  );
+  await verifiedBackup(process.env.DB_PATH!, target);
+  const { DatabaseSync } = await import("node:sqlite");
+  const copy = new DatabaseSync(target);
+  try {
+    const issue = copy
+      .prepare(
+        "SELECT * FROM wms_putback_issue WHERE line_id IS NOT NULL ORDER BY id DESC LIMIT 1",
+      )
+      .get()!;
+    const other = copy
+      .prepare("SELECT id FROM wms_line WHERE tw_id<>? LIMIT 1")
+      .get(issue.tw_id)!;
+    copy
+      .prepare("UPDATE wms_putback_issue SET line_id=? WHERE id=?")
+      .run(other.id, issue.id);
+    assert.equal(A.integrity(copy).ok, false);
+    assert.ok(
+      A.integrity(copy).putback.some((r) => r.problem === "rozbieżność zwrotu"),
+    );
+    copy
+      .prepare("UPDATE wms_putback_issue SET line_id=? WHERE id=?")
+      .run(issue.line_id, issue.id);
+    assert.equal(A.integrity(copy).ok, true);
+    copy.exec("PRAGMA foreign_keys=OFF; DROP TABLE wms_putback");
+    assert.throws(
+      () => A.integrity(copy),
+      /Niepełny schemat rozbieżności zwrotów/,
+    );
+    copy.exec("DROP TABLE wms_putback_issue");
+    assert.equal(A.integrity(copy).ok, true);
+  } finally {
+    copy.close();
+  }
+});

@@ -1,3 +1,4 @@
+import { removePickedAllocation } from "./wms-picked-disposition.js";
 import { z } from "zod";
 import { activePutback } from "./wms.js";
 import { db, nowIso } from "../db/db.js";
@@ -229,48 +230,20 @@ function recordPackingIssue(
     fail("Zeskanuj jednoznaczny kod części z zamówienia", 400);
   const line = matches[0];
   if (
-    kind === "damage" &&
-    db().prepare("SELECT mode FROM wms_bin WHERE bin=?").get(input.quarantine)
-      ?.mode !== "quarantine"
-  )
-    fail("Zeskanuj lokalizację kwarantanny", 400);
-  if (
     input.quantity > line.picked ||
     (!input.parcelNo && input.quantity > line.picked - line.packed)
   )
     fail("Tyle niesprawdzonych sztuk nie znajduje się przy stanowisku", 400);
   if (input.parcelNo)
     removePackedContent(line.id, input.parcelNo, input.quantity);
-  // Zmniejszamy pobrania; uszkodzona sztuka trafia do kwarantanny, a nieobecna nie tworzy żadnego przyjęcia.
-  let left = input.quantity;
-  for (const a of order.allocations.filter(
-    (a) => a.line_id === line.id && a.picked > 0,
-  )) {
-    const take = Math.min(left, a.picked);
-    if (a.quantity === take)
-      db().prepare("DELETE FROM wms_allocation WHERE id=?").run(a.id);
-    else
-      db()
-        .prepare(
-          "UPDATE wms_allocation SET quantity=quantity-?,picked=picked-? WHERE id=?",
-        )
-        .run(take, take, a.id);
-    left -= take;
-    if (!left) break;
-  }
-  if (left)
-    fail("Niespójna historia pobrań. Wstrzymaj zamówienie i wyjaśnij zapas");
-  if (input.quarantine !== null)
-    move(
-      actor,
-      line.tw_id,
-      input.quarantine,
-      input.quantity,
-      0,
-      "return",
-      input.reason,
-      order.id,
-    );
+  removePickedAllocation(
+    actor,
+    order,
+    line.id,
+    input.quantity,
+    input.quarantine,
+    input.reason,
+  );
   db()
     .prepare("UPDATE wms_line SET picked=picked-?,packed=packed-? WHERE id=?")
     .run(input.quantity, input.parcelNo ? input.quantity : 0, line.id);

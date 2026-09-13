@@ -34,6 +34,19 @@ historii nie przepisujemy.
 ---
 
 
+## 0.316.0 — rozbieżność podczas zwrotu z pakowania
+
+Kolektor rozdziela sprawne i uszkodzone części podczas zwrotu. Uszkodzenie wymaga skanu części, jawnej ilości, opisu oraz skanu kwarantanny.
+Zmiana rodzaju części czyści ilość i skan produktu. Kwarantanna nie otrzymuje rezerwacji sprzedażowej.
+Brak fizyczny potwierdza biuro po oddaniu skrzynki na stanowisko i zwolnieniu zadania. Jawne zero oznacza, że niczego nie znaleziono.
+Częściowa korekta zostawia znalezione sztuki do odłożenia. Ostatnie rozliczenie kończy zadanie, zachowując wstrzymanie dla decyzji biura.
+Historia i analityka rozróżniają uszkodzenia oraz braki. Nie powstaje automatyczne zadanie wymiany dla wstrzymanego zamówienia.
+Pakowanie i zwrot współdzielą regułę rozliczenia pobrań. Usunięto powielone zmiany przydziałów; zachowano dziennik i ponowienia.
+Kompaktowy widok Biura zachowuje formularz rozbieżności oraz historię. Nie ukrywa ich razem z drugorzędnymi komunikatami skanowania.
+
+**[wymaga działania]** Rozliczyć oczekujące zapisy, wykonać zweryfikowaną kopię, build i restart API. Odświeżyć Biuro oraz zaktualizować APK.
+Start dodaje tabelę historii rozbieżności zwrotu i indeksy. Starsze kopie pozostają czytelne bez migracji podczas kontroli.
+
 ## 0.314.1 — odłączenie pustej skrzynki po zwrocie
 
 Ostatnia partia zleconego zwrotu kończy przydział skrzynki i usuwa zamówienie z bieżącej trasy, zachowując historię przydziału.

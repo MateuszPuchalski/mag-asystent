@@ -94,6 +94,8 @@ export async function wmsRoutes(app: FastifyInstance) {
   );
   for (const [name, action] of Object.entries({
     claim: Putback.claimPutback,
+    damage: Putback.damagePutback,
+    shortage: Putback.shortagePutback,
     finish: Putback.finishPutback,
     release: Putback.releasePutback,
     abort: Putback.abortPutback,

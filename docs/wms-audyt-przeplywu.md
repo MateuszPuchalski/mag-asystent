@@ -5,6 +5,20 @@ docelowo 1500 zamówień dziennie. Praca i weryfikacja wyłącznie na danych see
 Poprzedni etap był postępem: wdrożył zdjęcia części i zweryfikował zbiórkę.
 Nie stanowi to dowodu ukończenia całego audytu procesów.
 
+## Uszkodzenie lub brak wykryty przy zwrocie
+
+Odtworzono zakleszczenie: po częściowym odłożeniu, oddaniu skrzynki i przerwaniu zlecenia korekta pakowania wymagała nieosiągalnego etapu pakowania.
+Nowy skan kwarantanny rozlicza fizyczne uszkodzenie bez pozornego zwrotu do dobrej półki. Brak wymaga jawnego przeliczenia biura po zwolnieniu skrzynki.
+Wspólna reguła pakowania i zwrotu usuwa tylko rozliczone pobrania. Kwarantanna otrzymuje zapas bez rezerwacji; brak nie tworzy żadnego przyjęcia.
+Zadanie kończy się po rozliczeniu wszystkich pobrań, zachowując wstrzymanie. Nie generuje zamiennika bez decyzji o dalszym losie zamówienia.
+
+[Microsoft opisuje oddzielnie powód zwrotu i dyspozycję produktu](https://learn.microsoft.com/en-us/dynamics365/supply-chain/sales-marketing/specify-how-to-dispose-of-returned-items).
+To źródło dotyczy zwrotów sprzedaży. Nasz wniosek projektowy stosuje rozróżnienie również do niewysłanych pobrań wracających z pakowania.
+
+Regresje obejmują dobrą partię, kwarantannę, częściowy brak, uprawnienia, skany, wersje, awarię transakcji oraz ponowienie.
+Kopia zachowuje historię po zmianie zamówienia i wykrywa rozbieżność przypisaną do niewłaściwej pozycji.
+Test kolektora odzyskuje kwarantannę po utracie odpowiedzi; ponowienie zachowuje jej cel i jeden klucz.
+
 ## Zwrot po przekazaniu do pakowania
 
 Odtworzony przypadek: klient anuluje zamówienie po przekazaniu skrzynki i częściowej kontroli paczek.

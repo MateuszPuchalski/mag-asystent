@@ -21,7 +21,7 @@ fun putbackClaim(task:WmsPutbackTask,station:String,box:String):WmsPutbackDraft 
         put("version",task.version);put("box",task.box);put("station",task.station);put("contentsConfirmed",true)
     },"Odbiór całej zawartości ${task.box} ze stanowiska ${task.station}")
 }
-fun putbackScan(task:WmsPutbackTask,actor:Long,part:WmsReturnTask,scan:WmsReturnScan,raw:String):Pair<WmsReturnScan,WmsPutbackDraft?> {
+fun putbackScan(task:WmsPutbackTask,actor:Long,part:WmsReturnTask,scan:WmsReturnScan,raw:String,damaged:Boolean=false,reason:String=""):Pair<WmsReturnScan,WmsPutbackDraft?> {
     require(task.user_id==actor && task.completed_at==null && task.cancelled_at==null && part in task.picks) { "Odśwież własny zwrot" }
     val code=raw.trim()
     require(code.isNotBlank() && code.length<=120) { "Nieprawidłowy kod" }
@@ -30,6 +30,15 @@ fun putbackScan(task:WmsPutbackTask,actor:Long,part:WmsReturnTask,scan:WmsReturn
         WmsReturnStage.PRODUCT -> { require(code.equals(part.sku,ignoreCase=true)||code==part.barcode) { "Zeskanuj część ${part.sku}" };scan.copy(barcode=code) to null }
         WmsReturnStage.QUANTITY -> throw IllegalArgumentException("Najpierw policz i potwierdź ilość")
         WmsReturnStage.BIN -> {
+            if(damaged) {
+                require(scan.quantity!=null && scan.quantity in 1..part.remaining) { "Policz uszkodzone sztuki" }
+                require(reason.trim().length in 3..500) { "Opisz uszkodzenie przed odłożeniem" }
+                require(code.matches(Regex("^[A-Z0-9][A-Z0-9-]{0,29}$"))) { "Zeskanuj kwarantannę" }
+                return scan to WmsPutbackDraft(task.id,"api/wms/putback/${task.id}/damage",buildJsonObject {
+                    put("version",task.version);put("orderVersion",task.order_version);put("box",task.box);put("allocationId",part.allocation_id)
+                    put("barcode",scan.barcode);put("quantity",scan.quantity);put("quarantine",code);put("reason",reason.trim())
+                },"Kwarantanna ${scan.quantity} × ${part.sku}: ${task.box} → $code")
+            }
             val target=returnDestination(part,scan,code)
             scan to WmsPutbackDraft(task.id,"api/wms/putback/${task.id}/finish",buildJsonObject {
                 put("version",task.version);put("orderVersion",task.order_version);put("box",task.box);put("allocationId",part.allocation_id)

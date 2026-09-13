@@ -28,6 +28,25 @@ private class PutbackClient(val store:PutbackStore):WmsPutbackTransport {
     }
 }
 class WmsPutbackTest {
+    @Test fun `uszkodzenie wymaga czesci jawnej ilosci powodu i kwarantanny`() {
+        val t=putbackFixture.copy(user_id=4)
+        val scan=WmsReturnScan(true,"LOC:PART",1)
+        assertThrows(IllegalArgumentException::class.java){putbackScan(t,4,putbackPart,scan,"Q-01",true,"")}
+        assertThrows(IllegalArgumentException::class.java){putbackScan(t,4,putbackPart,scan.copy(quantity=3),"Q-01",true,"Pęknięcie")}
+        val draft=putbackScan(t,4,putbackPart,scan,"Q-01",true,"Pęknięcie").second!!
+        assertTrue(draft.path.endsWith("/damage"));assertEquals("LOC:PART",draft.body["barcode"]!!.jsonPrimitive.content)
+        assertEquals("Q-01",draft.body["quarantine"]!!.jsonPrimitive.content);assertFalse(draft.body.containsKey("target"))
+        assertThrows(IllegalArgumentException::class.java){putbackScan(t,4,putbackPart,scan,"Q-01")}
+    }
+    @Test fun `kwarantanna po utracie odpowiedzi wraca jednym kluczem bez pamieci skrzynki`()=runTest {
+        val store=PutbackStore();val client=PutbackClient(store);client.task=putbackFixture.copy(user_id=4)
+        var c=WmsPutbackController(store,{client});c.select(putbackActor,1)
+        val draft=putbackScan(client.task,4,putbackPart,WmsReturnScan(true,"LOC:PART",1),"Q-01",true,"Pęknięcie").second!!
+        client.lost=true;c.submit(putbackActor,draft);val saved=store.journal.pending!!
+        c=WmsPutbackController(store,{client});c.open(putbackActor);client.lost=false;c.retry(putbackActor)
+        assertEquals(saved.key,client.sent.last().key);assertEquals(saved.body,client.sent.last().body)
+        assertEquals(1,client.committed.size);assertNull(store.journal.pending);assertNull(c.state.value.confirmedBox)
+    }
     @Test fun `odbior i zwolnienie wymagaja fizycznego stanowiska oraz skrzynki`() {
         assertThrows(IllegalArgumentException::class.java){putbackClaim(putbackFixture,"EX","BOX")}
         assertThrows(IllegalArgumentException::class.java){putbackClaim(putbackFixture,"PACK","LOC:BOX")}

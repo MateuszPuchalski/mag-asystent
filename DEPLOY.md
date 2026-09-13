@@ -15,6 +15,12 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.316.0 zlecony zwrot rozlicza także uszkodzenia i potwierdzone braki. Rozliczyć oczekujące zapisy i wykonać zweryfikowaną kopię przed aktualizacją.
+Wykonać build, restart API, odświeżyć Biuro i zaktualizować APK. Start tworzy `wms_putback_issue` oraz indeksy historii.
+
+Odbiór seeded: jedna dobra sztuka na półkę → uszkodzona do kwarantanny → oddanie reszty → potwierdzony brak biura → decyzja o zamówieniu.
+Ponowienie kwarantanny i braku musi zachować jeden zapis. Wstrzymanie, poprawne rezerwacje i historia mają pozostać zgodne.
+
 Od 0.314.0 dostępne są zlecone zwroty z pakowania. Przed aktualizacją rozliczyć oczekujące zapisy i wykonać zweryfikowaną kopię bazy.
 Wykonać build, restart API, odświeżyć Biuro i zaktualizować APK. Start dodaje tabelę `wms_putback` bez automatycznego tworzenia zadań.
 Odbiór seeded: częściowe pakowanie → wstrzymanie → zlecenie Biura → odbiór skrzynki → częściowe odłożenie → zakończenie → decyzja biura.

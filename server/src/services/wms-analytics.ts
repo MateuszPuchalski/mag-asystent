@@ -136,6 +136,11 @@ export function analytics(raw: unknown, database: Db = db()) {
       WHERE i.created_at>=? AND i.created_at<=? GROUP BY i.kind ORDER BY i.kind`,
       )
       .all(since, now);
+    const putbackIssues = d
+      .prepare(
+        "SELECT kind,count(*) AS cases,sum(quantity) AS units FROM wms_putback_issue WHERE created_at>=? AND created_at<=? GROUP BY kind ORDER BY kind",
+      )
+      .all(since, now);
     const flow = flowAnalytics(d, since, now);
     d.exec("COMMIT");
     return {
@@ -156,6 +161,7 @@ export function analytics(raw: unknown, database: Db = db()) {
       channels,
       adjustments,
       packingIssues,
+      putbackIssues,
       dispatchCoverage,
     };
   } catch (e) {
@@ -285,6 +291,13 @@ export function integrity(database: Db = db()) {
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name='wms_putback'",
       )
       .get();
+    const hasPutbackIssues = database
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='wms_putback_issue'",
+      )
+      .get();
+    if (hasPutbackIssues && !hasPutback)
+      throw new Error("Niepełny schemat rozbieżności zwrotów WMS");
     if (hasPutback && recoveryTables.length === 0)
       throw new Error("Niepełny schemat zleconych zwrotów WMS");
     const putback = hasPutback
@@ -299,6 +312,16 @@ export function integrity(database: Db = db()) {
           )
           .all()
       : [];
+    if (hasPutbackIssues)
+      putback.push(
+        ...database
+          .prepare(
+            `SELECT i.id,p.order_id,'rozbieżność zwrotu' AS problem FROM wms_putback_issue i
+      LEFT JOIN wms_putback p ON p.id=i.task_id LEFT JOIN wms_line l ON l.id=i.line_id
+      WHERE p.id IS NULL OR (i.line_id IS NOT NULL AND (l.id IS NULL OR l.order_id<>p.order_id OR l.tw_id<>i.tw_id))`,
+          )
+          .all(),
+      );
     database.exec("COMMIT");
     return {
       ok:

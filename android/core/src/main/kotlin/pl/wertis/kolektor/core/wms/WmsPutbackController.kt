@@ -137,7 +137,7 @@ class WmsPutbackController(
         }
         // Ciągłość dotyczy tylko rozliczonego zapisu tej samej skrzynki. Odczyt
         // po pauzie lub restarcie nie dziedziczy potwierdzenia fizycznego odbioru.
-        mutable.value = mutable.value.copy(message = rejection, confirmedBox=if(rememberBox && rejection==null && (pending.path.endsWith("/claim") || pending.path.endsWith("/finish"))) pending.body["box"]?.jsonPrimitive?.content else null)
+        mutable.value = mutable.value.copy(message = rejection, confirmedBox=if(rememberBox && rejection==null && (pending.path.endsWith("/claim") || pending.path.endsWith("/finish") || pending.path.endsWith("/damage"))) pending.body["box"]?.jsonPrimitive?.content else null)
     }
 
     private suspend fun load(context: WmsContext, id: Long, client: WmsPutbackTransport, epoch: Long?) {
