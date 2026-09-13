@@ -80,6 +80,12 @@ const TRASY = () => [
      odmowy uprzywilejowanej. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/pieniadze` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/odmowa-platnosci` },
+  /* Notatka i rozjazdy (0.313.0). Rozjazdy są ODCZYTEM, a mimo to stoją tu
+     razem z zapisami: niosą kody koszy i numery zwrotów po terminie, czyli
+     pracę biura, nie halę. */
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka` },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij` },
+  { method: "GET" as const, url: "/api/obsluga/zwroty/rozjazdy" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -272,8 +278,14 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      Allegro i jego cofnięcie. Przy pobraniu to JEDYNY ślad po wypłacie —
      Allegro tych pieniędzy nie trzymało, więc trasa `pieniadze` jest tam
      zamknięta z definicji, a zwrot zamykał się bez dowodu, że oddaliśmy. */
-  assert.equal(posty.length, 24,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu czterech`);
+  /* Dwudziesta piąta i szósta (0.313.0): notatka biura i cofnięcie jej zmiany.
+     Kolumna `notatka` stała w bazie od 0.172.0, ale wypełniała ją wyłącznie
+     rejestracja paczki nieodebranej — przy zwrocie z Allegro nie było jak
+     zapisać ustalenia, więc wracało ono do panelu Allegro albo do niczyjej
+     pamięci. Druga trasa jest z §25a.5: notatkę nadpisuje ten, kto pisze
+     ostatni, a skasowane zdanie musi mieć drogę powrotną. */
+  assert.equal(posty.length, 26,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu sześciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
@@ -745,4 +757,77 @@ test("dociągnięcie po skanie wymaga sparowanego konta", async () => {
     headers: naglowki, payload: { kod: ETYKIETA } });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /nie jest sparowane/);
+});
+
+test("rozjazdy oddają WYŁĄCZNIE kontrole zwrotów, nie całą halę", async () => {
+  /* `/api/reconcile` niesie też lokalizacje kartotek i zadania w błędzie,
+     a do tego nie ma bramki ról (`routes/device.ts`). Panel obsługi dostaje
+     wąską trasę: cztery kontrole i nic poza tym. */
+  const { naglowki } = login("biuro", "Biuro Basia");
+  const r = await app.inject({
+    method: "GET", url: "/api/obsluga/zwroty/rozjazdy", headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  const rodzaje: string[] = r.json().rozjazdy.map((x: { rodzaj: string }) => x.rodzaj);
+  const wolno = new Set([
+    "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu"]);
+  for (const x of rodzaje) assert.ok(wolno.has(x), `rozjazd ${x} nie należy do zwrotów`);
+});
+
+test("oś zwrotu wychodzi z odczytu szczegółu, rosnąco po czasie", async () => {
+  /* Trasa oddawała oś od 0.156.0 i nikt jej nie rysował — panel dostał typ
+     `WpisOsiZwrotu` i zostawił go nieużytym. Kształt pilnujemy tutaj, bo od
+     0.313.0 rysuje go karta w kolumnie dowodów. */
+  const d = db();
+  const wstaw = d.prepare(`INSERT INTO zwrot_zdarzenie
+    (zwrot_id,rodzaj,tresc,dane_json,kiedy_at,kto) VALUES (?,?,?,?,?,?)`);
+  wstaw.run(zwrot, "kwota", "Do oddania 49,99 (pełna)", '{"kwotaGrosze":4999}',
+    "2026-09-02T10:00:00Z", "Ala z biura");
+  wstaw.run(zwrot, "werdykt", "Zwrot przyjęty", "{}", "2026-09-01T10:00:00Z", "Ala z biura");
+  /* Zepsuty JSON nie ma prawa wywrócić całej osi — jeden wiersz to jeden
+     wiersz, a oś jest jedynym miejscem, gdzie widać przebieg sprawy. */
+  wstaw.run(zwrot, "rabat", "Rabat zgłoszony", "{to nie jest json",
+    "2026-09-03T10:00:00Z", "automat");
+
+  const { naglowki } = login("biuro", "Biuro Bożena");
+  const r = await app.inject({
+    method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(r.statusCode, 200);
+  const os = r.json().os as Array<{ rodzaj: string; kiedy: string; dane: unknown }>;
+  assert.deepEqual(os.map((w) => w.rodzaj), ["werdykt", "kwota", "rabat"],
+    "najstarsze na górze — oś czyta się w kolejności pracy");
+  assert.deepEqual(os[1].dane, { kwotaGrosze: 4999 });
+  assert.equal(os[2].dane, null, "zepsuty JSON to brak danych, nie awaria odczytu");
+});
+
+test("notatka zapisuje się przy zwrocie ZAMKNIĘTYM i da się ją cofnąć", async () => {
+  /* Notatkę dopisuje się najczęściej PO zamknięciu, gdy sprawa wraca
+     pytaniem. Bramka na stanie końcowym kazałaby wybierać między poprawną
+     kolejnością pracy a zapisaniem ustalenia. */
+  db().prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-05T10:00:00Z' WHERE id=?")
+    .run(zwrot);
+  const { naglowki } = login("biuro", "Biuro Bogdan");
+  const zapisz = (tresc: string | null) => app.inject({
+    method: "POST", url: `/api/obsluga/zwroty/${zwrot}/notatka`,
+    headers: naglowki, payload: { notatka: tresc } });
+
+  const pierwsza = await zapisz("klient dzwonił, czeka na przelew");
+  assert.equal(pierwsza.statusCode, 200);
+  assert.equal(pierwsza.json().notatka, "klient dzwonił, czeka na przelew");
+  assert.equal(pierwsza.json().notatkaPrzez, "Biuro Bogdan");
+
+  await zapisz(null);
+  const cofniete = await app.inject({
+    method: "POST", url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij`, headers: naglowki });
+  assert.equal(cofniete.statusCode, 200);
+  assert.equal(cofniete.json().notatka, "klient dzwonił, czeka na przelew",
+    "cofnięcie wraca do zdania sprzed skasowania");
+
+  /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: notatka bywa zdaniem o kliencie,
+     a `events` nie ma retencji (§9 architektury). */
+  const wpisy = db().prepare(
+    "SELECT payload FROM events WHERE type LIKE 'zwrot_notatka%'").all() as Array<{ payload: string }>;
+  assert.ok(wpisy.length >= 2);
+  for (const w of wpisy) {
+    assert.ok(!w.payload.includes("czeka na przelew"), "treść notatki nie idzie do dziennika");
+  }
 });
