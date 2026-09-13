@@ -40,17 +40,36 @@ window.WmsCarts = (h) => {
     damaged: "Uszkodzony towar",
     box_full: "Pełna skrzynka",
   };
-  async function renderPacking() {
+  function packingForm() {
     const saved =
       sessionStorage.getItem(`wertis.wms.station.${h.userId()}`) || "";
-    panel(
-      `<h2>Pakowanie · skan skrzynki</h2><p>Wskaż stanowisko i zeskanuj przekazaną skrzynkę. WMS otworzy jej zamówienie oraz kontrolę towarów.</p><form id="wms-cart-pack" class="wms-form">${field("station", "Skan stanowiska pakowania", "text", saved, 'autocomplete="off"')}${field("box", "Skan skrzynki", "text", "", 'autocomplete="off"')}<button class="primary">OTWÓRZ PAKOWANIE</button></form>`,
-    );
+    return `<form id="wms-cart-pack" class="wms-form">${field("station", "Skan stanowiska pakowania", "text", saved, 'autocomplete="off"')}${field("box", "Skan skrzynki", "text", "", 'autocomplete="off"')}<button class="primary">OTWÓRZ PAKOWANIE</button></form>`;
+  }
+  function focusPacking() {
+    const form = document.getElementById("wms-cart-pack");
+    if (!form) return false;
     focus(
-      document
-        .getElementById("wms-cart-pack")
-        ?.elements.namedItem(saved ? "box" : "station"),
+      form.elements.namedItem(
+        form.elements.namedItem("station").value ? "box" : "station",
+      ),
     );
+    return true;
+  }
+  async function packingApplied(path, values, result) {
+    if (path !== "/api/wms/cart-box-pack") return false;
+    // Ponowienie po utracie odpowiedzi musi otworzyć tę samą skrzynkę co zwykły skan.
+    sessionStorage.setItem(
+      `wertis.wms.station.${h.userId()}`,
+      values.station.trim().toUpperCase(),
+    );
+    await h.openOrder(result.id);
+    return true;
+  }
+  async function renderPacking() {
+    panel(
+      `<h2>Pakowanie · skan skrzynki</h2><p>Wskaż stanowisko i zeskanuj przekazaną skrzynkę. WMS otworzy jej zamówienie oraz kontrolę towarów.</p>${packingForm()}`,
+    );
+    focusPacking();
   }
   async function render() {
     verifiedStop = null;
@@ -271,11 +290,7 @@ window.WmsCarts = (h) => {
     if (form.id === "wms-cart-pack") {
       result = await mutate("/api/wms/cart-box-pack", values);
       if (result) {
-        sessionStorage.setItem(
-          `wertis.wms.station.${h.userId()}`,
-          values.station,
-        );
-        await h.openOrder(result.id);
+        await packingApplied("/api/wms/cart-box-pack", values, result);
       }
       return true;
     }
@@ -414,5 +429,14 @@ window.WmsCarts = (h) => {
     }
     return true;
   }
-  return { render, renderPacking, click, submit, stationSelect };
+  return {
+    render,
+    renderPacking,
+    packingForm,
+    focusPacking,
+    packingApplied,
+    click,
+    submit,
+    stationSelect,
+  };
 };

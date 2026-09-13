@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import path from "node:path";
+import { exercisePackingContinuity } from "./wms-packing-continuity-e2e.mjs";
 
 export async function exerciseCarts(page, output) {
   let photoRequests = 0;
@@ -190,6 +191,7 @@ export async function exerciseCarts(page, output) {
     await expect(
       page.locator('#wms-work form[data-action-wms="pack"]'),
     ).toBeVisible();
+    if (capacity === 30) await exercisePackingContinuity(page, output, post);
     if (!(await page.locator('[data-tab-wms="carts"]').isVisible()))
       await page.locator('#wms-work [data-do-wms="queue"]').click();
     await page.locator('[data-tab-wms="carts"]').click();

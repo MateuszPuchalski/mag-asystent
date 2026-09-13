@@ -43,6 +43,9 @@ export async function exercisePacking(page, output) {
   await act({ action: "pack-start", tote: o.tote });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('[data-tab-wms="orders"]').click();
+  await expect(page.locator("#wms-filter")).toBeAttached();
+  if (!(await page.locator("#wms-filter").isVisible()))
+    await page.locator('#wms-work [data-do-wms="queue"]').click();
   await page.locator('#wms-filter [name="q"]').fill("E2E-MULTI-CONTENTS");
   await page.locator('#wms-filter [name="status"]').selectOption("all");
   await page.locator("#wms-filter").evaluate((f) => f.requestSubmit());

@@ -15,6 +15,10 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+Od 0.321.0 ekran przygotowanych paczek przyjmuje następną skrzynkę. Stanowisko pozostaje w sesji użytkownika, a ponowienie otwiera właściwe zamówienie.
+Wykonać zweryfikowaną kopię, build, restart API i odświeżyć Biuro. Odbiór seeded obejmuje dwie kolejne skrzynki oraz utratę odpowiedzi przy drugiej.
+Zmiana pakowania nie dodaje tabel. Scalony main zawiera migrację Obsługi dla automatu rabatów; opis znajduje się w historii 0.320.0.
+
 Od 0.320.0 kolektor wyszukuje kolejne zadanie skanem bezpośrednio po zakończeniu odkładania. Powrót do listy zachowuje filtr w bieżącej sesji.
 Zmiana wymaga nowego APK, bez migracji bazy. Przed aktualizacją rozliczyć oczekujące zapisy; nie czyścić danych aplikacji.
 Odbiór seeded: zakończyć odłożenie, zeskanować kolejną część, wybrać zadanie i sprawdzić wymaganie nowych skanów bufora oraz części.

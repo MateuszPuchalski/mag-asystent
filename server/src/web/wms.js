@@ -460,7 +460,8 @@ window.Wms = (() => {
             String(Number(b.dataset.orderWms) === o.id),
           ),
         );
-      focusWhenReady(el("wms-step")?.querySelector("input"));
+      if (!cartUi.focusPacking())
+        focusWhenReady(el("wms-step")?.querySelector("input"));
     } catch (e) {
       readFailure(e, turn);
       throw e;
@@ -485,7 +486,7 @@ window.Wms = (() => {
   function step(o) {
     if (o.shipments.length && o.status === "packed")
       return (
-        `<div class="wms-message">Paczki przygotowane. Odbiór przez kuriera wymaga potwierdzenia w Wydaniach.</div>${o.shipments.map(packingUi.saved).join("")}<button data-tab-wms="handoff">PRZEJDŹ DO WYDAŃ</button>` +
+        `<div class="wms-message">Paczki przygotowane. Odbiór przez kuriera wymaga potwierdzenia w Wydaniach.</div><section class="wms-surface"><h3>Pakuj kolejną skrzynkę</h3>${cartUi.packingForm()}</section>${o.shipments.map(packingUi.saved).join("")}<button data-tab-wms="handoff">PRZEJDŹ DO WYDAŃ</button>` +
         handoffUi.repackForm(o)
       );
     if (o.hold_reason)
@@ -1030,7 +1031,8 @@ window.Wms = (() => {
         if (p) {
           const result = await mutate(p.path, p.body, p);
           if (result) {
-            await refresh();
+            if (!(await cartUi.packingApplied(p.path, p.body, result)))
+              await refresh();
             message("Potwierdzono poprzednią operację.");
           }
         }
@@ -1475,6 +1477,14 @@ window.Wms = (() => {
   });
   // Enter ze skanera przechodzi do kodu SKU; kolejny Enter zatwierdza sztukę.
   document.addEventListener("keydown", (event) => {
+    if (
+      event.key === "Enter" &&
+      event.target.form?.id === "wms-cart-pack" &&
+      event.target.name === "station"
+    ) {
+      advanceScan(event, "box");
+      return;
+    }
     if (event.key === "Enter" && event.target.form?.id === "wms-empty-box") {
       const next = {
         place: "box",

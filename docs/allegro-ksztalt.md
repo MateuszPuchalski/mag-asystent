@@ -487,6 +487,11 @@ większe od zera. Odpowiedź 201 niesie samo `{ id }` utworzonego wniosku.
 z `/order/checkout-forms`), nie oferty i nie pozycji zwrotu. Trzymamy go
 w `zamowienie_klienta_pozycja.external_id`.
 
+Od 0.320.0 to żądanie wysyła też AUTOMAT, zaraz po zaciągnięciu odstąpienia
+(§25a.20 panelu). Dlatego czeka pół godziny: `AUTOMATIC` w 40 rekordach na 100
+znaczy, że Allegro zakłada część wniosków samo, a końcówka bez idempotencji
+przyjęłaby nasz jako drugi.
+
 **LISTA WNIOSKÓW TO NIE JEDYNE ŹRÓDŁO.** Wniosek złożony w panelu Allegro
 trafia do niej dopiero z opóźnieniem, a my czytamy ją taktem co kwadrans.
 Drugim źródłem jest sam zwrot: `COMMISSION_REFUND_CLAIMED` i

@@ -564,6 +564,11 @@ czeka na odbiór; skrzynka zbiórkowa jest już wolna. W **Wydaniach** otwórz
 przekazanie dla przewoźnika i skanuj etykiety podczas fizycznego przekazywania.
 Powtórzenie tego samego skanu nie dodaje drugiej paczki.
 
+Po zapisaniu paczek skanuj następną skrzynkę bez powrotu do zakładki **Pakowanie**. Stanowisko pozostaje wybrane; możesz je zmienić przed skanem skrzynki.
+Enter po stanowisku przenosi fokus do skrzynki. Skan skrzynki otwiera jej zamówienie, a pole części jest gotowe do kontroli.
+Podsumowanie poprzednich paczek pozostaje widoczne do otwarcia następnego zamówienia. Nie oznacza potwierdzenia odbioru kuriera.
+Po utracie odpowiedzi użyj **PONÓW**. Potwierdzony wynik otworzy właściwą skrzynkę bez ponownego rozpoczynania pakowania.
+
 Usuń z listy paczki, które zostają na hali. Przed zamknięciem potwierdź, że kurier
 odebrał wszystkie paczki wskazane na liście. Dopiero odbiór całego zamówienia
 ustawia stan **Wysłane**. Możesz pobrać pełną listę przekazania jako CSV.

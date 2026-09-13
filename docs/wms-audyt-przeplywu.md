@@ -5,6 +5,22 @@ docelowo 1500 zamówień dziennie. Praca i weryfikacja wyłącznie na danych see
 Poprzedni etap był postępem: wdrożył zdjęcia części i zweryfikował zbiórkę.
 Nie stanowi to dowodu ukończenia całego audytu procesów.
 
+## Ciągłość codziennego odkładania i pakowania
+
+Kolektor przyjmuje skan następnego zadania po zakończeniu odkładania. Ręczny powrót zachowuje filtr i stronę w bieżącej sesji.
+Opis i regresje: [audyt kolektora](wms-kolektor-audyt.md).
+
+Audyt przeglądarki odtworzył dodatkowe przejście do zakładki Pakowanie po przygotowaniu paczek. Ekran potwierdzenia nie miał pola kolejnej skrzynki.
+Wspólny formularz stanowiska i skrzynki jest teraz dostępny w tym kroku. Zapamiętuje stanowisko, a fokus trafia do pustego pola skrzynki.
+Poprzednie paczki pozostają widoczne. Odbiór kuriera jest nadal osobną czynnością podczas fizycznego przekazania.
+
+Zwykły skan i ponowienie korzystają z jednego zakończenia operacji. Utrata odpowiedzi nie pozostawia operatora przy starym zamówieniu po podjęciu następnego.
+Test przechodzi dwa kolejne zamówienia bez nawigacji, weryfikuje błędną skrzynkę, stanowisko, wstrzymanie i utratę odpowiedzi.
+Usunięto jedno przejście między zamówieniami. Nie jest to pomiar czasu ani przepustowości pracy hali.
+
+[Microsoft opisuje łączenie kroków identyfikacji, zamykania i wyszukiwania w procesie pakowania](https://www.microsoft.com/en-us/dynamics-365/blog/it-professional/2022/11/15/improve-packing-efficiency-with-the-warehouse-management-mobile-app/).
+Umieszczenie następnej skrzynki przy potwierdzeniu WERTIS jest naszym zastosowaniem tej zasady.
+
 ## Uszkodzenie lub brak wykryty przy zwrocie
 
 Odtworzono zakleszczenie: po częściowym odłożeniu, oddaniu skrzynki i przerwaniu zlecenia korekta pakowania wymagała nieosiągalnego etapu pakowania.

@@ -63,6 +63,8 @@ import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
 import { synchronizujAllegroReklamacje } from "./services/allegro-reklamacje-sync.js";
 import { synchronizujAllegroRabaty } from "./services/allegro-rabaty-sync.js";
+import { zlozBrakujaceWnioski } from "./services/rabaty-automat.js";
+import { zglosRabat } from "./adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
@@ -391,8 +393,25 @@ async function main() {
     });
     /* Wnioski o rabat idą OSOBNYM taktem, nie doklejone do zwrotów: jedna
        końcówka nie ma prawa zabrać drugiej ze sobą, gdy odpowie błędem
-       (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację). */
-    uruchomTakt("allegro-rabaty", config.allegro.rabatySyncMs, synchronizujAllegroRabaty);
+       (blizna 0.149.2 — jeden zepsuty wątek zatrzymywał całą synchronizację).
+
+       DWA KROKI W JEDNYM TAKCIE, w tej kolejności (0.320.0): najpierw lustro
+       wniosków, potem składanie brakujących. Odwrotnie automat pytałby o stan
+       sprzed kwadransa i składał drugi wniosek do pozycji, która pierwszy
+       dostała w panelu Allegro. Składanie pod parasolem, bo odmowa jednego
+       wniosku nie ma prawa zatrzymać odświeżania lustra. */
+    uruchomTakt("allegro-rabaty", config.allegro.rabatySyncMs, async () => {
+      await synchronizujAllegroRabaty();
+      try {
+        const w = await zlozBrakujaceWnioski(db(),
+          (lineItemId, ilosc) => zglosRabat(config.allegro.apiUrl, lineItemId, ilosc));
+        if (w.zlozone || w.bledy) {
+          console.log(`[rabat] automat: ${w.zlozone} złożonych, ${w.bledy} odmów`);
+        }
+      } catch (e) {
+        console.error("[rabat] automat:", e instanceof Error ? e.message : e);
+      }
+    });
     /* Reklamacje (0.222.0) — piąty ticker i piąty rytm. Gęstszy niż zwroty,
        rzadszy niż skrzynka: reklamacja niesie CZAT, więc klient czeka na
        odpowiedź jak w skrzynce, ale `decisionDueDate` liczy się w dniach.

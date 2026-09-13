@@ -3419,6 +3419,48 @@ Pod kolejką stoi zdanie o ukrytych z drogą powrotną jednym kliknięciem. Sito
 pamięta wybór między otwarciami ekranu, a filtr, który pamięta i milczy,
 zagłodziłby sprawy spoza sita.
 
+### 25a.20. Wniosek o rabat składany sam (0.320.0)
+
+Ręczny przycisk przy pozycji stoi od 0.164.0 i działa. Trzeba o nim tylko
+pamiętać przy KAŻDYM zwrocie, a na liście stoi ich kilkaset. Prowizja, po którą
+nikt nie kliknął, zostaje u Allegro. Zgłoszenie właściciela z 13 września
+brzmiało wprost: wniosek ma iść sam.
+
+**Kiedy.** Zaraz po tym, jak dowiadujemy się o odstąpieniu — czyli po
+zaciągnięciu zwrotu, jeszcze przed werdyktem biura. To też decyzja
+właściciela. Wniosek NIE JEST decyzją o towarze: dotyczy prowizji od
+transakcji, którą klient wycofał. Nie czeka więc ani na ocenę, ani na korektę.
+Gdyby zwrot skończył się odmową, wniosek zdejmuje się w panelu Allegro.
+
+**Pół godziny karencji.** Czterdzieści wniosków na sto zakłada Allegro samo
+(`type: AUTOMATIC`, obserwacja z 2 września). Końcówka nie ma idempotencji,
+więc nasz wniosek złożony w tej samej minucie byłby DRUGIM zgłoszeniem do tej
+samej prowizji. Karencja daje lustru wniosków szansę zobaczyć ich wniosek,
+zanim strażnik odpowie „brak". Przed wnioskiem Allegro złożonym po dniach nie
+broni to nic — poza ich własną stroną.
+
+**Co odpada.** Paczka nieodebrana nie jest odstąpieniem: klient niczego nie
+zgłosił, przesyłka wróciła sama. Pozycja dopisana przez biuro odpada tak samo,
+bo nie ma jej w zgłoszeniu klienta. Wniosek o prowizję od czegoś, czego klient
+nie zwrócił, byłby zgłoszeniem nieprawdy.
+
+**Tylko nowe zwroty** — również decyzja właściciela. Pozycje zastane w chwili
+wdrożenia migracja stempluje raz (`rabat_poza_automatem`). Bez tego pierwszy
+takt wysłałby serię żądań o zwroty sprzed miesięcy. Część wróciłaby odmową,
+a odmowy nie cofa się jednym kliknięciem. Ten sam wzorzec co przy powrocie
+kosza z bufora (0.266.0). Zaległości zostają przy ręcznym przycisku.
+
+**Gdzie to chodzi.** W takcie rabatów, dwoma krokami: najpierw lustro wniosków,
+potem składanie brakujących. Odwrotna kolejność pytałaby o stan sprzed
+kwadransa. Sufit dwudziestu wniosków na przebieg jest OSTROŻNOŚCIĄ, nie
+optymalizacją: po dłuższej przerwie w synchronizacji seria stu żądań zderzyłaby
+się z limitem Allegro. Limit przerywa przebieg, bo dotyczy wszystkich
+następnych żądań; reszta czeka na następny takt.
+
+Wniosek automatu podpisuje się na osi zwrotu jako „automat (odstąpienie)"
+i nie ma konta w aplikacji. Odmowa Allegro zostaje w dzienniku ze zdaniem —
+bez niego pytanie „dlaczego nie ma wniosku" nie ma odpowiedzi.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4352,6 +4394,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rabat transakcyjny — stan przy pozycji | **działa** od 0.164.0 | `services/rabaty.ts`, `allegro_rabat`, `zwrot_klienta.status_allegro` |
 | Rabat transakcyjny — złożenie wniosku | **działa** od 0.164.0 | PIERWSZY zapis do Allegro; wymaga `allegro:api:orders:write` |
 | Anulowanie wniosku o rabat | **niepotrzebne** | decyzja właściciela: Allegro anuluje wniosek samo |
+| Rabat transakcyjny — wniosek składany sam | **działa** od 0.320.0 | `services/rabaty-automat.ts`; karencja 30 min, sufit 20 na takt, zastane pozycje poza automatem |
 | Reklamacje — odczyt, kolejka i czat | **działa** od 0.222.0 | `services/reklamacje.ts`, `services/allegro-reklamacje-sync.ts`, `panel/src/reklamacje/` |
 | Termin decyzji przy reklamacji | **z Allegro** od 0.222.0 | `decisionDueDate`; sprzed 0.140.0 liczyliśmy go sami i było to błędem |
 | Dyskusje (`type: "DISPUTE"`) | **działa** od 0.245.0 | §25c; `services/dyskusje.ts`, `panel/src/dyskusje/` |

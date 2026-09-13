@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.321.0 — następna skrzynka bez opuszczania pakowania
+
+Po zapisaniu przygotowanych paczek można od razu zeskanować kolejną skrzynkę. Wspólny formularz zachowuje stanowisko i ustawia fokus do skanu.
+Enter po zmianie stanowiska prowadzi do skrzynki. Poprzednie etykiety pozostają widoczne; odbiór kuriera wymaga osobnego potwierdzenia.
+Ponowienie utraconej odpowiedzi otwiera właściwe zamówienie. Nie pozostawia pakującego przy poprzedniej skrzynce po rozpoczęciu kolejnej.
+Browser E2E przechodzi dwa zamówienia bez nawigacji oraz sprawdza błędne kody, wstrzymanie i jeden zapis przy ponowieniu.
+Scalono main z automatem rabatów transakcyjnych Obsługi. Dane odbioru WMS pozostają seeded, bez połączenia z żywym Allegro.
+
 ## 0.320.1 — filtr na ekranie zgodny ze skanem
 
 Skan tego samego kodu ponownie pokazuje rzeczywisty filtr listy, także po wpisaniu niewysłanego tekstu ręcznie.
@@ -45,6 +53,37 @@ Po zakończeniu odkładania kolektor przyjmuje skan następnej części lub bufo
 Ręczny powrót zachowuje filtr i stronę listy w bieżącej sesji. Nowe wyszukiwanie zaczyna od pierwszej strony.
 Zmiana konta lub serwera czyści kontekst. Skan ze starego ekranu, częściowe zadanie i nieznany zapis nie pozwalają przejść dalej.
 Wybór i podjęcie następnego zadania nadal wymagają świeżych skanów bufora oraz części. Pięć nowych regresji; pełny core ma 453 testy.
+
+## 0.320.0 — 13 września 2026
+
+**Wniosek o rabat transakcyjny idzie sam.** Ręczny przycisk przy pozycji zwrotu
+stoi od 0.164.0 i działa — trzeba tylko o nim pamiętać przy każdym z kilkuset
+zwrotów. Prowizja, po którą nikt nie kliknął, zostaje u Allegro. Zgłoszenie
+właściciela: „musimy zrobić automatyczny wniosek o rabat transakcyjny do
+zwracanych przedmiotów".
+
+- **Automat składa wniosek zaraz po odstąpieniu**, jeszcze przed werdyktem
+  biura. Wniosek dotyczy PROWIZJI od wycofanej transakcji, a nie towaru, więc
+  nie czeka ani na ocenę, ani na korektę. To decyzja właściciela, zapisana
+  wprost: wniosek ma iść, jak tylko dowiemy się o odstąpieniu.
+- **Pół godziny karencji przed wysyłką.** Czterdzieści wniosków na sto zakłada
+  Allegro samo, a końcówka nie ma idempotencji: nasz wniosek złożony w tej
+  samej minucie byłby DRUGIM zgłoszeniem do tej samej prowizji. Karencja daje
+  lustrowi wniosków szansę zobaczyć ich wniosek pierwszy.
+- **Paczka nieodebrana i pozycja dopisana przez biuro odpadają.** W pierwszej
+  klient niczego nie zgłosił, w drugiej nie ma jej w zgłoszeniu klienta.
+- **Sufit dwudziestu wniosków na takt**, a limit Allegro przerywa przebieg
+  zamiast mnożyć odmowy. Odmowa jednej pozycji nie zabiera pozostałych i zostaje
+  w dzienniku ze zdaniem.
+- **Automat podpisuje się jako „automat (odstąpienie)"** na osi zwrotu i nie ma
+  konta w aplikacji — wynik automatu nie udaje decyzji człowieka.
+- **[wymaga działania] Tylko nowe zwroty.** Migracja stempluje pozycje zastane
+  w chwili wdrożenia jako `rabat_poza_automatem` i mówi w logu, ile ich było.
+  Do nich wniosek składa biuro przyciskiem, tak jak przed tym wydaniem. Bez
+  stempla pierwszy takt wysłałby serię żądań o zwroty sprzed miesięcy.
+
+Nowego uprawnienia Allegro to nie potrzebuje: `allegro:api:orders:write` jest
+w użyciu od 0.164.0. Szczegóły w `docs/panel-obslugi-klienta.md` §25a.20.
 
 ## 0.319.0 — pusta skrzynka bez anulowania zamówienia
 
