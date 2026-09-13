@@ -1,6 +1,8 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
+import {
+  TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
+} from "./tagi-spraw.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
@@ -489,7 +491,7 @@ export function listaReklamacji(
      WHERE r.typ = 'CLAIM'
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all() as Wiersz[];
-  const tagi = tagiWszystkichSpraw(database);
+  const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
   return wiersze.map((w) => {
     const r = zWiersza(w, teraz);
     r.tagi = tagi.get(r.id) ?? [];
@@ -630,7 +632,7 @@ export function szczegolReklamacji(
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
-  reklamacja.tagi = tagiSprawy(database, id);
+  reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const konto = Number(w.channel_account_id);
 
   const { zwroty, rozmowy } = kontekstZamowienia(database, konto, reklamacja.orderId, teraz);

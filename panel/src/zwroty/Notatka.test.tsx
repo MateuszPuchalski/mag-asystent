@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dowody } from "./Dowody";
 import type { Zwrot } from "../api/typy";
 
-/* ── Notatka biura przy zwrocie (0.285.0) ────────────────────────────────────
+/* ── Notatka biura przy zwrocie (0.313.0) ────────────────────────────────────
    Kolumna `notatka` stała w bazie od 0.172.0 i wypełniała ją WYŁĄCZNIE
    rejestracja paczki nieodebranej. Przy zwrocie z Allegro nie było gdzie
    zapisać ustalenia — wracało ono do panelu Allegro albo do niczyjej pamięci.
@@ -33,7 +33,8 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   linkZwrotu: null, zamowienie: null,
   werdykt: "przyjety", werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null,
   korektaNumer: null, korektaZrodlo: null,
-  zrodlo: "allegro", notatka: null, notatkaAt: null, notatkaPrzez: null,
+  zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
+  notatka: null, notatkaAt: null, notatkaPrzez: null,
   maPoprzedniaNotatke: false,
   kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },

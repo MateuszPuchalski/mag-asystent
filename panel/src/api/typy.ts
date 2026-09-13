@@ -872,6 +872,12 @@ export interface Zwrot {
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
+  /** Kto wziął zwrot na siebie; `null` = niczyj (0.315.0). */
+  prowadzi: string | null;
+  prowadziUserId: number | null;
+  prowadziAt: string | null;
+  /** Tagi biura — ten sam słownik co przy reklamacjach i dyskusjach. */
+  tagi: TagSprawy[];
   /** Notatka biura — od 0.313.0 przy KAŻDYM zwrocie, nie tylko przy paczce. */
   notatka: string | null;
   notatkaAt: string | null;

@@ -2592,6 +2592,30 @@ CREATE TABLE IF NOT EXISTS reklamacja_tag_sprawy (
 CREATE INDEX IF NOT EXISTS ix_reklamacja_tag_sprawy_tag
   ON reklamacja_tag_sprawy(tag_id);
 
+-- Tagi przy ZWROCIE (0.315.0). Druga tabela wiązań, nie druga definicja tagu:
+-- słownik (`reklamacja_tag` wyżej) jest JEDEN dla reklamacji, dyskusji
+-- i zwrotów, bo „gwarancja" znaczy wszędzie to samo, a jeden ekran ustawień
+-- to jedno miejsce do pilnowania sufitu aktywnych nazw.
+--
+-- DLACZEGO OSOBNA TABELA, A NIE KOLUMNA `rodzaj` W TAMTEJ. SQLite nie zna
+-- warunkowego klucza obcego, więc jedna tabela na oba byty wiązałaby się
+-- z „jakimś wierszem gdzieś": kasowanie sprawy przestałoby sprzątać po sobie,
+-- a wiązanie przeżywałoby zwrot, do którego należało.
+--
+-- Nazwa słownika została z 0.279.0 i jest HISTORIĄ, nie opisem. Przemianowanie
+-- znaczy w SQLite przebudowę tabeli i dotknięcie trzech modułów naraz — drożej,
+-- niż warte, skoro znaczenie stoi w tym komentarzu.
+CREATE TABLE IF NOT EXISTS zwrot_tag_sprawy (
+  zwrot_id      INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+  tag_id        INTEGER NOT NULL REFERENCES reklamacja_tag(id) ON DELETE CASCADE,
+  dodal_user_id INTEGER REFERENCES app_user(user_id),
+  dodano_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Klucz z dwóch kolumn: ten sam tag na tym samym zwrocie drugi raz nie jest
+  -- drugim faktem, tylko drugim kliknięciem.
+  PRIMARY KEY (zwrot_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zwrot_tag_sprawy_tag ON zwrot_tag_sprawy(tag_id);
+
 CREATE TABLE IF NOT EXISTS reklamacja_zalacznik_wysylki (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   reklamacja_id  INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,

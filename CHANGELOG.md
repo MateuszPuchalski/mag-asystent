@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.315.0 — 13 września 2026
+
+**Zwrot wie, czyj jest i o czym jest.** Trzecia część audytu zwrotów. Sito
+„Moje"/„Niczyje" i tagi spraw miały od 0.278.0 i 0.279.0 wyłącznie reklamacje
+i dyskusje, choć komponenty stoją w katalogu wspólnym, a hooki API składają
+adres z rodzaju sprawy. Zwroty dostają jedno i drugie.
+
+**Znacznik „biorę to", nie zamek.** Nikomu niczego nie blokuje — mówi reszcie
+biura, że ktoś już wziął tę sprawę. Ponowne kliknięcie zdejmuje, a zdejmowanie
+rozstrzyga TOŻSAMOŚĆ, nie imię: dwie osoby w biurze bywają imienniczkami,
+a objawem porównywania łańcuchów jest cudza sprawa we własnym sicie. Na oś
+zwrotu to nie idzie — wzięcie sprawy niczego w niej nie zmienia.
+
+**Decyzja właściciela zmieniła się tego samego dnia.** Pierwsza odpowiedź
+brzmiała „zwroty prowadzi całe biuro, sito nie odpowiadałoby na żadne prawdziwe
+pytanie", druga przywróciła prowadzącego. Obie stoją w dokumentacji, bo
+pierwsza była dobrym argumentem i może wrócić.
+
+**Tagi ze wspólnego słownika.** „Gwarancja" znaczy to samo przy reklamacji
+i przy zwrocie, więc słownik zostaje jeden — z jednym ekranem ustawień i jednym
+sufitem dwudziestu aktywnych nazw. Wiązania idą do OSOBNEJ tabeli, bo SQLite
+nie zna warunkowego klucza obcego: jedna tabela na oba byty wiązałaby się
+z „jakimś wierszem gdzieś", a kasowanie sprawy przestałoby sprzątać po sobie.
+
+Sito i tag ZAWĘŻAJĄ listę, nie przestawiają kolejności — ta liczy termin
+ustawowy i jedna pomyłka w tagu nie ma prawa zakopać zwrotu z zegarem.
+
+Licznik tras POST zwrotów rośnie z dwudziestu sześciu do dwudziestu siedmiu.
+Trasy tagów licznika nie ruszają: rejestruje je wspólny `trasyTagowSprawy`.
+
+**Numer wzięty POWYŻEJ otwartego PR-a** `codex/robust-wms`, który w trakcie
+tego wydania przeskoczył z 0.312.1 na 0.314.1. Kod pisał się jako 0.314.0
+i został przenumerowany przy commicie — trzeci raz w tej sesji, dokładnie
+z powodu, który `CLAUDE.md` opisuje.
+
+Przy okazji: trzy pliki z 0.313.0 (`zwroty/Os.tsx`, `Os.test.tsx`,
+`Notatka.test.tsx`) niosły w komentarzach numer 0.285.0. Przenumerowanie tamtego
+wydania poszło przez `git grep`, który nie widzi plików jeszcze nieśledzonych.
+Poprawione.
+
+
 ## 0.313.0 — 13 września 2026
 
 **Zwrot opowiada, co się z nim działo.** Druga część audytu zamówionego przez

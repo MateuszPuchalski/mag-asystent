@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw,
-  ShoppingCart,
+  ShoppingCart, UserCheck,
 } from "lucide-react";
+import { TagiSprawy } from "../sprawy/Tagi";
+import type { Tag } from "../api/typy";
 import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot } from "../api/typy";
 import { Os } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
@@ -143,7 +145,8 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
 
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   fakturaBlad = "", onFaktura, os = [],
-  trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke }: {
+  trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
+  onProwadze, trwaProwadzenie = false, tagi }: {
   zwrot: Zwrot;
   kandydaciFaktury?: KandydatFaktury[];
   fakturaTrwa?: boolean;
@@ -157,6 +160,18 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   /** Brak = kolumna notatki nie pokazuje (pole bez zapisu kłamie). */
   onNotatka?: (tekst: string) => void;
   onCofnijNotatke?: () => void;
+  /** Znacznik „biorę to" (0.315.0); brak = sekcji pracy biura nie ma. */
+  onProwadze?: () => void;
+  trwaProwadzenie?: boolean;
+  /** Tagi biura — ten sam komplet propsów co przy reklamacji. */
+  tagi?: {
+    slownik: Tag[];
+    trwa: boolean;
+    blad: string;
+    onPrzypnij: (tagId: number) => void;
+    onOdepnij: (tagId: number) => void;
+    onNowy: (nazwa: string) => void;
+  };
 }) {
   const zam = zwrot.zamowienie;
 
@@ -372,6 +387,29 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>
+    </Sekcja>}
+
+    {/* PRACA BIURA — kto to prowadzi i o czym to jest (0.315.0). Stoi NAD
+        notatką, bo odpowiada na pytania zadawane częściej i krócej: „czyje to"
+        i „czego ta sprawa czeka". Notatka jest dłuższa i czyta się ją wtedy,
+        gdy tag nie wystarczy — ta sama kolejność co przy reklamacji. */}
+    {(onProwadze || tagi) && <Sekcja ikona={<UserCheck size={14} />} tytul="Praca biura">
+      {onProwadze && <>
+        <p className="mb-1">
+          <span className="text-slate-500">Prowadzi</span>{" "}
+          <b>{zwrot.prowadzi ?? "nikt"}</b>
+        </p>
+        {/* ZNACZNIK, NIE ZAMEK: nie blokuje nikomu decyzji, tylko mówi reszcie
+            biura, że ktoś już to wziął. Ponowne kliknięcie zdejmuje. */}
+        <Przycisk className="w-full" disabled={trwaProwadzenie} onClick={onProwadze}>
+          {zwrot.prowadzi ? "Odłóż zwrot" : "Prowadzę ten zwrot"}
+        </Przycisk>
+      </>}
+      {tagi && <div className={onProwadze ? "mt-3" : ""}>
+        <TagiSprawy przypiete={zwrot.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
+          blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
+          onNowy={tagi.onNowy} />
+      </div>}
     </Sekcja>}
 
     {onNotatka && <Sekcja ikona={<NotebookPen size={14} />} tytul="Notatka biura">

@@ -555,6 +555,18 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "notatka_at", "TEXT");
   addColumn("zwrot_klienta", "notatka_przez", "TEXT");
   addColumn("zwrot_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
+  /* PROWADZĄCY ZWROT (0.315.0). Decyzja właściciela z 13 września: zwrot ma
+     nosić znacznik „biorę to", tak samo jak reklamacja od 0.278.0.
+
+     DWIE KOLUMNY NA JEDNĄ RZECZ i to jest świadome — ten sam wzór co przy
+     `reklamacja_klienta`. `prowadzi` niesie imię i zostaje prawdą o tym, co
+     aplikacja wtedy wiedziała, także gdy konto zniknie. `prowadzi_user_id`
+     niesie TOŻSAMOŚĆ i po niej rozstrzyga się zdjęcie znacznika: porównywanie
+     imion kazałoby dwóm osobom o tym samym imieniu zdejmować sobie znacznik
+     nawzajem, po cichu. */
+  addColumn("zwrot_klienta", "prowadzi", "TEXT");
+  addColumn("zwrot_klienta", "prowadzi_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("zwrot_klienta", "prowadzi_at", "TEXT");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
