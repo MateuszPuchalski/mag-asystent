@@ -3,6 +3,7 @@ import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
 import {
   BladTagu, odepnijTag, przelaczTag, przypnijTag, slownikTagow, utworzTag, zmienNazweTagu,
+  type OsTagow,
 } from "../services/tagi-spraw.js";
 
 /* ── Trasy tagów spraw (0.279.0) ─────────────────────────────────────────────
@@ -82,13 +83,14 @@ export async function tagiRoutes(app: FastifyInstance) {
  * tej samej tabeli, a zdublowanie tras zdublowałoby też walidację numeru
  * sprawy — ta sama decyzja co przy załącznikach dyskusji w 0.245.0.
  */
-export function trasyTagowSprawy(app: FastifyInstance, sciezka: string) {
+export function trasyTagowSprawy(app: FastifyInstance, sciezka: string, os: OsTagow) {
   app.post<{ Params: { id: string; tagId: string } }>(
     `${sciezka}/:id/tagi/:tagId`, async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        const nowy = przypnijTag(db(), Number(req.params.id), Number(req.params.tagId), kto());
+        const nowy = przypnijTag(
+          db(), os, Number(req.params.id), Number(req.params.tagId), kto());
         /* `false` znaczy „już tam był" i NIE jest błędem: drugie kliknięcie
            w ten sam tag to drugie kliknięcie, a nie drugi fakt. */
         return { przypiety: nowy };
@@ -100,7 +102,8 @@ export function trasyTagowSprawy(app: FastifyInstance, sciezka: string) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        const zdjety = odepnijTag(db(), Number(req.params.id), Number(req.params.tagId), kto());
+        const zdjety = odepnijTag(
+          db(), os, Number(req.params.id), Number(req.params.tagId), kto());
         if (!zdjety) return reply.code(404).send({ error: "Ta sprawa nie ma tego tagu" });
         return { ok: true };
       } catch (e) { return blad(reply, e); }

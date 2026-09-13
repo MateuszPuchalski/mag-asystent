@@ -12,7 +12,7 @@ import {
   useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
-  useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
+  useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow, useProwadziZwrot,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -23,6 +23,10 @@ import { Koszyk } from "../zwroty/Koszyk";
 import type { RozjazdZwrotu } from "../api/zwroty";
 import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
+import { PasekSita, ZdanieOUkrytych, useSito, wSicie } from "../sprawy/Moje";
+import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
+import { useJa } from "../api/rozmowy";
+import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
@@ -228,12 +232,38 @@ export function Zwroty() {
   const [poNadaniu, setPoNadaniu] = useState(false);
   const [bladSync, setBladSync] = useState("");
 
+  /* Tożsamość rozstrzyga „czyje to" — po NUMERZE KONTA, nie po imieniu. */
+  const ja = useJa();
+  const mojeId = ja.data?.user.userId ?? null;
+  const { sito, przelacz: przelaczSito } = useSito();
+  const slownikTagow = useTagi();
+  const nowyTag = useNowyTag();
+  const przypnijTag = usePrzypnijTag();
+  const odepnijTag = useOdepnijTag();
+  const [tag, setTag] = useState<number | null>(null);
+  const [bladTagu, setBladTagu] = useState("");
+
   const wKubelku = useMemo(() => {
     const lista = kubelek === null
       ? (data?.zwroty ?? [])
       : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek);
     return przewoznik ? lista.filter((z) => (z.przewoznik ?? "") === przewoznik) : lista;
   }, [data, kubelek, przewoznik]);
+
+  /* SITO I TAG ZAWĘŻAJĄ, NIE PRZESTAWIAJĄ (0.315.0). Kolejność liczy termin
+     ustawowy i to się nie zmienia — tag jest zdaniem biura o sprawie, a jedna
+     pomyłka nie ma prawa zakopać zwrotu z zegarem na dole listy. Ta sama
+     klauzula co przy tagach reklamacji (`sprawy/Tagi.tsx`) i przy kategoriach
+     Copilota w skrzynce (§14.5). */
+  const wSicieIzTagiem = useMemo(
+    () => wKubelku
+      .filter((z) => wSicie(z.prowadziUserId, mojeId, sito))
+      .filter((z) => tag === null || z.tagi.some((t) => t.id === tag)),
+    [wKubelku, sito, mojeId, tag]);
+  const ukrytych = wKubelku.length - wSicieIzTagiem.length;
+  /* Pigułki liczą się z KUBEŁKA, nie z listy po sicie: filtr pokazujący tag,
+     którego po zawężeniu nie ma, obiecywałby zawężenie do pustki. */
+  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
 
   /* Przewoźnicy z TEGO, co przyszło, nie ze słownika: Allegro nie publikuje
      zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
@@ -249,6 +279,7 @@ export function Zwroty() {
   const cofnijPrzelew = useCofnijPrzelew();
   const notatka = useNotatkaZwrotu();
   const cofnijNotatke = useCofnijNotatkeZwrotu();
+  const prowadzi = useProwadziZwrot();
   const [bladNotatki, setBladNotatki] = useState("");
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
@@ -278,11 +309,11 @@ export function Zwroty() {
      nadania jest PRZEŁĄCZNIKIEM, bo odpowiada na inne pytanie: „co przyszło
      najdawniej", a nie „co się najbardziej pali". */
   const widoczne = useMemo(() => {
-    const lista = pasujace ?? wKubelku;
+    const lista = pasujace ?? wSicieIzTagiem;
     if (!poNadaniu) return lista;
     return [...lista].sort((a, b) =>
       String(a.paczkaAt ?? "9999").localeCompare(String(b.paczkaAt ?? "9999")));
-  }, [pasujace, wKubelku, poNadaniu]);
+  }, [pasujace, wSicieIzTagiem, poNadaniu]);
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -346,6 +377,9 @@ export function Zwroty() {
        Inaczej przełącznik wyglądałby na zepsuty: lista zostawałaby ta sama. */
     setFraza("");
     setWynikSkanu(null);
+    /* Tag schodzi razem z frazą: kliknięcie w kubełek jest prośbą o TEN
+       kubełek, a nie o jego przecięcie z poprzednim zawężeniem. */
+    setTag(null);
     const pierwszy = (data?.zwroty ?? []).find((z) => k === null || z.kubelek === k);
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
@@ -443,6 +477,8 @@ export function Zwroty() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "7") przelacz(null);
+      else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
+      else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
       else klawiszKubelka(e);
     },
   );
@@ -570,19 +606,37 @@ export function Zwroty() {
       {!pasujace && kubelek !== null && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
         {opis?.pytanie}
       </p>}
+      {/* SITO I TAGI W JEDNYM RZĘDZIE, bo oba są zawężeniem tej samej listy
+          (0.315.0). Kubełek odpowiada „na jakim to etapie", sito „czyje to",
+          tag „o czym to" — trzy różne pytania, jedna lista. */}
+      {(mojeId !== null || wgTagow.length > 0) && !pasujace &&
+        <div className="shrink-0 space-y-1 border-b border-slate-200 px-2 py-1">
+          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+            moich={wKubelku.filter((z) => wSicie(z.prowadziUserId, mojeId, "moje")).length}
+            niczyich={wKubelku.filter((z) => z.prowadziUserId === null).length} />
+          <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+        </div>}
+
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania. Pasek pokazuje klawisze
           OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
-      <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
+      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
         dodatkowe={KLAWISZE_KUBELKA[kubelek ?? "wszystkie"] ?? []} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-          : <Kolejka zwroty={widoczne} wybrany={wybrany} zKubelkiem={Boolean(pasujace) || kubelek === null}
+          : <Kolejka zwroty={widoczne} wybrany={wybrany} mojeId={mojeId}
+              zKubelkiem={Boolean(pasujace) || kubelek === null}
               onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
       </div>
+      {/* FILTR, KTÓRY PAMIĘTA I MILCZY, ZAGŁODZIŁBY SPRAWY SPOZA SITA.
+          Zdanie mówi, ile zwrotów zostało schowanych, i daje drogę powrotną
+          jednym kliknięciem — ta sama cena pamięci co przy reklamacjach. */}
+      {!pasujace && <ZdanieOUkrytych ile={ukrytych}
+        nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+        onPokazWszystkie={() => { przelaczSito(null); setTag(null); }} />}
     </Karta>
 
     <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -685,6 +739,28 @@ export function Zwroty() {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
+            trwaProwadzenie={prowadzi.isPending}
+            onProwadze={() => prowadzi.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
+            tagi={{
+              slownik: slownikTagow.data?.tagi ?? [],
+              trwa: nowyTag.isPending || przypnijTag.isPending || odepnijTag.isPending,
+              blad: bladTagu,
+              onPrzypnij: (tagId) => {
+                setBladTagu("");
+                przypnijTag.mutate({ id: zwrot.id, rodzaj: "zwroty", tagId },
+                  { onError: (e) => setBladTagu((e as Error).message) });
+              },
+              onOdepnij: (tagId) => {
+                setBladTagu("");
+                odepnijTag.mutate({ id: zwrot.id, rodzaj: "zwroty", tagId },
+                  { onError: (e) => setBladTagu((e as Error).message) });
+              },
+              onNowy: (nazwa) => {
+                setBladTagu("");
+                nowyTag.mutate({ id: zwrot.id, rodzaj: "zwroty", nazwa },
+                  { onError: (e) => setBladTagu((e as Error).message) });
+              },
+            }}
             trwaNotatka={notatka.isPending || cofnijNotatke.isPending}
             bladNotatki={bladNotatki}
             onNotatka={(tekst) => {

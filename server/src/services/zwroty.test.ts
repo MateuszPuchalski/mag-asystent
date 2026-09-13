@@ -12,6 +12,7 @@ import {
   znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   osZwrotu, zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, ZwrotConflict,
+  stempelProwadziZwrot,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
 
@@ -1613,4 +1614,60 @@ test("notatkę da się dopisać przy zwrocie ZAMKNIĘTYM", () => {
   /* Na oś idzie SAM FAKT, bez treści: notatka bywa zdaniem o kliencie,
      a oś ogląda się z boku ekranu. */
   assert.equal(osZwrotu(d, id)[0].tresc, "Notatka biura zmieniona");
+});
+
+test("„biorę to” jest PRZEŁĄCZNIKIEM i rozstrzyga tożsamość, nie imię", () => {
+  /* Blizna reklamacji z 0.278.0: porównywanie łańcuchów kazało dwóm osobom
+     o tym samym imieniu zdejmować sobie znacznik nawzajem, po cichu. */
+  const d = stanowisko();
+  const ala = biuro(d);
+  const drugaAla = Number(d.prepare(
+    "INSERT INTO app_user(name,role) VALUES ('Biuro','biuro')").run().lastInsertRowid);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+
+  const wziete = stempelProwadziZwrot(d, id, ala);
+  assert.equal(wziete.prowadzi, "Biuro");
+  assert.ok(wziete.prowadziAt);
+
+  /* Imiennik NIE zdejmuje cudzego znacznika — bierze sprawę na siebie. */
+  const przejete = stempelProwadziZwrot(d, id, { id: drugaAla, name: "Biuro" }, wziete.wersja);
+  assert.equal(
+    Number((d.prepare("SELECT prowadzi_user_id AS u FROM zwrot_klienta WHERE id=?")
+      .get(id) as { u: number }).u),
+    drugaAla);
+
+  /* Drugie kliknięcie TEJ SAMEJ osoby zdejmuje znacznik. */
+  const oddane = stempelProwadziZwrot(d, id, { id: drugaAla, name: "Biuro" }, przejete.wersja);
+  assert.equal(oddane.prowadzi, null);
+  assert.equal(oddane.prowadziAt, null);
+});
+
+test("znacznik prowadzącego NIE idzie na oś zwrotu", () => {
+  /* Oś opowiada, co się ze sprawą stało. Wzięcie jej na siebie niczego
+     w zwrocie nie zmienia i zaśmiecałoby przebieg zdaniami o tym, kto
+     akurat patrzył. Ślad zostaje w dzienniku. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+  stempelProwadziZwrot(d, id, kto);
+  assert.deepEqual(osZwrotu(d, id), []);
+  assert.equal(
+    Number((d.prepare("SELECT COUNT(*) AS n FROM events WHERE type='zwrot_prowadzi'")
+      .get() as { n: number }).n),
+    1);
+});
+
+test("prowadzący i tagi wychodzą na wierszu kolejki", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
+  stempelProwadziZwrot(d, id, kto);
+  const tag = Number(d.prepare("INSERT INTO reklamacja_tag(nazwa) VALUES ('gwarancja')")
+    .run().lastInsertRowid);
+  d.prepare("INSERT INTO zwrot_tag_sprawy(zwrot_id,tag_id) VALUES (?,?)").run(id, tag);
+
+  const w = listaZwrotow(d).find((z) => z.id === id)!;
+  assert.equal(w.prowadzi, "Biuro");
+  assert.equal(w.prowadziUserId, kto.id);
+  assert.deepEqual(w.tagi.map((t) => t.nazwa), ["gwarancja"]);
 });

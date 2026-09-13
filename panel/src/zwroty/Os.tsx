@@ -2,7 +2,7 @@ import React from "react";
 import type { WpisOsiZwrotu } from "../api/typy";
 import { czas } from "../ui";
 
-/* ── Oś zwrotu (0.285.0) ─────────────────────────────────────────────────────
+/* ── Oś zwrotu (0.313.0) ─────────────────────────────────────────────────────
    Zwrot zapisywał ślad po każdej decyzji od 0.156.0 i serwer oddawał go przy
    szczególe sprawy. Panel dostał na to nawet typ — i zostawił go nieużytym.
    Biuro patrzące na zamknięty zwrot nie widziało więc ANI kto go przyjął, ANI

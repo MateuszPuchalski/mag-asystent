@@ -3330,6 +3330,46 @@ z `/api/reconcile`: tamta nie ma bramki ról i niesie całą halę razem
 z lokalizacjami kartotek. Przy zerze pasek milczy — pas z napisem „wszystko
 w porządku" uczy przewijać wzrokiem to miejsce.
 
+### 25a.19. Czyje to i o czym (0.315.0)
+
+Reklamacje dostały sito „Moje"/„Niczyje" w 0.278.0, a tagi spraw w 0.279.0.
+Zwroty nie dostały wtedy nic, choć komponenty stoją w katalogu wspólnym
+`panel/src/sprawy/`, a hooki API składają adres z rodzaju sprawy.
+
+**Prowadzący.** Zwrot nosi znacznik „biorę to" — to ZNACZNIK, nie zamek:
+nikomu niczego nie blokuje, tylko mówi reszcie biura, że ktoś już tę sprawę
+wziął. Ponowne kliknięcie zdejmuje. Zdejmowanie rozstrzyga TOŻSAMOŚĆ, nie imię,
+bo dwie osoby w biurze bywają imienniczkami — blizna reklamacji z 0.278.0.
+
+Znacznik nie idzie na oś zwrotu. Oś opowiada, co się ze sprawą stało; wzięcie
+jej na siebie niczego w zwrocie nie zmienia i zaśmiecałoby przebieg zdaniami
+o tym, kto akurat patrzył. Ślad zostaje w dzienniku.
+
+**Decyzja właściciela zmieniła się w trakcie.** Pierwsza odpowiedź brzmiała
+„zwroty prowadzi całe biuro, sito nie odpowiadałoby na żadne prawdziwe
+pytanie". Druga, tego samego dnia, przywróciła prowadzącego. Zapisuję obie, bo
+pierwsza była dobrym argumentem i może wrócić.
+
+**Tagi.** Słownik jest JEDEN dla reklamacji, dyskusji i zwrotów: „gwarancja"
+znaczy wszędzie to samo, a dwa słowniki znaczyłyby dwa ekrany ustawień i dwa
+sufity aktywnych nazw. Wiązania idą do OSOBNEJ tabeli (`zwrot_tag_sprawy`),
+bo SQLite nie zna warunkowego klucza obcego — jedna tabela na oba byty
+wiązałaby się z „jakimś wierszem gdzieś", a kasowanie sprawy przestałoby
+sprzątać po sobie.
+
+Nazwa tabeli słownika została z 0.279.0 (`reklamacja_tag`) i jest HISTORIĄ, nie
+opisem. Przemianowanie znaczy w SQLite przebudowę tabeli i dotknięcie trzech
+modułów naraz — drożej, niż warte.
+
+**Sito i tag ZAWĘŻAJĄ, nie przestawiają.** Kolejność kolejki liczy termin
+ustawowy i to się nie zmienia: jedna pomyłka w tagu nie ma prawa zakopać
+zwrotu z zegarem na dole listy. Pigułki liczą się z KUBEŁKA, nie z listy po
+zawężeniu — filtr obiecujący zawężenie do pustki uczy klikać na próżno.
+
+Pod kolejką stoi zdanie o ukrytych z drogą powrotną jednym kliknięciem. Sito
+pamięta wybór między otwarciami ekranu, a filtr, który pamięta i milczy,
+zagłodziłby sprawy spoza sita.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4230,6 +4270,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Przebieg sprawy na ekranie (oś zwrotu) | **działa** od 0.313.0 | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
 | Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
 | Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali |
+| Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** od 0.315.0 | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
+| Tagi przy zwrocie | **działa** od 0.315.0 | `zwrot_tag_sprawy` + wspólny słownik `reklamacja_tag`; oś tagów jako parametr serwisu (`TAGI_ZWROTU`) |
 | Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
 | Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |

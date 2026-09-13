@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import type { WpisOsiZwrotu } from "../api/typy";
 import { Os } from "./Os";
 
-/* ── Oś zwrotu (0.285.0) ─────────────────────────────────────────────────────
+/* ── Oś zwrotu (0.313.0) ─────────────────────────────────────────────────────
    Serwer oddawał ją przy szczególe sprawy od 0.156.0, panel miał na nią nawet
    typ — i nikt jej nie rysował. Biuro patrzące na zamknięty zwrot nie widziało
    ani kto go przyjął, ani za co poszła kwota, ani czy towar wrócił na półkę.
