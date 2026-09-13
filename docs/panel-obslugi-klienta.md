@@ -3285,6 +3285,51 @@ Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy ona SUROWYCH
 zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem — przez
 Sferę, tak samo jak korekta zwrotu.
 
+### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
+
+Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.
+
+**Oś zwrotu.** Zwrot zapisywał ślad po każdej decyzji od 0.156.0, a serwer
+oddawał go przy szczególe sprawy. Panel miał na to nawet typ i zostawił go
+nieużytym, więc biuro patrzące na zamknięty zwrot nie widziało ani kto go
+przyjął, ani za co poszła kwota, ani czy towar wrócił na półkę. Od tego wydania
+oś stoi na końcu kolumny dowodów, najstarsze na górze: reszta kolumny odpowiada
+na „co zdecydować", a oś na „co się już stało".
+
+Przy okazji wyszła rzecz gorsza. Na oś pisały WYŁĄCZNIE cofnięcia — przyjęcie
+zwrotu, zapisana kwota i ocena pozycji szły tylko do dziennika `events`, czyli
+do audytu systemu. Karta pokazywałaby „Cofnięto przyjęcie" nad pustką po samym
+przyjęciu. Te trzy zdarzenia dopisujemy więc na oś razem z tym wydaniem.
+
+**Oś zaczyna się TERAZ.** Zwroty sprzed tego wydania pokażą tylko to, co
+zapisano wcześniej — czyli korekty, pieniądze i cofnięcia. Historii nie
+dopisujemy wstecz, bo nie mamy skąd: dziennik zna zdarzenia, ale nie zna
+zdań, które oś ma pokazać.
+
+**Notatka biura.** Kolumna `notatka` stała w bazie od 0.172.0 i wypełniała ją
+wyłącznie rejestracja paczki nieodebranej. Teraz pisze się ją przy każdym
+zwrocie, z cofnięciem zmiany (§25a.5) i z autorem przy zdaniu. Stoi w tej samej
+kolumnie co notatka reklamacji, bo dwa ekrany obsługi mają mieć jeden nawyk.
+
+Do dziennika idzie DŁUGOŚĆ, nigdy treść — notatka bywa zdaniem o kliencie,
+a `events` nie ma retencji (§9 architektury). Na oś idzie sam fakt zapisu.
+
+Notatkę wolno dopisać przy zwrocie ZAMKNIĘTYM i to jest jedyny taki zapis.
+Dopisuje się ją najczęściej właśnie wtedy, gdy sprawa wraca pytaniem; bramka
+na stanie końcowym kazałaby wybierać między poprawną kolejnością pracy
+a zapisaniem ustalenia.
+
+**Rozjazdy nad kolejką.** Cztery kontrole rekoncyliacji dotyczące zwrotów —
+termin ustawowy, zwrot bez śladu po przelewie, koszyk czekający na korektę
+i kosz bez powrotu z regału — liczyły się od dawna i rysowały wyłącznie
+w `/biuro`. Obsługa pracuje na innym ekranie, więc raport chroniący jej pracę
+wisiał tam, gdzie ona nie zagląda.
+
+Pasek bierze je z WĄSKIEJ trasy `/api/obsluga/zwroty/rozjazdy`, a nie
+z `/api/reconcile`: tamta nie ma bramki ról i niesie całą halę razem
+z lokalizacjami kartotek. Przy zerze pasek milczy — pas z napisem „wszystko
+w porządku" uczy przewijać wzrokiem to miejsce.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4182,6 +4227,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
+| Przebieg sprawy na ekranie (oś zwrotu) | **działa** od 0.313.0 | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
+| Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
+| Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali |
 | Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
 | Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |

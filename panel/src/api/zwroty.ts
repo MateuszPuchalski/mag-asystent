@@ -495,3 +495,63 @@ export function useOdmowPlatnosci() {
     },
   });
 }
+
+/* ── Notatka biura i rozjazdy (0.313.0) ──────────────────────────────────── */
+
+/** Stan notatki po zapisie — nagłówek zwrotu odświeża się z tego, nie z listy. */
+export interface StanNotatkiZwrotu {
+  notatka: string | null;
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzednia: boolean;
+  wersja: number;
+}
+
+export function useNotatkaZwrotu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; notatka: string | null; wersja: number }) =>
+      api<StanNotatkiZwrotu>(`/api/obsluga/zwroty/${v.id}/notatka`,
+        { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+export function useCofnijNotatkeZwrotu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<StanNotatkiZwrotu>(`/api/obsluga/zwroty/${v.id}/notatka/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/** Rozjazd rekoncyliacji — tyle, ile niesie wiersz paska. */
+export interface RozjazdZwrotu {
+  rodzaj: string;
+  klucz: string;
+  opis: string;
+  odKiedy: string | null;
+}
+
+/**
+ * Cztery kontrole rekoncyliacji, które dotyczą zwrotów.
+ *
+ * Osobne zapytanie, nie część kolejki: liczy je serwer z całej bazy, a kolejka
+ * jedzie przy każdym kliknięciu kubełka. Odświeżanie co minutę wystarcza —
+ * to raport poranny, nie alarm czasu rzeczywistego.
+ */
+export function useRozjazdyZwrotow() {
+  return useQuery({
+    queryKey: ["zwroty", "rozjazdy"] as const,
+    queryFn: () => api<{ rozjazdy: RozjazdZwrotu[] }>("/api/obsluga/zwroty/rozjazdy"),
+    refetchInterval: 60_000,
+  });
+}
