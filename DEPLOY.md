@@ -340,6 +340,36 @@ Sama aplikacja radzi sobie z przeskokiem AP od 0.60.4: przy zmianie sieci
 porzuca gniazda otwarte do poprzedniego punktu. Wcześniej trzeba było ręcznie
 rozłączyć i połączyć Wi-Fi.
 
+#### Kolektor sam mówi, co widzi (0.323.0)
+
+**Ustawienia → DIAGNOSTYKA POŁĄCZENIA.** Ekran powstał z pytania właściciela
+o przeskoki między punktami dostępowymi. Pytanie było dobre i nie dało się na
+nie odpowiedzieć: przyczyny z tego rozdziału wyglądają na ekranie identycznie.
+
+Ekran mówi trzy rzeczy i żadnej nie zmienia:
+
+1. **Serwer** — czy odpowiedział, po ilu milisekundach i w jakiej wersji.
+   Odmowa dostaje zdanie zamiast kodu błędu, bo każda prowadzi gdzie indziej.
+   Cisza to zapora albo izolacja klientów. Odrzucone połączenie to zły port
+   albo zgaszony serwer. Nieznana nazwa to DNS, brak trasy to druga sieć.
+2. **Droga do serwera** — rodzaj sieci, adres kolektora, interfejs i DNS.
+   Gdy serwer jest podany adresem IP, ekran porównuje podsieci sam i pisze
+   wprost, że są różne. Przy adresie podanym nazwą milczy, bo porównania nie
+   ma — zgadnięty werdykt kazałby przestawiać sieć, która jest dobra.
+3. **Przerwy w łączności** — kiedy się zaczęła, ile trwała, ile było prób
+   i z jakim powodem. To odpowiedź na pytanie „czy wraca sama, czy trzeba
+   przełączyć Wi-Fi". Zapisuje się sama, więc nikt nie musi jej pamiętać.
+
+Przerwy bierze się z pytania o kolejkę Sfery, które kolektor i tak wysyła co
+półtorej sekundy — ani jednego żądania więcej. Zapis żyje w pamięci aplikacji,
+do jej zamknięcia, i nigdzie nie jedzie.
+
+**Czego ekran NIE wie.** Nazwy sieci (SSID) ani punktu dostępowego (BSSID) —
+od Androida 8 wymagają uprawnienia do lokalizacji, a pytanie o nie w alejce
+kosztuje więcej, niż niesie odpowiedź. Przeskok między punktami tej samej
+podsieci jest więc dla kolektora niewidoczny; widać dopiero jego SKUTEK,
+czyli przerwę na liście.
+
 ### Sieć gościnna: adres jest, serwera nie ma
 
 Objaw myli, bo wszystko wygląda poprawnie. Kolektor łączy się z drugą siecią,

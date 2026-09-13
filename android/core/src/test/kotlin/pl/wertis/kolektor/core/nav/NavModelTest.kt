@@ -17,6 +17,16 @@ class NavModelTest {
         assertEquals(Screen.KARTONY, backTarget(Screen.KARTON, null))
         assertEquals(Screen.HOME, backTarget(Screen.LOCATION, null))
         assertEquals(Screen.HOME, backTarget(Screen.SETTINGS, null))
+        // diagnostyka łączności otwiera się z Ustawień i tam wraca
+        assertEquals(Screen.SETTINGS, backTarget(Screen.POLACZENIE, null))
+    }
+
+    @Test fun `kazdy ekran ma tytul w pasku gornym`() {
+        /* Ekran bez tytułu pokazuje pusty pasek, a pusty pasek wygląda jak
+           awaria rysowania. Splash paska nie ma w ogóle — stąd wyjątek. */
+        for (s in Screen.entries.filter { it != Screen.SPLASH }) {
+            assertEquals(true, SCREEN_TITLES.containsKey(s))
+        }
     }
 
     @Test fun `ekrany bazowe bez powrotu`() {

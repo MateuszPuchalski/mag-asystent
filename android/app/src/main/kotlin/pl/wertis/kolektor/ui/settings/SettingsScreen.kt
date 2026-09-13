@@ -167,6 +167,14 @@ fun SettingsScreen(graph: AppGraph) {
                     graph.effects.toast("Zapisano adres serwera")
                 }
             }
+            /* Diagnostyka stoi PRZY ADRESIE, nie w osobnej sekcji na dole.
+               Pytanie „dlaczego kolektor nie widzi serwera" zadaje się patrząc
+               na adres — i pierwszym odruchem bywa zmienić go na chybił trafił,
+               choć zwykle jest dobry. */
+            OutlineButton(
+                "DIAGNOSTYKA POŁĄCZENIA",
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { graph.nav.go(Screen.POLACZENIE) }
         }
 
         SectionLabel("Funkcje urządzenia")
