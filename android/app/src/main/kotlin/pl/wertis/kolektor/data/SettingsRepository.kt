@@ -15,6 +15,7 @@ data class AppSettings(
     val serverUrl: String = DEFAULT_SERVER_URL,
     val wakeLock: Boolean = true, // ekran nie gaśnie podczas pracy
     val dropLog: Boolean = true, // log upadków urządzenia do audytu
+    val logSieci: Boolean = true, // przerwy w łączności do dziennika serwera
     val batteryAssist: Boolean = true, // podpowiedź hot-swap przy niskiej baterii
 ) {
     companion object {
@@ -61,6 +62,7 @@ class SettingsRepository(context: Context) {
     private fun load(): AppSettings = AppSettings(
         serverUrl = prefs.getString("serverUrl", AppSettings.DEFAULT_SERVER_URL) ?: AppSettings.DEFAULT_SERVER_URL,
         wakeLock = prefs.getBoolean("wakeLock", true),
+        logSieci = prefs.getBoolean("logSieci", true),
         dropLog = prefs.getBoolean("dropLog", true),
         batteryAssist = prefs.getBoolean("batteryAssist", true),
     )
@@ -72,6 +74,7 @@ class SettingsRepository(context: Context) {
         prefs.edit {
             putString("serverUrl", next.serverUrl)
             putBoolean("wakeLock", next.wakeLock)
+            putBoolean("logSieci", next.logSieci)
             putBoolean("dropLog", next.dropLog)
             putBoolean("batteryAssist", next.batteryAssist)
         }

@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, diagnoza łączności (podsieć, powód odmowy, dziennik przerw) — **312 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie) — **316 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (17 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -169,6 +169,10 @@ przed którą ta pozycja broni.
 - [ ] serwer podany nazwą → ekran o podsieci MILCZY (nie zgaduje),
 - [ ] tryb samolotowy na 10 s → po powrocie na liście stoi JEDNA przerwa
       z czasem trwania, a nie siedem wpisów.
+- [ ] ta sama przerwa pojawia się w panelu biura w DZIENNIKU ZDARZEŃ
+      jako `siec_przerwa`, z czasem trwania i liczbą prób,
+- [ ] przerwa krótsza niż 5 s zostaje TYLKO w kolektorze,
+- [ ] Ustawienia → „Log przerw w łączności" wyłączone → nic nie jedzie.
 
 **Kontekst = otwarty ekran**
 

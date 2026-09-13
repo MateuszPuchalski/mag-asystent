@@ -25,11 +25,15 @@ import pl.wertis.kolektor.net.apiCall
 
 /**
  * @param dziennik zapis przerw w łączności — patrz komentarz przy pętli niżej.
+ * @param poPrzerwie wołane, gdy łączność WŁAŚNIE wróciła i domknęła przerwę.
+ *   Wysyłkę do dziennika serwera składa wołający (`AppGraph`), bo to on zna
+ *   adres serwera i drogę sieciową; repozytorium kolejki nie ma ich znać.
  */
 class QueueRepository(
     private val api: ApiService,
     scope: CoroutineScope,
     private val dziennik: DziennikCiszy = DziennikCiszy(),
+    private val poPrzerwie: (() -> Unit)? = null,
 ) {
     private val _queue = MutableStateFlow<QueueResponse?>(null)
     val queue: StateFlow<QueueResponse?> = _queue
@@ -53,7 +57,9 @@ class QueueRepository(
        odpowiedzi poza czyjąś pamięcią.
 
        Zapis nie dokłada ANI JEDNEGO żądania: bierze wynik, który i tak tu jest.
-       Czyta go ekran POŁĄCZENIE z Ustawień. */
+       Czyta go ekran POŁĄCZENIE z Ustawień, a od 0.326.0 przerwy dłuższe od
+       progu jadą też do dziennika serwera — wysyłką zajmuje się `poPrzerwie`,
+       wołane dokładnie wtedy, gdy jest czym wysłać. */
     val dziennikCiszy: DziennikCiszy get() = dziennik
 
     private val kick = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -66,7 +72,9 @@ class QueueRepository(
                         _queue.value = apiCall { api.queue() }
                         porazkiZRzedu = 0
                         _serwerMilczy.value = false
-                        dziennik.sukces(System.currentTimeMillis())
+                        /* Wysyłka DOPIERO po domknięciu przerwy i tylko wtedy:
+                           sukces pada tu co półtorej sekundy przez całą zmianę. */
+                        if (dziennik.sukces(System.currentTimeMillis())) poPrzerwie?.invoke()
                     } catch (e: Exception) {
                         /* offline / serwer w restarcie — pastylka trzyma ostatni stan */
                         porazkiZRzedu++

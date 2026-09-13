@@ -190,6 +190,11 @@ fun SettingsScreen(graph: AppGraph) {
                 settings.dropLog,
             ) { v -> graph.settings.update { it.copy(dropLog = v) } }
             ToggleRow(
+                "Log przerw w łączności",
+                "przerwy dłuższe niż 5 s do dziennika serwera",
+                settings.logSieci,
+            ) { v -> graph.settings.update { it.copy(logSieci = v) } }
+            ToggleRow(
                 "Asysta niskiej baterii",
                 "flush bufora + ostrzeżenie przy <15% (hot-swap)",
                 settings.batteryAssist,

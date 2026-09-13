@@ -14,6 +14,8 @@ import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.MagazynyRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
+import pl.wertis.kolektor.core.net.DziennikCiszy
+import pl.wertis.kolektor.data.wyslijPrzerwy
 import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
 import pl.wertis.kolektor.data.SetupRepository
@@ -83,7 +85,28 @@ class AppGraph(context: Context) {
        zwykłe odpytywanie dociąga świeże. Tylko pamięć, czyszczone przy
        zmianie serwera. */
     val cards = CardsRepository()
-    val queueRepo = QueueRepository(api, appScope)
+    /* Przerwa w łączności jedzie do dziennika serwera PO swoim końcu (0.326.0).
+       Wysyłka stoi tutaj, a nie w repozytorium kolejki, bo składa się z rzeczy
+       rozrzuconych po grafie: adresu serwera z ustawień, drogi sieciowej
+       z monitora i przełącznika, którym da się to wyłączyć. Kolejka ma wiedzieć
+       tylko tyle, że przerwa się właśnie domknęła. */
+    /* Dziennik powstaje TUTAJ, a nie w środku repozytorium kolejki: czyta go
+       ekran diagnostyki, a wysyłka niżej musi mieć go pod ręką bez sięgania
+       do repozytorium, które właśnie się buduje. */
+    val dziennikCiszy = DziennikCiszy()
+    val queueRepo = QueueRepository(
+        api, appScope, dziennikCiszy,
+        poPrzerwie = {
+            if (settings.current.logSieci) {
+                appScope.launch {
+                    wyslijPrzerwy(
+                        dziennikCiszy, api,
+                        connectivity.opisDrogi(), settings.current.serverUrl,
+                    )
+                }
+            }
+        },
+    )
     val locationsRepo = LocationsRepository(context, api)
     val magazynyRepo = MagazynyRepository(context, api)
     val problemsRepo = ProblemsRepository(api, appScope)
