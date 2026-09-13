@@ -631,6 +631,9 @@ Po częściowym odłożeniu ponownie zeskanuj bufor i część dla kolejnej part
 W opcjach wybierz uszkodzony towar, potwierdź jego ilość i zeskanuj kwarantannę. Brakującą ilość zostaw w zadaniu i zgłoś biuru.
 Przycisk powrotu do kolejki nie zwalnia przypisania na serwerze. Podjęte zadanie nadal pokazuje właściciela i można je wznowić.
 
+Po zakończeniu zadania zeskanuj następną część lub bufor bez wracania do menu. Skan otwiera pasujące zadania, ale nie podejmuje ich automatycznie.
+Powrót przyciskiem zachowuje filtr i stronę listy w bieżącej sesji. Nowy filtr zaczyna od pierwszej strony; zmiana konta lub serwera czyści kontekst.
+
 Nieznany wynik blokuje zarówno zbiórkę, jak i odkładanie. Przycisk wskazuje właściwy proces; tam użyj **SPRAWDŹ OSTATNI ZAPIS**.
 Nie przenoś towaru drugi raz. Zmiana konta lub serwera wymaga powrotu do pierwotnej tożsamości przed ponowieniem.
 Natywne liczenie dostaw jest dostępne od 0.299.0. Oczekiwany dokument nadal przygotowuje biuro.

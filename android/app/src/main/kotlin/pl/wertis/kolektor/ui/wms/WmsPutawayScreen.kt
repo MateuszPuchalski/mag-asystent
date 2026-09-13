@@ -90,9 +90,10 @@ fun WmsPutawayScreen(graph: AppGraph) {
         if (!allowed || controller.state.value.busy || view.generation != controller.state.value.generation) {
             error = "Najpierw potwierdź stan ostatniej operacji"
             graph.feedback.beep(false)
-        } else if (task == null) {
-            query = input.rawCode.trim()
-            search()
+        } else if (task == null || stage == WmsPutawayStage.DONE) {
+            val bound = context!!
+            val scannedGeneration = view.generation
+            graph.appScope.launch { controller.scanQueue(bound, input.rawCode, scannedGeneration) }
         } else {
             val result = putawayScan(task, context!!.actorId, scan, putawayCode(stage!!, input), damaged)
             scan = result.state
@@ -155,7 +156,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
             WmsPutawayStage.PRODUCT -> "2 · SKANUJ KOD CZĘŚCI"
             WmsPutawayStage.QUANTITY -> "3 · POLICZ I POTWIERDŹ ILOŚĆ"
             WmsPutawayStage.TARGET -> if (damaged) "4 · SKANUJ KWARANTANNĘ" else "4 · ODŁÓŻ I SKANUJ PÓŁKĘ"
-            WmsPutawayStage.DONE -> "ZADANIE ZAKOŃCZONE"
+            WmsPutawayStage.DONE -> "GOTOWE · SKANUJ KOLEJNĄ CZĘŚĆ"
             else -> "ZADANIE WYKONUJE INNA OSOBA"
         }
         Text(prompt, Modifier.fillMaxWidth().background(Amber, RoundedCornerShape(10.dp)).padding(12.dp), color = Ink, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
@@ -186,7 +187,7 @@ fun WmsPutawayScreen(graph: AppGraph) {
                 Text("Skan celu zapisze tę ilość. Częściowe odłożenie pozostawi resztę w buforze.")
             }
             WmsPutawayStage.OTHER -> Text("Przekaż towar właścicielowi zadania lub poproś biuro o przejęcie.")
-            WmsPutawayStage.DONE -> Text("Cała ilość została rozliczona. Wybierz kolejne zadanie.")
+            WmsPutawayStage.DONE -> Text("Cała ilość została rozliczona. Skan części lub bufora otworzy listę kolejnych zadań.")
             else -> Unit
         }
         (error ?: view.message)?.let { Text(it, fontWeight = FontWeight.Bold) }

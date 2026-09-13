@@ -119,6 +119,84 @@ private class PutawayClient(private val store: PutawayStore) : WmsPutawayTranspo
 }
 
 class WmsPutawayRecoveryTest {
+    @Test fun `skan po pelnym odlozeniu otwiera kolejna liste bez podjecia i bez odziedziczonych skanow`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        val controller = WmsPutawayController(store, { client })
+        controller.queue(putawayActor, "BUF-01", 50); controller.select(putawayActor, 1)
+        val full = putawayScan(part, 2, WmsPutawayScan(true, part.barcode, 12), "A-01").command!!
+        controller.submit(putawayActor, full)
+        assertEquals(0, controller.state.value.task!!.remaining)
+        val finishedGeneration = controller.state.value.generation
+        client.current = part.copy(id = 2, user_id = null)
+        controller.scanQueue(putawayActor, " 0590123 ", finishedGeneration)
+        assertEquals("0590123" to 0, client.queried)
+        assertNull(controller.state.value.task)
+        assertNull(store.journal.putaway)
+        assertEquals(1, client.sent.size)
+        controller.select(putawayActor, 2)
+        assertEquals(WmsPutawayStage.CLAIM, putawayStage(controller.state.value.task!!, 2, WmsPutawayScan()))
+        controller.submit(putawayActor, putawayClaim(client.current))
+        assertEquals(WmsPutawayStage.SOURCE, putawayStage(controller.state.value.task!!, 2, WmsPutawayScan()))
+        assertEquals(12, client.current.remaining)
+        assertEquals(WmsActive(putawayActor, 5), store.journal.active)
+    }
+    @Test fun `nowy filtr resetuje strone a inny operator nie dziedziczy filtra`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        val controller = WmsPutawayController(store, { client })
+        controller.queue(putawayActor, "BUF-01", 50); controller.select(putawayActor, 1)
+        controller.queue(putawayActor, "0590123")
+        assertEquals("0590123" to 0, client.queried)
+        controller.queue(putawayActor, "")
+        assertEquals("" to 0, client.queried)
+        controller.queue(putawayActor, "PZ-1", 100)
+        controller.open(putawayActor.copy(actorId = 3))
+        assertEquals("" to 0, client.queried)
+        assertTrue(client.sent.isEmpty())
+    }
+    @Test fun `kolejny skan nie opuszcza czesciowego zadania ani nieznanego zapisu`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        val controller = WmsPutawayController(store, { client })
+        controller.select(putawayActor, 1)
+        controller.scanQueue(putawayActor, "NEXT", controller.state.value.generation)
+        assertNull(client.queried)
+        client.lostResponse = true
+        val full = putawayScan(part, 2, WmsPutawayScan(true, part.barcode, 12), "A-01").command!!
+        controller.submit(putawayActor, full)
+        val pending = store.journal.pending
+        controller.scanQueue(putawayActor, "NEXT", controller.state.value.generation)
+        assertEquals(pending, store.journal.pending)
+        assertNull(client.queried)
+        client.lostResponse = false; controller.retry(putawayActor)
+        controller.scanQueue(putawayActor, "NEXT", controller.state.value.generation)
+        assertEquals("NEXT" to 0, client.queried)
+        assertEquals(1, client.committed.size)
+    }
+    @Test fun `skan ze starej generacji tla lub obcej sesji nie zmienia kolejki`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        val controller = WmsPutawayController(store, { client })
+        controller.queue(putawayActor, "BUF-01")
+        val old = controller.state.value.generation
+        controller.scanQueue(putawayActor, "0590123", old)
+        controller.scanQueue(putawayActor, "SECOND", old)
+        controller.scanQueue(putawayActor.copy(actorId = 3), "FOREIGN", controller.state.value.generation)
+        controller.invalidateVerification()
+        controller.scanQueue(putawayActor, "BACKGROUND", controller.state.value.generation)
+        assertEquals("0590123" to 0, client.queried)
+        assertTrue(client.sent.isEmpty())
+    }
+    @Test fun `powrot po zadaniu zachowuje filtr i strone bufora`() = runTest {
+        val store = PutawayStore(); val client = PutawayClient(store)
+        val controller = WmsPutawayController(store, { client })
+        controller.queue(putawayActor, "BUF-01", 50)
+        controller.select(putawayActor, 1)
+        controller.submit(putawayActor, draft())
+        controller.invalidateVerification(); controller.activateVerification(); controller.open(putawayActor)
+        controller.queue(putawayActor)
+        assertEquals("BUF-01" to 50, client.queried)
+        assertEquals(9, client.current.remaining)
+        assertNull(store.journal.putaway)
+        assertEquals(1, client.sent.size)
+    }
     @Test fun `podjecie potwierdza wlasciciela i zachowuje aktywny wozek`() = runTest {
         val store = PutawayStore(); val client = PutawayClient(store)
         client.current = part.copy(user_id = null)

@@ -46,13 +46,27 @@ class WmsPutawayController(
 
     suspend fun open(context: WmsContext) = read(context, resume = true)
     suspend fun select(context: WmsContext, id: Long) = read(context, taskId = id)
-    suspend fun queue(context: WmsContext, query: String = "", offset: Int = 0) = read(context, query = query, offset = offset)
+    suspend fun queue(context: WmsContext, query: String? = null, offset: Int? = null) = read(context, query = query, offset = offset)
 
-    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String = "", offset: Int = 0, epoch: Long? = verification.capture()) = lock.withLock {
+    suspend fun scanQueue(context: WmsContext, raw: String, generation: Long) {
+        if (raw.isBlank()) return
+        read(context, query = raw.trim(), scanGeneration = generation)
+    }
+
+    private suspend fun read(context: WmsContext, resume: Boolean = false, taskId: Long? = null, query: String? = null, offset: Int? = null, scanGeneration: Long? = null, epoch: Long? = verification.capture()) = lock.withLock {
         if (!verification.matches(epoch)) return@withLock
-        mutable.value = WmsPutawayView(generation = ++generation, context = context, busy = true, query = query, offset = offset)
+        val previous = mutable.value
+        // Skan ze starego ekranu nie może opuścić rozpoczętego zadania ani wyprzedzić nieznanego zapisu.
+        if (scanGeneration != null && (previous.context != context || previous.generation != scanGeneration ||
+            !previous.ready || previous.busy || previous.journal.pending != null ||
+            previous.task?.let { putawayStage(it, context.actorId, WmsPutawayScan()) != WmsPutawayStage.DONE } == true)) return@withLock
+        // Powrót zachowuje miejsce na liście; nowy filtr i nowa sesja zaczynają od pierwszej strony.
+        val sameContext = previous.context == context
+        val filter = query ?: previous.query.takeIf { sameContext }.orEmpty()
+        val page = offset ?: if (query == null && sameContext) previous.offset else 0
+        mutable.value = WmsPutawayView(generation = ++generation, context = context, busy = true, query = filter, offset = page)
         try {
-            require(query.length <= 120 && offset in 0..1000000) { "Zbyt długi filtr kolejki" }
+            require(filter.length <= 120 && page in 0..1000000) { "Zbyt długi filtr kolejki" }
             val journal = store.read()
             mutable.value = mutable.value.copy(journal = journal)
             if (journal.pending != null) {
@@ -67,7 +81,7 @@ class WmsPutawayController(
                 store.write(next)
                 mutable.value = mutable.value.copy(journal = next)
             } else {
-                val queue = client.queue(query, offset)
+                val queue = client.queue(filter, page)
                 val next = journal.copy(putaway = null)
                 store.write(next)
                 mutable.value = mutable.value.copy(journal = next, queue = queue, ready = verification.matches(epoch))

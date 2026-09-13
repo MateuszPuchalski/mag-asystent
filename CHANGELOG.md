@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.320.0 — kolejne odłożenie bez powrotu do menu
+
+Po zakończeniu odkładania kolektor przyjmuje skan następnej części lub bufora i pokazuje pasujące zadania. Odpada osobne dotknięcie powrotu do kolejki.
+Ręczny powrót zachowuje filtr i stronę listy w bieżącej sesji. Nowe wyszukiwanie zaczyna od pierwszej strony.
+Zmiana konta lub serwera czyści kontekst. Skan ze starego ekranu, częściowe zadanie i nieznany zapis nie pozwalają przejść dalej.
+Wybór i podjęcie następnego zadania nadal wymagają świeżych skanów bufora oraz części. Pięć nowych regresji; pełny core ma 453 testy.
+
 ## 0.319.0 — pusta skrzynka bez anulowania zamówienia
 
 Biuro może wycofać pustą skrzynkę przed lub po przekazaniu do stanowiska. Skanuje aktualne miejsce i skrzynkę, potwierdza pustkę oraz wpisuje powód.

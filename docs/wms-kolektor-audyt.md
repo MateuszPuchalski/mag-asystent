@@ -165,6 +165,19 @@ Pełny dziennik pozostaje wymagany; czyszczenie danych aplikacji nie jest sposob
 
 ## Natywne odkładanie od 0.298.0
 
+Audyt ciągłości pracy wykrył wymuszony powrót do listy przed skanem następnej części. Wybór zadania usuwał także filtr bufora i numer strony.
+Test odtworzył powrót z `BUF-01`, strona 50, do pustego filtra i strony zero.
+Zakończone zadanie przyjmuje teraz skan wyszukiwania następnej części lub bufora. Powrót ręczny zachowuje kontekst listy w pamięci bieżącej sesji.
+Nowy filtr resetuje stronę. Nowe konto lub serwer nie dziedziczą poprzedniego kontekstu; restart aplikacji może przywrócić zadanie, ale nie filtr listy.
+
+Zmiana usuwa jedno dotknięcie przed kolejnym skanem. Nie pomija podjęcia zadania, weryfikacji bufora, części, ilości ani celu.
+Pięć regresji JVM sprawdza ciągłość listy, pełne i częściowe odłożenie, utratę odpowiedzi, stare skany, tło oraz zmianę operatora.
+Kompilacja Compose i fizyczna próba kolektora pozostają osobnymi dowodami.
+
+Microsoft opisuje [wyszukiwanie wewnątrz procesu](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/warehouse-app-data-inquiry)
+oraz [powrót z zachowaniem kontekstu](https://learn.microsoft.com/en-us/dynamics365/supply-chain/warehousing/warehouse-app-detours).
+Zastosowanie tych zasad do kolejnego zadania WERTIS jest decyzją projektową. Nie stanowi pomiaru przepustowości magazynu.
+
 Kolektor korzysta z kolejki WMS utworzonej podczas przyjęcia do bufora. Lista ma strony po 50 zadań i wyszukiwanie SKU, EAN, dokumentu lub bufora.
 Odczyt nie podejmuje pracy. Operator wybiera zadanie, podejmuje je, skanuje bufor i część, potwierdza ilość oraz skanuje docelową półkę.
 Wspólne komponenty zachowują cele dotyku co najmniej 48 dp. Znane półki pomagają wybrać cel; serwer sprawdza rejestrację, przeznaczenie i blokady.
