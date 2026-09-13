@@ -6,6 +6,19 @@ Przyjęcia dokumentowe, zwroty i obsługa klienta zachowują dotychczasowe ekran
 WMS prowadzi cały przebieg samodzielnie, bez konta, abonamentu ani API Sellasist.
 Zgodnie z decyzją właściciela obecna praca i odbiór wykorzystują wyłącznie dane seeded.
 
+## Codzienna droga brakującej części do wysyłki
+
+1. Przyjmujący wybiera dostawę, skanuje część, liczy sztuki i potwierdza bufor. Zamknięcie dokumentu pozostawia zadania odkładania.
+2. Odkładający wybiera zadanie z kolejki. Najpierw widzi części potrzebne zamówieniom; skanuje bufor, część, potwierdza ilość i skanuje półkę.
+3. Dopiero ilość na półce kompletacji pozwala rozpocząć zbiórkę. Częściowa partia może wystarczyć zamówieniu, choć reszta dostawy pozostaje w buforze.
+4. Zbierający skanuje wózek. WMS rezerwuje gotowe nowe zamówienia i przypisuje je skrzynkom ze stałymi pozycjami.
+5. Po zbiórce przekazuje wózek na stanowisko. Pakujący skanuje stanowisko i skrzynkę, sprawdza zawartość, następnie zapisuje przygotowane paczki.
+6. Przy odbiorze kuriera pracownik skanuje paczki i zamyka przekazanie z potwierdzoną liczbą. To potwierdza fizyczne wydanie.
+
+Nowe zamówienie po uzupełnieniu zapasu nie wymaga osobnego przycisku rezerwacji w Biurze przed skanem wózka.
+Wstrzymania i niepełne przydziały istniejących zamówień wymagają wyjaśnienia zgodnie z opisami wyjątków.
+Regresja `wms-inbound-to-dispatch.test.ts` sprawdza tę drogę dla trzech pracowników, częściowego odłożenia oraz ponowionych zapisów.
+
 ## Zlecony zwrot z pakowania
 
 Gdy niczego nie pobrano albo wszystkie pobrania już odłożono, Biuro może wycofać pustą skrzynkę bez anulowania zamówienia.

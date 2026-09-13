@@ -5,6 +5,19 @@ docelowo 1500 zamówień dziennie. Praca i weryfikacja wyłącznie na danych see
 Poprzedni etap był postępem: wdrożył zdjęcia części i zweryfikował zbiórkę.
 Nie stanowi to dowodu ukończenia całego audytu procesów.
 
+## Odbiór całej drogi brakującej części
+
+Regresja `wms-inbound-to-dispatch.test.ts` łączy rzeczywiste serwisy oraz bazę SQLite w jednym przebiegu dla trzech pracowników.
+Nowe zamówienie na trzy sztuki czeka przed dostawą i po przyjęciu pięciu sztuk do bufora. Zamknięcie dokumentu nie udostępnia zapasu.
+Odłożenie dwóch sztuk nadal pozostawia zamówienie w kolejce. Trzecia sztuka pozwala skanowi wózka automatycznie zarezerwować i rozpocząć zbiórkę.
+Nie występuje osobna alokacja przez biuro. Skan stanowiska i skrzynki wymaga wcześniejszego przekazania wózka.
+Po kontroli zawartości etykieta pozostawia status zapakowany. Skan do listy kuriera również nie oznacza wydania; dopiero zamknięcie przekazania kończy wysyłkę.
+Końcowy bilans: trzy sztuki wysłane, dwie chronione w buforze, pusta półka i brak jej rezerwacji. Stały kod skrzynki pozostaje przypisany.
+Ponowienia przyjęcia, odłożenia, podjęcia wózka i wydania nie dublują operacji. Kontrola integralności przechodzi.
+
+Odbiór potwierdził istniejącą automatyczną alokację skanem wózka. Nie wymagał zmiany logiki produkcyjnej ani dodatkowej automatyzacji w tle.
+Test pozostaje w standardowej bramce WMS. Dowodzi spójności jednego przebiegu programowego; nie zastępuje próby kolektora i fizycznych etykiet.
+
 ## Ciągłość codziennego odkładania i pakowania
 
 Kolektor przyjmuje skan następnego zadania po zakończeniu odkładania. Ręczny powrót zachowuje filtr i stronę w bieżącej sesji.

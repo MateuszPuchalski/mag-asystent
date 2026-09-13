@@ -15,6 +15,8 @@ Analityka przepływu wymaga pełnego katalogu `server/dist`, w tym modułu `serv
 Raporty uruchamiają osobny wątek Node i otwierają istniejącą bazę tylko do odczytu. Nie wymagają dodatkowej usługi ani migracji danych.
 Po aktualizacji wykonać build i restart API. Daty dziennego raportu wysyłek oraz CSV są liczone w strefie Warszawy.
 
+0.325.1 rozszerza bramkę WMS o pełny przebieg brakującej dostawy do wysyłki. Zmiana dotyczy testów i instrukcji, bez migracji ani nowych ustawień.
+
 Od 0.325.0 kolejka odkładania uwzględnia braki zamówień. Wykonać kopię, build, restart API, odświeżyć Biuro i zaktualizować APK.
 Brak migracji bazy. Odbiór seeded: nowsza dostawa brakującej części przed rutynową, pokrycie istniejącym zapasem oraz spadek pilności po odłożeniu.
 Starszy APK zachowuje kolejność serwera, ale nie pokazuje przyczyny. Nowy APK ze starszym API pomija nieznaną pilność.

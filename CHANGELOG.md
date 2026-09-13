@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.325.1 — odbiór całej drogi od brakującej dostawy do kuriera
+
+- Nowa regresja łączy przyjęcie, częściowe odkładanie, automatyczny przydział skanem wózka, zbiórkę, pakowanie i fizyczne wydanie.
+- Test sprawdza trzech pracowników, ponowienia zapisów, zawartość paczki, pozostały bufor i stały kod skrzynki. Działa w standardowej bramce WMS.
+- Instrukcja zaczyna się od codziennego przebiegu. Wyjaśnia automatyczną rezerwację nowych gotowych zamówień przy skanie wózka.
+- Odbiór potwierdził istniejącą logikę; wydanie zmienia testy i dokumentację.
+
 ## 0.325.0 — odkładanie według braków zamówień
 
 - Kolejka odkładania daje pierwszeństwo częściom z niepokrytym zapotrzebowaniem zamówień, następnie priorytetowi i terminowi. Pozostałe zadania zachowują kolejność przyjęcia.
