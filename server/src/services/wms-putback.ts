@@ -295,11 +295,19 @@ export function finishPutback(
       },
       t.id,
     );
+    const completedAt = next.lines.every((l) => l.picked === 0) ? nowIso() : null;
+    if (completedAt) {
+      // Pusta skrzynka nie może więzić zamówienia na zakończonej trasie.
+      // Historia przydziału zostaje; biuro nadal decyduje o wznowieniu lub zmianie.
+      db().prepare("UPDATE wms_cart_assignment SET ended_at=? WHERE order_id=? AND ended_at IS NULL").run(completedAt, o.id);
+      db().prepare("DELETE FROM wms_wave_order WHERE order_id=?").run(o.id);
+      db().prepare("UPDATE wms_order SET status='allocated',tote=NULL,picker_id=NULL,packer_id=NULL WHERE id=?").run(o.id);
+    }
     db()
       .prepare(
         "UPDATE wms_putback SET version=version+1,completed_at=? WHERE id=?",
       )
-      .run(next.lines.every((l) => l.picked === 0) ? nowIso() : null, t.id);
+      .run(completedAt, t.id);
     return putbackTask(actor, t.id);
   });
 }

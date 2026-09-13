@@ -199,6 +199,23 @@ test("jawny zwrot z pakowania przekazuje skrzynkę trzeciemu operatorowi i zwaln
   assert.ok(t.completed_at);
   assert.equal(t.picks.length, 0);
   assert.equal(f.order.hold_reason, "Klient anuluje");
+  assert.equal(f.order.tote, null);
+  assert.equal(f.order.wave_id, null);
+  assert.equal(f.order.status, "allocated");
+  assert.ok(
+    db()
+      .prepare("SELECT ended_at FROM wms_cart_assignment WHERE order_id=?")
+      .get(before.id)!.ended_at,
+  );
+  W.actOnOrder(admin, randomUUID(), before.id, {
+    action: "amend",
+    version: f.order.version,
+    reason: "Klient zmienia ilość po odłożeniu",
+    dueAt: "2026-09-14T12:00:00Z",
+    priority: 0,
+    lines: [{ sku: f.sku, quantity: 2 }],
+  });
+  assert.equal(f.order.lines[0].quantity, 2);
   W.actOnOrder(admin, randomUUID(), before.id, {
     action: "cancel",
     version: f.order.version,
@@ -281,6 +298,22 @@ test("zlecenie i podjęcie odrzucają brak wstrzymania, obcego operatora, starą
   t = claim(t, packer);
   t = P.finishPutback(packer, randomUUID(), t.id, body(t, 3));
   assert.ok(t.completed_at);
+  W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "resume",
+    version: f.order.version,
+    reason: "Klient jednak odbierze zamówienie",
+  });
+  const renewed = W.createWave(worker, randomUUID(), {
+    name: "Ponowna zbiórka",
+    orders: [{ id: o.id, version: f.order.version, tote: `NEW-${f.n}` }],
+  });
+  assert.equal(renewed.tasks[0].order_id, o.id);
+  assert.equal(renewed.tasks[0].remaining, 3);
+  W.actOnOrder(admin, randomUUID(), o.id, {
+    action: "cancel",
+    version: f.order.version,
+    reason: "Koniec próby ponownej zbiórki",
+  });
   assert.equal(A.integrity().ok, true);
 });
 test("awaria podjęcia cofa paczki i pozycję, ponowienie partii zachowuje jeden ruch, przerwanie zostawia wstrzymanie", () => {

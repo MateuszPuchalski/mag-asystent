@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.314.1 — odłączenie pustej skrzynki po zwrocie
+
+Ostatnia partia zleconego zwrotu kończy przydział skrzynki i usuwa zamówienie z bieżącej trasy, zachowując historię przydziału.
+Biuro może zmienić pozycje albo wznowić zamówienie do nowej zbiórki. Rezerwacje i wstrzymanie pozostają do tej decyzji.
+Regresja sprawdza obie ścieżki po pełnym zwrocie. Poprawiono również parametr klawiatury ilości wykryty przez kompilację APK w CI.
+Wykonać build, restart API i aktualizację APK. Nie ma dodatkowej migracji danych.
+
 ## 0.314.0 — zlecony zwrot z pakowania
 
 Biuro może zlecić zwrot wstrzymanej skrzynki po przekazaniu do pakowania. Samo wstrzymanie nie powoduje zwrotu.

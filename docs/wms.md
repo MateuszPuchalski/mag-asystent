@@ -17,7 +17,8 @@ Na kolektorze wybierz **ZWROTY Z PAKOWANIA — ZLECONE**. Zadanie może podjąć
 Przełóż całą niewysłaną zawartość zamówienia do wskazanej skrzynki. Skan stanowiska i skrzynki potwierdza jej odbiór.
 Ten zapis cofa kontrolę paczek, zachowuje historię zawartości i zwalnia pozycję wózka. Zapas nadal pozostaje poza półkami.
 Następnie skanuj część → wpisz policzoną ilość → odłóż i zeskanuj półkę. Można wybrać inną półkę kompletacji.
-Każda partia wraca wraz z rezerwacją na rzeczywisty cel. Ostatnia partia kończy zadanie; zamówienie pozostaje wstrzymane dla biura.
+Każda partia wraca wraz z rezerwacją na rzeczywisty cel. Ostatnia partia kończy zadanie i dawny przydział skrzynki; zamówienie pozostaje wstrzymane dla biura.
+Biuro może zmienić pozycje albo wznowić zamówienie do nowej zbiórki. Historia poprzedniego przydziału zostaje.
 
 Nieznany wynik zapisu wymaga **PONÓW**, bez ponownego przenoszenia tej samej partii. Restart zachowuje komendę i klucz.
 Powrót po pauzie lub ponowieniu wymaga świeżego skanu skrzynki. Kolejne potwierdzone partie tej samej sesji zachowują wybór skrzynki.
