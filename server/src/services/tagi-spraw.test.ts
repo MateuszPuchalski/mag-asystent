@@ -6,6 +6,7 @@ import { migrate } from "../db/db.js";
 import {
   BladTagu, MAKS_AKTYWNYCH, odepnijTag, przelaczTag, przypnijTag, slownikTagow,
   tagiSprawy, tagiWszystkichSpraw, utworzTag, zmienNazweTagu,
+  TAGI_REKLAMACJI, TAGI_ZWROTU,
 } from "./tagi-spraw.js";
 
 /* ── Tagi spraw (0.279.0) ────────────────────────────────────────────────────
@@ -100,16 +101,16 @@ test("tag się WYŁĄCZA, nigdy nie kasuje — na starej sprawie zostaje", () =>
   const { d, sprawa } = stanowisko();
   const id = sprawa("i-1");
   const tag = utworzTag(d, "u producenta", ALA);
-  przypnijTag(d, id, tag.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
 
   przelaczTag(d, tag.id, false, ALA);
-  assert.deepEqual(tagiSprawy(d, id).map((t) => t.nazwa), ["u producenta"],
+  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, id).map((t) => t.nazwa), ["u producenta"],
     "historia sprawy nie ma prawa zniknąć razem z tagiem");
 
   /* Ale NOWEJ sprawie wyłączonego już nie przypniemy — inaczej „wyłączony"
      nie znaczyłoby nic. */
   const druga = sprawa("i-2");
-  assert.throws(() => przypnijTag(d, druga, tag.id, ALA), /wyłączony/);
+  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, druga, tag.id, ALA), /wyłączony/);
 });
 
 test("wpisanie nazwy tagu wyłączonego WRACA go do użytku", () => {
@@ -130,9 +131,9 @@ test("drugie kliknięcie w ten sam tag nie jest drugim faktem ani drugim śladem
   const id = sprawa("i-1");
   const tag = utworzTag(d, "czeka na część", ALA);
 
-  assert.equal(przypnijTag(d, id, tag.id, ALA), true);
-  assert.equal(przypnijTag(d, id, tag.id, ALA), false);
-  assert.equal(tagiSprawy(d, id).length, 1);
+  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
+  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), false);
+  assert.equal(tagiSprawy(d, TAGI_REKLAMACJI, id).length, 1);
 
   const sladow = d.prepare(
     "SELECT count(*) n FROM events WHERE type='sprawa_tag_przypiety'").get() as { n: number };
@@ -143,14 +144,14 @@ test("zdjęcie tagu jest całym cofnięciem, jakiego tag potrzebuje", () => {
   const { d, sprawa } = stanowisko();
   const id = sprawa("i-1");
   const tag = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, id, tag.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
 
-  assert.equal(odepnijTag(d, id, tag.id, ALA), true);
-  assert.equal(tagiSprawy(d, id).length, 0);
-  assert.equal(odepnijTag(d, id, tag.id, ALA), false, "nie ma czego zdejmować drugi raz");
+  assert.equal(odepnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
+  assert.equal(tagiSprawy(d, TAGI_REKLAMACJI, id).length, 0);
+  assert.equal(odepnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), false, "nie ma czego zdejmować drugi raz");
 
   /* I z powrotem, tym samym ruchem — na tym stoi decyzja o braku `/cofnij`. */
-  assert.equal(przypnijTag(d, id, tag.id, ALA), true);
+  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA), true);
 });
 
 test("sprawy nieistniejącej nie da się otagować, a numer tagu nie jest przepustką", () => {
@@ -158,8 +159,8 @@ test("sprawy nieistniejącej nie da się otagować, a numer tagu nie jest przepu
   const id = sprawa("i-1");
   const tag = utworzTag(d, "czeka na część", ALA);
 
-  assert.throws(() => przypnijTag(d, 9999, tag.id, ALA), /Sprawa 9999 nie istnieje/);
-  assert.throws(() => przypnijTag(d, id, 9999, ALA), /Tag 9999 nie istnieje/);
+  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, 9999, tag.id, ALA), /Sprawa 9999 nie istnieje/);
+  assert.throws(() => przypnijTag(d, TAGI_REKLAMACJI, id, 9999, ALA), /Tag 9999 nie istnieje/);
 });
 
 test("dyskusja i reklamacja mają własne tagi mimo JEDNEJ tabeli", () => {
@@ -168,11 +169,11 @@ test("dyskusja i reklamacja mają własne tagi mimo JEDNEJ tabeli", () => {
   const dys = sprawa("d-1", "DISPUTE");
   const a = utworzTag(d, "czeka na część", ALA);
   const b = utworzTag(d, "do decyzji właściciela", ALA);
-  przypnijTag(d, rek, a.id, ALA);
-  przypnijTag(d, dys, b.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, rek, a.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, dys, b.id, ALA);
 
-  assert.deepEqual(tagiSprawy(d, rek).map((t) => t.nazwa), ["czeka na część"]);
-  assert.deepEqual(tagiSprawy(d, dys).map((t) => t.nazwa), ["do decyzji właściciela"]);
+  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, rek).map((t) => t.nazwa), ["czeka na część"]);
+  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, dys).map((t) => t.nazwa), ["do decyzji właściciela"]);
 });
 
 test("tagi całej kolejki jadą JEDNYM zapytaniem, alfabetycznie", () => {
@@ -183,11 +184,11 @@ test("tagi całej kolejki jadą JEDNYM zapytaniem, alfabetycznie", () => {
   const druga = sprawa("i-2");
   const zet = utworzTag(d, "zebrać dowody", ALA);
   const ce = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, jedna, zet.id, ALA);
-  przypnijTag(d, jedna, ce.id, ALA);
-  przypnijTag(d, druga, ce.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, jedna, zet.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, jedna, ce.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, druga, ce.id, ALA);
 
-  const mapa = tagiWszystkichSpraw(d);
+  const mapa = tagiWszystkichSpraw(d, TAGI_REKLAMACJI);
   assert.deepEqual(mapa.get(jedna)?.map((t) => t.nazwa), ["czeka na część", "zebrać dowody"]);
   assert.deepEqual(mapa.get(druga)?.map((t) => t.nazwa), ["czeka na część"]);
   assert.equal(mapa.get(9999), undefined);
@@ -198,12 +199,67 @@ test("zmiana nazwy nie gubi przypięć, a kolizja nazw jest odmową", () => {
   const id = sprawa("i-1");
   const tag = utworzTag(d, "u producenta", ALA);
   const inny = utworzTag(d, "czeka na część", ALA);
-  przypnijTag(d, id, tag.id, ALA);
+  przypnijTag(d, TAGI_REKLAMACJI, id, tag.id, ALA);
 
   zmienNazweTagu(d, tag.id, "u serwisu", ALA);
-  assert.deepEqual(tagiSprawy(d, id).map((t) => t.nazwa), ["u serwisu"],
+  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, id).map((t) => t.nazwa), ["u serwisu"],
     "to ten sam tag, inaczej nazwany");
 
   assert.throws(() => zmienNazweTagu(d, tag.id, "Czeka Na Część", ALA), /już jest w słowniku/);
   assert.equal(slownikTagow(d).find((t) => t.id === inny.id)?.nazwa, "czeka na część");
+});
+
+/* ── DRUGA OŚ: ZWROTY (0.315.0) ──────────────────────────────────────────────
+   Słownik zostaje jeden, wiązania idą do własnej tabeli. Trzy rzeczy warte
+   testu: niezależność obu osi, sprzątanie po skasowanej sprawie i odmowa dla
+   zwrotu, którego nie ma.                                                   */
+
+/** Zwrot testowy — tyle kolumn, ile wymaga schemat. */
+function zwrotTestowy(d: DatabaseSync, ext = "zw-1"): number {
+  return Number(d.prepare(`INSERT INTO zwrot_klienta
+    (channel_account_id, external_id, created_at, synced_at)
+    VALUES (1, ?, '2026-09-01T08:00:00Z', '2026-09-11T09:00:00Z')`)
+    .run(ext).lastInsertRowid);
+}
+
+test("ten sam tag na zwrocie i reklamacji to DWA niezależne wiązania", () => {
+  /* Słownik jest jeden — „gwarancja" znaczy to samo wszędzie — ale wiązania
+     mieszkają w osobnych tabelach. Jedna tabela z kolumną `rodzaj` wiązałaby
+     się z „jakimś wierszem gdzieś": SQLite nie zna warunkowego klucza obcego,
+     więc kasowanie sprawy przestałoby po sobie sprzątać. */
+  const { d, sprawa } = stanowisko();
+  const tag = utworzTag(d, "gwarancja", ALA);
+  const rek = sprawa("i-1");
+  const zwrot = zwrotTestowy(d);
+
+  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, rek, tag.id, ALA), true);
+  assert.equal(przypnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA), true);
+  assert.deepEqual(tagiSprawy(d, TAGI_ZWROTU, zwrot).map((t) => t.nazwa), ["gwarancja"]);
+  assert.deepEqual([...tagiWszystkichSpraw(d, TAGI_ZWROTU).keys()], [zwrot],
+    "mapa kolejki zna wyłącznie swoją oś");
+
+  /* Zdjęcie ze zwrotu nie rusza reklamacji — i odwrotnie. */
+  assert.equal(odepnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA), true);
+  assert.deepEqual(tagiSprawy(d, TAGI_ZWROTU, zwrot), []);
+  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, rek).map((t) => t.nazwa), ["gwarancja"]);
+});
+
+test("skasowany zwrot zabiera swoje wiązania", () => {
+  /* `ON DELETE CASCADE` w obie strony. Wiązanie przeżywające sprawę byłoby
+     tagiem wiszącym w próżni — i policzyłoby się w filtrze. */
+  const { d } = stanowisko();
+  const tag = utworzTag(d, "sporny", ALA);
+  const zwrot = zwrotTestowy(d);
+  przypnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA);
+
+  d.prepare("DELETE FROM zwrot_klienta WHERE id=?").run(zwrot);
+  const ile = (d.prepare("SELECT COUNT(*) AS n FROM zwrot_tag_sprawy").get() as { n: number }).n;
+  assert.equal(Number(ile), 0);
+});
+
+test("zwrot, którego nie ma, nie przyjmuje tagu", () => {
+  const { d } = stanowisko();
+  const tag = utworzTag(d, "gwarancja", ALA);
+  assert.throws(() => przypnijTag(d, TAGI_ZWROTU, 9999, tag.id, ALA),
+    (e: unknown) => e instanceof BladTagu && e.kod === 404);
 });

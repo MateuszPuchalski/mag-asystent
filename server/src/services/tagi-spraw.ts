@@ -36,6 +36,35 @@ export interface TagSprawy {
   nazwa: string;
 }
 
+/* ── DWIE OSIE, JEDEN SŁOWNIK (0.315.0) ──────────────────────────────────────
+   Tagi weszły w 0.279.0 wyłącznie dla `reklamacja_klienta` — jednego wiersza
+   na reklamację i dyskusję. Zwrot mieszka we własnej tabeli, więc dostaje
+   własną tabelę wiązań, a nie własny słownik: „gwarancja" znaczy to samo przy
+   reklamacji i przy zwrocie, a dwa słowniki znaczyłyby dwa ekrany ustawień
+   i dwa sufity aktywnych nazw.
+
+   NAZWY TABEL I KOLUMN WCHODZĄ DO SQL-A PRZEZ INTERPOLACJĘ i to jest
+   bezpieczne, bo są STAŁYMI MODUŁU — nie ma drogi, którą wejście z żądania
+   trafiłoby do zapytania. Piszę to wprost, żeby czytający nie musiał tego
+   sprawdzać sam.                                                            */
+
+export interface OsTagow {
+  /** Tabela sprawy — po niej sprawdzamy, że wiersz w ogóle istnieje. */
+  sprawy: string;
+  /** Tabela wiązań tag ↔ sprawa. */
+  wiazania: string;
+  /** Kolumna wiązania wskazująca sprawę. */
+  kolumna: string;
+}
+
+export const TAGI_REKLAMACJI: OsTagow = {
+  sprawy: "reklamacja_klienta", wiazania: "reklamacja_tag_sprawy", kolumna: "reklamacja_id",
+};
+
+export const TAGI_ZWROTU: OsTagow = {
+  sprawy: "zwrot_klienta", wiazania: "zwrot_tag_sprawy", kolumna: "zwrot_id",
+};
+
 export class BladTagu extends Error {
   constructor(message: string, readonly kod = 400) { super(message); }
 }
@@ -160,9 +189,9 @@ export function przelaczTag(
 }
 
 /** Czy sprawa o tym numerze w ogóle istnieje — numer tagu nie jest przepustką. */
-function sprawaIstnieje(database: DatabaseSync, reklamacjaId: number): boolean {
-  return database.prepare("SELECT 1 FROM reklamacja_klienta WHERE id=?")
-    .get(reklamacjaId) !== undefined;
+function sprawaIstnieje(database: DatabaseSync, os: OsTagow, sprawaId: number): boolean {
+  return database.prepare(`SELECT 1 FROM ${os.sprawy} WHERE id=?`)
+    .get(sprawaId) !== undefined;
 }
 
 /**
@@ -173,11 +202,11 @@ function sprawaIstnieje(database: DatabaseSync, reklamacjaId: number): boolean {
  * Dziennik ma mówić, co się zmieniło, a nie ile razy ktoś kliknął.
  */
 export function przypnijTag(
-  database: DatabaseSync, reklamacjaId: number, tagId: number,
+  database: DatabaseSync, os: OsTagow, sprawaId: number, tagId: number,
   autor: { id: number; name: string },
 ): boolean {
-  if (!sprawaIstnieje(database, reklamacjaId)) {
-    throw new BladTagu(`Sprawa ${reklamacjaId} nie istnieje`, 404);
+  if (!sprawaIstnieje(database, os, sprawaId)) {
+    throw new BladTagu(`Sprawa ${sprawaId} nie istnieje`, 404);
   }
   const tag = database.prepare("SELECT id, nazwa, aktywny FROM reklamacja_tag WHERE id=?")
     .get(tagId) as Record<string, unknown> | undefined;
@@ -188,12 +217,12 @@ export function przypnijTag(
     throw new BladTagu(`Tag „${String(tag.nazwa)}” jest wyłączony z użycia`, 409);
   }
 
-  const zmiana = database.prepare(`INSERT OR IGNORE INTO reklamacja_tag_sprawy
-    (reklamacja_id, tag_id, dodal_user_id) VALUES (?,?,?)`)
-    .run(reklamacjaId, tagId, autor.id);
+  const zmiana = database.prepare(`INSERT OR IGNORE INTO ${os.wiazania}
+    (${os.kolumna}, tag_id, dodal_user_id) VALUES (?,?,?)`)
+    .run(sprawaId, tagId, autor.id);
   if (Number(zmiana.changes) === 0) return false;
   logEvent("sprawa_tag_przypiety", autor.name, null,
-    { id: reklamacjaId, tagId, nazwa: String(tag.nazwa) }, autor.id, database);
+    { id: sprawaId, os: os.kolumna, tagId, nazwa: String(tag.nazwa) }, autor.id, database);
   return true;
 }
 
@@ -206,26 +235,28 @@ export function przypnijTag(
  * o cofnięciu obok istniejącej drogi powrotnej.
  */
 export function odepnijTag(
-  database: DatabaseSync, reklamacjaId: number, tagId: number,
+  database: DatabaseSync, os: OsTagow, sprawaId: number, tagId: number,
   autor: { id: number; name: string },
 ): boolean {
   const tag = database.prepare("SELECT nazwa FROM reklamacja_tag WHERE id=?")
     .get(tagId) as { nazwa: string } | undefined;
   const zmiana = database.prepare(
-    "DELETE FROM reklamacja_tag_sprawy WHERE reklamacja_id=? AND tag_id=?")
-    .run(reklamacjaId, tagId);
+    `DELETE FROM ${os.wiazania} WHERE ${os.kolumna}=? AND tag_id=?`)
+    .run(sprawaId, tagId);
   if (Number(zmiana.changes) === 0) return false;
   logEvent("sprawa_tag_zdjety", autor.name, null,
-    { id: reklamacjaId, tagId, nazwa: tag?.nazwa ?? null }, autor.id, database);
+    { id: sprawaId, os: os.kolumna, tagId, nazwa: tag?.nazwa ?? null }, autor.id, database);
   return true;
 }
 
 /** Tagi JEDNEJ sprawy, alfabetycznie — czipy w wierszu mają stać w miejscu. */
-export function tagiSprawy(database: DatabaseSync, reklamacjaId: number): TagSprawy[] {
-  return (database.prepare(`SELECT t.id, t.nazwa FROM reklamacja_tag_sprawy s
+export function tagiSprawy(
+  database: DatabaseSync, os: OsTagow, sprawaId: number,
+): TagSprawy[] {
+  return (database.prepare(`SELECT t.id, t.nazwa FROM ${os.wiazania} s
     JOIN reklamacja_tag t ON t.id = s.tag_id
-    WHERE s.reklamacja_id = ? ORDER BY t.nazwa COLLATE NOCASE`)
-    .all(reklamacjaId) as Array<Record<string, unknown>>)
+    WHERE s.${os.kolumna} = ? ORDER BY t.nazwa COLLATE NOCASE`)
+    .all(sprawaId) as Array<Record<string, unknown>>)
     .map((w) => ({ id: Number(w.id), nazwa: String(w.nazwa) }));
 }
 
@@ -236,12 +267,14 @@ export function tagiSprawy(database: DatabaseSync, reklamacjaId: number): TagSpr
  * rozdziela w pamięci; zapytanie per sprawa dałoby przy pięćdziesięciu
  * sprawach pięćdziesiąt jeden zapytań na każde odświeżenie ekranu.
  */
-export function tagiWszystkichSpraw(database: DatabaseSync): Map<number, TagSprawy[]> {
+export function tagiWszystkichSpraw(
+  database: DatabaseSync, os: OsTagow,
+): Map<number, TagSprawy[]> {
   const mapa = new Map<number, TagSprawy[]>();
-  for (const w of database.prepare(`SELECT s.reklamacja_id, t.id, t.nazwa
-    FROM reklamacja_tag_sprawy s JOIN reklamacja_tag t ON t.id = s.tag_id
+  for (const w of database.prepare(`SELECT s.${os.kolumna} AS sprawa_id, t.id, t.nazwa
+    FROM ${os.wiazania} s JOIN reklamacja_tag t ON t.id = s.tag_id
     ORDER BY t.nazwa COLLATE NOCASE`).all() as Array<Record<string, unknown>>) {
-    const klucz = Number(w.reklamacja_id);
+    const klucz = Number(w.sprawa_id);
     const lista = mapa.get(klucz) ?? [];
     lista.push({ id: Number(w.id), nazwa: String(w.nazwa) });
     mapa.set(klucz, lista);

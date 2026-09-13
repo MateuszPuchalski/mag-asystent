@@ -19,7 +19,8 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
-  zrodlo: "allegro", notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
+  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
@@ -392,8 +393,10 @@ describe("Klawisze kubełka", () => {
     pokaz("/obsluga/zwroty/1");
     expect(screen.getByText("przyjmij")).toBeInTheDocument();
     expect(screen.queryByText("zapisz kwotę")).toBeNull();
-    /* Sit „moje"/„niczyje" tu nie ma — zwrot nie nosi prowadzącego. */
-    expect(screen.queryByText("niczyje")).toBeNull();
+    /* SITA DOSZŁY W 0.315.0. Do 0.313.0 stała tu odwrotna asercja i była
+       prawdziwa: zwrot nie nosił prowadzącego, więc pasek nie miał prawa
+       obiecywać `n`. Decyzja właściciela z 13 września to odwróciła. */
+    expect(screen.getByText("niczyje")).toBeInTheDocument();
   });
 });
 
@@ -423,5 +426,41 @@ describe("Pasek rozjazdów", () => {
       expect(pasek).toHaveTextContent("ZW-1");
       expect(pasek).toHaveTextContent("Z-7");
     } finally { scena.rozjazdy = []; }
+  });
+});
+
+/* ── Sito i tagi (0.315.0) ───────────────────────────────────────────────────
+   Reklamacje i dyskusje mają je od 0.278.0 i 0.279.0. Zwroty dostały je
+   decyzją właściciela z 13 września — razem z prowadzącym, którego ta sama
+   rozmowa najpierw odrzuciła, a potem przywróciła.                          */
+describe("Sito i tagi w kolejce zwrotów", () => {
+  const zTagiem = (id: number, nazwa: string, kubelek: Kubelek = "decyzja") => ({
+    ...zwrot(id, kubelek, `ZT-${id}`),
+    tagi: [{ id: nazwa.length, nazwa }],
+  });
+
+  it("tag ZAWĘŻA listę, nie przestawia kolejności", async () => {
+    /* Kolejność liczy termin ustawowy i to się nie zmienia: jedna pomyłka
+       w tagu nie ma prawa zakopać zwrotu z zegarem na dole listy. */
+    scena.zwroty = [zTagiem(11, "gwarancja"), zTagiem(12, "sporny")];
+    try {
+      pokaz();
+      expect(screen.getAllByRole("listitem").length).toBe(2);
+      /* Pigułka filtra i czip na wierszu noszą tę samą nazwę — bierzemy
+         PIERWSZY przycisk, bo pasek stoi nad listą. */
+      await userEvent.click(screen.getAllByRole("button", { name: /gwarancja/ })[0]);
+      const po = screen.getAllByRole("listitem");
+      expect(po.length).toBe(1);
+      expect(po[0].textContent).toContain("ZT-11");
+    } finally { scena.zwroty = null; }
+  });
+
+  it("pigułka tagu, którego w kubełku nie ma, się nie pokazuje", () => {
+    /* Filtr obiecujący zawężenie do pustki uczy klikać na próżno. */
+    scena.zwroty = [zwrot(13, "decyzja", "ZT-13")];
+    try {
+      pokaz();
+      expect(screen.queryByRole("button", { name: /gwarancja/ })).toBeNull();
+    } finally { scena.zwroty = null; }
   });
 });

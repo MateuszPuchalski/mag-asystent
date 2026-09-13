@@ -1,6 +1,8 @@
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { tagiSprawy, tagiWszystkichSpraw, type TagSprawy } from "./tagi-spraw.js";
+import {
+  TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
+} from "./tagi-spraw.js";
 import { linkZamowienia } from "./allegro-linki.js";
 import {
   BladReklamacji,
@@ -282,7 +284,7 @@ export function listaDyskusji(
      jest kolumną — liczy go ten plik ze statusu ostatniej wiadomości. SQL
      musiałby powtórzyć tę regułę drugi raz i rozjechać się przy pierwszej
      poprawce. Wierszy są dziesiątki, więc to nic nie kosztuje. */
-  const tagi = tagiWszystkichSpraw(database);
+  const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
   return wiersze
     .map((w) => {
       const d = zWiersza(w, teraz);
@@ -326,7 +328,7 @@ export function szczegolDyskusji(
      pokazałoby sprawę uboższą, niż jest naprawdę. */
   if (!w) throw new BladReklamacji(`Dyskusja ${id} nie istnieje`, 404);
   const dyskusja = zWiersza(w, teraz);
-  dyskusja.tagi = tagiSprawy(database, id);
+  dyskusja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const { zwroty, rozmowy } = kontekstZamowienia(
     database, Number(w.channel_account_id), dyskusja.orderId, teraz);
   return {

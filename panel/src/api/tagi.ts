@@ -3,6 +3,7 @@ import { api } from "./klient";
 import type { Tag } from "./typy";
 import { kluczeReklamacji } from "./reklamacje";
 import { kluczeDyskusji } from "./dyskusje";
+import { kluczeZwrotow } from "./zwroty";
 
 /* ── Słownik tagów i przypięcia (0.279.0) ────────────────────────────────────
    SŁOWNIK JEST JEDEN dla reklamacji i dyskusji, więc ma własny klucz cache
@@ -23,7 +24,7 @@ export function useTagi() {
 }
 
 /** Rodzaj sprawy rozstrzyga tylko ADRES — reszta jest wspólna. */
-export type RodzajSprawy = "reklamacje" | "dyskusje";
+export type RodzajSprawy = "reklamacje" | "dyskusje" | "zwroty";
 
 function useOdswiezWszystko() {
   const qc = useQueryClient();
@@ -31,9 +32,14 @@ function useOdswiezWszystko() {
     void qc.invalidateQueries({ queryKey: kluczeTagow.slownik });
     void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
     void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+    /* Kolejka zwrotów dochodzi w 0.315.0. Unieważniamy WSZYSTKIE TRZY, bo tag
+       zmieniony przy reklamacji bywa tym samym tagiem, który filtruje zwroty —
+       a kolejka ze starą nazwą byłaby drugą wersją prawdy, nie opóźnieniem. */
+    void qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
     void qc.invalidateQueries({
-      queryKey: rodzaj === "reklamacje"
-        ? kluczeReklamacji.reklamacja(id) : kluczeDyskusji.dyskusja(id),
+      queryKey: rodzaj === "reklamacje" ? kluczeReklamacji.reklamacja(id)
+        : rodzaj === "dyskusje" ? kluczeDyskusji.dyskusja(id)
+          : kluczeZwrotow.zwrot(id),
     });
   };
 }

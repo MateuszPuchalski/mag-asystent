@@ -86,6 +86,10 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij` },
   { method: "GET" as const, url: "/api/obsluga/zwroty/rozjazdy" },
+  /* Prowadzący i tagi (0.315.0) — znacznik „biorę to" mówi, kto zajmuje się
+     sprawą klienta, a tag bywa zdaniem o niej. Oba należą do biura. */
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/prowadzi` },
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/tagi/1` },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -284,8 +288,12 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      zapisać ustalenia, więc wracało ono do panelu Allegro albo do niczyjej
      pamięci. Druga trasa jest z §25a.5: notatkę nadpisuje ten, kto pisze
      ostatni, a skasowane zdanie musi mieć drogę powrotną. */
-  assert.equal(posty.length, 26,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu sześciu`);
+  /* Dwudziesta siódma (0.315.0): znacznik „biorę to". JEDNA trasa na wzięcie
+     i oddanie, bo to przełącznik — druga kazałaby panelowi wiedzieć, czyj jest
+     znacznik, zanim kliknie. Trasy TAGÓW tego licznika nie ruszają: rejestruje
+     je `trasyTagowSprawy` z `routes/tagi.ts`, wspólnie dla trzech ekranów. */
+  assert.equal(posty.length, 27,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu siedmiu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",

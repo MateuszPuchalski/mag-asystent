@@ -14,7 +14,7 @@ import {
   znajdzZwrotPoKodzie,
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
-  zapiszNotatkeZwrotu, cofnijNotatkeZwrotu,
+  zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, stempelProwadziZwrot,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
@@ -30,6 +30,8 @@ import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 import { reconcile } from "../services/reconcile.js";
+import { trasyTagowSprawy } from "./tagi.js";
+import { TAGI_ZWROTU } from "../services/tagi-spraw.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
    SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
@@ -572,6 +574,25 @@ export async function zwrotyRoutes(app: FastifyInstance) {
    * danych na dysk — a kto wynosi zestawienia o ludziach, sam trafia do logu.
    * Ta sama zasada stoi przy `analiza_eksport` i `audyt_eksport`.
    */
+  /* ── PROWADZĄCY ZWROT (0.315.0) ─────────────────────────────────────────
+     Jedna trasa na wzięcie i oddanie: to PRZEŁĄCZNIK, a nie dwie decyzje.
+     Druga trasa kazałaby panelowi wiedzieć, czyj jest znacznik, zanim
+     kliknie — a to wie serwer, i tylko on wie na pewno.
+
+     Bez `autoryzuj()`: znacznik nie rusza ani pieniędzy, ani stanów. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/prowadzi", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return stempelProwadziZwrot(db(), Number(req.params.id), kto(), req.body?.wersja);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Tagi zwrotu — ten sam rejestrator co przy reklamacjach i dyskusjach,
+     tylko z inną osią wiązań. Słownik jest jeden dla wszystkich trzech. */
+  trasyTagowSprawy(app, "/api/obsluga/zwroty", TAGI_ZWROTU);
+
   /* ── NOTATKA BIURA (0.313.0) ────────────────────────────────────────────
      Bez `autoryzuj()`: to zdanie zostaje U NAS i niczego nie obiecuje
      klientowi — czyli zwykła praca biura, tak samo jak zapis przelewu.
