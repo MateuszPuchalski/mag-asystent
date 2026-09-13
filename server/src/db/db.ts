@@ -543,6 +543,18 @@ export function migrate(database: DatabaseSync) {
   addColumn("zwrot_klienta", "przelew_przez", "TEXT");
   addColumn("zwrot_klienta", "przelew_user_id", "INTEGER REFERENCES app_user(user_id)");
   addColumn("zwrot_klienta", "przelew_referencja", "TEXT");
+  /* NOTATKA BIURA PRZY ZWROCIE (0.313.0). Kolumna `notatka` istnieje od
+     0.172.0, ale wypełniała ją WYŁĄCZNIE rejestracja paczki nieodebranej —
+     przy zwrocie z Allegro nie było jak dopisać zdania o ustaleniach.
+
+     Poprzednia treść zostaje na wierszu, żeby zmianę dało się cofnąć: notatka
+     jest polem swobodnym, które nadpisuje ten, kto pisze ostatni. Ten sam
+     wzorzec co przy reklamacjach (0.280.0) i ta sama cena — jeden szczebel
+     wstecz, bez tabeli historii dla pola, którego nikt nie audytuje. */
+  addColumn("zwrot_klienta", "notatka_poprzednia", "TEXT");
+  addColumn("zwrot_klienta", "notatka_at", "TEXT");
+  addColumn("zwrot_klienta", "notatka_przez", "TEXT");
+  addColumn("zwrot_klienta", "notatka_user_id", "INTEGER REFERENCES app_user(user_id)");
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do

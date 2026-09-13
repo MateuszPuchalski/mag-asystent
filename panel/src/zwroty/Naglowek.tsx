@@ -59,8 +59,11 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
         : <span className="text-slate-500">kupujący: Allegro nie podało</span>}
     </p>
 
+    {/* NOTATKA ZESZŁA STĄD W 0.313.0. Przy paczce nieodebranej cytowaliśmy ją
+        tutaj, bo nie miała innego miejsca — od tego wydania ma własną sekcję
+        w kolumnie dowodów, razem z autorem, godziną i cofnięciem. Zdanie
+        powtórzone dwa razy na jednym ekranie każe je czytać dwa razy. */}
     {nieodebrana && <p className="mt-1 text-xs text-violet-800">
-      Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.
-      {zwrot.notatka ? ` „${zwrot.notatka}"` : ""}</p>}
+      Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.</p>}
   </header>;
 }

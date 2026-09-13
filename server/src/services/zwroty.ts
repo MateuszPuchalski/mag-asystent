@@ -136,8 +136,13 @@ export interface WierszZwrotu {
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
-  /** Notatka biura przy paczce nieodebranej; przy zwrocie z Allegro `null`. */
+  /** Notatka biura — od 0.313.0 dopisywana przy KAŻDYM zwrocie, nie tylko
+      przy paczce nieodebranej. */
   notatka: string | null;
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  /** Czy jest dokąd wracać cofnięciem (§25a.5). */
+  maPoprzedniaNotatke: boolean;
   /** Login kupującego prosto ze zwrotu — nie wymaga pobranego zamówienia. */
   kupujacyLogin: string | null;
   /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
@@ -448,6 +453,9 @@ function zloz(
     rejectionCode,
     zrodlo: String(z.zrodlo ?? "allegro"),
     notatka: (z.notatka as string) ?? null,
+    notatkaAt: (z.notatka_at as string) ?? null,
+    notatkaPrzez: (z.notatka_przez as string) ?? null,
+    maPoprzedniaNotatke: ((z.notatka_poprzednia as string) ?? null) !== null,
     /* ZWROT ALBO JEGO ZAMÓWIENIE (0.177.0). Login siedzi w OBU odpowiedziach
        Allegro — `CustomerReturn.buyer.login` i `checkout-forms.buyer.login` —
        i oba synchronizatory go mapują. Ekran czytał wyłącznie pierwszy, więc
@@ -804,13 +812,6 @@ export function licznikiKubelkow(zwroty: WierszZwrotu[]): Record<Kubelek, number
   return puste;
 }
 
-/** Oś jednego zwrotu — wpisy wiszą przy źródle (blizna 0.130.0). */
-export function osZwrotu(database: Db, zwrotId: number) {
-  return database.prepare(
-    "SELECT rodzaj, tresc, dane_json, kiedy_at, kto FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY kiedy_at ASC, id ASC"
-  ).all(zwrotId);
-}
-
 /**
  * Potwierdzenie kartoteki dla pozycji zwrotu.
  *
@@ -988,6 +989,14 @@ export function rozstrzygnijZwrot(
       WHERE id=?`).run(decyzja, teraz.toISOString(), kto.name, kto.id,
         uzasadnienie === "" ? null : uzasadnienie, zwrotId);
     podnies(database, zwrotId);
+    /* NA OŚ, nie tylko do dziennika (0.313.0). Do 0.284.0 oś zwrotu znała
+       wyłącznie cofnięcia, bo tylko one ją zapisywały — karta pokazywałaby
+       „Cofnięto przyjęcie" nad pustką po samym przyjęciu. `events` ma tę
+       decyzję od zawsze, ale jest audytem SYSTEMU: nie ma retencji, nie ma
+       ekranu i nie odpowiada na pytanie biura „co się z tą sprawą działo". */
+    zdarzenie(database, zwrotId, "werdykt",
+      decyzja === "przyjety" ? "Zwrot przyjęty" : `Odmowa: ${uzasadnienie}`,
+      { decyzja, powod: uzasadnienie || null }, kto, teraz.toISOString());
     logEvent(`zwrot_werdykt_${decyzja}`, kto.name, null,
       { zwrotId, powod: uzasadnienie || null }, kto.id, database);
     return { werdykt: decyzja, wersja: wersja + 1 };
@@ -1086,8 +1095,9 @@ export function ocenPozycje(
   database: Db, pozycjaId: number, ocena: "stan" | "utylizacja" | null,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
 ): { wersja: number; koszyk: number | null } {
-  const p = database.prepare("SELECT id, zwrot_id FROM zwrot_klienta_pozycja WHERE id=?")
-    .get(pozycjaId) as { id: number; zwrot_id: number } | undefined;
+  const p = database.prepare(
+    "SELECT id, zwrot_id, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { id: number; zwrot_id: number; nazwa: string } | undefined;
   if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
   return transaction(database, () => {
     const z = podKlucz(database, Number(p.zwrot_id), wersja);
@@ -1108,6 +1118,14 @@ export function ocenPozycje(
       .run(ocena, ocena === null ? null : teraz.toISOString(),
         ocena === null ? null : kto.name, pozycjaId);
     podnies(database, Number(p.zwrot_id));
+    /* Zdanie niesie NAZWĘ TOWARU, nie identyfikator pozycji: oś czyta człowiek
+       szukający odpowiedzi „co się stało z tym sekatorem", a numer wiersza nie
+       odpowiada na nic. */
+    zdarzenie(database, Number(p.zwrot_id), ocena === null ? "ocena_cofnieta" : "ocena",
+      ocena === null
+        ? `${p.nazwa} — cofnięto ocenę`
+        : `${p.nazwa} — ${ocena === "stan" ? "na stan" : "utylizacja"}`,
+      { pozycjaId, ocena }, kto, teraz.toISOString());
     logEvent(ocena === null ? "zwrot_ocena_cofnieta" : "zwrot_ocena", kto.name, null,
       { zwrotId: Number(p.zwrot_id), pozycjaId, ocena }, kto.id, database);
     /* Zmiana oceny ZDEJMUJE z koszyka, zanim cokolwiek dołoży. Inaczej
@@ -1567,6 +1585,12 @@ export function zapiszKwote(
       SET kwota_grosze=?, kwota_dostawa_grosze=?, kwota_wariant=?, kwota_at=?, kwota_przez=?
       WHERE id=?`).run(suma + dostawa, dostawa, wariant, teraz.toISOString(), kto.name, zwrotId);
     podnies(database, zwrotId);
+    /* Zdanie mówi KWOTĘ I WARIANT, bo po zamknięciu zwrotu to jest jedyne
+       miejsce, w którym widać, ile obiecano klientowi i za co. */
+    zdarzenie(database, zwrotId, "kwota",
+      `Do oddania ${((suma + dostawa) / 100).toFixed(2)} (${NAZWA_WARIANTU[wariant] ?? wariant})`,
+      { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant }, kto,
+      teraz.toISOString());
     logEvent("zwrot_kwota", kto.name, null,
       { zwrotId, kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant,
         pozycje: [...wybrane] }, kto.id, database);
@@ -1827,6 +1851,162 @@ function opisz(database: Db, idy: number[]) {
     externalId: String(w.external_id),
   }));
 }
+
+/* ── Notatka biura i oś zwrotu (0.313.0) ─────────────────────────────────────
+   Dwie strony jednej sprawy: co biuro ZAPISAŁO od siebie i co się ze zwrotem
+   DZIAŁO. Do 0.284.0 pierwszego nie dało się zrobić przy zwrocie z Allegro,
+   a drugie zapisywało pięć serwisów i nie czytał nikt.                      */
+
+export interface WpisOsiZwrotu {
+  id: number;
+  rodzaj: string;
+  tresc: string | null;
+  kiedy: string;
+  kto: string | null;
+  dane: Record<string, unknown> | null;
+}
+
+/**
+ * Oś zwrotu — rosnąco po czasie, czyli w kolejności pracy.
+ *
+ * Najnowsze na górze byłoby kolejnością SZUKANIA, a tu czyta się drogę sprawy
+ * od początku: przyjęcie, ocena, kwota, korekta, pieniądze. Tę samą kolejność
+ * ma oś rozmowy w skrzynce i to jest ten sam nawyk.
+ *
+ * `dane_json` wychodzi rozpakowane, bo panel odróżnia po nim numer korekty
+ * znaleziony przez automat od przepisanego ręką. Zepsuty JSON oddajemy jako
+ * `null` zamiast wywracać całą oś — jeden wiersz nie ma prawa zabrać reszty.
+ */
+export function osZwrotu(database: Db, zwrotId: number): WpisOsiZwrotu[] {
+  const wiersze = database.prepare(
+    `SELECT id, rodzaj, tresc, dane_json, kiedy_at, kto
+       FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY kiedy_at, id`)
+    .all(zwrotId) as Array<Record<string, unknown>>;
+  return wiersze.map((w) => {
+    let dane: Record<string, unknown> | null = null;
+    try {
+      dane = w.dane_json ? JSON.parse(String(w.dane_json)) as Record<string, unknown> : null;
+    } catch { dane = null; }
+    return {
+      id: Number(w.id),
+      rodzaj: String(w.rodzaj),
+      tresc: (w.tresc as string) ?? null,
+      kiedy: String(w.kiedy_at),
+      kto: (w.kto as string) ?? null,
+      dane,
+    };
+  });
+}
+
+/** Stan notatki po zapisie — panel odświeża z tego nagłówek zwrotu. */
+export interface StanNotatki {
+  notatka: string | null;
+  notatkaAt: string | null;
+  notatkaPrzez: string | null;
+  maPoprzednia: boolean;
+  wersja: number;
+}
+
+function wierszNotatki(database: Db, zwrotId: number) {
+  const w = database.prepare(
+    `SELECT wersja, notatka, notatka_poprzednia, notatka_at, notatka_przez
+       FROM zwrot_klienta WHERE id=?`).get(zwrotId) as Record<string, unknown> | undefined;
+  if (!w) throw new Error("Nie znaleziono zwrotu");
+  return w;
+}
+
+const stanNotatki = (w: Record<string, unknown>): StanNotatki => ({
+  notatka: (w.notatka as string) ?? null,
+  notatkaAt: (w.notatka_at as string) ?? null,
+  notatkaPrzez: (w.notatka_przez as string) ?? null,
+  maPoprzednia: ((w.notatka_poprzednia as string) ?? null) !== null,
+  wersja: Number(w.wersja),
+});
+
+/**
+ * Sprawdzenie wersji BEZ bramki na zwrocie zamkniętym.
+ *
+ * `podKlucz` odmawia przy `zamkniety_at` i ma rację przy decyzjach: one
+ * zmieniają to, co obiecaliśmy klientowi. Notatka niczego nie obiecuje —
+ * zapisuje ustalenie biura — a najczęściej dopisuje się ją PO zamknięciu,
+ * gdy sprawa wraca pytaniem. Ta sama decyzja co przy zapisie przelewu.
+ */
+function wersjaSieZgadza(w: Record<string, unknown>, wersja: number | undefined): void {
+  if (wersja === undefined) return;
+  if (Number(w.wersja) !== wersja) {
+    throw new ZwrotConflict(
+      "Zwrot zmienił się w międzyczasie — odśwież i sprawdź, co zrobił inny agent.",
+      { wersja: Number(w.wersja), przyslana: wersja });
+  }
+}
+
+/**
+ * Zapis notatki. Poprzednia treść zostaje na wierszu — stąd cofnięcie.
+ *
+ * DO DZIENNIKA IDZIE DŁUGOŚĆ, NIGDY TREŚĆ, i tak samo na oś: notatka bywa
+ * zdaniem o kliencie, a `events` nie ma retencji (§9 architektury). Oś niesie
+ * sam fakt zapisu, bo treść i tak stoi w nagłówku zwrotu.
+ */
+export function zapiszNotatkeZwrotu(
+  database: Db, zwrotId: number, notatka: string | null,
+  kto: { id: number; name: string }, wersja?: number, teraz = new Date(),
+): StanNotatki {
+  return transaction(database, () => {
+    const w = wierszNotatki(database, zwrotId);
+    wersjaSieZgadza(w, wersja);
+    const wartosc = (notatka ?? "").trim() || null;
+    const at = teraz.toISOString();
+    database.prepare(`UPDATE zwrot_klienta
+      SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+          wersja=wersja+1
+      WHERE id=?`).run(wartosc, (w.notatka as string) ?? null, at, kto.name, kto.id, zwrotId);
+    zdarzenie(database, zwrotId, wartosc === null ? "notatka_zdjeta" : "notatka",
+      wartosc === null ? "Notatka skasowana" : "Notatka biura zmieniona",
+      { znakow: wartosc?.length ?? 0 }, kto, at);
+    logEvent(wartosc === null ? "zwrot_notatka_zdjeta" : "zwrot_notatka", kto.name, null,
+      { zwrotId, znakow: wartosc?.length ?? 0 }, kto.id, database);
+    return stanNotatki(wierszNotatki(database, zwrotId));
+  })();
+}
+
+/**
+ * Cofnięcie ZMIANY notatki — jeden szczebel, przez zamianę.
+ *
+ * Bieżąca treść ląduje w `notatka_poprzednia`, więc drugie kliknięcie wraca
+ * tam, gdzie było. Wiersz sprzed tego wydania nie zna swojej poprzedniej
+ * treści i dostaje odmowę ze zdaniem, a nie ciche nic.
+ */
+export function cofnijNotatkeZwrotu(
+  database: Db, zwrotId: number, kto: { id: number; name: string },
+  wersja?: number, teraz = new Date(),
+): StanNotatki {
+  return transaction(database, () => {
+    const w = wierszNotatki(database, zwrotId);
+    wersjaSieZgadza(w, wersja);
+    const poprzednia = (w.notatka_poprzednia as string) ?? null;
+    if (poprzednia === null) throw new Error("Nie ma do czego wracać — to pierwsza notatka");
+    const at = teraz.toISOString();
+    database.prepare(`UPDATE zwrot_klienta
+      SET notatka=?, notatka_poprzednia=?, notatka_at=?, notatka_przez=?, notatka_user_id=?,
+          wersja=wersja+1
+      WHERE id=?`).run(poprzednia, (w.notatka as string) ?? null, at, kto.name, kto.id, zwrotId);
+    zdarzenie(database, zwrotId, "notatka_cofnieta", "Cofnięto zmianę notatki",
+      { znakow: poprzednia.length }, kto, at);
+    logEvent("zwrot_notatka_cofnieta", kto.name, null,
+      { zwrotId, znakow: poprzednia.length }, kto.id, database);
+    return stanNotatki(wierszNotatki(database, zwrotId));
+  })();
+}
+
+/**
+ * Wariant kwoty po ludzku — na oś, nie do bazy.
+ *
+ * Kolumna niesie `pelna` / `bez_wysylki` / `inna`, bo to KLUCZ. Oś czyta
+ * człowiek, a „bez_wysylki" w zdaniu o pieniądzach wygląda jak usterka.
+ */
+const NAZWA_WARIANTU: Record<string, string> = {
+  pelna: "pełna", bez_wysylki: "bez wysyłki", inna: "część pozycji",
+};
 
 function zdarzenie(
   database: Db, zwrotId: number, rodzaj: string, tresc: string,

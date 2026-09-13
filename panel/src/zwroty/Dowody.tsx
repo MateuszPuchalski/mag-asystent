@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, MessageSquare, Package, Receipt, RefreshCw, ShoppingCart,
+  CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw,
+  ShoppingCart,
 } from "lucide-react";
-import type { KandydatFaktury, PozycjaZwrotu, Zwrot } from "../api/typy";
+import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot } from "../api/typy";
+import { Os } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
-import { czas, NaglowekSekcji, Plakietka, Skopiuj } from "../ui";
+import { czas, NaglowekSekcji, Plakietka, Przycisk, Skopiuj } from "../ui";
 import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
@@ -89,14 +91,72 @@ function DociagnijZamowienia() {
   </div>;
 }
 
+/**
+ * Notatka biura — nasze ustalenia, których Allegro nie zna.
+ *
+ * STOI W TEJ SAMEJ KOLUMNIE CO PRZY REKLAMACJI (0.280.0) i to jest cała
+ * decyzja o miejscu: dwa ekrany obsługi mają mieć jeden nawyk, nie dwa.
+ *
+ * Zapis JAWNYM przyciskiem, nie przy każdym znaku: notatka pisze się zdaniami,
+ * a zapis po każdej literze podnosiłby wersję zwrotu i wywracał kontrolę
+ * świeżości u kolegi przy drugim biurku.
+ */
+function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
+  zwrot: Zwrot;
+  trwa: boolean;
+  blad: string;
+  onZapisz: (tekst: string) => void;
+  /* Cofnięcie jest OPCJONALNE tym samym wzorcem co reszta: czego nie da się
+     zrobić, tego nie ma na ekranie. */
+  onCofnij?: () => void;
+}) {
+  const [tekst, setTekst] = useState(zwrot.notatka ?? "");
+  /* Przełączenie zwrotu podmienia treść pola. Bez tego notatka poprzedniej
+     sprawy zostawałaby w edytorze i dało się ją zapisać na cudzym zwrocie. */
+  useEffect(() => { setTekst(zwrot.notatka ?? ""); }, [zwrot.id, zwrot.notatka]);
+  const zmienione = tekst.trim() !== (zwrot.notatka ?? "").trim();
+  return <div className="flex flex-col gap-2">
+    <label className="sr-only" htmlFor="notatka-zwrotu">Notatka biura</label>
+    <textarea id="notatka-zwrotu" rows={3} value={tekst}
+      onChange={(e) => setTekst(e.target.value)}
+      placeholder="Ustalenia, których Allegro nie zna"
+      className="field resize-y text-sm" />
+    {blad && <p className="text-xs text-red-700">{blad}</p>}
+    <Przycisk wariant="glowny" disabled={!zmienione || trwa}
+      onClick={() => onZapisz(tekst)}>
+      {trwa ? "Zapisuję…" : "Zapisz notatkę"}
+    </Przycisk>
+    {/* Autor i godzina stoją TU, a nie w osobnej sekcji: pytanie „kto to
+        napisał" zadaje się patrząc na notatkę. Cofnięcie jest ZDANIEM, nie
+        ramką z decyzją — §25a.5. */}
+    {zwrot.notatkaPrzez && <p className="text-podpis text-slate-600">
+      Zmiana: {zwrot.notatkaPrzez}, {czas(zwrot.notatkaAt)}
+      {onCofnij && zwrot.maPoprzedniaNotatke && <>
+        {" · "}
+        <button type="button" disabled={trwa} onClick={onCofnij}
+          className="py-1 font-semibold text-slate-700 underline disabled:opacity-50">
+          cofnij zmianę</button>
+      </>}
+    </p>}
+  </div>;
+}
+
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
-  fakturaBlad = "", onFaktura }: {
+  fakturaBlad = "", onFaktura, os = [],
+  trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke }: {
   zwrot: Zwrot;
   kandydaciFaktury?: KandydatFaktury[];
   fakturaTrwa?: boolean;
   fakturaBlad?: string;
   /** Brak = kolumna nie proponuje wskazania (przycisk bez działania kłamie). */
   onFaktura?: (dokId: number | null) => void;
+  /** Przebieg sprawy (0.313.0); pusta lista nie rysuje sekcji. */
+  os?: WpisOsiZwrotu[];
+  trwaNotatka?: boolean;
+  bladNotatki?: string;
+  /** Brak = kolumna notatki nie pokazuje (pole bez zapisu kłamie). */
+  onNotatka?: (tekst: string) => void;
+  onCofnijNotatke?: () => void;
 }) {
   const zam = zwrot.zamowienie;
 
@@ -312,6 +372,19 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>
+    </Sekcja>}
+
+    {onNotatka && <Sekcja ikona={<NotebookPen size={14} />} tytul="Notatka biura">
+      <Notatka zwrot={zwrot} trwa={trwaNotatka} blad={bladNotatki}
+        onZapisz={onNotatka} onCofnij={onCofnijNotatke} />
+    </Sekcja>}
+
+    {/* OŚ STOI NA KOŃCU KOLUMNY i to jest jej miejsce: reszta dowodów odpowiada
+        na „co zdecydować", a oś na „co się już stało". Pierwsze czyta się przed
+        decyzją, drugie po fakcie — najczęściej przy zwrocie zamkniętym, gdy
+        sprawa wraca pytaniem. */}
+    {os.length > 0 && <Sekcja ikona={<History size={14} />} tytul="Przebieg sprawy">
+      <Os wpisy={os} />
     </Sekcja>}
 
   </div>;
