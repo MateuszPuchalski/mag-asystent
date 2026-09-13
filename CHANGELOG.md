@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.325.2 — odbiór natywnych ekranów przyjęcia i odkładania
+
+- Nowe testy Compose uruchamiają rzeczywiste ekrany, repozytorium HTTP i trwały dziennik na emulatorze Androida.
+- Sprawdzają jawne liczenie, blokadę przedwczesnego skanu półki, powrót skanera po IME oraz nową pustą ilość przy kolejnej partii.
+- Odkładanie sprawdza również zwijanie alternatywnych miejsc i powrót do instrukcji po potwierdzeniu ilości.
+- CI zachowuje raport i zrzuty ekranu dla profilu 360 × 640 dp. Test korzysta wyłącznie z lokalnego kontraktu HTTP.
+- Emulator nie zastępuje odbioru fizycznego skanera ani próby przepustowości hali. Regresja serwisowa nadal sprawdza rzeczywiste księgowanie.
+
 ## 0.325.1 — odbiór całej drogi od brakującej dostawy do kuriera
 
 - Nowa regresja łączy przyjęcie, częściowe odkładanie, automatyczny przydział skanem wózka, zbiórkę, pakowanie i fizyczne wydanie.

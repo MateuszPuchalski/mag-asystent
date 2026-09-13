@@ -8,6 +8,8 @@ wydruku. Kompletacja i pakowanie WMS działają także w przeglądarce ze skaner
 Instrukcja tego modułu: [`docs/wms.md`](docs/wms.md).
 
 API i baza WMS pracują lokalnie, bez Sellasist. Obecny odbiór obejmuje wyłącznie dane seeded.
+Wersja 0.325.2 dodaje odbiór ekranów kolektora w CI, bez migracji ani zmiany poleceń WMS.
+Testy urządzenia czyszczą jego dane testowe; uruchamiać je wyłącznie na osobnym emulatorze lub kolektorze testowym.
 Zamówienia, rezerwacje, skany, pakowanie i rejestr paczek prowadzi sam WMS.
 Osobne integracje Allegro i Subiekta zachowują dotychczasową konfigurację.
 
