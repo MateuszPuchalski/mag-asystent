@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.331.0 — 14 września 2026
+
+**Kolejka wiedzy opróżnia się sama.** [wymaga działania] Właściciel: „wiedza
+powinna uzupełniać się automatycznie". Pytany o zakres, ze wskazaniem ryzyka,
+wybrał najdalszy: cała kolejka automatycznie, człowiek tylko prostuje.
+
+**To jest odwrócenie zasady, nie jej rozszerzenie**, i wydanie tego nie
+ukrywa. Do 0.330.0 nagłówek `services/wiedza.ts` niósł zdanie „automat może
+proponować, ale nie zatwierdza nigdy", a `czlowiekZBiura` pilnował go przed
+zapisem. `identyfikatory.ts` niósł drugie: „decyzją właściciela automat nie
+zgaduje marki z FS450". Oba zeszły z tą zmianą.
+
+Kolejka `model_z_opisu` nie czekała na zatwierdzenie, tylko na odczytanie.
+W wierszu stoi goły tekst, a człowiek dopisywał do niego markę. Automat bierze
+ją z czterech źródeł, od najmocniejszego. Tekst zaczyna się od znanej marki.
+Sama nazwa trafia w dokładnie jeden znany model. Marka stoi w nazwie kartoteki
+albo w tytule naszej oferty. Dopiero gdy trzy pierwsze milczą, pyta model
+językowy, i to osobnym przełącznikiem.
+
+**Parametr „Marka" naszej oferty jest celowo nieużyty.** Niesie markę części,
+nie maszyny. Wzięty jako marka maszyny dałby model „WERTIS LS 46-450": markę
+sprzedawcy sklejoną z nazwą cudzej kosiarki, zatwierdzoną bez człowieka.
+Pierwszy szkic tego modułu wszedł w tę pułapkę i stoi o niej test.
+
+Wiersz, przy którym wszystkie źródła milczą, zostaje w kolejce. Pusty klucz
+byłby gorszy od braku klucza.
+
+**Wpis maszyny jest odróżnialny** i to jest jedyna rzecz w tym wydaniu, której
+nie wolno cofnąć: `rozstrzygnal` niepuste przy pustym `rozstrzygnal_user_id`.
+Po tej parze stoi karta „Co automat dopisał do wiedzy" w ustawieniach obsługi
+i po niej liczy się, ile wiedzy dopisała maszyna.
+
+Czego automat nie zniósł. `czlowiekZBiura` dalej strzeże gałęzi ludzkiej, więc
+magazynier nadal nie zatwierdzi wiedzy. Zatwierdzenie bez dowodu nadal nie
+przechodzi, także dla maszyny. Model językowy przechodzi przez to samo sito,
+co dane doboru ze szkicu: marka musi stać w materiale albo wśród marek, które
+już przeszły przez człowieka.
+
+**Wyłączone domyślnie**, a model językowy osobnym przełącznikiem. Szczegóły
+w `DEPLOY.md`.
+
+---
+
 ## 0.330.0 — 14 września 2026
 
 **Copilot widzi zdjęcia z rozmowy.** Właściciel pokazał zdjęcie tabliczki

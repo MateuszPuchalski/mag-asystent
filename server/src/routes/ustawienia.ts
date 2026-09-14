@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
 import { pokrycieSygnatur } from "../services/sygnatury.js";
+import { coAutomatDopisal } from "../services/wiedza-automat.js";
 import { pokrycieWiedzy } from "../services/identyfikatory.js";
 import { skutecznoscDoboru } from "../services/skutecznosc-doboru.js";
 
@@ -49,6 +50,15 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
      zgubić po drodze. */
   app.get<{ Querystring: { dni?: string } }>("/api/obsluga/skutecznosc-doboru", async (req, reply) =>
     odmowa(reply) ?? skutecznoscDoboru(dniZQuery(req.query.dni), db()));
+
+  /* CO AUTOMAT DOPISAŁ (0.331.0) — lista do prostowania.
+     Właściciel wybrał opróżnianie kolejki wiedzy automatem i ta trasa jest
+     drugą połową tamtej decyzji: skoro maszyna zatwierdza, człowiek musi mieć
+     gdzie zobaczyć, co zatwierdziła, i co cofnąć. Cofanie idzie istniejącymi
+     trasami wiedzy, więc tutaj zostaje sam odczyt — i dlatego ta trasa stoi
+     w pliku ze strażnikiem ZERO TRAS ZAPISU, nie w `wiedza.ts`. */
+  app.get("/api/obsluga/wiedza-automat", async (_req, reply) =>
+    odmowa(reply) ?? coAutomatDopisal(100, db()));
 }
 
 /** Okno przycinane do trzech wartości, które oferuje selektor karty. */

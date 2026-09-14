@@ -44,6 +44,10 @@ vi.mock("../api/rozmowy", async () => {
         tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, wymiary: { kartotek: 0, wymiarow: 0 },
         fts: { dostepne: false, wpisow: 0 } },
     }),
+    /* Automat wiedzy (0.331.0): pusta lista, bo ten test sprawdza SKŁAD
+       ekranu, a treść karty ma własny. Atrapa MUSI tu być — bez niej hook
+       idzie po dane naprawdę i przewraca cały plik na braku QueryClienta. */
+    useWiedzaAutomat: () => ({ data: [] }),
     /* Skuteczność doboru (0.267.0): jedenaście dróg i dziewięć statusów, bo
        karta wypisuje je co do jednego — także te z zerem. */
     useSkutecznoscDoboru: () => ({

@@ -67,6 +67,8 @@ import { zglosRabat } from "./adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
+import { oproznijKolejke } from "./services/wiedza-automat.js";
+import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
 import { powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
@@ -456,6 +458,29 @@ async function main() {
       /* Głośno TYLKO wtedy, gdy takt stanął. Przebieg, który nic nie zastał,
          jest normą i nie ma o czym mówić. */
       if (w.przerwane) console.warn(`[copilot-auto-szkic] przebieg przerwany: ${w.przerwane}`);
+    });
+  }
+
+  /* KOLEJKA WIEDZY OPRÓŻNIA SIĘ SAMA (0.331.0). Takt, nie `buildApp()` —
+     ta sama reguła, co przy każdym innym: testy tras nie mają dopisywać
+     wiedzy do bazy w tle.
+
+     Źródło czwarte (model językowy) podpinamy TYLKO wtedy, gdy właściciel
+     włączył je osobno i Copilot ma czym mówić. Bez niego automat chodzi na
+     trzech źródłach deterministycznych i nie kosztuje ani grosza. */
+  if (config.wiedzaAutomat.wlaczony) {
+    const zModelem = config.wiedzaAutomat.model
+      && config.copilot.mode === "anthropic" && config.copilot.klucz;
+    uruchomTakt("wiedza-automat", config.wiedzaAutomat.ms, async () => {
+      const w = await oproznijKolejke({
+        naPrzebieg: config.wiedzaAutomat.naPrzebieg,
+        ...(zModelem ? { nadajKlucz: nadawcaKluczaAnthropic } : {}),
+      });
+      /* Głośno tylko o tym, co woła o reakcję: wiersze bez marki zostają
+         człowiekowi, a błędy znaczą, że coś w kolejce nie przechodzi. */
+      if (w.bezMarki || w.bledow) {
+        console.warn(`[wiedza-automat] bez marki: ${w.bezMarki}, błędów: ${w.bledow}`);
+      }
     });
   }
 

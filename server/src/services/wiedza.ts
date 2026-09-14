@@ -9,11 +9,15 @@ import { sqlZwin, zwin } from "../tekst.js";
  *
  * Trzy tabele: `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`.
  * Wiedza rośnie Z PRACY: z zatwierdzonych doborów, z pomiarów z hali
- * i z ręcznych wpisów biura — zawsze jako PROPOZYCJA, którą rozstrzyga
- * człowiek. Automat może proponować (i w E3/F będzie), ale nie zatwierdza
- * nigdy — doktryna `zwiazPewne` z `services/sygnatury.ts`. Roli „ekspert"
- * nie ma decyzją właściciela: rozstrzyga każdy z biura, także autor
- * propozycji, a obie osoby są zapisane osobno.
+ * i z ręcznych wpisów biura — zawsze jako PROPOZYCJA. Roli „ekspert" nie ma
+ * decyzją właściciela: rozstrzyga każdy z biura, także autor propozycji,
+ * a obie osoby są zapisane osobno.
+ *
+ * KTO ROZSTRZYGA, ZMIENIŁO SIĘ W 0.331.0. Do 0.330.0 stało tu zdanie „automat
+ * może proponować, ale nie zatwierdza nigdy" z odwołaniem do doktryny
+ * `zwiazPewne`. Właściciel, pytany wprost i ze wskazaniem ryzyka, wybrał
+ * opróżnianie kolejki automatem — więc zdanie musiało zejść, a nie zostać
+ * jako nieprawda w nagłówku. Szczegóły przy `podpisRozstrzygniecia`.
  *
  * Ten plik NIE importuje `dobor.ts` — tamten importuje ten (hak na
  * zatwierdzeniu doboru), a `kandydaci.ts` oba.
@@ -151,6 +155,33 @@ export function czlowiekZBiura(database: DatabaseSync, userId: number): string {
     throw new Error("Wiedzę rozstrzyga człowiek z biura — automat i hala nie zatwierdzają");
   }
   return u.name;
+}
+
+/* ── KTO ROZSTRZYGA (0.331.0) ────────────────────────────────────────────────
+   Do 0.330.0 odpowiedź brzmiała „wyłącznie człowiek z biura" i stała wyżej,
+   w `czlowiekZBiura`, jako zdanie o kodzie, nie o dyscyplinie. Właściciel,
+   pytany wprost i ze wskazaniem ryzyka, wybrał opróżnianie kolejki automatem.
+
+   Strażnik NIE ZNIKA i to jest cała ostrożność, jaka tu została. Gałąź
+   ludzka dalej przez niego przechodzi, więc magazynier nadal nie zatwierdzi
+   zastosowania, a konto bez roli biura nadal dostanie wyjątek. Automat nie
+   udaje człowieka: idzie osobną, nazwaną gałęzią i zostawia po sobie parę
+   `rozstrzygnal='automat (…)'` z `rozstrzygnal_user_id` PUSTYM.
+
+   Ta para jest jedynym znacznikiem, po którym da się później odróżnić wpis
+   maszyny od wpisu człowieka — i dlatego nie wolno jej zrównać. Bez niej
+   „skuteczność źródeł" przestaje cokolwiek mierzyć, a lista „co automat
+   dopisał" nie ma czego pokazać. Ten sam wzorzec, co `przez='automat'`
+   w szkicu (0.317.0) i `dodal='oferta'` w wiedzy z ofert (0.264.0).        */
+
+/** Kto rozstrzyga: konto człowieka (sprawdzane rolą) albo nazwany automat. */
+export type Rozstrzygajacy = number | { automat: string };
+
+export function podpisRozstrzygniecia(
+  database: DatabaseSync, kto: Rozstrzygajacy,
+): { name: string; userId: number | null } {
+  if (typeof kto === "number") return { name: czlowiekZBiura(database, kto), userId: kto };
+  return { name: `automat (${kto.automat})`, userId: null };
 }
 
 export const podpis = (autor: Autor) =>
@@ -409,10 +440,10 @@ function zaladujDoRozstrzygniecia(database: DatabaseSync, id: number): Zastosowa
  * transakcji: historia wersji to łańcuch wierszy, nie osobna tabela.
  */
 export function rozstrzygnijZastosowanie(
-  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, userId: number,
+  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, kto: Rozstrzygajacy,
   database: DatabaseSync = db(),
 ): Zastosowanie {
-  const autor = czlowiekZBiura(database, userId);
+  const { name: autor, userId } = podpisRozstrzygniecia(database, kto);
   if (decyzja !== "zatwierdz" && decyzja !== "odrzuc") throw new Error("Decyzja to zatwierdz albo odrzuc");
   const uzasadnienie = oczysc(powod);
   if (decyzja === "odrzuc" && !uzasadnienie) throw new Error("Odrzucenie wymaga powodu — bez niego autor nie wie, co poprawić");

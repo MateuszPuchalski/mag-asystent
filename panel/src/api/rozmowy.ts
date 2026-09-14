@@ -7,6 +7,7 @@ import type {
   PowodNegatywny,
   HistoriaKlienta,
   Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
+  WpisAutomatu,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
 
@@ -24,6 +25,7 @@ export const klucze = {
   sygnatury: ["sygnatury"] as const,
   pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
   skutecznoscDoboru: (dni: number) => ["skutecznosc-doboru", dni] as const,
+  wiedzaAutomat: ["wiedza-automat"] as const,
   towar: (twId: number) => ["towar", twId] as const,
   zalaczniki: (id: number) => ["zalaczniki", id] as const,
   kandydaci: (id: number) => ["kandydaci", id] as const,
@@ -529,6 +531,22 @@ export function usePokrycieSygnatur() {
     queryKey: klucze.sygnatury,
     queryFn: () => api<PokrycieSygnatur>("/api/obsluga/sygnatury"),
     staleTime: 60_000,
+  });
+}
+
+/**
+ * Co automat dopisał do wiedzy (0.331.0) — lista do prostowania.
+ *
+ * Bez `refetchInterval`: takt chodzi co pół godziny, a karta jest miejscem,
+ * do którego się ZAGLĄDA, nie licznikiem do patrzenia. `staleTime` krótszy
+ * niż przy pokryciu, bo tu liczy się świeżość: im wcześniej ktoś zobaczy zły
+ * wpis, tym mniej doborów zdąży on nakarmić.
+ */
+export function useWiedzaAutomat() {
+  return useQuery({
+    queryKey: klucze.wiedzaAutomat,
+    queryFn: () => api<WpisAutomatu[]>("/api/obsluga/wiedza-automat"),
+    staleTime: 30_000,
   });
 }
 

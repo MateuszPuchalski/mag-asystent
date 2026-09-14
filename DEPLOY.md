@@ -2291,6 +2291,43 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.331.0 — kolejka wiedzy opróżnia się sama
+
+**Migracji nie ma. Nic się samo nie włączy.** Automat stoi na zerze i włącza
+się jedną linią:
+
+```
+export WIEDZA_AUTOMAT=1
+```
+
+Zanim to zrobisz, wiedz co włączasz, bo to jest odwrócenie zasady, nie jej
+rozszerzenie. Do 0.330.0 wiedzę zatwierdzał wyłącznie człowiek z biura.
+Teraz robi to takt, co pół godziny, a jego wpisy karmią czwarty szczebel
+doboru. Zła marka wraca do klienta jako zła część.
+
+Automat bierze markę z czterech źródeł. Trzy pierwsze są deterministyczne
+i nic nie kosztują. Marka na początku tekstu, jedyny znany model o tej nazwie,
+marka z nazwy kartoteki albo z tytułu oferty. Czwarte to model językowy
+i włącza się OSOBNO:
+
+```
+export WIEDZA_AUTOMAT_MODEL=1
+```
+
+Rozdzielenie jest celowe. Trzy pierwsze źródła stoją na naszych danych,
+czwarte nie, i tylko ono wystawia rachunek u dostawcy.
+
+`WIEDZA_AUTOMAT_NA_PRZEBIEG` (domyślnie 25) mówi, ile wierszy bierze jeden
+przebieg. Nie podnoś tego przed pierwszym uruchomieniem. Zaległa kolejka na
+dwa tysiące wpisów to dwa tysiące wierszy do sprawdzenia naraz.
+
+Po pierwszym przebiegu otwórz w panelu Ustawienia i kartę **„Co automat
+dopisał do wiedzy"**. Przejrzyj pierwsze kilkadziesiąt wpisów, zanim zostawisz
+takt na noc. Wpis, który nie trzyma się kupy, cofa się przy wpisie w Wiedzy.
+
+Wiersz, przy którym wszystkie źródła milczą, zostaje w kolejce dla człowieka.
+To nie jest awaria, tylko odpowiedź.
+
 ### Aktualizacja do 0.197.0 — worker Sfery przed pierwszym wdrożeniem
 
 **Instalacje bez workera Sfery: nic do zrobienia.** Zmiany dotyczą wyłącznie

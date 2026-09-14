@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Settings } from "lucide-react";
-import { usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useZdrowie } from "../api/rozmowy";
+import {
+  usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat, useZdrowie,
+} from "../api/rozmowy";
 import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { Karta } from "../ui";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
@@ -8,6 +10,7 @@ import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
 import { SkutecznoscDoboru } from "../ustawienia/SkutecznoscDoboru";
+import { WiedzaAutomat } from "../ustawienia/WiedzaAutomat";
 import { SlownikTagow } from "../ustawienia/SlownikTagow";
 import { useTagi, useZmienTag } from "../api/tagi";
 
@@ -42,6 +45,7 @@ export function Ustawienia() {
      przełączenie ma pobrać inne dane, a nie przemalować te same. */
   const [dniDoboru, setDniDoboru] = useState(30);
   const skutecznosc = useSkutecznoscDoboru(dniDoboru);
+  const automat = useWiedzaAutomat();
   const tagi = useTagi();
   const zmienTag = useZmienTag();
   const [bladTagu, setBladTagu] = useState("");
@@ -61,6 +65,9 @@ export function Ustawienia() {
     <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     <PokrycieSygnatur dane={sygnatury.data} />
     <PokrycieWiedzy dane={wiedza.data} />
+    {/* Zaraz POD pokryciem wiedzy: tamta karta mówi, ile czeka w kolejce,
+        ta — co z kolejki wyszło bez człowieka. Jedno czytanie, dwa stany. */}
+    <WiedzaAutomat wpisy={automat.data} />
     <PomiarCopilota dane={pomiar.data} />
     <SkutecznoscDoboru dane={skutecznosc.data} dni={dniDoboru} onDni={setDniDoboru} />
     <SlownikTagow tagi={tagi.data?.tagi ?? []} trwa={zmienTag.isPending} blad={bladTagu}

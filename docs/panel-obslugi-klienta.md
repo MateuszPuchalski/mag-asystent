@@ -1460,8 +1460,41 @@ Cykl życia: `propozycja` → `zatwierdzone` | `odrzucone` | `wycofane`.
 Propozycję składa dobór (automatycznie, przy zatwierdzeniu z marką i modelem),
 pomiar z hali (na kliknięcie) albo biuro ręcznie. Źródło `opis` ma nadawcę
 od E3 — człowieka na liście „Z opisów"; `copilot` czeka na F.
-Rozstrzyga wyłącznie człowiek z biura,
-także autor propozycji. Zatwierdzenie wymaga choć jednego dowodu.
+Rozstrzyga człowiek z biura, także autor propozycji — **albo od 0.331.0
+automat wiedzy**, jeśli właściciel go włączył. Zatwierdzenie wymaga choć
+jednego dowodu i ten warunek obowiązuje też maszynę.
+
+**Kolejka wiedzy opróżnia się sama (0.331.0).** Właściciel: „wiedza powinna
+uzupełniać się automatycznie", a pytany o zakres wybrał najdalszy — cała
+kolejka automatycznie, człowiek tylko prostuje. To **odwraca** zasadę, która
+do 0.330.0 stała w nagłówku `services/wiedza.ts` i w `czlowiekZBiura`:
+„automat może proponować, ale nie zatwierdza nigdy".
+
+Kolejka `model_z_opisu` nie czekała na ZATWIERDZENIE, tylko na ODCZYTANIE:
+w wierszu stoi goły tekst („LS 46-450", „FS450"), a człowiek dopisywał do niego
+markę. Automat bierze ją z czterech źródeł, od najmocniejszego: tekst zaczyna
+się od znanej marki; sama nazwa trafia w dokładnie jeden znany model; marka
+stoi w nazwie kartoteki albo w tytule naszej oferty; a gdy trzy pierwsze
+milczą i właściciel włączył `WIEDZA_AUTOMAT_MODEL`, pyta model językowy.
+
+**Parametr „Marka" naszej oferty jest tu celowo nieużyty.** Niesie markę
+CZĘŚCI, nie maszyny. Wzięty jako marka maszyny dałby model „WERTIS LS 46-450",
+czyli markę sprzedawcy sklejoną z nazwą cudzej kosiarki i zatwierdzoną bez
+człowieka. Tytuł oferty czytamy, ale wyłącznie po to, żeby znaleźć w nim markę
+już znaną z zatwierdzonej wiedzy.
+
+Wiersz, przy którym wszystkie źródła milczą, **zostaje w kolejce**. Pusty klucz
+byłby gorszy od braku klucza.
+
+Wpis maszyny jest odróżnialny: `rozstrzygnal` niepuste przy pustym
+`rozstrzygnal_user_id`. Po tej parze stoi karta **„Co automat dopisał do
+wiedzy"** w ustawieniach obsługi — lista do prostowania, bez której pierwsza
+połowa tej decyzji byłaby nie do przyjęcia. Cofanie idzie istniejącymi
+trasami, bo to dalej to samo wycofanie, tylko cudzego wpisu.
+
+Czego automat nie zniósł: `czlowiekZBiura` dalej strzeże gałęzi ludzkiej, więc
+magazynier nadal nie zatwierdzi wiedzy, a zatwierdzenie bez dowodu nadal nie
+przechodzi.
 
 **Dowód** przechowuje rodzaj (§11.3), treść, odnośnik, zadanie i rozmowę,
 autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
@@ -1469,7 +1502,7 @@ autora i datę. Tabela jest append-only: dowodu nie da się poprawić po cichu.
 **Zabudowa silnika** (`zabudowa_silnika`, 0.229.0) mówi, który silnik stoi
 w której maszynie. Relacja jest wiele do wielu: jedna kosiarka bywa sprzedawana
 w dwóch wersjach silnikowych, a jeden silnik stoi w setkach maszyn. Cykl życia
-i podpisy ma te same co zastosowanie, rozstrzyga wyłącznie człowiek z biura,
+i podpisy ma te same co zastosowanie, rozstrzyga człowiek z biura,
 a wycofanie wymaga powodu ZAWSZE — cofnięcie pary gasi całą gałąź kandydatów
 naraz.
 
@@ -4413,6 +4446,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
+| Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
