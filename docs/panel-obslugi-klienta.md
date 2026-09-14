@@ -2773,6 +2773,27 @@ Numer magazynu stoi w `MAG_ID_ODP` i **nie ma domyślnej wartości**. Zero znacz
 wyłączone: zgadnięty numer wystawiłby dokument przesuwający złom w cudze
 miejsce, a MM się nie cofa jednym kliknięciem.
 
+**Panel biura mówi teraz, na co kosz czeka (0.333.0).** Zgłoszenie
+właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę MM
+w Subiekcie". Dokument nie zginął — czekał na korekty, dokładnie tak, jak
+opisuje bramka wyżej. Zakładka MAGAZYN pokazywała jednak kosz zamknięty
+z pastylką NA HALĘ i bez numeru, czyli obraz nie do odróżnienia od awarii.
+
+Wiersz kosza niesie od tego wydania pastylkę stanu dokumentu: CZEKA NA KOREKTĘ
+z liczbą zwrotów, MM ZAMÓWIONA, gdy zadanie stoi w kolejce Sfery, albo MM
+W BŁĘDZIE. Rozróżnienie jest treścią, bo prowadzi do innej pracy i innego
+człowieka: korektę wystawia biuro w Subiekcie, zaciętą kolejkę odblokowuje
+serwis. Podgląd kosza wymienia numery zwrotów, których korekt brakuje.
+
+Panel obsługi mówił to od 0.200.0 — pasek nad kolejką zwrotów. Ta sama prawda
+brakowała po stronie biura, a to tam zagląda się z pytaniem „gdzie dokument".
+
+Przy okazji wyszły dwa pola, których panel biura oczekiwał, a serwer nigdy nie
+oddawał: `zwrotow` na liście (stąd „undefined zwr.") i `zwroty` w podglądzie
+(stąd wywrócony podgląd). Nie wychodziło to wcześniej, bo kosze z dokumentu
+Subiekta mają numer MM i trafiają w drugą gałąź tego samego zdania — własne
+kosze biuro zaczęło składać dopiero teraz.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym
