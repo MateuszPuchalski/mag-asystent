@@ -2942,6 +2942,23 @@ Filtr liczy się w panelu, w pamięci ekranu — tą samą drogą co filtr kube�
 i z tego samego powodu: lista przyjeżdża w całości. Serwer nie dostał ani
 jednej nowej trasy, więc nigdzie nie zapisuje się, czego ktoś szukał.
 
+**Skan ZASTĘPUJE treść pola, a nie dopisuje się na końcu (0.329.0).** Hook
+milczy, gdy kursor stoi w polu — i to jest świadome, bo pole obsługuje Enter
+samo. Skutkiem ubocznym było jednak doklejanie: operator skanował drugą
+etykietę, pole pokazywało sklejone dwa numery, a szukanie po nich nie
+znajdowało nic. Wyglądało to na zepsuty czytnik.
+
+Rozpoznaje to `SeriaWPolu` tym samym podpisem czytnika: gęsta seria znaków
+dłuższa niż sześć. Podmiana pada dopiero na szóstym znaku i tylko wtedy, gdy
+przed serią coś w polu stało. Numer wpisywany ręką nie znika, bo człowiek robi
+przerwy dłuższe niż trzysta milisekund, a poprawka Backspace'em przerywa serię.
+Enter jest ostatnią bramką: gdy podmiana nie zaszła, szuka po SERII, nie po
+sklejeniu.
+
+Próg jest sześcioznakowy, nie dwuznakowy, i to jest cała ostrożność tej reguły.
+Zbyt gorliwa kasowałaby numer wpisywany ręką w środku pisania — a tego biuro
+nie zgłosi jako usterki, tylko powie „znowu mi zjadło".
+
 **Szukanie przebija kubełek.** Lista pokazuje wtedy wyniki ze wszystkich
 kubełków, a wiersz niesie etykietę swojego. Bez tego operator wpisuje numer,
 widzi „ten kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi
@@ -4395,6 +4412,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Korekta i zamknięcie zwrotu | **działa** od 0.162.0 | `zapiszKorekte`, `cofnijKorekte` — numer z Subiekta |
 | Skan etykiety zwrotnej otwiera zwrot | **działa** od 0.163.0 | `znajdzZwrotPoKodzie`, `panel/src/skaner.ts` |
 | Szukanie zwrotu po fragmencie kodu | **działa** od 0.165.0 | `panel/src/zwroty/Szukanie.tsx`, filtr w pamięci ekranu |
+| Skan w polu szukania zastępuje treść | **działa** od 0.329.0 | `SeriaWPolu` w `panel/src/skaner.ts`; próg sześciu znaków serii |
 | Panel trzyma się okna, kolumny przewijają się osobno | **działa** od 0.165.0 | `panel/src/main.tsx`, wzorzec z makiety |
 | Produkty ze zwrotu w głównym oknie, akcja na wierszu | **działa** od 0.167.0 | `panel/src/zwroty/Pozycje.tsx` |
 | Przebieg sprawy na ekranie (oś zwrotu) | **działa** od 0.313.0 | `osZwrotu` w `services/zwroty.ts`, `panel/src/zwroty/Os.tsx`; werdykt, kwota i ocena dopisują się na oś od tego wydania — wcześniej pisały ją same cofnięcia |
