@@ -4359,10 +4359,20 @@ async function pokazPodgladKosza(id, cichy) {
     ].filter(Boolean);
     cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
         KOSZ ${esc(k.kod)} ${badgeKosza(k.status)}
-        <button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>
+        ${k.doEdycji
+          ? `<button class="akcja cichy" data-przelicz-kosz="${k.id}"
+               style="margin-left:auto">PRZELICZ ZE ZWROTÓW</button>
+             <button class="akcja cichy" data-kosz-zamknij-podglad>ZWIŃ</button>`
+          : '<button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>'}
       </h2>
       <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
       ${etapy.length ? `<p class="mute" style="margin-bottom:8px">${etapy.join(" → ")}</p>` : ""}
+      ${k.doEdycji
+        ? `<p class="mute">Dokumentu jeszcze nie ma, więc zawartość da się poprawić.
+             PRZELICZ ZE ZWROTÓW układa ją od nowa z ocen „na stan" — zestaw
+             sprzedany jedną ofertą wchodzi wtedy rozbity, tak jak leży na
+             magazynie.</p>`
+        : ""}
       ${bezKorekty.length
         ? `<p><span class="badge amber">CZEKA NA KOREKTĘ</span>
              MM wyjdzie, gdy dojdą numery korekt do ${bezKorekty.length} zwr.:
@@ -5303,8 +5313,27 @@ $("koszSzukaj").addEventListener("input", (e) => {
   koszSzukajTimer = setTimeout(() => szukajWKoszach(q), 250);
 });
 
-$("koszPodglad").addEventListener("click", (e) => {
-  if (e.target.closest("[data-kosz-zamknij-podglad]")) zamknijPodgladKosza();
+$("koszPodglad").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-kosz-zamknij-podglad]")) { zamknijPodgladKosza(); return; }
+  const przelicz = e.target.closest("[data-przelicz-kosz]");
+  if (!przelicz) return;
+  /* BEZ PYTANIA O ZGODĘ (§25a.5): przeliczenie niczego nie wysyła i niczego nie
+     traci — układa zawartość od nowa z tych samych ocen. Nieodwracalny jest
+     dopiero dokument, a tego tu jeszcze nie ma. */
+  const id = Number(przelicz.dataset.przeliczKosz);
+  przelicz.disabled = true;
+  try {
+    const w = await (await api(`/api/biuro/kosze/${id}/przelicz`, { method: "POST" })).json();
+    toast(`Przeliczono: ${w.przed} → ${w.po} kartotek`);
+    await odswiezEtap3();
+  } catch (err) {
+    /* TOAST, nie `cichaAwaria`: to czynność KLIKNIĘTA, a serwis odmawia
+       zdaniem („kosz ma już dokument MM"). Odmowa schowana w konsoli wygląda
+       jak przycisk, który nic nie robi. */
+    toast(err.message);
+  } finally {
+    przelicz.disabled = false;
+  }
 });
 
 /* Kosz otwiera się KLIKNIĘCIEM WIERSZA, a drugie kliknięcie go zwija — to samo

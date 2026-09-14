@@ -838,10 +838,13 @@ test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY
     "towar schodzi z dokumentu, którego jeszcze nikt nie wystawił");
 });
 
-test("ocena pozycji z ZAMKNIĘTEGO koszyka ODMAWIA i nazywa kosz", () => {
-  /* Do 0.202.0 przechodziła po cichu: `zdejmijZKosza` szuka kosza otwartego,
+test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
+  /* Do 0.202.0 przechodziła po cichu: `zdejmijZKosza` szukał kosza otwartego,
      a jego brak oddawał `false`, którego nikt nie czytał. Towar zostawał na
-     dokumencie, który pojechał na halę — bez oceny, która go tam posłała. */
+     dokumencie, który pojechał na halę — bez oceny, która go tam posłała.
+
+     Od 0.334.0 bramką jest DOKUMENT, nie samo zamknięcie: kosz bez papieru
+     wolno poprawić (test niżej). Tu papier już jest, więc odmowa zostaje. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
@@ -854,6 +857,8 @@ test("ocena pozycji z ZAMKNIĘTEGO koszyka ODMAWIA i nazywa kosz", () => {
   d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
   zamknijKosz(d, kosz, KTO);
   d.prepare("UPDATE zwrot_klienta SET korekta_numer=NULL WHERE id=?").run(id);
+  /* Dokument wyszedł: worker wpisał numer MM. Dopiero to zamyka drogę. */
+  d.prepare("UPDATE kosz SET mm_numer='MM 1333/MAG/2026' WHERE id=?").run(kosz);
 
   /* Wersja to 3, nie 2: pierwsza ocena ją podniosła. Bramka wersji stoi PRZED
      bramką kosza i to jest właściwa kolejność — konflikt dwóch agentów jest
@@ -866,6 +871,57 @@ test("ocena pozycji z ZAMKNIĘTEGO koszyka ODMAWIA i nazywa kosz", () => {
     .get(poz[0]) as { ocena: string | null }).ocena, "stan");
   assert.equal(Number((d.prepare(
     "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(kosz) as { n: number }).n), 1);
+});
+
+test("kosz zamknięty BEZ dokumentu wolno poprawić, a pozycja wraca do NIEGO", () => {
+  /* Zgłoszenie właściciela (0.334.0): „dodałem zestaw, a powinienem rozbić go
+     przed dodaniem do MM — nie chce się zrobić". Kosz stał zamknięty tygodniami,
+     bo MM czeka na komplet korekt, i pomyłki nie dało się odkręcić w aplikacji.
+
+     POZYCJA WRACA DO TEGO SAMEGO PUDŁA. Odłożenie jej do bieżącego koszyka
+     rozdzieliłoby papier od zawartości: towar leży w tamtym pudle przy biurku,
+     a MM wystawiłaby się na następne. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
+  zamknijKosz(d, kosz, KTO);
+
+  /* Cofnięcie oceny ZDEJMUJE wiersz z zamkniętego kosza — bez odmowy. */
+  assert.equal(ocenPozycje(d, poz[0], null, 3, KTO).koszyk, null);
+  assert.equal(Number((d.prepare(
+    "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(kosz) as { n: number }).n), 0);
+
+  /* Ponowna ocena idzie do BIEŻĄCEGO koszyka i to jest uczciwe: tamto pudło
+     zostało zamknięte, a towar leży teraz tam, gdzie operator go odłożył.
+     Poprawianie zawartości zamkniętego pudła ma własną drogę — `przeliczKosz`,
+     który nie każe wyjmować i wkładać niczego dwa razy. */
+  assert.notEqual(ocenPozycje(d, poz[0], "stan", 4, KTO).koszyk, null);
+});
+
+test("poprawka zamkniętego kosza UNIEWAŻNIA jego zadanie MM", () => {
+  /* Zadanie ułożone dla starej zawartości wystawiłoby papier na to, co już
+     zdjęto. Kosz bez `mm_queue_id` wraca pod `wypuscGotoweKoszyki` i dostaje
+     świeże zadanie — z tym, co w pudle leży naprawdę. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
+  const { queueId } = zamknijKosz(d, kosz, KTO);
+  assert.notEqual(queueId, null, "komplet korekt wypuszcza MM od razu");
+
+  ocenPozycje(d, poz[0], null, 3, KTO);
+  assert.equal((d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(kosz) as { mm_queue_id: number | null }).mm_queue_id, null);
+  assert.equal((d.prepare("SELECT status FROM sfera_queue WHERE id=?")
+    .get(queueId!) as { status: string }).status, "cancelled");
 });
 
 test("cofnięcie kwoty wraca do DO ZWROTU i czyści zaznaczenie pozycji", () => {

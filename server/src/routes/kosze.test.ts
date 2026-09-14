@@ -415,3 +415,24 @@ test("starszy APK bez pola `potwierdzenie` dalej działa, a śmieć odpada", asy
   });
   assert.equal(r.statusCode, 400);
 });
+
+test("przeliczenie kosza: bramka biura, a kosz Z DOKUMENTEM dostaje 400 ze zdaniem", async () => {
+  /* Trasa z 0.334.0. Reguła, KIEDY wolno przeliczyć, stoi w serwisie
+     (`services/komplety.test.ts`); tutaj pilnujemy dwóch rzeczy, których
+     serwis nie widzi: że hala tego nie kliknie i że odmowa dochodzi do
+     ekranu ZDANIEM, a nie gołym „Bad Request". */
+  const magazynier = zalogowany("magazynier");
+  const biuro = zalogowany("biuro");
+  const koszId = koszDoRozkladania("KZ-33");
+
+  let r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/${koszId}/przelicz`, headers: magazynier,
+  });
+  assert.equal(r.statusCode, 403, "zawartość dokumentu poprawia biuro, nie hala");
+
+  r = await app.inject({
+    method: "POST", url: `/api/biuro/kosze/${koszId}/przelicz`, headers: biuro,
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /dokument MM/);
+});

@@ -191,17 +191,21 @@ test("BEZ MAG_ID_ODP utylizacja zachowuje się jak przed 0.211.0", () => {
     "wyłączony odpad nie pokazuje się nawet jako pusty koszyk");
 });
 
-test("zamkniętego kosza nie da się opróżnić ani zamknąć drugi raz", () => {
-  /* Kosz zamknięty pojechał na halę z wystawionym papierem. Wyjęcie wiersza
-     rozjechałoby dokument z zawartością. */
+test("kosza Z DOKUMENTEM nie da się opróżnić ani zamknąć drugi raz", () => {
+  /* BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE (0.334.0). Do tego wydania blokowało
+     samo zamknięcie — a kosz bywa zamknięty tygodniami, czekając na komplet
+     korekt. Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go
+     przed dodaniem do MM", i nie dało się tego poprawić, choć papieru nie było.
+     Tu kosz ma już numer MM, więc odmowa zostaje. */
   const d = stanowisko();
   const KTO = biuro(d);
   const { poz } = zwrotZTowarem(d, [11], KTO);
   ocenPozycje(d, poz[0], "stan", 2, KTO);
   const kosz = stanOtwartegoKosza(d, KTO)!;
   zamknijKosz(d, kosz.id, KTO);
+  d.prepare("UPDATE kosz SET mm_numer='MM 1333/MAG/2026' WHERE id=?").run(kosz.id);
 
-  assert.equal(zdejmijZKosza(d, poz[0], KTO), false);
+  assert.equal(zdejmijZKosza(d, poz[0], KTO), null);
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?")
     .get(kosz.id) as { n: number }).n, 1);
   assert.throws(() => zamknijKosz(d, kosz.id, KTO), /jest już zamkniety/);

@@ -2794,6 +2794,25 @@ oddawał: `zwrotow` na liście (stąd „undefined zwr.") i `zwroty` w podglądz
 Subiekta mają numer MM i trafiają w drugą gałąź tego samego zdania — własne
 kosze biuro zaczęło składać dopiero teraz.
 
+**Kosz bez dokumentu wolno poprawić (0.334.0).** Zgłoszenie właściciela:
+„dodałem zestaw, a powinienem rozbić go przed dodaniem do MM — nie chce się
+zrobić". Kosz stał zamknięty tygodniami, bo MM czeka na komplet korekt, a jego
+zawartości nie dało się tknąć.
+
+**Bramką jest DOKUMENT, nie samo zamknięcie.** Do tego wydania odmawiał każdy
+kosz zamknięty. Powód odmowy jest jednak jeden: papier, który wyszedł
+do Subiekta i zdjął towar z magazynu głównego. Kosz bez numeru MM i bez zadania
+w toku niczego jeszcze nie przesunął, więc poprawka nic nie rozjeżdża.
+
+Podgląd kosza ma przy takim koszu przycisk PRZELICZ ZE ZWROTÓW. Składa
+zawartość jeszcze raz z pozycji zwrotów, dzisiejszymi regułami — zestaw
+złożony przed 0.328.0 wraca rozbity na kartoteki z paragonu. Zadanie MM ułożone
+dla starej zawartości zostaje anulowane, a kosz wraca po świeże.
+
+Kolejność zwrotów zostaje bez zmian. Magazynier rozkłada pudło po kartce,
+a przestawiona lista kazałaby mu szukać. Pozycja, której nadal nie umiemy
+rozłożyć, nie wraca do pudła po cichu — jej numer idzie do dziennika zdarzeń.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

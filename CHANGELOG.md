@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.334.0 — 14 września 2026
+
+**Kosz zamknięty, ale bez dokumentu, wolno poprawić.** Zgłoszenie właściciela:
+„dodałem zestaw, a powinienem rozbić go przed dodaniem do MM — nie chce się
+zrobić". Kosz stał zamknięty tygodniami, czekając na komplet korekt, i pomyłki
+nie dało się odkręcić w aplikacji.
+
+Bramką jest od tego wydania DOKUMENT, nie samo zamknięcie. Powód odmowy zawsze
+był jeden: papier, który wyszedł do Subiekta i zdjął towar z magazynu głównego.
+Kosz bez numeru MM i bez zadania w toku niczego jeszcze nie przesunął.
+
+- **PRZELICZ ZE ZWROTÓW w podglądzie kosza** (zakładka MAGAZYN). Składa
+  zawartość jeszcze raz z pozycji zwrotów, dzisiejszymi regułami — zestaw
+  dołożony przed 0.328.0 wraca rozbity na kartoteki z paragonu.
+- **Stare zadanie MM zostaje anulowane**, a kosz wraca po świeże — z tym, co
+  w pudle leży naprawdę.
+- **Zdjęcie pozycji z zamkniętego kosza bez dokumentu przestaje odmawiać.**
+  Pozycja wraca do TEGO SAMEGO pudła: towar leży tam, nie w bieżącym koszyku.
+- Kolejność zwrotów zostaje nietknięta, a pozycja, której nadal nie umiemy
+  rozłożyć, nie znika po cichu — jej numer idzie do dziennika zdarzeń.
+
 ## 0.333.0 — 14 września 2026
 
 **Kosz zamknięty mówi, na co czeka jego MM.** Zgłoszenie właściciela: „nie
