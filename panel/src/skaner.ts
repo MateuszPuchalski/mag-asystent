@@ -104,3 +104,93 @@ export function useSkaner(
     };
   }, []);
 }
+
+/* ── Czytnik W POLU TEKSTOWYM (0.329.0) ─────────────────────────────────────
+   Zgłoszenie właściciela: „skan powinien najpierw wyczyścić pole szukania,
+   a nie dopisywać się na końcu tego, co już w nim stoi".
+
+   Hook wyżej celowo MILCZY, gdy kursor stoi w polu — pole obsługuje Enter samo
+   i dwie drogi naraz wpisywałyby kod podwójnie. Skutek uboczny tej decyzji jest
+   jednak taki, że znaki czytnika lecą do pola jak pisanie: przy niepustym polu
+   doklejają się do poprzedniej treści. Operator, który zeskanował jedną
+   etykietę, a potem drugą, szuka po sklejonych dwóch numerach i nie znajduje
+   nic. Wygląda to na zepsuty czytnik, a jest zwykłym dopisaniem.
+
+   ROZSTRZYGA SERIA, NIE POJEDYNCZY ZNAK. Ten sam podpis czytnika co wyżej:
+   znaki lecą gęściej niż `PRZERWA_MS`, a kod jest dłuższy niż `MIN_DLUGOSC`.
+   Podmiana następuje dopiero przy SZÓSTYM znaku serii i tylko wtedy, gdy przed
+   serią coś w polu stało — człowiek piszący numer od pustego pola nie traci
+   nic, a poprawka Backspace'em przerywa serię i też nic nie kasuje.
+
+   PRÓG SZEŚCIU ZNAKÓW, nie dwóch: człowiek bywa wraca do pola po namyśle
+   i dopisuje dwa znaki szybciej niż w trzysta milisekund. Sześć znaków bez
+   ani jednej przerwy po pauzie to już nie namysł, tylko czytnik.
+
+   KLASA, NIE HOOK, i to jest cała różnica dla testu: reguła jest zależna od
+   ZEGARA, a zegar wstrzykuje się w konstruktorze wywołania. Test hooka musiałby
+   udawać czas Reacta, a ten sam błąd — zbyt gorliwa podmiana — kasowałby biuru
+   wpisany numer i wyszedłby dopiero na produkcji.                            */
+
+export interface WynikKlawisza {
+  /** Ustaw pole na tę wartość i zjedz zdarzenie: seria okazała się skanem. */
+  podmien: string | null;
+  /** Kod gotowy do wyszukania — Enter zakończył dość długą serię. */
+  kod: string | null;
+}
+
+const NIC: WynikKlawisza = { podmien: null, kod: null };
+
+export class SeriaWPolu {
+  private ostatni = 0;
+  private seria = "";
+  /** Co stało w polu, zanim zaczęła się ta seria. */
+  private przedSeria = "";
+
+  /** Przerwanie serii: poprawka ręką, klawisz funkcyjny, koniec skanu. */
+  przerwij(): void {
+    this.ostatni = 0;
+    this.seria = "";
+    this.przedSeria = "";
+  }
+
+  /**
+   * @param e klawisz z pola (`key` plus modyfikatory)
+   * @param wPolu bieżąca treść pola — przed wstawieniem tego znaku
+   */
+  klawisz(
+    e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean },
+    wPolu: string,
+    teraz: number = Date.now(),
+  ): WynikKlawisza {
+    if (e.metaKey || e.ctrlKey || e.altKey) { this.przerwij(); return NIC; }
+
+    if (e.key === "Enter" || e.key === "Tab") {
+      /* Enter jest tu OSTATNIĄ szansą na poprawienie pola: gdy podmiana nie
+         zaszła (czytnik krótszy niż próg albo pole było puste), a seria mimo
+         to jest kodem, szukamy po NIEJ, nie po sklejeniu. */
+      const kod = this.seria.length >= MIN_DLUGOSC ? this.seria : null;
+      this.przerwij();
+      return { podmien: null, kod };
+    }
+
+    /* Backspace, strzałki, Delete — to poprawia człowiek, nie czytnik. */
+    if (e.key.length !== 1) { this.przerwij(); return NIC; }
+
+    const wSerii = teraz - this.ostatni <= PRZERWA_MS;
+    this.ostatni = teraz;
+    if (!wSerii) {
+      this.seria = e.key;
+      this.przedSeria = wPolu;
+      return NIC;
+    }
+    this.seria += e.key;
+
+    /* DOKŁADNIE przy progu, nie po nim: siódmy znak dopisuje się już do pola
+       podmienionego i drugie czyszczenie zjadłoby szósty. */
+    if (this.seria.length === MIN_DLUGOSC && this.przedSeria !== "") {
+      this.przedSeria = "";
+      return { podmien: this.seria, kod: null };
+    }
+    return NIC;
+  }
+}

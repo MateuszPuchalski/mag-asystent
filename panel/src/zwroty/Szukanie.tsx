@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { PackageX, ScanLine, Search, X } from "lucide-react";
 import type { WynikSkanu } from "../api/zwroty";
+import { SeriaWPolu } from "../skaner";
 
 /* ── Szukanie zwrotu: czytnikiem albo ręką (0.163.0, rozszerzone w 0.165.0) ──
    Paczka wraca do biura wcześniej niż wiedza o tym, który to zwrot. Czytnik
@@ -15,7 +16,13 @@ import type { WynikSkanu } from "../api/zwroty";
 
    Dwa pola na jeden kod byłyby dwoma nawykami do wyuczenia. Komunikaty mówią,
    CZEGO szukano — „nie znalazłem" bez tej informacji wygląda przy czytniku
-   identycznie jak zepsuty czytnik.                                          */
+   identycznie jak zepsuty czytnik.
+
+   SKAN W POLU ZASTĘPUJE, NIE DOPISUJE (0.329.0). Gdy kursor stoi w tym polu,
+   `useSkaner` milczy, a znaki czytnika lecą tu jak pisanie — więc druga
+   zeskanowana etykieta doklejała się do pierwszej i szukanie po sklejeniu nie
+   znajdowało nic. Rozpoznaje to `SeriaWPolu` tym samym podpisem czytnika,
+   którego używa hook: gęsta seria dłuższa niż `MIN_DLUGOSC`.                */
 
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
@@ -37,6 +44,10 @@ export function Szukanie({
   rejestruje?: boolean;
   onNieodebrana?: (waybill: string, orderId: string, notatka: string) => void;
 }) {
+  /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
+     stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
+     milisekundach. */
+  const seria = useRef(new SeriaWPolu());
   const [nieodebrana, setNieodebrana] = useState(false);
   const [zamowienie, setZamowienie] = useState("");
   const [notatka, setNotatka] = useState("");
@@ -52,15 +63,22 @@ export function Szukanie({
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {
+          const { podmien, kod } = seria.current.klawisz(e, fraza);
+          /* Podmiana zjada znak i wstawia SAMĄ serię — inaczej szósty znak
+             kodu doleciałby jeszcze do starej treści. */
+          if (podmien !== null) { e.preventDefault(); onFraza(podmien); return; }
           if (e.key !== "Enter") return;
-          const v = fraza.trim();
+          const v = (kod ?? fraza).trim();
           if (!v) return;
+          /* Pole pokazuje to, po czym naprawdę szukamy. Zostawienie w nim
+             sklejenia kazałoby operatorowi zgadywać, czego dotyczy wynik. */
+          if (v !== fraza) onFraza(v);
           onSzukaj(v);
         }}
       />
       {/* Bez krzyżyka powrót do kubełka znaczy kasowanie znak po znaku —
           a przy dwudziestoczteroznakowej etykiecie to osobna czynność. */}
-      {fraza && <button type="button" onClick={() => onFraza("")}
+      {fraza && <button type="button" onClick={() => { seria.current.przerwij(); onFraza(""); }}
         aria-label="Wyczyść szukanie"
         className="absolute right-2 rounded p-0.5 text-slate-400 hover:bg-slate-100">
         <X size={14} /></button>}

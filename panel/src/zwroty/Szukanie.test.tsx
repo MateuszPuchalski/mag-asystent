@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Szukanie } from "./Szukanie";
 import type { WynikSkanu } from "../api/zwroty";
@@ -21,7 +21,47 @@ const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof 
   return p;
 };
 
+/* Czytnik wysyła znaki co kilka milisekund. `userEvent` pisze z opóźnieniami
+   człowieka, więc serię stukamy wprost — i sami trzymamy zegar, bo od niego
+   zależy cała reguła. */
+function zeskanuj(pole: HTMLElement, kod: string, fraza: string, onFraza: (v: string) => void) {
+  let widziane = fraza;
+  let teraz = 10_000;
+  const zegar = vi.spyOn(Date, "now").mockImplementation(() => teraz);
+  for (const k of kod) {
+    const zdarzenie = fireEvent.keyDown(pole, { key: k });
+    /* `fireEvent` oddaje false, gdy obsługa zjadła zdarzenie — wtedy pole
+       dostaje nową wartość z `onFraza`, a nie doklejony znak. */
+    widziane = zdarzenie ? widziane + k : widziane;
+    teraz += 10;
+  }
+  fireEvent.keyDown(pole, { key: "Enter" });
+  zegar.mockRestore();
+  return widziane;
+}
+
 describe("Pole szukania zwrotu", () => {
+  it("skan ZASTĘPUJE treść pola, zamiast dopisywać się na końcu", () => {
+    /* Zgłoszenie właściciela (0.329.0). Kursor stojący w polu ucisza
+       `useSkaner`, więc znaki czytnika lecą tu jak pisanie — druga etykieta
+       doklejała się do pierwszej i szukanie po sklejeniu nie znajdowało nic. */
+    const p = pokaz(null, { fraza: "N4QZ/2026" });
+    const pole = screen.getByPlaceholderText(/Zeskanuj etykietę/);
+
+    zeskanuj(pole, ETYKIETA, "N4QZ/2026", p.onFraza);
+    /* Pole dostaje SAM kod — pierwsza podmiana pada na progu serii. */
+    expect(p.onFraza).toHaveBeenCalledWith(ETYKIETA.slice(0, 6));
+    /* A szukamy po całym kodzie, nie po sklejeniu ze starą treścią. */
+    expect(p.onSzukaj).toHaveBeenCalledWith(ETYKIETA);
+  });
+
+  it("Enter po ręcznym wpisaniu szuka po CAŁEJ treści pola", () => {
+    /* Reguła ma nie ruszać drogi, którą biuro chodzi od 0.165.0. */
+    const p = pokaz(null, { fraza: "N4QZ/2026" });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Zeskanuj etykietę/), { key: "Enter" });
+    expect(p.onSzukaj).toHaveBeenCalledWith("N4QZ/2026");
+  });
+
   it("nieznany kod pokazuje SIEBIE i drogę wyjścia", async () => {
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     /* Kod na ekranie, bo naklejka bywa pomięta i skan urwany w połowie. */

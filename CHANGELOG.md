@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.329.0 — 14 września 2026
+
+**Skan w polu szukania zastępuje treść, zamiast dopisywać się na końcu.**
+Zgłoszenie właściciela: „skan powinien najpierw wyczyścić pole szukania".
+
+Kursor stojący w polu ucisza `useSkaner` — świadomie, bo pole obsługuje Enter
+samo, a dwie drogi naraz wpisywałyby kod podwójnie. Skutkiem ubocznym było
+doklejanie: operator skanował drugą etykietę, pole pokazywało sklejone dwa
+numery, a szukanie po nich nie znajdowało nic. Wyglądało to na zepsuty czytnik,
+a było zwykłym dopisaniem.
+
+- **Rozstrzyga SERIA, nie pojedynczy znak** — ten sam podpis czytnika, którego
+  hook używa od 0.163.0: znaki gęściej niż co 300 ms, kod dłuższy niż sześć
+  znaków.
+- **Podmiana pada na szóstym znaku** i tylko wtedy, gdy przed serią coś w polu
+  stało. Pole puste zostaje nietknięte.
+- **Numer wpisywany ręką nie znika**: człowiek robi przerwy dłuższe niż próg,
+  a poprawka Backspace'em przerywa serię. Próg sześciu znaków zamiast dwóch to
+  cała ostrożność tej reguły — zbyt gorliwa kasowałaby numer w środku pisania.
+- **Enter jest ostatnią bramką**: gdy podmiana nie zaszła, szukamy po SERII,
+  a nie po sklejeniu ze starą treścią.
+
+Reguła stoi w `SeriaWPolu` (`panel/src/skaner.ts`) obok stałych czytnika, jako
+klasa z wstrzykiwanym zegarem — bez niego test nie odróżniłby „szybko" od
+„po namyśle". Dotyczy pola nad kolejką zwrotów; pozostałe pola szukania
+zostają bez zmian.
+
 ## 0.328.0 — 13 września 2026
 
 **Komplet wchodzi do koszyka rozbity, tak jak leży na magazynie.** Zgłoszenie
