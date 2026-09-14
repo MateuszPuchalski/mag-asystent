@@ -4,7 +4,8 @@ import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
 import { oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
 import {
-  czlowiekZBiura, WiedzaConflict, zaproponujZastosowanie, type DaneModelu, type Zastosowanie,
+  czlowiekZBiura, podpisRozstrzygniecia, WiedzaConflict, zaproponujZastosowanie,
+  type Autor, type DaneModelu, type Rozstrzygajacy, type Zastosowanie,
 } from "./wiedza.js";
 
 /**
@@ -356,9 +357,16 @@ function zaladujNowy(database: DatabaseSync, id: number): ModelZOpisu {
  * uniemożliwiło zmierzenie, które z dwóch źródeł daje lepszą wiedzę.
  */
 export function przerobModelZOpisu(
-  id: number, model: DaneModelu, userId: number, database: DatabaseSync = db(),
+  id: number, model: DaneModelu, kto: Rozstrzygajacy, database: DatabaseSync = db(),
 ): Zastosowanie {
-  const autor = czlowiekZBiura(database, userId);
+  const { name: autor, userId } = podpisRozstrzygniecia(database, kto);
+  /* Propozycja i rozstrzygnięcie mają tego samego autora, ale różne kształty:
+     `Autor` rozróżnia człowieka i automat wariantem, `podpisRozstrzygniecia`
+     spłaszcza to do pary nazwa-konto. Składamy z powrotem, zamiast podawać
+     `{ userId: null }` — automat ma się przedstawić automatem. */
+  const autorPropozycji: Autor = typeof kto === "number"
+    ? { userId: kto, name: autor } : { automat: kto.automat };
+  const maszyna = typeof kto !== "number";
   return transaction(database, () => {
     const m = zaladujNowy(database, id);
     const zOferty = m.zrodlo === "oferta";
@@ -367,11 +375,17 @@ export function przerobModelZOpisu(
       komentarz: zOferty ? `Lista zgodności oferty: ${m.tekst}` : `Modele: ${m.tekst}`,
       dowod: {
         rodzaj: "decyzja_biura",
-        tresc: zOferty
+        /* Rodzaj dowodu zostaje `decyzja_biura` także wtedy, gdy klucz złożył
+           automat, i to NIE jest przeoczenie. `RODZAJE_DOWODU` stoi na liście
+           zamkniętej z `CHECK` na kolumnie, a dołożenie wartości wymaga
+           przebudowy tabeli (blizna 0.135.0) — cena za etykietę, której i tak
+           nikt nie czyta bez treści obok. Treść mówi prawdę: zdanie zaczyna
+           się od tego, kto ten klucz złożył. */
+        tresc: `${maszyna ? "klucz złożony automatem: " : ""}${zOferty
           ? `z listy zgodności naszej oferty${m.ofertaId ? ` ${m.ofertaId}` : ""} przy kartotece „${m.symbol}”: ${m.tekst}`
-          : `z opisu kartoteki „${m.symbol}”: Modele: ${m.tekst}`,
+          : `z opisu kartoteki „${m.symbol}”: Modele: ${m.tekst}`}`,
       },
-    }, { userId, name: autor }, database);
+    }, autorPropozycji, database);
     if (!z) throw new WiedzaConflict("Ta para kartoteka–model już czeka w kolejce albo jest zatwierdzona", {});
     database.prepare(`UPDATE model_z_opisu SET stan='przerobiony', zastosowanie_id=?, rozstrzygnal=?, rozstrzygnal_user_id=?,
       rozstrzygnieto_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`).run(z.id, autor, userId, id);

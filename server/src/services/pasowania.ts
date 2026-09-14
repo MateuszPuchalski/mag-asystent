@@ -4,7 +4,7 @@ import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import {
   DOWODY_TECHNICZNE, NAZWA_DOWODU, POWODY_NEGATYWNE, RODZAJE_DOWODU, WiedzaConflict, ZDANIE_POWODU,
-  czlowiekZBiura, dzien, podpis, wTransakcji,
+  czlowiekZBiura, dzien, podpis, podpisRozstrzygniecia, wTransakcji, type Rozstrzygajacy,
 } from "./wiedza.js";
 import type { Autor, PewnoscZastosowania, Polaryzacja, PowodNegatywny, RodzajDowodu, StanZastosowania } from "./wiedza.js";
 import { podzielZamienniki } from "./zamienniki.js";
@@ -338,10 +338,10 @@ export function zaproponujPasowanie(p: NowePasowanie, autor: Autor, database: Da
 }
 
 export function rozstrzygnijPasowanie(
-  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, userId: number,
+  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, kto: Rozstrzygajacy,
   database: DatabaseSync = db(),
 ): Pasowanie {
-  const autor = czlowiekZBiura(database, userId);
+  const { name: autor, userId } = podpisRozstrzygniecia(database, kto);
   if (decyzja !== "zatwierdz" && decyzja !== "odrzuc") throw new Error("Decyzja to zatwierdz albo odrzuc");
   const uzasadnienie = oczysc(powod);
   if (decyzja === "odrzuc" && !uzasadnienie) throw new Error("Odrzucenie wymaga powodu — bez niego autor nie wie, co poprawić");

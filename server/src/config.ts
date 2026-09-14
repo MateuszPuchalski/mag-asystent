@@ -866,6 +866,42 @@ export const config = {
     autoNaGodzine: Math.max(1, Number(process.env.COPILOT_AUTO_NA_GODZINE ?? 30) || 30),
   },
 
+  /**
+   * KOLEJKA WIEDZY OPRÓŻNIA SIĘ SAMA (0.331.0).
+   *
+   * Właściciel: „wiedza powinna uzupełniać się automatycznie", a pytany
+   * o zakres wybrał najdalszy — cała kolejka automatycznie, człowiek tylko
+   * prostuje. To ODWRACA zasadę „automat nie zatwierdza", która do 0.330.0
+   * stała w nagłówku `services/wiedza.ts` i w `czlowiekZBiura`.
+   *
+   * Domyślnie WYŁĄCZONE, i to nie jest cofanie decyzji właściciela. Rzecz,
+   * która sama dopisuje wiedzę karmiącą dobór, ma się włączać świadomie przy
+   * `wertis.env` — tak samo jak automatyczny szkic w 0.317.0, o który ten sam
+   * właściciel prosił i który też wrócił wyłączony.
+   */
+  wiedzaAutomat: {
+    wlaczony: process.env.WIEDZA_AUTOMAT === "1",
+    /**
+     * Rytm własny. Przebieg bez modelu językowego to kilka zapytań SQL, więc
+     * pół godziny wystarcza z zapasem: kolejka rośnie po imporcie z Subiekta
+     * i po synchronizacji ofert, a nie z minuty na minutę.
+     */
+    ms: Math.max(60_000, Number(process.env.WIEDZA_AUTOMAT_MS ?? 1_800_000) || 1_800_000),
+    /**
+     * Ile wierszy bierze JEDEN przebieg — osobno dla kluczy, zastosowań
+     * i pasowań. Hamulec na pierwsze uruchomienie na zaległej kolejce:
+     * dwa tysiące wpisów naraz to dwa tysiące wierszy do prostowania,
+     * zanim ktokolwiek zdąży spojrzeć na pierwszy.
+     */
+    naPrzebieg: Math.max(1, Number(process.env.WIEDZA_AUTOMAT_NA_PRZEBIEG ?? 25) || 25),
+    /**
+     * Czy wolno dopytać model językowy, gdy trzy źródła deterministyczne
+     * milczą. Osobno od wyłącznika głównego, bo to jedyna część automatu,
+     * która KOSZTUJE — i jedyna, która nie stoi na naszych danych.
+     */
+    model: process.env.WIEDZA_AUTOMAT_MODEL === "1",
+  },
+
 };
 
 /**

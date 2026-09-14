@@ -11,6 +11,7 @@ import {
   KATEGORIE, PEWNOSCI, type NadawcaKlasyfikacji, type OdpowiedzModelu,
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
+import type { Tokeny } from "../services/copilot-koszt.js";
 import type {
   NadawcaRozpoznania, OdpowiedzRozpoznania,
 } from "../services/copilot-reklamacja.js";
@@ -606,6 +607,100 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
     throw naNasz(e);
   }
 };
+
+/* ── Składanie klucza modelu z wiersza kolejki wiedzy (0.331.0) ──────────────
+   Źródło CZWARTE automatu, wołane dopiero wtedy, gdy trzy deterministyczne
+   milczą. Zadanie jest wąskie do granicy: wskaż markę i nazwę, nie rozstrzygaj
+   niczego więcej.
+
+   Wynik przechodzi przez to samo sito, co dane doboru ze szkicu — marka musi
+   stać w podanym materiale albo wśród marek, które już przeszły przez
+   człowieka. Sito jest w SERWISIE, nie tutaj: adapter oddaje, co dostał.    */
+
+const KluczModelu = z.object({
+  rodzaj: z.enum(["maszyna", "silnik"]),
+  marka: z.string(),
+  nazwa: z.string(),
+  wariant: z.string().nullable(),
+  /** `false` znaczy „nie wiem" i jest odpowiedzią, nie porażką. */
+  pewny: z.boolean(),
+});
+
+const INSTRUKCJA_KLUCZA = [
+  "Wskazujesz markę i model maszyny ogrodniczej na podstawie krótkiego tekstu.",
+  "Tekst pochodzi z listy zgodności naszej oferty albo z opisu kartoteki",
+  "i bywa samym oznaczeniem, na przykład „FS450” albo „LS 46-450”.",
+  "",
+  "Dostajesz też nazwę kartoteki, tytuł naszej oferty i listę marek, które",
+  "w naszej bazie już są.",
+  "",
+  "ZASADY:",
+  "1. MARKĘ WSKAŻ Z PODANEGO MATERIAŁU. Musi stać w tekście, w nazwie",
+  "   kartoteki, w tytule oferty albo na liście znanych marek. Marka spoza",
+  "   tego materiału zostanie odrzucona przez serwer i wiersz wróci do kolejki.",
+  "2. NAZWA TO OZNACZENIE Z TEKSTU, przepisane dosłownie i bez marki.",
+  "   Z „NAC LS 46-450” nazwa to „LS 46-450”.",
+  "3. `rodzaj` to `silnik`, gdy tekst mówi o jednostce napędowej",
+  "   (na przykład „Briggs & Stratton 450E”), a `maszyna` w każdym innym razie.",
+  "4. `wariant` wypełnij tylko wtedy, gdy tekst go niesie. Inaczej `null`.",
+  "5. NIE ZGADUJ. `pewny` = false, gdy materiał nie wystarcza, gdy tekst niesie",
+  "   kilka oznaczeń naraz (na przykład „236; 240”) albo gdy to samo oznaczenie",
+  "   nosi kilka marek. Odpowiedź „nie wiem” kosztuje jeden wiersz w kolejce,",
+  "   a zła marka kosztuje część wysłaną do złej maszyny.",
+  "",
+  "Odpowiadaj wyłącznie JSON-em według schematu.",
+].join("\n");
+
+export type WynikKlucza = {
+  model: { rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string; wariant: string | null } | null;
+  zuzycie: Tokeny;
+  ms: number;
+};
+
+export async function nadawcaKluczaAnthropic(
+  tekst: string, kontekst: { kartoteka: string; oferta: string | null; marki: string[] },
+): Promise<WynikKlucza> {
+  const start = Date.now();
+  try {
+    const odp = await anthropic().messages.parse({
+      model: config.copilot.model,
+      /* Kilka pól po kilka słów. Sufit z zapasem, nie z oszczędności. */
+      max_tokens: 300,
+      system: [{ type: "text", text: INSTRUKCJA_KLUCZA, cache_control: { type: "ephemeral" } }],
+      output_config: {
+        /* Niski wysiłek: to jest rozpoznanie oznaczenia, nie rozumowanie. */
+        effort: "low",
+        format: zodOutputFormat(KluczModelu),
+      },
+      messages: [{
+        role: "user",
+        content: [
+          `TEKST: ${tekst}`,
+          `KARTOTEKA: ${kontekst.kartoteka}`,
+          `OFERTA: ${kontekst.oferta ?? "(brak)"}`,
+          `ZNANE MARKI: ${kontekst.marki.join(", ") || "(brak)"}`,
+        ].join("\n"),
+      }],
+    });
+    const u = odp.usage;
+    const zuzycie: Tokeny = {
+      wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,
+      cacheZapis: u?.cache_creation_input_tokens ?? 0, cacheOdczyt: u?.cache_read_input_tokens ?? 0,
+    };
+    const w = odp.parsed_output;
+    /* Brak odpowiedzi i „nie jestem pewny" znaczą tu to samo i to jest
+       zamierzone: wiersz zostaje w kolejce dla człowieka. */
+    if (!w || !w.pewny) return { model: null, zuzycie, ms: Date.now() - start };
+    return {
+      model: { rodzaj: w.rodzaj, marka: w.marka, nazwa: w.nazwa, wariant: w.wariant },
+      zuzycie, ms: Date.now() - start,
+    };
+  } catch (e) {
+    /* Odmowa dostawcy NIE wywraca przebiegu automatu: wiersz zostaje w
+       kolejce, a to jest jego stan wyjściowy. Serwis liczy błąd i leci dalej. */
+    throw naNasz(e);
+  }
+}
 
 /**
  * Błąd SDK na nasze klasy — od najbardziej szczegółowej.

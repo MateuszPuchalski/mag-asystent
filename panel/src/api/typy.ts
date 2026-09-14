@@ -354,6 +354,22 @@ export type PokwitowanieZOferty = {
   czeka: number;
 };
 
+/**
+ * Wpis, który automat wiedzy dopisał BEZ człowieka (0.331.0).
+ *
+ * Rozpoznany po parze `rozstrzygnal` niepuste i `rozstrzygnal_user_id` puste.
+ * Karta w ustawieniach pokazuje te wiersze do PROSTOWANIA — cofanie idzie
+ * istniejącymi trasami wiedzy, bo to dalej to samo wycofanie, tylko cudzego
+ * wpisu zamiast własnego.
+ */
+export type WpisAutomatu = {
+  rodzaj: "zastosowanie" | "pasowanie";
+  id: number;
+  symbol: string;
+  etykieta: string;
+  at: string;
+};
+
 /** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0. */
 export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
 

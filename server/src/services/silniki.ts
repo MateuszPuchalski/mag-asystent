@@ -4,6 +4,7 @@ import { zwin } from "../tekst.js";
 import { logEvent } from "./events.js";
 import {
   DOWODY_TECHNICZNE, NAZWA_DOWODU, RODZAJE_DOWODU, WiedzaConflict, czlowiekZBiura, dzien,
+  podpisRozstrzygniecia, type Rozstrzygajacy,
   kluczModelu, naModel, podpis, upewnijModel, wTransakcji,
 } from "./wiedza.js";
 import type {
@@ -381,10 +382,10 @@ export function zaproponujZabudowe(
  * Zatwierdzenie z `zastepujeId` wycofuje starą parę w tej samej transakcji.
  */
 export function rozstrzygnijZabudowe(
-  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, userId: number,
+  id: number, decyzja: "zatwierdz" | "odrzuc", powod: string | null | undefined, kto: Rozstrzygajacy,
   database: DatabaseSync = db(),
 ): Zabudowa {
-  const autor = czlowiekZBiura(database, userId);
+  const { name: autor, userId } = podpisRozstrzygniecia(database, kto);
   if (decyzja !== "zatwierdz" && decyzja !== "odrzuc") throw new Error("Decyzja to zatwierdz albo odrzuc");
   const uzasadnienie = oczysc(powod);
   if (decyzja === "odrzuc" && !uzasadnienie) {
