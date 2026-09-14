@@ -290,7 +290,7 @@ export async function rozpoznajSprawe(z: ZadanieRozpoznania): Promise<KartaSpraw
      które padło, komplet, który się nie zmieścił. Karta bez zdjęć wie mniej,
      ale brak karty nie mówi agentowi nic. */
   const zdjecia = z.zdjecia === false
-    ? { zdjecia: [], nieObrazy: [], pominieto: 0, bledow: 0 }
+    ? { zdjecia: [], nieObrazy: [], pominieto: 0, ponadLimit: 0, bledow: 0 }
     : await przygotujZdjecia(database, z.reklamacjaId, z.pobierz);
   for (const zd of zdjecia.zdjecia) numery.add(zd.numer);
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { Sparkles } from "lucide-react";
 import { Przycisk, czas } from "../ui";
+import { OdczytZdjec } from "./OdczytZdjec";
 import { ProcesCopilota } from "./ProcesCopilota";
 import type { StanCopilota, SzkicCopilota } from "../api/typy";
 
@@ -117,6 +118,10 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
     {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
+    {/* ODCZYT PRZED RACHUNKIEM, bo jest materiałem, na którym rachunek stoi.
+        Agent czyta go z miniaturą na osi przed oczami; dopiero potem ma sens
+        pytanie, czy twierdzenie oparte na tym odczycie jest do przyjęcia. */}
+    <OdczytZdjec odczyt={s.odczytZeZdjec} />
     <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
     {/* POKWITOWANIE, NIE LISTA BRAKÓW (0.264.0). Do 0.263.0 stał tu akapit
         wypisujący oznaczenia, których kartoteka nie zna — i przy następnym

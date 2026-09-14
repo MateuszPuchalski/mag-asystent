@@ -2261,6 +2261,30 @@ przebiegów, po pięć naraz. To jest zamierzone. Po pierwszej godzinie zajrzyj
 na kartę „Copilot" w ustawieniach i porównaj rachunek z tym, czego się
 spodziewasz, zanim podniesiesz limity.
 
+**Od 0.330.0 szkic CZYTA ZDJĘCIA z rozmowy.** Migracja dokłada kolumnę
+`szkic_copilota.odczyt_zdjec` sama, przy starcie. Nie ma przełącznika i to
+jest świadome: zdjęcie jest częścią pytania klienta, tak samo jak tekst.
+
+Wiedz jednak, co to znaczy dla rachunku i dla danych. Obraz w pełnej
+rozdzielczości to u dostawcy do kilku tysięcy tokenów wejścia. Rozmowa ze
+zdjęciami kosztuje więc wielokrotnie więcej niż rozmowa z samym tekstem.
+Hamulcem jest sufit sztuk: idą najwyżej cztery najnowsze zdjęcia klienta.
+
+**Pikseli zamaskować się nie da.** Wszystko inne wychodzi do dostawcy przez
+maskowanie, które wycina telefon i adres. Obraz wychodzi w całości, więc
+zdjęcie paragonu wyjdzie z imieniem, a etykieta przesyłki z adresem. Idą
+wyłącznie załączniki PRZYCHODZĄCE ze statusem `SAFE`. Szczegóły w polityce
+danych (`docs/obsluga-klienta.md`).
+
+Przy włączonym `COPILOT_AUTO_SZKIC=1` te zdjęcia wychodzą **bez kliknięcia
+człowieka**. Właściciel wybrał to, pytany wprost. Jeśli zmienisz zdanie,
+wyłącz takt; ścieżka z kliknięciem zostanie.
+
+Po włączeniu zajrzyj do rozmowy ze zdjęciem tabliczki. Nad oknem „Skąd to
+wiem" ma stać blok „Co model odczytał ze zdjęć" z numerem `Z1` i przepisaną
+tabliczką. Pusty blok przy widocznej miniaturze znaczy jedno z dwóch: plik
+nie ma statusu `SAFE` albo nie jest obrazem w rozpoznawanym typie.
+
 Sprawdzenie na żywym koncie idzie tak. Kliknij przycisk przy JEDNEJ rozmowie
 i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się

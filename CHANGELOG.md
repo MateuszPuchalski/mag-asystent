@@ -34,6 +34,54 @@ historii nie przepisujemy.
 ---
 
 
+## 0.330.0 — 14 września 2026
+
+**Copilot widzi zdjęcia z rozmowy.** Właściciel pokazał zdjęcie tabliczki
+znamionowej kosiarki i powiedział, że model nie umiał wyciągnąć z niego
+modelu. Nie umiał, bo tego zdjęcia nigdy nie dostał. Wątek szedł do dostawcy
+jako goły tekst i nie wspominał nawet, że załącznik istnieje.
+
+**To była ta sama blizna, co w 0.283.0, kupiona drugi raz.** Tamto wydanie
+dało oczy karcie reklamacyjnej. Skrzynka została z defektem, a instrukcja
+szkicu uczyła model prosić o tabliczkę, więc w najgorszym układzie prosił
+o zdjęcie tabliczki pod zdjęciem tabliczki.
+
+**Bez zadeklarowanego odczytu zdjęć włożyć się nie dało** i to jest sedno
+wydania, nie szczegół. Odsiew numerów odrzuca szkic, w którym stoi numer
+nieobecny w faktach i w wątku. Tabliczka to sama numeracja, więc model, który
+odczytałby ją poprawnie i użył, wywróciłby własny szkic. Każde udane
+odczytanie kasowałoby swój wynik.
+
+Model przepisuje więc, co widzi, przy numerze zdjęcia, a serwer dopiero potem
+uznaje ten tekst za materiał do cytowania. Numer zdjęcia jest sprawdzany:
+powołanie się na zdjęcie, którego nie wysłaliśmy, wywraca szkic. Bez tego
+pole byłoby furtką na dowolną liczbę.
+
+Odczyt widzi agent, nad oknem „Skąd to wiem". To jest kontrola, nie ozdoba.
+Agent porównuje tekst z miniaturą i jednym spojrzeniem wie, czy model
+przeczytał tabliczkę, czy ją sobie wyobraził.
+
+**Dane z tabliczki wpadają do propozycji doboru.** Marka i model maszyny
+trafiają tam bez przepisywania ich ręcznie. Sprawdzenie zostaje
+deterministyczne, bo wartość musi stać w zadeklarowanym odczycie.
+
+Twierdzenie oparte na zdjęciu ma własne źródło z sufitem „prawdopodobne".
+Powód nie znika przy ostrym zdjęciu: z tego, że tabliczkę widać, nie wynika,
+że to tabliczka maszyny, o którą klient pyta.
+
+Trzy zawężenia. Idą wyłącznie załączniki przychodzące, wyłącznie ze statusem
+`SAFE` i najwyżej cztery najnowsze. Sufit sztuk jest tu, a nie przy
+reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
+uruchomić takt z 0.317.0.
+
+**Pikseli zamaskować się nie da** i wydanie tego nie ukrywa. Zdjęcie wychodzi
+do dostawcy w całości, a przy włączonym takcie także bez kliknięcia człowieka.
+Właściciel wybrał to, pytany wprost. Cena stoi w polityce danych.
+
+Do klienta dalej nie idzie nic bez człowieka.
+
+---
+
 ## 0.329.0 — 14 września 2026
 
 **Skan w polu szukania zastępuje treść, zamiast dopisywać się na końcu.**

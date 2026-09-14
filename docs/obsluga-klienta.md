@@ -708,6 +708,39 @@ nie przeszłoby technicznie, i zdanie na karcie mówiące, ile zdjęć pominięt
 Budżetu kwotowego w konfiguracji **nie ma** — to jest znana i nazwana
 ekspozycja, nie przeoczenie.
 
+**Od 0.330.0 to samo dotyczy ZDJĘĆ W ROZMOWIE ze skrzynki, także bez udziału
+człowieka.** Właściciel pokazał zdjęcie tabliczki kosiarki i stwierdzenie, że
+model nie umiał odczytać z niego modelu. Nie umiał, bo tego zdjęcia nigdy nie
+dostał: wątek szedł do dostawcy jako goły tekst i nie wspominał nawet, że
+załącznik istnieje. Blizna z 0.283.0 wróciła na drugim froncie, dokładnie tak,
+jak ostrzega `CLAUDE.md` przy strażnikach postawionych dla jednego pliku.
+
+Cena jest ta sama i trzeba ją nazwać drugi raz, bo warunki są gorsze.
+Pikseli dalej zamaskować się nie da. Zdjęcie w rozmowie bywa paragonem,
+etykietą przesyłki albo ekranem telefonu i wychodzi do dostawcy w całości.
+Nowe jest to, że **przy szkicu automatycznym (0.317.0) nikt tego nie klika** —
+takt bierze rozmowę co kilka minut. Właściciel, pytany wprost o tę różnicę,
+wybrał obie ścieżki.
+
+Trzy zawężenia tej drogi, każde wymuszone kodem, nie regulaminem:
+
+- **tylko `SAFE`** — plik, który Allegro uznało za niebezpieczny, nie jedzie
+  nigdzie; ta sama reguła, którą oś rozmowy stosuje do podglądu;
+- **tylko przychodzące** — czytamy zdjęcia klienta, nie własne; nasze nic nie
+  mówią o jego maszynie, a kosztują tyle samo;
+- **sufit sztuk** (`SUFIT_SZTUK_ROZMOWY`, dziś cztery) — tu, inaczej niż przy
+  reklamacji, sufit JEST, bo tamtą ścieżkę uruchamia kliknięcie człowieka,
+  a tę takt. Idą najnowsze, a spis mówi modelowi, ile zostało poza.
+
+Co wraca: kolumna `szkic_copilota.odczyt_zdjec` z tym, co model odczytał, przy
+numerze zdjęcia. To nie jest ozdoba ani wygoda — bez niej zdjęć do szkicu
+włożyć się nie da, bo odsiew numerów odrzucałby każdy poprawnie odczytany
+numer katalogowy. Odczyt jest jednocześnie ceną i kontrolą: otwiera numerom
+drogę do szkicu i pokazuje agentowi, co dokładnie model twierdzi, że widzi.
+Twierdzenia oparte na zdjęciu mają własne źródło `zdjecie` z sufitem
+„prawdopodobne", bo z tego, że tabliczkę widać, nie wynika, że to tabliczka
+maszyny, o którą klient pyta.
+
 Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
 co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
 których nie wie. Właściciel odwrócił 11 września wcześniejszą regułę „maszyna

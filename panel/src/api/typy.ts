@@ -328,6 +328,22 @@ export type SzkicCopilota = {
    * w danych, to zdanie o NAS, a nie o maszynie klienta.
    */
   lukiKartoteki: PokwitowanieZOferty;
+  /**
+   * CO MODEL ODCZYTAŁ ZE ZDJĘĆ przysłanych przez klienta.
+   *
+   * To jest CENA za prawo powołania się na fotografię. Odsiew numerów odrzuca
+   * szkic z numerem nieobecnym w faktach i w wątku, a tabliczka znamionowa to
+   * sama numeracja — bez zadeklarowanego odczytu każde UDANE odczytanie
+   * kasowałoby własny szkic. Odczyt otwiera tym numerom drogę i jednocześnie
+   * czyni je sprawdzalnymi: agent czyta go obok miniatury i rozstrzyga jednym
+   * spojrzeniem, czy model przeczytał tabliczkę, czy ją sobie wyobraził.
+   *
+   * Pusta lista znaczy jedno z trojga i ekran ich nie rozróżnia, bo nie musi:
+   * rozmowa nie miała zdjęć, zdjęcia nie przeszły bramki albo model niczego
+   * nie odczytał. Za każdym razem wynika z tego to samo — nie ma się na co
+   * powołać.
+   */
+  odczytZeZdjec: OdczytZdjecia[];
 };
 
 export type PokwitowanieZOferty = {
@@ -341,8 +357,13 @@ export type PokwitowanieZOferty = {
 /** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0. */
 export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
 
-/** Skąd wzięło się twierdzenie: nasza baza, opis oferty, wiedza własna modelu. */
-export type ZrodloTwierdzenia = "fakty" | "oferta" | "model";
+/**
+ * Skąd wzięło się twierdzenie: nasza baza, opis oferty, ZDJĘCIE od klienta,
+ * wiedza własna modelu. `zdjecie` ma sufit „prawdopodobne" i to nie jest
+ * ostrożność na wyrost: z tego, że na fotografii widać tabliczkę, nie wynika,
+ * że to tabliczka maszyny, o którą klient pyta.
+ */
+export type ZrodloTwierdzenia = "fakty" | "oferta" | "zdjecie" | "model";
 export type PoziomPewnosci = "pewne" | "prawdopodobne" | "niepewne";
 export type TwierdzenieCopilota = {
   teza: string;
@@ -353,6 +374,8 @@ export type TwierdzenieCopilota = {
   /** Serwer obniżył pewność do sufitu źródła — model chciał wyżej. */
   obnizona: boolean;
 };
+/** Co model odczytał z jednego zdjęcia. `zdjecie` to `Z1`, `Z2` ze spisu. */
+export type OdczytZdjecia = { zdjecie: string; tekst: string };
 export type OcenaDanych = "wpisane" | "odrzucone";
 export type OcenaPasowania = "zaproponowane" | "odrzucone";
 export type PropozycjaPasowaniaCopilota = {
