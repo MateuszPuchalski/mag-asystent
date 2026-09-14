@@ -24,6 +24,8 @@ import {
   zakonczKosz,
   zalatwPominiecie,
 } from "../services/kosze.js";
+import { przeliczKosz } from "../services/kosze-zwrotow.js";
+import { db } from "../db/db.js";
 
 /* ── Kosze zwrotowe — trasy ──────────────────────────────────────────────────
    Dwie publiczności jednej tabeli:
@@ -64,6 +66,29 @@ export async function koszeRoutes(app: FastifyInstance) {
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { kosze: listaKoszy() };
   });
+
+  /**
+   * Przeliczenie zawartości zamkniętego koszyka ze zwrotów (0.334.0).
+   *
+   * Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go przed
+   * dodaniem do MM". Serwis odmawia, gdy dokument już wyszedł — trasa nie
+   * powtarza tej reguły, tylko podaje jej zdanie dalej.
+   *
+   * BRAMKA BIURA, bo to zmiana treści dokumentu, który za chwilę powstanie.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/api/biuro/kosze/:id/przelicz", async (req, reply) => {
+      const nie = odmowaBiuro();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      /* Bramka wyżej odmówiła już żądaniu bez sesji — tu sesja JEST. */
+      const s = sesjaZadania()!;
+      try {
+        return przeliczKosz(db(), Number(req.params.id),
+          { id: s.user.userId, name: s.user.name });
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
 
   /* Pominięte pozycje ze wszystkich koszy — lista pracy biura, nie historia.
      Stoi PRZED `/:id` świadomie: router i tak przedkłada segment stały nad

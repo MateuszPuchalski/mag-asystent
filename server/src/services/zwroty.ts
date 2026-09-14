@@ -1151,12 +1151,12 @@ export function ocenPozycje(
       { zwrotId: Number(p.zwrot_id), pozycjaId, ocena }, kto.id, database);
     /* Zmiana oceny ZDEJMUJE z koszyka, zanim cokolwiek dołoży. Inaczej
        „na stan", potem „utylizacja" zostawiłoby towar na dokumencie MM,
-       którego nikt już nie chce na regale. Zamkniętego kosza to nie rusza —
-       tamten pojechał na halę z wystawionym papierem. */
+       którego nikt już nie chce na regale. Kosza z DOKUMENTEM to nie rusza —
+       tamten pojechał na halę z wystawionym papierem (bramka wyżej). */
     zdejmijZKosza(database, pozycjaId, kto);
     /* Każda ocena do SWOJEGO koszyka. `zdejmijZKosza` wyżej zdejmuje
-       z dowolnego otwartego, więc „na stan", potem „utylizacja" przenosi
-       pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
+       z dowolnego kosza bez dokumentu, więc „na stan", potem „utylizacja"
+       przenosi pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
     const koszyk = ocena === null ? null
       : dolozDoKosza(database, pozycjaId, kto, teraz,
         ocena === "utylizacja" ? "odpad" : "zwroty");

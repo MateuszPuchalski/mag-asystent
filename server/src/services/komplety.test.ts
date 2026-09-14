@@ -4,7 +4,9 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { skladPozycji } from "./komplety.js";
-import { dolozDoKosza, zdejmijZKosza } from "./kosze-zwrotow.js";
+import {
+  dolozDoKosza, przeliczKosz, wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza,
+} from "./kosze-zwrotow.js";
 
 /* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
    Zgłoszenie właściciela: oferta sprzedaje się jako komplet, a na magazynie
@@ -210,7 +212,7 @@ test("koszyk dostaje WSZYSTKIE kartoteki kompletu, a zdjęcie zabiera wszystkie"
     .get(poz[0]) as { n: number };
   assert.equal(n, 3);
 
-  assert.equal(zdejmijZKosza(d, poz[0], kto), true);
+  assert.notEqual(zdejmijZKosza(d, poz[0], kto), null, "oddaje kosz, z którego zdjęto");
   const { n: po } = d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE zwrot_pozycja_id=?")
     .get(poz[0]) as { n: number };
   assert.equal(po, 0);
@@ -252,4 +254,81 @@ test("pozycja bez składu NIE wchodzi do koszyka po cichu", () => {
   assert.equal(dolozDoKosza(d, poz[0], kto), null);
   const { n } = d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja").get() as { n: number };
   assert.equal(n, 0, "nic nie wchodzi, dopóki nie wiadomo CO wchodzi");
+});
+
+/* ── Przeliczenie zamkniętego kosza (0.334.0) ────────────────────────────────
+   Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go przed
+   dodaniem do MM — nie chce się zrobić". Kosze złożone przed 0.328.0 niosą
+   zestaw jako JEDEN wiersz, a takiej MM Sfera nie wystawi: na magazynie leżą
+   składniki osobno. Wyjmowanie i wkładanie pozycji po kolei byłoby drogą
+   ręczną przez kilkanaście kliknięć — i rozdzieliłoby papier od pudła.      */
+
+test("zamknięty kosz z ZESTAWEM przelicza się na kartoteki paragonu", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 910, [[21, 1], [22, 1], [23, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  const koszId = dolozDoKosza(d, poz[0], kto)!;
+  /* Tak wygląda kosz sprzed 0.328.0: jeden wiersz „zestaw" zamiast trzech
+     kartotek. Odtwarzamy go wprost, bo dzisiejszy kod już go nie zrobi. */
+  d.prepare("DELETE FROM kosz_pozycja WHERE kosz_id=?").run(koszId);
+  towar(d, 99);
+  d.prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,zwrot_pozycja_id)
+    VALUES (?,?,?,?,1,?)`).run(koszId, 99, "SYM-99", "Zestaw", poz[0]);
+  zamknijKosz(d, koszId, kto);
+
+  const w = przeliczKosz(d, koszId, kto);
+  assert.deepEqual([w.przed, w.po], [1, 3], "jeden zestaw schodzi, trzy kartoteki wchodzą");
+  const wiersze = d.prepare("SELECT tw_id, ilosc FROM kosz_pozycja WHERE kosz_id=? ORDER BY tw_id")
+    .all(koszId) as Array<{ tw_id: number; ilosc: number }>;
+  assert.deepEqual(wiersze.map((x) => [x.tw_id, x.ilosc]), [[21, 1], [22, 1], [23, 1]]);
+  /* Kosz ZOSTAJE zamknięty: towar leży w tamtym pudle, przeliczenie zmienia
+     tylko papier, który z niego wyjdzie. */
+  assert.equal((d.prepare("SELECT status FROM kosz WHERE id=?")
+    .get(koszId) as { status: string }).status, "zamkniety");
+});
+
+test("przeliczenie ODMAWIA, gdy dokument MM już wyszedł", () => {
+  /* Po numerze MM papier jest w Subiekcie i towar zszedł z magazynu głównego.
+     Zmiana zawartości w aplikacji rozjechałaby dwa stany, których nikt potem
+     nie zestawi. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 911, [[21, 1], [22, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  const koszId = dolozDoKosza(d, poz[0], kto)!;
+  zamknijKosz(d, koszId, kto);
+  d.prepare("UPDATE kosz SET mm_numer='MM 1333/MAG/2026' WHERE id=?").run(koszId);
+
+  assert.throws(() => przeliczKosz(d, koszId, kto), /dokument MM/);
+});
+
+test("przeliczenie UNIEWAŻNIA zadanie MM ułożone dla starej zawartości", () => {
+  /* Zadanie czeka w kolejce z wierszami sprzed poprawki. Zostawione wystawiłoby
+     dokładnie ten papier, dla którego biuro sięgnęło po przeliczenie. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 912, [[21, 1], [22, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }]);
+  const { id, poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  const koszId = dolozDoKosza(d, poz[0], kto)!;
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
+  const { queueId } = zamknijKosz(d, koszId, kto);
+  assert.notEqual(queueId, null, "komplet korekt wypuszcza MM od razu");
+
+  przeliczKosz(d, koszId, kto);
+  assert.equal((d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(koszId) as { mm_queue_id: number | null }).mm_queue_id, null);
+  assert.equal((d.prepare("SELECT status FROM sfera_queue WHERE id=?")
+    .get(queueId!) as { status: string }).status, "cancelled");
+  /* Kosz bez zadania i z kompletem korekt wraca pod `wypuscGotoweKoszyki`
+     i dostaje ŚWIEŻE zadanie — z tym, co w pudle leży naprawdę. */
+  assert.equal(wypuscGotoweKoszyki(d), 1);
+  const swieze = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(koszId) as { mm_queue_id: number | null }).mm_queue_id;
+  assert.notEqual(swieze, null);
+  assert.notEqual(swieze, queueId);
 });

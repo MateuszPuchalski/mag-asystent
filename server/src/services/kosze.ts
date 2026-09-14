@@ -15,6 +15,7 @@ import { aliasKodu } from "./ean-alias.js";
 import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
 import { sladZKosza } from "./zwrot-slad.js";
+import { koszDoEdycji } from "./kosze-zwrotow.js";
 
 /* ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
    Kosz zastępuje papierową kartkę wożoną z towarem. Cykl życia:
@@ -173,6 +174,12 @@ export interface SzczegolKosza {
   /** Kto i kiedy anulował karton (0.123.0); NULL przy każdym innym koszu. */
   anulowanoAt: string | null;
   anulowanoPrzez: string | null;
+  /**
+   * Czy zawartość wolno jeszcze poprawić (0.334.0) — czyli czy dokumentu MM
+   * jeszcze nie ma i żadne zadanie go nie wystawia. Ekran po tym wie, czy
+   * pokazać PRZELICZ ZE ZWROTÓW; regułę trzyma `koszDoEdycji`.
+   */
+  doEdycji: boolean;
   /**
    * Zwroty wnoszące pozycje do tego kosza (0.333.0).
    *
@@ -486,6 +493,8 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
 
   return {
     mmNumer: kosz.mm_numer ?? null,
+    doEdycji: kosz.status !== "otwarty" && (kosz.rodzaj ?? "zwroty") !== RODZAJ_KARTON
+      && koszDoEdycji(db(), koszId),
     zwroty,
     powrot: powrot ? { status: powrot.status, numer: powrot.numer ?? null } : null,
     rodzaj: kosz.rodzaj ?? "zwroty",

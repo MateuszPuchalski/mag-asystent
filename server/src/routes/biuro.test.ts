@@ -174,7 +174,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    16,
+    17,
     "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
       "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
       "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
@@ -193,6 +193,11 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "(`zastosuj: true`), więc nie da się zastosować czegoś innego, niż " +
       "się widziało na ekranie. Patrzenie nadal nic nie zapisuje — pilnuje " +
       "tego `routes/lokalizacje-masowe.test.ts`.\n\n" +
+      "Zapis siedemnasty przyszedł z 0.334.0: PRZELICZ ZE ZWROTÓW w podglądzie " +
+      "kosza. Kosz zamknięty przed 0.328.0 niesie zestaw jako jedną pozycję, " +
+      "a MM z takiej pozycji nie powstanie — składniki leżą na magazynie " +
+      "osobno. Przycisk stoi WYŁĄCZNIE przy koszu bez dokumentu i wymaga " +
+      "kliknięcia; wejście na ekran nadal nic nie przelicza.\n\n" +
       "Reguła się NIE zmienia: liczba rośnie wyłącznie ŚWIADOMIE, a żaden " +
       "zapis nie dzieje się przy samym patrzeniu na ekran."
   );

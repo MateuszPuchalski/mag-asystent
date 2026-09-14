@@ -206,13 +206,45 @@ export function dolozDoKosza(
 export function zamknietyKoszPozycji(
   database: Db, pozycjaId: number,
 ): { id: number; kod: string } | null {
+  /* BRAMKĄ JEST DOKUMENT, NIE STATUS (0.334.0). Do tego wydania blokowało samo
+     zamknięcie kosza — a kosz bywa zamknięty tygodniami, bo MM czeka na komplet
+     korekt. Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić go
+     przed dodaniem do MM" — i nie dało się tego poprawić, choć żaden dokument
+     jeszcze nie wyszedł. Pomyłka była nie do odkręcenia w aplikacji, a towar
+     leżał w pudle przy biurku.
+
+     Zadanie w toku blokuje tak samo jak gotowy numer: worker mógł już zacząć
+     wystawiać dokument, a wtedy edycja rozjechałaby papier z zawartością.
+     `pending` i `error` są bezpieczne — pierwsze jeszcze nie ruszyło, drugie
+     się nie udało. */
   const w = database.prepare(
-    `SELECT k.id, k.kod FROM kosz_pozycja kp
+    `SELECT k.id, k.kod, k.mm_numer, q.status AS q_status
+       FROM kosz_pozycja kp
        JOIN kosz k ON k.id = kp.kosz_id
+       LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
       WHERE kp.zwrot_pozycja_id=? AND k.status<>'otwarty'
+        AND (k.mm_dok_id IS NOT NULL OR k.mm_numer IS NOT NULL
+             OR q.status IN ('processing','waiting_for_doc','done'))
       ORDER BY k.id LIMIT 1`)
     .get(pozycjaId) as { id: number; kod: string } | undefined;
   return w ? { id: Number(w.id), kod: w.kod } : null;
+}
+
+/**
+ * Czy z tego kosza wolno jeszcze wyjmować i dokładać (0.334.0).
+ *
+ * Ta sama bramka co wyżej, tylko pytana o KOSZ, nie o pozycję — potrzebuje jej
+ * ekran biura, żeby nie pokazywać przycisków, których serwer i tak nie przyjmie.
+ */
+export function koszDoEdycji(database: Db, koszId: number): boolean {
+  const w = database.prepare(
+    `SELECT k.mm_dok_id, k.mm_numer, q.status AS q_status
+       FROM kosz k LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
+      WHERE k.id=?`).get(koszId) as
+    { mm_dok_id: number | null; mm_numer: string | null; q_status: string | null } | undefined;
+  if (!w) return false;
+  if (w.mm_dok_id != null || w.mm_numer != null) return false;
+  return !["processing", "waiting_for_doc", "done"].includes(String(w.q_status ?? ""));
 }
 
 /**
@@ -224,23 +256,131 @@ export function zamknietyKoszPozycji(
  */
 export function zdejmijZKosza(
   database: Db, pozycjaId: number, kto: { id: number; name: string },
-): boolean {
+): number | null {
   /* WSZYSTKIE wiersze tej pozycji, nie pierwszy z brzegu: od 0.328.0 komplet
      wchodzi do koszyka kilkoma kartotekami. Zdjęcie jednej zostawiłoby resztę
      zestawu na dokumencie MM — czyli towar na papierze, którego nikt nie wyjął
      z pudła. */
+  /* KOSZ ZAMKNIĘTY BEZ DOKUMENTU TEŻ (0.334.0). Pudło stoi przy biurku,
+     a papieru nie ma — poprawka jest wtedy zwykłą pracą, nie przepisywaniem
+     historii. Bramkę trzyma `zamknietyKoszPozycji`: gdy dokument już wyszedł,
+     wołający dostaje odmowę, zanim tu dojdzie. */
   const wiersze = database.prepare(
     `SELECT kp.id, kp.kosz_id FROM kosz_pozycja kp
        JOIN kosz k ON k.id = kp.kosz_id
-      WHERE kp.zwrot_pozycja_id=? AND k.status='otwarty'`)
+      WHERE kp.zwrot_pozycja_id=?`)
     .all(pozycjaId) as Array<{ id: number; kosz_id: number }>;
-  if (!wiersze.length) return false;
+  if (!wiersze.length) return null;
+  const koszId = Number(wiersze[0].kosz_id);
+  /* JEDNA BRAMKA NA OBU DROGACH. Gdyby ta funkcja miała własny warunek,
+     rozjechałaby się z `zamknietyKoszPozycji` przy pierwszej zmianie jednej
+     z nich — a rozjazd znaczyłby tu wiersz zdjęty z dokumentu, który już
+     pojechał na halę. */
+  if (!koszDoEdycji(database, koszId)) return null;
   const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
   for (const w of wiersze) usun.run(w.id);
+  /* Zadanie MM ułożone dla STAREJ zawartości traci ważność. Kasujemy je
+     i zerujemy `mm_queue_id`, bo tylko kosz bez zadania wraca pod
+     `wypuscGotoweKoszyki` — inaczej papier pojechałby z tym, co już zdjęto. */
+  uniewaznijZadanieMm(database, koszId, kto);
   logEvent("kosz_zwrotow_zdjeto", kto.name, null,
-    { koszId: Number(wiersze[0].kosz_id), pozycjaId, kartotek: wiersze.length },
+    { koszId, pozycjaId, kartotek: wiersze.length },
     kto.id, database);
-  return true;
+  return koszId;
+}
+
+/**
+ * Przelicza zawartość zamkniętego kosza od nowa, ze zwrotów (0.334.0).
+ *
+ * Zgłoszenie właściciela: „dodałem zestaw, a powinienem rozbić ten zestaw przed
+ * dodaniem do MM — nie chce się zrobić". Kosz stał zamknięty, czekając na
+ * komplet korekt, a pomyłki nie dało się odkręcić w aplikacji.
+ *
+ * PRZELICZENIE, A NIE EDYCJA WIERSZY, i to jest cała decyzja tej funkcji.
+ * Ręczne dopisywanie kartotek do dokumentu MM znaczyłoby drugą drogę obok
+ * `skladPozycji` — i drugie miejsce, w którym na papier może trafić towar,
+ * którego nikt nie zwrócił. Tutaj źródłem zostaje to samo co zawsze: ocena
+ * „na stan" i rozbicie z paragonu. Zmieniło się tylko to, że od 0.328.0
+ * rozbicie jest lepsze niż w dniu, w którym kosz powstał.
+ *
+ * Pozycje bez zwrotu (kartony, koszyki z dokumentu) NIE SĄ tu ruszane: nie ma
+ * ich z czego przeliczyć, a skasowanie zostawiłoby pudło bez zawartości.
+ */
+export function przeliczKosz(
+  database: Db, koszId: number, kto: { id: number; name: string },
+): { przed: number; po: number; kartotek: number } {
+  return transaction(database, () => {
+    const k = database.prepare("SELECT id, kod, status FROM kosz WHERE id=?").get(koszId) as
+      { id: number; kod: string; status: string } | undefined;
+    if (!k) throw new Error("Nie znam takiego koszyka zwrotów.");
+    if (!koszDoEdycji(database, koszId)) {
+      throw new Error(`Koszyk ${k.kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
+    }
+
+    const wiersze = database.prepare(
+      `SELECT id, zwrot_pozycja_id FROM kosz_pozycja WHERE kosz_id=? ORDER BY id`)
+      .all(koszId) as Array<{ id: number; zwrot_pozycja_id: number | null }>;
+    const przed = wiersze.length;
+    /* KOLEJNOŚĆ ZWROTÓW ZOSTAJE. Pozycje wracają w tej samej kolejności, w jakiej
+       biuro je oceniało — magazynier rozkłada pudło po kartce, a przestawiona
+       lista kazałaby mu szukać. */
+    const zwrotowe = [...new Set(wiersze
+      .map((w) => w.zwrot_pozycja_id).filter((x): x is number => x != null))];
+    if (!zwrotowe.length) {
+      throw new Error(`Koszyk ${k.kod} nie ma pozycji ze zwrotów — nie ma czego przeliczyć.`);
+    }
+
+    const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
+    for (const w of wiersze) if (w.zwrot_pozycja_id != null) usun.run(w.id);
+
+    const wstaw = database.prepare(
+      `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
+       VALUES (?,?,?,?,?,?)`);
+    let kartotek = 0;
+    const pominiete: number[] = [];
+    for (const pozycjaId of zwrotowe) {
+      const sklad = skladPozycji(database, pozycjaId);
+      /* Pozycja, której dziś nie umiemy rozłożyć, NIE WRACA do pudła po cichu:
+         zniknięcie z dokumentu jest widoczne, a wiersz z jedną kartoteką
+         zamiast trzech — nie. Zdanie o niej idzie do dziennika. */
+      if (!sklad.skladniki.length) { pominiete.push(pozycjaId); continue; }
+      for (const sk of sklad.skladniki) {
+        wstaw.run(koszId, sk.twId, sk.symbol, sk.nazwa, sk.ilosc, pozycjaId);
+        kartotek++;
+      }
+    }
+
+    uniewaznijZadanieMm(database, koszId, kto);
+    logEvent("kosz_zwrotow_przeliczony", kto.name, null,
+      { koszId, kod: k.kod, przed, po: kartotek, pominiete }, kto.id, database);
+    return { przed, po: kartotek, kartotek };
+  })();
+}
+
+/**
+ * Unieważnia zadanie MM ułożone dla poprzedniej zawartości kosza (0.334.0).
+ *
+ * Zadanie `pending` da się anulować — jeszcze nie ruszyło. `error` zostaje
+ * w kolejce jako ślad po nieudanej próbie i tylko odpinamy je od kosza: kosz
+ * bez `mm_queue_id` wraca pod `wypuscGotoweKoszyki` i dostanie świeże zadanie
+ * z nową zawartością. Zadania w toku tu nie dojdą — blokuje je bramka.
+ */
+function uniewaznijZadanieMm(
+  database: Db, koszId: number, kto: { id: number | null; name: string },
+): void {
+  const k = database.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(koszId) as
+    { mm_queue_id: number | null } | undefined;
+  if (!k?.mm_queue_id) return;
+  const z = database.prepare("SELECT status FROM sfera_queue WHERE id=?")
+    .get(k.mm_queue_id) as { status: string } | undefined;
+  if (z?.status === "pending") {
+    database.prepare(
+      `UPDATE sfera_queue SET status='cancelled',
+        processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`).run(k.mm_queue_id);
+  }
+  database.prepare("UPDATE kosz SET mm_queue_id=NULL WHERE id=?").run(koszId);
+  logEvent("kosz_zwrotow_mm_uniewazniona", kto.name, null,
+    { koszId, queueId: k.mm_queue_id, stan: z?.status ?? null }, kto.id, database);
 }
 
 /** Co leży w otwartym koszyku tego rodzaju. `null`, gdy jeszcze żadnego nie ma. */
@@ -370,6 +510,12 @@ export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
   let wypuszczone = 0;
   for (const k of czekajace) {
     if (brakujaceKorekty(database, Number(k.id)).length > 0) continue;
+    /* PUSTY KOSZ NIE DOSTAJE DOKUMENTU (0.334.0). Od tego wydania da się
+       wyjąć pozycję z kosza zamkniętego bez dokumentu — a kosz opróżniony do
+       zera dostałby tu MM bez ani jednej linii, którą Sfera i tak odrzuci. */
+    const { n } = database.prepare(
+      "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(k.id) as { n: number };
+    if (!n) continue;
     /* Każdy koszyk WŁASNĄ transakcją: jeden wywrócony nie ma prawa zabrać
        pozostałych — ta sama lekcja co przy sygnaturach w 0.169.0. */
     transaction(database, () => {
