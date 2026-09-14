@@ -292,13 +292,17 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      i oddanie, bo to przełącznik — druga kazałaby panelowi wiedzieć, czyj jest
      znacznik, zanim kliknie. Trasy TAGÓW tego licznika nie ruszają: rejestruje
      je `trasyTagowSprawy` z `routes/tagi.ts`, wspólnie dla trzech ekranów. */
-  assert.equal(posty.length, 27,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu siedmiu`);
+  /* Dwudziesta ósma (0.335.0): ptaszek przy składniku kompletu. JEDNA trasa
+     na oba kierunki, bo to przełącznik — ciało niesie stan docelowy, nie
+     czynność. Dokładania pozycji dalej nie ma i to się NIE zmieniło: ptaszek
+     rusza wiersz kompletu, który ocena „na stan" już do koszyka włożyła. */
+  assert.equal(posty.length, 28,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu ośmiu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
-    "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci"]) {
+    "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

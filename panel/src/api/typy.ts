@@ -976,7 +976,14 @@ export interface FakturaZwrotu {
  * dlaczego — zdanie pisze serwer, panel go nie układa.
  */
 export interface SkladPozycji {
-  skladniki: Array<{ twId: number; symbol: string; nazwa: string; ilosc: number }>;
+  /**
+   * `wKoszyku` mówi, czy ten składnik NAPRAWDĘ leży dziś w koszyku (0.335.0).
+   * To stan wiersza `kosz_pozycja`, a nie zamiar: ptaszek rysowany z samego
+   * składu obiecywałby dokument, którego zawartość wygląda inaczej.
+   */
+  skladniki: Array<{
+    twId: number; symbol: string; nazwa: string; ilosc: number; wKoszyku: boolean;
+  }>;
   zrodlo: "oferta" | "paragon" | "biuro" | null;
   powod: string | null;
 }

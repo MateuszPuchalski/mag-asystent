@@ -3,7 +3,7 @@ import { transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
 import { enqueueMM } from "./queue.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
-import { skladPozycji, zapamietajSklad } from "./komplety.js";
+import { skladPozycji, zapamietajSklad, type Skladnik, type SkladPozycji } from "./komplety.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką:
@@ -250,8 +250,8 @@ export function koszDoEdycji(database: Db, koszId: number): boolean {
 /**
  * Zdejmuje pozycję z koszyka po cofnięciu albo zmianie oceny.
  *
- * TYLKO Z OTWARTEGO. Kosz zamknięty pojechał już na halę z wystawionym
- * dokumentem — wyjęcie z niego wiersza rozjechałoby papier z zawartością,
+ * TYLKO Z KOSZA BEZ DOKUMENTU (0.334.0). Kosz z wystawioną MM pojechał już na
+ * halę z papierem — wyjęcie z niego wiersza rozjechałoby dokument z zawartością,
  * a magazynier szukałby towaru, którego nikt nie wyjął z kartonu.
  */
 export function zdejmijZKosza(
@@ -287,6 +287,118 @@ export function zdejmijZKosza(
     { koszId, pozycjaId, kartotek: wiersze.length },
     kto.id, database);
   return koszId;
+}
+
+/**
+ * Skład pozycji z zaznaczeniem: co WEJDZIE i co już LEŻY w koszyku (0.335.0).
+ *
+ * Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
+ * które idą do MM". Komplet wchodził dotąd w całości albo wcale, a wracają
+ * z niego nieraz same części — reszta zostaje u klienta albo nadaje się
+ * wyłącznie na odpad.
+ *
+ * SUMA DWÓCH LIST, nie sam `skladPozycji`. Koszyk bywa starszy niż dzisiejsze
+ * reguły: kosz złożony przed 0.328.0 niesie zestaw jednym wierszem, którego
+ * rozbicie z paragonu już nie zaproponuje. Pominięcie takiego wiersza znaczyłoby
+ * ptaszek, którego nie da się odznaczyć — czyli towar na dokumencie, o którym
+ * ekran milczy.
+ */
+export interface SkladDoZaznaczenia extends Omit<SkladPozycji, "skladniki"> {
+  skladniki: Array<Skladnik & { wKoszyku: boolean }>;
+}
+
+export function skladDoZaznaczenia(database: Db, pozycjaId: number): SkladDoZaznaczenia {
+  const sklad = skladPozycji(database, pozycjaId);
+  const wKoszyku = database.prepare(
+    `SELECT tw_id, symbol, nazwa, ilosc FROM kosz_pozycja
+      WHERE zwrot_pozycja_id=? ORDER BY id`)
+    .all(pozycjaId) as Array<{ tw_id: number; symbol: string; nazwa: string; ilosc: number }>;
+  const leza = new Map(wKoszyku.map((w) => [Number(w.tw_id), w]));
+
+  const skladniki = sklad.skladniki.map((s) => ({
+    ...s,
+    /* ILOŚĆ Z KOSZYKA, gdy wiersz tam stoi. To ona pojedzie na dokument MM,
+       a rozbieżność z dzisiejszym wyliczeniem jest informacją, nie błędem. */
+    ilosc: leza.get(s.twId)?.ilosc ?? s.ilosc,
+    wKoszyku: leza.has(s.twId),
+  }));
+  const znane = new Set(skladniki.map((s) => s.twId));
+  for (const w of wKoszyku) {
+    if (znane.has(Number(w.tw_id))) continue;
+    skladniki.push({
+      twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa,
+      ilosc: Number(w.ilosc), wKoszyku: true,
+    });
+  }
+  return { ...sklad, skladniki };
+}
+
+/**
+ * Zdejmuje z koszyka jeden składnik kompletu albo wkłada go z powrotem (0.335.0).
+ *
+ * PTASZEK RUSZA WIERSZ KOSZYKA, nie osobną tabelę zaznaczeń, i to jest cała
+ * decyzja tej funkcji. `kosz_pozycja` JEST prawdą o tym, co pojedzie na MM —
+ * druga lista obok niej znaczyłaby dwa źródła dla jednego dokumentu i pytanie,
+ * które z nich wygrywa, zadane w najgorszym momencie.
+ *
+ * Skutek uboczny jest zamierzony: `przeliczKosz` układa zawartość od nowa
+ * z paragonu, więc KASUJE zaznaczenia. Tak ma być — to jedna droga wyjścia
+ * z pomyłki w drugą stronę, bez osobnego przycisku „przywróć ptaszki".
+ */
+export function zaznaczSkladnik(
+  database: Db, pozycjaId: number, twId: number, wKoszyku: boolean,
+  kto: { id: number; name: string },
+): SkladDoZaznaczenia {
+  return transaction(database, () => {
+    const wiersze = database.prepare(
+      `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
+      .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
+    if (!wiersze.length) {
+      throw new Error("Ta pozycja nie leży w żadnym koszyku — najpierw oceń ją „na stan”.");
+    }
+    const koszId = Number(wiersze[0].kosz_id);
+    const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
+      { kod: string }).kod;
+    /* TA SAMA BRAMKA CO WSZĘDZIE (0.334.0): dokument zamyka drogę, samo
+       zamknięcie kosza nie. Własny warunek rozjechałby się z resztą pliku. */
+    if (!koszDoEdycji(database, koszId)) {
+      throw new Error(`Koszyk ${kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
+    }
+
+    const stoi = wiersze.filter((w) => Number(w.tw_id) === twId);
+    if (wKoszyku) {
+      if (stoi.length) return skladDoZaznaczenia(database, pozycjaId);
+      /* WYŁĄCZNIE SKŁADNIK TEJ POZYCJI. Dowolna kartoteka z żądania byłaby
+         drugą drogą dopisywania wierszy do MM — obok `skladPozycji` i bez
+         żadnego dokumentu za sobą. Towar, którego nikt nie zwrócił, trafiałby
+         wtedy na papier przez zwykłą literówkę w numerze. */
+      const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
+      if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej dopisać.");
+      database.prepare(
+        `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
+         VALUES (?,?,?,?,?,?)`).run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
+    } else {
+      if (!stoi.length) return skladDoZaznaczenia(database, pozycjaId);
+      /* OSTATNIEGO NIE ZDEJMIEMY, i to nie jest brak funkcji. Pozycja bez
+         żadnego wiersza w koszyku znaczy „nic z niej nie jedzie na MM" — a na
+         to jest starsza i czytelniejsza droga: cofnięcie oceny. Dwa sposoby na
+         ten sam skutek kosztowałyby pytanie, czym się różnią. */
+      if (stoi.length === wiersze.length) {
+        throw new Error(
+          "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny.");
+      }
+      const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
+      for (const w of stoi) usun.run(w.id);
+    }
+
+    /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
+       przy zdjęciu całej pozycji. Bez tego papier pojechałby z ptaszkami
+       sprzed poprawki. */
+    uniewaznijZadanieMm(database, koszId, kto);
+    logEvent("kosz_zwrotow_skladnik", kto.name, null,
+      { koszId, kod, pozycjaId, twId, wKoszyku }, kto.id, database);
+    return skladDoZaznaczenia(database, pozycjaId);
+  })();
 }
 
 /**

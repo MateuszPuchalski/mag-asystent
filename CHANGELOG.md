@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.335.0 — 14 września 2026
+
+**Składniki kompletu można zaznaczać.** Zgłoszenie właściciela: „powinno
+rozbijać na komponenty do zaznaczania, które idą do MM". Komplet wchodził do
+koszyka zwrotów w całości albo wcale, a wracają z niego nieraz same części —
+reszta zostaje u klienta albo nadaje się wyłącznie na odpad.
+
+- **Ptaszki przy składnikach** w wierszu pozycji (panel obsługi, zwroty).
+  Wszystkie zaznaczone z góry: typowy zwrot kompletu jest kompletny, a ekran
+  pyta wyłącznie o wyjątek. Odznaczenie zdejmuje wiersz z dokumentu MM od razu.
+- **Odznaczony składnik zostaje na ekranie**, więc ptaszek ma drogę powrotną.
+- **Ostatniego składnika nie zdejmiesz ptaszkiem** — od tego jest cofnięcie
+  oceny; dwa sposoby na ten sam skutek kosztują pytanie, czym się różnią.
+- **Kartoteki spoza składu pozycji nie wolno dopisać.** Inaczej literówka
+  w numerze kładłaby na dokument towar, którego nikt nie zwrócił.
+- Zadanie MM ułożone dla starej zawartości jest anulowane, a kosz wraca po
+  świeże — tak samo jak przy przeliczeniu z 0.334.0.
+- Umowa tras POST zwrotów: 27 → 28 (jedna trasa na oba kierunki ptaszka).
+
 ## 0.334.0 — 14 września 2026
 
 **Kosz zamknięty, ale bez dokumentu, wolno poprawić.** Zgłoszenie właściciela:
