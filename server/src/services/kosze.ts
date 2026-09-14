@@ -173,6 +173,15 @@ export interface SzczegolKosza {
   /** Kto i kiedy anulował karton (0.123.0); NULL przy każdym innym koszu. */
   anulowanoAt: string | null;
   anulowanoPrzez: string | null;
+  /**
+   * Zwroty wnoszące pozycje do tego kosza (0.333.0).
+   *
+   * Panel biura czytał to pole od dawna (`k.zwroty.length`), a serwer go NIGDY
+   * nie oddawał — kosz złożony w aplikacji wywracał podgląd zdaniem „cannot
+   * read properties of undefined". Nie wyszło to wcześniej, bo kosze z Subiekta
+   * mają `mmNumer` i trafiają w drugą gałąź tego samego zdania.
+   */
+  zwroty: Array<{ id: number; numer: string; korektaNumer: string | null }>;
 }
 
 export interface WierszListyKoszy {
@@ -205,6 +214,24 @@ export interface WierszListyKoszy {
   rodzaj: string;
   anulowanoAt: string | null;
   anulowanoPrzez: string | null;
+  /** Ile ZWROTÓW wniosło pozycje do kosza. Panel czytał to pole, serwer go nie oddawał. */
+  zwrotow: number;
+  /**
+   * Ile zwrotów z tego kosza NIE MA jeszcze numeru korekty (0.333.0).
+   *
+   * To jest odpowiedź na pytanie „dlaczego nie ma MM": dokument wychodzi
+   * dopiero, gdy korekty są komplet (`wypuscGotoweKoszyki`). Do tego wydania
+   * ekran o tym MILCZAŁ, więc kosz zamknięty i bez numeru wyglądał na awarię
+   * zamiast na czekanie.
+   */
+  brakujeKorekt: number;
+  /**
+   * Na czym stoi dokument MM tego kosza:
+   * `gotowa` — numer jest; `zamowiona` — zadanie czeka w kolejce Sfery;
+   * `blad` — kolejka odmówiła; `czeka_na_korekte` — brakuje numerów korekt;
+   * `brak` — kosz otwarty albo z dokumentu Subiekta, więc MM mu się nie należy.
+   */
+  mmStan: "gotowa" | "zamowiona" | "blad" | "czeka_na_korekte" | "brak";
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
@@ -255,7 +282,21 @@ export function listaKoszy(): WierszListyKoszy[] {
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id) AS pozycji,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='done') AS odlozonych,
               (SELECT COUNT(*) FROM kosz_pozycja p WHERE p.kosz_id = k.id AND p.status='skipped') AS pominietych,
-              k.mm_numer, k.rodzaj, k.anulowano_at, k.anulowano_przez
+              /* Zwroty wnoszące pozycje — liczone PO ZWROCIE, nie po pozycji:
+                 jeden zwrot bywa kilkoma kartotekami, a od 0.328.0 komplet
+                 wchodzi do kosza kilkoma wierszami naraz. */
+              (SELECT COUNT(DISTINCT zp.zwrot_id) FROM kosz_pozycja p
+                 JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+                WHERE p.kosz_id = k.id) AS zwrotow,
+              /* Zwroty BEZ numeru korekty — to one trzymają dokument MM.
+                 Ten sam warunek co w brakujaceKorekty(); gdyby się rozjechał,
+                 ekran tłumaczyłby czekanie inaczej, niż wygląda naprawdę. */
+              (SELECT COUNT(DISTINCT zp.zwrot_id) FROM kosz_pozycja p
+                 JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+                 JOIN zwrot_klienta z ON z.id = zp.zwrot_id
+                WHERE p.kosz_id = k.id AND z.korekta_numer IS NULL) AS brakuje_korekt,
+              (SELECT q.status FROM sfera_queue q WHERE q.id = k.mm_queue_id) AS mm_status,
+              k.mm_numer, k.mm_queue_id, k.rodzaj, k.anulowano_at, k.anulowano_przez
        FROM kosz k
        WHERE k.status NOT IN ('rozlozony', 'anulowany')
           OR COALESCE(k.rozlozono_at, k.anulowano_at) >= datetime('now', '-14 days')
@@ -278,7 +319,25 @@ export function listaKoszy(): WierszListyKoszy[] {
     rodzaj: (w.rodzaj as string) ?? "zwroty",
     anulowanoAt: (w.anulowano_at as string) ?? null,
     anulowanoPrzez: (w.anulowano_przez as string) ?? null,
+    zwrotow: Number(w.zwrotow ?? 0),
+    brakujeKorekt: Number(w.brakuje_korekt ?? 0),
+    mmStan: stanMm(w),
   }));
+}
+
+/**
+ * Na czym stoi dokument MM kosza (0.333.0).
+ *
+ * Kolejność pytań jest treścią: numer bije wszystko, bo dokument już jest;
+ * błąd kolejki bije czekanie na korektę, bo to inna praca i innego człowieka.
+ * Kosz otwarty ani kosz Z DOKUMENTU nie czekają na nic — tam MM albo dopiero
+ * będzie zamawiana, albo nigdy jej nie było.
+ */
+function stanMm(w: Record<string, unknown>): WierszListyKoszy["mmStan"] {
+  if (w.mm_numer) return "gotowa";
+  if (w.status !== "zamkniety") return "brak";
+  if (w.mm_queue_id) return w.mm_status === "error" ? "blad" : "zamowiona";
+  return Number(w.brakuje_korekt ?? 0) > 0 ? "czeka_na_korekte" : "brak";
 }
 
 /** Kosze do rozłożenia — to, co widzi kolektor na zakładce ZWROTY. */
@@ -412,8 +471,22 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
         .prepare("SELECT status, sgt_doc_number AS numer FROM sfera_queue WHERE id=?")
         .get(kosz.powrot_queue_id) as { status: string; numer: string | null } | undefined)
     : undefined;
+  /* Zwroty wnoszące pozycje — z numerem korekty, bo to on trzyma dokument MM.
+     Panel czytał `k.zwroty` od dawna; serwer nie oddawał go nigdy. */
+  const zwroty = (db().prepare(
+    `SELECT DISTINCT z.id AS id,
+            COALESCE(z.reference_number, z.external_id) AS numer,
+            z.korekta_numer AS korekta
+       FROM kosz_pozycja p
+       JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+       JOIN zwrot_klienta z ON z.id = zp.zwrot_id
+      WHERE p.kosz_id = ? ORDER BY z.id`).all(koszId) as
+    Array<{ id: number; numer: string; korekta: string | null }>)
+    .map((z) => ({ id: Number(z.id), numer: String(z.numer), korektaNumer: z.korekta ?? null }));
+
   return {
     mmNumer: kosz.mm_numer ?? null,
+    zwroty,
     powrot: powrot ? { status: powrot.status, numer: powrot.numer ?? null } : null,
     rodzaj: kosz.rodzaj ?? "zwroty",
     anulowanoAt: kosz.anulowano_at ?? null,

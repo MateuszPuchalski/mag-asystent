@@ -4161,6 +4161,27 @@ function badgeKosza(status) {
   return '<span class="badge mute2">ROZŁOŻONY</span>';
 }
 
+/* ── Na czym stoi dokument MM kosza (0.333.0) ────────────────────────────────
+   Zgłoszenie właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę
+   MM w Subiekcie". Dokument NIE JEST spóźniony ani zgubiony — czeka, i to
+   z powodu, który aplikacja zna od 0.200.0: towar wraca na magazyn główny
+   dopiero korektą, więc MM wystawione wcześniej przesuwałoby stan, którego
+   tam jeszcze nie ma.
+
+   Ekran o tym MILCZAŁ. Kosz zamknięty, bez numeru, z pastylką NA HALĘ wygląda
+   dokładnie jak awaria — i tak został zgłoszony. Pastylka mówi teraz, na co
+   kosz czeka i czyja to praca: korekta w Subiekcie czy kolejka Sfery.        */
+function stanMmKosza(k) {
+  if (k.rodzaj === "karton" || k.mmNumer) return "";
+  if (k.mmStan === "czeka_na_korekte") {
+    return `<span class="badge amber">CZEKA NA KOREKTĘ${
+      k.brakujeKorekt ? ` — ${k.brakujeKorekt} ZWR.` : ""}</span>`;
+  }
+  if (k.mmStan === "zamowiona") return '<span class="badge mute2">MM ZAMÓWIONA</span>';
+  if (k.mmStan === "blad") return '<span class="badge err">MM W BŁĘDZIE — SPRAWDŹ KOLEJKĘ</span>';
+  return "";
+}
+
 /* Kolumna ROZŁOŻYŁ: osoba nad godziną, jak KTO ODŁOŻYŁ przy pozycjach dostawy.
    Kosz nierozłożony dostaje MYŚLNIK, nie pustkę — pusta komórka wygląda na brak
    danych, a to jest odpowiedź „jeszcze nikt". Ślad znika sam po COFNIJ
@@ -4184,7 +4205,7 @@ function rysujKosze(kosze) {
               <span class="b">${esc(k.kod)}</span>
               <span class="mute">${karton
                 ? `${k.pozycji} poz.`
-                : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow} zwr.`}</span>
+                : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow ?? 0} zwr.`}</span>
             </span>
             <span class="sprawaTemat">${k.status === "anulowany"
               ? `Anulowany${k.anulowanoPrzez ? ` przez ${esc(k.anulowanoPrzez)}` : ""} — ${
@@ -4198,6 +4219,7 @@ function rysujKosze(kosze) {
             <span class="sprawaStopka">
               ${karton ? '<span class="badge mute2">KARTON</span>' : ""}
               ${badgeKosza(k.status)}
+              ${stanMmKosza(k)}
               ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
               ${k.status === "otwarty" && !karton
                 ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}"
@@ -4311,9 +4333,14 @@ async function pokazPodgladKosza(id, cichy) {
        nie wystawia — dokument zamawia aplikacja, a etap „powrót MM" niżej mówi,
        na czym stanął. Zdanie, które zostało nieprawdą, jest gorsze niż jego
        brak: uczy chodzić do Subiekta po robotę, której tam już nie ma. */
+    /* `k.zwroty ?? []` nie jest ostrożnością na wyrost: to pole serwer zaczął
+       oddawać dopiero w 0.333.0, a przedtem ta linijka wywracała cały podgląd
+       kosza złożonego w aplikacji („cannot read properties of undefined"). */
+    const zwroty = k.zwroty ?? [];
+    const bezKorekty = zwroty.filter((z) => !z.korektaNumer);
     const zrodlo = k.mmNumer
       ? `z przesunięcia MM ${esc(k.mmNumer)}`
-      : `${k.zwroty.length} zwr. przypiętych w aplikacji`;
+      : `${zwroty.length} zwr. przypiętych w aplikacji`;
     const pominiete = k.pozycje.filter((p) => p.status === "skipped");
     /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione
        i przez kogo"; podgląd odpowiada przy sprawie „co się z tym działo".
@@ -4336,6 +4363,12 @@ async function pokazPodgladKosza(id, cichy) {
       </h2>
       <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
       ${etapy.length ? `<p class="mute" style="margin-bottom:8px">${etapy.join(" → ")}</p>` : ""}
+      ${bezKorekty.length
+        ? `<p><span class="badge amber">CZEKA NA KOREKTĘ</span>
+             MM wyjdzie, gdy dojdą numery korekt do ${bezKorekty.length} zwr.:
+             ${bezKorekty.slice(0, 8).map((z) => esc(z.numer)).join(", ")}${
+               bezKorekty.length > 8 ? " …" : ""}</p>`
+        : ""}
       ${pominiete.length
         ? `<p><span class="badge amber">KOSZ NIEKOMPLETNY</span>
              hala pominęła ${pominiete.length} poz. — powód przy wierszu niżej</p>`

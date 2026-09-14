@@ -646,3 +646,88 @@ test("karton nie miesza się z obiegiem zwrotów", async () => {
     /to zwroty/
   );
 });
+
+/* ── Kosz złożony w aplikacji: czego panel biura potrzebuje (0.333.0) ────────
+   Zgłoszenie właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę
+   MM w Subiekcie". Dokument nie zginął — czeka na numery korekt, bo towar
+   wraca na magazyn główny dopiero korektą (bramka z 0.200.0). Ekran o tym
+   milczał, więc czekanie wyglądało jak awaria.
+
+   Przy okazji wyszło, że panel czytał DWA POLA, których serwer nigdy nie
+   oddawał: `zwrotow` na liście i `zwroty` w podglądzie. Pierwsze rysowało
+   „undefined zwr.", drugie wywracało cały podgląd. Nie wyszło wcześniej, bo
+   kosze Z DOKUMENTU mają `mmNumer` i trafiają w drugą gałąź tego zdania —
+   a własne kosze biuro zaczęło składać dopiero teraz.                       */
+
+/** Kosz złożony w aplikacji, z pozycją wniesioną przez zwrot. */
+function koszZeZwrotu(kod: string, korekta: string | null) {
+  const d = db();
+  const teraz = new Date().toISOString();
+  d.prepare("INSERT OR IGNORE INTO channel_account(id,channel,external_account_id) VALUES (1,'allegro','k')").run();
+  const zwrotId = Number(d.prepare(
+    `INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+       korekta_numer,created_at,synced_at)
+     VALUES (1,'zw-1',?,?,?,?)`).run(`N4QZ-${kod}`, korekta, teraz, teraz).lastInsertRowid);
+  const pozId = Number(d.prepare(
+    `INSERT INTO zwrot_klienta_pozycja(zwrot_id,klucz,nazwa,ilosc,cena_grosze,waluta,tw_id)
+     VALUES (?,?,'Sekator',1,4999,'PLN',900036)`).run(zwrotId, `k-${kod}`).lastInsertRowid);
+  const koszId = Number(d.prepare(
+    `INSERT INTO kosz(kod,status,rodzaj,utworzono_at,utworzono_przez,zamknieto_at,zamknieto_przez)
+     VALUES (?, 'zamkniety', 'zwroty', ?, 'Ala', ?, 'Ala')`)
+    .run(kod, teraz, teraz).lastInsertRowid);
+  d.prepare(
+    `INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,zwrot_pozycja_id)
+     VALUES (?,900036,'TEST-LINIA-TODO','Pozycja',1,?)`).run(koszId, pozId);
+  return koszId;
+}
+
+test("kosz bez korekty mówi, że CZEKA — a nie udaje, że MM zginęła", () => {
+  const koszId = koszZeZwrotu("Z-3", null);
+  const w = K.listaKoszy().find((k) => k.id === koszId)!;
+
+  assert.equal(w.zwrotow, 1, "panel rysował tu »undefined zwr.«");
+  assert.equal(w.brakujeKorekt, 1);
+  assert.equal(w.mmStan, "czeka_na_korekte");
+  assert.equal(w.mmNumer, null);
+});
+
+test("po dojściu korekty kosz przestaje czekać", () => {
+  const koszId = koszZeZwrotu("Z-4", "KFS 12/2026");
+  const w = K.listaKoszy().find((k) => k.id === koszId)!;
+  assert.equal(w.brakujeKorekt, 0);
+  /* MM jeszcze nie zamówiona — wypuszcza ją takt albo zamknięcie kosza. */
+  assert.equal(w.mmStan, "brak");
+});
+
+test("zamówiona MM i MM w błędzie to DWIE różne odpowiedzi", () => {
+  /* Bez tego rozróżnienia biuro szukałoby korekty tam, gdzie stoi zepsute
+     zadanie kolejki — czyli robiłoby nie tę pracę. */
+  const koszId = koszZeZwrotu("Z-5", "KFS 13/2026");
+  const d = db();
+  const q = Number(d.prepare(
+    `INSERT INTO sfera_queue(type,status,payload,created_at,created_by)
+     VALUES ('mm','pending','{}',?, 'Ala')`).run(new Date().toISOString()).lastInsertRowid);
+  d.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(q, koszId);
+  assert.equal(K.listaKoszy().find((k) => k.id === koszId)!.mmStan, "zamowiona");
+
+  d.prepare("UPDATE sfera_queue SET status='error' WHERE id=?").run(q);
+  assert.equal(K.listaKoszy().find((k) => k.id === koszId)!.mmStan, "blad");
+});
+
+test("podgląd kosza niesie ZWROTY — bez nich panel się wywracał", () => {
+  const koszId = koszZeZwrotu("Z-6", null);
+  const k = K.szczegolKosza(koszId);
+  assert.equal(k.zwroty.length, 1);
+  assert.equal(k.zwroty[0].numer, "N4QZ-Z-6");
+  assert.equal(k.zwroty[0].korektaNumer, null, "po tym polu ekran mówi, na co czeka");
+});
+
+test("kosz Z DOKUMENTU nie czeka na żadną korektę", () => {
+  /* Tamten towar przyjechał już przesunięciem z Subiekta — korekta go nie
+     dotyczy, a pastylka »czeka« byłaby tam zwykłym kłamstwem. */
+  const kosz = koszDoRozkladania("KZ-09");
+  const w = K.listaKoszy().find((k) => k.id === kosz.id)!;
+  assert.equal(w.zwrotow, 0);
+  assert.equal(w.brakujeKorekt, 0);
+  assert.equal(w.mmStan, "gotowa", "ten kosz ma numer MM z dokumentu");
+});

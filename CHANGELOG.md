@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.333.0 — 14 września 2026
+
+**Kosz zamknięty mówi, na co czeka jego MM.** Zgłoszenie właściciela: „nie
+utworzyło MM przy zamknięciu zwrotu, nie widzę MM w Subiekcie". Dokument nie
+zginął — czekał na numery korekt, zgodnie z bramką z 0.200.0: MM zdejmuje towar
+z magazynu głównego, a ze zwrotu wraca on tam dopiero korektą.
+
+Zakładka MAGAZYN pokazywała jednak kosz zamknięty, z pastylką NA HALĘ i bez
+numeru dokumentu — obraz nie do odróżnienia od awarii.
+
+- **Pastylka stanu MM przy wierszu kosza**: CZEKA NA KOREKTĘ z liczbą zwrotów,
+  MM ZAMÓWIONA (zadanie stoi w kolejce Sfery) albo MM W BŁĘDZIE. Rozróżnienie
+  prowadzi do innej pracy: korektę wystawia biuro, zaciętą kolejkę serwis.
+- **Podgląd kosza wymienia numery zwrotów**, których korekt brakuje.
+- **[poprawka] „undefined zwr." znika.** Panel biura czytał pole `zwrotow`,
+  którego serwer nigdy nie oddawał.
+- **[poprawka] Podgląd kosza złożonego w aplikacji przestaje się wywracać.**
+  Ta sama przyczyna: `k.zwroty.length` na polu, którego nie było — stąd „cannot
+  read properties of undefined". Nie wychodziło to wcześniej, bo kosze
+  z dokumentu Subiekta mają numer MM i trafiają w drugą gałąź tego zdania.
+
+Panel obsługi mówił to wszystko od 0.200.0 paskiem nad kolejką zwrotów; brakowało
+tego po stronie biura, a to tam zagląda się z pytaniem „gdzie dokument".
+
 ## 0.332.0 — 14 września 2026
 
 **Copilota można dopytać.** Właściciel: „dodaj możliwość kontynuowania rozmowy
