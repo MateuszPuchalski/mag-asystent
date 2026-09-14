@@ -48,6 +48,21 @@ export type TypModelu = (typeof TYPY_MODELU)[number];
  */
 export const SUFIT_ZDJEC = { naSztuke: 3_500_000, lacznie: 20_000_000 } as const;
 
+/**
+ * SUFIT SZTUK — ale WYŁĄCZNIE dla rozmowy ze skrzynki.
+ *
+ * Reklamacja sufitu sztuk nie ma i to jest decyzja właściciela zapisana wyżej:
+ * tam o zdjęcia prosi CZŁOWIEK jednym kliknięciem i płaci za jedną sprawę.
+ * Szkic w skrzynce chodzi od 0.317.0 TAKTEM, co kilka minut i bez kliknięcia.
+ * Ta sama hojność na ścieżce bez hamulca znaczy rachunek, którego nikt nie
+ * zamawiał: rozmowa z trzydziestoma zdjęciami kosztowałaby przy każdym
+ * nieświeżym szkicu od nowa.
+ *
+ * Idą NAJNOWSZE, bo to one odpowiadają na ostatnie pytanie, a spis mówi
+ * agentowi, ile zostało poza. Cicha utrata zdjęcia byłaby gorsza od limitu.
+ */
+export const SUFIT_SZTUK_ROZMOWY = 4;
+
 export interface ZdjecieZBramki {
   readonly numer: string;
   readonly typ: TypModelu;
@@ -63,6 +78,14 @@ export interface WynikZdjec {
   nieObrazy: string[];
   /** Ile obrazów nie zmieściło się w suficie bajtów. */
   pominieto: number;
+  /**
+   * Ile obrazów odpadło na suficie SZTUK (tylko rozmowa; patrz
+   * `SUFIT_SZTUK_ROZMOWY`). Osobno od `pominieto`, bo to inny powód i inne
+   * zdanie w spisie: „nie było miejsca" i „było ich więcej, niż bierzemy"
+   * to nie to samo, a wspólny licznik kłamałby w jednym z tych dwóch
+   * przypadków przy każdym odczycie.
+   */
+  ponadLimit: number;
   /** Ile pobrań padło. Rozpoznanie leci dalej — zdjęcie to dodatek. */
   bledow: number;
 }
@@ -103,6 +126,46 @@ export function kandydaci(database: DatabaseSync, reklamacjaId: number): Kandyda
 }
 
 /**
+ * Załączniki ROZMOWY ze skrzynki, od NAJNOWSZYCH.
+ *
+ * Osobne zapytanie od `kandydaci`, bo to inna tabela i inna populacja:
+ * `message_attachment` wisi na wiadomościach Centrum Wiadomości, a
+ * `reklamacja_zalacznik` na sprawie. Jedno zapytanie z `UNION` udawałoby, że
+ * to jedna rzecz — a rozmowa bywa bez sprawy i sprawa bywa bez rozmowy.
+ *
+ * DWA ZAWĘŻENIA, oba świadome:
+ *
+ * `status='SAFE'` — ta sama reguła, którą oś rozmowy stosuje do podglądu
+ * (`skrzynka.ts`). `UNSAFE` znaczy, że Allegro uznało plik za niebezpieczny;
+ * wysłanie go dostawcy modelu byłoby wpuszczeniem pliku tylnymi drzwiami
+ * dokładnie tam, gdzie front go nie wpuszcza.
+ *
+ * `direction='incoming'` — czytamy zdjęcia KLIENTA, nie własne. Zdjęcie, które
+ * sami wysłaliśmy, niczego modelowi nie mówi o maszynie klienta, a kosztuje
+ * tyle samo co każde inne.
+ */
+export function kandydaciRozmowy(database: DatabaseSync, conversationId: number): Kandydat[] {
+  return (database.prepare(`SELECT a.id, a.file_name AS nazwa, a.url
+    FROM message_attachment a
+    JOIN message m ON m.id = a.message_id
+   WHERE m.conversation_id = ?
+     AND m.direction = 'incoming'
+     AND a.status = 'SAFE'
+     AND a.url IS NOT NULL
+   ORDER BY m.sent_at DESC, m.id DESC, a.id DESC`)
+    .all(conversationId) as Array<Record<string, unknown>>)
+    .map((r) => ({
+      id: Number(r.id),
+      nazwa: String(r.nazwa ?? ""),
+      url: String(r.url ?? ""),
+      /* Wątek szkicu nie numeruje wiadomości (linie `KLIENT:` / `MY:`), więc
+         nie ma numeru, którym dałoby się tu uczciwie podpisać załącznik. */
+      przyWiadomosci: null,
+    }))
+    .filter((k) => k.url !== "");
+}
+
+/**
  * Pobierz i przepuść przez bramkę.
  *
  * ŻADNE POTKNIĘCIE NIE WYWRACA ROZPOZNANIA. Plik spoza typu jest pomijany
@@ -113,15 +176,21 @@ export function kandydaci(database: DatabaseSync, reklamacjaId: number): Kandyda
  * Numery nadajemy PO bramce i chronologicznie od najstarszego, żeby `Z1` na
  * ekranie znaczyło to samo co `Z1` w karcie.
  */
-export async function przygotujZdjecia(
-  database: DatabaseSync, reklamacjaId: number, pobierz: Pobieracz = pobierzZalacznik,
+async function przezBramke(
+  lista: Kandydat[], pobierz: Pobieracz, sufitSztuk: number | null,
 ): Promise<WynikZdjec> {
-  const lista = kandydaci(database, reklamacjaId);
-  const wynik: WynikZdjec = { zdjecia: [], nieObrazy: [], pominieto: 0, bledow: 0 };
+  const wynik: WynikZdjec = { zdjecia: [], nieObrazy: [], pominieto: 0, ponadLimit: 0, bledow: 0 };
   let bajtow = 0;
 
   const zebrane: Array<Omit<ZdjecieZBramki, "numer">> = [];
   for (const k of lista) {
+    /* Sufit SZTUK sprawdzamy PRZED pobraniem, inaczej byłby sufitem na to,
+       co model zobaczy, a nie na to, za co płacimy transferem. Sufit BAJTÓW
+       sprawdzić przed pobraniem się nie da — wagę zna dopiero odpowiedź. */
+    if (sufitSztuk !== null && zebrane.length >= sufitSztuk) {
+      wynik.ponadLimit += 1;
+      continue;
+    }
     let dane: ArrayBuffer;
     try {
       dane = await pobierz(k.url, { maksBajtow: SUFIT_ZDJEC.naSztuke });
@@ -158,6 +227,39 @@ export async function przygotujZdjecia(
 }
 
 /**
+ * Pobierz i przepuść przez bramkę — ZDJĘCIA SPRAWY.
+ *
+ * ŻADNE POTKNIĘCIE NIE WYWRACA ROZPOZNANIA. Plik spoza typu jest pomijany
+ * i wymieniany z nazwy; pobranie, które padło, jest liczone. Karta bez zdjęć
+ * jest gorsza od karty bez rozpoznania tylko o tyle, o ile mniej wie — a brak
+ * karty nie mówi agentowi nic.
+ *
+ * Numery nadajemy PO bramce i chronologicznie od najstarszego, żeby `Z1` na
+ * ekranie znaczyło to samo co `Z1` w karcie.
+ */
+export async function przygotujZdjecia(
+  database: DatabaseSync, reklamacjaId: number, pobierz: Pobieracz = pobierzZalacznik,
+): Promise<WynikZdjec> {
+  return przezBramke(kandydaci(database, reklamacjaId), pobierz, null);
+}
+
+/**
+ * To samo dla ROZMOWY ze skrzynki (szkic odpowiedzi).
+ *
+ * Różnice od ścieżki sprawy są dwie i obie stoją wyżej przy swoich stałych:
+ * inne źródło załączników (`kandydaciRozmowy`) i sufit sztuk, bo tę ścieżkę
+ * potrafi uruchomić takt bez udziału człowieka.
+ *
+ * Tak samo jak tam: potknięcie nie wywraca szkicu. Szkic bez zdjęć jest tym,
+ * czym był do tego wydania, a szkicu nie ma dopiero wtedy, gdy padnie model.
+ */
+export async function przygotujZdjeciaRozmowy(
+  database: DatabaseSync, conversationId: number, pobierz: Pobieracz = pobierzZalacznik,
+): Promise<WynikZdjec> {
+  return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, SUFIT_SZTUK_ROZMOWY);
+}
+
+/**
  * Spis zdjęć doklejany do TEKSTU.
  *
  * Bez spisu model widzi obrazy, ale nie wie, który jest którym `Z` — a bez
@@ -166,12 +268,13 @@ export async function przygotujZdjecia(
  * „czytelne zdjęcie zamiast dokumentu".
  */
 export function spisZdjec(w: WynikZdjec): string {
-  if (!w.zdjecia.length && !w.nieObrazy.length && !w.pominieto) return "";
+  if (!w.zdjecia.length && !w.nieObrazy.length && !w.pominieto && !w.ponadLimit) return "";
   const linie = ["ZDJĘCIA (obrazy stoją PRZED tym tekstem, w tej kolejności):"];
   for (const z of w.zdjecia) linie.push(`[${z.numer}] plik: ${z.nazwa}`);
   if (w.nieObrazy.length) {
     linie.push(`Nie pokazano, bo nie są obrazem: ${w.nieObrazy.join(", ")}`);
   }
   if (w.pominieto) linie.push(`Nie pokazano z braku miejsca: ${w.pominieto}`);
+  if (w.ponadLimit) linie.push(`Starszych zdjęć nie pokazano: ${w.ponadLimit}`);
   return linie.join("\n");
 }

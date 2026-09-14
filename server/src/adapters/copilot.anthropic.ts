@@ -185,6 +185,12 @@ const Twierdzenie = z.object({
   pewnosc: z.enum(POZIOMY_PEWNOSCI),
 });
 
+/** Co model odczytał z jednego zdjęcia; `zdjecie` sprawdza serwis. */
+const OdczytZdjecia = z.object({
+  zdjecie: z.string(),
+  tekst: z.string(),
+});
+
 const Szkic = z.object({
   tresc: z.string(),
   uzyteFakty: z.array(z.string()),
@@ -192,6 +198,7 @@ const Szkic = z.object({
   daneDoboru: DaneZRozmowy,
   pasowanie: PasowanieZRozmowy,
   twierdzenia: z.array(Twierdzenie),
+  odczytZeZdjec: z.array(OdczytZdjecia),
 });
 
 /* Instrukcja stoi PIERWSZA i jest STAŁA — na tym stoi cache (patrz wyżej).
@@ -451,6 +458,36 @@ const INSTRUKCJA_SZKICU = [
   "   a nie „poszukaj adresu sam”. Wtedy wolno podać nazwę i numer katalogowy,",
   "   ale nie wolno twierdzić, że aukcja istnieje.",
   "",
+  "8. ZDJĘCIA. Czasem dostajesz zdjęcia od klienta. Stoją PRZED tekstem, a ich",
+  "   spis z numerami [Z1], [Z2] i nazwami plików jest w FAKTACH na końcu.",
+  "8a. CO WIDZISZ, PRZEPISZ DO `odczytZeZdjec`: jeden wpis na zdjęcie, `zdjecie`",
+  "   = numer (np. „Z1”, bez nawiasów), `tekst` = to, co da się na nim ODCZYTAĆ.",
+  "   Tabliczkę znamionową przepisz wiernie, z numerami: model, numer",
+  "   katalogowy, moc, pojemność, rok, numer seryjny. To pole czyta agent obok",
+  "   miniatury i sprawdza je jednym spojrzeniem, więc pisz je dla niego,",
+  "   nie dla klienta. Zdjęcia nieczytelnego nie zgaduj. Napisz, czego nie",
+  "   widać. Zdjęcie bez tekstu opisz jednym zdaniem (np. „pęknięta obudowa",
+  "   filtra powietrza”).",
+  "8b. NIE POWOŁUJ SIĘ NA ZDJĘCIE, KTÓREGO NIE MA W SPISIE. Numer spoza spisu",
+  "   wywraca cały szkic. Gdy zdjęć nie ma, `odczytZeZdjec` to pusta lista.",
+  "8c. FAKT ODCZYTANY ZE ZDJĘCIA MA ŹRÓDŁO `zdjecie` w `twierdzenia`, a",
+  "   w `odwolanie` numer zdjęcia. Nie podpisuj go jako `fakty`, bo fakty to",
+  "   nasza baza, a tabliczka to fotografia, której u nas nikt nie sprawdził.",
+  "8d. TABLICZKA NIE DOWODZI, ŻE TO TA MASZYNA. Dowodzi, że taka tabliczka",
+  "   istnieje na zdjęciu. Z tego, co na niej stoi, korzystaj jak z tego, co",
+  "   klient napisał, i nie wyżej. Gdy odczyt KŁÓCI SIĘ z tym, co klient pisał",
+  "   w wiadomości, nie rozstrzygaj tego sam. Napisz o rozbieżności",
+  "   w `zastrzezenia` i zapytaj klienta, która maszyna jest ta właściwa.",
+  "8e. DANE Z TABLICZKI WPISZ DO `daneDoboru` (reguła 3a): marka, model,",
+  "   numer seryjny, silnik. To jest najkrótsza droga od zdjęcia do doboru",
+  "   części i po to zdjęcie dostałeś. Wpisuj DOSŁOWNIE, jak stoi na tabliczce.",
+  "8f. MARKA NA OBUDOWIE TO CZĘSTO MARKA HANDLOWA, nie producent. Gdy tabliczka",
+  "   niesie OBIE, czyli nazwę z obudowy i firmę z adresem, podaj obie. Jako",
+  "   `marka` wpisz tę z obudowy. Nie łącz ich w jedną nazwę, której nigdzie",
+  "   nie widać.",
+  "8g. Nie opisuj klientowi jego własnego zdjęcia zdanie po zdaniu. On wie,",
+  "   co przysłał. Użyj odczytu do odpowiedzi na jego pytanie.",
+  "",
   "FORMA ODPOWIEDZI DLA KLIENTA — pisz ją tak, żeby dała się przeczytać na",
   "telefonie: krótkie akapity po jednej myśli, pusta linia między nimi. Gdy",
   "wyliczasz części, kroki albo rzeczy do sprawdzenia, zrób z tego listę: każda",
@@ -475,12 +512,14 @@ const INSTRUKCJA_SZKICU = [
   "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
   "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło),",
   "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a), `pasowanie` (para",
-  "kartotek z faktów wg reguły 3b albo null) oraz `twierdzenia` (skąd wiesz to,",
-  "co napisałeś, wg reguł 1 i 2a — agent czyta tę listę obok szkicu).",
+  "kartotek z faktów wg reguły 3b albo null), `twierdzenia` (skąd wiesz to,",
+  "co napisałeś, wg reguł 1 i 2a — agent czyta tę listę obok szkicu) oraz",
+  "`odczytZeZdjec` (co widać na zdjęciach, wg reguły 8a; pusta lista bez zdjęć).",
 ].join("\n");
 
 /** Realny nadawca szkicu. Wstrzykuje go TRASA, jak nadawcę klasyfikacji. */
-export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promise<OdpowiedzSzkicu> => {
+export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
+  async (watek, fakty, zdjecia = []): Promise<OdpowiedzSzkicu> => {
   const start = Date.now();
   try {
     const odp = await anthropic().messages.parse({
@@ -496,15 +535,43 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
          `AnthropicError`, a agent czytał „usterka po naszej stronie" bez
          jednego słowa o tym, co się stało.
          Rosnąc o pole w wyjściu, rośnij o sufit — inaczej limit obcina nie to
-         pole, które dołożyłeś, tylko całą odpowiedź. */
-      max_tokens: 3000,
+         pole, które dołożyłeś, tylko całą odpowiedź.
+         ── I ZNOWU, TYM RAZEM Z WYPRZEDZENIEM ────────────────────────────────
+         `odczytZeZdjec` to najdłuższe pole, jakie ten schemat kiedykolwiek
+         dostał: przepisana tabliczka znamionowa ma kilkanaście linii numerów,
+         a zdjęć bywa `SUFIT_SZTUK_ROZMOWY`. Stąd 4500, nie 3000. Blizna wyżej
+         kosztowała wydanie naprawcze i mówiła dokładnie to samo. */
+      max_tokens: 4500,
       system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta. */
         effort: "medium",
         format: zodOutputFormat(Szkic),
       },
-      messages: [{ role: "user", content: `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}` }],
+      /* ── OBRAZY PRZED TEKSTEM ─────────────────────────────────────────────
+         Ten sam kształt, co przy karcie reklamacyjnej (0.283.0), i z tego
+         samego powodu: bez spisu na końcu tekstu model widzi obrazy, ale nie
+         wie, który jest którym `Z`, a wtedy odczyt przestaje być sprawdzalny.
+         Spis dokleja serwis do FAKTÓW, nie adapter — tu jest tylko kolejność.
+
+         Bez zdjęć `content` zostaje gołym łańcuchem, dokładnie jak przed tym
+         wydaniem: prefiks żądania ma być bit w bit ten sam, bo na nim stoi
+         cache instrukcji, a rozmowa bez zdjęć to dalej większość rozmów. */
+      messages: [{
+        role: "user",
+        content: zdjecia.length === 0
+          ? `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`
+          : [
+            ...zdjecia.map((z) => ({
+              type: "image" as const,
+              source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+            })),
+            {
+              type: "text" as const,
+              text: `FAKTY:\n${String(fakty)}\n\nROZMOWA:\n${String(watek)}`,
+            },
+          ],
+      }],
     });
     const u = odp.usage;
     const w = odp.parsed_output;
@@ -523,6 +590,11 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu = async (watek, fakty): Promi
       daneDoboru: { ...w.daneDoboru, parametry },
       pasowanie: w.pasowanie,
       twierdzenia: w.twierdzenia,
+      /* Wpis bez numeru albo bez treści wypada tu, nie w serwisie: to kształt,
+         nie treść. Serwis sprawdza, czy numer jest NASZ — a to co innego. */
+      odczytZeZdjec: w.odczytZeZdjec
+        .map((o) => ({ zdjecie: o.zdjecie.trim(), tekst: o.tekst.trim() }))
+        .filter((o) => o.zdjecie && o.tekst),
       model: odp.model ?? config.copilot.model,
       zuzycie: {
         wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,

@@ -373,6 +373,19 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   -- Przy szkicu, nie w osobnej tabeli: lista rodzi się z tego samego wywołania
   -- i ginie z następnym, tak samo jak zastrzeżenia.
   twierdzenia          TEXT NOT NULL DEFAULT '[]',
+  -- ── CO MODEL ODCZYTAŁ ZE ZDJĘĆ ─────────────────────────────────────────
+  -- JSON: lista `{zdjecie, tekst}`, gdzie `zdjecie` to `Z1`, `Z2` ze spisu
+  -- wysłanego do dostawcy, a `tekst` to przepisana tabliczka albo opis tego,
+  -- co widać. Kolumna jest tu z tego samego powodu co `twierdzenia`: to jest
+  -- CENA za prawo powołania się na zdjęcie.
+  --
+  -- Bez niej zdjęć do szkicu włożyć się nie da. `numerySpozaFaktow` odrzuca
+  -- szkic z numerem nieobecnym w faktach i w wątku, a tabliczka to sama
+  -- numeracja, więc każde UDANE odczytanie kasowałoby własny szkic. Odczyt
+  -- deklarowany tutaj staje się materiałem, z którego wolno cytować, i tym
+  -- samym jest sprawdzalny: agent widzi go obok miniatury i rozstrzyga
+  -- jednym spojrzeniem, czy model przeczytał tabliczkę, czy ją wymyślił.
+  odczyt_zdjec         TEXT NOT NULL DEFAULT '[]',
   -- ── LUKI W KARTOTECE (0.254.0) ─────────────────────────────────────────
   -- JSON: oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka.
   -- Właściciel: „jeśli jakieś numery są w ofercie, a nie ma w kartotece,

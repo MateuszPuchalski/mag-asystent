@@ -24,6 +24,9 @@ import { bezPodpisu, zwin } from "../tekst.js";
 import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygnaturze.js";
+import {
+  przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
+} from "./copilot-zdjecia.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -153,7 +156,7 @@ export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: strin
    sprawdzić, kosztuje dokładnie tyle, co szkic zmyślony.                    */
 
 /** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
-export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "model"] as const;
+export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "model"] as const;
 export type ZrodloTwierdzenia = (typeof ZRODLA_TWIERDZENIA)[number];
 
 /** Ile temu twierdzeniu wolno ufać. Też od najmocniejszej. */
@@ -170,6 +173,13 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  * `fakty` — nasza baza: kartoteka, pasowania, pomiary z hali. Wolno „pewne".
  * `oferta` — słowa sprzedawcy sprzed lat; najwyżej „prawdopodobne", bo towar
  *   u dostawcy zmienia się bez zmiany opisu.
+ * `zdjecie` — odczytane z fotografii przysłanej przez klienta; najwyżej
+ *   „prawdopodobne", i to z DWÓCH niezależnych powodów. Pierwszy jest banalny:
+ *   litery na tabliczce mylą się z cyframi, a zdjęcie bywa nieostre. Drugi
+ *   jest poważniejszy i nie znika przy idealnej ostrości — z tego, że na
+ *   zdjęciu widać tabliczkę, NIE wynika, że to tabliczka maszyny, o którą
+ *   klient pyta. Zdjęcie bywa z internetu, z maszyny sąsiada albo z drugiej
+ *   kosiarki w garażu. „Pewne" zostaje dla naszej bazy.
  * `model` — wiedza własna modelu, bez pokrycia w naszych danych; „niepewne"
  *   i ani stopnia wyżej. To nie jest opinia o modelu, tylko o tym, że nikt
  *   tego u nas nie sprawdził.
@@ -178,7 +188,7 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  * której nie mamy powodu poprawiać.
  */
 const SUFIT_PEWNOSCI: Record<ZrodloTwierdzenia, PoziomPewnosci> = {
-  fakty: "pewne", oferta: "prawdopodobne", model: "niepewne",
+  fakty: "pewne", oferta: "prawdopodobne", zdjecie: "prawdopodobne", model: "niepewne",
 };
 
 /** Twierdzenie tak, jak oddał je model — przed obcięciem pewności do sufitu. */
@@ -212,6 +222,28 @@ export function ocenTwierdzenia(surowe: TwierdzenieSurowe[]): Twierdzenie[] {
   return surowe.filter((t) => t.teza.trim()).map(ustalPewnosc);
 }
 
+/* ── ODCZYT ZE ZDJĘCIA: PO CO OSOBNE POLE ───────────────────────────────────
+   Bez niego zdjęcia do szkicu WŁOŻYĆ SIĘ NIE DA, i nie jest to kwestia formy.
+   `numerySpozaFaktow` odrzuca szkic, w którym stoi numer nieobecny w faktach
+   ani w wątku. Tabliczka znamionowa to sama numeracja: „PBRM 39 E4", „131",
+   numer seryjny. Model, który ją poprawnie odczyta i użyje, wywróciłby własny
+   szkic — każde UDANE odczytanie kasowałoby swój wynik.
+
+   Pole jest więc DEKLARACJĄ: model przepisuje, co widzi, przy numerze zdjęcia,
+   a serwer dopiero potem uznaje ten tekst za materiał, z którego wolno cytować.
+   Kolejność ma znaczenie — najpierw sprawdzamy, czy `Zn` jest zdjęciem, które
+   NAPRAWDĘ wysłaliśmy. Inaczej pole byłoby furtką: dopisz zmyślony odczyt
+   i przemyć nim dowolny numer obok kontroli.
+
+   Agent widzi odczyt obok miniatury i rozstrzyga jednym spojrzeniem, czy model
+   przeczytał tabliczkę, czy ją sobie wyobraził.                              */
+
+/** Co model odczytał z jednego zdjęcia. `zdjecie` to `Z1`, `Z2` — sprawdzane. */
+export interface OdczytZdjecia {
+  zdjecie: string;
+  tekst: string;
+}
+
 /** Surowa odpowiedź modelu. Walidacja jest niżej, w `ulozSzkic`. */
 export interface OdpowiedzSzkicu {
   tresc: string;
@@ -230,6 +262,12 @@ export interface OdpowiedzSzkicu {
    * źródła `ocenTwierdzenia`, nie adapter. Pusta lista przy nadawcy-atrapie.
    */
   twierdzenia: TwierdzenieSurowe[];
+  /**
+   * Co model odczytał ze zdjęć rozmowy. Pusta lista przy nadawcy-atrapie
+   * i wtedy, gdy zdjęć nie było — obie sytuacje wyglądają tu tak samo,
+   * bo dla walidacji znaczą to samo: nie ma się na co powołać.
+   */
+  odczytZeZdjec: OdczytZdjecia[];
   model: string;
   zuzycie: Tokeny;
   ms: number;
@@ -241,7 +279,9 @@ export interface OdpowiedzSzkicu {
  * być `FaktyBezpieczne` (tylko ten plik). Goły `string` nie wejdzie żadną
  * z tych dróg nawet przez pomyłkę.
  */
-export type NadawcaSzkicu = (watek: TrescBezpieczna, fakty: FaktyBezpieczne) => Promise<OdpowiedzSzkicu>;
+export type NadawcaSzkicu = (
+  watek: TrescBezpieczna, fakty: FaktyBezpieczne, zdjecia?: ZdjecieZBramki[],
+) => Promise<OdpowiedzSzkicu>;
 
 export const OCENY_SZKICU = ["wstawiony", "zastapiony", "odrzucony"] as const;
 export type OcenaSzkicu = (typeof OCENY_SZKICU)[number];
@@ -305,6 +345,15 @@ export interface SzkicCopilota {
    * byłoby zmyśleniem danych.
    */
   lukiKartoteki: PokwitowanieSzkicu;
+  /**
+   * CO MODEL ODCZYTAŁ ZE ZDJĘĆ — dla agenta, obok miniatur.
+   *
+   * Pusta lista znaczy jedno z trojga i ekran nie ma jak ich rozróżnić, bo
+   * i nie musi: rozmowa nie miała zdjęć, zdjęcia nie przeszły bramki albo
+   * model niczego na nich nie odczytał. We wszystkich trzech przypadkach nie
+   * ma się na co powołać, a to jest jedyne, co z tego pola wynika.
+   */
+  odczytZeZdjec: OdczytZdjecia[];
 }
 
 /**
@@ -425,8 +474,10 @@ export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
 export function numeryNiezadeklarowane(
   tresc: string, dozwolone: string, twierdzenia: TwierdzenieSurowe[],
 ): string[] {
+  /* `zdjecie` obok `model`: jedno i drugie znaczy „wiem to spoza naszej bazy,
+     i mówię skąd". Różnią się sufitem pewności, nie prawem do numeru. */
   const zWiedzy = twierdzenia
-    .filter((t) => t.zrodlo === "model")
+    .filter((t) => t.zrodlo === "model" || t.zrodlo === "zdjecie")
     .map((t) => zwin(t.teza).toUpperCase())
     .join(" ");
   return numerySpozaFaktow(tresc, dozwolone)
@@ -958,6 +1009,7 @@ export type AutorSzkicu = { id: number | null; name: string };
 export async function ulozSzkic(
   conversationId: number, kto: AutorSzkicu,
   nadaj: NadawcaSzkicu, subiekt: SubiektAdapter, teraz = new Date(),
+  pobierzZdjecie?: Pobieracz,
 ): Promise<SzkicCopilota> {
   /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
      zgodności kosztują żądanie NA OFERTĘ, więc idą po nie wyłącznie stąd:
@@ -1010,6 +1062,25 @@ export async function ulozSzkic(
      Licznik kolejki „przy tej kartotece" wymagałby wskazania kartoteki, a to
      jest dokładnie to, czego w tym przypadku nie wiemy. */
 
+  /* ── ZDJĘCIA Z ROZMOWY ────────────────────────────────────────────────────
+     Pobranie stoi PO zapisie wiedzy i PRZED asercją maskowania, bo ta
+     kolejność jest jedyną, która nie traci niczego cennego: wiedza z oferty
+     ma zostać nawet gdy Allegro odmówi bajtów, a bajty nie mają prawa wyjść,
+     zanim tekst przejdzie kontrolę.
+
+     PIKSELI ZAMASKOWAĆ SIĘ NIE DA i asercja niżej ich nie dotyczy — to nie
+     jest przeoczenie, tylko cena zapisana wprost w nagłówku `copilot-zdjecia`
+     i w polityce danych. Zdjęcie klienta idzie do dostawcy w całości.
+     Właściciel zgodził się na to także dla TAKTU, pytany wprost.
+
+     Awaria pobrania NIE wywraca szkicu: `przygotujZdjeciaRozmowy` liczy błędy
+     i oddaje, co się udało. Szkic bez zdjęć jest tym, czym był wczoraj. */
+  const zdjecia: WynikZdjec = await przygotujZdjeciaRozmowy(db(), conversationId, pobierzZdjecie);
+  const spis = spisZdjec(zdjecia);
+  /* Spis dopinamy do FAKTÓW, nie do wątku: wątek jest tekstem klienta i po to
+     przeszedł przez maskowanie, żeby nic naszego się w nim nie znalazło. */
+  const tekstFaktow = (spis ? `${k.tekstFaktow}\n\n${spis}` : k.tekstFaktow) as FaktyBezpieczne;
+
   /* Asercja przed siecią — na WĄTKU, bo tam jest tekst klienta. Faktów nie
      sprawdzamy tymi wzorcami celowo: dziewięć cyfr numeru OEM zapaliłoby
      „telefon" i to byłby fałszywy alarm, a nie zepsute maskowanie. */
@@ -1020,7 +1091,7 @@ export async function ulozSzkic(
 
   let odp: OdpowiedzSzkicu;
   try {
-    odp = await nadaj(k.watek, k.tekstFaktow);
+    odp = await nadaj(k.watek, tekstFaktow, zdjecia.zdjecia);
   } catch (e) {
     const slad = (e as { slad?: string }).slad || (e as Error).message;
     zapiszBlad(conversationId, slad, kto, teraz);
@@ -1033,7 +1104,27 @@ export async function ulozSzkic(
   /* Numer wolno wziąć z własnej wiedzy — ale nie po cichu. Niezadeklarowany
      jest tym samym, czym był każdy numer spoza faktów do 0.252.0: zdaniem,
      którego agent nie ma jak sprawdzić przed wysłaniem do klienta. */
-  const obce = numeryNiezadeklarowane(odp.tresc, `${k.tekstFaktow}\n${k.watek}`, odp.twierdzenia);
+  /* ── ODCZYT ZE ZDJĘĆ: NAJPIERW TOŻSAMOŚĆ, POTEM ZAUFANIE ──────────────────
+     Odczyt powołany na `Z7`, gdy wysłaliśmy trzy zdjęcia, nie jest pomyłką
+     w numeracji — to jedyny znany sposób, żeby przemycić przez `numery-
+     SpozaFaktow` numer wzięty z niczego. Dlatego sprawdzenie jest takie samo
+     jak przy faktach spoza listy: wywraca szkic, nie filtruje po cichu. */
+  const wyslane = new Set(zdjecia.zdjecia.map((z) => z.numer));
+  const zmyslone = odp.odczytZeZdjec.filter((o) => !wyslane.has(o.zdjecie));
+  if (zmyslone.length) {
+    zapiszWywolanie(conversationId, odp, "blad",
+      `zdjecie_spoza_listy: ${zmyslone.map((o) => o.zdjecie).join(", ")}`, kto, teraz);
+    throw new BladOdpowiedziCopilota(
+      `Model powołał się na zdjęcie ${zmyslone[0]!.zdjecie}, którego nie dostał — szkic odrzucony.`,
+      200, "zdjecie_spoza_listy");
+  }
+  /* Dopiero TERAZ odczyt staje się materiałem, z którego wolno cytować —
+     na równi z faktami i wątkiem. Bez tego każde poprawne odczytanie
+     tabliczki wywracałoby własny szkic na odsiewie numerów. */
+  const zOdczytu = odp.odczytZeZdjec.map((o) => o.tekst).join("\n");
+  const material = `${tekstFaktow}\n${k.watek}${zOdczytu ? `\n${zOdczytu}` : ""}`;
+
+  const obce = numeryNiezadeklarowane(odp.tresc, material, odp.twierdzenia);
   if (obce.length) {
     zapiszWywolanie(conversationId, odp, "blad", `numer_niezadeklarowany: ${obce.join(", ")}`, kto, teraz);
     throw new BladOdpowiedziCopilota(
@@ -1060,14 +1151,19 @@ export async function ulozSzkic(
   const tresc = bezZnacznikow(odp.tresc);
   /* Dane z rozmowy: zmyślona wartość NIE odrzuca szkicu (szkic jest wart
      pieniędzy sam w sobie), tylko wypada z propozycji; liczbę notujemy. */
-  const propozycja = oczyscPropozycje(odp.daneDoboru, String(k.watek));
+  /* Dane doboru z TABLICZKI to najcenniejsze, co daje to wydanie: marka
+     i model maszyny wpadają do doboru bez przepisywania ich ręcznie ze
+     zdjęcia. Sprawdzenie zostaje deterministyczne — wartość musi stać
+     w odczycie, który model zadeklarował i który agent widzi obok miniatury. */
+  const propozycja = oczyscPropozycje(
+    odp.daneDoboru, `${String(k.watek)}${zOdczytu ? `\n${zOdczytu}` : ""}`);
   /* Para z rozmowy tą samą regułą: wypada, szkic zostaje, powód do dziennika. */
   const para = sprawdzPasowanie(odp.pasowanie, k.kartoteki, String(k.watek));
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki,odczyt_zdjec)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
@@ -1075,6 +1171,7 @@ export async function ulozSzkic(
         dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
         pasowanie_propozycja=excluded.pasowanie_propozycja,
         twierdzenia=excluded.twierdzenia, luki_kartoteki=excluded.luki_kartoteki,
+        odczyt_zdjec=excluded.odczyt_zdjec,
         /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
         ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
         pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
@@ -1082,7 +1179,8 @@ export async function ulozSzkic(
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
         propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
         para.propozycja ? JSON.stringify(para.propozycja) : null,
-        JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie));
+        JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie),
+        JSON.stringify(odp.odczytZeZdjec));
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -1232,7 +1330,7 @@ export function odrzucPasowanie(
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
       dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena,
-      twierdzenia, luki_kartoteki
+      twierdzenia, luki_kartoteki, odczyt_zdjec
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -1250,6 +1348,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
     twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
     lukiKartoteki: czytajPokwitowanie(w.luki_kartoteki == null ? null : String(w.luki_kartoteki)),
+    odczytZeZdjec: JSON.parse(String(w.odczyt_zdjec ?? "[]")) as OdczytZdjecia[],
   };
 }
 

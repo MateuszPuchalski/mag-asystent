@@ -26,7 +26,8 @@ const nadaj: import("./copilot-szkic.js").NadawcaSzkicu = async () => {
   wywolan++;
   return {
     tresc: "Dzień dobry, ten gaźnik pasuje (F1).", uzyteFakty: ["F1"], zastrzezenia: [],
-    daneDoboru: null, pasowanie: null, twierdzenia: [], model: "atrapa", ms: 5,
+    daneDoboru: null, pasowanie: null, twierdzenia: [], odczytZeZdjec: [],
+    model: "atrapa", ms: 5,
     zuzycie: { wej: 10, wyj: 5, cacheZapis: 0, cacheOdczyt: 0 },
   };
 };

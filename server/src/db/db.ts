@@ -202,6 +202,7 @@ export function migrate(database: DatabaseSync) {
      w `schema.sql`. Stare szkice mają pustą listę: powstały, zanim ktokolwiek
      zestawił obie listy obok siebie. */
   addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
+  addColumn("szkic_copilota", "odczyt_zdjec", "TEXT NOT NULL DEFAULT '[]'");
   /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
      w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
      powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza

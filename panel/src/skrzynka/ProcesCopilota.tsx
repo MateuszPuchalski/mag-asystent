@@ -1,5 +1,5 @@
 import React from "react";
-import { Database, FileText, Brain } from "lucide-react";
+import { Database, FileText, Brain, Camera } from "lucide-react";
 import type { PoziomPewnosci, TwierdzenieCopilota, ZrodloTwierdzenia } from "../api/typy";
 
 /**
@@ -27,6 +27,10 @@ import type { PoziomPewnosci, TwierdzenieCopilota, ZrodloTwierdzenia } from "../
 const ZRODLA: Record<ZrodloTwierdzenia, { etykieta: string; klasa: string; Ikona: typeof Database }> = {
   fakty: { etykieta: "z bazy", klasa: "border-emerald-200 bg-emerald-50 text-emerald-900", Ikona: Database },
   oferta: { etykieta: "z opisu oferty", klasa: "border-sky-200 bg-sky-50 text-sky-900", Ikona: FileText },
+  /* Fiolet, bo zdjęcie nie jest ani naszą bazą, ani wiedzą modelu, a agent ma
+     je rozpoznać nie czytając etykiety. Bursztyn zostaje przy wiedzy modelu:
+     to on woła o sprawdzenie najgłośniej. */
+  zdjecie: { etykieta: "ze zdjęcia klienta", klasa: "border-violet-200 bg-violet-50 text-violet-900", Ikona: Camera },
   model: { etykieta: "z wiedzy modelu", klasa: "border-amber-200 bg-amber-50 text-amber-900", Ikona: Brain },
 };
 

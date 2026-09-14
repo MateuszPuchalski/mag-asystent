@@ -84,6 +84,7 @@ const odpowiedz = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}
   /* `daneDoboru: null` domyślnie — testy propozycji dokładają dane świadomie,
      a reszta nie zmienia znaczenia przez sam fakt, że model coś rozpoznał. */
   uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, pasowanie: null, twierdzenia: [],
+  odczytZeZdjec: [],
   model: "claude-opus-5", ms: 800,
   zuzycie: { wej: 2000, wyj: 300, cacheZapis: 0, cacheOdczyt: 1500 }, ...n,
 });
@@ -792,4 +793,166 @@ test("rozmowa bez wiadomości nie ma na co odpowiadać", async () => {
   db().prepare("DELETE FROM message").run();
   await assert.rejects(S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt), /żadnej wiadomości/);
   assert.equal(liczba("copilot_wywolanie"), 0, "bez wiadomości nic nie kosztuje");
+});
+
+/* ── Zdjęcia z rozmowy idą do modelu ──────────────────────────────────────────
+   Wydanie ma jeden fundament, bez którego reszta jest ozdobą: odczyt ze
+   zdjęcia MUSI móc przejść przez `numerySpozaFaktow`. Tabliczka znamionowa to
+   sama numeracja, więc gdyby odczyt nie był materiałem do cytowania, każde
+   UDANE odczytanie kasowałoby własny szkic. Druga strona tej samej monety jest
+   równie ważna: skoro odczyt otwiera drogę numerom, to numer zdjęcia musi być
+   sprawdzony, inaczej pole jest furtką na dowolną liczbę.                    */
+
+/* Prawdziwa sygnatura PNG — bramka czyta BAJTY, nie nazwę pliku. */
+const PNG_BAJTY = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Wiesza zdjęcie na ostatniej PRZYCHODZĄCEJ wiadomości badanej rozmowy. */
+function powieszZdjecie(nazwa: string, status = "SAFE") {
+  const m = db().prepare(
+    `SELECT id FROM message WHERE conversation_id=? AND direction='incoming'
+      ORDER BY sent_at DESC, id DESC LIMIT 1`).get(rozmowa) as { id: number };
+  db().prepare(`INSERT INTO message_attachment(message_id,file_name,mime_type,url,status)
+    VALUES (?,?,?,?,?)`).run(m.id, nazwa, "image/png", `https://allegro.pl/plik/${nazwa}`, status);
+}
+
+const pobierzPng = async () => PNG_BAJTY.buffer.slice(
+  PNG_BAJTY.byteOffset, PNG_BAJTY.byteOffset + PNG_BAJTY.byteLength) as ArrayBuffer;
+
+/** Nadawca, który zapamiętuje, co dostał. */
+function szpieg(n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}) {
+  const widziane: { zdjecia: unknown[]; fakty: string } = { zdjecia: [], fakty: "" };
+  const nadaj: import("./copilot-szkic.js").NadawcaSzkicu = async (_w, fakty, zdjecia = []) => {
+    widziane.zdjecia = zdjecia;
+    widziane.fakty = String(fakty);
+    return odpowiedz(n);
+  };
+  return { widziane, nadaj };
+}
+
+test("zdjęcie z rozmowy jedzie do modelu, a jego spis stoi w FAKTACH", async () => {
+  powieszZdjecie("tabliczka.png");
+  const s = szpieg();
+  await S.ulozSzkic(rozmowa, KTO(), s.nadaj, subiekt, new Date(), pobierzPng);
+
+  assert.equal(s.widziane.zdjecia.length, 1);
+  assert.equal((s.widziane.zdjecia[0] as { numer: string }).numer, "Z1");
+  /* Spis idzie do FAKTÓW, nie do wątku: wątek to tekst klienta i po to
+     przeszedł przez maskowanie, żeby nic naszego się w nim nie znalazło. */
+  assert.ok(s.widziane.fakty.includes("[Z1] plik: tabliczka.png"));
+});
+
+test("rozmowa bez zdjęć nie wychodzi po bajty i dostaje pusty spis", async () => {
+  const s = szpieg();
+  let pobran = 0;
+  await S.ulozSzkic(rozmowa, KTO(), s.nadaj, subiekt, new Date(),
+    async () => { pobran += 1; return pobierzPng(); });
+
+  assert.equal(pobran, 0);
+  assert.equal(s.widziane.zdjecia.length, 0);
+  assert.ok(!s.widziane.fakty.includes("ZDJĘCIA"), "zdanie o niczym kosztuje tokeny");
+});
+
+/* Numer z tabliczki, który NAPRAWDĘ wpada w odsiew. `NUMER` wymaga czterech
+   znaków i cyfry, więc „PBRM", „39" i „E4" mu się wymykają — sprawdzenie na
+   nich byłoby testem, który przechodzi także bez poprawki. IAN ma sześć cyfr
+   i jest dokładnie tym, o co tu chodzi: numerem, po którym szuka się części. */
+const IAN = "508992";
+
+test("numer ODCZYTANY z tabliczki przechodzi przez odsiew — to jest cały sens wydania", async () => {
+  powieszZdjecie("tabliczka.png");
+  const s = await S.ulozSzkic(rozmowa, KTO(), szpieg({
+    tresc: `Dzień dobry, z tabliczki odczytujemy numer ${IAN} (F1).`,
+    uzyteFakty: ["F1"],
+    odczytZeZdjec: [{ zdjecie: "Z1", tekst: `PARKSIDE PBRM 39 E4, IAN ${IAN}_2507, 131 cm3` }],
+    twierdzenia: [{
+      teza: `Na tabliczce stoi numer ${IAN}`, zrodlo: "zdjecie",
+      odwolanie: "Z1", pewnosc: "prawdopodobne",
+    }],
+  }).nadaj, subiekt, new Date(), pobierzPng);
+
+  assert.ok(s.tresc.includes(IAN));
+  assert.deepEqual(s.odczytZeZdjec, [
+    { zdjecie: "Z1", tekst: `PARKSIDE PBRM 39 E4, IAN ${IAN}_2507, 131 cm3` },
+  ]);
+});
+
+test("odczyt powołany na zdjęcie, którego NIE wysłaliśmy, wywraca cały szkic", async () => {
+  powieszZdjecie("tabliczka.png");
+  /* To jest jedyny znany sposób przemycenia numeru wziętego z niczego:
+     dopisz zmyślony odczyt i schowaj w nim dowolną liczbę. Dlatego wywraca,
+     a nie filtruje po cichu. */
+  await assert.rejects(
+    S.ulozSzkic(rozmowa, KTO(), szpieg({
+      odczytZeZdjec: [{ zdjecie: "Z7", tekst: "numer katalogowy 99999999" }],
+    }).nadaj, subiekt, new Date(), pobierzPng),
+    /zdjęcie Z7/);
+  assert.equal(liczba("szkic_copilota"), 0, "odrzucony szkic nie zostaje w bazie");
+});
+
+test("dane doboru wolno wziąć z tabliczki, ale tylko przez zadeklarowany odczyt", async () => {
+  powieszZdjecie("tabliczka.png");
+  const s = await S.ulozSzkic(rozmowa, KTO(), szpieg({
+    tresc: "Dzień dobry, potwierdzamy (F1).", uzyteFakty: ["F1"],
+    odczytZeZdjec: [{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }],
+    daneDoboru: {
+      marka: "PARKSIDE", model: "PBRM 39 E4", wariant: null, rocznik: null,
+      nrSeryjny: null, silnik: null, oem: null, nazwaCzesci: null, parametry: {},
+    },
+  }).nadaj, subiekt, new Date(), pobierzPng);
+
+  assert.equal(s.daneDoboru?.model, "PBRM 39 E4");
+  assert.equal(s.daneDoboru?.marka, "PARKSIDE");
+});
+
+test("wartość, której nie ma ANI w rozmowie, ANI w odczycie, dalej odpada", async () => {
+  powieszZdjecie("tabliczka.png");
+  /* Sprawdzenie zostaje deterministyczne. Zdjęcia poszerzyły materiał
+     o odczyt, nie zniosły reguły — inaczej `daneDoboru` karmiłyby szczeble
+     doboru wartościami, których nikt nigdy nie widział. */
+  const s = await S.ulozSzkic(rozmowa, KTO(), szpieg({
+    tresc: "Dzień dobry, potwierdzamy (F1).", uzyteFakty: ["F1"],
+    odczytZeZdjec: [{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }],
+    daneDoboru: {
+      marka: null, model: "STIGA COMBI 48", wariant: null, rocznik: null,
+      nrSeryjny: null, silnik: null, oem: null, nazwaCzesci: null, parametry: {},
+    },
+  }).nadaj, subiekt, new Date(), pobierzPng);
+
+  assert.equal(s.daneDoboru, null, "model spoza rozmowy i spoza odczytu nie przechodzi");
+});
+
+test("twierdzenie ze zdjęcia nie może być PEWNE — tabliczka to nie nasza baza", () => {
+  /* Sufit ma dwa powody i żaden nie znika przy ostrym zdjęciu: litery mylą
+     się z cyframi, a z tego, że tabliczkę widać, nie wynika, że to tabliczka
+     maszyny, o którą klient pyta. */
+  const t = S.ustalPewnosc({
+    teza: "model to PBRM 39 E4", zrodlo: "zdjecie", odwolanie: "Z1", pewnosc: "pewne",
+  });
+  assert.equal(t.pewnosc, "prawdopodobne");
+  assert.equal(t.obnizona, true);
+});
+
+test("załącznik UNSAFE nie jedzie do dostawcy nawet wtedy, gdy jest obrazem", async () => {
+  powieszZdjecie("podejrzany.png", "UNSAFE");
+  const s = szpieg();
+  let pobran = 0;
+  await S.ulozSzkic(rozmowa, KTO(), s.nadaj, subiekt, new Date(),
+    async () => { pobran += 1; return pobierzPng(); });
+
+  assert.equal(pobran, 0, "Allegro uznało plik za niebezpieczny — nie wiemy lepiej");
+  assert.equal(s.widziane.zdjecia.length, 0);
+});
+
+test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () => {
+  powieszZdjecie("tabliczka.png");
+  /* Dowód, że test wyżej mierzy poprawkę, a nie pobożne życzenie: identyczna
+     treść bez `odczytZeZdjec` ma paść na tym samym odsiewie, co przed tym
+     wydaniem. Zdjęcia nie zniosły reguły „numer albo ze źródła, albo wcale" —
+     dały jej jedno źródło więcej, sprawdzalne i widoczne dla agenta. */
+  await assert.rejects(
+    S.ulozSzkic(rozmowa, KTO(), szpieg({
+      tresc: `Dzień dobry, z tabliczki odczytujemy numer ${IAN} (F1).`,
+      uzyteFakty: ["F1"],
+    }).nadaj, subiekt, new Date(), pobierzPng),
+    /nie mówiąc, skąd go ma/);
 });

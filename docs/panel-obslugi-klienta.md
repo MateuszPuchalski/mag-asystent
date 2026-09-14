@@ -1925,6 +1925,45 @@ ma się włączać decyzją przy `wertis.env`, a nie skutkiem ubocznym aktualiza
 Do klienta dalej **nie idzie nic** bez człowieka. Zasada nadrzędna nr 2 nie ma
 tu wyjątku.
 
+**Copilot widzi zdjęcia z rozmowy (0.330.0).** Właściciel pokazał zdjęcie
+tabliczki znamionowej kosiarki PARKSIDE i powiedział, że model nie umiał
+wyciągnąć z niego modelu. Nie umiał, bo tego zdjęcia nigdy nie dostał.
+Wątek szedł do dostawcy jako goły tekst i **nie wspominał nawet, że załącznik
+istnieje** — z punktu widzenia modelu klient przysłał pustą wiadomość.
+
+To była **ta sama blizna, co w 0.283.0, kupiona drugi raz**. Tamto wydanie
+dało oczy karcie reklamacyjnej, bo karta prosiła agenta o zdjęcia, które
+w sprawie już były. Skrzynka została z defektem, a instrukcja szkicu uczyła
+model prosić o tabliczkę — więc w najgorszym układzie szkic prosił o zdjęcie
+tabliczki pod zdjęciem tabliczki.
+
+**Bez deklarowanego odczytu zdjęć włożyć się nie dało** i to jest sedno tego
+wydania, nie szczegół. Odsiew `numerySpozaFaktow` odrzuca szkic, w którym stoi
+numer nieobecny w faktach i w wątku. Tabliczka to sama numeracja, więc model,
+który odczytałby ją poprawnie i użył, wywróciłby własny szkic: każde UDANE
+odczytanie kasowałoby swój wynik. Dlatego model przepisuje, co widzi, do
+`odczytZeZdjec` przy numerze zdjęcia, a serwer dopiero potem uznaje ten tekst
+za materiał, z którego wolno cytować. Numer zdjęcia jest **sprawdzany** —
+powołanie się na `Z7`, gdy poszły trzy zdjęcia, wywraca szkic, bo inaczej pole
+byłoby furtką na dowolną liczbę.
+
+Odczyt widzi agent, w bloku `skrzynka/OdczytZdjec.tsx` nad oknem „Skąd to
+wiem". To jest kontrola, nie ozdoba: agent porównuje tekst z miniaturą na osi
+i jednym spojrzeniem wie, czy model przeczytał tabliczkę, czy ją sobie
+wyobraził. Twierdzenie oparte na zdjęciu ma własne źródło `zdjecie` z sufitem
+**prawdopodobne**, bo z tego, że tabliczkę widać, nie wynika, że to tabliczka
+maszyny, o którą klient pyta.
+
+Najcenniejsze jest to, co dzieje się dalej: **dane z tabliczki wpadają do
+propozycji doboru**. Marka i model maszyny trafiają do `daneDoboru` bez
+przepisywania ich ręcznie ze zdjęcia, a sprawdzenie zostaje deterministyczne,
+bo wartość musi stać w zadeklarowanym odczycie.
+
+Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
+`SAFE`, tylko przychodzące i sufit sztuk. Sufit jest tu, a nie przy
+reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
+uruchomić takt z 0.317.0.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
@@ -4373,6 +4412,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
+| Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
