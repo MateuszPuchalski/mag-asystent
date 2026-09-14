@@ -741,6 +741,20 @@ Twierdzenia oparte na zdjęciu mają własne źródło `zdjecie` z sufitem
 „prawdopodobne", bo z tego, że tabliczkę widać, nie wynika, że to tabliczka
 maszyny, o którą klient pyta.
 
+**Od 0.332.0 do dostawcy idzie też PYTANIE AGENTA.** Dopytanie o szkic wysyła
+ten sam materiał co szkic, a do niego zdanie napisane przez pracownika biura.
+
+To pytanie **nie przechodzi przez maskowanie** i jest to decyzja, nie luka.
+Maskowanie wycina telefon, adres i login, bo pisze je KLIENT o sobie. Pytanie
+agenta pisze pracownik o naszym towarze, a wycięcie z niego numerów zabrałoby
+mu sens: „czy 17211-ZL8-023 to ten sam filtr" bez numeru nie jest pytaniem.
+
+Wynika z tego obowiązek po stronie biura, nie po stronie kodu: **w pytaniu do
+Copilota nie pisze się o kliencie**. Nazwisko, adres i numer telefonu nie mają
+tam czego szukać, a wątek rozmowy model i tak dostaje osobno, zamaskowany.
+Dziennik zapisuje wyłącznie DŁUGOŚĆ pytania, nigdy jego treść — `events` nie
+ma retencji, a pytanie bywa o konkretnej sprawie.
+
 Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
 co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
 których nie wie. Właściciel odwrócił 11 września wcześniejszą regułę „maszyna

@@ -5,7 +5,10 @@ import { config } from "../config.js";
 import {
   ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
-import { nadawcaAnthropic, nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
+import {
+  nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
+} from "../adapters/copilot.anthropic.js";
+import { wymianyRozmowy, zadajPytanie } from "../services/copilot-pytania.js";
 import {
   ocenSzkic, odrzucDaneDoboru, odrzucPasowanie, przyjmijDaneDoboru, przyjmijPasowanie, ulozSzkic,
 } from "../services/copilot-szkic.js";
@@ -16,7 +19,7 @@ import {
 } from "../adapters/copilot.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   SZEŚĆ TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   SIEDEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
    werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0), werdykt
    o szkicu, los danych doboru z rozmowy (przyrost trzeci) i los pasowania
    z rozmowy (przyrost czwarty). Werdykty wyglądają na drobiazg, a bez nich
@@ -35,6 +38,15 @@ import {
    nie policzy, ile par model trafia. Do tego para, rola i dowód pochodzą
    z wiersza szkicu SPRAWDZONEGO przez serwer, nie z ciała żądania — panel
    nie ma jak podać cudzej pary.
+
+   SIÓDMA (0.332.0) to dopytanie: agent pyta o szkic, model odpowiada JEMU.
+   Licznik podniósł się o jeden i oto zdanie, które umowa za to bierze.
+   Osobna od trasy szkicu, choć obie wołają model o tej samej rozmowie, bo
+   robi rzecz przeciwną: tamta produkuje tekst DLA KLIENTA i przepuszcza go
+   przez sita (numery spoza faktów, fakty spoza listy), ta produkuje tekst
+   DLA AGENTA i celowo tych sit nie ma. Wspólna trasa musiałaby wybrać jedno
+   zachowanie dla obu — a wtedy albo szkic przestałby być sprawdzany, albo
+   dopytanie przestałoby umieć powiedzieć „tego numeru u nas nie ma".
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -169,6 +181,41 @@ export async function copilotRoutes(app: FastifyInstance) {
       return reply.code(dostawcy ? 502 : 400).send({ error: (e as Error).message });
     }
   });
+
+  /* Wymiany dopytania dla rozmowy. Czysty odczyt — „zero zapisu przy
+     patrzeniu" nie ma tu wyjątku, tak samo jak przy stanie Copilota. */
+  app.get<{ Params: { id: string } }>(
+    "/api/obsluga/copilot/pytania/:id", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      return wymianyRozmowy(Number(req.params.id));
+    });
+
+  /**
+   * Dopytanie o szkic (0.332.0). Jedno pytanie na kliknięcie, odpowiedź dla
+   * agenta. Kliknięcie jest hamulcem samo w sobie, jak przy szkicu; sufit
+   * pytań na rozmowę chroni przed pętlą, nie przed wydatkiem.
+   */
+  app.post<{ Body: { rozmowaId?: number; pytanie?: string } }>(
+    "/api/obsluga/copilot/pytanie", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const powod = czemuWylaczony();
+      if (powod) return reply.code(400).send({ error: powod });
+      const rozmowaId = Number(req.body?.rozmowaId);
+      if (!Number.isInteger(rozmowaId)) return reply.code(400).send({ error: "Nie podano rozmowy" });
+      try {
+        return {
+          wymiana: await zadajPytanie(
+            rozmowaId, String(req.body?.pytanie ?? ""), kto(), nadawcaPytaniaAnthropic, subiekt),
+        };
+      } catch (e) {
+        const dostawcy = e instanceof BladLimituCopilota || e instanceof BladKluczaCopilota
+          || e instanceof BladPrzeciazeniaCopilota || e instanceof BladLacznosciCopilota
+          || e instanceof BladOdpowiedziCopilota;
+        return reply.code(dostawcy ? 502 : 400).send({ error: (e as Error).message });
+      }
+    });
 
   /** Werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. To jest miernik. */
   app.post<{ Params: { id: string }; Body: { ocena?: string } }>(

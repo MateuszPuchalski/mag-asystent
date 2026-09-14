@@ -3,7 +3,8 @@ import { Sparkles } from "lucide-react";
 import { Przycisk, czas } from "../ui";
 import { OdczytZdjec } from "./OdczytZdjec";
 import { ProcesCopilota } from "./ProcesCopilota";
-import type { StanCopilota, SzkicCopilota } from "../api/typy";
+import type { StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
+import { Dopytanie } from "./Dopytanie";
 
 /**
  * Szkic odpowiedzi z Copilota (§14.6, 0.231.0) — przycisk i karta pod edytorem.
@@ -35,6 +36,18 @@ export interface PropsSzkicuCopilota {
   /** Szkic agenta jest niepusty — dopiero wtedy „Zastąp" ma sens. */
   maSzkicAgenta: boolean;
   wylaczony: boolean;
+  /**
+   * DOPYTANIE (0.332.0). `undefined` = rozmowa jeszcze się nie wczytała.
+   * Pole stoi w propsach szkicu, a nie osobno, bo dopytanie jest pytaniem
+   * O SZKIC: bez niego nie ma o czym rozmawiać i nie ma czego kwestionować.
+   */
+  dopytanie?: {
+    wymiany: WymianaCopilota[];
+    blad: string | null;
+    pracuje: boolean;
+    onPytaj: (pytanie: string) => void;
+    limitZnakow: number;
+  };
   onUloz: () => void;
   onWstaw: () => void;
   onZastap: () => void;
@@ -154,5 +167,14 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
           <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka} — model wskazuje człowiek.</>}
       </p>}
     <p className="mt-1 text-podpis text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
+    {/* DOPYTANIE POD SZKICEM, nie obok: agent czyta szkic, rodzi mu się
+        wątpliwość, pyta. Odwrotna kolejność kazałaby pytać na ślepo. */}
+    {p.dopytanie && <Dopytanie
+      wymiany={p.dopytanie.wymiany}
+      wylaczony={p.wylaczony}
+      blad={p.dopytanie.blad}
+      pracuje={p.dopytanie.pracuje}
+      onPytaj={p.dopytanie.onPytaj}
+      limitZnakow={p.dopytanie.limitZnakow} />}
   </section>;
 }

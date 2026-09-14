@@ -282,6 +282,38 @@ CREATE TABLE IF NOT EXISTS klasyfikacja_rozmowy (
 -- STOJĄ TU TOKENY, NIE ZŁOTÓWKI. Cennik mieszka w `services/copilot-koszt.ts`
 -- z datą odczytu; kwota zapisana w bazie jest kłamstwem od dnia zmiany cennika,
 -- a liczba tokenów jest faktem na zawsze.
+-- ── Dopytanie Copilota (0.332.0) ───────────────────────────────────────────
+-- Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem, możliwość
+-- dopytania, rozwiania wątpliwości".
+--
+-- WIERSZ TO WYMIANA, nie tura. Pytanie i odpowiedź powstają w jednym
+-- wywołaniu i bez siebie nie znaczą nic: pytanie bez odpowiedzi to ślad po
+-- nieudanym żądaniu, a odpowiedź bez pytania nie ma czego dotyczyć. Wiersz
+-- powstaje dopiero, gdy model odpowie — nieudane wywołanie zostawia ślad
+-- w księdze `copilot_wywolanie` i tam jest jego miejsce.
+--
+-- ODPOWIEDŹ JEST DLA AGENTA, NIE DLA KLIENTA, i to jest najważniejsze zdanie
+-- o tej tabeli. Nie ma stąd żadnej drogi do wiadomości: żeby cokolwiek z tej
+-- wymiany trafiło do klienta, agent układa szkic na nowo, a szkic przechodzi
+-- przez swoje sprawdzenia (numery spoza faktów, fakty spoza listy). Dlatego
+-- ta tabela nie ma `ocena` — mierzy się szkic, nie rozmowę o nim.
+--
+-- `twierdzenia` w tym samym kształcie co przy szkicu: agent ma widzieć, na
+-- czym stoi odpowiedź, także gdy jest nią „fakty tego nie rozstrzygają".
+CREATE TABLE IF NOT EXISTS copilot_pytanie (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  pytanie         TEXT NOT NULL,
+  odpowiedz       TEXT NOT NULL,
+  twierdzenia     TEXT NOT NULL DEFAULT '[]',
+  model           TEXT NOT NULL,
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  przez           TEXT NOT NULL,
+  przez_user_id   INTEGER REFERENCES app_user(user_id)
+);
+CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
+  ON copilot_pytanie(conversation_id, id);
+
 CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   -- BEZ `CHECK` z tego samego powodu, co kategoria: kolejne przyrosty etapu F

@@ -2291,6 +2291,28 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.332.0 — Copilota można dopytać
+
+**Migracja dokłada tabelę `copilot_pytanie` sama. Panel trzeba przebudować.**
+Przełącznika nie ma: dopytanie działa wszędzie tam, gdzie działa szkic, czyli
+przy `COPILOT_MODE=anthropic` z kluczem.
+
+Każde dopytanie to osobne wywołanie u dostawcy, płatne jak szkic. Hamulcem
+jest kliknięcie agenta i sufit dopytań na rozmowę. Takt tego nie rusza.
+
+**Powiedz biuru jedno zdanie, zanim zaczną pytać.** Pytanie do Copilota nie
+przechodzi przez maskowanie, bo wycięcie z niego numerów zabrałoby mu sens.
+W pytaniu nie pisze się więc o kliencie: bez nazwiska, adresu i telefonu.
+Wątek rozmowy model dostaje osobno i zamaskowany, tak jak dotąd.
+
+Odpowiedź czyta agent. Do klienta nie idzie stąd nic i nie ma przycisku,
+który by to zmienił. Kto chce mieć z wymiany wiadomość, układa szkic od nowa.
+
+Sprawdzenie na żywym koncie: otwórz rozmowę ze szkicem, zapytaj „skąd wiesz,
+że to pasuje" i zobacz, czy odpowiedź ma pod sobą okno „Skąd to wiem".
+Rachunek za pytania stoi na karcie „Copilot" w ustawieniach, pod zadaniem
+`pytanie`.
+
 ### Aktualizacja do 0.331.0 — kolejka wiedzy opróżnia się sama
 
 **Migracji nie ma. Nic się samo nie włączy.** Automat stoi na zerze i włącza

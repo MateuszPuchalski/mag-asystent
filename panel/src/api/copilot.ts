@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  OcenaDanych, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota, WynikPartii,
+  OcenaDanych, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
+  WymianaCopilota, WynikPartii,
 } from "./typy";
 
 /* ── Copilot: rozpoznanie, o co pyta klient (§14, etap F) ────────────────────
@@ -14,6 +15,7 @@ import type {
 export const kluczeCopilota = {
   stan: ["copilot"] as const,
   pomiar: ["copilot-pomiar"] as const,
+  pytania: (rozmowaId: number) => ["copilot-pytania", rozmowaId] as const,
 };
 
 /**
@@ -153,6 +155,51 @@ export function useOcenPasowanie() {
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
       qc.invalidateQueries({ queryKey: ["wiedza", "kolejka"] });
       qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
+    },
+  });
+}
+
+/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
+   Agent pyta o szkic, model odpowiada JEMU. Nie ma stąd drogi do klienta:
+   żeby coś z wymiany trafiło do wiadomości, agent układa szkic od nowa.
+
+   Wymiany trzymamy pod WŁASNYM kluczem, nie w `rozmowa(id)`. Powód jest
+   praktyczny: dopytanie nie zmienia osi rozmowy ani szkicu, więc doklejenie
+   go do tamtego klucza kazałoby przy każdym pytaniu odświeżać całą oś —
+   z migotaniem listy wiadomości pod ręką agenta. */
+
+/**
+ * Ile znaków może mieć pytanie.
+ *
+ * DRUGA KOPIA `LIMIT_PYTANIA` z serwera i to jest świadome, nie przeoczenie.
+ * Ta gasi przycisk, zanim żądanie poleci; tamta odrzuca żądanie, zanim
+ * poleci do dostawcy. Panel bez własnej liczby musiałby pytać serwer o to,
+ * czy wolno zapytać.
+ */
+export const LIMIT_PYTANIA = 600;
+
+export function useWymianyCopilota(rozmowaId: number) {
+  return useQuery({
+    queryKey: kluczeCopilota.pytania(rozmowaId),
+    queryFn: () => api<WymianaCopilota[]>(`/api/obsluga/copilot/pytania/${rozmowaId}`),
+    staleTime: 30_000,
+    /* Bez rozmowy nie ma czego pobierać — inaczej ekran bez wybranej rozmowy
+       strzelałby po `/pytania/0` przy każdym wejściu. */
+    enabled: rozmowaId > 0,
+  });
+}
+
+export function useZadajPytanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; pytanie: string }) =>
+      api<{ wymiana: WymianaCopilota }>("/api/obsluga/copilot/pytanie",
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pytania(v.rozmowaId) });
+      /* Pomiar TAK, oś rozmowy NIE: każde pytanie kosztuje i ma stanąć
+         w rachunku, ale szkicu ani wiadomości nie rusza ani o znak. */
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
     },
   });
 }

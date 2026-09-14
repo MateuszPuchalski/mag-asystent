@@ -1997,6 +1997,46 @@ Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
 uruchomić takt z 0.317.0.
 
+**Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania
+rozmowy z modelem, możliwość dopytania, rozwiania wątpliwości". Agent czyta
+szkic, rodzi mu się wątpliwość i pyta pod nim: „czy ten nóż na pewno pasuje
+do 46 cm i skąd to wiesz?".
+
+**Odpowiedź idzie do AGENTA i nie ma stąd drogi do klienta.** To jest cała
+architektura tej funkcji, nie zastrzeżenie na marginesie. Szkic ma swoje sita:
+numer spoza faktów go wywraca, fakt spoza listy go wywraca. Stoją tam, bo
+tamten tekst idzie do klienta.
+
+Odpowiedź na dopytanie nie idzie nigdzie. Gdyby przepuścić ją przez sita
+szkicu, model nie mógłby napisać „numeru 17211-ZL8-023 nie mamy w kartotece",
+bo ten numer nie stoi w faktach. **Zdanie, którego agent najbardziej
+potrzebuje, wywracałoby własną odpowiedź.**
+
+Z tego wynika kształt ekranu. Odpowiedź **nie ma przycisku „wstaw"**, choć
+szkic ma trzy. Przycisk wstawiania byłby obejściem wszystkich sit jednym
+kliknięciem. Kto chce mieć z wymiany wiadomość, układa szkic od nowa, a wtedy
+wymiana jest częścią materiału i szkic przechodzi przez wszystko, co zwykle.
+Jedna droga do klienta, ta sama co była.
+
+Co zostaje z dyscypliny: `twierdzenia` w tym samym kształcie co przy szkicu,
+z tym samym sufitem pewności na źródło, i to samo okno „Skąd to wiem" przy
+każdej odpowiedzi. Odpowiedź „fakty tego nie rozstrzygają" jest najcenniejsza
+dokładnie wtedy, gdy widać, czego zabrakło.
+
+Model dostaje ten sam materiał co szkic — fakty, wątek, zdjęcia — plus
+aktualny szkic i poprzednie wymiany. Dopytanie, które widzi INNY materiał niż
+szkic, jest dopytaniem o coś innego.
+
+Hamulec jest jeden: sufit dopytań na rozmowę. Reszty nie ma i to ten sam
+rachunek, co przy szkicu na kliknięcie: agent prosi o pracę dla siebie
+i płaci za jedno pytanie. Takt tego nie rusza, automat nie dopytuje. Po
+wyczerpaniu sufitu zdanie mówi, co robić dalej: jeśli sprawa dalej nie jest
+jasna, fakty jej nie rozstrzygną i trzeba zapytać klienta.
+
+Nieudane wywołanie **nie zostawia wymiany**, ale zostawia ślad w księdze
+kosztów. Wiersz to wymiana, nie tura: pytanie bez odpowiedzi to ślad po
+nieudanym żądaniu, a nie rozmowa.
+
 **Rachunek stoi w osobnym oknie, nie w tekście.** Klient ma dostać gładką
 odpowiedź, agent — to, na czym ona stoi. Okno „Skąd to wiem"
 (`skrzynka/ProcesCopilota.tsx`) wisi pod szkicem i otwiera się samo tylko
@@ -4447,6 +4487,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
+| Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
