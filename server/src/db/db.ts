@@ -203,6 +203,20 @@ export function migrate(database: DatabaseSync) {
      zestawił obie listy obok siebie. */
   addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("szkic_copilota", "odczyt_zdjec", "TEXT NOT NULL DEFAULT '[]'");
+  /* Dopytanie Copilota (0.332.0). Tabela nowa, więc `schema.sql` załatwia
+     świeże bazy; ta linia jest dla istniejących instalacji. */
+  database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+    pytanie         TEXT NOT NULL,
+    odpowiedz       TEXT NOT NULL,
+    twierdzenia     TEXT NOT NULL DEFAULT '[]',
+    model           TEXT NOT NULL,
+    at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    przez           TEXT NOT NULL,
+    przez_user_id   INTEGER REFERENCES app_user(user_id))`);
+  database.exec(`CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
+    ON copilot_pytanie(conversation_id, id)`);
   /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
      w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
      powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza

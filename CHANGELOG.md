@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.332.0 — 14 września 2026
+
+**Copilota można dopytać.** Właściciel: „dodaj możliwość kontynuowania rozmowy
+z modelem, możliwość dopytania, rozwiania wątpliwości". Agent czyta szkic,
+rodzi mu się wątpliwość i pyta pod nim, zamiast zgadywać albo pisać od nowa.
+
+**Odpowiedź idzie do agenta i nie ma stąd drogi do klienta.** To jest cała
+architektura tej funkcji. Szkic ma sita: numer spoza faktów go wywraca, fakt
+spoza listy go wywraca. Stoją tam, bo tamten tekst idzie do klienta.
+
+Gdyby przepuścić przez nie odpowiedź na dopytanie, model nie mógłby napisać
+„tego numeru nie mamy w kartotece", bo ten numer nie stoi w faktach. Zdanie,
+którego agent najbardziej potrzebuje, wywracałoby własną odpowiedź.
+
+Dlatego odpowiedź **nie ma przycisku wstawiania**, choć szkic ma trzy.
+Przycisk byłby obejściem wszystkich sit jednym kliknięciem. Kto chce mieć
+z wymiany wiadomość, układa szkic od nowa i wtedy wymiana jest materiałem.
+
+Co zostaje z dyscypliny: twierdzenia ze źródłem i sufitem pewności, to samo
+okno „Skąd to wiem" przy każdej odpowiedzi. Model dostaje ten sam materiał co
+szkic, plus aktualny szkic i poprzednie wymiany.
+
+Hamulec jest jeden: sufit dopytań na rozmowę. Kliknięcie jest hamulcem samo
+w sobie, tak jak przy szkicu. Takt tego nie rusza, automat nie dopytuje.
+
+**Pytanie agenta nie przechodzi przez maskowanie** i to jest decyzja: pisze je
+pracownik o naszym towarze, a wycięcie numerów zabrałoby mu sens. Z tego
+wynika obowiązek biura, zapisany w polityce danych — w pytaniu do Copilota nie
+pisze się o kliencie. Dziennik zapisuje długość pytania, nigdy treść.
+
+Licznik tras zapisu Copilota podniósł się z sześciu do siedmiu i dostał za to
+zdanie w uzasadnieniu, tak jak każdy nowy zapis.
+
+---
+
 ## 0.331.0 — 14 września 2026
 
 **Kolejka wiedzy opróżnia się sama.** [wymaga działania] Właściciel: „wiedza

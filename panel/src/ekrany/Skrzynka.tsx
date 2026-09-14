@@ -13,7 +13,10 @@ import {
 import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
-import { useCopilot, useKlasyfikuj, useOcenKlasyfikacje, useOcenSzkic, useUlozSzkic } from "../api/copilot";
+import {
+  LIMIT_PYTANIA, useCopilot, useKlasyfikuj, useOcenKlasyfikacje, useOcenSzkic, useUlozSzkic,
+  useWymianyCopilota, useZadajPytanie,
+} from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
@@ -41,6 +44,12 @@ export function Skrzynka() {
   const ulozSzkic = useUlozSzkic();
   const ocenSzkic = useOcenSzkic();
   const [bladSzkicu, setBladSzkicu] = useState("");
+  /* Dopytanie (0.332.0). Limit znaków stoi TU jako stała panelu, a serwer ma
+     swoją — ta jest po to, żeby przycisk gasł przed żądaniem, tamta po to,
+     żeby żądanie odpadło przed siecią. Dwie granice, jedna liczba. */
+  const wymiany = useWymianyCopilota(wybranaId ?? 0);
+  const zadajPytanie = useZadajPytanie();
+  const [bladPytania, setBladPytania] = useState<string | null>(null);
   const klasyfikuj = useKlasyfikuj();
   const ocenKategorie = useOcenKlasyfikacje();
   const przejmij = usePrzejmij();
@@ -271,6 +280,18 @@ export function Skrzynka() {
         },
         onOdrzuc: () => rozmowa.data
           && ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" }),
+        /* DOPYTANIE (0.332.0). Bez `onSuccess` czyszczącego szkic czy oś:
+           odpowiedź czyta agent, a do klienta nie idzie stąd nic. */
+        dopytanie: {
+          wymiany: wymiany.data ?? [],
+          blad: bladPytania,
+          pracuje: zadajPytanie.isPending,
+          limitZnakow: LIMIT_PYTANIA,
+          onPytaj: (pytanie: string) => rozmowa.data && zadajPytanie.mutate(
+            { rozmowaId: rozmowa.data.rozmowa.id, pytanie },
+            { onError: (e) => setBladPytania((e as Error).message),
+              onSuccess: () => setBladPytania(null) }),
+        },
       }}
       zalaczniki={zalaczniki.data?.zalaczniki ?? []}
       dodajeZalacznik={dodajZalacznik.isPending}

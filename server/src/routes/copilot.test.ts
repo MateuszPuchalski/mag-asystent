@@ -17,7 +17,7 @@ delete process.env.COPILOT_MODE;
 
 /* ── Trasy Copilota (etap F) — trzy umowy ───────────────────────────────────
    1. Bramka roli na KAŻDEJ trasie, także na odczycie; 401 przed 403.
-   2. Otwarcie ekranu niczego nie zapisuje, a tras zapisu jest SZEŚĆ.
+   2. Otwarcie ekranu niczego nie zapisuje, a tras zapisu jest SIEDEM.
    3. Wyłączony Copilot odmawia zdaniem, nie wywrotką — i nie wychodzi do sieci.
 */
 
@@ -124,11 +124,14 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
    tamta wywodzi źródło z kontekstu i nie zna wiersza szkicu; para, rola
    i dowód idą z wiersza SPRAWDZONEGO przez serwer, nie z ciała żądania.
    Rozstrzyga biuro, jak przy każdej propozycji. */
-test("Copilot ma SZEŚĆ tras zapisu", async () => {
+/* SIÓDMA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
+   trasa produkuje tekst DLA AGENTA i celowo nie ma sit szkicu, więc wspólna
+   trasa z tamtą musiałaby wybrać jedno zachowanie dla dwóch różnych rzeczy. */
+test("Copilot ma SIEDEM tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 6, `tras POST jest ${posty.length}, a umowa mówi o sześciu`);
-  for (const slowo of ["klasyfikacja", "ocena", "szkic", "dane", "pasowanie"]) {
+  assert.equal(posty.length, 7, `tras POST jest ${posty.length}, a umowa mówi o siedmiu`);
+  for (const slowo of ["klasyfikacja", "ocena", "szkic", "dane", "pasowanie", "pytanie"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

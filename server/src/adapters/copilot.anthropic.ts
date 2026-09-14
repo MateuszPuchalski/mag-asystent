@@ -12,6 +12,7 @@ import {
 } from "../services/copilot-klasyfikacja.js";
 import type { NadawcaSzkicu, OdpowiedzSzkicu } from "../services/copilot-szkic.js";
 import type { Tokeny } from "../services/copilot-koszt.js";
+import type { NadawcaPytania, OdpowiedzNaPytanie } from "../services/copilot-pytania.js";
 import type {
   NadawcaRozpoznania, OdpowiedzRozpoznania,
 } from "../services/copilot-reklamacja.js";
@@ -600,6 +601,114 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
       zuzycie: {
         wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,
         cacheZapis: u?.cache_creation_input_tokens ?? 0, cacheOdczyt: u?.cache_read_input_tokens ?? 0,
+      },
+      ms: Date.now() - start,
+    };
+  } catch (e) {
+    throw naNasz(e);
+  }
+};
+
+/* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
+   Odpowiedź dla AGENTA, nie dla klienta, i instrukcja mówi to w pierwszym
+   zdaniu. Cała reszta z niej wynika: bez form grzecznościowych, bez zakazu
+   półpauzy, bez limitu znaków wiadomości, za to z prawem powiedzenia wprost
+   „fakty tego nie rozstrzygają".
+
+   Ta odpowiedź NIE przechodzi przez sita szkicu i to jest zamierzone (patrz
+   nagłówek `services/copilot-pytania.ts`). Model wolno tu nazwać numer,
+   którego nie mamy w kartotece — właśnie po to agent pyta.               */
+
+const OdpowiedzPytania = z.object({
+  tresc: z.string(),
+  twierdzenia: z.array(Twierdzenie),
+});
+
+const INSTRUKCJA_PYTANIA = [
+  "Odpowiadasz AGENTOWI biura obsługi, nie klientowi. Tekst, który piszesz,",
+  "nie pójdzie do klienta: agent czyta go, żeby rozstrzygnąć wątpliwość przy",
+  "szkicu odpowiedzi.",
+  "",
+  "Z tego wynika forma. Bez zwrotów grzecznościowych, bez wstępu, bez",
+  "podsumowania na koniec. Jedno konkretne zdanie bije akapit ogólników.",
+  "Agent zna towar i skróty branżowe, więc nie tłumacz podstaw.",
+  "",
+  "Dostajesz FAKTY z naszej bazy, ROZMOWĘ z klientem, czasem ZDJĘCIA od",
+  "klienta, aktualny SZKIC odpowiedzi i poprzednie dopytania.",
+  "",
+  "ZASADY:",
+  "1. ODPOWIEDZ NA ZADANE PYTANIE. Agent pyta o jedną rzecz i chce jednej",
+  "   odpowiedzi. Nie streszczaj przy okazji całej sprawy.",
+  "2. „FAKTY TEGO NIE ROZSTRZYGAJĄ” JEST PEŁNOPRAWNĄ ODPOWIEDZIĄ i często",
+  "   najcenniejszą. Powiedz to wprost i dopowiedz, CO by to rozstrzygnęło:",
+  "   pomiar, zdjęcie tabliczki, numer z części, pytanie do klienta.",
+  "3. KAŻDE TWIERDZENIE TECHNICZNE WPISZ DO `twierdzenia` ze źródłem, tak samo",
+  "   jak przy szkicu. `fakty` to nasza baza, `oferta` to opis naszej aukcji,",
+  "   `zdjecie` to fotografia od klienta, `model` to Twoja własna wiedza.",
+  "   Pewność przyznaje serwer, więc nie zawyżaj jej dla efektu.",
+  "4. WOLNO CI NAZWAĆ NUMER, KTÓREGO NIE MA W FAKTACH, i to jest różnica",
+  "   wobec szkicu. Agent pyta właśnie o takie rzeczy. Podpisz je źródłem",
+  "   `model` i powiedz, że u nas tego nie ma.",
+  "5. NIE PRZEPISUJ SZKICU. Agent go widzi. Gdy pyta, czy coś w nim poprawić,",
+  "   powiedz co i dlaczego, a nie oddawaj całości od nowa.",
+  "6. Gdy pytanie dotyczy zdjęcia, opisuj TO, CO WIDAĆ, i cytuj numer zdjęcia.",
+  "   Nieczytelnego nie zgaduj.",
+  "",
+  "Zwróć wyłącznie JSON: `tresc` (odpowiedź dla agenta) oraz `twierdzenia`.",
+].join("\n");
+
+export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
+  const start = Date.now();
+  try {
+    const historia = k.historia
+      .map((h, i) => `[D${i + 1}] AGENT: ${h.pytanie}\n[D${i + 1}] TY: ${h.odpowiedz}`)
+      .join("\n");
+    const tekst = [
+      `FAKTY:\n${String(k.fakty)}`,
+      `ROZMOWA Z KLIENTEM:\n${String(k.watek)}`,
+      k.szkic ? `AKTUALNY SZKIC:\n${k.szkic}` : "AKTUALNY SZKIC: (jeszcze go nie ma)",
+      historia ? `POPRZEDNIE DOPYTANIA:\n${historia}` : "",
+      `PYTANIE AGENTA:\n${k.pytanie}`,
+    ].filter(Boolean).join("\n\n");
+
+    const odp = await anthropic().messages.parse({
+      model: config.copilot.model,
+      /* Odpowiedź dla agenta bywa jednym zdaniem, a bywa wyliczeniem czterech
+         rzeczy do sprawdzenia. Sufit z zapasem na listę twierdzeń, bo to ona
+         rośnie najszybciej — ta sama blizna, co przy szkicu w 0.253.1. */
+      max_tokens: 2000,
+      system: [{ type: "text", text: INSTRUKCJA_PYTANIA, cache_control: { type: "ephemeral" } }],
+      output_config: {
+        /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
+        effort: "medium",
+        format: zodOutputFormat(OdpowiedzPytania),
+      },
+      messages: [{
+        role: "user",
+        content: k.zdjecia.length === 0 ? tekst : [
+          ...k.zdjecia.map((z) => ({
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: z.typ, data: z.base64 },
+          })),
+          { type: "text" as const, text: tekst },
+        ],
+      }],
+    });
+
+    const u = odp.usage;
+    const w = odp.parsed_output;
+    if (!w) {
+      throw new BladOdpowiedziCopilota(
+        `Model nie oddał odpowiedzi (stop: ${odp.stop_reason ?? "?"})`, 200);
+    }
+    return {
+      tresc: w.tresc,
+      twierdzenia: w.twierdzenia,
+      model: odp.model ?? config.copilot.model,
+      zuzycie: {
+        wej: u?.input_tokens ?? 0, wyj: u?.output_tokens ?? 0,
+        cacheZapis: u?.cache_creation_input_tokens ?? 0,
+        cacheOdczyt: u?.cache_read_input_tokens ?? 0,
       },
       ms: Date.now() - start,
     };

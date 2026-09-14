@@ -370,6 +370,24 @@ export type WpisAutomatu = {
   at: string;
 };
 
+/**
+ * Wymiana z Copilotem (0.332.0): pytanie agenta i odpowiedź modelu.
+ *
+ * ODPOWIEDŹ CZYTA AGENT, nie klient, i nie ma stąd drogi do wiadomości.
+ * Dlatego wiersz nie ma `ocena` — mierzy się szkic, nie rozmowę o nim —
+ * i dlatego ekran nie daje przycisku „wstaw". Żeby coś z wymiany poszło do
+ * klienta, agent układa szkic od nowa, a tamten ma swoje sita.
+ */
+export type WymianaCopilota = {
+  id: number;
+  pytanie: string;
+  odpowiedz: string;
+  twierdzenia: TwierdzenieCopilota[];
+  model: string;
+  at: string;
+  przez: string;
+};
+
 /** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0. */
 export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
 
