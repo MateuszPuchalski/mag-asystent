@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { skladPozycji } from "./komplety.js";
 import {
-  dolozDoKosza, przeliczKosz, wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza,
+  dolozDoKosza, przeliczKosz, skladDoZaznaczenia, wypuscGotoweKoszyki, zamknijKosz,
+  zaznaczSkladnik, zdejmijZKosza,
 } from "./kosze-zwrotow.js";
 
 /* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
@@ -331,4 +332,123 @@ test("przeliczenie UNIEWAŻNIA zadanie MM ułożone dla starej zawartości", () 
     .get(koszId) as { mm_queue_id: number | null }).mm_queue_id;
   assert.notEqual(swieze, null);
   assert.notEqual(swieze, queueId);
+});
+
+/* ── Ptaszki przy składnikach kompletu (0.335.0) ─────────────────────────────
+   Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
+   które idą do MM". Komplet wchodził dotąd w całości albo wcale, a wracają
+   z niego nieraz same części.
+
+   Ptaszek rusza WIERSZ KOSZYKA, bo `kosz_pozycja` jest prawdą o tym, co
+   pojedzie na dokument. Osobna lista zaznaczeń znaczyłaby dwa źródła dla
+   jednego papieru i pytanie, które wygrywa, zadane przy wystawianiu MM.    */
+
+/** Komplet trzech kartotek, już dołożony do koszyka. */
+function kompletWKoszyku(d: Db, kto: { id: number; name: string }, dokId: number) {
+  const dok = paragon(d, dokId, [[21, 1], [22, 1], [23, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }]);
+  const { id, poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  const koszId = dolozDoKosza(d, poz[0], kto)!;
+  return { id, pozycjaId: poz[0], koszId };
+}
+
+const wKoszyku = (d: Db, koszId: number) =>
+  (d.prepare("SELECT tw_id FROM kosz_pozycja WHERE kosz_id=? ORDER BY tw_id")
+    .all(koszId) as Array<{ tw_id: number }>).map((x) => Number(x.tw_id));
+
+test("odznaczony składnik NIE jedzie na MM, a reszta kompletu zostaje", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 920);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+
+  const sklad = zaznaczSkladnik(d, pozycjaId, 22, false, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23], "środkowy schodzi z dokumentu");
+  /* Odznaczony NIE ZNIKA z ekranu — inaczej nie dałoby się go przywrócić. */
+  assert.deepEqual(sklad.skladniki.map((s) => [s.twId, s.wKoszyku]),
+    [[21, true], [22, false], [23, true]]);
+});
+
+test("ptaszek wraca i składnik wraca razem z nim", () => {
+  /* Cofnięcie zamiast potwierdzenia (§25a.5): odznaczenie idzie jednym
+     kliknięciem, więc musi mieć drogę powrotną tej samej długości. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 921);
+  zaznaczSkladnik(d, pozycjaId, 22, false, kto);
+  zaznaczSkladnik(d, pozycjaId, 22, true, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+  /* Drugie kliknięcie w tę samą stronę nie podwaja wiersza. */
+  zaznaczSkladnik(d, pozycjaId, 22, true, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+});
+
+test("OSTATNIEGO składnika nie zdejmiesz ptaszkiem — od tego jest cofnięcie oceny", () => {
+  /* Pozycja bez żadnego wiersza w koszyku znaczy „nic z niej nie jedzie na
+     MM", a na to jest starsza droga. Dwa sposoby na ten sam skutek kosztują
+     pytanie, czym się różnią. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 922);
+  zaznaczSkladnik(d, pozycjaId, 21, false, kto);
+  zaznaczSkladnik(d, pozycjaId, 22, false, kto);
+  assert.throws(() => zaznaczSkladnik(d, pozycjaId, 23, false, kto), /cofnięciem oceny/);
+  assert.deepEqual(wKoszyku(d, koszId), [23], "odmowa niczego nie rusza");
+});
+
+test("kartoteki SPOZA składu pozycji nie wolno dopisać do MM", () => {
+  /* Inaczej literówka w numerze kładłaby na dokument towar, którego nikt nie
+     zwrócił — a to wychodzi dopiero przy inwentaryzacji. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 923);
+  towar(d, 77);
+  assert.throws(() => zaznaczSkladnik(d, pozycjaId, 77, true, kto), /nie ma w składzie/);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+});
+
+test("ptaszek na zamkniętym koszu UNIEWAŻNIA jego zadanie MM", () => {
+  /* Zadanie ułożone dla starej zawartości wystawiłoby papier ze składnikiem,
+     który właśnie odznaczono. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletWKoszyku(d, kto, 924);
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 1/2026' WHERE id=?").run(id);
+  const { queueId } = zamknijKosz(d, koszId, kto);
+  assert.notEqual(queueId, null);
+
+  zaznaczSkladnik(d, pozycjaId, 22, false, kto);
+  assert.equal((d.prepare("SELECT status FROM sfera_queue WHERE id=?")
+    .get(queueId!) as { status: string }).status, "cancelled");
+  assert.equal(wypuscGotoweKoszyki(d), 1, "kosz wraca po świeże zadanie");
+});
+
+test("po wystawieniu MM ptaszek ODMAWIA i nazywa koszyk", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 925);
+  zamknijKosz(d, koszId, kto);
+  d.prepare("UPDATE kosz SET mm_numer='MM 1333/MAG/2026' WHERE id=?").run(koszId);
+
+  assert.throws(() => zaznaczSkladnik(d, pozycjaId, 22, false, kto), /dokument MM/);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+});
+
+test("koszyk starszy niż dzisiejsze reguły też ma swoje ptaszki", () => {
+  /* Kosz złożony przed 0.328.0 niesie zestaw JEDNYM wierszem, którego
+     rozbicie z paragonu już nie zaproponuje. Pominięcie takiego wiersza
+     znaczyłoby towar na dokumencie, o którym ekran milczy. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 926);
+  towar(d, 99);
+  d.prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,zwrot_pozycja_id)
+    VALUES (?,?,?,?,1,?)`).run(koszId, 99, "SYM-99", "Zestaw", pozycjaId);
+
+  const sklad = skladDoZaznaczenia(d, pozycjaId);
+  assert.deepEqual(sklad.skladniki.map((s) => [s.twId, s.wKoszyku]),
+    [[21, true], [22, true], [23, true], [99, true]]);
+  /* I da się go odznaczyć — inaczej zostałby na papierze na zawsze. */
+  zaznaczSkladnik(d, pozycjaId, 99, false, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
 });

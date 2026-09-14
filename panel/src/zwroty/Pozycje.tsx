@@ -1,7 +1,7 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
 import type { DoDopisania, PozycjaZwrotu, SkladPozycji, Zwrot } from "../api/typy";
-import { usePotwierdzKartoteke, zlote } from "../api/zwroty";
+import { usePotwierdzKartoteke, useZaznaczSkladnik, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
@@ -128,6 +128,49 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
           className="mt-1 block text-slate-500 underline underline-offset-2 hover:text-slate-800">
           wskaż kartotekę</button>}
     {zapisz.error && <p className="mt-1 text-red-700">{(zapisz.error as Error).message}</p>}
+  </div>;
+}
+
+/**
+ * Składniki kompletu z ptaszkami (0.335.0).
+ *
+ * Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
+ * które idą do MM". Z kompletu wracają nieraz same części — reszta zostaje
+ * u klienta albo nadaje się wyłącznie na odpad.
+ *
+ * PTASZKI STOJĄ ZAZNACZONE i to nie jest domyślność z lenistwa: typowy zwrot
+ * kompletu jest kompletny, a ekran ma pytać wyłącznie o wyjątek (dekalog §1 —
+ * mniej decyzji). Odznaczenie zdejmuje wiersz z dokumentu MM od razu, bo to
+ * `kosz_pozycja` jest prawdą o tym, co pojedzie na papier.
+ *
+ * Pokazujemy je DOPIERO, gdy pozycja leży w koszyku. Wcześniej skład jest
+ * planem, a ptaszek obiecywałby wiersz, którego nie ma czego zdjąć.
+ */
+function Skladniki({ p, sklad, zwrotId }: {
+  p: PozycjaZwrotu; sklad: SkladPozycji; zwrotId: number;
+}) {
+  const zaznacz = useZaznaczSkladnik();
+  return <div className="mt-1 text-xs">
+    <p className="text-slate-500">Z paragonu — odznacz, co NIE jedzie na MM:</p>
+    <ul className="mt-1 space-y-0.5">
+      {sklad.skladniki.map((s) => (
+        <li key={s.twId}>
+          {/* Cała etykieta jest celem kliknięcia, nie sam kwadracik. */}
+          <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-slate-100">
+            <input type="checkbox" checked={s.wKoszyku} disabled={zaznacz.isPending}
+              className="h-4 w-4 accent-emerald-600"
+              onChange={(e) => zaznacz.mutate({
+                pozycjaId: p.id, twId: s.twId, wKoszyku: e.target.checked, zwrotId,
+              })} />
+            <b className="font-mono">{s.symbol}</b>
+            <span className="text-slate-500">× {s.ilosc}</span>
+            <span className="min-w-0 flex-1 truncate text-slate-500">{s.nazwa}</span>
+          </label>
+        </li>))}
+    </ul>
+    {/* ODMOWA SERWERA JEST ZDANIEM („to ostatni składnik — zdejmuje się ją
+        cofnięciem oceny"), więc pokazujemy ją wprost, przy ptaszkach. */}
+    {zaznacz.error && <p className="mt-1 text-red-700">{(zaznacz.error as Error).message}</p>}
   </div>;
 }
 
@@ -342,11 +385,14 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           {/* KOMPLET ROZBITY NA PARAGONIE. Pokazujemy go tylko wtedy, gdy
               kartotek jest więcej niż jedna: przy zwykłym towarze wiersz
               powtarzałby nazwę stojącą linijkę wyżej. */}
-          {(sklady[p.id]?.skladniki.length ?? 0) > 1 &&
-            <p className="mt-1 text-xs text-slate-500">
-              Do koszyka z paragonu: {sklady[p.id]!.skladniki
-                .map((s) => `${s.symbol} × ${s.ilosc}`).join(", ")}
-            </p>}
+          {(sklady[p.id]?.skladniki.length ?? 0) > 1 && (p.wKoszyku
+            ? <Skladniki p={p} sklad={sklady[p.id]!} zwrotId={zwrot.id} />
+            /* Zanim pozycja trafi do koszyka, skład jest PLANEM: mówimy, co
+               wejdzie, ale nie dajemy ptaszka, bo nie ma czego zdjąć. */
+            : <p className="mt-1 text-xs text-slate-500">
+                Do koszyka z paragonu: {sklady[p.id]!.skladniki
+                  .map((s) => `${s.symbol} × ${s.ilosc}`).join(", ")}
+              </p>)}
 
           {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —
               i tam ją proponujemy. Zapisaną widać wszędzie, bo po zamknięciu

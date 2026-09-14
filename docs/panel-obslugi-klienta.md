@@ -2813,6 +2813,29 @@ Kolejność zwrotów zostaje bez zmian. Magazynier rozkłada pudło po kartce,
 a przestawiona lista kazałaby mu szukać. Pozycja, której nadal nie umiemy
 rozłożyć, nie wraca do pudła po cichu — jej numer idzie do dziennika zdarzeń.
 
+**Składniki kompletu mają ptaszki (0.335.0).** Zgłoszenie właściciela:
+„powinno rozbijać na komponenty do zaznaczania, które idą do MM". Komplet
+wchodził dotąd do koszyka w całości albo wcale, a wracają z niego nieraz same
+części — reszta zostaje u klienta albo nadaje się wyłącznie na odpad.
+
+Wiersz pozycji wymienia teraz składniki z paragonu, każdy z polem zaznaczenia.
+Wszystkie stoją ZAZNACZONE: typowy zwrot kompletu jest kompletny, a ekran ma
+pytać wyłącznie o wyjątek. Odznaczenie zdejmuje wiersz z dokumentu MM od razu.
+
+**Ptaszek rusza wiersz koszyka, nie osobną listę zaznaczeń.** Tabela
+`kosz_pozycja` jest prawdą o tym, co pojedzie na papier. Druga lista obok niej
+znaczyłaby dwa źródła dla jednego dokumentu i pytanie, które z nich wygrywa,
+zadane przy wystawianiu MM.
+
+Trzy reguły pilnują skutków ubocznych. Ostatniego składnika nie zdejmiesz
+ptaszkiem — od tego jest cofnięcie oceny, droga starsza i czytelniejsza.
+Kartoteki spoza składu pozycji nie wolno dopisać, bo literówka w numerze
+kładłaby na dokument towar, którego nikt nie zwrócił. Zadanie MM ułożone dla
+starej zawartości traci ważność, tak samo jak przy przeliczeniu kosza.
+
+Ptaszki pokazują się dopiero wtedy, gdy pozycja leży w koszyku. Wcześniej skład
+jest planem i wiersz mówi tylko, co do koszyka wejdzie.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

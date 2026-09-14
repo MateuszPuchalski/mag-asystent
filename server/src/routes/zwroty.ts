@@ -4,7 +4,7 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, otwarteKoszyki, zamknijKosz,
+  koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, zamknijKosz, zaznaczSkladnik,
 } from "../services/kosze-zwrotow.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -25,7 +25,6 @@ import {
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
-import { skladPozycji } from "../services/komplety.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
@@ -248,6 +247,36 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* Ptaszek przy składniku kompletu (0.335.0). Zgłoszenie właściciela:
+     „powinno rozbijać na komponenty do zaznaczania, które idą do MM".
+
+     JEDNA TRASA NA OBA KIERUNKI, bo to przełącznik — dwie kazałyby panelowi
+     wiedzieć, co dziś stoi w koszyku, zanim kliknie. Ciało niesie `wKoszyku`,
+     czyli stan DOCELOWY, a nie czynność.
+
+     Bramka ta sama co przy ocenie: samo `odmowa()`, bez `autoryzuj()`.
+     Przesunięcie towaru między własnymi magazynami to codzienna praca biura,
+     a nie operacja, po której coś opuszcza firmę. */
+  app.post<{ Params: { id: string }; Body: { twId?: number; wKoszyku?: boolean } }>(
+    "/api/obsluga/zwroty/pozycje/:id/skladnik", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const twId = Number(req.body?.twId);
+      if (!Number.isFinite(twId) || twId <= 0) {
+        return reply.code(400).send({ error: "Brak numeru kartoteki (`twId`)." });
+      }
+      try {
+        return {
+          sklad: zaznaczSkladnik(db(), Number(req.params.id), twId,
+            req.body?.wKoszyku === true, kto()),
+        };
+      } catch (e) {
+        /* Odmowa serwisu jest ZDANIEM dla człowieka („koszyk Z-3 ma już
+           dokument"), a nie kodem — panel pokazuje ją wprost. */
+        return reply.code(400).send({ error: (e as Error).message });
+      }
     });
 
   /* ── Koszyk zwrotów (0.192.0) ──────────────────────────────────────────
@@ -683,8 +712,10 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          TYLKO W SZCZEGÓLE, nigdy w kolejce: `skladPozycji` pyta o dokument,
          o zamówienie i o mapowanie każdej oferty, a kolejka liczy naraz
          wszystkie zwroty. Ta sama zasada co przy liście wyżej. */
+      /* Z ZAZNACZENIEM (0.335.0): ekran ma pokazać nie tylko CO wejdzie, ale
+         i co już leży w koszyku — inaczej ptaszek rysowałby się z nadziei. */
       sklady: Object.fromEntries(
-        zwrot.pozycje.map((p) => [p.id, skladPozycji(db(), p.id)])),
+        zwrot.pozycje.map((p) => [p.id, skladDoZaznaczenia(db(), p.id)])),
     };
   });
 

@@ -122,6 +122,30 @@ export function useWerdykt() {
   });
 }
 
+/**
+ * Ptaszek przy składniku kompletu (0.335.0).
+ *
+ * `wKoszyku` to stan DOCELOWY, nie czynność — jedna trasa na oba kierunki,
+ * więc panel nie musi wiedzieć, co dziś stoi w koszyku, zanim kliknie.
+ *
+ * Unieważnia szczegół zwrotu I pasek koszyka: odznaczenie zdejmuje wiersz
+ * z dokumentu, więc licznik zebranych sztuk zmienia się razem z ptaszkiem.
+ */
+export function useZaznaczSkladnik() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; twId: number; wKoszyku: boolean; zwrotId: number }) =>
+      api<{ sklad: SkladPozycji }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/skladnik`,
+        { method: "POST", body: JSON.stringify({ twId: v.twId, wKoszyku: v.wKoszyku }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
+  });
+}
+
 export function useOcena() {
   const qc = useQueryClient();
   return useMutation({

@@ -6,6 +6,15 @@ import userEvent from "@testing-library/user-event";
 import { Pozycje } from "./Pozycje";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
+/* Ptaszek przy składniku woła serwer (0.335.0). Podstawiamy sam hook, a nie
+   `fetch`: test pilnuje, CO panel wysyła, a nie jak wygląda żądanie — od tego
+   jest `api/klient.test.ts`. */
+const zaznacz = vi.fn();
+vi.mock("../api/zwroty", async (orig) => ({
+  ...(await orig<Record<string, unknown>>()),
+  useZaznaczSkladnik: () => ({ mutate: zaznacz, isPending: false, error: null }),
+}));
+
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
    Do 0.165.0 pozycje stały w prawej kolumnie, a kubełki DO OCENY i DO ZWROTU
    wypisywały te same nazwy drugi raz, jako gołe kontrolki. Operator oceniał
@@ -376,17 +385,60 @@ describe("Pozycja dopisana przez biuro", () => {
     expect(screen.getByText(/Nie weszła do koszyka/)).toBeInTheDocument();
   });
 
-  it("komplet pokazuje, CO wejdzie do koszyka z paragonu", () => {
+  it("komplet PRZED koszykiem pokazuje, co do niego wejdzie", () => {
     /* Oferta jest jedna, a na magazynie leżą trzy kartoteki (0.328.0).
        Bez tego wiersza biuro nie ma skąd wiedzieć, że MM poniesie trzy
-       pozycje zamiast jednej — dowiedziałoby się przy rozkładaniu. */
+       pozycje zamiast jednej — dowiedziałoby się przy rozkładaniu.
+
+       BEZ PTASZKÓW, dopóki pozycja nie leży w koszyku (0.335.0): skład jest
+       wtedy planem, a ptaszek obiecywałby wiersz, którego nie ma czego zdjąć. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
+    ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: false },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false },
+    ] } } });
+    expect(screen.getByText(/SEK-01 × 1, REK-02 × 2/)).toBeInTheDocument();
+    /* Po nazwie, nie po liczbie: w wierszu stoją też pola wyboru pozycji
+       do kwoty i nie o nie tu chodzi. */
+    expect(screen.queryByRole("checkbox", { name: /SEK-01/ })).toBeNull();
+  });
+
+  it("komplet W KOSZYKU dostaje ptaszki, wszystkie zaznaczone", async () => {
+    /* Zgłoszenie właściciela (0.335.0): „powinno rozbijać na komponenty do
+       zaznaczania, które idą do MM". Z kompletu wracają nieraz same części.
+
+       ZAZNACZONE Z GÓRY: typowy zwrot kompletu jest kompletny, a ekran ma
+       pytać wyłącznie o wyjątek. */
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1 },
-      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2 },
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: true },
     ] } } });
-    expect(screen.getByText(/SEK-01 × 1, REK-02 × 2/)).toBeInTheDocument();
+    const sekator = screen.getByRole("checkbox", { name: /SEK-01/ }) as HTMLInputElement;
+    const rekawice = screen.getByRole("checkbox", { name: /REK-02/ }) as HTMLInputElement;
+    expect([sekator.checked, rekawice.checked]).toEqual([true, true]);
+
+    await userEvent.click(rekawice);
+    expect(zaznacz).toHaveBeenCalledWith(
+      { pozycjaId: 1, twId: 23, wKoszyku: false, zwrotId: 1 });
+  });
+
+  it("odznaczony składnik ZOSTAJE na ekranie — inaczej nie da się go cofnąć", () => {
+    /* Zniknięcie wiersza po odznaczeniu byłoby drogą w jedną stronę, a §25a.5
+       każe każdemu kliknięciu bez pytania zostawić drogę powrotną. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
+    ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false },
+    ] } } });
+    expect(screen.getByText("REK-02")).toBeInTheDocument();
+    expect((screen.getByRole("checkbox", { name: /SEK-01/ }) as HTMLInputElement).checked)
+      .toBe(true);
+    expect((screen.getByRole("checkbox", { name: /REK-02/ }) as HTMLInputElement).checked)
+      .toBe(false);
   });
 
   it("zwykły towar NIE powtarza swojej nazwy jako składu", () => {
@@ -394,7 +446,7 @@ describe("Pozycja dopisana przez biuro", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1 },
+      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
     ] } } });
     expect(screen.queryByText(/Do koszyka z paragonu/)).toBeNull();
   });
