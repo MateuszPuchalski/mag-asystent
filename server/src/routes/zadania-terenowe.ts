@@ -11,10 +11,13 @@ export async function zadaniaTerenoweRoutes(app:FastifyInstance){
  app.post<{Params:{id:string};Body:{wynik?:string}}>("/api/zadania-terenowe/:id/wykonaj",async(req,reply)=>{const s=sesjaZadania()!;try{return{zadanie:wykonajZadanie(Number(req.params.id),req.body?.wynik??"",{id:s.user.userId,name:s.user.name})};}catch(e){return blad(reply,e);}});
  /* ── ZDJĘCIE OD HALI (§13.3, 0.352.0) ────────────────────────────────────
     `bodyLimit` OSOBNY dla tej trasy, mimo globalnego 6 MiB: zdjęcie jedzie
-    base64 w JSON, czyli rośnie o jedną trzecią, a 4 MiB ciała to ~3 MiB
-    obrazu — dokładnie tyle, ile przyjmuje serwis. Limit na trasie chroni
-    PROCES (kadr z 13 Mpx w pamięci taniego serwera), limit w serwisie chroni
-    DYSK. To dwie różne awarie i dwa różne progi. */
+    base64 w JSON, czyli rośnie o jedną trzecią, a 4 MiB ciała to ~3 MB
+    obrazu — czyli DOKŁADNIE próg serwisu, ten sam wyrażony w jednostkach
+    transportu. To jest limit wiążący: próba na żywym serwerze pokazała, że
+    zdjęcie 3,5 MB odpada tutaj kodem 413 i do serwisu nie dociera.
+
+    Niżej niż globalne 6 MiB, bo to jedyne miejsce, w którym kadr z aparatu
+    kolektora wchodzi do pamięci procesu. */
  app.post<{Params:{id:string};Body:{fotoBase64?:string;opis?:string}}>("/api/zadania-terenowe/:id/zalacznik",{bodyLimit:4*1024*1024},async(req,reply)=>{const s=sesjaZadania()!;try{return{zadanie:dodajZalacznik(Number(req.params.id),req.body?.fotoBase64??"",req.body?.opis,{id:s.user.userId,name:s.user.name})};}catch(e){return blad(reply,e);}});
 
  /* Nazwa pliku niesie znacznik czasu, więc treść pod tym URL-em nie zmienia

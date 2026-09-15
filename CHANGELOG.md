@@ -141,9 +141,16 @@ drogą: magazyn zdjęć wyprowadził się z `problems.ts` do `services/foto.ts`,
 bo dostał drugiego odbiorcę. Druga kopia `photoDir()` rozjechałaby się po
 pierwszej literówce, a objawem byłby katalog, w którym nie ma połowy dowodów.
 
-Limit stoi w DWÓCH miejscach i to nie jest powtórzenie: 4 MiB ciała na trasie
-chroni PROCES przed kadrem z trzynastu megapikseli, 3 MB w serwisie chroni
-DYSK przed aparatem zaciętym na serii. To dwie różne awarie i dwa różne progi.
+**Limit okazał się jeden, nie dwa — i to jest poprawka do własnego
+komentarza.** Pierwsza wersja twierdziła, że 4 MiB ciała na trasie i 3 MB
+w serwisie to „dwa różne progi". Próba na żywym serwerze pokazała co innego:
+4 MiB JSON-a po odjęciu narzutu base64 to dokładnie ~3 MB obrazu, więc
+zdjęcie 3,5 MB odpada na trasie kodem 413 i do serwisu nigdy nie dociera.
+
+Sprawdzenie w serwisie zostaje, bo pilnuje UMOWY SERWISU, nie tej jednej
+trasy — `bodyLimit` obowiązuje wyłącznie tam. Żeby nie było nie do
+odróżnienia od martwego kodu, ma własny test wołający funkcję wprost,
+z pominięciem HTTP.
 
 W panelu zdjęcie jest **piątym źródłem obrazów** i wchodzi do wspólnej kolejki
 pobierania, a nie obok niej. Nagłówek `useZdjecie.ts` liczy, ile razy ta blizna

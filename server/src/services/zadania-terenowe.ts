@@ -181,10 +181,16 @@ export function oddajZadanie(id:number,autor:{id:number;name:string}){
  * Zamknięte odpada świadomie — dowód dokładany do zadania rozliczonego tydzień
  * temu nie jest odpowiedzią, tylko dopiskiem do cudzej pracy.
  *
- * LIMIT JEST TUTAJ, nie tylko na trasie. Kolektor koduje kadr do ~200 KB, ale
- * limit ciała żądania chroni proces, a nie dysk: aparat zacięty na serii
- * zapełniłby `data/photos` w godzinę, a objawu nie widać nigdzie, dopóki nie
- * padnie zapis bazy.
+ * LIMIT JEST TEN SAM CO NA TRASIE i to zmierzone, nie założone: `bodyLimit`
+ * 4 MiB podzielone przez narzut base64 daje ~3 MB obrazu, czyli dokładnie te
+ * 3072 kB. Pierwsza wersja tej zmiany twierdziła w komentarzu, że to „dwa
+ * różne progi" — próba na żywym serwerze pokazała, że zdjęcie 3,5 MB odpada
+ * na trasie kodem 413 i do serwisu nigdy nie dociera.
+ *
+ * Sprawdzenie zostaje mimo to, bo pilnuje UMOWY SERWISU, nie tej jednej
+ * trasy: `bodyLimit` obowiązuje wyłącznie tam, a ta funkcja zawoła się
+ * z każdego następnego miejsca, które ktoś dopisze. Dowodzi tego test
+ * wołający ją wprost, z pominięciem HTTP.
  */
 const ZALACZNIK_MAX_KB=3072;
 export function dodajZalacznik(id:number,fotoBase64:string,opis:string|undefined,autor:{id:number;name:string}){
