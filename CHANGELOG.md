@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.340.0 — 15 września 2026
+
+**Zwroty rozliczone poza aplikacją da się skasować, a raport milknie
+o historii.** Zgłoszenie właściciela: „wywal zwroty rozliczone poza
+aplikacją".
+
+- **[wymaga działania] `npm run zwroty:sprzatnij`** — nowe narzędzie konsoli.
+  Raport jest domyślny, kasuje dopiero `--wykonaj`. Kursor synchronizacji
+  zostaje nietknięty, więc skasowane nie wracają przy takcie.
+- **Cztery ślady zatrzymują kasowanie**: nasz zwrot płatności, notatka
+  o przelewie, numer korekty i pozycja w koszyku. Raport wypisuje, ile spraw
+  trzyma który — zwrot bywa zatrzymany przez dwie rzeczy naraz.
+- **Kontrola `zwrot_rozliczony_bez_korekty` woła tylko o nowe przypadki.**
+  Próg w `ZWROT_ROZLICZONE_OD`, domyślnie dzień wdrożenia; liczy się po dacie
+  zgłoszenia zwrotu, bo momentu rozliczenia Allegro nie podaje.
+- Dziennik zdarzeń zostaje nietknięty i dostaje wpis o samym kasowaniu.
+
 ## 0.339.0 — 15 września 2026
 
 **Kolejka zwrotów przestaje pokazywać pracę, której nie ma.** Dwa zgłoszenia

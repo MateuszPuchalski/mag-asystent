@@ -1654,6 +1654,44 @@ zrobiłby to samo później, a `--bez-pobrania` zostawia to właśnie jemu.
 
 Decyzje biura wracają PUSTE. Werdykty, oceny i kwoty trzeba nadać od nowa.
 
+## 6f-bis. Kasowanie zwrotów rozliczonych poza aplikacją (0.340.0)
+
+Od 0.339.0 zwrot, który Allegro raportuje jako rozliczony, schodzi z kolejki
+pracy do ZAMKNIĘTYCH. Decyzja właściciela idzie dalej. Sprawa
+załatwiona w panelu Allegro, bez jednego naszego śladu, nie opisuje niczego,
+co kiedykolwiek robiliśmy — taki wiersz ma zniknąć z bazy.
+
+```bash
+cd /c/wertis && source wertis.env
+npm --prefix server run zwroty:sprzatnij               # RAPORT, nic nie kasuje
+npm --prefix server run zwroty:sprzatnij -- --wykonaj  # kasuje
+```
+
+**Raport jest domyślny**, bo skasowanego zwrotu nie da się odzyskać. Kursor
+synchronizacji zostaje nietknięty, więc Allegro nie odda go przy takcie — to
+świadoma różnica wobec `zwroty:reset`, gdzie celem było pobranie wszystkiego od
+nowa. Pojedynczy zwrot wraca drogą POSZUKAJ W ALLEGRO, gdy okaże się potrzebny
+do rozmowy z klientem.
+
+Kasowany jest zwrot, który ma status `FINISHED` albo `FINISHED_APT` i NIE ma
+u nas żadnego z czterech śladów:
+
+- zapisanego zwrotu płatności — to my go zleciliśmy,
+- notatki o przelewie — biuro zapisało, że oddało ręką,
+- numeru korekty — dokument stoi w księgach firmy,
+- ani jednej pozycji w koszyku — towar poszedł na dokument MM.
+
+**Każdy z tych śladów zatrzymuje kasowanie tego zwrotu**, a raport wypisuje,
+ile spraw trzyma który ślad. Zwrot bywa zatrzymany przez dwie rzeczy naraz,
+więc bez tego rozbicia zdjęcie jednej wyglądałoby na brak skutku.
+
+Powód przy koszyku jest techniczny i wart zapamiętania: kolumna
+`kosz_pozycja.zwrot_pozycja_id` nie ma klucza obcego. Skasowanie zwrotu nie
+wywróciłoby zapisu, tylko zostawiło w pudle wiersz wskazujący na nieistniejącą
+pozycję — po cichu.
+
+Dziennik zdarzeń zostaje nietknięty i dostaje wpis o samym kasowaniu.
+
 ## 6g. Kolejność przy zwrotach: korekta, potem MM (0.200.0)
 
 MM koszyka zdejmuje towar z **magazynu głównego**. Towar ze zwrotu trafia na
