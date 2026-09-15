@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.354.0 — 15 września 2026
+
+**`/api/health` sam wykrywa panel zostawiony na starym buildzie.** To jest
+najcichsza pomyłka wdrożenia, jaką zna ta aplikacja: `npm run build`
+w katalogu `server/` NIE przebudowuje panelu obsługi. Proces API wstaje wtedy
+z nowego kodu i melduje nową wersję, a ekran obsługi zostaje na poprzednim.
+Nic nie wygląda na zepsute — wygląda na wydanie, które „nie działa".
+
+- **Zbudowany panel nosi pieczątkę** `<meta name="wertis-panel">` z numerem
+  wersji z korzenia repo. Wstawia ją wtyczka Vite przy każdym buildzie.
+- **`/api/health` podaje `panelObslugi`** obok `wersja`, a rozjazd ustawia
+  `"ok":false` i dopisuje do `problemy` zdanie mówiące, CO zrobić i w KTÓRYM
+  katalogu. Łapie go przez to także `Test-WertisHealth` z instalatora.
+- **Brak pieczątki MILCZY.** `null` znaczy „panel sprzed tego wydania albo
+  instalacja bez panelu" — zdanie w tych przypadkach robiłoby czerwonym każde
+  środowisko deweloperskie, czyli uczyłoby ignorować listę problemów.
+- Akapit w `DEPLOY.md` przy tabeli odczytu zdrowia.
+
+Powodem jest własna blizna tej gałęzi: siedemnaście wydań panelu bez ani
+jednego potwierdzenia, że dotarły na wdrożony ekran. Recepta na dwa polecenia
+istniała w `DEPLOY.md` i nie została uruchomiona ani razu — więc recepta była
+złym rozwiązaniem. Pyta o to teraz sama trasa.
+
 ## 0.353.0 — 15 września 2026
 
 **Kolejka zwrotów odzyskuje ekran.** Na laptopie 1366×768 pokazywała DWA
