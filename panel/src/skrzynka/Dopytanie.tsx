@@ -2,6 +2,7 @@ import React from "react";
 import { MessageCircleQuestion } from "lucide-react";
 import { Przycisk } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
+import { Zwijka } from "./Zwijka";
 import type { WymianaCopilota } from "../api/typy";
 
 /**
@@ -28,6 +29,12 @@ import type { WymianaCopilota } from "../api/typy";
  * najcenniejsza dokładnie wtedy, gdy widać, czego zabrakło.
  *
  * Bez bursztynu: to nie jest ostrzeżenie ani zaznaczenie.
+ *
+ * ZWINIĘTE, DOPÓKI NIE MA O CO PYTAĆ (0.342.0). Pole tekstowe i przycisk
+ * zajmowały wysokość w KAŻDEJ rozmowie, także tej, w której agent niczego nie
+ * kwestionuje — a wątpliwość rodzi się dopiero po przeczytaniu szkicu, więc
+ * płacił za nią wysokością, zanim ją miał. Blok z odbytą wymianą otwiera się
+ * sam: tam jest już treść do przeczytania, nie sama możliwość.
  */
 export function Dopytanie(p: {
   wymiany: WymianaCopilota[];
@@ -42,13 +49,14 @@ export function Dopytanie(p: {
   const zaDlugie = tekst.length > p.limitZnakow;
   const gotowe = tekst.trim().length > 0 && !zaDlugie && !p.pracuje && !p.wylaczony;
 
-  return <section className="mt-2 rounded border border-slate-200 bg-white" aria-label="Dopytanie Copilota">
-    <h4 className="flex items-center gap-1.5 border-b border-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700">
-      <MessageCircleQuestion size={14} aria-hidden="true" />
-      Dopytaj Copilota
-      <span className="font-normal text-slate-500">odpowiedź czytasz Ty, nie klient</span>
-    </h4>
-
+  return <Zwijka
+    tytul="Dopytaj Copilota"
+    Ikona={MessageCircleQuestion}
+    podpis={p.wymiany.length > 0
+      ? `${p.wymiany.length} ${p.wymiany.length === 1 ? "wymiana" : "wymian"} · odpowiedź czytasz Ty, nie klient`
+      : "odpowiedź czytasz Ty, nie klient"}
+    domyslnieOtwarte={p.wymiany.length > 0}
+  >
     {p.wymiany.length > 0 && <ul className="divide-y divide-slate-100" aria-label="Wymiany z Copilotem">
       {p.wymiany.map((w) => <li key={w.id} className="p-2">
         <p className="text-xs font-semibold text-slate-700">{w.przez}: {w.pytanie}</p>
@@ -57,7 +65,7 @@ export function Dopytanie(p: {
       </li>)}
     </ul>}
 
-    <div className="border-t border-slate-100 p-2">
+    <div className="p-2">
       <label className="sr-only" htmlFor="dopytanie-tresc">Pytanie do Copilota</label>
       <textarea
         id="dopytanie-tresc"
@@ -87,5 +95,5 @@ export function Dopytanie(p: {
         </Przycisk>
       </div>
     </div>
-  </section>;
+  </Zwijka>;
 }

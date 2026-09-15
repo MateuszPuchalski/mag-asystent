@@ -22,8 +22,23 @@ const props = (n: Partial<Parameters<typeof Dopytanie>[0]> = {}) => ({
   pracuje: false, onPytaj: vi.fn(), limitZnakow: 600, ...n,
 });
 
+/**
+ * Renderuje i ROZWIJA blok (0.342.0).
+ *
+ * Od tego wydania dopytanie jest zwinięte, dopóki nie ma o co pytać: pole
+ * i przycisk zajmowały wysokość w każdej rozmowie, także tej, w której agent
+ * niczego nie kwestionuje. `getByRole` pomija elementy ukryte, więc test
+ * badający pole MUSI je wpierw otworzyć — inaczej sprawdzałby pustkę.
+ */
+function otworz(p: Parameters<typeof Dopytanie>[0]) {
+  render(<Dopytanie {...p} />);
+  fireEvent.click(screen.getByRole("button", { name: /Dopytaj Copilota/ }));
+}
+
 describe("dopytanie Copilota", () => {
   test("odpowiedź NIE MA przycisku wstawiania — to jest granica, nie brak", () => {
+    /* Blok z odbytą wymianą otwiera się sam, więc nie ma tu czego rozwijać —
+       i właśnie dlatego brak przycisku jest tu sprawdzalny, a nie pozorny. */
     render(<Dopytanie {...props({ wymiany: [w()] })} />);
     for (const slowo of [/wstaw/i, /zastąp/i]) {
       expect(screen.queryByRole("button", { name: slowo })).toBeNull();
@@ -37,14 +52,14 @@ describe("dopytanie Copilota", () => {
 
   test("puste pytanie nie da się wysłać", () => {
     const p = props();
-    render(<Dopytanie {...p} />);
+    otworz(p);
     const przycisk = screen.getByRole("button", { name: /zapytaj/i });
     expect((przycisk as HTMLButtonElement).disabled).toBe(true);
   });
 
   test("pytanie leci po kliknięciu, a pole się czyści", () => {
     const p = props();
-    render(<Dopytanie {...p} />);
+    otworz(p);
     const pole = screen.getByLabelText(/pytanie do copilota/i);
     fireEvent.change(pole, { target: { value: "  Skąd to wiesz?  " } });
     fireEvent.click(screen.getByRole("button", { name: /zapytaj/i }));
@@ -55,7 +70,7 @@ describe("dopytanie Copilota", () => {
 
   test("pytanie dłuższe od limitu blokuje przycisk, zanim żądanie poleci", () => {
     const p = props({ limitZnakow: 10 });
-    render(<Dopytanie {...p} />);
+    otworz(p);
     fireEvent.change(screen.getByLabelText(/pytanie do copilota/i),
       { target: { value: "a".repeat(11) } });
 
@@ -64,7 +79,7 @@ describe("dopytanie Copilota", () => {
   });
 
   test("licznik znaków milczy, dopóki daleko do limitu", () => {
-    render(<Dopytanie {...props({ limitZnakow: 600 })} />);
+    otworz(props({ limitZnakow: 600 }));
     fireEvent.change(screen.getByLabelText(/pytanie do copilota/i), { target: { value: "krótko" } });
     /* Licznik stale widoczny uczy pisać krótko zamiast pisać jasno. */
     expect(screen.queryByText(/\/ 600/)).toBeNull();
@@ -77,13 +92,32 @@ describe("dopytanie Copilota", () => {
   });
 
   test("cudza rozmowa gasi i pole, i przycisk", () => {
-    render(<Dopytanie {...props({ wylaczony: true })} />);
+    otworz(props({ wylaczony: true }));
     expect((screen.getByLabelText(/pytanie do copilota/i) as HTMLTextAreaElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /zapytaj/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   test("błąd z serwera stoi przy przycisku, nie w konsoli", () => {
-    render(<Dopytanie {...props({ blad: "Ta rozmowa ma już 20 dopytań." })} />);
+    otworz(props({ blad: "Ta rozmowa ma już 20 dopytań." }));
     expect(screen.getByText(/ma już 20 dopytań/)).toBeTruthy();
+  });
+});
+
+describe("zwijanie dopytania (0.342.0)", () => {
+  test("bez wymian blok jest ZWINIĘTY — wątpliwość rodzi się po przeczytaniu szkicu", () => {
+    render(<Dopytanie {...props()} />);
+    expect(screen.queryByRole("button", { name: /zapytaj/i })).toBeNull();
+    expect(screen.getByText("Dopytaj Copilota")).toBeVisible();
+  });
+
+  test("odbyta wymiana otwiera blok sama — jest tam treść, nie sama możliwość", () => {
+    render(<Dopytanie {...props({ wymiany: [w()] })} />);
+    expect(screen.getByRole("button", { name: /zapytaj/i })).toBeVisible();
+    expect(screen.getByText(/1 wymiana/)).toBeVisible();
+  });
+
+  test("liczebnik jest odmieniony — „3 wymian”, nie „3 wymiana”", () => {
+    render(<Dopytanie {...props({ wymiany: [w(), w({ id: 2 }), w({ id: 3 })] })} />);
+    expect(screen.getByText(/3 wymian/)).toBeVisible();
   });
 });
