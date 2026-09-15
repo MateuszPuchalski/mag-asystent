@@ -2635,6 +2635,17 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 | ZAMKNIĘTE | — | wgląd i `R` (cofnij korektę) |
 | ODRZUCONE | — | tylko wgląd |
 
+**`Z` oddaje pieniądze i nie należy do żadnego kubełka.** Należność przechodzi
+przez DO ZWROTU, DO KOREKTY i ZAMKNIĘTE — bramka serwera nie patrzy na
+zamknięcie. Klawisz robi dokładnie to samo, co przycisk ODDAJ PIENIĄDZE, i tylko
+wtedy, gdy ten przycisk stoi na ekranie. Pasek skrótów dopisuje go ze STANU
+zwrotu, a nie z tabeli wyżej: po wypłacie martwy klawisz uczyłby przewijać
+pasek wzrokiem.
+
+Do audytu z 15 września 2026 ostatni krok pracy — jedyny, który rusza
+pieniędzmi — nie miał żadnego klawisza. Ręka schodziła z klawiatury na mysz
+dokładnie tam, gdzie tabela obiecywała odwrotnie.
+
 **Zwrot rozliczony przez Allegro trafia od razu do ZAMKNIĘTYCH (0.339.0).**
 Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania, pokazuje
 zwroty, za które pieniądze zostały już zwrócone".
@@ -2711,7 +2722,13 @@ i §25a.5 daje takim rzeczom potwierdzenie. Utylizacja nie ma wariantu
 hurtowego z tego samego powodu — jeden ruch wysyłałby cały zwrot na złom.
 
 Kursor schodzi na następny wiersz po ODMOWIE i po zapisaniu numeru korekty,
-czyli wtedy, gdy zwrot wychodzi z drabiny. Po „przyjmij" i po ocenie zostaje
+czyli wtedy, gdy zwrot wychodzi z drabiny — **chyba że pieniądze jeszcze wiszą**
+(audyt, 15 września 2026). Korekta zamyka zwrot, ale nie drogę do wypłaty,
+a biuro wystawia ją zwykle PRZED oddaniem pieniędzy. Kursor uciekał więc
+dokładnie przed ostatnim krokiem, choć ekran dwie linijki wyżej obiecywał
+„pieniądze oddajesz przyciskiem niżej — także po zapisaniu korekty".
+Wypłata ma dwie drogi i obie muszą być zamknięte: przez Allegro
+i przelewem poza nim (przy pobraniu jedyna). Po „przyjmij" i po ocenie zostaje
 na miejscu: zwrot schodzi wtedy o szczebel niżej, a kolumna środkowa pokazuje
 pytanie następnego kubełka. Skakanie na następny wiersz kazałoby wracać do
 sprawy, której się jeszcze nie skończyło.
@@ -2876,8 +2893,14 @@ numer i login kupującego, czyli to, co się z niego przepisuje.
 
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
-Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
-zwrotu. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
+Potwierdzenie dostaje to, czego nie da się cofnąć: odmowa wypłaty i wniosek
+o rabat transakcyjny. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
+
+**Oddanie pieniędzy potwierdzenia NIE MA i mieć nie ma.** Do audytu z 15
+września 2026 stało w tym zdaniu odwrotnie, a dwa akapity niżej — i w kodzie
+— było już inaczej. Zwrot pieniędzy cofa się dopłatą i widać go od razu
+na osi, więc pytanie „na pewno" kosztowałoby kliknięcie przy każdym zwrocie
+i nie kupowało nic.
 
 **Drabina cofania (0.202.0).** Każdy kubełek cofa dokładnie ten krok, który go
 wprowadził. Schodzi się po jednym szczeblu, tą samą drogą, którą się weszło:
@@ -3951,6 +3974,126 @@ Skład liczy się **wyłącznie w szczególe zwrotu**, nigdy w kolejce: każde
 liczenie pyta o dokument, o zamówienie i o mapowanie każdej oferty, a kolejka
 bierze naraz wszystkie zwroty.
 
+### 25a.24. Kolejka odzyskuje ekran (audyt, 15 września 2026)
+
+Pomiar na żywym panelu, dziesięć zwrotów w bazie, przeglądarka:
+
+| co | przed | po |
+|---|---|---|
+| chrom nad listą | 344 px | **265 px** |
+| pasm nad listą | 7 | **5** |
+| wysokość wiersza | 110 px | **86 px** |
+| zwrotów widocznych, okno 1080 | 5 | **7** |
+| zwrotów widocznych, okno 950 | 4 | **6** |
+| zwrotów widocznych, laptop 1366×768 | 2 | **4** |
+
+**Chrom był i jest STAŁY**, bo każde pasmo ma `shrink-0` — to dobra decyzja
+(inaczej przy ciasnym oknie kurczyłyby się wyłącznie one). Skutek uboczny jest
+taki, że procentowo boli najbardziej tam, gdzie okno najmniejsze: 43% przy
+803 px kolumny, 53% przy 653 px.
+
+**Pasma nie powstały naraz.** Dokładało je siedem wydań, po jednym, i każde
+z osobna kosztowało „tylko trzydzieści pikseli". Dlatego budżetu pilnuje teraz
+test (`ekrany/Zwroty.test.tsx`): liczy pasma, nie piksele, i zmusza szóste do
+rozmowy zamiast do cichego wejścia.
+
+**Cztery zmiany, żadna nie kasuje funkcji:**
+
+1. **Pytanie kubełka i sito w jednym paśmie** (33 + 37 → 33 px). Mówiły o tej
+   samej liście: kubełek „na jakim to etapie", sito „czyje to", tag „o czym
+   to" (§25a.19, 0.315.0). Trzy pytania o jedną rzecz mieszczą się w rzędzie.
+2. **„Nieodebrana" wchodzi w rząd pola szukania** (91 → 49 px). Przycisk z
+   0.338.0 zostaje na froncie — stał tylko we własnym wierszu. Etykieta
+   krótsza, pełne zdanie w podpowiedzi.
+3. **Login wraca do pierwszej linijki wiersza** (110 → 86 px razem z `py-2`).
+   0.337.0 postawiło go osobno po to, żeby NIE dokleić go do nazwy towaru,
+   „bo nazwa i tak bywa ucięta". Powód dotyczył linijki z nazwą i dalej
+   obowiązuje; numer zwrotu ma kilkanaście znaków i miejsce zostaje.
+4. **Pasek skrótów: „ruch po liście" → „lista"**. Klawisz obok mówi, że chodzi
+   o ruch.
+
+**Czego NIE ruszono i dlaczego.** Pasmo filtrów (65 px) i pasek skrótów (49 px)
+dalej zawijają się na dwa rzędy. Kolumna ma 352 px w środku, a ich treść
+potrzebuje 531 i 419 px — zmieszczenie w jednym rzędzie wymaga odebrania
+etykiet („Od daty nadania" → „Od nadania", „Synchronizuj" → sama ikona). To
+osiemdziesiąt pikseli kupione za rozpoznawalność, czyli za dekalog p. 2.
+Czeka na decyzję właściciela, nie na kod.
+
+**Pasek skrótów kosztuje 49 px, nie 22**, które kupiła jego decyzja z 0.281.0.
+Cena podwoiła się po cichu, gdy doszły klawisze kubełka (0.284.0). Skrócenie
+opisu oddało część, reszta zostaje jako jawny dług.
+
+### 25a.22. Dwa kliknięcia, które szły za łatwo (audyt, 15 września 2026)
+
+Ekran zwrotów ma jedną regułę o kliknięciach: §25a.5. Cofnięcie wszędzie, gdzie
+da się cofnąć; potwierdzenie tam, gdzie się nie da. Dwa miejsca nie miały ani
+jednego, ani drugiego.
+
+**ZGŁOŚ RABAT pyta, zanim złoży.** Wniosek idzie do Allegro, panel nie ma
+końcówki do jego wycofania, a drugiego na tę samą pozycję złożyć się nie da —
+końcówka nie jest idempotentna (§25a.20). To jest dokładnie definicja rzeczy,
+której §25a.5 każe dać potwierdzenie, a przycisk składał wniosek jednym
+kliknięciem — i stoi na liście pozycji, tuż obok ocen „na stan" i „utylizacja"
+klikanych dziesiątki razy dziennie.
+
+Pytanie mówi SKUTEK, nie „czy na pewno": *wniosek idzie do Allegro i panel go
+nie wycofa*. Pytanie bez treści uczy odruchu klikania „tak". Po złożeniu
+przycisk i tak znika, więc to jedyny moment, w którym ta informacja kogokolwiek
+dosięgnie.
+
+**Odmowa wypłaty nie ma już kodu wybranego z góry.** Stał tam
+`REFUND_REJECTED` i wyglądało to na wybór ostrożny, bo jako jedyny z siedmiu
+kodów żąda uzasadnienia. Skutek był odwrotny. Operator rozwija odmowę, żeby
+powiedzieć „wysłaliśmy nowy towar", wpisuje to w uzasadnienie — i wysyła je
+pod kodem, którego nie wybrał.
+
+Klient czyta ten kod w Allegro jako oświadczenie firmy, a drugiej odmowy do tego
+samego zwrotu Allegro nie przyjmie (422). Wybór ma być świadomy, więc pole
+zaczyna puste i przycisk czeka na wskazanie. Domyślna wartość jest tu wygodą
+kupioną za cudze oświadczenie.
+
+### 25a.23. Komunikat, który się tłumaczy i milknie
+
+Audyt policzył na ekranie zwrotów pięćdziesiąt pięć komunikatów, z czego
+czternaście mówi, co zrobić. Reszta opisuje stan i to bywa w porządku — stan
+też trzeba znać. Nie jest w porządku wtedy, gdy ekran tłumaczy się z braku
+i na tym kończy.
+
+Wzorcowy przypadek: **brak dokumentu sprzedaży** (`zwroty/Dokument.tsx`). Ekran
+wymieniał trzy prawdziwe powody — stara sprzedaż, brak numeru zamówienia na
+dokumencie, brak potwierdzonej kartoteki — i nie podawał żadnego ruchu.
+Wskazać dokumentu nie ma jak, bo kandydatów jest zero, a panel nie umie szukać
+po numerze.
+
+Ruch jednak istnieje i jest ten sam co zawsze: **korekta zamyka zwrot tak samo
+bez dokumentu**. Tego brakowało — nie funkcji, tylko jednego zdania.
+
+**Policzone rzetelnie, liczba z audytu była zgrubna.** Przegląd wszystkich
+zdań widocznych dla człowieka w `zwroty/` i `ekrany/Zwroty.tsx` daje 97
+napisów. Większość to ETYKIETY, ODZNAKI i PODPOWIEDZI — nazwy stanów,
+przy których żaden ruch nie jest potrzebny albo żaden nie istnieje
+(„Allegro nie powiązało żadnej wiadomości", „Wydana do doręczenia").
+
+Komunikatów, przy których ruch ISTNIEJE, a ekran go nie nazywał, jest
+**sześć** i wszystkie są poprawione:
+
+| gdzie | co mówiło | czego brakowało |
+|---|---|---|
+| `Dowody` | „dociągnie ją najbliższa synchronizacja" | przycisk „Dociągnij teraz" stoi dwa wiersze niżej |
+| `Dowody` | „bez numeru zamówienia nie ma czego dociągnąć" | wycena idzie z pozycji, a zwrot zamyka korekta |
+| `Kolejka`, sygnał `kwota_nieaktualna` | „kwota nie zgadza się z pozycjami" | popraw kwotę |
+| `Kolejka`, sygnał `przelew_czeka` | „śladu po przelewie nie ma" | zapisz go w sekcji Pieniądze |
+| `Pozycje` | „Zwrot bez pozycji — nie ma czego wycenić" | dociągnij zamówienie albo dopisz z kartonu |
+| `Pozycje` | „Kwoty pełnej nie znamy bez zamówienia" | dociągnij je w kolumnie obok |
+
+**Pierwszy wiersz jest najgorszy z całej listy.** Zdanie odsyłało do CZEKANIA
+na synchronizację, a przycisk robiący to natychmiast stał dwa wiersze niżej.
+Ekran nie tyle milczał, co odradzał ruch, który sam oferował.
+
+**Czego nadal nie ma i dlaczego.** Szukania dokumentu sprzedaży po numerze —
+to nowa końcówka, nie zdanie. Dopóki jej nie ma, brak dokumentu kończy się
+informacją, że zwrotu to nie zatrzymuje (§25a.23 wyżej).
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4722,6 +4865,39 @@ Pytanie „czy obsługujemy też dyskusje" zeszło z niej dwa razy i za każdym
 razem inaczej. W 0.222.0: NIE — panel prowadzi wyłącznie reklamacje.
 9 września 2026: **TAK**, dyskusje dostają własną zakładkę (§25c). Pierwsza
 odpowiedź stoi tu dalej, bo tłumaczy kod trzech wydań.
+
+## 26a. Język ekranu: liczebnik ma trzy formy
+
+Dopisane po audycie z 15 września 2026, bo to nie jest drobiazg jednego ekranu
+— panel myślił tak w ośmiu miejscach na czterech ekranach.
+
+Polszczyzna odmienia rzeczownik przy liczbie na trzy sposoby: **1 pozycja**,
+**2 pozycje**, **5 pozycji**. Nastki idą z piątką (**12 pozycji**), a dziesiątki
+wyżej wracają do dwójki (**22 pozycje**).
+
+Panel liczył dwie formy i mylił się na dwa przeciwne sposoby:
+
+| zapis | co dawał | gdzie |
+|---|---|---|
+| forma 2–4 wszędzie | „5 pozycje", „i 5 inne" | `zwroty/Dopisz.tsx`, `zwroty/Kolejka.tsx`, `skrzynka/Sprawa.tsx` |
+| dopełniacz wszędzie | „2 pasujących zwrotów", „2 zdjęć" | `zwroty/Szukanie.tsx`, `skrzynka/Dopytanie.tsx`, `skrzynka/Copilot.tsx`, `skrzynka/OdczytZdjec.tsx`, `wiedza/Silniki.tsx` |
+
+**Drugi błąd jest gorszy, choć wygląda niewinniej.** Dwa i trzy zdarzają się na
+ekranie o wiele częściej niż pięć, więc widziano go częściej. Wygląda przy tym
+na świadomy wybór, bo końcówka jest poprawna — tylko nie dla tej liczby.
+
+Reguła stoi w `ui/odmien` i `ui/ile`, a pilnuje jej `ui/Odmiana.test.ts`.
+Bramka zapala się tylko tam, gdzie OBOK wyboru formy drukuje się liczba: bez
+liczebnika polski ma dwie formy i dwie wystarczą. Dlatego „ogląda"/„oglądają"
+w `skrzynka/Obecni.tsx` zostaje — czasownik ma dwie formy, nie trzy.
+
+Jedyna poprawna kopia reguły mieszkała jako prywatna funkcja w
+`ekrany/Wiedza.tsx`. Nikt jej nie znalazł przy pozostałych ośmiu miejscach
+— reguła języka schowana w ekranie nie jest regułą, jest kopią.
+
+`dniSlowo` przyjechało przy okazji z trzech kolejek, gdzie stało przepisane
+znak w znak. „Dni" brzmi tak samo w obu formach mnogich, więc tamte kopie były
+poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
 ## 27. Zasady nadrzędne
 

@@ -6,7 +6,7 @@ import {
   useZaproponujZastosowanie,
 } from "../api/wiedza";
 import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
-import { Blad, Karta, Pusto, Zakladki } from "../ui";
+import { Blad, Karta, Pusto, Zakladki, ile } from "../ui";
 import { Propozycja } from "../wiedza/Propozycja";
 import { NowaPropozycja } from "../wiedza/NowaPropozycja";
 import { WiedzaTowaru } from "../wiedza/WiedzaTowaru";
@@ -54,7 +54,7 @@ export function Wiedza() {
           pominięcie: para maszyna–silnik czeka na tę samą decyzję człowieka. */}
       <span className="text-sm text-slate-500">
         {kolejka.data ? `${kolejka.data.liczba} do rozstrzygnięcia` : "Wczytuję…"}
-        {kolejka.data?.pasowanDoRozstrzygniecia ? ` · ${odmienPasowania(kolejka.data.pasowanDoRozstrzygniecia)} do rozstrzygnięcia` : ""}
+        {kolejka.data?.pasowanDoRozstrzygniecia ? ` · ${ile(kolejka.data.pasowanDoRozstrzygniecia, "pasowanie", "pasowania", "pasowań")} do rozstrzygnięcia` : ""}
         {silniki.data?.doRozstrzygniecia ? ` · ${silniki.data.doRozstrzygniecia} silników do rozstrzygnięcia` : ""}</span>
     </Karta>
 
@@ -115,9 +115,6 @@ export function Wiedza() {
   </div>;
 }
 
-/** „1 pasowanie / 2 pasowania / 5 pasowań" — licznik czyta człowiek, nie parser. */
-function odmienPasowania(n: number): string {
-  const r10 = n % 10, r100 = n % 100;
-  const slowo = n === 1 ? "pasowanie" : r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14) ? "pasowania" : "pasowań";
-  return `${n} ${slowo}`;
-}
+/* Reguła trzech form przeniosła się do `ui/odmien` (audyt, 15 września 2026).
+   Stała tutaj jako jedyna poprawna kopia w całym panelu — i właśnie dlatego,
+   że stała w ekranie, nikt jej nie znalazł przy ośmiu pozostałych miejscach. */

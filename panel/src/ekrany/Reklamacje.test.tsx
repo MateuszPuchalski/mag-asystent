@@ -526,6 +526,6 @@ describe("Ekran reklamacji", () => {
     for (const k of ["j", "k", "m", "n"]) {
       expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
     }
-    expect(screen.getByText("ruch po liście")).toBeInTheDocument();
+    expect(screen.getByText("lista")).toBeInTheDocument();
   });
 });

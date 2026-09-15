@@ -206,10 +206,33 @@ Czytaj tak:
 | `"mode":"seeded"` | pracujesz na danych demo, Subiekt nietknięty |
 | `"problemy":[...]` | **przeczytaj zdanie** — mówi, co jest nie tak |
 | `"worker":{"zyje":false}` | usługa `wertis-worker` nie działa; zapisy stoją w kolejce |
+| `"panelObslugi"` inne niż `"wersja"` | **panel został na starym buildzie** — patrz niżej |
 
 Wcześniej ten `curl` **nie mógł wykryć rozjazdu**: raportował wyłącznie proces
 API, więc worker pracujący na demo wyglądał identycznie jak poprawny. Teraz
 każdy proces melduje swój tryb i `/api/health` je porównuje.
+
+### Panel obsługi buduje się Z KORZENIA repo
+
+`npm run build` w katalogu `server/` **nie przebudowuje panelu obsługi**.
+Buduje go dopiero to samo polecenie uruchomione w korzeniu repo.
+
+To jest najcichsza pomyłka wdrożenia, jaką zna ta aplikacja. Proces API wstaje
+z nowego kodu i melduje nową wersję, a ekran obsługi zostaje na poprzednim
+buildzie. Nic nie wygląda na zepsute — wygląda na wydanie, które „nie działa".
+
+```bash
+npm run build          # W KORZENIU repo, nie w server/
+```
+
+**Od 0.354.0 nie trzeba o tym pamiętać.** Panel nosi w zbudowanym `index.html`
+pieczątkę `<meta name="wertis-panel">`, a `/api/health` porównuje ją z wersją
+serwera. Rozjazd ustawia `"ok":false` i dopisuje zdanie do `problemy`, więc
+łapie go także `Test-WertisHealth` z instalatora.
+
+Pieczątki nie ma w buildach sprzed 0.354.0. `"panelObslugi":null` znaczy więc
+„panel jest stary albo nie ma go tu wcale" — i **nie** jest zgłaszane jako
+problem, żeby nie robić czerwonym każdego środowiska deweloperskiego.
 
 ## 3. Rejestracja usług Windows (NSSM)
 

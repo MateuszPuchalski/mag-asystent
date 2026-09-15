@@ -6,7 +6,7 @@ import {
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
-import { Pusto } from "../ui";
+import { Pusto, dniSlowo } from "../ui";
 import { CzipTagu } from "../sprawy/Tagi";
 import { mojaSprawa } from "../sprawy/Moje";
 
@@ -91,8 +91,10 @@ export const OCZEKIWANIA: Record<string, string> = {
   PARTIAL_REFUND: "częściowy zwrot",
 };
 
-/** „1 dzień", ale „2 dni". Polszczyzna ma tu jeden wyjątek i tylko jeden. */
-export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
+/* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
+   kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
+   sąsiednie pliki i test tej kolejki. */
+export { dniSlowo } from "../ui";
 
 /**
  * Dni do terminu decyzji — jedyna liczba na wierszu, którą czyta się jako pilność.

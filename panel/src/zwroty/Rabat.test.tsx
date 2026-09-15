@@ -23,7 +23,24 @@ describe("Rabat transakcyjny", () => {
     pasek(stan(), { onZglos });
     expect(screen.getByText(/brak wniosku/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /ZGŁOŚ RABAT/ }));
+    /* PIERWSZE KLIKNIĘCIE NIE SKŁADA WNIOSKU (audyt, 15 września 2026). */
+    expect(onZglos).not.toHaveBeenCalled();
+    expect(screen.getByText(/panel go nie wycofa/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /ZŁÓŻ WNIOSEK/ }));
     expect(onZglos).toHaveBeenCalled();
+  });
+
+  it("Anuluj zamyka pytanie i zostawia przycisk na miejscu", async () => {
+    /* §25a.5 żąda potwierdzenia tam, gdzie nie ma cofnięcia — a potwierdzenie
+       bez wyjścia byłoby pułapką, nie pytaniem. Wniosku Allegro nie wycofa
+       żadną końcówką, więc to jedyny moment, w którym da się wycofać ręką. */
+    const onZglos = vi.fn();
+    pasek(stan(), { onZglos });
+    await userEvent.click(screen.getByRole("button", { name: /ZGŁOŚ RABAT/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Anuluj/ }));
+    expect(onZglos).not.toHaveBeenCalled();
+    expect(screen.queryByText(/panel go nie wycofa/)).toBeNull();
+    expect(screen.getByRole("button", { name: /ZGŁOŚ RABAT/ })).toBeInTheDocument();
   });
 
   it("przyznany pokazuje kwotę prowizji i NIE daje przycisku", () => {

@@ -242,10 +242,13 @@ describe("Dowody", () => {
     expect(screen.getByText("wraca 2")).toBeInTheDocument();
   });
 
-  it("bez pobranego zamówienia pokazuje identyfikator i mówi, że treść dojdzie", () => {
+  it("bez pobranego zamówienia pokazuje identyfikator i MÓWI, CO ZROBIĆ", () => {
+    /* Do audytu z 15 września 2026 zdanie odsyłało do CZEKANIA na
+       synchronizację, choć przycisk „Dociągnij teraz" stoi dwa wiersze niżej.
+       Operator czekał na coś, co miał pod ręką. */
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByText("ord-1")).toBeInTheDocument();
-    expect(screen.getByText(/dociągnie ją najbliższa synchronizacja/)).toBeInTheDocument();
+    expect(screen.getByText(/Dociągnij je przyciskiem niżej/)).toBeInTheDocument();
   });
 
   it("odnośnik zamówienia wychodzi w nowej karcie i nie wynosi naszego adresu", () => {

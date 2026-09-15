@@ -34,6 +34,156 @@ historii nie przepisujemy.
 ---
 
 
+## 0.355.0 — 15 września 2026
+
+**Sześć komunikatów ekranu zwrotów kończy się ruchem, nie tłumaczeniem.**
+Przegląd wszystkich zdań widocznych dla człowieka w `zwroty/`
+i `ekrany/Zwroty.tsx`: 97 napisów, z czego większość to etykiety i odznaki
+nazywające stan, przy którym żaden ruch nie jest potrzebny. Sześć opisywało
+przeszkodę, która ma wyjście, i tego wyjścia nie nazywało.
+
+- **„Treści zamówienia jeszcze nie pobrano"** odsyłało do CZEKANIA na
+  synchronizację, a przycisk „Dociągnij teraz" stał dwa wiersze niżej. Ekran
+  nie tyle milczał, co odradzał ruch, który sam oferował. To najgorszy
+  przypadek z całej listy.
+- **Brak numeru zamówienia** kończył się ścianą; mówi teraz, że wycenę robi się
+  z pozycji, a zwrot zamyka numer korekty.
+- **Sygnał „kwota?"** mówił, co jest nie tak, i milkł — dopisuje „popraw kwotę".
+- **Sygnał „przelew?"** dopisuje „zapisz go w sekcji Pieniądze".
+- **„Zwrot bez pozycji"** nazywa obie drogi: dociągnięcie zamówienia albo
+  dopisanie tego, co przyszło w kartonie.
+- **„Kwoty pełnej nie znamy bez zamówienia"** wskazuje kolumnę, w której się je
+  dociąga.
+
+Reszty nie ruszono świadomie. Szukanie dokumentu sprzedaży po numerze to nowa
+końcówka, nie zdanie; a komunikat opisujący stan bez żadnego możliwego ruchu
+(„Allegro nie powiązało żadnej wiadomości") przerobiony na radę kłamałby.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`. Od 0.354.0 pilnuje tego `/api/health`.
+
+## 0.354.0 — 15 września 2026
+
+**`/api/health` sam wykrywa panel zostawiony na starym buildzie.** To jest
+najcichsza pomyłka wdrożenia, jaką zna ta aplikacja: `npm run build`
+w katalogu `server/` NIE przebudowuje panelu obsługi. Proces API wstaje wtedy
+z nowego kodu i melduje nową wersję, a ekran obsługi zostaje na poprzednim.
+Nic nie wygląda na zepsute — wygląda na wydanie, które „nie działa".
+
+- **Zbudowany panel nosi pieczątkę** `<meta name="wertis-panel">` z numerem
+  wersji z korzenia repo. Wstawia ją wtyczka Vite przy każdym buildzie.
+- **`/api/health` podaje `panelObslugi`** obok `wersja`, a rozjazd ustawia
+  `"ok":false` i dopisuje do `problemy` zdanie mówiące, CO zrobić i w KTÓRYM
+  katalogu. Łapie go przez to także `Test-WertisHealth` z instalatora.
+- **Brak pieczątki MILCZY.** `null` znaczy „panel sprzed tego wydania albo
+  instalacja bez panelu" — zdanie w tych przypadkach robiłoby czerwonym każde
+  środowisko deweloperskie, czyli uczyłoby ignorować listę problemów.
+- Akapit w `DEPLOY.md` przy tabeli odczytu zdrowia.
+
+Powodem jest własna blizna tej gałęzi: siedemnaście wydań panelu bez ani
+jednego potwierdzenia, że dotarły na wdrożony ekran. Recepta na dwa polecenia
+istniała w `DEPLOY.md` i nie została uruchomiona ani razu — więc recepta była
+złym rozwiązaniem. Pyta o to teraz sama trasa.
+
+## 0.353.0 — 15 września 2026
+
+**Kolejka zwrotów odzyskuje ekran.** Na laptopie 1366×768 pokazywała DWA
+zwroty; pokazuje cztery. W oknie 950 px — sześć zamiast czterech.
+
+Pomiar na żywym panelu, przed i po:
+
+| co | przed | po |
+|---|---|---|
+| chrom nad listą | 344 px | 265 px |
+| pasm nad listą | 7 | 5 |
+| wysokość wiersza | 110 px | 86 px |
+| zwrotów widocznych (1080 / 950 / 1366×768) | 5 / 4 / 2 | **7 / 6 / 4** |
+
+Żadna funkcja nie znika — zmieniło się rozmieszczenie:
+
+- **Pytanie kubełka i sito stoją w jednym paśmie.** Mówiły o tej samej liście:
+  „na jakim to etapie", „czyje to", „o czym to".
+- **„Nieodebrana" wchodzi w rząd pola szukania**, zamiast stać pod nim we
+  własnym wierszu. Przycisk zostaje na froncie — o to chodziło w 0.338.0 —
+  a pełne zdanie przenosi się do podpowiedzi.
+- **Login kupującego wraca do pierwszej linijki wiersza**, obok numeru zwrotu.
+  0.337.0 postawiło go osobno, żeby nie dokleić do nazwy towaru, bo nazwa bywa
+  ucięta; numer zwrotu ucięty nie bywa.
+- **Pasek skrótów mówi „lista" zamiast „ruch po liście"** — klawisz obok i tak
+  mówi, że chodzi o ruch.
+- **Budżetu pasm pilnuje test.** Siedem pasm nie powstało naraz: dokładało je
+  siedem wydań po jednym, każde za „tylko trzydzieści pikseli". Szóste
+  będzie musiało podnieść próg i zostawić zdanie.
+
+**Co zostaje niezrobione i jest jawnym długiem.** Pasmo filtrów i pasek
+skrótów dalej zawijają się na dwa rzędy — razem 114 px. Zmieszczenie ich
+w jednym rzędzie wymaga odebrania etykiet przyciskom i polom wyboru, czyli
+osiemdziesięciu pikseli kupionych za rozpoznawalność. To decyzja właściciela.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
+## 0.352.0 — 15 września 2026
+
+**Panel przestał pisać „5 pozycje" i „2 pasujących zwrotów".** Polszczyzna ma
+przy liczebniku trzy formy rzeczownika, a panel liczył dwie — w ośmiu
+miejscach na czterech ekranach.
+
+- **Reguła trzech form stoi w jednym miejscu** (`ui/odmien`, `ui/ile`)
+  i pilnuje jej bramka `ui/Odmiana.test.ts`. Zapala się tylko tam, gdzie obok
+  wyboru formy drukuje się liczba: bez liczebnika dwie formy wystarczą, więc
+  „ogląda"/„oglądają" zostaje.
+- **Osiem poprawionych miejsc.** Trzy myliły się w górę („5 pozycje", „i 5
+  inne", „5 inne rozmowy"), pięć w dół („2 pasujących zwrotów", „2 wymian",
+  „2 rozmów", „2 zdjęć", „2 doborów"). Drugi błąd był częstszy: dwójka
+  i trójka pojawiają się na ekranie o wiele częściej niż piątka.
+- **Jedyna poprawna kopia reguły** mieszkała jako prywatna funkcja
+  w `ekrany/Wiedza.tsx` i nikt jej nie znalazł. Przeniosła się do `ui/`.
+- **`dniSlowo` przyjechało z trzech kolejek**, gdzie stało przepisane znak
+  w znak. Tamte kopie były poprawne — „dni" brzmi tak samo w obu formach
+  mnogich — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
+- **Brak dokumentu sprzedaży kończy się ruchem, nie tłumaczeniem.** Ekran
+  wymieniał trzy powody i milkł; korekta zamyka zwrot tak samo bez dokumentu
+  i teraz to mówi.
+- **Kwoty i liczby sztuk przy pozycjach dostają `tabular-nums`** (potrącenie,
+  ilość zwrócona) — stoją jedna pod drugą i czyta się je w pionie.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
+## 0.351.0 — 15 września 2026
+
+**Ekran zwrotów przestał gubić pieniądze i przestał składać wnioski za łatwo.**
+Cztery poprawki z audytu ekranu zwrotów, wszystkie o ostatnim kroku pracy —
+tym, na którym z panelu wychodzą cudze pieniądze i cudze oświadczenia.
+
+- **Zapis korekty nie przewija już na następny zwrot, dopóki pieniądze wiszą.**
+  Ekran przeczył sam sobie: obiecywał „pieniądze oddajesz przyciskiem niżej —
+  także po zapisaniu korekty", a zaraz po zapisie zabierał ten zwrot z oczu.
+  Biuro wystawia korektę zwykle PRZED wypłatą, więc kursor uciekał dokładnie
+  przed ostatnim krokiem — i dlatego przelewy szły w Sales Center. Kursor
+  schodzi niżej dopiero wtedy, gdy zamknięte są obie drogi wypłaty: przez
+  Allegro i przelewem poza nim.
+- **Klawisz `Z` oddaje pieniądze.** Tabela klawiszy obiecywała jeden klawisz na
+  kubełek, a ostatni krok — jedyny, który rusza pieniędzmi — nie miał żadnego.
+  Klawisz robi to samo, co przycisk ODDAJ PIENIĄDZE, i tylko wtedy, gdy ten
+  przycisk stoi na ekranie; pasek skrótów dopisuje go ze stanu zwrotu, nie
+  z tabeli kubełków. Sam klawisz stoi też przy przycisku.
+- **ZGŁOŚ RABAT pyta, zanim złoży.** Wniosku Allegro nie wycofa żadna końcówka
+  i drugiego na tę samą pozycję złożyć się nie da, a przycisk składał go jednym
+  kliknięciem — siedząc na liście pozycji obok ocen klikanych dziesiątki razy
+  dziennie. Potwierdzenie mówi skutek, nie „czy na pewno".
+- **Odmowa wypłaty nie ma kodu wybranego z góry.** Stał tam `REFUND_REJECTED`
+  jako wybór pozornie ostrożny. Skutek był odwrotny: uzasadnienie „wysłaliśmy
+  nowy towar" wychodziło do klienta pod oświadczeniem, że odmawiamy zwrotu
+  pieniędzy. Wybór jest teraz świadomy albo nie ma go wcale.
+- Doktryna prostuje przy okazji własne zdanie: §25a.5 mówiło, że potwierdzenie
+  dostaje oddanie pieniędzy — a dwa akapity niżej, i w kodzie, było inaczej.
+  Zwrot pieniędzy cofa się dopłatą, więc potwierdzenia nie ma i mieć nie ma.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
 ## 0.350.2 — 15 września 2026
 
 **Przesyłka z paragonu nie wchodzi już do składu kompletu.** Na produkcji

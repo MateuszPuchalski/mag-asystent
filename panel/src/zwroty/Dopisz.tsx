@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { PackagePlus } from "lucide-react";
 import type { DoDopisania } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { Blad } from "../ui";
+import { Blad, ile, odmien } from "../ui";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 
 /* ── Produkt, którego klient nie zgłosił (0.184.0) ───────────────────────────
@@ -55,8 +55,8 @@ export function Dopisz({ kandydaci, trwa, blad, onDopisz }: {
 
   return <div className="mt-3 rounded-lg border border-slate-300 bg-slate-50 p-2">
     <p className="text-xs text-slate-600">
-      Z tego zamówienia {kandydaci.length === 1 ? "została" : "zostały"} jeszcze{" "}
-      {kandydaci.length === 1 ? "pozycja" : `${kandydaci.length} pozycje`}. Dopisz to,
+      Z tego zamówienia {odmien(kandydaci.length, "została", "zostały", "zostało")} jeszcze{" "}
+      {ile(kandydaci.length, "pozycja", "pozycje", "pozycji")}. Dopisz to,
       co naprawdę przyszło w kartonie.
     </p>
     <ul className="mt-2 space-y-1">

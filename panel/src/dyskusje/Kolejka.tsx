@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { MessageSquareWarning, Headset, Lock, CircleHelp, Scale, Hourglass } from "lucide-react";
 import type { Dyskusja, KubelekDyskusji, SygnalDyskusji } from "../api/typy";
-import { Pusto } from "../ui";
+import { Pusto, dniSlowo } from "../ui";
 import { CzipTagu } from "../sprawy/Tagi";
 import { mojaSprawa } from "../sprawy/Moje";
 
@@ -50,8 +50,10 @@ export const SYGNALY: Record<SygnalDyskusji,
     krotko: "status?", klasa: "bg-red-100 text-ranga-zle", ikona: <CircleHelp size={13} /> },
 };
 
-/** „1 dzień", ale „2 dni". Polszczyzna ma tu jeden wyjątek i tylko jeden. */
-export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
+/* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
+   kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
+   sąsiednie pliki i test tej kolejki. */
+export { dniSlowo } from "../ui";
 
 /**
  * Jak długo piłka jest po naszej stronie.

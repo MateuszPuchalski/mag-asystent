@@ -129,7 +129,7 @@ describe("Pole szukania zwrotu", () => {
   it("mówi, ile pasuje i że szuka poza kubełkiem", () => {
     /* Bez tego zdania wynik z kubełka ZAMKNIĘTE wyglądałby jak praca. */
     pokaz(null, { fraza: "567", ile: 3 });
-    expect(screen.getByText(/3 pasujących zwrotów — szukam po wszystkich kubełkach/))
+    expect(screen.getByText(/3 zwroty pasują — szukam po wszystkich kubełkach/))
       .toBeInTheDocument();
   });
 
@@ -179,7 +179,7 @@ describe("Pole szukania zwrotu", () => {
        wtedy zobacz przycisk. Przy paczce na krzyż to przechodzi; przy „sporo
        paczek" to codzienna praca schowana za komunikatem o błędzie. */
     const p = pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Paczka nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
     /* Bez skanu numer listu trzeba WPISAĆ: to jedyny uchwyt takiej paczki. */
     await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-1");
     await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-4");
@@ -191,7 +191,7 @@ describe("Pole szukania zwrotu", () => {
     /* Serwer i tak odmówi („numer listu jest tu jedynym uchwytem"), a odmowa
        po kliknięciu kosztuje przejście w obie strony. */
     pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Paczka nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
     expect(screen.getByRole("button", { name: /Zarejestruj paczkę/ })).toBeDisabled();
   });
 
