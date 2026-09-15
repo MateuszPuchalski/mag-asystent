@@ -126,7 +126,12 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  /* `odeslanie_zadania` (0.352.0) — odpowiedź hali BEZ wyniku. Musi tu stać
+     jawnie: nieznany rodzaj wpada w `Os.tsx` do gałęzi domyślnej, czyli
+     rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
+     zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
+    | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -713,9 +718,23 @@ export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   lokalizacja: string | null; priorytet: "normalny" | "pilny";
-  status: "nowe" | "w_toku" | "wykonane" | "anulowane";
+  /* `odeslane` (0.352.0): hala odpowiedziała, ale bez wyniku. Ruch wraca do
+     biura, a nie do magazynu — dlatego to osobny status, nie `anulowane`
+     (anuluje zlecający) ani `wykonane` (to byłby pomiar, którego nie ma). */
+  status: "nowe" | "w_toku" | "wykonane" | "anulowane" | "odeslane";
   utworzonoAt: string; utworzonoPrzez: string; przypisanoPrzez: string | null;
   wynik: string | null; wykonanoPrzez: string | null;
+  odeslanoAt: string | null; odeslanoPrzez: string | null;
+  powodKod: "brak_towaru" | "nie_da_sie" | null; powod: string | null;
+  /* Liczy SERWER, nie ekran — patrz `zleconeOdMs` w `zadania-terenowe.ts`.
+     `null` przy zadaniu zamkniętym. */
+  zleconeOdMs: number | null;
+  /* Zdjęcia od hali (§13.3) — sama lista, treść ciągnie `useZdjecieZadania`. */
+  zalaczniki: ZalacznikZadania[];
+}
+
+export type ZalacznikZadania = {
+  id: number; opis: string | null; at: string; przez: string;
 };
 
 export type StatusSynchronizacji =
