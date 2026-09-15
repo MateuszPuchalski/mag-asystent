@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.6 — 15 września 2026
+
+**ZW przelicza się sam po zerach, ale skutek magazynowy bierze z paragonu.**
+Sonda `-SzkicZW -Ilosci "2=0"` na PA 8995/MAG/03/2026 z dwiema pozycjami
+(`docs/sfera-com.md` §2m).
+
+- **Po `IloscJm = 0` Subiekt przelicza dokument sam.** Wartość, kwota do zapłaty
+  i przelew zeszły z 26,89 do 14,99 zł; wyzerowany wiersz został na ZW.
+- **Przelew i tak ustawiamy jawnie.** Po wcześniejszym ZW do tego samego paragonu
+  szkic zaczyna od kwoty całego paragonu.
+- **Nowe pytanie: `SkutekMagazynowy = False` na tym szkicu**, przy `True` na dwóch
+  poprzednich. ZW przejmuje go od paragonu, a to decyduje o zgraniu z MM do
+  magazynu zwrotów.
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.5 — 15 września 2026
 
 **Drugi ZW do tego samego paragonu i poprawka o `DokHanLp`.** Sonda `-SzkicZW`
