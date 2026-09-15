@@ -422,6 +422,20 @@ dokumentu — to „Zapłacono przelewem 100%" z okna ZW.
 w oknie na „zwrot ze sprzedaży". Liczbę tej wartości poda odczyt ZW wystawionego
 ręcznie (`-WzorZW`).
 
+**`NaPodstawie` blokuje paragon.** Drugi przebieg na tym samym PA odmówił:
+„Nie można zablokować obiektu. Obiekt został zablokowany przez operatora…
+na stacji…". Blokadę trzymało okno Subiekta tego operatora albo szkic
+z pierwszego przebiegu. Sonda do 0.348.3 nie zamykała szkicu ani sesji.
+
+Dokument ma `void Zamknij()`, a sesja `bool Zakoncz()`. Dla automatycznego ZW
+wynikają z tego dwie zasady. Po `Zapisz()` worker zamyka dokument, bo inaczej
+biuro nie otworzy paragonu. Odmowa blokady znaczy „spróbuj później", nie błąd
+zwrotu — biuro może mieć paragon otwarty.
+
+`[WERYFIKUJ]` Worker nie woła dziś `Zamknij()` po `Zapisz()` przy MM ani KFS.
+Czy zapisany dokument zostaje przez to zablokowany dla biura, pokaże pierwsze
+MM na produkcji.
+
 `[WERYFIKUJ]` Czy po `IloscJm = 0` wartość i przelew przeliczają się same.
 Czy zero usuwa wiersz, czy go zostawia. Zamyka to `-SzkicZW -Ilosci` na paragonie
 z kilkoma pozycjami.
