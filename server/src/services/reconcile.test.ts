@@ -146,8 +146,10 @@ test("zwrot ZAMKNIĘTY nie ma już terminu do pilnowania", () => {
 
 test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
   zwrotZgloszonyPrzed(3, "ROZL-1");
-  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED'
-    WHERE reference_number='ROZL-1'`).run();
+  /* Zgłoszenie DZISIEJSZE: od 0.340.0 kontrola woła tylko o zwroty zgłoszone
+     po progu `ZWROT_ROZLICZONE_OD`, a atrapa cofa datę o kilka dni. */
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED',
+    created_at=datetime('now') WHERE reference_number='ROZL-1'`).run();
   const w = reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty");
   assert.equal(w.length, 1);
   assert.match(w[0].opis, /ROZL-1/);
@@ -156,19 +158,38 @@ test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
   assert.equal(listaZwrotow(db()).find((z) => z.numer === "ROZL-1")?.kubelek, "zamkniety");
 });
 
+test("zwrot rozliczony PRZED progiem milczy — to historia, nie praca (0.340.0)", () => {
+  /* Kontrola powstała w 0.339.0, a historia firmy niesie setki zwrotów
+     rozliczonych w panelu Allegro, których korekt nikt już wstecz nie
+     wystawi. Raport z setką wierszy przestaje być czytany — blizna 0.319.0,
+     gdzie czterysta trzydzieści trzy wiersze zjadły cały ekran.
+
+     Próg stoi w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia. Ten
+     test podaje zwrot ze stycznia, czyli grubo przed każdym sensownym progiem. */
+  zwrotZgloszonyPrzed(3, "STARY-1");
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED',
+    created_at='2026-01-10T08:00:00Z' WHERE reference_number='STARY-1'`).run();
+  assert.equal(reconcile().rozjazdy
+    .filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty").length, 0);
+});
+
 test("zwrot rozliczony Z KOREKTĄ i z ocenami milczy — nic nie zostało", () => {
   /* Raport wołający o sprawy załatwione uczy przewijać raport. */
   zwrotZgloszonyPrzed(3, "ROZL-2");
+  /* Data po progu, żeby ten test mierzył KOREKTĘ, a nie odcięcie czasowe. */
   db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED_APT',
-    korekta_numer='KFS 9/2026' WHERE reference_number='ROZL-2'`).run();
+    korekta_numer='KFS 9/2026', created_at=datetime('now')
+   WHERE reference_number='ROZL-2'`).run();
   assert.equal(reconcile().rozjazdy
     .filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty").length, 0);
 });
 
 test("zwrot ODRZUCONY nie woła o korektę — nie ma czego korygować", () => {
   zwrotZgloszonyPrzed(3, "ROZL-3");
+  /* Data po progu, żeby ten test mierzył ODMOWĘ, a nie odcięcie czasowe. */
   db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED',
-    rejection_code='REFUND_REJECTED' WHERE reference_number='ROZL-3'`).run();
+    rejection_code='REFUND_REJECTED', created_at=datetime('now')
+   WHERE reference_number='ROZL-3'`).run();
   assert.equal(reconcile().rozjazdy
     .filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty").length, 0);
 });

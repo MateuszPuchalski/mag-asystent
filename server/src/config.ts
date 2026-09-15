@@ -426,6 +426,27 @@ export const config = {
      */
     zwrotyOd: data(process.env.ALLEGRO_ZWROTY_OD, "2026-08-19T22:00:00Z", "ALLEGRO_ZWROTY_OD"),
     /**
+     * Od kiedy raport woła o zwrot rozliczony POZA aplikacją (0.340.0).
+     *
+     * Kontrola `zwrot_rozliczony_bez_korekty` powstała w 0.339.0 razem
+     * z decyzją, że taki zwrot schodzi z kolejki pracy — miała nie dać mu
+     * zniknąć w ciszy razem z korektą i towarem. Na historii firmy wołałaby
+     * jednak o setki spraw sprzed wdrożenia, których korekt nikt już wstecz
+     * nie wystawi, a raport z setką wierszy przestaje być czytany (blizna
+     * 0.319.0: czterysta trzydzieści trzy wiersze zjadły cały ekran).
+     *
+     * Decyzja właściciela: liczymy OD DNIA WDROŻENIA 0.340.0, czyli 15
+     * WRZEŚNIA 2026, północ czasu lokalnego (stąd 14 września 22:00 UTC —
+     * Polska jest we wrześniu na UTC+2). Łapiemy to, co jeszcze da się
+     * naprawić, i nie wypominamy tego, czego nie da.
+     *
+     * Próg stoi po dacie ZGŁOSZENIA zwrotu, bo momentu rozliczenia Allegro
+     * nam nie podaje — jest tylko status „teraz". Data zgłoszenia jest
+     * zawsze wcześniejsza, więc próg myli się w stronę CISZY, a nie hałasu.
+     */
+    zwrotyRozliczoneOd: data(
+      process.env.ZWROT_ROZLICZONE_OD, "2026-09-14T22:00:00Z", "ZWROT_ROZLICZONE_OD"),
+    /**
      * Takt uzupełniania OFERT do rozmów; 0 wyłącza ticker.
      *
      * Rzadszy niż skrzynka i gęstszy niż zamówienia: tytuł oferty jest
