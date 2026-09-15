@@ -215,9 +215,15 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
  * Numeru listu przewozowego tu NIE MA i nie będzie: nie zapisujemy go
  * w modelu pracy (polityka danych zwrotów), więc szuka go dopiero serwer
  * w kopii odpowiedzi Allegro.
+ *
+ * LOGIN KUPUJĄCEGO doszedł w 0.337.0 na zgłoszenie właściciela. Odpowiada na
+ * inne pytanie niż numery: nie „gdzie jest TA paczka", tylko „co jeszcze mam
+ * od TEGO klienta" — a to pytanie pada przy każdej rozmowie, w której klient
+ * mówi o dwóch przesyłkach naraz. Jedyny uchwyt, jaki wtedy jest pod ręką.
  */
-const kody = (z: Zwrot) => [z.numer, z.externalId, z.orderId, z.korektaNumer]
-  .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+const kody = (z: Zwrot) =>
+  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Zwroty() {
   const { id } = useParams();
@@ -751,6 +757,7 @@ export function Zwroty() {
                 }}
                 doDopisania={szczegol.data?.doDopisania ?? []}
                 sklady={szczegol.data?.sklady ?? {}}
+                wierszeDokumentu={szczegol.data?.wierszeDokumentu ?? []}
                 bladDopisania={bladDopisania}
                 onDopisz={(zamPozycjaId) => {
                   setBladDopisania("");

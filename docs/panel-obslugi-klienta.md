@@ -2836,6 +2836,67 @@ starej zawartości traci ważność, tak samo jak przy przeliczeniu kosza.
 Ptaszki pokazują się dopiero wtedy, gdy pozycja leży w koszyku. Wcześniej skład
 jest planem i wiersz mówi tylko, co do koszyka wejdzie.
 
+**Skład wolno wskazać ręką (0.336.0).** Zgłoszenie właściciela: „rozwiąż «nie
+weszła do koszyka» — nie wiem, gdzie to wskazać". Automat sam odsyłał do
+ręcznej drogi zdaniem „wskaż skład ręcznie", a drogi nie było: kolumna
+`zrodlo='biuro'` stała w schemacie od 0.328.0 i nie miał jej kto wypełnić.
+
+**Automat milczy częściej, niż się wydawało.** Odejmowanie z paragonu wymaga,
+żeby KAŻDA POZOSTAŁA oferta zamówienia miała kartotekę. Mapowanie ofert
+wypełnia się dopiero przy zwrocie danej oferty, więc w zamówieniu na pięć
+różnych rzeczy automat prawie zawsze odmawia. Nie dlatego, że dane są złe —
+nie ma ich skąd wziąć. Człowiek patrzy na paragon i wie w pięć sekund.
+
+Pod zdaniem o niewejściu stoi teraz przycisk WSKAŻ SKŁAD RĘCZNIE, czyli w tym
+samym miejscu, w którym człowiek właśnie czyta o kłopocie. Formularz wymienia
+wiersze paragonu z polami zaznaczenia; sztuki podpowiada z dokumentu i pyta
+o liczbę NA JEDEN KOMPLET, bo tak myśli człowiek patrzący na zestaw.
+
+Materiałem są wiersze paragonu, nie wyszukiwarka kartotek. Dowolna kartoteka
+znaczyłaby drogę, którą na dokument MM trafia towar nieobecny na żadnej
+sprzedaży. Zapisany skład zapamiętuje się przy ofercie, więc następny zwrot
+tego zestawu idzie bez pytania, a poprawka ZASTĘPUJE poprzedni skład.
+
+Pozycja z oceną „na stan" wchodzi do koszyka od razu po zapisie. Kazanie
+operatorowi cofnąć ocenę i postawić ją drugi raz byłoby pytaniem o to, co już
+powiedział.
+
+**[poprawka] Powód niewejścia przestaje się zestarzeć.** Zdanie „nie weszła do
+koszyka" jedzie w szczególe zwrotu, a zatwierdzenie kartoteki i ocena
+unieważniały wyłącznie kolejkę. Pozycja miała już kartotekę, a panel dalej
+pisał, że jej nie ma — tak wyglądał pierwszy zrzut od właściciela.
+
+**Szukanie widzi login kupującego (0.337.0).** Zgłoszenie właściciela: „zwroty
+powinien móc szukać po loginie klienta". Filtr frazy porównywał dotąd cztery
+numery: zwrotu, Allegro, zamówienia i korekty.
+
+Login odpowiada na INNE pytanie niż numery. Numer mówi, gdzie jest ta jedna
+paczka; login — co jeszcze mamy od tego klienta. To pytanie pada przy każdej
+rozmowie, w której klient wspomina o dwóch przesyłkach naraz, a numeru żadnej
+z nich nie podaje.
+
+Wiersz kolejki pokazuje login osobną linijką. Trafienie, którego nie widać,
+wygląda na przypadek: operator nie wie, czemu ten zwrot wszedł na listę.
+Zwrot bez loginu nie zostawia pustej linijki — Allegro nie zawsze go podaje.
+
+**Paczka nieodebrana wychodzi ze ślepego zaułka (0.338.0).** Zgłoszenie
+właściciela: „jest sporo paczek, które po prostu zostały nieodebrane i wracają
+do nas — znajdź sposób, aby wyświetlały mi się w zakładce zwroty".
+
+Wyświetlały się od 0.172.0. Ślepy zaułek był po stronie DROGI: żeby dojść do
+rejestracji, trzeba było najpierw zeskanować kod, dostać „nie znam kodu"
+i dopiero wtedy zobaczyć przycisk. Przy paczce na krzyż to przechodzi; przy
+„sporo paczek" jest to codzienna praca schowana za komunikatem o błędzie.
+
+Przycisk PACZKA NIEODEBRANA stoi teraz pod polem szukania, bez żadnego
+warunku. Otwarty bez skanu formularz pyta o numer listu z naklejki — to jedyny
+uchwyt takiej paczki, bo Allegro nie zna zwrotu, którego klient nie zgłosił.
+Po nieudanym skanie numer bierze się ze skanu i drugiego pola nie ma.
+
+Wszystkie takie paczki widać, wpisując w szukanie „nieodebrana". Osobne sito
+nie jest do tego potrzebne: identyfikatorem jest nasz `nieodebrana:<numer
+listu>`, a filtr frazy porównuje właśnie identyfikatory.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

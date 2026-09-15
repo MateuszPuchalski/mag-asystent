@@ -296,13 +296,18 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      na oba kierunki, bo to przełącznik — ciało niesie stan docelowy, nie
      czynność. Dokładania pozycji dalej nie ma i to się NIE zmieniło: ptaszek
      rusza wiersz kompletu, który ocena „na stan" już do koszyka włożyła. */
-  assert.equal(posty.length, 28,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu ośmiu`);
+  /* Dwudziesta dziewiąta (0.336.0): ręczne wskazanie składu kompletu. Automat
+     odsyłał do tej drogi zdaniem „wskaż skład ręcznie", a drogi nie było —
+     odejmowanie z paragonu wymaga kartoteki przy KAŻDEJ pozostałej ofercie
+     zamówienia, a te wypełniają się dopiero przy zwrocie tamtej oferty. */
+  assert.equal(posty.length, 29,
+    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu dziewięciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
-    "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik"]) {
+    "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
+    "sklad"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

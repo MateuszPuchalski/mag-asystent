@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -10,6 +10,10 @@ import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZ
 export const kluczeZwrotow = {
   kolejka: ["zwroty"] as const,
   zwrot: (id: number) => ["zwrot", id] as const,
+  /* Przedrostek WSZYSTKICH szczegółów — dla zapisów, które nie znają numeru
+     zwrotu, a zmieniają to, co szczegół niesie (0.336.0). Otwarty jest i tak
+     jeden, więc nic zbędnego się tym nie odświeża. */
+  szczegoly: ["zwrot"] as const,
   kosz: ["zwroty", "kosz"] as const,
 };
 
@@ -29,6 +33,9 @@ export function useZwrot(id: number | null) {
       /* Klucz to identyfikator pozycji. Serwer liczy to TYLKO w szczególe —
          w kolejce byłoby kilkaset zapytań o dokumenty i mapowania ofert. */
       sklady: Record<number, SkladPozycji>;
+      /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
+         zwrot, bo dokument jest jeden. */
+      wierszeDokumentu: WierszDokumentu[];
     }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,
@@ -54,7 +61,14 @@ export function usePotwierdzKartoteke() {
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/kartoteka`,
         { method: "POST", body: JSON.stringify({ twId: v.twId, zrodlo: v.zrodlo }) },
       ),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    /* SZCZEGÓŁ TEŻ (0.336.0). To on niesie `sklady`, czyli zdanie „nie weszła
+       do koszyka — POWÓD". Bez tego zatwierdzenie kartoteki zostawiało na
+       ekranie powód sprzed zatwierdzenia: pozycja miała już kartotekę, a panel
+       dalej pisał, że jej nie ma. Zgłoszenie właściciela z 0.336.0. */
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+    },
   });
 }
 
@@ -146,6 +160,29 @@ export function useZaznaczSkladnik() {
   });
 }
 
+/**
+ * Ręczne wskazanie składu kompletu (0.336.0).
+ *
+ * Odświeża szczegół (powód i skład), kolejkę (`wKoszyku` pozycji) i pasek
+ * koszyka: zapis wkłada pozycję do pudła, gdy ocena „na stan" już stoi.
+ */
+export function useWskazSklad() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: {
+      pozycjaId: number; zwrotId: number;
+      skladniki: Array<{ twId: number; naKomplet: number }>;
+    }) => api<{ sklad: SkladPozycji; koszyk: number | null }>(
+      `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/sklad`,
+      { method: "POST", body: JSON.stringify({ skladniki: v.skladniki }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
+  });
+}
+
 export function useOcena() {
   const qc = useQueryClient();
   return useMutation({
@@ -162,6 +199,8 @@ export function useOcena() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      /* I szczegół — po ocenie zmienia się `wKoszyku` każdego składnika. */
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
     },
   });
 }

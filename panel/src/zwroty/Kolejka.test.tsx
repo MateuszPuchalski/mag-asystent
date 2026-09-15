@@ -372,3 +372,21 @@ describe("Dowody", () => {
     expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
   });
 });
+
+describe("Login kupującego na wierszu (0.337.0)", () => {
+  it("wiersz pokazuje login, bo od tego wydania szuka się po nim", () => {
+    /* Trafienie, którego nie widać, wygląda na przypadek: operator nie wie,
+       czemu ten zwrot wszedł na listę wyników. */
+    render(<Kolejka zwroty={[zwrot({ kupujacyLogin: "ogrodnik_77" })]} wybrany={null}
+      onWybierz={() => {}} />);
+    expect(screen.getByText("ogrodnik_77")).toBeInTheDocument();
+  });
+
+  it("brak loginu NIE zostawia pustej linijki", () => {
+    /* Allegro nie zawsze go podaje, a pusty wiersz rozpycha kolejkę o rząd
+       pikseli, który nic nie znaczy. */
+    const { container } = render(<Kolejka zwroty={[zwrot({ kupujacyLogin: null })]}
+      wybrany={null} onWybierz={() => {}} />);
+    expect(container.textContent).not.toContain("ogrodnik_77");
+  });
+});

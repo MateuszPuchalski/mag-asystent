@@ -160,6 +160,36 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.getByText(/będzie co wycenić/)).toBeInTheDocument();
   });
 
+  it("paczkę nieodebraną da się zarejestrować BEZ nieudanego skanu (0.338.0)", async () => {
+    /* Zgłoszenie właściciela: „jest sporo paczek, które po prostu zostały
+       nieodebrane i wracają do nas". Droga istniała od 0.172.0, ale szła przez
+       ślepy zaułek — najpierw zeskanuj kod, dostań „nie znam kodu", dopiero
+       wtedy zobacz przycisk. Przy paczce na krzyż to przechodzi; przy „sporo
+       paczek" to codzienna praca schowana za komunikatem o błędzie. */
+    const p = pokaz(null);
+    await userEvent.click(screen.getByRole("button", { name: /Paczka nieodebrana/ }));
+    /* Bez skanu numer listu trzeba WPISAĆ: to jedyny uchwyt takiej paczki. */
+    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-1");
+    await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-4");
+    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
+    expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-1", "ord-4", "");
+  });
+
+  it("bez numeru listu rejestracja MILCZY", async () => {
+    /* Serwer i tak odmówi („numer listu jest tu jedynym uchwytem"), a odmowa
+       po kliknięciu kosztuje przejście w obie strony. */
+    pokaz(null);
+    await userEvent.click(screen.getByRole("button", { name: /Paczka nieodebrana/ }));
+    expect(screen.getByRole("button", { name: /Zarejestruj paczkę/ })).toBeDisabled();
+  });
+
+  it("po nieudanym skanie numer BIERZE SIĘ ZE SKANU, bez drugiego pola", async () => {
+    /* Dwa pola na ten sam numer byłyby pytaniem o to, co czytnik już podał. */
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
+    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
+    expect(screen.queryByLabelText("Numer listu przewozowego")).toBeNull();
+  });
+
   it("bez podpiętej obsługi ekran nie proponuje rejestracji", () => {
     /* Przycisk bez działania obiecywałby drogę, której nie ma. */
     pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { onNieodebrana: undefined });

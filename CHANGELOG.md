@@ -34,6 +34,62 @@ historii nie przepisujemy.
 ---
 
 
+## 0.338.0 — 15 września 2026
+
+**Paczka nieodebrana wychodzi ze ślepego zaułka.** Zgłoszenie właściciela:
+„jest sporo paczek, które po prostu zostały nieodebrane i wracają do nas —
+znajdź sposób, aby wyświetlały mi się w zakładce zwroty".
+
+Wyświetlały się od 0.172.0. Zaułkiem była DROGA: rejestracja pokazywała się
+dopiero po nieudanym skanie, czyli za komunikatem o błędzie. Przy paczce na
+krzyż to przechodzi, przy „sporo paczek" — nie.
+
+- **Przycisk PACZKA NIEODEBRANA pod polem szukania**, bez warunku.
+- **Formularz otwarty bez skanu pyta o numer listu** z naklejki; po nieudanym
+  skanie numer bierze się ze skanu i drugiego pola nie ma.
+- Bez numeru listu przycisk rejestracji milczy — serwer i tak by odmówił.
+- Wszystkie takie paczki wyciąga wpisanie „nieodebrana" w szukanie; osobne
+  sito nie jest potrzebne, bo identyfikator niesie ten przedrostek.
+
+## 0.337.0 — 15 września 2026
+
+**Zwroty szukają po loginie kupującego.** Zgłoszenie właściciela. Filtr frazy
+porównywał cztery numery — zwrotu, Allegro, zamówienia i korekty — a login
+odpowiada na inne pytanie: nie „gdzie jest TA paczka", tylko „co jeszcze mam
+od TEGO klienta". Pada przy każdej rozmowie o dwóch przesyłkach naraz.
+
+- **Login wchodzi do filtru frazy**, obok czterech numerów.
+- **Wiersz kolejki pokazuje login** osobną linijką: trafienie, którego nie
+  widać, wygląda na przypadek. Zwrot bez loginu nie zostawia pustej linijki.
+- Pole szukania mówi o tym wprost w podpowiedzi.
+
+## 0.336.0 — 15 września 2026
+
+**„Nie weszła do koszyka" ma wreszcie drogę wyjścia.** Zgłoszenie właściciela:
+„rozwiąż «nie weszła do koszyka» — nie wiem, gdzie to wskazać". Automat sam
+odsyłał zdaniem „wskaż skład ręcznie", a takiej drogi w panelu nie było.
+
+Automat milczy częściej, niż zakładaliśmy: odejmowanie z paragonu wymaga
+kartoteki przy KAŻDEJ pozostałej ofercie zamówienia, a mapowanie powstaje
+dopiero przy zwrocie tamtej oferty. W zamówieniu na pięć różnych rzeczy
+odmawia prawie zawsze.
+
+- **WSKAŻ SKŁAD RĘCZNIE** pod zdaniem o niewejściu (panel obsługi, zwroty).
+  Formularz wymienia wiersze paragonu, podpowiada sztuki z dokumentu i pyta
+  o liczbę na JEDEN komplet.
+- **Zapisany skład zapamiętuje się przy ofercie**, więc następny zwrot tego
+  zestawu idzie bez pytania. Poprawka zastępuje poprzedni skład w całości.
+- **Pozycja z oceną „na stan" wchodzi do koszyka od razu** — bez cofania
+  i powtarzania oceny.
+- Odmowy pilnują dokumentu MM: pusty skład, zerowa ilość, kartoteka spoza
+  kopii Subiekta i ta sama kartoteka dwa razy.
+- **[poprawka] Powód niewejścia przestaje się zestarzeć.** Zatwierdzenie
+  kartoteki i ocena unieważniały tylko kolejkę, a zdanie jedzie w szczególe:
+  pozycja miała już kartotekę, a panel dalej pisał, że jej nie ma.
+- **[poprawka] „W zamówieniu są 5 oferty"** czytało się jak usterka panelu.
+  Zdanie mówi teraz „Ofert bez kartoteki na tym dokumencie: 5".
+- Umowa tras POST zwrotów: 28 → 29.
+
 ## 0.335.0 — 14 września 2026
 
 **Składniki kompletu można zaznaczać.** Zgłoszenie właściciela: „powinno

@@ -10,9 +10,11 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
    `fetch`: test pilnuje, CO panel wysyła, a nie jak wygląda żądanie — od tego
    jest `api/klient.test.ts`. */
 const zaznacz = vi.fn();
+const wskaz = vi.fn();
 vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   useZaznaczSkladnik: () => ({ mutate: zaznacz, isPending: false, error: null }),
+  useWskazSklad: () => ({ mutate: wskaz, isPending: false, error: null }),
 }));
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
@@ -470,3 +472,66 @@ describe("Pozycja dopisana przez biuro", () => {
     expect(screen.queryByText(/Nie weszła do koszyka/)).toBeNull();
   });
 
+
+describe("Ręczne wskazanie składu (0.336.0)", () => {
+  /* Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
+     to wskazać". Automat odsyłał do ręcznej drogi zdaniem „wskaż skład
+     ręcznie", a drogi nie było. */
+  const WIERSZE = [
+    { twId: 21, symbol: "SEK-01", nazwa: "Sekator", naDokumencie: 1 },
+    { twId: 23, symbol: "REK-02", nazwa: "Rękawice", naDokumencie: 4 },
+  ];
+  const bezSkladu = (h: Partial<Parameters<typeof Pozycje>[0]> = {}) =>
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null, offerId: "of-KPL" }),
+    ] }), { sklady: { 1: { zrodlo: null, skladniki: [],
+      powod: "Ofert bez kartoteki na tym dokumencie: 3 — wskaż skład ręcznie" } },
+      wierszeDokumentu: WIERSZE, ...h });
+
+  it("powód niewejścia niesie DROGĘ WYJŚCIA, a nie samo zdanie o kłopocie", async () => {
+    bezSkladu();
+    /* Po roli, nie po tekście: to samo zdanie pisze SERWER w powodzie, a tu
+       chodzi o przycisk, czyli o drogę, a nie o opis kłopotu. */
+    await userEvent.click(screen.getByRole("button", { name: /wskaż skład ręcznie/ }));
+    expect(screen.getByText(/Zaznacz wiersze paragonu/)).toBeInTheDocument();
+    /* Materiałem są WIERSZE PARAGONU, nie wyszukiwarka kartotek. */
+    expect(screen.getByRole("checkbox", { name: /SEK-01/ })).toBeInTheDocument();
+  });
+
+  it("sztuki podpowiadają się z paragonu i lecą jako ILOŚĆ NA KOMPLET", async () => {
+    bezSkladu();
+    await userEvent.click(screen.getByRole("button", { name: /wskaż skład ręcznie/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /REK-02/ }));
+    const ile = screen.getByRole("textbox", { name: /Sztuk na komplet — REK-02/ });
+    expect(ile).toHaveValue("4");
+    await userEvent.clear(ile);
+    await userEvent.type(ile, "2");
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz skład/ }));
+    expect(wskaz).toHaveBeenCalledWith(
+      { pozycjaId: 1, zwrotId: 1, skladniki: [{ twId: 23, naKomplet: 2 }] },
+      expect.anything());
+  });
+
+  it("pusty skład nie ma czego zapisać, więc przycisk MILCZY", async () => {
+    bezSkladu();
+    await userEvent.click(screen.getByRole("button", { name: /wskaż skład ręcznie/ }));
+    expect(screen.getByRole("button", { name: /Zapisz skład/ })).toBeDisabled();
+  });
+
+  it("bez dokumentu sprzedaży mówi, czego brakuje, zamiast pokazywać pustą listę", async () => {
+    /* To INNA usterka, ze swoją drogą: wskazanie paragonu w kolumnie dowodów.
+       Pusta lista wyglądałaby na zepsuty ekran. */
+    bezSkladu({ wierszeDokumentu: [] });
+    await userEvent.click(screen.getByRole("button", { name: /wskaż skład ręcznie/ }));
+    expect(screen.getByText(/nie ma wskazanego dokumentu sprzedaży/)).toBeInTheDocument();
+  });
+
+  it("pozycja, która WESZŁA do koszyka, nie pyta o skład", () => {
+    lista(zwrot({ kubelek: "zwrot", pozycje: [
+      POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
+    ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
+      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
+    ] } }, wierszeDokumentu: WIERSZE });
+    expect(screen.queryByRole("button", { name: /wskaż skład ręcznie/ })).toBeNull();
+  });
+});

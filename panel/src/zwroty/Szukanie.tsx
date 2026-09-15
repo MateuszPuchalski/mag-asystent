@@ -51,15 +51,54 @@ export function Szukanie({
   const [nieodebrana, setNieodebrana] = useState(false);
   const [zamowienie, setZamowienie] = useState("");
   const [notatka, setNotatka] = useState("");
+  /* Numer listu WPISANY, gdy formularz otwarto przyciskiem, a nie po nieudanym
+     skanie (0.338.0). Przy skanie numer jest już w `kod` i pola nie ma. */
+  const [list, setList] = useState("");
   const brak = wynik?.trafienie === null;
   const wiele = wynik?.trafienie === "wiele";
+  /* Numer listu: ze skanu, gdy formularz wyszedł z nieudanego szukania,
+     a z pola, gdy operator otworzył go sam. */
+  const zeSkanu = brak && Boolean(kod);
+  const numerListu = (zeSkanu ? kod : list).trim();
+
+  const formularz = onNieodebrana
+    ? <div className="mt-2 rounded-lg border border-amber-300 bg-white p-2 text-xs">
+        <p className="text-slate-600">
+          Klient nie odebrał przesyłki i wróciła do nas. To NIE jest zwrot
+          zgłoszony przez klienta — panel oznaczy ją wprost.</p>
+        {zeSkanu
+          ? <p className="mt-1 text-slate-500">
+              Numer listu: <b className="break-all font-mono">{kod}</b></p>
+          /* Bez skanu numer trzeba WPISAĆ: to jedyny uchwyt takiej paczki,
+             bo Allegro nie zna zwrotu, którego klient nie zgłosił. */
+          : <input className="field mt-2 h-7 text-xs" value={list} autoFocus
+              aria-label="Numer listu przewozowego" placeholder="Numer listu z naklejki"
+              onChange={(e) => setList(e.target.value)} />}
+        <input className="field mt-2 h-7 text-xs" value={zamowienie}
+          aria-label="Numer zamówienia" placeholder="Numer zamówienia (jeśli znasz)"
+          onChange={(e) => setZamowienie(e.target.value)} />
+        <p className="mt-1 text-slate-500">
+          Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
+        <input className="field mt-2 h-7 text-xs" value={notatka}
+          aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
+          onChange={(e) => setNotatka(e.target.value)} />
+        <div className="mt-2 flex gap-2">
+          <button type="button" disabled={rejestruje || !numerListu}
+            onClick={() => onNieodebrana(numerListu, zamowienie.trim(), notatka.trim())}
+            className="btn-primary text-xs">
+            {rejestruje ? "Rejestruję…" : "Zarejestruj paczkę"}</button>
+          <button type="button" className="btn-secondary text-xs"
+            onClick={() => { setNieodebrana(false); setList(""); }}>Wróć</button>
+        </div>
+      </div>
+    : null;
 
   return <div className="shrink-0 border-b border-slate-200 p-2">
     <div className="relative flex items-center gap-2">
       <ScanLine size={16} className="shrink-0 text-slate-400" />
       <input
         className={`field h-8 flex-1 text-sm ${fraza ? "pr-8" : ""}`}
-        placeholder="Zeskanuj etykietę albo szukaj po numerze"
+        placeholder="Zeskanuj etykietę albo szukaj po numerze lub loginie"
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {
@@ -116,28 +155,22 @@ export function Szukanie({
           className="btn-secondary ml-2 mt-2 inline-flex items-center gap-1 text-xs">
           <PackageX size={12} />To nieodebrana paczka</button>}
 
-      {onNieodebrana && nieodebrana && <div className="mt-2 rounded-lg border border-amber-300 bg-white p-2">
-        <p className="text-slate-600">
-          Klient nie odebrał przesyłki i wróciła do nas. To NIE jest zwrot
-          zgłoszony przez klienta — panel oznaczy ją wprost.</p>
-        <input className="field mt-2 h-7 text-xs" value={zamowienie}
-          aria-label="Numer zamówienia" placeholder="Numer zamówienia (jeśli znasz)"
-          onChange={(e) => setZamowienie(e.target.value)} />
-        <p className="mt-1 text-slate-500">
-          Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
-        <input className="field mt-2 h-7 text-xs" value={notatka}
-          aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
-          onChange={(e) => setNotatka(e.target.value)} />
-        <div className="mt-2 flex gap-2">
-          <button type="button" disabled={rejestruje}
-            onClick={() => onNieodebrana(kod, zamowienie.trim(), notatka.trim())}
-            className="btn-primary text-xs">
-            {rejestruje ? "Rejestruję…" : "Zarejestruj paczkę"}</button>
-          <button type="button" className="btn-secondary text-xs"
-            onClick={() => setNieodebrana(false)}>Wróć</button>
-        </div>
-      </div>}
     </div>}
+
+    {/* ── Droga pierwszoplanowa (0.338.0) ──────────────────────────────────────
+        Zgłoszenie właściciela: „jest sporo paczek, które po prostu zostały
+        nieodebrane i wracają do nas — znajdź sposób, aby wyświetlały mi się
+        w zakładce zwroty". Wyświetlały się od 0.172.0 — tylko DROGA DO NICH
+        szła przez ślepy zaułek: trzeba było najpierw zeskanować kod, dostać
+        „nie znam kodu" i dopiero wtedy zobaczyć przycisk. Przy paczce na
+        krzyż to przechodzi; przy „sporo paczek" to codzienna praca schowana
+        za komunikatem o błędzie. */}
+    {onNieodebrana && !nieodebrana && !brak &&
+      <button type="button" onClick={() => setNieodebrana(true)}
+        className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">
+        <PackageX size={12} />Paczka nieodebrana</button>}
+
+    {onNieodebrana && nieodebrana && formularz}
 
     {/* Dwa trafienia to brak trafienia — wybiera człowiek, patrząc na oba. */}
     {wiele && <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">

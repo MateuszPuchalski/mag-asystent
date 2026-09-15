@@ -6,6 +6,7 @@ import { db } from "../db/db.js";
 import {
   koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, zamknijKosz, zaznaczSkladnik,
 } from "../services/kosze-zwrotow.js";
+import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszIloscZwrocona, zapiszKorekte, zapiszKwote,
@@ -15,6 +16,7 @@ import {
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, stempelProwadziZwrot,
+  wskazSklad,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
@@ -248,6 +250,34 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
     });
+
+  /* Ręczne wskazanie składu kompletu (0.336.0). Zgłoszenie właściciela:
+     „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie to wskazać".
+
+     Automat sam odsyłał do tej drogi zdaniem „wskaż skład ręcznie", a drogi
+     nie było: odejmowanie z paragonu wymaga, żeby każda POZOSTAŁA oferta
+     zamówienia miała kartotekę, a te wypełniają się dopiero przy zwrocie.
+
+     Bramka ta sama co przy ocenie i kartotece: samo `odmowa()`. To praca
+     biura nad własnym magazynem, nie operacja wysyłająca cokolwiek na
+     zewnątrz. */
+  app.post<{
+    Params: { id: string };
+    Body: { skladniki?: Array<{ twId?: number; naKomplet?: number }> };
+  }>("/api/obsluga/zwroty/pozycje/:id/sklad", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const skladniki = (req.body?.skladniki ?? []).map((s) => ({
+      twId: Number(s?.twId), naKomplet: Number(s?.naKomplet),
+    }));
+    try {
+      return wskazSklad(db(), Number(req.params.id), skladniki, kto());
+    } catch (e) {
+      /* Odmowa serwisu jest ZDANIEM dla człowieka („kartoteki 77 nie ma
+         w kopii Subiekta"), a nie kodem — panel pokazuje ją wprost. */
+      return reply.code(400).send({ error: (e as Error).message });
+    }
+  });
 
   /* Ptaszek przy składniku kompletu (0.335.0). Zgłoszenie właściciela:
      „powinno rozbijać na komponenty do zaznaczania, które idą do MM".
@@ -716,6 +746,10 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          i co już leży w koszyku — inaczej ptaszek rysowałby się z nadziei. */
       sklady: Object.fromEntries(
         zwrot.pozycje.map((p) => [p.id, skladDoZaznaczenia(db(), p.id)])),
+      /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
+         zwrot, nie raz na pozycję: dokument jest jeden, a kopiowanie go przy
+         każdej pozycji rozdęłoby odpowiedź o to samo. */
+      wierszeDokumentu: wierszeDokumentuZwrotu(db(), id),
     };
   });
 
