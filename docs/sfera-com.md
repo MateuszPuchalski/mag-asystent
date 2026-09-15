@@ -418,9 +418,20 @@ w oknie ZW produkty, które nie wróciły — worker zrobi to samo.
 **Płatność przychodzi z paragonu.** `PlatnoscPrzelewKwota` równa się wartości
 dokumentu — to „Zapłacono przelewem 100%" z okna ZW.
 
-**Rodzaj zwrotu to `RodzajZwrotuDetal`, a szkic ma w nim 0.** Biuro zmienia go
-w oknie na „zwrot ze sprzedaży". Liczbę tej wartości poda odczyt ZW wystawionego
-ręcznie (`-WzorZW`).
+**„Zwrot ze sprzedaży" to `RodzajZwrotuDetal = 1`.** Szkic ma tam 0, a ZW
+772/MAG/07/2026 wystawiony ręcznie przez biuro ma 1. Odczytała to sonda
+`-WzorZW`. Worker ustawia więc 1 sam, bo `NaPodstawie` tego nie robi.
+
+**Wyzerowana pozycja zostaje na ZW.** Ten sam ręczny ZW do paragonu z dwiema
+pozycjami ma dwa wiersze: pierwszy z `IloscJm = 1`, drugi z `IloscJm = 0`.
+Każdy niesie `DokHanLp` wiersza paragonu. Worker zeruje wiersze, nie usuwa ich.
+
+**Przelew równa się wartości po zerach.** Na tym ZW `PlatnoscPrzelewKwota`
+i `WartoscBrutto` to po 7,34 zł. Stan końcowy jest więc znany; nie wiadomo,
+czy Subiekt liczy go sam, czy biuro poprawia kwotę ręką.
+
+**`NaPodstawie` odmawia dla WZ.** Komunikat brzmi „Nie można wystawić korekty
+do dokumentu WZ…". Paragonem jest wyłącznie `dok_Typ = 21`.
 
 **`NaPodstawie` blokuje paragon.** Drugi przebieg na tym samym PA odmówił:
 „Nie można zablokować obiektu. Obiekt został zablokowany przez operatora…
@@ -437,8 +448,10 @@ Czy zapisany dokument zostaje przez to zablokowany dla biura, pokaże pierwsze
 MM na produkcji.
 
 `[WERYFIKUJ]` Czy po `IloscJm = 0` wartość i przelew przeliczają się same.
-Czy zero usuwa wiersz, czy go zostawia. Zamyka to `-SzkicZW -Ilosci` na paragonie
-z kilkoma pozycjami.
+Zamyka to `-SzkicZW -Ilosci` na paragonie z kilkoma pozycjami.
+
+`[WERYFIKUJ]` Jakie ilości daje `NaPodstawie` dla paragonu, który ma już ZW.
+To przypadek klienta, który odsyła zamówienie w dwóch paczkach.
 
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
