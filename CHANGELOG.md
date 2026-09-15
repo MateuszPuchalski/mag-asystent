@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.350.1 — 15 września 2026
+
+**Nieudany zapis ZW nie przypina już zwrotowi nieistniejącego numeru.** Worker
+Sfery próbował zapisać ZW do PA 745/MAG/09/2026, a Subiekt odmówił i wycofał
+zapis. Import zdążył jednak zobaczyć ten dokument i przypiął zwrotowi 603Q/2026
+„ZW 463/MAG/09/2026”, którego w Subiekcie nie było.
+
+- **Korekta wchodzi do kopii dokumentów dopiero przy drugim imporcie z rzędu.**
+  Dokument z wycofanego zapisu znika przed drugim odczytem. Prawdziwa korekta
+  przypina się około minuty później niż dotąd.
+- **Odmowa zapisu ZW w kolejce niesie więcej:** łańcuch wyjątków z kodem HRESULT
+  i numer, jeśli Subiekt zdążył go nadać — z prośbą o sprawdzenie w Subiekcie.
+- **Usługa `wertis-sfera` może pisać dziennik do pliku** — polecenia w `DEPLOY.md`.
+
+Przebuduj exe workera Sfery (`sfera-worker\build.ps1`) i zrestartuj usługi.
+
 ## 0.350.0 — 15 września 2026
 
 **Koszyk z panelu jest wirtualny: zbiera towar, rodzi MM i się kończy.**

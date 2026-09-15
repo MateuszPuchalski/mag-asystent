@@ -3,6 +3,7 @@ import { db, nowIso, transaction } from "../db/db.js";
 import { mssqlPool, assertSafeColumn } from "../db/mssql.js";
 import { config } from "../config.js";
 import { WZORZEC_UUID_TSQL, uuidZTekstu, wyrazenieUuid } from "./subiekt.uuid.js";
+import { dojrzaleKorekty } from "./korekty-dojrzale.js";
 import { numerKosza } from "../services/przyjecia.js";
 import { symbolTypu } from "./typy-dokumentow.js";
 import { poImporcie } from "../services/po-imporcie.js";
@@ -858,7 +859,24 @@ export async function importFromMssql(): Promise<ImportStats> {
       );
     }
 
-    for (const f of faktury) {
+    /* KOREKTA DOPIERO PRZY DRUGIM ODCZYCIE (0.350.1) — uzasadnienie
+       w `korekty-dojrzale.ts`. Pamięć widzianych odświeżamy WYŁĄCZNIE przy
+       udanym odczycie faktur: nieudany zostawia stary read-model i nie wie
+       nic o tym, które korekty dziś istnieją. */
+    const widziane = new Set((d.prepare("SELECT dok_id FROM sgt_korekta_widziana").all() as
+      Array<{ dok_id: number }>).map((w) => Number(w.dok_id)));
+    const { doZapisu, korekty } = dojrzaleKorekty(
+      faktury, new Set(config.mssql.dokTypyKorekt), widziane);
+    if (fakturyOk) {
+      const teraz = new Date().toISOString();
+      const obecne = new Set(korekty);
+      const wstaw = d.prepare(
+        "INSERT OR IGNORE INTO sgt_korekta_widziana(dok_id, pierwszy_raz_at) VALUES (?,?)");
+      for (const id of korekty) wstaw.run(id, teraz);
+      const usun = d.prepare("DELETE FROM sgt_korekta_widziana WHERE dok_id=?");
+      for (const id of widziane) if (!obecne.has(id)) usun.run(id);
+    }
+    for (const f of doZapisu) {
       insFaktura.run(
         f.dok_Id,
         symbolTypu(f.dok_Typ),
