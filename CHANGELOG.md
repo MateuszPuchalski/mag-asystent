@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.351.0 — 15 września 2026
+
+**Ekran zwrotów przestał gubić pieniądze i przestał składać wnioski za łatwo.**
+Cztery poprawki z audytu ekranu zwrotów, wszystkie o ostatnim kroku pracy —
+tym, na którym z panelu wychodzą cudze pieniądze i cudze oświadczenia.
+
+- **Zapis korekty nie przewija już na następny zwrot, dopóki pieniądze wiszą.**
+  Ekran przeczył sam sobie: obiecywał „pieniądze oddajesz przyciskiem niżej —
+  także po zapisaniu korekty", a zaraz po zapisie zabierał ten zwrot z oczu.
+  Biuro wystawia korektę zwykle PRZED wypłatą, więc kursor uciekał dokładnie
+  przed ostatnim krokiem — i dlatego przelewy szły w Sales Center. Kursor
+  schodzi niżej dopiero wtedy, gdy zamknięte są obie drogi wypłaty: przez
+  Allegro i przelewem poza nim.
+- **Klawisz `Z` oddaje pieniądze.** Tabela klawiszy obiecywała jeden klawisz na
+  kubełek, a ostatni krok — jedyny, który rusza pieniędzmi — nie miał żadnego.
+  Klawisz robi to samo, co przycisk ODDAJ PIENIĄDZE, i tylko wtedy, gdy ten
+  przycisk stoi na ekranie; pasek skrótów dopisuje go ze stanu zwrotu, nie
+  z tabeli kubełków. Sam klawisz stoi też przy przycisku.
+- **ZGŁOŚ RABAT pyta, zanim złoży.** Wniosku Allegro nie wycofa żadna końcówka
+  i drugiego na tę samą pozycję złożyć się nie da, a przycisk składał go jednym
+  kliknięciem — siedząc na liście pozycji obok ocen klikanych dziesiątki razy
+  dziennie. Potwierdzenie mówi skutek, nie „czy na pewno".
+- **Odmowa wypłaty nie ma kodu wybranego z góry.** Stał tam `REFUND_REJECTED`
+  jako wybór pozornie ostrożny. Skutek był odwrotny: uzasadnienie „wysłaliśmy
+  nowy towar" wychodziło do klienta pod oświadczeniem, że odmawiamy zwrotu
+  pieniędzy. Wybór jest teraz świadomy albo nie ma go wcale.
+- Doktryna prostuje przy okazji własne zdanie: §25a.5 mówiło, że potwierdzenie
+  dostaje oddanie pieniędzy — a dwa akapity niżej, i w kodzie, było inaczej.
+  Zwrot pieniędzy cofa się dopłatą, więc potwierdzenia nie ma i mieć nie ma.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
 ## 0.350.2 — 15 września 2026
 
 **Przesyłka z paragonu nie wchodzi już do składu kompletu.** Na produkcji

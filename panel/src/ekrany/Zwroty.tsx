@@ -531,6 +531,16 @@ export function Zwroty() {
   const klawiszKubelka = (e: KeyboardEvent) => {
     if (!zwrot || trwa) return;
     const wersja = zwrot.wersja;
+    /* PIENIĄDZE STOJĄ PRZED KUBEŁKAMI, bo należność nie siedzi w jednym.
+       Przycisk ODDAJ PIENIĄDZE bywa na ekranie w DO ZWROTU, w DO KOREKTY
+       i na zwrocie ZAMKNIĘTYM — bramka serwera nie patrzy na zamknięcie
+       (`zwrot-pieniedzy.ts`). Gałąź w każdym kubełku z osobna rozjechałaby
+       się z tą bramką przy pierwszej zmianie drabiny. */
+    if (e.key === "z" || e.key === "Z") {
+      e.preventDefault();
+      akcje.current.oddajPieniadze?.();
+      return;
+    }
     if (zwrot.kubelek === "decyzja") {
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
@@ -596,6 +606,14 @@ export function Zwroty() {
   if (error) return <Blad>{(error as Error).message}</Blad>;
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
+
+  /* Czy przy tym zwrocie zostało coś do zrobienia z pieniędzmi.
+     Czytane z RENDERU, nie z `onSuccess`: korekta nie rusza żadnej z tych
+     dwóch bramek (`zwrot-pieniedzy.ts`), więc wartość sprzed zapisu jest ta
+     sama co po nim — a nie ściga się z odświeżeniem zapytania. */
+  const stanPieniedzy = szczegol.data?.pieniadze;
+  const pieniadzeCzekaja =
+    Boolean(stanPieniedzy?.moznaZwrocic || stanPieniedzy?.moznaZapisacPrzelew);
 
   /* Ekran trzyma się okna, a przewijają się KOLUMNY (0.165.0). Pion strony był
      tu drogą do zgubienia kolejki: żeby dojść do dołu dowodów, operator
@@ -740,7 +758,16 @@ export function Zwroty() {
         /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
            zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
            pokazywał wtedy P/O, choć działały S/U. */
-        dodatkowe={KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? []} />
+        /* `Z` DOPISUJE SIĘ ZE STANU, nie z tabeli kubełków: należność
+           przechodzi przez trzy kubełki i gaśnie w środku każdego z nich.
+           Wpisany do `KLAWISZE_KUBELKA` stałby w pasku także po wypłacie —
+           czyli byłby dokładnie tym martwym klawiszem, przeciw któremu
+           powstał `SkrotyKlawiszy`. */
+        dodatkowe={[
+          ...KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [],
+          ...(stanPieniedzy?.moznaZwrocic
+            ? [["Z", "oddaj pieniądze"] as const] : []),
+        ]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
@@ -776,9 +803,21 @@ export function Zwroty() {
               onWerdykt={(decyzja, powod) =>
                 werdykt.mutate({ id: zwrot.id, decyzja, powod, wersja: zwrot.wersja },
                   { onSuccess: () => { if (decyzja === "odrzucony") idz(1); } })}
+              /* KOREKTA PRZESUWA KURSOR TYLKO WTEDY, GDY PIENIĄDZE SĄ ZAŁATWIONE
+                 (audyt, 15 września 2026). Dwa zdania na tym samym ekranie
+                 przeczyły sobie: `Decyzje.tsx` obiecywało „pieniądze oddajesz
+                 przyciskiem niżej — także po zapisaniu korekty", a zapis numeru
+                 natychmiast wyprowadzał z tego zwrotu na następny. Biuro
+                 wystawia korektę zwykle PRZED wypłatą, więc kursor uciekał
+                 dokładnie przed pieniędzmi — i dlatego szły w Sales Center.
+                 Dwie drogi do wypłaty, dwie bramki: przez Allegro
+                 (`moznaZwrocic`) i przelewem poza nim (`moznaZapisacPrzelew`,
+                 przy pobraniu jedyna). Obie zamknięte znaczą, że przy tym
+                 zwrocie nie ma już czego kliknąć — dopiero wtedy wolno zabrać
+                 go z oczu. */
               onKorekta={(numer) =>
                 korekta.mutate({ id: zwrot.id, numer, wersja: zwrot.wersja },
-                  { onSuccess: () => idz(1) })}
+                  { onSuccess: () => { if (!pieniadzeCzekaja) idz(1); } })}
               onCofnijKorekte={() =>
                 cofnijKorekte.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
               onCofnijKwote={() =>
@@ -790,6 +829,7 @@ export function Zwroty() {
                 patrzy, a nie o kolumnę dalej. */}
             {szczegol.data?.pieniadze && <Pieniadze
               stan={szczegol.data.pieniadze}
+              akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
                 || przelew.isPending || cofnijPrzelew.isPending}
               blad={bladPieniedzy}

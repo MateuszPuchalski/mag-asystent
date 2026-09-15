@@ -55,6 +55,11 @@ const scena = vi.hoisted(() => ({
   /* Decyzje z klawiatury MUSZĄ mieć atrapę: prawdziwa mutacja strzela
      `fetch`-em, a test sprawdza właśnie to, czy klawisz ją woła. */
   wolano: [] as Array<{ co: string; dane: Record<string, unknown> }>,
+  /* Szczegół zwrotu — stąd bierze się STAN PIENIĘDZY, a od niego zależy, czy
+     zapis korekty wolno przewinąć na następny zwrot. `undefined` znaczy „nie
+     pobrano" i tak zachowuje się ekran bez serwera — czyli tak, jak we
+     wszystkich pozostałych testach tego pliku. */
+  szczegol: undefined as { pieniadze?: Record<string, unknown> } | undefined,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -81,6 +86,8 @@ vi.mock("../api/zwroty", async () => {
     useKorekta: () => atrapa("korekta"),
     useKwota: () => atrapa("kwota"),
     useCofnijKorekte: () => atrapa("cofnijKorekte"),
+    useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
+    useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
   };
 });
 
@@ -486,6 +493,100 @@ describe("Klawisze kubełka", () => {
       await waitFor(() => expect(screen.getByLabelText("Numer korekty")).toHaveFocus());
       expect(scena.wolano).toEqual([]);
     } finally { scena.zwroty = null; }
+  });
+
+  /* ── Korekta a pieniądze (audyt, 15 września 2026) ──────────────────────
+     Ekran przeczył sam sobie: `Decyzje.tsx` pisało „pieniądze oddajesz
+     przyciskiem niżej — także po zapisaniu korekty", a zapis numeru zabierał
+     ten zwrot z oczu. Biuro wystawia korektę zwykle PRZED wypłatą.          */
+  const kursor = () => document.querySelector("[aria-current]")?.textContent ?? "";
+
+  const dwieKorekty = () => [
+    { ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety" as const, kwotaGrosze: 4999 },
+    { ...zwrot(7, "korekta", "ZK-7"), werdykt: "przyjety" as const, kwotaGrosze: 1500 },
+  ];
+
+  const pieniadze = (n: Record<string, unknown>) => ({
+    pieniadze: {
+      moznaZwrocic: false, moznaOdmowic: true, powod: null, kwotaGrosze: 4999,
+      waluta: "PLN", oddane: null, odmowa: null, przelew: null,
+      moznaZapisacPrzelew: false, powodPrzelewu: null, ...n,
+    },
+  });
+
+  const zapiszKorekte = async () => {
+    await userEvent.type(screen.getByLabelText("Numer korekty"), "ZW 413/MAG/09/2026");
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz korektę/ }));
+  };
+
+  it("zapis korekty NIE zabiera z oczu zwrotu, który czeka na wypłatę", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = pieniadze({ moznaZwrocic: true });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await zapiszKorekte();
+      expect(scena.wolano.map((w) => w.co)).toEqual(["korekta"]);
+      await waitFor(() => expect(kursor()).toContain("ZK-6"));
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
+  });
+
+  it("czeka także na PRZELEW poza Allegro — przy pobraniu to jedyna droga", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = pieniadze({ moznaZwrocic: false, moznaZapisacPrzelew: true });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await zapiszKorekte();
+      await waitFor(() => expect(kursor()).toContain("ZK-6"));
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
+  });
+
+  it("gdy pieniądze są załatwione, korekta przewija na następny zwrot", async () => {
+    /* Druga połowa umowy: zwrot bez otwartego pytania ma zejść z ekranu sam,
+       bo odklikiwanie się z gotowej sprawy to ta sama praca co szukanie jej. */
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = pieniadze({
+      oddane: { id: "ref-1", status: "SUCCEEDED", kiedy: null, potwierdzone: true },
+    });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await zapiszKorekte();
+      await waitFor(() => expect(kursor()).toContain("ZK-7"));
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
+  });
+
+  it("klawisz `Z` oddaje pieniądze także na zwrocie w DO KOREKTY", async () => {
+    /* Należność nie siedzi w jednym kubełku, więc klawisz stoi PRZED gałęziami
+       kubełków. Ten zwrot jest ZAMKNIĘTY korektą, a pieniądze wiszą — do tego
+       audytu żaden klawisz nie robił tu nic. */
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = pieniadze({ moznaZwrocic: true });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      /* Pasek skrótów obiecuje klawisz dokładnie tam, gdzie on działa. */
+      expect(screen.getByText("oddaj pieniądze")).toBeInTheDocument();
+      await userEvent.keyboard("z");
+      await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["zwrocPieniadze"]));
+      expect(scena.wolano[0].dane).toMatchObject({ id: 6 });
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
+  });
+
+  it("pasek nie obiecuje `Z`, gdy nie ma czego oddać", async () => {
+    /* Martwy klawisz w pasku to błąd, przeciw któremu powstał `SkrotyKlawiszy`. */
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = pieniadze({
+      oddane: { id: "ref-1", status: "SUCCEEDED", kiedy: null, potwierdzone: true },
+    });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      expect(screen.queryByText("oddaj pieniądze")).toBeNull();
+      await userEvent.keyboard("z");
+      expect(scena.wolano).toEqual([]);
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
   });
 
   it("`j` po przyjęciu zwrotu idzie do NASTĘPNEGO, a nie przez niego przeskakuje", async () => {

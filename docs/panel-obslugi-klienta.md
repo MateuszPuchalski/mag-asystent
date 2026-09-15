@@ -2635,6 +2635,17 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 | ZAMKNIĘTE | — | wgląd i `R` (cofnij korektę) |
 | ODRZUCONE | — | tylko wgląd |
 
+**`Z` oddaje pieniądze i nie należy do żadnego kubełka.** Należność przechodzi
+przez DO ZWROTU, DO KOREKTY i ZAMKNIĘTE — bramka serwera nie patrzy na
+zamknięcie. Klawisz robi dokładnie to samo, co przycisk ODDAJ PIENIĄDZE, i tylko
+wtedy, gdy ten przycisk stoi na ekranie. Pasek skrótów dopisuje go ze STANU
+zwrotu, a nie z tabeli wyżej: po wypłacie martwy klawisz uczyłby przewijać
+pasek wzrokiem.
+
+Do audytu z 15 września 2026 ostatni krok pracy — jedyny, który rusza
+pieniędzmi — nie miał żadnego klawisza. Ręka schodziła z klawiatury na mysz
+dokładnie tam, gdzie tabela obiecywała odwrotnie.
+
 **Zwrot rozliczony przez Allegro trafia od razu do ZAMKNIĘTYCH (0.339.0).**
 Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania, pokazuje
 zwroty, za które pieniądze zostały już zwrócone".
@@ -2711,7 +2722,13 @@ i §25a.5 daje takim rzeczom potwierdzenie. Utylizacja nie ma wariantu
 hurtowego z tego samego powodu — jeden ruch wysyłałby cały zwrot na złom.
 
 Kursor schodzi na następny wiersz po ODMOWIE i po zapisaniu numeru korekty,
-czyli wtedy, gdy zwrot wychodzi z drabiny. Po „przyjmij" i po ocenie zostaje
+czyli wtedy, gdy zwrot wychodzi z drabiny — **chyba że pieniądze jeszcze wiszą**
+(audyt, 15 września 2026). Korekta zamyka zwrot, ale nie drogę do wypłaty,
+a biuro wystawia ją zwykle PRZED oddaniem pieniędzy. Kursor uciekał więc
+dokładnie przed ostatnim krokiem, choć ekran dwie linijki wyżej obiecywał
+„pieniądze oddajesz przyciskiem niżej — także po zapisaniu korekty".
+Wypłata ma dwie drogi i obie muszą być zamknięte: przez Allegro
+i przelewem poza nim (przy pobraniu jedyna). Po „przyjmij" i po ocenie zostaje
 na miejscu: zwrot schodzi wtedy o szczebel niżej, a kolumna środkowa pokazuje
 pytanie następnego kubełka. Skakanie na następny wiersz kazałoby wracać do
 sprawy, której się jeszcze nie skończyło.
@@ -2876,8 +2893,14 @@ numer i login kupującego, czyli to, co się z niego przepisuje.
 
 ### 25a.5. Cofnięcie zamiast potwierdzenia
 
-Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa
-zwrotu. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
+Potwierdzenie dostaje to, czego nie da się cofnąć: odmowa wypłaty i wniosek
+o rabat transakcyjny. Reszta ma cofnięcie, dopóki zapis czeka w kolejce.
+
+**Oddanie pieniędzy potwierdzenia NIE MA i mieć nie ma.** Do audytu z 15
+września 2026 stało w tym zdaniu odwrotnie, a dwa akapity niżej — i w kodzie
+— było już inaczej. Zwrot pieniędzy cofa się dopłatą i widać go od razu
+na osi, więc pytanie „na pewno" kosztowałoby kliknięcie przy każdym zwrocie
+i nie kupowało nic.
 
 **Drabina cofania (0.202.0).** Każdy kubełek cofa dokładnie ten krok, który go
 wprowadził. Schodzi się po jednym szczeblu, tą samą drogą, którą się weszło:
@@ -3950,6 +3973,35 @@ automat, czy wskazał człowiek — wynik automatu nie udaje decyzji (§4.3).
 Skład liczy się **wyłącznie w szczególe zwrotu**, nigdy w kolejce: każde
 liczenie pyta o dokument, o zamówienie i o mapowanie każdej oferty, a kolejka
 bierze naraz wszystkie zwroty.
+
+### 25a.22. Dwa kliknięcia, które szły za łatwo (audyt, 15 września 2026)
+
+Ekran zwrotów ma jedną regułę o kliknięciach: §25a.5. Cofnięcie wszędzie, gdzie
+da się cofnąć; potwierdzenie tam, gdzie się nie da. Dwa miejsca nie miały ani
+jednego, ani drugiego.
+
+**ZGŁOŚ RABAT pyta, zanim złoży.** Wniosek idzie do Allegro, panel nie ma
+końcówki do jego wycofania, a drugiego na tę samą pozycję złożyć się nie da —
+końcówka nie jest idempotentna (§25a.20). To jest dokładnie definicja rzeczy,
+której §25a.5 każe dać potwierdzenie, a przycisk składał wniosek jednym
+kliknięciem — i stoi na liście pozycji, tuż obok ocen „na stan" i „utylizacja"
+klikanych dziesiątki razy dziennie.
+
+Pytanie mówi SKUTEK, nie „czy na pewno": *wniosek idzie do Allegro i panel go
+nie wycofa*. Pytanie bez treści uczy odruchu klikania „tak". Po złożeniu
+przycisk i tak znika, więc to jedyny moment, w którym ta informacja kogokolwiek
+dosięgnie.
+
+**Odmowa wypłaty nie ma już kodu wybranego z góry.** Stał tam
+`REFUND_REJECTED` i wyglądało to na wybór ostrożny, bo jako jedyny z siedmiu
+kodów żąda uzasadnienia. Skutek był odwrotny. Operator rozwija odmowę, żeby
+powiedzieć „wysłaliśmy nowy towar", wpisuje to w uzasadnienie — i wysyła je
+pod kodem, którego nie wybrał.
+
+Klient czyta ten kod w Allegro jako oświadczenie firmy, a drugiej odmowy do tego
+samego zwrotu Allegro nie przyjmie (422). Wybór ma być świadomy, więc pole
+zaczyna puste i przycisk czeka na wskazanie. Domyślna wartość jest tu wygodą
+kupioną za cudze oświadczenie.
 
 ### 25a.8. Czego panel nie wie
 
