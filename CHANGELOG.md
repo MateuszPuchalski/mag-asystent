@@ -45,8 +45,9 @@ na PA 12102/MAG/07/2026, który ma już ZW 772 (`docs/sfera-com.md` §2m).
   10,49 zł). Automat ustawia przelew sam.
 - **Poprawka do 0.348.4: `DokHanLp` to numer wiersza na ZW, nie na paragonie.**
   Automat dopasowuje pozycje po `TowarId`, tak jak przy KFS.
-- **Paragon z Allegro ma wiersz „PRZESYŁKA".** Kiedy go zwracać, rozstrzyga
-  właściciel.
+- **Paragon z Allegro ma wiersz „PRZESYŁKA".** Decyzja właściciela: automat
+  zeruje go, gdy w panelu zwrotów odznaczono „Koszt dostawy", a zostawia przy
+  zaznaczonym — tak jak `delivery` w zwrocie pieniędzy Allegro.
 
 Kodu serwera ani workera to wydanie nie zmienia.
 

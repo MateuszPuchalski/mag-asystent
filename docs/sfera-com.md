@@ -458,8 +458,13 @@ idzie za wartością nawet bez zer — patrz wyżej. Zamyka to `-SzkicZW -Ilosci
 na paragonie z kilkoma pozycjami, bez wcześniejszego ZW.
 
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
-z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało. Kiedy automat zostawia
-ją z ilością 1 — przy zwrocie kosztu dostawy — rozstrzyga właściciel.
+z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
+
+**Przesyłka na ZW idzie za polem „Koszt dostawy" w panelu zwrotów** (decyzja
+właściciela, 15 września 2026). Odznaczone pole daje `kwota_dostawa_grosze`
+równe null i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
+tak jak `delivery` w zwrocie pieniędzy Allegro. Jedno pole steruje więc
+i przelewem klienta, i dokumentem.
 
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
