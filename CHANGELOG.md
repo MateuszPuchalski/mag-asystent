@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.337.0 — 15 września 2026
+
+**Zwroty szukają po loginie kupującego.** Zgłoszenie właściciela. Filtr frazy
+porównywał cztery numery — zwrotu, Allegro, zamówienia i korekty — a login
+odpowiada na inne pytanie: nie „gdzie jest TA paczka", tylko „co jeszcze mam
+od TEGO klienta". Pada przy każdej rozmowie o dwóch przesyłkach naraz.
+
+- **Login wchodzi do filtru frazy**, obok czterech numerów.
+- **Wiersz kolejki pokazuje login** osobną linijką: trafienie, którego nie
+  widać, wygląda na przypadek. Zwrot bez loginu nie zostawia pustej linijki.
+- Pole szukania mówi o tym wprost w podpowiedzi.
+
 ## 0.336.0 — 15 września 2026
 
 **„Nie weszła do koszyka" ma wreszcie drogę wyjścia.** Zgłoszenie właściciela:

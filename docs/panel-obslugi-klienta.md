@@ -2866,6 +2866,19 @@ koszyka" jedzie w szczególe zwrotu, a zatwierdzenie kartoteki i ocena
 unieważniały wyłącznie kolejkę. Pozycja miała już kartotekę, a panel dalej
 pisał, że jej nie ma — tak wyglądał pierwszy zrzut od właściciela.
 
+**Szukanie widzi login kupującego (0.337.0).** Zgłoszenie właściciela: „zwroty
+powinien móc szukać po loginie klienta". Filtr frazy porównywał dotąd cztery
+numery: zwrotu, Allegro, zamówienia i korekty.
+
+Login odpowiada na INNE pytanie niż numery. Numer mówi, gdzie jest ta jedna
+paczka; login — co jeszcze mamy od tego klienta. To pytanie pada przy każdej
+rozmowie, w której klient wspomina o dwóch przesyłkach naraz, a numeru żadnej
+z nich nie podaje.
+
+Wiersz kolejki pokazuje login osobną linijką. Trafienie, którego nie widać,
+wygląda na przypadek: operator nie wie, czemu ten zwrot wszedł na listę.
+Zwrot bez loginu nie zostawia pustej linijki — Allegro nie zawsze go podaje.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

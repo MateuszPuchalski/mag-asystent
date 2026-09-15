@@ -59,7 +59,7 @@ export function Szukanie({
       <ScanLine size={16} className="shrink-0 text-slate-400" />
       <input
         className={`field h-8 flex-1 text-sm ${fraza ? "pr-8" : ""}`}
-        placeholder="Zeskanuj etykietę albo szukaj po numerze"
+        placeholder="Zeskanuj etykietę albo szukaj po numerze lub loginie"
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {

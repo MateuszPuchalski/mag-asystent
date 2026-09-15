@@ -181,6 +181,12 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
             {z.pozycje.length > 1 ? ` i ${z.pozycje.length - 1} inne` : ""}
             {sztuki ? ` · ${sztuki} szt.` : ""}
           </div>
+          {/* LOGIN NA WIERSZU (0.337.0). Od tego wydania szuka się po nim,
+              a trafienie, którego nie widać, wygląda na przypadek: operator
+              nie wie, czemu ten zwrot wszedł na listę. Osobna linijka, nie
+              doklejka do nazwy towaru — nazwa i tak bywa ucięta. */}
+          {z.kupujacyLogin && <div className="truncate text-xs text-slate-500">
+            {z.kupujacyLogin}</div>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold tabular-nums">
               {zlote(z.sumaPozycjiGrosze, z.waluta)}</span>

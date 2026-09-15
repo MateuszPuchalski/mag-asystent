@@ -176,6 +176,23 @@ describe("Ekran zwrotów", () => {
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
   });
 
+  it("szuka po LOGINIE kupującego, bo to jedyny uchwyt w rozmowie (0.337.0)", async () => {
+    /* Zgłoszenie właściciela. Numery odpowiadają na pytanie „gdzie jest TA
+       paczka"; login na inne — „co jeszcze mam od TEGO klienta". Pada przy
+       każdej rozmowie, w której klient mówi o dwóch przesyłkach naraz. */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), kupujacyLogin: "ogrodnik_77" },
+      { ...zwrot(2, "zwrot", "ZW-2"), kupujacyLogin: "inny_klient" },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "ogrodnik");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
   it("CAŁY numer otwiera zwrot, sam fragment nigdy", async () => {
     /* Ekran sam otwiera przy jednym wyniku, więc dopasowanie przybliżone
        prowadziłoby do cudzej sprawy — cudzego klienta i cudzych pieniędzy. */
