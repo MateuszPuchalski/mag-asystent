@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.2 — 15 września 2026
+
+**Worker Sfery mówi prawdę o pustej sesji, a sonda ZW zadaje dwa ostatnie
+pytania.** Na produkcji zadania MM padały komunikatem „Sfera nie zna wywołania
+DodajMM()", choć sonda na tej samej maszynie widziała tę metodę.
+
+Worker Sfery:
+- **Pusty obiekt z COM to już nie „nieznana nazwa".** Gdy Sfera oddaje null,
+  błąd mówi o sesji bez dostępu do podmiotu i podaje konto, na którym działa
+  usługa. Usługa NSSM bez `ObjectName` działa jako LocalSystem, a sonda
+  przechodzi na koncie człowieka.
+- **Konto Windows stoi w pierwszych liniach dziennika** i przy otwarciu sesji.
+- **[wymaga działania]** Gdy MM padają tym błędem, ustaw konto usługi
+  `wertis-sfera` na to, na którym przechodzi sonda (`DEPLOY.md`, blok NSSM).
+  Zadań w kolejce nie anuluj — ruszą po restarcie.
+
+Sonda ZW (`docs/sfera-com.md` §2m):
+- Pierwszy przebieg na paragonie potwierdził `DodajZW()` i `NaPodstawie`.
+  Pozycje i przelew przychodzą z paragonu, rodzaj zwrotu zostaje na 0.
+- **`-Ilosci "1=0,2=1"`** zeruje pozycje na szkicu tak jak biuro i pokazuje,
+  czy wartość i przelew przeliczyły się same.
+- **`-WzorZW <dok_Id>`** wczytuje ZW wystawiony ręcznie i odczytuje liczbę
+  rodzaju „zwrot ze sprzedaży". Tylko odczyt.
+
 ## 0.348.1 — 15 września 2026
 
 **Sonda umie zajrzeć do ZW — zwrotu do paragonu.** Pierwszy krok automatycznego

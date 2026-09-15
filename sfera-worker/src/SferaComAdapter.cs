@@ -97,6 +97,20 @@ public sealed class SferaComAdapter : ISferaAdapter
         {
             return co();
         }
+        /* PUSTY OBIEKT TO NIE POMYŁKA W NAZWIE (15 września 2026). Binder C#
+           zgłasza `RuntimeBinderException` także wtedy, gdy wołamy metodę na
+           null — i do tego dnia ten przypadek szedł gałęzią niżej. Kolejka na
+           produkcji pokazała więc „Sfera nie zna wywołania DodajMM()", choć sonda
+           tę nazwę potwierdziła. Pusty był obiekt sesji albo manager, a nie nazwa. */
+        catch (Exception e) when (PustyObiekt(e))
+        {
+            throw new InvalidOperationException(
+                $"Sfera oddała PUSTY obiekt przy „{wywolanie}” — to nie jest pomyłka w nazwie. " +
+                $"Najczęściej sesja Subiekta jest otwarta na koncie bez dostępu do podmiotu: usługa " +
+                $"działa jako {KontoProcesu()}, a sonda.ps1 zwykle na koncie człowieka. Uruchom " +
+                "wertis-sfera na koncie, na którym przechodzi sonda (DEPLOY §3, konto usługi). " +
+                $"Błąd źródłowy: {e.Message}", e);
+        }
         catch (Exception e) when (NieznanaNazwa(e))
         {
             throw new InvalidOperationException(
@@ -138,6 +152,17 @@ public sealed class SferaComAdapter : ISferaAdapter
         || e is MissingMemberException
         // DISP_E_MEMBERNOTFOUND / DISP_E_UNKNOWNNAME
         || (e is COMException com && ((uint)com.HResult is 0x80020003 or 0x80020006));
+
+    /**
+     * Czy wyjątek mówi „wołasz na null". Binder C# zgłasza to tą samą klasą co
+     * brak nazwy, więc rozstrzyga treść. Sprawdzane PRZED `NieznanaNazwa`.
+     */
+    private static bool PustyObiekt(Exception e) =>
+        e is RuntimeBinderException
+        && e.Message.Contains("null reference", StringComparison.OrdinalIgnoreCase);
+
+    /** Konto Windows procesu — do dziennika i do treści błędu pustej sesji. */
+    internal static string KontoProcesu() => $"{Environment.UserDomainName}\\{Environment.UserName}";
 
     public string CreateMM(int magFrom, int magTo, IReadOnlyList<MmItem> items)
     {
@@ -434,8 +459,29 @@ public sealed class SferaComAdapter : ISferaAdapter
            BITOWA — powód wybranej kombinacji stoi przy `TRYB_DOMYSLNY`. */
         var tryb = _env.GetInt("SFERA_TRYB_URUCHOMIENIA", TRYB_DOMYSLNY);
         _subiekt = Krok("GT.Uruchom(...)", 3, () => gt.Uruchom(URUCHOM_DOPASUJ, tryb));
+
+        /* PUSTA SESJA ODPADA TUTAJ, a nie przy pierwszym dokumencie (15 września
+           2026). Na produkcji `Uruchom` przeszedł bez wyjątku, a łańcuch wywrócił
+           się dopiero na `SuDokumentyManager.DodajMM()` — z treścią o nieznanej
+           nazwie. Sonda na koncie człowieka widziała tego managera, usługa na
+           swoim koncie już nie. Sesja stoi w polu PRZED sprawdzeniem, żeby
+           `ZamknijSesje()` u wołającego zwolniło uchwyt COM. */
+        if (_subiekt is null)
+            throw new InvalidOperationException(
+                $"GT.Uruchom oddał pustą sesję na koncie {KontoProcesu()} — Subiekt w tle nie wstał. " +
+                "Uruchom wertis-sfera na koncie, na którym przechodzi sonda.ps1 (DEPLOY §3, konto usługi).");
+        dynamic sesja = _subiekt;
+        object? manager = Krok<object?>("Subiekt.SuDokumentyManager", 4,
+            () => (object?)sesja.SuDokumentyManager);
+        if (manager is null)
+            throw new InvalidOperationException(
+                $"Sesja Subiekta otwarta na koncie {KontoProcesu()}, ale bez SuDokumentyManager — " +
+                "to konto nie widzi dokumentów podmiotu. Uruchom wertis-sfera na koncie, " +
+                "na którym przechodzi sonda.ps1 (DEPLOY §3, konto usługi).");
+
         Console.WriteLine(
-            $"[sfera] sesja Subiekta otwarta (Sfera COM, {progId}, serwer {Serwer()}, tryb 0x{tryb:X})");
+            $"[sfera] sesja Subiekta otwarta (Sfera COM, {progId}, serwer {Serwer()}, " +
+            $"tryb 0x{tryb:X}, konto {KontoProcesu()})");
         return _subiekt!;
     }
 

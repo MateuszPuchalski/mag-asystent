@@ -398,6 +398,34 @@ Warte zapamiętania na później: `Dysponuj(Variant, Variant)`,
 `PodajDostepneDostawy()` i `DostepnaIlosc`. Wskazywanie dostaw przy rozchodzie
 ma tu gotowy mechanizm, gdyby firma go kiedyś potrzebowała.
 
+## 2m. Szkic ZW — zwrot do paragonu (15 września 2026)
+
+Sonda `-SzkicZW` utworzyła ZW w pamięci i podpięła go pod paragon
+PA 3/MAG/02/2026. `Zapisz()` nie padł, dokument nie powstał.
+
+**`DodajZW()` istnieje i daje dokument typu 14.** To ten sam typ, który import
+czyta jako ZW (`DOK_TYPY_KOREKT`). Numer ZW wróci więc do zwrotu sam.
+
+**`NaPodstawie(dok_Id)` działa dla paragonu.** Ustawia `DoDokumentuId`
+i `DoDokumentuNumerPelny`, a datę sprzedaży bierze z PA. Faktura z 2016 roku
+odpadła zdaniem „Nie można wystawić korekty do dokumentu".
+
+**Pozycje przychodzą z paragonu, z jego ilością.** Jedna pozycja PA dała jedną
+pozycję ZW. Pozycja niesie `DokHanLp`, czyli numer wiersza paragonu. Po nim
+worker dopasuje zwracaną sztukę bez zgadywania po `TowarId`. Biuro zeruje
+w oknie ZW produkty, które nie wróciły — worker zrobi to samo.
+
+**Płatność przychodzi z paragonu.** `PlatnoscPrzelewKwota` równa się wartości
+dokumentu — to „Zapłacono przelewem 100%" z okna ZW.
+
+**Rodzaj zwrotu to `RodzajZwrotuDetal`, a szkic ma w nim 0.** Biuro zmienia go
+w oknie na „zwrot ze sprzedaży". Liczbę tej wartości poda odczyt ZW wystawionego
+ręcznie (`-WzorZW`).
+
+`[WERYFIKUJ]` Czy po `IloscJm = 0` wartość i przelew przeliczają się same.
+Czy zero usuwa wiersz, czy go zostawia. Zamyka to `-SzkicZW -Ilosci` na paragonie
+z kilkoma pozycjami.
+
 ## 3. Czego z publicznych źródeł ustalić się nie da
 
 Trzy grupy. Wszystkie zostają jako `[WERYFIKUJ]`.

@@ -11,6 +11,7 @@
 # Dwa wyjatki, wlaczane swiadomie: -SzkicMM wola DodajMM(), a -SzkicZW wola
 # DodajZW(), zeby zobaczyc wlasciwosci obiektu dokumentu. Dokument zostaje
 # w pamieci i nie jest zapisywany, ale to jedyne Dodaj* w calym skrypcie.
+# -WzorZW tylko WCZYTUJE istniejacy ZW - odczyt, bez zmiany i bez Zapisz().
 #
 # Uzycie (PowerShell na maszynie z Subiektem GT i Sfera):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
@@ -59,7 +60,14 @@ param(
     [switch]$SzkicZW,
     # dok_Id paragonu PA, pod ktory idzie szkic ZW. Numer z ekranu nie wystarczy:
     # NaPodstawie bierze identyfikator (SAFEARRAY(int) w wariancie „wielu").
-    [int]$Paragon = 0
+    [int]$Paragon = 0,
+    # Ilosci na szkicu ZW, jak biuro wpisuje je w oknie: "Lp=ilosc" po
+    # przecinku, np. "1=0,2=1". Nadal w pamieci. Rozstrzyga, czy wartosc
+    # i platnosc przeliczaja sie same po zmianie ilosci. Dotyczy -SzkicZW.
+    [string]$Ilosci = "",
+    # dok_Id ZW wystawionego RECZNIE przez biuro. Sonda go tylko WCZYTUJE,
+    # zeby odczytac liczbe, ktora znaczy "zwrot ze sprzedazy". Dotyczy -SzkicZW.
+    [int]$WzorZW = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -638,16 +646,87 @@ if ($SzkicZW) {
                         Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
                     }
                 }
+
+                # Biuro zeruje w oknie ZW pozycje, ktore nie wrocily - ilosc z paragonu
+                # zostaje przy tych, ktore wrocily (wlasciciel, 15 wrzesnia 2026). Worker
+                # zrobi to samo, wiec sprawdzamy dokladnie ten ruch: czy po zerze wartosc
+                # i przelew przeliczaja sie same, czy kod musi je ustawic.
+                if ($Ilosci) {
+                    Write-Wynik ""
+                    Write-Wynik "ZMIANA ILOSCI - $Ilosci, nadal BEZ Zapisz()"
+                    foreach ($para in ($Ilosci -split ',')) {
+                        $czesci = $para.Trim() -split '='
+                        if ($czesci.Count -ne 2) { Write-Wynik "  BRAK  zly zapis '$para' - ma byc Lp=ilosc"; continue }
+                        try {
+                            $lp = [int]$czesci[0]
+                            $ile = [decimal]::Parse($czesci[1], [Globalization.CultureInfo]::InvariantCulture)
+                            $pozycjeZw.Element($lp).IloscJm = $ile
+                            Write-Wynik ("  JEST  [{0}] IloscJm = {1}" -f $lp, $ile)
+                        } catch {
+                            Write-Wynik ("  BRAK  [{0}] odmowa: {1}" -f $czesci[0], $_.Exception.Message)
+                        }
+                    }
+                    try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+                    # Liczba pozycji po zerach mowi, czy zero USUWA wiersz, czy go zostawia.
+                    Write-Wynik ("--- Pozycje ZW po zmianie ilosci: {0} ---" -f $liczba)
+                    for ($i = 1; $i -le $liczba; $i++) {
+                        try {
+                            $el = $pozycjeZw.Element($i)
+                            Write-Wynik ("  [{0}] TowarId={1} IloscJm={2} WartoscBruttoPoRabacie={3}" -f $i,
+                                (Wartosc $el "TowarId"), (Wartosc $el "IloscJm"), (Wartosc $el "WartoscBruttoPoRabacie"))
+                        } catch {
+                            Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                        }
+                    }
+                    Wlasciwosci-Wg $zw 'Wartosc|Kwota|Plat|Przelew|Gotow|Kart' "ZW PO zmianie ilosci"
+                }
             }
         }
     } catch {
         Write-Wynik "  BRAK  DodajZW() odmowil: $($_.Exception.Message)"
     }
+
+    # ZW wystawiony RECZNIE - jedyne zrodlo liczby "zwrot ze sprzedazy" w polu
+    # RodzajZwrotuDetal. Szkic ma tam 0, a zgadniecie wartosci na dokumencie
+    # fiskalnym to dokladnie ten blad, ktory w MM kosztowal cztery wydania.
+    # WczytajDokument tylko otwiera istniejacy dokument; zadnego Zapisz().
+    if ($WzorZW -gt 0) {
+        Write-Wynik ""
+        Write-Wynik "WZOR ZW - WczytajDokument($WzorZW), tylko odczyt"
+        try {
+            $wzor = $sgt.SuDokumentyManager.WczytajDokument($WzorZW)
+            if ($null -eq $wzor) {
+                Write-Wynik "  BRAK  WczytajDokument oddal null - to chyba nie dok_Id"
+            } else {
+                Wlasciwosci-Wg $wzor $polaDokumentu "ZW wystawiony recznie"
+                $pozycjeWzoru = $null
+                try { $pozycjeWzoru = $wzor.Pozycje } catch { }
+                if ($null -ne $pozycjeWzoru) {
+                    $liczbaWzoru = 0
+                    try { $liczbaWzoru = [int]$pozycjeWzoru.Liczba } catch { }
+                    # Czy biuro zostawia na ZW wiersze z zerem, czy Subiekt je wycina.
+                    Write-Wynik ("--- Pozycje recznego ZW: {0} ---" -f $liczbaWzoru)
+                    for ($i = 1; $i -le $liczbaWzoru; $i++) {
+                        try {
+                            $el = $pozycjeWzoru.Element($i)
+                            Write-Wynik ("  [{0}] TowarId={1} IloscJm={2} DokHanLp={3}" -f $i,
+                                (Wartosc $el "TowarId"), (Wartosc $el "IloscJm"), (Wartosc $el "DokHanLp"))
+                        } catch {
+                            Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                        }
+                    }
+                }
+            }
+        } catch {
+            Write-Wynik "  BRAK  WczytajDokument odmowil: $($_.Exception.Message)"
+        }
+    }
     Write-Wynik ""
     Write-Wynik "Pytania do wyniku szkicu ZW:"
     Write-Wynik "  - czy NaPodstawie przepisal WSZYSTKIE pozycje paragonu i z jaka iloscia"
-    Write-Wynik "  - jak nazywa sie pole rodzaju zwrotu i jaka ma wartosc domyslna"
-    Write-Wynik "  - jak nazywaja sie pola platnosci (przelew, gotowka, karta) na ZW"
+    Write-Wynik "  - czy po IloscJm=0 wartosc i PlatnoscPrzelewKwota przeliczyly sie same (-Ilosci)"
+    Write-Wynik "  - czy zero usuwa wiersz, czy go zostawia (-Ilosci, -WzorZW)"
+    Write-Wynik "  - jaka liczba w RodzajZwrotuDetal znaczy 'zwrot ze sprzedazy' (-WzorZW)"
     Write-Wynik ""
 }
 

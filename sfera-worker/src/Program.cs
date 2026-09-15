@@ -23,6 +23,11 @@ public static class Program
 
         var env = EnvFile.Load();
         Console.WriteLine($"[sfera] wertis.env: {env.Sciezka ?? "(brak pliku — tylko zmienne środowiskowe)"}");
+        /* KONTO PROCESU w pierwszych liniach dziennika (15 września 2026). Sonda
+           przechodzi na koncie człowieka, a usługa NSSM bez `ObjectName` działa
+           jako LocalSystem — i tam Subiekt w tle oddał pusty obiekt. Bez tej
+           linii nie było jak odróżnić złego konta od złej nazwy. */
+        Console.WriteLine($"[sfera] konto Windows: {SferaComAdapter.KontoProcesu()}");
 
         /* Bez SFERA_WORKER=1 zadania mm bierze worker Node — drugi wykonawca
            tej samej kolejki to wyścig, w dry-run tym groźniejszy, że oznaczałby
