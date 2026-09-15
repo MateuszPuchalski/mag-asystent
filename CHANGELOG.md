@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.343.0 — 15 września 2026
+
+**Automat rozbijania kompletów przestaje milczeć.** Odejmowanie z paragonu
+wymagało, żeby każda POZOSTAŁA oferta zamówienia miała wpis
+w `oferta_kartoteka` — a ten powstaje dopiero przy zwrocie tamtej oferty.
+W zamówieniu na kilka różnych rzeczy nie ma go prawie nigdy, więc rozbicie
+odmawiało nie dlatego, że dane są złe, tylko dlatego, że pytaliśmy nie o to
+źródło. Zgłoszenia z 0.336.0 („Ofert bez kartoteki: 3" i „: 5") to była
+reguła, nie wyjątek.
+
+- **Gdy oferta nie ma mapowania, automat pyta po SKU** — tym samym tropem,
+  którym proponuje kartotekę przy zwrocie. Ręczne wskazanie składu zostaje
+  dla przypadków, w których naprawdę nie ma czego dopasować.
+- **Odczyt w locie, nie zapis.** Dopasowanie nie trafia do `oferta_kartoteka`:
+  tamta tabela jest pamięcią człowieka, a wynik automatu nie ma udawać
+  czyjejś decyzji.
+- **Dwa trafienia tego samego symbolu to brak trafienia** — zgadywanie
+  przypisałoby wiersze paragonu cudzej ofercie.
+
+## 0.342.1 — 15 września 2026
+
+**[poprawka] `npm run zwroty:sprzatnij` wraca.** Narzędzie doszło w 0.340.0
+i zostało scalone w komplecie — a wpis w `server/package.json` zniknął przy
+scalaniu równoległej gałęzi, która podbijała wersję w tym samym pliku. Kod
+został, więc żadna bramka nic nie zauważyła; właściciel dowiedział się
+z `npm error Missing script`.
+
+- **Strażnik `src/skrypty.test.ts`**: każdy plik `src/*-run.ts` musi być
+  wskazany przez któryś skrypt w `package.json`. Plik `-run.ts` istnieje po
+  to, żeby go uruchomić z konsoli — bez wpisu jest martwym kodem.
+
 ## 0.342.0 — 15 września 2026
 
 **Karta Copilota przestaje być zatłoczona.** Zgłoszenie właściciela ze zrzutu
