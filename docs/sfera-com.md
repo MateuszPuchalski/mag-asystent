@@ -491,6 +491,15 @@ Wtedy ruszają koszyki czekające na numer.
 `[WERYFIKUJ]` Pierwszy prawdziwy ZW z automatu: czy `Zapisz()` daje dokument
 wykonany i czy przelew na zapisanym ZW zgadza się z wartością.
 
+**Pierwsza próba na produkcji: `Zapisz()` odmówił bez przyczyny** (15 września
+2026, PA 745/MAG/09/2026, jedna pozycja). Sfera zwróciła tylko „Nie można
+zapisać dokumentu.". Dokument ma `SzczegolyOstatniegoBledu` i `SprawdzPoprawnosc()`.
+Od 0.349.1 worker woła `SprawdzPoprawnosc()` przed zapisem i dopisuje szczegóły
+do błędu. Sonda `-SzkicZW -Paragon <dok_Id> -Towary "tw=ilosc" -Sprawdz` pokazuje
+tę samą przyczynę bez zapisu.
+
+`[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
+
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
 z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
 

@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.349.1 — 15 września 2026
+
+**ZW, którego Subiekt nie zapisze, mówi dlaczego.** Pierwszy automatyczny ZW
+na produkcji (zwrot 603Q/2026, PA 745/MAG/09/2026) padł trzy razy zdaniem
+„Nie można zapisać dokumentu." — bez przyczyny.
+
+- **Worker woła `SprawdzPoprawnosc()` przed zapisem** i przy odmowie dopisuje
+  do błędu `SzczegolyOstatniegoBledu` z dokumentu.
+- **Odmowa zapisu kończy zadanie od razu**, bez trzech identycznych prób.
+- **Sonda `-SzkicZW -Towary "tw=ilosc" -Sprawdz`** ustawia szkic jak worker
+  i pokazuje przyczynę odmowy — nadal bez `Zapisz()`.
+
+Po aktualizacji przebuduj exe workera Sfery (`sfera-worker\build.ps1`)
+i zrestartuj `wertis-sfera`, tak jak przy 0.349.0.
+
 ## 0.349.0 — 15 września 2026
 
 **ZW do paragonu wystawia się sam po zapisaniu kwoty.** Na nagraniu pracy
