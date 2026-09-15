@@ -14,10 +14,14 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-re
 let db: typeof import("../db/db.js").db;
 let reconcile: typeof import("./reconcile.js").reconcile;
 let reconcileCsv: typeof import("./reconcile.js").reconcileCsv;
+/* Kolejka pracy, żeby sprawdzić DRUGĄ stronę decyzji z 0.339.0: zwrot woła
+   w raporcie i jednocześnie NIE stoi już w kubełku. */
+let listaZwrotow: typeof import("./zwroty.js").listaZwrotow;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ reconcile, reconcileCsv } = await import("./reconcile.js"));
+  ({ listaZwrotow } = await import("./zwroty.js"));
 });
 
 const TW = 1;
@@ -69,7 +73,14 @@ beforeEach(() => {
   db().prepare("DELETE FROM zamowienie_klienta").run();
 });
 
-/** Zwrot w pracy, zgłoszony `dni` dni temu. Termin ustawowy to czternaście. */
+/**
+ * Zwrot w pracy, którego PACZKA wróciła `dni` dni temu (0.339.0).
+ *
+ * Termin obsługi to siedem dni OD DORĘCZENIA, więc to `dostarczono_at`
+ * ustawia zegar, a nie data zgłoszenia. Do 0.338.0 ta atrapa podawała samo
+ * `created_at` i było to wtedy poprawne — zegar startował właśnie tam.
+ * Zgłoszenie stawiamy dwa dni przed paczką, bo tak wygląda prawdziwy zwrot.
+ */
 function zwrotZgloszonyPrzed(dni: number, numer: string): void {
   db().prepare(`INSERT INTO channel_account(channel, external_account_id)
     VALUES ('allegro','rekoncyliacja') ON CONFLICT DO NOTHING`).run();
@@ -77,17 +88,24 @@ function zwrotZgloszonyPrzed(dni: number, numer: string): void {
     "SELECT id FROM channel_account WHERE external_account_id='rekoncyliacja'")
     .get() as { id: number }).id);
   db().prepare(`INSERT INTO zwrot_klienta
-    (channel_account_id, external_id, reference_number, created_at, synced_at)
-    VALUES (?,?,?, datetime('now', ?), datetime('now'))`)
-    .run(konto, `zw-${numer}`, numer, `-${dni} days`);
+    (channel_account_id, external_id, reference_number, created_at,
+     paczka_at, dostarczono_at, przesylka_status, synced_at)
+    VALUES (?,?,?, datetime('now', ?), datetime('now', ?), datetime('now', ?),
+            'DELIVERED', datetime('now'))`)
+    .run(konto, `zw-${numer}`, numer, `-${dni + 2} days`, `-${dni + 1} days`,
+      `-${dni} days`);
 }
 
-/* ── Termin ustawowy (0.210.0) ──────────────────────────────────────────────
-   Do tego wydania terminu pilnował WYŁĄCZNIE kolor wiersza w panelu.
-   Rekoncyliacja i /api/health nie znały zwrotów wcale, więc czternaście dni
-   mijało bez alarmu, jeśli przez tydzień nikt nie otworzył ekranu.         */
+/* ── Termin obsługi (0.210.0, przestawiony w 0.339.0) ───────────────────────
+   Do 0.210.0 terminu pilnował WYŁĄCZNIE kolor wiersza w panelu: rekoncyliacja
+   i /api/health nie znały zwrotów wcale, więc termin mijał bez alarmu, jeśli
+   przez tydzień nikt nie otworzył ekranu.
 
-test("zwrot po terminie ustawowym trafia do raportu, i to na jego GÓRĘ", () => {
+   Od 0.339.0 zegarem jest SIEDEM DNI OD DORĘCZENIA PACZKI (regulamin Allegro),
+   a nie czternaście od zgłoszenia klienta. Zmieniła się reguła, nie kontrola:
+   raport ma dalej łapać to, czego nikt nie otworzył na czas.               */
+
+test("zwrot po terminie obsługi trafia do raportu, i to na jego GÓRĘ", () => {
   zwrotZgloszonyPrzed(20, "PO-1");
   const r = reconcile();
   const w = r.rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie");
@@ -99,13 +117,15 @@ test("zwrot po terminie ustawowym trafia do raportu, i to na jego GÓRĘ", () =>
 });
 
 test("doba przed terminem już zgłasza — to ostatni moment, żeby zdążyć", () => {
-  zwrotZgloszonyPrzed(13, "BLISKO-1");
+  /* Szósty dzień po doręczeniu: z siedmiu zostaje jeden. */
+  zwrotZgloszonyPrzed(6, "BLISKO-1");
   const r = reconcile();
   assert.equal(r.rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 1);
 });
 
 test("zwrot z zapasem czasu NIE zgłasza się — raport ma zostać pusty", () => {
-  /* Raport przychodzący codziennie przestaje być czytany po tygodniu. */
+  /* Raport przychodzący codziennie przestaje być czytany po tygodniu.
+     Trzeci dzień po doręczeniu: zostają cztery. */
   zwrotZgloszonyPrzed(3, "SPOKOJ-1");
   assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 0);
 });
@@ -115,6 +135,42 @@ test("zwrot ZAMKNIĘTY nie ma już terminu do pilnowania", () => {
   db().prepare(`UPDATE zwrot_klienta SET werdykt='przyjety', kwota_grosze=100,
     korekta_numer='KFS 1/2026', zamkniety_at=datetime('now') WHERE reference_number='ZAMK-1'`).run();
   assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_po_terminie").length, 0);
+});
+
+/* ── Cena decyzji z 0.339.0 ─────────────────────────────────────────────────
+   Status `FINISHED` zdejmuje zwrot z kolejki pracy. Pieniądze wróciły do
+   klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
+   właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM (bramka
+   0.200.0), więc koszyk z takim zwrotem stanąłby w miejscu na zawsze.
+   Ten raport jest jedynym miejscem, w którym taki zwrot jeszcze się odezwie. */
+
+test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
+  zwrotZgloszonyPrzed(3, "ROZL-1");
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED'
+    WHERE reference_number='ROZL-1'`).run();
+  const w = reconcile().rozjazdy.filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty");
+  assert.equal(w.length, 1);
+  assert.match(w[0].opis, /ROZL-1/);
+  assert.match(w[0].opis, /brak numeru korekty/);
+  /* I NIE MA GO w kolejce pracy — o to właśnie prosił właściciel. */
+  assert.equal(listaZwrotow(db()).find((z) => z.numer === "ROZL-1")?.kubelek, "zamkniety");
+});
+
+test("zwrot rozliczony Z KOREKTĄ i z ocenami milczy — nic nie zostało", () => {
+  /* Raport wołający o sprawy załatwione uczy przewijać raport. */
+  zwrotZgloszonyPrzed(3, "ROZL-2");
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED_APT',
+    korekta_numer='KFS 9/2026' WHERE reference_number='ROZL-2'`).run();
+  assert.equal(reconcile().rozjazdy
+    .filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty").length, 0);
+});
+
+test("zwrot ODRZUCONY nie woła o korektę — nie ma czego korygować", () => {
+  zwrotZgloszonyPrzed(3, "ROZL-3");
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED',
+    rejection_code='REFUND_REJECTED' WHERE reference_number='ROZL-3'`).run();
+  assert.equal(reconcile().rozjazdy
+    .filter((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty").length, 0);
 });
 
 test("zgodny zapis nie generuje raportu", () => {

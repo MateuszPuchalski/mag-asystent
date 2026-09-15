@@ -176,16 +176,19 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   const zam = zwrot.zamowienie;
 
   return <div className="text-sm">
-    <Sekcja ikona={<CalendarClock size={14} />} tytul="Zegar ustawowy">
+    <Sekcja ikona={<CalendarClock size={14} />} tytul="Zegar obsługi">
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-slate-500">Zgłoszony</dt><dd>{czas(zwrot.utworzono)}</dd>
         <dt className="text-slate-500">Termin</dt>
-        <dd className={zwrot.dniDoTerminu <= 3 ? "font-bold text-ranga-zle" : ""}>
-          {czas(zwrot.terminAt)}</dd>
+        {/* BRAK TERMINU TO ZDANIE, nie pusta komórka (0.339.0): pusta wygląda
+            jak usterka panelu, a to jest stan — paczka jeszcze jedzie. */}
+        <dd className={zwrot.dniDoTerminu !== null && zwrot.dniDoTerminu <= 3
+          ? "font-bold text-ranga-zle" : ""}>
+          {zwrot.terminAt ? czas(zwrot.terminAt) : "rusza, gdy paczka wróci"}</dd>
       </dl>
       <p className="mt-2 text-xs text-slate-500">
-        Termin liczony od zgłoszenia zwrotu. Ustawa liczy go od otrzymania
-        oświadczenia — te dwa momenty nie muszą być tym samym.</p>
+        Siedem dni od otrzymania zwrotu — tak liczy Allegro. Termin ustawowy na
+        oddanie pieniędzy biegnie osobno, od oświadczenia klienta.</p>
     </Sekcja>
 
     {/* SEKCJI „ZWROT" TU JUŻ NIE MA (0.207.0). Numer i login kupującego stoją

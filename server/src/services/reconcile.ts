@@ -2,6 +2,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { koszykiCzekajaceNaKorekty } from "./kosze-zwrotow.js";
 import { listaZwrotow } from "./zwroty.js";
+import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
@@ -21,7 +22,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 export interface Rozjazd {
   rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
     | "kosz_czeka_na_korekte" | "kosz_bez_powrotu" | "zwrot_bez_przelewu"
-    | "zwrot_po_terminie";
+    | "zwrot_po_terminie" | "zwrot_rozliczony_bez_korekty";
   klucz: string;
   opis: string;
   odKiedy: string | null;
@@ -275,16 +276,65 @@ function zwrotyBezPrzelewu(): Rozjazd[] {
 function zwrotyPoTerminie(): Rozjazd[] {
   return listaZwrotow(db())
     .filter((z) => z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony")
+    /* Bez terminu nie ma czego pilnować (0.339.0): paczka jeszcze nie wróciła,
+       więc zegar obsługi nie ruszył. Dopisanie ich do raportu kazałoby gonić
+       pracę, której nie da się wykonać. */
+    .filter((z): z is typeof z & { dniDoTerminu: number } => z.dniDoTerminu !== null)
     .filter((z) => z.dniDoTerminu <= 1)
     .map((z) => ({
       rodzaj: "zwrot_po_terminie" as const,
       klucz: z.numer ?? z.externalId,
+      /* TERMIN OBSŁUGI, nie ustawowy (0.339.0) — siedem dni od doręczenia
+         paczki, regulamin Allegro. Zdanie mówi to wprost, bo raport czyta
+         człowiek, który zna oba zegary i musi wiedzieć, o którym mowa. */
       opis: z.dniDoTerminu < 0
         ? `Zwrot ${z.numer ?? z.externalId} jest ${-z.dniDoTerminu} dni PO terminie ` +
-          `ustawowym, w kubełku ${z.kubelek}.`
-        : `Zwrot ${z.numer ?? z.externalId} ma termin ustawowy za ${z.dniDoTerminu} ` +
+          `obsługi, w kubełku ${z.kubelek}.`
+        : `Zwrot ${z.numer ?? z.externalId} ma termin obsługi za ${z.dniDoTerminu} ` +
           `dni, a stoi w kubełku ${z.kubelek}.`,
       odKiedy: z.terminAt,
+    }));
+}
+
+/**
+ * Zwrot rozliczony przez Allegro, po którym została NASZA robota (0.339.0).
+ *
+ * Od tego wydania status `FINISHED` zdejmuje zwrot z kolejki pracy — decyzja
+ * właściciela po zgłoszeniu „pokazuje zwroty, za które pieniądze zostały już
+ * zwrócone". Cena tej decyzji jest jednak realna i nie wolno jej zapłacić
+ * w ciszy: pieniądze wróciły do klienta, ale korekta w Subiekcie i towar na
+ * półce to osobna robota, a zwrot właśnie przestał o nią prosić.
+ *
+ * Bez korekty NIE WYJDZIE TEŻ MM (bramka 0.200.0), więc koszyk z tym zwrotem
+ * stanąłby w miejscu na zawsze — i to jest drugi powód, dla którego ta
+ * kontrola istnieje. Raport jest tu jedynym miejscem, w którym taki zwrot
+ * jeszcze się odezwie.
+ *
+ * Odrzuconych NIE liczymy: przy odmowie nie ma czego korygować.
+ */
+function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
+  return listaZwrotow(db())
+    .filter((z) => STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
+    .filter((z) => !z.rejectionCode && z.werdykt !== "odrzucony")
+    .map((z) => ({
+      z,
+      /* DWA BRAKI, JEDEN WIERSZ. Osobne rozjazdy na ten sam zwrot kazałyby
+         otwierać go dwa razy, a robi się je za jednym podejściem. */
+      braki: [
+        z.korektaNumer ? null : "brak numeru korekty",
+        z.pozycje.some((p) => !p.ocena) ? "pozycje bez oceny" : null,
+      ].filter((x): x is string => x !== null),
+    }))
+    .filter((x) => x.braki.length > 0)
+    .map(({ z, braki }) => ({
+      rodzaj: "zwrot_rozliczony_bez_korekty" as const,
+      klucz: z.numer ?? z.externalId,
+      /* NUMER W ZDANIU, jak w kontrolach wyżej: raport czyta się jako listę
+         zdań, a nie jako tabelę z kluczem obok. */
+      opis: `Zwrot ${z.numer ?? z.externalId}: Allegro oddało pieniądze ` +
+        `(${z.statusAllegro}), a u nas został${braki.length > 1 ? "y" : ""}: ` +
+        `${braki.join(" i ")}.`,
+      odKiedy: z.utworzono,
     }));
 }
 
@@ -297,17 +347,18 @@ export function reconcile(): Rekoncyliacja {
   const powroty = koszeBezPowrotu();
   const przelewy = zwrotyBezPrzelewu();
   const terminy = zwrotyPoTerminie();
+  const rozliczone = zwrotyRozliczoneBezKorekty();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
       zadan: bledy.length + bufor.length + mm.length + kosze.length + powroty.length
-        + przelewy.length + terminy.length,
+        + przelewy.length + terminy.length + rozliczone.length,
     },
     /* Terminy PIERWSZE: mają skutek prawny, a raport czyta się od góry. */
     /* Terminy PIERWSZE (skutek prawny), zaraz za nimi pieniądze klienta. */
-    rozjazdy: [...terminy, ...przelewy, ...loc.rozjazdy, ...bledy, ...bufor, ...mm,
-      ...kosze, ...powroty],
+    rozjazdy: [...terminy, ...przelewy, ...rozliczone, ...loc.rozjazdy, ...bledy,
+      ...bufor, ...mm, ...kosze, ...powroty],
   };
 }
 

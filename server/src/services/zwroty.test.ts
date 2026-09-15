@@ -12,7 +12,7 @@ import {
   znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   osZwrotu, zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, ZwrotConflict,
-  stempelProwadziZwrot,
+  stempelProwadziZwrot, poczatekTerminu,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
 
@@ -102,12 +102,66 @@ function dodaj(d: Db, utworzono: string, pola: Record<string, unknown> = {},
   return id;
 }
 
-test("termin ustawowy liczy się od zgłoszenia i domyślnie ma czternaście dni", () => {
-  assert.equal(terminZwrotu("2026-08-01T00:00:00Z"), "2026-08-15T00:00:00.000Z");
+test("termin obsługi liczy się OD PACZKI U NAS i ma siedem dni", () => {
+  /* ZMIANA REGUŁY W 0.339.0, nie poprawka liczby. Do 0.338.0 stało tu
+     czternaście dni od zgłoszenia klienta, czyli termin ustawowy na oddanie
+     pieniędzy. Właściciel: „Allegro narzuca obsługę zwrotów do 7 dni po
+     otrzymaniu zwrotu" — i tym zegarem ma iść kolejność pracy, bo to po nim
+     Allegro rozlicza sprzedawcę.
+
+     Zegar nie rusza, dopóki paczki nie ma: wymyślony termin dla przesyłki
+     w drodze kazałby gonić pracę, której nie da się wykonać. */
+  assert.equal(terminZwrotu("2026-08-01T00:00:00Z"), "2026-08-08T00:00:00.000Z");
   assert.equal(terminZwrotu("2026-08-01T00:00:00Z", 30), "2026-08-31T00:00:00.000Z",
-    "liczba dni idzie z env, bo to liczba z prawa, nie z kodu");
+    "liczba dni idzie z env, bo to liczba z cudzego regulaminu, nie z kodu");
+  assert.equal(terminZwrotu(null), null, "bez paczki nie ma terminu");
   assert.equal(dniDoTerminu("2026-09-04T12:00:00Z", TERAZ), 3);
   assert.equal(dniDoTerminu("2026-08-30T12:00:00Z", TERAZ), -2, "po terminie liczymy dalej, na minus");
+  assert.equal(dniDoTerminu(null, TERAZ), null);
+});
+
+test("początek terminu bierze się z DORĘCZENIA, a bez trackingu z nadania", () => {
+  /* TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU" (0.187.0). Dwie definicje
+     „paczka wróciła" rozjechałyby się przy pierwszej poprawce jednej z nich,
+     a wtedy wiersz świeciłby terminem, mówiąc obok, że paczki nie ma. */
+  const brak = { dostarczonoAt: null, paczkaAt: null, przesylkaStatus: null };
+  assert.equal(poczatekTerminu(brak), null, "nic nie wyszło — nic nie wróciło");
+  assert.equal(poczatekTerminu({ ...brak, paczkaAt: "2026-08-20T10:00:00Z" }),
+    "2026-08-20T10:00:00Z", "bez trackingu zostaje nadanie");
+  /* Z trackingiem samo nadanie NIE WYSTARCZY: paczka w drodze nie jest
+     paczką u nas, a status mówi, że wiemy, gdzie jest. */
+  assert.equal(poczatekTerminu({
+    ...brak, paczkaAt: "2026-08-20T10:00:00Z", przesylkaStatus: "IN_TRANSIT" }), null);
+  assert.equal(poczatekTerminu({
+    dostarczonoAt: "2026-08-25T09:00:00Z", paczkaAt: "2026-08-20T10:00:00Z",
+    przesylkaStatus: "DELIVERED" }), "2026-08-25T09:00:00Z");
+});
+
+test("zwrot ROZLICZONY PRZEZ ALLEGRO schodzi z kolejki pracy (0.339.0)", () => {
+  /* Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania,
+     pokazuje zwroty, za które pieniądze zostały już zwrócone".
+
+     Ze SCHEMATU `CustomerReturn.status`: `FINISHED` to „the payment has been
+     refunded, return process is finished", `FINISHED_APT` to to samo ręką
+     Allegro Protect. Do 0.338.0 kubełek liczył się z pięciu naszych faktów
+     i tego statusu nie czytał wcale — zwrot rozliczony w panelu Allegro stał
+     u nas w DO DECYZJI i pytał „przyjąć czy odrzucić?" bez końca. */
+  const bazowy = {
+    rejectionCode: null, werdykt: null, zamknietyAt: null,
+    kwotaGrosze: null, korektaNumer: null, pozycje: [{ ocena: null }],
+  };
+  assert.equal(kubelekZwrotu(bazowy), "decyzja", "bez statusu wszystko po staremu");
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "FINISHED" }), "zamkniety");
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "FINISHED_APT" }), "zamkniety",
+    "Allegro Protect oddaje TE SAME pieniądze, tyle że z cudzej kieszeni");
+  /* Statusy drogi, nie końca: paczka jedzie albo leży, pieniędzy nie ma. */
+  for (const status of ["CREATED", "DISPATCHED", "IN_TRANSIT", "DELIVERED"]) {
+    assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: status }), "decyzja", status);
+  }
+  /* ODRZUCENIE ROZSTRZYGA WCZEŚNIEJ i tak ma zostać: „odrzucony" niesie
+     powód, a „zamknięty" mówi tylko, że sprawy nie ma. */
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "FINISHED",
+    rejectionCode: "REFUND_REJECTED" }), "odrzucony");
 });
 
 test("kubełek wynika z faktów, a stan końcowy rozstrzyga pierwszy", () => {
@@ -250,22 +304,34 @@ test("suma pozycji mnoży cenę przez ilość i zostaje w groszach", () => {
   assert.equal(sumaPozycji([]), 0);
 });
 
-test("kolejność bierze się z terminu, nie z daty wpływu", () => {
-  /* Blizna 0.121.0: ustawowy zegar steruje kolejnością pracy. Zwrot
-     zgłoszony dawno ma mniej czasu i stoi wyżej niż wczorajszy. */
+test("kolejność bierze się z terminu, a ten liczy się OD PACZKI (0.339.0)", () => {
+  /* Blizna 0.121.0 zostaje w mocy — zegar steruje kolejnością pracy — ale od
+     0.339.0 jest to zegar OBSŁUGI: siedem dni od paczki u nas. Zwrot zgłoszony
+     dawno, którego paczka przyszła wczoraj, NIE jest pilniejszy: pracy przy
+     nim można dotknąć dopiero od wczoraj. */
   const d = stanowisko();
-  /* Obu zwrotom dajemy paczkę, żeby ten test mierzył wyłącznie kolejność —
-     brak paczki zapala własny sygnał i mieszałby się z terminem. */
-  dodaj(d, "2026-08-31T00:00:00Z", { paczka_at: "2026-08-31T10:00:00Z" });  // termin 14.09
-  dodaj(d, "2026-08-20T00:00:00Z", { paczka_at: "2026-08-21T10:00:00Z" });  // termin 03.09
+  dodaj(d, "2026-08-31T00:00:00Z", { paczka_at: "2026-08-31T10:00:00Z" });  // termin 07.09
+  dodaj(d, "2026-08-20T00:00:00Z", { paczka_at: "2026-08-26T12:00:00Z" });  // termin 02.09
   const lista = listaZwrotow(d, TERAZ);
   assert.equal(lista[0].utworzono, "2026-08-20T00:00:00Z", "pilniejszy na górze");
-  /* Termin wypada 03.09 o północy, a „teraz" to 01.09 południe — zostaje
-     półtorej doby. Zaokrąglamy W DÓŁ, bo termin liczony hojnie to termin
-     przekroczony: lepiej pokazać jeden dzień niż obiecać dwa. */
+  /* Termin wypada 02.09 w południe, a „teraz" to 01.09 południe — zostaje
+     doba. Zaokrąglamy W DÓŁ, bo termin liczony hojnie to termin przekroczony. */
   assert.equal(lista[0].dniDoTerminu, 1);
   assert.deepEqual(lista[0].sygnaly, ["termin"]);
   assert.deepEqual(lista[1].sygnaly, [], "drugi ma czas i milczy");
+});
+
+test("zwrot bez paczki nie ma terminu i stoi NA KOŃCU kolejki", () => {
+  /* Puste miejsce po terminie nie ma prawa udawać najpilniejszego. Taki zwrot
+     ma własny sygnał — `brak_dowodu` — i to on mówi, na co się czeka. */
+  const d = stanowisko();
+  dodaj(d, "2026-08-20T00:00:00Z");                                          // bez paczki
+  dodaj(d, "2026-08-31T00:00:00Z", { paczka_at: "2026-08-31T10:00:00Z" });   // termin 07.09
+  const lista = listaZwrotow(d, TERAZ);
+  assert.equal(lista[0].utworzono, "2026-08-31T00:00:00Z", "ten z paczką ma termin");
+  assert.equal(lista[1].dniDoTerminu, null);
+  assert.equal(lista[1].terminAt, null);
+  assert.deepEqual(lista[1].sygnaly, ["brak_dowodu"], "milczy o terminie, mówi o paczce");
 });
 
 test("liczniki kubełków zgadzają się z kolejką", () => {

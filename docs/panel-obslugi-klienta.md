@@ -2557,6 +2557,32 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 | ZAMKNIĘTE | — | wgląd i `R` (cofnij korektę) |
 | ODRZUCONE | — | tylko wgląd |
 
+**Zwrot rozliczony przez Allegro trafia od razu do ZAMKNIĘTYCH (0.339.0).**
+Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania, pokazuje
+zwroty, za które pieniądze zostały już zwrócone".
+
+Kubełek liczył się dotąd z pięciu naszych faktów — werdykt, oceny, kwota,
+korekta, zamknięcie — i ani razu nie patrzył na status z Allegro. Ze schematu
+`CustomerReturn.status`: `FINISHED` znaczy „the payment has been refunded,
+return process is finished", `FINISHED_APT` to samo ręką Allegro Protect.
+
+Zwrot rozliczony w panelu Allegro albo przez Allegro Protect stał więc u nas
+w DO DECYZJI i pytał „przyjąć czy odrzucić?", choć pieniądze dawno były
+u klienta. Pytanie bez treści, przy każdym takim zwrocie, na zawsze.
+
+Odmowa rozstrzyga wcześniej niż rozliczenie. Oba stany są końcowe, więc żaden
+nie chowa pracy, ale ODRZUCONE niesie powód, a ZAMKNIĘTE mówi tylko tyle, że
+sprawy nie ma.
+
+**Cena tej decyzji jest realna i nie jest płacona w ciszy.** Pieniądze wróciły
+do klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
+właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM, bo bramka
+z 0.200.0 czeka na komplet korekt.
+
+Dlatego taki zwrot woła w pasku DO SPRAWDZENIA, kontrolą
+`zwrot_rozliczony_bez_korekty`: wymienia brakujący numer korekty i pozycje bez
+oceny. Raport jest jedynym miejscem, w którym jeszcze się odezwie.
+
 **Te klawisze DZIAŁAJĄ od 0.284.0 i wcześniej nie działały.** Ekran rysował je
 przy przyciskach jako podpowiedzi, a nasłuch znał wyłącznie ruch po liście
 i cyfry kubełków. Tabela wyżej mówiła przy tym o trzech ocenach, choć od
@@ -2605,11 +2631,32 @@ droższą niż najtańsza zwykła, sprzedawca nie musi dopłacać różnicy. Odd
 więcej świadomie: tak samo rozlicza to Allegro, a liczenie najtańszej opcji
 wymagałoby cennika oferty, którego przy zwrocie nie mamy.
 
-Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
+Sygnały są trzy: termin obsługi blisko, towar jeszcze nie wrócił, sprawa
 rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
 sztuk — czeka na ocenę hali z 0.151.0.
 
-Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
+Kolejność bierze się z terminu obsługi, nie z daty wpływu.
+
+**Zegar liczy SIEDEM DNI OD PACZKI U NAS (0.339.0).** Zgłoszenie właściciela:
+„Allegro narzuca obsługę zwrotów do 7 dni po otrzymaniu zwrotu". Do 0.338.0
+liczyliśmy czternaście dni od zgłoszenia klienta, czyli termin ustawowy na
+oddanie pieniędzy.
+
+To są dwa różne zegary i decyzja właściciela brzmi: kolejnością pracy rządzi
+ten, który realnie wiąże, bo po nim Allegro rozlicza sprzedawcę. Termin
+ustawowy nie znika z prawa — znika z kolejności pracy.
+
+Zegar nie rusza, dopóki paczka nie wróci. Wiersz mówi wtedy „czeka na paczkę",
+a nie pokazuje zera: wymyślony termin dla przesyłki w drodze kazałby gonić
+pracę, której nie da się wykonać. Takie zwroty stoją na końcu kolejki i mają
+własny sygnał — brak dowodu powrotu.
+
+Początek zegara bierze się z doręczenia, a gdy trackingu nie ma wcale —
+z nadania. To ta sama reguła, którą od 0.187.0 stosuje sygnał braku dowodu:
+dwie definicje „paczka wróciła" rozjechałyby się przy pierwszej poprawce.
+
+Liczba dni stoi w `ZWROT_TERMIN_DNI` w `wertis.env` i domyślnie wynosi 7.
+Zmiana cudzego regulaminu ma być wpisem w pliku, nie wydaniem.
 
 ### 25a.4. Układ
 

@@ -108,10 +108,19 @@ export interface WierszZwrotu {
   dostarczonoAt: string | null;
   /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   przesylkaStatus: string | null;
+  /**
+   * Ostatni status zwrotu po stronie Allegro (0.339.0).
+   *
+   * Do 0.338.0 czytały go wyłącznie sygnały, z surowego wiersza. Od kiedy
+   * rozstrzyga o KUBEŁKU, musi być widoczny tam, gdzie widać kubełek —
+   * inaczej zwrot znika z kolejki bez zdania, które to tłumaczy.
+   */
+  statusAllegro: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
-  terminAt: string;
-  dniDoTerminu: number;
+  /** `null`, dopóki paczka nie wróciła — zegar obsługi jeszcze nie ruszył. */
+  terminAt: string | null;
+  dniDoTerminu: number | null;
   sumaPozycjiGrosze: number;
   /**
    * Kwota PEŁNA: pozycje plus koszt dostawy. `null`, dopóki zamówienia nie
@@ -189,20 +198,43 @@ const PROG_TERMINU_DNI = 3;
 type Wiersz = Record<string, unknown>;
 
 /**
- * Termin ustawowy zwrotu pieniędzy.
+ * Od kiedy biegnie zegar obsługi zwrotu (0.339.0).
  *
- * `[WERYFIKUJ]` Liczymy go od `createdAt` zwrotu, bo to najbliższy moment,
- * jaki Allegro nam podaje. Ustawa liczy czternaście dni od OTRZYMANIA
- * oświadczenia o odstąpieniu, a te dwa momenty nie muszą być tym samym.
- * Błąd idzie w stronę bezpieczną — nasz termin wypada nie później niż
- * ustawowy — ale zanim ktoś oprze na tym spór, trzeba to sprawdzić.
+ * OD PACZKI U NAS, nie od zgłoszenia klienta. Regulamin Allegro daje siedem
+ * dni od OTRZYMANIA zwrotu, a nie od jego zadeklarowania — i tym zegarem
+ * właściciel kazał ustawiać kolejność pracy, bo to po nim Allegro rozlicza
+ * sprzedawcę. Do 0.338.0 liczyliśmy czternaście dni od `createdAt`, czyli
+ * termin ustawowy na oddanie pieniędzy.
+ *
+ * TA SAMA REGUŁA CO PRZY SYGNALE „BRAK DOWODU" (0.187.0), i to jest celowe:
+ * dwie definicje „paczka wróciła" rozjechałyby się przy pierwszej poprawce
+ * jednej z nich, a wtedy wiersz świeciłby terminem, mówiąc jednocześnie, że
+ * paczki nie ma. Doręczenie z trackingu; a gdy trackingu NIE MA wcale,
+ * zostaje data nadania — lepszy zegar z nadania niż jego brak.
+ *
+ * `null` znaczy: PACZKA JESZCZE NIE WRÓCIŁA, więc nie ma czego obsługiwać
+ * i zegar nie ruszył. Wymyślony termin dla paczki w drodze kazałby gonić
+ * pracę, której nie da się wykonać.
  */
-export function terminZwrotu(utworzono: string, dni = config.allegro.zwrotTerminDni): string {
-  return new Date(Date.parse(utworzono) + dni * 86_400_000).toISOString();
+export function poczatekTerminu(z: {
+  dostarczonoAt: string | null; paczkaAt: string | null; przesylkaStatus: string | null;
+}): string | null {
+  if (z.dostarczonoAt) return z.dostarczonoAt;
+  if (z.przesylkaStatus == null && z.paczkaAt) return z.paczkaAt;
+  return null;
 }
 
-/** Pełne dni do terminu; ujemne znaczy „po terminie". */
-export function dniDoTerminu(terminAt: string, teraz = Date.now()): number {
+/** Termin obsługi — `null`, dopóki paczka nie wróciła. */
+export function terminZwrotu(
+  poczatek: string | null, dni = config.allegro.zwrotTerminDni,
+): string | null {
+  if (!poczatek) return null;
+  return new Date(Date.parse(poczatek) + dni * 86_400_000).toISOString();
+}
+
+/** Pełne dni do terminu; ujemne znaczy „po terminie", `null` — zegar nie ruszył. */
+export function dniDoTerminu(terminAt: string | null, teraz = Date.now()): number | null {
+  if (!terminAt) return null;
   return Math.floor((Date.parse(terminAt) - teraz) / 86_400_000);
 }
 
@@ -217,9 +249,32 @@ export function kubelekZwrotu(z: {
   rejectionCode: string | null; werdykt: string | null; zamknietyAt: string | null;
   kwotaGrosze: number | null; korektaNumer: string | null;
   pozycje: Array<{ ocena: string | null }>;
+  /** Ostatni status zwrotu po stronie Allegro (0.339.0). */
+  statusAllegro?: string | null;
 }): Kubelek {
   if (z.zamknietyAt) return "zamkniety";
   if (z.werdykt === "odrzucony" || z.rejectionCode) return "odrzucony";
+  /* ALLEGRO ROZLICZYŁO — SPRAWA ZAMKNIĘTA (0.339.0). Zgłoszenie właściciela:
+     „pokazuje za dużo zwrotów do procesowania, pokazuje zwroty, za które
+     pieniądze zostały już zwrócone".
+
+     Ze SCHEMATU `CustomerReturn.status`: `FINISHED` to „the payment has been
+     refunded, return process is finished", `FINISHED_APT` to to samo ręką
+     Allegro Protect. Do 0.338.0 kubełek liczył się z pięciu naszych faktów
+     i tego statusu nie czytał wcale — zwrot rozliczony w panelu Allegro albo
+     przez Allegro Protect stał u nas w DO DECYZJI i pytał „przyjąć czy
+     odrzucić?", choć pieniądze dawno były u klienta. Pytanie bez treści,
+     na zawsze, przy każdym takim zwrocie.
+
+     DECYZJA WŁAŚCICIELA: całkiem z kolejki. Zdejmuje to z pracy także zwroty
+     bez naszej korekty i bez oceny towaru — dlatego wychodzą one w raporcie
+     rekoncyliacji (`zwrot_rozliczony_bez_korekty`), a nie w ciszy.
+
+     ODMOWA ROZSTRZYGA WCZEŚNIEJ, linijkę wyżej. Oba stany są końcowe, więc
+     żaden nie chowa pracy — ale „odrzucony" niesie POWÓD, a „zamknięty" mówi
+     tylko, że sprawy nie ma. Przy wyborze między dwoma prawdami wygrywa ta,
+     która więcej tłumaczy. */
+  if (STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return "zamkniety";
   if (z.werdykt !== "przyjety") return "decyzja";
   /* Pusta lista pozycji NIE jest „ocenione wszystko": zwrot bez pozycji nie
      ma czego wycenić, więc zostaje przy ocenie, gdzie człowiek to zobaczy. */
@@ -253,7 +308,7 @@ const PROG_POTWIERDZENIA_DNI = 3;
  * w którą stronę patrzeć.
  */
 export function sygnalyZwrotu(z: {
-  kubelek: Kubelek; dni: number; paczkaAt: string | null;
+  kubelek: Kubelek; dni: number | null; paczkaAt: string | null;
   dostarczonoAt: string | null; przesylkaStatus: string | null;
   rejectionCode: string | null;
   /* Kiedy TO MY zleciliśmy przelew; `null` = nie zleciliśmy go z panelu. */
@@ -277,7 +332,10 @@ export function sygnalyZwrotu(z: {
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
      przewijać czerwone wiersze. */
   const wPracy = z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony";
-  if (wPracy && z.dni <= PROG_TERMINU_DNI) s.push("termin");
+  /* `null` = paczka jeszcze nie wróciła, więc zegar nie ruszył (0.339.0).
+     Sygnał terminu na paczce w drodze kazałby gonić pracę, której nie da się
+     wykonać — od tego jest `brak_dowodu` linijkę niżej. */
+  if (wPracy && z.dni !== null && z.dni <= PROG_TERMINU_DNI) s.push("termin");
   /* Dowodem jest DORĘCZENIE, nie nadanie (0.187.0). Do 0.186.0 sygnał gasł,
      gdy klient nadał paczkę — a paczka w drodze nie jest paczką u nas. Zwrot
      doręczony i ten jadący od tygodnia wyglądały w kolejce identycznie.
@@ -405,7 +463,11 @@ function zloz(
   tagi: TagSprawy[] = [],
 ): WierszZwrotu {
   const utworzono = String(z.created_at);
-  const terminAt = terminZwrotu(utworzono);
+  const terminAt = terminZwrotu(poczatekTerminu({
+    dostarczonoAt: (z.dostarczono_at as string) ?? null,
+    paczkaAt: (z.paczka_at as string) ?? null,
+    przesylkaStatus: (z.przesylka_status as string) ?? null,
+  }));
   const dni = dniDoTerminu(terminAt, teraz);
   const rejectionCode = (z.rejection_code as string) ?? null;
   const kubelek = kubelekZwrotu({
@@ -415,6 +477,7 @@ function zloz(
     kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
     korektaNumer: (z.korekta_numer as string) ?? null,
     pozycje,
+    statusAllegro: (z.status_allegro as string) ?? null,
   });
   const suma = sumaPozycji(pozycje);
   return {
@@ -426,6 +489,7 @@ function zloz(
     paczkaAt: (z.paczka_at as string) ?? null,
     dostarczonoAt: (z.dostarczono_at as string) ?? null,
     przesylkaStatus: (z.przesylka_status as string) ?? null,
+    statusAllegro: (z.status_allegro as string) ?? null,
     kubelek,
     sygnaly: sygnalyZwrotu({
       kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null,
@@ -786,8 +850,10 @@ export function listaZwrotow(
         tagiWgZwrotu.get(Number(z.id)) ?? []);
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
-       jakiej ten ekran potrzebuje. */
-    .sort((a, b) => a.dniDoTerminu - b.dniDoTerminu);
+       jakiej ten ekran potrzebuje. ZWROTY BEZ TERMINU IDĄ NA KONIEC (0.339.0):
+       ich paczka jeszcze nie wróciła, więc nie ma czego obsłużyć, a puste
+       miejsce po terminie nie ma prawa udawać najpilniejszego. */
+    .sort((a, b) => (a.dniDoTerminu ?? Infinity) - (b.dniDoTerminu ?? Infinity));
 }
 
 /**

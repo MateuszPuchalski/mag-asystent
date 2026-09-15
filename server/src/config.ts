@@ -394,11 +394,19 @@ export const config = {
     reklamacjeSyncMs: num(
       process.env.ALLEGRO_REKLAMACJE_SYNC_MS, 180_000, "ALLEGRO_REKLAMACJE_SYNC_MS"),
     /**
-     * Ile dni ma sprzedawca na oddanie pieniędzy od oświadczenia klienta.
-     * Ustawowo czternaście; w env, bo to liczba z prawa, a nie z naszego
-     * kodu — zmiana przepisu ma być wpisem w `wertis.env`, nie wydaniem.
+     * Ile dni ma sprzedawca na OBSŁUŻENIE zwrotu od jego otrzymania.
+     *
+     * SIEDEM, OD DORĘCZENIA PACZKI (0.339.0) — regulamin Allegro. Do 0.338.0
+     * stało tu czternaście liczonych od zgłoszenia klienta, czyli termin
+     * ustawowy na oddanie pieniędzy. Decyzja właściciela: kolejką ma rządzić
+     * ten zegar, który realnie go wiąże, bo to po nim Allegro rozlicza
+     * sprzedawcę. Termin ustawowy nie znika z prawa — znika z KOLEJNOŚCI
+     * PRACY, a przy paczce jadącej do nas tydzień oba i tak wypadają blisko.
+     *
+     * Zostaje w env, bo to liczba z cudzego regulaminu, a nie z naszego kodu:
+     * zmiana zasad ma być wpisem w `wertis.env`, nie wydaniem.
      */
-    zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 14, "ZWROT_TERMIN_DNI"),
+    zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 7, "ZWROT_TERMIN_DNI"),
     /**
      * Od kiedy widzimy zwroty. Decyzja właściciela: 20 SIERPNIA 2026, północ
      * czasu lokalnego (stąd 19 sierpnia 22:00 UTC — Polska jest w sierpniu
