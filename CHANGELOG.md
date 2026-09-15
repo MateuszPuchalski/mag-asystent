@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.344.0 — 15 września 2026
+
+**Numer listu przewozowego stoi w modelu pracy.** Decyzja właściciela:
+„zapisuj numery paczek". Zdejmuje to politykę z 0.163.0, przez którą numer żył
+wyłącznie w kopii odpowiedzi Allegro — panel nie mógł go ani pokazać, ani
+przefiltrować w locie.
+
+- **Synchronizacja zapisuje numer PIERWSZEJ paczki** zwrotu, tej samej,
+  z której idą data nadania i przewoźnik. Zwrot w dwóch przesyłkach pokazywałby
+  inaczej datę jednej, firmę drugiej, a numer trzeciej.
+- **Odświeżenie bez paczek numeru nie kasuje.** Allegro oddaje zgłoszenie bez
+  tablicy `parcels`, zanim klient nada przesyłkę.
+- **Kolumna dowodów pokazuje numer przy przewoźniku** — razem odpowiadają na
+  jedno pytanie: którą paczką to jechało.
+- **Filtr frazy szuka po numerze w locie.** Enter dalej pyta serwer, bo tamta
+  droga zna też paczki, których w modelu pracy jeszcze nie ma.
+- **Paczka nieodebrana przestaje być wyjątkiem** — obie drogi wypełniają tę
+  samą kolumnę, różni je tylko to, kto wpisuje.
+
+Trzy rzeczy zostają bez zmian, każda z własnego powodu: numeru nie ma
+w dzienniku zdarzeń, nie ma w logu żądań serwera (trasa skanu zostaje POST-em)
+i nie ma w eksporcie CSV, bo plik na dysku zostaje trwalszy niż baza.
+
 ## 0.343.0 — 15 września 2026
 
 **Automat rozbijania kompletów przestaje milczeć.** Odejmowanie z paragonu

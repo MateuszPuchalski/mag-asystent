@@ -359,6 +359,13 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           stał w sekcji „Zwrot" razem z numerem i loginem. */}
       {zwrot.przewoznik && <p className="mt-1 text-slate-600">
         Przewoźnik: {PRZEWOZNICY[zwrot.przewoznik] ?? zwrot.przewoznik}</p>}
+      {/* NUMER LISTU OD 0.344.0. Do 0.343.0 panel go nie znał — polityka
+          0.163.0 trzymała numer wyłącznie w kopii odpowiedzi Allegro.
+          Decyzja właściciela: „zapisuj numery paczek". Stoi przy przewoźniku,
+          bo razem odpowiadają na jedno pytanie: którą paczką to jechało.
+          `font-mono`, bo czyta się go znak po znaku z naklejki. */}
+      {zwrot.waybill && <p className="mt-1 text-slate-600">
+        Numer listu: <b className="break-all font-mono">{zwrot.waybill}</b></p>}
       <p className="mt-2 text-xs text-slate-500">
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>

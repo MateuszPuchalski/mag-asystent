@@ -916,6 +916,14 @@ export interface Zwrot {
   dostarczonoAt: string | null;
   /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   przesylkaStatus: string | null;
+  /**
+   * Numer listu przewozowego paczki zwrotnej (0.344.0).
+   *
+   * Do 0.343.0 panel go nie znał: polityka 0.163.0 trzymała numer wyłącznie
+   * w kopii odpowiedzi Allegro, więc szukanie po nim wymagało Entera i pytania
+   * serwera. Decyzja właściciela zdjęła tę politykę.
+   */
+  waybill: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
   /**

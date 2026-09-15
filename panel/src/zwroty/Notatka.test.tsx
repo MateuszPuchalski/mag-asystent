@@ -27,7 +27,7 @@ import type { Zwrot } from "../api/typy";
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "N4QZ/2026", orderId: "ord-1",
   utworzono: "2026-08-20T07:28:12.000Z", paczkaAt: null, dostarczonoAt: null,
-  przesylkaStatus: null, statusAllegro: null, kubelek: "zamkniety", sygnaly: [],
+  przesylkaStatus: null, statusAllegro: null, waybill: null, kubelek: "zamkniety", sygnaly: [],
   terminAt: "2026-09-03T07:28:12.000Z", dniDoTerminu: 7,
   sumaPozycjiGrosze: 3798, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,

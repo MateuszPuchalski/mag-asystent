@@ -14,11 +14,11 @@ import type { Db } from "../db/db.js";
    a wśród kodów jest `DELIVERED`. Właściciel zobaczył tę datę we własnym
    panelu sprzedawcy i słusznie zapytał, czemu u nas jej nie ma.
 
-   ── Numeru listu dalej NIE ZAPISUJEMY (polityka 0.163.0) ───────────────────
-   I nie trzeba. Waybill przychodzi w tej samej odpowiedzi, co zwrot, więc
-   synchronizacja ma go w ręku podczas przebiegu: pytamy tracking od razu
-   i zapisujemy WYŁĄCZNIE wynik — moment doręczenia i kod statusu. Numer żyje
-   przez jedno żądanie, dokładnie jak mówi polityka.
+   ── Tu numer dalej ŻYJE PRZEZ JEDNO ŻĄDANIE (0.344.0) ─────────────────────
+   Decyzja właściciela zdjęła politykę 0.163.0 i model pracy trzyma teraz numer
+   PIERWSZEJ paczki zwrotu. Ten plik i tak go stamtąd nie bierze: pytanie brzmi
+   „co z KAŻDĄ paczką tego zwrotu", a na to odpowiada wyłącznie lądowisko.
+   Zapisujemy z odpytania WYŁĄCZNIE wynik — moment doręczenia i kod statusu.
 
    ── Pytamy tylko o te W DRODZE (decyzja właściciela) ───────────────────────
    Zwrot z zapisaną datą doręczenia nie jest pytany drugi raz: data się nie

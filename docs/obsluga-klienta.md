@@ -490,21 +490,32 @@ i IMIENIEM AGENTA. To ostatnie jest daną pracownika, nie klienta, i stoi tam
 z tego samego powodu co przy każdej innej mutacji: zapis bez autora nie da się
 później rozliczyć. Zdjęcie powiązania kasuje wpis.
 
-**Numeru listu przewozowego NIE ZAPISUJEMY w modelu pracy.** Od 0.163.0 skan
-etykiety otwiera zwrot, a szukamy po kopii odpowiedzi Allegro w lądowisku
-`allegro_zwrot`. Kolumny na ten numer nie ma i nie będzie: leży tam, gdzie
-i tak leżał, i żyje przez jedno żądanie. Zeskanowany kod nie trafia ani do
-dziennika zdarzeń, ani do adresu żądania — dlatego trasa skanu jest POST-em,
-choć niczego nie zapisuje.
+**Numer listu przewozowego STOI w modelu pracy od 0.344.0.** Decyzja
+właściciela: „zapisuj numery paczek". Do 0.343.0 obowiązywała reguła odwrotna
+i warto wiedzieć, co dokładnie się zmieniło, a co nie.
 
-**Jeden wyjątek: paczka nieodebrana (0.172.0).** Tam numer listu STOI w modelu
-pracy, w kolumnie `zwrot_klienta.waybill`. Zwrot z Allegro ma kopię odpowiedzi,
-w której da się numeru poszukać; przesyłki, której klient nie odebrał, Allegro
-nie zna wcale, więc kopii nie ma i nigdy nie będzie. Numer jest wtedy jedynym
-uchwytem, po którym operator zeskanuje ten sam karton drugi raz. Wyjątek jest
-wąski i pilnują go trzy rzeczy: kolumna wypełnia się tylko dla
-`zrodlo='nieodebrana'`, wpisuje ją człowiek ze skanu, a eksport CSV jej nie
-niesie — bo plik na dysku zostaje trwalszy niż baza.
+Od 0.163.0 do 0.343.0 kolumny `zwrot_klienta.waybill` nie wypełnialiśmy przy
+zwrotach z Allegro. Numer leżał wyłącznie w kopii odpowiedzi
+(`allegro_zwrot.surowe_json`) i stamtąd go czytaliśmy — skan etykiety otwierał
+zwrot, tracking brał parę numer-przewoźnik. Panel numeru nie znał, więc nie
+mógł go ani pokazać, ani przefiltrować w locie.
+
+Synchronizacja zapisuje teraz numer PIERWSZEJ paczki zwrotu — tej samej, z
+której idą data nadania i przewoźnik. Trzy pola z jednego źródła, bo zwrot
+w dwóch przesyłkach pokazywałby inaczej datę jednej, firmę drugiej, a numer
+trzeciej. Odświeżenie bez paczek numeru nie kasuje: Allegro oddaje zgłoszenie
+bez tablicy `parcels`, zanim klient nada przesyłkę.
+
+**Co się NIE zmieniło, i to celowo.** Eksport CSV numeru nie niesie — plik na
+dysku zostaje trwalszy niż baza, a ta część polityki nie była przedmiotem
+decyzji. Trasa skanu zostaje POST-em, żeby zeskanowany kod nie trafiał do
+adresu żądania ani do logu serwera. Dziennik zdarzeń numeru nie zapisuje.
+
+**Paczka nieodebrana (0.172.0) przestaje być wyjątkiem.** Tam numer stał
+w modelu pracy od początku, bo przesyłki, której klient nie odebrał, Allegro
+nie zna wcale — nie ma kopii, w której dałoby się szukać. Od 0.344.0 obie
+drogi wypełniają tę samą kolumnę i różnią się już tylko tym, kto ją wpisuje:
+tam człowiek ze skanu, tu synchronizacja.
 
 **Dwie oceny tego numeru są obie prawdziwe.** Raport sondy nazywa go daną
 osobową okrężną drogą (`services/ksztalt.ts`, 0.155.0), a czyszczenie lądowisk

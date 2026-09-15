@@ -136,18 +136,22 @@ export function naGrosze(amount: string | undefined): number {
 }
 
 /**
- * Najwcześniejsza paczka: jej data i przewoźnik.
+ * Najwcześniejsza paczka: jej data, przewoźnik i NUMER LISTU (0.344.0).
  *
- * `data` na NULL znaczy „towar jeszcze nie wrócił". Przewoźnik idzie z TEJ
- * SAMEJ paczki, co data — inaczej zwrot w dwóch przesyłkach pokazywałby datę
- * jednej, a firmę drugiej.
+ * `data` na NULL znaczy „towar jeszcze nie wrócił". Wszystkie trzy pola idą
+ * z TEJ SAMEJ paczki — inaczej zwrot w dwóch przesyłkach pokazywałby datę
+ * jednej, firmę drugiej, a numer trzeciej.
  */
 function pierwszaPaczka(paczki: Paczka[] | undefined):
-  { data: string | null; przewoznik: string | null } {
+  { data: string | null; przewoznik: string | null; waybill: string | null } {
   const zDatami = (paczki ?? []).filter((p) => Boolean(p.createdAt))
     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
   const p = zDatami[0];
-  return { data: p?.createdAt ?? null, przewoznik: p?.carrierId ?? null };
+  return {
+    data: p?.createdAt ?? null,
+    przewoznik: p?.carrierId ?? null,
+    waybill: (p?.waybill ?? "").trim() || null,
+  };
 }
 
 /** Jeden przebieg. Sieć kończy się PRZED transakcją, więc wolne API nie blokuje SQLite. */
@@ -278,11 +282,11 @@ export const TRACKING_NA_PRZEBIEG = 200;
  * Kolumna `dostarczono_at` nie zapełniła się więc nigdy i panel przy każdej
  * paczce mówił, że nie dotarła. Właściciel zobaczył to od razu.
  *
- * ── Numeru listu dalej nie zapisujemy (polityka 0.163.0) ──────────────────
- * I nadal nie trzeba: numer leży w kopii odpowiedzi Allegro
- * (`allegro_zwrot.surowe_json`) i stamtąd go czytamy, tym samym `json_each`,
- * co szukanie zwrotu po naklejce. `zwrot_klienta` kolumny na numer nie ma
- * i nie dostaje.
+ * ── Numer listu STOI OD 0.344.0 w modelu pracy ────────────────────────────
+ * Decyzja właściciela zdjęła politykę 0.163.0: „zapisuj numery paczek".
+ * Ta lista czyta go jednak dalej Z LĄDOWISKA i to zostaje bez zmian — tu
+ * potrzebna jest para numer+przewoźnik z KAŻDEJ paczki zwrotu, a model pracy
+ * trzyma tylko tę pierwszą. Dwa źródła, dwa różne pytania.
  *
  * TYLKO TE W DRODZE — decyzja właściciela. Zwrot z zapisaną datą doręczenia
  * nie jest pytany drugi raz: data się nie zmieni, a każde żądanie to koszt
@@ -384,17 +388,23 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   const paczka = pierwszaPaczka(zwrot.parcels);
   database.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,order_id,created_at,paczka_at,
-     kupujacy_login,przewoznik,rejection_code,rejection_reason,status_allegro,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+     kupujacy_login,przewoznik,waybill,rejection_code,rejection_reason,status_allegro,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
       created_at=excluded.created_at, paczka_at=excluded.paczka_at,
       kupujacy_login=excluded.kupujacy_login, przewoznik=excluded.przewoznik,
+      -- NUMER LISTU NIE ZNIKA przy odświeżeniu (0.344.0). Allegro potrafi
+      -- oddać zwrot bez tablicy parcels, zanim klient nada paczkę, i wtedy
+      -- excluded.waybill jest puste. Nadpisanie skasowałoby numer, który
+      -- operator ma na naklejce w ręku.
+      waybill=COALESCE(excluded.waybill, zwrot_klienta.waybill),
       rejection_code=excluded.rejection_code, rejection_reason=excluded.rejection_reason,
       status_allegro=excluded.status_allegro,
       synced_at=excluded.synced_at`).run(
     konto, zwrot.id, zwrot.referenceNumber ?? null, zwrot.orderId ?? null,
     utworzono, paczka.data, zwrot.buyer?.login ?? null, paczka.przewoznik,
+    paczka.waybill,
     zwrot.rejection?.code ?? null, zwrot.rejection?.reason ?? null,
     zwrot.status ?? null, at);
 
