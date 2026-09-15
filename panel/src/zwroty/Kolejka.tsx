@@ -5,7 +5,7 @@ import { mojaSprawa } from "../sprawy/Moje";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
-import { Pusto } from "../ui";
+import { Pusto, ile, dniSlowo } from "../ui";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej
@@ -75,14 +75,10 @@ export const SYGNALY: Record<Sygnal,
     ikona: <PackageX size={13} /> },
 };
 
-/**
- * „1 dzień", ale „2 dni" i „12 dni".
- *
- * Polszczyzna ma tu jeden wyjątek i tylko jeden, więc reguła też jest jedna.
- * „1 dni" na ekranie, który ma się czytać w biegu, zatrzymuje oko na pół
- * sekundy — a to jest dokładnie ten koszt, który ten ekran miał zdjąć.
- */
-export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
+/* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
+   kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
+   sąsiednie pliki i test tej kolejki. */
+export { dniSlowo } from "../ui";
 
 /**
  * Dni do terminu — jedyna liczba na wierszu, którą czyta się jako pilność.
@@ -191,7 +187,7 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
           </div>
           <div className="mt-0.5 truncate text-sm text-slate-600">
             {z.pozycje[0]?.nazwa ?? "Zwrot bez pozycji"}
-            {z.pozycje.length > 1 ? ` i ${z.pozycje.length - 1} inne` : ""}
+            {z.pozycje.length > 1 ? ` i ${ile(z.pozycje.length - 1, "inna", "inne", "innych")}` : ""}
             {sztuki ? ` · ${sztuki} szt.` : ""}
           </div>
           {/* LOGIN NA WIERSZU (0.337.0). Od tego wydania szuka się po nim,

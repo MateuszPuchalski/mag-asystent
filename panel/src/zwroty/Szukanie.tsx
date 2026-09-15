@@ -2,6 +2,9 @@ import React, { useRef, useState } from "react";
 import { PackageX, ScanLine, Search, X } from "lucide-react";
 import type { WynikSkanu } from "../api/zwroty";
 import { SeriaWPolu } from "../skaner";
+/* `ile` jest tu już nazwą propsa (liczba trafień), więc pomocnik wchodzi pod
+   aliasem — dwie różne rzeczy o tej samej nazwie czytałoby się gorzej. */
+import { ile as liczba } from "../ui";
 
 /* ── Szukanie zwrotu: czytnikiem albo ręką (0.163.0, rozszerzone w 0.165.0) ──
    Paczka wraca do biura wcześniej niż wiedza o tym, który to zwrot. Czytnik
@@ -133,7 +136,7 @@ export function Szukanie({
         z kubełka ZAMKNIĘTE wyglądałby jak zwrot czekający na pracę. */}
     {ile !== null && <p className="mt-1 text-xs text-slate-500">
       {ile
-        ? `${ile} ${ile === 1 ? "zwrot pasuje" : "pasujących zwrotów"} — szukam po wszystkich kubełkach.`
+        ? `${liczba(ile, "zwrot pasuje", "zwroty pasują", "zwrotów pasuje")} — szukam po wszystkich kubełkach.`
         : "Żaden zwrot w kolejce nie pasuje. Enter zapyta jeszcze o numer listu."}
     </p>}
 

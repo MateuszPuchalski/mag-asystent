@@ -5,7 +5,7 @@ import {
   useDodajAliasSilnika, useRozstrzygnijZabudowe, useSilniki, useUsunAliasSilnika, useWycofajZabudowe,
   useZaproponujZabudowe,
 } from "../api/wiedza";
-import { Blad, Pole, Przycisk, Pusto } from "../ui";
+import { Blad, Pole, Przycisk, Pusto, ile } from "../ui";
 import { PolaModelu, type DaneModelu } from "./PolaModelu";
 import { DOWODY_DO_WYBORU, NAZWA_DOWODU } from "../skrzynka/statusy";
 
@@ -200,7 +200,7 @@ function Luka({ l, trwa, onWyslij }: {
   return <div className="rounded-lg border p-3">
     <div className="flex flex-wrap items-center gap-2">
       <b>{maszyna}</b>
-      <span className="text-xs text-slate-500">{l.pytan} {l.pytan === 1 ? "dobór" : "doborów"}</span>
+      <span className="text-xs text-slate-500">{ile(l.pytan, "dobór", "dobory", "doborów")}</span>
       {l.zabudowy.length === 0
         ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis text-amber-800">brak silnika</span>
         : <span className="text-xs text-slate-600">

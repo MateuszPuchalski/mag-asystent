@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { Kopilot, Rozmowa, StanCopilota, WynikPartii } from "../api/typy";
 import { NAZWA_KATEGORII, NAZWA_PEWNOSCI } from "./statusy";
+import { odmien } from "../ui";
 
 /* ── Copilot nad kolejką (§14, etap F) ───────────────────────────────────────
    PRZYCISK STOI NAD KOLEJKĄ, NIE W ROZMOWIE, i to jest decyzja. W rozmowie
@@ -107,7 +108,7 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
     {partia.length > 0 && <button type="button" className="btn-secondary flex items-center gap-1 text-xs"
       onClick={() => setPyta(true)}>
       <Sparkles size={14} />
-      Rozpoznaj {partia.length} {partia.length === 1 ? "rozmowę" : "rozmów"}
+      Rozpoznaj {partia.length} {odmien(partia.length, "rozmowę", "rozmowy", "rozmów")}
     </button>}
     {/* Reszta kubełka nie znika po cichu: limit jest hamulcem na wydatek,
         a nie obietnicą, że to już wszystko. */}

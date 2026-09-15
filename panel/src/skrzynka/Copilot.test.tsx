@@ -44,7 +44,7 @@ describe("pasek Copilota nad kolejką", () => {
     render(<PasekCopilota stan={WLACZONY} onRozpoznaj={onRozpoznaj}
       kandydaci={[rozmowa({ id: 7 }), rozmowa({ id: 9 })]} />);
 
-    await userEvent.click(screen.getByRole("button", { name: /Rozpoznaj 2 rozmów/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Rozpoznaj 2 rozmowy/ }));
     /* „Rozpoznam N" bez zdania o koszcie byłoby zaproszeniem bez ceny. */
     expect(screen.getByText(/to kosztuje/)).toBeTruthy();
     expect(onRozpoznaj).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe("pasek Copilota nad kolejką", () => {
     const kandydaci = Array.from({ length: 5 }, (_, i) => rozmowa({ id: i + 1 }));
     render(<PasekCopilota stan={{ ...WLACZONY, maxPartia: 2 }} kandydaci={kandydaci}
       onRozpoznaj={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /Rozpoznaj 2 rozmów/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Rozpoznaj 2 rozmowy/ })).toBeTruthy();
     expect(screen.getByText(/pozostanie 3/)).toBeTruthy();
   });
 

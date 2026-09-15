@@ -4003,6 +4003,28 @@ samego zwrotu Allegro nie przyjmie (422). Wybór ma być świadomy, więc pole
 zaczyna puste i przycisk czeka na wskazanie. Domyślna wartość jest tu wygodą
 kupioną za cudze oświadczenie.
 
+### 25a.23. Komunikat, który się tłumaczy i milknie
+
+Audyt policzył na ekranie zwrotów pięćdziesiąt pięć komunikatów, z czego
+czternaście mówi, co zrobić. Reszta opisuje stan i to bywa w porządku — stan
+też trzeba znać. Nie jest w porządku wtedy, gdy ekran tłumaczy się z braku
+i na tym kończy.
+
+Wzorcowy przypadek: **brak dokumentu sprzedaży** (`zwroty/Dokument.tsx`). Ekran
+wymieniał trzy prawdziwe powody — stara sprzedaż, brak numeru zamówienia na
+dokumencie, brak potwierdzonej kartoteki — i nie podawał żadnego ruchu.
+Wskazać dokumentu nie ma jak, bo kandydatów jest zero, a panel nie umie szukać
+po numerze.
+
+Ruch jednak istnieje i jest ten sam co zawsze: **korekta zamyka zwrot tak samo
+bez dokumentu**. Tego brakowało — nie funkcji, tylko jednego zdania.
+
+**Pozostałe czterdzieści komunikatów czeka na decyzję, nie na kod.** Część
+z nich opisuje stan, do którego żaden ruch nie istnieje po naszej stronie
+(„Allegro nie powiązało żadnej wiadomości"), a część wymagałaby nowej
+końcówki — na przykład szukania dokumentu po numerze. Przerobienie ich hurtem
+na „zrób to i to" dałoby rady, których nie da się wykonać.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi
@@ -4774,6 +4796,39 @@ Pytanie „czy obsługujemy też dyskusje" zeszło z niej dwa razy i za każdym
 razem inaczej. W 0.222.0: NIE — panel prowadzi wyłącznie reklamacje.
 9 września 2026: **TAK**, dyskusje dostają własną zakładkę (§25c). Pierwsza
 odpowiedź stoi tu dalej, bo tłumaczy kod trzech wydań.
+
+## 26a. Język ekranu: liczebnik ma trzy formy
+
+Dopisane po audycie z 15 września 2026, bo to nie jest drobiazg jednego ekranu
+— panel myślił tak w ośmiu miejscach na czterech ekranach.
+
+Polszczyzna odmienia rzeczownik przy liczbie na trzy sposoby: **1 pozycja**,
+**2 pozycje**, **5 pozycji**. Nastki idą z piątką (**12 pozycji**), a dziesiątki
+wyżej wracają do dwójki (**22 pozycje**).
+
+Panel liczył dwie formy i mylił się na dwa przeciwne sposoby:
+
+| zapis | co dawał | gdzie |
+|---|---|---|
+| forma 2–4 wszędzie | „5 pozycje", „i 5 inne" | `zwroty/Dopisz.tsx`, `zwroty/Kolejka.tsx`, `skrzynka/Sprawa.tsx` |
+| dopełniacz wszędzie | „2 pasujących zwrotów", „2 zdjęć" | `zwroty/Szukanie.tsx`, `skrzynka/Dopytanie.tsx`, `skrzynka/Copilot.tsx`, `skrzynka/OdczytZdjec.tsx`, `wiedza/Silniki.tsx` |
+
+**Drugi błąd jest gorszy, choć wygląda niewinniej.** Dwa i trzy zdarzają się na
+ekranie o wiele częściej niż pięć, więc widziano go częściej. Wygląda przy tym
+na świadomy wybór, bo końcówka jest poprawna — tylko nie dla tej liczby.
+
+Reguła stoi w `ui/odmien` i `ui/ile`, a pilnuje jej `ui/Odmiana.test.ts`.
+Bramka zapala się tylko tam, gdzie OBOK wyboru formy drukuje się liczba: bez
+liczebnika polski ma dwie formy i dwie wystarczą. Dlatego „ogląda"/„oglądają"
+w `skrzynka/Obecni.tsx` zostaje — czasownik ma dwie formy, nie trzy.
+
+Jedyna poprawna kopia reguły mieszkała jako prywatna funkcja w
+`ekrany/Wiedza.tsx`. Nikt jej nie znalazł przy pozostałych ośmiu miejscach
+— reguła języka schowana w ekranie nie jest regułą, jest kopią.
+
+`dniSlowo` przyjechało przy okazji z trzech kolejek, gdzie stało przepisane
+znak w znak. „Dni" brzmi tak samo w obu formach mnogich, więc tamte kopie były
+poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
 ## 27. Zasady nadrzędne
 

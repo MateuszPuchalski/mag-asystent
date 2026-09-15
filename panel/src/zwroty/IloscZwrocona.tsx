@@ -35,7 +35,8 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz }: {
      czemu wypłata była niższa, niż wynikałoby ze zgłoszenia. */
   if (p.iloscZwrocona != null && p.iloscZwrocona !== p.ilosc) {
     return <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
-      <span className="font-bold">
+      {/* Liczba sztuk też jest liczbą czytaną w pionie — po jednej na pozycję. */}
+      <span className="font-bold tabular-nums">
         Wróciło {p.iloscZwrocona} z {p.ilosc} szt.</span>
       <span className="ml-2">kwota liczy się z tego, co wróciło</span>
       <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
@@ -48,7 +49,7 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz }: {
   /* Zgodne ze zgłoszeniem mówi o sobie JEDNYM zdaniem, nie ramką: to stan
      typowy i nie ma o czym rozmawiać. */
   if (p.iloscZwrocona != null) {
-    return <p className="mt-2 text-xs text-slate-500">
+    return <p className="mt-2 text-xs tabular-nums text-slate-500">
       Policzone — wróciło {p.iloscZwrocona} z {p.ilosc} szt.
       <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
         className="ml-2 underline underline-offset-2">cofnij</button>

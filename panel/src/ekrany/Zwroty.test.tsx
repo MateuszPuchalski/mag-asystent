@@ -171,7 +171,7 @@ describe("Ekran zwrotów", () => {
     pokaz();
     await userEvent.type(szukajka(), "ZW-");
     /* Oba zwroty pasują, choć kursor stoi w kubełku, w którym leży jeden. */
-    expect(screen.getByText(/2 pasujących zwrotów — szukam po wszystkich kubełkach/))
+    expect(screen.getByText(/2 zwroty pasują — szukam po wszystkich kubełkach/))
       .toBeInTheDocument();
   });
 

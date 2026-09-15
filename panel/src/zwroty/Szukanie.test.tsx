@@ -129,7 +129,7 @@ describe("Pole szukania zwrotu", () => {
   it("mówi, ile pasuje i że szuka poza kubełkiem", () => {
     /* Bez tego zdania wynik z kubełka ZAMKNIĘTE wyglądałby jak praca. */
     pokaz(null, { fraza: "567", ile: 3 });
-    expect(screen.getByText(/3 pasujących zwrotów — szukam po wszystkich kubełkach/))
+    expect(screen.getByText(/3 zwroty pasują — szukam po wszystkich kubełkach/))
       .toBeInTheDocument();
   });
 

@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.352.0 — 15 września 2026
+
+**Panel przestał pisać „5 pozycje" i „2 pasujących zwrotów".** Polszczyzna ma
+przy liczebniku trzy formy rzeczownika, a panel liczył dwie — w ośmiu
+miejscach na czterech ekranach.
+
+- **Reguła trzech form stoi w jednym miejscu** (`ui/odmien`, `ui/ile`)
+  i pilnuje jej bramka `ui/Odmiana.test.ts`. Zapala się tylko tam, gdzie obok
+  wyboru formy drukuje się liczba: bez liczebnika dwie formy wystarczą, więc
+  „ogląda"/„oglądają" zostaje.
+- **Osiem poprawionych miejsc.** Trzy myliły się w górę („5 pozycje", „i 5
+  inne", „5 inne rozmowy"), pięć w dół („2 pasujących zwrotów", „2 wymian",
+  „2 rozmów", „2 zdjęć", „2 doborów"). Drugi błąd był częstszy: dwójka
+  i trójka pojawiają się na ekranie o wiele częściej niż piątka.
+- **Jedyna poprawna kopia reguły** mieszkała jako prywatna funkcja
+  w `ekrany/Wiedza.tsx` i nikt jej nie znalazł. Przeniosła się do `ui/`.
+- **`dniSlowo` przyjechało z trzech kolejek**, gdzie stało przepisane znak
+  w znak. Tamte kopie były poprawne — „dni" brzmi tak samo w obu formach
+  mnogich — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
+- **Brak dokumentu sprzedaży kończy się ruchem, nie tłumaczeniem.** Ekran
+  wymieniał trzy powody i milkł; korekta zamyka zwrot tak samo bez dokumentu
+  i teraz to mówi.
+- **Kwoty i liczby sztuk przy pozycjach dostają `tabular-nums`** (potrącenie,
+  ilość zwrócona) — stoją jedna pod drugą i czyta się je w pionie.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
 ## 0.351.0 — 15 września 2026
 
 **Ekran zwrotów przestał gubić pieniądze i przestał składać wnioski za łatwo.**

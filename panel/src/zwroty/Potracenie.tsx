@@ -44,8 +44,12 @@ export function Potracenie({ p, trwa, blad, onZapisz }: {
      — tak samo jak ocenę hali. Obok stoi kwota, która naprawdę wyjdzie. */
   if (p.potracenieGrosze != null) {
     return <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
-      <span className="font-bold">Potrącenie −{zlote(p.potracenieGrosze, p.waluta)}</span>
-      <span className="ml-2">
+      {/* `tabular-nums` jak przy każdej innej kwocie w panelu: te dwie stoją
+          przy KAŻDEJ potrąconej pozycji, więc czyta się je w pionie — a cyfry
+          o różnej szerokości rozjeżdżają wtedy przecinek między wierszami. */}
+      <span className="font-bold tabular-nums">
+        Potrącenie −{zlote(p.potracenieGrosze, p.waluta)}</span>
+      <span className="ml-2 tabular-nums">
         do oddania {zlote(wartosc - p.potracenieGrosze, p.waluta)}</span>
       <p className="mt-0.5 italic">„{p.potraceniePowod}"</p>
       <button type="button" disabled={trwa} onClick={() => onZapisz(null, "")}
@@ -70,7 +74,7 @@ export function Potracenie({ p, trwa, blad, onZapisz }: {
           aria-label={`Potrącenie: ${p.nazwa}`} placeholder="np. 30,00"
           onChange={(e) => setKwota(e.target.value)} />
       </label>
-      <span className="text-slate-500">z {zlote(wartosc, p.waluta)}</span>
+      <span className="tabular-nums text-slate-500">z {zlote(wartosc, p.waluta)}</span>
     </div>
     {/* Powód pilnuje POLE, nie dopiero serwer: odmowa po kliknięciu uczy, że
         przycisk bywa zepsuty, a tu po prostu brakuje zdania dla klienta. */}
