@@ -57,3 +57,25 @@ export function powiazZaleglosci(
     koszyki: krok("koszyki", () => wypuscGotoweKoszyki(database, teraz)),
   };
 }
+
+/**
+ * Wiązanie, które czeka na SUBIEKTA, a nie na Allegro (15 września 2026).
+ *
+ * Korekta powstaje w Subiekcie i wchodzi do bazy importem co minutę. Wiązanie
+ * szło jednak wyłącznie taktem Allegro, co pięć minut — więc operator, który nie
+ * chciał czekać, przepisywał numer ręką. Na nagraniu z pracy przepisał przy tym
+ * numer cudzej korekty i poprawiał go z pamięci.
+ *
+ * DWA KROKI, NIE CZTERY. Kartoteki i dokumenty sprzedaży zależą od danych
+ * Allegro i przechodzą po wszystkich otwartych zwrotach — co minutę byłoby to
+ * drogie bez zysku. Korekta i koszyk zależą od Subiekta, a ich zbiór jest mały:
+ * zwroty z dokumentem i kwotą, bez numeru korekty.
+ */
+export function powiazPoImporcieSubiekta(
+  database: Db = defaultDb(), teraz = new Date(),
+): Pick<WynikWiazania, "korekty" | "koszyki"> {
+  return {
+    korekty: krok("korekty", () => zwiazKorektyPewne(database, teraz)),
+    koszyki: krok("koszyki", () => wypuscGotoweKoszyki(database, teraz)),
+  };
+}

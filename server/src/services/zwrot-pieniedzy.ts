@@ -79,7 +79,7 @@ type Wiersz = {
   zwrot_pieniedzy_id: string | null; zwrot_pieniedzy_command_id: string | null;
   zwrot_pieniedzy_status: string | null; zwrot_pieniedzy_at: string | null;
   odmowa_kod: string | null; odmowa_powod: string | null; odmowa_at: string | null;
-  status_allegro: string | null;
+  status_allegro: string | null; rozliczony_allegro_at: string | null;
   przelew_at: string | null; przelew_przez: string | null;
   przelew_referencja: string | null;
 };
@@ -89,7 +89,7 @@ const wczytaj = (database: Db, zwrotId: number): Wiersz => {
       z.wersja, z.werdykt, z.zamkniety_at, z.kwota_grosze, z.kwota_dostawa_grosze,
       z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id,
       z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
-      z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro,
+      z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro, z.rozliczony_allegro_at,
       z.przelew_at, z.przelew_przez, z.przelew_referencja,
       o.platnosc_id, o.platnosc_typ, o.waluta
     FROM zwrot_klienta z
@@ -274,7 +274,15 @@ export function stanZwrotuPieniedzy(
 
   if (w.zwrot_pieniedzy_id) return nie("Pieniądze już oddano przez panel.");
   if (w.odmowa_kod) return nie("Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.");
-  if (w.zamkniety_at) return nie("Zwrot jest zamknięty.");
+  /* KOREKTA ZAMYKA ZWROT, ALE NIE DROGĘ DO PIENIĘDZY (audyt, 15 września 2026).
+     Do tego wydania zamknięty zwrot odmawiał przelewu, a biuro wystawia korektę
+     zwykle PRZED oddaniem pieniędzy. Na nagraniu z pracy przycisk znikał, więc
+     przelew szedł w Sales Center. Drogę zamyka dopiero Allegro, gdy potwierdzi,
+     że pieniądze wyszły — bramka przelewu nie patrzy na zamknięcie od 0.269.0
+     z tego samego powodu. */
+  if (w.rozliczony_allegro_at || STATUSY_ODDANE.has(String(w.status_allegro ?? ""))) {
+    return nie("Allegro już oddało pieniądze za ten zwrot.");
+  }
 
   /* Odmówić wolno ZANIM zapadnie werdykt o kwocie — to jest osobna droga,
      nie wariant zwrotu. Oddać pieniądze wolno dopiero po przyjęciu. */

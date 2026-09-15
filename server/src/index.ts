@@ -70,7 +70,7 @@ import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
 import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
-import { powiazZaleglosci } from "./services/wiazania.js";
+import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
 
@@ -119,6 +119,12 @@ export async function odswiezReadModel(
   try {
     await imp();
     bladImportuStartowego = null;
+    /* KOREKTA WCHODZI Z SUBIEKTA, więc wiąże się ZARAZ PO imporcie (audyt
+       zwrotów, 15 września 2026). Do tego wydania czekała na takt Allegro, a
+       operator przepisywał numer ręką. Po udanym imporcie, nie w `finally`:
+       nieudany zostawia stare dokumenty i nie ma czego wiązać. Każdy krok ma
+       własny parasol w `wiazania.ts`, więc wiązanie nie udaje awarii importu. */
+    powiazPoImporcieSubiekta(db());
   } catch (e) {
     const powod = e instanceof Error ? e.message : String(e);
     bladImportuStartowego =

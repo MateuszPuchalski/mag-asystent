@@ -34,10 +34,10 @@ import type { AkcjeKlawiszy } from "../zwroty/klawisze";
    nie dwa.
 
    PIĘĆ KUBEŁKÓW MA DZIAŁANIE: werdykt, ocena i kwota od 0.156.0, korekta od
-   0.162.0. Ekran nie wystawia korekty ani nie oddaje pieniędzy — jedno robi
-   człowiek w Subiekcie, drugie w panelu Allegro — więc mówi to wprost przy
-   przycisku. Zdanie o tym, czego panel nie robi, jest tu tak samo potrzebne
-   jak sam przycisk: bez niego zamknięcie zwrotu obiecywałoby przelew.
+   0.162.0. Ekran nie wystawia korekty — robi to człowiek w Subiekcie — więc
+   mówi to wprost przy polu numeru. Pieniądze oddaje od 0.190.0 przycisk ODDAJ
+   PIENIĄDZE; zdanie „oddajesz w panelu Allegro" przetrwało przy korekcie do
+   audytu z 15 września 2026 i odsyłało biuro do Sales Center.
 
    Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
    strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się
@@ -54,7 +54,7 @@ const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>>
   decyzja: [["P", "przyjmij"], ["O", "odrzuć"]],
   ocena: [["S", "na stan"], ["U", "utylizacja"], ["Shift+S", "wszystkie na stan"]],
   zwrot: [["Enter", "zapisz kwotę"]],
-  korekta: [["Enter", "zapisz numer korekty"]],
+  korekta: [["Enter", "wpisz numer korekty"]],
   zamkniety: [["R", "cofnij korektę"]],
 };
 
@@ -208,6 +208,42 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
 }
 
 /**
+ * Kartoteki i rozjazdy ZWINIĘTE W JEDEN WIERSZ (15 września 2026).
+ *
+ * Zgłoszenie właściciela: „schowaj to gdzieś". Dwa bursztynowe pasy zajmowały
+ * nad kolejką tyle, co trzy zwroty, a w codziennej pracy mówiły to samo co
+ * wczoraj — dekalog p. 2: na ekranie to, co rozstrzyga bieżącą czynność.
+ * Liczby zostają widoczne, zdania są o jedno kliknięcie dalej.
+ *
+ * SAMO SIĘ OTWIERA, gdy stoi synchronizacja przy pozycjach czekających na
+ * automat. To jedyne zdanie tych pasów, które wymaga działania dziś, a nie
+ * kiedyś — schowane kazałoby zatwierdzać ręką to, co naprawia jedna rzecz.
+ * Czerwony pasek niekompletnej kolejki stoi osobno i nie chowa się nigdy.
+ */
+function PasekUwag({ bilans, stan, rozjazdy }: {
+  bilans?: BilansKartotek; stan?: StanZwrotow; rozjazdy: RozjazdZwrotu[];
+}) {
+  const [rozwiniete, setRozwiniete] = useState(false);
+  const bez = bilans?.bez ?? 0;
+  if (!bez && !rozjazdy.length) return null;
+  const alarm = Boolean(stan && stan.status !== "current" && (bilans?.powody.do_zwiazania ?? 0) > 0);
+  const otwarte = rozwiniete || alarm;
+  return <section aria-label="Uwagi do kolejki" className="shrink-0 space-y-1">
+    <button type="button" onClick={() => setRozwiniete((r) => !r)}
+      className="flex w-full flex-wrap items-center gap-x-3 rounded-lg border border-amber-200
+        bg-amber-50 px-3 py-1 text-left text-xs text-amber-900">
+      {bez > 0 && <span>Bez kartoteki <b className="tabular-nums">{bez}</b></span>}
+      {rozjazdy.length > 0 && <span>Do sprawdzenia <b className="tabular-nums">{rozjazdy.length}</b></span>}
+      <span className="ml-auto underline">{otwarte ? "zwiń szczegóły" : "pokaż szczegóły"}</span>
+    </button>
+    {otwarte && <>
+      {bilans && <PasekKartotek bilans={bilans} stan={stan} />}
+      <PasekRozjazdow rozjazdy={rozjazdy} />
+    </>}
+  </section>;
+}
+
+/**
  * Kody, po których człowiek szuka zwrotu — wszystkie, jakie zwrot niesie.
  *
  * Numer zwrotu bywa doklejony na paczce, identyfikator z Allegro wpada
@@ -285,12 +321,18 @@ export function Zwroty() {
   const [tag, setTag] = useState<number | null>(null);
   const [bladTagu, setBladTagu] = useState("");
 
+  /* PACZKA U NAS (audyt zwrotów, 15 września 2026). Biuro przy stosie kartonów
+     pyta „które z tych zwrotów mogę dziś zrobić", a kolejka trzymała też
+     zwroty w drodze. Filtr ZAWĘŻA i niczego nie przestawia — ta sama klauzula
+     co przy sicie i tagach z 0.315.0. */
+  const [paczkaUNas, setPaczkaUNas] = useState(false);
   const wKubelku = useMemo(() => {
     const lista = kubelek === null
       ? (data?.zwroty ?? [])
       : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek);
-    return przewoznik ? lista.filter((z) => (z.przewoznik ?? "") === przewoznik) : lista;
-  }, [data, kubelek, przewoznik]);
+    const uNas = paczkaUNas ? lista.filter((z) => z.dostarczonoAt !== null) : lista;
+    return przewoznik ? uNas.filter((z) => (z.przewoznik ?? "") === przewoznik) : uNas;
+  }, [data, kubelek, przewoznik, paczkaUNas]);
 
   /* SITO I TAG ZAWĘŻAJĄ, NIE PRZESTAWIAJĄ (0.315.0). Kolejność liczy termin
      ustawowy i to się nie zmienia — tag jest zdaniem biura o sprawie, a jedna
@@ -363,7 +405,13 @@ export function Zwroty() {
   const przyjmij = (w: WynikSkanu) => {
     setWynikSkanu(w);
     setBladSkanu("");
-    if (w.zwrotId) nawiguj(`/obsluga/zwroty/${w.zwrotId}`);
+    if (!w.zwrotId) return;
+    /* TRAFIENIE ZDEJMUJE KURSOR Z POLA (audyt zwrotów, 15 września 2026).
+       Czytnik pisze w pole, gdy ono ma kursor, a skróty w polu milkną. Po
+       otwarciu zwrotu następnym ruchem jest `P` albo `S`, nie dopisanie znaku —
+       na nagraniu z biura zwrot przyjmowało przez to kliknięcie. */
+    (document.activeElement as HTMLElement | null)?.blur();
+    nawiguj(`/obsluga/zwroty/${w.zwrotId}`);
   };
   const szukaj = (v: string) => {
     setKod(v);
@@ -426,12 +474,24 @@ export function Zwroty() {
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
 
+  /* MIEJSCE W LIŚCIE PRZEŻYWA WYJŚCIE ZWROTU Z KUBEŁKA (audyt, 15 września 2026).
+     Po `P` przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim.
+     `idz` liczyło wtedy od pozycji zero plus jeden, więc `j` przeskakiwało
+     zwrot, który właśnie wskoczył na zwolnione miejsce — praca kubełkiem
+     gubiła co drugi zwrot. Zapamiętujemy więc ostatnią pozycję widzianą. */
+  const ostatnieMiejsce = useRef(0);
+  const miejsce = widoczne.findIndex((z) => z.id === wybrany);
+  if (miejsce >= 0) ostatnieMiejsce.current = miejsce;
+
   /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
      `j` ma iść do następnego wyniku, a nie do zwrotu schowanego przed oczami. */
   const idz = (o: number) => {
     if (!widoczne.length) return;
     const i = widoczne.findIndex((z) => z.id === wybrany);
-    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
+    /* Zwrotu nie ma już na liście: następny STOI na jego miejscu, poprzedni
+       o jedno wyżej. */
+    const cel = i >= 0 ? i + o : (o > 0 ? ostatnieMiejsce.current : ostatnieMiejsce.current - 1);
+    const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, cel))];
     if (nast) nawiguj(`/obsluga/zwroty/${nast.id}`);
   };
 
@@ -501,6 +561,14 @@ export function Zwroty() {
       akcje.current.zapiszKwote?.();
       return;
     }
+    if (zwrot.kubelek === "korekta" && e.key === "Enter") {
+      /* Numer korekty wpisuje człowiek, więc ten Enter niczego nie zapisuje —
+         stawia kursor w polu. Drugi Enter, już w polu, zapisuje numer. Do
+         audytu z 15 września 2026 pasek obiecywał tu Enter, a klawisz milczał. */
+      e.preventDefault();
+      akcje.current.korekta?.();
+      return;
+    }
     /* `R` stoi przy numerze korekty, czyli na zwrocie ZAMKNIĘTYM — tam, gdzie
        ekran rysuje ten klawisz od 0.162.0 (`Decyzje.tsx`). */
     if (zwrot.korektaNumer && (e.key === "r" || e.key === "R")) {
@@ -543,8 +611,7 @@ export function Zwroty() {
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {data?.stan && <PasekOgona stan={data.stan} />}
-    {data?.kartoteki && <PasekKartotek bilans={data.kartoteki} stan={data.stan} />}
-    <PasekRozjazdow rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
+    <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
     <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -594,6 +661,11 @@ export function Zwroty() {
           <input type="checkbox" checked={poNadaniu} className="h-4 w-4 shrink-0"
             onChange={() => setPoNadaniu((v) => !v)} />
           Od daty nadania
+        </label>
+        <label className="flex min-h-6 cursor-pointer items-center gap-1.5 text-slate-600">
+          <input type="checkbox" checked={paczkaUNas} className="h-4 w-4 shrink-0"
+            onChange={() => setPaczkaUNas((v) => !v)} />
+          Paczka u nas
         </label>
         {/* SYNCHRONIZACJA W ISTNIEJĄCYM PAŚMIE, nie we własnym (0.232.0).
             Osobny pasek nad listą kosztowałby wiersze kolejki — a to ona jest
@@ -665,7 +737,10 @@ export function Zwroty() {
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
       <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
-        dodatkowe={KLAWISZE_KUBELKA[kubelek ?? "wszystkie"] ?? []} />
+        /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
+           zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
+           pokazywał wtedy P/O, choć działały S/U. */
+        dodatkowe={KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? []} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>

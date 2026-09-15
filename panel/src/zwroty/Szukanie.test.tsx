@@ -105,6 +105,18 @@ describe("Pole szukania zwrotu", () => {
     expect(p.onSzukaj).not.toHaveBeenCalled();
   });
 
+  it("Esc oddaje klawisze ekranowi — kursor wychodzi z pola, treść zostaje", async () => {
+    /* Skróty milkną w polu tekstowym. Na nagraniu z biura `P` po skanie nie
+       działało i zwrot przyjmowało kliknięcie (audyt, 15 września 2026). */
+    const p = pokaz(null, { fraza: "N4QZ/2026" });
+    const pole = screen.getByPlaceholderText(/Zeskanuj etykietę/);
+    pole.focus();
+    await userEvent.keyboard("{Escape}");
+    expect(pole).not.toHaveFocus();
+    expect(p.onFraza).not.toHaveBeenCalled();
+    expect(p.onSzukaj).not.toHaveBeenCalled();
+  });
+
   it("każdy znak idzie do filtru, bez czekania na Enter", async () => {
     /* Filtr liczy się w pamięci ekranu, więc opóźnianie go byłoby opóźnianiem
        tego, co i tak jest natychmiastowe. */

@@ -37,12 +37,13 @@ import { TAGI_ZWROTU } from "../services/tagi-spraw.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
    SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
-   0.162.0 — numer korekty i jego cofnięcie. Nic nie wychodzi stąd do Allegro
-   ani do Subiekta: korektę wystawia człowiek w Subiekcie, a pieniądze oddaje
-   w panelu Allegro. Panel zapisuje FAKT, że to się stało.
+   0.162.0 — numer korekty i jego cofnięcie. Korektę wystawia człowiek
+   w Subiekcie, a panel zapisuje FAKT, że powstała.
 
-   Oddanie pieniędzy przez API czeka na końcówki zapisu Allegro, których sonda
-   nie potwierdzi (jest GET-em).
+   Do Allegro wychodzą od 0.190.0 zwrot pieniędzy i odmowa wypłaty, a od
+   0.164.0 wniosek o rabat. Zdanie „pieniądze oddaje w panelu Allegro" stało
+   tu do audytu z 15 września 2026 — dwadzieścia wydań po tym, jak przestało
+   być prawdą.
 
    Bramka roli stoi na KAŻDEJ trasie, także na odczycie — tak samo jak przy
    skrzynce. Zwrot niesie numer zamówienia i nazwisko sprawy klienta; to są
@@ -719,7 +720,10 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     const nie = odmowa(reply);
     if (nie) return nie;
     const id = Number(req.params.id);
-    const zwrot = listaZwrotow(db()).find((z) => z.id === id);
+    /* Filtr po identyfikatorze, nie `.find` po całej historii (audyt zwrotów,
+       15 września 2026) — koszt i powód stoją przy `listaZwrotow`. */
+    const jeden = listaZwrotow(db(), Date.now(), { id });
+    const zwrot = jeden.length ? jeden[0] : null;
     if (!zwrot) return reply.code(404).send({ error: "Nie znaleziono zwrotu" });
     /* Kandydatów liczymy TYLKO wtedy, gdy dokumentu jeszcze nie ma. Przy
        zwrocie z dokumentem lista nie ma komu służyć, a przebiega okno

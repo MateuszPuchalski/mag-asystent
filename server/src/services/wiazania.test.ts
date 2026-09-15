@@ -75,3 +75,29 @@ test("takt woła wiązanie w `finally`, a nie po `await`", () => {
     assert.match(zrodlo, wzor, `${takt}: wiązanie musi stać w finally`);
   }
 });
+
+/* ── Wiązanie po imporcie z Subiekta (audyt zwrotów, 15 września 2026) ───────
+   Korekta wchodzi do bazy importem co minutę, a wiązało ją dopiero Allegro co
+   pięć minut. Operator nie czekał i przepisywał numer ręką — na nagraniu
+   z pracy przepisał przy tym numer cudzej korekty.                          */
+
+test("po imporcie z Subiekta chodzą korekty i koszyki, a nie przegląd kartotek", async () => {
+  /* Kartoteki i dokumenty przechodzą po wszystkich otwartych zwrotach. Co minutę
+     byłoby to drogie bez zysku, bo zależą od danych Allegro, nie Subiekta. */
+  const { powiazPoImporcieSubiekta } = await import("./wiazania.js");
+  const d = stanowisko();
+  const w = powiazPoImporcieSubiekta(d);
+  assert.deepEqual(Object.keys(w).sort(), ["korekty", "koszyki"]);
+  const p = d.prepare("SELECT tw_id FROM zwrot_klienta_pozycja").get() as { tw_id: number | null };
+  assert.equal(p.tw_id, null, "kartoteka czeka na takt Allegro");
+});
+
+test("udany import woła wiązanie korekt, nieudany nie", () => {
+  /* Źródło, a nie wywołanie: `odswiezReadModel` bez wstrzyknięcia strzelałby
+     do prawdziwego MSSQL. Wiązanie po nieudanym imporcie pracowałoby na starych
+     dokumentach, więc stoi PO `await imp()`, a nie w `finally`. */
+  const zrodlo = fs.readFileSync(new URL("../index.ts", import.meta.url), "utf8");
+  assert.match(zrodlo,
+    /await imp\(\);[^}]*powiazPoImporcieSubiekta\(/,
+    "wiązanie ma iść zaraz po udanym imporcie");
+});

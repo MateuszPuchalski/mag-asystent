@@ -28,6 +28,13 @@ export interface AkcjeKlawiszy {
   odmow?: () => void;
   /** DO ZWROTU, klawisz `Enter`: zapisuje kwotę z bieżącego zaznaczenia. */
   zapiszKwote?: () => void;
+  /**
+   * DO KOREKTY, klawisz `Enter`: stawia kursor w polu numeru korekty.
+   *
+   * NIE autoFocus. Pole, które samo łapie kursor przy każdym zwrocie w tym
+   * kubełku, uciszałoby `j`/`k` — a przejście przez kubełek to też praca.
+   */
+  korekta?: () => void;
 }
 
 /**

@@ -426,3 +426,29 @@ test("zamknięty zwrot NIE blokuje zapisu — przelew idzie zwykle po korekcie",
   assert.equal(stanZwrotuPieniedzy(d, id).moznaZapisacPrzelew, true);
   assert.ok(zapiszPrzelew(d, id, 1, KTO, null).kiedy);
 });
+
+/* ── Zamknięcie a pieniądze (audyt zwrotów, 15 września 2026) ───────────────
+   Biuro wystawia korektę zwykle PRZED przelewem. Korekta zamyka zwrot, a do
+   tego wydania zamknięty zwrot chował ODDAJ PIENIĄDZE — na nagraniu z pracy
+   przelew szedł więc w Sales Center, obok gotowego przycisku.               */
+
+test("korekta zamyka zwrot, ale NIE drogę do oddania pieniędzy", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare(`UPDATE zwrot_klienta SET zamkniety_at='2026-09-15T12:39:00Z',
+    korekta_numer='ZW 413/MAG/09/2026' WHERE id=?`).run(id);
+  assert.equal(stanZwrotuPieniedzy(d, id).moznaZwrocic, true);
+  const w = await zwrocPieniadze(d, id, 1, KTO, async () => ({ id: "ref-1" }));
+  assert.equal(w.refundId, "ref-1");
+});
+
+test("zwrot rozliczony przez Allegro nie proponuje drugiego przelewu", () => {
+  /* Zatrzask z 0.345.0: wskaźnik idzie dalej osią czasu, rozliczenie zostaje. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare(`UPDATE zwrot_klienta SET rozliczony_allegro_at='2026-09-10T08:00:00Z',
+    status_allegro='COMMISSION_REFUND_CLAIMED' WHERE id=?`).run(id);
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.moznaZwrocic, false);
+  assert.match(String(s.powod), /Allegro już oddało/);
+});

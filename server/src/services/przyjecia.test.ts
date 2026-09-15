@@ -65,6 +65,31 @@ test("numer z kartki: sama liczba, cały numer i śmieci", () => {
   assert.equal(P.numerZKartki("   "), "");
 });
 
+test("kod kosza z aplikacji otwiera TEN kosz, a nie MM o tej samej liczbie", () => {
+  /* Audyt zwrotów, 15 września 2026. Zakładka ZWROTY kieruje tu każdy skan,
+     a numer z kartki to same cyfry — więc etykieta `Z-7` otwierała MM numer 7.
+     Przedrostek istniał dokładnie po to, żeby te przestrzenie się nie zderzały. */
+  const d = db();
+  d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (41007, 'MM 7/MAG/2026', '7', '2026-08-18', 1, 3)`).run();
+  d.prepare(`INSERT INTO sgt_mm_zwrot_pozycja(dok_id, tw_id, ilosc, symbol, nazwa)
+     VALUES (41007, 900036, 1, 'TEST-LINIA-TODO', 'Pozycja nietknięta')`).run();
+  const teraz = new Date().toISOString();
+  const id = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez, zamknieto_at, zamknieto_przez)
+     VALUES ('Z-7', 'zamkniety', 'zwroty', ?, 'Biuro', ?, 'Biuro')`).run(teraz, teraz).lastInsertRowid);
+  d.prepare("INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)")
+    .run(id, 900_036, "TEST-LINIA-TODO", "Pozycja nietknięta", 1);
+
+  assert.equal(P.otworzPrzyjecie(" z-7 ", "Jan").id, id, "wielkość liter i spacje ze skanera nie przeszkadzają");
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz WHERE mm_dok_id = 41007").get() as
+    { n: number }).n, 0, "MM numer 7 nie dostał kosza");
+
+  /* Kosz jeszcze otwarty przy biurku nie jest pracą hali — i nie spada na cyfry. */
+  d.prepare("UPDATE kosz SET status='otwarty' WHERE id=?").run(id);
+  assert.throws(() => P.otworzPrzyjecie("Z-7", "Jan"), /nie czeka na rozłożenie/);
+});
+
 test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", () => {
   const kosz = P.otworzPrzyjecie("1209", "Jan");
   assert.equal(kosz.kod, "1209");

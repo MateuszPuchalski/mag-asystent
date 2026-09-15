@@ -102,6 +102,11 @@ export function Szukanie({
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {
+          /* ESC ODDAJE KLAWISZE EKRANOWI (audyt zwrotów, 15 września 2026).
+             Skróty milkną, gdy kursor stoi w polu — i słusznie — ale z pola
+             nie było wyjścia bez myszy. Na nagraniu z biura `P` po skanie nie
+             działało, a zwrot przyjmowało kliknięcie. Treść zostaje. */
+          if (e.key === "Escape") { seria.current.przerwij(); e.currentTarget.blur(); return; }
           const { podmien, kod } = seria.current.klawisz(e, fraza);
           /* Podmiana zjada znak i wstawia SAMĄ serię — inaczej szósty znak
              kodu doleciałby jeszcze do starej treści. */
