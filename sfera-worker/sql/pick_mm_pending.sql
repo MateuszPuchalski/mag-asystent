@@ -36,10 +36,14 @@
 --    adres z tego kosza siedzi już w Subiekcie (`zakolejkujPowrot`), czyli
 --    zależność jest rozstrzygnięta przed wstawieniem wiersza, a nie przy
 --    jego wyborze.
+--  • ZW DO PARAGONU ('zw', 0.349.0) oddaje towar na magazyn główny, a chodzi
+--    tą samą furtką tw_id IS NULL. Niezmiennik pilnuje KOD, jak przy powrocie
+--    kosza: MM koszyka nie wychodzi, dopóki zwrot nie ma numeru korekty,
+--    więc ZW zawsze poprzedza przesunięcie tego towaru.
 SELECT q.id, q.type, q.payload, q.attempts, q.source_doc_id, q.tw_id,
        q.created_by, q.created_by_ref
 FROM sfera_queue q
-WHERE q.type IN ('mm', 'korekta_zwrot')
+WHERE q.type IN ('mm', 'korekta_zwrot', 'zw')
   AND q.status = 'pending'
   AND (q.next_attempt_at IS NULL OR q.next_attempt_at <= @now)
   AND NOT EXISTS (

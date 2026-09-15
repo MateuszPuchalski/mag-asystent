@@ -17,6 +17,36 @@ public sealed record ZlecenieKorekty(
 /// MmNumer/RwNumer puste, gdy odpowiedni dokument nie był potrzebny.</summary>
 public sealed record WynikKorekty(string KorektaNumer, string MmNumer, string RwNumer = "");
 
+/// <summary>
+/// Zlecenie ZW do paragonu (0.349.0) — lustro ZlecenieZw z sfera.ts.
+/// Pozycje są już zsumowane po kartotece i rozbite z kompletów po stronie
+/// serwera; WartoscGrosze to PEŁNA wartość zwrotu, bez potrąceń.
+/// </summary>
+public sealed record ZlecenieZw(
+    int DokId, IReadOnlyList<MmItem> Pozycje, int PrzesylkaTwId, bool PrzesylkaZostaw,
+    long WartoscGrosze);
+
+/// <summary>
+/// Dokument źródłowy otwarty w Subiekcie przez kogoś innego (0.349.0).
+/// To NIE jest błąd zadania: biuro ma paragon na ekranie. Kolejka odkłada
+/// zadanie bez zużycia próby — trzy próby w dwie minuty skończyłyby się
+/// błędem w chwili, gdy biuro jeszcze patrzy na paragon.
+/// </summary>
+public sealed class DokumentZablokowanyException : Exception
+{
+    public DokumentZablokowanyException(string message) : base(message) { }
+}
+
+/// <summary>
+/// Odmowa, której ponowienie nie zmieni (0.349.0): rozjazd wartości, brak
+/// wiersza na paragonie, ZW bez skutku magazynowego. Kolejka od razu
+/// oznacza błąd — trzy identyczne próby opóźniłyby tylko biuro.
+/// </summary>
+public sealed class BladTrwalyException : Exception
+{
+    public BladTrwalyException(string message) : base(message) { }
+}
+
 /* Granica ZAPISU DOKUMENTÓW do Subiekta — odpowiednik SferaAdapter
    z server/src/adapters/sfera.ts, zawężony do operacji tego procesu.
    set_location zostaje w workerze Node (bezpośredni UPDATE jednej kolumny),
@@ -35,4 +65,10 @@ public interface ISferaAdapter
     /// obejmującej dwa dokumenty, więc wycofanie jest zadaniem implementacji.
     /// </summary>
     WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty zlecenie);
+
+    /// <summary>
+    /// ZW do paragonu (0.349.0) — sam dokument, bez MM: towar przesuwa koszyk
+    /// zwrotów, który czeka na ten numer. Zwraca pełny numer ZW.
+    /// </summary>
+    string CreateZw(ZlecenieZw zlecenie);
 }

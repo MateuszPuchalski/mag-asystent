@@ -115,6 +115,16 @@ export const config = {
   sferaWorker: process.env.SFERA_WORKER === "1",
 
   /**
+   * Automatyczny ZW do paragonu (0.349.0) — zlecany sam po zapisaniu kwoty.
+   *
+   * Domyślnie WYŁĄCZONY. ZW to dokument fiskalny ze skutkiem magazynowym,
+   * a pierwszy prawdziwy ma powstać przy właścicielu (DEPLOY, akapit 0.349.0).
+   * Wystawia go worker Sfery, więc przełącznik wymaga `SFERA_WORKER=1` —
+   * pilnuje tego `bledyKonfiguracji`.
+   */
+  sferaZw: process.env.SFERA_ZW === "1",
+
+  /**
    * Połączenie z bazą MSSQL Subiekta GT (SGT_MODE=mssql).
    *
    * Co trzeba ustalić na WŁASNEJ bazie — mag_Id magazynów i pole lokalizacji
@@ -571,6 +581,19 @@ export const config = {
   },
 
   /**
+   * `tw_Id` kartoteki „PRZESYŁKA" z paragonów Allegro (0.349.0).
+   *
+   * Automatyczny ZW zeruje ten wiersz albo go zostawia — zależnie od pola
+   * „Koszt dostawy" przy zwrocie (decyzja właściciela, 15 września 2026).
+   * Numer, a nie symbol z `POZYCJE_NIE_TOWAROWE`: worker porównuje `TowarId`
+   * pozycji dokumentu, a symbolu na pozycji ZW nie czyta.
+   *
+   * Zero znaczy „nie ustawiono" i przy `SFERA_ZW=1` zatrzymuje start. Zgadnięty
+   * numer zostawiłby na ZW przesyłkę, której klientowi nie oddano.
+   */
+  twIdPrzesylka: num(process.env.TW_ID_PRZESYLKA, 0, "TW_ID_PRZESYLKA"),
+
+  /**
    * Symbole kartotek, które na dokumencie NIE są towarem (CSV).
    *
    * Domyślnie `PRZESYŁKA` — wiersz „koszt transportu" stojący na części faktur
@@ -1025,6 +1048,21 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(
       "SFERA_WORKER=1 wymaga SGT_MODE=mssql — w trybie seeded dokumenty MM " +
         "wykonuje worker Node i zadania mm nie miałyby wykonawcy.",
+    );
+  }
+
+  /* ZW wystawia wyłącznie worker Sfery (C#). Bez niego zadania `zw` wisiałyby
+     w kolejce, a zwrot w DO KOREKTY czekałby na numer, który nie przyjdzie. */
+  if (c.sferaZw && !c.sferaWorker) {
+    bledy.push(
+      "SFERA_ZW=1 wymaga SFERA_WORKER=1 — automatyczny ZW wystawia worker Sfery " +
+        "(wertis-sfera), a bez niego zadania zw nie miałyby wykonawcy.",
+    );
+  }
+  if (c.sferaZw && c.twIdPrzesylka <= 0) {
+    bledy.push(
+      "SFERA_ZW=1 wymaga TW_ID_PRZESYLKA — numeru kartoteki przesyłki z paragonów " +
+        "Allegro. Ustalisz go w SSMS: SELECT tw_Id FROM tw__Towar WHERE tw_Symbol = 'PRZESYŁKA'.",
     );
   }
 

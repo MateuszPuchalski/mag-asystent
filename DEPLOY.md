@@ -1791,6 +1791,28 @@ Po wdrożeniu powiedz biuru o trzech zmianach:
 
 Przycisk przy takim zwrocie zniknie sam, gdy Allegro potwierdzi rozliczenie.
 
+**ZW do paragonu wystawia automat (0.349.0).** Funkcja jest wyłączona, dopóki
+nie ustawisz dwóch wartości w `wertis.env`. ZW to dokument fiskalny, więc
+włączaj po kolei:
+
+1. Popraw konto usługi `wertis-sfera` (§3) i sprawdź, że MM z kolejki przechodzą.
+2. Wgraj nowe exe workera Sfery. Stare nie zna zadania `zw` i zostawi je w kolejce.
+3. Ustal numer kartoteki przesyłki z paragonów Allegro:
+
+```sql
+SELECT tw_Id FROM tw__Towar WHERE tw_Symbol = 'PRZESYŁKA';
+```
+
+4. Dopisz `SFERA_ZW=1` i `TW_ID_PRZESYLKA=<numer>`, potem zrestartuj usługi (§3).
+5. Pierwszy zwrot do paragonu zapisz przy właścicielu i otwórz ZW w Subiekcie.
+   Sprawdź rodzaj „zwrot ze sprzedaży”, wyzerowane pozycje i przelew równy wartości.
+
+Po włączeniu powiedz biuru o trzech zmianach:
+
+1. Po zapisaniu kwoty zwrotu do paragonu ZW wystawia automat — nie rób go ręcznie.
+2. Przy zdaniu „Automat nie wystawił ZW” wystaw ZW ręcznie i wpisz numer, jak dotąd.
+3. Zwroty do faktur zostają bez zmian.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

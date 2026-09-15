@@ -8,6 +8,7 @@ Sfery Subiekta GT:
 |---|---|
 | `mm` | dokument przesunięcia magazynowego |
 | `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów oraz (0.67.0) RW dla pozycji zniszczonych — atomowo |
+| `zw` | ZW do paragonu (0.349.0), sam dokument bez MM — zlecany po zapisaniu kwoty zwrotu, kroki w `docs/sfera-com.md` §2m |
 
 `set_location` zostaje w workerze Node (bezpośredni UPDATE jednej kolumny,
 Sfera do niego niepotrzebna).

@@ -96,6 +96,39 @@ export interface ZlecenieKorekty {
   pozycjeZniszczone?: MmItem[];
 }
 
+/**
+ * Zlecenie ZW — zwrotu do paragonu (0.349.0). Wykonuje worker Sfery (C#).
+ *
+ * TYLKO DOKUMENT, bez MM i RW — inaczej niż `ZlecenieKorekty`. Towar
+ * przesuwają koszyki zwrotów, które i tak czekają na numer korekty
+ * (`brakujaceKorekty`). Druga droga przesunięcia rozjechałaby się z nimi.
+ *
+ * Zasady wystawiania zmierzone sondą (docs/sfera-com.md §2m):
+ *   var zw = SuDokumentyManager.DodajZW(); zw.NaPodstawie(dokId);
+ *   // SkutekMagazynowy = False → NIE wystawiamy, zwrot idzie do biura
+ *   zw.RodzajZwrotuDetal = 1;                       // „zwrot ze sprzedaży"
+ *   // pozycje po TowarId: zwracane dostają swoją ilość, reszta 0 (wiersz zostaje)
+ *   // wartość ZW porównana z `wartoscGrosze`; rozjazd → bez Zapisz()
+ *   zw.PlatnoscPrzelewKwota = zw.WartoscBrutto;     // szkic startuje od całego PA
+ *   zw.Zapisz(); zw.NumerPelny; zw.Zamknij();       // Zamknij zwalnia paragon
+ */
+export interface ZlecenieZw {
+  /** Zwrot, któremu numer ZW wróci do `korekta_numer`. */
+  zwrotId: number;
+  /** Paragon w Subiekcie (dok_Id, `dok_Typ` 21). */
+  dokId: number;
+  /** Numer paragonu — do etykiety w kolejce i do komunikatu błędu. */
+  paragon: string;
+  /** Zwracane kartoteki, zsumowane po `twId`, PO rozbiciu kompletów. */
+  pozycje: MmItem[];
+  /** Kartoteka przesyłki (`TW_ID_PRZESYLKA`). */
+  przesylkaTwId: number;
+  /** Czy oddajemy koszt dostawy — pole „Koszt dostawy" przy zwrocie. */
+  przesylkaZostaw: boolean;
+  /** PEŁNA wartość zwrotu: ceny razy sztuki, bez potrąceń, plus dostawa. */
+  wartoscGrosze: number;
+}
+
 /** Numery dokumentów — trafiają do `sfera_queue.wynik_json`. */
 export interface WynikKorekty {
   korektaNumer: string;
@@ -110,7 +143,7 @@ export interface WynikKorekty {
  * Node. Jedna lista dla obu stron: `pickTask` w Node ma ich nie dotykać przy
  * SFERA_WORKER=1, a `sfera-worker/sql/*.sql` bierze dokładnie te same.
  */
-export const TYPY_SFERY = ["mm"] as const;
+export const TYPY_SFERY = ["mm", "zw"] as const;
 
 export interface SferaAdapter {
   /** Ustaw pole lokalizacji na kartotece towaru (spec §5.2). */

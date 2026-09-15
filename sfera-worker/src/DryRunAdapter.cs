@@ -30,4 +30,13 @@ public sealed class DryRunAdapter : ISferaAdapter
             z.Pozycje.Count > 0 ? $"MM DRY-RUN/{_licznik}" : "",
             z.PozycjeZniszczone.Count > 0 ? $"RW DRY-RUN/{_licznik}" : "");
     }
+
+    public string CreateZw(ZlecenieZw z)
+    {
+        _licznik++;
+        Console.WriteLine(
+            $"[sfera] DRY-RUN: ZW do paragonu {z.DokId}, kartotek {z.Pozycje.Count}, " +
+            $"przesyłka {(z.PrzesylkaZostaw ? "zostaje" : "zero")}, wartość {z.WartoscGrosze / 100m:0.00} — dokument NIE powstaje");
+        return $"ZW DRY-RUN/{_licznik}";
+    }
 }

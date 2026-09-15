@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.349.0 — 15 września 2026
+
+**ZW do paragonu wystawia się sam po zapisaniu kwoty.** Na nagraniu pracy
+biura ręczny ZW był najdłuższym krokiem jednego zwrotu. Decyzje właściciela:
+ZW powstaje bez przycisku i niesie PEŁNĄ wartość zwróconego towaru.
+Potrącenie za uszkodzenie albo użycie idzie wyłącznie przez zwrot pieniędzy
+w Allegro. Korekty faktur zostają ręczne.
+
+- **Serwer zleca zadanie `zw`** zaraz po „zapisz kwotę”, gdy zwrot jest
+  przypięty do paragonu. Kartoteki liczy tą samą drogą co koszyk, także przy
+  kompletach. Przesyłka idzie za polem „Koszt dostawy”.
+- **Worker Sfery wystawia ZW** według ustaleń sondy (`docs/sfera-com.md` §2m).
+  Paragon otwarty w biurze odkłada zadanie o 2 minuty. Brak skutku
+  magazynowego, rozjazd wartości albo brak sztuk na paragonie kończą zadanie
+  od razu błędem, bez zapisu dokumentu.
+- **Numer ZW wraca do zwrotu sam**, w ciągu minuty, i wypuszcza koszyki.
+  Zwrot zamyka się tak, jak po wpisaniu numeru ręką.
+- **Człowiek wyprzedza automat.** Wpisany numer albo poprawiona kwota anulują
+  czekający ZW. Gdy dokument już powstaje, panel mówi to wprost.
+- **Panel mówi, kto wystawia ZW:** „Automat wystawia ZW”, „Automat nie
+  wystawił ZW: …” albo „Wystawiona automatycznie po zapisaniu kwoty”.
+- Zwrot do paragonu, którego automat nie umie wystawić, dostaje zdanie w osi.
+- **[wymaga działania]** Funkcja jest WYŁĄCZONA do czasu ustawienia
+  `SFERA_ZW=1` i `TW_ID_PRZESYLKA` w `wertis.env` — patrz `DEPLOY.md`.
+
 ## 0.348.6 — 15 września 2026
 
 **ZW przelicza się sam po zerach, ale skutek magazynowy bierze z paragonu.**

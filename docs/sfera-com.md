@@ -470,12 +470,33 @@ PA 3/MAG/02 i PA 12102 — `True`. Pozycje PA 8995 mają `CenaMagazynowa = 0`.
 Do czasu ustalenia automat NIE wystawia ZW z `False` i oddaje zwrot biuru. ZW
 bez przyjęcia na MAG, a po nim MM koszyka, zdjęłyby ze stanu towar dwa razy.
 
+**Automat w 0.349.0 składa te ustalenia w jedno zadanie `zw`.** Serwer zleca
+je po zapisaniu kwoty (`services/zw-automat.ts`), worker Sfery wystawia ZW
+(`SferaComAdapter.WystawZw`). Kolejność kroków w workerze:
+
+1. `DodajZW()` i `NaPodstawie(dok_Id)`. Blokada paragonu odkłada zadanie
+   o 2 minuty bez zużycia próby.
+2. `SkutekMagazynowy = False` kończy zadanie błędem dla biura.
+3. `RodzajZwrotuDetal = 1`.
+4. Pozycje po `TowarId`. Zwracane dostają swoją ilość, reszta 0, przesyłka
+   idzie za polem dostawy.
+5. Wartość ZW porównana z pełną wartością zwrotu co do grosza. Rozjazd kończy
+   zadanie bez `Zapisz()`.
+6. `PlatnoscPrzelewKwota = WartoscBrutto`, `Zapisz()`, `NumerPelny`, zawsze
+   `Zamknij()`.
+
+Numer ZW wpisuje do zwrotu worker Node co minutę, jako `korekta_zrodlo='sfera'`.
+Wtedy ruszają koszyki czekające na numer.
+
+`[WERYFIKUJ]` Pierwszy prawdziwy ZW z automatu: czy `Zapisz()` daje dokument
+wykonany i czy przelew na zapisanym ZW zgadza się z wartością.
+
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
 z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
 
 **Przesyłka na ZW idzie za polem „Koszt dostawy" w panelu zwrotów** (decyzja
 właściciela, 15 września 2026). Odznaczone pole daje `kwota_dostawa_grosze`
-równe null i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
+równe 0 i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
 tak jak `delivery` w zwrocie pieniędzy Allegro. Jedno pole steruje więc
 i przelewem klienta, i dokumentem.
 
