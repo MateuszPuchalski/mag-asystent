@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 function dodaj(
-  type: "mm" | "set_location" | "korekta_zwrot",
+  type: "mm" | "set_location" | "korekta_zwrot" | "zw",
   twId: number | null,
   opts: { status?: string; nextAt?: string | null } = {}
 ): number {
@@ -152,4 +152,12 @@ test("worker Sfery bierze też korektę zwrotu, a guard lokalizacji jej nie doty
   db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(lokalizacja);
   const czekajaca = dodaj("korekta_zwrot", null, { status: "waiting_for_doc" });
   assert.equal(pickWaiting()?.id, czekajaca);
+});
+
+test("ZW do paragonu bierze worker Sfery — bez tego wisiałby w kolejce", () => {
+  /* 0.349.0. Typ trzeba dopisać w czterech miejscach naraz (TYPY_SFERY, oba
+     pliki SQL, odzysk po przerwaniu w Queue.cs). Ten test łapie brak w SQL:
+     worker Node omija `zw` przy SFERA_WORKER=1, więc nikt inny go nie weźmie. */
+  const zw = dodaj("zw", null);
+  assert.equal(pickPending()?.id, zw);
 });

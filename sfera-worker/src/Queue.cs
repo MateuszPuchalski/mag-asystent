@@ -5,7 +5,7 @@ namespace WertisSferaWorker;
 
 /* ── Cykl życia zadań dokumentowych — LUSTRO server/src/worker/kolejka.ts ────
    Ten proces obsługuje WYŁĄCZNIE zadania tworzące dokumenty w Subiekcie:
-   type='mm' oraz type='korekta_zwrot' (lista TYPY_SFERY w sfera.ts). Statusy, próby, backoff i wpisy
+   type='mm', type='zw' (0.349.0) oraz dawne type='korekta_zwrot' (lista TYPY_SFERY w sfera.ts). Statusy, próby, backoff i wpisy
    audytowe odwzorowują workera Node co do wartości — kolektor, biuro, stock.ts
    i rekoncyliacja czytają jedną kolejkę i nie mogą widzieć dwóch dialektów.
 
@@ -27,6 +27,9 @@ public static class Queue
     private static readonly int[] BackoffMs = { 5000, 30000, 120000 };
     private const int MaxProb = 3;
     private const int WaitingRetryMs = 60000;
+    /* Paragon otwarty w biurze (0.349.0). Dwie minuty, bo tyle trwa ręczne
+       zajrzenie w dokument — częstsze pytanie tylko zaśmieca dziennik. */
+    private const int BlokadaRetryMs = 120000;
 
     /// <summary>Pass waiting_for_doc przed pending — jak pickTask() w Node.</summary>
     public static Zadanie? Pick(SqliteConnection db)
@@ -86,6 +89,7 @@ public static class Queue
             {
                 "mm" => (RobMm(payload, sfera), (string?)null),
                 "korekta_zwrot" => RobKorekte(payload, sfera),
+                "zw" => (RobZw(payload, sfera), (string?)null),
                 _ => throw new InvalidOperationException("Nieznany typ zadania: " + z.Typ),
             };
 
@@ -100,6 +104,14 @@ public static class Queue
                 Zdarzenie(db, z, "queue_applied", $"{{\"docNo\":{Json(docNo)},\"proby\":{z.Proby}}}");
             });
             Console.WriteLine($"[sfera] #{z.Id} OK {z.Typ} · {docNo}");
+        }
+        catch (DokumentZablokowanyException e)
+        {
+            OznaczBlokade(db, z, e.Message);
+        }
+        catch (BladTrwalyException e)
+        {
+            OznaczBladTrwaly(db, z, e.Message);
         }
         catch (Exception e)
         {
@@ -142,6 +154,16 @@ public static class Queue
         return (w.KorektaNumer, json);
     }
 
+    /* ZW oddaje JEDEN numer — kolumna sgt_doc_number wystarcza, wynik_json zostaje
+       pusty. Numer do zwrotu przepisuje worker Node (`wpiszNumeryZw`). */
+    private static string RobZw(JsonElement payload, ISferaAdapter sfera)
+        => sfera.CreateZw(new ZlecenieZw(
+            payload.GetProperty("dokId").GetInt32(),
+            Pozycje(payload.GetProperty("pozycje")),
+            payload.GetProperty("przesylkaTwId").GetInt32(),
+            payload.GetProperty("przesylkaZostaw").GetBoolean(),
+            payload.GetProperty("wartoscGrosze").GetInt64()));
+
     /// <summary>Retry z backoffem; po wyczerpaniu prób terminalny error (lustro oznaczBlad).</summary>
     public static void OznaczBlad(SqliteConnection db, Zadanie z, string blad)
     {
@@ -173,6 +195,41 @@ public static class Queue
     }
 
     /// <summary>
+    /// Dokument źródłowy otwarty w Subiekcie (0.349.0): zadanie wraca do pending
+    /// BEZ zużycia próby. Status pending, nie nowy — kolektor nie zna innych.
+    /// error_msg niesie powód, żeby kolejka mówiła, na co czeka.
+    /// </summary>
+    public static void OznaczBlokade(SqliteConnection db, Zadanie z, string blad)
+    {
+        Db.Transakcja(db, () =>
+        {
+            Db.Exec(db,
+                "UPDATE sfera_queue SET status='pending', error_msg=@e, next_attempt_at=@za WHERE id=@id",
+                ("@e", blad), ("@za", Db.IsoZaMs(BlokadaRetryMs)), ("@id", z.Id));
+            Zdarzenie(db, z, "queue_retry",
+                $"{{\"proba\":{z.Proby},\"max\":{MaxProb},\"blad\":{Json(blad)},\"blokada\":true}}");
+        });
+        Console.WriteLine($"[sfera] #{z.Id} dokument zablokowany, ponowienie za {BlokadaRetryMs}ms: {blad}");
+    }
+
+    /// <summary>
+    /// Odmowa, której ponowienie nie zmieni (0.349.0) — od razu terminalny error.
+    /// Ścieżka PONÓW zostaje dla człowieka, który poprawił dane.
+    /// </summary>
+    public static void OznaczBladTrwaly(SqliteConnection db, Zadanie z, string blad)
+    {
+        var proby = z.Proby + 1;
+        Db.Transakcja(db, () =>
+        {
+            Db.Exec(db,
+                "UPDATE sfera_queue SET status='error', attempts=@p, error_msg=@e, processed_at=@at WHERE id=@id",
+                ("@p", proby), ("@e", blad), ("@at", Db.NowIso()), ("@id", z.Id));
+            Zdarzenie(db, z, "queue_failed", $"{{\"proby\":{proby},\"blad\":{Json(blad)},\"trwaly\":true}}");
+        });
+        Console.WriteLine($"[sfera] #{z.Id} ERROR (odmowa bez ponowień): {blad}");
+    }
+
+    /// <summary>
     /// Odzysk po padnięciu w trakcie zapisu: zadanie zastane w 'processing' NIE
     /// wraca automatycznie do pending — COM mógł zdążyć z Zapisz(), a SQLite
     /// nie, i ponowienie zdublowałoby dokument ze skutkiem magazynowym.
@@ -185,7 +242,7 @@ public static class Queue
         {
             cmd.CommandText =
                 @"SELECT id, type, payload, attempts, source_doc_id, tw_id, created_by, created_by_ref
-                  FROM sfera_queue WHERE type IN ('mm', 'korekta_zwrot') AND status='processing' ORDER BY id";
+                  FROM sfera_queue WHERE type IN ('mm', 'korekta_zwrot', 'zw') AND status='processing' ORDER BY id";
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 przerwane.Add(new Zadanie(

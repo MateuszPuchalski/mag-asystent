@@ -956,8 +956,16 @@ export interface Zwrot {
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
-  /** `subiekt` = numer znaleziony w Subiekcie, `reczne` = przepisany ręką. */
+  /**
+   * `subiekt` = numer znaleziony w Subiekcie, `reczne` = przepisany ręką,
+   * `sfera` = ZW wystawił automat po zapisaniu kwoty (0.349.0).
+   */
   korektaZrodlo: string | null;
+  /**
+   * Zadanie automatycznego ZW (0.349.0); `null`, gdy automat go nie zlecił.
+   * Opcjonalne, bo panel ma działać także z serwerem sprzed tego wydania.
+   */
+  zw?: ZadanieZw | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
@@ -980,6 +988,19 @@ export interface Zwrot {
   faktura: FakturaZwrotu;
   wersja: number;
   pozycje: PozycjaZwrotu[];
+}
+
+/**
+ * Automatyczny ZW w kolejce Sfery (0.349.0).
+ *
+ * `status` to status wiersza kolejki: `pending`, `processing` i
+ * `waiting_for_doc` znaczą „numer przyjdzie sam", `error` — „wystaw ręką".
+ * `pending` z `blad` to paragon otwarty w biurze; zadanie ponowi się samo.
+ */
+export interface ZadanieZw {
+  status: string;
+  numer: string | null;
+  blad: string | null;
 }
 
 /**

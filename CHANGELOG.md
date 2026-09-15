@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.349.0 — 15 września 2026
+
+**ZW do paragonu wystawia się sam po zapisaniu kwoty.** Na nagraniu pracy
+biura ręczny ZW był najdłuższym krokiem jednego zwrotu. Decyzje właściciela:
+ZW powstaje bez przycisku i niesie PEŁNĄ wartość zwróconego towaru.
+Potrącenie za uszkodzenie albo użycie idzie wyłącznie przez zwrot pieniędzy
+w Allegro. Korekty faktur zostają ręczne.
+
+- **Serwer zleca zadanie `zw`** zaraz po „zapisz kwotę”, gdy zwrot jest
+  przypięty do paragonu. Kartoteki liczy tą samą drogą co koszyk, także przy
+  kompletach. Przesyłka idzie za polem „Koszt dostawy”.
+- **Worker Sfery wystawia ZW** według ustaleń sondy (`docs/sfera-com.md` §2m).
+  Paragon otwarty w biurze odkłada zadanie o 2 minuty. Brak skutku
+  magazynowego, rozjazd wartości albo brak sztuk na paragonie kończą zadanie
+  od razu błędem, bez zapisu dokumentu.
+- **Numer ZW wraca do zwrotu sam**, w ciągu minuty, i wypuszcza koszyki.
+  Zwrot zamyka się tak, jak po wpisaniu numeru ręką.
+- **Człowiek wyprzedza automat.** Wpisany numer albo poprawiona kwota anulują
+  czekający ZW. Gdy dokument już powstaje, panel mówi to wprost.
+- **Panel mówi, kto wystawia ZW:** „Automat wystawia ZW”, „Automat nie
+  wystawił ZW: …” albo „Wystawiona automatycznie po zapisaniu kwoty”.
+- Zwrot do paragonu, którego automat nie umie wystawić, dostaje zdanie w osi.
+- **[wymaga działania]** Funkcja jest WYŁĄCZONA do czasu ustawienia
+  `SFERA_ZW=1` i `TW_ID_PRZESYLKA` w `wertis.env` — patrz `DEPLOY.md`.
+
+## 0.348.6 — 15 września 2026
+
+**ZW przelicza się sam po zerach, ale skutek magazynowy bierze z paragonu.**
+Sonda `-SzkicZW -Ilosci "2=0"` na PA 8995/MAG/03/2026 z dwiema pozycjami
+(`docs/sfera-com.md` §2m).
+
+- **Po `IloscJm = 0` Subiekt przelicza dokument sam.** Wartość, kwota do zapłaty
+  i przelew zeszły z 26,89 do 14,99 zł; wyzerowany wiersz został na ZW.
+- **Przelew i tak ustawiamy jawnie.** Po wcześniejszym ZW do tego samego paragonu
+  szkic zaczyna od kwoty całego paragonu.
+- **ZW wywołuje skutek magazynowy** — przyjmuje towar z powrotem na magazyn
+  główny (potwierdził właściciel). Zgrywa się to z obiegiem koszyka: MM koszyka
+  czeka na numer korekty każdego zwrotu, więc ZW zawsze idzie pierwszy.
+- **Otwarte: `SkutekMagazynowy = False` na szkicu do PA 8995**, przy `True` na
+  dwóch poprzednich. Do czasu ustalenia automat takiego ZW nie wystawia i oddaje
+  zwrot biuru.
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.5 — 15 września 2026
 
 **Drugi ZW do tego samego paragonu i poprawka o `DokHanLp`.** Sonda `-SzkicZW`

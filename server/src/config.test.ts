@@ -62,6 +62,22 @@ test("SFERA_WORKER=1 przy seeded to blad — zadania mm nie mialyby wykonawcy", 
   assert.match(bledy[0], /SFERA_WORKER=1 wymaga SGT_MODE=mssql/);
 });
 
+test("SFERA_ZW bez workera Sfery albo bez kartoteki przesyłki nie przechodzi startu", () => {
+  /* 0.349.0. Bez workera zadania zw nie mają wykonawcy; bez TW_ID_PRZESYLKA
+     ZW nie umie zdecydować o wierszu przesyłki. Filtr po nazwie przełącznika,
+     bo tryb mssql dokłada własne wymagania, o które ten test nie pyta. */
+  const zw = (b: string[]) => b.filter((x) => /SFERA_ZW/.test(x));
+  const bezWorkera = { ...config, sferaZw: true, twIdPrzesylka: 943, sferaWorker: false };
+  assert.equal(zw(bledyKonfiguracji(bezWorkera as typeof config)).length, 1);
+  assert.match(zw(bledyKonfiguracji(bezWorkera as typeof config))[0], /wymaga SFERA_WORKER=1/);
+
+  const bezPrzesylki = { ...config, sferaZw: true, twIdPrzesylka: 0, sferaWorker: true, sgtMode: "mssql" as const };
+  assert.match(zw(bledyKonfiguracji(bezPrzesylki as typeof config))[0], /TW_ID_PRZESYLKA/);
+
+  const komplet = { ...config, sferaZw: true, twIdPrzesylka: 943, sferaWorker: true, sgtMode: "mssql" as const };
+  assert.deepEqual(zw(bledyKonfiguracji(komplet as typeof config)), []);
+});
+
 /* Zdjęcia kartotek: każda z tych pomyłek daje TEN SAM objaw — pusty slot na
    karcie towaru — i żadna nie prowadzi do przyczyny, bo kartoteka bez zdjęcia
    wygląda dokładnie tak samo jak zła nazwa kolumny. Dlatego łapiemy je przy

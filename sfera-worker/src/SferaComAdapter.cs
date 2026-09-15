@@ -265,6 +265,153 @@ public sealed class SferaComAdapter : ISferaAdapter
         return Krok("RW.NumerPelny", 8, () => (string)rw.NumerPelny);
     }
 
+    public string CreateZw(ZlecenieZw z)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new InvalidOperationException(
+                "COM Sfery działa wyłącznie na Windows z zainstalowanym Subiektem GT. " +
+                "Do przebiegu próbnego bez Sfery służy flaga --dry-run.");
+
+        try
+        {
+            return WystawZw((object)Sesja(), z);
+        }
+        /* Blokada paragonu i odmowa merytoryczna nie psują SESJI — Sfera
+           odpowiedziała poprawnie. Restart sesji kosztuje sekundy przy każdym
+           zadaniu, więc zostaje dla prawdziwych awarii COM. */
+        catch (Exception e) when (e is DokumentZablokowanyException or BladTrwalyException)
+        {
+            throw;
+        }
+        catch
+        {
+            ZamknijSesje();
+            throw;
+        }
+    }
+
+    /**
+     * ZW do paragonu (0.349.0). Każdy krok stoi na pomiarze sondy — nazwy
+     * i zachowania z docs/sfera-com.md §2m, nie z dokumentacji producenta.
+     */
+    private static string WystawZw(object sesja, ZlecenieZw z)
+    {
+        dynamic su = sesja;
+        dynamic zw = Krok("SuDokumentyManager.DodajZW()", 6, () => su.SuDokumentyManager.DodajZW());
+        try
+        {
+            /* `NaPodstawie` BLOKUJE paragon (sonda, 15 września 2026). Blokada
+               cudzej sesji to biuro z paragonem na ekranie — zadanie ma poczekać,
+               a nie spalić próby. Odmowa korekty to zły dokument: czekanie nic
+               nie zmieni. */
+            try
+            {
+                Krok("ZW.NaPodstawie(dok_Id)", 6, () => { zw.NaPodstawie(z.DokId); });
+            }
+            catch (InvalidOperationException e) when (Zawiera(e, "zablokowa"))
+            {
+                throw new DokumentZablokowanyException(
+                    $"Paragon {z.DokId} jest otwarty w Subiekcie — ZW spróbuje ponownie za 2 minuty. {e.Message}");
+            }
+            catch (InvalidOperationException e) when (Zawiera(e, "wystawić korekty"))
+            {
+                throw new BladTrwalyException(
+                    $"Subiekt nie pozwala wystawić ZW do dokumentu {z.DokId} — sprawdź, czy to paragon. {e.Message}");
+            }
+
+            /* SKUTEK Z PARAGONU. Szkic do PA 8995 miał False — taki ZW nie przyjąłby
+               towaru na magazyn, a MM koszyka zdjęłoby go i tak. Do czasu
+               ustalenia przyczyny decyduje biuro (docs/sfera-com.md §2m). */
+            bool skutek = Krok("ZW.SkutekMagazynowy", 6, () => (bool)zw.SkutekMagazynowy);
+            if (!skutek)
+                throw new BladTrwalyException(
+                    "ZW do tego paragonu nie przyjąłby towaru na magazyn (SkutekMagazynowy = False). " +
+                    "Wystaw ZW ręcznie w Subiekcie i wpisz numer w panelu. ZW NIE wystawiono.");
+
+            // „zwrot ze sprzedaży" — odczytane z ZW 772 wystawionego przez biuro
+            Krok("ZW.RodzajZwrotuDetal", 6, () => { zw.RodzajZwrotuDetal = 1; });
+
+            /* POZYCJE PO TowarId, nie po `DokHanLp` — to numer wiersza na ZW,
+               nie na paragonie. Wiersz, który nie wraca, dostaje ZERO i ZOSTAJE:
+               tak wygląda ZW biura, a Subiekt po zerze sam przelicza wartość.
+               Ta sama kartoteka w dwóch wierszach paragonu wypełnia się po kolei. */
+            dynamic pozycje = Krok("ZW.Pozycje", 6, () => zw.Pozycje);
+            int ile = Krok("ZW.Pozycje.Liczba", 6, () => (int)pozycje.Liczba);
+            var zostalo = z.Pozycje
+                .GroupBy(p => p.TwId)
+                .ToDictionary(g => g.Key, g => g.Sum(p => (decimal)p.Qty));
+            bool przesylkaJest = false;
+            for (int i = PIERWSZA_POZYCJA; i < PIERWSZA_POZYCJA + ile; i++)
+            {
+                int nr = i;
+                dynamic p = Krok($"ZW.Pozycje.Element({nr})", 6,
+                    () => ElementZIndeksem((object)pozycje, nr));
+                int tw = Krok($"ZW.Pozycje.Element({nr}).TowarId", 6, () => (int)p.TowarId);
+                decimal ilosc = Krok($"ZW.Pozycje.Element({nr}).IloscJm", 6,
+                    () => Convert.ToDecimal((object)p.IloscJm));
+
+                decimal nowa;
+                if (z.PrzesylkaTwId > 0 && tw == z.PrzesylkaTwId)
+                {
+                    przesylkaJest = true;
+                    nowa = z.PrzesylkaZostaw ? ilosc : 0m;
+                }
+                else if (zostalo.TryGetValue(tw, out var reszta) && reszta > 0m)
+                {
+                    nowa = Math.Min(ilosc, reszta);
+                    zostalo[tw] = reszta - nowa;
+                }
+                else
+                {
+                    nowa = 0m;
+                }
+
+                if (nowa != ilosc)
+                    Krok($"ZW.Pozycje.Element({nr}).IloscJm =", 6, () => { p.IloscJm = (double)nowa; });
+            }
+
+            /* Paragon z wcześniejszym ZW daje wyłącznie niezwrócone wiersze
+               (sonda, PA 12102). Brak sztuk znaczy więc zwykle „ZW już był" —
+               drugi dokument byłby dublem. */
+            var brak = zostalo.Where(kv => kv.Value > 0m).ToList();
+            if (brak.Count > 0)
+                throw new BladTrwalyException(
+                    "Na paragonie nie zostało do zwrotu: " +
+                    string.Join(", ", brak.Select(kv => $"kartoteka {kv.Key} × {kv.Value:0.####}")) +
+                    ". Możliwe, że ZW do tego paragonu już istnieje. ZW NIE wystawiono.");
+            if (z.PrzesylkaZostaw && !przesylkaJest)
+                throw new BladTrwalyException(
+                    "Zwrot oddaje koszt dostawy, a paragon nie ma wiersza przesyłki (TW_ID_PRZESYLKA). " +
+                    "ZW NIE wystawiono.");
+
+            /* PEŁNA WARTOŚĆ ZWROTU = wartość ZW, co do grosza (decyzja właściciela:
+               potrącenie tylko w Allegro). Rozjazd to inna cena na paragonie niż
+               w zamówieniu albo zła kartoteka — dokument fiskalny nie wychodzi. */
+            decimal wartosc = Krok("ZW.WartoscBrutto", 6, () => Convert.ToDecimal((object)zw.WartoscBrutto));
+            long grosze = (long)Math.Round(wartosc * 100m, MidpointRounding.AwayFromZero);
+            if (grosze != z.WartoscGrosze)
+                throw new BladTrwalyException(
+                    $"Wartość ZW {wartosc:0.00} zł nie zgadza się z pełną wartością zwrotu " +
+                    $"{z.WartoscGrosze / 100m:0.00} zł. ZW NIE wystawiono — wystaw go ręcznie.");
+
+            /* Szkic po wcześniejszym ZW startuje od kwoty CAŁEGO paragonu (sonda,
+               PA 12102: 17,83 zł przy wartości 10,49 zł), więc przelew idzie jawnie. */
+            Krok("ZW.PlatnoscPrzelewKwota", 6, () => { zw.PlatnoscPrzelewKwota = wartosc; });
+            Krok("ZW.Zapisz()", 6, () => { zw.Zapisz(); });
+            return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
+        }
+        finally
+        {
+            /* `Zamknij()` ZAWSZE — także po odmowie. Otwarty szkic trzyma blokadę
+               paragonu, a sesja workera żyje godzinami: biuro nie otworzyłoby tego
+               paragonu do restartu usługi (sonda, drugi przebieg). */
+            try { zw.Zamknij(); } catch { /* zamknięcie nie ma prawa zasłonić przyczyny */ }
+        }
+    }
+
+    private static bool Zawiera(Exception e, string fraza) =>
+        e.Message.Contains(fraza, StringComparison.OrdinalIgnoreCase);
+
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
     {
         if (!OperatingSystem.IsWindows())

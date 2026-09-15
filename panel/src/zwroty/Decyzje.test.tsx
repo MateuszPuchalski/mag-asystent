@@ -240,4 +240,24 @@ describe("Korekta zwrotu (0.162.0)", () => {
       korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
     expect(screen.getByRole("button", { name: /Cofnij korektę/ })).toBeEnabled();
   });
+
+  it("zlecony automat mówi, że numer przyjdzie sam — bez zachęty do ręcznego ZW", () => {
+    /* 0.349.0. „Wystawiasz w Subiekcie" przy czekającym automacie kończyłoby się
+       drugim dokumentem obok tego, który właśnie powstaje. */
+    pasek(doKorekty({ zw: { status: "pending", numer: null, blad: null } }));
+    expect(screen.getByText(/Automat wystawia ZW/)).toBeInTheDocument();
+    expect(screen.queryByText(/wystawiasz w Subiekcie/i)).toBeNull();
+  });
+
+  it("błąd automatu odsyła do ręcznego ZW i mówi dlaczego", () => {
+    pasek(doKorekty({ zw: { status: "error", numer: null,
+      blad: "Wartość ZW 10,00 zł nie zgadza się z pełną wartością zwrotu 12,00 zł." } }));
+    expect(screen.getByText(/Automat nie wystawił ZW/)).toHaveTextContent(/Wartość ZW 10,00 zł/);
+  });
+
+  it("numer z automatu podpisuje się jako wystawiony automatycznie", () => {
+    pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "ZW 9/MAG/09/2026",
+      korektaZrodlo: "sfera" }), { onCofnijKorekte: vi.fn() });
+    expect(screen.getByText(/Wystawiona automatycznie/)).toBeInTheDocument();
+  });
 });

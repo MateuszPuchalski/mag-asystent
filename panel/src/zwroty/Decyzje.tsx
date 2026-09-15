@@ -122,6 +122,9 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   }
 
   if (zwrot.kubelek === "korekta") {
+    const zw = zwrot.zw ?? null;
+    const zwWDrodze = zw !== null
+      && (zw.status === "pending" || zw.status === "processing" || zw.status === "waiting_for_doc");
     return <div className={ramka}>
       {/* KWOTA Z DROGĄ WYJŚCIA (0.202.0). To jedyny ekran, na którym kwota jest
           już ustalona, a jeszcze nic na jej podstawie nie wyszło z firmy —
@@ -135,10 +138,25 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           className="text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
           popraw kwotę</button>
       </div>}
-      <p className="mb-2 text-xs text-slate-500">
-        {/* Wprost, bo inaczej ekran obiecywałby, że zrobi to sam. */}
-        Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.
-      </p>
+      {/* KTO WYSTAWIA ZW (0.349.0). „Wystawiasz w Subiekcie" było prawdą, dopóki
+          robiło to wyłącznie biuro. Przy zleconym automacie zdanie mówi, że numer
+          przyjdzie sam — inaczej biuro wystawiłoby drugi dokument obok. Pole
+          numeru zostaje: wpisany numer anuluje czekające zlecenie. */}
+      {zwWDrodze
+        ? <p className="mb-2 text-xs text-slate-500">
+            Automat wystawia ZW w Subiekcie — numer wpisze się tu sam w ciągu minuty.
+            Nie wystawiaj go ręcznie.
+            {zw?.blad && <span className="block">Czeka: {zw.blad}</span>}
+          </p>
+        : zw?.status === "error"
+          ? <p className="mb-2 text-xs text-ranga-zle">
+              Automat nie wystawił ZW: {zw.blad ?? "bez opisu błędu."} Wystaw go w Subiekcie
+              i przepisz tu numer — to zamyka zwrot.
+            </p>
+          : <p className="mb-2 text-xs text-slate-500">
+              {/* Wprost, bo inaczej ekran obiecywałby, że zrobi to sam. */}
+              Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.
+            </p>}
       <div className="flex flex-wrap items-center gap-2">
         <Pole id="numer-korekty" className="w-56" value={numer} aria-label="Numer korekty"
           placeholder="Np. ZW 413/MAG/09/2026" onChange={(e) => setNumer(e.target.value)}
@@ -179,7 +197,9 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           <p className="mt-0.5 text-xs text-slate-500">
             {zwrot.korektaZrodlo === "subiekt"
               ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
-              : "Numer przepisany w panelu."}
+              : zwrot.korektaZrodlo === "sfera"
+                ? "Wystawiona automatycznie po zapisaniu kwoty."
+                : "Numer przepisany w panelu."}
           </p>
         </>
       : zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod

@@ -1,7 +1,7 @@
 import { db, type Db } from "../db/db.js";
 import { currentUserRef } from "../context.js";
 import { logEvent } from "./events.js";
-import type { MmItem } from "../adapters/sfera.js";
+import type { MmItem, ZlecenieZw } from "../adapters/sfera.js";
 
 export interface EnqueueBase {
   createdBy: string;
@@ -222,4 +222,18 @@ export function enqueueMM(
   database?: Db
 ): number {
   return insert("mm", { magFrom, magTo, items }, base, database ?? db());
+}
+
+/**
+ * Zadanie ZW do paragonu (0.349.0) — wykonuje worker Sfery.
+ *
+ * Bez `twId` i bez `sourceDocId`, ŚWIADOMIE. ZW oddaje towar na magazyn
+ * główny, więc przez guard „adres przed sprzedawalnością" przechodzi furtką
+ * wielopozycyjną — tak jak `korekta_zwrot`. Kolejności pilnuje tu obieg
+ * koszyka: MM z koszyka nie wychodzi, dopóki zwrot nie ma numeru korekty.
+ * `sourceDocId` wskazałby paragon, a `czekaNaDokument` szuka bufora wyłącznie
+ * w read-modelu dostaw — reguła udawałaby, że działa.
+ */
+export function enqueueZw(zlecenie: ZlecenieZw, base: EnqueueBase, database?: Db): number {
+  return insert("zw", zlecenie, base, database ?? db());
 }

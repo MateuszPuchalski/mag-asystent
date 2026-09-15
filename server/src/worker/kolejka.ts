@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { TYPY_SFERY, type MmItem, type SferaAdapter } from "../adapters/sfera.js";
 import { logEvent } from "../services/events.js";
 import { wypuscPowrotyKoszy } from "../services/kosze.js";
+import { wpiszNumeryZw } from "../services/zw-automat.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
    Wydzielone z `worker.ts`, bo tamten moduł przy imporcie startuje pętlę
@@ -203,6 +204,14 @@ let ostatniePowroty = 0;
 export function powrotyPoDokumentachSfery(teraz = Date.now()): number {
   if (!config.sferaWorker || teraz - ostatniePowroty < ODSTEP_POWROTOW_MS) return 0;
   ostatniePowroty = teraz;
+  /* NUMERY ZW PRZED POWROTAMI (0.349.0). Numer wystawionego ZW wypuszcza MM
+     koszyka na regał, a dopiero po nim ma sens pytać o powrót. Pod własnym
+     parasolem: zepsuty zwrot nie ma prawa zatrzymać powrotów koszy. */
+  try {
+    wpiszNumeryZw(db(), new Date(teraz));
+  } catch (e) {
+    console.error("[worker] numery ZW:", e instanceof Error ? e.message : e);
+  }
   try {
     return wypuscPowrotyKoszy();
   } catch (e) {

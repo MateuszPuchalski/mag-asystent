@@ -419,10 +419,13 @@ ZW produkty, które nie wróciły — worker zrobi to samo.
 przesyłka ma `DokHanLp = 2`, a w drugim szkicu do tego samego paragonu `1`.
 Worker dopasowuje więc pozycje po `TowarId`, tak jak przy KFS.
 
-**Przelew dostaje kwotę całego paragonu, nie ZW.** Przy paragonie z jedną pozycją
-to ta sama liczba (79,50 zł). Drugi szkic do PA 12102 miał wartość 10,49 zł,
-a `PlatnoscPrzelewKwota` 17,83 zł — sumę obu wierszy paragonu. Worker ustawia
-więc przelew sam, równy `WartoscBrutto` ZW.
+**Przelew startuje od kwoty paragonu i idzie za zmianami ilości.** Na PA
+8995/MAG/03/2026 przelew po powiązaniu miał 26,89 zł, tyle co wartość. Po
+wyzerowaniu wiersza wartość, `KwotaDoZaplaty` i przelew zeszły razem do 14,99 zł.
+
+Paragon z wcześniejszym ZW daje jednak zły punkt wyjścia. Drugi szkic do PA 12102
+miał wartość 10,49 zł, a `PlatnoscPrzelewKwota` 17,83 zł — cały paragon. Worker
+ustawia więc przelew jawnie, równy `WartoscBrutto` ZW.
 
 **„Zwrot ze sprzedaży" to `RodzajZwrotuDetal = 1`.** Szkic ma tam 0, a ZW
 772/MAG/07/2026 wystawiony ręcznie przez biuro ma 1. Odczytała to sonda
@@ -433,8 +436,7 @@ pozycjami ma dwa wiersze: pierwszy z `IloscJm = 1`, drugi z `IloscJm = 0`.
 Worker zeruje wiersze, nie usuwa ich.
 
 **Na zapisanym ZW przelew równa się wartości po zerach.** Na ZW 772
-`PlatnoscPrzelewKwota` i `WartoscBrutto` to po 7,34 zł. Szkic dostaje kwotę
-całego paragonu, więc różnicę poprawia okno ZW albo biuro ręką.
+`PlatnoscPrzelewKwota` i `WartoscBrutto` to po 7,34 zł.
 
 **`NaPodstawie` odmawia dla WZ.** Komunikat brzmi „Nie można wystawić korekty
 do dokumentu WZ…". Paragonem jest wyłącznie `dok_Typ = 21`.
@@ -453,16 +455,48 @@ zwrotu — biuro może mieć paragon otwarty.
 Czy zapisany dokument zostaje przez to zablokowany dla biura, pokaże pierwsze
 MM na produkcji.
 
-`[WERYFIKUJ]` Czy po `IloscJm = 0` wartość ZW przelicza się sama. Przelew nie
-idzie za wartością nawet bez zer — patrz wyżej. Zamyka to `-SzkicZW -Ilosci`
-na paragonie z kilkoma pozycjami, bez wcześniejszego ZW.
+**Po `IloscJm = 0` Subiekt przelicza dokument sam.** Na szkicu do PA 8995 wiersz
+towaru 466 dostał `WartoscBruttoPoRabacie = 0` i został na ZW. Netto, VAT
+i brutto dokumentu zeszły o jego kwotę bez wołania `Przelicz()`.
+
+**ZW wywołuje skutek magazynowy: przyjmuje towar z powrotem na magazyn główny**
+(właściciel, 15 września 2026). Zgrywa się to z obiegiem koszyka bez zmian.
+MM koszyka czeka, aż każdy zwrot w nim ma `korekta_numer` (`brakujaceKorekty`
+w `kosze-zwrotow.ts`). Kolejność jest więc stała: ZW oddaje towar na MAG, MM
+koszyka zabiera go na bufor zwrotów albo odpad, MM powrotu wraca na MAG.
+
+`[WERYFIKUJ]` Dlaczego szkic do PA 8995 miał `SkutekMagazynowy = False`, a do
+PA 3/MAG/02 i PA 12102 — `True`. Pozycje PA 8995 mają `CenaMagazynowa = 0`.
+Do czasu ustalenia automat NIE wystawia ZW z `False` i oddaje zwrot biuru. ZW
+bez przyjęcia na MAG, a po nim MM koszyka, zdjęłyby ze stanu towar dwa razy.
+
+**Automat w 0.349.0 składa te ustalenia w jedno zadanie `zw`.** Serwer zleca
+je po zapisaniu kwoty (`services/zw-automat.ts`), worker Sfery wystawia ZW
+(`SferaComAdapter.WystawZw`). Kolejność kroków w workerze:
+
+1. `DodajZW()` i `NaPodstawie(dok_Id)`. Blokada paragonu odkłada zadanie
+   o 2 minuty bez zużycia próby.
+2. `SkutekMagazynowy = False` kończy zadanie błędem dla biura.
+3. `RodzajZwrotuDetal = 1`.
+4. Pozycje po `TowarId`. Zwracane dostają swoją ilość, reszta 0, przesyłka
+   idzie za polem dostawy.
+5. Wartość ZW porównana z pełną wartością zwrotu co do grosza. Rozjazd kończy
+   zadanie bez `Zapisz()`.
+6. `PlatnoscPrzelewKwota = WartoscBrutto`, `Zapisz()`, `NumerPelny`, zawsze
+   `Zamknij()`.
+
+Numer ZW wpisuje do zwrotu worker Node co minutę, jako `korekta_zrodlo='sfera'`.
+Wtedy ruszają koszyki czekające na numer.
+
+`[WERYFIKUJ]` Pierwszy prawdziwy ZW z automatu: czy `Zapisz()` daje dokument
+wykonany i czy przelew na zapisanym ZW zgadza się z wartością.
 
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
 z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
 
 **Przesyłka na ZW idzie za polem „Koszt dostawy" w panelu zwrotów** (decyzja
 właściciela, 15 września 2026). Odznaczone pole daje `kwota_dostawa_grosze`
-równe null i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
+równe 0 i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
 tak jak `delivery` w zwrocie pieniędzy Allegro. Jedno pole steruje więc
 i przelewem klienta, i dokumentem.
 

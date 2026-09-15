@@ -15,6 +15,7 @@ import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza 
   from "./kosze-zwrotow.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { zapiszSkladRecznie, type SkladPozycji } from "./komplety.js";
+import { odsunZwPrzedRecznym, zakolejkujZw } from "./zw-automat.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
@@ -144,8 +145,16 @@ export interface WierszZwrotu {
   kwotaGrosze: number | null;
   kwotaWariant: string | null;
   korektaNumer: string | null;
-  /** `subiekt` = automat znalazł dokument, `reczne` = człowiek przepisał. */
+  /**
+   * `subiekt` = automat znalazł dokument, `reczne` = człowiek przepisał,
+   * `sfera` = ZW wystawił worker Sfery (0.349.0).
+   */
   korektaZrodlo: string | null;
+  /**
+   * Zadanie automatycznego ZW (0.349.0) — `null`, gdy nie zlecono żadnego.
+   * Panel mówi po nim, czy numer przyjdzie sam, czy biuro ma wystawić ZW ręką.
+   */
+  zw: { status: string; numer: string | null; blad: string | null } | null;
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
@@ -563,6 +572,11 @@ function zloz(
     kwotaWariant: (z.kwota_wariant as string) ?? null,
     korektaNumer: (z.korekta_numer as string) ?? null,
     korektaZrodlo: (z.korekta_zrodlo as string) ?? null,
+    zw: z.zw_status == null ? null : {
+      status: String(z.zw_status),
+      numer: (z.zw_numer as string) ?? null,
+      blad: (z.zw_blad as string) ?? null,
+    },
     rejectionCode,
     zrodlo: String(z.zrodlo ?? "allegro"),
     prowadzi: (z.prowadzi as string) ?? null,
@@ -683,12 +697,19 @@ export function listaZwrotow(
   filtr: FiltrZwrotow | null = null,
 ): WierszZwrotu[] {
   const znaki = (n: number) => Array.from({ length: n }, () => "?").join(",");
+  /* Stan zadania ZW (0.349.0) złączeniem, nie osobnym zapytaniem na zwrot:
+     zadanie jest co najwyżej jedno i wskazuje je kolumna zwrotu. Aliasy z
+     przedrostkiem `zw_`, żeby nie zasłoniły kolumn zwrotu o tych samych nazwach. */
+  const ZWROTY_Z_ZW = `SELECT z.*, q.status AS zw_status, q.sgt_doc_number AS zw_numer,
+      q.error_msg AS zw_blad
+    FROM zwrot_klienta z
+    LEFT JOIN sfera_queue q ON q.id = z.korekta_queue_id AND q.type = 'zw'`;
   const zwroty = (filtr === null
-    ? database.prepare("SELECT * FROM zwrot_klienta ORDER BY created_at ASC").all()
+    ? database.prepare(`${ZWROTY_Z_ZW} ORDER BY z.created_at ASC`).all()
     : "id" in filtr
-      ? database.prepare("SELECT * FROM zwrot_klienta WHERE id=?").all(filtr.id)
-      : database.prepare(`SELECT * FROM zwrot_klienta WHERE channel_account_id=? AND order_id=?
-          ORDER BY created_at ASC`).all(filtr.channelAccountId, filtr.orderId)) as Wiersz[];
+      ? database.prepare(`${ZWROTY_Z_ZW} WHERE z.id=?`).all(filtr.id)
+      : database.prepare(`${ZWROTY_Z_ZW} WHERE z.channel_account_id=? AND z.order_id=?
+          ORDER BY z.created_at ASC`).all(filtr.channelAccountId, filtr.orderId)) as Wiersz[];
   const idyZwrotow = zwroty.map((z) => Number(z.id));
   const pozycje = (filtr === null
     ? database.prepare("SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC").all()
@@ -1719,7 +1740,7 @@ export function zapiszKwote(
   database: Db, zwrotId: number, wybor: { pozycjeIds: number[]; dostawa: boolean },
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
 ): { kwotaGrosze: number; dostawaGrosze: number; wariant: string; wersja: number } {
-  return transaction(database, () => {
+  const wynik = transaction(database, () => {
     const z = podKlucz(database, zwrotId, wersja);
     if (z.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
 
@@ -1791,6 +1812,18 @@ export function zapiszKwote(
         pozycje: [...wybrane] }, kto.id, database);
     return { kwotaGrosze: suma + dostawa, dostawaGrosze: dostawa, wariant, wersja: wersja + 1 };
   })();
+
+  /* ZW ZLECA SIĘ SAM PO KWOCIE (0.349.0, decyzja właściciela). PO transakcji,
+     bo `zakolejkujZw` otwiera własną, a `BEGIN IMMEDIATE` się nie zagnieżdża.
+     Pod parasolem: kwota jest zapisana i obiecana klientowi, a nieudane
+     zlecenie ZW nie ma prawa jej wywrócić — biuro wystawi ZW ręką. Wersji
+     zwrotu zlecenie nie podnosi, więc panel zapisuje dalej bez konfliktu. */
+  try {
+    zakolejkujZw(database, zwrotId, kto, teraz);
+  } catch (e) {
+    console.error("[zw] zlecenie nie weszło:", zwrotId, e instanceof Error ? e.message : e);
+  }
+  return wynik;
 }
 
 /**
@@ -1838,6 +1871,10 @@ export function cofnijKwote(
     if (z.korekta_numer) {
       throw new Error(`Najpierw cofnij korektę ${z.korekta_numer} — kwota jest pod nią.`);
     }
+    /* ZW zlecony z TEJ kwoty (0.349.0) czeka w kolejce albo już powstał.
+       Czekający anulujemy — poprawiona kwota zleci nowy. Wystawiony
+       zatrzymuje cofnięcie, bo dokument stoi w Subiekcie na starą kwotę. */
+    odsunZwPrzedRecznym(database, zwrotId, "kwota", teraz);
 
     const kiedy = teraz.toISOString();
     database.prepare("UPDATE zwrot_klienta_pozycja SET w_zwrocie=0 WHERE zwrot_id=?").run(zwrotId);
@@ -1898,6 +1935,9 @@ export function zapiszKorekte(
       .get(zwrotId) as { werdykt: string | null; kwota_grosze: number | null };
     if (stan.werdykt !== "przyjety") throw new Error("Najpierw przyjmij zwrot");
     if (stan.kwota_grosze === null) throw new Error("Najpierw ustal kwotę do oddania");
+    /* Człowiek wyprzedza automat (0.349.0). Bez anulowania czekającego ZW
+       powstałby drugi dokument obok tego, którego numer właśnie wpisano. */
+    odsunZwPrzedRecznym(database, zwrotId, "korekta", teraz);
 
     const kiedy = teraz.toISOString();
     /* `reczne` odróżnia to od numeru znalezionego w Subiekcie przez automat
@@ -1954,7 +1994,11 @@ export function cofnijKorekte(
     const kiedy = teraz.toISOString();
     database.prepare(
       `UPDATE zwrot_klienta
-        SET korekta_numer=NULL, korekta_zrodlo=NULL, zamkniety_at=NULL WHERE id=?`).run(zwrotId);
+        SET korekta_numer=NULL, korekta_zrodlo=NULL, zamkniety_at=NULL,
+            korekta_queue_id=NULL WHERE id=?`).run(zwrotId);
+    /* `korekta_queue_id` ODPINAMY (0.349.0). Wykonane zadanie ZW zostałoby
+       inaczej przy zwrocie i `wpiszNumeryZw` wpisałby cofnięty numer z powrotem
+       w ciągu minuty. Sam dokument zostaje w Subiekcie — usuwa go biuro. */
     podnies(database, zwrotId);
     zdarzenie(database, zwrotId, "korekta_cofnieta", `Cofnięto korektę ${z.korekta_numer}`,
       { numer: z.korekta_numer }, kto, kiedy);

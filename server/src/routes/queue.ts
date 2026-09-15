@@ -20,7 +20,10 @@ function mapRow(r: QueueRow) {
     type: r.type,
     status: r.status,
     label: r.label,
-    detail: r.detail + (r.sgt_doc_number ? ` · dok. MM ${r.sgt_doc_number}` : ""),
+    /* „MM" tylko przy MM. Numer ZW (0.349.0) niesie własny symbol, a dopisek
+       „dok. MM ZW 12/MAG/09/2026" wysłałby magazyniera po zły dokument. */
+    detail: r.detail + (r.sgt_doc_number
+      ? ` · dok. ${r.type === "mm" ? "MM " : ""}${r.sgt_doc_number}` : ""),
     errMsg: r.error_msg,
     /* Godzina LOKALNA, nie wycinek z ISO. Wycinek pokazywał UTC, czyli latem
        dwie godziny wstecz — „zapisano 12:05" przy zegarze wskazującym 14:05. */
