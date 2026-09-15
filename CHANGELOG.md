@@ -123,6 +123,27 @@ Funkcja `wiek()` przeniosła się z alarmu synchronizacji do wspólnego `ui` i p
 raz pierwszy rozbija dobę na dni. Poniżej doby nic się nie zmienia — alarm
 dostaje dokładnie to, co dotąd.
 
+### Cztery usterki złapane przy przeglądzie własnego kodu
+
+Warto je wymienić, bo każda przeżyłaby testy pierwszej wersji.
+
+Oś rozmowy czytała odesłanie ze STANU zadania, a stan po ponowieniu wraca na
+`nowe` — więc ponowienie kasowało odesłanie z historii rozmowy. Czyta teraz
+z księgi zdarzeń, jak zmiany statusu i sprawy. Oś jest historią, nie stanem.
+
+Ponowienie nie przywracało `waiting_for_internal`. Odesłanie zdejmowało ten
+status słusznie, ale po ponowieniu rozmowa wyglądała na taką, w której ruch
+należy do agenta — a agent nie miał czym odpisać, bo znowu czekał na pomiar.
+
+Kafelek stanu na osi nie znał piątej wartości: wypisywał surowy klucz
+`odeslane` w szarości, a karta zostawała bursztynowa, czyli mówiła „hala
+pracuje" dokładnie wtedy, gdy hala odmówiła.
+
+Najgorsza z czterech: panel nie znał rodzaju wpisu `odeslanie_zadania`, a oś
+rysuje nieznany rodzaj w gałęzi domyślnej — jak wypowiedź w rozmowie. Notatka
+wewnętrzna „brak towaru, półka pusta" wyglądałaby na zdanie wysłane
+kupującemu. Wszystkie cztery mają teraz własne testy.
+
 ### Przy wdrożeniu
 
 Migracja przebudowuje `zadanie_terenowe`, bo SQLite nie poszerza `CHECK`-a

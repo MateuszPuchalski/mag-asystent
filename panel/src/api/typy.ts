@@ -126,7 +126,12 @@ export type ZalacznikOsi = {
 
 export type WpisOsi = {
   id: string;
-  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  /* `odeslanie_zadania` (0.352.0) — odpowiedź hali BEZ wyniku. Musi tu stać
+     jawnie: nieznany rodzaj wpada w `Os.tsx` do gałęzi domyślnej, czyli
+     rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
+     zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
+    | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string;
   odKlienta: boolean;
   tresc: string;

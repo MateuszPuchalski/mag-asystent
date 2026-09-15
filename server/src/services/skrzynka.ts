@@ -701,18 +701,32 @@ export function osRozmowy(id: number): {
      w rodzaju wpisu, a nie w tym, czy wpis w ogóle jest. Przed tą wersją hala
      nie miała jak odpowiedzieć „nie da się", więc oś kończyła się zleceniem
      i rozmowa czekała na pomiar, którego nikt nie robił. */
+  /* Czytamy z KSIĘGI ZDARZEŃ, nie ze stanu zadania. Pierwsza wersja tej
+     zmiany brała wiersze `WHERE status='odeslane'` — i wtedy ponowienie
+     zadania przez biuro kasowało odesłanie z osi rozmowy, bo status wracał na
+     `nowe`. Oś jest historią: „hala odesłała, biuro ponowiło" to dwa fakty,
+     a nie jeden stan. Ta sama droga co przy zmianach statusu i sprawach. */
   const odeslane = db().prepare(`
-    SELECT id, powod_kod, powod, odeslano_at, odeslano_przez FROM zadanie_terenowe
-     WHERE conversation_id=? AND status='odeslane' ORDER BY odeslano_at
+    SELECT e.id, e.payload, e.created_at, z.odeslano_przez
+      FROM conversation_event e
+      LEFT JOIN zadanie_terenowe z
+        ON z.id = CAST(json_extract(e.payload,'$.taskId') AS INTEGER)
+     WHERE e.conversation_id=? AND e.event_type='field_task_returned' ORDER BY e.id
   `).all(id) as Array<Record<string, unknown>>;
-  for (const z of odeslane) {
+  for (const w of odeslane) {
+    const p = JSON.parse(String(w.payload ?? "{}")) as
+      { taskId?: number; reasonCode?: string; reason?: string | null };
+    const z = {
+      id: p.taskId ?? 0, powod_kod: p.reasonCode ?? "", powod: p.reason ?? null,
+      odeslano_at: w.created_at, odeslano_przez: w.odeslano_przez,
+    };
     const kod = String(z.powod_kod ?? "");
     /* Zdanie po polsku składa SERWER, bo oś czyta je także eksport do PDF-u
        i podpowiedź w kolejce — a te nie mają słownika panelu pod ręką.
        Sam kod jedzie osobnym polem dla tych, którzy chcą go rozstrzygnąć. */
     const nazwa = kod === "brak_towaru" ? "brak towaru" : "nie da się wykonać";
     os.push({
-      id: `odeslanie-${z.id}`, rodzaj: "odeslanie_zadania",
+      id: `odeslanie-${w.id}`, rodzaj: "odeslanie_zadania",
       autor: String(z.odeslano_przez ?? "magazyn"), odKlienta: false,
       tresc: z.powod ? `${nazwa}: ${String(z.powod)}` : nazwa,
       at: String(z.odeslano_at), ofertaId: null, zadanieId: Number(z.id),

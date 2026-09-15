@@ -1,6 +1,6 @@
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { dopiszZdarzenieOdeslania, dopiszZdarzenieWyniku } from "./conversations.js";
+import { dopiszZdarzenieOdeslania, dopiszZdarzenieWyniku, ustawStatus } from "./conversations.js";
 
 export type RodzajZadania = "pomiar" | "zdjecie" | "weryfikacja" | "inne";
 export type PriorytetZadania = "normalny" | "pilny";
@@ -155,5 +155,12 @@ export function ponowZadanie(id:number,instrukcja:string|undefined,autor:{id:num
  const nowa=instrukcja===undefined?null:tekst(instrukcja,"Instrukcja",2000);
  const r=db().prepare(`UPDATE zadanie_terenowe SET status='nowe',przypisano_at=NULL,przypisano_przez=NULL,przypisano_user_id=NULL,odeslano_at=NULL,odeslano_przez=NULL,odeslano_user_id=NULL,powod_kod=NULL,powod=NULL,instrukcja=COALESCE(?,instrukcja) WHERE id=? AND status='odeslane'`).run(nowa,id);
  if(!r.changes){const z=zadanie(id);if(!z)throw new Error("Nie znaleziono zadania");throw new Error("Ponowić można wyłącznie zadanie odesłane przez halę");}
- const z=zadanie(id)!;logEvent("zadanie_terenowe_ponowione",autor.name,z.twId,{zadanieId:id});return z;
+ const z=zadanie(id)!;
+ /* Rozmowa ZNOWU czeka na halę — symetrycznie do `zlecPomiar` (0.159.0).
+    Bez tego odesłanie zdejmowało `waiting_for_internal` (słusznie: hala
+    odpowiedziała), a ponowienie zostawiało rozmowę jako `open`, czyli
+    z ruchem po stronie agenta — który nie ma co napisać, bo czeka na pomiar. */
+ const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
+ if(rozmowa?.conversation_id!=null)ustawStatus(db(),rozmowa.conversation_id,"waiting_for_internal",autor.id,null);
+ logEvent("zadanie_terenowe_ponowione",autor.name,z.twId,{zadanieId:id});return z;
 }

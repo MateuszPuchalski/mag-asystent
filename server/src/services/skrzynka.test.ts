@@ -20,6 +20,7 @@ let ustawPriorytet: typeof import("./conversations.js").ustawPriorytet;
 let wezZadanie: typeof import("./zadania-terenowe.js").wezZadanie;
 let wykonajZadanie: typeof import("./zadania-terenowe.js").wykonajZadanie;
 let odeslijZadanie: typeof import("./zadania-terenowe.js").odeslijZadanie;
+let ponowZadanie: typeof import("./zadania-terenowe.js").ponowZadanie;
 
 const BIURO = { id: 0, name: "Biuro" };
 let rozmowaId = 0;
@@ -30,7 +31,7 @@ before(async () => {
   ({ listaRozmow, osRozmowy, zlecPomiar, stanSkrzynki, stanKolejkiWysylek } =
     await import("./skrzynka.js"));
   ({ przejmijRozmowe, wskazKartoteke, ustawPriorytet, zapiszWiadomosc } = await import("./conversations.js"));
-  ({ wezZadanie, wykonajZadanie, odeslijZadanie } = await import("./zadania-terenowe.js"));
+  ({ wezZadanie, wykonajZadanie, odeslijZadanie, ponowZadanie } = await import("./zadania-terenowe.js"));
   const d = db();
   BIURO.id = Number(d.prepare(
     "INSERT INTO app_user(login,name,role) VALUES ('biuro','Biuro','biuro')").run().lastInsertRowid);
@@ -1173,4 +1174,48 @@ test("odesłanie z hali staje na osi i ZDEJMUJE czekanie na wewnętrzne", () => 
   assert.equal((d.prepare(`SELECT count(*) n FROM conversation_event
     WHERE conversation_id=? AND event_type='field_task_returned'`).get(rozmowa) as
     { n: number }).n, 1);
+});
+
+/* ── Ponowienie nie kasuje historii i wraca do czekania (0.352.0) ────────────
+   Dwie usterki złapane przy przeglądzie własnego diffu, obie tej samej rodziny:
+   pierwsza wersja czytała odesłanie ze STANU zadania, a stan po ponowieniu
+   wraca na `nowe`. Oś jest historią, nie stanem.                            */
+test("po ponowieniu odesłanie ZOSTAJE na osi, a rozmowa znowu czeka na halę", () => {
+  const d = db();
+  const konto = (d.prepare("SELECT channel_account_id AS k FROM conversation WHERE id=?")
+    .get(rozmowaId) as { k: number }).k;
+  const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,status) VALUES (?,'w-ponow','Klient Y','open')`)
+    .run(konto).lastInsertRowid);
+  const wiadomosc = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-ponow','incoming','Jaki rozstaw?','2026-09-01T08:00:00.000Z')`)
+    .run(rozmowa, konto).lastInsertRowid);
+  const anna = { id: Number(d.prepare(
+    "INSERT INTO app_user(login,name,role) VALUES ('anna-p','Anna','biuro')")
+    .run().lastInsertRowid), name: "Anna" };
+  const halina = { id: Number(d.prepare(
+    "INSERT INTO app_user(login,name,role) VALUES ('halina-p','Halina','magazynier')")
+    .run().lastInsertRowid), name: "Halina" };
+
+  const zadanie = zlecPomiar(rozmowa, wiadomosc, "Zmierz rozstaw.", anna);
+  odeslijZadanie(zadanie.id, "nie_da_sie", "Część jest zabudowana.", halina);
+  ponowZadanie(zadanie.id, "Rozkręć osłonę, potem zmierz.", anna);
+
+  const { os } = osRozmowy(rozmowa);
+  /* Historia: hala odesłała. Stan: zadanie znowu czeka. Oba naraz. */
+  const wpis = os.find((w) => w.rodzaj === "odeslanie_zadania");
+  assert.ok(wpis, "ponowienie NIE MA prawa skasować odesłania z osi");
+  assert.match(wpis.tresc, /nie da się wykonać: Część jest zabudowana/);
+  assert.equal(os.find((w) => w.rodzaj === "zlecenie")!.zlecenie!.status, "nowe");
+
+  /* Rozmowa znowu czeka na halę — symetrycznie do zlecenia. Bez tego agent
+     widziałby ruch po swojej stronie, nie mając czym odpisać. */
+  assert.equal((d.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
+    { status: string }).status, "waiting_for_internal");
+
+  /* Drugie odesłanie tego samego zadania daje DRUGI wpis, nie nadpisuje
+     pierwszego — inaczej „ile razy hala to odesłała" nie miałoby źródła. */
+  odeslijZadanie(zadanie.id, "brak_towaru", null, halina);
+  assert.equal(osRozmowy(rozmowa).os.filter((w) => w.rodzaj === "odeslanie_zadania").length, 2);
 });
