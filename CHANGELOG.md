@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.336.0 — 15 września 2026
+
+**„Nie weszła do koszyka" ma wreszcie drogę wyjścia.** Zgłoszenie właściciela:
+„rozwiąż «nie weszła do koszyka» — nie wiem, gdzie to wskazać". Automat sam
+odsyłał zdaniem „wskaż skład ręcznie", a takiej drogi w panelu nie było.
+
+Automat milczy częściej, niż zakładaliśmy: odejmowanie z paragonu wymaga
+kartoteki przy KAŻDEJ pozostałej ofercie zamówienia, a mapowanie powstaje
+dopiero przy zwrocie tamtej oferty. W zamówieniu na pięć różnych rzeczy
+odmawia prawie zawsze.
+
+- **WSKAŻ SKŁAD RĘCZNIE** pod zdaniem o niewejściu (panel obsługi, zwroty).
+  Formularz wymienia wiersze paragonu, podpowiada sztuki z dokumentu i pyta
+  o liczbę na JEDEN komplet.
+- **Zapisany skład zapamiętuje się przy ofercie**, więc następny zwrot tego
+  zestawu idzie bez pytania. Poprawka zastępuje poprzedni skład w całości.
+- **Pozycja z oceną „na stan" wchodzi do koszyka od razu** — bez cofania
+  i powtarzania oceny.
+- Odmowy pilnują dokumentu MM: pusty skład, zerowa ilość, kartoteka spoza
+  kopii Subiekta i ta sama kartoteka dwa razy.
+- **[poprawka] Powód niewejścia przestaje się zestarzeć.** Zatwierdzenie
+  kartoteki i ocena unieważniały tylko kolejkę, a zdanie jedzie w szczególe:
+  pozycja miała już kartotekę, a panel dalej pisał, że jej nie ma.
+- **[poprawka] „W zamówieniu są 5 oferty"** czytało się jak usterka panelu.
+  Zdanie mówi teraz „Ofert bez kartoteki na tym dokumencie: 5".
+- Umowa tras POST zwrotów: 28 → 29.
+
 ## 0.335.0 — 14 września 2026
 
 **Składniki kompletu można zaznaczać.** Zgłoszenie właściciela: „powinno

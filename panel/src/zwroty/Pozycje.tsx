@@ -1,7 +1,7 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
-import type { DoDopisania, PozycjaZwrotu, SkladPozycji, Zwrot } from "../api/typy";
-import { usePotwierdzKartoteke, useZaznaczSkladnik, zlote } from "../api/zwroty";
+import type { DoDopisania, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
+import { usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
@@ -132,6 +132,78 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
 }
 
 /**
+ * Ręczne wskazanie składu kompletu (0.336.0).
+ *
+ * Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
+ * to wskazać". Automat sam odsyłał do tej drogi zdaniem „wskaż skład ręcznie",
+ * a drogi nie było.
+ *
+ * MATERIAŁEM SĄ WIERSZE PARAGONU, nie wyszukiwarka kartotek. Dowolna kartoteka
+ * znaczyłaby drogę, którą na dokument MM trafia towar nieobecny na żadnej
+ * sprzedaży — czyli dokładnie to, przed czym broni reguła „kartoteka
+ * z paragonu". Człowiek patrzy na paragon i w pięć sekund wie, co wchodziło
+ * w skład; automat nie wie, bo pozostałe oferty zamówienia nie mają kartotek.
+ *
+ * ILOŚĆ JEST NA JEDEN KOMPLET — tak myśli człowiek patrzący na zestaw („w
+ * środku są dwie sztuki tego") i tak stoi w tabeli. Podpowiadamy sztuki
+ * z dokumentu, bo przy jednym kupionym komplecie to ta sama liczba.
+ */
+function WskazSklad({ p, wiersze, zwrotId, onKoniec }: {
+  p: PozycjaZwrotu; wiersze: WierszDokumentu[]; zwrotId: number; onKoniec: () => void;
+}) {
+  const zapisz = useWskazSklad();
+  const [wybrane, setWybrane] = useState<Record<number, string>>({});
+
+  const przelacz = (w: WierszDokumentu) => setWybrane((s) => {
+    const kopia = { ...s };
+    if (w.twId in kopia) delete kopia[w.twId];
+    else kopia[w.twId] = String(w.naDokumencie);
+    return kopia;
+  });
+
+  const skladniki = Object.entries(wybrane)
+    .map(([twId, ile]) => ({ twId: Number(twId), naKomplet: Number(ile.replace(",", ".")) }));
+  const gotowe = skladniki.length > 0 && skladniki.every((x) => x.naKomplet > 0);
+
+  return <div className="mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs">
+    <p className="text-amber-900">
+      Zaznacz wiersze paragonu, które wchodzą w skład tej oferty, i podaj
+      sztuki <b>na jeden komplet</b>.</p>
+    {wiersze.length === 0
+      /* Bez dokumentu nie ma z czego składać — i to jest INNA usterka, ze swoją
+         własną drogą: wskazanie paragonu w kolumnie dowodów. */
+      ? <p className="mt-1 text-slate-600">
+          Ten zwrot nie ma wskazanego dokumentu sprzedaży — wskaż go w kolumnie
+          obok, wtedy będzie z czego składać.</p>
+      : <ul className="mt-1 space-y-0.5">
+          {wiersze.map((w) => (
+            <li key={w.twId} className="flex items-center gap-2">
+              <label className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-0.5
+                hover:bg-amber-100">
+                <input type="checkbox" className="h-4 w-4 accent-emerald-600"
+                  checked={w.twId in wybrane} onChange={() => przelacz(w)} />
+                <b className="font-mono">{w.symbol}</b>
+                <span className="min-w-0 flex-1 truncate text-slate-600">{w.nazwa}</span>
+                <span className="text-slate-500">na paragonie: {w.naDokumencie}</span>
+              </label>
+              {w.twId in wybrane && <input className="field h-6 w-16 text-xs"
+                aria-label={`Sztuk na komplet — ${w.symbol}`} value={wybrane[w.twId]}
+                onChange={(e) => setWybrane((s) => ({ ...s, [w.twId]: e.target.value }))} />}
+            </li>))}
+        </ul>}
+    <div className="mt-2 flex gap-2">
+      <button type="button" className="btn-primary text-xs"
+        disabled={!gotowe || zapisz.isPending}
+        onClick={() => zapisz.mutate({ pozycjaId: p.id, zwrotId, skladniki },
+          { onSuccess: onKoniec })}>
+        {zapisz.isPending ? "Zapisuję…" : "Zapisz skład"}</button>
+      <button type="button" className="btn-secondary text-xs" onClick={onKoniec}>Wróć</button>
+    </div>
+    {zapisz.error && <p className="mt-1 text-red-700">{(zapisz.error as Error).message}</p>}
+  </div>;
+}
+
+/**
  * Składniki kompletu z ptaszkami (0.335.0).
  *
  * Zgłoszenie właściciela: „powinno rozbijać na komponenty do zaznaczania,
@@ -175,7 +247,7 @@ function Skladniki({ p, sklad, zwrotId }: {
 }
 
 export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
-  doDopisania = [], bladDopisania = "", sklady = {},
+  doDopisania = [], bladDopisania = "", sklady = {}, wierszeDokumentu = [],
   onOcena, onKwota, onZglosRabat, onPotracenie, onIlosc, onDopisz, onZdejmij,
   onWszystkieNaStan, akcje }: {
   zwrot: Zwrot;
@@ -188,6 +260,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   bladDopisania?: string;
   /** Co wejdzie do koszyka za każdą pozycję (0.328.0), po identyfikatorze. */
   sklady?: Record<number, SkladPozycji>;
+  /** Wiersze paragonu — materiał do ręcznego składu kompletu (0.336.0). */
+  wierszeDokumentu?: WierszDokumentu[];
   onOcena: (pozycjaId: number, ocena: "stan" | "utylizacja" | null) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
@@ -212,6 +286,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      zwrotu"), a pozycja DOPISANA przez biuro wchodziła odznaczona i po cichu
      wypadała z kwoty — bo serwer odrzuca nadmiar, nigdy braku. Wyprowadzenie
      zaznaczenia z `zwrot.pozycje` znosi obie te drogi naraz. */
+  /* Która pozycja ma otwarty formularz składu (0.336.0). Jedna naraz: dwa
+     otwarte pytałyby o to samo w dwóch miejscach ekranu. */
+  const [skladamy, setSkladamy] = useState<number | null>(null);
   const [odznaczone, setOdznaczone] = useState<ReadonlySet<number>>(() => new Set());
   const wybrane = useMemo(
     () => zwrot.pozycje.filter((p) => !odznaczone.has(p.id)).map((p) => p.id),
@@ -382,6 +459,16 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 kartoteki na jednym paragonie. */}
             Nie weszła do koszyka — {sklady[p.id]?.powod
               ?? "bez kartoteki nie ma czego wpisać na MM"}.</p>}
+          {/* DROGA WYJŚCIA, nie samo zdanie o kłopocie (0.336.0). Zgłoszenie
+              właściciela: „nie wiem, gdzie to wskazać". Automat odsyłał do
+              ręcznej drogi, której nie było — teraz stoi tuż pod powodem,
+              czyli tam, gdzie człowiek właśnie czyta. */}
+          {p.ocena === "stan" && !p.wKoszyku && p.offerId && (skladamy === p.id
+            ? <WskazSklad p={p} wiersze={wierszeDokumentu} zwrotId={zwrot.id}
+                onKoniec={() => setSkladamy(null)} />
+            : <button type="button" onClick={() => setSkladamy(p.id)}
+                className="mt-1 text-xs text-slate-600 underline underline-offset-2
+                  hover:text-slate-900">wskaż skład ręcznie</button>)}
           {/* KOMPLET ROZBITY NA PARAGONIE. Pokazujemy go tylko wtedy, gdy
               kartotek jest więcej niż jedna: przy zwykłym towarze wiersz
               powtarzałby nazwę stojącą linijkę wyżej. */}

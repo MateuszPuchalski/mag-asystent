@@ -2836,6 +2836,36 @@ starej zawartości traci ważność, tak samo jak przy przeliczeniu kosza.
 Ptaszki pokazują się dopiero wtedy, gdy pozycja leży w koszyku. Wcześniej skład
 jest planem i wiersz mówi tylko, co do koszyka wejdzie.
 
+**Skład wolno wskazać ręką (0.336.0).** Zgłoszenie właściciela: „rozwiąż «nie
+weszła do koszyka» — nie wiem, gdzie to wskazać". Automat sam odsyłał do
+ręcznej drogi zdaniem „wskaż skład ręcznie", a drogi nie było: kolumna
+`zrodlo='biuro'` stała w schemacie od 0.328.0 i nie miał jej kto wypełnić.
+
+**Automat milczy częściej, niż się wydawało.** Odejmowanie z paragonu wymaga,
+żeby KAŻDA POZOSTAŁA oferta zamówienia miała kartotekę. Mapowanie ofert
+wypełnia się dopiero przy zwrocie danej oferty, więc w zamówieniu na pięć
+różnych rzeczy automat prawie zawsze odmawia. Nie dlatego, że dane są złe —
+nie ma ich skąd wziąć. Człowiek patrzy na paragon i wie w pięć sekund.
+
+Pod zdaniem o niewejściu stoi teraz przycisk WSKAŻ SKŁAD RĘCZNIE, czyli w tym
+samym miejscu, w którym człowiek właśnie czyta o kłopocie. Formularz wymienia
+wiersze paragonu z polami zaznaczenia; sztuki podpowiada z dokumentu i pyta
+o liczbę NA JEDEN KOMPLET, bo tak myśli człowiek patrzący na zestaw.
+
+Materiałem są wiersze paragonu, nie wyszukiwarka kartotek. Dowolna kartoteka
+znaczyłaby drogę, którą na dokument MM trafia towar nieobecny na żadnej
+sprzedaży. Zapisany skład zapamiętuje się przy ofercie, więc następny zwrot
+tego zestawu idzie bez pytania, a poprawka ZASTĘPUJE poprzedni skład.
+
+Pozycja z oceną „na stan" wchodzi do koszyka od razu po zapisie. Kazanie
+operatorowi cofnąć ocenę i postawić ją drugi raz byłoby pytaniem o to, co już
+powiedział.
+
+**[poprawka] Powód niewejścia przestaje się zestarzeć.** Zdanie „nie weszła do
+koszyka" jedzie w szczególe zwrotu, a zatwierdzenie kartoteki i ocena
+unieważniały wyłącznie kolejkę. Pozycja miała już kartotekę, a panel dalej
+pisał, że jej nie ma — tak wyglądał pierwszy zrzut od właściciela.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

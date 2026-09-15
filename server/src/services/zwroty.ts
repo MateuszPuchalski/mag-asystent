@@ -14,6 +14,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
   from "./kosze-zwrotow.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
+import { zapiszSkladRecznie, type SkladPozycji } from "./komplety.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
@@ -1161,6 +1162,36 @@ export function ocenPozycje(
       : dolozDoKosza(database, pozycjaId, kto, teraz,
         ocena === "utylizacja" ? "odpad" : "zwroty");
     return { wersja: wersja + 1, koszyk };
+  })();
+}
+
+/**
+ * Skład kompletu wskazany ręką biura, z dołożeniem do koszyka (0.336.0).
+ *
+ * Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
+ * to wskazać". Zapis samego składu nie kończy sprawy: pozycja ma już ocenę
+ * „na stan", tylko odbiła się od braku rozbicia. Kazanie operatorowi cofnąć
+ * ocenę i postawić ją drugi raz byłoby pytaniem o to, co już powiedział.
+ *
+ * DOKŁADAMY WYŁĄCZNIE PRZY OCENIE „NA STAN". Pozycja bez oceny albo do
+ * utylizacji nie ma czego szukać na regale zwrotów — skład zapisuje się
+ * mimo to, bo jest faktem o ofercie, nie o tym jednym zwrocie.
+ */
+export function wskazSklad(
+  database: Db, pozycjaId: number,
+  skladniki: Array<{ twId: number; naKomplet: number }>,
+  kto: { id: number; name: string }, teraz = new Date(),
+): { sklad: SkladPozycji; koszyk: number | null } {
+  return transaction(database, () => {
+    const sklad = zapiszSkladRecznie(database, pozycjaId, skladniki, kto, teraz);
+    const p = database.prepare(
+      "SELECT zwrot_id, ocena FROM zwrot_klienta_pozycja WHERE id=?").get(pozycjaId) as
+      { zwrot_id: number; ocena: string | null };
+    zdarzenie(database, Number(p.zwrot_id), "sklad_wskazany",
+      `skład kompletu wskazany ręcznie — kartotek: ${sklad.skladniki.length}`,
+      { pozycjaId, kartotek: sklad.skladniki.length }, kto, teraz.toISOString());
+    const koszyk = p.ocena === "stan" ? dolozDoKosza(database, pozycjaId, kto, teraz) : null;
+    return { sklad, koszyk };
   })();
 }
 

@@ -211,8 +211,10 @@ function zKompletu(
   }
 
   if (bezKartoteki.length > 1) {
+    /* Bez odmiany przez przypadki: „są 5 oferty" czytało się jak usterka
+       panelu, a to zdanie ma wysłać człowieka do roboty, nie do zgłoszenia. */
     return PUSTY(
-      `W zamówieniu są ${bezKartoteki.length} oferty bez kartoteki na tym dokumencie — ` +
+      `Ofert bez kartoteki na tym dokumencie: ${bezKartoteki.length} — ` +
       "nie umiem rozdzielić wierszy paragonu; wskaż skład ręcznie");
   }
   if (zostalo.size === 0) {
@@ -262,4 +264,101 @@ export function zapamietajSklad(
   }
   logEvent("oferta_komplet_ustalony", kto.name, null,
     { offerId, kartotek: skladniki.length, zrodlo }, kto.id, database);
+}
+
+/* ── Skład wskazany ręką biura (0.336.0) ─────────────────────────────────────
+   Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
+   to wskazać". Automat sam odsyłał do ręcznej drogi („wskaż skład ręcznie"),
+   której nigdy nie zbudowano: kolumna `zrodlo='biuro'` stała w schemacie od
+   0.328.0 i nie miał jej kto wypełnić.
+
+   Odejmowanie z paragonu wymaga, żeby KAŻDA POZOSTAŁA oferta zamówienia miała
+   kartotekę. `oferta_kartoteka` wypełnia się dopiero przy zwrocie tej oferty,
+   więc w zamówieniu na pięć różnych rzeczy automat prawie zawsze milczy — nie
+   dlatego, że dane są złe, tylko dlatego, że nie ma ich skąd wziąć. Człowiek
+   patrzy wtedy na paragon i wie w pięć sekund, co wchodziło w skład.         */
+
+/** Wiersz dokumentu sprzedaży — materiał, z którego biuro składa komplet. */
+export interface WierszDokumentu {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  /** Sztuki na CAŁYM dokumencie, czyli na całe zamówienie. */
+  naDokumencie: number;
+}
+
+/**
+ * Wiersze dokumentu wskazanego przy zwrocie — pusto, gdy dokumentu nie ma.
+ *
+ * PARAGON, A NIE WYSZUKIWARKA KARTOTEK, i to jest decyzja. Pozwolenie na
+ * dowolną kartotekę znaczyłoby drogę, którą na dokument MM trafia towar
+ * nieobecny na żadnej sprzedaży — czyli dokładnie to, przed czym broni się
+ * reguła „kartoteka z paragonu".
+ */
+export function wierszeDokumentuZwrotu(database: Db, zwrotId: number): WierszDokumentu[] {
+  const z = database.prepare("SELECT faktura_dok_id FROM zwrot_klienta WHERE id=?")
+    .get(zwrotId) as { faktura_dok_id: number | null } | undefined;
+  if (!z?.faktura_dok_id) return [];
+  return [...pozycjeDokumentu(database, Number(z.faktura_dok_id)).entries()]
+    .map(([twId, ilosc]) => ({ twId, ...kartoteka(database, twId), naDokumencie: ilosc }))
+    .sort((a, b) => a.symbol.localeCompare(b.symbol, "pl"));
+}
+
+/**
+ * Zapisuje skład kompletu wskazany przez człowieka.
+ *
+ * ILOŚĆ NA JEDEN KOMPLET, nie na zwrot. Tak stoi w tabeli i tak myśli
+ * człowiek patrzący na zestaw: „w środku są dwie sztuki tego". Przeliczenie
+ * na zwracane sztuki robi `skladPozycji`, ten sam kod co przy paragonie.
+ *
+ * KASUJEMY POPRZEDNI SKŁAD tej oferty przed zapisem. Sam `zapamietajSklad`
+ * nadpisuje wiersz po wierszu, więc bez kasowania nie dałoby się USUNĄĆ
+ * składnika wpisanego przez pomyłkę — a pomyłka w składzie kładzie na MM
+ * towar, którego nikt nie zwrócił.
+ */
+export function zapiszSkladRecznie(
+  database: Db, pozycjaId: number,
+  skladniki: Array<{ twId: number; naKomplet: number }>,
+  kto: { id: number; name: string }, teraz = new Date(),
+): SkladPozycji {
+  const p = database.prepare(
+    `SELECT p.offer_id, z.channel_account_id
+       FROM zwrot_klienta_pozycja p
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id
+      WHERE p.id=?`).get(pozycjaId) as
+    { offer_id: string | null; channel_account_id: number } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu.");
+  /* Skład pamięta się PRZY OFERCIE — bez jej identyfikatora nie ma gdzie go
+     powiesić ani jak odnaleźć przy następnym zwrocie tego samego zestawu. */
+  if (!p.offer_id) throw new Error("Ta pozycja nie ma oferty — składu nie ma przy czym zapamiętać.");
+  if (!skladniki.length) throw new Error("Pusty skład nic nie znaczy — wskaż choć jedną kartotekę.");
+
+  const czysty = skladniki.map((s) => {
+    const twId = Number(s.twId);
+    const ile = Number(s.naKomplet);
+    if (!Number.isFinite(twId) || twId <= 0) throw new Error("Zły numer kartoteki w składzie.");
+    if (!Number.isFinite(ile) || ile <= 0) {
+      throw new Error("Ilość w komplecie musi być większa od zera — zerowy składnik to brak składnika.");
+    }
+    const t = database.prepare("SELECT symbol, nazwa FROM sgt_towar WHERE tw_id=?").get(twId) as
+      { symbol: string; nazwa: string } | undefined;
+    /* Kartoteka spoza kopii Subiekta nie ma prawa wejść na dokument MM:
+       Sfera odrzuciłaby go dopiero w workerze, po odejściu operatora. */
+    if (!t) throw new Error(`Kartoteki ${twId} nie ma w kopii Subiekta.`);
+    return { twId, symbol: t.symbol, nazwa: t.nazwa, ilosc: ile };
+  });
+  /* Ta sama kartoteka dwa razy to podwojone sztuki na MM. Klucz tabeli by je
+     scalił po cichu, biorąc ostatnią — cisza jest tu gorsza od odmowy. */
+  if (new Set(czysty.map((s) => s.twId)).size !== czysty.length) {
+    throw new Error("Ta sama kartoteka wpisana dwa razy — zsumuj ją w jednym wierszu.");
+  }
+
+  /* TRANSAKCJĘ TRZYMA WOŁAJĄCY (`wskazSklad`) — tak jak `dolozDoKosza`
+     i `zapamietajSklad` obok. Własna wywracałaby się na zagnieżdżeniu:
+     `node:sqlite` nie zna transakcji w transakcji. */
+  database.prepare("DELETE FROM oferta_komplet WHERE channel_account_id=? AND offer_id=?")
+    .run(Number(p.channel_account_id), p.offer_id);
+  zapamietajSklad(database, Number(p.channel_account_id), p.offer_id, czysty,
+    (s) => s.ilosc, "biuro", kto, teraz);
+  return skladPozycji(database, pozycjaId);
 }

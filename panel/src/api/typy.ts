@@ -975,6 +975,15 @@ export interface FakturaZwrotu {
  * wyłącznie paragon. `skladniki` puste znaczy: NIE WEJDZIE, a `powod` mówi
  * dlaczego — zdanie pisze serwer, panel go nie układa.
  */
+/** Wiersz paragonu — materiał, z którego biuro składa komplet (0.336.0). */
+export interface WierszDokumentu {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  /** Sztuki na CAŁYM dokumencie, czyli na całe zamówienie. */
+  naDokumencie: number;
+}
+
 export interface SkladPozycji {
   /**
    * `wKoszyku` mówi, czy ten składnik NAPRAWDĘ leży dziś w koszyku (0.335.0).

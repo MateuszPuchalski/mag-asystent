@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { skladPozycji } from "./komplety.js";
+import { skladPozycji, wierszeDokumentuZwrotu } from "./komplety.js";
+import { wskazSklad } from "./zwroty.js";
 import {
   dolozDoKosza, przeliczKosz, skladDoZaznaczenia, wypuscGotoweKoszyki, zamknijKosz,
   zaznaczSkladnik, zdejmijZKosza,
@@ -81,12 +82,15 @@ function mapuj(d: Db, offerId: string, twId: number) {
 }
 
 /** Zwrot z pozycjami; `twId` null = oferta bez kartoteki, czyli komplet. */
+let kolejnyZwrot = 0;
 function zwrot(d: Db, dokId: number | null,
   pozycje: Array<{ offerId: string; twId: number | null; ilosc: number; zwrocona?: number }>) {
+  /* Własny numer na każdy zwrot: jeden test bada DWA zwroty tego samego
+     zamówienia, a `external_id` jest unikalny w obrębie konta. */
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,order_id,created_at,synced_at,faktura_dok_id)
-    VALUES (1,'zw-1','ord-1','2026-09-02T08:00:00Z','2026-09-02T08:00:00Z',?)`)
-    .run(dokId).lastInsertRowid);
+    VALUES (1,?,'ord-1','2026-09-02T08:00:00Z','2026-09-02T08:00:00Z',?)`)
+    .run(`zw-${++kolejnyZwrot}`, dokId).lastInsertRowid);
   const poz = pozycje.map((p, i) => {
     if (p.twId != null) towar(d, p.twId);
     return Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
@@ -451,4 +455,110 @@ test("koszyk starszy niż dzisiejsze reguły też ma swoje ptaszki", () => {
   /* I da się go odznaczyć — inaczej zostałby na papierze na zawsze. */
   zaznaczSkladnik(d, pozycjaId, 99, false, kto);
   assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+});
+
+/* ── Skład wskazany ręką biura (0.336.0) ─────────────────────────────────────
+   Zgłoszenie właściciela: „rozwiąż «nie weszła do koszyka» — nie wiem, gdzie
+   to wskazać". Automat odsyłał do ręcznej drogi zdaniem „wskaż skład ręcznie",
+   a drogi nie było: kolumna `zrodlo='biuro'` stała w schemacie od 0.328.0
+   i nie miał jej kto wypełnić.                                              */
+
+test("biuro wskazuje skład i pozycja WCHODZI do koszyka bez powtarzania oceny", () => {
+  /* Pozycja ma już ocenę „na stan" — odbiła się wyłącznie od braku rozbicia.
+     Kazanie operatorowi cofnąć ocenę i postawić ją drugi raz byłoby pytaniem
+     o to, co już powiedział. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 930, [[21, 1], [22, 2]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }, { offerId: "of-A", ilosc: 1 },
+    { offerId: "of-B", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  /* Trzy oferty bez kartoteki — automat MILCZY i odsyła do człowieka. */
+  assert.match(String(skladPozycji(d, poz[0]).powod), /wskaż skład ręcznie/);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='stan' WHERE id=?").run(poz[0]);
+
+  const w = wskazSklad(d, poz[0], [{ twId: 21, naKomplet: 1 }, { twId: 22, naKomplet: 2 }], kto);
+  assert.equal(w.sklad.zrodlo, "biuro", "wynik automatu nie udaje decyzji człowieka");
+  assert.deepEqual(w.sklad.skladniki.map((s) => [s.twId, s.ilosc]), [[21, 1], [22, 2]]);
+  assert.notEqual(w.koszyk, null, "pozycja wchodzi do koszyka od razu");
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE zwrot_pozycja_id=?")
+    .get(poz[0]) as { n: number }).n, 2);
+});
+
+test("ilość jest NA KOMPLET, więc dwa zwracane komplety dają dwa razy tyle", () => {
+  /* Tak stoi w tabeli i tak myśli człowiek patrzący na zestaw: „w środku są
+     dwie sztuki tego". Przeliczenie na zwracane sztuki robi `skladPozycji`. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 931, [[21, 4]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 2 }, { offerId: "of-A", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 2 }]);
+
+  const w = wskazSklad(d, poz[0], [{ twId: 21, naKomplet: 2 }], kto);
+  assert.deepEqual(w.sklad.skladniki.map((s) => s.ilosc), [4], "2 sztuki × 2 komplety");
+});
+
+test("poprawiony skład ZASTĘPUJE poprzedni, a nie dokłada się do niego", () => {
+  /* Bez kasowania nie dałoby się USUNĄĆ składnika wpisanego przez pomyłkę —
+     a pomyłka w składzie kładzie na MM towar, którego nikt nie zwrócił. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 932, [[21, 1], [22, 1], [23, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }, { offerId: "of-A", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  wskazSklad(d, poz[0], [{ twId: 21, naKomplet: 1 }, { twId: 99, naKomplet: 1 }].slice(0, 1), kto);
+  const w = wskazSklad(d, poz[0], [{ twId: 22, naKomplet: 1 }], kto);
+  assert.deepEqual(w.sklad.skladniki.map((s) => s.twId), [22], "stary składnik znika");
+});
+
+test("wskazany skład obowiązuje przy NASTĘPNYM zwrocie tej oferty", () => {
+  /* Inaczej ten sam zestaw trzeba by składać ręcznie za każdym razem —
+     a właśnie temu służy pamięć przy ofercie. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 933, [[21, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }, { offerId: "of-A", ilosc: 1 }]);
+  const pierwszy = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  wskazSklad(d, pierwszy.poz[0], [{ twId: 21, naKomplet: 3 }], kto);
+
+  d.prepare("DELETE FROM zwrot_klienta_pozycja").run();
+  d.prepare("DELETE FROM zwrot_klienta").run();
+  const drugi = zwrot(d, null, [{ offerId: "of-KPL", twId: null, ilosc: 2 }]);
+  const s = skladPozycji(d, drugi.poz[0]);
+  assert.equal(s.zrodlo, "biuro");
+  assert.deepEqual(s.skladniki.map((x) => [x.twId, x.ilosc]), [[21, 6]]);
+});
+
+test("skład ODMAWIA tego, co wywróciłoby dokument MM", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const dok = paragon(d, 934, [[21, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }, { offerId: "of-A", ilosc: 1 }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  assert.throws(() => wskazSklad(d, poz[0], [], kto), /choć jedną kartotekę/);
+  assert.throws(() => wskazSklad(d, poz[0], [{ twId: 21, naKomplet: 0 }], kto), /większa od zera/);
+  /* Kartoteka spoza kopii Subiekta: Sfera odrzuciłaby dokument dopiero
+     w workerze, czyli po odejściu operatora od biurka. */
+  assert.throws(() => wskazSklad(d, poz[0], [{ twId: 4242, naKomplet: 1 }], kto),
+    /nie ma w kopii Subiekta/);
+  /* Ta sama kartoteka dwa razy: klucz tabeli scaliłby ją po cichu, biorąc
+     ostatnią wartość — cisza jest tu gorsza od odmowy. */
+  assert.throws(() => wskazSklad(d, poz[0],
+    [{ twId: 21, naKomplet: 1 }, { twId: 21, naKomplet: 2 }], kto), /dwa razy/);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM oferta_komplet").get() as { n: number }).n, 0);
+});
+
+test("wiersze dokumentu to MATERIAŁ dla człowieka, a bez dokumentu jest pusto", () => {
+  /* Paragon, a nie wyszukiwarka kartotek: dowolna kartoteka znaczyłaby drogę,
+     którą na MM trafia towar nieobecny na żadnej sprzedaży. */
+  const d = stanowisko();
+  const dok = paragon(d, 935, [[22, 2], [21, 1]]);
+  const { id } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  assert.deepEqual(wierszeDokumentuZwrotu(d, id).map((w) => [w.symbol, w.naDokumencie]),
+    [["SYM-21", 1], ["SYM-22", 2]], "po symbolu, bo tak czyta się paragon");
+
+  const bezDok = zwrot(d, null, [{ offerId: "of-X", twId: null, ilosc: 1 }]);
+  assert.deepEqual(wierszeDokumentuZwrotu(d, bezDok.id), []);
 });

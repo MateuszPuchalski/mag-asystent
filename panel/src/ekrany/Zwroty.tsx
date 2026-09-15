@@ -751,6 +751,7 @@ export function Zwroty() {
                 }}
                 doDopisania={szczegol.data?.doDopisania ?? []}
                 sklady={szczegol.data?.sklady ?? {}}
+                wierszeDokumentu={szczegol.data?.wierszeDokumentu ?? []}
                 bladDopisania={bladDopisania}
                 onDopisz={(zamPozycjaId) => {
                   setBladDopisania("");
