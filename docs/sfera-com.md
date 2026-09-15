@@ -410,13 +410,19 @@ czyta jako ZW (`DOK_TYPY_KOREKT`). Numer ZW wróci więc do zwrotu sam.
 i `DoDokumentuNumerPelny`, a datę sprzedaży bierze z PA. Faktura z 2016 roku
 odpadła zdaniem „Nie można wystawić korekty do dokumentu".
 
-**Pozycje przychodzą z paragonu, z jego ilością.** Jedna pozycja PA dała jedną
-pozycję ZW. Pozycja niesie `DokHanLp`, czyli numer wiersza paragonu. Po nim
-worker dopasuje zwracaną sztukę bez zgadywania po `TowarId`. Biuro zeruje
-w oknie ZW produkty, które nie wróciły — worker zrobi to samo.
+**Pozycje przychodzą z paragonu — tylko te, które jeszcze nie wróciły.** Pierwszy
+paragon dał jedną pozycję z pełną ilością. PA 12102/MAG/07/2026 miał już ZW 772
+na produkt. Drugi szkic do niego dostał wyłącznie przesyłkę. Biuro zeruje w oknie
+ZW produkty, które nie wróciły — worker zrobi to samo.
 
-**Płatność przychodzi z paragonu.** `PlatnoscPrzelewKwota` równa się wartości
-dokumentu — to „Zapłacono przelewem 100%" z okna ZW.
+**`DokHanLp` to numer wiersza na ZW, nie na paragonie.** W ręcznym ZW 772
+przesyłka ma `DokHanLp = 2`, a w drugim szkicu do tego samego paragonu `1`.
+Worker dopasowuje więc pozycje po `TowarId`, tak jak przy KFS.
+
+**Przelew dostaje kwotę całego paragonu, nie ZW.** Przy paragonie z jedną pozycją
+to ta sama liczba (79,50 zł). Drugi szkic do PA 12102 miał wartość 10,49 zł,
+a `PlatnoscPrzelewKwota` 17,83 zł — sumę obu wierszy paragonu. Worker ustawia
+więc przelew sam, równy `WartoscBrutto` ZW.
 
 **„Zwrot ze sprzedaży" to `RodzajZwrotuDetal = 1`.** Szkic ma tam 0, a ZW
 772/MAG/07/2026 wystawiony ręcznie przez biuro ma 1. Odczytała to sonda
@@ -424,11 +430,11 @@ dokumentu — to „Zapłacono przelewem 100%" z okna ZW.
 
 **Wyzerowana pozycja zostaje na ZW.** Ten sam ręczny ZW do paragonu z dwiema
 pozycjami ma dwa wiersze: pierwszy z `IloscJm = 1`, drugi z `IloscJm = 0`.
-Każdy niesie `DokHanLp` wiersza paragonu. Worker zeruje wiersze, nie usuwa ich.
+Worker zeruje wiersze, nie usuwa ich.
 
-**Przelew równa się wartości po zerach.** Na tym ZW `PlatnoscPrzelewKwota`
-i `WartoscBrutto` to po 7,34 zł. Stan końcowy jest więc znany; nie wiadomo,
-czy Subiekt liczy go sam, czy biuro poprawia kwotę ręką.
+**Na zapisanym ZW przelew równa się wartości po zerach.** Na ZW 772
+`PlatnoscPrzelewKwota` i `WartoscBrutto` to po 7,34 zł. Szkic dostaje kwotę
+całego paragonu, więc różnicę poprawia okno ZW albo biuro ręką.
 
 **`NaPodstawie` odmawia dla WZ.** Komunikat brzmi „Nie można wystawić korekty
 do dokumentu WZ…". Paragonem jest wyłącznie `dok_Typ = 21`.
@@ -447,11 +453,18 @@ zwrotu — biuro może mieć paragon otwarty.
 Czy zapisany dokument zostaje przez to zablokowany dla biura, pokaże pierwsze
 MM na produkcji.
 
-`[WERYFIKUJ]` Czy po `IloscJm = 0` wartość i przelew przeliczają się same.
-Zamyka to `-SzkicZW -Ilosci` na paragonie z kilkoma pozycjami.
+`[WERYFIKUJ]` Czy po `IloscJm = 0` wartość ZW przelicza się sama. Przelew nie
+idzie za wartością nawet bez zer — patrz wyżej. Zamyka to `-SzkicZW -Ilosci`
+na paragonie z kilkoma pozycjami, bez wcześniejszego ZW.
 
-`[WERYFIKUJ]` Jakie ilości daje `NaPodstawie` dla paragonu, który ma już ZW.
-To przypadek klienta, który odsyła zamówienie w dwóch paczkach.
+**Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
+z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
+
+**Przesyłka na ZW idzie za polem „Koszt dostawy" w panelu zwrotów** (decyzja
+właściciela, 15 września 2026). Odznaczone pole daje `kwota_dostawa_grosze`
+równe null i zero na wierszu przesyłki. Zaznaczone zostawia go z ilością 1 —
+tak jak `delivery` w zwrocie pieniędzy Allegro. Jedno pole steruje więc
+i przelewem klienta, i dokumentem.
 
 ## 3. Czego z publicznych źródeł ustalić się nie da
 

@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.5 — 15 września 2026
+
+**Drugi ZW do tego samego paragonu i poprawka o `DokHanLp`.** Sonda `-SzkicZW`
+na PA 12102/MAG/07/2026, który ma już ZW 772 (`docs/sfera-com.md` §2m).
+
+- **`NaPodstawie` daje tylko pozycje, które jeszcze nie wróciły.** Drugi szkic
+  dostał samą przesyłkę — produkt z ZW 772 w nim nie wystąpił.
+- **Przelew dostaje kwotę całego paragonu, nie ZW** (17,83 zł przy wartości
+  10,49 zł). Automat ustawia przelew sam.
+- **Poprawka do 0.348.4: `DokHanLp` to numer wiersza na ZW, nie na paragonie.**
+  Automat dopasowuje pozycje po `TowarId`, tak jak przy KFS.
+- **Paragon z Allegro ma wiersz „PRZESYŁKA".** Decyzja właściciela: automat
+  zeruje go, gdy w panelu zwrotów odznaczono „Koszt dostawy", a zostawia przy
+  zaznaczonym — tak jak `delivery` w zwrocie pieniędzy Allegro.
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.4 — 15 września 2026
 
 **Wzór ZW odczytany: rodzaj zwrotu i wyzerowane pozycje.** Sonda `-WzorZW`
