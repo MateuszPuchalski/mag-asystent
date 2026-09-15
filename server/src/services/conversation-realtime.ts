@@ -4,7 +4,11 @@ export type ConversationEventType =
   | "presence"
   | "message.created"
   | "assignment.changed"
-  | "warehouse.result";
+  | "warehouse.result"
+  /* Odesłanie zadania z hali (0.352.0). OSOBNY typ, nie `warehouse.result`
+     z pustym wynikiem: panel ma pokazać brak odpowiedzi jako brak, a nie jako
+     wynik, którego nikt nie zmierzył. */
+  | "warehouse.returned";
 
 export interface ConversationRealtimeEvent {
   id: number;

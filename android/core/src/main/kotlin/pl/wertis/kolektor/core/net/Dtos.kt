@@ -1152,9 +1152,24 @@ data class ZadanieTerenowe(
     val utworzonoPrzez: String,
     val przypisanoPrzez: String? = null,
     val przypisanoUserId: Long? = null,
+    // Odesłanie do biura (0.352.0). Domyślne `null` jest tu ważniejsze niż
+    // zwykle: kolektor ze starszym APK dostaje te pola od nowego serwera
+    // i ma je zignorować, a nie wywrócić się na deserializacji.
+    val odeslanoPrzez: String? = null,
+    val powodKod: String? = null,
+    val powod: String? = null,
     val wynik: String? = null,
     val wykonanoPrzez: String? = null,
 )
 @Serializable data class ZadaniaTerenoweResponse(val zadania: List<ZadanieTerenowe> = emptyList())
 @Serializable data class ZadanieTerenoweResponse(val zadanie: ZadanieTerenowe)
 @Serializable data class WynikZadaniaBody(val wynik: String)
+
+/**
+ * Odesłanie zadania do biura (0.352.0).
+ *
+ * `powod` jest opcjonalny, bo kod niesie już całą decyzję. Wymóg pisania
+ * stałby dokładnie tam, gdzie dekalog ergonomii każe go nie stawiać: kciuk
+ * w rękawicy, klawiatura ekranowa i człowiek stojący przed pustą półką.
+ */
+@Serializable data class OdeslijZadanieBody(val powodKod: String, val powod: String? = null)

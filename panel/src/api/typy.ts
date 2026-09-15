@@ -713,9 +713,14 @@ export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   lokalizacja: string | null; priorytet: "normalny" | "pilny";
-  status: "nowe" | "w_toku" | "wykonane" | "anulowane";
+  /* `odeslane` (0.352.0): hala odpowiedziała, ale bez wyniku. Ruch wraca do
+     biura, a nie do magazynu — dlatego to osobny status, nie `anulowane`
+     (anuluje zlecający) ani `wykonane` (to byłby pomiar, którego nie ma). */
+  status: "nowe" | "w_toku" | "wykonane" | "anulowane" | "odeslane";
   utworzonoAt: string; utworzonoPrzez: string; przypisanoPrzez: string | null;
   wynik: string | null; wykonanoPrzez: string | null;
+  odeslanoAt: string | null; odeslanoPrzez: string | null;
+  powodKod: "brak_towaru" | "nie_da_sie" | null; powod: string | null;
 };
 
 export type StatusSynchronizacji =

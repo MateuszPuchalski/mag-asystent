@@ -34,6 +34,81 @@ historii nie przepisujemy.
 ---
 
 
+## 0.352.0 — 15 września 2026
+
+**Hala dostaje czym odpowiedzieć „nie da się".** Do 0.351.0 zadanie terenowe
+miało z magazynu JEDNO wyjście: wynik. Magazynier stojący przed pustą półką
+mógł więc tylko wpisać brak jako wynik — i zadanie szło do biura oznaczone
+jako WYKONANE — albo zostawić je w toku, gdzie nie widział go już nikt.
+Pierwsze kłamie w metryce „czas realizacji zadania magazynowego", drugie
+kłamie ciszą. Obie drogi kończyły się agentem czekającym na pomiar, którego
+nikt nie zamierzał zrobić.
+
+To nie jest nowy pomysł. Projekt panelu §13.3 wymienia „odrzuca z powodem",
+„oznacza brak towaru" i „oznacza brak możliwości wykonania" od pierwszej
+wersji tego dokumentu, a tabela stanu mówiła o zadaniach terenowych „działa
+od 0.141.0". Działała połowa: droga tam.
+
+### Odesłanie ma kod, nie wypracowanie
+
+Powód to WYBÓR Z DWÓCH — `brak_towaru` albo `nie_da_sie` — a dopisek jest
+nieobowiązkowy. Dwa kody, bo biuro reaguje na nie inaczej: przy braku towaru
+idzie do Subiekta albo do dostawcy, przy niemożliwości przeformułowuje
+zlecenie. Trzeci kod musiałby nazwać trzecią reakcję biura, a takiej nie ma —
+byłby wyłącznie kolejnym kaflem do przeczytania w rękawicy.
+
+Wymóg pisania stałby dokładnie tam, gdzie dekalog ergonomii każe go nie
+stawiać: klawiatura ekranowa nad pustą półką. Kod biuro rozstrzyga maszynowo,
+a szczegół dostaje wtedy, gdy hala ma go pod ręką.
+
+Na kolektorze ścieżka główna zostaje jednym dotknięciem. Oba wyjścia chowają
+się za jednym przyciskiem NIE MOGĘ, bo są wyjątkiem, nie regułą: cztery
+przyciski na płasko kosztowałyby uwagę przy każdym pomiarze, żeby oszczędzić
+jedno dotknięcie przy co dwudziestym.
+
+### Oddanie to nie odesłanie
+
+Osobna droga, bez werdyktu i bez powodu: zadanie wraca do puli i weźmie je
+ktokolwiek inny. Powstała, bo przejęcie przypinało zadanie do konta na zawsze.
+Magazynier, który wziął pomiar i skończył zmianę, zostawiał je poza zasięgiem
+kolektorów wszystkich pozostałych — a skasować mogło je wyłącznie biuro, o ile
+w ogóle zauważyło. Bez tej drogi „odeślij" stałoby się protezą oddania
+i zaśmieciło biuru skrzynkę powodami, które powodami nie są.
+
+### Zadanie odesłane leży po stronie biura i ma stamtąd wyjście
+
+Dwa, dokładnie: ponowienie albo anulowanie. Bez nich odesłanie byłoby nową
+ślepą uliczką, tyle że lepiej opisaną. Przy ponowieniu wolno poprawić
+instrukcję, bo najczęstszą reakcją na „nie da się" jest przeformułowanie
+zlecenia; zakładanie drugiego zadania zrywałoby powiązanie z rozmową, a razem
+z nim wynik przestałby wracać na jej oś.
+
+Ślad odesłania ZOSTAJE w księdze także po ponowieniu. Inaczej „ile razy hala
+odesłała ten sam pomiar" nie miałoby gdzie się policzyć — a to jest pytanie
+o jakość zleceń biura, nie o pracę hali.
+
+### Rozmowa przestaje czekać na pomiar, którego nie będzie
+
+Odesłanie wraca na oś rozmowy jako OSOBNY rodzaj wpisu i zdejmuje
+`waiting_for_internal`. Rozmowa czekała na halę; hala odpowiedziała. To, że
+odpowiedziała „nie mam czym", nie zmienia faktu, że czekanie się skończyło.
+Wpis nie udaje wyniku: agent ma zobaczyć, że pomiaru NIE MA, a nie pomiar
+brzmiący jak wymówka.
+
+### Przy wdrożeniu
+
+Migracja przebudowuje `zadanie_terenowe`, bo SQLite nie poszerza `CHECK`-a
+w miejscu — ta sama droga co przy `towar_identyfikator`. Zadania sprzed
+wydania przechodzą z wynikiem, powiązaniem z towarem i rozmową; test
+migracji dowodzi obu rzeczy naraz, bo najpierw pokazuje, że stara baza
+faktycznie odrzuca nowy status.
+
+Stary APK od nowego serwera dostaje trzy nieznane pola i ma je ignorować —
+`Dtos.kt` deklaruje je z wartością domyślną. Wdrożenie bez pracy ręcznej.
+
+---
+
+
 ## 0.350.2 — 15 września 2026
 
 **Przesyłka z paragonu nie wchodzi już do składu kompletu.** Na produkcji

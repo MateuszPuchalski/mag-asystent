@@ -1398,7 +1398,13 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   zrodlo TEXT NOT NULL DEFAULT 'reczne',
   zrodlo_ref TEXT,
   priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
-  status TEXT NOT NULL DEFAULT 'nowe' CHECK (status IN ('nowe','w_toku','wykonane','anulowane')),
+  -- `odeslane` (0.352.0) to PIĄTY status i jedyny, w którym zadanie wraca
+  -- z hali do biura nierozwiązane. Do 0.351.0 hala miała jedno wyjście —
+  -- wynik — więc magazynier stojący przed pustą półką albo kłamał wynikiem
+  -- („nie ma na K-12"), albo zostawiał zadanie w `w_toku` na zawsze. Oba
+  -- kłamstwa trafiały do §22 jako „czas realizacji zadania magazynowego".
+  status TEXT NOT NULL DEFAULT 'nowe'
+    CHECK (status IN ('nowe','w_toku','wykonane','anulowane','odeslane')),
   utworzono_at TEXT NOT NULL, utworzono_przez TEXT NOT NULL,
   utworzono_user_id INTEGER REFERENCES app_user(user_id),
   przypisano_at TEXT, przypisano_przez TEXT,
@@ -1406,6 +1412,15 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   wynik TEXT, wykonano_at TEXT, wykonano_przez TEXT,
   wykonano_user_id INTEGER REFERENCES app_user(user_id),
   anulowano_at TEXT, anulowano_przez TEXT,
+  -- Odesłanie z hali (0.352.0). KOD jest obowiązkowy, treść nie: kciuk
+  -- w rękawicy ma dotknąć jednego kafla, a nie pisać trzech zdań na
+  -- kolektorze (dekalog ergonomii, punkty o mniejszej liczbie interakcji).
+  -- Biuro dostaje więc zawsze powód rozstrzygalny maszynowo, a szczegół
+  -- wtedy, gdy hala ma go pod ręką.
+  odeslano_at TEXT, odeslano_przez TEXT,
+  odeslano_user_id INTEGER REFERENCES app_user(user_id),
+  powod_kod TEXT CHECK (powod_kod IS NULL OR powod_kod IN ('brak_towaru','nie_da_sie')),
+  powod TEXT,
   -- Zadanie może pochodzić z rozmowy z klientem (0.142.0). NULL znaczy
   -- „zlecone ręcznie z panelu" i tak zostaje dla wszystkiego sprzed tej
   -- wersji — migracja nie zgaduje powiązań po dacie ani po treści.

@@ -128,7 +128,11 @@ export function typPodgladu(mime: string | null | undefined): string | null {
 export interface Wzmianka { userId: number; name: string }
 
 export interface WpisOsi {
-  id: string; rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  id: string;
+  /* `odeslanie_zadania` (0.352.0) to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
+     nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
+     że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   /**
@@ -689,6 +693,29 @@ export function osRozmowy(id: number): {
       id: `zadanie-${z.id}`, rodzaj: "wynik_zadania",
       autor: String(z.wykonano_przez ?? "magazyn"), odKlienta: false,
       tresc: String(z.wynik), at: String(z.wykonano_at), ofertaId: null, zadanieId: Number(z.id),
+    });
+  }
+
+  /* ODESŁANIE Z HALI (0.352.0) — ten sam kształt co wynik, bo dla osi to ten
+     sam moment: hala odpowiedziała. Różnica jest w treści odpowiedzi, więc
+     w rodzaju wpisu, a nie w tym, czy wpis w ogóle jest. Przed tą wersją hala
+     nie miała jak odpowiedzieć „nie da się", więc oś kończyła się zleceniem
+     i rozmowa czekała na pomiar, którego nikt nie robił. */
+  const odeslane = db().prepare(`
+    SELECT id, powod_kod, powod, odeslano_at, odeslano_przez FROM zadanie_terenowe
+     WHERE conversation_id=? AND status='odeslane' ORDER BY odeslano_at
+  `).all(id) as Array<Record<string, unknown>>;
+  for (const z of odeslane) {
+    const kod = String(z.powod_kod ?? "");
+    /* Zdanie po polsku składa SERWER, bo oś czyta je także eksport do PDF-u
+       i podpowiedź w kolejce — a te nie mają słownika panelu pod ręką.
+       Sam kod jedzie osobnym polem dla tych, którzy chcą go rozstrzygnąć. */
+    const nazwa = kod === "brak_towaru" ? "brak towaru" : "nie da się wykonać";
+    os.push({
+      id: `odeslanie-${z.id}`, rodzaj: "odeslanie_zadania",
+      autor: String(z.odeslano_przez ?? "magazyn"), odKlienta: false,
+      tresc: z.powod ? `${nazwa}: ${String(z.powod)}` : nazwa,
+      at: String(z.odeslano_at), ofertaId: null, zadanieId: Number(z.id),
     });
   }
   /* KOMENTARZE WEWNĘTRZNE (0.157.0). Do tego wydania `conversation_comment`

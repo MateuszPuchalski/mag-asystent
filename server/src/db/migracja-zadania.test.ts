@@ -145,3 +145,56 @@ test("baza już naprawiona przechodzi migrację bez przebudowy", () => {
     Array<{ table: string; on_delete: string }>).find((k) => k.table === "sgt_towar");
   assert.equal(klucz?.on_delete, "SET NULL");
 });
+
+/* ── Poszerzenie CHECK-a statusu (0.352.0) ───────────────────────────────────
+   `odeslane` to piąty status, a SQLite nie umie poszerzyć `CHECK`-a w miejscu.
+   Test dowodzi OBU rzeczy naraz: że stara baza faktycznie odrzuca nowy status
+   (więc przebudowa jest konieczna, a nie ostrożnościowa) i że po migracji
+   zadanie sprzed wydania przeżywa z wynikiem i powiązaniem.                  */
+test("stara baza ODRZUCA status `odeslane` — dlatego tabela idzie do przebudowy", () => {
+  const d = bazaSprzedMigracji();
+  assert.throws(() => d.prepare("UPDATE zadanie_terenowe SET status='odeslane'").run(),
+    /CHECK constraint failed/);
+});
+
+test("po migracji hala odsyła zadanie, a stare zadania zostają nietknięte", () => {
+  const d = bazaSprzedMigracji();
+  d.exec(schema);
+  migrate(d);
+
+  d.prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,zrodlo,priorytet,status,
+    utworzono_at,utworzono_przez,odeslano_at,odeslano_przez,powod_kod,powod)
+    VALUES ('pomiar','Zmierz wałek','W mm.','panel','normalny','odeslane',
+    '2026-09-15T08:00:00.000Z','A. Lewandowska','2026-09-15T09:00:00.000Z','M. Kowal',
+    'brak_towaru','Półka pusta.')`).run();
+
+  const nowe = d.prepare(
+    "SELECT status, powod_kod, powod, odeslano_przez FROM zadanie_terenowe WHERE tytul='Zmierz wałek'")
+    .get() as Record<string, unknown>;
+  assert.equal(nowe.status, "odeslane");
+  assert.equal(nowe.powod_kod, "brak_towaru");
+  assert.equal(nowe.odeslano_przez, "M. Kowal");
+
+  /* Zadanie sprzed migracji przechodzi przez przebudowę bez straty — w tym
+     `tw_id`, bo `zadanieNieTrzymaTowaru` biegnie PRZED tą przebudową i obie
+     kopiują kolumny po nazwach. */
+  const stare = d.prepare(`SELECT tytul, wynik, wykonano_przez, tw_id, status
+    FROM zadanie_terenowe WHERE tytul='Zmierz rozstaw otworów'`).get() as Record<string, unknown>;
+  assert.equal(stare.wynik, "Rozstaw 148 mm.");
+  assert.equal(stare.wykonano_przez, "M. Kowal");
+  assert.equal(stare.tw_id, 40312);
+  assert.equal(stare.status, "wykonane");
+
+  /* Lista kodów jest zamknięta także po przebudowie. */
+  assert.throws(() => d.prepare(
+    "UPDATE zadanie_terenowe SET powod_kod='cokolwiek' WHERE tytul='Zmierz wałek'").run(),
+    /CHECK constraint failed/);
+
+  /* Indeksy giną razem z tabelą przy przebudowie; migracja ma je odtworzyć,
+     bo `schema.sql` zrobi to dopiero przy NASTĘPNYM otwarciu bazy. */
+  const indeksy = (d.prepare(
+    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='zadanie_terenowe'")
+    .all() as Array<{ name: string }>).map((i) => i.name);
+  assert.ok(indeksy.includes("ix_zadanie_terenowe_status"), indeksy.join(","));
+  assert.ok(indeksy.includes("ix_zadanie_terenowe_przypisane"), indeksy.join(","));
+});
