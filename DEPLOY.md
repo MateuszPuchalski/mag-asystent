@@ -1756,6 +1756,19 @@ SELECT id, kod, rozlozono_at, powrot_queue_id FROM kosz
 2. MM powrotne w błędzie z braku stanu ponów, gdy MM na regał wejdzie.
 3. MM powrotne już wykonane zostaw: nowe MM na regał wyrówna regał zwrotów.
 
+**Znane zwroty odświeżają się same (0.347.0).** Do 0.346.0 synchronizacja
+pobierała zwrot raz i nie wracała do niego. Zwrot rozliczony później w Allegro
+stał więc w DO DECYZJI. Od 0.347.0 każdy przebieg odświeża też zwroty otwarte,
+jednym dodatkowym zapytaniem.
+
+Pierwszy przebieg po aktualizacji przerzuci zaległość naraz:
+
+1. Zwroty rozliczone w Allegro zejdą z DO DECYZJI do ZAMKNIĘTYCH.
+2. Rekoncyliacja pokaże część z nich jako rozliczone bez korekty.
+3. Te wpisy to prawdziwa zaległość korekt, nie awaria synchronizacji.
+
+Nic nie trzeba ustawiać.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

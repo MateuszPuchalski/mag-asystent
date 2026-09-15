@@ -1,7 +1,9 @@
 import { config } from "../config.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
-import { urlListyZwrotow, zapytajAllegro } from "../adapters/allegro.http.js";
+import {
+  ODSWIEZENIE_NA_STRONE, urlListyZwrotow, urlOdswiezeniaZwrotow, zapytajAllegro,
+} from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
@@ -240,6 +242,19 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
         at, at, new Date(Date.parse(at) + interval).toISOString(), pozostalo);
     })();
 
+    /* ODŚWIEŻENIE ZNANYCH ZWROTÓW — przed trackingiem, bo dopiero ono przynosi
+       numer listu zwrotom pobranym przed nadaniem paczki. Własny parasol:
+       zepsuta strona odświeżenia nie ma prawa zabrać nowych zwrotów ani pytania
+       o doręczenia. 429 idzie wyżej, bo limit jest wspólny dla całego konta. */
+    try {
+      await odswiezZnane(database, konto, query, apiUrl, od,
+        new Set(zebrane.map((z) => z.id)), at);
+    } catch (error) {
+      if (error instanceof BladLimituAllegro) throw error;
+      console.warn("[zwroty] odświeżenie znanych zwrotów nie doszło:",
+        error instanceof Error ? error.message : error);
+    }
+
     /* Tracking idzie PO transakcji, bo wychodzi do sieci: trzymanie otwartej
        transakcji SQLite na czas żądania HTTP blokowałoby drugi proces (worker)
        na tyle, ile trwa najwolniejszy przewoźnik. */
@@ -258,6 +273,64 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
       next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, next);
     throw error;
   }
+}
+
+/**
+ * Ile stron odświeżenia wolno przejść w jednym przebiegu.
+ *
+ * Bezpiecznik jak `MAKS_STRON`, tylko przy stronie dziesięć razy większej:
+ * trzy tysiące otwartych zwrotów to więcej, niż firma ma w kolejce przez kwartał.
+ */
+const MAKS_STRON_ODSWIEZENIA = 3;
+
+/**
+ * Odświeża zwroty, które już mamy i które nie są zamknięte (15 września 2026).
+ *
+ * KURSOR ODDAJE TYLKO NOWE. Zwrot pobrany przed nadaniem paczki nie dostawał
+ * potem ani listu, ani terminu, ani `FINISHED`. W kolejce stało przez to
+ * kilkaset zwrotów dawno rozliczonych w Allegro, a jedynymi drogami wyjścia
+ * były skan etykiety i reset z konsoli.
+ *
+ * OKNO OD NAJSTARSZEGO OTWARTEGO. Zwrot zamknięty u nas albo rozliczony
+ * w Allegro nie ma już czego się dowiedzieć, a ciągnąłby okno w przeszłość.
+ * Zwroty pobrane w tym samym przebiegu pomijamy — są świeże z definicji.
+ *
+ * ZAPISUJE WYŁĄCZNIE ZNANE. Lista w oknie oddaje też zwroty skasowane z bazy
+ * przez `zwroty:sprzatnij` (0.340.0). Wstawienie ich z powrotem cofnęłoby
+ * tamto sprzątanie po cichu, przy każdym takcie. Nowe zwroty przynosi kursor
+ * i tylko on.
+ */
+async function odswiezZnane(
+  database: Db, konto: number, query: (url: string) => Promise<unknown | null>,
+  apiUrl: string, od: string | null, pobraneTeraz: Set<string>, at: string,
+): Promise<number> {
+  const otwarte = database.prepare(`SELECT external_id, created_at FROM zwrot_klienta
+    WHERE channel_account_id = ? AND zamkniety_at IS NULL AND rozliczony_allegro_at IS NULL`)
+    .all(konto) as Array<{ external_id: string; created_at: string }>;
+  const doOdswiezenia = new Set(
+    otwarte.map((z) => z.external_id).filter((id) => !pobraneTeraz.has(id)));
+  if (!doOdswiezenia.size) return 0;
+
+  /* Daty porównujemy jako tekst: Allegro oddaje ISO 8601 w UTC, a ta sama
+     kolumna trzyma je dosłownie. Próg firmy obowiązuje i tutaj. */
+  const najstarszy = otwarte.reduce(
+    (a, z) => (z.created_at < a ? z.created_at : a), otwarte[0].created_at);
+  const odKiedy = od && od > najstarszy ? od : najstarszy;
+
+  const zebrane: Zwrot[] = [];
+  for (let strona = 0; strona < MAKS_STRON_ODSWIEZENIA; strona++) {
+    const partia = tablica<Zwrot>(
+      await query(urlOdswiezeniaZwrotow(apiUrl, odKiedy, strona * ODSWIEZENIE_NA_STRONE)),
+      "customerReturns");
+    zebrane.push(...partia.filter((z) => typeof z?.id === "string" && doOdswiezenia.has(z.id)));
+    if (partia.length < ODSWIEZENIE_NA_STRONE) break;
+  }
+  if (!zebrane.length) return 0;
+
+  transaction(database, () => {
+    for (const zwrot of zebrane) zapisz(database, zwrot, konto, at);
+  })();
+  return zebrane.length;
 }
 
 /**
