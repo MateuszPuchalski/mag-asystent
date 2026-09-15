@@ -6,6 +6,7 @@ import {
   urlWnioskuORabat,
   urlDyskusji,
   urlListyZwrotow,
+  urlOdswiezeniaZwrotow,
   urlRoszczenProwizji,
   urlOpinii,
   urlOstatnichZamowien,
@@ -85,6 +86,18 @@ test("kursor `from` w liście zwrotów jest kodowany i znika, gdy go nie ma", ()
   const z = urlListyZwrotow("https://api.allegro.pl", null, 0, "abc/123");
   assert.match(z, /&from=abc%2F123$/);
   assert.equal(urlListyZwrotow("https://api.allegro.pl", null, 0).includes("from="), false);
+});
+
+test("odświeżenie zwrotów bierze największą stronę ze schematu i nigdy kursora", () => {
+  /* Kursor oddaje wyłącznie zwroty utworzone po ostatnim widzianym — z nim
+     odświeżenie nie zobaczyłoby żadnego znanego zwrotu. `maximum: 1000` stoi
+     w schemacie parametru `limit` w `docs/allegro/swagger.yaml`. */
+  const z = urlOdswiezeniaZwrotow("https://api.allegro.pl", "2026-08-30T08:00:00Z", -5);
+  assert.equal(z,
+    "https://api.allegro.pl/order/customer-returns?limit=1000&offset=0" +
+    "&createdAt.gte=2026-08-30T08%3A00%3A00Z");
+  assert.equal(z.includes("from="), false);
+  assert.equal(rodzinaKoncowki(z), "customer-returns", "ta sama wersja beta co lista");
 });
 
 test("szczegół zwrotu i roszczenia prowizji stoją we własnych rodzinach", () => {

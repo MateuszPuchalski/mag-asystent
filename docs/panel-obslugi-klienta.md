@@ -3609,6 +3609,13 @@ Testy jednostkowe tego nie złapały, bo sprawdzały serwis trackingu w izolacji
 Złapał to właściciel pierwszego dnia. Strażnik stoi teraz na SZWIE: przebieg
 z pustą stroną zwrotów ma i tak zapytać o paczkę w drodze.
 
+**Znane zwroty odświeżają się same (15 września 2026).** Ten sam kursor zostawiał
+większą lukę: zwrot pobrany przed nadaniem paczki nie dostawał listu, terminu
+ani `FINISHED`. Kolejka rosła o zwroty dawno rozliczone w Allegro. Każdy przebieg
+pyta więc dodatkowo o listę od najstarszego otwartego zwrotu, stroną do tysiąca
+rekordów. Zapisuje wyłącznie zwroty, które już są w bazie — skasowane przez
+`zwroty:sprzatnij` nie wracają.
+
 **Nie wiem mówi „nie wiem".** Gdy przewoźnik nie podał nic, ekran pisze
 „Nie wiadomo, czy dotarła", a nie „Jeszcze do nas nie dotarła". To była trzecia
 z rzędu nieprawda w tej sekcji: zdanie twierdzące stawiane bez podstawy.

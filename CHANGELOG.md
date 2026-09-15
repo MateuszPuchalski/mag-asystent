@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.347.0 — 15 września 2026
+
+**Znane zwroty odświeżają się same.** Audyt procesu zwrotów: w kolejce stało
+866 zwrotów DO DECYZJI przy dwóch zamkniętych, a 579 było po terminie
+ustawowym. Przyczyna leżała w synchronizacji, nie w pracy biura.
+
+Kursor `from` oddaje wyłącznie zwroty utworzone PO ostatnim widzianym. Zwrot
+pobrany raz nie wracał więc nigdy: paczka nadana później nie przynosiła listu
+ani terminu, a `FINISHED`, odmowa i wycofana pozycja zrobione w Allegro nie
+docierały do kolejki. Jedynymi wyjściami były skan etykiety i reset z konsoli.
+Testy synchronizatora musiały kasować jej stan, żeby zwrot wrócił na listę.
+
+- **Każdy przebieg pyta dodatkowo o zwroty od najstarszego OTWARTEGO** —
+  `createdAt.gte`, bez kursora, stroną 1000 rekordów (`maximum` ze schematu).
+  Jedno żądanie pokrywa miesiąc zwrotów. Zwrot zamknięty u nas albo rozliczony
+  w Allegro nie ciągnie okna wstecz, a bez otwartych żądania nie ma wcale.
+- **Zapisuje wyłącznie zwroty, które już są w bazie.** Skasowane przez
+  `zwroty:sprzatnij` nie wracają — nowe przynosi kursor i tylko on.
+- **Odświeżenie idzie przed trackingiem**, więc paczka poznana w tym przebiegu
+  od razu dostaje datę doręczenia i termin.
+- **Zepsuta strona odświeżenia nie zabiera przebiegu**: nowe zwroty i tracking
+  idą dalej, błąd trafia do dziennika. 429 przerywa przebieg i odsuwa takt,
+  bo limit jest wspólny dla konta.
+- Pierwszy przebieg po aktualizacji przerzuci zaległość naraz — patrz
+  `DEPLOY.md` §6g.
+
 ## 0.346.0 — 15 września 2026
 
 **Zwrot pieniędzy niesie pozycje, a kosz rozłożony przed korektą nie gubi

@@ -170,6 +170,29 @@ export function urlTrackingu(
   return `${apiUrl}/order/carriers/${encodeURIComponent(carrierId)}/tracking?${filtr}`;
 }
 
+/** Ile zwrotów prosi jedna strona odświeżenia — `maximum` ze schematu `limit`. */
+export const ODSWIEZENIE_NA_STRONE = 1000;
+
+/**
+ * Strona ODŚWIEŻENIA zwrotów, które już mamy (audyt zwrotów, 15 września 2026).
+ *
+ * Kursor `from` oddaje wyłącznie zwroty utworzone po ostatnim widzianym, więc
+ * raz pobrany zwrot nie wracał nigdy. Paczka nadana później, `FINISHED`
+ * i odmowa zrobione w Allegro nie docierały do kolejki, a zwrot stał w DO
+ * DECYZJI tygodniami.
+ *
+ * Tu jedzie sam `createdAt.gte` od najstarszego otwartego zwrotu, bez kursora,
+ * i największa strona, jaką dopuszcza schemat. Jedno żądanie na przebieg
+ * pokrywa wtedy cały miesiąc zwrotów. Offset zamiast kursora jest tu dopuszczalny:
+ * to przegląd znanych rekordów, a rekord przesunięty wstawką wróci następnym razem.
+ */
+export function urlOdswiezeniaZwrotow(apiUrl: string, odKiedy: string, offset: number): string {
+  return (
+    `${apiUrl}/order/customer-returns?limit=${ODSWIEZENIE_NA_STRONE}` +
+    `&offset=${Math.max(0, Math.trunc(offset))}&createdAt.gte=${encodeURIComponent(odKiedy)}`
+  );
+}
+
 /**
  * Szczegół jednego zwrotu (`/order/customer-returns/{id}`, Accept beta.v1).
  *

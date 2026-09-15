@@ -86,8 +86,10 @@ test("paginacja idzie dalej niż pierwsza strona i staje na bezpieczniku", async
   let strony = 0;
   await synchronizujAllegroZwroty({
     database: d, apiUrl: "https://api", now: () => new Date("2026-09-01T10:00:00Z"),
-    /* Zawsze pełna strona: bez bezpiecznika ta pętla biłaby w konto bez końca. */
-    query: async () => {
+    /* Zawsze pełna strona: bez bezpiecznika ta pętla biłaby w konto bez końca.
+       Odświeżenie znanych zwrotów to osobne żądanie i osobny test — tu nie liczy się. */
+    query: async (u) => {
+      if (u.includes("limit=1000")) return odpowiedz([]);
       strony++;
       return odpowiedz(Array.from({ length: 100 }, (_, i) => zwrot(`s${strony}-${i}`, "2026-08-30T00:00:00Z")));
     },
@@ -627,4 +629,127 @@ test("odświeżenie bez paczek NIE KASUJE zapisanego numeru listu", async () => 
   });
   assert.equal((d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
     .get() as { waybill: string | null }).waybill, "WB-1", "numer przeżywa odświeżenie");
+});
+
+/* ── Odświeżenie znanych zwrotów (audyt zwrotów, 15 września 2026) ───────────
+   Kursor `from` oddaje wyłącznie zwroty utworzone po ostatnim widzianym. Zwrot
+   pobrany przed nadaniem paczki nie dostawał potem listu, terminu ani
+   `FINISHED`, więc kolejka rosła o zwroty dawno rozliczone w Allegro. Testy
+   wyżej musiały kasować stan synchronizacji, żeby zwrot wrócił na listę.   */
+
+const ODSWIEZENIE = "limit=1000";
+
+test("zwrot, który minął kursor, dostaje paczkę i FINISHED w następnym przebiegu", async () => {
+  const d = stanowisko();
+  const url: string[] = [];
+  let pozniej = false;
+  const query = async (u: string) => {
+    url.push(u);
+    if (u.includes("/tracking")) return historia(false);
+    if (!pozniej) return odpowiedz(u.includes(ODSWIEZENIE) ? [] : [zwrot("z1", "2026-08-30T08:00:00Z")]);
+    return odpowiedz(u.includes(ODSWIEZENIE)
+      ? [zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1], status: "FINISHED" })]
+      : []);
+  };
+  await synchronizujAllegroZwroty({ database: d, zwrotyOd: "2026-06-03T00:00:00Z",
+    now: () => new Date("2026-08-30T12:00:00Z"), apiUrl: "https://api", query });
+
+  pozniej = true;
+  url.length = 0;
+  await synchronizujAllegroZwroty({ database: d,
+    now: () => new Date("2026-09-01T12:00:00Z"), apiUrl: "https://api", query });
+
+  const odswiezenia = url.filter((u) => u.includes(ODSWIEZENIE));
+  assert.equal(odswiezenia.length, 1, "jedno żądanie na przebieg");
+  assert.match(odswiezenia[0], /createdAt\.gte=2026-08-30T08%3A00%3A00Z/,
+    "okno od najstarszego otwartego zwrotu");
+  const w = d.prepare(`SELECT waybill, paczka_at, status_allegro, rozliczony_allegro_at
+    FROM zwrot_klienta WHERE external_id='z1'`).get() as Record<string, unknown>;
+  assert.equal(w.waybill, "WB-1");
+  assert.equal(w.paczka_at, "2026-08-30T09:00:00Z");
+  assert.equal(w.status_allegro, "FINISHED");
+  assert.ok(w.rozliczony_allegro_at, "rozliczenie w Allegro dochodzi bez skanu i bez resetu");
+  assert.ok(url.some((u) => u.includes("/tracking")),
+    "świeżo poznana paczka idzie do trackingu w tym samym przebiegu");
+});
+
+test("odświeżenie NIE przywraca zwrotu, którego w bazie nie ma", async () => {
+  /* `zwroty:sprzatnij` kasuje zwroty rozliczone poza aplikacją (0.340.0),
+     a lista w oknie dat nadal je oddaje. Wstawienie ich z powrotem cofnęłoby
+     sprzątanie po cichu, przy każdym takcie. */
+  const d = stanowisko();
+  let drugi = false;
+  const query = async (u: string) => odpowiedz(!drugi
+    ? [zwrot("z1", "2026-08-30T08:00:00Z")]
+    : u.includes(ODSWIEZENIE)
+      ? [zwrot("z1", "2026-08-30T08:00:00Z"), zwrot("skasowany", "2026-08-31T08:00:00Z")]
+      : []);
+  await synchronizujAllegroZwroty({ database: d, zwrotyOd: null, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:00:00Z"), query });
+  drugi = true;
+  await synchronizujAllegroZwroty({ database: d, zwrotyOd: null, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:05:00Z"), query });
+
+  const id = (d.prepare("SELECT external_id FROM zwrot_klienta").all() as
+    Array<{ external_id: string }>).map((z) => z.external_id);
+  assert.deepEqual(id, ["z1"], "nowe zwroty przynosi kursor i tylko on");
+});
+
+test("zamknięty i rozliczony nie ciągną okna wstecz, a bez otwartych nie ma żądania", async () => {
+  const d = stanowisko();
+  let pierwszy = true;
+  const url: string[] = [];
+  const query = async (u: string) => {
+    url.push(u);
+    if (!pierwszy) return odpowiedz([]);
+    pierwszy = false;
+    return odpowiedz([
+      zwrot("stary", "2026-08-01T08:00:00Z"),
+      zwrot("rozliczony", "2026-08-10T08:00:00Z"),
+      zwrot("otwarty", "2026-08-30T08:00:00Z"),
+    ]);
+  };
+  const przebieg = (kiedy: string) => synchronizujAllegroZwroty({
+    database: d, zwrotyOd: null, apiUrl: "https://api", now: () => new Date(kiedy), query });
+
+  await przebieg("2026-09-01T10:00:00Z");
+  d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-01T11:00:00Z' WHERE external_id='stary'").run();
+  d.prepare(`UPDATE zwrot_klienta SET rozliczony_allegro_at='2026-09-01T11:00:00Z'
+    WHERE external_id='rozliczony'`).run();
+
+  url.length = 0;
+  await przebieg("2026-09-01T12:00:00Z");
+  const odswiezenia = url.filter((u) => u.includes(ODSWIEZENIE));
+  assert.equal(odswiezenia.length, 1);
+  assert.match(odswiezenia[0], /createdAt\.gte=2026-08-30T08%3A00%3A00Z/,
+    "zwroty bez pracy nie ciągną okna miesiąc wstecz");
+
+  d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-01T13:00:00Z' WHERE external_id='otwarty'").run();
+  url.length = 0;
+  await przebieg("2026-09-01T14:00:00Z");
+  assert.equal(url.filter((u) => u.includes(ODSWIEZENIE)).length, 0,
+    "nie ma czego odświeżać — limit zostaje na koncie");
+});
+
+test("zepsute odświeżenie nie wywraca przebiegu, ale 429 idzie wyżej", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({ database: d, zwrotyOd: null, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:00:00Z"),
+    query: async () => odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z")]) });
+
+  await synchronizujAllegroZwroty({ database: d, apiUrl: "https://api",
+    now: () => new Date("2026-09-01T10:05:00Z"),
+    query: async (u) => {
+      if (u.includes(ODSWIEZENIE)) throw new BladOdpowiedziAllegro("Allegro odpowiedziało 500", 500);
+      return odpowiedz([]);
+    } });
+  assert.equal(stanZwrotow(d).errorCount, 0, "nowe zwroty i tracking nie płacą za tę jedną stronę");
+
+  await assert.rejects(() => synchronizujAllegroZwroty({ database: d, apiUrl: "https://api",
+    intervalMs: 60_000, now: () => new Date("2026-09-01T10:10:00Z"),
+    query: async (u) => {
+      if (u.includes(ODSWIEZENIE)) throw new BladLimituAllegro("limit", 900_000);
+      return odpowiedz([]);
+    } }));
+  assert.equal(stanZwrotow(d).lastErrorCode, 429, "limit jest wspólny dla konta — takt ma się cofnąć");
 });
