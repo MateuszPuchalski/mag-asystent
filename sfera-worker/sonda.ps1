@@ -602,6 +602,7 @@ if ($SzkicZW) {
         Write-Wynik "  (nie udalo sie odczytac: $($_.Exception.Message))"
     }
 
+    $zw = $null
     try {
         $zw = $sgt.SuDokumentyManager.DodajZW()
         Write-Wynik "  JEST  DodajZW() oddal obiekt dokumentu"
@@ -615,17 +616,31 @@ if ($SzkicZW) {
         } else {
             Write-Wynik ""
             Write-Wynik "NaPodstawie($Paragon) - nadal BEZ Zapisz()"
+            $powiazany = $false
             try {
                 $zw.NaPodstawie($Paragon)
+                $powiazany = $true
                 Write-Wynik "  JEST  NaPodstawie przyjal dok_Id paragonu"
             } catch {
                 Write-Wynik "  BRAK  NaPodstawie odmowil: $($_.Exception.Message)"
+                # Drugi przebieg na tym samym PA (15 wrzesnia 2026) odbil sie od blokady:
+                # NaPodstawie BLOKUJE paragon, a do 0.348.3 sonda nie zamykala szkicu.
+                # Trzyma ja okno Subiekta z tym paragonem albo niezamkniety szkic.
+                if ($_.Exception.Message -match 'zablokowa') {
+                    Write-Wynik "        Paragon trzyma inna sesja: zamknij go w Subiekcie albo wez inny PA."
+                }
             }
-            Wlasciwosci-Wg $zw $polaDokumentu "ZW PO powiazaniu"
 
+            # Bez powiazania ZW jest pusty - drugi wydruk tych samych zer i "Pozycje: 0"
+            # wygladalby jak wynik, a jest tylko skutkiem odmowy.
             $pozycjeZw = $null
-            try { $pozycjeZw = $zw.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
-            if ($null -eq $pozycjeZw) {
+            if ($powiazany) {
+                Wlasciwosci-Wg $zw $polaDokumentu "ZW PO powiazaniu"
+                try { $pozycjeZw = $zw.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
+            }
+            if (-not $powiazany) {
+                Write-Wynik "  (pozycji nie czytam - bez powiazania szkic ZW jest pusty)"
+            } elseif ($null -eq $pozycjeZw) {
                 Write-Wynik "  (Pozycje null - NaPodstawie nie przepisal pozycji)"
             } else {
                 $liczba = 0
@@ -684,6 +699,12 @@ if ($SzkicZW) {
         }
     } catch {
         Write-Wynik "  BRAK  DodajZW() odmowil: $($_.Exception.Message)"
+    } finally {
+        # Zamknij() zwalnia blokade paragonu. Bez tego nastepny przebieg na tym samym
+        # PA dostawal "Nie mozna zablokowac obiektu" (sonda-zw.txt, 15:51).
+        if ($null -ne $zw) {
+            try { $zw.Zamknij() } catch { Write-Wynik "  UWAGA  Zamknij() szkicu ZW odmowil: $($_.Exception.Message)" }
+        }
     }
 
     # ZW wystawiony RECZNIE - jedyne zrodlo liczby "zwrot ze sprzedazy" w polu
@@ -693,6 +714,7 @@ if ($SzkicZW) {
     if ($WzorZW -gt 0) {
         Write-Wynik ""
         Write-Wynik "WZOR ZW - WczytajDokument($WzorZW), tylko odczyt"
+        $wzor = $null
         try {
             $wzor = $sgt.SuDokumentyManager.WczytajDokument($WzorZW)
             if ($null -eq $wzor) {
@@ -719,6 +741,11 @@ if ($SzkicZW) {
             }
         } catch {
             Write-Wynik "  BRAK  WczytajDokument odmowil: $($_.Exception.Message)"
+        } finally {
+            # Wczytany ZW tez jest zablokowany dla biura, dopoki go nie zamkniemy.
+            if ($null -ne $wzor) {
+                try { $wzor.Zamknij() } catch { Write-Wynik "  UWAGA  Zamknij() wzoru ZW odmowil: $($_.Exception.Message)" }
+            }
         }
     }
     Write-Wynik ""
@@ -739,6 +766,13 @@ Write-Wynik "Zamyka je bramka 2 z docs/wdrozenie.md: jedno MM na kartotece probn
 Write-Wynik ""
 Write-Wynik "Nastepny krok: wpisz ustalenia do docs/sfera-com.md i zdejmij zamkniete"
 Write-Wynik "znaczniki [WERYFIKUJ] z sfera-worker/README.md."
+
+# Zakoncz() konczy sesje w tle jawnie. Do 0.348.3 sonda zostawiala to wyjsciu
+# z PowerShella, a blokady Subiekta sa przypisane do operatora i stacji - tych
+# samych, na ktorych czlowiek ma otwarte okno Subiekta.
+if ($null -ne $sgt) {
+    try { [void]$sgt.Zakoncz() } catch { Write-Wynik "UWAGA  Zakoncz() odmowil: $($_.Exception.Message)" }
+}
 
 $script:linie | Set-Content -LiteralPath $Wynik -Encoding UTF8
 Write-Host "`nWynik zapisany: $Wynik"

@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.3 — 15 września 2026
+
+**Sonda ZW zwalnia paragon.** Drugi przebieg na tym samym PA odbił się od
+blokady: `NaPodstawie` blokuje paragon, a sonda nie zamykała szkicu ani sesji.
+
+- **Szkic ZW i wczytany wzór zamykają się `Zamknij()`**, także po błędzie.
+- **Sesja kończy się `Zakoncz()`** przed zapisem pliku wynikowego.
+- **Odmowa `NaPodstawie` zatrzymuje dalszy odczyt szkicu** i mówi o blokadzie.
+  Wcześniej sonda drukowała drugi raz te same zera i „Pozycje: 0".
+- `docs/sfera-com.md` §2m: zasady dla automatycznego ZW — zamknąć dokument
+  po `Zapisz()`, a blokadę paragonu traktować jako „spróbuj później".
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.2 — 15 września 2026
 
 **Worker Sfery mówi prawdę o pustej sesji, a sonda ZW zadaje dwa ostatnie
