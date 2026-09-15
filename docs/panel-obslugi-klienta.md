@@ -4068,11 +4068,31 @@ po numerze.
 Ruch jednak istnieje i jest ten sam co zawsze: **korekta zamyka zwrot tak samo
 bez dokumentu**. Tego brakowało — nie funkcji, tylko jednego zdania.
 
-**Pozostałe czterdzieści komunikatów czeka na decyzję, nie na kod.** Część
-z nich opisuje stan, do którego żaden ruch nie istnieje po naszej stronie
-(„Allegro nie powiązało żadnej wiadomości"), a część wymagałaby nowej
-końcówki — na przykład szukania dokumentu po numerze. Przerobienie ich hurtem
-na „zrób to i to" dałoby rady, których nie da się wykonać.
+**Policzone rzetelnie, liczba z audytu była zgrubna.** Przegląd wszystkich
+zdań widocznych dla człowieka w `zwroty/` i `ekrany/Zwroty.tsx` daje 97
+napisów. Większość to ETYKIETY, ODZNAKI i PODPOWIEDZI — nazwy stanów,
+przy których żaden ruch nie jest potrzebny albo żaden nie istnieje
+(„Allegro nie powiązało żadnej wiadomości", „Wydana do doręczenia").
+
+Komunikatów, przy których ruch ISTNIEJE, a ekran go nie nazywał, jest
+**sześć** i wszystkie są poprawione:
+
+| gdzie | co mówiło | czego brakowało |
+|---|---|---|
+| `Dowody` | „dociągnie ją najbliższa synchronizacja" | przycisk „Dociągnij teraz" stoi dwa wiersze niżej |
+| `Dowody` | „bez numeru zamówienia nie ma czego dociągnąć" | wycena idzie z pozycji, a zwrot zamyka korekta |
+| `Kolejka`, sygnał `kwota_nieaktualna` | „kwota nie zgadza się z pozycjami" | popraw kwotę |
+| `Kolejka`, sygnał `przelew_czeka` | „śladu po przelewie nie ma" | zapisz go w sekcji Pieniądze |
+| `Pozycje` | „Zwrot bez pozycji — nie ma czego wycenić" | dociągnij zamówienie albo dopisz z kartonu |
+| `Pozycje` | „Kwoty pełnej nie znamy bez zamówienia" | dociągnij je w kolumnie obok |
+
+**Pierwszy wiersz jest najgorszy z całej listy.** Zdanie odsyłało do CZEKANIA
+na synchronizację, a przycisk robiący to natychmiast stał dwa wiersze niżej.
+Ekran nie tyle milczał, co odradzał ruch, który sam oferował.
+
+**Czego nadal nie ma i dlaczego.** Szukania dokumentu sprzedaży po numerze —
+to nowa końcówka, nie zdanie. Dopóki jej nie ma, brak dokumentu kończy się
+informacją, że zwrotu to nie zatrzymuje (§25a.23 wyżej).
 
 ### 25a.8. Czego panel nie wie
 

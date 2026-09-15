@@ -55,7 +55,10 @@ export const SYGNALY: Record<Sygnal,
      ilość i cenę przy każdym takcie. Czerwony, bo to pieniądze w złej
      wysokości, a nie praca do zrobienia kiedyś. */
   kwota_nieaktualna: {
-    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie",
+    /* Podpowiedź KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Sygnał mówił,
+       co jest nie tak, i milkł — a naprawa to jedno kliknięcie w kubełku
+       DO ZWROTU. */
+    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie. Popraw kwotę",
     krotko: "kwota?", klasa: "bg-red-100 text-ranga-zle",
     ikona: <CircleHelp size={13} /> },
   /* Wróciło mniej, niż klient zgłosił. Bursztyn, nie czerwień: to nie jest
@@ -66,7 +69,7 @@ export const SYGNALY: Record<Sygnal,
      ich nie odda za nas. Świeci także na zwrocie zamkniętym, bo przelew idzie
      zwykle PO korekcie. */
   przelew_czeka: {
-    tytul: "Pobranie — pieniądze oddaje się przelewem, a śladu po nim nie ma",
+    tytul: "Pobranie — pieniądze oddaje się przelewem. Zapisz go w sekcji Pieniądze",
     krotko: "przelew?", klasa: "bg-amber-100 text-ranga-uwaga",
     ikona: <BanknoteArrowDown size={13} /> },
   rozjazd_ilosci: {

@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.355.0 — 15 września 2026
+
+**Sześć komunikatów ekranu zwrotów kończy się ruchem, nie tłumaczeniem.**
+Przegląd wszystkich zdań widocznych dla człowieka w `zwroty/`
+i `ekrany/Zwroty.tsx`: 97 napisów, z czego większość to etykiety i odznaki
+nazywające stan, przy którym żaden ruch nie jest potrzebny. Sześć opisywało
+przeszkodę, która ma wyjście, i tego wyjścia nie nazywało.
+
+- **„Treści zamówienia jeszcze nie pobrano"** odsyłało do CZEKANIA na
+  synchronizację, a przycisk „Dociągnij teraz" stał dwa wiersze niżej. Ekran
+  nie tyle milczał, co odradzał ruch, który sam oferował. To najgorszy
+  przypadek z całej listy.
+- **Brak numeru zamówienia** kończył się ścianą; mówi teraz, że wycenę robi się
+  z pozycji, a zwrot zamyka numer korekty.
+- **Sygnał „kwota?"** mówił, co jest nie tak, i milkł — dopisuje „popraw kwotę".
+- **Sygnał „przelew?"** dopisuje „zapisz go w sekcji Pieniądze".
+- **„Zwrot bez pozycji"** nazywa obie drogi: dociągnięcie zamówienia albo
+  dopisanie tego, co przyszło w kartonie.
+- **„Kwoty pełnej nie znamy bez zamówienia"** wskazuje kolumnę, w której się je
+  dociąga.
+
+Reszty nie ruszono świadomie. Szukanie dokumentu sprzedaży po numerze to nowa
+końcówka, nie zdanie; a komunikat opisujący stan bez żadnego możliwego ruchu
+(„Allegro nie powiązało żadnej wiadomości") przerobiony na radę kłamałby.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`. Od 0.354.0 pilnuje tego `/api/health`.
+
 ## 0.354.0 — 15 września 2026
 
 **`/api/health` sam wykrywa panel zostawiony na starym buildzie.** To jest

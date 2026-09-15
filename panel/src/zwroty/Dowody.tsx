@@ -203,12 +203,19 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               <span className="break-all font-mono text-xs">{zwrot.orderId ?? "—"}</span>
               {zwrot.orderId && <Skopiuj tekst={zwrot.orderId} />}
             </div>
+            {/* OBA ZDANIA KOŃCZĄ SIĘ RUCHEM (audyt, 15 września 2026). Pierwsze
+                odsyłało do CZEKANIA na synchronizację, choć przycisk „Dociągnij
+                teraz" stoi dwa wiersze niżej — operator czekał na coś, co miał pod
+                ręką. Drugie kończyło się ścianą: bez numeru zamówienia panel nie ma
+                czego dociągnąć, ale zwrot da się doprowadzić do końca i tak. */}
             <p className="mt-2 text-xs text-slate-500">
               {zwrot.orderId
-                ? `Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa
-                   synchronizacja. Bez niej pozycje zwrotu nie mają skąd wziąć kartoteki.`
+                ? `Treści zamówienia jeszcze nie pobrano — bez nich pozycje zwrotu nie
+                   mają skąd wziąć kartoteki. Dociągnij je przyciskiem niżej albo
+                   poczekaj na najbliższą synchronizację.`
                 : `Allegro nie podało przy tym zwrocie numeru zamówienia. Bez niego
-                   nie ma czego dociągnąć ani z czego wziąć kartoteki.`}</p>
+                   nie ma czego dociągnąć ani z czego wziąć kartoteki — wycenę robisz
+                   z pozycji, a zwrot zamyka numer korekty z Subiekta.`}</p>
           </>
         : <>
             <div className="flex items-center gap-1">
