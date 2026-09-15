@@ -44,9 +44,12 @@ Sonda `-SzkicZW -Ilosci "2=0"` na PA 8995/MAG/03/2026 z dwiema pozycjami
   i przelew zeszły z 26,89 do 14,99 zł; wyzerowany wiersz został na ZW.
 - **Przelew i tak ustawiamy jawnie.** Po wcześniejszym ZW do tego samego paragonu
   szkic zaczyna od kwoty całego paragonu.
-- **Nowe pytanie: `SkutekMagazynowy = False` na tym szkicu**, przy `True` na dwóch
-  poprzednich. ZW przejmuje go od paragonu, a to decyduje o zgraniu z MM do
-  magazynu zwrotów.
+- **ZW wywołuje skutek magazynowy** — przyjmuje towar z powrotem na magazyn
+  główny (potwierdził właściciel). Zgrywa się to z obiegiem koszyka: MM koszyka
+  czeka na numer korekty każdego zwrotu, więc ZW zawsze idzie pierwszy.
+- **Otwarte: `SkutekMagazynowy = False` na szkicu do PA 8995**, przy `True` na
+  dwóch poprzednich. Do czasu ustalenia automat takiego ZW nie wystawia i oddaje
+  zwrot biuru.
 
 Kodu serwera ani workera to wydanie nie zmienia.
 

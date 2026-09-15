@@ -459,11 +459,16 @@ MM na produkcji.
 towaru 466 dostał `WartoscBruttoPoRabacie = 0` i został na ZW. Netto, VAT
 i brutto dokumentu zeszły o jego kwotę bez wołania `Przelicz()`.
 
-`[WERYFIKUJ]` Skutek magazynowy ZW idzie za paragonem. Szkice do PA 3/MAG/02
-i PA 12102 miały `SkutekMagazynowy = True`, a do PA 8995 — `False`. Pozycje PA 8995
-mają przy tym `CenaMagazynowa = 0`. Trzeba ustalić, dlaczego ten paragon nie ruszył
-magazynu i co wtedy ZW robi z towarem. Od tego zależy, jak ZW zgra się z MM
-do magazynu zwrotów.
+**ZW wywołuje skutek magazynowy: przyjmuje towar z powrotem na magazyn główny**
+(właściciel, 15 września 2026). Zgrywa się to z obiegiem koszyka bez zmian.
+MM koszyka czeka, aż każdy zwrot w nim ma `korekta_numer` (`brakujaceKorekty`
+w `kosze-zwrotow.ts`). Kolejność jest więc stała: ZW oddaje towar na MAG, MM
+koszyka zabiera go na bufor zwrotów albo odpad, MM powrotu wraca na MAG.
+
+`[WERYFIKUJ]` Dlaczego szkic do PA 8995 miał `SkutekMagazynowy = False`, a do
+PA 3/MAG/02 i PA 12102 — `True`. Pozycje PA 8995 mają `CenaMagazynowa = 0`.
+Do czasu ustalenia automat NIE wystawia ZW z `False` i oddaje zwrot biuru. ZW
+bez przyjęcia na MAG, a po nim MM koszyka, zdjęłyby ze stanu towar dwa razy.
 
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
 z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
