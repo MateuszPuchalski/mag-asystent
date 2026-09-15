@@ -916,6 +916,14 @@ export interface Zwrot {
   dostarczonoAt: string | null;
   /** Ostatni kod przewoźnika: `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   przesylkaStatus: string | null;
+  /**
+   * Numer listu przewozowego paczki zwrotnej (0.344.0).
+   *
+   * Do 0.343.0 panel go nie znał: polityka 0.163.0 trzymała numer wyłącznie
+   * w kopii odpowiedzi Allegro, więc szukanie po nim wymagało Entera i pytania
+   * serwera. Decyzja właściciela zdjęła tę politykę.
+   */
+  waybill: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
   /**
@@ -929,6 +937,14 @@ export interface Zwrot {
   dniDoTerminu: number | null;
   /** Ostatni status zwrotu po stronie Allegro; `FINISHED` = pieniądze oddane. */
   statusAllegro: string | null;
+  /**
+   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0).
+   *
+   * `statusAllegro` mówi, co jest TERAZ: rozliczony zwrot idzie dalej osią
+   * czasu Allegro, choćby na `COMMISSION_REFUND_CLAIMED` — a ten dotyczy
+   * NASZEJ prowizji, nie pieniędzy klienta. Ten zatrzask trzyma fakt.
+   */
+  rozliczonyAllegroAt: string | null;
   sumaPozycjiGrosze: number;
   kwotaPelnaGrosze: number | null;
   waluta: string;

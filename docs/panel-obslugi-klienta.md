@@ -2652,6 +2652,29 @@ Odmowa rozstrzyga wcześniej niż rozliczenie. Oba stany są końcowe, więc ża
 nie chowa pracy, ale ODRZUCONE niesie powód, a ZAMKNIĘTE mówi tylko tyle, że
 sprawy nie ma.
 
+**Rozliczenie ZATRZASKUJE SIĘ (0.345.0).** Zgłoszenie właściciela: „nadal
+pokazuje paczki, do których został już stwierdzony zwrot". Przyczyna była
+nasza własna.
+
+`status_allegro` to jeden wskaźnik „teraz", a nie historia. Zwrot rozliczony
+idzie dalej tą samą osią czasu — a wypycha go tam automat rabatów z 0.320.0,
+składający wniosek o prowizję zaraz po zaciągnięciu odstąpienia. Status
+przechodzi wtedy na `COMMISSION_REFUND_CLAIMED`.
+
+Słowa właściciela, warte zapamiętania: to jest **zwrot rabatu DLA NAS, a nie
+zwrot pieniędzy klientowi**. Kubełek liczony ze wskaźnika przestawał widzieć
+rozliczenie i wypychał taki zwrot z ZAMKNIĘTYCH z powrotem do DO DECYZJI —
+z pytaniem „przyjąć czy odrzucić?" o sprawę, której pieniądze dawno wyszły.
+
+Kolumna `rozliczony_allegro_at` trzyma PIERWSZĄ zobaczoną datę rozliczenia
+i już jej nie oddaje. Sam wniosek o prowizję nadal nie zamyka niczego: bez
+wcześniejszego `FINISHED` zwrot stoi w kolejce i ma tam stać.
+
+Migracja zatrzaskuje to, co widać w chwili wdrożenia. Zwrotów, które zdążyły
+pójść dalej wcześniej, nie odzyska nikt — chwili rozliczenia Allegro nie
+podaje, a kopia odpowiedzi trzyma status „teraz", nie przebieg. Schodzą
+z kolejki ręcznie albo narzędziem `zwroty:sprzatnij`.
+
 **Cena tej decyzji jest realna i nie jest płacona w ciszy.** Pieniądze wróciły
 do klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
 właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM, bo bramka
@@ -3326,7 +3349,11 @@ samym wzorcem co kolektor: przerwa resetuje bufor, Enter kończy serię, krótka
 seria nie jest kodem, a pierwszy znak czeka czterdzieści milisekund, zanim
 trafi do skrótów. Człowiek nie wciska dwóch klawiszy w takim czasie.
 
-Numeru listu ekran nie zapisuje. Politykę opisuje `docs/obsluga-klienta.md`.
+Numer listu STOI od 0.344.0 w modelu pracy — decyzja właściciela zdjęła
+politykę 0.163.0. Wiersz kolejki filtruje się po nim w locie, a kolumna dowodów
+pokazuje go przy przewoźniku. Enter dalej pyta serwer, bo tamta droga zna także
+paczki, których w modelu pracy jeszcze nie ma: zwrot bywa u nas szybciej niż
+w Allegro. Politykę opisuje `docs/obsluga-klienta.md`.
 
 **To samo pole SZUKA (0.165.0).** Każdy wpisany znak zawęża kolejkę po
 fragmencie numeru zwrotu, identyfikatora z Allegro, numeru zamówienia albo
@@ -3561,10 +3588,11 @@ schematu wyszedł wniosek o całym API — i przez trzy wydania panel pisał
 Czas doręczenia podaje osobna końcówka: `GET /order/carriers/{id}/tracking`.
 Każdy wpis historii niesie `occurredAt`, a wśród kodów jest `DELIVERED`.
 
-**Numeru listu dalej nie zapisujemy** (polityka 0.163.0) i nie trzeba.
-Numer leży w kopii odpowiedzi Allegro (`allegro_zwrot.surowe_json`) i stamtąd
-go czytamy — tym samym `json_each`, co szukanie zwrotu po naklejce. Zapisujemy
-sam WYNIK: moment doręczenia i kod statusu.
+**Tracking czyta numer z LĄDOWISKA i to zostaje bez zmian.** Od 0.344.0 numer
+stoi także w modelu pracy, ale tamta kolumna trzyma wyłącznie PIERWSZĄ paczkę
+zwrotu — a tu potrzebna jest para numer-przewoźnik z każdej. Dwa źródła
+odpowiadają na dwa różne pytania. Zapisujemy sam WYNIK odpytania: moment
+doręczenia i kod statusu.
 
 **Pytamy tylko o paczki w drodze.** Zwrot z zapisaną datą nie jest pytany
 drugi raz — data się nie zmieni, a każde żądanie kosztuje u Allegro.

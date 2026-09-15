@@ -337,6 +337,7 @@ export function migrate(database: DatabaseSync) {
      wymienia wartości słownie i nie zamyka ich enumem, a nieznana wartość ma
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");
+  addColumn("zwrot_klienta", "rozliczony_allegro_at", "TEXT");
   /* Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył
      (0.209.0). Bez tej liczby urwanie na limicie stron było CICHE: przebieg
      kończył się sukcesem, kursor szedł naprzód, a zwroty spoza dziesiątej
@@ -592,6 +593,7 @@ export function migrate(database: DatabaseSync) {
      cofnąć jednym kliknięciem. Ten sam wzorzec i ta sama blizna co przy
      powrocie kosza z bufora (`powrotKoszaPozaAplikacja`). */
   rabatPozaAutomatem(database);
+  zatrzasnijRozliczone(database);
   /* Konto autora zadania. `created_by` (nazwa) zostaje — to snapshot tego, co
      aplikacja wtedy wiedziała. Worker działa poza żądaniem, więc bez tej
      kolumny nie umiałby przypisać zdarzenia „zapis wszedł do Subiekta" do
@@ -853,6 +855,40 @@ function rabatPozaAutomatem(database: DatabaseSync) {
         "— wniosek do nich składa biuro przyciskiem, jak przed 0.320.0.");
     }
   })();
+}
+
+/**
+ * Zatrzask rozliczenia dla zwrotów zastanych w chwili wdrożenia (0.345.0).
+ *
+ * `zwrot_klienta.status_allegro` to JEDEN WSKAŹNIK „TERAZ", a nie historia.
+ * Zwrot rozliczony (`FINISHED`) idzie dalej tą samą osią czasu — choćby na
+ * `COMMISSION_REFUND_CLAIMED`, który mówi o NASZEJ prowizji, nie o pieniądzach
+ * klienta. Wskaźnik przestaje wtedy pokazywać rozliczenie, a kubełek liczony
+ * z niego wypychał taki zwrot z ZAMKNIĘTYCH z powrotem do kolejki pracy.
+ *
+ * Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
+ * stwierdzony zwrot". Wypychał je przy tym NASZ WŁASNY automat rabatów
+ * (0.320.0), który składa wniosek zaraz po zaciągnięciu odstąpienia.
+ *
+ * Ta migracja zatrzaskuje to, co jeszcze widać: zwroty stojące DZIŚ na
+ * rozliczeniu dostają datę. Tych, które zdążyły pójść dalej przed wdrożeniem,
+ * nie odzyska nikt — chwili rozliczenia Allegro nie podaje, a kopia odpowiedzi
+ * trzyma status „teraz", nie przebieg. Zostają w kolejce i schodzą z niej
+ * ręcznie albo narzędziem `zwroty:sprzatnij`.
+ */
+function zatrzasnijRozliczone(database: DatabaseSync) {
+  const jest = database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='zwrot_klienta'").get();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!jest) return;
+  const n = Number(database.prepare(
+    `UPDATE zwrot_klienta SET rozliczony_allegro_at = synced_at
+      WHERE rozliczony_allegro_at IS NULL
+        AND status_allegro IN ('FINISHED','FINISHED_APT')`).run().changes ?? 0);
+  if (n) {
+    console.warn(`[migracja] ${n} zwrot(ów) zatrzaśnięto jako rozliczone przez Allegro ` +
+      "— data jest z ostatniej synchronizacji, bo chwili rozliczenia Allegro nie podaje.");
+  }
 }
 
 /**

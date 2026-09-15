@@ -33,7 +33,7 @@ const ZAMOWIENIE: Zamowienie = {
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "REF-1", orderId: "ord-1",
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null,
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, rozliczonyAllegroAt: null, waybill: null,
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
@@ -177,6 +177,20 @@ describe("Dowody", () => {
        klienta, a nie datę jej doręczenia do nas. Wcześniejsze „towar jeszcze
        nie wrócił" twierdziło coś, czego nie wiemy. */
     expect(screen.getByText(/Klient nie nadał jeszcze paczki/)).toBeInTheDocument();
+  });
+
+  it("numer listu stoi przy PRZEWOŹNIKU, bo razem mówią, czym to jechało (0.344.0)", () => {
+    /* Do 0.343.0 panel numeru nie znał: polityka 0.163.0 trzymała go wyłącznie
+       w kopii odpowiedzi Allegro. Decyzja właściciela: „zapisuj numery paczek". */
+    render(zKlientem(<Dowody zwrot={zwrot({ waybill: "600000367616070023174201" })} />));
+    expect(screen.getByText("600000367616070023174201")).toBeInTheDocument();
+  });
+
+  it("brak numeru listu nie zostawia pustej etykiety", () => {
+    /* Allegro oddaje zwrot bez paczek, dopóki klient jej nie nada — wtedy
+       „Numer listu:" bez numeru wyglądałby na usterkę. */
+    render(zKlientem(<Dowody zwrot={zwrot({ waybill: null })} />));
+    expect(screen.queryByText(/Numer listu/)).toBeNull();
   });
 
   it("zamówienie niesie metodę dostawy, bo to ona kosztuje", () => {

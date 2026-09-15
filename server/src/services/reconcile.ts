@@ -314,7 +314,10 @@ function zwrotyPoTerminie(): Rozjazd[] {
  */
 function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
   return listaZwrotow(db())
-    .filter((z) => STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
+    /* ZATRZASK, nie wskaźnik „teraz" (0.345.0) — ten sam powód co przy
+       kubełku: zwrot rozliczony idzie dalej osią czasu Allegro. */
+    .filter((z) => z.rozliczonyAllegroAt
+      || STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
     /* TYLKO OD PROGU (0.340.0). Historia firmy niesie setki zwrotów
        rozliczonych w panelu Allegro, których korekt nikt już wstecz nie
        wystawi — raport o nich uczyłby przewijać raport. Próg stoi

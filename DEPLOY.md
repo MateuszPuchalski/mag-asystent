@@ -1617,8 +1617,14 @@ Dlatego przy nieznanym kodzie ekran daje przycisk POSZUKAJ W ALLEGRO, który
 pyta o ten jeden numer poza kolejnością tickera. Konto Allegro musi być
 sparowane (§6b).
 
-Numeru listu WERTIS nigdzie nie zapisuje. Nie ma go w dzienniku zdarzeń ani
-w logu żądań serwera.
+Numer listu WERTIS zapisuje od 0.344.0 — decyzja właściciela zdjęła politykę
+0.163.0. Stoi w `zwrot_klienta.waybill`, widać go w kolumnie dowodów i szuka
+się po nim w locie.
+
+Trzy rzeczy zostają bez zmian, każda z własnego powodu. Numeru NIE MA
+w dzienniku zdarzeń. NIE MA go w logu żądań serwera — dlatego trasa skanu jest
+POST-em, choć niczego nie zapisuje. NIE MA go w eksporcie CSV, bo plik na dysku
+zostaje trwalszy niż baza.
 
 ## 6f. Czyszczenie zwrotów i pobranie od nowa (0.199.0)
 

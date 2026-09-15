@@ -212,9 +212,13 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
  *
  * Numer zwrotu bywa doklejony na paczce, identyfikator z Allegro wpada
  * z odnośnika, numer zamówienia z rozmowy z klientem, numer korekty z Subiekta.
- * Numeru listu przewozowego tu NIE MA i nie będzie: nie zapisujemy go
- * w modelu pracy (polityka danych zwrotów), więc szuka go dopiero serwer
- * w kopii odpowiedzi Allegro.
+ *
+ * NUMER LISTU DOSZEDŁ W 0.344.0 i to jest zdjęcie polityki 0.163.0, nie
+ * przeoczenie naprawione po latach. Do 0.343.0 numer żył wyłącznie w kopii
+ * odpowiedzi Allegro, więc filtr go nie widział, a szukanie po naklejce
+ * wymagało Entera i pytania serwera. Decyzja właściciela: „zapisuj numery
+ * paczek". Enter dalej pyta serwer — tamta droga zna też numery paczek,
+ * których w modelu pracy nie ma, bo zwrot bywa u nas szybciej niż w Allegro.
  *
  * LOGIN KUPUJĄCEGO doszedł w 0.337.0 na zgłoszenie właściciela. Odpowiada na
  * inne pytanie niż numery: nie „gdzie jest TA paczka", tylko „co jeszcze mam
@@ -222,7 +226,7 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
  * mówi o dwóch przesyłkach naraz. Jedyny uchwyt, jaki wtedy jest pod ręką.
  */
 const kody = (z: Zwrot) =>
-  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin]
+  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin, z.waybill]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Zwroty() {

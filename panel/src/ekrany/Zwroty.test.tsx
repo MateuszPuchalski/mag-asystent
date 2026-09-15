@@ -14,7 +14,7 @@ import type { Kubelek, Zwrot } from "../api/typy";
 
 const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   id, externalId: `zw-${id}`, numer, orderId: `ord-${id}`,
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null,
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, rozliczonyAllegroAt: null, waybill: null,
   kubelek, sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z", dniDoTerminu: 7,
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
@@ -206,6 +206,23 @@ describe("Ekran zwrotów", () => {
     try {
       pokaz();
       await userEvent.type(szukajka(), "nieodebrana");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
+  it("filtr widzi NUMER LISTU bez pytania serwera (0.344.0)", async () => {
+    /* Do 0.343.0 numer żył wyłącznie w kopii odpowiedzi Allegro, więc filtr go
+       nie widział i szukanie po naklejce wymagało Entera. Decyzja właściciela
+       zdjęła politykę 0.163.0: „zapisuj numery paczek". */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), waybill: "600000367616070023174201" },
+      { ...zwrot(2, "zwrot", "ZW-2") },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "6000003676");
       expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
     } finally {
       scena.zwroty = null;

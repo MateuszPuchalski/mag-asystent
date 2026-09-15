@@ -164,6 +164,42 @@ test("zwrot ROZLICZONY PRZEZ ALLEGRO schodzi z kolejki pracy (0.339.0)", () => {
     rejectionCode: "REFUND_REJECTED" }), "odrzucony");
 });
 
+test("rozliczenie ZATRZASKUJE SIĘ — status Allegro idzie dalej, kubełek nie (0.345.0)", () => {
+  /* Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
+     stwierdzony zwrot".
+
+     `status_allegro` to wskaźnik TERAZ, nie historia. Zwrot rozliczony idzie
+     dalej tą samą osią czasu Allegro — a wypycha go tam NASZ WŁASNY automat
+     rabatów (0.320.0), składający wniosek zaraz po zaciągnięciu odstąpienia.
+     Właściciel nazwał to wprost: `COMMISSION_REFUND_CLAIMED` to zwrot rabatu
+     DLA NAS, nie zwrot pieniędzy klientowi.
+
+     Bez zatrzasku zwrot zamknięty w poniedziałek wracał we wtorek do kolejki
+     jako DO DECYZJI — z pytaniem „przyjąć czy odrzucić?" o sprawę, której
+     pieniądze dawno wyszły. */
+  const bazowy = {
+    rejectionCode: null, werdykt: null, zamknietyAt: null,
+    kwotaGrosze: null, korektaNumer: null, pozycje: [{ ocena: null }],
+  };
+  /* Sam wniosek o prowizję NIE JEST rozliczeniem — bez zatrzasku zwrot stoi
+     w kolejce i ma tam stać, bo klient pieniędzy jeszcze nie dostał. */
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "COMMISSION_REFUND_CLAIMED" }),
+    "decyzja", "wniosek o NASZĄ prowizję nie zamyka sprawy klienta");
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "COMMISSION_REFUNDED" }),
+    "decyzja");
+
+  /* Ale gdy rozliczenie RAZ było widziane, wskaźnik może iść, gdzie chce. */
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: "COMMISSION_REFUND_CLAIMED",
+    rozliczonyAllegroAt: "2026-09-14T10:00:00Z" }), "zamkniety");
+  assert.equal(kubelekZwrotu({ ...bazowy, statusAllegro: null,
+    rozliczonyAllegroAt: "2026-09-14T10:00:00Z" }), "zamkniety",
+    "zatrzask działa też wtedy, gdy Allegro przestało cokolwiek mówić");
+
+  /* ODMOWA DALEJ ROZSTRZYGA WCZEŚNIEJ — niesie powód, a zatrzask nie. */
+  assert.equal(kubelekZwrotu({ ...bazowy, rozliczonyAllegroAt: "2026-09-14T10:00:00Z",
+    rejectionCode: "REFUND_REJECTED" }), "odrzucony");
+});
+
 test("kubełek wynika z faktów, a stan końcowy rozstrzyga pierwszy", () => {
   const bazowy = {
     rejectionCode: null, werdykt: null, zamknietyAt: null,

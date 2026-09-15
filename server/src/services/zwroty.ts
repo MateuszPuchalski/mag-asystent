@@ -166,6 +166,25 @@ export interface WierszZwrotu {
   kupujacyLogin: string | null;
   /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
   przewoznik: string | null;
+  /**
+   * Numer listu przewozowego paczki zwrotnej (0.344.0).
+   *
+   * Decyzja właściciela zdjęła politykę 0.163.0: „zapisuj numery paczek".
+   * Numer z naklejki jest tym, co operator trzyma w ręku przy kartonie —
+   * ma więc stać tam, gdzie się na niego patrzy. Do 0.343.0 żył wyłącznie
+   * w kopii odpowiedzi Allegro i panel nie mógł go pokazać ani przefiltrować.
+   *
+   * W CSV go NIE MA i to zostaje: plik na dysku jest zapisem trwalszym niż
+   * baza, a tamta część polityki nie była przedmiotem decyzji.
+   */
+  waybill: string | null;
+  /**
+   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0).
+   *
+   * `status_allegro` to wskaźnik TERAZ, nie historia: zwrot rozliczony idzie
+   * dalej tą samą osią czasu. Ten zatrzask trzyma fakt, a nie chwilowy stan.
+   */
+  rozliczonyAllegroAt: string | null;
   /** Rozmowy o TYM zakupie; puste znaczy „Allegro nic nie powiązało". */
   rozmowy: RozmowaZwrotu[];
   /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
@@ -251,6 +270,8 @@ export function kubelekZwrotu(z: {
   pozycje: Array<{ ocena: string | null }>;
   /** Ostatni status zwrotu po stronie Allegro (0.339.0). */
   statusAllegro?: string | null;
+  /** Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0). */
+  rozliczonyAllegroAt?: string | null;
 }): Kubelek {
   if (z.zamknietyAt) return "zamkniety";
   if (z.werdykt === "odrzucony" || z.rejectionCode) return "odrzucony";
@@ -274,7 +295,22 @@ export function kubelekZwrotu(z: {
      żaden nie chowa pracy — ale „odrzucony" niesie POWÓD, a „zamknięty" mówi
      tylko, że sprawy nie ma. Przy wyborze między dwoma prawdami wygrywa ta,
      która więcej tłumaczy. */
-  if (STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return "zamkniety";
+  /* ZATRZASK, NIE WSKAŹNIK (0.345.0). `status_allegro` mówi, co jest TERAZ,
+     a nie co było: zwrot rozliczony idzie dalej tą samą osią czasu — choćby
+     na `COMMISSION_REFUND_CLAIMED`, który dotyczy NASZEJ prowizji, a nie
+     pieniędzy klienta. Wskaźnik przestawał wtedy pokazywać rozliczenie
+     i kubełek wypychał taki zwrot z powrotem do kolejki pracy.
+
+     Zgłoszenie właściciela: „nadal pokazuje paczki, do których został już
+     stwierdzony zwrot" — a wypychał je NASZ WŁASNY automat rabatów (0.320.0),
+     składający wniosek zaraz po zaciągnięciu odstąpienia.
+
+     Wskaźnik czytamy DALEJ, obok zatrzasku: pierwsze spojrzenie na świeżo
+     zsynchronizowany zwrot bywa wcześniejsze niż zapis zatrzasku, a dwa
+     źródła tej samej prawdy nie kłócą się — oba mówią „pieniądze wróciły". */
+  if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) {
+    return "zamkniety";
+  }
   if (z.werdykt !== "przyjety") return "decyzja";
   /* Pusta lista pozycji NIE jest „ocenione wszystko": zwrot bez pozycji nie
      ma czego wycenić, więc zostaje przy ocenie, gdzie człowiek to zobaczy. */
@@ -478,6 +514,7 @@ function zloz(
     korektaNumer: (z.korekta_numer as string) ?? null,
     pozycje,
     statusAllegro: (z.status_allegro as string) ?? null,
+    rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
   });
   const suma = sumaPozycji(pozycje);
   return {
@@ -548,6 +585,8 @@ function zloz(
        „Kupujacy" w eksporcie CSV. */
     kupujacyLogin: (z.kupujacy_login as string) ?? zamowienie?.kupujacyLogin ?? null,
     przewoznik: (z.przewoznik as string) ?? null,
+    waybill: (z.waybill as string) ?? null,
+    rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
     rozmowy,
     /* Snapshot z kolumn zwrotu, a nie złączenie z `sgt_faktura`: read-model
        czyści się przy każdym imporcie i dokument wypada z okna po dwóch

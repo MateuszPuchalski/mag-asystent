@@ -528,7 +528,7 @@ test("doręczenie dochodzi w NASTĘPNYM przebiegu, choć kursor minął już ten
   assert.equal(trackingi.length, 0, "zwrot z datą doręczenia wypada z pytań");
 });
 
-test("numeru listu nie zapisujemy — do trackingu bierzemy go z lądowiska", async () => {
+test("numer listu STOI w modelu pracy, a tracking dalej czyta lądowisko", async () => {
   const d = stanowisko();
   await synchronizujAllegroZwroty({
     database: d, zwrotyOd: "2026-06-03T00:00:00Z",
@@ -537,11 +537,16 @@ test("numeru listu nie zapisujemy — do trackingu bierzemy go z lądowiska", as
       : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1] })])),
   });
 
-  /* Polityka 0.163.0: kolumny na numer listu przy zwrocie z Allegro NIE MA
-     i mieć nie będzie. Numer żyje w kopii odpowiedzi i tam go czytamy. */
+  /* ZDJĘTA POLITYKA 0.163.0 (0.344.0). Do 0.343.0 stała tu odwrotna asercja
+     i była wtedy prawdziwa: kolumny na numer listu przy zwrocie z Allegro nie
+     wypełnialiśmy świadomie, a numer żył wyłącznie w kopii odpowiedzi.
+
+     Decyzja właściciela: „zapisuj numery paczek". Numer z naklejki jest tym,
+     co operator ma w ręku przy kartonie, więc ma stać tam, gdzie się na niego
+     patrzy — na zwrocie, a nie w surowym JSON-ie pod spodem. */
   const w = d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
     .get() as { waybill: string | null };
-  assert.equal(w.waybill, null, "zwrot z Allegro nie zapamiętuje numeru listu");
+  assert.equal(w.waybill, "WB-1", "numer pierwszej paczki ląduje na zwrocie");
 
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1")
     .get() as { id: number }).id);
@@ -551,4 +556,75 @@ test("numeru listu nie zapisujemy — do trackingu bierzemy go z lądowiska", as
   /* Zamknięty zwrot odpada — tak samo jak odrzucony. */
   d.prepare("UPDATE zwrot_klienta SET zamkniety_at='2026-09-02T08:00:00Z'").run();
   assert.deepEqual(paczkiDoSprawdzenia(d, konto), [], "zamkniętego już nie pytamy");
+});
+
+test("rozliczenie ZATRZASKUJE SIĘ przy pierwszym FINISHED (0.345.0)", async () => {
+  /* Zwrot rozliczony idzie dalej osią czasu Allegro — nasz własny automat
+     rabatów przestawia go na `COMMISSION_REFUND_CLAIMED` zaraz po
+     zaciągnięciu odstąpienia. Bez zatrzasku kubełek wypychał go wtedy
+     z ZAMKNIĘTYCH z powrotem do kolejki pracy. */
+  const d = stanowisko();
+  const wspolne = {
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", apiUrl: "https://api",
+  };
+  const zeStatusem = (status: string) => async (u: string) =>
+    (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1], status })]));
+
+  await synchronizujAllegroZwroty({
+    ...wspolne, now: () => new Date("2026-08-30T12:00:00Z"), query: zeStatusem("FINISHED") });
+  const pierwsze = (d.prepare(
+    "SELECT rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { rozliczony_allegro_at: string | null }).rozliczony_allegro_at;
+  assert.ok(pierwsze, "pierwsze FINISHED zatrzaskuje datę");
+
+  /* Nasz wniosek o prowizję przestawia wskaźnik — zatrzask ma zostać. */
+  d.prepare("DELETE FROM allegro_zwroty_sync_state").run();
+  await synchronizujAllegroZwroty({
+    ...wspolne, now: () => new Date("2026-09-02T12:00:00Z"),
+    query: zeStatusem("COMMISSION_REFUND_CLAIMED") });
+  const w = d.prepare(
+    "SELECT status_allegro, rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { status_allegro: string; rozliczony_allegro_at: string };
+  assert.equal(w.status_allegro, "COMMISSION_REFUND_CLAIMED", "wskaźnik idzie dalej");
+  assert.equal(w.rozliczony_allegro_at, pierwsze, "zatrzask trzyma PIERWSZĄ datę");
+});
+
+test("zwrot NIGDY nierozliczony nie dostaje zatrzasku", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", apiUrl: "https://api",
+    now: () => new Date("2026-08-30T12:00:00Z"),
+    query: async (u) => (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z",
+        { parcels: [paczkaZ1], status: "DELIVERED" })])),
+  });
+  assert.equal((d.prepare(
+    "SELECT rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { rozliczony_allegro_at: string | null }).rozliczony_allegro_at, null);
+});
+
+test("odświeżenie bez paczek NIE KASUJE zapisanego numeru listu", async () => {
+  /* Allegro potrafi oddać ten sam zwrot bez tablicy `parcels` — tak wygląda
+     zgłoszenie, zanim klient nada przesyłkę. Nadpisanie pustym skasowałoby
+     numer, który operator ma na naklejce w ręku. */
+  const d = stanowisko();
+  const wspolne = {
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", apiUrl: "https://api",
+    query: async (u: string) => (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1] })])),
+  };
+  await synchronizujAllegroZwroty({ ...wspolne, now: () => new Date("2026-08-30T12:00:00Z") });
+  assert.equal((d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { waybill: string | null }).waybill, "WB-1");
+
+  /* Ten sam zwrot, tym razem BEZ paczek. Kursor cofamy, żeby wrócił na listę. */
+  d.prepare("DELETE FROM allegro_zwroty_sync_state").run();
+  await synchronizujAllegroZwroty({
+    ...wspolne, now: () => new Date("2026-08-31T12:00:00Z"),
+    query: async (u: string) => (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", {})])),
+  });
+  assert.equal((d.prepare("SELECT waybill FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { waybill: string | null }).waybill, "WB-1", "numer przeżywa odświeżenie");
 });

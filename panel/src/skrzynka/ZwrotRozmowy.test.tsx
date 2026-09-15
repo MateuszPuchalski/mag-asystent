@@ -12,7 +12,7 @@ import { ZwrotRozmowy } from "./ZwrotRozmowy";
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 5, externalId: "zwrot-1", numer: "1111/Z04A", orderId: "zam-77",
-  utworzono: "2026-09-01T10:00:00.000Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null,
+  utworzono: "2026-09-01T10:00:00.000Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, rozliczonyAllegroAt: null, waybill: null,
   kubelek: "decyzja", sygnaly: ["brak_dowodu"], terminAt: "2026-09-15T10:00:00.000Z", dniDoTerminu: 9,
   sumaPozycjiGrosze: 4599, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: "https://salescenter.allegro.com/returns/zwrot-1", zamowienie: null,

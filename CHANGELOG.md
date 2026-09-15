@@ -34,6 +34,52 @@ historii nie przepisujemy.
 ---
 
 
+## 0.345.0 — 15 września 2026
+
+**Rozliczenie zwrotu zatrzaskuje się i już nie znika.** Zgłoszenie
+właściciela: „nadal pokazuje paczki, do których został już stwierdzony zwrot".
+Przyczyna była nasza własna.
+
+`status_allegro` to jeden wskaźnik „teraz", a nie historia. Zwrot rozliczony
+idzie dalej tą samą osią czasu — a wypycha go tam automat rabatów z 0.320.0,
+składający wniosek o prowizję zaraz po zaciągnięciu odstąpienia. Status
+przechodzi na `COMMISSION_REFUND_CLAIMED`, czyli — słowami właściciela — na
+zwrot rabatu DLA NAS, a nie zwrot pieniędzy klientowi. Kubełek przestawał
+wtedy widzieć rozliczenie i wypychał zwrot z ZAMKNIĘTYCH do DO DECYZJI.
+
+- **Nowa kolumna `rozliczony_allegro_at`** trzyma PIERWSZĄ zobaczoną datę
+  rozliczenia. Kubełek, raport rekoncyliacji i `zwroty:sprzatnij` czytają
+  zatrzask, nie wskaźnik.
+- **Sam wniosek o prowizję nie zamyka niczego.** Bez wcześniejszego `FINISHED`
+  zwrot stoi w kolejce — klient pieniędzy jeszcze nie dostał.
+- **[wymaga działania] Migracja zatrzaskuje zwroty stojące DZIŚ na
+  rozliczeniu** i wypisuje ich liczbę przy starcie. Tych, które zdążyły pójść
+  dalej przed wdrożeniem, nie odzyska nikt: chwili rozliczenia Allegro nie
+  podaje. Schodzą z kolejki ręcznie albo przez `zwroty:sprzatnij`.
+
+## 0.344.0 — 15 września 2026
+
+**Numer listu przewozowego stoi w modelu pracy.** Decyzja właściciela:
+„zapisuj numery paczek". Zdejmuje to politykę z 0.163.0, przez którą numer żył
+wyłącznie w kopii odpowiedzi Allegro — panel nie mógł go ani pokazać, ani
+przefiltrować w locie.
+
+- **Synchronizacja zapisuje numer PIERWSZEJ paczki** zwrotu, tej samej,
+  z której idą data nadania i przewoźnik. Zwrot w dwóch przesyłkach pokazywałby
+  inaczej datę jednej, firmę drugiej, a numer trzeciej.
+- **Odświeżenie bez paczek numeru nie kasuje.** Allegro oddaje zgłoszenie bez
+  tablicy `parcels`, zanim klient nada przesyłkę.
+- **Kolumna dowodów pokazuje numer przy przewoźniku** — razem odpowiadają na
+  jedno pytanie: którą paczką to jechało.
+- **Filtr frazy szuka po numerze w locie.** Enter dalej pyta serwer, bo tamta
+  droga zna też paczki, których w modelu pracy jeszcze nie ma.
+- **Paczka nieodebrana przestaje być wyjątkiem** — obie drogi wypełniają tę
+  samą kolumnę, różni je tylko to, kto wpisuje.
+
+Trzy rzeczy zostają bez zmian, każda z własnego powodu: numeru nie ma
+w dzienniku zdarzeń, nie ma w logu żądań serwera (trasa skanu zostaje POST-em)
+i nie ma w eksporcie CSV, bo plik na dysku zostaje trwalszy niż baza.
+
 ## 0.343.0 — 15 września 2026
 
 **Automat rozbijania kompletów przestaje milczeć.** Odejmowanie z paragonu
