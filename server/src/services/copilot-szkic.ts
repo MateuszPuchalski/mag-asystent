@@ -370,7 +370,7 @@ export interface PokwitowanieSzkicu {
   /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
   modele: string[];
   /**
-   * Pozycje, które weszły do wiedzy OD RAZU (0.339.0), bo markę dało się
+   * Pozycje, które weszły do wiedzy OD RAZU (0.341.0), bo markę dało się
    * odczytać. Rozłączne z `modele`: wiersz albo dostał klucz, albo czeka.
    * Szkice sprzed tego wydania mają tu pustą listę i to jest o nich prawda.
    */
@@ -1172,7 +1172,7 @@ export async function ulozSzkic(
   /* Para z rozmowy tą samą regułą: wypada, szkic zostaje, powód do dziennika. */
   const para = sprawdzPasowanie(odp.pasowanie, k.kartoteki, String(k.watek));
 
-  /* ── DANE WEJŚCIOWE WCHODZĄ SAME (0.339.0) ────────────────────────────────
+  /* ── DANE WEJŚCIOWE WCHODZĄ SAME (0.341.0) ────────────────────────────────
      Właściciel: „dane wejściowe po rozpoznaniu powinny wchodzić
      automatycznie". Do 0.338.0 stała tu propozycja i zdanie „wpisz je
      w zakładce Dobór" — agent przepisywał klikiem to, co model już odczytał.
@@ -1275,7 +1275,7 @@ const liczbaPol = (d: DaneDoboru) =>
  * TYLKO W PUSTE POLA — jedna reguła, dwa wołające.
  *
  * To, co agent wpisał sam, jest jego słowem i zostaje. Reguła stała przy
- * kliknięciu od przyrostu trzeciego; automatyczny wpis (0.339.0) nie ma prawa
+ * kliknięciu od przyrostu trzeciego; automatyczny wpis (0.341.0) nie ma prawa
  * być hojniejszy, bo nadpisanie pola wpisanego ręką byłoby jedyną rzeczą
  * w tym module, której agent nie mógłby cofnąć bez pamiętania, co tam było.
  */

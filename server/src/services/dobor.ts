@@ -116,7 +116,7 @@ const PUSTE: DaneDoboru = {
   silnik: null, oem: null, nazwaCzesci: null, parametry: {},
 };
 
-/* ── KTO PISZE DANE DOBORU (0.339.0) ─────────────────────────────────────────
+/* ── KTO PISZE DANE DOBORU (0.341.0) ─────────────────────────────────────────
    Do 0.338.0 odpowiedź brzmiała „człowiek", bo dane doboru wchodziły albo
    z ręki agenta, albo z jego kliknięcia przy propozycji Copilota. Właściciel:
    „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".

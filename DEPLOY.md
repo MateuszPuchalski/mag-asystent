@@ -2291,7 +2291,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.339.0 — nic nie czeka na kliknięcie
+### Aktualizacja do 0.341.0 — nic nie czeka na kliknięcie
 
 **Migracji nie ma. Panel trzeba przebudować. Przełącznika nie ma** i to jest
 świadome: obie zmiany dotyczą drogi, którą uruchamia kliknięcie agenta albo

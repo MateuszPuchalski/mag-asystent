@@ -33,7 +33,7 @@ const ZAMOWIENIE: Zamowienie = {
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "REF-1", orderId: "ord-1",
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null,
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null,
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
@@ -370,6 +370,24 @@ describe("Dowody", () => {
        pozycji z osobna. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
     expect(screen.getByRole("button", { name: /Dociągnij teraz/ })).toBeInTheDocument();
+  });
+});
+
+describe("Zegar obsługi na wierszu (0.339.0)", () => {
+  it("bez paczki wiersz mówi, na co czeka, zamiast pokazywać zero dni", () => {
+    /* Puste miejsce po terminie czytałoby się jak „dziś", czyli odwrotnie
+       niż jest: zegar obsługi rusza dopiero od paczki u nas. */
+    render(<Kolejka zwroty={[zwrot({ terminAt: null, dniDoTerminu: null })]}
+      wybrany={null} onWybierz={() => {}} />);
+    expect(screen.getByText("czeka na paczkę")).toBeInTheDocument();
+  });
+
+  it("z terminem pastylka liczy dni i mówi, o który zegar chodzi", () => {
+    render(<Kolejka zwroty={[zwrot({ dniDoTerminu: 2 })]} wybrany={null}
+      onWybierz={() => {}} />);
+    const p = screen.getByText("2 dni");
+    expect(p).toBeInTheDocument();
+    expect(p).toHaveAttribute("title", expect.stringContaining("7 dni od paczki"));
   });
 });
 

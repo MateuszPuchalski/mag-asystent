@@ -204,7 +204,7 @@ test("LIMIT dostawcy przerywa przebieg — dalsze wywołania pogłębiają przer
   assert.equal(wywolan, 1, "po limicie nie wołamy drugi raz");
 });
 
-test("zmiana danych doboru budzi takt — bez tego 0.339.0 jest połową funkcji", async () => {
+test("zmiana danych doboru budzi takt — bez tego 0.341.0 jest połową funkcji", async () => {
   /* Klient pyta pod ofertą A o część do innej maszyny. Model rozpoznaje markę
      i model, dane wchodzą do doboru same, ale kandydatów policzono PRZED tym
      wpisem, więc pierwszy szkic ich nie zna. Gdyby takt patrzył wyłącznie na

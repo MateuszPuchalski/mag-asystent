@@ -117,7 +117,7 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
     <div className="max-h-56 overflow-y-auto" data-testid="szkic-copilota-tresc">
       {/* Bez drugiego przycisku „Wpisz": dane wpisuje się tam, gdzie stoją —
           w zakładce Dobór. Tu tylko zdanie, żeby agent wiedział, że są. */}
-      {/* WPISAŁ, nie „rozpoznał" (0.339.0). Dane wejściowe wchodzą do doboru
+      {/* WPISAŁ, nie „rozpoznał" (0.341.0). Dane wejściowe wchodzą do doboru
           same, w puste pola; zdanie „wpisz je w zakładce Dobór" prosiło agenta
           o przepisanie tego, co system już zrobił. */}
       {p.nowePolaDoboru.length > 0 && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
@@ -163,7 +163,7 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
           Z oferty dopisano do kartoteki {s.lukiKartoteki.symbol}:{" "}
           <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
         </>}
-        {/* WPISANE PRZED ODŁOŻONYMI (0.339.0): najpierw to, co już JEST
+        {/* WPISANE PRZED ODŁOŻONYMI (0.341.0): najpierw to, co już JEST
             w wiedzy, potem to, co dopiero czeka. Odwrotna kolejność kazałaby
             agentowi czytać o robocie, zanim dowie się, że część zniknęła. */}
         {s.lukiKartoteki.wpisane.length > 0 && <>
@@ -174,7 +174,7 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
           Bez rozpoznanej marki, do kolejki Wiedzy:{" "}
           <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
         </>}
-        {/* Zdanie „model wskazuje człowiek" zeszło z 0.339.0. Było nieprawdą
+        {/* Zdanie „model wskazuje człowiek" zeszło z 0.341.0. Było nieprawdą
             od 0.331.0, kiedy kolejkę zaczął opróżniać automat, i to ono
             kazało agentowi myśleć, że nic się nie dzieje. */}
         {s.lukiKartoteki.czeka > 0 &&

@@ -54,7 +54,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* `dowod_zastosowania` i `zastosowanie` doszły w 0.339.0: od tego wydania
+  /* `dowod_zastosowania` i `zastosowanie` doszły w 0.341.0: od tego wydania
      wiedza z oferty wchodzi od razu, więc ten plik zostawia po sobie wiersze,
      które trzymają `model_urzadzenia` kluczem obcym. Kolejność jest tu
      TREŚCIĄ, nie porządkiem — dziecko przed rodzicem. */
@@ -418,7 +418,7 @@ test("szkic sprzed 0.264.0 czyta się jako lista MODELI, bez dorabiania rodzaju"
     .run(rozmowa, biuro, JSON.stringify(["FS250", "FR450"]));
   const s = S.szkicCopilota(rozmowa)!;
   /* `wpisane` pusta i to jest o tamtych szkicach PRAWDA: wiedza z ofert
-     zaczęła wchodzić od razu dopiero w 0.339.0. Dorobienie im niepustej listy
+     zaczęła wchodzić od razu dopiero w 0.341.0. Dorobienie im niepustej listy
      byłoby zmyśleniem tak samo jak dorobienie rodzaju. */
   assert.deepEqual(s.lukiKartoteki,
     { symbol: null, numery: [], modele: ["FS250", "FR450"], wpisane: [], czeka: 0 });
@@ -617,7 +617,7 @@ test("wartość z rozmowy zostaje, zmyślona wypada — po zwinięciu numeru i p
   assert.deepEqual(S.oczyscPropozycje(null, w), { dane: null, odrzuconych: 0 });
 });
 
-/* ── UMOWA ZMIENIŁA SIĘ W 0.339.0 ────────────────────────────────────────────
+/* ── UMOWA ZMIENIŁA SIĘ W 0.341.0 ────────────────────────────────────────────
    Do 0.338.0 ten test nazywał się „…i NIE dotyka doboru", a `liczba(...)===0`
    była jego sednem: propozycja czekała na kliknięcie agenta. Właściciel:
    „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
@@ -691,7 +691,7 @@ test("automat wpisuje TYLKO w puste pola — słowo agenta zostaje nietknięte",
 });
 
 test("odrzucenie zostaje dla propozycji, której automat NIE miał gdzie wpisać", async () => {
-  /* Po 0.339.0 odrzucenie ma sens wyłącznie wtedy, gdy nic nie weszło —
+  /* Po 0.341.0 odrzucenie ma sens wyłącznie wtedy, gdy nic nie weszło —
      czyli gdy wszystkie pola były już zajęte. Odrzucanie wartości, która stoi
      w doborze, byłoby przyciskiem obiecującym cofnięcie, którego nie robi;
      agent poprawia takie pole tam, gdzie ono stoi, w zakładce Dobór. */
@@ -997,7 +997,7 @@ test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () =
     /nie mówiąc, skąd go ma/);
 });
 
-/* ── Wiedza z ofert wskakuje bez agenta (0.339.0) ────────────────────────────
+/* ── Wiedza z ofert wskakuje bez agenta (0.341.0) ────────────────────────────
    Właściciel: „wiedza z ofert powinna wskakiwać bez potwierdzania przez
    agenta". Numery robiły to od 0.264.0; pozycje listy zgodności czekały
    w kolejce, bo w wierszu stoi goły tekst bez marki.

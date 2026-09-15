@@ -353,7 +353,7 @@ export type PokwitowanieZOferty = {
   /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
   modele: string[];
   /**
-   * Pozycje, które weszły do wiedzy OD RAZU (0.339.0), bo markę dało się
+   * Pozycje, które weszły do wiedzy OD RAZU (0.341.0), bo markę dało się
    * odczytać z tekstu, z naszej bazy albo z tytułu oferty. Rozłączne
    * z `modele`. Szkice sprzed tego wydania mają tu pustą listę.
    */
@@ -918,8 +918,17 @@ export interface Zwrot {
   przesylkaStatus: string | null;
   kubelek: Kubelek;
   sygnaly: Sygnal[];
-  terminAt: string;
-  dniDoTerminu: number;
+  /**
+   * Termin OBSŁUGI: siedem dni od paczki u nas (0.341.0).
+   *
+   * `null` znaczy, że paczka jeszcze nie wróciła, więc zegar nie ruszył —
+   * a nie że termin minął. Do 0.338.0 było to czternaście dni od zgłoszenia
+   * klienta i pole nigdy nie bywało puste.
+   */
+  terminAt: string | null;
+  dniDoTerminu: number | null;
+  /** Ostatni status zwrotu po stronie Allegro; `FINISHED` = pieniądze oddane. */
+  statusAllegro: string | null;
   sumaPozycjiGrosze: number;
   kwotaPelnaGrosze: number | null;
   waluta: string;

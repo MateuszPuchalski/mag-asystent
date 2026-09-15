@@ -59,10 +59,16 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
         doszła, ile zostało do terminu. Brak paczki to zdanie, nie pusta komórka. */}
     <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
       <dt className="text-slate-500">Zgłoszony</dt>
-      <dd>{czas(zwrot.utworzono)} · termin {czas(zwrot.terminAt)}
-        <span className={zwrot.dniDoTerminu < 0 ? " font-bold text-ranga-zle" : " text-slate-500"}>
-          {zwrot.dniDoTerminu < 0 ? ` (minął ${-zwrot.dniDoTerminu} dni temu)` : ` (za ${zwrot.dniDoTerminu} dni)`}
-        </span></dd>
+      {/* Termin rusza dopiero od paczki u nas (0.339.0), więc bywa pusty. */}
+      <dd>{czas(zwrot.utworzono)}{zwrot.terminAt === null || zwrot.dniDoTerminu === null
+        ? " · termin rusza, gdy paczka wróci"
+        : <> · termin {czas(zwrot.terminAt)}
+            <span className={zwrot.dniDoTerminu < 0
+              ? " font-bold text-ranga-zle" : " text-slate-500"}>
+              {zwrot.dniDoTerminu < 0
+                ? ` (minął ${-zwrot.dniDoTerminu} dni temu)`
+                : ` (za ${zwrot.dniDoTerminu} dni)`}
+            </span></>}</dd>
       <dt className="text-slate-500">Paczka</dt>
       <dd>{zwrot.paczkaAt
         ? <>nadana {czas(zwrot.paczkaAt)}{zwrot.przewoznik && <> · {zwrot.przewoznik}</>}

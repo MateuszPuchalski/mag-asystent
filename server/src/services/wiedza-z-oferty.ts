@@ -47,7 +47,7 @@ import type { WiedzaZOferty } from "./copilot-szkic.js";
  */
 export const PORCJA_Z_OFERTY = 20;
 
-/** Podpis maszyny składającej klucz przy zbieraniu z oferty (0.339.0). */
+/** Podpis maszyny składającej klucz przy zbieraniu z oferty (0.341.0). */
 const AUTOMAT_OFERTY = { automat: "oferta" } as const;
 
 /** Kartoteka, do której wolno pisać — wraz z ofertą, z której wiedza pochodzi. */
@@ -61,7 +61,7 @@ export interface PokwitowanieZapisu {
   /** Ile pozycji TEJ kartoteki czeka w kolejce Wiedzy — łącznie, nie tylko z tego szkicu. */
   czeka: number;
   /**
-   * Pozycje, które weszły do wiedzy OD RAZU, bez kolejki i bez agenta (0.339.0).
+   * Pozycje, które weszły do wiedzy OD RAZU, bez kolejki i bez agenta (0.341.0).
    * Podzbiór rozłączny z `modele`: wiersz albo dostał klucz tutaj, albo czeka.
    */
   wpisane: string[];
@@ -121,7 +121,7 @@ export function zapiszWiedzeZOferty(
       modele.push(tekst);
     }
 
-    /* ── KLUCZ SKŁADANY OD RAZU (0.339.0) ───────────────────────────────────
+    /* ── KLUCZ SKŁADANY OD RAZU (0.341.0) ───────────────────────────────────
        Właściciel: „wiedza z ofert powinna wskakiwać bez potwierdzania przez
        agenta". Numery wskakiwały tak od 0.264.0; pozycje listy zgodności
        czekały w kolejce, bo w wierszu stoi goły tekst bez marki.

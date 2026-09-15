@@ -41,9 +41,9 @@ import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic
  * NA AKTUALNYCH DANYCH. Świeżość mierzą dwa pola — te same, którymi ekran
  * mówi „klient dopisał" i „dane doboru zmieniły się od szkicu".
  *
- * DRUGIE POLE DOSZŁO W 0.339.0 i bez niego tamto wydanie byłoby połową
+ * DRUGIE POLE DOSZŁO W 0.341.0 i bez niego tamto wydanie byłoby połową
  * funkcji. Model rozpoznaje w pytaniu markę, model i nazwę części, a te dane
- * od 0.339.0 wchodzą do doboru SAME. Kandydatów liczy się jednak z danych,
+ * od 0.341.0 wchodzą do doboru SAME. Kandydatów liczy się jednak z danych,
  * które stały tam PRZED wywołaniem modelu, więc pierwszy szkic ich jeszcze
  * nie zna: klient pyta pod gaźnikiem A o gaźnik do innej maszyny, dane
  * wpadają, i nikt by po nie nie wrócił. Zmiana wersji doboru budzi takt,

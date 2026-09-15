@@ -100,7 +100,7 @@ describe("Szkic Copilota w edytorze", () => {
   /* Dane doboru z rozmowy (przyrost trzeci): karta w edytorze tylko MÓWI, że
      są — wpisuje je zakładka Dobór. Druga nieświeżość: fakty się zmieniły. */
   it("mówi, co WPISAŁ do doboru, bez drugiego przycisku; zmiana doboru po szkicu jest nazwana", () => {
-    /* „Wpisał", nie „rozpoznał" (0.339.0): dane wejściowe wchodzą do doboru
+    /* „Wpisał", nie „rozpoznał" (0.341.0): dane wejściowe wchodzą do doboru
        same, w puste pola. Zdanie „wpisz je w zakładce Dobór" prosiło agenta
        o przepisanie tego, co system już zrobił. */
     edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2, nowePolaDoboru: ["Marka", "Model", "Silnik"] }));
@@ -144,7 +144,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("pasek mówi, CO POSZŁO DO BAZY — nie czego brakuje", () => {
     /* Do 0.263.0 wypisywał listę braków i przy następnym szkicu liczył ją od
        zera. Teraz kwituje trzy rzeczy: numery dopisane do kartoteki, pozycje
-       zgodności, które weszły do wiedzy OD RAZU (0.339.0), i te, przy których
+       zgodności, które weszły do wiedzy OD RAZU (0.341.0), i te, przy których
        marka milczała, więc zostały w kolejce. */
     edytor(copilot({ szkic: szkic({ lukiKartoteki: {
       symbol: "W09-0211", numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],

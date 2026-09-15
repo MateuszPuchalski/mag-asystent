@@ -350,7 +350,7 @@ function zaladujNowy(database: DatabaseSync, id: number): ModelZOpisu {
  * nie mówi, do jakiej marki należy `FS450`). Wiersz schodzi na `przerobiony`
  * w tej samej transakcji, więc drugie kliknięcie dostaje 409, nie dubel.
  *
- * TRANSAKCJA PRZEZ `wTransakcji`, NIE `transaction` (0.339.0). Od tego
+ * TRANSAKCJA PRZEZ `wTransakcji`, NIE `transaction` (0.341.0). Od tego
  * wydania ta funkcja bywa wołana Z WNĘTRZA cudzej transakcji — `zapiszWiedzeZ
  * Oferty` składa klucz od razu przy zbieraniu z oferty, a `node:sqlite` nie
  * zagnieżdża `BEGIN`. Objawem był cichy brak wpisu: wyjątek „cannot start

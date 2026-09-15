@@ -1997,7 +1997,7 @@ Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
 uruchomić takt z 0.317.0.
 
-**Nic nie czeka na kliknięcie (0.339.0).** Dwie prośby właściciela, jedna
+**Nic nie czeka na kliknięcie (0.341.0).** Dwie prośby właściciela, jedna
 zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
 oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
 
@@ -2597,6 +2597,32 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 | ZAMKNIĘTE | — | wgląd i `R` (cofnij korektę) |
 | ODRZUCONE | — | tylko wgląd |
 
+**Zwrot rozliczony przez Allegro trafia od razu do ZAMKNIĘTYCH (0.339.0).**
+Zgłoszenie właściciela: „pokazuje za dużo zwrotów do procesowania, pokazuje
+zwroty, za które pieniądze zostały już zwrócone".
+
+Kubełek liczył się dotąd z pięciu naszych faktów — werdykt, oceny, kwota,
+korekta, zamknięcie — i ani razu nie patrzył na status z Allegro. Ze schematu
+`CustomerReturn.status`: `FINISHED` znaczy „the payment has been refunded,
+return process is finished", `FINISHED_APT` to samo ręką Allegro Protect.
+
+Zwrot rozliczony w panelu Allegro albo przez Allegro Protect stał więc u nas
+w DO DECYZJI i pytał „przyjąć czy odrzucić?", choć pieniądze dawno były
+u klienta. Pytanie bez treści, przy każdym takim zwrocie, na zawsze.
+
+Odmowa rozstrzyga wcześniej niż rozliczenie. Oba stany są końcowe, więc żaden
+nie chowa pracy, ale ODRZUCONE niesie powód, a ZAMKNIĘTE mówi tylko tyle, że
+sprawy nie ma.
+
+**Cena tej decyzji jest realna i nie jest płacona w ciszy.** Pieniądze wróciły
+do klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
+właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM, bo bramka
+z 0.200.0 czeka na komplet korekt.
+
+Dlatego taki zwrot woła w pasku DO SPRAWDZENIA, kontrolą
+`zwrot_rozliczony_bez_korekty`: wymienia brakujący numer korekty i pozycje bez
+oceny. Raport jest jedynym miejscem, w którym jeszcze się odezwie.
+
 **Te klawisze DZIAŁAJĄ od 0.284.0 i wcześniej nie działały.** Ekran rysował je
 przy przyciskach jako podpowiedzi, a nasłuch znał wyłącznie ruch po liście
 i cyfry kubełków. Tabela wyżej mówiła przy tym o trzech ocenach, choć od
@@ -2645,11 +2671,32 @@ droższą niż najtańsza zwykła, sprzedawca nie musi dopłacać różnicy. Odd
 więcej świadomie: tak samo rozlicza to Allegro, a liczenie najtańszej opcji
 wymagałoby cennika oferty, którego przy zwrocie nie mamy.
 
-Sygnały są trzy: termin ustawowy blisko, towar jeszcze nie wrócił, sprawa
+Sygnały są trzy: termin obsługi blisko, towar jeszcze nie wrócił, sprawa
 rozstrzygnięta już w panelu Allegro. Czwarty z projektu — rozjazd liczby
 sztuk — czeka na ocenę hali z 0.151.0.
 
-Kolejność bierze się z terminu ustawowego, nie z daty wpływu.
+Kolejność bierze się z terminu obsługi, nie z daty wpływu.
+
+**Zegar liczy SIEDEM DNI OD PACZKI U NAS (0.339.0).** Zgłoszenie właściciela:
+„Allegro narzuca obsługę zwrotów do 7 dni po otrzymaniu zwrotu". Do 0.338.0
+liczyliśmy czternaście dni od zgłoszenia klienta, czyli termin ustawowy na
+oddanie pieniędzy.
+
+To są dwa różne zegary i decyzja właściciela brzmi: kolejnością pracy rządzi
+ten, który realnie wiąże, bo po nim Allegro rozlicza sprzedawcę. Termin
+ustawowy nie znika z prawa — znika z kolejności pracy.
+
+Zegar nie rusza, dopóki paczka nie wróci. Wiersz mówi wtedy „czeka na paczkę",
+a nie pokazuje zera: wymyślony termin dla przesyłki w drodze kazałby gonić
+pracę, której nie da się wykonać. Takie zwroty stoją na końcu kolejki i mają
+własny sygnał — brak dowodu powrotu.
+
+Początek zegara bierze się z doręczenia, a gdy trackingu nie ma wcale —
+z nadania. To ta sama reguła, którą od 0.187.0 stosuje sygnał braku dowodu:
+dwie definicje „paczka wróciła" rozjechałyby się przy pierwszej poprawce.
+
+Liczba dni stoi w `ZWROT_TERMIN_DNI` w `wertis.env` i domyślnie wynosi 7.
+Zmiana cudzego regulaminu ma być wpisem w pliku, nie wydaniem.
 
 ### 25a.4. Układ
 
@@ -4651,8 +4698,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
-| Dane wejściowe wchodzą same (§11.2) | **działa** od 0.339.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
-| Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.339.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
+| Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
+| Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
