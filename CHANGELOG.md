@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.4 — 15 września 2026
+
+**Wzór ZW odczytany: rodzaj zwrotu i wyzerowane pozycje.** Sonda `-WzorZW`
+wczytała ZW 772/MAG/07/2026 wystawiony ręcznie przez biuro
+(`docs/sfera-com.md` §2m).
+
+- **„Zwrot ze sprzedaży" to `RodzajZwrotuDetal = 1`.** Szkic po `DodajZW()`
+  ma 0, więc automat musi ustawić tę wartość sam.
+- **Wyzerowana pozycja zostaje na dokumencie** z `IloscJm = 0` i numerem
+  wiersza paragonu. Automat zeruje wiersze, nie usuwa ich.
+- **Przelew równa się wartości brutto po zerach.**
+- **Sonda podpowiada, gdy `-Paragon` nie jest paragonem** — `NaPodstawie`
+  odmawia dla WZ, a paragon ma `dok_Typ = 21`.
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.3 — 15 września 2026
 
 **Sonda ZW zwalnia paragon.** Drugi przebieg na tym samym PA odbił się od

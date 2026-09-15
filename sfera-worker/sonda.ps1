@@ -628,6 +628,11 @@ if ($SzkicZW) {
                 # Trzyma ja okno Subiekta z tym paragonem albo niezamkniety szkic.
                 if ($_.Exception.Message -match 'zablokowa') {
                     Write-Wynik "        Paragon trzyma inna sesja: zamknij go w Subiekcie albo wez inny PA."
+                } elseif ($_.Exception.Message -match 'wystawi. korekty') {
+                    # Trzeci przebieg dostal dok_Id WZ zamiast PA - numer w komunikacie
+                    # mowi, jaki to dokument, ale nie mowi, gdzie szukac wlasciwego.
+                    Write-Wynik "        To nie paragon albo Subiekt nie pozwala go korygowac. Paragon ma dok_Typ = 21:"
+                    Write-Wynik "        SELECT dok_Id, dok_NrPelny, dok_Typ FROM dok__Dokument WHERE dok_Id = $Paragon"
                 }
             }
 
