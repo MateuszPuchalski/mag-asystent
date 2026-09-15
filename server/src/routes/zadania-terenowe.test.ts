@@ -58,3 +58,34 @@ test("ponowić wolno tylko odesłane, i tylko biuru",async()=>{const b=login("bi
     w `anulujZadanie` nie znała `odeslane`, więc zadanie odesłane nie miało
     żadnego wyjścia poza ponowieniem. */
  r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/anuluj`,headers:b});assert.equal(r.statusCode,200,r.body);assert.equal(r.json().zadanie.status,"anulowane");});
+
+/* ── Wiek zlecenia liczy SERWER (0.352.0) ────────────────────────────────────
+   Kolektor to urządzenie z własnym zegarem, który bywa przestawiony; wiek
+   policzony na nim wyglądałby na fakt, nie będąc nim. To ta sama decyzja co
+   przy `czekaOdMs` w kolejce rozmów.                                        */
+test("zadanie otwarte niesie wiek zlecenia, zamknięte nie niesie żadnego",async()=>{const b=login("biuro","Anna"),m=login("magazynier","Marek");
+ let r=await app.inject({method:"POST",url:"/api/zadania-terenowe",headers:b,payload:{rodzaj:"pomiar",tytul:"Zmierz",instrukcja:"Y"}});const id=r.json().zadanie.id;
+ /* Zadanie sprzed trzech dni — znacznik podstawiamy, bo inaczej test mierzyłby
+    czas własnego przebiegu. Wartość bierzemy z zegara testu, nie z zaszytej
+    daty: raport z oknem czasowym nie ma prawa znać konkretnej daty. */
+ const trzyDniTemu=new Date(Date.now()-3*24*3600_000).toISOString();
+ db().prepare("UPDATE zadanie_terenowe SET utworzono_at=? WHERE id=?").run(trzyDniTemu,id);
+
+ r=await app.inject({method:"GET",url:"/api/zadania-terenowe",headers:b});
+ const z=r.json().zadania.find((x:{id:number})=>x.id===id);
+ assert.ok(z.zleconeOdMs>=3*24*3600_000-5000&&z.zleconeOdMs<3*24*3600_000+60_000,`zleconeOdMs=${z.zleconeOdMs}`);
+
+ /* Przejęcie NIE ZERUJE zegara: pytanie brzmi „jak dawno biuro poprosiło",
+    a przejęcie przez halę na to nie odpowiada. */
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wez`,headers:m});
+ assert.ok(r.json().zadanie.zleconeOdMs>=3*24*3600_000-5000,"przejęcie nie zeruje wieku zlecenia");
+
+ /* Odesłanie też nie — wtedy dług przechodzi na biuro, ale zlecenie jest
+    dalej tak samo stare. */
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/odeslij`,headers:m,payload:{powodKod:"brak_towaru"}});
+ assert.ok(r.json().zadanie.zleconeOdMs>=3*24*3600_000-5000);
+
+ /* Zamknięte milczy: „zlecone 9 dni temu" przy wyniku sprzed tygodnia
+    mierzyłoby wiek historii, a nie zaległość. */
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/anuluj`,headers:b});
+ assert.equal(r.json().zadanie.zleconeOdMs,null);});

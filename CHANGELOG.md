@@ -95,6 +95,34 @@ odpowiedziała „nie mam czym", nie zmienia faktu, że czekanie się skończył
 Wpis nie udaje wyniku: agent ma zobaczyć, że pomiaru NIE MA, a nie pomiar
 brzmiący jak wymówka.
 
+### Nic już nie starzeje się po cichu
+
+Karta zadania mówiła, KIEDY je zlecono — „15.09.2026, 08:00". Odjęcie zostawało
+czytelnikowi, a kartę ogląda się między jedną rozmową a drugą, więc zadanie
+sprzed trzech dni wyglądało dokładnie tak samo jak sprzed trzech minut. Lista
+jest posortowana od najstarszych i ten porządek był niewidoczny.
+
+Oba ekrany pokazują teraz WIEK ZLECENIA. Liczy go serwer, nie ekran: kolektor
+ma własny zegar, który bywa przestawiony, a „zlecone 4 dni temu" policzone na
+takim zegarze wyglądałoby na fakt, nie będąc nim. Ta sama decyzja co przy
+`czekaOdMs` w kolejce rozmów.
+
+Zegar nazywa się **„zlecone ... temu", nie „czeka"**. Blizna 0.251.0 mówi, że
+zegar nazwany „czeka" musi być prawdziwy, a przy zadaniu w toku nikt nie czeka
+— ktoś je właśnie robi. Wiek zlecenia odpowiada na inne pytanie i jest
+prawdziwy w każdym otwartym stanie. Zadanie zamknięte milczy: „zlecone 9 dni
+temu" przy wyniku sprzed tygodnia mierzyłoby wiek historii, nie zaległość.
+
+**Bez progu „za późno".** Kusiło, żeby stare zlecenie zapalić na czerwono, ale
+żadna liczba godzin nie jest tu ustaleniem właściciela — §22 wymienia „czas
+realizacji zadania magazynowego" jako metrykę i nie podaje terminu.
+Wyróżniony jest sam wiek, przy każdym zadaniu: to fakt. Termin byłby
+werdyktem, którego nikt nie wydał.
+
+Funkcja `wiek()` przeniosła się z alarmu synchronizacji do wspólnego `ui` i po
+raz pierwszy rozbija dobę na dni. Poniżej doby nic się nie zmienia — alarm
+dostaje dokładnie to, co dotąd.
+
 ### Przy wdrożeniu
 
 Migracja przebudowuje `zadanie_terenowe`, bo SQLite nie poszerza `CHECK`-a

@@ -30,6 +30,22 @@ import pl.wertis.kolektor.ui.theme.InkMute
 import pl.wertis.kolektor.ui.theme.InkSoft
 import pl.wertis.kolektor.ui.theme.cardSurface
 
+/**
+ * Wiek zlecenia po ludzku — „41 min", „2 g", „3 dni".
+ *
+ * Ta sama drabina słów co `wiek()` w panelu, żeby biuro i hala mówiły o tym
+ * samym zadaniu tak samo. Minuty bez godzin, bo na kolektorze liczy się rząd
+ * wielkości, a nie dokładność: „2 g" wystarcza, żeby sięgnąć po to zadanie
+ * przed świeższym.
+ */
+private fun wiekZlecenia(ms: Long): String {
+    val min = ms / 60_000
+    if (min < 1) return "przed chwilą"
+    val g = min / 60
+    if (g >= 24) { val dni = g / 24; return if (dni == 1L) "1 dzień" else "$dni dni" }
+    return if (g > 0) "$g g" else "$min min"
+}
+
 @Composable
 fun FieldTasksScreen(graph: AppGraph) {
     var tasks by remember { mutableStateOf<List<ZadanieTerenowe>>(emptyList()) }
@@ -81,7 +97,21 @@ private fun FieldTaskCard(
         Text(task.instrukcja, fontSize = 14.sp, color = InkSoft)
         task.symbol?.let { Text("$it · ${task.nazwaTowaru.orEmpty()}", fontWeight = FontWeight.SemiBold, color = Ink) }
         task.lokalizacja?.takeIf { it.isNotBlank() }?.let { Text("Półka: $it", color = AmberInk, fontWeight = FontWeight.Bold) }
-        Text("Zlecił(a): ${task.utworzonoPrzez}", fontSize = 11.sp, color = InkMute)
+        // WIEK, NIE ZNACZNIK. Zadanie sprzed trzech dni wyglądało dokładnie tak
+        // samo jak sprzed trzech minut, a lista jest posortowana od najstarszych
+        // — bez tej liczby porządek listy był niewidoczny i wyglądał na losowy.
+        //
+        // BEZ PROGU. Kusi, żeby stare zlecenie zapalić na czerwono, ale żadna
+        // liczba godzin nie jest tu ustaleniem właściciela — projekt panelu §22
+        // wymienia „czas realizacji zadania magazynowego" jako metrykę i NIE
+        // podaje terminu. Wyróżniony jest więc sam wiek, przy każdym zadaniu:
+        // to fakt. „Za późno" byłoby werdyktem, którego nikt nie wydał.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Zlecił(a): ${task.utworzonoPrzez}", fontSize = 11.sp, color = InkMute)
+            task.zleconeOdMs?.let {
+                Text("· ${wiekZlecenia(it)} temu", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
+            }
+        }
         if (task.status == "nowe") PrimaryButton("WEŹ ZADANIE", modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onTake)
         else {
             SectionLabel("WYNIK")

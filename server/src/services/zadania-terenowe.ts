@@ -24,6 +24,22 @@ export interface ZadanieTerenowe {
   wynik: string | null; wykonanoAt: string | null; wykonanoPrzez: string | null;
  odeslanoAt: string | null; odeslanoPrzez: string | null;
  powodKod: PowodOdeslania | null; powod: string | null;
+ /**
+  * Ile milisekund minęło od ZLECENIA — `null` przy zadaniu zamkniętym.
+  *
+  * Liczy SERWER, nie ekran, i to jest ta sama decyzja co przy `czekaOdMs`
+  * w kolejce rozmów. Kolektor to urządzenie z własnym zegarem, który bywa
+  * przestawiony; „zlecone 4 dni temu" policzone na takim zegarze byłoby
+  * gorsze niż brak liczby, bo wygląda na fakt.
+  *
+  * Mierzy od `utworzono_at` w KAŻDYM stanie otwartym — także w `w_toku`
+  * i `odeslane`. Pytanie brzmi „jak dawno biuro poprosiło", a na nie
+  * odpowiedź nie zmienia się przez to, że ktoś zadanie przejął. Blizna
+  * 0.251.0 mówi o czym innym: tam zegar nazywał się „czeka" i kłamał przy
+  * statusie, w którym nikt nie czekał. Tu nazwa jest „zlecone ... temu"
+  * i jest prawdziwa zawsze.
+  */
+ zleconeOdMs: number | null;
 }
 const SELECT = `SELECT z.id,z.rodzaj,z.tytul,z.instrukcja,z.tw_id AS twId,
  t.symbol,t.nazwa AS nazwaTowaru,t.lokalizacja,z.zrodlo,z.zrodlo_ref AS zrodloRef,
@@ -34,14 +50,20 @@ const SELECT = `SELECT z.id,z.rodzaj,z.tytul,z.instrukcja,z.tw_id AS twId,
  z.odeslano_przez AS odeslanoPrzez,z.powod_kod AS powodKod,z.powod FROM zadanie_terenowe z
  LEFT JOIN sgt_towar t ON t.tw_id=z.tw_id`;
 const teraz=()=>new Date().toISOString();
+/* Zadanie zamknięte nie ma zegara: „zlecone 9 dni temu" przy wyniku sprzed
+   tygodnia mierzyłoby wiek historii, a nie zaległość. */
+const OTWARTE=new Set(["nowe","w_toku","odeslane"]);
+const zZegarem=(z:ZadanieTerenowe,chwila:number):ZadanieTerenowe=>({...z,
+ zleconeOdMs:OTWARTE.has(z.status)?Math.max(0,chwila-Date.parse(z.utworzonoAt)):null});
 function tekst(v:string,n:string,max:number){const t=v.trim();if(!t)throw new Error(`${n} nie może być pusty`);if(t.length>max)throw new Error(`${n} może mieć najwyżej ${max} znaków`);return t;}
 export function listaZadan(opts:{status?:string;userId?:number}={}):ZadanieTerenowe[]{
  const w:string[]=[];const a:(string|number)[]=[];
  if(opts.status){w.push("z.status=?");a.push(opts.status);} if(opts.userId!==undefined){w.push("(z.przypisano_user_id IS NULL OR z.przypisano_user_id=?)");a.push(opts.userId);}
  const where=w.length?` WHERE ${w.join(" AND ")}`:"";
- return db().prepare(`${SELECT}${where} ORDER BY CASE z.priorytet WHEN 'pilny' THEN 0 ELSE 1 END, CASE z.status WHEN 'odeslane' THEN 0 WHEN 'w_toku' THEN 1 WHEN 'nowe' THEN 2 ELSE 3 END,z.utworzono_at`).all(...a) as unknown as ZadanieTerenowe[];
+ const chwila=Date.now();
+ return (db().prepare(`${SELECT}${where} ORDER BY CASE z.priorytet WHEN 'pilny' THEN 0 ELSE 1 END, CASE z.status WHEN 'odeslane' THEN 0 WHEN 'w_toku' THEN 1 WHEN 'nowe' THEN 2 ELSE 3 END,z.utworzono_at`).all(...a) as unknown as ZadanieTerenowe[]).map((z)=>zZegarem(z,chwila));
 }
-export function zadanie(id:number):ZadanieTerenowe|null{return(db().prepare(`${SELECT} WHERE z.id=?`).get(id) as unknown as ZadanieTerenowe)??null;}
+export function zadanie(id:number):ZadanieTerenowe|null{const z=db().prepare(`${SELECT} WHERE z.id=?`).get(id) as unknown as ZadanieTerenowe|undefined;return z?zZegarem(z,Date.now()):null;}
 export function utworzZadanie(input:{rodzaj:RodzajZadania;tytul:string;instrukcja:string;twId?:number|null;zrodlo?:string;zrodloRef?:string|null;priorytet?:PriorytetZadania},autor:{id:number;name:string}){
  if(!["pomiar","zdjecie","weryfikacja","inne"].includes(input.rodzaj))throw new Error("Nieznany rodzaj zadania");
  const t=tekst(input.tytul,"Tytuł",120),i=tekst(input.instrukcja,"Instrukcja",2000),p=input.priorytet??"normalny";

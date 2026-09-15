@@ -721,6 +721,9 @@ export type Zadanie = {
   wynik: string | null; wykonanoPrzez: string | null;
   odeslanoAt: string | null; odeslanoPrzez: string | null;
   powodKod: "brak_towaru" | "nie_da_sie" | null; powod: string | null;
+  /* Liczy SERWER, nie ekran — patrz `zleconeOdMs` w `zadania-terenowe.ts`.
+     `null` przy zadaniu zamkniętym. */
+  zleconeOdMs: number | null;
 };
 
 export type StatusSynchronizacji =

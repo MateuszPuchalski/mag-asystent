@@ -4793,6 +4793,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Droga powrotna z hali (§13.3) | **działa** od 0.352.0 | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
 | Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
+| Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; bez progu „za późno", bo §22 nie podaje terminu |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |

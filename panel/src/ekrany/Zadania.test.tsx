@@ -22,7 +22,8 @@ const zadanie = (n: Partial<Zadanie> = {}): Zadanie => ({
   lokalizacja: null, priorytet: "normalny", status: "nowe",
   utworzonoAt: "2026-09-15T08:00:00.000Z", utworzonoPrzez: "A. Lewandowska",
   przypisanoPrzez: null, wynik: null, wykonanoPrzez: null,
-  odeslanoAt: null, odeslanoPrzez: null, powodKod: null, powod: null, ...n,
+  odeslanoAt: null, odeslanoPrzez: null, powodKod: null, powod: null,
+  zleconeOdMs: 42 * 60_000, ...n,
 });
 
 const odeslane = (n: Partial<Zadanie> = {}) => zadanie({
@@ -95,6 +96,27 @@ describe("Zadania terenowe — droga powrotna z hali", () => {
     expect(ponow).toHaveBeenCalledWith(
       { id: 12, instrukcja: "Wałek leży w kartonie przy rampie." },
       expect.anything());
+  });
+
+  it("karta mówi, JAK STARE jest pytanie, a nie kiedy je zadano", () => {
+    /* Sam znacznik wymaga odjęcia w głowie, a kartę ogląda się między jedną
+       rozmową a drugą. Zadanie sprzed trzech dni wyglądało dokładnie tak samo
+       jak sprzed trzech minut — i tak samo się o nim zapominało. */
+    LISTA = [zadanie({ zleconeOdMs: 3 * 24 * 3600_000 })];
+    pokaz();
+    expect(screen.getByText(/3 dni temu/)).toBeInTheDocument();
+  });
+
+  it("zadanie zamknięte wraca do znacznika — wiek historii nie jest zaległością", async () => {
+    /* Wykonane leży poza widokiem domyślnym, więc test przechodzi na jego
+       zakładkę — tak samo jak człowiek szukający wyniku sprzed tygodnia. */
+    LISTA = [zadanie({ status: "wykonane", wynik: "46 mm", wykonanoPrzez: "M. Kowal",
+      zleconeOdMs: null })];
+    pokaz();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Wykonane" }));
+    expect(screen.getByText("46 mm")).toBeInTheDocument();
+    expect(screen.queryByText(/temu/)).not.toBeInTheDocument();
+    expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
   });
 
   it("zadanie nieodesłane nie dostaje przycisków biura", () => {

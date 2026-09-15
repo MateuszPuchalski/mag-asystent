@@ -1158,6 +1158,10 @@ data class ZadanieTerenowe(
     val odeslanoPrzez: String? = null,
     val powodKod: String? = null,
     val powod: String? = null,
+    // Wiek zlecenia liczy SERWER (0.352.0). Kolektor ma własny zegar, który
+    // bywa przestawiony — „zlecone 4 dni temu" policzone na nim wyglądałoby
+    // na fakt, nie będąc nim. `null` przy zadaniu zamkniętym.
+    val zleconeOdMs: Long? = null,
     val wynik: String? = null,
     val wykonanoPrzez: String? = null,
 )

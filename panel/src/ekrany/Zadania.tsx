@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { useAnulujZadanie, useNoweZadanie, usePonowZadanie, useZadania } from "../api/rozmowy";
-import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas } from "../ui";
+import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas, wiek } from "../ui";
 import { Kafel } from "../towar/Kafel";
 import type { Zadanie } from "../api/typy";
 
@@ -228,7 +228,21 @@ export function Zadania() {
           {t.wynik && <div className="rounded-lg bg-os-wynik p-3">
             <div className="mb-1 text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu</div>
             <p className="whitespace-pre-wrap text-tresc">{t.wynik}</p></div>}
-          <p className="text-xs text-slate-500">Zlecił(a) {t.utworzonoPrzez} · {czas(t.utworzonoAt)}</p>
+          {/* ── ZEGAR MÓWI, JAK STARE JEST PYTANIE (0.352.0) ───────────────
+              Sam znacznik „15.09.2026, 08:00" wymaga od czytelnika odjęcia
+              w głowie, a kartę ogląda się między jedną rozmową a drugą.
+              Zadanie sprzed trzech dni wyglądało dokładnie tak samo jak
+              sprzed trzech minut — i tak samo się o nim zapominało.
+
+              „Zlecone ... temu", nie „czeka": blizna 0.251.0 mówi, że zegar
+              nazwany „czeka" musi być prawdziwy, a przy zadaniu W TOKU nikt
+              nie czeka — ktoś je właśnie robi. Wiek zlecenia jest prawdziwy
+              w każdym otwartym stanie, bo odpowiada na inne pytanie: jak
+              dawno biuro poprosiło. */}
+          <p className="text-xs text-slate-500">
+            {t.zleconeOdMs != null
+              ? <>Zlecone <b className="text-slate-700">{wiek(t.zleconeOdMs)} temu</b> · {t.utworzonoPrzez}</>
+              : <>Zlecił(a) {t.utworzonoPrzez} · {czas(t.utworzonoAt)}</>}</p>
         </div>
         {t.status === "odeslane" && <Odeslane zadanie={t} />}
       </Karta>)}
