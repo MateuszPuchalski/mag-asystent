@@ -2,6 +2,7 @@ import { db as defaultDb, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { kartotekaPoSku } from "./dopasowanie-sku.js";
+import { pomijanaPozycja } from "../pomijane.js";
 
 /* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
    Zgłoszenie właściciela: „niektóre oferty są sprzedawane jako komplety, ale
@@ -63,12 +64,24 @@ type WierszPozycji = {
 
 const PUSTY = (powod: string): SkladPozycji => ({ skladniki: [], zrodlo: null, powod });
 
-/** Wiersze dokumentu sprzedaży, zsumowane po kartotece. */
+/**
+ * Wiersze dokumentu sprzedaży, zsumowane po kartotece — BEZ pozycji usługowych.
+ *
+ * PRZESYŁKA NIE JEST SKŁADNIKIEM KOMPLETU (0.350.2). Paragon z Allegro niesie
+ * wiersz „PRZESYŁKA", a odejmowanie niżej oddaje kompletowi wszystko, czego
+ * nie zabrała inna oferta — więc zabierało i przesyłkę. Na produkcji zwrot
+ * 970W/2026 dostał ją w składzie: koszyk pokazał ją do odznaczenia, a
+ * automatyczny ZW odmówił, bo pozycja zwrotu wskazywała kartotekę przesyłki.
+ * Filtr ten sam, którym rozkładanie dostaw pomija usługi (`pomijane.ts`).
+ */
 function pozycjeDokumentu(database: Db, dokId: number): Map<number, number> {
   const w = database.prepare(
-    `SELECT tw_id, SUM(ilosc) AS ilosc FROM sgt_faktura_pozycja WHERE dok_id=? GROUP BY tw_id`)
-    .all(dokId) as Array<{ tw_id: number; ilosc: number }>;
-  return new Map(w.map((x) => [Number(x.tw_id), Number(x.ilosc)]));
+    `SELECT p.tw_id, SUM(p.ilosc) AS ilosc, MIN(t.symbol) AS symbol
+       FROM sgt_faktura_pozycja p LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+      WHERE p.dok_id=? GROUP BY p.tw_id`)
+    .all(dokId) as Array<{ tw_id: number; ilosc: number; symbol: string | null }>;
+  return new Map(w.filter((x) => !pomijanaPozycja(x.symbol))
+    .map((x) => [Number(x.tw_id), Number(x.ilosc)]));
 }
 
 /** Symbol i nazwa kartoteki — na ekran i na dokument MM. */

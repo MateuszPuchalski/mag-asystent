@@ -119,6 +119,23 @@ test("zwykła pozycja bierze kartotekę z paragonu, a ILOŚĆ ze zwrotu", () => 
   assert.deepEqual(s.skladniki.map((x) => [x.twId, x.ilosc]), [[11, 2]]);
 });
 
+test("przesyłka z paragonu NIE jest składnikiem kompletu", () => {
+  /* 0.350.2, produkcja: paragon zwrotu 970W/2026 miał M83118, M831172
+     i PRZESYŁKĘ. Odejmowanie oddało kompletowi wszystko, czego nie zabrała
+     inna oferta — razem z przesyłką. Koszyk pokazał ją do odznaczenia,
+     a automatyczny ZW odmówił zlecenia. */
+  const d = stanowisko();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (943,'PRZESYŁKA','Koszt transportu')").run();
+  const dok = paragon(d, 950, [[21, 1], [22, 1], [943, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 }]);
+  const { id, poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  assert.deepEqual(skladPozycji(d, poz[0]).skladniki.map((x) => x.twId), [21, 22]);
+  /* Ręczne wskazanie składu czyta te same wiersze — przesyłki nie ma czego
+     zaznaczać. */
+  assert.deepEqual(wierszeDokumentuZwrotu(d, id).map((w) => w.twId), [21, 22]);
+});
+
 test("komplet rozbija się na wiersze paragonu", () => {
   /* Oferta jest jedna, a na magazynie leżą trzy kartoteki. Mapowanie oferty
      nie ma jak ich wskazać — klucz `oferta_kartoteka` to (konto, oferta). */
