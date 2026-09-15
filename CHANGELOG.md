@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.338.0 — 15 września 2026
+
+**Paczka nieodebrana wychodzi ze ślepego zaułka.** Zgłoszenie właściciela:
+„jest sporo paczek, które po prostu zostały nieodebrane i wracają do nas —
+znajdź sposób, aby wyświetlały mi się w zakładce zwroty".
+
+Wyświetlały się od 0.172.0. Zaułkiem była DROGA: rejestracja pokazywała się
+dopiero po nieudanym skanie, czyli za komunikatem o błędzie. Przy paczce na
+krzyż to przechodzi, przy „sporo paczek" — nie.
+
+- **Przycisk PACZKA NIEODEBRANA pod polem szukania**, bez warunku.
+- **Formularz otwarty bez skanu pyta o numer listu** z naklejki; po nieudanym
+  skanie numer bierze się ze skanu i drugiego pola nie ma.
+- Bez numeru listu przycisk rejestracji milczy — serwer i tak by odmówił.
+- Wszystkie takie paczki wyciąga wpisanie „nieodebrana" w szukanie; osobne
+  sito nie jest potrzebne, bo identyfikator niesie ten przedrostek.
+
 ## 0.337.0 — 15 września 2026
 
 **Zwroty szukają po loginie kupującego.** Zgłoszenie właściciela. Filtr frazy

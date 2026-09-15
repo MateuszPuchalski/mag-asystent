@@ -2879,6 +2879,24 @@ Wiersz kolejki pokazuje login osobną linijką. Trafienie, którego nie widać,
 wygląda na przypadek: operator nie wie, czemu ten zwrot wszedł na listę.
 Zwrot bez loginu nie zostawia pustej linijki — Allegro nie zawsze go podaje.
 
+**Paczka nieodebrana wychodzi ze ślepego zaułka (0.338.0).** Zgłoszenie
+właściciela: „jest sporo paczek, które po prostu zostały nieodebrane i wracają
+do nas — znajdź sposób, aby wyświetlały mi się w zakładce zwroty".
+
+Wyświetlały się od 0.172.0. Ślepy zaułek był po stronie DROGI: żeby dojść do
+rejestracji, trzeba było najpierw zeskanować kod, dostać „nie znam kodu"
+i dopiero wtedy zobaczyć przycisk. Przy paczce na krzyż to przechodzi; przy
+„sporo paczek" jest to codzienna praca schowana za komunikatem o błędzie.
+
+Przycisk PACZKA NIEODEBRANA stoi teraz pod polem szukania, bez żadnego
+warunku. Otwarty bez skanu formularz pyta o numer listu z naklejki — to jedyny
+uchwyt takiej paczki, bo Allegro nie zna zwrotu, którego klient nie zgłosił.
+Po nieudanym skanie numer bierze się ze skanu i drugiego pola nie ma.
+
+Wszystkie takie paczki widać, wpisując w szukanie „nieodebrana". Osobne sito
+nie jest do tego potrzebne: identyfikatorem jest nasz `nieodebrana:<numer
+listu>`, a filtr frazy porównuje właśnie identyfikatory.
+
 **Pobranie ma ślad od 0.269.0.** Do 0.268.0 panel mówił „oddaj przelewem"
 i na tym kończył: `zwrot_pieniedzy_id` wypełnia wyłącznie ścieżka Allegro, więc
 zwrot domykał się korektą bez zapisu, czy klient dostał pieniądze. Jedynym

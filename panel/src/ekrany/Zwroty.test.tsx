@@ -193,6 +193,25 @@ describe("Ekran zwrotów", () => {
     }
   });
 
+  it("wpisanie „nieodebrana” wyciąga WSZYSTKIE takie paczki (0.338.0)", async () => {
+    /* Nie potrzeba osobnego sita: identyfikator takiej paczki to nasz
+       `nieodebrana:<numer listu>`, a filtr frazy porównuje właśnie
+       identyfikatory. To jest odpowiedź na prośbę „chcę je widzieć w zakładce
+       zwroty" — i ma nią zostać, więc pilnuje jej test. */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), zrodlo: "nieodebrana",
+        externalId: "nieodebrana:PACZ-1", numer: null },
+      { ...zwrot(2, "zwrot", "ZW-2") },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "nieodebrana");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
   it("CAŁY numer otwiera zwrot, sam fragment nigdy", async () => {
     /* Ekran sam otwiera przy jednym wyniku, więc dopasowanie przybliżone
        prowadziłoby do cudzej sprawy — cudzego klienta i cudzych pieniędzy. */
