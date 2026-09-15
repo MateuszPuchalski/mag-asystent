@@ -1813,6 +1813,14 @@ Po włączeniu powiedz biuru o trzech zmianach:
 2. Przy zdaniu „Automat nie wystawił ZW” wystaw ZW ręcznie i wpisz numer, jak dotąd.
 3. Zwroty do faktur zostają bez zmian.
 
+**Koszyk z panelu jest wirtualny (0.350.0).** Po aktualizacji serwera koszyki
+„Z-” znikają z zakładki ZWROTY na kolektorze. Nic nie trzeba ustawiać.
+
+Powiedz hali, że koszyków „Z-” już się nie rozkłada. Rozkłada się kosz
+z numerem MM, które taki koszyk wystawił. Skan etykiety „Z-” podpowie ten
+numer. Kosze „Z-” w toku zostają w biurze: czekają na korekty albo na MM,
+jak dotąd.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

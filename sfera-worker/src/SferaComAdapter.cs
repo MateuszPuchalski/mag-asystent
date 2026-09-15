@@ -397,7 +397,7 @@ public sealed class SferaComAdapter : ISferaAdapter
             /* Szkic po wcześniejszym ZW startuje od kwoty CAŁEGO paragonu (sonda,
                PA 12102: 17,83 zł przy wartości 10,49 zł), więc przelew idzie jawnie. */
             Krok("ZW.PlatnoscPrzelewKwota", 6, () => { zw.PlatnoscPrzelewKwota = wartosc; });
-            Krok("ZW.Zapisz()", 6, () => { zw.Zapisz(); });
+            ZapiszZeSzczegolami((object)zw, "ZW");
             return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
@@ -411,6 +411,38 @@ public sealed class SferaComAdapter : ISferaAdapter
 
     private static bool Zawiera(Exception e, string fraza) =>
         e.Message.Contains(fraza, StringComparison.OrdinalIgnoreCase);
+
+    /**
+     * Zapis z PRZYCZYNĄ odmowy (0.349.1).
+     *
+     * Pierwszy ZW na produkcji (15 września 2026) padł zdaniem „Nie można
+     * zapisać dokumentu." — trzy razy, bez słowa o powodzie. Przyczynę trzyma
+     * `SzczegolyOstatniegoBledu` na dokumencie (nazwa z sondy), a
+     * `SprawdzPoprawnosc()` zgłasza ją PRZED próbą zapisu.
+     *
+     * Odmowa jest TRWAŁA: dane dokumentu między próbami się nie zmieniają, więc
+     * trzy identyczne próby tylko opóźniały biuro. Nieznana nazwa albo pusty
+     * obiekt idą dalej zwykłą drogą — to awaria, nie odmowa.
+     */
+    private static void ZapiszZeSzczegolami(object dokument, string nazwa)
+    {
+        dynamic dok = dokument;
+        try
+        {
+            dok.SprawdzPoprawnosc();
+            dok.Zapisz();
+        }
+        catch (Exception e) when (!PustyObiekt(e) && !NieznanaNazwa(e))
+        {
+            string szczegoly;
+            try { szczegoly = (Convert.ToString((object)dok.SzczegolyOstatniegoBledu) ?? "").Trim(); }
+            catch { szczegoly = ""; }
+            throw new BladTrwalyException(
+                $"Subiekt nie zapisał {nazwa}: {e.Message.Trim()} " +
+                (szczegoly.Length > 0 ? $"Szczegóły: {szczegoly} " : "(Sfera nie podała szczegółów) ") +
+                $"{nazwa} NIE wystawiono — wystaw go ręcznie.");
+        }
+    }
 
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
     {

@@ -241,6 +241,12 @@ export interface WierszListyKoszy {
    * `brak` — kosz otwarty albo z dokumentu Subiekta, więc MM mu się nie należy.
    */
   mmStan: "gotowa" | "zamowiona" | "blad" | "czeka_na_korekte" | "brak";
+  /**
+   * Koszyk wirtualny (0.350.0): złożony w panelu, bez dokumentu MM pod sobą.
+   * Zbiera towar ze zwrotów, po zamknięciu rodzi MM i na tym się kończy —
+   * halę rozkłada kosz z TAMTEGO dokumentu. Kolektor go nie dostaje.
+   */
+  wirtualny: boolean;
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
@@ -268,6 +274,49 @@ export function koszPoKodzie(raw: string): WierszKosza | undefined {
   return db()
     .prepare("SELECT * FROM kosz WHERE kod = ? AND status <> 'rozlozony' AND rodzaj <> ?")
     .get(normalizujKod(raw), RODZAJ_KARTON) as WierszKosza | undefined;
+}
+
+/* ── Koszyk wirtualny (0.350.0) ─────────────────────────────────────────────
+   Decyzja właściciela z 15 września 2026: „wirtualny koszyk powinien być
+   tworzony w celu agregowania towarów ze zwrotów i po jego zamknięciu
+   stworzona MM, a ten wirtualny koszyk zamknięty".
+
+   Dane z produkcji pokazały, dlaczego to wróciło. MM wystawione dla Z-7 wraca
+   importem jako przyjęcie 1352 i hala rozkłada KOSZ Z TEGO DOKUMENTU — a Z-7
+   wisiał obok na kolektorze jako drugi kosz do rozłożenia, z zerem odłożonych
+   pozycji. Jeden fizyczny towar, dwie jednostki pracy.
+
+   Wirtualny to kosz z przedrostkiem `Z-` (nadaje go `kosze-zwrotow.ts`) i bez
+   `mm_dok_id`. Sam przedrostek nie wystarcza: kod kosza z dokumentu to liczba
+   z numeru MM, więc się z nim nie zderzy — ale warunek na dokumencie mówi
+   wprost, o co chodzi.                                                        */
+
+export const KOD_KOSZA_WIRTUALNEGO = /^Z-\d+$/i;
+
+export function jestKoszemWirtualnym(k: { kod: string; mm_dok_id?: number | null }): boolean {
+  return (k.mm_dok_id ?? null) === null && KOD_KOSZA_WIRTUALNEGO.test(String(k.kod ?? "").trim());
+}
+
+/**
+ * Zdanie dla hali, która zeskanowała etykietę koszyka wirtualnego.
+ *
+ * Mówi, CO rozłożyć zamiast niego: numer MM, który przyjdzie importem. Gołe
+ * „nie ma takiego kosza" kazałoby magazynierowi szukać usterki, a to jest
+ * zwykła pomyłka etykiety.
+ */
+export function odmowaKoszaWirtualnego(raw: string): string {
+  const kod = String(raw ?? "").trim().toUpperCase();
+  const k = db().prepare(
+    `SELECT q.status AS mm_status, q.sgt_doc_number AS mm_numer
+       FROM kosz k LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
+      WHERE k.kod = ? AND k.mm_dok_id IS NULL ORDER BY k.id DESC LIMIT 1`)
+    .get(kod) as { mm_status: string | null; mm_numer: string | null } | undefined;
+  const poczatek = `${kod} to koszyk wirtualny — nie rozkłada się go na hali.`;
+  if (k?.mm_status === "done" && k.mm_numer) {
+    const liczba = /(\d+)\s*\//.exec(k.mm_numer)?.[1] ?? k.mm_numer;
+    return `${poczatek} Rozłóż kosz z dokumentu ${k.mm_numer}: wpisz ${liczba}.`;
+  }
+  return `${poczatek} Jego MM jeszcze nie weszło do Subiekta — rozłożysz kosz z tego dokumentu, gdy się pojawi.`;
 }
 
 /* ── Czym kosz NIE jest od 0.140.0 ───────────────────────────────────────────
@@ -305,7 +354,7 @@ export function listaKoszy(): WierszListyKoszy[] {
                  JOIN zwrot_klienta z ON z.id = zp.zwrot_id
                 WHERE p.kosz_id = k.id AND z.korekta_numer IS NULL) AS brakuje_korekt,
               (SELECT q.status FROM sfera_queue q WHERE q.id = k.mm_queue_id) AS mm_status,
-              k.mm_numer, k.mm_queue_id, k.rodzaj, k.anulowano_at, k.anulowano_przez
+              k.mm_numer, k.mm_queue_id, k.rodzaj, k.anulowano_at, k.anulowano_przez, k.mm_dok_id
        FROM kosz k
        WHERE k.status NOT IN ('rozlozony', 'anulowany')
           OR COALESCE(k.rozlozono_at, k.anulowano_at) >= datetime('now', '-14 days')
@@ -331,6 +380,7 @@ export function listaKoszy(): WierszListyKoszy[] {
     zwrotow: Number(w.zwrotow ?? 0),
     brakujeKorekt: Number(w.brakuje_korekt ?? 0),
     mmStan: stanMm(w),
+    wirtualny: jestKoszemWirtualnym({ kod: String(w.kod), mm_dok_id: (w.mm_dok_id as number) ?? null }),
   }));
 }
 
@@ -370,8 +420,13 @@ function stanMm(w: Record<string, unknown>): WierszListyKoszy["mmStan"] {
  * zejścia ze stanu (RW) ta aplikacja nie wystawia.
  */
 export function koszeDlaKolektora(): WierszListyKoszy[] {
+  /* KOSZYK WIRTUALNY TEŻ NIE (0.350.0). Po zamknięciu rodzi MM, a halę
+     rozkłada kosz z tego dokumentu — obecny tu dawał dwie jednostki pracy na
+     jeden towar (Z-7 obok 1352 na produkcji). Biuro widzi go dalej w
+     `listaKoszy`, bo tam śledzi jego dokument. */
   return listaKoszy().filter(
     (k) => k.status === "zamkniety" && k.rodzaj !== RODZAJ_KARTON && k.rodzaj !== RODZAJ_ODPAD
+      && !k.wirtualny
   );
 }
 

@@ -398,6 +398,21 @@ test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
   );
 });
 
+test("koszyk wirtualny nie trafia na kolektor — halę rozkłada kosz z jego MM", async () => {
+  /* 0.350.0, decyzja właściciela: koszyk złożony w panelu zbiera towar, rodzi
+     MM i się kończy. Na produkcji Z-7 wisiał na kolektorze obok przyjęcia 1352
+     z tego samego MM — dwie jednostki pracy na jeden towar. */
+  const wirtualny = koszAplikacji("Z-7");
+  const zDokumentu = koszDoRozkladania("KZ-01");
+  const naKolektorze = K.koszeDlaKolektora().map((k) => k.id);
+  assert.equal(naKolektorze.includes(wirtualny.id), false);
+  assert.equal(naKolektorze.includes(zDokumentu.id), true);
+  /* Biuro widzi go dalej — to tam śledzi się jego dokument MM. */
+  const wBiurze = K.listaKoszy().find((k) => k.id === wirtualny.id);
+  assert.equal(wBiurze?.wirtualny, true);
+  assert.equal(K.listaKoszy().find((k) => k.id === zDokumentu.id)?.wirtualny, false);
+});
+
 test("koszyk odpadu nie jest pracą hali i nie cofa bufora", async () => {
   /* 0.211.0 dołożyło rodzaj koszy i nie ruszyło listy dla kolektora, więc
      kosz odpadu wyglądał tam jak każdy inny. Magazynier odłożyłby złom na

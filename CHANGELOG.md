@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.350.0 — 15 września 2026
+
+**Koszyk z panelu jest wirtualny: zbiera towar, rodzi MM i się kończy.**
+Decyzja właściciela: „wirtualny koszyk powinien być tworzony w celu
+agregowania towarów ze zwrotów i po jego zamknięciu stworzona MM, a ten
+wirtualny koszyk zamknięty”. Na produkcji koszyk Z-7 wisiał na kolektorze
+obok przyjęcia 1352 z własnego MM — hala rozłożyła 1352, a Z-7 został
+z zerem odłożonych pozycji.
+
+- **Kolektor nie dostaje koszyków „Z-”.** Na zakładce ZWROTY zostają kosze
+  z dokumentu MM — to je rozkłada hala, razem z powrotem na magazyn.
+- **Skan albo wpis „Z-7” odsyła do dokumentu:** „Z-7 to koszyk wirtualny —
+  rozłóż kosz z dokumentu MM 1352/MAG/2026: wpisz 1352”. Gdy MM jeszcze nie
+  weszło, mówi, żeby poczekać.
+- **Panel mówi, że zamknięcie kończy koszyk**, a na hali rozkłada się kosz
+  z numerem tego MM. Zbieranie towaru, bramka korekt i wystawianie MM
+  działają bez zmian.
+- Kolektor: podpowiedź „np. 1209” i nagłówek „KOSZE W ROZKŁADANIU” (nowe APK).
+
+## 0.349.1 — 15 września 2026
+
+**ZW, którego Subiekt nie zapisze, mówi dlaczego.** Pierwszy automatyczny ZW
+na produkcji (zwrot 603Q/2026, PA 745/MAG/09/2026) padł trzy razy zdaniem
+„Nie można zapisać dokumentu." — bez przyczyny.
+
+- **Worker woła `SprawdzPoprawnosc()` przed zapisem** i przy odmowie dopisuje
+  do błędu `SzczegolyOstatniegoBledu` z dokumentu.
+- **Odmowa zapisu kończy zadanie od razu**, bez trzech identycznych prób.
+- **Sonda `-SzkicZW -Towary "tw=ilosc" -Sprawdz`** ustawia szkic jak worker
+  i pokazuje przyczynę odmowy — nadal bez `Zapisz()`.
+
+Po aktualizacji przebuduj exe workera Sfery (`sfera-worker\build.ps1`)
+i zrestartuj `wertis-sfera`, tak jak przy 0.349.0.
+
 ## 0.349.0 — 15 września 2026
 
 **ZW do paragonu wystawia się sam po zapisaniu kwoty.** Na nagraniu pracy

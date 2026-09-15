@@ -1,6 +1,8 @@
 import { db, nowIso, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { BladKosza, szczegolKosza, type SzczegolKosza } from "./kosze.js";
+import {
+  BladKosza, KOD_KOSZA_WIRTUALNEGO, odmowaKoszaWirtualnego, szczegolKosza, type SzczegolKosza,
+} from "./kosze.js";
 
 /* ── Przyjęcia na regał zwrotów — kosz z dokumentu Subiekta ──────────────────
    Obieg magazynu jest starszy niż ta aplikacja i wygląda tak:
@@ -124,25 +126,16 @@ export function listaPrzyjec(): WierszPrzyjecia[] {
  * się od razu `zamkniety`, bo nie ma czego do niego dokładać — zawartość
  * ustalił dokument.
  */
-/** Kod kosza złożonego w aplikacji: przedrostek `Z-` i liczba (`kosze-zwrotow.ts`). */
-const KOD_KOSZA_APLIKACJI = /^Z-\d+$/i;
-
 export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
-  /* KOD KOSZA Z APLIKACJI (audyt zwrotów, 15 września 2026). Zakładka ZWROTY
+  /* KOD KOSZYKA WIRTUALNEGO NIE OTWIERA NICZEGO (0.350.0). Zakładka ZWROTY
      kieruje tu każdy skan, a `numerZKartki` zostawia same cyfry — więc `Z-7`
-     otwierało MM numer 7 albo kończyło się 404. Przedrostek powstał po to,
-     żeby te dwie przestrzenie się nie zderzały; do dziś nikt go tu nie czytał.
-     Kod bez kosza w pracy odpada GŁOŚNO, a nie cyframi: MM o tej samej liczbie
-     to cudzy kosz. */
+     otwierałby MM numer 7. Od audytu zwrotów otwierał SAM Z-7, a to był drugi
+     kosz na towar, który hala rozkłada z dokumentu MM tego koszyka. Teraz
+     odpowiedź mówi, który dokument rozłożyć. Odpada głośno, nie cyframi: MM
+     o tej samej liczbie to cudzy kosz. */
   const surowy = String(raw ?? "").trim().toUpperCase();
-  if (KOD_KOSZA_APLIKACJI.test(surowy)) {
-    const k = db()
-      .prepare("SELECT id, status, rodzaj FROM kosz WHERE kod = ? ORDER BY id DESC LIMIT 1")
-      .get(surowy) as { id: number; status: string; rodzaj: string } | undefined;
-    if (!k || k.rodzaj !== "zwroty" || k.status === "otwarty" || k.status === "anulowany") {
-      throw new BladKosza(404, `Kosz ${surowy} nie czeka na rozłożenie — sprawdź etykietę`);
-    }
-    return szczegolKosza(k.id);
+  if (KOD_KOSZA_WIRTUALNEGO.test(surowy)) {
+    throw new BladKosza(404, odmowaKoszaWirtualnego(surowy));
   }
   const numer = numerZKartki(raw);
   if (!numer) throw new BladKosza(400, "Podaj numer z kartki przy koszu, np. 1209");

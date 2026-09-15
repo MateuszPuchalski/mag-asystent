@@ -65,10 +65,11 @@ test("numer z kartki: sama liczba, cały numer i śmieci", () => {
   assert.equal(P.numerZKartki("   "), "");
 });
 
-test("kod kosza z aplikacji otwiera TEN kosz, a nie MM o tej samej liczbie", () => {
-  /* Audyt zwrotów, 15 września 2026. Zakładka ZWROTY kieruje tu każdy skan,
-     a numer z kartki to same cyfry — więc etykieta `Z-7` otwierała MM numer 7.
-     Przedrostek istniał dokładnie po to, żeby te przestrzenie się nie zderzały. */
+test("kod koszyka wirtualnego odsyła do jego MM — nie otwiera ani jego, ani MM o tej liczbie", () => {
+  /* 0.350.0, decyzja właściciela: koszyk złożony w panelu jest WIRTUALNY.
+     Po zamknięciu rodzi MM, a halę rozkłada kosz z tamtego dokumentu. Do
+     tego wydania `Z-7` otwierał sam koszyk — drugi kosz na ten sam towar.
+     Numer z kartki to same cyfry, więc bez tej gałęzi `Z-7` otworzyłby MM 7. */
   const d = db();
   d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
      VALUES (41007, 'MM 7/MAG/2026', '7', '2026-08-18', 1, 3)`).run();
@@ -81,13 +82,20 @@ test("kod kosza z aplikacji otwiera TEN kosz, a nie MM o tej samej liczbie", () 
   d.prepare("INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)")
     .run(id, 900_036, "TEST-LINIA-TODO", "Pozycja nietknięta", 1);
 
-  assert.equal(P.otworzPrzyjecie(" z-7 ", "Jan").id, id, "wielkość liter i spacje ze skanera nie przeszkadzają");
+  /* MM jeszcze nie weszło — odmowa mówi, że dokumentu trzeba poczekać. */
+  assert.throws(() => P.otworzPrzyjecie(" z-7 ", "Jan"), /Z-7 to koszyk wirtualny.*jeszcze nie weszło/,
+    "wielkość liter i spacje ze skanera nie przeszkadzają");
+
+  /* MM weszło — odmowa podaje numer, który hala ma rozłożyć zamiast koszyka. */
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', 'done', '{}', 'MM 1352/MAG/2026', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+  d.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(q, id);
+  assert.throws(() => P.otworzPrzyjecie("Z-7", "Jan"), /Rozłóż kosz z dokumentu MM 1352\/MAG\/2026: wpisz 1352/);
+
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz WHERE mm_dok_id = 41007").get() as
     { n: number }).n, 0, "MM numer 7 nie dostał kosza");
-
-  /* Kosz jeszcze otwarty przy biurku nie jest pracą hali — i nie spada na cyfry. */
-  d.prepare("UPDATE kosz SET status='otwarty' WHERE id=?").run(id);
-  assert.throws(() => P.otworzPrzyjecie("Z-7", "Jan"), /nie czeka na rozłożenie/);
+  assert.equal((d.prepare("SELECT status FROM kosz WHERE id=?").get(id) as { status: string }).status,
+    "zamkniety", "koszyk wirtualny zostaje zamknięty — nikt go nie rozkłada");
 });
 
 test("otwarcie po numerze buduje kosz z pozycji dokumentu i jest idempotentne", () => {

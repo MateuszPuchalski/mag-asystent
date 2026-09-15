@@ -67,7 +67,13 @@ param(
     [string]$Ilosci = "",
     # dok_Id ZW wystawionego RECZNIE przez biuro. Sonda go tylko WCZYTUJE,
     # zeby odczytac liczbe, ktora znaczy "zwrot ze sprzedazy". Dotyczy -SzkicZW.
-    [int]$WzorZW = 0
+    [int]$WzorZW = 0,
+    # Kartoteki zwracane jak w zadaniu zw workera: "TowarId=ilosc" po przecinku,
+    # np. "9280=1". Reszta wierszy dostaje zero. Nadal w pamieci. Dotyczy -SzkicZW.
+    [string]$Towary = "",
+    # Po ustawieniu szkicu jak worker: rodzaj 1, przelew = wartosc i
+    # SprawdzPoprawnosc() z SzczegolyOstatniegoBledu - BEZ Zapisz(). Dotyczy -SzkicZW.
+    [switch]$Sprawdz
 )
 
 $ErrorActionPreference = "Continue"
@@ -699,6 +705,54 @@ if ($SzkicZW) {
                         }
                     }
                     Wlasciwosci-Wg $zw 'Wartosc|Kwota|Plat|Przelew|Gotow|Kart' "ZW PO zmianie ilosci"
+                }
+
+                # JAK WORKER (0.349.1). Na produkcji Zapisz() odmowil zdaniem "Nie mozna
+                # zapisac dokumentu" bez przyczyny. Przyczyne trzyma SzczegolyOstatniegoBledu,
+                # a SprawdzPoprawnosc() pokazuje ja bez zapisu - wiec sonda dalej nic nie wystawia.
+                if ($Towary -or $Sprawdz) {
+                    Write-Wynik ""
+                    Write-Wynik "JAK WORKER - Towary '$Towary', nadal BEZ Zapisz()"
+                    $chce = @{}
+                    foreach ($para in ($Towary -split ',')) {
+                        if (-not $para.Trim()) { continue }
+                        $cz = $para.Trim() -split '='
+                        if ($cz.Count -eq 2) {
+                            $chce[[int]$cz[0]] = [decimal]::Parse($cz[1], [Globalization.CultureInfo]::InvariantCulture)
+                        }
+                    }
+                    if ($Towary) {
+                        try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+                        for ($i = 1; $i -le $liczba; $i++) {
+                            try {
+                                $el = $pozycjeZw.Element($i)
+                                $tw = [int]$el.TowarId
+                                $ilosc = [decimal]$el.IloscJm
+                                $nowa = [decimal]0
+                                if ($chce.ContainsKey($tw) -and $chce[$tw] -gt 0) {
+                                    $nowa = [Math]::Min($ilosc, $chce[$tw])
+                                    $chce[$tw] = $chce[$tw] - $nowa
+                                }
+                                if ($nowa -ne $ilosc) { $el.IloscJm = [double]$nowa }
+                                Write-Wynik ("  [{0}] TowarId={1} IloscJm {2} -> {3}" -f $i, $tw, $ilosc, $nowa)
+                            } catch {
+                                Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                            }
+                        }
+                    }
+                    try { $zw.RodzajZwrotuDetal = 1; Write-Wynik "  JEST  RodzajZwrotuDetal = 1" }
+                    catch { Write-Wynik "  BRAK  RodzajZwrotuDetal: $($_.Exception.Message)" }
+                    try {
+                        $zw.PlatnoscPrzelewKwota = $zw.WartoscBrutto
+                        Write-Wynik ("  JEST  PlatnoscPrzelewKwota = {0}" -f $zw.WartoscBrutto)
+                    } catch { Write-Wynik "  BRAK  PlatnoscPrzelewKwota: $($_.Exception.Message)" }
+                    try {
+                        $zw.SprawdzPoprawnosc()
+                        Write-Wynik "  JEST  SprawdzPoprawnosc() nie zglosil bledu"
+                    } catch {
+                        Write-Wynik "  BRAK  SprawdzPoprawnosc() odmowil: $($_.Exception.Message)"
+                    }
+                    Write-Wynik ("  SzczegolyOstatniegoBledu = {0}" -f (Wartosc $zw "SzczegolyOstatniegoBledu"))
                 }
             }
         }
