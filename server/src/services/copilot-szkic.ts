@@ -9,6 +9,9 @@ import {
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
 import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor.js";
+
+/** Podpis maszyny piszącej dane doboru. Jedno miejsce, bo po nim się poznaje. */
+const AUTOMAT_DANYCH = { automat: "szkic" } as const;
 import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { dociagnijTresc } from "./allegro-oferta-tresc.js";
@@ -364,11 +367,19 @@ export interface SzkicCopilota {
 export interface PokwitowanieSzkicu {
   symbol: string | null;
   numery: Array<{ rodzaj: string; wartosc: string }>;
+  /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
   modele: string[];
+  /**
+   * Pozycje, które weszły do wiedzy OD RAZU (0.339.0), bo markę dało się
+   * odczytać. Rozłączne z `modele`: wiersz albo dostał klucz, albo czeka.
+   * Szkice sprzed tego wydania mają tu pustą listę i to jest o nich prawda.
+   */
+  wpisane: string[];
   czeka: number;
 }
 
-const PUSTE_POKWITOWANIE: PokwitowanieSzkicu = { symbol: null, numery: [], modele: [], czeka: 0 };
+const PUSTE_POKWITOWANIE: PokwitowanieSzkicu =
+  { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 };
 
 /**
  * Odczyt kolumny `luki_kartoteki` w obu kształtach, jakie tam stoją.
@@ -387,6 +398,7 @@ function czytajPokwitowanie(json: string | null): PokwitowanieSzkicu {
     symbol: o.symbol == null ? null : String(o.symbol),
     numery: Array.isArray(o.numery) ? o.numery : [],
     modele: Array.isArray(o.modele) ? o.modele.map(String) : [],
+    wpisane: Array.isArray(o.wpisane) ? o.wpisane.map(String) : [],
     czeka: Number(o.czeka ?? 0),
   };
 }
@@ -1159,6 +1171,37 @@ export async function ulozSzkic(
     odp.daneDoboru, `${String(k.watek)}${zOdczytu ? `\n${zOdczytu}` : ""}`);
   /* Para z rozmowy tą samą regułą: wypada, szkic zostaje, powód do dziennika. */
   const para = sprawdzPasowanie(odp.pasowanie, k.kartoteki, String(k.watek));
+
+  /* ── DANE WEJŚCIOWE WCHODZĄ SAME (0.339.0) ────────────────────────────────
+     Właściciel: „dane wejściowe po rozpoznaniu powinny wchodzić
+     automatycznie". Do 0.338.0 stała tu propozycja i zdanie „wpisz je
+     w zakładce Dobór" — agent przepisywał klikiem to, co model już odczytał.
+
+     PRZED ZAPISEM SZKICU, i to nie jest szczegół porządkowy. Wpis podnosi
+     `dobor_rozmowy.wersja`, a szkic pamięta wersję, na której powstał. Zapis
+     w odwrotnej kolejności dawałby szkic nieświeży w chwili narodzin: ekran
+     mówiłby „dane doboru zmieniły się od szkicu — ułóż ponownie" o zmianie,
+     którą sam ten szkic właśnie wprowadził.
+
+     TYLKO W PUSTE POLA, tą samą regułą co kliknięcie. Cofnięcie jest tam,
+     gdzie zawsze: agent poprawia pole w zakładce Dobór, a `updated_by`
+     mówi, że poprzednią wartość wpisała maszyna. */
+  let wersjaDoboru = k.doborWersja;
+  let wpisanePol = 0;
+  if (propozycja.dane) {
+    const { czesc, pol } = tylkoWPuste(propozycja.dane, doborRozmowy(conversationId).dane);
+    if (pol > 0) {
+      try {
+        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH).wersja;
+        wpisanePol = pol;
+      } catch {
+        /* Wyścig z agentem piszącym ręcznie w tej samej chwili kończy się
+           `ConversationConflict`. Szkic zostaje — jest wart pieniędzy sam
+           w sobie — a dane agent ma i tak, bo to on właśnie je wpisał. */
+      }
+    }
+  }
+
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
@@ -1177,10 +1220,17 @@ export async function ulozSzkic(
         pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
-        propozycja.dane ? JSON.stringify(propozycja.dane) : null, k.doborWersja,
+        propozycja.dane ? JSON.stringify(propozycja.dane) : null, wersjaDoboru,
         para.propozycja ? JSON.stringify(para.propozycja) : null,
         JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie),
         JSON.stringify(odp.odczytZeZdjec));
+    /* Los propozycji danych ustawiamy OD RAZU, bo nie ma już czego klikać.
+       `dane_ocena_at` niesie czas, a KTO wpisał, mówi `dobor_rozmowy`:
+       `updated_by='automat (szkic)'` przy pustym `updated_user_id`. */
+    if (wpisanePol > 0) {
+      db().prepare(`UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=?
+        WHERE conversation_id=?`).run(teraz.toISOString(), conversationId);
+    }
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
@@ -1222,6 +1272,30 @@ const liczbaPol = (d: DaneDoboru) =>
   KLUCZE_DANYCH.filter((k) => d[k]).length + Object.keys(d.parametry).length;
 
 /**
+ * TYLKO W PUSTE POLA — jedna reguła, dwa wołające.
+ *
+ * To, co agent wpisał sam, jest jego słowem i zostaje. Reguła stała przy
+ * kliknięciu od przyrostu trzeciego; automatyczny wpis (0.339.0) nie ma prawa
+ * być hojniejszy, bo nadpisanie pola wpisanego ręką byłoby jedyną rzeczą
+ * w tym module, której agent nie mógłby cofnąć bez pamiętania, co tam było.
+ */
+function tylkoWPuste(
+  propozycja: DaneDoboru, biezace: DaneDoboru,
+): { czesc: Partial<DaneDoboru>; pol: number } {
+  const czesc: Partial<DaneDoboru> = {};
+  let pol = 0;
+  for (const k of KLUCZE_DANYCH) {
+    if (propozycja[k] && !biezace[k]) { czesc[k] = propozycja[k]; pol += 1; }
+  }
+  const parametry = { ...biezace.parametry };
+  for (const [n, v] of Object.entries(propozycja.parametry)) {
+    if (!(n in parametry)) { parametry[n] = v; pol += 1; }
+  }
+  if (pol > 0) czesc.parametry = parametry;
+  return { czesc, pol };
+}
+
+/**
  * Agent kliknął „Wpisz do danych": propozycja wchodzi do `dobor_rozmowy`
  * WYŁĄCZNIE w puste pola — to, co agent wpisał sam, jest jego słowem i zostaje.
  * Zapis idzie przez `zapiszDane`, więc dostaje wszystko, co ręczny: wersję,
@@ -1235,20 +1309,8 @@ export function przyjmijDaneDoboru(
   const s = szkicCopilota(conversationId);
   if (!s || !s.daneDoboru) throw new Error("Ta rozmowa nie ma propozycji danych doboru");
   if (s.daneOcena !== null) throw new Error("Propozycja danych została już oceniona");
-  const biezace = doborRozmowy(conversationId).dane;
-  const czesc: Partial<DaneDoboru> = {};
-  let pol = 0;
-  for (const k of KLUCZE_DANYCH) {
-    if (s.daneDoboru[k] && !biezace[k]) { czesc[k] = s.daneDoboru[k]; pol += 1; }
-  }
-  const parametry = { ...biezace.parametry };
-  for (const [n, v] of Object.entries(s.daneDoboru.parametry)) {
-    if (!(n in parametry)) { parametry[n] = v; pol += 1; }
-  }
-  if (pol > 0) {
-    czesc.parametry = parametry;
-    zapiszDane(conversationId, czesc, expectedVersion, kto.id);
-  }
+  const { czesc, pol } = tylkoWPuste(s.daneDoboru, doborRozmowy(conversationId).dane);
+  if (pol > 0) zapiszDane(conversationId, czesc, expectedVersion, kto.id);
   transaction(db(), () => {
     db().prepare("UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=? WHERE conversation_id=?")
       .run(teraz.toISOString(), conversationId);

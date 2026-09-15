@@ -18,6 +18,7 @@ let db: typeof import("../db/db.js").db;
 let config: typeof import("../config.js").config;
 let S: typeof import("./copilot-szkic.js");
 let P: typeof import("./pasowania.js");
+let W: typeof import("./wiedza.js");
 let D: typeof import("./dobor.js");
 let K: typeof import("./copilot-klasyfikacja.js");
 let subiekt: typeof import("../context.js").subiekt;
@@ -33,6 +34,7 @@ before(async () => {
   ({ subiekt } = await import("../context.js"));
   S = await import("./copilot-szkic.js");
   P = await import("./pasowania.js");
+  W = await import("./wiedza.js");
   D = await import("./dobor.js");
   K = await import("./copilot-klasyfikacja.js");
   const d = db();
@@ -52,7 +54,12 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
+  /* `dowod_zastosowania` i `zastosowanie` doszły w 0.339.0: od tego wydania
+     wiedza z oferty wchodzi od razu, więc ten plik zostawia po sobie wiersze,
+     które trzymają `model_urzadzenia` kluczem obcym. Kolejność jest tu
+     TREŚCIĄ, nie porządkiem — dziecko przed rodzicem. */
   for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator", "model_z_opisu",
+    "dowod_zastosowania", "zastosowanie",
     "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
     "channel_account", "events", "app_user"]) {
@@ -400,7 +407,7 @@ test("bez PEWNEJ kartoteki oferty nie zapisujemy NIC", async () => {
 
   assert.equal(liczba("towar_identyfikator"), 0, "oferta bez SKU nie wskazuje kartoteki");
   assert.equal(liczba("model_z_opisu"), 0);
-  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: [], czeka: 0 });
+  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 });
 });
 
 test("szkic sprzed 0.264.0 czyta się jako lista MODELI, bez dorabiania rodzaju", () => {
@@ -410,7 +417,11 @@ test("szkic sprzed 0.264.0 czyta się jako lista MODELI, bez dorabiania rodzaju"
     przez_user_id,luki_kartoteki) VALUES (?,'x','[]','[]','m','2026-09-01T00:00:00Z','Ala',?,?)`)
     .run(rozmowa, biuro, JSON.stringify(["FS250", "FR450"]));
   const s = S.szkicCopilota(rozmowa)!;
-  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: ["FS250", "FR450"], czeka: 0 });
+  /* `wpisane` pusta i to jest o tamtych szkicach PRAWDA: wiedza z ofert
+     zaczęła wchodzić od razu dopiero w 0.339.0. Dorobienie im niepustej listy
+     byłoby zmyśleniem tak samo jak dorobienie rodzaju. */
+  assert.deepEqual(s.lukiKartoteki,
+    { symbol: null, numery: [], modele: ["FS250", "FR450"], wpisane: [], czeka: 0 });
 });
 
 test("odwołania (F…) znikają z treści PO sprawdzeniu, uzyteFakty zostaje", async () => {
@@ -606,7 +617,14 @@ test("wartość z rozmowy zostaje, zmyślona wypada — po zwinięciu numeru i p
   assert.deepEqual(S.oczyscPropozycje(null, w), { dane: null, odrzuconych: 0 });
 });
 
-test("ułożenie zapisuje propozycję sprawdzoną przeciw rozmowie i NIE dotyka doboru", async () => {
+/* ── UMOWA ZMIENIŁA SIĘ W 0.339.0 ────────────────────────────────────────────
+   Do 0.338.0 ten test nazywał się „…i NIE dotyka doboru", a `liczba(...)===0`
+   była jego sednem: propozycja czekała na kliknięcie agenta. Właściciel:
+   „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
+
+   Co z tamtej umowy ZOSTAŁO i dalej jest tu pilnowane: wartość spoza rozmowy
+   nie wchodzi nigdzie, a dziennik nie niesie wartości.                      */
+test("ułożenie WPISUJE rozpoznane dane do doboru, bez kliknięcia agenta", async () => {
   dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, szukam śruby noża.");
   const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
     daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
@@ -614,10 +632,24 @@ test("ułożenie zapisuje propozycję sprawdzoną przeciw rozmowie i NIE dotyka 
   }), subiekt);
   assert.deepEqual(s.daneDoboru, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
     nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy wypadł, reszta została");
-  assert.equal(s.daneOcena, null);
-  assert.equal(s.doborWersja, 1);
-  assert.equal(liczba("dobor_rozmowy"), 0, "samo ułożenie wpisało coś do doboru");
-  assert.equal(D.doborRozmowy(rozmowa).status, "not_started");
+  assert.equal(s.daneOcena, "wpisane", "nie ma już czego klikać");
+  assert.equal(liczba("dobor_rozmowy"), 1);
+
+  const d = D.doborRozmowy(rozmowa);
+  assert.deepEqual(d.dane, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
+    nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy nie wszedł także tutaj");
+  assert.equal(d.status, "searching", "wpis danych rusza dobór z miejsca, jak ręczny");
+  /* Szkic pamięta wersję PO wpisie. Odwrotna kolejność dałaby szkic nieświeży
+     w chwili narodzin — ekran mówiłby „ułóż ponownie" o własnej zmianie. */
+  assert.equal(s.doborWersja, d.wersja);
+
+  /* PODPIS MASZYNY: `updated_by` z nazwą automatu przy PUSTYM koncie. To
+     jedyny znacznik, po którym agent pozna, skąd wzięła się wartość w polu. */
+  const w = db().prepare(
+    "SELECT updated_by, updated_user_id FROM dobor_rozmowy WHERE conversation_id=?")
+    .get(rozmowa) as Record<string, unknown>;
+  assert.equal(w.updated_by, "automat (szkic)");
+  assert.equal(w.updated_user_id, null);
   const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic'").get() as { payload: string };
   assert.match(zd.payload, /"polDoboru":4/);
   assert.match(zd.payload, /"polOdrzuconych":1/);
@@ -631,38 +663,46 @@ test("wartość zamaskowana nie wraca do danych — telefon podany jako numer se
   assert.deepEqual(s.daneDoboru, DANE({ nazwaCzesci: "uszczelka" }));
 });
 
-test("„Wpisz do danych” wpisuje TYLKO puste pola drogą ręcznego zapisu: wersja, status, dziennik, 409", async () => {
+test("automat wpisuje TYLKO w puste pola — słowo agenta zostaje nietknięte", async () => {
   dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, klucz 16.");
-  /* Agent wpisał model sam, inaczej niż model to widzi — jego słowo zostaje. */
+  /* Agent wpisał model sam, inaczej niż widzi go model. To jest ta jedna
+     rzecz, której automatowi nie wolno ruszyć: nadpisanie pola wpisanego ręką
+     byłoby jedyną zmianą, której agent nie cofnie bez pamiętania, co tam było. */
   D.zapiszDane(rozmowa, { model: "GTV51" }, 1, biuro);
   const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
     daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200", parametry: { klucz: "16" } }),
   }), subiekt);
-  assert.equal(s.doborWersja, 2);
-  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, 1, KTO()), /odśwież/, "stara wersja doboru musi dać konflikt");
-  const po = S.przyjmijDaneDoboru(rozmowa, 2, KTO());
-  assert.equal(po.daneOcena, "wpisane");
+
   const d = D.doborRozmowy(rozmowa);
-  assert.equal(d.wersja, 3);
-  assert.equal(d.status, "searching");
-  assert.deepEqual(d.dane, DANE({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200", parametry: { klucz: "16" } }));
+  assert.deepEqual(d.dane,
+    DANE({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200", parametry: { klucz: "16" } }),
+    "model agenta zostaje, reszta dochodzi");
+  assert.equal(s.daneOcena, "wpisane");
+  assert.equal(s.doborWersja, d.wersja);
+
+  /* Drugie kliknięcie nie ma już czego wpisać i mówi to wprost. */
+  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, d.wersja, KTO()), /już oceniona/);
+
   const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
-  assert.ok(typy.includes("dobor_dane") && typy.includes("copilot_dane_doboru"));
-  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_dane_doboru'").get() as { payload: string };
-  assert.match(los.payload, /"pol":3/);
-  assert.equal(los.payload.includes("Faworyt"), false);
-  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, 3, KTO()), /już oceniona/);
-  assert.equal(K.pomiarCopilota(db()).szkice.daneWpisane, 1);
+  assert.ok(typy.includes("dobor_dane"), "wpis idzie tą samą drogą co ręczny, z dziennikiem");
+  const zapis = db().prepare(
+    "SELECT payload FROM events WHERE type='dobor_dane' ORDER BY id DESC").get() as { payload: string };
+  assert.equal(zapis.payload.includes("GTV51N196L-4W1"), false, "wartości w dzienniku nie ma (§19)");
 });
 
-test("odrzucenie zostawia wiersz dla pomiaru; nowy szkic zeruje ocenę danych", async () => {
+test("odrzucenie zostaje dla propozycji, której automat NIE miał gdzie wpisać", async () => {
+  /* Po 0.339.0 odrzucenie ma sens wyłącznie wtedy, gdy nic nie weszło —
+     czyli gdy wszystkie pola były już zajęte. Odrzucanie wartości, która stoi
+     w doborze, byłoby przyciskiem obiecującym cofnięcie, którego nie robi;
+     agent poprawia takie pole tam, gdzie ono stoi, w zakładce Dobór. */
   dopiszKlienta("Kosiarka Faworyt.");
-  await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
+  D.zapiszDane(rozmowa, { marka: "Stiga" }, 1, biuro);
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
+  assert.equal(s.daneOcena, null, "nic nie weszło, więc jest co ocenić");
+  assert.equal(D.doborRozmowy(rozmowa).dane.marka, "Stiga");
+
   assert.equal(S.odrzucDaneDoboru(rozmowa, KTO()).daneOcena, "odrzucone");
   assert.equal(K.pomiarCopilota(db()).szkice.daneOdrzucone, 1);
-  assert.equal(liczba("dobor_rozmowy"), 0);
-  const znow = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
-  assert.equal(znow.daneOcena, null);
   assert.throws(() => S.odrzucDaneDoboru(rozmowa + 1000, KTO()), /nie ma propozycji/);
 });
 
@@ -955,4 +995,62 @@ test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () =
       uzyteFakty: ["F1"],
     }).nadaj, subiekt, new Date(), pobierzPng),
     /nie mówiąc, skąd go ma/);
+});
+
+/* ── Wiedza z ofert wskakuje bez agenta (0.339.0) ────────────────────────────
+   Właściciel: „wiedza z ofert powinna wskakiwać bez potwierdzania przez
+   agenta". Numery robiły to od 0.264.0; pozycje listy zgodności czekały
+   w kolejce, bo w wierszu stoi goły tekst bez marki.
+
+   Granica, która tu została i jest pilnowana niżej: automat NIE ZGADUJE
+   MARKI. Wiersz, przy którym trzy źródła deterministyczne milczą, zostaje
+   w kolejce — pusty klucz byłby gorszy od braku klucza.                     */
+
+/* POZYCJA MUSI BYĆ LUKĄ, żeby w ogóle trafić do kolejki: `lukiZOferty` uznaje
+   za lukę dopiero tę, która ma token z CYFRĄ I LITERĄ naraz. „NAC LS 46-450"
+   nie ma takiego tokenu („46-450" to same cyfry) i nie dociera tu wcale —
+   pierwsza wersja tych testów sprawdzała ścieżkę, w którą dane nie wchodzą.
+   „STIHL FS450" ma „FS450" i jest właściwym materiałem. */
+test("pozycja zgodności ze ZNANĄ marką wchodzi do wiedzy od razu, podpisana automatem", async () => {
+  /* „STIHL" przeszło już przez człowieka przy innym modelu, więc odczytanie
+     go z początku tekstu nie jest zgadywaniem. */
+  W.upewnijModel({ rodzaj: "maszyna", marka: "STIHL", nazwa: "MS 170" },
+    { userId: biuro, name: "A. Lewandowska" });
+  zOferty(["STIHL FS450"]);
+
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  assert.deepEqual(s.lukiKartoteki.wpisane, ["STIHL FS450"]);
+  assert.deepEqual(s.lukiKartoteki.modele, [], "wiersz wpisany nie jest „odłożony do kolejki”");
+
+  const z = db().prepare(
+    `SELECT stan, zrodlo_propozycji, rozstrzygnal, rozstrzygnal_user_id FROM zastosowanie`)
+    .get() as Record<string, unknown>;
+  assert.equal(z.stan, "zatwierdzone", "wiedza z oferty nie czeka na kliknięcie");
+  assert.equal(z.zrodlo_propozycji, "oferta");
+  assert.equal(z.rozstrzygnal, "automat (oferta)");
+  assert.equal(z.rozstrzygnal_user_id, null, "pusty user_id to znacznik wpisu maszyny");
+});
+
+test("pozycja bez rozpoznawalnej marki ZOSTAJE w kolejce — automat nie zgaduje", async () => {
+  /* Żadnego modelu w bazie, więc lista znanych marek jest pusta i wszystkie
+     trzy źródła milczą. Pusty klucz byłby gorszy od braku klucza. */
+  zOferty(["FS450"]);
+  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+
+  assert.deepEqual(s.lukiKartoteki.wpisane, []);
+  assert.deepEqual(s.lukiKartoteki.modele, ["FS450"]);
+  assert.equal(s.lukiKartoteki.czeka, 1);
+  assert.equal(liczba("zastosowanie"), 0);
+});
+
+test("drugie ułożenie nie mnoży wiedzy z tej samej oferty", async () => {
+  W.upewnijModel({ rodzaj: "maszyna", marka: "STIHL", nazwa: "MS 170" },
+    { userId: biuro, name: "A. Lewandowska" });
+  zOferty(["STIHL FS450"]);
+
+  await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+  const drugi = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
+
+  assert.deepEqual(drugi.lukiKartoteki.wpisane, [], "drugi przebieg nie ma czego wpisać");
+  assert.equal(liczba("zastosowanie"), 1, "jedna para, jeden wiersz");
 });

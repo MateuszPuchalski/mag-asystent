@@ -350,7 +350,14 @@ export type PokwitowanieZOferty = {
   /** Do KTÓREJ kartoteki to poszło; `null`, gdy oferta nie wskazuje pewnej kartoteki. */
   symbol: string | null;
   numery: Array<{ rodzaj: string; wartosc: string }>;
+  /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
   modele: string[];
+  /**
+   * Pozycje, które weszły do wiedzy OD RAZU (0.339.0), bo markę dało się
+   * odczytać z tekstu, z naszej bazy albo z tytułu oferty. Rozłączne
+   * z `modele`. Szkice sprzed tego wydania mają tu pustą listę.
+   */
+  wpisane: string[];
   czeka: number;
 };
 

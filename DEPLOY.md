@@ -2291,6 +2291,36 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.339.0 — nic nie czeka na kliknięcie
+
+**Migracji nie ma. Panel trzeba przebudować. Przełącznika nie ma** i to jest
+świadome: obie zmiany dotyczą drogi, którą uruchamia kliknięcie agenta albo
+takt, który i tak musisz włączyć osobno.
+
+Zmieniają się dwie rzeczy, które agent zobaczy od razu.
+
+Dane wejściowe rozpoznane w rozmowie **wchodzą do doboru same**, w puste pola.
+Pole wpisane ręką zostaje nietknięte. Pasek nad szkicem mówi teraz „Copilot
+wpisał do doboru", a nie „wpisz je w zakładce Dobór". Wartość, z którą się nie
+zgadzasz, poprawia się tam, gdzie stoi, czyli w zakładce Dobór; `updated_by`
+mówi, że poprzednią wpisała maszyna.
+
+Pozycje listy zgodności z ofert **wchodzą do wiedzy od razu**, o ile markę da
+się odczytać z tekstu, z naszej bazy albo z tytułu oferty. Bez rozpoznanej
+marki wiersz zostaje w kolejce, jak dotąd. Ta droga nie woła modelu
+językowego, więc nie kosztuje nic.
+
+Jeśli masz włączony `COPILOT_AUTO_SZKIC=1`, wiedz o jednym: **zmiana danych
+doboru budzi teraz takt**. Rozmowa, w której dane właśnie wpadły, dostanie
+drugi szkic, tym razem z kandydatami. To jest zamierzone i na tym polega
+odpowiedź na pytanie o inny produkt pod tą samą ofertą. Rachunek rośnie
+o jedno wywołanie na taką rozmowę, nie więcej: trzeci przebieg zastaje pola
+wypełnione i nic nie robi.
+
+Sprawdzenie na żywym koncie: otwórz rozmowę, w której klient podał markę
+i model maszyny, i ułóż szkic. W zakładce Dobór te pola mają być już
+wypełnione, a pasek nad szkicem ma o tym mówić.
+
 ### Aktualizacja do 0.332.0 — Copilota można dopytać
 
 **Migracja dokłada tabelę `copilot_pytanie` sama. Panel trzeba przebudować.**

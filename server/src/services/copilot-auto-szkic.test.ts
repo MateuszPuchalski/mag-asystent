@@ -40,8 +40,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "conversation_event", "message",
-    "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "dobor_rozmowy", "conversation_event",
+    "message", "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
     .run().lastInsertRowid);
   wywolan = 0;
@@ -202,4 +202,25 @@ test("LIMIT dostawcy przerywa przebieg — dalsze wywołania pogłębiają przer
   assert.equal(w.ulozonych, 0);
   assert.match(String(w.przerwane), /limit/);
   assert.equal(wywolan, 1, "po limicie nie wołamy drugi raz");
+});
+
+test("zmiana danych doboru budzi takt — bez tego 0.339.0 jest połową funkcji", async () => {
+  /* Klient pyta pod ofertą A o część do innej maszyny. Model rozpoznaje markę
+     i model, dane wchodzą do doboru same, ale kandydatów policzono PRZED tym
+     wpisem, więc pierwszy szkic ich nie zna. Gdyby takt patrzył wyłącznie na
+     ostatnią wiadomość, nikt by po tych kandydatów nie wrócił. */
+  const D = await import("./dobor.js");
+  const r = rozmowa("w-dobor");
+  await biegnij();
+  assert.equal(wywolan, 1);
+
+  /* Ktoś dopisał dane doboru — tak samo, jak robi to teraz sam szkic. */
+  D.zapiszDane(r, { marka: "STIHL" }, 1, { automat: "test" });
+
+  await biegnij();
+  assert.equal(wywolan, 2, "nowe dane to nowy materiał, więc nowy szkic");
+
+  /* I NIE W KÓŁKO: trzeci przebieg zastaje szkic na aktualnej wersji. */
+  await biegnij();
+  assert.equal(wywolan, 2);
 });
