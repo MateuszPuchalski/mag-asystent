@@ -2275,6 +2275,15 @@ CREATE TABLE IF NOT EXISTS sgt_faktura (
 );
 CREATE INDEX IF NOT EXISTS ix_faktura_data ON sgt_faktura(data_wyst);
 CREATE INDEX IF NOT EXISTS ix_faktura_oryg ON sgt_faktura(nr_oryg);
+-- Korekty, które poprzedni import już widział (0.350.1). NIE jest częścią
+-- read-modelu kasowanego przy imporcie — to pamięć między importami. Korekta
+-- wchodzi do `sgt_faktura` dopiero przy drugim odczycie, bo import czyta
+-- z NOLOCK i złapał kiedyś ZW z zapisu, który Subiekt wycofał
+-- (`adapters/korekty-dojrzale.ts`).
+CREATE TABLE IF NOT EXISTS sgt_korekta_widziana (
+  dok_id          INTEGER PRIMARY KEY,
+  pierwszy_raz_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS sgt_faktura_pozycja (
   id     INTEGER PRIMARY KEY AUTOINCREMENT,

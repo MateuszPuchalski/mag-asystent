@@ -437,11 +437,38 @@ public sealed class SferaComAdapter : ISferaAdapter
             string szczegoly;
             try { szczegoly = (Convert.ToString((object)dok.SzczegolyOstatniegoBledu) ?? "").Trim(); }
             catch { szczegoly = ""; }
+            /* NUMER PO ODMOWIE (0.350.1). Na produkcji Subiekt nadał ZW 463,
+               wpisał dokument i wycofał zapis — a import zdążył ten numer
+               zobaczyć. Numer w komunikacie mówi biuru, czego szukać w Subiekcie
+               (także w buforze), zanim uzna, że dokumentu nie ma. */
+            string numer;
+            try { numer = (Convert.ToString((object)dok.NumerPelny) ?? "").Trim(); }
+            catch { numer = ""; }
             throw new BladTrwalyException(
                 $"Subiekt nie zapisał {nazwa}: {e.Message.Trim()} " +
                 (szczegoly.Length > 0 ? $"Szczegóły: {szczegoly} " : "(Sfera nie podała szczegółów) ") +
+                $"Wyjątek: {LancuchWyjatku(e)}. " +
+                (numer.Length > 0
+                    ? $"Subiekt zdążył nadać numer {numer} — sprawdź w Subiekcie, także w buforze, czy dokument nie został. "
+                    : "") +
                 $"{nazwa} NIE wystawiono — wystaw go ręcznie.");
         }
+    }
+
+    /**
+     * Typ, kod HRESULT i treść każdego wyjątku w łańcuchu (0.350.1).
+     *
+     * Sfera przy odmowie zapisu ZW oddaje wyłącznie „Nie można zapisać
+     * dokumentu.", a `SzczegolyOstatniegoBledu` bywa puste. Kod HRESULT i typ
+     * wyjątku to jedyne, co jeszcze niesie informację — bez nich zostaje
+     * zgadywanie przyczyny.
+     */
+    private static string LancuchWyjatku(Exception e)
+    {
+        var czesci = new List<string>();
+        for (Exception? x = e; x is not null && czesci.Count < 5; x = x.InnerException)
+            czesci.Add($"{x.GetType().Name} 0x{x.HResult:X8} „{x.Message.Trim()}”");
+        return string.Join(" ← ", czesci);
     }
 
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)

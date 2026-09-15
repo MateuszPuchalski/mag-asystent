@@ -500,6 +500,19 @@ tę samą przyczynę bez zapisu.
 
 `[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
 
+**Odmowa zapisu potrafi zostawić numer, którego nie ma** (15 września 2026).
+Worker w 0.349.1 powtórzył zapis dwa razy, a `SprawdzPoprawnosc()` przeszło
+także na szkicu z sondy. Subiekt odmówił bez szczegółów. Dziewięć sekund później
+import przypiął zwrotowi „ZW 463/MAG/09/2026”, którego w Subiekcie nie było.
+Import czyta dokumenty z `NOLOCK` i zobaczył wiersz z zapisu, który Subiekt
+wycofał. Ten sam ZW wystawiony ręcznie w Subiekcie przeszedł bez komunikatu.
+
+Od 0.350.1 korekta wchodzi do read-modelu dopiero przy drugim imporcie
+(`adapters/korekty-dojrzale.ts`). Worker dopisuje do odmowy łańcuch wyjątków
+z kodem HRESULT i numer, jeśli Subiekt zdążył go nadać. Ręczny zapis przechodzi,
+a zapis z usługi nie — podejrzane jest konto LocalSystem, na którym działa
+`wertis-sfera`.
+
 **Paragon z Allegro ma wiersz przesyłki.** Pozycja 943 „PRZESYŁKA" to usługa
 z `CenaMagazynowa = 0`. Na ZW 772 biuro ją wyzerowało.
 

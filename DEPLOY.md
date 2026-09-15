@@ -1821,6 +1821,19 @@ z numerem MM, które taki koszyk wystawił. Skan etykiety „Z-” podpowie ten
 numer. Kosze „Z-” w toku zostają w biurze: czekają na korekty albo na MM,
 jak dotąd.
 
+**Dziennik workera Sfery (0.350.1).** Usługa zarejestrowana bez `AppStdout`
+nie zapisuje nigdzie tego, co worker wypisuje. Na produkcji tak właśnie było
+przy nieudanym zapisie ZW. Dopisz ścieżki i zrestartuj usługę:
+
+```powershell
+C:\wertis\tools\nssm.exe set wertis-sfera AppStdout C:\wertis\logs\wertis-sfera.log
+C:\wertis\tools\nssm.exe set wertis-sfera AppStderr C:\wertis\logs\wertis-sfera.err.log
+Restart-Service wertis-sfera
+```
+
+Po aktualizacji do 0.350.1 zwrot, któremu wycofany zapis przypiął nieistniejący
+numer ZW, poprawia się ręcznie: „Cofnij korektę” w panelu, potem ZW w Subiekcie.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji
