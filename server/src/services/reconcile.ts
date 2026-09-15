@@ -192,6 +192,11 @@ function koszeBezKorekty(): Rozjazd[] {
  *
  * Nie wchodzą kosze rozłożone przed tymi wydaniami: rozliczyło je biuro ręką,
  * więc raport wypisywałby historię jako pracę (`powrot_poza_aplikacja`).
+ *
+ * Nie wchodzi też kosz z aplikacji, którego MM NA regał jeszcze nie weszło.
+ * Jego powrót czeka wtedy świadomie (`zakolejkujPowrot`), a przyczynę mówi
+ * inny wiersz: brak korekty albo MM w kolejce lub w błędzie. Zdanie „sprawdź
+ * adresy" kazałoby szukać nie tam.
  */
 function koszeBezPowrotu(): Rozjazd[] {
   const rows = db()
@@ -200,6 +205,8 @@ function koszeBezPowrotu(): Rozjazd[] {
         WHERE status='rozlozony' AND powrot_queue_id IS NULL
           AND powrot_poza_aplikacja = 0
           AND rodzaj NOT IN ('karton','odpad')
+          AND (mm_dok_id IS NOT NULL
+               OR mm_queue_id IN (SELECT id FROM sfera_queue WHERE status='done'))
           AND rozlozono_at < ?
           AND EXISTS (SELECT 1 FROM kosz_pozycja p
                        WHERE p.kosz_id = kosz.id AND p.status='done')

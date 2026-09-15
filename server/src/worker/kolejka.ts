@@ -169,10 +169,14 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     zdarzenieZadania(task, "queue_applied", { docNo, wynik, proby: task.attempts });
     console.log(`[worker] #${task.id} OK ${task.type}${docNo ? " · MM " + docNo : ""}`);
     /* ADRES ZAPISANY — może zwolnił kosz czekający na powrót z bufora
-       (0.266.0). To JEDYNY moment, w którym ten warunek się zmienia, więc
-       osobnego tickera nie zakładamy. Pod parasolem, bo kolejka ma chodzić
-       dalej także wtedy, gdy kosz jest zepsuty. */
-    if (task.type === "set_location") {
+       (0.266.0). Pod parasolem, bo kolejka ma chodzić dalej także wtedy, gdy
+       kosz jest zepsuty.
+
+       WYKONANE MM TEŻ. Kosz z aplikacji czeka z powrotem, aż jego MM na regał
+       zwrotów wejdzie do Subiekta (`zakolejkujPowrot`). Przy SFERA_WORKER=1 MM
+       wykonuje worker C# i ten proces tego nie usłyszy — tamtą drogę pokrywa
+       `powrotyPoDokumentachSfery`. */
+    if (task.type === "set_location" || task.type === "mm") {
       try {
         wypuscPowrotyKoszy();
       } catch (e) {
@@ -181,5 +185,28 @@ export async function przetworzZadanie(task: Task, sfera: SferaAdapter): Promise
     }
   } catch (e) {
     oznaczBlad(task, e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** Co ile najwyżej worker Node pyta o powroty po dokumentach workera Sfery. */
+export const ODSTEP_POWROTOW_MS = 60_000;
+let ostatniePowroty = 0;
+
+/**
+ * Powroty koszy, którym MM na regał wykonał worker Sfery (C#).
+ *
+ * Przy SFERA_WORKER=1 status `done` MM pisze inny proces, więc ten nie ma
+ * zdarzenia, na którym mógłby zawiesić `wypuscPowrotyKoszy`. Zostaje pytanie
+ * w pętli, którą worker i tak kręci — nie nowy ticker. Raz na minutę, bo
+ * powrót czeka tu na korektę biura liczoną w godzinach, a pętla chodzi częściej.
+ */
+export function powrotyPoDokumentachSfery(teraz = Date.now()): number {
+  if (!config.sferaWorker || teraz - ostatniePowroty < ODSTEP_POWROTOW_MS) return 0;
+  ostatniePowroty = teraz;
+  try {
+    return wypuscPowrotyKoszy();
+  } catch (e) {
+    console.error("[worker] powroty koszy:", e instanceof Error ? e.message : e);
+    return 0;
   }
 }
