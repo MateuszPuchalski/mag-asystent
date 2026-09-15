@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.345.0 — 15 września 2026
+
+**Rozliczenie zwrotu zatrzaskuje się i już nie znika.** Zgłoszenie
+właściciela: „nadal pokazuje paczki, do których został już stwierdzony zwrot".
+Przyczyna była nasza własna.
+
+`status_allegro` to jeden wskaźnik „teraz", a nie historia. Zwrot rozliczony
+idzie dalej tą samą osią czasu — a wypycha go tam automat rabatów z 0.320.0,
+składający wniosek o prowizję zaraz po zaciągnięciu odstąpienia. Status
+przechodzi na `COMMISSION_REFUND_CLAIMED`, czyli — słowami właściciela — na
+zwrot rabatu DLA NAS, a nie zwrot pieniędzy klientowi. Kubełek przestawał
+wtedy widzieć rozliczenie i wypychał zwrot z ZAMKNIĘTYCH do DO DECYZJI.
+
+- **Nowa kolumna `rozliczony_allegro_at`** trzyma PIERWSZĄ zobaczoną datę
+  rozliczenia. Kubełek, raport rekoncyliacji i `zwroty:sprzatnij` czytają
+  zatrzask, nie wskaźnik.
+- **Sam wniosek o prowizję nie zamyka niczego.** Bez wcześniejszego `FINISHED`
+  zwrot stoi w kolejce — klient pieniędzy jeszcze nie dostał.
+- **[wymaga działania] Migracja zatrzaskuje zwroty stojące DZIŚ na
+  rozliczeniu** i wypisuje ich liczbę przy starcie. Tych, które zdążyły pójść
+  dalej przed wdrożeniem, nie odzyska nikt: chwili rozliczenia Allegro nie
+  podaje. Schodzą z kolejki ręcznie albo przez `zwroty:sprzatnij`.
+
 ## 0.344.0 — 15 września 2026
 
 **Numer listu przewozowego stoi w modelu pracy.** Decyzja właściciela:

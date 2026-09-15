@@ -937,6 +937,14 @@ export interface Zwrot {
   dniDoTerminu: number | null;
   /** Ostatni status zwrotu po stronie Allegro; `FINISHED` = pieniądze oddane. */
   statusAllegro: string | null;
+  /**
+   * Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0).
+   *
+   * `statusAllegro` mówi, co jest TERAZ: rozliczony zwrot idzie dalej osią
+   * czasu Allegro, choćby na `COMMISSION_REFUND_CLAIMED` — a ten dotyczy
+   * NASZEJ prowizji, nie pieniędzy klienta. Ten zatrzask trzyma fakt.
+   */
+  rozliczonyAllegroAt: string | null;
   sumaPozycjiGrosze: number;
   kwotaPelnaGrosze: number | null;
   waluta: string;

@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { urlListyZwrotow, zapytajAllegro } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
@@ -388,8 +389,9 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
   const paczka = pierwszaPaczka(zwrot.parcels);
   database.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,order_id,created_at,paczka_at,
-     kupujacy_login,przewoznik,waybill,rejection_code,rejection_reason,status_allegro,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+     kupujacy_login,przewoznik,waybill,rejection_code,rejection_reason,status_allegro,
+     rozliczony_allegro_at,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       reference_number=excluded.reference_number, order_id=excluded.order_id,
       created_at=excluded.created_at, paczka_at=excluded.paczka_at,
@@ -401,12 +403,20 @@ function zapisz(database: Db, zwrot: Zwrot, konto: number, at: string): void {
       waybill=COALESCE(excluded.waybill, zwrot_klienta.waybill),
       rejection_code=excluded.rejection_code, rejection_reason=excluded.rejection_reason,
       status_allegro=excluded.status_allegro,
+      -- ZATRZASK ROZLICZENIA (0.345.0). status_allegro to wskaźnik TERAZ,
+      -- a nie historia: zwrot rozliczony idzie dalej tą samą osią czasu,
+      -- choćby na COMMISSION_REFUND_CLAIMED, który mówi o NASZEJ prowizji,
+      -- nie o pieniądzach klienta. COALESCE trzyma PIERWSZĄ zobaczoną datę,
+      -- więc raz stwierdzone rozliczenie już nie znika.
+      rozliczony_allegro_at=COALESCE(
+        zwrot_klienta.rozliczony_allegro_at, excluded.rozliczony_allegro_at),
       synced_at=excluded.synced_at`).run(
     konto, zwrot.id, zwrot.referenceNumber ?? null, zwrot.orderId ?? null,
     utworzono, paczka.data, zwrot.buyer?.login ?? null, paczka.przewoznik,
     paczka.waybill,
     zwrot.rejection?.code ?? null, zwrot.rejection?.reason ?? null,
-    zwrot.status ?? null, at);
+    zwrot.status ?? null,
+    STATUSY_ODDANE.has(String(zwrot.status ?? "")) ? at : null, at);
 
   const id = Number((database.prepare(
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?",

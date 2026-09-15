@@ -34,7 +34,7 @@ const POZYCJA = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "z-1", numer: "REF-1", orderId: "ord-1",
-  utworzono: "2026-09-01T08:00:00Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, waybill: null, kubelek: "decyzja",
+  utworzono: "2026-09-01T08:00:00Z", paczkaAt: null, dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, rozliczonyAllegroAt: null, waybill: null, kubelek: "decyzja",
   sygnaly: [], terminAt: "2026-09-15T08:00:00Z", dniDoTerminu: 14,
   sumaPozycjiGrosze: 9998, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null,

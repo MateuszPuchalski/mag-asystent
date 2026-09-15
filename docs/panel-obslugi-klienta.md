@@ -2652,6 +2652,29 @@ Odmowa rozstrzyga wcześniej niż rozliczenie. Oba stany są końcowe, więc ża
 nie chowa pracy, ale ODRZUCONE niesie powód, a ZAMKNIĘTE mówi tylko tyle, że
 sprawy nie ma.
 
+**Rozliczenie ZATRZASKUJE SIĘ (0.345.0).** Zgłoszenie właściciela: „nadal
+pokazuje paczki, do których został już stwierdzony zwrot". Przyczyna była
+nasza własna.
+
+`status_allegro` to jeden wskaźnik „teraz", a nie historia. Zwrot rozliczony
+idzie dalej tą samą osią czasu — a wypycha go tam automat rabatów z 0.320.0,
+składający wniosek o prowizję zaraz po zaciągnięciu odstąpienia. Status
+przechodzi wtedy na `COMMISSION_REFUND_CLAIMED`.
+
+Słowa właściciela, warte zapamiętania: to jest **zwrot rabatu DLA NAS, a nie
+zwrot pieniędzy klientowi**. Kubełek liczony ze wskaźnika przestawał widzieć
+rozliczenie i wypychał taki zwrot z ZAMKNIĘTYCH z powrotem do DO DECYZJI —
+z pytaniem „przyjąć czy odrzucić?" o sprawę, której pieniądze dawno wyszły.
+
+Kolumna `rozliczony_allegro_at` trzyma PIERWSZĄ zobaczoną datę rozliczenia
+i już jej nie oddaje. Sam wniosek o prowizję nadal nie zamyka niczego: bez
+wcześniejszego `FINISHED` zwrot stoi w kolejce i ma tam stać.
+
+Migracja zatrzaskuje to, co widać w chwili wdrożenia. Zwrotów, które zdążyły
+pójść dalej wcześniej, nie odzyska nikt — chwili rozliczenia Allegro nie
+podaje, a kopia odpowiedzi trzyma status „teraz", nie przebieg. Schodzą
+z kolejki ręcznie albo narzędziem `zwroty:sprzatnij`.
+
 **Cena tej decyzji jest realna i nie jest płacona w ciszy.** Pieniądze wróciły
 do klienta, ale korekta w Subiekcie i towar na półce to osobna robota — a zwrot
 właśnie przestał o nią prosić. Bez korekty nie wyjdzie też MM, bo bramka

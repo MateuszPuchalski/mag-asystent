@@ -558,6 +558,52 @@ test("numer listu STOI w modelu pracy, a tracking dalej czyta lądowisko", async
   assert.deepEqual(paczkiDoSprawdzenia(d, konto), [], "zamkniętego już nie pytamy");
 });
 
+test("rozliczenie ZATRZASKUJE SIĘ przy pierwszym FINISHED (0.345.0)", async () => {
+  /* Zwrot rozliczony idzie dalej osią czasu Allegro — nasz własny automat
+     rabatów przestawia go na `COMMISSION_REFUND_CLAIMED` zaraz po
+     zaciągnięciu odstąpienia. Bez zatrzasku kubełek wypychał go wtedy
+     z ZAMKNIĘTYCH z powrotem do kolejki pracy. */
+  const d = stanowisko();
+  const wspolne = {
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", apiUrl: "https://api",
+  };
+  const zeStatusem = (status: string) => async (u: string) =>
+    (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z", { parcels: [paczkaZ1], status })]));
+
+  await synchronizujAllegroZwroty({
+    ...wspolne, now: () => new Date("2026-08-30T12:00:00Z"), query: zeStatusem("FINISHED") });
+  const pierwsze = (d.prepare(
+    "SELECT rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { rozliczony_allegro_at: string | null }).rozliczony_allegro_at;
+  assert.ok(pierwsze, "pierwsze FINISHED zatrzaskuje datę");
+
+  /* Nasz wniosek o prowizję przestawia wskaźnik — zatrzask ma zostać. */
+  d.prepare("DELETE FROM allegro_zwroty_sync_state").run();
+  await synchronizujAllegroZwroty({
+    ...wspolne, now: () => new Date("2026-09-02T12:00:00Z"),
+    query: zeStatusem("COMMISSION_REFUND_CLAIMED") });
+  const w = d.prepare(
+    "SELECT status_allegro, rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { status_allegro: string; rozliczony_allegro_at: string };
+  assert.equal(w.status_allegro, "COMMISSION_REFUND_CLAIMED", "wskaźnik idzie dalej");
+  assert.equal(w.rozliczony_allegro_at, pierwsze, "zatrzask trzyma PIERWSZĄ datę");
+});
+
+test("zwrot NIGDY nierozliczony nie dostaje zatrzasku", async () => {
+  const d = stanowisko();
+  await synchronizujAllegroZwroty({
+    database: d, zwrotyOd: "2026-06-03T00:00:00Z", apiUrl: "https://api",
+    now: () => new Date("2026-08-30T12:00:00Z"),
+    query: async (u) => (u.includes("/tracking") ? historia(false)
+      : odpowiedz([zwrot("z1", "2026-08-30T08:00:00Z",
+        { parcels: [paczkaZ1], status: "DELIVERED" })])),
+  });
+  assert.equal((d.prepare(
+    "SELECT rozliczony_allegro_at FROM zwrot_klienta WHERE external_id='z1'")
+    .get() as { rozliczony_allegro_at: string | null }).rozliczony_allegro_at, null);
+});
+
 test("odświeżenie bez paczek NIE KASUJE zapisanego numeru listu", async () => {
   /* Allegro potrafi oddać ten sam zwrot bez tablicy `parcels` — tak wygląda
      zgłoszenie, zanim klient nada przesyłkę. Nadpisanie pustym skasowałoby

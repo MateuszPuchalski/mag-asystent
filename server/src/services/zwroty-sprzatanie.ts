@@ -37,6 +37,18 @@ import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 const STATUSY = [...STATUSY_ODDANE];
 const PYTAJNIKI = STATUSY.map(() => "?").join(",");
 
+/**
+ * Warunek „Allegro oddało pieniądze" — zatrzask ALBO wskaźnik (0.345.0).
+ *
+ * `status_allegro` mówi, co jest TERAZ: zwrot rozliczony idzie dalej osią
+ * czasu Allegro, choćby na `COMMISSION_REFUND_CLAIMED`, który dotyczy naszej
+ * prowizji. Bez zatrzasku narzędzie przestawało widzieć zwroty, które miało
+ * sprzątać, dokładnie wtedy, gdy nasz własny automat rabatów ruszył sprawę
+ * dalej.
+ */
+const ROZLICZONY =
+  `(z.rozliczony_allegro_at IS NOT NULL OR z.status_allegro IN (${PYTAJNIKI}))`;
+
 /** Zwrot bez ŻADNEJ pozycji w koszyku — warunek wspólny dla liczenia i kasowania. */
 const BEZ_KOSZYKA = `NOT EXISTS (
   SELECT 1 FROM kosz_pozycja kp
@@ -61,7 +73,7 @@ export interface PodsumowanieSprzatania {
 function licz(database: Db, warunek: string): number {
   const w = database.prepare(
     `SELECT COUNT(*) AS n FROM zwrot_klienta z
-      WHERE z.status_allegro IN (${PYTAJNIKI}) AND ${warunek}`)
+      WHERE ${ROZLICZONY} AND ${warunek}`)
     .get(...(STATUSY as [])) as { n: number } | undefined;
   return Number(w?.n ?? 0);
 }
@@ -80,7 +92,7 @@ const BEZ_SLADU = `z.zwrot_pieniedzy_id IS NULL AND z.przelew_at IS NULL
 export function policzRozliczonePozaAplikacja(database: Db): PodsumowanieSprzatania {
   const kandydaci = database.prepare(
     `SELECT z.id, z.reference_number, z.external_id FROM zwrot_klienta z
-      WHERE z.status_allegro IN (${PYTAJNIKI}) AND ${BEZ_SLADU} ORDER BY z.id`)
+      WHERE ${ROZLICZONY} AND ${BEZ_SLADU} ORDER BY z.id`)
     .all(...(STATUSY as [])) as
     Array<{ id: number; reference_number: string | null; external_id: string }>;
   const idy = kandydaci.map((z) => Number(z.id));
@@ -126,7 +138,7 @@ export function skasujRozliczonePozaAplikacja(
     database.prepare(
       `DELETE FROM zwrot_klienta WHERE id IN (
          SELECT z.id FROM zwrot_klienta z
-          WHERE z.status_allegro IN (${PYTAJNIKI}) AND ${BEZ_SLADU})`)
+          WHERE ${ROZLICZONY} AND ${BEZ_SLADU})`)
       .run(...(STATUSY as []));
     logEvent("zwroty_rozliczone_skasowane", kto.name, null, {
       zwrotow: przed.doSkasowania, pozycji: przed.pozycji,

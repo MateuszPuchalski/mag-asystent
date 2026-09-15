@@ -33,7 +33,7 @@ const ZAMOWIENIE: Zamowienie = {
 
 const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 1, externalId: "zw-1", numer: "REF-1", orderId: "ord-1",
-  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, waybill: null,
+  utworzono: "2026-08-25T09:00:00.000Z", paczkaAt: "2026-08-28T09:00:00.000Z", dostarczonoAt: null, przesylkaStatus: null, statusAllegro: null, rozliczonyAllegroAt: null, waybill: null,
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
