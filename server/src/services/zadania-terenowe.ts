@@ -1,6 +1,7 @@
 import { db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { dopiszZdarzenieOdeslania, dopiszZdarzenieWyniku, ustawStatus } from "./conversations.js";
+import { sciezkaZdjecia, zapiszZdjecie } from "./foto.js";
 
 export type RodzajZadania = "pomiar" | "zdjecie" | "weryfikacja" | "inne";
 export type PriorytetZadania = "normalny" | "pilny";
@@ -40,6 +41,12 @@ export interface ZadanieTerenowe {
   * i jest prawdziwa zawsze.
   */
  zleconeOdMs: number | null;
+ /** Zdjęcia od hali — bez treści plików, sama lista (§13.3). */
+ zalaczniki: ZalacznikZadania[];
+}
+
+export interface ZalacznikZadania {
+ id: number; opis: string | null; at: string; przez: string;
 }
 const SELECT = `SELECT z.id,z.rodzaj,z.tytul,z.instrukcja,z.tw_id AS twId,
  t.symbol,t.nazwa AS nazwaTowaru,t.lokalizacja,z.zrodlo,z.zrodlo_ref AS zrodloRef,
@@ -53,17 +60,28 @@ const teraz=()=>new Date().toISOString();
 /* Zadanie zamknięte nie ma zegara: „zlecone 9 dni temu" przy wyniku sprzed
    tygodnia mierzyłoby wiek historii, a nie zaległość. */
 const OTWARTE=new Set(["nowe","w_toku","odeslane"]);
-const zZegarem=(z:ZadanieTerenowe,chwila:number):ZadanieTerenowe=>({...z,
- zleconeOdMs:OTWARTE.has(z.status)?Math.max(0,chwila-Date.parse(z.utworzonoAt)):null});
+function zalacznikiDla(ids:number[]):Map<number,ZalacznikZadania[]>{
+ const out=new Map<number,ZalacznikZadania[]>();
+ if(!ids.length)return out;
+ const q=ids.map(()=>"?").join(",");
+ for(const r of db().prepare(`SELECT id,zadanie_id AS zadanieId,opis,at,przez FROM zadanie_zalacznik WHERE zadanie_id IN (${q}) ORDER BY id`).all(...ids) as Array<{id:number;zadanieId:number;opis:string|null;at:string;przez:string}>){
+  out.set(Number(r.zadanieId),[...(out.get(Number(r.zadanieId))??[]),{id:Number(r.id),opis:r.opis,at:String(r.at),przez:String(r.przez)}]);
+ }
+ return out;
+}
+const zZegarem=(z:ZadanieTerenowe,chwila:number,zal:ZalacznikZadania[]=[]):ZadanieTerenowe=>({...z,
+ zleconeOdMs:OTWARTE.has(z.status)?Math.max(0,chwila-Date.parse(z.utworzonoAt)):null,zalaczniki:zal});
 function tekst(v:string,n:string,max:number){const t=v.trim();if(!t)throw new Error(`${n} nie może być pusty`);if(t.length>max)throw new Error(`${n} może mieć najwyżej ${max} znaków`);return t;}
 export function listaZadan(opts:{status?:string;userId?:number}={}):ZadanieTerenowe[]{
  const w:string[]=[];const a:(string|number)[]=[];
  if(opts.status){w.push("z.status=?");a.push(opts.status);} if(opts.userId!==undefined){w.push("(z.przypisano_user_id IS NULL OR z.przypisano_user_id=?)");a.push(opts.userId);}
  const where=w.length?` WHERE ${w.join(" AND ")}`:"";
  const chwila=Date.now();
- return (db().prepare(`${SELECT}${where} ORDER BY CASE z.priorytet WHEN 'pilny' THEN 0 ELSE 1 END, CASE z.status WHEN 'odeslane' THEN 0 WHEN 'w_toku' THEN 1 WHEN 'nowe' THEN 2 ELSE 3 END,z.utworzono_at`).all(...a) as unknown as ZadanieTerenowe[]).map((z)=>zZegarem(z,chwila));
+ const wiersze=(db().prepare(`${SELECT}${where} ORDER BY CASE z.priorytet WHEN 'pilny' THEN 0 ELSE 1 END, CASE z.status WHEN 'odeslane' THEN 0 WHEN 'w_toku' THEN 1 WHEN 'nowe' THEN 2 ELSE 3 END,z.utworzono_at`).all(...a) as unknown as ZadanieTerenowe[]);
+ const zal=zalacznikiDla(wiersze.map((z)=>z.id));
+ return wiersze.map((z)=>zZegarem(z,chwila,zal.get(z.id)??[]));
 }
-export function zadanie(id:number):ZadanieTerenowe|null{const z=db().prepare(`${SELECT} WHERE z.id=?`).get(id) as unknown as ZadanieTerenowe|undefined;return z?zZegarem(z,Date.now()):null;}
+export function zadanie(id:number):ZadanieTerenowe|null{const z=db().prepare(`${SELECT} WHERE z.id=?`).get(id) as unknown as ZadanieTerenowe|undefined;return z?zZegarem(z,Date.now(),zalacznikiDla([z.id]).get(z.id)??[]):null;}
 export function utworzZadanie(input:{rodzaj:RodzajZadania;tytul:string;instrukcja:string;twId?:number|null;zrodlo?:string;zrodloRef?:string|null;priorytet?:PriorytetZadania},autor:{id:number;name:string}){
  if(!["pomiar","zdjecie","weryfikacja","inne"].includes(input.rodzaj))throw new Error("Nieznany rodzaj zadania");
  const t=tekst(input.tytul,"Tytuł",120),i=tekst(input.instrukcja,"Instrukcja",2000),p=input.priorytet??"normalny";
@@ -151,6 +169,46 @@ export function oddajZadanie(id:number,autor:{id:number;name:string}){
  * `nie_da_sie` jest przeformułowanie zlecenia. Zmuszanie do zakładania
  * drugiego zadania zrywałoby powiązanie z rozmową.
  */
+/**
+ * Zdjęcie od hali przy zadaniu — projekt panelu §13.3 (0.352.0).
+ *
+ * Są pytania, na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest
+ * na tabliczce", „jak wygląda pęknięcie". Do 0.351.0 agent przepisywał opis ze
+ * słów magazyniera i wysyłał go kupującemu jako WŁASNE ustalenie — a przy
+ * sporze nie miał się o co oprzeć.
+ *
+ * Bramka własności ta sama co przy odesłaniu: `nowe` albo WŁASNE `w_toku`.
+ * Zamknięte odpada świadomie — dowód dokładany do zadania rozliczonego tydzień
+ * temu nie jest odpowiedzią, tylko dopiskiem do cudzej pracy.
+ *
+ * LIMIT JEST TUTAJ, nie tylko na trasie. Kolektor koduje kadr do ~200 KB, ale
+ * limit ciała żądania chroni proces, a nie dysk: aparat zacięty na serii
+ * zapełniłby `data/photos` w godzinę, a objawu nie widać nigdzie, dopóki nie
+ * padnie zapis bazy.
+ */
+const ZALACZNIK_MAX_KB=3072;
+export function dodajZalacznik(id:number,fotoBase64:string,opis:string|undefined,autor:{id:number;name:string}){
+ const z=zadanie(id);if(!z)throw new Error("Nie znaleziono zadania");
+ if(!(z.status==="nowe"||(z.status==="w_toku"&&z.przypisanoUserId===autor.id)))throw new Error("Zdjęcie dokłada się do zadania czekającego albo przejętego przez Ciebie");
+ const czysty=(fotoBase64??"").replace(/^data:image\/\w+;base64,/,"").trim();
+ if(!czysty)throw new Error("Zdjęcie jest puste");
+ /* Rozmiar liczymy z DŁUGOŚCI base64, przed dekodowaniem: bufor powstaje
+    dopiero po sprawdzeniu, więc zdjęcie ponad limit nie zajmuje pamięci. */
+ if(Math.round(czysty.length*3/4/1024)>ZALACZNIK_MAX_KB)throw new Error(`Zdjęcie może mieć najwyżej ${ZALACZNIK_MAX_KB} kB`);
+ const podpis=opis?.trim()||null;
+ if(podpis&&podpis.length>500)throw new Error("Podpis może mieć najwyżej 500 znaków");
+ const ref=zapiszZdjecie(czysty,"z");
+ const zalId=Number(db().prepare("INSERT INTO zadanie_zalacznik(zadanie_id,foto_ref,opis,at,przez,przez_user_id) VALUES(?,?,?,?,?,?)").run(id,ref,podpis,teraz(),autor.name,autor.id).lastInsertRowid);
+ logEvent("zadanie_terenowe_zalacznik",autor.name,z.twId,{zadanieId:id,zalacznikId:zalId});
+ return zadanie(id)!;
+}
+
+/** Ścieżka pliku załącznika — `null`, gdy wiersz albo plik nie istnieje. */
+export function sciezkaZalacznika(zadanieId:number,zalacznikId:number):string|null{
+ const r=db().prepare("SELECT foto_ref FROM zadanie_zalacznik WHERE id=? AND zadanie_id=?").get(zalacznikId,zadanieId) as {foto_ref:string}|undefined;
+ return r?sciezkaZdjecia(r.foto_ref):null;
+}
+
 export function ponowZadanie(id:number,instrukcja:string|undefined,autor:{id:number;name:string}){
  const nowa=instrukcja===undefined?null:tekst(instrukcja,"Instrukcja",2000);
  const r=db().prepare(`UPDATE zadanie_terenowe SET status='nowe',przypisano_at=NULL,przypisano_przez=NULL,przypisano_user_id=NULL,odeslano_at=NULL,odeslano_przez=NULL,odeslano_user_id=NULL,powod_kod=NULL,powod=NULL,instrukcja=COALESCE(?,instrukcja) WHERE id=? AND status='odeslane'`).run(nowa,id);

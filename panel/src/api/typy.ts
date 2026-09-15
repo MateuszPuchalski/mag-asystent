@@ -729,6 +729,12 @@ export type Zadanie = {
   /* Liczy SERWER, nie ekran — patrz `zleconeOdMs` w `zadania-terenowe.ts`.
      `null` przy zadaniu zamkniętym. */
   zleconeOdMs: number | null;
+  /* Zdjęcia od hali (§13.3) — sama lista, treść ciągnie `useZdjecieZadania`. */
+  zalaczniki: ZalacznikZadania[];
+}
+
+export type ZalacznikZadania = {
+  id: number; opis: string | null; at: string; przez: string;
 };
 
 export type StatusSynchronizacji =

@@ -7,7 +7,8 @@ import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { useAnulujZadanie, useNoweZadanie, usePonowZadanie, useZadania } from "../api/rozmowy";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas, wiek } from "../ui";
 import { Kafel } from "../towar/Kafel";
-import type { Zadanie } from "../api/typy";
+import type { Zadanie, ZalacznikZadania } from "../api/typy";
+import { useZdjecieZadania } from "../towar/useZdjecie";
 
 const Schemat = z.object({
   rodzaj: z.enum(["pomiar", "zdjecie", "weryfikacja", "inne"]),
@@ -64,6 +65,37 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
       </div>
     </form>
   </div>;
+}
+
+/* ── ZDJĘCIE OD HALI (§13.3, 0.352.0) ────────────────────────────────────────
+   Są pytania, na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest
+   na tabliczce", „jak wygląda pęknięcie". Agent przepisywał wtedy opis ze słów
+   magazyniera i wysyłał go kupującemu jako WŁASNE ustalenie.
+
+   Obraz ciągnie `useZdjecieZadania`, nie `<img src>`: trasa stoi za sesją,
+   więc goły `src` dostałby 401 i narysował ikonę zepsutego obrazu. Ta blizna
+   jest w nagłówku `useZdjecie.ts` kupiona trzy razy — czwarty raz byłby
+   świadomy.                                                                  */
+function ZdjecieHali({ zadanieId, zalacznik }: { zadanieId: number; zalacznik: ZalacznikZadania }) {
+  const { url, blad, ponow } = useZdjecieZadania(zadanieId, zalacznik.id);
+  return <figure className="min-w-0">
+    <div className="grid aspect-square place-items-center overflow-hidden rounded-lg border bg-slate-50">
+      {url
+        ? <a href={url} target="_blank" rel="noreferrer" className="block h-full w-full">
+            <img src={url} alt={zalacznik.opis ?? `Zdjęcie od ${zalacznik.przez}`}
+              className="h-full w-full object-cover" /></a>
+        : blad
+        /* Zdanie i ponowienie, nie sama pustka: brak zdjęcia z powodu wygląda
+           inaczej niż zdjęcie, którego nikt nie zrobił — a tu zdjęcie NA PEWNO
+           jest, bo hala je przysłała. */
+        ? <button type="button" onClick={ponow}
+            className="p-2 text-podpis text-slate-600 underline">{blad} Spróbuj ponownie</button>
+        : <span className="text-podpis text-slate-500">
+            {url === null ? "brak pliku" : "wczytuję…"}</span>}
+    </div>
+    {zalacznik.opis && <figcaption className="mt-1 truncate text-podpis text-slate-600"
+      title={zalacznik.opis}>{zalacznik.opis}</figcaption>}
+  </figure>;
 }
 
 const FILTRY = [["otwarte", "Otwarte"], ["odeslane", "Odesłane"],
@@ -225,6 +257,11 @@ export function Zadania() {
           {t.przypisanoPrzez && <p><Clock className="mr-2 inline" size={15} />
             {t.status === "wykonane" ? "Wykonał" : "Realizuje"}:{" "}
             <b>{t.status === "wykonane" ? t.wykonanoPrzez : t.przypisanoPrzez}</b></p>}
+          {/* Zdjęcia PRZED wynikiem: przy pytaniu „co jest na tabliczce"
+              obraz JEST odpowiedzią, a zdanie pod nim ją tylko nazywa. */}
+          {t.zalaczniki.length > 0 && <div className="grid grid-cols-3 gap-2">
+            {t.zalaczniki.map((z) => <ZdjecieHali key={z.id} zadanieId={t.id} zalacznik={z} />)}
+          </div>}
           {t.wynik && <div className="rounded-lg bg-os-wynik p-3">
             <div className="mb-1 text-xs font-bold uppercase text-ranga-ok">Wynik z magazynu</div>
             <p className="whitespace-pre-wrap text-tresc">{t.wynik}</p></div>}

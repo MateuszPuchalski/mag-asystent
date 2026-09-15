@@ -1,5 +1,8 @@
 package pl.wertis.kolektor.ui.tasks
 
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,12 +10,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import pl.wertis.kolektor.AppGraph
+import java.io.File
 import pl.wertis.kolektor.core.net.OdeslijZadanieBody
+import pl.wertis.kolektor.core.net.ZalacznikZadaniaBody
+import pl.wertis.kolektor.device.PhotoCapture
 import pl.wertis.kolektor.core.net.WynikZadaniaBody
 import pl.wertis.kolektor.core.net.ZadanieTerenowe
 import pl.wertis.kolektor.net.apiCall
@@ -51,6 +60,7 @@ fun FieldTasksScreen(graph: AppGraph) {
     var tasks by remember { mutableStateOf<List<ZadanieTerenowe>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context: Context = LocalContext.current
     suspend fun refresh() { try { tasks = apiCall { graph.api.zadaniaTerenowe() }.zadania.filter { it.status == "nowe" || it.status == "w_toku" } } catch (e: Exception) { graph.effects.toast(e.message ?: "Nie udało się pobrać zadań") } }
     LaunchedEffect(Unit) { refresh() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -62,7 +72,16 @@ fun FieldTasksScreen(graph: AppGraph) {
             onTake = { scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweWez(task.id) };refresh() } catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } },
             onFinish = { result -> scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweWykonaj(task.id, WynikZadaniaBody(result)) };graph.feedback.beep(true);graph.effects.toast("Wynik wysłany do biura");refresh() }catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } },
             onReturn = { kod, powod -> scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweOdeslij(task.id, OdeslijZadanieBody(kod, powod)) };graph.feedback.beep(true);graph.effects.toast("Odesłane do biura");refresh() }catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } },
-            onRelease = { scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweOddaj(task.id) };graph.effects.toast("Zadanie wróciło do puli");refresh() }catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } }) }
+            onRelease = { scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweOddaj(task.id) };graph.effects.toast("Zadanie wróciło do puli");refresh() }catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } },
+            onPhoto = { file, opis -> scope.launch { busy=true;try {
+                // Kodowanie NA WĄTKU IO: pełny kadr z aparatu kolektora to
+                // kilkanaście megapikseli, a `PhotoCapture.encode` skaluje go
+                // w pamięci — na wątku głównym ekran stałby na sekundy.
+                val base64 = withContext(Dispatchers.IO) { PhotoCapture.encode(file) }
+                if (base64 == null) graph.effects.toast("Nie udało się odczytać zdjęcia — zrób je jeszcze raz")
+                else { apiCall { graph.api.zadanieTerenoweZalacznik(task.id, ZalacznikZadaniaBody(base64, opis)) };graph.feedback.beep(true);graph.effects.toast("Zdjęcie poszło do biura");refresh() }
+            } catch(e:Exception){graph.effects.toast(e.message?:"Błąd")} finally { PhotoCapture.discard(file);busy=false } } },
+            context = context) }
         OutlineButton("ODŚWIEŻ", modifier = Modifier.fillMaxWidth()) { scope.launch { refresh() } }
     }
 }
@@ -88,10 +107,30 @@ private fun FieldTaskCard(
     onFinish: (String) -> Unit,
     onReturn: (String, String?) -> Unit,
     onRelease: () -> Unit,
+    onPhoto: (File, String?) -> Unit,
+    context: Context,
 ) {
     var result by remember(task.id) { mutableStateOf("") }
     var wyjscia by remember(task.id) { mutableStateOf(false) }
     var dopisek by remember(task.id) { mutableStateOf("") }
+
+    /* Aparat wołany systemowym `ACTION_IMAGE_CAPTURE`, jak przy niezgodności
+       w dostawie — nie wciągamy CameraX dla jednego kadru, a kolektor ma
+       aparat producenta. Plik roboczy kasuje `onPhoto` po zakodowaniu: dowód
+       żyje na serwerze, nie w pamięci kolektora, którą ktoś kiedyś wyczyści. */
+    var czeka by remember(task.id) { mutableStateOf<File?>(null) }
+    val aparat = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val plik = czeka
+        czeka = null
+        if (ok && plik != null) onPhoto(plik, dopisek.ifBlank { null }) else PhotoCapture.discard(plik)
+    }
+    fun zrobZdjecie() {
+        runCatching {
+            val (plik, uri) = PhotoCapture.newTarget(context, "zadanie")
+            czeka = plik
+            aparat.launch(uri)
+        }.onFailure { /* ergonomia: brak aparatu to nie awaria ekranu */ }
+    }
     Column(Modifier.fillMaxWidth().cardSurface(background = if (task.priorytet == "pilny") AmberBg else CardWhite, borderColor = if (task.priorytet == "pilny") AmberLine else CardBorder).padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(task.tytul, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Ink, modifier = Modifier.weight(1f)); if (task.priorytet == "pilny") Text("PILNE", color = Destructive, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
         Text(task.instrukcja, fontSize = 14.sp, color = InkSoft)
@@ -117,6 +156,18 @@ private fun FieldTaskCard(
             SectionLabel("WYNIK")
             OutlinedTextField(value = result, onValueChange = { result = it }, placeholder = { Text("Np. 46 mm, od środka do środka") }, minLines = 3, modifier = Modifier.fillMaxWidth())
             PrimaryButton("WYŚLIJ WYNIK DO BIURA", modifier = Modifier.fillMaxWidth(), enabled = result.isNotBlank() && !busy) { onFinish(result) }
+        }
+        // ZDJĘCIE PRZY KAŻDYM OTWARTYM ZADANIU, nie tylko przy wyniku: bywa
+        // odpowiedzią samo w sobie („co jest na tabliczce"), a bywa dowodem do
+        // odesłania („oto pusta półka"). Osobny przycisk, bo jedno zadanie
+        // przyjmuje kilka kadrów — półka, etykieta, suwmiarka.
+        OutlineButton("ZRÓB ZDJĘCIE", modifier = Modifier.fillMaxWidth(), enabled = !busy) { zrobZdjecie() }
+        if (task.zalaczniki.isNotEmpty()) {
+            Text(
+                "Wysłane zdjęcia: ${task.zalaczniki.size}",
+                fontSize = 11.sp,
+                color = InkMute,
+            )
         }
         if (wyjscia) {
             SectionLabel("DLACZEGO NIE")

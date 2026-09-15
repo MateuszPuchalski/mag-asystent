@@ -1434,6 +1434,34 @@ CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_przypisane
 CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
   ON zadanie_terenowe(tw_id, utworzono_at);
 
+-- ── Zdjęcia przy zadaniu terenowym (0.352.0) ──────────────────────────────
+-- Projekt panelu §13.3 wymienia „robi zdjęcie" obok wyniku i powodu odesłania.
+-- Do 0.351.0 hala mogła odpowiedzieć biuru wyłącznie tekstem, a są pytania,
+-- na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest na
+-- tabliczce", „jak wygląda pęknięcie". Agent przepisywał wtedy opis ze słów
+-- magazyniera i wysyłał go kupującemu jako własne ustalenie.
+--
+-- TABELA, NIE KOLUMNA. Zadanie żyje dłużej niż jedna odpowiedź: hala odsyła je
+-- ze zdjęciem pustej półki, biuro ponawia, a druga próba kończy się pomiarem
+-- i zdjęciem suwmiarki. Jedno `foto_ref` kasowałoby pierwszy dowód przy drugim.
+-- Nazwa jest z projektu właściciela (spis tabel w §17).
+--
+-- CASCADE, bo załącznik bez zadania nie znaczy nic — inaczej niż zdjęcie przy
+-- niezgodności w dostawie, które jest dowodem wobec dostawcy.
+CREATE TABLE IF NOT EXISTS zadanie_zalacznik (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  zadanie_id    INTEGER NOT NULL REFERENCES zadanie_terenowe(id) ON DELETE CASCADE,
+  foto_ref      TEXT NOT NULL,
+  -- Podpis od hali, nieobowiązkowy: kciuk w rękawicy ma zrobić zdjęcie, a nie
+  -- opisać je zdaniem. Zdjęcie bez podpisu mówi więcej niż podpis bez zdjęcia.
+  opis          TEXT,
+  at            TEXT NOT NULL,
+  przez         TEXT NOT NULL,
+  przez_user_id INTEGER REFERENCES app_user(user_id)
+);
+CREATE INDEX IF NOT EXISTS ix_zadanie_zalacznik_zadanie
+  ON zadanie_zalacznik(zadanie_id, id);
+
 -- Token OAuth konta Allegro. JEDEN wiersz (id=1): aplikacja obsługuje jedno
 -- konto sprzedawcy. Refresh token jest STANEM, nie konfiguracją — Allegro
 -- wydaje nową parę przy każdym odświeżeniu, więc env nie ma tu czego trzymać.

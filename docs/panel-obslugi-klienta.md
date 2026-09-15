@@ -1694,6 +1694,23 @@ wraca na `nowe` i weźmie je ktokolwiek inny. Istnieje, bo przejęcie przypinał
 zadanie do konta na zawsze — magazynier, który wziął pomiar i skończył zmianę,
 zostawiał je poza zasięgiem kolektorów innych osób.
 
+**Zdjęcie działa od 0.352.0** i jest TABELĄ (`zadanie_zalacznik`), nie kolumną.
+Zadanie żyje dłużej niż jedna odpowiedź: hala odsyła je ze zdjęciem pustej
+półki, biuro ponawia, a druga próba kończy się pomiarem i zdjęciem suwmiarki.
+Jedno pole kasowałoby pierwszy dowód przy drugim.
+
+Bramka jest ta sama co przy odesłaniu: zadanie czekające albo przejęte przez
+tę osobę. Do zadania rozliczonego zdjęcia się nie dokłada — dowód przy pracy
+sprzed tygodnia nie jest odpowiedzią, tylko dopiskiem do cudzej pracy. Podpis
+jest nieobowiązkowy: kciuk w rękawicy ma zrobić zdjęcie, a nie opisać je
+zdaniem.
+
+Plik leży w `data/photos`, obok zdjęć niezgodności w dostawie, i idzie tą samą
+drogą (`services/foto.ts`, wyprowadzone z `problems.ts` w 0.352.0). Limit stoi
+w DWÓCH miejscach i to nie jest powtórzenie: 4 MiB ciała na trasie chroni
+proces przed kadrem z 13 Mpx, 3 MB w serwisie chroni dysk przed aparatem
+zaciętym na serii.
+
 Zadanie odesłane leży po stronie BIURA i ma stamtąd dokładnie dwa wyjścia:
 `ponow` (wraca na `nowe`, wolno przy okazji poprawić instrukcję) albo
 `anuluj`. Ślad odesłania zostaje w księdze zdarzeń także po ponowieniu —
@@ -2421,6 +2438,8 @@ POST   /api/zadania-terenowe/:id/wykonaj
 POST   /api/zadania-terenowe/:id/odeslij
 POST   /api/zadania-terenowe/:id/oddaj
 POST   /api/zadania-terenowe/:id/ponow
+POST   /api/zadania-terenowe/:id/zalacznik
+GET    /api/zadania-terenowe/:id/zalacznik/:zid
 GET    /api/products/search
 GET    /api/obsluga/rozmowy/:id/dobor/kandydaci
 PUT    /api/obsluga/rozmowy/:id/dobor/dane
@@ -4794,6 +4813,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Droga powrotna z hali (§13.3) | **działa** od 0.352.0 | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
 | Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
 | Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; bez progu „za późno", bo §22 nie podaje terminu |
+| Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |

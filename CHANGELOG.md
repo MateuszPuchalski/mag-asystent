@@ -123,6 +123,34 @@ Funkcja `wiek()` przeniosła się z alarmu synchronizacji do wspólnego `ui` i p
 raz pierwszy rozbija dobę na dni. Poniżej doby nic się nie zmienia — alarm
 dostaje dokładnie to, co dotąd.
 
+### Hala odpowiada zdjęciem, nie tylko zdaniem
+
+Trzeci punkt §13.3, ostatni nieoddany: „robi zdjęcie". Są pytania, na które
+tekst nie odpowiada — „czy to ta sama wtyczka", „co jest na tabliczce", „jak
+wygląda pęknięcie". Agent przepisywał wtedy opis ze słów magazyniera i wysyłał
+go kupującemu jako WŁASNE ustalenie, a przy sporze nie miał się o co oprzeć.
+
+**Tabela, nie kolumna.** Zadanie żyje dłużej niż jedna odpowiedź: odsyłane ze
+zdjęciem pustej półki, ponawiane przez biuro, a druga próba kończy się pomiarem
+i zdjęciem suwmiarki. Jedno pole kasowałoby pierwszy dowód przy drugim. Nazwa
+`zadanie_zalacznik` jest z projektu właściciela — figurowała w spisie tabel,
+choć w schemacie jej nie było.
+
+Plik leży w `data/photos`, obok zdjęć niezgodności w dostawie, i idzie tą samą
+drogą: magazyn zdjęć wyprowadził się z `problems.ts` do `services/foto.ts`,
+bo dostał drugiego odbiorcę. Druga kopia `photoDir()` rozjechałaby się po
+pierwszej literówce, a objawem byłby katalog, w którym nie ma połowy dowodów.
+
+Limit stoi w DWÓCH miejscach i to nie jest powtórzenie: 4 MiB ciała na trasie
+chroni PROCES przed kadrem z trzynastu megapikseli, 3 MB w serwisie chroni
+DYSK przed aparatem zaciętym na serii. To dwie różne awarie i dwa różne progi.
+
+W panelu zdjęcie jest **piątym źródłem obrazów** i wchodzi do wspólnej kolejki
+pobierania, a nie obok niej. Nagłówek `useZdjecie.ts` liczy, ile razy ta blizna
+już kosztowała: trasa stoi za sesją, więc `<img src>` dostaje 401 i rysuje
+ikonę zepsutego obrazu. Kupiona trzy razy w tym froncie — czwarty byłby
+świadomy.
+
 ### Cztery usterki złapane przy przeglądzie własnego kodu
 
 Warto je wymienić, bo każda przeżyłaby testy pierwszej wersji.

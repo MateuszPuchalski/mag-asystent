@@ -89,3 +89,55 @@ test("zadanie otwarte niesie wiek zlecenia, zamknięte nie niesie żadnego",asyn
     mierzyłoby wiek historii, a nie zaległość. */
  r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/anuluj`,headers:b});
  assert.equal(r.json().zadanie.zleconeOdMs,null);});
+
+/* ── Zdjęcie od hali (§13.3, 0.352.0) ────────────────────────────────────────
+   Są pytania, na które tekst nie odpowiada: „czy to ta sama wtyczka", „co jest
+   na tabliczce". Do 0.351.0 agent przepisywał opis ze słów magazyniera
+   i wysyłał go kupującemu jako WŁASNE ustalenie.                             */
+const JPEG_1PX = "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsL"
+  + "DBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLD"
+  + "BgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMj"
+  + "IyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL"
+  + "/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2"
+  + "JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqD"
+  + "hIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+"
+  + "Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+iiigD//Z";
+
+test("hala dokłada zdjęcie do zadania, biuro dostaje je na liście i pod URL-em",async()=>{const b=login("biuro","Anna"),m=login("magazynier","Marek");
+ let r=await app.inject({method:"POST",url:"/api/zadania-terenowe",headers:b,payload:{rodzaj:"zdjecie",tytul:"Sfotografuj tabliczkę",instrukcja:"Cała tabliczka, ostro.",twId:77}});const id=r.json().zadanie.id;
+ await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wez`,headers:m});
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/zalacznik`,headers:m,payload:{fotoBase64:JPEG_1PX,opis:"Tabliczka od spodu"}});
+ assert.equal(r.statusCode,200,r.body);
+ const zal=r.json().zadanie.zalaczniki;
+ assert.equal(zal.length,1);assert.equal(zal[0].opis,"Tabliczka od spodu");assert.equal(zal[0].przez,"Marek");
+
+ /* Zdjęcie ma być do OBEJRZENIA, nie tylko do policzenia — inaczej biuro wie,
+    że coś przyszło, i nadal nie wie co. */
+ r=await app.inject({method:"GET",url:`/api/zadania-terenowe/${id}/zalacznik/${zal[0].id}`,headers:b});
+ assert.equal(r.statusCode,200);assert.equal(r.headers["content-type"],"image/jpeg");
+ assert.ok(r.rawPayload.length>100,"pod URL-em stoi plik, nie pustka");
+
+ /* Zadanie żyje dłużej niż jedna odpowiedź: odesłane ze zdjęciem pustej
+    półki, ponowione, potem pomiar ze zdjęciem suwmiarki. Jedno `foto_ref`
+    kasowałoby pierwszy dowód przy drugim — dlatego tabela, nie kolumna. */
+ await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/zalacznik`,headers:m,payload:{fotoBase64:JPEG_1PX}});
+ r=await app.inject({method:"GET",url:"/api/zadania-terenowe",headers:b});
+ assert.equal(r.json().zadania.find((x:{id:number})=>x.id===id).zalaczniki.length,2);
+ const e=db().prepare("SELECT count(*) n FROM events WHERE type='zadanie_terenowe_zalacznik'").get() as {n:number};
+ assert.equal(e.n,2,"każde zdjęcie zostawia ślad w księdze");});
+
+test("zdjęcia nie dokłada się do cudzego ani do zamkniętego zadania",async()=>{const b=login("biuro","Anna"),m=login("magazynier","Marek"),drugi=login("magazynier","Ola");
+ let r=await app.inject({method:"POST",url:"/api/zadania-terenowe",headers:b,payload:{rodzaj:"pomiar",tytul:"Zmierz",instrukcja:"Y"}});const id=r.json().zadanie.id;
+ await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wez`,headers:m});
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/zalacznik`,headers:drugi,payload:{fotoBase64:JPEG_1PX}});
+ assert.equal(r.statusCode,400,"cudze zadanie w toku nie przyjmuje zdjęć zza pleców");
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/zalacznik`,headers:m,payload:{fotoBase64:""}});
+ assert.equal(r.statusCode,400,"puste zdjęcie nie jest zdjęciem");
+
+ await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/wykonaj`,headers:m,payload:{wynik:"46 mm"}});
+ r=await app.inject({method:"POST",url:`/api/zadania-terenowe/${id}/zalacznik`,headers:m,payload:{fotoBase64:JPEG_1PX}});
+ assert.equal(r.statusCode,400,"dowód dokładany do zadania rozliczonego to dopisek do cudzej pracy");
+
+ /* Nieistniejący załącznik to 404, nie ścieżka do cudzego pliku. */
+ r=await app.inject({method:"GET",url:`/api/zadania-terenowe/${id}/zalacznik/99999`,headers:b});
+ assert.equal(r.statusCode,404);});

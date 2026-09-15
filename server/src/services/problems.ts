@@ -1,7 +1,5 @@
-import fs from "node:fs";
-import path from "node:path";
 import { db } from "../db/db.js";
-import { config } from "../config.js";
+import { sciezkaZdjecia, zapiszZdjecie } from "./foto.js";
 import { logEvent } from "./events.js";
 import { closeIfComplete } from "./delivery.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
@@ -118,25 +116,10 @@ const QTY_REQUIRED: ReadonlySet<string> = new Set(PROBLEM_TYPES);
 
 const nowIso = () => new Date().toISOString();
 
-let photoDirGotowy = false;
-
-function photoDir(): string {
-  const dir = path.resolve(path.dirname(config.dbPath), "photos");
-  if (!photoDirGotowy) {
-    fs.mkdirSync(dir, { recursive: true });
-    photoDirGotowy = true;
-  }
-  return dir;
-}
-
-/** Zapis zdjęcia (base64 z aparatu kolektora) na dysk; zwraca nazwę pliku. */
-function savePhoto(base64: string): string {
-  const clean = base64.replace(/^data:image\/\w+;base64,/, "");
-  const buf = Buffer.from(clean, "base64");
-  const name = `p${Date.now()}-${Math.round(buf.length / 1024)}kb.jpg`;
-  fs.writeFileSync(path.join(photoDir(), name), buf);
-  return name;
-}
+/* Magazyn zdjęć wyprowadzony do `foto.ts` w 0.352.0 — drugim odbiorcą jest
+   zadanie terenowe (§13.3). Nazwy zostają tutejsze, żeby reszta pliku i jego
+   testy czytały się jak dotąd. */
+const savePhoto = (base64: string) => zapiszZdjecie(base64);
 
 /** Referencja zdjęcia po id problemu (null = brak zdjęcia albo brak problemu). */
 export function photoRefOf(id: number): string | null {
@@ -146,12 +129,7 @@ export function photoRefOf(id: number): string | null {
   return r?.foto_ref ?? null;
 }
 
-export function photoPath(ref: string): string | null {
-  // bez ../ w nazwie — ref pochodzi z bazy, ale nie ufamy mu na ścieżce
-  const safe = path.basename(ref);
-  const p = path.join(photoDir(), safe);
-  return fs.existsSync(p) ? p : null;
-}
+export const photoPath = (ref: string): string | null => sciezkaZdjecia(ref);
 
 export interface RaiseProblemInput {
   deliveryId: number;

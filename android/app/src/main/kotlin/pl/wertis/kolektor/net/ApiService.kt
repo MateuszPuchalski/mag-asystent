@@ -407,6 +407,9 @@ interface ApiService {
     @POST("api/zadania-terenowe/{id}/wykonaj")
     suspend fun zadanieTerenoweWykonaj(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.WynikZadaniaBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
 
+    @POST("api/zadania-terenowe/{id}/zalacznik")
+    suspend fun zadanieTerenoweZalacznik(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.ZalacznikZadaniaBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
     @POST("api/zadania-terenowe/{id}/odeslij")
     suspend fun zadanieTerenoweOdeslij(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.OdeslijZadanieBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
 

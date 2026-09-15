@@ -23,13 +23,21 @@ const zadanie = (n: Partial<Zadanie> = {}): Zadanie => ({
   utworzonoAt: "2026-09-15T08:00:00.000Z", utworzonoPrzez: "A. Lewandowska",
   przypisanoPrzez: null, wynik: null, wykonanoPrzez: null,
   odeslanoAt: null, odeslanoPrzez: null, powodKod: null, powod: null,
-  zleconeOdMs: 42 * 60_000, ...n,
+  zleconeOdMs: 42 * 60_000, zalaczniki: [], ...n,
 });
 
 const odeslane = (n: Partial<Zadanie> = {}) => zadanie({
   status: "odeslane", powodKod: "brak_towaru", powod: "Półka A01 pusta, w buforze też nie ma.",
   odeslanoAt: "2026-09-15T09:30:00.000Z", odeslanoPrzez: "M. Kowal", ...n,
 });
+
+vi.mock("../towar/useZdjecie", () => ({
+  useZdjecieZadania: (_z: number, id: number | null) => ({
+    url: id === 9 ? "blob:zdjecie" : null,
+    blad: id === 9 ? null : "Serwer nie odpowiada.",
+    ponow: () => {},
+  }),
+}));
 
 const ponow = vi.fn();
 const anuluj = vi.fn();
@@ -117,6 +125,29 @@ describe("Zadania terenowe — droga powrotna z hali", () => {
     expect(screen.getByText("46 mm")).toBeInTheDocument();
     expect(screen.queryByText(/temu/)).not.toBeInTheDocument();
     expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
+  });
+
+  it("zdjęcie od hali stoi na karcie i ma opis w treści zastępczej", () => {
+    /* Przy pytaniu „co jest na tabliczce" obraz JEST odpowiedzią. Do 0.351.0
+       hala mogła odpowiedzieć wyłącznie tekstem, a agent przepisywał opis ze
+       słów magazyniera i wysyłał go kupującemu jako własne ustalenie. */
+    LISTA = [zadanie({ zalaczniki: [
+      { id: 9, opis: "Tabliczka od spodu", at: "2026-09-15T09:00:00.000Z", przez: "M. Kowal" },
+    ] })];
+    pokaz();
+    const obraz = screen.getByRole("img", { name: "Tabliczka od spodu" });
+    expect(obraz).toHaveAttribute("src", "blob:zdjecie");
+    expect(screen.getByText("Tabliczka od spodu")).toBeInTheDocument();
+  });
+
+  it("nieudane pobranie mówi DLACZEGO i daje ponowić", () => {
+    /* Brak zdjęcia z powodu wygląda inaczej niż zdjęcie, którego nikt nie
+       zrobił — a tu zdjęcie NA PEWNO jest, bo hala je przysłała. */
+    LISTA = [zadanie({ zalaczniki: [
+      { id: 4, opis: null, at: "2026-09-15T09:00:00.000Z", przez: "M. Kowal" },
+    ] })];
+    pokaz();
+    expect(screen.getByRole("button", { name: /Serwer nie odpowiada.*ponownie/ })).toBeInTheDocument();
   });
 
   it("zadanie nieodesłane nie dostaje przycisków biura", () => {
