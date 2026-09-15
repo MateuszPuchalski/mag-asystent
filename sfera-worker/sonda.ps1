@@ -8,9 +8,9 @@
 # Sonda NICZEGO NIE ZAPISUJE. Otwiera sesje, czyta nazwy skladowych i konczy
 # prace. Zadnego Zapisz().
 #
-# Jeden wyjatek, wlaczany swiadomie: -SzkicMM wola DodajMM(), zeby zobaczyc
-# wlasciwosci obiektu dokumentu. Dokument zostaje w pamieci i nie jest
-# zapisywany, ale to jedyne Dodaj* w calym skrypcie.
+# Dwa wyjatki, wlaczane swiadomie: -SzkicMM wola DodajMM(), a -SzkicZW wola
+# DodajZW(), zeby zobaczyc wlasciwosci obiektu dokumentu. Dokument zostaje
+# w pamieci i nie jest zapisywany, ale to jedyne Dodaj* w calym skrypcie.
 #
 # Uzycie (PowerShell na maszynie z Subiektem GT i Sfera):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
@@ -52,7 +52,14 @@ param(
     # i tak nie jest zapisywany - pozycja powstaje w pamieci razem z nim.
     # To zamyka nazwe pola ilosci i podstawe indeksu Element. Dotyczy wylacznie
     # -SzkicMM; bez tego parametru zaden Dodaj na pozycjach nie pada.
-    [int]$Towar = 0
+    [int]$Towar = 0,
+    # Tworzy ZW (zwrot do paragonu) w pamieci i podpina go pod paragon -Paragon.
+    # NIE wola Zapisz(). Audyt zwrotow z 15 wrzesnia 2026: biuro wystawia ZW
+    # reka, a worker ma to przejac - najpierw trzeba znac nazwy na obiekcie ZW.
+    [switch]$SzkicZW,
+    # dok_Id paragonu PA, pod ktory idzie szkic ZW. Numer z ekranu nie wystarczy:
+    # NaPodstawie bierze identyfikator (SAFEARRAY(int) w wariancie „wielu").
+    [int]$Paragon = 0
 )
 
 $ErrorActionPreference = "Continue"
@@ -532,6 +539,116 @@ if ($SzkicMM) {
     } catch {
         Write-Wynik "  BRAK  DodajMM() odmowil: $($_.Exception.Message)"
     }
+}
+
+# --- Szkic ZW: zwrot do paragonu, w pamieci (audyt zwrotow, 15 wrzesnia 2026) --
+#
+# Biuro wystawia ZW reka: paragon PA, "Wypisz zwrot", zera w pozycjach, ktore
+# nie wrocily. Worker ma to przejac, ale DodajZW() znamy wylacznie z nazwy na
+# liscie managera - pozycji po NaPodstawie i pol rodzaju zwrotu nikt nie widzial.
+# Ta sama droga co przy MM: obiekt w pamieci, zadnego Zapisz().
+#
+# DANYCH KONTRAHENTA NIE WYPISUJEMY. ZW po powiazaniu niesie nabywce z paragonu,
+# a plik wynikowy wraca do repozytorium. Wlasciwosci o kontrahencie, adresie
+# i uwagach odsiewa wzorzec $prywatne; zostaje tylko to, czego potrzebuje kod.
+if ($SzkicZW) {
+    # Wartosc bez wywracania sondy. Brak nazwy to co innego niz null: COM na
+    # nieznanej nazwie oddaje w PowerShellu cichy $null.
+    function Wartosc($obiekt, [string]$nazwa) {
+        if (-not (Ma-Nazwe $obiekt $nazwa)) { return "(brak nazwy)" }
+        try {
+            $w = $obiekt.$nazwa
+            if ($null -eq $w) { return "(null)" }
+            return "$w"
+        } catch { return "(odmowa: $($_.Exception.Message))" }
+    }
+    $prywatne = 'Kontrahent|Nabywca|Odbiorca|Adres|Nip|Pesel|Telefon|Email|Mail|Uwagi|Opis|Osoba|Imie|Nazwisko|Bank|Konto'
+    function Wlasciwosci-Wg($obiekt, [string]$wzorzec, [string]$etykieta) {
+        Write-Wynik ""
+        Write-Wynik "--- $etykieta (wartosci) ---"
+        try {
+            $nazwy = Get-Member -InputObject $obiekt -MemberType Property -ErrorAction Stop |
+                Where-Object { $_.Name -match $wzorzec -and $_.Name -notmatch $prywatne } |
+                ForEach-Object { $_.Name }
+            if (-not $nazwy) { Write-Wynik "  (zadna wlasciwosc nie pasuje)"; return }
+            foreach ($n in $nazwy) { Write-Wynik ("  {0,-34} = {1}" -f $n, (Wartosc $obiekt $n)) }
+        } catch {
+            Write-Wynik "  (Get-Member odmowil: $($_.Exception.Message))"
+        }
+    }
+    $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
+
+    Write-Wynik ""
+    Write-Wynik "SZKIC ZW - zwrot do paragonu w pamieci, BEZ Zapisz()"
+    Write-Wynik "  Uwaga: dokument NIE jest zapisywany; po odczytaniu nazw sesja sie konczy."
+
+    # Sygnatury wszystkiego, co dotyczy zwrotu do paragonu: ZW, ZWn, PAk. Gdyby
+    # DodajZW() odmowil, ta lista mowi, jak nazywa sie wlasciwa metoda.
+    Write-Wynik ""
+    Write-Wynik "--- SuDokumentyManager - metody zwrotow i korekt paragonu ---"
+    try {
+        Get-Member -InputObject $sgt.SuDokumentyManager -MemberType Method -ErrorAction Stop |
+            Where-Object { $_.Name -match 'ZW|PAk|Zwrot' } |
+            ForEach-Object { Write-Wynik ("  {0}" -f ($_.Definition -replace '\s+', ' ')) }
+    } catch {
+        Write-Wynik "  (nie udalo sie odczytac: $($_.Exception.Message))"
+    }
+
+    try {
+        $zw = $sgt.SuDokumentyManager.DodajZW()
+        Write-Wynik "  JEST  DodajZW() oddal obiekt dokumentu"
+        Wlasciwosci-Wg $zw $polaDokumentu "ZW PRZED powiazaniem"
+
+        if ($Paragon -le 0) {
+            Write-Wynik ""
+            Write-Wynik "  BRAK  paragonu: podaj -Paragon <dok_Id>, zeby zobaczyc pozycje po NaPodstawie."
+            Write-Wynik "        dok_Id znajdziesz w SSMS na bazie podmiotu:"
+            Write-Wynik "        SELECT dok_Id, dok_NrPelny FROM dok__Dokument WHERE dok_NrPelny = 'PA 1/MAG/09/2026'"
+        } else {
+            Write-Wynik ""
+            Write-Wynik "NaPodstawie($Paragon) - nadal BEZ Zapisz()"
+            try {
+                $zw.NaPodstawie($Paragon)
+                Write-Wynik "  JEST  NaPodstawie przyjal dok_Id paragonu"
+            } catch {
+                Write-Wynik "  BRAK  NaPodstawie odmowil: $($_.Exception.Message)"
+            }
+            Wlasciwosci-Wg $zw $polaDokumentu "ZW PO powiazaniu"
+
+            $pozycjeZw = $null
+            try { $pozycjeZw = $zw.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
+            if ($null -eq $pozycjeZw) {
+                Write-Wynik "  (Pozycje null - NaPodstawie nie przepisal pozycji)"
+            } else {
+                $liczba = 0
+                try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+                Write-Wynik ""
+                Write-Wynik ("--- Pozycje ZW po powiazaniu: {0} ---" -f $liczba)
+                # Element liczy OD JEDYNKI - zmierzone przy szkicu MM (docs/sfera-com.md 2l).
+                for ($i = 1; $i -le $liczba; $i++) {
+                    try {
+                        $el = $pozycjeZw.Element($i)
+                        Write-Wynik ("  [{0}] TowarId={1} Symbol={2} IloscJm={3} Ilosc={4}" -f $i,
+                            (Wartosc $el "TowarId"), (Wartosc $el "TowarSymbol"),
+                            (Wartosc $el "IloscJm"), (Wartosc $el "Ilosc"))
+                        if ($i -eq 1) {
+                            Wlasciwosci-Wg $el 'Ilosc|Cena|Wartosc|Rabat|Vat|Lp|Orygin|Korekt|Magazyn' "Pierwsza pozycja ZW"
+                        }
+                    } catch {
+                        Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                    }
+                }
+            }
+        }
+    } catch {
+        Write-Wynik "  BRAK  DodajZW() odmowil: $($_.Exception.Message)"
+    }
+    Write-Wynik ""
+    Write-Wynik "Pytania do wyniku szkicu ZW:"
+    Write-Wynik "  - czy NaPodstawie przepisal WSZYSTKIE pozycje paragonu i z jaka iloscia"
+    Write-Wynik "  - jak nazywa sie pole rodzaju zwrotu i jaka ma wartosc domyslna"
+    Write-Wynik "  - jak nazywaja sie pola platnosci (przelew, gotowka, karta) na ZW"
+    Write-Wynik ""
 }
 
 Write-Wynik "Czego sonda NIE rozstrzyga, bo wymaga wystawienia dokumentu:"

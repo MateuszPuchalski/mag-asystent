@@ -170,6 +170,28 @@ Gdy w pliku ich nie ma, sonda mówi to wprost. Wtedy podaje się LICZBY, nie naz
 powershell ... -File sonda.ps1 -SzkicMM -MagNadawczy 1 -MagOdbiorczy 3
 ```
 
+### Szkic ZW — zwrot do paragonu (audyt zwrotów, 15 września 2026)
+
+Biuro wystawia dziś ZW ręką: paragon PA, „Wypisz zwrot", zera w pozycjach, które
+nie wróciły. Zanim zrobi to worker, trzeba znać nazwy na obiekcie ZW. Przełącznik
+`-SzkicZW` tworzy ZW w pamięci i podpina go pod paragon. `Zapisz()` nie pada,
+więc dokument nie powstaje.
+
+Paragon podaje się jego `dok_Id`, nie numerem. Znajdziesz go w SQL Server
+Management Studio na bazie podmiotu:
+
+```sql
+SELECT dok_Id, dok_NrPelny FROM dok__Dokument WHERE dok_NrPelny = 'PA 3351/MAG/09/2026';
+```
+
+```powershell
+powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env -SzkicZW -Paragon 123456 -Wynik C:\wertis\sonda-zw.txt
+```
+
+Sonda wypisuje pozycje ZW po powiązaniu, z ilościami, oraz pola rodzaju zwrotu,
+płatności i skutku magazynowego. Danych kontrahenta nie wypisuje, bo plik wynikowy
+wraca do repozytorium.
+
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
 Wszystko, co dotyczy COM, siedzi w **jednym pliku**
