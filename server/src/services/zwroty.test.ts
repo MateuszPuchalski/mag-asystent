@@ -1829,3 +1829,28 @@ test("prowadzący i tagi wychodzą na wierszu kolejki", () => {
   assert.equal(w.prowadziUserId, kto.id);
   assert.deepEqual(w.tagi.map((t) => t.nazwa), ["gwarancja"]);
 });
+
+test("szczegół po identyfikatorze składa TEN SAM wiersz, co kolejka", () => {
+  /* Audyt zwrotów, 15 września 2026. Trasa szczegółu budowała całą historię,
+     żeby wyjąć jeden wiersz, a szczegół odświeża się po każdym zapisie. Zawężony
+     odczyt ma dać wiersz identyczny co do pola — inaczej szczegół i kolejka
+     mówiłyby o tym samym zwrocie co innego. Drugi zwrot, drugie zamówienie
+     i druga rozmowa stoją tu po to, żeby zawężenie miało co odciąć. */
+  const d = stanowisko();
+  towar(d, 10, "SEK-46", "5901234567890");
+  zamowienie(d, "ord-a", [{ offerId: "111", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
+  zamowienie(d, "ord-b", [{ offerId: "222", nazwa: "Kosa", sku: null, cena: 19999 }]);
+  const a = dodaj(d, "2026-08-25T08:00:00Z",
+    { order_id: "ord-a", paczka_at: "2026-08-27T08:00:00Z" },
+    [{ ilosc: 1, cena: 4999, offerId: "111", twId: 10, twSymbol: "SEK-46", twZrodlo: "sku" }]);
+  dodaj(d, "2026-08-26T08:00:00Z", { order_id: "ord-b" },
+    [{ ilosc: 1, cena: 19999, offerId: "222", nazwa: "Kosa" }]);
+  rozmowa(d, "w-a", "ord-a", "Kiedy zwrot?", "2026-08-28T08:00:00Z");
+  rozmowa(d, "w-b", "ord-b", "Kosa za ciężka", "2026-08-28T09:00:00Z");
+
+  const zKolejki = listaZwrotow(d, TERAZ).find((z) => z.id === a);
+  assert.ok(zKolejki?.pozycje[0].ean, "test ma sprawdzać także EAN z zawężonego słownika");
+  assert.deepEqual(listaZwrotow(d, TERAZ, { id: a }), [zKolejki]);
+  assert.deepEqual(listaZwrotow(d, TERAZ, { id: 99_999 }), [],
+    "nieznany zwrot to pusta lista, nie wyjątek");
+});

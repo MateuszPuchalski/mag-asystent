@@ -1769,6 +1769,17 @@ Pierwszy przebieg po aktualizacji przerzuci zaległość naraz:
 
 Nic nie trzeba ustawiać.
 
+**Zwrot bez czekania (0.348.0).** Serwer zakłada przy starcie trzy nowe indeksy.
+Na dużej bazie pierwszy start po aktualizacji trwa przez to chwilę dłużej.
+
+Po wdrożeniu powiedz biuru o trzech zmianach:
+
+1. Przycisk ODDAJ PIENIĄDZE pokaże się też przy zwrotach zamkniętych korektą.
+2. Zwrotu opłaconego już ręcznie w Sales Center nie oddawaj drugi raz przyciskiem.
+3. Enter w polu powodu odmowy od razu zapisuje odmowę.
+
+Przycisk przy takim zwrocie zniknie sam, gdy Allegro potwierdzi rozliczenie.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

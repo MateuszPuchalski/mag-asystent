@@ -739,6 +739,17 @@ export function migrate(database: DatabaseSync) {
   /* Skąd wiersz koszyka się wziął — po tym cofnięcie oceny go zdejmuje.
      Kosz z dokumentu Subiekta ma tu `NULL`: tamten rodzi się z pozycji MM. */
   addColumn("kosz_pozycja", "zwrot_pozycja_id", "INTEGER");
+  /* INDEKSY PRACY NA ZWROTACH (audyt zwrotów, 15 września 2026). Kolejka,
+     szczegół zwrotu i koszyk pytają po tych trzech kolumnach przy każdym
+     odświeżeniu, a do tego wydania każde pytanie szło przez całą tabelę.
+     Tutaj, a nie w schemacie: dwie z tych kolumn dochodzą w `migrate()`, a
+     schemat wykonuje się przed nią — ta sama reguła co przy indeksie `klucz`. */
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS ix_kosz_pozycja_zwrot_pozycja ON kosz_pozycja(zwrot_pozycja_id);
+    CREATE INDEX IF NOT EXISTS ix_message_zamowienie ON message(related_order_id);
+    CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_zamowienie
+      ON zwrot_klienta(channel_account_id, order_id);
+  `);
   przebudujIndeksKoduKosza(database);
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */

@@ -271,6 +271,22 @@ describe("Ekran zwrotów", () => {
     expect(wybor).not.toHaveTextContent("DHL");
   });
 
+  it("„Paczka u nas” zawęża do zwrotów z doręczoną paczką i niczego nie przestawia", async () => {
+    /* Audyt zwrotów, 15 września 2026: biuro przy stosie kartonów pyta, które
+       zwroty może dziś zrobić. Kolejność dalej liczy termin (0.315.0). */
+    scena.zwroty = [
+      { ...zwrot(31, "decyzja", "ZU-31"), dostarczonoAt: "2026-09-01T09:00:00.000Z" },
+      zwrot(32, "decyzja", "ZU-32"),
+    ];
+    try {
+      pokaz();
+      expect(screen.getAllByText("ZU-32").length).toBeGreaterThan(0);
+      await userEvent.click(screen.getByLabelText(/Paczka u nas/));
+      expect(screen.queryByText("ZU-32")).toBeNull();
+      expect(screen.getAllByText("ZU-31").length).toBeGreaterThan(0);
+    } finally { scena.zwroty = null; }
+  });
+
   it("przewoźnik zawęża kolejkę, a domyślnie nie zawęża niczego", async () => {
     pokaz();
     expect(screen.getAllByText("ZW-1").length).toBeGreaterThan(0);
@@ -293,26 +309,33 @@ describe("Ekran zwrotów", () => {
     expect(po[0]).toContain("ZW-2");
   });
 
-  it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", () => {
+  it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", async () => {
     /* Bez liczb nie da się powiedzieć, czy problem jest w kodzie, czy
        w danych Allegro: jedna pozycja bez SKU to sprzedawca, czterdzieści
        z tym samym powodem to usterka. Kod, którego panel nie zna, pokazuje
        się surowy — licznik, który cicho gubi część liczb, jest gorszy od
        jego braku. */
     pokaz();
+    /* Od 15 września 2026 pasy są zwinięte w jeden wiersz („schowaj to gdzieś"):
+       liczba stoi na wierzchu, zdania są o kliknięcie dalej. */
+    expect(screen.queryByText(/oferta bez SKU/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
     expect(screen.getByText(/Bez kartoteki: 3 z 8 pozycji w pracy/)).toBeInTheDocument();
     expect(screen.getByText(/oferta bez SKU/)).toBeInTheDocument();
     expect(screen.getByText(/jakis_nowy_kod/)).toBeInTheDocument();
   });
 
-  it("czekanie na automat nazywa się inaczej niż czekanie na człowieka", () => {
+  it("czekanie na automat nazywa się inaczej niż czekanie na człowieka", async () => {
     /* Pozycja z pewnością `sku` wiąże się sama. Gdy stoi w liczniku, to jest
        usterka, a nie praca do zrobienia — jedna liczba na oba przypadki
        kazała szukać winy nie tam, gdzie trzeba. */
     scena.kartoteki = { bez: 5, wszystkie: 9,
       powody: { do_zwiazania: 4, do_zatwierdzenia: 1 } };
-    scena.stan = {};
+    /* Synchronizacja DZIAŁA, więc wiersz jest zwinięty. Stan bez statusu to
+       synchronizacja, która stoi — a wtedy wiersz otwiera się sam (test niżej). */
+    scena.stan = { status: "current", kodOstatniegoBledu: null, pozostaloDoPobrania: null };
     pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
     expect(screen.getByText(/czeka na automat/)).toBeInTheDocument();
     expect(screen.getByText(/czeka na zatwierdzenie/)).toBeInTheDocument();
   });
@@ -451,6 +474,45 @@ describe("Klawisze kubełka", () => {
        obiecywać `n`. Decyzja właściciela z 13 września to odwróciła. */
     expect(screen.getByText("niczyje")).toBeInTheDocument();
   });
+
+  it("`Enter` w DO KOREKTY stawia kursor w polu numeru, niczego nie zapisując", async () => {
+    /* Audyt zwrotów, 15 września 2026: pasek obiecywał tu Enter, a klawisz
+       milczał. Numer wpisuje człowiek, więc pierwszy Enter nie ma czego zapisać. */
+    scena.wolano = [];
+    scena.zwroty = [{ ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety", kwotaGrosze: 4999 }];
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(screen.getByLabelText("Numer korekty")).toHaveFocus());
+      expect(scena.wolano).toEqual([]);
+    } finally { scena.zwroty = null; }
+  });
+
+  it("`j` po przyjęciu zwrotu idzie do NASTĘPNEGO, a nie przez niego przeskakuje", async () => {
+    /* Przyjęty zwrot znika z listy DO DECYZJI, a kursor zostaje na nim. Do
+       audytu z 15 września 2026 `j` liczyło wtedy od zera i gubiło co drugi
+       zwrot — praca kubełkiem z klawiatury omijała połowę kolejki. */
+    scena.zwroty = [zwrot(21, "decyzja", "ZD-21"), zwrot(22, "decyzja", "ZD-22"),
+      zwrot(23, "decyzja", "ZD-23")];
+    const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    /* Świeży element przy każdym rysowaniu: ten sam obiekt React by pominął,
+       a atrapa kolejki czyta scenę dopiero przy rysowaniu. */
+    const drzewo = () => <QueryClientProvider client={klient}>
+      <MemoryRouter initialEntries={["/obsluga/zwroty/21"]}><Routes>
+        <Route path="/obsluga/zwroty" element={<Zwroty />} />
+        <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
+      </Routes></MemoryRouter></QueryClientProvider>;
+    try {
+      const { rerender } = render(drzewo());
+      expect(await screen.findByRole("heading", { name: "ZD-21" })).toBeInTheDocument();
+
+      scena.zwroty = [zwrot(21, "ocena", "ZD-21"), zwrot(22, "decyzja", "ZD-22"),
+        zwrot(23, "decyzja", "ZD-23")];
+      rerender(drzewo());
+      await userEvent.keyboard("j");
+      expect(await screen.findByRole("heading", { name: "ZD-22" })).toBeInTheDocument();
+    } finally { scena.zwroty = null; }
+  });
 });
 
 /* ── Rozjazdy nad kolejką (0.313.0) ──────────────────────────────────────────
@@ -480,6 +542,11 @@ describe("Pasek rozjazdów", () => {
     ];
     try {
       pokaz();
+      /* Zwinięty wiersz mówi samą liczbę; pasek rodzajów jest pod kliknięciem
+         (15 września 2026, „schowaj to gdzieś"). */
+      expect(screen.queryByLabelText("Rozjazdy zwrotów")).toBeNull();
+      expect(screen.getByRole("button", { name: /Do sprawdzenia 3/ })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
       const pasek = screen.getByLabelText("Rozjazdy zwrotów");
       expect(pasek).toHaveTextContent("Do sprawdzenia (3)");
       expect(pasek).toHaveTextContent("2 po terminie ustawowym");

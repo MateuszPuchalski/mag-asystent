@@ -124,7 +124,26 @@ export function listaPrzyjec(): WierszPrzyjecia[] {
  * się od razu `zamkniety`, bo nie ma czego do niego dokładać — zawartość
  * ustalił dokument.
  */
+/** Kod kosza złożonego w aplikacji: przedrostek `Z-` i liczba (`kosze-zwrotow.ts`). */
+const KOD_KOSZA_APLIKACJI = /^Z-\d+$/i;
+
 export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
+  /* KOD KOSZA Z APLIKACJI (audyt zwrotów, 15 września 2026). Zakładka ZWROTY
+     kieruje tu każdy skan, a `numerZKartki` zostawia same cyfry — więc `Z-7`
+     otwierało MM numer 7 albo kończyło się 404. Przedrostek powstał po to,
+     żeby te dwie przestrzenie się nie zderzały; do dziś nikt go tu nie czytał.
+     Kod bez kosza w pracy odpada GŁOŚNO, a nie cyframi: MM o tej samej liczbie
+     to cudzy kosz. */
+  const surowy = String(raw ?? "").trim().toUpperCase();
+  if (KOD_KOSZA_APLIKACJI.test(surowy)) {
+    const k = db()
+      .prepare("SELECT id, status, rodzaj FROM kosz WHERE kod = ? ORDER BY id DESC LIMIT 1")
+      .get(surowy) as { id: number; status: string; rodzaj: string } | undefined;
+    if (!k || k.rodzaj !== "zwroty" || k.status === "otwarty" || k.status === "anulowany") {
+      throw new BladKosza(404, `Kosz ${surowy} nie czeka na rozłożenie — sprawdź etykietę`);
+    }
+    return szczegolKosza(k.id);
+  }
   const numer = numerZKartki(raw);
   if (!numer) throw new BladKosza(400, "Podaj numer z kartki przy koszu, np. 1209");
 

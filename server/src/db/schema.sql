@@ -1812,8 +1812,10 @@ CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
 
 -- ── Pamięć powiązań oferta → kartoteka (0.154.0) ────────────────────────────
 -- Człowiek wskazuje kartotekę RAZ. Ten sam towar wraca za miesiąc na innym
--- zwrocie i ma się powiązać sam — inaczej praca powtarza się w nieskończoność,
--- a to jest dokładnie ten koszt, który panel zwrotów miał zdejmować.
+-- zwrocie i dostaje to wskazanie jako PROPOZYCJĘ — inaczej praca powtarzałaby
+-- się w nieskończoność. Propozycja, nie wiązanie: decyzja właściciela
+-- z audytu zwrotów (15 września 2026) „automat proponuje". Stało tu, że
+-- towar „ma się powiązać sam", a kod od 0.219.0 wiązał sam wyłącznie po SKU.
 --
 -- Wzorzec i uzasadnienie wprost z `ean_alias`: BEZ klucza obcego do
 -- `sgt_towar`, bo wpis ma przeżyć import kasujący read-model. To nie jest

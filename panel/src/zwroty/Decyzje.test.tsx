@@ -67,6 +67,18 @@ describe("Decyzje zwrotu", () => {
     expect(onWerdykt).toHaveBeenCalledWith("odrzucony", "Towar użyty");
   });
 
+  it("Enter w polu powodu potwierdza odmowę, a pusty powód dalej nie", async () => {
+    /* Audyt zwrotów, 15 września 2026: wpisany powód JEST potwierdzeniem
+       z §25a.5 — sięganie po mysz po nim nie dodaje namysłu. */
+    const onWerdykt = vi.fn();
+    pasek(zwrot(), { onWerdykt });
+    await userEvent.click(screen.getByRole("button", { name: /Odrzuć/ }));
+    await userEvent.type(screen.getByLabelText(/Powód/), "{Enter}");
+    expect(onWerdykt).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText(/Powód/), "Towar użyty{Enter}");
+    expect(onWerdykt).toHaveBeenCalledWith("odrzucony", "Towar użyty");
+  });
+
   it("stan końcowy nie proponuje decyzji", () => {
     pasek(zwrot({ kubelek: "zamkniety" }));
     expect(screen.queryByRole("button", { name: /Przyjmij|Zapisz kwotę/ })).toBeNull();
@@ -158,7 +170,15 @@ describe("Korekta zwrotu (0.162.0)", () => {
        a stamtąd wraca tylko numer, przepisany ręką. */
     pasek(doKorekty());
     expect(screen.getByText(/wystawiasz w Subiekcie/i)).toBeInTheDocument();
-    expect(screen.getByText(/Pieniądze oddajesz w panelu Allegro/i)).toBeInTheDocument();
+  });
+
+  it("NIE odsyła po pieniądze do panelu Allegro — przycisk jest niżej", () => {
+    /* Audyt zwrotów, 15 września 2026. Zdanie „oddajesz w panelu Allegro" stało
+       tu od 0.162.0 i po 0.190.0 było już nieprawdą. Na nagraniu z pracy
+       operator oddawał pieniądze w Sales Center, obok gotowego przycisku. */
+    pasek(doKorekty());
+    expect(screen.queryByText(/w panelu Allegro/i)).toBeNull();
+    expect(screen.getByText(/ODDAJ PIENIĄDZE/)).toBeInTheDocument();
   });
 
   it("kwota ma tu DROGĘ WYJŚCIA — to ostatni ekran przed korektą", async () => {

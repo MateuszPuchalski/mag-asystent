@@ -34,6 +34,55 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.0 — 15 września 2026
+
+**Zwrot bez czekania: panel, serwer i kolektor.** Pakiet z audytu procesu
+zwrotów i nagrania pracy biura. Jeden zwrot zajmował tam około 105 sekund,
+a część z nich to było czekanie, klikanie myszą i przepisywanie.
+
+Panel obsługi:
+- **Zapis nie przeładowuje już trzech list.** `["zwroty"]` było przedrostkiem
+  koszyka i rozjazdów liczonych z całej bazy, więc każdy klawisz decyzji
+  odświeżał wszystkie. Kolejka odświeża się teraz dokładnie, a otwarty szczegół
+  zawsze — dzięki temu ODDAJ PIENIĄDZE pojawia się zaraz po zapisaniu kwoty,
+  zamiast pisać „Najpierw zaznacz, co oddajemy".
+- **Korekta nie chowa zwrotu pieniędzy.** Zamknięty zwrot odmawiał przelewu, a
+  biuro wystawia korektę zwykle przed nim; przelew szedł więc w Sales Center.
+  Drogę zamyka dopiero rozliczenie potwierdzone przez Allegro. Zdanie „oddajesz
+  w panelu Allegro" przy korekcie zniknęło — było fałszywe od 0.190.0.
+- **Klawiatura:** trafiony skan zdejmuje kursor z pola szukania, `Esc` z niego
+  wychodzi, `Enter` w DO KOREKTY stawia kursor w polu numeru, a `Enter` w polu
+  powodu potwierdza odmowę. `j` po przyjęciu zwrotu idzie do następnego, zamiast
+  go przeskakiwać. Pasek skrótów pokazuje klawisze OTWARTEGO zwrotu.
+- **Filtr „Paczka u nas"** — zawęża do zwrotów z doręczoną paczką i niczego nie
+  przestawia.
+- **Paski „Bez kartoteki" i „Do sprawdzenia" zwinięte w jeden wiersz** — prośba
+  właściciela „schowaj to gdzieś". Liczby stoją na wierzchu, zdania są
+  o kliknięcie dalej. Wiersz otwiera się sam, gdy stoi synchronizacja przy
+  pozycjach czekających na automat; czerwony pasek niekompletnej kolejki zostaje.
+
+Serwer:
+- **Numer korekty wiąże się zaraz po imporcie z Subiekta**, a nie dopiero taktem
+  Allegro co pięć minut. Po imporcie chodzą tylko korekty i koszyki.
+- **Szczegół zwrotu liczy jeden zwrot**, a nie całą historię z propozycją
+  kartoteki i rabatem dla każdej pozycji. Szczegół odświeża się po każdym zapisie.
+- **Trzy indeksy:** pozycje kosza po pozycji zwrotu, wiadomości po zamówieniu,
+  zwroty po koncie i zamówieniu.
+
+Kolektor:
+- **Skan `Z-7` otwiera kosz z aplikacji.** Zakładka ZWROTY obcinała kod do cyfr
+  i otwierała MM numer 7. Poprawka jest po stronie serwera.
+- **Kosze z aplikacji stoją nad dokumentami MM**, a błędy otwarcia, pominięcia,
+  skanu i ZAKOŃCZ słychać sygnałem.
+
+Decyzje właściciela zapisane przy okazji: kartoteka wskazana raz ręcznie jest
+PROPOZYCJĄ, nie wiązaniem (poprawiony komentarz w `schema.sql`). Automatyczne
+zakończenie kosza NIE weszło — ekran ignoruje skany po zakończeniu, więc
+poprawka ostatniego regału przepadłaby bez słowa.
+
+- **[wymaga działania]** Po wdrożeniu przeczytaj `DEPLOY.md` §6g: przycisk ODDAJ
+  PIENIĄDZE pokaże się też przy zwrotach zamkniętych korektą.
+
 ## 0.347.0 — 15 września 2026
 
 **Znane zwroty odświeżają się same.** Audyt procesu zwrotów: w kolejce stało

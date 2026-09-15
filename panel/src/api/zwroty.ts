@@ -17,6 +17,29 @@ export const kluczeZwrotow = {
   kosz: ["zwroty", "kosz"] as const,
 };
 
+/**
+ * Odświeżenie po zapisie zwrotu — kolejka DOKŁADNIE i otwarty szczegół.
+ *
+ * DOKŁADNIE, bo `["zwroty"]` jest przedrostkiem także koszyka i rozjazdów. Do
+ * audytu z 15 września 2026 każdy klawisz decyzji przeładowywał więc trzy
+ * listy, w tym rozjazdy liczone z całej bazy, choć żaden z tych zapisów ich nie
+ * rusza. Rozjazdy mają własny rytm co minutę, a koszyk odświeża ten, kto go zmienia.
+ *
+ * SZCZEGÓŁ ZAWSZE, bo to on niesie blok pieniędzy. Po zapisaniu przyjęcia albo
+ * kwoty ekran dalej pisał „Najpierw zaznacz, co oddajemy", a przycisk ODDAJ
+ * PIENIĄDZE nie pojawiał się, dopóki ktoś nie otworzył zwrotu od nowa.
+ *
+ * ZWRACAMY OBIETNICĘ KOLEJKI i tylko jej. Mutacja zostaje w toku, aż kolejka
+ * wróci, więc następny klawisz dostaje świeży kubełek i wersję — bez tego `P`
+ * i zaraz `S` odbiłoby się od blokady optymistycznej. Na szczegół nikt nie
+ * czeka: klawisze go nie czytają.
+ */
+function odswiez(qc: ReturnType<typeof useQueryClient>, { kosz = false } = {}) {
+  void qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+  if (kosz) void qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+  return qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+}
+
 export function useZwroty() {
   return useQuery({
     queryKey: kluczeZwrotow.kolejka,
@@ -66,7 +89,7 @@ export function usePotwierdzKartoteke() {
        ekranie powód sprzed zatwierdzenia: pozycja miała już kartotekę, a panel
        dalej pisał, że jej nie ma. Zgłoszenie właściciela z 0.336.0. */
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
     },
   });
@@ -97,7 +120,7 @@ export function useSynchronizujZwroty() {
   return useMutation({
     mutationFn: () => api<{ stan: StanZwrotow; kartoteki: number }>(
       "/api/obsluga/zwroty/synchronizuj", { method: "POST" }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -116,7 +139,7 @@ export function useDociagnijZamowienia() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api<WynikDociagniecia>("/api/obsluga/zwroty/zamowienia", { method: "POST" }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -132,7 +155,7 @@ export function useWerdykt() {
     mutationFn: (v: { id: number; decyzja: "przyjety" | "odrzucony"; powod: string | null; wersja: number }) =>
       api<{ werdykt: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/werdykt`,
         { method: "POST", body: JSON.stringify({ decyzja: v.decyzja, powod: v.powod, wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -154,7 +177,7 @@ export function useZaznaczSkladnik() {
         { method: "POST", body: JSON.stringify({ twId: v.twId, wKoszyku: v.wKoszyku }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
     },
   });
@@ -177,7 +200,7 @@ export function useWskazSklad() {
       { method: "POST", body: JSON.stringify({ skladniki: v.skladniki }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
     },
   });
@@ -197,7 +220,7 @@ export function useOcena() {
        jego pasek — inaczej licznik na ekranie stałby w miejscu, a operator
        nie wiedziałby, ile już zebrał (0.192.0). */
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
       /* I szczegół — po ocenie zmienia się `wKoszyku` każdego składnika. */
       qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
@@ -238,7 +261,7 @@ export function useZamknijKosz() {
         "/api/obsluga/zwroty/kosz/zamknij",
         { method: "POST", body: JSON.stringify({ koszId }) }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
     },
   });
@@ -256,7 +279,7 @@ export function useNieodebrana() {
     mutationFn: (v: { waybill: string; orderId?: string | null; notatka?: string | null }) =>
       api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
         { method: "POST", body: JSON.stringify(v) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -274,7 +297,7 @@ export function usePotracenie() {
       api<{ wersja: number; potracenieGrosze: number | null }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/potracenie`,
         { method: "POST", body: JSON.stringify({ grosze: v.grosze, powod: v.powod, wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -293,7 +316,7 @@ export function useKwota() {
         `/api/obsluga/zwroty/${v.id}/kwota`,
         { method: "POST", body: JSON.stringify({
           pozycjeIds: v.pozycjeIds, dostawa: v.dostawa, wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -312,7 +335,7 @@ export function useKorekta() {
       api<{ korektaNumer: string; zamknietyAt: string; wersja: number }>(
         `/api/obsluga/zwroty/${v.id}/korekta`,
         { method: "POST", body: JSON.stringify({ numer: v.numer, wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -330,7 +353,7 @@ export function useIloscZwrocona() {
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ilosc`,
         { method: "POST", body: JSON.stringify({ ilosc: v.ilosc, wersja: v.wersja }) }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
     },
   });
@@ -345,7 +368,7 @@ export function useCofnijWerdykt() {
     mutationFn: (v: { id: number; wersja: number }) =>
       api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/werdykt/cofnij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -361,7 +384,7 @@ export function useCofnijKwote() {
     mutationFn: (v: { id: number; wersja: number }) =>
       api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/kwota/cofnij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -371,7 +394,7 @@ export function useCofnijKorekte() {
     mutationFn: (v: { id: number; wersja: number }) =>
       api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/korekta/cofnij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -389,7 +412,7 @@ export function useZglosRabat() {
     mutationFn: (v: { pozycjaId: number }) =>
       api<{ wniosekId: string; lineItemId: string }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/rabat`, { method: "POST" }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -417,7 +440,7 @@ export function useSkanZwrotu() {
       }),
     /* Trafienie bywa świeże po dociągnięciu, więc kolejka ma się odświeżyć —
        ale samo szukanie niczego nie zapisuje. */
-    onSuccess: (w) => { if (w.trafienie) qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }); },
+    onSuccess: (w) => { if (w.trafienie) qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }); },
   });
 }
 
@@ -429,7 +452,7 @@ export function useDociagnijPoSkanie() {
       api<WynikSkanu>("/api/obsluga/zwroty/skan/dociagnij", {
         method: "POST", body: JSON.stringify({ kod }),
       }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka }),
+    onSettled: () => odswiez(qc),
   });
 }
 
@@ -448,7 +471,7 @@ export function useFaktura() {
       api<{ faktura: FakturaZwrotu }>(`/api/obsluga/zwroty/${v.id}/faktura`,
         { method: "POST", body: JSON.stringify({ dokId: v.dokId }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -468,7 +491,7 @@ export function useDopiszPozycje() {
       api<{ wersja: number; pozycjaId: number }>(`/api/obsluga/zwroty/${v.id}/pozycje`,
         { method: "POST", body: JSON.stringify({ zamPozycjaId: v.zamPozycjaId, wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -482,7 +505,7 @@ export function useZdejmijPozycje() {
       api<{ wersja: number }>(`/api/obsluga/zwroty/pozycje/${v.pozycjaId}/zdejmij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -511,7 +534,7 @@ export function useZwrocPieniadze() {
         `/api/obsluga/zwroty/${v.id}/pieniadze`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -530,7 +553,7 @@ export function useZapiszPrzelew() {
       api<{ kiedy: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/przelew`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja, referencja: v.referencja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -543,7 +566,7 @@ export function useCofnijPrzelew() {
       api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/przelew/cofnij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -556,7 +579,7 @@ export function useOdmowPlatnosci() {
       api<{ kod: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/odmowa-platnosci`,
         { method: "POST", body: JSON.stringify({ kod: v.kod, powod: v.powod, wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -580,7 +603,7 @@ export function useNotatkaZwrotu() {
       api<StanNotatkiZwrotu>(`/api/obsluga/zwroty/${v.id}/notatka`,
         { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -593,7 +616,7 @@ export function useCofnijNotatkeZwrotu() {
       api<StanNotatkiZwrotu>(`/api/obsluga/zwroty/${v.id}/notatka/cofnij`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });
@@ -637,7 +660,7 @@ export function useProwadziZwrot() {
         `/api/obsluga/zwroty/${v.id}/prowadzi`,
         { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
     onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
   });

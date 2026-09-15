@@ -664,36 +664,66 @@ export function csvZwrotow(zwroty: WierszZwrotu[]): string {
  * i dzięki temu przełączenie kubełka jest natychmiastowe — a to jest
  * dokładnie ten koszt, który miał zniknąć.
  */
+/** Zawężenie listy: zwroty JEDNEGO zamówienia albo JEDEN zwrot. */
+export type FiltrZwrotow =
+  | { channelAccountId: number; orderId: string }
+  | { id: number };
+
 export function listaZwrotow(
   database: Db = defaultDb(), teraz = Date.now(),
   /* Zwroty JEDNEGO zamówienia (0.221.0) — dla bloku zwrotu przy rozmowie.
      Ten sam skład wiersza, co w kolejce zwrotów: druga funkcja składająca
-     zwrot rozjechałaby się z pierwszą przy pierwszym nowym polu. Filtr
-     zawęża zwroty i ich pozycje; reszta to proste odczyty słownikowe. */
-  zamowienie: { channelAccountId: number; orderId: string } | null = null,
+     zwrot rozjechałaby się z pierwszą przy pierwszym nowym polu.
+
+     JEDEN ZWROT (audyt zwrotów, 15 września 2026) — dla szczegółu. Do tego
+     wydania trasa szczegółu budowała CAŁĄ historię zwrotów, żeby wyjąć z niej
+     jeden wiersz, razem z propozycją kartoteki i stanem rabatu dla każdej
+     pozycji każdego zwrotu. Szczegół odświeża się po każdym zapisie, więc
+     płacił to każdy klawisz. Filtr zawęża też odczyty słownikowe niżej. */
+  filtr: FiltrZwrotow | null = null,
 ): WierszZwrotu[] {
-  const zwroty = (zamowienie
-    ? database.prepare(`SELECT * FROM zwrot_klienta WHERE channel_account_id=? AND order_id=?
-        ORDER BY created_at ASC`).all(zamowienie.channelAccountId, zamowienie.orderId)
-    : database.prepare("SELECT * FROM zwrot_klienta ORDER BY created_at ASC").all()) as Wiersz[];
-  const pozycje = (zamowienie
-    ? database.prepare(`SELECT p.* FROM zwrot_klienta_pozycja p
-        JOIN zwrot_klienta z ON z.id = p.zwrot_id
-       WHERE z.channel_account_id=? AND z.order_id=? ORDER BY p.id ASC`)
-      .all(zamowienie.channelAccountId, zamowienie.orderId)
-    : database.prepare("SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC").all()) as Wiersz[];
+  const znaki = (n: number) => Array.from({ length: n }, () => "?").join(",");
+  const zwroty = (filtr === null
+    ? database.prepare("SELECT * FROM zwrot_klienta ORDER BY created_at ASC").all()
+    : "id" in filtr
+      ? database.prepare("SELECT * FROM zwrot_klienta WHERE id=?").all(filtr.id)
+      : database.prepare(`SELECT * FROM zwrot_klienta WHERE channel_account_id=? AND order_id=?
+          ORDER BY created_at ASC`).all(filtr.channelAccountId, filtr.orderId)) as Wiersz[];
+  const idyZwrotow = zwroty.map((z) => Number(z.id));
+  const pozycje = (filtr === null
+    ? database.prepare("SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC").all()
+    : idyZwrotow.length
+      ? database.prepare(`SELECT * FROM zwrot_klienta_pozycja
+          WHERE zwrot_id IN (${znaki(idyZwrotow.length)}) ORDER BY id ASC`).all(...idyZwrotow)
+      : []) as Wiersz[];
+  const idyPozycji = pozycje.map((p) => Number(p.id));
   /* Które pozycje leżą już w koszyku zwrotów (0.192.0). Osobne zapytanie,
      nie złączenie: `listaZwrotow` czyta całe tabele naraz i dokładanie
      `LEFT JOIN` do jednej z nich rozjechałoby ten wzorzec bez zysku. */
-  const wKoszyku = new Set((database.prepare(
-    "SELECT zwrot_pozycja_id AS id FROM kosz_pozycja WHERE zwrot_pozycja_id IS NOT NULL")
-    .all() as Array<{ id: number }>).map((k) => Number(k.id)));
-  const zamowienia = database.prepare(
-    "SELECT * FROM zamowienie_klienta"
-  ).all() as Wiersz[];
-  const pozZam = database.prepare(
-    "SELECT * FROM zamowienie_klienta_pozycja ORDER BY id ASC"
-  ).all() as Wiersz[];
+  const wKoszyku = new Set(((filtr === null
+    ? database.prepare(
+      "SELECT zwrot_pozycja_id AS id FROM kosz_pozycja WHERE zwrot_pozycja_id IS NOT NULL").all()
+    : idyPozycji.length
+      ? database.prepare(`SELECT zwrot_pozycja_id AS id FROM kosz_pozycja
+          WHERE zwrot_pozycja_id IN (${znaki(idyPozycji.length)})`).all(...idyPozycji)
+      : []) as Array<{ id: number }>).map((k) => Number(k.id)));
+  /* Przy filtrze tylko zamówienia, do których prowadzą zwroty. Para konto plus
+     numer, bo przestrzeń numerów nie jest wspólna dla kont (§15.1). */
+  const pary = [...new Map(zwroty.filter((z) => z.order_id)
+    .map((z) => [`${z.channel_account_id}|${z.order_id}`, z] as const)).values()];
+  const zamowienia = (filtr === null
+    ? database.prepare("SELECT * FROM zamowienie_klienta").all()
+    : pary.flatMap((z) => database.prepare(
+        "SELECT * FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?")
+        .all(Number(z.channel_account_id), String(z.order_id)))) as Wiersz[];
+  const idyZamowien = zamowienia.map((k) => Number(k.id));
+  const pozZam = (filtr === null
+    ? database.prepare("SELECT * FROM zamowienie_klienta_pozycja ORDER BY id ASC").all()
+    : idyZamowien.length
+      ? database.prepare(`SELECT * FROM zamowienie_klienta_pozycja
+          WHERE zamowienie_id IN (${znaki(idyZamowien.length)}) ORDER BY id ASC`)
+        .all(...idyZamowien)
+      : []) as Wiersz[];
 
   /* Stan zdjęcia oferty (0.214.0). JEDNO zapytanie na całą kolejkę, jak przy
      zamówieniach wyżej — snapshotów jest tyle, co ofert, a `LEFT JOIN` na
@@ -726,23 +756,31 @@ export function listaZwrotow(
      (jest tylko przy One Fulfillment, którego ta firma nie używa). Jedno
      zapytanie na całą kolejkę, nie jedno na pozycję. */
   const eanWgTw = new Map<number, string>();
-  for (const t of database.prepare(
-    "SELECT tw_id, ean FROM sgt_towar WHERE ean IS NOT NULL AND ean <> ''",
-  ).all() as Wiersz[]) {
+  /* Przy filtrze tylko kartoteki pozycji tych zwrotów, nie cały słownik EAN-ów. */
+  const twIdy = [...new Set(pozycje.filter((p) => p.tw_id != null).map((p) => Number(p.tw_id)))];
+  for (const t of (filtr === null
+    ? database.prepare("SELECT tw_id, ean FROM sgt_towar WHERE ean IS NOT NULL AND ean <> ''").all()
+    : twIdy.length
+      ? database.prepare(`SELECT tw_id, ean FROM sgt_towar WHERE ean IS NOT NULL AND ean <> ''
+          AND tw_id IN (${znaki(twIdy.length)})`).all(...twIdy)
+      : []) as Wiersz[]) {
     eanWgTw.set(Number(t.tw_id), String(t.ean));
   }
 
   /* Rozmowy o tym zakupie. Grupujemy po numerze zamówienia, bo jeden zakup
      potrafi mieć kilka wątków — dlatego lista, a nie kolumna `conversation_id`
-     przy zwrocie, która mieści jedną. */
+     przy zwrocie, która mieści jedną. Przy filtrze tylko numery tych zwrotów. */
   const rozmowyWgZam = new Map<string, RozmowaZwrotu[]>();
-  for (const r of database.prepare(`
+  const numery = [...new Set(zwroty.filter((z) => z.order_id).map((z) => String(z.order_id)))];
+  const rozmowy = filtr !== null && !numery.length ? [] : database.prepare(`
     SELECT m.related_order_id AS zam, c.id, c.subject, c.status,
            MAX(m.sent_at) AS ostatnia
       FROM message m JOIN conversation c ON c.id = m.conversation_id
      WHERE m.related_order_id IS NOT NULL
+       ${filtr === null ? "" : `AND m.related_order_id IN (${znaki(numery.length)})`}
      GROUP BY m.related_order_id, c.id
-     ORDER BY ostatnia DESC`).all() as Wiersz[]) {
+     ORDER BY ostatnia DESC`).all(...(filtr === null ? [] : numery));
+  for (const r of rozmowy as Wiersz[]) {
     const klucz = String(r.zam);
     const lista = rozmowyWgZam.get(klucz) ?? [];
     lista.push({

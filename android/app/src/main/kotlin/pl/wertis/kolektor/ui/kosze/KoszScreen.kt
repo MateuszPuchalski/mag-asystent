@@ -205,6 +205,8 @@ fun KoszScreen(graph: AppGraph) {
                 wybierz(nastepna(kosz, pomijajac = pozycjaId))
                 reload++
             } catch (e: Exception) {
+                /* Dekalog p. 7: błąd słychać — tak samo jak przy odłożeniu wyżej. */
+                graph.feedback.beep(false)
                 graph.effects.toast(e.message ?: "Nie udało się pominąć pozycji")
             }
         }
@@ -251,6 +253,9 @@ fun KoszScreen(graph: AppGraph) {
                     }
                 }
             } catch (e: Exception) {
+                /* Brak sieci przy skanie brzmi jak nieznany kod — magazynier ma
+                   usłyszeć, że skan nie przeszedł, zanim sięgnie po następny towar. */
+                graph.feedback.beep(false)
                 graph.effects.toast(e.message ?: "Błąd połączenia z serwerem")
             }
         }
@@ -359,6 +364,9 @@ fun KoszScreen(graph: AppGraph) {
                         )
                         graph.nav.zakonczonyKosz()
                     } catch (e: Exception) {
+                        /* Odmowa zakończenia to praca, która NIE poszła — słychać ją
+                           tak samo jak nieudane odłożenie (dekalog p. 7). */
+                        graph.feedback.beep(false)
                         graph.effects.toast(e.message ?: "Nie udało się zakończyć")
                     }
                 }

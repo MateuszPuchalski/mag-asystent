@@ -39,6 +39,9 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   /* PRZED gałęziami kubełków, bo to hak — a gałęzie kończą się `return`.
      Klawisz `O` otwiera pole powodu; pole samo łapie kursor (`autoFocus`). */
   useAkcjaKlawisza(akcje, "odmow", () => setOdmowa(true));
+  /* `Enter` w DO KOREKTY stawia kursor w polu numeru. Po `id`, bo `Pole` nie
+     przekazuje referencji — a pola poza tym kubełkiem nie ma i wołanie milczy. */
+  useAkcjaKlawisza(akcje, "korekta", () => document.getElementById("numer-korekty")?.focus());
   /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
      z niczego, bo read-model zna tylko dokumenty zakupu (FZ, PZ). */
   const [numer, setNumer] = useState("");
@@ -72,6 +75,11 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
             </label>
             <Pole id="powod-odmowy" value={powod} autoFocus
               onChange={(e) => setPowod(e.target.value)}
+              /* Enter w polu POTWIERDZA. Wpisany powód jest potwierdzeniem
+                 z §25a.5, a sięganie po mysz po nim nie dodaje namysłu. */
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !trwa && powod.trim()) onWerdykt("odrzucony", powod.trim());
+              }}
               placeholder="np. towar nosi ślady użycia" />
             <div className="flex gap-2">
               <Przycisk wariant="glowny" disabled={trwa || powod.trim() === ""}
@@ -132,18 +140,21 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
         Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Pole className="w-56" value={numer} aria-label="Numer korekty"
-          placeholder="Np. KFS 12/2026" onChange={(e) => setNumer(e.target.value)}
+        <Pole id="numer-korekty" className="w-56" value={numer} aria-label="Numer korekty"
+          placeholder="Np. ZW 413/MAG/09/2026" onChange={(e) => setNumer(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && numer.trim()) onKorekta(numer.trim()); }} />
         <Przycisk wariant="glowny" disabled={trwa || !numer.trim()}
           onClick={() => onKorekta(numer.trim())}>
           <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz korektę
         </Przycisk>
       </div>
-      {/* Pieniądze oddaje człowiek w panelu Allegro — zamknięcie znaczy
-          „nasza część zrobiona", nie „klient dostał przelew". */}
+      {/* ZDANIE O PIENIĄDZACH MÓWI PRAWDĘ OD AUDYTU (15 września 2026). Stało
+          tu „oddajesz w panelu Allegro; panel ich nie przelewa" — prawdziwe
+          w 0.162.0, fałszywe od 0.190.0. Na nagraniu z pracy operator oddawał
+          pieniądze w Sales Center, obok gotowego przycisku. Korekta zamyka
+          zwrot, ale przycisku już nie chowa. */}
       <p className="mt-1 text-xs text-slate-500">
-        Pieniądze oddajesz w panelu Allegro; panel ich nie przelewa.
+        Pieniądze oddajesz przyciskiem ODDAJ PIENIĄDZE niżej — także po zapisaniu korekty.
       </p>
       {blad && <Blad>{blad}</Blad>}
     </div>;

@@ -101,6 +101,9 @@ fun PrzyjeciaScreen(graph: AppGraph) {
                 szukanie = ""
                 graph.nav.openKosz(r.kosz.id)
             } catch (e: Exception) {
+                /* Dekalog p. 7: błąd słychać, zanim się go przeczyta. Magazynier
+                   ze skanerem w ręce patrzy na kosz, nie na ekran. */
+                graph.feedback.beep(false)
                 graph.effects.toast(e.message ?: "Nie znam takiego przyjęcia")
             }
         }
@@ -136,10 +139,25 @@ fun PrzyjeciaScreen(graph: AppGraph) {
         WertisTextField(
             value = szukanie,
             onValueChange = { szukanie = it },
-            placeholder = "np. 1209",
+            placeholder = "np. 1209 albo Z-7",
             leadingIcon = WIcons.Search,
             onDone = { otworz(szukanie) },
         )
+
+        /* KOSZE Z APLIKACJI NAD PRZYJĘCIAMI (audyt zwrotów, 15 września 2026).
+           Stały pod listą do dwustu dokumentów z okna importu, więc kosz
+           przywieziony z biura trzeba było wyszukiwać przewijaniem — kciukiem,
+           z koszem w drugiej ręce. Tych koszy jest kilka, a każdy czeka na halę. */
+        if (kosze.isNotEmpty()) {
+            Text(
+                "KOSZE Z APLIKACJI · DO ROZŁOŻENIA",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+                color = InkSoft,
+            )
+            kosze.forEach { k -> KoszRowView(k) { graph.nav.openKosz(k.id) } }
+        }
 
         Text(
             "PRZYJĘCIA NA REGAŁ ZWROTÓW",
@@ -156,17 +174,6 @@ fun PrzyjeciaScreen(graph: AppGraph) {
             )
         }
         lista.forEach { p -> PrzyjecieRowView(p) { otworz(p.numer) } }
-
-        if (kosze.isNotEmpty()) {
-            Text(
-                "KOSZE Z APLIKACJI · DO ROZŁOŻENIA",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp,
-                color = InkSoft,
-            )
-            kosze.forEach { k -> KoszRowView(k) { graph.nav.openKosz(k.id) } }
-        }
 
         /* Odświeżenie ręką: import z Subiekta chodzi co minutę, a magazynier
            stojący z nowym koszem nie ma ochoty czekać w niewiedzy. */
