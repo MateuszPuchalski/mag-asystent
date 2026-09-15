@@ -1,4 +1,5 @@
 import { Camera } from "lucide-react";
+import { Zwijka } from "./Zwijka";
 import type { OdczytZdjecia } from "../api/typy";
 
 /**
@@ -17,23 +18,27 @@ import type { OdczytZdjecia } from "../api/typy";
  * z miniaturą na osi rozmowy i w jednym spojrzeniu wie, czy model przeczytał
  * tabliczkę, czy ją sobie wyobraził.
  *
- * ZAWSZE OTWARTE, inaczej niż okno „Skąd to wiem". Tamto zwija się, gdy
- * wszystko stoi na bazie, bo wtedy nie ma czego sprawdzać. Tutaj nie ma
- * takiego przypadku: każdy wiersz jest do sprawdzenia z definicji, bo każdy
- * jest odczytem z fotografii, której u nas nikt nie oglądał.
+ * ZWINIĘTE DOMYŚLNIE OD 0.342.0, i to jest zmiana zdania, nie przeoczenie.
+ * Do 0.341.0 stało tu „zawsze otwarte, bo każdy wiersz jest do sprawdzenia
+ * z definicji". Zdanie było prawdziwe i prowadziło do złego ekranu: odczyt
+ * z czterech zdjęć wypychał szkic, po który agent tu przyszedł, poza
+ * krawędź. Właściciel rozstrzygnął spór wprost — czytelność szkicu wygrywa.
+ *
+ * Do sprawdzenia jest dalej każdy wiersz i nagłówek mówi to bez rozwijania:
+ * niesie LICZBĘ zdjęć i zdanie „porównaj z miniaturą". Kto ma wątpliwość,
+ * rozwija jednym kliknięciem; kto nie ma, nie płaci za nią wysokością.
  *
  * Bez bursztynu: to nie jest ostrzeżenie ani zaznaczenie, tylko materiał.
  */
 export function OdczytZdjec({ odczyt }: { odczyt: OdczytZdjecia[] }) {
   if (odczyt.length === 0) return null;
 
-  return <div className="mt-2 rounded border border-violet-200 bg-violet-50 p-2">
-    <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-900">
-      <Camera size={14} aria-hidden="true" />
-      Co model odczytał ze zdjęć
-      <span className="font-normal text-violet-800">porównaj z miniaturą</span>
-    </p>
-    <ul className="mt-1.5 space-y-1.5 text-xs text-slate-800" aria-label="Odczyt ze zdjęć rozmowy">
+  return <Zwijka
+    tytul="Co model odczytał ze zdjęć"
+    Ikona={Camera}
+    podpis={`${odczyt.length} ${odczyt.length === 1 ? "zdjęcie" : "zdjęć"} · porównaj z miniaturą`}
+  >
+    <ul className="space-y-1.5 p-2 text-xs text-slate-800" aria-label="Odczyt ze zdjęć rozmowy">
       {odczyt.map((o) => <li key={o.zdjecie} className="flex gap-2">
         <span className="shrink-0 rounded bg-violet-200 px-1.5 py-0.5 font-semibold text-violet-900">
           {o.zdjecie}
@@ -43,5 +48,5 @@ export function OdczytZdjec({ odczyt }: { odczyt: OdczytZdjecia[] }) {
         <pre className="whitespace-pre-wrap font-sans">{o.tekst}</pre>
       </li>)}
     </ul>
-  </div>;
+  </Zwijka>;
 }

@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.342.0 — 15 września 2026
+
+**Karta Copilota przestaje być zatłoczona.** Zgłoszenie właściciela ze zrzutu
+ekranu rozmowy: „panel jest zbyt zatłoczony, użyj technik, aby zwiększyć
+obszar roboczy". Na zrzucie widać trzy zagnieżdżone paski przewijania
+i pięćset znaków szkicu czytane przez szparę wysokości 224 px.
+
+Część tego ścisku dołożyły wydania 0.330.0 i 0.332.0, upychając kolejne bloki
+w tę samą kolumnę bez pytania, ile ich już tam stoi.
+
+Spór rozstrzygnął właściciel jednym słowem: czytelność szkicu.
+
+**Szkic płynie, nie przewija się w okienku.** Ograniczenie założono w 0.232.1,
+gdy długi szkic zwijał oś rozmowy i chował przyciski pod krawędzią. Powód
+zniknął w tym samym wydaniu, bo przyciski przeniesiono nad treść, a samo
+ograniczenie zostało. Oś chroni siatka na edytorze, założona dokładnie po to,
+żeby wewnętrzne nie były potrzebne.
+
+**Odczyt ze zdjęć i dopytanie są zwinięte.** Nagłówek niesie tyle, żeby dało
+się rozstrzygnąć bez rozwijania: liczbę zdjęć albo liczbę wymian. Dopytanie
+z odbytą wymianą otwiera się samo, bo tam jest treść, nie sama możliwość.
+Zwijanie ma jedną implementację, nie trzy kopie tej samej logiki.
+
+**Trzy paski informacyjne scaliły się w jeden.** Mówiły wariant tego samego
+zdania, każdy we własnej ramce. Rozdzielone miały sens, gdy każdy niósł
+przycisk; przycisków nie ma od 0.341.0. Licznik znaków przeniósł się do
+nagłówka karty.
+
+Cena jest jawna: przy długim szkicu bloki pod nim schodzą poniżej krawędzi
+i trzeba do nich przewinąć. Właściciel wybrał to świadomie, pytany wprost.
+
+---
+
 ## 0.341.0 — 15 września 2026
 
 **Nic nie czeka na kliknięcie.** Dwie prośby właściciela, jedna zmiana:

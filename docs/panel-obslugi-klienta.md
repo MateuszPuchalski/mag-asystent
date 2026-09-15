@@ -1997,6 +1997,44 @@ Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
 uruchomić takt z 0.317.0.
 
+**Karta Copilota przestaje być zatłoczona (0.342.0).** Zgłoszenie właściciela
+ze zrzutu ekranu rozmowy: „panel jest zbyt zatłoczony, użyj technik, aby
+zwiększyć obszar roboczy". Na zrzucie widać **trzy zagnieżdżone paski
+przewijania** i pięćset znaków szkicu czytane przez szparę wysokości 224 px.
+
+Część tego ścisku dołożyły wydania 0.330.0 i 0.332.0, upychając kolejne bloki
+w tę samą kolumnę bez pytania, ile ich już tam stoi.
+
+Spór rozstrzygnął właściciel jednym słowem: **czytelność szkicu**. Z tego
+wynikają trzy zmiany i jedna jawna cena.
+
+**Szkic płynie, nie przewija się w okienku.** Do 0.341.0 stało na nim
+`max-h-56 overflow-y-auto`, założone w 0.232.1, gdy długi szkic zwijał oś
+rozmowy i chował przyciski pod krawędzią. Powód zniknął w tym samym wydaniu —
+przyciski przeniesiono NAD treść — a ograniczenie zostało. Oś chroni
+`max-h-[60vh]` na edytorze, czyli siatka założona po to, żeby wewnętrzne nie
+były potrzebne.
+
+**Bloki drugoplanowe są zwinięte.** Odczyt ze zdjęć i dopytanie zwijają się do
+jednej linii, która niesie tyle, żeby dało się rozstrzygnąć bez rozwijania:
+liczbę zdjęć albo liczbę wymian. Okno „Skąd to wiem" zwijało się już wcześniej
+i zostaje przy swojej regule — otwiera się samo, gdy pada zdanie spoza bazy.
+Dopytanie z odbytą wymianą też otwiera się samo: tam jest treść, nie sama
+możliwość. To jest dekalog ergonomii, punkt 2, ten sam, który w kolektorze
+chowa szczegóły w `Collapsible.kt`.
+
+Zwijanie ma **jedną implementację** (`skrzynka/Zwijka.tsx`), nie trzy kopie
+`useState` w trzech plikach.
+
+**Trzy paski informacyjne scaliły się w jeden.** Dane doboru, pasowanie
+i pokwitowanie wiedzy z oferty mówiły wariant tego samego zdania („Copilot
+zrobił coś obok szkicu"), każdy we własnej ramce. Rozdzielone miały sens,
+gdy każdy niósł PRZYCISK; przycisków nie ma od 0.341.0. Licznik znaków
+przeniósł się do nagłówka karty.
+
+**Cena jest jawna.** Przy długim szkicu bloki pod nim schodzą poniżej krawędzi
+i trzeba do nich przewinąć. Właściciel wybrał to świadomie, pytany wprost.
+
 **Nic nie czeka na kliknięcie (0.341.0).** Dwie prośby właściciela, jedna
 zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
 oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
@@ -4714,6 +4752,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
+| Karta Copilota bez ścisku (§14.6) | **działa** od 0.342.0 | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
 | Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
 | Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |

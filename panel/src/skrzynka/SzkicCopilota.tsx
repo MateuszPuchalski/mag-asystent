@@ -98,7 +98,7 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
   return <section className="mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3" aria-label="Szkic Copilota">
     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
       <b className="text-violet-900"><Sparkles size={12} className="inline" /> Szkic Copilota</b>
-      <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez}</span>
+      <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez} · {s.tresc.length} znaków</span>
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
       {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
@@ -114,17 +114,63 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         <Przycisk className="text-xs" onClick={p.onOdrzuc}>Odrzuć</Przycisk>
       </span>
     </div>
-    <div className="max-h-56 overflow-y-auto" data-testid="szkic-copilota-tresc">
-      {/* Bez drugiego przycisku „Wpisz": dane wpisuje się tam, gdzie stoją —
-          w zakładce Dobór. Tu tylko zdanie, żeby agent wiedział, że są. */}
-      {/* WPISAŁ, nie „rozpoznał" (0.341.0). Dane wejściowe wchodzą do doboru
-          same, w puste pola; zdanie „wpisz je w zakładce Dobór" prosiło agenta
-          o przepisanie tego, co system już zrobił. */}
-      {p.nowePolaDoboru.length > 0 && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
-        Copilot wpisał do doboru: {p.nowePolaDoboru.join(", ")}. Popraw w zakładce Dobór, jeśli się myli.</p>}
-      {/* Para z rozmowy (przyrost czwarty) tą samą zasadą: zdanie tu, kliknięcie w Doborze. */}
-      {p.paraPasowania && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
-        Copilot rozpoznał pasowanie {p.paraPasowania} — zaproponuj je w zakładce Dobór.</p>}
+    {/* ── SZKIC PŁYNIE, NIE PRZEWIJA SIĘ W OKIENKU (0.342.0) ─────────────────
+        Do 0.341.0 stało tu `max-h-56 overflow-y-auto`. Komentarz z 0.232.1
+        tłumaczył to tak: długi szkic rozpychał edytor, oś rozmowy zwijała się
+        do jednej linii, a dół karty — z przyciskami — ginął pod krawędzią.
+
+        Powód zniknął, a ograniczenie zostało. Przyciski przeniesiono NA GÓRĘ
+        w tym samym wydaniu, więc dół nie zabiera już niczego, co trzeba
+        kliknąć. Oś chroni `max-h-[60vh]` na edytorze — siatka założona
+        dokładnie po to, żeby wewnętrzne nie były potrzebne.
+
+        Zostawało więc okienko wysokości 224 px na tekst, który agent ma
+        PRZECZYTAĆ przed wysłaniem do klienta: pięćset znaków przez szparę,
+        w trzecim zagnieżdżonym pasku przewijania. Właściciel rozstrzygnął
+        spór wprost: czytelność szkicu wygrywa. Cena jest jawna — przy długim
+        szkicu bloki pod nim schodzą poniżej krawędzi i trzeba do nich
+        przewinąć. */}
+    <div data-testid="szkic-copilota-tresc">
+      {/* ── JEDEN PASEK „PRZY OKAZJI", NIE TRZY (0.342.0) ───────────────────
+          Do 0.341.0 stały tu dwa osobne akapity (dane doboru, pasowanie),
+          a trzeci — pokwitowanie wiedzy z oferty — pod całą kartą. Każdy
+          w ramce, każdy zjadający wiersz, wszystkie mówiące wariant tego
+          samego zdania: „Copilot zrobił coś obok szkicu".
+
+          Rozdzielone miały sens, gdy każde niosło PRZYCISK. Przycisków nie ma
+          od 0.341.0 — dane wchodzą same — więc został sam komunikat, a trzy
+          ramki na jeden komunikat to ścisk, nie porządek.
+
+          `data-testid` zostaje HISTORYCZNY (`luki-kartoteki`), bo po nim
+          sięgają testy, a zmiana nazwy kupiłaby wyłącznie ładniejsze słowo. */}
+      {(p.nowePolaDoboru.length > 0 || p.paraPasowania || s.lukiKartoteki.numery.length > 0
+        || s.lukiKartoteki.wpisane.length > 0 || s.lukiKartoteki.modele.length > 0
+        || s.lukiKartoteki.czeka > 0) &&
+        <p className="mb-2 rounded border border-sky-200 bg-white p-2 text-xs text-sky-900"
+          data-testid="luki-kartoteki">
+          <b className="text-sky-950">Przy okazji.</b>{" "}
+          {p.nowePolaDoboru.length > 0 && <>
+            Do doboru wpisano: <b>{p.nowePolaDoboru.join(", ")}</b> (popraw w zakładce Dobór,
+            jeśli się myli).{" "}
+          </>}
+          {p.paraPasowania && <>
+            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w zakładce Dobór.{" "}
+          </>}
+          {s.lukiKartoteki.numery.length > 0 && <>
+            Z oferty do kartoteki {s.lukiKartoteki.symbol}:{" "}
+            <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
+          </>}
+          {/* WPISANE PRZED ODŁOŻONYMI (0.341.0): najpierw to, co już JEST
+              w wiedzy, potem to, co dopiero czeka. */}
+          {s.lukiKartoteki.wpisane.length > 0 && <>
+            Z listy zgodności do wiedzy: <b>{s.lukiKartoteki.wpisane.join(", ")}</b>.{" "}
+          </>}
+          {s.lukiKartoteki.modele.length > 0 && <>
+            Bez rozpoznanej marki, do kolejki Wiedzy:{" "}
+            <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
+          </>}
+          {s.lukiKartoteki.czeka > 0 && <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka}.</>}
+        </p>}
       {s.zastrzezenia.length > 0 && <ul className="mb-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900"
         aria-label="Czego model nie znalazł w faktach">
         {s.zastrzezenia.map((z, i) => <li key={i}>⚠ {z}</li>)}
@@ -139,48 +185,6 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         pytanie, czy twierdzenie oparte na tym odczycie jest do przyjęcia. */}
     <OdczytZdjec odczyt={s.odczytZeZdjec} />
     <ProcesCopilota key={s.at} twierdzenia={s.twierdzenia} />
-    {/* POKWITOWANIE, NIE LISTA BRAKÓW (0.264.0). Do 0.263.0 stał tu akapit
-        wypisujący oznaczenia, których kartoteka nie zna — i przy następnym
-        szkicu wypisywał je od nowa. System zauważał lukę za każdym razem
-        i za każdym razem o niej zapominał.
-
-        Teraz mówi, co POSZŁO DO BAZY. Bez przycisku, i to nie jest
-        oszczędność: rozstrzygnięcie modelu wymaga marki i wariantu, czyli
-        ekranu Wiedza, a przycisk „dopisz" przy szkicu udawałby, że da się to
-        zrobić w rozmowie. Numery dopisują się same, bo są wyszukiwalne
-        bez niczyjej decyzji.
-
-        `data-testid` zostaje HISTORYCZNY. Zmiana nazwy kosztowałaby tyle,
-        co przeszukanie testów, a zyskiem byłoby wyłącznie ładniejsze słowo.
-
-        Pasek jest dla AGENTA: do faktów ta wiedza nie wchodzi, więc klient
-        nie ma jak jej zobaczyć. */}
-    {(s.lukiKartoteki.numery.length > 0 || s.lukiKartoteki.modele.length > 0
-      || s.lukiKartoteki.wpisane.length > 0 || s.lukiKartoteki.czeka > 0) &&
-      <p className="mt-2 rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900"
-        data-testid="luki-kartoteki">
-        {s.lukiKartoteki.numery.length > 0 && <>
-          Z oferty dopisano do kartoteki {s.lukiKartoteki.symbol}:{" "}
-          <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
-        </>}
-        {/* WPISANE PRZED ODŁOŻONYMI (0.341.0): najpierw to, co już JEST
-            w wiedzy, potem to, co dopiero czeka. Odwrotna kolejność kazałaby
-            agentowi czytać o robocie, zanim dowie się, że część zniknęła. */}
-        {s.lukiKartoteki.wpisane.length > 0 && <>
-          Z listy zgodności do wiedzy weszło:{" "}
-          <b>{s.lukiKartoteki.wpisane.join(", ")}</b>.{" "}
-        </>}
-        {s.lukiKartoteki.modele.length > 0 && <>
-          Bez rozpoznanej marki, do kolejki Wiedzy:{" "}
-          <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
-        </>}
-        {/* Zdanie „model wskazuje człowiek" zeszło z 0.341.0. Było nieprawdą
-            od 0.331.0, kiedy kolejkę zaczął opróżniać automat, i to ono
-            kazało agentowi myśleć, że nic się nie dzieje. */}
-        {s.lukiKartoteki.czeka > 0 &&
-          <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka}.</>}
-      </p>}
-    <p className="mt-1 text-podpis text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
     {/* DOPYTANIE POD SZKICEM, nie obok: agent czyta szkic, rodzi mu się
         wątpliwość, pyta. Odwrotna kolejność kazałaby pytać na ślepo. */}
     {p.dopytanie && <Dopytanie

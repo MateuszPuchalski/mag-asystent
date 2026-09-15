@@ -72,14 +72,21 @@ describe("Szkic Copilota w edytorze", () => {
 
   /* Zrzut właściciela z 8.09.2026: długi szkic rozpychał edytor, oś rozmowy
      zwijała się do jednej linii, a przyciski ginęły pod krawędzią kolumny.
-     Przyciski stoją nad treścią, a treść przewija się we własnym pojemniku. */
-  it("przyciski stoją PRZED treścią, a treść ma własny przewijany pojemnik", () => {
+     Z tamtego wydania zostaje POŁOWA, która naprawdę leczyła przyczynę:
+     przyciski stoją NAD treścią, więc dół nie zabiera niczego do kliknięcia.
+
+     Druga połowa — własny przewijany pojemnik na tekst — zeszła w 0.342.0
+     decyzją właściciela („czytelność szkicu"). Okienko wysokości 224 px
+     kazało czytać pięćset znaków przez szparę, w trzecim zagnieżdżonym pasku
+     przewijania, a oś chroni `max-h-[60vh]` na edytorze — siatka założona
+     dokładnie po to, żeby wewnętrzne nie były potrzebne. */
+  it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
     edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }) }));
     const wstaw = screen.getByRole("button", { name: "Wstaw do szkicu" });
     const tresc = screen.getByTestId("szkic-copilota-tresc");
     expect(wstaw.compareDocumentPosition(tresc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(tresc.className).toMatch(/max-h-\d+/);
-    expect(tresc.className).toMatch(/overflow-y-auto/);
+    expect(tresc.className).not.toMatch(/max-h-\d+/);
+    expect(tresc.className).not.toMatch(/overflow-y-auto/);
   });
 
   it("„Zastąp szkic” pojawia się tylko przy niepustym szkicu agenta", async () => {
@@ -104,8 +111,12 @@ describe("Szkic Copilota w edytorze", () => {
        same, w puste pola. Zdanie „wpisz je w zakładce Dobór" prosiło agenta
        o przepisanie tego, co system już zrobił. */
     edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2, nowePolaDoboru: ["Marka", "Model", "Silnik"] }));
-    expect(screen.getByText(/Copilot wpisał do doboru: Marka, Model, Silnik/)).toBeInTheDocument();
-    expect(screen.getByText(/Popraw w zakładce Dobór/)).toBeInTheDocument();
+    /* Od 0.342.0 zdanie stoi w JEDNYM pasku „Przy okazji" razem z pasowaniem
+       i pokwitowaniem wiedzy — trzy ramki na jeden komunikat to był ścisk,
+       nie porządek. Tekst rozbity na wiele elementów, stąd `textContent`. */
+    expect(screen.getByTestId("luki-kartoteki").textContent)
+      .toMatch(/Do doboru wpisano:\s*Marka, Model, Silnik/);
+    expect(screen.getByTestId("luki-kartoteki").textContent).toMatch(/popraw w zakładce Dobór/i);
     expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
     expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
   });
@@ -113,7 +124,7 @@ describe("Szkic Copilota w edytorze", () => {
   it("szkic sprzed migracji (wersja doboru 0) nie udaje nieświeżego, a bez nowych pól nie ma zdania", () => {
     edytor(copilot({ szkic: szkic({ doborWersja: 0 }), doborWersja: 3 }));
     expect(screen.queryByText(/dane doboru zmieniły się/)).toBeNull();
-    expect(screen.queryByText(/Copilot wpisał do doboru/)).toBeNull();
+    expect(screen.queryByText(/Do doboru wpisano/)).toBeNull();
   });
 
   it("oceniony szkic znika z ekranu — wiersz zostaje dla pomiaru", () => {
@@ -169,5 +180,36 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("bez zapisu i bez kolejki nie ma paska — plakietka należy się wyjątkowi, nie normie", () => {
     edytor(copilot({ szkic: szkic() }));
     expect(screen.queryByTestId("luki-kartoteki")).toBeNull();
+  });
+
+  it("JEDEN pasek „Przy okazji” niesie wszystko, co Copilot zrobił obok szkicu", () => {
+    /* Do 0.341.0 były to trzy osobne ramki: dane doboru, pasowanie
+       i pokwitowanie wiedzy. Rozdzielenie miało sens, gdy każda niosła
+       PRZYCISK; przycisków nie ma od 0.341.0, więc został sam komunikat. */
+    edytor(copilot({
+      nowePolaDoboru: ["Marka", "Model"],
+      paraPasowania: "W09-0211 → LC170430140-0001",
+      szkic: szkic({
+        lukiKartoteki: {
+          symbol: "W09-0211",
+          numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],
+          modele: ["FS450"], wpisane: ["STIHL MS 170"], czeka: 2,
+        },
+      }),
+    }));
+
+    const pasek = screen.getByTestId("luki-kartoteki");
+    for (const fragment of ["Marka, Model", "W09-0211 → LC170430140-0001",
+      "16100-ZH8-W61", "STIHL MS 170", "FS450", "czeka tam 2"]) {
+      expect(pasek.textContent).toContain(fragment);
+    }
+    /* JEDEN pasek, nie cztery — o to w tym wydaniu chodzi. */
+    expect(screen.getAllByTestId("luki-kartoteki")).toHaveLength(1);
+  });
+
+  it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
+    edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
+    expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
+    expect(screen.getByText(/5 znaków/)).toBeVisible();
   });
 });

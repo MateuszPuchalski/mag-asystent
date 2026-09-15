@@ -1,5 +1,5 @@
-import React from "react";
 import { Database, FileText, Brain, Camera } from "lucide-react";
+import { Zwijka } from "./Zwijka";
 import type { PoziomPewnosci, TwierdzenieCopilota, ZrodloTwierdzenia } from "../api/typy";
 
 /**
@@ -45,22 +45,25 @@ const doSprawdzenia = (t: TwierdzenieCopilota) => t.zrodlo !== "fakty";
 
 export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilota[] }) {
   const ile = twierdzenia.filter(doSprawdzenia).length;
-  /* Stan startowy liczy się RAZ, przy pierwszym renderze tego szkicu — nowy
-     szkic to nowy komponent, bo `key` w rodzicu wisi na czasie szkicu. Bez
-     tego okno zamykałoby się agentowi pod ręką przy każdym odświeżeniu. */
-  const [otwarte, setOtwarte] = React.useState(ile > 0);
   if (twierdzenia.length === 0) return null;
 
-  return <div className="mt-2 rounded border border-slate-200 bg-white">
-    <button type="button" className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-slate-700"
-      aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
-      <span className="font-semibold">Skąd to wiem</span>
-      <span className="text-slate-500">{twierdzenia.length} twierdzeń</span>
-      {ile > 0 && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
-        {ile} do sprawdzenia</span>}
-      <span className="ml-auto text-slate-500">{otwarte ? "zwiń" : "rozwiń"}</span>
-    </button>
-    <ul className="border-t border-slate-100 p-2 text-xs" aria-label="Twierdzenia szkicu ze źródłem" hidden={!otwarte}>
+  /* ZWIJKA ZAMIAST WŁASNEGO `useState` (0.342.0). Kształt i słowa bez zmian —
+     zmienia się tylko to, że trzy bloki karty Copilota mają jedną
+     implementację zwijania zamiast trzech kopii tej samej logiki.
+
+     Stan startowy liczy się RAZ, przy pierwszym renderze tego szkicu: nowy
+     szkic to nowy komponent, bo `key` w rodzicu wisi na czasie szkicu. Bez
+     tego okno zamykałoby się agentowi pod ręką przy każdym odświeżeniu. */
+  return <Zwijka
+    tytul="Skąd to wiem"
+    podpis={`${twierdzenia.length} twierdzeń`}
+    domyslnieOtwarte={ile > 0}
+    plakietka={ile > 0
+      ? <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
+        {ile} do sprawdzenia</span>
+      : undefined}
+  >
+    <ul className="p-2 text-xs" aria-label="Twierdzenia szkicu ze źródłem">
       {twierdzenia.map((t, i) => {
         const z = ZRODLA[t.zrodlo];
         return <li key={i} className="mb-1.5 last:mb-0">
@@ -75,5 +78,5 @@ export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilo
         </li>;
       })}
     </ul>
-  </div>;
+  </Zwijka>;
 }

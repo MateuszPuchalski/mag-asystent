@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { OdczytZdjec } from "./OdczytZdjec";
 
 /* ── Odczyt ze zdjęć ─────────────────────────────────────────────────────────
@@ -43,5 +43,33 @@ describe("odczyt ze zdjęć rozmowy", () => {
     /* „Porównaj z miniaturą" to jedyna instrukcja, jakiej ten blok potrzebuje.
        Bez niej wygląda jak wynik, a jest materiałem do sprawdzenia. */
     expect(screen.getByText(/porównaj z miniaturą/i)).toBeTruthy();
+  });
+
+  test("ZWINIĘTE domyślnie: szkic jest ważniejszy niż odczyt czterech zdjęć", () => {
+    /* Do 0.341.0 blok stał otwarty i wypychał szkic poza krawędź. Nagłówek
+       ma nieść tyle, żeby agent wiedział, czy warto rozwijać: liczbę zdjęć
+       i zdanie, co z nimi zrobić. */
+    render(<OdczytZdjec odczyt={[{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }]} />);
+
+    expect(screen.getByText("Co model odczytał ze zdjęć")).toBeVisible();
+    expect(screen.getByText(/1 zdjęcie/)).toBeVisible();
+    expect(screen.getByText("PARKSIDE PBRM 39 E4")).not.toBeVisible();
+  });
+
+  test("jedno kliknięcie pokazuje odczyt, drugie go chowa", () => {
+    render(<OdczytZdjec odczyt={[{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }]} />);
+    const przelacz = screen.getByRole("button", { name: /Co model odczytał ze zdjęć/ });
+
+    fireEvent.click(przelacz);
+    expect(screen.getByText("PARKSIDE PBRM 39 E4")).toBeVisible();
+    expect(przelacz.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(przelacz);
+    expect(screen.getByText("PARKSIDE PBRM 39 E4")).not.toBeVisible();
+  });
+
+  test("liczebnik jest odmieniony — „5 zdjęć”, nie „5 zdjęcie”", () => {
+    render(<OdczytZdjec odczyt={[1, 2, 3, 4, 5].map((n) => ({ zdjecie: `Z${n}`, tekst: `tekst ${n}` }))} />);
+    expect(screen.getByText(/5 zdjęć/)).toBeVisible();
   });
 });
