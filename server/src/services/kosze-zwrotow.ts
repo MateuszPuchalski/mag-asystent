@@ -612,10 +612,18 @@ function zakolejkujMm(
 export function wypuscGotoweKoszyki(database: Db, teraz = new Date()): number {
   /* OBA RODZAJE (0.211.0). Bramka korekty obowiązuje odpad tak samo jak
      zwroty: towar wraca na magazyn główny dopiero po korekcie, więc MM na
-     odpad zdjęłoby stan, którego jeszcze nie ma. */
+     odpad zdjęłoby stan, którego jeszcze nie ma.
+
+     TAKŻE KOSZ JUŻ ROZŁOŻONY. Zamknięcie jest czynnością fizyczną, więc hala
+     rozkłada kosz, zanim biuro wpisze korekty. Do tego wydania automat patrzył
+     wyłącznie na `zamkniety`: kosz rozłożony przed korektą tracił swoje MM
+     na zawsze, a MM powrotne zdejmowało z regału zwrotów stan, którego tam
+     nie było. `powrot_poza_aplikacja` odsiewa kosze rozliczone ręką przez biuro
+     — dokument wystawiony dziś przesunąłby ich towar drugi raz. */
   const czekajace = database.prepare(
     `SELECT id, kod, rodzaj FROM kosz
-      WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
+      WHERE status IN ('zamkniety','rozlozony') AND powrot_poza_aplikacja = 0
+        AND mm_dok_id IS NULL AND mm_queue_id IS NULL
         AND rodzaj IN ('zwroty','odpad') ORDER BY id`)
     .all() as Array<{ id: number; kod: string; rodzaj: RodzajKosza }>;
 
@@ -660,9 +668,12 @@ export interface KoszykCzekajacy {
  * pracę, więc to jedno zdanie przy koszyku, nie nowy ekran.
  */
 export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
+  /* Ten sam zbiór co w `wypuscGotoweKoszyki`, z rozłożonymi włącznie. Rozjazd
+     obu warunków dałby kosz, który czeka, a o którym nikt nie mówi. */
   const kosze = database.prepare(
     `SELECT id, kod, zamknieto_at, rodzaj FROM kosz
-      WHERE status='zamkniety' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
+      WHERE status IN ('zamkniety','rozlozony') AND powrot_poza_aplikacja = 0
+        AND mm_dok_id IS NULL AND mm_queue_id IS NULL
         AND rodzaj IN ('zwroty','odpad') ORDER BY id`)
     .all() as Array<{ id: number; kod: string; zamknieto_at: string; rodzaj: RodzajKosza }>;
   return kosze.map((k) => ({

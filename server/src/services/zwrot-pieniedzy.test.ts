@@ -42,16 +42,25 @@ function zwrotGotowy(d: Db, n: Record<string, unknown> = {}) {
   const pole = <T>(nazwa: string, domyslna: T): T =>
     (nazwa in n ? n[nazwa] : domyslna) as T;
 
-  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,
     platnosc_typ,platnosc_id,dostawa_grosze,suma_grosze,waluta,synced_at)
     VALUES (1,'ord-1','READY_FOR_PROCESSING',?,?,1499,6498,'PLN','2026-09-02T08:00:00Z')`)
-    .run(pole<string>("platnoscTyp", "ONLINE"), pole<string | null>("platnoscId", "pay-uuid"));
+    .run(pole<string>("platnoscTyp", "ONLINE"), pole<string | null>("platnoscId", "pay-uuid"))
+    .lastInsertRowid);
+  /* Jedna pozycja zamówienia i jedna ZAZNACZONA pozycja zwrotu. Kwota domyślna
+     to jej cena plus dostawa — dokładnie tyle, ile policzyłby `zapiszKwote`. */
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,external_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,'li-1','111','Sekator',1,4999,'PLN')`).run(zam);
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,order_id,created_at,synced_at,werdykt,
      kwota_grosze,kwota_dostawa_grosze,wersja)
     VALUES (1,'zw-1',?,'2026-09-01T08:00:00Z','2026-09-02T08:00:00Z',?,?,?,1)`)
     .run(pole<string | null>("orderId", "ord-1"), pole<string | null>("werdykt", "przyjety"),
       pole<number | null>("kwota", 6498), pole<number>("dostawa", 1499)).lastInsertRowid);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta,w_zwrocie)
+    VALUES (?,'111|Sekator','111','Sekator',1,4999,'PLN',1)`).run(id);
   return id;
 }
 
@@ -72,6 +81,81 @@ test("żądanie ma cztery pola wymagane przez schemat i kwotę z serwera", async
   assert.match(String(c.commandId), /^[0-9a-f-]{36}$/);
   /* Dostawa idzie w złotych, bo tak żąda `Price`, a grosze trzyma baza. */
   assert.deepEqual(c.delivery, { value: { amount: "14.99", currency: "PLN" } });
+  /* Pozycja zamówienia z ZAZNACZENIA. Do 15 września 2026 tego pola nie było
+     i kwota z ekranu nie docierała do Allegro. */
+  assert.deepEqual(c.lineItems, [{ id: "li-1", type: "QUANTITY", quantity: 1 }]);
+});
+
+/* ── Pozycje żądania (lineItems) ─────────────────────────────────────────── */
+
+/** Wysyła zwrot i oddaje ciało żądania. */
+async function wyslij(d: Db, id: number): Promise<Record<string, any>> {
+  let wyslane: Record<string, unknown> | null = null;
+  await zwrocPieniadze(d, id, 1, KTO, async (c) => { wyslane = c; return { id: "ref-1" }; });
+  return wyslane as unknown as Record<string, any>;
+}
+
+test("sztuki idą po tym, co WRÓCIŁO, a nie po zgłoszeniu", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc=2, ilosc_zwrocona=1 WHERE zwrot_id=?").run(id);
+  assert.deepEqual((await wyslij(d, id)).lineItems,
+    [{ id: "li-1", type: "QUANTITY", quantity: 1 }]);
+});
+
+test("potrącenie idzie kwotą wprost — QUANTITY oddałoby pełną cenę", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { kwota: 3999 + 1499 });
+  d.prepare(`UPDATE zwrot_klienta_pozycja SET potracenie_grosze=1000, potracenie_powod='rysa'
+    WHERE zwrot_id=?`).run(id);
+  assert.deepEqual((await wyslij(d, id)).lineItems,
+    [{ id: "li-1", type: "AMOUNT", value: { amount: "39.99", currency: "PLN" } }]);
+});
+
+test("inna cena w zamówieniu też idzie kwotą — Allegro liczyłoby po swojej", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("UPDATE zamowienie_klienta_pozycja SET cena_grosze=5500").run();
+  assert.deepEqual((await wyslij(d, id)).lineItems,
+    [{ id: "li-1", type: "AMOUNT", value: { amount: "49.99", currency: "PLN" } }]);
+});
+
+test("niezaznaczona pozycja nie jedzie w żądaniu", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  const zam = (d.prepare("SELECT id FROM zamowienie_klienta").get() as { id: number }).id;
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+    (zamowienie_id,external_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
+    VALUES (?,'li-2','222','Kosa',1,19999,'PLN')`).run(zam);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja
+    (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta,w_zwrocie)
+    VALUES (?,'222|Kosa','222','Kosa',1,19999,'PLN',0)`).run(id);
+  const linie = (await wyslij(d, id)).lineItems as Array<{ id: string }>;
+  assert.deepEqual(linie.map((l) => l.id), ["li-1"]);
+});
+
+test("pozycja bez odpowiednika w zamówieniu zatrzymuje przelew przed siecią", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("DELETE FROM zamowienie_klienta_pozycja").run();
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.moznaZwrocic, false);
+  assert.match(String(s.powod), /Sekator/, "zdanie mówi, której pozycji brakuje");
+  let wolane = false;
+  await assert.rejects(
+    () => zwrocPieniadze(d, id, 1, KTO, async () => { wolane = true; return { id: "x" }; }),
+    ZwrotPieniedzyConflict);
+  assert.equal(wolane, false, "żądanie bez linii oddałoby mniej, niż obiecał ekran");
+});
+
+test("kwota rozjechana z pozycjami zatrzymuje przelew", () => {
+  /* Synchronizacja nadpisuje cenę pozycji, a kwota jest migawką z zaznaczenia. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET cena_grosze=5999").run();
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.moznaZwrocic, false);
+  assert.match(String(s.powod), /popraw kwotę/);
 });
 
 /* Pole `delivery` z zerem znaczy „oddaj zero za dostawę" i to jest co innego

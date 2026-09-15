@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.346.0 — 15 września 2026
+
+**Zwrot pieniędzy niesie pozycje, a kosz rozłożony przed korektą nie gubi
+dokumentu.** Trzy usterki z audytu procesu zwrotów. Dwie po cichu psuły stan
+magazynu, trzecia rozjeżdżała kwotę przelewu z tym, co pokazywał ekran.
+
+- **Zwrot pieniędzy wysyła `lineItems`.** Do tego wydania żądanie niosło same
+  pola wymagane i dostawę, więc kwota z zaznaczenia — z potrąceniem i sztukami,
+  które naprawdę wróciły — nie docierała do Allegro. Pozycja idzie jako
+  `QUANTITY`, gdy Allegro policzy dokładnie naszą kwotę, a jako `AMOUNT` przy
+  potrąceniu, niecałej sztuce albo innej cenie w zamówieniu. Pozycja bez
+  odpowiednika w zamówieniu albo suma rozjechana z kwotą zatrzymuje przycisk
+  zdaniem i nic nie wychodzi. Do sprawdzenia pierwszym zwrotem z panelu: czy
+  `QUANTITY` liczy się po cenie z zamówienia (`docs/allegro-ksztalt.md`).
+- **Kosz rozłożony przed korektą czeka z powrotem na swoje MM na regał.**
+  ZAKOŃCZ zamawiało MM ZWROTY→MAG od razu, a MM MAG→ZWROTY nie wychodziło już
+  nigdy, bo automat patrzył tylko na kosze zamknięte. Powrót zdejmował więc
+  z regału zwrotów stan, którego tam nie było. Teraz automat wypuszcza MM na
+  regał także koszom rozłożonym, a powrót wychodzi dopiero po jego wykonaniu:
+  worker ponawia go po każdym MM, a przy `SFERA_WORKER=1` raz na minutę.
+- **COFNIJ ZAKOŃCZENIE anuluje czekające MM powrotne.** Do tego wydania zadanie
+  zostawało w kolejce, a drugie ZAKOŃCZ oddawało je ze starą zawartością.
+  Powrót już wykonany blokuje cofnięcie, tak samo jak zapisany adres.
+- Alert `kosz_bez_powrotu` milczy przy koszu, którego MM na regał jeszcze nie
+  weszło — przyczynę mówi brak korekty albo kolejka. Pastylka „czeka na
+  korektę" zostaje także przy koszu już rozłożonym.
+- **[wymaga działania] Kosze rozłożone przed korektą PRZED wdrożeniem** mają
+  powrót bez przyjazdu. Zapytanie i kroki: `DEPLOY.md` §6g.
+
 ## 0.345.0 — 15 września 2026
 
 **Rozliczenie zwrotu zatrzaskuje się i już nie znika.** Zgłoszenie

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
+import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
+import { iloscLiczona } from "./ilosc-zwrotu.js";
 
 /* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
 
@@ -97,6 +99,82 @@ const wczytaj = (database: Db, zwrotId: number): Wiersz => {
   if (!w) throw new Error("Nie znaleziono zwrotu");
   return w;
 };
+
+/** Pozycja `lineItems[]` ze schematu `RefundLineItem`. */
+type LiniaZwrotu =
+  | { id: string; type: "QUANTITY"; quantity: number }
+  | { id: string; type: "AMOUNT"; value: { amount: string; currency: string } };
+
+const naZlote = (grosze: number) => (grosze / 100).toFixed(2);
+
+/**
+ * Pozycje zamówienia, za które oddajemy pieniądze — `lineItems` żądania.
+ *
+ * DO 15 WRZEŚNIA 2026 ŻĄDANIE NIE NIOSŁO ANI JEDNEJ POZYCJI. Szły same pola
+ * wymagane i dostawa. Kwota policzona przy zaznaczeniu, razem z potrąceniem
+ * i sztukami, które naprawdę wróciły, nie docierała do Allegro. Biuro oddawało
+ * więc pieniądze w Sales Center, choć ten przycisk stał obok.
+ *
+ * ARYTMETYKA JEST TA SAMA CO W `zapiszKwote`: cena razy sztuki liczone minus
+ * potrącenie. Inna dałaby rozjazd przy pierwszym zaokrągleniu, a żądanie
+ * wypłaciłoby co innego, niż obiecał ekran.
+ *
+ * `QUANTITY` idzie tylko wtedy, gdy Allegro policzy DOKŁADNIE naszą kwotę: bez
+ * potrącenia, w całych sztukach i przy cenie równej cenie z zamówienia.
+ * W każdym innym przypadku `AMOUNT` z kwotą wprost. Czy `QUANTITY` liczy się
+ * po cenie pozycji zamówienia, mówi znacznik w `docs/allegro-ksztalt.md`.
+ *
+ * Dwie pozycje zwrotu na jednej pozycji zamówienia (dopisana przez biuro obok
+ * zgłoszonej) składają się w JEDNĄ linię. Schemat nie mówi, co Allegro robi
+ * z powtórzonym `id`, więc go nie wysyłamy.
+ */
+function liniePozycji(database: Db, w: Wiersz): {
+  linie: LiniaZwrotu[]; groszy: number; bezPozycji: string[];
+} {
+  const pozycje = database.prepare(`SELECT id, offer_id, nazwa, ilosc, ilosc_zwrocona,
+      cena_grosze, potracenie_grosze
+    FROM zwrot_klienta_pozycja WHERE zwrot_id = ? AND w_zwrocie = 1 ORDER BY id`)
+    .all(w.id) as Array<{ id: number; offer_id: string | null; nazwa: string; ilosc: number;
+      ilosc_zwrocona: number | null; cena_grosze: number; potracenie_grosze: number | null }>;
+  const cenaZamowienia = database.prepare(
+    "SELECT cena_grosze FROM zamowienie_klienta_pozycja WHERE id = ?");
+
+  const wgLinii = new Map<string, { sztuk: number; grosze: number; kwotowo: boolean }>();
+  const bezPozycji: string[] = [];
+  for (const p of pozycje) {
+    const sztuk = iloscLiczona(p);
+    const potracenie = Number(p.potracenie_grosze ?? 0);
+    const grosze = Math.round(Number(p.cena_grosze) * sztuk) - potracenie;
+    /* Pozycja warta zero nie jest linią: nic za nią nie wychodzi. Ujemnej nie
+       ma czym wysłać — suma rozjedzie się wtedy z kwotą i zatrzyma przycisk. */
+    if (grosze <= 0) continue;
+    const pozycja = w.order_id
+      ? dopasujPozycjeZamowienia(database, Number(w.channel_account_id), w.order_id,
+          p.offer_id, String(p.nazwa)).pozycja
+      : null;
+    if (!pozycja?.external_id) {
+      bezPozycji.push(String(p.nazwa));
+      continue;
+    }
+    const cena = (cenaZamowienia.get(pozycja.id) as { cena_grosze: number } | undefined)
+      ?.cena_grosze;
+    const kwotowo = potracenie > 0 || !Number.isInteger(sztuk)
+      || Number(cena) !== Number(p.cena_grosze);
+    const juz = wgLinii.get(pozycja.external_id);
+    wgLinii.set(pozycja.external_id, {
+      sztuk: (juz?.sztuk ?? 0) + sztuk,
+      grosze: (juz?.grosze ?? 0) + grosze,
+      kwotowo: (juz?.kwotowo ?? false) || kwotowo,
+    });
+  }
+
+  const waluta = w.waluta ?? "PLN";
+  const linie: LiniaZwrotu[] = [...wgLinii].map(([id, l]) => l.kwotowo
+    ? { id, type: "AMOUNT", value: { amount: naZlote(l.grosze), currency: waluta } }
+    : { id, type: "QUANTITY", quantity: l.sztuk });
+  const groszy = [...wgLinii.values()].reduce((s, l) => s + l.grosze, 0);
+  return { linie, groszy, bezPozycji };
+}
 
 /** Co widać na ekranie przy przycisku. Zdanie o przeszkodzie pisze SERWER. */
 export type StanZwrotuPieniedzy = {
@@ -228,6 +306,22 @@ export function stanZwrotuPieniedzy(
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
       powod: "Kwota do oddania wynosi zero." };
   }
+  /* POZYCJE SPRAWDZAMY PRZED WYSŁANIEM, nie po odmowie Allegro. Żądanie
+     z brakującą linią oddałoby mniej, niż obiecał ekran — i to po cichu, bo
+     Allegro przyjęłoby je jako poprawne. */
+  const { bezPozycji, groszy } = liniePozycji(database, w);
+  if (bezPozycji.length) {
+    return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
+      powod: `Nie wiem, której pozycji zamówienia dotyczy: ${bezPozycji.join(", ")}. `
+        + "Dociągnij zamówienie albo oddaj pieniądze w panelu Allegro." };
+  }
+  /* Kwota jest migawką z chwili zaznaczenia (`kwotaRozjechana` w `zwroty.ts`).
+     Gdy pozycje zmieniły się od tamtej pory, żądanie wysłałoby inną sumę niż
+     ta na ekranie. */
+  if (groszy + Number(w.kwota_dostawa_grosze ?? 0) !== Number(w.kwota_grosze)) {
+    return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
+      powod: "Kwota nie zgadza się z zaznaczonymi pozycjami — popraw kwotę." };
+  }
   return { ...podstawa, moznaZwrocic: true, moznaOdmowic, powod: null };
 }
 
@@ -279,7 +373,6 @@ export async function zwrocPieniadze(
   const kwota = Number(w.kwota_grosze);
   const dostawa = w.kwota_dostawa_grosze == null ? 0 : Number(w.kwota_dostawa_grosze);
   const waluta = w.waluta ?? "PLN";
-  const naZlote = (grosze: number) => (grosze / 100).toFixed(2);
 
   /* Cztery pola wymagane wprost przez schemat `InitializeRefund`: `payment`,
      `order`, `commandId`, `reason`. `delivery` idzie tylko wtedy, gdy operator
@@ -291,6 +384,11 @@ export async function zwrocPieniadze(
     commandId,
     reason: POWOD_ZWROTU,
   };
+  /* `lineItems` z tego samego zaznaczenia, które policzyło kwotę. Bramka
+     w `stanZwrotuPieniedzy` sprawdziła przed chwilą, że linie sumują się do
+     kwoty. Pustej listy nie wysyłamy: zwrot samej dostawy nie ma pozycji. */
+  const { linie } = liniePozycji(database, w);
+  if (linie.length) ciało.lineItems = linie;
   if (dostawa > 0) {
     ciało.delivery = { value: { amount: naZlote(dostawa), currency: waluta } };
   }

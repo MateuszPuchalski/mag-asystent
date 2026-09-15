@@ -1739,6 +1739,23 @@ przepisuje biuro jak dotąd. Nazwę i listę typów przestawiają
 w kolejce. Jeśli któreś stoi w `pending` na towar, którego nie ma na stanie,
 Sfera odrzuci je czytelnym błędem; wystaw korektę i użyj PONÓW.
 
+**Kosz rozłożony przed korektą (0.346.0).** Hala często rozkłada kosz, zanim
+biuro wpisze korekty. Do 0.345.0 taki kosz nie dostawał MM na regał zwrotów,
+a jego MM powrotne szło od razu. Od 0.346.0 powrót czeka na MM na regał
+i wychodzi sam po jego wykonaniu.
+
+Przy wdrożeniu znajdź kosze, które przeszły starą drogą:
+
+```sql
+SELECT id, kod, rozlozono_at, powrot_queue_id FROM kosz
+ WHERE status='rozlozony' AND mm_dok_id IS NULL AND mm_queue_id IS NULL
+   AND powrot_poza_aplikacja = 0 AND rodzaj = 'zwroty';
+```
+
+1. Automat wystawi im zaległe MM na regał, gdy ich zwroty mają korekty.
+2. MM powrotne w błędzie z braku stanu ponów, gdy MM na regał wejdzie.
+3. MM powrotne już wykonane zostaw: nowe MM na regał wyrówna regał zwrotów.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

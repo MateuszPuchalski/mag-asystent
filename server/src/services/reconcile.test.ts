@@ -63,13 +63,15 @@ function zadanie(o: {
 }
 
 beforeEach(() => {
+  /* Kosze PRZED kolejką: `kosz.mm_queue_id` wskazuje zadanie kolejki, więc
+     odwrotna kolejność wywraca się na kluczu obcym. */
+  db().prepare("DELETE FROM kosz_pozycja").run();
+  db().prepare("DELETE FROM kosz").run();
   db().prepare("DELETE FROM sfera_queue").run();
   db().prepare("DELETE FROM delivery_line").run();
   db().prepare("DELETE FROM delivery").run();
   db().prepare("DELETE FROM zwrot_klienta_pozycja").run();
   db().prepare("DELETE FROM zwrot_klienta").run();
-  db().prepare("DELETE FROM kosz_pozycja").run();
-  db().prepare("DELETE FROM kosz").run();
   db().prepare("DELETE FROM zamowienie_klienta").run();
 });
 
@@ -257,6 +259,12 @@ test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
     db().prepare(
       `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, status)
        VALUES (?, 1, 'X', 'Towar', 1, 'done')`).run(id);
+    /* MM na regał już w Subiekcie. Bez niego powrót czeka świadomie i ten
+       wiersz milczy — osobny przypadek na końcu testu. */
+    const naRegal = Number(db().prepare(
+      `INSERT INTO sfera_queue(type, status, payload, created_at, created_by)
+       VALUES ('mm', 'done', '{}', ?, 'Biuro')`).run(at).lastInsertRowid);
+    db().prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(naRegal, id);
     return id;
   };
 
@@ -282,6 +290,14 @@ test("kosz rozłożony bez powrotu z bufora zgłasza się po dobie", () => {
   db().prepare(
     "UPDATE kosz SET mm_dok_id=1208, powrot_poza_aplikacja=1 WHERE id=?").run(historia);
   assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "KZ-8").length, 0);
+
+  /* Kosz z aplikacji, którego MM na regał jeszcze nie weszło, też milczy:
+     powrót czeka świadomie, a przyczynę mówi brak korekty albo kolejka. */
+  const czeka = kosz(5, "Z-3");
+  db().prepare(
+    "UPDATE sfera_queue SET status='pending' WHERE id=(SELECT mm_queue_id FROM kosz WHERE id=?)")
+    .run(czeka);
+  assert.equal(reconcile().rozjazdy.filter((x) => x.klucz === "Z-3").length, 0);
 });
 
 test("pobranie bez śladu po przelewie zgłasza się po dobie", () => {

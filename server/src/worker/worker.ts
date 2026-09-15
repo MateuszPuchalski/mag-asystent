@@ -2,7 +2,9 @@ import { config } from "../config.js";
 import { makeSferaAdapter } from "../adapters/index.js";
 import { bezMigracji, brakujacaTabela } from "../db/db.js";
 import { zamelduj } from "../services/process-state.js";
-import { czekaNaDokument, oznaczBlad, pickTask, przetworzZadanie } from "./kolejka.js";
+import {
+  czekaNaDokument, oznaczBlad, pickTask, powrotyPoDokumentachSfery, przetworzZadanie,
+} from "./kolejka.js";
 
 /* ── Worker NIE migruje schematu (0.177.1) ───────────────────────────────────
    MUSI stać przed pierwszym dotknięciem bazy, a pierwsze jest `zamelduj()`
@@ -87,5 +89,8 @@ setInterval(() => {
      wróciłby dokładnie ten restart, którego unikamy. */
   if (!schematGotowy()) return;
   zamelduj("worker");
+  /* Przed `tick()`, bo tamten wraca wcześnie, gdy worker jest zajęty albo
+     kolejka pusta — a powrót czeka właśnie wtedy, gdy nic się nie dzieje. */
+  powrotyPoDokumentachSfery();
   tick();
 }, config.worker.pollMs);

@@ -3647,9 +3647,15 @@ panelu Allegro. Przy zwrocie nie było to spełnione ani razu.
 `POST /order/customer-returns/{id}/rejection` w wersji `beta.v1`, na
 `allegro:api:orders:write`.
 
-**Kwoty nie ma w ciele żądania.** Serwer bierze tę, którą sam policzył
-z zaznaczenia. Panel podający liczbę pozwoliłby oddać dowolną kwotę żądaniem
-z pominięciem ekranu — ta sama decyzja co przy `zapiszKwote` w 0.156.0.
+**Kwoty nie podaje panel.** Serwer składa `lineItems` z zaznaczonych pozycji
+tą samą arytmetyką co `zapiszKwote`. Panel podający liczbę pozwoliłby oddać
+dowolną kwotę żądaniem z pominięciem ekranu — ta sama decyzja co w 0.156.0.
+
+Do 15 września 2026 żądanie nie niosło pozycji wcale, więc kwota z zaznaczenia
+nie docierała do Allegro. Pozycja idzie jako `QUANTITY`, gdy Allegro policzy
+dokładnie naszą kwotę. Przy potrąceniu albo innej cenie w zamówieniu idzie
+`AMOUNT`. Pozycja bez odpowiednika w zamówieniu albo suma rozjechana z kwotą
+zatrzymuje przycisk zdaniem i nic nie wychodzi.
 
 **`commandId` powstaje RAZ na zwrot.** Allegro daje przy tej końcówce
 idempotencję po tym polu i to jest jedyna osłona przed drugim przelewem, gdy

@@ -68,6 +68,8 @@ interface WierszKosza {
   mm_numer: string | null;
   /** Magazyn, Z KTÓREGO dokument wysłał towar na regał — snapshot z importu. */
   mm_mag_z: number | null;
+  /** Zadanie MM NA regał (MAG→ZWROTY) kosza z aplikacji; NULL = jeszcze nie zamówione. */
+  mm_queue_id: number | null;
   /** Zadanie MM powrotnego (ZWROTY→MAG); NULL = jeszcze nie zamówione. */
   powrot_queue_id: number | null;
   /** 1 = powrót rozliczyło biuro poza aplikacją (kosz sprzed 0.266.0/0.277.0). */
@@ -342,6 +344,12 @@ export function listaKoszy(): WierszListyKoszy[] {
  */
 function stanMm(w: Record<string, unknown>): WierszListyKoszy["mmStan"] {
   if (w.mm_numer) return "gotowa";
+  /* Kosz ROZŁOŻONY też bywa w czekaniu: hala rozkłada go przed korektą, a MM
+     na regał wychodzi dopiero po niej (`wypuscGotoweKoszyki`). Poza tym jednym
+     przypadkiem rozłożony kosz o dokument już nie pyta. */
+  if (w.status === "rozlozony") {
+    return !w.mm_queue_id && Number(w.brakuje_korekt ?? 0) > 0 ? "czeka_na_korekte" : "brak";
+  }
   if (w.status !== "zamkniety") return "brak";
   if (w.mm_queue_id) return w.mm_status === "error" ? "blad" : "zamowiona";
   return Number(w.brakuje_korekt ?? 0) > 0 ? "czeka_na_korekte" : "brak";
@@ -806,17 +814,38 @@ export function cofnijZakonczenie(koszId: number, autor: string): SzczegolKosza 
     }
   }
 
+  /* MM POWROTNE (0.266.0) siedzi przy KOSZU, nie przy pozycji. Do 15 września
+     2026 cofnięcie go nie widziało: kosz wracał do rozkładania z dokumentem
+     już zamówionym, a drugie ZAKOŃCZ oddawało to samo stare zadanie
+     (`zakolejkujPowrot` patrzy na `powrot_queue_id`). Granica Subiekta jest
+     ta sama co wyżej: czekające anulujemy, wykonanego nie ruszamy. */
+  if (kosz.powrot_queue_id != null) {
+    const z = d.prepare("SELECT status FROM sfera_queue WHERE id = ?").get(kosz.powrot_queue_id) as
+      | { status: string }
+      | undefined;
+    if (z && z.status !== "pending" && z.status !== "cancelled") {
+      throw new BladKosza(
+        400,
+        `MM powrotne kosza ${kosz.kod} jest już w Subiekcie (${z.status}) — zakończenia nie ` +
+          "cofnie aplikacja. Dokument odwrotny wystawia biuro."
+      );
+    }
+  }
+
   transaction(d, () => {
     for (const p of pozycje) anulujJesliCzeka(p.mm_queue_id, "MM");
+    anulujJesliCzeka(kosz.powrot_queue_id, "MM powrotne");
     d.prepare("UPDATE kosz_pozycja SET mm_queue_id=NULL WHERE kosz_id=?").run(koszId);
     d.prepare(
-      "UPDATE kosz SET status='zamkniety', rozlozono_at=NULL, rozlozono_przez=NULL WHERE id=?"
+      `UPDATE kosz SET status='zamkniety', rozlozono_at=NULL, rozlozono_przez=NULL,
+                       powrot_queue_id=NULL WHERE id=?`
     ).run(koszId);
     logEvent("kosz_zakonczenie_cofniete", autor, null, {
       koszId,
       kod: kosz.kod,
       pozycji: pozycje.length,
       mmAnulowanych: pozycje.filter((p) => p.mm_queue_id != null).length,
+      powrotAnulowany: kosz.powrot_queue_id != null,
     });
   })();
   return szczegolKosza(koszId);
@@ -1023,6 +1052,21 @@ export function zakolejkujPowrot(koszId: number, autor: string): number | null {
   const trasa = trasaPowrotu(k);
   if (!trasa) return null;
   if (adresyWDrodze(koszId) > 0) return null;
+  /* POWRÓT PO PRZYJEŹDZIE. Kosz złożony w aplikacji wysyła towar na regał
+     WŁASNYM MM (`kosze-zwrotow.ts`), a to MM czeka na komplet korekt. Hala
+     rozkłada kosz wcześniej, bo zamknięcie jest czynnością fizyczną.
+
+     Do 15 września 2026 ZAKOŃCZ zamawiało powrót od razu. Dokument zdejmował
+     z regału zwrotów stan, którego tam nie było, a MM na regał nie wychodziło
+     już nigdy. Teraz powrót czeka, aż tamto MM wejdzie do Subiekta, i wychodzi
+     z `wypuscPowrotyKoszy`. Kosz z dokumentu przyjechał cudzym MM i nie czeka. */
+  if (k.mm_dok_id === null) {
+    const naRegal = k.mm_queue_id === null ? undefined
+      : db().prepare("SELECT status FROM sfera_queue WHERE id = ?").get(k.mm_queue_id) as
+        | { status: string }
+        | undefined;
+    if (naRegal?.status !== "done") return null;
+  }
 
   const odlozone = db()
     .prepare("SELECT tw_id, ilosc FROM kosz_pozycja WHERE kosz_id = ? AND status='done'")

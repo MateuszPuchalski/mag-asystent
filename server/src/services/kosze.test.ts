@@ -145,7 +145,7 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
      (do 0.276.x tak właśnie było) — dwa adresy wiszą w kolejce, a powrót czeka
      na nie tak samo jak przy koszu z panelu. */
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     0,
     "adres przed sprzedawalnością — najpierw kartoteka, potem stan"
   );
@@ -166,7 +166,9 @@ test("odłożenie: zapis adresu tylko przy zmianie, zawsze PRZED zadaniem MM", a
  * panel (`kosze-zwrotow.ts`). To ten kosz zdejmuje towar z bufora po
  * rozłożeniu — i tylko ten.
  */
-function koszAplikacji(kod = "Z-7", rodzaj = "zwroty"): ReturnType<typeof K.szczegolKosza> {
+function koszAplikacji(
+  kod = "Z-7", rodzaj = "zwroty", naRegale = true,
+): ReturnType<typeof K.szczegolKosza> {
   const d = db();
   const teraz = new Date().toISOString();
   const kosz = d
@@ -185,6 +187,14 @@ function koszAplikacji(kod = "Z-7", rodzaj = "zwroty"): ReturnType<typeof K.szcz
   ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Pozycja jeszcze nietknięta", 1);
   ins.run(koszId, 900_036, "TEST-LINIA-TODO", "Ta sama kartoteka z drugiego zwrotu", 2);
   ins.run(koszId, 900_037, "TEST-LINIA-DONE", "Pozycja odłożona w całości", 1);
+  /* MM NA regał już w Subiekcie — tak wygląda kosz, któremu korekty doszły
+     przed rozłożeniem. Kosz rozłożony wcześniej ma osobne testy niżej. */
+  if (naRegale) {
+    const q = Number(d.prepare(
+      `INSERT INTO sfera_queue(type, status, payload, created_at, created_by)
+       VALUES ('mm', 'done', '{}', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+    d.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(q, koszId);
+  }
   return K.szczegolKosza(koszId);
 }
 
@@ -200,7 +210,7 @@ test("kosz z aplikacji cofa bufor JEDNYM MM ZWROTY→MAG", async () => {
   K.zakonczKosz(kosz.id, "Magazynier");
 
   const mm = db()
-    .prepare("SELECT payload, tw_id FROM sfera_queue WHERE type='mm'")
+    .prepare("SELECT payload, tw_id FROM sfera_queue WHERE type='mm' AND status='pending'")
     .all() as Array<{ payload: string; tw_id: number | null }>;
   assert.equal(mm.length, 1, "jeden kosz to jeden dokument — decyzja właściciela");
   const p = JSON.parse(mm[0].payload) as { magFrom: number; magTo: number; items: Array<{ twId: number; qty: number }> };
@@ -219,7 +229,7 @@ test("kosz z aplikacji cofa bufor JEDNYM MM ZWROTY→MAG", async () => {
      jest tu pamięcią, nie ozdobą. */
   K.zakonczKosz(kosz.id, "Magazynier");
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     1
   );
 });
@@ -233,7 +243,7 @@ test("powrót czeka na zapis adresów i wychodzi dopiero po nim", async () => {
   K.zakonczKosz(kosz.id, "Magazynier");
 
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     0,
     "adresy jeszcze nie weszły — dokument nie ma prawa powstać"
   );
@@ -254,7 +264,7 @@ test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async
 
   K.zakonczKosz(kosz.id, "Magazynier");
 
-  const mm = db().prepare("SELECT payload FROM sfera_queue WHERE type='mm'").all() as
+  const mm = db().prepare("SELECT payload FROM sfera_queue WHERE type='mm' AND status='pending'").all() as
     Array<{ payload: string }>;
   assert.equal(mm.length, 1);
   const items = (JSON.parse(mm[0].payload) as { items: Array<{ twId: number; qty: number }> }).items;
@@ -324,7 +334,7 @@ test("kosz z dokumentu wraca NA MAGAZYN, z którego dokument go wysłał", async
 
   K.zakonczKosz(kosz.id, "Magazynier");
 
-  const mm = db().prepare("SELECT payload FROM sfera_queue WHERE type='mm'").all() as
+  const mm = db().prepare("SELECT payload FROM sfera_queue WHERE type='mm' AND status='pending'").all() as
     Array<{ payload: string }>;
   assert.equal(mm.length, 1, "jeden kosz to jeden dokument, tak samo jak przy koszu z panelu");
   const p = JSON.parse(mm[0].payload) as
@@ -341,7 +351,7 @@ test("kosz z dokumentu wraca NA MAGAZYN, z którego dokument go wysłał", async
      dwa razy zdjęłoby z regału stan, którego nikt nie przeniósł. */
   K.zakonczKosz(kosz.id, "Magazynier");
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     1
   );
 });
@@ -360,7 +370,7 @@ test("kosz z dokumentu bez znanego magazynu źródłowego powrotu nie dostaje", 
   assert.equal(K.zakolejkujPowrot(kosz.id, "Magazynier"), null);
   assert.equal(K.wypuscPowrotyKoszy(), 0);
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     0
   );
 
@@ -383,7 +393,7 @@ test("kosz rozłożony przed 0.266.0 powrotu nie dostaje", async () => {
   assert.equal(K.zakolejkujPowrot(kosz.id, "Magazynier"), null);
   assert.equal(K.wypuscPowrotyKoszy(), 0);
   assert.equal(
-    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'").get() as { n: number }).n,
+    (db().prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status='pending'").get() as { n: number }).n,
     0
   );
 });
@@ -410,6 +420,80 @@ test("zakończenie odmawia, dopóki cokolwiek leży w koszu", async () => {
   const kosz = koszDoRozkladania();
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
   assert.throws(() => K.zakonczKosz(kosz.id, "Magazynier"), /Nieodłożone pozycje/);
+});
+
+/* ── Kosz rozłożony PRZED korektą (audyt zwrotów, 15 września 2026) ──────────
+   Hala rozkłada kosz, zanim biuro wpisze korekty — zamknięcie jest czynnością
+   fizyczną. ZAKOŃCZ zamawiało wtedy powrót z regału, na który nic nie weszło,
+   a MM na regał nie wychodziło nigdy: automat patrzył tylko na kosze
+   zamknięte. Cofnięcie zakończenia nie widziało zaś powrotu wcale.          */
+
+/** Odkłada wszystko na własne półki i udaje workera, który zapisał adresy. */
+function rozloz(koszId: number) {
+  for (const p of K.szczegolKosza(koszId).pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+  K.zakonczKosz(koszId, "Magazynier");
+}
+
+test("powrót nie wychodzi, dopóki MM na regał nie weszło do Subiekta", async () => {
+  const kosz = koszAplikacji("Z-23", "zwroty", false);
+  rozloz(kosz.id);
+  assert.equal(K.szczegolKosza(kosz.id).powrot, null);
+  assert.equal(K.wypuscPowrotyKoszy(), 0, "zdjęłoby z regału stan, którego tam nie ma");
+});
+
+test("kosz rozłożony przed korektą: najpierw MM na regał, potem powrót", async () => {
+  const { wypuscGotoweKoszyki } = await import("./kosze-zwrotow.js");
+  const koszId = koszZeZwrotu("Z-20", null);
+  rozloz(koszId);
+  const mm = () => db()
+    .prepare("SELECT id, status, payload FROM sfera_queue WHERE type='mm' ORDER BY id")
+    .all() as Array<{ id: number; status: string; payload: string }>;
+  assert.deepEqual(mm(), [], "bez korekty nie ma ani MM na regał, ani powrotu");
+  assert.equal(K.listaKoszy().find((k) => k.id === koszId)!.mmStan, "czeka_na_korekte",
+    "rozłożony kosz dalej mówi, na co czeka");
+
+  db().prepare("UPDATE zwrot_klienta SET korekta_numer='ZW 413/MAG/09/2026'").run();
+  assert.equal(wypuscGotoweKoszyki(db()), 1, "rozłożony kosz też dostaje swoje MM na regał");
+  assert.equal(K.wypuscPowrotyKoszy(), 0, "powrót czeka, aż tamto MM wejdzie do Subiekta");
+
+  const [naRegal] = mm();
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(naRegal.id);
+  assert.equal(K.wypuscPowrotyKoszy(), 1);
+  const [, powrot] = mm();
+  assert.ok(powrot.id > naRegal.id, "kolejka wykonuje zadania po id — przyjazd przed powrotem");
+  assert.equal((JSON.parse(powrot.payload) as { magFrom: number }).magFrom, 3,
+    "powrót schodzi z regału zwrotów");
+});
+
+test("cofnięcie zakończenia anuluje czekający powrót, a ponowne ZAKOŃCZ zamawia świeży", async () => {
+  const kosz = koszAplikacji("Z-21");
+  rozloz(kosz.id);
+  assert.equal(K.szczegolKosza(kosz.id).powrot?.status, "pending");
+
+  K.cofnijZakonczenie(kosz.id, "Magazynier");
+  assert.equal(K.szczegolKosza(kosz.id).powrot, null,
+    "karta nie pokazuje dokumentu, którego nie będzie");
+  const policz = (status: string) => (db()
+    .prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm' AND status=?")
+    .get(status) as { n: number }).n;
+  assert.equal(policz("cancelled"), 1, "stare zadanie nie ma prawa pojechać do Subiekta");
+
+  /* Do tej poprawki drugie ZAKOŃCZ oddawało STARE zadanie — z zawartością
+     sprzed cofnięcia. */
+  K.zakonczKosz(kosz.id, "Magazynier");
+  assert.equal(policz("pending"), 1);
+  assert.equal(policz("cancelled"), 1);
+});
+
+test("po wejściu powrotu do Subiekta cofnięcie zakończenia odmawia", async () => {
+  const kosz = koszAplikacji("Z-22");
+  rozloz(kosz.id);
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='mm' AND status='pending'").run();
+
+  assert.throws(() => K.cofnijZakonczenie(kosz.id, "Magazynier"),
+    /MM powrotne kosza Z-22 jest już w Subiekcie/);
+  assert.equal(K.szczegolKosza(kosz.id).status, "rozlozony", "stan kosza zostaje nietknięty");
 });
 
 /* ── Pełne rozkładanie kosza (0.77.0) ────────────────────────────────────────

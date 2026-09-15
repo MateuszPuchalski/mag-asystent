@@ -432,6 +432,12 @@ pola wymagane: `payment`, `order`, `commandId` i `reason`. Opcjonalne są
 `additionalServices` i `sellerComment`. Pozycja `lineItems[]` ma `id`, `type`
 (`QUANTITY` albo `AMOUNT`), `quantity` i `value`.
 
+Do 15 września 2026 panel wysyłał same pola wymagane i dostawę. Kwota
+z zaznaczenia nie docierała więc do Allegro. Teraz żądanie niesie `lineItems`:
+`QUANTITY` przy pełnej cenie bez potrącenia, `AMOUNT` z kwotą wprost w każdym
+innym przypadku. Otwarte zostaje, czy `QUANTITY` liczy się po cenie pozycji
+zamówienia. Pierwszy zwrot oddany z panelu to pokaże.
+
 Wartości `reason` jest SIEDEM: `REFUND`, `COMPLAINT`, `PRODUCT_NOT_AVAILABLE`,
 `PAID_VALUE_TOO_LOW`, `OVERPAID`, `CANCELLED_BY_BUYER` i `NOT_COLLECTED`.
 Panel wysyła stale `REFUND` — pozostałe opisują sytuacje, których ekran zwrotu
