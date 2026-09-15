@@ -272,6 +272,17 @@ nssm set wertis-sfera Start SERVICE_AUTO_START
 nssm set wertis-sfera AppExit Default Restart
 ```
 
+> **Konto usługi to warunek, nie szczegół.** NSSM rejestruje usługę na koncie
+> `LocalSystem`. Subiekt w tle potrafi tam oddać pustą sesję, a sonda przechodzi,
+> bo idzie na koncie człowieka. Objaw w kolejce Sfery to „pusty obiekt" przy
+> `SuDokumentyManager.DodajMM()`. Pierwsza linia `wertis-sfera.log` mówi, na jakim
+> koncie działa usługa. Uruchom ją na tym samym koncie, na którym przechodzi sonda:
+
+```powershell
+nssm set wertis-sfera ObjectName '.\NazwaKonta' 'HasloKonta'
+nssm restart wertis-sfera
+```
+
 **Konfiguracja usług — nic do przepisywania.** Obie usługi mają
 `AppDirectory C:\wertis`, więc czytają `C:\wertis\wertis.env` — ten sam plik,
 który uzupełniłeś w §2a. Po jego zmianie wystarczy restart:

@@ -192,6 +192,17 @@ Sonda wypisuje pozycje ZW po powiązaniu, z ilościami, oraz pola rodzaju zwrotu
 płatności i skutku magazynowego. Danych kontrahenta nie wypisuje, bo plik wynikowy
 wraca do repozytorium.
 
+Dwa przełączniki odpowiadają na pytania, których nie rozstrzyga sam szkic
+(`docs/sfera-com.md` §2m):
+
+```powershell
+powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env -SzkicZW -Paragon 123456 -Ilosci "1=0,2=1" -WzorZW 654321
+```
+
+`-Ilosci` ustawia ilości na szkicu tak, jak biuro w oknie ZW, i pokazuje
+przeliczoną wartość oraz płatność. `-WzorZW` tylko WCZYTUJE ZW wystawiony
+ręcznie, żeby odczytać liczbę rodzaju „zwrot ze sprzedaży".
+
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
 Wszystko, co dotyczy COM, siedzi w **jednym pliku**
