@@ -84,13 +84,26 @@ export const SYGNALY: Record<Sygnal,
  */
 export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
 
-/** Dni do terminu — jedyna liczba na wierszu, którą czyta się jako pilność. */
-function Termin({ dni }: { dni: number }) {
+/**
+ * Dni do terminu — jedyna liczba na wierszu, którą czyta się jako pilność.
+ *
+ * `null` = paczka jeszcze nie wróciła, więc zegar obsługi nie ruszył (0.339.0).
+ * Pusta pastylka wyglądałaby jak „zero dni", czyli odwrotnie niż jest; szare
+ * „czeka na paczkę" mówi prawdę i nie udaje pilności.
+ */
+function Termin({ dni }: { dni: number | null }) {
+  if (dni === null) {
+    /* `text-slate-600`, nie 500: na `bg-slate-100` tamten daje 4,34:1 przy
+       progu 4,5 — pilnuje tego `Kontrast.test.ts`. */
+    return <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+      title="Termin obsługi rusza dopiero, gdy paczka wróci do nas">czeka na paczkę</span>;
+  }
   const pilne = dni <= 3;
   const tekst = dni < 0 ? `${dniSlowo(Math.abs(dni))} po` : dni === 0 ? "dziś" : dniSlowo(dni);
   return <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
     pilne ? "bg-red-100 text-ranga-zle" : "bg-slate-100 text-slate-600"}`}
-    title={`Termin ustawowy: ${dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
+    title={`Termin obsługi (7 dni od paczki u nas): ${
+      dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
 }
 
 export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId = null }: {

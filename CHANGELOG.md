@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.339.0 — 15 września 2026
+
+**Kolejka zwrotów przestaje pokazywać pracę, której nie ma.** Dwa zgłoszenia
+właściciela naraz: „Allegro narzuca obsługę zwrotów do 7 dni po otrzymaniu
+zwrotu" oraz „pokazuje za dużo zwrotów do procesowania, pokazuje zwroty, za
+które pieniądze zostały już zwrócone".
+
+**[wymaga działania] Zegar liczy teraz 7 dni od paczki u nas**, a nie 14 dni
+od zgłoszenia klienta. Kto ustawił `ZWROT_TERMIN_DNI` w `wertis.env` ręcznie,
+ma tam nadal starą liczbę i po wdrożeniu zobaczy stary zegar — wartość
+domyślna zmieniła się z 14 na 7.
+
+- **Termin obsługi zamiast ustawowego.** Kolejność pracy, czerwony wiersz
+  i raport rekoncyliacji idą za regułą Allegro, bo to po niej Allegro rozlicza
+  sprzedawcę. Termin ustawowy nie znika z prawa, tylko z kolejności pracy.
+- **Zegar nie rusza bez paczki.** Wiersz mówi „czeka na paczkę" zamiast
+  pokazywać zero dni, a taki zwrot stoi na końcu kolejki. Początek bierze się
+  z doręczenia, a bez trackingu z nadania — ta sama reguła co sygnał braku
+  dowodu z 0.187.0.
+- **Zwrot rozliczony przez Allegro schodzi z kolejki.** `FINISHED`
+  i `FINISHED_APT` znaczą wprost „the payment has been refunded" — taki zwrot
+  stał dotąd w DO DECYZJI i pytał „przyjąć czy odrzucić?" bez końca.
+  Odrzucenie rozstrzyga wcześniej, bo niesie powód.
+- **Nowa kontrola `zwrot_rozliczony_bez_korekty` w pasku DO SPRAWDZENIA.**
+  Zwrot zdjęty z kolejki, któremu brakuje numeru korekty albo ocen towaru,
+  woła w raporcie zamiast zniknąć w ciszy — bez korekty nie wyjdzie też MM.
+- Status zwrotu z Allegro jedzie od tego wydania w kolejce, bo rozstrzyga
+  o kubełku: zniknięcie z pracy musi mieć widoczne uzasadnienie.
+
 ## 0.338.0 — 15 września 2026
 
 **Paczka nieodebrana wychodzi ze ślepego zaułka.** Zgłoszenie właściciela:
