@@ -147,7 +147,12 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
           /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
              klauzuli w `skrzynka/Kolejka.tsx`. Belka stoi przy KAŻDYM wierszu,
              bo dokładana przy zaznaczeniu przesuwałaby treść o trzy piksele. */
-          className={`flex w-full gap-3 border-l-[3px] px-4 py-3 text-left ${aktywny
+          /* `py-2`, nie `py-3` (audyt, 15 września 2026). Cztery piksele na
+             wiersz to przy siedmiu zwrotach cały ósmy wiersz w oknie laptopa —
+             a wiersz ma 86 px i bez tamtych czterech. Cel kliknięcia na blacie
+             mierzy się myszą, nie kciukiem (`docs/ergonomia-magazynu.md`,
+             zakres dekalogu). */
+          className={`flex w-full gap-3 border-l-[3px] px-4 py-2 text-left ${aktywny
             ? "border-l-wertis-amber bg-slate-200"
             : "border-l-transparent hover:bg-slate-50"}`}>
           {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
@@ -160,10 +165,20 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
             {/* Paczka nieodebrana nie ma numeru zwrotu — jej identyfikator to
                 nasz `nieodebrana:<numer listu>`, więc pokazujemy sam numer
                 listu i mówimy wprost, czym to jest. */}
-            <span className="truncate font-bold">
-              {z.zrodlo === "nieodebrana"
-                ? (z.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
-                : (z.numer ?? z.externalId)}</span>
+            {/* LOGIN PRZY NUMERZE, NIE W OSOBNEJ LINIJCE (audyt, 15 września
+                2026). 0.337.0 postawiło go osobno z jednego powodu: „nazwa i tak
+                bywa ucięta" — czyli żeby NIE dokleić go do nazwy towaru. Powód
+                dotyczył linijki drugiej i dalej obowiązuje; pierwsza ma miejsce,
+                bo numer zwrotu ma kilkanaście znaków, a nie kilkadziesiąt.
+                Osobna linijka kosztowała 16 px razy długość kolejki. */}
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="truncate font-bold">
+                {z.zrodlo === "nieodebrana"
+                  ? (z.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
+                  : (z.numer ?? z.externalId)}</span>
+              {z.kupujacyLogin &&
+                <span className="truncate text-xs text-slate-500">{z.kupujacyLogin}</span>}
+            </span>
             {z.zrodlo === "nieodebrana" &&
               <span title="Klient nie odebrał przesyłki — to nie jest zgłoszony zwrot"
                 className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800">
@@ -190,12 +205,6 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
             {z.pozycje.length > 1 ? ` i ${ile(z.pozycje.length - 1, "inna", "inne", "innych")}` : ""}
             {sztuki ? ` · ${sztuki} szt.` : ""}
           </div>
-          {/* LOGIN NA WIERSZU (0.337.0). Od tego wydania szuka się po nim,
-              a trafienie, którego nie widać, wygląda na przypadek: operator
-              nie wie, czemu ten zwrot wszedł na listę. Osobna linijka, nie
-              doklejka do nazwy towaru — nazwa i tak bywa ucięta. */}
-          {z.kupujacyLogin && <div className="truncate text-xs text-slate-500">
-            {z.kupujacyLogin}</div>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold tabular-nums">
               {zlote(z.sumaPozycjiGrosze, z.waluta)}</span>

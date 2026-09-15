@@ -97,10 +97,11 @@ export function Szukanie({
     : null;
 
   return <div className="shrink-0 border-b border-slate-200 p-2">
-    <div className="relative flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <ScanLine size={16} className="shrink-0 text-slate-400" />
+      <div className="relative flex min-w-0 flex-1 items-center">
       <input
-        className={`field h-8 flex-1 text-sm ${fraza ? "pr-8" : ""}`}
+        className={`field h-8 w-full text-sm ${fraza ? "pr-8" : ""}`}
         placeholder="Zeskanuj etykietę albo szukaj po numerze lub loginie"
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
@@ -129,7 +130,26 @@ export function Szukanie({
         aria-label="Wyczyść szukanie"
         className="absolute right-2 rounded p-0.5 text-slate-400 hover:bg-slate-100">
         <X size={14} /></button>}
-      {szuka && <span className="text-xs text-slate-500">Szukam…</span>}
+      </div>
+      {szuka && <span className="shrink-0 text-xs text-slate-500">Szukam…</span>}
+
+      {/* DROGA PIERWSZOPLANOWA, TERAZ W RZĘDZIE POLA (0.338.0; audyt, 15
+          września 2026). Zgłoszenie właściciela: „jest sporo paczek, które po
+          prostu zostały nieodebrane i wracają do nas — znajdź sposób, aby
+          wyświetlały mi się w zakładce zwroty". Wyświetlały się od 0.172.0 —
+          tylko DROGA DO NICH szła przez ślepy zaułek: trzeba było najpierw
+          zeskanować kod, dostać „nie znam kodu" i dopiero wtedy zobaczyć
+          przycisk.
+
+          Front zostaje, schodzi tylko z własnego wiersza: stał pod polem
+          i kosztował 35 px kolumny kolejki na stałe. Etykieta krótsza, pełne
+          zdanie w `title` — przycisk dalej widać bez skanowania czegokolwiek,
+          a to było w tamtym zgłoszeniu całą rzeczą. */}
+      {onNieodebrana && !nieodebrana && !brak &&
+        <button type="button" onClick={() => setNieodebrana(true)}
+          title="Paczka nieodebrana — klient nie zgłosił zwrotu, przesyłka wróciła sama"
+          className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
+          <PackageX size={12} />Nieodebrana</button>}
     </div>
 
     {/* Filtr PRZEBIJA kubełek, więc ekran musi to powiedzieć. Inaczej wynik
@@ -165,18 +185,6 @@ export function Szukanie({
 
     </div>}
 
-    {/* ── Droga pierwszoplanowa (0.338.0) ──────────────────────────────────────
-        Zgłoszenie właściciela: „jest sporo paczek, które po prostu zostały
-        nieodebrane i wracają do nas — znajdź sposób, aby wyświetlały mi się
-        w zakładce zwroty". Wyświetlały się od 0.172.0 — tylko DROGA DO NICH
-        szła przez ślepy zaułek: trzeba było najpierw zeskanować kod, dostać
-        „nie znam kodu" i dopiero wtedy zobaczyć przycisk. Przy paczce na
-        krzyż to przechodzi; przy „sporo paczek" to codzienna praca schowana
-        za komunikatem o błędzie. */}
-    {onNieodebrana && !nieodebrana && !brak &&
-      <button type="button" onClick={() => setNieodebrana(true)}
-        className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">
-        <PackageX size={12} />Paczka nieodebrana</button>}
 
     {onNieodebrana && nieodebrana && formularz}
 

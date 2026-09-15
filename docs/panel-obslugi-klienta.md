@@ -3974,6 +3974,55 @@ Skład liczy się **wyłącznie w szczególe zwrotu**, nigdy w kolejce: każde
 liczenie pyta o dokument, o zamówienie i o mapowanie każdej oferty, a kolejka
 bierze naraz wszystkie zwroty.
 
+### 25a.24. Kolejka odzyskuje ekran (audyt, 15 września 2026)
+
+Pomiar na żywym panelu, dziesięć zwrotów w bazie, przeglądarka:
+
+| co | przed | po |
+|---|---|---|
+| chrom nad listą | 344 px | **265 px** |
+| pasm nad listą | 7 | **5** |
+| wysokość wiersza | 110 px | **86 px** |
+| zwrotów widocznych, okno 1080 | 5 | **7** |
+| zwrotów widocznych, okno 950 | 4 | **6** |
+| zwrotów widocznych, laptop 1366×768 | 2 | **4** |
+
+**Chrom był i jest STAŁY**, bo każde pasmo ma `shrink-0` — to dobra decyzja
+(inaczej przy ciasnym oknie kurczyłyby się wyłącznie one). Skutek uboczny jest
+taki, że procentowo boli najbardziej tam, gdzie okno najmniejsze: 43% przy
+803 px kolumny, 53% przy 653 px.
+
+**Pasma nie powstały naraz.** Dokładało je siedem wydań, po jednym, i każde
+z osobna kosztowało „tylko trzydzieści pikseli". Dlatego budżetu pilnuje teraz
+test (`ekrany/Zwroty.test.tsx`): liczy pasma, nie piksele, i zmusza szóste do
+rozmowy zamiast do cichego wejścia.
+
+**Cztery zmiany, żadna nie kasuje funkcji:**
+
+1. **Pytanie kubełka i sito w jednym paśmie** (33 + 37 → 33 px). Mówiły o tej
+   samej liście: kubełek „na jakim to etapie", sito „czyje to", tag „o czym
+   to" (§25a.19, 0.315.0). Trzy pytania o jedną rzecz mieszczą się w rzędzie.
+2. **„Nieodebrana" wchodzi w rząd pola szukania** (91 → 49 px). Przycisk z
+   0.338.0 zostaje na froncie — stał tylko we własnym wierszu. Etykieta
+   krótsza, pełne zdanie w podpowiedzi.
+3. **Login wraca do pierwszej linijki wiersza** (110 → 86 px razem z `py-2`).
+   0.337.0 postawiło go osobno po to, żeby NIE dokleić go do nazwy towaru,
+   „bo nazwa i tak bywa ucięta". Powód dotyczył linijki z nazwą i dalej
+   obowiązuje; numer zwrotu ma kilkanaście znaków i miejsce zostaje.
+4. **Pasek skrótów: „ruch po liście" → „lista"**. Klawisz obok mówi, że chodzi
+   o ruch.
+
+**Czego NIE ruszono i dlaczego.** Pasmo filtrów (65 px) i pasek skrótów (49 px)
+dalej zawijają się na dwa rzędy. Kolumna ma 352 px w środku, a ich treść
+potrzebuje 531 i 419 px — zmieszczenie w jednym rzędzie wymaga odebrania
+etykiet („Od daty nadania" → „Od nadania", „Synchronizuj" → sama ikona). To
+osiemdziesiąt pikseli kupione za rozpoznawalność, czyli za dekalog p. 2.
+Czeka na decyzję właściciela, nie na kod.
+
+**Pasek skrótów kosztuje 49 px, nie 22**, które kupiła jego decyzja z 0.281.0.
+Cena podwoiła się po cichu, gdy doszły klawisze kubełka (0.284.0). Skrócenie
+opisu oddało część, reszta zostaje jako jawny dług.
+
 ### 25a.22. Dwa kliknięcia, które szły za łatwo (audyt, 15 września 2026)
 
 Ekran zwrotów ma jedną regułę o kliknięciach: §25a.5. Cofnięcie wszędzie, gdzie

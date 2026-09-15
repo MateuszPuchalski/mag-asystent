@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.353.0 — 15 września 2026
+
+**Kolejka zwrotów odzyskuje ekran.** Na laptopie 1366×768 pokazywała DWA
+zwroty; pokazuje cztery. W oknie 950 px — sześć zamiast czterech.
+
+Pomiar na żywym panelu, przed i po:
+
+| co | przed | po |
+|---|---|---|
+| chrom nad listą | 344 px | 265 px |
+| pasm nad listą | 7 | 5 |
+| wysokość wiersza | 110 px | 86 px |
+| zwrotów widocznych (1080 / 950 / 1366×768) | 5 / 4 / 2 | **7 / 6 / 4** |
+
+Żadna funkcja nie znika — zmieniło się rozmieszczenie:
+
+- **Pytanie kubełka i sito stoją w jednym paśmie.** Mówiły o tej samej liście:
+  „na jakim to etapie", „czyje to", „o czym to".
+- **„Nieodebrana" wchodzi w rząd pola szukania**, zamiast stać pod nim we
+  własnym wierszu. Przycisk zostaje na froncie — o to chodziło w 0.338.0 —
+  a pełne zdanie przenosi się do podpowiedzi.
+- **Login kupującego wraca do pierwszej linijki wiersza**, obok numeru zwrotu.
+  0.337.0 postawiło go osobno, żeby nie dokleić do nazwy towaru, bo nazwa bywa
+  ucięta; numer zwrotu ucięty nie bywa.
+- **Pasek skrótów mówi „lista" zamiast „ruch po liście"** — klawisz obok i tak
+  mówi, że chodzi o ruch.
+- **Budżetu pasm pilnuje test.** Siedem pasm nie powstało naraz: dokładało je
+  siedem wydań po jednym, każde za „tylko trzydzieści pikseli". Szóste
+  będzie musiało podnieść próg i zostawić zdanie.
+
+**Co zostaje niezrobione i jest jawnym długiem.** Pasmo filtrów i pasek
+skrótów dalej zawijają się na dwa rzędy — razem 114 px. Zmieszczenie ich
+w jednym rzędzie wymaga odebrania etykiet przyciskom i polom wyboru, czyli
+osiemdziesięciu pikseli kupionych za rozpoznawalność. To decyzja właściciela.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
 ## 0.352.0 — 15 września 2026
 
 **Panel przestał pisać „5 pozycje" i „2 pasujących zwrotów".** Polszczyzna ma

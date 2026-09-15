@@ -13,7 +13,14 @@ import React from "react";
    CENA JEST JAWNA: jeden wiersz wysokości kolumny, około 22 px, zabrany
    liście spraw. Bierzemy ją świadomie i raz. Rozwijana pomoc pod znakiem
    zapytania kosztowałaby dwa kliknięcia przy każdym przypomnieniu, a schowane
-   przypomnienie to znowu pamiętanie.                                        */
+   przypomnienie to znowu pamiętanie.
+
+   TA CENA PODWOIŁA SIĘ PO CICHU (audyt, 15 września 2026). Pomiar na żywym
+   ekranie zwrotów: pasek zawija się na dwa rzędy i kosztuje 49 px, nie 22 —
+   odkąd doszły klawisze kubełka (0.284.0) i `Z` od pieniędzy. Decyzja z 0.281.0
+   kupiła jeden wiersz, więc do jednego wiersza wracamy: opisy schodzą do
+   rzeczownika („lista" zamiast „ruch po liście"), bo klawisz obok i tak mówi,
+   że chodzi o ruch. Skrótów ubywać nie miało prawa — ubywa znaków.        */
 
 const Klawisz = ({ children }: { children: React.ReactNode }) =>
   <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-mono text-podpis text-slate-700">
@@ -37,7 +44,7 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, dodatkowe = [] }:
 }) {
   return <p className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-2 py-1 text-podpis text-slate-600">
     <span className="flex items-center gap-1">
-      <Klawisz>j</Klawisz><Klawisz>k</Klawisz> ruch po liście</span>
+      <Klawisz>j</Klawisz><Klawisz>k</Klawisz> lista</span>
     <span className="flex items-center gap-1">
       <Klawisz>1</Klawisz>–<Klawisz>{kubelkow + 1}</Klawisz> kubełek</span>
     {sita && zMoje && <span className="flex items-center gap-1"><Klawisz>m</Klawisz> moje</span>}

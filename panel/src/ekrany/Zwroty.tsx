@@ -732,21 +732,27 @@ export function Zwroty() {
           });
         }} />
 
-      {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
-          Przy włączonym filtrze milknie: lista nie jest wtedy kubełkiem,
-          więc jego pytanie mówiłoby nieprawdę o tym, co widać. */}
-      {!pasujace && kubelek !== null && <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
-        {opis?.pytanie}
-      </p>}
-      {/* SITO I TAGI W JEDNYM RZĘDZIE, bo oba są zawężeniem tej samej listy
-          (0.315.0). Kubełek odpowiada „na jakim to etapie", sito „czyje to",
-          tag „o czym to" — trzy różne pytania, jedna lista. */}
-      {(mojeId !== null || wgTagow.length > 0) && !pasujace &&
-        <div className="shrink-0 space-y-1 border-b border-slate-200 px-2 py-1">
-          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-            moich={wKubelku.filter((z) => wSicie(z.prowadziUserId, mojeId, "moje")).length}
-            niczyich={wKubelku.filter((z) => z.prowadziUserId === null).length} />
-          <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+      {/* ── PYTANIE KUBEŁKA I SITO W JEDNYM PAŚMIE (audyt, 15 września 2026) ──
+          Stały w dwóch, po 33 i 37 px, i mówiły o TEJ SAMEJ liście: kubełek
+          „na jakim to etapie", sito „czyje to", tag „o czym to" (0.315.0).
+          Trzy pytania o jedną rzecz mieszczą się w jednym rzędzie, a kolejka
+          odzyskuje wiersz.
+
+          Oba warunki zostają osobne, bo każdy milczy z innego powodu: pytanie
+          przy włączonym filtrze mówiłoby nieprawdę o tym, co widać, a sita nie
+          ma bez tożsamości. Pasmo znika dopiero, gdy milczą oba. */}
+      {!pasujace && (kubelek !== null || mojeId !== null || wgTagow.length > 0) &&
+        <div className="shrink-0 space-y-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {kubelek !== null &&
+              <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}
+            {(mojeId !== null || wgTagow.length > 0) &&
+              <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+                moich={wKubelku.filter((z) => wSicie(z.prowadziUserId, mojeId, "moje")).length}
+                niczyich={wKubelku.filter((z) => z.prowadziUserId === null).length} />}
+          </div>
+          {wgTagow.length > 0 &&
+            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />}
         </div>}
 
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:

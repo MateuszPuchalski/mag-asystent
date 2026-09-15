@@ -132,6 +132,23 @@ describe("Ekran zwrotów", () => {
     expect(screen.getByText("Przyjąć czy odrzucić?")).toBeInTheDocument();
   });
 
+  /* ── BUDŻET PASM NAD LISTĄ (audyt, 15 września 2026) ──────────────────
+     Pomiar na żywym ekranie: siedem pasm zabierało 344 px z 803 px kolumny,
+     czyli 43%, i było ich stałe — przy oknie 800 px kolejka pokazywała DWA
+     zwroty. Pasma nie powstały naraz: dokładało je po jednym siedem wydań,
+     a każde z osobna kosztowało „tylko trzydzieści pikseli".
+
+     Ten test nie mierzy pikseli — jsdom ich nie ma. Liczy PASMA, bo to one
+     narastają, i zmusza ósme do rozmowy z właścicielem zamiast do cichego
+     wejścia. Podniesienie progu jest wolne; ma tylko zostawić zdanie.       */
+  it("nad listą stoi najwyżej pięć pasm — ósme wydałoby się samo", async () => {
+    scena.zwroty = null;
+    pokaz();
+    const karta = document.querySelector(".card")!;
+    /* Ostatnie dziecko to sama lista, reszta to chrom. */
+    expect(karta.children.length - 1).toBeLessThanOrEqual(5);
+  });
+
   it("przełączenie kubełka przestawia też kursor na pierwszy zwrot", async () => {
     pokaz();
     await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
