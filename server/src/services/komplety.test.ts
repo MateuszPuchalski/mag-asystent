@@ -60,16 +60,18 @@ function paragon(d: Db, dokId: number, linie: Array<[number, number]>) {
 }
 
 /** Zamówienie z ofertami — po nim odejmuje się to, co NIE jest kompletem. */
-function zamowienie(d: Db, oferty: Array<{ offerId: string; ilosc: number }>) {
+function zamowienie(d: Db,
+  oferty: Array<{ offerId: string; ilosc: number; sku?: string | null }>) {
   const id = Number(d.prepare(`INSERT INTO zamowienie_klienta
     (channel_account_id,external_id,status,dostawa_grosze,suma_grosze,waluta,synced_at)
     VALUES (1,'ord-1','READY_FOR_PROCESSING',0,10000,'PLN','2026-09-01T08:00:00Z')`)
     .run().lastInsertRowid);
   for (const o of oferty) {
     d.prepare(`INSERT INTO zamowienie_klienta_pozycja
-      (zamowienie_id,external_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
-      VALUES (?,?,?,?,?,5000,'PLN')`)
-      .run(id, `li-${o.offerId}`, o.offerId, `Oferta ${o.offerId}`, o.ilosc);
+      (zamowienie_id,external_id,offer_id,nazwa,sku,ilosc,cena_grosze,waluta)
+      VALUES (?,?,?,?,?,?,5000,'PLN')`)
+      .run(id, `li-${o.offerId}`, o.offerId, `Oferta ${o.offerId}`,
+        o.sku ?? null, o.ilosc);
   }
   return id;
 }
@@ -155,6 +157,54 @@ test("ten sam towar w komplecie I osobno — odejmuje się SZTUKI, nie wiersz", 
 
   const s = skladPozycji(d, poz[0]);
   assert.deepEqual(s.skladniki.map((x) => [x.twId, x.ilosc]), [[21, 1], [30, 1]]);
+});
+
+test("cudza oferta zabiera swoje po SKU, gdy nikt jej jeszcze nie mapował (0.343.0)", () => {
+  /* TO JEST POWÓD, DLA KTÓREGO AUTOMAT MILCZAŁ. `oferta_kartoteka` wypełnia
+     się dopiero przy zwrocie DANEJ oferty, więc w zamówieniu na kilka różnych
+     rzeczy pozostałe oferty nie mają mapowania prawie nigdy. Rozbicie
+     kompletu odmawiało nie dlatego, że dane są złe, tylko dlatego, że
+     pytaliśmy nie o to źródło. */
+  const d = stanowisko();
+  const dok = paragon(d, 940, [[21, 1], [22, 1], [30, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 },
+    { offerId: "of-INNY", ilosc: 1, sku: "SYM-30" }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  const s = skladPozycji(d, poz[0]);
+  assert.equal(s.zrodlo, "paragon", "komplet wchodzi, choć nikt nie mapował drugiej oferty");
+  assert.deepEqual(s.skladniki.map((x) => x.twId), [21, 22], "SYM-30 zabrała cudza oferta");
+});
+
+test("SKU trafiające w DWIE kartoteki to brak trafienia", () => {
+  /* Symbol miał być unikalny; skoro nie jest, zgadywanie przypisałoby wiersze
+     paragonu cudzej ofercie — czyli położyłoby na półkę towar, którego nikt
+     nie oddał. Ta sama zasada co przy propozycji kartoteki. */
+  const d = stanowisko();
+  const dok = paragon(d, 941, [[21, 1], [30, 1]]);
+  /* Druga kartoteka o tym samym symbolu, innym numerze. */
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (31,'SYM-30','Dubel')").run();
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 },
+    { offerId: "of-INNY", ilosc: 1, sku: "SYM-30" }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+
+  assert.match(String(skladPozycji(d, poz[0]).powod), /nie umiem rozdzielić/);
+});
+
+test("dopasowanie po SKU NIE zapisuje się do pamięci wskazań", () => {
+  /* `oferta_kartoteka` jest pamięcią CZŁOWIEKA (§4.3 panelu): wynik automatu
+     nie ma udawać czyjejś decyzji. Tutaj odpowiadamy tylko na pytanie, czyj
+     jest ten wiersz paragonu. */
+  const d = stanowisko();
+  const dok = paragon(d, 942, [[21, 1], [30, 1]]);
+  zamowienie(d, [{ offerId: "of-KPL", ilosc: 1 },
+    { offerId: "of-INNY", ilosc: 1, sku: "SYM-30" }]);
+  const { poz } = zwrot(d, dok, [{ offerId: "of-KPL", twId: null, ilosc: 1 }]);
+  skladPozycji(d, poz[0]);
+
+  assert.equal((d.prepare(
+    "SELECT COUNT(*) AS n FROM oferta_kartoteka WHERE offer_id='of-INNY'")
+    .get() as { n: number }).n, 0);
 });
 
 test("dwie oferty bez kartoteki: automat MILCZY i mówi dlaczego", () => {

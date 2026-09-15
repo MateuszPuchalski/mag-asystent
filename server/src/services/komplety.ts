@@ -1,6 +1,7 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
+import { kartotekaPoSku } from "./dopasowanie-sku.js";
 
 /* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
    Zgłoszenie właściciela: „niektóre oferty są sprzedawane jako komplety, ale
@@ -162,6 +163,38 @@ export function skladPozycji(
 }
 
 /**
+ * Kartoteka oferty ZAMÓWIENIA: z mapowania, a gdy go nie ma — po SKU (0.343.0).
+ *
+ * TO JEST POWÓD, DLA KTÓREGO AUTOMAT MILCZAŁ. Odejmowanie niżej wymaga, żeby
+ * każda POZOSTAŁA oferta zamówienia miała kartotekę, a `oferta_kartoteka`
+ * wypełnia się dopiero wtedy, gdy ktoś zatwierdzi kartotekę PRZY ZWROCIE tamtej
+ * oferty. W zamówieniu na pięć różnych rzeczy nie ma jej prawie nigdy — więc
+ * rozbicie kompletu odmawiało nie dlatego, że dane są złe, tylko dlatego, że
+ * pytaliśmy nie o to źródło. Zgłoszenia właściciela z 0.336.0 („Ofert bez
+ * kartoteki na tym dokumencie: 3" i „: 5") to była reguła, nie wyjątek.
+ *
+ * ODCZYT W LOCIE, NIE ZAPIS. Dopasowanie po SKU nie trafia do
+ * `oferta_kartoteka`: tamta tabela jest PAMIĘCIĄ CZŁOWIEKA (§4.3 panelu —
+ * wynik automatu nie ma udawać czyjejś decyzji), a my odpowiadamy tu tylko na
+ * pytanie „czyj jest ten wiersz paragonu".
+ *
+ * DWA TRAFIENIA TO BRAK TRAFIENIA — tak samo jak przy propozycji kartoteki
+ * (`kartotekaPoSku`). Symbol miał być unikalny; skoro nie jest, zgadywanie
+ * przypisałoby wiersze paragonu cudzej ofercie, a to kładzie na półkę towar,
+ * którego nikt nie oddał.
+ */
+function kartotekaOferty(
+  database: Db, kontoId: number, offerId: string, sku: string | null,
+): { tw_id: number } | undefined {
+  const m = database.prepare(
+    "SELECT tw_id FROM oferta_kartoteka WHERE channel_account_id=? AND offer_id=?")
+    .get(kontoId, offerId) as { tw_id: number } | undefined;
+  if (m) return m;
+  const poSku = kartotekaPoSku(database, sku);
+  return poSku.stan === "jedno" && poSku.twId !== null ? { tw_id: poSku.twId } : undefined;
+}
+
+/**
  * Rozbicie kompletu: wiersze dokumentu, których nie zabrała żadna inna oferta.
  *
  * Liczymy po OFERTACH ZAMÓWIENIA, nie po pozycjach zwrotu, i to jest sedno.
@@ -176,13 +209,13 @@ function zKompletu(
   }
 
   const oferty = database.prepare(
-    `SELECT o.offer_id, SUM(o.ilosc) AS ilosc
+    `SELECT o.offer_id, SUM(o.ilosc) AS ilosc, MIN(o.sku) AS sku
        FROM zamowienie_klienta_pozycja o
        JOIN zamowienie_klienta z ON z.id = o.zamowienie_id
       WHERE z.channel_account_id=? AND z.external_id=? AND o.offer_id IS NOT NULL
       GROUP BY o.offer_id`)
     .all(Number(p.channel_account_id), p.order_id) as
-      Array<{ offer_id: string; ilosc: number }>;
+      Array<{ offer_id: string; ilosc: number; sku: string | null }>;
   if (!oferty.length) {
     return PUSTY("Zamówienia nie ma jeszcze w kopii — bez niego nie wiadomo, co jeszcze było na paragonie");
   }
@@ -190,9 +223,7 @@ function zKompletu(
   const zostalo = new Map(naDokumencie);
   const bezKartoteki: string[] = [];
   for (const o of oferty) {
-    const m = database.prepare(
-      "SELECT tw_id FROM oferta_kartoteka WHERE channel_account_id=? AND offer_id=?")
-      .get(Number(p.channel_account_id), o.offer_id) as { tw_id: number } | undefined;
+    const m = kartotekaOferty(database, Number(p.channel_account_id), o.offer_id, o.sku);
     if (o.offer_id === p.offer_id) {
       /* Nasza oferta NIE zabiera sobie nic, nawet gdy ma mapowanie: trafiłaby
          tu tylko wtedy, gdy jej kartoteki na dokumencie NIE MA. */

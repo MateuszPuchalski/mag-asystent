@@ -2988,6 +2988,23 @@ wypełnia się dopiero przy zwrocie danej oferty, więc w zamówieniu na pięć
 różnych rzeczy automat prawie zawsze odmawia. Nie dlatego, że dane są złe —
 nie ma ich skąd wziąć. Człowiek patrzy na paragon i wie w pięć sekund.
 
+**Od 0.343.0 automat pyta też o SKU.** Powyższe było diagnozą, nie wyrokiem:
+mapowanie ofert to nie jedyne miejsce, w którym stoi kartoteka. Oferta
+zamówienia niesie SKU sprzedawcy, a to ten sam trop, po którym automat
+proponuje kartotekę przy zwrocie.
+
+Gdy oferta nie ma wpisu w `oferta_kartoteka`, pytamy więc po SKU. Rozbicie
+kompletu zaczyna działać w zamówieniach, w których dotąd milczało — a ręczne
+wskazanie zostaje dla przypadków, w których naprawdę nie ma czego dopasować.
+
+To ODCZYT W LOCIE, nie zapis. Dopasowanie po SKU nie trafia do
+`oferta_kartoteka`: tamta tabela jest pamięcią człowieka (§4.3), a my
+odpowiadamy tu wyłącznie na pytanie, czyj jest ten wiersz paragonu.
+
+Dwa trafienia tego samego symbolu dalej znaczą brak trafienia. Symbol miał
+być unikalny; skoro nie jest, zgadywanie przypisałoby wiersze paragonu cudzej
+ofercie — czyli położyłoby na półkę towar, którego nikt nie oddał.
+
 Pod zdaniem o niewejściu stoi teraz przycisk WSKAŻ SKŁAD RĘCZNIE, czyli w tym
 samym miejscu, w którym człowiek właśnie czyta o kłopocie. Formularz wymienia
 wiersze paragonu z polami zaznaczenia; sztuki podpowiada z dokumentu i pyta
