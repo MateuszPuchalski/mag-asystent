@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.342.1 — 15 września 2026
+
+**[poprawka] `npm run zwroty:sprzatnij` wraca.** Narzędzie doszło w 0.340.0
+i zostało scalone w komplecie — a wpis w `server/package.json` zniknął przy
+scalaniu równoległej gałęzi, która podbijała wersję w tym samym pliku. Kod
+został, więc żadna bramka nic nie zauważyła; właściciel dowiedział się
+z `npm error Missing script`.
+
+- **Strażnik `src/skrypty.test.ts`**: każdy plik `src/*-run.ts` musi być
+  wskazany przez któryś skrypt w `package.json`. Plik `-run.ts` istnieje po
+  to, żeby go uruchomić z konsoli — bez wpisu jest martwym kodem.
+
 ## 0.342.0 — 15 września 2026
 
 **Karta Copilota przestaje być zatłoczona.** Zgłoszenie właściciela ze zrzutu
