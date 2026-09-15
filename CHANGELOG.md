@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.350.0 — 15 września 2026
+
+**Koszyk z panelu jest wirtualny: zbiera towar, rodzi MM i się kończy.**
+Decyzja właściciela: „wirtualny koszyk powinien być tworzony w celu
+agregowania towarów ze zwrotów i po jego zamknięciu stworzona MM, a ten
+wirtualny koszyk zamknięty”. Na produkcji koszyk Z-7 wisiał na kolektorze
+obok przyjęcia 1352 z własnego MM — hala rozłożyła 1352, a Z-7 został
+z zerem odłożonych pozycji.
+
+- **Kolektor nie dostaje koszyków „Z-”.** Na zakładce ZWROTY zostają kosze
+  z dokumentu MM — to je rozkłada hala, razem z powrotem na magazyn.
+- **Skan albo wpis „Z-7” odsyła do dokumentu:** „Z-7 to koszyk wirtualny —
+  rozłóż kosz z dokumentu MM 1352/MAG/2026: wpisz 1352”. Gdy MM jeszcze nie
+  weszło, mówi, żeby poczekać.
+- **Panel mówi, że zamknięcie kończy koszyk**, a na hali rozkłada się kosz
+  z numerem tego MM. Zbieranie towaru, bramka korekt i wystawianie MM
+  działają bez zmian.
+- Kolektor: podpowiedź „np. 1209” i nagłówek „KOSZE W ROZKŁADANIU” (nowe APK).
+
 ## 0.349.1 — 15 września 2026
 
 **ZW, którego Subiekt nie zapisze, mówi dlaczego.** Pierwszy automatyczny ZW

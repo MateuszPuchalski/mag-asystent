@@ -63,10 +63,10 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    regał zwrotów zrobiło biuro przed przywiezieniem kosza, a powrotne
    (ZWR→MAG) zrobi biuro po rozłożeniu. Kolektor zapisuje adresy i tyle.
 
-   Pod przyjęciami stoi druga sekcja: kosze SKŁADANE W APLIKACJI (Etap 3
-   zwrotów Allegro). Dwa obiegi obok siebie są świadomą decyzją właściciela —
-   ten z dokumentem jest codzienną robotą, tamten obsługuje zwroty prowadzone
-   w całości przez WERTIS.                                                    */
+   Nad przyjęciami stoi druga sekcja: kosze zamknięte, czekające na hali.
+   Od 0.350.0 serwer NIE przysyła tu koszyków wirtualnych („Z-") — koszyk
+   złożony w panelu rodzi MM i halę rozkłada kosz z TAMTEGO dokumentu.
+   Etykieta „Z-" zeskanowana tutaj dostaje od serwera numer MM do rozłożenia. */
 
 @Composable
 fun PrzyjeciaScreen(graph: AppGraph) {
@@ -139,7 +139,7 @@ fun PrzyjeciaScreen(graph: AppGraph) {
         WertisTextField(
             value = szukanie,
             onValueChange = { szukanie = it },
-            placeholder = "np. 1209 albo Z-7",
+            placeholder = "np. 1209",
             leadingIcon = WIcons.Search,
             onDone = { otworz(szukanie) },
         )
@@ -150,7 +150,7 @@ fun PrzyjeciaScreen(graph: AppGraph) {
            z koszem w drugiej ręce. Tych koszy jest kilka, a każdy czeka na halę. */
         if (kosze.isNotEmpty()) {
             Text(
-                "KOSZE Z APLIKACJI · DO ROZŁOŻENIA",
+                "KOSZE W ROZKŁADANIU",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.2.sp,

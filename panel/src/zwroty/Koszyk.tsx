@@ -75,9 +75,13 @@ export function Koszyk() {
         Ta sama zasada co przy korekcie: ekran mówi, czego NIE robi i co robi
         za człowieka. */}
     <span className={`w-full ${kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}>
-      Kosz jedzie na halę od razu. MM z magazynu głównego {kosz.rodzaj === "odpad"
+      {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie. Na hali
+          rozkłada się kosz z dokumentu MM, a nie ten koszyk — zdanie mówi
+          to wprost, bo inaczej etykieta „Z-" trafiałaby na regał. */}
+      Zamknięcie kończy koszyk. MM z magazynu głównego {kosz.rodzaj === "odpad"
         ? "na magazyn odpadu" : "na regał zwrotów"} wychodzi, gdy wszystkie
-      zwroty z tego kosza mają numer korekty.
+      zwroty z tego koszyka mają numer korekty — na hali rozkłada się kosz
+      z numerem tego MM.
     </span>
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
     </div>)}

@@ -9,7 +9,9 @@ import {
   BladKosza,
   cofnijPozycje,
   cofnijZakonczenie,
+  jestKoszemWirtualnym,
   koszPoKodzie,
+  odmowaKoszaWirtualnego,
   koszeDlaKolektora,
   listaKoszy,
   odlozPozycje,
@@ -137,6 +139,11 @@ export async function koszeRoutes(app: FastifyInstance) {
      zamiast id, bo id nie ma na fizycznej etykiecie. */
   app.get<{ Params: { kod: string } }>("/api/kosze/kod/:kod", async (req, reply) => {
     const kosz = koszPoKodzie(decodeURIComponent(req.params.kod));
+    /* Etykieta koszyka wirtualnego (0.350.0) odsyła do dokumentu MM, zamiast
+       otwierać drugi kosz na ten sam towar. */
+    if (kosz && jestKoszemWirtualnym(kosz)) {
+      return reply.code(404).send({ error: odmowaKoszaWirtualnego(kosz.kod) });
+    }
     if (!kosz || kosz.status !== "zamkniety") {
       return reply.code(404).send({ error: "Brak zamkniętego kosza o tym kodzie" });
     }
