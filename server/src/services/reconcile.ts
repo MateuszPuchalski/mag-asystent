@@ -315,6 +315,16 @@ function zwrotyPoTerminie(): Rozjazd[] {
 function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
   return listaZwrotow(db())
     .filter((z) => STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
+    /* TYLKO OD PROGU (0.340.0). Historia firmy niesie setki zwrotów
+       rozliczonych w panelu Allegro, których korekt nikt już wstecz nie
+       wystawi — raport o nich uczyłby przewijać raport. Próg stoi
+       w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia 0.340.0.
+       Pusty próg (`ZWROT_ROZLICZONE_OD=`) znaczy „wołaj o wszystkie" — tak
+       samo jak przy pozostałych progach dat w konfiguracji. */
+    .filter((z) => {
+      const od = config.allegro.zwrotyRozliczoneOd;
+      return od === null || z.utworzono >= od;
+    })
     .filter((z) => !z.rejectionCode && z.werdykt !== "odrzucony")
     .map((z) => ({
       z,

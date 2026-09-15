@@ -2623,6 +2623,22 @@ Dlatego taki zwrot woła w pasku DO SPRAWDZENIA, kontrolą
 `zwrot_rozliczony_bez_korekty`: wymienia brakujący numer korekty i pozycje bez
 oceny. Raport jest jedynym miejscem, w którym jeszcze się odezwie.
 
+**Kontrola woła TYLKO o nowe przypadki (0.340.0).** Historia firmy niesie
+zwroty rozliczone w panelu Allegro, których korekt nikt już wstecz nie
+wystawi. Raport o nich uczyłby przewijać raport — tak jak w 0.319.0, gdzie
+czterysta trzydzieści trzy wiersze zjadły cały ekran.
+
+Próg stoi w `ZWROT_ROZLICZONE_OD` i domyślnie jest dniem wdrożenia 0.340.0.
+Liczy się po dacie ZGŁOSZENIA zwrotu, bo momentu rozliczenia Allegro nie
+podaje — jest tylko status „teraz". Data zgłoszenia jest zawsze wcześniejsza,
+więc próg myli się w stronę ciszy, a nie hałasu.
+
+**Historyczny ogon da się skasować z bazy.** Decyzja właściciela: „wywal
+zwroty rozliczone poza aplikacją". Robi to narzędzie `zwroty:sprzatnij`
+z konsoli — nie trasa w API, bo to operacja nieodwracalna (DEPLOY §6f-bis).
+Kasuje wyłącznie zwroty bez jednego naszego śladu: bez zwrotu płatności, bez
+notatki o przelewie, bez numeru korekty i bez pozycji w koszyku.
+
 **Te klawisze DZIAŁAJĄ od 0.284.0 i wcześniej nie działały.** Ekran rysował je
 przy przyciskach jako podpowiedzi, a nasłuch znał wyłącznie ruch po liście
 i cyfry kubełków. Tabela wyżej mówiła przy tym o trzech ocenach, choć od
