@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.350.2 — 15 września 2026
+
+**Przesyłka z paragonu nie wchodzi już do składu kompletu.** Na produkcji
+zwrot 970W/2026 (komplet rozbity na paragonie PA 21548/MAG/08/2026) dostał
+w składzie wiersz PRZESYŁKA obok M83118 i M831172. Koszyk pokazał ją do
+odznaczenia, a automatyczny ZW nie został zlecony.
+
+- **Skład kompletu i ręczne wskazanie składu pomijają pozycje usługowe**
+  z `POZYCJE_NIE_TOWAROWE` (domyślnie PRZESYŁKA) — ten sam filtr, którym
+  rozkładanie dostaw pomija usługi.
+- Wiersz przesyłki na ZW dalej idzie za polem „Koszt dostawy”.
+
 ## 0.350.1 — 15 września 2026
 
 **Nieudany zapis ZW nie przypina już zwrotowi nieistniejącego numeru.** Worker
