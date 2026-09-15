@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.348.1 — 15 września 2026
+
+**Sonda umie zajrzeć do ZW — zwrotu do paragonu.** Pierwszy krok automatycznego
+ZW, na który właściciel dał zgodę po audycie zwrotów. Biuro wystawia dziś ZW
+ręką: paragon PA, „Wypisz zwrot", zera w pozycjach, które nie wróciły. Worker
+w repozytorium umie tylko KFS do faktury, a `DodajZW()` znamy wyłącznie z nazwy
+na liście managera.
+
+- **Przełącznik `-SzkicZW -Paragon <dok_Id>`** w `sfera-worker/sonda.ps1` tworzy
+  ZW w pamięci, podpina go pod paragon i wypisuje pozycje z ilościami oraz pola
+  rodzaju zwrotu, płatności i skutku magazynowego. `Zapisz()` nie pada, więc
+  w Subiekcie nie powstaje żaden dokument.
+- **Danych kontrahenta sonda nie wypisuje** — plik wynikowy wraca do repozytorium.
+- Instrukcja z zapytaniem o `dok_Id` paragonu stoi w `sfera-worker/README.md`.
+
+Kodu serwera ani workera to wydanie nie zmienia.
+
 ## 0.348.0 — 15 września 2026
 
 **Zwrot bez czekania: panel, serwer i kolektor.** Pakiet z audytu procesu
