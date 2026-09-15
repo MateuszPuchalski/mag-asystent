@@ -37,10 +37,20 @@ import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic
  * zerowałby licznik, a rachunek u dostawcy nie.
  *
  * ── CZEGO TEN TAKT NIE ROBI ─────────────────────────────────────────────────
- * Nie nadpisuje szkicu, który już odpowiada na NAJNOWSZE pytanie klienta.
- * Świeżość mierzy `szkic_copilota.message_id` — to samo pole, którym ekran
- * mówi „klient dopisał, propozycja jest nieświeża". Dopisek klienta czyni
- * szkic nieświeżym i wtedy, i tylko wtedy, powstaje nowy.
+ * Nie nadpisuje szkicu, który już odpowiada na NAJNOWSZE pytanie klienta
+ * NA AKTUALNYCH DANYCH. Świeżość mierzą dwa pola — te same, którymi ekran
+ * mówi „klient dopisał" i „dane doboru zmieniły się od szkicu".
+ *
+ * DRUGIE POLE DOSZŁO W 0.341.0 i bez niego tamto wydanie byłoby połową
+ * funkcji. Model rozpoznaje w pytaniu markę, model i nazwę części, a te dane
+ * od 0.341.0 wchodzą do doboru SAME. Kandydatów liczy się jednak z danych,
+ * które stały tam PRZED wywołaniem modelu, więc pierwszy szkic ich jeszcze
+ * nie zna: klient pyta pod gaźnikiem A o gaźnik do innej maszyny, dane
+ * wpadają, i nikt by po nie nie wrócił. Zmiana wersji doboru budzi takt,
+ * a drugi szkic pisze się już z kandydatami.
+ *
+ * Pętli z tego nie ma: drugi przebieg zastaje pola wypełnione, więc nie
+ * wpisuje nic, wersja doboru stoi i szkic przestaje być nieświeży.
  *
  * Nie wysyła niczego do klienta. Zasada nadrzędna nr 2 („człowiek wysyła
  * odpowiedź") nie ma tu wyjątku i mieć nie będzie.
@@ -97,10 +107,16 @@ const CZEKAJACE = `
        WHERE m2.conversation_id = c.id AND m2.auto_odpowiedz = 0
        ORDER BY m2.sent_at DESC, m2.id DESC LIMIT 1)
     LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
+    LEFT JOIN dobor_rozmowy d ON d.conversation_id = c.id
    WHERE m.direction = 'incoming'
      AND m.related_object_type = 'OFFER'
      AND m.related_object_id IS NOT NULL
-     AND IFNULL(s.message_id, -1) <> m.id
+     AND (IFNULL(s.message_id, -1) <> m.id
+        /* Jeden, nie zero: rozmowa BEZ wiersza doboru ma wersję 1, tak jak
+           mówi doborRozmowy(). Zero dawałoby wieczną nieświeżość każdej
+           rozmowy, w której nikt nic nie wpisał, czyli większości.
+           Bez odwrotnych apostrofów: to wnętrze szablonu SQL. */
+        OR IFNULL(s.dobor_wersja, 1) <> IFNULL(d.wersja, 1))
    ORDER BY m.sent_at, m.id
    LIMIT ?`;
 

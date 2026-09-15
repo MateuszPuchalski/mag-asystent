@@ -1997,6 +1997,46 @@ Trzy zawężenia, opisane w polityce danych (`docs/obsluga-klienta.md`): tylko
 reklamacji, bo tamtą ścieżkę uruchamia kliknięcie człowieka, a tę potrafi
 uruchomić takt z 0.317.0.
 
+**Nic nie czeka na kliknięcie (0.341.0).** Dwie prośby właściciela, jedna
+zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
+oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
+
+**Dane wejściowe wchodzą do doboru same.** Marka, model, silnik i nazwa części
+rozpoznane w rozmowie trafiają do `dobor_rozmowy` w tym samym przebiegu, który
+układa szkic. Wchodzą **tylko w puste pola** — to, co agent wpisał sam, jest
+jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję,
+dziennik i przejście `not_started → searching`.
+
+Kolejność jest tu treścią, nie porządkiem: wpis stoi PRZED zapisem szkicu, bo
+podnosi wersję doboru. Odwrotnie dałby szkic nieświeży w chwili narodzin, a
+ekran mówiłby „ułóż ponownie" o zmianie, którą sam ten szkic wprowadził.
+
+**Zmiana danych budzi takt** i bez tego całość byłaby połową funkcji.
+Kandydatów liczy się z danych, które stały w doborze PRZED wywołaniem modelu,
+więc pierwszy szkic ich nie zna. Klient pyta pod gaźnikiem A o część do innej
+maszyny, dane wpadają, a drugi szkic pisze się już z kandydatami. Pętli z tego
+nie ma: drugi przebieg zastaje pola wypełnione i niczego nie dopisuje.
+
+**Wiedza z ofert wskakuje od razu.** Numery z opisu robiły to od 0.264.0.
+Pozycje listy zgodności czekały w kolejce, bo w wierszu stoi goły tekst bez
+marki — klucz składa się teraz przy zbieraniu, z tych samych trzech źródeł
+deterministycznych, co automat z 0.331.0. To jest lepszy moment niż takt:
+ofertę mamy w ręku razem z jej tytułem, a takt przyszedłby pół godziny później.
+Modelu językowego na tej drodze nie ma, więc nie kosztuje ani grosza.
+
+Pozycja, przy której źródła milczą, **zostaje w kolejce**. Pusty klucz byłby
+gorszy od braku klucza.
+
+**Zdanie „model wskazuje człowiek" zeszło z ekranu.** Było nieprawdą od
+0.331.0, kiedy kolejkę zaczął opróżniać automat, i to ono kazało właścicielowi
+myśleć, że nic się nie dzieje. Pasek mówi teraz osobno, co weszło do wiedzy,
+a co czeka bez rozpoznanej marki.
+
+**Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
+`dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
+'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
+gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
+
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania
 rozmowy z modelem, możliwość dopytania, rozwiania wątpliwości". Agent czyta
 szkic, rodzi mu się wątpliwość i pyta pod nim: „czy ten nóż na pewno pasuje
@@ -4674,6 +4714,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.330.0 | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
+| Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
+| Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
 | Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |

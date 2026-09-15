@@ -34,6 +34,50 @@ historii nie przepisujemy.
 ---
 
 
+## 0.341.0 — 15 września 2026
+
+**Nic nie czeka na kliknięcie.** Dwie prośby właściciela, jedna zmiana:
+„wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta" oraz
+„dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
+
+**Dane wejściowe wchodzą do doboru same.** Marka, model, silnik i nazwa części
+rozpoznane w rozmowie trafiają tam w tym samym przebiegu, który układa szkic,
+i tylko w puste pola. To, co agent wpisał sam, jest jego słowem i zostaje.
+
+Wpis stoi PRZED zapisem szkicu, bo podnosi wersję doboru. Odwrotna kolejność
+dałaby szkic nieświeży w chwili narodzin: ekran mówiłby „ułóż ponownie"
+o zmianie, którą sam ten szkic wprowadził.
+
+**Zmiana danych budzi takt automatycznych szkiców** i bez tego całość byłaby
+połową funkcji. Kandydatów liczy się z danych sprzed wywołania modelu, więc
+pierwszy szkic ich nie zna. Klient pyta pod jednym gaźnikiem o inny, dane
+wpadają, a drugi szkic pisze się już z kandydatami. Pętli nie ma: drugi
+przebieg zastaje pola wypełnione i niczego nie dopisuje.
+
+**Wiedza z ofert wskakuje od razu.** Numery robiły to od 0.264.0; pozycje
+listy zgodności czekały w kolejce, bo w wierszu stoi goły tekst bez marki.
+Klucz składa się teraz przy zbieraniu, z tych samych trzech źródeł
+deterministycznych, co automat z 0.331.0. To lepszy moment niż takt: ofertę
+mamy w ręku razem z tytułem, a takt przyszedłby pół godziny później. Modelu
+językowego na tej drodze nie ma, więc nie kosztuje nic.
+
+Pozycja, przy której źródła milczą, zostaje w kolejce. Pusty klucz byłby
+gorszy od braku klucza.
+
+**Zdanie „model wskazuje człowiek" zeszło z ekranu.** Było nieprawdą od
+0.331.0 i to ono kazało myśleć, że nic się nie dzieje.
+
+Przy okazji naprawiony błąd, który ukrył się za cichym `catch`:
+`przerobModelZOpisu` otwierał własną transakcję, więc wołany ze środka cudzej
+wywracał się na „cannot start a transaction within a transaction". Z zewnątrz
+wyglądało to identycznie jak „marki nie dało się odczytać". Funkcja używa
+teraz `wTransakcji`, a nieudane złożenia klucza są liczone w dzienniku.
+
+Wpis maszyny jest odróżnialny wszędzie, gdzie powstaje: `updated_by`
+i `rozstrzygnal` z nazwą automatu przy pustym koncie.
+
+---
+
 ## 0.340.0 — 15 września 2026
 
 **Zwroty rozliczone poza aplikacją da się skasować, a raport milknie
@@ -79,6 +123,7 @@ domyślna zmieniła się z 14 na 7.
   woła w raporcie zamiast zniknąć w ciszy — bez korekty nie wyjdzie też MM.
 - Status zwrotu z Allegro jedzie od tego wydania w kolejce, bo rozstrzyga
   o kubełku: zniknięcie z pracy musi mieć widoczne uzasadnienie.
+
 
 ## 0.338.0 — 15 września 2026
 

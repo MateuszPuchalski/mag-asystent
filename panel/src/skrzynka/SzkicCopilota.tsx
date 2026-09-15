@@ -117,8 +117,11 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
     <div className="max-h-56 overflow-y-auto" data-testid="szkic-copilota-tresc">
       {/* Bez drugiego przycisku „Wpisz": dane wpisuje się tam, gdzie stoją —
           w zakładce Dobór. Tu tylko zdanie, żeby agent wiedział, że są. */}
+      {/* WPISAŁ, nie „rozpoznał" (0.341.0). Dane wejściowe wchodzą do doboru
+          same, w puste pola; zdanie „wpisz je w zakładce Dobór" prosiło agenta
+          o przepisanie tego, co system już zrobił. */}
       {p.nowePolaDoboru.length > 0 && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
-        Copilot rozpoznał w rozmowie: {p.nowePolaDoboru.join(", ")} — wpisz je w zakładce Dobór.</p>}
+        Copilot wpisał do doboru: {p.nowePolaDoboru.join(", ")}. Popraw w zakładce Dobór, jeśli się myli.</p>}
       {/* Para z rozmowy (przyrost czwarty) tą samą zasadą: zdanie tu, kliknięcie w Doborze. */}
       {p.paraPasowania && <p className="mb-2 rounded border border-violet-200 bg-white p-2 text-xs text-violet-900">
         Copilot rozpoznał pasowanie {p.paraPasowania} — zaproponuj je w zakładce Dobór.</p>}
@@ -153,18 +156,29 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         Pasek jest dla AGENTA: do faktów ta wiedza nie wchodzi, więc klient
         nie ma jak jej zobaczyć. */}
     {(s.lukiKartoteki.numery.length > 0 || s.lukiKartoteki.modele.length > 0
-      || s.lukiKartoteki.czeka > 0) &&
+      || s.lukiKartoteki.wpisane.length > 0 || s.lukiKartoteki.czeka > 0) &&
       <p className="mt-2 rounded border border-sky-200 bg-sky-50 p-2 text-xs text-sky-900"
         data-testid="luki-kartoteki">
         {s.lukiKartoteki.numery.length > 0 && <>
           Z oferty dopisano do kartoteki {s.lukiKartoteki.symbol}:{" "}
           <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
         </>}
-        {s.lukiKartoteki.modele.length > 0 && <>
-          Do kolejki Wiedzy poszło:{" "}<b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
+        {/* WPISANE PRZED ODŁOŻONYMI (0.341.0): najpierw to, co już JEST
+            w wiedzy, potem to, co dopiero czeka. Odwrotna kolejność kazałaby
+            agentowi czytać o robocie, zanim dowie się, że część zniknęła. */}
+        {s.lukiKartoteki.wpisane.length > 0 && <>
+          Z listy zgodności do wiedzy weszło:{" "}
+          <b>{s.lukiKartoteki.wpisane.join(", ")}</b>.{" "}
         </>}
+        {s.lukiKartoteki.modele.length > 0 && <>
+          Bez rozpoznanej marki, do kolejki Wiedzy:{" "}
+          <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
+        </>}
+        {/* Zdanie „model wskazuje człowiek" zeszło z 0.341.0. Było nieprawdą
+            od 0.331.0, kiedy kolejkę zaczął opróżniać automat, i to ono
+            kazało agentowi myśleć, że nic się nie dzieje. */}
         {s.lukiKartoteki.czeka > 0 &&
-          <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka} — model wskazuje człowiek.</>}
+          <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka}.</>}
       </p>}
     <p className="mt-1 text-podpis text-slate-500">{s.tresc.length} znaków · każde twierdzenie ma podpisane źródło</p>
     {/* DOPYTANIE POD SZKICEM, nie obok: agent czyta szkic, rodzi mu się

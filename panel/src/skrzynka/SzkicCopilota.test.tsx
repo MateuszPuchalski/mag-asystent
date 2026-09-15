@@ -14,7 +14,7 @@ import type { SzkicCopilota } from "../api/typy";
 
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
-  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], odczytZeZdjec: [], lukiKartoteki: { symbol: null, numery: [], modele: [], czeka: 0 }, messageId: 41, model: "claude-opus-5",
+  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], odczytZeZdjec: [], lukiKartoteki: { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 }, messageId: 41, model: "claude-opus-5",
   at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
   daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
 });
@@ -99,9 +99,13 @@ describe("Szkic Copilota w edytorze", () => {
 
   /* Dane doboru z rozmowy (przyrost trzeci): karta w edytorze tylko MÓWI, że
      są — wpisuje je zakładka Dobór. Druga nieświeżość: fakty się zmieniły. */
-  it("mówi, jakie dane rozpoznał, bez drugiego przycisku; zmiana doboru po szkicu jest nazwana", () => {
+  it("mówi, co WPISAŁ do doboru, bez drugiego przycisku; zmiana doboru po szkicu jest nazwana", () => {
+    /* „Wpisał", nie „rozpoznał" (0.341.0): dane wejściowe wchodzą do doboru
+       same, w puste pola. Zdanie „wpisz je w zakładce Dobór" prosiło agenta
+       o przepisanie tego, co system już zrobił. */
     edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2, nowePolaDoboru: ["Marka", "Model", "Silnik"] }));
-    expect(screen.getByText(/Copilot rozpoznał w rozmowie: Marka, Model, Silnik/)).toBeInTheDocument();
+    expect(screen.getByText(/Copilot wpisał do doboru: Marka, Model, Silnik/)).toBeInTheDocument();
+    expect(screen.getByText(/Popraw w zakładce Dobór/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
     expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
   });
@@ -109,7 +113,7 @@ describe("Szkic Copilota w edytorze", () => {
   it("szkic sprzed migracji (wersja doboru 0) nie udaje nieświeżego, a bez nowych pól nie ma zdania", () => {
     edytor(copilot({ szkic: szkic({ doborWersja: 0 }), doborWersja: 3 }));
     expect(screen.queryByText(/dane doboru zmieniły się/)).toBeNull();
-    expect(screen.queryByText(/Copilot rozpoznał w rozmowie/)).toBeNull();
+    expect(screen.queryByText(/Copilot wpisał do doboru/)).toBeNull();
   });
 
   it("oceniony szkic znika z ekranu — wiersz zostaje dla pomiaru", () => {
@@ -139,11 +143,12 @@ describe("Szkic Copilota w edytorze", () => {
 describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("pasek mówi, CO POSZŁO DO BAZY — nie czego brakuje", () => {
     /* Do 0.263.0 wypisywał listę braków i przy następnym szkicu liczył ją od
-       zera. Teraz kwituje: numery dopisane do kartoteki i teksty odłożone
-       do kolejki, gdzie model wskaże człowiek. */
+       zera. Teraz kwituje trzy rzeczy: numery dopisane do kartoteki, pozycje
+       zgodności, które weszły do wiedzy OD RAZU (0.341.0), i te, przy których
+       marka milczała, więc zostały w kolejce. */
     edytor(copilot({ szkic: szkic({ lukiKartoteki: {
       symbol: "W09-0211", numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],
-      modele: ["HONDA GX999"], czeka: 3,
+      modele: ["HONDA GX999"], wpisane: ["STIHL FS450"], czeka: 3,
     } }) }));
     const pasek = screen.getByTestId("luki-kartoteki");
     expect(pasek.textContent).toContain("W09-0211");
@@ -157,7 +162,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
        pokwitowanie jest puste. Licznik kolejki jest STANEM, nie przyrostem,
        i agent ma go widzieć dalej. */
     edytor(copilot({ szkic: szkic({ lukiKartoteki:
-      { symbol: "W09-0211", numery: [], modele: [], czeka: 2 } }) }));
+      { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));
     expect(screen.getByTestId("luki-kartoteki").textContent).toContain("2");
   });
 

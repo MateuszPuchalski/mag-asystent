@@ -2,7 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
-import { naszeSymbole } from "./identyfikatory.js";
+import { naszeSymbole, przerobModelZOpisu } from "./identyfikatory.js";
+import { markaNaPoczatku, markaZKontekstu, jedynyModelPoNazwie } from "./wiedza-automat.js";
+import { rozstrzygnijZastosowanie } from "./wiedza.js";
 import type { WiedzaZOferty } from "./copilot-szkic.js";
 
 /**
@@ -45,6 +47,9 @@ import type { WiedzaZOferty } from "./copilot-szkic.js";
  */
 export const PORCJA_Z_OFERTY = 20;
 
+/** Podpis maszyny składającej klucz przy zbieraniu z oferty (0.341.0). */
+const AUTOMAT_OFERTY = { automat: "oferta" } as const;
+
 /** Kartoteka, do której wolno pisać — wraz z ofertą, z której wiedza pochodzi. */
 export interface CelZapisu { twId: number; symbol: string; ofertaId: string }
 
@@ -55,6 +60,11 @@ export interface PokwitowanieZapisu {
   modele: string[];
   /** Ile pozycji TEJ kartoteki czeka w kolejce Wiedzy — łącznie, nie tylko z tego szkicu. */
   czeka: number;
+  /**
+   * Pozycje, które weszły do wiedzy OD RAZU, bez kolejki i bez agenta (0.341.0).
+   * Podzbiór rozłączny z `modele`: wiersz albo dostał klucz tutaj, albo czeka.
+   */
+  wpisane: string[];
 }
 
 /**
@@ -111,16 +121,71 @@ export function zapiszWiedzeZOferty(
       modele.push(tekst);
     }
 
+    /* ── KLUCZ SKŁADANY OD RAZU (0.341.0) ───────────────────────────────────
+       Właściciel: „wiedza z ofert powinna wskakiwać bez potwierdzania przez
+       agenta". Numery wskakiwały tak od 0.264.0; pozycje listy zgodności
+       czekały w kolejce, bo w wierszu stoi goły tekst bez marki.
+
+       TU JEST NAJLEPSZY MOMENT NA ZŁOŻENIE KLUCZA, lepszy niż takt z 0.331.0:
+       ofertę mamy w ręku razem z jej tytułem, czyli z materiałem, z którego
+       marka się wyczytuje. Takt musiałby po nią wracać, a przede wszystkim
+       przyszedłby pół godziny później.
+
+       ŹRÓDŁA TE SAME, nie druga kopia — trzy funkcje z `wiedza-automat`.
+       Model językowego tu NIE ma i to jest decyzja: ta droga ma nie kosztować
+       ani grosza i nie zgadywać. Wiersz, przy którym źródła milczą, zostaje
+       w kolejce i tam czeka na takt albo na człowieka, jak dotąd. */
+    const wpisane: string[] = [];
+    let nieudanych = 0;
+    if (modele.length) {
+      const marki = (database.prepare(
+        "SELECT DISTINCT marka FROM model_urzadzenia").all() as Array<{ marka: string }>)
+        .map((w) => w.marka);
+      const swieze = database.prepare(
+        `SELECT id, tekst FROM model_z_opisu WHERE tw_id=? AND stan='nowy' AND oferta_id=?`)
+        .all(cel.twId, cel.ofertaId) as Array<{ id: number; tekst: string }>;
+      for (const w of swieze) {
+        if (!modele.includes(w.tekst)) continue;
+        const model = markaNaPoczatku(w.tekst, marki)
+          ?? jedynyModelPoNazwie(database, w.tekst)
+          ?? markaZKontekstu(database, cel.twId, cel.ofertaId, w.tekst, marki);
+        if (!model) continue;
+        try {
+          const z = przerobModelZOpisu(w.id, model, AUTOMAT_OFERTY, database);
+          rozstrzygnijZastosowanie(z.id, "zatwierdz", null, AUTOMAT_OFERTY, database);
+          wpisane.push(w.tekst);
+        } catch {
+          /* NIE PRZERYWA zbierania: najczęstszy powód to „ta para już czeka
+             w kolejce albo jest zatwierdzona", czyli stan zastany.
+
+             Liczbę odnotowujemy w dzienniku i to nie jest ozdoba. Pierwsza
+             wersja tego bloku milczała, a pod spodem KAŻDY wpis wywracał się
+             na „cannot start a transaction within a transaction" — z zewnątrz
+             wyglądało to identycznie jak „marki nie dało się odczytać".
+             Cicha obsługa błędu ukryła wadę, której szukałem w złym miejscu. */
+          nieudanych += 1;
+        }
+      }
+    }
+
     /* Dziennik TYLKO przy niezerowym zapisie. Dziesiąte kliknięcie pod tą samą
        ofertą nic nie dopisuje, a zdarzenie „zapisano 0 i 0" zaśmiecałoby
        księgę zdaniem bez treści. */
     if (numery.length || modele.length) {
       logEvent("wiedza_z_oferty_zapisana", kto.name, cel.twId,
-        { ofertaId: cel.ofertaId, symbol: cel.symbol, numerow: numery.length, modeli: modele.length },
+        { ofertaId: cel.ofertaId, symbol: cel.symbol, numerow: numery.length,
+          modeli: modele.length, wpisanych: wpisane.length, nieudanych },
         kto.id, database);
     }
 
-    return { numery, modele, czeka: czekaWKolejce(cel.twId, database) };
+    /* `modele` niesie już tylko to, co ZOSTAŁO w kolejce — wiersz wpisany nie
+       jest „odłożony do kolejki" i ekran nie ma prawa tak o nim mówić. */
+    return {
+      numery,
+      modele: modele.filter((m) => !wpisane.includes(m)),
+      wpisane,
+      czeka: czekaWKolejce(cel.twId, database),
+    };
   })();
 }
 

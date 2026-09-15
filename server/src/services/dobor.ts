@@ -116,6 +116,27 @@ const PUSTE: DaneDoboru = {
   silnik: null, oem: null, nazwaCzesci: null, parametry: {},
 };
 
+/* ── KTO PISZE DANE DOBORU (0.341.0) ─────────────────────────────────────────
+   Do 0.338.0 odpowiedź brzmiała „człowiek", bo dane doboru wchodziły albo
+   z ręki agenta, albo z jego kliknięcia przy propozycji Copilota. Właściciel:
+   „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
+
+   Automat NIE UDAJE CZŁOWIEKA i to jest jedyna ostrożność, jaka tu została:
+   idzie własną gałęzią i zostawia `updated_by='automat (…)'` przy PUSTYM
+   `updated_user_id`. Ta para jest jedynym znacznikiem, po którym da się
+   odróżnić wpis maszyny od wpisu agenta — ten sam wzorzec, co przy wiedzy
+   (0.331.0), szkicu (0.317.0) i numerach z ofert (0.264.0).                */
+
+/** Kto zapisuje: konto człowieka albo nazwany automat. */
+export type AutorDanych = number | { automat: string };
+
+function ktoPisze(
+  database: DatabaseSync, kto: AutorDanych,
+): { autor: string; userId: number | null } {
+  if (typeof kto === "number") return { autor: imie(database, kto), userId: kto };
+  return { autor: `automat (${kto.automat})`, userId: null };
+}
+
 function imie(database: DatabaseSync, userId: number): string {
   const u = database.prepare("SELECT name FROM app_user WHERE user_id=?").get(userId) as
     { name: string } | undefined;
@@ -293,14 +314,14 @@ function upewnijWiersz(database: DatabaseSync, conversationId: number): void {
   database.prepare("INSERT OR IGNORE INTO dobor_rozmowy(conversation_id) VALUES (?)").run(conversationId);
 }
 
-function podpisz(database: DatabaseSync, conversationId: number, autor: string, userId: number): void {
+function podpisz(database: DatabaseSync, conversationId: number, autor: string, userId: number | null): void {
   database.prepare(`UPDATE dobor_rozmowy SET updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
     updated_by=?, updated_user_id=? WHERE conversation_id=?`).run(autor, userId, conversationId);
 }
 
 function slad(
   database: DatabaseSync, conversationId: number, typOsi: string, typAudytu: string,
-  dane: Record<string, unknown>, autor: string, userId: number,
+  dane: Record<string, unknown>, autor: string, userId: number | null,
 ): void {
   database.prepare(`INSERT INTO conversation_event(conversation_id, event_type, payload)
     VALUES (?,?,?)`).run(conversationId, typOsi, JSON.stringify({ ...dane, autor }));
@@ -311,7 +332,7 @@ function slad(
    `candidates_found`): każda zostawia kreskę na osi z „przed → po". */
 function zmienStatus(
   database: DatabaseSync, conversationId: number, przed: StatusDoboru, po: StatusDoboru,
-  brakuje: string | null, autor: string, userId: number,
+  brakuje: string | null, autor: string, userId: number | null,
 ): void {
   database.prepare("UPDATE dobor_rozmowy SET status=?, brakuje=? WHERE conversation_id=?")
     .run(po, brakuje, conversationId);
@@ -334,11 +355,11 @@ const oczysc = (v: unknown): string | null => {
  * w `not_started` znikałby z plakietki kolejki.
  */
 export function zapiszDane(
-  conversationId: number, dane: Partial<DaneDoboru>, expectedVersion: number, userId: number,
+  conversationId: number, dane: Partial<DaneDoboru>, expectedVersion: number, kto: AutorDanych,
   database: DatabaseSync = db(),
 ): Dobor {
   istniejeRozmowa(database, conversationId);
-  const autor = imie(database, userId);
+  const { autor, userId } = ktoPisze(database, kto);
   const wynik = transaction(database, () => {
     const przed = sprawdzWersje(database, conversationId, expectedVersion);
     const nowe: DaneDoboru = { ...przed.dane };

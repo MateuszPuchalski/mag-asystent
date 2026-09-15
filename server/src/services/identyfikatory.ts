@@ -4,7 +4,7 @@ import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
 import { oczysc, segmentyPoEtykiecie } from "./opis-sekcje.js";
 import {
-  czlowiekZBiura, podpisRozstrzygniecia, WiedzaConflict, zaproponujZastosowanie,
+  czlowiekZBiura, podpisRozstrzygniecia, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
   type Autor, type DaneModelu, type Rozstrzygajacy, type Zastosowanie,
 } from "./wiedza.js";
 
@@ -350,6 +350,13 @@ function zaladujNowy(database: DatabaseSync, id: number): ModelZOpisu {
  * nie mówi, do jakiej marki należy `FS450`). Wiersz schodzi na `przerobiony`
  * w tej samej transakcji, więc drugie kliknięcie dostaje 409, nie dubel.
  *
+ * TRANSAKCJA PRZEZ `wTransakcji`, NIE `transaction` (0.341.0). Od tego
+ * wydania ta funkcja bywa wołana Z WNĘTRZA cudzej transakcji — `zapiszWiedzeZ
+ * Oferty` składa klucz od razu przy zbieraniu z oferty, a `node:sqlite` nie
+ * zagnieżdża `BEGIN`. Objawem był cichy brak wpisu: wyjątek „cannot start
+ * a transaction within a transaction" łapał `catch` u wołającego, wiersz
+ * zostawał w kolejce i wyglądało to na „marki nie dało się odczytać".
+ *
  * Źródło propozycji BIERZE SIĘ Z WIERSZA, nie jest wpisane na sztywno
  * (0.264.0). Kolejka niesie dwa świadectwa: sekcję „Modele:" z opisu naszej
  * kartoteki i pozycję listy zgodności z naszej oferty Allegro. Zrównanie ich
@@ -367,7 +374,7 @@ export function przerobModelZOpisu(
   const autorPropozycji: Autor = typeof kto === "number"
     ? { userId: kto, name: autor } : { automat: kto.automat };
   const maszyna = typeof kto !== "number";
-  return transaction(database, () => {
+  return wTransakcji(database, () => {
     const m = zaladujNowy(database, id);
     const zOferty = m.zrodlo === "oferta";
     const z = zaproponujZastosowanie({
@@ -392,7 +399,7 @@ export function przerobModelZOpisu(
     logEvent("wiedza_model_z_opisu_przerobiony", autor, m.twId,
       { id, zastosowanieId: z.id, model: z.model.etykieta, zrodlo: m.zrodlo }, userId, database);
     return z;
-  })();
+  });
 }
 
 /** Odrzucenie = „to nie jest lista modeli". Wiersz zostaje, żeby nie wrócił po przebudowie. */
