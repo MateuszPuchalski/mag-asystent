@@ -247,6 +247,62 @@ export function useKosz() {
   });
 }
 
+/** Kartoteka w wyniku szukania do koszyka — tyle, ile trzeba, żeby wskazać. */
+export interface TowarDoKosza {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ean: string | null;
+  /** Stan na magazynie głównym; `null` przy trafieniu ze skanu. */
+  stanMag: number | null;
+}
+
+/**
+ * Towar do koszyka: skan albo kartoteka (0.365.0).
+ *
+ * JEDNO PYTANIE, jedna trasa — „który to towar". Kod z czytnika wraca jako
+ * `dokladne` z jednym wynikiem, fraza jako lista. Pusty nie pyta serwera.
+ */
+export function useTowaryDoKosza(q: string) {
+  const czysty = q.trim();
+  return useQuery({
+    queryKey: ["kosz-towary", czysty] as const,
+    enabled: czysty.length > 0,
+    queryFn: () => api<{ towary: TowarDoKosza[]; dokladne: boolean; przyblizone: boolean }>(
+      `/api/obsluga/zwroty/kosz/towary?q=${encodeURIComponent(czysty)}`),
+  });
+}
+
+/**
+ * Dołożenie towaru do koszyka ręką (0.365.0).
+ *
+ * Decyzja właściciela: „dodaj możliwość dodawania produktów do koszyka
+ * zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki",
+ * z granicą „tylko z poziomu obsługi zwrotów, jak jeszcze nie jest zamknięty".
+ * Odświeża pasek koszyka, bo licznik ma rosnąć na oczach.
+ */
+export function useDolozTowar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { twId: number; ilosc?: number; rodzaj?: "zwroty" | "odpad" }) =>
+      api<{ koszId: number; kod: string; pozycjaId: number; symbol: string; ilosc: number }>(
+        "/api/obsluga/zwroty/kosz/towar", { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
+  });
+}
+
+/** Zdjęcie z koszyka wiersza dołożonego ręką — cena pomyłki przy skanie. */
+export function useZdejmijTowar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pozycjaId: number) =>
+      api<{ koszId: number; kod: string; symbol: string }>(
+        "/api/obsluga/zwroty/kosz/towar/zdejmij",
+        { method: "POST", body: JSON.stringify({ pozycjaId }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
+  });
+}
+
 /**
  * Domknięcie koszyka: MM wychodzi PO KOMPLECIE KOREKT (0.200.0).
  *

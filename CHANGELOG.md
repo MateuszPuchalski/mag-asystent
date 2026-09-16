@@ -75,6 +75,26 @@ nie podpowiadało.
 - Lista czyta WYŁĄCZNIE to, co synchronizacja już przyniosła. Pytanie do
   Allegro ma własny przycisk i własny limit.
 
+**Towar wchodzi do koszyka zwrotów skanem albo z kartoteki.** Trzecie
+zgłoszenie tego dnia, z granicą wypowiedzianą zaraz po nim: „tylko z poziomu
+obsługi zwrotów, jak jeszcze nie jest zamknięty". Pudło bywa pełniejsze niż
+zgłoszenie — paczka nieodebrana bez numeru zamówienia nie ma ani jednej
+pozycji, a towar leży na biurku. Jedyną drogą z biurka na półkę było czekanie.
+
+- **Pole przy otwartym zwrocie, pod pozycjami**, jedno na skan i na szukanie.
+  Kod z czytnika rozpoznaje ta sama drabinka co na kolektorze (EAN, alias,
+  symbol) i wtedy Enter dokłada bez klikania w listę. Przy kilku wynikach
+  Enter nie zgaduje.
+- **Drugi skan tego samego towaru dolicza sztukę**, zamiast zakładać drugi
+  wiersz — magazynier liczy sztuki skanowaniem.
+- **Taki wiersz nie niesie pieniędzy** i ekran mówi to wprost. Nie ma za sobą
+  zwrotu, więc nie wchodzi do rozliczenia i nie zatrzymuje bramki korekt.
+  Przesuwa wyłącznie towar.
+- **Zdjąć da się tylko wiersz dołożony ręką i tylko z koszyka otwartego.**
+  Wiersz z oceny schodzi cofnięciem oceny; pudło zamknięte opisuje to, co
+  pojechało.
+- Ocena „na stan" dokłada dalej sama — decyzja nr 3 z 3 września zostaje.
+
 Szukanie nie wymagało zmiany: filtr kolejki porównuje login od 0.337.0. Nic
 nie trzeba ustawiać, wystarczy nowy build panelu.
 

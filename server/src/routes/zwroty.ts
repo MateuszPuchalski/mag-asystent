@@ -1,11 +1,13 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sesjaZadania } from "../context.js";
+import { sesjaZadania, subiekt } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, zamknijKosz, zaznaczSkladnik,
+  dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
+import { towarZKodu } from "../services/kosze.js";
 import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -333,6 +335,80 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       czekajace: koszykiCzekajaceNaKorekty(db()),
     };
   });
+
+  /* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ──────────────────
+     Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
+     zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki".
+
+     JEDNA TRASA NA OBIE DROGI, bo to jedno pytanie: „który to towar". Kod
+     z czytnika rozpoznaje ta sama drabinka co na kolektorze (EAN, alias EAN,
+     symbol) i wtedy odpowiedź jest JEDNA i oznaczona `dokladne`. Gdy kod nie
+     pasuje do niczego, pytanie zamienia się w szukanie po kartotece — z tą
+     samą furtką na literówki, z której korzysta karta towaru.
+
+     Odczyt bez zapisu: dziennik dostaje dopiero dołożenie. Zapisywanie każdej
+     wpisanej litery robiłoby z pola szukania rejestr ruchów operatora. */
+  app.get<{ Querystring: { q?: string } }>(
+    "/api/obsluga/zwroty/kosz/towary", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const q = String(req.query?.q ?? "").trim();
+      if (!q) return { towary: [], dokladne: false, przyblizone: false };
+
+      const zeSkanu = towarZKodu(q);
+      if (zeSkanu) {
+        return {
+          /* Stan przy trafieniu ze skanu zostaje `null` i to nie jest brak
+             danych: kod z czytnika ROZSTRZYGA, który to towar, a liczba na
+             magazynie pomaga dopiero przy wybieraniu z listy. */
+          towary: [{
+            twId: zeSkanu.tw_id, symbol: zeSkanu.symbol, nazwa: zeSkanu.nazwa,
+            ean: zeSkanu.ean || null, stanMag: null,
+          }],
+          dokladne: true, przyblizone: false,
+        };
+      }
+      const { wyniki, przyblizone } = subiekt.szukajZFurtka(q, 20);
+      return {
+        towary: wyniki.map((t) => ({
+          twId: t.id, symbol: t.sym, nazwa: t.name, ean: t.ean || null, stanMag: t.mag,
+        })),
+        dokladne: false, przyblizone,
+      };
+    });
+
+  app.post<{ Body: { twId?: number; ilosc?: number; rodzaj?: string } }>(
+    "/api/obsluga/zwroty/kosz/towar", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const twId = Number(req.body?.twId);
+      if (!Number.isFinite(twId) || twId <= 0) {
+        return reply.code(400).send({ error: "Wskaż towar — ze skanu albo z listy." });
+      }
+      /* Rodzaj koszyka z ciała, bo operator ma przy biurku dwa pudła: zwroty
+         i odpad. Wartość spoza pary jest odmową, nie cichym „zwroty": złom
+         wpuszczony na regał zwrotów wróciłby do sprzedaży. */
+      const rodzaj = req.body?.rodzaj ?? "zwroty";
+      if (rodzaj !== "zwroty" && rodzaj !== "odpad") {
+        return reply.code(400).send({ error: "Koszyk jest albo zwrotów, albo odpadu." });
+      }
+      try {
+        return dolozTowar(db(), twId, Number(req.body?.ilosc ?? 1), kto(), new Date(), rodzaj);
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  app.post<{ Body: { pozycjaId?: number } }>(
+    "/api/obsluga/zwroty/kosz/towar/zdejmij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.pozycjaId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Wskaż pozycję, którą mam zdjąć." });
+      }
+      try {
+        return zdejmijTowar(db(), id, kto());
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
 
   app.post<{ Body: { koszId?: number } }>(
     "/api/obsluga/zwroty/kosz/zamknij", async (req, reply) => {

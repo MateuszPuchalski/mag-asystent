@@ -300,14 +300,28 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      odsyłał do tej drogi zdaniem „wskaż skład ręcznie", a drogi nie było —
      odejmowanie z paragonu wymaga kartoteki przy KAŻDEJ pozostałej ofercie
      zamówienia, a te wypełniają się dopiero przy zwrocie tamtej oferty. */
-  assert.equal(posty.length, 29,
-    `tras POST jest ${posty.length}, a umowa mówi o dwudziestu dziewięciu`);
+  /* Trzydziesta i pierwsza (0.365.0): towar dołożony do koszyka ręką i jego
+     zdjęcie. Decyzja właściciela: „dodaj możliwość dodawania produktów do
+     koszyka zwrotowego poprzez zeskanowanie produktu lub wybranie go
+     z kartoteki" — i zaraz potem „tylko z poziomu obsługi zwrotów, jak
+     jeszcze nie jest zamknięty".
+
+     To NIE cofa decyzji nr 3 z 3 września („dokładanie nie jest osobnym
+     ruchem"): ocena „na stan" dalej dokłada sama i żadnej trasy na to nie ma.
+     Te dwie są dla towaru, którego w zgłoszeniu NIE MA — paczka nieodebrana
+     bez numeru zamówienia nie ma ani jednej pozycji, a leży na biurku.
+
+     Druga trasa jest ceną pierwszej: skan bywa pomyłką, a wiersz bez zwrotu
+     nie ma oceny, którą dałoby się cofnąć. Bez niej jedynym wyjściem byłoby
+     zamknięcie pudła z cudzym towarem w środku. */
+  assert.equal(posty.length, 31,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu jeden`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
-    "sklad"]) {
+    "sklad", "kosz/towar"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

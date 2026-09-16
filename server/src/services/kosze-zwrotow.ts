@@ -74,7 +74,21 @@ export interface StanKosza {
   pozycji: number;
   sztuk: number;
   otwartyOd: string;
-  pozycje: Array<{ symbol: string; nazwa: string; ilosc: number }>;
+  pozycje: Array<{
+    /** Id wiersza koszyka — po nim zdejmuje się to, co dołożono ręką. */
+    id: number;
+    symbol: string;
+    nazwa: string;
+    ilosc: number;
+    /**
+     * Wiersz przyszedł z OCENY ZWROTU (0.365.0).
+     *
+     * Ekran rozstrzyga po tym, którą drogą wyjścia pokazać: wiersz ze zwrotu
+     * schodzi cofnięciem oceny na karcie zwrotu, dołożony ręką — krzyżykiem
+     * przy pozycji. Jedna droga na obie kosztowałaby kasowanie cudzej oceny.
+     */
+    zeZwrotu: boolean;
+  }>;
 }
 
 /**
@@ -189,6 +203,155 @@ export function dolozDoKosza(
       sztuk: sklad.skladniki.reduce((a, s) => a + s.ilosc, 0), ilosc: ile },
     kto.id, database);
   return koszId;
+}
+
+/* ── Towar dołożony RĘKĄ: skanem albo z kartoteki (0.365.0) ─────────────────
+   Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
+   zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki".
+
+   To jest świadome poszerzenie decyzji nr 3 z 3 września 2026 („dokładanie nie
+   jest osobnym ruchem"), a nie jej cofnięcie. Tamta decyzja opisywała ocenę
+   zwrotu i tam nic się nie zmienia: „na stan" dalej dokłada samo. Ale pudło
+   bywa pełniejsze niż zgłoszenie:
+
+     - paczka NIEODEBRANA zarejestrowana bez numeru zamówienia nie ma ani
+       jednej pozycji, więc nie ma czego oceniać — a towar leży na biurku,
+     - klient dokłada do paczki rzecz, której nie zgłosił (blizna 0.184.0),
+     - zwrot bywa u nas szybciej niż jego kopia z Allegro.
+
+   We wszystkich trzech wypadkach jedyną drogą towaru z biurka na półkę było
+   dotąd czekanie. Teraz jest skan.
+
+   ── CZEGO TAKI WIERSZ NIE NIESIE ────────────────────────────────────────
+   Nie ma za sobą zwrotu, więc nie ma ceny, nie wnosi nic do rozliczenia
+   z klientem i NIE WCHODZI do bramki korekt (`brakujaceKorekty` pyta po
+   `zwrot_pozycja_id`). Przesuwa wyłącznie TOWAR: na MM wchodzi tak samo jak
+   pozostałe wiersze, a po rozłożeniu wraca z bufora tą samą drogą. Pieniądze
+   zostają tam, gdzie były — przy zwrocie, korekcie albo przy decyzji biura.
+
+   Tym różni się od `zaznaczSkladnik`, który dopisywać kartotek nie pozwala
+   i nie będzie: tamten rusza wiersze POZYCJI ZWROTU, gdzie cena i sztuki mają
+   pochodzić z dokumentu sprzedaży, a nie z pola tekstowego.                  */
+
+/** Ile sztuk wolno dołożyć jednym ruchem. Kosz to pudło, nie dostawa. */
+export const MAX_SZTUK_RECZNIE = 999;
+
+export interface DolozonyTowar {
+  koszId: number;
+  kod: string;
+  pozycjaId: number;
+  symbol: string;
+  nazwa: string;
+  /** Ile sztuk stoi w koszyku PO dołożeniu — skan po skanie to widać. */
+  ilosc: number;
+}
+
+/**
+ * Dokłada do otwartego koszyka towar wskazany ręką. Oddaje stan wiersza.
+ *
+ * DRUGI SKAN TEGO SAMEGO TOWARU DOLICZA SZTUKĘ, nie zakłada drugiego wiersza.
+ * Magazynier liczy sztuki skanowaniem — to jest ten sam ruch co przy dostawie
+ * i ta sama odpowiedź: licznik rośnie na oczach. Osobne wiersze kazałyby
+ * potem sumować je wzrokiem.
+ *
+ * Kartoteka jest źródłem symbolu i nazwy. Towaru spoza niej nie dokładamy:
+ * na dokument MM idzie `tw_id`, a wiersz bez kartoteki nie ma czym się tam
+ * przedstawić.
+ */
+export function dolozTowar(
+  database: Db, twId: number, ile: number, kto: { id: number; name: string },
+  teraz = new Date(), rodzaj: RodzajKosza = "zwroty",
+): DolozonyTowar {
+  const sztuk = Math.floor(Number(ile) || 0);
+  if (sztuk < 1) throw new Error("Podaj, ile sztuk dokładasz — mniej niż jedna to nic.");
+  if (sztuk > MAX_SZTUK_RECZNIE) {
+    throw new Error(`Najwyżej ${MAX_SZTUK_RECZNIE} sztuk naraz — tyle mieści się w pudle.`);
+  }
+  if (magazynDocelowy(rodzaj) <= 0) {
+    throw new Error("Ten rodzaj koszyka nie ma magazynu docelowego — sprawdź wertis.env.");
+  }
+  const t = database.prepare("SELECT tw_id, symbol, nazwa FROM sgt_towar WHERE tw_id = ?")
+    .get(twId) as { tw_id: number; symbol: string; nazwa: string } | undefined;
+  if (!t) throw new Error("Nie znam takiej kartoteki — wskaż towar ze skanu albo z listy.");
+
+  return transaction(database, () => {
+    const koszId = otwartyKosz(database, kto, teraz, rodzaj);
+    const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
+      { kod: string }).kod;
+    /* Wyłącznie wiersz DOŁOŻONY RĘKĄ (`zwrot_pozycja_id IS NULL`). Doliczenie
+       sztuki do wiersza ze zwrotu rozjechałoby dokument MM ze zgłoszeniem
+       klienta — a tamta liczba pochodzi z tego, co wróciło w paczce. */
+    const stoi = database.prepare(
+      `SELECT id, ilosc FROM kosz_pozycja
+        WHERE kosz_id=? AND tw_id=? AND zwrot_pozycja_id IS NULL ORDER BY id LIMIT 1`)
+      .get(koszId, twId) as { id: number; ilosc: number } | undefined;
+
+    let pozycjaId: number;
+    let ilosc: number;
+    if (stoi) {
+      ilosc = Number(stoi.ilosc) + sztuk;
+      pozycjaId = Number(stoi.id);
+      database.prepare("UPDATE kosz_pozycja SET ilosc=? WHERE id=?").run(ilosc, pozycjaId);
+    } else {
+      ilosc = sztuk;
+      pozycjaId = Number(database.prepare(
+        `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
+         VALUES (?,?,?,?,?,NULL)`)
+        .run(koszId, t.tw_id, t.symbol, t.nazwa, sztuk).lastInsertRowid);
+    }
+    logEvent("kosz_zwrotow_towar_dolozony", kto.name, t.tw_id,
+      { koszId, kod, pozycjaId, symbol: t.symbol, dodano: sztuk, ilosc, rodzaj },
+      kto.id, database);
+    return { koszId, kod, pozycjaId, symbol: t.symbol, nazwa: t.nazwa, ilosc };
+  })();
+}
+
+/**
+ * Zdejmuje z koszyka wiersz dołożony ręką (0.365.0).
+ *
+ * TYLKO TAKI. Wiersz ze zwrotu schodzi cofnięciem oceny i to zostaje jedyną
+ * jego drogą: ocena jest faktem o towarze, a nie zawartością pudła, więc
+ * kasowanie jej z drugiej strony rozjechałoby kartę zwrotu z koszykiem.
+ *
+ * Pomyłka przy skanie jest normalnym elementem tej pracy, nie wyjątkiem —
+ * dlatego bez roli i bez pytania „czy na pewno".
+ *
+ * BRAMKĄ JEST ZAMKNIĘCIE KOSZYKA, decyzja właściciela: „tylko z poziomu
+ * obsługi zwrotów, jak jeszcze nie jest zamknięty". Węziej niż przy
+ * `zdejmijZKosza`, które od 0.334.0 wpuszcza także kosz zamknięty bez
+ * dokumentu — i węziej świadomie: tamta droga poprawia OCENĘ, którą biuro
+ * wydało przy biurku, a ta rusza zawartość pudła. Pudło zamknięte odjechało
+ * od biurka i jego zawartość jest już opisem tego, co pojechało.
+ */
+export function zdejmijTowar(
+  database: Db, pozycjaId: number, kto: { id: number; name: string },
+): { koszId: number; kod: string; symbol: string } {
+  return transaction(database, () => {
+    const w = database.prepare(
+      `SELECT kp.id, kp.kosz_id, kp.tw_id, kp.symbol, kp.zwrot_pozycja_id, k.kod
+         FROM kosz_pozycja kp JOIN kosz k ON k.id = kp.kosz_id
+        WHERE kp.id = ?`).get(pozycjaId) as
+      { id: number; kosz_id: number; tw_id: number; symbol: string;
+        zwrot_pozycja_id: number | null; kod: string } | undefined;
+    if (!w) throw new Error("Nie znam takiej pozycji koszyka.");
+    if (w.zwrot_pozycja_id !== null) {
+      throw new Error("Ta pozycja przyszła ze zwrotu — zdejmuje się ją cofnięciem oceny.");
+    }
+    const koszId = Number(w.kosz_id);
+    const status = (database.prepare("SELECT status FROM kosz WHERE id=?").get(koszId) as
+      { status: string }).status;
+    if (status !== "otwarty") {
+      throw new Error(
+        `Koszyk ${w.kod} jest już ${status} — zawartość zamkniętego pudła opisuje to, co pojechało.`);
+    }
+    database.prepare("DELETE FROM kosz_pozycja WHERE id=?").run(pozycjaId);
+    /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
+       przy zdjęciu pozycji ze zwrotu. */
+    uniewaznijZadanieMm(database, koszId, kto);
+    logEvent("kosz_zwrotow_towar_zdjety", kto.name, Number(w.tw_id),
+      { koszId, kod: w.kod, pozycjaId, symbol: w.symbol }, kto.id, database);
+    return { koszId, kod: w.kod, symbol: w.symbol };
+  })();
 }
 
 /**
@@ -505,14 +668,20 @@ export function stanOtwartegoKosza(
     { id: number; kod: string; utworzono_at: string } | undefined;
   if (!k) return null;
   const pozycje = database.prepare(
-    "SELECT symbol, nazwa, ilosc FROM kosz_pozycja WHERE kosz_id=? ORDER BY id")
-    .all(k.id) as Array<{ symbol: string; nazwa: string; ilosc: number }>;
+    `SELECT id, symbol, nazwa, ilosc, zwrot_pozycja_id FROM kosz_pozycja
+      WHERE kosz_id=? ORDER BY id`)
+    .all(k.id) as Array<{
+    id: number; symbol: string; nazwa: string; ilosc: number; zwrot_pozycja_id: number | null;
+  }>;
   return {
     rodzaj,
     id: Number(k.id), kod: k.kod, otwartyOd: k.utworzono_at,
     pozycji: pozycje.length,
     sztuk: pozycje.reduce((s, p) => s + Number(p.ilosc), 0),
-    pozycje: pozycje.map((p) => ({ ...p, ilosc: Number(p.ilosc) })),
+    pozycje: pozycje.map((p) => ({
+      id: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
+      zeZwrotu: p.zwrot_pozycja_id !== null,
+    })),
   };
 }
 

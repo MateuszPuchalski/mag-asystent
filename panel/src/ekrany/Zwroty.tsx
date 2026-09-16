@@ -6,6 +6,7 @@ import type { BilansKartotek, Kubelek, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
+import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
@@ -905,6 +906,12 @@ export function Zwroty() {
                   zdejmij.mutate({ id: zwrot.id, pozycjaId, wersja: zwrot.wersja },
                     { onError: (e) => setBladDopisania((e as Error).message) });
                 }} />
+              {/* DOŁOŻENIE TOWARU DO KOSZYKA (0.365.0) stoi POD pozycjami,
+                  bo to ostatnia rzecz przy otwartym kartonie: najpierw oceniam
+                  to, co klient zgłosił, potem dokładam to, czego w zgłoszeniu
+                  nie ma. Pasek koszyka pokazuje się dopiero z zawartością, więc
+                  pierwszej sztuki nie dałoby się tam zeskanować. */}
+              <DolozTowar />
             </div>
           </>}
     </Karta>

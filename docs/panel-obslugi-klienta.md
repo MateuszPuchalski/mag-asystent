@@ -3606,6 +3606,42 @@ wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
 Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
 którego po tamtej stronie nie ma.
 
+### 25a.13a. Towar dołożony do koszyka ręką (0.365.0)
+
+Decyzja właściciela: „dodaj możliwość dodawania produktów do koszyka zwrotowego
+poprzez zeskanowanie produktu lub wybranie go z kartoteki", a zaraz po niej
+granica: „tylko z poziomu obsługi zwrotów, jak jeszcze nie jest zamknięty".
+
+To poszerzenie decyzji nr 3 z 3 września, nie jej cofnięcie. Ocena „na stan"
+dalej dokłada sama i osobnej trasy na to nie ma. Ale pudło bywa pełniejsze niż
+zgłoszenie: paczka nieodebrana bez numeru zamówienia nie ma ani jednej pozycji,
+klient dokłada rzecz, której nie zgłosił, a zwrot bywa u nas szybciej niż jego
+kopia z Allegro. We wszystkich trzech wypadkach jedyną drogą towaru z biurka na
+półkę było czekanie.
+
+**Stoi przy OTWARTYM ZWROCIE, pod pozycjami.** Pasek koszyka pokazuje się
+dopiero z zawartością, więc pierwszej sztuki nie dałoby się tam zeskanować.
+Poza tym operator stoi wtedy nad otwartym kartonem konkretnej paczki — ekran
+idzie za czynnością fizyczną.
+
+**Jedno pole na skan i na szukanie.** Kod z czytnika rozpoznaje ta sama
+drabinka co na kolektorze: EAN, alias EAN, symbol. Trafienie jest wtedy jedno
+i Enter dokłada je bez klikania w listę. Fraza szuka po kartotece, z tą samą
+furtką na literówki co karta towaru; przy kilku wynikach Enter nie zgaduje.
+
+**Drugi skan tego samego towaru dolicza sztukę**, zamiast zakładać drugi
+wiersz. Magazynier liczy sztuki skanowaniem — to ten sam ruch co przy dostawie.
+
+**Taki wiersz nie niesie pieniędzy** i ekran mówi to wprost. Nie ma za sobą
+zwrotu, więc nie ma ceny, nie wchodzi do rozliczenia z klientem i nie zatrzymuje
+bramki korekt — ta pyta po `zwrot_pozycja_id`. Przesuwa wyłącznie TOWAR: na MM
+wchodzi jak każdy inny wiersz i tą samą drogą wraca z bufora.
+
+**Zdjąć da się wyłącznie wiersz dołożony ręką i wyłącznie z koszyka otwartego.**
+Wiersz z oceny schodzi cofnięciem oceny: ocena jest faktem o towarze, a
+kasowanie jej z drugiej strony ekranu rozjechałoby kartę zwrotu z koszykiem.
+Koszyk zamknięty odjechał od biurka i jego zawartość opisuje to, co pojechało.
+
 ### 25a.14. Dokument sprzedaży z Subiekta (0.174.0)
 
 Ostatnia pozycja z listy biura zwrotów: „widoczny numer paragonu". Pracownik
