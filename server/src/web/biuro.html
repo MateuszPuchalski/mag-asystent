@@ -5614,6 +5614,28 @@ document.addEventListener("click", (e) => {
   if (widok) ustawSzuflade(widok.id, szufladaW !== widok.id);
 });
 
+/* ── Rozruch strony (0.373.0 — przywrócone po 0.138.0) ───────────────────────
+   Te dwie linijki stały tu od początku i wyszły jako SKUTEK UBOCZNY kasowania
+   obsługi klienta w 0.138.0: leżały w tym samym ogonie pliku, co przyciski
+   konfiguracji pytań, i pojechały razem z nimi. Nic tego nie złapało, bo test
+   wywołań pilnuje wyłącznie odwrotnej strony — funkcji WOŁANEJ, a nieistniejącej.
+
+   Co to kosztowało przez trzydzieści kilka wydań:
+
+   1. KAŻDE ODŚWIEŻENIE WYGLĄDAŁO NA WYLOGOWANIE. Token przeżywa w localStorage
+      i jest ważny — ale panel odsłania `start()`, a `start()` wołało wyłącznie
+      `zaloguj()`. Po F5 zostawał formularz logowania nad żywą sesją.
+   2. CYKL 30 s NIE CHODZIŁ WCALE. `odswiez()` został zdefiniowany i nie miał
+      wołającego, więc lista dostaw, ikona zdrowia i liczniki zakładek stały
+      w miejscu do ręcznego kliknięcia. Bursztyn „kulejący cykl" z 0.111.0
+      opisywał wtedy cykl, którego nie było.
+
+   Kolejność ma znaczenie: pętla przed `start()` wystrzeliłaby pierwszy przebieg
+   w panel jeszcze schowany. Odmowa serwera niczego tu nie psuje — `api()` na
+   401 woła `wyloguj()` i człowiek wraca do formularza, tak jak przed 0.138.0. */
+setInterval(() => { if (token) odswiez(); }, 30_000);
+
+if (token) start();
 </script>
 <dialog id="dialogW"></dialog>
 <div id="toasty"></div>
