@@ -30,6 +30,7 @@ import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { useJa } from "../api/rozmowy";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
+import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 
 /* ── Ekran zwrotów (0.150.0) ─────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka — dwa ekrany obsługi mają mieć jeden nawyk,
@@ -262,9 +263,56 @@ function PasekUwag({ bilans, stan, rozjazdy }: {
  * inne pytanie niż numery: nie „gdzie jest TA paczka", tylko „co jeszcze mam
  * od TEGO klienta" — a to pytanie pada przy każdej rozmowie, w której klient
  * mówi o dwóch przesyłkach naraz. Jedyny uchwyt, jaki wtedy jest pod ręką.
+ *
+ * NAZWA ODBIORCY I PRZEWOŹNIK DOSZLI W 0.367.0 i to jest odpowiedź na pytanie,
+ * którego wcześniej nie zadano dość dokładnie. Właściciel: paczki nakleja
+ * klient albo kurier, więc numeru listu z WRACAJĄCEGO kartonu nasz system nie
+ * widział nigdy — pierwszy skan takiej paczki musi chybić z definicji. Zostaje
+ * to, co na naklejce widać: kto na niej stoi i czyim samochodem przyjechała.
+ *
+ * Przewoźnik ma też własną listę rozwijaną i to NIE jest dublowanie: lista
+ * odpowiada na „pokaż wszystko od InPostu", a człon frazy zawęża trafienia po
+ * kimś innym. Aliasy niżej biorą się stąd, że na naklejce stoi „Paczkomat",
+ * a w danych `INPOST`.
  */
 const kody = (z: Zwrot) =>
-  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin, z.waybill]
+  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin, z.waybill,
+    z.odbiorcaNazwa, z.przewoznik, ...aliasy(z.przewoznik)]
+    .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+
+/**
+ * Jak operator NAZYWA przewoźnika, gdy patrzy na naklejkę.
+ *
+ * Kod z Allegro jest jeden, a słowo na pudle bywa inne — „paczkomat" to
+ * InPost, „pocztex" to Poczta. Bez tego człon frazy przepisany z naklejki
+ * wyglądałby na brak danych, a nie na inną nazwę tej samej firmy.
+ */
+const ALIASY: Record<string, string[]> = {
+  INPOST: ["paczkomat", "inpost"],
+  POCZTA: ["poczta", "pocztex"],
+  DPD: ["dpd"],
+  DHL: ["dhl"],
+  UPS: ["ups"],
+  GLS: ["gls"],
+  FEDEX: ["fedex"],
+};
+const aliasy = (kod: string | null) => (kod ? ALIASY[kod.toUpperCase()] ?? [] : []);
+
+/**
+ * Uchwyty, które NAZYWAJĄ JEDEN ZWROT — i tylko po nich ekran otwiera sam.
+ *
+ * `kody` wyżej służy do zawężania listy i celowo bierze też rzeczy opisowe:
+ * login, nazwę odbiorcy, przewoźnika. Żadna z nich nie jest identyfikatorem
+ * paczki — login mówi, CZYJA to paczka, a nie KTÓRA (decyzja 0.365.0), nazwa
+ * odbiorcy tak samo, a przewoźnik opisuje setki naraz.
+ *
+ * Do 0.366.0 jedna lista robiła oba zadania i przy loginie to jeszcze uchodziło.
+ * Przy przewoźniku przestało od razu: wpisanie „dpd" przy jednym zwrocie tej
+ * firmy OTWIERAŁO go, jakby ktoś podał numer. Otwarcie stawia na ekranie cudze
+ * pieniądze, więc lista do otwierania musi być węższa niż lista do szukania.
+ */
+const identyfikatory = (z: Zwrot) =>
+  [z.numer, z.externalId, z.orderId, z.korektaNumer, z.waybill]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Zwroty() {
@@ -383,12 +431,16 @@ export function Zwroty() {
      dziesiątki, nie tysiące. Szukanie po fragmencie na serwerze musiałoby albo
      rozluźnić `znajdzZwrotPoKodzie` (a ono ma być DOKŁADNE, bo samo otwiera
      zwrot), albo dołożyć trasę z dziennikiem — czyli zapisać, czego ktoś
-     szukał. Numeru listu ten filtr nie widzi: nie ma go w modelu pracy. Od
-     niego jest Enter i `POST /skan`, który szuka w kopii odpowiedzi Allegro. */
+     szukał. Numer listu ten filtr WIDZI od 0.344.0 — zdanie mówiące inaczej
+     stało tu przez pięć wydań po tym, jak przestało być prawdą. Enter zostaje,
+     bo `POST /skan` zna też numery paczek, których w modelu pracy nie ma.
+
+     Od 0.367.0 fraza dzieli się po spacjach (`pasujeDoFrazy`): człowiek
+     z kartonem w ręku ma kilka drobnych uchwytów naraz, a żaden sam nie
+     zawęża. */
   const pasujace = useMemo(() => {
-    const f = fraza.trim().toLowerCase();
-    if (!f) return null;
-    return (data?.zwroty ?? []).filter((z) => kody(z).some((k) => k.includes(f)));
+    if (!rozbij(fraza).length) return null;
+    return (data?.zwroty ?? []).filter((z) => pasujeDoFrazy(kody(z), fraza));
   }, [data, fraza]);
 
   /* Szukanie PRZEBIJA kubełek. Bez tego operator wpisuje numer, widzi „ten
@@ -452,9 +504,14 @@ export function Zwroty() {
    * zwroty z jednego zamówienia — nie otwierają żadnego; wybiera człowiek.
    */
   useEffect(() => {
-    const f = fraza.trim().toLowerCase();
-    if (!f) return;
-    const trafienia = (data?.zwroty ?? []).filter((z) => kody(z).includes(f));
+    const czlony = rozbij(fraza);
+    /* JEDEN CZŁON I DOKŁADNIE (0.367.0). Fraza wieloczłonowa zawęża listę,
+       ale nigdy nie otwiera sama: dopasowanie po fragmentach jest z natury
+       przybliżone, a to jest ekran, z którego wychodzi się z czyimś zwrotem
+       i czyimiś pieniędzmi. Ta sama zasada trzyma `znajdzZwrotPoKodzie`. */
+    if (czlony.length !== 1) return;
+    const f = czlony[0];
+    const trafienia = (data?.zwroty ?? []).filter((z) => identyfikatory(z).includes(f));
     if (trafienia.length === 1 && trafienia[0].id !== wybrany) {
       nawiguj(`/obsluga/zwroty/${trafienia[0].id}`);
     }
@@ -734,10 +791,16 @@ export function Zwroty() {
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
         onLogin={setLoginPaczek}
-        onNieodebrana={(waybill, orderId, notatka, login) => {
+        /* JEDEN OBIEKT zamiast sześciu pozycyjnych argumentów (0.367.0).
+           Przy czterech dało się jeszcze policzyć na palcach; przy sześciu
+           zamiana dwóch sąsiednich napisów jest błędem, którego kompilator
+           nie zobaczy, a zapisze się jako czyjeś nazwisko w polu loginu. */
+        onNieodebrana={(d) => {
           setBladSkanu("");
           nieodebrana.mutate({
-            waybill, orderId: orderId || null, notatka: notatka || null, login: login || null,
+            waybill: d.waybill, orderId: d.orderId || null, notatka: d.notatka || null,
+            login: d.login || null, odbiorcaNazwa: d.odbiorcaNazwa || null,
+            przewoznik: d.przewoznik || null,
           }, {
             onSuccess: (w) => { setWynikSkanu(null); setFraza(""); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
             onError: (e) => setBladSkanu((e as Error).message),

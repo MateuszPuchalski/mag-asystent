@@ -1002,6 +1002,17 @@ dostawy nie przechodzą przez mapowanie.
 Zostaje `buyer.login` i `buyer.id` — polityka danych skrzynki dopuszcza login
 rozmówcy wprost, a bez niego nie da się powiązać zamówienia z rozmową.
 
+**Od 0.367.0 dochodzi NAZWA ODBIORCY, i tylko ona.** Bierzemy `firstName`
+z `lastName` z `delivery.address`, a gdy jest `companyName` — jego. To ODBIORCA
+DOSTAWY, nie kupujący: `CheckoutFormDeliveryAddress` ma oba pola w `required`
+i to ta nazwa stoi na naklejce. Bywa inna niż kupujący.
+
+Powód jest jeden: paczki, których klient nie odebrał, nakleja klient albo
+kurier, więc ich numerów w Allegro nie ma wcale. Po chybionym skanie zostaje
+nazwa z naklejki. Reszta tego obiektu — `street`, `city`, `zipCode`,
+`phoneNumber` — dalej nie przechodzi, a lądowisko wycina cały `address` razem
+z nazwą. Zakres decyzji stoi w `docs/obsluga-klienta.md`.
+
 ### Lądowiska są OKROJONE — i to jest zmiana z 0.152.0
 
 Do 0.151.0 `allegro_zwrot.surowe_json` trzymało odpowiedź dosłownie, razem

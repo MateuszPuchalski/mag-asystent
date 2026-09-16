@@ -174,7 +174,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", async () => {
+test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -314,8 +314,19 @@ test("zwroty mają dwadzieścia jeden tras POST, a trzy wychodzą do Allegro", a
      Druga trasa jest ceną pierwszej: skan bywa pomyłką, a wiersz bez zwrotu
      nie ma oceny, którą dałoby się cofnąć. Bez niej jedynym wyjściem byłoby
      zamknięcie pudła z cudzym towarem w środku. */
-  assert.equal(posty.length, 31,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu jeden`);
+  /* Trzydziesta druga (0.367.0): paczki klienta. Trasa ISTNIAŁA od 0.365.0
+     i była GET-em — licznik jej nie widział, bo umowa liczy `app.post`.
+     Zmieniła metodę, nie pracę: dalej NIC NIE ZAPISUJE.
+
+     Powód jest ten sam co przy `/skan` z 0.163.0: uchwyt jechał w adresie
+     (`?login=`), a od tego wydania bywa nim nazwisko z naklejki. Adres ląduje
+     w logu żądań serwera, więc dana osobowa pojechałaby do pliku, którego
+     polityka zwrotów nie obejmuje. Ciało żądania do loga nie wchodzi.
+
+     Licznik rośnie o jeden, a zapisów nie przybywa ani jeden — i to jest cała
+     treść tego zdania w uzasadnieniu. */
+  assert.equal(posty.length, 32,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dwóch`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",

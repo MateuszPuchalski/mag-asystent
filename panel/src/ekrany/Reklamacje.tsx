@@ -23,6 +23,7 @@ import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
+import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 
 /* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0, werdykt od przyrostu trzeciego) ──
    Trzy kolumny, jak skrzynka i jak zwroty — trzy ekrany obsługi mają mieć
@@ -164,11 +165,15 @@ export function Reklamacje() {
 
   /* Filtr liczy się TUTAJ, w pamięci ekranu — tą samą drogą co filtr kubełka
      i z tego samego powodu: lista przyjeżdża w całości, bo spraw w pracy są
-     dziesiątki, nie tysiące. */
+     dziesiątki, nie tysiące.
+
+     DOPASOWANIE JEST WSPÓLNE dla trzech ekranów obsługi (0.367.0) — ten sam
+     `useMemo` stał tu przepisany znak w znak. Od tego wydania fraza dzieli się
+     po spacjach i każdy człon musi trafić, więc „numer login" zawęża zamiast
+     nie znajdować nic. */
   const pasujace = useMemo(() => {
-    const f = fraza.trim().toLowerCase();
-    if (!f) return null;
-    return (data?.reklamacje ?? []).filter((r) => kody(r).some((k) => k.includes(f)));
+    if (!rozbij(fraza).length) return null;
+    return (data?.reklamacje ?? []).filter((r) => pasujeDoFrazy(kody(r), fraza));
   }, [data, fraza]);
 
   /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany

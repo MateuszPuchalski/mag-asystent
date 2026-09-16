@@ -3135,6 +3135,32 @@ Wiersz kolejki pokazuje login osobną linijką. Trafienie, którego nie widać,
 wygląda na przypadek: operator nie wie, czemu ten zwrot wszedł na listę.
 Zwrot bez loginu nie zostawia pustej linijki — Allegro nie zawsze go podaje.
 
+**Fraza dzieli się po spacjach (0.367.0).** Zgłoszenie właściciela: „szukanie
+nieodebranych paczek odbywa się głównie za pomocą loginu użytkownika i innych
+informacji na przesyłce". Do 0.366.0 fraza szła do porównania w całości, więc
+„kowalski inpost" nie znajdowało nic — nie dlatego, że tych danych nie ma,
+tylko dlatego, że nie stoją obok siebie w jednym polu.
+
+Człowiek z kartonem w ręku ma kilka drobnych uchwytów naraz i żaden sam nie
+zawęża. Każdy człon musi trafić w KTÓREŚ pole; nie muszą trafiać w to samo.
+Reguła odwrotna byłaby gorsza niż brak filtru: dopisanie drugiego słowa
+rozszerzałoby wynik, więc im więcej człowiek wie, tym dłuższą dostawałby listę.
+
+Doszły przy tym dwa pola: nazwa odbiorcy z naklejki i przewoźnik, razem
+z nazwami, których używa człowiek („paczkomat" znaczy `INPOST`). Lista
+rozwijana przewoźnika zostaje — odpowiada na inne pytanie niż człon frazy.
+
+**Otwieranie zwrotu ma WĘŻSZĄ listę uchwytów niż szukanie.** Login, nazwa
+odbiorcy i przewoźnik opisują człowieka albo firmę, nie paczkę — zawężają
+listę, ale nie otwierają sprawy. Jedna lista do obu zadań kosztowała otwarcie
+zwrotu na samo „dpd", gdy ta firma miała w kolejce jeden wiersz. Fraza
+wieloczłonowa nie otwiera niczego z tego samego powodu: dopasowanie po
+fragmentach jest przybliżone, a z tego ekranu wychodzi się z cudzymi pieniędzmi.
+
+Kod dopasowania jest JEDEN dla trzech ekranów obsługi (`panel/src/sprawy/
+szukanie.ts`). Reklamacje, dyskusje i zwroty trzymały go przepisanego znak
+w znak.
+
 **Paczka nieodebrana wychodzi ze ślepego zaułka (0.338.0).** Zgłoszenie
 właściciela: „jest sporo paczek, które po prostu zostały nieodebrane i wracają
 do nas — znajdź sposób, aby wyświetlały mi się w zakładce zwroty".
@@ -3605,6 +3631,32 @@ wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
 
 Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
 którego po tamtej stronie nie ma.
+
+**Pierwszy skan takiej paczki CHYBIA Z DEFINICJI (0.367.0).** Właściciel:
+paczki nakleja klient albo kurier, więc tych numerów w Allegro nie ma wcale.
+Numeru listu z wracającego kartonu nasz system nigdy nie widział i nie
+zobaczy — a panel mówił tymczasem „paczka bywa u nas szybciej niż zwrot"
+i kazał czekać na coś, co nie przyjdzie.
+
+Dlatego kolejność wyjść z nieznanego kodu jest odwrócona względem 0.172.0:
+rejestracja stoi pierwsza, pytanie do Allegro drugie. Nie znika, bo etykieta
+zwrotna ZGŁOSZONEGO zwrotu wygląda tak samo i tamtą drogą się ją znajduje.
+
+**Uchwyt człowieka to jedno pole: login albo nazwisko z naklejki.** Dwa pola
+kazałyby operatorowi najpierw rozstrzygnąć, czym jest to, co przepisuje.
+Rozstrzyga serwer: login w całości, nazwisko po fragmencie od trzech znaków.
+Różnica jest świadoma — nikt nie przepisze nazwiska znak w znak tak, jak
+zapisało je Allegro, a fragment loginu wskazywałby cudze zakupy.
+
+Ceną fragmentu jest to, że dwoje ludzi o tym samym nazwisku daje dwa wiersze.
+Dlatego wiersz listy niesie nazwę odbiorcy — wybiera człowiek, patrząc na
+wszystkie trafienia naraz. Wybór ustala od razu trzy rzeczy: numer zamówienia,
+login i nazwę odbiorcy.
+
+**Przewoźnik dochodzi listą rozwijaną.** Przy nieodebranej Allegro nie zna go
+wcale, a operator ma logo przed oczami. Lista, nie pole: wpisane „inpost"
+i „InPost" byłyby w danych dwiema firmami, a kody muszą się zgadzać z tymi,
+które przychodzą przy zwrotach.
 
 ### 25a.13a. Towar dołożony do koszyka ręką (0.365.0)
 

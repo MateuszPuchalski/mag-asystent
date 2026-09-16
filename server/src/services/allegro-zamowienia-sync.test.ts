@@ -139,6 +139,17 @@ test("zamówienie niesie koszt dostawy, sumę, SKU i wszystkie pozycje", async (
 });
 
 test("adres, e-mail i telefon kupującego nie wchodzą ani do modelu, ani do lądowiska", async () => {
+  /* STRAŻNIK PRZEPISANY W 0.367.0, i to jest jego WZMOCNIENIE, nie
+     rozbrojenie. Do 0.366.0 lista zakazanych niosła też „Kowalski" — bo
+     żadnego kawałka adresu dostawy nie braliśmy. Decyzja właściciela zdjęła
+     z tej listy SAMĄ NAZWĘ odbiorcy: paczki nakleja klient albo kurier, więc
+     numeru listu z wracającego kartonu nasz system nigdy nie widział, a nazwa
+     z naklejki jest jedynym uchwytem, jaki po chybionym skanie zostaje.
+
+     Zakres zdjęcia jest dokładnie taki: JEDNA nazwana kolumna modelu pracy.
+     Ulica, miasto, kod, telefon i e-mail zostają zakazane wszędzie, a nazwa
+     NIE WCHODZI do lądowiska — `oczyscSurowy` wycina cały `address` razem
+     z nią, więc prywatna kopia odpowiedzi nie dostaje jej wcale. */
   const d = stanowisko();
   zwrot(d, "z1", "ord-1");
   await uzupelnijZamowienia({
@@ -146,12 +157,59 @@ test("adres, e-mail i telefon kupującego nie wchodzą ani do modelu, ani do lą
   });
   const model = JSON.stringify(d.prepare("SELECT * FROM zamowienie_klienta").get());
   const ladowisko = (d.prepare("SELECT surowe_json FROM allegro_zamowienie").get() as { surowe_json: string }).surowe_json;
-  for (const tajne of ["jan@example.com", "Polna 7", "600100200", "Kowalski"]) {
+  for (const tajne of ["jan@example.com", "Polna 7", "600100200"]) {
     assert.equal(model.includes(tajne), false, `„${tajne}" nie wchodzi do modelu pracy`);
     assert.equal(ladowisko.includes(tajne), false, `„${tajne}" nie wchodzi do lądowiska`);
   }
+  assert.equal(ladowisko.includes("Kowalski"), false,
+    "nazwa odbiorcy nie wchodzi do lądowiska — model pracy ma ją jedną kolumną");
   assert.equal(zostalyWrazliwe(ladowisko), false);
   assert.equal(ladowisko.includes("SEK-NAC-46"), true, "SKU zostaje — to nie dana osobowa");
+});
+
+test("nazwa odbiorcy z naklejki wchodzi JEDNĄ kolumną, a reszta adresu nie wchodzi wcale", () => {
+  /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
+     za pomocą loginu użytkownika i innych informacji na przesyłce". Numeru
+     listu z wracającej paczki nie ma w Allegro, bo nakleja ją klient albo
+     kurier — zostaje nazwa odbiorcy i przewoźnik. */
+  const kolumny = (stanowisko().prepare("PRAGMA table_info(zamowienie_klienta)")
+    .all() as Array<{ name: string }>).map((k) => k.name);
+  assert.equal(kolumny.includes("odbiorca_nazwa"), true);
+  for (const zakazana of ["ulica", "street", "miasto", "city", "kod", "zip",
+    "telefon", "phone", "email"]) {
+    assert.equal(kolumny.some((k) => k.includes(zakazana)), false,
+      `kolumna z „${zakazana}" otwiera drogę danym, których nie pobieramy`);
+  }
+});
+
+test("nazwą odbiorcy jest FIRMA, gdy paczka idzie na firmę", async () => {
+  /* Paczka firmowa nosi na naklejce nazwę firmy zamiast imienia i nazwiska.
+     Operator przepisze to, co widzi — więc to firma ma być uchwytem. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  await uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async () => zamowienie("ord-1", {
+      delivery: { method: { name: "Kurier InPost" }, cost: { amount: "0", currency: "PLN" },
+        address: { firstName: "Jan", lastName: "Kowalski", companyName: "Kowalex" } },
+    }),
+  });
+  assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zamowienie_klienta")
+    .get() as { n: string }).n, "Kowalex");
+});
+
+test("brak adresu dostawy zostaje BRAKIEM, nie pustym napisem", async () => {
+  /* Pusty napis szukałby się jak trafienie w każdym wierszu bez naklejki. */
+  const d = stanowisko();
+  zwrot(d, "z1", "ord-1");
+  await uzupelnijZamowienia({
+    database: d, apiUrl: "https://api", accountId: "k",
+    query: async () => zamowienie("ord-1", {
+      delivery: { method: { name: "Odbiór osobisty" }, cost: { amount: "0", currency: "PLN" } },
+    }),
+  });
+  assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zamowienie_klienta")
+    .get() as { n: string | null }).n, null);
 });
 
 test("jedno nieosiągalne zamówienie nie zabiera kontekstu pozostałym", async () => {
