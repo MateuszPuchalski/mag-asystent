@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, type MutableRefObject } from "react";
 import { Banknote, Ban, Check, Undo2 } from "lucide-react";
 import type { StanZwrotuPieniedzy } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
+import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
 /* ── Oddanie pieniędzy i odmowa (§25a, 0.190.0) ──────────────────────────────
 
@@ -35,11 +36,23 @@ const KODY: Array<{ kod: string; etykieta: string }> = [
   { kod: "NO_RETURN_RIGHT", etykieta: "Brak prawa do zwrotu" },
 ];
 const WYMAGA_POWODU = "REFUND_REJECTED";
+/**
+ * Żadnego kodu nie ma wybranego z góry — i to jest decyzja, nie brak jednej.
+ *
+ * Do audytu z 15 września 2026 stał tu `KODY[0]`, czyli `REFUND_REJECTED`.
+ * Wyglądało to na wybór bezpieczny, bo jako jedyny żąda uzasadnienia.
+ * Jest odwrotnie. Operator rozwija odmowę, żeby powiedzieć „wysłaliśmy nowy
+ * towar", wpisuje to w uzasadnienie — i wysyła je pod kodem, którego nie
+ * wybrał. Klient czyta ten kod w Allegro jako oświadczenie firmy, więc wybór
+ * ma być świadomy: pole zaczyna puste, a przycisk czeka na wskazanie.
+ */
+const BEZ_KODU = "";
 const LIMIT_POWODU = 250;
 /** `LIMIT_REFERENCJI` z `services/zwrot-pieniedzy.ts` — tytuł przelewu bywa długi. */
 const LIMIT_REFERENCJI = 140;
 
-export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew }: {
+export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
+  akcje }: {
   stan: StanZwrotuPieniedzy;
   trwa: boolean;
   blad: string;
@@ -48,13 +61,29 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   /** Zapis przelewu oddanego poza Allegro (0.269.0) i jego cofnięcie. */
   onPrzelew?: (referencja: string | null) => void;
   onCofnijPrzelew?: () => void;
+  /** Rejestr klawiszy ekranu — stąd bierze się `Z`. */
+  akcje?: MutableRefObject<AkcjeKlawiszy>;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
-  const [kod, setKod] = useState(KODY[0].kod);
+  const [kod, setKod] = useState(BEZ_KODU);
   const [powod, setPowod] = useState("");
   const [referencja, setReferencja] = useState("");
 
-  const powodPusty = kod === WYMAGA_POWODU && powod.trim() === "";
+  /* Dwie różne przeszkody, jedna bramka: nie wybrano kodu albo wybrany kod
+     żąda uzasadnienia, którego nie ma. */
+  const niegotowe = kod === BEZ_KODU || (kod === WYMAGA_POWODU && powod.trim() === "");
+
+  /* KLAWISZ `Z` ODDAJE PIENIĄDZE (audyt z 15 września 2026). Tabela §25a.2
+     obiecuje, że typowy zwrot to jeden klawisz na kubełek — a ostatni krok,
+     jedyny, który rusza pieniędzmi, nie miał żadnego i wymuszał sięgnięcie po mysz
+     dokładnie tam, gdzie ręka już leżała na klawiaturze.
+
+     Rejestracja jest BEZWARUNKOWA, bo to hook; warunek siedzi w środku
+     funkcji. Sprawdza dokładnie to samo, co decyduje o istnieniu przycisku
+     wyżej — klawisz ma robić to, co widać, i nic więcej. */
+  useAkcjaKlawisza(akcje, "oddajPieniadze", () => {
+    if (stan.moznaZwrocic && !trwa) onZwroc();
+  });
 
   return <section className="mt-3 rounded-lg border border-slate-200 bg-white p-3"
     aria-label="Pieniądze">
@@ -84,8 +113,13 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono ({stan.odmowa.kod})</span>}
 
+      {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
+          rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
+          czyta się dopiero wtedy, gdy się wie, że jest czego szukać. */}
       {stan.moznaZwrocic && <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
-        onClick={onZwroc}>{trwa ? "ODDAJĘ…" : "ODDAJ PIENIĄDZE"}</Przycisk>}
+        onClick={onZwroc}>{trwa ? "ODDAJĘ…"
+          : <><kbd className="rounded border border-black/20 px-1 text-xs">Z</kbd>{" "}
+            ODDAJ PIENIĄDZE</>}</Przycisk>}
 
       {stan.moznaOdmowic && !odmawiam && !stan.odmowa && !stan.oddane &&
         <Przycisk className={`text-xs ${stan.moznaZwrocic ? "" : "ml-auto"}`}
@@ -138,17 +172,18 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       <label className="block text-xs font-semibold text-slate-600">Powód odmowy
         <select className="field mt-1 w-full text-sm" aria-label="Kod odmowy"
           value={kod} onChange={(e) => setKod(e.target.value)}>
+          <option value={BEZ_KODU}>— wybierz powód —</option>
           {KODY.map((k) => <option key={k.kod} value={k.kod}>{k.etykieta}</option>)}
         </select>
       </label>
       <label className="block text-xs font-semibold text-slate-600">
-        Uzasadnienie {kod === WYMAGA_POWODU ? "(wymagane)" : "(opcjonalne)"}
+        Uzasadnienie {kod === BEZ_KODU ? "" : kod === WYMAGA_POWODU ? "(wymagane)" : "(opcjonalne)"}
         <textarea className="field mt-1 min-h-16 w-full text-sm" maxLength={LIMIT_POWODU}
           aria-label="Uzasadnienie odmowy" value={powod}
           onChange={(e) => setPowod(e.target.value)} />
       </label>
       <div className="flex items-center gap-2">
-        <Przycisk wariant="glowny" className="text-xs" disabled={trwa || powodPusty}
+        <Przycisk wariant="glowny" className="text-xs" disabled={trwa || niegotowe}
           onClick={() => onOdmow(kod, powod.trim() === "" ? null : powod.trim())}>
           {trwa ? "WYSYŁAM…" : "WYŚLIJ ODMOWĘ"}</Przycisk>
         <Przycisk className="text-xs" onClick={() => setOdmawiam(false)}>Anuluj</Przycisk>

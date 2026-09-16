@@ -5,7 +5,7 @@ import { mojaSprawa } from "../sprawy/Moje";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
-import { Pusto } from "../ui";
+import { Pusto, ile, dniSlowo } from "../ui";
 
 /* ── Kolejka zwrotów ─────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej
@@ -55,7 +55,10 @@ export const SYGNALY: Record<Sygnal,
      ilość i cenę przy każdym takcie. Czerwony, bo to pieniądze w złej
      wysokości, a nie praca do zrobienia kiedyś. */
   kwota_nieaktualna: {
-    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie",
+    /* Podpowiedź KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Sygnał mówił,
+       co jest nie tak, i milkł — a naprawa to jedno kliknięcie w kubełku
+       DO ZWROTU. */
+    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie. Popraw kwotę",
     krotko: "kwota?", klasa: "bg-red-100 text-ranga-zle",
     ikona: <CircleHelp size={13} /> },
   /* Wróciło mniej, niż klient zgłosił. Bursztyn, nie czerwień: to nie jest
@@ -66,7 +69,7 @@ export const SYGNALY: Record<Sygnal,
      ich nie odda za nas. Świeci także na zwrocie zamkniętym, bo przelew idzie
      zwykle PO korekcie. */
   przelew_czeka: {
-    tytul: "Pobranie — pieniądze oddaje się przelewem, a śladu po nim nie ma",
+    tytul: "Pobranie — pieniądze oddaje się przelewem. Zapisz go w sekcji Pieniądze",
     krotko: "przelew?", klasa: "bg-amber-100 text-ranga-uwaga",
     ikona: <BanknoteArrowDown size={13} /> },
   rozjazd_ilosci: {
@@ -75,14 +78,10 @@ export const SYGNALY: Record<Sygnal,
     ikona: <PackageX size={13} /> },
 };
 
-/**
- * „1 dzień", ale „2 dni" i „12 dni".
- *
- * Polszczyzna ma tu jeden wyjątek i tylko jeden, więc reguła też jest jedna.
- * „1 dni" na ekranie, który ma się czytać w biegu, zatrzymuje oko na pół
- * sekundy — a to jest dokładnie ten koszt, który ten ekran miał zdjąć.
- */
-export const dniSlowo = (n: number) => `${n} ${n === 1 ? "dzień" : "dni"}`;
+/* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
+   kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
+   sąsiednie pliki i test tej kolejki. */
+export { dniSlowo } from "../ui";
 
 /**
  * Dni do terminu — jedyna liczba na wierszu, którą czyta się jako pilność.
@@ -151,7 +150,12 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
           /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
              klauzuli w `skrzynka/Kolejka.tsx`. Belka stoi przy KAŻDYM wierszu,
              bo dokładana przy zaznaczeniu przesuwałaby treść o trzy piksele. */
-          className={`flex w-full gap-3 border-l-[3px] px-4 py-3 text-left ${aktywny
+          /* `py-2`, nie `py-3` (audyt, 15 września 2026). Cztery piksele na
+             wiersz to przy siedmiu zwrotach cały ósmy wiersz w oknie laptopa —
+             a wiersz ma 86 px i bez tamtych czterech. Cel kliknięcia na blacie
+             mierzy się myszą, nie kciukiem (`docs/ergonomia-magazynu.md`,
+             zakres dekalogu). */
+          className={`flex w-full gap-3 border-l-[3px] px-4 py-2 text-left ${aktywny
             ? "border-l-wertis-amber bg-slate-200"
             : "border-l-transparent hover:bg-slate-50"}`}>
           {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
@@ -164,10 +168,20 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
             {/* Paczka nieodebrana nie ma numeru zwrotu — jej identyfikator to
                 nasz `nieodebrana:<numer listu>`, więc pokazujemy sam numer
                 listu i mówimy wprost, czym to jest. */}
-            <span className="truncate font-bold">
-              {z.zrodlo === "nieodebrana"
-                ? (z.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
-                : (z.numer ?? z.externalId)}</span>
+            {/* LOGIN PRZY NUMERZE, NIE W OSOBNEJ LINIJCE (audyt, 15 września
+                2026). 0.337.0 postawiło go osobno z jednego powodu: „nazwa i tak
+                bywa ucięta" — czyli żeby NIE dokleić go do nazwy towaru. Powód
+                dotyczył linijki drugiej i dalej obowiązuje; pierwsza ma miejsce,
+                bo numer zwrotu ma kilkanaście znaków, a nie kilkadziesiąt.
+                Osobna linijka kosztowała 16 px razy długość kolejki. */}
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="truncate font-bold">
+                {z.zrodlo === "nieodebrana"
+                  ? (z.externalId.replace(/^nieodebrana:/, "") || "bez numeru")
+                  : (z.numer ?? z.externalId)}</span>
+              {z.kupujacyLogin &&
+                <span className="truncate text-xs text-slate-500">{z.kupujacyLogin}</span>}
+            </span>
             {z.zrodlo === "nieodebrana" &&
               <span title="Klient nie odebrał przesyłki — to nie jest zgłoszony zwrot"
                 className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800">
@@ -191,15 +205,9 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
           </div>
           <div className="mt-0.5 truncate text-sm text-slate-600">
             {z.pozycje[0]?.nazwa ?? "Zwrot bez pozycji"}
-            {z.pozycje.length > 1 ? ` i ${z.pozycje.length - 1} inne` : ""}
+            {z.pozycje.length > 1 ? ` i ${ile(z.pozycje.length - 1, "inna", "inne", "innych")}` : ""}
             {sztuki ? ` · ${sztuki} szt.` : ""}
           </div>
-          {/* LOGIN NA WIERSZU (0.337.0). Od tego wydania szuka się po nim,
-              a trafienie, którego nie widać, wygląda na przypadek: operator
-              nie wie, czemu ten zwrot wszedł na listę. Osobna linijka, nie
-              doklejka do nazwy towaru — nazwa i tak bywa ucięta. */}
-          {z.kupujacyLogin && <div className="truncate text-xs text-slate-500">
-            {z.kupujacyLogin}</div>}
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold tabular-nums">
               {zlote(z.sumaPozycjiGrosze, z.waluta)}</span>

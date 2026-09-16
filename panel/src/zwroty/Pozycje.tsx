@@ -328,7 +328,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   const nieocenione = zwrot.pozycje.filter((p) => !p.ocena);
 
   if (!zwrot.pozycje.length) {
-    return <Pusto waga="lista">Zwrot bez pozycji — nie ma czego wycenić.</Pusto>;
+    /* PUSTKA TEŻ MÓWI, CO ZROBIĆ (audyt, 15 września 2026). Zwrot bez pozycji
+       ma dwie przyczyny i obie mają wyjście: zamówienia jeszcze nie pobrano
+       (kolumna dowodów, „Dociągnij teraz") albo to paczka nieodebrana, której
+       klient nie zgłosił — wtedy pozycje dopisuje biuro. */
+    return <Pusto waga="lista">
+      Zwrot bez pozycji — nie ma czego wycenić. Dociągnij zamówienie w kolumnie
+      obok albo dopisz to, co naprawdę przyszło w kartonie.</Pusto>;
   }
 
   return <div className="p-4">
@@ -552,7 +558,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             /* Ekran mówi, czego NIE wie: koszt dostawy stoi przy zamówieniu,
                a tego jeszcze nie pobrano. */
             ? <p className="text-xs text-slate-500">
-                Kwoty pełnej nie znamy bez zamówienia — koszt dostawy stoi przy nim.</p>
+                Kwoty pełnej nie znamy bez zamówienia — koszt dostawy stoi przy nim.
+                Dociągnij je w kolumnie obok.</p>
             : <div className="flex items-baseline justify-between">
                 <span className="font-bold">Z dostawą</span>
                 <span className="text-lg font-bold tabular-nums">

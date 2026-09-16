@@ -35,6 +35,20 @@ export interface AkcjeKlawiszy {
    * kubełku, uciszałoby `j`/`k` — a przejście przez kubełek to też praca.
    */
   korekta?: () => void;
+  /**
+   * PIENIĄDZE, klawisz `Z`: oddaje je od razu.
+   *
+   * ZAPISUJE, a nie otwiera — odwrotnie niż `odmow` wyżej, i z tego samego
+   * paragrafu. §25a.5 daje potwierdzenie temu, czego nie da się cofnąć;
+   * zwrot pieniędzy cofa się dopłatą i widać go na osi, więc pytałby o zgodę
+   * na coś, na co nie pyta jej przycisk obok. Dwie różne odpowiedzi na to samo
+   * pytanie — zależnie od tego, czy operator sięgnął po mysz — to gorsza
+   * nauka niż jedna, i ta niepytająca jest już wybrana.
+   *
+   * Nie sprawdza tu nic: czy jest co oddać, wie `Pieniadze.tsx`, bo to on
+   * dostaje stan z serwera. Ekran zna klawisze, nie reguły pieniędzy.
+   */
+  oddajPieniadze?: () => void;
 }
 
 /**

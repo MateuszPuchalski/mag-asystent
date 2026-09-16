@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Pieniadze } from "./Pieniadze";
+import type { AkcjeKlawiszy } from "./klawisze";
 import type { StanZwrotuPieniedzy } from "../api/typy";
 
 /* ── Pieniądze przy zwrocie (§25a, 0.190.0) ──────────────────────────────────
@@ -61,11 +62,27 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByText(/Oddano/)).toBeNull();
   });
 
+  /* ŻADEN KOD NIE JEST WYBRANY Z GÓRY (audyt, 15 września 2026). Stał tu
+     `REFUND_REJECTED` i wyglądało to bezpiecznie, bo jako jedyny żąda powodu.
+     Skutek był odwrotny: uzasadnienie „wysłaliśmy nowy towar" wychodziło do
+     klienta pod oświadczeniem, że odmawiamy zwrotu pieniędzy. */
+  it("odmowa nie ma kodu wybranego z góry i bez wskazania nie wychodzi", async () => {
+    const onOdmow = vi.fn();
+    ekran({ onOdmow });
+    await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
+    expect(screen.getByLabelText("Kod odmowy")).toHaveValue("");
+    expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
+    /* Sam powód nie odblokowuje: brakuje tego, czego klient nie zgadnie. */
+    await userEvent.type(screen.getByLabelText(/Uzasadnienie/), "Towar wrócił uszkodzony");
+    expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
+    expect(onOdmow).not.toHaveBeenCalled();
+  });
+
   it("odmowa z kodem wymagającym powodu nie wychodzi pusta", async () => {
     const onOdmow = vi.fn();
     ekran({ onOdmow });
     await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
-    /* Domyślny kod to REFUND_REJECTED — ten wymaga uzasadnienia. */
+    await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), "REFUND_REJECTED");
     expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Uzasadnienie/), "Towar wrócił uszkodzony");
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ }));
@@ -91,6 +108,44 @@ describe("Pieniądze przy zwrocie", () => {
   it("w trakcie żądania przycisk jest zablokowany", () => {
     ekran({ trwa: true });
     expect(screen.getByRole("button", { name: /ODDAJĘ…/ })).toBeDisabled();
+  });
+
+  /* ── Klawisz `Z` (audyt, 15 września 2026) ───────────────────────────
+     Tabela §25a.2 obiecuje klawisz na kubełek, a ostatni krok — jedyny, który
+     rusza pieniędzmi — nie miał żadnego. Testy idą przez REJESTR, bo taką
+     drogą chodzi prawdziwy nasłuch z `ekrany/Zwroty.tsx`.                    */
+  const rejestr = () => ({ current: {} as AkcjeKlawiszy });
+
+  it("klawisz oddaje pieniądze przez rejestr ekranu", () => {
+    const akcje = rejestr();
+    const onZwroc = vi.fn();
+    ekran({ akcje, onZwroc });
+    akcje.current.oddajPieniadze?.();
+    expect(onZwroc).toHaveBeenCalled();
+  });
+
+  it("klawisz milczy dokładnie tam, gdzie nie ma przycisku", () => {
+    /* Gorszy od braku skrótu jest skrót robiący coś, czego nie widać — przy
+       pobraniu Allegro tych pieniędzy nie trzymało i żądanie wróciłoby odmową. */
+    const akcje = rejestr();
+    const onZwroc = vi.fn();
+    ekran({ akcje, onZwroc,
+      stan: stan({ moznaZwrocic: false, powod: "Zamówienie za pobraniem." }) });
+    akcje.current.oddajPieniadze?.();
+    expect(onZwroc).not.toHaveBeenCalled();
+  });
+
+  it("klawisz nie wysyła drugiego żądania w trakcie pierwszego", () => {
+    const akcje = rejestr();
+    const onZwroc = vi.fn();
+    ekran({ akcje, onZwroc, trwa: true });
+    akcje.current.oddajPieniadze?.();
+    expect(onZwroc).not.toHaveBeenCalled();
+  });
+
+  it("przycisk pokazuje swój klawisz, bo rozpoznanie jest tańsze od pamiętania", () => {
+    ekran();
+    expect(screen.getByRole("button", { name: /Z ODDAJ PIENIĄDZE/ })).toBeInTheDocument();
   });
 
   /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────

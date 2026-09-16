@@ -1,6 +1,6 @@
 import React from "react";
 import { MessageCircleQuestion } from "lucide-react";
-import { Przycisk } from "../ui";
+import { Przycisk, ile } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
 import { Zwijka } from "./Zwijka";
 import type { WymianaCopilota } from "../api/typy";
@@ -53,7 +53,7 @@ export function Dopytanie(p: {
     tytul="Dopytaj Copilota"
     Ikona={MessageCircleQuestion}
     podpis={p.wymiany.length > 0
-      ? `${p.wymiany.length} ${p.wymiany.length === 1 ? "wymiana" : "wymian"} · odpowiedź czytasz Ty, nie klient`
+      ? `${ile(p.wymiany.length, "wymiana", "wymiany", "wymian")} · odpowiedź czytasz Ty, nie klient`
       : "odpowiedź czytasz Ty, nie klient"}
     domyslnieOtwarte={p.wymiany.length > 0}
   >

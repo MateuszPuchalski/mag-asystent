@@ -60,6 +60,14 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz }: {
         Sprzedaż bywa starsza niż okno importu, integracja nie zawsze wpisuje
         numer zamówienia na dokument, a bez potwierdzonej kartoteki nie ma
         po czym dopasować towarów.</p>
+      {/* ZDANIE KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Trzy powody bez
+          czwartego zdania zostawiały operatora przy ścianie: ekran tłumaczył się
+          i milkł. Wskazać dokumentu nie ma jak — kandydatów jest zero, a panel
+          nie umie szukać po numerze — ale zwrot da się doprowadzić do końca bez
+          dokumentu, i to jest ta informacja, której tu brakowało. */}
+      <p className="mt-1">
+        Zwrotu to nie zatrzymuje: korektę wystawiasz w Subiekcie, a jej numer
+        przepisujesz wyżej — to zamyka zwrot tak samo jak z dokumentem.</p>
       {blad && <p className="mt-1 text-red-700">{blad}</p>}
     </div>;
   }

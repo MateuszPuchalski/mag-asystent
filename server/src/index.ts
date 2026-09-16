@@ -26,7 +26,8 @@ import { dostawcyRoutes } from "./routes/dostawcy.js";
 import { kartonRoutes } from "./routes/karton.js";
 import { allegroRoutes } from "./routes/allegro.js";
 import { zadaniaTerenoweRoutes } from "./routes/zadania-terenowe.js";
-import { panelObslugiRoutes } from "./routes/panel-obslugi.js";
+import { panelObslugiRoutes, problemPaneluObslugi, wersjaPaneluObslugi }
+  from "./routes/panel-obslugi.js";
 import { skrzynkaRoutes } from "./routes/skrzynka.js";
 import { copilotRoutes } from "./routes/copilot.js";
 import { zwrotyRoutes } from "./routes/zwroty.js";
@@ -236,6 +237,13 @@ export async function buildApp() {
       /* Read-model Subiekta bywa nieświeży i to jest stan do zameldowania,
          a nie powód, żeby nie wstać — patrz `odswiezReadModel`. */
       bladImportuStartowego,
+      /* PANEL ZOSTAŁ NA STARYM BUILDZIE (audyt, 15 września 2026). Najcichsza
+         pomyłka wdrożenia, jaką zna to repo: `npm run build` w `server/` nie
+         przebudowuje panelu, więc API melduje nową wersję, a ekran obsługi
+         zostaje na starej. Wygląda to na wydanie, które „nie działa".
+         Recepta w `DEPLOY.md` istniała przez siedemnaście wydań panelu i nie
+         została uruchomiona ani razu — więc pyta o to teraz sama trasa. */
+      bez("panel obsługi", () => problemPaneluObslugi(WERSJA)),
       ...awarie,
     ].filter((x): x is string => x !== null);
     return {
@@ -245,6 +253,11 @@ export async function buildApp() {
          aktualizacji: `git pull` przestawia serwer, ale APK na kolektorze
          zostaje stary do czasu rozesłania przez MDM. */
       wersja: WERSJA,
+      /* Wersja ZBUDOWANEGO panelu obsługi, obok wersji serwera i z tego samego
+         powodu co ona: rozjazd jest pytaniem numer jeden po aktualizacji.
+         `null` znaczy „panelu tu nie ma albo jest sprzed 0.355.0" — to nie
+         jest to samo co rozjazd i nie robi wdrożenia czerwonym. */
+      panelObslugi: wersjaPaneluObslugi(),
       /* Etykieta instancji (0.69.0). Trasa jest bez sesji i tak ma być:
          etykieta nie jest daną biura, a ostrzeżenie „to jest dev" musi być
          widoczne PRZED zalogowaniem — właśnie wtedy człowiek myli serwery. */

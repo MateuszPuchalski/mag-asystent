@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Layers, Unlink } from "lucide-react";
 import type { SprawaRozmowy, WierszSprawy } from "../api/typy";
-import { Przycisk } from "../ui";
+import { Przycisk, odmien } from "../ui";
 
 /* Pasek sprawy (§6.1, 0.161.0).
    
@@ -35,7 +35,9 @@ export function Sprawa({ sprawa, rozmowaId, sprawy, trwa, blad, onZaloz, onDolac
       <b>{sprawa.tytul}</b>
       {rodzenstwo.length
         ? <span className="flex flex-wrap items-center gap-2 text-slate-600">
-            · {rodzenstwo.length === 1 ? "druga rozmowa" : `${rodzenstwo.length} inne rozmowy`}:
+            · {rodzenstwo.length === 1 ? "druga rozmowa"
+              : `${rodzenstwo.length} ${odmien(rodzenstwo.length, "inna rozmowa",
+                "inne rozmowy", "innych rozmów")}`}:
             {rodzenstwo.map((r) => <button key={r.id} className="underline hover:text-slate-900"
               onClick={() => onOtworz(r.id)}>{r.klient} #{r.id}</button>)}
           </span>

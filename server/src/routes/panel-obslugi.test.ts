@@ -47,3 +47,49 @@ test("zasoby nie wychodzą poza katalog builda", async () => {
       `zasób ${zly} nie został odrzucony`);
   }
 });
+
+/* ── Pieczątka wersji panelu (audyt, 15 września 2026) ──────────────────────
+   `npm run build` w `server/` NIE przebudowuje panelu. Kto pomyli katalog,
+   dostaje API z nowego kodu i ekran obsługi ze starego builda — a `/api/health`
+   melduje przy tym nową wersję, więc wdrożenie wygląda na udane. Siedemnaście
+   wydań panelu zeszło z jednej gałęzi bez ani jednego potwierdzenia, że
+   dotarły na ekran; recepta w `DEPLOY.md` nie została uruchomiona ani razu.
+
+   Testy idą po funkcjach CZYSTYCH, nie po dysku: w CI `npm test` biegnie przed
+   `npm run build`, więc test sięgający po prawdziwy katalog zachowywałby się
+   inaczej u programisty niż na maszynie CI — czyli nie pilnowałby niczego. */
+
+test("pieczątkę czyta się z HTML-a, także po wstrzyknięciu skryptów przez Vite", async () => {
+  const { wersjaZHtml } = await import("./panel-obslugi.js");
+  assert.equal(wersjaZHtml('<head><meta name="wertis-panel" content="0.355.0"/></head>'), "0.355.0");
+  /* Kolejność znaczników nie jest umową — plugin stempluje `post`, ale build
+     Vite wstawia swoje skrypty obok i to się zmienia między wersjami. */
+  assert.equal(wersjaZHtml(
+    '<head><script src="/a.js"></script><meta name="wertis-panel" content="1.2.3"/>'
+    + '<link rel="stylesheet" href="/a.css"></head>'), "1.2.3");
+});
+
+test("brak pieczątki to nie jest wersja — build sprzed tego wydania jej nie ma", async () => {
+  const { wersjaZHtml } = await import("./panel-obslugi.js");
+  assert.equal(wersjaZHtml("<head><title>WERTIS</title></head>"), null);
+  assert.equal(wersjaZHtml(""), null);
+});
+
+test("rozjazd wersji mówi, CO zrobić, i wskazuje właściwy katalog", async () => {
+  const { problemZWersji } = await import("./panel-obslugi.js");
+  const zdanie = problemZWersji("0.352.0", "0.355.0");
+  assert.ok(zdanie, "rozjazd musi dać zdanie");
+  /* Obie wersje w zdaniu, bo bez nich nie widać, która strona została z tyłu. */
+  assert.match(zdanie, /0\.352\.0/);
+  assert.match(zdanie, /0\.355\.0/);
+  assert.match(zdanie, /KORZENIU/);
+});
+
+test("zgodne wersje i brak panelu MILCZĄ, bo żadne z nich nie jest usterką", async () => {
+  const { problemZWersji } = await import("./panel-obslugi.js");
+  assert.equal(problemZWersji("0.355.0", "0.355.0"), null);
+  /* `null` to instalacja bez panelu albo build sprzed pieczątki. Zdanie w tych
+     przypadkach robiłoby czerwonym każdy `npm run dev` i każdą starą
+     instalację — czyli uczyłoby ignorować listę problemów zdrowia. */
+  assert.equal(problemZWersji(null, "0.355.0"), null);
+});

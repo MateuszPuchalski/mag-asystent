@@ -1,6 +1,7 @@
 import { Camera } from "lucide-react";
 import { Zwijka } from "./Zwijka";
 import type { OdczytZdjecia } from "../api/typy";
+import { ile } from "../ui";
 
 /**
  * CO MODEL ODCZYTAŁ ZE ZDJĘĆ — jeden akapit na fotografię.
@@ -36,7 +37,7 @@ export function OdczytZdjec({ odczyt }: { odczyt: OdczytZdjecia[] }) {
   return <Zwijka
     tytul="Co model odczytał ze zdjęć"
     Ikona={Camera}
-    podpis={`${odczyt.length} ${odczyt.length === 1 ? "zdjęcie" : "zdjęć"} · porównaj z miniaturą`}
+    podpis={`${ile(odczyt.length, "zdjęcie", "zdjęcia", "zdjęć")} · porównaj z miniaturą`}
   >
     <ul className="space-y-1.5 p-2 text-xs text-slate-800" aria-label="Odczyt ze zdjęć rozmowy">
       {odczyt.map((o) => <li key={o.zdjecie} className="flex gap-2">

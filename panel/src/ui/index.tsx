@@ -323,16 +323,20 @@ export const czas = (v: string | null | undefined) =>
  * Zadanie terenowe potrafi czekać tydzień, a „172 g 12 min" to liczba, którą
  * czytelnik musi podzielić w głowie, żeby się przestraszyć. Poniżej doby nic
  * się nie zmienia — alarm dostaje dokładnie to co dotąd.
+ *
+ * DNI LICZY `dniSlowo`, nie własny ternar (scalenie 0.352.0 z 0.353.0). Obie
+ * gałęzie dopisały do tego pliku odmianę tego samego słowa naraz: ta funkcja
+ * swoją, a wydanie o liczebniku — wspólną regułę niżej. Wynik był poprawny
+ * w obu miejscach, bo „dni" brzmi tak samo w obu formach mnogich, ale dwa
+ * zapisy jednej odmiany w JEDNYM pliku to już nie oszczędność, tylko rozjazd
+ * czekający na okazję.
  */
 export function wiek(ms: number | null): string {
   if (ms == null) return "—";
   const min = Math.floor(ms / 60_000);
   if (min < 1) return "poniżej minuty";
   const g = Math.floor(min / 60);
-  if (g >= 24) {
-    const dni = Math.floor(g / 24);
-    return dni === 1 ? "1 dzień" : `${dni} dni`;
-  }
+  if (g >= 24) return dniSlowo(Math.floor(g / 24));
   return g ? `${g} g ${min % 60} min` : `${min} min`;
 }
 
@@ -410,3 +414,52 @@ export function LoginKlienta({ login, className = "" }: { login: string; classNa
         ? "Nie udało się skopiować loginu" : "Kopiuj login"}</span>
   </button>;
 }
+
+/* ── Trzy formy liczby mnogiej (audyt zwrotów, 15 września 2026) ─────────────
+   Polszczyzna ma przy liczebniku TRZY formy, nie dwie: „1 pozycja",
+   „2 pozycje", „5 pozycji". Panel liczył dwie w ośmiu miejscach i wychodziło
+   z tego „5 pozycje" (`zwroty/Dopisz.tsx`), „i 5 inne" (`zwroty/Kolejka.tsx`)
+   albo — co gorsza, bo wygląda poprawnie — „2 pasujących zwrotów"
+   (`zwroty/Szukanie.tsx`). Drugi błąd jest częstszy od pierwszego: dwa i trzy
+   zdarzają się na ekranie znacznie częściej niż pięć.
+
+   REGUŁA STOI W JEDNYM MIEJSCU, bo osiem kopii dwuformowego wyrażenia to
+   dokładnie to, co dało osiem różnych wyników. Jedyna poprawna kopia mieszkała
+   w `ekrany/Wiedza.tsx` i nikt jej nie znalazł — prywatna funkcja w ekranie
+   nie jest miejscem na regułę języka.
+
+   `dniSlowo` stało w TRZECH kolejkach przepisane znak w znak i przyjechało
+   tutaj razem z regułą. „dni" brzmi tak samo w obu formach mnogich, więc tamte
+   dwie gałęzie były poprawne — ale trzy kopie jednej odmiany to trzy miejsca,
+   w których następna może się rozjechać.                                     */
+
+/**
+ * „1 dzień", ale „2 dni" i „12 dni".
+ *
+ * Wygląda na dwie formy i jest trzema: dla „dni" środkowa i ostatnia brzmią
+ * tak samo. „1 dni" na ekranie, który ma się czytać w biegu, zatrzymuje oko na
+ * pół sekundy — a to jest dokładnie ten koszt, który kolejki miały zdjąć.
+ */
+export const dniSlowo = (n: number) => ile(n, "dzień", "dni", "dni");
+
+/**
+ * Forma rzeczownika przy liczbie `n`.
+ *
+ * @param jeden mianownik liczby pojedynczej — „pozycja"
+ * @param dwa   forma dla 2–4 — „pozycje"
+ * @param piec  dopełniacz liczby mnogiej — „pozycji"
+ */
+export function odmien(n: number, jeden: string, dwa: string, piec: string): string {
+  /* Bierzemy WARTOŚĆ BEZWZGLĘDNĄ, bo `-2 % 10` daje w JS −2 i cała reguła
+     rozsypuje się po cichu. Liczników ujemnych ekran nie pokazuje, ale reguła
+     języka nie ma zależeć od tego, czy ktoś tego kiedyś nie policzy. */
+  const l = Math.abs(n);
+  if (l === 1) return jeden;
+  const r10 = l % 10, r100 = l % 100;
+  /* Nastki są wyjątkiem i tylko one: „12 pozycji", nie „12 pozycje". */
+  return r10 >= 2 && r10 <= 4 && (r100 < 12 || r100 > 14) ? dwa : piec;
+}
+
+/** To samo z liczbą z przodu: „5 pozycji". */
+export const ile = (n: number, jeden: string, dwa: string, piec: string): string =>
+  `${n} ${odmien(n, jeden, dwa, piec)}`;

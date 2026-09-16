@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BadgePercent } from "lucide-react";
 import type { StanRabatu } from "../api/typy";
 import { Przycisk } from "../ui";
@@ -27,6 +27,18 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
   blad: string;
   onZglos: () => void;
 }) {
+  /* ── WNIOSEK PYTA „NA PEWNO" (audyt, 15 września 2026) ────────────────────
+     §25a.5 daje cofnięcie wszędzie, gdzie da się cofnąć, a potwierdzenie tam,
+     gdzie się nie da. Tu się nie da: wniosek idzie do Allegro, panel nie ma
+     końcówki do jego wycofania, a drugiego na tę samą pozycję złożyć nie można
+     (przycisk znika, bo końcówka nie jest idempotentna).
+
+     Do tego audytu stało tu jedno kliknięcie bez pytania — i to przy
+     przycisku, który siedzi na liście pozycji, tuż obok oceny „na stan"
+     i „utylizacja" klikanych dziesiątki razy dziennie. Trafienie obok
+     kosztowało nieodwracalny wniosek o cudze pieniądze. */
+  const [pytam, setPytam] = useState(false);
+
   const kolor = rabat.stan === "przyznany" ? "text-ranga-ok"
     : rabat.stan === "odrzucony" ? "text-ranga-zle"
     : rabat.stan === "nie_wiadomo" ? "text-slate-500" : "text-slate-600";
@@ -41,9 +53,21 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
           zrobiło to samo. To ta liczba mówi, ile pracy zdejmuje przycisk. */}
       {rabat.typ === "AUTOMATIC" && <span className="text-slate-500">· automat Allegro</span>}
 
-      {rabat.stan === "brak" && <Przycisk className="ml-auto text-xs" disabled={trwa}
-        onClick={onZglos}>ZGŁOŚ RABAT</Przycisk>}
+      {rabat.stan === "brak" && !pytam && <Przycisk className="ml-auto text-xs" disabled={trwa}
+        onClick={() => setPytam(true)}>ZGŁOŚ RABAT</Przycisk>}
     </div>
+
+    {/* Zdanie mówi SKUTEK, nie „czy na pewno": pytanie bez treści uczy tylko
+        odruchu klikania „tak". Po złożeniu przycisk i tak znika, więc to jedyny
+        moment, w którym ta informacja kogokolwiek dosięgnie. */}
+    {rabat.stan === "brak" && pytam && <div className="mt-1 flex flex-wrap items-center gap-2
+      rounded border border-slate-200 bg-slate-50 p-1.5">
+      <span className="text-slate-600">Wniosek idzie do Allegro i panel go nie wycofa.</span>
+      <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
+        onClick={() => { setPytam(false); onZglos(); }}>ZŁÓŻ WNIOSEK</Przycisk>
+      <Przycisk className="text-xs" disabled={trwa}
+        onClick={() => setPytam(false)}>Anuluj</Przycisk>
+    </div>}
 
     {/* Brak dopasowania mówi POWÓD — milczenie wygląda jak usterka panelu,
         a jest zerwanym ogniwem w danych (ten sam wzorzec co przy kartotekach). */}
