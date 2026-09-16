@@ -309,8 +309,46 @@ def sprawdz_specyfikacje_allegro() -> int:
     return 0
 
 
+# Znaczniki niescalonego konfliktu. Dopasowanie stoi na POCZĄTKU LINII, bo
+# w prozie o gicie te ciągi mają prawo wystąpić w środku zdania albo w bloku
+# kodu z wcięciem — a git zapisuje je zawsze od pierwszej kolumny.
+KONFLIKT_RE = re.compile(r"^(<{7}|={7}$|>{7})", re.MULTILINE)
+
+
+def sprawdz_znaczniki_konfliktu() -> int:
+    """Żaden śledzony dokument nie niesie niescalonego konfliktu.
+
+    DLACZEGO TO ISTNIEJE. `CHANGELOG.md` przyjechał na `main` ze scaleniem
+    z `<<<<<<< HEAD` w linii 37, `=======` w 196 i `>>>>>>> origin/main`
+    w 259 — czyli z dwustu dwudziestoma liniami wpisów rozdzielonymi na dwie
+    strony konfliktu. Przeszło to SIEDEM BRAMEK i całą CI, bo żadna nie czyta
+    tego pliku pod tym kątem, a dwa kolejne wydania przeniosły to dalej, nie
+    zauważając.
+
+    Znacznik konfliktu jest tanim błędem do złapania i drogim do przeoczenia:
+    plik wygląda na kompletny, a mówi dwie rzeczy naraz i nie wiadomo, która
+    jest prawdziwa. Sprawdzamy WSZYSTKIE dokumenty z `DOCS`, nie sam
+    CHANGELOG — następny raz zdarzy się gdzie indziej.
+    """
+    bad = 0
+    for doc in DOCS:
+        if not os.path.exists(doc):
+            continue
+        for m in KONFLIKT_RE.finditer(open(doc, encoding="utf-8").read()):
+            nr = m.string.count("\n", 0, m.start()) + 1
+            print(
+                f"KONFLIKT        {doc}:{nr} zaczyna się od „{m.group(1)}” —\n"
+                "                to niescalony konflikt, nie treść dokumentu."
+            )
+            bad += 1
+    if not bad:
+        print(f"znaczników konfliktu: brak w {len(DOCS)} dokumentach")
+    return bad
+
+
 def main() -> int:
-    bad = sprawdz_wersje() + sprawdz_licznik_weryfikuj() + sprawdz_specyfikacje_allegro()
+    bad = (sprawdz_wersje() + sprawdz_licznik_weryfikuj()
+           + sprawdz_specyfikacje_allegro() + sprawdz_znaczniki_konfliktu())
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

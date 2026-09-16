@@ -34,7 +34,6 @@ historii nie przepisujemy.
 ---
 
 
-<<<<<<< HEAD
 ## 0.368.0 — 16 września 2026
 
 **Bramkę korekt wolno sforsować.** Decyzja właściciela: „dodaj opcję
@@ -66,6 +65,17 @@ do czasu korekty.
   w logu. Licznik tras POST zwrotów 32 → 33.
 - **Kosz z dokumentem, pusty i rozliczony poza aplikacją odmawiają** — tam nie
   ma czego robić.
+
+**[poprawka] CHANGELOG miał w sobie niescalony konflikt.** Plik przyjechał na
+`main` ze scaleniem 0.365.0 ze znacznikami `<<<<<<< HEAD`, `=======`
+i `>>>>>>> origin/main` — z dwustu dwudziestoma liniami wpisów rozdzielonymi na
+dwie strony. Treść była cała i w dobrej kolejności, więc naprawa to skasowanie
+trzech linii.
+
+Gorsze od samego konfliktu jest to, że przeszedł SIEDEM BRAMEK i całą CI, a dwa
+kolejne wydania przeniosły go dalej, nie zauważając. Żadna kontrola nie czytała
+dokumentów pod tym kątem. Od tego wydania czyta: `tools/docs_check.py` odmawia,
+gdy którykolwiek śledzony dokument zaczyna linię od znacznika konfliktu.
 
 Wdrożenie: nowy build panelu i serwera.
 
@@ -193,7 +203,7 @@ nie trzeba ustawiać, wystarczy nowy build panelu.
 Numer 0.363.0 zostaje pusty i to nie jest pomyłka. Wydanie obok ustąpiło go
 temu PR-owi, a potem weszło na `main` pierwsze — wersja może iść tylko
 w górę, więc ta zmiana bierze 0.365.0.
-=======
+
 ## 0.364.0 — 16 września 2026
 
 **Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie
@@ -256,7 +266,6 @@ i stan Allegro naraz. Pilnuje tego teraz test panelu.
 
 Trasy miary dostały też własny plik bramek: przez trzy wydania nie miały
 testu roli wcale, tak samo jak rozstrzyganie kolizji przed 0.361.0.
->>>>>>> origin/main
 
 ## 0.362.0 — 16 września 2026
 
