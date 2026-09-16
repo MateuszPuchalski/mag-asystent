@@ -276,6 +276,7 @@ function mapRow(r: any): ProblemView {
     createdBy: r.created_by,
     resolvedAt: r.resolved_at,
     resolvedNote: r.resolved_note,
+    resolvedBy: r.resolved_by ?? null,
     docNumber: r.doc_number ?? null,
     sym: r.sym ?? null,
     name: r.name ?? null,
@@ -299,6 +300,32 @@ export function listUnresolved(): ProblemView[] {
   return (db().prepare(`${SELECT_JOIN} WHERE p.resolved_at IS NULL ORDER BY p.id DESC`).all() as any[]).map(
     mapRow
   );
+}
+
+/**
+ * Wyjątki ZAMKNIĘTE ostatnio — żeby hala dowiedziała się, co postanowiono.
+ *
+ * Do 0.356.0 ta droga nie istniała. Magazynier zgłaszał niezgodność ze
+ * zdjęciem, biuro ją zamykało i pisało `resolved_note`, a kolektor pobierał
+ * wyłącznie `listUnresolved` — więc zgłoszenie po prostu ZNIKAŁO z ekranu.
+ * Z punktu widzenia hali wyglądało to identycznie jak zignorowanie, a to uczy
+ * najprostszej rzeczy: nie zgłaszać.
+ *
+ * OKNO, nie „wszystkie": lista ma pokazać, co postanowiono, odkąd człowiek
+ * ostatnio patrzył, a nie historię magazynu. Kilkaset zamkniętych wyjątków
+ * na ekranie kolektora to ten sam szum, co żaden.
+ */
+export function listRozstrzygniete(dni = 7): ProblemView[] {
+  /* `datetime` ze SPACJĄ nie zadziała: `created_at` i `resolved_at` zapisuje
+     `nowIso()`, czyli ISO z `T` i `Z`. Porównanie tekstowe z formatem bez `T`
+     przesuwałoby okno o dobę — ta sama pułapka, którą opisuje komentarz przy
+     `GRANICA` w `skutecznosc-doboru.ts`. */
+  const dniLimit = Math.max(1, Math.min(90, Math.trunc(dni)));
+  return (db().prepare(
+    `${SELECT_JOIN} WHERE p.resolved_at IS NOT NULL
+       AND p.resolved_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now',?)
+     ORDER BY p.resolved_at DESC`
+  ).all(`-${dniLimit} days`) as any[]).map(mapRow);
 }
 
 export function listByDelivery(deliveryId: number): ProblemView[] {
@@ -336,8 +363,8 @@ export function zapiszPrzesylke(
 
 export function resolveProblem(id: number, note: string | undefined, user: string): { ok: true } | { error: string } {
   const r = db()
-    .prepare("UPDATE problem SET resolved_at=?, resolved_note=? WHERE id=? AND resolved_at IS NULL")
-    .run(nowIso(), note ?? null, id);
+    .prepare("UPDATE problem SET resolved_at=?, resolved_note=?, resolved_by=? WHERE id=? AND resolved_at IS NULL")
+    .run(nowIso(), note ?? null, user, id);
   if (r.changes === 0) return { error: "Problem nie istnieje albo jest już rozwiązany" };
   logEvent("problem_resolved", user, null, { problemId: id });
   return { ok: true };

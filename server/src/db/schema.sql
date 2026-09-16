@@ -1179,7 +1179,12 @@ CREATE TABLE IF NOT EXISTS problem (
   created_at    TEXT NOT NULL,
   created_by    TEXT,
   resolved_at   TEXT,
-  resolved_note TEXT
+  resolved_note TEXT,
+  -- KTO rozstrzygnął (0.357.0). Do 0.356.0 nazwisko szło wyłącznie do księgi
+  -- zdarzeń, a hala i tak nie widziała rozstrzygnięcia w ogóle. Gdy zaczyna je
+  -- widzieć, „biuro zamknęło" bez nazwiska jest gorsze niż cisza: magazynier
+  -- ma iść z pytaniem do człowieka, nie do tabeli.
+  resolved_by   TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_problem_delivery ON problem(delivery_id);
 -- lista „nierozwiązane" jest odpytywana przy każdym starcie aplikacji

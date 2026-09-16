@@ -330,6 +330,11 @@ interface ApiService {
     @GET("api/problems/unresolved")
     suspend fun unresolvedProblems(): ProblemsResponse
 
+    /* Druga połowa pętli (0.357.0): co biuro postanowiło z tym, co hala
+       zgłosiła. Bez tego zgłoszenie po zamknięciu znikało bez słowa. */
+    @GET("api/problems/rozstrzygniete")
+    suspend fun rozstrzygnieteProblems(@Query("dni") dni: Int = 7): ProblemsResponse
+
     @POST("api/problems/{id}/resolve")
     suspend fun resolveProblem(@Path("id") id: Long, @Body body: ResolveProblemBody): OkResponse
 
