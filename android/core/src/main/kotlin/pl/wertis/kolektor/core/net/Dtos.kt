@@ -820,6 +820,12 @@ data class ProblemView(
     val hasPhoto: Boolean = false,
     val createdAt: String = "",
     val createdBy: String? = null,
+    // Co postanowiło biuro (0.357.0). Do 0.356.0 kolektor pobierał wyłącznie
+    // nierozwiązane, więc te trzy pola nie miały jak do niego dotrzeć —
+    // zgłoszenie po zamknięciu po prostu znikało z ekranu.
+    val resolvedAt: String? = null,
+    val resolvedNote: String? = null,
+    val resolvedBy: String? = null,
     /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
     val docNumber: String? = null,
     val sym: String? = null,

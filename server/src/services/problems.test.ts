@@ -332,3 +332,69 @@ test("średnik i cudzysłów w opisie nie rozwalają kolumn", () => {
   assert.match(wiersz, /"karton 2; napis ""UWAGA"""/);
   assert.equal(wiersz.split('"')[0].split(";").length, 7, "kolumny przed opisem bez zmian");
 });
+
+/* ── Co biuro postanowiło wraca na halę (0.357.0) ────────────────────────────
+   Do 0.356.0 kolektor pobierał wyłącznie `listUnresolved`, więc zgłoszenie po
+   zamknięciu ZNIKAŁO z jego ekranu. Z punktu widzenia magazyniera wyglądało to
+   identycznie jak zignorowanie — a to uczy najprostszej rzeczy: nie zgłaszać.
+
+   Nagłówek `ProblemsScreen.kt` mówi to samo od 0.30.0: „zgłoszenie, którego
+   nikt nigdy nie zobaczy, to ta sama niewiedza co przed wdrożeniem". Pilnował
+   tego tylko dla kierunku tam.                                               */
+
+test("zamknięty wyjątek wraca na halę z powodem I Z NAZWISKIEM", () => {
+  const z = zglos({ typ: "missing_item", qty: 0, lineId });
+  const id = (z as { id: number }).id;
+  assert.equal(P.listRozstrzygniete().length, 0, "dopóki otwarty, nie jest rozstrzygnięty");
+
+  assert.deepEqual(P.resolveProblem(id, "Dostawca przyśle brakujące w środę.", "A. Lewandowska"),
+    { ok: true });
+
+  const lista = P.listRozstrzygniete();
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].id, id);
+  assert.equal(lista[0].resolvedNote, "Dostawca przyśle brakujące w środę.");
+  /* Nazwisko, nie samo „biuro": magazynier ma iść z pytaniem do człowieka,
+     a nie do tabeli. Do 0.356.0 szło wyłącznie do księgi zdarzeń. */
+  assert.equal(lista[0].resolvedBy, "A. Lewandowska");
+  assert.equal(lista[0].createdBy, "Jan Kowalski", "widać też, kto zgłaszał");
+
+  /* Zamknięty znika z listy otwartych — to zostaje bez zmian. */
+  assert.equal(P.listUnresolved().length, 0);
+});
+
+test("okno odcina historię magazynu, a nie ostatnie postanowienia", () => {
+  const stary = (zglos({ typ: "missing_item", qty: 0, lineId }) as { id: number }).id;
+  const swiezy = (zglos({ typ: "qty_mismatch", qty: 3, lineId }) as { id: number }).id;
+  P.resolveProblem(stary, "Sprzed miesiąca.", "A. Lewandowska");
+  P.resolveProblem(swiezy, "Wczoraj.", "A. Lewandowska");
+
+  /* Znacznik podstawiamy, bo inaczej test mierzyłby czas własnego przebiegu.
+     Wartość liczona OD TERAZ, nigdy zaszyta — reguła z `temuMinut`. */
+  const dawno = new Date(Date.now() - 40 * 24 * 3600_000).toISOString();
+  db().prepare("UPDATE problem SET resolved_at=? WHERE id=?").run(dawno, stary);
+
+  assert.deepEqual(P.listRozstrzygniete(7).map((p) => p.id), [swiezy],
+    "tydzień pokazuje tylko to, co postanowiono od ostatniego zajrzenia");
+  assert.equal(P.listRozstrzygniete(90).length, 2, "szersze okno widzi oba");
+});
+
+test("najnowsze postanowienie stoi pierwsze", () => {
+  const a = (zglos({ typ: "missing_item", qty: 0, lineId }) as { id: number }).id;
+  const b = (zglos({ typ: "qty_mismatch", qty: 3, lineId }) as { id: number }).id;
+  P.resolveProblem(a, "Pierwsze.", "Anna");
+  P.resolveProblem(b, "Drugie.", "Anna");
+  db().prepare("UPDATE problem SET resolved_at=? WHERE id=?")
+    .run(new Date(Date.now() - 3600_000).toISOString(), a);
+
+  assert.deepEqual(P.listRozstrzygniete().map((p) => p.resolvedNote), ["Drugie.", "Pierwsze."]);
+});
+
+test("wyjątek zamknięty bez notatki nadal wraca — sam fakt też jest odpowiedzią", () => {
+  const id = (zglos({ typ: "missing_item", qty: 0, lineId }) as { id: number }).id;
+  P.resolveProblem(id, undefined, "Anna");
+  const lista = P.listRozstrzygniete();
+  assert.equal(lista.length, 1, "cisza z notatką i cisza bez ekranu to dwie różne ciszy");
+  assert.equal(lista[0].resolvedNote, null);
+  assert.equal(lista[0].resolvedBy, "Anna");
+});
