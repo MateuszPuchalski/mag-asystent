@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.362.0 — 16 września 2026
+
+**Wskazany towar sam wjeżdża na ekran, a skan wskazanego go odkłada.** Dwie
+poprawki rozkładania kosza z jednej obserwacji na hali: kolektor wiedział
+więcej, niż pokazywał, i wymagał więcej, niż musiał.
+
+**Lista przewija się do wskazanej pozycji.** Kosz na dwadzieścia wierszy mieści
+na ekranie kolektora cztery. Skan towaru z dna kosza podświetlał wiersz, którego
+nie było widać — człowiek szukał go kciukiem, choć urządzenie od razu wiedziało,
+o który chodzi. Lista rozkładania jest teraz leniwa i przewija się sama, tak samo
+jak przy dostawie. Dotyczy kosza i kartonu, bo rozkłada je ten sam ekran.
+
+**Skan pozycji wybranej palcem odkłada ją.** Drugi skan towaru kończy odłożenie
+od 0.189.0, ale uzbrajał go wyłącznie skan pierwszy. Kto wybrał towar
+dotknięciem wiersza, a potem go zeskanował, dostawał samo ponowne wskazanie:
+dwa razy pokazał urządzeniu to samo i nic się nie działo. Dotknięcie wiersza
+liczy się teraz tak samo jak skan. Automatyczne wskazanie następnej pozycji po
+odłożeniu zostaje NIEUZBROJONE — inaczej pierwszy skan przy nowej pozycji
+odkładałby ją, zanim magazynier spojrzy na regał.
+
+**Odmowa bez adresu przestaje być niema.** Drugi skan tej samej pozycji bez
+wpisanego regału nie ma czego potwierdzić i wcześniej kończył się samym
+piknięciem — wyglądało to jak zepsuty skaner. Teraz kolektor mówi, czego brakuje.
+
+Wdrożenie: nowy APK na kolektory. Serwer i panele bez zmian.
+
 ## 0.359.0 — 16 września 2026
 
 **Ten sam towar z kilku zwrotów to jedna linijka — i jest czym zmierzyć, czy
