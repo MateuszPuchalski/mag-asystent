@@ -5135,7 +5135,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; od 0.364.0 „za długo" ma próg, ale liczony z historii kanału, nie wpisany ręką |
 | Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
 | Czas realizacji zadania magazynowego (§22) | **działa** od 0.361.0 | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, każda ze swoim `n` |
-| Alarm „to stoi za długo" | **działa** od 0.364.0 | `alarmyWymiany()`, `GET /api/biuro/alarm-wymiany`, plakietka w pasku stanu; próg to `p90` spraw domkniętych w TYM kanale, osobno dla każdego z czterech |
+| Alarm „to stoi za długo" | **działa** od 0.364.0 | `alarmyWymiany()`, `GET /api/biuro/alarm-wymiany`, plakietka w pasku stanu; próg to `p90` spraw domkniętych w TYM kanale, osobno dla każdego z osobna |
+| Notatka do dostawy w mierze i alarmie | **działa** od 0.369.0 | wyłączona w 0.361.0 przez uzasadnienie wzięte z `conversation_event`; `delivery_note` ma jedną odpowiedź, a brak odpowiedzi wstrzymuje domknięcie dostawy |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |

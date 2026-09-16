@@ -1197,8 +1197,11 @@
           sprzed tygodnia utopiłaby sto załatwionych w kwadrans.
           Kolumna OTWARTE liczy sprawy, które trwają DO DZIŚ i dlatego nie
           mają czasu zamknięcia; bez niej tabela pokazywałaby wyłącznie to,
-          co ktoś domknął. Progu „za późno" tu nie ma — §22 wymienia tę
-          metrykę i nie podaje terminu, więc czy to długo, rozstrzyga człowiek.
+          co ktoś domknął. Notatka do dostawy jest tu od 0.369.0 i jest
+          jedynym kanałem, w którym brak odpowiedzi WSTRZYMUJE pracę —
+          dostawy nie da się domknąć, póki pytanie wisi bez odpowiedzi.
+          Kiedy zaczyna być za długo, mówi blok niżej: próg bierze się
+          z historii tego samego kanału, nie z niczyjego ustalenia.
         </p>
       </div>
       <table id="wymiana"></table>
@@ -3545,6 +3548,7 @@ const NAZWA_KANALU = {
   niezgodnosc: "Niezgodność w dostawie",
   pominiecie: "Pominięcie w koszu",
   kolizja: "Kolizja kodu",
+  notatka: "Notatka do dostawy",
 };
 
 /* Minuty na zdanie dla człowieka. Doba rozbija się na dni z tego samego

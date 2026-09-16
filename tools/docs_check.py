@@ -227,6 +227,35 @@ ZNACZNIK_RE = re.compile(r"^`\[WERYFIKUJ\]`", re.MULTILINE)
 DEKLARACJA_RE = re.compile(r"takich rzeczy (?:zostały|zostało) (\w+(?: \w+)?)")
 
 
+def sprawdz_znaczniki_konfliktu() -> int:
+    """Znacznik konfliktu w dokumencie — dokument scalony do połowy.
+
+    POWSTAŁO PO DWÓCH PRZEPUSZCZONYCH. 16 września `CHANGELOG.md` wszedł na
+    `main` z trzema liniami `<<<<<<<`, `=======` i `>>>>>>>` po scaleniu, które
+    ktoś porzucił w połowie. Przeszedł wszystkie siedem bramek, bo ŻADNA nie
+    czytała pliku `.md` pod kątem składni: ten skrypt sprawdzał numer wersji,
+    martwe ścieżki i liczby, a nie to, czy plik jest cały.
+
+    Drugie wydanie tego samego dnia dopisało swój wpis WEWNĄTRZ popsutego
+    bloku — i to jest powód, dla którego ta bramka istnieje. Taki błąd nie
+    stoi w miejscu: każde następne scalenie wkłada kolejną treść do środka
+    i rośnie obszar, którego nikt już nie umie rozdzielić z pamięci.
+
+    Znacznik na początku wiersza nie ma w tym repozytorium żadnego
+    poprawnego zastosowania — sprawdzone na wszystkich dokumentach z `DOCS`
+    w dniu dodania bramki. Wzmianka W TEKŚCIE (jak ta) nie zaczyna wiersza
+    i przechodzi.
+    """
+    bad = 0
+    for doc in DOCS:
+        for i, line in enumerate(open(doc, encoding="utf-8"), 1):
+            line = line.rstrip("\n")
+            if line.startswith("<<<<<<< ") or line == "=======" or line.startswith(">>>>>>> "):
+                print(f"ZNACZNIK KONFLIKTU  {doc}:{i} → {line[:40]}")
+                bad += 1
+    return bad
+
+
 def sprawdz_licznik_weryfikuj() -> int:
     """Preambuła `struktura.md` deklaruje liczbę rzeczy do ustalenia.
 
@@ -310,7 +339,8 @@ def sprawdz_specyfikacje_allegro() -> int:
 
 
 def main() -> int:
-    bad = sprawdz_wersje() + sprawdz_licznik_weryfikuj() + sprawdz_specyfikacje_allegro()
+    bad = (sprawdz_wersje() + sprawdz_licznik_weryfikuj()
+           + sprawdz_specyfikacje_allegro() + sprawdz_znaczniki_konfliktu())
     for doc in DOCS:
         text = open(doc, encoding="utf-8").read()
         base = os.path.dirname(doc)

@@ -29,7 +29,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zadanie_terenowe", "problem", "ean_rozstrzygniecie", "ean_conflict"]) {
+  for (const t of ["zadanie_terenowe", "problem", "ean_rozstrzygniecie", "ean_conflict", "delivery_note"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -107,14 +107,14 @@ test("okno odcina historię, a puste kanały mówią `null`, nie zero", () => {
   assert.equal(waskie.najstarszaOtwartaMin, null);
 });
 
-test("wszystkie cztery kanały są w raporcie ZAWSZE, także puste", () => {
+test("wszystkie pięć kanałów są w raporcie ZAWSZE, także puste", () => {
   /* Ta sama zasada co przy jedenastu drogach doboru: kanał bez ani jednej
      sprawy jest ustaleniem, nie pustką — mówi, że tą drogą nikt nie chodzi. */
   const r = W.czasyWymiany(30);
   assert.deepEqual(r.wiersze.map((w) => w.kanal),
-    ["zadanie", "niezgodnosc", "pominiecie", "kolizja"]);
+    ["zadanie", "niezgodnosc", "pominiecie", "kolizja", "notatka"]);
   assert.deepEqual(r.wiersze.map((w) => w.kierunek),
-    ["biuro→hala", "hala→biuro", "hala→biuro", "hala→biuro"]);
+    ["biuro→hala", "hala→biuro", "hala→biuro", "hala→biuro", "biuro→hala"]);
   assert.ok(r.wiersze.every((w) => w.medianaMin === null && w.zamknietych === 0));
 });
 
@@ -219,4 +219,54 @@ test("sprawa DOMKNIĘTA, choćby najdłuższa, nie jest spóźniona", () => {
   assert.equal(a.spoznionych, 0);
   assert.equal(a.najstarszaSpoznionaMin, null);
   assert.equal(W.alarmyWymiany().spoznionychRazem, 0);
+});
+
+test("NOTATKA jest kanałem — jej wyłączenie w 0.361.0 było pomyłką", () => {
+  /* 0.361.0 zostawiło notatki poza miarą, bo „odpowiedź bywa rozmową na kilka
+     tur". To zdanie jest nieprawdziwe o tej tabeli i mówi to sam kod:
+     `odpowiedzNaNotatke` odmawia nadpisania, bo odpowiedź jest JEDNA
+     i ostateczna, a nowe ustalenie to NOWA NOTATKA. Kilka tur to kilka
+     notatek, z których każda ma dwa końce.
+
+     Ten kanał jest zresztą jedynym, w którym brak odpowiedzi WSTRZYMUJE
+     pracę: `czekaNaOdpowiedz` nie pozwala domknąć dostawy. Sprawa o najwyższej
+     stawce z całej piątki siedziała poza miarą i poza alarmem.             */
+  const dodaj = (minutTemu: number, trwaloMinut: number | null) =>
+    db().prepare(`INSERT INTO delivery_note(sgt_dok_id,tresc,created_at,created_by,odpowiedz,odp_at,odp_by)
+      VALUES(1,'Czy to ta paleta?',?,'Anna',?,?,?)`)
+      .run(
+        temu(minutTemu),
+        trwaloMinut === null ? null : "Tak",
+        trwaloMinut === null ? null : temu(minutTemu - trwaloMinut),
+        trwaloMinut === null ? null : "Marek"
+      );
+
+  for (let i = 0; i < 10; i++) dodaj(5000 + i, 90);
+  dodaj(600, null); // wisi dziesięć godzin i trzyma dostawę otwartą
+
+  const w = wiersz("notatka");
+  assert.equal(w.kierunek, "biuro→hala", "pyta biuro, odpowiada hala");
+  assert.equal(w.zamknietych, 10);
+  assert.equal(w.medianaMin, 90);
+  assert.equal(w.otwartych, 1);
+  assert.ok(w.najstarszaOtwartaMin! >= 600);
+
+  const a = W.alarmyWymiany().kanaly.find((k) => k.kanal === "notatka")!;
+  assert.equal(a.progMin, 90, "próg z historii TEGO kanału, nie z innego");
+  assert.equal(a.podstawa, "p90", "90 minut jest nad podłogą godziny, więc liczy się z danych");
+  assert.equal(a.spoznionych, 1, "pytanie wiszące dziesięć godzin przy progu półtorej");
+});
+
+test("odczyt odpowiedzi przez biuro NIE domyka wymiany", () => {
+  /* Wymiana kończy się, gdy hala odpowiedziała — `odp_at`. Kiedy biuro tę
+     odpowiedź przeczytało (`odp_widziana_at`, 0.57.0) to osobne pytanie
+     i ma własny licznik w nagłówku. Liczone jako koniec, wydłużałoby czas
+     odpowiedzi HALI o zwłokę BIURA i mieszałoby dwie różne winy. */
+  db().prepare(`INSERT INTO delivery_note(sgt_dok_id,tresc,created_at,created_by,odpowiedz,odp_at,odp_by,odp_widziana_at)
+    VALUES(1,'X',?,'Anna','Tak',?,'Marek',?)`)
+    .run(temu(200), temu(140), temu(20));
+
+  const w = wiersz("notatka");
+  assert.equal(w.zamknietych, 1);
+  assert.equal(w.medianaMin, 60, "60 minut do odpowiedzi, nie 180 do jej przeczytania");
 });
