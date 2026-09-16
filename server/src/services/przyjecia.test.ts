@@ -239,3 +239,56 @@ test("rozłożone przyjęcia schodzą pod te, które czekają", () => {
     [["1210", "rozlozony"], ["1209", "poza_aplikacja"]]
   );
 });
+
+test("koszyk ZWIĄZANY z dokumentem otwiera się z własnej etykiety (0.376.0)", () => {
+  /* Jedno pudło, jedno imię. Do 0.375.0 hala rozkładała kosz założony
+     z dokumentu, czyli DRUGI kosz na ten sam karton: pierwszy nie miał ani
+     jednego odłożenia, a drugi nie miał zamknięcia. Po związaniu skan `Z-7`
+     prowadzi do tego samego kosza co numer z dokumentu. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', 'done', '{}', 'MM 1209/MAG/2026', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+  const id = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez,
+       zamknieto_at, zamknieto_przez, mm_queue_id, mm_dok_id, mm_numer)
+     VALUES ('Z-7', 'zamkniety', 'zwroty', ?, 'Biuro', ?, 'Biuro', ?, ?, 'MM 1209/MAG/2026')`)
+    .run(teraz, teraz, q, DOK).lastInsertRowid);
+  d.prepare("INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)")
+    .run(id, 900_036, "TEST-LINIA-TODO", "Pozycja nietknięta", 3);
+
+  const zEtykiety = P.otworzPrzyjecie(" z-7 ", "Jan");
+  assert.equal(zEtykiety.id, id, "etykieta koszyka prowadzi do NIEGO");
+
+  /* Numer z dokumentu prowadzi tam samo — i nie zakłada drugiego kosza. */
+  const zKartki = P.otworzPrzyjecie("1209", "Ewa");
+  assert.equal(zKartki.id, id);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number }).n, 1,
+    "jeden karton to jeden kosz — i to jest cała ta zmiana");
+});
+
+test("skan numeru z kartki WIĄŻE czekający koszyk, zamiast zakładać sobowtóra", () => {
+  /* 0.377.0. Worker wiąże koszyki co minutę, a magazynier bywa szybszy niż
+     jego takt. Skan w tej luce zakładał NOWY kosz na dokument należący do
+     czekającego koszyka — czyli dokładnie tego sobowtóra, którego 0.376.0
+     miało się pozbyć. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', 'done', '{}', 'MM 1209/MAG/2026', ?, 'Biuro')`).run(teraz).lastInsertRowid);
+  const koszykId = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez,
+       zamknieto_at, zamknieto_przez, mm_queue_id)
+     VALUES ('Z-11', 'zamkniety', 'zwroty', ?, 'Biuro', ?, 'Biuro', ?)`)
+    .run(teraz, teraz, q).lastInsertRowid);
+  d.prepare("INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc) VALUES (?,?,?,?,?)")
+    .run(koszykId, 900_036, "TEST-LINIA-TODO", "Pozycja nietknięta", 3);
+
+  const kosz = P.otworzPrzyjecie("1209", "Jan");
+
+  assert.equal(kosz.id, koszykId, "kartka prowadzi do czekającego koszyka");
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number }).n, 1,
+    "i nie zakłada drugiego kosza na ten sam karton");
+  assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszykId) as
+    { mm_dok_id: number }).mm_dok_id, DOK);
+});

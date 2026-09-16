@@ -6,6 +6,7 @@ import { migrate, type Db } from "../db/db.js";
 import {
   bilansKartotek,
   dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  pozycjeNaOutlet, przeniesionoNaOutlet,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona,
@@ -56,6 +57,8 @@ function zamowienie(d: Db, ext: string, pozycje: Array<{ offerId: string; nazwa:
 function towar(d: Db, twId: number, symbol: string, ean: string | null = null) {
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)")
     .run(twId, symbol, `Towar ${symbol}`, ean);
+  /* Wiersz stanu — od 0.372.2 kartoteka bez niego nie wchodzi do pudła. */
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
 }
 
 /** Rozmowa w skrzynce, w której klient wspomniał o tym zamówieniu. */
@@ -925,6 +928,7 @@ test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   ocenPozycje(d, poz[1], "utylizacja", 2, KTO);
@@ -952,6 +956,7 @@ test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
@@ -988,6 +993,7 @@ test("kosz zamknięty BEZ dokumentu wolno poprawić, a pozycja wraca do NIEGO", 
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
@@ -1013,6 +1019,7 @@ test("poprawka zamkniętego kosza UNIEWAŻNIA jego zadanie MM", () => {
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
@@ -1950,4 +1957,79 @@ test("szczegół po identyfikatorze składa TEN SAM wiersz, co kolejka", () => {
   assert.deepEqual(listaZwrotow(d, TERAZ, { id: a }), [zKolejki]);
   assert.deepEqual(listaZwrotow(d, TERAZ, { id: 99_999 }), [],
     "nieznany zwrot to pusta lista, nie wyjątek");
+});
+
+/* ── Trzecia ocena: outlet obsługiwany ręką (0.375.0) ───────────────────────
+   Warunek, pod którym ta ocena w ogóle weszła, brzmiał: ma kończyć się listą
+   roboczą, a nie samym znacznikiem. Znacznik bez czytelnika to „przecena"
+   z 0.209.0 drugi raz.                                                       */
+
+/** Zwrot przyjęty, z pozycją wiszącą na kartotece prowadzonej magazynowo. */
+function zwrotZKartoteka(d: Db, KTO: { id: number; name: string }) {
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11, tw_symbol='SYM-11' WHERE id=?")
+    .run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  return { id, poz };
+}
+
+test("ocena „outlet” NIE zakłada koszyka i NIE rusza dokumentu", () => {
+  /* Magazyn outletowy nie jest skonfigurowany, bo obsługuje go ręka. Koszyk
+     znaczyłby dokument MM, a dokument — zgadnięty magazyn docelowy. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZKartoteka(d, KTO);
+
+  const wynik = ocenPozycje(d, poz[0], "outlet", 2, KTO);
+
+  assert.equal(wynik.koszyk, null, "outlet nie ma koszyka i to jest jego definicja");
+  const { n } = d.prepare("SELECT COUNT(*) AS n FROM kosz").get() as { n: number };
+  assert.equal(n, 0, "żadne pudło nie powstaje");
+  const { m } = d.prepare("SELECT COUNT(*) AS m FROM sfera_queue").get() as { m: number };
+  assert.equal(m, 0, "i żadne zadanie do Subiekta");
+});
+
+test("pozycja na outlet stoi na LIŚCIE, a przeniesienie ją z niej zdejmuje", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZKartoteka(d, KTO);
+  ocenPozycje(d, poz[0], "outlet", 2, KTO);
+
+  const czeka = pozycjeNaOutlet(d);
+  assert.equal(czeka.length, 1, "lista mówi, co czeka na przeniesienie");
+  assert.equal(czeka[0].symbol, "SYM-11");
+  assert.equal(czeka[0].pozycjaId, poz[0]);
+
+  const wynik = przeniesionoNaOutlet(d, poz[0], KTO);
+  assert.equal(pozycjeNaOutlet(d).length, 0, "odklikane schodzi z listy");
+  assert.equal(przeniesionoNaOutlet(d, poz[0], KTO).outletAt, wynik.outletAt,
+    "powtórzenie jest ciche i zostawia PIERWSZY podpis");
+});
+
+test("zmiana oceny z outletu na stan KASUJE ślad przeniesienia", () => {
+  /* Pozycja, która wraca do obiegu magazynowego, nie czeka już na niczyją
+     rękę przy regale — a stary znacznik kłamałby, że na nim stoi. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZKartoteka(d, KTO);
+  ocenPozycje(d, poz[0], "outlet", 2, KTO);
+  przeniesionoNaOutlet(d, poz[0], KTO);
+
+  ocenPozycje(d, poz[0], "stan", 3, KTO);
+
+  const w = d.prepare("SELECT outlet_at, ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(poz[0]) as { outlet_at: string | null; ocena: string };
+  assert.equal(w.outlet_at, null);
+  assert.equal(w.ocena, "stan");
+});
+
+test("przeniesienia nie da się zameldować dla pozycji BEZ tej oceny", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZKartoteka(d, KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+
+  assert.throws(() => przeniesionoNaOutlet(d, poz[0], KTO), /nie jest oceniona na outlet/);
 });

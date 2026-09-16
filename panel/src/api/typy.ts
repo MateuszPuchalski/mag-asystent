@@ -811,6 +811,29 @@ export type SzczegolyWysylki = {
    kolejkę niż liczniki.                                                     */
 
 export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | "odrzucony";
+
+/**
+ * Ocena towaru ze zwrotu (0.375.0).
+ *
+ * Trzy wartości, dwa zachowania. `stan` i `utylizacja` mają swój koszyk
+ * i swój dokument MM; `outlet` nie ma żadnego, bo magazyn outletowy obsługuje
+ * dziś ręka — a to znaczy listę roboczą zamiast papieru.
+ */
+export type Ocena = "stan" | "utylizacja" | "outlet";
+
+/** Pozycja czekająca na przeniesienie na regał outletowy (0.375.0). */
+export interface PozycjaNaOutlet {
+  pozycjaId: number;
+  zwrotId: number;
+  numer: string;
+  nazwa: string;
+  twId: number | null;
+  symbol: string | null;
+  ilosc: number;
+  /** Ile wartości sztuka straciła — tyle mniej dostał klient za nią. */
+  potracenieGrosze: number | null;
+  ocenionoAt: string | null;
+}
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
   | "rozjazd_ilosci" | "przelew_czeka";

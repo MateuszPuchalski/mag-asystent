@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { TYPY_SFERY, type MmItem, type SferaAdapter } from "../adapters/sfera.js";
 import { logEvent } from "../services/events.js";
 import { wypuscPowrotyKoszy } from "../services/kosze.js";
+import { zwiazKoszykiZDokumentami } from "../services/kosze-zwrotow.js";
 import { wpiszNumeryZw } from "../services/zw-automat.js";
 
 /* ── Logika kolejki Sfery ───────────────────────────────────────────────────
@@ -211,6 +212,14 @@ export function powrotyPoDokumentachSfery(teraz = Date.now()): number {
     wpiszNumeryZw(db(), new Date(teraz));
   } catch (e) {
     console.error("[worker] numery ZW:", e instanceof Error ? e.message : e);
+  }
+  /* WIĄZANIE PRZED POWROTAMI (0.376.0). Powrót bierze trasę z dokumentu
+     koszyka, więc kosz musi go najpierw dostać. Pod własnym parasolem: jeden
+     nieudany import nie ma prawa zatrzymać powrotów. */
+  try {
+    zwiazKoszykiZDokumentami(db());
+  } catch (e) {
+    console.error("[worker] wiązanie koszyków z MM:", e instanceof Error ? e.message : e);
   }
   try {
     return wypuscPowrotyKoszy();

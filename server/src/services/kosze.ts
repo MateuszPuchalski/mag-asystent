@@ -1186,6 +1186,15 @@ function adresyWDrodze(koszId: number): number {
  * biuro ręką — czyli dokładnie tak, jak działał cały ten obieg do 0.276.x.
  */
 function trasaPowrotu(k: WierszKosza): { zMagazynu: number; doMagazynu: number } | null {
+  /* KOSZYK Z PANELU MA TRASĘ Z KONFIGURACJI, także po związaniu z dokumentem
+     (0.377.0). To MY zleciliśmy tamto MM i wiemy, że poszło MAG→ZWROTY
+     (`zakolejkujMm`), więc `mm_mag_z` niczego tu nie dodaje — a bywa PUSTE,
+     bo kolumna read-modelu jest nullowalna. Bez tego warunku związanie
+     odbierałoby koszykowi trasę, którą przed nim miał pewną: powrót nie
+     wychodziłby wcale, a towar zostawał na regale zwrotów. */
+  if (k.mm_queue_id !== null) {
+    return { zMagazynu: config.magId.ZWROTY, doMagazynu: config.magId.MAG };
+  }
   if (k.mm_dok_id === null) {
     return { zMagazynu: config.magId.ZWROTY, doMagazynu: config.magId.MAG };
   }

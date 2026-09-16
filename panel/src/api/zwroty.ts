@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -15,6 +15,9 @@ export const kluczeZwrotow = {
      jeden, więc nic zbędnego się tym nie odświeża. */
   szczegoly: ["zwrot"] as const,
   kosz: ["zwroty", "kosz"] as const,
+  /* Lista robocza outletu (0.375.0) — osobny klucz, bo odświeża ją co innego
+     niż koszyk: ocena „na outlet" i meldunek o przeniesieniu. */
+  outlet: ["zwroty", "outlet"] as const,
 };
 
 /**
@@ -211,8 +214,7 @@ export function useOcena() {
   return useMutation({
     /* `null` COFA ocenę (0.202.0) — serwer i trasa umiały to od 0.192.0, tylko
        panel nie miał klawisza. */
-    mutationFn: (v: { pozycjaId: number; ocena: "stan" | "utylizacja" | null;
-      wersja: number }) =>
+    mutationFn: (v: { pozycjaId: number; ocena: Ocena | null; wersja: number }) =>
       api<{ wersja: number; koszyk: number | null }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
         { method: "POST", body: JSON.stringify({ ocena: v.ocena, wersja: v.wersja }) }),
@@ -222,7 +224,42 @@ export function useOcena() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      /* I lista outletu: ocena „na outlet" dopisuje do niej pozycję, a zmiana
+         na inną — zabiera. */
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
       /* I szczegół — po ocenie zmienia się `wKoszyku` każdego składnika. */
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+    },
+  });
+}
+
+/* ── Regał outletowy obsługiwany ręką (0.375.0) ─────────────────────────────
+   Decyzja właściciela: „na razie będziemy obsługiwać outlet ręcznie". Panel
+   nie wystawia tu żadnego dokumentu — mówi, co czeka na przeniesienie,
+   i przyjmuje meldunek, że już nie czeka.
+
+   Lista jest WARUNKIEM istnienia trzeciej oceny. Znacznik bez czytelnika to
+   „przecena" zdjęta w 0.209.0; ten ma czytelnika, który niesie towar na
+   regał.                                                                     */
+
+export function useOutlet() {
+  return useQuery({
+    queryKey: kluczeZwrotow.outlet,
+    queryFn: () => api<{ pozycje: PozycjaNaOutlet[] }>("/api/obsluga/zwroty/outlet"),
+  });
+}
+
+export function usePrzeniesionoNaOutlet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number }) =>
+      api<{ pozycjaId: number; outletAt: string }>(
+        "/api/obsluga/zwroty/outlet/przeniesiono",
+        { method: "POST", body: JSON.stringify(v) }),
+    /* Także oś zwrotu: meldunek dopisuje do niej zdanie, więc otwarta karta
+       pokazywałaby stan sprzed kliknięcia. */
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
     },
   });

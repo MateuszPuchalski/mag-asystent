@@ -34,7 +34,11 @@ historii nie przepisujemy.
 ---
 
 
-## 0.373.1 — 16 września 2026
+## 0.377.1 — 16 września 2026
+
+**Numer ustępuje wydaniu 0.377.0 z main.**
+Wydanie powstało jako 0.373.1 i zmieniło numer przy scalaniu, bo w międzyczasie
+main doszedł do 0.377.0. Treść dokumentu się nie zmieniła.
 
 **Strategia WMS na piśmie: co znaczy „pełny system magazynowy" przy 342 m².**
 Pytanie właściciela brzmiało, jak zamienić WERTIS w pełny WMS i wyłączyć
@@ -62,6 +66,149 @@ tyle co deklaracja bez mechanizmu.
 
 Poza dokumentacją nie zmienia się nic — żadnego kodu, żadnej trasy, żadnej
 tabeli.
+## 0.377.0 — 16 września 2026
+
+**Pięć dziur z przeglądu trzech poprzednich wydań.** Przegląd własnego diffu,
+zanim ktokolwiek go scalił. Każda z tych rzeczy kosztowałaby towar albo zaufanie
+do ekranu, a żadnej nie złapały testy — bo testy sprawdzały to, co kod miał
+robić, a nie to, czego nie przewidziałem.
+
+**Wyścig o dokument.** Worker wiąże koszyki z ich MM co minutę, a magazynier
+bywa szybszy niż jego takt. Skan numeru z kartki w tej luce zakładał NOWY kosz
+na dokument należący do czekającego koszyka — czyli sobowtóra, którego 0.376.0
+miało się pozbyć. Dwa kosze z jednym `mm_dok_id` dałyby dwa wiersze w liście
+przyjęć, otwierały cudze pudło i mogły zamówić drugie MM powrotne na towar,
+który już wrócił. Teraz wiązanie stoi TAKŻE na drodze skanu, a dokument z cudzym
+koszem nie daje się związać po raz drugi i zostawia ślad w dzienniku.
+
+**Związany koszyk odzyskuje trasę powrotu.** Związanie przestawiło go do gałęzi
+„kosz z dokumentu", a ta bierze magazyn docelowy wyłącznie z `mm_mag_z` —
+kolumny read-modelu, która bywa PUSTA. Koszyk tracił więc trasę, którą przed
+związaniem miał pewną: powrót nie wychodził wcale, a towar zostawał na regale
+zwrotów. To MY zleciliśmy tamto MM i wiemy, że poszło MAG→ZWROTY, więc trasa
+idzie z konfiguracji.
+
+**Kartoteki nieznanej nie sądzimy.** Bramka z 0.374.0 czytała brak wiersza stanu
+jako „usługa". Importer bierze jednak wyłącznie kartoteki ODBLOKOWANE i tylko
+dla nich wstawia stany, więc towar zablokowany w Subiekcie nie ma tu ani jednego
+wiersza — a leży na regale zwrotów najczęściej ze wszystkich. Bramka odmawiałaby
+mu wejścia do pudła z całkowicie fałszywym powodem, po cichu, przez ocenę.
+Brak stanu znaczy „usługa" dopiero wtedy, gdy kartotekę skądinąd znamy.
+
+**Ptaszek składnika przestał być obejściem.** Koszyk napełniony przed 0.374.0
+dostawał wiersz usługowy z powrotem przez odznaczenie i zaznaczenie go na nowo.
+Jedna reguła ma jedno miejsce.
+
+**Pasek klawiszy zna `O`.** Tabela podpowiedzi rozjechała się z nasłuchem
+w 0.375.0 — klawisz działał, ale ekran o nim nie mówił.
+
+## 0.376.0 — 16 września 2026
+
+**Jeden karton nosi jedno imię.** Do tego wydania obsługa napełniała koszyk
+„Z-7", a hala rozkładała kosz z jego dokumentu — „1209" — bo otwarcie przyjęcia
+zakładało NOWY kosz, pusty i bez związku z tamtym. Jeden fizyczny karton był
+więc dwiema jednostkami pracy: pierwsza nie miała ani jednego odłożenia, druga
+nie miała zamknięcia, a raport cyklu musiał je zszywać heurystyką po czasie.
+
+Teraz koszyk DOSTAJE swój dokument, zamiast rodzić sobowtóra. Worker wiąże go
+minutę po tym, jak MM wejdzie do read-modelu, i od tej chwili skan etykiety
+`Z-7` otwiera na hali ten sam kosz co numer `1209` — z jego zawartością, jego
+historią i jego kodem.
+
+**Wiązanie idzie po PEŁNYM numerze**, nie po samej liczbie. Numery MM
+w Subiekcie startują od nowa z każdym rokiem, więc dopasowanie po liczbie
+zderzyłoby dzisiejszy karton z zeszłorocznym.
+
+**Magazyn źródłowy wchodzi RAZEM z dokumentem** i to nie jest szczegół zapisu.
+Od chwili związania trasę powrotu liczy gałąź „kosz z dokumentu", a ta bierze
+cel wyłącznie z `mm_mag_z`. Bez tej kolumny związany koszyk przestałby dostawać
+MM powrotne i zgłaszałby się w rekoncyliacji jako `kosz_bez_powrotu` — towar
+zostałby na regale zwrotów.
+
+Odmowa dla kodu koszyka zostaje tam, gdzie papieru jeszcze nie ma: wtedy nie ma
+czego rozkładać, a zdanie mówi, na co czekać. Raport cyklu rozpoznaje kosz hali
+po BRAKU własnego zadania MM, nie po samym dokumencie — inaczej związany koszyk
+wypadłby z niego jako „druga połowa cudzej sprawy".
+
+**Czego to wydanie NIE robi: etykiety z kodem kreskowym.** Magazynier dalej
+wpisuje kod z kartki, tylko teraz jest to krótkie `Z-7` zamiast numeru
+dokumentu. Kod kreskowy wymaga albo nowej zależności, albo tablicy symboliki
+Code128 — a tablicy przepisanej z pamięci ten projekt nie przyjmuje, tak samo
+jak nazw kolumn Subiekta.
+
+## 0.375.0 — 16 września 2026
+
+**Trzecia ocena zwrotu: „na outlet".** Decyzja właściciela z 16 września:
+towar używany jedzie na regał outletowy, a firma obsługuje ten regał RĘKĄ.
+Magazyn outletowy stoi w Subiekcie, w aplikacji nie jest skonfigurowany.
+
+**Czego ta ocena broni.** Do tego wydania oceny były dwie, więc używka
+dostawała „na stan" — bo to jedyne, co nie jest utylizacją. Pudło jechało na
+halę, magazynier odkładał egzemplarz otwarty na półkę pickingową, a MM powrotne
+oddawało go do sprzedaży. Fabryczny i używany stawały się nie do odróżnienia,
+a kompletujący brał ten, który stał bliżej. To jest mechanizm produkujący drugi
+zwrot, tym razem uzasadniony i droższy.
+
+**To NIE jest powrót „przeceny" zdjętej w 0.209.0**, choć przycisk stoi w tym
+samym miejscu. Tamta kończyła się znacznikiem w bazie: nie dokładała do
+koszyka, nie ruszała stanu, nie zakładała zadania, nie prowadziła DONIKĄD. Ta
+kończy się LISTĄ ROBOCZĄ — pasek „Na regał outletowy" wymienia, co czeka na
+przeniesienie, i domyka pozycję jednym kliknięciem. Bez tej listy ocena nie
+miała prawa wejść i to jest warunek, nie ozdoba.
+
+Pasek mówi wprost, że przenosi i wystawia MM człowiek. Bez tego zdania
+wyglądałby jak kolejka czekająca na papier, który nie przyjdzie. Niesie też
+potrącenie przy pozycji: to jest liczba, o którą przedmiot potaniał, bo
+dokładnie tyle mniej dostał za niego klient. Kto wycenia regał, ma ją pod ręką.
+
+Ocena „outlet" nie zakłada koszyka i nie zleca niczego Sferze. Zmiana na inną
+ocenę kasuje ślad przeniesienia, bo pozycja wracająca do obiegu magazynowego
+nie czeka już przy regale. Klawisz to `o` w kubełku DO OCENY — z „odmów"
+z kubełka DO DECYZJI się nie zderza, bo tamta gałąź kończy się wcześniej.
+
+**[wymaga działania]** Baza przechodzi PRZEBUDOWĘ tabeli pozycji zwrotu.
+`CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` go nie zmieni,
+więc poszerzenie listy ocen znaczy nową tabelę i przepisanie wierszy. Migracja
+bierze definicję Z BAZY i podmienia w niej jedną klauzulę — wypisanie kolumn
+z ręki gubiłoby po cichu każdą, o której ten kod nie wie. Robi to raz, pod
+blokadą zapisu, i odtwarza OBA indeksy. Po aktualizacji sprawdź w panelu, czy
+pozycje zwrotów mają swoje oceny i kartoteki.
+
+Licznik tras POST zwrotów 32 → 33: doszedł meldunek „ta sztuka stoi już na
+regale". Do Subiekta nie idzie z niego nic.
+
+## 0.374.0 — 16 września 2026
+
+**Kartoteka, której dokument MM nie ruszy, nie wchodzi już do pudła.** To jest
+naprawa przyczyny blizny Z-8 z 0.371.0, a nie jej skutku. Koszt przesyłki wszedł
+wtedy do koszyka SKANEM, kosz się zamknął, a Sfera odrzuciła MM zdaniem „Brak
+towaru w magazynie". Poprzednie wydanie dało drogę wyjścia — zdejmowanie wiersza
+z zamkniętego kosza. To wydanie nie wpuszcza go tam w ogóle.
+
+Odmowa pada przy DOKŁADANIU, bo tam stoi człowiek z przedmiotem w ręku. Bramka
+przy zamykaniu przyszłaby o dwadzieścia pięć kartotek za późno.
+
+**Rozstrzygają dwie rzeczy, które wiemy na pewno.** Numer `TW_ID_PRZESYLKA`
+z konfiguracji — tę kartotekę nazwał człowiek, a automat ZW już jej pilnuje po
+swojej stronie; asymetria znaczyłaby, że jedna droga ją wpuszcza, a druga nie.
+Oraz brak jakiegokolwiek wiersza stanu: importer bierze całe `tw_Stan` bez
+filtra magazynów, więc kartoteka prowadzona magazynowo ma tu wiersz choćby
+z zerem. Usługa nie ma go wcale.
+
+**Czego świadomie NIE zrobiliśmy:** nie dopisaliśmy do importu kolumny rodzaju
+kartoteki. Nie ma jej w read-modelu ani w `docs/subiekt-gt-struktura.md`, więc
+wzięcie jej nazwy z pamięci byłoby dokładnie tym błędem, który zamyka reguła
+„kształt czyta się z pliku, nie z pamięci".
+
+Bramka obowiązuje OBIE drogi do pudła. Skan dostaje zdanie z symbolem
+i powodem, a ocena „na stan" pozycji przesyłkowej zostawia ślad w dzienniku
+(`kosz_zwrotow_odmowa`) zamiast po cichu wpuścić wiersz. Pozycja przesyłki stoi
+na paragonie obok towaru, więc bez tego weszłaby do koszyka tą samą drogą co
+komplet.
+
+**[uwaga przy czytaniu testów]** Fikstury pięciu plików testowych dostały wiersz
+`sgt_stan` przy kartotece. Kartoteka bez stanu opisuje odtąd USŁUGĘ, a nie część
+— i to jest teraz część umowy, nie szczegół zapisu.
 
 ## 0.373.0 — 16 września 2026
 
@@ -94,6 +241,37 @@ w źródle `biuro.html`.
 Kolejność w pliku ma znaczenie: pętla stoi PRZED `start()`, bo pierwszy przebieg
 wystrzelony w schowany panel rysowałby w nic. Odmowa serwera niczego nie psuje —
 `api()` na 401 dalej woła `wyloguj()`.
+
+## 0.372.1 — 16 września 2026
+
+**Projekt obiegu zwrotów zapisany w repo — `docs/zwroty-projekt.md`.** Rozmowa
+z właścicielem o tym, jak wyglądałaby obsługa zwrotów projektowana od początku,
+przy celu „w ogóle nie klikać w Subiekcie". Wniosek jest taki, że
+przeprojektowania nie ma: obieg, który mamy, jest w większości słuszny.
+
+Cztery decyzje właściciela wchodzą do dokumentu jako wiążące. ZW wychodzi przy
+obsłudze KAŻDEGO zwrotu, a nie przy zamknięciu koszyka — dokument księgowy ma
+powstawać wtedy, kiedy oddajemy pieniądze. Okno, w którym towar czeka w pudle,
+a Subiekt ma go jako stan magazynu głównego, właściciel uznał za nieistotne;
+rozważany magazyn pośredni odpada razem z jednym dodatkowym MM na zwrot. Outlet
+obsługujemy ręcznie do odwołania. Zwrot idzie pełną wartością, a potrącenie
+wyłącznie przez Allegro.
+
+Z decyzji wynika zdanie warte zapamiętania: bramka korekt przestaje być bramką,
+a staje się BEZPIECZNIKIEM. Przy ZW wychodzącym natychmiast numer korekty jest
+na miejscu na długo przed zamknięciem pudła, więc bramka zatrzyma koszyk
+wyłącznie wtedy, gdy ZW padł. Rutynowe używanie przycisku wystawiającego MM mimo
+korekt jest odtąd miarą tego, że ZW nie działa.
+
+Dokument wymienia sześć rzeczy popsutych, z jedną blokującą pozostałe. Odmowa
+zapisu ZW na produkcji (`0x80040F20`) wstrzymuje automatyzację każdego kolejnego
+dokumentu. Ocena towaru ma dwie wartości, a firma ma trzy drogi — brak oceny
+outletowej odkłada używkę na półkę pickingową obok fabrycznych. Utylizacja jedzie
+MM-em na magazyn odpadu i zostaje na stanie jako duch. Nadwyżka zwrotu nie ma
+czym wejść na stan, co kosztowało już koszyk Z-8. Karton dalej nosi dwa imiona.
+Brakuje PW, a RW nie ma wejścia w obiegu.
+
+Sam kod nie drgnął — to wydanie jest dokumentacją.
 
 ## 0.372.0 — 16 września 2026
 
