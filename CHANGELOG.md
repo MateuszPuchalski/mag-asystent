@@ -79,6 +79,24 @@ Czerwień od niej świeciłaby cały dzień i nauczyłaby biuro ignorować ikon�
 także wtedy, gdy naprawdę padnie worker — dlatego spóźnione dostają osobną
 plakietkę, z drogą do tabeli, która je wyjaśnia.
 
+### Piąty kanał — i wycofanie uzasadnienia z 0.361.0
+
+Notatki do dostaw stały poza miarą, bo napisałem, że „odpowiedź na notatkę bywa
+rozmową na kilka tur". **To zdanie jest nieprawdziwe o tej tabeli i mówi to sam
+kod:** `odpowiedzNaNotatke` odmawia nadpisania, bo odpowiedź jest jedna
+i ostateczna, a nowe ustalenie to NOWA notatka. Kilka tur to kilka notatek,
+z których każda ma dwa końce — czyli dokładnie to, co ta miara liczy.
+Uzasadnienie przyszło z `conversation_event` w panelu obsługi, gdzie naprawdę
+jest wątkiem, i zostało przeniesione na strukturę działającą inaczej.
+
+Kanał ten jest zresztą **jedynym, w którym brak odpowiedzi wstrzymuje pracę**:
+`czekaNaOdpowiedz` nie pozwala domknąć dostawy, póki pytanie wisi. Sprawa
+o najwyższej stawce z całej piątki siedziała poza miarą i poza alarmem.
+
+Odczyt odpowiedzi przez biuro (`odp_widziana_at`) do miary **nie** wchodzi:
+liczony jako koniec, wydłużałby czas odpowiedzi HALI o zwłokę BIURA i mieszał
+dwie różne winy.
+
 ### Czego ten alarm NIE mówi
 
 Wykrywa odstające od WŁASNEJ NORMY, nie złe. Magazyn, w którym każda sprawa
