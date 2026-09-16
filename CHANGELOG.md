@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.366.0 — 16 września 2026
+
+**Notatka do dostawy wraca do miary i alarmu — jej wyłączenie było pomyłką.**
+0.361.0 zostawiło ten kanał poza miarą jednym zdaniem: „odpowiedź na notatkę
+bywa rozmową na kilka tur, więc czas wymiany znaczyłby tam co innego".
+
+To zdanie jest **nieprawdziwe o tej tabeli i mówi to sam kod**.
+`odpowiedzNaNotatke` odmawia nadpisania, bo „odpowiedź jest jedna
+i ostateczna", a nowe ustalenie to NOWA notatka. Kilka tur to kilka notatek,
+z których każda ma dwa końce — czyli dokładnie to, co ta miara liczy.
+Uzasadnienie przyszło z `conversation_event` w panelu obsługi, gdzie naprawdę
+jest wątkiem, i zostało przeniesione na strukturę działającą inaczej.
+Strukturę sprawdziłem dopiero teraz.
+
+### Kanał o najwyższej stawce z całej piątki
+
+To **jedyny**, w którym brak odpowiedzi WSTRZYMUJE pracę: `czekaNaOdpowiedz`
+nie pozwala domknąć dostawy, póki pytanie wisi bez odpowiedzi. Siedział poza
+miarą i poza alarmem, osłonięty zdaniem, którego nikt nie sprawdził.
+
+### Odczyt odpowiedzi przez biuro nie jest końcem wymiany
+
+`odp_widziana_at` (0.57.0) liczone jako zamknięcie wydłużałoby czas odpowiedzi
+HALI o zwłokę BIURA i mieszało dwie różne winy. Ma własny licznik w nagłówku
+panelu i to jest jego miejsce.
+
+### Świadome wyłączenie i niesprawdzone założenie wyglądają identycznie
+
+W komentarzu różni je wyłącznie to, czy ktoś otworzył schemat. Ta pomyłka
+kosztowała jeden kanał w dwóch własnościach naraz — akurat ten, w którym
+cisza zatrzymuje dostawę.
+
+
 ## 0.364.0 — 16 września 2026
 
 **Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie
@@ -78,24 +111,6 @@ z Subiektem. Sprawa stojąca trzeci dzień to zdrowy system i kulejąca PRACA.
 Czerwień od niej świeciłaby cały dzień i nauczyłaby biuro ignorować ikonę
 także wtedy, gdy naprawdę padnie worker — dlatego spóźnione dostają osobną
 plakietkę, z drogą do tabeli, która je wyjaśnia.
-
-### Piąty kanał — i wycofanie uzasadnienia z 0.361.0
-
-Notatki do dostaw stały poza miarą, bo napisałem, że „odpowiedź na notatkę bywa
-rozmową na kilka tur". **To zdanie jest nieprawdziwe o tej tabeli i mówi to sam
-kod:** `odpowiedzNaNotatke` odmawia nadpisania, bo odpowiedź jest jedna
-i ostateczna, a nowe ustalenie to NOWA notatka. Kilka tur to kilka notatek,
-z których każda ma dwa końce — czyli dokładnie to, co ta miara liczy.
-Uzasadnienie przyszło z `conversation_event` w panelu obsługi, gdzie naprawdę
-jest wątkiem, i zostało przeniesione na strukturę działającą inaczej.
-
-Kanał ten jest zresztą **jedynym, w którym brak odpowiedzi wstrzymuje pracę**:
-`czekaNaOdpowiedz` nie pozwala domknąć dostawy, póki pytanie wisi. Sprawa
-o najwyższej stawce z całej piątki siedziała poza miarą i poza alarmem.
-
-Odczyt odpowiedzi przez biuro (`odp_widziana_at`) do miary **nie** wchodzi:
-liczony jako koniec, wydłużałby czas odpowiedzi HALI o zwłokę BIURA i mieszał
-dwie różne winy.
 
 ### Czego ten alarm NIE mówi
 
