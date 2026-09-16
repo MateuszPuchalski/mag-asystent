@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
-import type { BilansKartotek, Kubelek, StanZwrotow, Zwrot } from "../api/typy";
+import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
@@ -22,6 +22,7 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
 import { Koszyk } from "../zwroty/Koszyk";
+import { NaOutlet } from "../zwroty/NaOutlet";
 import type { RozjazdZwrotu } from "../api/zwroty";
 import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
@@ -584,7 +585,12 @@ export function Zwroty() {
       /* WIELKA LITERA TO HURT — czyli `Shift+S`. Osobnego sprawdzania modyfikatora
          nie ma po co pisać: przeglądarka oddaje tu gotowy znak. */
       if (e.key === "S") { e.preventDefault(); void wszystkieNaStan().catch(() => {}); return; }
-      const ocena = e.key === "s" ? "stan" : e.key === "u" || e.key === "U" ? "utylizacja" : null;
+      /* `o` to OUTLET, i nie zderza się z „odmów" z kubełka DO DECYZJI: tamta
+         gałąź kończy się `return` nad tym miejscem, więc w kubełku DO OCENY
+         klawisz jest wolny. Litera bierze się z nazwy, a nie z kolejności. */
+      const ocena: Ocena | null = e.key === "s" ? "stan"
+        : e.key === "u" || e.key === "U" ? "utylizacja"
+          : e.key === "o" || e.key === "O" ? "outlet" : null;
       if (!ocena) return;
       /* PIERWSZA NIEOCENIONA, potem następna — kolejność z ekranu, więc klawisz
          idzie tą samą drogą, którą wędruje wzrok. Przy zwrocie jednopozycyjnym
@@ -660,6 +666,9 @@ export function Zwroty() {
     {data?.stan && <PasekOgona stan={data.stan} />}
     <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
+    {/* Obok koszyka, bo to ta sama praca: co wyjęte z pudła, gdzie idzie.
+        Outlet nie ma pudła ani dokumentu — ma listę i czyjeś ręce. */}
+    <NaOutlet />
     <div className={SIATKA_TRZECH_KOLUMN}>
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,

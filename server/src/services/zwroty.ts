@@ -1202,8 +1202,16 @@ export function cofnijWerdykt(
   })();
 }
 
+/** Trzy oceny pozycji zwrotu; `null` cofa ocenę (0.375.0). */
+export type OcenaPozycji = "stan" | "utylizacja" | "outlet" | null;
+
+/** Jak ocena brzmi na osi zwrotu — czyta ją człowiek, nie kod. */
+const OPIS_OCENY: Record<Exclude<OcenaPozycji, null>, string> = {
+  stan: "na stan", utylizacja: "utylizacja", outlet: "na outlet",
+};
+
 /**
- * Ocena towaru: na stan albo do utylizacji. `null` cofa ocenę.
+ * Ocena towaru: na stan, do utylizacji albo na outlet. `null` cofa ocenę.
  *
  * OCENA „NA STAN" DOKŁADA POZYCJĘ DO KOSZYKA ZWROTÓW (0.192.0) — bez
  * osobnego ruchu. Właściciel opisał obieg biura tak: „gdy agent zasiada do
@@ -1212,12 +1220,21 @@ export function cofnijWerdykt(
  * i tak wykonuje, JEST tym dołożeniem; osobny przycisk kazałby mu powiedzieć
  * dwa razy to samo.
  *
- * OCENY SĄ DWIE, NIE TRZY (0.209.0). „Przecena" stała tu od 0.156.0 i nie
- * prowadziła DONIKĄD: nie dokładała do koszyka, nie ruszała stanu, nie
- * zakładała zadania — zapisywała się i na tym się kończyła. Trzeci przycisk,
- * który wygląda jak decyzja, a nie jest żadną, kosztuje operatora namysł przy
- * każdej pozycji i zostawia towar w stanie, z którego nic nie wyprowadza.
- * Wraca dopiero razem ze ścieżką przeceny, jeśli właściciel jej zechce.
+ * OCENY SĄ TRZY OD 0.375.0, a trzecia ma warunek. „Przecena" stała tu od
+ * 0.156.0 i zeszła w 0.209.0, bo nie prowadziła DONIKĄD: nie dokładała do
+ * koszyka, nie ruszała stanu, nie zakładała zadania — zapisywała się i na tym
+ * się kończyła. Trzeci przycisk, który wygląda jak decyzja, a nie jest żadną,
+ * kosztuje operatora namysł przy każdej pozycji.
+ *
+ * „Outlet" stoi w tym samym miejscu i też nie tworzy dokumentu — magazyn
+ * outletowy nie jest skonfigurowany, bo właściciel obsługuje go RĘKĄ (decyzja
+ * z 16 września 2026). Wolno jej tu stać, bo kończy się LISTĄ ROBOCZĄ:
+ * `pozycjeNaOutlet` wymienia, co czeka na przeniesienie, a `przeniesionoNaOutlet`
+ * to odklikuje. Bez tej listy byłaby „przeceną" drugi raz.
+ *
+ * Czego ta ocena BRONI: towar używany bez własnej oceny dostawał „na stan",
+ * jechał na halę i wracał MM-em powrotnym na półkę pickingową obok
+ * fabrycznych. Kompletujący brał ten, który stał bliżej.
  *
  * KAŻDA OCENA MA SWÓJ KOSZYK (0.211.0). „Stan" idzie na regał zwrotów,
  * „utylizacja" na magazyn odpadu — decyzja właściciela. Do 0.210.0 utylizacja
@@ -1235,7 +1252,7 @@ export function cofnijWerdykt(
  * jest faktem o towarze, ale ekran musi powiedzieć, czego nie zrobił.
  */
 export function ocenPozycje(
-  database: Db, pozycjaId: number, ocena: "stan" | "utylizacja" | null,
+  database: Db, pozycjaId: number, ocena: OcenaPozycji,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
 ): { wersja: number; koszyk: number | null } {
   const p = database.prepare(
@@ -1265,9 +1282,7 @@ export function ocenPozycje(
        szukający odpowiedzi „co się stało z tym sekatorem", a numer wiersza nie
        odpowiada na nic. */
     zdarzenie(database, Number(p.zwrot_id), ocena === null ? "ocena_cofnieta" : "ocena",
-      ocena === null
-        ? `${p.nazwa} — cofnięto ocenę`
-        : `${p.nazwa} — ${ocena === "stan" ? "na stan" : "utylizacja"}`,
+      ocena === null ? `${p.nazwa} — cofnięto ocenę` : `${p.nazwa} — ${OPIS_OCENY[ocena]}`,
       { pozycjaId, ocena }, kto, teraz.toISOString());
     logEvent(ocena === null ? "zwrot_ocena_cofnieta" : "zwrot_ocena", kto.name, null,
       { zwrotId: Number(p.zwrot_id), pozycjaId, ocena }, kto.id, database);
@@ -1279,10 +1294,115 @@ export function ocenPozycje(
     /* Każda ocena do SWOJEGO koszyka. `zdejmijZKosza` wyżej zdejmuje
        z dowolnego kosza bez dokumentu, więc „na stan", potem „utylizacja"
        przenosi pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
-    const koszyk = ocena === null ? null
+    /* OUTLET NIE MA KOSZYKA i to jest jego definicja, nie brak. Magazyn
+       outletowy nie jest skonfigurowany, więc dokument MM nie miałby dokąd
+       jechać — a zgadnięty numer przesunąłby używkę w cudze miejsce. */
+    const koszyk = ocena === null || ocena === "outlet" ? null
       : dolozDoKosza(database, pozycjaId, kto, teraz,
         ocena === "utylizacja" ? "odpad" : "zwroty");
+    /* Zmiana oceny na inną KASUJE ślad przeniesienia: pozycja, która wraca do
+       obiegu magazynowego, nie czeka już na niczyją rękę przy regale. */
+    if (ocena !== "outlet") {
+      database.prepare(
+        "UPDATE zwrot_klienta_pozycja SET outlet_at=NULL, outlet_przez=NULL WHERE id=?")
+        .run(pozycjaId);
+    }
     return { wersja: wersja + 1, koszyk };
+  })();
+}
+
+/* ── Lista robocza outletu (0.375.0) ────────────────────────────────────────
+   Warunek, pod którym trzecia ocena w ogóle weszła. „Przecena" zeszła
+   w 0.209.0, bo kończyła się znacznikiem w bazie — a znacznik, którego nikt
+   nie czyta, jest ślepym zaułkiem. Tu znacznik ma czytelnika: człowieka, który
+   niesie używkę na regał i wystawia jej MM w Subiekcie.
+
+   Lista mówi, CO czeka. Odkliknięcie mówi, że już nie czeka. Nic poza tym —
+   żadnego dokumentu z naszej strony, bo magazyn outletowy obsługuje dziś ręka
+   (decyzja właściciela, 16 września 2026).                                    */
+
+export interface PozycjaNaOutlet {
+  pozycjaId: number;
+  zwrotId: number;
+  /** Numer zwrotu — po nim człowiek wraca do sprawy, gdy coś się nie zgadza. */
+  numer: string;
+  nazwa: string;
+  /** Kartoteka, jeśli znana; bez niej zostaje sama nazwa z Allegro. */
+  twId: number | null;
+  symbol: string | null;
+  ilosc: number;
+  /**
+   * Ile wartości ta sztuka straciła, w groszach.
+   *
+   * Nie ozdoba: to jest liczba, którą oddaliśmy klientowi MNIEJ, więc mówi
+   * wprost, o ile przedmiot potaniał. Kto wycenia regał, ma ją pod ręką
+   * zamiast szacować z pamięci.
+   */
+  potracenieGrosze: number | null;
+  ocenionoAt: string | null;
+}
+
+/**
+ * Pozycje ocenione „na outlet", których nikt jeszcze nie przeniósł.
+ *
+ * Kolejność od najstarszej: regał outletowy nie ma priorytetów, a przedmiot
+ * leżący przy biurku od tygodnia jest jedyną rzeczą, o którą tu chodzi.
+ */
+export function pozycjeNaOutlet(database: Db = defaultDb()): PozycjaNaOutlet[] {
+  return (database.prepare(
+    `SELECT p.id, p.zwrot_id, p.nazwa, p.tw_id, p.tw_symbol, p.ilosc, p.ilosc_zwrocona,
+            p.potracenie_grosze, p.ocena_at,
+            COALESCE(z.reference_number, z.external_id) AS numer
+       FROM zwrot_klienta_pozycja p
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id
+      WHERE p.ocena='outlet' AND p.outlet_at IS NULL
+      ORDER BY p.ocena_at, p.id`).all() as Array<Record<string, unknown>>)
+    .map((w) => ({
+      pozycjaId: Number(w.id), zwrotId: Number(w.zwrot_id), numer: String(w.numer),
+      nazwa: String(w.nazwa),
+      twId: w.tw_id === null ? null : Number(w.tw_id),
+      symbol: (w.tw_symbol as string) ?? null,
+      /* TO, CO WRÓCIŁO, nie deklaracja klienta — ta sama reguła co przy
+         koszyku (`iloscLiczona`). Na regał trafia tyle sztuk, ile leży
+         w pudle. */
+      ilosc: iloscLiczona(w as { ilosc: number; ilosc_zwrocona: number | null }),
+      potracenieGrosze: w.potracenie_grosze === null ? null : Number(w.potracenie_grosze),
+      ocenionoAt: (w.ocena_at as string) ?? null,
+    }));
+}
+
+/**
+ * Odklikanie: ta pozycja stoi już na regale outletowym.
+ *
+ * BEZ WERSJI ZWROTU, świadomie. To nie jest zmiana decyzji o zwrocie ani
+ * o pieniądzach, tylko meldunek o wykonanej pracy fizycznej — a dwie osoby
+ * meldujące to samo pudło nie mają o co się spierać. Powtórzenie jest ciche
+ * i zostawia pierwszy podpis: liczy się, że towar tam JEST.
+ */
+export function przeniesionoNaOutlet(
+  database: Db, pozycjaId: number, kto: { id: number; name: string }, teraz = new Date(),
+): { pozycjaId: number; outletAt: string } {
+  const p = database.prepare(
+    "SELECT id, zwrot_id, nazwa, ocena, outlet_at FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as
+    { id: number; zwrot_id: number; nazwa: string; ocena: string | null;
+      outlet_at: string | null } | undefined;
+  if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+  if (p.ocena !== "outlet") {
+    throw new Error(`„${p.nazwa}" nie jest oceniona na outlet — nie ma czego przenosić.`);
+  }
+  if (p.outlet_at) return { pozycjaId, outletAt: p.outlet_at };
+
+  const at = teraz.toISOString();
+  return transaction(database, () => {
+    database.prepare(
+      "UPDATE zwrot_klienta_pozycja SET outlet_at=?, outlet_przez=? WHERE id=?")
+      .run(at, kto.name, pozycjaId);
+    zdarzenie(database, Number(p.zwrot_id), "outlet",
+      `${p.nazwa} — przeniesiono na regał outletowy`, { pozycjaId }, kto, at);
+    logEvent("zwrot_outlet_przeniesiony", kto.name, null,
+      { zwrotId: Number(p.zwrot_id), pozycjaId }, kto.id, database);
+    return { pozycjaId, outletAt: at };
   })();
 }
 

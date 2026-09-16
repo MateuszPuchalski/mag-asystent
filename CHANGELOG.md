@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.375.0 — 16 września 2026
+
+**Trzecia ocena zwrotu: „na outlet".** Decyzja właściciela z 16 września:
+towar używany jedzie na regał outletowy, a firma obsługuje ten regał RĘKĄ.
+Magazyn outletowy stoi w Subiekcie, w aplikacji nie jest skonfigurowany.
+
+**Czego ta ocena broni.** Do tego wydania oceny były dwie, więc używka
+dostawała „na stan" — bo to jedyne, co nie jest utylizacją. Pudło jechało na
+halę, magazynier odkładał egzemplarz otwarty na półkę pickingową, a MM powrotne
+oddawało go do sprzedaży. Fabryczny i używany stawały się nie do odróżnienia,
+a kompletujący brał ten, który stał bliżej. To jest mechanizm produkujący drugi
+zwrot, tym razem uzasadniony i droższy.
+
+**To NIE jest powrót „przeceny" zdjętej w 0.209.0**, choć przycisk stoi w tym
+samym miejscu. Tamta kończyła się znacznikiem w bazie: nie dokładała do
+koszyka, nie ruszała stanu, nie zakładała zadania, nie prowadziła DONIKĄD. Ta
+kończy się LISTĄ ROBOCZĄ — pasek „Na regał outletowy" wymienia, co czeka na
+przeniesienie, i domyka pozycję jednym kliknięciem. Bez tej listy ocena nie
+miała prawa wejść i to jest warunek, nie ozdoba.
+
+Pasek mówi wprost, że przenosi i wystawia MM człowiek. Bez tego zdania
+wyglądałby jak kolejka czekająca na papier, który nie przyjdzie. Niesie też
+potrącenie przy pozycji: to jest liczba, o którą przedmiot potaniał, bo
+dokładnie tyle mniej dostał za niego klient. Kto wycenia regał, ma ją pod ręką.
+
+Ocena „outlet" nie zakłada koszyka i nie zleca niczego Sferze. Zmiana na inną
+ocenę kasuje ślad przeniesienia, bo pozycja wracająca do obiegu magazynowego
+nie czeka już przy regale. Klawisz to `o` w kubełku DO OCENY — z „odmów"
+z kubełka DO DECYZJI się nie zderza, bo tamta gałąź kończy się wcześniej.
+
+**[wymaga działania]** Baza przechodzi PRZEBUDOWĘ tabeli pozycji zwrotu.
+`CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` go nie zmieni,
+więc poszerzenie listy ocen znaczy nową tabelę i przepisanie wierszy. Migracja
+bierze definicję Z BAZY i podmienia w niej jedną klauzulę — wypisanie kolumn
+z ręki gubiłoby po cichu każdą, o której ten kod nie wie. Robi to raz, pod
+blokadą zapisu, i odtwarza OBA indeksy. Po aktualizacji sprawdź w panelu, czy
+pozycje zwrotów mają swoje oceny i kartoteki.
+
+Licznik tras POST zwrotów 32 → 33: doszedł meldunek „ta sztuka stoi już na
+regale". Do Subiekta nie idzie z niego nic.
+
 ## 0.374.0 — 16 września 2026
 
 **Kartoteka, której dokument MM nie ruszy, nie wchodzi już do pudła.** To jest

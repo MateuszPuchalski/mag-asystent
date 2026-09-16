@@ -320,14 +320,23 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
      Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały (rejestruje
      je `trasyTagowSprawy`), a eksport CSV był GET-em — obie rzeczy schodzą
      razem z prowadzącym, ale nie tutaj widać ich odejście. */
-  assert.equal(posty.length, 32,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dwóch`);
+  /* Trzydziesta trzecia (0.375.0): meldunek „ta sztuka stoi już na regale
+     outletowym". Licznik rośnie o jeden, a do Subiekta nie idzie NIC — trasa
+     stawia znacznik w naszej bazie i tyle. Outlet obsługuje dziś ręka
+     (decyzja właściciela, 16 września 2026), więc dokumentu nie ma skąd wziąć.
+
+     Ta trasa jest warunkiem, pod którym weszła trzecia ocena. Bez niej
+     znacznik „outlet" byłby ślepym zaułkiem, za który 0.209.0 zdjęło
+     „przecenę" — a lista czekających bez sposobu na jej domknięcie rosłaby
+     w nieskończoność. */
+  assert.equal(posty.length, 33,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu trzech`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
-    "sklad", "kosz/towar", "mm-mimo-korekt"]) {
+    "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
