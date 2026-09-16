@@ -100,6 +100,15 @@ export const RODZAJ_KARTON = "karton";
 export const RODZAJ_ODPAD = "odpad";
 
 export interface PozycjaKosza {
+  /**
+   * Wiersze SKLEJONE z tym w jeden (0.359.0) — ten sam towar z innych zwrotów.
+   *
+   * Pusta lista znaczy „wiersz jest sam". Kolektor nie musi o tym wiedzieć:
+   * widzi jedną pozycję z sumaryczną ilością i odkłada ją jednym ruchem.
+   * Lista jest tu dla biura i dla testów, bo bez niej nie da się sprawdzić,
+   * że za jedną linijką stoją trzy zwroty.
+   */
+  sklejone: number[];
   id: number;
   twId: number;
   symbol: string;
@@ -461,7 +470,8 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
   const wszystkieAdresy = adresyWszystkie(twIds);
   const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   const stany = stanyNiezerowe(twIds);
-  const pozycje: PozycjaKosza[] = wiersze.map((w) => ({
+  const rozbite: PozycjaKosza[] = wiersze.map((w) => ({
+    sklejone: [],
     id: w.id as number,
     twId: w.tw_id as number,
     symbol: w.symbol as string,
@@ -495,6 +505,42 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
+  /* ── Ten sam towar z dwóch zwrotów to JEDNA linijka (0.359.0) ─────────────
+     Zgłoszenie z hali brzmiało tak: „ten sam symbol trzy razy pod rząd, trzy
+     razy ta sama półka". Koszyk trzyma wiersz na każdą pozycję zwrotu, bo tym
+     wierszem wraca ślad na oś zwrotu — ale magazynier niesie te trzy sztuki
+     w jednej ręce i idzie z nimi RAZ. Na dokument MM i tak wchodzą zsumowane
+     (`kosze-zwrotow.ts`), więc rozbicie żyło wyłącznie na ekranie.
+
+     Sklejamy WYŁĄCZNIE wiersze nieodróżnialne: ten sam towar, ten sam stan,
+     ten sam adres, ten sam powód pominięcia, ta sama odpowiedź na „później"
+     i TA SAMA ODPOWIEDŹ BIURA na pominięcie (0.358.0). Ostatni człon nie jest
+     ozdobny: kolektor pokazuje przy pominięciu zdanie biura, a sklejenie dwóch
+     wierszy z różnymi odpowiedziami schowałoby jedną z nich — czyli wróciłoby
+     do stanu, który tamto wydanie właśnie naprawiło.
+
+     Dzięki temu licznik ODŁOŻONE x/y nie skacze w trakcie pracy — gdyby
+     sklejać tylko czekające, mianownik rósłby z każdym odłożeniem.
+
+     Sklejona linijka rusza się CAŁA: odłożenie, pominięcie, „później"
+     i cofnięcie biorą rodzeństwo z `rodzenstwo()`. Inaczej ekran pokazywałby
+     trzy sztuki, a zapisywałby jedną.                                        */
+  const klucz = (w: Record<string, unknown>): string => [
+    w.tw_id, w.status, (w.lok_faktyczna as string) ?? "",
+    w.pozniej_at ? "P" : "", (w.powod as string) ?? "",
+    (w.zalatwione_at as string) ?? "", (w.zalatwione_notatka as string) ?? "",
+    (w.zalatwione_przez as string) ?? "",
+  ].join("|");
+  const grupy = new Map<string, PozycjaKosza>();
+  for (let i = 0; i < rozbite.length; i++) {
+    const k = klucz(wiersze[i]);
+    const lider = grupy.get(k);
+    if (!lider) { grupy.set(k, rozbite[i]); continue; }
+    lider.ilosc += rozbite[i].ilosc;
+    lider.sklejone.push(rozbite[i].id);
+  }
+  const pozycje: PozycjaKosza[] = [...grupy.values()];
+
   /* ── Kolejność listy kosza ────────────────────────────────────────────────
      Trzy grupy, od tego, co jeszcze do zrobienia, po to, co już zrobione:
 
@@ -629,6 +675,36 @@ export type Potwierdzenie = "polka" | "towar" | "wpis";
 
 export const POTWIERDZENIA: readonly Potwierdzenie[] = ["polka", "towar", "wpis"] as const;
 
+/**
+ * Wiersze kosza NIEODRÓŻNIALNE na ekranie od tego jednego (0.359.0).
+ *
+ * Ten sam klucz co przy sklejaniu w `szczegolKosza` — i to jest cała treść tej
+ * funkcji. Gdyby oba miejsca liczyły grupę własnym warunkiem, rozjechałyby się
+ * przy pierwszej poprawce jednego z nich, a objawem byłaby linijka „3 szt."
+ * zapisująca jedną sztukę. Wynik zawiera wiersz pytany i jest po `id`, więc
+ * pierwszy element jest zawsze liderem widocznym na ekranie.
+ */
+function rodzenstwo(p: Record<string, unknown>): Array<{ id: number; ilosc: number }> {
+  return db()
+    .prepare(
+      `SELECT id, ilosc FROM kosz_pozycja
+        WHERE kosz_id = ? AND tw_id = ? AND status = ?
+          AND COALESCE(lok_faktyczna, '') = ?
+          AND (CASE WHEN pozniej_at IS NULL THEN 0 ELSE 1 END) = ?
+          AND COALESCE(powod, '') = ?
+          AND COALESCE(zalatwione_at, '') = ?
+          AND COALESCE(zalatwione_notatka, '') = ?
+          AND COALESCE(zalatwione_przez, '') = ?
+        ORDER BY id`
+    )
+    .all(
+      p.kosz_id as number, p.tw_id as number, p.status as string,
+      (p.lok_faktyczna as string) ?? "", p.pozniej_at ? 1 : 0, (p.powod as string) ?? "",
+      (p.zalatwione_at as string) ?? "", (p.zalatwione_notatka as string) ?? "",
+      (p.zalatwione_przez as string) ?? "",
+    ) as Array<{ id: number; ilosc: number }>;
+}
+
 export function odlozPozycje(
   pozycjaId: number,
   lokalizacja: string,
@@ -682,25 +758,30 @@ export function odlozPozycje(
     );
   }
 
+  /* CAŁA SKLEJONA LINIJKA (0.359.0). Zadanie adresu powstało WYŻEJ i jest
+     jedno na cały ruch — po drugie i trzecie kartoteka i tak miałaby już nowy
+     adres, więc byłyby to zadania bez treści. Wiersze dostają jeden `loc_queue_id`,
+     dzięki czemu cofnięcie anuluje ten sam zapis, który odłożenie zamówiło. */
+  const grupa = rodzenstwo(p);
+  const teraz = nowIso();
   /* `powod=NULL` cofa pominięcie: magazynier, który jednak znalazł towar,
      ma go po prostu odłożyć, a nie szukać osobnego „cofnij". */
-  db()
-    .prepare(
-      `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL, pozniej_at=NULL,
-              zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL,
-              lok_faktyczna=?, odlozono_at=?, odlozono_przez=?, loc_queue_id=? WHERE id=?`
-    )
-    .run(code, nowIso(), autor, locQueueId, pozycjaId);
-
-  /* ŚLAD NA OSI ZWROTU (0.269.0). Biuro patrzące na zwrot widzi teraz, że
-     towar wrócił na półkę i na którą — do tego wydania rozłożenie zostawiało
-     wyłącznie globalny `logEvent`, więc pytanie „gdzie to leży" kończyło się
-     w Subiekcie albo telefonem na halę. Kosz bez zwrotu (z dokumentu MM,
-     karton) nie ma gdzie tego dopisać i to nie jest awaria. */
-  sladZKosza(db(), pozycjaId, "rozlozenie",
-    `Towar wrócił na półkę ${code} (kosz ${kosz.kod})`,
-    { koszId: kosz.id, kod: kosz.kod, lokalizacja: code, twId, poprawka },
-    autor, nowIso());
+  const zapis = db().prepare(
+    `UPDATE kosz_pozycja SET status='done', powod=NULL, pominieto_at=NULL, pozniej_at=NULL,
+            zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL,
+            lok_faktyczna=?, odlozono_at=?, odlozono_przez=?, loc_queue_id=? WHERE id=?`);
+  for (const w of grupa) {
+    zapis.run(code, teraz, autor, locQueueId, w.id);
+    /* ŚLAD NA OSI ZWROTU (0.269.0) idzie PER WIERSZ, bo każdy z nich należy do
+       innego zwrotu. Biuro patrzące na zwrot widzi, że towar wrócił na półkę
+       i na którą — bez tego pytanie „gdzie to leży" kończyło się w Subiekcie
+       albo telefonem na halę. Kosz bez zwrotu (z dokumentu MM, karton) nie ma
+       gdzie tego dopisać i to nie jest awaria. */
+    sladZKosza(db(), w.id, "rozlozenie",
+      `Towar wrócił na półkę ${code} (kosz ${kosz.kod})`,
+      { koszId: kosz.id, kod: kosz.kod, lokalizacja: code, twId, poprawka },
+      autor, teraz);
+  }
 
   /* `manual_entry` WYŁĄCZNIE przy wpisie z klawiatury. To zdarzenie zasila
      dwa raporty (`services/raporty.ts`): udział wejść ręcznych per kod, czyli
@@ -711,10 +792,16 @@ export function odlozPozycje(
   if (potwierdzenie === "wpis") {
     logEvent("manual_entry", autor, twId, { code, kind: "LOC", zrodlo: "kosz" });
   }
+  /* JEDNO ZDARZENIE NA RUCH CZŁOWIEKA, nie na wiersz bazy. Trzy wpisy w tej
+     samej sekundzie zawyżyłyby tempo w raporcie wydajności — a tam kierunek
+     błędu jest wybrany świadomie: zaniżamy, bo zawyżone tempo trafia do
+     rozmowy o pracy (`services/raporty.ts`). Wiersze stoją w `pozycje`, więc
+     audyt dalej wie, czego ten ruch dotyczył. */
   logEvent(poprawka ? "kosz_putaway_poprawka" : "kosz_putaway", autor, twId, {
     koszId: kosz.id,
     pozycjaId,
-    qty: p.ilosc,
+    ...(grupa.length > 1 ? { pozycje: grupa.map((w) => w.id) } : {}),
+    qty: grupa.reduce((n, w) => n + Number(w.ilosc), 0),
     location: code,
     expected: oczekiwany,
     /* CZYM potwierdzono adres. Bez tego pola dziennik nie odróżnia odłożenia
@@ -790,14 +877,19 @@ export function cofnijOdlozenie(pozycjaId: number, autor: string): SzczegolKosza
   }
 
   anulujJesliCzeka(p.loc_queue_id as number | null, "Zapis adresu");
+  /* CAŁA SKLEJONA LINIJKA (0.359.0) — magazynier cofa to, co widzi, a widzi
+     jeden wiersz z sumaryczną ilością. Cofnięcie samego lidera zostawiłoby
+     resztę odłożoną i rozbiło linijkę na dwie, bez żadnego ruchu na hali. */
+  const grupa = rodzenstwo(p);
   transaction(d, () => {
-    d.prepare(
+    const cofnij = d.prepare(
       `UPDATE kosz_pozycja SET status='todo', lok_faktyczna=NULL,
-              odlozono_at=NULL, odlozono_przez=NULL, loc_queue_id=NULL WHERE id=?`
-    ).run(pozycjaId);
+              odlozono_at=NULL, odlozono_przez=NULL, loc_queue_id=NULL WHERE id=?`);
+    for (const w of grupa) cofnij.run(w.id);
     logEvent("kosz_putaway_cofniete", autor, p.tw_id as number, {
       koszId: kosz.id,
       pozycjaId,
+      ...(grupa.length > 1 ? { pozycje: grupa.map((w) => w.id) } : {}),
       symbol: p.symbol,
       byloNa: p.lok_faktyczna,
     });
@@ -818,14 +910,18 @@ export function cofnijPominiecie(pozycjaId: number, autor: string): SzczegolKosz
     throw new BladKosza(400, "Kosz jest już zakończony — najpierw cofnij zakończenie");
   }
 
-  d.prepare(
+  /* Cała sklejona linijka, jak przy odłożeniu (0.359.0): pominięcie dotyczyło
+     wszystkich sztuk tego towaru, więc cofa się je razem. */
+  const grupa = rodzenstwo(p);
+  const wroc = d.prepare(
     `UPDATE kosz_pozycja SET status='todo', powod=NULL, pominieto_at=NULL,
             zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
-     WHERE id=?`
-  ).run(pozycjaId);
+     WHERE id=?`);
+  for (const w of grupa) wroc.run(w.id);
   logEvent("kosz_pominiecie_cofniete", autor, p.tw_id as number, {
     koszId: kosz.id,
     pozycjaId,
+    ...(grupa.length > 1 ? { pozycje: grupa.map((w) => w.id) } : {}),
     symbol: p.symbol,
     bylPowod: p.powod,
   });
@@ -929,10 +1025,17 @@ export function przesunNaKoniec(pozycjaId: number, autor: string): SzczegolKosza
   const kosz = wierszKosza(p.kosz_id as number);
   if (kosz.status !== "zamkniety") throw new BladKosza(400, "Kosz nie jest w rozkładaniu");
 
-  d.prepare("UPDATE kosz_pozycja SET pozniej_at=? WHERE id=?").run(nowIso(), pozycjaId);
+  /* Cała sklejona linijka i TEN SAM znacznik czasu (0.359.0): rodzeństwo ma
+     zostać razem także na końcu listy, a dwa znaczniki rozbiłyby je na dwie
+     pozycje stojące obok siebie. */
+  const grupa = rodzenstwo(p);
+  const teraz = nowIso();
+  const przesun = d.prepare("UPDATE kosz_pozycja SET pozniej_at=? WHERE id=?");
+  for (const w of grupa) przesun.run(teraz, w.id);
   logEvent("kosz_pozycja_na_pozniej", autor, p.tw_id as number, {
     koszId: kosz.id,
     pozycjaId,
+    ...(grupa.length > 1 ? { pozycje: grupa.map((w) => w.id) } : {}),
     symbol: p.symbol,
   });
   return szczegolKosza(kosz.id);
@@ -990,21 +1093,27 @@ export function pominPozycjeKosza(
 
   /* Pominięcie ZERUJE załatwienie: skoro hala zgłasza brak drugi raz, sprawa
      wraca na listę biura, choćby ktoś zamknął ją wcześniej. */
-  d.prepare(
+  const grupa = rodzenstwo(p);
+  const teraz = nowIso();
+  const pomin = d.prepare(
     `UPDATE kosz_pozycja SET status='skipped', powod=?, pominieto_at=?,
             zalatwione_at=NULL, zalatwione_przez=NULL, zalatwione_notatka=NULL
-     WHERE id=?`
-  ).run(tresc, nowIso(), pozycjaId);
-  /* Pominięcie mówi biuru rzecz, o którą samo by nie zapytało: towaru,
-     który zwrot zapowiadał, w koszu nie było. Na osi zwrotu stoi obok oceny
-     i kwoty — czyli tam, gdzie biuro rozstrzyga sprawę z klientem. */
-  sladZKosza(db(), pozycjaId, "kosz_pominiety",
-    `Hala nie znalazła towaru w koszu ${kosz.kod}: ${tresc}`,
-    { koszId: kosz.id, kod: kosz.kod, powod: tresc, twId: p.tw_id }, autor, nowIso());
+     WHERE id=?`);
+  for (const w of grupa) {
+    pomin.run(tresc, teraz, w.id);
+    /* Pominięcie mówi biuru rzecz, o którą samo by nie zapytało: towaru,
+       który zwrot zapowiadał, w koszu nie było. Ślad idzie PER WIERSZ, bo
+       każdy należy do innego zwrotu i każdy z tych klientów czeka na
+       rozstrzygnięcie. */
+    sladZKosza(db(), w.id, "kosz_pominiety",
+      `Hala nie znalazła towaru w koszu ${kosz.kod}: ${tresc}`,
+      { koszId: kosz.id, kod: kosz.kod, powod: tresc, twId: p.tw_id }, autor, teraz);
+  }
   logEvent("kosz_pozycja_pominieta", autor, p.tw_id as number, {
     koszId: kosz.id,
     kod: kosz.kod,
     pozycjaId,
+    ...(grupa.length > 1 ? { pozycje: grupa.map((w) => w.id) } : {}),
     symbol: p.symbol,
     powod: tresc,
   });

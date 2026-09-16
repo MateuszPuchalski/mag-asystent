@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.358.0",
+  "version": "0.359.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -24,7 +24,8 @@
     "sonda:zalacznik": "tsx src/sonda-zalacznik-run.ts",
     "inwentarz": "tsx src/inwentarz-run.ts",
     "zwroty:reset": "tsx src/zwroty-reset-run.ts",
-    "zwroty:sprzatnij": "tsx src/zwroty-sprzatanie-run.ts"
+    "zwroty:sprzatnij": "tsx src/zwroty-sprzatanie-run.ts",
+    "zwroty:cykl": "tsx src/cykl-zwrotow-run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

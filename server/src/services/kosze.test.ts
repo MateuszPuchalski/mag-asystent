@@ -255,11 +255,170 @@ test("powrót czeka na zapis adresów i wychodzi dopiero po nim", async () => {
   assert.equal(K.szczegolKosza(kosz.id).powrot?.status, "pending");
 });
 
+/* ── Sklejanie powtórzonych kartotek (0.359.0) ───────────────────────────────
+   Ten sam towar z dwóch zwrotów to dwa wiersze `kosz_pozycja` — tak musi być,
+   bo każdy wiersz niesie ślad na oś swojego zwrotu. Na ekranie były jednak
+   dwie linijki, dwa skany i dwa podejścia do tej samej półki. Cena błędu przy
+   sklejaniu jest jedna i zawsze ta sama: ekran pokazuje trzy sztuki, a zapis
+   dotyczy jednej.                                                             */
+
+test("ten sam towar z dwóch zwrotów to jedna linijka z sumą sztuk", async () => {
+  const kosz = koszAplikacji("Z-40");
+  assert.equal(kosz.pozycje.length, 2, "trzy wiersze bazy, dwie linijki na ekranie");
+  const sklejona = kosz.pozycje.find((p) => p.twId === 900_036)!;
+  assert.equal(sklejona.ilosc, 3, "1 + 2 sztuki z dwóch zwrotów");
+  assert.equal(sklejona.sklejone.length, 1, "drugi wiersz stoi za tą linijką");
+  /* Lider to wiersz o najniższym id — kolejność zwrotów zostaje. */
+  assert.ok(sklejona.sklejone.every((id) => id > sklejona.id));
+});
+
+test("odłożenie sklejonej linijki zapisuje WSZYSTKIE jej wiersze, jednym adresem", async () => {
+  const kosz = koszAplikacji("Z-41");
+  const sklejona = kosz.pozycje.find((p) => p.twId === 900_036)!;
+  K.odlozPozycje(sklejona.id, "D04-01-02", "Magazynier");
+
+  const wiersze = db().prepare(
+    "SELECT status, lok_faktyczna, loc_queue_id FROM kosz_pozycja WHERE kosz_id=? AND tw_id=900036")
+    .all(kosz.id) as Array<{ status: string; lok_faktyczna: string; loc_queue_id: number | null }>;
+  assert.equal(wiersze.length, 2);
+  assert.ok(wiersze.every((w) => w.status === "done" && w.lok_faktyczna === "D04-01-02"),
+    "ekran pokazywał trzy sztuki — zapis ma dotyczyć trzech");
+  /* JEDNO zadanie adresu na cały ruch: drugie i tak zapisałoby to samo pole
+     tą samą wartością, a w kolejce wyglądałoby na drugą decyzję człowieka. */
+  const zadania = db().prepare(
+    "SELECT COUNT(*) AS n FROM sfera_queue WHERE type='set_location'").get() as { n: number };
+  assert.equal(zadania.n, 1);
+  assert.equal(new Set(wiersze.map((w) => w.loc_queue_id)).size, 1,
+    "oba wiersze wskazują TO SAMO zadanie — cofnięcie anuluje dokładnie je");
+
+  /* Jedno zdarzenie na ruch człowieka, z sumaryczną ilością: trzy wpisy w tej
+     samej sekundzie zawyżyłyby tempo w raporcie wydajności. */
+  /* Po koszu, nie po typie: `events` nie jest czyszczone między testami. */
+  const zdarzenia = (db().prepare(
+    "SELECT payload FROM events WHERE type='kosz_putaway'").all() as Array<{ payload: string }>)
+    .map((z) => JSON.parse(z.payload) as { koszId: number; qty: number; pozycje: number[] })
+    .filter((z) => z.koszId === kosz.id);
+  assert.equal(zdarzenia.length, 1);
+  const p = zdarzenia[0];
+  assert.equal(p.qty, 3);
+  assert.equal(p.pozycje.length, 2);
+});
+
+test("sklejenie NIE zabiera śladu osobnym zwrotom", async () => {
+  /* To jest cena, której sklejanie mieć nie może. Wiersz `kosz_pozycja`
+     istnieje właśnie po to, żeby na oś SWOJEGO zwrotu dopisać „towar wrócił na
+     półkę X" (0.269.0). Jedna linijka na ekranie ma zostawić dwa ślady, bo
+     czeka na nie dwóch klientów. */
+  const d = db();
+  const teraz = new Date().toISOString();
+  /* Konto BEZ narzuconego id: `channel_account` ma AUTOINCREMENT, a wpisane
+     ręcznie „1" podbija licznik i następny test dostaje id=2 przy zapytaniu
+     o 1 — czyli FOREIGN KEY z cudzej osi. */
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k-44')")
+    .run().lastInsertRowid);
+  const koszId = Number(d.prepare(
+    `INSERT INTO kosz(kod,status,rodzaj,utworzono_at,utworzono_przez,zamknieto_at,zamknieto_przez)
+     VALUES ('Z-44','zamkniety','zwroty',?,'Ala',?,'Ala')`).run(teraz, teraz).lastInsertRowid);
+  for (const nr of ["a", "b"]) {
+    const zwrotId = Number(d.prepare(
+      `INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+         korekta_numer,created_at,synced_at)
+       VALUES (?,?,?,'KFS 1/2026',?,?)`)
+      .run(konto, `zw-${nr}`, `N4QZ-${nr}`, teraz, teraz).lastInsertRowid);
+    const pozId = Number(d.prepare(
+      `INSERT INTO zwrot_klienta_pozycja(zwrot_id,klucz,nazwa,ilosc,cena_grosze,waluta,tw_id)
+       VALUES (?,?,'Sekator',1,4999,'PLN',900036)`).run(zwrotId, `k-${nr}`).lastInsertRowid);
+    d.prepare(
+      `INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,zwrot_pozycja_id)
+       VALUES (?,900036,'TEST-LINIA-TODO','Pozycja',1,?)`).run(koszId, pozId);
+  }
+
+  const linijka = K.szczegolKosza(koszId).pozycje;
+  assert.equal(linijka.length, 1, "dwa zwroty, jedna linijka");
+  assert.equal(linijka[0].ilosc, 2);
+
+  K.odlozPozycje(linijka[0].id, "D04-01-02", "Magazynier");
+  const slady = d.prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_zdarzenie WHERE rodzaj='rozlozenie'").get() as { n: number };
+  assert.equal(slady.n, 2, "każdy zwrot dostaje swoje zdanie na osi");
+});
+
+test("cofnięcie, pominięcie i „później” też biorą całą linijkę", async () => {
+  const kosz = koszAplikacji("Z-42");
+  const sklejona = () => K.szczegolKosza(kosz.id).pozycje.find((p) => p.twId === 900_036)!;
+  const stany = () => (db().prepare(
+    "SELECT status, pozniej_at FROM kosz_pozycja WHERE kosz_id=? AND tw_id=900036")
+    .all(kosz.id) as Array<{ status: string; pozniej_at: string | null }>);
+
+  K.przesunNaKoniec(sklejona().id, "Magazynier");
+  assert.equal(new Set(stany().map((w) => w.pozniej_at)).size, 1,
+    "ten sam znacznik czasu — inaczej rodzeństwo rozjechałoby się na końcu listy");
+  assert.equal(sklejona().ilosc, 3, "linijka została jedna");
+
+  K.pominPozycjeKosza(sklejona().id, "brak_w_koszu", "Magazynier");
+  assert.ok(stany().every((w) => w.status === "skipped"));
+  assert.equal(K.szczegolKosza(kosz.id).pozycje.find((p) => p.twId === 900_036)!.ilosc, 3);
+
+  K.cofnijPozycje(sklejona().id, "Magazynier");
+  assert.ok(stany().every((w) => w.status === "todo"));
+
+  K.odlozPozycje(sklejona().id, "D04-01-02", "Magazynier");
+  K.cofnijPozycje(sklejona().id, "Magazynier");
+  assert.ok(stany().every((w) => w.status === "todo" && w.pozniej_at === null),
+    "cofnięcie odłożenia wraca CAŁĄ linijką, nie połową");
+});
+
+test("sklejone są tylko wiersze NIEODRÓŻNIALNE na ekranie", async () => {
+  /* Gdyby klucz pomijał adres, wiersz odłożony na D04 skleiłby się z wierszem
+     leżącym jeszcze w koszu — a licznik ODŁOŻONE x/y przestałby się zgadzać
+     z tym, co magazynier widzi. */
+  const kosz = koszAplikacji("Z-43");
+  const wiersze = db().prepare(
+    "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND tw_id=900036 ORDER BY id")
+    .all(kosz.id) as Array<{ id: number }>;
+  /* Ręcznie rozjeżdżamy stan jednego wiersza — tak, jak zrobiłaby to praca
+     sprzed sklejania (kosz zaczęty na starszym wydaniu). */
+  db().prepare("UPDATE kosz_pozycja SET status='done', lok_faktyczna='Z09-01-01' WHERE id=?")
+    .run(wiersze[1].id);
+  const widok = K.szczegolKosza(kosz.id).pozycje.filter((p) => p.twId === 900_036);
+  assert.equal(widok.length, 2, "inny stan i inny adres to dwie linijki");
+  assert.deepEqual(widok.map((p) => p.ilosc).sort(), [1, 2]);
+});
+
+test("różna odpowiedź biura rozdziela pominięcia, choć towar ten sam", async () => {
+  /* 0.358.0 dało kolektorowi zdanie biura przy pominięciu, bo pominięcie bez
+     widocznej odpowiedzi uczy jednego: nie zgłaszać. Sklejenie dwóch wierszy
+     z RÓŻNYMI odpowiedziami schowałoby jedną z nich — czyli cofnęłoby tamto
+     wydanie po cichu, przez klucz w innym pliku. */
+  const kosz = koszAplikacji("Z-45");
+  const sklejona = K.szczegolKosza(kosz.id).pozycje.find((p) => p.twId === 900_036)!;
+  K.pominPozycjeKosza(sklejona.id, "brak_w_koszu", "Magazynier");
+
+  const wiersze = db().prepare(
+    "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND tw_id=900036 ORDER BY id")
+    .all(kosz.id) as Array<{ id: number }>;
+  assert.equal(K.szczegolKosza(kosz.id).pozycje.filter((p) => p.twId === 900_036).length, 1,
+    "dopóki odpowiedzi nie ma, pominięcia stoją w jednej linijce");
+
+  /* Biuro zamyka sprawę JEDNEGO ze zwrotów — drugi wciąż czeka. */
+  db().prepare(
+    `UPDATE kosz_pozycja SET zalatwione_at=?, zalatwione_przez='Ala',
+            zalatwione_notatka='towar znalazł się przy pakowaniu' WHERE id=?`)
+    .run(new Date().toISOString(), wiersze[0].id);
+
+  const widok = K.szczegolKosza(kosz.id).pozycje.filter((p) => p.twId === 900_036);
+  assert.equal(widok.length, 2, "zamknięte i niezamknięte to dwie różne linijki");
+  assert.equal(widok.filter((p) => p.zalatwioneNotatka !== null).length, 1);
+});
+
 test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async () => {
   const kosz = koszAplikacji("Z-9");
+  /* Dwa wiersze na 900036 (dwa zwroty) są od 0.359.0 JEDNĄ linijką, więc
+     odłożenie bierze obie sztuki naraz. Pominięta zostaje druga kartoteka. */
+  assert.equal(kosz.pozycje.length, 2, "trzy wiersze, dwie linijki");
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");
   K.pominPozycjeKosza(kosz.pozycje[1].id, "brak_w_koszu", "Magazynier");
-  K.pominPozycjeKosza(kosz.pozycje[2].id, "brak_w_koszu", "Magazynier");
   db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
 
   K.zakonczKosz(kosz.id, "Magazynier");
@@ -268,7 +427,7 @@ test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async
     Array<{ payload: string }>;
   assert.equal(mm.length, 1);
   const items = (JSON.parse(mm[0].payload) as { items: Array<{ twId: number; qty: number }> }).items;
-  assert.deepEqual(items.map((i) => [i.twId, i.qty]), [[900_036, 1]],
+  assert.deepEqual(items.map((i) => [i.twId, i.qty]), [[900_036, 3]],
     "z bufora schodzi WYŁĄCZNIE to, co magazynier naprawdę odłożył");
 });
 
@@ -277,10 +436,17 @@ test("rozłożenie i pominięcie zostawiają ślad na osi ZWROTU", async () => {
      czytał tego w drugą stronę. Biuro patrzące na zwrot nie widziało ani
      tego, że towar wrócił na półkę, ani tego, że go w koszu nie było. */
   const d = db();
-  d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')").run();
+  /* Id konta BIERZEMY Z ZAPISU, nie zakładamy „1": `channel_account` ma
+     AUTOINCREMENT, a `beforeEach` kasuje wiersze bez zerowania licznika. Każdy
+     wcześniejszy test z kontem przesuwał więc ten numer i wywracał ten tutaj
+     na FOREIGN KEY. */
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','k')")
+    .run().lastInsertRowid);
   const zwrotId = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,created_at,synced_at)
-    VALUES (1,'zw-slad','2026-09-01T08:00:00Z','2026-09-01T09:00:00Z')`).run().lastInsertRowid);
+    VALUES (?,'zw-slad','2026-09-01T08:00:00Z','2026-09-01T09:00:00Z')`)
+    .run(konto).lastInsertRowid);
   const pozZwrotu = Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
     (zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,klucz)
     VALUES (?,'111','Sekator',1,4999,'PLN','111|Sekator')`).run(zwrotId).lastInsertRowid);
