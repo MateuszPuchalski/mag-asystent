@@ -397,7 +397,26 @@ public sealed class SferaComAdapter : ISferaAdapter
             /* Szkic po wcześniejszym ZW startuje od kwoty CAŁEGO paragonu (sonda,
                PA 12102: 17,83 zł przy wartości 10,49 zł), więc przelew idzie jawnie. */
             Krok("ZW.PlatnoscPrzelewKwota", 6, () => { zw.PlatnoscPrzelewKwota = wartosc; });
-            ZapiszZeSzczegolami((object)zw, "ZW");
+            /* STAN DOKUMENTU DO TREŚCI ODMOWY (0.372.0). Odmowa zapisu ZW padła
+               na produkcji trzeci raz i trzeci raz nie powiedziała nic:
+               `SzczegolyOstatniegoBledu` puste, komunikat Sfery jednozdaniowy,
+               a HRESULT (0x80040F20) to numer wewnętrzny Sfery. Bez stanu
+               dokumentu biuro nie ma nawet od czego zacząć — nie zna paragonu,
+               bo w treści stoi tylko numer zadania.
+
+               Wartości są te SAME, które kod już odczytał wyżej. Nic tu nie
+               zgadujemy i nic nie wołamy drugi raz — poza `DoDokumentuNumerPelny`
+               (nazwa z sondy, docs/sfera-com.md §2m), czytanym obronnie. */
+            string towary = string.Join(",", z.Pozycje
+                .GroupBy(p => p.TwId)
+                .Select(g => $"{g.Key}={g.Sum(x => (decimal)x.Qty):0.####}"));
+            string stan =
+                $"paragon {Pole((object)zw, "DoDokumentuNumerPelny")} (dok_Id {z.DokId}), " +
+                $"wartość {wartosc:0.00} zł, przelew {wartosc:0.00} zł, " +
+                $"rodzaj zwrotu 1, skutek magazynowy {skutek}, wierszy {ile}. " +
+                "Tę samą odmowę pokaże sonda BEZ zapisu: sonda.ps1 -PlikEnv C:\\wertis\\wertis.env " +
+                $"-SzkicZW -Paragon {z.DokId} -Towary \"{towary}\" -Sprawdz";
+            ZapiszZeSzczegolami((object)zw, "ZW", stan);
             return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
@@ -413,6 +432,40 @@ public sealed class SferaComAdapter : ISferaAdapter
         e.Message.Contains(fraza, StringComparison.OrdinalIgnoreCase);
 
     /**
+     * Właściwość dokumentu do TREŚCI BŁĘDU — nigdy nie wywraca wołającego.
+     *
+     * Lustro `Wartosc` z `sonda.ps1`: brak nazwy to co innego niż pusta wartość,
+     * a jedno i drugie ma się zmieścić w zdaniu zamiast przerwać je wyjątkiem.
+     * Jesteśmy tu już w obsłudze odmowy — druga odmowa zasłoniłaby pierwszą.
+     *
+     * DANYCH KONTRAHENTA TĄ DROGĄ NIE CZYTAMY. Treść błędu idzie do kolejki,
+     * na ekran i do dziennika, a nabywca z paragonu nie jest nikomu do niczego
+     * potrzebny przy odmowie zapisu.
+     */
+    private static string Pole(object dokument, string nazwa)
+    {
+        dynamic dok = dokument;
+        try
+        {
+            object? w = nazwa switch
+            {
+                "DoDokumentuNumerPelny" => dok.DoDokumentuNumerPelny,
+                _ => null,
+            };
+            string tekst = (Convert.ToString(w) ?? "").Trim();
+            return tekst.Length > 0 ? tekst : "(puste)";
+        }
+        catch (Exception e) when (NieznanaNazwa(e) || PustyObiekt(e))
+        {
+            return "(brak nazwy)";
+        }
+        catch (Exception e)
+        {
+            return $"(odmowa: {e.Message.Trim()})";
+        }
+    }
+
+    /**
      * Zapis z PRZYCZYNĄ odmowy (0.349.1).
      *
      * Pierwszy ZW na produkcji (15 września 2026) padł zdaniem „Nie można
@@ -424,7 +477,7 @@ public sealed class SferaComAdapter : ISferaAdapter
      * trzy identyczne próby tylko opóźniały biuro. Nieznana nazwa albo pusty
      * obiekt idą dalej zwykłą drogą — to awaria, nie odmowa.
      */
-    private static void ZapiszZeSzczegolami(object dokument, string nazwa)
+    private static void ZapiszZeSzczegolami(object dokument, string nazwa, string stan = "")
     {
         dynamic dok = dokument;
         try
@@ -448,6 +501,7 @@ public sealed class SferaComAdapter : ISferaAdapter
                 $"Subiekt nie zapisał {nazwa}: {e.Message.Trim()} " +
                 (szczegoly.Length > 0 ? $"Szczegóły: {szczegoly} " : "(Sfera nie podała szczegółów) ") +
                 $"Wyjątek: {LancuchWyjatku(e)}. " +
+                (stan.Length > 0 ? $"Dokument: {stan}. " : "") +
                 (numer.Length > 0
                     ? $"Subiekt zdążył nadać numer {numer} — sprawdź w Subiekcie, także w buforze, czy dokument nie został. "
                     : "") +

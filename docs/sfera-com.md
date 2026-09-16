@@ -498,6 +498,27 @@ Od 0.349.1 worker woła `SprawdzPoprawnosc()` przed zapisem i dopisuje szczegó�
 do błędu. Sonda `-SzkicZW -Paragon <dok_Id> -Towary "tw=ilosc" -Sprawdz` pokazuje
 tę samą przyczynę bez zapisu.
 
+**Druga próba na produkcji padła tak samo — i to jest wynik** (16 września 2026,
+zadanie `#1075`). Trzy dopisane drogi diagnostyki oddały trzy puste ręce:
+`SzczegolyOstatniegoBledu` puste, komunikat Sfery to dalej jedno zdanie, a cały
+nowy materiał z 0.350.1 to kod `COMException 0x80040F20`. Facility tego kodu to
+`ITF`, czyli numer WEWNĘTRZNY Sfery, nie błąd Windows — bez tabeli producenta nie
+mówi nic.
+
+`[WERYFIKUJ]` Co dokładnie znaczy `0x80040F20` przy `SuDokument.Zapisz()`.
+
+Wniosek dla workera stoi gdzie indziej: skoro Sfera nie powie DLACZEGO, treść
+odmowy ma powiedzieć CZEGO dotyczyła. Od 0.372.0 błąd niesie stan dokumentu,
+który nie przeszedł: numer paragonu, `dok_Id`, wartość, przelew, rodzaj zwrotu,
+skutek magazynowy i liczbę wierszy. Niesie też gotową komendę sondy z tymi
+numerami.
+Do 0.371.0 biuro dostawało wyłącznie numer zadania i musiało dojść do paragonu
+samo, zanim w ogóle mogło zacząć mierzyć.
+
+Dwa pytania rozstrzyga potem człowiek, nie kod. Czy ten sam ZW przechodzi
+RĘCZNIE w Subiekcie — jeśli tak, odmowa dotyczy tego, co ustawia worker.
+Jeśli nie, przyczyna siedzi w paragonie albo w uprawnieniach operatora.
+
 `[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
 
 **Odmowa zapisu potrafi zostawić numer, którego nie ma** (15 września 2026).

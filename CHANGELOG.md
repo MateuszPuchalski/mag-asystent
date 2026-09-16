@@ -34,6 +34,66 @@ historii nie przepisujemy.
 ---
 
 
+## 0.372.0 — 16 września 2026
+
+**[wymaga działania] Odmowa zapisu ZW mówi wreszcie, CZEGO dotyczyła.** Nowy
+`wertis-sfera-worker.exe` z artefaktu CI — zatrzymaj `wertis-sfera`, podmień plik,
+uruchom usługę. Bez podmiany nic się nie zmienia; reszta wdrożenia bez zmian.
+
+Automatyczny ZW padł na produkcji drugi raz (zadanie `#1075`) i drugi raz nie
+powiedział nic: „Nie można zapisać dokumentu.", `SzczegolyOstatniegoBledu` puste,
+a cały materiał z 0.350.1 to `COMException 0x80040F20`. Ten kod ma facility `ITF`,
+czyli jest numerem wewnętrznym Sfery — bez tabeli producenta nie znaczy nic.
+
+Skoro Sfera nie powie DLACZEGO, treść odmowy ma powiedzieć CZEGO dotyczyła.
+Błąd niesie teraz stan dokumentu, który nie przeszedł: numer paragonu, `dok_Id`,
+wartość, przelew, rodzaj zwrotu, skutek magazynowy i liczbę wierszy. Na końcu
+stoi gotowa komenda sondy `-SzkicZW … -Sprawdz` z tymi samymi numerami, więc
+biuro powtarza odmowę BEZ zapisu, zamiast najpierw szukać paragonu po numerze
+zadania.
+
+Wartości są te same, które kod odczytał po drodze — nic nie jest czytane drugi
+raz i nic zgadywane. Jedyna nowa nazwa to `DoDokumentuNumerPelny`, zmierzona
+sondą i opisana w `docs/sfera-com.md` §2m, czytana obronnie: brak nazwy mieści
+się w zdaniu, zamiast przerwać je drugim wyjątkiem.
+
+Danych nabywcy ta droga nie czyta. Treść błędu idzie do kolejki, na ekran i do
+dziennika, a przy odmowie zapisu nabywca z paragonu nie jest nikomu potrzebny.
+
+## 0.371.0 — 16 września 2026
+
+**Koszyk zwrotów bez dokumentu wolno poprawić.** Zgłoszenie właściciela:
+„pozwól mi edytować koszyki zwrotowe, z których nie zostały jeszcze utworzone
+MM". Bramką przy zdejmowaniu wiersza dołożonego ręką był dotąd STATUS koszyka —
+granica z 0.365.0, węższa niż w całej reszcie tej ścieżki, gdzie od 0.334.0
+rozstrzyga DOKUMENT.
+
+Kosztowała dokładnie tyle, ile miała chronić. Do koszyka Z-8 (25 kartotek)
+wszedł skanem koszt przesyłki — kartoteka bez stanu, której dokument MM nie
+przesunie. Kosz się zamknął, MM wyszła, Sfera odrzuciła ją zdaniem „Brak towaru
+w magazynie". Wiersza nie dało się zdjąć nigdzie: w panelu blokowało zamknięcie,
+a PRZELICZ ZE ZWROTÓW w biurze rusza wyłącznie wiersze ze zwrotów.
+
+**Pasek czekających pokazuje teraz każdy kosz zamknięty bez dokumentu.** Do
+0.370.0 stały w nim wyłącznie kosze, którym brakuje korekt, i tylko takie, do
+których nie przypięto zadania. Z-8 wypadł przez oba warunki naraz — korekty miał
+komplet, a zadanie stało w błędzie. Kosz zniknął z panelu, choć to on wymagał
+ręki, i nic o tym nie mówiło.
+
+Każdy wiersz paska mówi, na co czeka: na korektę, na poprawkę zawartości po
+odmowie Sfery (z jej treścią i krzyżykiem przy wierszach dołożonych ręką), albo
+na samo wypuszczenie MM. Ten ostatni stan powstaje po poprawce: zdjęcie wiersza
+unieważnia zadanie ułożone dla starej zawartości, a nikt go nie ponawia sam.
+Przycisk WYSTAW MM nie pyta wtedy „czy na pewno" — stan jest na miejscu,
+a wystawienie robi to, co i tak zrobiłby automat przy najbliższym takcie wiązań.
+
+Przy odmowie Sfery przycisku nie ma świadomie: nieudane zadanie wciąż wisi przy
+koszu, więc druga MM dałaby dwa papiery na jedno pudło.
+
+Dokładanie zostaje po staremu — skan po zamknięciu zakłada nowy koszyk, bo przy
+biurku stoi wtedy nowe pudło. Karton dostał własną odmowę: nie jedzie na MM
+w ogóle, więc bramka dokumentu przepuszczałaby go zawsze.
+
 ## 0.370.0 — 16 września 2026
 
 **Panel zwrotów do wymaganego minimum.** Zgłoszenie właściciela, a po pytaniu

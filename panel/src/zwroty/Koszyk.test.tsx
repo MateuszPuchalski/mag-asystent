@@ -20,6 +20,8 @@ const { odpowiedz } = vi.hoisted(() => ({
     czekajace: [] as Array<{
       id: number; kod: string; rodzaj: "zwroty" | "odpad"; zamknietoAt: string;
       brakuje: Array<{ zwrotId: number; numer: string }>;
+      blad?: string | null;
+      dolozone?: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
     }>,
   },
 }));
@@ -53,7 +55,7 @@ const pokaz = () => {
 describe("Koszyk zwrotów", () => {
   beforeEach(() => {
     odpowiedz.kosze = []; odpowiedz.czekajace = [];
-    zamknij.mockClear(); mimo.mockClear();
+    zamknij.mockClear(); mimo.mockClear(); zdejmijTowar.mockClear();
   });
 
   it("pusty koszyk NIE ZAJMUJE miejsca na ekranie", () => {
@@ -181,5 +183,41 @@ describe("Koszyk zwrotów", () => {
     })];
     pokaz();
     expect(screen.queryByText(/dołożone ręką/)).toBeNull();
+  });
+
+  it("kosz z ODRZUCONĄ MM mówi, co odrzuciła Sfera, i daje krzyżyk przy pomyłce", async () => {
+    /* Koszyk Z-8: skanem wszedł do niego KOSZT PRZESYŁKI — kartoteka bez stanu,
+       więc Sfera odrzuciła dokument zdaniem „Brak towaru w magazynie". Do
+       0.370.0 taki kosz nie pokazywał się w panelu w ogóle i nie było jak go
+       poprawić; zgłoszenie właściciela: „pozwól mi edytować koszyki zwrotowe,
+       z których nie zostały jeszcze utworzone MM". */
+    odpowiedz.czekajace = [{
+      id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
+      brakuje: [], blad: "Brak towaru w magazynie",
+      dolozone: [{ pozycjaId: 77, symbol: "KOSZT-PRZESYLKI", nazwa: "Koszt przesyłki", ilosc: 1 }],
+    }];
+    pokaz();
+    expect(screen.getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
+    /* PRZYCISKU „wystaw" NIE MA, dopóki nieudane zadanie wisi przy koszu —
+       druga MM obok pierwszej dałaby dwa papiery na jedno pudło. */
+    expect(screen.queryByRole("button", { name: /Wystaw MM/ })).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Zdejmij KOSZT-PRZESYLKI z koszyka Z-8/ }));
+    expect(zdejmijTowar).toHaveBeenCalledWith(77);
+  });
+
+  it("kosz z kompletem korekt wystawia MM JEDNYM kliknięciem", async () => {
+    /* Stan po poprawce: zadanie zdjęto razem z pomyłką, a nikt go nie ponawia
+       sam. Pytania „czy na pewno" tu nie ma i być nie może — zdanie wyżej mówi
+       o koszcie, którego w tym stanie nie ma: stan jest na miejscu. */
+    odpowiedz.czekajace = [{
+      id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
+      brakuje: [], blad: null, dolozone: [],
+    }];
+    pokaz();
+    expect(screen.getByText(/komplet korekt/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Wystaw MM$/ }));
+    expect(mimo).toHaveBeenCalledWith(8);
   });
 });

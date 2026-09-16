@@ -228,7 +228,13 @@ export function useOcena() {
   });
 }
 
-/** Koszyk zamknięty, który CZEKA na korekty (0.200.0). */
+/**
+ * Koszyk zamknięty BEZ DOKUMENTU (0.200.0, poszerzony w 0.371.0).
+ *
+ * Do 0.370.0 były tu wyłącznie kosze, którym brakuje korekt. Kosz, któremu
+ * Sfera odrzuciła MM, nie pokazywał się nigdzie — a to właśnie on wymaga
+ * ręki: sam się nie odblokuje.
+ */
 export interface KoszykCzekajacy {
   id: number;
   kod: string;
@@ -236,6 +242,10 @@ export interface KoszykCzekajacy {
   rodzaj: "zwroty" | "odpad";
   zamknietoAt: string;
   brakuje: Array<{ zwrotId: number; numer: string }>;
+  /** Odmowa Sfery; niepusta znaczy też, że zadanie wciąż wisi przy koszu. */
+  blad?: string | null;
+  /** Wiersze dołożone ręką — jedyne, które da się z zamkniętego kosza zdjąć. */
+  dolozone?: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
 }
 
 /** Co leży w otwartym koszyku zwrotów tego operatora (0.192.0). */
