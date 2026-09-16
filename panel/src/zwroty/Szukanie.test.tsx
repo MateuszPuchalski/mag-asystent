@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Szukanie } from "./Szukanie";
-import type { WynikSkanu } from "../api/zwroty";
+import type { PaczkaKlienta, WynikSkanu } from "../api/zwroty";
 
 /* Pole mówi, CZEGO szukało. Przy czytniku „nie znalazłem" bez tej informacji
    wygląda identycznie jak zepsuty czytnik — a operator stoi wtedy z paczką
@@ -11,11 +11,19 @@ import type { WynikSkanu } from "../api/zwroty";
 
 const ETYKIETA = "600000367616070023174201";
 
+/** Historia zakupów jednego klienta — najnowsza paczka pierwsza, jak z serwera. */
+const PACZKI: PaczkaKlienta[] = [
+  { orderId: "ord-nowy", kupionoAt: "2026-08-20T10:00:00Z", sumaGrosze: 20496,
+    waluta: "PLN", pozycji: 1, zawartosc: "Sekator ×1", maZwrot: false },
+  { orderId: "ord-stary", kupionoAt: "2026-06-01T10:00:00Z", sumaGrosze: 9900,
+    waluta: "PLN", pozycji: 2, zawartosc: "Wąż 20 m ×1 · Złączka ×2", maZwrot: true },
+];
+
 const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Szukanie>> = {}) => {
   const p = {
     wynik, kod: ETYKIETA, fraza: "", ile: null, szuka: false, dociaga: false, blad: "",
     onFraza: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(),
-    onNieodebrana: vi.fn(), ...n,
+    onNieodebrana: vi.fn(), onLogin: vi.fn(), ...n,
   };
   render(<Szukanie {...p} />);
   return p;
@@ -197,6 +205,51 @@ describe("Pole szukania zwrotu", () => {
     await userEvent.type(screen.getByLabelText("Login kupującego"), "jan_kowalski");
     await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
     expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-7", "", "", "jan_kowalski");
+  });
+
+  it("Enter w polu loginu PYTA o paczki tego klienta", async () => {
+    /* Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+       w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pytamy po
+       dopisaniu loginu, nie po każdym znaku: zapytanie na znak byłoby
+       dwunastoma odczytami na jeden login. */
+    const p = pokaz(null);
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    const pole = screen.getByLabelText("Login kupującego");
+    await userEvent.type(pole, "jan_kowalski");
+    expect(p.onLogin).not.toHaveBeenCalled();
+    await userEvent.type(pole, "{Enter}");
+    expect(p.onLogin).toHaveBeenCalledWith("jan_kowalski");
+  });
+
+  it("wybrana paczka WPISUJE numer zamówienia, a ten jedzie do rejestracji", async () => {
+    /* Wybór wpisuje numer do pola wyżej, zamiast trzymać go osobno: operator
+       ma widzieć, co pojedzie na serwer, a nie ufać, że klik się zapamiętał. */
+    const p = pokaz(null, { paczki: PACZKI });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-9");
+    await userEvent.click(screen.getByRole("button", { name: /ord-nowy/ }));
+    expect(screen.getByLabelText("Numer zamówienia")).toHaveValue("ord-nowy");
+
+    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
+    expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-9", "ord-nowy", "", "");
+  });
+
+  it("paczka ze zwrotem jest OZNACZONA, ale wybieralna", async () => {
+    /* Jedno zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać
+       drugiej po zwrocie pierwszej. Blokada kazałaby wtedy kłamać. */
+    pokaz(null, { paczki: PACZKI });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText("ma już zwrot")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /ord-stary/ }));
+    expect(screen.getByLabelText("Numer zamówienia")).toHaveValue("ord-stary");
+  });
+
+  it("klient bez historii dostaje ZDANIE, nie pustkę", async () => {
+    /* Pusta lista wygląda jak zepsute szukanie. Operator ma wiedzieć, że może
+       iść dalej bez numeru zamówienia. */
+    pokaz(null, { paczki: [] });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText(/Nie mam paczek tego klienta/)).toBeInTheDocument();
   });
 
   it("ekran mówi, PO CO ten login", async () => {

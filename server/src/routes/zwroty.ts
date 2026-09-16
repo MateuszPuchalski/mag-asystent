@@ -25,6 +25,7 @@ import {
   zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
@@ -344,6 +345,28 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return zamknijKosz(db(), id, kto());
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  /* Co ten klient u nas kupił (0.363.0). Odpowiedź na zgłoszenie właściciela:
+     „kupujący może mieć wiele paczek kupionych w historii sklepu, więc muszę
+     mieć możliwość wybrania paczki". Rejestracja nieodebranej pytała o numer
+     zamówienia jak o rzecz oczywistą, a to jedyna rzecz, której przy takiej
+     paczce nie ma pod ręką.
+
+     ODCZYT, nie dociąganie: trasa czyta wyłącznie to, co synchronizacja już
+     przyniosła. Pytanie do Allegro ma tu własny przycisk i własny limit, a ta
+     lista odświeża się przy każdym znaku w polu loginu.
+
+     Konto bierzemy PIERWSZE, tak samo jak rejestracja niżej — dwie różne
+     zasady dawałyby listę z jednego konta i wiersz zapisany na drugim. */
+  app.get<{ Querystring: { login?: string } }>(
+    "/api/obsluga/zwroty/paczki-klienta", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const konto = db().prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!konto) return { paczki: [] };
+      return { paczki: paczkiKlienta(konto.id, String(req.query?.login ?? ""), db()) };
     });
 
   /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,

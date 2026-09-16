@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { PackageX, ScanLine, Search, X } from "lucide-react";
-import type { WynikSkanu } from "../api/zwroty";
+import { zlote, type PaczkaKlienta, type WynikSkanu } from "../api/zwroty";
+import { czas } from "../ui";
 import { SeriaWPolu } from "../skaner";
 /* `ile` jest tu już nazwą propsa (liczba trafień), więc pomocnik wchodzi pod
    aliasem — dwie różne rzeczy o tej samej nazwie czytałoby się gorzej. */
@@ -29,7 +30,8 @@ import { ile as liczba } from "../ui";
 
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
-  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana,
+  paczki = null, szukaPaczek = false,
+  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana, onLogin,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -46,6 +48,11 @@ export function Szukanie({
   /** Rejestracja paczki nieodebranej; brak = ekran jej nie proponuje. */
   rejestruje?: boolean;
   onNieodebrana?: (waybill: string, orderId: string, notatka: string, login: string) => void;
+  /** Paczki z historii tego klienta; `null` = jeszcze o nie nie pytano. */
+  paczki?: PaczkaKlienta[] | null;
+  szukaPaczek?: boolean;
+  /** Prośba o historię klienta — wysyłana z pola loginu, nie z każdego znaku. */
+  onLogin?: (login: string) => void;
 }) {
   /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
@@ -92,10 +99,56 @@ export function Szukanie({
             numer, człowiek. */}
         <input className="field mt-2 h-7 text-xs" value={login}
           aria-label="Login kupującego" placeholder="Login kupującego (jeśli znasz)"
-          onChange={(e) => setLogin(e.target.value)} />
+          onChange={(e) => setLogin(e.target.value)}
+          /* PYTAMY PO DOPISANIU LOGINU, nie po każdym znaku (0.363.0). Enter
+             i wyjście z pola to dwa ruchy, które operator i tak wykonuje —
+             a zapytanie na znak byłoby dwunastoma odczytami na jeden login. */
+          onBlur={() => onLogin?.(login.trim())}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            onLogin?.(login.trim());
+          }} />
         <p className="mt-1 text-slate-500">
           Po loginie znajdziesz tę paczkę później — szukanie zna go tak samo
-          jak numery. Z zamówienia bierze się sam.</p>
+          jak numery. Enter pokaże paczki tego klienta.</p>
+
+        {/* ── WYBÓR PACZKI Z HISTORII KLIENTA (0.363.0) ──────────────────────
+            Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+            w historii sklepu, więc muszę mieć możliwość wybrania paczki".
+            Numer zamówienia przepisywany z panelu Allegro był jedyną drogą,
+            a to przepisywanie dwudziestu znaków z drugiego ekranu.
+
+            Wybór WPISUJE numer do pola wyżej, zamiast trzymać go osobno:
+            operator ma widzieć, co pojedzie na serwer, a nie ufać, że klik
+            gdzieś się zapamiętał. */}
+        {szukaPaczek && <p className="mt-1 text-slate-500">Szukam paczek…</p>}
+        {paczki !== null && !szukaPaczek && (paczki.length === 0
+          ? <p className="mt-1 text-slate-500">
+              Nie mam paczek tego klienta. Numer zamówienia wpisz ręcznie —
+              albo zostaw puste, paczka i tak się zarejestruje.</p>
+          : <ul className="mt-2 space-y-1">
+              {paczki.map((k) => {
+                const wybrana = k.orderId === zamowienie;
+                return <li key={k.orderId}>
+                  <button type="button" onClick={() => setZamowienie(k.orderId)}
+                    className={`w-full rounded border p-1.5 text-left text-xs ${wybrana
+                      ? "border-sky-400 bg-sky-50 text-sky-900"
+                      : "border-slate-200 hover:bg-slate-50"}`}>
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <b className="font-mono">{k.orderId}</b>
+                      <span className="text-slate-500">{czas(k.kupionoAt)}</span>
+                      <span className="tabular-nums">{zlote(k.sumaGrosze, k.waluta)}</span>
+                      {/* Zwrot na tym zamówieniu NIE blokuje: jedno zamówienie
+                          bywa dwiema paczkami. Ale to jest ostrzeżenie, którego
+                          operator sam by nie miał. */}
+                      {k.maZwrot && <span className="text-amber-700">ma już zwrot</span>}
+                    </span>
+                    <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
+                  </button>
+                </li>;
+              })}
+            </ul>)}
         <input className="field mt-2 h-7 text-xs" value={notatka}
           aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
           onChange={(e) => setNotatka(e.target.value)} />

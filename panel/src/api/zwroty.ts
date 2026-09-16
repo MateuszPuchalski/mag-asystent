@@ -267,6 +267,38 @@ export function useZamknijKosz() {
   });
 }
 
+/** Jedna paczka z historii klienta — tyle, ile trzeba, żeby wskazać właściwą. */
+export interface PaczkaKlienta {
+  orderId: string;
+  kupionoAt: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  pozycji: number;
+  zawartosc: string;
+  /** Zwrot dla tego zamówienia już istnieje — ostrzeżenie, nie blokada. */
+  maZwrot: boolean;
+}
+
+/**
+ * Co ten klient u nas kupił (0.363.0).
+ *
+ * Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+ * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty login
+ * NIE PYTA serwera — zapytanie o wszystkich byłoby listą cudzych zakupów,
+ * a nie odpowiedzią na pytanie operatora.
+ *
+ * Odczyt, więc `useQuery`: otwarcie i przeglądanie niczego nie mutuje.
+ */
+export function usePaczkiKlienta(login: string) {
+  const czysty = login.trim();
+  return useQuery({
+    queryKey: ["paczki-klienta", czysty] as const,
+    enabled: czysty.length > 0,
+    queryFn: () => api<{ paczki: PaczkaKlienta[] }>(
+      `/api/obsluga/zwroty/paczki-klienta?login=${encodeURIComponent(czysty)}`),
+  });
+}
+
 /**
  * Rejestracja paczki, której klient nie odebrał (0.172.0).
  *

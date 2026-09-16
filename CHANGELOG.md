@@ -54,6 +54,26 @@ klienta. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
   synchronizacji.
 - **Dziennik notuje sam fakt, nie login.** Dana osobowa ma jedno miejsce.
 
+**Z loginu wybierasz PACZKĘ.** Druga połowa tego samego zgłoszenia: „kupujący
+może mieć wiele paczek kupionych w historii sklepu, więc muszę mieć możliwość
+wybrania paczki". Numer zamówienia trzeba było dotąd wyklikać w panelu Allegro
+i przepisać ręcznie — dwadzieścia znaków z drugiego ekranu, do pola, które nic
+nie podpowiadało.
+
+- **Enter w polu loginu pokazuje zakupy tego klienta** — numer, data, kwota
+  i zawartość w jednej linijce. Pytamy po dopisaniu loginu, nie po każdym
+  znaku: zapytanie na znak to dwanaście odczytów na jeden login.
+- **Kliknięcie wpisuje numer do pola zamówienia**, zamiast trzymać go osobno.
+  Operator widzi, co pojedzie na serwer.
+- **Paczka z zarejestrowanym już zwrotem jest oznaczona, ale wybieralna.**
+  Jedno zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać drugiej
+  po zwrocie pierwszej — blokada kazałaby wtedy kłamać.
+- **Login dopasowuje się bez wielkości liter, ale w całości.** Fragment
+  wskazywałby cudze zakupy, a z tego ekranu wychodzi się z czyimś numerem
+  zamówienia w ręku.
+- Lista czyta WYŁĄCZNIE to, co synchronizacja już przyniosła. Pytanie do
+  Allegro ma własny przycisk i własny limit.
+
 Szukanie nie wymagało zmiany: filtr kolejki porównuje login od 0.337.0. Nic
 nie trzeba ustawiać, wystarczy nowy build panelu.
 

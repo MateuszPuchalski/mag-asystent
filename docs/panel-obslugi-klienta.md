@@ -3582,6 +3582,21 @@ z okna synchronizacji.
 Dziennik notuje sam fakt (`zLoginem`), nie login. Dana osobowa ma jedno
 miejsce, a nie dwa do pilnowania przy tej samej polityce.
 
+**Z loginu wybiera się PACZKĘ.** Druga połowa tego samego zgłoszenia: „kupujący
+może mieć wiele paczek kupionych w historii sklepu". Enter w polu loginu
+pokazuje zakupy tego klienta — numer, datę, kwotę i zawartość w jednej
+linijce. Kliknięcie wpisuje numer do pola zamówienia, więc operator widzi, co
+pojedzie na serwer.
+
+Pytamy po dopisaniu loginu, nie po każdym znaku: zapytanie na znak to
+dwanaście odczytów na jeden login. Lista czyta wyłącznie to, co synchronizacja
+już przyniosła; pytanie do Allegro ma własny przycisk i własny limit.
+
+Paczka z zarejestrowanym już zwrotem jest OZNACZONA, ale wybieralna. Jedno
+zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać drugiej po
+zwrocie pierwszej — blokada kazałaby wtedy kłamać. Login dopasowuje się bez
+wielkości liter, ale w całości: fragment wskazywałby cudze zakupy.
+
 **Numer listu przewozowego stoi TU w modelu pracy** — świadomy wyjątek od
 polityki 0.163.0. Przy zwrocie z Allegro numer szuka się w kopii odpowiedzi,
 a paczka nieodebrana żadnej kopii nie ma: to jedyny uchwyt, po którym da się
