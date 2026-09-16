@@ -3,7 +3,6 @@ import {
   CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw,
   ShoppingCart, UserCheck,
 } from "lucide-react";
-import { TagiSprawy } from "../sprawy/Tagi";
 import type { Tag } from "../api/typy";
 import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot } from "../api/typy";
 import { Os } from "./Os";
@@ -146,7 +145,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   fakturaBlad = "", onFaktura, os = [],
   trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
-  onProwadze, trwaProwadzenie = false, tagi }: {
+  }: {
   zwrot: Zwrot;
   kandydaciFaktury?: KandydatFaktury[];
   fakturaTrwa?: boolean;
@@ -160,18 +159,6 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   /** Brak = kolumna notatki nie pokazuje (pole bez zapisu kłamie). */
   onNotatka?: (tekst: string) => void;
   onCofnijNotatke?: () => void;
-  /** Znacznik „biorę to" (0.315.0); brak = sekcji pracy biura nie ma. */
-  onProwadze?: () => void;
-  trwaProwadzenie?: boolean;
-  /** Tagi biura — ten sam komplet propsów co przy reklamacji. */
-  tagi?: {
-    slownik: Tag[];
-    trwa: boolean;
-    blad: string;
-    onPrzypnij: (tagId: number) => void;
-    onOdepnij: (tagId: number) => void;
-    onNowy: (nazwa: string) => void;
-  };
 }) {
   const zam = zwrot.zamowienie;
 
@@ -186,9 +173,11 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
           ? "font-bold text-ranga-zle" : ""}>
           {zwrot.terminAt ? czas(zwrot.terminAt) : "rusza, gdy paczka wróci"}</dd>
       </dl>
-      <p className="mt-2 text-xs text-slate-500">
-        Siedem dni od otrzymania zwrotu — tak liczy Allegro. Termin ustawowy na
-        oddanie pieniędzy biegnie osobno, od oświadczenia klienta.</p>
+      {/* DWÓCH ZDAŃ O TYM, JAK LICZY ALLEGRO, TU JUŻ NIE MA (0.370.0).
+          Powtarzały się przy KAŻDYM zwrocie, a mówiły o systemie, nie o tej
+          sprawie — po trzecim otwarciu ekranu nikt ich nie czyta, a miejsce
+          zajmują dalej. Zasada zegara stoi w `docs/panel-obslugi-klienta.md`
+          i w pastylce terminu, która mówi liczbę dla TEGO zwrotu. */}
     </Sekcja>
 
     {/* SEKCJI „ZWROT" TU JUŻ NIE MA (0.207.0). Numer i login kupującego stoją
@@ -385,11 +374,15 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         pisał". To dwa różne zdania i tylko pierwsze jest prawdziwe: Allegro
         oznacza zamówieniem tylko część wiadomości, a klient piszący z poziomu
         oferty tym mostkiem się nie znajdzie. */}
+    {/* SEKCJA MILCZY, GDY NIE MA CZEGO POWIEDZIEĆ (0.370.0). Przy typowym
+        zwrocie mostek nie trafia w nic, więc ikona, nagłówek i ramka stały tu
+        po to, żeby napisać „nie powiązało" — czyli zdanie o Allegro, nie
+        o sprawie. Dekalog p. 2: na wierzchu to, co rozstrzyga bieżącą
+        czynność. Że wiadomości bywają, mówi dokumentacja i ta sekcja wtedy,
+        gdy naprawdę są. */}
+    {zwrot.rozmowy.length > 0 &&
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
-      {zwrot.rozmowy.length === 0
-        ? <p className="text-xs text-slate-500">
-            Allegro nie powiązało z tym zamówieniem żadnej wiadomości.</p>
-        : <ul className="space-y-1">
+      {<ul className="space-y-1">
             {zwrot.rozmowy.map((r) => <li key={r.id}>
               <a href={`/obsluga/skrzynka/${r.id}`}
                 className="block rounded-lg bg-slate-50 px-2 py-1 hover:bg-slate-100">
@@ -400,34 +393,17 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               </a>
             </li>)}
           </ul>}
-    </Sekcja>
+    </Sekcja>}
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>
     </Sekcja>}
 
-    {/* PRACA BIURA — kto to prowadzi i o czym to jest (0.315.0). Stoi NAD
-        notatką, bo odpowiada na pytania zadawane częściej i krócej: „czyje to"
-        i „czego ta sprawa czeka". Notatka jest dłuższa i czyta się ją wtedy,
-        gdy tag nie wystarczy — ta sama kolejność co przy reklamacji. */}
-    {(onProwadze || tagi) && <Sekcja ikona={<UserCheck size={14} />} tytul="Praca biura">
-      {onProwadze && <>
-        <p className="mb-1">
-          <span className="text-slate-500">Prowadzi</span>{" "}
-          <b>{zwrot.prowadzi ?? "nikt"}</b>
-        </p>
-        {/* ZNACZNIK, NIE ZAMEK: nie blokuje nikomu decyzji, tylko mówi reszcie
-            biura, że ktoś już to wziął. Ponowne kliknięcie zdejmuje. */}
-        <Przycisk className="w-full" disabled={trwaProwadzenie} onClick={onProwadze}>
-          {zwrot.prowadzi ? "Odłóż zwrot" : "Prowadzę ten zwrot"}
-        </Przycisk>
-      </>}
-      {tagi && <div className={onProwadze ? "mt-3" : ""}>
-        <TagiSprawy przypiete={zwrot.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
-          blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
-          onNowy={tagi.onNowy} />
-      </div>}
-    </Sekcja>}
+    {/* SEKCJI „PRACA BIURA" TU JUŻ NIE MA (0.370.0). Stała tu od 0.315.0 ze
+        znacznikiem prowadzącego i tagami sprawy; zgłoszenie właściciela
+        „uprość panel zwrotów do wymaganego minimum" zdjęło oba przy zwrotach.
+        Przy reklamacji i dyskusji zostają — tam prowadzący odpowiada na
+        prawdziwe pytanie, bo sprawę bierze konkretna osoba. */}
 
     {onNotatka && <Sekcja ikona={<NotebookPen size={14} />} tytul="Notatka biura">
       <Notatka zwrot={zwrot} trwa={trwaNotatka} blad={bladNotatki}

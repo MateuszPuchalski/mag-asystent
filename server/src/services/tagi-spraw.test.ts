@@ -6,7 +6,7 @@ import { migrate } from "../db/db.js";
 import {
   BladTagu, MAKS_AKTYWNYCH, odepnijTag, przelaczTag, przypnijTag, slownikTagow,
   tagiSprawy, tagiWszystkichSpraw, utworzTag, zmienNazweTagu,
-  TAGI_REKLAMACJI, TAGI_ZWROTU,
+  TAGI_REKLAMACJI,
 } from "./tagi-spraw.js";
 
 /* ── Tagi spraw (0.279.0) ────────────────────────────────────────────────────
@@ -213,53 +213,3 @@ test("zmiana nazwy nie gubi przypięć, a kolizja nazw jest odmową", () => {
    Słownik zostaje jeden, wiązania idą do własnej tabeli. Trzy rzeczy warte
    testu: niezależność obu osi, sprzątanie po skasowanej sprawie i odmowa dla
    zwrotu, którego nie ma.                                                   */
-
-/** Zwrot testowy — tyle kolumn, ile wymaga schemat. */
-function zwrotTestowy(d: DatabaseSync, ext = "zw-1"): number {
-  return Number(d.prepare(`INSERT INTO zwrot_klienta
-    (channel_account_id, external_id, created_at, synced_at)
-    VALUES (1, ?, '2026-09-01T08:00:00Z', '2026-09-11T09:00:00Z')`)
-    .run(ext).lastInsertRowid);
-}
-
-test("ten sam tag na zwrocie i reklamacji to DWA niezależne wiązania", () => {
-  /* Słownik jest jeden — „gwarancja" znaczy to samo wszędzie — ale wiązania
-     mieszkają w osobnych tabelach. Jedna tabela z kolumną `rodzaj` wiązałaby
-     się z „jakimś wierszem gdzieś": SQLite nie zna warunkowego klucza obcego,
-     więc kasowanie sprawy przestałoby po sobie sprzątać. */
-  const { d, sprawa } = stanowisko();
-  const tag = utworzTag(d, "gwarancja", ALA);
-  const rek = sprawa("i-1");
-  const zwrot = zwrotTestowy(d);
-
-  assert.equal(przypnijTag(d, TAGI_REKLAMACJI, rek, tag.id, ALA), true);
-  assert.equal(przypnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA), true);
-  assert.deepEqual(tagiSprawy(d, TAGI_ZWROTU, zwrot).map((t) => t.nazwa), ["gwarancja"]);
-  assert.deepEqual([...tagiWszystkichSpraw(d, TAGI_ZWROTU).keys()], [zwrot],
-    "mapa kolejki zna wyłącznie swoją oś");
-
-  /* Zdjęcie ze zwrotu nie rusza reklamacji — i odwrotnie. */
-  assert.equal(odepnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA), true);
-  assert.deepEqual(tagiSprawy(d, TAGI_ZWROTU, zwrot), []);
-  assert.deepEqual(tagiSprawy(d, TAGI_REKLAMACJI, rek).map((t) => t.nazwa), ["gwarancja"]);
-});
-
-test("skasowany zwrot zabiera swoje wiązania", () => {
-  /* `ON DELETE CASCADE` w obie strony. Wiązanie przeżywające sprawę byłoby
-     tagiem wiszącym w próżni — i policzyłoby się w filtrze. */
-  const { d } = stanowisko();
-  const tag = utworzTag(d, "sporny", ALA);
-  const zwrot = zwrotTestowy(d);
-  przypnijTag(d, TAGI_ZWROTU, zwrot, tag.id, ALA);
-
-  d.prepare("DELETE FROM zwrot_klienta WHERE id=?").run(zwrot);
-  const ile = (d.prepare("SELECT COUNT(*) AS n FROM zwrot_tag_sprawy").get() as { n: number }).n;
-  assert.equal(Number(ile), 0);
-});
-
-test("zwrot, którego nie ma, nie przyjmuje tagu", () => {
-  const { d } = stanowisko();
-  const tag = utworzTag(d, "gwarancja", ALA);
-  assert.throws(() => przypnijTag(d, TAGI_ZWROTU, 9999, tag.id, ALA),
-    (e: unknown) => e instanceof BladTagu && e.kod === 404);
-});

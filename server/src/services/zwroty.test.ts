@@ -5,14 +5,14 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   bilansKartotek,
-  csvZwrotow, dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
   cofnijKorekte, cofnijKwote, cofnijWerdykt, kwotaRozjechana, zapiszIloscZwrocona,
   znajdzZwrotPoKodzie,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   osZwrotu, zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, ZwrotConflict,
-  stempelProwadziZwrot, poczatekTerminu,
+  poczatekTerminu,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
 import { paczkiKlienta } from "./zamowienia.js";
@@ -1292,34 +1292,15 @@ test("zwrot bez powiązanych wiadomości ma pustą listę, a nie brak pola", () 
   assert.deepEqual(listaZwrotow(d, TERAZ)[0].rozmowy, []);
 });
 
-test("CSV dla biura ma średniki, jeden wiersz na pozycję i żadnego listu przewozowego", () => {
-  /* Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu.
-     Numeru listu nie wynosimy na dysk — polityka danych zwrotów z 0.163.0. */
-  const d = stanowisko();
-  towar(d, 70, "SEK-46", "5901234123457");
-  zamowienie(d, "ord-9", [{ offerId: "of-1", nazwa: "Sekator", sku: "SEK-46", cena: 4999 }]);
-  dodaj(d, "2026-08-30T09:00:00Z",
-    { order_id: "ord-9", kupujacy_login: "mirek352810", przewoznik: "DPD" },
-    [{ ilosc: 1, cena: 4999, offerId: "of-1", twId: 70, twSymbol: "SEK-46" },
-      { ilosc: 2, cena: 1000, offerId: "of-2", nazwa: "Filtr" }]);
-
-  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
-  const linie = csv.trim().split("\r\n");
-  assert.equal(linie.length, 3, "nagłówek i dwie pozycje");
-  assert.match(linie[0], /^﻿?Zrodlo;Numer zwrotu;/, "BOM i średniki, żeby Excel PL nie pytał");
-  assert.match(linie[1], /^zwrot klienta;/, "wiersz mówi, czy to zgłoszenie, czy nieodebrana");
-  assert.match(linie[1], /mirek352810;/);
-  assert.match(linie[1], /DPD;/);
-  assert.match(linie[1], /5901234123457/, "EAN wchodzi do zestawienia");
-  assert.match(linie[2], /Filtr;/);
-  assert.equal(csv.includes("waybill"), false, "numeru listu w pliku nie ma");
-});
-
-test("zwrot bez pozycji też dostaje wiersz w zestawieniu", () => {
-  /* Inaczej zniknąłby z pliku i nikt by się nie dowiedział, że jest. */
+test("zwrot bez pozycji też dostaje wiersz w kolejce", () => {
+  /* Inaczej zniknąłby z listy i nikt by się nie dowiedział, że jest. Test
+     pytał o to przez zestawienie CSV, które zeszło w 0.370.0 — pytanie jest
+     jednak o KOLEJKĘ i tam się je zadaje wprost. */
   const d = stanowisko();
   dodaj(d, "2026-08-30T09:00:00Z", {}, []);
-  assert.equal(csvZwrotow(listaZwrotow(d, TERAZ)).trim().split("\r\n").length, 2);
+  const w = listaZwrotow(d, TERAZ);
+  assert.equal(w.length, 1);
+  assert.deepEqual(w[0].pozycje, []);
 });
 
 /* ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────── */
@@ -1406,19 +1387,6 @@ test("potrącenie zostawia ślad w dzienniku, razem z powodem", () => {
     .get() as { type: string; payload: string };
   assert.ok(e, "zdarzenie jest");
   assert.match(e.payload, /brak opakowania/);
-});
-
-test("potrącenie wchodzi do zestawienia CSV razem z powodem", () => {
-  const d = stanowisko();
-  const id = dodaj(d, "2026-08-30T09:00:00Z", { werdykt: "przyjety" },
-    [{ ilosc: 1, cena: 10000, ocena: "stan" }]);
-  const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
-    .get(id) as { id: number }).id);
-  zapiszPotracenie(d, poz, 2500, "ślady użycia", 1, KTO);
-
-  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
-  assert.match(csv, /Potracenie;Powod potracenia;/);
-  assert.match(csv, /25,00;ślady użycia/);
 });
 
 /* ── Paczki nieodebrane (0.172.0) ───────────────────────────────────────── */
@@ -1622,17 +1590,6 @@ test("dziennik notuje FAKT nazwy odbiorcy, nie samą nazwę", () => {
   assert.doesNotMatch(e.payload, /Kowalski/);
 });
 
-test("nazwy odbiorcy NIE MA w eksporcie CSV", () => {
-  /* Plik na dysku jest zapisem trwalszym niż baza, a decyzja właściciela
-     dotyczyła szukania na ekranie, nie wynoszenia danych osobowych do
-     arkusza. Ta sama granica co przy numerze listu od 0.344.0. */
-  const d = stanowisko();
-  zarejestrujNieodebrana(d, { waybill: "PACZ-C", odbiorcaNazwa: "Jan Kowalski" }, KTO);
-  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
-  assert.equal(csv.includes("Kowalski"), false);
-  assert.equal(csv.includes("Odbiorca"), false);
-});
-
 test("zamówienie bez daty zakupu stoi na końcu, nie na górze", () => {
   /* Wiersz bez `kupiono_at` jest niedokończonym zapisem synchronizacji.
      Sortowanie malejąco po NULL-u wystawiłoby go jako najświeższy zakup. */
@@ -1736,12 +1693,6 @@ test("rejestracja zostawia ślad w dzienniku", () => {
   zarejestrujNieodebrana(d, { waybill: "PX4" }, KTO);
   const e = d.prepare("SELECT type FROM events WHERE type='zwrot_nieodebrana'").get();
   assert.ok(e, "każda mutacja ma autora, także ta");
-});
-
-test("zestawienie CSV odróżnia paczkę nieodebraną od zgłoszenia", () => {
-  const d = stanowisko();
-  zarejestrujNieodebrana(d, { waybill: "PX5" }, KTO);
-  assert.match(csvZwrotow(listaZwrotow(d, TERAZ)), /nieodebrana paczka;/);
 });
 
 /* ── Login kupującego (0.177.0) ──────────────────────────────────────────────
@@ -1974,62 +1925,6 @@ test("notatkę da się dopisać przy zwrocie ZAMKNIĘTYM", () => {
   /* Na oś idzie SAM FAKT, bez treści: notatka bywa zdaniem o kliencie,
      a oś ogląda się z boku ekranu. */
   assert.equal(osZwrotu(d, id)[0].tresc, "Notatka biura zmieniona");
-});
-
-test("„biorę to” jest PRZEŁĄCZNIKIEM i rozstrzyga tożsamość, nie imię", () => {
-  /* Blizna reklamacji z 0.278.0: porównywanie łańcuchów kazało dwóm osobom
-     o tym samym imieniu zdejmować sobie znacznik nawzajem, po cichu. */
-  const d = stanowisko();
-  const ala = biuro(d);
-  const drugaAla = Number(d.prepare(
-    "INSERT INTO app_user(name,role) VALUES ('Biuro','biuro')").run().lastInsertRowid);
-  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
-
-  const wziete = stempelProwadziZwrot(d, id, ala);
-  assert.equal(wziete.prowadzi, "Biuro");
-  assert.ok(wziete.prowadziAt);
-
-  /* Imiennik NIE zdejmuje cudzego znacznika — bierze sprawę na siebie. */
-  const przejete = stempelProwadziZwrot(d, id, { id: drugaAla, name: "Biuro" }, wziete.wersja);
-  assert.equal(
-    Number((d.prepare("SELECT prowadzi_user_id AS u FROM zwrot_klienta WHERE id=?")
-      .get(id) as { u: number }).u),
-    drugaAla);
-
-  /* Drugie kliknięcie TEJ SAMEJ osoby zdejmuje znacznik. */
-  const oddane = stempelProwadziZwrot(d, id, { id: drugaAla, name: "Biuro" }, przejete.wersja);
-  assert.equal(oddane.prowadzi, null);
-  assert.equal(oddane.prowadziAt, null);
-});
-
-test("znacznik prowadzącego NIE idzie na oś zwrotu", () => {
-  /* Oś opowiada, co się ze sprawą stało. Wzięcie jej na siebie niczego
-     w zwrocie nie zmienia i zaśmiecałoby przebieg zdaniami o tym, kto
-     akurat patrzył. Ślad zostaje w dzienniku. */
-  const d = stanowisko();
-  const kto = biuro(d);
-  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
-  stempelProwadziZwrot(d, id, kto);
-  assert.deepEqual(osZwrotu(d, id), []);
-  assert.equal(
-    Number((d.prepare("SELECT COUNT(*) AS n FROM events WHERE type='zwrot_prowadzi'")
-      .get() as { n: number }).n),
-    1);
-});
-
-test("prowadzący i tagi wychodzą na wierszu kolejki", () => {
-  const d = stanowisko();
-  const kto = biuro(d);
-  const id = dodaj(d, "2026-08-30T09:00:00Z", {}, [{ ilosc: 1, cena: 5000 }]);
-  stempelProwadziZwrot(d, id, kto);
-  const tag = Number(d.prepare("INSERT INTO reklamacja_tag(nazwa) VALUES ('gwarancja')")
-    .run().lastInsertRowid);
-  d.prepare("INSERT INTO zwrot_tag_sprawy(zwrot_id,tag_id) VALUES (?,?)").run(id, tag);
-
-  const w = listaZwrotow(d).find((z) => z.id === id)!;
-  assert.equal(w.prowadzi, "Biuro");
-  assert.equal(w.prowadziUserId, kto.id);
-  assert.deepEqual(w.tagi.map((t) => t.nazwa), ["gwarancja"]);
 });
 
 test("szczegół po identyfikatorze składa TEN SAM wiersz, co kolejka", () => {

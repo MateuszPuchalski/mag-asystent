@@ -18,8 +18,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   kubelek, sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z", dniDoTerminu: 7,
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
-  kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
-  zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
+  kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1, zrodlo: "allegro",
   notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
@@ -139,14 +138,28 @@ describe("Ekran zwrotów", () => {
      a każde z osobna kosztowało „tylko trzydzieści pikseli".
 
      Ten test nie mierzy pikseli — jsdom ich nie ma. Liczy PASMA, bo to one
-     narastają, i zmusza ósme do rozmowy z właścicielem zamiast do cichego
-     wejścia. Podniesienie progu jest wolne; ma tylko zostawić zdanie.       */
-  it("nad listą stoi najwyżej pięć pasm — ósme wydałoby się samo", async () => {
+     narastają, i zmusza kolejne do rozmowy z właścicielem zamiast do cichego
+     wejścia. Podniesienie progu jest wolne; ma tylko zostawić zdanie.
+
+     PRÓG SCHODZI Z PIĘCIU DO CZTERECH (0.370.0) i to jest pierwszy raz, kiedy
+     idzie w dół. Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego
+     minimum". Zeszły dwa pasma: filtrów (przewoźnik, daty, CSV — Synchronizuj
+     wszedł do rzędu pola szukania) i sita z tagami. Zostają cztery: kubełki,
+     szukanie, pytanie kubełka i pasek klawiszy.
+
+     PASEK KLAWISZY ZOSTAJE, bo właściciel go nie wskazał, a dekalog p. 2 mówi
+     wprost, że rozpoznanie jest tańsze od pamiętania. Traci tylko `m` i `n`,
+     które prowadziły do zdjętego sita.
+
+     Audyt z 15 września zbijał chrom, ale jego kryterium brzmiało „żadna
+     zmiana nie kasuje funkcji" — to wydanie kryterium ZMIENIA, na wyraźną
+     prośbę. Dlatego próg jest niższy, a nie tylko dotrzymany.               */
+  it("nad listą stoją najwyżej cztery pasma — piąte wydałoby się samo", async () => {
     scena.zwroty = null;
     pokaz();
     const karta = document.querySelector(".card")!;
     /* Ostatnie dziecko to sama lista, reszta to chrom. */
-    expect(karta.children.length - 1).toBeLessThanOrEqual(5);
+    expect(karta.children.length - 1).toBeLessThanOrEqual(4);
   });
 
   it("przełączenie kubełka przestawia też kursor na pierwszy zwrot", async () => {
@@ -354,52 +367,18 @@ describe("Ekran zwrotów", () => {
     expect(screen.queryByText("Przyjąć czy odrzucić?")).toBeNull();
   });
 
-  it("filtr przewoźnika zna tylko firmy, które naprawdę przyjechały", () => {
-    /* Allegro nie publikuje zamkniętej listy przewoźników, a sonda złapała
-       `UNKNOWN`. Filtr ze słownika uczyłby klikać na próżno. */
-    pokaz();
-    const wybor = screen.getByLabelText("Przewoźnik");
-    expect(wybor).toHaveTextContent("Każdy przewoźnik");
-    expect(wybor).toHaveTextContent("INPOST");
-    expect(wybor).not.toHaveTextContent("DHL");
-  });
-
-  it("„Paczka u nas” zawęża do zwrotów z doręczoną paczką i niczego nie przestawia", async () => {
-    /* Audyt zwrotów, 15 września 2026: biuro przy stosie kartonów pyta, które
-       zwroty może dziś zrobić. Kolejność dalej liczy termin (0.315.0). */
-    scena.zwroty = [
-      { ...zwrot(31, "decyzja", "ZU-31"), dostarczonoAt: "2026-09-01T09:00:00.000Z" },
-      zwrot(32, "decyzja", "ZU-32"),
-    ];
-    try {
-      pokaz();
-      expect(screen.getAllByText("ZU-32").length).toBeGreaterThan(0);
-      await userEvent.click(screen.getByLabelText(/Paczka u nas/));
-      expect(screen.queryByText("ZU-32")).toBeNull();
-      expect(screen.getAllByText("ZU-31").length).toBeGreaterThan(0);
-    } finally { scena.zwroty = null; }
-  });
-
-  it("przewoźnik zawęża kolejkę, a domyślnie nie zawęża niczego", async () => {
-    pokaz();
-    expect(screen.getAllByText("ZW-1").length).toBeGreaterThan(0);
-    await userEvent.selectOptions(screen.getByLabelText("Przewoźnik"), "DPD");
-    expect(screen.queryByText("ZW-1")).toBeNull();
-  });
-
-  it("kolejność domyślna zostaje po terminie ustawowym", async () => {
-    /* Blizna 0.121.0: termin steruje kolejnością pracy. Data nadania jest
-       PRZEŁĄCZNIKIEM, bo odpowiada na inne pytanie. */
+  it("kolejność liczy ZEGAR USTAWOWY i nie ma jak jej przestawić", async () => {
+    /* Blizna 0.121.0: termin steruje kolejnością pracy. Przełącznik „od daty
+       nadania" zszedł w 0.370.0 razem z pasmem filtrów — odpowiadał na inne
+       pytanie („co przyszło najdawniej") niż to, które prowadzi tę pracę. */
     pokaz();
     await userEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
-    const przed = screen.getAllByRole("button").map((b) => b.textContent ?? "")
+    const kolejnosc = screen.getAllByRole("button").map((b) => b.textContent ?? "")
       .filter((t) => t.includes("ZW-"));
-    expect(przed[0]).toContain("ZW-1");
-
-    await userEvent.click(screen.getByLabelText(/Od daty nadania/));
-    const po = screen.getAllByRole("button").map((b) => b.textContent ?? "")
-      .filter((t) => t.includes("ZW-"));
-    expect(po[0]).toContain("ZW-2");
+    expect(kolejnosc[0]).toContain("ZW-1");
+    expect(screen.queryByLabelText(/Od daty nadania/)).toBeNull();
+    expect(screen.queryByLabelText(/Przewoźnik/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /Pobierz CSV/ })).toBeNull();
   });
 
   it("licznik kartotek mówi ILE i DLACZEGO, a nieznanego powodu nie gubi", async () => {
@@ -750,34 +729,26 @@ describe("Pasek rozjazdów", () => {
    Reklamacje i dyskusje mają je od 0.278.0 i 0.279.0. Zwroty dostały je
    decyzją właściciela z 13 września — razem z prowadzącym, którego ta sama
    rozmowa najpierw odrzuciła, a potem przywróciła.                          */
-describe("Sito i tagi w kolejce zwrotów", () => {
-  const zTagiem = (id: number, nazwa: string, kubelek: Kubelek = "decyzja") => ({
-    ...zwrot(id, kubelek, `ZT-${id}`),
-    tagi: [{ id: nazwa.length, nazwa }],
-  });
+describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
+  /* Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
+     a po pytaniu o szczegóły wskazanie wprost: sito Moje/Niczyje, tagi
+     spraw, filtry przewoźnika i dat, Pobierz CSV — i „usunąć zupełnie".
 
-  it("tag ZAWĘŻA listę, nie przestawia kolejności", async () => {
-    /* Kolejność liczy termin ustawowy i to się nie zmienia: jedna pomyłka
-       w tagu nie ma prawa zakopać zwrotu z zegarem na dole listy. */
-    scena.zwroty = [zTagiem(11, "gwarancja"), zTagiem(12, "sporny")];
+     Ten test stoi w miejscu trzech, które pilnowały sita i tagów. Pilnuje
+     rzeczy odwrotnej i jest tu potrzebny z tego samego powodu, dla którego
+     one były: sito przy zwrotach wracało już raz tego samego dnia, w którym
+     zeszło (0.315.0). Bez tej asercji trzeci powrót przeszedłby po cichu. */
+  it("sita, tagów i filtrów nie ma na ekranie", async () => {
+    scena.zwroty = [{ ...zwrot(11, "decyzja", "ZT-11"), przewoznik: "DPD" }];
     try {
       pokaz();
-      expect(screen.getAllByRole("listitem").length).toBe(2);
-      /* Pigułka filtra i czip na wierszu noszą tę samą nazwę — bierzemy
-         PIERWSZY przycisk, bo pasek stoi nad listą. */
-      await userEvent.click(screen.getAllByRole("button", { name: /gwarancja/ })[0]);
-      const po = screen.getAllByRole("listitem");
-      expect(po.length).toBe(1);
-      expect(po[0].textContent).toContain("ZT-11");
-    } finally { scena.zwroty = null; }
-  });
-
-  it("pigułka tagu, którego w kubełku nie ma, się nie pokazuje", () => {
-    /* Filtr obiecujący zawężenie do pustki uczy klikać na próżno. */
-    scena.zwroty = [zwrot(13, "decyzja", "ZT-13")];
-    try {
-      pokaz();
-      expect(screen.queryByRole("button", { name: /gwarancja/ })).toBeNull();
+      for (const czego of [/Moje/, /Niczyje/, /gwarancja/, /Pobierz CSV/]) {
+        expect(screen.queryByRole("button", { name: czego })).toBeNull();
+      }
+      expect(screen.queryByLabelText(/Przewoźnik/)).toBeNull();
+      expect(screen.queryByLabelText(/Paczka u nas/)).toBeNull();
+      /* Sam wiersz zostaje nietknięty — zeszły sita, nie kolejka. */
+      expect(screen.getAllByRole("listitem").length).toBe(1);
     } finally { scena.zwroty = null; }
   });
 });

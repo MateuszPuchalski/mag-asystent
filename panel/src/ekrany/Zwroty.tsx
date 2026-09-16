@@ -14,7 +14,7 @@ import {
   usePaczkiKlienta, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
-  useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow, useProwadziZwrot,
+  useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -25,10 +25,6 @@ import { Koszyk } from "../zwroty/Koszyk";
 import type { RozjazdZwrotu } from "../api/zwroty";
 import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
-import { PasekSita, ZdanieOUkrytych, useSito, wSicie } from "../sprawy/Moje";
-import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
-import { useJa } from "../api/rozmowy";
-import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import type { AkcjeKlawiszy } from "../zwroty/klawisze";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 
@@ -356,55 +352,33 @@ export function Zwroty() {
      są silnikiem pracy — każdy niesie jedno pytanie — a ta zakładka jest do
      SZUKANIA: „gdzie stoi ten zwrot", nie „co mam zrobić". Rejestr skasowany
      w 0.140.0 mieszał te dwie rzeczy i to go pogrążyło. */
-  const [przewoznik, setPrzewoznik] = useState<string>("");
-  const [poNadaniu, setPoNadaniu] = useState(false);
   const [bladSync, setBladSync] = useState("");
 
-  /* Tożsamość rozstrzyga „czyje to" — po NUMERZE KONTA, nie po imieniu. */
-  const ja = useJa();
-  const mojeId = ja.data?.user.userId ?? null;
-  const { sito, przelacz: przelaczSito } = useSito();
-  const slownikTagow = useTagi();
-  const nowyTag = useNowyTag();
-  const przypnijTag = usePrzypnijTag();
-  const odepnijTag = useOdepnijTag();
-  const [tag, setTag] = useState<number | null>(null);
-  const [bladTagu, setBladTagu] = useState("");
+  /* TOŻSAMOŚCI TEN EKRAN JUŻ NIE POTRZEBUJE (0.370.0). Czytał ją po to, żeby
+     odróżnić „moje" od „niczyjego" — a sito zeszło. `zMoje={false}` w pasku
+     klawiszy mówi to wprost: klawisze `m` i `n` nie istnieją. */
 
-  /* PACZKA U NAS (audyt zwrotów, 15 września 2026). Biuro przy stosie kartonów
-     pyta „które z tych zwrotów mogę dziś zrobić", a kolejka trzymała też
-     zwroty w drodze. Filtr ZAWĘŻA i niczego nie przestawia — ta sama klauzula
-     co przy sicie i tagach z 0.315.0. */
-  const [paczkaUNas, setPaczkaUNas] = useState(false);
-  const wKubelku = useMemo(() => {
-    const lista = kubelek === null
-      ? (data?.zwroty ?? [])
-      : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek);
-    const uNas = paczkaUNas ? lista.filter((z) => z.dostarczonoAt !== null) : lista;
-    return przewoznik ? uNas.filter((z) => (z.przewoznik ?? "") === przewoznik) : uNas;
-  }, [data, kubelek, przewoznik, paczkaUNas]);
+  /* ── CO ZESZŁO Z TEJ KOLUMNY W 0.370.0 ──────────────────────────────────
+     Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
+     a po pytaniu o szczegóły wskazanie wprost: sito Moje/Niczyje, tagi spraw,
+     filtry przewoźnika i dat, Pobierz CSV — i „usunąć zupełnie".
 
-  /* SITO I TAG ZAWĘŻAJĄ, NIE PRZESTAWIAJĄ (0.315.0). Kolejność liczy termin
-     ustawowy i to się nie zmienia — tag jest zdaniem biura o sprawie, a jedna
-     pomyłka nie ma prawa zakopać zwrotu z zegarem na dole listy. Ta sama
-     klauzula co przy tagach reklamacji (`sprawy/Tagi.tsx`) i przy kategoriach
-     Copilota w skrzynce (§14.5). */
-  const wSicieIzTagiem = useMemo(
-    () => wKubelku
-      .filter((z) => wSicie(z.prowadziUserId, mojeId, sito))
-      .filter((z) => tag === null || z.tagi.some((t) => t.id === tag)),
-    [wKubelku, sito, mojeId, tag]);
-  const ukrytych = wKubelku.length - wSicieIzTagiem.length;
-  /* Pigułki liczą się z KUBEŁKA, nie z listy po sicie: filtr pokazujący tag,
-     którego po zawężeniu nie ma, obiecywałby zawężenie do pustki. */
-  const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
+     SITO WRACA DO PIERWSZEJ DECYZJI, nie do nowej. 0.315.0 ustaliło najpierw,
+     że przy zwrocie prowadzącego NIE MA, bo zwroty prowadzi całe biuro i sito
+     „nie odpowiadałoby na żadne prawdziwe pytanie" — a tego samego dnia
+     przywróciło go z powrotem. To jest powrót do tamtego zdania i dlatego
+     stoi tu zapisane: bez niego następna sesja „naprawi" to trzeci raz.
 
-  /* Przewoźnicy z TEGO, co przyszło, nie ze słownika: Allegro nie publikuje
-     zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
-     Filtr, który zna wartości niewystępujące w danych, uczy klikać na próżno. */
-  const przewoznicy = useMemo(() => [...new Set(
-    (data?.zwroty ?? []).map((z) => z.przewoznik).filter((p): p is string => Boolean(p)),
-  )].sort(), [data]);
+     FILTRY ZESZŁY, BO SZUKANIE JE WCHŁONĘŁO. Od 0.367.0 fraza dzieli się po
+     spacjach i zna przewoźnika razem z nazwami z naklejki, więc lista
+     rozwijana odpowiadała na pytanie, na które odpowiada już pole wyżej.
+
+     Sito i tagi ZOSTAJĄ przy reklamacjach i dyskusjach — `sprawy/Moje.tsx`
+     i `sprawy/Tagi.tsx` stoją nietknięte. Zeszło UŻYCIE, nie komponent. */
+  const wKubelku = useMemo(() => kubelek === null
+    ? (data?.zwroty ?? [])
+    : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek),
+  [data, kubelek]);
 
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
@@ -413,7 +387,6 @@ export function Zwroty() {
   const cofnijPrzelew = useCofnijPrzelew();
   const notatka = useNotatkaZwrotu();
   const cofnijNotatke = useCofnijNotatkeZwrotu();
-  const prowadzi = useProwadziZwrot();
   const [bladNotatki, setBladNotatki] = useState("");
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
@@ -447,16 +420,11 @@ export function Zwroty() {
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
      ZAMKNIĘTYCH. Kod jest mocniejszy niż zakładka, na którą ktoś przed chwilą
      kliknął — tak samo jak adres w pasku przeglądarki. */
-  /* Kolejność DOMYŚLNA zostaje po zegarze ustawowym — blizna 0.121.0: termin
-     jest osobnym bytem i steruje kolejnością pracy. Sortowanie po dacie
-     nadania jest PRZEŁĄCZNIKIEM, bo odpowiada na inne pytanie: „co przyszło
-     najdawniej", a nie „co się najbardziej pali". */
-  const widoczne = useMemo(() => {
-    const lista = pasujace ?? wSicieIzTagiem;
-    if (!poNadaniu) return lista;
-    return [...lista].sort((a, b) =>
-      String(a.paczkaAt ?? "9999").localeCompare(String(b.paczkaAt ?? "9999")));
-  }, [pasujace, wSicieIzTagiem, poNadaniu]);
+  /* Kolejność liczy ZEGAR USTAWOWY i tylko on — blizna 0.121.0. Przełącznik
+     „od daty nadania" zszedł w 0.370.0 razem z pasmem filtrów: odpowiadał na
+     inne pytanie („co przyszło najdawniej") niż to, które prowadzi tę pracę
+     („co się najbardziej pali"). */
+  const widoczne = pasujace ?? wKubelku;
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -531,9 +499,6 @@ export function Zwroty() {
        Inaczej przełącznik wyglądałby na zepsuty: lista zostawałaby ta sama. */
     setFraza("");
     setWynikSkanu(null);
-    /* Tag schodzi razem z frazą: kliknięcie w kubełek jest prośbą o TEN
-       kubełek, a nie o jego przecięcie z poprzednim zawężeniem. */
-    setTag(null);
     const pierwszy = (data?.zwroty ?? []).find((z) => k === null || z.kubelek === k);
     nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
   };
@@ -661,8 +626,8 @@ export function Zwroty() {
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-6]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
       else if (e.key === "7") przelacz(null);
-      else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
-      else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
+      /* Klawisze `m` i `n` zeszły razem z sitem (0.370.0). Martwy klawisz
+         w nasłuchu jest gorszy niż jego brak: milczy i uczy, że nie działa. */
       else klawiszKubelka(e);
     },
   );
@@ -719,66 +684,6 @@ export function Zwroty() {
           ]} />
       </nav>
 
-      {/* Filtr przewoźnika i kolejność. Oba liczą się w pamięci ekranu, tak
-          samo jak kubełek — lista i tak przyjeżdża w całości. */}
-      {/* ── CAŁE PASMO PONAD PRÓG NARAZ (0.255.0) ────────────────────────────
-          Audyt wskazał w tym pasku pole wyboru i „Pobierz CSV". Przy pomiarze
-          okazało się, że `select` i „Synchronizuj" mają po 22 px, czyli też są
-          pod progiem 24×24 z WCAG 2.2 AA. O wysokości pasma decyduje najwyższy
-          element, więc podniesienie jednego celu kosztuje dokładnie tyle samo,
-          co podniesienie wszystkich — a zostawienie dwóch pod progiem w paśmie,
-          które się właśnie naprawia, nie miałoby sensu. */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 px-2 py-1 text-xs">
-        <select className="min-h-6 rounded border border-slate-300 bg-white px-1 py-0.5 text-xs"
-          aria-label="Przewoźnik" value={przewoznik}
-          onChange={(e) => setPrzewoznik(e.target.value)}>
-          <option value="">Każdy przewoźnik</option>
-          {przewoznicy.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        {/* Pole trafienia to CAŁA etykieta, nie sam kwadracik (0.255.0). Kwadrat
-            miał 13×13 px — jedyna nieostylowana kontrolka w panelu, przy progu
-            24×24 z WCAG 2.2 AA. `h-4 w-4` to wzorzec z `wiedza/Tokeny.tsx`,
-            a `py-1` na etykiecie podnosi sam cel do 24 px. */}
-        <label className="flex min-h-6 cursor-pointer items-center gap-1.5 text-slate-600">
-          <input type="checkbox" checked={poNadaniu} className="h-4 w-4 shrink-0"
-            onChange={() => setPoNadaniu((v) => !v)} />
-          Od daty nadania
-        </label>
-        <label className="flex min-h-6 cursor-pointer items-center gap-1.5 text-slate-600">
-          <input type="checkbox" checked={paczkaUNas} className="h-4 w-4 shrink-0"
-            onChange={() => setPaczkaUNas((v) => !v)} />
-          Paczka u nas
-        </label>
-        {/* SYNCHRONIZACJA W ISTNIEJĄCYM PAŚMIE, nie we własnym (0.232.0).
-            Osobny pasek nad listą kosztowałby wiersze kolejki — a to ona jest
-            treścią tej kolumny (blizna 0.193.0 ze skrzynki). Przycisk stoi
-            obok filtrów, bo należy do tej samej rodziny: wszystkie mówią
-            o tym, CO widać na liście.
-
-            Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro,
-            które właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel
-            i czekało na niego kilkanaście minut. */}
-        <button type="button" disabled={synchronizuj.isPending}
-          onClick={() => { setBladSync(""); synchronizuj.mutate(undefined,
-            { onError: (e) => setBladSync((e as Error).message) }); }}
-          title="Pobierz nowe zwroty z Allegro teraz"
-          className="ml-auto inline-flex min-h-6 items-center gap-1 rounded border border-slate-300
-            bg-white px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-          <RefreshCw size={12} className={synchronizuj.isPending ? "animate-spin" : ""} />
-          {synchronizuj.isPending ? "Pobieram…" : "Synchronizuj"}
-        </button>
-        {/* Eksport zostawia ŚLAD w dzienniku, bo wynosi loginy kupujących —
-            ta sama zasada co przy analizie i audycie. */}
-        {/* Postać przycisku, ale nadal ODNOŚNIK (0.255.0). Miał 69×16 px, czyli
-            poniżej progu 24×24, i był jedynym działaniem-odnośnikiem w pasku
-            samych przycisków. `href` zostaje — pobranie ma działać ze środkowego
-            kliknięcia i z menu przeglądarki, czego `onClick` by nie dał. */}
-        <a href="/api/obsluga/zwroty/csv"
-          className="btn-secondary min-h-6 px-2 py-0.5 text-xs">Pobierz CSV</a>
-        {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token,
-            uprawnienie, przerwę — a sam kod HTTP nie mówi nic. */}
-        {bladSync && <span className="w-full text-red-700">{bladSync}</span>}
-      </div>
       <Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
@@ -791,6 +696,14 @@ export function Zwroty() {
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
         onLogin={setLoginPaczek}
+        /* SYNCHRONIZACJA WCHODZI DO RZĘDU POLA (0.370.0). Stała we własnym
+           paśmie razem z filtrami; po ich zdjęciu zostałaby sama i kosztowała
+           całe pasmo na jeden przycisk. Ta sama droga, którą w audycie
+           15 września przeszedł przycisk NIEODEBRANA. */
+        synchronizuje={synchronizuj.isPending}
+        bladSync={bladSync}
+        onSynchronizuj={() => { setBladSync(""); synchronizuj.mutate(undefined,
+          { onError: (e) => setBladSync((e as Error).message) }); }}
         /* JEDEN OBIEKT zamiast sześciu pozycyjnych argumentów (0.367.0).
            Przy czterech dało się jeszcze policzyć na palcach; przy sześciu
            zamiana dwóch sąsiednich napisów jest błędem, którego kompilator
@@ -816,18 +729,12 @@ export function Zwroty() {
           Oba warunki zostają osobne, bo każdy milczy z innego powodu: pytanie
           przy włączonym filtrze mówiłoby nieprawdę o tym, co widać, a sita nie
           ma bez tożsamości. Pasmo znika dopiero, gdy milczą oba. */}
-      {!pasujace && (kubelek !== null || mojeId !== null || wgTagow.length > 0) &&
-        <div className="shrink-0 space-y-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {kubelek !== null &&
-              <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>}
-            {(mojeId !== null || wgTagow.length > 0) &&
-              <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-                moich={wKubelku.filter((z) => wSicie(z.prowadziUserId, mojeId, "moje")).length}
-                niczyich={wKubelku.filter((z) => z.prowadziUserId === null).length} />}
-          </div>
-          {wgTagow.length > 0 &&
-            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />}
+      {/* PYTANIE KUBEŁKA, samo (0.370.0). Stało tu z sitem i filtrem tagów;
+          po ich zdjęciu pasmo niesie jedno zdanie i milczy przy szukaniu
+          oraz w zakładce WSZYSTKIE, gdzie pytania nie ma. */}
+      {!pasujace && kubelek !== null &&
+        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1">
+          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
         </div>}
 
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
@@ -835,7 +742,7 @@ export function Zwroty() {
           OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
-      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
+      <SkrotyKlawiszy zMoje={false} kubelkow={KUBELKI.length}
         /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
            zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
            pokazywał wtedy P/O, choć działały S/U. */
@@ -852,16 +759,10 @@ export function Zwroty() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-          : <Kolejka zwroty={widoczne} wybrany={wybrany} mojeId={mojeId}
+          : <Kolejka zwroty={widoczne} wybrany={wybrany}
               zKubelkiem={Boolean(pasujace) || kubelek === null}
               onWybierz={(z) => nawiguj(`/obsluga/zwroty/${z}`)} />}
       </div>
-      {/* FILTR, KTÓRY PAMIĘTA I MILCZY, ZAGŁODZIŁBY SPRAWY SPOZA SITA.
-          Zdanie mówi, ile zwrotów zostało schowanych, i daje drogę powrotną
-          jednym kliknięciem — ta sama cena pamięci co przy reklamacjach. */}
-      {!pasujace && <ZdanieOUkrytych ile={ukrytych}
-        nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
-        onPokazWszystkie={() => { przelaczSito(null); setTag(null); }} />}
     </Karta>
 
     <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -973,8 +874,16 @@ export function Zwroty() {
                   bo to ostatnia rzecz przy otwartym kartonie: najpierw oceniam
                   to, co klient zgłosił, potem dokładam to, czego w zgłoszeniu
                   nie ma. Pasek koszyka pokazuje się dopiero z zawartością, więc
-                  pierwszej sztuki nie dałoby się tam zeskanować. */}
-              <DolozTowar />
+                  pierwszej sztuki nie dałoby się tam zeskanować.
+
+                  TYLKO PRZY ZWROCIE, KTÓRY JESZCZE ŻYJE (0.370.0). Granicę
+                  postawił właściciel razem ze zgłoszeniem: „tylko z poziomu
+                  obsługi zwrotów, jak jeszcze nie jest zamknięty" — a pole
+                  rysowało się bezwarunkowo, także przy zwrocie zamkniętym
+                  i odrzuconym. Skaner przy sprawie, której nie ma jak zmienić,
+                  obiecuje ruch, po którym serwer odmówi. */}
+              {zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony" &&
+                <DolozTowar />}
             </div>
           </>}
     </Karta>
@@ -985,28 +894,6 @@ export function Zwroty() {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
-            trwaProwadzenie={prowadzi.isPending}
-            onProwadze={() => prowadzi.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
-            tagi={{
-              slownik: slownikTagow.data?.tagi ?? [],
-              trwa: nowyTag.isPending || przypnijTag.isPending || odepnijTag.isPending,
-              blad: bladTagu,
-              onPrzypnij: (tagId) => {
-                setBladTagu("");
-                przypnijTag.mutate({ id: zwrot.id, rodzaj: "zwroty", tagId },
-                  { onError: (e) => setBladTagu((e as Error).message) });
-              },
-              onOdepnij: (tagId) => {
-                setBladTagu("");
-                odepnijTag.mutate({ id: zwrot.id, rodzaj: "zwroty", tagId },
-                  { onError: (e) => setBladTagu((e as Error).message) });
-              },
-              onNowy: (nazwa) => {
-                setBladTagu("");
-                nowyTag.mutate({ id: zwrot.id, rodzaj: "zwroty", nazwa },
-                  { onError: (e) => setBladTagu((e as Error).message) });
-              },
-            }}
             trwaNotatka={notatka.isPending || cofnijNotatke.isPending}
             bladNotatki={bladNotatki}
             onNotatka={(tekst) => {

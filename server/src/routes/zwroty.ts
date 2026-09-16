@@ -11,14 +11,14 @@ import {
 import { towarZKodu } from "../services/kosze.js";
 import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
-  bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
+  bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszIloscZwrocona, zapiszKorekte, zapiszKwote,
   zapiszPotracenie,
   zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
-  zapiszNotatkeZwrotu, cofnijNotatkeZwrotu, stempelProwadziZwrot,
+  zapiszNotatkeZwrotu, cofnijNotatkeZwrotu,
   wskazSklad,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
@@ -36,8 +36,6 @@ import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 import { reconcile } from "../services/reconcile.js";
-import { trasyTagowSprawy } from "./tagi.js";
-import { TAGI_ZWROTU } from "../services/tagi-spraw.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
    SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
@@ -793,24 +791,19 @@ export async function zwrotyRoutes(app: FastifyInstance) {
    * danych na dysk — a kto wynosi zestawienia o ludziach, sam trafia do logu.
    * Ta sama zasada stoi przy `analiza_eksport` i `audyt_eksport`.
    */
-  /* ── PROWADZĄCY ZWROT (0.315.0) ─────────────────────────────────────────
-     Jedna trasa na wzięcie i oddanie: to PRZEŁĄCZNIK, a nie dwie decyzje.
-     Druga trasa kazałaby panelowi wiedzieć, czyj jest znacznik, zanim
-     kliknie — a to wie serwer, i tylko on wie na pewno.
+  /* ── PROWADZĄCEGO I TAGÓW PRZY ZWROCIE JUŻ NIE MA (0.370.0) ────────────
+     Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum",
+     a po pytaniu o szczegóły wskazanie wprost na sito Moje/Niczyje i tagi.
 
-     Bez `autoryzuj()`: znacznik nie rusza ani pieniędzy, ani stanów. */
-  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
-    "/api/obsluga/zwroty/:id/prowadzi", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        return stempelProwadziZwrot(db(), Number(req.params.id), kto(), req.body?.wersja);
-      } catch (e) { return konflikt(reply, e); }
-    });
+     Prowadzący wraca do PIERWSZEJ decyzji z 0.315.0, nie do nowej: tamto
+     wydanie ustaliło najpierw, że przy zwrocie prowadzącego NIE MA, bo zwroty
+     prowadzi całe biuro — i tego samego dnia przywróciło go z powrotem. Bez
+     tego zdania następna sesja „naprawi" to trzeci raz.
 
-  /* Tagi zwrotu — ten sam rejestrator co przy reklamacjach i dyskusjach,
-     tylko z inną osią wiązań. Słownik jest jeden dla wszystkich trzech. */
-  trasyTagowSprawy(app, "/api/obsluga/zwroty", TAGI_ZWROTU);
+     Reklamacje i dyskusje ZOSTAJĄ z jednym i drugim: tam sprawę bierze
+     konkretna osoba, więc pytanie „czyje to" jest prawdziwe. Zniknęło
+     wiązanie zwrotów, nie maszyneria — `trasyTagowSprawy` i `stempelProwadzi*`
+     stoją nietknięte. */
 
   /* ── NOTATKA BIURA (0.313.0) ────────────────────────────────────────────
      Bez `autoryzuj()`: to zdanie zostaje U NAS i niczego nie obiecuje
@@ -861,18 +854,10 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get("/api/obsluga/zwroty/csv", async (_req, reply) => {
-    const nie = odmowa(reply);
-    if (nie) return nie;
-    const zwroty = listaZwrotow(db());
-    const s = sesjaZadania();
-    logEvent("zwroty_eksport", s?.user.name ?? "?", null,
-      { zwrotow: zwroty.length }, s?.user.userId ?? null, db());
-    return reply
-      .type("text/csv; charset=utf-8")
-      .header("content-disposition", 'attachment; filename="wertis-zwroty.csv"')
-      .send(csvZwrotow(zwroty));
-  });
+  /* EKSPORTU CSV JUŻ NIE MA (0.370.0) — właściciel wskazał go wprost jako
+     niepotrzebny. Wynosił loginy kupujących do pliku na dysku, czyli poza
+     politykę danych zwrotów, i zostawiał ślad `zwroty_eksport` właśnie
+     dlatego. Odpadło jedno i drugie. */
 
   app.get<{ Params: { id: string } }>("/api/obsluga/zwroty/:id", async (req, reply) => {
     const nie = odmowa(reply);

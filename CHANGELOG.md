@@ -34,6 +34,54 @@ historii nie przepisujemy.
 ---
 
 
+## 0.370.0 — 16 września 2026
+
+**Panel zwrotów do wymaganego minimum.** Zgłoszenie właściciela, a po pytaniu
+o szczegóły wskazanie wprost: sito Moje/Niczyje, tagi spraw, filtry przewoźnika
+i dat, Pobierz CSV — i „usunąć zupełnie".
+
+Ekran urósł ze 159 linii 1 września do 1035 i był dwa razy większy niż
+reklamacje. Audyt z 15 września zbił chrom nad listą z 344 px do 265, ale jego
+zasada brzmiała „żadna zmiana nie kasuje funkcji". **To wydanie kryterium
+zmienia** — i dlatego mówi o tym wprost, żeby następna sesja nie uznała
+kasowania za pomyłkę.
+
+- **Sito i prowadzący zwrotu znikają.** To POWRÓT do pierwszej decyzji
+  z 0.315.0, nie nowa: tamto wydanie ustaliło najpierw, że przy zwrocie
+  prowadzącego nie ma, bo zwroty prowadzi całe biuro — i tego samego dnia
+  przywróciło go z powrotem.
+- **Tagi przy zwrotach znikają** razem z tabelą wiązań.
+- **Filtry przewoźnika i dat znikają**, bo szukanie je wchłonęło: od 0.367.0
+  fraza dzieli się po spacjach i zna przewoźnika razem z nazwami z naklejki.
+- **Eksport CSV znika.** Wynosił loginy kupujących na dysk, poza politykę
+  danych zwrotów, i właśnie dlatego zostawiał ślad — a nikt go nie używał.
+- **Pasm nad listą: pięć → cztery.** Synchronizuj wszedł do rzędu pola
+  szukania, tą samą drogą, którą w audycie przeszedł przycisk NIEODEBRANA.
+  Zamyka to dług z §25a.24, gdzie pasmo filtrów czekało „na decyzję
+  właściciela, nie na kod". Pasek klawiszy został — traci `m` i `n`.
+- **Wiersz kolejki** wraca do siedmiu rzeczy: schodzą plakietka prowadzącego
+  i czipy tagów.
+
+**Reklamacje i dyskusje zostają z sitem i tagami.** Tam sprawę bierze konkretna
+osoba i prowadzi rozmowę z klientem, więc pytanie „czyje to" jest prawdziwe.
+Zeszła oś wiązań zwrotów, nie maszyneria.
+
+**Z karty zwrotu zeszły trzy rzeczy**, wszystkie z dekalogu p. 2:
+
+- Sekcja „Wiadomości o tym zakupie" MILCZY, gdy nic nie jest powiązane —
+  pisała wtedy zdanie o Allegro, nie o tej sprawie.
+- Dwa zdania o tym, jak Allegro liczy siedem dni, powtarzały się przy każdym
+  zwrocie; liczbę dla TEJ sprawy mówi pastylka terminu.
+- Skaner dokładania towaru rysował się także przy zwrocie zamkniętym
+  i odrzuconym, choć właściciel postawił przy nim granicę „tylko… jak jeszcze
+  nie jest zamknięty". Obiecywał ruch, po którym serwer odmawia.
+
+Licznik tras POST zwrotów 33 → 32 i to pierwszy raz, kiedy ta umowa idzie
+w dół. Kolumny `prowadzi*` zostają w tabeli i nie czyta ich nikt: przebudowa
+dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje.
+
+Wdrożenie: nowy build panelu i serwera.
+
 ## 0.368.0 — 16 września 2026
 
 **Bramkę korekt wolno sforsować.** Decyzja właściciela: „dodaj opcję

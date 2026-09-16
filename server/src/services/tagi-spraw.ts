@@ -60,10 +60,10 @@ export interface OsTagow {
 export const TAGI_REKLAMACJI: OsTagow = {
   sprawy: "reklamacja_klienta", wiazania: "reklamacja_tag_sprawy", kolumna: "reklamacja_id",
 };
+/* OSI TAGÓW ZWROTU JUŻ NIE MA (0.370.0) — patrz komentarz przy tabeli
+   `zwrot_tag_sprawy` w `schema.sql`. Zeszła oś, nie mechanizm: `OsTagow`
+   przyjmuje kolejną tabelę tak samo jak przyjęła tamtą. */
 
-export const TAGI_ZWROTU: OsTagow = {
-  sprawy: "zwrot_klienta", wiazania: "zwrot_tag_sprawy", kolumna: "zwrot_id",
-};
 
 export class BladTagu extends Error {
   constructor(message: string, readonly kod = 400) { super(message); }
