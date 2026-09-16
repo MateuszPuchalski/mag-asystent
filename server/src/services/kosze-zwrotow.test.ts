@@ -7,7 +7,7 @@ import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
-  MAX_SZTUK_RECZNIE,
+  MAX_SZTUK_RECZNIE, powodPozaMagazynem,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
@@ -43,6 +43,10 @@ function zwrotZTowarem(d: Db, twIdy: Array<number | null>, kto: { id: number; na
     if (tw === null) continue;
     d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
       .run(tw, `SYM-${tw}`, `Towar ${tw}`);
+    /* WIERSZ STANU, bo od 0.372.2 kartoteka bez niego nie wchodzi do pudła.
+       Towar, który wyszedł ze sprzedaży, jest magazynowi znany — fikstura bez
+       tego wiersza opisywałaby usługę, a nie część. */
+    d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(tw);
   }
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,created_at,synced_at)
@@ -405,9 +409,15 @@ test("komplet korekt nie zmienia drogi — wymuszenie wypuszcza tak samo", () =>
    pozycji, a towar leży na biurku.                                          */
 
 /** Kartoteka, którą można zeskanować. */
-function kartoteka(d: Db, twId: number, symbol = `SYM-${twId}`) {
+function kartoteka(d: Db, twId: number, symbol = `SYM-${twId}`,
+  prowadzona = true) {
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
     .run(twId, symbol, `Towar ${twId}`);
+  /* `prowadzona = false` opisuje USŁUGĘ: kartotekę bez ani jednego wiersza
+     w `tw_Stan`, czyli taką, jakiej dokument MM nie ruszy (0.372.2). */
+  if (prowadzona) {
+    d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
+  }
 }
 
 test("skan dokłada towar do koszyka, a drugi skan DOLICZA sztukę", () => {
@@ -577,4 +587,47 @@ test("kosz z zadaniem W TOKU nie pokazuje się — papier jest w drodze", () => 
   d.prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(queueId);
   d.prepare("UPDATE kosz SET mm_numer='MM 2/ZWR/2026' WHERE id=?").run(kosz.id);
   assert.equal(koszykiBezDokumentu(d).length, 0);
+});
+
+/* ── Kartoteka, której dokument MM nie ruszy (0.372.2) ──────────────────────
+   Blizna Z-8: koszt przesyłki wszedł do pudła skanem, kosz się zamknął, a MM
+   odbiła się od Sfery zdaniem „Brak towaru w magazynie". Odmowa ma paść przy
+   dokładaniu, bo tam stoi człowiek z przedmiotem w ręku.                    */
+
+test("usługi nie da się dołożyć do pudła — odmowa mówi, czego dotyczy", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 943, "PRZESYLKA", false);
+
+  assert.throws(() => dolozTowar(d, 943, 1, KTO),
+    /PRZESYLKA.*nie jest prowadzona magazynowo/s,
+    "odmowa niesie symbol i powód, a nie sam kod błędu");
+  assert.equal(otwarteKoszyki(d, KTO).length, 0, "pudło nie powstaje dla odmowy");
+});
+
+test("kartoteka przesyłki odpada po numerze z konfiguracji, mimo wiersza stanu", () => {
+  /* Ta sama kartoteka bywa prowadzona magazynowo — wtedy zostaje jej numer
+     z `wertis.env`, ten sam, którego pilnuje automat ZW. Asymetria znaczyłaby,
+     że jedna droga ją wpuszcza, a druga nie. */
+  const d = stanowisko();
+  kartoteka(d, 943, "PRZESYLKA");
+
+  assert.equal(powodPozaMagazynem(d, 943, 943)?.includes("kartoteka przesyłki"), true);
+  assert.equal(powodPozaMagazynem(d, 943, 0), null, "bez numeru w konfiguracji nie zgadujemy");
+});
+
+test("ocena „na stan” pozycji przesyłkowej NIE dokłada jej do pudła", () => {
+  /* Wiersz przesyłki stoi na paragonie obok towaru, więc ta sama ocena, którą
+     operator naciska na części, wpuściłaby go tą samą drogą. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [77], KTO);
+  d.prepare("DELETE FROM sgt_stan WHERE tw_id=77").run();
+
+  const kosz = dolozDoKosza(d, z.poz[0], KTO);
+  assert.equal(kosz, null, "pozycja nie wchodzi do koszyka");
+  assert.equal(otwarteKoszyki(d, KTO).length, 0, "i nie zakłada pudła");
+  const slad = d.prepare("SELECT COUNT(*) AS n FROM events WHERE type='kosz_zwrotow_odmowa'")
+    .get() as { n: number };
+  assert.equal(slad.n, 1, "odmowa zostawia ślad — cisza byłaby tu najgorsza");
 });

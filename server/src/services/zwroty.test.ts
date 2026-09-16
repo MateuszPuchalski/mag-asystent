@@ -56,6 +56,8 @@ function zamowienie(d: Db, ext: string, pozycje: Array<{ offerId: string; nazwa:
 function towar(d: Db, twId: number, symbol: string, ean: string | null = null) {
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean) VALUES (?,?,?,?)")
     .run(twId, symbol, `Towar ${symbol}`, ean);
+  /* Wiersz stanu — od 0.372.2 kartoteka bez niego nie wchodzi do pudła. */
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
 }
 
 /** Rozmowa w skrzynce, w której klient wspomniał o tym zamówieniu. */
@@ -925,6 +927,7 @@ test("cofnięcie oceny zdejmuje pozycję z OTWARTEGO koszyka i wraca do DO OCENY
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   ocenPozycje(d, poz[1], "utylizacja", 2, KTO);
@@ -952,6 +955,7 @@ test("ocena pozycji z kosza, który MA DOKUMENT, ODMAWIA i nazywa kosz", () => {
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
@@ -988,6 +992,7 @@ test("kosz zamknięty BEZ dokumentu wolno poprawić, a pozycja wraca do NIEGO", 
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;
@@ -1013,6 +1018,7 @@ test("poprawka zamkniętego kosza UNIEWAŻNIA jego zadanie MM", () => {
   const KTO = biuro(d);
   const { id, poz } = zwrotDoDecyzji(d);
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Część')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11 WHERE id=?").run(poz[0]);
   rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
   const kosz = ocenPozycje(d, poz[0], "stan", 2, KTO).koszyk!;

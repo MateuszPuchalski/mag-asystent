@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.374.0 — 16 września 2026
+
+**Kartoteka, której dokument MM nie ruszy, nie wchodzi już do pudła.** To jest
+naprawa przyczyny blizny Z-8 z 0.371.0, a nie jej skutku. Koszt przesyłki wszedł
+wtedy do koszyka SKANEM, kosz się zamknął, a Sfera odrzuciła MM zdaniem „Brak
+towaru w magazynie". Poprzednie wydanie dało drogę wyjścia — zdejmowanie wiersza
+z zamkniętego kosza. To wydanie nie wpuszcza go tam w ogóle.
+
+Odmowa pada przy DOKŁADANIU, bo tam stoi człowiek z przedmiotem w ręku. Bramka
+przy zamykaniu przyszłaby o dwadzieścia pięć kartotek za późno.
+
+**Rozstrzygają dwie rzeczy, które wiemy na pewno.** Numer `TW_ID_PRZESYLKA`
+z konfiguracji — tę kartotekę nazwał człowiek, a automat ZW już jej pilnuje po
+swojej stronie; asymetria znaczyłaby, że jedna droga ją wpuszcza, a druga nie.
+Oraz brak jakiegokolwiek wiersza stanu: importer bierze całe `tw_Stan` bez
+filtra magazynów, więc kartoteka prowadzona magazynowo ma tu wiersz choćby
+z zerem. Usługa nie ma go wcale.
+
+**Czego świadomie NIE zrobiliśmy:** nie dopisaliśmy do importu kolumny rodzaju
+kartoteki. Nie ma jej w read-modelu ani w `docs/subiekt-gt-struktura.md`, więc
+wzięcie jej nazwy z pamięci byłoby dokładnie tym błędem, który zamyka reguła
+„kształt czyta się z pliku, nie z pamięci".
+
+Bramka obowiązuje OBIE drogi do pudła. Skan dostaje zdanie z symbolem
+i powodem, a ocena „na stan" pozycji przesyłkowej zostawia ślad w dzienniku
+(`kosz_zwrotow_odmowa`) zamiast po cichu wpuścić wiersz. Pozycja przesyłki stoi
+na paragonie obok towaru, więc bez tego weszłaby do koszyka tą samą drogą co
+komplet.
+
+**[uwaga przy czytaniu testów]** Fikstury pięciu plików testowych dostały wiersz
+`sgt_stan` przy kartotece. Kartoteka bez stanu opisuje odtąd USŁUGĘ, a nie część
+— i to jest teraz część umowy, nie szczegół zapisu.
+
 ## 0.372.1 — 16 września 2026
 
 **Projekt obiegu zwrotów zapisany w repo — `docs/zwroty-projekt.md`.** Rozmowa

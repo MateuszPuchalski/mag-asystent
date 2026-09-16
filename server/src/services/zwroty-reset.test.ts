@@ -30,6 +30,7 @@ function biuro(d: Db) {
 
 function zwrotZTowarem(d: Db, kto: { id: number; name: string }, klucz = "z1") {
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Towar')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,created_at,synced_at)
     VALUES (1,?,'2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`)

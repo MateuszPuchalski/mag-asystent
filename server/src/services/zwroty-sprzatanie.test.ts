@@ -36,6 +36,7 @@ function biuro(d: Db) {
 /** Zwrot rozliczony po stronie Allegro, bez jednego naszego kliknięcia. */
 function rozliczonyPrzezAllegro(d: Db, klucz: string, status = "FINISHED") {
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Towar')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (11,1,0)").run();
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,reference_number,created_at,synced_at,status_allegro)
     VALUES (1,?,?,'2026-09-01T08:00:00Z','2026-09-01T08:00:00Z',?)`)

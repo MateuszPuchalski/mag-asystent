@@ -45,6 +45,10 @@ function biuro(d: Db) {
 function towar(d: Db, twId: number) {
   d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
     .run(twId, `SYM-${twId}`, `Towar ${twId}`);
+  /* Wiersz stanu, bo od 0.372.2 kartoteka bez niego nie wchodzi do pudła:
+     usługi dokument MM nie ruszy (`powodPozaMagazynem`). Składnik kompletu
+     jest częścią, więc magazyn go zna. */
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(twId);
 }
 
 /** Paragon z rozbitymi pozycjami — tak wystawia go Subiekt. */
