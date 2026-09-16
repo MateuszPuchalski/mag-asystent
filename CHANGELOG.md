@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.372.1 — 16 września 2026
+
+**Projekt obiegu zwrotów zapisany w repo — `docs/zwroty-projekt.md`.** Rozmowa
+z właścicielem o tym, jak wyglądałaby obsługa zwrotów projektowana od początku,
+przy celu „w ogóle nie klikać w Subiekcie". Wniosek jest taki, że
+przeprojektowania nie ma: obieg, który mamy, jest w większości słuszny.
+
+Cztery decyzje właściciela wchodzą do dokumentu jako wiążące. ZW wychodzi przy
+obsłudze KAŻDEGO zwrotu, a nie przy zamknięciu koszyka — dokument księgowy ma
+powstawać wtedy, kiedy oddajemy pieniądze. Okno, w którym towar czeka w pudle,
+a Subiekt ma go jako stan magazynu głównego, właściciel uznał za nieistotne;
+rozważany magazyn pośredni odpada razem z jednym dodatkowym MM na zwrot. Outlet
+obsługujemy ręcznie do odwołania. Zwrot idzie pełną wartością, a potrącenie
+wyłącznie przez Allegro.
+
+Z decyzji wynika zdanie warte zapamiętania: bramka korekt przestaje być bramką,
+a staje się BEZPIECZNIKIEM. Przy ZW wychodzącym natychmiast numer korekty jest
+na miejscu na długo przed zamknięciem pudła, więc bramka zatrzyma koszyk
+wyłącznie wtedy, gdy ZW padł. Rutynowe używanie przycisku wystawiającego MM mimo
+korekt jest odtąd miarą tego, że ZW nie działa.
+
+Dokument wymienia sześć rzeczy popsutych, z jedną blokującą pozostałe. Odmowa
+zapisu ZW na produkcji (`0x80040F20`) wstrzymuje automatyzację każdego kolejnego
+dokumentu. Ocena towaru ma dwie wartości, a firma ma trzy drogi — brak oceny
+outletowej odkłada używkę na półkę pickingową obok fabrycznych. Utylizacja jedzie
+MM-em na magazyn odpadu i zostaje na stanie jako duch. Nadwyżka zwrotu nie ma
+czym wejść na stan, co kosztowało już koszyk Z-8. Karton dalej nosi dwa imiona.
+Brakuje PW, a RW nie ma wejścia w obiegu.
+
+Sam kod nie drgnął — to wydanie jest dokumentacją.
+
 ## 0.372.0 — 16 września 2026
 
 **[wymaga działania] Odmowa zapisu ZW mówi wreszcie, CZEGO dotyczyła.** Nowy
