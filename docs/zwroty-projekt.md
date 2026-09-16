@@ -188,14 +188,22 @@ skanuje zamiast przepisywać liczbę z kartki.
 ## 5. Kolejność prac
 
 1. Rozstrzygnąć `0x80040F20` (4.1). Bez tego reszta automatyzacji nie ma sensu.
-2. Blokada kartotek usługowych na skanie do koszyka (4.4, najtańsza połowa).
-3. Trzecia ocena z listą roboczą albo świadoma rezygnacja z niej (4.2).
-4. PW dla nadwyżek (4.4, druga połowa).
-5. RW dla utylizacji, po decyzji o bilansie (4.3).
-6. Jeden numer kosza i etykieta z kodem kreskowym (4.5).
+2. ~~Blokada kartotek spoza magazynu przy dokładaniu do koszyka~~ — **zrobione
+   w 0.374.0**. Bramka stoi na numerze `TW_ID_PRZESYLKA` i na braku wiersza
+   stanu, bo tylko te dwie rzeczy wiemy na pewno.
+3. ~~Trzecia ocena z listą roboczą~~ — **zrobione w 0.375.0**. Ocena „na outlet"
+   nie tworzy dokumentu; kończy się paskiem „Na regał outletowy" i meldunkiem
+   o przeniesieniu.
+4. PW dla nadwyżek (4.4, druga połowa) — zostaje.
+5. RW dla utylizacji, po decyzji o bilansie (4.3) — zostaje.
+6. ~~Jeden numer kosza~~ — **zrobione w 0.376.0**: koszyk dostaje swój dokument
+   MM, a hala otwiera go z jego własnej etykiety. **Etykieta z kodem kreskowym
+   zostaje** i wymaga decyzji: nowa zależność (biblioteka kodów kreskowych) albo
+   własny koder Code128 z tablicą wziętą ze specyfikacji, nie z pamięci.
 7. KFS — tylko jeśli właściciel odwróci decyzję o ręcznych fakturach.
 
-Punkty 2 i 6 są niezależne od Sfery i można je zrobić w każdej chwili.
+Punkty 4 i 5 są niezależne od Sfery po naszej stronie, ale ich wykonanie i tak
+zatrzyma się na punkcie 1: to worker Sfery wystawia dokumenty.
 
 ## 6. Czego ten projekt NIE rozstrzyga
 
