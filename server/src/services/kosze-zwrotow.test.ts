@@ -7,9 +7,10 @@ import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
-  MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami,
+  MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami, zaznaczSkladnik,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
+import { zapamietajSklad } from "./komplety.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Obieg właściciela: pusta MM przy zasiadaniu do zwrotów, dokładanie pozycja
@@ -692,4 +693,68 @@ test("koszyk z zadaniem W TOKU nie wiąże się z niczym", () => {
   dokument(d, 41209, "MM 1209/MAG/2026", "1209");
 
   assert.equal(zwiazKoszykiZDokumentami(d), 0);
+});
+
+/* ── Poprawki z przeglądu 0.377.0 ───────────────────────────────────────────
+   Trzy dziury znalezione w przeglądzie własnego diffu, każda z ceną w towarze. */
+
+test("dokument, który ma już swój kosz hali, NIE wiąże się z koszykiem", () => {
+  /* Wyścig: między importem a taktem workera mija do minuty, a magazynier
+     bywa szybszy. Drugi kosz z tym samym `mm_dok_id` dałby dwa wiersze
+     w liście przyjęć i drugie MM powrotne na towar, który już wrócił. */
+  const d = stanowisko();
+  const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
+  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
+  d.prepare(`INSERT INTO kosz(kod, status, rodzaj, mm_dok_id, utworzono_at, utworzono_przez)
+     VALUES ('1209','zamkniety','zwroty',41209,'2026-09-16T10:30:00Z','Jan')`).run();
+
+  assert.equal(zwiazKoszykiZDokumentami(d), 0);
+  assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszId) as
+    { mm_dok_id: number | null }).mm_dok_id, null, "koszyk zostaje bez dokumentu");
+  const slad = d.prepare(
+    "SELECT COUNT(*) AS n FROM events WHERE type='kosz_zwrotow_zwiazanie_pominiete'")
+    .get() as { n: number };
+  assert.equal(slad.n, 1, "pominięcie zostawia ślad — cisza kazałaby szukać usterki");
+});
+
+test("kartoteki NIEZNANEJ read-modelowi nie sądzimy — to towar zablokowany", () => {
+  /* Importer bierze wyłącznie kartoteki odblokowane i tylko dla nich wstawia
+     wiersze stanu. Towar zablokowany w Subiekcie nie ma tu ani jednego wiersza,
+     a leży na regale zwrotów najczęściej ze wszystkich. Brak stanu znaczy
+     „usługa" DOPIERO wtedy, gdy kartotekę skądinąd znamy. */
+  const d = stanowisko();
+  assert.equal(powodPozaMagazynem(d, 900_099), null, "nieznana kartoteka przechodzi");
+
+  kartoteka(d, 900_098, "SYM-98", false);
+  assert.notEqual(powodPozaMagazynem(d, 900_098), null, "znana i bez stanu — to usługa");
+});
+
+test("ptaszek składnika NIE jest obejściem bramki kartotek", () => {
+  /* Koszyk napełniony przed 0.374.0 dostawał wiersz usługowy z powrotem przez
+     odznaczenie i zaznaczenie go na nowo. Jedna reguła, jedno miejsce.
+
+     Pozycja musi mieć DWA składniki, bo ostatniego wiersza kosz nie oddaje —
+     zapamiętany komplet daje taki skład bez sięgania po paragon. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [11], KTO);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=NULL WHERE id=?").run(z.poz[0]);
+  const oferta = (d.prepare("SELECT offer_id FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(z.poz[0]) as { offer_id: string }).offer_id;
+  kartoteka(d, 12, "SYM-12");
+  zapamietajSklad(d, 1, oferta,
+    [{ twId: 11, symbol: "SYM-11", nazwa: "Towar 11", ilosc: 1 },
+     { twId: 12, symbol: "SYM-12", nazwa: "Towar 12", ilosc: 1 }],
+    () => 1, "biuro", KTO);
+
+  const koszId = ocenPozycje(d, z.poz[0], "stan", 2, KTO).koszyk;
+  assert.notEqual(koszId, null, "komplet wchodzi do pudła dwoma wierszami");
+
+  /* Kartoteka traci stan już PO wejściu do pudła — tak wygląda wiersz sprzed
+     bramki, widziany dzisiejszymi oczami. */
+  d.prepare("DELETE FROM sgt_stan WHERE tw_id=11").run();
+  zaznaczSkladnik(d, z.poz[0], 11, false, KTO);
+
+  assert.throws(() => zaznaczSkladnik(d, z.poz[0], 11, true, KTO),
+    /nie wejdzie do pudła/, "ta sama odmowa co przy dokładaniu");
 });

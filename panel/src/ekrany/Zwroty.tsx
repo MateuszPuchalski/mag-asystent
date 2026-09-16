@@ -52,7 +52,8 @@ import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
  */
 const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
   decyzja: [["P", "przyjmij"], ["O", "odrzuć"]],
-  ocena: [["S", "na stan"], ["U", "utylizacja"], ["Shift+S", "wszystkie na stan"]],
+  ocena: [["S", "na stan"], ["U", "utylizacja"], ["O", "na outlet"],
+    ["Shift+S", "wszystkie na stan"]],
   zwrot: [["Enter", "zapisz kwotę"]],
   korekta: [["Enter", "wpisz numer korekty"]],
   zamkniety: [["R", "cofnij korektę"]],

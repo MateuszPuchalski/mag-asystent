@@ -142,6 +142,15 @@ export function powodPozaMagazynem(
     return "to kartoteka przesyłki — koszt dostawy wraca do klienta przelewem, " +
       "a nie dokumentem magazynowym";
   }
+  /* KARTOTEKI NIEZNANEJ NIE SĄDZIMY. Importer bierze wyłącznie kartoteki
+     odblokowane (`tw_Zablokowany = 0`) i tylko dla nich wstawia wiersze stanu,
+     więc towar ZABLOKOWANY w Subiekcie nie ma tu ani jednego wiersza — a taki
+     leży na regale zwrotów najczęściej ze wszystkich. Brak stanu znaczy
+     „usługa" dopiero wtedy, gdy kartotekę skądinąd znamy. */
+  const znana = database.prepare("SELECT 1 AS jest FROM sgt_towar WHERE tw_id=? LIMIT 1")
+    .get(twId) as { jest: number } | undefined;
+  if (!znana) return null;
+
   const stan = database.prepare("SELECT 1 AS jest FROM sgt_stan WHERE tw_id=? LIMIT 1")
     .get(twId) as { jest: number } | undefined;
   if (!stan) {
@@ -620,6 +629,11 @@ export function zaznaczSkladnik(
          wtedy na papier przez zwykłą literówkę w numerze. */
       const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
       if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej dopisać.");
+      /* TA SAMA BRAMKA CO PRZY DOKŁADANIU (0.377.0). Bez niej ptaszek byłby
+         obejściem: koszyk napełniony przed 0.374.0 dostawał wiersz usługowy
+         z powrotem przez odznaczenie i zaznaczenie go na nowo. */
+      const powod = powodPozaMagazynem(database, twId);
+      if (powod) throw new Error(`„${s.symbol}" nie wejdzie do pudła: ${powod}.`);
       database.prepare(
         `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
          VALUES (?,?,?,?,?,?)`).run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
@@ -969,6 +983,24 @@ export function zwiazKoszykiZDokumentami(database: Db): number {
     /* Brak dokumentu w read-modelu NIE jest błędem: import chodzi co minutę,
        a Sfera właśnie go wystawiła. Kosz poczeka do następnego taktu. */
     if (!dok) continue;
+
+    /* WYŚCIG Z HALĄ. Między importem a tym taktem mija do minuty, a w tej
+       minucie magazynier może zdążyć zeskanować numer z kartki — wtedy
+       `otworzPrzyjecie` założyło już kosz na ten dokument. Drugi kosz z tym
+       samym `mm_dok_id` dałby dwa wiersze w liście przyjęć, otwierałby cudze
+       pudło i mógłby zamówić DRUGIE MM powrotne na towar, który już wrócił.
+
+       Nie wiążemy wtedy niczego. Kartka z numerem działa jak dotąd, a koszyk
+       zostaje bez dokumentu — czyli dokładnie tak, jak przed 0.376.0. */
+    const zajety = database.prepare(
+      "SELECT id FROM kosz WHERE mm_dok_id=? AND id<>? LIMIT 1")
+      .get(dok.dok_id, k.id) as { id: number } | undefined;
+    if (zajety) {
+      logEvent("kosz_zwrotow_zwiazanie_pominiete", AUTOMAT_KOREKTY, null,
+        { koszId: k.id, kod: k.kod, dokId: Number(dok.dok_id), zajetyPrzez: zajety.id },
+        undefined, database);
+      continue;
+    }
     /* `mm_mag_z` RAZEM z dokumentem, nie osobno. Od chwili związania trasę
        powrotu liczy gałąź „kosz z dokumentu" (`trasaPowrotu` w `kosze.ts`),
        a ta bierze magazyn docelowy WYŁĄCZNIE z tej kolumny. Bez niej związany

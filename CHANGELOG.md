@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.377.0 — 16 września 2026
+
+**Pięć dziur z przeglądu trzech poprzednich wydań.** Przegląd własnego diffu,
+zanim ktokolwiek go scalił. Każda z tych rzeczy kosztowałaby towar albo zaufanie
+do ekranu, a żadnej nie złapały testy — bo testy sprawdzały to, co kod miał
+robić, a nie to, czego nie przewidziałem.
+
+**Wyścig o dokument.** Worker wiąże koszyki z ich MM co minutę, a magazynier
+bywa szybszy niż jego takt. Skan numeru z kartki w tej luce zakładał NOWY kosz
+na dokument należący do czekającego koszyka — czyli sobowtóra, którego 0.376.0
+miało się pozbyć. Dwa kosze z jednym `mm_dok_id` dałyby dwa wiersze w liście
+przyjęć, otwierały cudze pudło i mogły zamówić drugie MM powrotne na towar,
+który już wrócił. Teraz wiązanie stoi TAKŻE na drodze skanu, a dokument z cudzym
+koszem nie daje się związać po raz drugi i zostawia ślad w dzienniku.
+
+**Związany koszyk odzyskuje trasę powrotu.** Związanie przestawiło go do gałęzi
+„kosz z dokumentu", a ta bierze magazyn docelowy wyłącznie z `mm_mag_z` —
+kolumny read-modelu, która bywa PUSTA. Koszyk tracił więc trasę, którą przed
+związaniem miał pewną: powrót nie wychodził wcale, a towar zostawał na regale
+zwrotów. To MY zleciliśmy tamto MM i wiemy, że poszło MAG→ZWROTY, więc trasa
+idzie z konfiguracji.
+
+**Kartoteki nieznanej nie sądzimy.** Bramka z 0.374.0 czytała brak wiersza stanu
+jako „usługa". Importer bierze jednak wyłącznie kartoteki ODBLOKOWANE i tylko
+dla nich wstawia stany, więc towar zablokowany w Subiekcie nie ma tu ani jednego
+wiersza — a leży na regale zwrotów najczęściej ze wszystkich. Bramka odmawiałaby
+mu wejścia do pudła z całkowicie fałszywym powodem, po cichu, przez ocenę.
+Brak stanu znaczy „usługa" dopiero wtedy, gdy kartotekę skądinąd znamy.
+
+**Ptaszek składnika przestał być obejściem.** Koszyk napełniony przed 0.374.0
+dostawał wiersz usługowy z powrotem przez odznaczenie i zaznaczenie go na nowo.
+Jedna reguła ma jedno miejsce.
+
+**Pasek klawiszy zna `O`.** Tabela podpowiedzi rozjechała się z nasłuchem
+w 0.375.0 — klawisz działał, ale ekran o nim nie mówił.
+
 ## 0.376.0 — 16 września 2026
 
 **Jeden karton nosi jedno imię.** Do tego wydania obsługa napełniała koszyk
