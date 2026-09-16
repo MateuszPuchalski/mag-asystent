@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.373.1 — 16 września 2026
+
+**Strategia WMS na piśmie: co znaczy „pełny system magazynowy" przy 342 m².**
+Pytanie właściciela brzmiało, jak zamienić WERTIS w pełny WMS i wyłączyć
+Sellasist. Odpowiedź wymaga rozdzielenia dwóch projektów, które to pytanie
+skleja — i dlatego jest dokumentem, a nie akapitem.
+
+Nowy [`docs/wms-strategia.md`](docs/wms-strategia.md) rozstrzyga cztery rzeczy:
+
+- **Sellasist nie jest systemem magazynowym.** Z sześciu prac, które wykonuje,
+  WMS przejmuje jedną: listę zbiórki. Reszta to integracje z kanałami
+  i kurierami, czyli osobny program prac na kilkanaście miesięcy.
+- **Właścicielem stanu zostaje Subiekt.** WERTIS trzyma rozbicie sumy na
+  miejsca i rozlicza je z Subiektem. Droga odwrotna postawiłaby COM Sfery na
+  ścieżce krytycznej wysyłki, a on potrafi się zawiesić.
+- **Brakuje odwrotnej mapy.** Dziś wiadomo, w jakich miejscach leży towar; WMS
+  musi wiedzieć, ile czego leży pod adresem. Bez tego nie ma pobrania,
+  inwentaryzacji ani rezerwacji.
+- **Wygrana leży w wydaniu towaru.** Pobrania i pakowania nie ma dziś w kodzie
+  wcale, a to jedyne miejsce, w którym pomyłka kosztuje zwrot i reklamację.
+
+Dokument wchodzi do `tools/styl_check.py`, choć jako uzasadnienie decyzji mógłby
+stać poza zakresem tak jak `docs/architektura.md`. Powód stoi przy wpisie:
+dokument o dyscyplinie kosztów, który sam nie trzyma limitu zdania, przekonuje
+tyle co deklaracja bez mechanizmu.
+
+Poza dokumentacją nie zmienia się nic — żadnego kodu, żadnej trasy, żadnej
+tabeli.
+
 ## 0.373.0 — 16 września 2026
 
 **Panel biura znów wstaje z zapamiętanej sesji, a cykl 30 s znów chodzi.**
