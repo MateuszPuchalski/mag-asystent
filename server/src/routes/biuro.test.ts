@@ -1242,7 +1242,7 @@ test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async 
   assert.equal(p.lines[0].doneBy, "Krzysiek", "nazwisko odkładającego przeżyło okno importu");
 });
 
-test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.363.0)", () => {
+test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.364.0)", () => {
   /* Cztery rzeczy, bez których ten sygnał byłby gorszy niż jego brak.      */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
@@ -1288,7 +1288,7 @@ test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.363.0)", 
   assert.match(rysujStan, /spoznionychRazem/, "plakietka liczy się w pasku stanu");
 });
 
-test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.363.0)", () => {
+test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => {
   /* Blizna z 0.361.0: `.catch` stał za `.json()`, a `api()` rzuca przy każdej
      odpowiedzi spoza 2xx — czyli PRZED `.json()`. Zabezpieczenie nie łapało
      więc niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało

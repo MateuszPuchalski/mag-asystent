@@ -226,7 +226,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return czasyWymiany(Number(req.query.dni) || 30);
   });
 
-  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE (0.363.0) ───────────────────────────
+  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE (0.364.0) ───────────────────────────
      Tabela wyżej odpowiada na pytanie zadane — a żeby je zadać, trzeba wejść
      na STAN SYSTEMU i spojrzeć. Ta trasa odpowiada na pytanie NIEZADANE
      i dlatego chodzi w cyklu, na każdej zakładce: własność „Wiek" wymaga,

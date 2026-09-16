@@ -126,7 +126,7 @@ test("p90 bierze najbliższą rangę — liczbę, którą MIAŁA któraś sprawa
   assert.equal(W.p90([]), null);
 });
 
-/* ── Alarm: co stoi dłużej, niż stoi zwykle (0.363.0) ────────────────────────
+/* ── Alarm: co stoi dłużej, niż stoi zwykle (0.364.0) ────────────────────────
    Własność „Wiek" mówi: widać, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK.
    Tabela wyżej odpowiada na pytanie zadane — alarm ma odpowiedzieć na
    niezadane, a do tego potrzebuje progu. Próg nie jest tu niczyim werdyktem:

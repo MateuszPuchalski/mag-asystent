@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.363.0 — 16 września 2026
+## 0.364.0 — 16 września 2026
 
 **Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie
 zostawiło tę rzecz otwartą z uzasadnieniem, które było słabsze, niż wyglądało:
@@ -94,8 +94,8 @@ przyszło z 0.361.0, drugie żyło od 0.114.0: odmowa trasy z licznikiem
 odpowiedzi na notatki wywracała cały pasek stanu — ikonę zdrowia, kolejkę
 i stan Allegro naraz. Pilnuje tego teraz test panelu.
 
-Trasy miary dostały też własny plik bramek: do 0.362.0 nie miały testu roli
-wcale, tak samo jak rozstrzyganie kolizji przed 0.361.0.
+Trasy miary dostały też własny plik bramek: przez trzy wydania nie miały
+testu roli wcale, tak samo jak rozstrzyganie kolizji przed 0.361.0.
 
 ## 0.362.0 — 16 września 2026
 

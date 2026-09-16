@@ -186,7 +186,7 @@ export function czasyWymiany(dni = 30, teraz = Date.now()): {
   };
 }
 
-/* ── ALARM: co stoi dłużej, niż stoi zwykle (0.363.0) ─────────────────────────
+/* ── ALARM: co stoi dłużej, niż stoi zwykle (0.364.0) ─────────────────────────
  *
  * DLACZEGO PRÓG NIE JEST WPISANY RĘKĄ. Poprzednie wydanie zostawiło tę rzecz
  * otwartą z uzasadnieniem, które było SŁABSZE, niż wyglądało: „§22 nie podaje

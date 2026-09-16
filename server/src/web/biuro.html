@@ -1626,7 +1626,7 @@ let widok = localStorage.getItem("wertis.widok") || "dostawy";
 if (widok === "zwroty" || widok === "pytania") widok = "sprawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
-/* Alarm wymiany (0.363.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
+/* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
 let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
@@ -1842,7 +1842,7 @@ function rysujStan(health, kolejka) {
       title="${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"} — kliknij, żeby przeczytać."
       >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`);
   }
-  /* Spóźnione sprawy (0.363.0) — OSOBNA PLAKIETKA, nie kolor ikony zdrowia,
+  /* Spóźnione sprawy (0.364.0) — OSOBNA PLAKIETKA, nie kolor ikony zdrowia,
      i to nie jest kwestia gustu. Ikona odpowiada na pytanie „czy system
      działa": worker, kolejka, rozjazdy z Subiektem. Sprawa stojąca trzeci
      dzień to zdrowy system i kulejąca PRACA — dwie różne rzeczy pod jednym
@@ -3575,7 +3575,7 @@ function rysujWymiane(r) {
       '<tr><td colspan="7" class="mute">Brak spraw w tym oknie</td></tr>');
 }
 
-/* ── Co stoi dłużej, niż stoi zwykle (0.363.0) ──────────────────────────────
+/* ── Co stoi dłużej, niż stoi zwykle (0.364.0) ──────────────────────────────
    Próg nie jest niczyim werdyktem: to `p90` spraw DOMKNIĘTYCH w tym samym
    kanale. Ekran mówi to wprost przy każdym wierszu, bo liczba bez pochodzenia
    jest wyrocznią, a wyroczni nie da się podważyć danymi. */
@@ -4140,7 +4140,7 @@ async function odswiezStan() {
     const [h, q, odp] = await Promise.all([
       (await fetch("/api/health")).json(),
       (await api("/api/queue")).json(),
-      /* `.catch` na CAŁYM łańcuchu (poprawione w 0.363.0). Stał za `.json()`,
+      /* `.catch` na CAŁYM łańcuchu (poprawione w 0.364.0). Stał za `.json()`,
          a `api()` rzuca przy każdej odpowiedzi spoza 2xx — czyli PRZED
          `.json()`. Zabezpieczenie nie łapało więc niczego, co naprawdę pada,
          a 500 z licznika odpowiedzi zabierało cały pasek stanu: ikonę
@@ -4231,7 +4231,7 @@ async function odswiezNadzor() {
       (await api("/api/ean-conflicts")).json(),
       /* To samo okno co metryki obok: dwie tabele na jednym ekranie liczące
          z różnych okresów to najprostszy sposób na sprzeczne wnioski. */
-      /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.363.0 stał
+      /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.364.0 stał
          za `.json()` i nie łapał nic, co naprawdę pada: `api()` rzuca przy
          każdej odpowiedzi spoza 2xx, czyli PRZED `.json()`. Awaria najmłodszej
          i najmniej ważnej tabeli wywracała przez to dwie starsze na tym samym
@@ -4290,7 +4290,7 @@ async function odswiez() {
    w koszach, a te widać na własnej zakładce. Nowa obsługa przyniesie własny
    licznik razem z własną kolejką.
 
-   Od 0.363.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
+   Od 0.364.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
    liczba, którą biuro ma zobaczyć, siedząc na innej zakładce. Spóźniona
    sprawa jest jedyną taką liczbą, jaką magazyn ma. */
 async function odswiezLiczniki() {
