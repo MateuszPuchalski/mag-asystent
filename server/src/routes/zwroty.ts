@@ -4,7 +4,7 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
+  koszykiBezDokumentu, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
   zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
@@ -324,14 +324,19 @@ export async function zwrotyRoutes(app: FastifyInstance) {
   app.get("/api/obsluga/zwroty/kosz", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    /* `czekajace` jest polem ADDYTYWNYM (0.200.0): koszyki zamknięte, którym
-       brakuje korekt, nie należą do żadnego operatora — to praca biura, nie
-       jego biurka. Stary panel je zignoruje. */
+    /* `czekajace` jest polem ADDYTYWNYM (0.200.0): koszyki zamknięte bez
+       dokumentu nie należą do żadnego operatora — to praca biura, nie jego
+       biurka. Stary panel je zignoruje.
+
+       OD 0.371.0 SZERSZE NIŻ SAME BRAKI KOREKT: kosz, któremu Sfera odrzuciła
+       MM, wypadał stąd i nie było go widać nigdzie. Nazwa pola zostaje, bo
+       zmiana nazwy w umowie z panelem kosztowałaby tyle, co cała ta poprawka,
+       a czekaniem to nadal jest. */
     return {
       /* DWA koszyki od 0.211.0 — zwroty i odpad. Lista, nie pole: trzeci
          rodzaj (przecena?) nie ma wtedy zmieniać kształtu odpowiedzi. */
       kosze: otwarteKoszyki(db(), kto()),
-      czekajace: koszykiCzekajaceNaKorekty(db()),
+      czekajace: koszykiBezDokumentu(db()),
     };
   });
 

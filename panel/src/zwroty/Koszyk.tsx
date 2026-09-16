@@ -42,22 +42,63 @@ export function Koszyk() {
     rodzaj === "odpad" ? "Koszyk odpadu" : "Koszyk zwrotów";
 
   return <>
-    {/* Koszyki zamknięte, którym brakuje korekt. Stoją NAD otwartym, bo to
-        praca zaległa: kosz jest już na hali, a dokumentu wciąż nie ma. */}
+    {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
+        zaległa: kosz jest już na hali, a dokumentu wciąż nie ma.
+
+        TRZY POWODY, JEDEN PASEK (0.371.0). Kosz czeka albo na korektę, albo na
+        poprawkę zawartości po odmowie Sfery, albo na samo wypuszczenie MM.
+        Zdanie mówi, na który z nich — bo „czeka" bez powodu wygląda jak
+        zacięta kolejka i wysyła człowieka do kolejki zadań w biurze. */}
     {czekajace.map((c) => <div key={c.id}
       className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
         border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
       <PackageOpen size={14} className="shrink-0" />
       <b>{nazwa(c.rodzaj)} {c.kod}</b>
       <span className="min-w-0 flex-1">
-        czeka na {c.brakuje.length === 1 ? "korektę" : "korekty"}: {
-          c.brakuje.map((b) => b.numer).join(", ")}
+        {c.blad
+          ? <>Sfera odrzuciła MM: <b>{c.blad}</b></>
+          : c.brakuje.length > 0
+            ? <>czeka na {c.brakuje.length === 1 ? "korektę" : "korekty"}: {
+                c.brakuje.map((b) => b.numer).join(", ")}</>
+            : <>komplet korekt — MM czeka na wypuszczenie</>}
       </span>
       {/* DLACZEGO czeka — bez tego zdania wygląda to na zaciętą kolejkę. */}
       <span className="w-full text-amber-700">
-        MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero
-        po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni numer.
+        {c.blad
+          /* Odmowa Sfery bywa o towarze, którego nie da się przesunąć — tak
+             zaczął koszyk Z-8, do którego wszedł skanem koszt przesyłki.
+             Zdanie mówi, CO z tym zrobić, a nie tylko że jest źle. */
+          ? <>Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij
+              wiersz, który tam nie pasuje, i wystaw MM jeszcze raz. Wiersz ze
+              zwrotu schodzi cofnięciem oceny na karcie zwrotu.</>
+          : c.brakuje.length > 0
+            ? <>MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam
+                dopiero po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni
+                numer.</>
+            : <>Zadanie MM zdjęto przy poprawce zawartości i nikt go nie ponawia
+                sam — dokument wychodzi po naciśnięciu.</>}
       </span>
+      {/* ── WIERSZE DOŁOŻONE RĘKĄ (0.371.0) ───────────────────────────────
+          Od tego wydania da się je zdjąć TAKŻE z kosza zamkniętego, dopóki nie
+          ma dokumentu — zgłoszenie właściciela: „pozwól mi edytować koszyki
+          zwrotowe, z których nie zostały jeszcze utworzone MM". Bez tego
+          pomyłka przy skanie była nie do odkręcenia w aplikacji, a kosz stał
+          na hali z dokumentem, którego Sfera nie chciała przyjąć. */}
+      {(c.dolozone ?? []).length > 0 &&
+        <span className="flex w-full flex-wrap items-center gap-1">
+          <span className="text-amber-700">dołożone ręką:</span>
+          {(c.dolozone ?? []).map((p) => <span key={p.pozycjaId}
+            className="inline-flex items-center gap-1 rounded border border-amber-300
+              bg-white px-1">
+            <span className="font-mono">{p.symbol}</span>
+            <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
+            <button type="button" disabled={zdejmij.isPending}
+              onClick={() => zdejmij.mutate(p.pozycjaId)}
+              aria-label={`Zdejmij ${p.symbol} z koszyka ${c.kod}`}
+              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <X size={12} /></button>
+          </span>)}
+        </span>}
       {/* ── WYMUSZENIE (0.368.0) ──────────────────────────────────────────
           Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
           nawet jeśli nie ma wszystkich ZW". Kosz stoi czasem tygodniami i
@@ -71,7 +112,11 @@ export function Koszyk() {
 
           Zdanie mówi KOSZT, nie „operacja nieodwracalna". Człowiek ma wiedzieć,
           co konkretnie może pójść źle, a nie że ma się bać. */}
-      {pewien === c.id
+      {/* PRZYCISKU NIE MA PRZY ODMOWIE SFERY, i to nie jest przeoczenie:
+          nieudane zadanie WCIĄŻ WISI przy koszu, więc nie ma czego wypuszczać,
+          a druga MM obok pierwszej dałaby dwa papiery na jedno pudło. Zdjęcie
+          wiersza odpina tamto zadanie i przycisk pojawia się sam. */}
+      {c.blad ? null : pewien === c.id
         ? <span className="flex w-full flex-wrap items-center gap-2">
             <span className="text-amber-800">
               MM pójdzie na stan, którego jeszcze nie ma: Sfera odrzuci
@@ -85,10 +130,19 @@ export function Koszyk() {
             <button type="button" className="btn-secondary text-xs"
               onClick={() => setPewien(null)}>Nie</button>
           </span>
-        : <button type="button" className="btn-secondary text-xs"
-            onClick={() => setPewien(c.id)}>Wystaw MM mimo braku korekt</button>}
-      {mimo.error && pewien === c.id &&
-        <Blad>{(mimo.error as Error).message}</Blad>}
+        /* KOMPLET KOREKT NIE PYTA „czy na pewno". Pytanie wyżej mówi o koszcie,
+           którego tu nie ma: stan jest na miejscu, a wystawienie robi dokładnie
+           to, co i tak zrobiłby automat przy najbliższym takcie wiązań.
+           Dekalog zabrania pytania, na które jest tylko jedna odpowiedź. */
+        : c.brakuje.length > 0
+          ? <button type="button" className="btn-secondary text-xs"
+              onClick={() => setPewien(c.id)}>Wystaw MM mimo braku korekt</button>
+          : <Przycisk className="text-xs" disabled={mimo.isPending}
+              onClick={() => mimo.mutate(c.id)}>
+              {mimo.isPending ? "Wystawiam…" : "Wystaw MM"}
+            </Przycisk>}
+      {mimo.error && <div className="w-full"><Blad>{(mimo.error as Error).message}</Blad></div>}
+      {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
     {kosze.map((kosz) => <div key={kosz.id}
       /* Odpad w innym kolorze niż zwroty: to dwa różne końce hali, a pasek

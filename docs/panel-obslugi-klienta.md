@@ -3763,10 +3763,43 @@ zwrotu, więc nie ma ceny, nie wchodzi do rozliczenia z klientem i nie zatrzymuj
 bramki korekt — ta pyta po `zwrot_pozycja_id`. Przesuwa wyłącznie TOWAR: na MM
 wchodzi jak każdy inny wiersz i tą samą drogą wraca z bufora.
 
-**Zdjąć da się wyłącznie wiersz dołożony ręką i wyłącznie z koszyka otwartego.**
-Wiersz z oceny schodzi cofnięciem oceny: ocena jest faktem o towarze, a
-kasowanie jej z drugiej strony ekranu rozjechałoby kartę zwrotu z koszykiem.
-Koszyk zamknięty odjechał od biurka i jego zawartość opisuje to, co pojechało.
+**Zdjąć da się wyłącznie wiersz dołożony ręką.** Wiersz z oceny schodzi
+cofnięciem oceny: ocena jest faktem o towarze, a kasowanie jej z drugiej strony
+ekranu rozjechałoby kartę zwrotu z koszykiem.
+
+**Bramką jest DOKUMENT, nie zamknięcie (0.371.0).** Do 0.370.0 stała tu granica
+właściciela z 0.365.0: „jak jeszcze nie jest zamknięty". Nowe zgłoszenie ją
+zdejmuje: „pozwól mi edytować koszyki zwrotowe, z których nie zostały jeszcze
+utworzone MM".
+
+Kosztowała dokładnie tyle, ile miała chronić. Do koszyka Z-8 wszedł skanem
+KOSZT PRZESYŁKI — kartoteka bez stanu na magazynie. Kosz się zamknął, MM
+wyszła, a Sfera odrzuciła ją zdaniem „Brak towaru w magazynie". Usługi nie da
+się przesunąć dokumentem MM. Wiersza nie dało się zdjąć nigdzie: tu blokowało
+zamknięcie, a PRZELICZ ZE ZWROTÓW w biurze rusza wyłącznie wiersze ze zwrotów.
+
+Uzasadnienie z 0.365.0 trzyma się wyłącznie wtedy, gdy wyszedł papier. Bez
+dokumentu nikt tego towaru nigdzie nie posłał. Pudło stoi przy biurku, więc
+poprawka jest zwykłą pracą, nie przepisywaniem historii. To ten sam wniosek,
+który 0.334.0 wyciągnęło dla pozycji ze zwrotów.
+
+Dokładanie zostaje po staremu. Skan po zamknięciu zakłada NOWY koszyk, bo przy
+biurku stoi wtedy nowe pudło. Poprawianie pomyłki i dokładanie świeżego towaru
+to dwie różne czynności.
+
+**Pasek czekających mówi teraz o trzech stanach (0.371.0).** Do 0.370.0 pokazywał
+wyłącznie kosze, którym brakuje korekt — i tylko takie, do których nie przypięto
+zadania. Koszyk Z-8 wypadł przez oba warunki naraz: korekty miał komplet,
+a zadanie stało w błędzie. Kosz zniknął z panelu, choć to on wymagał ręki.
+
+Teraz w pasku stoi każdy kosz zamknięty bez dokumentu, ze zdaniem o tym, na co
+czeka. Brakująca korekta wygląda jak dotąd. Odmowa Sfery pokazuje jej treść
+i wiersze dołożone ręką z krzyżykiem. Kosz po poprawce dostaje przycisk WYSTAW
+MM — bez pytania „czy na pewno", bo stan jest na miejscu.
+
+Przy odmowie Sfery przycisku nie ma i to nie jest przeoczenie. Nieudane zadanie
+wciąż wisi przy koszu, więc nie ma czego wypuszczać. Zdjęcie wiersza odpina je
+i przycisk pojawia się sam.
 
 ### 25a.14. Dokument sprzedaży z Subiekta (0.174.0)
 

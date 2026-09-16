@@ -316,33 +316,53 @@ export function dolozTowar(
  * Pomyłka przy skanie jest normalnym elementem tej pracy, nie wyjątkiem —
  * dlatego bez roli i bez pytania „czy na pewno".
  *
- * BRAMKĄ JEST ZAMKNIĘCIE KOSZYKA, decyzja właściciela: „tylko z poziomu
- * obsługi zwrotów, jak jeszcze nie jest zamknięty". Węziej niż przy
- * `zdejmijZKosza`, które od 0.334.0 wpuszcza także kosz zamknięty bez
- * dokumentu — i węziej świadomie: tamta droga poprawia OCENĘ, którą biuro
- * wydało przy biurku, a ta rusza zawartość pudła. Pudło zamknięte odjechało
- * od biurka i jego zawartość jest już opisem tego, co pojechało.
+ * BRAMKĄ JEST DOKUMENT, NIE ZAMKNIĘCIE (0.371.0). Do tego wydania stało tu
+ * `status === "otwarty"` — węziej niż wszędzie indziej w tym pliku, z granicy
+ * postawionej przez właściciela w 0.365.0: „tylko z poziomu obsługi zwrotów,
+ * jak jeszcze nie jest zamknięty". Nowe zgłoszenie właściciela zdejmuje tamtą
+ * granicę: „pozwól mi edytować koszyki zwrotowe, z których nie zostały jeszcze
+ * utworzone MM".
+ *
+ * Kosztowała dokładnie tyle, ile miała chronić. Do koszyka Z-8 (25 kartotek)
+ * wszedł skanem KOSZT PRZESYŁKI — kartoteka bez stanu na magazynie. Kosz się
+ * zamknął, MM wyszła i Sfera odrzuciła ją zdaniem „Brak towaru w magazynie",
+ * bo usługi nie da się przesunąć. Wiersza nie dało się zdjąć NIGDZIE: tu
+ * blokowało zamknięcie, a PRZELICZ ZE ZWROTÓW w biurze rusza wyłącznie wiersze
+ * ze zwrotów i dołożony ręką zostawia na miejscu.
+ *
+ * Uzasadnienie z 0.365.0 („pudło zamknięte odjechało od biurka") trzyma się
+ * wyłącznie wtedy, gdy WYSZEDŁ PAPIER. Bez dokumentu nikt tego towaru nigdzie
+ * nie posłał — pudło stoi, a poprawka jest zwykłą pracą, nie przepisywaniem
+ * historii. To ten sam wniosek, który 0.334.0 wyciągnęło dla `zdejmijZKosza`.
  */
 export function zdejmijTowar(
   database: Db, pozycjaId: number, kto: { id: number; name: string },
 ): { koszId: number; kod: string; symbol: string } {
   return transaction(database, () => {
     const w = database.prepare(
-      `SELECT kp.id, kp.kosz_id, kp.tw_id, kp.symbol, kp.zwrot_pozycja_id, k.kod
+      `SELECT kp.id, kp.kosz_id, kp.tw_id, kp.symbol, kp.zwrot_pozycja_id, k.kod, k.rodzaj
          FROM kosz_pozycja kp JOIN kosz k ON k.id = kp.kosz_id
         WHERE kp.id = ?`).get(pozycjaId) as
       { id: number; kosz_id: number; tw_id: number; symbol: string;
-        zwrot_pozycja_id: number | null; kod: string } | undefined;
+        zwrot_pozycja_id: number | null; kod: string; rodzaj: string | null } | undefined;
     if (!w) throw new Error("Nie znam takiej pozycji koszyka.");
+    /* KARTON NIE JEST KOSZYKIEM ZWROTÓW i po zdjęciu bramki zamknięcia trzeba
+       to powiedzieć wprost. Karton nie jedzie na MM w ogóle (0.122.0), więc
+       `koszDoEdycji` przepuszcza go zawsze — a pudło dostawy stojące na hali
+       z listą do rozłożenia nie jest niczyją pomyłką przy skanie. */
+    if ((w.rodzaj ?? "zwroty") !== "zwroty" && (w.rodzaj ?? "zwroty") !== "odpad") {
+      throw new Error(`Koszyk ${w.kod} nie jest koszykiem zwrotów ani odpadu.`);
+    }
     if (w.zwrot_pozycja_id !== null) {
       throw new Error("Ta pozycja przyszła ze zwrotu — zdejmuje się ją cofnięciem oceny.");
     }
     const koszId = Number(w.kosz_id);
-    const status = (database.prepare("SELECT status FROM kosz WHERE id=?").get(koszId) as
-      { status: string }).status;
-    if (status !== "otwarty") {
-      throw new Error(
-        `Koszyk ${w.kod} jest już ${status} — zawartość zamkniętego pudła opisuje to, co pojechało.`);
+    /* TA SAMA BRAMKA CO WSZĘDZIE W TYM PLIKU (0.371.0). Własny warunek
+       rozjechałby się z `zdejmijZKosza` i `przeliczKosz` przy pierwszej zmianie
+       jednej z nich — a rozjazd znaczyłby tu wiersz zdjęty z dokumentu, który
+       już pojechał na halę. */
+    if (!koszDoEdycji(database, koszId)) {
+      throw new Error(`Koszyk ${w.kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
     }
     database.prepare("DELETE FROM kosz_pozycja WHERE id=?").run(pozycjaId);
     /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
@@ -827,6 +847,71 @@ export interface KoszykCzekajacy {
   zamknietoAt: string;
   /** Zwroty bez numeru korekty — człowiek ma wiedzieć, czego szukać. */
   brakuje: Array<{ zwrotId: number; numer: string }>;
+  /**
+   * Odmowa Sfery, gdy zadanie MM stanęło w błędzie — inaczej `null` (0.371.0).
+   *
+   * Niepusta wartość znaczy też, że zadanie WCIĄŻ WISI przy koszu: dopóki
+   * wisi, nie ma czego wypuszczać i przycisk „wystaw" nie ma tu prawa stać.
+   */
+  blad: string | null;
+  /**
+   * Wiersze dołożone ręką — JEDYNE, które da się z zamkniętego kosza zdjąć.
+   *
+   * Wiersz ze zwrotu schodzi cofnięciem oceny na karcie zwrotu i to zostaje
+   * jego jedyną drogą; lista tutaj jest po to, żeby ekran nie proponował
+   * krzyżyka przy wierszu, którego serwer i tak nie zdejmie.
+   */
+  dolozone: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
+}
+
+/**
+ * Koszyki zamknięte BEZ DOKUMENTU — wszystko, co jeszcze czeka na człowieka
+ * albo na papier (0.371.0).
+ *
+ * Do tego wydania lista pokazywała wyłącznie kosze, którym brakuje korekt,
+ * i wyłącznie takie, do których nie przypięto jeszcze zadania. Koszyk Z-8
+ * wypadł przez obie dziury naraz: korekty miał komplet, zadanie MM dostał,
+ * a Sfera odrzuciła je zdaniem „Brak towaru w magazynie", bo skanem wszedł do
+ * niego KOSZT PRZESYŁKI — kartoteka bez stanu, której nie da się przesunąć.
+ * Kosz zniknął wtedy z panelu: dokumentu nie ma, pudło stoi, i nikt nie mówi
+ * dlaczego. Cisza jest tu gorsza od złej wiadomości.
+ *
+ * TRZY STANY, JEDEN PASEK. Kosz bez dokumentu czeka dokładnie na jedno z:
+ * brakującą korektę, poprawkę zawartości po odmowie Sfery, albo na samo
+ * wypuszczenie MM (po poprawce zadanie znika i nikt go nie ponawia aż do
+ * następnego taktu wiązań). Osobny ekran na każdy z nich kazałby zgadywać,
+ * na który patrzeć.
+ *
+ * Kosza z zadaniem W TOKU tu nie ma i nie powinno być: papier jest w drodze,
+ * a jedyną odpowiedzią byłoby „czekaj".
+ */
+export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
+  /* Ten sam zbiór co w `wypuscGotoweKoszyki`, z rozłożonymi włącznie i z jedną
+     różnicą: zadanie w BŁĘDZIE nie wyklucza kosza. Tamta funkcja pomija go
+     słusznie (nie wolno wystawiać drugiego dokumentu obok wiszącego zadania),
+     ale ekran ma go pokazać właśnie dlatego, że sam się już nie odblokuje. */
+  const kosze = database.prepare(
+    `SELECT k.id, k.kod, k.zamknieto_at, k.rodzaj, q.error_msg AS blad
+       FROM kosz k LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
+      WHERE k.status IN ('zamkniety','rozlozony') AND k.powrot_poza_aplikacja = 0
+        AND k.mm_dok_id IS NULL AND k.rodzaj IN ('zwroty','odpad')
+        AND (k.mm_queue_id IS NULL OR q.status = 'error')
+      ORDER BY k.id`)
+    .all() as Array<{ id: number; kod: string; zamknieto_at: string;
+      rodzaj: RodzajKosza; blad: string | null }>;
+  const dolozone = database.prepare(
+    `SELECT id, symbol, nazwa, ilosc FROM kosz_pozycja
+      WHERE kosz_id=? AND zwrot_pozycja_id IS NULL ORDER BY id`);
+  return kosze.map((k) => ({
+    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
+    brakuje: brakujaceKorekty(database, Number(k.id)),
+    blad: k.blad ?? null,
+    dolozone: (dolozone.all(k.id) as Array<
+      { id: number; symbol: string; nazwa: string; ilosc: number }>)
+      .map((p) => ({
+        pozycjaId: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
+      })),
+  }));
 }
 
 /**
@@ -835,20 +920,15 @@ export interface KoszykCzekajacy {
  * Bez tego czekanie byłoby ciszą: kosz stoi zamknięty, dokumentu nie ma,
  * a nikt nie wie, na czym stoi sprawa. Kubełek DO KOREKTY zbiera tę samą
  * pracę, więc to jedno zdanie przy koszyku, nie nowy ekran.
+ *
+ * WĘŻSZY WIDOK tej samej listy od 0.371.0. Rozjazd zbioru z `wypuscGotoweKoszyki`
+ * dałby kosz, który czeka, a o którym nikt nie mówi — więc filtr, nie drugie
+ * zapytanie. Czyta to `reconcile`, który mówi „brakuje: ..." i o koszu bez
+ * ani jednego brakującego numeru nie miałby co powiedzieć.
  */
 export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
-  /* Ten sam zbiór co w `wypuscGotoweKoszyki`, z rozłożonymi włącznie. Rozjazd
-     obu warunków dałby kosz, który czeka, a o którym nikt nie mówi. */
-  const kosze = database.prepare(
-    `SELECT id, kod, zamknieto_at, rodzaj FROM kosz
-      WHERE status IN ('zamkniety','rozlozony') AND powrot_poza_aplikacja = 0
-        AND mm_dok_id IS NULL AND mm_queue_id IS NULL
-        AND rodzaj IN ('zwroty','odpad') ORDER BY id`)
-    .all() as Array<{ id: number; kod: string; zamknieto_at: string; rodzaj: RodzajKosza }>;
-  return kosze.map((k) => ({
-    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
-    brakuje: brakujaceKorekty(database, Number(k.id)),
-  })).filter((k) => k.brakuje.length > 0);
+  return koszykiBezDokumentu(database)
+    .filter((k) => k.brakuje.length > 0 && k.blad === null);
 }
 
 /**

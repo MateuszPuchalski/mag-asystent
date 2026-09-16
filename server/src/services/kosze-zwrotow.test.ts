@@ -6,7 +6,7 @@ import { migrate, type Db } from "../db/db.js";
 import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
-  dolozTowar, zdejmijTowar,
+  dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
   MAX_SZTUK_RECZNIE,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
@@ -468,10 +468,12 @@ test("zdejmowanie dotyczy WYŁĄCZNIE wiersza dołożonego ręką", () => {
   assert.equal(stanOtwartegoKosza(d, KTO)!.pozycji, 1, "została pozycja ze zwrotu");
 });
 
-test("koszyk ZAMKNIĘTY nie przyjmuje i nie oddaje — pudło odjechało", () => {
-  /* Granica z decyzji właściciela: „tylko (…) jak jeszcze nie jest zamknięty".
-     Węziej niż przy pozycjach ze zwrotu, bo tamta droga poprawia ocenę wydaną
-     przy biurku, a ta rusza zawartość pudła. */
+test("koszyk zamknięty BEZ DOKUMENTU wciąż oddaje wiersz dołożony ręką", () => {
+  /* Zgłoszenie właściciela (0.371.0): „pozwól mi edytować koszyki zwrotowe,
+     z których nie zostały jeszcze utworzone MM". Granica z 0.365.0 („jak
+     jeszcze nie jest zamknięty") kosztowała koszyk Z-8: wszedł do niego skanem
+     KOSZT PRZESYŁKI, kartoteka bez stanu, więc Sfera odrzuciła MM zdaniem
+     „Brak towaru w magazynie" — a wiersza nie dało się zdjąć nigdzie. */
   const d = stanowisko();
   const KTO = biuro(d);
   kartoteka(d, 41);
@@ -479,11 +481,34 @@ test("koszyk ZAMKNIĘTY nie przyjmuje i nie oddaje — pudło odjechało", () =>
   const kosz = stanOtwartegoKosza(d, KTO)!;
   zamknijKosz(d, kosz.id, KTO);
 
-  assert.throws(() => zdejmijTowar(d, dolozony.pozycjaId, KTO), /jest już zamkniety/);
-  /* Dołożenie po zamknięciu zakłada NOWY koszyk — przy biurku stoi nowe pudło,
-     a nie dosypuje się do tego, które pojechało. */
+  zdejmijTowar(d, dolozony.pozycjaId, KTO);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?")
+    .get(kosz.id) as { n: number }).n, 0, "wiersz zszedł z zamkniętego pudła");
+  /* Zadanie MM ułożone dla starej zawartości traci ważność — inaczej papier
+     pojechałby z tym, co już zdjęto. */
+  assert.equal((d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(kosz.id) as { mm_queue_id: number | null }).mm_queue_id, null);
+
+  /* Dołożenie po zamknięciu dalej zakłada NOWY koszyk — przy biurku stoi nowe
+     pudło, a nie dosypuje się do tego, które pojechało. Poprawianie pomyłki
+     i dokładanie świeżego towaru to dwie różne czynności. */
   const nowy = dolozTowar(d, 41, 1, KTO);
   assert.notEqual(nowy.koszId, kosz.id);
+});
+
+test("koszyk Z DOKUMENTEM nie oddaje nic — papier pojechał na halę", () => {
+  /* Druga strona tej samej bramki. Po wystawieniu MM zdjęcie wiersza
+     rozjechałoby dokument z zawartością, a magazynier szukałby towaru,
+     którego nikt nie wyjął z kartonu. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 42);
+  const dolozony = dolozTowar(d, 42, 1, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+  d.prepare("UPDATE kosz SET mm_numer='MM 1/ZWR/2026' WHERE id=?").run(kosz.id);
+
+  assert.throws(() => zdejmijTowar(d, dolozony.pozycjaId, KTO), /ma już dokument MM/);
 });
 
 test("odmowy mówią, co jest nie tak: sztuki i nieznana kartoteka", () => {
@@ -493,4 +518,63 @@ test("odmowy mówią, co jest nie tak: sztuki i nieznana kartoteka", () => {
   assert.throws(() => dolozTowar(d, 51, 0, KTO), /ile sztuk/);
   assert.throws(() => dolozTowar(d, 51, MAX_SZTUK_RECZNIE + 1, KTO), /Najwyżej/);
   assert.throws(() => dolozTowar(d, 999_999, 1, KTO), /Nie znam takiej kartoteki/);
+});
+
+test("kosz z ODRZUCONĄ MM widać w panelu — z odmową Sfery i wierszem do zdjęcia", () => {
+  /* Koszyk Z-8 wypadł z panelu przez dwa warunki naraz: lista wymagała
+     BRAKUJĄCEJ KOREKTY (a miał komplet) i braku zadania (a miał zadanie
+     w błędzie). Kosz stał na hali, dokumentu nie było i nic o tym nie mówiło —
+     cisza gorsza od złej wiadomości (0.371.0). */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id: zwrotId, poz } = zwrotZTowarem(d, [71], KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  skorygowany(d, zwrotId);
+  kartoteka(d, 72, "KOSZT-PRZESYLKI");
+  const dolozony = dolozTowar(d, 72, 1, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+
+  const queueId = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(kosz.id) as { mm_queue_id: number }).mm_queue_id;
+  d.prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?")
+    .run("Brak towaru w magazynie", queueId);
+
+  const lista = koszykiBezDokumentu(d);
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].blad, "Brak towaru w magazynie");
+  assert.deepEqual(lista[0].dolozone.map((p) => p.symbol), ["KOSZT-PRZESYLKI"]);
+  assert.equal(lista[0].brakuje.length, 0);
+  /* `reconcile` mówi „brakuje: ..." i o koszu z kompletem korekt nie miałby co
+     powiedzieć — wężysza lista nie ma prawa go złapać. */
+  assert.equal(koszykiCzekajaceNaKorekty(d).length, 0);
+
+  /* Zdjęcie pomyłki odpina zadanie: kosz przestaje mieć błąd, a panel dostaje
+     stan, w którym wolno wystawić MM jeszcze raz. */
+  zdejmijTowar(d, dolozony.pozycjaId, KTO);
+  const po = koszykiBezDokumentu(d);
+  assert.equal(po.length, 1);
+  assert.equal(po[0].blad, null);
+  assert.equal(po[0].dolozone.length, 0);
+});
+
+test("kosz z zadaniem W TOKU nie pokazuje się — papier jest w drodze", () => {
+  /* Jedyną odpowiedzią byłoby „czekaj", a pasek mówiący „czekaj" uczy patrzeć
+     w kolejkę zadań zamiast w pracę. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id: zwrotId, poz } = zwrotZTowarem(d, [73], KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  skorygowany(d, zwrotId);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+  const queueId = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?")
+    .get(kosz.id) as { mm_queue_id: number }).mm_queue_id;
+
+  d.prepare("UPDATE sfera_queue SET status='processing' WHERE id=?").run(queueId);
+  assert.equal(koszykiBezDokumentu(d).length, 0);
+  /* Tak samo po wystawieniu dokumentu — wtedy nie ma już czego poprawiać. */
+  d.prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(queueId);
+  d.prepare("UPDATE kosz SET mm_numer='MM 2/ZWR/2026' WHERE id=?").run(kosz.id);
+  assert.equal(koszykiBezDokumentu(d).length, 0);
 });
