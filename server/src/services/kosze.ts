@@ -101,7 +101,7 @@ export const RODZAJ_ODPAD = "odpad";
 
 export interface PozycjaKosza {
   /**
-   * Wiersze SKLEJONE z tym w jeden (0.357.0) — ten sam towar z innych zwrotów.
+   * Wiersze SKLEJONE z tym w jeden (0.359.0) — ten sam towar z innych zwrotów.
    *
    * Pusta lista znaczy „wiersz jest sam". Kolektor nie musi o tym wiedzieć:
    * widzi jedną pozycję z sumaryczną ilością i odkłada ją jednym ruchem.
@@ -505,7 +505,7 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
     mmStatus: (w.mm_status as string) ?? null,
     mmNumer: (w.mm_numer as string) ?? null,
   }));
-  /* ── Ten sam towar z dwóch zwrotów to JEDNA linijka (0.357.0) ─────────────
+  /* ── Ten sam towar z dwóch zwrotów to JEDNA linijka (0.359.0) ─────────────
      Zgłoszenie z hali brzmiało tak: „ten sam symbol trzy razy pod rząd, trzy
      razy ta sama półka". Koszyk trzyma wiersz na każdą pozycję zwrotu, bo tym
      wierszem wraca ślad na oś zwrotu — ale magazynier niesie te trzy sztuki
@@ -513,7 +513,12 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
      (`kosze-zwrotow.ts`), więc rozbicie żyło wyłącznie na ekranie.
 
      Sklejamy WYŁĄCZNIE wiersze nieodróżnialne: ten sam towar, ten sam stan,
-     ten sam adres, ten sam powód pominięcia i ta sama odpowiedź na „później".
+     ten sam adres, ten sam powód pominięcia, ta sama odpowiedź na „później"
+     i TA SAMA ODPOWIEDŹ BIURA na pominięcie (0.358.0). Ostatni człon nie jest
+     ozdobny: kolektor pokazuje przy pominięciu zdanie biura, a sklejenie dwóch
+     wierszy z różnymi odpowiedziami schowałoby jedną z nich — czyli wróciłoby
+     do stanu, który tamto wydanie właśnie naprawiło.
+
      Dzięki temu licznik ODŁOŻONE x/y nie skacze w trakcie pracy — gdyby
      sklejać tylko czekające, mianownik rósłby z każdym odłożeniem.
 
@@ -523,6 +528,8 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
   const klucz = (w: Record<string, unknown>): string => [
     w.tw_id, w.status, (w.lok_faktyczna as string) ?? "",
     w.pozniej_at ? "P" : "", (w.powod as string) ?? "",
+    (w.zalatwione_at as string) ?? "", (w.zalatwione_notatka as string) ?? "",
+    (w.zalatwione_przez as string) ?? "",
   ].join("|");
   const grupy = new Map<string, PozycjaKosza>();
   for (let i = 0; i < rozbite.length; i++) {
@@ -669,7 +676,7 @@ export type Potwierdzenie = "polka" | "towar" | "wpis";
 export const POTWIERDZENIA: readonly Potwierdzenie[] = ["polka", "towar", "wpis"] as const;
 
 /**
- * Wiersze kosza NIEODRÓŻNIALNE na ekranie od tego jednego (0.357.0).
+ * Wiersze kosza NIEODRÓŻNIALNE na ekranie od tego jednego (0.359.0).
  *
  * Ten sam klucz co przy sklejaniu w `szczegolKosza` — i to jest cała treść tej
  * funkcji. Gdyby oba miejsca liczyły grupę własnym warunkiem, rozjechałyby się
@@ -685,11 +692,16 @@ function rodzenstwo(p: Record<string, unknown>): Array<{ id: number; ilosc: numb
           AND COALESCE(lok_faktyczna, '') = ?
           AND (CASE WHEN pozniej_at IS NULL THEN 0 ELSE 1 END) = ?
           AND COALESCE(powod, '') = ?
+          AND COALESCE(zalatwione_at, '') = ?
+          AND COALESCE(zalatwione_notatka, '') = ?
+          AND COALESCE(zalatwione_przez, '') = ?
         ORDER BY id`
     )
     .all(
       p.kosz_id as number, p.tw_id as number, p.status as string,
       (p.lok_faktyczna as string) ?? "", p.pozniej_at ? 1 : 0, (p.powod as string) ?? "",
+      (p.zalatwione_at as string) ?? "", (p.zalatwione_notatka as string) ?? "",
+      (p.zalatwione_przez as string) ?? "",
     ) as Array<{ id: number; ilosc: number }>;
 }
 
@@ -746,7 +758,7 @@ export function odlozPozycje(
     );
   }
 
-  /* CAŁA SKLEJONA LINIJKA (0.357.0). Zadanie adresu powstało WYŻEJ i jest
+  /* CAŁA SKLEJONA LINIJKA (0.359.0). Zadanie adresu powstało WYŻEJ i jest
      jedno na cały ruch — po drugie i trzecie kartoteka i tak miałaby już nowy
      adres, więc byłyby to zadania bez treści. Wiersze dostają jeden `loc_queue_id`,
      dzięki czemu cofnięcie anuluje ten sam zapis, który odłożenie zamówiło. */
@@ -865,7 +877,7 @@ export function cofnijOdlozenie(pozycjaId: number, autor: string): SzczegolKosza
   }
 
   anulujJesliCzeka(p.loc_queue_id as number | null, "Zapis adresu");
-  /* CAŁA SKLEJONA LINIJKA (0.357.0) — magazynier cofa to, co widzi, a widzi
+  /* CAŁA SKLEJONA LINIJKA (0.359.0) — magazynier cofa to, co widzi, a widzi
      jeden wiersz z sumaryczną ilością. Cofnięcie samego lidera zostawiłoby
      resztę odłożoną i rozbiło linijkę na dwie, bez żadnego ruchu na hali. */
   const grupa = rodzenstwo(p);
@@ -898,7 +910,7 @@ export function cofnijPominiecie(pozycjaId: number, autor: string): SzczegolKosz
     throw new BladKosza(400, "Kosz jest już zakończony — najpierw cofnij zakończenie");
   }
 
-  /* Cała sklejona linijka, jak przy odłożeniu (0.357.0): pominięcie dotyczyło
+  /* Cała sklejona linijka, jak przy odłożeniu (0.359.0): pominięcie dotyczyło
      wszystkich sztuk tego towaru, więc cofa się je razem. */
   const grupa = rodzenstwo(p);
   const wroc = d.prepare(
@@ -1013,7 +1025,7 @@ export function przesunNaKoniec(pozycjaId: number, autor: string): SzczegolKosza
   const kosz = wierszKosza(p.kosz_id as number);
   if (kosz.status !== "zamkniety") throw new BladKosza(400, "Kosz nie jest w rozkładaniu");
 
-  /* Cała sklejona linijka i TEN SAM znacznik czasu (0.357.0): rodzeństwo ma
+  /* Cała sklejona linijka i TEN SAM znacznik czasu (0.359.0): rodzeństwo ma
      zostać razem także na końcu listy, a dwa znaczniki rozbiłyby je na dwie
      pozycje stojące obok siebie. */
   const grupa = rodzenstwo(p);

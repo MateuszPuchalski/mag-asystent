@@ -442,4 +442,45 @@ class DtosTest {
         )
         assertEquals("dev", dev.srodowisko)
     }
+
+    /* ── Odpowiedź biura wraca na halę (0.358.0) ─────────────────────────────
+       Serwer oddawał `zalatwione*` przy KAŻDEJ pozycji kosza od 0.77.0, a ten
+       DTO ich nie deklarował — więc kotlinx po cichu je zjadał. Pominięcie
+       zamknięte przez biuro wyglądało na ekranie hali identycznie jak takie,
+       którym nikt się nie zajął.
+
+       To jest cała klasa błędów, której ten plik pilnuje: pole leci po drucie
+       i ginie w milczeniu. Nie wywala testu, nie wywala buildu — po prostu
+       znika. Dlatego test dekoduje DOSŁOWNY kształt z serwera.               */
+    @Test fun `KoszPozycja - zalatwienie przez biuro nie ginie przy dekodowaniu`() {
+        val json = """
+            {"id":41,"twId":900,"symbol":"W09-0211","nazwa":"Gaźnik","ilosc":1.0,
+             "status":"skipped","unit":"szt","powod":"Nie ma go w koszu",
+             "pominietoAt":"2026-09-14T09:12:00.000Z",
+             "zalatwioneAt":"2026-09-15T11:03:00.000Z",
+             "zalatwionePrzez":"A. Lewandowska",
+             "zalatwioneNotatka":"Znalazł się na regale zwrotów, skorygowane."}
+        """.trimIndent()
+        val p = WertisJson.decodeFromString<KoszPozycja>(json)
+        assertEquals("skipped", p.status)
+        assertEquals("Nie ma go w koszu", p.powod)
+        assertEquals("2026-09-15T11:03:00.000Z", p.zalatwioneAt)
+        assertEquals("A. Lewandowska", p.zalatwionePrzez)
+        assertEquals("Znalazł się na regale zwrotów, skorygowane.", p.zalatwioneNotatka)
+    }
+
+    @Test fun `KoszPozycja - pominiecie bez odpowiedzi biura zostaje otwarte`() {
+        // Starszy serwer i świeże pominięcie wyglądają tu tak samo i mają
+        // prawo: brak odpowiedzi to `null`, nie pusty napis. Ekran rozstrzyga
+        // po `zalatwioneAt`, więc ta różnica decyduje o barwie wiersza.
+        val json = """
+            {"id":42,"twId":901,"symbol":"FTC272","nazwa":"Podkładka","ilosc":1.0,
+             "status":"skipped","powod":"Uszkodzona"}
+        """.trimIndent()
+        val p = WertisJson.decodeFromString<KoszPozycja>(json)
+        assertEquals("Uszkodzona", p.powod)
+        assertNull(p.zalatwioneAt)
+        assertNull(p.zalatwioneNotatka)
+        assertNull(p.zalatwionePrzez)
+    }
 }

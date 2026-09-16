@@ -255,7 +255,7 @@ test("powrót czeka na zapis adresów i wychodzi dopiero po nim", async () => {
   assert.equal(K.szczegolKosza(kosz.id).powrot?.status, "pending");
 });
 
-/* ── Sklejanie powtórzonych kartotek (0.357.0) ───────────────────────────────
+/* ── Sklejanie powtórzonych kartotek (0.359.0) ───────────────────────────────
    Ten sam towar z dwóch zwrotów to dwa wiersze `kosz_pozycja` — tak musi być,
    bo każdy wiersz niesie ślad na oś swojego zwrotu. Na ekranie były jednak
    dwie linijki, dwa skany i dwa podejścia do tej samej półki. Cena błędu przy
@@ -386,9 +386,35 @@ test("sklejone są tylko wiersze NIEODRÓŻNIALNE na ekranie", async () => {
   assert.deepEqual(widok.map((p) => p.ilosc).sort(), [1, 2]);
 });
 
+test("różna odpowiedź biura rozdziela pominięcia, choć towar ten sam", async () => {
+  /* 0.358.0 dało kolektorowi zdanie biura przy pominięciu, bo pominięcie bez
+     widocznej odpowiedzi uczy jednego: nie zgłaszać. Sklejenie dwóch wierszy
+     z RÓŻNYMI odpowiedziami schowałoby jedną z nich — czyli cofnęłoby tamto
+     wydanie po cichu, przez klucz w innym pliku. */
+  const kosz = koszAplikacji("Z-45");
+  const sklejona = K.szczegolKosza(kosz.id).pozycje.find((p) => p.twId === 900_036)!;
+  K.pominPozycjeKosza(sklejona.id, "brak_w_koszu", "Magazynier");
+
+  const wiersze = db().prepare(
+    "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND tw_id=900036 ORDER BY id")
+    .all(kosz.id) as Array<{ id: number }>;
+  assert.equal(K.szczegolKosza(kosz.id).pozycje.filter((p) => p.twId === 900_036).length, 1,
+    "dopóki odpowiedzi nie ma, pominięcia stoją w jednej linijce");
+
+  /* Biuro zamyka sprawę JEDNEGO ze zwrotów — drugi wciąż czeka. */
+  db().prepare(
+    `UPDATE kosz_pozycja SET zalatwione_at=?, zalatwione_przez='Ala',
+            zalatwione_notatka='towar znalazł się przy pakowaniu' WHERE id=?`)
+    .run(new Date().toISOString(), wiersze[0].id);
+
+  const widok = K.szczegolKosza(kosz.id).pozycje.filter((p) => p.twId === 900_036);
+  assert.equal(widok.length, 2, "zamknięte i niezamknięte to dwie różne linijki");
+  assert.equal(widok.filter((p) => p.zalatwioneNotatka !== null).length, 1);
+});
+
 test("pominięta pozycja nie wraca z bufora — nikt jej nie przeniósł", async () => {
   const kosz = koszAplikacji("Z-9");
-  /* Dwa wiersze na 900036 (dwa zwroty) są od 0.357.0 JEDNĄ linijką, więc
+  /* Dwa wiersze na 900036 (dwa zwroty) są od 0.359.0 JEDNĄ linijką, więc
      odłożenie bierze obie sztuki naraz. Pominięta zostaje druga kartoteka. */
   assert.equal(kosz.pozycje.length, 2, "trzy wiersze, dwie linijki");
   K.odlozPozycje(kosz.pozycje[0].id, "A01-02-03", "Magazynier");

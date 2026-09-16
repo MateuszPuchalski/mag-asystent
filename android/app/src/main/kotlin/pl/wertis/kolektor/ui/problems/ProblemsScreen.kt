@@ -61,7 +61,17 @@ import pl.wertis.kolektor.ui.theme.cardSurface
    dopiero lista „nierozwiązane" zamienia wyjątek w zadanie.
 
    Kolizje EAN są tu obok, bo to ten sam gatunek długu: dane, które zatrzymują
-   pracę w alejce, a naprawia się je w biurze.                                 */
+   pracę w alejce, a naprawia się je w biurze.
+
+   ── DRUGA POŁOWA PĘTLI (0.357.0) ─────────────────────────────────────────
+   Zdanie wyżej pilnowało wyłącznie kierunku TAM. Do 0.356.0 ekran pobierał
+   `unresolved`, więc wyjątek po zamknięciu przez biuro po prostu z niego
+   znikał — a z punktu widzenia magazyniera znikniecie bez słowa wygląda
+   identycznie jak zignorowanie. To uczy najprostszej rzeczy: nie zgłaszać.
+
+   Sekcja „ROZSTRZYGNIĘTE" mówi, CO postanowiono i KTO, w oknie tygodnia.
+   Bez przycisków: to nie jest praca do zrobienia, tylko odpowiedź do
+   przeczytania.                                                             */
 
 @Composable
 fun ProblemsScreen(graph: AppGraph) {
@@ -70,6 +80,17 @@ fun ProblemsScreen(graph: AppGraph) {
     var resolving by remember { mutableStateOf<ProblemView?>(null) }
 
     LaunchedEffect(Unit) { graph.problemsRepo.refreshNow() }
+
+    /* Osobne pobranie, nie rozszerzenie repozytorium: `problemsRepo` niesie
+       LICZNIK na pasku każdego ekranu, a rozstrzygnięte nie są zaległością
+       i nie mają prawa go podnosić. */
+    val rozstrzygniete by produceState<List<ProblemView>>(emptyList()) {
+        value = try {
+            apiCall { graph.api.rozstrzygnieteProblems() }.problems
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 
     val conflicts by produceState<List<EanConflictRow>?>(null) {
         value = try {
@@ -117,6 +138,16 @@ fun ProblemsScreen(graph: AppGraph) {
             problems.forEach { p -> ProblemCard(p) { resolving = p } }
         }
 
+        if (rozstrzygniete.isNotEmpty()) {
+            SectionLabel("ROZSTRZYGNIĘTE PRZEZ BIURO (${rozstrzygniete.size})")
+            Text(
+                "Co biuro postanowiło z tym, co zgłosiliście w ostatnim tygodniu.",
+                fontSize = 11.5.sp,
+                color = InkSoft,
+            )
+            rozstrzygniete.forEach { p -> RozstrzygnieteCard(p) }
+        }
+
         val c = conflicts
         if (c != null && c.isNotEmpty()) {
             SectionLabel("KOLIZJE KODÓW (${c.size})")
@@ -127,6 +158,57 @@ fun ProblemsScreen(graph: AppGraph) {
             )
             c.forEach { row -> ConflictCard(graph, row) }
         }
+    }
+}
+
+/**
+ * Wyjątek ZAMKNIĘTY przez biuro (0.357.0).
+ *
+ * Bez przycisku i bez czerwieni: to nie jest praca do zrobienia, tylko
+ * odpowiedź do przeczytania. Czerwień na tym ekranie znaczy „stoi i czeka",
+ * a ta karta mówi coś przeciwnego.
+ *
+ * Notatka biura stoi WYŻEJ niż opis zgłoszenia, odwrotnie niż w karcie
+ * otwartej. Magazynier zna własne zgłoszenie — przyszedł tu po odpowiedź,
+ * której nie zna.
+ */
+@Composable
+private fun RozstrzygnieteCard(p: ProblemView) {
+    Column(
+        modifier = Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(WIcons.Check, null, tint = Success, modifier = Modifier.size(17.dp))
+            Text(
+                ProblemType.labelOf(p.typ),
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Ink,
+            )
+        }
+        p.sym?.let { sym ->
+            Text("$sym · ${p.name.orEmpty()}", fontSize = 12.5.sp, color = Ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        // NOTATKA PIERWSZA. Jej brak też jest odpowiedzią i też ma swoje zdanie:
+        // „zamknięte bez notatki" mówi mniej niż powód, ale nieporównanie
+        // więcej niż zniknięcie z listy bez śladu.
+        Text(
+            p.resolvedNote?.takeIf { it.isNotBlank() } ?: "Zamknięte bez notatki.",
+            fontSize = 13.sp,
+            color = if (p.resolvedNote.isNullOrBlank()) InkMute else Ink,
+        )
+        // Nazwisko, nie samo „biuro": z pytaniem idzie się do człowieka.
+        Text(
+            listOfNotNull(
+                p.resolvedBy?.let { "Zamknął(a): $it" } ?: "Zamknęło biuro",
+                p.docNumber,
+                p.createdBy?.let { "zgłosił(a): $it" },
+            ).joinToString(" · "),
+            fontSize = 11.5.sp,
+            color = InkMute,
+        )
     }
 }
 

@@ -106,7 +106,7 @@ Zniknęły od tego czasu:
   wraca też druga połowa drogi — po rozłożeniu kosza aplikacja zamawia jedno
   MM ZWROTY→MAG, więc stan schodzi z bufora bez ręki biura.
 
-  **Od 0.357.0 ten sam towar z kilku zwrotów to jedna linijka kosza.** Wierszy
+  **Od 0.359.0 ten sam towar z kilku zwrotów to jedna linijka kosza.** Wierszy
   w bazie zostaje tyle, ile zwrotów: każdy niesie ślad na oś swojego.
   Magazynier widzi jednak jedną pozycję z sumą sztuk i odkłada ją jednym
   ruchem.

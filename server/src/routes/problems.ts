@@ -11,6 +11,7 @@ import {
   raiseProblem,
   resolveProblem,
   zapiszPrzesylke,
+  listRozstrzygniete,
 } from "../services/problems.js";
 
 /* ── Faza 2: wyjątki widoczne i mierzalne (D8) ──────────────────────────── */
@@ -21,6 +22,18 @@ export async function problemRoutes(app: FastifyInstance) {
    * wyjątki znikają z pola widzenia i nikt się nimi nie zajmuje.
    */
   app.get("/api/problems/unresolved", async () => ({ problems: listUnresolved() }));
+
+  /* ── CO BIURO POSTANOWIŁO (0.357.0) ──────────────────────────────────────
+     Druga połowa tej samej pętli. Do 0.356.0 kolektor pobierał wyłącznie
+     nierozwiązane, więc zgłoszenie po zamknięciu po prostu znikało z ekranu —
+     nie do odróżnienia od zignorowania. Zgłoszenie, które znika bez słowa,
+     uczy najprostszej rzeczy: nie zgłaszać.
+
+     Okno domyślnie tygodniowe, bo lista ma pokazać, co postanowiono, odkąd
+     człowiek ostatnio patrzył. Historia magazynu należy do biura. */
+  app.get<{ Querystring: { dni?: string } }>("/api/problems/rozstrzygniete", async (req) => ({
+    problems: listRozstrzygniete(Number(req.query.dni) || 7),
+  }));
 
   app.post<{ Params: { id: string }; Body: { note?: string } }>(
     "/api/problems/:id/resolve",

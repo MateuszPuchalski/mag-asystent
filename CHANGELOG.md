@@ -34,6 +34,119 @@ historii nie przepisujemy.
 ---
 
 
+## 0.359.0 — 16 września 2026
+
+**Ten sam towar z kilku zwrotów to jedna linijka — i jest czym zmierzyć, czy
+to pomogło.** Dwie zmiany z jednej rozmowy o przyspieszeniu zwrotów. Pierwsza
+skraca pracę hali, druga mówi, gdzie ten czas naprawdę schodzi.
+
+**Sklejone linijki kosza.** Koszyk trzyma osobny wiersz na każdą pozycję
+zwrotu, bo tym wierszem wraca ślad na oś tamtego zwrotu. Na ekranie kolektora
+dawało to trzy razy ten sam symbol, trzy skany i trzy podejścia do tej samej
+półki. Na dokument MM te wiersze i tak wchodziły zsumowane, więc rozbicie żyło
+wyłącznie na ekranie (dekalog, punkt 3).
+
+- **Jedna pozycja z sumą sztuk** zamiast kilku identycznych. Sklejane są
+  wyłącznie wiersze nieodróżnialne: ten sam towar, stan, adres, powód
+  pominięcia i ta sama odpowiedź na „później".
+- **Linijka rusza się cała** — odłożenie, pominięcie, „później" i cofnięcie
+  biorą całe rodzeństwo. Ekran pokazujący trzy sztuki nie ma prawa zapisać
+  jednej.
+- **Ślad na osi zwrotu zostaje osobny.** Jedno odłożenie dopisuje zdanie
+  każdemu ze zwrotów — czeka na nie dwóch różnych klientów.
+- **Jedno zdarzenie na ruch człowieka**, z sumaryczną ilością. Trzy wpisy
+  w tej samej sekundzie zawyżałyby tempo w raporcie wydajności, a tam kierunek
+  błędu jest wybrany świadomie: zaniżamy.
+- **Zadanie zapisu adresu jest jedno** na cały ruch, więc cofnięcie anuluje
+  dokładnie ten zapis, który odłożenie zamówiło.
+
+**Raport cyklu zwrotu — `npm run zwroty:cykl`.** Rozmowa o przyspieszaniu
+zwrotów zaczęła się od zdania „rozkładanie jest wolne", a w kodzie praca hali
+była już ścięta do dwóch skanów na pozycję. Bez pomiaru następna zmiana byłaby
+znów zgadywaniem.
+
+- **Siedem odcinków życia kartonu**, z medianą i najdłuższym przypadkiem:
+  napełnianie, korekty, dokument, czekanie hali, rozkładanie, domknięcie
+  i cały cykl. Przy każdym stoi, czyja to praca.
+- **Zszywa koszyk „Z-7" z koszem „1209"** z jego dokumentu. Liczone osobno,
+  pierwszy nie ma ani jednego odłożenia, a drugi zamknięcia — odcinek między
+  nimi, czyli właśnie czekanie, nie istniałby w żadnym z nich.
+- **Działa wstecz i niczego nie zapisuje.** Wszystkie znaczniki są w bazie od
+  dawna: `kosz` wie, kiedy powstał i został zamknięty, a `sfera_queue` — kiedy
+  dokument wszedł do Subiekta.
+- **Mediana, nie średnia**, a próbka mniejsza niż pięć kartonów dostaje
+  gwiazdkę. Brak danych wypisuje się jako brak danych, nie jako zero.
+
+Nic nie trzeba ustawiać. Opis raportu i zdanie dla hali stoją w `DEPLOY.md`.
+
+## 0.358.0 — 16 września 2026
+
+**Ten sam brak, drugi kanał — i tym razem dane leciały po drucie od dawna.**
+Magazynier pomija pozycję w koszu z powodem („nie ma go w koszu"). Biuro sprawę
+zamyka i pisze, czym się skończyła: znaleziony, reklamowany, skorygowany.
+Serwer oddaje `zalatwioneAt`, `zalatwionePrzez` i `zalatwioneNotatka` przy
+KAŻDEJ pozycji kosza od 0.77.0.
+
+Kolektor tych pól nie deklarował w `KoszPozycja`, więc kotlinx po cichu je
+zjadał. Pominięcie zamknięte przez biuro wyglądało na ekranie hali dokładnie
+tak samo jak takie, którym nikt się nie zajął: czerwone „pominięta — powód",
+w nieskończoność.
+
+To jest gorszy gatunek błędu niż brakująca funkcja. Nic nie padło, nic nie
+świeciło na czerwono w CI, żaden test nie wiedział, że ma coś sprawdzić —
+pole po prostu znikało między serwerem a ekranem. Dwa nowe testy dekodują
+dosłowny kształt z serwera właśnie po to; to jedyna bramka, która łapie tę
+klasę usterek.
+
+Na ekranie: powód pominięcia po zamknięciu schodzi z czerwieni na szarość, bo
+czerwień znaczy „stoi i czeka", a zamknięta sprawa nie stoi. Pod nim staje
+zdanie biura z nazwiskiem. Nagłówek panelu pozycji mówi wprost „BIURO ZAMKNĘŁO
+SPRAWĘ" — odłożenie dalej działa, bo towar mógł się znaleźć, ale zaległością
+to już nie jest.
+
+Zero zmian po stronie serwera. Wdrożenie bez pracy ręcznej; wymaga nowego APK.
+
+---
+
+
+## 0.357.0 — 16 września 2026
+
+**Hala dowiaduje się, co biuro postanowiło z jej zgłoszeniem.** Magazynier
+zgłaszał niezgodność w dostawie ze zdjęciem, biuro ją zamykało i pisało powód
+w `resolved_note` — a kolektor pobierał wyłącznie `/api/problems/unresolved`.
+Zgłoszenie po prostu ZNIKAŁO z jego ekranu.
+
+Z punktu widzenia człowieka w alejce zniknięcie bez słowa wygląda identycznie
+jak zignorowanie. To uczy najprostszej rzeczy, jaką da się wyciągnąć z takiego
+systemu: nie zgłaszać.
+
+Nagłówek `ProblemsScreen.kt` mówi od 0.30.0: „zgłoszenie, którego nikt nigdy
+nie zobaczy, to ta sama niewiedza co przed wdrożeniem". Pilnował tego wyłącznie
+dla kierunku TAM. Ekran dostaje trzecią sekcję — ROZSTRZYGNIĘTE PRZEZ BIURO,
+okno tygodnia — bez przycisków, bo to nie praca do zrobienia, tylko odpowiedź
+do przeczytania.
+
+**Notatka biura stoi wyżej niż opis zgłoszenia**, odwrotnie niż w karcie
+otwartej. Magazynier zna własne zgłoszenie; przyszedł po odpowiedź, której nie
+zna. Zamknięcie bez notatki też wraca, własnym zdaniem: mówi mniej niż powód,
+ale nieporównanie więcej niż zniknięcie bez śladu.
+
+**Doszło `problem.resolved_by`.** Do 0.356.0 nazwisko zamykającego szło
+wyłącznie do księgi zdarzeń — co nie przeszkadzało, dopóki hala nie widziała
+rozstrzygnięcia w ogóle. Gdy zaczyna widzieć, „biuro zamknęło" bez nazwiska
+jest gorsze niż cisza: z pytaniem idzie się do człowieka, nie do tabeli. Stare
+wiersze zostają z NULL i ekran mówi o nich „Zamknęło biuro" — zgadywanie autora
+po dacie byłoby wymyślaniem nazwiska.
+
+Sekcja NIE podnosi licznika na pasku: rozstrzygnięte nie są zaległością.
+Dlatego osobne pobranie, a nie rozszerzenie `ProblemsRepository`, które ten
+licznik niesie na każdym ekranie.
+
+Wdrożenie bez pracy ręcznej.
+
+---
+
+
 ## 0.356.0 — 15 września 2026
 
 **Sześć komunikatów ekranu zwrotów kończy się ruchem, nie tłumaczeniem.**
@@ -339,51 +452,6 @@ tym, na którym z panelu wychodzą cudze pieniądze i cudze oświadczenia.
 
 **[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
 w KORZENIU repo, nie w `server/`.
-
-## 0.357.0 — 16 września 2026
-
-**Ten sam towar z kilku zwrotów to jedna linijka — i jest czym zmierzyć, czy
-to pomogło.** Dwie zmiany z jednej rozmowy o przyspieszeniu zwrotów. Pierwsza
-skraca pracę hali, druga mówi, gdzie ten czas naprawdę schodzi.
-
-**Sklejone linijki kosza.** Koszyk trzyma osobny wiersz na każdą pozycję
-zwrotu, bo tym wierszem wraca ślad na oś tamtego zwrotu. Na ekranie kolektora
-dawało to trzy razy ten sam symbol, trzy skany i trzy podejścia do tej samej
-półki. Na dokument MM te wiersze i tak wchodziły zsumowane, więc rozbicie żyło
-wyłącznie na ekranie (dekalog, punkt 3).
-
-- **Jedna pozycja z sumą sztuk** zamiast kilku identycznych. Sklejane są
-  wyłącznie wiersze nieodróżnialne: ten sam towar, stan, adres, powód
-  pominięcia i ta sama odpowiedź na „później".
-- **Linijka rusza się cała** — odłożenie, pominięcie, „później" i cofnięcie
-  biorą całe rodzeństwo. Ekran pokazujący trzy sztuki nie ma prawa zapisać
-  jednej.
-- **Ślad na osi zwrotu zostaje osobny.** Jedno odłożenie dopisuje zdanie
-  każdemu ze zwrotów — czeka na nie dwóch różnych klientów.
-- **Jedno zdarzenie na ruch człowieka**, z sumaryczną ilością. Trzy wpisy
-  w tej samej sekundzie zawyżałyby tempo w raporcie wydajności, a tam kierunek
-  błędu jest wybrany świadomie: zaniżamy.
-- **Zadanie zapisu adresu jest jedno** na cały ruch, więc cofnięcie anuluje
-  dokładnie ten zapis, który odłożenie zamówiło.
-
-**Raport cyklu zwrotu — `npm run zwroty:cykl`.** Rozmowa o przyspieszaniu
-zwrotów zaczęła się od zdania „rozkładanie jest wolne", a w kodzie praca hali
-była już ścięta do dwóch skanów na pozycję. Bez pomiaru następna zmiana byłaby
-znów zgadywaniem.
-
-- **Siedem odcinków życia kartonu**, z medianą i najdłuższym przypadkiem:
-  napełnianie, korekty, dokument, czekanie hali, rozkładanie, domknięcie
-  i cały cykl. Przy każdym stoi, czyja to praca.
-- **Zszywa koszyk „Z-7" z koszem „1209"** z jego dokumentu. Liczone osobno,
-  pierwszy nie ma ani jednego odłożenia, a drugi zamknięcia — odcinek między
-  nimi, czyli właśnie czekanie, nie istniałby w żadnym z nich.
-- **Działa wstecz i niczego nie zapisuje.** Wszystkie znaczniki są w bazie od
-  dawna: `kosz` wie, kiedy powstał i został zamknięty, a `sfera_queue` — kiedy
-  dokument wszedł do Subiekta.
-- **Mediana, nie średnia**, a próbka mniejsza niż pięć kartonów dostaje
-  gwiazdkę. Brak danych wypisuje się jako brak danych, nie jako zero.
-
-Nic nie trzeba ustawiać. Opis raportu i zdanie dla hali stoją w `DEPLOY.md`.
 
 ## 0.350.2 — 15 września 2026
 

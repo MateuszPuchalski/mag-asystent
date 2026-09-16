@@ -754,6 +754,10 @@ export function migrate(database: DatabaseSync) {
   /* 0.76.1 — instalacja z 0.75.0 ma tę tabelę bez snapshotu nazwy,
      a CREATE TABLE IF NOT EXISTS jej nie ruszy. */
   /* 0.77.0 — powód pominięcia pozycji kosza (status `skipped`). */
+  /* Kto zamknął wyjątek z dostawy (0.357.0). Stare wiersze zostają z NULL
+     i ekran hali mówi o nich „biuro" — zgadywanie autora po dacie byłoby
+     wymyślaniem nazwiska. */
+  addColumn("problem", "resolved_by", "TEXT");
   addColumn("kosz_pozycja", "powod", "TEXT");
   /* Kiedy pominięto — bez tego lista pominięć w biurze nie umie powiedzieć,
      która sprawa czeka najdłużej, a to jest jej cała treść. */

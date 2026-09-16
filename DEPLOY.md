@@ -1844,7 +1844,7 @@ z numerem MM, które taki koszyk wystawił. Skan etykiety „Z-” podpowie ten
 numer. Kosze „Z-” w toku zostają w biurze: czekają na korekty albo na MM,
 jak dotąd.
 
-**Ten sam towar z kilku zwrotów to jedna linijka (0.357.0).** Kolektor
+**Ten sam towar z kilku zwrotów to jedna linijka (0.359.0).** Kolektor
 pokazuje jedną pozycję z sumą sztuk i odkłada ją jednym ruchem. Nic nie trzeba
 ustawiać, ale powiedz hali dwie rzeczy:
 

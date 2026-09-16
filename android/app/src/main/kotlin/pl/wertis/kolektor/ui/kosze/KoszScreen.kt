@@ -569,10 +569,30 @@ private fun PozycjaRow(
                     Text(
                         "pominięta — ${p.powod ?: "bez powodu"}",
                         fontSize = 12.sp,
-                        color = Destructive,
+                        /* Czerwień znaczy „stoi i czeka". Po zamknięciu przez
+                           biuro sprawa nie stoi, więc powód schodzi na szarość:
+                           zostaje jako fakt z hali, przestaje być zaległością. */
+                        color = if (p.zalatwioneAt != null) InkMute else Destructive,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    /* ── ODPOWIEDŹ BIURA (0.358.0) ───────────────────────────
+                       Serwer oddawał ją od 0.77.0, a kolektor nie deklarował
+                       pól, więc kotlinx je zjadał. Pominięcie zamknięte
+                       wyglądało tu identycznie jak takie, którym nikt się nie
+                       zajął — a zgłoszenie bez widocznej odpowiedzi uczy
+                       jednego: nie zgłaszać. */
+                    p.zalatwioneAt?.let {
+                        Text(
+                            "biuro: ${p.zalatwioneNotatka?.takeIf { n -> n.isNotBlank() }
+                                ?: "zamknięte bez notatki"}"
+                                + (p.zalatwionePrzez?.let { kto -> " · $kto" } ?: ""),
+                            fontSize = 12.sp,
+                            color = Success,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             Column(horizontalAlignment = Alignment.End) {
@@ -684,6 +704,9 @@ private fun PanelPozycji(
     ) {
         Text(
             when {
+                /* Zamknięte przez biuro mówi to wprost: odłożenie dalej działa
+                   (towar mógł się znaleźć), ale sprawa nie wisi. */
+                pominieta && p.zalatwioneAt != null -> "POMINIĘTA · BIURO ZAMKNĘŁO SPRAWĘ"
                 pominieta -> "POMINIĘTA — ODŁOŻENIE COFNIE POMINIĘCIE"
                 done -> "ODŁOŻONA — MOŻESZ POPRAWIĆ ADRES ALBO COFNĄĆ"
                 else -> "ODŁÓŻ NA"

@@ -332,6 +332,8 @@ export interface ProblemView {
   createdBy: string | null;
   resolvedAt: string | null;
   resolvedNote: string | null;
+  /** Kto zamknął wyjątek; `null` dla zamkniętych przed 0.357.0. */
+  resolvedBy: string | null;
   /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
   docNumber: string | null;
   sym: string | null;
