@@ -1152,9 +1152,47 @@ data class ZadanieTerenowe(
     val utworzonoPrzez: String,
     val przypisanoPrzez: String? = null,
     val przypisanoUserId: Long? = null,
+    // Odesłanie do biura (0.352.0). Domyślne `null` jest tu ważniejsze niż
+    // zwykle: kolektor ze starszym APK dostaje te pola od nowego serwera
+    // i ma je zignorować, a nie wywrócić się na deserializacji.
+    val odeslanoPrzez: String? = null,
+    val powodKod: String? = null,
+    val powod: String? = null,
+    // Wiek zlecenia liczy SERWER (0.352.0). Kolektor ma własny zegar, który
+    // bywa przestawiony — „zlecone 4 dni temu" policzone na nim wyglądałoby
+    // na fakt, nie będąc nim. `null` przy zadaniu zamkniętym.
+    val zleconeOdMs: Long? = null,
+    // Zdjęcia od hali (§13.3, 0.352.0) — sama lista, bez treści plików.
+    val zalaczniki: List<ZalacznikZadania> = emptyList(),
     val wynik: String? = null,
     val wykonanoPrzez: String? = null,
 )
 @Serializable data class ZadaniaTerenoweResponse(val zadania: List<ZadanieTerenowe> = emptyList())
 @Serializable data class ZadanieTerenoweResponse(val zadanie: ZadanieTerenowe)
 @Serializable data class WynikZadaniaBody(val wynik: String)
+
+/**
+ * Odesłanie zadania do biura (0.352.0).
+ *
+ * `powod` jest opcjonalny, bo kod niesie już całą decyzję. Wymóg pisania
+ * stałby dokładnie tam, gdzie dekalog ergonomii każe go nie stawiać: kciuk
+ * w rękawicy, klawiatura ekranowa i człowiek stojący przed pustą półką.
+ */
+@Serializable data class ZalacznikZadania(
+    val id: Long,
+    val opis: String? = null,
+    val at: String,
+    val przez: String,
+)
+
+@Serializable data class OdeslijZadanieBody(val powodKod: String, val powod: String? = null)
+
+/**
+ * Zdjęcie do zadania terenowego (§13.3, 0.352.0).
+ *
+ * Kadr jedzie base64 w JSON, jak przy niezgodności w dostawie — kolektor
+ * koduje go do ~200 KB (`PhotoCapture.encode`), a trasa przyjmuje do 4 MiB
+ * ciała. Podpis nieobowiązkowy: kciuk w rękawicy ma zrobić zdjęcie, a nie
+ * opisać je zdaniem.
+ */
+@Serializable data class ZalacznikZadaniaBody(val fotoBase64: String, val opis: String? = null)

@@ -311,6 +311,35 @@ export const SIATKA_TRZECH_KOLUMN =
 export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
+/**
+ * Wiek po ludzku — „41 min", „2 g 36 min", „3 dni".
+ *
+ * Mieszkał w `skrzynka/AlarmSynchronizacji.tsx` od 0.152.0 i miał tam jednego
+ * odbiorcę. Od 0.352.0 ma dwóch: alarm i zegar zadań terenowych, gdzie zdanie
+ * „ile danych brakuje" zamienia się w „jak dawno biuro poprosiło".
+ *
+ * DOBA ROZBIJA SIĘ NA DNI (0.352.0). Do tego wydania funkcja kończyła się na
+ * godzinach, bo alarm synchronizacji liczy minuty i nikt nie dawał jej doby.
+ * Zadanie terenowe potrafi czekać tydzień, a „172 g 12 min" to liczba, którą
+ * czytelnik musi podzielić w głowie, żeby się przestraszyć. Poniżej doby nic
+ * się nie zmienia — alarm dostaje dokładnie to co dotąd.
+ *
+ * DNI LICZY `dniSlowo`, nie własny ternar (scalenie 0.352.0 z 0.353.0). Obie
+ * gałęzie dopisały do tego pliku odmianę tego samego słowa naraz: ta funkcja
+ * swoją, a wydanie o liczebniku — wspólną regułę niżej. Wynik był poprawny
+ * w obu miejscach, bo „dni" brzmi tak samo w obu formach mnogich, ale dwa
+ * zapisy jednej odmiany w JEDNYM pliku to już nie oszczędność, tylko rozjazd
+ * czekający na okazję.
+ */
+export function wiek(ms: number | null): string {
+  if (ms == null) return "—";
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return "poniżej minuty";
+  const g = Math.floor(min / 60);
+  if (g >= 24) return dniSlowo(Math.floor(g / 24));
+  return g ? `${g} g ${min % 60} min` : `${min} min`;
+}
+
 /** Sama godzina — „14:23". Tam, gdzie data jest oczywista z kontekstu. */
 export const godzina = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleTimeString("pl", { timeStyle: "short" }) : "—";

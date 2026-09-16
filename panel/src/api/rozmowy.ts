@@ -255,6 +255,37 @@ export function useZlecPomiar() {
   });
 }
 
+/**
+ * Dwie odpowiedzi biura na zadanie odesłane przez halę (0.352.0).
+ *
+ * `ponow` i `anuluj` — trzeciej nie ma i to jest celowe. Zadanie odesłane
+ * leży po stronie biura i musi z tej strony zejść, bo inaczej odesłanie
+ * zamieniłoby jedną ślepą uliczkę (`w_toku` na zawsze) w drugą.
+ *
+ * Instrukcja jedzie z ponowieniem, bo najczęstszą reakcją na „nie da się"
+ * jest przeformułowanie zlecenia. Osobne, nowe zadanie zerwałoby powiązanie
+ * z rozmową, a razem z nim wynik przestałby wracać na jej oś.
+ */
+export function usePonowZadanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; instrukcja?: string }) =>
+      api(`/api/zadania-terenowe/${v.id}/ponow`, {
+        method: "POST", body: JSON.stringify({ instrukcja: v.instrukcja }),
+      }),
+    onSettled: () => qc.invalidateQueries({ queryKey: klucze.zadania }),
+  });
+}
+
+export function useAnulujZadanie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api(`/api/zadania-terenowe/${v.id}/anuluj`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: klucze.zadania }),
+  });
+}
+
 export function useNoweZadanie() {
   const qc = useQueryClient();
   return useMutation({

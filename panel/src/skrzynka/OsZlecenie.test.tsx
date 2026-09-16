@@ -93,3 +93,52 @@ describe("Zlecenie dla hali na osi", () => {
     expect(screen.queryByRole("button", { name: /szkicu/i })).toBeNull();
   });
 });
+
+/* ── Odesłanie z hali na osi (0.352.0) ───────────────────────────────────────
+   Usterka złapana przy przeglądzie własnego diffu: `STAN_ZLECENIA` nie znało
+   piątego stanu, więc kafelek wypisywał surowy klucz „odeslane" w szarości,
+   a karta zostawała bursztynowa — czyli mówiła „hala pracuje" dokładnie
+   wtedy, gdy hala właśnie odmówiła.                                         */
+describe("Zlecenie odesłane przez halę", () => {
+  it("mówi po polsku, że hala odesłała — a nie wypisuje klucza z bazy", () => {
+    pokaz([zlecenie({ zlecenie: { ...zlecenie().zlecenie, status: "odeslane" } })]);
+    expect(screen.getByText("hala odesłała")).toBeInTheDocument();
+    expect(screen.queryByText("odeslane")).not.toBeInTheDocument();
+  });
+
+  it("nie udaje, że hala nad tym pracuje", () => {
+    /* Kryterium bursztynu jest jedno: czy zlecenie stoi w kolejce magazynu.
+       Odesłane nie stoi — ruch wrócił do biura. „Realizuje: Halina" przy
+       zadaniu, które Halina właśnie oddała, byłoby zdaniem nieprawdziwym. */
+    pokaz([zlecenie({ zlecenie: {
+      ...zlecenie().zlecenie, status: "odeslane", przypisanoPrzez: "Halina",
+    } })]);
+    expect(screen.queryByText(/realizuje: Halina/i)).not.toBeInTheDocument();
+  });
+
+  it("wpis odesłania NIE udaje wypowiedzi do klienta", () => {
+    /* Najgorszy możliwy wynik tej zmiany: `Os.tsx` rysuje nieznany rodzaj
+       w gałęzi domyślnej, czyli jak wiadomość w rozmowie. Notatka wewnętrzna
+       „brak towaru, półka pusta" wyglądałaby wtedy na zdanie wysłane
+       kupującemu. Pierwsza wersja 0.352.0 miała dokładnie tę usterkę. */
+    pokaz([{
+      id: "odeslanie-9", rodzaj: "odeslanie_zadania", autor: "Halina", odKlienta: false,
+      tresc: "brak towaru: Półka A01 pusta.", at: "2026-09-07T11:02:00Z",
+      ofertaId: null, zadanieId: 3,
+    }]);
+    expect(screen.getByText(/Hala odesłała/)).toBeInTheDocument();
+    /* Treść wewnętrzna nie ma drogi do szkicu odpowiedzi jednym kliknięciem —
+       inaczej niż wynik pomiaru, który jest odpowiedzią na pytanie klienta. */
+    expect(screen.queryByRole("button", { name: /szkicu/i })).not.toBeInTheDocument();
+  });
+
+  it("wpis odesłania niesie powód po polsku i autora z hali", () => {
+    pokaz([{
+      id: "odeslanie-9", rodzaj: "odeslanie_zadania", autor: "Halina", odKlienta: false,
+      tresc: "brak towaru: Półka A01 pusta.", at: "2026-09-07T11:02:00Z",
+      ofertaId: null, zadanieId: 3,
+    }]);
+    expect(screen.getByText(/brak towaru: Półka A01 pusta/)).toBeInTheDocument();
+    expect(screen.getByText(/Halina/)).toBeInTheDocument();
+  });
+});

@@ -255,7 +255,7 @@ export async function buildApp() {
       wersja: WERSJA,
       /* Wersja ZBUDOWANEGO panelu obsługi, obok wersji serwera i z tego samego
          powodu co ona: rozjazd jest pytaniem numer jeden po aktualizacji.
-         `null` znaczy „panelu tu nie ma albo jest sprzed 0.354.0" — to nie
+         `null` znaczy „panelu tu nie ma albo jest sprzed 0.355.0" — to nie
          jest to samo co rozjazd i nie robi wdrożenia czerwonym. */
       panelObslugi: wersjaPaneluObslugi(),
       /* Etykieta instancji (0.69.0). Trasa jest bez sesji i tak ma być:

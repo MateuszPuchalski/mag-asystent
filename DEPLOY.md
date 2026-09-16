@@ -225,12 +225,12 @@ buildzie. Nic nie wygląda na zepsute — wygląda na wydanie, które „nie dzi
 npm run build          # W KORZENIU repo, nie w server/
 ```
 
-**Od 0.354.0 nie trzeba o tym pamiętać.** Panel nosi w zbudowanym `index.html`
+**Od 0.355.0 nie trzeba o tym pamiętać.** Panel nosi w zbudowanym `index.html`
 pieczątkę `<meta name="wertis-panel">`, a `/api/health` porównuje ją z wersją
 serwera. Rozjazd ustawia `"ok":false` i dopisuje zdanie do `problemy`, więc
 łapie go także `Test-WertisHealth` z instalatora.
 
-Pieczątki nie ma w buildach sprzed 0.354.0. `"panelObslugi":null` znaczy więc
+Pieczątki nie ma w buildach sprzed 0.355.0. `"panelObslugi":null` znaczy więc
 „panel jest stary albo nie ma go tu wcale" — i **nie** jest zgłaszane jako
 problem, żeby nie robić czerwonym każdego środowiska deweloperskiego.
 

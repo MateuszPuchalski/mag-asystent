@@ -61,7 +61,7 @@ test("zasoby nie wychodzą poza katalog builda", async () => {
 
 test("pieczątkę czyta się z HTML-a, także po wstrzyknięciu skryptów przez Vite", async () => {
   const { wersjaZHtml } = await import("./panel-obslugi.js");
-  assert.equal(wersjaZHtml('<head><meta name="wertis-panel" content="0.354.0"/></head>'), "0.354.0");
+  assert.equal(wersjaZHtml('<head><meta name="wertis-panel" content="0.355.0"/></head>'), "0.355.0");
   /* Kolejność znaczników nie jest umową — plugin stempluje `post`, ale build
      Vite wstawia swoje skrypty obok i to się zmienia między wersjami. */
   assert.equal(wersjaZHtml(
@@ -77,19 +77,19 @@ test("brak pieczątki to nie jest wersja — build sprzed tego wydania jej nie m
 
 test("rozjazd wersji mówi, CO zrobić, i wskazuje właściwy katalog", async () => {
   const { problemZWersji } = await import("./panel-obslugi.js");
-  const zdanie = problemZWersji("0.352.0", "0.354.0");
+  const zdanie = problemZWersji("0.352.0", "0.355.0");
   assert.ok(zdanie, "rozjazd musi dać zdanie");
   /* Obie wersje w zdaniu, bo bez nich nie widać, która strona została z tyłu. */
   assert.match(zdanie, /0\.352\.0/);
-  assert.match(zdanie, /0\.354\.0/);
+  assert.match(zdanie, /0\.355\.0/);
   assert.match(zdanie, /KORZENIU/);
 });
 
 test("zgodne wersje i brak panelu MILCZĄ, bo żadne z nich nie jest usterką", async () => {
   const { problemZWersji } = await import("./panel-obslugi.js");
-  assert.equal(problemZWersji("0.354.0", "0.354.0"), null);
+  assert.equal(problemZWersji("0.355.0", "0.355.0"), null);
   /* `null` to instalacja bez panelu albo build sprzed pieczątki. Zdanie w tych
      przypadkach robiłoby czerwonym każdy `npm run dev` i każdą starą
      instalację — czyli uczyłoby ignorować listę problemów zdrowia. */
-  assert.equal(problemZWersji(null, "0.354.0"), null);
+  assert.equal(problemZWersji(null, "0.355.0"), null);
 });

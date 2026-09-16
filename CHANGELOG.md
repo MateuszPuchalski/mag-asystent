@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.355.0 — 15 września 2026
+## 0.356.0 — 15 września 2026
 
 **Sześć komunikatów ekranu zwrotów kończy się ruchem, nie tłumaczeniem.**
 Przegląd wszystkich zdań widocznych dla człowieka w `zwroty/`
@@ -60,9 +60,9 @@ końcówka, nie zdanie; a komunikat opisujący stan bez żadnego możliwego ruch
 („Allegro nie powiązało żadnej wiadomości") przerobiony na radę kłamałby.
 
 **[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
-w KORZENIU repo, nie w `server/`. Od 0.354.0 pilnuje tego `/api/health`.
+w KORZENIU repo, nie w `server/`. Od 0.355.0 pilnuje tego `/api/health`.
 
-## 0.354.0 — 15 września 2026
+## 0.355.0 — 15 września 2026
 
 **`/api/health` sam wykrywa panel zostawiony na starym buildzie.** To jest
 najcichsza pomyłka wdrożenia, jaką zna ta aplikacja: `npm run build`
@@ -85,7 +85,7 @@ jednego potwierdzenia, że dotarły na wdrożony ekran. Recepta na dwa polecenia
 istniała w `DEPLOY.md` i nie została uruchomiona ani razu — więc recepta była
 złym rozwiązaniem. Pyta o to teraz sama trasa.
 
-## 0.353.0 — 15 września 2026
+## 0.354.0 — 15 września 2026
 
 **Kolejka zwrotów odzyskuje ekran.** Na laptopie 1366×768 pokazywała DWA
 zwroty; pokazuje cztery. W oknie 950 px — sześć zamiast czterech.
@@ -123,7 +123,7 @@ osiemdziesięciu pikseli kupionych za rozpoznawalność. To decyzja właściciel
 **[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
 w KORZENIU repo, nie w `server/`.
 
-## 0.352.0 — 15 września 2026
+## 0.353.0 — 15 września 2026
 
 **Panel przestał pisać „5 pozycje" i „2 pasujących zwrotów".** Polszczyzna ma
 przy liczebniku trzy formy rzeczownika, a panel liczył dwie — w ośmiu
@@ -150,6 +150,162 @@ miejscach na czterech ekranach.
 
 **[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
 w KORZENIU repo, nie w `server/`.
+
+## 0.352.0 — 15 września 2026
+
+**Hala dostaje czym odpowiedzieć „nie da się".** Do 0.351.0 zadanie terenowe
+miało z magazynu JEDNO wyjście: wynik. Magazynier stojący przed pustą półką
+mógł więc tylko wpisać brak jako wynik — i zadanie szło do biura oznaczone
+jako WYKONANE — albo zostawić je w toku, gdzie nie widział go już nikt.
+Pierwsze kłamie w metryce „czas realizacji zadania magazynowego", drugie
+kłamie ciszą. Obie drogi kończyły się agentem czekającym na pomiar, którego
+nikt nie zamierzał zrobić.
+
+To nie jest nowy pomysł. Projekt panelu §13.3 wymienia „odrzuca z powodem",
+„oznacza brak towaru" i „oznacza brak możliwości wykonania" od pierwszej
+wersji tego dokumentu, a tabela stanu mówiła o zadaniach terenowych „działa
+od 0.141.0". Działała połowa: droga tam.
+
+### Odesłanie ma kod, nie wypracowanie
+
+Powód to WYBÓR Z DWÓCH — `brak_towaru` albo `nie_da_sie` — a dopisek jest
+nieobowiązkowy. Dwa kody, bo biuro reaguje na nie inaczej: przy braku towaru
+idzie do Subiekta albo do dostawcy, przy niemożliwości przeformułowuje
+zlecenie. Trzeci kod musiałby nazwać trzecią reakcję biura, a takiej nie ma —
+byłby wyłącznie kolejnym kaflem do przeczytania w rękawicy.
+
+Wymóg pisania stałby dokładnie tam, gdzie dekalog ergonomii każe go nie
+stawiać: klawiatura ekranowa nad pustą półką. Kod biuro rozstrzyga maszynowo,
+a szczegół dostaje wtedy, gdy hala ma go pod ręką.
+
+Na kolektorze ścieżka główna zostaje jednym dotknięciem. Oba wyjścia chowają
+się za jednym przyciskiem NIE MOGĘ, bo są wyjątkiem, nie regułą: cztery
+przyciski na płasko kosztowałyby uwagę przy każdym pomiarze, żeby oszczędzić
+jedno dotknięcie przy co dwudziestym.
+
+### Oddanie to nie odesłanie
+
+Osobna droga, bez werdyktu i bez powodu: zadanie wraca do puli i weźmie je
+ktokolwiek inny. Powstała, bo przejęcie przypinało zadanie do konta na zawsze.
+Magazynier, który wziął pomiar i skończył zmianę, zostawiał je poza zasięgiem
+kolektorów wszystkich pozostałych — a skasować mogło je wyłącznie biuro, o ile
+w ogóle zauważyło. Bez tej drogi „odeślij" stałoby się protezą oddania
+i zaśmieciło biuru skrzynkę powodami, które powodami nie są.
+
+### Zadanie odesłane leży po stronie biura i ma stamtąd wyjście
+
+Dwa, dokładnie: ponowienie albo anulowanie. Bez nich odesłanie byłoby nową
+ślepą uliczką, tyle że lepiej opisaną. Przy ponowieniu wolno poprawić
+instrukcję, bo najczęstszą reakcją na „nie da się" jest przeformułowanie
+zlecenia; zakładanie drugiego zadania zrywałoby powiązanie z rozmową, a razem
+z nim wynik przestałby wracać na jej oś.
+
+Ślad odesłania ZOSTAJE w księdze także po ponowieniu. Inaczej „ile razy hala
+odesłała ten sam pomiar" nie miałoby gdzie się policzyć — a to jest pytanie
+o jakość zleceń biura, nie o pracę hali.
+
+### Rozmowa przestaje czekać na pomiar, którego nie będzie
+
+Odesłanie wraca na oś rozmowy jako OSOBNY rodzaj wpisu i zdejmuje
+`waiting_for_internal`. Rozmowa czekała na halę; hala odpowiedziała. To, że
+odpowiedziała „nie mam czym", nie zmienia faktu, że czekanie się skończyło.
+Wpis nie udaje wyniku: agent ma zobaczyć, że pomiaru NIE MA, a nie pomiar
+brzmiący jak wymówka.
+
+### Nic już nie starzeje się po cichu
+
+Karta zadania mówiła, KIEDY je zlecono — „15.09.2026, 08:00". Odjęcie zostawało
+czytelnikowi, a kartę ogląda się między jedną rozmową a drugą, więc zadanie
+sprzed trzech dni wyglądało dokładnie tak samo jak sprzed trzech minut. Lista
+jest posortowana od najstarszych i ten porządek był niewidoczny.
+
+Oba ekrany pokazują teraz WIEK ZLECENIA. Liczy go serwer, nie ekran: kolektor
+ma własny zegar, który bywa przestawiony, a „zlecone 4 dni temu" policzone na
+takim zegarze wyglądałoby na fakt, nie będąc nim. Ta sama decyzja co przy
+`czekaOdMs` w kolejce rozmów.
+
+Zegar nazywa się **„zlecone ... temu", nie „czeka"**. Blizna 0.251.0 mówi, że
+zegar nazwany „czeka" musi być prawdziwy, a przy zadaniu w toku nikt nie czeka
+— ktoś je właśnie robi. Wiek zlecenia odpowiada na inne pytanie i jest
+prawdziwy w każdym otwartym stanie. Zadanie zamknięte milczy: „zlecone 9 dni
+temu" przy wyniku sprzed tygodnia mierzyłoby wiek historii, nie zaległość.
+
+**Bez progu „za późno".** Kusiło, żeby stare zlecenie zapalić na czerwono, ale
+żadna liczba godzin nie jest tu ustaleniem właściciela — §22 wymienia „czas
+realizacji zadania magazynowego" jako metrykę i nie podaje terminu.
+Wyróżniony jest sam wiek, przy każdym zadaniu: to fakt. Termin byłby
+werdyktem, którego nikt nie wydał.
+
+Funkcja `wiek()` przeniosła się z alarmu synchronizacji do wspólnego `ui` i po
+raz pierwszy rozbija dobę na dni. Poniżej doby nic się nie zmienia — alarm
+dostaje dokładnie to, co dotąd.
+
+### Hala odpowiada zdjęciem, nie tylko zdaniem
+
+Trzeci punkt §13.3, ostatni nieoddany: „robi zdjęcie". Są pytania, na które
+tekst nie odpowiada — „czy to ta sama wtyczka", „co jest na tabliczce", „jak
+wygląda pęknięcie". Agent przepisywał wtedy opis ze słów magazyniera i wysyłał
+go kupującemu jako WŁASNE ustalenie, a przy sporze nie miał się o co oprzeć.
+
+**Tabela, nie kolumna.** Zadanie żyje dłużej niż jedna odpowiedź: odsyłane ze
+zdjęciem pustej półki, ponawiane przez biuro, a druga próba kończy się pomiarem
+i zdjęciem suwmiarki. Jedno pole kasowałoby pierwszy dowód przy drugim. Nazwa
+`zadanie_zalacznik` jest z projektu właściciela — figurowała w spisie tabel,
+choć w schemacie jej nie było.
+
+Plik leży w `data/photos`, obok zdjęć niezgodności w dostawie, i idzie tą samą
+drogą: magazyn zdjęć wyprowadził się z `problems.ts` do `services/foto.ts`,
+bo dostał drugiego odbiorcę. Druga kopia `photoDir()` rozjechałaby się po
+pierwszej literówce, a objawem byłby katalog, w którym nie ma połowy dowodów.
+
+**Limit okazał się jeden, nie dwa — i to jest poprawka do własnego
+komentarza.** Pierwsza wersja twierdziła, że 4 MiB ciała na trasie i 3 MB
+w serwisie to „dwa różne progi". Próba na żywym serwerze pokazała co innego:
+4 MiB JSON-a po odjęciu narzutu base64 to dokładnie ~3 MB obrazu, więc
+zdjęcie 3,5 MB odpada na trasie kodem 413 i do serwisu nigdy nie dociera.
+
+Sprawdzenie w serwisie zostaje, bo pilnuje UMOWY SERWISU, nie tej jednej
+trasy — `bodyLimit` obowiązuje wyłącznie tam. Żeby nie było nie do
+odróżnienia od martwego kodu, ma własny test wołający funkcję wprost,
+z pominięciem HTTP.
+
+W panelu zdjęcie jest **piątym źródłem obrazów** i wchodzi do wspólnej kolejki
+pobierania, a nie obok niej. Nagłówek `useZdjecie.ts` liczy, ile razy ta blizna
+już kosztowała: trasa stoi za sesją, więc `<img src>` dostaje 401 i rysuje
+ikonę zepsutego obrazu. Kupiona trzy razy w tym froncie — czwarty byłby
+świadomy.
+
+### Cztery usterki złapane przy przeglądzie własnego kodu
+
+Warto je wymienić, bo każda przeżyłaby testy pierwszej wersji.
+
+Oś rozmowy czytała odesłanie ze STANU zadania, a stan po ponowieniu wraca na
+`nowe` — więc ponowienie kasowało odesłanie z historii rozmowy. Czyta teraz
+z księgi zdarzeń, jak zmiany statusu i sprawy. Oś jest historią, nie stanem.
+
+Ponowienie nie przywracało `waiting_for_internal`. Odesłanie zdejmowało ten
+status słusznie, ale po ponowieniu rozmowa wyglądała na taką, w której ruch
+należy do agenta — a agent nie miał czym odpisać, bo znowu czekał na pomiar.
+
+Kafelek stanu na osi nie znał piątej wartości: wypisywał surowy klucz
+`odeslane` w szarości, a karta zostawała bursztynowa, czyli mówiła „hala
+pracuje" dokładnie wtedy, gdy hala odmówiła.
+
+Najgorsza z czterech: panel nie znał rodzaju wpisu `odeslanie_zadania`, a oś
+rysuje nieznany rodzaj w gałęzi domyślnej — jak wypowiedź w rozmowie. Notatka
+wewnętrzna „brak towaru, półka pusta" wyglądałaby na zdanie wysłane
+kupującemu. Wszystkie cztery mają teraz własne testy.
+
+### Przy wdrożeniu
+
+Migracja przebudowuje `zadanie_terenowe`, bo SQLite nie poszerza `CHECK`-a
+w miejscu — ta sama droga co przy `towar_identyfikator`. Zadania sprzed
+wydania przechodzą z wynikiem, powiązaniem z towarem i rozmową; test
+migracji dowodzi obu rzeczy naraz, bo najpierw pokazuje, że stara baza
+faktycznie odrzuca nowy status.
+
+Stary APK od nowego serwera dostaje trzy nieznane pola i ma je ignorować —
+`Dtos.kt` deklaruje je z wartością domyślną. Wdrożenie bez pracy ręcznej.
 
 ## 0.351.0 — 15 września 2026
 

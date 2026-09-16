@@ -407,6 +407,17 @@ interface ApiService {
     @POST("api/zadania-terenowe/{id}/wykonaj")
     suspend fun zadanieTerenoweWykonaj(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.WynikZadaniaBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
 
+    @POST("api/zadania-terenowe/{id}/zalacznik")
+    suspend fun zadanieTerenoweZalacznik(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.ZalacznikZadaniaBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
+    @POST("api/zadania-terenowe/{id}/odeslij")
+    suspend fun zadanieTerenoweOdeslij(@Path("id") id: Long, @Body body: pl.wertis.kolektor.core.net.OdeslijZadanieBody): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
+    /* Oddanie idzie BEZ CIAŁA, więc z `EMPTY_BODY` — żądanie bez treści nie ma
+       prawa deklarować typu treści (ta sama reguła co przy `wez`). */
+    @POST("api/zadania-terenowe/{id}/oddaj")
+    suspend fun zadanieTerenoweOddaj(@Path("id") id: Long, @Body body: RequestBody = EMPTY_BODY): pl.wertis.kolektor.core.net.ZadanieTerenoweResponse
+
     @GET("api/magazyny")
     suspend fun listMagazyny(): MagazynyResponse
 

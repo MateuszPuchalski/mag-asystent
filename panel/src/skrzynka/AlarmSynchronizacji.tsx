@@ -1,17 +1,15 @@
 import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import type { Zdrowie } from "../api/typy";
-import { Przycisk, czas } from "../ui";
+import { Przycisk, czas, wiek } from "../ui";
 
 /* Wiek danych po ludzku. „2 g 36 min" mówi agentowi to, czego nie mówi
-   znacznik czasu: ile pytań mogło przyjść, a on ich nie widzi. */
-export function wiek(ms: number | null): string {
-  if (ms == null) return "—";
-  const min = Math.floor(ms / 60_000);
-  if (min < 1) return "poniżej minuty";
-  const g = Math.floor(min / 60);
-  return g ? `${g} g ${min % 60} min` : `${min} min`;
-}
+   znacznik czasu: ile pytań mogło przyjść, a on ich nie widzi.
+
+   Sama funkcja przeniosła się do `ui` w 0.352.0, bo dostała drugiego odbiorcę
+   (zegar zadań terenowych). Re-eksport zostaje, bo to TU jej się szuka —
+   alarm był jej jedynym domem przez dwieście wydań. */
+export { wiek };
 
 const POWOD: Record<string, string> = {
   rate_limited: "Allegro odpowiada 429 i prosi o przerwę.",
