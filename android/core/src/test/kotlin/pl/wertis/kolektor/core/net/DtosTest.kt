@@ -483,4 +483,36 @@ class DtosTest {
         assertNull(p.zalatwioneNotatka)
         assertNull(p.zalatwionePrzez)
     }
+
+    /* ── Decyzja biura o kolizji kodu (0.359.0) ──────────────────────────────
+       Ten sam gatunek co przy `KoszPozycja` wyżej: pole leci po drucie i albo
+       dociera, albo ginie w milczeniu. Tu doszło razem z serwerem, więc test
+       pilnuje przede wszystkim STARSZEGO serwera — kolektor musi zdekodować
+       kartę bez tych pól, bo APK wyprzedza czasem wdrożenie serwera.        */
+    @Test fun `EanConflictRow - decyzja biura i nieudana poprawka`() {
+        val json = """
+            {"ean":"5907654321098","hits":4,"autoResolved":1,"twIds":[900001,900002],
+             "towary":[],"lastSeen":"2026-09-16T07:00:00.000Z",
+             "rozstrzygniecie":{"rodzaj":"poprawione","notatka":"Zdjęty kod z kartoteki 900002.",
+               "at":"2026-09-15T12:00:00.000Z","przez":"A. Lewandowska"},
+             "trafienPoDecyzji":2}
+        """.trimIndent()
+        val r = WertisJson.decodeFromString<EanConflictRow>(json)
+        assertEquals("poprawione", r.rozstrzygniecie?.rodzaj)
+        assertEquals("A. Lewandowska", r.rozstrzygniecie?.przez)
+        // Dwa trafienia PO obiecanej poprawce — ekran ma to pokazać na czerwono
+        // i nie jest to ocena, tylko liczba.
+        assertEquals(2, r.trafienPoDecyzji)
+    }
+
+    @Test fun `EanConflictRow - starszy serwer nie zna decyzji, karta i tak wchodzi`() {
+        val json = """
+            {"ean":"5901234567890","hits":1,"autoResolved":0,"twIds":[900001],"lastSeen":"x"}
+        """.trimIndent()
+        val r = WertisJson.decodeFromString<EanConflictRow>(json)
+        assertNull(r.rozstrzygniecie)
+        // Brak decyzji i brak pola to dla hali TA SAMA sytuacja: nikt nie
+        // odpowiedział. Zero jest tu poprawną wartością, nie brakiem danych.
+        assertEquals(0, r.trafienPoDecyzji)
+    }
 }

@@ -34,6 +34,65 @@ historii nie przepisujemy.
 ---
 
 
+## 0.359.0 — 16 września 2026
+
+**Kolizja kodu przestaje być dziennikiem bez wyjścia.** `ean_conflict` zapisuje
+każde spotkanie tego samego kodu na kilku kartotekach od 0.37.0 i do 0.358.0
+nie miał ANI JEDNEJ kolumny mówiącej, czy ktokolwiek się tym zajął. Kolizja
+wpadała na listę i zostawała tam na zawsze, w tej samej postaci co pierwszego
+dnia.
+
+Najgorsze było to, że **obie strony patrzyły na tę samą listę**: biuro
+w `/biuro`, hala na ekranie wyjątków kolektora. Obie widziały problem i żadna
+nie mogła drugiej nic powiedzieć.
+
+### Dwa rodzaje, bo hala reaguje na nie ODWROTNIE
+
+`poprawione` znaczy „kartoteki naprawione, kolizja zniknie". `dopuszczone`
+znaczy „ten kod stoi na kilku kartotekach zgodnie z prawdą — zestaw i sztuka
+luzem — wybieraj po symbolu i nie zgłaszaj drugi raz". Trzeci rodzaj musiałby
+nazwać trzecią reakcję hali, a takiej nie ma.
+
+### Nieudana poprawka ujawnia się sama
+
+To jest sedno tej wersji. Serwer liczy trafienia PO decyzji, więc kolizja
+oznaczona jako `poprawione`, która zatrzymała kogoś jeszcze raz, **sama mówi,
+że poprawka nie zadziałała** — bez niczyjej oceny i bez pamiętania, żeby
+sprawdzić. Przy `dopuszczone` te same trafienia nie znaczą nic złego, bo tam
+mają wracać.
+
+Na kolektorze tylko ten jeden stan świeci na czerwono: to jedyny, w którym
+hala ma coś zrobić — powiedzieć biuru, że nie zadziałało.
+
+### Osobna tabela, nie kolumna w dzienniku
+
+`ean_conflict` to jeden wiersz na TRAFIENIE, raport agreguje je po kodzie.
+`resolved_at` na dzienniku kazałby pisać tę samą decyzję na dwudziestu
+wierszach i nie odpowiadałby na pytanie, co zrobić z trafieniem dwudziestym
+pierwszym. Decyzja dotyczy kodu, więc `ean_rozstrzygniecie` ma klucz na kodzie,
+a druga decyzja nadpisuje pierwszą: pytanie brzmi „co z tym kodem jest TERAZ",
+nie „co kiedykolwiek o nim myślano". Obie zostają w księdze zdarzeń.
+
+### Remis milisekundy złapany po raz drugi w tej samej sesji
+
+Pierwsza wersja liczyła „po decyzji" porównaniem `seen_at > at`. Oba znaczniki
+mają rozdzielczość milisekundy, więc trafienie zapisane w tej samej milisekundzie
+co decyzja wpadało po złej stronie — i padało to raz na kilka przebiegów całego
+zestawu testów, czyli najgorszym możliwym sposobem.
+
+To dokładnie ta blizna, którą 0.352.0 wyjęło z raportu skuteczności doboru,
+popełniona w nowym kodzie tego samego dnia. Lekarstwo też to samo: granicą jest
+`id` ostatniego trafienia znanego w chwili decyzji, bo `AUTOINCREMENT` jest
+jedynym ściśle rosnącym porządkiem w dzienniku. Test WYMUSZA remis, zamiast na
+niego czekać.
+
+Licznik umowy zapisów panelu biura: 17 → 18.
+
+Wdrożenie bez pracy ręcznej; wymaga nowego APK, żeby hala zobaczyła decyzje.
+
+---
+
+
 ## 0.358.0 — 16 września 2026
 
 **Ten sam brak, drugi kanał — i tym razem dane leciały po drucie od dawna.**

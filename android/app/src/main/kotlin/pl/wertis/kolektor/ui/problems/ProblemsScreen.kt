@@ -275,6 +275,33 @@ private fun ConflictCard(graph: AppGraph, row: EanConflictRow) {
             fontWeight = FontWeight.SemiBold,
             color = AmberInk,
         )
+        /* ── DECYZJA BIURA (0.359.0) ─────────────────────────────────────
+           Do 0.358.0 ta karta mówiła wyłącznie, ILE razy kod kogoś zatrzymał.
+           Biuro patrzyło na tę samą listę w `/biuro` i też nie mogło nic
+           powiedzieć — dziennik bez wyjścia z obu stron.
+
+           Dwa rodzaje znaczą dla hali coś PRZECIWNEGO, więc muszą wyglądać
+           inaczej: `dopuszczone` to koniec sprawy (wybieraj po symbolu, nie
+           zgłaszaj drugi raz), `poprawione` to obietnica, którą kolejne
+           trafienie podważa. */
+        row.rozstrzygniecie?.let { r ->
+            val nieudana = r.rodzaj == "poprawione" && row.trafienPoDecyzji > 0
+            Text(
+                when {
+                    nieudana -> "BIURO: POPRAWIONE — ale kod zatrzymał jeszcze ${row.trafienPoDecyzji}×"
+                    r.rodzaj == "poprawione" -> "BIURO: POPRAWIONE — kolizja ma zniknąć"
+                    else -> "BIURO: DOPUSZCZONE — wybierz po symbolu, nie zgłaszaj ponownie"
+                },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                // Czerwień TYLKO przy nieudanej poprawce: to jedyny stan, w
+                // którym hala ma coś zrobić — powiedzieć biuru, że nie zadziałało.
+                color = if (nieudana) Destructive else Success,
+            )
+            r.notatka?.takeIf { it.isNotBlank() }?.let { nota ->
+                Text("$nota · ${r.przez}", fontSize = 11.5.sp, color = InkSoft)
+            }
+        }
         /* Kartoteki po ludzku: symbol i nazwa, nie surowe tw_Id — z gołego
            identyfikatora nie da się rozpoznać, o które towary chodzi.
            Starszy serwer nie wysyła `towary` — wtedy zostaje dawna linia. */

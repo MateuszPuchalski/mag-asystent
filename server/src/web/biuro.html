@@ -3279,6 +3279,35 @@ function rysujKolejke(q) {
    odmówi w trakcie zapisu). Operacje ratunkowe serwera za groźnym
    potwierdzeniem: pełny resync na produkcji to import całej kartoteki. */
 $("widokNadzor").addEventListener("click", async (e) => {
+  /* Delegacja stoi na WIDOKU, nie na tabeli kolizji — ta sama reguła co przy
+     kolejce Sfery obok, i ta sama, której pilnuje test delegacji. Tabela
+     przerysowuje się w całości przy każdym odświeżeniu, więc nasłuch wpięty
+     w nią ginąłby po pierwszym odczycie. */
+  const kolizja = e.target.closest("[data-kolizja]");
+  if (kolizja) {
+    const ean = kolizja.dataset.ean;
+    const rodzaj = kolizja.dataset.kolizja;
+    const notatka = await zapytaj({
+      tytul: rodzaj === "poprawione" ? "KOD POPRAWIONY" : "KOLIZJA DOPUSZCZONA",
+      /* Opis mówi HALI, co z tego wynika, bo to ona zobaczy skutek na ekranie
+         wyjątków. Biuro klika, ale odbiorcą decyzji jest magazynier. */
+      opis: rodzaj === "poprawione"
+        ? "Kartoteki naprawione — kolizja ma zniknąć. Kolejne trafienie pokaże się jako nieudana poprawka."
+        : "Ten kod stoi na kilku kartotekach zgodnie z prawdą. Hala ma wybierać po symbolu i nie zgłaszać go drugi raz.",
+      potwierdz: rodzaj === "poprawione" ? "ZAPISZ POPRAWIONE" : "ZAPISZ DOPUSZCZONE",
+    });
+    if (notatka === null) return;
+    try {
+      await api(`/api/ean-conflicts/${encodeURIComponent(ean)}/rozstrzygnij`, {
+        method: "POST",
+        body: JSON.stringify({ rodzaj, notatka: notatka || undefined }),
+      });
+      await odswiezNadzor();
+    } catch (err) {
+      alert(err.message || "Nie udało się zapisać decyzji");
+    }
+    return;
+  }
   const ponow = e.target.closest("[data-kolejka-ponow]");
   const anuluj = e.target.closest("[data-kolejka-anuluj]");
   if (ponow || anuluj) {
@@ -3461,17 +3490,54 @@ function csvRozjazdow(r) {
 }
 
 /* ── Kolizje kodów ── */
+/* ── DECYZJA BIURA O KODZIE (0.359.0) ───────────────────────────────────────
+   Do 0.358.0 ta tabela była dziennikiem bez wyjścia: kolizja wpadała na listę
+   i zostawała na zawsze w tej samej postaci co pierwszego dnia. Hala patrzyła
+   na TĘ SAMĄ listę na ekranie wyjątków i też nie mogła nic zrobić — obie
+   strony widziały problem, żadna nie mogła drugiej nic powiedzieć.
+
+   Dwa rodzaje, bo hala reaguje na nie ODWROTNIE. `poprawione` znaczy „kolizja
+   zniknie", więc kolejne trafienie jest dowodem, że poprawka nie zadziałała.
+   `dopuszczone` znaczy „zostanie i ma zostać" — wybieraj po symbolu i nie
+   zgłaszaj drugi raz. Serwer liczy trafienia PO decyzji, więc nieudana
+   poprawka ujawnia się sama, bez niczyjej oceny. */
+function decyzjaKolizji(k) {
+  const r = k.rozstrzygniecie;
+  if (!r) return '<span class="mute">—</span>';
+  /* Ten sam format znacznika co reszta tej tabeli — inaczej jedna kolumna
+     pokazywałaby czas inaczej niż sąsiednia i to wyglądałoby na usterkę. */
+  const kiedy = esc((r.at || "").replace("T", " ").slice(0, 16));
+  const kto = esc(r.przez || "biuro");
+  const nota = r.notatka ? `<div class="mute">${esc(r.notatka)}</div>` : "";
+  /* Trafienia po obiecanej poprawce to jedyny sygnał BŁĘDU w tej tabeli —
+     i nie jest opinią, tylko liczbą. Przy `dopuszczone` te same trafienia
+     nie znaczą nic złego, więc tam nie zapala się nic. */
+  const wraca = r.rodzaj === "poprawione" && k.trafienPoDecyzji > 0
+    ? `<div class="badge err">POPRAWKA NIE ZADZIAŁAŁA — ${k.trafienPoDecyzji}× po decyzji</div>`
+    : "";
+  return `<b>${r.rodzaj === "poprawione" ? "POPRAWIONE" : "DOPUSZCZONE"}</b>
+    <div class="mute">${kto} · ${kiedy}</div>${nota}${wraca}`;
+}
+
 function rysujKolizje(lista) {
   $("kolizje").innerHTML =
-    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th></tr>" +
+    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th><th>DECYZJA BIURA</th></tr>" +
     (lista.map((k) => `<tr>
         <td class="b">${esc(k.ean)}</td>
         <td>${k.hits}×</td>
         <td class="mute">${k.autoResolved}×</td>
         <td class="mute">${esc((k.twIds || []).join(", "))}</td>
         <td class="mute">${esc((k.lastSeen || "").replace("T", " ").slice(0, 16))}</td>
+        <td>${decyzjaKolizji(k)}
+          <div style="margin-top:4px">
+            <button class="akcja cichy" data-kolizja="poprawione" data-ean="${esc(k.ean)}"
+              style="font-size:11px;padding:3px 8px">POPRAWIONE</button>
+            <button class="akcja cichy" data-kolizja="dopuszczone" data-ean="${esc(k.ean)}"
+              style="font-size:11px;padding:3px 8px">DOPUSZCZONE</button>
+          </div>
+        </td>
       </tr>`).join("") ||
-      '<tr><td colspan="5" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
+      '<tr><td colspan="6" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
 }
 
 /* Znaczniki z API są w UTC — do pokazania trzeba czasu lokalnego przeglądarki.

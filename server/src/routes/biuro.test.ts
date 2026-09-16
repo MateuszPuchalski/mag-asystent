@@ -174,7 +174,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    17,
+    18,
     "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
       "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
       "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
@@ -198,6 +198,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "a MM z takiej pozycji nie powstanie — składniki leżą na magazynie " +
       "osobno. Przycisk stoi WYŁĄCZNIE przy koszu bez dokumentu i wymaga " +
       "kliknięcia; wejście na ekran nadal nic nie przelicza.\n\n" +
+      "Zapis osiemnasty przyszedł z 0.359.0: DECYZJA O KOLIZJI KODU. " +
+      "`ean_conflict` był do 0.358.0 dziennikiem bez wyjścia — kolizja " +
+      "wpadała na listę i zostawała tam na zawsze w tej samej postaci co " +
+      "pierwszego dnia. Obie strony patrzyły na TĘ SAMĄ listę (biuro tutaj, " +
+      "hala na ekranie wyjątków kolektora) i żadna nie mogła drugiej nic " +
+      "powiedzieć. Zapis wymaga kliknięcia POPRAWIONE albo DOPUSZCZONE oraz " +
+      "przejścia przez dialog — samo otwarcie karty nadzoru nadal nie " +
+      "zapisuje niczego, a odczyt kolizji jest i zostaje GET-em.\n\n" +
       "Reguła się NIE zmienia: liczba rośnie wyłącznie ŚWIADOMIE, a żaden " +
       "zapis nie dzieje się przy samym patrzeniu na ekran."
   );

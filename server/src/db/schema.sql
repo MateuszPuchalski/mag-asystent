@@ -1201,6 +1201,38 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 
+-- ── Co biuro postanowiło z kolizją (0.359.0) ──────────────────────────────
+-- `ean_conflict` to DZIENNIK TRAFIEŃ: jeden wiersz na każde spotkanie kodu
+-- w alejce, raport agreguje je po kodzie. Rozstrzygnięcie dotyczy KODU, nie
+-- pojedynczego trafienia — kolumna `resolved_at` na dzienniku kazałaby pisać
+-- tę samą decyzję na dwudziestu wierszach i nie odpowiadałaby na pytanie, co
+-- zrobić z trafieniem dwudziestym pierwszym. Stąd osobna tabela, klucz na kod.
+--
+-- DWA RODZAJE, bo hala reaguje na nie odwrotnie:
+--   `poprawione`  — biuro naprawiło kartoteki w Subiekcie. Kolizja ma zniknąć,
+--                   więc KOLEJNE trafienie znaczy, że poprawka nie zadziałała
+--                   i trzeba powiedzieć o tym biuru.
+--   `dopuszczone` — ten kod stoi na kilku kartotekach zgodnie z prawdą
+--                   (zestaw i sztuka luzem). Trafienia będą wracać i to jest
+--                   w porządku: wybierz po symbolu i nie zgłaszaj drugi raz.
+-- Trzeci rodzaj musiałby nazwać trzecią reakcję hali, a takiej nie ma.
+CREATE TABLE IF NOT EXISTS ean_rozstrzygniecie (
+  ean           TEXT PRIMARY KEY,
+  rodzaj        TEXT NOT NULL CHECK (rodzaj IN ('poprawione','dopuszczone')),
+  notatka       TEXT,
+  at            TEXT NOT NULL,
+  przez         TEXT NOT NULL,
+  przez_user_id INTEGER REFERENCES app_user(user_id),
+  -- OSTATNIE TRAFIENIE ZNANE W CHWILI DECYZJI — i to nie jest ozdoba obok
+  -- `at`. „Po decyzji" liczone po samym znaczniku nie rozstrzyga remisu:
+  -- `seen_at` i `at` mają rozdzielczość milisekundy, a decyzja zapisana w tej
+  -- samej milisekundzie co trafienie nie umie powiedzieć, które było
+  -- pierwsze. Ta sama pułapka, którą 0.352.0 wyjęło z raportu skuteczności
+  -- doboru, i to samo lekarstwo: remis rozstrzyga `id`, bo jest
+  -- AUTOINCREMENT-em, czyli jedynym ściśle rosnącym porządkiem w dzienniku.
+  po_trafieniu_id INTEGER NOT NULL DEFAULT 0
+);
+
 -- ── Kody kreskowe nadane w WERTIS (0.37.0) ────────────────────────────────
 -- Magazynier trzyma karton, na kartonie jest kod, a kartoteka go nie ma — do
 -- 0.37.0 jedynym wyjściem było „zapamiętaj i powiedz biuru", czyli nic.

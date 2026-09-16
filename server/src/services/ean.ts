@@ -1,4 +1,5 @@
 import { db } from "../db/db.js";
+import { logEvent } from "./events.js";
 
 /* ── Rejestr kolizji kodów kreskowych (§4.5) ──────────────────────────────────
    Ten sam EAN na kilku kartotekach zatrzymuje pracę w alejce (D7). Zamiast
@@ -27,6 +28,66 @@ export interface KolizjaTowar {
   name: string;
 }
 
+/**
+ * Co biuro postanowiło z kodem (0.359.0).
+ *
+ * DWA RODZAJE, bo hala reaguje na nie odwrotnie — patrz `schema.sql`.
+ * `poprawione` obiecuje, że kolizja zniknie; `dopuszczone` mówi, że zostanie
+ * i ma zostać.
+ */
+export const RODZAJE_ROZSTRZYGNIECIA = ["poprawione", "dopuszczone"] as const;
+export type RodzajRozstrzygniecia = (typeof RODZAJE_ROZSTRZYGNIECIA)[number];
+
+export interface RozstrzygniecieKolizji {
+  rodzaj: RodzajRozstrzygniecia;
+  notatka: string | null;
+  at: string;
+  przez: string;
+}
+
+/**
+ * Biuro zamyka sprawę kodu. Ponowne wywołanie NADPISUJE poprzednią decyzję.
+ *
+ * Nadpisanie, a nie druga decyzja obok: pytanie brzmi „co z tym kodem jest
+ * teraz", a nie „co kiedykolwiek o nim myślano". Historia zostaje w księdze
+ * zdarzeń, gdzie zresztą jest jej miejsce — i tam widać, że `poprawione`
+ * zamieniono później na `dopuszczone`, bo poprawka nie zadziałała.
+ */
+export function rozstrzygnijKolizje(
+  ean: string,
+  rodzaj: RodzajRozstrzygniecia,
+  notatka: string | undefined,
+  autor: { id: number; name: string },
+): { ok: true } | { error: string } {
+  const kod = ean.trim();
+  if (!kod) return { error: "Podaj kod kreskowy" };
+  if (!RODZAJE_ROZSTRZYGNIECIA.includes(rodzaj)) {
+    return { error: "Rozstrzygnięcie to `poprawione` albo `dopuszczone`" };
+  }
+  const tresc = notatka?.trim() || null;
+  if (tresc && tresc.length > 500) return { error: "Notatka może mieć najwyżej 500 znaków" };
+  /* Kolizji, której nigdy nie było, nie ma co rozstrzygać — inaczej lista
+     zapełniłaby się decyzjami o kodach, których hala nigdy nie spotkała. */
+  const widziany = db().prepare("SELECT 1 FROM ean_conflict WHERE ean=? LIMIT 1").get(kod);
+  if (!widziany) return { error: "Ten kod nie zatrzymał jeszcze nikogo w alejce" };
+
+  /* Granicą jest OSTATNIE TRAFIENIE, nie chwila zapisu. Po samym znaczniku
+     trafienie z tej samej milisekundy co decyzja wpadało po złej stronie —
+     ta sama blizna co w raporcie skuteczności doboru (0.352.0). */
+  const ostatnie = db().prepare(
+    "SELECT COALESCE(MAX(id),0) AS id FROM ean_conflict WHERE ean=?").get(kod) as { id: number };
+  db().prepare(
+    `INSERT INTO ean_rozstrzygniecie(ean, rodzaj, notatka, at, przez, przez_user_id, po_trafieniu_id)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT(ean) DO UPDATE SET
+       rodzaj=excluded.rodzaj, notatka=excluded.notatka,
+       at=excluded.at, przez=excluded.przez, przez_user_id=excluded.przez_user_id,
+       po_trafieniu_id=excluded.po_trafieniu_id`
+  ).run(kod, rodzaj, tresc, nowIso(), autor.name, autor.id, Number(ostatnie.id));
+  logEvent("ean_kolizja_rozstrzygnieta", autor.name, null, { ean: kod, rodzaj });
+  return { ok: true };
+}
+
 /** Zagregowany raport — ile razy który kod zatrzymał pracę. */
 export function eanConflictReport(): Array<{
   ean: string;
@@ -35,14 +96,35 @@ export function eanConflictReport(): Array<{
   twIds: number[];
   towary: KolizjaTowar[];
   lastSeen: string;
+  /** Decyzja biura albo `null`, gdy nikt się jeszcze nie wypowiedział. */
+  rozstrzygniecie: RozstrzygniecieKolizji | null;
+  /**
+   * Trafienia PO rozstrzygnięciu — 0, gdy decyzji nie ma.
+   *
+   * Liczone po `id` dziennika, nie po znaczniku: trafienie z tej samej
+   * milisekundy co decyzja nie dałoby się rozstrzygnąć czasem (0.352.0).
+   *
+   * Przy `poprawione` liczba większa od zera jest DOWODEM, że poprawka nie
+   * zadziałała, i nie wymaga niczyjej oceny: biuro obiecało, że kolizja
+   * zniknie, a kod zatrzymał kogoś jeszcze raz. Przy `dopuszczone` ta sama
+   * liczba nie znaczy nic złego — tam trafienia mają wracać.
+   */
+  trafienPoDecyzji: number;
 }> {
+  /* Decyzja i liczba trafień PO niej jednym złączeniem, nie zapytaniem na
+     wiersz: lista kolizji bywa długa, a raport czyta ją i kolektor, i biuro. */
   const rows = db()
     .prepare(
-      `SELECT ean, COUNT(*) AS hits, SUM(auto) AS autoResolved,
-              MAX(seen_at) AS lastSeen, MAX(tw_ids) AS twIds
-       FROM ean_conflict GROUP BY ean ORDER BY hits DESC, ean`
+      `SELECT c.ean, COUNT(*) AS hits, SUM(c.auto) AS autoResolved,
+              MAX(c.seen_at) AS lastSeen, MAX(c.tw_ids) AS twIds,
+              r.rodzaj AS rodzaj, r.notatka AS notatka, r.at AS decyzjaAt, r.przez AS przez,
+              SUM(CASE WHEN r.ean IS NOT NULL AND c.id > r.po_trafieniu_id THEN 1 ELSE 0 END) AS poDecyzji
+       FROM ean_conflict c LEFT JOIN ean_rozstrzygniecie r ON r.ean = c.ean
+       GROUP BY c.ean ORDER BY hits DESC, c.ean`
     )
-    .all() as Array<{ ean: string; hits: number; autoResolved: number; lastSeen: string; twIds: string }>;
+    .all() as Array<{ ean: string; hits: number; autoResolved: number; lastSeen: string; twIds: string;
+      rodzaj: string | null; notatka: string | null; decyzjaAt: string | null; przez: string | null;
+      poDecyzji: number }>;
 
   /* Symbole i nazwy jednym zapytaniem dla wszystkich kolizji naraz. Kartoteka
      skasowana po zapisaniu kolizji wraca z pustym symbolem — identyfikator
@@ -73,5 +155,14 @@ export function eanConflictReport(): Array<{
       name: znane.get(id)?.name ?? "",
     })),
     lastSeen: r.lastSeen,
+    rozstrzygniecie: r.rodzaj
+      ? {
+          rodzaj: r.rodzaj as RodzajRozstrzygniecia,
+          notatka: r.notatka ?? null,
+          at: String(r.decyzjaAt),
+          przez: String(r.przez ?? "biuro"),
+        }
+      : null,
+    trafienPoDecyzji: Number(r.poDecyzji ?? 0),
   }));
 }
