@@ -20,6 +20,7 @@ import {
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
   zapiszNotatkeZwrotu, cofnijNotatkeZwrotu,
   wskazSklad,
+  pozycjeNaOutlet, przeniesionoNaOutlet,
 } from "../services/zwroty.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
@@ -242,16 +243,45 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       const o = req.body?.ocena ?? null;
-      /* „Przecena" zeszła w 0.209.0 — patrz `ocenPozycje`. Panel, który jej
-         jeszcze nie zdjął, ma dostać 400 z wymienionymi ocenami, a nie cichy
-         zapis wartości, której baza już nie zna. */
-      if (o !== null && !["stan", "utylizacja"].includes(o)) {
-        return reply.code(400).send({ error: "Ocena to `stan`, `utylizacja` albo brak." });
+      /* „Przecena" zeszła w 0.209.0, „outlet" doszedł w 0.375.0 — panel ze
+         starą listą ma dostać 400 z wymienionymi ocenami, a nie cichy zapis
+         wartości, której `CHECK` tabeli i tak nie przyjmie. */
+      if (o !== null && !["stan", "utylizacja", "outlet"].includes(o)) {
+        return reply.code(400)
+          .send({ error: "Ocena to `stan`, `utylizacja`, `outlet` albo brak." });
       }
       try {
         return ocenPozycje(db(), Number(req.params.id), o as never,
           Number(req.body?.wersja), kto());
       } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* ── Regał outletowy obsługiwany ręką (0.375.0) ────────────────────────
+     Decyzja właściciela z 16 września 2026: „na razie będziemy obsługiwać
+     outlet ręcznie". Magazyn outletowy istnieje w Subiekcie, w aplikacji nie
+     jest skonfigurowany, a regał jest jeden i oglądają go klienci stacjonarni.
+
+     Stąd kształt tych dwóch tras: aplikacja nie wystawia tu ŻADNEGO dokumentu.
+     Mówi tylko, co czeka na przeniesienie, i przyjmuje meldunek, że już nie
+     czeka. To jest warunek, pod którym trzecia ocena w ogóle weszła —
+     bez listy byłaby „przeceną" z 0.209.0 drugi raz. */
+  app.get("/api/obsluga/zwroty/outlet", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    return { pozycje: pozycjeNaOutlet(db()) };
+  });
+
+  app.post<{ Body: { pozycjaId?: number } }>(
+    "/api/obsluga/zwroty/outlet/przeniesiono", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.pozycjaId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Wskaż pozycję, którą przeniesiono." });
+      }
+      try {
+        return przeniesionoNaOutlet(db(), id, kto());
+      } catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
     });
 
   /* Ręczne wskazanie składu kompletu (0.336.0). Zgłoszenie właściciela:

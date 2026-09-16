@@ -1,6 +1,6 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
-import type { DoDopisania, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
+import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
 import { usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
@@ -43,13 +43,23 @@ const POWODY: Record<string, string> = {
 
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
-/* DWA PRZYCISKI, NIE TRZY (0.209.0). „Na przecenę" nie prowadziła donikąd:
-   nie dokładała do koszyka, nie ruszała stanu, nie zakładała zadania. Trzeci
-   przycisk, który wygląda jak decyzja, a nie jest żadną, kosztuje namysł przy
-   każdej pozycji — a ocena jest tu naciskana najczęściej ze wszystkiego. */
-const OCENY: Array<["stan" | "utylizacja", string, string]> = [
+/* TRZY PRZYCISKI OD 0.375.0, i trzeci ma warunek. „Na przecenę" zeszła stąd
+   w 0.209.0, bo nie prowadziła donikąd: nie dokładała do koszyka, nie ruszała
+   stanu, nie zakładała zadania. Przycisk, który wygląda jak decyzja, a nie
+   jest żadną, kosztuje namysł przy każdej pozycji — a ocena jest tu naciskana
+   najczęściej ze wszystkiego.
+
+   „Na outlet" wolno tu stać, bo kończy się LISTĄ ROBOCZĄ (`NaOutlet`): ktoś
+   niesie używkę na regał i odklikuje ją po wystawieniu MM w Subiekcie. Bez
+   tamtej listy byłby to ten sam ślepy zaułek drugi raz.
+
+   Czego broni: bez tej oceny towar używany dostawał „na stan", jechał na halę
+   i wracał na półkę pickingową obok fabrycznych. Kompletujący brał ten, który
+   stał bliżej. */
+const OCENY: Array<[Ocena, string, string]> = [
   ["stan", "S", "Na stan"],
   ["utylizacja", "U", "Utylizacja"],
+  ["outlet", "O", "Na outlet"],
 ];
 
 /**
@@ -262,7 +272,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   sklady?: Record<number, SkladPozycji>;
   /** Wiersze paragonu — materiał do ręcznego składu kompletu (0.336.0). */
   wierszeDokumentu?: WierszDokumentu[];
-  onOcena: (pozycjaId: number, ocena: "stan" | "utylizacja" | null) => void;
+  onOcena: (pozycjaId: number, ocena: Ocena | null) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;

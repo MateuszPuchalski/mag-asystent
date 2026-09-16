@@ -443,6 +443,10 @@ export function migrate(database: DatabaseSync) {
      co stoi w bazie przed tą migracją, przyszło ze zgłoszenia klienta. */
   addColumn("zwrot_klienta_pozycja", "zrodlo",
     "TEXT NOT NULL DEFAULT 'allegro' CHECK(zrodlo IN ('allegro','biuro'))");
+  /* Ręczne przeniesienie na regał outletowy (0.375.0). Puste przy ocenie
+     „outlet" znaczy „czeka" — na tym stoi lista robocza biura. */
+  addColumn("zwrot_klienta_pozycja", "outlet_at", "TEXT");
+  addColumn("zwrot_klienta_pozycja", "outlet_przez", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");
@@ -805,6 +809,7 @@ export function migrate(database: DatabaseSync) {
   bezObslugiKlienta(database);
   pozycjaZwrotuBezReadModelu(database);
   indeksKluczaPozycji(database);
+  ocenaZnaOutlet(database);
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
@@ -1587,6 +1592,79 @@ function indeksKluczaPozycji(database: DatabaseSync) {
   rozplacDuplikatyKluczy(database);
   database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
     ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
+}
+
+/**
+ * Trzecia ocena pozycji zwrotu: „outlet" (0.375.0).
+ *
+ * `CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` nie umie go
+ * zmienić — poszerzenie listy wartości znaczy więc PRZEBUDOWĘ. Zabieg ten sam
+ * co przy `pozycjaZwrotuBezReadModelu`: nowa tabela, przepisanie, podmiana
+ * nazwy, klucze obce zdjęte PRZED transakcją.
+ *
+ * DEFINICJĘ BIERZEMY Z BAZY, nie z tego pliku. Tabela dorosła przez kilkanaście
+ * wydań (potrącenie, `w_zwrocie`, kartoteka) i jej kształt u klienta zależy od
+ * tego, z której wersji aktualizuje. Wypisanie kolumn tutaj z ręki znaczyłoby,
+ * że przebudowa GUBI każdą, o której ten kod nie wie — a gubi się je po cichu,
+ * bo `INSERT ... SELECT` po wspólnych kolumnach nie ma jak o tym powiedzieć.
+ * Podmieniamy więc jedną klauzulę w cudzym `CREATE TABLE` i resztę zostawiamy
+ * dokładnie taką, jaka była.
+ *
+ * Kolumny `outlet_at` i `outlet_przez` dokłada `addColumn` wyżej, jak każdą
+ * inną — przebudowa ich nie dotyczy, bo `CHECK` ich nie obejmuje.
+ */
+function ocenaZnaOutlet(database: DatabaseSync) {
+  const def = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'")
+    .get() as { sql: string } | undefined;
+  /* Bazy testowe bywają MINIMALNE — dwie tabele i nic poza tym. Migracja nie
+     ma prawa się na nich wywalić; ta sama ostrożność co przy przebudowie. */
+  if (!def?.sql) return;
+  if (def.sql.includes("'outlet'")) return;
+
+  const STARY = /ocena\s+TEXT\s+CHECK\s*\(\s*ocena\s+IN\s*\(\s*'stan'\s*,\s*'utylizacja'\s*\)\s*\)/;
+  /* Definicja, której nie rozpoznajemy, ZOSTAJE nietknięta. Ślepa przebudowa
+     bazy o nieznanym kształcie kosztowałaby więcej niż jedna ocena mniej. */
+  if (!STARY.test(def.sql)) {
+    console.warn("[migracja] pomijam poszerzenie oceny o `outlet` — nieznany kształt tabeli");
+    return;
+  }
+
+  const nowaDef = def.sql
+    .replace(STARY, "ocena TEXT CHECK (ocena IN ('stan','utylizacja','outlet'))")
+    .replace(/CREATE\s+TABLE\s+("?)zwrot_klienta_pozycja\1/i,
+      "CREATE TABLE zwrot_klienta_pozycja_outlet");
+
+  const kolumny = (database.prepare("PRAGMA table_info(zwrot_klienta_pozycja)")
+    .all() as Array<{ name: string }>).map((c) => c.name).join(", ");
+
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+         przy żywym serwerze, a obie strony wołają `migrate()`. */
+      const teraz = database.prepare(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'"
+      ).get() as { sql: string } | undefined;
+      if (!teraz || teraz.sql.includes("'outlet'")) return;
+      database.exec(nowaDef);
+      database.exec(
+        `INSERT INTO zwrot_klienta_pozycja_outlet(${kolumny})
+           SELECT ${kolumny} FROM zwrot_klienta_pozycja;
+         DROP TABLE zwrot_klienta_pozycja;
+         ALTER TABLE zwrot_klienta_pozycja_outlet RENAME TO zwrot_klienta_pozycja;`);
+      /* Indeksy giną razem ze starą tabelą i trzeba je odtworzyć OBA. Bez
+         `ux_` upsert synchronizatora wstawiałby duplikaty pozycji, a to jest
+         blizna 0.153.1 — praca człowieka przywiązana do klucza. */
+      database.exec(`CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_pozycja_zwrot
+        ON zwrot_klienta_pozycja(zwrot_id)`);
+      rozplacDuplikatyKluczy(database);
+      database.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_zwrot_klienta_pozycja_klucz
+        ON zwrot_klienta_pozycja(zwrot_id, klucz)`);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 /**

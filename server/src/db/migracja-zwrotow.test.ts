@@ -408,3 +408,89 @@ test("migracja stempluje kosze z dokumentu rozłożone przed 0.277.0", () => {
   assert.equal(Number(kosz("1240").p), 0);
   d.close();
 });
+
+/* ── Trzecia ocena wchodzi do bazy, która stoi u klienta (0.375.0) ──────────
+   `CHECK` wpisuje się w SQLite w definicję tabeli, a `ALTER TABLE` go nie
+   zmieni — poszerzenie listy ocen znaczy przebudowę. Ten test pilnuje trzech
+   rzeczy naraz: że nowa wartość przechodzi, że dane zostają i że wracają OBA
+   indeksy. Bez `ux_` upsert synchronizatora wstawiałby duplikaty pozycji,
+   czyli blizna 0.153.1 — praca człowieka przywiązana do klucza. */
+
+/**
+ * Baza sprzed 0.375.0: pełny schemat, ale pozycja zwrotu z DWIEMA ocenami.
+ *
+ * Schemat kładziemy w całości, a cofamy WYŁĄCZNIE tę jedną tabelę. Ręcznie
+ * zbudowana atrapa nie miałaby kolumn, których szukają inne kroki `migrate()`
+ * — a wtedy test mówiłby o czymś innym, niż bada.
+ */
+function bazaZeStaraOcena() {
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  d.exec(`
+    DROP TABLE zwrot_klienta_pozycja;
+    CREATE TABLE zwrot_klienta_pozycja (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      zwrot_id INTEGER NOT NULL REFERENCES zwrot_klienta(id) ON DELETE CASCADE,
+      zrodlo TEXT NOT NULL DEFAULT 'allegro' CHECK (zrodlo IN ('allegro','biuro')),
+      offer_id TEXT, nazwa TEXT NOT NULL, ilosc REAL NOT NULL,
+      cena_grosze INTEGER NOT NULL, waluta TEXT NOT NULL,
+      powod TEXT, powod_komentarz TEXT, url TEXT,
+      w_zwrocie INTEGER NOT NULL DEFAULT 0,
+      klucz TEXT NOT NULL,
+      ocena TEXT CHECK (ocena IN ('stan','utylizacja')),
+      ocena_at TEXT, ocena_przez TEXT);
+    CREATE INDEX ix_zwrot_klienta_pozycja_zwrot ON zwrot_klienta_pozycja(zwrot_id);
+    CREATE UNIQUE INDEX ux_zwrot_klienta_pozycja_klucz
+      ON zwrot_klienta_pozycja(zwrot_id, klucz);
+    INSERT INTO channel_account(id, channel, external_account_id) VALUES (1,'allegro','k');
+    INSERT INTO zwrot_klienta(id, channel_account_id, external_id, created_at, synced_at)
+      VALUES (1, 1, 'z1', '2026-09-01T08:00:00Z', '2026-09-01T08:00:00Z');
+    INSERT INTO zwrot_klienta_pozycja
+      (id, zwrot_id, nazwa, ilosc, cena_grosze, waluta, klucz, ocena, ocena_przez)
+      VALUES (7, 1, 'Sekator', 1, 5000, 'PLN', 'of|Sekator', 'stan', 'Ala');
+  `);
+  return d;
+}
+
+test("ocena „outlet” wchodzi do zastanej bazy, a praca człowieka zostaje", () => {
+  const d = bazaZeStaraOcena();
+  assert.throws(() => d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='outlet' WHERE id=7")
+    .run(), /constraint/, "przed migracją baza tej wartości nie przyjmuje");
+
+  migrate(d);
+
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='outlet' WHERE id=7").run();
+  const w = d.prepare("SELECT ocena, ocena_przez, nazwa FROM zwrot_klienta_pozycja WHERE id=7")
+    .get() as { ocena: string; ocena_przez: string; nazwa: string };
+  assert.equal(w.ocena, "outlet");
+  assert.equal(w.ocena_przez, "Ala", "podpis oceny przeżywa przebudowę");
+  assert.equal(w.nazwa, "Sekator");
+
+  const indeksy = (d.prepare(
+    "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='zwrot_klienta_pozycja'")
+    .all() as Array<{ name: string }>).map((i) => i.name);
+  assert.equal(indeksy.includes("ux_zwrot_klienta_pozycja_klucz"), true,
+    "indeks UNIQUE wraca — bez niego synchronizator dubluje pozycje");
+  assert.equal(indeksy.includes("ix_zwrot_klienta_pozycja_zwrot"), true);
+  d.close();
+});
+
+test("druga migracja tej samej bazy niczego nie rusza", () => {
+  /* `db()` woła `migrate()` w KAŻDYM procesie, a `npm run seed` potrafi
+     chodzić przy żywym serwerze. Przebudowa musi więc być jednorazowa. */
+  const d = bazaZeStaraOcena();
+  migrate(d);
+  const przed = (d.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'")
+    .get() as { sql: string }).sql;
+
+  migrate(d);
+
+  const po = (d.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zwrot_klienta_pozycja'")
+    .get() as { sql: string }).sql;
+  assert.equal(po, przed, "definicja tabeli stoi w miejscu");
+  assert.equal(Number((d.prepare("SELECT COUNT(*) AS n FROM zwrot_klienta_pozycja")
+    .get() as { n: number }).n), 1, "i wiersz się nie zdublował");
+  d.close();
+});

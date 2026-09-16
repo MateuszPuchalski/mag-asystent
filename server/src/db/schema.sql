@@ -1835,11 +1835,21 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta_pozycja (
   -- Adres oferty wprost z `items[].url` — JEDYNY odnośnik, który specyfikacja
   -- Allegro opisuje, więc jedyny bez znacznika `[WERYFIKUJ]`.
   url TEXT,
-  -- Oceny są DWIE od 0.209.0. „Przecena" nie prowadziła donikąd: nie dokładała
-  -- do koszyka, nie ruszała stanu, nie zakładała zadania. Zdjęta razem
-  -- z przyciskiem — wraca dopiero ze ścieżką przeceny, jeśli powstanie.
-  ocena TEXT CHECK (ocena IN ('stan','utylizacja')),
+  -- Oceny są TRZY od 0.375.0. Dwie pierwsze mają swój koszyk i swój dokument
+  -- MM; „outlet" nie ma ani jednego i to jest cała jego treść — towar używany
+  -- jedzie na regał outletowy, a przesunięcie robi człowiek w Subiekcie.
+  --
+  -- To NIE jest powrót „przeceny" zdjętej w 0.209.0, choć stoi w tym samym
+  -- miejscu. Tamta kończyła się znacznikiem: nie dokładała do koszyka, nie
+  -- ruszała stanu, nie zakładała zadania i nie prowadziła DONIKĄD. Ta kończy
+  -- się LISTĄ ROBOCZĄ, którą ktoś odklikuje po wystawieniu MM ręką
+  -- (`outlet_at`) — i dlatego wolno jej tu stać.
+  ocena TEXT CHECK (ocena IN ('stan','utylizacja','outlet')),
   ocena_at TEXT, ocena_przez TEXT,
+  -- Kiedy i kto przeniósł tę pozycję na regał outletowy RĘKĄ. Puste przy
+  -- ocenie „outlet" znaczy „czeka na przeniesienie" — na tym stoi lista.
+  outlet_at TEXT,
+  outlet_przez TEXT,
   -- ── Potrącenie za utratę wartości (0.170.0) ────────────────────────────────
   -- Ile MNIEJ oddajemy za tę pozycję, bo wróciła używana albo uszkodzona.
   -- Kwota, nie procent: klient widzi złotówki, a zaokrąglanie procentu przy

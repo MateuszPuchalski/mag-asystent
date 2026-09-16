@@ -996,3 +996,32 @@ test("kosz Z DOKUMENTU nie czeka na żadną korektę", () => {
   assert.equal(w.brakujeKorekt, 0);
   assert.equal(w.mmStan, "gotowa", "ten kosz ma numer MM z dokumentu");
 });
+
+test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał nadawcy", async () => {
+  /* 0.377.0. Związanie koszyka z jego dokumentem (0.376.0) przestawiło go do
+     gałęzi „kosz z dokumentu", a ta bierze cel WYŁĄCZNIE z `mm_mag_z`. Kolumna
+     read-modelu jest nullowalna, więc koszyk tracił trasę, którą przed
+     związaniem miał pewną — powrót nie wychodził wcale, a towar zostawał na
+     regale zwrotów.
+
+     To MY zleciliśmy tamto MM i wiemy, że poszło MAG→ZWROTY, więc nadawca
+     dokumentu niczego tu nie dodaje. */
+  const kosz = koszDoRozkladania("KZ-88");
+  const q = Number(db().prepare(
+    `INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm','done','{}','MM 1209/MAG/2026', ?, 'Biuro')`)
+    .run(new Date().toISOString()).lastInsertRowid);
+  db().prepare("UPDATE kosz SET mm_queue_id=?, mm_mag_z=NULL WHERE id=?").run(q, kosz.id);
+
+  for (const p of kosz.pozycje) K.odlozPozycje(p.id, "A01-02-03", "Magazynier");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE type='set_location'").run();
+  K.zakonczKosz(kosz.id, "Magazynier");
+
+  const mm = db().prepare(
+    "SELECT payload FROM sfera_queue WHERE type='mm' AND status='pending'").all() as
+    Array<{ payload: string }>;
+  assert.equal(mm.length, 1, "powrót wychodzi mimo pustego nadawcy w dokumencie");
+  const p = JSON.parse(mm[0].payload) as { magFrom: number; magTo: number };
+  assert.equal(p.magFrom, 3);
+  assert.equal(p.magTo, 1, "na magazyn główny — tak, jak koszyk stamtąd wyjechał");
+});

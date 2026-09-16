@@ -3,6 +3,7 @@ import { logEvent } from "./events.js";
 import {
   BladKosza, KOD_KOSZA_WIRTUALNEGO, odmowaKoszaWirtualnego, szczegolKosza, type SzczegolKosza,
 } from "./kosze.js";
+import { zwiazKoszykiZDokumentami } from "./kosze-zwrotow.js";
 
 /* ── Przyjęcia na regał zwrotów — kosz z dokumentu Subiekta ──────────────────
    Obieg magazynu jest starszy niż ta aplikacja i wygląda tak:
@@ -135,6 +136,15 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
      o tej samej liczbie to cudzy kosz. */
   const surowy = String(raw ?? "").trim().toUpperCase();
   if (KOD_KOSZA_WIRTUALNEGO.test(surowy)) {
+    /* OD 0.376.0 KOD KOSZYKA OTWIERA WŁASNY KOSZ — jeśli ma już dokument.
+       Koszyk związany z MM (`zwiazKoszykiZDokumentami`) jest tym samym pudłem,
+       które hala ma rozłożyć, więc skan jego etykiety ma prowadzić DO NIEGO.
+       Odmowa zostaje wyłącznie tam, gdzie papieru jeszcze nie ma: wtedy nie ma
+       czego rozkładać, a zdanie mówi, na co czekać. */
+    const wlasny = db().prepare(
+      "SELECT id FROM kosz WHERE kod = ? AND mm_dok_id IS NOT NULL ORDER BY id DESC LIMIT 1")
+      .get(surowy) as { id: number } | undefined;
+    if (wlasny) return szczegolKosza(wlasny.id);
     throw new BladKosza(404, odmowaKoszaWirtualnego(surowy));
   }
   const numer = numerZKartki(raw);
@@ -156,6 +166,14 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
         "synchronizację z Subiektem"
     );
   }
+
+  /* WIĄZANIE TUTAJ, NIE TYLKO W WORKERZE (0.377.0). Worker wiąże koszyki co
+     minutę, a magazynier bywa szybszy niż jego takt: skan numeru z kartki
+     w tej luce zakładał NOWY kosz na dokument, który należy do czekającego
+     koszyka. Powstawał wtedy sobowtór — dokładnie ten, którego 0.376.0 miało
+     się pozbyć. Wiązanie jest idempotentne i tanie, więc stoi też na tej
+     drodze; kolejny wiersz niżej znajdzie już związany koszyk. */
+  zwiazKoszykiZDokumentami(d);
 
   const istniejacy = d.prepare("SELECT id FROM kosz WHERE mm_dok_id = ?").get(dok.dok_id) as
     | { id: number }

@@ -51,6 +51,8 @@ function zwrot(d: Db, kto: { id: number; name: string }) {
   for (const tw of [11, 12]) {
     d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
       .run(tw, `SYM-${tw}`, `Towar ${tw}`);
+    /* Wiersz stanu — od 0.372.2 kartoteka bez niego nie wchodzi do pudła. */
+    d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (?,1,0)").run(tw);
   }
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,created_at,synced_at)

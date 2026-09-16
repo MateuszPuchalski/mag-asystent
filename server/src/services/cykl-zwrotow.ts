@@ -43,6 +43,17 @@ const ZDARZENIA_HALI = [
   "kosz_pozycja_pominieta",
 ] as const;
 
+/**
+ * Kosz, który zrodził DOKUMENT, a nie praca przy biurku.
+ *
+ * Do 0.376.0 wystarczał warunek `mm_dok_id IS NOT NULL` — dokument miały
+ * wyłącznie kosze z Subiekta. Od wiązania koszyków ma go także koszyk z panelu,
+ * więc rozstrzyga `mm_queue_id`: to MY zleciliśmy tamto MM. Bez tej poprawki
+ * związany koszyk wypadłby z raportu jako „druga połowa cudzej sprawy".
+ */
+const jestKoszemHali = (k: WierszKosza): boolean =>
+  k.mm_dok_id !== null && k.mm_queue_id === null;
+
 /** Rodzaje koszy, które w ogóle są pracą hali (odpad i karton nie są). */
 const RODZAJ_ZWROTY = "zwroty";
 
@@ -105,6 +116,8 @@ interface WierszKosza {
   utworzono_at: string;
   zamknieto_at: string | null;
   mm_dok_id: number | null;
+  /** Zadanie MM, które zleciliśmy MY — po nim poznaje się koszyk z panelu. */
+  mm_queue_id: number | null;
   mm_numer: string | null;
   mm_zamowione: string | null;
   mm_w_subiekcie: string | null;
@@ -137,7 +150,7 @@ const minuty = (od: string | null, do_: string | null): number | null => {
 function koszeZOkna(database: Db, dni: number): WierszKosza[] {
   return database
     .prepare(
-      `SELECT k.id, k.kod, k.utworzono_at, k.zamknieto_at, k.mm_dok_id,
+      `SELECT k.id, k.kod, k.utworzono_at, k.zamknieto_at, k.mm_dok_id, k.mm_queue_id,
               COALESCE(k.mm_numer, q.sgt_doc_number) AS mm_numer,
               q.created_at   AS mm_zamowione,
               q.processed_at AS mm_w_subiekcie,
@@ -164,7 +177,7 @@ export function cyklZwrotow(dni = 90, database: Db = db()): CyklZwrotow {
      Trzymamy je pod kodem, bo tym kodem jest liczba z numeru MM koszyka. */
   const zDokumentu = new Map<string, WierszKosza[]>();
   for (const k of kosze) {
-    if (k.mm_dok_id === null) continue;
+    if (!jestKoszemHali(k)) continue;
     const lista = zDokumentu.get(k.kod) ?? [];
     lista.push(k);
     zDokumentu.set(k.kod, lista);
@@ -173,9 +186,11 @@ export function cyklZwrotow(dni = 90, database: Db = db()): CyklZwrotow {
   const sprawy: SprawaKartonu[] = [];
   const halaDlaSprawy = new Map<number, SprawaKartonu>();
   for (const k of kosze) {
-    if (k.mm_dok_id !== null) continue;
+    if (jestKoszemHali(k)) continue;
     /* Kosz hali szukamy PO ZAMKNIĘCIU koszyka i najbliższy w czasie: kod wraca
-       do obiegu, a numery MM powtarzają się co rok. */
+       do obiegu, a numery MM powtarzają się co rok. Od 0.376.0 koszyk dostaje
+       swój dokument SAM, więc dla kartonów po tej zmianie ta lista jest pusta
+       i sprawa stoi na jednym koszu — tak, jak stoi w hali. */
     const kandydaci = (zDokumentu.get(numerKosza(k.mm_numer ?? "")) ?? [])
       .filter((d) => !k.zamknieto_at || d.utworzono_at >= k.zamknieto_at)
       .sort((a, b) => a.utworzono_at.localeCompare(b.utworzono_at));

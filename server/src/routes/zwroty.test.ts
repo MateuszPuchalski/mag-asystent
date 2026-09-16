@@ -320,14 +320,23 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
      Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały (rejestruje
      je `trasyTagowSprawy`), a eksport CSV był GET-em — obie rzeczy schodzą
      razem z prowadzącym, ale nie tutaj widać ich odejście. */
-  assert.equal(posty.length, 32,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dwóch`);
+  /* Trzydziesta trzecia (0.375.0): meldunek „ta sztuka stoi już na regale
+     outletowym". Licznik rośnie o jeden, a do Subiekta nie idzie NIC — trasa
+     stawia znacznik w naszej bazie i tyle. Outlet obsługuje dziś ręka
+     (decyzja właściciela, 16 września 2026), więc dokumentu nie ma skąd wziąć.
+
+     Ta trasa jest warunkiem, pod którym weszła trzecia ocena. Bez niej
+     znacznik „outlet" byłby ślepym zaułkiem, za który 0.209.0 zdjęło
+     „przecenę" — a lista czekających bez sposobu na jej domknięcie rosłaby
+     w nieskończoność. */
+  assert.equal(posty.length, 33,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu trzech`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
-    "sklad", "kosz/towar", "mm-mimo-korekt"]) {
+    "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
@@ -416,6 +425,7 @@ test("potwierdzenie kartoteki zapisuje wybór RAZEM ze źródłem", async () => 
   const { naglowki } = login("biuro", "Ala potwierdza");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-46','Sekator')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (77,1,0)").run();
   const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
 
   const r = await app.inject({ method: "POST", headers: naglowki,
@@ -441,6 +451,7 @@ test("puste `twId` zdejmuje powiązanie — to droga wyjścia z pomyłki", async
   const { naglowki } = login("biuro", "Ala cofa");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-46','Sekator')").run();
+  d.prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (77,1,0)").run();
   const poz = Number((d.prepare("SELECT id FROM zwrot_klienta_pozycja").get() as { id: number }).id);
   const url = `/api/obsluga/zwroty/pozycje/${poz}/kartoteka`;
   await app.inject({ method: "POST", url, headers: naglowki, payload: { twId: 77, zrodlo: "reczne" } });
@@ -547,6 +558,7 @@ test("MM wypuszczone przez automat NIE dostaje konta klikającego człowieka", a
     .get(zwrot) as { id: number }).id;
   /* Bez kartoteki pozycja do koszyka nie wchodzi — MM przesuwa stany kartotek. */
   db().prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'SEK-01','Sekator NAC')").run();
+  db().prepare("INSERT OR IGNORE INTO sgt_stan(tw_id,mag_id,stan) VALUES (77,1,0)").run();
   db().prepare("UPDATE zwrot_klienta_pozycja SET tw_id=77 WHERE id=?").run(pozycja);
 
   let r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/werdykt`,
