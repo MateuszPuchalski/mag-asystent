@@ -34,6 +34,63 @@ historii nie przepisujemy.
 ---
 
 
+## 0.360.0 — 16 września 2026
+
+**Pierwsza liczba mówiąca, ILE trwa sprawa między halą a biurem.** §22
+projektu panelu wymienia „czas realizacji zadania magazynowego" wśród metryk
+biznesowych. W kodzie nie było go wcale — i to nie dlatego, że brakowało
+danych. Znaczniki obu końców każdej wymiany leżą w bazie od lat:
+`utworzono_at`/`wykonano_at` przy zadaniach, `created_at`/`resolved_at` przy
+niezgodnościach, `pominieto_at`/`zalatwione_at` przy koszu. Trzy miejsca
+czytały `wykonano_at`, żeby go WYŚWIETLIĆ. Różnicy nie liczył nikt.
+
+Karta STAN SYSTEMU dostaje tabelę czterech kanałów, w tym samym oknie co
+metryki obok — dwie tabele na jednym ekranie liczące z różnych okresów to
+najprostszy sposób na sprzeczne wnioski.
+
+### Mediana i ogon, nigdy średnia
+
+Cztery sprawy po dziesięć minut i jedna po dziesięć tysięcy dają średnią
+około dwóch tysięcy — liczbę, której nie miała ŻADNA z nich. Mediana mówi,
+jak wygląda zwykły dzień; `p90` — jak wygląda zły. Obie stoją obok siebie,
+każda ze swoim `n`, bo mediana z czterech spraw i tak zostanie przeczytana
+jako werdykt.
+
+`p90` liczy się **najbliższą rangą**, nie interpolacją: interpolacja zwraca
+wartość, której nie miała żadna sprawa, a ten raport mówi o sprawach, nie
+o rozkładzie.
+
+### Sprawa, która trwa DO DZIŚ, nie wypada z raportu
+
+Wymiana bez zamknięcia nie ma czasu zamknięcia, więc nie wchodzi do mediany —
+a bywa najgorsza z całej listy, bo najdłużej stoi zwykle to, czego nikt nie
+ruszył. Bez kolumny OTWARTE i NAJSTARSZA OTWARTA tabela pokazywałaby wyłącznie
+sprawy domknięte, czyli mierzyłaby własny sukces.
+
+### Odesłanie liczy się jako odpowiedź
+
+Zadanie odesłane przez halę („nie da się", 0.352.0) jest DOMKNIĘTE: hala
+odpowiedziała. Gdyby nie liczyło się jako zamknięcie, „czas realizacji zadania
+magazynowego" mierzyłby wyłącznie zadania, które się udały — a te trudne
+wypadałyby z miary właśnie dlatego, że były trudne.
+
+### Czego w tej tabeli nie ma
+
+**Progu „za późno".** §22 wymienia tę metrykę i nie podaje terminu, więc
+raport mówi, ile trwa; czy to długo, rozstrzyga człowiek. Liczba godzin
+wpisana tutaj byłaby werdyktem, którego nikt nie wydał.
+
+**Notatek do dostaw.** Ich pętla ma własny licznik nieprzeczytanych odpowiedzi
+od 0.77.0, a odpowiedź na notatkę bywa rozmową na kilka tur — „czas wymiany"
+znaczyłby tam co innego niż w pozostałych czterech kanałach, a jedna tabela
+kłamałaby o obu naraz.
+
+Trasa jest GET-em, więc umowa zapisów panelu biura zostaje nietknięta:
+patrzenie na miarę niczego nie mutuje.
+
+---
+
+
 ## 0.359.0 — 16 września 2026
 
 **Kolizja kodu przestaje być dziennikiem bez wyjścia.** `ean_conflict` zapisuje

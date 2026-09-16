@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { czasyWymiany } from "../services/wymiana.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
@@ -210,6 +211,20 @@ export async function biuroRoutes(app: FastifyInstance) {
     }
     return null;
   }
+
+  /* ── ILE TRWA WYMIANA Z HALĄ (0.360.0) ───────────────────────────────────
+     §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
+     podaje przy nim ani progu, ani miejsca. W kodzie nie było go wcale:
+     znaczniki obu końców leżą w bazie od lat, a różnicy nie liczył nikt.
+
+     GET, więc umowa zapisów panelu zostaje nietknięta — patrzenie na miarę
+     niczego nie mutuje. Bramka roli ta sama co przy notatkach: to liczby
+     o pracy ludzi i nie mają po co jeździć poza biuro. */
+  app.get<{ Querystring: { dni?: string } }>("/api/biuro/wymiana", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return czasyWymiany(Number(req.query.dni) || 30);
+  });
 
   app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {
     const nie = odmowa();

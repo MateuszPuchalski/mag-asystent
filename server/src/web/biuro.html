@@ -1187,6 +1187,24 @@
     </section>
 
     <section class="card">
+      <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Znaczniki obu końców każdej sprawy leżą w bazie od lat — ta tabela
+          jako pierwsza liczy różnicę. MEDIANA mówi, jak wygląda zwykły dzień,
+          OGON (p90) — jak wygląda zły. Średniej tu nie ma celowo: jedna sprawa
+          sprzed tygodnia utopiłaby sto załatwionych w kwadrans.
+          Kolumna OTWARTE liczy sprawy, które trwają DO DZIŚ i dlatego nie
+          mają czasu zamknięcia; bez niej tabela pokazywałaby wyłącznie to,
+          co ktoś domknął. Progu „za późno" tu nie ma — §22 wymienia tę
+          metrykę i nie podaje terminu, więc czy to długo, rozstrzyga człowiek.
+        </p>
+      </div>
+      <table id="wymiana"></table>
+    </section>
+
+    <section class="card">
       <h2>SERWER</h2>
       <table id="zdrowie"></table>
       <!-- Dwie operacje ratunkowe, które żyły dotąd wyłącznie w DEPLOY.md
@@ -3490,6 +3508,45 @@ function csvRozjazdow(r) {
 }
 
 /* ── Kolizje kodów ── */
+/* ── Ile trwa wymiana z halą (0.360.0) ─────────────────────────────────────
+   Pierwsza w tym repo liczba mówiąca, ILE trwa sprawa między halą a biurem.
+   §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
+   podaje przy nim ani progu, ani miejsca — a w kodzie nie było go wcale. */
+const NAZWA_KANALU = {
+  zadanie: "Zadanie terenowe",
+  niezgodnosc: "Niezgodność w dostawie",
+  pominiecie: "Pominięcie w koszu",
+  kolizja: "Kolizja kodu",
+};
+
+/* Minuty na zdanie dla człowieka. Doba rozbija się na dni z tego samego
+   powodu co w panelu obsługi: „4320 min" trzeba podzielić w głowie, żeby się
+   przestraszyć. */
+function czasWymiany(min) {
+  if (min === null || min === undefined) return '<span class="mute">—</span>';
+  if (min < 60) return `${min} min`;
+  const g = Math.floor(min / 60);
+  if (g < 24) return `${g} g ${min % 60} min`;
+  const dni = Math.floor(g / 24);
+  return dni === 1 ? "1 dzień" : `${dni} dni`;
+}
+
+function rysujWymiane(r) {
+  const w = (r && r.wiersze) || [];
+  $("wymiana").innerHTML =
+    "<tr><th>KANAŁ</th><th>KIERUNEK</th><th>ZAMKNIĘTYCH</th><th>MEDIANA</th><th>OGON (p90)</th><th>OTWARTE</th><th>NAJSTARSZA OTWARTA</th></tr>" +
+    (w.map((x) => `<tr>
+        <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
+        <td class="mute">${esc(x.kierunek)}</td>
+        <td>${x.zamknietych}</td>
+        <td>${czasWymiany(x.medianaMin)}</td>
+        <td class="mute">${czasWymiany(x.p90Min)}</td>
+        <td>${x.otwartych}</td>
+        <td class="mute">${czasWymiany(x.najstarszaOtwartaMin)}</td>
+      </tr>`).join("") ||
+      '<tr><td colspan="7" class="mute">Brak spraw w tym oknie</td></tr>');
+}
+
 /* ── DECYZJA BIURA O KODZIE (0.359.0) ───────────────────────────────────────
    Do 0.358.0 ta tabela była dziennikiem bez wyjścia: kolizja wpadała na listę
    i zostawała na zawsze w tej samej postaci co pierwszego dnia. Hala patrzyła
@@ -4094,12 +4151,17 @@ async function odswiezNadzor() {
   if (h) rysujZdrowie(h);
   if (q) rysujKolejke(q);
   try {
-    const [m, k] = await Promise.all([
+    const [m, k, wym] = await Promise.all([
       (await api(`/api/metrics?days=${$("dniMetryk").value}`)).json(),
       (await api("/api/ean-conflicts")).json(),
+      /* To samo okno co metryki obok: dwie tabele na jednym ekranie liczące
+         z różnych okresów to najprostszy sposób na sprzeczne wnioski. */
+      (await api(`/api/biuro/wymiana?dni=${$("dniMetryk").value}`)).json()
+        .catch(() => ({ wiersze: [] })),
     ]);
     rysujMetryki(m);
     rysujKolizje(k.conflicts || []);
+    rysujWymiane(wym);
   } catch (e) { cichaAwaria("metryki", e); }
 }
 
