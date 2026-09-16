@@ -1016,6 +1016,14 @@ data class KoszPozycja(
     val powod: String? = null,
     /** Odłożona na PÓŹNIEJ — stoi na końcu listy, ale wciąż czeka na odłożenie. */
     val pozniejAt: String? = null,
+    /* ── CO BIURO Z TYM ZROBIŁO (0.358.0) ───────────────────────────────────
+       Serwer oddaje te trzy pola przy KAŻDEJ pozycji od 0.77.0. Kolektor ich
+       nie deklarował, więc kotlinx po cichu je zjadał — i pominięcie zamknięte
+       przez biuro wyglądało na ekranie hali dokładnie tak samo jak pominięcie,
+       którym nikt się nie zajął. Dane leciały po drucie i lądowały w koszu.  */
+    val zalatwioneAt: String? = null,
+    val zalatwionePrzez: String? = null,
+    val zalatwioneNotatka: String? = null,
     /** Adres ŻYWY z kartoteki (serwer koryguje o kolejkę) — nie snapshot. */
     val lokOczekiwana: String? = null,
     /**

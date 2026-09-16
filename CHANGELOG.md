@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.358.0 — 16 września 2026
+
+**Ten sam brak, drugi kanał — i tym razem dane leciały po drucie od dawna.**
+Magazynier pomija pozycję w koszu z powodem („nie ma go w koszu"). Biuro sprawę
+zamyka i pisze, czym się skończyła: znaleziony, reklamowany, skorygowany.
+Serwer oddaje `zalatwioneAt`, `zalatwionePrzez` i `zalatwioneNotatka` przy
+KAŻDEJ pozycji kosza od 0.77.0.
+
+Kolektor tych pól nie deklarował w `KoszPozycja`, więc kotlinx po cichu je
+zjadał. Pominięcie zamknięte przez biuro wyglądało na ekranie hali dokładnie
+tak samo jak takie, którym nikt się nie zajął: czerwone „pominięta — powód",
+w nieskończoność.
+
+To jest gorszy gatunek błędu niż brakująca funkcja. Nic nie padło, nic nie
+świeciło na czerwono w CI, żaden test nie wiedział, że ma coś sprawdzić —
+pole po prostu znikało między serwerem a ekranem. Dwa nowe testy dekodują
+dosłowny kształt z serwera właśnie po to; to jedyna bramka, która łapie tę
+klasę usterek.
+
+Na ekranie: powód pominięcia po zamknięciu schodzi z czerwieni na szarość, bo
+czerwień znaczy „stoi i czeka", a zamknięta sprawa nie stoi. Pod nim staje
+zdanie biura z nazwiskiem. Nagłówek panelu pozycji mówi wprost „BIURO ZAMKNĘŁO
+SPRAWĘ" — odłożenie dalej działa, bo towar mógł się znaleźć, ale zaległością
+to już nie jest.
+
+Zero zmian po stronie serwera. Wdrożenie bez pracy ręcznej; wymaga nowego APK.
+
+---
+
+
 ## 0.357.0 — 16 września 2026
 
 **Hala dowiaduje się, co biuro postanowiło z jej zgłoszeniem.** Magazynier
