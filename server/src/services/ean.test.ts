@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-ean-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Kolizje kodów przestają być dziennikiem bez wyjścia (0.359.0) ───────────
+/* ── Kolizje kodów przestają być dziennikiem bez wyjścia (0.360.0) ───────────
    `ean_conflict` zapisuje każde spotkanie kodu w alejce od 0.37.0 i do 0.358.0
    nie miał ANI JEDNEJ kolumny mówiącej, czy ktokolwiek się tym zajął. Obie
    strony patrzyły na tę samą listę — biuro w `/biuro`, hala na ekranie
@@ -111,7 +111,7 @@ test("druga decyzja NADPISUJE pierwszą, a licznik liczy się od nowej", () => {
 });
 
 test("REMIS MILISEKUNDY nie przekłamuje licznika — rozstrzyga `id`, nie znacznik", () => {
-  /* Ten test istnieje, bo pierwsza wersja 0.359.0 liczyła „po decyzji"
+  /* Ten test istnieje, bo pierwsza wersja 0.360.0 liczyła „po decyzji"
      porównaniem `seen_at > at`. Oba znaczniki mają rozdzielczość milisekundy,
      więc trafienie zapisane w tej samej milisekundzie co decyzja wpadało po
      złej stronie — a padało to RAZ NA KILKA przebiegów całego zestawu, czyli

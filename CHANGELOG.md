@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.360.0 — 16 września 2026
+## 0.361.0 — 16 września 2026
 
 **Pierwsza liczba mówiąca, ILE trwa sprawa między halą a biurem.** §22
 projektu panelu wymienia „czas realizacji zadania magazynowego" wśród metryk
@@ -91,7 +91,7 @@ patrzenie na miarę niczego nie mutuje.
 ---
 
 
-## 0.359.0 — 16 września 2026
+## 0.360.0 — 16 września 2026
 
 **Kolizja kodu przestaje być dziennikiem bez wyjścia.** `ean_conflict` zapisuje
 każde spotkanie tego samego kodu na kilku kartotekach od 0.37.0 i do 0.358.0
@@ -149,6 +149,50 @@ Wdrożenie bez pracy ręcznej; wymaga nowego APK, żeby hala zobaczyła decyzje.
 
 ---
 
+## 0.359.0 — 16 września 2026
+
+**Ten sam towar z kilku zwrotów to jedna linijka — i jest czym zmierzyć, czy
+to pomogło.** Dwie zmiany z jednej rozmowy o przyspieszeniu zwrotów. Pierwsza
+skraca pracę hali, druga mówi, gdzie ten czas naprawdę schodzi.
+
+**Sklejone linijki kosza.** Koszyk trzyma osobny wiersz na każdą pozycję
+zwrotu, bo tym wierszem wraca ślad na oś tamtego zwrotu. Na ekranie kolektora
+dawało to trzy razy ten sam symbol, trzy skany i trzy podejścia do tej samej
+półki. Na dokument MM te wiersze i tak wchodziły zsumowane, więc rozbicie żyło
+wyłącznie na ekranie (dekalog, punkt 3).
+
+- **Jedna pozycja z sumą sztuk** zamiast kilku identycznych. Sklejane są
+  wyłącznie wiersze nieodróżnialne: ten sam towar, stan, adres, powód
+  pominięcia i ta sama odpowiedź na „później".
+- **Linijka rusza się cała** — odłożenie, pominięcie, „później" i cofnięcie
+  biorą całe rodzeństwo. Ekran pokazujący trzy sztuki nie ma prawa zapisać
+  jednej.
+- **Ślad na osi zwrotu zostaje osobny.** Jedno odłożenie dopisuje zdanie
+  każdemu ze zwrotów — czeka na nie dwóch różnych klientów.
+- **Jedno zdarzenie na ruch człowieka**, z sumaryczną ilością. Trzy wpisy
+  w tej samej sekundzie zawyżałyby tempo w raporcie wydajności, a tam kierunek
+  błędu jest wybrany świadomie: zaniżamy.
+- **Zadanie zapisu adresu jest jedno** na cały ruch, więc cofnięcie anuluje
+  dokładnie ten zapis, który odłożenie zamówiło.
+
+**Raport cyklu zwrotu — `npm run zwroty:cykl`.** Rozmowa o przyspieszaniu
+zwrotów zaczęła się od zdania „rozkładanie jest wolne", a w kodzie praca hali
+była już ścięta do dwóch skanów na pozycję. Bez pomiaru następna zmiana byłaby
+znów zgadywaniem.
+
+- **Siedem odcinków życia kartonu**, z medianą i najdłuższym przypadkiem:
+  napełnianie, korekty, dokument, czekanie hali, rozkładanie, domknięcie
+  i cały cykl. Przy każdym stoi, czyja to praca.
+- **Zszywa koszyk „Z-7" z koszem „1209"** z jego dokumentu. Liczone osobno,
+  pierwszy nie ma ani jednego odłożenia, a drugi zamknięcia — odcinek między
+  nimi, czyli właśnie czekanie, nie istniałby w żadnym z nich.
+- **Działa wstecz i niczego nie zapisuje.** Wszystkie znaczniki są w bazie od
+  dawna: `kosz` wie, kiedy powstał i został zamknięty, a `sfera_queue` — kiedy
+  dokument wszedł do Subiekta.
+- **Mediana, nie średnia**, a próbka mniejsza niż pięć kartonów dostaje
+  gwiazdkę. Brak danych wypisuje się jako brak danych, nie jako zero.
+
+Nic nie trzeba ustawiać. Opis raportu i zdanie dla hali stoją w `DEPLOY.md`.
 
 ## 0.358.0 — 16 września 2026
 

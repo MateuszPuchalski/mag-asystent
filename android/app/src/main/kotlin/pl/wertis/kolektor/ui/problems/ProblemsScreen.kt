@@ -275,7 +275,7 @@ private fun ConflictCard(graph: AppGraph, row: EanConflictRow) {
             fontWeight = FontWeight.SemiBold,
             color = AmberInk,
         )
-        /* ── DECYZJA BIURA (0.359.0) ─────────────────────────────────────
+        /* ── DECYZJA BIURA (0.360.0) ─────────────────────────────────────
            Do 0.358.0 ta karta mówiła wyłącznie, ILE razy kod kogoś zatrzymał.
            Biuro patrzyło na tę samą listę w `/biuro` i też nie mogło nic
            powiedzieć — dziennik bez wyjścia z obu stron.

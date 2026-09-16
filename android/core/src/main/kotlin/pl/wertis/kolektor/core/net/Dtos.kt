@@ -887,7 +887,7 @@ data class EanConflictRow(
     /** Puste przy starszym serwerze — karta wraca wtedy do listy twIds. */
     val towary: List<KolizjaTowar> = emptyList(),
     val lastSeen: String = "",
-    /* ── CO BIURO POSTANOWIŁO (0.359.0) ─────────────────────────────────────
+    /* ── CO BIURO POSTANOWIŁO (0.360.0) ─────────────────────────────────────
        `null` przy starszym serwerze i przy kolizji, o której nikt się jeszcze
        nie wypowiedział — to dla hali ta sama sytuacja: nikt nie odpowiedział. */
     val rozstrzygniecie: RozstrzygniecieKolizji? = null,

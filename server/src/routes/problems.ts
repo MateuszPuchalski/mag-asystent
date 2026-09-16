@@ -130,7 +130,7 @@ export async function problemRoutes(app: FastifyInstance) {
   /** Raport kolizji EAN dla biura — lista kodów do naprawy w kartotece. */
   app.get("/api/ean-conflicts", async () => ({ conflicts: eanConflictReport() }));
 
-  /* ── BIURO ZAMYKA SPRAWĘ KODU (0.359.0) ──────────────────────────────────
+  /* ── BIURO ZAMYKA SPRAWĘ KODU (0.360.0) ──────────────────────────────────
      Do 0.358.0 `ean_conflict` był dziennikiem bez wyjścia: kolizja wpadała
      tam i zostawała na zawsze w tej samej postaci co pierwszego dnia. Obie
      strony patrzyły na tę samą listę — biuro w `/biuro`, hala na ekranie

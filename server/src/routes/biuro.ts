@@ -212,7 +212,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return null;
   }
 
-  /* ── ILE TRWA WYMIANA Z HALĄ (0.360.0) ───────────────────────────────────
+  /* ── ILE TRWA WYMIANA Z HALĄ (0.361.0) ───────────────────────────────────
      §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
      podaje przy nim ani progu, ani miejsca. W kodzie nie było go wcale:
      znaczniki obu końców leżą w bazie od lat, a różnicy nie liczył nikt.

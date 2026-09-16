@@ -1201,7 +1201,7 @@ CREATE TABLE IF NOT EXISTS ean_conflict (
 );
 CREATE INDEX IF NOT EXISTS ix_ean_conflict_ean ON ean_conflict(ean);
 
--- ── Co biuro postanowiło z kolizją (0.359.0) ──────────────────────────────
+-- ── Co biuro postanowiło z kolizją (0.360.0) ──────────────────────────────
 -- `ean_conflict` to DZIENNIK TRAFIEŃ: jeden wiersz na każde spotkanie kodu
 -- w alejce, raport agreguje je po kodzie. Rozstrzygnięcie dotyczy KODU, nie
 -- pojedynczego trafienia — kolumna `resolved_at` na dzienniku kazałaby pisać

@@ -29,7 +29,7 @@ export interface KolizjaTowar {
 }
 
 /**
- * Co biuro postanowiło z kodem (0.359.0).
+ * Co biuro postanowiło z kodem (0.360.0).
  *
  * DWA RODZAJE, bo hala reaguje na nie odwrotnie — patrz `schema.sql`.
  * `poprawione` obiecuje, że kolizja zniknie; `dopuszczone` mówi, że zostanie

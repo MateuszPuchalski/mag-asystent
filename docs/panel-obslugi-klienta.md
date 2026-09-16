@@ -4990,7 +4990,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
 | Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; bez progu „za późno", bo §22 nie podaje terminu |
 | Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
-| Czas realizacji zadania magazynowego (§22) | **działa** od 0.360.0 | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, bez progu „za późno" — §22 nie podaje terminu |
+| Czas realizacji zadania magazynowego (§22) | **działa** od 0.361.0 | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, bez progu „za późno" — §22 nie podaje terminu |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |

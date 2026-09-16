@@ -484,7 +484,7 @@ class DtosTest {
         assertNull(p.zalatwionePrzez)
     }
 
-    /* ── Decyzja biura o kolizji kodu (0.359.0) ──────────────────────────────
+    /* ── Decyzja biura o kolizji kodu (0.360.0) ──────────────────────────────
        Ten sam gatunek co przy `KoszPozycja` wyżej: pole leci po drucie i albo
        dociera, albo ginie w milczeniu. Tu doszło razem z serwerem, więc test
        pilnuje przede wszystkim STARSZEGO serwera — kolektor musi zdekodować
