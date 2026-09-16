@@ -81,6 +81,55 @@ w dół. Kolumny `prowadzi*` zostają w tabeli i nie czyta ich nikt: przebudowa
 dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje.
 
 Wdrożenie: nowy build panelu i serwera.
+## 0.369.0 — 16 września 2026
+
+**Notatka do dostawy wraca do miary i alarmu — jej wyłączenie było pomyłką.**
+0.361.0 zostawiło ten kanał poza miarą jednym zdaniem: „odpowiedź na notatkę
+bywa rozmową na kilka tur, więc czas wymiany znaczyłby tam co innego".
+
+To zdanie jest **nieprawdziwe o tej tabeli i mówi to sam kod**.
+`odpowiedzNaNotatke` odmawia nadpisania, bo „odpowiedź jest jedna
+i ostateczna", a nowe ustalenie to NOWA notatka. Kilka tur to kilka notatek,
+z których każda ma dwa końce — czyli dokładnie to, co ta miara liczy.
+Uzasadnienie przyszło z `conversation_event` w panelu obsługi, gdzie naprawdę
+jest wątkiem, i zostało przeniesione na strukturę działającą inaczej.
+Strukturę sprawdziłem dopiero teraz.
+
+### Kanał o najwyższej stawce z całej piątki
+
+To **jedyny**, w którym brak odpowiedzi WSTRZYMUJE pracę: `czekaNaOdpowiedz`
+nie pozwala domknąć dostawy, póki pytanie wisi bez odpowiedzi. Siedział poza
+miarą i poza alarmem, osłonięty zdaniem, którego nikt nie sprawdził.
+
+### Odczyt odpowiedzi przez biuro nie jest końcem wymiany
+
+`odp_widziana_at` (0.57.0) liczone jako zamknięcie wydłużałoby czas odpowiedzi
+HALI o zwłokę BIURA i mieszało dwie różne winy. Ma własny licznik w nagłówku
+panelu i to jest jego miejsce.
+
+### Ósma bramka: znacznik konfliktu w dokumencie
+
+Przy scalaniu `main` wyszło, że `CHANGELOG.md` **na `main`** niesie trzy linie
+porzuconego scalenia. Przeszły wszystkie siedem bramek, bo żadna nie czytała
+pliku `.md` pod kątem składni — ten skrypt sprawdzał numer wersji, martwe
+ścieżki i liczby, a nie to, czy plik jest cały.
+
+Drugie wydanie tego samego dnia dopisało swój wpis **wewnątrz** popsutego bloku
+i to jest właściwy powód tej bramki. Taki błąd nie stoi w miejscu: każde
+następne scalenie wkłada kolejną treść do środka, a obszar, którego nikt już
+nie rozdzieli z pamięci, rośnie.
+
+`sprawdz_znaczniki_konfliktu()` odmawia przy znaczniku na początku wiersza
+w dowolnym dokumencie z listy `DOCS`. Wzmianka w tekście przechodzi — jak ta
+powyżej. Znaczniki z `main` zdjęte przy okazji; oba popsute wpisy były całe,
+śmieciem były wyłącznie trzy linie.
+
+### Świadome wyłączenie i niesprawdzone założenie wyglądają identycznie
+
+W komentarzu różni je wyłącznie to, czy ktoś otworzył schemat. Ta pomyłka
+kosztowała jeden kanał w dwóch własnościach naraz — akurat ten, w którym
+cisza zatrzymuje dostawę.
+
 
 ## 0.368.0 — 16 września 2026
 
@@ -113,17 +162,6 @@ do czasu korekty.
   w logu. Licznik tras POST zwrotów 32 → 33.
 - **Kosz z dokumentem, pusty i rozliczony poza aplikacją odmawiają** — tam nie
   ma czego robić.
-
-**[poprawka] CHANGELOG miał w sobie niescalony konflikt.** Plik przyjechał na
-`main` ze scaleniem 0.365.0 ze znacznikami `<<<<<<< HEAD`, `=======`
-i `>>>>>>> origin/main` — z dwustu dwudziestoma liniami wpisów rozdzielonymi na
-dwie strony. Treść była cała i w dobrej kolejności, więc naprawa to skasowanie
-trzech linii.
-
-Gorsze od samego konfliktu jest to, że przeszedł SIEDEM BRAMEK i całą CI, a dwa
-kolejne wydania przeniosły go dalej, nie zauważając. Żadna kontrola nie czytała
-dokumentów pod tym kątem. Od tego wydania czyta: `tools/docs_check.py` odmawia,
-gdy którykolwiek śledzony dokument zaczyna linię od znacznika konfliktu.
 
 Wdrożenie: nowy build panelu i serwera.
 

@@ -33,7 +33,7 @@ import { mediana, OKNO } from "./raporty.js";
 
 export interface WierszWymiany {
   /** Klucz kanału — polszczyzna stoi na ekranie, nie w API. */
-  kanal: "zadanie" | "niezgodnosc" | "pominiecie" | "kolizja";
+  kanal: "zadanie" | "niezgodnosc" | "pominiecie" | "kolizja" | "notatka";
   /** Kierunek: kto na kogo czeka, gdy sprawa stoi. */
   kierunek: "biuro→hala" | "hala→biuro";
   zamknietych: number;
@@ -93,7 +93,7 @@ interface Kanal {
 }
 
 /**
- * Cztery kanały, jedno okno czasu — surowe minuty, nie podsumowania.
+ * Pięć kanałów, jedno okno czasu — surowe minuty, nie podsumowania.
  *
  * SUROWE, BO CZYTELNICY SĄ DWAJ. Tabela robi z tego medianę i ogon, alarm
  * niżej — próg i listę spóźnionych. Druga kopia tych czterech zapytań
@@ -101,10 +101,20 @@ interface Kanal {
  * a wtedy tabela i alarm mówiłyby o dwóch różnych zbiorach spraw pod
  * jedną nazwą. To gorsze niż brak alarmu.
  *
- * Notatek do dostaw tu NIE MA i to jest świadome: ich pętla ma własny licznik
- * nieprzeczytanych odpowiedzi w nagłówku panelu (0.77.0), a odpowiedź na
- * notatkę bywa rozmową na kilka tur — „czas wymiany" znaczyłby tam co innego
- * niż w pozostałych czterech i jedna tabela kłamałaby o obu naraz.
+ * NOTATKI DOSZŁY W 0.369.0, A ICH WYŁĄCZENIE BYŁO POMYŁKĄ. 0.361.0 zostawiło
+ * je poza miarą z uzasadnieniem „odpowiedź na notatkę bywa rozmową na kilka
+ * tur, więc czas wymiany znaczyłby tam co innego". To zdanie jest NIEPRAWDZIWE
+ * o tej tabeli i mówi to sam kod: `odpowiedzNaNotatke` odmawia nadpisania,
+ * bo „odpowiedź jest jedna i ostateczna", a nowe ustalenie to NOWA NOTATKA.
+ * Rozmowa na kilka tur to kilka notatek, z których każda jest osobną wymianą
+ * o dwóch końcach — czyli dokładnie tym, co ta funkcja mierzy. Uzasadnienie
+ * przyszło z `conversation_event` w panelu obsługi, gdzie rzeczywiście jest
+ * wątkiem, i zostało przeniesione na strukturę, która działa inaczej.
+ *
+ * TEN KANAŁ JEST ZRESZTĄ JEDYNYM, W KTÓRYM BRAK ODPOWIEDZI WSTRZYMUJE PRACĘ:
+ * `czekaNaOdpowiedz` nie pozwala domknąć dostawy, póki notatka wisi bez
+ * odpowiedzi. Sprawa o najwyższej stawce z całej piątki siedziała poza miarą
+ * i poza alarmem.
  */
 function zbierzKanaly(dni: number, teraz: number): Kanal[] {
   const okno = OKNO(dni);
@@ -162,15 +172,27 @@ function zbierzKanaly(dni: number, teraz: number): Kanal[] {
     return { zamkniete, otwarte };
   };
 
+  /* ── Notatki do dostaw: pytanie biura → odpowiedź hali ─────────────────
+     Trzeci znacznik (`odp_widziana_at`, odczyt odpowiedzi przez biuro) do
+     miary NIE wchodzi: wymiana kończy się, gdy hala odpowiedziała. Kiedy
+     biuro odpowiedź przeczytało, jest osobnym pytaniem i ma własny licznik
+     w nagłówku panelu od 0.57.0. */
+  const notatki = db().prepare(
+    `SELECT created_at AS od, odp_at AS domkniete
+       FROM delivery_note WHERE created_at >= ${granica}`
+  ).all(okno) as Array<{ od: string; domkniete: string | null }>;
+
   const p = rozbij(problemy);
   const k = rozbij(pominiecia);
   const e = rozbij(kolizje);
+  const n = rozbij(notatki);
 
   return [
     { kanal: "zadanie", kierunek: "biuro→hala", zamkniete: zadaniaZamkniete, otwarte: zadaniaOtwarte },
     { kanal: "niezgodnosc", kierunek: "hala→biuro", zamkniete: p.zamkniete, otwarte: p.otwarte },
     { kanal: "pominiecie", kierunek: "hala→biuro", zamkniete: k.zamkniete, otwarte: k.otwarte },
     { kanal: "kolizja", kierunek: "hala→biuro", zamkniete: e.zamkniete, otwarte: e.otwarte },
+    { kanal: "notatka", kierunek: "biuro→hala", zamkniete: n.zamkniete, otwarte: n.otwarte },
   ];
 }
 
@@ -264,7 +286,7 @@ export function progKanalu(zamkniete: number[]): {
 }
 
 /**
- * Cztery kanały, cztery własne progi, jedno stałe okno.
+ * Pięć kanałów, pięć własnych progów, jedno stałe okno.
  *
  * OKNO JEST STAŁE I NIE BIERZE SIĘ Z EKRANU. Tabela obok ma suwak dni, alarm
  * nie ma go celowo: sygnał, który zmienia treść przy przestawieniu listy

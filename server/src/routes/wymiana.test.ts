@@ -96,7 +96,7 @@ test("alarm NIE przyjmuje okna z zewnątrz — próg nie może zależeć od pyta
   assert.equal(t.json().dni, 7, "tabela nadal słucha swojego suwaka");
 });
 
-test("alarm wymienia wszystkie cztery kanały ZAWSZE, także bez spraw", async () => {
+test("alarm wymienia wszystkie pięć kanałów ZAWSZE, także bez spraw", async () => {
   /* Kanał, który znika z odpowiedzi przy pustej bazie, wygląda na ekranie
      tak samo jak kanał, w którym nic nie stoi — a to są dwie różne rzeczy. */
   const biuro = login("biuro", "Anna");
@@ -104,7 +104,7 @@ test("alarm wymienia wszystkie cztery kanały ZAWSZE, także bez spraw", async (
   const d = r.json();
   assert.deepEqual(
     d.kanaly.map((k: { kanal: string }) => k.kanal),
-    ["zadanie", "niezgodnosc", "pominiecie", "kolizja"]
+    ["zadanie", "niezgodnosc", "pominiecie", "kolizja", "notatka"]
   );
   for (const k of d.kanaly) {
     assert.equal(k.progMin, null, `${k.kanal}: pusta baza nie ma z czego liczyć progu`);
