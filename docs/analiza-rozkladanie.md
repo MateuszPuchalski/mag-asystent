@@ -106,6 +106,13 @@ Zniknęły od tego czasu:
   wraca też druga połowa drogi — po rozłożeniu kosza aplikacja zamawia jedno
   MM ZWROTY→MAG, więc stan schodzi z bufora bez ręki biura.
 
+  **Od 0.357.0 ten sam towar z kilku zwrotów to jedna linijka kosza.** Wierszy
+  w bazie zostaje tyle, ile zwrotów: każdy niesie ślad na oś swojego.
+  Magazynier widzi jednak jedną pozycję z sumą sztuk i odkłada ją jednym
+  ruchem.
+  Dokument MM sumował te wiersze od początku, więc rozbicie żyło tylko na
+  ekranie (dekalog, punkt 3).
+
 Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
 
 - skanowanie sprzętowe (Zebra/Honeywell) zastąpiło dotyk i chipy `DEMO_LOCS`,
@@ -123,6 +130,10 @@ Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykona
 > liczbowo.
 
 
+0. **Czym się mierzy skutek.** `npm run zwroty:cykl` liczy mediany siedmiu
+   odcinków życia jednego kartonu i mówi przy każdym, czyja to praca.
+   Odpowiada na jedno pytanie: który odcinek jest długi. Każda pozycja niżej
+   powinna zaczynać się od spojrzenia w ten raport, a nie od przeczucia.
 1. **Podpowiedzi dla BRAK LOK.** Towar bez lokalizacji wymaga znalezienia
    miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru.
    Może też podpowiadać lokalizacje towarów o podobnym symbolu.

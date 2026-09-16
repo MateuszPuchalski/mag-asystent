@@ -1844,6 +1844,19 @@ z numerem MM, które taki koszyk wystawił. Skan etykiety „Z-” podpowie ten
 numer. Kosze „Z-” w toku zostają w biurze: czekają na korekty albo na MM,
 jak dotąd.
 
+**Ten sam towar z kilku zwrotów to jedna linijka (0.357.0).** Kolektor
+pokazuje jedną pozycję z sumą sztuk i odkłada ją jednym ruchem. Nic nie trzeba
+ustawiać, ale powiedz hali dwie rzeczy:
+
+1. Linijka „3 szt." znaczy trzy sztuki z trzech zwrotów. Idą na tę samą półkę,
+   jednym skanem.
+2. Pominięcie i cofnięcie też biorą całą linijkę. Gdy jednej sztuki brakuje,
+   a dwie są, odłóż linijkę i zgłoś brak biuru.
+
+Liczby w raporcie wydajności lekko spadną przy kartonach z powtórzonym
+towarem: jeden ruch człowieka to od tego wydania jedno zdarzenie, a nie trzy.
+Kierunek jest wybrany świadomie — zawyżone tempo trafia do rozmowy o pracy.
+
 **Dziennik workera Sfery (0.350.1).** Usługa zarejestrowana bez `AppStdout`
 nie zapisuje nigdzie tego, co worker wypisuje. Na produkcji tak właśnie było
 przy nieudanym zapisie ZW. Dopisz ścieżki i zrestartuj usługę:
@@ -2335,6 +2348,31 @@ sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
   Poziomy strefy złotej są per zakres regałów w
   `server/src/services/strefa-zlota.ts` — regały bez reguły trafiają na osobną,
   czwartą listę, zamiast po cichu wpaść do złego kubełka.
+
+- **Raport cyklu zwrotu — gdy ktoś pyta, czy zwroty idą szybciej.** Liczy ze
+  znaczników, które w bazie już są, niczego nie zapisuje i działa wstecz.
+
+  ```bash
+  cd /c/wertis && npm run zwroty:cykl
+  npm run zwroty:cykl -- --dni 30
+  npm run zwroty:cykl -- --csv > kartony.csv
+  ```
+
+  Wypisuje mediany siedmiu odcinków życia jednego kartonu. Są to: napełnianie
+  koszyka, czekanie na korekty, wystawienie dokumentu, czekanie hali,
+  rozkładanie, domknięcie i cały cykl. Ostatni mierzy czas od zamknięcia pudła
+  do chwili, w której towar znów jest sprzedawalny.
+
+  Przy każdym odcinku stoi, **czyja to praca** — obsługi, biura, workera czy
+  hali. Odcinek „czekanie hali" nie jest niczyją: to czas, w którym karton
+  stoi. Obok mediany idzie najdłuższy przypadek, bo to on bywa reklamacją.
+
+  **Mediana, nie średnia** — jeden karton zamknięty w piątek i rozłożony
+  w poniedziałek podniósłby średnią o kilkadziesiąt godzin. Próbka mniejsza
+  niż pięć kartonów dostaje gwiazdkę: taka liczba jest szumem, nie wynikiem.
+
+  Raport sam zszywa koszyk „Z-7" z koszem „1209" z jego dokumentu — bez tego
+  pierwszy nie miałby ani jednego odłożenia, a drugi zamknięcia.
 
 - **Aktualizacja aplikacji** — jedną drogą, instalatorem:
 
