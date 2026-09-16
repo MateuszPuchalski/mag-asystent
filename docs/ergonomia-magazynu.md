@@ -62,6 +62,11 @@ od pamiętania. Nie każ pamiętać tego, co może zostać na ekranie.
 gdy krzyczy niżej (`android/app/src/main/kotlin/pl/wertis/kolektor/ui/delivery/DeliveryLinesScreen.kt`).
 Szczegóły chowa `Collapsible.kt`, a nie kolejny ekran.
 
+**Wskazana pozycja ma być widoczna.** Podświetlenie poza obszarem ekranu nie
+jest wskazaniem — jest pamięcią urządzenia, której człowiek nie widzi. Lista
+rozkładania sama przewija się do pozycji wskazanej skanem albo palcem; robi tak
+dostawa, kosz i karton.
+
 **Zabrania.** Przenoszenia liczby sztuk do poprzedniego ekranu, gdy człowiek
 liczy sztuki na tym.
 

@@ -11,9 +11,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -120,17 +124,39 @@ fun KoszScreen(graph: AppGraph) {
        w `:core`, tutaj mieszka tylko jej pamięć. */
     var uzbrojona by remember { mutableStateOf<Long?>(null) }
     var ostatniSkanAt by remember { mutableStateOf(0L) }
+    val listState = rememberLazyListState()
+
+    /* Wskazana pozycja ma być WIDOCZNA, a nie tylko wskazana. Kosz na
+       dwadzieścia wierszy mieści na ekranie kolektora cztery: po skanie towaru
+       z dna kosza podświetlenie lądowało poza widokiem, więc człowiek szukał
+       go kciukiem, choć urządzenie wiedziało, gdzie jest. Ta sama droga, którą
+       rozkładanie dostawy chodzi od dawna.
+
+       `kosz` jest kluczem razem z `wybrana`, bo serwer przestawia zrobione
+       pozycje na koniec listy — po odłożeniu ten sam identyfikator ma inny
+       indeks i przewinięcie sprzed przeładowania pokazywałoby cudzy wiersz. */
+    LaunchedEffect(wybrana, kosz) {
+        val i = kosz?.pozycje?.indexOfFirst { it.id == wybrana } ?: -1
+        if (i >= 0) listState.animateScrollToItem(i)
+    }
 
     /**
-     * @param przezSkan wskazanie pochodzi ze SKANU towaru, a nie z automatu po
-     *   odłożeniu ani z dotknięcia wiersza. Tylko ono uzbraja drugi skan:
-     *   po każdym odłożeniu ekran sam wskazuje następną pozycję, więc bez tego
-     *   rozróżnienia PIERWSZY skan przy nowej pozycji odkładałby ją od razu.
+     * @param odCzlowieka pozycję wskazał CZŁOWIEK — skanem towaru albo palcem
+     *   w wiersz — a nie automat po odłożeniu. Tylko takie wskazanie uzbraja
+     *   drugi skan: po każdym odłożeniu ekran sam wskazuje następną pozycję,
+     *   więc bez tego rozróżnienia PIERWSZY skan przy nowej pozycji odkładałby
+     *   ją od razu, zanim magazynier zdąży spojrzeć na regał.
+     *
+     *   Dotknięcie wiersza liczy się TAK SAMO jak skan (0.362.0) i wcześniej
+     *   nie liczyło. Kto wybrał towar palcem, a potem go zeskanował, dostawał
+     *   samo ponowne wskazanie — dwa razy pokazał urządzeniu to samo i nic się
+     *   nie działo. Automat po odłożeniu zostaje nieuzbrojony, bo jego nikt nie
+     *   wskazywał.
      */
-    fun wybierz(p: KoszPozycja?, przezSkan: Boolean = false) {
+    fun wybierz(p: KoszPozycja?, odCzlowieka: Boolean = false) {
         wybrana = p?.id
         adres = p?.lokOczekiwana ?: ""
-        uzbrojona = if (przezSkan) p?.id else null
+        uzbrojona = if (odCzlowieka) p?.id else null
     }
 
     /* Kolejny przedmiot do wzięcia z kosza. Serwer trzyma pozycje zrobione na
@@ -236,9 +262,16 @@ fun KoszScreen(graph: AppGraph) {
                             odloz(r.pozycjaId!!, kod, potwierdzenie = "towar")
                         } else {
                             graph.feedback.beep(true)
+                            /* Drugi skan TEJ SAMEJ pozycji bez adresu nie ma
+                               czego potwierdzić — regułę zna `czyPotwierdzaOdlozenie`,
+                               ale odmowa była dotąd niema i wyglądała jak
+                               niedziałający skaner. Zdanie mówi, czego brakuje. */
+                            if (r.pozycjaId == uzbrojona && adres.isBlank()) {
+                                graph.effects.toast("Najpierw regał — bez adresu nie wiem, gdzie odłożyć")
+                            }
                             wybierz(
                                 kosz?.pozycje?.firstOrNull { it.id == r.pozycjaId },
-                                przezSkan = true,
+                                odCzlowieka = true,
                             )
                         }
                     }
@@ -391,18 +424,23 @@ fun KoszScreen(graph: AppGraph) {
 
         /* Jedyna przewijana część ekranu. Odstęp MUSI być powtórzony: `spacedBy`
            kolumny zewnętrznej rozdziela już tylko szapkę od listy, a nie wiersze
-           między sobą. Dolne wcięcie stoi PO `verticalScroll`, więc jedzie
-           z treścią i daje ostatniemu wierszowi oddech, zamiast zostawiać pusty
-           pasek nad krawędzią. */
-        Column(
+           między sobą. Dolne wcięcie jedzie W TREŚCI (`contentPadding`), więc
+           daje ostatniemu wierszowi oddech, zamiast zostawiać pusty pasek nad
+           krawędzią.
+
+           LENIWA OD 0.362.0, wcześniej `Column` z `verticalScroll`. Zmiana jest
+           po to, żeby dało się PRZEWINĄĆ DO WSKAZANEJ pozycji: `animateScrollToItem`
+           potrzebuje indeksu, a przewijana kolumna zna tylko piksele. Ta sama
+           droga, którą rozkładanie dostawy chodzi od 0.54.0. */
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 12.dp),
+                .weight(1f),
+            contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            k.pozycje.forEach { p ->
+            items(k.pozycje, key = { it.id }) { p ->
                 val wskazana = p.id == wybrana && k.status == "zamkniety"
                 PozycjaRow(
                     graph = graph,
@@ -426,7 +464,7 @@ fun KoszScreen(graph: AppGraph) {
                     },
                     /* Pozycja ODŁOŻONA też daje się wskazać — inaczej nie byłoby
                        jak cofnąć złego skanu ani poprawić adresu. */
-                    onClick = { wybierz(p) },
+                    onClick = { wybierz(p, odCzlowieka = true) },
                 )
             }
 
@@ -439,7 +477,7 @@ fun KoszScreen(graph: AppGraph) {
 
                Serwer przepuści ją tylko wtedy, gdy MM jeszcze czekają w kolejce;
                po zapisie do Subiekta odmówi i powie dlaczego. */
-            if (k.status == "rozlozony") {
+            if (k.status == "rozlozony") item(key = "cofnij-zakonczenie") {
                 OutlineButton("COFNIJ ZAKOŃCZENIE", modifier = Modifier.fillMaxWidth()) {
                     scope.launch {
                         try {
