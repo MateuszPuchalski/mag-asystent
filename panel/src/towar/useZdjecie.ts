@@ -260,6 +260,28 @@ export function useZdjecieZalacznikaReklamacji(
   return { url, blad, ponow };
 }
 
+/**
+ * PIĄTE ŹRÓDŁO: zdjęcie od hali przy zadaniu terenowym (0.352.0).
+ *
+ * Ta sama mechanika co przy czterech poprzednich i z tego samego powodu:
+ * `/api/zadania-terenowe/:id/zalacznik/:zid` stoi za sesją, więc `<img src>`
+ * dostaje 401 i rysuje ikonę zepsutego obrazu. Nagłówek tego pliku liczy, ile
+ * razy ta blizna już kosztowała — piąty raz kupowałby ją świadomie.
+ *
+ * Zdanie o porażce jest tu potrzebne jak w skrzynce, nie jak przy kartotece:
+ * zdjęcie z hali jest CZĘŚCIĄ ODPOWIEDZI na pytanie klienta. Jego brak bez
+ * powodu wygląda tak samo jak brak zdjęcia, którego nikt nie zrobił.
+ */
+export function useZdjecieZadania(
+  zadanieId: number, zalacznikId: number | null | undefined,
+): { url: string | null | undefined; blad: string | null; ponow: () => void } {
+  const sciezka = zalacznikId == null
+    ? null : `/api/zadania-terenowe/${zadanieId}/zalacznik/${zalacznikId}`;
+  const url = useObraz(sciezka);
+  const { blad, ponow } = useBladObrazu(sciezka);
+  return { url, blad, ponow };
+}
+
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */
 export function _wyczyscPamiecZdjec() {
   pamiec.clear();

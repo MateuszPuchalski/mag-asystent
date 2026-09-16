@@ -311,6 +311,31 @@ export const SIATKA_TRZECH_KOLUMN =
 export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
+/**
+ * Wiek po ludzku — „41 min", „2 g 36 min", „3 dni".
+ *
+ * Mieszkał w `skrzynka/AlarmSynchronizacji.tsx` od 0.152.0 i miał tam jednego
+ * odbiorcę. Od 0.352.0 ma dwóch: alarm i zegar zadań terenowych, gdzie zdanie
+ * „ile danych brakuje" zamienia się w „jak dawno biuro poprosiło".
+ *
+ * DOBA ROZBIJA SIĘ NA DNI (0.352.0). Do tego wydania funkcja kończyła się na
+ * godzinach, bo alarm synchronizacji liczy minuty i nikt nie dawał jej doby.
+ * Zadanie terenowe potrafi czekać tydzień, a „172 g 12 min" to liczba, którą
+ * czytelnik musi podzielić w głowie, żeby się przestraszyć. Poniżej doby nic
+ * się nie zmienia — alarm dostaje dokładnie to co dotąd.
+ */
+export function wiek(ms: number | null): string {
+  if (ms == null) return "—";
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return "poniżej minuty";
+  const g = Math.floor(min / 60);
+  if (g >= 24) {
+    const dni = Math.floor(g / 24);
+    return dni === 1 ? "1 dzień" : `${dni} dni`;
+  }
+  return g ? `${g} g ${min % 60} min` : `${min} min`;
+}
+
 /** Sama godzina — „14:23". Tam, gdzie data jest oczywista z kontekstu. */
 export const godzina = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleTimeString("pl", { timeStyle: "short" }) : "—";

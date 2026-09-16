@@ -408,6 +408,40 @@ export function dopiszZdarzenieWyniku(
   publishConversationEvent("warehouse.result", conversationId, { taskId: zadanieId, result: wynik });
 }
 
+/**
+ * Dopisuje na oś rozmowy ODESŁANIE zadania — czyli brak wyniku (0.352.0).
+ *
+ * Osobny typ zdarzenia, a nie `field_task_result` z doklejonym zdaniem
+ * „nie da się". Oś jest księgą: wpis mówiący „wynik" o zadaniu, które wyniku
+ * nie ma, kłamie tak samo jak status `wykonane` na zadaniu odesłanym — a to
+ * jest dokładnie ta nieprawda, dla której ta wersja powstała.
+ *
+ * Skutek dla statusu rozmowy jest TEN SAM co przy wyniku i to nie jest
+ * niekonsekwencja: `waiting_for_internal` znaczy „czekamy na halę". Hala
+ * odpowiedziała. Że odpowiedziała „nie mam czym", nie zmienia faktu, że
+ * czekanie się skończyło i ruch wraca do agenta.
+ */
+export function dopiszZdarzenieOdeslania(
+  conversationId: number,
+  zadanieId: number,
+  powodKod: string,
+  powod: string | null,
+  database: DatabaseSync = db(),
+): void {
+  database.prepare(`
+    INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+    VALUES (?, NULL, 'field_task_returned', json_object('taskId', ?, 'reasonCode', ?, 'reason', ?))
+  `).run(conversationId, zadanieId, powodKod, powod);
+  const przed = statusZapisany(database, conversationId);
+  if (przed === "waiting_for_internal") {
+    database.prepare("UPDATE conversation SET status='open', snoozed_until=NULL WHERE id=?")
+      .run(conversationId);
+    zapiszZmianeStatusu(database, conversationId, przed, "open", "hala", undefined);
+  }
+  publishConversationEvent("warehouse.returned", conversationId,
+    { taskId: zadanieId, reasonCode: powodKod, reason: powod });
+}
+
 /* ── Statusy rozmowy §7 (0.158.0) ────────────────────────────────────────────
    Do tego wydania `conversation` nie miała kolumny statusu. Kolejka nie
    odróżniała sprawy załatwionej od nietkniętej, a rozmowa raz otwarta rosła

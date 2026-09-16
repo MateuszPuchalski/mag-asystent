@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User } from "lucide-react";
+import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
 import type { StatusDoboru, StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { LoginKlienta, Przycisk, czas } from "../ui";
@@ -309,6 +309,16 @@ export function Os({
           <Przycisk className="mt-2 text-xs" onClick={() => onWstawDoSzkicu(w.tresc)}>
             Wstaw wynik do szkicu</Przycisk>
         </article>
+      : w.rodzaj === "odeslanie_zadania"
+      /* Fiolet i brak przycisku do szkicu — oba celowo. Barwa ta sama co na
+         ekranie zadań, żeby jeden stan miał w panelu jedną barwę. Przycisku
+         nie ma, bo „brak towaru: półka A01 pusta" to notatka wewnętrzna: do
+         kupującego idzie zdanie, które agent musi napisać sam. */
+      ? <article key={w.id} className="ml-6 rounded-lg border border-violet-300 bg-violet-50 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold uppercase text-violet-900">
+            <Undo2 size={12} />Hala odesłała · {w.autor}</div>
+          <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
+        </article>
       /* PRÓG CZYTELNOŚCI, nie ozdoba (0.198.0). Od zdjęcia ogranicznika
          1500 px z `<main>` środkowa kolumna rośnie z monitorem, a wypowiedź
          rozciągnięta na całą jej szerokość dawałaby linijkę na sto dwadzieścia
@@ -536,6 +546,11 @@ const RODZAJ_ZLECENIA: Record<string, { nazwa: string; Ikona: typeof Ruler }> = 
 const STAN_ZLECENIA: Record<string, { etykieta: string; klasa: string }> = {
   nowe: { etykieta: "czeka na halę", klasa: "bg-amber-100 text-amber-900" },
   w_toku: { etykieta: "hala pracuje", klasa: "bg-sky-100 text-sky-900" },
+  /* 0.352.0: bez tego wiersza kafelek wypisywał surowy klucz „odeslane"
+     w szarości, a karta zostawała bursztynowa jak przy czekaniu na halę —
+     czyli mówiła, że hala pracuje, choć hala właśnie odmówiła. Fiolet ten sam
+     co na ekranie zadań, żeby jeden stan miał jedną barwę w całym panelu. */
+  odeslane: { etykieta: "hala odesłała", klasa: "bg-violet-100 text-violet-900" },
   wykonane: { etykieta: "wykonane", klasa: "bg-emerald-100 text-emerald-800" },
   anulowane: { etykieta: "anulowane", klasa: "bg-slate-200 text-slate-600" },
 };
@@ -543,7 +558,10 @@ const STAN_ZLECENIA: Record<string, { etykieta: string; klasa: string }> = {
 function Zlecenie({ wpis }: { wpis: WpisOsi }) {
   const z = wpis.zlecenie;
   if (!z) return null;
-  const zamkniete = z.status === "wykonane" || z.status === "anulowane";
+  /* `odeslane` liczy się tu jak zamknięte, bo kryterium jest jedno: czy
+     hala nad tym pracuje. Nie pracuje — odesłała. Bursztyn zostaje dla
+     zlecenia, które naprawdę stoi w kolejce magazynu. */
+  const zamkniete = z.status === "wykonane" || z.status === "anulowane" || z.status === "odeslane";
   const stan = STAN_ZLECENIA[z.status] ?? { etykieta: z.status, klasa: "bg-slate-100 text-slate-600" };
   const { nazwa, Ikona } = RODZAJ_ZLECENIA[z.rodzaj] ?? RODZAJ_ZLECENIA.inne;
   return <article aria-label={`Zlecenie: ${z.tytul}`}

@@ -790,6 +790,7 @@ export function migrate(database: DatabaseSync) {
   /* NA KOŃCU, po wszystkich `addColumn`: przebudowa kopiuje kolumny po
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
+  zadanieWracaDoBiura(database);
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
   doborZnaDrogi(database);
@@ -1645,6 +1646,98 @@ function zadanieNieTrzymaTowaru(database: DatabaseSync) {
       /* Indeksy giną razem z tabelą, a `schema.sql` odtworzy je dopiero przy
          NASTĘPNYM otwarciu bazy. Do tego czasu kolejka zadań na kolektorze
          skanowałaby całą tabelę, więc stawiamy je tutaj. */
+      database.exec(`
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_status
+          ON zadanie_terenowe(status, priorytet, utworzono_at);
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_przypisane
+          ON zadanie_terenowe(przypisano_user_id, status);
+        CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_towar
+          ON zadanie_terenowe(tw_id, utworzono_at);
+      `);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+/**
+ * Hala ma czym odpowiedzieć „nie da się" (0.352.0).
+ *
+ * Do 0.351.0 zadanie terenowe miało z hali JEDNO wyjście: wynik. Magazynier
+ * przed pustą półką mógł więc tylko wpisać brak jako wynik — i zadanie szło do
+ * biura oznaczone jako WYKONANE — albo zostawić je w `w_toku`, gdzie nie
+ * widział go nikt. Projekt panelu §13.3 wymienia „odrzuca z powodem",
+ * „oznacza brak towaru" i „oznacza brak możliwości wykonania" od pierwszej
+ * wersji; kod nie miał żadnego z tych trzech.
+ *
+ * `CHECK` na statusie SQLite poszerzyć w miejscu nie umie, stąd przebudowa —
+ * ta sama co przy `towar_identyfikator`. Biegnie PO `zadanieNieTrzymaTowaru`,
+ * bo tamta odtwarza tabelę w kształcie swojej epoki i skasowałaby te kolumny.
+ */
+function zadanieWracaDoBiura(database: DatabaseSync) {
+  const ksztalt = () => (database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zadanie_terenowe'"
+  ).get() as { sql: string } | undefined);
+  const wiersz = ksztalt();
+  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'odeslane'")) return;
+
+  /* Klucze obce schodzą PRZED transakcją z tego samego powodu co przy
+     przebudowie wyżej: w transakcji `PRAGMA foreign_keys` jest ignorowane
+     po cichu, a `DROP TABLE` rodzica przy wierszach dziecka wywróciłby start
+     usługi. */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    transaction(database, () => {
+      /* Warunek PONOWNIE pod blokadą zapisu: API i worker startują razem
+         i oba wołają `migrate()`. */
+      const teraz = ksztalt();
+      if (!teraz || teraz.sql.includes("'odeslane'")) return;
+      database.exec(`
+        CREATE TABLE zadanie_terenowe_nowe (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
+          tytul TEXT NOT NULL,
+          instrukcja TEXT NOT NULL,
+          tw_id INTEGER REFERENCES sgt_towar(tw_id) ON DELETE SET NULL,
+          zrodlo TEXT NOT NULL DEFAULT 'reczne',
+          zrodlo_ref TEXT,
+          priorytet TEXT NOT NULL DEFAULT 'normalny' CHECK (priorytet IN ('normalny','pilny')),
+          status TEXT NOT NULL DEFAULT 'nowe'
+            CHECK (status IN ('nowe','w_toku','wykonane','anulowane','odeslane')),
+          utworzono_at TEXT NOT NULL, utworzono_przez TEXT NOT NULL,
+          utworzono_user_id INTEGER REFERENCES app_user(user_id),
+          przypisano_at TEXT, przypisano_przez TEXT,
+          przypisano_user_id INTEGER REFERENCES app_user(user_id),
+          wynik TEXT, wykonano_at TEXT, wykonano_przez TEXT,
+          wykonano_user_id INTEGER REFERENCES app_user(user_id),
+          anulowano_at TEXT, anulowano_przez TEXT,
+          odeslano_at TEXT, odeslano_przez TEXT,
+          odeslano_user_id INTEGER REFERENCES app_user(user_id),
+          powod_kod TEXT CHECK (powod_kod IS NULL OR powod_kod IN ('brak_towaru','nie_da_sie')),
+          powod TEXT,
+          conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+          message_id INTEGER REFERENCES message(id) ON DELETE SET NULL
+        );
+        INSERT INTO zadanie_terenowe_nowe(
+          id, rodzaj, tytul, instrukcja, tw_id, zrodlo, zrodlo_ref, priorytet, status,
+          utworzono_at, utworzono_przez, utworzono_user_id,
+          przypisano_at, przypisano_przez, przypisano_user_id,
+          wynik, wykonano_at, wykonano_przez, wykonano_user_id,
+          anulowano_at, anulowano_przez, conversation_id, message_id)
+        SELECT
+          id, rodzaj, tytul, instrukcja, tw_id, zrodlo, zrodlo_ref, priorytet, status,
+          utworzono_at, utworzono_przez, utworzono_user_id,
+          przypisano_at, przypisano_przez, przypisano_user_id,
+          wynik, wykonano_at, wykonano_przez, wykonano_user_id,
+          anulowano_at, anulowano_przez, conversation_id, message_id
+        FROM zadanie_terenowe;
+        DROP TABLE zadanie_terenowe;
+        ALTER TABLE zadanie_terenowe_nowe RENAME TO zadanie_terenowe;
+      `);
+      /* Indeksy giną razem z tabelą, a `schema.sql` odtworzy je dopiero przy
+         NASTĘPNYM otwarciu bazy — ten sam powód co przy przebudowie wyżej. */
       database.exec(`
         CREATE INDEX IF NOT EXISTS ix_zadanie_terenowe_status
           ON zadanie_terenowe(status, priorytet, utworzono_at);

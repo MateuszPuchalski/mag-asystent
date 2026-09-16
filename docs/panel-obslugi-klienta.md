@@ -1676,10 +1676,57 @@ lokalizację, oczekiwany typ wyniku i osobę zlecającą.
 Magazynier przejmuje zadanie, odrzuca z powodem, wpisuje wynik, robi zdjęcie,
 oznacza brak towaru, oznacza brak możliwości wykonania i kończy zadanie.
 
+**Droga powrotna działa od 0.352.0 i do tego wydania jej nie było.** Hala miała
+jedno wyjście — wynik — więc magazynier przed pustą półką albo wpisywał brak
+JAKO WYNIK i zadanie szło do biura oznaczone jako wykonane, albo zostawiał je
+w toku, gdzie nie widział go już nikt. Pierwsze kłamie w metryce „czas
+realizacji zadania magazynowego" (§22), drugie kłamie ciszą.
+
+Odesłanie ma status `odeslane` i **kod powodu**: `brak_towaru` albo
+`nie_da_sie`. Kod jest obowiązkowy, dopisek nie — kciuk w rękawicy ma dotknąć
+jednego kafla, a nie pisać zdań nad pustą półką. Dwa kody, bo biuro reaguje na
+nie inaczej: przy braku towaru idzie do Subiekta albo do dostawcy, przy
+niemożliwości przeformułowuje zlecenie. Trzeci kod musiałby nazwać trzecią
+reakcję biura, a takiej nie ma.
+
+**Oddanie (`oddaj`) to nie odesłanie.** Nie ma werdyktu ani powodu: zadanie
+wraca na `nowe` i weźmie je ktokolwiek inny. Istnieje, bo przejęcie przypinało
+zadanie do konta na zawsze — magazynier, który wziął pomiar i skończył zmianę,
+zostawiał je poza zasięgiem kolektorów innych osób.
+
+**Zdjęcie działa od 0.352.0** i jest TABELĄ (`zadanie_zalacznik`), nie kolumną.
+Zadanie żyje dłużej niż jedna odpowiedź: hala odsyła je ze zdjęciem pustej
+półki, biuro ponawia, a druga próba kończy się pomiarem i zdjęciem suwmiarki.
+Jedno pole kasowałoby pierwszy dowód przy drugim.
+
+Bramka jest ta sama co przy odesłaniu: zadanie czekające albo przejęte przez
+tę osobę. Do zadania rozliczonego zdjęcia się nie dokłada — dowód przy pracy
+sprzed tygodnia nie jest odpowiedzią, tylko dopiskiem do cudzej pracy. Podpis
+jest nieobowiązkowy: kciuk w rękawicy ma zrobić zdjęcie, a nie opisać je
+zdaniem.
+
+Plik leży w `data/photos`, obok zdjęć niezgodności w dostawie, i idzie tą samą
+drogą (`services/foto.ts`, wyprowadzone z `problems.ts` w 0.352.0). Limit stoi
+w DWÓCH miejscach i to nie jest powtórzenie: 4 MiB ciała na trasie chroni
+proces przed kadrem z 13 Mpx, 3 MB w serwisie chroni dysk przed aparatem
+zaciętym na serii.
+
+Zadanie odesłane leży po stronie BIURA i ma stamtąd dokładnie dwa wyjścia:
+`ponow` (wraca na `nowe`, wolno przy okazji poprawić instrukcję) albo
+`anuluj`. Ślad odesłania zostaje w księdze zdarzeń także po ponowieniu —
+inaczej „ile razy hala odesłała ten pomiar" nie miałoby gdzie się policzyć,
+a to jest pytanie o jakość zleceń biura, nie hali.
+
 ### 13.4. Wynik
 
 Wynik wraca na oś rozmowy, do listy zadań, do autora, do szkicu i opcjonalnie
 do propozycji wpisu w bazie wiedzy.
+
+Odesłanie wraca tą samą drogą co wynik i **zdejmuje `waiting_for_internal`**:
+rozmowa czekała na halę, a hala odpowiedziała — to, że odpowiedziała „nie mam
+czym", nie zmienia faktu, że czekanie się skończyło. Na osi stoi jako osobny
+rodzaj wpisu (`odeslanie_zadania`), nigdy jako wynik: agent ma zobaczyć, że
+pomiaru NIE MA, a nie pomiar brzmiący jak wymówka.
 
 **Wynik nie staje się automatycznie potwierdzonym faktem technicznym.**
 Utrwalenie go jako wiedzy wymaga zatwierdzenia. Od E2 robi to przycisk
@@ -2388,6 +2435,11 @@ POST   /api/obsluga/zadania/pomiar
 GET    /api/zadania-terenowe
 POST   /api/zadania-terenowe/:id/wez
 POST   /api/zadania-terenowe/:id/wykonaj
+POST   /api/zadania-terenowe/:id/odeslij
+POST   /api/zadania-terenowe/:id/oddaj
+POST   /api/zadania-terenowe/:id/ponow
+POST   /api/zadania-terenowe/:id/zalacznik
+GET    /api/zadania-terenowe/:id/zalacznik/:zid
 GET    /api/products/search
 GET    /api/obsluga/rozmowy/:id/dobor/kandydaci
 PUT    /api/obsluga/rozmowy/:id/dobor/dane
@@ -4758,6 +4810,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Jawna zgoda „odpowiedz mimo to" przy cudzym uchwycie | **działa** od 0.224.1 | flaga `mimoObecnosci` w ciele wysyłki; do 0.224.0 trasa jej nie deklarowała i gubiła, więc miękka blokada działała jak twarda |
 | Szyna zdarzeń do panelu | **działa** od 0.144.0 | `GET /api/conversations/events` |
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
+| Droga powrotna z hali (§13.3) | **działa** od 0.352.0 | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
+| Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
+| Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; bez progu „za późno", bo §22 nie podaje terminu |
+| Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |
