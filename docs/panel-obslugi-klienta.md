@@ -3033,6 +3033,31 @@ oddawał: `zwrotow` na liście (stąd „undefined zwr.") i `zwroty` w podglądz
 Subiekta mają numer MM i trafiają w drugą gałąź tego samego zdania — własne
 kosze biuro zaczęło składać dopiero teraz.
 
+**Bramkę wolno sforsować (0.368.0).** Decyzja właściciela: „dodaj opcję
+sforsowania zamknięcia koszyka, nawet jeśli nie ma wszystkich ZW". Bramka
+z 0.200.0 zostaje domyślna i zostaje słuszna — to jest wyjście awaryjne obok
+niej, nie jej zdjęcie.
+
+Kiedy ma sens: korekta bywa wystawiona poza aplikacją albo wystawi się za
+chwilę, a kosz fizycznie stoi na drodze i blokuje pracę hali. Człowiek przy
+biurku wie to, czego baza nie wie.
+
+Co to kosztuje, powiedziane wprost, bo płaci to magazyn: MM idzie na stan,
+którego jeszcze nie ma. Sfera odrzuci dokument przy braku stanu albo — gdy
+Subiekt dopuszcza ujemne — stan zejdzie pod zero do czasu korekty. To jest
+dokładnie ten błąd kolejności, który naprawiło 0.200.0, więc droga zostawia
+ślad z numerami zwrotów, na które nie doczekano.
+
+Przycisk stoi przy koszu czekającym, w pasku nad kolejką, i wymaga DRUGIEGO
+kliknięcia. To jedyne miejsce w tym panelu, w którym pytamy „czy na pewno":
+dekalog zabrania pytania po czynności, którą coś już potwierdziło, a tu
+potwierdzić nie ma czego — skutek widać dopiero w Subiekcie. Zdanie mówi
+KOSZT, nie „operacja nieodwracalna".
+
+Jedna droga obsługuje oba stany: kosz otwarty zamyka się po drodze, a kosz
+już zamknięty albo rozłożony dostaje sam dokument. Kosz z dokumentem, pusty
+i rozliczony poza aplikacją odmawiają — tam nie ma czego robić.
+
 **Kosz bez dokumentu wolno poprawić (0.334.0).** Zgłoszenie właściciela:
 „dodałem zestaw, a powinienem rozbić go przed dodaniem do MM — nie chce się
 zrobić". Kosz stał zamknięty tygodniami, bo MM czeka na komplet korekt, a jego

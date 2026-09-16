@@ -35,6 +35,40 @@ historii nie przepisujemy.
 
 
 <<<<<<< HEAD
+## 0.368.0 — 16 września 2026
+
+**Bramkę korekt wolno sforsować.** Decyzja właściciela: „dodaj opcję
+sforsowania zamknięcia koszyka, nawet jeśli nie ma wszystkich ZW".
+
+Bramka z 0.200.0 zostaje domyślna i zostaje słuszna. To jest wyjście awaryjne
+obok niej, nie jej zdjęcie: kosz stoi czasem tygodniami i blokuje pracę hali,
+a człowiek przy biurku wie to, czego baza nie wie — korekta bywa wystawiona
+poza aplikacją albo wystawi się za chwilę.
+
+**Co to kosztuje, panel mówi wprost**, bo płaci to magazyn. MM zdejmuje towar
+z magazynu głównego, a ze zwrotu wraca on tam dopiero po korekcie. Dokument
+wypuszczony wcześniej idzie na stan, którego jeszcze nie ma: Sfera odrzuci go
+przy braku stanu albo — gdy Subiekt dopuszcza ujemne — stan zejdzie pod zero
+do czasu korekty.
+
+- **Przycisk stoi przy koszu czekającym** i wymaga DRUGIEGO kliknięcia. To
+  jedyne miejsce w panelu, w którym pytamy „czy na pewno": dekalog zabrania
+  pytania po czynności, którą coś już potwierdziło, a tu potwierdzić nie ma
+  czego — skutek widać dopiero w Subiekcie.
+- **Jedna droga na oba stany.** Kosz otwarty zamyka się po drodze, a kosz już
+  zamknięty albo rozłożony dostaje sam dokument. Ten drugi przypadek jest
+  właśnie tym z życia.
+- **Ślad z numerami zwrotów**, na które nie doczekano. Gdy MM wywróci się na
+  braku stanu, pierwsze pytanie brzmi „na czyją korektę" — i zdarzenie ma na
+  nie odpowiedzieć bez odtwarzania stanu bazy sprzed wypuszczenia.
+- **Osobna trasa, nie flaga przy zamykaniu.** Flaga w ciele robi z wyjątku
+  wariant zwykłej czynności: łatwo ustawić ją przez pomyłkę i nie widać jej
+  w logu. Licznik tras POST zwrotów 32 → 33.
+- **Kosz z dokumentem, pusty i rozliczony poza aplikacją odmawiają** — tam nie
+  ma czego robić.
+
+Wdrożenie: nowy build panelu i serwera.
+
 ## 0.367.0 — 16 września 2026
 
 **Paczkę znajdziesz po tym, co widać na naklejce.** Zgłoszenie właściciela:

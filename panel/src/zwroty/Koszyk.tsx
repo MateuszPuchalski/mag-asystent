@@ -1,6 +1,6 @@
 import React from "react";
 import { PackageOpen, X } from "lucide-react";
-import { useKosz, useZamknijKosz, useZdejmijTowar } from "../api/zwroty";
+import { useKosz, useMmMimoKorekt, useZamknijKosz, useZdejmijTowar } from "../api/zwroty";
 import { Przycisk, Blad } from "../ui";
 
 /* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
@@ -27,6 +27,11 @@ export function Koszyk() {
      z oceny schodzi cofnięciem oceny na karcie zwrotu — jedna droga na oba
      kosztowałaby kasowanie cudzej oceny z drugiej strony ekranu. */
   const zdejmij = useZdejmijTowar();
+  /* WYMUSZENIE DOKUMENTU (0.368.0) — decyzja właściciela, wyjście awaryjne
+     obok bramki z 0.200.0. Osobna mutacja, bo osobna trasa: tę decyzję ma być
+     widać, a nie ukrywać w fladze przy zwykłym zamykaniu. */
+  const mimo = useMmMimoKorekt();
+  const [pewien, setPewien] = React.useState<number | null>(null);
   /* DWA KOSZYKI OD 0.211.0: zwroty i odpad. Pusty się nie pokazuje — pasek
      rośnie wtedy, kiedy operator naprawdę coś w nim ma. */
   const kosze = (data?.kosze ?? []).filter((k) => k.pozycji > 0);
@@ -53,6 +58,37 @@ export function Koszyk() {
         MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero
         po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni numer.
       </span>
+      {/* ── WYMUSZENIE (0.368.0) ──────────────────────────────────────────
+          Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
+          nawet jeśli nie ma wszystkich ZW". Kosz stoi czasem tygodniami i
+          blokuje pracę hali, a człowiek przy biurku wie to, czego baza nie wie
+          — korekta bywa wystawiona poza aplikacją albo wystawi się za chwilę.
+
+          DWA KLIKNIĘCIA, i to jest jedyne miejsce w tym panelu, gdzie pytamy
+          „czy na pewno". Dekalog zabrania pytania po czynności, którą coś już
+          potwierdziło — tu nie ma czego potwierdzać, bo skutek jest po drugiej
+          stronie ekranu, w Subiekcie, i widać go dopiero, gdy MM się wywróci.
+
+          Zdanie mówi KOSZT, nie „operacja nieodwracalna". Człowiek ma wiedzieć,
+          co konkretnie może pójść źle, a nie że ma się bać. */}
+      {pewien === c.id
+        ? <span className="flex w-full flex-wrap items-center gap-2">
+            <span className="text-amber-800">
+              MM pójdzie na stan, którego jeszcze nie ma: Sfera odrzuci
+              dokument albo — gdy Subiekt dopuszcza ujemne — stan zejdzie pod
+              zero do czasu korekty. Wystawiam?
+            </span>
+            <Przycisk className="text-xs" disabled={mimo.isPending}
+              onClick={() => mimo.mutate(c.id, { onSettled: () => setPewien(null) })}>
+              {mimo.isPending ? "Wystawiam…" : "Tak, wystaw MM"}
+            </Przycisk>
+            <button type="button" className="btn-secondary text-xs"
+              onClick={() => setPewien(null)}>Nie</button>
+          </span>
+        : <button type="button" className="btn-secondary text-xs"
+            onClick={() => setPewien(c.id)}>Wystaw MM mimo braku korekt</button>}
+      {mimo.error && pewien === c.id &&
+        <Blad>{(mimo.error as Error).message}</Blad>}
     </div>)}
     {kosze.map((kosz) => <div key={kosz.id}
       /* Odpad w innym kolorze niż zwroty: to dwa różne końce hali, a pasek

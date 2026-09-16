@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Koszyk } from "./Koszyk";
 import type { KoszZwrotow } from "../api/typy";
@@ -27,10 +28,12 @@ vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   useKosz: () => ({ data: odpowiedz }),
   useZamknijKosz: () => ({ mutate: zamknij, isPending: false, error: null }),
+  useMmMimoKorekt: () => ({ mutate: mimo, isPending: false, error: null }),
   useZdejmijTowar: () => ({ mutate: zdejmijTowar, isPending: false, error: null }),
 }));
 
 const zamknij = vi.fn();
+const mimo = vi.fn();
 const zdejmijTowar = vi.fn();
 
 const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
@@ -48,7 +51,10 @@ const pokaz = () => {
 };
 
 describe("Koszyk zwrotów", () => {
-  beforeEach(() => { odpowiedz.kosze = []; odpowiedz.czekajace = []; zamknij.mockClear(); });
+  beforeEach(() => {
+    odpowiedz.kosze = []; odpowiedz.czekajace = [];
+    zamknij.mockClear(); mimo.mockClear();
+  });
 
   it("pusty koszyk NIE ZAJMUJE miejsca na ekranie", () => {
     /* Punkt 2 dekalogu. Stały pasek mówiący „zero" byłby elementem, który
@@ -117,6 +123,40 @@ describe("Koszyk zwrotów", () => {
     pokaz();
     expect(screen.getByText(/czeka na korekty/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
+  });
+
+  it("wymuszenie MM wymaga DRUGIEGO kliknięcia i mówi, co kosztuje", async () => {
+    /* Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
+       jeśli nie ma wszystkich ZW". To jedyne miejsce w tym panelu, w którym
+       pytamy „czy na pewno" — dekalog zabrania pytania po czynności, którą coś
+       już potwierdziło, a tu potwierdzić nie ma czego: skutek widać dopiero
+       w Subiekcie, gdy MM się wywróci. */
+    odpowiedz.czekajace = [{
+      id: 9, kod: "Z-6", rodzaj: "zwroty", zamknietoAt: "2026-09-03T09:00:00Z",
+      brakuje: [{ zwrotId: 1, numer: "ZW-7" }],
+    }];
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /Wystaw MM mimo braku korekt/ }));
+    expect(mimo).not.toHaveBeenCalled();
+    /* Zdanie mówi KOSZT, nie „operacja nieodwracalna": człowiek ma wiedzieć,
+       co konkretnie może pójść źle. */
+    expect(screen.getByText(/stan zejdzie pod zero/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Tak, wystaw MM/ }));
+    expect(mimo).toHaveBeenCalledWith(9, expect.anything());
+  });
+
+  it("wycofanie się z wymuszenia NIE wystawia dokumentu", async () => {
+    odpowiedz.czekajace = [{
+      id: 9, kod: "Z-6", rodzaj: "zwroty", zamknietoAt: "2026-09-03T09:00:00Z",
+      brakuje: [{ zwrotId: 1, numer: "ZW-7" }],
+    }];
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: /Wystaw MM mimo braku korekt/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Nie$/ }));
+    expect(mimo).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Wystaw MM mimo braku korekt/ }))
+      .toBeInTheDocument();
   });
 
   it("wiersz dołożony ręką ma krzyżyk, wiersz z oceny NIE", () => {
