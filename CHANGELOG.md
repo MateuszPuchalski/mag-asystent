@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.373.0 — 16 września 2026
+
+**Panel biura znów wstaje z zapamiętanej sesji, a cykl 30 s znów chodzi.**
+Zgłoszenie właściciela: „z każdym odświeżeniem wylogowuje `/biuro`". Sesja
+była cały czas ważna — to panel przestał się nią przedstawiać.
+
+Dwie linijki rozruchu wyszły jako SKUTEK UBOCZNY kasowania obsługi klienta
+w 0.138.0. Leżały w tym samym ogonie pliku co przyciski konfiguracji pytań
+i pojechały razem z nimi:
+
+```
+setInterval(() => { if (token) odswiez(); }, 30_000);
+if (token) start();
+```
+
+Kosztowało to trzydzieści kilka wydań, po cichu i na dwa sposoby. Po pierwsze,
+każde odświeżenie wyglądało na wylogowanie: token przeżywa w `localStorage`,
+ale panel odsłania `start()`, a `start()` wołało wyłącznie logowanie. Po drugie
+— i tego nikt nie zgłosił — cykl nie chodził wcale. `odswiez()` został
+zdefiniowany bez ani jednego wołającego, więc lista dostaw, ikona zdrowia
+i liczniki zakładek stały do ręcznego kliknięcia. Bursztyn „kulejący cykl"
+z 0.111.0 opisywał przez ten czas cykl, którego nie było.
+
+**Strażnik dopisany od razu, bo przeoczenie było lustrzane.** Test z 0.138.0
+pilnuje funkcji WOŁANEJ, a nieistniejącej — tutaj funkcja istniała, a zniknęło
+wywołanie. Nowy test w `routes/biuro.test.ts` sprawdza obie strony rozruchu
+w źródle `biuro.html`.
+
+Kolejność w pliku ma znaczenie: pętla stoi PRZED `start()`, bo pierwszy przebieg
+wystrzelony w schowany panel rysowałby w nic. Odmowa serwera niczego nie psuje —
+`api()` na 401 dalej woła `wyloguj()`.
+
 ## 0.372.0 — 16 września 2026
 
 **[wymaga działania] Odmowa zapisu ZW mówi wreszcie, CZEGO dotyczyła.** Nowy
