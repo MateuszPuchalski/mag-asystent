@@ -20,7 +20,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1,
   zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
-  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, przewoznik: null, rozmowy: [],
+  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
@@ -251,6 +251,75 @@ describe("Ekran zwrotów", () => {
     } finally {
       scena.zwroty = null;
     }
+  });
+
+  it("DWA CZŁONY zawężają, choć trafiają w różne pola (0.367.0)", async () => {
+    /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
+       za pomocą loginu użytkownika i innych informacji na przesyłce". Do
+       0.366.0 fraza szła do porównania w całości, więc „kowalski inpost" nie
+       znajdowało nic — nie dlatego, że tych danych nie ma, tylko dlatego, że
+       nie stoją obok siebie w jednym polu. */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), odbiorcaNazwa: "Jan Kowalski", przewoznik: "INPOST" },
+      { ...zwrot(2, "zwrot", "ZW-2"), odbiorcaNazwa: "Jan Kowalski", przewoznik: "DPD" },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "kowalski");
+      expect(screen.getByText(/2 zwroty pasują/)).toBeInTheDocument();
+      await userEvent.type(szukajka(), " inpost");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
+  it("przewoźnika wolno nazwać tak, jak stoi na naklejce (0.367.0)", async () => {
+    /* Na pudle stoi „Paczkomat", a w danych `INPOST`. Bez aliasu człon
+       przepisany z naklejki wyglądałby na brak danych, a nie na inną nazwę
+       tej samej firmy. */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), przewoznik: "INPOST" },
+      { ...zwrot(2, "zwrot", "ZW-2"), przewoznik: "DPD" },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "paczkomat");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
+  it("fraza WIELOCZŁONOWA nigdy nie otwiera zwrotu sama (0.367.0)", async () => {
+    /* Dopasowanie po fragmentach jest z natury przybliżone, a to jest ekran,
+       z którego wychodzi się z czyimś zwrotem i czyimiś pieniędzmi. Jeden
+       człon i dokładnie — tak jak dotąd; więcej członów tylko zawęża. */
+    pokaz();
+    /* Kolejność członów jest tu ISTOTNA: „ZW-2 dpd" przechodziłoby przez stan
+       jednoczłonowy „ZW-2" w połowie pisania i otwarcie byłoby wtedy zgodne
+       z regułą 0.165.0 („otwarcie w pół pisania nie jest wpadką"). Pytanie
+       brzmi inaczej: czy otwiera FRAZA WIELOCZŁONOWA jako taka. Kursor stoi
+       na ZW-1 z kubełka domyślnego, więc rozstrzyga nagłówek ZW-2. */
+    await userEvent.type(szukajka(), "dpd ZW-2");
+    expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "ZW-2" })).toBeNull();
+
+    /* Sam numer, bez drugiego członu, dalej otwiera — reguła z 0.165.0 stoi. */
+    await userEvent.clear(szukajka());
+    await userEvent.type(szukajka(), "ZW-2");
+    expect(await screen.findByRole("heading", { name: "ZW-2" })).toBeInTheDocument();
+  });
+
+  it("przewoźnik ZAWĘŻA, ale nigdy nie otwiera zwrotu (0.367.0)", async () => {
+    /* Uchwyt opisowy nie jest identyfikatorem: przewoźnik opisuje setki paczek
+       naraz, a otwarcie stawia na ekranie cudze pieniądze. W bazie testowej
+       DPD ma dokładnie jeden zwrot — i to właśnie ten przypadek otwierał go
+       jak podany numer, dopóki jedna lista robiła oba zadania. */
+    pokaz();
+    await userEvent.type(szukajka(), "dpd");
+    expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "ZW-2" })).toBeNull();
   });
 
   it("CAŁY numer otwiera zwrot, sam fragment nigdy", async () => {

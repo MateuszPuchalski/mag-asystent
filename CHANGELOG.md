@@ -35,6 +35,64 @@ historii nie przepisujemy.
 
 
 <<<<<<< HEAD
+## 0.367.0 — 16 września 2026
+
+**Paczkę znajdziesz po tym, co widać na naklejce.** Zgłoszenie właściciela:
+„szukanie nieodebranych paczek odbywa się głównie za pomocą loginu użytkownika
+i innych informacji na przesyłce — usprawnij i przebuduj".
+
+Najpierw ustalenie, które przewraca założenie z 0.172.0. Paczki nakleja klient
+albo kurier, więc ich numerów w Allegro NIE MA. Numeru listu z wracającego
+kartonu nasz system nie widział nigdy i nie zobaczy — pierwszy skan takiej
+paczki chybia z definicji, a nie z opóźnienia synchronizacji. Panel mówił
+tymczasem „paczka bywa u nas szybciej niż zwrot" i kazał czekać na coś, co
+nigdy nie przyjdzie.
+
+**Szukanie rozumie kilka słów naraz.** Do 0.366.0 fraza szła do porównania
+w całości, więc „kowalski inpost" nie znajdowało nic — nie dlatego, że tych
+danych nie ma, tylko dlatego, że nie stoją obok siebie w jednym polu. Człowiek
+z kartonem w ręku ma kilka drobnych uchwytów naraz i żaden sam nie zawęża.
+Każdy człon musi teraz trafić w któreś pole; nie muszą trafiać w to samo.
+
+- **Przewoźnik wchodzi do szukania**, razem z nazwami z naklejki: „paczkomat"
+  znaczy `INPOST`, „pocztex" to Poczta. Lista rozwijana zostaje — odpowiada na
+  inne pytanie („pokaż wszystko od InPostu").
+- **Otwieranie zwrotu dostało WĘŻSZĄ listę uchwytów niż szukanie.** Login,
+  nazwa odbiorcy i przewoźnik zawężają, ale nigdy nie otwierają: opisują
+  człowieka albo firmę, nie paczkę. Bez tego wpisanie „dpd" przy jednym
+  zwrocie tej firmy otwierało go, jakby ktoś podał numer.
+- **Fraza wieloczłonowa nie otwiera sprawy sama.** Dopasowanie po fragmentach
+  jest z natury przybliżone, a z tego ekranu wychodzi się z czyimiś pieniędzmi.
+- **Jedno dopasowanie dla trzech ekranów obsługi.** Reklamacje, dyskusje
+  i zwroty trzymały ten sam kod przepisany znak w znak.
+
+**Nazwa odbiorcy z naklejki wchodzi do danych — i to jest świadome zdjęcie
+fragmentu polityki danych, decyzją właściciela.** Bez niej operator nie ma
+żadnego uchwytu poza loginem, którego przy takiej paczce najczęściej nie zna.
+
+- **Zakres to JEDNA kolumna.** Imię z nazwiskiem z adresu dostawy, a przy
+  paczce firmowej nazwa firmy. Ulica, miasto, kod pocztowy, telefon, e-mail
+  i PESEL zostają zablokowane, tak jak były.
+- **Lądowisko nazwy nie dostaje.** Prywatna kopia odpowiedzi Allegro dalej
+  wycina cały adres; nazwę czyta mapowanie z żywej odpowiedzi.
+- **Do eksportu CSV nazwa nie wychodzi** — ta sama granica co przy numerze
+  listu od 0.344.0.
+- **Odczyt po nazwisku zostawia ślad**: liczba trafień, nigdy sam uchwyt.
+  Uchwyt jedzie w ciele żądania, nie w adresie, bo adres ląduje w logu serwera.
+
+**Rejestracja paczki pisze mniej.** Po chybionym skanie rejestracja jest teraz
+PIERWSZYM wyjściem, a pytanie do Allegro drugim — odwrotnie niż od 0.172.0,
+bo tamta kolejność stała na obalonym założeniu. Dwa pola na uchwyt człowieka
+schodzą do jednego: wpisujesz login albo nazwisko z naklejki, a serwer sam
+rozstrzyga, czym to jest. Login dopasowuje się w całości, nazwisko po
+fragmencie od trzech znaków — nikt nie przepisze go znak w znak tak, jak
+zapisało je Allegro. Wybór paczki z listy ustala od razu numer zamówienia,
+login i nazwę odbiorcy. Przewoźnik dochodzi listą rozwijaną, bez pisania.
+
+Wdrożenie: nowy build panelu i serwera. Nazwy odbiorców pojawią się przy
+zamówieniach dociągniętych PO aktualizacji — starsze wiersze zostają bez niej,
+bo synchronizacja nie chodzi po zamówieniach wstecz.
+
 ## 0.365.0 — 16 września 2026
 
 **Paczkę nieodebraną znajdziesz po loginie klienta.** Zgłoszenie właściciela:

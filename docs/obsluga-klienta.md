@@ -468,6 +468,44 @@ nie kupuje nam niczego.
 **Zasada adresów zostaje nietknięta.** Adresy dostawy nie przechodzą przez
 mapowanie ani tu, ani w skrzynce.
 
+### Nazwa odbiorcy z naklejki (0.367.0) — zdjęcie fragmentu tej polityki
+
+To jedyne miejsce, w którym ta polityka się cofa, i cofa się o dokładnie jedno
+pole. Decyzja właściciela, podjęta po przedstawieniu zakresu blokady.
+
+**Powód.** Paczka, której klient nie odebrał, wraca do nas z naklejką, którą
+naklejał klient albo kurier — tych numerów w Allegro NIE MA. Numeru listu
+z wracającego kartonu nasz system nie widział nigdy i nie zobaczy, więc
+pierwszy skan takiej paczki chybia z definicji, a nie z opóźnienia
+synchronizacji. Zostaje to, co na naklejce widać: nazwa odbiorcy i przewoźnik.
+Bez nazwy operator nie ma żadnego uchwytu poza loginem, którego przy takiej
+paczce najczęściej nie zna.
+
+**Zakres.** Bierzemy `firstName` i `lastName` z `delivery.address`, a gdy jest
+`companyName` — jego, bo paczka firmowa nosi na naklejce nazwę firmy zamiast
+osoby. Wszystko idzie do JEDNEJ kolumny `odbiorca_nazwa`, przy zamówieniu
+i przy zwrocie. Szukanie nie rozróżnia imienia od nazwiska, a jedna kolumna to
+jedna rzecz do pilnowania.
+
+**Czego to NIE zdejmuje.** `street`, `city`, `zipCode` i `phoneNumber` stoją
+w tym samym obiekcie i zostają zablokowane. Kolumn na nie nie ma i nie będzie.
+E-mail, PESEL i konto bankowe bez zmian.
+
+**Lądowisko nazwy NIE dostaje.** `allegro-oczyszczanie.ts` zostaje nietknięty
+i dalej wycina cały `address`. Mapowanie czyta żywą odpowiedź, więc model
+pracy ma nazwę jedną nazwaną kolumną, a prywatna kopia odpowiedzi nie ma jej
+wcale. Zdjęcie dotyczy pola, nie nazwy pola w każdym ładunku.
+
+**Do CSV nazwa nie wychodzi.** Plik na dysku jest zapisem trwalszym niż baza,
+a decyzja dotyczyła szukania na ekranie. Ta sama granica co przy numerze listu
+od 0.344.0.
+
+**Odczyt zostawia ślad.** Wyszukanie paczek klienta po nazwisku dopisuje
+zdarzenie z LICZBĄ trafień i długością uchwytu — nigdy z samym uchwytem.
+Odpowiada ono na pytanie „kto i kiedy przeglądał", nie „czego szukał".
+Z tego samego powodu uchwyt jedzie w ciele żądania, nie w adresie: adres
+ląduje w logu żądań serwera, którego ta polityka nie obejmuje.
+
 **Hala nie widzi zwrotu.** Trasy mają bramkę roli także na odczycie. Do
 magazyniera idzie wyłącznie zadanie oceny towaru, tak jak przy pytaniach
 idzie samo zadanie pomiaru.
@@ -475,8 +513,9 @@ idzie samo zadanie pomiaru.
 **Zamówienie pobieramy w całości, bez danych kupującego.** Od 0.152.0 zwrot
 dociąga swoje zamówienie: pozycje, koszt dostawy i SKU sprzedawcy
 (`offer.external.id`). Adres dostawy, e-mail, telefon i PESEL kupującego nie
-przechodzą przez mapowanie ani przez lądowisko. Zostaje login — jedyna dana
-osobowa, którą ta polityka dopuszcza wprost.
+przechodzą przez mapowanie ani przez lądowisko. Zostają login i — od 0.367.0 —
+nazwa odbiorcy z naklejki; dwie dane osobowe, które ta polityka dopuszcza
+wprost, każda z własnym uzasadnieniem wyżej.
 
 **Kartotekę wskazuje człowiek, a automat tylko proponuje.** Dopasowanie po
 SKU liczy się przy ODCZYCIE i niczego nie zapisuje; do bazy trafia dopiero

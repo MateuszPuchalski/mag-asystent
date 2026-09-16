@@ -173,6 +173,18 @@ export interface WierszZwrotu {
   maPoprzedniaNotatke: boolean;
   /** Login kupującego prosto ze zwrotu — nie wymaga pobranego zamówienia. */
   kupujacyLogin: string | null;
+  /**
+   * Nazwa odbiorcy Z NAKLEJKI (0.367.0).
+   *
+   * Paczki nadaje klient albo kurier, więc numeru listu z wracającego kartonu
+   * nasz system NIGDY nie widział — pierwszy skan takiej paczki musi chybić.
+   * Uchwytem zostaje to, co jeszcze jest na naklejce: nazwa odbiorcy.
+   *
+   * W CSV jej NIE MA, tak samo jak numeru listu: plik na dysku jest zapisem
+   * trwalszym niż baza, a decyzja właściciela dotyczyła szukania na ekranie,
+   * nie wynoszenia danych osobowych do arkusza.
+   */
+  odbiorcaNazwa: string | null;
   /** `INPOST`, `DPD`, `UNKNOWN`… — surowo, bo Allegro nie zamyka listy. */
   przewoznik: string | null;
   /**
@@ -598,6 +610,10 @@ function zloz(
        Zysk nie kończy się na ekranie — po tym polu idzie też kolumna
        „Kupujacy" w eksporcie CSV. */
     kupujacyLogin: (z.kupujacy_login as string) ?? zamowienie?.kupujacyLogin ?? null,
+    /* Ten sam fallback i z tego samego powodu co przy loginie: kolumna zwrotu
+       jest pierwsza, bo przy paczce nieodebranej wpisał ją człowiek patrzący
+       na naklejkę, a zamówienia często nie ma wcale. */
+    odbiorcaNazwa: (z.odbiorca_nazwa as string) ?? zamowienie?.odbiorcaNazwa ?? null,
     przewoznik: (z.przewoznik as string) ?? null,
     waybill: (z.waybill as string) ?? null,
     rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
@@ -1390,13 +1406,28 @@ export function wskazSklad(
  * odnajdywalny także wtedy, gdy zamówienie wypadnie z okna synchronizacji.
  */
 
+/*
+ * ── NAZWA ODBIORCY I PRZEWOŹNIK Z NAKLEJKI (0.367.0) ───────────────────────
+ * Właściciel: paczki nakleja klient albo kurier i tych numerów w Allegro nie
+ * ma. To przewraca założenie z 0.172.0, że nietrafiony skan wracającej paczki
+ * to zwykły wyścig synchronizacji — numeru z naklejki nasz system nie widział
+ * NIGDY i nie zobaczy, więc pierwszy skan musi chybić z definicji.
+ *
+ * Zostają dwa uchwyty, które na naklejce widać: nazwa odbiorcy i przewoźnik.
+ * Oba zapisujemy do kolumn zwrotu i oba wchodzą do szukania — dopiero razem
+ * z loginem dają odpowiedź na „czyja to paczka i która".
+ */
+
 /** Ile znaków loginu zapisujemy. Allegro trzyma się dużo krótszych. */
 const LIMIT_LOGINU = 100;
+
+/** Ile znaków nazwy odbiorcy. Naklejka i tak nie mieści więcej. */
+const LIMIT_NAZWY = 120;
 
 export function zarejestrujNieodebrana(
   database: Db, dane: {
     waybill: string; orderId?: string | null; notatka?: string | null;
-    login?: string | null;
+    login?: string | null; odbiorcaNazwa?: string | null; przewoznik?: string | null;
   },
   kto: { id: number; name: string }, teraz = new Date(),
 ): { zwrotId: number; pozycji: number } {
@@ -1420,18 +1451,28 @@ export function zarejestrujNieodebrana(
      własnym zapytaniem — tamto jest starsze i działa, a dublowanie odczytu
      jednego wiersza przy rejestracji jednej paczki nic nie kosztuje. */
   const zam = orderId
-    ? database.prepare(
-      "SELECT kupujacy_login FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?")
-      .get(konto.id, orderId) as { kupujacy_login: string | null } | undefined
+    ? database.prepare(`SELECT kupujacy_login, odbiorca_nazwa FROM zamowienie_klienta
+         WHERE channel_account_id=? AND external_id=?`)
+      .get(konto.id, orderId) as
+      { kupujacy_login: string | null; odbiorca_nazwa: string | null } | undefined
     : undefined;
   const login = (dane.login ?? "").trim().slice(0, LIMIT_LOGINU)
     || (zam?.kupujacy_login ?? null);
+  /* Ta sama zasada co przy loginie: wpisane bije to z zamówienia, bo pochodzi
+     od człowieka patrzącego na naklejkę. Adres dostawy bywa inny niż kupujący
+     i to WŁAŚNIE ta nazwa stoi na kartonie. */
+  const odbiorca = (dane.odbiorcaNazwa ?? "").trim().slice(0, LIMIT_NAZWY)
+    || (zam?.odbiorca_nazwa ?? null);
+  /* Przewoźnika przy nieodebranej Allegro nie zna wcale — do 0.366.0 kolumna
+     zostawała pusta. Operator widzi go na naklejce, a wybór z listy nie
+     wymaga pisania. Trzymamy SUROWO, jak przy zwrocie z Allegro. */
+  const przewoznik = (dane.przewoznik ?? "").trim().toUpperCase() || null;
 
   return transaction(database, () => {
     database.prepare(`INSERT INTO zwrot_klienta
       (channel_account_id,external_id,order_id,created_at,paczka_at,dostarczono_at,
-       zrodlo,waybill,notatka,kupujacy_login,synced_at)
-      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?,?)`).run(
+       zrodlo,waybill,notatka,kupujacy_login,odbiorca_nazwa,przewoznik,synced_at)
+      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?,?,?,?)`).run(
       konto.id, external, orderId, at,
       /* Paczka JEST u nas — inaczej nie byłoby czego rejestrować. To jedyny
          zwrot, przy którym datę powrotu znamy na pewno, więc `dostarczono_at`
@@ -1439,7 +1480,8 @@ export function zarejestrujNieodebrana(
          przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
          samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
          na biurku operatora. */
-      at, at, waybill, (dane.notatka ?? "").trim() || null, login, at);
+      at, at, waybill, (dane.notatka ?? "").trim() || null,
+      login, odbiorca, przewoznik, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
       .get(konto.id, external) as { id: number }).id);
@@ -1471,11 +1513,13 @@ export function zarejestrujNieodebrana(
       pozycji = poz.length;
     }
 
-    /* W dzienniku SAM FAKT, nie login. Zdarzenie odpowiada na pytanie „skąd
-       ten wiersz", a do tego wystarczy, że uchwyt był; sama dana osobowa
-       leży w kolumnie zwrotu i stamtąd się ją czyta. */
+    /* W dzienniku SAME FAKTY, nie dane osobowe. Zdarzenie odpowiada na pytanie
+       „skąd ten wiersz", a do tego wystarczy, że uchwyt był; login i nazwa
+       odbiorcy leżą w kolumnach zwrotu i stamtąd się je czyta. Przewoźnik
+       daną osobową nie jest, więc idzie wprost. */
     logEvent("zwrot_nieodebrana", kto.name, null,
-      { zwrotId, orderId, pozycji, zLoginem: login !== null }, kto.id, database);
+      { zwrotId, orderId, pozycji, zLoginem: login !== null,
+        zOdbiorca: odbiorca !== null, przewoznik }, kto.id, database);
     return { zwrotId, pozycji };
   })();
 }

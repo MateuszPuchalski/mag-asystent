@@ -21,6 +21,7 @@ import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
+import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka, zwroty i reklamacje — CZTERY ekrany obsługi mają
@@ -96,11 +97,15 @@ export function Dyskusje() {
 
   /* Filtr liczy się TUTAJ, w pamięci ekranu — tą samą drogą co filtr kubełka
      i z tego samego powodu: lista przyjeżdża w całości, bo spraw w pracy są
-     dziesiątki, nie tysiące. */
+     dziesiątki, nie tysiące.
+
+     DOPASOWANIE JEST WSPÓLNE dla trzech ekranów obsługi (0.367.0) — ten sam
+     `useMemo` stał tu przepisany znak w znak. Od tego wydania fraza dzieli się
+     po spacjach i każdy człon musi trafić, więc „numer login" zawęża zamiast
+     nie znajdować nic. */
   const pasujace = useMemo(() => {
-    const f = fraza.trim().toLowerCase();
-    if (!f) return null;
-    return (data?.dyskusje ?? []).filter((d) => kody(d).some((k) => k.includes(f)));
+    if (!rozbij(fraza).length) return null;
+    return (data?.dyskusje ?? []).filter((d) => pasujeDoFrazy(kody(d), fraza));
   }, [data, fraza]);
 
   /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany

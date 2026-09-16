@@ -1531,6 +1531,108 @@ test("login porównuje się BEZ wielkości liter, ale w całości", () => {
   assert.equal(paczkiKlienta(1, "   ", d).length, 0, "pusty login nie pyta o wszystkich");
 });
 
+test("nazwisko z naklejki szuka po FRAGMENCIE — login dalej w całości", () => {
+  /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
+     za pomocą loginu użytkownika i innych informacji na przesyłce". Numeru
+     listu z wracającej paczki nasz system nie widział nigdy — nakleja ją
+     klient albo kurier — więc po chybionym skanie zostaje nazwa z naklejki.
+
+     Nikt nie przepisze nazwiska znak w znak tak, jak zapisało je Allegro:
+     bywa z drugim imieniem albo z firmą przed nazwiskiem. Żądanie dokładności
+     zamieniłoby ten uchwyt w martwy. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Maria Kowalski' WHERE external_id=?")
+    .run("ord-1");
+
+  assert.equal(paczkiKlienta(1, "kowalski", d).length, 1, "fragment nazwy wystarcza");
+  assert.equal(paczkiKlienta(1, "KOWALSKI", d).length, 1, "wielkość liter bez znaczenia");
+  assert.equal(paczkiKlienta(1, "jan_kowalski", d).length, 1, "login dalej działa");
+  assert.equal(paczkiKlienta(1, "ko", d).length, 0,
+    "dwa znaki to za mało — trafiłoby pół sklepu");
+});
+
+test("procent w nazwisku nie dopasowuje wszystkich", () => {
+  /* Znak wieloznaczny wpisany przez operatora pokazałby cudze zakupy, a z tego
+     ekranu wychodzi się z czyimś numerem zamówienia w ręku. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski' WHERE external_id=?")
+    .run("ord-1");
+  assert.equal(paczkiKlienta(1, "%%%", d).length, 0, "procent jest znakiem, nie wzorcem");
+  assert.equal(paczkiKlienta(1, "J_n", d).length, 0, "podkreślnik też jest znakiem");
+});
+
+test("wiersz paczki niesie nazwę odbiorcy — po niej rozpoznaje się karton", () => {
+  /* Fragment nazwiska POKAŻE cudze zakupy, gdy dwoje ludzi nazywa się tak
+     samo. To jest cena wyboru po fragmencie i dlatego wybiera człowiek,
+     patrząc na wszystkie trafienia naraz. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
+  zakup(d, "ord-2", "anna_k", "2026-08-21T10:00:00Z");
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski' WHERE external_id='ord-1'").run();
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Anna Kowalska' WHERE external_id='ord-2'").run();
+
+  const paczki = paczkiKlienta(1, "kowalsk", d);
+  assert.equal(paczki.length, 2, "dwoje o podobnym nazwisku to dwa wiersze, nie zero");
+  assert.deepEqual(paczki.map((p) => p.odbiorcaNazwa), ["Anna Kowalska", "Jan Kowalski"]);
+});
+
+test("nieodebrana zapamiętuje NAZWĘ Z NAKLEJKI i przewoźnika", () => {
+  /* Dwa uchwyty, które zostają po tym, jak pierwszy skan chybi. Przewoźnika
+     przy nieodebranej Allegro nie zna wcale — do 0.366.0 kolumna zostawała
+     pusta, a operator widzi go na naklejce. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, {
+    waybill: "PACZ-N1", odbiorcaNazwa: "  Jan Kowalski  ", przewoznik: "inpost",
+  }, KTO);
+
+  const z = listaZwrotow(d, TERAZ).find((x) => x.id === w.zwrotId)!;
+  assert.equal(z.odbiorcaNazwa, "Jan Kowalski", "spacje ze schowka nie wchodzą do bazy");
+  assert.equal(z.przewoznik, "INPOST", "przewoźnik stoi surowo, wersalikami jak z Allegro");
+});
+
+test("nazwa odbiorcy wpisana ręką bije tę z zamówienia", () => {
+  /* Ta sama zasada co przy loginie: wpisane pochodzi od człowieka patrzącego
+     na naklejkę, a adres dostawy bywa inny niż kupujący. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
+  d.prepare("UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski' WHERE external_id='ord-1'").run();
+
+  const zPola = zarejestrujNieodebrana(d,
+    { waybill: "PACZ-A", orderId: "ord-1", odbiorcaNazwa: "Biuro Kowalex" }, KTO);
+  assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zwrot_klienta WHERE id=?")
+    .get(zPola.zwrotId) as { n: string }).n, "Biuro Kowalex");
+
+  const zZamowienia = zarejestrujNieodebrana(d, { waybill: "PACZ-B", orderId: "ord-1" }, KTO);
+  assert.equal((d.prepare("SELECT odbiorca_nazwa AS n FROM zwrot_klienta WHERE id=?")
+    .get(zZamowienia.zwrotId) as { n: string }).n, "Jan Kowalski");
+});
+
+test("dziennik notuje FAKT nazwy odbiorcy, nie samą nazwę", () => {
+  /* Ta sama polityka co przy loginie: dana osobowa ma jedno miejsce.
+     Przewoźnik daną osobową nie jest, więc idzie wprost. */
+  const d = stanowisko();
+  zarejestrujNieodebrana(d,
+    { waybill: "PACZ-D", odbiorcaNazwa: "Jan Kowalski", przewoznik: "DPD" }, KTO);
+  const e = d.prepare("SELECT payload FROM events WHERE type='zwrot_nieodebrana'")
+    .get() as { payload: string };
+  assert.equal(JSON.parse(e.payload).zOdbiorca, true);
+  assert.equal(JSON.parse(e.payload).przewoznik, "DPD");
+  assert.doesNotMatch(e.payload, /Kowalski/);
+});
+
+test("nazwy odbiorcy NIE MA w eksporcie CSV", () => {
+  /* Plik na dysku jest zapisem trwalszym niż baza, a decyzja właściciela
+     dotyczyła szukania na ekranie, nie wynoszenia danych osobowych do
+     arkusza. Ta sama granica co przy numerze listu od 0.344.0. */
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PACZ-C", odbiorcaNazwa: "Jan Kowalski" }, KTO);
+  const csv = csvZwrotow(listaZwrotow(d, TERAZ));
+  assert.equal(csv.includes("Kowalski"), false);
+  assert.equal(csv.includes("Odbiorca"), false);
+});
+
 test("zamówienie bez daty zakupu stoi na końcu, nie na górze", () => {
   /* Wiersz bez `kupiono_at` jest niedokończonym zapisem synchronizacji.
      Sortowanie malejąco po NULL-u wystawiłoby go jako najświeższy zakup. */

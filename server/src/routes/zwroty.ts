@@ -431,18 +431,33 @@ export async function zwrotyRoutes(app: FastifyInstance) {
 
      ODCZYT, nie dociąganie: trasa czyta wyłącznie to, co synchronizacja już
      przyniosła. Pytanie do Allegro ma tu własny przycisk i własny limit, a ta
-     lista odświeża się przy każdym znaku w polu loginu.
+     lista odświeża się po dopisaniu uchwytu, nie po każdym znaku.
 
      Konto bierzemy PIERWSZE, tak samo jak rejestracja niżej — dwie różne
-     zasady dawałyby listę z jednego konta i wiersz zapisany na drugim. */
-  app.get<{ Querystring: { login?: string } }>(
+     zasady dawałyby listę z jednego konta i wiersz zapisany na drugim.
+
+     POST, CHOĆ NIC NIE ZAPISUJE (0.367.0) — ta sama decyzja i to samo
+     uzasadnienie co przy `/skan` z 0.163.0. Do 0.366.0 uchwyt jechał
+     w adresie (`?login=`), a od tego wydania bywa nim NAZWISKO Z NAKLEJKI:
+     adres ląduje w logu żądań serwera, więc dana osobowa pojechałaby do pliku,
+     którego polityka zwrotów nie obejmuje. Ciało żądania do loga nie wchodzi.
+
+     ŚLAD ZOSTAJE, bo to odczyt cudzej danej osobowej — precedens `zwroty_eksport`
+     niżej. W dzienniku stoi LICZBA trafień i rodzaj uchwytu, nigdy sam uchwyt:
+     zdarzenie odpowiada na pytanie „kto i kiedy przeglądał", a nie „czego
+     szukał". */
+  app.post<{ Body: { szukane?: string } }>(
     "/api/obsluga/zwroty/paczki-klienta", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
+      const szukane = String(req.body?.szukane ?? "").trim();
       const konto = db().prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
         .get() as { id: number } | undefined;
-      if (!konto) return { paczki: [] };
-      return { paczki: paczkiKlienta(konto.id, String(req.query?.login ?? ""), db()) };
+      if (!konto || !szukane) return { paczki: [] };
+      const paczki = paczkiKlienta(konto.id, szukane, db());
+      logEvent("zwrot_paczki_klienta", kto().name, null,
+        { trafien: paczki.length, dlugosc: szukane.length }, kto().id, db());
+      return { paczki };
     });
 
   /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,
@@ -451,6 +466,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      `zrodlo` mówi wprost, że to nie zgłoszenie klienta. */
   app.post<{ Body: {
     waybill?: string; orderId?: string | null; notatka?: string | null; login?: string | null;
+    odbiorcaNazwa?: string | null; przewoznik?: string | null;
   } }>(
     "/api/obsluga/zwroty/nieodebrana", async (req, reply) => {
       const nie = odmowa(reply);
@@ -465,6 +481,14 @@ export async function zwrotyRoutes(app: FastifyInstance) {
              i chowa w kolumnie zwrotu; walidacji kształtu nie ma, bo Allegro
              nie zamyka listy dopuszczalnych loginów. */
           login: req.body?.login ?? null,
+          /* Nazwa odbiorcy i przewoźnik Z NAKLEJKI (0.367.0). Numeru listu
+             z wracającej paczki nasz system nie widział nigdy — paczki nakleja
+             klient albo kurier — więc to jedyne dwa uchwyty, które zostają po
+             tym, jak pierwszy skan chybi. Serwer przycina je i chowa
+             w kolumnach zwrotu; walidacji kształtu nie ma, bo naklejki nie
+             wypisuje Allegro. */
+          odbiorcaNazwa: req.body?.odbiorcaNazwa ?? null,
+          przewoznik: req.body?.przewoznik ?? null,
         }, kto());
       } catch (e) { return konflikt(reply, e); }
     });

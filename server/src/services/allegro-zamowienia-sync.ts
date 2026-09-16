@@ -28,7 +28,11 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
    Ten przebieg NIE chodzi po wszystkich zamówieniach konta — dociąga tylko
    te, do których prowadzi zwrot, i najwyżej `NA_PRZEBIEG` naraz. Zwrotów
    w pracy są dziesiątki, więc po kilku przebiegach nie zostaje nic do
-   pobrania, a ticker milczy.                                                */
+   pobrania, a ticker milczy.
+
+   CZWARTY POWÓD DOSZEDŁ W 0.367.0: NAZWA ODBIORCY z naklejki. Patrz
+   `nazwaOdbiorcy` niżej — tam stoi uzasadnienie i zakres tego, co z adresu
+   dostawy bierzemy, a czego dalej nie.                                      */
 
 /**
  * Ile zamówień wolno dociągnąć w jednym przebiegu.
@@ -64,7 +68,13 @@ type Zamowienie = {
   status?: string;
   updatedAt?: string;
   buyer?: { login?: string } | null;
-  delivery?: { cost?: Kwota; method?: { name?: string } | null } | null;
+  /* Z `delivery` bierzemy koszt, metodę i — od 0.367.0 — SAMĄ NAZWĘ odbiorcy
+     z adresu. Reszta `address` (ulica, miasto, kod, telefon) nie jest tu nawet
+     zadeklarowana: czego typ nie zna, tego mapowanie nie zapisze przez pomyłkę. */
+  delivery?: {
+    cost?: Kwota; method?: { name?: string } | null;
+    address?: { firstName?: string; lastName?: string; companyName?: string } | null;
+  } | null;
   /* Płatność i żądanie faktury (0.169.0). Z `payment` bierzemy TYP i moment
      zapłaty; identyfikatora ani kwoty nie — kwotę mamy już z `summary`.
      Z `invoice` bierzemy SAMĄ FLAGĘ `required`: `invoice.address` niesie
@@ -276,6 +286,34 @@ function zapiszBraki(database: Db, konto: number, numery: string[], teraz: Date)
   })();
 }
 
+/**
+ * Nazwa odbiorcy z naklejki (0.367.0).
+ *
+ * Decyzja właściciela i świadome zdjęcie fragmentu polityki danych. Paczki
+ * nadaje klient albo kurier, więc numeru listu z wracającego kartonu nasz
+ * system NIGDY nie widział — pierwszy skan takiej paczki musi chybić i żadna
+ * synchronizacja tego nie naprawi. Uchwytem zostaje to, co jeszcze jest na
+ * naklejce: nazwa odbiorcy i przewoźnik.
+ *
+ * FIRMA BIJE OSOBĘ, bo paczka firmowa nosi na naklejce nazwę firmy zamiast
+ * imienia i nazwiska — operator przepisze to, co widzi.
+ *
+ * To jedyne trzy pola, które stąd bierzemy. `street`, `city`, `zipCode`
+ * i `phoneNumber` stoją w tym samym obiekcie i zostają zablokowane: kolumn na
+ * nie nie ma, a lądowisko `surowe_json` wycina CAŁY `address` razem z nazwą
+ * (`oczyscSurowy` niżej). Model pracy dostaje więc nazwę jedną nazwaną
+ * kolumną, a prywatna kopia odpowiedzi nie dostaje jej wcale.
+ */
+function nazwaOdbiorcy(z: Zamowienie): string | null {
+  const a = z.delivery?.address;
+  if (!a) return null;
+  const firma = (a.companyName ?? "").trim();
+  if (firma) return firma;
+  const osoba = [a.firstName, a.lastName].map((x) => (x ?? "").trim())
+    .filter(Boolean).join(" ");
+  return osoba || null;
+}
+
 function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
   database.prepare(`INSERT INTO allegro_zamowienie(id,surowe_json,synced_at)
     VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET
@@ -289,12 +327,14 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
     .map((p) => p.boughtAt).filter((d): d is string => Boolean(d)).sort()[0] ?? null;
 
   database.prepare(`INSERT INTO zamowienie_klienta
-    (channel_account_id,external_id,status,kupujacy_login,dostawa_grosze,dostawa_metoda,
+    (channel_account_id,external_id,status,kupujacy_login,odbiorca_nazwa,
+     dostawa_grosze,dostawa_metoda,
      platnosc_typ,platnosc_at,platnosc_id,faktura_zadana,
      suma_grosze,waluta,kupiono_at,zmieniono_at,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       status=excluded.status, kupujacy_login=excluded.kupujacy_login,
+      odbiorca_nazwa=excluded.odbiorca_nazwa,
       dostawa_grosze=excluded.dostawa_grosze, dostawa_metoda=excluded.dostawa_metoda,
       platnosc_typ=excluded.platnosc_typ, platnosc_at=excluded.platnosc_at,
       platnosc_id=excluded.platnosc_id,
@@ -302,7 +342,7 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
       suma_grosze=excluded.suma_grosze, waluta=excluded.waluta,
       kupiono_at=excluded.kupiono_at, zmieniono_at=excluded.zmieniono_at,
       synced_at=excluded.synced_at`).run(
-    konto, z.id, z.status ?? null, z.buyer?.login ?? null,
+    konto, z.id, z.status ?? null, z.buyer?.login ?? null, nazwaOdbiorcy(z),
     z.delivery?.cost?.amount == null ? null : naGrosze(z.delivery.cost.amount),
     z.delivery?.method?.name ?? null,
     z.payment?.type ?? null, z.payment?.finishedAt ?? null,
