@@ -6,10 +6,12 @@ import type { BilansKartotek, Kubelek, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
+import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
-  useNieodebrana, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
+  useNieodebrana,
+  usePaczkiKlienta, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow, useProwadziZwrot,
@@ -368,6 +370,11 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
+  /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
+     wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
+     znaku. Pusty nie pyta wcale. */
+  const [loginPaczek, setLoginPaczek] = useState("");
+  const paczkiKlienta = usePaczkiKlienta(loginPaczek);
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
   const [bladSkanu, setBladSkanu] = useState("");
 
@@ -724,9 +731,14 @@ export function Zwroty() {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
         rejestruje={nieodebrana.isPending}
-        onNieodebrana={(waybill, orderId, notatka) => {
+        paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
+        szukaPaczek={paczkiKlienta.isFetching}
+        onLogin={setLoginPaczek}
+        onNieodebrana={(waybill, orderId, notatka, login) => {
           setBladSkanu("");
-          nieodebrana.mutate({ waybill, orderId: orderId || null, notatka: notatka || null }, {
+          nieodebrana.mutate({
+            waybill, orderId: orderId || null, notatka: notatka || null, login: login || null,
+          }, {
             onSuccess: (w) => { setWynikSkanu(null); setFraza(""); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
             onError: (e) => setBladSkanu((e as Error).message),
           });
@@ -894,6 +906,12 @@ export function Zwroty() {
                   zdejmij.mutate({ id: zwrot.id, pozycjaId, wersja: zwrot.wersja },
                     { onError: (e) => setBladDopisania((e as Error).message) });
                 }} />
+              {/* DOŁOŻENIE TOWARU DO KOSZYKA (0.365.0) stoi POD pozycjami,
+                  bo to ostatnia rzecz przy otwartym kartonie: najpierw oceniam
+                  to, co klient zgłosił, potem dokładam to, czego w zgłoszeniu
+                  nie ma. Pasek koszyka pokazuje się dopiero z zawartością, więc
+                  pierwszej sztuki nie dałoby się tam zeskanować. */}
+              <DolozTowar />
             </div>
           </>}
     </Karta>

@@ -1225,7 +1225,15 @@ export interface KoszZwrotow {
   pozycji: number;
   sztuk: number;
   otwartyOd: string;
-  pozycje: Array<{ symbol: string; nazwa: string; ilosc: number }>;
+  pozycje: Array<{
+    /** Id wiersza — po nim zdejmuje się to, co dołożono ręką (0.365.0). */
+    id: number;
+    symbol: string;
+    nazwa: string;
+    ilosc: number;
+    /** Wiersz przyszedł z oceny zwrotu; tamten schodzi cofnięciem oceny. */
+    zeZwrotu: boolean;
+  }>;
 }
 
 /* ── Reklamacje klienckie (0.222.0) ──────────────────────────────────────────
