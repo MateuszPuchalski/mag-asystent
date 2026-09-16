@@ -83,18 +83,30 @@ function wiersz(
   };
 }
 
+interface Kanal {
+  kanal: WierszWymiany["kanal"];
+  kierunek: WierszWymiany["kierunek"];
+  /** Minuty spraw ZAMKNIĘTYCH — surowo, bo alarm liczy z nich własny próg. */
+  zamkniete: number[];
+  /** Minuty spraw trwających DO DZIŚ, liczone do `teraz`. */
+  otwarte: number[];
+}
+
 /**
- * Cztery kanały, jedno okno czasu.
+ * Cztery kanały, jedno okno czasu — surowe minuty, nie podsumowania.
+ *
+ * SUROWE, BO CZYTELNICY SĄ DWAJ. Tabela robi z tego medianę i ogon, alarm
+ * niżej — próg i listę spóźnionych. Druga kopia tych czterech zapytań
+ * rozjechałaby się z pierwszą przy pierwszej zmianie definicji kanału,
+ * a wtedy tabela i alarm mówiłyby o dwóch różnych zbiorach spraw pod
+ * jedną nazwą. To gorsze niż brak alarmu.
  *
  * Notatek do dostaw tu NIE MA i to jest świadome: ich pętla ma własny licznik
  * nieprzeczytanych odpowiedzi w nagłówku panelu (0.77.0), a odpowiedź na
  * notatkę bywa rozmową na kilka tur — „czas wymiany" znaczyłby tam co innego
  * niż w pozostałych czterech i jedna tabela kłamałaby o obu naraz.
  */
-export function czasyWymiany(dni = 30, teraz = Date.now()): {
-  dni: number;
-  wiersze: WierszWymiany[];
-} {
+function zbierzKanaly(dni: number, teraz: number): Kanal[] {
   const okno = OKNO(dni);
   const granica = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
 
@@ -154,13 +166,136 @@ export function czasyWymiany(dni = 30, teraz = Date.now()): {
   const k = rozbij(pominiecia);
   const e = rozbij(kolizje);
 
+  return [
+    { kanal: "zadanie", kierunek: "biuro→hala", zamkniete: zadaniaZamkniete, otwarte: zadaniaOtwarte },
+    { kanal: "niezgodnosc", kierunek: "hala→biuro", zamkniete: p.zamkniete, otwarte: p.otwarte },
+    { kanal: "pominiecie", kierunek: "hala→biuro", zamkniete: k.zamkniete, otwarte: k.otwarte },
+    { kanal: "kolizja", kierunek: "hala→biuro", zamkniete: e.zamkniete, otwarte: e.otwarte },
+  ];
+}
+
+export function czasyWymiany(dni = 30, teraz = Date.now()): {
+  dni: number;
+  wiersze: WierszWymiany[];
+} {
   return {
     dni,
-    wiersze: [
-      wiersz("zadanie", "biuro→hala", zadaniaZamkniete, zadaniaOtwarte),
-      wiersz("niezgodnosc", "hala→biuro", p.zamkniete, p.otwarte),
-      wiersz("pominiecie", "hala→biuro", k.zamkniete, k.otwarte),
-      wiersz("kolizja", "hala→biuro", e.zamkniete, e.otwarte),
-    ],
+    wiersze: zbierzKanaly(dni, teraz).map((k) =>
+      wiersz(k.kanal, k.kierunek, k.zamkniete, k.otwarte)
+    ),
+  };
+}
+
+/* ── ALARM: co stoi dłużej, niż stoi zwykle (0.363.0) ─────────────────────────
+ *
+ * DLACZEGO PRÓG NIE JEST WPISANY RĘKĄ. Poprzednie wydanie zostawiło tę rzecz
+ * otwartą z uzasadnieniem, które było SŁABSZE, niż wyglądało: „§22 nie podaje
+ * terminu, więc terminu nie ma". To prawda o §22 i nieprawda o systemie —
+ * termin da się WYMIERZYĆ zamiast ogłaszać. Sprawa jest spóźniona, gdy stoi
+ * dłużej niż dziewięć na dziesięć spraw TEGO SAMEGO KANAŁU, które w tym oknie
+ * ktoś domknął. Taki próg nie jest niczyim werdyktem: jest zdaniem o własnej
+ * historii firmy i da się go sprawdzić, patrząc na te same dane.
+ *
+ * PRÓG OSOBNY DLA KAŻDEGO KANAŁU, bo jedna liczba byłaby zła dla co najmniej
+ * trzech. Kolizja kodu czeka na decyzję biura przy biurku; zadanie terenowe
+ * wymaga przejścia przez halę. Wspólne „cztery godziny" alarmowałoby przy
+ * każdej kolizji i przy żadnym zadaniu.
+ *
+ * CZEGO TEN ALARM NIE MÓWI — i to jest jego prawdziwa granica. Wykrywa
+ * ODSTAJĄCE OD WŁASNEJ NORMY, nie ZŁE. Magazyn, w którym każda sprawa stoi
+ * trzy dni, ma próg trzech dni i milczy. Na to potrzebna jest liczba
+ * właściciela i pytanie o nią zostaje otwarte — ale alarm z własnej historii
+ * działa DZIŚ i przyjmie tamtą liczbę bez przebudowy: wystarczy, żeby
+ * `progKanalu` zwróciło ją zamiast `p90`.
+ */
+
+/**
+ * Ile spraw musi być zamkniętych, zanim `p90` znaczy cokolwiek.
+ *
+ * DZIESIĘĆ Z ARYTMETYKI, NIE Z WYCZUCIA. `p90` liczy się najbliższą rangą:
+ * indeks to `ceil(0.9·n) − 1`. Dla `n = 9` wychodzi `ceil(8.1) − 1 = 8`,
+ * czyli OSTATNI element — próg równy najdłuższej sprawie, jaka się zdarzyła.
+ * Alarm z takim progiem nie zapala się nigdy, a wygląda, jakby działał. To
+ * gorsze od jego braku, bo cisza znaczy wtedy dwie różne rzeczy. Dopiero
+ * `n = 10` daje `ceil(9) − 1 = 8`, czyli dziewiątą z dziesięciu — pierwszy
+ * `n`, przy którym ogon jest naprawdę odcięty.
+ */
+export const MIN_SPRAW = 10;
+
+/**
+ * Podłoga progu: nic młodszego niż godzina nie jest spóźnione.
+ *
+ * Kanał, w którym wszystko domyka się w trzy minuty, miałby `p90` rzędu
+ * kilku minut — i alarmowałby przy sprawie sprzed kwadransa, czyli przy
+ * NORMALNEJ pracy. Alarm zapalający się codziennie uczy, że alarm nic nie
+ * znaczy, i zabiera ten jedyny sygnał także tym sprawom, które naprawdę stoją.
+ */
+export const PROG_MIN_MINUT = 60;
+
+export interface AlarmKanalu {
+  kanal: WierszWymiany["kanal"];
+  kierunek: WierszWymiany["kierunek"];
+  /** Minuty, powyżej których sprawa jest spóźniona; `null` = za mało historii. */
+  progMin: number | null;
+  /** Skąd wziął się próg — ekran ma powiedzieć to wprost, nie podać gołą liczbę. */
+  podstawa: "p90" | "podloga" | "za_malo_spraw";
+  /** Ile zamkniętych spraw złożyło się na próg. Każda liczba niesie swoje `n`. */
+  n: number;
+  spoznionych: number;
+  najstarszaSpoznionaMin: number | null;
+}
+
+/**
+ * Próg jednego kanału.
+ *
+ * Podłoga wygrywa z `p90`, gdy `p90` jest od niej niższe — i wtedy `podstawa`
+ * mówi „podłoga", bo ekran nie ma prawa pokazywać liczby wyliczonej z danych,
+ * gdy ta akurat z danych nie pochodzi.
+ */
+export function progKanalu(zamkniete: number[]): {
+  progMin: number | null;
+  podstawa: AlarmKanalu["podstawa"];
+} {
+  if (zamkniete.length < MIN_SPRAW) return { progMin: null, podstawa: "za_malo_spraw" };
+  const ogon = p90(zamkniete) as number;
+  return ogon >= PROG_MIN_MINUT
+    ? { progMin: Math.round(ogon), podstawa: "p90" }
+    : { progMin: PROG_MIN_MINUT, podstawa: "podloga" };
+}
+
+/**
+ * Cztery kanały, cztery własne progi, jedno stałe okno.
+ *
+ * OKNO JEST STAŁE I NIE BIERZE SIĘ Z EKRANU. Tabela obok ma suwak dni, alarm
+ * nie ma go celowo: sygnał, który zmienia treść przy przestawieniu listy
+ * rozwijanej, nie jest sygnałem, tylko widokiem. Trzydzieści dni, zawsze te
+ * same, na każdej zakładce.
+ */
+export function alarmyWymiany(dni = 30, teraz = Date.now()): {
+  dni: number;
+  minSpraw: number;
+  progMinMinut: number;
+  spoznionychRazem: number;
+  kanaly: AlarmKanalu[];
+} {
+  const kanaly = zbierzKanaly(dni, teraz).map((k): AlarmKanalu => {
+    const { progMin, podstawa } = progKanalu(k.zamkniete);
+    const spoznione = progMin === null ? [] : k.otwarte.filter((m) => m > progMin);
+    return {
+      kanal: k.kanal,
+      kierunek: k.kierunek,
+      progMin,
+      podstawa,
+      n: k.zamkniete.length,
+      spoznionych: spoznione.length,
+      najstarszaSpoznionaMin: spoznione.length ? Math.round(Math.max(...spoznione)) : null,
+    };
+  });
+  return {
+    dni,
+    minSpraw: MIN_SPRAW,
+    progMinMinut: PROG_MIN_MINUT,
+    spoznionychRazem: kanaly.reduce((a, k) => a + k.spoznionych, 0),
+    kanaly,
   };
 }

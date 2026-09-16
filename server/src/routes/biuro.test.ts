@@ -1241,3 +1241,70 @@ test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async 
   assert.equal(p.archiwalny, true, "panel wie, że to nasz zapis, a nie dzisiejsza faktura");
   assert.equal(p.lines[0].doneBy, "Krzysiek", "nazwisko odkładającego przeżyło okno importu");
 });
+
+test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.363.0)", () => {
+  /* Cztery rzeczy, bez których ten sygnał byłby gorszy niż jego brak.      */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  /* 1. ALARM CHODZI W CYKLU, nie na wejściu na zakładkę. Własność „Wiek"
+        mówi: widać, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK. Sygnał
+        pobierany dopiero po wejściu na STAN SYSTEMU odpowiadałby wyłącznie
+        temu, kto już poszedł sprawdzić — czyli nikomu, kto go potrzebuje. */
+  const liczniki = html.slice(
+    html.indexOf("async function odswiezLiczniki()"),
+    html.indexOf("async function odswiezEtap3()")
+  );
+  assert.match(liczniki, /\/api\/biuro\/alarm-wymiany/,
+    "alarm pobiera się w cyklu, a cykl chodzi na każdej zakładce");
+
+  /* 2. OKNO ALARMU JEST STAŁE. Suwak `dniMetryk` rządzi tabelą; plakietka
+        w nagłówku ma znaczyć jedno, niezależnie od tego, co ktoś wybrał. */
+  assert.ok(
+    !/alarm-wymiany\?dni=/.test(html),
+    "alarm nie bierze okna z ekranu — inaczej ta sama sprawa raz jest spóźniona, raz nie"
+  );
+
+  /* 3. PLAKIETKA MA DROGĘ DO TREŚCI. Zgłoszenie z 20 sierpnia: sygnał bez
+        drogi do treści jest sygnałem zgubionym. */
+  assert.match(html, /data-do="nadzor" data-cel="kartaWymiany"/,
+    "plakietka prowadzi na tabelę, która ją wyjaśnia");
+  assert.match(html, /id="kartaWymiany"/, "cel skoku istnieje");
+
+  /* 4. SPÓŹNIENIE NIE BARWI IKONY ZDROWIA. Ikona odpowiada na pytanie „czy
+        system działa". Sprawa stojąca trzeci dzień to zdrowy system i
+        kulejąca praca — czerwień od niej świeciłaby cały dzień i nauczyłaby
+        biuro ignorować ikonę także wtedy, gdy naprawdę padnie worker. */
+  const rysujStan = html.slice(
+    html.indexOf("function rysujStan("),
+    html.indexOf("rysujIkoneAllegro();")
+  );
+  assert.ok(
+    !/czerwone\.push\("wymiana"\)|czerwone\.push\("spoznione"\)/.test(rysujStan),
+    "spóźniona sprawa nie zabiera czerwieni awariom systemu"
+  );
+  assert.match(rysujStan, /spoznionychRazem/, "plakietka liczy się w pasku stanu");
+});
+
+test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.363.0)", () => {
+  /* Blizna z 0.361.0: `.catch` stał za `.json()`, a `api()` rzuca przy każdej
+     odpowiedzi spoza 2xx — czyli PRZED `.json()`. Zabezpieczenie nie łapało
+     więc niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało
+     z ekranu metryki oraz kolizje kodów. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.ok(
+    !/\)\)\.json\(\)\s*\.catch\(/.test(html),
+    "`.catch` za samym `.json()` nie łapie odmowy trasy — ma stać na całym łańcuchu"
+  );
+  const miara = html.slice(html.indexOf("api(`/api/biuro/wymiana?dni="));
+  assert.match(
+    miara.slice(0, 200),
+    /\.then\(\(r\) => r\.json\(\)\)\s*\.catch\(/,
+    "miara ma własne zabezpieczenie na całym łańcuchu, nie za `.json()`"
+  );
+});

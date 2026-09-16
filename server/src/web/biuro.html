@@ -1186,7 +1186,7 @@
       <table id="kolizje"></table>
     </section>
 
-    <section class="card">
+    <section class="card" id="kartaWymiany">
       <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
       <div class="objasnienie" hidden>
@@ -1202,6 +1202,11 @@
         </p>
       </div>
       <table id="wymiana"></table>
+      <!-- Alarm liczy z OKNA STAŁEGO (30 dni), a tabela wyżej z suwaka obok.
+           Dlatego stoi pod własnym nagłówkiem i sam mówi, z czego liczy —
+           dwie liczby z różnych okresów bez podpisu to gotowy sprzeczny
+           wniosek. -->
+      <div id="alarmWymiany" style="margin-top:12px"></div>
     </section>
 
     <section class="card">
@@ -1621,6 +1626,9 @@ let widok = localStorage.getItem("wertis.widok") || "dostawy";
 if (widok === "zwroty" || widok === "pytania") widok = "sprawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
+/* Alarm wymiany (0.363.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
+   czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
+let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
 let odpowiedziNaNotatki = [];
 /** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
@@ -1827,12 +1835,32 @@ function rysujStan(health, kolejka) {
   /* Odpowiedzi na notatki (0.57.0) zostają plakietką OBOK ikon: mają własną
      drogę (dostawy → karta odpowiedzi), a zgłoszenie z 20 sierpnia nauczyło,
      że sygnał bez drogi do treści jest sygnałem zgubionym. */
+  const plakietki = [];
   const n = odpowiedziNaNotatki.length;
-  $("stan").innerHTML = n
-    ? `<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
+  if (n) {
+    plakietki.push(`<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
       title="${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"} — kliknij, żeby przeczytać."
-      >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`
-    : "";
+      >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`);
+  }
+  /* Spóźnione sprawy (0.363.0) — OSOBNA PLAKIETKA, nie kolor ikony zdrowia,
+     i to nie jest kwestia gustu. Ikona odpowiada na pytanie „czy system
+     działa": worker, kolejka, rozjazdy z Subiektem. Sprawa stojąca trzeci
+     dzień to zdrowy system i kulejąca PRACA — dwie różne rzeczy pod jednym
+     kolorem znaczą tyle, co jedna. Czerwień na ikonie od jednej takiej sprawy
+     świeciłaby cały dzień i nauczyłaby biuro ignorować ją także wtedy, gdy
+     naprawdę padnie worker.
+
+     Bursztyn, nie czerwień, bo nic nie stoi: sprawa idzie wolniej niż zwykle.
+     Plakietka prowadzi na tabelę, która to wyjaśnia — zgłoszenie z 20 sierpnia
+     nauczyło, że sygnał bez drogi do treści jest sygnałem zgubionym. */
+  const sp = ostatnieAlarmy?.spoznionychRazem || 0;
+  if (sp) {
+    const opis = sp === 1 ? "spóźniona sprawa" : "spóźnione sprawy";
+    plakietki.push(`<span class="badge amber" data-do="nadzor" data-cel="kartaWymiany"
+      title="${sp} ${opis} — stoją dłużej niż dziewięć na dziesięć domkniętych w tym kanale. Kliknij, żeby zobaczyć które."
+      >${sp}<span class="et">${opis}</span></span>`);
+  }
+  $("stan").innerHTML = plakietki.join("");
 
   rysujIkoneAllegro();
 }
@@ -3547,6 +3575,46 @@ function rysujWymiane(r) {
       '<tr><td colspan="7" class="mute">Brak spraw w tym oknie</td></tr>');
 }
 
+/* ── Co stoi dłużej, niż stoi zwykle (0.363.0) ──────────────────────────────
+   Próg nie jest niczyim werdyktem: to `p90` spraw DOMKNIĘTYCH w tym samym
+   kanale. Ekran mówi to wprost przy każdym wierszu, bo liczba bez pochodzenia
+   jest wyrocznią, a wyroczni nie da się podważyć danymi. */
+function rysujAlarmWymiany(a) {
+  const k = (a && a.kanaly) || [];
+  const spoznione = k.filter((x) => x.spoznionych > 0);
+  const cel = $("alarmWymiany");
+  if (!cel) return;
+
+  /* Kanały bez progu wymieniamy Z NAZWY, zamiast milczeć. Cisza znaczyłaby
+     „nic nie stoi", a znaczy „jeszcze nie ma z czego liczyć" — i biuro nie
+     ma jak tych dwóch rzeczy odróżnić, jeśli ekran ich nie odróżnia. */
+  const bezProgu = k.filter((x) => x.progMin === null);
+
+  const naglowek = spoznione.length
+    ? `<p class="b" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — ${
+        spoznione.reduce((s2, x) => s2 + x.spoznionych, 0)}</p>`
+    : '<p class="b mute" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — nic</p>';
+
+  const wiersze = spoznione.map((x) => `<tr>
+      <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
+      <td>${x.spoznionych}</td>
+      <td class="mute">próg ${czasWymiany(x.progMin)}${
+        x.podstawa === "podloga" ? " (podłoga)" : ` (p90 z ${x.n})`}</td>
+      <td>najdłuższa: ${czasWymiany(x.najstarszaSpoznionaMin)}</td>
+    </tr>`).join("");
+
+  cel.innerHTML = naglowek +
+    (wiersze ? `<table>${wiersze}</table>` : "") +
+    (bezProgu.length
+      ? `<p class="mute" style="margin:8px 0 0">Bez progu — za mało domkniętych
+         spraw (potrzeba ${a.minSpraw}): ${
+           bezProgu.map((x) => `${esc(NAZWA_KANALU[x.kanal] || x.kanal)} (${x.n})`).join(", ")}.</p>`
+      : "") +
+    `<p class="mute" style="margin:8px 0 0">Próg liczony osobno dla każdego kanału
+     z ostatnich ${a && a.dni ? a.dni : 30} dni; nie zależy od OKNA wybranego
+     przy tabeli wyżej.</p>`;
+}
+
 /* ── DECYZJA BIURA O KODZIE (0.360.0) ───────────────────────────────────────
    Do 0.358.0 ta tabela była dziennikiem bez wyjścia: kolizja wpadała na listę
    i zostawała na zawsze w tej samej postaci co pierwszego dnia. Hala patrzyła
@@ -4072,7 +4140,14 @@ async function odswiezStan() {
     const [h, q, odp] = await Promise.all([
       (await fetch("/api/health")).json(),
       (await api("/api/queue")).json(),
-      (await api("/api/biuro/notatki/odpowiedzi")).json().catch(() => ({ odpowiedzi: [] })),
+      /* `.catch` na CAŁYM łańcuchu (poprawione w 0.363.0). Stał za `.json()`,
+         a `api()` rzuca przy każdej odpowiedzi spoza 2xx — czyli PRZED
+         `.json()`. Zabezpieczenie nie łapało więc niczego, co naprawdę pada,
+         a 500 z licznika odpowiedzi zabierało cały pasek stanu: ikonę
+         zdrowia, kolejkę i stan Allegro naraz. */
+      api("/api/biuro/notatki/odpowiedzi")
+        .then((r) => r.json())
+        .catch(() => ({ odpowiedzi: [] })),
     ]);
     odpowiedziNaNotatki = odp.odpowiedzi || [];
     /* Stan Allegro jedzie od 0.114.0 także w health — ikona w pasku ma być
@@ -4156,12 +4231,21 @@ async function odswiezNadzor() {
       (await api("/api/ean-conflicts")).json(),
       /* To samo okno co metryki obok: dwie tabele na jednym ekranie liczące
          z różnych okresów to najprostszy sposób na sprzeczne wnioski. */
-      (await api(`/api/biuro/wymiana?dni=${$("dniMetryk").value}`)).json()
+      /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.363.0 stał
+         za `.json()` i nie łapał nic, co naprawdę pada: `api()` rzuca przy
+         każdej odpowiedzi spoza 2xx, czyli PRZED `.json()`. Awaria najmłodszej
+         i najmniej ważnej tabeli wywracała przez to dwie starsze na tym samym
+         ekranie — metryki i kolizje. */
+      api(`/api/biuro/wymiana?dni=${$("dniMetryk").value}`)
+        .then((r) => r.json())
         .catch(() => ({ wiersze: [] })),
     ]);
     rysujMetryki(m);
     rysujKolizje(k.conflicts || []);
     rysujWymiane(wym);
+    /* Alarm rysuje się z danych POBRANYCH W CYKLU, a nie tu: wejście na
+       zakładkę nie ma czekać na własne żądanie, skoro liczba już jest. */
+    if (ostatnieAlarmy) rysujAlarmWymiany(ostatnieAlarmy);
   } catch (e) { cichaAwaria("metryki", e); }
 }
 
@@ -4204,8 +4288,22 @@ async function odswiez() {
 /* Liczniki zakładek odeszły razem z obsługą klienta (0.140.0). Pigułka
    mówiła, ile spraw czeka; magazyn takiej liczby nie ma — praca hali stoi
    w koszach, a te widać na własnej zakładce. Nowa obsługa przyniesie własny
-   licznik razem z własną kolejką. */
-async function odswiezLiczniki() {}
+   licznik razem z własną kolejką.
+
+   Od 0.363.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
+   liczba, którą biuro ma zobaczyć, siedząc na innej zakładce. Spóźniona
+   sprawa jest jedyną taką liczbą, jaką magazyn ma. */
+async function odswiezLiczniki() {
+  try {
+    ostatnieAlarmy = await (await api("/api/biuro/alarm-wymiany")).json();
+    if (widok === "nadzor") rysujAlarmWymiany(ostatnieAlarmy);
+  } catch (e) {
+    /* Bez `cichaAwaria`: alarm ma NIE psuć werdyktu o cyklu. Gdy padnie,
+       plakietka po prostu nie urośnie — a bursztyn od jego awarii zabrałby
+       ten kolor sprawom, o których alarm miał mówić. */
+    console.warn("[alarm wymiany]", e);
+  }
+}
 
 /* Kosze i pominięte pozycje — praca hali widziana z biura. Jedna funkcja,
    bo odświeżają się razem z zakładką MAGAZYN i żadne z nich nie jest na

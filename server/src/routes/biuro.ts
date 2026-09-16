@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { czasyWymiany } from "../services/wymiana.js";
+import { alarmyWymiany, czasyWymiany } from "../services/wymiana.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
@@ -224,6 +224,21 @@ export async function biuroRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return czasyWymiany(Number(req.query.dni) || 30);
+  });
+
+  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE (0.363.0) ───────────────────────────
+     Tabela wyżej odpowiada na pytanie zadane — a żeby je zadać, trzeba wejść
+     na STAN SYSTEMU i spojrzeć. Ta trasa odpowiada na pytanie NIEZADANE
+     i dlatego chodzi w cyklu, na każdej zakładce: własność „Wiek" wymaga,
+     żeby widać było, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK.
+
+     Bez parametru `dni`: okno jest stałe (30 dni). Suwak przy tabeli rządzi
+     tabelą; sygnał, który zmienia treść przy przestawieniu listy rozwijanej,
+     przestaje być sygnałem. */
+  app.get("/api/biuro/alarm-wymiany", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return alarmyWymiany();
   });
 
   app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {
