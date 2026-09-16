@@ -135,6 +135,15 @@ export function otworzPrzyjecie(raw: string, autor: string): SzczegolKosza {
      o tej samej liczbie to cudzy kosz. */
   const surowy = String(raw ?? "").trim().toUpperCase();
   if (KOD_KOSZA_WIRTUALNEGO.test(surowy)) {
+    /* OD 0.376.0 KOD KOSZYKA OTWIERA WŁASNY KOSZ — jeśli ma już dokument.
+       Koszyk związany z MM (`zwiazKoszykiZDokumentami`) jest tym samym pudłem,
+       które hala ma rozłożyć, więc skan jego etykiety ma prowadzić DO NIEGO.
+       Odmowa zostaje wyłącznie tam, gdzie papieru jeszcze nie ma: wtedy nie ma
+       czego rozkładać, a zdanie mówi, na co czekać. */
+    const wlasny = db().prepare(
+      "SELECT id FROM kosz WHERE kod = ? AND mm_dok_id IS NOT NULL ORDER BY id DESC LIMIT 1")
+      .get(surowy) as { id: number } | undefined;
+    if (wlasny) return szczegolKosza(wlasny.id);
     throw new BladKosza(404, odmowaKoszaWirtualnego(surowy));
   }
   const numer = numerZKartki(raw);

@@ -927,6 +927,66 @@ export interface KoszykCzekajacy {
   dolozone: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
 }
 
+/* ── Jedno pudło, jedno imię (0.376.0) ──────────────────────────────────────
+   Do tego wydania karton nosił DWA imiona. Obsługa napełniała koszyk „Z-7",
+   a hala rozkładała kosz z jego dokumentu — „1209" — bo `otworzPrzyjecie`
+   zakładał wtedy NOWY kosz, pusty i bez związku z tamtym. Jeden fizyczny
+   karton był więc dwiema jednostkami pracy: pierwsza nie miała ani jednego
+   odłożenia, druga nie miała zamknięcia, a raport cyklu musiał zszywać je
+   heurystyką po czasie, bo numery MM powtarzają się co rok.
+
+   Wiązanie robi to, czego brakowało: po wejściu dokumentu do Subiekta koszyk
+   DOSTAJE ten dokument, zamiast rodzić sobie sobowtóra. Hala otwiera wtedy ten
+   sam kosz — z jego zawartością, jego historią i jego kodem.
+
+   PO PEŁNYM NUMERZE, nie po samej liczbie. `sgt_doc_number` niesie to, co
+   oddała Sfera („MM 1209/MAG/2026"), a liczba z numeru powtarza się co rok.
+   Dopasowanie po niej zderzyłoby dzisiejszy karton z zeszłorocznym.          */
+
+/**
+ * Wiąże koszyki z dokumentami MM, które weszły już do read-modelu.
+ *
+ * Oddaje liczbę związanych. Woła to worker co minutę, obok numerów ZW —
+ * dokument pojawia się w read-modelu dopiero po imporcie, więc chwila między
+ * zapisem w Sferze a tym wiązaniem jest normalna, nie awaryjna.
+ *
+ * IDEMPOTENTNE przez `mm_dok_id IS NULL` w warunku UPDATE: dwa takty w tej
+ * samej sekundzie nie mają jak związać kosza dwa razy.
+ */
+export function zwiazKoszykiZDokumentami(database: Db): number {
+  const czekajace = database.prepare(
+    `SELECT k.id, k.kod, q.sgt_doc_number AS numer
+       FROM kosz k JOIN sfera_queue q ON q.id = k.mm_queue_id
+      WHERE k.mm_dok_id IS NULL AND q.type='mm' AND q.status='done'
+        AND q.sgt_doc_number IS NOT NULL
+      ORDER BY k.id`).all() as Array<{ id: number; kod: string; numer: string }>;
+
+  let zwiazanych = 0;
+  for (const k of czekajace) {
+    const dok = database.prepare(
+      "SELECT dok_id, mag_z FROM sgt_mm_zwrot WHERE nr_pelny = ?").get(k.numer) as
+      { dok_id: number; mag_z: number | null } | undefined;
+    /* Brak dokumentu w read-modelu NIE jest błędem: import chodzi co minutę,
+       a Sfera właśnie go wystawiła. Kosz poczeka do następnego taktu. */
+    if (!dok) continue;
+    /* `mm_mag_z` RAZEM z dokumentem, nie osobno. Od chwili związania trasę
+       powrotu liczy gałąź „kosz z dokumentu" (`trasaPowrotu` w `kosze.ts`),
+       a ta bierze magazyn docelowy WYŁĄCZNIE z tej kolumny. Bez niej związany
+       koszyk przestałby dostawać MM powrotne i zgłaszałby się w rekoncyliacji
+       jako `kosz_bez_powrotu` — towar zostałby na regale zwrotów. */
+    const r = database.prepare(
+      "UPDATE kosz SET mm_dok_id=?, mm_numer=?, mm_mag_z=? WHERE id=? AND mm_dok_id IS NULL")
+      .run(dok.dok_id, k.numer, dok.mag_z, k.id);
+    if (Number(r.changes) === 0) continue;
+    zwiazanych++;
+    logEvent("kosz_zwrotow_zwiazany", AUTOMAT_KOREKTY, null,
+      { koszId: k.id, kod: k.kod, dokId: Number(dok.dok_id), numer: k.numer,
+        magZ: dok.mag_z },
+      undefined, database);
+  }
+  return zwiazanych;
+}
+
 /**
  * Koszyki zamknięte BEZ DOKUMENTU — wszystko, co jeszcze czeka na człowieka
  * albo na papier (0.371.0).

@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.376.0 — 16 września 2026
+
+**Jeden karton nosi jedno imię.** Do tego wydania obsługa napełniała koszyk
+„Z-7", a hala rozkładała kosz z jego dokumentu — „1209" — bo otwarcie przyjęcia
+zakładało NOWY kosz, pusty i bez związku z tamtym. Jeden fizyczny karton był
+więc dwiema jednostkami pracy: pierwsza nie miała ani jednego odłożenia, druga
+nie miała zamknięcia, a raport cyklu musiał je zszywać heurystyką po czasie.
+
+Teraz koszyk DOSTAJE swój dokument, zamiast rodzić sobowtóra. Worker wiąże go
+minutę po tym, jak MM wejdzie do read-modelu, i od tej chwili skan etykiety
+`Z-7` otwiera na hali ten sam kosz co numer `1209` — z jego zawartością, jego
+historią i jego kodem.
+
+**Wiązanie idzie po PEŁNYM numerze**, nie po samej liczbie. Numery MM
+w Subiekcie startują od nowa z każdym rokiem, więc dopasowanie po liczbie
+zderzyłoby dzisiejszy karton z zeszłorocznym.
+
+**Magazyn źródłowy wchodzi RAZEM z dokumentem** i to nie jest szczegół zapisu.
+Od chwili związania trasę powrotu liczy gałąź „kosz z dokumentu", a ta bierze
+cel wyłącznie z `mm_mag_z`. Bez tej kolumny związany koszyk przestałby dostawać
+MM powrotne i zgłaszałby się w rekoncyliacji jako `kosz_bez_powrotu` — towar
+zostałby na regale zwrotów.
+
+Odmowa dla kodu koszyka zostaje tam, gdzie papieru jeszcze nie ma: wtedy nie ma
+czego rozkładać, a zdanie mówi, na co czekać. Raport cyklu rozpoznaje kosz hali
+po BRAKU własnego zadania MM, nie po samym dokumencie — inaczej związany koszyk
+wypadłby z niego jako „druga połowa cudzej sprawy".
+
+**Czego to wydanie NIE robi: etykiety z kodem kreskowym.** Magazynier dalej
+wpisuje kod z kartki, tylko teraz jest to krótkie `Z-7` zamiast numeru
+dokumentu. Kod kreskowy wymaga albo nowej zależności, albo tablicy symboliki
+Code128 — a tablicy przepisanej z pamięci ten projekt nie przyjmuje, tak samo
+jak nazw kolumn Subiekta.
+
 ## 0.375.0 — 16 września 2026
 
 **Trzecia ocena zwrotu: „na outlet".** Decyzja właściciela z 16 września:

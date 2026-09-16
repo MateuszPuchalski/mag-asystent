@@ -7,7 +7,7 @@ import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
-  MAX_SZTUK_RECZNIE, powodPozaMagazynem,
+  MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
@@ -630,4 +630,66 @@ test("ocena „na stan” pozycji przesyłkowej NIE dokłada jej do pudła", () 
   const slad = d.prepare("SELECT COUNT(*) AS n FROM events WHERE type='kosz_zwrotow_odmowa'")
     .get() as { n: number };
   assert.equal(slad.n, 1, "odmowa zostawia ślad — cisza byłaby tu najgorsza");
+});
+
+/* ── Jedno pudło, jedno imię (0.376.0) ──────────────────────────────────────
+   Karton nosił dwa imiona: „Z-7" w panelu i „1209" na hali. Wiązanie daje
+   koszykowi jego własny dokument, zamiast pozwolić hali zrodzić sobowtóra. */
+
+/** Koszyk zamknięty, z zadaniem MM w podanym stanie. */
+function koszykZZadaniem(d: Db, numer: string | null, status = "done") {
+  const teraz = "2026-09-16T10:00:00Z";
+  const q = Number(d.prepare(
+    `INSERT INTO sfera_queue(type, status, payload, sgt_doc_number, created_at, created_by)
+     VALUES ('mm', ?, '{}', ?, ?, 'Biuro')`).run(status, numer, teraz).lastInsertRowid);
+  const id = Number(d.prepare(
+    `INSERT INTO kosz(kod, status, rodzaj, utworzono_at, utworzono_przez, mm_queue_id)
+     VALUES ('Z-9', 'zamkniety', 'zwroty', ?, 'Ala', ?)`).run(teraz, q).lastInsertRowid);
+  return id;
+}
+
+const dokument = (d: Db, dokId: number, nrPelny: string, numer: string) =>
+  d.prepare(`INSERT INTO sgt_mm_zwrot(dok_id, nr_pelny, numer, data_wyst, mag_z, mag_do)
+     VALUES (?,?,?,'2026-09-16',1,3)`).run(dokId, nrPelny, numer);
+
+test("koszyk dostaje SWÓJ dokument, gdy ten wejdzie do read-modelu", () => {
+  const d = stanowisko();
+  const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
+
+  assert.equal(zwiazKoszykiZDokumentami(d), 0, "bez dokumentu nie ma czego wiązać");
+
+  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
+  assert.equal(zwiazKoszykiZDokumentami(d), 1);
+
+  const k = d.prepare("SELECT mm_dok_id, mm_numer, mm_mag_z FROM kosz WHERE id=?").get(koszId) as
+    { mm_dok_id: number; mm_numer: string; mm_mag_z: number };
+  assert.equal(k.mm_dok_id, 41209);
+  assert.equal(k.mm_numer, "MM 1209/MAG/2026");
+  /* MAGAZYN ŹRÓDŁOWY RAZEM Z DOKUMENTEM. Od związania trasę powrotu liczy
+     gałąź „kosz z dokumentu", a ta bierze cel wyłącznie stąd — bez tej
+     kolumny towar zostałby na regale zwrotów. */
+  assert.equal(k.mm_mag_z, 1, "powrót ma dokąd wrócić");
+  assert.equal(zwiazKoszykiZDokumentami(d), 0, "drugi takt nie wiąże drugi raz");
+});
+
+test("wiązanie idzie po PEŁNYM numerze — liczba powtarza się co rok", () => {
+  /* Dopasowanie po samej liczbie zderzyłoby dzisiejszy karton z zeszłorocznym:
+     numery MM w Subiekcie startują od nowa z każdym rokiem. */
+  const d = stanowisko();
+  const koszId = koszykZZadaniem(d, "MM 1209/MAG/2026");
+  dokument(d, 40209, "MM 1209/MAG/2025", "1209");
+
+  assert.equal(zwiazKoszykiZDokumentami(d), 0, "zeszłoroczny dokument to nie ten karton");
+  assert.equal((d.prepare("SELECT mm_dok_id FROM kosz WHERE id=?").get(koszId) as
+    { mm_dok_id: number | null }).mm_dok_id, null);
+});
+
+test("koszyk z zadaniem W TOKU nie wiąże się z niczym", () => {
+  /* Dopóki Sfera nie oddała numeru, dokumentu nie ma — a kosz związany
+     z cudzym dokumentem posłałby halę do nie tego pudła. */
+  const d = stanowisko();
+  koszykZZadaniem(d, null, "pending");
+  dokument(d, 41209, "MM 1209/MAG/2026", "1209");
+
+  assert.equal(zwiazKoszykiZDokumentami(d), 0);
 });
