@@ -34,6 +34,69 @@ historii nie przepisujemy.
 ---
 
 
+## 0.364.0 — 16 września 2026
+
+**Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie
+zostawiło tę rzecz otwartą z uzasadnieniem, które było słabsze, niż wyglądało:
+„§22 nie podaje terminu, więc terminu nie ma". To prawda o §22 i nieprawda
+o systemie. Sprawa jest spóźniona, gdy stoi dłużej niż dziewięć na dziesięć
+spraw TEGO SAMEGO KANAŁU, które ktoś w tym oknie domknął. Taki próg nie jest
+niczyim werdyktem — to zdanie o własnej historii firmy i da się je sprawdzić,
+patrząc na te same dane.
+
+Pasek stanu dostaje plakietkę ze spóźnionymi sprawami, a karta STAN SYSTEMU —
+blok mówiący, w którym kanale i od jak dawna.
+
+### Próg osobny dla każdego kanału
+
+Jedna liczba byłaby zła dla co najmniej trzech. Kolizja kodu czeka na decyzję
+przy biurku; zadanie terenowe wymaga przejścia przez halę. Wspólne „cztery
+godziny" alarmowałoby przy każdej kolizji i przy żadnym zadaniu. Sprawdzone
+na żywym serwerze: ta sama sprawa sprzed stu minut jest spóźniona w kanale
+domykanym w półtorej godziny i normalna w kanale domykanym w dziesięć.
+
+### Dziesięć spraw, nie „kilka" — to arytmetyka, nie wyczucie
+
+`p90` liczy się najbliższą rangą, czyli indeksem `ceil(0,9·n) − 1`. Przy
+dziewięciu sprawach wychodzi z tego OSTATNI element: próg równy najdłuższej
+sprawie, jaka się zdarzyła. Alarm z takim progiem nie zapali się nigdy,
+a wygląda na działający — i milczy tak samo jak alarm sprawny. Dopiero
+dziesiąta sprawa odcina ogon naprawdę.
+
+Poniżej dziesięciu kanał **mówi to wprost** zamiast milczeć: cisza znaczyłaby
+„nic nie stoi", a znaczy „jeszcze nie ma z czego liczyć".
+
+### Podłoga godziny
+
+Kanał domykany w trzy minuty miałby próg rzędu dwóch minut i alarmowałby przy
+normalnej pracy. Alarm zapalający się codziennie uczy, że alarm nic nie znaczy.
+
+### Spóźnienie nie barwi ikony zdrowia
+
+Ikona odpowiada na pytanie „czy system działa": worker, kolejka, rozjazdy
+z Subiektem. Sprawa stojąca trzeci dzień to zdrowy system i kulejąca PRACA.
+Czerwień od niej świeciłaby cały dzień i nauczyłaby biuro ignorować ikonę
+także wtedy, gdy naprawdę padnie worker — dlatego spóźnione dostają osobną
+plakietkę, z drogą do tabeli, która je wyjaśnia.
+
+### Czego ten alarm NIE mówi
+
+Wykrywa odstające od WŁASNEJ NORMY, nie złe. Magazyn, w którym każda sprawa
+stoi trzy dni, ma próg trzech dni i milczy. Na to potrzebna jest liczba
+właściciela i pytanie o nią zostaje otwarte — ale alarm z własnej historii
+działa dziś i przyjmie tamtą liczbę bez przebudowy.
+
+### Przy okazji: `.catch`, który nie łapał nic
+
+W dwóch miejscach panelu zabezpieczenie stało za `.json()`, a `api()` rzuca
+przy każdej odpowiedzi spoza 2xx — czyli PRZED `.json()`. Jedno z nich
+przyszło z 0.361.0, drugie żyło od 0.114.0: odmowa trasy z licznikiem
+odpowiedzi na notatki wywracała cały pasek stanu — ikonę zdrowia, kolejkę
+i stan Allegro naraz. Pilnuje tego teraz test panelu.
+
+Trasy miary dostały też własny plik bramek: przez trzy wydania nie miały
+testu roli wcale, tak samo jak rozstrzyganie kolizji przed 0.361.0.
+
 ## 0.362.0 — 16 września 2026
 
 **Wskazany towar sam wjeżdża na ekran, a skan wskazanego go odkłada.** Dwie
@@ -59,6 +122,121 @@ wpisanego regału nie ma czego potwierdzić i wcześniej kończył się samym
 piknięciem — wyglądało to jak zepsuty skaner. Teraz kolektor mówi, czego brakuje.
 
 Wdrożenie: nowy APK na kolektory. Serwer i panele bez zmian.
+
+## 0.361.0 — 16 września 2026
+
+**Pierwsza liczba mówiąca, ILE trwa sprawa między halą a biurem.** §22
+projektu panelu wymienia „czas realizacji zadania magazynowego" wśród metryk
+biznesowych. W kodzie nie było go wcale — i to nie dlatego, że brakowało
+danych. Znaczniki obu końców każdej wymiany leżą w bazie od lat:
+`utworzono_at`/`wykonano_at` przy zadaniach, `created_at`/`resolved_at` przy
+niezgodnościach, `pominieto_at`/`zalatwione_at` przy koszu. Trzy miejsca
+czytały `wykonano_at`, żeby go WYŚWIETLIĆ. Różnicy nie liczył nikt.
+
+Karta STAN SYSTEMU dostaje tabelę czterech kanałów, w tym samym oknie co
+metryki obok — dwie tabele na jednym ekranie liczące z różnych okresów to
+najprostszy sposób na sprzeczne wnioski.
+
+### Mediana i ogon, nigdy średnia
+
+Cztery sprawy po dziesięć minut i jedna po dziesięć tysięcy dają średnią
+około dwóch tysięcy — liczbę, której nie miała ŻADNA z nich. Mediana mówi,
+jak wygląda zwykły dzień; `p90` — jak wygląda zły. Obie stoją obok siebie,
+każda ze swoim `n`, bo mediana z czterech spraw i tak zostanie przeczytana
+jako werdykt.
+
+`p90` liczy się **najbliższą rangą**, nie interpolacją: interpolacja zwraca
+wartość, której nie miała żadna sprawa, a ten raport mówi o sprawach, nie
+o rozkładzie.
+
+### Sprawa, która trwa DO DZIŚ, nie wypada z raportu
+
+Wymiana bez zamknięcia nie ma czasu zamknięcia, więc nie wchodzi do mediany —
+a bywa najgorsza z całej listy, bo najdłużej stoi zwykle to, czego nikt nie
+ruszył. Bez kolumny OTWARTE i NAJSTARSZA OTWARTA tabela pokazywałaby wyłącznie
+sprawy domknięte, czyli mierzyłaby własny sukces.
+
+### Odesłanie liczy się jako odpowiedź
+
+Zadanie odesłane przez halę („nie da się", 0.352.0) jest DOMKNIĘTE: hala
+odpowiedziała. Gdyby nie liczyło się jako zamknięcie, „czas realizacji zadania
+magazynowego" mierzyłby wyłącznie zadania, które się udały — a te trudne
+wypadałyby z miary właśnie dlatego, że były trudne.
+
+### Czego w tej tabeli nie ma
+
+**Progu „za późno".** §22 wymienia tę metrykę i nie podaje terminu, więc
+raport mówi, ile trwa; czy to długo, rozstrzyga człowiek. Liczba godzin
+wpisana tutaj byłaby werdyktem, którego nikt nie wydał.
+
+**Notatek do dostaw.** Ich pętla ma własny licznik nieprzeczytanych odpowiedzi
+od 0.77.0, a odpowiedź na notatkę bywa rozmową na kilka tur — „czas wymiany"
+znaczyłby tam co innego niż w pozostałych czterech kanałach, a jedna tabela
+kłamałaby o obu naraz.
+
+Trasa jest GET-em, więc umowa zapisów panelu biura zostaje nietknięta:
+patrzenie na miarę niczego nie mutuje.
+
+---
+
+
+## 0.360.0 — 16 września 2026
+
+**Kolizja kodu przestaje być dziennikiem bez wyjścia.** `ean_conflict` zapisuje
+każde spotkanie tego samego kodu na kilku kartotekach od 0.37.0 i do 0.358.0
+nie miał ANI JEDNEJ kolumny mówiącej, czy ktokolwiek się tym zajął. Kolizja
+wpadała na listę i zostawała tam na zawsze, w tej samej postaci co pierwszego
+dnia.
+
+Najgorsze było to, że **obie strony patrzyły na tę samą listę**: biuro
+w `/biuro`, hala na ekranie wyjątków kolektora. Obie widziały problem i żadna
+nie mogła drugiej nic powiedzieć.
+
+### Dwa rodzaje, bo hala reaguje na nie ODWROTNIE
+
+`poprawione` znaczy „kartoteki naprawione, kolizja zniknie". `dopuszczone`
+znaczy „ten kod stoi na kilku kartotekach zgodnie z prawdą — zestaw i sztuka
+luzem — wybieraj po symbolu i nie zgłaszaj drugi raz". Trzeci rodzaj musiałby
+nazwać trzecią reakcję hali, a takiej nie ma.
+
+### Nieudana poprawka ujawnia się sama
+
+To jest sedno tej wersji. Serwer liczy trafienia PO decyzji, więc kolizja
+oznaczona jako `poprawione`, która zatrzymała kogoś jeszcze raz, **sama mówi,
+że poprawka nie zadziałała** — bez niczyjej oceny i bez pamiętania, żeby
+sprawdzić. Przy `dopuszczone` te same trafienia nie znaczą nic złego, bo tam
+mają wracać.
+
+Na kolektorze tylko ten jeden stan świeci na czerwono: to jedyny, w którym
+hala ma coś zrobić — powiedzieć biuru, że nie zadziałało.
+
+### Osobna tabela, nie kolumna w dzienniku
+
+`ean_conflict` to jeden wiersz na TRAFIENIE, raport agreguje je po kodzie.
+`resolved_at` na dzienniku kazałby pisać tę samą decyzję na dwudziestu
+wierszach i nie odpowiadałby na pytanie, co zrobić z trafieniem dwudziestym
+pierwszym. Decyzja dotyczy kodu, więc `ean_rozstrzygniecie` ma klucz na kodzie,
+a druga decyzja nadpisuje pierwszą: pytanie brzmi „co z tym kodem jest TERAZ",
+nie „co kiedykolwiek o nim myślano". Obie zostają w księdze zdarzeń.
+
+### Remis milisekundy złapany po raz drugi w tej samej sesji
+
+Pierwsza wersja liczyła „po decyzji" porównaniem `seen_at > at`. Oba znaczniki
+mają rozdzielczość milisekundy, więc trafienie zapisane w tej samej milisekundzie
+co decyzja wpadało po złej stronie — i padało to raz na kilka przebiegów całego
+zestawu testów, czyli najgorszym możliwym sposobem.
+
+To dokładnie ta blizna, którą 0.352.0 wyjęło z raportu skuteczności doboru,
+popełniona w nowym kodzie tego samego dnia. Lekarstwo też to samo: granicą jest
+`id` ostatniego trafienia znanego w chwili decyzji, bo `AUTOINCREMENT` jest
+jedynym ściśle rosnącym porządkiem w dzienniku. Test WYMUSZA remis, zamiast na
+niego czekać.
+
+Licznik umowy zapisów panelu biura: 17 → 18.
+
+Wdrożenie bez pracy ręcznej; wymaga nowego APK, żeby hala zobaczyła decyzje.
+
+---
 
 ## 0.359.0 — 16 września 2026
 
