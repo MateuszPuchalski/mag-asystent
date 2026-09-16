@@ -101,7 +101,7 @@ interface Kanal {
  * a wtedy tabela i alarm mówiłyby o dwóch różnych zbiorach spraw pod
  * jedną nazwą. To gorsze niż brak alarmu.
  *
- * NOTATKI DOSZŁY W 0.366.0, A ICH WYŁĄCZENIE BYŁO POMYŁKĄ. 0.361.0 zostawiło
+ * NOTATKI DOSZŁY W 0.369.0, A ICH WYŁĄCZENIE BYŁO POMYŁKĄ. 0.361.0 zostawiło
  * je poza miarą z uzasadnieniem „odpowiedź na notatkę bywa rozmową na kilka
  * tur, więc czas wymiany znaczyłby tam co innego". To zdanie jest NIEPRAWDZIWE
  * o tej tabeli i mówi to sam kod: `odpowiedzNaNotatke` odmawia nadpisania,

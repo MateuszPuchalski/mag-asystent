@@ -55,6 +55,8 @@ export interface Zamowienie {
   externalId: string;
   status: string | null;
   kupujacyLogin: string | null;
+  /** Nazwa odbiorcy Z NAKLEJKI (0.367.0) — po niej szuka się wracającej paczki. */
+  odbiorcaNazwa: string | null;
   dostawaGrosze: number | null;
   dostawaMetoda: string | null;
   /** `ONLINE`, `CASH_ON_DELIVERY`, … — surowo, bo Allegro nie zamyka listy. */
@@ -96,6 +98,7 @@ export function naZamowienie(
     externalId: String(zam.external_id),
     status: (zam.status as string) ?? null,
     kupujacyLogin: (zam.kupujacy_login as string) ?? null,
+    odbiorcaNazwa: (zam.odbiorca_nazwa as string) ?? null,
     dostawaGrosze: zam.dostawa_grosze == null ? null : Number(zam.dostawa_grosze),
     dostawaMetoda: (zam.dostawa_metoda as string) ?? null,
     platnoscTyp: (zam.platnosc_typ as string) ?? null,
@@ -194,33 +197,77 @@ export interface PaczkaKlienta {
    * tego samego.
    */
   maZwrot: boolean;
+  /** Nazwa odbiorcy z naklejki (0.367.0) — to po niej operator rozpoznaje paczkę. */
+  odbiorcaNazwa: string | null;
+  /**
+   * Login kupującego (0.367.0).
+   *
+   * Paczkę znalezioną po NAZWISKU trzeba zapisać z loginem, a operator go
+   * wtedy nie zna — zna go serwer, który właśnie tę paczkę wskazał. Bez tego
+   * pola wiersz zarejestrowany z naklejki zostawałby bez uchwytu, po którym
+   * biuro wraca do klienta.
+   */
+  kupujacyLogin: string | null;
+}
+
+/** Od ilu znaków wolno szukać po nazwie. Poniżej trafiałoby pół sklepu. */
+const MIN_NAZWY = 3;
+
+/**
+ * Znaki, które w `LIKE` znaczą co innego, niż wyglądają.
+ *
+ * Nazwisko z naklejki idzie do zapytania jako FRAGMENT, więc procent wpisany
+ * przez operatora dopasowałby wszystko, a podkreślnik dowolny znak. Ucieczka
+ * jest tu warunkiem poprawności, nie ostrożnością: wynik tej listy prowadzi do
+ * czyjegoś numeru zamówienia.
+ */
+function doLike(fraza: string): string {
+  return fraza.replace(/[\\%_]/g, (z) => `\\${z}`);
 }
 
 /**
- * Zamówienia tego kupującego, od najnowszego. Pusta lista znaczy „nic nie wiem".
+ * Zamówienia tego klienta, od najnowszego. Pusta lista znaczy „nic nie wiem".
  *
- * PORÓWNANIE BEZ WIELKOŚCI LITER, bo login przyjeżdża przeklejony z wiadomości,
- * a Allegro pokazuje go raz tak, raz inaczej. Dopasowanie jest DOKŁADNE:
- * fragment loginu wskazywałby cudze zakupy, a to jest ekran, z którego wychodzi
- * się z czyimś numerem zamówienia w ręku.
+ * PORÓWNANIE BEZ WIELKOŚCI LITER, bo uchwyt przyjeżdża przeklejony
+ * z wiadomości albo przepisany z naklejki, a wielkość liter bywa różna.
+ *
+ * DWA UCHWYTY, DWIE RÓŻNE ZASADY DOPASOWANIA (0.367.0):
+ *
+ *   • LOGIN — w CAŁOŚCI. Fragment loginu wskazywałby cudze zakupy, a to jest
+ *     ekran, z którego wychodzi się z czyimś numerem zamówienia w ręku. Tak
+ *     stało od 0.365.0 i tak zostaje.
+ *   • NAZWA ODBIORCY — po FRAGMENCIE, od `MIN_NAZWY` znaków. Nikt nie przepisze
+ *     nazwiska z naklejki znak w znak tak, jak zapisało je Allegro: bywa
+ *     z drugim imieniem, z firmą przed nazwiskiem albo z ogonkiem zjedzonym
+ *     przez drukarkę. Żądanie dokładności zamieniłoby ten uchwyt w martwy.
+ *
+ * Różnica jest świadoma i ma cenę: fragment nazwiska POKAŻE cudze zakupy,
+ * jeśli dwoje ludzi nazywa się tak samo. Dlatego wiersz listy niesie nazwę
+ * odbiorcy — wybiera człowiek, patrząc na wszystkie trafienia naraz.
  */
 export function paczkiKlienta(
-  konto: number, login: string, database: Db = defaultDb(), limit = 20,
+  konto: number, szukane: string, database: Db = defaultDb(), limit = 20,
 ): PaczkaKlienta[] {
-  const szukany = (login ?? "").trim();
+  const szukany = (szukane ?? "").trim();
   if (!szukany) return [];
+  /* Pusty wzorzec, gdy uchwyt jest za krótki — dopasowanie po nazwie wtedy
+     po prostu nie zachodzi, a gałąź po loginie działa dalej. */
+  const wzorzec = szukany.length >= MIN_NAZWY ? `%${doLike(szukany)}%` : null;
 
   const zamowienia = database.prepare(
-    `SELECT id, external_id, kupiono_at, suma_grosze, waluta
+    `SELECT id, external_id, kupiono_at, suma_grosze, waluta, odbiorca_nazwa, kupujacy_login
        FROM zamowienie_klienta
-      WHERE channel_account_id = ? AND lower(kupujacy_login) = lower(?)
+      WHERE channel_account_id = ?
+        AND (lower(kupujacy_login) = lower(?)
+             OR (? IS NOT NULL AND lower(odbiorca_nazwa) LIKE lower(?) ESCAPE '\\'))
       /* Najnowsze pierwsze, a bez daty na końcu: zamówienie bez daty zakupu
          jest niedokończonym zapisem synchronizacji, nie świeżym zakupem.
          Bez odwrotnych apostrofów w tym komentarzu — zamknęłyby szablon. */
       ORDER BY kupiono_at IS NULL, kupiono_at DESC, id DESC
-      LIMIT ?`).all(konto, szukany, Math.max(1, limit)) as Array<{
+      LIMIT ?`).all(konto, szukany, wzorzec, wzorzec, Math.max(1, limit)) as Array<{
     id: number; external_id: string; kupiono_at: string | null;
-    suma_grosze: number | null; waluta: string;
+    suma_grosze: number | null; waluta: string; odbiorca_nazwa: string | null;
+    kupujacy_login: string | null;
   }>;
   if (!zamowienia.length) return [];
 
@@ -260,6 +307,8 @@ export function paczkiKlienta(
       zawartosc: poz.slice(0, 3).map((p) => `${p.nazwa} ×${p.ilosc}`).join(" · ")
         + (poz.length > 3 ? ` · +${poz.length - 3}` : ""),
       maZwrot: zeZwrotem.has(String(z.external_id)),
+      odbiorcaNazwa: z.odbiorca_nazwa ?? null,
+      kupujacyLogin: z.kupujacy_login ?? null,
     };
   });
 }

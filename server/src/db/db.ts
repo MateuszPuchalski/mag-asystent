@@ -463,6 +463,20 @@ export function migrate(database: DatabaseSync) {
                     AND paczka_at IS NOT NULL`);
   addColumn("zwrot_klienta", "kupujacy_login", "TEXT");
   addColumn("zwrot_klienta", "przewoznik", "TEXT");
+  /* ── NAZWA ODBIORCY Z NAKLEJKI (0.367.0) ───────────────────────────────
+     Decyzja właściciela, świadome zdjęcie fragmentu polityki danych. Paczki
+     nadaje klient albo kurier, więc numeru listu z wracającego kartonu nasz
+     system NIGDY nie widział i pierwszy skan takiej paczki musi chybić —
+     żadna synchronizacja tego nie naprawi. Zostaje to, co jeszcze jest na
+     naklejce: nazwa odbiorcy i przewoźnik.
+
+     JEDNA KOLUMNA, nie dwie. Szukanie nie rozróżnia imienia od nazwiska,
+     a jedna kolumna to jedna rzecz do pilnowania przy polityce danych.
+     Ulica, miasto, kod pocztowy, telefon i e-mail zostają zablokowane —
+     zdjęcie kończy się na nazwie. Pilnują tego testy przy mapowaniu
+     zamówień i lista zakazanych członów w `migracja-zwrotow.test.ts`. */
+  addColumn("zwrot_klienta", "odbiorca_nazwa", "TEXT");
+  addColumn("zamowienie_klienta", "odbiorca_nazwa", "TEXT");
   /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy
      SNAPSHOTEM, bo `sgt_faktura` czyści się przy każdym imporcie i dokument
      wypada z okna — powiązanie musi przeżyć własne źródło. */

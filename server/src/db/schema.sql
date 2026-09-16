@@ -1762,6 +1762,20 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- Przewoźnik z pierwszej paczki. Bez `CHECK`: Allegro nie publikuje
   -- zamkniętej listy, a sonda złapała `UNKNOWN`, którego nie ma w specyfikacji.
   przewoznik TEXT,
+  -- Nazwa odbiorcy Z NAKLEJKI (0.367.0) — druga dana osobowa dopuszczona
+  -- w zwrotach i jedyna dołożona decyzją właściciela, nie przez Allegro.
+  --
+  -- Paczki nadaje klient albo kurier, więc numeru listu z wracającego kartonu
+  -- nasz system NIGDY nie widział: pierwszy skan takiej paczki musi chybić.
+  -- Uchwytem zostaje to, co jeszcze jest na naklejce — nazwa odbiorcy.
+  -- Przy `zrodlo='nieodebrana'` wpisuje ją operator, przy zwrocie z Allegro
+  -- kopiuje się z zamówienia; ten sam wzór co `kupujacy_login`, z tego samego
+  -- powodu: zamówienie bywa jeszcze niepobrane albo wypadło z okna.
+  --
+  -- JEDNA kolumna na imię, nazwisko albo nazwę firmy. Szukanie ich nie
+  -- rozróżnia. Ulica, miasto, kod pocztowy, telefon i e-mail zostają
+  -- zablokowane — zdjęcie polityki kończy się na nazwie.
+  odbiorca_nazwa TEXT,
   -- ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────
   -- Numer, po którym biuro odnajduje sprzedaż, żeby wystawić korektę. Wskazuje
   -- go CZŁOWIEK z listy kandydatów albo automat, ale wyłącznie wtedy, gdy na
@@ -2018,9 +2032,19 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   channel_account_id INTEGER NOT NULL REFERENCES channel_account(id),
   external_id TEXT NOT NULL,
   status TEXT,
-  -- Login kupującego — jedyna dana osobowa, którą polityka danych skrzynki
+  -- Login kupującego — pierwsza dana osobowa, którą polityka danych skrzynki
   -- dopuszcza wprost. Bez niej nie da się powiązać zamówienia z rozmową.
   kupujacy_login TEXT,
+  -- Nazwa odbiorcy z `delivery.address` (0.367.0). Druga i ostatnia taka
+  -- dana; reszta tamtego obiektu — ulica, miasto, kod, telefon — nie
+  -- przechodzi przez mapowanie i nie ma tu kolumny.
+  --
+  -- To ODBIORCA DOSTAWY, nie kupujący: `CheckoutFormDeliveryAddress` ma
+  -- `firstName` i `lastName` w `required`, i to ta nazwa stoi na naklejce,
+  -- po której operator szuka wracającej paczki. Bywa inna niż kupujący.
+  -- Gdy jest `companyName`, bierzemy jego: paczka firmowa nosi nazwę firmy
+  -- zamiast osoby i bez tego zostałaby nieodnajdywalna.
+  odbiorca_nazwa TEXT,
   -- Koszt dostawy, czyli składnik, którego zwrotowi BRAKOWAŁO w 0.150.0.
   -- Bez niego wariant „bez wysyłki" był nieodróżnialny od pełnej kwoty.
   dostawa_grosze INTEGER,

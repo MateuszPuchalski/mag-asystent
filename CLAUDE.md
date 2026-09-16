@@ -46,8 +46,12 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   strzelają do Allegro). Dziś żadnego nie ma — gdy wróci, rytm bierze
   z `services/takt.ts` (rozrzut, respekt dla 429).
 - **Prywatność:** adresy dostawy nie przechodzą przez mapowanie (pilnują
-  testy). Obsługa klienta powstaje od nowa i swoją politykę danych ma
-  zapisać w `docs/obsluga-klienta.md`, zanim dotknie pierwszej rozmowy.
+  testy). Od 0.367.0 jest z tego JEDEN wyjątek, decyzją właściciela: sama
+  NAZWA odbiorcy z `delivery.address`, bo po niej szuka się paczki, której
+  klient nie odebrał. Ulica, miasto, kod i telefon zostają zablokowane,
+  a lądowisko nazwy nie dostaje. Zakres i powód stoją w
+  `docs/obsluga-klienta.md` — dokładając cokolwiek z adresu, dopisujesz tam
+  własne uzasadnienie albo tego nie robisz.
 - **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
   w repo: `docs/allegro/swagger.yaml` (cudza, nietykalna — sumę pilnuje
   `tools/docs_check.py`). Czytaj SCHEMAT, nie przykład: przykłady Allegro bywają

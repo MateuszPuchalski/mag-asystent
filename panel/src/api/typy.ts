@@ -1001,6 +1001,16 @@ export interface Zwrot {
   /** Czy cofnięcie zmiany ma dokąd wrócić (§25a.5). */
   maPoprzedniaNotatke: boolean;
   kupujacyLogin: string | null;
+  /**
+   * Nazwa odbiorcy Z NAKLEJKI (0.367.0).
+   *
+   * Paczki nakleja klient albo kurier, więc numeru listu z wracającego
+   * kartonu nasz system nie widział nigdy — pierwszy skan takiej paczki
+   * chybia z definicji. Zostaje to, co na naklejce widać.
+   *
+   * W eksporcie CSV jej NIE MA, tak samo jak numeru listu.
+   */
+  odbiorcaNazwa: string | null;
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];
   /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */

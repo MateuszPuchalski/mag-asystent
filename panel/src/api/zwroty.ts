@@ -333,25 +333,38 @@ export interface PaczkaKlienta {
   zawartosc: string;
   /** Zwrot dla tego zamówienia już istnieje — ostrzeżenie, nie blokada. */
   maZwrot: boolean;
+  /** Nazwa odbiorcy z naklejki (0.367.0) — po niej rozpoznaje się karton. */
+  odbiorcaNazwa: string | null;
+  /** Login kupującego — paczkę znalezioną po nazwisku trzeba zapisać z nim. */
+  kupujacyLogin: string | null;
 }
 
 /**
- * Co ten klient u nas kupił (0.365.0).
+ * Co ten klient u nas kupił (0.365.0, uchwyt poszerzony w 0.367.0).
  *
  * Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
- * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty login
+ * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty uchwyt
  * NIE PYTA serwera — zapytanie o wszystkich byłoby listą cudzych zakupów,
  * a nie odpowiedzią na pytanie operatora.
  *
+ * UCHWYTEM JEST LOGIN ALBO NAZWISKO Z NAKLEJKI. Jedno pole, bo operator
+ * z kartonem w ręku ma to, co ma — dwa pola kazałyby mu najpierw rozstrzygnąć,
+ * czym jest to, co przepisuje. Zasady dopasowania rozstrzyga serwer: login
+ * w całości, nazwisko po fragmencie.
+ *
+ * POST, CHOĆ TO ODCZYT — ta sama decyzja co przy `/skan` z 0.163.0. Uchwyt
+ * w adresie wylądowałby w logu żądań serwera, a bywa nim teraz nazwisko.
+ *
  * Odczyt, więc `useQuery`: otwarcie i przeglądanie niczego nie mutuje.
  */
-export function usePaczkiKlienta(login: string) {
-  const czysty = login.trim();
+export function usePaczkiKlienta(szukane: string) {
+  const czysty = szukane.trim();
   return useQuery({
     queryKey: ["paczki-klienta", czysty] as const,
     enabled: czysty.length > 0,
     queryFn: () => api<{ paczki: PaczkaKlienta[] }>(
-      `/api/obsluga/zwroty/paczki-klienta?login=${encodeURIComponent(czysty)}`),
+      "/api/obsluga/zwroty/paczki-klienta",
+      { method: "POST", body: JSON.stringify({ szukane: czysty }) }),
   });
 }
 
@@ -368,6 +381,8 @@ export function useNieodebrana() {
       waybill: string; orderId?: string | null; notatka?: string | null;
       /** Login kupującego (0.365.0) — przy nieodebranej często jedyny uchwyt. */
       login?: string | null;
+      /** Nazwa odbiorcy i przewoźnik Z NAKLEJKI (0.367.0) — patrz `Szukanie`. */
+      odbiorcaNazwa?: string | null; przewoznik?: string | null;
     }) =>
       api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
         { method: "POST", body: JSON.stringify(v) }),
