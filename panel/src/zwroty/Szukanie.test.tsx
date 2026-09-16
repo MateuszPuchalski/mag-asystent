@@ -161,7 +161,7 @@ describe("Pole szukania zwrotu", () => {
     await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-9");
     await userEvent.type(screen.getByLabelText("Notatka"), "awizo dwa razy");
     await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith(ETYKIETA, "ord-9", "awizo dwa razy");
+    expect(p.onNieodebrana).toHaveBeenCalledWith(ETYKIETA, "ord-9", "awizo dwa razy", "");
   });
 
   it("rejestracja mówi wprost, że to nie jest zgłoszenie klienta", async () => {
@@ -184,7 +184,27 @@ describe("Pole szukania zwrotu", () => {
     await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-1");
     await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-4");
     await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-1", "ord-4", "");
+    expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-1", "ord-4", "", "");
+  });
+
+  it("login kupującego idzie z formularza — po nim biuro wraca do paczki", async () => {
+    /* Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
+       loginie klienta". Numeru zamówienia przy nieodebranej najczęściej nie
+       ma, a wtedy login jest jedynym uchwytem, jaki operator ma pod ręką. */
+    const p = pokaz(null);
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-7");
+    await userEvent.type(screen.getByLabelText("Login kupującego"), "jan_kowalski");
+    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
+    expect(p.onNieodebrana).toHaveBeenCalledWith("PACZ-7", "", "", "jan_kowalski");
+  });
+
+  it("ekran mówi, PO CO ten login", async () => {
+    /* Pole bez powodu wygląda na kolejną rubrykę do wypełnienia. To zdanie
+       jest całą różnicą między „wypełnij" a „to się przyda tobie". */
+    pokaz(null);
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText(/znajdziesz tę paczkę później/)).toBeInTheDocument();
   });
 
   it("bez numeru listu rejestracja MILCZY", async () => {

@@ -1443,6 +1443,52 @@ test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta",
     "nieodebrana leży u nas w chwili rejestracji");
 });
 
+test("nieodebrana zapamiętuje LOGIN klienta — to po nim biuro do niej wraca", () => {
+  /* Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
+     loginie klienta". Pole szukania w panelu zna login od 0.337.0 i mówi to
+     wprost, ale TEJ paczce login brał się wyłącznie z zamówienia — a numeru
+     zamówienia przy nieodebranej najczęściej nie ma. Karton wraca sam, bez
+     zgłoszenia i bez kopii z Allegro. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "PACZ-1", login: "  jan_kowalski  " }, KTO);
+
+  const z = listaZwrotow(d, TERAZ).find((x) => x.id === w.zwrotId)!;
+  assert.equal(z.kupujacyLogin, "jan_kowalski", "spacje ze schowka nie wchodzą do bazy");
+  assert.equal(z.orderId, null, "login wystarcza sam — bez numeru zamówienia");
+});
+
+test("login bez wpisania bierze się z zamówienia, ale zostaje w KOLUMNIE zwrotu", () => {
+  /* Zapis do kolumny, a nie złączenie przy odczycie: zwrot ma być odnajdywalny
+     także wtedy, gdy zamówienie wypadnie z okna synchronizacji. */
+  const d = stanowisko();
+  zamowienie(d, "ord-log", [{ offerId: "1", nazwa: "Sekator", sku: "SEK-1", cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='ania_z_allegro' WHERE external_id=?")
+    .run("ord-log");
+
+  const w = zarejestrujNieodebrana(d, { waybill: "PACZ-2", orderId: "ord-log" }, KTO);
+  assert.equal(w.pozycji, 1, "numer zamówienia dalej przepisuje pozycje");
+  assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
+    .get(w.zwrotId) as { l: string | null }).l, "ania_z_allegro");
+
+  /* Wpisany bije ten z zamówienia: pochodzi od człowieka patrzącego na sprawę. */
+  const drugi = zarejestrujNieodebrana(d,
+    { waybill: "PACZ-3", orderId: "ord-log", login: "ktos_inny" }, KTO);
+  assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
+    .get(drugi.zwrotId) as { l: string | null }).l, "ktos_inny");
+});
+
+test("dziennik notuje FAKT loginu, nie sam login", () => {
+  /* Zdarzenie odpowiada na pytanie „skąd ten wiersz". Dana osobowa leży
+     w kolumnie zwrotu i stamtąd się ją czyta — kopia w dzienniku byłaby
+     drugim miejscem do pilnowania przy tej samej polityce danych. */
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PACZ-4", login: "jan_kowalski" }, KTO);
+  const e = d.prepare("SELECT payload FROM events WHERE type='zwrot_nieodebrana'")
+    .get() as { payload: string };
+  assert.equal(JSON.parse(e.payload).zLoginem, true);
+  assert.doesNotMatch(e.payload, /jan_kowalski/);
+});
+
 test("migracja domyka datę powrotu paczkom nieodebranym sprzed poprawki", () => {
   /* Niezmiennik, nie jednorazowa łatka: wiersz nieodebranej bez daty powrotu
      jest sprzeczny sam ze sobą, więc `migrate()` domyka go przy każdym

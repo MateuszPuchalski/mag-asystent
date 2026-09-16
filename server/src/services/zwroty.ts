@@ -1374,9 +1374,30 @@ export function wskazSklad(
  * Gdy podany numer zamówienia jest już w bazie, pozycje przepisujemy z niego —
  * bez nich zwrot nie miałby czego wycenić, a operator nie wie, co w paczce
  * jest, dopóki jej nie otworzy.
+ *
+ * ── LOGIN KUPUJĄCEGO (0.363.0) ─────────────────────────────────────────────
+ * Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
+ * loginie klienta". Szukanie w panelu zna login od 0.337.0 i pole mówi to
+ * wprost — ale TEJ paczce login brał się wyłącznie z zamówienia, a numeru
+ * zamówienia przy nieodebranej najczęściej nie ma. Karton wraca sam, bez
+ * zgłoszenia i bez kopii z Allegro, więc jedyne, co operator ma pod ręką, to
+ * naklejka i wiadomość od klienta. Szukanie po loginie milczało wtedy tak
+ * samo, jak gdyby paczki nie było — a to najgorszy rodzaj odpowiedzi.
+ *
+ * Login WPISANY bije ten z zamówienia, bo pochodzi od człowieka patrzącego na
+ * sprawę. Gdy go nie ma, bierzemy z zamówienia — i zapisujemy do KOLUMNY,
+ * zamiast liczyć na złączenie przy każdym odczycie: zwrot ma zostać
+ * odnajdywalny także wtedy, gdy zamówienie wypadnie z okna synchronizacji.
  */
+
+/** Ile znaków loginu zapisujemy. Allegro trzyma się dużo krótszych. */
+const LIMIT_LOGINU = 100;
+
 export function zarejestrujNieodebrana(
-  database: Db, dane: { waybill: string; orderId?: string | null; notatka?: string | null },
+  database: Db, dane: {
+    waybill: string; orderId?: string | null; notatka?: string | null;
+    login?: string | null;
+  },
   kto: { id: number; name: string }, teraz = new Date(),
 ): { zwrotId: number; pozycji: number } {
   const waybill = (dane.waybill ?? "").trim();
@@ -1395,11 +1416,22 @@ export function zarejestrujNieodebrana(
   const orderId = (dane.orderId ?? "").trim() || null;
   const at = teraz.toISOString();
 
+  /* Zamówienie czytamy PRZED wstawieniem, bo niesie login. Pozycje idą niżej
+     własnym zapytaniem — tamto jest starsze i działa, a dublowanie odczytu
+     jednego wiersza przy rejestracji jednej paczki nic nie kosztuje. */
+  const zam = orderId
+    ? database.prepare(
+      "SELECT kupujacy_login FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?")
+      .get(konto.id, orderId) as { kupujacy_login: string | null } | undefined
+    : undefined;
+  const login = (dane.login ?? "").trim().slice(0, LIMIT_LOGINU)
+    || (zam?.kupujacy_login ?? null);
+
   return transaction(database, () => {
     database.prepare(`INSERT INTO zwrot_klienta
       (channel_account_id,external_id,order_id,created_at,paczka_at,dostarczono_at,
-       zrodlo,waybill,notatka,synced_at)
-      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?)`).run(
+       zrodlo,waybill,notatka,kupujacy_login,synced_at)
+      VALUES (?,?,?,?,?,?,'nieodebrana',?,?,?,?)`).run(
       konto.id, external, orderId, at,
       /* Paczka JEST u nas — inaczej nie byłoby czego rejestrować. To jedyny
          zwrot, przy którym datę powrotu znamy na pewno, więc `dostarczono_at`
@@ -1407,7 +1439,7 @@ export function zarejestrujNieodebrana(
          przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
          samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
          na biurku operatora. */
-      at, at, waybill, (dane.notatka ?? "").trim() || null, at);
+      at, at, waybill, (dane.notatka ?? "").trim() || null, login, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
       .get(konto.id, external) as { id: number }).id);
@@ -1439,8 +1471,11 @@ export function zarejestrujNieodebrana(
       pozycji = poz.length;
     }
 
+    /* W dzienniku SAM FAKT, nie login. Zdarzenie odpowiada na pytanie „skąd
+       ten wiersz", a do tego wystarczy, że uchwyt był; sama dana osobowa
+       leży w kolumnie zwrotu i stamtąd się ją czyta. */
     logEvent("zwrot_nieodebrana", kto.name, null,
-      { zwrotId, orderId, pozycji }, kto.id, database);
+      { zwrotId, orderId, pozycji, zLoginem: login !== null }, kto.id, database);
     return { zwrotId, pozycji };
   })();
 }

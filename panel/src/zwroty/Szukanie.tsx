@@ -45,7 +45,7 @@ export function Szukanie({
   onWybierz: (id: number) => void;
   /** Rejestracja paczki nieodebranej; brak = ekran jej nie proponuje. */
   rejestruje?: boolean;
-  onNieodebrana?: (waybill: string, orderId: string, notatka: string) => void;
+  onNieodebrana?: (waybill: string, orderId: string, notatka: string, login: string) => void;
 }) {
   /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
@@ -53,6 +53,7 @@ export function Szukanie({
   const seria = useRef(new SeriaWPolu());
   const [nieodebrana, setNieodebrana] = useState(false);
   const [zamowienie, setZamowienie] = useState("");
+  const [login, setLogin] = useState("");
   const [notatka, setNotatka] = useState("");
   /* Numer listu WPISANY, gdy formularz otwarto przyciskiem, a nie po nieudanym
      skanie (0.338.0). Przy skanie numer jest już w `kod` i pola nie ma. */
@@ -82,16 +83,30 @@ export function Szukanie({
           onChange={(e) => setZamowienie(e.target.value)} />
         <p className="mt-1 text-slate-500">
           Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
+        {/* ── LOGIN KUPUJĄCEGO (0.363.0) ─────────────────────────────────────
+            Zgłoszenie właściciela: „nieodebrane paczki powinienem móc
+            wyszukiwać po loginie klienta". Pole szukania zna login od 0.337.0,
+            ale TA paczka brała go wyłącznie z zamówienia — a numeru zamówienia
+            przy nieodebranej najczęściej nie ma. Stoi POD zamówieniem, bo
+            wtedy idzie od uchwytu najpewniejszego do najsłabszego: naklejka,
+            numer, człowiek. */}
+        <input className="field mt-2 h-7 text-xs" value={login}
+          aria-label="Login kupującego" placeholder="Login kupującego (jeśli znasz)"
+          onChange={(e) => setLogin(e.target.value)} />
+        <p className="mt-1 text-slate-500">
+          Po loginie znajdziesz tę paczkę później — szukanie zna go tak samo
+          jak numery. Z zamówienia bierze się sam.</p>
         <input className="field mt-2 h-7 text-xs" value={notatka}
           aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
           onChange={(e) => setNotatka(e.target.value)} />
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={rejestruje || !numerListu}
-            onClick={() => onNieodebrana(numerListu, zamowienie.trim(), notatka.trim())}
+            onClick={() => onNieodebrana(
+              numerListu, zamowienie.trim(), notatka.trim(), login.trim())}
             className="btn-primary text-xs">
             {rejestruje ? "Rejestruję…" : "Zarejestruj paczkę"}</button>
           <button type="button" className="btn-secondary text-xs"
-            onClick={() => { setNieodebrana(false); setList(""); }}>Wróć</button>
+            onClick={() => { setNieodebrana(false); setList(""); setLogin(""); }}>Wróć</button>
         </div>
       </div>
     : null;

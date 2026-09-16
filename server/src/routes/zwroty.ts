@@ -350,7 +350,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
      więc wiersz zakłada BIURO — i to jest jedyna trasa zwrotów tworząca zwrot
      od zera. Pieniądze i tak trzeba oddać, więc idzie tą samą kolejką, ale
      `zrodlo` mówi wprost, że to nie zgłoszenie klienta. */
-  app.post<{ Body: { waybill?: string; orderId?: string | null; notatka?: string | null } }>(
+  app.post<{ Body: {
+    waybill?: string; orderId?: string | null; notatka?: string | null; login?: string | null;
+  } }>(
     "/api/obsluga/zwroty/nieodebrana", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -359,6 +361,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           waybill: String(req.body?.waybill ?? ""),
           orderId: req.body?.orderId ?? null,
           notatka: req.body?.notatka ?? null,
+          /* Login kupującego (0.363.0) — przy nieodebranej to często jedyny
+             uchwyt, po którym biuro wróci do tej paczki. Serwer przycina go
+             i chowa w kolumnie zwrotu; walidacji kształtu nie ma, bo Allegro
+             nie zamyka listy dopuszczalnych loginów. */
+          login: req.body?.login ?? null,
         }, kto());
       } catch (e) { return konflikt(reply, e); }
     });

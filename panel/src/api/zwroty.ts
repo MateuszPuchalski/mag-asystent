@@ -276,7 +276,11 @@ export function useZamknijKosz() {
 export function useNieodebrana() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { waybill: string; orderId?: string | null; notatka?: string | null }) =>
+    mutationFn: (v: {
+      waybill: string; orderId?: string | null; notatka?: string | null;
+      /** Login kupującego (0.363.0) — przy nieodebranej często jedyny uchwyt. */
+      login?: string | null;
+    }) =>
       api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
         { method: "POST", body: JSON.stringify(v) }),
     onSettled: () => odswiez(qc),

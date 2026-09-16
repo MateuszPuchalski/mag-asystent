@@ -3566,6 +3566,22 @@ przepisuje pozycje zamówienia do zwrotu, więc jest co ocenić i co wycenić.
 Bez niego wiersz zostaje pustym uchwytem na paczkę — lepszym niż kartka
 przy monitorze, ale pieniędzy z niego nie policzy.
 
+**Login kupującego jest trzecim uchwytem (0.363.0).** Zgłoszenie właściciela:
+„nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
+szukania zna login od 0.337.0 i mówi to wprost — ale ta paczka brała go
+wyłącznie z zamówienia, a numeru zamówienia przy nieodebranej najczęściej nie
+ma. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
+
+Formularz pyta o login pod numerem zamówienia, czyli w kolejności od uchwytu
+najpewniejszego do najsłabszego: naklejka, numer, człowiek. Wpisany bije ten
+z zamówienia, bo pochodzi od kogoś patrzącego na sprawę. Gdy go nie wpisano,
+bierze się z zamówienia — i ląduje w KOLUMNIE zwrotu, a nie w złączeniu przy
+odczycie. Paczka ma zostać odnajdywalna także wtedy, gdy zamówienie wypadnie
+z okna synchronizacji.
+
+Dziennik notuje sam fakt (`zLoginem`), nie login. Dana osobowa ma jedno
+miejsce, a nie dwa do pilnowania przy tej samej polityce.
+
 **Numer listu przewozowego stoi TU w modelu pracy** — świadomy wyjątek od
 polityki 0.163.0. Przy zwrocie z Allegro numer szuka się w kopii odpowiedzi,
 a paczka nieodebrana żadnej kopii nie ma: to jedyny uchwyt, po którym da się

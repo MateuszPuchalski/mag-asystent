@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.363.0 — 16 września 2026
+
+**Paczkę nieodebraną znajdziesz po loginie klienta.** Zgłoszenie właściciela:
+„nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
+szukania w panelu zna login od 0.337.0 i obiecuje go w podpowiedzi — ale
+akurat ta paczka brała go wyłącznie z zamówienia. Numeru zamówienia przy
+nieodebranej najczęściej nie ma: karton wraca sam, bez zgłoszenia i bez kopii
+z Allegro, a jedyne, co operator ma pod ręką, to naklejka i wiadomość od
+klienta. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
+
+- **Formularz rejestracji pyta o login kupującego**, pod numerem zamówienia.
+  Oba pola zostają opcjonalne, a ekran mówi, co daje każde z nich: numer
+  przepisuje pozycje, login pozwala wrócić do paczki.
+- **Wpisany login bije ten z zamówienia** — pochodzi od człowieka patrzącego
+  na sprawę. Bez wpisu bierze się z zamówienia, jeśli numer podano.
+- **Login ląduje w kolumnie zwrotu**, a nie w złączeniu przy odczycie. Paczka
+  zostaje odnajdywalna także wtedy, gdy zamówienie wypadnie z okna
+  synchronizacji.
+- **Dziennik notuje sam fakt, nie login.** Dana osobowa ma jedno miejsce.
+
+Szukanie nie wymagało zmiany: filtr kolejki porównuje login od 0.337.0. Nic
+nie trzeba ustawiać, wystarczy nowy build panelu.
+
 ## 0.362.0 — 16 września 2026
 
 **Wskazany towar sam wjeżdża na ekran, a skan wskazanego go odkłada.** Dwie

@@ -724,9 +724,11 @@ export function Zwroty() {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
         rejestruje={nieodebrana.isPending}
-        onNieodebrana={(waybill, orderId, notatka) => {
+        onNieodebrana={(waybill, orderId, notatka, login) => {
           setBladSkanu("");
-          nieodebrana.mutate({ waybill, orderId: orderId || null, notatka: notatka || null }, {
+          nieodebrana.mutate({
+            waybill, orderId: orderId || null, notatka: notatka || null, login: login || null,
+          }, {
             onSuccess: (w) => { setWynikSkanu(null); setFraza(""); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
             onError: (e) => setBladSkanu((e as Error).message),
           });
