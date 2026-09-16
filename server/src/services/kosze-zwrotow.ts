@@ -852,6 +852,86 @@ export function koszykiCzekajaceNaKorekty(database: Db): KoszykCzekajacy[] {
 }
 
 /**
+ * Wypuszcza MM koszyka MIMO BRAKUJĄCYCH KOREKT (0.368.0).
+ *
+ * Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
+ * jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna i zostaje
+ * słuszna — to jest wyjście awaryjne obok niej, nie jej zdjęcie.
+ *
+ * CO TO KOSZTUJE, powiedziane wprost, bo płaci to magazyn. MM zdejmuje towar
+ * z magazynu GŁÓWNEGO, a ze zwrotu towar trafia tam dopiero po korekcie
+ * wystawionej w Subiekcie. Dokument wypuszczony wcześniej idzie na stan,
+ * którego jeszcze nie ma: Sfera odrzuci go przy braku stanu albo — gdy
+ * Subiekt dopuszcza ujemne — zepchnie stan pod zero i różnica wyrówna się
+ * dopiero z korektą. To dokładnie ten błąd kolejności, który naprawiło
+ * 0.200.0, więc droga jest ŚWIADOMA i zostawia ślad z imionami zwrotów.
+ *
+ * KIEDY MA SENS. Korekta bywa wystawiona poza aplikacją albo wystawi się za
+ * chwilę, a kosz fizycznie stoi na drodze i blokuje pracę hali. Człowiek przy
+ * biurku wie to, czego baza nie wie — i to on bierze decyzję na siebie.
+ *
+ * JEDNA DROGA NA OBA STANY. Kosz otwarty zamyka się po drodze; kosz już
+ * zamknięty albo rozłożony dostaje sam dokument. Osobna opcja przy zamykaniu
+ * i osobny przycisk przy koszu czekającym byłyby dwiema nazwami na jedną
+ * decyzję, a kosz, który stoi tygodniami, jest właśnie tym drugim przypadkiem.
+ *
+ * CZEGO NIE FORSUJE: kosza z dokumentem (papier już wyszedł), kosza pustego
+ * (dokument bez linii nie jest dokumentem) i kosza rozliczonego poza
+ * aplikacją (jego towar przesunął już ktoś ręką). Te trzy odmowy nie są
+ * ostrożnością, tylko brakiem czegokolwiek do zrobienia.
+ */
+export function wypuscMmMimoKorekt(
+  database: Db, koszId: number, kto: { id: number; name: string }, teraz = new Date(),
+): { koszId: number; kod: string; queueId: number; pominietoKorekt: number } {
+  return transaction(database, () => {
+    const k = database.prepare(
+      `SELECT id, kod, status, rodzaj, powrot_poza_aplikacja, mm_dok_id, mm_queue_id
+         FROM kosz WHERE id=?`).get(koszId) as {
+      id: number; kod: string; status: string; rodzaj: RodzajKosza;
+      powrot_poza_aplikacja: number; mm_dok_id: number | null; mm_queue_id: number | null;
+    } | undefined;
+    if (!k) throw new Error("Nie znam takiego koszyka zwrotów.");
+    if (k.mm_dok_id !== null || k.mm_queue_id !== null) {
+      throw new Error(`Koszyk ${k.kod} ma już dokument MM — nie ma czego wypuszczać.`);
+    }
+    if (Number(k.powrot_poza_aplikacja) === 1) {
+      throw new Error(`Koszyk ${k.kod} rozliczono poza aplikacją — jego towar już wrócił.`);
+    }
+    /* Karton nie jedzie na MM w ogóle (0.122.0): towar nie opuścił magazynu,
+       więc nie ma czego przesuwać i forsowanie niczego by nie odblokowało. */
+    if (k.rodzaj !== "zwroty" && k.rodzaj !== "odpad") {
+      throw new Error(`Koszyk ${k.kod} nie jedzie na MM — dokumentu nie ma i nie będzie.`);
+    }
+
+    const pozycji = (database.prepare(
+      "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?")
+      .get(koszId) as { n: number }).n;
+    if (!pozycji) throw new Error(`Koszyk ${k.kod} jest pusty — nie ma z czego wystawić MM.`);
+
+    const at = teraz.toISOString();
+    if (k.status === "otwarty") {
+      database.prepare(
+        `UPDATE kosz SET status='zamkniety', zamknieto_at=?, zamknieto_przez=?
+          WHERE id=?`).run(at, kto.name, koszId);
+    }
+
+    const braki = brakujaceKorekty(database, koszId);
+    const queueId = zakolejkujMm(database,
+      { id: koszId, kod: k.kod, rodzaj: k.rodzaj }, kto, at);
+
+    /* ŚLAD Z IMIONAMI, nie samą liczbą. Gdy MM wywróci się na braku stanu,
+       pierwsze pytanie brzmi „na czyją korektę nie doczekaliśmy" — i wtedy
+       zdarzenie ma na nie odpowiedzieć bez odtwarzania stanu bazy sprzed
+       wypuszczenia. Numery zwrotów daną osobową nie są. */
+    logEvent("kosz_zwrotow_mm_mimo_korekt", kto.name, null,
+      { koszId, kod: k.kod, pozycji, queueId,
+        pominietoKorekt: braki.length, zwroty: braki.map((b) => b.numer) },
+      kto.id, database);
+    return { koszId, kod: k.kod, queueId, pominietoKorekt: braki.length };
+  })();
+}
+
+/**
  * Zamyka koszyk. Dokument MM wychodzi DOPIERO PO KOREKTACH.
  *
  * Do 0.199.0 zamknięcie kolejkowało MM od razu — i to był błąd kolejności,
