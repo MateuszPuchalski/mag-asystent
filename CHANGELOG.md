@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.372.0 — 16 września 2026
+
+**[wymaga działania] Odmowa zapisu ZW mówi wreszcie, CZEGO dotyczyła.** Nowy
+`wertis-sfera-worker.exe` z artefaktu CI — zatrzymaj `wertis-sfera`, podmień plik,
+uruchom usługę. Bez podmiany nic się nie zmienia; reszta wdrożenia bez zmian.
+
+Automatyczny ZW padł na produkcji drugi raz (zadanie `#1075`) i drugi raz nie
+powiedział nic: „Nie można zapisać dokumentu.", `SzczegolyOstatniegoBledu` puste,
+a cały materiał z 0.350.1 to `COMException 0x80040F20`. Ten kod ma facility `ITF`,
+czyli jest numerem wewnętrznym Sfery — bez tabeli producenta nie znaczy nic.
+
+Skoro Sfera nie powie DLACZEGO, treść odmowy ma powiedzieć CZEGO dotyczyła.
+Błąd niesie teraz stan dokumentu, który nie przeszedł: numer paragonu, `dok_Id`,
+wartość, przelew, rodzaj zwrotu, skutek magazynowy i liczbę wierszy. Na końcu
+stoi gotowa komenda sondy `-SzkicZW … -Sprawdz` z tymi samymi numerami, więc
+biuro powtarza odmowę BEZ zapisu, zamiast najpierw szukać paragonu po numerze
+zadania.
+
+Wartości są te same, które kod odczytał po drodze — nic nie jest czytane drugi
+raz i nic zgadywane. Jedyna nowa nazwa to `DoDokumentuNumerPelny`, zmierzona
+sondą i opisana w `docs/sfera-com.md` §2m, czytana obronnie: brak nazwy mieści
+się w zdaniu, zamiast przerwać je drugim wyjątkiem.
+
+Danych nabywcy ta droga nie czyta. Treść błędu idzie do kolejki, na ekran i do
+dziennika, a przy odmowie zapisu nabywca z paragonu nie jest nikomu potrzebny.
+
 ## 0.371.0 — 16 września 2026
 
 **Koszyk zwrotów bez dokumentu wolno poprawić.** Zgłoszenie właściciela:

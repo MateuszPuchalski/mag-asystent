@@ -275,6 +275,11 @@ w `wertis.env`. Samowystarczalny exe zdejmujesz z artefaktu przebiegu CI
 (workflow „Worker Sfery" → Artifacts), więc .NET SDK nie jest tu potrzebny;
 droga ręczna stoi w [`sfera-worker/README.md`](sfera-worker/README.md).
 
+**Aktualizacja workera to PODMIANA EXE.** `git pull` go nie rusza — plik nie
+pochodzi z repo, tylko z artefaktu CI. Zatrzymaj `wertis-sfera`, podmień
+`wertis-sfera-worker.exe`, uruchom usługę. Wpis w `CHANGELOG.md` mówi, kiedy
+wydanie tego wymaga.
+
 > **Usługę rejestruj jako OSTATNIĄ.** Najpierw uruchom exe z ręki:
 > `wertis-sfera-worker.exe --dry-run --once`. Błąd widać wtedy na ekranie,
 > a nie w przekierowanym dzienniku NSSM. Bramki opisuje
