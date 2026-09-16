@@ -6,11 +6,7 @@ import { linkZwrotu } from "./allegro-linki.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
-import {
-  TAGI_ZWROTU, tagiWszystkichSpraw, type TagSprawy,
-} from "./tagi-spraw.js";
 import type { FakturaZwrotu } from "./faktury.js";
-import { wierszCsv, zbudujCsv } from "./csv.js";
 import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
   from "./kosze-zwrotow.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
@@ -158,12 +154,10 @@ export interface WierszZwrotu {
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
-  /** Kto wziął zwrot na siebie; `null` = niczyj (0.315.0). */
-  prowadzi: string | null;
-  prowadziUserId: number | null;
-  prowadziAt: string | null;
-  /** Tagi biura — ten sam słownik co przy reklamacjach i dyskusjach. */
-  tagi: TagSprawy[];
+  /* PROWADZĄCEGO I TAGÓW W TYM DTO JUŻ NIE MA (0.370.0) — patrz komentarz
+     przy trasach zwrotów. Kolumny `prowadzi*` zostają w tabeli: przebudowa
+     dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje, a wiersz
+     bez nich niczego nie traci. */
   /** Notatka biura — od 0.313.0 dopisywana przy KAŻDYM zwrocie, nie tylko
       przy paczce nieodebranej. */
   notatka: string | null;
@@ -516,8 +510,6 @@ function zloz(
      z `w_zwrocie`, `cena_grosze` i `potracenie_grosze`, a DTO pozycji nie
      niesie zaznaczenia — i nie ma powodu, żeby zaczęło. */
   surowe: Wiersz[] = [],
-  /** Tagi biura — składane osobno, bo idą JEDNYM zapytaniem na całą kolejkę. */
-  tagi: TagSprawy[] = [],
 ): WierszZwrotu {
   const utworzono = String(z.created_at);
   const terminAt = terminZwrotu(poczatekTerminu({
@@ -591,10 +583,6 @@ function zloz(
     },
     rejectionCode,
     zrodlo: String(z.zrodlo ?? "allegro"),
-    prowadzi: (z.prowadzi as string) ?? null,
-    prowadziUserId: z.prowadzi_user_id == null ? null : Number(z.prowadzi_user_id),
-    prowadziAt: (z.prowadzi_at as string) ?? null,
-    tagi,
     notatka: (z.notatka as string) ?? null,
     notatkaAt: (z.notatka_at as string) ?? null,
     notatkaPrzez: (z.notatka_przez as string) ?? null,
@@ -634,57 +622,16 @@ function zloz(
   };
 }
 
-/**
- * Kolejka jako CSV dla biura.
- *
- * Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu — ta sama
- * reguła co przy analizie i rekoncyliacji (`services/csv.ts`). Jeden wiersz
- * na POZYCJĘ, nie na zwrot: pracownik liczy w Excelu towary, a zwrot
- * wielopozycyjny w jednym wierszu kazałby mu je rozklejać ręcznie.
- *
- * Numeru listu przewozowego tu NIE MA — polityka danych zwrotów z 0.163.0
- * mówi, że nie zapisujemy go w modelu pracy, a plik wynoszony na dysk jest
- * zapisem trwalszym niż baza.
- */
-export function csvZwrotow(zwroty: WierszZwrotu[]): string {
-  const naglowek = [
-    "Zrodlo", "Numer zwrotu", "Identyfikator", "Zamowienie", "Kupujacy", "Zgloszony",
-    "Termin", "Dni do terminu", "Kubelek", "Przewoznik", "Platnosc", "Faktura",
-    "Towar", "Symbol", "EAN", "SKU", "Sztuk", "Cena", "Waluta", "Powod",
-    "Ocena", "Potracenie", "Powod potracenia", "Werdykt", "Kwota oddana",
-    "Dokument sprzedazy", "Numer korekty",
-  ].join(";");
+/* EKSPORTU CSV JUŻ NIE MA (0.370.0). Właściciel wskazał go wprost jako
+   niepotrzebny przy prośbie „uprość panel zwrotów do wymaganego minimum".
 
-  const wiersze = zwroty.flatMap((z) => {
-    const wspolne = [
-      z.zrodlo === "nieodebrana" ? "nieodebrana paczka" : "zwrot klienta",
-      z.numer ?? "", z.externalId, z.orderId ?? "", z.kupujacyLogin ?? "",
-      z.utworzono, z.terminAt, z.dniDoTerminu, z.kubelek, z.przewoznik ?? "",
-      z.zamowienie?.platnoscTyp ?? "",
-      z.zamowienie?.fakturaZadana == null ? "" : (z.zamowienie.fakturaZadana ? "faktura" : "paragon"),
-    ];
-    const ogon = [
-      z.werdykt ?? "",
-      z.kwotaGrosze == null ? "" : (z.kwotaGrosze / 100).toFixed(2).replace(".", ","),
-      z.faktura.numer ?? "",
-      z.korektaNumer ?? "",
-    ];
-    /* Zwrot bez pozycji też dostaje wiersz — inaczej zniknąłby z zestawienia
-       i nikt by się nie dowiedział, że w ogóle jest. */
-    if (!z.pozycje.length) {
-      return [wierszCsv([...wspolne, "", "", "", "", "", "", "", "", "", "", "", ...ogon], ";")];
-    }
-    return z.pozycje.map((p) => wierszCsv([
-      ...wspolne, p.nazwa, p.twSymbol ?? "", p.ean ?? "", p.sku ?? "", p.ilosc,
-      (p.cenaGrosze / 100).toFixed(2).replace(".", ","), p.waluta,
-      p.powod ?? "", p.ocena ?? "",
-      p.potracenieGrosze == null ? "" : (p.potracenieGrosze / 100).toFixed(2).replace(".", ","),
-      p.potraceniePowod ?? "", ...ogon,
-    ], ";"));
-  });
+   Nie jest to sama oszczędność miejsca na ekranie: plik wynosił loginy
+   kupujących na dysk, czyli poza politykę danych zwrotów, i właśnie
+   dlatego zostawiał ślad `zwroty_eksport`. Rzecz, której nikt nie używa,
+   a która wynosi dane osobowe, jest samym kosztem.
 
-  return zbudujCsv([naglowek, ...wiersze]);
-}
+   Gdyby wróciła: numeru listu i nazwy odbiorcy w pliku nie było i nie ma
+   mieć — plik na dysku jest zapisem trwalszym niż baza. */
 
 /**
  * Cała kolejka, jednym zapytaniem plus jednym na pozycje.
@@ -829,11 +776,6 @@ export function listaZwrotow(
     rozmowyWgZam.set(klucz, lista);
   }
 
-  /* Tagi biura — JEDNO zapytanie na kolejkę, nie jedno na wiersz. Ta sama
-     zasada co przy reklamacjach (`tagiWszystkichSpraw`): pięćdziesiąt zwrotów
-     dałoby inaczej pięćdziesiąt jeden zapytań na każde odświeżenie ekranu. */
-  const tagiWgZwrotu = tagiWszystkichSpraw(database, TAGI_ZWROTU);
-
   return zwroty
     .map((z) => {
       const surowe = wgZwrotu.get(Number(z.id)) ?? [];
@@ -960,8 +902,7 @@ export function listaZwrotow(
       }) : null;
 
       return zloz(z, zlozone, zamowienie, teraz,
-        rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe,
-        tagiWgZwrotu.get(Number(z.id)) ?? []);
+        rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe);
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. ZWROTY BEZ TERMINU IDĄ NA KONIEC (0.339.0):
@@ -2258,49 +2199,22 @@ function wersjaSieZgadza(w: Record<string, unknown>, wersja: number | undefined)
   }
 }
 
-/**
- * „Biorę to" przy zwrocie — znacznik dla reszty biura (0.315.0).
- *
- * Reklamacja ma to od 0.278.0 i powód jest ten sam: żeby dwie osoby nie wzięły
- * jednej sprawy przy dwóch biurkach. Zwrot różni się od reklamacji tym, że MA
- * zapisy, przy których nazwisko pojawia się samo — werdykt, ocena, kwota — ale
- * wszystkie padają PO decyzji. Pytanie „kto się tym zajmuje" zadaje się
- * wcześniej, więc znacznik jest jawnym kliknięciem, nie stemplem przy okazji.
- *
- * PONOWNE KLIKNIĘCIE ZDEJMUJE. Bez tego jedyną drogą wyjścia z pomyłkowego
- * przejęcia byłaby cudza decyzja na cudzej sprawie.
- *
- * ZDEJMOWANIE ROZSTRZYGA TOŻSAMOŚĆ, NIE IMIĘ — blizna reklamacji z 0.278.0:
- * porównywanie łańcuchów kazało dwóm osobom o tym samym imieniu zdejmować
- * sobie znacznik nawzajem, a objawem była cudza sprawa we własnym sicie.
- *
- * Na oś zwrotu to NIE IDZIE. Oś opowiada, co się ze sprawą stało; wzięcie jej
- * na siebie niczego nie zmienia w zwrocie i zaśmiecałoby przebieg zdaniami
- * o tym, kto akurat patrzył. Ślad zostaje w dzienniku, jak przy reklamacji.
- */
-export function stempelProwadziZwrot(
-  database: Db, zwrotId: number, kto: { id: number; name: string },
-  wersja?: number, teraz = new Date(),
-): { prowadzi: string | null; prowadziAt: string | null; wersja: number } {
-  return transaction(database, () => {
-    const w = database.prepare(
-      "SELECT wersja, prowadzi_user_id FROM zwrot_klienta WHERE id=?")
-      .get(zwrotId) as Record<string, unknown> | undefined;
-    if (!w) throw new Error("Nie znaleziono zwrotu");
-    wersjaSieZgadza(w, wersja);
-    const zdejmuje = w.prowadzi_user_id !== null && Number(w.prowadzi_user_id) === kto.id;
-    const at = zdejmuje ? null : teraz.toISOString();
-    database.prepare(`UPDATE zwrot_klienta
-      SET prowadzi=?, prowadzi_user_id=?, prowadzi_at=?, wersja=wersja+1
-      WHERE id=?`).run(zdejmuje ? null : kto.name, zdejmuje ? null : kto.id, at, zwrotId);
-    logEvent("zwrot_prowadzi", kto.name, null, { zwrotId, zdjete: zdejmuje }, kto.id, database);
-    return {
-      prowadzi: zdejmuje ? null : kto.name,
-      prowadziAt: at,
-      wersja: Number(w.wersja) + 1,
-    };
-  })();
-}
+/* ZNACZNIKA „BIORĘ TO" PRZY ZWROCIE JUŻ NIE MA (0.370.0).
+
+   Wraca to do PIERWSZEJ decyzji z 0.315.0, a nie ustala nową: tamto wydanie
+   ustaliło najpierw, że przy zwrocie prowadzącego nie ma, bo zwroty prowadzi
+   całe biuro i sito „Moje"/„Niczyje" nie odpowiadałoby na żadne prawdziwe
+   pytanie — a tego samego dnia przywróciło znacznik z powrotem. Właściciel
+   wskazał go teraz wprost jako niepotrzebny przy prośbie o wymagane minimum.
+
+   REKLAMACJA I DYSKUSJA ZOSTAJĄ ZE ZNACZNIKIEM (0.278.0) i to nie jest
+   niekonsekwencja: tam sprawę bierze konkretna osoba i prowadzi rozmowę
+   z klientem, więc pytanie „czyje to" jest prawdziwe. Zwrot przechodzi przez
+   biuro jako kolejka decyzji, nie jako czyjaś sprawa.
+
+   Kolumny `prowadzi`, `prowadzi_user_id` i `prowadzi_at` zostają w tabeli:
+   przebudowa dla trzech nieużywanych kolumn niesie więcej ryzyka, niż
+   kupuje. Czyta ich odtąd nikt. */
 
 /**
  * Zapis notatki. Poprzednia treść zostaje na wierszu — stąd cofnięcie.

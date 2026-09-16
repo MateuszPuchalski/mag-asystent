@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { PackageX, ScanLine, Search, X } from "lucide-react";
+import { PackageX, RefreshCw, ScanLine, Search, X } from "lucide-react";
 import { zlote, type PaczkaKlienta, type WynikSkanu } from "../api/zwroty";
 import { czas } from "../ui";
 import { SeriaWPolu } from "../skaner";
@@ -49,8 +49,8 @@ const PRZEWOZNICY_NAKLEJKI: Array<[string, string]> = [
 
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
-  paczki = null, szukaPaczek = false,
-  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana, onLogin,
+  paczki = null, szukaPaczek = false, synchronizuje = false, bladSync = "",
+  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana, onLogin, onSynchronizuj,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -75,6 +75,18 @@ export function Szukanie({
   szukaPaczek?: boolean;
   /** Prośba o historię klienta — wysyłana po dopisaniu uchwytu, nie z każdego znaku. */
   onLogin?: (szukane: string) => void;
+  /**
+   * Synchronizacja z Allegro (0.370.0).
+   *
+   * Stała we własnym paśmie razem z filtrami przewoźnika i dat. Po ich zdjęciu
+   * zostałaby sama i kosztowała CAŁE PASMO na jeden przycisk — a pasmo nad
+   * listą to wiersze kolejki, bo to ona jest treścią tej kolumny (blizna
+   * 0.193.0 ze skrzynki). Wchodzi więc do rzędu pola, tą samą drogą, którą
+   * w audycie 15 września przeszedł przycisk NIEODEBRANA.
+   */
+  synchronizuje?: boolean;
+  bladSync?: string;
+  onSynchronizuj?: () => void;
 }) {
   /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
@@ -291,7 +303,20 @@ export function Szukanie({
           title="Paczka nieodebrana — klient nie zgłosił zwrotu, przesyłka wróciła sama"
           className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
           <PackageX size={12} />Nieodebrana</button>}
+
+      {/* Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro, które
+          właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel. */}
+      {onSynchronizuj &&
+        <button type="button" disabled={synchronizuje} onClick={onSynchronizuj}
+          title="Pobierz nowe zwroty z Allegro teraz"
+          className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
+          <RefreshCw size={12} className={synchronizuje ? "animate-spin" : ""} />
+          {synchronizuje ? "Pobieram…" : "Synchronizuj"}</button>}
     </div>
+
+    {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token, uprawnienie,
+        przerwę — a sam kod HTTP nie mówi nic. */}
+    {bladSync && <p className="mt-1 text-xs text-red-700">{bladSync}</p>}
 
     {/* Filtr PRZEBIJA kubełek, więc ekran musi to powiedzieć. Inaczej wynik
         z kubełka ZAMKNIĘTE wyglądałby jak zwrot czekający na pracę. */}

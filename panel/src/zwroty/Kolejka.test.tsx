@@ -37,8 +37,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   kubelek: "decyzja", sygnaly: [], terminAt: "2026-09-08T09:00:00.000Z",
   dniDoTerminu: 7, sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null,
-  werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null, korektaZrodlo: null,
-  zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
+  werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, zrodlo: "allegro",
   notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [],
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   rejectionCode: null, wersja: 1,
@@ -346,12 +345,12 @@ describe("Dowody", () => {
     expect(screen.getByText(/Doręczona do nas/)).toBeInTheDocument();
   });
 
-  it("wiadomości o zakupie prowadzą do skrzynki, a ich brak mówi o sobie", () => {
-    /* Puste znaczy „Allegro nic nie powiązało", nie „klient nie pisał":
-       Allegro oznacza zamówieniem tylko część wiadomości. */
+  it("wiadomości o zakupie prowadzą do skrzynki, a ich BRAK MILCZY", () => {
+    /* Do 0.368.0 pusta sekcja pisała „Allegro nic nie powiązało" — zdanie
+       o Allegro, nie o tej sprawie, powtarzane przy prawie każdym zwrocie.
+       Od 0.370.0 sekcji wtedy po prostu nie ma (dekalog p. 2). */
     const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.getByText(/nie powiązało z tym zamówieniem żadnej wiadomości/))
-      .toBeInTheDocument();
+    expect(screen.queryByText(/Wiadomości o tym zakupie/)).toBeNull();
 
     rerender(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
       { id: 7, temat: "Kiedy zwrot pieniędzy?", status: "open",

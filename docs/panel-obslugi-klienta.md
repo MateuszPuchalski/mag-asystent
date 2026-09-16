@@ -3594,6 +3594,55 @@ Eksport CSV ma separator `;`, jeden wiersz na POZYCJĘ i nie niesie numeru listu
 przewozowego. Zostawia ślad w dzienniku, bo wynosi loginy kupujących — ta sama
 zasada co przy analizie i audycie.
 
+### 25a.25. Wymagane minimum (0.370.0)
+
+Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego minimum". Po
+pytaniu o szczegóły wskazał wprost sito Moje/Niczyje, tagi spraw, filtry
+przewoźnika i dat oraz Pobierz CSV — i dodał: usunąć zupełnie.
+
+**To wydanie ZMIENIA KRYTERIUM, nie tylko układ.** Audyt z 15 września zbił
+chrom nad listą z 344 px do 265 px, ale jego zasada brzmiała „żadna zmiana nie
+kasuje funkcji". Tu funkcje schodzą. Zapisujemy to wprost, bo następna sesja
+czytająca §25a.24 zobaczy tamtą zasadę i uzna kasowanie za pomyłkę.
+
+**Sito wraca do PIERWSZEJ decyzji, a nie ustala nowej.** 0.315.0 ustaliło
+najpierw, że przy zwrocie prowadzącego nie ma, bo zwroty prowadzi całe biuro —
+i tego samego dnia przywróciło znacznik z powrotem. To jest powrót do tamtego
+zdania. Bez tego akapitu trzeci powrót przeszedłby po cichu.
+
+**Filtry zeszły, bo szukanie je wchłonęło.** Od 0.367.0 fraza dzieli się po
+spacjach i zna przewoźnika razem z nazwami z naklejki, więc lista rozwijana
+odpowiadała na pytanie, na które odpowiada już pole wyżej.
+
+**Eksport CSV wynosił loginy kupujących** na dysk, czyli poza politykę danych
+zwrotów, i właśnie dlatego zostawiał ślad `zwroty_eksport`. Rzecz, której nikt
+nie używa, a która wynosi dane osobowe, jest samym kosztem.
+
+Pasm nad listą: pięć → cztery. Zeszły dwa, a Synchronizuj wszedł do rzędu pola
+szukania — tą samą drogą, którą w audycie przeszedł przycisk NIEODEBRANA. Pasek
+klawiszy został, bo właściciel go nie wskazał; traci `m` i `n`, które prowadziły
+do zdjętego sita. Zamyka to dług z §25a.24, gdzie pasmo filtrów czekało „na
+decyzję właściciela, nie na kod".
+
+**Reklamacje i dyskusje zostają z sitem i tagami.** Tam sprawę bierze konkretna
+osoba i prowadzi rozmowę z klientem, więc pytanie „czyje to" jest prawdziwe.
+Zeszła oś wiązań zwrotów, nie maszyneria: `sprawy/Moje.tsx`, `sprawy/Tagi.tsx`
+i `trasyTagowSprawy` stoją nietknięte.
+
+Kolumny `prowadzi*` zostają w `zwrot_klienta` i nie czyta ich nikt. Przebudowa
+tabeli dla trzech nieużywanych kolumn niesie więcej ryzyka, niż kupuje.
+
+**Z karty zwrotu zeszły trzy rzeczy**, wszystkie z dekalogu p. 2 — pokazuj to,
+co rozstrzyga bieżącą czynność:
+
+- Sekcja „Wiadomości o tym zakupie" MILCZY, gdy nic nie jest powiązane. Pisała
+  wtedy „Allegro nic nie powiązało" — zdanie o Allegro, nie o tej sprawie.
+- Dwa zdania o tym, jak Allegro liczy siedem dni, powtarzały się przy każdym
+  zwrocie. Zasada stoi tu, a liczbę dla TEJ sprawy mówi pastylka terminu.
+- Skaner dokładania towaru rysował się bezwarunkowo, choć właściciel postawił
+  przy nim granicę „tylko… jak jeszcze nie jest zamknięty". Przy zwrocie
+  zamkniętym i odrzuconym obiecywał ruch, po którym serwer odmawia.
+
 ### 25a.13. Paczka nieodebrana (0.172.0)
 
 Karton wraca, a zwrotu nie ma i nie będzie. Klient nie odebrał przesyłki,

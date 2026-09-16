@@ -17,7 +17,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   sumaPozycjiGrosze: 4599, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: "https://salescenter.allegro.com/returns/zwrot-1", zamowienie: null,
   werdykt: null, werdyktPowod: null, kwotaGrosze: null, kwotaWariant: null, korektaNumer: null, korektaZrodlo: null,
-  rejectionCode: null, zrodlo: "allegro", prowadzi: null, prowadziUserId: null, prowadziAt: null, tagi: [],
+  rejectionCode: null, zrodlo: "allegro",
   notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: "kupujacy_44", odbiorcaNazwa: null, przewoznik: null,
   rozmowy: [], faktura: { dokId: null, numer: null, typ: null, dataWyst: null, zrodlo: null } as never,
   wersja: 1,

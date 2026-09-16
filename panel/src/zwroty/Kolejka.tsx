@@ -1,7 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown } from "lucide-react";
-import { CzipTagu } from "../sprawy/Tagi";
-import { mojaSprawa } from "../sprawy/Moje";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
@@ -105,14 +103,12 @@ function Termin({ dni }: { dni: number | null }) {
       dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
 }
 
-export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId = null }: {
+export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
   zwroty: Zwrot[];
   wybrany: number | null;
   /** Przy szukaniu lista miesza kubełki, więc wiersz musi powiedzieć swój. */
   zKubelkiem?: boolean;
   onWybierz: (id: number) => void;
-  /** Konto zalogowanego — po nim, a nie po imieniu, poznaje się własną sprawę. */
-  mojeId?: number | null;
 }) {
   const aktywnyWiersz = useRef<HTMLButtonElement | null>(null);
 
@@ -186,16 +182,9 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
               <span title="Klient nie odebrał przesyłki — to nie jest zgłoszony zwrot"
                 className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-bold text-violet-800">
                 nieodebrana</span>}
-            {/* CZYJA TO SPRAWA — odpowiedź na wierszu, bez włączania sita
-                (0.315.0, wzorem reklamacji). Rozstrzyga NUMER KONTA: dwie osoby
-                w biurze bywają imienniczkami, a imię na to nie odpowiada. */}
-            {z.prowadzi && <span
-              title={mojaSprawa(z.prowadziUserId, mojeId)
-                ? `Prowadzisz ten zwrot (${z.prowadzi})` : `Prowadzi: ${z.prowadzi}`}
-              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${
-                mojaSprawa(z.prowadziUserId, mojeId)
-                  ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"}`}>
-              {mojaSprawa(z.prowadziUserId, mojeId) ? "Ty" : z.prowadzi}</span>}
+            {/* PLAKIETKI PROWADZĄCEGO TU JUŻ NIE MA (0.370.0). Stała od
+                0.315.0; zwroty prowadzi całe biuro, więc odpowiadała na pytanie,
+                którego przy tej kolejce nikt nie zadaje. */}
             <span className="ml-auto" />
             {/* Wynik szukania bywa z kubełka, którego nikt nie ogląda —
                 bez tej etykiety zwrot ZAMKNIĘTY wyglądałby jak praca. */}
@@ -211,9 +200,6 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz, mojeId
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold tabular-nums">
               {zlote(z.sumaPozycjiGrosze, z.waluta)}</span>
-            {/* Tag stoi obok sygnałów, bo oba są faktem o sprawie — tyle że
-                sygnał wylicza serwer, a tag zapisuje biuro. */}
-            {z.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
             {z.sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>

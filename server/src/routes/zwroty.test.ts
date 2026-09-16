@@ -64,7 +64,6 @@ function login(role: Rola, name: string) {
 const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/zwroty" },
   { method: "GET" as const, url: `/api/obsluga/zwroty/${zwrot}` },
-  { method: "GET" as const, url: "/api/obsluga/zwroty/csv" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/zamowienia" },
   { method: "POST" as const, url: "/api/obsluga/zwroty/synchronizuj" },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/werdykt` },
@@ -86,10 +85,9 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/notatka/cofnij` },
   { method: "GET" as const, url: "/api/obsluga/zwroty/rozjazdy" },
-  /* Prowadzący i tagi (0.315.0) — znacznik „biorę to" mówi, kto zajmuje się
-     sprawą klienta, a tag bywa zdaniem o niej. Oba należą do biura. */
-  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/prowadzi` },
-  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/tagi/1` },
+  /* PROWADZĄCEGO, TAGÓW I EKSPORTU CSV TU JUŻ NIE MA (0.370.0) — właściciel
+     wskazał je wprost jako niepotrzebne przy zwrotach. Reklamacje i dyskusje
+     mają jedno i drugie dalej, z własnymi bramkami. */
   /* Paczki klienta (0.367.0) — ODCZYT, ale POST-em, bo uchwytem bywa nazwisko
      z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista
      cudzych zakupów, czyli praca biura. */
@@ -159,30 +157,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () => {
-  /* Ta sama zasada co przy `analiza_eksport` i `audyt_eksport`: kto pobiera
-     zestawienie o ludziach, sam trafia do dziennika. */
-  const { naglowki } = login("biuro", "Ala z eksportu");
-  const d = db();
-  const zdarzen = () => (d.prepare(
-    "SELECT count(*) n FROM events WHERE type='zwroty_eksport'").get() as { n: number }).n;
-  const przed = zdarzen();
-
-  const r = await app.inject({ method: "GET", url: "/api/obsluga/zwroty/csv", headers: naglowki });
-  assert.equal(r.statusCode, 200);
-  assert.match(r.headers["content-type"] as string, /text\/csv/);
-  assert.match(r.headers["content-disposition"] as string, /wertis-zwroty\.csv/);
-  assert.equal(zdarzen(), przed + 1, "eksport dopisał zdarzenie");
-
-  /* Separator `;`, bo Excel PL otwiera taki plik bez kreatora importu.
-     Numeru listu przewozowego w pliku NIE MA — polityka danych zwrotów. */
-  const tekst = r.body;
-  assert.match(tekst, /Numer zwrotu;/);
-  assert.match(tekst, /EAN;SKU;/);
-  assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
-});
-
-test("zwroty mają trzydzieści trzy trasy POST, a trzy wychodzą do Allegro", async () => {
+test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -335,16 +310,18 @@ test("zwroty mają trzydzieści trzy trasy POST, a trzy wychodzą do Allegro", a
      treść tego zdania w uzasadnieniu. */
   /* Trzydziesta trzecia (0.368.0): wypuszczenie MM koszyka MIMO brakujących
      korekt. Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
-     nawet jeśli nie ma wszystkich ZW".
+     nawet jeśli nie ma wszystkich ZW". Osobna trasa, nie flaga przy `zamknij`:
+     flagę łatwo ustawić przez pomyłkę i nie widać jej ani w tej liście, ani
+     w logu żądań.
 
-     OSOBNA TRASA, nie flaga przy `zamknij` — i to jest cała treść tego zdania.
-     Flaga w ciele robi z wyjątku wariant zwykłej czynności: łatwo ją ustawić
-     przez pomyłkę i nie widać jej ani w tej liście, ani w logu żądań. Bramka
-     z 0.200.0 zostaje domyślna, bo MM zdejmuje towar z magazynu głównego,
-     a ze zwrotu wraca on tam dopiero po korekcie. Wypuszczenie wcześniej
-     zostawia ślad z numerami zwrotów, na które nie doczekano. */
-  assert.equal(posty.length, 33,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu trzech`);
+     LICZNIK SCHODZI O JEDEN W 0.370.0 i to jest pierwszy raz, kiedy ta umowa
+     idzie w dół. Zgłoszenie właściciela: „uprość panel zwrotów do wymaganego
+     minimum", a po pytaniu o szczegóły wskazanie wprost na sito Moje/Niczyje.
+     Znika `/prowadzi`. Trasy tagów tego licznika nigdy nie ruszały (rejestruje
+     je `trasyTagowSprawy`), a eksport CSV był GET-em — obie rzeczy schodzą
+     razem z prowadzącym, ale nie tutaj widać ich odejście. */
+  assert.equal(posty.length, 32,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dwóch`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",

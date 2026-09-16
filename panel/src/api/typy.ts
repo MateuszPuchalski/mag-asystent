@@ -988,12 +988,10 @@ export interface Zwrot {
   rejectionCode: string | null;
   /** `allegro` albo `nieodebrana` — paczka, której klient nie odebrał. */
   zrodlo: string;
-  /** Kto wziął zwrot na siebie; `null` = niczyj (0.315.0). */
-  prowadzi: string | null;
-  prowadziUserId: number | null;
-  prowadziAt: string | null;
-  /** Tagi biura — ten sam słownik co przy reklamacjach i dyskusjach. */
-  tagi: TagSprawy[];
+  /* PROWADZĄCEGO I TAGÓW ZWROT JUŻ NIE NIESIE (0.370.0). Serwer ich nie
+     wysyła, więc typ nie ma prawa ich obiecywać — pole zadeklarowane, a nigdy
+     nieprzychodzące, jest `undefined` udającym `null`. Reklamacja i dyskusja
+     mają jedno i drugie dalej. */
   /** Notatka biura — od 0.313.0 przy KAŻDYM zwrocie, nie tylko przy paczce. */
   notatka: string | null;
   notatkaAt: string | null;
