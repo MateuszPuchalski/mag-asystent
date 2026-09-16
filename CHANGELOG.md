@@ -34,6 +34,95 @@ historii nie przepisujemy.
 ---
 
 
+## 0.363.0 — 16 września 2026
+
+**Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie
+zostawiło tę rzecz otwartą z uzasadnieniem, które było słabsze, niż wyglądało:
+„§22 nie podaje terminu, więc terminu nie ma". To prawda o §22 i nieprawda
+o systemie. Sprawa jest spóźniona, gdy stoi dłużej niż dziewięć na dziesięć
+spraw TEGO SAMEGO KANAŁU, które ktoś w tym oknie domknął. Taki próg nie jest
+niczyim werdyktem — to zdanie o własnej historii firmy i da się je sprawdzić,
+patrząc na te same dane.
+
+Pasek stanu dostaje plakietkę ze spóźnionymi sprawami, a karta STAN SYSTEMU —
+blok mówiący, w którym kanale i od jak dawna.
+
+### Próg osobny dla każdego kanału
+
+Jedna liczba byłaby zła dla co najmniej trzech. Kolizja kodu czeka na decyzję
+przy biurku; zadanie terenowe wymaga przejścia przez halę. Wspólne „cztery
+godziny" alarmowałoby przy każdej kolizji i przy żadnym zadaniu. Sprawdzone
+na żywym serwerze: ta sama sprawa sprzed stu minut jest spóźniona w kanale
+domykanym w półtorej godziny i normalna w kanale domykanym w dziesięć.
+
+### Dziesięć spraw, nie „kilka" — to arytmetyka, nie wyczucie
+
+`p90` liczy się najbliższą rangą, czyli indeksem `ceil(0,9·n) − 1`. Przy
+dziewięciu sprawach wychodzi z tego OSTATNI element: próg równy najdłuższej
+sprawie, jaka się zdarzyła. Alarm z takim progiem nie zapali się nigdy,
+a wygląda na działający — i milczy tak samo jak alarm sprawny. Dopiero
+dziesiąta sprawa odcina ogon naprawdę.
+
+Poniżej dziesięciu kanał **mówi to wprost** zamiast milczeć: cisza znaczyłaby
+„nic nie stoi", a znaczy „jeszcze nie ma z czego liczyć".
+
+### Podłoga godziny
+
+Kanał domykany w trzy minuty miałby próg rzędu dwóch minut i alarmowałby przy
+normalnej pracy. Alarm zapalający się codziennie uczy, że alarm nic nie znaczy.
+
+### Spóźnienie nie barwi ikony zdrowia
+
+Ikona odpowiada na pytanie „czy system działa": worker, kolejka, rozjazdy
+z Subiektem. Sprawa stojąca trzeci dzień to zdrowy system i kulejąca PRACA.
+Czerwień od niej świeciłaby cały dzień i nauczyłaby biuro ignorować ikonę
+także wtedy, gdy naprawdę padnie worker — dlatego spóźnione dostają osobną
+plakietkę, z drogą do tabeli, która je wyjaśnia.
+
+### Czego ten alarm NIE mówi
+
+Wykrywa odstające od WŁASNEJ NORMY, nie złe. Magazyn, w którym każda sprawa
+stoi trzy dni, ma próg trzech dni i milczy. Na to potrzebna jest liczba
+właściciela i pytanie o nią zostaje otwarte — ale alarm z własnej historii
+działa dziś i przyjmie tamtą liczbę bez przebudowy.
+
+### Przy okazji: `.catch`, który nie łapał nic
+
+W dwóch miejscach panelu zabezpieczenie stało za `.json()`, a `api()` rzuca
+przy każdej odpowiedzi spoza 2xx — czyli PRZED `.json()`. Jedno z nich
+przyszło z 0.361.0, drugie żyło od 0.114.0: odmowa trasy z licznikiem
+odpowiedzi na notatki wywracała cały pasek stanu — ikonę zdrowia, kolejkę
+i stan Allegro naraz. Pilnuje tego teraz test panelu.
+
+Trasy miary dostały też własny plik bramek: do 0.362.0 nie miały testu roli
+wcale, tak samo jak rozstrzyganie kolizji przed 0.361.0.
+
+## 0.362.0 — 16 września 2026
+
+**Wskazany towar sam wjeżdża na ekran, a skan wskazanego go odkłada.** Dwie
+poprawki rozkładania kosza z jednej obserwacji na hali: kolektor wiedział
+więcej, niż pokazywał, i wymagał więcej, niż musiał.
+
+**Lista przewija się do wskazanej pozycji.** Kosz na dwadzieścia wierszy mieści
+na ekranie kolektora cztery. Skan towaru z dna kosza podświetlał wiersz, którego
+nie było widać — człowiek szukał go kciukiem, choć urządzenie od razu wiedziało,
+o który chodzi. Lista rozkładania jest teraz leniwa i przewija się sama, tak samo
+jak przy dostawie. Dotyczy kosza i kartonu, bo rozkłada je ten sam ekran.
+
+**Skan pozycji wybranej palcem odkłada ją.** Drugi skan towaru kończy odłożenie
+od 0.189.0, ale uzbrajał go wyłącznie skan pierwszy. Kto wybrał towar
+dotknięciem wiersza, a potem go zeskanował, dostawał samo ponowne wskazanie:
+dwa razy pokazał urządzeniu to samo i nic się nie działo. Dotknięcie wiersza
+liczy się teraz tak samo jak skan. Automatyczne wskazanie następnej pozycji po
+odłożeniu zostaje NIEUZBROJONE — inaczej pierwszy skan przy nowej pozycji
+odkładałby ją, zanim magazynier spojrzy na regał.
+
+**Odmowa bez adresu przestaje być niema.** Drugi skan tej samej pozycji bez
+wpisanego regału nie ma czego potwierdzić i wcześniej kończył się samym
+piknięciem — wyglądało to jak zepsuty skaner. Teraz kolektor mówi, czego brakuje.
+
+Wdrożenie: nowy APK na kolektory. Serwer i panele bez zmian.
+
 ## 0.361.0 — 16 września 2026
 
 **Pierwsza liczba mówiąca, ILE trwa sprawa między halą a biurem.** §22
