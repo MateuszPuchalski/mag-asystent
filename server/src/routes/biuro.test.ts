@@ -174,7 +174,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    17,
+    18,
     "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
       "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
       "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
@@ -198,6 +198,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
       "a MM z takiej pozycji nie powstanie — składniki leżą na magazynie " +
       "osobno. Przycisk stoi WYŁĄCZNIE przy koszu bez dokumentu i wymaga " +
       "kliknięcia; wejście na ekran nadal nic nie przelicza.\n\n" +
+      "Zapis osiemnasty przyszedł z 0.360.0: DECYZJA O KOLIZJI KODU. " +
+      "`ean_conflict` był do 0.358.0 dziennikiem bez wyjścia — kolizja " +
+      "wpadała na listę i zostawała tam na zawsze w tej samej postaci co " +
+      "pierwszego dnia. Obie strony patrzyły na TĘ SAMĄ listę (biuro tutaj, " +
+      "hala na ekranie wyjątków kolektora) i żadna nie mogła drugiej nic " +
+      "powiedzieć. Zapis wymaga kliknięcia POPRAWIONE albo DOPUSZCZONE oraz " +
+      "przejścia przez dialog — samo otwarcie karty nadzoru nadal nie " +
+      "zapisuje niczego, a odczyt kolizji jest i zostaje GET-em.\n\n" +
       "Reguła się NIE zmienia: liczba rośnie wyłącznie ŚWIADOMIE, a żaden " +
       "zapis nie dzieje się przy samym patrzeniu na ekran."
   );
@@ -1232,4 +1240,71 @@ test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async 
   const p = szczegol.json();
   assert.equal(p.archiwalny, true, "panel wie, że to nasz zapis, a nie dzisiejsza faktura");
   assert.equal(p.lines[0].doneBy, "Krzysiek", "nazwisko odkładającego przeżyło okno importu");
+});
+
+test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.364.0)", () => {
+  /* Cztery rzeczy, bez których ten sygnał byłby gorszy niż jego brak.      */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+
+  /* 1. ALARM CHODZI W CYKLU, nie na wejściu na zakładkę. Własność „Wiek"
+        mówi: widać, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK. Sygnał
+        pobierany dopiero po wejściu na STAN SYSTEMU odpowiadałby wyłącznie
+        temu, kto już poszedł sprawdzić — czyli nikomu, kto go potrzebuje. */
+  const liczniki = html.slice(
+    html.indexOf("async function odswiezLiczniki()"),
+    html.indexOf("async function odswiezEtap3()")
+  );
+  assert.match(liczniki, /\/api\/biuro\/alarm-wymiany/,
+    "alarm pobiera się w cyklu, a cykl chodzi na każdej zakładce");
+
+  /* 2. OKNO ALARMU JEST STAŁE. Suwak `dniMetryk` rządzi tabelą; plakietka
+        w nagłówku ma znaczyć jedno, niezależnie od tego, co ktoś wybrał. */
+  assert.ok(
+    !/alarm-wymiany\?dni=/.test(html),
+    "alarm nie bierze okna z ekranu — inaczej ta sama sprawa raz jest spóźniona, raz nie"
+  );
+
+  /* 3. PLAKIETKA MA DROGĘ DO TREŚCI. Zgłoszenie z 20 sierpnia: sygnał bez
+        drogi do treści jest sygnałem zgubionym. */
+  assert.match(html, /data-do="nadzor" data-cel="kartaWymiany"/,
+    "plakietka prowadzi na tabelę, która ją wyjaśnia");
+  assert.match(html, /id="kartaWymiany"/, "cel skoku istnieje");
+
+  /* 4. SPÓŹNIENIE NIE BARWI IKONY ZDROWIA. Ikona odpowiada na pytanie „czy
+        system działa". Sprawa stojąca trzeci dzień to zdrowy system i
+        kulejąca praca — czerwień od niej świeciłaby cały dzień i nauczyłaby
+        biuro ignorować ikonę także wtedy, gdy naprawdę padnie worker. */
+  const rysujStan = html.slice(
+    html.indexOf("function rysujStan("),
+    html.indexOf("rysujIkoneAllegro();")
+  );
+  assert.ok(
+    !/czerwone\.push\("wymiana"\)|czerwone\.push\("spoznione"\)/.test(rysujStan),
+    "spóźniona sprawa nie zabiera czerwieni awariom systemu"
+  );
+  assert.match(rysujStan, /spoznionychRazem/, "plakietka liczy się w pasku stanu");
+});
+
+test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => {
+  /* Blizna z 0.361.0: `.catch` stał za `.json()`, a `api()` rzuca przy każdej
+     odpowiedzi spoza 2xx — czyli PRZED `.json()`. Zabezpieczenie nie łapało
+     więc niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało
+     z ekranu metryki oraz kolizje kodów. */
+  const html = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../web/biuro.html"),
+    "utf8"
+  );
+  assert.ok(
+    !/\)\)\.json\(\)\s*\.catch\(/.test(html),
+    "`.catch` za samym `.json()` nie łapie odmowy trasy — ma stać na całym łańcuchu"
+  );
+  const miara = html.slice(html.indexOf("api(`/api/biuro/wymiana?dni="));
+  assert.match(
+    miara.slice(0, 200),
+    /\.then\(\(r\) => r\.json\(\)\)\s*\.catch\(/,
+    "miara ma własne zabezpieczenie na całym łańcuchu, nie za `.json()`"
+  );
 });

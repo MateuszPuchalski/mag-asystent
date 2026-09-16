@@ -347,7 +347,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
-  /* Co ten klient u nas kupił (0.363.0). Odpowiedź na zgłoszenie właściciela:
+  /* Co ten klient u nas kupił (0.365.0). Odpowiedź na zgłoszenie właściciela:
      „kupujący może mieć wiele paczek kupionych w historii sklepu, więc muszę
      mieć możliwość wybrania paczki". Rejestracja nieodebranej pytała o numer
      zamówienia jak o rzecz oczywistą, a to jedyna rzecz, której przy takiej
@@ -384,7 +384,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           waybill: String(req.body?.waybill ?? ""),
           orderId: req.body?.orderId ?? null,
           notatka: req.body?.notatka ?? null,
-          /* Login kupującego (0.363.0) — przy nieodebranej to często jedyny
+          /* Login kupującego (0.365.0) — przy nieodebranej to często jedyny
              uchwyt, po którym biuro wróci do tej paczki. Serwer przycina go
              i chowa w kolumnie zwrotu; walidacji kształtu nie ma, bo Allegro
              nie zamyka listy dopuszczalnych loginów. */

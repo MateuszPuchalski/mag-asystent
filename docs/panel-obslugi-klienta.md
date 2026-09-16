@@ -3566,7 +3566,7 @@ przepisuje pozycje zamówienia do zwrotu, więc jest co ocenić i co wycenić.
 Bez niego wiersz zostaje pustym uchwytem na paczkę — lepszym niż kartka
 przy monitorze, ale pieniędzy z niego nie policzy.
 
-**Login kupującego jest trzecim uchwytem (0.363.0).** Zgłoszenie właściciela:
+**Login kupującego jest trzecim uchwytem (0.365.0).** Zgłoszenie właściciela:
 „nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
 szukania zna login od 0.337.0 i mówi to wprost — ale ta paczka brała go
 wyłącznie z zamówienia, a numeru zamówienia przy nieodebranej najczęściej nie
@@ -5019,8 +5019,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Zadania terenowe i kolektor | **działa** od 0.141.0 | `zadanie_terenowe`, `FieldTasksScreen.kt` |
 | Droga powrotna z hali (§13.3) | **działa** od 0.352.0 | status `odeslane`, kody `brak_towaru`/`nie_da_sie`, `oddaj` i `ponow`; do 0.351.0 hala mogła odpowiedzieć wyłącznie wynikiem |
 | Odesłanie na osi rozmowy | **działa** od 0.352.0 | `field_task_returned`, wpis `odeslanie_zadania`, zdejmuje `waiting_for_internal` |
-| Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; bez progu „za późno", bo §22 nie podaje terminu |
+| Wiek zlecenia na karcie i na kolektorze | **działa** od 0.352.0 | `zleconeOdMs` liczone na serwerze, `wiek()` w `panel/src/ui`; od 0.364.0 „za długo" ma próg, ale liczony z historii kanału, nie wpisany ręką |
 | Zdjęcie przy zadaniu (§13.3) | **działa** od 0.352.0 | `zadanie_zalacznik`, `services/foto.ts`, `useZdjecieZadania` — piąte źródło obrazów w panelu |
+| Czas realizacji zadania magazynowego (§22) | **działa** od 0.361.0 | `services/wymiana.ts`, `GET /api/biuro/wymiana`, tabela w karcie STAN SYSTEMU; mediana i p90, każda ze swoim `n` |
+| Alarm „to stoi za długo" | **działa** od 0.364.0 | `alarmyWymiany()`, `GET /api/biuro/alarm-wymiany`, plakietka w pasku stanu; próg to `p90` spraw domkniętych w TYM kanale, osobno dla każdego z czterech |
 | Wynik z hali na osi rozmowy | **działa** od 0.144.0 | `conversation_event`, `field_task_result` |
 | Wyszukiwarka towaru w panelu | **działa** od 0.145.0 | `panel/src/wyszukiwarka.tsx` |
 | Kartoteka wywiedziona z oferty | **działa** od 0.152.0 | `services/dopasowanie-sku.ts`, `offer.external.id` |

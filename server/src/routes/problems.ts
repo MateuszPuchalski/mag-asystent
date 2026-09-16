@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
-import { userOf } from "../context.js";
-import { eanConflictReport } from "../services/ean.js";
+import { sesjaZadania, userOf } from "../context.js";
+import { eanConflictReport,
+  rozstrzygnijKolizje,
+  type RodzajRozstrzygniecia,
+} from "../services/ean.js";
 import {
   exportCsv,
   listByDelivery,
@@ -126,4 +129,32 @@ export async function problemRoutes(app: FastifyInstance) {
 
   /** Raport kolizji EAN dla biura — lista kodów do naprawy w kartotece. */
   app.get("/api/ean-conflicts", async () => ({ conflicts: eanConflictReport() }));
+
+  /* ── BIURO ZAMYKA SPRAWĘ KODU (0.360.0) ──────────────────────────────────
+     Do 0.358.0 `ean_conflict` był dziennikiem bez wyjścia: kolizja wpadała
+     tam i zostawała na zawsze w tej samej postaci co pierwszego dnia. Obie
+     strony patrzyły na tę samą listę — biuro w `/biuro`, hala na ekranie
+     wyjątków — i żadna nie mogła drugiej nic powiedzieć.
+
+     Rola bramkowana tutaj, bo to DECYZJA biura o danych w Subiekcie, a nie
+     obserwacja z alejki. Hala zgłasza kolizję samym skanem i nie ma czego
+     rozstrzygać. */
+  app.post<{ Params: { ean: string }; Body: { rodzaj?: RodzajRozstrzygniecia; notatka?: string } }>(
+    "/api/ean-conflicts/:ean/rozstrzygnij",
+    async (req, reply) => {
+      const s = sesjaZadania();
+      if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+      if (!["biuro", "admin"].includes(s.user.role)) {
+        return reply.code(403).send({ error: "Kolizje kodów rozstrzyga biuro" });
+      }
+      const wynik = rozstrzygnijKolizje(
+        req.params.ean,
+        req.body?.rodzaj as RodzajRozstrzygniecia,
+        req.body?.notatka,
+        { id: s.user.userId, name: s.user.name },
+      );
+      if ("error" in wynik) return reply.code(400).send(wynik);
+      return wynik;
+    },
+  );
 }

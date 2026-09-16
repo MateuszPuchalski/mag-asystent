@@ -1186,6 +1186,29 @@
       <table id="kolizje"></table>
     </section>
 
+    <section class="card" id="kartaWymiany">
+      <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
+        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
+      <div class="objasnienie" hidden>
+        <p class="mute" style="margin-bottom:10px">
+          Znaczniki obu końców każdej sprawy leżą w bazie od lat — ta tabela
+          jako pierwsza liczy różnicę. MEDIANA mówi, jak wygląda zwykły dzień,
+          OGON (p90) — jak wygląda zły. Średniej tu nie ma celowo: jedna sprawa
+          sprzed tygodnia utopiłaby sto załatwionych w kwadrans.
+          Kolumna OTWARTE liczy sprawy, które trwają DO DZIŚ i dlatego nie
+          mają czasu zamknięcia; bez niej tabela pokazywałaby wyłącznie to,
+          co ktoś domknął. Progu „za późno" tu nie ma — §22 wymienia tę
+          metrykę i nie podaje terminu, więc czy to długo, rozstrzyga człowiek.
+        </p>
+      </div>
+      <table id="wymiana"></table>
+      <!-- Alarm liczy z OKNA STAŁEGO (30 dni), a tabela wyżej z suwaka obok.
+           Dlatego stoi pod własnym nagłówkiem i sam mówi, z czego liczy —
+           dwie liczby z różnych okresów bez podpisu to gotowy sprzeczny
+           wniosek. -->
+      <div id="alarmWymiany" style="margin-top:12px"></div>
+    </section>
+
     <section class="card">
       <h2>SERWER</h2>
       <table id="zdrowie"></table>
@@ -1603,6 +1626,9 @@ let widok = localStorage.getItem("wertis.widok") || "dostawy";
 if (widok === "zwroty" || widok === "pytania") widok = "sprawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
+/* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
+   czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
+let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
 let odpowiedziNaNotatki = [];
 /** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
@@ -1809,12 +1835,32 @@ function rysujStan(health, kolejka) {
   /* Odpowiedzi na notatki (0.57.0) zostają plakietką OBOK ikon: mają własną
      drogę (dostawy → karta odpowiedzi), a zgłoszenie z 20 sierpnia nauczyło,
      że sygnał bez drogi do treści jest sygnałem zgubionym. */
+  const plakietki = [];
   const n = odpowiedziNaNotatki.length;
-  $("stan").innerHTML = n
-    ? `<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
+  if (n) {
+    plakietki.push(`<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
       title="${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"} — kliknij, żeby przeczytać."
-      >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`
-    : "";
+      >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`);
+  }
+  /* Spóźnione sprawy (0.364.0) — OSOBNA PLAKIETKA, nie kolor ikony zdrowia,
+     i to nie jest kwestia gustu. Ikona odpowiada na pytanie „czy system
+     działa": worker, kolejka, rozjazdy z Subiektem. Sprawa stojąca trzeci
+     dzień to zdrowy system i kulejąca PRACA — dwie różne rzeczy pod jednym
+     kolorem znaczą tyle, co jedna. Czerwień na ikonie od jednej takiej sprawy
+     świeciłaby cały dzień i nauczyłaby biuro ignorować ją także wtedy, gdy
+     naprawdę padnie worker.
+
+     Bursztyn, nie czerwień, bo nic nie stoi: sprawa idzie wolniej niż zwykle.
+     Plakietka prowadzi na tabelę, która to wyjaśnia — zgłoszenie z 20 sierpnia
+     nauczyło, że sygnał bez drogi do treści jest sygnałem zgubionym. */
+  const sp = ostatnieAlarmy?.spoznionychRazem || 0;
+  if (sp) {
+    const opis = sp === 1 ? "spóźniona sprawa" : "spóźnione sprawy";
+    plakietki.push(`<span class="badge amber" data-do="nadzor" data-cel="kartaWymiany"
+      title="${sp} ${opis} — stoją dłużej niż dziewięć na dziesięć domkniętych w tym kanale. Kliknij, żeby zobaczyć które."
+      >${sp}<span class="et">${opis}</span></span>`);
+  }
+  $("stan").innerHTML = plakietki.join("");
 
   rysujIkoneAllegro();
 }
@@ -3279,6 +3325,35 @@ function rysujKolejke(q) {
    odmówi w trakcie zapisu). Operacje ratunkowe serwera za groźnym
    potwierdzeniem: pełny resync na produkcji to import całej kartoteki. */
 $("widokNadzor").addEventListener("click", async (e) => {
+  /* Delegacja stoi na WIDOKU, nie na tabeli kolizji — ta sama reguła co przy
+     kolejce Sfery obok, i ta sama, której pilnuje test delegacji. Tabela
+     przerysowuje się w całości przy każdym odświeżeniu, więc nasłuch wpięty
+     w nią ginąłby po pierwszym odczycie. */
+  const kolizja = e.target.closest("[data-kolizja]");
+  if (kolizja) {
+    const ean = kolizja.dataset.ean;
+    const rodzaj = kolizja.dataset.kolizja;
+    const notatka = await zapytaj({
+      tytul: rodzaj === "poprawione" ? "KOD POPRAWIONY" : "KOLIZJA DOPUSZCZONA",
+      /* Opis mówi HALI, co z tego wynika, bo to ona zobaczy skutek na ekranie
+         wyjątków. Biuro klika, ale odbiorcą decyzji jest magazynier. */
+      opis: rodzaj === "poprawione"
+        ? "Kartoteki naprawione — kolizja ma zniknąć. Kolejne trafienie pokaże się jako nieudana poprawka."
+        : "Ten kod stoi na kilku kartotekach zgodnie z prawdą. Hala ma wybierać po symbolu i nie zgłaszać go drugi raz.",
+      potwierdz: rodzaj === "poprawione" ? "ZAPISZ POPRAWIONE" : "ZAPISZ DOPUSZCZONE",
+    });
+    if (notatka === null) return;
+    try {
+      await api(`/api/ean-conflicts/${encodeURIComponent(ean)}/rozstrzygnij`, {
+        method: "POST",
+        body: JSON.stringify({ rodzaj, notatka: notatka || undefined }),
+      });
+      await odswiezNadzor();
+    } catch (err) {
+      alert(err.message || "Nie udało się zapisać decyzji");
+    }
+    return;
+  }
   const ponow = e.target.closest("[data-kolejka-ponow]");
   const anuluj = e.target.closest("[data-kolejka-anuluj]");
   if (ponow || anuluj) {
@@ -3461,17 +3536,133 @@ function csvRozjazdow(r) {
 }
 
 /* ── Kolizje kodów ── */
+/* ── Ile trwa wymiana z halą (0.361.0) ─────────────────────────────────────
+   Pierwsza w tym repo liczba mówiąca, ILE trwa sprawa między halą a biurem.
+   §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
+   podaje przy nim ani progu, ani miejsca — a w kodzie nie było go wcale. */
+const NAZWA_KANALU = {
+  zadanie: "Zadanie terenowe",
+  niezgodnosc: "Niezgodność w dostawie",
+  pominiecie: "Pominięcie w koszu",
+  kolizja: "Kolizja kodu",
+};
+
+/* Minuty na zdanie dla człowieka. Doba rozbija się na dni z tego samego
+   powodu co w panelu obsługi: „4320 min" trzeba podzielić w głowie, żeby się
+   przestraszyć. */
+function czasWymiany(min) {
+  if (min === null || min === undefined) return '<span class="mute">—</span>';
+  if (min < 60) return `${min} min`;
+  const g = Math.floor(min / 60);
+  if (g < 24) return `${g} g ${min % 60} min`;
+  const dni = Math.floor(g / 24);
+  return dni === 1 ? "1 dzień" : `${dni} dni`;
+}
+
+function rysujWymiane(r) {
+  const w = (r && r.wiersze) || [];
+  $("wymiana").innerHTML =
+    "<tr><th>KANAŁ</th><th>KIERUNEK</th><th>ZAMKNIĘTYCH</th><th>MEDIANA</th><th>OGON (p90)</th><th>OTWARTE</th><th>NAJSTARSZA OTWARTA</th></tr>" +
+    (w.map((x) => `<tr>
+        <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
+        <td class="mute">${esc(x.kierunek)}</td>
+        <td>${x.zamknietych}</td>
+        <td>${czasWymiany(x.medianaMin)}</td>
+        <td class="mute">${czasWymiany(x.p90Min)}</td>
+        <td>${x.otwartych}</td>
+        <td class="mute">${czasWymiany(x.najstarszaOtwartaMin)}</td>
+      </tr>`).join("") ||
+      '<tr><td colspan="7" class="mute">Brak spraw w tym oknie</td></tr>');
+}
+
+/* ── Co stoi dłużej, niż stoi zwykle (0.364.0) ──────────────────────────────
+   Próg nie jest niczyim werdyktem: to `p90` spraw DOMKNIĘTYCH w tym samym
+   kanale. Ekran mówi to wprost przy każdym wierszu, bo liczba bez pochodzenia
+   jest wyrocznią, a wyroczni nie da się podważyć danymi. */
+function rysujAlarmWymiany(a) {
+  const k = (a && a.kanaly) || [];
+  const spoznione = k.filter((x) => x.spoznionych > 0);
+  const cel = $("alarmWymiany");
+  if (!cel) return;
+
+  /* Kanały bez progu wymieniamy Z NAZWY, zamiast milczeć. Cisza znaczyłaby
+     „nic nie stoi", a znaczy „jeszcze nie ma z czego liczyć" — i biuro nie
+     ma jak tych dwóch rzeczy odróżnić, jeśli ekran ich nie odróżnia. */
+  const bezProgu = k.filter((x) => x.progMin === null);
+
+  const naglowek = spoznione.length
+    ? `<p class="b" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — ${
+        spoznione.reduce((s2, x) => s2 + x.spoznionych, 0)}</p>`
+    : '<p class="b mute" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — nic</p>';
+
+  const wiersze = spoznione.map((x) => `<tr>
+      <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
+      <td>${x.spoznionych}</td>
+      <td class="mute">próg ${czasWymiany(x.progMin)}${
+        x.podstawa === "podloga" ? " (podłoga)" : ` (p90 z ${x.n})`}</td>
+      <td>najdłuższa: ${czasWymiany(x.najstarszaSpoznionaMin)}</td>
+    </tr>`).join("");
+
+  cel.innerHTML = naglowek +
+    (wiersze ? `<table>${wiersze}</table>` : "") +
+    (bezProgu.length
+      ? `<p class="mute" style="margin:8px 0 0">Bez progu — za mało domkniętych
+         spraw (potrzeba ${a.minSpraw}): ${
+           bezProgu.map((x) => `${esc(NAZWA_KANALU[x.kanal] || x.kanal)} (${x.n})`).join(", ")}.</p>`
+      : "") +
+    `<p class="mute" style="margin:8px 0 0">Próg liczony osobno dla każdego kanału
+     z ostatnich ${a && a.dni ? a.dni : 30} dni; nie zależy od OKNA wybranego
+     przy tabeli wyżej.</p>`;
+}
+
+/* ── DECYZJA BIURA O KODZIE (0.360.0) ───────────────────────────────────────
+   Do 0.358.0 ta tabela była dziennikiem bez wyjścia: kolizja wpadała na listę
+   i zostawała na zawsze w tej samej postaci co pierwszego dnia. Hala patrzyła
+   na TĘ SAMĄ listę na ekranie wyjątków i też nie mogła nic zrobić — obie
+   strony widziały problem, żadna nie mogła drugiej nic powiedzieć.
+
+   Dwa rodzaje, bo hala reaguje na nie ODWROTNIE. `poprawione` znaczy „kolizja
+   zniknie", więc kolejne trafienie jest dowodem, że poprawka nie zadziałała.
+   `dopuszczone` znaczy „zostanie i ma zostać" — wybieraj po symbolu i nie
+   zgłaszaj drugi raz. Serwer liczy trafienia PO decyzji, więc nieudana
+   poprawka ujawnia się sama, bez niczyjej oceny. */
+function decyzjaKolizji(k) {
+  const r = k.rozstrzygniecie;
+  if (!r) return '<span class="mute">—</span>';
+  /* Ten sam format znacznika co reszta tej tabeli — inaczej jedna kolumna
+     pokazywałaby czas inaczej niż sąsiednia i to wyglądałoby na usterkę. */
+  const kiedy = esc((r.at || "").replace("T", " ").slice(0, 16));
+  const kto = esc(r.przez || "biuro");
+  const nota = r.notatka ? `<div class="mute">${esc(r.notatka)}</div>` : "";
+  /* Trafienia po obiecanej poprawce to jedyny sygnał BŁĘDU w tej tabeli —
+     i nie jest opinią, tylko liczbą. Przy `dopuszczone` te same trafienia
+     nie znaczą nic złego, więc tam nie zapala się nic. */
+  const wraca = r.rodzaj === "poprawione" && k.trafienPoDecyzji > 0
+    ? `<div class="badge err">POPRAWKA NIE ZADZIAŁAŁA — ${k.trafienPoDecyzji}× po decyzji</div>`
+    : "";
+  return `<b>${r.rodzaj === "poprawione" ? "POPRAWIONE" : "DOPUSZCZONE"}</b>
+    <div class="mute">${kto} · ${kiedy}</div>${nota}${wraca}`;
+}
+
 function rysujKolizje(lista) {
   $("kolizje").innerHTML =
-    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th></tr>" +
+    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th><th>DECYZJA BIURA</th></tr>" +
     (lista.map((k) => `<tr>
         <td class="b">${esc(k.ean)}</td>
         <td>${k.hits}×</td>
         <td class="mute">${k.autoResolved}×</td>
         <td class="mute">${esc((k.twIds || []).join(", "))}</td>
         <td class="mute">${esc((k.lastSeen || "").replace("T", " ").slice(0, 16))}</td>
+        <td>${decyzjaKolizji(k)}
+          <div style="margin-top:4px">
+            <button class="akcja cichy" data-kolizja="poprawione" data-ean="${esc(k.ean)}"
+              style="font-size:11px;padding:3px 8px">POPRAWIONE</button>
+            <button class="akcja cichy" data-kolizja="dopuszczone" data-ean="${esc(k.ean)}"
+              style="font-size:11px;padding:3px 8px">DOPUSZCZONE</button>
+          </div>
+        </td>
       </tr>`).join("") ||
-      '<tr><td colspan="5" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
+      '<tr><td colspan="6" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
 }
 
 /* Znaczniki z API są w UTC — do pokazania trzeba czasu lokalnego przeglądarki.
@@ -3949,7 +4140,14 @@ async function odswiezStan() {
     const [h, q, odp] = await Promise.all([
       (await fetch("/api/health")).json(),
       (await api("/api/queue")).json(),
-      (await api("/api/biuro/notatki/odpowiedzi")).json().catch(() => ({ odpowiedzi: [] })),
+      /* `.catch` na CAŁYM łańcuchu (poprawione w 0.364.0). Stał za `.json()`,
+         a `api()` rzuca przy każdej odpowiedzi spoza 2xx — czyli PRZED
+         `.json()`. Zabezpieczenie nie łapało więc niczego, co naprawdę pada,
+         a 500 z licznika odpowiedzi zabierało cały pasek stanu: ikonę
+         zdrowia, kolejkę i stan Allegro naraz. */
+      api("/api/biuro/notatki/odpowiedzi")
+        .then((r) => r.json())
+        .catch(() => ({ odpowiedzi: [] })),
     ]);
     odpowiedziNaNotatki = odp.odpowiedzi || [];
     /* Stan Allegro jedzie od 0.114.0 także w health — ikona w pasku ma być
@@ -4028,12 +4226,26 @@ async function odswiezNadzor() {
   if (h) rysujZdrowie(h);
   if (q) rysujKolejke(q);
   try {
-    const [m, k] = await Promise.all([
+    const [m, k, wym] = await Promise.all([
       (await api(`/api/metrics?days=${$("dniMetryk").value}`)).json(),
       (await api("/api/ean-conflicts")).json(),
+      /* To samo okno co metryki obok: dwie tabele na jednym ekranie liczące
+         z różnych okresów to najprostszy sposób na sprzeczne wnioski. */
+      /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.364.0 stał
+         za `.json()` i nie łapał nic, co naprawdę pada: `api()` rzuca przy
+         każdej odpowiedzi spoza 2xx, czyli PRZED `.json()`. Awaria najmłodszej
+         i najmniej ważnej tabeli wywracała przez to dwie starsze na tym samym
+         ekranie — metryki i kolizje. */
+      api(`/api/biuro/wymiana?dni=${$("dniMetryk").value}`)
+        .then((r) => r.json())
+        .catch(() => ({ wiersze: [] })),
     ]);
     rysujMetryki(m);
     rysujKolizje(k.conflicts || []);
+    rysujWymiane(wym);
+    /* Alarm rysuje się z danych POBRANYCH W CYKLU, a nie tu: wejście na
+       zakładkę nie ma czekać na własne żądanie, skoro liczba już jest. */
+    if (ostatnieAlarmy) rysujAlarmWymiany(ostatnieAlarmy);
   } catch (e) { cichaAwaria("metryki", e); }
 }
 
@@ -4076,8 +4288,22 @@ async function odswiez() {
 /* Liczniki zakładek odeszły razem z obsługą klienta (0.140.0). Pigułka
    mówiła, ile spraw czeka; magazyn takiej liczby nie ma — praca hali stoi
    w koszach, a te widać na własnej zakładce. Nowa obsługa przyniesie własny
-   licznik razem z własną kolejką. */
-async function odswiezLiczniki() {}
+   licznik razem z własną kolejką.
+
+   Od 0.364.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
+   liczba, którą biuro ma zobaczyć, siedząc na innej zakładce. Spóźniona
+   sprawa jest jedyną taką liczbą, jaką magazyn ma. */
+async function odswiezLiczniki() {
+  try {
+    ostatnieAlarmy = await (await api("/api/biuro/alarm-wymiany")).json();
+    if (widok === "nadzor") rysujAlarmWymiany(ostatnieAlarmy);
+  } catch (e) {
+    /* Bez `cichaAwaria`: alarm ma NIE psuć werdyktu o cyklu. Gdy padnie,
+       plakietka po prostu nie urośnie — a bursztyn od jego awarii zabrałby
+       ten kolor sprawom, o których alarm miał mówić. */
+    console.warn("[alarm wymiany]", e);
+  }
+}
 
 /* Kosze i pominięte pozycje — praca hali widziana z biura. Jedna funkcja,
    bo odświeżają się razem z zakładką MAGAZYN i żadne z nich nie jest na

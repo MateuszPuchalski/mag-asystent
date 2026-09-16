@@ -159,7 +159,7 @@ export function zamowienieRozmowy(
   });
 }
 
-/* ── Paczki jednego klienta: co on w ogóle u nas kupił (0.363.0) ─────────────
+/* ── Paczki jednego klienta: co on w ogóle u nas kupił (0.365.0) ─────────────
    Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
    w historii sklepu, więc muszę mieć możliwość wybrania paczki".
 

@@ -369,7 +369,7 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
-  /* Login, o którego PACZKI pytamy (0.363.0) — osobno od tego, co operator
+  /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
      wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
      znaku. Pusty nie pyta wcale. */
   const [loginPaczek, setLoginPaczek] = useState("");

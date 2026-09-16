@@ -90,7 +90,7 @@ export function Szukanie({
           onChange={(e) => setZamowienie(e.target.value)} />
         <p className="mt-1 text-slate-500">
           Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
-        {/* ── LOGIN KUPUJĄCEGO (0.363.0) ─────────────────────────────────────
+        {/* ── LOGIN KUPUJĄCEGO (0.365.0) ─────────────────────────────────────
             Zgłoszenie właściciela: „nieodebrane paczki powinienem móc
             wyszukiwać po loginie klienta". Pole szukania zna login od 0.337.0,
             ale TA paczka brała go wyłącznie z zamówienia — a numeru zamówienia
@@ -100,7 +100,7 @@ export function Szukanie({
         <input className="field mt-2 h-7 text-xs" value={login}
           aria-label="Login kupującego" placeholder="Login kupującego (jeśli znasz)"
           onChange={(e) => setLogin(e.target.value)}
-          /* PYTAMY PO DOPISANIU LOGINU, nie po każdym znaku (0.363.0). Enter
+          /* PYTAMY PO DOPISANIU LOGINU, nie po każdym znaku (0.365.0). Enter
              i wyjście z pola to dwa ruchy, które operator i tak wykonuje —
              a zapytanie na znak byłoby dwunastoma odczytami na jeden login. */
           onBlur={() => onLogin?.(login.trim())}
@@ -113,7 +113,7 @@ export function Szukanie({
           Po loginie znajdziesz tę paczkę później — szukanie zna go tak samo
           jak numery. Enter pokaże paczki tego klienta.</p>
 
-        {/* ── WYBÓR PACZKI Z HISTORII KLIENTA (0.363.0) ──────────────────────
+        {/* ── WYBÓR PACZKI Z HISTORII KLIENTA (0.365.0) ──────────────────────
             Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
             w historii sklepu, więc muszę mieć możliwość wybrania paczki".
             Numer zamówienia przepisywany z panelu Allegro był jedyną drogą,

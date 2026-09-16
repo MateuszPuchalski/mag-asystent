@@ -280,7 +280,7 @@ export interface PaczkaKlienta {
 }
 
 /**
- * Co ten klient u nas kupił (0.363.0).
+ * Co ten klient u nas kupił (0.365.0).
  *
  * Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
  * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty login
@@ -310,7 +310,7 @@ export function useNieodebrana() {
   return useMutation({
     mutationFn: (v: {
       waybill: string; orderId?: string | null; notatka?: string | null;
-      /** Login kupującego (0.363.0) — przy nieodebranej często jedyny uchwyt. */
+      /** Login kupującego (0.365.0) — przy nieodebranej często jedyny uchwyt. */
       login?: string | null;
     }) =>
       api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",

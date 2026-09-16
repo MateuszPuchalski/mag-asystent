@@ -1490,7 +1490,7 @@ test("dziennik notuje FAKT loginu, nie sam login", () => {
   assert.doesNotMatch(e.payload, /jan_kowalski/);
 });
 
-/* ── Wybór paczki z historii klienta (0.363.0) ──────────────────────────────
+/* ── Wybór paczki z historii klienta (0.365.0) ──────────────────────────────
    Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
    w historii sklepu, więc muszę mieć możliwość wybrania paczki". Sam login
    mówi, CZYJA to paczka; nie mówi, KTÓRA.                                   */

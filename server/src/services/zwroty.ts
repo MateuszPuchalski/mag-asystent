@@ -1375,7 +1375,7 @@ export function wskazSklad(
  * bez nich zwrot nie miałby czego wycenić, a operator nie wie, co w paczce
  * jest, dopóki jej nie otworzy.
  *
- * ── LOGIN KUPUJĄCEGO (0.363.0) ─────────────────────────────────────────────
+ * ── LOGIN KUPUJĄCEGO (0.365.0) ─────────────────────────────────────────────
  * Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
  * loginie klienta". Szukanie w panelu zna login od 0.337.0 i pole mówi to
  * wprost — ale TEJ paczce login brał się wyłącznie z zamówienia, a numeru

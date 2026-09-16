@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { alarmyWymiany, czasyWymiany } from "../services/wymiana.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyInstance } from "fastify";
@@ -210,6 +211,35 @@ export async function biuroRoutes(app: FastifyInstance) {
     }
     return null;
   }
+
+  /* ── ILE TRWA WYMIANA Z HALĄ (0.361.0) ───────────────────────────────────
+     §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
+     podaje przy nim ani progu, ani miejsca. W kodzie nie było go wcale:
+     znaczniki obu końców leżą w bazie od lat, a różnicy nie liczył nikt.
+
+     GET, więc umowa zapisów panelu zostaje nietknięta — patrzenie na miarę
+     niczego nie mutuje. Bramka roli ta sama co przy notatkach: to liczby
+     o pracy ludzi i nie mają po co jeździć poza biuro. */
+  app.get<{ Querystring: { dni?: string } }>("/api/biuro/wymiana", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return czasyWymiany(Number(req.query.dni) || 30);
+  });
+
+  /* ── CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE (0.364.0) ───────────────────────────
+     Tabela wyżej odpowiada na pytanie zadane — a żeby je zadać, trzeba wejść
+     na STAN SYSTEMU i spojrzeć. Ta trasa odpowiada na pytanie NIEZADANE
+     i dlatego chodzi w cyklu, na każdej zakładce: własność „Wiek" wymaga,
+     żeby widać było, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK.
+
+     Bez parametru `dni`: okno jest stałe (30 dni). Suwak przy tabeli rządzi
+     tabelą; sygnał, który zmienia treść przy przestawieniu listy rozwijanej,
+     przestaje być sygnałem. */
+  app.get("/api/biuro/alarm-wymiany", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return alarmyWymiany();
+  });
 
   app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {
     const nie = odmowa();

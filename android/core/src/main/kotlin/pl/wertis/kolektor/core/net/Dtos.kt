@@ -887,6 +887,28 @@ data class EanConflictRow(
     /** Puste przy starszym serwerze — karta wraca wtedy do listy twIds. */
     val towary: List<KolizjaTowar> = emptyList(),
     val lastSeen: String = "",
+    /* ── CO BIURO POSTANOWIŁO (0.360.0) ─────────────────────────────────────
+       `null` przy starszym serwerze i przy kolizji, o której nikt się jeszcze
+       nie wypowiedział — to dla hali ta sama sytuacja: nikt nie odpowiedział. */
+    val rozstrzygniecie: RozstrzygniecieKolizji? = null,
+    /**
+     * Trafienia PO decyzji.
+     *
+     * Przy `poprawione` liczba większa od zera znaczy, że poprawka nie
+     * zadziałała — i to nie jest niczyja ocena, tylko fakt: biuro obiecało,
+     * że kolizja zniknie, a kod zatrzymał kogoś jeszcze raz. Przy
+     * `dopuszczone` ta sama liczba nie znaczy nic złego.
+     */
+    val trafienPoDecyzji: Int = 0,
+)
+
+@Serializable
+data class RozstrzygniecieKolizji(
+    /** `poprawione` albo `dopuszczone` — hala reaguje na nie odwrotnie. */
+    val rodzaj: String = "",
+    val notatka: String? = null,
+    val at: String = "",
+    val przez: String = "",
 )
 
 @Serializable
