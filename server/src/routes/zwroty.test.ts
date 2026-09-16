@@ -90,6 +90,14 @@ const TRASY = () => [
      sprawą klienta, a tag bywa zdaniem o niej. Oba należą do biura. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/prowadzi` },
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/tagi/1` },
+  /* Paczki klienta (0.367.0) — ODCZYT, ale POST-em, bo uchwytem bywa nazwisko
+     z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista
+     cudzych zakupów, czyli praca biura. */
+  { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta" },
+  /* Wypuszczenie MM mimo brakujących korekt (0.368.0). Wyjście awaryjne obok
+     bramki z 0.200.0 — hala nie ma prawa go nawet zobaczyć, bo decyzję bierze
+     na siebie człowiek przy biurku. */
+  { method: "POST" as const, url: "/api/obsluga/zwroty/kosz/mm-mimo-korekt" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -174,7 +182,7 @@ test("eksport do Excela zostawia ślad, bo wynosi loginy kupujących", async () 
   assert.equal(tekst.includes("List przewozowy"), false, "numeru listu nie wynosimy");
 });
 
-test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", async () => {
+test("zwroty mają trzydzieści trzy trasy POST, a trzy wychodzą do Allegro", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -325,14 +333,24 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
 
      Licznik rośnie o jeden, a zapisów nie przybywa ani jeden — i to jest cała
      treść tego zdania w uzasadnieniu. */
-  assert.equal(posty.length, 32,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dwóch`);
+  /* Trzydziesta trzecia (0.368.0): wypuszczenie MM koszyka MIMO brakujących
+     korekt. Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka,
+     nawet jeśli nie ma wszystkich ZW".
+
+     OSOBNA TRASA, nie flaga przy `zamknij` — i to jest cała treść tego zdania.
+     Flaga w ciele robi z wyjątku wariant zwykłej czynności: łatwo ją ustawić
+     przez pomyłkę i nie widać jej ani w tej liście, ani w logu żądań. Bramka
+     z 0.200.0 zostaje domyślna, bo MM zdejmuje towar z magazynu głównego,
+     a ze zwrotu wraca on tam dopiero po korekcie. Wypuszczenie wcześniej
+     zostawia ślad z numerami zwrotów, na które nie doczekano. */
+  assert.equal(posty.length, 33,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu trzech`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
-    "sklad", "kosz/towar"]) {
+    "sklad", "kosz/towar", "mm-mimo-korekt"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

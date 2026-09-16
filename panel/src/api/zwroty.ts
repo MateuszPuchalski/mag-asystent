@@ -323,6 +323,32 @@ export function useZamknijKosz() {
   });
 }
 
+/**
+ * Wypuszczenie MM koszyka MIMO brakujących korekt (0.368.0).
+ *
+ * Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
+ * jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna — to wyjście
+ * awaryjne obok niej.
+ *
+ * OSOBNY ADRES, nie flaga przy `zamknij`: flaga w ciele robi z wyjątku wariant
+ * zwykłej czynności, a tę decyzję ma być widać w kodzie i w logu.
+ *
+ * Odświeża to samo co domknięcie — dokument zmienia stan kosza i pozycji.
+ */
+export function useMmMimoKorekt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (koszId: number) =>
+      api<{ koszId: number; kod: string; queueId: number; pominietoKorekt: number }>(
+        "/api/obsluga/zwroty/kosz/mm-mimo-korekt",
+        { method: "POST", body: JSON.stringify({ koszId }) }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+    },
+  });
+}
+
 /** Jedna paczka z historii klienta — tyle, ile trzeba, żeby wskazać właściwą. */
 export interface PaczkaKlienta {
   orderId: string;

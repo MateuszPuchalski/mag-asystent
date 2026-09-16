@@ -4,7 +4,8 @@ import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
-  koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, zamknijKosz, zaznaczSkladnik,
+  koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
+  zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
 import { towarZKodu } from "../services/kosze.js";
@@ -420,6 +421,33 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
       try {
         return zamknijKosz(db(), id, kto());
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  /* WYPUSZCZENIE MM MIMO BRAKUJĄCYCH KOREKT (0.368.0). Decyzja właściciela:
+     „dodaj opcję sforsowania zamknięcia koszyka, nawet jeśli nie ma wszystkich
+     ZW". Bramka z 0.200.0 zostaje domyślna — to jest wyjście awaryjne obok
+     niej, nie jej zdjęcie.
+
+     OSOBNA TRASA, nie flaga przy `zamknij`. Flaga w ciele robi z wyjątku
+     wariant zwykłej czynności: jedno pole więcej w żądaniu, które łatwo
+     ustawić przez pomyłkę i którego nie widać w dzienniku żądań. Osobny adres
+     jest widoczny w kodzie panelu, w logu i w tej liście tras — a ta decyzja
+     ma być widoczna, bo płaci za nią magazyn.
+
+     Bramka roli ta sama co przy zamykaniu, bez `autoryzuj()`: to przesunięcie
+     między własnymi magazynami, jak zamknięcie koszyka. Nic nie opuszcza
+     firmy i nic nie rusza cudzych pieniędzy. */
+  app.post<{ Body: { koszId?: number } }>(
+    "/api/obsluga/zwroty/kosz/mm-mimo-korekt", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.koszId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Podaj koszyk, dla którego mam wystawić MM." });
+      }
+      try {
+        return wypuscMmMimoKorekt(db(), id, kto());
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 

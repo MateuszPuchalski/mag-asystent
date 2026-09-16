@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
-  wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza, dolozTowar, zdejmijTowar,
+  wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
+  dolozTowar, zdejmijTowar,
   MAX_SZTUK_RECZNIE,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
@@ -302,6 +303,99 @@ test("brakujące korekty wymieniają zwroty Z IMIENIA", () => {
 
   const braki = brakujaceKorekty(d, kosz.id);
   assert.deepEqual(braki, [{ zwrotId: a.id, numer: "ZW-7" }]);
+});
+
+/* ── Wypuszczenie MM mimo brakujących korekt (0.368.0) ──────────────────────
+   Decyzja właściciela: „dodaj opcję sforsowania zamknięcia koszyka, nawet
+   jeśli nie ma wszystkich ZW". Bramka z 0.200.0 zostaje domyślna — to wyjście
+   awaryjne obok niej, nie jej zdjęcie. Koszt jest realny i te testy go
+   utrwalają razem z drogą.                                                  */
+
+test("wymuszenie wypuszcza MM mimo braku korekt i zostawia ślad Z IMIONAMI", () => {
+  /* Gdy MM wywróci się na braku stanu, pierwsze pytanie brzmi „na czyją
+     korektę nie doczekaliśmy". Zdarzenie ma na nie odpowiedzieć bez
+     odtwarzania stanu bazy sprzed wypuszczenia. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  const b = zwrotZTowarem(d, [12], KTO, "z2");
+  d.prepare("UPDATE zwrot_klienta SET reference_number='ZW-7' WHERE id=?").run(a.id);
+  d.prepare("UPDATE zwrot_klienta SET reference_number='ZW-8' WHERE id=?").run(b.id);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  ocenPozycje(d, b.poz[0], "stan", 2, KTO);
+
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  const w = wypuscMmMimoKorekt(d, kosz.id, KTO);
+  assert.equal(w.pominietoKorekt, 2);
+  assert.ok(w.queueId > 0, "dokument wychodzi mimo braków");
+  assert.equal((d.prepare("SELECT status FROM kosz WHERE id=?")
+    .get(kosz.id) as { status: string }).status, "zamkniety",
+  "kosz otwarty zamyka się po drodze — jedna droga na oba stany");
+
+  const e = d.prepare("SELECT payload FROM events WHERE type='kosz_zwrotow_mm_mimo_korekt'")
+    .get() as { payload: string };
+  assert.deepEqual(JSON.parse(e.payload).zwroty, ["ZW-7", "ZW-8"]);
+});
+
+test("wymuszenie działa TAKŻE na koszu już zamkniętym, który czeka tygodniami", () => {
+  /* To jest przypadek z życia: kosz stoi zamknięty, korekty nie ma, a pudło
+     blokuje pracę hali. Osobna opcja przy zamykaniu nie pomogłaby wcale. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  assert.equal(zamknijKosz(d, kosz.id, KTO).queueId, null, "normalną drogą czeka");
+
+  const w = wypuscMmMimoKorekt(d, kosz.id, KTO);
+  assert.equal(w.pominietoKorekt, 1);
+  assert.equal(Number((d.prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'")
+    .get() as { n: number }).n), 1);
+});
+
+test("wymuszenie NIE robi drugiego dokumentu na jeden fizyczny kosz", () => {
+  /* Idempotencja stoi na `kosz.mm_queue_id`, tak samo jak przy automacie.
+     Dwa kliknięcia w jeden przycisk to scenariusz normalny, nie wypadek. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  wypuscMmMimoKorekt(d, kosz.id, KTO);
+  assert.throws(() => wypuscMmMimoKorekt(d, kosz.id, KTO), /ma już dokument MM/);
+  assert.equal(Number((d.prepare("SELECT COUNT(*) AS n FROM sfera_queue WHERE type='mm'")
+    .get() as { n: number }).n), 1);
+});
+
+test("wymuszenie odmawia koszowi pustemu i rozliczonemu poza aplikacją", () => {
+  /* Te odmowy nie są ostrożnością, tylko brakiem czegokolwiek do zrobienia:
+     dokument bez linii nie jest dokumentem, a towar kosza rozliczonego ręką
+     przesunął już ktoś inny. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const pusty = otwartyKosz(d, KTO);
+  assert.throws(() => wypuscMmMimoKorekt(d, pusty, KTO), /pusty/);
+
+  const a = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  d.prepare("UPDATE kosz SET powrot_poza_aplikacja=1 WHERE id=?").run(kosz.id);
+  assert.throws(() => wypuscMmMimoKorekt(d, kosz.id, KTO), /poza aplikacją/);
+});
+
+test("komplet korekt nie zmienia drogi — wymuszenie wypuszcza tak samo", () => {
+  /* Przycisk ma działać także wtedy, gdy braków nie ma: człowiek nie musi
+     najpierw sprawdzać, czy wolno mu go nacisnąć. Licznik pominiętych mówi
+     wtedy zero i to jest cała różnica. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const a = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, a.poz[0], "stan", 2, KTO);
+  skorygowany(d, a.id);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  const w = wypuscMmMimoKorekt(d, kosz.id, KTO);
+  assert.equal(w.pominietoKorekt, 0);
+  assert.ok(w.queueId > 0);
 });
 
 /* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ─────────────────────
