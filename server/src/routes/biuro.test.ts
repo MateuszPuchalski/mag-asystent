@@ -400,6 +400,33 @@ test("panel nie woła funkcji, której nie ma", () => {
 
 });
 
+test("panel wstaje z zapamiętanego tokenu i sam napędza cykl", () => {
+  /* Strażnik odwrotnej strony niż test wyżej. Tamten pilnuje funkcji WOŁANEJ,
+     a nieistniejącej; ta blizna była lustrzana — funkcja istniała, a wywołanie
+     zniknęło. 0.138.0 skasowało obsługę klienta razem z ogonem pliku, w którym
+     stał rozruch strony, i nikt tego nie zauważył przez trzydzieści kilka wydań.
+
+     Objaw pierwszy: każde odświeżenie wyglądało na wylogowanie. Token leżał
+     ważny w localStorage, ale panel odsłania `start()`, a `start()` wołało
+     wyłącznie logowanie. Objaw drugi: cykl 30 s nie chodził w ogóle, więc
+     lista dostaw i ikona zdrowia stały do ręcznego kliknięcia.
+
+     Dlatego sprawdzamy WYWOŁANIA, nie definicje: obie funkcje były na miejscu
+     przez cały ten czas. */
+  const html = fs.readFileSync(
+    path.join(import.meta.dirname, "..", "web", "biuro.html"),
+    "utf8"
+  );
+  const js = kodPanelu(html);
+
+  assert.match(js, /if\s*\(\s*token\s*\)\s*start\(\)/,
+    "panel nie wstaje z zapamiętanego tokenu — po odświeżeniu człowiek widzi " +
+    "formularz logowania nad wciąż ważną sesją");
+  assert.match(js, /setInterval\([\s\S]{0,120}?odswiez\(\)/,
+    "nic nie napędza cyklu 30 s — `odswiez` bez wołającego znaczy listę dostaw " +
+    "i ikonę zdrowia stojące do ręcznego kliknięcia");
+});
+
 test("lista dostaw sygnalizuje wyjątki", () => {
   /* Pasek postępu tego NIE powie i powiedzieć nie może: wyjątek liczy się jako
      pozycja domknięta (D8). Bez osobnego sygnału dostawa z trzema reklamacjami
