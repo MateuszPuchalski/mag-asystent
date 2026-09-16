@@ -3566,6 +3566,37 @@ przepisuje pozycje zamówienia do zwrotu, więc jest co ocenić i co wycenić.
 Bez niego wiersz zostaje pustym uchwytem na paczkę — lepszym niż kartka
 przy monitorze, ale pieniędzy z niego nie policzy.
 
+**Login kupującego jest trzecim uchwytem (0.365.0).** Zgłoszenie właściciela:
+„nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
+szukania zna login od 0.337.0 i mówi to wprost — ale ta paczka brała go
+wyłącznie z zamówienia, a numeru zamówienia przy nieodebranej najczęściej nie
+ma. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
+
+Formularz pyta o login pod numerem zamówienia, czyli w kolejności od uchwytu
+najpewniejszego do najsłabszego: naklejka, numer, człowiek. Wpisany bije ten
+z zamówienia, bo pochodzi od kogoś patrzącego na sprawę. Gdy go nie wpisano,
+bierze się z zamówienia — i ląduje w KOLUMNIE zwrotu, a nie w złączeniu przy
+odczycie. Paczka ma zostać odnajdywalna także wtedy, gdy zamówienie wypadnie
+z okna synchronizacji.
+
+Dziennik notuje sam fakt (`zLoginem`), nie login. Dana osobowa ma jedno
+miejsce, a nie dwa do pilnowania przy tej samej polityce.
+
+**Z loginu wybiera się PACZKĘ.** Druga połowa tego samego zgłoszenia: „kupujący
+może mieć wiele paczek kupionych w historii sklepu". Enter w polu loginu
+pokazuje zakupy tego klienta — numer, datę, kwotę i zawartość w jednej
+linijce. Kliknięcie wpisuje numer do pola zamówienia, więc operator widzi, co
+pojedzie na serwer.
+
+Pytamy po dopisaniu loginu, nie po każdym znaku: zapytanie na znak to
+dwanaście odczytów na jeden login. Lista czyta wyłącznie to, co synchronizacja
+już przyniosła; pytanie do Allegro ma własny przycisk i własny limit.
+
+Paczka z zarejestrowanym już zwrotem jest OZNACZONA, ale wybieralna. Jedno
+zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać drugiej po
+zwrocie pierwszej — blokada kazałaby wtedy kłamać. Login dopasowuje się bez
+wielkości liter, ale w całości: fragment wskazywałby cudze zakupy.
+
 **Numer listu przewozowego stoi TU w modelu pracy** — świadomy wyjątek od
 polityki 0.163.0. Przy zwrocie z Allegro numer szuka się w kopii odpowiedzi,
 a paczka nieodebrana żadnej kopii nie ma: to jedyny uchwyt, po którym da się
@@ -3574,6 +3605,42 @@ wychodzi w eksporcie. Politykę opisuje `docs/obsluga-klienta.md`.
 
 Odnośnika do Allegro taki wiersz nie dostaje. Prowadziłby na stronę zwrotu,
 którego po tamtej stronie nie ma.
+
+### 25a.13a. Towar dołożony do koszyka ręką (0.365.0)
+
+Decyzja właściciela: „dodaj możliwość dodawania produktów do koszyka zwrotowego
+poprzez zeskanowanie produktu lub wybranie go z kartoteki", a zaraz po niej
+granica: „tylko z poziomu obsługi zwrotów, jak jeszcze nie jest zamknięty".
+
+To poszerzenie decyzji nr 3 z 3 września, nie jej cofnięcie. Ocena „na stan"
+dalej dokłada sama i osobnej trasy na to nie ma. Ale pudło bywa pełniejsze niż
+zgłoszenie: paczka nieodebrana bez numeru zamówienia nie ma ani jednej pozycji,
+klient dokłada rzecz, której nie zgłosił, a zwrot bywa u nas szybciej niż jego
+kopia z Allegro. We wszystkich trzech wypadkach jedyną drogą towaru z biurka na
+półkę było czekanie.
+
+**Stoi przy OTWARTYM ZWROCIE, pod pozycjami.** Pasek koszyka pokazuje się
+dopiero z zawartością, więc pierwszej sztuki nie dałoby się tam zeskanować.
+Poza tym operator stoi wtedy nad otwartym kartonem konkretnej paczki — ekran
+idzie za czynnością fizyczną.
+
+**Jedno pole na skan i na szukanie.** Kod z czytnika rozpoznaje ta sama
+drabinka co na kolektorze: EAN, alias EAN, symbol. Trafienie jest wtedy jedno
+i Enter dokłada je bez klikania w listę. Fraza szuka po kartotece, z tą samą
+furtką na literówki co karta towaru; przy kilku wynikach Enter nie zgaduje.
+
+**Drugi skan tego samego towaru dolicza sztukę**, zamiast zakładać drugi
+wiersz. Magazynier liczy sztuki skanowaniem — to ten sam ruch co przy dostawie.
+
+**Taki wiersz nie niesie pieniędzy** i ekran mówi to wprost. Nie ma za sobą
+zwrotu, więc nie ma ceny, nie wchodzi do rozliczenia z klientem i nie zatrzymuje
+bramki korekt — ta pyta po `zwrot_pozycja_id`. Przesuwa wyłącznie TOWAR: na MM
+wchodzi jak każdy inny wiersz i tą samą drogą wraca z bufora.
+
+**Zdjąć da się wyłącznie wiersz dołożony ręką i wyłącznie z koszyka otwartego.**
+Wiersz z oceny schodzi cofnięciem oceny: ocena jest faktem o towarze, a
+kasowanie jej z drugiej strony ekranu rozjechałoby kartę zwrotu z koszykiem.
+Koszyk zamknięty odjechał od biurka i jego zawartość opisuje to, co pojechało.
 
 ### 25a.14. Dokument sprzedaży z Subiekta (0.174.0)
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Koszyk } from "./Koszyk";
 import type { KoszZwrotow } from "../api/typy";
@@ -27,15 +27,18 @@ vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   useKosz: () => ({ data: odpowiedz }),
   useZamknijKosz: () => ({ mutate: zamknij, isPending: false, error: null }),
+  useZdejmijTowar: () => ({ mutate: zdejmijTowar, isPending: false, error: null }),
 }));
 
 const zamknij = vi.fn();
+const zdejmijTowar = vi.fn();
 
 const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
   rodzaj: "zwroty",
   id: 3, kod: "Z-7", pozycji: 2, sztuk: 5, otwartyOd: "2026-09-03T08:00:00Z",
-  pozycje: [{ symbol: "SEK-01", nazwa: "Sekator", ilosc: 2 },
-    { symbol: "LOP-02", nazwa: "Łopata", ilosc: 3 }],
+  pozycje: [{ id: 91, symbol: "SEK-01", nazwa: "Sekator", ilosc: 2, zeZwrotu: true },
+    /* Wiersz dołożony ręką (0.365.0) — ma własną drogę wyjścia. */
+    { id: 92, symbol: "LOP-02", nazwa: "Łopata", ilosc: 3, zeZwrotu: false }],
   ...n,
 });
 
@@ -70,7 +73,11 @@ describe("Koszyk zwrotów", () => {
   it("NIE MA przycisku dodawania — dokłada ocena „na stan\"", () => {
     /* Punkt 5 dekalogu i sedno tej zmiany: naciśnięcie, które operator i tak
        wykonuje przy towarze, JEST dołożeniem do MM. Osobny przycisk kazałby
-       powiedzieć dwa razy to samo. */
+       powiedzieć dwa razy to samo.
+
+       0.365.0 tego nie rusza. Dokładanie towaru spoza zgłoszenia ma własne
+       miejsce — przy OTWARTYM ZWROCIE, gdzie stoi operator z kartonem — a nie
+       w tym pasku, który mówi, co już w pudle leży. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
     expect(screen.queryByRole("button", { name: /dodaj|dołóż/i })).toBeNull();
@@ -110,5 +117,29 @@ describe("Koszyk zwrotów", () => {
     pokaz();
     expect(screen.getByText(/czeka na korekty/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
+  });
+
+  it("wiersz dołożony ręką ma krzyżyk, wiersz z oceny NIE", () => {
+    /* Pomyłka przy skanie nie ma oceny, którą dałoby się cofnąć — więc musi
+       mieć własną drogę wyjścia. Wiersz z oceny tej drogi mieć nie może:
+       kasowanie cudzej oceny z drugiej strony ekranu rozjechałoby kartę
+       zwrotu z koszykiem. */
+    odpowiedz.kosze = [KOSZ()];
+    pokaz();
+    expect(screen.queryByRole("button", { name: /Zdejmij SEK-01/ })).toBeNull();
+    const krzyzyk = screen.getByRole("button", { name: /Zdejmij LOP-02 z koszyka/ });
+    fireEvent.click(krzyzyk);
+    expect(zdejmijTowar).toHaveBeenCalledWith(92);
+  });
+
+  it("koszyk bez wierszy dołożonych ręką nie pisze o nich ani słowa", () => {
+    /* Etykieta „dołożone ręką" nad pustką byłaby napisem o braku — punkt 2
+       dekalogu każe pokazywać to, co potrzebne teraz. */
+    odpowiedz.kosze = [KOSZ({
+      pozycje: [{ id: 91, symbol: "SEK-01", nazwa: "Sekator", ilosc: 2, zeZwrotu: true }],
+      pozycji: 1, sztuk: 2,
+    })];
+    pokaz();
+    expect(screen.queryByText(/dołożone ręką/)).toBeNull();
   });
 });

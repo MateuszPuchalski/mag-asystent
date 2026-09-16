@@ -5,7 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
-  wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza,
+  wypuscGotoweKoszyki, zamknijKosz, zdejmijZKosza, dolozTowar, zdejmijTowar,
+  MAX_SZTUK_RECZNIE,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 
@@ -301,4 +302,101 @@ test("brakujące korekty wymieniają zwroty Z IMIENIA", () => {
 
   const braki = brakujaceKorekty(d, kosz.id);
   assert.deepEqual(braki, [{ zwrotId: a.id, numer: "ZW-7" }]);
+});
+
+/* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ─────────────────────
+   Zgłoszenie właściciela, a zaraz po nim jego granica: „tylko z poziomu
+   obsługi zwrotów, jak jeszcze nie jest zamknięty". Pudło bywa pełniejsze niż
+   zgłoszenie — paczka nieodebrana bez numeru zamówienia nie ma ani jednej
+   pozycji, a towar leży na biurku.                                          */
+
+/** Kartoteka, którą można zeskanować. */
+function kartoteka(d: Db, twId: number, symbol = `SYM-${twId}`) {
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)")
+    .run(twId, symbol, `Towar ${twId}`);
+}
+
+test("skan dokłada towar do koszyka, a drugi skan DOLICZA sztukę", () => {
+  /* Magazynier liczy sztuki skanowaniem — to ten sam ruch co przy dostawie.
+     Osobne wiersze kazałyby potem sumować je wzrokiem. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 21, "SEK-1");
+
+  const raz = dolozTowar(d, 21, 1, KTO);
+  assert.equal(raz.symbol, "SEK-1");
+  assert.equal(raz.ilosc, 1);
+  const dwa = dolozTowar(d, 21, 1, KTO);
+  assert.equal(dwa.pozycjaId, raz.pozycjaId, "ten sam wiersz, nie drugi");
+  assert.equal(dwa.ilosc, 2);
+
+  const stan = stanOtwartegoKosza(d, KTO)!;
+  assert.equal(stan.pozycji, 1);
+  assert.equal(stan.sztuk, 2);
+  assert.equal(stan.pozycje[0].zeZwrotu, false, "ekran ma wiedzieć, którą drogą to weszło");
+});
+
+test("dołożony towar jedzie na MM i NIE trzyma go bramką korekt", () => {
+  /* Wiersz bez zwrotu nie ma ceny ani zgłoszenia, więc nie wnosi nic do
+     rozliczenia z klientem. Przesuwa wyłącznie towar — i ma pojechać nawet
+     wtedy, gdy w pudle nie ma ani jednej pozycji ze zwrotu. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 22);
+  dolozTowar(d, 22, 3, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+
+  assert.deepEqual(brakujaceKorekty(d, kosz.id), [], "nie ma zwrotu, więc nie ma na co czekać");
+  const w = zamknijKosz(d, kosz.id, KTO);
+  assert.equal(w.brakujeKorekt, 0);
+  assert.ok(w.queueId, "MM wychodzi od razu");
+  const zadanie = d.prepare("SELECT payload FROM sfera_queue WHERE id=?").get(w.queueId) as
+    { payload: string };
+  assert.deepEqual((JSON.parse(zadanie.payload) as { items: Array<{ twId: number; qty: number }> })
+    .items, [{ twId: 22, qty: 3 }]);
+});
+
+test("zdejmowanie dotyczy WYŁĄCZNIE wiersza dołożonego ręką", () => {
+  /* Wiersz ze zwrotu schodzi cofnięciem oceny: ocena jest faktem o towarze,
+     a kasowanie jej z drugiej strony rozjechałoby kartę zwrotu z koszykiem. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { poz } = zwrotZTowarem(d, [31], KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  kartoteka(d, 32);
+  const dolozony = dolozTowar(d, 32, 1, KTO);
+
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  const zeZwrotu = kosz.pozycje.find((p) => p.zeZwrotu)!;
+  assert.throws(() => zdejmijTowar(d, zeZwrotu.id, KTO), /cofnięciem oceny/);
+
+  zdejmijTowar(d, dolozony.pozycjaId, KTO);
+  assert.equal(stanOtwartegoKosza(d, KTO)!.pozycji, 1, "została pozycja ze zwrotu");
+});
+
+test("koszyk ZAMKNIĘTY nie przyjmuje i nie oddaje — pudło odjechało", () => {
+  /* Granica z decyzji właściciela: „tylko (…) jak jeszcze nie jest zamknięty".
+     Węziej niż przy pozycjach ze zwrotu, bo tamta droga poprawia ocenę wydaną
+     przy biurku, a ta rusza zawartość pudła. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 41);
+  const dolozony = dolozTowar(d, 41, 1, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+
+  assert.throws(() => zdejmijTowar(d, dolozony.pozycjaId, KTO), /jest już zamkniety/);
+  /* Dołożenie po zamknięciu zakłada NOWY koszyk — przy biurku stoi nowe pudło,
+     a nie dosypuje się do tego, które pojechało. */
+  const nowy = dolozTowar(d, 41, 1, KTO);
+  assert.notEqual(nowy.koszId, kosz.id);
+});
+
+test("odmowy mówią, co jest nie tak: sztuki i nieznana kartoteka", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  kartoteka(d, 51);
+  assert.throws(() => dolozTowar(d, 51, 0, KTO), /ile sztuk/);
+  assert.throws(() => dolozTowar(d, 51, MAX_SZTUK_RECZNIE + 1, KTO), /Najwyżej/);
+  assert.throws(() => dolozTowar(d, 999_999, 1, KTO), /Nie znam takiej kartoteki/);
 });

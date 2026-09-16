@@ -67,6 +67,72 @@ kosztowała jeden kanał w dwóch własnościach naraz — akurat ten, w którym
 cisza zatrzymuje dostawę.
 
 
+## 0.365.0 — 16 września 2026
+
+**Paczkę nieodebraną znajdziesz po loginie klienta.** Zgłoszenie właściciela:
+„nieodebrane paczki powinienem móc wyszukiwać po loginie klienta". Pole
+szukania w panelu zna login od 0.337.0 i obiecuje go w podpowiedzi — ale
+akurat ta paczka brała go wyłącznie z zamówienia. Numeru zamówienia przy
+nieodebranej najczęściej nie ma: karton wraca sam, bez zgłoszenia i bez kopii
+z Allegro, a jedyne, co operator ma pod ręką, to naklejka i wiadomość od
+klienta. Szukanie po loginie milczało wtedy tak samo, jakby paczki nie było.
+
+- **Formularz rejestracji pyta o login kupującego**, pod numerem zamówienia.
+  Oba pola zostają opcjonalne, a ekran mówi, co daje każde z nich: numer
+  przepisuje pozycje, login pozwala wrócić do paczki.
+- **Wpisany login bije ten z zamówienia** — pochodzi od człowieka patrzącego
+  na sprawę. Bez wpisu bierze się z zamówienia, jeśli numer podano.
+- **Login ląduje w kolumnie zwrotu**, a nie w złączeniu przy odczycie. Paczka
+  zostaje odnajdywalna także wtedy, gdy zamówienie wypadnie z okna
+  synchronizacji.
+- **Dziennik notuje sam fakt, nie login.** Dana osobowa ma jedno miejsce.
+
+**Z loginu wybierasz PACZKĘ.** Druga połowa tego samego zgłoszenia: „kupujący
+może mieć wiele paczek kupionych w historii sklepu, więc muszę mieć możliwość
+wybrania paczki". Numer zamówienia trzeba było dotąd wyklikać w panelu Allegro
+i przepisać ręcznie — dwadzieścia znaków z drugiego ekranu, do pola, które nic
+nie podpowiadało.
+
+- **Enter w polu loginu pokazuje zakupy tego klienta** — numer, data, kwota
+  i zawartość w jednej linijce. Pytamy po dopisaniu loginu, nie po każdym
+  znaku: zapytanie na znak to dwanaście odczytów na jeden login.
+- **Kliknięcie wpisuje numer do pola zamówienia**, zamiast trzymać go osobno.
+  Operator widzi, co pojedzie na serwer.
+- **Paczka z zarejestrowanym już zwrotem jest oznaczona, ale wybieralna.**
+  Jedno zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać drugiej
+  po zwrocie pierwszej — blokada kazałaby wtedy kłamać.
+- **Login dopasowuje się bez wielkości liter, ale w całości.** Fragment
+  wskazywałby cudze zakupy, a z tego ekranu wychodzi się z czyimś numerem
+  zamówienia w ręku.
+- Lista czyta WYŁĄCZNIE to, co synchronizacja już przyniosła. Pytanie do
+  Allegro ma własny przycisk i własny limit.
+
+**Towar wchodzi do koszyka zwrotów skanem albo z kartoteki.** Trzecie
+zgłoszenie tego dnia, z granicą wypowiedzianą zaraz po nim: „tylko z poziomu
+obsługi zwrotów, jak jeszcze nie jest zamknięty". Pudło bywa pełniejsze niż
+zgłoszenie — paczka nieodebrana bez numeru zamówienia nie ma ani jednej
+pozycji, a towar leży na biurku. Jedyną drogą z biurka na półkę było czekanie.
+
+- **Pole przy otwartym zwrocie, pod pozycjami**, jedno na skan i na szukanie.
+  Kod z czytnika rozpoznaje ta sama drabinka co na kolektorze (EAN, alias,
+  symbol) i wtedy Enter dokłada bez klikania w listę. Przy kilku wynikach
+  Enter nie zgaduje.
+- **Drugi skan tego samego towaru dolicza sztukę**, zamiast zakładać drugi
+  wiersz — magazynier liczy sztuki skanowaniem.
+- **Taki wiersz nie niesie pieniędzy** i ekran mówi to wprost. Nie ma za sobą
+  zwrotu, więc nie wchodzi do rozliczenia i nie zatrzymuje bramki korekt.
+  Przesuwa wyłącznie towar.
+- **Zdjąć da się tylko wiersz dołożony ręką i tylko z koszyka otwartego.**
+  Wiersz z oceny schodzi cofnięciem oceny; pudło zamknięte opisuje to, co
+  pojechało.
+- Ocena „na stan" dokłada dalej sama — decyzja nr 3 z 3 września zostaje.
+
+Szukanie nie wymagało zmiany: filtr kolejki porównuje login od 0.337.0. Nic
+nie trzeba ustawiać, wystarczy nowy build panelu.
+
+Numer 0.363.0 zostaje pusty i to nie jest pomyłka. Wydanie obok ustąpiło go
+temu PR-owi, a potem weszło na `main` pierwsze — wersja może iść tylko
+w górę, więc ta zmiana bierze 0.365.0.
 ## 0.364.0 — 16 września 2026
 
 **Próg „za późno" da się WYMIERZYĆ zamiast ogłaszać.** Poprzednie wydanie

@@ -1,11 +1,13 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sesjaZadania } from "../context.js";
+import { sesjaZadania, subiekt } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   koszykiCzekajaceNaKorekty, otwarteKoszyki, skladDoZaznaczenia, zamknijKosz, zaznaczSkladnik,
+  dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
+import { towarZKodu } from "../services/kosze.js";
 import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, csvZwrotow, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -25,6 +27,7 @@ import {
   zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "../services/zwrot-pieniedzy.js";
 import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
@@ -333,6 +336,80 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     };
   });
 
+  /* ── Towar dołożony ręką: skan albo kartoteka (0.365.0) ──────────────────
+     Zgłoszenie właściciela: „dodaj możliwość dodawania produktów do koszyka
+     zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki".
+
+     JEDNA TRASA NA OBIE DROGI, bo to jedno pytanie: „który to towar". Kod
+     z czytnika rozpoznaje ta sama drabinka co na kolektorze (EAN, alias EAN,
+     symbol) i wtedy odpowiedź jest JEDNA i oznaczona `dokladne`. Gdy kod nie
+     pasuje do niczego, pytanie zamienia się w szukanie po kartotece — z tą
+     samą furtką na literówki, z której korzysta karta towaru.
+
+     Odczyt bez zapisu: dziennik dostaje dopiero dołożenie. Zapisywanie każdej
+     wpisanej litery robiłoby z pola szukania rejestr ruchów operatora. */
+  app.get<{ Querystring: { q?: string } }>(
+    "/api/obsluga/zwroty/kosz/towary", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const q = String(req.query?.q ?? "").trim();
+      if (!q) return { towary: [], dokladne: false, przyblizone: false };
+
+      const zeSkanu = towarZKodu(q);
+      if (zeSkanu) {
+        return {
+          /* Stan przy trafieniu ze skanu zostaje `null` i to nie jest brak
+             danych: kod z czytnika ROZSTRZYGA, który to towar, a liczba na
+             magazynie pomaga dopiero przy wybieraniu z listy. */
+          towary: [{
+            twId: zeSkanu.tw_id, symbol: zeSkanu.symbol, nazwa: zeSkanu.nazwa,
+            ean: zeSkanu.ean || null, stanMag: null,
+          }],
+          dokladne: true, przyblizone: false,
+        };
+      }
+      const { wyniki, przyblizone } = subiekt.szukajZFurtka(q, 20);
+      return {
+        towary: wyniki.map((t) => ({
+          twId: t.id, symbol: t.sym, nazwa: t.name, ean: t.ean || null, stanMag: t.mag,
+        })),
+        dokladne: false, przyblizone,
+      };
+    });
+
+  app.post<{ Body: { twId?: number; ilosc?: number; rodzaj?: string } }>(
+    "/api/obsluga/zwroty/kosz/towar", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const twId = Number(req.body?.twId);
+      if (!Number.isFinite(twId) || twId <= 0) {
+        return reply.code(400).send({ error: "Wskaż towar — ze skanu albo z listy." });
+      }
+      /* Rodzaj koszyka z ciała, bo operator ma przy biurku dwa pudła: zwroty
+         i odpad. Wartość spoza pary jest odmową, nie cichym „zwroty": złom
+         wpuszczony na regał zwrotów wróciłby do sprzedaży. */
+      const rodzaj = req.body?.rodzaj ?? "zwroty";
+      if (rodzaj !== "zwroty" && rodzaj !== "odpad") {
+        return reply.code(400).send({ error: "Koszyk jest albo zwrotów, albo odpadu." });
+      }
+      try {
+        return dolozTowar(db(), twId, Number(req.body?.ilosc ?? 1), kto(), new Date(), rodzaj);
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  app.post<{ Body: { pozycjaId?: number } }>(
+    "/api/obsluga/zwroty/kosz/towar/zdejmij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.pozycjaId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Wskaż pozycję, którą mam zdjąć." });
+      }
+      try {
+        return zdejmijTowar(db(), id, kto());
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
   app.post<{ Body: { koszId?: number } }>(
     "/api/obsluga/zwroty/kosz/zamknij", async (req, reply) => {
       const nie = odmowa(reply);
@@ -346,11 +423,35 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
+  /* Co ten klient u nas kupił (0.365.0). Odpowiedź na zgłoszenie właściciela:
+     „kupujący może mieć wiele paczek kupionych w historii sklepu, więc muszę
+     mieć możliwość wybrania paczki". Rejestracja nieodebranej pytała o numer
+     zamówienia jak o rzecz oczywistą, a to jedyna rzecz, której przy takiej
+     paczce nie ma pod ręką.
+
+     ODCZYT, nie dociąganie: trasa czyta wyłącznie to, co synchronizacja już
+     przyniosła. Pytanie do Allegro ma tu własny przycisk i własny limit, a ta
+     lista odświeża się przy każdym znaku w polu loginu.
+
+     Konto bierzemy PIERWSZE, tak samo jak rejestracja niżej — dwie różne
+     zasady dawałyby listę z jednego konta i wiersz zapisany na drugim. */
+  app.get<{ Querystring: { login?: string } }>(
+    "/api/obsluga/zwroty/paczki-klienta", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const konto = db().prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
+        .get() as { id: number } | undefined;
+      if (!konto) return { paczki: [] };
+      return { paczki: paczkiKlienta(konto.id, String(req.query?.login ?? ""), db()) };
+    });
+
   /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,
      więc wiersz zakłada BIURO — i to jest jedyna trasa zwrotów tworząca zwrot
      od zera. Pieniądze i tak trzeba oddać, więc idzie tą samą kolejką, ale
      `zrodlo` mówi wprost, że to nie zgłoszenie klienta. */
-  app.post<{ Body: { waybill?: string; orderId?: string | null; notatka?: string | null } }>(
+  app.post<{ Body: {
+    waybill?: string; orderId?: string | null; notatka?: string | null; login?: string | null;
+  } }>(
     "/api/obsluga/zwroty/nieodebrana", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -359,6 +460,11 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           waybill: String(req.body?.waybill ?? ""),
           orderId: req.body?.orderId ?? null,
           notatka: req.body?.notatka ?? null,
+          /* Login kupującego (0.365.0) — przy nieodebranej to często jedyny
+             uchwyt, po którym biuro wróci do tej paczki. Serwer przycina go
+             i chowa w kolumnie zwrotu; walidacji kształtu nie ma, bo Allegro
+             nie zamyka listy dopuszczalnych loginów. */
+          login: req.body?.login ?? null,
         }, kto());
       } catch (e) { return konflikt(reply, e); }
     });

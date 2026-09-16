@@ -15,6 +15,7 @@ import {
   stempelProwadziZwrot, poczatekTerminu,
 } from "./zwroty.js";
 import { zamknijKosz } from "./kosze-zwrotow.js";
+import { paczkiKlienta } from "./zamowienia.js";
 
 /* ── Strażnicy kolejki zwrotów (0.150.0) ─────────────────────────────────────
    Ekran ma zjadać klikanie, a nie je mnożyć. Trzy rzeczy to gwarantują
@@ -1441,6 +1442,105 @@ test("nieodebrana paczka wchodzi w kolejkę, ale nie udaje zgłoszenia klienta",
      ma i nie będzie: przewoźnika nie znamy, a Allegro tego zwrotu nie zna. */
   assert.equal(z.dostarczonoAt, z.paczkaAt,
     "nieodebrana leży u nas w chwili rejestracji");
+});
+
+test("nieodebrana zapamiętuje LOGIN klienta — to po nim biuro do niej wraca", () => {
+  /* Zgłoszenie właściciela: „nieodebrane paczki powinienem móc wyszukiwać po
+     loginie klienta". Pole szukania w panelu zna login od 0.337.0 i mówi to
+     wprost, ale TEJ paczce login brał się wyłącznie z zamówienia — a numeru
+     zamówienia przy nieodebranej najczęściej nie ma. Karton wraca sam, bez
+     zgłoszenia i bez kopii z Allegro. */
+  const d = stanowisko();
+  const w = zarejestrujNieodebrana(d, { waybill: "PACZ-1", login: "  jan_kowalski  " }, KTO);
+
+  const z = listaZwrotow(d, TERAZ).find((x) => x.id === w.zwrotId)!;
+  assert.equal(z.kupujacyLogin, "jan_kowalski", "spacje ze schowka nie wchodzą do bazy");
+  assert.equal(z.orderId, null, "login wystarcza sam — bez numeru zamówienia");
+});
+
+test("login bez wpisania bierze się z zamówienia, ale zostaje w KOLUMNIE zwrotu", () => {
+  /* Zapis do kolumny, a nie złączenie przy odczycie: zwrot ma być odnajdywalny
+     także wtedy, gdy zamówienie wypadnie z okna synchronizacji. */
+  const d = stanowisko();
+  zamowienie(d, "ord-log", [{ offerId: "1", nazwa: "Sekator", sku: "SEK-1", cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='ania_z_allegro' WHERE external_id=?")
+    .run("ord-log");
+
+  const w = zarejestrujNieodebrana(d, { waybill: "PACZ-2", orderId: "ord-log" }, KTO);
+  assert.equal(w.pozycji, 1, "numer zamówienia dalej przepisuje pozycje");
+  assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
+    .get(w.zwrotId) as { l: string | null }).l, "ania_z_allegro");
+
+  /* Wpisany bije ten z zamówienia: pochodzi od człowieka patrzącego na sprawę. */
+  const drugi = zarejestrujNieodebrana(d,
+    { waybill: "PACZ-3", orderId: "ord-log", login: "ktos_inny" }, KTO);
+  assert.equal((d.prepare("SELECT kupujacy_login AS l FROM zwrot_klienta WHERE id=?")
+    .get(drugi.zwrotId) as { l: string | null }).l, "ktos_inny");
+});
+
+test("dziennik notuje FAKT loginu, nie sam login", () => {
+  /* Zdarzenie odpowiada na pytanie „skąd ten wiersz". Dana osobowa leży
+     w kolumnie zwrotu i stamtąd się ją czyta — kopia w dzienniku byłaby
+     drugim miejscem do pilnowania przy tej samej polityce danych. */
+  const d = stanowisko();
+  zarejestrujNieodebrana(d, { waybill: "PACZ-4", login: "jan_kowalski" }, KTO);
+  const e = d.prepare("SELECT payload FROM events WHERE type='zwrot_nieodebrana'")
+    .get() as { payload: string };
+  assert.equal(JSON.parse(e.payload).zLoginem, true);
+  assert.doesNotMatch(e.payload, /jan_kowalski/);
+});
+
+/* ── Wybór paczki z historii klienta (0.365.0) ──────────────────────────────
+   Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+   w historii sklepu, więc muszę mieć możliwość wybrania paczki". Sam login
+   mówi, CZYJA to paczka; nie mówi, KTÓRA.                                   */
+
+/** Zamówienie z loginem i datą — historia, w której trzeba wskazać jedną paczkę. */
+function zakup(d: Db, ext: string, login: string, kupiono: string, nazwa = "Sekator") {
+  zamowienie(d, ext, [{ offerId: `of-${ext}`, nazwa, sku: null, cena: 4999 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login=?, kupiono_at=? WHERE external_id=?")
+    .run(login, kupiono, ext);
+}
+
+test("paczki klienta: od najnowszej, z zawartością i ostrzeżeniem o zwrocie", () => {
+  const d = stanowisko();
+  zakup(d, "ord-stary", "jan_kowalski", "2026-06-01T10:00:00Z", "Wąż 20 m");
+  zakup(d, "ord-nowy", "jan_kowalski", "2026-08-20T10:00:00Z");
+  zakup(d, "ord-obcy", "ktos_inny", "2026-08-25T10:00:00Z");
+  /* Zwrot na starszym zamówieniu — operator ma to zobaczyć PRZED wyborem. */
+  zarejestrujNieodebrana(d, { waybill: "PACZ-0", orderId: "ord-stary" }, KTO);
+
+  const paczki = paczkiKlienta(1, "jan_kowalski", d);
+  assert.deepEqual(paczki.map((p) => p.orderId), ["ord-nowy", "ord-stary"],
+    "cudze zakupy nie wchodzą, najnowsze pierwsze");
+  assert.equal(paczki[0].zawartosc, "Sekator ×1");
+  assert.equal(paczki[0].pozycji, 1);
+  assert.equal(paczki[0].maZwrot, false);
+  assert.equal(paczki[1].maZwrot, true, "ostrzeżenie, nie blokada");
+});
+
+test("login porównuje się BEZ wielkości liter, ale w całości", () => {
+  /* Login przyjeżdża przeklejony z wiadomości, a Allegro pokazuje go raz tak,
+     raz inaczej. Fragment nie wystarcza: z tego ekranu wychodzi się z czyimś
+     numerem zamówienia w ręku. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "Jan_Kowalski", "2026-08-20T10:00:00Z");
+  assert.equal(paczkiKlienta(1, "jan_kowalski", d).length, 1);
+  assert.equal(paczkiKlienta(1, "  JAN_KOWALSKI ", d).length, 1, "spacje ze schowka też nie");
+  assert.equal(paczkiKlienta(1, "jan", d).length, 0, "fragment loginu to cudzy zakup");
+  assert.equal(paczkiKlienta(1, "   ", d).length, 0, "pusty login nie pyta o wszystkich");
+});
+
+test("zamówienie bez daty zakupu stoi na końcu, nie na górze", () => {
+  /* Wiersz bez `kupiono_at` jest niedokończonym zapisem synchronizacji.
+     Sortowanie malejąco po NULL-u wystawiłoby go jako najświeższy zakup. */
+  const d = stanowisko();
+  zakup(d, "ord-z-data", "jan_kowalski", "2026-08-20T10:00:00Z");
+  zamowienie(d, "ord-bez-daty", [{ offerId: "of-x", nazwa: "Nożyce", sku: null, cena: 100 }]);
+  d.prepare("UPDATE zamowienie_klienta SET kupujacy_login='jan_kowalski' WHERE external_id=?")
+    .run("ord-bez-daty");
+  assert.deepEqual(paczkiKlienta(1, "jan_kowalski", d).map((p) => p.orderId),
+    ["ord-z-data", "ord-bez-daty"]);
 });
 
 test("migracja domyka datę powrotu paczkom nieodebranym sprzed poprawki", () => {

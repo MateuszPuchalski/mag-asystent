@@ -158,3 +158,108 @@ export function zamowienieRozmowy(
     return oferta === "" ? "nieznane" : stanZdjeciaOferty(obrazy.get(oferta));
   });
 }
+
+/* ── Paczki jednego klienta: co on w ogóle u nas kupił (0.365.0) ─────────────
+   Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+   w historii sklepu, więc muszę mieć możliwość wybrania paczki".
+
+   Rejestracja paczki nieodebranej pytała o numer zamówienia jak o rzecz
+   OCZYWISTĄ — a przy nieodebranej to jedyna rzecz, której operator nie ma.
+   Karton wraca bez zgłoszenia i bez kopii z Allegro; pod ręką jest naklejka
+   i login z wiadomości. Numer zamówienia trzeba było więc wyklikać w panelu
+   Allegro i przepisać ręcznie, do pola, które nic nie podpowiada.
+
+   Ta funkcja odpowiada na pytanie zadawane w tamtym momencie: „co ten klient
+   od nas dostał". Wynik jest LEKKI i świadomie inny niż `Zamowienie`: do
+   wskazania paczki wystarczy data, kwota i zawartość w jednej linijce.
+   Kartoteki, zdjęcia ofert i mostki po SKU są tam potrzebne przy wycenie,
+   a nie przy pytaniu „to ta czy tamta".                                      */
+
+export interface PaczkaKlienta {
+  /** Numer zamówienia z Allegro — to on wchodzi do rejestracji. */
+  orderId: string;
+  kupionoAt: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  pozycji: number;
+  /** Zawartość w jednej linijce: „Sekator ×1 · Wąż 20 m ×2". */
+  zawartosc: string;
+  /**
+   * Zwrot dla tego zamówienia JUŻ ISTNIEJE.
+   *
+   * Nie blokuje wyboru i nie ma blokować: jedno zamówienie bywa dwiema
+   * paczkami, a klient potrafi nie odebrać drugiej po zwrocie pierwszej.
+   * Ale to jest ostrzeżenie, którego operator sam by nie miał — a bez niego
+   * najłatwiejsza pomyłka przy tym ekranie to zarejestrowanie drugi raz
+   * tego samego.
+   */
+  maZwrot: boolean;
+}
+
+/**
+ * Zamówienia tego kupującego, od najnowszego. Pusta lista znaczy „nic nie wiem".
+ *
+ * PORÓWNANIE BEZ WIELKOŚCI LITER, bo login przyjeżdża przeklejony z wiadomości,
+ * a Allegro pokazuje go raz tak, raz inaczej. Dopasowanie jest DOKŁADNE:
+ * fragment loginu wskazywałby cudze zakupy, a to jest ekran, z którego wychodzi
+ * się z czyimś numerem zamówienia w ręku.
+ */
+export function paczkiKlienta(
+  konto: number, login: string, database: Db = defaultDb(), limit = 20,
+): PaczkaKlienta[] {
+  const szukany = (login ?? "").trim();
+  if (!szukany) return [];
+
+  const zamowienia = database.prepare(
+    `SELECT id, external_id, kupiono_at, suma_grosze, waluta
+       FROM zamowienie_klienta
+      WHERE channel_account_id = ? AND lower(kupujacy_login) = lower(?)
+      /* Najnowsze pierwsze, a bez daty na końcu: zamówienie bez daty zakupu
+         jest niedokończonym zapisem synchronizacji, nie świeżym zakupem.
+         Bez odwrotnych apostrofów w tym komentarzu — zamknęłyby szablon. */
+      ORDER BY kupiono_at IS NULL, kupiono_at DESC, id DESC
+      LIMIT ?`).all(konto, szukany, Math.max(1, limit)) as Array<{
+    id: number; external_id: string; kupiono_at: string | null;
+    suma_grosze: number | null; waluta: string;
+  }>;
+  if (!zamowienia.length) return [];
+
+  const znaki = zamowienia.map(() => "?").join(",");
+  /* Pozycje i zwroty JEDNYM zapytaniem każde — wzorzec z `listaZwrotow`.
+     Zapytanie na zamówienie wygląda niewinnie przy jednym kliencie i psuje
+     się dokładnie wtedy, gdy ktoś ma ich trzydzieści. */
+  const pozycje = database.prepare(
+    `SELECT zamowienie_id, nazwa, ilosc FROM zamowienie_klienta_pozycja
+      WHERE zamowienie_id IN (${znaki}) ORDER BY id`)
+    .all(...zamowienia.map((z) => z.id)) as Array<{
+    zamowienie_id: number; nazwa: string; ilosc: number;
+  }>;
+  const wgZamowienia = new Map<number, Array<{ nazwa: string; ilosc: number }>>();
+  for (const p of pozycje) {
+    const lista = wgZamowienia.get(Number(p.zamowienie_id)) ?? [];
+    lista.push({ nazwa: String(p.nazwa), ilosc: Number(p.ilosc) });
+    wgZamowienia.set(Number(p.zamowienie_id), lista);
+  }
+
+  const zeZwrotem = new Set((database.prepare(
+    `SELECT DISTINCT order_id FROM zwrot_klienta
+      WHERE channel_account_id = ? AND order_id IN (${znaki})`)
+    .all(konto, ...zamowienia.map((z) => z.external_id)) as Array<{ order_id: string }>)
+    .map((z) => String(z.order_id)));
+
+  return zamowienia.map((z) => {
+    const poz = wgZamowienia.get(Number(z.id)) ?? [];
+    return {
+      orderId: String(z.external_id),
+      kupionoAt: z.kupiono_at ?? null,
+      sumaGrosze: z.suma_grosze == null ? null : Number(z.suma_grosze),
+      waluta: String(z.waluta ?? "PLN"),
+      pozycji: poz.length,
+      /* Trzy pozycje i ogon liczbą: linijka ma się zmieścić w wierszu listy,
+         a czwarta nazwa i tak niczego nie rozstrzyga przy wyborze paczki. */
+      zawartosc: poz.slice(0, 3).map((p) => `${p.nazwa} ×${p.ilosc}`).join(" · ")
+        + (poz.length > 3 ? ` · +${poz.length - 3}` : ""),
+      maZwrot: zeZwrotem.has(String(z.external_id)),
+    };
+  });
+}

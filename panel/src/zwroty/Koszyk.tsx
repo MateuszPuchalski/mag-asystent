@@ -1,6 +1,6 @@
 import React from "react";
-import { PackageOpen } from "lucide-react";
-import { useKosz, useZamknijKosz } from "../api/zwroty";
+import { PackageOpen, X } from "lucide-react";
+import { useKosz, useZamknijKosz, useZdejmijTowar } from "../api/zwroty";
 import { Przycisk, Blad } from "../ui";
 
 /* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
@@ -23,6 +23,10 @@ import { Przycisk, Blad } from "../ui";
 export function Koszyk() {
   const { data } = useKosz();
   const zamknij = useZamknijKosz();
+  /* Zdejmowanie dotyczy WYŁĄCZNIE wierszy dołożonych ręką (0.365.0). Wiersz
+     z oceny schodzi cofnięciem oceny na karcie zwrotu — jedna droga na oba
+     kosztowałaby kasowanie cudzej oceny z drugiej strony ekranu. */
+  const zdejmij = useZdejmijTowar();
   /* DWA KOSZYKI OD 0.211.0: zwroty i odpad. Pusty się nie pokazuje — pasek
      rośnie wtedy, kiedy operator naprawdę coś w nim ma. */
   const kosze = (data?.kosze ?? []).filter((k) => k.pozycji > 0);
@@ -62,7 +66,12 @@ export function Koszyk() {
     <span className="tabular-nums">
       {kosz.pozycji} poz. · {kosz.sztuk} szt.</span>
     {/* Symbole, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
-        i na dokumencie MM. Nazwy nie zmieściłyby się w jednym pasku. */}
+        i na dokumencie MM. Nazwy nie zmieściłyby się w jednym pasku.
+
+        Ta linijka pokazuje CAŁĄ zawartość i tak zostaje. Wiersze dołożone
+        ręką wracają niżej drugi raz — z krzyżykiem, bo tylko one dają się tu
+        zdjąć (0.365.0). Powtórzenie symbolu jest ceną za to, że jedna linijka
+        dalej odpowiada na pytanie „co leży w pudle". */}
     <span className={`min-w-0 flex-1 truncate ${
       kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}
       title={kosz.pozycje.map((p) => `${p.symbol} × ${p.ilosc}`).join(", ")}>
@@ -83,7 +92,26 @@ export function Koszyk() {
       zwroty z tego koszyka mają numer korekty — na hali rozkłada się kosz
       z numerem tego MM.
     </span>
+    {/* DOŁOŻONE RĘKĄ — osobno i z krzyżykiem (0.365.0). Osobno, bo tylko one
+        dają się tu zdjąć; krzyżyk, bo skan bywa pomyłką, a wiersz bez zwrotu
+        nie ma oceny do cofnięcia. Przy koszyku bez takich wierszy nie ma tu
+        niczego: pusta etykieta „dołożone" byłaby napisem o braku. */}
+    {kosz.pozycje.some((p) => !p.zeZwrotu) && <span className="flex w-full flex-wrap items-center gap-1">
+      <span className={kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}>
+        dołożone ręką:</span>
+      {kosz.pozycje.filter((p) => !p.zeZwrotu).map((p) => <span key={p.id}
+        className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1">
+        <span className="font-mono">{p.symbol}</span>
+        <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
+        <button type="button" disabled={zdejmij.isPending}
+          onClick={() => zdejmij.mutate(p.id)}
+          aria-label={`Zdejmij ${p.symbol} z koszyka`}
+          className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <X size={12} /></button>
+      </span>)}
+    </span>}
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
+    {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
   </>;
 }

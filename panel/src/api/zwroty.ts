@@ -247,6 +247,62 @@ export function useKosz() {
   });
 }
 
+/** Kartoteka w wyniku szukania do koszyka — tyle, ile trzeba, żeby wskazać. */
+export interface TowarDoKosza {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ean: string | null;
+  /** Stan na magazynie głównym; `null` przy trafieniu ze skanu. */
+  stanMag: number | null;
+}
+
+/**
+ * Towar do koszyka: skan albo kartoteka (0.365.0).
+ *
+ * JEDNO PYTANIE, jedna trasa — „który to towar". Kod z czytnika wraca jako
+ * `dokladne` z jednym wynikiem, fraza jako lista. Pusty nie pyta serwera.
+ */
+export function useTowaryDoKosza(q: string) {
+  const czysty = q.trim();
+  return useQuery({
+    queryKey: ["kosz-towary", czysty] as const,
+    enabled: czysty.length > 0,
+    queryFn: () => api<{ towary: TowarDoKosza[]; dokladne: boolean; przyblizone: boolean }>(
+      `/api/obsluga/zwroty/kosz/towary?q=${encodeURIComponent(czysty)}`),
+  });
+}
+
+/**
+ * Dołożenie towaru do koszyka ręką (0.365.0).
+ *
+ * Decyzja właściciela: „dodaj możliwość dodawania produktów do koszyka
+ * zwrotowego poprzez zeskanowanie produktu lub wybranie go z kartoteki",
+ * z granicą „tylko z poziomu obsługi zwrotów, jak jeszcze nie jest zamknięty".
+ * Odświeża pasek koszyka, bo licznik ma rosnąć na oczach.
+ */
+export function useDolozTowar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { twId: number; ilosc?: number; rodzaj?: "zwroty" | "odpad" }) =>
+      api<{ koszId: number; kod: string; pozycjaId: number; symbol: string; ilosc: number }>(
+        "/api/obsluga/zwroty/kosz/towar", { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
+  });
+}
+
+/** Zdjęcie z koszyka wiersza dołożonego ręką — cena pomyłki przy skanie. */
+export function useZdejmijTowar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pozycjaId: number) =>
+      api<{ koszId: number; kod: string; symbol: string }>(
+        "/api/obsluga/zwroty/kosz/towar/zdejmij",
+        { method: "POST", body: JSON.stringify({ pozycjaId }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
+  });
+}
+
 /**
  * Domknięcie koszyka: MM wychodzi PO KOMPLECIE KOREKT (0.200.0).
  *
@@ -267,6 +323,38 @@ export function useZamknijKosz() {
   });
 }
 
+/** Jedna paczka z historii klienta — tyle, ile trzeba, żeby wskazać właściwą. */
+export interface PaczkaKlienta {
+  orderId: string;
+  kupionoAt: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  pozycji: number;
+  zawartosc: string;
+  /** Zwrot dla tego zamówienia już istnieje — ostrzeżenie, nie blokada. */
+  maZwrot: boolean;
+}
+
+/**
+ * Co ten klient u nas kupił (0.365.0).
+ *
+ * Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
+ * w historii sklepu, więc muszę mieć możliwość wybrania paczki". Pusty login
+ * NIE PYTA serwera — zapytanie o wszystkich byłoby listą cudzych zakupów,
+ * a nie odpowiedzią na pytanie operatora.
+ *
+ * Odczyt, więc `useQuery`: otwarcie i przeglądanie niczego nie mutuje.
+ */
+export function usePaczkiKlienta(login: string) {
+  const czysty = login.trim();
+  return useQuery({
+    queryKey: ["paczki-klienta", czysty] as const,
+    enabled: czysty.length > 0,
+    queryFn: () => api<{ paczki: PaczkaKlienta[] }>(
+      `/api/obsluga/zwroty/paczki-klienta?login=${encodeURIComponent(czysty)}`),
+  });
+}
+
 /**
  * Rejestracja paczki, której klient nie odebrał (0.172.0).
  *
@@ -276,7 +364,11 @@ export function useZamknijKosz() {
 export function useNieodebrana() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { waybill: string; orderId?: string | null; notatka?: string | null }) =>
+    mutationFn: (v: {
+      waybill: string; orderId?: string | null; notatka?: string | null;
+      /** Login kupującego (0.365.0) — przy nieodebranej często jedyny uchwyt. */
+      login?: string | null;
+    }) =>
       api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
         { method: "POST", body: JSON.stringify(v) }),
     onSettled: () => odswiez(qc),
