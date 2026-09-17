@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.380.0 — 17 września 2026
+
+**Cały koszyk zwrotowy da się usunąć.** Zgłoszenie właściciela, a powód widać
+było na jego ekranie wydanie wcześniej: pudła odrzucone przez Sferę stały
+w pasku z kilkoma kartotekami usługowymi w środku, a jedyną drogą było
+zdejmowanie ich wiersz po wierszu. Do 0.379.0 schodził wyłącznie koszyk PUSTY.
+
+**Bramką jest DOKUMENT, nie zamknięcie** — ta sama, co przy poprawianiu
+zawartości. Koszyk z wystawioną MM nie schodzi i nie zejdzie: papier pojechał
+na halę, ktoś rozkłada z niego towar, a stan w Subiekcie już się przesunął.
+Skasowanie takiego pudła u nas nie cofnęłoby ani jednej z tych rzeczy —
+zostawiłoby tylko halę bez listy. Schodzi za to koszyk ZAMKNIĘTY bez dokumentu,
+bo to właśnie on blokuje pasek.
+
+**Oceny wracają, wiersz po wierszu**, tą samą regułą co przy zdejmowaniu
+jednego (0.379.0): to ocena wsadziła towar do pudła, więc usunięcie pudła bez
+jej zdjęcia zostawiłoby karty zwrotów mówiące o regale, na który nic nie jedzie.
+Zwroty wracają do kubełka DO OCENY, każdy ze zdaniem na osi.
+
+**Zadanie MM schodzi razem z koszykiem.** Pudło odrzucone przez Sferę ma przy
+sobie zadanie w błędzie; zostawione bez kosza wisiałoby w kolejce jako praca
+nad czymś, czego nie ma.
+
+**Pytamy tylko wtedy, gdy jest o co.** Pudło puste nie niesie niczyjej pracy,
+więc schodzi jednym kliknięciem — pytanie byłoby tu bez treści. Napełnione
+niesie oceny i wymaga drugiego kliknięcia, a zdanie mówi SKUTEK, nie „operacja
+nieodwracalna": ile pozycji zniknie, że oceny wrócą do DO OCENY i że towar
+zostanie tam, gdzie leży.
+
+**Ślad w dzienniku niesie ZAWARTOŚĆ**, nie samą liczbę. Usunięte pudło znika
+z bazy razem z wierszami, więc dziennik jest jedynym miejscem, w którym zostaje
+odpowiedź na pytanie „co w nim było".
+
+Trasa `kosz/porzuc` zmieniła nazwę na `kosz/usun` razem z zakresem. Licznik tras
+POST zwrotów zostaje na 35 — to ta sama trasa, nie nowa.
+
 ## 0.379.0 — 17 września 2026
 
 **Kilka pudeł naraz, a zaległy koszyk wreszcie da się odetkać.** Dwa zgłoszenia
