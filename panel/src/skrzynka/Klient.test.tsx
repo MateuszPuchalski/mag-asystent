@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import type { HistoriaKlienta } from "../api/typy";
 
@@ -25,7 +26,7 @@ const dane = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
 
 const pokaz = (d: HistoriaKlienta, onOtworz = vi.fn()) => {
   historia.mockReturnValue({ data: d, isLoading: false, error: null });
-  render(<Klient rozmowaId={4821} onOtworzRozmowe={onOtworz} />);
+  render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={onOtworz} /></MemoryRouter>);
   return onOtworz;
 };
 
@@ -47,9 +48,10 @@ describe("zakładka klienta", () => {
   it("oś rozdziela zakup od rozmowy i prowadzi w dwa różne miejsca", async () => {
     const onOtworz = pokaz(dane({ wpisy: [
       { rodzaj: "zakup", at: "2024-06-14T12:00:00Z", tresc: "Szarpak SZR-148/82",
-        zamowienieId: "2024/06/1183", link: "https://allegro.pl/zam/2024-06-1183", rozmowaId: null },
+        zamowienieId: "2024/06/1183", link: "https://allegro.pl/zam/2024-06-1183", rozmowaId: null,
+        sprawaId: null },
       { rodzaj: "rozmowa", at: "2024-06-14T09:00:00Z", tresc: "ustalono model kosiarki",
-        zamowienieId: null, link: null, rozmowaId: 3140 },
+        zamowienieId: null, link: null, rozmowaId: 3140, sprawaId: null },
     ] }));
 
     /* Zakup wychodzi z aplikacji do panelu Allegro — to jedyne miejsce, gdzie
@@ -71,5 +73,24 @@ describe("zakładka klienta", () => {
   it("klient znany, ale bez historii, dostaje zdanie zamiast pustki", () => {
     pokaz(dane());
     expect(screen.getByText(/Pierwszy kontakt/)).toBeInTheDocument();
+  });
+
+  it("zwrot, reklamacja i dyskusja stoją na osi i prowadzą do swoich kolejek", async () => {
+    /* S2 spoiwa: zakładka obiecywała historię, a pokazywała jej połowę.
+       Wiersz prowadzi na ekran właściwej kolejki, bo tam stoją bramki sprawy. */
+    pokaz(dane({ wpisy: [
+      { rodzaj: "zwrot", at: "2026-08-10T12:00:00Z", tresc: "Z-77",
+        zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 11 },
+      { rodzaj: "reklamacja", at: "2026-08-09T12:00:00Z", tresc: "Nie działa",
+        zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 22 },
+      { rodzaj: "dyskusja", at: "2026-08-08T12:00:00Z", tresc: "Gdzie paczka",
+        zamowienieId: "ord-1", link: null, rozmowaId: null, sprawaId: 33 },
+    ] }));
+
+    expect(screen.getByRole("link", { name: /Z-77/ })).toHaveAttribute("href", "/obsluga/zwroty/11");
+    expect(screen.getByRole("link", { name: /Nie działa/ }))
+      .toHaveAttribute("href", "/obsluga/reklamacje/22");
+    expect(screen.getByRole("link", { name: /Gdzie paczka/ }))
+      .toHaveAttribute("href", "/obsluga/dyskusje/33");
   });
 });

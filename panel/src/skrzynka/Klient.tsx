@@ -1,5 +1,7 @@
 import React from "react";
-import { ExternalLink, MessageSquare, Tractor, UserRound } from "lucide-react";
+import { ExternalLink, MessageSquare, MessagesSquare, Scale, Tractor, Undo2, UserRound }
+  from "lucide-react";
+import { Link } from "react-router-dom";
 import type { MaszynaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
 import { czas, LoginKlienta, NaglowekSekcji, Pusto } from "../ui";
@@ -66,7 +68,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
               : "Poza tą rozmową nie mamy u tego klienta nic więcej."}
           </p>
         : <ul className="space-y-1">
-            {wpisy.map((w, i) => <Wpis key={`${w.rodzaj}-${w.zamowienieId ?? w.rozmowaId}-${i}`}
+            {wpisy.map((w, i) => <Wpis key={`${w.rodzaj}-${w.sprawaId ?? w.zamowienieId ?? w.rozmowaId}-${i}`}
               wpis={w} onOtworzRozmowe={onOtworzRozmowe} />)}
           </ul>}
     </section>
@@ -99,6 +101,14 @@ function Maszyna({ maszyna, onOtworzRozmowe }: {
   </li>;
 }
 
+/* Sprawa z trzech pozostałych kolejek: dokąd prowadzi wiersz i czym się
+   przedstawia. Jedno miejsce, żeby nazwy nie rozjechały się z blokiem spoiwa. */
+const SPRAWY_OSI = {
+  zwrot: { nazwa: "Zwrot", ikona: Undo2, sciezka: "/obsluga/zwroty" },
+  reklamacja: { nazwa: "Reklamacja", ikona: Scale, sciezka: "/obsluga/reklamacje" },
+  dyskusja: { nazwa: "Dyskusja", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
+} as const;
+
 /** Jeden wiersz osi: zakup prowadzi do zamówienia, rozmowa — do rozmowy. */
 function Wpis({ wpis, onOtworzRozmowe }: {
   wpis: WpisHistorii; onOtworzRozmowe: (id: number) => void;
@@ -106,7 +116,21 @@ function Wpis({ wpis, onOtworzRozmowe }: {
   return <li className="flex gap-2 border-t border-slate-100 py-1.5 text-xs first:border-t-0">
     <span className="w-20 shrink-0 pt-0.5 text-podpis text-slate-500">{czas(wpis.at)}</span>
     <span className="min-w-0 flex-1">
-      {wpis.rodzaj === "zakup"
+      {wpis.rodzaj !== "zakup" && wpis.rodzaj !== "rozmowa" && wpis.sprawaId !== null
+        ? (() => {
+            /* Trzy kolejki doszły w S2 spoiwa. Wiersz prowadzi na ekran
+               właściwej kolejki, bo tam stoją bramki tej sprawy — historia
+               jest czytaniem, nigdy pracą. */
+            const { nazwa, ikona: Ikona, sciezka } = SPRAWY_OSI[wpis.rodzaj];
+            /* `Link`, nie `href`: gołe przeładowanie wyrzuciłoby wspólny
+               cache zapytań i dociągnęło całą skrzynkę od nowa. */
+            return <Link to={`${sciezka}/${wpis.sprawaId}`} className="hover:underline">
+              <Ikona size={11} className="mr-1 inline align-baseline text-slate-400" />
+              <span className="text-slate-500">{nazwa}:</span>{" "}
+              <span className="text-slate-800">{wpis.tresc}</span>
+            </Link>;
+          })()
+        : wpis.rodzaj === "zakup"
         ? <>
             <span className="text-slate-800">Zakup: {wpis.tresc}</span>
             <span className="text-slate-500"> · zamówienie{" "}

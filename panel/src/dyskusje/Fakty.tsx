@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
+import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
@@ -157,6 +158,18 @@ export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCof
           <span className="ml-2 text-slate-500">{czas(z.utworzono)}</span>
         </li>)}
       </ul>
+    </Sekcja>}
+
+    {/* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa). Przy dyskusji
+        to przypadek najważniejszy: ona zwykle poprzedza reklamację, więc agent
+        ma widzieć, czy sprawa poszła już dalej — i nie obiecywać w tym kanale
+        rozstrzygnięcia, nad którym kanał stracił władzę. */}
+    {szczegol.sprawy.length > 0 && <Sekcja tytul="Inne sprawy tego zakupu">
+      <SprawyZakupu sprawy={szczegol.sprawy} />
+    </Sekcja>}
+
+    {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
+      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "dyskusja", id: d.id }} />
     </Sekcja>}
 
     {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">

@@ -5460,4 +5460,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
+| Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji |
+| Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
+| Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
+| Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania |
+| Miara eskalacji po rozmowie | **działa** od 0.387.0 | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |
+| Statusy końcowe sprawy w jednym pliku | **działa** od 0.387.0 | `services/statusy-spraw.ts`; status nieznany zostaje OTWARTY |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

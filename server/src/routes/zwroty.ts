@@ -23,6 +23,7 @@ import {
   wskazSklad,
   pozycjeNaOutlet, przeniesionoNaOutlet,
 } from "../services/zwroty.js";
+import { kontekstZwrotu } from "../services/droga-klienta.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
 import { odmowZwrotuPieniedzy as wyslijOdmowe, zglosRabat, zwrocPlatnosc } from "../adapters/allegro.http.js";
 import {
@@ -989,6 +990,15 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          zwrot, nie raz na pozycję: dokument jest jeden, a kopiowanie go przy
          każdej pozycji rozdęłoby odpowiedź o to samo. */
       wierszeDokumentu: wierszeDokumentuZwrotu(db(), id),
+      /* Reklamacje, dyskusje i droga tego zakupu (S1 i S3 spoiwa,
+         `docs/obsluga-klienta-calosc.md`). Zwrot widział rozmowy od 0.169.0,
+         a spraw posprzedażowych nie widział wcale — biuro oddawało pieniądze,
+         nie wiedząc o otwartej reklamacji o ten sam towar.
+
+         TYLKO W SZCZEGÓLE, jak składy wyżej i z tego samego powodu: kolejka
+         liczy naraz wszystkie zwroty, a ten odczyt pyta o każde zamówienie
+         osobno. */
+      ...kontekstZwrotu(db(), id),
     };
   });
 

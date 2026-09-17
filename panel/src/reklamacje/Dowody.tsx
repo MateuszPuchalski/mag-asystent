@@ -4,6 +4,7 @@ import type {
   RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt, ZdjecieKarty,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
+import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { zlote } from "../api/zwroty";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
@@ -345,6 +346,18 @@ export function Dowody({
           <span className="ml-2 text-slate-500">{czas(z.utworzono)}</span>
         </li>)}
       </ul>
+    </Sekcja>}
+
+    {/* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa,
+        `docs/obsluga-klienta-calosc.md`). Reklamacja i dyskusja leżą w JEDNEJ
+        tabeli i do 0.386.0 nie widziały się nawzajem — dyskusja, która urosła
+        w tę reklamację, była osobnym wierszem bez śladu po przejściu. */}
+    {szczegol.sprawy.length > 0 && <Sekcja tytul="Inne sprawy tego zakupu">
+      <SprawyZakupu sprawy={szczegol.sprawy} />
+    </Sekcja>}
+
+    {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
+      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "reklamacja", id: r.id }} />
     </Sekcja>}
 
     {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">

@@ -5,6 +5,7 @@ import { pokrycieSygnatur } from "../services/sygnatury.js";
 import { coAutomatDopisal } from "../services/wiedza-automat.js";
 import { pokrycieWiedzy } from "../services/identyfikatory.js";
 import { skutecznoscDoboru } from "../services/skutecznosc-doboru.js";
+import { eskalacje } from "../services/droga-klienta.js";
 
 /* ── Trasy ekranu ustawień obsługi (0.169.0) ─────────────────────────────────
    ZERO ZAPISÓW i to jest umowa, tak samo jak licznik `method:` w biurze.
@@ -50,6 +51,18 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
      zgubić po drodze. */
   app.get<{ Querystring: { dni?: string } }>("/api/obsluga/skutecznosc-doboru", async (req, reply) =>
     odmowa(reply) ?? skutecznoscDoboru(dniZQuery(req.query.dni), db()));
+
+  /* MIARA ESKALACJI (S5 spoiwa, `docs/obsluga-klienta-calosc.md`): po ilu
+     rozmowach klient szedł dalej — w dyskusję albo w reklamację. Kolejka pusta
+     przy rosnącej eskalacji jest miarą, która kłamie, a do tego wydania biuro
+     nie miało tej liczby wcale.
+
+     BEZ OSI OSOBOWEJ, celowo. Ta liczba mówi o naszych odpowiedziach jako
+     całości; rozbita na ludzi stałaby się oceną pracownika liczoną z decyzji
+     klienta, na którą pracownik ma wpływ częściowy. Skuteczność doboru wyżej
+     ma oś osobową, bo tam mierzymy wybór agenta, a nie cudzy ruch. */
+  app.get("/api/obsluga/eskalacja", async (_req, reply) =>
+    odmowa(reply) ?? { miesiace: eskalacje(db()) });
 
   /* CO AUTOMAT DOPISAŁ (0.331.0) — lista do prostowania.
      Właściciel wybrał opróżnianie kolejki wiedzy automatem i ta trasa jest

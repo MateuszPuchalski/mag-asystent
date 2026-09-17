@@ -261,6 +261,58 @@ export type KartaTowaru = {
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
 };
 
+/* ── Spoiwo kolejek (`docs/obsluga-klienta-calosc.md`) ───────────────────────
+   Typy stoją TUTAJ, a nie przy komponencie, bo niesie je ładunek czterech
+   różnych tras. Komponent, który by je posiadał, kazałby `api/` importować
+   z warstwy widoku — a wtedy zmiana układu bloku ruszałaby kontrakt HTTP. */
+
+/** Reklamacja albo dyskusja tego samego zakupu — wiersz lekki, do czytania. */
+export interface SprawaZakupu {
+  id: number;
+  /** `CLAIM` albo `DISPUTE`; jedna plakietka na oba to blizna 0.121.0. */
+  typ: string;
+  numer: string | null;
+  temat: string | null;
+  statusAllegro: string | null;
+  decyzjaDo: string | null;
+  otwartoAt: string;
+  prowadzi: string | null;
+  otwarta: boolean;
+}
+
+/**
+ * Jedna pozycja listy „Moje" (S4 spoiwa) — z której kolejki i co to za sprawa.
+ *
+ * TRZY KOLEJKI, nie cztery: zwrot nie ma prowadzącego od 0.370.0, bo
+ * przechodzi przez biuro jako kolejka decyzji, a nie jako czyjaś sprawa.
+ */
+export interface MojaSprawa {
+  kolejka: "rozmowa" | "reklamacja" | "dyskusja";
+  id: number;
+  opis: string;
+  /** Ostatni ruch przy sprawie — zegar opisowy, nie termin. */
+  at: string;
+  /** Termin z Allegro; `null` przy rozmowie i dyskusji, które go nie mają. */
+  terminDo: string | null;
+}
+
+/** Jeden miesiąc miary eskalacji (S5 spoiwa) — zawsze z własną podstawą. */
+export interface MiesiacEskalacji {
+  miesiac: string;
+  /** Zakupy, przy których klient napisał do skrzynki. */
+  zRozmowa: number;
+  /** Z nich: ile skończyło się dyskusją albo reklamacją PO naszej rozmowie. */
+  eskalowane: number;
+}
+
+/** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
+export interface PrzystanekDrogi {
+  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  id: number;
+  at: string;
+  opis: string | null;
+}
+
 export type OsRozmowy = {
   rozmowa: Rozmowa;
   os: WpisOsi[];
@@ -271,6 +323,10 @@ export type OsRozmowy = {
   oferta: OfertaRozmowy | null;
   /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
   zwroty: Zwrot[];
+  /* Spoiwo kolejek (S1 i S3, `docs/obsluga-klienta-calosc.md`): reklamacje
+     i dyskusje tego zakupu oraz jego droga przez kolejki. */
+  sprawy: SprawaZakupu[];
+  droga: PrzystanekDrogi[];
   dobor: Dobor;
   /** Propozycja Copilota (§14.6) — osobny byt, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
@@ -705,9 +761,16 @@ export type MaszynaKlienta = {
 };
 
 export type WpisHistorii = {
-  rodzaj: "zakup" | "rozmowa";
+  /* Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`).
+     Zakładka obiecywała historię klienta, a znała wyłącznie zakupy i rozmowy:
+     zwrot, reklamacja i dyskusja tego samego kupującego nie docierały tu
+     wcale, więc agent czytał „nic się nie działo" o kliencie, który miesiąc
+     wcześniej odesłał towar. */
+  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
   at: string; tresc: string;
   zamowienieId: string | null; link: string | null; rozmowaId: number | null;
+  /** Identyfikator sprawy albo zwrotu u nas; `null` przy zakupie i rozmowie. */
+  sprawaId: number | null;
 };
 
 export type HistoriaKlienta = {
@@ -1446,6 +1509,10 @@ export interface SzczegolReklamacji {
   zalaczniki: ZalacznikReklamacji[];
   zwroty: Zwrot[];
   rozmowy: Array<{ id: number; temat: string | null; status: string; ostatniaAt: string | null }>;
+  /* Spoiwo kolejek (S1 i S3): rodzeństwo posprzedażowe BEZ tej sprawy oraz
+     droga zakupu przez kolejki. */
+  sprawy: SprawaZakupu[];
+  droga: PrzystanekDrogi[];
   kartoteka: {
     pewnosc: string; twId: number | null; symbol: string | null;
     zrodlo: string | null; powod: string | null;
@@ -1583,6 +1650,10 @@ export interface SzczegolDyskusji {
   zalaczniki: ZalacznikReklamacji[];
   zwroty: Zwrot[];
   rozmowy: Array<{ id: number; temat: string | null; status: string; ostatniaAt: string | null }>;
+  /* Spoiwo kolejek (S1 i S3): rodzeństwo posprzedażowe BEZ tej sprawy oraz
+     droga zakupu przez kolejki. */
+  sprawy: SprawaZakupu[];
+  droga: PrzystanekDrogi[];
 }
 
 /** Wynik prośby o zakończenie — los próby, nie potwierdzenie zamknięcia. */

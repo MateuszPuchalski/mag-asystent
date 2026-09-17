@@ -56,9 +56,25 @@ function zakup(login: string, externalId: string, nazwa: string, kiedy: string):
     VALUES (?,?,1,1000,'PLN')`).run(id, nazwa);
 }
 
+function zwrotKlienta(login: string, numer: string, kiedy: string): number {
+  return Number(db().prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,
+    reference_number,order_id,kupujacy_login,created_at,synced_at)
+    VALUES (?,?,?,'ord-1',?,?,?)`).run(konto, `zw-${numer}`, numer, login, kiedy, kiedy)
+    .lastInsertRowid);
+}
+
+function sprawaKlienta(login: string, typ: string, temat: string, kiedy: string): number {
+  return Number(db().prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,
+    reference_number,order_id,kupujacy_login,typ,temat,otwarto_at,synced_at)
+    VALUES (?,?,?,'ord-1',?,?,?,?,?)`)
+    .run(konto, `sp-${typ}-${kiedy}`, typ === "CLAIM" ? "9/2026" : null, login, typ, temat,
+      kiedy, kiedy).lastInsertRowid);
+}
+
 beforeEach(() => {
   const d = db();
   for (const t of ["dobor_rozmowy", "zamowienie_klienta_pozycja", "zamowienie_klienta",
+    "reklamacja_klienta", "zwrot_klienta",
     "message", "conversation", "allegro_inbox_thread", "channel_account", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -138,4 +154,39 @@ test("wątek bez loginu daje pustą historię, nie zgadywanie", () => {
   zakup("zielony_ogrod", "2024/06/1183", "Szarpak SZR-148/82", "2024-06-14T12:00:00.000Z");
 
   assert.deepEqual(historiaKlienta(bezLoginu), { login: null, maszyny: [], wpisy: [] });
+});
+
+/* ── S2 spoiwa: historia przestaje pomijać trzy kolejki z czterech ───────────
+   Do tego wydania zakładka obiecywała historię klienta, a znała wyłącznie
+   zakupy i rozmowy. Agent czytał „nic się nie działo" o kliencie, który
+   miesiąc wcześniej odesłał towar i złożył reklamację.                      */
+
+test("zwrot, reklamacja i dyskusja wchodzą na oś historii klienta", () => {
+  const zw = zwrotKlienta("zielony_ogrod", "Z-77", "2026-08-10T08:00:00.000Z");
+  const rek = sprawaKlienta("zielony_ogrod", "CLAIM", "Nie działa", "2026-08-12T08:00:00.000Z");
+  const dys = sprawaKlienta("zielony_ogrod", "DISPUTE", "Gdzie paczka", "2026-08-11T08:00:00.000Z");
+
+  const wpisy = historiaKlienta(biezaca).wpisy;
+  const wg = (r: string) => wpisy.find((w) => w.rodzaj === r);
+  assert.equal(wg("zwrot")!.sprawaId, zw);
+  assert.equal(wg("reklamacja")!.sprawaId, rek);
+  assert.equal(wg("dyskusja")!.sprawaId, dys);
+  /* Oś jest jedna i ułożona czasem — najnowsze u góry, jak zakupy i rozmowy. */
+  assert.deepEqual(
+    wpisy.filter((w) => w.sprawaId !== null).map((w) => w.rodzaj),
+    ["reklamacja", "dyskusja", "zwrot"]);
+});
+
+test("zwrot i sprawa CUDZEGO klienta nie wchodzą do tej historii", () => {
+  zwrotKlienta("kto_inny", "Z-88", "2026-08-10T08:00:00.000Z");
+  sprawaKlienta("kto_inny", "CLAIM", "Nie moja sprawa", "2026-08-12T08:00:00.000Z");
+
+  assert.deepEqual(historiaKlienta(biezaca).wpisy.filter((w) => w.sprawaId !== null), []);
+});
+
+test("dyskusja bez tematu bierze podpis, a nie pustą linię", () => {
+  sprawaKlienta("zielony_ogrod", "DISPUTE", "", "2026-08-11T08:00:00.000Z");
+
+  const w = historiaKlienta(biezaca).wpisy.find((x) => x.rodzaj === "dyskusja")!;
+  assert.equal(w.tresc, "Sprawa bez tematu");
 });

@@ -5,7 +5,7 @@ import type {
   DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
   SkutecznoscDoboru,
   PowodNegatywny,
-  HistoriaKlienta,
+  HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
   Rozmowa, SprawaRozmowy, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WierszSprawy, WpisWzmianki,
   WpisAutomatu,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
@@ -21,10 +21,12 @@ export const klucze = {
   ja: ["ja"] as const,
   zdrowie: ["zdrowie"] as const,
   wzmianki: ["wzmianki"] as const,
+  moje: ["mojeSprawy"] as const,
   sprawy: ["sprawy"] as const,
   sygnatury: ["sygnatury"] as const,
   pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
   skutecznoscDoboru: (dni: number) => ["skutecznosc-doboru", dni] as const,
+  eskalacja: ["eskalacja"] as const,
   wiedzaAutomat: ["wiedza-automat"] as const,
   towar: (twId: number) => ["towar", twId] as const,
   zalaczniki: (id: number) => ["zalaczniki", id] as const,
@@ -67,6 +69,32 @@ export function useWzmianki() {
   return useQuery({
     queryKey: klucze.wzmianki,
     queryFn: () => api<{ wzmianki: WpisWzmianki[]; nowe: number }>("/api/obsluga/wzmianki"),
+    refetchInterval: 30_000,
+  });
+}
+
+/**
+ * Jedno „Moje" ponad kolejkami (S4 spoiwa, `docs/obsluga-klienta-calosc.md`).
+ *
+ * Tożsamość bierze SERWER z sesji — parametru tu nie ma i mieć nie będzie.
+ * `?userId=` pozwalałby czytać listę pracy kolegi, czyli monitoring
+ * pracowniczy pod inną nazwą.
+ *
+ * Ten sam rytm co przy wzmiankach: sprawa z terminem ma dojechać do agenta,
+ * który akurat siedzi na innym ekranie.
+ */
+/** Miara eskalacji za zębatką (S5 spoiwa) — odczyt bez osi osobowej. */
+export function useEskalacja() {
+  return useQuery({
+    queryKey: klucze.eskalacja,
+    queryFn: () => api<{ miesiace: MiesiacEskalacji[] }>("/api/obsluga/eskalacja"),
+  });
+}
+
+export function useMojeSprawy() {
+  return useQuery({
+    queryKey: klucze.moje,
+    queryFn: () => api<{ sprawy: MojaSprawa[] }>("/api/obsluga/moje"),
     refetchInterval: 30_000,
   });
 }

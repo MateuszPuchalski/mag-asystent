@@ -107,6 +107,9 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
   { method: "GET" as const, url: "/api/obsluga/wzmianki" },
+  /* Jedno „Moje" ponad kolejkami (S4 spoiwa) — ta sama bramka, bo lista
+     niesie tematy rozmów i spraw klientów. */
+  { method: "GET" as const, url: "/api/obsluga/moje" },
   { method: "GET" as const, url: "/api/obsluga/sprawy" },
   { method: "POST" as const, url: "/api/obsluga/sprawy",
     payload: { tytul: "Szarpak", rozmowaId: rozmowa } },
@@ -809,4 +812,28 @@ test("trasa wysyłki PRZEKAZUJE „mimo to” — inaczej jawna zgoda nie dział
     "flaga z ciała musi dojechać do serwisu — inaczej jawna zgoda jest ścianą");
 
   wyjdzZRozmowy(rozmowa, ala.userId);
+});
+
+test("moje sprawy: tożsamość z sesji, nie z zapytania — cudzej listy nie ma jak poprosić", async () => {
+  /* `?userId=` byłby monitoringiem pracowniczym pod inną nazwą: każdy z biura
+     mógłby przejrzeć listę pracy kolegi. Trasa bierze tożsamość z sesji
+     i parametru nie czyta wcale, więc podstawienie cudzego numeru nic nie robi. */
+  const ala = login("biuro", "A. Lewandowska");
+  const bob = login("biuro", "B. Nowak");
+  const d = db();
+  d.prepare("UPDATE conversation SET assigned_user_id=?, status='open' WHERE id=?")
+    .run(ala.userId, rozmowa);
+
+  const przed = liczbaZdarzen();
+  const moja = await app.inject({ method: "GET", url: "/api/obsluga/moje", headers: ala.naglowki });
+  assert.equal(moja.statusCode, 200, moja.body);
+  assert.equal(moja.json<{ sprawy: unknown[] }>().sprawy.length, 1);
+
+  const cudza = await app.inject({
+    method: "GET", url: `/api/obsluga/moje?userId=${ala.userId}`, headers: bob.naglowki,
+  });
+  assert.equal(cudza.statusCode, 200, cudza.body);
+  assert.deepEqual(cudza.json<{ sprawy: unknown[] }>().sprawy, [],
+    "parametr z cudzym numerem nie ma prawa niczego pokazać");
+  assert.equal(liczbaZdarzen(), przed, "odczyt listy pracy niczego nie mutuje");
 });

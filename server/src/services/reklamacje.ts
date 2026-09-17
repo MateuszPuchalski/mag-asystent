@@ -8,7 +8,10 @@ import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
+import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
+  from "./droga-klienta.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
+import { STATUSY_KONCOWE } from "./statusy-spraw.js";
 
 /* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
    TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i od 0.245.0 musi
@@ -132,9 +135,9 @@ export const STATUSY_ALLEGRO = [
  * od 0.273.0, a dwie listy końcowe przepisane ręcznie w dwóch plikach to
  * jedna lista za dużo: przy następnej zmianie rozjadą się w ciszy.
  */
-export const STATUSY_KONCOWE = [
-  "CLAIM_ACCEPTED", "CLAIM_REJECTED", "DISPUTE_CLOSED",
-] as const;
+/* Lista zeszła do `statusy-spraw.ts`, bo spoiwo kolejek pyta o to samo.
+   Re-eksport zostaje, żeby importy czytające ją stąd dalej działały. */
+export { STATUSY_KONCOWE };
 
 /**
  * Statusy, które POTWIERDZAJĄ nasz werdykt — węższe niż końcowe i to jest
@@ -690,6 +693,10 @@ export interface SzczegolReklamacji {
   zwroty: WierszZwrotu[];
   /** Rozmowy o tym samym zakupie; po loginie kupującego NIE dobieramy. */
   rozmowy: RozmowaZakupu[];
+  /** Dyskusje i inne reklamacje tego zakupu — bez tej sprawy (S1 spoiwa). */
+  sprawy: SprawaZakupu[];
+  /** Droga zakupu przez cztery kolejki, w kolejności czasu (S3 spoiwa). */
+  droga: PrzystanekDrogi[];
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
   /* Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił.
@@ -714,9 +721,22 @@ export interface SzczegolReklamacji {
  */
 export function kontekstZamowienia(
   database: Db, konto: number, orderId: string | null, teraz: number,
-): { zwroty: WierszZwrotu[]; rozmowy: RozmowaZakupu[] } {
-  if (!orderId) return { zwroty: [], rozmowy: [] };
+  /* Sprawa, z której pytamy — wypada z rodzeństwa. Bez tego reklamacja
+     pokazywałaby w bloku „inne sprawy tego zakupu" samą siebie. */
+  pomin: number | null = null,
+): {
+  zwroty: WierszZwrotu[]; rozmowy: RozmowaZakupu[];
+  /* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa,
+     `docs/obsluga-klienta-calosc.md`). Reklamacja i dyskusja leżą w JEDNEJ
+     tabeli i do tego wydania nie widziały się nawzajem — dyskusja, która
+     urosła w reklamację, była osobnym wierszem bez śladu po przejściu.
+     To najważniejszy moment całej obsługi i nie zostawiał go nic. */
+  sprawy: SprawaZakupu[]; droga: PrzystanekDrogi[];
+} {
+  if (!orderId) return { zwroty: [], rozmowy: [], sprawy: [], droga: [] };
   return {
+    sprawy: sprawyZakupu(database, konto, orderId, pomin),
+    droga: drogaZakupu(database, konto, orderId),
     zwroty: listaZwrotow(database, teraz, { channelAccountId: konto, orderId }),
     rozmowy: (database.prepare(`
       SELECT c.id, c.subject, c.status, MAX(m.sent_at) AS ostatnia
@@ -771,7 +791,8 @@ export function szczegolReklamacji(
   reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const konto = Number(w.channel_account_id);
 
-  const { zwroty, rozmowy } = kontekstZamowienia(database, konto, reklamacja.orderId, teraz);
+  const { zwroty, rozmowy, sprawy, droga } =
+    kontekstZamowienia(database, konto, reklamacja.orderId, teraz, id);
 
   /* Kartoteka po ofercie — ten sam łańcuch co w skrzynce (pamięć wskazań,
      potem SKU ze snapshotu). Bez snapshotu `sku` jest `undefined` i ekran
@@ -789,7 +810,7 @@ export function szczegolReklamacji(
     reklamacja,
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
-    zwroty, rozmowy, kartoteka,
+    zwroty, rozmowy, sprawy, droga, kartoteka,
     karta: kartaSprawy(database, id),
   };
 }

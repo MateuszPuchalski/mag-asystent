@@ -30,7 +30,7 @@ const rek = (): Reklamacja => ({
 } as unknown as Reklamacja);
 
 const szczegol = (karta: SzczegolReklamacji["karta"]): SzczegolReklamacji => ({
-  reklamacja: rek(), czat: [], zalaczniki: [], zwroty: [], rozmowy: [],
+  reklamacja: rek(), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
   kartoteka: null, karta,
 } as unknown as SzczegolReklamacji);
 

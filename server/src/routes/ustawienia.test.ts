@@ -131,3 +131,22 @@ test("ZERO TRAS ZAPISU i to jest umowa", async () => {
       `ustawienia obsługi dostały trasę ${metoda.toUpperCase()}`);
   }
 });
+
+test("eskalacja: liczby dla biura, bez osi osobowej i bez zapisu", async () => {
+  /* Miara mówi o NASZYCH odpowiedziach jako całości. Rozbita na ludzi byłaby
+     oceną pracownika liczoną z cudzego ruchu, więc osi osobowej tu nie ma
+     i ten test jest miejscem, w którym ktoś to zauważy, gdyby ją dokładał. */
+  let r = await app.inject({ method: "GET", url: "/api/obsluga/eskalacja" });
+  assert.equal(r.statusCode, 401, "401 przed 403 — brak sesji to nie brak roli");
+  r = await app.inject({ method: "GET", url: "/api/obsluga/eskalacja", headers: login("magazynier") });
+  assert.equal(r.statusCode, 403, "hala nie ogląda pracy biura");
+
+  const zdarzen = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
+  const przed = zdarzen();
+  r = await app.inject({ method: "GET", url: "/api/obsluga/eskalacja", headers: login("biuro") });
+  assert.equal(r.statusCode, 200, r.body);
+  const body = r.json<Record<string, unknown>>();
+  assert.ok(Array.isArray(body.miesiace));
+  assert.equal("osoby" in body, false, "miara eskalacji nie ma osi osobowej");
+  assert.equal(zdarzen(), przed, "otwarcie raportu niczego nie mutuje");
+});

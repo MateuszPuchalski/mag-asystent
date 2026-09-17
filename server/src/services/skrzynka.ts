@@ -6,6 +6,8 @@ import type { StatusRozmowy } from "./conversations.js";
 import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
+import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
+  from "./droga-klienta.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
@@ -472,6 +474,20 @@ export function osRozmowy(id: number): {
    * dobierać nie wolno (blizna 0.56.6). Bez zamówienia lista jest pusta.
    */
   zwroty: WierszZwrotu[];
+  /**
+   * Reklamacje i dyskusje TEGO zamówienia (S1 spoiwa,
+   * `docs/obsluga-klienta-calosc.md`). Ten sam mostek co przy zwrotach i ten
+   * sam powód, tylko mocniejszy: agent pisał odpowiedź, nie wiedząc, że
+   * klient ma u nas otwartą reklamację o ten sam towar. Odpowiedź udająca
+   * pierwszy kontakt w sprawie z zegarem ustawowym kosztuje zaufanie.
+   */
+  sprawy: SprawaZakupu[];
+  /**
+   * Droga tego zakupu przez kolejki (S3 spoiwa) — pytanie, dyskusja,
+   * reklamacja, zwrot w kolejności czasu. ODCZYT, nie zapis: przeskok wylicza
+   * się z momentów, które i tak leżą w bazie.
+   */
+  droga: PrzystanekDrogi[];
   dobor: Dobor;
   /** Propozycja Copilota (§14.6) — osobny wiersz, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
@@ -857,6 +873,8 @@ export function osRozmowy(id: number): {
     zwroty: zamowienie
       ? listaZwrotow(db(), Date.now(), { channelAccountId: kontoRozmowy, orderId: zamowienie.externalId })
       : [],
+    sprawy: sprawyZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
+    droga: drogaZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
     /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
        to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
        zdarzenie szyny. */

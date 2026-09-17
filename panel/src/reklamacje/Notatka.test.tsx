@@ -41,7 +41,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
 
 const props = (r: Reklamacja, n = {}) => ({
   szczegol: {
-    reklamacja: r, czat: [], zalaczniki: [], zwroty: [], rozmowy: [],
+    reklamacja: r, czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
     kartoteka: null, karta: null,
   } as unknown as SzczegolReklamacji,
   trwa: false, bladZapisu: "",
