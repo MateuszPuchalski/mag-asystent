@@ -519,6 +519,25 @@ Dwa pytania rozstrzyga potem człowiek, nie kod. Czy ten sam ZW przechodzi
 RĘCZNIE w Subiekcie — jeśli tak, odmowa dotyczy tego, co ustawia worker.
 Jeśli nie, przyczyna siedzi w paragonie albo w uprawnieniach operatora.
 
+**Trzecia próba wykluczyła konto usługi** (17 września 2026, zadanie `#1116`,
+PA 14781/MAG/08/2026, sześć wierszy, 189,24 zł). Sesja Sfery wstaje już na
+koncie użytkownika, nie na `LocalSystem`, a ZW odmawia tym samym
+`0x80040F20`. Hipoteza o profilu użytkownika upadła.
+
+**Rozstrzygające jest to, co zrobiło MM z TEJ SAMEJ sesji.** Zadanie `#1119`,
+ten sam proces i ten sam operator, odmówiło MERYTORYCZNIE: `Brak towaru
+w magazynie`. Jeden proces, jedna sesja COM, dwa dokumenty, dwa różne
+zachowania. Przyczyna nie leży więc ani w połączeniu, ani w koncie Windows,
+ani w samym operatorze Subiekta.
+
+`[WERYFIKUJ]` Czego ZW wymaga, a MM nie. Pierwszy kandydat to KASA: ZW oddaje
+pieniądze, a MM nie rusza żadnych, więc brak kasy domyślnej albo prawa do niej
+uderzyłby wyłącznie w ZW. Drugi to paragon z zamkniętego miesiąca.
+
+Trzeci kandydat jest rozstrzygający: ten sam ZW wystawiony ręką NA KONCIE
+OPERATORA WORKERA, a nie na koncie biura. Dopiero to rozdziela „dokument jest
+zły" od „operator nie ma prawa".
+
 `[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
 
 **Odmowa zapisu potrafi zostawić numer, którego nie ma** (15 września 2026).
