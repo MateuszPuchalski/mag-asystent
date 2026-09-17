@@ -8,7 +8,7 @@ import {
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
   MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami, zaznaczSkladnik,
-  zalozKoszyk, porzucKoszyk,
+  zalozKoszyk, usunKoszyk,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 import { zapamietajSklad } from "./komplety.js";
@@ -820,31 +820,80 @@ test("drugie naciśnięcie zakłada DRUGIE pudło, a ocena pyta, do którego", (
   assert.equal(otwarteKoszyki(d, KTO).find((k) => k.id === raz.id)!.pozycji, 0);
 });
 
-test("pusty koszyk da się PORZUCIĆ, a napełniony już nie", () => {
-  /* Bez porzucania NOWY KOSZYK byłby drogą w jedną stronę: pustego nie da się
-     zamknąć, więc naciśnięty przez pomyłkę stałby w pasku do końca świata. */
+test("koszyk schodzi CAŁY — także napełniony, a oceny wracają", () => {
+  /* Zgłoszenie właściciela (0.380.0): „zrób, żeby można było usunąć cały
+     koszyk zwrotowy". Do 0.379.0 schodził wyłącznie pusty, więc pudło odrzucone
+     przez Sferę trzeba było opróżniać wiersz po wierszu.
+
+     OCENY WRACAJĄ tą samą regułą co przy zdejmowaniu jednego wiersza: to one
+     wsadziły towar do pudła. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, z.poz[0], "stan", 2, KTO);
+  kartoteka(d, 21, "SEK-1");
+  const kosz = otwarteKoszyki(d, KTO)[0];
+  dolozTowar(d, 21, 1, KTO, new Date(), "zwroty", kosz.id);
+
+  const wynik = usunKoszyk(d, kosz.id, KTO);
+
+  assert.equal(wynik.pozycji, 2, "schodzi cała zawartość, nie po wierszu");
+  assert.equal(wynik.zwrotow, 1);
+  assert.equal(otwarteKoszyki(d, KTO).length, 0, "pudła nie ma");
+  assert.equal((d.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(z.poz[0]) as { ocena: string | null }).ocena, null, "ocena wróciła");
+  /* Dziennik jest jedynym miejscem, gdzie zostaje odpowiedź „co w nim było". */
+  const slad = d.prepare(
+    "SELECT payload FROM events WHERE type='kosz_zwrotow_usuniety'").get() as
+    { payload: string };
+  assert.match(slad.payload, /SEK-1/);
+});
+
+test("koszyk ZAMKNIĘTY bez dokumentu też schodzi — to on blokuje pasek", () => {
+  /* Pudła odrzucone przez Sferę stoją zamknięte i to właśnie one zajmowały
+     właścicielowi pół ekranu. Bramką jest DOKUMENT, nie zamknięcie. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [11], KTO);
+  skorygowany(d, z.id);
+  ocenPozycje(d, z.poz[0], "stan", 2, KTO);
+  const kosz = otwarteKoszyki(d, KTO)[0];
+  zamknijKosz(d, kosz.id, KTO);
+
+  assert.equal(usunKoszyk(d, kosz.id, KTO).kod, kosz.kod);
+  assert.equal(koszykiBezDokumentu(d).length, 0, "pasek pustoszeje");
+  const zadanie = d.prepare("SELECT status FROM sfera_queue WHERE type='mm'")
+    .get() as { status: string } | undefined;
+  assert.notEqual(zadanie?.status, "pending",
+    "zadanie MM schodzi razem z koszykiem — inaczej wisiałoby nad niczym");
+});
+
+test("koszyka Z DOKUMENTEM nie usuwa nikt", () => {
+  /* Papier pojechał na halę, ktoś rozkłada z niego towar, a stan w Subiekcie
+     już się przesunął. Kasowanie kosza u nas nie cofnęłoby ani jednej z tych
+     rzeczy — zostawiłoby tylko halę bez listy. */
   const d = stanowisko();
   const KTO = biuro(d);
   const kosz = zalozKoszyk(d, KTO);
+  d.prepare("UPDATE kosz SET mm_dok_id=41209, status='zamkniety' WHERE id=?").run(kosz.id);
 
-  assert.equal(porzucKoszyk(d, kosz.id, KTO).kod, kosz.kod);
-  assert.equal(otwarteKoszyki(d, KTO).length, 0);
-
-  const drugi = zalozKoszyk(d, KTO);
-  kartoteka(d, 21, "SEK-1");
-  dolozTowar(d, 21, 1, KTO);
-  assert.throws(() => porzucKoszyk(d, drugi.id, KTO), /ma 1 pozycji/,
-    "napełniony schodzi zamknięciem albo zdejmowaniem wierszy");
+  assert.throws(() => usunKoszyk(d, kosz.id, KTO), /ma już dokument MM/);
 });
 
-test("porzucić nie da się koszyka, który czeka na dokument", () => {
+test("usunięcie koszyka z zadaniem W BŁĘDZIE zdejmuje także to zadanie", () => {
+  /* Pudło odrzucone przez Sferę ma przy sobie zadanie w błędzie. Zostawione
+     bez kosza wisiałoby w kolejce jako praca nad czymś, czego nie ma. */
   const d = stanowisko();
   const KTO = biuro(d);
   const kosz = zalozKoszyk(d, KTO);
   const q = Number(d.prepare(
-    `INSERT INTO sfera_queue(type, status, payload, created_at, created_by)
-     VALUES ('mm','pending','{}','2026-09-17T08:00:00Z','Ala')`).run().lastInsertRowid);
+    `INSERT INTO sfera_queue(type, status, payload, error_msg, created_at, created_by)
+     VALUES ('mm','error','{}','Brak towaru w magazynie','2026-09-17T08:00:00Z','Ala')`)
+    .run().lastInsertRowid);
   d.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(q, kosz.id);
 
-  assert.throws(() => porzucKoszyk(d, kosz.id, KTO), /nie jest już otwarty/);
+  usunKoszyk(d, kosz.id, KTO);
+
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz WHERE id=?")
+    .get(kosz.id) as { n: number }).n, 0);
 });

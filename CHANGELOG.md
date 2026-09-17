@@ -34,11 +34,11 @@ historii nie przepisujemy.
 ---
 
 
-## 0.379.1 — 17 września 2026
+## 0.380.1 — 17 września 2026
 
-**Numer ustępuje wydaniom z main już trzeci raz.**
-Wydanie powstało jako 0.373.1, potem 0.377.1 i 0.378.1; numer zmieniał się przy
-każdym scalaniu main. Treść dokumentów przy tych zmianach nie ucierpiała.
+**Numer ustępuje wydaniom z main już czwarty raz.**
+Wydanie powstało jako 0.373.1, potem 0.377.1, 0.378.1 i 0.379.1; numer zmieniał
+się przy każdym scalaniu main. Treść dokumentów na tym nie ucierpiała.
 
 **Strategia WMS na piśmie: co znaczy „pełny system magazynowy" przy 342 m².**
 Pytanie właściciela brzmiało, jak zamienić WERTIS w pełny WMS i wyłączyć
@@ -103,6 +103,42 @@ tyle co deklaracja bez mechanizmu.
 
 Poza dokumentacją nie zmienia się nic — żadnego kodu, żadnej trasy, żadnej
 tabeli.
+## 0.380.0 — 17 września 2026
+
+**Cały koszyk zwrotowy da się usunąć.** Zgłoszenie właściciela, a powód widać
+było na jego ekranie wydanie wcześniej: pudła odrzucone przez Sferę stały
+w pasku z kilkoma kartotekami usługowymi w środku, a jedyną drogą było
+zdejmowanie ich wiersz po wierszu. Do 0.379.0 schodził wyłącznie koszyk PUSTY.
+
+**Bramką jest DOKUMENT, nie zamknięcie** — ta sama, co przy poprawianiu
+zawartości. Koszyk z wystawioną MM nie schodzi i nie zejdzie: papier pojechał
+na halę, ktoś rozkłada z niego towar, a stan w Subiekcie już się przesunął.
+Skasowanie takiego pudła u nas nie cofnęłoby ani jednej z tych rzeczy —
+zostawiłoby tylko halę bez listy. Schodzi za to koszyk ZAMKNIĘTY bez dokumentu,
+bo to właśnie on blokuje pasek.
+
+**Oceny wracają, wiersz po wierszu**, tą samą regułą co przy zdejmowaniu
+jednego (0.379.0): to ocena wsadziła towar do pudła, więc usunięcie pudła bez
+jej zdjęcia zostawiłoby karty zwrotów mówiące o regale, na który nic nie jedzie.
+Zwroty wracają do kubełka DO OCENY, każdy ze zdaniem na osi.
+
+**Zadanie MM schodzi razem z koszykiem.** Pudło odrzucone przez Sferę ma przy
+sobie zadanie w błędzie; zostawione bez kosza wisiałoby w kolejce jako praca
+nad czymś, czego nie ma.
+
+**Pytamy tylko wtedy, gdy jest o co.** Pudło puste nie niesie niczyjej pracy,
+więc schodzi jednym kliknięciem — pytanie byłoby tu bez treści. Napełnione
+niesie oceny i wymaga drugiego kliknięcia, a zdanie mówi SKUTEK, nie „operacja
+nieodwracalna": ile pozycji zniknie, że oceny wrócą do DO OCENY i że towar
+zostanie tam, gdzie leży.
+
+**Ślad w dzienniku niesie ZAWARTOŚĆ**, nie samą liczbę. Usunięte pudło znika
+z bazy razem z wierszami, więc dziennik jest jedynym miejscem, w którym zostaje
+odpowiedź na pytanie „co w nim było".
+
+Trasa `kosz/porzuc` zmieniła nazwę na `kosz/usun` razem z zakresem. Licznik tras
+POST zwrotów zostaje na 35 — to ta sama trasa, nie nowa.
+
 ## 0.379.0 — 17 września 2026
 
 **Kilka pudeł naraz, a zaległy koszyk wreszcie da się odetkać.** Dwa zgłoszenia

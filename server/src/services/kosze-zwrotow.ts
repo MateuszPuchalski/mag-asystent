@@ -275,38 +275,86 @@ export function zalozKoszyk(
 }
 
 /**
- * Porzuca PUSTY koszyk, którego nikt nie napełnił.
+ * Usuwa CAŁY koszyk — także napełniony (0.380.0).
  *
- * Bez tego przycisk NOWY KOSZYK byłby drogą w jedną stronę: koszyk pusty nie
- * daje się zamknąć (dokument bez linii nie jest dokumentem), więc naciśnięty
- * przez pomyłkę stałby w pasku do końca świata i mówił, że operator ma pracę,
- * której nie ma.
+ * Do 0.379.0 schodził wyłącznie pusty. Zgłoszenie właściciela: „zrób, żeby
+ * można było usunąć cały koszyk zwrotowy". Powód widać było na jego ekranie:
+ * pudła odrzucone przez Sferę stały w pasku z kilkoma kartotekami usługowymi
+ * w środku, a jedyną drogą było zdejmowanie ich wiersz po wierszu.
  *
- * WYŁĄCZNIE PUSTY I WYŁĄCZNIE BEZ ZADANIA. Koszyk z zawartością schodzi
- * zamknięciem albo zdejmowaniem wierszy — dwie drogi do tego samego skutku
- * kosztowałyby pytanie, czym się różnią.
+ * BRAMKĄ JEST DOKUMENT, tak samo jak przy poprawianiu zawartości. Koszyk
+ * z wystawioną MM nie schodzi i nie zejdzie: papier pojechał na halę, ktoś
+ * rozkłada z niego towar, a stan w Subiekcie już się przesunął. Kasowanie
+ * takiego kosza u nas nie cofnęłoby ani jednej z tych rzeczy — zostawiłoby
+ * tylko halę bez listy.
+ *
+ * OCENY WRACAJĄ, wiersz po wierszu, tą samą regułą co przy zdejmowaniu jednego
+ * (0.379.0): to ocena wsadziła towar do pudła, więc usunięcie pudła bez jej
+ * zdjęcia zostawiłoby karty zwrotów mówiące o regale, na który nic nie jedzie.
+ * Zwroty wracają do kubełka DO OCENY, każdy ze zdaniem na osi.
+ *
+ * ZADANIE MM SCHODZI RAZEM Z KOSZYKIEM. Pudło odrzucone przez Sferę ma przy
+ * sobie zadanie w błędzie; zostawione bez kosza wisiałoby w kolejce jako praca
+ * nad czymś, czego nie ma.
  */
-export function porzucKoszyk(
+export function usunKoszyk(
   database: Db, koszId: number, kto: { id: number; name: string },
-): { koszId: number; kod: string } {
+): { koszId: number; kod: string; pozycji: number; zwrotow: number } {
   return transaction(database, () => {
     const k = database.prepare(
-      `SELECT id, kod, status, mm_dok_id, mm_queue_id FROM kosz WHERE id=?`).get(koszId) as
-      { id: number; kod: string; status: string; mm_dok_id: number | null;
-        mm_queue_id: number | null } | undefined;
+      `SELECT id, kod, status, rodzaj, mm_dok_id FROM kosz WHERE id=?`).get(koszId) as
+      { id: number; kod: string; status: string; rodzaj: RodzajKosza;
+        mm_dok_id: number | null } | undefined;
     if (!k) throw new Error("Nie znam takiego koszyka zwrotów.");
-    if (k.status !== "otwarty" || k.mm_dok_id !== null || k.mm_queue_id !== null) {
-      throw new Error(`Koszyk ${k.kod} nie jest już otwarty — porzucić da się tylko pusty.`);
+    if (k.rodzaj !== "zwroty" && k.rodzaj !== "odpad") {
+      throw new Error(`Koszyk ${k.kod} nie jest koszykiem zwrotów ani odpadu.`);
     }
-    const { n } = database.prepare(
-      "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(koszId) as { n: number };
-    if (n > 0) {
+    if (k.mm_dok_id !== null) {
       throw new Error(
-        `Koszyk ${k.kod} ma ${n} pozycji — zamknij go albo zdejmij z niego wiersze.`);
+        `Koszyk ${k.kod} ma już dokument MM — towar pojechał na halę i aplikacja go nie cofnie.`);
     }
+
+    const wiersze = database.prepare(
+      `SELECT id, symbol, ilosc, zwrot_pozycja_id FROM kosz_pozycja WHERE kosz_id=?`)
+      .all(koszId) as Array<{ id: number; symbol: string; ilosc: number;
+        zwrot_pozycja_id: number | null }>;
+
+    /* NAJPIERW OCENY, potem kasowanie: po `DELETE` nie ma już czego czytać,
+       a numer zwrotu jest potrzebny do zdania na jego osi. */
+    const zwroty = new Set<number>();
+    const at = new Date().toISOString();
+    for (const w of wiersze) {
+      if (w.zwrot_pozycja_id === null) continue;
+      const poz = Number(w.zwrot_pozycja_id);
+      const z = database.prepare(
+        "SELECT zwrot_id, nazwa FROM zwrot_klienta_pozycja WHERE id=?").get(poz) as
+        { zwrot_id: number; nazwa: string } | undefined;
+      database.prepare(`UPDATE zwrot_klienta_pozycja
+        SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE id=?`).run(poz);
+      if (!z) continue;
+      zwroty.add(Number(z.zwrot_id));
+      database.prepare("UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?")
+        .run(Number(z.zwrot_id));
+      database.prepare(`INSERT INTO zwrot_zdarzenie
+        (zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
+        VALUES (?,'ocena_cofnieta',?,?,?,?,?)`)
+        .run(Number(z.zwrot_id), `${z.nazwa} — koszyk ${k.kod} usunięty, ocena cofnięta`,
+          JSON.stringify({ pozycjaId: poz, koszId, kod: k.kod }), at, kto.name, kto.id);
+    }
+
+    uniewaznijZadanieMm(database, koszId, kto);
+    database.prepare("DELETE FROM kosz_pozycja WHERE kosz_id=?").run(koszId);
     database.prepare("DELETE FROM kosz WHERE id=?").run(koszId);
-    logEvent("kosz_zwrotow_porzucony", kto.name, null, { koszId, kod: k.kod }, kto.id, database);
-    return { koszId, kod: k.kod };
+
+    /* ŚLAD Z ZAWARTOŚCIĄ, nie samą liczbą. Usunięte pudło znika z bazy razem
+       z wierszami, więc dziennik jest jedynym miejscem, w którym zostaje
+       odpowiedź na pytanie „co w nim było". */
+    logEvent("kosz_zwrotow_usuniety", kto.name, null,
+      { koszId, kod: k.kod, status: k.status, rodzaj: k.rodzaj,
+        pozycje: wiersze.map((w) => ({ symbol: w.symbol, ilosc: Number(w.ilosc) })),
+        zwrotow: zwroty.size },
+      kto.id, database);
+    return { koszId, kod: k.kod, pozycji: wiersze.length, zwrotow: zwroty.size };
   })();
 }
 

@@ -5,7 +5,7 @@ import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   koszykiBezDokumentu, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
-  zalozKoszyk, porzucKoszyk, WyborKoszyka,
+  zalozKoszyk, usunKoszyk, WyborKoszyka,
   zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
@@ -476,15 +476,15 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     });
 
   app.post<{ Body: { koszId?: number } }>(
-    "/api/obsluga/zwroty/kosz/porzuc", async (req, reply) => {
+    "/api/obsluga/zwroty/kosz/usun", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       const id = Number(req.body?.koszId);
       if (!Number.isFinite(id) || id <= 0) {
-        return reply.code(400).send({ error: "Wskaż koszyk, który mam porzucić." });
+        return reply.code(400).send({ error: "Wskaż koszyk, który mam usunąć." });
       }
       try {
-        return porzucKoszyk(db(), id, kto());
+        return usunKoszyk(db(), id, kto());
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 

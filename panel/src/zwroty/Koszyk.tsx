@@ -1,9 +1,9 @@
 import React from "react";
 import { PackageOpen, PackagePlus, X } from "lucide-react";
 import {
-  useKosz, useMmMimoKorekt, useNowyKoszyk, usePorzucKoszyk, useZamknijKosz, useZdejmijTowar,
+  useKosz, useMmMimoKorekt, useNowyKoszyk, useUsunKoszyk, useZamknijKosz, useZdejmijTowar,
 } from "../api/zwroty";
-import { Przycisk, Blad } from "../ui";
+import { Przycisk, Blad, ile } from "../ui";
 import { DolozTowar } from "./DolozTowar";
 
 /* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
@@ -23,6 +23,39 @@ import { DolozTowar } from "./DolozTowar";
    otwartego zwrotu. Wewnątrz karty zwrotu znikałby przy każdym przejściu do
    następnej paczki — a licznik ma rosnąć na oczach.                          */
 
+/**
+ * Usunięcie całego pudła — jedno kliknięcie na pustym, dwa na napełnionym.
+ *
+ * PYTAMY TYLKO WTEDY, GDY JEST O CO. Pudło puste nie niesie niczyjej pracy,
+ * więc pytanie po jego usunięciu byłoby pytaniem bez treści — a dekalog
+ * zabrania pytań, na które jest jedna odpowiedź. Napełnione niesie oceny,
+ * które wrócą do kubełka DO OCENY, i zdanie mówi to WPROST: nie „operacja
+ * nieodwracalna", tylko co konkretnie się stanie.
+ */
+function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
+  kod: string; pozycji: number; trwa: boolean; pytamy: boolean;
+  onPytaj: () => void; onNie: () => void; onTak: () => void;
+}) {
+  if (pozycji === 0) {
+    return <button type="button" className="btn-secondary text-xs" disabled={trwa}
+      onClick={onTak}>{trwa ? "Usuwam…" : "Usuń pusty koszyk"}</button>;
+  }
+  if (!pytamy) {
+    return <button type="button" className="btn-secondary text-xs" disabled={trwa}
+      onClick={onPytaj}>Usuń koszyk</button>;
+  }
+  return <span className="flex w-full flex-wrap items-center gap-2">
+    <span>
+      Koszyk {kod} zniknie razem z {ile(pozycji, "pozycją", "pozycjami", "pozycjami")}.
+      Oceny wrócą do kubełka DO OCENY, a towar zostanie tam, gdzie leży. Usuwam?
+    </span>
+    <Przycisk className="text-xs" disabled={trwa} onClick={onTak}>
+      {trwa ? "Usuwam…" : `Tak, usuń ${kod}`}
+    </Przycisk>
+    <button type="button" className="btn-secondary text-xs" onClick={onNie}>Nie</button>
+  </span>;
+}
+
 export function Koszyk() {
   const { data } = useKosz();
   const zamknij = useZamknijKosz();
@@ -40,8 +73,12 @@ export function Koszyk() {
      nie da się zamknąć, więc bez tej drugiej drogi pomyłka stałaby w pasku
      na zawsze. */
   const nowy = useNowyKoszyk();
-  const porzuc = usePorzucKoszyk();
+  const usun = useUsunKoszyk();
   const [pewien, setPewien] = React.useState<number | null>(null);
+  /* Osobny stan od `pewien`: tamten pyta o WYSTAWIENIE MM mimo korekt, ten
+     o usunięcie pudła. Jeden stan na dwa pytania dałby ekran, na którym
+     kliknięcie „tak" odpowiada na cudze. */
+  const [doUsuniecia, setDoUsuniecia] = React.useState<number | null>(null);
   /* DWA KOSZYKI OD 0.211.0: zwroty i odpad. Pusty się nie pokazuje — pasek
      rośnie wtedy, kiedy operator naprawdę coś w nim ma. */
   /* PUSTY KOSZYK JEST WIDOCZNY OD 0.378.0, i to nie łamie punktu 2 dekalogu,
@@ -192,6 +229,13 @@ export function Koszyk() {
               onClick={() => mimo.mutate(c.id)}>
               {mimo.isPending ? "Wystawiam…" : "Wystaw MM"}
             </Przycisk>}
+      {/* USUNIĘCIE CAŁEGO PUDŁA (0.380.0) stoi także tutaj, bo to właśnie
+          koszyki zaległe zajmowały pół ekranu. Zdejmowanie ich wiersz po
+          wierszu było jedyną drogą i dlatego nikt tego nie robił. */}
+      <UsunKoszyk kod={c.kod} pozycji={(c.pozycje ?? []).length} trwa={usun.isPending}
+        pytamy={doUsuniecia === c.id}
+        onPytaj={() => setDoUsuniecia(c.id)} onNie={() => setDoUsuniecia(null)}
+        onTak={() => usun.mutate(c.id, { onSettled: () => setDoUsuniecia(null) })} />
       {mimo.error && <div className="w-full"><Blad>{(mimo.error as Error).message}</Blad></div>}
       {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
@@ -220,15 +264,17 @@ export function Koszyk() {
     {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
         więc serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia,
         stoi tu droga wyjścia: porzucenie pudła, którego nikt nie napełnił. */}
-    {kosz.pozycji > 0
-      ? <Przycisk className="text-xs" disabled={zamknij.isPending}
-          onClick={() => zamknij.mutate(kosz.id)}>
-          {zamknij.isPending ? "Zamykam…" : "Zamknij koszyk"}
-        </Przycisk>
-      : <button type="button" className="btn-secondary text-xs" disabled={porzuc.isPending}
-          onClick={() => porzuc.mutate(kosz.id)}>
-          {porzuc.isPending ? "Porzucam…" : "Porzuć pusty koszyk"}
-        </button>}
+    {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
+        więc serwer i tak odmówi. */}
+    {kosz.pozycji > 0 &&
+      <Przycisk className="text-xs" disabled={zamknij.isPending}
+        onClick={() => zamknij.mutate(kosz.id)}>
+        {zamknij.isPending ? "Zamykam…" : "Zamknij koszyk"}
+      </Przycisk>}
+    <UsunKoszyk kod={kosz.kod} pozycji={kosz.pozycji} trwa={usun.isPending}
+      pytamy={doUsuniecia === kosz.id}
+      onPytaj={() => setDoUsuniecia(kosz.id)} onNie={() => setDoUsuniecia(null)}
+      onTak={() => usun.mutate(kosz.id, { onSettled: () => setDoUsuniecia(null) })} />
     {/* Co się stanie po kliknięciu — wprost, bo powstaje dokument w Subiekcie.
         Ta sama zasada co przy korekcie: ekran mówi, czego NIE robi i co robi
         za człowieka. */}
@@ -269,7 +315,7 @@ export function Koszyk() {
       </span>)}
     </span>}
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
-    {porzuc.error && <div className="w-full"><Blad>{(porzuc.error as Error).message}</Blad></div>}
+    {usun.error && <div className="w-full"><Blad>{(usun.error as Error).message}</Blad></div>}
     {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
   </>;
