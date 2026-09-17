@@ -1254,6 +1254,7 @@ const OPIS_OCENY: Record<Exclude<OcenaPozycji, null>, string> = {
 export function ocenPozycje(
   database: Db, pozycjaId: number, ocena: OcenaPozycji,
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
+  koszId?: number | null,
 ): { wersja: number; koszyk: number | null } {
   const p = database.prepare(
     "SELECT id, zwrot_id, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
@@ -1297,9 +1298,12 @@ export function ocenPozycje(
     /* OUTLET NIE MA KOSZYKA i to jest jego definicja, nie brak. Magazyn
        outletowy nie jest skonfigurowany, więc dokument MM nie miałby dokąd
        jechać — a zgadnięty numer przesunąłby używkę w cudze miejsce. */
+    /* WSKAZANY KOSZYK JEDZIE DALEJ (0.379.0). Przy kilku otwartych pudłach
+       `dolozDoKosza` odmawia zgadywania i oddaje wybór ekranowi — decyzja
+       właściciela. Przy jednym pudle nikt o nic nie pyta. */
     const koszyk = ocena === null || ocena === "outlet" ? null
       : dolozDoKosza(database, pozycjaId, kto, teraz,
-        ocena === "utylizacja" ? "odpad" : "zwroty");
+        ocena === "utylizacja" ? "odpad" : "zwroty", koszId);
     /* Zmiana oceny na inną KASUJE ślad przeniesienia: pozycja, która wraca do
        obiegu magazynowego, nie czeka już na niczyją rękę przy regale. */
     if (ocena !== "outlet") {

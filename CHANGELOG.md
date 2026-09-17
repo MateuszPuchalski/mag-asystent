@@ -34,11 +34,11 @@ historii nie przepisujemy.
 ---
 
 
-## 0.378.1 — 17 września 2026
+## 0.379.1 — 17 września 2026
 
-**Numer ustępuje wydaniom z main już drugi raz.**
-Wydanie powstało jako 0.373.1, potem 0.377.1, a numer zmieniał się przy każdym
-scalaniu main. Treść dokumentu przy tych zmianach nie ucierpiała.
+**Numer ustępuje wydaniom z main już trzeci raz.**
+Wydanie powstało jako 0.373.1, potem 0.377.1 i 0.378.1; numer zmieniał się przy
+każdym scalaniu main. Treść dokumentów przy tych zmianach nie ucierpiała.
 
 **Strategia WMS na piśmie: co znaczy „pełny system magazynowy" przy 342 m².**
 Pytanie właściciela brzmiało, jak zamienić WERTIS w pełny WMS i wyłączyć
@@ -76,6 +76,26 @@ pytaniem, który system ma prawo się mylić w danej sprawie. Z niej wynika resz
   dokumentów tygodniowo; wtedy jeden na zamówienie. Dlatego jej przepustowość
   mierzy się PRZED decyzją, a nie po niej.
 
+**Projekt techniczny stoi osobno, w `docs/wms-projekt.md`.** Strategia mówi, czy
+i po co budować; projekt mówi, z czego: dziesięć tabel, niezmienniki z pomiarem,
+siedem przebiegów, cztery ekrany kolektora i lista tras z rolami.
+
+Projekt przeszedł audyt w DWÓCH rundach i to rozróżnienie jest uczciwe.
+Pierwsza szła razem z pisaniem i złapała dziewięć rzeczy. Druga czytała gotowy
+tekst jako cudzy i znalazła jedenaście więcej, w tym dwie zatrzymujące wdrożenie:
+
+- **Zasiew zapasu wymagałby policzenia całego magazynu przed startem.** Miejsce
+  `nieznane` na magazyn usuwa tydzień postoju: stan z Subiekta wchodzi tam
+  jednym ruchem, a hala przenosi towar na półki w tempie normalnej pracy.
+- **Niezmiennik „suma z półek równa się stanowi Subiekta" byłby czerwony od
+  pierwszego dnia.** `reconcile.ts` mówi wprost, że raport przychodzący
+  codziennie przestaje być czytany — a czerwony z projektu to ten sam błąd,
+  tylko wcześniej.
+
+Sekcja 13 projektu wypisuje wszystkie dwadzieścia znalezisk wraz z miejscem,
+w którym poprawka weszła do tekstu. Słowniczek w `docs/slownik.md` dostał osiem
+nowych pojęć, bo nowe byty bez jednego słowa rozjeżdżają się po tygodniu.
+
 Dokument wchodzi do `tools/styl_check.py`, choć jako uzasadnienie decyzji mógłby
 stać poza zakresem tak jak `docs/architektura.md`. Powód stoi przy wpisie:
 dokument o dyscyplinie kosztów, który sam nie trzyma limitu zdania, przekonuje
@@ -83,6 +103,43 @@ tyle co deklaracja bez mechanizmu.
 
 Poza dokumentacją nie zmienia się nic — żadnego kodu, żadnej trasy, żadnej
 tabeli.
+## 0.379.0 — 17 września 2026
+
+**Kilka pudeł naraz, a zaległy koszyk wreszcie da się odetkać.** Dwa zgłoszenia
+właściciela z jednego zrzutu ekranu, na którym pasek koszyków zajmował pół
+ekranu, a przycisku nowego pudła nie było widać wcale.
+
+**Otwartych koszyków może być kilka.** To ODWRACA decyzję z 3 września
+(„otwarty koszyk jest JEDEN na operatora"). Tamta opisywała jedno pudło przy
+jednym biurku; praca pokazała kilka kartonów naraz, a zamykanie pierwszego po
+to, żeby zacząć drugi, wystawia dokument na pudło, które jeszcze nie odjechało.
+Przycisk NOWY KOSZYK stoi więc zawsze i za każdym naciśnięciem zakłada kolejne.
+
+**Cena tej swobody: przy kilku pudłach ocena PYTA, do którego.** Wybór
+właściciela, nie domysł kodu. Zgadywanie „do najnowszego" byłoby tanie
+w kodzie i drogie na hali — towar trafiałby do cudzego kartonu bez jednego
+słowa na ekranie. Pytamy JEDNYM kliknięciem: przycisk oceny rozwija się na tyle
+przycisków, ile jest pudeł, z kodem na każdym. Osobne okienko po naciśnięciu
+byłoby pytaniem PO czynności, a tego zabrania dekalog. Przy jednym pudle nikt
+o nic nie pyta, a pole skanu przy konkretnym koszyku celuje wprost w niego.
+
+**Z koszyka bez dokumentu schodzi teraz KAŻDY wiersz, także ten z oceny.**
+Reguła „wiersz ze zwrotu schodzi cofnięciem oceny" była słuszna w zamyśle —
+jedna droga na jeden skutek — a zostawiła koszyki bez wyjścia. Z-8 na produkcji
+odbił się od Sfery na kartotece usługowej przyniesionej OCENĄ: nie miał ani
+jednego wiersza ze skanu, więc nie miał ani jednego krzyżyka, i żeby go
+odetkać, trzeba było odnaleźć zwrot, z którego przyszedł feralny wiersz.
+
+**Ocena schodzi RAZEM z wierszem** i to jest warunek spójności, nie dodatek. To
+ona wsadziła towar do pudła, więc wyjęcie bez jej zdjęcia zostawiłoby kartę
+zwrotu mówiącą o regale, którego dokument tej sztuki nie niesie. Zwrot wraca do
+kubełka DO OCENY, a jego oś dostaje zdanie o tym, co się stało. Pasek pokazuje
+odtąd CAŁĄ zawartość pudła, a wiersz ze zwrotu jest oznaczony — jego krzyżyk
+mówi w etykiecie, że cofnie ocenę.
+
+**[uwaga przy czytaniu]** Trzy testy pilnujące odwróconych reguł przepisano na
+nowe, razem z powodem. Strażnik ma pilnować tego, co obowiązuje dziś.
+
 ## 0.378.0 — 17 września 2026
 
 **Koszyk zwrotów zakłada się WPROST, a towar dokłada bez otwierania zwrotu.**

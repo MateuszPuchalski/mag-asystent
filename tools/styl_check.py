@@ -55,6 +55,9 @@ DOCS = [
     # wydaniem pieniędzy — a dokument o dyscyplinie kosztów, który sam nie
     # trzyma limitu zdania, przekonuje tyle co deklaracja bez mechanizmu.
     "docs/wms-strategia.md",
+    # Projekt WMS: czyta go implementujący, obok otwartego edytora, i wykonuje
+    # z niego migracje. Ten sam powód co przy procedurze wdrożenia.
+    "docs/wms-projekt.md",
 ]
 
 SLOWNIK = "docs/slownik.md"

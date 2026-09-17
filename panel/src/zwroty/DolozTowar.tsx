@@ -27,7 +27,9 @@ import { SeriaWPolu } from "../skaner";
    oznaczony `dokladne` — ten dokładamy od razu, bo skan jest wskazaniem, a nie
    pytaniem.                                                                  */
 
-export function DolozTowar({ rodzaj = "zwroty" }: { rodzaj?: "zwroty" | "odpad" }) {
+export function DolozTowar(
+  { rodzaj = "zwroty", koszId }: { rodzaj?: "zwroty" | "odpad"; koszId?: number },
+) {
   const [otwarte, setOtwarte] = useState(false);
   const [fraza, setFraza] = useState("");
   const [blad, setBlad] = useState("");
@@ -40,7 +42,11 @@ export function DolozTowar({ rodzaj = "zwroty" }: { rodzaj?: "zwroty" | "odpad" 
 
   const dodaj = (twId: number, symbol: string) => {
     setBlad("");
-    doloz.mutate({ twId, ilosc: 1, rodzaj }, {
+    /* KOSZYK WPROST, gdy pole stoi przy konkretnym pudle (0.379.0). Bez tego
+       skan przy drugim kartonie wpadałby do pierwszego albo odbijałby się od
+       pytania „do którego" — a pytanie zadane przy pudle, które człowiek ma
+       przed sobą, byłoby pytaniem o to, co już powiedział. */
+    doloz.mutate({ twId, ilosc: 1, rodzaj, koszId }, {
       onSuccess: (w) => {
         /* Licznik sztuk W ZDANIU, nie sama nazwa: drugi skan tego samego
            towaru dolicza sztukę, a operator ma to zobaczyć bez patrzenia

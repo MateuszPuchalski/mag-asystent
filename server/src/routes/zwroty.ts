@@ -5,7 +5,7 @@ import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   koszykiBezDokumentu, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
-  zalozKoszyk, porzucKoszyk,
+  zalozKoszyk, porzucKoszyk, WyborKoszyka,
   zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
@@ -239,7 +239,10 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  app.post<{ Params: { id: string }; Body: { ocena?: string | null; wersja?: number } }>(
+  app.post<{
+    Params: { id: string };
+    Body: { ocena?: string | null; wersja?: number; koszId?: number };
+  }>(
     "/api/obsluga/zwroty/pozycje/:id/ocena", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -253,8 +256,16 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
       try {
         return ocenPozycje(db(), Number(req.params.id), o as never,
-          Number(req.body?.wersja), kto());
-      } catch (e) { return konflikt(reply, e); }
+          Number(req.body?.wersja), kto(), new Date(), req.body?.koszId ?? null);
+      } catch (e) {
+        /* WYBÓR PUDŁA WRACA STRUKTURALNIE, nie zdaniem (0.379.0). Ekran ma
+           narysować przyciski z kodami koszyków, a nie kazać człowiekowi
+           przepisywać kod z komunikatu o błędzie. */
+        if (e instanceof WyborKoszyka) {
+          return reply.code(409).send({ error: e.message, kosze: e.kosze });
+        }
+        return konflikt(reply, e);
+      }
     });
 
   /* ── Regał outletowy obsługiwany ręką (0.375.0) ────────────────────────
@@ -412,7 +423,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       };
     });
 
-  app.post<{ Body: { twId?: number; ilosc?: number; rodzaj?: string } }>(
+  app.post<{ Body: { twId?: number; ilosc?: number; rodzaj?: string; koszId?: number } }>(
     "/api/obsluga/zwroty/kosz/towar", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -428,8 +439,17 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "Koszyk jest albo zwrotów, albo odpadu." });
       }
       try {
-        return dolozTowar(db(), twId, Number(req.body?.ilosc ?? 1), kto(), new Date(), rodzaj);
-      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+        return dolozTowar(db(), twId, Number(req.body?.ilosc ?? 1), kto(), new Date(),
+          rodzaj, req.body?.koszId ?? null);
+      } catch (e) {
+        /* Wybór pudła wraca STRUKTURALNIE, tak samo jak przy ocenie: skan bez
+           wskazania celu przy kilku otwartych pudłach ma narysować przyciski
+           z kodami, a nie komunikat do przepisania. */
+        if (e instanceof WyborKoszyka) {
+          return reply.code(409).send({ error: e.message, kosze: e.kosze });
+        }
+        return reply.code(409).send({ error: (e as Error).message });
+      }
     });
 
   /* ── Koszyk zakładany WPROST (0.378.0) ─────────────────────────────────
