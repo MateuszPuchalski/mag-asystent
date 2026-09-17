@@ -6,8 +6,13 @@ w [`wms-strategia.md`](wms-strategia.md), a decyzja o kolejności prac w jej
 sekcji 9.
 
 > **Status.** To jest PROJEKT, nie opis kodu. Żadna z tabel niżej nie istnieje
-> w `server/src/db/schema.sql`. Sekcja 13 jest audytem tego projektu i listą
-> poprawek, które z audytu weszły do tekstu wyżej.
+> w `server/src/db/schema.sql` na `main`. Sekcja 13 jest audytem tego projektu,
+> a sekcja 14 — kolizją z gotową implementacją.
+
+> **CZYTAJ NAJPIERW SEKCJĘ 14.** WMS jest już zbudowany na gałęzi
+> `codex/robust-wms` (PR #415, otwarty od 10 września). Ten dokument powstał
+> bez tej wiedzy i zaprojektował to samo drugi raz. Decyzja o tym, co z czym
+> scalić, należy do właściciela i nie zapada w tym pliku.
 
 ---
 
@@ -571,6 +576,10 @@ ile kartotek ma już prawdziwe miejsce.
 
 ## 13. Audyt projektu
 
+> Audyt niżej ocenia SAM PROJEKT, bez wiedzy o gałęzi z sekcji 14. Zostaje
+> w tekście, bo jego znaleziska dotyczą też tamtej implementacji — zwłaszcza
+> zasiew i rozliczenie z Subiektem.
+
 Audyt szukał trzech rzeczy: sprzeczności z regułami repo, dziur w modelu danych
 i założeń bez pokrycia w danych. Poszedł DWIEMA RUNDAMI i to rozróżnienie jest
 uczciwe, a nie kosmetyczne.
@@ -732,3 +741,94 @@ wydajności przy trzech kolektorach naraz ani zachowania kolejki pod obciążeni
 
 Obie rzeczy są do zmierzenia na działającym etapie 1b i żaden przegląd tekstu
 tego nie zastąpi.
+
+---
+
+## 14. Kolizja: WMS jest już zbudowany
+
+`CLAUDE.md` mówi wprost: gdy ktoś buduje TO SAMO, powiedz właścicielowi
+i czekaj na decyzję przed napisaniem linijki kodu. Ta sekcja jest tym
+powiedzeniem, a kodu WMS w tej gałęzi nie ma i nie będzie do decyzji.
+
+### Co stoi na `codex/robust-wms`
+
+| miara | wartość |
+|---|---|
+| pull request | #415, otwarty od 10 września, bez scalenia |
+| commity spoza `main` | 74 |
+| tabele `wms_*` | 40 |
+| serwisy `wms-*` | ponad trzydzieści, z testami |
+| pliki testowe WMS | 22 |
+| skrypty e2e w `tools/` | 16 |
+| ekrany kolektora | 24 |
+| commity `main`, których gałąź nie ma | 134 |
+
+Ostatni wiersz jest tu najważniejszy po pierwszym. Gałąź stoi na `main` sprzed
+0.327.0, a `main` jest dziś o sto trzydzieści kilka commitów dalej — razem
+z przebudową zwrotów i reklamacji.
+
+### Ta sama rzecz, dwa razy
+
+| byt z tego projektu | odpowiednik na gałęzi |
+|---|---|
+| `zapas` | `wms_stock` (z `reserved` i `capacity`) |
+| `ruch_zapasu` | `wms_movement` (z wyzwalaczami blokującymi zmianę) |
+| `miejsce` | `wms_bin` (tryby `pick`, `reserve`, `quarantine`) |
+| `rezerwacja` | `wms_allocation` |
+| zbiórka zbiorcza, przegroda | `wms_cart`, `wms_cart_slot`, `wms_wave` |
+| pakowanie z kontrolą | `wms_pack_content`, `wms_pack_issue` |
+| inwentura | `wms_stock_check`, `wms_stock_observation` |
+| uzupełnianie | `wms_replenishment` |
+
+Tamta implementacja jest w kilku miejscach twardsza od tego projektu.
+`wms_movement` blokuje zmianę i kasowanie wyzwalaczem, a nie zdaniem
+w dokumencie. Kolumny `version` niosą zamek optymistyczny, którego ten projekt
+nie ma wcale.
+
+### Różnica, która nie jest nazewnictwem
+
+**Tamten WMS jest samodzielny: nie pisze do Subiekta i nie rozlicza się z nim.**
+To nie jest domysł. W serwisach `wms-*` nie ma ani jednego wywołania kolejki,
+`reconcile.ts` nie zna żadnej tabeli `wms_`, a karta towaru (`stock.ts`) nie
+czyta `wms_stock`.
+
+Znaczy to, że stan magazynowy istniałby w dwóch miejscach naraz, bez pomiaru
+rozjazdu między nimi. Sekcja 3 strategii odrzuca dokładnie ten układ, a sekcja
+4 tego projektu stawia przeciw niemu sześć niezmienników.
+
+To jest cała decyzja do podjęcia i nie da się jej podjąć w dokumencie.
+Rozstrzyga ją właściciel: albo WMS ma własną prawdę o stanie, albo prawdą
+zostaje Subiekt, a WMS trzyma jej rozbicie.
+
+### Dlaczego nie wyszło to wcześniej
+
+`tools/co_w_toku.sh` istnieje po to, żeby takie zderzenie wychodziło przed
+pracą, a nie po niej. Lista otwartych PR-ów wymaga jednak `gh` w ścieżce,
+a w środowisku tej sesji `gh` nie ma.
+
+Skrypt powiedział to uczciwie — „nie wiem, brak gh w PATH" — i pracował dalej.
+Ostrzeżenie o zajętym numerze i o cudzej pracy po prostu nie mogło paść.
+Gałąź nazywa się `codex/robust-wms`, więc samo przejrzenie listy gałęzi też by
+wystarczyło; nikt tego nie zrobił.
+
+### Trzy drogi i ich koszt
+
+1. **Scalić gałąź, ten projekt traktować jak przegląd.** Najtaniej, ale
+   zostaje 134 commity `main` do nadgonienia i pytanie o stan otwarte.
+2. **Wziąć z projektu tylko granicę do Subiekta.** Zasiew, niezmienniki
+   i rozliczenie dołożyć do istniejących tabel `wms_*`.
+3. **Zbudować od nowa według tego projektu.** Najdroższe i trudne do obrony
+   wobec działającego kodu z testami.
+
+**Rekomendacja: droga druga.** Kod, który istnieje i ma testy, jest wart
+więcej niż projekt. Brakuje mu jednej rzeczy — rozliczenia z Subiektem — a to
+jest dokładnie ta rzecz, którą ten dokument opisuje najdokładniej.
+
+### Liczby pod tę decyzję
+
+Sonda `tools/sonda-wms.mjs` czyta bazę Subiekta WYŁĄCZNIE do odczytu i zbiera
+dziesięć pomiarów. Każdy niesie zdanie o tym, którą decyzję rozstrzyga.
+
+Najważniejszy jest drugi: czy system sprzedaży księguje dokument przy złożeniu
+zamówienia, czy przy wysyłce. Odpowiedź „przy złożeniu" unieważnia zasiew
+z sekcji 11 i niezmiennik N2, niezależnie od tego, która droga wyżej wygra.

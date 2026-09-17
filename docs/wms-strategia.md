@@ -10,6 +10,10 @@ WERTIS był pełnym systemem magazynowym i zastąpił Sellasist.**
 > pełnej listy funkcji, z których firma korzysta. Sekcja 10 wypisuje wprost,
 > czego nie wiem.
 
+> **WMS już istnieje na gałęzi `codex/robust-wms` (PR #415).** Zderzenie opisuje
+> [`wms-projekt.md`](wms-projekt.md) §14. Wnioski tego dokumentu zostają w mocy,
+> bo dotyczą zakresu i kolejności, a nie tego, kto pisze kod.
+
 > **Projekt techniczny.** Model danych, przebiegi i ekrany stoją osobno,
 > w [`wms-projekt.md`](wms-projekt.md). Ten dokument mówi, czy i po co budować;
 > tamten mówi, z czego.

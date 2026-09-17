@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.380.2 — 17 września 2026
+
+**WMS jest już zbudowany na gałęzi `codex/robust-wms` — i dowiedzieliśmy się
+tego po napisaniu projektu.** PR #415 stoi otwarty od 10 września: 74 commity,
+40 tabel `wms_*`, ponad trzydzieści serwisów z testami, 24 ekrany kolektora
+i szesnaście skryptów e2e. Ten projekt zaprojektował to samo drugi raz.
+
+To jest ta sama blizna co statusy rozmowy z 0.157.0 i 0.158.0, tylko większa.
+`CLAUDE.md` każe w takim wypadku powiedzieć właścicielowi i czekać na decyzję
+przed napisaniem linijki kodu — więc kodu WMS w tej gałęzi nie ma.
+
+**Dlaczego strażnik nie zadziałał.** `tools/co_w_toku.sh` pokazuje otwarte
+PR-y tylko wtedy, gdy `gh` jest w ścieżce. W tej sesji go nie było, a skrypt
+uczciwie powiedział „nie wiem" i pracował dalej. Sama nazwa gałęzi wystarczyłaby
+za ostrzeżenie; nikt na listę gałęzi nie spojrzał.
+
+**Różnica jest głębsza niż nazewnictwo tabel.** Tamten WMS jest SAMODZIELNY:
+w serwisach `wms-*` nie ma wywołania kolejki, `reconcile.ts` nie zna tabel
+`wms_`, a karta towaru nie czyta `wms_stock`. Stan magazynowy istniałby więc
+w dwóch miejscach naraz, bez pomiaru rozjazdu — czyli w układzie, który
+strategia §3 odrzuca. Rekomendacja stoi w `docs/wms-projekt.md` §14: scalić
+tamten kod, a z tego projektu wziąć wyłącznie granicę do Subiekta.
+
+**Nowa sonda `tools/sonda-wms.mjs`** zbiera dziesięć pomiarów z bazy Subiekta,
+każdy ze zdaniem o tym, którą decyzję rozstrzyga. Skrypt jest wyłącznie do
+odczytu i nie jest to obietnica w komentarzu: zapytanie niezaczynające się od
+`SELECT` leci wyjątkiem przed połączeniem, a kolumna lokalizacji przechodzi
+przez wzorzec `tw_Pole1..8`.
+
+Tryb `--sql` wypisuje same zapytania do wklejenia w SSMS, bez sieci i bez
+`node_modules`. Kolumna `dok_Uwagi` do sondy NIE WCHODZI, choć to w niej stoi
+numer zamówienia: mieści się tam też adres i telefon.
+
+Najważniejszy pomiar jest drugi w kolejności — czy system sprzedaży księguje
+dokument przy złożeniu zamówienia, czy przy wysyłce. Odpowiedź „przy złożeniu"
+unieważnia zasiew zapasu i niezmiennik zgodności z Subiektem, niezależnie od
+tego, którą gałąź właściciel wybierze.
+
 ## 0.380.1 — 17 września 2026
 
 **Numer ustępuje wydaniom z main już czwarty raz.**
