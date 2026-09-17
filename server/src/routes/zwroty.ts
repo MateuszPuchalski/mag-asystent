@@ -5,6 +5,7 @@ import { transaction } from "../db/db.js";
 import { db } from "../db/db.js";
 import {
   koszykiBezDokumentu, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
+  zalozKoszyk, porzucKoszyk,
   zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
@@ -428,6 +429,42 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
       try {
         return dolozTowar(db(), twId, Number(req.body?.ilosc ?? 1), kto(), new Date(), rodzaj);
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  /* ── Koszyk zakładany WPROST (0.378.0) ─────────────────────────────────
+     Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+     produktów do nich jako oddzielna opcja". Do tego wydania koszyk powstawał
+     wyłącznie jako SKUTEK UBOCZNY pierwszego dołożenia — oceny „na stan" albo
+     skanu w karcie zwrotu. Agent, który stawia przy biurku pusty karton, zanim
+     otworzy pierwszą paczkę, nie miał czym go zgłosić.
+
+     Obie trasy są ZAPISEM do naszej bazy i do niczyjej więcej: koszyk nie jest
+     dokumentem, dopóki się go nie zamknie. Bramka ta sama co przy ocenie —
+     samo `odmowa()`, bo to codzienna praca biura nad własnym magazynem. */
+  app.post<{ Body: { rodzaj?: string } }>(
+    "/api/obsluga/zwroty/kosz/nowy", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const rodzaj = req.body?.rodzaj ?? "zwroty";
+      if (rodzaj !== "zwroty" && rodzaj !== "odpad") {
+        return reply.code(400).send({ error: "Koszyk jest albo zwrotów, albo odpadu." });
+      }
+      try {
+        return { kosz: zalozKoszyk(db(), kto(), new Date(), rodzaj) };
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+
+  app.post<{ Body: { koszId?: number } }>(
+    "/api/obsluga/zwroty/kosz/porzuc", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const id = Number(req.body?.koszId);
+      if (!Number.isFinite(id) || id <= 0) {
+        return reply.code(400).send({ error: "Wskaż koszyk, który mam porzucić." });
+      }
+      try {
+        return porzucKoszyk(db(), id, kto());
       } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
 
