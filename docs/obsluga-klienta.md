@@ -8,6 +8,10 @@ i odszedł razem z nim.
 Projekt docelowy panelu opisuje `docs/panel-obslugi-klienta.md`. Ten plik
 zostaje rejestrem decyzji i dowodów; tamten mówi, dokąd idziemy.
 
+Trzeci plik doszedł, gdy kolejek zrobiły się cztery:
+`docs/obsluga-klienta-calosc.md`. Tamten nie opisuje ekranu ani decyzji, tylko
+reguły obowiązujące MIĘDZY kolejkami — i nazywa siedem wiązań, których nie ma.
+
 **Stan: BUDOWA.** Wydanie 0.141.0 dostarcza pierwszy pionowy kawałek:
 panel React/Tailwind → zadanie terenowe → kolektor → wynik w panelu.
 Osiem pytań niżej nadal prowadzi projekt pełnej skrzynki Allegro. Wypełnia się je

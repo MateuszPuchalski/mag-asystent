@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.386.0 — 17 września 2026
+
+**Obsługa klienta dostaje dekalog całej drogi, nie czwartej kolejki.**
+Panel prowadzi cztery kolejki — skrzynkę, zwroty, reklamacje i dyskusje —
+a klient ma jedną sprawę i przechodzi przez nie po kolei. Przegląd źródeł
+pokazał, że mostek po numerze zamówienia istnieje, ale przechodzi po nim pięć
+ekranów z dwunastu możliwych. Żaden ekran nie widzi sprawy POSPRZEDAŻOWEJ:
+agent odpowiadający na pytanie nie wie, że ten sam klient ma otwartą
+reklamację. Historia klienta (`services/klient-historia.ts`) składa oś
+z zakupów i rozmów, a trzy kolejki z czterech pomija.
+
+Nowy `docs/obsluga-klienta-calosc.md` jest trzecim dokumentem obsługi
+i ma jedno zadanie: reguły MIĘDZY kolejkami. Rejestr decyzji zostaje
+w `obsluga-klienta.md`, projekt ekranu w `panel-obslugi-klienta.md`.
+Plik niesie dziesięć reguł, tabelę pięciu zbudowanych wiązań i siedmiu
+brakujących, plan spoiwa w sześciu krokach oraz mapę dwudziestu sytuacji
+klienta z nazwaną dziurą przy każdej.
+
+Dwie dziury są większe od reszty: **wymiana towaru na inny nie ma w aplikacji
+żadnego miejsca**, a sprawa spoza Allegro — telefon, e-mail — także nie.
+Obie są decyzją właściciela, nie zadaniem do wzięcia.
+
+Przy okazji dwie poprawki faktów. `CLAUDE.md` dostaje regułę obsługi klienta
+obok reguły ergonomii magazynu. Wiersz „Tagi przy zwrocie" w §28 projektu
+panelu twierdził „działa od 0.315.0", a tabela `zwrot_tag_sprawy` zeszła
+w 0.370.0 — teraz wiersz mówi to wprost.
+
+Kodu to wydanie nie zmienia. Kroki spoiwa czekają na decyzję właściciela,
+bo pierwszy z nich dotyka czterech ekranów naraz.
+
 ## 0.384.1 — 17 września 2026
 
 **Odmowa ZW: hipoteza o kwocie przelewu upada, sonda mierzy dwie następne.**

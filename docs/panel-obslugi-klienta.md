@@ -5262,6 +5262,11 @@ poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
 ## 27. Zasady nadrzędne
 
+Te dwanaście punktów mówi o JEDNEJ rozmowie i jednej sprawie. Reguły
+obowiązujące MIĘDZY czterema kolejkami stoją osobno, w dekalogu
+`docs/obsluga-klienta-calosc.md`. Tamten plik niesie też mapę możliwości
+i plan spoiwa; ten rozdział zostaje bez zmian.
+
 1. Najpierw dane i dowody, potem automatyzacja.
 2. Człowiek wysyła odpowiedź do klienta.
 3. Automat nie jest źródłem kompatybilności.
@@ -5404,7 +5409,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
 | Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali; od 0.319.0 pasek liczy rodzajami, a numery pokazuje po kliknięciu |
 | Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** od 0.315.0 | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
-| Tagi przy zwrocie | **działa** od 0.315.0 | `zwrot_tag_sprawy` + wspólny słownik `reklamacja_tag`; oś tagów jako parametr serwisu (`TAGI_ZWROTU`) |
+| Tagi przy zwrocie | **zdjęte** w 0.370.0 | działały od 0.315.0; tabela `zwrot_tag_sprawy` zeszła razem z osią, mechanizm `OsTagow` został przy reklamacjach i dyskusjach |
 | Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
 | Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
