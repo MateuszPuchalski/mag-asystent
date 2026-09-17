@@ -897,3 +897,33 @@ test("usunięcie koszyka z zadaniem W BŁĘDZIE zdejmuje także to zadanie", () 
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM kosz WHERE id=?")
     .get(kosz.id) as { n: number }).n, 0);
 });
+
+test("pasek mówi, KTÓREGO towaru brakuje na magazynie (0.381.0)", () => {
+  /* Produkcja, 17 września: „dostaję brak towaru w magazynie, ale nie mówi
+     jakiego, abym mógł go usunąć z koszyka". Sfera nie nazywa wiersza —
+     nazywamy go za nią, stanem z read-modelu. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [11], KTO);
+  skorygowany(d, z.id);
+  ocenPozycje(d, z.poz[0], "stan", 2, KTO);
+  kartoteka(d, 21, "S10111");
+  const kosz = otwarteKoszyki(d, KTO)[0];
+  dolozTowar(d, 21, 5, KTO, new Date(), "zwroty", kosz.id);
+  /* Na magazynie głównym leżą DWA sekatory — dokładnie tyle, ile bierze
+     koszyk — i ani jednej usługi. */
+  d.prepare("UPDATE sgt_stan SET stan=2 WHERE tw_id=11 AND mag_id=1").run();
+  zamknijKosz(d, kosz.id, KTO);
+  const q = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(kosz.id) as
+    { mm_queue_id: number }).mm_queue_id;
+  d.prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?")
+    .run('Sfera odrzuciła "MM.Zapisz()": Brak towaru w magazynie.', q);
+
+  const czeka = koszykiBezDokumentu(d)[0];
+
+  const wg = new Map(czeka.pozycje.map((p) => [p.symbol, p]));
+  assert.equal(wg.get("S10111")!.brakNaMag, true, "usługa nie ma czym się przesunąć");
+  assert.equal(wg.get("S10111")!.stanMag, 0);
+  assert.equal(wg.get("SYM-11")!.brakNaMag, false, "sekator ma pokrycie");
+  assert.equal(wg.get("SYM-11")!.stanMag, 2);
+});

@@ -34,7 +34,12 @@ historii nie przepisujemy.
 ---
 
 
-## 0.381.1 — 17 września 2026
+## 0.382.1 — 17 września 2026
+
+**Numer ustępuje wydaniu 0.381.0 z main.** Te dwa wydania powstały jako
+0.381.0 i 0.381.1; main nazwał tamten numer wcześniej, więc idą o jeden
+w górę. To piąta kolizja numeru na tej gałęzi w dwa dni.
+
 
 **Scalenie zgubiło skrypty WMS z korzenia i `postbuild` serwera.** Bramka
 `WMS (ubuntu-latest)` padła na pierwszym kroku: „Missing script: test:wms".
@@ -66,7 +71,7 @@ Wersja Node zostaje na `>=22.5` z main, choć gałąź podnosiła ją do `>=24.1
 Podniesienie wymagania maszyny wdrożeniowej jest decyzją właściciela, a nie
 skutkiem ubocznym scalania — cały zestaw WMS przechodzi na 22.22.
 
-## 0.381.0 — 17 września 2026
+## 0.382.0 — 17 września 2026
 
 **WMS z gałęzi `codex/robust-wms` wchodzi do gałęzi, a do niego dochodzi
 granica do Subiekta.** Decyzja właściciela po kolizji opisanej w 0.380.2:
@@ -107,6 +112,33 @@ magazynu — to osobna praca i osobne wydanie.
 Zasiew jest idempotentny z ARYTMETYKI, nie z klucza: liczy różnicę i dosypuje
 brak, więc drugi przebieg na niezmienionych danych nie robi nic. Siedem testów
 w `services/wms-subiekt.test.ts` pilnuje właśnie tych granic.
+
+## 0.381.0 — 17 września 2026
+
+**Odmowa Sfery wskazuje wreszcie WIERSZ, a nie tylko powód.** Zgłoszenie
+właściciela z produkcji: „dostaję brak towaru w magazynie, ale nie mówi jakiego,
+abym mógł go usunąć z koszyka". Sfera odrzuca dokument zdaniem `Brak towaru
+w magazynie` i nazwy kartoteki nie podaje — ani w komunikacie, ani w logu.
+
+Nazywamy ją za nią. Pasek zaległych koszyków pokazuje przy każdym wierszu stan
+z magazynu, Z KTÓREGO ta MM ma zabrać towar, a wiersze bez pokrycia są czerwone
+i niosą liczbę: „na magazynie 0 z 5". Zdanie nad listą mówi, że to właśnie one
+wywróciły dokument. Krzyżyk przy nich już stoi od 0.379.0, więc odetkanie kosza
+kosztuje jedno kliknięcie zamiast szukania po omacku.
+
+**Magazyn bierzemy Z ZADANIA, nie z konfiguracji.** Zadanie zna swój `magFrom`
+na pewno, a konfiguracja mogła się w międzyczasie zmienić. Kosz, który zadania
+jeszcze nie ma, pyta o magazyn główny — bo stamtąd MM koszyka wychodzi.
+
+**Czego to NIE rozstrzyga.** Stan pochodzi z read-modelu, czyli z kopii sprzed
+najwyżej minuty. Wiersz oznaczony czerwono to bardzo mocna wskazówka, nie wyrok:
+przy świeżym ZW liczba może jeszcze nie dojść. Dlatego to jest OPIS, a nie
+bramka — niczego nie blokuje i nie zdejmuje.
+
+**Przy okazji, z tego samego logu produkcyjnego: `0x80040F20` przestało
+blokować.** Sesja Sfery wstaje teraz na koncie użytkownika, a nie `LocalSystem`,
+i `MM.Zapisz()` dochodzi do walidacji dokumentu zamiast odbijać się od COM.
+To potwierdza podejrzenie z `docs/zwroty-projekt.md` §4.1.
 
 ## 0.380.2 — 17 września 2026
 
