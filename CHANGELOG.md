@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.381.1 — 17 września 2026
+
+**Sprostowanie: konto usługi NIE było przyczyną odmowy ZW.** Poprzedni wpis
+ogłosił, że `0x80040F20` przestało blokować. To był wniosek z jednego MM, które
+doszło do walidacji — za szybki i nieprawdziwy. Zadanie `#1116` (PA
+14781/MAG/08/2026, sześć wierszy, 189,24 zł) odmówiło tym samym kodem już po
+przeniesieniu sesji na konto użytkownika.
+
+**Ta sama para logów daje jednak dowód, którego wcześniej nie było.** MM z TEJ
+SAMEJ sesji, tego samego procesu i tego samego operatora odmawia MERYTORYCZNIE
+(`Brak towaru w magazynie`, zadanie `#1119`). Jeden proces, jedna sesja COM, dwa
+dokumenty, dwa różne zachowania — więc przyczyna nie leży ani w połączeniu, ani
+w koncie Windows, ani w operatorze Subiekta jako takim.
+
+Wniosek jest węższy niż dotąd: **przyczyna siedzi w tym, czego ZW wymaga, a MM
+nie.** Pierwszy kandydat to KASA — ZW oddaje pieniądze, MM nie rusza żadnych,
+więc brak kasy domyślnej albo prawa do niej uderzyłby wyłącznie w ZW. Drugi to
+paragon z zamkniętego miesiąca. Trzeci, rozstrzygający, to ten sam ZW wystawiony
+ręką NA KONCIE OPERATORA WORKERA, a nie na koncie biura.
+
+Zmiana dotyczy też zakresu blokady. Do tego wpisu `docs/zwroty-projekt.md` §4.1
+mówił, że wszystko stoi. **MM przechodzi walidację**, więc dokumenty magazynowe
+(RW, PW) nie mają powodu odbijać się od COM; ryzyko zostaje przy handlowych,
+a KFS jest bliższy ZW niż MM.
+
+Dokumentacja, zero zmian w kodzie.
+
 ## 0.381.0 — 17 września 2026
 
 **Odmowa Sfery wskazuje wreszcie WIERSZ, a nie tylko powód.** Zgłoszenie
