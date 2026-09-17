@@ -8,6 +8,7 @@ import {
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
   MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami, zaznaczSkladnik,
+  zalozKoszyk, porzucKoszyk,
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 import { zapamietajSklad } from "./komplety.js";
@@ -757,4 +758,63 @@ test("ptaszek składnika NIE jest obejściem bramki kartotek", () => {
 
   assert.throws(() => zaznaczSkladnik(d, z.poz[0], 11, true, KTO),
     /nie wejdzie do pudła/, "ta sama odmowa co przy dokładaniu");
+});
+
+/* ── Koszyk zakładany WPROST (0.378.0) ──────────────────────────────────────
+   Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+   produktów do nich jako oddzielna opcja". Pusty karton staje przy biurku,
+   ZANIM otworzy się pierwszą paczkę.                                         */
+
+test("NOWY KOSZYK zakłada pudło bez ani jednej pozycji", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+
+  const kosz = zalozKoszyk(d, KTO);
+
+  assert.equal(kosz.pozycji, 0, "pudło jest puste i to jest cały sens tej drogi");
+  assert.equal(kosz.rodzaj, "zwroty");
+  assert.match(kosz.kod, /^Z-\d+$/);
+  assert.equal(otwarteKoszyki(d, KTO).length, 1);
+});
+
+test("drugie naciśnięcie oddaje TEN SAM koszyk, a nie drugie pudło", () => {
+  /* Decyzja z 3 września 2026 zostaje: fizyczny kosz stoi przy jednym biurku.
+     Dwa pudła na jednego operatora znaczyłyby dwa dokumenty na jeden karton. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+
+  const raz = zalozKoszyk(d, KTO);
+  const dwa = zalozKoszyk(d, KTO);
+
+  assert.equal(dwa.id, raz.id);
+  assert.equal(otwarteKoszyki(d, KTO).length, 1);
+});
+
+test("pusty koszyk da się PORZUCIĆ, a napełniony już nie", () => {
+  /* Bez porzucania NOWY KOSZYK byłby drogą w jedną stronę: pustego nie da się
+     zamknąć, więc naciśnięty przez pomyłkę stałby w pasku do końca świata. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const kosz = zalozKoszyk(d, KTO);
+
+  assert.equal(porzucKoszyk(d, kosz.id, KTO).kod, kosz.kod);
+  assert.equal(otwarteKoszyki(d, KTO).length, 0);
+
+  const drugi = zalozKoszyk(d, KTO);
+  kartoteka(d, 21, "SEK-1");
+  dolozTowar(d, 21, 1, KTO);
+  assert.throws(() => porzucKoszyk(d, drugi.id, KTO), /ma 1 pozycji/,
+    "napełniony schodzi zamknięciem albo zdejmowaniem wierszy");
+});
+
+test("porzucić nie da się koszyka, który czeka na dokument", () => {
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const kosz = zalozKoszyk(d, KTO);
+  const q = Number(d.prepare(
+    `INSERT INTO sfera_queue(type, status, payload, created_at, created_by)
+     VALUES ('mm','pending','{}','2026-09-17T08:00:00Z','Ala')`).run().lastInsertRowid);
+  d.prepare("UPDATE kosz SET mm_queue_id=? WHERE id=?").run(q, kosz.id);
+
+  assert.throws(() => porzucKoszyk(d, kosz.id, KTO), /nie jest już otwarty/);
 });

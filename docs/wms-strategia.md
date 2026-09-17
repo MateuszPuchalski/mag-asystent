@@ -333,3 +333,161 @@ a nie tylko szczegóły.
 Odpowiedź na pytanie piąte rozstrzyga sens całej sekcji 7. Zamiennik Sellasist
 napisany po to, żeby przestać płacić abonament, jest opłacalny dopiero przy
 kwocie, której nie znam.
+
+---
+
+## 11. Jak WMS łączy się z OMS i z Subiektem
+
+Sekcje 1–10 mówią, CO zbudować. Ta mówi, JAK to spiąć z systemem sprzedaży
+i z Subiektem. Pytanie techniczne sprowadza się do jednego pytania
+organizacyjnego: **który system ma prawo się mylić w danej sprawie.**
+
+### 11.1. Tabela własności faktów
+
+Tę tabelę pisze się przed pierwszą linijką kodu integracji.
+
+| fakt | właściciel | reszta |
+|---|---|---|
+| kartoteka: symbol, nazwa, kod kreskowy, jednostka | Subiekt | kopia do odczytu |
+| cena, kontrahent, faktura, VAT, KSeF | Subiekt | kopia do odczytu |
+| stan na magazynie — liczba księgowa | Subiekt | liczy z niej |
+| **ilość pod adresem, w partii, na palecie** | **WMS** | Subiekt tego nie widzi |
+| **która sztuka jest obiecana któremu zamówieniu** | **WMS** | OMS widzi status |
+| zamówienie, kanał, płatność, sposób wysyłki | OMS | WMS dostaje zlecenie |
+| **ilość wolna do sprzedaży w kanale** | **OMS, liczona z WMS** | — |
+| etykieta kurierska i numer listu | OMS | WMS drukuje |
+
+Wiersz trzeci i czwarty wyglądają na tę samą rzecz i nią nie są. Subiekt trzyma
+**saldo księgowe**, a WMS **wynik liczenia**. Zgadzają się dopiero po
+zaksięgowanym dokumencie, a między dokumentami różnią się zawsze. Ta różnica
+jest normalna i ma być MIERZONA, a nie zakazana.
+
+### 11.2. Trzy powierzchnie integracji mają różną fizykę
+
+| powierzchnia | mechanizm | koszt błędu |
+|---|---|---|
+| odczyt z Subiekta | `SELECT` co 60 s, konto tylko do odczytu | żaden, powtórz |
+| zapis do Subiekta | kolejka zadań i worker Sfery | dokument do wycofania ręką |
+| zlecenie z OMS i wynik do OMS | wąski kontrakt pracy | zamówienie stoi |
+
+Odczyt wolno powtarzać, gubić i opóźniać. Zapis nie: jest wolny, bywa się
+zawiesza, a jego skutek zostaje w księgach. Dlatego zapis idzie przez kolejkę
+z ponowieniem, nigdy wprost z trasy HTTP.
+
+**To już stoi w repo.** `sfera_queue` ma stany, trzy próby, backoff i numer
+dokumentu w odpowiedzi. Tabele `sgt_*` są modelem odczytu, a `sgt_stan` pokazuje
+liczbę Subiekta skorygowaną o kolejkę (`server/src/services/stock.ts`). Nowy
+WMS nie wymyśla tego drugi raz — dokłada do tego własny dziennik ruchów.
+
+### 11.3. WMS a system sprzedaży
+
+OMS nie ma wiedzieć o adresach regałowych. WMS nie ma wiedzieć o formach
+płatności. Kontrakt jest wąski w obie strony.
+
+Z systemu sprzedaży do WMS:
+
+1. Zamówienie ZWOLNIONE do realizacji, z pozycjami i sposobem wysyłki.
+2. Anulowanie pozycji albo całego zamówienia, jako PROŚBA.
+
+Punkt drugi jest miejscem, w którym tanie integracje pękają. WMS musi mieć
+prawo odpowiedzieć „za późno, jest spakowane". Anulowanie bez tej odpowiedzi
+wysyła paczkę, za którą nikt nie zapłacił.
+
+Z WMS do systemu sprzedaży:
+
+1. Rezerwacja potwierdzona albo braki na pozycji.
+2. Zbiórka skończona, karton spakowany, masa i wymiary zmierzone.
+3. Przesyłka nadana, numer listu przewozowego znany.
+
+**Ilość wolna do sprzedaży to WYNIK WMS, nie liczba z Subiekta.** Liczy się ją
+tak: stan w miejscach nadających się do sprzedaży, minus rezerwacje, minus
+kwarantanna, minus towar liczony w tej chwili. Wysłanie do kanału liczby
+z Subiekta sprzedaje zwrot leżący w kwarantannie i ostatnią sztukę dwa razy.
+
+Wysyłaj **wartość bezwzględną, nie różnicę**. Zgubiona różnica zostaje w danych
+na zawsze, a zgubiona wartość bezwzględna poprawia się przy następnej wysyłce.
+
+### 11.4. WMS a Subiekt: odczyt i zapis to dwie różne technologie
+
+| | odczyt | zapis |
+|---|---|---|
+| kanał | MSSQL, konto tylko do odczytu | COM Sfery, proces C# |
+| czas | milisekundy | sekundy, czasem zawieszenie |
+| równoległość | dowolna | **szeregowo, COM nie jest bezpieczny wątkowo** |
+| błąd | powtórz | dokument częściowy, trzeba wycofać |
+
+Dwie cechy Subiekta rozstrzygają kształt zapisu i obie stoją już w tym repo.
+
+**Nie ma transakcji obejmującej dwa dokumenty.** Mówi to wprost komentarz
+w `server/src/adapters/sfera.ts`: gdy MM się nie uda, korekta zostaje usunięta
+ręką implementacji. Każda operacja WMS tworząca dwa dokumenty potrzebuje tego
+samego wzorca — jedno zadanie kolejki z własnym wycofaniem.
+
+**Bufor dokumentu to maszyna stanów, nie znacznik.** Znaczenia `dok_Status`
+opisuje [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md). Dokument w buforze
+NIE przesunął stanu. Kto uzna „dokument powstał" za „towar się ruszył", zobaczy
+skutek dopiero przy liczeniu.
+
+### 11.5. Ile dokumentów przybędzie
+
+| zdarzenie fizyczne | dokument | dziś | po etapie 2 |
+|---|---|---|---|
+| przyjęcie dostawy | PZ albo adnotacja na FZ | ręcznie, 7–8 na tydzień | tak samo |
+| odłożenie MGP → MAG | MM | rzadko | przy każdej dostawie |
+| **pobranie i wysyłka** | **WZ albo dokument sprzedaży** | **nie ma** | **przy każdym zamówieniu** |
+| powrót zwrotu na stan | MM i korekta sprzedaży | jest | tak samo |
+| różnica z liczenia | PW albo RW | nie ma | co tydzień |
+
+Ostatni wiersz tabeli zmienia ryzyko całego systemu. Dziś Sfera wystawia kilka
+dokumentów tygodniowo. Po etapie 2 stoi między spakowanym kartonem a wysłanym
+zamówieniem, czyli na ścieżce krytycznej.
+
+**Zmierz jej przepustowość i zachowanie przy zawieszeniu, zanim się na niej
+oprzesz.** To jest ta sama granica, którą sekcja 3 odrzuca jako drogę B.
+
+### 11.6. Pięć rzeczy, które psują integracje
+
+1. **Powtórzone polecenie tworzy drugi dokument.** Klucz sprawy przed
+   wywołaniem, sprawdzenie po niejasnym błędzie.
+2. **Brak rekoncyliacji.** Suma z miejsc musi się równać stanowi z Subiekta,
+   codziennie i automatycznie.
+3. **Ekran pokazujący surową liczbę z Subiekta.** Pokaż ją skorygowaną
+   o kolejkę i nazwij to, co jest w drodze.
+4. **Jednostki.** Sprzedaż idzie w sztukach, dostawa w kartonach po dwadzieścia
+   cztery; hierarchia opakowań należy do WMS.
+5. **Zwroty dotykają trzech systemów naraz.** OMS zgadza się na zwrot, WMS mówi
+   co wróciło, Subiekt oddaje pieniądze.
+
+Rekoncyliacja nie jest skryptem na później. `server/src/services/reconcile.ts`
+ma dziewięć rodzajów rozjazdu i właściwą zasadę w komentarzu: niezmienniki
+trzeba mierzyć, nie deklarować. WMS dokłada do tej listy jeden wpis i jest to
+wpis najważniejszy.
+
+### 11.7. Czego nie robić
+
+- **Dwukierunkowej synchronizacji stanu.** Jedna strona liczy, druga zapisuje.
+- **Zapisu wprost do tabel Subiekta.** Pominięcie Sfery pomija numerację
+  i skutki magazynowe.
+- **Wspólnej bazy między OMS a WMS.** Wspólna tabela to wspólna awaria.
+- **Zapisu synchronicznego na ścieżce wysyłki.** Zawieszenie COM zatrzyma
+  wtedy pakowanie.
+- **Porządkowania zdarzeń po czasie z zegara.** Numeruj je rosnąco.
+
+### 11.8. Co z tego WERTIS ma już dziś
+
+| powierzchnia | stan |
+|---|---|
+| model odczytu z Subiekta | jest — tabele `sgt_*`, odświeżanie co 60 s |
+| kolejka zapisu do Subiekta | jest — `sfera_queue` i worker |
+| rekoncyliacja | jest — `server/src/services/reconcile.ts` |
+| klucz idempotencji | jest dla Allegro — `server/src/services/idempotencja.ts` |
+| dziennik ruchów zapasu | **brak** — `events` jest audytem, nie saldem |
+| kontrakt z systemem sprzedaży | **brak** — dziś plik CSV w jedną stronę |
+
+Brakuje więc nie techniki integracji, tylko własnej liczby do zintegrowania.
+Dopóki nie ma `zapas` i `ruch_zapasu`, nie ma czego rozliczać ze stanem
+Subiekta ani z czego liczyć ilość wolną do sprzedaży.
+
+Stąd kolejność z sekcji 9. Najpierw dziennik ruchów, potem kontrakt z systemem
+sprzedaży w jedną stronę, a zapis dokumentów wydania dopiero po zmierzeniu
+Sfery.

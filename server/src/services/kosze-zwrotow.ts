@@ -188,6 +188,75 @@ export function otwartyKosz(database: Db, kto: { id: number; name: string },
   return id;
 }
 
+/* ── Koszyk zakładany WPROST, bez zwrotu pod ręką (0.378.0) ─────────────────
+   Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+   produktów do nich jako oddzielna opcja".
+
+   To ODWRACA granicę z 0.365.0 („tylko z poziomu obsługi zwrotów"), i to jest
+   cała treść tej zmiany. Tamta granica zakładała, że pudło zawsze powstaje
+   przy rozpakowywanym zwrocie. Nie zawsze: agent siada do zwrotów i najpierw
+   stawia przy biurku pusty karton, a dopiero potem otwiera pierwszą paczkę.
+
+   ZASADA „JEDEN KOSZYK NA OPERATORA" ZOSTAJE (decyzja z 3 września 2026).
+   Fizyczny kosz stoi przy jednym biurku, więc drugie naciśnięcie NOWY KOSZYK
+   oddaje ten sam kosz zamiast zakładać drugi. Bez tego dwie osoby przy
+   zwrotach mieszałyby towar w jednym dokumencie — albo jedna osoba w dwóch.  */
+
+/**
+ * Zakłada koszyk WPROST albo oddaje ten, który operator już ma otwarty.
+ *
+ * Idempotentne z premedytacją: przycisk naciśnięty dwa razy nie ma prawa dać
+ * dwóch pudeł, bo przy biurku stoi jedno.
+ */
+export function zalozKoszyk(
+  database: Db, kto: { id: number; name: string }, teraz = new Date(),
+  rodzaj: RodzajKosza = "zwroty",
+): StanKosza {
+  if (magazynDocelowy(rodzaj) <= 0) {
+    throw new Error("Ten rodzaj koszyka nie ma magazynu docelowego — sprawdź wertis.env.");
+  }
+  const koszId = otwartyKosz(database, kto, teraz, rodzaj);
+  const stan = otwarteKoszyki(database, kto).find((k) => k.id === koszId);
+  if (!stan) throw new Error("Koszyk powstał, ale nie umiem go odczytać — odśwież ekran.");
+  return stan;
+}
+
+/**
+ * Porzuca PUSTY koszyk, którego nikt nie napełnił.
+ *
+ * Bez tego przycisk NOWY KOSZYK byłby drogą w jedną stronę: koszyk pusty nie
+ * daje się zamknąć (dokument bez linii nie jest dokumentem), więc naciśnięty
+ * przez pomyłkę stałby w pasku do końca świata i mówił, że operator ma pracę,
+ * której nie ma.
+ *
+ * WYŁĄCZNIE PUSTY I WYŁĄCZNIE BEZ ZADANIA. Koszyk z zawartością schodzi
+ * zamknięciem albo zdejmowaniem wierszy — dwie drogi do tego samego skutku
+ * kosztowałyby pytanie, czym się różnią.
+ */
+export function porzucKoszyk(
+  database: Db, koszId: number, kto: { id: number; name: string },
+): { koszId: number; kod: string } {
+  return transaction(database, () => {
+    const k = database.prepare(
+      `SELECT id, kod, status, mm_dok_id, mm_queue_id FROM kosz WHERE id=?`).get(koszId) as
+      { id: number; kod: string; status: string; mm_dok_id: number | null;
+        mm_queue_id: number | null } | undefined;
+    if (!k) throw new Error("Nie znam takiego koszyka zwrotów.");
+    if (k.status !== "otwarty" || k.mm_dok_id !== null || k.mm_queue_id !== null) {
+      throw new Error(`Koszyk ${k.kod} nie jest już otwarty — porzucić da się tylko pusty.`);
+    }
+    const { n } = database.prepare(
+      "SELECT COUNT(*) AS n FROM kosz_pozycja WHERE kosz_id=?").get(koszId) as { n: number };
+    if (n > 0) {
+      throw new Error(
+        `Koszyk ${k.kod} ma ${n} pozycji — zamknij go albo zdejmij z niego wiersze.`);
+    }
+    database.prepare("DELETE FROM kosz WHERE id=?").run(koszId);
+    logEvent("kosz_zwrotow_porzucony", kto.name, null, { koszId, kod: k.kod }, kto.id, database);
+    return { koszId, kod: k.kod };
+  })();
+}
+
 /**
  * Dokłada pozycję zwrotu do otwartego koszyka operatora.
  *

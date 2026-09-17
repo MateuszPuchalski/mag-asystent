@@ -1,7 +1,10 @@
 import React from "react";
-import { PackageOpen, X } from "lucide-react";
-import { useKosz, useMmMimoKorekt, useZamknijKosz, useZdejmijTowar } from "../api/zwroty";
+import { PackageOpen, PackagePlus, X } from "lucide-react";
+import {
+  useKosz, useMmMimoKorekt, useNowyKoszyk, usePorzucKoszyk, useZamknijKosz, useZdejmijTowar,
+} from "../api/zwroty";
 import { Przycisk, Blad } from "../ui";
+import { DolozTowar } from "./DolozTowar";
 
 /* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką: „gdy agent zasiada do
@@ -31,17 +34,51 @@ export function Koszyk() {
      obok bramki z 0.200.0. Osobna mutacja, bo osobna trasa: tę decyzję ma być
      widać, a nie ukrywać w fladze przy zwykłym zamykaniu. */
   const mimo = useMmMimoKorekt();
+  /* KOSZYK ZAKŁADANY WPROST (0.378.0) — zgłoszenie właściciela: „potrzebuję
+     tworzenia koszy zwrotowych i dodawania produktów do nich jako oddzielna
+     opcja". Porzucanie jest warunkiem zakładania, nie ozdobą: pustego kosza
+     nie da się zamknąć, więc bez tej drugiej drogi pomyłka stałaby w pasku
+     na zawsze. */
+  const nowy = useNowyKoszyk();
+  const porzuc = usePorzucKoszyk();
   const [pewien, setPewien] = React.useState<number | null>(null);
   /* DWA KOSZYKI OD 0.211.0: zwroty i odpad. Pusty się nie pokazuje — pasek
      rośnie wtedy, kiedy operator naprawdę coś w nim ma. */
-  const kosze = (data?.kosze ?? []).filter((k) => k.pozycji > 0);
+  /* PUSTY KOSZYK JEST WIDOCZNY OD 0.378.0, i to nie łamie punktu 2 dekalogu,
+     tylko go stosuje. Reguła mówi: pokazuj to, co potrzebne TERAZ. Pudło
+     założone wprost JEST bieżącą pracą operatora — stoi przy biurku i czeka na
+     pierwszą sztukę. Niewidoczne kazałoby zgadywać, czy przycisk zadziałał. */
+  const kosze = data?.kosze ?? [];
   const czekajace = data?.czekajace ?? [];
-  if (kosze.length === 0 && czekajace.length === 0) return null;
 
   const nazwa = (rodzaj: "zwroty" | "odpad") =>
     rodzaj === "odpad" ? "Koszyk odpadu" : "Koszyk zwrotów";
 
   return <>
+    {/* ── ZAŁOŻENIE PUDŁA WPROST (0.378.0) ──────────────────────────────────
+        Do tego wydania koszyk powstawał wyłącznie jako SKUTEK UBOCZNY:
+        pierwszej oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent,
+        który stawia przy biurku pusty karton, ZANIM otworzy pierwszą paczkę,
+        nie miał czym go zgłosić.
+
+        Rząd stoi tu, a nie w osobnym ekranie, bo to ta sama praca co reszta
+        paska — i bo pudło dotyczy CAŁEJ sesji, nie otwartego zwrotu.
+
+        Przycisk znika, gdy koszyk zwrotów już stoi: naciśnięcie oddałoby ten
+        sam kosz (jeden na operatora, decyzja z 3 września 2026), więc byłby to
+        przycisk bez skutku. */}
+    {!kosze.some((k) => k.rodzaj === "zwroty") &&
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
+          disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
+          <PackagePlus size={12} />
+          {nowy.isPending ? "Zakładam…" : "Nowy koszyk zwrotów"}
+        </button>
+        <span className="text-xs text-slate-500">
+          Pudło do zbierania towaru — bez otwierania zwrotu.
+        </span>
+        {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
+      </div>}
     {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
         zaległa: kosz jest już na hali, a dokumentu wciąż nie ma.
 
@@ -154,7 +191,7 @@ export function Koszyk() {
     <PackageOpen size={14} className="shrink-0" />
     <b>{nazwa(kosz.rodzaj)} {kosz.kod}</b>
     <span className="tabular-nums">
-      {kosz.pozycji} poz. · {kosz.sztuk} szt.</span>
+      {kosz.pozycji > 0 ? `${kosz.pozycji} poz. · ${kosz.sztuk} szt.` : "pusty"}</span>
     {/* Symbole, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
         i na dokumencie MM. Nazwy nie zmieściłyby się w jednym pasku.
 
@@ -166,13 +203,30 @@ export function Koszyk() {
       kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}
       title={kosz.pozycje.map((p) => `${p.symbol} × ${p.ilosc}`).join(", ")}>
       {kosz.pozycje.map((p) => p.symbol).join(", ")}</span>
-    <Przycisk className="text-xs" disabled={zamknij.isPending}
-      onClick={() => zamknij.mutate(kosz.id)}>
-      {zamknij.isPending ? "Zamykam…" : "Zamknij koszyk"}
-    </Przycisk>
+    {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
+        więc serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia,
+        stoi tu droga wyjścia: porzucenie pudła, którego nikt nie napełnił. */}
+    {kosz.pozycji > 0
+      ? <Przycisk className="text-xs" disabled={zamknij.isPending}
+          onClick={() => zamknij.mutate(kosz.id)}>
+          {zamknij.isPending ? "Zamykam…" : "Zamknij koszyk"}
+        </Przycisk>
+      : <button type="button" className="btn-secondary text-xs" disabled={porzuc.isPending}
+          onClick={() => porzuc.mutate(kosz.id)}>
+          {porzuc.isPending ? "Porzucam…" : "Porzuć pusty koszyk"}
+        </button>}
     {/* Co się stanie po kliknięciu — wprost, bo powstaje dokument w Subiekcie.
         Ta sama zasada co przy korekcie: ekran mówi, czego NIE robi i co robi
         za człowieka. */}
+    {/* ── SKAN DO TEGO PUDŁA (0.378.0) ──────────────────────────────────
+        Ten sam komponent, który stoi w karcie zwrotu, tylko bez zwrotu pod
+        ręką. Tamto miejsce ZOSTAJE: operator stoi wtedy nad otwartym kartonem
+        konkretnej paczki i ekran idzie za czynnością fizyczną. Tutaj chodzi
+        o drugą czynność — zbieranie towaru do pudła, które stoi przy biurku
+        niezależnie od tego, co akurat jest otwarte na ekranie. */}
+    <div className="w-full">
+      <DolozTowar rodzaj={kosz.rodzaj} />
+    </div>
     <span className={`w-full ${kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}>
       {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie. Na hali
           rozkłada się kosz z dokumentu MM, a nie ten koszyk — zdanie mówi
@@ -201,6 +255,7 @@ export function Koszyk() {
       </span>)}
     </span>}
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
+    {porzuc.error && <div className="w-full"><Blad>{(porzuc.error as Error).message}</Blad></div>}
     {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
   </>;

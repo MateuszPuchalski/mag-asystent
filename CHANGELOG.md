@@ -34,11 +34,11 @@ historii nie przepisujemy.
 ---
 
 
-## 0.377.1 — 16 września 2026
+## 0.378.1 — 17 września 2026
 
-**Numer ustępuje wydaniu 0.377.0 z main.**
-Wydanie powstało jako 0.373.1 i zmieniło numer przy scalaniu, bo w międzyczasie
-main doszedł do 0.377.0. Treść dokumentu się nie zmieniła.
+**Numer ustępuje wydaniom z main już drugi raz.**
+Wydanie powstało jako 0.373.1, potem 0.377.1, a numer zmieniał się przy każdym
+scalaniu main. Treść dokumentu przy tych zmianach nie ucierpiała.
 
 **Strategia WMS na piśmie: co znaczy „pełny system magazynowy" przy 342 m².**
 Pytanie właściciela brzmiało, jak zamienić WERTIS w pełny WMS i wyłączyć
@@ -59,6 +59,23 @@ Nowy [`docs/wms-strategia.md`](docs/wms-strategia.md) rozstrzyga cztery rzeczy:
 - **Wygrana leży w wydaniu towaru.** Pobrania i pakowania nie ma dziś w kodzie
   wcale, a to jedyne miejsce, w którym pomyłka kosztuje zwrot i reklamację.
 
+**Sekcja 11 odpowiada na drugie pytanie: jak WMS spina się z OMS i Subiektem.**
+Rozstrzyga ją tabela własności faktów, bo pytanie o protokół jest w istocie
+pytaniem, który system ma prawo się mylić w danej sprawie. Z niej wynika reszta:
+
+- **Stan księgowy i wynik liczenia to DWA fakty.** Subiekt trzyma saldo, WMS
+  rozbicie na miejsca. Różnią się zawsze między dokumentami i to jest normalne,
+  więc różnicę się mierzy, zamiast jej zakazywać.
+- **Ilość wolna do sprzedaży jest wynikiem WMS, nie liczbą z Subiekta.** Stan
+  z Subiekta wysłany do kanału sprzedaje zwrot z kwarantanny i ostatnią sztukę
+  dwa razy.
+- **Odczyt i zapis do Subiekta to różne technologie.** MSSQL wolno powtarzać,
+  COM Sfery trzeba szeregować — i nie ma w nim transakcji obejmującej dwa
+  dokumenty, co repo wie już z korekty zwrotu.
+- **Po etapie 2 Sfera stoi na ścieżce krytycznej wysyłki.** Dziś wystawia kilka
+  dokumentów tygodniowo; wtedy jeden na zamówienie. Dlatego jej przepustowość
+  mierzy się PRZED decyzją, a nie po niej.
+
 Dokument wchodzi do `tools/styl_check.py`, choć jako uzasadnienie decyzji mógłby
 stać poza zakresem tak jak `docs/architektura.md`. Powód stoi przy wpisie:
 dokument o dyscyplinie kosztów, który sam nie trzyma limitu zdania, przekonuje
@@ -66,6 +83,42 @@ tyle co deklaracja bez mechanizmu.
 
 Poza dokumentacją nie zmienia się nic — żadnego kodu, żadnej trasy, żadnej
 tabeli.
+## 0.378.0 — 17 września 2026
+
+**Koszyk zwrotów zakłada się WPROST, a towar dokłada bez otwierania zwrotu.**
+Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+produktów do nich jako oddzielna opcja".
+
+Do tego wydania pudło powstawało wyłącznie jako SKUTEK UBOCZNY pierwszego
+dołożenia — oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent, który
+siada do zwrotów i stawia przy biurku pusty karton, ZANIM otworzy pierwszą
+paczkę, nie miał czym go zgłosić.
+
+**To odwraca granicę z 0.365.0** („tylko z poziomu obsługi zwrotów") i tyle jest
+w tej zmianie. Tamto miejsce ZOSTAJE i nie jest to dublowanie wejścia: przy
+otwartym zwrocie operator stoi nad kartonem konkretnej paczki, a ekran idzie za
+czynnością fizyczną. W pasku chodzi o drugą czynność — zbieranie towaru do
+pudła, które stoi przy biurku niezależnie od tego, co jest na ekranie. Ocena
+„na stan" dalej dokłada sama i nikt jej nie zastępuje przyciskiem.
+
+**Zasada „jeden koszyk na operatora" zostaje** (decyzja z 3 września 2026).
+Drugie naciśnięcie oddaje TEN SAM kosz, a przycisk znika, gdy pudło już stoi —
+przycisk bez skutku jest gorszy od jego braku.
+
+**Pusty koszyk jest widoczny i to nie łamie punktu 2 dekalogu, tylko go
+stosuje.** Reguła mówi: pokazuj to, co potrzebne TERAZ. Pudło założone wprost
+JEST bieżącą pracą — stoi przy biurku i czeka na pierwszą sztukę. Niewidoczne
+kazałoby zgadywać, czy przycisk zadziałał. Bez pudła widać jeden przycisk
+i zdanie o tym, czym ono jest; żadnych zerowych liczników.
+
+**Porzucanie jest warunkiem zakładania, nie ozdobą.** Pustego kosza nie da się
+zamknąć, bo dokument bez linii nie jest dokumentem — więc bez drugiej drogi
+pomyłkowe naciśnięcie stałoby w pasku na zawsze i mówiło o pracy, której nie ma.
+Porzucić da się WYŁĄCZNIE pudło puste i bez zadania MM.
+
+Licznik tras POST zwrotów 33 → 35. Do Subiekta nie idzie z nich ani jeden zapis
+więcej: koszyk staje się dokumentem dopiero przy zamknięciu.
+
 ## 0.377.0 — 16 września 2026
 
 **Pięć dziur z przeglądu trzech poprzednich wydań.** Przegląd własnego diffu,
