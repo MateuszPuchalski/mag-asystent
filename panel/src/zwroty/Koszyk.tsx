@@ -148,8 +148,13 @@ export function Koszyk() {
              zaczął koszyk Z-8, do którego wszedł skanem koszt przesyłki.
              Zdanie mówi, CO z tym zrobić, a nie tylko że jest źle. */
           ? <>Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij
-              wiersz, który tam nie pasuje, i wystaw MM jeszcze raz. Wiersz ze
-              zwrotu schodzi cofnięciem oceny na karcie zwrotu.</>
+              wiersz, który tam nie pasuje, i wystaw MM jeszcze raz.
+              {(c.pozycje ?? []).some((p) => p.brakNaMag)
+                /* Sfera nie mówi, na którym wierszu padła — mówimy za nią.
+                   Bez tego zdania liczba przy symbolu byłaby ozdobą. */
+                ? <> Czerwone wiersze niżej to te, których na magazynie
+                  brakuje — Sfera odrzuciła dokument przez nie.</>
+                : <> Cały koszyk schodzi przyciskiem USUŃ KOSZYK.</>}</>
           : c.brakuje.length > 0
             ? <>MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam
                 dopiero po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni
@@ -174,8 +179,17 @@ export function Koszyk() {
           {(c.pozycje ?? []).map((p) => <span key={p.pozycjaId}
             className="inline-flex items-center gap-1 rounded border border-amber-300
               bg-white px-1">
-            <span className="font-mono">{p.symbol}</span>
+            <span className={`font-mono ${p.brakNaMag ? "font-bold text-ranga-zle" : ""}`}>
+              {p.symbol}</span>
             <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
+            {/* ── TEN WIERSZ WYWRÓCIŁ DOKUMENT (0.381.0) ──────────────────
+                Sfera odrzuca MM zdaniem „Brak towaru w magazynie" i NIE MÓWI,
+                którego. Zgłoszenie właściciela z produkcji: „dostaję brak
+                towaru w magazynie, ale nie mówi jakiego, abym mógł go usunąć
+                z koszyka". Liczba wskazuje wiersz palcem, a krzyżyk obok już
+                stoi — tyle wystarczy, żeby kosz ruszył dalej. */}
+            {p.brakNaMag && <span className="text-ranga-zle">
+              na magazynie {p.stanMag ?? 0} z {p.ilosc}</span>}
             {p.zeZwrotu && <span className="text-amber-700" title="Zdjęcie cofnie ocenę">
               ze zwrotu</span>}
             <button type="button" disabled={zdejmij.isPending}

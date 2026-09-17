@@ -332,6 +332,10 @@ export interface KoszykCzekajacy {
    */
   pozycje?: Array<{
     pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+    /** Ile tego towaru leży na magazynie, z którego MM ma go zabrać (0.381.0). */
+    stanMag?: number;
+    /** Czy to TEN wiersz wywrócił dokument: na magazynie jest go za mało. */
+    brakNaMag?: boolean;
   }>;
 }
 

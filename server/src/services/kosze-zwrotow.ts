@@ -1162,6 +1162,18 @@ export interface KoszykCzekajacy {
    */
   pozycje: Array<{
     pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+    /**
+     * Ile TEGO towaru leży na magazynie, z którego MM ma go zabrać (0.381.0).
+     *
+     * Sfera odrzuca dokument zdaniem „Brak towaru w magazynie" i NIE MÓWI,
+     * którego. Zgłoszenie właściciela z produkcji: „dostaję brak towaru
+     * w magazynie, ale nie mówi jakiego, abym mógł go usunąć z koszyka".
+     * Liczba stąd wskazuje wiersz palcem — a zdejmuje się go tym samym
+     * krzyżykiem, który już przy nim stoi.
+     */
+    stanMag: number;
+    /** Czy tego wiersza NIE DA SIĘ przesunąć: na magazynie jest go za mało. */
+    brakNaMag: boolean;
   }>;
 }
 
@@ -1264,33 +1276,58 @@ export function zwiazKoszykiZDokumentami(database: Db): number {
  * Kosza z zadaniem W TOKU tu nie ma i nie powinno być: papier jest w drodze,
  * a jedyną odpowiedzią byłoby „czekaj".
  */
+/**
+ * Z którego magazynu miała zabrać towar ta MM (0.381.0).
+ *
+ * Z ZADANIA, nie z konfiguracji: koszyk odpadu i koszyk zwrotów jadą dziś
+ * z tego samego magazynu, ale zadanie zna swój `magFrom` na pewno, a
+ * konfiguracja mogła się w międzyczasie zmienić. Kosz bez zadania jeszcze go
+ * nie ma — wtedy zostaje magazyn główny, bo stamtąd MM koszyka wychodzi.
+ */
+function magazynZrodlowy(payload: string | null): number {
+  if (!payload) return config.magId.MAG;
+  try {
+    const p = JSON.parse(payload) as { magFrom?: number };
+    return Number(p.magFrom) || config.magId.MAG;
+  } catch {
+    /* Uszkodzony payload nie ma prawa zabrać paska: pytamy o magazyn główny
+       i pokazujemy kosz tak, jak dotąd. */
+    return config.magId.MAG;
+  }
+}
+
 export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
   /* Ten sam zbiór co w `wypuscGotoweKoszyki`, z rozłożonymi włącznie i z jedną
      różnicą: zadanie w BŁĘDZIE nie wyklucza kosza. Tamta funkcja pomija go
      słusznie (nie wolno wystawiać drugiego dokumentu obok wiszącego zadania),
      ale ekran ma go pokazać właśnie dlatego, że sam się już nie odblokuje. */
   const kosze = database.prepare(
-    `SELECT k.id, k.kod, k.zamknieto_at, k.rodzaj, q.error_msg AS blad
+    `SELECT k.id, k.kod, k.zamknieto_at, k.rodzaj, q.error_msg AS blad, q.payload
        FROM kosz k LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
       WHERE k.status IN ('zamkniety','rozlozony') AND k.powrot_poza_aplikacja = 0
         AND k.mm_dok_id IS NULL AND k.rodzaj IN ('zwroty','odpad')
         AND (k.mm_queue_id IS NULL OR q.status = 'error')
       ORDER BY k.id`)
     .all() as Array<{ id: number; kod: string; zamknieto_at: string;
-      rodzaj: RodzajKosza; blad: string | null }>;
+      rodzaj: RodzajKosza; blad: string | null; payload: string | null }>;
   const wiersze = database.prepare(
-    `SELECT id, symbol, nazwa, ilosc, zwrot_pozycja_id FROM kosz_pozycja
-      WHERE kosz_id=? ORDER BY id`);
+    `SELECT kp.id, kp.tw_id, kp.symbol, kp.nazwa, kp.ilosc, kp.zwrot_pozycja_id,
+            COALESCE(st.stan, 0) AS stan
+       FROM kosz_pozycja kp
+       LEFT JOIN sgt_stan st ON st.tw_id = kp.tw_id AND st.mag_id = ?
+      WHERE kp.kosz_id = ? ORDER BY kp.id`);
   return kosze.map((k) => ({
     id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
     brakuje: brakujaceKorekty(database, Number(k.id)),
     blad: k.blad ?? null,
-    pozycje: (wiersze.all(k.id) as Array<
+    pozycje: (wiersze.all(magazynZrodlowy(k.payload), k.id) as Array<
       { id: number; symbol: string; nazwa: string; ilosc: number;
-        zwrot_pozycja_id: number | null }>)
+        zwrot_pozycja_id: number | null; stan: number }>)
       .map((p) => ({
         pozycjaId: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
         zeZwrotu: p.zwrot_pozycja_id !== null,
+        stanMag: Number(p.stan),
+        brakNaMag: Number(p.stan) < Number(p.ilosc),
       })),
   }));
 }
