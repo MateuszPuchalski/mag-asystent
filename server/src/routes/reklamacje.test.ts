@@ -554,3 +554,34 @@ test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 5
   const brak = await app.inject({ method: "GET", url: `${pobranie}9999/podglad`, headers: naglowki });
   assert.equal(brak.statusCode, 404);
 });
+
+/* ── Próg daty na trasie ─────────────────────────────────────────────────────
+   Trasa do tego wydania nie przyjmowała ŻADNEGO parametru — argument żądania
+   nazywał się `_req`. `od=wszystko` jest jedynym, jaki dostała, i zostaje
+   `GET`: umowa „zero zapisu przy patrzeniu" jest nietknięta.               */
+
+test("kolejka niesie próg, a `od=wszystko` go zdejmuje", async () => {
+  const { naglowki } = login("biuro", "Ala trzecia");
+  /* Sprawa sprzed progu wdrożeniowego — archiwum, którego właściciel nie chce
+     widzieć. Wiersz z `before` stoi na wrześniu, więc przechodzi. */
+  db().prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,typ,
+    status_allegro,otwarto_at,synced_at)
+    SELECT channel_account_id,'i-stara','CLAIM','CLAIM_SUBMITTED',
+      '2026-02-01T10:00:00Z','2026-09-07T10:00:00Z'
+      FROM reklamacja_klienta WHERE external_id='i-1'`).run();
+
+  const zProgiem = await app.inject({
+    method: "GET", url: "/api/obsluga/reklamacje", headers: naglowki });
+  const a = zProgiem.json();
+  assert.deepEqual(a.reklamacje.map((r: { externalId: string }) => r.externalId), ["i-1"]);
+  assert.equal(a.prog.ukrytych, 1);
+  assert.equal(a.prog.zdjety, false);
+
+  const bez = await app.inject({
+    method: "GET", url: "/api/obsluga/reklamacje?od=wszystko", headers: naglowki });
+  const b = bez.json();
+  assert.equal(b.reklamacje.length, 2, "furtka musi mieć co pokazać");
+  assert.equal(b.prog.zdjety, true);
+  /* Próg jedzie ZAWSZE, także po zdjęciu: panel musi umieć wrócić. */
+  assert.ok(b.prog.od, "bez tej daty przełącznik nie miałby dokąd wracać");
+});

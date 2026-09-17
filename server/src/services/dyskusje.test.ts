@@ -95,7 +95,10 @@ test("DORADCA ALLEGRO stawia piłkę po naszej stronie — inaczej niż przy rek
   assert.ok(D.sygnalyDyskusji(rdzen).includes("doradca"), "doradca zostaje też sygnałem");
   /* A przy reklamacji ta sama wartość NIE przenosi sprawy do odpowiedzi. */
   assert.equal(
-    R.kubelek({ statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "ALLEGRO_ADVISOR_REPLIED", czatAktywny: true }),
+    R.kubelek({
+      statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "ALLEGRO_ADVISOR_REPLIED",
+      czatAktywny: true, dniDoTerminu: null,
+    }),
     "zamknieta", "reguła reklamacji zostaje nietknięta");
 });
 
@@ -241,4 +244,26 @@ test("STRAŻNIK ŹRÓDŁA: każde sięgnięcie do tabeli spraw wie, o który rod
   }
   assert.ok(sprawdzonych >= 12,
     `strażnik przestał cokolwiek znajdować (${sprawdzonych}) — pilnowałby pustki`);
+});
+
+/* ── Próg daty ───────────────────────────────────────────────────────────────
+   Ta sama tabela i ten sam pełny przelot listy z 0.273.0 karmią obie kolejki,
+   więc próg jest jeden. Tutaj jest nawet ciaśniej niż przy reklamacjach:
+   porządek „kto czeka najdłużej" stawia najstarsze na samej górze z definicji.
+                                                                             */
+test("próg daty odcina dyskusje sprzed niego, a granicę przepuszcza", () => {
+  const prog = "2026-07-01T00:00:00Z";
+  const stara = sprawa({ id: "d-stara" });
+  const granica = sprawa({ id: "d-granica" });
+  sprawa({ id: "d-nowa" });
+  db().prepare("UPDATE reklamacja_klienta SET otwarto_at=? WHERE id=?")
+    .run("2026-06-30T23:59:00Z", stara);
+  db().prepare("UPDATE reklamacja_klienta SET otwarto_at=? WHERE id=?").run(prog, granica);
+
+  assert.deepEqual(
+    new Set(D.listaDyskusji(db(), TERAZ, prog).map((d) => d.externalId)),
+    new Set(["d-granica", "d-nowa"]),
+    "granica włącznie — „od 1 lipca” znaczy z 1 lipca");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null).length, 3,
+    "bez progu wraca wszystko, inaczej dyskusja sprzed progu byłaby nieosiągalna");
 });

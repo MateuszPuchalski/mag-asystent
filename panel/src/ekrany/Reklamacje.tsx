@@ -18,6 +18,7 @@ import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamac
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { PasekProgu } from "../sprawy/Prog";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
@@ -134,7 +135,11 @@ export function Reklamacje() {
   const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
-  const { data, isLoading, error } = useReklamacje();
+  /* Próg daty jest zdejmowany NA ŻĄDANIE i wybór nie przeżywa zamknięcia
+     ekranu. Zapamiętanie go w `localStorage` byłoby pułapką: biuro zobaczyłoby
+     komplet archiwum po tygodniu i nie wiedziało, czemu. */
+  const [bezProgu, setBezProgu] = useState(false);
+  const { data, isLoading, error } = useReklamacje(bezProgu);
   const prowadze = useProwadze();
   const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
@@ -370,6 +375,7 @@ export function Reklamacje() {
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
     {data?.stan && <PasekOgona stan={data.stan} />}
     {data?.stan && <PasekSynchronizacji stan={data.stan} blad={bladSync}
       trwa={synchronizuj.isPending}

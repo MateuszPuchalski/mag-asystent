@@ -30,6 +30,11 @@ export const KUBELKI: Array<{ id: KubelekReklamacji; etykieta: string; pytanie: 
   { id: "decyzja", etykieta: "Do decyzji", pytanie: "Uznać czy odrzucić?" },
   { id: "odpowiedz", etykieta: "Do odpowiedzi", pytanie: "Co odpisać klientowi?" },
   { id: "zamknieta", etykieta: "Rozstrzygnięte", pytanie: "Tylko wgląd." },
+  /* CZWARTY KUBEŁEK, nie ukrycie. Sprawa z zamkniętą rozmową i terminem sprzed
+     miesiąca nie jest pracą — Allegro nie przyjmie już wiadomości, a zegar nic
+     nie mierzy. Zniknięcie z kolejki musi mieć jednak widoczne uzasadnienie
+     i własny licznik; ta sama reguła co przy zwrotach rozliczonych (0.339.0). */
+  { id: "bez_ruchu", etykieta: "Bez ruchu", pytanie: "Nic tu nie zrobimy." },
 ];
 
 /* Etykieta stoi W MAPIE, nie w łańcuchu `?:` przy renderze — ta sama poprawka

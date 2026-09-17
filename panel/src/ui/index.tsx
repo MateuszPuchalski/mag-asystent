@@ -345,6 +345,21 @@ export const godzina = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleTimeString("pl", { timeStyle: "short" }) : "—";
 
 /**
+ * Sam dzień, słownie — „1 lipca 2026". Tam, gdzie godzina nic nie wnosi.
+ *
+ * Powstało dla progu kolejki spraw: próg jest decyzją o DNIU, a „01.07.2026,
+ * 02:00" z `czas()` kazałoby czytelnikowi zastanawiać się nad drugą w nocy,
+ * która jest wyłącznie skutkiem zapisu północy czasu lokalnego w UTC.
+ *
+ * Stoi TUTAJ, a nie przy pasku, bo strażnik `Czas.test.ts` ma rację: drugi
+ * format daty w panelu zaczyna się właśnie od `toLocaleDateString` napisanego
+ * na miejscu, w ekranie.
+ */
+export const dzien = (v: string | null | undefined) =>
+  v ? new Date(v).toLocaleDateString("pl", { day: "numeric", month: "long", year: "numeric" })
+    : "—";
+
+/**
  * Kopiowanie tekstu, którego nikt nie przepisuje z ekranu ręcznie:
  * identyfikatora zamówienia (UUID) i numeru dokumentu z Subiekta.
  *

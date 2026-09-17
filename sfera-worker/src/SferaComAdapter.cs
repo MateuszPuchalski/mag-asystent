@@ -413,7 +413,7 @@ public sealed class SferaComAdapter : ISferaAdapter
             string stan =
                 $"paragon {Pole((object)zw, "DoDokumentuNumerPelny")} (dok_Id {z.DokId}), " +
                 $"wartość {wartosc:0.00} zł, przelew {wartosc:0.00} zł, " +
-                /* KWOTA DO ZAPŁATY OBOK PRZELEWU (0.383.1). Worker ustawia JEDNĄ
+                /* KWOTA DO ZAPŁATY OBOK PRZELEWU (0.384.1). Worker ustawia JEDNĄ
                    formę płatności, a okno Subiekta wypełnia pięć i pilnuje ich
                    sumy. Jeśli szkic dziedziczy po paragonie drugą formę, suma
                    rozjedzie się z tą kwotą — i to widać dopiero, gdy obie stoją

@@ -224,7 +224,10 @@ test("sprawa rozstrzygnięta przez Allegro nie przyjmuje werdyktu z panelu", asy
 });
 
 test("kubełek i sygnały: lokalny werdykt zamyka, `send_failed` nie; towar do decyzji tylko po uznaniu", () => {
-  const baza = { statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: null, czatAktywny: true };
+  const baza = {
+    statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: null,
+    czatAktywny: true, dniDoTerminu: 1,
+  };
   assert.equal(kubelek({ ...baza, werdyktStatus: "sent" }), "zamknieta");
   assert.equal(kubelek({ ...baza, werdyktStatus: "send_uncertain" }), "zamknieta");
   assert.equal(kubelek({ ...baza, werdyktStatus: "send_failed" }), "decyzja");
