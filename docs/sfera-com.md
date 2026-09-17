@@ -527,15 +527,16 @@ koncie użytkownika, nie na `LocalSystem`, a ZW odmawia tym samym
 **Rozstrzygające jest to, co zrobiło MM z TEJ SAMEJ sesji.** Zadanie `#1119`,
 ten sam proces i ten sam operator, odmówiło MERYTORYCZNIE: `Brak towaru
 w magazynie`. Jeden proces, jedna sesja COM, dwa dokumenty, dwa różne
-zachowania — więc przyczyna nie leży ani w połączeniu, ani w koncie Windows,
-ani w operatorze Subiekta jako takim.
+zachowania. Przyczyna nie leży więc ani w połączeniu, ani w koncie Windows,
+ani w samym operatorze Subiekta.
 
 `[WERYFIKUJ]` Czego ZW wymaga, a MM nie. Pierwszy kandydat to KASA: ZW oddaje
 pieniądze, a MM nie rusza żadnych, więc brak kasy domyślnej albo prawa do niej
-uderzyłby wyłącznie w ZW. Drugi to paragon z zamkniętego miesiąca. Trzeci —
-rozstrzygający — to ten sam ZW wystawiony ręką NA KONCIE OPERATORA WORKERA,
-a nie na koncie biura: dopiero to rozdziela „dokument jest zły" od „operator
-nie ma prawa".
+uderzyłby wyłącznie w ZW. Drugi to paragon z zamkniętego miesiąca.
+
+Trzeci kandydat jest rozstrzygający: ten sam ZW wystawiony ręką NA KONCIE
+OPERATORA WORKERA, a nie na koncie biura. Dopiero to rozdziela „dokument jest
+zły" od „operator nie ma prawa".
 
 `[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
 
