@@ -136,6 +136,20 @@ Czego ZW wymaga, a MM nie — lista do sprawdzenia po kolei, od najtańszego:
    na tym, którego używa `wertis-sfera`. To jedyny test, który rozdziela
    „dokument jest zły" od „operator nie ma prawa".
 
+**Punkt 3 wykonany 17 września: ZW PRZESZEDŁ ręką, na koncie workera.** Zdejmuje
+to z listy kasę, zamknięty sierpień i sam paragon. Dokument jest dobry, operator
+ma prawa. Zostaje jedno: różnica między tym, co ustawia okno Subiekta, a tym,
+co ustawia worker.
+
+Właściciel pokazał wzorzec poprawnego ZW. Płatność stoi tam na przelewie,
+100,0% wartości — dokładnie tak, jak ustawia ją worker. Podejrzenie o samą
+kwotę przelewu tym samym upada.
+
+Zostają dwie różnice, obie mierzalne sondą bez zapisu. Okno wypełnia wszystkie
+pięć form płatności i pilnuje ich sumy, worker ustawia jedną. Okno niesie
+nabywcę, worker nie ustawia go nigdy. Szczegóły i komenda sondy stoją
+w `docs/sfera-com.md` §2m.
+
 Dopóki to nie jest rozstrzygnięte, ZW zostaje ręczny. **Blokada nie dotyczy
 jednak całej automatyzacji**, i to jest zmiana wobec pierwszej wersji tego
 akapitu: MM przechodzi walidację, więc dokumenty magazynowe (RW, PW) nie mają

@@ -540,6 +540,43 @@ zły" od „operator nie ma prawa".
 
 `[WERYFIKUJ]` Przyczyna odmowy zapisu ZW z tamtej próby.
 
+**Ten sam ZW przeszedł ręką, na koncie operatora workera** (właściciel,
+17 września 2026). To zamyka trzy tropy naraz. Dokument nie jest zły, operator
+ma prawa, a kasa, zamknięty miesiąc i sam paragon odpadają. Zostaje wyłącznie
+różnica między tym, co ustawia okno Subiekta, a tym, co ustawia worker.
+
+**Wzorzec poprawnego ZW** (zrzut ekranu właściciela, 17 września 2026).
+ZW do PA 11657/MAG/09/2026, jeden wiersz, rodzaj zwrotu „zwrot ze sprzedaży".
+Płatność: „Zapłacono przelewem" 100,0%, czyli 129,98 zł — całość wartości.
+Przedpłata, gotówka, karta i kredyt kupiecki mają po 0,00. Nabywca jest
+wypełniony nazwiskiem i adresem. Skutek magazynowy stoi jako osobne działanie
+obok „Zapisz", nie jako pole formularza.
+
+**To OSŁABIA podejrzenie o kwotę przelewu.** Worker ustawia dokładnie to samo:
+przelew równy pełnej wartości ZW. Dokument, który przeszedł, wygląda tak samo,
+więc sama liczba nie może być powodem odmowy.
+
+Podejrzenie nie znika, tylko się przesuwa. Okno wypełnia PIĘĆ form płatności
+naraz i pilnuje, żeby ich suma równała się kwocie do zapłaty. Worker ustawia
+JEDNĄ. Szkic po `NaPodstawie` dziedziczy płatność z paragonu, a paragon
+z Allegro bywa opłacony inaczej niż przelewem. Wtedy po ustawieniu przelewu na
+dokumencie stoją dwie formy, a ich suma jest dwa razy za duża.
+
+Drugi kandydat to nabywca. Worker nie ustawia go nigdy, a dokument, który
+przeszedł, go niesie.
+
+`[WERYFIKUJ]` Czy po ustawieniu przelewu suma form płatności na szkicu równa
+się kwocie do zapłaty.
+
+`[WERYFIKUJ]` Czy ZW wymaga nabywcy i czy `NaPodstawie` bierze go z paragonu.
+
+Obie rzeczy mierzy sonda, bez zapisu. Po ustawieniu „jak worker" wypisuje
+wszystkie pola płatności i kwoty. O polach nabywcy i rachunku mówi wyłącznie
+„puste" albo „wypełnione" — wartości zostają w Subiekcie, bo adres dostawy nie
+ma prawa stąd wyjść. Ten sam zrzut robi `-WzorZW` na dokumencie, który
+przeszedł. Dwie kolumny obok siebie rozstrzygają obie hipotezy w jednym
+przebiegu.
+
 **Odmowa zapisu potrafi zostawić numer, którego nie ma** (15 września 2026).
 Worker w 0.349.1 powtórzył zapis dwa razy, a `SprawdzPoprawnosc()` przeszło
 także na szkicu z sondy. Subiekt odmówił bez szczegółów. Dziewięć sekund później

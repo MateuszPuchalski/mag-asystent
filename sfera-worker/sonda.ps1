@@ -590,6 +590,29 @@ if ($SzkicZW) {
             Write-Wynik "  (Get-Member odmowil: $($_.Exception.Message))"
         }
     }
+
+    # CZY WYPELNIONE, bez wartosci. Pola nabywcy i rachunku odsiewa $prywatne
+    # i ma je odsiewac dalej - adres dostawy nie ma prawa wyjsc z Subiekta.
+    # Ale odmowa zapisu ZW (0x80040F20) kaze wiedziec, czy dokument, ktory
+    # PRZESZEDL, niesie nabywce, ktorego worker nigdy nie ustawia. Sama
+    # odpowiedz "puste/wypelnione" wystarcza do porownania i nic nie ujawnia.
+    function Wlasciwosci-Czy-Puste($obiekt, [string]$wzorzec, [string]$etykieta) {
+        Write-Wynik ""
+        Write-Wynik "--- $etykieta (tylko: puste czy wypelnione) ---"
+        try {
+            $nazwy = Get-Member -InputObject $obiekt -MemberType Property -ErrorAction Stop |
+                Where-Object { $_.Name -match $wzorzec } | ForEach-Object { $_.Name }
+            if (-not $nazwy) { Write-Wynik "  (zadna wlasciwosc nie pasuje)"; return }
+            foreach ($n in $nazwy) {
+                $v = Wartosc $obiekt $n
+                $stan = "wypelnione"
+                if ($null -eq $v -or "$v".Trim() -eq "" -or "$v" -eq "0") { $stan = "puste" }
+                Write-Wynik ("  {0,-34} : {1}" -f $n, $stan)
+            }
+        } catch {
+            Write-Wynik "  (Get-Member odmowil: $($_.Exception.Message))"
+        }
+    }
     $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
 
     Write-Wynik ""
@@ -753,6 +776,14 @@ if ($SzkicZW) {
                         Write-Wynik "  BRAK  SprawdzPoprawnosc() odmowil: $($_.Exception.Message)"
                     }
                     Write-Wynik ("  SzczegolyOstatniegoBledu = {0}" -f (Wartosc $zw "SzczegolyOstatniegoBledu"))
+
+                    # OBRAZ PO USTAWIENIU, nie przed. Worker ustawia JEDNA forme
+                    # platnosci - przelew. Jesli szkic niesie druga (gotowka,
+                    # karta) z paragonu, suma form rozjedzie sie z kwota do
+                    # zaplaty, a Subiekt odmawia takiego dokumentu jednym zdaniem
+                    # bez szczegolow. Bez tego zrzutu nie wiemy nawet, czy tak jest.
+                    Wlasciwosci-Wg $zw $polaDokumentu "ZW JAK WORKER, przed Zapisz()"
+                    Wlasciwosci-Czy-Puste $zw $prywatne "ZW JAK WORKER - pola nabywcy i rachunku"
                 }
             }
         }
@@ -780,6 +811,7 @@ if ($SzkicZW) {
                 Write-Wynik "  BRAK  WczytajDokument oddal null - to chyba nie dok_Id"
             } else {
                 Wlasciwosci-Wg $wzor $polaDokumentu "ZW wystawiony recznie"
+                Wlasciwosci-Czy-Puste $wzor $prywatne "ZW wystawiony recznie - pola nabywcy i rachunku"
                 $pozycjeWzoru = $null
                 try { $pozycjeWzoru = $wzor.Pozycje } catch { }
                 if ($null -ne $pozycjeWzoru) {
