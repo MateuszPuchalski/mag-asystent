@@ -108,14 +108,39 @@ a Sfera bywa wrażliwa na brak profilu użytkownika. Kolejność sprawdzania:
 3. Gdy i to odmawia — przyczyna siedzi w paragonie albo w uprawnieniach,
    a nie w tym, co ustawia worker.
 
-**ROZSTRZYGNIĘTE 17 września: to było konto.** Sesja Sfery wstaje teraz na
-koncie użytkownika (`WERTIS-MONIKA\mateu`), a nie `LocalSystem`, i `MM.Zapisz()`
-dochodzi do walidacji dokumentu zamiast odbijać się od COM. Punkt 1 z listy
-wyżej wystarczył; pozostałe dwa nie były potrzebne.
+**KONTO TO NIE BYŁO — rozstrzygnięte 17 września, na niekorzyść tej hipotezy.**
+Sesja Sfery wstaje dziś na koncie użytkownika (`WERTIS-MONIKA\mateu`), a nie
+`LocalSystem`. Punkt 1 z listy wyżej został wykonany i NIE pomógł: ZW dalej
+odmawia tym samym `0x80040F20` (zadanie `#1116`, PA 14781/MAG/08/2026).
 
-Następna odmowa jest już MERYTORYCZNA — `Brak towaru w magazynie` — i o niej
-mówi punkt 4.4. Blokada automatyzacji zniknęła: KFS, RW i PW mają odtąd czym
-przejść, o ile ktoś je napisze.
+Ta sama zmiana konta dała jednak dowód, którego wcześniej nie było. **MM z tej
+samej sesji, tego samego procesu i tego samego operatora DOCHODZI do walidacji**
+— odmawia merytorycznie, zdaniem `Brak towaru w magazynie` (zadanie `#1119`).
+Dwa dokumenty, jedna sesja COM, dwa różne zachowania.
+
+Z tego wynika wniosek węższy i mocniejszy niż poprzedni: **przyczyna siedzi
+w samym dokumencie ZW albo w tym, czego ZW wymaga, a MM nie.** Sesja, proces,
+konto Windows i operator Subiekta są wspólne, więc żadne z nich nie tłumaczy
+różnicy.
+
+Czego ZW wymaga, a MM nie — lista do sprawdzenia po kolei, od najtańszego:
+
+1. **Kasa i forma płatności.** ZW oddaje pieniądze, MM nie rusza żadnych.
+   Sprawdź, czy operator `SFERA_OPERATOR` ma przypisaną kasę domyślną i prawo
+   do niej. Biuro wystawia ZW ręcznie NA INNYM operatorze — porównaj ustawienia
+   tych dwóch kont w Subiekcie, zaczynając od kasy.
+2. **Okres i paragon z sierpnia.** `#1116` dotyczy PA z 08/2026, a dziś jest
+   wrzesień. Sprawdź, czy miesiąc nie jest zamknięty i czy ten paragon nie
+   wszedł już do rozliczenia, którego ZW nie może ruszyć.
+3. **Ten sam ZW ręką, na koncie operatora workera.** Nie na koncie biura —
+   na tym, którego używa `wertis-sfera`. To jedyny test, który rozdziela
+   „dokument jest zły" od „operator nie ma prawa".
+
+Dopóki to nie jest rozstrzygnięte, ZW zostaje ręczny. **Blokada nie dotyczy
+jednak całej automatyzacji**, i to jest zmiana wobec pierwszej wersji tego
+akapitu: MM przechodzi walidację, więc dokumenty magazynowe (RW, PW) nie mają
+powodu odbijać się od COM. Ryzyko zostaje przy dokumentach handlowych — KFS
+jest bliższy ZW niż MM.
 
 ### 4.2. Ocena towaru ma dwie wartości, a rzeczywistość trzy
 
