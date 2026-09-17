@@ -16,10 +16,25 @@ export const kluczeReklamacji = {
   zalacznikiWysylki: (id: number) => ["reklamacja-zalaczniki-wysylki", id] as const,
 };
 
-export function useReklamacje() {
+/**
+ * Kolejka; `bezProgu` zdejmuje próg daty (przełącznik „pokaż starsze").
+ *
+ * PARAMETR WCHODZI DO KLUCZA, i to nie jest ozdoba: bez niego obie odpowiedzi
+ * — ta z progiem i ta bez — wylądowałyby w pamięci podręcznej pod jednym
+ * kluczem, a przełącznik pokazywałby raz jedno, raz drugie, zależnie od tego,
+ * co przyszło ostatnie. Klucz zostaje PREFIKSEM `["reklamacje"]`, więc każde
+ * unieważnienie w tym pliku trafia w oba warianty naraz.
+ */
+export function useReklamacje(bezProgu = false) {
   return useQuery({
-    queryKey: kluczeReklamacji.kolejka,
-    queryFn: () => api<KolejkaReklamacji>("/api/obsluga/reklamacje"),
+    queryKey: [...kluczeReklamacji.kolejka, bezProgu] as const,
+    /* DWA LITERAŁY, nie jeden szablon z warunkiem w środku. Strażnik adresów
+       w `routes/reklamacje.test.ts` czyta ten plik i wyławia adresy z wywołań
+       klienta — szablon z cudzysłowem w ternarze urywa dopasowanie w połowie,
+       a wtedy strażnik przestaje pilnować akurat tej trasy. */
+    queryFn: () => (bezProgu
+      ? api<KolejkaReklamacji>("/api/obsluga/reklamacje?od=wszystko")
+      : api<KolejkaReklamacji>("/api/obsluga/reklamacje")),
   });
 }
 

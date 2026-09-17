@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
+import { config } from "../config.js";
 import {
-  BladReklamacji, ReklamacjaConflict,
+  BladReklamacji, progKolejki, ReklamacjaConflict,
 } from "../services/reklamacje.js";
 import {
   licznikiDyskusji, listaDyskusji, szczegolDyskusji,
@@ -69,13 +70,19 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i reklamacjach. */
-  app.get("/api/obsluga/dyskusje", async (_req, reply) => {
+  app.get<{ Querystring: { od?: string } }>("/api/obsluga/dyskusje", async (req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    const dyskusje = listaDyskusji(db());
+    /* Próg i furtka te same co przy reklamacjach — obie kolejki karmi ta sama
+       tabela, więc rozjazd między nimi byłby rozjazdem w obrębie jednego
+       ekranu obsługi. */
+    const bezProgu = req.query?.od === "wszystko";
+    const prog = progKolejki(db(), Date.now(), config.allegro.reklamacjeOd, "DISPUTE");
+    const dyskusje = listaDyskusji(db(), Date.now(), bezProgu ? null : prog.od);
     return {
       dyskusje,
       liczniki: licznikiDyskusji(dyskusje),
+      prog: { ...prog, zdjety: bezProgu },
       stan: stanReklamacjiHealth(db()),
     };
   });

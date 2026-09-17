@@ -4422,9 +4422,15 @@ pytanie, więc operator nie wybiera akcji z menu — odpowiada.
 
 | kubełek | pytanie | skąd |
 |---|---|---|
-| DO DECYZJI | uznać czy odrzucić? | `CLAIM_SUBMITTED` bez naszego werdyktu |
+| DO DECYZJI | uznać czy odrzucić? | brak statusu końcowego i brak naszego werdyktu |
 | DO ODPOWIEDZI | co odpisać klientowi? | rozstrzygnięta, a ostatnie słowo było klienta |
-| ROZSTRZYGNIĘTE | — | `CLAIM_ACCEPTED`, `CLAIM_REJECTED` albo werdykt z panelu, który wyszedł |
+| ROZSTRZYGNIĘTE | — | `CLAIM_ACCEPTED`, `CLAIM_REJECTED`, `DISPUTE_CLOSED` albo werdykt z panelu, który wyszedł |
+| BEZ RUCHU | nic tu nie zrobimy | rozmowa zamknięta, a termin minął o ponad 30 dni |
+
+Wiersz DO DECYZJI mówił w tej tabeli `CLAIM_SUBMITTED`, a kod pytał inaczej:
+kubełek liczy się przez NEGACJĘ statusu końcowego, więc bierze też sprawę bez
+statusu i sprawę ze statusem spoza specyfikacji. Tabela mówi teraz to, co robi
+kod — rozjazd tego rodzaju jest gorszy od braku tabeli.
 
 **Werdykt z panelu zamyka sprawę od razu, nie za takt synchronizacji.**
 Po „WYŚLIJ WERDYKT" wiersz przechodzi do ROZSTRZYGNIĘTYCH, zanim Allegro
@@ -4592,6 +4598,45 @@ ma.
 stanowiska o towarze i prośby o zakończenie dyskusji. Allegro ich nie cofnie,
 więc przycisk byłby obietnicą bez pokrycia. Tam zostaje potwierdzenie i to się
 w tym wydaniu nie zmienia.
+
+### 25b.3d. Próg daty i kubełek BEZ RUCHU
+
+Zgłoszenie właściciela: **„w kolejce pojawiają mi się stare reklamacje"**,
+doprecyzowane na **„pokaż tylko reklamacje od 1 lipca 2026"**.
+
+**Przyczyna była nasza w całości i składała się z trzech ogniw.** Pełny przelot
+listy dołożony w 0.273.0 zapisuje CAŁE archiwum konta. Zapytanie kolejki nie
+miało ani filtra statusu, ani okna czasowego, ani limitu — do przeglądarki
+jechała zawartość całej tabeli. Porządek dołożył resztę: `decyzja_do ASC`
+stawia termin sprzed pół roku NAD dzisiejszym, więc archiwum lądowało nie
+gdziekolwiek, tylko na samej górze.
+
+**Próg jest granicą WIDOKU, nie pobierania.** Stoi w `REKLAMACJE_OD` i odcina
+po `otwarto_at`. Synchronizacja widzi dalej wszystko, bo pełny przelot zamyka
+sprawy rozstrzygnięte w Centrum Sprzedaży i bez archiwum przestałby to robić.
+
+**Sprawa wznowiona wraca sama.** `openedDate` to wedle schematu „the most
+recent date when the issue has been opened or reopened", więc wznowienie
+przesuwa datę do przodu i przenosi sprawę nad próg. Próg jej nie zakopuje.
+
+**Za tępość progu płaci pasek.** Próg nie pyta, czy sprawa jest skończona —
+pyta, kiedy wpłynęła. Dlatego mówi, ile spraw schował, i OSOBNO liczy te, które
+nadal mają żywy obowiązek: nierozstrzygnięte i z terminem w przyszłości. Zwykle
+ta liczba jest zerem. Dzień, w którym nie będzie, jest tym dniem, dla którego
+ją liczymy. Przełącznik „pokaż starsze" zdejmuje próg na jedno spojrzenie
+i nie przeżywa zamknięcia ekranu.
+
+**BEZ RUCHU to kubełek, nie ukrycie.** Wpada tam sprawa z zamkniętą rozmową
+ORAZ terminem przeterminowanym o ponad trzydzieści dni — albo bez terminu
+wcale. Obie części są potrzebne: `chatActive: false` znaczy, że Allegro nie
+przyjmie wiadomości, ale werdykt nie jest wiadomością, więc sam ten fakt nie
+kończy pracy. **Sprawa z żywą rozmową zostaje w DO DECYZJI niezależnie od
+wieku** — kubełek, który chowa pracę, jest gorszy od kolejki pokazującej za
+dużo.
+
+**Dyskusje biorą ten sam próg.** Obie kolejki karmi ta sama tabela i ten sam
+przelot; tam jest nawet ciaśniej, bo porządek „kto czeka najdłużej" stawia
+najstarsze na górze z definicji.
 
 ### 25b.4. Zegar
 

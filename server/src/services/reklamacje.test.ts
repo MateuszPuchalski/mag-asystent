@@ -5,8 +5,8 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
   adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, kubelek,
-  cofnijNotatke, licznikiKubelkow, listaReklamacji, ReklamacjaConflict, stempelProwadzi, sygnaly,
-  szczegolReklamacji, zapiszNotatke,
+  cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
+  stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
 /* Ten plik pilnuje reguł, których na ekranie nie widać: że kolejka ustawia się
@@ -42,14 +42,18 @@ function stanowisko() {
   const dodaj = (w: {
     ext: string; status?: string; termin?: string | null; ostatnia?: string | null;
     czat?: number; order?: string | null; zwrot?: number | null;
+    /* Data otwarcia jest PARAMETREM od wydania z progiem kolejki: to po niej
+       próg odcina, więc test progu musi umieć ją ustawić. */
+    otwarto?: string;
   }) => Number(d.prepare(`INSERT INTO reklamacja_klienta
     (channel_account_id,external_id,reference_number,order_id,kupujacy_login,
      status_allegro,decyzja_do,ostatnia_wiadomosc_status,czat_aktywny,zwrot_wymagany,
      otwarto_at,synced_at)
-    VALUES (?,?,?,?,'kupujacy1',?,?,?,?,?,'2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
+    VALUES (?,?,?,?,'kupujacy1',?,?,?,?,?,?,'2026-09-07T11:00:00Z')`)
     .run(konto, w.ext, `nr-${w.ext}`, w.order ?? null,
       w.status ?? "CLAIM_SUBMITTED", w.termin === undefined ? "2026-09-20T10:00:00Z" : w.termin,
-      w.ostatnia ?? null, w.czat ?? 1, w.zwrot ?? null).lastInsertRowid);
+      w.ostatnia ?? null, w.czat ?? 1, w.zwrot ?? null,
+      w.otwarto ?? "2026-09-01T08:00:00Z").lastInsertRowid);
 
   return { d, konto, dodaj };
 }
@@ -86,17 +90,21 @@ test("DO DECYZJI trzyma wszystko przed werdyktem, także sprawy z nową wiadomo�
      z zegarem — czyli jedyną liczbę, dla której ten ekran powstał. */
   assert.equal(kubelek({
     statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: "BUYER_REPLIED", czatAktywny: true,
+    dniDoTerminu: 5,
   }), "decyzja");
   assert.equal(kubelek({
     statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "BUYER_REPLIED", czatAktywny: true,
+    dniDoTerminu: 5,
   }), "odpowiedz");
   assert.equal(kubelek({
     statusAllegro: "CLAIM_REJECTED", ostatniaWiadomoscStatus: "SELLER_REPLIED", czatAktywny: true,
+    dniDoTerminu: 5,
   }), "zamknieta");
   /* Rozstrzygnięta z zamkniętym czatem: klient czeka, ale Allegro nowej
      wiadomości nie przyjmie, więc to nie jest praca do zrobienia. */
   assert.equal(kubelek({
     statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "BUYER_REPLIED", czatAktywny: false,
+    dniDoTerminu: 5,
   }), "zamknieta");
 });
 
@@ -136,7 +144,8 @@ test("liczniki kubełków zgadzają się z tym, co pokazuje lista", () => {
   dodaj({ ext: "e", status: "CLAIM_REJECTED", ostatnia: "SELLER_REPLIED" });
 
   const lista = listaReklamacji(d, TERAZ);
-  assert.deepEqual(licznikiKubelkow(lista), { decyzja: 2, odpowiedz: 1, zamknieta: 1 });
+  assert.deepEqual(licznikiKubelkow(lista),
+    { decyzja: 2, odpowiedz: 1, zamknieta: 1, bez_ruchu: 0 });
 });
 
 test("„prowadzę” jest ZNACZNIKIEM: drugie kliknięcie tej samej osoby je zdejmuje", () => {
@@ -448,4 +457,103 @@ test("odnośnik do sprawy niesie UUID, a nie numer czytelny", () => {
   assert.doesNotMatch(r.link!, /nr-/, "numer czytelny nie ma prawa trafić do adresu");
   /* Numer nadal JEST — tylko gdzie indziej niż w adresie. */
   assert.equal(r.numer, "nr-067de4cd-015e-4cae-a091-8fb92cb5a558");
+});
+
+/* ── Próg daty i czwarty kubełek ─────────────────────────────────────────────
+   Zgłoszenie właściciela: „w kolejce pojawiają mi się stare reklamacje",
+   doprecyzowane na „pokaż tylko reklamacje od 1 lipca 2026". Te testy pilnują
+   OBU stron tej decyzji: że próg odcina archiwum i że NIE odcina pracy.     */
+
+const PROG = "2026-07-01T00:00:00Z";
+
+test("próg odcina sprawy sprzed niego, a sprawę z dnia progu przepuszcza", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "stara", otwarto: "2026-06-30T23:59:00Z" });
+  dodaj({ ext: "granica", otwarto: PROG });
+  dodaj({ ext: "nowa", otwarto: "2026-09-01T08:00:00Z" });
+
+  const lista = listaReklamacji(d, TERAZ, PROG);
+  /* Granica WŁĄCZNIE: „od 1 lipca" znaczy z 1 lipca. Wersja z ostrym `>`
+     zjadłaby cały pierwszy dzień i nikt by tego nie zauważył. */
+  assert.deepEqual(new Set(lista.map((r) => r.externalId)), new Set(["granica", "nowa"]));
+});
+
+test("bez progu wraca wszystko — próg ma być sitem, nie ścianą", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "stara", otwarto: "2026-01-05T08:00:00Z" });
+  dodaj({ ext: "nowa" });
+
+  assert.equal(listaReklamacji(d, TERAZ, PROG).length, 1);
+  assert.equal(listaReklamacji(d, TERAZ, null).length, 2,
+    "„pokaż starsze” musi mieć co pokazać, inaczej sprawa sprzed progu jest nieosiągalna");
+});
+
+test("sprawa WZNOWIONA przechodzi próg, bo `openedDate` to data ponownego otwarcia", () => {
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "wznowiona", otwarto: "2026-05-10T08:00:00Z" });
+  assert.equal(listaReklamacji(d, TERAZ, PROG).length, 0);
+
+  /* Tak robi synchronizacja: `otwarto_at=excluded.otwarto_at`. Specyfikacja
+     mówi o `openedDate` „the most recent date when the issue has been opened
+     OR REOPENED" — i to jest cała obrona przed zakopaniem sprawy progiem. */
+  d.prepare("UPDATE reklamacja_klienta SET otwarto_at=? WHERE id=?")
+    .run("2026-09-05T08:00:00Z", id);
+  assert.deepEqual(listaReklamacji(d, TERAZ, PROG).map((r) => r.externalId), ["wznowiona"]);
+});
+
+test("`progKolejki` liczy ukryte, a osobno te z ŻYWYM terminem", () => {
+  const { d, dodaj } = stanowisko();
+  /* Ukryta i skończona — zwykłe archiwum, o którym nikt nie musi wiedzieć. */
+  dodaj({ ext: "archiwum", otwarto: "2026-03-01T08:00:00Z", status: "CLAIM_ACCEPTED" });
+  /* Ukryta i po terminie — też nie jest pracą: zegar już nic nie mierzy. */
+  dodaj({ ext: "po-terminie", otwarto: "2026-03-02T08:00:00Z", termin: "2026-03-20T10:00:00Z" });
+  /* Ukryta, nierozstrzygnięta i z terminem W PRZYSZŁOŚCI. TO jest ta jedna,
+     dla której licznik w ogóle istnieje. */
+  dodaj({ ext: "zywa", otwarto: "2026-06-01T08:00:00Z", termin: "2026-09-25T10:00:00Z" });
+  dodaj({ ext: "widoczna" });
+
+  const p = progKolejki(d, TERAZ, PROG);
+  assert.equal(p.od, PROG);
+  assert.equal(p.ukrytych, 3);
+  assert.equal(p.ukrytychZTerminem, 1,
+    "licznik, który krzyczy zawsze, nie znaczy nic — liczy się tylko żywy obowiązek");
+});
+
+test("bez progu nie ma czego liczyć", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "stara", otwarto: "2026-01-05T08:00:00Z" });
+  assert.deepEqual(progKolejki(d, TERAZ, null),
+    { od: null, ukrytych: 0, ukrytychZTerminem: 0 });
+});
+
+test("BEZ RUCHU bierze sprawę z zamkniętym czatem i terminem sprzed miesiąca", () => {
+  const rdzen = { statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: null };
+  assert.equal(kubelek({ ...rdzen, czatAktywny: false, dniDoTerminu: -31 }), "bez_ruchu");
+  /* Sprawa bez terminu i bez czatu nie ma czym wrócić do pracy. Przy reklamacji
+     brak terminu znaczy „Allegro go nie podało", a nie „termin jest odległy". */
+  assert.equal(kubelek({ ...rdzen, czatAktywny: false, dniDoTerminu: null }), "bez_ruchu");
+});
+
+test("ŻYWY CZAT trzyma sprawę w DO DECYZJI niezależnie od wieku", () => {
+  /* Ta asercja jest ważniejsza od poprzedniej. Kubełek, który chowa pracę,
+     jest gorszy od kolejki, która pokazuje za dużo — a da się tu odpisać. */
+  const rdzen = { statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: null };
+  assert.equal(kubelek({ ...rdzen, czatAktywny: true, dniDoTerminu: -365 }), "decyzja");
+  /* Zamknięty czat, ale termin minął dopiero co: werdykt nie jest wiadomością,
+     więc nadal jest co zrobić. */
+  assert.equal(kubelek({ ...rdzen, czatAktywny: false, dniDoTerminu: -3 }), "decyzja");
+});
+
+test("`DISPUTE_CLOSED` zamyka sprawę, ale NIE potwierdza naszego werdyktu", () => {
+  const rdzen = {
+    statusAllegro: "DISPUTE_CLOSED", ostatniaWiadomoscStatus: null,
+    czatAktywny: false, dniDoTerminu: null,
+  };
+  assert.equal(kubelek(rdzen), "zamknieta", "status końcowy schodzi z pracy");
+  /* Dwie stałe, nie jedna: „spór zamknięto" nie jest odpowiedzią na pytanie
+     „czy Allegro przyjęło to, co wysłaliśmy". Zgaszenie tego sygnału byłoby
+     kłamstwem na ekranie. */
+  assert.ok(sygnaly({
+    ...rdzen, zwrotWymagany: null, werdyktStatus: "sent", werdykt: "ACCEPTED_REFUND",
+  }).includes("werdykt_niepotwierdzony"));
 });

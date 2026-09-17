@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import {
@@ -271,15 +272,22 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
  * brzmi „kto czeka na nas najdłużej", a nie „co przyszło pierwsze" — i tylko
  * na to pytanie mamy tu czym odpowiedzieć, bo terminu Allegro nie daje.
  * Sprawy, w których ruch należy do klienta, idą po nich: nie czekają na nas.
+ *
+ * PRÓG DATY TEN SAM CO PRZY REKLAMACJACH i z tego samego powodu: obie kolejki
+ * karmi ta sama tabela i ten sam pełny przelot listy z 0.273.0, który zapisuje
+ * całe archiwum konta. Tutaj jest nawet ciaśniej — porządek „kto czeka
+ * najdłużej" stawia najstarsze na samej górze z definicji. Naprawienie połowy
+ * ekranu byłoby wydaniem do wyrzucenia za tydzień.
  */
 export function listaDyskusji(
   database: Db = defaultDb(), teraz = Date.now(),
+  od: string | null = config.allegro.reklamacjeOd,
 ): WierszDyskusji[] {
   const wiersze = database.prepare(`
     SELECT r.* FROM reklamacja_klienta r
-     WHERE r.typ = 'DISPUTE'
+     WHERE r.typ = 'DISPUTE' AND (? IS NULL OR r.otwarto_at >= ?)
      ORDER BY r.ostatnia_wiadomosc_at IS NULL, r.ostatnia_wiadomosc_at ASC,
-              r.otwarto_at ASC`).all() as Wiersz[];
+              r.otwarto_at ASC`).all(od, od) as Wiersz[];
   /* Sortowanie „kto czeka najdłużej" domykamy w pamięci, bo `ruchNasz` nie
      jest kolumną — liczy go ten plik ze statusu ostatniej wiadomości. SQL
      musiałby powtórzyć tę regułę drugi raz i rozjechać się przy pierwszej

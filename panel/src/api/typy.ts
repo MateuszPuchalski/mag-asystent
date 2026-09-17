@@ -1271,7 +1271,27 @@ export interface KoszZwrotow {
    Panel prowadzi wyłącznie reklamacje (`type: "CLAIM"` z `/sale/issues`).
    Dyskusje odsiewa synchronizator, więc tu ich nie ma. */
 
-export type KubelekReklamacji = "decyzja" | "odpowiedz" | "zamknieta";
+export type KubelekReklamacji = "decyzja" | "odpowiedz" | "zamknieta" | "bez_ruchu";
+
+/**
+ * Co próg daty schował przed kolejką.
+ *
+ * Jedzie przy OBU kolejkach — reklamacji i dyskusji — bo obie karmi ta sama
+ * tabela i ten sam próg. `zdjety` mówi, czy patrzymy właśnie na komplet:
+ * przełącznik musi umieć narysować się w obie strony.
+ */
+export interface ProgKolejki {
+  /** Próg w ISO albo `null`, gdy go nie ma. Zdanie na pasku pisze panel. */
+  od: string | null;
+  ukrytych: number;
+  /**
+   * Ile UKRYTYCH spraw ma jeszcze żywy obowiązek — nierozstrzygniętych
+   * i z terminem decyzji w przyszłości. Zwykle zero; gdy nie zero, pasek
+   * mówi to głośno, bo wtedy próg chowa pracę, a nie archiwum.
+   */
+  ukrytychZTerminem: number;
+  zdjety: boolean;
+}
 
 export type SygnalReklamacji =
   | "termin"
@@ -1416,6 +1436,7 @@ export interface StanReklamacji extends StanZwrotow {
 export interface KolejkaReklamacji {
   reklamacje: Reklamacja[];
   liczniki: Record<KubelekReklamacji, number>;
+  prog: ProgKolejki;
   stan: StanReklamacji;
 }
 
@@ -1550,6 +1571,8 @@ export interface Dyskusja {
 export interface KolejkaDyskusji {
   dyskusje: Dyskusja[];
   liczniki: Record<KubelekDyskusji, number>;
+  /** Próg jest WSPÓLNY z reklamacjami — jedna tabela, jedna granica widoku. */
+  prog: ProgKolejki;
   /** Pasek synchronizacji jest WSPÓLNY: obie sprawy jadą jedną listą. */
   stan: StanReklamacji;
 }

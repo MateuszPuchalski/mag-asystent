@@ -16,6 +16,7 @@ import { Czat } from "../reklamacje/Czat";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { PasekProgu } from "../sprawy/Prog";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
@@ -79,7 +80,10 @@ export function Dyskusje() {
   const cofnijNotatke = useCofnijNotatkeDyskusji();
   const [bladZapisu, setBladZapisu] = useState("");
 
-  const { data, isLoading, error } = useDyskusje();
+  /* Próg daty ten sam co przy reklamacjach; wybór nie przeżywa zamknięcia
+     ekranu z tego samego powodu. */
+  const [bezProgu, setBezProgu] = useState(false);
+  const { data, isLoading, error } = useDyskusje(bezProgu);
   const prowadze = useProwadzeDyskusje();
   const notatka = useNotatkaDyskusji();
   const odpowiedz = useOdpowiedzWDyskusji();
@@ -271,6 +275,7 @@ export function Dyskusje() {
   const opis = KUBELKI.find((k) => k.id === kubelek);
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
     {/* Pasek synchronizacji jest WSPÓLNY z reklamacjami i mówi to wprost —
         inaczej agent szukałby tu przycisku, którego nie ma, i uznał ekran
         za zepsuty. */}

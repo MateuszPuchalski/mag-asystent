@@ -7,7 +7,7 @@ import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/skrzynka.js";
 import {
-  adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji,
+  adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji, progKolejki,
   cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
@@ -92,13 +92,23 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
   /* Cała kolejka jednym strzałem razem z licznikami. Panel filtruje kubełkiem
      u siebie, więc przełączenie kubełka nie kosztuje żądania — ten sam wybór
      co przy zwrotach i z tego samego powodu. */
-  app.get("/api/obsluga/reklamacje", async (_req, reply) => {
+  app.get<{ Querystring: { od?: string } }>("/api/obsluga/reklamacje", async (req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    const reklamacje = listaReklamacji(db());
+    /* JEDYNY parametr tej trasy: `od=wszystko` zdejmuje próg daty. Bez tej
+       furtki próg byłby ścianą, a sprawa sprzed niego — nieosiągalna z panelu.
+       Trasa zostaje `GET` i niczego nie zapisuje: umowa „zero zapisu przy
+       patrzeniu" jest nietknięta. */
+    const bezProgu = req.query?.od === "wszystko";
+    const prog = progKolejki(db());
+    const reklamacje = listaReklamacji(db(), Date.now(), bezProgu ? null : prog.od);
     return {
       reklamacje,
       liczniki: licznikiKubelkow(reklamacje),
+      /* `prog` jedzie ZAWSZE, także przy `od=wszystko`: panel musi umieć
+         narysować przełącznik w obie strony, a po zdjęciu progu wciąż ma
+         powiedzieć, do czego wraca. */
+      prog: { ...prog, zdjety: bezProgu },
       stan: stanReklamacjiHealth(db()),
     };
   });

@@ -34,6 +34,60 @@ historii nie przepisujemy.
 ---
 
 
+## 0.384.0 — 17 września 2026
+
+**Kolejka reklamacji pokazuje pracę, a nie archiwum.** Zgłoszenie właściciela:
+„w kolejce pojawiają mi się stare reklamacje", doprecyzowane na „pokaż tylko
+reklamacje od 1 lipca 2026".
+
+**Przyczyna była nasza w całości i miała trzy ogniwa.** Pełny przelot listy
+dołożony w 0.273.0 zapisuje CAŁE archiwum konta — do tysiąca spraw co trzy
+minuty. Zapytanie kolejki nie miało ani filtra statusu, ani okna czasowego,
+ani limitu: do przeglądarki jechała zawartość całej tabeli, a trasa nie
+przyjmowała żadnego parametru. Porządek dołożył resztę — `decyzja_do ASC`
+stawia termin sprzed pół roku NAD dzisiejszym, więc archiwum lądowało nie
+gdziekolwiek, tylko na samej górze listy.
+
+- **[wymaga działania] Próg `REKLAMACJE_OD`, domyślnie 1 lipca 2026.** Odcina
+  po `otwarto_at` i dotyczy WIDOKU, nie pobierania: pełny przelot zamyka sprawy
+  rozstrzygnięte w Centrum Sprzedaży i bez archiwum przestałby to robić. Pusta
+  wartość wyłącza próg, a cofnięcie go nie wymaga ponownej synchronizacji.
+- **Sprawa wznowiona wraca nad próg sama.** Allegro przesuwa wtedy `openedDate`
+  — wedle schematu „opened or reopened" — a to po niej próg odcina.
+- **Pasek mówi, ile spraw schował.** Próg daty nie pyta, czy sprawa jest
+  skończona, tylko kiedy wpłynęła, więc osobno liczy te ukryte, które nadal mają
+  żywy obowiązek: nierozstrzygnięte i z terminem w przyszłości. Zwykle zero.
+  Dzień, w którym nie będzie zera, jest tym dniem, dla którego to liczymy.
+  „Pokaż starsze" zdejmuje próg na jedno spojrzenie.
+- **Czwarty kubełek BEZ RUCHU.** Sprawa z zamkniętą rozmową ORAZ terminem
+  przeterminowanym o ponad trzydzieści dni schodzi z DO DECYZJI. Obie części
+  są potrzebne: werdykt nie jest wiadomością, więc sam zamknięty czat pracy nie
+  kończy. **Sprawa z żywą rozmową zostaje w DO DECYZJI niezależnie od wieku** —
+  kubełek, który chowa pracę, jest gorszy od kolejki pokazującej za dużo.
+- **Dyskusje biorą ten sam próg.** Jedna tabela, jeden przelot, jedna granica.
+  Tam jest nawet ciaśniej: porządek „kto czeka najdłużej" stawia najstarsze na
+  górze z definicji.
+
+**`DISPUTE_CLOSED` dołożony do statusów końcowych — jako osłona, nie naprawa.**
+Trzecia wartość stała w SQL-u doboru rozmów od 0.273.0, a w kubełku były dwie.
+Reklamacja nie powinna nosić statusu dyskusji (`type` ma osobne `CLAIM`
+i `DISPUTE`), więc prawdopodobnie nie dotyczy to żadnego wiersza — ale dwie
+listy końcowe przepisane ręcznie w dwóch plikach rozjadą się w ciszy przy
+następnej zmianie. Sygnał „werdykt niepotwierdzony" zostaje przy węższej parze
+`CLAIM_ACCEPTED`/`CLAIM_REJECTED`: „spór zamknięto" nie jest odpowiedzią na
+pytanie, czy Allegro przyjęło to, co wysłaliśmy.
+
+**Tabela kubełków w dokumentacji mówiła co innego niż kod.** Pisała
+„`CLAIM_SUBMITTED` bez naszego werdyktu", a kubełek liczy się przez NEGACJĘ
+statusu końcowego — bierze też sprawę bez statusu i ze statusem spoza
+specyfikacji. Poprawione po stronie tabeli, bo to kod ma rację.
+
+**`dzien()` dołącza do `czas()` i `godzina()` w `ui/index.tsx`.** Próg jest
+decyzją o dniu, a „01.07.2026, 02:00" kazałoby czytelnikowi zastanawiać się nad
+drugą w nocy, która jest wyłącznie skutkiem zapisu północy w UTC.
+
+---
+
 ## 0.383.0 — 17 września 2026
 
 **Skrzynka dostała klawiaturę — jako ostatnia z czterech kolejek obsługi.**
