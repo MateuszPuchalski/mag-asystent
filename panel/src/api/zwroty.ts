@@ -214,10 +214,12 @@ export function useOcena() {
   return useMutation({
     /* `null` COFA ocenę (0.202.0) — serwer i trasa umiały to od 0.192.0, tylko
        panel nie miał klawisza. */
-    mutationFn: (v: { pozycjaId: number; ocena: Ocena | null; wersja: number }) =>
+    mutationFn: (v: { pozycjaId: number; ocena: Ocena | null; wersja: number;
+      koszId?: number }) =>
       api<{ wersja: number; koszyk: number | null }>(
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ocena`,
-        { method: "POST", body: JSON.stringify({ ocena: v.ocena, wersja: v.wersja }) }),
+        { method: "POST", body: JSON.stringify(
+          { ocena: v.ocena, wersja: v.wersja, koszId: v.koszId }) }),
     /* Ocena „na stan" dokłada pozycję do koszyka zwrotów, więc odświeża też
        jego pasek — inaczej licznik na ekranie stałby w miejscu, a operator
        nie wiedziałby, ile już zebrał (0.192.0). */
@@ -309,8 +311,17 @@ export interface KoszykCzekajacy {
   brakuje: Array<{ zwrotId: number; numer: string }>;
   /** Odmowa Sfery; niepusta znaczy też, że zadanie wciąż wisi przy koszu. */
   blad?: string | null;
-  /** Wiersze dołożone ręką — jedyne, które da się z zamkniętego kosza zdjąć. */
-  dolozone?: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
+  /**
+   * CAŁA zawartość pudła (0.379.0), nie tylko wiersze ze skanu.
+   *
+   * Koszyk Z-8 pokazał cenę tamtego zawężenia: odbił się od Sfery na kartotece
+   * przyniesionej OCENĄ, więc nie miał ani jednego krzyżyka i nie było jak go
+   * odetkać z tego ekranu. `zeZwrotu` zostaje, bo zdjęcie takiego wiersza cofa
+   * przy okazji ocenę — ekran ma to powiedzieć PRZED kliknięciem.
+   */
+  pozycje?: Array<{
+    pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+  }>;
 }
 
 /** Co leży w otwartym koszyku zwrotów tego operatora (0.192.0). */
@@ -359,14 +370,22 @@ export function useTowaryDoKosza(q: string) {
 export function useDolozTowar() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { twId: number; ilosc?: number; rodzaj?: "zwroty" | "odpad" }) =>
+    mutationFn: (v: { twId: number; ilosc?: number; rodzaj?: "zwroty" | "odpad";
+      koszId?: number }) =>
       api<{ koszId: number; kod: string; pozycjaId: number; symbol: string; ilosc: number }>(
         "/api/obsluga/zwroty/kosz/towar", { method: "POST", body: JSON.stringify(v) }),
     onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
   });
 }
 
-/** Zdjęcie z koszyka wiersza dołożonego ręką — cena pomyłki przy skanie. */
+/**
+ * Zdjęcie wiersza z koszyka bez dokumentu — cena pomyłki przy skanie i ocenie.
+ *
+ * ODŚWIEŻA TAKŻE ZWROTY (0.379.0). Od tego wydania schodzi stąd również wiersz
+ * przyniesiony OCENĄ, a wtedy serwer cofa tę ocenę: zwrot wraca do kubełka
+ * DO OCENY. Bez unieważnienia kolejki karta zwrotu pokazywałaby ocenę, której
+ * już nie ma.
+ */
 export function useZdejmijTowar() {
   const qc = useQueryClient();
   return useMutation({
@@ -374,7 +393,11 @@ export function useZdejmijTowar() {
       api<{ koszId: number; kod: string; symbol: string }>(
         "/api/obsluga/zwroty/kosz/towar/zdejmij",
         { method: "POST", body: JSON.stringify({ pozycjaId }) }),
-    onSettled: () => qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+    },
   });
 }
 

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  brakujaceKorekty, dolozDoKosza, otwarteKoszyki, otwartyKosz, stanOtwartegoKosza,
+  brakujaceKorekty, dolozDoKosza, otwarteKoszyki, koszDoDolozenia, stanOtwartegoKosza,
   wypuscGotoweKoszyki, wypuscMmMimoKorekt, zamknijKosz, zdejmijZKosza,
   dolozTowar, zdejmijTowar, koszykiBezDokumentu, koszykiCzekajaceNaKorekty,
   MAX_SZTUK_RECZNIE, powodPozaMagazynem, zwiazKoszykiZDokumentami, zaznaczSkladnik,
@@ -237,7 +237,7 @@ test("pusty koszyk odmawia domknięcia", () => {
      operator odszedłby od biurka. */
   const d = stanowisko();
   const KTO = biuro(d);
-  const id = otwartyKosz(d, KTO);
+  const id = koszDoDolozenia(d, KTO);
   assert.throws(() => zamknijKosz(d, id, KTO), /pusty/);
 });
 
@@ -379,7 +379,7 @@ test("wymuszenie odmawia koszowi pustemu i rozliczonemu poza aplikacją", () => 
      przesunął już ktoś inny. */
   const d = stanowisko();
   const KTO = biuro(d);
-  const pusty = otwartyKosz(d, KTO);
+  const pusty = koszDoDolozenia(d, KTO);
   assert.throws(() => wypuscMmMimoKorekt(d, pusty, KTO), /pusty/);
 
   const a = zwrotZTowarem(d, [11], KTO);
@@ -462,22 +462,35 @@ test("dołożony towar jedzie na MM i NIE trzyma go bramką korekt", () => {
     .items, [{ twId: 22, qty: 3 }]);
 });
 
-test("zdejmowanie dotyczy WYŁĄCZNIE wiersza dołożonego ręką", () => {
-  /* Wiersz ze zwrotu schodzi cofnięciem oceny: ocena jest faktem o towarze,
-     a kasowanie jej z drugiej strony rozjechałoby kartę zwrotu z koszykiem. */
+test("z koszyka BEZ DOKUMENTU schodzi każdy wiersz, a ze zwrotu razem z oceną", () => {
+  /* ODWRÓCENIE REGUŁY z 0.365.0 („wiersz ze zwrotu schodzi cofnięciem oceny"),
+     zgłoszone przez właściciela: „pozwól edytować te koszyki".
+
+     Reguła była słuszna w zamyśle — jedna droga na jeden skutek — a zostawiła
+     koszyki bez wyjścia. Z-8 na produkcji odbił się od Sfery na kartotece
+     usługowej przyniesionej OCENĄ: nie miał ani jednego wiersza ze skanu,
+     więc nie miał ani jednego krzyżyka.
+
+     OCENA SCHODZI RAZEM Z WIERSZEM i to jest warunek spójności: to ona wsadziła
+     towar do pudła, więc wyjęcie bez jej zdjęcia zostawiłoby kartę zwrotu
+     mówiącą o regale, którego dokument tej sztuki nie niesie. */
   const d = stanowisko();
   const KTO = biuro(d);
-  const { poz } = zwrotZTowarem(d, [31], KTO);
-  ocenPozycje(d, poz[0], "stan", 2, KTO);
-  kartoteka(d, 32);
-  const dolozony = dolozTowar(d, 32, 1, KTO);
+  const z = zwrotZTowarem(d, [11], KTO);
+  ocenPozycje(d, z.poz[0], "stan", 2, KTO);
+  const wiersz = d.prepare(
+    "SELECT id FROM kosz_pozycja WHERE zwrot_pozycja_id=?").get(z.poz[0]) as { id: number };
 
-  const kosz = stanOtwartegoKosza(d, KTO)!;
-  const zeZwrotu = kosz.pozycje.find((p) => p.zeZwrotu)!;
-  assert.throws(() => zdejmijTowar(d, zeZwrotu.id, KTO), /cofnięciem oceny/);
+  zdejmijTowar(d, Number(wiersz.id), KTO);
 
-  zdejmijTowar(d, dolozony.pozycjaId, KTO);
-  assert.equal(stanOtwartegoKosza(d, KTO)!.pozycji, 1, "została pozycja ze zwrotu");
+  assert.equal(otwarteKoszyki(d, KTO)[0].pozycji, 0, "wiersz schodzi z pudła");
+  const poz = d.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(z.poz[0]) as { ocena: string | null };
+  assert.equal(poz.ocena, null, "ocena schodzi razem z nim");
+  const slad = d.prepare(
+    `SELECT COUNT(*) AS n FROM zwrot_zdarzenie WHERE zwrot_id=? AND rodzaj='ocena_cofnieta'`)
+    .get(z.id) as { n: number };
+  assert.equal(slad.n, 1, "oś zwrotu mówi, że sztuka wyszła z koszyka");
 });
 
 test("koszyk zamknięty BEZ DOKUMENTU wciąż oddaje wiersz dołożony ręką", () => {
@@ -555,7 +568,11 @@ test("kosz z ODRZUCONĄ MM widać w panelu — z odmową Sfery i wierszem do zdj
   const lista = koszykiBezDokumentu(d);
   assert.equal(lista.length, 1);
   assert.equal(lista[0].blad, "Brak towaru w magazynie");
-  assert.deepEqual(lista[0].dolozone.map((p) => p.symbol), ["KOSZT-PRZESYLKI"]);
+  /* CAŁA zawartość od 0.379.0, nie tylko wiersze ze skanu: koszyk Z-8 odbił
+     się na kartotece przyniesionej OCENĄ i nie miał czym się odetkać. */
+  assert.deepEqual(lista[0].pozycje.map((p) => p.symbol).sort(),
+    ["KOSZT-PRZESYLKI", "SYM-71"]);
+  assert.deepEqual(lista[0].pozycje.map((p) => p.zeZwrotu).sort(), [false, true]);
   assert.equal(lista[0].brakuje.length, 0);
   /* `reconcile` mówi „brakuje: ..." i o koszu z kompletem korekt nie miałby co
      powiedzieć — wężysza lista nie ma prawa go złapać. */
@@ -567,7 +584,8 @@ test("kosz z ODRZUCONĄ MM widać w panelu — z odmową Sfery i wierszem do zdj
   const po = koszykiBezDokumentu(d);
   assert.equal(po.length, 1);
   assert.equal(po[0].blad, null);
-  assert.equal(po[0].dolozone.length, 0);
+  assert.deepEqual(po[0].pozycje.map((p) => p.symbol), ["SYM-71"],
+    "zostaje wiersz ze zwrotu — jego zdjęcie cofa przy okazji ocenę");
 });
 
 test("kosz z zadaniem W TOKU nie pokazuje się — papier jest w drodze", () => {
@@ -777,17 +795,29 @@ test("NOWY KOSZYK zakłada pudło bez ani jednej pozycji", () => {
   assert.equal(otwarteKoszyki(d, KTO).length, 1);
 });
 
-test("drugie naciśnięcie oddaje TEN SAM koszyk, a nie drugie pudło", () => {
-  /* Decyzja z 3 września 2026 zostaje: fizyczny kosz stoi przy jednym biurku.
-     Dwa pudła na jednego operatora znaczyłyby dwa dokumenty na jeden karton. */
+test("drugie naciśnięcie zakłada DRUGIE pudło, a ocena pyta, do którego", () => {
+  /* ODWRÓCENIE decyzji z 3 września („jeden koszyk na operatora"). Przy biurku
+     stoi czasem kilka kartonów, a zamykanie pierwszego po to, żeby zacząć
+     drugi, wystawia dokument na pudło, które jeszcze nie odjechało.
+
+     Cena tej swobody: przy kilku pudłach ocena PYTA. Zgadywanie „do
+     najnowszego" byłoby tanie w kodzie i drogie na hali. */
   const d = stanowisko();
   const KTO = biuro(d);
 
   const raz = zalozKoszyk(d, KTO);
   const dwa = zalozKoszyk(d, KTO);
 
-  assert.equal(dwa.id, raz.id);
-  assert.equal(otwarteKoszyki(d, KTO).length, 1);
+  assert.notEqual(dwa.id, raz.id);
+  assert.equal(otwarteKoszyki(d, KTO).length, 2);
+
+  const z = zwrotZTowarem(d, [11], KTO);
+  assert.throws(() => ocenPozycje(d, z.poz[0], "stan", 2, KTO), /wskaż, do którego/);
+
+  /* Ze wskazaniem przechodzi i trafia DOKŁADNIE tam, gdzie kazano. */
+  const wynik = ocenPozycje(d, z.poz[0], "stan", 2, KTO, new Date(), dwa.id);
+  assert.equal(wynik.koszyk, dwa.id);
+  assert.equal(otwarteKoszyki(d, KTO).find((k) => k.id === raz.id)!.pozycji, 0);
 });
 
 test("pusty koszyk da się PORZUCIĆ, a napełniony już nie", () => {

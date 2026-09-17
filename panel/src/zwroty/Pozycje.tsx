@@ -1,7 +1,9 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
 import { Check, X as Krzyzyk } from "lucide-react";
 import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
-import { usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote } from "../api/zwroty";
+import {
+  useKosz, usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote,
+} from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
@@ -272,7 +274,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   sklady?: Record<number, SkladPozycji>;
   /** Wiersze paragonu — materiał do ręcznego składu kompletu (0.336.0). */
   wierszeDokumentu?: WierszDokumentu[];
-  onOcena: (pozycjaId: number, ocena: Ocena | null) => void;
+  onOcena: (pozycjaId: number, ocena: Ocena | null, koszId?: number) => void;
   onKwota: (pozycjeIds: number[], dostawa: boolean) => void;
   onZglosRabat?: (pozycjaId: number) => void;
   onPotracenie?: (pozycjaId: number, grosze: number | null, powod: string) => void;
@@ -298,6 +300,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      zaznaczenia z `zwrot.pozycje` znosi obie te drogi naraz. */
   /* Która pozycja ma otwarty formularz składu (0.336.0). Jedna naraz: dwa
      otwarte pytałyby o to samo w dwóch miejscach ekranu. */
+  /* Otwarte pudła z TEGO SAMEGO zapytania co pasek koszyka — react-query
+     oddaje je z pamięci, więc przycisk oceny nie kosztuje strzału do serwera. */
+  const pudla = useKosz().data?.kosze ?? [];
   const [skladamy, setSkladamy] = useState<number | null>(null);
   const [odznaczone, setOdznaczone] = useState<ReadonlySet<number>>(() => new Set());
   const wybrane = useMemo(
@@ -439,11 +444,35 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               którego dotyczy. Zapisana ocena zostaje widoczna w każdym
               kubełku — to fakt o tej pozycji, nie stan ekranu. */}
           {ocenianie && !p.ocena && <div className="mt-2 flex flex-wrap gap-2">
-            {OCENY.map(([klucz, klawisz, etykieta]) => (
-              <Przycisk key={klucz} className="text-xs" disabled={trwa}
-                onClick={() => onOcena(p.id, klucz)}>
-                <kbd className="rounded border border-slate-300 px-1">{klawisz}</kbd> {etykieta}
-              </Przycisk>))}
+            {OCENY.map(([klucz, klawisz, etykieta]) => {
+              /* ── WYBÓR PUDŁA PRZY OCENIE (0.379.0) ─────────────────────
+                 Decyzja właściciela, razem z odwróceniem zasady „jeden koszyk
+                 na operatora": przy kilku otwartych pudłach ocena PYTA, do
+                 którego. Zgadywanie „do najnowszego" byłoby tanie w kodzie
+                 i drogie na hali — towar trafiałby do cudzego kartonu bez
+                 jednego słowa na ekranie.
+
+                 Pytamy JEDNYM klikiem, nie dwoma: przycisk rozwija się na tyle
+                 przycisków, ile jest pudeł, z kodem na każdym. Osobne okienko
+                 „do którego?" po naciśnięciu byłoby pytaniem po czynności —
+                 tego zabrania dekalog.
+
+                 Ocena „outlet" nie ma pudła i nie rozwija się nigdy. */
+              const doPudla = klucz === "outlet" ? []
+                : pudla.filter((k) => k.rodzaj === (klucz === "utylizacja" ? "odpad" : "zwroty"));
+              if (doPudla.length > 1) {
+                return doPudla.map((k) => (
+                  <Przycisk key={`${klucz}-${k.id}`} className="text-xs" disabled={trwa}
+                    onClick={() => onOcena(p.id, klucz, k.id)}>
+                    {etykieta} → {k.kod}
+                  </Przycisk>));
+              }
+              return (
+                <Przycisk key={klucz} className="text-xs" disabled={trwa}
+                  onClick={() => onOcena(p.id, klucz)}>
+                  <kbd className="rounded border border-slate-300 px-1">{klawisz}</kbd> {etykieta}
+                </Przycisk>);
+            })}
           </div>}
           {p.ocena && <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-ranga-ok">
             <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}

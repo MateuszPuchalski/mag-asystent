@@ -167,17 +167,68 @@ export function powodPozaMagazynem(
  * z Subiekta (`mm_dok_id IS NOT NULL`) odpadają: tamte rodzi dokument, a nie
  * praca przy biurku, i nigdy nie stoją otwarte.
  */
-export function otwartyKosz(database: Db, kto: { id: number; name: string },
-  teraz = new Date(), rodzaj: RodzajKosza = "zwroty"): number {
-  /* PO RODZAJU, nie tylko po właścicielu (0.211.0). Operator ma przy biurku
-     dwa pudła naraz — zwroty i odpad — a bez tego warunku pozycja do
-     utylizacji wpadłaby do pierwszego z brzegu i pojechała na zły magazyn. */
-  const juz = database.prepare(
-    `SELECT id FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
-       AND utworzono_przez=? AND rodzaj=? ORDER BY id LIMIT 1`)
-    .get(kto.name, rodzaj) as { id: number } | undefined;
-  if (juz) return Number(juz.id);
+export class WyborKoszyka extends Error {
+  constructor(public readonly kosze: Array<{ id: number; kod: string }>) {
+    super("Masz otwarte kilka koszyków — wskaż, do którego to wkładasz.");
+    this.name = "WyborKoszyka";
+  }
+}
 
+/** Otwarte pudła tego operatora dla tego rodzaju, od najstarszego. */
+function otwarteTegoRodzaju(
+  database: Db, kto: { name: string }, rodzaj: RodzajKosza,
+): Array<{ id: number; kod: string }> {
+  return (database.prepare(
+    `SELECT id, kod FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
+       AND utworzono_przez=? AND rodzaj=? ORDER BY id`)
+    .all(kto.name, rodzaj) as Array<{ id: number; kod: string }>)
+    .map((k) => ({ id: Number(k.id), kod: k.kod }));
+}
+
+/**
+ * Do którego pudła trafia ta sztuka.
+ *
+ * KILKA PUDEŁ NARAZ OD 0.379.0. Decyzja właściciela odwraca tę z 3 września
+ * („otwarty koszyk jest JEDEN na operatora"): przy biurku stoi czasem kilka
+ * kartonów o różnym przeznaczeniu, a jeden na operatora znaczył, że trzeba
+ * zamknąć pierwszy, żeby zacząć drugi.
+ *
+ * Cena tej swobody jest jedna i właściciel wybrał ją świadomie: przy kilku
+ * otwartych pudłach OCENA PYTA, do którego. Zgadywanie „do najnowszego" byłoby
+ * tanie w kodzie i drogie na hali — towar trafiałby do cudzego kartonu bez
+ * jednego słowa na ekranie.
+ *
+ * Bez wskazania rozstrzygamy tylko tam, gdzie nie ma czego zgadywać: zero
+ * otwartych pudeł zakłada nowe, jedno bierze siebie.
+ */
+export function koszDoDolozenia(
+  database: Db, kto: { id: number; name: string }, teraz = new Date(),
+  rodzaj: RodzajKosza = "zwroty", koszId?: number | null,
+): number {
+  if (koszId) {
+    const k = database.prepare(
+      `SELECT id FROM kosz WHERE id=? AND status='otwarty' AND mm_dok_id IS NULL
+         AND mm_queue_id IS NULL AND rodzaj=?`).get(koszId, rodzaj) as
+      { id: number } | undefined;
+    if (!k) {
+      throw new Error("Ten koszyk nie jest już otwarty na ten rodzaj towaru — odśwież ekran.");
+    }
+    return Number(k.id);
+  }
+
+  /* PO RODZAJU, nie tylko po właścicielu (0.211.0). Operator ma przy biurku
+     osobne pudła na zwroty i na odpad — a bez tego warunku pozycja do
+     utylizacji wpadłaby do pierwszego z brzegu i pojechała na zły magazyn. */
+  const otwarte = otwarteTegoRodzaju(database, kto, rodzaj);
+  if (otwarte.length === 1) return otwarte[0].id;
+  if (otwarte.length > 1) throw new WyborKoszyka(otwarte);
+
+  return zalozPudlo(database, kto, teraz, rodzaj);
+}
+
+/** Zakłada pudło i melduje to w dzienniku. Jedyne miejsce, które je tworzy. */
+function zalozPudlo(database: Db, kto: { id: number; name: string },
+  teraz: Date, rodzaj: RodzajKosza): number {
   const at = teraz.toISOString();
   const kod = nowyKod(database);
   const id = Number(database.prepare(
@@ -203,10 +254,12 @@ export function otwartyKosz(database: Db, kto: { id: number; name: string },
    zwrotach mieszałyby towar w jednym dokumencie — albo jedna osoba w dwóch.  */
 
 /**
- * Zakłada koszyk WPROST albo oddaje ten, który operator już ma otwarty.
+ * Zakłada koszyk WPROST — za każdym naciśnięciem NOWE pudło (0.379.0).
  *
- * Idempotentne z premedytacją: przycisk naciśnięty dwa razy nie ma prawa dać
- * dwóch pudeł, bo przy biurku stoi jedno.
+ * Do 0.378.0 drugie naciśnięcie oddawało ten sam kosz, bo obowiązywała zasada
+ * „jeden koszyk na operatora". Właściciel ją odwrócił: przy biurku stoi czasem
+ * kilka kartonów, a zamykanie pierwszego po to, żeby zacząć drugi, wystawia
+ * dokument na pudło, które jeszcze nie odjechało.
  */
 export function zalozKoszyk(
   database: Db, kto: { id: number; name: string }, teraz = new Date(),
@@ -215,7 +268,7 @@ export function zalozKoszyk(
   if (magazynDocelowy(rodzaj) <= 0) {
     throw new Error("Ten rodzaj koszyka nie ma magazynu docelowego — sprawdź wertis.env.");
   }
-  const koszId = otwartyKosz(database, kto, teraz, rodzaj);
+  const koszId = zalozPudlo(database, kto, teraz, rodzaj);
   const stan = otwarteKoszyki(database, kto).find((k) => k.id === koszId);
   if (!stan) throw new Error("Koszyk powstał, ale nie umiem go odczytać — odśwież ekran.");
   return stan;
@@ -269,7 +322,7 @@ export function porzucKoszyk(
  */
 export function dolozDoKosza(
   database: Db, pozycjaId: number, kto: { id: number; name: string }, teraz = new Date(),
-  rodzaj: RodzajKosza = "zwroty",
+  rodzaj: RodzajKosza = "zwroty", koszId?: number | null,
 ): number | null {
   /* Odpad bez numeru magazynu w `wertis.env` nie ma dokąd jechać. Koszyka
      wtedy NIE zakładamy: ocena zapisuje się jak przed 0.211.0, a ekran
@@ -307,14 +360,14 @@ export function dolozDoKosza(
     }
   }
 
-  const koszId = otwartyKosz(database, kto, teraz, rodzaj);
+  const kosz = koszDoDolozenia(database, kto, teraz, rodzaj, koszId);
   /* Dwa razy ta sama pozycja to jeden wiersz. Operator bywa poprawiany:
      cofnięcie oceny i ponowne „na stan" nie ma prawa podwoić sztuk na MM.
      Przy komplecie wierszy jest kilka, więc pytamy o ISTNIENIE, nie o jeden. */
   const stoi = database.prepare(
     "SELECT id FROM kosz_pozycja WHERE kosz_id=? AND zwrot_pozycja_id=? LIMIT 1")
-    .get(koszId, pozycjaId) as { id: number } | undefined;
-  if (stoi) return koszId;
+    .get(kosz, pozycjaId) as { id: number } | undefined;
+  if (stoi) return kosz;
 
   /* TO, CO WRÓCIŁO, nie deklaracja klienta (0.212.0) — `skladPozycji` liczy
      sztuki tą samą regułą. Na dokument MM idzie towar, który fizycznie leży
@@ -324,7 +377,7 @@ export function dolozDoKosza(
     `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
      VALUES (?,?,?,?,?,?)`);
   for (const s of sklad.skladniki) {
-    wstaw.run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
+    wstaw.run(kosz, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
   }
   /* Skład policzony z dokumentu ZAPAMIĘTUJE SIĘ dopiero tutaj, na drodze
      zapisu. Liczenie go od nowa przy każdym zwrocie znaczyłoby, że ten sam
@@ -335,10 +388,10 @@ export function dolozDoKosza(
       sklad.skladniki, (s) => s.ilosc / Math.max(1, ile), "paragon", kto, teraz);
   }
   logEvent("kosz_zwrotow_dolozono", kto.name, null,
-    { koszId, pozycjaId, kartotek: sklad.skladniki.length, zrodlo: sklad.zrodlo,
+    { koszId: kosz, pozycjaId, kartotek: sklad.skladniki.length, zrodlo: sklad.zrodlo,
       sztuk: sklad.skladniki.reduce((a, s) => a + s.ilosc, 0), ilosc: ile },
     kto.id, database);
-  return koszId;
+  return kosz;
 }
 
 /* ── Towar dołożony RĘKĄ: skanem albo z kartoteki (0.365.0) ─────────────────
@@ -396,7 +449,7 @@ export interface DolozonyTowar {
  */
 export function dolozTowar(
   database: Db, twId: number, ile: number, kto: { id: number; name: string },
-  teraz = new Date(), rodzaj: RodzajKosza = "zwroty",
+  teraz = new Date(), rodzaj: RodzajKosza = "zwroty", doKosza?: number | null,
 ): DolozonyTowar {
   const sztuk = Math.floor(Number(ile) || 0);
   if (sztuk < 1) throw new Error("Podaj, ile sztuk dokładasz — mniej niż jedna to nic.");
@@ -416,7 +469,7 @@ export function dolozTowar(
   if (powod) throw new Error(`„${t.symbol}" nie wejdzie do pudła: ${powod}.`);
 
   return transaction(database, () => {
-    const koszId = otwartyKosz(database, kto, teraz, rodzaj);
+    const koszId = koszDoDolozenia(database, kto, teraz, rodzaj, doKosza);
     const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
       { kod: string }).kod;
     /* Wyłącznie wiersz DOŁOŻONY RĘKĄ (`zwrot_pozycja_id IS NULL`). Doliczenie
@@ -494,9 +547,6 @@ export function zdejmijTowar(
     if ((w.rodzaj ?? "zwroty") !== "zwroty" && (w.rodzaj ?? "zwroty") !== "odpad") {
       throw new Error(`Koszyk ${w.kod} nie jest koszykiem zwrotów ani odpadu.`);
     }
-    if (w.zwrot_pozycja_id !== null) {
-      throw new Error("Ta pozycja przyszła ze zwrotu — zdejmuje się ją cofnięciem oceny.");
-    }
     const koszId = Number(w.kosz_id);
     /* TA SAMA BRAMKA CO WSZĘDZIE W TYM PLIKU (0.371.0). Własny warunek
        rozjechałby się z `zdejmijZKosza` i `przeliczKosz` przy pierwszej zmianie
@@ -505,12 +555,52 @@ export function zdejmijTowar(
     if (!koszDoEdycji(database, koszId)) {
       throw new Error(`Koszyk ${w.kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
     }
-    database.prepare("DELETE FROM kosz_pozycja WHERE id=?").run(pozycjaId);
+    /* ── WIERSZ ZE ZWROTU SCHODZI TAKŻE STĄD (0.379.0) ─────────────────
+       Do tego wydania odmawiał: „zdejmuje się ją cofnięciem oceny". Reguła
+       była słuszna w zamyśle — jedna droga na jeden skutek — a w praktyce
+       zostawiła koszyki bez wyjścia. Z-8 na produkcji odbił się od Sfery na
+       kartotece usługowej, nie miał ani jednego wiersza dołożonego ręką
+       i przez to ani jednego krzyżyka: żeby go odetkać, trzeba było odnaleźć
+       zwrot, z którego przyszedł feralny wiersz. Zgłoszenie właściciela
+       brzmiało „pozwól edytować te koszyki".
+
+       OCENA SCHODZI RAZEM Z WIERSZEM, i to jest warunek spójności, nie dodatek.
+       To ocena „na stan" wsadziła towar do pudła, więc wyjęcie go bez zdjęcia
+       oceny zostawiłoby kartę zwrotu mówiącą, że sztuka jedzie na regał,
+       którego dokument jej nie niesie. Zwrot wraca do kubełka DO OCENY i ktoś
+       podejmuje decyzję jeszcze raz — tym razem wiedząc, czego Sfera nie
+       przyjmie.
+
+       SUROWY SQL, bo `zwroty.ts` importuje ten plik; import w drugą stronę
+       zamknąłby cykl modułów. Ten sam wzorzec co w `zw-automat.ts`. */
+    if (w.zwrot_pozycja_id !== null) {
+      const poz = Number(w.zwrot_pozycja_id);
+      const z = database.prepare(
+        `SELECT p.zwrot_id, p.nazwa FROM zwrot_klienta_pozycja p WHERE p.id=?`)
+        .get(poz) as { zwrot_id: number; nazwa: string } | undefined;
+      database.prepare(`DELETE FROM kosz_pozycja
+        WHERE kosz_id=? AND zwrot_pozycja_id=?`).run(koszId, poz);
+      database.prepare(`UPDATE zwrot_klienta_pozycja
+        SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE id=?`).run(poz);
+      if (z) {
+        const at = new Date().toISOString();
+        database.prepare(`UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?`)
+          .run(Number(z.zwrot_id));
+        database.prepare(`INSERT INTO zwrot_zdarzenie
+          (zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
+          VALUES (?,'ocena_cofnieta',?,?,?,?,?)`)
+          .run(Number(z.zwrot_id), `${z.nazwa} — zdjęty z koszyka ${w.kod}, ocena cofnięta`,
+            JSON.stringify({ pozycjaId: poz, koszId, kod: w.kod }), at, kto.name, kto.id);
+      }
+    } else {
+      database.prepare("DELETE FROM kosz_pozycja WHERE id=?").run(pozycjaId);
+    }
     /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
        przy zdjęciu pozycji ze zwrotu. */
     uniewaznijZadanieMm(database, koszId, kto);
     logEvent("kosz_zwrotow_towar_zdjety", kto.name, Number(w.tw_id),
-      { koszId, kod: w.kod, pozycjaId, symbol: w.symbol }, kto.id, database);
+      { koszId, kod: w.kod, pozycjaId, symbol: w.symbol,
+        zeZwrotu: w.zwrot_pozycja_id !== null }, kto.id, database);
     return { koszId, kod: w.kod, symbol: w.symbol };
   })();
 }
@@ -829,10 +919,16 @@ export function stanOtwartegoKosza(
   database: Db, kto: { name: string }, rodzaj: RodzajKosza = "zwroty",
 ): StanKosza | null {
   const k = database.prepare(
-    `SELECT id, kod, utworzono_at FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
+    `SELECT id FROM kosz WHERE status='otwarty' AND mm_dok_id IS NULL
        AND utworzono_przez=? AND rodzaj=? ORDER BY id LIMIT 1`).get(kto.name, rodzaj) as
-    { id: number; kod: string; utworzono_at: string } | undefined;
-  if (!k) return null;
+    { id: number } | undefined;
+  return k ? stanKosza(database, Number(k.id), rodzaj) : null;
+}
+
+/** Jedno pudło z zawartością — wspólny kształt dla wszystkich odczytów. */
+function stanKosza(database: Db, koszId: number, rodzaj: RodzajKosza): StanKosza {
+  const k = database.prepare("SELECT id, kod, utworzono_at FROM kosz WHERE id=?")
+    .get(koszId) as { id: number; kod: string; utworzono_at: string };
   const pozycje = database.prepare(
     `SELECT id, symbol, nazwa, ilosc, zwrot_pozycja_id FROM kosz_pozycja
       WHERE kosz_id=? ORDER BY id`)
@@ -852,17 +948,22 @@ export function stanOtwartegoKosza(
 }
 
 /**
- * Wszystkie otwarte koszyki operatora — zwroty i odpad (0.211.0).
+ * WSZYSTKIE otwarte pudła operatora, od najstarszego (0.379.0).
  *
- * Odpad wyłączony w konfiguracji nie ma prawa pokazać się na ekranie: koszyka
- * bez magazynu docelowego i tak nie da się zamknąć.
+ * Do 0.378.0 oddawało najwyżej jedno na rodzaj, bo tyle wolno było mieć.
+ * Decyzja właściciela to odwróciła — a lista, która pokazuje jedno z kilku,
+ * kłamałaby o tym, ile kartonów stoi przy biurku.
  */
 export function otwarteKoszyki(database: Db, kto: { name: string }): StanKosza[] {
   const rodzaje: RodzajKosza[] = ["zwroty", "odpad"];
-  return rodzaje
-    .filter((r) => magazynDocelowy(r) > 0)
-    .map((r) => stanOtwartegoKosza(database, kto, r))
-    .filter((k): k is StanKosza => k !== null);
+  const out: StanKosza[] = [];
+  for (const r of rodzaje) {
+    if (magazynDocelowy(r) <= 0) continue;
+    for (const k of otwarteTegoRodzaju(database, kto, r)) {
+      out.push(stanKosza(database, k.id, r));
+    }
+  }
+  return out;
 }
 
 /**
@@ -1001,13 +1102,19 @@ export interface KoszykCzekajacy {
    */
   blad: string | null;
   /**
-   * Wiersze dołożone ręką — JEDYNE, które da się z zamkniętego kosza zdjąć.
+   * CAŁA zawartość pudła, nie tylko wiersze dołożone ręką (0.379.0).
    *
-   * Wiersz ze zwrotu schodzi cofnięciem oceny na karcie zwrotu i to zostaje
-   * jego jedyną drogą; lista tutaj jest po to, żeby ekran nie proponował
-   * krzyżyka przy wierszu, którego serwer i tak nie zdejmie.
+   * Do tego wydania stały tu wyłącznie wiersze ze skanu, bo tylko one dawały
+   * się zdjąć. Koszyk Z-8 pokazał cenę tej reguły: odbił się od Sfery na
+   * kartotece usługowej przyniesionej OCENĄ, więc nie miał ani jednego
+   * krzyżyka i nie było jak go odetkać z tego ekranu.
+   *
+   * `zeZwrotu` zostaje, bo zdjęcie takiego wiersza cofa przy okazji ocenę —
+   * i ekran ma to powiedzieć PRZED kliknięciem, a nie po nim.
    */
-  dolozone: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
+  pozycje: Array<{
+    pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+  }>;
 }
 
 /* ── Jedno pudło, jedno imię (0.376.0) ──────────────────────────────────────
@@ -1123,17 +1230,19 @@ export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
       ORDER BY k.id`)
     .all() as Array<{ id: number; kod: string; zamknieto_at: string;
       rodzaj: RodzajKosza; blad: string | null }>;
-  const dolozone = database.prepare(
-    `SELECT id, symbol, nazwa, ilosc FROM kosz_pozycja
-      WHERE kosz_id=? AND zwrot_pozycja_id IS NULL ORDER BY id`);
+  const wiersze = database.prepare(
+    `SELECT id, symbol, nazwa, ilosc, zwrot_pozycja_id FROM kosz_pozycja
+      WHERE kosz_id=? ORDER BY id`);
   return kosze.map((k) => ({
     id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
     brakuje: brakujaceKorekty(database, Number(k.id)),
     blad: k.blad ?? null,
-    dolozone: (dolozone.all(k.id) as Array<
-      { id: number; symbol: string; nazwa: string; ilosc: number }>)
+    pozycje: (wiersze.all(k.id) as Array<
+      { id: number; symbol: string; nazwa: string; ilosc: number;
+        zwrot_pozycja_id: number | null }>)
       .map((p) => ({
         pozycjaId: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
+        zeZwrotu: p.zwrot_pozycja_id !== null,
       })),
   }));
 }

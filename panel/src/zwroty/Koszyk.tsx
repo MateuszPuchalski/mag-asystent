@@ -67,18 +67,23 @@ export function Koszyk() {
         Przycisk znika, gdy koszyk zwrotów już stoi: naciśnięcie oddałoby ten
         sam kosz (jeden na operatora, decyzja z 3 września 2026), więc byłby to
         przycisk bez skutku. */}
-    {!kosze.some((k) => k.rodzaj === "zwroty") &&
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+    {/* PRZYCISK STOI ZAWSZE OD 0.379.0. Do 0.378.0 znikał przy otwartym pudle,
+        bo obowiązywała zasada „jeden koszyk na operatora" — właściciel ją
+        odwrócił i wtedy znikający przycisk stał się dokładnie tym, czego
+        brakowało na ekranie. */}
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
         <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
           disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
           <PackagePlus size={12} />
           {nowy.isPending ? "Zakładam…" : "Nowy koszyk zwrotów"}
         </button>
         <span className="text-xs text-slate-500">
-          Pudło do zbierania towaru — bez otwierania zwrotu.
+          {kosze.length > 0
+            ? "Kolejne pudło — przy kilku otwartych ocena pyta, do którego."
+            : "Pudło do zbierania towaru — bez otwierania zwrotu."}
         </span>
-        {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
-      </div>}
+      {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
+    </div>
     {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
         zaległa: kosz jest już na hali, a dokumentu wciąż nie ma.
 
@@ -115,23 +120,32 @@ export function Koszyk() {
             : <>Zadanie MM zdjęto przy poprawce zawartości i nikt go nie ponawia
                 sam — dokument wychodzi po naciśnięciu.</>}
       </span>
-      {/* ── WIERSZE DOŁOŻONE RĘKĄ (0.371.0) ───────────────────────────────
-          Od tego wydania da się je zdjąć TAKŻE z kosza zamkniętego, dopóki nie
-          ma dokumentu — zgłoszenie właściciela: „pozwól mi edytować koszyki
-          zwrotowe, z których nie zostały jeszcze utworzone MM". Bez tego
-          pomyłka przy skanie była nie do odkręcenia w aplikacji, a kosz stał
-          na hali z dokumentem, którego Sfera nie chciała przyjąć. */}
-      {(c.dolozone ?? []).length > 0 &&
+      {/* ── CAŁA ZAWARTOŚĆ, Z KRZYŻYKIEM PRZY KAŻDYM WIERSZU (0.379.0) ────
+          Do 0.378.0 stały tu wyłącznie wiersze ze SKANU, bo tylko one dawały
+          się zdjąć. Koszyk Z-8 na produkcji pokazał cenę tej reguły: odbił się
+          od Sfery na kartotece usługowej przyniesionej OCENĄ, więc nie miał
+          ani jednego krzyżyka — żeby go odetkać, trzeba było odnaleźć zwrot,
+          z którego przyszedł feralny wiersz. Zgłoszenie właściciela: „pozwól
+          edytować te koszyki".
+
+          Wiersz ze zwrotu jest OZNACZONY, bo jego zdjęcie cofa przy okazji
+          ocenę i odsyła zwrot do kubełka DO OCENY. To ma być widać przed
+          kliknięciem, a nie po nim. */}
+      {(c.pozycje ?? []).length > 0 &&
         <span className="flex w-full flex-wrap items-center gap-1">
-          <span className="text-amber-700">dołożone ręką:</span>
-          {(c.dolozone ?? []).map((p) => <span key={p.pozycjaId}
+          <span className="text-amber-700">w pudle:</span>
+          {(c.pozycje ?? []).map((p) => <span key={p.pozycjaId}
             className="inline-flex items-center gap-1 rounded border border-amber-300
               bg-white px-1">
             <span className="font-mono">{p.symbol}</span>
             <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
+            {p.zeZwrotu && <span className="text-amber-700" title="Zdjęcie cofnie ocenę">
+              ze zwrotu</span>}
             <button type="button" disabled={zdejmij.isPending}
               onClick={() => zdejmij.mutate(p.pozycjaId)}
-              aria-label={`Zdejmij ${p.symbol} z koszyka ${c.kod}`}
+              aria-label={p.zeZwrotu
+                ? `Zdejmij ${p.symbol} z koszyka ${c.kod} i cofnij ocenę`
+                : `Zdejmij ${p.symbol} z koszyka ${c.kod}`}
               className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
               <X size={12} /></button>
           </span>)}
@@ -225,7 +239,7 @@ export function Koszyk() {
         o drugą czynność — zbieranie towaru do pudła, które stoi przy biurku
         niezależnie od tego, co akurat jest otwarte na ekranie. */}
     <div className="w-full">
-      <DolozTowar rodzaj={kosz.rodzaj} />
+      <DolozTowar rodzaj={kosz.rodzaj} koszId={kosz.id} />
     </div>
     <span className={`w-full ${kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}>
       {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie. Na hali

@@ -11,10 +11,16 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
    jest `api/klient.test.ts`. */
 const zaznacz = vi.fn();
 const wskaz = vi.fn();
+/* Otwarte pudła — przy kilku ocena pyta, do którego (0.379.0). Stan jest
+   zmienny, bo każdy test ustawia swoją liczbę kartonów przy biurku. */
+const pudla: { kosze: Array<{ id: number; kod: string; rodzaj: "zwroty" | "odpad" }> } = {
+  kosze: [],
+};
 vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   useZaznaczSkladnik: () => ({ mutate: zaznacz, isPending: false, error: null }),
   useWskazSklad: () => ({ mutate: wskaz, isPending: false, error: null }),
+  useKosz: () => ({ data: pudla }),
 }));
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
@@ -532,5 +538,57 @@ describe("Ręczne wskazanie składu (0.336.0)", () => {
       { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
     ] } }, wierszeDokumentu: WIERSZE });
     expect(screen.queryByRole("button", { name: /wskaż skład ręcznie/ })).toBeNull();
+  });
+});
+
+describe("Wybór pudła przy ocenie (0.379.0)", () => {
+  /* Decyzja właściciela razem z odwróceniem zasady „jeden koszyk na
+     operatora": przy kilku otwartych pudłach ocena PYTA, do którego. */
+
+  it("jedno pudło nie pyta o nic", () => {
+    pudla.kosze = [{ id: 17, kod: "Z-17", rodzaj: "zwroty" }];
+    const onOcena = vi.fn();
+    render(<QueryClientProvider client={new QueryClient()}>
+      <Pozycje zwrot={zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] })}
+        trwa={false} blad="" onOcena={onOcena} onKwota={vi.fn()} />
+    </QueryClientProvider>);
+
+    expect(screen.getByRole("button", { name: /Na stan/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Z-17/)).toBeNull();
+  });
+
+  it("dwa pudła rozwijają ocenę na przyciski Z KODEM, jeden klik każdy", () => {
+    /* Osobne okienko „do którego?" po naciśnięciu byłoby pytaniem PO
+       czynności — tego zabrania dekalog. Stąd tyle przycisków, ile pudeł. */
+    pudla.kosze = [
+      { id: 17, kod: "Z-17", rodzaj: "zwroty" },
+      { id: 18, kod: "Z-18", rodzaj: "zwroty" },
+    ];
+    const onOcena = vi.fn();
+    render(<QueryClientProvider client={new QueryClient()}>
+      <Pozycje zwrot={zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] })}
+        trwa={false} blad="" onOcena={onOcena} onKwota={vi.fn()} />
+    </QueryClientProvider>);
+
+    expect(screen.getByRole("button", { name: /Na stan → Z-17/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Na stan → Z-18/ })).toBeInTheDocument();
+    /* Utylizacja jedzie do pudła odpadu, więc nie rozwija się wraz ze zwrotami. */
+    expect(screen.getByRole("button", { name: /Utylizacja/ })).toBeInTheDocument();
+  });
+
+  it("kliknięcie niesie WSKAZANY koszyk, a nie domysł", async () => {
+    pudla.kosze = [
+      { id: 17, kod: "Z-17", rodzaj: "zwroty" },
+      { id: 18, kod: "Z-18", rodzaj: "zwroty" },
+    ];
+    const onOcena = vi.fn();
+    render(<QueryClientProvider client={new QueryClient()}>
+      <Pozycje zwrot={zwrot({ kubelek: "ocena", pozycje: [POZYCJA()] })}
+        trwa={false} blad="" onOcena={onOcena} onKwota={vi.fn()} />
+    </QueryClientProvider>);
+
+    await userEvent.click(screen.getByRole("button", { name: /Na stan → Z-18/ }));
+
+    expect(onOcena).toHaveBeenCalledWith(11, "stan", 18);
   });
 });
