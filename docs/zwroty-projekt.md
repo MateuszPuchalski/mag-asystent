@@ -108,8 +108,14 @@ a Sfera bywa wrażliwa na brak profilu użytkownika. Kolejność sprawdzania:
 3. Gdy i to odmawia — przyczyna siedzi w paragonie albo w uprawnieniach,
    a nie w tym, co ustawia worker.
 
-Dopóki to nie jest rozstrzygnięte, **nie ma sensu automatyzować żadnego
-kolejnego dokumentu**. Każdy padnie tak samo.
+**ROZSTRZYGNIĘTE 17 września: to było konto.** Sesja Sfery wstaje teraz na
+koncie użytkownika (`WERTIS-MONIKA\mateu`), a nie `LocalSystem`, i `MM.Zapisz()`
+dochodzi do walidacji dokumentu zamiast odbijać się od COM. Punkt 1 z listy
+wyżej wystarczył; pozostałe dwa nie były potrzebne.
+
+Następna odmowa jest już MERYTORYCZNA — `Brak towaru w magazynie` — i o niej
+mówi punkt 4.4. Blokada automatyzacji zniknęła: KFS, RW i PW mają odtąd czym
+przejść, o ile ktoś je napisze.
 
 ### 4.2. Ocena towaru ma dwie wartości, a rzeczywistość trzy
 

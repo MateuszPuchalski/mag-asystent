@@ -23,6 +23,7 @@ const { odpowiedz } = vi.hoisted(() => ({
       blad?: string | null;
       pozycje?: Array<{
         pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+        stanMag?: number; brakNaMag?: boolean;
       }>;
     }>,
   },
@@ -308,5 +309,32 @@ describe("Koszyk zwrotów", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Usuń koszyk$/ }));
     await userEvent.click(screen.getByRole("button", { name: /Tak, usuń Z-8/ }));
     expect(usunKoszyk).toHaveBeenCalledWith(8, expect.anything());
+  });
+
+  it("odmowa Sfery WSKAZUJE wiersz, którego na magazynie brakuje", async () => {
+    /* Produkcja, 17 września: „dostaję brak towaru w magazynie, ale nie mówi
+       jakiego, abym mógł go usunąć z koszyka". Sfera nie nazywa wiersza —
+       nazywamy go za nią, stanem z read-modelu. */
+    odpowiedz.czekajace = [{
+      id: 14, kod: "Z-14", rodzaj: "zwroty", zamknietoAt: "2026-09-17T06:00:00Z",
+      brakuje: [], blad: 'Sfera odrzuciła "MM.Zapisz()": Brak towaru w magazynie.',
+      pozycje: [
+        { pozycjaId: 91, symbol: "S10111", nazwa: "Usługa", ilosc: 5,
+          zeZwrotu: false, stanMag: 0, brakNaMag: true },
+        { pozycjaId: 92, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1,
+          zeZwrotu: true, stanMag: 4, brakNaMag: false },
+      ],
+    }];
+    pokaz();
+
+    expect(screen.getByText(/na magazynie 0 z 5/)).toBeInTheDocument();
+    expect(screen.getByText(/Czerwone wiersze niżej/)).toBeInTheDocument();
+    /* Wiersz z pokryciem nie jest oskarżany — inaczej lista wskazywałaby
+       wszystko naraz, czyli nic. */
+    expect(screen.queryByText(/na magazynie 4 z 1/)).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /Zdejmij S10111 z koszyka Z-14/ }));
+    expect(zdejmijTowar).toHaveBeenCalledWith(91);
   });
 });
