@@ -59,7 +59,7 @@ inputs:
   node-version:
     description: Wersja Node dla runnera i dla klucza cache'a.
     required: false
-    default: "22"
+    default: "24.15.0"
 
 runs:
   using: composite

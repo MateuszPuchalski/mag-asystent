@@ -112,7 +112,7 @@ class LimityCzasuInterceptor : Interceptor {
 class ApiClient(
     currentUser: () -> String,
     sessionToken: () -> String?,
-    deviceId: String,
+    private val deviceId: String,
     initialBaseUrl: String,
     /** Katalog na cache HTTP; null = bez cache (testy). */
     cacheDir: File? = null,
@@ -163,6 +163,19 @@ class ApiClient(
         .addConverterFactory(WertisJson.asConverterFactory("application/json".toMediaType()))
         .build()
         .create(ApiService::class.java)
+
+    /** Pobranie zdjęcia jest przypisane do źródła cache. Zmiana ustawień
+     * podczas żądania nie może podstawić innego hosta ani nowej sesji. */
+    fun fixedService(server: String, token: String?): ApiService {
+        val fixed = okHttp.newBuilder().cache(null).followRedirects(false).followSslRedirects(false)
+            // Powolny strumień nie może blokować pozostałych zdjęć bez końca.
+            .callTimeout(15, TimeUnit.SECONDS)
+            .apply { interceptors().removeAll { it is HostSelectionInterceptor || it is IdentityHeaderInterceptor } }
+            .addInterceptor(IdentityHeaderInterceptor({ "" }, { token }, deviceId)).build()
+        return Retrofit.Builder().baseUrl(server).client(fixed)
+            .addConverterFactory(WertisJson.asConverterFactory("application/json".toMediaType()))
+            .build().create(ApiService::class.java)
+    }
 
     fun setBaseUrl(url: String) {
         hostSelection.baseUrl = url.toHttpUrlOrNull()

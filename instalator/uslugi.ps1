@@ -317,15 +317,14 @@ function Install-WertisNarzedzie {
 function Test-WertisNode {
     <#
         .SYNOPSIS
-        Czy zainstalowany Node spełnia `engines` z package.json (>= 22.5).
+        Czy zainstalowany Node spełnia `engines` z package.json (>= 24.15).
         .DESCRIPTION
         Maszyna z wcześniejszym Node'em przechodzi zwykłe „czy jest node?"
         bez zająknięcia, a wywala się dopiero na `npm ci` albo — gorzej —
         przy starcie usługi, komunikatem o nieznanym module `node:sqlite`.
-        Aplikacja używa wbudowanego sterownika SQLite, który pojawił się
-        dokładnie w 22.5.
+        WMS wymaga aktualnego SQLite oraz mechanizmu kopii działającej bazy.
     #>
-    param([version]$Minimalna = "22.5.0")
+    param([version]$Minimalna = "24.15.0")
     if (Test-DryRun "Sprawdził(a)bym wersję Node (wymagana >= $Minimalna).") { return $true }
     if (-not (Test-Polecenie "node")) { return $false }
 
