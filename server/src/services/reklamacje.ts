@@ -1,3 +1,4 @@
+import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import {
@@ -59,7 +60,15 @@ export class ReklamacjaConflict extends Error {
   }
 }
 
-export type Kubelek = "decyzja" | "odpowiedz" | "zamknieta";
+/**
+ * Kubełki kolejki reklamacji — jedno pytanie na kubełek (dekalog, punkt 5).
+ *
+ * `bez_ruchu` doszedł jako czwarty na zgłoszenie właściciela „w kolejce
+ * pojawiają mi się stare reklamacje". Kubełek, a NIE ukrycie: sprawa martwa
+ * ma zejść z pracy, ale zniknięcie z kolejki musi mieć widoczne uzasadnienie
+ * i własny licznik — ta sama reguła co przy zwrotach rozliczonych (0.339.0).
+ */
+export type Kubelek = "decyzja" | "odpowiedz" | "zamknieta" | "bez_ruchu";
 
 /**
  * Rodzaj sprawy posprzedażowej — rozróżnik kolumny `typ`.
@@ -112,8 +121,31 @@ export const STATUSY_ALLEGRO = [
   "CLAIM_SUBMITTED", "CLAIM_ACCEPTED", "CLAIM_REJECTED",
 ] as const;
 
-/** Statusy końcowe reklamacji — po nich biuro nie ma już decyzji do podjęcia. */
-const ROZSTRZYGNIETE = ["CLAIM_ACCEPTED", "CLAIM_REJECTED"];
+/**
+ * Statusy końcowe — po nich biuro nie ma już decyzji do podjęcia.
+ *
+ * `DISPUTE_CLOSED` dołożony jako OSŁONA, nie jako naprawa, i różnica jest
+ * istotna. Enum `PostPurchaseIssueStatus` jest JEDEN dla obu rodzajów spraw,
+ * a `type` ma dwie wartości (`DISPUTE`, `CLAIM`), więc reklamacja nie powinna
+ * nosić statusu dyskusji i prawdopodobnie żaden wiersz tego nie robi. Trzecia
+ * wartość stała jednak w SQL-u doboru rozmów (`allegro-reklamacje-sync.ts`)
+ * od 0.273.0, a dwie listy końcowe przepisane ręcznie w dwóch plikach to
+ * jedna lista za dużo: przy następnej zmianie rozjadą się w ciszy.
+ */
+export const STATUSY_KONCOWE = [
+  "CLAIM_ACCEPTED", "CLAIM_REJECTED", "DISPUTE_CLOSED",
+] as const;
+
+/**
+ * Statusy, które POTWIERDZAJĄ nasz werdykt — węższe niż końcowe i to jest
+ * świadome.
+ *
+ * `werdykt_niepotwierdzony` pyta „czy Allegro przyjęło TO, co wysłaliśmy".
+ * `DISPUTE_CLOSED` nie odpowiada na to pytanie: mówi, że spór zamknięto,
+ * a nie że uznano albo odrzucono reklamację. Jedna stała na oba znaczenia
+ * gasiłaby sygnał bez pokrycia — czyli kłamała na ekranie.
+ */
+const POTWIERDZAJA_WERDYKT: readonly string[] = ["CLAIM_ACCEPTED", "CLAIM_REJECTED"];
 
 /**
  * Werdykt po polsku — zdanie pisze SERWER, panel nie tłumaczy kodów. Kod
@@ -139,6 +171,15 @@ const CZEKA_NA_NAS = ["NEW", "BUYER_REPLIED"];
 
 /** Ile dni przed terminem decyzji wiersz zapala się na czerwono. */
 const PROG_TERMINU_DNI = 3;
+
+/**
+ * Ile dni PO terminie sprawa przestaje być pracą, a staje się archiwum.
+ *
+ * TRZYDZIEŚCI, i ta liczba ma być hojna. Termin decyzji minął, więc zegar
+ * i tak już nic nie mierzy; jedyne, co ta liczba chroni, to sprawa, którą
+ * biuro właśnie prowadzi mimo spóźnienia. Miesiąc wystarczy każdemu urlopowi.
+ */
+const PROG_BEZ_RUCHU_DNI = 30;
 
 const DZIEN_MS = 86_400_000;
 
@@ -310,15 +351,39 @@ export function dniDoTerminu(termin: string | null, teraz = Date.now()): number 
 export const rozstrzygnieta = (w: {
   statusAllegro: string | null; werdyktStatus?: StatusWerdyktu | null;
 }): boolean =>
-  ROZSTRZYGNIETE.includes(w.statusAllegro ?? "") || WERDYKT_WYDANY.includes(w.werdyktStatus ?? "");
+  (STATUSY_KONCOWE as readonly string[]).includes(w.statusAllegro ?? "")
+  || WERDYKT_WYDANY.includes(w.werdyktStatus ?? "");
+
+/**
+ * Sprawa BEZ RUCHU — nierozstrzygnięta, a zrobić się w niej nie da nic.
+ *
+ * KONIUNKCJA I OBIE CZĘŚCI SĄ POTRZEBNE. `chatActive: false` znaczy, że
+ * Allegro nie przyjmie już wiadomości w tej sprawie (schemat: „Sending of new
+ * messages for this issue is inactive"), więc rozmowy nie ma jak prowadzić.
+ * Sam ten fakt nie wystarcza: sprawa z zamkniętym czatem i świeżym terminem
+ * nadal czeka na WERDYKT, a werdykt nie jest wiadomością. Dopiero termin
+ * przeterminowany o miesiąc mówi, że i tego nikt nie wyda.
+ *
+ * SPRAWA Z ŻYWYM CZATEM ZOSTAJE W DO DECYZJI NIEZALEŻNIE OD WIEKU. Da się
+ * w niej odpisać, więc jest pracą — a kubełek, który chowa pracę, jest gorszy
+ * od kolejki, która pokazuje za dużo.
+ *
+ * `decyzja_do IS NULL` liczy się jak termin miniony: przy reklamacji brak
+ * terminu znaczy „Allegro go nie podało" (schemat dopuszcza `null` i mówi
+ * wprost „Null for disputes"), a nie „termin jest odległy". Sprawa bez zegara
+ * i bez czatu nie ma czym wrócić do pracy.
+ */
+const bezRuchu = (w: { czatAktywny: boolean; dniDoTerminu: number | null }): boolean =>
+  !w.czatAktywny && (w.dniDoTerminu === null || w.dniDoTerminu < -PROG_BEZ_RUCHU_DNI);
 
 export function kubelek(w: {
   statusAllegro: string | null;
   ostatniaWiadomoscStatus: string | null;
   czatAktywny: boolean;
+  dniDoTerminu: number | null;
   werdyktStatus?: StatusWerdyktu | null;
 }): Kubelek {
-  if (!rozstrzygnieta(w)) return "decyzja";
+  if (!rozstrzygnieta(w)) return bezRuchu(w) ? "bez_ruchu" : "decyzja";
   /* Rozstrzygnięta, ale rozmowa trwa i ostatnie słowo było klienta. Werdykt
      zapadł, a człowiek po drugiej stronie nadal czeka na zdanie. */
   if (w.czatAktywny && CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) return "odpowiedz";
@@ -341,7 +406,7 @@ export function sygnaly(w: {
   /* Los naszego werdyktu. „Niepotwierdzony" trwa, dopóki `status_allegro`
      nie pokaże gałęzi końcowej — potwierdza synchronizacja, nie my. */
   const wydany = WERDYKT_WYDANY.includes(w.werdyktStatus ?? "");
-  if (wydany && !ROZSTRZYGNIETE.includes(w.statusAllegro ?? "")) s.push("werdykt_niepotwierdzony");
+  if (wydany && !POTWIERDZAJA_WERDYKT.includes(w.statusAllegro ?? "")) s.push("werdykt_niepotwierdzony");
   if (w.werdyktStatus === "send_failed") s.push("werdykt_nieudany");
   /* Uznana u nas, a stanowisko o towarze nie wyszło ani od nas, ani — sądząc
      po `returnRequired` — z Centrum Sprzedaży. Sygnał, nie kubełek: to jest
@@ -451,18 +516,30 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
 }
 
 /**
- * Cała kolejka jednym odczytem.
+ * Cała kolejka jednym odczytem — od progu daty w górę.
  *
- * Reklamacji w pracy są dziesiątki, nie tysiące, więc panel dostaje listę
+ * Reklamacji W PRACY są dziesiątki, nie tysiące, więc panel dostaje listę
  * w całości i filtruje kubełkiem u siebie — przełączenie kubełka nie kosztuje
  * wtedy ani jednego żądania. Ten sam wybór co przy zwrotach.
  *
+ * TO ZDANIE BYŁO NIEPRAWDĄ OD 0.273.0 i stąd wziął się próg. Pełny przelot
+ * listy dołożony w tamtym wydaniu zapisuje CAŁE archiwum konta, a to zapytanie
+ * nie miało ani filtra statusu, ani okna czasowego, ani limitu — do panelu
+ * jechała zawartość całej tabeli. Zgłoszenie właściciela brzmiało „w kolejce
+ * pojawiają mi się stare reklamacje" i było opisem dokładnie tego.
+ *
  * PORZĄDEK BIERZE SIĘ Z TERMINU DECYZJI, nie z daty wpływu: pytanie biura
  * brzmi „co się dziś przeterminuje", a nie „co przyszło pierwsze". Sprawy bez
- * terminu idą na koniec — nie mają zegara, więc nie mają pilności.
+ * terminu idą na koniec — nie mają zegara, więc nie mają pilności. Ten porządek
+ * był drugą połową problemu: `decyzja_do ASC` stawia termin sprzed pół roku
+ * NAD dzisiejszym, więc archiwum lądowało nie gdziekolwiek, tylko na górze.
+ *
+ * `od` to próg po `otwarto_at`; `null` znaczy „bez progu" i tak wchodzi
+ * przełącznik „pokaż starsze" z panelu.
  */
 export function listaReklamacji(
   database: Db = defaultDb(), teraz = Date.now(),
+  od: string | null = config.allegro.reklamacjeOd,
 ): WierszReklamacji[] {
   /* Dwa złączenia LEWE po tej samej ofercie: snapshot Allegro (nazwa i adres
      zdjęcia) oraz potwierdzona kartoteka Subiekta. Oba po `channel_account_id`
@@ -488,9 +565,9 @@ export function listaReklamacji(
          Backticków tu nie ma — blok stoi w literale szablonowym. */
       LEFT JOIN zamowienie_klienta zk
         ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
-     WHERE r.typ = 'CLAIM'
+     WHERE r.typ = 'CLAIM' AND (? IS NULL OR r.otwarto_at >= ?)
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
-    .all() as Wiersz[];
+    .all(od, od) as Wiersz[];
   const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
   return wiersze.map((w) => {
     const r = zWiersza(w, teraz);
@@ -500,9 +577,68 @@ export function listaReklamacji(
 }
 
 export function licznikiKubelkow(lista: WierszReklamacji[]): Record<Kubelek, number> {
-  const l: Record<Kubelek, number> = { decyzja: 0, odpowiedz: 0, zamknieta: 0 };
+  const l: Record<Kubelek, number> = { decyzja: 0, odpowiedz: 0, zamknieta: 0, bez_ruchu: 0 };
   for (const r of lista) l[r.kubelek] += 1;
   return l;
+}
+
+/** Ile spraw próg schował i czy któraś z nich to jeszcze praca. */
+export interface ProgKolejki {
+  /** Próg w ISO albo `null`, gdy go nie ma. Panel pisze z niego zdanie. */
+  od: string | null;
+  ukrytych: number;
+  /**
+   * Ile UKRYTYCH spraw ma jeszcze żywy obowiązek: nierozstrzygnięta i z terminem
+   * decyzji w przyszłości.
+   *
+   * TO JEST CAŁY BEZPIECZNIK TEGO PROGU i dlatego liczy się osobno. Próg daty
+   * jest narzędziem tępym: nie pyta, czy sprawa jest skończona, tylko kiedy
+   * wpłynęła. Zwykle ta liczba będzie zerem, bo próg stoi kwartał wstecz —
+   * ale dzień, w którym nie będzie, jest dokładnie tym dniem, dla którego ją
+   * liczymy. Bez niej sprawa z żywym zegarem znikałaby po cichu, a to jest
+   * gorsze niż kolejka pokazująca za dużo.
+   */
+  ukrytychZTerminem: number;
+}
+
+/**
+ * Co próg schował — liczone w bazie, nie na liście.
+ *
+ * Liczenie na liście byłoby niemożliwe z definicji: lista to właśnie te
+ * sprawy, które próg PRZEPUŚCIŁ. Stąd osobne zapytanie z warunkiem
+ * zanegowanym.
+ *
+ * JEDNA FUNKCJA NA OBA EKRANY, z rodzajem sprawy w parametrze. Dyskusje mają
+ * ten sam próg i tę samą tabelę; druga kopia tego zapytania rozjechałaby się
+ * z pierwszą przy pierwszej poprawce. `ukrytychZTerminem` przy dyskusji wyjdzie
+ * zerem z natury rzeczy — `decisionDueDate` jest wedle schematu „null for
+ * disputes" — i to jest prawdziwa odpowiedź, a nie luka w liczeniu.
+ */
+export function progKolejki(
+  database: Db = defaultDb(), teraz = Date.now(),
+  od: string | null = config.allegro.reklamacjeOd,
+  typ: TypSprawy = "CLAIM",
+): ProgKolejki {
+  if (!od) return { od: null, ukrytych: 0, ukrytychZTerminem: 0 };
+  /* Listy statusów wchodzą do SQL-a ZE STAŁYCH, nie przepisane ręką. Druga
+     kopia tych samych wartości rozjechałaby się z pierwszą przy najbliższej
+     zmianie — dokładnie tak, jak rozjechały się listy końcowe w 0.273.0. */
+  const koncowe = STATUSY_KONCOWE.map(() => "?").join(",");
+  const wydane = WERDYKT_WYDANY.map(() => "?").join(",");
+  const w = database.prepare(`
+    SELECT COUNT(*) AS ile,
+           SUM(CASE WHEN r.decyzja_do IS NOT NULL AND r.decyzja_do >= ?
+                     AND COALESCE(r.status_allegro,'') NOT IN (${koncowe})
+                     AND COALESCE(r.werdykt_status,'') NOT IN (${wydane})
+                    THEN 1 ELSE 0 END) AS z_terminem
+      FROM reklamacja_klienta r
+     WHERE r.typ = ? AND r.otwarto_at < ?`)
+    .get(new Date(teraz).toISOString(), ...STATUSY_KONCOWE, ...WERDYKT_WYDANY, typ, od) as Wiersz;
+  return {
+    od,
+    ukrytych: Number(w?.ile ?? 0),
+    ukrytychZTerminem: Number(w?.z_terminem ?? 0),
+  };
 }
 
 /** Czat sprawy w kolejności czasu, z załącznikami przy wiadomościach. */

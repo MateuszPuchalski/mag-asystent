@@ -24,10 +24,17 @@ export const kluczeDyskusji = {
   dyskusja: (id: number) => ["dyskusja", id] as const,
 };
 
-export function useDyskusje() {
+/** Kolejka; `bezProgu` zdejmuje próg daty — reguła klucza jak przy reklamacjach. */
+export function useDyskusje(bezProgu = false) {
   return useQuery({
-    queryKey: kluczeDyskusji.kolejka,
-    queryFn: () => api<KolejkaDyskusji>("/api/obsluga/dyskusje"),
+    queryKey: [...kluczeDyskusji.kolejka, bezProgu] as const,
+    /* DWA LITERAŁY, nie jeden szablon z warunkiem w środku. Strażnik adresów
+       w `routes/dyskusje.test.ts` czyta ten plik i wyławia adresy z wywołań
+       klienta — szablon z cudzysłowem w ternarze urywa dopasowanie w połowie,
+       a wtedy strażnik przestaje pilnować akurat tej trasy. */
+    queryFn: () => (bezProgu
+      ? api<KolejkaDyskusji>("/api/obsluga/dyskusje?od=wszystko")
+      : api<KolejkaDyskusji>("/api/obsluga/dyskusje")),
   });
 }
 

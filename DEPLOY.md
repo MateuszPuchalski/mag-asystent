@@ -2158,6 +2158,24 @@ zamiast 20 lipca. Zwroty sprzed tej daty przestaną być widoczne przy
 najbliższym przebiegu — próg jest bezwzględny i działa też wtedy, gdy kursor
 już stoi. Jeśli w `wertis.env` stoi własna wartość, to ona nadal rządzi.
 
+**[wymaga działania] Kolejki reklamacji i dyskusji pokazują sprawy od
+1 lipca 2026.** Nowe `REKLAMACJE_OD` ma domyślnie `2026-06-30T22:00:00Z`,
+czyli północ czasu lokalnego. Stoi za tym zgłoszenie właściciela: „w kolejce
+pojawiają mi się stare reklamacje". Pełny przelot listy z 0.273.0 zapisuje całe
+archiwum konta, a zapytanie kolejki nie miało żadnego okna czasowego.
+
+Próg dotyczy WIDOKU, nie pobierania — baza wie dalej wszystko, więc cofnięcie
+progu nie wymaga ponownej synchronizacji. Pusta wartość wyłącza próg zupełnie.
+Ekran mówi, ile spraw schował, i osobno ostrzega, gdy któraś z nich ma jeszcze
+termin decyzji. Przełącznik „pokaż starsze" zdejmuje próg na jedno spojrzenie.
+
+Sprawa wznowiona przez klienta wraca nad próg sama: Allegro przesuwa wtedy
+`openedDate`, a to po niej próg odcina.
+
+Dochodzi też czwarty kubełek **BEZ RUCHU** — sprawa z zamkniętą rozmową
+i terminem przeterminowanym o ponad trzydzieści dni schodzi z DO DECYZJI.
+Sprawa z żywą rozmową zostaje w pracy niezależnie od wieku.
+
 **Odnośniki do panelu Allegro mogą wymagać poprawki.** Adresy stron panelu
 sprzedawcy nie są przez Allegro udokumentowane, więc domyślne wzorce są
 założeniem. Dwa wyjątki są już sprawdzone kliknięciem: zwrot od 0.207.0

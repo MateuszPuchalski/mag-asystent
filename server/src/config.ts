@@ -404,6 +404,27 @@ export const config = {
     reklamacjeSyncMs: num(
       process.env.ALLEGRO_REKLAMACJE_SYNC_MS, 180_000, "ALLEGRO_REKLAMACJE_SYNC_MS"),
     /**
+     * Od kiedy kolejka POKAZUJE sprawy. Decyzja właściciela: 1 LIPCA 2026,
+     * północ czasu lokalnego (stąd 30 czerwca 22:00 UTC — Polska jest w lipcu
+     * na UTC+2). Zgłoszenie brzmiało „w kolejce pojawiają mi się stare
+     * reklamacje", a doprecyzowanie — „pokaż tylko reklamacje od 1 lipca".
+     *
+     * TO JEST PRÓG WIDOKU, NIE POBIERANIA, i tym różni się od `zwrotyOd`.
+     * Tamten próg odcina sprawę przy synchronizacji; ten odcina ją na liście,
+     * a baza wie dalej wszystko. Powód jest konkretny: pełny przelot listy
+     * (0.273.0) zamyka sprawy rozstrzygnięte w Centrum Sprzedaży i musi
+     * widzieć archiwum, żeby to robić. Próg przy pobieraniu zabrałby nam tę
+     * robotę razem z licznikiem „ogona".
+     *
+     * Próg stoi po `otwarto_at`, czyli po `openedDate`, a specyfikacja opisuje
+     * je jako „the most recent date when the issue has been opened or
+     * reopened". Sprawa sprzed progu, którą klient WZNOWI, wraca na listę
+     * sama — próg jej nie zakopuje, tylko przestaje o niej przypominać.
+     *
+     * Pusta wartość znaczy „bez progu" i to jest droga powrotna bez wydania.
+     */
+    reklamacjeOd: data(process.env.REKLAMACJE_OD, "2026-06-30T22:00:00Z", "REKLAMACJE_OD"),
+    /**
      * Ile dni ma sprzedawca na OBSŁUŻENIE zwrotu od jego otrzymania.
      *
      * SIEDEM, OD DORĘCZENIA PACZKI (0.339.0) — regulamin Allegro. Do 0.338.0
