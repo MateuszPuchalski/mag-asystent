@@ -576,6 +576,50 @@ export function listaReklamacji(
   });
 }
 
+/** Trzy liczby o zegarze: co już przepadło, co dziś, co jutro. */
+export interface LicznikiTerminow {
+  poTerminie: number;
+  dzis: number;
+  jutro: number;
+}
+
+/** Pilność sprawy albo `null`, gdy zegar przy niej nic nie mówi. */
+export type Pilnosc = keyof LicznikiTerminow;
+
+/**
+ * Pilność JEDNEJ sprawy — czysta funkcja obok liczników, żeby panel mógł
+ * zawęzić listę tą samą regułą, którą serwer policzył pasek.
+ *
+ * LICZY SIĘ TYLKO PRACA. Sprawa rozstrzygnięta albo bez ruchu ma termin
+ * w kolumnie, ale nie ma już decyzji do podjęcia — wliczenie jej podniosłoby
+ * pasek o sprawy, przy których nikt nic nie zrobi. Pasek ma odpowiadać na
+ * pytanie „ile mam dziś zdążyć", a nie „ile dat minęło w tabeli".
+ */
+export function pilnosc(w: { kubelek: Kubelek; dniDoTerminu: number | null }): Pilnosc | null {
+  if (w.kubelek !== "decyzja" || w.dniDoTerminu === null) return null;
+  if (w.dniDoTerminu < 0) return "poTerminie";
+  if (w.dniDoTerminu === 0) return "dzis";
+  if (w.dniDoTerminu === 1) return "jutro";
+  return null;
+}
+
+/**
+ * Ile spraw przeterminuje się dziś — liczba, której ekran nie miał.
+ *
+ * Pastylka terminu na wierszu istnieje od 0.222.0 i czerwienieje na trzy dni
+ * przed (`PROG_TERMINU_DNI`). Brakowało czego innego: żeby DOSTAĆ tę liczbę,
+ * trzeba było policzyć czerwone pastylki okiem, przewijając kolejkę. Zegar był,
+ * alarmu nie było.
+ */
+export function licznikiTerminow(lista: WierszReklamacji[]): LicznikiTerminow {
+  const l: LicznikiTerminow = { poTerminie: 0, dzis: 0, jutro: 0 };
+  for (const r of lista) {
+    const p = pilnosc(r);
+    if (p) l[p] += 1;
+  }
+  return l;
+}
+
 export function licznikiKubelkow(lista: WierszReklamacji[]): Record<Kubelek, number> {
   const l: Record<Kubelek, number> = { decyzja: 0, odpowiedz: 0, zamknieta: 0, bez_ruchu: 0 };
   for (const r of lista) l[r.kubelek] += 1;

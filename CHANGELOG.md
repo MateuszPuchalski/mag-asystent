@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.385.0 — 17 września 2026
+
+**Kolejka mówi, ile spraw przeterminuje się dziś.** Wybór właściciela:
+„ostrzeżenie PRZED terminem".
+
+**Najpierw sprostowanie, bo pytanie postawiłem błędnie.** Ostrzeżenie przed
+terminem w tym panelu ISTNIEJE od 0.222.0: `PROG_TERMINU_DNI` to trzy dni,
+sygnał `termin` zapala się przed czasem, a pastylka na wierszu czerwienieje
+i pisze „dziś" albo „N dni po". Brakowało czego innego — żeby DOSTAĆ liczbę,
+trzeba było policzyć czerwone pastylki okiem, przewijając całą kolejkę. Zegar
+był, alarmu nie było.
+
+- **Trzy liczby nad kolejką: po terminie, dziś, jutro.** Liczy je serwer z tej
+  samej listy co kubełki. Druga reguła po stronie panelu rozjechałaby się
+  z pierwszą, a pasek pokazujący inną pilność niż wiersze pod nim jest gorszy
+  od braku paska.
+- **Liczy się WYŁĄCZNIE praca.** Sprawa rozstrzygnięta albo bez ruchu ma termin
+  w kolumnie, ale nie ma już decyzji do podjęcia. Pytanie brzmi „ile mam dziś
+  zdążyć", a nie „ile dat minęło w tabeli".
+- **Każda liczba jest też sitem.** Kliknięcie zawęża kolejkę i przestawia
+  kubełek na DO DECYZJI — z ROZSTRZYGNIĘTYCH lista byłaby pusta pod niezerową
+  liczbą, czyli pasek kłamałby pustką. Drugie kliknięcie sito zdejmuje.
+- **Pasek milczy przy samych zerach.** Wiersz ekranu ze zdaniem „po terminie 0,
+  dziś 0, jutro 0" nie mówi nic, czego nie mówi sama kolejka.
+
+Poza ekran to nie wychodzi i jest to granica tego wydania. Powiadomienie —
+mail, push, wpis w pasku zdrowia — dotyka `wertis.env` i cudzej skrzynki, więc
+jest osobną decyzją właściciela.
+
+---
+
 ## 0.384.0 — 17 września 2026
 
 **Kolejka reklamacji pokazuje pracę, a nie archiwum.** Zgłoszenie właściciela:

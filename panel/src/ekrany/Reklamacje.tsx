@@ -10,7 +10,8 @@ import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import type {
-  KubelekReklamacji, Reklamacja, StanReklamacji, SzczegolyWysylki, WiadomoscReklamacji,
+  KubelekReklamacji, Pilnosc, Reklamacja, StanReklamacji, SzczegolyWysylki,
+  WiadomoscReklamacji,
 } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
@@ -19,6 +20,7 @@ import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } f
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekProgu } from "../sprawy/Prog";
+import { PasekZegara, wPilnosci } from "../reklamacje/Zegar";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
@@ -126,6 +128,9 @@ export function Reklamacje() {
   const mojeId = ja.data?.user.userId ?? null;
   const { sito, przelacz: przelaczSito } = useSito();
   const [tag, setTag] = useState<number | null>(null);
+  /* Sito zegara. Nie pamięta się między otwarciami — inaczej biuro wracałoby
+     rano do listy zawężonej do „jutro" z wczoraj i nie wiedziało czemu. */
+  const [pilnosc, setPilnosc] = useState<Pilnosc | null>(null);
   const slownikTagow = useTagi();
   const nowyTag = useNowyTag();
   const przypnij = usePrzypnijTag();
@@ -196,9 +201,15 @@ export function Reklamacje() {
   /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
      i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
      nie wykluczać. */
-  const poSitach = useMemo(
+  const poTagu = useMemo(
     () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
     [moi, tag]);
+
+  /* Zegar NAKŁADA SIĘ na pozostałe sita, tak jak tag na „Moje". Pytania „czyje
+     to", „o czym to" i „na kiedy to" zadaje się naraz. */
+  const poSitach = useMemo(
+    () => (pilnosc === null ? poTagu : poTagu.filter((r) => wPilnosci(r, pilnosc))),
+    [poTagu, pilnosc]);
 
   const widoczne = pasujace ?? poSitach;
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
@@ -422,6 +433,19 @@ export function Reklamacje() {
                 samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
             <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
           </div>
+
+        {/* Zegar zbiorczo. Liczy CAŁĄ kolejkę, nie bieżący kubełek: pytanie
+            „ile mam dziś zdążyć" nie zmienia odpowiedzi przez to, że ktoś
+            patrzy akurat na rozstrzygnięte. */}
+        {data?.terminy && <PasekZegara terminy={data.terminy} wybrana={pilnosc}
+          onWybierz={(p) => {
+            setPilnosc(p);
+            /* Wybór pilności PRZESTAWIA KUBEŁEK na DO DECYZJI. Zegar liczy
+               wyłącznie pracę, więc klik z kubełka ROZSTRZYGNIĘTE dawałby pustą
+               listę pod niezerową liczbą — czyli pasek kłamałby pustką. Jedno
+               kliknięcie, jedna odpowiedź. */
+            if (p) setKubelek("decyzja");
+          }} />}
 
         <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
 

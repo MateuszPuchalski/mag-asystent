@@ -5,8 +5,8 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
   adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, kubelek,
-  cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
-  stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
+  cofnijNotatke, licznikiKubelkow, licznikiTerminow, listaReklamacji, progKolejki,
+  ReklamacjaConflict, stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
 /* Ten plik pilnuje reguł, których na ekranie nie widać: że kolejka ustawia się
@@ -556,4 +556,23 @@ test("`DISPUTE_CLOSED` zamyka sprawę, ale NIE potwierdza naszego werdyktu", () 
   assert.ok(sygnaly({
     ...rdzen, zwrotWymagany: null, werdyktStatus: "sent", werdykt: "ACCEPTED_REFUND",
   }).includes("werdykt_niepotwierdzony"));
+});
+
+test("zegar zbiorczy liczy WYŁĄCZNIE pracę i dzieli ją na trzy", () => {
+  const { d, dodaj } = stanowisko();
+  /* TERAZ to 7 września 12:00. Termin tego samego dnia po południu daje zero
+     dni — czyli „dziś", a nie „po terminie". Granica myli się tu łatwo. */
+  dodaj({ ext: "dzis", termin: "2026-09-07T16:00:00Z" });
+  dodaj({ ext: "jutro", termin: "2026-09-08T16:00:00Z" });
+  dodaj({ ext: "przepadlo", termin: "2026-09-01T10:00:00Z" });
+  dodaj({ ext: "spokojnie", termin: "2026-09-30T10:00:00Z" });
+  /* Rozstrzygnięta z terminem na dziś. Ma datę w kolumnie, ale nie ma już
+     decyzji do podjęcia — wliczenie jej podniosłoby pasek o pracę, której nie
+     ma, i zamieniło alarm w szum. */
+  dodaj({ ext: "zamknieta", termin: "2026-09-07T16:00:00Z", status: "CLAIM_ACCEPTED" });
+  /* Bez ruchu: czat zamknięty i termin sprzed pół roku. Też nie jest pracą. */
+  dodaj({ ext: "martwa", termin: "2026-03-01T10:00:00Z", czat: 0 });
+
+  assert.deepEqual(licznikiTerminow(listaReklamacji(d, TERAZ, null)),
+    { poTerminie: 1, dzis: 1, jutro: 1 });
 });

@@ -1433,9 +1433,26 @@ export interface StanReklamacji extends StanZwrotow {
   dyskusjiPominietych: number | null;
 }
 
+/**
+ * Zegar zbiorczo: co przepadło, co dziś, co jutro.
+ *
+ * Liczy SERWER z tej samej listy co kubełki, i liczy TYLKO pracę — sprawa
+ * rozstrzygnięta albo bez ruchu ma termin w kolumnie, ale nie ma już decyzji
+ * do podjęcia. Pasek odpowiada na pytanie „ile mam dziś zdążyć", a nie „ile dat
+ * minęło w tabeli".
+ */
+export interface LicznikiTerminow {
+  poTerminie: number;
+  dzis: number;
+  jutro: number;
+}
+
+export type Pilnosc = keyof LicznikiTerminow;
+
 export interface KolejkaReklamacji {
   reklamacje: Reklamacja[];
   liczniki: Record<KubelekReklamacji, number>;
+  terminy: LicznikiTerminow;
   prog: ProgKolejki;
   stan: StanReklamacji;
 }

@@ -4638,6 +4638,38 @@ dużo.
 przelot; tam jest nawet ciaśniej, bo porządek „kto czeka najdłużej" stawia
 najstarsze na górze z definicji.
 
+### 25b.3e. Zegar zbiorczo
+
+Wybór właściciela: „ostrzeżenie PRZED terminem". Pytanie było postawione
+błędnie i sprostowanie należy do zapisu: **ostrzeżenie przed terminem istnieje
+od 0.222.0.** `PROG_TERMINU_DNI` wynosi trzy dni, sygnał `termin` zapala się
+przed czasem, a pastylka na wierszu czerwienieje i pisze „dziś" albo „N dni po".
+
+Brakowało czego innego. Żeby DOSTAĆ liczbę „ile przeterminuje się dziś", trzeba
+było policzyć czerwone pastylki okiem, przewijając całą kolejkę. Zegar był,
+alarmu nie było.
+
+Nad kolejką stoją więc trzy liczby: **po terminie, dziś, jutro**. Liczy je
+serwer z tej samej listy co kubełki, bo druga reguła po stronie panelu
+rozjechałaby się z pierwszą — a pasek pokazujący inną pilność niż wiersze pod
+nim jest gorszy od braku paska.
+
+**Liczy się WYŁĄCZNIE praca.** Sprawa rozstrzygnięta albo bez ruchu ma termin
+w kolumnie, ale nie ma już decyzji do podjęcia. Pasek odpowiada na pytanie „ile
+mam dziś zdążyć", a nie „ile dat minęło w tabeli".
+
+**Każda liczba jest też sitem.** Kliknięcie zawęża kolejkę do swoich spraw
+i przestawia kubełek na DO DECYZJI — z ROZSTRZYGNIĘTYCH lista byłaby pusta pod
+niezerową liczbą, czyli pasek kłamałby pustką. Drugie kliknięcie zdejmuje sito.
+Liczba, przy której nie da się kliknąć, zostawiałaby dokładnie tę pracę, którą
+miała zdjąć.
+
+**Pasek milczy przy samych zerach.** Wiersz ekranu ze zdaniem „po terminie 0,
+dziś 0, jutro 0" nie mówi nic, czego nie mówi sama kolejka.
+
+Poza ekran to nie wychodzi i jest to granica tego wydania. Powiadomienie —
+mail, push, wpis w pasku zdrowia — dotyka `wertis.env` i cudzej skrzynki.
+
 ### 25b.4. Zegar
 
 **Czytamy go, nie liczymy.** `decisionDueDate` jest terminem na uznanie albo

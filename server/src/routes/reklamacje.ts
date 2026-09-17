@@ -7,7 +7,8 @@ import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/skrzynka.js";
 import {
-  adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji, progKolejki,
+  adresZalacznika, BladReklamacji, licznikiKubelkow, licznikiTerminow,
+  listaReklamacji, progKolejki,
   cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
@@ -105,6 +106,10 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     return {
       reklamacje,
       liczniki: licznikiKubelkow(reklamacje),
+      /* Zegar zbiorczo. Liczy SERWER z tej samej listy co kubełki — druga
+         reguła po stronie panelu rozjechałaby się z pierwszą przy pierwszej
+         poprawce, a objawem byłby pasek pokazujący inną pilność niż wiersze. */
+      terminy: licznikiTerminow(reklamacje),
       /* `prog` jedzie ZAWSZE, także przy `od=wszystko`: panel musi umieć
          narysować przełącznik w obie strony, a po zdjęciu progu wciąż ma
          powiedzieć, do czego wraca. */
