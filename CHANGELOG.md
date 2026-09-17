@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.383.0 — 17 września 2026
+
+**Skrzynka dostała klawiaturę — jako ostatnia z czterech kolejek obsługi.**
+Zwroty, reklamacje i dyskusje chodzą z klawiatury od 0.245.0. Skrzynka nie
+miała ani jednego klawisza, a to na niej agent siedzi najdłużej z całego
+panelu. Żadna decyzja tego nie wybrała; nikt jej tu po prostu nie dorobił.
+
+- **`j` / `k` i strzałki** chodzą po widocznej liście rozmów, **`1`–`5`**
+  przełączają kubełek. Pasek skrótów nad listą je wypisuje — skrót, o którym
+  nikt nie wie, nie skraca niczyjej pracy (0.281.0).
+- **Nasłuch mieszka w KOLEJCE, nie w ekranie.** Kubełek, kategoria i szukanie
+  są stanem kolejki; ekran widzi sam identyfikator wybranej rozmowy i liczyłby
+  „następną" z listy nieprzefiltrowanej.
+- **Pole tekstowe wygrywa zawsze.** To jedyny ekran obsługi, na którym agent
+  pisze — bez tej bramki `j` w słowie „już" przerzucałoby rozmowę spod kursora.
+  Próba jej cofnięcia wywraca cztery testy, w tym trzy o szukaniu w kolejce.
+- „Wszystkie" jest w skrzynce kubełkiem pierwszym, nie doklejonym na końcu, więc
+  pasek skrótów dostaje przełącznik `zWszystkimi` zamiast liczyć o jeden za dużo.
+
+**Audyt, który to znalazł, odrzucił przy okazji cztery własne zarzuty.** Zmienna
+wysokość wiersza kolejki i zmienny skład linii podpisu to decyzje z 0.251.0
+z uzasadnieniem w kodzie; 225 px pustki nad edytorem okazało się artefaktem
+krótkiej rozmowy (przy długiej spada do 16 px); a wyłączona wysyłka ma już
+zdanie o właścicielu rozmowy. Nic z tego nie weszło do wydania.
+
+**[wymaga działania]** Panel obsługi trzeba przebudować: `npm run build`
+w KORZENIU repo, nie w `server/`.
+
 ## 0.381.1 — 17 września 2026
 
 **Sprostowanie: konto usługi NIE było przyczyną odmowy ZW.** Poprzedni wpis

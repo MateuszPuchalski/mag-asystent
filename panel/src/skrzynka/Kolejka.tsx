@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AlarmClock, Eye, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
@@ -7,6 +7,7 @@ import type {
 } from "../api/typy";
 import { czas, FiltrSegmentowy, godzina, Plakietka, Pusto } from "../ui";
 import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
+import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
 /* Kubełki kolejki wprost z §10.1: „Nieprzypisane, Moje, Oczekujące, Po
@@ -163,6 +164,52 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     || r.ostatniaWiadomosc.toLowerCase().includes(szukane)
     || (r.wlasciciel ?? "").toLowerCase().includes(szukane));
 
+  /* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────
+     Cztery kolejki obsługi, trzy chodziły z klawiatury od 0.245.0 — zwroty,
+     reklamacje i dyskusje. Skrzynka nie miała ANI JEDNEGO klawisza, a to na
+     niej agent siedzi najdłużej z całego panelu (patrz `Edytor.tsx`, 0.247.0).
+     Żadna decyzja tego nie wybrała; po prostu nikt jej tu nie dorobił.
+
+     NASŁUCH MIESZKA W KOLEJCE, nie w ekranie, i to jest różnica wobec tamtych
+     trzech. Tam ekran zna listę, więc wie, co jest „następne". Tutaj kubełek,
+     kategoria i szukanie są stanem TEJ kolejki, a ekran widzi wyłącznie
+     `wybranaId` — liczyłby więc „następną" z listy nieprzefiltrowanej
+     i przeskakiwał na rozmowy, których nie widać. Podnoszenie tego stanu na
+     ekran byłoby większą zmianą niż cały ten skrót.
+
+     POLE TEKSTOWE WYGRYWA ZAWSZE. Na tym ekranie agent PISZE — bez tej bramki
+     `j` w słowie „już" przerzucałoby rozmowę spod kursora. Stąd ten sam
+     strażnik co w reklamacjach: INPUT, TEXTAREA i pole edytowalne milczą. */
+  const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
+  naKlawisz.current = (e: KeyboardEvent) => {
+    const el = e.target as HTMLElement | null;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+    if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+    if (e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k") {
+      if (!widoczne.length) return;
+      e.preventDefault();
+      const o = e.key === "ArrowDown" || e.key === "j" ? 1 : -1;
+      const i = widoczne.findIndex((r) => r.id === wybranaId);
+      /* Bez zaznaczenia `j` bierze PIERWSZĄ, a `k` ostatnią — ruch w dół z niczego
+         zaczyna od góry listy, nie od jej końca. */
+      const cel = i < 0 ? (o > 0 ? 0 : widoczne.length - 1) : i + o;
+      const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, cel))];
+      if (nast && nast.id !== wybranaId) onWybierz(nast.id);
+      return;
+    }
+    /* „Wszystkie" jest tu kubełkiem PIERWSZYM (§10.1), nie doklejonym na końcu
+       jak w tamtych trzech ekranach — więc cyfra mapuje się wprost na indeks. */
+    if (/^[1-9]$/.test(e.key) && Number(e.key) <= KUBELKI.length) {
+      e.preventDefault();
+      setKubelek(KUBELKI[Number(e.key) - 1].klucz);
+    }
+  };
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => naKlawisz.current(e);
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, []);
+
   /* Skład kubełka JEDNYM SPOJRZENIEM (dekalog ergonomii, punkt 1: informacja
      w miejscu, gdzie zapada decyzja). Liczniki liczą się z tego, co widać —
      serwer nie musi ich podawać, bo lista i tak przyjeżdża w całości. */
@@ -268,6 +315,13 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         onClick={() => setKategoria(null)}>pokaż wszystkie</button>}
     </div>}
     <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
+      {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
+          rozpoznanie jest tańsze od pamiętania, a skrót, o którym nikt nie wie,
+          nie skraca niczyjej pracy. Sit „moje"/„niczyje" skrzynka nie ma —
+          „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
+          ma po co stać. */}
+      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
+        sita={false} zWszystkimi={false} />
       {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
       {!laduje && !rozmowy.length &&
         <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>}

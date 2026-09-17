@@ -26,7 +26,8 @@ const Klawisz = ({ children }: { children: React.ReactNode }) =>
   <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-mono text-podpis text-slate-700">
     {children}</kbd>;
 
-export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, dodatkowe = [] }: {
+export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = true,
+  dodatkowe = [] }: {
   /** `false` przy nieznanej tożsamości — wtedy `m` nic nie robi i nie kłamiemy. */
   zMoje: boolean;
   /** Ile jest kubełków; ostatnia cyfra to „Wszystkie". */
@@ -39,6 +40,16 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, dodatkowe = [] }:
    * który ten komponent naprawiał: klawiszem widocznym i martwym.
    */
   sita?: boolean;
+  /**
+   * Czy „Wszystkie" jest DOKLEJONE za kubełkami (0.383.0).
+   *
+   * Zwroty, reklamacje i dyskusje trzymają je poza tablicą kubełków, więc
+   * ostatnią cyfrą jest `kubelkow + 1`. Skrzynka ma je jako kubełek PIERWSZY
+   * (§10.1), więc cyfry kończą się na `kubelkow`. Bez tego przełącznika
+   * skrzynka musiałaby podać o jeden za mało i pasek kłamałby czytelnikowi
+   * kodu zamiast użytkownikowi.
+   */
+  zWszystkimi?: boolean;
   /** Klawisze WŁASNE ekranu: `[klawisz, co robi]`, w kolejności użycia. */
   dodatkowe?: ReadonlyArray<readonly [string, string]>;
 }) {
@@ -46,7 +57,7 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, dodatkowe = [] }:
     <span className="flex items-center gap-1">
       <Klawisz>j</Klawisz><Klawisz>k</Klawisz> lista</span>
     <span className="flex items-center gap-1">
-      <Klawisz>1</Klawisz>–<Klawisz>{kubelkow + 1}</Klawisz> kubełek</span>
+      <Klawisz>1</Klawisz>–<Klawisz>{zWszystkimi ? kubelkow + 1 : kubelkow}</Klawisz> kubełek</span>
     {sita && zMoje && <span className="flex items-center gap-1"><Klawisz>m</Klawisz> moje</span>}
     {sita && <span className="flex items-center gap-1"><Klawisz>n</Klawisz> niczyje</span>}
     {dodatkowe.map(([klawisz, opis]) => <span key={klawisz} className="flex items-center gap-1">
