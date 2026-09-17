@@ -5144,6 +5144,44 @@ razem inaczej. W 0.222.0: NIE — panel prowadzi wyłącznie reklamacje.
 9 września 2026: **TAK**, dyskusje dostają własną zakładkę (§25c). Pierwsza
 odpowiedź stoi tu dalej, bo tłumaczy kod trzech wydań.
 
+## 26b. Klawiatura w skrzynce (0.383.0)
+
+Cztery kolejki obsługi. Trzy chodziły z klawiatury od 0.245.0 — zwroty,
+reklamacje i dyskusje. **Skrzynka nie miała ani jednego klawisza**, a to na niej
+agent siedzi najdłużej z całego panelu (stwierdza to wprost komentarz
+w `skrzynka/Edytor.tsx` z 0.247.0).
+
+Żadna decyzja tego nie wybrała. Przegląd doktryny nie znalazł ani jednego
+zdania o klawiaturze skrzynki — po prostu nikt jej tu nie dorobił, a trzy
+pozostałe ekrany dostały ją przy innych wydaniach.
+
+| klawisz | co robi |
+|---|---|
+| `j` / `k`, strzałki | ruch po widocznej liście rozmów |
+| `1`–`5` | kubełek |
+
+**Nasłuch mieszka w KOLEJCE, nie w ekranie**, i to jest różnica wobec tamtych
+trzech. Tam ekran zna listę, więc wie, co jest następne. Tu kubełek, kategoria
+i szukanie są stanem `skrzynka/Kolejka.tsx`, a ekran widzi wyłącznie `wybranaId`
+— liczyłby więc „następną" z listy nieprzefiltrowanej i skakałby na rozmowy,
+których nie widać. Podniesienie tego stanu na ekran byłoby większą zmianą niż
+cały ten skrót.
+
+**Pole tekstowe wygrywa zawsze.** To jedyny ekran obsługi, na którym agent
+PISZE — bez bramki na INPUT, TEXTAREA i pole edytowalne `j` w słowie „już"
+przerzucałoby rozmowę spod kursora, a litera nie wchodziłaby do szkicu. Dwa
+błędy naraz, oba ciche. Przy próbie cofnięcia tej bramki padają CZTERY testy:
+jeden o pisaniu w szkicu i trzy o szukaniu w kolejce — bo pole wyszukiwania
+przestaje wtedy przyjmować cyfry i litery kubełków.
+
+**„Wszystkie" jest tu kubełkiem PIERWSZYM** (§10.1), nie doklejonym na końcu jak
+w tamtych trzech ekranach, więc cyfra mapuje się wprost na indeks, a pasek
+skrótów kończy się na `kubelkow`, nie `kubelkow + 1` (przełącznik `zWszystkimi`
+w `sprawy/Skroty.tsx`).
+
+Sit „moje"/„niczyje" skrzynka nie dostaje: „Moje" jest tu kubełkiem i siedzi już
+pod cyfrą. Klawisz obiecujący drugie wejście do tego samego byłby martwy.
+
 ## 26a. Język ekranu: liczebnik ma trzy formy
 
 Dopisane po audycie z 15 września 2026, bo to nie jest drobiazg jednego ekranu
