@@ -413,6 +413,12 @@ public sealed class SferaComAdapter : ISferaAdapter
             string stan =
                 $"paragon {Pole((object)zw, "DoDokumentuNumerPelny")} (dok_Id {z.DokId}), " +
                 $"wartość {wartosc:0.00} zł, przelew {wartosc:0.00} zł, " +
+                /* KWOTA DO ZAPŁATY OBOK PRZELEWU (0.384.1). Worker ustawia JEDNĄ
+                   formę płatności, a okno Subiekta wypełnia pięć i pilnuje ich
+                   sumy. Jeśli szkic dziedziczy po paragonie drugą formę, suma
+                   rozjedzie się z tą kwotą — i to widać dopiero, gdy obie stoją
+                   w jednym zdaniu. Nazwa zmierzona sondą (docs/sfera-com.md §2m). */
+                $"do zapłaty {Pole((object)zw, "KwotaDoZaplaty")}, " +
                 $"rodzaj zwrotu 1, skutek magazynowy {skutek}, wierszy {ile}. " +
                 "Tę samą odmowę pokaże sonda BEZ zapisu: sonda.ps1 -PlikEnv C:\\wertis\\wertis.env " +
                 $"-SzkicZW -Paragon {z.DokId} -Towary \"{towary}\" -Sprawdz";
@@ -450,6 +456,7 @@ public sealed class SferaComAdapter : ISferaAdapter
             object? w = nazwa switch
             {
                 "DoDokumentuNumerPelny" => dok.DoDokumentuNumerPelny,
+                "KwotaDoZaplaty" => dok.KwotaDoZaplaty,
                 _ => null,
             };
             string tekst = (Convert.ToString(w) ?? "").Trim();

@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.384.1 — 17 września 2026
+
+**Odmowa ZW: hipoteza o kwocie przelewu upada, sonda mierzy dwie następne.**
+Właściciel wystawił ten sam ZW ręką, na koncie operatora workera — przeszedł.
+Zdejmuje to z listy kasę, zamknięty sierpień, paragon i prawa operatora.
+Pokazał też wzorzec poprawnego ZW: przelew 100% wartości, dokładnie tak, jak
+ustawia go worker. Sama kwota nie może więc być powodem odmowy.
+
+Zostają dwie różnice między oknem Subiekta a workerem. Okno wypełnia pięć form
+płatności i pilnuje ich sumy, worker ustawia jedną. Okno niesie nabywcę, worker
+nie ustawia go nigdy. Obie rzeczy mierzy teraz sonda, bez zapisu: po ustawieniu
+„jak worker" wypisuje wszystkie pola płatności i kwoty, a o polach nabywcy
+i rachunku mówi wyłącznie „puste" albo „wypełnione". Wartości zostają
+w Subiekcie — adres dostawy nie ma prawa stąd wyjść. Ten sam zrzut robi
+`-WzorZW` na dokumencie, który przeszedł.
+
+Treść odmowy workera niesie od teraz kwotę do zapłaty obok przelewu. Rozjazd
+tych dwóch liczb widać dopiero, gdy stoją w jednym zdaniu.
 ## 0.384.0 — 17 września 2026
 
 **Kolejka reklamacji pokazuje pracę, a nie archiwum.** Zgłoszenie właściciela:
