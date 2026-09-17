@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.381.0 — 17 września 2026
+
+**WMS z gałęzi `codex/robust-wms` wchodzi do gałęzi, a do niego dochodzi
+granica do Subiekta.** Decyzja właściciela po kolizji opisanej w 0.380.2:
+scalamy gotowy kod, a z projektu bierzemy wyłącznie to, czego mu brakowało.
+
+Scalenie kosztowało siedem konfliktów i ani jeden nie dotyczył `schema.sql` —
+tabele `wms_*` i tabele z main są rozłączne. Rozstrzygnięcia stoją przy
+commicie scalającym; najważniejsze dwa: rozruch `biuro.html` zostaje z 0.373.0
+(wariant z gałęzi gubił cykl 30 s), a cztery pliki `wms-*-run.ts` dostały wpisy
+w `scripts`, bo gałąź jest starsza niż strażnik `skrypty.test.ts`.
+
+**[wymaga działania] Zasiew zapasu przy wdrożeniu.** Nowy
+`npm -w server run wms:zasiew` wpisuje stan z Subiekta do miejsca `NIEZNANE`,
+po jednym ruchu na kartotekę. Bez argumentu pokazuje i nic nie zapisuje; zapis
+wymaga `--zapisz`. Procedura stoi w [`DEPLOY.md`](DEPLOY.md) §6h.
+
+**Dlaczego miejsce nieznane, a nie liczenie magazynu.** Uczciwe napełnienie
+rozbicia znaczyłoby policzyć wszystko przed startem, czyli tydzień postoju.
+Miejsce `NIEZNANE` ma tryb `reserve`, więc przydział pod zamówienie nigdy z
+niego nie weźmie — zbiórka ruszy dopiero z półki, którą ktoś zeskanował.
+
+**Rekoncyliacja dostała dziesiąty rodzaj rozjazdu: `zapas_vs_subiekt`.** Do
+scalenia suma z miejsc i stan Subiekta żyły osobno i nikt ich nie porównywał.
+To jest niezmiennik N2 z `docs/wms-projekt.md` §4 i jedyny, który pilnuje
+granicy między dwiema prawdami o stanie.
+
+Zapas w miejscu nieznanym NIE jest rozjazdem i nie wchodzi do raportu. Liczy go
+osobno `postepZasiewu`, bo to miara postępu wdrożenia. Raport czerwony od
+pierwszego dnia przestaje być czytany — mówi to wprost komentarz w
+`reconcile.ts` i ta sama zasada obowiązuje tutaj.
+
+**Czego granica świadomie nie robi.** Nie zdejmuje nadmiaru: gdy WMS ma więcej
+niż Subiekt, decyduje człowiek, a skrypt zwraca rozjazd. Nie zaokrągla ułamka:
+`wms_stock.on_hand` jest liczbą całkowitą, więc stan `2,5` wraca z powodem
+`ulamek`. Nie obsługuje magazynów poza MAG, bo `wms_bin` nie ma kolumny
+magazynu — to osobna praca i osobne wydanie.
+
+Zasiew jest idempotentny z ARYTMETYKI, nie z klucza: liczy różnicę i dosypuje
+brak, więc drugi przebieg na niezmienionych danych nie robi nic. Siedem testów
+w `services/wms-subiekt.test.ts` pilnuje właśnie tych granic.
+
 ## 0.380.2 — 17 września 2026
 
 **WMS jest już zbudowany na gałęzi `codex/robust-wms` — i dowiedzieliśmy się

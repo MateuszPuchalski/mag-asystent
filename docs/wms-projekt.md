@@ -9,10 +9,10 @@ sekcji 9.
 > w `server/src/db/schema.sql` na `main`. Sekcja 13 jest audytem tego projektu,
 > a sekcja 14 — kolizją z gotową implementacją.
 
-> **CZYTAJ NAJPIERW SEKCJĘ 14.** WMS jest już zbudowany na gałęzi
-> `codex/robust-wms` (PR #415, otwarty od 10 września). Ten dokument powstał
-> bez tej wiedzy i zaprojektował to samo drugi raz. Decyzja o tym, co z czym
-> scalić, należy do właściciela i nie zapada w tym pliku.
+> **ROZSTRZYGNIĘTE (0.381.0).** WMS z gałęzi `codex/robust-wms` jest scalony,
+> a z tego projektu weszła wyłącznie granica do Subiekta — droga druga
+> z sekcji 14. Sekcje 3–12 opisują więc projekt, którego NIE zbudowano;
+> zbudowano tabele `wms_*`. Czytaj je jak uzasadnienia decyzji, nie jak plan.
 
 ---
 
@@ -823,6 +823,31 @@ wystarczyło; nikt tego nie zrobił.
 **Rekomendacja: droga druga.** Kod, który istnieje i ma testy, jest wart
 więcej niż projekt. Brakuje mu jednej rzeczy — rozliczenia z Subiektem — a to
 jest dokładnie ta rzecz, którą ten dokument opisuje najdokładniej.
+
+### Co weszło do kodu w 0.381.0
+
+Droga druga, czyli granica bez przepisywania tabel. Trzy rzeczy i ani jednej
+więcej:
+
+1. `services/wms-subiekt.ts` — zasiew, rozjazd i postęp, z siedmioma testami.
+2. `reconcile.ts` — dziesiąty rodzaj rozjazdu, `zapas_vs_subiekt`.
+3. `wms-zasiew-run.ts` i `npm run wms:zasiew` — podgląd domyślnie, zapis na żądanie.
+
+Miejsce `NIEZNANE` z sekcji 3.1 weszło jako zwykły adres w trybie `reserve`.
+Nie wymagało to zmiany schematu: przydział pod zamówienie bierze wyłącznie
+z miejsc `pick`, więc towar bez zeskanowanej półki jest niewidoczny dla zbiórki.
+
+Reszta tego projektu — nazwy polskie, dwustopniowa rezerwacja, własny model
+zadań — NIE weszła i nie wejdzie. Tamte byty istnieją już pod nazwami `wms_*`
+i przepisywanie ich kosztowałoby wydanie bez zysku dla magazynu.
+
+### Czego granica nie obejmuje
+
+- **Magazynów poza MAG.** `wms_bin` nie ma kolumny magazynu, więc cały WMS
+  opisuje jeden magazyn. Wielomagazynowość zaczyna się od tej kolumny.
+- **Zapisu dokumentów do Subiekta.** Korekta z inwentury i dokument wydania
+  nadal nie powstają; decyzja o nich czeka na pomiar Sfery z sekcji 11.5.
+- **Zdejmowania nadmiaru.** Gdy WMS ma więcej niż Subiekt, rozstrzyga człowiek.
 
 ### Liczby pod tę decyzję
 

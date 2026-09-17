@@ -2048,6 +2048,41 @@ Restart-Service wertis-sfera
 Po aktualizacji do 0.350.1 zwrot, któremu wycofany zapis przypiął nieistniejący
 numer ZW, poprawia się ręcznie: „Cofnij korektę” w panelu, potem ZW w Subiekcie.
 
+## 6h. Zasiew zapasu WMS ze stanu Subiekta (0.381.0)
+
+WMS trzyma własne rozbicie stanu na miejsca. Pierwszego dnia to rozbicie jest
+puste, a magazyn pełny — i tę lukę zamyka zasiew.
+
+**Nie liczysz magazynu przed startem.** Zasiew wpisuje stan z Subiekta do
+jednego miejsca `NIEZNANE`, po jednym ruchu na kartotekę. Hala przenosi towar
+stamtąd na półki w tempie normalnej pracy.
+
+Miejsce `NIEZNANE` ma tryb `reserve`, więc przydział pod zamówienie nigdy z
+niego nie weźmie. Zbiórka ruszy dopiero z półki, którą ktoś zeskanował.
+
+### Kolejność
+
+1. Zatrzymaj workera, żeby kolejka nie mieszała się z zasiewem.
+2. Zrób kopię bazy aplikacji.
+3. Uruchom podgląd: `npm -w server run wms:zasiew`.
+4. Przeczytaj listę pominiętych rozjazdów.
+5. Zapisz: `npm -w server run wms:zasiew -- --zapisz`.
+6. Sprawdź rekoncyliację: rodzaj `zapas_vs_subiekt` ma być pusty.
+
+> **Ostrzeżenie przed krokiem 5.** Zasiew dotyka całego magazynu. Krok 3 jest
+> podglądem i niczego nie zapisuje — przeczytaj go, zanim dodasz `--zapisz`.
+
+### Czego zasiew NIE robi
+
+Nie zdejmuje nadmiaru. Gdy WMS ma więcej niż Subiekt, ktoś policzył półkę albo
+Subiekt wydał towar, którego hala nie ruszyła. To decyzja człowieka.
+
+Nie radzi sobie z ułamkiem. `wms_stock` trzyma liczby całkowite, więc kartoteka
+ze stanem `2,5` wraca jako rozjazd z powodem `ulamek`.
+
+Nie obsługuje magazynów innych niż MAG. `wms_bin` nie ma kolumny magazynu, więc
+cały WMS opisuje jeden magazyn — tak samo jak raporty WMS.
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

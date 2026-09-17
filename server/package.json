@@ -1,7 +1,7 @@
 {
   "name": "@wertis/server",
   "private": true,
-  "version": "0.380.2",
+  "version": "0.381.0",
   "type": "module",
   "description": "WERTIS — serwer API + worker Sfery (Fastify, SQLite).",
   "main": "dist/index.js",
@@ -29,7 +29,8 @@
     "wms:backup": "tsx src/wms-backup-run.ts",
     "wms:capacity": "tsx src/wms-capacity-run.ts",
     "wms:cart-capacity": "tsx src/wms-cart-capacity-run.ts",
-    "wms:demo": "tsx src/wms-demo-run.ts"
+    "wms:demo": "tsx src/wms-demo-run.ts",
+    "wms:zasiew": "tsx src/wms-zasiew-run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
