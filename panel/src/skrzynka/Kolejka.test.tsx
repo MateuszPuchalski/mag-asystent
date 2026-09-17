@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka } from "./Kolejka";
 import type { Rozmowa } from "../api/typy";
@@ -408,5 +408,120 @@ describe("kolejność listy (0.215.0)", () => {
     expect(klienci()).toEqual(["Pilna sprzed tygodnia", "Świeże pytanie", "Najstarsze pytanie"]);
     /* Wybór to nawyk stanowiska — przeglądarka go pamięta. */
     expect(localStorage.getItem("wertis.kolejka.porzadek")).toBe("najnowsze");
+  });
+});
+
+/* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────────────
+   Cztery kolejki obsługi, trzy chodziły z klawiatury od 0.245.0. Skrzynka nie
+   miała ani jednego klawisza — a to na niej agent siedzi najdłużej z całego
+   panelu. Żadna decyzja tego nie wybrała; nikt jej tu po prostu nie dorobił.
+
+   Nasłuch stoi w KOLEJCE, nie w ekranie: kubełek, kategoria i szukanie są
+   stanem tej kolejki, więc tylko ona wie, co jest „następne" po zawężeniu.
+   Dlatego testy idą po komponencie, a nie po ekranie.                        */
+
+const TRZY = [
+  rozmowa({ id: 1, ostatniaWiadomosc: "Pierwsza z brzegu",
+    ostatniaWiadomoscAt: "2026-09-01T07:00:00.000Z" }),
+  rozmowa({ id: 2, ostatniaWiadomosc: "Druga z brzegu",
+    ostatniaWiadomoscAt: "2026-09-01T08:00:00.000Z" }),
+  rozmowa({ id: 3, ostatniaWiadomosc: "Trzecia z brzegu",
+    ostatniaWiadomoscAt: "2026-09-01T09:00:00.000Z" }),
+];
+
+const zKlawiszami = (wybranaId: number | null, onWybierz: (id: number) => void) =>
+  render(<Kolejka rozmowy={TRZY} stan={STAN} wybranaId={wybranaId} laduje={false}
+    onWybierz={onWybierz} onOdswiez={() => {}} />);
+
+/**
+ * Kolejność WYŚWIETLONA, nie kolejność z tablicy.
+ *
+ * Kolejka sortuje sama („najdłużej czekające"), więc test wiążący się
+ * z identyfikatorami sprawdzałby ułożenie danych wejściowych, a nie umowę
+ * klawisza. Umowa brzmi: `j` bierze WIDOCZNY następny wiersz.
+ */
+const kolejnosc = (): number[] => [...document.querySelectorAll("[aria-current]")]
+  .map((e) => TRZY.find((r) => (e.textContent ?? "").includes(r.ostatniaWiadomosc))?.id ?? 0);
+
+describe("Kolejka: klawiatura", () => {
+  it("`j` bez zaznaczenia bierze PIERWSZĄ widoczną, nie ostatnią", async () => {
+    /* Ruch w dół z niczego zaczyna od góry listy. Odwrotnie byłoby
+       zaskoczeniem: agent wchodzi na ekran i naciska `j`, żeby zacząć. */
+    const onWybierz = vi.fn();
+    zKlawiszami(null, onWybierz);
+    await userEvent.keyboard("j");
+    expect(onWybierz).toHaveBeenCalledWith(kolejnosc()[0]);
+  });
+
+  it("`k` bez zaznaczenia bierze OSTATNIĄ — ruch w górę zaczyna od dołu", async () => {
+    const onWybierz = vi.fn();
+    zKlawiszami(null, onWybierz);
+    await userEvent.keyboard("k");
+    expect(onWybierz).toHaveBeenCalledWith(kolejnosc()[2]);
+  });
+
+  it("`j` i `k` chodzą po liście, a strzałki robią to samo", async () => {
+    const onWybierz = vi.fn();
+    zKlawiszami(null, onWybierz);
+    const [gora, srodek, dol] = kolejnosc();
+    onWybierz.mockClear();
+    cleanup();
+    zKlawiszami(srodek, onWybierz);
+    await userEvent.keyboard("j");
+    expect(onWybierz).toHaveBeenLastCalledWith(dol);
+    await userEvent.keyboard("k");
+    expect(onWybierz).toHaveBeenLastCalledWith(gora);
+    await userEvent.keyboard("{ArrowDown}");
+    expect(onWybierz).toHaveBeenLastCalledWith(dol);
+    await userEvent.keyboard("{ArrowUp}");
+    expect(onWybierz).toHaveBeenLastCalledWith(gora);
+  });
+
+  it("na końcach listy ruch STOI, zamiast zawijać się na drugi koniec", async () => {
+    /* Zawijanie gubi miejsce w kolejce: agent naciska `j` o jeden raz za dużo
+       i ląduje na górze, nie wiedząc, że przeskoczył wszystko. */
+    const onWybierz = vi.fn();
+    zKlawiszami(null, onWybierz);
+    const dol = kolejnosc()[2];
+    onWybierz.mockClear();
+    cleanup();
+    zKlawiszami(dol, onWybierz);
+    await userEvent.keyboard("j");
+    expect(onWybierz).not.toHaveBeenCalled();
+  });
+
+  it("KLAWISZ MILCZY, GDY KURSOR STOI W POLU — to jest tu sedno", async () => {
+    /* Na tym ekranie agent PISZE odpowiedź do klienta. Bez tej bramki `j`
+       w słowie „już" przerzucałoby rozmowę spod kursora, a litera nie
+       wchodziłaby do szkicu. Dwa błędy naraz, oba ciche. */
+    const onWybierz = vi.fn();
+    const { container } = zKlawiszami(1, onWybierz);
+    const pole = document.createElement("textarea");
+    container.appendChild(pole);
+    pole.focus();
+    await userEvent.keyboard("już kk jj 2");
+    expect(onWybierz).not.toHaveBeenCalled();
+    expect(pole.value).toBe("już kk jj 2");
+  });
+
+  it('cyfra przełącza kubełek, a „Wszystkie” jest PIERWSZE, nie doklejone', async () => {
+    /* Zwroty, reklamacje i dyskusje trzymają „Wszystkie" poza tablicą kubełków,
+       więc tam ostatnia cyfra to `kubelkow + 1`. Skrzynka ma je jako kubełek
+       pierwszy (§10.1) i cyfra mapuje się wprost na indeks. */
+    zKlawiszami(null, vi.fn());
+    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.keyboard("2");
+    expect(screen.getByRole("button", { name: /Nieprzypisane/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.keyboard("1");
+    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("pasek pokazuje klawisze, bo skrót, o którym nikt nie wie, nie skraca pracy", async () => {
+    /* Ta sama lekcja co 0.281.0 na reklamacjach. Pasek NIE obiecuje sit
+       „moje"/„niczyje": w skrzynce „Moje" jest kubełkiem pod cyfrą. */
+    zKlawiszami(null, vi.fn());
+    expect(screen.getByText(/ruch|lista/)).toBeInTheDocument();
+    expect(screen.getByText(/kubełek/)).toBeInTheDocument();
+    expect(screen.queryByText(/niczyje/)).toBeNull();
   });
 });
