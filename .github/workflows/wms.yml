@@ -1,0 +1,24 @@
+name: WMS
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  workflow:
+    name: WMS (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/zaleznosci
+      - run: npm run test:wms
+      - run: npm run build
+      # Obciążenie wózków liczy się minutami i nie zależy od systemu, więc
+      # biegnie raz. Kroku przeglądarkowego tu nie ma: ekrany WMS-a rysuje
+      # panel obsługi i pilnują ich testy `panel/`.
+      - if: runner.os == 'Linux'
+        run: npm run test:wms:cart-capacity
