@@ -58,14 +58,40 @@ describe("Koszyk zwrotów", () => {
     zamknij.mockClear(); mimo.mockClear(); zdejmijTowar.mockClear();
   });
 
-  it("pusty koszyk NIE ZAJMUJE miejsca na ekranie", () => {
-    /* Punkt 2 dekalogu. Stały pasek mówiący „zero" byłby elementem, który
-       operator uczy się przestać widzieć — a wtedy nie zauważy go też wtedy,
-       gdy zacznie coś znaczyć. */
-    expect(pokaz().container).toBeEmptyDOMElement();
+  it("bez koszyka pasek proponuje ZAŁOŻENIE pudła i nic poza tym", () => {
+    /* Punkt 2 dekalogu, zastosowany po zmianie z 0.378.0, a nie złamany.
+       Reguła mówi: pokazuj to, co potrzebne TERAZ. Licznik zerowy nie jest
+       potrzebny nigdy, ale wejście do pracy — owszem: zgłoszenie właściciela
+       brzmiało „potrzebuję tworzenia koszy zwrotowych jako oddzielna opcja".
 
+       Stąd granica: bez pudła widać JEDEN przycisk i zdanie o tym, czym ono
+       jest. Żadnych liczników, żadnych pustych etykiet. */
+    const bez = pokaz();
+    expect(bez.getByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeInTheDocument();
+    expect(bez.queryByText(/poz\./)).toBeNull();
+  });
+
+  it("pusty koszyk JEST widoczny, bo to bieżąca praca operatora", () => {
+    /* Pudło założone wprost stoi przy biurku i czeka na pierwszą sztukę.
+       Niewidoczne kazałoby zgadywać, czy przycisk w ogóle zadziałał. */
     odpowiedz.kosze = [KOSZ({ pozycji: 0, sztuk: 0, pozycje: [] })];
-    expect(pokaz().container).toBeEmptyDOMElement();
+    pokaz();
+
+    expect(screen.getByText(/Koszyk zwrotów Z-7/)).toBeInTheDocument();
+    expect(screen.getByText("pusty")).toBeInTheDocument();
+    /* ZAMKNĄĆ GO NIE MA JAK: dokument bez linii nie jest dokumentem, więc
+       serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia, stoi
+       droga wyjścia. */
+    expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Porzuć pusty koszyk/ })).toBeInTheDocument();
+  });
+
+  it("przycisk zakładania ZNIKA, gdy koszyk zwrotów już stoi", () => {
+    /* Jeden koszyk na operatora (decyzja z 3 września 2026) — drugie
+       naciśnięcie oddałoby ten sam kosz, czyli byłby to przycisk bez skutku. */
+    odpowiedz.kosze = [KOSZ()];
+    pokaz();
+    expect(screen.queryByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeNull();
   });
 
   it("pokazuje kod, licznik i symbole, gdy coś w nim leży", () => {
@@ -78,17 +104,20 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByText(/SEK-01, LOP-02/)).toBeInTheDocument();
   });
 
-  it("NIE MA przycisku dodawania — dokłada ocena „na stan\"", () => {
-    /* Punkt 5 dekalogu i sedno tej zmiany: naciśnięcie, które operator i tak
-       wykonuje przy towarze, JEST dołożeniem do MM. Osobny przycisk kazałby
-       powiedzieć dwa razy to samo.
+  it("dokładanie towaru stoi TAKŻE przy pudle, nie tylko przy zwrocie", () => {
+    /* ODWRÓCENIE GRANICY z 0.365.0 („tylko z poziomu obsługi zwrotów"),
+       zgłoszone przez właściciela w 0.378.0: „dodawanie produktów do nich jako
+       oddzielna opcja".
 
-       0.365.0 tego nie rusza. Dokładanie towaru spoza zgłoszenia ma własne
-       miejsce — przy OTWARTYM ZWROCIE, gdzie stoi operator z kartonem — a nie
-       w tym pasku, który mówi, co już w pudle leży. */
+       Tamto miejsce ZOSTAJE i to nie jest dublowanie wejścia. Przy otwartym
+       zwrocie operator stoi nad kartonem konkretnej paczki — ekran idzie za
+       czynnością fizyczną. Tutaj chodzi o drugą czynność: zbieranie towaru do
+       pudła, które stoi przy biurku niezależnie od tego, co jest na ekranie.
+
+       Ocena „na stan" dalej dokłada sama i nikt jej nie zastępuje przyciskiem. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.queryByRole("button", { name: /dodaj|dołóż/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /Dołóż towar do koszyka/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Zamknij koszyk/ })).toBeInTheDocument();
   });
 

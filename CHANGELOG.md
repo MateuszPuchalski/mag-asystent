@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.378.0 — 17 września 2026
+
+**Koszyk zwrotów zakłada się WPROST, a towar dokłada bez otwierania zwrotu.**
+Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+produktów do nich jako oddzielna opcja".
+
+Do tego wydania pudło powstawało wyłącznie jako SKUTEK UBOCZNY pierwszego
+dołożenia — oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent, który
+siada do zwrotów i stawia przy biurku pusty karton, ZANIM otworzy pierwszą
+paczkę, nie miał czym go zgłosić.
+
+**To odwraca granicę z 0.365.0** („tylko z poziomu obsługi zwrotów") i tyle jest
+w tej zmianie. Tamto miejsce ZOSTAJE i nie jest to dublowanie wejścia: przy
+otwartym zwrocie operator stoi nad kartonem konkretnej paczki, a ekran idzie za
+czynnością fizyczną. W pasku chodzi o drugą czynność — zbieranie towaru do
+pudła, które stoi przy biurku niezależnie od tego, co jest na ekranie. Ocena
+„na stan" dalej dokłada sama i nikt jej nie zastępuje przyciskiem.
+
+**Zasada „jeden koszyk na operatora" zostaje** (decyzja z 3 września 2026).
+Drugie naciśnięcie oddaje TEN SAM kosz, a przycisk znika, gdy pudło już stoi —
+przycisk bez skutku jest gorszy od jego braku.
+
+**Pusty koszyk jest widoczny i to nie łamie punktu 2 dekalogu, tylko go
+stosuje.** Reguła mówi: pokazuj to, co potrzebne TERAZ. Pudło założone wprost
+JEST bieżącą pracą — stoi przy biurku i czeka na pierwszą sztukę. Niewidoczne
+kazałoby zgadywać, czy przycisk zadziałał. Bez pudła widać jeden przycisk
+i zdanie o tym, czym ono jest; żadnych zerowych liczników.
+
+**Porzucanie jest warunkiem zakładania, nie ozdobą.** Pustego kosza nie da się
+zamknąć, bo dokument bez linii nie jest dokumentem — więc bez drugiej drogi
+pomyłkowe naciśnięcie stałoby w pasku na zawsze i mówiło o pracy, której nie ma.
+Porzucić da się WYŁĄCZNIE pudło puste i bez zadania MM.
+
+Licznik tras POST zwrotów 33 → 35. Do Subiekta nie idzie z nich ani jeden zapis
+więcej: koszyk staje się dokumentem dopiero przy zamknięciu.
+
 ## 0.377.0 — 16 września 2026
 
 **Pięć dziur z przeglądu trzech poprzednich wydań.** Przegląd własnego diffu,

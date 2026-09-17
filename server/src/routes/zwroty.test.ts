@@ -329,14 +329,24 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
      znacznik „outlet" byłby ślepym zaułkiem, za który 0.209.0 zdjęło
      „przecenę" — a lista czekających bez sposobu na jej domknięcie rosłaby
      w nieskończoność. */
-  assert.equal(posty.length, 33,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu trzech`);
+  /* Trzydziesta czwarta i piąta (0.378.0): założenie koszyka WPROST i porzucenie
+     pustego. Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych
+     i dodawania produktów do nich jako oddzielna opcja". Do tego wydania koszyk
+     powstawał wyłącznie jako skutek uboczny pierwszego dołożenia.
+
+     Licznik rośnie o dwa, a do Subiekta nie idzie ani jeden zapis więcej:
+     koszyk staje się dokumentem dopiero przy zamknięciu, a porzucenie dotyczy
+     wyłącznie pustego. Druga trasa jest warunkiem pierwszej — bez niej NOWY
+     KOSZYK byłby drogą w jedną stronę, bo pustego kosza nie da się zamknąć. */
+  assert.equal(posty.length, 35,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu pięciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
-    "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono"]) {
+    "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
+    "kosz/nowy", "kosz/porzuc"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

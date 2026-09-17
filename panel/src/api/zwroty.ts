@@ -233,6 +233,34 @@ export function useOcena() {
   });
 }
 
+/* ── Koszyk zakładany WPROST (0.378.0) ──────────────────────────────────────
+   Zgłoszenie właściciela: „potrzebuję tworzenia koszy zwrotowych i dodawania
+   produktów do nich jako oddzielna opcja". Do tego wydania koszyk powstawał
+   wyłącznie jako skutek uboczny pierwszego dołożenia.
+
+   Obie mutacje odświeżają WYŁĄCZNIE koszyk: zwrotów nie ruszają, bo pudło
+   zakładane wprost nie ma za sobą żadnego zwrotu.                            */
+
+export function useNowyKoszyk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rodzaj?: "zwroty" | "odpad" } = {}) =>
+      api<{ kosz: KoszZwrotow }>("/api/obsluga/zwroty/kosz/nowy",
+        { method: "POST", body: JSON.stringify({ rodzaj: v.rodzaj ?? "zwroty" }) }),
+    onSettled: () => { qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }); },
+  });
+}
+
+export function usePorzucKoszyk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (koszId: number) =>
+      api<{ koszId: number; kod: string }>("/api/obsluga/zwroty/kosz/porzuc",
+        { method: "POST", body: JSON.stringify({ koszId }) }),
+    onSettled: () => { qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }); },
+  });
+}
+
 /* ── Regał outletowy obsługiwany ręką (0.375.0) ─────────────────────────────
    Decyzja właściciela: „na razie będziemy obsługiwać outlet ręcznie". Panel
    nie wystawia tu żadnego dokumentu — mówi, co czeka na przeniesienie,
