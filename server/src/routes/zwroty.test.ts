@@ -346,7 +346,7 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
-    "kosz/nowy", "kosz/porzuc"]) {
+    "kosz/nowy", "kosz/usun"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

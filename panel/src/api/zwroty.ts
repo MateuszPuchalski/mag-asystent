@@ -253,13 +253,24 @@ export function useNowyKoszyk() {
   });
 }
 
-export function usePorzucKoszyk() {
+/**
+ * Usuwa CAŁY koszyk — także napełniony (0.380.0).
+ *
+ * Odświeża TAKŻE zwroty: usunięcie pudła cofa oceny wszystkich wierszy, które
+ * przyszły ze zwrotów, więc karty wracają do kubełka DO OCENY.
+ */
+export function useUsunKoszyk() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (koszId: number) =>
-      api<{ koszId: number; kod: string }>("/api/obsluga/zwroty/kosz/porzuc",
+      api<{ koszId: number; kod: string; pozycji: number; zwrotow: number }>(
+        "/api/obsluga/zwroty/kosz/usun",
         { method: "POST", body: JSON.stringify({ koszId }) }),
-    onSettled: () => { qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz }); },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+    },
   });
 }
 

@@ -34,11 +34,15 @@ vi.mock("../api/zwroty", async (orig) => ({
   useZamknijKosz: () => ({ mutate: zamknij, isPending: false, error: null }),
   useMmMimoKorekt: () => ({ mutate: mimo, isPending: false, error: null }),
   useZdejmijTowar: () => ({ mutate: zdejmijTowar, isPending: false, error: null }),
+  useNowyKoszyk: () => ({ mutate: nowyKoszyk, isPending: false, error: null }),
+  useUsunKoszyk: () => ({ mutate: usunKoszyk, isPending: false, error: null }),
 }));
 
 const zamknij = vi.fn();
 const mimo = vi.fn();
 const zdejmijTowar = vi.fn();
+const nowyKoszyk = vi.fn();
+const usunKoszyk = vi.fn();
 
 const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
   rodzaj: "zwroty",
@@ -58,6 +62,7 @@ describe("Koszyk zwrotów", () => {
   beforeEach(() => {
     odpowiedz.kosze = []; odpowiedz.czekajace = [];
     zamknij.mockClear(); mimo.mockClear(); zdejmijTowar.mockClear();
+    nowyKoszyk.mockClear(); usunKoszyk.mockClear();
   });
 
   it("bez koszyka pasek proponuje ZAŁOŻENIE pudła i nic poza tym", () => {
@@ -83,9 +88,10 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByText("pusty")).toBeInTheDocument();
     /* ZAMKNĄĆ GO NIE MA JAK: dokument bez linii nie jest dokumentem, więc
        serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia, stoi
-       droga wyjścia. */
+       droga wyjścia — i od 0.380.0 schodzi nią także pudło NAPEŁNIONE.
+       Pusty nie pyta o nic: nie niesie niczyjej pracy. */
     expect(screen.queryByRole("button", { name: /Zamknij koszyk/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Porzuć pusty koszyk/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Usuń pusty koszyk/ })).toBeInTheDocument();
   });
 
   it("przycisk zakładania stoi TAKŻE przy otwartym pudle", () => {
@@ -268,5 +274,39 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByText(/komplet korekt/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^Wystaw MM$/ }));
     expect(mimo).toHaveBeenCalledWith(8);
+  });
+
+  it("usunięcie NAPEŁNIONEGO pudła pyta i mówi, co zniknie", async () => {
+    /* Zgłoszenie właściciela (0.380.0): „zrób, żeby można było usunąć cały
+       koszyk zwrotowy". Pytamy tylko przy zawartości — pudło puste nie niesie
+       niczyjej pracy, więc pytanie byłoby bez treści.
+
+       Zdanie mówi SKUTEK, nie „operacja nieodwracalna": oceny wracają do
+       kubełka DO OCENY, a towar zostaje tam, gdzie leży. */
+    odpowiedz.kosze = [KOSZ()];
+    pokaz();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Usuń koszyk$/ }));
+    expect(screen.getByText(/Oceny wrócą do kubełka DO OCENY/)).toBeInTheDocument();
+    expect(screen.getByText(/2 pozycjami/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Tak, usuń Z-7/ }));
+    expect(usunKoszyk).toHaveBeenCalledWith(3, expect.anything());
+  });
+
+  it("zaległy koszyk też da się usunąć w całości", async () => {
+    /* To one zajmowały właścicielowi pół ekranu, a zdejmowanie ich wiersz po
+       wierszu było jedyną drogą — i dlatego nikt tego nie robił. */
+    odpowiedz.czekajace = [{
+      id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
+      brakuje: [], blad: "Brak towaru w magazynie",
+      pozycje: [{ pozycjaId: 77, symbol: "S10111", nazwa: "Usługa", ilosc: 5,
+        zeZwrotu: false }],
+    }];
+    pokaz();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Usuń koszyk$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Tak, usuń Z-8/ }));
+    expect(usunKoszyk).toHaveBeenCalledWith(8, expect.anything());
   });
 });
