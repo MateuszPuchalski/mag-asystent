@@ -5,6 +5,7 @@ import { listaZwrotow } from "./zwroty.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { subiekt } from "../context.js";
 import { parseLocs } from "../locs.js";
+import { rozjazdyZapasu } from "./wms-subiekt.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
 
 /* ── Nocna rekoncyliacja (plan §9) ──────────────────────────────────────────
@@ -21,6 +22,7 @@ import { wierszCsv, zbudujCsv } from "./csv.js";
 
 export interface Rozjazd {
   rodzaj: "lokalizacja" | "zadanie_w_bledzie" | "utknelo_w_buforze" | "mm_czeka"
+    | "zapas_vs_subiekt"
     | "kosz_czeka_na_korekte" | "kosz_bez_powrotu" | "zwrot_bez_przelewu"
     | "zwrot_po_terminie" | "zwrot_rozliczony_bez_korekty";
   klucz: string;
@@ -358,6 +360,30 @@ function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
     }));
 }
 
+/* 10. Suma zapasu z miejsc WMS kontra stan Subiekta (0.381.0).
+
+   Niezmiennik N2 z `docs/wms-projekt.md` §4 i jedyny, który pilnuje granicy
+   między dwiema prawdami o stanie. Do scalenia WMS-a nikt go nie mierzył,
+   bo obie liczby żyły osobno.
+
+   ZAPAS W MIEJSCU NIEZNANYM NIE JEST ROZJAZDEM i dlatego go tu nie ma —
+   `rozjazdyZapasu` liczy sumę po WSZYSTKICH miejscach, więc towar czekający
+   na pierwszy skan półki wchodzi do sumy tak samo jak ten z półki. Postęp
+   wdrożenia mierzy osobno `postepZasiewu`. */
+function zapasKontraSubiekt(): Rozjazd[] {
+  return rozjazdyZapasu().map((r) => ({
+    rodzaj: "zapas_vs_subiekt" as const,
+    klucz: r.symbol ?? String(r.twId),
+    opis:
+      r.powod === "ulamek"
+        ? `Subiekt ma ${r.subiekt} szt (ułamek), a zapas trzyma liczby całkowite — ` +
+          "kartoteka wymaga decyzji o jednostce"
+        : `Subiekt ${r.subiekt} szt, miejsca ${r.wms} szt — ` +
+          (r.roznica > 0 ? `brakuje ${r.roznica}` : `nadmiar ${-r.roznica}`),
+    odKiedy: null,
+  }));
+}
+
 export function reconcile(): Rekoncyliacja {
   const loc = lokalizacje();
   const bledy = zadaniaWBledzie();
@@ -368,17 +394,18 @@ export function reconcile(): Rekoncyliacja {
   const przelewy = zwrotyBezPrzelewu();
   const terminy = zwrotyPoTerminie();
   const rozliczone = zwrotyRozliczoneBezKorekty();
+  const zapas = zapasKontraSubiekt();
   return {
     at: new Date().toISOString(),
     sprawdzono: {
       kartotek: loc.sprawdzono,
       zadan: bledy.length + bufor.length + mm.length + kosze.length + powroty.length
-        + przelewy.length + terminy.length + rozliczone.length,
+        + przelewy.length + terminy.length + rozliczone.length + zapas.length,
     },
     /* Terminy PIERWSZE: mają skutek prawny, a raport czyta się od góry. */
     /* Terminy PIERWSZE (skutek prawny), zaraz za nimi pieniądze klienta. */
-    rozjazdy: [...terminy, ...przelewy, ...rozliczone, ...loc.rozjazdy, ...bledy,
-      ...bufor, ...mm, ...kosze, ...powroty],
+    rozjazdy: [...terminy, ...przelewy, ...rozliczone, ...zapas, ...loc.rozjazdy,
+      ...bledy, ...bufor, ...mm, ...kosze, ...powroty],
   };
 }
 

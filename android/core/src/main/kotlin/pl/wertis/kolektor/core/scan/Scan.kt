@@ -21,7 +21,7 @@ enum class ScanKind {
     TEXT,
 }
 
-data class Scan(val code: String, val kind: ScanKind)
+data class Scan(val code: String, val kind: ScanKind, val rawCode: String = code)
 
 /** true = skan obsłużony; false = przekaż do następnego handlera/fallbacku. */
 typealias ScanHandler = (Scan) -> Boolean
@@ -86,9 +86,9 @@ fun classify(raw: String, cfg: ScanConfig = ScanRules.current): Scan {
     val trimmed = raw.trim()
     val up = trimmed.uppercase()
     if (cfg.locPrefix.isNotEmpty() && up.startsWith(cfg.locPrefix.uppercase())) {
-        return Scan(up.substring(cfg.locPrefix.length), ScanKind.LOC)
+        return Scan(up.substring(cfg.locPrefix.length), ScanKind.LOC, trimmed)
     }
-    if (cfg.isLoc(up)) return Scan(up, ScanKind.LOC)
+    if (cfg.isLoc(up)) return Scan(up, ScanKind.LOC, trimmed)
     if (EAN_RE.matches(trimmed)) return Scan(trimmed, ScanKind.EAN)
     return Scan(trimmed, ScanKind.TEXT)
 }

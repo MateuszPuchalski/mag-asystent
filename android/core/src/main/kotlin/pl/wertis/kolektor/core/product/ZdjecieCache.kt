@@ -26,6 +26,8 @@ data class WpisZdjecia(
     val uzyto: Long = 0,
     /** Serwer odpowiedział 404: ta kartoteka zdjęcia NIE MA. */
     val brak: Boolean = false,
+    /** Wiąże ETag z plikiem także po przerwaniu zapisu indeksu. */
+    val sha256: String = "",
 )
 
 /** Co zrobić przy wejściu na kartę. */
@@ -49,7 +51,7 @@ const val SWIEZOSC_MS: Long = 6 * 60 * 60 * 1000
 /**
  * Jak długo pamiętamy, że zdjęcia nie ma.
  *
- * Krócej niż świeżość pliku i to jest celowe: zdjęcie DODANE dziś w Subiekcie
+ * Dłużej niż świeżość pliku: zdjęcie DODANE dziś w Subiekcie
  * ma się pojawić najdalej jutro, bez przeinstalowania i bez czyszczenia danych.
  */
 const val NEGATYW_MS: Long = 24 * 60 * 60 * 1000
@@ -64,10 +66,10 @@ const val NEGATYW_MS: Long = 24 * 60 * 60 * 1000
 fun decyzja(wpis: WpisZdjecia?, maPlik: Boolean, teraz: Long): DecyzjaZdjecia {
     if (wpis == null) return DecyzjaZdjecia.Pobierz
     if (wpis.brak) {
-        return if (teraz - wpis.sprawdzono < NEGATYW_MS) DecyzjaZdjecia.NieMa else DecyzjaZdjecia.Pobierz
+        return if (teraz >= wpis.sprawdzono && teraz - wpis.sprawdzono < NEGATYW_MS) DecyzjaZdjecia.NieMa else DecyzjaZdjecia.Pobierz
     }
     if (!maPlik) return DecyzjaZdjecia.Pobierz
-    if (teraz - wpis.sprawdzono < SWIEZOSC_MS) return DecyzjaZdjecia.UzyjLokalnego
+    if (teraz >= wpis.sprawdzono && teraz - wpis.sprawdzono < SWIEZOSC_MS) return DecyzjaZdjecia.UzyjLokalnego
     return if (wpis.etag.isNotEmpty()) DecyzjaZdjecia.Rewaliduj(wpis.etag) else DecyzjaZdjecia.Pobierz
 }
 
@@ -79,12 +81,12 @@ fun decyzja(wpis: WpisZdjecia?, maPlik: Boolean, teraz: Long): DecyzjaZdjecia {
  * SZTUK; kasowanie ich przy nadmiarze bajtów wyrzucałoby wiedzę „ta kartoteka
  * zdjęcia nie ma", czyli to, co oszczędza najwięcej żądań.
  */
-fun doUsuniecia(
-    wpisy: Map<Long, WpisZdjecia>,
+fun <K> doUsuniecia(
+    wpisy: Map<K, WpisZdjecia>,
     limitBajtow: Int,
     limitWpisow: Int,
-): List<Long> {
-    val doUsuniecia = mutableListOf<Long>()
+): List<K> {
+    val doUsuniecia = mutableListOf<K>()
     val zPlikiem = wpisy.filterValues { !it.brak }
     var bajtow = zPlikiem.values.sumOf { it.bajtow.toLong() }
 
@@ -92,7 +94,7 @@ fun doUsuniecia(
        kolejne pobranie uruchamia sprzątanie, a cache dyszy przy progu zamiast
        pracować. Ta sama reguła co po stronie serwera. */
     val celBajtow = (limitBajtow * 0.8).toLong()
-    val kolejka = zPlikiem.entries.sortedBy { it.value.uzyto }
+    val kolejka = if (bajtow > limitBajtow) zPlikiem.entries.sortedBy { it.value.uzyto } else emptyList()
     for ((twId, wpis) in kolejka) {
         if (bajtow <= celBajtow) break
         doUsuniecia += twId

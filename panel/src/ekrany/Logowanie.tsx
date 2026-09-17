@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Warehouse } from "lucide-react";
 import { api, zapiszToken } from "../api/klient";
 import { Blad, Przycisk } from "../ui";
 
@@ -31,12 +30,10 @@ export function Logowanie({ zalogowano }: { zalogowano: () => void }) {
 
   return <main className="grid min-h-screen place-items-center bg-wertis-ink p-5">
     <form onSubmit={handleSubmit(wyslij)} className="card w-full max-w-sm p-7">
-      <div className="mb-7 flex items-center gap-3">
-        <div className="rounded-xl bg-wertis-amber p-3"><Warehouse /></div>
-        <div>
-          <h1 className="text-tytul font-bold">WERTIS</h1>
-          <p className="text-sm text-slate-500">Obsługa klienta</p>
-        </div>
+      <div className="mb-7">
+        <img src="/biuro/wertis-logo.png" width={1600} height={672} alt="WERTIS — sklep z częściami" className="mx-auto mb-5 h-auto w-56 max-w-full" />
+        <h1 className="text-tytul font-bold">Obsługa klienta</h1>
+        <p className="mt-2 text-sm text-slate-500">Zaloguj się kontem WERTIS, aby rozpocząć pracę.</p>
       </div>
       <label className="mb-4 block text-sm font-semibold">Login
         <input className="field mt-1" autoFocus {...register("login")} />

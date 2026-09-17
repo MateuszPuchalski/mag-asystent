@@ -74,6 +74,10 @@ zrobi WERTIS** — a wtedy roczna licencja opłaca funkcje leżące odłogiem.
 > jeszcze uruchomiona (§8), więc wyłączanie czegokolwiek przed tym testem
 > byłoby przedwczesne.
 
+> **Osobne pytanie, osobny dokument.** Ten dokument porównuje WERTIS
+> z Asystentem Magazyniera. Pytanie „co trzeba dołożyć, żeby WERTIS był pełnym
+> WMS-em i zastąpił Sellasist" rozstrzyga [`wms-strategia.md`](wms-strategia.md).
+
 ---
 
 ## 2. Czym jest każdy z systemów

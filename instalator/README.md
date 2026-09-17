@@ -96,7 +96,7 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 
 1. **Zależności** — Node.js LTS i Git przez `winget` (bez wingeta: instalator
    MSI z nodejs.org). Sprawdza też **wersję Node**: aplikacja wymaga co
-   najmniej 22.5. Git jest w komplecie celowo. Bieżąca obsługa
+   najmniej 24.15. Git jest w komplecie celowo. Bieżąca obsługa
    z `DEPLOY.md` §7 stoi na `git pull` i Git Bashu.
 
    > **Dlaczego wersja, a nie sama obecność.** Serwer używa wbudowanego

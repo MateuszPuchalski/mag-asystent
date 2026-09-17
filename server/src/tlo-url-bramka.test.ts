@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 /* ── Bramka TLO_URL zostaje ──────────────────────────────────────────────────
@@ -17,7 +16,7 @@ import { execFileSync } from "node:child_process";
    już wczytany z inną wartością (patrz `tlo-url.test.ts`).                    */
 
 const katalog = fs.mkdtempSync(path.join(os.tmpdir(), "wertis-tlobramka-"));
-const config = fileURLToPath(new URL("./config.ts", import.meta.url));
+const config = new URL("./config.ts", import.meta.url).href;
 
 /** Startuje `config.ts` w osobnym procesie; zwraca `null`, gdy przeszedł. */
 function odmowa(tloUrl: string): string | null {

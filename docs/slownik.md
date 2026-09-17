@@ -79,6 +79,14 @@ lista wariantów rosłaby o każdy przypadek gramatyczny z osobna.
 | **odpowiedź na notatkę** | wraca do biura sygnałem w pasku stanu, który prowadzi do karty; „przeczytane" jest stanem w bazie, nie w przeglądarce | |
 | **zakres wyjątku** | czy kategoria dotyczy pozycji dokumentu, czy całej dostawy; nie mylić z jego stanem otwarty–rozwiązany | |
 | **aktualizacja kolektora** | wymiana APK na urządzeniu; „aktualizacja" bez określenia myli się z aktualizacją serwera | |
+| **miejsce** | adres o kodzie `A01-02-03` jako byt w bazie, z własną strefą i stanem; „regał" to przedmiot, „miejsce" to wiersz | |
+| **zapas** | ile sztuk kartoteki leży pod jednym adresem; nie mylić ze stanem magazynowym z Subiekta | |
+| **ruch zapasu** | jedno zdarzenie zmieniające zapas; dziennik tylko dopisywany, z którego wynika saldo | |
+| **rezerwacja miękka** | obietnica sztuki pod zlecenie, bez wskazania półki | |
+| **rezerwacja twarda** | rezerwacja wskazująca miejsce, założona przy składaniu zbiórki | |
+| **zlecenie wydania** | zamówienie klienta widziane przez magazyn: towar, ilość, termin; bez ceny i płatności | |
+| **zbiórka zbiorcza** | jedno zadanie pobrania obsługujące kilka zleceń naraz, po jednej przegrodzie wózka | |
+| **inwentura ciągła** | liczenie rozłożone na cały rok, wyzwalane pracą; nie mylić z inwentaryzacją roczną | |
 | **podpis wydania** | klucz, którym podpisany jest APK; bez tego samego klucza Android odrzuca aktualizację | |
 
 Nazwy własne zostają bez zmian: Subiekt GT, Sfera, InsERT, NSSM, DataWedge,

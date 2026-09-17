@@ -124,6 +124,15 @@ test("potwierdzony brak zdjęcia → 404, nie błąd serwera", async () => {
   assert.equal(r.statusCode, 404);
 });
 
+test("awaria źródła bez obrazu → 503, nigdy potwierdzony brak zdjęcia", async () => {
+  const teraz = new Date().toISOString();
+  db().prepare(`INSERT INTO zdjecie_cache(tw_id,plik,mime,bajtow,etag,pobrano_at,uzyto_at,blad)
+    VALUES (1,NULL,NULL,0,NULL,?,?,?)`).run(teraz, teraz, "Niedostępne źródło");
+  const r = await app.inject(zSesja());
+  assert.equal(r.statusCode, 503);
+  assert.equal(r.headers["cache-control"], "no-store");
+});
+
 test("wpis wskazuje plik, którego nie ma → 404 zamiast urwanego strumienia", async () => {
   wCache(1);
   fs.unlinkSync(path.join(katalogZdjec(), "t1.jpg"));
