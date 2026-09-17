@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.381.1 — 17 września 2026
+
+**Scalenie zgubiło skrypty WMS z korzenia i `postbuild` serwera.** Bramka
+`WMS (ubuntu-latest)` padła na pierwszym kroku: „Missing script: test:wms".
+Przyczyna jest moja i warto ją zapisać: konflikt w obu `package.json`
+rozstrzygnąłem przez `--ours`, czyli wziąłem plik z main W CAŁOŚCI — razem
+z brakiem wpisów, które dołożyła gałąź.
+
+Plik konfiguracyjny nie jest tekstem, tylko zbiorem wpisów. Rozstrzyganie go
+stroną zamiast wpisem kasuje cudzą pracę po cichu, a testy tego nie widzą,
+bo skryptu po prostu nie ma.
+
+Wróciło pięć wpisów w korzeniu: `test:wms`, `test:wms:e2e`,
+`test:wms:capacity`, `test:wms:cart-capacity` i `wms:backup`. Do listy
+`test:wms` doszedł `wms-subiekt.test.ts` — granica do Subiekta należy do
+zestawu WMS i bramka ma ją mierzyć razem z resztą.
+
+**Gorsza zguba to `postbuild` w `server/package.json`.** Ten wpis woła
+`tools/copy-wms.mjs`, który kopiuje do `dist/web` dziewięć plików ekranów WMS
+i arkusze stylów. Bez niego `npm run build` kończył się powodzeniem i wydawał
+build BEZ ekranów WMS — awaria widoczna dopiero na wdrożeniu.
+
+Sprawdzone lokalnie, nie na oko: `npm run test:wms` (169 testów),
+`npm run build` z podglądem zawartości `dist/web` oraz
+`npm run test:wms:cart-capacity` (2000 przesyłek, `integrity: true`).
+Kroku przeglądarkowego nie da się tu uruchomić — wersja Chromium
+w środowisku nie pasuje do Playwrighta, więc sprawdza go CI.
+
+Wersja Node zostaje na `>=22.5` z main, choć gałąź podnosiła ją do `>=24.15.0`.
+Podniesienie wymagania maszyny wdrożeniowej jest decyzją właściciela, a nie
+skutkiem ubocznym scalania — cały zestaw WMS przechodzi na 22.22.
+
 ## 0.381.0 — 17 września 2026
 
 **WMS z gałęzi `codex/robust-wms` wchodzi do gałęzi, a do niego dochodzi
