@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.379.0 — 17 września 2026
+
+**Kilka pudeł naraz, a zaległy koszyk wreszcie da się odetkać.** Dwa zgłoszenia
+właściciela z jednego zrzutu ekranu, na którym pasek koszyków zajmował pół
+ekranu, a przycisku nowego pudła nie było widać wcale.
+
+**Otwartych koszyków może być kilka.** To ODWRACA decyzję z 3 września
+(„otwarty koszyk jest JEDEN na operatora"). Tamta opisywała jedno pudło przy
+jednym biurku; praca pokazała kilka kartonów naraz, a zamykanie pierwszego po
+to, żeby zacząć drugi, wystawia dokument na pudło, które jeszcze nie odjechało.
+Przycisk NOWY KOSZYK stoi więc zawsze i za każdym naciśnięciem zakłada kolejne.
+
+**Cena tej swobody: przy kilku pudłach ocena PYTA, do którego.** Wybór
+właściciela, nie domysł kodu. Zgadywanie „do najnowszego" byłoby tanie
+w kodzie i drogie na hali — towar trafiałby do cudzego kartonu bez jednego
+słowa na ekranie. Pytamy JEDNYM kliknięciem: przycisk oceny rozwija się na tyle
+przycisków, ile jest pudeł, z kodem na każdym. Osobne okienko po naciśnięciu
+byłoby pytaniem PO czynności, a tego zabrania dekalog. Przy jednym pudle nikt
+o nic nie pyta, a pole skanu przy konkretnym koszyku celuje wprost w niego.
+
+**Z koszyka bez dokumentu schodzi teraz KAŻDY wiersz, także ten z oceny.**
+Reguła „wiersz ze zwrotu schodzi cofnięciem oceny" była słuszna w zamyśle —
+jedna droga na jeden skutek — a zostawiła koszyki bez wyjścia. Z-8 na produkcji
+odbił się od Sfery na kartotece usługowej przyniesionej OCENĄ: nie miał ani
+jednego wiersza ze skanu, więc nie miał ani jednego krzyżyka, i żeby go
+odetkać, trzeba było odnaleźć zwrot, z którego przyszedł feralny wiersz.
+
+**Ocena schodzi RAZEM z wierszem** i to jest warunek spójności, nie dodatek. To
+ona wsadziła towar do pudła, więc wyjęcie bez jej zdjęcia zostawiłoby kartę
+zwrotu mówiącą o regale, którego dokument tej sztuki nie niesie. Zwrot wraca do
+kubełka DO OCENY, a jego oś dostaje zdanie o tym, co się stało. Pasek pokazuje
+odtąd CAŁĄ zawartość pudła, a wiersz ze zwrotu jest oznaczony — jego krzyżyk
+mówi w etykiecie, że cofnie ocenę.
+
+**[uwaga przy czytaniu]** Trzy testy pilnujące odwróconych reguł przepisano na
+nowe, razem z powodem. Strażnik ma pilnować tego, co obowiązuje dziś.
+
 ## 0.378.0 — 17 września 2026
 
 **Koszyk zwrotów zakłada się WPROST, a towar dokłada bez otwierania zwrotu.**

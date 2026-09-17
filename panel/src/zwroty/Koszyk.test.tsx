@@ -21,7 +21,9 @@ const { odpowiedz } = vi.hoisted(() => ({
       id: number; kod: string; rodzaj: "zwroty" | "odpad"; zamknietoAt: string;
       brakuje: Array<{ zwrotId: number; numer: string }>;
       blad?: string | null;
-      dolozone?: Array<{ pozycjaId: number; symbol: string; nazwa: string; ilosc: number }>;
+      pozycje?: Array<{
+        pozycjaId: number; symbol: string; nazwa: string; ilosc: number; zeZwrotu: boolean;
+      }>;
     }>,
   },
 }));
@@ -86,12 +88,18 @@ describe("Koszyk zwrotów", () => {
     expect(screen.getByRole("button", { name: /Porzuć pusty koszyk/ })).toBeInTheDocument();
   });
 
-  it("przycisk zakładania ZNIKA, gdy koszyk zwrotów już stoi", () => {
-    /* Jeden koszyk na operatora (decyzja z 3 września 2026) — drugie
-       naciśnięcie oddałoby ten sam kosz, czyli byłby to przycisk bez skutku. */
+  it("przycisk zakładania stoi TAKŻE przy otwartym pudle", () => {
+    /* ODWRÓCENIE decyzji z 3 września („jeden koszyk na operatora"), zgłoszone
+       przez właściciela w 0.379.0: przy biurku stoi czasem kilka kartonów,
+       a zamykanie pierwszego po to, żeby zacząć drugi, wystawia dokument na
+       pudło, które jeszcze nie odjechało.
+
+       Zdanie obok przycisku zmienia się razem ze stanem: mówi, że przy kilku
+       otwartych pudłach ocena zapyta, do którego. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.queryByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeInTheDocument();
+    expect(screen.getByText(/ocena pyta, do którego/)).toBeInTheDocument();
   });
 
   it("pokazuje kod, licznik i symbole, gdy coś w nim leży", () => {
@@ -223,7 +231,13 @@ describe("Koszyk zwrotów", () => {
     odpowiedz.czekajace = [{
       id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
       brakuje: [], blad: "Brak towaru w magazynie",
-      dolozone: [{ pozycjaId: 77, symbol: "KOSZT-PRZESYLKI", nazwa: "Koszt przesyłki", ilosc: 1 }],
+      pozycje: [
+        { pozycjaId: 77, symbol: "KOSZT-PRZESYLKI", nazwa: "Koszt przesyłki", ilosc: 1,
+          zeZwrotu: false },
+        /* Wiersz przyniesiony OCENĄ (0.379.0). Do tego wydania nie miał tu
+           krzyżyka i to przez niego Z-8 nie dawał się odetkać z tego ekranu. */
+        { pozycjaId: 78, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, zeZwrotu: true },
+      ],
     }];
     pokaz();
     expect(screen.getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
@@ -234,6 +248,12 @@ describe("Koszyk zwrotów", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /Zdejmij KOSZT-PRZESYLKI z koszyka Z-8/ }));
     expect(zdejmijTowar).toHaveBeenCalledWith(77);
+
+    /* WIERSZ ZE ZWROTU TEŻ SCHODZI, a etykieta mówi, co to kosztuje: jego
+       zdjęcie cofa ocenę i odsyła zwrot do kubełka DO OCENY. */
+    await userEvent.click(screen.getByRole(
+      "button", { name: /Zdejmij SEK-01 z koszyka Z-8 i cofnij ocenę/ }));
+    expect(zdejmijTowar).toHaveBeenCalledWith(78);
   });
 
   it("kosz z kompletem korekt wystawia MM JEDNYM kliknięciem", async () => {
@@ -242,7 +262,7 @@ describe("Koszyk zwrotów", () => {
        o koszcie, którego w tym stanie nie ma: stan jest na miejscu. */
     odpowiedz.czekajace = [{
       id: 8, kod: "Z-8", rodzaj: "zwroty", zamknietoAt: "2026-09-15T09:00:00Z",
-      brakuje: [], blad: null, dolozone: [],
+      brakuje: [], blad: null, pozycje: [],
     }];
     pokaz();
     expect(screen.getByText(/komplet korekt/)).toBeInTheDocument();

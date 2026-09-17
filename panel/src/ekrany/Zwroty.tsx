@@ -853,8 +853,8 @@ export function Zwroty() {
               <Pozycje key={zwrot.id} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 akcje={akcje} onWszystkieNaStan={() => void wszystkieNaStan().catch(() => {})}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
-                onOcena={(pozycjaId, ocena) =>
-                  ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja })}
+                onOcena={(pozycjaId, ocena, koszId) =>
+                  ocena2.mutate({ pozycjaId, ocena, wersja: zwrot.wersja, koszId })}
                 onKwota={(pozycjeIds, dostawa) =>
                   kwota.mutate({ id: zwrot.id, pozycjeIds, dostawa, wersja: zwrot.wersja })}
                 onPotracenie={(pozycjaId, grosze, powod) =>
