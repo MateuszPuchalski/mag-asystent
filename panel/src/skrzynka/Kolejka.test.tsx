@@ -520,7 +520,10 @@ describe("Kolejka: klawiatura", () => {
     /* Ta sama lekcja co 0.281.0 na reklamacjach. Pasek NIE obiecuje sit
        „moje"/„niczyje": w skrzynce „Moje" jest kubełkiem pod cyfrą. */
     zKlawiszami(null, vi.fn());
-    expect(screen.getByText(/ruch|lista/)).toBeInTheDocument();
+    /* Skróty siedzą pod „?" od 0.402.0 — reguła została ta sama: pokazane
+       klawisze mają być TYMI, które naprawdę działają. */
+    await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
+    expect(screen.getByText(/ruch po liście/)).toBeInTheDocument();
     expect(screen.getByText(/kubełek/)).toBeInTheDocument();
     expect(screen.queryByText(/niczyje/)).toBeNull();
   });

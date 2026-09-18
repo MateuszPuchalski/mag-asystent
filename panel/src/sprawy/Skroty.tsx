@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 /* ── Skróty klawiszowe NA EKRANIE (0.281.0) ──────────────────────────────────
    Kolejka reklamacji i dyskusji chodzi z klawiatury od 0.245.0: strzałki albo
@@ -10,17 +10,31 @@ import React from "react";
    każ pamiętać tego, co może zostać na ekranie". Skrót, o którym nikt nie wie,
    nie skraca niczyjej pracy — jest kodem, nie funkcją.
 
-   CENA JEST JAWNA: jeden wiersz wysokości kolumny, około 22 px, zabrany
-   liście spraw. Bierzemy ją świadomie i raz. Rozwijana pomoc pod znakiem
-   zapytania kosztowałaby dwa kliknięcia przy każdym przypomnieniu, a schowane
-   przypomnienie to znowu pamiętanie.
+   CENA BYŁA JAWNA: jeden wiersz wysokości kolumny, około 22 px, zabrany
+   liście spraw. 0.281.0 wzięło ją świadomie i odrzuciło pomoc pod znakiem
+   zapytania zdaniem: „kosztowałaby dwa kliknięcia przy każdym przypomnieniu,
+   a schowane przypomnienie to znowu pamiętanie".
 
    TA CENA PODWOIŁA SIĘ PO CICHU (audyt, 15 września 2026). Pomiar na żywym
-   ekranie zwrotów: pasek zawija się na dwa rzędy i kosztuje 49 px, nie 22 —
-   odkąd doszły klawisze kubełka (0.284.0) i `Z` od pieniędzy. Decyzja z 0.281.0
-   kupiła jeden wiersz, więc do jednego wiersza wracamy: opisy schodzą do
-   rzeczownika („lista" zamiast „ruch po liście"), bo klawisz obok i tak mówi,
-   że chodzi o ruch. Skrótów ubywać nie miało prawa — ubywa znaków.        */
+   ekranie zwrotów: pasek zawijał się na dwa rzędy i kosztował 49 px, nie 22 —
+   odkąd doszły klawisze kubełka (0.284.0) i `Z` od pieniędzy. Wtedy skróciły
+   się opisy.
+
+   ── ZNAK ZAPYTANIA JEDNAK WYGRYWA (0.402.0) ─────────────────────────────────
+   Zgłoszenie właściciela ze zrzutem: „panel wygląda chaotycznie". Policzone na
+   ekranie reklamacji: SIEDEM pasm sterowania nad pierwszą sprawą, 268 px
+   w kolumnie szerokiej na 280. Ten pasek jest jednym z nich, a trzy sąsiednie
+   odpowiadają na to samo pytanie „co pokazać". Rachunek z 0.281.0 był robiony
+   przy dwóch pasmach i przy nich był słuszny; przy siedmiu przestał.
+
+   ZARZUT Z 0.281.0 ZOSTAJE ODPOWIEDZIANY, nie zignorowany: pomoc otwiera się
+   NA NAJECHANIE, nie na kliknięcie. Dwa kliknięcia, których tamta decyzja nie
+   chciała płacić, kosztują teraz zero — a panel obsługi chodzi na monitorach
+   biura z myszą pod ręką (§10.5, decyzja o zdjęciu widoku mobilnego). Klawisz
+   dalej stoi też w podpowiedzi każdej pigułki, więc rozpoznanie ma dwie drogi.
+
+   Nazwa komponentu zostaje, bo to dalej ten sam byt: „gdzie agent widzi, czym
+   chodzi się po tej kolejce".                                              */
 
 const Klawisz = ({ children }: { children: React.ReactNode }) =>
   <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-mono text-podpis text-slate-700">
@@ -53,14 +67,40 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
   /** Klawisze WŁASNE ekranu: `[klawisz, co robi]`, w kolejności użycia. */
   dodatkowe?: ReadonlyArray<readonly [string, string]>;
 }) {
-  return <p className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 px-2 py-1 text-podpis text-slate-600">
-    <span className="flex items-center gap-1">
-      <Klawisz>j</Klawisz><Klawisz>k</Klawisz> lista</span>
-    <span className="flex items-center gap-1">
-      <Klawisz>1</Klawisz>–<Klawisz>{zWszystkimi ? kubelkow + 1 : kubelkow}</Klawisz> kubełek</span>
-    {sita && zMoje && <span className="flex items-center gap-1"><Klawisz>m</Klawisz> moje</span>}
-    {sita && <span className="flex items-center gap-1"><Klawisz>n</Klawisz> niczyje</span>}
-    {dodatkowe.map(([klawisz, opis]) => <span key={klawisz} className="flex items-center gap-1">
-      <Klawisz>{klawisz}</Klawisz> {opis}</span>)}
-  </p>;
+  const [otwarte, setOtwarte] = useState(false);
+  const pozycje: Array<readonly [React.ReactNode, string]> = [
+    [<><Klawisz>j</Klawisz><Klawisz>k</Klawisz></>, "ruch po liście"],
+    [<><Klawisz>1</Klawisz>–<Klawisz>{zWszystkimi ? kubelkow + 1 : kubelkow}</Klawisz></>, "kubełek"],
+    ...(sita && zMoje ? [[<Klawisz>m</Klawisz>, "moje sprawy"] as const] : []),
+    ...(sita ? [[<Klawisz>n</Klawisz>, "niczyje sprawy"] as const] : []),
+    ...dodatkowe.map(([klawisz, opis]) => [<Klawisz>{klawisz}</Klawisz>, opis] as const),
+  ];
+
+  /* NAJECHANIE I FOKUS OTWIERAJĄ, kliknięcie NIE PRZEŁĄCZA — i to nie jest
+     drobiazg. Kliknięcie myszą idzie po najechaniu, więc przełącznik zamykałby
+     to, co najechanie przed chwilą otworzyło; pierwsza wersja tej poprawki
+     miała dokładnie tę usterkę i złapały ją testy czterech ekranów.
+
+     Trzy drogi wejścia dają ten sam skutek: mysz najeżdża, Tab ustawia fokus,
+     dotyk ustawia fokus stuknięciem. Zamknięcie to zejście kursora albo utrata
+     fokusu — pomoc nie ma w środku niczego do klikania. */
+  return <div className="relative shrink-0"
+    onMouseEnter={() => setOtwarte(true)} onMouseLeave={() => setOtwarte(false)}>
+    <button type="button" aria-label="Skróty klawiszowe tej kolejki"
+      aria-expanded={otwarte}
+      onFocus={() => setOtwarte(true)} onBlur={() => setOtwarte(false)}
+      className="rounded border border-slate-300 px-2 py-1 text-podpis font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+      ?</button>
+    {otwarte && <div
+      className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+      <p className="mb-1 text-podpis font-semibold text-slate-500">Skróty klawiszowe</p>
+      <ul className="flex flex-col gap-1">
+        {pozycje.map(([klawisz, opis], i) => <li key={i}
+          className="flex items-center gap-2 text-podpis text-slate-700">
+          <span className="flex w-16 shrink-0 items-center gap-0.5">{klawisz}</span>
+          <span className="min-w-0">{opis}</span>
+        </li>)}
+      </ul>
+    </div>}
+  </div>;
 }

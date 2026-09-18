@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.402.0 — 18 września 2026
+
+**Lewa kolumna przestaje krzyczeć.** Zgłoszenie właściciela ze zrzutem: „panel
+wygląda chaotycznie". Policzone na ekranie reklamacji: nad pierwszą sprawą
+stało SIEDEM pasm sterowania, około 268 px w kolumnie szerokiej na 280 —
+kubełki w dwóch rzędach, kolejność, sita, tagi, skróty, szukanie i pytanie
+kubełka. Cztery z nich odpowiadały na to samo pytanie „co pokazać", każde
+w innym kształcie.
+
+- **Wiersz narzędzi:** szukanie rośnie na całą wolną szerokość, a obok stoją
+  kolejność i pomoc. To jedyne pole, do którego się pisze.
+- **Kolejność to jeden przycisk z menu**, nie pasmo pigułek. Napis mówi
+  bieżącą oś, więc jedno spojrzenie zamiast czytania czterech napisów.
+  Menu niesie te same osie, w tej samej kolejności.
+- **Skróty klawiszowe schodzą pod „?"** — i to jest odwrócenie decyzji
+  z 0.281.0. Zarzut tamtej decyzji („dwa kliknięcia przy każdym
+  przypomnieniu") jest ODPOWIEDZIANY, nie zignorowany: pomoc otwiera się na
+  NAJECHANIE. Klawisz stoi też dalej w podpowiedzi każdej pigułki.
+- **Wiersz zawężeń:** sita „Moje" i „Niczyje" razem z tagami. Jedno pytanie —
+  co zawęzić — jeden wiersz.
+- **Ten sam układ na czterech ekranach obsługi.** Zwroty biorą mniej: ich
+  szukanie to skaner z własnym rzędem, więc dostaje tylko pomoc w rzędzie
+  kubełków.
+- **„Synchronizacja: działa" znika z cichego paska.** Zdanie prawdziwe zawsze
+  nie niesie nic, a zasada 10 projektu żąda widocznej AWARII, nie widocznego
+  spokoju. Zostaje to, co odstaje: stan inny niż normalny i liczba pominiętych
+  dyskusji.
+
+**Czego NIE zrobiłem, choć makieta to pokazywała:** pytanie kubełka („Uznać
+czy odrzucić?") zostaje własnym wierszem. Zdjąłem je przy pierwszym podejściu
+i przywróciłem — dekalog, punkt 5 mówi, że pytanie ZASTĘPUJE menu akcji, więc
+mówi, po co ten kubełek istnieje, a pigułka mówi tylko, jak się nazywa.
+Uczciwy rachunek to więc siedem pasm na pięć, nie na dwa.
+
+Wdrożenie: nic ręką.
+
+---
+
+
 ## 0.401.0 — 18 września 2026
 
 **Kolejność w kolejkach obsługi wybiera agent.** Zgłoszenie właściciela:

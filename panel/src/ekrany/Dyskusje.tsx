@@ -321,9 +321,17 @@ export function Dyskusje() {
           </div>}
         </>
       : <PasekTla prog={data?.prog} onPrzelaczProg={setBezProgu}
-          stanTekst={data?.stan
+          /* Cisza nie ma co mówić (0.402.0) — powód przy tym samym polu
+             w `ekrany/Reklamacje.tsx`. Schodzi WYŁĄCZNIE „synchronizacja:
+             działa": zdanie prawdziwe zawsze i przez to puste.
+
+             „Odświeżasz ją w reklamacjach" ZOSTAJE także w ciszy i to jest
+             rozróżnienie, nie niekonsekwencja. Tamto mówiło o stanie, ten
+             odpowiada na pytanie „czemu nie ma tu przycisku" — a ono pada
+             wtedy, gdy wszystko działa, bo wtedy właśnie ktoś go szuka. */
+          stanTekst={data?.stan && data.stan.status !== "current"
             ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status} · odświeżasz ją w reklamacjach`
-            : undefined} />}
+            : "odświeżasz ją w reklamacjach"} />}
 
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -349,26 +357,23 @@ export function Dyskusje() {
             ]} />
         </nav>
 
-        {/* Sito „Moje" — własny rząd, powód przy tym samym paśmie
-            w `ekrany/Reklamacje.tsx`. */}
-        <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
-            <PasekPorzadku porzadek={porzadek} dozwolone={["otwarto", "ruch"]}
-              onZmien={ustawPorzadek} />
-            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-              moich={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length}
-              niczyich={wKubelku.filter((d) => d.prowadziId === null).length} />
-            {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
-                samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
-            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
-          </div>
-
-        <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
-
-        <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
+        {/* Wiersz narzędzi i wiersz zawężeń — ten sam układ, co w reklamacjach
+            od 0.402.0; powód stoi tam, przy tym samym paśmie. */}
+        <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
-          <input id="szukaj-dyskusji" className="field !py-1 text-xs" value={fraza}
+          <input id="szukaj-dyskusji" className="field min-w-0 flex-1 !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Temat, zamówienie, login albo treść notatki" />
+            placeholder="Temat, zamówienie, login, notatka" />
+          <PasekPorzadku porzadek={porzadek} dozwolone={["otwarto", "ruch"]}
+            onZmien={ustawPorzadek} />
+          <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1">
+          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+            moich={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length}
+            niczyich={wKubelku.filter((d) => d.prowadziId === null).length} />
+          <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
         </div>
 
         {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.

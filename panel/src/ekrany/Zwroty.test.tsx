@@ -553,14 +553,17 @@ describe("Klawisze kubełka", () => {
     expect(scena.wolano).toEqual([]);
   });
 
-  it("pasek pokazuje klawisze OGLĄDANEGO kubełka", async () => {
+  it("pomoc pokazuje klawisze OGLĄDANEGO kubełka", async () => {
     pokaz("/obsluga/zwroty/1");
+    /* Skróty siedzą pod „?" od 0.402.0 — reguła została ta sama: pokazane
+       klawisze mają być TYMI, które naprawdę działają. */
+    await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
     expect(screen.getByText("przyjmij")).toBeInTheDocument();
     expect(screen.queryByText("zapisz kwotę")).toBeNull();
     /* SITA DOSZŁY W 0.315.0. Do 0.313.0 stała tu odwrotna asercja i była
        prawdziwa: zwrot nie nosił prowadzącego, więc pasek nie miał prawa
        obiecywać `n`. Decyzja właściciela z 13 września to odwróciła. */
-    expect(screen.getByText("niczyje")).toBeInTheDocument();
+    expect(screen.getByText(/niczyje/)).toBeInTheDocument();
   });
 
   it("`Enter` w DO KOREKTY stawia kursor w polu numeru, niczego nie zapisując", async () => {
@@ -647,7 +650,8 @@ describe("Klawisze kubełka", () => {
     scena.szczegol = pieniadze({ moznaZwrocic: true });
     try {
       pokaz("/obsluga/zwroty/6");
-      /* Pasek skrótów obiecuje klawisz dokładnie tam, gdzie on działa. */
+      /* Pomoc obiecuje klawisz dokładnie tam, gdzie on działa. */
+      await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
       expect(screen.getByText("oddaj pieniądze")).toBeInTheDocument();
       await userEvent.keyboard("z");
       await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["zwrocPieniadze"]));

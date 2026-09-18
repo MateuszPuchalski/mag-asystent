@@ -433,9 +433,23 @@ export function Reklamacje() {
             }} />}
         </>
       : <PasekTla prog={data?.prog} onPrzelaczProg={setBezProgu}
-          stanTekst={data?.stan
-            ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status}${
-              data.stan.dyskusjiPominietych ? `, pominiętych dyskusji ${data.stan.dyskusjiPominietych}` : ""}`
+          /* ── CISZA NIE MA CO MÓWIĆ (0.402.0) ─────────────────────────
+             Do 0.401.0 stało tu „synchronizacja: działa" — zdanie, które
+             w stanie normalnym jest prawdziwe ZAWSZE i przez to nie niesie
+             nic. Zgłoszenie właściciela o chaosie ekranu trafia w to wprost:
+             zasada 10 projektu żąda widocznej AWARII, nie widocznego spokoju.
+
+             Zostaje wyłącznie to, co odstaje: stan inny niż `current` (wtedy
+             i tak alarmuje `tloAlarmuje`) oraz pominięte dyskusje, których
+             liczba jest faktem o niekompletnej liście. Gdy nie ma ani jednego,
+             pole jest puste i wiersz kurczy się do samego progu. */
+          stanTekst={data?.stan && (data.stan.status !== "current" || data.stan.dyskusjiPominietych)
+            ? [
+              data.stan.status === "current" ? null
+                : `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status}`,
+              data.stan.dyskusjiPominietych
+                ? `pominiętych dyskusji ${data.stan.dyskusjiPominietych}` : null,
+            ].filter(Boolean).join(" · ")
             : undefined}
           trwaSync={synchronizuj.isPending}
           onSynchronizuj={() => {
@@ -469,33 +483,49 @@ export function Reklamacje() {
             ]} />
         </nav>
 
-        {/* ── SITO „MOJE" (0.278.0) ────────────────────────────────────────
-            WŁASNY RZĄD, nie czwarta pigułka wśród kubełków. Kubełek mówi
-            „na jakim to etapie", sito „czyje to" — zlanie tego w jeden rząd
-            odebrałoby pytanie „moje sprawy do decyzji", czyli dokładnie to,
-            które właściciel zadaje najczęściej. Ten rząd weźmie też czipy
-            tagów, bo one odpowiadają na trzecie pytanie: „o czym to". */}
-        <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
-            <PasekPorzadku porzadek={porzadek}
-              dozwolone={["termin", "otwarto", "ruch", "kwota"]} onZmien={ustawPorzadek} />
-            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-              moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
-              niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
-            {/* Tagi w TYM SAMYM rzędzie co „Moje", bo oba są zawężeniem tej
-                samej listy — kubełek stoi nad nimi i jest wyborem, nie sitem. */}
-            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
-          </div>
+        {/* ── SIEDEM PASM SCHODZI DO TRZECH (0.402.0) ────────────────────────
+            Zgłoszenie właściciela ze zrzutem: „panel wygląda chaotycznie".
+            Policzone: nad pierwszą sprawą stało SIEDEM pasm sterowania, 268 px
+            w kolumnie szerokiej na 280 — kubełki w dwóch rzędach, kolejność,
+            sita, skróty, szukanie i pytanie kubełka. Cztery z nich odpowiadały
+            na to samo pytanie „co pokazać", każde w innym kształcie.
 
-        <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
+            Zostają TRZY: kubełki (wybór), wiersz narzędzi (szukanie, kolejność,
+            skróty) i wiersz zawężeń (sita, tagi, próg daty). Nie ubyła ani
+            jedna funkcja — ubyły rzędy.
 
-        <div className="shrink-0 border-b border-slate-200 px-2 py-1.5">
+            SZUKANIE STOI PIERWSZE W SWOIM WIERSZU i rośnie na całą wolną
+            szerokość: to jedyne pole, do którego się pisze, a reszta wiersza to
+            przyciski. */}
+        <div className="flex shrink-0 items-center gap-1 border-b border-slate-200 px-2 py-1.5">
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
-          <input id="szukaj-reklamacji" className="field !py-1 text-xs" value={fraza}
+          <input id="szukaj-reklamacji" className="field min-w-0 flex-1 !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Numer, zamówienie, login albo treść notatki" />
+            placeholder="Numer, zamówienie, login, notatka" />
+          <PasekPorzadku porzadek={porzadek}
+            dozwolone={["termin", "otwarto", "ruch", "kwota"]} onZmien={ustawPorzadek} />
+          <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
         </div>
 
-        {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
+        {/* ── SITO „MOJE" (0.278.0) ────────────────────────────────────────
+            Kubełek mówi „na jakim to etapie", sito „czyje to" — zlanie tego
+            w jeden rząd odebrałoby pytanie „moje sprawy do decyzji", czyli
+            dokładnie to, które właściciel zadaje najczęściej. Ten rząd niesie
+            też czipy tagów („o czym to") i od 0.402.0 próg daty, bo zakres
+            listy to trzecie zawężenie tej samej listy, a nie stan systemu. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1">
+          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+            moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
+            niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
+          <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+        </div>
+
+        {/* ── PYTANIE KUBEŁKA ZOSTAJE (0.402.0) ──────────────────────────────
+            Pierwsze podejście do tej poprawki zdjęło ten wiersz razem z resztą
+            pasm. To był błąd: dekalog, punkt 5 — pytanie ZASTĘPUJE menu akcji,
+            więc mówi, po co ten kubełek istnieje, a pigułka mówi tylko, jak
+            się nazywa. Reguła wygrywa z rachunkiem pikseli.
+
             Przy włączonym filtrze milknie: lista nie jest wtedy kubełkiem. */}
         {!pasujace && kubelek !== null &&
           <p className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">

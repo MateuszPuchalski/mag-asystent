@@ -75,13 +75,24 @@ describe("porządek kolejki", () => {
 describe("pasek porządku", () => {
   beforeEach(() => localStorage.clear());
 
-  it("zaznacza oś bieżącą i oddaje kliknięcie", async () => {
+  it("PRZYCISK MÓWI BIEŻĄCĄ OŚ, a menu oddaje wybór", async () => {
+    /* 0.402.0: pasmo pigułek zeszło do jednego przycisku z menu. Napis na
+       przycisku jest tu sednem — jedno spojrzenie zamiast czytania czterech
+       napisów, żeby poznać ten wybrany. */
     const onZmien = vi.fn();
     render(<PasekPorzadku porzadek="termin" dozwolone={["termin", "otwarto"]} onZmien={onZmien} />);
 
-    expect(screen.getByRole("button", { name: "Termin" })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "Od najnowszych" }));
+    const przycisk = screen.getByRole("button", { name: /Termin/ });
+    expect(przycisk).toHaveAttribute("aria-expanded", "false");
+    /* Osi NIEWYBRANEJ nie widać, dopóki menu jest zamknięte. */
+    expect(screen.queryByRole("menuitemradio")).toBeNull();
+
+    await userEvent.click(przycisk);
+    expect(screen.getByRole("menuitemradio", { name: /Termin/ })).toHaveAttribute("aria-checked", "true");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: /Od najnowszych/ }));
     expect(onZmien).toHaveBeenCalledWith("otwarto");
+    /* Wybór ZAMYKA menu — inaczej zasłaniałoby listę, którą właśnie przestawiło. */
+    expect(screen.queryByRole("menuitemradio")).toBeNull();
   });
 
   it("przy JEDNEJ osi nie rysuje się wcale", () => {

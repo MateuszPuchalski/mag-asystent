@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowDownWideNarrow } from "lucide-react";
+import { ArrowDownWideNarrow, Check } from "lucide-react";
 
 /* ── Porządek kolejek obsługi (0.401.0) ──────────────────────────────────────
    Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Reklamacje,
@@ -101,25 +101,52 @@ export function posortuj<T>(lista: T[], porzadek: OsPorzadku, klucze: KluczePorz
 }
 
 /**
- * Pasek wyboru osi.
+ * Wybór osi — JEDEN PRZYCISK Z MENU (0.402.0).
  *
- * JEDNA LINIA, drobnym drukiem: porządek jest nastawieniem widoku, a nie
- * czynnością przy sprawie. Pigułka w wadze filtra kubełków przeciągałaby na
- * siebie uwagę należną kolejce.
+ * 0.401.0 postawiło tu pasmo pigułek, po jednej na oś. Zgłoszenie właściciela
+ * ze zrzutem — „panel wygląda chaotycznie" — i policzenie tego na ekranie
+ * reklamacji pokazało, ile to kosztowało: pasmo zajmowało cały wiersz
+ * w kolumnie szerokiej na 280 px, zawijało się razem z sitem „Moje", a agent
+ * i tak musiał przeczytać CZTERY napisy, żeby poznać jeden — ten wybrany.
+ *
+ * NAPIS NA PRZYCISKU MÓWI BIEŻĄCĄ OŚ, więc jedno spojrzenie zamiast czterech.
+ * Wybór z menu kosztuje kliknięcie więcej niż pigułka i to jest cena zapłacona
+ * świadomie: oś przestawia się rzadko, a patrzy się na nią za każdym razem.
+ *
+ * Pigułek nie zabrakło żadnej — menu niesie te same osie, w tej samej
+ * kolejności, z tymi samymi podpowiedziami.
  */
 export function PasekPorzadku({ porzadek, dozwolone, onZmien }: {
   porzadek: OsPorzadku;
   dozwolone: OsPorzadku[];
   onZmien: (p: OsPorzadku) => void;
 }) {
+  const [otwarte, setOtwarte] = useState(false);
   if (dozwolone.length < 2) return null;
-  return <div className="flex shrink-0 flex-wrap items-center gap-1 text-podpis">
-    <ArrowDownWideNarrow size={12} className="shrink-0 text-slate-500" />
-    <span className="mr-1 text-slate-500">Kolejność</span>
-    {dozwolone.map((o) => <button key={o} type="button" title={PODPISY[o].podpowiedz}
-      aria-pressed={porzadek === o} onClick={() => onZmien(o)}
-      className={`rounded px-1.5 py-0.5 ${porzadek === o
-        ? "bg-slate-200 font-semibold text-slate-900" : "text-slate-600 hover:bg-slate-100"}`}>
-      {PODPISY[o].napis}</button>)}
+  return <div className="relative shrink-0">
+    <button type="button" aria-haspopup="menu" aria-expanded={otwarte}
+      title={`Kolejność: ${PODPISY[porzadek].podpowiedz}`}
+      onClick={() => setOtwarte((o) => !o)}
+      className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-podpis font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+      <ArrowDownWideNarrow size={12} className="shrink-0 text-slate-500" />
+      {PODPISY[porzadek].napis}
+    </button>
+    {otwarte && <>
+      {/* Kliknięcie POZA menu zamyka je — bez tego menu zostaje otwarte po
+          wyborze innego przycisku i zasłania listę. */}
+      <button type="button" aria-label="Zamknij wybór kolejności" tabIndex={-1}
+        onClick={() => setOtwarte(false)} className="fixed inset-0 z-10 cursor-default" />
+      <div role="menu" aria-label="Kolejność kolejki"
+        className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+        {dozwolone.map((o) => <button key={o} type="button" role="menuitemradio"
+          aria-checked={porzadek === o} title={PODPISY[o].podpowiedz}
+          onClick={() => { onZmien(o); setOtwarte(false); }}
+          className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${porzadek === o
+            ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}>
+          <Check size={13} className={porzadek === o ? "shrink-0 text-ranga-ok" : "shrink-0 opacity-0"} />
+          <span className="min-w-0">{PODPISY[o].napis}</span>
+        </button>)}
+      </div>
+    </>}
   </div>;
 }
