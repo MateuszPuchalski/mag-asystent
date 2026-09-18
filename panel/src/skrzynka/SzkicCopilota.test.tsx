@@ -6,6 +6,17 @@ import { Edytor } from "./Edytor";
 import type { PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { SzkicCopilota } from "../api/typy";
 
+/* Edytor woła od 0.399.0 hak szablonów, a te pliki nie stawiają klienta
+   TanStacka — pilnują trybu odpowiedzi, nagłówka i karty Copilota, nie listy
+   szablonów. Własne testy ma ona w `Szablony.test.tsx`. */
+vi.mock("../api/szablony", () => ({
+  useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
+  useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
+  useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
+  useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+
 /* ── Szkic z Copilota w edytorze (§14.6, 0.231.0) ────────────────────────────
    Pilnujemy granic, nie wyglądu: propozycja NIE wchodzi do pola sama;
    „Wstaw" dopisuje, „Zastąp" istnieje tylko, gdy jest co nadpisać; wyłączony

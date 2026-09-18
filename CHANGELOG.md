@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.399.0 — 18 września 2026
+
+**Szablony odpowiedzi w panelu obsługi.** Zgłoszenie właściciela: „dodaj ten
+szablon do szablonów odpowiedzi w skrzynce". Szablonów nie było wcale — §10.4
+projektu panelu wymieniał je wśród rzeczy planowanych i sam pisał „Nie ma
+szablonów". Agenci wklejali te zdania z notatnika, więc każda ich wersja była
+trochę inna.
+
+- **Przycisk „Szablony"** obok „Ułóż odpowiedź", w tym samym rzędzie: szablon
+  jest wstawką do szkicu, a nie osobnym trybem pracy.
+- **Pierwszy szablon to treść właściciela** — wymiana przez paczkomat, razem
+  z odnośnikiem do instrukcji Allegro. Wchodzi migracją, ale TYLKO do pustej
+  tabeli: szablon świadomie zdjęty nie ma prawa wracać po restarcie usługi.
+- **Biuro zakłada i poprawia szablony samo.** Lista wymagająca wydania przy
+  każdym przecinku wraca do notatnika agenta.
+- **Wstawia, nie wysyła.** Treść ląduje w szkicu i dalej wymaga „Wyślij do
+  klienta" — druga zasada nadrzędna projektu panelu.
+- **Dopisuje, nie nadpisuje** — ten sam kontrakt, co każda inna wstawka. Szkic
+  jest współdzielony z zespołem.
+- **Bez podstawiania danych.** Treść wchodzi dosłownie, bez `{{numer}}`: zła
+  wartość wjechałaby do wiadomości wysłanej klientowi, a agent zobaczyłby ją
+  dopiero po fakcie.
+- **Limit 2000 znaków sprawdzany PRZY ZAPISIE** i widoczny przy pisaniu.
+  To `NewMessageInThread.text.maxLength` ze specyfikacji Allegro — dłuższy
+  szablon robiłby szkic niewysyłalnym.
+- **Zdjęcie to archiwum, nie kasowanie** (§25a.5): przy szablonie wisi historia
+  tego, co wysłaliśmy klientom.
+- Do dziennika idzie DŁUGOŚĆ treści, nigdy sama treść — `events` nie ma
+  retencji, a szablon bywa zdaniem o kliencie.
+
+Wdrożenie: migracja dokłada tabelę `szablon_odpowiedzi` i pierwszy wpis.
+
+---
+
+
 ## 0.398.0 — 18 września 2026
 
 **Reklamacja znów pokazuje nowe wiadomości.** Zgłoszenie właściciela: „mam

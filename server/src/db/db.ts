@@ -841,7 +841,40 @@ export function migrate(database: DatabaseSync) {
   zalacznikiBezDubli(database);
   dosypZalacznikiZLadowiska(database);
   bezNakladkiSpraw(database);
+  pierwszySzablonOdpowiedzi(database);
   tabelaFts(database);
+}
+
+/**
+ * Pierwszy szablon odpowiedzi (0.399.0) — treść od właściciela.
+ *
+ * TYLKO GDY TABELA JEST PUSTA, i to nie jest ostrożność techniczna. Szablony
+ * pisze biuro, więc wpis dosypywany „gdy go nie ma" wracałby po każdym
+ * restarcie usługi do kogoś, kto świadomie go zdjął — a zdjęcie szablonu jest
+ * decyzją, nie usterką. Pusta tabela znaczy „pierwsze uruchomienie z tą
+ * funkcją" i tylko wtedy wolno cokolwiek wstawiać.
+ *
+ * Treść stoi TU, a nie w seedzie demo: to zdanie ma pojechać na produkcję,
+ * bo właściciel poprosił o dodanie go do szablonów, a nie o pokazanie go
+ * w pokazie.
+ */
+function pierwszySzablonOdpowiedzi(database: DatabaseSync) {
+  const ile = database.prepare("SELECT COUNT(*) AS n FROM szablon_odpowiedzi").get() as
+    { n: number };
+  if (Number(ile.n) > 0) return;
+  database.prepare("INSERT INTO szablon_odpowiedzi(nazwa, tresc, utworzyl) VALUES (?,?,?)")
+    .run("Wymiana przez paczkomat", [
+      "Dzień dobry,",
+      "Dziękujemy za zgłoszenie i przepraszamy za sytuację. Wykonamy wymianę przez paczkomat.",
+      "Uprzednio przed naszą wysyłką muszą Państwo wygenerować zwrot paczki",
+      "",
+      "* https://allegro.pl/pomoc/dla-kupujacych/zwrot-z-allegro-smart/jak-zwrocic-przedmioty-kupione-w-ramach-allegro-smart-dykrmbo5qTz",
+      "",
+      "Informację o wygenerowanym zwrocie otrzymamy automatycznie.",
+      "",
+      "Po otrzymaniu potwierdzenia o wygenerowaniu zwrotu nadamy nową przesyłkę na ten sam adres paczkomatu",
+      "Jak tylko nowa paczka dotrze do paczkomatu będzie można dokonać wymiany (zwrot powinien być do dedykowanej z smsa skrytki). Oczywiście zwrot można zanieść do paczkomatu wcześniej.",
+    ].join("\n"), "Właściciel");
 }
 
 /**

@@ -9,6 +9,9 @@ import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
 import { wskazZamowienie } from "../services/zamowienia-kandydaci.js";
+import {
+  archiwumSzablonow, dodajSzablon, listaSzablonow, zarchiwizujSzablon, zmienSzablon,
+} from "../services/szablony.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
 import { db } from "../db/db.js";
@@ -491,6 +494,56 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return wskazOferte(Number(req.params.id), req.body?.ofertaId ?? "",
           sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── SZABLONY ODPOWIEDZI (0.399.0) ─────────────────────────────────────────
+     Zgłoszenie właściciela: „dodaj ten szablon do szablonów odpowiedzi
+     w skrzynce". Szablonów nie było wcale.
+
+     Trasy stoją w skrzynce, a nie w osobnym pliku, bo za tą samą bramką co
+     reszta panelu obsługi: szablon niesie zdania, które idą do klienta,
+     i hala nie ma tu czego szukać.
+
+     ODCZYT NICZEGO NIE MUTUJE — lista jedzie GET-em, a liczniki zapisów
+     w testach tras pilnują, że otwarcie edytora nic nie dopisuje. */
+  app.get("/api/obsluga/szablony", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    return { szablony: listaSzablonow(db()) };
+  });
+
+  app.get("/api/obsluga/szablony/archiwum", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    return { szablony: archiwumSzablonow(db()) };
+  });
+
+  app.post<{ Body: { nazwa?: string; tresc?: string } }>(
+    "/api/obsluga/szablony", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return { szablon: dodajSzablon(req.body?.nazwa ?? "", req.body?.tresc ?? "",
+          sesjaZadania()!.user.userId) };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { nazwa?: string; tresc?: string } }>(
+    "/api/obsluga/szablony/:id", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return { szablon: zmienSzablon(Number(req.params.id), req.body?.nazwa ?? "",
+          req.body?.tresc ?? "", sesjaZadania()!.user.userId) };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ZDJĘCIE, NIE KASOWANIE (§25a.5) — stąd `POST` z flagą, a nie `DELETE`.
+     Ta sama trasa przywraca, bo to jedna decyzja w dwie strony. */
+  app.post<{ Params: { id: string }; Body: { archiwalny?: boolean } }>(
+    "/api/obsluga/szablony/:id/archiwum", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        zarchiwizujSzablon(Number(req.params.id), req.body?.archiwalny !== false,
+          sesjaZadania()!.user.userId);
+        return { ok: true };
       } catch (e) { return blad(reply, e); }
     });
 
