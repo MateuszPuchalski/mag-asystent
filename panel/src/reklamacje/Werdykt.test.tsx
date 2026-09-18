@@ -27,7 +27,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
   zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,
   wersja: 1, kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,
-  ofertaNazwa: "Kosiarka", ofertaZdjecie: "brak", twId: null, twSymbol: null,
+  ofertaNazwa: "Kosiarka", ofertaZdjecie: "brak", twId: null, twSymbol: null, twZParagonu: false,
   ...n,
 });
 

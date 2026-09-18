@@ -313,6 +313,12 @@ export interface WierszReklamacji {
   /** Kartoteka POTWIERDZONA (`oferta_kartoteka`); propozycję liczy szczegół. */
   twId: number | null;
   twSymbol: string | null;
+  /* ── SKĄD JEST TA SYGNATURA (0.403.0) ──────────────────────────────────────
+     Paragon i dzisiejsze mapowanie oferty bywają RÓŻNE — to cała treść
+     0.400.0. Do tego wydania panel dostawał wynik bez źródła, więc pisał
+     „W09-0804" bez różnicy, czy to sygnatura z chwili zakupu, czy z półki.
+     Agent czytający wiersz towaru ma prawo wiedzieć, czemu ufa. */
+  twZParagonu: boolean;
 }
 
 type Wiersz = Record<string, unknown>;
@@ -517,6 +523,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     ofertaZdjecie: stanZdjeciaOferty(w.oferta_zdjecie as string | null | undefined),
     twId: w.tw_id == null ? null : Number(w.tw_id),
     twSymbol: tekst(w.tw_symbol),
+    twZParagonu: false,
   };
 }
 
@@ -599,6 +606,7 @@ function zParagonuNaWiersz(
   if (!k) return;
   r.twId = k.twId;
   r.twSymbol = k.symbol;
+  r.twZParagonu = true;
 }
 
 export function listaReklamacji(
