@@ -297,7 +297,15 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         locAction: LocApplyAction?,
         recznie: Boolean = false,
     ) {
-        if (busy) return
+        /* Zapis w toku POŁYKA drugi skan i mówi o tym uchem. Sama cisza jest
+           tu gorsza od odmowy: dokument ergonomii sam ostrzega, że powyżej
+           ~300 ms ludzie skanują drugi raz, a człowiek na drabinie nie patrzy
+           w ekran (dekalog p. 7) — połknięty bez sygnału czyta się jak
+           zapisany. */
+        if (busy) {
+            graph.feedback.beep(false)
+            return
+        }
         busy = true
         /* Ile sztuk idzie na półkę — jedna reguła dla kafla, zapisu i echa
            bufora (`iloscDoOdlozenia`), razem z powodem, dla którego `null`
@@ -397,13 +405,48 @@ fun DeliveryLinesScreen(graph: AppGraph) {
 
     // router skanów: gdy czekamy na lokalizację — LOC kończy operację;
     // w innym wypadku każdy skan próbuje rozstrzygnąć towar.
-    // Przy otwartym pytaniu (rozjazd / wyjątek) skan jest połykany — decyzja
-    // człowieka nie może zostać przewinięta przez przypadkowy strzał skanera.
+    /* CO BLOKUJE SKANER — jedna lista, bo `ModalBottomSheet` go NIE blokuje.
+
+       `ScannerBus` jest globalnym stosem handlerów, niezależnym od fokusu okna
+       (`scan/ScannerBus.kt`): arkusz zasłania palec, ale skan i tak spada do
+       handlera ekranu pod spodem. Do 0.388.1 warunek wymieniał tylko dwa
+       stany i skan pod otwartym arkuszem szedł dalej do `resolveProduct`.
+       Przy kolizji EAN podmieniało to listę kandydatów pod palcem sięgającym
+       po drugą pozycję — a ten arkusz sam deklaruje, że operacja STOI (D7).
+       Przy korekcie ilości przestawiało wybraną pozycję, z sygnałem sukcesu,
+       którego człowiek nie miał jak wytłumaczyć. Oba błędy są ciche: nic nie
+       wygląda na zepsute (dekalog p. 3, „Granica tej reguły").
+
+       `ProblemSheet`, `PrzesuniecieSheet` i `EanSheet` mają WŁASNE handlery
+       i stoją na stosie wyżej, więc ich skany tu nie docierają. Zostają na
+       liście mimo to: ma ona odpowiadać na pytanie „co teraz połyka skaner",
+       a nie na pytanie „czego zapomniano". */
+    val arkuszOtwarty = mismatch != null || problemOpen || conflict != null ||
+        korektaDla != null || zakonczenie != null || notatkaOtwarta != null ||
+        eanDla != null || przesunFor != null
+
     ScanHandlerEffect { scan ->
-        if (mismatch != null || problemOpen) return@ScanHandlerEffect true
+        if (arkuszOtwarty) {
+            // decyzja człowieka nie może zostać przewinięta przypadkowym
+            // strzałem skanera — ale połknięcie musi być SŁYSZALNE
+            graph.feedback.beep(false)
+            return@ScanHandlerEffect true
+        }
         val line = active
         if (line != null && scan.kind != ScanKind.EAN) {
             scope.launch { putaway(line, normalizeLoc(scan.code)) }
+        } else if (scan.kind == ScanKind.LOC) {
+            /* Etykieta regału bez otwartej pozycji. Do 0.388.1 leciała do
+               `resolveProduct`, wracała jako „nieznany kod" i aplikacja
+               proponowała NADAĆ JĄ towarowi jako kod kreskowy — czynność,
+               którą serwer i tak odrzuca (`ean-alias` odrzuca kody o kształcie
+               adresu), więc było to zaproszenie do pracy skazanej na błąd.
+
+               Kolektor zna kształt kodu SAM (`core/scan/Scan.kt`), więc
+               odpowiada bez sieci i od razu: ograniczenie jest tańsze od
+               komunikatu, a komunikat ma mówić, co zrobić teraz (p. 6). */
+            graph.feedback.beep(false)
+            graph.effects.toast("${scan.code} to etykieta regału — najpierw zeskanuj towar")
         } else {
             scope.launch { resolveProduct(scan.code) }
         }

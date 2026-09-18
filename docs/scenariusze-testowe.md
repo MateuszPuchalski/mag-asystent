@@ -304,6 +304,18 @@ stawał się adresem pickingowym.
 Powtórz odłożenie na `C01-02-02`. Drugi raz nie ma zakolejkować nic — kartoteka
 już ten adres zna.
 
+**Skaner pod otwartym arkuszem (0.388.1).** Przy otwartym pytaniu ZAMIEŃ/DODAJ
+zeskanuj cokolwiek. Ma zabrzmieć sygnał błędu, a pytanie ma zostać na ekranie
+z tymi samymi danymi. To samo sprawdź przy arkuszu POPRAW ILOŚĆ i przy wyborze
+kandydata po kolizji kodu. Arkusz zasłania palec, ale nie zasłania skanera —
+do 0.388.1 skan przestawiał więc pozycję pod spodem.
+
+**Etykieta regału bez otwartej pozycji (0.388.1).** Zwiń wszystkie pozycje
+i zeskanuj półkę `C01-02-02`. Ma przyjść zdanie, że to etykieta regału i że
+najpierw trzeba zeskanować towar. Wcześniej kod wracał jako „nieznany" wraz
+z propozycją nadania go towarowi jako kodu kreskowego — czyli zaproszeniem do
+pracy, którą serwer i tak odrzuca.
+
 Wybierz **ZAMIEŃ** przy innej pozycji. Tam nowy adres ma stanąć na początku
 i zastąpić podstawowy, a pozostałe zostają.
 
