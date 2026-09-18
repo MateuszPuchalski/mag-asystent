@@ -35,7 +35,7 @@ const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja 
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null,
   notatka: null, wersja: 1, kubelek, sygnaly: [],
   link: null, linkZamowienia: null, linkOferty: null,
-  ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null,
+  ofertaNazwa: `Towar ${id}`, ofertaZdjecie: "brak", twId: null, twSymbol: null, twZParagonu: false,
   werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
   werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
   zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,
@@ -200,8 +200,10 @@ describe("Ekran reklamacji", () => {
     await userEvent.click(screen.getByTitle(/Tylko wgląd\. \(klawisz 3\)/));
     /* Bez przestawienia kursora środkowa kolumna pokazywałaby rozmowę ze
        sprawy z poprzedniego kubełka. Wiersz kolejki JEST wybrany — a numer
-       stoi też w kolumnie dowodów, więc szukamy po roli, nie po tekście. */
-    const wiersz = await screen.findByRole("button", { name: /222\/2026/ });
+       stoi też w kolumnie dowodów, i od 0.403.0 w PRZYCISKU: nagłówek zwijki
+       „Sprawa" niesie go w podpisie. Szukamy więc po `aria-current`, czyli po
+       tym, co test naprawdę sprawdza — który wiersz jest kursorem. */
+    const wiersz = await screen.findByRole("button", { name: /222\/2026/, current: true });
     expect(wiersz).toHaveAttribute("aria-current", "true");
     expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });

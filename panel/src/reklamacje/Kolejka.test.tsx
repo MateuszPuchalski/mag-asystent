@@ -26,7 +26,7 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null, wersja: 1,
   kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: "Kosiarka spalinowa NAC LS 46-450", ofertaZdjecie: "brak",
-  twId: null, twSymbol: null,
+  twId: null, twSymbol: null, twZParagonu: false,
     werdykt: null, werdyktNazwa: null, werdyktStatus: null, werdyktWiadomosc: null,
   werdyktKwotaGrosze: null, werdyktAt: null, werdyktPrzez: null, werdyktBlad: null,
   zwrotTowaru: null, zwrotTowaruAt: null, ilosc: 1,

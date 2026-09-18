@@ -1511,6 +1511,8 @@ export interface Reklamacja {
   /** Kartoteka POTWIERDZONA; propozycję liczy dopiero szczegół sprawy. */
   twId: number | null;
   twSymbol: string | null;
+  /** Czy sygnatura przyszła Z PARAGONU (0.400.0), a nie z dzisiejszej półki. */
+  twZParagonu: boolean;
 }
 
 export interface ZalacznikReklamacji {

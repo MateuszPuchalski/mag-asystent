@@ -588,6 +588,10 @@ test("symbol towaru bierze się Z PARAGONU, nie z dzisiejszego mapowania oferty"
   const [r] = listaReklamacji(d, TERAZ);
   assert.equal(r.twSymbol, "STARY-DOSTAWCA", "kolejka pyta paragonu");
   assert.equal(r.twId, 11);
+  /* Panel pisze przy sygnaturze, SKĄD ona jest (0.403.0). Bez tej flagi
+     wiersz towaru kazałby ufać jednakowo paragonowi i dzisiejszej półce,
+     a cała ta funkcja bierze się z tego, że to bywają dwie różne rzeczy. */
+  assert.equal(r.twZParagonu, true, "panel ma czym podpisać sygnaturę");
   assert.equal(szczegolReklamacji(d, id, TERAZ).reklamacja.twSymbol, "STARY-DOSTAWCA",
     "szczegół idzie tą samą drogą co kolejka");
 });
@@ -603,7 +607,9 @@ test("bez pobranego zamówienia zostaje mapowanie oferty — nic nie ginie", () 
     wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'NAC-4645','2026-09-07T08:00:00Z','A. L.')`)
     .run(konto);
 
-  assert.equal(listaReklamacji(d, TERAZ)[0].twSymbol, "NAC-4645");
+  const [r] = listaReklamacji(d, TERAZ);
+  assert.equal(r.twSymbol, "NAC-4645");
+  assert.equal(r.twZParagonu, false, "to nie jest sygnatura z paragonu i ekran tak napisze");
 });
 
 test("sygnatura trafiająca w DWIE kartoteki nie rozstrzyga za człowieka", () => {

@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.403.0 — 18 września 2026
+
+**Prawa kolumna reklamacji przestaje ważyć wszystko tak samo.** Druga połowa
+projektu ze zrzutu całego panelu. Kolumna dowodów miała dwadzieścia jeden
+wierszy w jednej wadze: „Tytuł: rękojmia" ważyło dokładnie tyle, co kwota
+żądania i termin decyzji. Trzy z tych wierszy rozstrzygają werdykt, reszta go
+tłumaczy — i nie było widać, które są które.
+
+- **Głowica niesie werdykt.** Kwota żądania i termin stoją na wierzchu, w
+  stopniu widocznym z drugiego końca biurka. Termin mówi „za 6 dni", a datę
+  zostawia pod spodem: pytanie agenta brzmi „ile mam czasu", nie „który to
+  dzień". Tytuł prawny, powód i status Allegro zeszły do znaczników.
+- **Reszta schodzi do trzech zwijek** — Zakup, Sprawa, Praca biura. Otwarty
+  zostaje zakup, bo kwoty rozstrzygają spór o zwrot pieniędzy. Podpis każdej
+  zwijki mówi, co w środku, więc zamknięta nie każe zgadywać.
+- **Wiersz towaru mówi, skąd jest sygnatura** — „z paragonu" albo
+  „z mapowania oferty". Po 0.400.0 to bywają dwie różne rzeczy i ekran je
+  rozróżnia, zamiast kazać ufać jednakowo. Wiersz niesie też ilość i cenę
+  pozycji spornej.
+- **Status Allegro stoi w jednym miejscu, nie w dwóch.** Zszedł z wiersza do
+  znacznika w głowicy.
+- **Karta Copilota zeszła na dół kolumny.** Kolejność czytania idzie za
+  kolejnością zaufania: najpierw Allegro i paragon, potem model. Karta i tak
+  jest zwinięta, więc nie kosztuje to ani jednego kliknięcia.
+
 ## 0.402.0 — 18 września 2026
 
 **Lewa kolumna przestaje krzyczeć.** Zgłoszenie właściciela ze zrzutem: „panel
