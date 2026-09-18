@@ -3,7 +3,8 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_RECZNE, ustawPriorytet, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_RECZNE, ustawPriorytet,
+  ustawReklamacyjna, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
@@ -443,6 +444,26 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       }
       try {
         return ustawPriorytet(db(), Number(req.params.id), p, sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ZNACZNIK „SPRAWA REKLAMACYJNA" (0.390.0) — NASZ, nie Allegro.
+     Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues`
+     w specyfikacji ma wyłącznie GET, otwiera ją kupujący. Ta trasa mówi
+     wyłącznie, że biuro prowadzi tę rozmowę jak reklamację.
+
+     PRZEŁĄCZNIK, więc ciało niesie `reklamacyjna: boolean`, a nie samo
+     wywołanie: zdjęcie znacznika jest tak samo potrzebne jak nadanie. */
+  app.post<{ Params: { id: string }; Body: { reklamacyjna?: boolean } }>(
+    "/api/obsluga/rozmowy/:id/reklamacyjna", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (typeof req.body?.reklamacyjna !== "boolean") {
+        return reply.code(400).send({ error: "Pole `reklamacyjna` musi być prawdą albo fałszem." });
+      }
+      try {
+        return ustawReklamacyjna(db(), Number(req.params.id), req.body.reklamacyjna,
+          sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
     });
 

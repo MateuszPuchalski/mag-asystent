@@ -78,6 +78,10 @@ export function Rozmowa(p: {
   zapisujeStatus: boolean;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
+  /* Znacznik reklamacyjny (0.390.0) — opcjonalny, jak reszta rzeczy, których
+     ten sam komponent bywa rysowany bez obsługi. */
+  onReklamacyjna?: (reklamacyjna: boolean) => void;
+  zapisujeReklamacyjna?: boolean;
   /* Werdykt o propozycji Copilota (§14, etap F). Opcjonalny, bo rozmowa bez
      rozpoznania nie ma czego oceniać — a każdy istniejący test tego ekranu
      opisuje właśnie taką rozmowę. */
@@ -137,7 +141,8 @@ export function Rozmowa(p: {
         zapisuje={p.ocenia} onOcen={p.onOcenKategorie ?? (() => {})} />}
         <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
           onZmien={p.onZmienStatus}
-          onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet} />
+          onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
+          onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna} />
       </div>
 
       {/* Drugi wiersz niesie METADANE: kto prowadzi i skąd przyszła rozmowa.

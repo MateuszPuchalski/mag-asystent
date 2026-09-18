@@ -359,6 +359,29 @@ export function useUstawPriorytet() {
   });
 }
 
+/**
+ * Znacznik „sprawa reklamacyjna" (0.390.0) — NASZ, nie Allegro.
+ *
+ * Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues` ma
+ * wyłącznie GET. Ta mutacja mówi wyłącznie, jak biuro prowadzi rozmowę.
+ *
+ * Unieważnia KOLEJKĘ i rozmowę, jak priorytet: plakietka stoi w obu miejscach,
+ * a znacznik widoczny tylko w otwartej rozmowie nie zmieniałby wyboru pracy.
+ */
+export function useUstawReklamacyjna() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; reklamacyjna: boolean }) =>
+      api(`/api/obsluga/rozmowy/${v.id}/reklamacyjna`, {
+        method: "POST", body: JSON.stringify({ reklamacyjna: v.reklamacyjna }),
+      }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+    },
+  });
+}
+
 export function useWskazOferte() {
   const qc = useQueryClient();
   return useMutation({

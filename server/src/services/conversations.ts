@@ -741,3 +741,54 @@ function zapiszZmianeStatusu(
     VALUES (?, 'status_changed', ?)`).run(conversationId, JSON.stringify({ przed, po, autor }));
   logEvent("rozmowa_status", autor, null, { conversationId, przed, po }, userId, database);
 }
+
+/**
+ * Znacznik „to jest sprawa reklamacyjna" (0.390.0).
+ *
+ * Zgłoszenie właściciela: „chcę tylko zaznaczyć, że to jest pytanie
+ * reklamacyjne i będzie traktowane jako reklamacja, ale nie będzie
+ * w allegrowych reklamacjach".
+ *
+ * TEJ SPRAWY NIE DA SIĘ ZAŁOŻYĆ W ALLEGRO i to nie jest nasza decyzja:
+ * `/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET. Sprawę
+ * posprzedażową otwiera KUPUJĄCY. Sprzedawca może w niej pisać (`/message`)
+ * i wydać werdykt (`/status`), ale nie może jej powołać do życia. Przycisk
+ * „załóż reklamację" byłby obietnicą, której Allegro nie przyjmie.
+ *
+ * Znacznik jest więc NASZ i odpowiada na pytanie biura, nie Allegro: „czy tę
+ * rozmowę prowadzimy jak reklamację". Zmienia trzy rzeczy i ani jednej
+ * więcej — plakietkę w kolejce, sito w kolejce i licznik. Zegara USTAWOWEGO
+ * nie dokłada, bo rozmowa go nie ma: termin przy reklamacji przychodzi
+ * z Allegro (`decisionDueDate`), a policzony u nas rozjeżdżałby się z tym,
+ * który widzi kupujący (blizna 0.121.0).
+ *
+ * PRZEŁĄCZNIK, nie droga w jedną stronę. Agent bierze pytanie za reklamacyjne
+ * po pierwszym zdaniu klienta, a po odpowiedzi hali okazuje się, że to pytanie
+ * o dobór. Znacznik bez zdejmowania kłamałby w kolejce do końca życia wątku.
+ *
+ * Nie wymaga prowadzenia rozmowy — ten sam powód co przy priorytecie: „to jest
+ * reklamacja" wolno powiedzieć o cudzej sprawie.
+ */
+export function ustawReklamacyjna(
+  database: DatabaseSync, conversationId: number, reklamacyjna: boolean, userId: number,
+): { reklamacyjna: boolean } {
+  const autor = imieAutora(database, userId);
+  const wynik = transaction(database, () => {
+    const przed = database.prepare("SELECT reklamacyjna FROM conversation WHERE id=?")
+      .get(conversationId) as { reklamacyjna: number } | undefined;
+    if (!przed) throw new Error("Nie znaleziono rozmowy");
+    database.prepare("UPDATE conversation SET reklamacyjna=? WHERE id=?")
+      .run(reklamacyjna ? 1 : 0, conversationId);
+    /* Ślad na osi i w dzienniku, jak każda mutacja rozmowy. Zdjęcie znacznika
+       jest zdarzeniem tak samo ważnym jak nadanie: „czemu to wypadło z sita
+       reklamacyjnego" ma mieć odpowiedź. */
+    database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
+      VALUES (?, NULL, 'reklamacyjna_changed', json_object('na', ?, 'autor', ?))`)
+      .run(conversationId, reklamacyjna ? 1 : 0, autor);
+    logEvent("rozmowa_reklamacyjna", autor, null,
+      { conversationId, na: reklamacyjna }, undefined, database);
+    return { reklamacyjna };
+  })();
+  publishConversationEvent("assignment.changed", conversationId, { reklamacyjna });
+  return wynik;
+}

@@ -1,9 +1,12 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { Dowody } from "./Dowody";
+
+beforeEach(() => localStorage.clear());
 
 /* ── Karta faktów Copilota w kolumnie dowodów (0.275.0) ──────────────────────
    Trzy rzeczy warte testu:
@@ -25,6 +28,9 @@ const rek = (): Reklamacja => ({
   ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
   otwartoAt: "2026-09-06T10:00:00.000Z", prowadzi: null, prowadziAt: null,
   notatka: null, wersja: 1, kubelek: "decyzja", sygnaly: [],
+  /* `tagi` jest w typie WYMAGANE i serwer zawsze je ustawia. Atrapa je
+     pomijała, więc rzutowanie `as unknown` kłamało o kontrakcie. */
+  tagi: [],
   link: null, linkZamowienia: null, linkOferty: null,
   ofertaNazwa: null, ofertaZdjecie: "nieznane", twId: null, twSymbol: null,
 } as unknown as Reklamacja);
@@ -150,5 +156,50 @@ describe("Karta faktów Copilota", () => {
     /* Cytat z ROZMOWY podpowiedzi nie potrzebuje: wiadomość jest obok.
        Karta cytuje `W1` trzykrotnie, więc bierzemy pierwszy z brzegu. */
     expect(screen.getAllByText("W1")[0]).not.toHaveAttribute("title");
+  });
+
+  /* ── KARTA SIĘ ZWIJA (0.389.0) ─────────────────────────────────────────────
+     Zgłoszenie właściciela: „zasłania sporo ekranu po prawej stronie". Kolumna
+     jest DOWODAMI — zamówienie, oferta, kartoteka, rozmowy o tym zakupie —
+     a karta maszyny spychała je poniżej krawędzi okna.                      */
+
+  it("karta jest domyślnie OTWARTA — zwinięcie na starcie zabrałoby ją używającym", () => {
+    render(<Dowody {...props(KARTA)} />);
+    expect(screen.getByText("Kosiarka przestała ciąć")).toBeVisible();
+  });
+
+  it("jedno kliknięcie zwija kartę, a wybór przeżywa zamknięcie ekranu", async () => {
+    const { unmount } = render(<Dowody {...props(KARTA)} />);
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
+    expect(screen.getByText("Kosiarka przestała ciąć")).not.toBeVisible();
+    unmount();
+
+    /* Nawyk stanowiska, nie decyzja na jedną sprawę — inaczej agent klikałby
+       przy każdej reklamacji z osobna. */
+    render(<Dowody {...props(KARTA)} />);
+    expect(screen.getByText("Kosiarka przestała ciąć")).not.toBeVisible();
+  });
+
+  it("zamknięta karta mówi, CO w niej jest — inaczej trzeba ją otwierać, żeby sprawdzić", async () => {
+    render(<Dowody {...props(KARTA)} />);
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
+
+    expect(screen.getByText("usterka, oczekiwanie klienta, dowody")).toBeVisible();
+    /* Braki wołają z nagłówka, bo to one trzymają sprawę w miejscu. */
+    expect(screen.getByText("2 braki")).toBeVisible();
+  });
+
+  it("bez karty nagłówek tłumaczy blok, zamiast trzech linijek prozy nad przyciskiem", () => {
+    render(<Dowody {...props(null)} />);
+    expect(screen.getByText("wyczyta usterkę, oczekiwanie i braki")).toBeVisible();
+  });
+
+  it("przeczytana sprawa bez ani jednego faktu nie udaje, że coś znalazł", async () => {
+    const pusta = { ...KARTA, usterka: null, kiedy: null, oczekiwanie: null,
+      dowody: [], brakuje: [], rada: null };
+    render(<Dowody {...props(pusta as SzczegolReklamacji["karta"])} />);
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
+
+    expect(screen.getByText("przeczytał, ale nic nie wyczytał")).toBeVisible();
   });
 });

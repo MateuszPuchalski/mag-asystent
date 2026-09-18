@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlarmClock, Clock, Flame } from "lucide-react";
+import { AlarmClock, Clock, Flame, Scale } from "lucide-react";
 import type { Rozmowa, StatusRozmowy } from "../api/typy";
 import { KLASA_STATUSU, Przycisk, czas } from "../ui";
 import { DO_WYBORU, NAZWA } from "./statusy";
@@ -24,13 +24,18 @@ import { DO_WYBORU, NAZWA } from "./statusy";
    rozmowy odłożonej na zawsze), więc ekran pyta o datę PRZED wysłaniem, a nie
    pokazuje potem błędu z serwera — agent nie ma się dowiadywać o regule
    z komunikatu odmowy. */
-export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisujePriorytet }: {
+export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisujePriorytet,
+  onReklamacyjna, zapisujeReklamacyjna = false }: {
   rozmowa: Rozmowa;
   zapisuje: boolean;
   blad: string;
   onZmien: (status: StatusRozmowy, doKiedy: string | null) => void;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
+  /* Znacznik reklamacyjny (0.390.0) — OPCJONALNY tym samym wzorcem co Copilot
+     i tagi: czego nie da się zrobić, tego nie ma na ekranie. */
+  onReklamacyjna?: (reklamacyjna: boolean) => void;
+  zapisujeReklamacyjna?: boolean;
 }) {
   const [odkladanie, setOdkladanie] = useState(false);
   const [termin, setTermin] = useState("");
@@ -60,6 +65,32 @@ export function Status({ rozmowa, zapisuje, blad, onZmien, onPriorytet, zapisuje
           : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
       <Flame size={13} />{rozmowa.priorytet === "pilny" ? "PILNE" : "Oznacz jako pilne"}
     </button>
+
+    {/* ── ZNACZNIK REKLAMACYJNY (0.390.0) ───────────────────────────────────
+        Właściciel: „chcę zaznaczyć, że to jest pytanie reklamacyjne i będzie
+        traktowane jako reklamacja, ale nie będzie w allegrowych reklamacjach".
+
+        SPRAWY W ALLEGRO ZAŁOŻYĆ SIĘ NIE DA i to nie jest nasz wybór:
+        `/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET, sprawę
+        otwiera kupujący. Ten znacznik jest NASZ i mówi wyłącznie, jak biuro
+        prowadzi tę rozmowę.
+
+        Przełącznik, nie droga w jedną stronę: agent bierze pytanie za
+        reklamacyjne po pierwszym zdaniu klienta, a po wyniku z hali bywa, że
+        to pytanie o dobór. Ten sam kształt co przy „pilne" obok — dwa
+        przełączniki, dwa różne pytania, jedna gramatyka. */}
+    {onReklamacyjna && <button type="button" disabled={zapisujeReklamacyjna}
+      aria-pressed={rozmowa.reklamacyjna}
+      title={rozmowa.reklamacyjna
+        ? "Prowadzimy tę rozmowę jak reklamację. W Allegro sprawy nie ma — założyć ją może tylko kupujący."
+        : "Oznacz, że prowadzimy tę rozmowę jak reklamację. Sprawy w Allegro to nie zakłada."}
+      onClick={() => onReklamacyjna(!rozmowa.reklamacyjna)}
+      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold disabled:opacity-50 ${
+        rozmowa.reklamacyjna
+          ? "bg-violet-100 text-violet-900 hover:bg-violet-200"
+          : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+      <Scale size={13} />{rozmowa.reklamacyjna ? "REKLAMACYJNA" : "Sprawa reklamacyjna"}
+    </button>}
 
     {/* STATUS RAZ, NIE DWA (0.193.0). Do 0.192.0 stała tu plakietka ze stanem,
         a obok niej pole wyboru z tą samą wartością — jedno pasmo nagłówka

@@ -36,6 +36,14 @@ export interface RozmowaSkrzynki {
   /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
   priorytet: "normalny" | "pilny";
   /**
+   * Ręczny znacznik „to sprawa reklamacyjna" (0.390.0).
+   *
+   * NASZ, nie Allegro: sprawy posprzedażowej sprzedawca nie może założyć
+   * (`/sale/issues` ma wyłącznie GET). Mówi, że rozmowę prowadzimy jak
+   * reklamację, i nic poza tym — zegara ustawowego rozmowa nie dostaje.
+   */
+  reklamacyjna: boolean;
+  /**
    * Ile czeka pytanie klienta, w milisekundach. `null`, gdy klient nie napisał
    * nic — wątek zaczęty przez nas nie ma na co czekać, a zegar liczony od
    * NASZEJ wiadomości kłamałby o cudzej cierpliwości.
@@ -249,7 +257,7 @@ const LISTA = `
            c.subject, 'Klient') AS klient,
          c.assigned_user_id AS wlascicielId, u.name AS wlasciciel, c.version AS wersja,
          c.status, c.snoozed_until AS odlozoneDo,
-         c.priorytet,
+         c.priorytet, c.reklamacyjna,
          o.body AS ostatniaWiadomosc,
          COALESCE(o.sent_at, c.updated_at) AS ostatniaWiadomoscAt,
          o.direction AS ostatniKierunek,
@@ -329,6 +337,7 @@ const naRozmowe = (
       (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
       w.ostatniRuch == null ? null : String(w.ostatniRuch)),
     priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
+    reklamacyjna: Boolean(Number(w.reklamacyjna ?? 0)),
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
@@ -802,6 +811,24 @@ export function osRozmowy(id: number): {
          angielskie klucze w bazie i w API, polszczyzna na ekranie. Panel nie
          ma parsować `tresc`, bo to jest zdanie dla człowieka, nie format. */
       zdarzenie: { rodzaj: "status", po: p.po ?? null },
+    });
+  }
+
+  /* ZNACZNIK REKLAMACYJNY NA OSI (0.390.0). Nadanie i zdjęcie są tak samo
+     ważne: „czemu ta rozmowa wypadła z sita reklamacyjnego" ma mieć
+     odpowiedź, a `events` nie ma retencji. */
+  for (const z of db().prepare(`
+    SELECT id, payload, created_at FROM conversation_event
+     WHERE conversation_id=? AND event_type='reklamacyjna_changed' ORDER BY id
+  `).all(id) as Array<Record<string, unknown>>) {
+    const p = JSON.parse(String(z.payload ?? "{}")) as { na?: number; autor?: string };
+    const nadano = Number(p.na ?? 0) === 1;
+    os.push({
+      id: `reklamacyjna-${z.id}`, rodzaj: "status", autor: String(p.autor ?? "system"),
+      odKlienta: false,
+      tresc: nadano ? "oznaczono jako sprawę reklamacyjną" : "zdjęto znacznik reklamacyjny",
+      at: String(z.created_at), ofertaId: null,
+      zdarzenie: { rodzaj: "status", po: nadano ? "reklamacyjna" : "nie_reklamacyjna" },
     });
   }
 
