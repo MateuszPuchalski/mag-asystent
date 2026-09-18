@@ -34,6 +34,134 @@ historii nie przepisujemy.
 ---
 
 
+## 0.401.0 — 18 września 2026
+
+**Kolejność w kolejkach obsługi wybiera agent.** Zgłoszenie właściciela:
+„dodaj sortowanie po dacie etc". Reklamacje, dyskusje i zwroty miały kolejność
+ZASZYTĄ — najpierw termin, potem data otwarcia malejąco — i ani jednego
+przełącznika. Agent szukający „co przyszło wczoraj" przewijał listę.
+
+- **Reklamacje: cztery osie** — termin, data otwarcia, ostatni ruch, kwota.
+- **Dyskusje: dwie** — data otwarcia i ostatni ruch. Terminu ani kwoty ta
+  kolejka NIE MA (Allegro nie oddaje przy dyskusji żadnego z tych pól), więc
+  pigułek dla nich nie ma: przełącznik, który nic nie robi, uczy, że
+  przełączniki nic nie robią.
+- **Zwroty: trzy** — termin, data utworzenia, kwota. Zwrot nie prowadzi
+  rozmowy, więc „ostatniego ruchu" nie ma czego pytać.
+- **Domyślny wszędzie zostaje TEN, który był**, więc wydanie niczego nie
+  przestawia pod ręką. Przy reklamacjach i zwrotach to zegar ustawowy.
+- **Wybór jest pamiętany osobno dla każdej kolejki** — ten sam nawyk, co przy
+  porządku w skrzynce. Osobno, bo „po kwocie" ma sens w reklamacjach i nie ma
+  go w dyskusjach.
+- **Puste zawsze na końcu.** Sprawa bez terminu nie jest najpilniejsza ani
+  najmniej pilna — jest sprawą, o której ta oś nic nie mówi.
+
+**Przy zwrotach jest to odwrócenie decyzji z 0.370.0**, gdzie przełącznik „od
+daty nadania" zszedł świadomie: odpowiadał na inne pytanie („co przyszło
+najdawniej") niż to, które prowadzi tę pracę („co się pali"). Wraca na wyraźne
+zgłoszenie właściciela i z zachowaniem tamtego powodu — zegar ustawowy dalej
+rządzi listą, dopóki agent sam nie powie inaczej.
+
+**Skrzynki to nie dotyczy i nie jest to przeoczenie:** ma przełącznik od
+0.259.0, a dwie pozostałe osie — termin i kwota — w rozmowie nie istnieją.
+
+Wdrożenie: nic ręką.
+
+---
+
+
+## 0.400.0 — 18 września 2026
+
+**Symbol towaru w reklamacji bierze się z paragonu, nie z dzisiejszego
+mapowania oferty.** Zgłoszenie właściciela: „symbol towaru w reklamacji
+powinno ściągać z paragonu do danego zamówienia".
+
+Kolejka i szczegół brały kartotekę z `oferta_kartoteka` — czyli z tego, na co
+oferta wskazuje DZIŚ. Sprzedawca przepina sygnaturę oferty, gdy towar od
+jednego dostawcy się wyczerpie, więc reklamacja sprzed miesiąca pokazywała
+część, której ten klient nigdy nie dostał.
+
+- **Paragonem jest pozycja zamówienia**: niesie sygnaturę sprzedawcy z chwili
+  zakupu. Reklamacja dotyczy rzeczy, którą klient DOSTAŁ.
+- **Paragon bije mapowanie** i jest to świadome odwrócenie reguły „za pamięcią
+  stoi decyzja człowieka, więc bije automat". Tamta reguła rozstrzyga, czym
+  JEST oferta; tutaj pytanie brzmi, co klient dostał — a to jest fakt zapisany
+  na pozycji zamówienia, nie wniosek.
+- **Bez pobranego zamówienia nic nie ginie**: zostaje mapowanie jak dotąd.
+  Zamówień starszych niż retencja Allegro nie mamy wcale.
+- **Dwa trafienia to nie powód do wybrania pierwszego** — ta sama zasada, co
+  w `kartotekaPoSku`. Wiersz zostaje przy tym, co wiedział.
+- **Jedno zapytanie na całą kolejkę**, nie jedno na wiersz.
+
+Wdrożenie: nic ręką.
+
+---
+
+
+## 0.399.0 — 18 września 2026
+
+**Szablony odpowiedzi w panelu obsługi.** Zgłoszenie właściciela: „dodaj ten
+szablon do szablonów odpowiedzi w skrzynce". Szablonów nie było wcale — §10.4
+projektu panelu wymieniał je wśród rzeczy planowanych i sam pisał „Nie ma
+szablonów". Agenci wklejali te zdania z notatnika, więc każda ich wersja była
+trochę inna.
+
+- **Przycisk „Szablony"** obok „Ułóż odpowiedź", w tym samym rzędzie: szablon
+  jest wstawką do szkicu, a nie osobnym trybem pracy.
+- **Pierwszy szablon to treść właściciela** — wymiana przez paczkomat, razem
+  z odnośnikiem do instrukcji Allegro. Wchodzi migracją, ale TYLKO do pustej
+  tabeli: szablon świadomie zdjęty nie ma prawa wracać po restarcie usługi.
+- **Biuro zakłada i poprawia szablony samo.** Lista wymagająca wydania przy
+  każdym przecinku wraca do notatnika agenta.
+- **Wstawia, nie wysyła.** Treść ląduje w szkicu i dalej wymaga „Wyślij do
+  klienta" — druga zasada nadrzędna projektu panelu.
+- **Dopisuje, nie nadpisuje** — ten sam kontrakt, co każda inna wstawka. Szkic
+  jest współdzielony z zespołem.
+- **Bez podstawiania danych.** Treść wchodzi dosłownie, bez `{{numer}}`: zła
+  wartość wjechałaby do wiadomości wysłanej klientowi, a agent zobaczyłby ją
+  dopiero po fakcie.
+- **Limit 2000 znaków sprawdzany PRZY ZAPISIE** i widoczny przy pisaniu.
+  To `NewMessageInThread.text.maxLength` ze specyfikacji Allegro — dłuższy
+  szablon robiłby szkic niewysyłalnym.
+- **Zdjęcie to archiwum, nie kasowanie** (§25a.5): przy szablonie wisi historia
+  tego, co wysłaliśmy klientom.
+- Do dziennika idzie DŁUGOŚĆ treści, nigdy sama treść — `events` nie ma
+  retencji, a szablon bywa zdaniem o kliencie.
+
+Wdrożenie: migracja dokłada tabelę `szablon_odpowiedzi` i pierwszy wpis.
+
+---
+
+
+## 0.398.0 — 18 września 2026
+
+**Reklamacja znów pokazuje nowe wiadomości.** Zgłoszenie właściciela: „mam
+reklamację, która nie pokazuje dzisiejszych wiadomości". Przyczyny były DWIE
+i obie wyciszały rozmowę po cichu, bez śladu na ekranie.
+
+- **Status końcowy nie wycisza rozmowy.** Kolejka uzupełnień odsiewała sprawy
+  o statusie `CLAIM_ACCEPTED`, `CLAIM_REJECTED` i `DISPUTE_CLOSED`, bo „ich
+  rozmowa już niczego nie zmieni". To była nieprawda o NASZYM WŁASNYM
+  przebiegu pracy: po uznaniu reklamacji panel wysyła krok „czy towar do
+  odesłania", a kupujący odpisuje w tej samej rozmowie — kiedy odeśle, jakim
+  kurierem. Sprawa miała wtedy status końcowy, więc żadna z tych odpowiedzi
+  nie docierała na ekran. Agent widział rozmowę urwaną na własnym pytaniu.
+- **Błąd sieci nie jest urwaniem trwałym.** Bezpiecznik stron i nieudane
+  żądanie zapisywały tę samą flagę `czat_urwany`, a sprawa z tą flagą wypada
+  z uzupełniania na stałe. Jedno mignięcie sieci wyciszało rozmowę na zawsze.
+  Flagę zapisuje odtąd wyłącznie bezpiecznik; błąd zostawia sprawę w kolejce,
+  a następny takt próbuje jeszcze raz.
+
+Kosztu u Allegro to nie podnosi. Prawdziwym strażnikiem jest LICZNIK: żądanie
+wychodzi wyłącznie wtedy, gdy Allegro mówi o większej liczbie wiadomości, niż
+mamy u siebie. Status był drugą bramką, która nie chroniła przed niczym.
+
+Wdrożenie: nic ręką. Zaległe wiadomości dociągną się same przy najbliższych
+taktach synchronizacji.
+
+---
+
+
 ## 0.397.0 — 18 września 2026
 
 **Rozmowa bez numeru zamówienia dostaje drogę do zakupu klienta.** Zgłoszenie

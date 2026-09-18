@@ -20,6 +20,7 @@ import { Prowadzi } from "../sprawy/Prowadzi";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
 import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
@@ -135,6 +136,11 @@ export function Reklamacje() {
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
   const { sito, przelacz: przelaczSito } = useSito();
+  /* Reklamacja ma wszystkie cztery osie: termin decyzji i oczekiwaną kwotę
+     niosą jej pola z Allegro. Domyślny zostaje TERMIN — to jest kolejność,
+     którą ekran miał zaszytą, więc wydanie niczego nie przestawia pod ręką. */
+  const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
+    "wertis.reklamacje.porzadek", ["termin", "otwarto", "ruch", "kwota"], "termin");
   const [tag, setTag] = useState<number | null>(null);
   const slownikTagow = useTagi();
   const nowyTag = useNowyTag();
@@ -212,7 +218,20 @@ export function Reklamacje() {
     () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
     [moi, tag]);
 
-  const widoczne = pasujace ?? poSitach;
+  /* ── PORZĄDEK WYBIERA AGENT (0.401.0) ────────────────────────────────────
+     Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Kolejność była
+     zaszyta — najpierw termin, potem data otwarcia malejąco — i nie dało się
+     jej ruszyć. Sortowanie stoi NA KOŃCU łańcucha, po kubełku, sitach, tagu
+     i szukaniu: najpierw ustala się, CO jest na liście, potem w jakiej
+     kolejności. Odwrotnie byłoby sortowaniem rzeczy, które i tak odpadną. */
+  const widoczne = useMemo(
+    () => posortuj(pasujace ?? poSitach, porzadek, {
+      otwarto: (r) => r.otwartoAt,
+      ruch: (r) => r.ostatniaWiadomoscAt ?? r.otwartoAt,
+      termin: (r) => r.decyzjaDo,
+      kwota: (r) => r.oczekiwanaKwotaGrosze,
+    }),
+    [pasujace, poSitach, porzadek]);
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
      tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
      samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
@@ -457,6 +476,8 @@ export function Reklamacje() {
             które właściciel zadaje najczęściej. Ten rząd weźmie też czipy
             tagów, bo one odpowiadają na trzecie pytanie: „o czym to". */}
         <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PasekPorzadku porzadek={porzadek}
+              dozwolone={["termin", "otwarto", "ruch", "kwota"]} onZmien={ustawPorzadek} />
             <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
               moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
               niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />

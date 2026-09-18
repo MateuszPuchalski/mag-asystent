@@ -1170,16 +1170,34 @@ podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
-**Z tej listy działa w 0.231.0:** licznik znaków, ostrzeżenie o dopisku
+**Z tej listy działa w 0.399.0:** licznik znaków, ostrzeżenie o dopisku
 klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze źródłem,
-wstawienie parametrów produktu, przełączenie trybu i szkic ze sztucznej
-inteligencji — przycisk „Ułóż odpowiedź" nad polem, opisany w §14.6.
+wstawienie parametrów produktu, przełączenie trybu, szkic ze sztucznej
+inteligencji (przycisk „Ułóż odpowiedź", §14.6) oraz SZABLONY.
 
 Wstawka parametrów bierze tożsamość towaru i dostępność. NIE bierze półki,
 rezerwacji ani rozbicia na magazyny. Szkic czyta klient, a adres regału mówi
 obcemu, jak zbudowany jest nasz magazyn.
 
-Nie ma szablonów, podglądu ani historii wersji szkicu.
+**Szablony doszły w 0.399.0** na zgłoszenie właściciela. Przycisk stoi obok
+„Ułóż odpowiedź", w tym samym rzędzie — szablon jest wstawką do szkicu, a nie
+osobnym trybem pracy. Lista jest wspólna dla całego panelu i biuro zakłada ją
+samo: treść, która wymaga wydania przy każdym przecinku, wraca do notatnika
+agenta, a wtedy każda jej wersja jest trochę inna.
+
+Trzy rzeczy, których szablon NIE robi:
+
+- **Nie wysyła.** Treść ląduje w szkicu i dalej wymaga „Wyślij do klienta" —
+  druga zasada nadrzędna tego projektu.
+- **Nie podstawia danych.** Wchodzi dosłownie, bez `{{numer}}`. Zła wartość
+  wjechałaby do wiadomości wysłanej klientowi, a agent zobaczyłby ją po fakcie.
+- **Nie nadpisuje szkicu.** Dopisuje się na końcu, jak każda inna wstawka —
+  szkic jest współdzielony, więc nadpisanie kasowałoby cudzą pracę.
+
+Zdjęty szablon idzie do archiwum, nie do kosza (§25a.5): wisi przy nim
+historia tego, co wysłaliśmy klientom.
+
+Nie ma podglądu ani historii wersji szkicu.
 
 **Szkic Copilota nie wchodzi do pola sam (0.231.0).** Propozycja stoi w karcie
 pod polem, a do szkicu agenta trafia na jedno z dwóch kliknięć. „Wstaw"

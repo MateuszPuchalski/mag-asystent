@@ -329,14 +329,29 @@ export async function synchronizujAllegroReklamacje(
 export function czatyDoUzupelnienia(
   database: Db, konto: number, limit = CZATOW_NA_PRZEBIEG,
 ): Array<{ id: number; externalId: string }> {
-  /* `status_allegro IS NULL` przechodzi świadomie: sprawa bez statusu nie jest
-     rozstrzygnięta, a `NOT IN` przy NULL-u dałoby fałsz i cicho by ją pominęło. */
+  /* ── STATUS KOŃCOWY NIE WYCISZA ROZMOWY (0.398.0) ──────────────────────────
+     Zgłoszenie właściciela: „mam reklamację, która nie pokazuje dzisiejszych
+     wiadomości". Stał tu warunek odsiewający `CLAIM_ACCEPTED`,
+     `CLAIM_REJECTED` i `DISPUTE_CLOSED` — z uzasadnieniem, że „ich rozmowa
+     już niczego nie zmieni".
+
+     I to było nieprawdą O NASZYM WŁASNYM PRZEBIEGU PRACY. Po UZNANIU
+     reklamacji panel wysyła krok „czy towar do odesłania"
+     (`reklamacje-wysylka.ts`, trasa `/zwrot-towaru`), a kupujący odpisuje
+     w tej samej rozmowie: kiedy odeśle, jakim kurierem, pod jaki adres.
+     Sprawa miała wtedy status `CLAIM_ACCEPTED`, więc jej rozmowa wypadała
+     z uzupełniania — i żadna z tych odpowiedzi nie docierała na ekran.
+     Agent widział rozmowę urwaną na własnym pytaniu.
+
+     KOSZTU TO NIE PODNOSI, bo prawdziwym strażnikiem jest LICZNIK niżej:
+     żądanie wychodzi wyłącznie wtedy, gdy Allegro mówi o większej liczbie
+     wiadomości, niż mamy u siebie. Sprawa rozstrzygnięta i wyciszona ma te
+     liczby równe i tak nie wchodzi do kolejki. Status był drugą bramką, która
+     nie chroniła przed niczym, a cicho gubiła wiadomości. */
   const wiersze = database.prepare(`
     SELECT r.id, r.external_id
       FROM reklamacja_klienta r
      WHERE r.channel_account_id = ?
-       AND COALESCE(r.status_allegro,'') NOT IN
-           ('CLAIM_ACCEPTED','CLAIM_REJECTED','DISPUTE_CLOSED')
        AND r.wiadomosci_ile >
            (SELECT COUNT(*) FROM reklamacja_wiadomosc w WHERE w.reklamacja_id = r.id)
        /* Sprawa z rozmową urwaną przez NASZ bezpiecznik odpada (0.273.0):
@@ -397,7 +412,18 @@ async function pobierzCzat(
        które dałoby się domknąć. Jedna gruba rozmowa głodziła dziewiętnaście
        pozostałych. */
     let wzieto = 0;
-    let urwane = false;
+    /* ── DWA RÓŻNE POWODY PRZERWANIA (0.398.0) ─────────────────────────────
+       Do 0.397.0 stała tu JEDNA zmienna `urwane` i to był drugi powód, dla
+       którego reklamacja przestawała pokazywać nowe wiadomości.
+
+       Bezpiecznik stron i błąd sieci znaczą co innego. Bezpiecznik mówi
+       „rozmowa jest dłuższa, niż bierzemy" — to stan trwały i wpis
+       `czat_urwany=1` jest wtedy prawdą, która chroni budżet. Błąd jednej
+       strony mówi „tym razem nie wyszło" — a zapisanie go tą samą flagą
+       WYRZUCAŁO sprawę z uzupełniania NA ZAWSZE, bo `czatyDoUzupelnienia`
+       pomija `czat_urwany=1`. Jedno mignięcie sieci wyciszało rozmowę
+       na stałe, bez słowa na ekranie. */
+    let urwaneLimitem = false;
     for (let strona = 0; strona < MAKS_STRON_CZATU; strona++) {
       let body: unknown | null;
       try {
@@ -406,9 +432,9 @@ async function pobierzCzat(
       } catch (e) {
         if (e instanceof BladLimituAllegro) throw e;
         /* Błąd przy JEDNEJ stronie kończy tę sprawę, nie przebieg — reszta
-           kolejki ma prawo się dociągnąć (ta sama zasada co przy 404). */
-        urwane = true;
-        break;
+           kolejki ma prawo się dociągnąć (ta sama zasada co przy 404).
+           Flagi NIE ruszamy: następny takt ma spróbować jeszcze raz. */
+        return wzieto > 0;
       }
       const wiadomosci = Array.isArray((body as Record<string, unknown> | null)?.chat)
         ? ((body as Record<string, unknown>).chat as Wiadomosc[]) : [];
@@ -421,12 +447,12 @@ async function pobierzCzat(
       if (wiadomosci.length < NA_STRONE) break;
       /* Ostatnia dozwolona strona była pełna: rozmowa ma dalszy ciąg, którego
          ten przebieg nie weźmie. */
-      if (strona === MAKS_STRON_CZATU - 1) urwane = true;
+      if (strona === MAKS_STRON_CZATU - 1) urwaneLimitem = true;
     }
     if (!wzieto) return false;
     /* ZNAK TRWAŁEGO OGONA. Bez niego wiersz wracałby do kolejki uzupełnień po
        każdym przebiegu, a ekran obiecywałby resztę, która nie ma skąd przyjść. */
-    if (urwane) {
+    if (urwaneLimitem) {
       database.prepare("UPDATE reklamacja_klienta SET czat_urwany=1 WHERE id=?").run(sprawa.id);
     } else {
       database.prepare("UPDATE reklamacja_klienta SET czat_urwany=0 WHERE id=?").run(sprawa.id);

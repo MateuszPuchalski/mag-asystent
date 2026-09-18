@@ -3,6 +3,7 @@ import { Lock, MessageSquare, Send } from "lucide-react";
 import { Przycisk } from "../ui";
 import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
 import { KartaSzkicu, PrzyciskSzkicu, type PropsSzkicuCopilota } from "./SzkicCopilota";
+import { Szablony } from "./Szablony";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
 /**
@@ -99,8 +100,22 @@ export function Edytor({
           zostało wycofane, bo z Copilotem WYŁĄCZONYM komponent renderował
           akapit, nie przycisk, i łamał rząd. Naprawiona jest przyczyna:
           `PrzyciskSzkicu` nie zajmuje już nigdy więcej niż jednej linii. */}
-      {!wKomentarzu && copilot && <div className="ml-auto flex min-w-0 justify-end">
-        <PrzyciskSzkicu p={copilot} /></div>}
+      {/* ── SZABLONY W TYM SAMYM RZĘDZIE (0.399.0) ───────────────────────────
+          Zgłoszenie właściciela: „dodaj ten szablon do szablonów odpowiedzi
+          w skrzynce". Szablon to WSTAWKA do szkicu, więc stoi tam, gdzie
+          reszta rzeczy skracających pisanie — nie w osobnym rzędzie, którego
+          0.249.0 wprost się pozbyło.
+
+          TYLKO W TRYBIE ODPOWIEDZI: szablony są zdaniami do klienta, a notatka
+          wewnętrzna nigdzie nie wychodzi. */}
+      {!wKomentarzu && <div className="ml-auto flex min-w-0 items-center justify-end gap-1">
+        <Szablony wylaczone={cudza} onWstaw={(tresc) => onZmiana(
+          /* DOPISUJE, NIE NADPISUJE — ten sam kontrakt, co każda wstawka w tym
+             edytorze. Szkic jest współdzielony z zespołem, więc nadpisanie
+             kasowałoby cudzą pracę bez pytania. */
+          szkic.trim() === "" ? tresc : `${szkic}\n\n${tresc}`)} />
+        {copilot && <PrzyciskSzkicu p={copilot} />}
+      </div>}
     </div>
 
     {wKomentarzu
