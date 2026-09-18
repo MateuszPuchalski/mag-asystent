@@ -1,7 +1,9 @@
 import { db } from "../db/db.js";
+import { config } from "../config.js";
 import { sciezkaZdjecia, zapiszZdjecie } from "./foto.js";
 import { logEvent } from "./events.js";
 import { closeIfComplete } from "./delivery.js";
+import { enqueueMM } from "./queue.js";
 import { wierszCsv, zbudujCsv } from "./csv.js";
 import type { ProblemView, ProblemType } from "../types.js";
 
@@ -165,6 +167,138 @@ export interface RaiseProblemInput {
 const SYM_OBCY_REQUIRED: ReadonlySet<string> = new Set(["wrong_item", "extra_item"]);
 
 /**
+ * Ile sztuk BRAKUJE według zgłoszenia. Zero znaczy „nie brakuje nic".
+ *
+ * Formuła jest ASYMETRYCZNA między kategoriami i uwspólnić jej nie sposób.
+ * Arkusz kolektora pyta przy „Braku w przesyłce", ILE BRAKUJE, a przy „Złej
+ * ilości" — ILE FAKTYCZNIE PRZYSZŁO (`ProblemSheet.etykietaIlosci`). Jedna
+ * formuła na oba przypadki przesunęłaby złą liczbę sztuk.
+ *
+ * NADMIAR daje zero, nie liczbę ujemną. Przyszło więcej, niż jest na
+ * dokumencie, więc na stanie niczego nie brakuje; nadmiar jest sprawą biura
+ * wobec dostawcy, nie ruchem magazynowym (patrz `zachowajStatusLinii`).
+ *
+ * `damaged` daje zero ŚWIADOMIE, decyzją właściciela. Towar uszkodzony leży na
+ * półce i jest do reklamacji. Brakującego nie ma tam wcale i to jest cała
+ * różnica między tymi kategoriami.
+ *
+ * Wynik jest przycięty do ilości z dokumentu. Brakować więcej, niż dostawca
+ * zafakturował, po prostu nie sposób — a pomyłka w polu „ile" nie ma prawa
+ * wystawić MM na ilość, której ta dostawa nigdy nie niosła.
+ */
+export function brakujaceSztuki(
+  typ: string,
+  qty: number | null | undefined,
+  iloscDok: number | null
+): number {
+  if (qty == null || !Number.isFinite(qty)) return 0;
+  if (iloscDok == null || !Number.isFinite(iloscDok) || iloscDok <= 0) return 0;
+  const brak =
+    typ === "missing_item" ? qty : typ === "qty_mismatch" ? iloscDok - qty : 0;
+  return Math.min(Math.max(brak, 0), iloscDok);
+}
+
+/**
+ * Przesuwa brakujący towar z magazynu dostawy na magazyn serwisowy.
+ *
+ * DLACZEGO TO ISTNIEJE: fakturę zakupu Subiekt księguje w całości, więc towar,
+ * którego w palecie nie było, WISI NA STANIE jako sprzedawalny. Do rozliczenia
+ * z dostawcą obiecywałby się klientom, a pierwszy, kto po niego pójdzie,
+ * wróci z półki z niczym.
+ *
+ * Nie robi nic, gdy `MAG_ID_SERWIS` nie jest ustawiony. To ta sama bramka co
+ * przy magazynie odpadu i z tego samego powodu: zgadnięty numer WYSTAWIA
+ * DOKUMENT, tylko na cudzy magazyn.
+ *
+ * Pominięcie zostawia ślad w zdarzeniach z powodem. Zgłoszenie braku zapisuje
+ * się mimo to — braku nie wolno zgubić przez lukę w konfiguracji, bo to fakt
+ * o dostawie, a nie o naszych numerach magazynów.
+ */
+function przesunBrakNaSerwis(
+  problemId: number,
+  lineId: number,
+  typ: string,
+  qty: number | null | undefined,
+  iloscDok: number | null,
+  user: string
+): void {
+  const brak = brakujaceSztuki(typ, qty, iloscDok);
+  if (brak <= 0) return;
+
+  const serwis = config.magId.SERWIS;
+  const linia = db()
+    .prepare(
+      `SELECT l.tw_id AS twId, l.tw_symbol AS symbol, d.source_mag_id AS magFrom,
+              d.sgt_dok_id AS dokId
+         FROM delivery_line l JOIN delivery d ON d.id = l.delivery_id
+        WHERE l.id = ?`
+    )
+    .get(lineId) as
+    | { twId: number; symbol: string; magFrom: number | null; dokId: number }
+    | undefined;
+
+  const pomin = (powod: string): void => {
+    logEvent("brak_na_serwis_pominiety", user, linia?.twId ?? null, {
+      problemId,
+      lineId,
+      typ,
+      brak,
+      powod,
+    });
+  };
+  if (serwis <= 0) return pomin("brak MAG_ID_SERWIS");
+  // pozycję sprawdził już `raiseProblem`; ta gałąź jest dla typów, nie dla życia
+  if (!linia) return pomin("nie ma takiej pozycji");
+  /* Magazyn ŹRÓDŁOWY bierzemy z dostawy, nie z konfiguracji. Kontener skutkuje
+     na MGP, a krajowa FZ na magazyn główny — jeden numer z `config` przesuwałby
+     połowę przypadków z magazynu, na którym tego towaru nigdy nie było.
+     Starsze dostawy tej kolumny nie mają wypełnionej, a zgadywanie numeru
+     wystawiłoby dokument w ciemno. */
+  const magFrom = linia.magFrom;
+  if (magFrom == null) return pomin("dostawa bez magazynu skutku");
+
+  const queueId = enqueueMM(
+    magFrom,
+    serwis,
+    [{ twId: linia.twId, qty: brak }],
+    {
+      createdBy: user,
+      /* `twId` ZOSTAJE PUSTE, świadomie. Guard „adres przed sprzedawalnością"
+         (sfera-worker/sql/pick_mm_pending.sql) pilnuje MM, które czyni towar
+         sprzedawalnym; to zabiera towar ze sprzedaży, więc nie ma czego
+         pilnować. Z wypełnioną kolumną zadanie czekałoby na `set_location`
+         tej samej kartoteki — a przy braku po CZĘŚCIOWYM odłożeniu taki zapis
+         zwykle stoi w kolejce. Jego błąd trzymałby fantom w sprzedaży dłużej,
+         dokładnie odwrotnie do celu tego ruchu. */
+      twId: null,
+      /* Dokument PODAJEMY. `czekaNaDokument` wstrzymuje MM, dopóki FZ siedzi
+         w buforze Subiekta — a na nieksięgowanej fakturze tego stanu jeszcze
+         nie ma, więc przesunięcie nie miałoby czego zabrać. */
+      sourceDocId: linia.dokId,
+      /* Etykieta mówi, DOKĄD i PO CZYM. Magazynier bierze kartkę do ręki, a
+         dokument MM sam z siebie nie powie, że to skutek braku w dostawie. */
+      label: `Brak w dostawie · ${linia.symbol}`,
+      detail: `${brak} szt na magazyn serwisowy`,
+    }
+  );
+
+  /* Zdarzenie dziedzinowe, obok `problem_raised`. Pytanie „dlaczego ten stan
+     się ruszył" musi mieć odpowiedź w jednym miejscu. `enqueueMM` własnego
+     wpisu nie robi, bo MM wychodzi z czterech różnych miejsc i każde z nich
+     zna inny powód ruchu. */
+  logEvent("brak_na_serwis", user, linia.twId, {
+    problemId,
+    lineId,
+    typ,
+    brak,
+    iloscDok,
+    magFrom,
+    magTo: serwis,
+    queueId,
+  });
+}
+
+/**
  * Zgłoszenie wyjątku. Waliduje regułę domenową: uszkodzenie / zły towar /
  * nieznany kod bez zdjęcia nie jest zgłoszeniem, tylko opinią.
  */
@@ -256,6 +390,14 @@ export function raiseProblem(
     closeIfComplete(input.deliveryId, user);
   }
   logEvent("problem_raised", user, null, { problemId: id, typ: input.typ, lineId: input.lineId ?? null });
+
+  /* Skutek magazynowy dopiero PO zapisie zgłoszenia i PO jego zdarzeniu.
+     Kolejność jest tu regułą, nie przypadkiem: zgłoszenie braku jest faktem
+     o dostawie i musi przeżyć nawet wtedy, gdy przesunięcia nie da się
+     wystawić. Odwrotna kolejność gubiłaby fakt z powodu naszej konfiguracji. */
+  if (input.lineId) {
+    przesunBrakNaSerwis(id, input.lineId, input.typ, input.qty, iloscDok, user);
+  }
   return { id };
 }
 

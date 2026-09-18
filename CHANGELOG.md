@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.391.0 — 18 września 2026
+
+**Brak w dostawie zdejmuje towar ze sprzedaży.** [wymaga działania]
+Decyzja właściciela: „gdy rozkładający dostawę zgłosi braki, brakujący towar
+powinien być przeniesiony na magazyn serwis". Do tego wydania zgłoszenie braku
+było wyłącznie ZDANIEM — wiersz w `problem`, pozycja na protokole dla dostawcy
+i na tym koniec.
+
+**Dlaczego to bolało.** Fakturę zakupu Subiekt księguje w CAŁOŚCI, więc towar,
+którego w palecie nie było, wisiał na magazynie głównym jako sprzedawalny.
+Sklep obiecywał go klientom, a magazynier wracał z półki z niczym. Rozbieżność
+żyła aż do rozliczenia z dostawcą i nie miała żadnego objawu.
+
+**Formuła braku jest ODWROTNA między kategoriami i to jest tu najgroźniejszy
+szczegół.** Arkusz kolektora pyta przy „Braku w przesyłce", ILE BRAKUJE, a przy
+„Złej ilości" — ILE FAKTYCZNIE PRZYSZŁO. Ruch bierze więc raz samą ilość, a raz
+różnicę wobec dokumentu; jedna formuła na oba przypadki przesunęłaby złą liczbę
+sztuk. NADMIAR nie rusza stanu, bo niczego nie brakuje. Uszkodzenie w
+transporcie też nie: ten towar leży na półce i jest do reklamacji.
+
+**Zakres jest zawężony świadomie.** Ruch dotyczy dwóch kategorii z pięciu,
+wychodzi z magazynu SKUTKU dostawy (kontener z MGP, krajowa FZ z magazynu
+głównego) i czeka na wyjście faktury z bufora Subiekta — na nieksięgowanym
+dokumencie tego stanu jeszcze nie ma. Zadanie idzie bez `tw_id`: guard „adres
+przed sprzedawalnością" pilnuje ruchu, który czyni towar sprzedawalnym, a ten
+zabiera go ze sprzedaży. Z wypełnioną kolumną przesunięcie czekałoby na zapis
+lokalizacji tej samej kartoteki — a przy braku po CZĘŚCIOWYM odłożeniu taki
+zapis zwykle stoi w kolejce.
+
+**[wymaga działania] `MAG_ID_SERWIS` w `wertis.env`.** Bez wpisu zgłoszenie
+braku zapisuje się jak dotąd i stanu nie rusza — zachowanie sprzed tego
+wydania. Zero znaczy wyłączone z tego samego powodu co przy magazynie odpadu:
+zgadnięty numer WYSTAWIA DOKUMENT, tylko na cudzy magazyn. Pominięcie zostawia
+ślad w zdarzeniach z powodem, żeby biuro wiedziało, czego nie zrobiono.
+
+**Czego to wydanie NIE robi.** Nie cofa przesunięcia przy rozstrzygnięciu
+wyjątku — dostawca czasem dosyła brak, a czasem wystawia korektę, i to są dwie
+różne drogi w Subiekcie. Zamknięcie wyjątku zostaje decyzją człowieka przy
+dokumencie. Nowego APK nie trzeba: cała zmiana siedzi po stronie serwera.
+
 ## 0.390.0 — 18 września 2026
 
 **Rozmowę wolno oznaczyć jako sprawę reklamacyjną — u nas, nie w Allegro.**

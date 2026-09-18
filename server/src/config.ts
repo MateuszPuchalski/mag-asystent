@@ -599,6 +599,20 @@ export const config = {
      * zakłada koszyka — czyli zachowanie sprzed tego wydania.
      */
     ODP: num(process.env.MAG_ID_ODP, 0, "MAG_ID_ODP"),
+    /**
+     * Magazyn SERWISOWY — towar, którego zabrakło w dostawie (0.391.0).
+     *
+     * ZERO ZNACZY WYŁĄCZONE, dokładnie z tego samego powodu co przy odpadzie
+     * wyżej: pomyłka w numerze WYSTAWIA DOKUMENT, a MM nie cofa się jednym
+     * kliknięciem. Dopóki numeru nie ma w `wertis.env`, zgłoszenie braku
+     * zapisuje się jak dotąd i nie rusza stanu — czyli zachowanie sprzed tego
+     * wydania.
+     *
+     * Po co w ogóle ten ruch: fakturę zakupu księguje Subiekt, więc brakujący
+     * towar WISI NA STANIE magazynu głównego jako sprzedawalny, choć fizycznie
+     * go nie ma. Do czasu rozliczenia z dostawcą obiecywałby się klientom.
+     */
+    SERWIS: num(process.env.MAG_ID_SERWIS, 0, "MAG_ID_SERWIS"),
   },
 
   /**
