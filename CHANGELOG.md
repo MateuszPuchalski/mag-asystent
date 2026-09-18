@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.394.0 — 18 września 2026
+
+**Notatka biura wchodzi do szukania w trzech kolejkach.** Zgłoszenie
+właściciela: gdy paczka do klienta nie dotarła, zgłaszamy to Allegro i wracamy
+z NUMEREM SPRAWY, który nie ma u nas żadnego własnego pola. Ląduje w notatce —
+i właśnie po nim ktoś potem szuka. Pole szukało po numerze, zamówieniu,
+loginie i prowadzącym, więc po tym numerze nie znajdowało niczego, choć stał
+on na ekranie obok.
+
+- Reklamacje, dyskusje i zwroty: `notatka` dochodzi do uchwytów sprawy, więc
+  fraza trafia też w treść pisaną przez biuro. Reguła iloczynu po członach
+  zostaje bez zmian — notatka jest kolejnym POLEM, nie kolejną regułą.
+- Podpowiedzi w polach mówią o tym wprost, bo funkcja, o której nikt nie wie,
+  jest funkcją, której nie ma.
+- Skrzynki to NIE dotyczy i to nie jest przeoczenie: komentarze rozmowy stoją
+  w osobnej tabeli i nie jadą z listą, więc objęcie ich szukaniem wymaga
+  zmiany po stronie serwera. Osobne wydanie albo osobna decyzja.
+
+Wdrożenie: nic ręką.
+
+---
+
+
 ## 0.393.0 — 18 września 2026
 
 **Status przesyłki do klienta i ceny produktów w kolumnie faktów.** Zgłoszenie

@@ -255,7 +255,7 @@ export function Szukanie({
       <div className="relative flex min-w-0 flex-1 items-center">
       <input
         className={`field h-8 w-full text-sm ${fraza ? "pr-8" : ""}`}
-        placeholder="Zeskanuj etykietę albo szukaj: numer, login, nazwisko, przewoźnik"
+        placeholder="Zeskanuj etykietę albo szukaj: numer, login, nazwisko, przewoźnik, notatka"
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {

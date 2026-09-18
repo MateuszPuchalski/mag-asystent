@@ -62,7 +62,14 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
 const kody = (d: Dyskusja) =>
   /* Prowadzący wchodzi do szukania — powód przy tej samej funkcji
      w `ekrany/Reklamacje.tsx`. */
-  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi]
+  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
+     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
+     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
+     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
+     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
+     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
+     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
+  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi, d.notatka]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Dyskusje() {
@@ -346,7 +353,7 @@ export function Dyskusje() {
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
           <input id="szukaj-dyskusji" className="field !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Temat, zamówienie albo login klienta" />
+            placeholder="Temat, zamówienie, login albo treść notatki" />
         </div>
 
         {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.

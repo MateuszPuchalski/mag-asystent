@@ -117,7 +117,14 @@ const kody = (r: Reklamacja) =>
   /* Prowadzący WCHODZI do szukania (0.278.0). Skrzynka szuka po nim od
      0.195.0, a tutaj „gdzie jest sprawa, którą wzięła Ala" nie miało dotąd
      żadnej drogi — ani sita, ani pola. */
-  [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi]
+  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
+     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
+     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
+     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
+     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
+     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
+     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
+  [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi, r.notatka]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Reklamacje() {
@@ -464,7 +471,7 @@ export function Reklamacje() {
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
           <input id="szukaj-reklamacji" className="field !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Numer, zamówienie albo login klienta" />
+            placeholder="Numer, zamówienie, login albo treść notatki" />
         </div>
 
         {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.

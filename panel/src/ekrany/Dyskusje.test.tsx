@@ -42,6 +42,10 @@ const DYSKUSJE = [
     prowadzi: "A. Lewandowska", prowadziId: 7, tagi: [{ id: 11, nazwa: "czeka na część" }] },
   { ...dys(5, "odpowiedz", "Reklamacja ceny"),
     prowadzi: "A. Lewandowska", prowadziId: 9 },
+  /* Sprawa z NUMEREM ALLEGRO W NOTATCE (0.394.0) — powód przy tej samej
+     atrapie w `ekrany/Reklamacje.test.tsx`. */
+  { ...dys(6, "odpowiedz", "Paczka zaginęła"),
+    notatka: "zgłoszone do Allegro, sprawa ALG-98765" },
 ];
 
 /* `vi.hoisted`, bo fabryka `vi.mock` jedzie przed resztą pliku. */
@@ -214,9 +218,16 @@ describe("Ekran dyskusji", () => {
   it("sito mówi, ile chowa, a klawisz `m` je przełącza", async () => {
     pokaz();
     await userEvent.keyboard("m");
-    expect(screen.getByText(/chowa 2 sprawy/)).toBeInTheDocument();
+    expect(screen.getByText(/chowa 3 sprawy/)).toBeInTheDocument();
     await userEvent.keyboard("m");
     expect(screen.queryByText(/chowa/)).not.toBeInTheDocument();
+  });
+
+  it("szuka po TREŚCI NOTATKI — numer sprawy Allegro nie ma innego pola", async () => {
+    pokaz();
+    await userEvent.type(screen.getByLabelText("Szukaj dyskusji"), "ALG-98765");
+    expect(screen.getByRole("button", { name: /Paczka zaginęła/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Przesyłka nie dotarła/ })).not.toBeInTheDocument();
   });
 
   it("szukanie po PROWADZĄCYM działa też w dyskusjach", async () => {

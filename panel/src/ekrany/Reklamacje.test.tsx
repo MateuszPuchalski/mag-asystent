@@ -54,6 +54,10 @@ const REKLAMACJE = [
   { ...rek(4, "decyzja", "444/2026"), prowadzi: "A. Lewandowska", prowadziId: 7,
     tagi: [{ id: 11, nazwa: "czeka na część" }] },
   { ...rek(5, "decyzja", "555/2026"), prowadzi: "A. Lewandowska", prowadziId: 9 },
+  /* Sprawa z NUMEREM ALLEGRO W NOTATCE (0.394.0). Zgłoszenie paczki, która nie
+     dotarła, wraca z numerem, dla którego nie mamy własnego pola — biuro pisze
+     go w notatce i potem po nim szuka. */
+  { ...rek(6, "decyzja", "666/2026"), notatka: "zgłoszone do Allegro, sprawa ALG-98765" },
 ];
 
 /* `vi.hoisted`, bo fabryka `vi.mock` jedzie przed resztą pliku. */
@@ -409,9 +413,9 @@ describe("Ekran reklamacji", () => {
        urwana bez znaku w 0.273.0. */
     pokaz();
     await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
-    /* Kubełek „Do decyzji" ma trzy sprawy, moja jest jedna — sito chowa dwie.
-       Liczebnik w formie 2–4, bo „chowa 2 spraw" czyta się jak usterka. */
-    expect(screen.getByText(/chowa 2 sprawy/)).toBeInTheDocument();
+    /* Kubełek „Do decyzji" ma cztery sprawy, moja jest jedna — sito chowa trzy.
+       Liczebnik w formie 2–4, bo „chowa 3 spraw" czyta się jak usterka. */
+    expect(screen.getByText(/chowa 3 sprawy/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
     expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
@@ -438,6 +442,16 @@ describe("Ekran reklamacji", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Moje/ }));
     await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "555");
     expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("szuka po TREŚCI NOTATKI — tam stoi numer sprawy Allegro", async () => {
+    /* 0.394.0. Numer zgłoszenia niedostarczonej paczki nie ma u nas własnego
+       pola; ląduje w notatce biura. Pole, które go nie znajduje, kłamie
+       pustką przy sprawie stojącej obok. */
+    pokaz();
+    await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "ALG-98765");
+    expect(screen.getByRole("button", { name: /666\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });
 
   it("szukanie po PROWADZĄCYM znajduje sprawę, której numeru nikt nie pamięta", async () => {
@@ -476,7 +490,7 @@ describe("Ekran reklamacji", () => {
 
     /* Otagowana jest 444, czyli NIE pierwsza w kubełku. Gdyby tag ruszał
        kolejność, wskoczyłaby na górę. */
-    expect(przed).toEqual(["111/2026", "444/2026", "555/2026"]);
+    expect(przed).toEqual(["111/2026", "444/2026", "555/2026", "666/2026"]);
     expect(przed.indexOf("444/2026")).toBeGreaterThan(0);
   });
 
