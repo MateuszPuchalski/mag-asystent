@@ -535,13 +535,20 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByRole("button", { name: /^Niczyje/ })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("skróty klawiszowe SĄ WIDOCZNE, a nie tylko w podpowiedzi pod kursorem", () => {
-    /* Dekalog p. 2: rozpoznanie jest tańsze od pamiętania. Skrót, o którym
-       nikt nie wie, nie skraca niczyjej pracy. */
+  it("skróty klawiszowe są DO ZNALEZIENIA i wymieniają te, które działają", async () => {
     pokaz();
+    /* Dekalog p. 2: rozpoznanie jest tańsze od pamiętania. Skrót, o którym
+       nikt nie wie, nie skraca niczyjej pracy.
+
+       OD 0.402.0 SKRÓTY SIEDZĄ POD „?" i test je stamtąd wyjmuje. Reguła
+       została ta sama i jest tu ważniejsza od miejsca: pokazane klawisze mają
+       być TYMI, które naprawdę działają. Pomoc otwiera się na najechanie —
+       zarzut z 0.281.0 („dwa kliknięcia przy każdym przypomnieniu") jest
+       odpowiedziany, a nie odrzucony. */
+    await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
     for (const k of ["j", "k", "m", "n"]) {
       expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
     }
-    expect(screen.getByText("lista")).toBeInTheDocument();
+    expect(screen.getByText("ruch po liście")).toBeInTheDocument();
   });
 });

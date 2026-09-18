@@ -713,6 +713,10 @@ export function Zwroty() {
             pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
             zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
             kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
+        {/* Kolejność i pomoc w RZĘDZIE KUBEŁKÓW (0.402.0). Tu, inaczej niż
+            w reklamacjach, nie ma osobnego wiersza narzędzi: szukanie zwrotów
+            to skaner z własnym rzędem (`zwroty/Szukanie.tsx`), więc dokładanie
+            mu sąsiadów zrobiłoby z niego to, czym nie jest. */}
         <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
           onZmien={ustawPorzadek} />
         <FiltrSegmentowy<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
@@ -722,6 +726,20 @@ export function Zwroty() {
               podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
             { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty?.length ?? 0,
               podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
+          ]} />
+      <SkrotyKlawiszy zMoje={false} kubelkow={KUBELKI.length}
+          /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
+             zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
+             pokazywał wtedy P/O, choć działały S/U. */
+          /* `Z` DOPISUJE SIĘ ZE STANU, nie z tabeli kubełków: należność
+             przechodzi przez trzy kubełki i gaśnie w środku każdego z nich.
+             Wpisany do `KLAWISZE_KUBELKA` stałby w pasku także po wypłacie —
+             czyli byłby dokładnie tym martwym klawiszem, przeciw któremu
+             powstał `SkrotyKlawiszy`. */
+          dodatkowe={[
+            ...KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [],
+            ...(stanPieniedzy?.moznaZwrocic
+              ? [["Z", "oddaj pieniądze"] as const] : []),
           ]} />
       </nav>
 
@@ -783,20 +801,6 @@ export function Zwroty() {
           OGLĄDANEGO kubełka, bo tylko one coś tam robią — lista wszystkich
           uczyłaby przebiegać wzrokiem obok tego jednego, który jest do rzeczy.
           Sit „moje"/„niczyje" tu nie ma: zwrot nie nosi prowadzącego. */}
-      <SkrotyKlawiszy zMoje={false} kubelkow={KUBELKI.length}
-        /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
-           zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
-           pokazywał wtedy P/O, choć działały S/U. */
-        /* `Z` DOPISUJE SIĘ ZE STANU, nie z tabeli kubełków: należność
-           przechodzi przez trzy kubełki i gaśnie w środku każdego z nich.
-           Wpisany do `KLAWISZE_KUBELKA` stałby w pasku także po wypłacie —
-           czyli byłby dokładnie tym martwym klawiszem, przeciw któremu
-           powstał `SkrotyKlawiszy`. */
-        dodatkowe={[
-          ...KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [],
-          ...(stanPieniedzy?.moznaZwrocic
-            ? [["Z", "oddaj pieniądze"] as const] : []),
-        ]} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading
           ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>

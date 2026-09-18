@@ -285,6 +285,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="czekanie">najdłużej czekające</option>
         <option value="najnowsze">od najnowszych</option>
       </select>
+      {/* Pomoc wchodzi do TEGO rzędu (0.402.0) zamiast stać pasmem niżej —
+          ten sam ruch, co na trzech pozostałych ekranach obsługi. */}
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}

@@ -257,8 +257,11 @@ describe("Ekran dyskusji", () => {
       .not.toBeInTheDocument();
   });
 
-  it("skróty klawiszowe są widoczne także tutaj", () => {
+  it("skróty klawiszowe są do znalezienia także tutaj", async () => {
     pokaz();
+    /* Skróty siedzą pod „?" od 0.402.0 — reguła została ta sama: pokazane
+       klawisze mają być TYMI, które naprawdę działają. */
+    await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
     expect(screen.getByText("n", { selector: "kbd" })).toBeInTheDocument();
     expect(screen.getByText(/kubełek$/)).toBeInTheDocument();
   });
