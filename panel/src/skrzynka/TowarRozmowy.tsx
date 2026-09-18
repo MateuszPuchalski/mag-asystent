@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
 import { EtykietaWartosci, NaglowekSekcji } from "../ui";
-import type { KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
+import type { CenaPoziomu, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
+import { zlote } from "../api/zwroty";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
@@ -103,6 +104,7 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
           {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
           {karta.data && <>
             <StanTowaru karta={karta.data} />
+            <CenyKartoteki ceny={karta.data.ceny ?? []} />
             {/* WYŁĄCZNIE ODCZYT — blok jest „Źródło: Subiekt GT" (§4.3 nie miesza
                 źródeł), a wiedza stoi tu jako osobna plakietka. Dopisuje się
                 w Doborze (z pracy) albo w Wiedza → Sprawdź kartotekę. */}
@@ -298,6 +300,46 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
       </p>}
     </div>
+  </div>;
+}
+
+/**
+ * Ceny z kartoteki Subiekta (0.396.0).
+ *
+ * Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Kolumna
+ * mówiła CZY MAMY i GDZIE, a na pytanie „ile to kosztuje" — padające w tej
+ * samej rozmowie — agent musiał otwierać Subiekta. To dokładnie ta czynność,
+ * której §25 zabrania.
+ *
+ * WSZYSTKIE POZIOMY, w kolejności Subiekta — decyzja właściciela. Sortowanie
+ * po kwocie przestawiałoby wiersze przy każdej przecenie, a agent uczy się
+ * miejsca, nie liczby.
+ *
+ * BRUTTO GRUBE, NETTO SZARE OBOK. Klient detaliczny pyta o brutto i tę kwotę
+ * agent przepisuje; netto potrzebne jest firmie proszącej o fakturę i wtedy
+ * ma być pod ręką, a nie do policzenia w głowie.
+ *
+ * PUSTY BLOK NIE RYSUJE SIĘ WCALE — ta sama zasada, co przy pasowaniach:
+ * brak wiedzy nie jest informacją wartą kolumny. Na produkcji blok milczy,
+ * dopóki import nie dostanie nazw cennika i nowego GRANT-u (`tools/sonda-cen.sql`).
+ */
+function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
+  if (ceny.length === 0) return null;
+  return <div className="rounded-lg border border-slate-200 p-3">
+    <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
+    <ul className="mt-1 space-y-0.5">
+      {ceny.map((c) => <li key={c.poziom}
+        className="flex items-baseline gap-2 text-xs">
+        {/* Nazwa poziomu, a gdy baza jej nie trzyma — sam numer. Wymyślona
+            nazwa byłaby gorsza od numeru: agent uwierzyłby, że to detaliczna. */}
+        <span className="min-w-0 flex-1 truncate text-slate-600">
+          {c.nazwa || `poziom ${c.poziom}`}</span>
+        <b className="shrink-0 tabular-nums text-slate-900">
+          {zlote(c.bruttoGrosze, c.waluta)}</b>
+        <span className="shrink-0 tabular-nums text-slate-500">
+          netto {zlote(c.nettoGrosze, c.waluta)}</span>
+      </li>)}
+    </ul>
   </div>;
 }
 

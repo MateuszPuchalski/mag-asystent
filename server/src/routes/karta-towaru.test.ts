@@ -43,7 +43,7 @@ const wczoraj = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["delivery_line", "delivery", "sgt_pozycja", "sgt_dokument", "device_session", "app_user"]) {
+  for (const t of ["delivery_line", "delivery", "sgt_pozycja", "sgt_dokument", "sgt_cena", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   d.prepare(
@@ -58,10 +58,18 @@ beforeEach(() => {
   ).run(token, u.userId, "test-device", teraz, teraz);
 });
 
+interface CenaPoziomu {
+  poziom: number;
+  nazwa: string;
+  nettoGrosze: number | null;
+  bruttoGrosze: number | null;
+  waluta: string;
+}
+
 const karta = async () => {
   const r = await app.inject({ url: "/api/products/1", headers: { "x-session": token } });
   assert.equal(r.statusCode, 200);
-  return r.json() as { wDostawie: WDostawie[] };
+  return r.json() as { wDostawie: WDostawie[]; ceny: CenaPoziomu[] };
 };
 
 test("bez dostaw karta niesie pustą listę, nie brak pola", async () => {
@@ -106,4 +114,64 @@ test("po odłożeniu całości sekcja znika z karty", async () => {
   ).run(id);
 
   assert.deepEqual((await karta()).wDostawie, []);
+});
+
+
+/* ── Ceny z kartoteki Subiekta (0.396.0) ─────────────────────────────────────
+   Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Ten sam
+   powód, dla którego strzeżemy `wDostawie`: serwis może liczyć dobrze, a pole
+   i tak zostanie po drodze. Bez tych testów pominięcie `ceny`
+   w `buildProductCard` nie miałoby objawu — karta wróciłaby poprawna, tylko
+   bez odpowiedzi na pytanie, po które sekcja powstała.                       */
+
+test("bez cen karta niesie pustą listę, nie brak pola", async () => {
+  /* `undefined` i `[]` wyglądają na ekranie tak samo, ale znaczą co innego
+     dla kontraktu. Tak zresztą wygląda DZIŚ każdy towar na produkcji: import
+     cen jeszcze nie pobiera (`tools/sonda-cen.sql`), a karta ma o tym mówić
+     pustą listą, nie brakiem pola. */
+  assert.deepEqual((await karta()).ceny, []);
+});
+
+test("WSZYSTKIE poziomy jadą na kartę, w kolejności Subiekta", async () => {
+  /* Decyzja właściciela: wszystkie poziomy, nie jeden wybrany. Kolejność idzie
+     po NUMERZE poziomu, a nie po kwocie — sortowanie po cenie przestawiałoby
+     wiersze przy każdej przecenie, a agent uczy się miejsca, nie liczby.
+     Wiersze wstawiamy w odwrotnej kolejności właśnie po to, żeby ten test
+     mógł polec, gdyby ktoś zdjął `ORDER BY`. */
+  const d = db();
+  const ins = d.prepare(`INSERT INTO sgt_cena(tw_id, poziom, nazwa, netto_grosze,
+    brutto_grosze, waluta) VALUES (?,?,?,?,?,?)`);
+  ins.run(1, 3, "Promocyjna", 3252, 4000, "PLN");
+  ins.run(1, 1, "Detaliczna", 4062, 4996, "PLN");
+  ins.run(1, 2, "Hurtowa", 3577, 4400, "PLN");
+
+  const ceny = (await karta()).ceny;
+  assert.deepEqual(ceny.map((c) => c.poziom), [1, 2, 3]);
+  assert.deepEqual(ceny.map((c) => c.nazwa), ["Detaliczna", "Hurtowa", "Promocyjna"]);
+});
+
+test("kwoty jadą w GROSZACH całkowitych, netto i brutto osobno", async () => {
+  /* Liczba zmiennoprzecinkowa w cenie podanej klientowi to błąd, który wychodzi
+     dopiero na fakturze — dlatego grosze, tak samo jak przy kwotach z Allegro.
+     Netto i brutto biorą się OBA ze źródła: przeliczanie u nas wymagałoby
+     stawki VAT i dokładało własny błąd zaokrąglenia. */
+  db().prepare(`INSERT INTO sgt_cena(tw_id, poziom, nazwa, netto_grosze,
+    brutto_grosze, waluta) VALUES (1,1,'Detaliczna',4062,4996,'PLN')`).run();
+
+  const [c] = (await karta()).ceny;
+  assert.equal(c.nettoGrosze, 4062);
+  assert.equal(c.bruttoGrosze, 4996);
+  assert.equal(c.waluta, "PLN");
+  assert.equal(Number.isInteger(c.bruttoGrosze), true);
+});
+
+test("brak kwoty zostaje NULL-em, a nie zerem", async () => {
+  /* Zero znaczyłoby „za darmo" i agent podałby je klientowi. `null` znaczy
+     „baza tej kwoty nie podała" i ekran ma to pokazać jako brak. */
+  db().prepare(`INSERT INTO sgt_cena(tw_id, poziom, nazwa, netto_grosze,
+    brutto_grosze, waluta) VALUES (1,1,'Detaliczna',NULL,4996,'PLN')`).run();
+
+  const [c] = (await karta()).ceny;
+  assert.equal(c.nettoGrosze, null);
+  assert.equal(c.bruttoGrosze, 4996);
 });

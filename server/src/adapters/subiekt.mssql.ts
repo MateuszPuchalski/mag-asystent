@@ -779,6 +779,14 @@ export async function importFromMssql(): Promise<ImportStats> {
       ...(mmOk ? ["sgt_mm_zwrot_pozycja", "sgt_mm_zwrot"] : []),
       ...(fakturyOk ? ["sgt_faktura_pozycja", "sgt_faktura"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
+      /* `sgt_cena` czyszczone MIMO ŻE import jeszcze go nie wypełnia (0.396.0).
+         Tabela stoi w schemacie, a read-model jest odtwarzany od zera przy
+         każdym przebiegu — gdyby jej tu zabrakło, ceny wpisane raz (seedem
+         demo albo ręcznie przy diagnozie) przeżyłyby każdy import i ekran
+         pokazywałby kwoty sprzed miesięcy jako bieżące. Wypełnienie dojdzie,
+         gdy `tools/sonda-cen.sql` odda nazwy tabeli cennikowej, a login
+         dostanie nowy GRANT. */
+      "sgt_cena",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
       d.prepare(`DELETE FROM ${t}`).run();

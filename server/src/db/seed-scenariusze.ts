@@ -251,6 +251,17 @@ interface TowarSc {
   lok?: string;
   /** `[mag_id, stan, rezerwacja?]` — bez wpisu magazyn nie ma wiersza wcale. */
   stany?: Array<[number, number, number?]>;
+  /**
+   * `[poziom, nazwa, netto_grosze, brutto_grosze]` — ceny kartoteki (0.396.0).
+   *
+   * SCENARIUSZ, NIE DEMO OGÓLNE, i to jest różnica wobec `seed.ts`. Eksport
+   * `mag.xlsx` cen nie niesie, a import z MSSQL jeszcze ich nie pobiera, więc
+   * wpisanie ich do głównego seeda pokazywałoby coś, czego produkcja dziś nie
+   * umie — dokładnie blizna z 0.7.0 przy kolumnie `ordered`. Tutaj wolno, bo
+   * ten plik z definicji trzyma dane syntetyczne do oglądania przypadków
+   * brzegowych i mówi o tym w `docs/scenariusze-testowe.md`.
+   */
+  ceny?: Array<[number, string, number | null, number | null]>;
 }
 
 const MAG = config.magId.MAG;
@@ -374,6 +385,15 @@ const TOWARY: TowarSc[] = [
   { twId: 900_041, symbol: "TEST-KONTENER-1", nazwa: "Pozycja kontenera importowego (1)", ean: "5900000000041", lok: "J02-03-02", stany: [[MGP, 120]] },
   { twId: 900_042, symbol: "TEST-KONTENER-2", nazwa: "Pozycja kontenera importowego (2)", ean: "5900000000042", stany: [[MGP, 60]] },
   { twId: 900_043, symbol: "TEST-KONTENER-3", nazwa: "Pozycja kontenera importowego (3)", ean: "5900000000043", lok: "J02-03-04", stany: [[MGP, 24]] },
+  // S80-S82 — ceny kartoteki (0.396.0). Trzy przypadki, bo każdy rysuje się
+  // inaczej: pełny cennik z nazwami, cennik bez nazw poziomów i towar zupełnie
+  // bez cen. Ten ostatni jest najważniejszy — tak wygląda DZIŚ każdy towar na
+  // produkcji, dopóki import nie dostanie nazw cennika (`tools/sonda-cen.sql`).
+  { twId: 900_045, symbol: "TEST-CENY-PELNE", nazwa: "Towar z pełnym cennikiem", ean: "5900000000045", lok: "A01-04-01", stany: [[MAG, 25]],
+    ceny: [[1, "Detaliczna", 4062, 4996], [2, "Hurtowa", 3577, 4400], [3, "Promocyjna", 3252, 4000]] },
+  { twId: 900_046, symbol: "TEST-CENY-BEZ-NAZW", nazwa: "Cennik bez nazw poziomów", ean: "5900000000046", lok: "A01-04-02", stany: [[MAG, 8]],
+    ceny: [[1, "", 8130, 10000], [4, "", 7317, 9000]] },
+  { twId: 900_047, symbol: "TEST-CENY-BRAK", nazwa: "Towar bez cen w kartotece", ean: "5900000000047", lok: "A01-04-03", stany: [[MAG, 3]] },
 ];
 
 /** Czterdzieści drobnic do dostawy S28 — generowane, bo liczy się tylko ich liczba. */
@@ -516,6 +536,7 @@ function wyczysc(): void {
     d.prepare("DELETE FROM sgt_mm_zwrot_pozycja WHERE dok_id >= ?").run(DOK_MM_OD);
     d.prepare("DELETE FROM sgt_mm_zwrot WHERE dok_id >= ?").run(DOK_MM_OD);
 
+    d.prepare("DELETE FROM sgt_cena WHERE tw_id >= ?").run(TW_OD);
     d.prepare("DELETE FROM sgt_stan WHERE tw_id >= ?").run(TW_OD);
     d.prepare("DELETE FROM sgt_towar WHERE tw_id >= ?").run(TW_OD);
 
@@ -571,11 +592,18 @@ function kartoteki(lista: TowarSc[]): number {
   const insStan = db().prepare(
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
+  const insCena = db().prepare(
+    `INSERT INTO sgt_cena(tw_id, poziom, nazwa, netto_grosze, brutto_grosze, waluta)
+     VALUES (?,?,?,?,?, 'PLN')`
+  );
   for (const t of lista) {
     insTowar.run(
       t.twId, t.symbol, t.nazwa, t.ean ?? "", t.unit ?? "szt.", t.opis ?? "", t.lok ?? ""
     );
     for (const [magId, stan, rez] of t.stany ?? []) insStan.run(t.twId, magId, stan, rez ?? 0);
+    for (const [poziom, nazwa, netto, brutto] of t.ceny ?? []) {
+      insCena.run(t.twId, poziom, nazwa, netto, brutto);
+    }
   }
   return lista.length;
 }

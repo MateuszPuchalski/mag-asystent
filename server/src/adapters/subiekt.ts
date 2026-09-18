@@ -62,6 +62,23 @@ export interface RawZamPosition {
 }
 
 /**
+ * Jeden poziom cenowy kartoteki (0.396.0).
+ *
+ * Wszystkie poziomy, nie jeden wybrany — decyzja właściciela. Kwoty w GROSZACH
+ * całkowitych, tak samo jak kwoty z Allegro: liczba zmiennoprzecinkowa w cenie
+ * podanej klientowi to błąd, który wychodzi dopiero na fakturze.
+ */
+export interface RawCena {
+  poziom: number;
+  /** Nazwa ze słownika Subiekta; pusta, gdy baza nazw nie trzyma. */
+  nazwa: string;
+  /** `null` znaczy „baza tej kwoty nie podała", nigdy „za darmo". */
+  netto_grosze: number | null;
+  brutto_grosze: number | null;
+  waluta: string;
+}
+
+/**
  * SubiektAdapter — odczyt kartoteki Subiekta GT (spec §6).
  *
  * Jedyna implementacja to `SeededSubiektAdapter` — SELECT-y zawsze idą po

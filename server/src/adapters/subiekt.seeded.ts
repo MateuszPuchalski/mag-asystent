@@ -4,6 +4,7 @@ import type { ProductRow } from "../types.js";
 import { parseLocs } from "../locs.js";
 import { sqlBezPozycjiUslugowych } from "../pomijane.js";
 import type {
+  RawCena,
   RawDocPosition,
   RawDocument,
   RawMagazyn,
@@ -354,6 +355,25 @@ export class SeededSubiektAdapter {
     return db()
       .prepare("SELECT mag_id, kod, nazwa FROM sgt_magazyn ORDER BY mag_id")
       .all() as unknown as RawMagazyn[];
+  }
+
+  /**
+   * Ceny kartoteki — WSZYSTKIE poziomy, w kolejności Subiekta (0.396.0).
+   *
+   * Kolejność idzie po numerze poziomu, a nie po kwocie: agent uczy się, że
+   * „pierwsza od góry to detaliczna", a sortowanie po cenie przestawiałoby
+   * wiersze przy każdej przecenie.
+   *
+   * Pusta lista znaczy „read-model nie ma cen tego towaru" i tak ma być
+   * czytana. Do czasu wypełnienia importu z MSSQL (patrz `tools/sonda-cen.sql`)
+   * jest pusta dla KAŻDEGO towaru na produkcji, a ekran nie rysuje wtedy nic —
+   * pusta tabelka cen byłaby obietnicą bez pokrycia.
+   */
+  cenyTowaru(twId: number): RawCena[] {
+    return db()
+      .prepare(`SELECT poziom, nazwa, netto_grosze, brutto_grosze, waluta
+        FROM sgt_cena WHERE tw_id = ? ORDER BY poziom`)
+      .all(twId) as unknown as RawCena[];
   }
 
   /** Stany towaru we WSZYSTKICH magazynach — do zestawienia na karcie. */

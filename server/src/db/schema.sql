@@ -986,6 +986,40 @@ CREATE TABLE IF NOT EXISTS sgt_stan (
   PRIMARY KEY (tw_id, mag_id)
 );
 
+-- ── Ceny z kartoteki Subiekta (0.396.0) ───────────────────────────────────────
+-- Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie
+-- widział, bo tej kolumny nigdy nie było — kartoteka niosła symbol, nazwę, EAN,
+-- jednostkę, opis i lokalizację, ani jednej kwoty.
+--
+-- OSOBNA TABELA, nie kolumny na `sgt_towar`, i to nie jest kwestia gustu:
+-- właściciel wybrał WSZYSTKIE poziomy cen, a ich liczba jest cechą konkretnej
+-- firmy, nie schematu. Osiem kolumn `cena_1..cena_8` kłamałoby w obie strony
+-- naraz — puste tam, gdzie firma używa dwóch, i za ciasne, gdyby dołożyła
+-- dziewiąty.
+--
+-- GROSZE CAŁKOWITE, tak samo jak kwoty z Allegro (`zamowienie_pozycja`).
+-- Liczba zmiennoprzecinkowa w cenie podanej klientowi to błąd, który wychodzi
+-- dopiero na fakturze.
+--
+-- NETTO I BRUTTO OBOK SIEBIE, oba wprost ze źródła. Przeliczanie u nas
+-- wymagałoby stawki VAT z kartoteki i dokładałoby własny błąd zaokrąglenia,
+-- a cena podana klientowi ma się zgadzać z fakturą co do grosza.
+CREATE TABLE IF NOT EXISTS sgt_cena (
+  tw_id        INTEGER NOT NULL,
+  -- Numer poziomu cenowego W SUBIEKCIE — kolejność na ekranie idzie po nim,
+  -- żeby „detaliczna" nie skakała raz nad, raz pod „hurtową".
+  poziom       INTEGER NOT NULL,
+  -- Nazwa poziomu ze słownika Subiekta. Pusta, gdy baza nazw nie trzyma —
+  -- wtedy ekran pokazuje sam numer, bo wymyślona nazwa byłaby gorsza.
+  nazwa        TEXT NOT NULL DEFAULT '',
+  netto_grosze INTEGER,
+  brutto_grosze INTEGER,
+  waluta       TEXT NOT NULL DEFAULT 'PLN',
+  PRIMARY KEY (tw_id, poziom)
+);
+-- Bez klucza obcego do `sgt_towar`: import kasuje i odtwarza read-model
+-- (blizna 0.154.0), więc FK wywracałby kolejność czyszczenia tabel.
+
 CREATE TABLE IF NOT EXISTS sgt_dokument (
   dok_id     INTEGER PRIMARY KEY,
   typ        TEXT NOT NULL,                     -- FZ | PZ

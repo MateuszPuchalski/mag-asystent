@@ -34,6 +34,44 @@ historii nie przepisujemy.
 ---
 
 
+## 0.396.0 — 18 września 2026
+
+**Ceny z kartoteki Subiekta na karcie towaru w panelu obsługi.** Zgłoszenie
+właściciela: „nie widzę cen z Subiekta przy towarach". I nie widział, bo ich
+nigdy nie było: `sgt_towar` nie miał kolumny ceny, importer ich nie pobierał,
+a login `wertis` nie ma nawet prawa do tabeli cennikowej. To nie była usterka
+wyświetlania, tylko brak całej ścieżki.
+
+- **Wszystkie poziomy cen**, w kolejności Subiekta — decyzja właściciela.
+  Sortowanie po kwocie przestawiałoby wiersze przy każdej przecenie, a agent
+  uczy się miejsca, nie liczby.
+- **Brutto grubym drukiem, netto szarym obok.** Brutto agent przepisuje
+  klientowi detalicznemu, netto jest pod ręką dla firmy proszącej o fakturę.
+- **Grosze całkowite**, tak samo jak kwoty z Allegro. Netto i brutto biorą się
+  OBA ze źródła: przeliczanie u nas wymagałoby stawki VAT i dokładało własny
+  błąd zaokrąglenia, a cena podana klientowi ma się zgadzać z fakturą.
+- **Osobna tabela `sgt_cena`**, nie kolumny na kartotece. Liczba poziomów jest
+  cechą firmy, nie schematu; osiem kolumn `cena_1..8` kłamałoby w obie strony.
+- **Pusty blok nie rysuje się wcale.** Brak wiedzy nie jest informacją wartą
+  kolumny — ta sama zasada, co przy pasowaniach.
+
+**Na produkcji blok jeszcze milczy i to jest świadome.** Brakuje nazw tabeli
+cennikowej (nasz wyciąg ze struktury InsERT ich nie zawiera) oraz nowego
+`GRANT SELECT`. Rozstrzyga to jedno uruchomienie nowej sondy
+`tools/sonda-cen.sql`; `DEPLOY.md` §6h mówi jak, a `docs/subiekt-gt-struktura.md`
+niesie to jako dwudziesty szósty znacznik `[WERYFIKUJ]`. Kształt ekranu widać
+w trybie demo po `npm run seed:scenariusze` (kartoteki `TEST-CENY-*`).
+
+**Czego to wydanie NIE dokłada:** cen w `biuro.html`. Biuro nie ma ekranu karty
+towaru — ma dostawy, magazyn zwrotów, analizę, dziennik i nadzór — więc nie ma
+dokąd ich wstawić bez budowania nowego widoku. Osobna decyzja.
+
+Wdrożenie: migracja dokłada tabelę `sgt_cena`. Poza tym nic ręką, dopóki nie
+zapadnie decyzja po sondzie.
+
+---
+
+
 ## 0.395.0 — 18 września 2026
 
 **Guzik „PRZEJMIJ ROZMOWĘ" schodzi ze skrzynki — przypisuje odpowiedź.**

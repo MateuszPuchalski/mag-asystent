@@ -28,6 +28,16 @@ import type { WDostawie } from "./services/dostawy-towaru.js";
 import type { Notatka } from "./services/notatki.js";
 import type { ZamowioneUDostawcy } from "./services/zamowienia-towaru.js";
 
+/** Jeden poziom cenowy na karcie towaru; kwoty w GROSZACH całkowitych. */
+export interface CenaPoziomu {
+  poziom: number;
+  /** Nazwa ze słownika Subiekta; pusta, gdy baza nazw nie trzyma. */
+  nazwa: string;
+  nettoGrosze: number | null;
+  bruttoGrosze: number | null;
+  waluta: string;
+}
+
 export interface ProductCard {
   id: number;
   sym: string;
@@ -67,6 +77,14 @@ export interface ProductCard {
    * pole `ordered`, które importer produkcyjny wypełniał zerem na sztywno.
    */
   zamowione: ZamowioneUDostawcy[];
+  /**
+   * Ceny z kartoteki Subiekta — WSZYSTKIE poziomy (0.396.0, decyzja właściciela).
+   *
+   * Pusta lista znaczy „nie wiemy", nigdy „za darmo". Na produkcji jest pusta,
+   * dopóki import z MSSQL nie dostanie nazw tabeli cennikowej i nowego
+   * `GRANT SELECT` — patrz `tools/sonda-cen.sql`.
+   */
+  ceny: CenaPoziomu[];
   /** Zamienniki wyczytane z `desc` — patrz `services/zamienniki.ts`. */
   zamienniki: Zamienniki;
   /**

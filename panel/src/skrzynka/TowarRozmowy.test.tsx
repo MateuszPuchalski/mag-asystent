@@ -283,3 +283,55 @@ describe("Parametry do szkicu", () => {
     expect(t).not.toContain("0 szt.");
   });
 });
+
+/* ── Ceny z kartoteki Subiekta (0.396.0) ─────────────────────────────────────
+   Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Kolumna
+   mówiła CZY MAMY i GDZIE, a na „ile to kosztuje" agent musiał otwierać
+   Subiekta — czyli robić to, czego §25 zabrania.                             */
+describe("ceny kartoteki", () => {
+  const zKartoteka = (ceny: KartaTowaru["ceny"]) => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, ceny } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43",
+      zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    })} />);
+  };
+
+  it("pokazuje WSZYSTKIE poziomy, brutto grubo i netto obok", () => {
+    /* Decyzja właściciela: wszystkie poziomy, nie jeden wybrany. Brutto to
+       kwota, którą agent przepisuje klientowi detalicznemu; netto stoi obok
+       dla firmy proszącej o fakturę, żeby nie liczyć w głowie. */
+    zKartoteka([
+      { poziom: 1, nazwa: "Detaliczna", nettoGrosze: 4062, bruttoGrosze: 4996, waluta: "PLN" },
+      { poziom: 2, nazwa: "Hurtowa", nettoGrosze: 3577, bruttoGrosze: 4400, waluta: "PLN" },
+    ]);
+    expect(screen.getByText("Detaliczna")).toBeInTheDocument();
+    expect(screen.getByText("Hurtowa")).toBeInTheDocument();
+    expect(screen.getByText("49,96 PLN")).toBeInTheDocument();
+    expect(screen.getByText("netto 40,62 PLN")).toBeInTheDocument();
+  });
+
+  it("poziom BEZ NAZWY dostaje numer, a nie wymyśloną nazwę", () => {
+    /* Wymyślona nazwa byłaby gorsza od numeru: agent uwierzyłby, że to
+       detaliczna, i podał klientowi cenę hurtową. */
+    zKartoteka([{ poziom: 4, nazwa: "", nettoGrosze: 7317, bruttoGrosze: 9000, waluta: "PLN" }]);
+    expect(screen.getByText("poziom 4")).toBeInTheDocument();
+  });
+
+  it("BEZ CEN nie rysuje pustego bloku", () => {
+    /* Ta sama zasada, co przy pasowaniach: brak wiedzy nie jest informacją
+       wartą kolumny. Tak wygląda dziś każdy towar na produkcji, dopóki import
+       nie dostanie nazw cennika. */
+    zKartoteka([]);
+    expect(screen.queryByText(/Ceny . Subiekt GT/)).toBeNull();
+  });
+
+  it("brak kwoty pokazuje się jako BRAK, nigdy jako zero", () => {
+    /* Zero znaczyłoby „za darmo" i agent podałby je klientowi. */
+    zKartoteka([
+      { poziom: 1, nazwa: "Detaliczna", nettoGrosze: null, bruttoGrosze: 4996, waluta: "PLN" },
+    ]);
+    expect(screen.getByText("netto —")).toBeInTheDocument();
+    expect(screen.queryByText(/netto 0,00/)).toBeNull();
+  });
+});
