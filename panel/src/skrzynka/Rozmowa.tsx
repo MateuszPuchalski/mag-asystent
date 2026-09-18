@@ -38,7 +38,6 @@ export function Rozmowa(p: {
   zrodloPomiaru: number | null;
   wskazowka: string;
   towar: Towar | null;
-  onPrzejmij: () => void;
   onPokazNowa: () => void;
   onSzkic: (v: string) => void;
   onZapiszSzkic: () => void;
@@ -119,16 +118,37 @@ export function Rozmowa(p: {
         w tym samym stopniu pisma i niemal tej samej wadze — cztery rzeczy
         walczyły o pierwsze spojrzenie, choć tylko jedna jest tematem ekranu.
 
-        Login rośnie i ciemnieje, kto prowadzi — schodzi do drugiego wiersza
-        w 12 px. Skala urosła z dwóch stopni do czterech, a rozmiar, waga
-        i barwa mówią teraz to samo, zamiast każde co innego.
+        Login rośnie i ciemnieje, kto prowadzi — schodzi pod niego w 12 px.
+        Skala urosła z dwóch stopni do czterech, a rozmiar, waga i barwa mówią
+        teraz to samo, zamiast każde co innego.
 
-        PRZEJĘCIE ZOSTAJE W PIERWSZYM RZĘDZIE i zostaje przyciskiem: przy
-        rozmowie niczyjej to jest działanie główne ekranu, nie metadana. */}
+        NAGŁÓWEK MA JEDEN RZĄD (0.395.0). Drugi niósł „Prowadzi nikt" i przycisk
+        przejęcia; po zdjęciu przycisku zostałyby dwa słowa na całą linię, a linia
+        w tej kolumnie spycha pytanie klienta niżej. Znacznik schodzi więc POD
+        login, w tej samej kolumnie tytułowej, i nie zabiera własnego pasma. */}
     <header className="shrink-0 border-b px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
-        <LoginKlienta login={rozmowa.klient}
-          className="mr-auto text-naglowek font-bold tracking-tight text-wertis-ink" />
+        <div className="mr-auto min-w-0">
+          <LoginKlienta login={rozmowa.klient}
+            className="text-naglowek font-bold tracking-tight text-wertis-ink" />
+        {/* ── PRZEJĘCIE DZIEJE SIĘ SAMO (0.395.0) ────────────────────────────
+            Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę,
+            to powinno dziać się automatycznie". I dzieje się — od 0.159.0
+            wysyłka odpowiedzi przypisuje rozmowę niczyją w tej samej
+            transakcji, co wiadomość. Guzik prosił o kliknięcie, które i tak
+            padało minutę później przy odpowiedzi.
+
+            ZOSTAJE ZDANIE, nie sama pustka: bez niego agent po zniknięciu
+            przycisku nie ma skąd wiedzieć, kiedy rozmowa stanie się jego.
+
+            Czego to NIE daje, świadomie: mocnego zamka PRZED odpowiedzią.
+            Dwóch agentów przy jednej niczyjej rozmowie rozstrzyga odtąd sam
+            uchwyt obecności (§6.3) i jawna zgoda „odpowiedz mimo to" — ta
+            sama droga, którą i tak trzeba było przejść, gdy kolega siedział
+            przy rozmowie nieprzejętej. */}
+          <Prowadzi prowadzi={rozmowa.wlasciciel} jaProwadze={moja} trwa={false}
+            wWierszu gdyNikt="nikt — przypisze pierwsza odpowiedź" />
+        </div>
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
@@ -144,26 +164,6 @@ export function Rozmowa(p: {
           onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna} />
       </div>
 
-      {/* ── JEDEN KSZTAŁT „KTO PROWADZI" W CAŁYM PANELU (0.392.0) ────────────
-          Do 0.391.0 skrzynka mówiła to DWOMA sposobami w dwóch wierszach:
-          przyciskiem w rzędzie pierwszym, gdy rozmowa niczyja, i metadaną
-          w drugim, gdy wzięta. Reklamacje i dyskusje dostały wtedy wspólny
-          pasek; decyzja właściciela o ujednoliceniu domyka to tutaj.
-
-          WAGA PRZYCISKU ZOSTAJE MOCNA i to nie jest niekonsekwencja: przy
-          rozmowie niczyjej przejęcie jest działaniem głównym ekranu (0.247.0),
-          bo nieprzejętą rozmowę piszą czasem dwie osoby naraz. Reklamacja
-          czeka w kolejce i tyle. Wspólny jest kształt wiersza, nie waga.
-
-          `mozeOddac={false}`, bo `przejmijRozmowe` przypisuje WYŁĄCZNIE rozmowę
-          niczyją — oddania tą drogą nie ma. Przycisk „oddaj" obiecywałby
-          czynność, którą serwer odbija konfliktem. Rozmowę przekazuje się
-          osobną drogą, z powodem. */}
-      <div className="mt-1">
-        <Prowadzi prowadzi={rozmowa.wlasciciel} jaProwadze={moja} mocny={!rozmowa.wlasciciel}
-          trwa={false} onProwadze={p.onPrzejmij}
-          etykietaWez="PRZEJMIJ ROZMOWĘ" mozeOddac={false} />
-      </div>
     </header>
 
     {/* Obecność IDZIE PRZED sprawą: „ktoś tu już siedzi" zmienia decyzję

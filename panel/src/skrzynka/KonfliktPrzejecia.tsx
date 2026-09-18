@@ -4,11 +4,16 @@ import type { SzczegolyKonfliktu } from "../api/typy";
 import { EtykietaWartosci, Przycisk } from "../ui";
 
 /**
- * Przegrany wyścig o przejęcie (§6.2).
+ * Odpowiedź odbita przez cudze prowadzenie (§6.2).
  *
- * Przejęcie jest atomowe: zapisze się jedno. Ekran ma powiedzieć TRZY rzeczy,
- * bo bez nich zostaje goły komunikat błędu — kto prowadzi, kiedy przejął
- * i na której wersji stoi rozmowa wobec tej, którą niosło żądanie.
+ * Do 0.394.0 otwierał to przegrany wyścig o przycisk „PRZEJMIJ ROZMOWĘ".
+ * Przycisk zszedł z ekranu w 0.395.0 (przejęcie dzieje się samo przy
+ * odpowiedzi), więc dialog karmi teraz odbita WYSYŁKA — jedyny moment, w
+ * którym cudze prowadzenie naprawdę staje agentowi na drodze.
+ *
+ * Ekran ma powiedzieć TRZY rzeczy, bo bez nich zostaje goły komunikat błędu —
+ * kto prowadzi, od kiedy i na której wersji stoi rozmowa wobec tej, którą
+ * niosło żądanie.
  */
 export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWymusic,
   wymusza, blad, onPoprosOPrzekazanie, onWymus, onZamknij }: {
@@ -30,10 +35,10 @@ export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWy
     <div className="flex items-start gap-3">
       <UserX className="mt-0.5 text-ranga-uwaga" size={18} />
       <div className="flex-1">
-        <b className="text-ranga-uwaga">Nie udało się przejąć — rozmowę prowadzi {wlasciciel}</b>
+        <b className="text-ranga-uwaga">Odpowiedź nie wyszła — rozmowę prowadzi {wlasciciel}</b>
         <p className="mt-1 text-sm text-amber-900">
-          Przejęcie jest atomowe: zapisze się jedno. {wlasciciel} był wcześniej, więc Twoje
-          żądanie zostało odrzucone, zanim cokolwiek zmieniło.
+          Dwie odpowiedzi na jedno pytanie to dwie różne prawdy u klienta, więc
+          Twoja została odrzucona, zanim cokolwiek poszło. Szkic został nietknięty.
         </p>
       </div>
       <button className="text-sm text-slate-500 underline" onClick={onZamknij}>Ukryj</button>
@@ -41,7 +46,7 @@ export function KonfliktPrzejecia({ szczegoly, mojaWersja, czasPrzejecia, mozeWy
 
     <dl className="mt-3 grid gap-2 sm:grid-cols-3">
       {[["Właściciel", wlasciciel],
-        ["Przejęcie o", czasPrzejecia ?? "—"],
+        ["Prowadzi od", czasPrzejecia ?? "—"],
         ["Wersja rozmowy", `${szczegoly.version ?? "?"} · Twoje żądanie niosło ${mojaWersja}`],
       ].map(([nazwa, wartosc]) => <div key={nazwa} className="rounded-lg border border-amber-200 bg-white p-2">
         <dt><EtykietaWartosci>{nazwa}</EtykietaWartosci></dt>

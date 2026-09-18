@@ -311,7 +311,19 @@ test("nie wyśle ten, kto nie prowadzi rozmowy", async () => {
     headers: marek.naglowki,
     payload: { body: "Pasuje.", expectedVersion: wersja(), expectedLastMessageId: pytanie } });
   assert.equal(r.statusCode, 409);
-  assert.match(r.json().error, /najpierw ją przejmij/);
+  /* ZDANIE MÓWI, CO DA SIĘ ZROBIĆ (0.395.0). Do 0.394.0 stało tu „najpierw ją
+     przejmij" i odsyłało do przycisku „PRZEJMIJ ROZMOWĘ"; przycisk zszedł
+     z ekranu na zgłoszenie właściciela, więc rada odsyłałaby w próżnię. */
+  assert.match(r.json().error, /poproś o przekazanie/);
+  assert.doesNotMatch(r.json().error, /przejmij/);
+
+  /* IMIĘ I CZAS W ŁADUNKU, bo od 0.395.0 to ten konflikt — a nie przegrany
+     wyścig o przycisk — karmi jedyny dialog przekazania w panelu. Bez nich
+     agent widzi, że nie wyszło, i nie wie, u kogo prosić. */
+  const sz = r.json();
+  assert.equal(sz.assignedUserName, "A. Lewandowska");
+  assert.ok(sz.assignedAt, "czas prowadzenia musi przyjechać z historii przypisań");
+  assert.equal(typeof sz.version, "number");
 });
 
 test("dopisek klienta zatrzymuje wysyłkę i oddaje panelowi wszystko, czego trzeba", async () => {

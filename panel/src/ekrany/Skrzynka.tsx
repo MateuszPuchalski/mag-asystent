@@ -4,7 +4,7 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
-  useAgenci, useDodajKomentarz, useJa, usePrzejmij,
+  useAgenci, useDodajKomentarz, useJa,
   usePrzekaz, useRozmowa, useUstawReklamacyjna,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
@@ -52,7 +52,6 @@ export function Skrzynka() {
   const [bladPytania, setBladPytania] = useState<string | null>(null);
   const klasyfikuj = useKlasyfikuj();
   const ocenKategorie = useOcenKlasyfikacje();
-  const przejmij = usePrzejmij();
   const przekaz = usePrzekaz();
   const oferta = useWskazOferte();
   const zdrowie = useZdrowie();
@@ -113,12 +112,6 @@ export function Skrzynka() {
   const zglos = (e: unknown) =>
     setBlad(e instanceof Konflikt ? `${e.message} — odśwież rozmowę` : (e as Error).message);
 
-  /* Przegrany wyścig o przejęcie NIE jest zwykłym błędem: ekran ma pokazać
-     właściciela, czas i obie wersje, a nie zamienić to w jedno zdanie. */
-  const zglosPrzejecie = (e: unknown) => {
-    if (e instanceof Konflikt) setKonflikt(e.szczegoly as SzczegolyKonfliktu);
-    else setBlad((e as Error).message);
-  };
 
   /* Kontrola świeżości porównuje ostatnią wiadomość KLIENTA, nie ostatnią
      w ogóle — inaczej własna odpowiedź blokowałaby kolejną w tej rozmowie. */
@@ -149,6 +142,14 @@ export function Skrzynka() {
            a zgoda musi być jawna, tak samo jak tam. */
         } else if (e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).trzymajacyName) {
           setPrzyRozmowie((e.szczegoly as SzczegolyWysylki).trzymajacyName ?? "");
+        /* Trzeci rodzaj: rozmowę prowadzi KTO INNY na stałe. Od 0.395.0 to
+           jedyne wejście do dialogu przekazania — wcześniej otwierał go
+           przegrany wyścig o przycisk „PRZEJMIJ ROZMOWĘ", a przycisk zszedł
+           z ekranu. Jedno zdanie w pasku byłoby tu stratą: agent musi
+           zobaczyć, KTO prowadzi i mieć drogę poproszenia go o przekazanie. */
+        } else if (e instanceof Konflikt
+          && (e.szczegoly as SzczegolyKonfliktu).assignedUserId != null) {
+          setKonflikt(e.szczegoly as SzczegolyKonfliktu);
         } else if (konfliktWysylki) setBladWysylki((e as Error).message);
         else zglos(e);
       },
@@ -223,9 +224,6 @@ export function Skrzynka() {
       zrodloPomiaru={zrodlo}
       wskazowka={wskazowka}
       towar={towar}
-      onPrzejmij={() => rozmowa.data && przejmij.mutate(
-        { id: rozmowa.data.rozmowa.id, expectedVersion: rozmowa.data.rozmowa.wersja },
-        { onError: zglosPrzejecie, onSuccess: () => setKonflikt(null) })}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
       ocenia={ocenKategorie.isPending}
       onOcenKategorie={(ocena) => rozmowa.data && ocenKategorie.mutate(

@@ -22,6 +22,11 @@ describe("KonfliktPrzejecia", () => {
        czy poczekać, czy prosić o przekazanie. */
     render(<KonfliktPrzejecia {...props} />);
     expect(screen.getByText(/rozmowę prowadzi M. Wójcik/)).toBeInTheDocument();
+    /* 0.395.0: dialog karmi odbita WYSYŁKA, nie przegrany wyścig o przycisk
+       przejęcia — tamtego przycisku nie ma. Zdanie o nietkniętym szkicu jest
+       tu najważniejsze: agent właśnie stracił ruch i musi wiedzieć, że nie
+       stracił tekstu. */
+    expect(screen.getByText(/Szkic został nietknięty/)).toBeInTheDocument();
     expect(screen.getByText("09:47:12")).toBeInTheDocument();
     expect(screen.getByText(/12 · Twoje żądanie niosło 11/)).toBeInTheDocument();
   });
