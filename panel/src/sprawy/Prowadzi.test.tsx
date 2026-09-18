@@ -4,15 +4,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Prowadzi } from "./Prowadzi";
 
-/* ── Wspólny pasek „kto prowadzi" (0.392.0) ──────────────────────────────────
-   Jeden kształt dla trzech ekranów, ale NIE jedna waga i NIE jedno zachowanie.
-   Testy pilnują dokładnie tych dwóch różnic, bo to one są tu decyzją:
+/* ── Wspólny pasek „kto prowadzi" (0.392.0, przepisany w 0.395.0) ────────────
+   Jeden kształt dla trzech ekranów, ale NIE jedno zachowanie. Testy pilnują
+   trzech rzeczy, bo to one są tu decyzją:
 
-   1. WAGA WYNIKA Z KOSZTU NIEZROBIENIA. W skrzynce nieprzejętą rozmowę piszą
-      czasem dwie osoby naraz (0.247.0), więc przycisk jest główny. Reklamacja
-      czeka w kolejce i tyle.
-   2. ODDAĆ MOŻNA TYLKO TO, CO SERWER PRZYJMIE. `przejmijRozmowe` przypisuje
-      wyłącznie rozmowę niczyją, więc skrzynka nie ma prawa rysować „oddaj".  */
+   1. CUDZEJ SPRAWY NIE ODBIERA SIĘ STĄD. Przy sprawie wziętej przez kogoś
+      innego przycisku nie ma wcale — idzie to osobną drogą, z powodem.
+   2. BEZ PROCEDURY NIE MA PRZYCISKU. Skrzynka bierze od 0.395.0 sam znacznik,
+      bo przejęcie dzieje się tam samo przy odpowiedzi; martwy przycisk uczy,
+      że klikanie nic nie daje.
+   3. SŁOWO „NIKT" DA SIĘ ZASTĄPIĆ zdaniem o tym, co stanie się samo — i to
+      jest cena zdjęcia przycisku, nie ozdoba.                                */
 
 describe("pasek prowadzącego", () => {
   it("bez prowadzącego mówi o nikim i proponuje wzięcie", async () => {
@@ -40,20 +42,21 @@ describe("pasek prowadzącego", () => {
     expect(onKlik).toHaveBeenCalled();
   });
 
-  it("skrzynka NIE proponuje oddania, bo serwer takiego zapisu nie przyjmie", () => {
-    /* `przejmijRozmowe` działa tylko na `assigned_user_id IS NULL`. Przycisk
-       „oddaj" wołałby zapis, który odbija się konfliktem. */
-    render(<Prowadzi prowadzi="Ja" jaProwadze mozeOddac={false} trwa={false}
-      onProwadze={vi.fn()} />);
+  it("BEZ PROCEDURY nie rysuje przycisku — tak bierze go skrzynka (0.395.0)", () => {
+    /* Skrzynka nie ma czego wołać: przypisanie robi wysyłka odpowiedzi.
+       Przycisk bez procedury byłby martwy. */
+    render(<Prowadzi prowadzi={null} trwa={false} />);
 
-    expect(screen.getByText("Ty")).toBeInTheDocument();
+    expect(screen.getByText("nikt")).toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("etykiety da się przestawić — skrzynka ma własną", () => {
-    render(<Prowadzi prowadzi={null} mocny etykietaWez="PRZEJMIJ ROZMOWĘ"
-      trwa={false} onProwadze={vi.fn()} />);
+  it("słowo „nikt” ustępuje zdaniu o tym, co stanie się SAMO", () => {
+    /* Po zdjęciu przycisku agent nie ma skąd wiedzieć, kiedy rozmowa stanie
+       się jego — i to zdanie jest jedynym miejscem, które mu to mówi. */
+    render(<Prowadzi prowadzi={null} trwa={false}
+      gdyNikt="nikt — przypisze pierwsza odpowiedź" />);
 
-    expect(screen.getByRole("button", { name: "PRZEJMIJ ROZMOWĘ" })).toBeInTheDocument();
+    expect(screen.getByText("nikt — przypisze pierwsza odpowiedź")).toBeInTheDocument();
   });
 });

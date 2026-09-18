@@ -115,25 +115,12 @@ export function useZadania() {
   });
 }
 
-/**
- * Przejęcie rozmowy.
- *
- * Konflikt NIE jest tu łapany: `Konflikt` leci do wołającego, bo ekran ma go
- * narysować kafelkami z właścicielem i wersją, a nie zamienić w komunikat.
- */
-export function usePrzejmij() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; expectedVersion: number }) =>
-      api(`/api/conversations/${v.id}/claim`, {
-        method: "POST", body: JSON.stringify({ expectedVersion: v.expectedVersion }),
-      }),
-    onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: klucze.rozmowy });
-      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
-    },
-  });
-}
+/* PRZEJĘCIA Z PANELU NIE MA OD 0.395.0. Hak `usePrzejmij` wołał
+   `POST /api/conversations/:id/claim` dla jedynego przycisku „PRZEJMIJ
+   ROZMOWĘ"; przycisk zszedł na zgłoszenie właściciela, bo wysyłka odpowiedzi
+   przypisuje rozmowę niczyją sama od 0.159.0. Trasa na serwerze ZOSTAJE
+   z własnymi testami — niesie też przejście `new` → `open` — ale panel jej
+   już nie woła. Wracając do niej, przywróć hak, a nie wołaj `api()` z ekranu. */
 
 /* Szkic jest współdzielony, więc zapis jest jawny i niesie wersję. Cicha
    autozapisywarka gubiłaby cudzą pracę przy dwóch agentach na jednej sprawie. */

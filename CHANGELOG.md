@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.395.0 — 18 września 2026
+
+**Guzik „PRZEJMIJ ROZMOWĘ" schodzi ze skrzynki — przypisuje odpowiedź.**
+Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę, to powinno
+dziać się automatycznie". I dzieje się od 0.159.0: wysyłka odpowiedzi
+przypisuje rozmowę niczyją w tej samej transakcji, co wiadomość. Przycisk
+prosił o kliknięcie, które i tak padało minutę później.
+
+- **Nagłówek ma jeden rząd zamiast dwóch.** Drugi niósł „Prowadzi nikt" i ten
+  przycisk; znacznik schodzi pod login, w kolumnę tytułową. Linia w środkowej
+  kolumnie spycha pytanie klienta niżej, a po nie agent tu przyszedł.
+- **Zostaje zdanie**, nie sama pustka: „nikt — przypisze pierwsza odpowiedź".
+  Zniknięcie czynności bez słowa byłoby gorsze od guzika.
+- **Dialog przekazania karmi teraz odbita WYSYŁKA.** Otwierał go przegrany
+  wyścig o ten przycisk, więc bez zmiany zniknąłby razem z nim. Konflikt
+  wysyłki niesie od tego wydania imię prowadzącego i czas z historii
+  przypisań, a zdanie mówi „poproś o przekazanie" zamiast odsyłać do
+  przycisku, którego nie ma.
+- **Cztery przełączniki paska `Prowadzi` schodzą razem z nim** — `mocny`,
+  `etykietaWez`, `etykietaOddaj`, `mozeOddac` istniały wyłącznie dla tamtego
+  jednego wołania, a reklamacja i dyskusja nigdy żadnego nie podały.
+- Czego to NIE daje, świadomie: mocnego zamka PRZED odpowiedzią. Dwóch agentów
+  przy jednej niczyjej rozmowie rozstrzyga odtąd uchwyt obecności i jawna zgoda
+  „odpowiedz mimo to" — ta sama droga, którą i tak trzeba było przejść.
+- Trasa `POST /api/conversations/:id/claim` ZOSTAJE ze swoimi testami: niesie
+  też przejście `new` → `open`. Panel jej nie woła.
+
+Wdrożenie: nic ręką.
+
+---
+
+
 ## 0.394.0 — 18 września 2026
 
 **Notatka biura wchodzi do szukania w trzech kolejkach.** Zgłoszenie

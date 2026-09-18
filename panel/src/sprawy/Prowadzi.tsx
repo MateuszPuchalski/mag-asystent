@@ -17,37 +17,50 @@ import { Przycisk } from "../ui";
    a ponowne kliknięcie zdejmuje — dokładnie jak było. Zmienia się miejsce
    i waga, nie zachowanie.
 
-   SKRZYNKA UŻYWA TEGO SAMEGO PASKA (0.392.0, decyzja właściciela o ujednoliceniu),
-   ale z `mocny`. Przejęcie rozmowy niczyjej jest tam DZIAŁANIEM GŁÓWNYM ekranu,
-   a nie metadaną — rozstrzygnęło to 0.247.0 i ten plik tego nie odwraca.
-   Wspólny jest kształt wiersza, nie waga przycisku: ta wynika z tego, ile
-   kosztuje NIEZROBIENIE kliknięcia. W reklamacji sprawa i tak stoi w kolejce;
-   w skrzynce nieprzejętą rozmowę piszą czasem dwie osoby naraz.             */
+   ── SKRZYNKA BIERZE SAM ZNACZNIK (0.395.0) ──────────────────────────────────
+   0.392.0 dało skrzynce ten sam pasek z przyciskiem „PRZEJMIJ ROZMOWĘ"
+   w wadze głównej. Zgłoszenie właściciela ze zrzutem zdjęło ten przycisk:
+   wysyłka odpowiedzi przypisuje rozmowę niczyją SAMA od 0.159.0, więc guzik
+   prosił o kliknięcie, które i tak padało minutę później.
 
-export function Prowadzi({ prowadzi, trwa, onProwadze, mocny = false, jaProwadze = false,
-  etykietaWez = "Prowadzę tę sprawę", etykietaOddaj = "Odłóż sprawę", mozeOddac = true }: {
+   Razem z nim zeszły `mocny`, `etykietaWez`, `etykietaOddaj` i `mozeOddac` —
+   cztery przełączniki, które istniały wyłącznie dla tamtego jednego wołania.
+   Reklamacja i dyskusja nigdy żadnego z nich nie podały. Przełącznik bez
+   wołającego to nie jest zapas na przyszłość, tylko kod, którego nikt nie
+   sprawdza; wracając po niego, wróć razem z ekranem, który go potrzebuje.   */
+
+export function Prowadzi({ prowadzi, trwa, onProwadze, jaProwadze = false,
+  wWierszu = false, gdyNikt = "nikt" }: {
   /** Imię prowadzącego; `null` znaczy „nikt jeszcze nie wziął". */
   prowadzi: string | null;
   trwa: boolean;
-  onProwadze: () => void;
-  /** Przycisk w wadze głównej — patrz preambuła; używa tego skrzynka. */
-  mocny?: boolean;
+  /**
+   * Procedura wzięcia i oddania sprawy; BRAK znaczy „sam znacznik".
+   *
+   * Ta sama reguła, co przy innych procedurach opcjonalnych w tym panelu:
+   * czego nie da się zrobić, tego nie ma na ekranie. Przycisk bez procedury
+   * byłby martwy, a martwy przycisk uczy, że klikanie tu nic nie daje.
+   */
+  onProwadze?: () => void;
   /** „Ty" zamiast imienia, gdy prowadzi patrzący. */
   jaProwadze?: boolean;
-  etykietaWez?: string;
-  etykietaOddaj?: string;
   /**
-   * Czy w ogóle da się ODDAĆ wziętą sprawę.
+   * Znacznik W WIERSZU z czymś innym, a nie własnym pasmem (0.395.0).
    *
-   * Skrzynka mówi `false`, bo `przejmijRozmowe` przypisuje WYŁĄCZNIE rozmowę
-   * niczyją (`assigned_user_id IS NULL`) — oddania tą drogą nie ma wcale.
-   * Przycisk „oddaj" wołałby tam zapis, który odbija się konfliktem, czyli
-   * obiecywałby czynność, której serwer nie przyjmie. Reklamacja i dyskusja
-   * mają prawdziwy przełącznik i zostają przy domyślnym `true`.
+   * Skrzynka po zdjęciu przycisku miała na te dwa słowa całą linię nagłówka,
+   * a linia w tej kolumnie spycha pytanie klienta niżej — po nie agent tu
+   * przyszedł. Ta sama zasada wypchnęła stamtąd bloki kontekstu w 0.180.0.
    */
-  mozeOddac?: boolean;
+  wWierszu?: boolean;
+  /**
+   * Czym zastąpić słowo „nikt".
+   *
+   * Skrzynka mówi tu, co stanie się SAMO, bo właśnie zniknął stamtąd przycisk
+   * i bez zdania agent nie ma skąd wiedzieć, kiedy rozmowa stanie się jego.
+   */
+  gdyNikt?: string;
 }) {
-  return <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2 text-sm">
+  return <div className={`${wWierszu ? "" : "mb-2 "}flex shrink-0 flex-wrap items-center gap-2 text-sm`}>
     <UserCheck size={14} className="shrink-0 text-slate-400" />
     <span className="text-slate-500">Prowadzi</span>
     {/* Imię POGRUBIONE, „nikt" nie: pusta sprawa nie ma się dopominać uwagi
@@ -55,17 +68,14 @@ export function Prowadzi({ prowadzi, trwa, onProwadze, mocny = false, jaProwadze
     <span className={prowadzi
       ? (jaProwadze ? "font-semibold text-ranga-ok" : "font-semibold text-slate-900")
       : "text-slate-500"}>
-      {prowadzi ? (jaProwadze ? "Ty" : prowadzi) : "nikt"}
+      {prowadzi ? (jaProwadze ? "Ty" : prowadzi) : gdyNikt}
     </span>
     {/* Przy sprawie wziętej przez KOGOŚ INNEGO przycisku nie ma: odebranie
         cudzej sprawy idzie osobną, opisaną drogą (przekazanie z powodem).
         Zdejmuje się WŁASNY znacznik albo bierze niczyją. */}
-    {(!prowadzi || (jaProwadze && mozeOddac)) && (mocny
-      ? <Przycisk wariant="glowny" className="ml-auto" disabled={trwa} onClick={onProwadze}>
-          {prowadzi ? etykietaOddaj : etykietaWez}
-        </Przycisk>
-      : <Przycisk className="ml-auto !px-2 !py-1 !text-xs" disabled={trwa} onClick={onProwadze}>
-          {prowadzi ? etykietaOddaj : etykietaWez}
-        </Przycisk>)}
+    {onProwadze && (!prowadzi || jaProwadze) &&
+      <Przycisk className="ml-auto !px-2 !py-1 !text-xs" disabled={trwa} onClick={onProwadze}>
+        {prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
+      </Przycisk>}
   </div>;
 }

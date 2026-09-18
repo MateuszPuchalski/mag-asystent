@@ -115,10 +115,31 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
      ostatniego znaku życia i nie przeżywa restartu usługi. */
   if (k.assignedUserId !== null && k.assignedUserId !== z.autor.id) {
     /* Trwały właściciel bije wszystko. Inaczej dwóch agentów odpowiada
-       jednocześnie, a klient dostaje dwie różne wersje tej samej prawdy. */
-    throw new ConversationConflict("Rozmowę prowadzi kto inny — najpierw ją przejmij", {
-      assignedUserId: k.assignedUserId, version: k.version,
-    });
+       jednocześnie, a klient dostaje dwie różne wersje tej samej prawdy.
+
+       ŁADUNEK NIESIE IMIĘ I CZAS (0.395.0), bo to on karmi teraz jedyny
+       dialog przekazania w panelu. Do 0.394.0 ten dialog otwierał przegrany
+       wyścig o przycisk „PRZEJMIJ ROZMOWĘ"; przycisk zszedł na zgłoszenie
+       właściciela, więc bez tych dwóch pól agent zobaczyłby gołe zdanie
+       i nie miałby skąd wziąć nazwiska, u którego prosić o przekazanie.
+
+       Czas bierzemy z HISTORII PRZYPISAŃ, nie z `updated_at` rozmowy — ten
+       drugi rusza się przy każdym zapisie szkicu (ta sama pułapka co
+       w `przejmijRozmowe`). */
+    const wlasciciel = database.prepare(`SELECT u.name,
+      (SELECT a.assigned_at FROM conversation_assignment a
+        WHERE a.conversation_id=? AND a.unassigned_at IS NULL
+        ORDER BY a.id DESC LIMIT 1) AS assigned_at
+      FROM app_user u WHERE u.user_id=?`)
+      .get(z.conversationId, k.assignedUserId) as
+      { name: string | null; assigned_at: string | null } | undefined;
+    /* ZDANIE NIE MÓWI JUŻ „najpierw ją przejmij": tej drogi nie ma od
+       0.395.0. Mówi to, co naprawdę da się zrobić — poprosić właściciela. */
+    throw new ConversationConflict(
+      `Rozmowę prowadzi ${wlasciciel?.name ?? "kto inny"} — poproś o przekazanie`, {
+        assignedUserId: k.assignedUserId, assignedUserName: wlasciciel?.name ?? null,
+        assignedAt: wlasciciel?.assigned_at ?? null, version: k.version,
+      });
   }
   const trzyma = k.assignedUserId === null ? trzymajacy(z.conversationId) : null;
   if (trzyma && trzyma.userId !== z.autor.id && !z.mimoObecnosci) {
