@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.388.1 — 18 września 2026
+
+**Trzy ciche usterki rozkładania dostaw, z audytu ekranu.**
+
+**Arkusz zasłaniał palec, ale nie skaner.** `ScannerBus` jest globalnym stosem
+handlerów, niezależnym od fokusu okna, więc skan spod otwartego
+`ModalBottomSheet` spadał do handlera ekranu pod spodem. Strażnik wymieniał
+tylko dwa stany z ośmiu. Przy kolizji kodu podmieniało to listę kandydatów pod
+palcem sięgającym po drugą pozycję — a ten arkusz sam deklaruje, że operacja
+STOI (D7). Przy arkuszu POPRAW ILOŚĆ przestawiało wybraną pozycję, z sygnałem
+sukcesu, którego człowiek nie miał jak wytłumaczyć. Oba błędy były ciche: nic
+nie wyglądało na zepsute.
+
+**Etykieta regału bez otwartej pozycji udawała nieznany towar.** Kod wracał
+jako „nieznany", a aplikacja proponowała NADAĆ GO towarowi jako kod kreskowy —
+czynność, którą serwer i tak odrzuca. Kolektor zna kształt kodu sam, więc
+odpowiada teraz bez sieci i od razu: to jest etykieta regału, najpierw zeskanuj
+towar. Ograniczenie jest tańsze od komunikatu (dekalog p. 6).
+
+**Skan w trakcie zapisu ginął bez sygnału.** Drugi skan trafiał na `busy`
+i wracał w ciszy. Dokument ergonomii sam ostrzega, że powyżej ~300 ms ludzie
+skanują drugi raz, a człowiek na drabinie nie patrzy w ekran — połknięty skan
+bez dźwięku czyta się jak zapisany. Teraz każde połknięcie brzmi błędem.
+
+Wszystkie trzy siedzą w `ui/delivery/DeliveryLinesScreen.kt` i żadna nie
+zmienia protokołu ani bazy. Testu nie dokładają, bo moduł `:app` nie kompiluje
+się poza CI — sprawdza je ręcznie rozszerzony scenariusz **S32**.
+
 ## 0.388.0 — 18 września 2026
 
 **Nakładka spraw odeszła — martwy kod, decyzja właściciela.**
