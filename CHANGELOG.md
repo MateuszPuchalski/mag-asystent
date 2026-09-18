@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.392.0 — 18 września 2026
+
+**Trzy zgłoszenia właściciela ze zrzutów, wszystkie o jednym: ekran obsługi
+oddaje miejsce pracy.**
+
+**Tło pracy mieści się w jednym cichym wierszu.** Nad kolejką reklamacji
+i dyskusji stały DWIE karty pełnej szerokości — próg daty i stan
+synchronizacji — czyli około dziewięćdziesięciu pikseli na rzeczy, których
+biuro nie czyta przy każdej sprawie. Nowy `sprawy/PasekTla.tsx` składa je
+w jedną szarą linię z dwiema akcjami.
+
+**ALARM ZOSTAJE GŁOŚNY i to jest cała reguła tego pliku.** Gdy próg chowa
+sprawy z ŻYWYM TERMINEM, gdy synchronizacja stoi albo gdy lista jest
+niekompletna, wracają pełne, kolorowe paski. Schowanie alarmu byłoby kupieniem
+pikseli za pracę, której nikt nie zobaczy — za tę regułę zapłacił próg
+w 0.385.0, a zwroty w 0.339.0.
+
+**Karta Copilota jest domyślnie ZWINIĘTA.** Odradzałem to w 0.389.0: zamknięty
+blok chowa „PRZECZYTAJ SPRAWĘ" za kliknięciem przy każdej nieprzeczytanej
+sprawie. Właściciel zobaczył obie wersje na własnym ekranie i wybrał tę.
+Cena jest mniejsza, niż wyglądała: pamięć z 0.389.0 działa w obie strony, więc
+agent pracujący z Copilotem otwiera blok raz, a nie przy każdej sprawie.
+
+**„Prowadzę tę sprawę" zeszło do ŚRODKOWEJ kolumny**, do paska werdyktu nad
+rozmową (`reklamacje/Prowadzi.tsx`). Kolumna po prawej odpowiada na pytanie
+„co wiemy o tej sprawie" — same fakty do czytania. Wzięcie sprawy jest
+CZYNNOŚCIĄ i należy tam, gdzie stoją pozostałe; przycisk pełnej szerokości
+w kolumnie faktów wyglądał przy tym na ważniejszy od nich wszystkich.
+
+Ten sam ruch w dyskusjach, żeby oba ekrany zostały bliźniacze. W kolumnie
+faktów zostają tagi i notatka: to zapiski O SPRAWIE, nie czynności.
+
+**Skrzynka dostaje ten sam pasek** (decyzja właściciela o ujednoliceniu).
+Mówiła to dotąd DWOMA sposobami w dwóch wierszach: przyciskiem, gdy rozmowa
+niczyja, i metadaną, gdy wzięta. Wspólny jest KSZTAŁT wiersza, nie waga
+przycisku: przejęcie zostaje działaniem głównym, bo nieprzejętą rozmowę piszą
+czasem dwie osoby naraz (0.247.0), a reklamacja po prostu czeka w kolejce.
+
+Skrzynka nie rysuje przy tym „oddaj" i to nie jest przeoczenie:
+`przejmijRozmowe` przypisuje WYŁĄCZNIE rozmowę niczyją, więc taki przycisk
+wołałby zapis, który serwer odbija konfliktem. Rozmowę przekazuje się osobną
+drogą, z powodem.
+
 ## 0.391.0 — 18 września 2026
 
 **Brak w dostawie zdejmuje towar ze sprzedaży.** [wymaga działania]

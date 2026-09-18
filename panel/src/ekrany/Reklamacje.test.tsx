@@ -203,9 +203,11 @@ describe("Ekran reklamacji", () => {
   });
 
   it("liczba odsianych dyskusji stoi na pasku — to zakres panelu, nie błąd", () => {
+    /* Od 0.392.0 tło pracy mieści się w JEDNYM cichym wierszu, więc zdanie
+       jest krótsze — ale liczba zostaje. Nikt nie ma szukać „zaginionej"
+       reklamacji, która nigdy reklamacją nie była. */
     pokaz();
-    expect(screen.getByText(/dyskusji pominiętych/)).toBeInTheDocument();
-    expect(screen.getByText("35")).toBeInTheDocument();
+    expect(screen.getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
   });
 
   it("nad rozmową stoi pasek werdyktu z dwoma przyciskami, a zdanie o Centrum Sprzedaży zniknęło", () => {
@@ -245,7 +247,7 @@ describe("Ekran reklamacji", () => {
   it("„synchronizuj teraz” jest JAWNYM kliknięciem, nie skutkiem otwarcia", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
-    await userEvent.click(screen.getByRole("button", { name: /Synchronizuj teraz/ }));
+    await userEvent.click(screen.getByRole("button", { name: /synchronizuj/i }));
     expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
   });
 

@@ -80,10 +80,15 @@ describe("Karta faktów Copilota", () => {
     expect(screen.getByText("W3")).toBeInTheDocument();
   });
 
-  it("bez karty zaprasza do przeczytania i mówi, że werdykt zostaje przy agencie", () => {
+  it("bez karty zaprasza do przeczytania i mówi, że werdykt zostaje przy agencie", async () => {
+    /* Blok jest domyślnie zwinięty (0.392.0), więc zaproszenie i przycisk stoją
+       jedno kliknięcie dalej. Zdanie o werdykcie ZOSTAJE w środku: to doktryna
+       tej karty — uznanie i odrzucenie należą do człowieka. */
     render(<Dowody {...props(null)} />);
-    expect(screen.getByText(/Werdykt zostaje przy Tobie/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "PRZECZYTAJ SPRAWĘ" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
+
+    expect(screen.getByText(/Werdykt zostaje przy Tobie/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "PRZECZYTAJ SPRAWĘ" })).toBeVisible();
   });
 
   it("rozpoznanie jest JAWNYM kliknięciem, nie skutkiem otwarcia ekranu", async () => {
@@ -91,6 +96,7 @@ describe("Karta faktów Copilota", () => {
        Copilocie od etapu F. */
     const onRozpoznaj = vi.fn();
     render(<Dowody {...props(null, { onRozpoznaj })} />);
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
     expect(onRozpoznaj).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "PRZECZYTAJ SPRAWĘ" }));
     expect(onRozpoznaj).toHaveBeenCalledTimes(1);
@@ -163,26 +169,28 @@ describe("Karta faktów Copilota", () => {
      jest DOWODAMI — zamówienie, oferta, kartoteka, rozmowy o tym zakupie —
      a karta maszyny spychała je poniżej krawędzi okna.                      */
 
-  it("karta jest domyślnie OTWARTA — zwinięcie na starcie zabrałoby ją używającym", () => {
+  it("karta jest domyślnie ZWINIĘTA — decyzja właściciela z 0.392.0", () => {
+    /* W 0.389.0 stała otwarta i odradzałem zwijanie: zamknięty blok chowa
+       „PRZECZYTAJ SPRAWĘ" za kliknięciem. Właściciel zobaczył obie wersje na
+       własnym ekranie i wybrał tę — jego kolumna, jego decyzja. */
+    render(<Dowody {...props(KARTA)} />);
+    expect(screen.getByText("Kosiarka przestała ciąć")).not.toBeVisible();
+  });
+
+  it("jedno kliknięcie otwiera kartę, a wybór przeżywa zamknięcie ekranu", async () => {
+    const { unmount } = render(<Dowody {...props(KARTA)} />);
+    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
+    expect(screen.getByText("Kosiarka przestała ciąć")).toBeVisible();
+    unmount();
+
+    /* Pamięć działa w OBIE strony i to ona zbija koszt domyślnego zwinięcia:
+       agent pracujący z Copilotem otwiera blok raz, nie przy każdej sprawie. */
     render(<Dowody {...props(KARTA)} />);
     expect(screen.getByText("Kosiarka przestała ciąć")).toBeVisible();
   });
 
-  it("jedno kliknięcie zwija kartę, a wybór przeżywa zamknięcie ekranu", async () => {
-    const { unmount } = render(<Dowody {...props(KARTA)} />);
-    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
-    expect(screen.getByText("Kosiarka przestała ciąć")).not.toBeVisible();
-    unmount();
-
-    /* Nawyk stanowiska, nie decyzja na jedną sprawę — inaczej agent klikałby
-       przy każdej reklamacji z osobna. */
+  it("zamknięta karta mówi, CO w niej jest — inaczej trzeba ją otwierać, żeby sprawdzić", () => {
     render(<Dowody {...props(KARTA)} />);
-    expect(screen.getByText("Kosiarka przestała ciąć")).not.toBeVisible();
-  });
-
-  it("zamknięta karta mówi, CO w niej jest — inaczej trzeba ją otwierać, żeby sprawdzić", async () => {
-    render(<Dowody {...props(KARTA)} />);
-    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
 
     expect(screen.getByText("usterka, oczekiwanie klienta, dowody")).toBeVisible();
     /* Braki wołają z nagłówka, bo to one trzymają sprawę w miejscu. */
@@ -194,11 +202,10 @@ describe("Karta faktów Copilota", () => {
     expect(screen.getByText("wyczyta usterkę, oczekiwanie i braki")).toBeVisible();
   });
 
-  it("przeczytana sprawa bez ani jednego faktu nie udaje, że coś znalazł", async () => {
+  it("przeczytana sprawa bez ani jednego faktu nie udaje, że coś znalazł", () => {
     const pusta = { ...KARTA, usterka: null, kiedy: null, oczekiwanie: null,
       dowody: [], brakuje: [], rada: null };
     render(<Dowody {...props(pusta as SzczegolReklamacji["karta"])} />);
-    await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
 
     expect(screen.getByText("przeczytał, ale nic nie wyczytał")).toBeVisible();
   });

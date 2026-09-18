@@ -11,6 +11,7 @@ import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { OcenaKategorii } from "./Copilot";
 import { Obecni } from "./Obecni";
+import { Prowadzi } from "../sprawy/Prowadzi";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -128,8 +129,6 @@ export function Rozmowa(p: {
       <div className="flex flex-wrap items-center gap-3">
         <LoginKlienta login={rozmowa.klient}
           className="mr-auto text-naglowek font-bold tracking-tight text-wertis-ink" />
-        {!rozmowa.wlasciciel && <Przycisk wariant="glowny" onClick={p.onPrzejmij}>
-          <UserCheck size={16} />PRZEJMIJ ROZMOWĘ</Przycisk>}
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
@@ -145,15 +144,26 @@ export function Rozmowa(p: {
           onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna} />
       </div>
 
-      {/* Drugi wiersz niesie METADANE: kto prowadzi i skąd przyszła rozmowa.
-          Oba są prawdziwe przez cały czas trwania sprawy, więc żadne nie ma
-          prawa konkurować z pytaniem klienta o uwagę. */}
-      {rozmowa.wlasciciel && <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <span className={`flex items-center gap-1 font-semibold ${
-          moja ? "text-ranga-ok" : "text-slate-600"}`}>
-          <UserCheck size={13} />{moja ? "Twoja rozmowa" : `Prowadzi ${rozmowa.wlasciciel}`}</span>
-        <span className="text-slate-300">·</span><span>Allegro</span>
-      </div>}
+      {/* ── JEDEN KSZTAŁT „KTO PROWADZI" W CAŁYM PANELU (0.392.0) ────────────
+          Do 0.391.0 skrzynka mówiła to DWOMA sposobami w dwóch wierszach:
+          przyciskiem w rzędzie pierwszym, gdy rozmowa niczyja, i metadaną
+          w drugim, gdy wzięta. Reklamacje i dyskusje dostały wtedy wspólny
+          pasek; decyzja właściciela o ujednoliceniu domyka to tutaj.
+
+          WAGA PRZYCISKU ZOSTAJE MOCNA i to nie jest niekonsekwencja: przy
+          rozmowie niczyjej przejęcie jest działaniem głównym ekranu (0.247.0),
+          bo nieprzejętą rozmowę piszą czasem dwie osoby naraz. Reklamacja
+          czeka w kolejce i tyle. Wspólny jest kształt wiersza, nie waga.
+
+          `mozeOddac={false}`, bo `przejmijRozmowe` przypisuje WYŁĄCZNIE rozmowę
+          niczyją — oddania tą drogą nie ma. Przycisk „oddaj" obiecywałby
+          czynność, którą serwer odbija konfliktem. Rozmowę przekazuje się
+          osobną drogą, z powodem. */}
+      <div className="mt-1">
+        <Prowadzi prowadzi={rozmowa.wlasciciel} jaProwadze={moja} mocny={!rozmowa.wlasciciel}
+          trwa={false} onProwadze={p.onPrzejmij}
+          etykietaWez="PRZEJMIJ ROZMOWĘ" mozeOddac={false} />
+      </div>
     </header>
 
     {/* Obecność IDZIE PRZED sprawą: „ktoś tu już siedzi" zmienia decyzję

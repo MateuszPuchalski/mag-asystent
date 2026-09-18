@@ -94,11 +94,10 @@ function Notatka({ dyskusja, trwa, blad, onZapisz, onCofnij }: {
   </div>;
 }
 
-export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCofnijNotatke, tagi }: {
+export function Fakty({ szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke, tagi }: {
   szczegol: SzczegolDyskusji;
   trwa: boolean;
   bladZapisu: string;
-  onProwadze: () => void;
   onNotatka: (tekst: string) => void;
   /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
   onCofnijNotatke?: () => void;
@@ -182,12 +181,10 @@ export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCof
       </ul>
     </Sekcja>}
 
+    {/* „Prowadzi" zeszło do ŚRODKOWEJ kolumny (0.392.0) — ten sam ruch i ten
+        sam powód co przy reklamacji: wzięcie sprawy jest czynnością, a ta
+        kolumna niesie fakty. Oba ekrany mają zostać bliźniacze. */}
     <Sekcja tytul="Praca biura">
-      <Wiersz etykieta="Prowadzi">{d.prowadzi ?? "nikt"}</Wiersz>
-      {/* ZNACZNIK, nie zamek. Ponowne kliknięcie zdejmuje. */}
-      <Przycisk className="mt-1 w-full" disabled={trwa} onClick={onProwadze}>
-        {d.prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
-      </Przycisk>
       {/* Tagi nad notatką — powód przy tej samej sekcji w `reklamacje/Dowody.tsx`. */}
       {tagi && <div className="mt-3">
         <TagiSprawy przypiete={d.tagi} slownik={tagi.slownik} trwa={tagi.trwa}

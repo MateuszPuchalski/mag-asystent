@@ -140,12 +140,17 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
         ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis font-bold text-amber-900">
             {ile(karta.brakuje.length, "brak", "braki", "braków")}</span>
         : undefined}
-      /* OTWARTA ZAWSZE, także bez karty. Zamykanie jej na starcie chowałoby
-         „PRZECZYTAJ SPRAWĘ" — główny przycisk tego bloku — za kliknięciem
-         przy KAŻDEJ nieprzeczytanej sprawie. Dekalog, punkt 3: ograniczaj
-         liczbę interakcji. Zamiast tego chudnie sam stan bez karty: proza
-         o tym, co Copilot potrafi, zeszła do podpisu nagłówka. */
-      domyslnieOtwarte
+      /* ZWINIĘTA DOMYŚLNIE — decyzja właściciela z 18 września 2026, po
+         zobaczeniu wersji otwartej na własnym ekranie.
+         
+         Odradzałem to w 0.389.0: zamknięty blok chowa „PRZECZYTAJ SPRAWĘ" za
+         kliknięciem przy każdej nieprzeczytanej sprawie. Właściciel zna ten
+         koszt i wybrał miejsce na ekranie — jego decyzja, jego kolumna.
+         
+         Cena jest mniejsza, niż wyglądała: `pamietajJako` pamięta ROZWINIĘCIE
+         tak samo jak zwinięcie, więc agent pracujący z Copilotem otwiera blok
+         raz, a nie przy każdej sprawie. Podpis nagłówka mówi, co w środku,
+         więc zamknięty blok nie każe zgadywać. */
       pamietajJako="wertis.reklamacje.copilot"
     >
     <div className="px-2 py-2">
@@ -286,14 +291,13 @@ const Cytat = ({ z, zdjecia = [] }: { z: string; zdjecia?: ZdjecieKarty[] }) => 
 };
 
 export function Dowody({
-  szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCofnijNotatke,
+  szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke,
   rozpoznaje = false, bladRozpoznania = "", onRozpoznaj,
   tagi,
 }: {
   szczegol: SzczegolReklamacji;
   trwa: boolean;
   bladZapisu: string;
-  onProwadze: () => void;
   onNotatka: (tekst: string) => void;
   /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
   onCofnijNotatke?: () => void;
@@ -452,14 +456,12 @@ export function Dowody({
       </ul>
     </Sekcja>}
 
+    {/* ── „PROWADZI" ZESZŁO DO ŚRODKOWEJ KOLUMNY (0.392.0) ──────────────────
+        Zgłoszenie właściciela ze zrzutem. Wzięcie sprawy jest CZYNNOŚCIĄ,
+        a ta kolumna odpowiada na pytanie „co wiemy" — same fakty do czytania.
+        Pasek stoi teraz przy werdykcie, nad rozmową (`reklamacje/Prowadzi.tsx`).
+        Zostają tu tagi i notatka, bo to zapiski O SPRAWIE, nie czynności. */}
     <Sekcja tytul="Praca biura">
-      <Wiersz etykieta="Prowadzi">{r.prowadzi ?? "nikt"}</Wiersz>
-      {/* ZNACZNIK, nie zamek: reklamacja przed werdyktem nie ma żadnego zapisu,
-          przy którym nazwisko pojawiłoby się samo. Ponowne kliknięcie zdejmuje. */}
-      <Przycisk className="mt-1 w-full" disabled={trwa} onClick={onProwadze}>
-        {r.prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
-      </Przycisk>
-
       {/* ── TAGI I NOTATKA ZWIJAJĄ SIĘ (0.389.0) ─────────────────────────────
           Na zrzucie właściciela te dwa bloki zajmowały pół kolumny: trzy
           propozycje tagów, „nowy tag", pole tekstowe i przycisk zapisu. To są

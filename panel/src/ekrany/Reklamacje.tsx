@@ -15,10 +15,12 @@ import type {
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
+import { Prowadzi } from "../sprawy/Prowadzi";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekProgu } from "../sprawy/Prog";
+import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
@@ -373,16 +375,46 @@ export function Reklamacje() {
   if (error) return <Blad>{(error as Error).message}</Blad>;
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
+  const alarmTla = tloAlarmuje({
+    prog: data?.prog, zlaSynchronizacja: Boolean(data?.stan && data.stan.status !== "current"),
+    pozostaloDoPobrania: data?.stan?.pozostaloDoPobrania ?? null,
+  });
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
-    {data?.stan && <PasekOgona stan={data.stan} />}
-    {data?.stan && <PasekSynchronizacji stan={data.stan} blad={bladSync}
-      trwa={synchronizuj.isPending}
-      onSynchronizuj={() => {
-        setBladSync("");
-        synchronizuj.mutate(undefined, { onError: (e) => setBladSync((e as Error).message) });
-      }} />}
+    {/* ── TŁO PRACY: JEDEN WIERSZ, DOPÓKI JEST SPOKÓJ (0.392.0) ────────────
+        Zgłoszenie właściciela ze zrzutem: „schowaj to gdzieś, zajmuje dużo
+        miejsca". Dwie karty pełnej szerokości zjadały nad kolejką około
+        dziewięćdziesięciu pikseli na rzeczy, których nikt nie czyta przy
+        każdej sprawie.
+
+        ALARM ZOSTAJE GŁOŚNY: gdy próg chowa sprawy z żywym terminem, gdy
+        synchronizacja stoi albo gdy lista jest niekompletna, wracają pełne,
+        kolorowe paski. Schowanie alarmu byłoby kupieniem pikseli za pracę,
+        której nikt nie zobaczy. */}
+    {alarmTla
+      ? <>
+          {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
+          {data?.stan && <PasekOgona stan={data.stan} />}
+          {data?.stan && <PasekSynchronizacji stan={data.stan} blad={bladSync}
+            trwa={synchronizuj.isPending}
+            onSynchronizuj={() => {
+              setBladSync("");
+              synchronizuj.mutate(undefined,
+                { onError: (e) => setBladSync((e as Error).message) });
+            }} />}
+        </>
+      : <PasekTla prog={data?.prog} onPrzelaczProg={setBezProgu}
+          stanTekst={data?.stan
+            ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status}${
+              data.stan.dyskusjiPominietych ? `, pominiętych dyskusji ${data.stan.dyskusjiPominietych}` : ""}`
+            : undefined}
+          trwaSync={synchronizuj.isPending}
+          onSynchronizuj={() => {
+            setBladSync("");
+            synchronizuj.mutate(undefined, { onError: (e) => setBladSync((e as Error).message) });
+          }} />}
+    {/* Błąd synchronizacji nie chowa się nigdy — także w trybie cichym. */}
+    {bladSync && !alarmTla && <p className="px-1 text-podpis text-red-700">{bladSync}</p>}
 
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -454,6 +486,16 @@ export function Reklamacje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
         {/* Pasek werdyktu NAD rozmową: rozstrzygnięcie całej sprawy stoi
             wyżej niż jej ostatnia wiadomość. */}
+        {/* Kto prowadzi — CZYNNOŚĆ, więc stoi przy innych czynnościach, a nie
+            w kolumnie faktów (0.392.0, zgłoszenie właściciela ze zrzutem). */}
+        {szczegol.data && <Prowadzi prowadzi={szczegol.data.reklamacja.prowadzi}
+          trwa={prowadze.isPending}
+          onProwadze={() => {
+            setBladZapisu("");
+            prowadze.mutate(
+              { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
+              { onError: (e) => setBladZapisu((e as Error).message) });
+          }} />}
         {szczegol.data && <Werdykt reklamacja={szczegol.data.reklamacja}
           trwa={werdykt.isPending} blad={bladWerdyktu}
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
@@ -533,12 +575,6 @@ export function Reklamacje() {
                 setBladRozpoznania("");
                 rozpoznaj.mutate({ id: szczegol.data!.reklamacja.id },
                   { onError: (e) => setBladRozpoznania((e as Error).message) });
-              }}
-              onProwadze={() => {
-                setBladZapisu("");
-                prowadze.mutate(
-                  { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
-                  { onError: (e) => setBladZapisu((e as Error).message) });
               }}
               onNotatka={(tekst) => {
                 setBladZapisu("");

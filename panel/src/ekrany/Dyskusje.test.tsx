@@ -153,9 +153,12 @@ describe("Ekran dyskusji", () => {
   });
 
   it("NIE MA przycisku synchronizacji, a pasek mówi, gdzie jej szukać", () => {
+    /* Obie sprawy przyjeżdżają jedną listą; drugi przycisk byłby drugim
+       żądaniem o to samo i drugą drogą w limit 429 (§25c.9). Od 0.392.0 zdanie
+       stoi w cichym wierszu tła, więc jest krótsze — ale dalej odsyła. */
     pokaz();
     expect(screen.queryByRole("button", { name: /synchronizuj/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/przyjeżdżają jedną listą/i)).toBeInTheDocument();
+    expect(screen.getByText(/odświeżasz ją w reklamacjach/i)).toBeInTheDocument();
   });
 
   it("punkt świeżości bierze ostatnią NIE naszą wiadomość, także doradcy", async () => {
