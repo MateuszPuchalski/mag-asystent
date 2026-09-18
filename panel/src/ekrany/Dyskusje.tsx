@@ -16,6 +16,7 @@ import { Czat } from "../reklamacje/Czat";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
+import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
 import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
@@ -80,6 +81,12 @@ export function Dyskusje() {
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
   const { sito, przelacz: przelaczSito } = useSito();
+  /* DWIE OSIE, nie cztery, i to nie jest niedoróbka: dyskusja NIE MA terminu
+     (Allegro nie oddaje przy niej ani `decisionDueDate`, ani `statusDueDate` —
+     powód stoi w `dyskusje/Fakty.tsx`) ani oczekiwanej kwoty. Pigułka
+     sortująca po polu, którego nie ma, uczy, że pigułki nic nie robią. */
+  const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
+    "wertis.dyskusje.porzadek", ["otwarto", "ruch"], "otwarto");
   const [tag, setTag] = useState<number | null>(null);
   const slownikTagow = useTagi();
   const nowyTag = useNowyTag();
@@ -142,7 +149,13 @@ export function Dyskusje() {
     () => (tag === null ? moi : moi.filter((d) => d.tagi.some((t) => t.id === tag))),
     [moi, tag]);
 
-  const widoczne = pasujace ?? poSitach;
+  /* Porządek NA KOŃCU łańcucha — powód przy tym samym miejscu w reklamacjach. */
+  const widoczne = useMemo(
+    () => posortuj(pasujace ?? poSitach, porzadek, {
+      otwarto: (d) => d.otwartoAt,
+      ruch: (d) => d.ostatniaWiadomoscAt ?? d.otwartoAt,
+    }),
+    [pasujace, poSitach, porzadek]);
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
      tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
      samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
@@ -339,6 +352,8 @@ export function Dyskusje() {
         {/* Sito „Moje" — własny rząd, powód przy tym samym paśmie
             w `ekrany/Reklamacje.tsx`. */}
         <div className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-2 py-1">
+            <PasekPorzadku porzadek={porzadek} dozwolone={["otwarto", "ruch"]}
+              onZmien={ustawPorzadek} />
             <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
               moich={wKubelku.filter((d) => mojaSprawa(d.prowadziId, mojeId)).length}
               niczyich={wKubelku.filter((d) => d.prowadziId === null).length} />

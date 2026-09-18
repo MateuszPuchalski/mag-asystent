@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.401.0 — 18 września 2026
+
+**Kolejność w kolejkach obsługi wybiera agent.** Zgłoszenie właściciela:
+„dodaj sortowanie po dacie etc". Reklamacje, dyskusje i zwroty miały kolejność
+ZASZYTĄ — najpierw termin, potem data otwarcia malejąco — i ani jednego
+przełącznika. Agent szukający „co przyszło wczoraj" przewijał listę.
+
+- **Reklamacje: cztery osie** — termin, data otwarcia, ostatni ruch, kwota.
+- **Dyskusje: dwie** — data otwarcia i ostatni ruch. Terminu ani kwoty ta
+  kolejka NIE MA (Allegro nie oddaje przy dyskusji żadnego z tych pól), więc
+  pigułek dla nich nie ma: przełącznik, który nic nie robi, uczy, że
+  przełączniki nic nie robią.
+- **Zwroty: trzy** — termin, data utworzenia, kwota. Zwrot nie prowadzi
+  rozmowy, więc „ostatniego ruchu" nie ma czego pytać.
+- **Domyślny wszędzie zostaje TEN, który był**, więc wydanie niczego nie
+  przestawia pod ręką. Przy reklamacjach i zwrotach to zegar ustawowy.
+- **Wybór jest pamiętany osobno dla każdej kolejki** — ten sam nawyk, co przy
+  porządku w skrzynce. Osobno, bo „po kwocie" ma sens w reklamacjach i nie ma
+  go w dyskusjach.
+- **Puste zawsze na końcu.** Sprawa bez terminu nie jest najpilniejsza ani
+  najmniej pilna — jest sprawą, o której ta oś nic nie mówi.
+
+**Przy zwrotach jest to odwrócenie decyzji z 0.370.0**, gdzie przełącznik „od
+daty nadania" zszedł świadomie: odpowiadał na inne pytanie („co przyszło
+najdawniej") niż to, które prowadzi tę pracę („co się pali"). Wraca na wyraźne
+zgłoszenie właściciela i z zachowaniem tamtego powodu — zegar ustawowy dalej
+rządzi listą, dopóki agent sam nie powie inaczej.
+
+**Skrzynki to nie dotyczy i nie jest to przeoczenie:** ma przełącznik od
+0.259.0, a dwie pozostałe osie — termin i kwota — w rozmowie nie istnieją.
+
+Wdrożenie: nic ręką.
+
+---
+
+
 ## 0.400.0 — 18 września 2026
 
 **Symbol towaru w reklamacji bierze się z paragonu, nie z dzisiejszego

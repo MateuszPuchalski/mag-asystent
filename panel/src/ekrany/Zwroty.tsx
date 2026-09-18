@@ -21,6 +21,7 @@ import { Naglowek } from "../zwroty/Naglowek";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
+import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
 import type { RozjazdZwrotu } from "../api/zwroty";
@@ -420,6 +421,9 @@ export function Zwroty() {
      Od 0.367.0 fraza dzieli się po spacjach (`pasujeDoFrazy`): człowiek
      z kartonem w ręku ma kilka drobnych uchwytów naraz, a żaden sam nie
      zawęża. */
+  const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
+    "wertis.zwroty.porzadek", ["termin", "otwarto", "kwota"], "termin");
+
   const pasujace = useMemo(() => {
     if (!rozbij(fraza).length) return null;
     return (data?.zwroty ?? []).filter((z) => pasujeDoFrazy(kody(z), fraza));
@@ -429,11 +433,29 @@ export function Zwroty() {
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
      ZAMKNIĘTYCH. Kod jest mocniejszy niż zakładka, na którą ktoś przed chwilą
      kliknął — tak samo jak adres w pasku przeglądarki. */
-  /* Kolejność liczy ZEGAR USTAWOWY i tylko on — blizna 0.121.0. Przełącznik
-     „od daty nadania" zszedł w 0.370.0 razem z pasmem filtrów: odpowiadał na
-     inne pytanie („co przyszło najdawniej") niż to, które prowadzi tę pracę
-     („co się najbardziej pali"). */
-  const widoczne = pasujace ?? wKubelku;
+  /* ── PORZĄDEK WRACA, ALE INACZEJ (0.401.0) ────────────────────────────────
+     Do 0.370.0 stał tu przełącznik „od daty nadania" i ZSZEDŁ ŚWIADOMIE razem
+     z pasmem filtrów: odpowiadał na inne pytanie („co przyszło najdawniej")
+     niż to, które prowadzi tę pracę („co się najbardziej pali").
+
+     Wraca na wyraźne zgłoszenie właściciela — „dodaj sortowanie po dacie etc"
+     — i z jedną różnicą, która tamten powód szanuje: DOMYŚLNY ZOSTAJE TERMIN.
+     Zegar ustawowy dalej rządzi listą, dopóki agent sam nie powie inaczej,
+     więc wydanie niczego nie przestawia pod ręką. Kolejność liczona po
+     terminie to blizna 0.121.0 i ona zostaje nietknięta.
+
+     TRZY OSIE, nie cztery: zwrot nie ma „ostatniego ruchu" — nie prowadzi
+     rozmowy, więc nie ma czego pytać. Kwotą jest suma pozycji, bo ona stoi
+     przy KAŻDYM zwrocie; `kwotaGrosze` bywa pusta do czasu decyzji, a dwie
+     różne kwoty pod jedną etykietą to dokładnie blizna 0.121.0 w innym
+     miejscu. */
+  const widoczne = useMemo(
+    () => posortuj(pasujace ?? wKubelku, porzadek, {
+      otwarto: (z) => z.utworzono,
+      termin: (z) => z.terminAt,
+      kwota: (z) => z.sumaPozycjiGrosze,
+    }),
+    [pasujace, wKubelku, porzadek]);
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -691,6 +713,8 @@ export function Zwroty() {
             pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
             zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
             kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
+        <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
+          onZmien={ustawPorzadek} />
         <FiltrSegmentowy<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
           pozycje={[
             ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
