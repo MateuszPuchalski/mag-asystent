@@ -10,7 +10,6 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { OcenaKategorii } from "./Copilot";
-import { Sprawa } from "./Sprawa";
 import { Obecni } from "./Obecni";
 
 /**
@@ -75,12 +74,6 @@ export function Rozmowa(p: {
   onWymus: (powod: string) => void;
   onWskazOferte: (ofertaId: string) => void;
   onDopytajOOferte: () => void;
-  sprawy: import("../api/typy").WierszSprawy[];
-  trwaSprawa: boolean;
-  bladSprawy: string;
-  onZalozSprawe: (tytul: string) => void;
-  onDolaczDoSprawy: (sprawaId: number) => void;
-  onOdlaczOdSprawy: () => void;
   onOtworzRozmowe: (id: number) => void;
   zapisujeStatus: boolean;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
@@ -161,13 +154,6 @@ export function Rozmowa(p: {
     {/* Obecność IDZIE PRZED sprawą: „ktoś tu już siedzi" zmienia decyzję
         o pisaniu odpowiedzi, a sprawa zmienia tylko sposób czytania. */}
     <Obecni obecni={p.obecni} mojeId={p.mojeId} />
-
-    {/* Sprawa stoi POD nagłówkiem, nad wszystkim innym: „to ten sam problem
-        co w tamtej rozmowie" zmienia sposób czytania całej reszty ekranu. */}
-    <Sprawa sprawa={p.dane.sprawa} rozmowaId={rozmowa.id} sprawy={p.sprawy}
-      trwa={p.trwaSprawa} blad={p.bladSprawy}
-      onZaloz={p.onZalozSprawe} onDolacz={p.onDolaczDoSprawy} onOdlacz={p.onOdlaczOdSprawy}
-      onOtworz={p.onOtworzRozmowe} />
 
     {/* Oferta, towar i zamówienie przeniosły się do KOLUMNY KONTEKSTU
         (0.180.0). Cztery bloki jeden pod drugim spychały pytanie klienta

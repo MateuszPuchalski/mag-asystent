@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.388.0 — 18 września 2026
+
+**Nakładka spraw odeszła — martwy kod, decyzja właściciela.**
+Sprawa stała od 0.161.0 jako klamra nad rozmowami: tytuł i lista wątków.
+Nie miała statusu, osi, terminu ani prowadzącego. Nie wchodziła do żadnego
+licznika, nie było jej w żadnej kolejce i nie dało się jej zamknąć. Zakładało
+się ją ręcznie, wpisując tytuł.
+
+**Powstała z decyzji podjętej PRZED liczbami, których żądało pytanie 1
+w `docs/obsluga-klienta.md` — i te liczby nie padły nigdy.** Dokument zapisał
+to wtedy jawnie, żeby nikt nie wziął odpowiedzi za wniosek z dowodów. Teraz
+ten zapis się odpłacił: przy przeglądzie było wiadomo, czego brakuje.
+
+**Zastąpiła ją DROGA ZAKUPU z 0.387.0.** Odpowiada na to samo pytanie — „co
+jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery kolejki,
+bez kliknięcia i bez wpisywania tytułu. Sprawa spinała rozmowy ręką i tylko
+rozmowy. Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie,
+którego dekalog obsługi zabrania w punkcie 3.
+
+**Czego świadomie tracimy, i to jest cała cena.** Droga wiąże po numerze
+zamówienia, więc dwóch rozmów o jednym problemie BEZ wspólnego zakupu nikt już
+nie sklei — pytanie przed zakupem zadane w dwóch wątkach zostaje dwoma wątkami.
+
+**[wymaga działania] Tabele `sprawa_klienta` i `sprawa_klienta_rozmowa` kasuje
+`migrate()` przy starcie.** Kto chce zachować tytuły spraw, robi kopię bazy
+PRZED aktualizacją — tak samo jak przy cięciu z 0.140.0. Tabela bez czytelnika
+nie jest archiwum, tylko pułapką dla następnego czytającego schemat.
+
+**Ślad w dzienniku ZOSTAJE.** `sprawa_dolaczona` i `sprawa_odlaczona` dalej
+leżą w `conversation_event`: wiszą przy ŹRÓDLE (blizna 0.130.0), a dziennik nie
+ma retencji. Panel przestał je rysować na osi, ale „kto i kiedy sklejał te
+rozmowy" zostaje pytaniem z odpowiedzią.
+
+Schodzą: `services/sprawy.ts`, `skrzynka/Sprawa.tsx`, cztery trasy
+(`GET`/`POST /api/obsluga/sprawy`, `POST …/sprawy/:id/rozmowy`,
+`POST …/rozmowy/:id/odlacz`), cztery haki panelu i pole `sprawa` w ładunku
+rozmowy. `db/migracja-sprawy.test.ts` zostaje na swoim miejscu jako
+`db/kasata-spraw.test.ts` z odwróconą treścią: pilnuje, żeby tabele NIE
+wróciły, i sprawdza kasatę na bazie z danymi, nie na świeżym schemacie.
+
 ## 0.387.0 — 17 września 2026
 
 **Spoiwo czterech kolejek: pięć kroków z sześciu, bez ani jednej nowej tabeli.**

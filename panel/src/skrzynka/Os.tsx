@@ -423,7 +423,7 @@ export function Os({
    Gdy zdarzenie jest ostatnie i nic po nim nie padło, celem zostaje ostatnia
    wypowiedź przed nim, bo skok donikąd byłby przyciskiem bez skutku.        */
 
-const ZDARZENIE: ReadonlySet<string> = new Set(["status", "sprawa", "dobor"]);
+const ZDARZENIE: ReadonlySet<string> = new Set(["status", "dobor"]);
 
 type Zdarzenie = WpisOsi & { cel: string | null };
 
@@ -476,11 +476,6 @@ function etykieta(z: Zdarzenie): string {
   if (e.rodzaj === "dobor") return e.po ? NAZWA_DOBORU[e.po as StatusDoboru] ?? e.po : z.tresc;
   if (e.rodzaj === "dobor_wybor") {
     return `${e.wybrano ? "wybrano" : "zdjęto"} ${e.symbol ?? "?"}`;
-  }
-  /* Gałąź JAWNA, nie „reszta": `"status" | "dobor"` to jeden wariant unii,
-     więc dwa `return` wyżej go nie wyczerpują i TypeScript ma rację. */
-  if (e.rodzaj === "sprawa") {
-    return e.dolaczona ? `sprawa: ${e.tytul ?? "?"}` : "odłączono od sprawy";
   }
   return z.tresc;
 }

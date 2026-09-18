@@ -828,7 +828,52 @@ export function migrate(database: DatabaseSync) {
   oznaczAutoodpowiedziWZastanych(database);
   zalacznikiBezDubli(database);
   dosypZalacznikiZLadowiska(database);
+  bezNakladkiSpraw(database);
   tabelaFts(database);
+}
+
+/**
+ * Kasacja nakładki spraw (0.388.0).
+ *
+ * Sprawa była KLAMRĄ nad rozmowami: tytułem i listą wątków, bez statusu,
+ * bez osi, bez terminu i bez prowadzącego. Powstała w 0.161.0 z decyzji
+ * podjętej PRZED liczbami, których żądało pytanie 1
+ * (`docs/obsluga-klienta.md`) — i te liczby nigdy nie padły.
+ *
+ * ZASTĄPIŁA JĄ DROGA ZAKUPU (0.387.0). Tamta odpowiada na to samo pytanie
+ * — „co jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery
+ * kolejki, bez kliknięcia i bez wpisywania tytułu. Dwa paski nad jedną
+ * rozmową mówiące o tym samym to podwojenie, którego dekalog obsługi
+ * zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
+ *
+ * Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
+ *
+ * TABELA BEZ CZYTELNIKA NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ — to samo zdanie,
+ * co przy cięciu z 0.140.0. Kto chce tych tytułów, robi kopię bazy PRZED
+ * aktualizacją; mówi o tym `DEPLOY.md`.
+ *
+ * ZDARZEŃ OSI NIE KASUJEMY. `sprawa_dolaczona` i `sprawa_odlaczona` zostają
+ * w `conversation_event`: wiszą przy ŹRÓDLE (blizna 0.130.0), a dziennik
+ * audytu nie ma retencji i czyta się go po latach. Panel przestał je
+ * rysować, ale „kto i kiedy sklejał rozmowy" zostaje odpowiedzią możliwą
+ * do udzielenia.
+ */
+function bezNakladkiSpraw(database: DatabaseSync) {
+  /* Klucze obce schodzą PRZED transakcją — w transakcji `PRAGMA foreign_keys`
+     jest ignorowane po cichu (ta sama pułapka co w `bezObslugiKlienta`). */
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    /* NAWIASY NA KOŃCU SĄ KONIECZNE: `transaction` ZWRACA opakowaną funkcję,
+       a nie wykonuje jej (patrz jej sygnatura). Bez `()` kasowanie byłoby
+       domknięciem wyrzuconym do kosza — cicho, bez błędu i bez skutku. */
+    transaction(database, () => {
+      /* Dziecko przed rodzicem, jak przy każdym innym kasowaniu tutaj. */
+      database.exec("DROP TABLE IF EXISTS sprawa_klienta_rozmowa");
+      database.exec("DROP TABLE IF EXISTS sprawa_klienta");
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 /**

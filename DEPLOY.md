@@ -137,6 +137,15 @@ w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 
 ## 2. Instalacja aplikacji
 
+> **Przed KAŻDĄ aktualizacją zrób kopię `server/data/wertis.db`.** Migracje
+> chodzą przy starcie i część z nich KASUJE tabele, których aplikacja już nie
+> czyta. Tabela bez czytelnika nie jest archiwum, tylko pułapką dla następnej
+> osoby czytającej schemat — i tak samo tłumaczyło to cięcie z 0.140.0.
+>
+> Kasaty dotąd: rejestry starej obsługi klienta (0.140.0) oraz nakładka spraw,
+> czyli `sprawa_klienta` i `sprawa_klienta_rozmowa` (0.388.0). Kto chce tamtych
+> danych, czyta je z kopii; po aktualizacji nie ma skąd ich wziąć.
+
 ```bash
 cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis

@@ -133,51 +133,27 @@ CREATE TABLE IF NOT EXISTS message (
 );
 CREATE INDEX IF NOT EXISTS ix_message_conversation ON message(conversation_id, sent_at);
 
--- ── Sprawa: jeden problem klienta ponad rozmowami (§6.1, 0.161.0) ──────────
--- Nazwa ma DWA powody i oba są blizną.
+-- ── NAKŁADKI SPRAW JUŻ NIE MA (0.388.0) ────────────────────────────────────
+-- `sprawa_klienta` i `sprawa_klienta_rozmowa` odeszły razem z kodem, który je
+-- czytał; `migrate()` kasuje je u klienta (`bezNakladkiSpraw` w `db/db.ts`).
 --
--- Nie `case`, choć tak nazywa ją §15 projektu: `case` jest słowem kluczowym
--- SQLite i każde zapytanie musiałoby ją cytować. Dokument dostaje nazwę
--- z kodu, nie odwrotnie — tak samo rozstrzyga to jego własna preambuła.
+-- Sprawa była klamrą nad rozmowami: tytułem i listą wątków, bez statusu, bez
+-- osi, bez terminu. Powstała w 0.161.0 z decyzji podjętej PRZED liczbami,
+-- których żądało pytanie 1 `docs/obsluga-klienta.md` — i te liczby nie padły
+-- nigdy. Od 0.387.0 na to samo pytanie odpowiada DROGA ZAKUPU: po numerze
+-- zamówienia, przez cztery kolejki, bez kliknięcia.
 --
--- Nie samo `sprawa`, bo tę tabelę `migrate()` KASUJE: stoi na liście nakładek
--- po starej implementacji, którą każda baza klienta musi stracić. Tabela
--- nazwana tak samo powstałaby ze `schema.sql` i znikała sekundę później,
--- po cichu i bez błędu, bo `migrate()` chodzi PO schemacie. Ten sam powód
--- dał w 0.150.0 `zwrot_klienta` zamiast `zwrot`.
---
--- Sprawa NIE MA własnego statusu ani osi. §7 nie zna statusów sprawy, a blizna
--- z 0.130.0 mówi wprost: zdarzenia wiszą przy ŹRÓDLE, nie przy sprawie —
--- historia sklejona z rozmów ginęła przy pierwszym rozklejeniu. Sprawa jest
--- tu WYŁĄCZNIE klamrą: tytułem i listą rozmów.
-CREATE TABLE IF NOT EXISTS sprawa_klienta (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  tytul        TEXT NOT NULL,
-  utworzyl     INTEGER REFERENCES app_user(user_id),
-  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-
--- Rozmowa należy do CO NAJWYŻEJ JEDNEJ sprawy — stąd `conversation_id` jako
--- klucz główny, a nie para. Poprzednia odpowiedź o tym samym kształcie
--- kosztowała cztery tabele nakładki oraz ręczne SCAL i ROZKLEJ
--- (`docs/obsluga-klienta.md`, pytanie 1). Jedna kolumna z kluczem obcym
--- zamyka tę drogę: sklejenie to jeden wiersz, rozklejenie to jego skasowanie.
-CREATE TABLE IF NOT EXISTS sprawa_klienta_rozmowa (
-  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
-  sprawa_id       INTEGER NOT NULL REFERENCES sprawa_klienta(id) ON DELETE CASCADE,
-  dolaczyl        INTEGER REFERENCES app_user(user_id),
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-);
-CREATE INDEX IF NOT EXISTS ix_sprawa_klienta_rozmowa_sprawa ON sprawa_klienta_rozmowa(sprawa_id);
+-- OBIE NAZWY ZOSTAJĄ SPALONE. Tabela nazwana tak samo powstałaby stąd
+-- i znikała sekundę później przy każdym starcie — ta sama pułapka, którą
+-- opisywał komentarz `dopasowanie` niżej.
 
 -- ── Dobór części przy rozmowie (§11, etap E1) ──────────────────────────────
--- Nazwa z sufiksem tym samym ruchem co `sprawa_klienta` i `zwrot_klienta`:
+-- Nazwa z sufiksem tym samym ruchem co `zwrot_klienta`:
 -- `dopasowanie` stoi na liście nakładek, które `migrate()` KASUJE przy każdym
 -- starcie. Tabela o tamtej nazwie powstałaby stąd i znikała sekundę później.
 --
 -- Jedna rozmowa = jeden dobór, więc `conversation_id` jest kluczem głównym,
--- a nie kolumną z indeksem. Pilnuje tego kształt tabeli, nie serwis — wzorzec
--- `sprawa_klienta_rozmowa`. Sprawa widzi dobory PRZEZ swoje rozmowy.
+-- a nie kolumną z indeksem. Pilnuje tego kształt tabeli, nie serwis.
 --
 -- Brak wiersza znaczy `not_started` i liczy się przy odczycie: otwarcie
 -- zakładki niczego nie wstawia („zero zapisu przy patrzeniu").
@@ -433,7 +409,7 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
 -- ── Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2) ──────────────────
 -- Pięć tabel zamiast dziesięciu bytów z §12 (`Manufacturer`, `Part`,
 -- `Measurement`, `KnowledgeRevision`…): każda z tamtych byłaby dziś tabelą bez
--- czytelnika — blizna 0.157.0. Nazwy polskie, jak `sprawa_klienta`; żadna nie
+-- czytelnika — blizna 0.157.0. Nazwy polskie, jak `zwrot_klienta`; żadna nie
 -- stoi na liście spalonych w `bezObslugiKlienta()` (tam jest `dopasowanie`).
 --
 -- Model maszyny i silnika w JEDNEJ tabeli z `rodzaj`: kosiarka i jej silnik
@@ -2456,7 +2432,7 @@ CREATE TABLE IF NOT EXISTS przyjecie_pominiete (
 -- się pokazać, że coś odsialiśmy.
 --
 -- NAZWA `reklamacja_klienta`, nie `reklamacja`. Wzór ten sam co przy
--- `zwrot_klienta` i `sprawa_klienta`: krótkie nazwy po starej obsłudze klienta
+-- `zwrot_klienta`: krótkie nazwy po starej obsłudze klienta
 -- kasuje `bezObslugiKlienta()` przy każdym starcie. `reklamacja` nie stoi na
 -- tamtej liście, bo stare reklamacje żyły jako kolumny `rekl_*` w
 -- `zwrot_pozycja` — ale sufiks zdejmuje to pytanie na zawsze.

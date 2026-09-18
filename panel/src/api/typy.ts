@@ -131,7 +131,7 @@ export type WpisOsi = {
      rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
      zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
-    | "komentarz" | "status" | "sprawa" | "dobor";
+    | "komentarz" | "status" | "dobor";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -153,8 +153,8 @@ export type WpisOsi = {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie sprawy w postaci KLUCZY (0.243.0) — przy `status`, `sprawa`
-   * i `dobor`. `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
+   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `dobor`.
+   * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
    * zostają w bazie i w API. Panel nie ma prawa rozbierać `tresc` z powrotem:
@@ -162,8 +162,7 @@ export type WpisOsi = {
    */
   zdarzenie?:
     | { rodzaj: "status" | "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
-    | { rodzaj: "sprawa"; dolaczona: boolean; tytul: string | null };
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;
@@ -184,19 +183,6 @@ export type WpisWzmianki = {
   at: string;
   odhaczona: boolean;
   odhaczonaAt: string | null;
-};
-
-/* Sprawa (§6.1, 0.161.0) — klamra nad rozmowami jednego problemu. Nie ma
-   statusu ani osi: §7 nie zna statusów sprawy, a zdarzenia wiszą przy ŹRÓDLE
-   (blizna 0.130.0). */
-export type SprawaRozmowy = {
-  id: number;
-  tytul: string;
-  rozmowy: Array<{ id: number; klient: string; ostatniaWiadomoscAt: string }>;
-};
-
-export type WierszSprawy = {
-  id: number; tytul: string; liczbaRozmow: number; ostatniaWiadomoscAt: string | null;
 };
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
@@ -318,7 +304,6 @@ export type OsRozmowy = {
   os: WpisOsi[];
   szkic: Szkic | null;
   ofertaWskazana: OfertaWskazana | null;
-  sprawa: SprawaRozmowy | null;
   zamowienie: ZamowienieRozmowy | null;
   oferta: OfertaRozmowy | null;
   /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */

@@ -79,15 +79,38 @@ skleja obiekty Allegro w jeden problem" i kosztowała cztery tabele nakładki
 plus ręczne SCAL i ROZKLEJ. Inwentarz powie, ile spraw naprawdę miało więcej
 niż jedno źródło — czyli czy było co sklejać.
 
-> **Odpowiedź:** Rozmowa, sprawa, dobór i zadanie to CZTERY osobne byty —
-> `panel-obslugi-klienta.md` §6.1. Sprawa stoi ponad rozmowami i skleja te,
-> które dotyczą jednego problemu klienta.
+> **Odpowiedź (0.161.0):** Rozmowa, sprawa, dobór i zadanie to CZTERY osobne
+> byty. Sprawa stoi ponad rozmowami i skleja te, które dotyczą jednego
+> problemu klienta.
 >
 > **To decyzja właściciela podjęta przed liczbami, których to pytanie żądało.**
 > Inwentarz miał powiedzieć, ile spraw naprawdę miało więcej niż jedno źródło,
 > czyli czy było co sklejać. Poprzednia odpowiedź o tym samym kształcie
 > kosztowała cztery tabele nakładki oraz ręczne SCAL i ROZKLEJ. Zapisujemy to
 > jawnie, żeby nikt nie wziął tej odpowiedzi za wniosek z dowodów.
+>
+> ### Odpowiedź zmieniona w 0.388.0: SPRAWY NIE MA
+>
+> Liczby, których to pytanie żądało, nie padły nigdy. Sprawa przeżyła
+> dwadzieścia siedem wydań jako tytuł plus lista rozmów: bez statusu, bez osi,
+> bez terminu, bez prowadzącego. Nie wchodziła do żadnego licznika i nie dało
+> się jej zamknąć.
+>
+> **Zastąpiła ją DROGA ZAKUPU z 0.387.0.** Tamta odpowiada na to samo pytanie
+> — „co jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery
+> kolejki, bez kliknięcia i bez wpisywania tytułu. Sprawa spinała rozmowy
+> ręką; droga spina wszystko sama.
+>
+> Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie, którego
+> dekalog obsługi zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
+> Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
+>
+> **Czego przy tym świadomie tracimy.** Droga wiąże po numerze zamówienia,
+> więc dwóch rozmów o jednym problemie BEZ wspólnego zakupu nie sklei. Pytanie
+> przed zakupem zadane w dwóch wątkach zostaje dwoma wątkami. To jest cena
+> zapisana tu jawnie, a nie przeoczenie.
+>
+> Jednostek domenowych zostaje trzy: rozmowa, dobór i zadanie.
 
 ### 2. Co wjeżdża i skąd?
 

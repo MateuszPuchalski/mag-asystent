@@ -41,11 +41,11 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* Sprawy PRZED użytkownikami: `sprawa_klienta.utworzyl` wskazuje na
+  /* Wiedza PRZED użytkownikami: `dowod_zastosowania` wskazuje na
      `app_user` bez kaskady. Do 0.181.0 test spraw był ostatni w pliku, więc
      brak tych dwóch nazw nie wywracał niczego — każdy test dopisany po nim
      padał w `beforeEach` na kluczu obcym. */
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "sprawa_klienta_rozmowa", "sprawa_klienta",
+  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia",
     "conversation_mention", "conversation_comment", "conversation_draft",
     "conversation_assignment", "conversation_event", "message", "conversation",
     "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
@@ -110,11 +110,6 @@ const TRASY = () => [
   /* Jedno „Moje" ponad kolejkami (S4 spoiwa) — ta sama bramka, bo lista
      niesie tematy rozmów i spraw klientów. */
   { method: "GET" as const, url: "/api/obsluga/moje" },
-  { method: "GET" as const, url: "/api/obsluga/sprawy" },
-  { method: "POST" as const, url: "/api/obsluga/sprawy",
-    payload: { tytul: "Szarpak", rozmowaId: rozmowa } },
-  { method: "POST" as const, url: "/api/obsluga/sprawy/1/rozmowy", payload: { rozmowaId: rozmowa } },
-  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/odlacz` },
   { method: "POST" as const, url: "/api/obsluga/wzmianki/1/odhacz" },
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/kandydaci` },
   { method: "PUT" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
@@ -613,51 +608,6 @@ test("wejście w rozmowę trzyma ją, ale nie zapisuje ani jednego wiersza", asy
   r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/presence`,
     headers: ala.naglowki, payload: { obecny: false } });
   assert.equal(r.json().trzyma, null);
-});
-
-test("sprawa skleja rozmowy, a rozmowa mówi wprost, do której już należy", async () => {
-  const b = login("biuro", "Anna");
-  const d = db();
-  const druga = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
-    external_conversation_id,subject)
-    SELECT channel_account_id,'w-2','Kupujący 44300444' FROM conversation WHERE id=?`)
-    .run(rozmowa).lastInsertRowid);
-
-  let r = await app.inject({ method: "POST", url: "/api/obsluga/sprawy", headers: b.naglowki,
-    payload: { tytul: "Szarpak do NAC LS 46-450", rozmowaId: rozmowa } });
-  assert.equal(r.statusCode, 200, r.body);
-  const sprawa = r.json().id;
-
-  r = await app.inject({ method: "POST", url: `/api/obsluga/sprawy/${sprawa}/rozmowy`,
-    headers: b.naglowki, payload: { rozmowaId: druga } });
-  assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json().rozmowy.length, 2);
-
-  /* Rozmowa jedzie razem ze swoją sprawą — agent ma zobaczyć rodzeństwo,
-     zanim zacznie pisać. */
-  r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`,
-    headers: b.naglowki });
-  assert.equal(r.json().sprawa.tytul, "Szarpak do NAC LS 46-450");
-
-  /* Rozmowa w drugiej sprawie odpada, a odmowa niesie TYTUŁ tej pierwszej —
-     inaczej agent nie wie, co odkleić. */
-  const trzecia = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
-    external_conversation_id,subject)
-    SELECT channel_account_id,'w-3','Kupujący 44300444' FROM conversation WHERE id=?`)
-    .run(rozmowa).lastInsertRowid);
-  r = await app.inject({ method: "POST", url: "/api/obsluga/sprawy", headers: b.naglowki,
-    payload: { tytul: "Filtr", rozmowaId: trzecia } });
-  assert.equal(r.statusCode, 200, r.body);
-  const inna = await app.inject({ method: "POST", url: `/api/obsluga/sprawy/${r.json().id}/rozmowy`,
-    headers: b.naglowki, payload: { rozmowaId: druga } });
-  assert.equal(inna.statusCode, 400);
-  assert.match(inna.json().error, /Szarpak do NAC LS 46-450/);
-
-  const odlacz = await app.inject({ method: "POST",
-    url: `/api/obsluga/rozmowy/${druga}/odlacz`, headers: b.naglowki });
-  assert.equal(odlacz.statusCode, 200, odlacz.body);
-  r = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${druga}`, headers: b.naglowki });
-  assert.equal(r.json().sprawa, null);
 });
 
 /* ── Strażnik adresów panelu (0.181.1) ──────────────────────────────────────
