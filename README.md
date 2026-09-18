@@ -446,6 +446,15 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
   zamknięcia dostawy.
 
+  **Brak zdejmuje towar ze sprzedaży (0.390.0).** „Brak w przesyłce" i niedobór
+  przy „Złej ilości" kolejkują MM z magazynu skutku dostawy na magazyn
+  serwisowy (`MAG_ID_SERWIS`). Powód: fakturę zakupu Subiekt księguje w całości,
+  więc towar, którego nie było w palecie, wisiałby na stanie jako sprzedawalny.
+  Ilość bierze się z kategorii — przy braku to samo zgłoszenie, przy złej ilości
+  różnica wobec dokumentu. Nadmiar i uszkodzenie w transporcie stanu nie ruszają.
+  Bez wpisu w `wertis.env` przesunięcia nie ma, a zgłoszenie zapisuje się jak
+  dotąd.
+
   Kluczy sprzed 0.21.0 (`qty_short`, `no_space`…) serwer od 0.26.0 już **nie
   przyjmuje** — okno wdrożenia APK się zamknęło. Etykiety zostają na zawsze:
   historii się nie kasuje, a protokół dla dostawcy nie może pokazywać

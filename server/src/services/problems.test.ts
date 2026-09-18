@@ -32,7 +32,7 @@ let deliveryId = 0;
 let lineId = 0;
 
 beforeEach(() => {
-  for (const t of ["events", "problem", "delivery_line", "delivery"]) {
+  for (const t of ["events", "problem", "delivery_line", "delivery", "sfera_queue"]) {
     db().prepare(`DELETE FROM ${t}`).run();
   }
   deliveryId = Number(
@@ -397,4 +397,23 @@ test("wyjątek zamknięty bez notatki nadal wraca — sam fakt też jest odpowie
   assert.equal(lista.length, 1, "cisza z notatką i cisza bez ekranu to dwie różne ciszy");
   assert.equal(lista[0].resolvedNote, null);
   assert.equal(lista[0].resolvedBy, "Anna");
+});
+
+/* ── Bez MAG_ID_SERWIS ─────────────────────────────────────────────────────── */
+
+test("BEZ MAG_ID_SERWIS zgłoszenie braku zachowuje się jak przed tym wydaniem", () => {
+  /* Ten plik biegnie bez `MAG_ID_SERWIS` w środowisku, więc mierzy dokładnie
+     to, co dzieje się u klienta, dopóki numeru nie ma w `wertis.env`. Bramka
+     jest ta sama co przy magazynie odpadu i z tego samego powodu: zgadnięty
+     numer WYSTAWIA DOKUMENT, tylko na cudzy magazyn. Plik obok
+     (`braki-na-serwis.test.ts`) mierzy zachowanie z numerem ustawionym. */
+  const r = zglos({ typ: "missing_item", qty: 3, lineId });
+  assert.ok("id" in r, "zgłoszenie zapisuje się mimo luki w konfiguracji");
+  const ile = db().prepare("SELECT COUNT(*) AS n FROM sfera_queue").get() as { n: number };
+  assert.equal(ile.n, 0, "bez numeru magazynu stan zostaje nietknięty");
+  const slad = db()
+    .prepare("SELECT payload FROM events WHERE type='brak_na_serwis_pominiety'")
+    .all() as Array<{ payload: string }>;
+  assert.equal(slad.length, 1, "pominięcie zostawia ślad — inaczej biuro nie wie, czego nie ma");
+  assert.equal(JSON.parse(slad[0].payload).powod, "brak MAG_ID_SERWIS");
 });
