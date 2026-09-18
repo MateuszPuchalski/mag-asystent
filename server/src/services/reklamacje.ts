@@ -542,6 +542,65 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
  * `od` to próg po `otwarto_at`; `null` znaczy „bez progu" i tak wchodzi
  * przełącznik „pokaż starsze" z panelu.
  */
+/**
+ * Symbol towaru z PARAGONU, nie z dzisiejszego mapowania oferty (0.400.0).
+ *
+ * Zgłoszenie właściciela: „symbol towaru w reklamacji powinno ściągać
+ * z paragonu do danego zamówienia". Do 0.399.0 kolejka i szczegół brały
+ * kartotekę z `oferta_kartoteka` — czyli z tego, na co oferta wskazuje DZIŚ.
+ * Sprzedawca przepina sygnaturę oferty, gdy towar od jednego dostawcy się
+ * wyczerpie, więc reklamacja sprzed miesiąca pokazywała część, której klient
+ * nigdy nie dostał.
+ *
+ * PARAGON BIJE MAPOWANIE, i to jest świadome odwrócenie reguły „za pamięcią
+ * stoi decyzja człowieka, więc bije automat". Tamta reguła rozstrzyga, czym
+ * JEST oferta; tutaj pytanie brzmi, co klient DOSTAŁ — a to jest fakt
+ * zapisany na pozycji zamówienia, nie wniosek. Gdy zamówienia nie mamy
+ * pobranego albo pozycja nie niesie sygnatury, zostaje mapowanie jak dotąd.
+ *
+ * DWA TRAFIENIA TO NIE POWÓD DO WYBRANIA PIERWSZEGO — ta sama zasada, co
+ * w `kartotekaPoSku`. Symbol miał być unikalny; skoro nie jest, wiersz zostaje
+ * przy tym, co wiedział, a rozstrzyga człowiek przy otwartej sprawie.
+ *
+ * JEDNO ZAPYTANIE NA CAŁĄ KOLEJKĘ, nie jedno na wiersz: `listaReklamacji`
+ * pilnuje tego wprost przy propozycjach kartoteki, a lista bywa
+ * kilkusetwierszowa.
+ */
+function zParagonu(database: Db, skus: Array<string | null>): Map<string, { twId: number; symbol: string }> {
+  const szukane = [...new Set(skus
+    .map((s) => (s ?? "").trim())
+    .filter((s) => s !== "")
+    .map((s) => s.toLowerCase()))];
+  const wynik = new Map<string, { twId: number; symbol: string }>();
+  if (szukane.length === 0) return wynik;
+  const luki = szukane.map(() => "?").join(",");
+  const wiersze = database.prepare(
+    `SELECT tw_id, symbol FROM sgt_towar
+      WHERE LOWER(TRIM(symbol)) IN (${luki})`).all(...szukane) as
+    Array<{ tw_id: number; symbol: string }>;
+  const ile = new Map<string, number>();
+  for (const w of wiersze) {
+    const klucz = String(w.symbol).trim().toLowerCase();
+    ile.set(klucz, (ile.get(klucz) ?? 0) + 1);
+    wynik.set(klucz, { twId: Number(w.tw_id), symbol: String(w.symbol) });
+  }
+  /* Symbol trafiający w dwie kartoteki wypada — patrz preambuła. */
+  for (const [klucz, n] of ile) if (n > 1) wynik.delete(klucz);
+  return wynik;
+}
+
+/** Nadpisanie kartoteki wiersza sygnaturą z paragonu; brak trafienia nie rusza nic. */
+function zParagonuNaWiersz(
+  r: WierszReklamacji, sku: unknown, mapa: Map<string, { twId: number; symbol: string }>,
+): void {
+  const klucz = String(sku ?? "").trim().toLowerCase();
+  if (klucz === "") return;
+  const k = mapa.get(klucz);
+  if (!k) return;
+  r.twId = k.twId;
+  r.twSymbol = k.symbol;
+}
+
 export function listaReklamacji(
   database: Db = defaultDb(), teraz = Date.now(),
   od: string | null = config.allegro.reklamacjeOd,
@@ -557,7 +616,24 @@ export function listaReklamacji(
      otwartej sprawie (szczegół). */
   const wiersze = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol, zk.kupiono_at
+           k.tw_id, k.tw_symbol, zk.kupiono_at,
+           /* ── SYGNATURA Z PARAGONU (0.400.0) ──────────────────────────────
+              Zgłoszenie właściciela: „symbol towaru w reklamacji powinno
+              ściągać z paragonu do danego zamówienia".
+
+              Pozycja zamówienia niesie sygnaturę sprzedawcy Z CHWILI ZAKUPU —
+              to jest paragon. Tabela oferta_kartoteka niesie DZISIEJSZE
+              mapowanie oferty, a sprzedawca przepina sygnaturę, gdy towar od
+              jednego dostawcy się wyczerpie (powód przy pamiecAktualna).
+              Reklamacja dotyczy rzeczy, którą klient DOSTAŁ, więc pyta
+              paragonu, nie dzisiejszej półki.
+
+              Ograniczenie do jednej pozycji: ten sam numer oferty bywa na
+              zamówieniu dwa razy, ale sygnaturę niesie tę samą.
+              Backticków tu nie ma — blok stoi w literale szablonowym. */
+           (SELECT zp.sku FROM zamowienie_klienta_pozycja zp
+             WHERE zp.zamowienie_id = zk.id AND zp.offer_id = r.offer_id
+             ORDER BY zp.id LIMIT 1) AS sku_paragonu
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
@@ -574,9 +650,12 @@ export function listaReklamacji(
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
     .all(od, od) as Wiersz[];
   const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
+  /* Sygnatury z paragonów JEDNYM zapytaniem na całą kolejkę (0.400.0). */
+  const zParagonow = zParagonu(database, wiersze.map((w) => (w as Wiersz).sku_paragonu as string | null));
   return wiersze.map((w) => {
     const r = zWiersza(w, teraz);
     r.tagi = tagi.get(r.id) ?? [];
+    zParagonuNaWiersz(r, (w as Wiersz).sku_paragonu, zParagonow);
     return r;
   });
 }
@@ -794,7 +873,24 @@ export function szczegolReklamacji(
      w rozmowie (0.221.0). */
   const w = database.prepare(`
     SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol, zk.kupiono_at
+           k.tw_id, k.tw_symbol, zk.kupiono_at,
+           /* ── SYGNATURA Z PARAGONU (0.400.0) ──────────────────────────────
+              Zgłoszenie właściciela: „symbol towaru w reklamacji powinno
+              ściągać z paragonu do danego zamówienia".
+
+              Pozycja zamówienia niesie sygnaturę sprzedawcy Z CHWILI ZAKUPU —
+              to jest paragon. Tabela oferta_kartoteka niesie DZISIEJSZE
+              mapowanie oferty, a sprzedawca przepina sygnaturę, gdy towar od
+              jednego dostawcy się wyczerpie (powód przy pamiecAktualna).
+              Reklamacja dotyczy rzeczy, którą klient DOSTAŁ, więc pyta
+              paragonu, nie dzisiejszej półki.
+
+              Ograniczenie do jednej pozycji: ten sam numer oferty bywa na
+              zamówieniu dwa razy, ale sygnaturę niesie tę samą.
+              Backticków tu nie ma — blok stoi w literale szablonowym. */
+           (SELECT zp.sku FROM zamowienie_klienta_pozycja zp
+             WHERE zp.zamowienie_id = zk.id AND zp.offer_id = r.offer_id
+             ORDER BY zp.id LIMIT 1) AS sku_paragonu
       FROM reklamacja_klienta r
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
@@ -813,6 +909,11 @@ export function szczegolReklamacji(
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
   const reklamacja = zWiersza(w, teraz);
+  /* Sygnatura z paragonu bije dzisiejsze mapowanie oferty (0.400.0) — powód
+     przy `zParagonu`. Szczegół idzie tą samą drogą co kolejka, bo dwa
+     składania tej samej reklamacji rozjechałyby się przy pierwszym polu. */
+  zParagonuNaWiersz(reklamacja, w.sku_paragonu,
+    zParagonu(database, [w.sku_paragonu as string | null]));
   reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const konto = Number(w.channel_account_id);
 

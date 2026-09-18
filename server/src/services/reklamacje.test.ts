@@ -557,3 +557,71 @@ test("`DISPUTE_CLOSED` zamyka sprawę, ale NIE potwierdza naszego werdyktu", () 
     ...rdzen, zwrotWymagany: null, werdyktStatus: "sent", werdykt: "ACCEPTED_REFUND",
   }).includes("werdykt_niepotwierdzony"));
 });
+
+test("symbol towaru bierze się Z PARAGONU, nie z dzisiejszego mapowania oferty", () => {
+  /* Zgłoszenie właściciela (0.400.0): „symbol towaru w reklamacji powinno
+     ściągać z paragonu do danego zamówienia".
+
+     Scenariusz jest ten, który się naprawdę zdarza: sprzedawca przepiął
+     ofertę na nowego dostawcę, więc `oferta_kartoteka` wskazuje część, której
+     ten klient NIGDY nie dostał. Paragon — pozycja jego zamówienia — niesie
+     sygnaturę z chwili zakupu i to on ma rozstrzygać. */
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1', order_id='ord-1' WHERE id=?").run(id);
+
+  /* Dzisiejsze mapowanie oferty: NOWY towar. */
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'NOWY-DOSTAWCA','2026-09-07T08:00:00Z','A. L.')`)
+    .run(konto);
+
+  /* Paragon: klient kupił STARY. */
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
+    synced_at) VALUES (?,'ord-1','2026-09-07T08:00:00Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,
+    cena_grosze,waluta) VALUES (?,'of-1','Kosiarka','STARY-DOSTAWCA',1,5500,'PLN')`).run(zam);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'STARY-DOSTAWCA','Kosiarka')")
+    .run();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NOWY-DOSTAWCA','Kosiarka II')")
+    .run();
+
+  const [r] = listaReklamacji(d, TERAZ);
+  assert.equal(r.twSymbol, "STARY-DOSTAWCA", "kolejka pyta paragonu");
+  assert.equal(r.twId, 11);
+  assert.equal(szczegolReklamacji(d, id, TERAZ).reklamacja.twSymbol, "STARY-DOSTAWCA",
+    "szczegół idzie tą samą drogą co kolejka");
+});
+
+test("bez pobranego zamówienia zostaje mapowanie oferty — nic nie ginie", () => {
+  /* Zamówień starszych niż retencja Allegro nie mamy wcale. Wtedy dzisiejsze
+     mapowanie jest jedyną wiedzą, jaką mamy, i ma zostać. */
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1', order_id='ord-nieznane' WHERE id=?")
+    .run(id);
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'NAC-4645','2026-09-07T08:00:00Z','A. L.')`)
+    .run(konto);
+
+  assert.equal(listaReklamacji(d, TERAZ)[0].twSymbol, "NAC-4645");
+});
+
+test("sygnatura trafiająca w DWIE kartoteki nie rozstrzyga za człowieka", () => {
+  /* Ta sama zasada, co w `kartotekaPoSku`: symbol miał być unikalny, a skoro
+     nie jest, wiersz zostaje przy tym, co wiedział. Podstawienie pierwszego
+     z brzegu byłoby zgadywaniem zapisanym na ekranie. */
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1', order_id='ord-1' WHERE id=?").run(id);
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'Z-MAPOWANIA','2026-09-07T08:00:00Z','A. L.')`)
+    .run(konto);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
+    synced_at) VALUES (?,'ord-1','2026-09-07T08:00:00Z')`).run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,
+    cena_grosze,waluta) VALUES (?,'of-1','Kosiarka','DUBEL',1,5500,'PLN')`).run(zam);
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (21,'DUBEL','Raz')").run();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (22,'dubel','Dwa')").run();
+
+  assert.equal(listaReklamacji(d, TERAZ)[0].twSymbol, "Z-MAPOWANIA");
+});

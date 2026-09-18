@@ -34,6 +34,34 @@ historii nie przepisujemy.
 ---
 
 
+## 0.400.0 — 18 września 2026
+
+**Symbol towaru w reklamacji bierze się z paragonu, nie z dzisiejszego
+mapowania oferty.** Zgłoszenie właściciela: „symbol towaru w reklamacji
+powinno ściągać z paragonu do danego zamówienia".
+
+Kolejka i szczegół brały kartotekę z `oferta_kartoteka` — czyli z tego, na co
+oferta wskazuje DZIŚ. Sprzedawca przepina sygnaturę oferty, gdy towar od
+jednego dostawcy się wyczerpie, więc reklamacja sprzed miesiąca pokazywała
+część, której ten klient nigdy nie dostał.
+
+- **Paragonem jest pozycja zamówienia**: niesie sygnaturę sprzedawcy z chwili
+  zakupu. Reklamacja dotyczy rzeczy, którą klient DOSTAŁ.
+- **Paragon bije mapowanie** i jest to świadome odwrócenie reguły „za pamięcią
+  stoi decyzja człowieka, więc bije automat". Tamta reguła rozstrzyga, czym
+  JEST oferta; tutaj pytanie brzmi, co klient dostał — a to jest fakt zapisany
+  na pozycji zamówienia, nie wniosek.
+- **Bez pobranego zamówienia nic nie ginie**: zostaje mapowanie jak dotąd.
+  Zamówień starszych niż retencja Allegro nie mamy wcale.
+- **Dwa trafienia to nie powód do wybrania pierwszego** — ta sama zasada, co
+  w `kartotekaPoSku`. Wiersz zostaje przy tym, co wiedział.
+- **Jedno zapytanie na całą kolejkę**, nie jedno na wiersz.
+
+Wdrożenie: nic ręką.
+
+---
+
+
 ## 0.399.0 — 18 września 2026
 
 **Szablony odpowiedzi w panelu obsługi.** Zgłoszenie właściciela: „dodaj ten
