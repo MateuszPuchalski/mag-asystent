@@ -299,6 +299,7 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | reklamacja z rękojmi i gwarancji | reklamacje, `prawo` | — |
 | dyskusja przed reklamacją | dyskusje (0.245.0), wiązanie od 0.386.0 | zegara |
 | prośba o rabat zamiast zwrotu | rabat transakcyjny (0.164.0) | — |
+| pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (0.390.0) | zegara — rozmowa nie ma terminu (§26) |
 | wymiana na inny towar | NIGDZIE | decyzji: zwrot z nowym zamówieniem czy osobny byt |
 | brak towaru na stanie | rozmowa plus zadanie terenowe | — |
 | klient wraca po miesiącu | rozmowa plus pełna historia (0.386.0) | — |
@@ -308,6 +309,11 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | spam i zaczepka | status `spam`, ręcznie | — |
 | sprawa poza Allegro: telefon, e-mail | NIGDZIE | decyzji o drugim kanale |
 | sprawa trafia do sądu albo do UOKiK | NIGDZIE | eksportu całej historii sprawy |
+
+**Czwarta zeszła w 0.390.0.** Klient pytający „mam składać reklamację, czy
+inaczej to załatwimy" nie miał gdzie zostać oznaczony. Sprawy w Allegro
+sprzedawca nie założy — `/sale/issues` ma wyłącznie GET — więc znacznik jest
+NASZ i zostaje przy rozmowie.
 
 **Trzy dziury zeszły z tej tabeli w 0.386.0.** Historia klienta bez zwrotów
 i spraw, dyskusja bez wiązania z reklamacją, brak jednego miejsca na własną

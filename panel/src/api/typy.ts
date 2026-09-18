@@ -32,6 +32,14 @@ export type Rozmowa = {
   status: StatusRozmowy;
   /** Ręczna flaga „pilne" (§10.2, 0.181.0). */
   priorytet: "normalny" | "pilny";
+  /**
+   * Ręczny znacznik „to sprawa reklamacyjna" (0.390.0) — NASZ, nie Allegro.
+   *
+   * Sprawy posprzedażowej sprzedawca nie może założyć: `/sale/issues` ma
+   * wyłącznie GET, otwiera ją kupujący. Znacznik mówi wyłącznie, że biuro
+   * prowadzi tę rozmowę jak reklamację — zegara ustawowego nie dokłada.
+   */
+  reklamacyjna: boolean;
   /** Ile czeka pytanie klienta. `null` = klient nic nie napisał, nikt nie czeka. */
   czekaOdMs: number | null;
   /**

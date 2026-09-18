@@ -5,7 +5,7 @@ import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
   useAgenci, useDodajKomentarz, useJa, usePrzejmij,
-  usePrzekaz, useRozmowa,
+  usePrzekaz, useRozmowa, useUstawReklamacyjna,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
@@ -66,6 +66,7 @@ export function Skrzynka() {
 
   const status = useUstawStatus();
   const priorytet = useUstawPriorytet();
+  const reklamacyjna = useUstawReklamacyjna();
   const agenci = useAgenci();
   const dodajKomentarz = useDodajKomentarz();
 
@@ -362,6 +363,13 @@ export function Skrzynka() {
         if (!rozmowa.data) return;
         setBladStatusu("");
         priorytet.mutate({ id: rozmowa.data.rozmowa.id, priorytet: nowy },
+          { onError: (e) => setBladStatusu((e as Error).message) });
+      }}
+      zapisujeReklamacyjna={reklamacyjna.isPending}
+      onReklamacyjna={(nowy) => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        reklamacyjna.mutate({ id: rozmowa.data.rozmowa.id, reklamacyjna: nowy },
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
       bladStatusu={bladStatusu}

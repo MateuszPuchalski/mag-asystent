@@ -106,6 +106,8 @@ const TRASY = () => [
     payload: { status: "resolved" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
+    payload: { reklamacyjna: true } },
   { method: "GET" as const, url: "/api/obsluga/wzmianki" },
   /* Jedno „Moje" ponad kolejkami (S4 spoiwa) — ta sama bramka, bo lista
      niesie tematy rozmów i spraw klientów. */
@@ -786,4 +788,44 @@ test("moje sprawy: tożsamość z sesji, nie z zapytania — cudzej listy nie ma
   assert.deepEqual(cudza.json<{ sprawy: unknown[] }>().sprawy, [],
     "parametr z cudzym numerem nie ma prawa niczego pokazać");
   assert.equal(liczbaZdarzen(), przed, "odczyt listy pracy niczego nie mutuje");
+});
+
+test("znacznik reklamacyjny jest PRZEŁĄCZNIKIEM i zostawia ślad w obie strony", async () => {
+  /* Zgłoszenie właściciela: „chcę zaznaczyć, że to pytanie reklamacyjne i będzie
+     traktowane jako reklamacja, ale nie będzie w allegrowych reklamacjach".
+
+     Znacznik jest NASZ, bo sprawy posprzedażowej sprzedawca nie może założyć —
+     `/sale/issues` w specyfikacji ma wyłącznie GET. Test pilnuje trzech rzeczy:
+     że da się go nadać, że da się go ZDJĄĆ i że obie zmiany widać na osi. */
+  const b = login("biuro", "Anna");
+
+  let r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
+    headers: b.naglowki, payload: { reklamacyjna: true } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ reklamacyjna: boolean }>().reklamacyjna, true);
+
+  r = await app.inject({ method: "GET", url: "/api/obsluga/rozmowy", headers: b.naglowki });
+  const wiersz = r.json<{ rozmowy: Array<{ id: number; reklamacyjna: boolean }> }>()
+    .rozmowy.find((x) => x.id === rozmowa)!;
+  assert.equal(wiersz.reklamacyjna, true, "kolejka musi to pokazać — inaczej znacznik nic nie zmienia");
+
+  /* Zdjęcie: agent bierze pytanie za reklamacyjne po pierwszym zdaniu klienta,
+     a po wyniku z hali okazuje się, że to pytanie o dobór. */
+  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
+    headers: b.naglowki, payload: { reklamacyjna: false } });
+  assert.equal(r.statusCode, 200, r.body);
+
+  const os = (await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}`,
+    headers: b.naglowki })).json<{ os: Array<{ tresc: string }> }>().os;
+  assert.ok(os.some((w) => w.tresc === "oznaczono jako sprawę reklamacyjną"), "nadanie na osi");
+  assert.ok(os.some((w) => w.tresc === "zdjęto znacznik reklamacyjny"), "zdjęcie na osi");
+});
+
+test("ciało bez `reklamacyjna` odpada 400, zamiast po cichu zdejmować znacznik", async () => {
+  /* Pole nieopisane w typie `Body` znika po cichu — blizna 0.224.1. Puste ciało
+     nie ma prawa znaczyć „fałsz", bo to zdejmowałoby znacznik przez literówkę. */
+  const b = login("biuro", "Anna");
+  const r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
+    headers: b.naglowki, payload: {} });
+  assert.equal(r.statusCode, 400, r.body);
 });

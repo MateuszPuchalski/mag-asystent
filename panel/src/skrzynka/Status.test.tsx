@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
   kopilot: null, ...n,
 });
 
@@ -149,5 +149,45 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
       onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
     expect(screen.getByRole("combobox", { name: /Status rozmowy/ }).className)
       .toMatch(/bg-stan-open/);
+  });
+
+  /* ── ZNACZNIK REKLAMACYJNY (0.390.0) ───────────────────────────────────────
+     Właściciel: „chcę zaznaczyć, że to jest pytanie reklamacyjne i będzie
+     traktowane jako reklamacja, ale nie będzie w allegrowych reklamacjach".
+
+     Sprawy w Allegro założyć się NIE DA — `/sale/issues` ma wyłącznie GET,
+     otwiera ją kupujący. Ten przełącznik jest nasz i te testy pilnują, żeby
+     ekran nie obiecywał czegoś innego.                                      */
+
+  it("przełącza znacznik w OBIE strony, bo pomyłka jest normalna", async () => {
+    const onZnacznik = vi.fn();
+    const { rerender } = render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
+      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+      onReklamacyjna={onZnacznik} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }));
+    expect(onZnacznik).toHaveBeenCalledWith(true);
+
+    rerender(<Status rozmowa={rozmowa({ reklamacyjna: true })} zapisuje={false} blad=""
+      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+      onReklamacyjna={onZnacznik} />);
+    await userEvent.click(screen.getByRole("button", { name: /REKLAMACYJNA/ }));
+    expect(onZnacznik).toHaveBeenLastCalledWith(false);
+  });
+
+  it("mówi wprost, że sprawy w Allegro to NIE zakłada", () => {
+    render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
+      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+      onReklamacyjna={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }))
+      .toHaveAttribute("title", expect.stringContaining("Allegro"));
+  });
+
+  it("bez obsługi znacznika przycisku NIE MA — obietnica bez pokrycia", () => {
+    render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
+      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false} />);
+
+    expect(screen.queryByRole("button", { name: /reklamacyjn/i })).not.toBeInTheDocument();
   });
 });

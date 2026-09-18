@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
   kopilot: null, ...n,
 });
 
@@ -523,5 +523,17 @@ describe("Kolejka: klawiatura", () => {
     expect(screen.getByText(/ruch|lista/)).toBeInTheDocument();
     expect(screen.getByText(/kubełek/)).toBeInTheDocument();
     expect(screen.queryByText(/niczyje/)).toBeNull();
+  });
+
+  it("wiersz woła plakietką REKLAMACYJNA — inaczej znacznik nie zmieniałby wyboru pracy", () => {
+    /* Znacznik widoczny tylko w otwartej rozmowie byłby wiedzą, po którą trzeba
+       wejść. Kolejka jest miejscem, w którym agent WYBIERA, co robić. */
+    pokaz([rozmowa({ reklamacyjna: true })]);
+    expect(screen.getByText("REKLAMACYJNA")).toBeInTheDocument();
+  });
+
+  it("zwykły wiersz nie nosi tej plakietki", () => {
+    pokaz([rozmowa()]);
+    expect(screen.queryByText("REKLAMACYJNA")).not.toBeInTheDocument();
   });
 });

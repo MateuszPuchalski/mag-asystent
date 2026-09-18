@@ -353,7 +353,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
            (§10.2) i po nim serwer sortuje domyślną listę. */
         const zegar = NASZ_RUCH.has(r.status) ? r.czekaOdMs : null;
         const wyjatkowy = WYJATKOWE.has(r.status);
-        const glosne = r.priorytet === "pilny" || wyjatkowy;
+        const glosne = r.priorytet === "pilny" || r.reklamacyjna || wyjatkowy;
         return <button key={r.id} onClick={() => onWybierz(r.id)}
           aria-current={wybranaId === r.id}
           /* ── ZAZNACZENIE PRZESTAJE BYĆ BURSZTYNOWE (0.265.0) ───────────────
@@ -397,6 +397,12 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {r.priorytet === "pilny" &&
               <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
                 PILNE</span>}
+            {/* ZNACZNIK REKLAMACYJNY (0.390.0) po „PILNE", przed statusem:
+                mówi, JAK prowadzimy sprawę, a nie co się z nią stało. Sprawy
+                w Allegro za nim nie ma — założyć ją może tylko kupujący. */}
+            {r.reklamacyjna &&
+              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-podpis font-bold text-violet-900">
+                REKLAMACYJNA</span>}
             {wyjatkowy && <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>}
           </div>}
           {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi

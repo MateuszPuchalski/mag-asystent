@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.390.0 — 18 września 2026
+
+**Rozmowę wolno oznaczyć jako sprawę reklamacyjną — u nas, nie w Allegro.**
+Zgłoszenie właściciela pod zrzutem rozmowy, w której klient pyta wprost:
+„co możemy zrobić, mam zrobić reklamacje czy jakoś inaczej temat załatwimy?".
+
+**SPRAWY W ALLEGRO ZAŁOŻYĆ SIĘ NIE DA i to nie jest nasza decyzja.**
+`/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET: sprawę
+posprzedażową otwiera KUPUJĄCY, a sprzedawca może w niej tylko pisać
+(`/message`) i wydać werdykt (`/status`). Przycisk „załóż reklamację" byłby
+obietnicą, której Allegro nie przyjmie — dlatego znacznik jest NASZ i mówi
+wyłącznie, jak biuro prowadzi tę rozmowę.
+
+FLAGA, nie status. Rozmowa oznaczona dalej ma swój status z §7 („czeka na
+nas", „odłożona"), bo to dwie różne osie. Wpisanie „reklamacyjna" do `status`
+zabrałoby tamtą oś dokładnie tym rozmowom, które jej najbardziej potrzebują.
+
+PRZEŁĄCZNIK, nie droga w jedną stronę: agent bierze pytanie za reklamacyjne po
+pierwszym zdaniu klienta, a po wyniku z hali bywa, że to pytanie o dobór.
+Nadanie i zdjęcie wchodzą na oś rozmowy i do dziennika — „czemu to wypadło
+z sita reklamacyjnego" ma mieć odpowiedź.
+
+Plakietka stoi w KOLEJCE, obok „PILNE", bo to tam agent wybiera pracę.
+Znacznik widoczny wyłącznie w otwartej rozmowie byłby wiedzą, po którą trzeba
+najpierw wejść.
+
+**Czego znacznik NIE dokłada: zegara.** Termin przy reklamacji przychodzi
+z Allegro (`decisionDueDate`), a policzony u nas rozjeżdżałby się z tym, który
+widzi kupujący — blizna 0.121.0. Rozmowa nadal nie ma terminu odpowiedzi i to
+zostaje otwartą decyzją z §26.
+
 ## 0.389.0 — 18 września 2026
 
 **Kolumna dowodów reklamacji mieści się w oknie.** Zgłoszenie właściciela ze
