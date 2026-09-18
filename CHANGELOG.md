@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.398.0 — 18 września 2026
+
+**Reklamacja znów pokazuje nowe wiadomości.** Zgłoszenie właściciela: „mam
+reklamację, która nie pokazuje dzisiejszych wiadomości". Przyczyny były DWIE
+i obie wyciszały rozmowę po cichu, bez śladu na ekranie.
+
+- **Status końcowy nie wycisza rozmowy.** Kolejka uzupełnień odsiewała sprawy
+  o statusie `CLAIM_ACCEPTED`, `CLAIM_REJECTED` i `DISPUTE_CLOSED`, bo „ich
+  rozmowa już niczego nie zmieni". To była nieprawda o NASZYM WŁASNYM
+  przebiegu pracy: po uznaniu reklamacji panel wysyła krok „czy towar do
+  odesłania", a kupujący odpisuje w tej samej rozmowie — kiedy odeśle, jakim
+  kurierem. Sprawa miała wtedy status końcowy, więc żadna z tych odpowiedzi
+  nie docierała na ekran. Agent widział rozmowę urwaną na własnym pytaniu.
+- **Błąd sieci nie jest urwaniem trwałym.** Bezpiecznik stron i nieudane
+  żądanie zapisywały tę samą flagę `czat_urwany`, a sprawa z tą flagą wypada
+  z uzupełniania na stałe. Jedno mignięcie sieci wyciszało rozmowę na zawsze.
+  Flagę zapisuje odtąd wyłącznie bezpiecznik; błąd zostawia sprawę w kolejce,
+  a następny takt próbuje jeszcze raz.
+
+Kosztu u Allegro to nie podnosi. Prawdziwym strażnikiem jest LICZNIK: żądanie
+wychodzi wyłącznie wtedy, gdy Allegro mówi o większej liczbie wiadomości, niż
+mamy u siebie. Status był drugą bramką, która nie chroniła przed niczym.
+
+Wdrożenie: nic ręką. Zaległe wiadomości dociągną się same przy najbliższych
+taktach synchronizacji.
+
+---
+
+
 ## 0.397.0 — 18 września 2026
 
 **Rozmowa bez numeru zamówienia dostaje drogę do zakupu klienta.** Zgłoszenie

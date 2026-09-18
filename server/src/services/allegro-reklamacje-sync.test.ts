@@ -279,7 +279,17 @@ test("rozmowę dociągamy tylko wtedy, gdy licznik Allegro rozjechał się z baz
     "kompletna rozmowa nie jest pytana drugi raz");
 });
 
-test("kolejka dociągania idzie po TERMINIE i pomija rozstrzygnięte", () => {
+test("kolejka dociągania idzie po TERMINIE, a status końcowy jej nie wycisza", () => {
+  /* ── ASERCJA ODWRÓCONA W 0.398.0, ŚWIADOMIE ───────────────────────────────
+     Do 0.397.0 ten test pilnował, żeby sprawa `CLAIM_ACCEPTED` wypadała
+     z kolejki uzupełnień. Pilnował usterki: zgłoszenie właściciela — „mam
+     reklamację, która nie pokazuje dzisiejszych wiadomości" — to dokładnie
+     ten przypadek. Po UZNANIU reklamacji panel wysyła krok „czy towar do
+     odesłania", a kupujący odpisuje w tej samej rozmowie; sprawa miała wtedy
+     status końcowy, więc jej odpowiedzi nie docierały nigdzie.
+
+     Kosztu to nie podnosi: żądanie wychodzi wyłącznie wtedy, gdy licznik
+     Allegro przewyższa liczbę wierszy u nas. */
   const d = baza();
   const konto = Number(d.prepare(
     "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
@@ -292,11 +302,46 @@ test("kolejka dociągania idzie po TERMINIE i pomija rozstrzygnięte", () => {
   wstaw("late", "2026-09-30T00:00:00Z", "CLAIM_SUBMITTED");
   wstaw("pilna", "2026-09-08T00:00:00Z", "CLAIM_SUBMITTED");
   wstaw("bez", null, "CLAIM_SUBMITTED");
-  wstaw("zamknieta", "2026-09-07T00:00:00Z", "CLAIM_ACCEPTED");
+  wstaw("uznana", "2026-09-07T00:00:00Z", "CLAIM_ACCEPTED");
 
   const kolejka = czatyDoUzupelnienia(d, konto);
-  assert.deepEqual(kolejka.map((k) => k.externalId), ["pilna", "late", "bez"],
+  assert.deepEqual(kolejka.map((k) => k.externalId), ["uznana", "pilna", "late", "bez"],
     "przy ciasnym budżecie pierwszeństwo ma sprawa, która się najbardziej pali");
+});
+
+test("po UZNANIU reklamacji rozmowa dalej się dociąga — blizna 0.398.0", () => {
+  /* Zgłoszenie właściciela w czystej postaci. Sprawa uznana, rozmowa dalej
+     czynna, licznik Allegro mówi o wiadomości, której u nas nie ma. Przed
+     0.398.0 sam status wystarczał, żeby nigdy o nią nie zapytać. */
+  const d = baza();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,status_allegro,
+      czat_aktywny,wiadomosci_ile,otwarto_at,synced_at)
+    VALUES (?,'i-uznana','CLAIM_ACCEPTED',1,3,'2026-09-01T00:00:00Z','2026-09-01T00:00:00Z')`)
+    .run(konto);
+
+  assert.deepEqual(czatyDoUzupelnienia(d, konto).map((k) => k.externalId), ["i-uznana"]);
+});
+
+test("sprawa wyciszona i domknięta NIE wraca po rozmowę — pilnuje LICZNIK", () => {
+  /* Druga połowa tamtej zmiany: zdjęcie warunku statusu nie ma prawa zamienić
+     kolejki w pytanie o wszystko. Strażnikiem zostaje licznik — gdy Allegro
+     nie mówi o niczym nowym, sprawy w kolejce nie ma, choćby była zamknięta
+     dwa lata temu. */
+  const d = baza();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
+    .run().lastInsertRowid);
+  const id = Number(d.prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,
+      status_allegro,wiadomosci_ile,otwarto_at,synced_at)
+    VALUES (?,'i-domknieta','CLAIM_REJECTED',1,'2026-09-01T00:00:00Z','2026-09-01T00:00:00Z')`)
+    .run(konto).lastInsertRowid);
+  d.prepare(`INSERT INTO reklamacja_wiadomosc(reklamacja_id,external_id,autor_rola,tresc,
+    utworzono_at) VALUES (?,'w-1','BUYER','pierwsza','2026-09-01T00:00:00Z')`).run(id);
+
+  assert.deepEqual(czatyDoUzupelnienia(d, konto), []);
 });
 
 test("czysta arytmetyka: typ sprawy i pierwsze oczekiwanie", () => {
@@ -495,4 +540,44 @@ test("odświeżenie sprawy, której nie ma, mówi to zamiast strzelać do Allegr
   });
   assert.equal(wynik, false);
   assert.equal(strzalow, 0);
+});
+
+test("BŁĄD JEDNEJ STRONY nie wycisza rozmowy na zawsze — blizna 0.398.0", async () => {
+  /* Druga przyczyna zgłoszenia „reklamacja nie pokazuje dzisiejszych
+     wiadomości". Do 0.397.0 błąd sieci przy drugiej stronie zapisywał tę samą
+     flagę `czat_urwany=1`, co bezpiecznik stron — a `czatyDoUzupelnienia`
+     pomija sprawy z tą flagą. Jedno mignięcie sieci wyrzucało rozmowę
+     z uzupełniania NA STAŁE, bez słowa na ekranie.
+
+     Bezpiecznik mówi „rozmowa jest dłuższa, niż bierzemy" i to jest stan
+     trwały. Błąd mówi „tym razem nie wyszło" i musi się dać ponowić. */
+  const d = baza();
+  let pekloRaz = false;
+  const query = async (url: string) => {
+    if (url.includes("/chat")) {
+      if (url.includes("offset=100") && !pekloRaz) {
+        pekloRaz = true;
+        throw new Error("ECONNRESET");
+      }
+      const offset = Number(/offset=(\d+)/.exec(url)?.[1] ?? 0);
+      return { chat: Array.from({ length: Math.max(0, Math.min(100, 150 - offset)) },
+        (_, i) => wiad(offset + i + 1)) };
+    }
+    return url.includes("offset=0")
+      ? { issues: [sprawa({ chat: { messagesCount: 150, lastMessage: null, initialMessage: wiad(1) } })] }
+      : { issues: [] };
+  };
+
+  await synchronizujAllegroReklamacje({ database: d, query });
+
+  /* Pierwsza strona zapisana, druga padła — ale flagi NIE MA, więc sprawa
+     wraca do kolejki zamiast zniknąć z niej po cichu. */
+  assert.equal(ileWiadomosci(d, "i-1"), 100);
+  assert.equal(Number((d.prepare("SELECT czat_urwany FROM reklamacja_klienta WHERE external_id='i-1'")
+    .get() as { czat_urwany: number }).czat_urwany), 0, "błąd sieci to nie urwanie trwałe");
+  assert.deepEqual(czatyDoUzupelnienia(d, 1).map((k) => k.externalId), ["i-1"]);
+
+  /* Następny takt dociąga resztę — i to jest cały sens tej poprawki. */
+  await synchronizujAllegroReklamacje({ database: d, query });
+  assert.equal(ileWiadomosci(d, "i-1"), 150, "druga próba domyka rozmowę");
 });
