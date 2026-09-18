@@ -11,7 +11,7 @@ import { publishConversationEvent } from "./conversation-realtime.js";
  * z nagłówka — stąd literówki i warianty tej samej osoby w audycie. Odczyt
  * z `app_user` zamyka tę drogę: mutacja i jej wpis mówią o tym samym koncie.
  */
-function imieAutora(database: DatabaseSync, userId: number): string {
+export function imieAutora(database: DatabaseSync, userId: number): string {
   const u = database.prepare("SELECT name FROM app_user WHERE user_id=?").get(userId) as
     { name: string } | undefined;
   return u?.name ?? `konto ${userId}`;

@@ -340,6 +340,20 @@ export interface PrzystanekDrogi {
   opis: string | null;
 }
 
+/** Zakup kupującego z rozmowy — wiersz do przeczytania i jednego kliknięcia. */
+export type KandydatZamowienia = {
+  externalId: string;
+  link: string | null;
+  status: string | null;
+  kupionoAt: string | null;
+  sumaGrosze: number | null;
+  waluta: string;
+  /** Nazwy pozycji po przecinku — po nich agent poznaje „to ta paczka". */
+  pozycje: string;
+  /** Czy zakup niesie OFERTĘ z tej rozmowy; jedyna przesłanka mocniejsza od czasu. */
+  maTeOferte: boolean;
+};
+
 export type OsRozmowy = {
   rozmowa: Rozmowa;
   os: WpisOsi[];
@@ -347,6 +361,14 @@ export type OsRozmowy = {
   ofertaWskazana: OfertaWskazana | null;
   zamowienie: ZamowienieRozmowy | null;
   oferta: OfertaRozmowy | null;
+  /**
+   * Zakupy tego kupującego — kandydaci do powiązania (0.397.0).
+   *
+   * Wątek z Allegro niesie JEDEN obiekt powiązany, więc pytanie zadane pod
+   * ofertą numeru zakupu nie ma. Mostkiem jest login kupującego, ten sam,
+   * którym chodzi zakładka „Klient".
+   */
+  kandydaciZamowien: KandydatZamowienia[];
   /** Zwroty TEGO zamówienia (0.221.0) — ten sam wiersz, co w kolejce zwrotów. */
   zwroty: Zwrot[];
   /* Spoiwo kolejek (S1 i S3, `docs/obsluga-klienta-calosc.md`): reklamacje

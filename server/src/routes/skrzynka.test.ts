@@ -98,6 +98,11 @@ const TRASY = () => [
     payload: { doUserId: null, powod: "urlop", expectedVersion: 1 } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/oferta`,
     payload: { ofertaId: "14892374512" } },
+  /* Wskazanie ZAMÓWIENIA (0.397.0) — ta sama bramka, co reszta skrzynki:
+     powiązanie otwiera pozycje i kwoty cudzego zakupu, więc hala nie ma tu
+     czego szukać. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/zamowienie`,
+    payload: { externalId: "ord-1" } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/kartoteka`,
     payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,

@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.397.0 — 18 września 2026
+
+**Rozmowa bez numeru zamówienia dostaje drogę do zakupu klienta.** Zgłoszenie
+właściciela ze zrzutem: klient napisał pod ofertą „dzisiaj otrzymałem paczkę,
+ale nie było w zestawie świecy", a rozmowa nie miała zamówienia wcale. Agent
+widział ofertę i kartotekę, nie widział ZAKUPU — więc nie wiedział, co klient
+dostał, za ile ani czy paczka doszła.
+
+Powód leży po stronie Allegro, nie u nas: wątek z Centrum Wiadomości niesie
+JEDEN obiekt powiązany. Pytanie zadane pod ofertą niesie numer oferty i nic
+więcej; numeru zamówienia w tym ładunku nie ma i nie będzie.
+
+- **Nowy blok „Zakupy tego klienta"** w kolumnie kontekstu, tuż pod
+  zamówieniem. Mostkiem jest LOGIN kupującego — ten sam, którym chodzi
+  zakładka KLIENT od S2 spoiwa, oba pola wprost z Allegro.
+- **Wiąże KLIKNIĘCIE, nie automat.** Ten sam login nie znaczy „ta paczka",
+  a automat pomyliłby się cicho — przy sprawie o brak w zestawie, czyli tam,
+  gdzie pomyłka kosztuje pieniądze.
+- **Zakup niosący ofertę z rozmowy idzie na górę** i nosi plakietkę „ta
+  oferta". Bez niej kolejność byłaby magią, której agent nie ma jak sprawdzić.
+- **Wielkość liter loginu nie rozstrzyga.** Allegro oddaje ten sam login raz
+  małymi, raz wielkimi literami — w tej samej rozmowie nagłówek wątku mówi
+  „chips20", a podpis wiadomości „CHIPS20".
+- **Wiadomość bije wskazanie.** Numer z Allegro jest faktem, wskazanie
+  wnioskiem człowieka; gdy klient dopisze wiadomość z numerem, wygrywa ona.
+- **Serwer sprawdza, czyj to zakup.** Panel wysyła sam numer, więc bramka stoi
+  w serwisie: zakup spoza listy kupującego jest odbijany.
+- Po powiązaniu wracają pozycje, kwoty, status przesyłki, zwroty, sprawy
+  posprzedażowe i droga zakupu — cała kolumna, która dotąd milczała.
+
+Wdrożenie: nic ręką. Bez nowej tabeli; wskazanie żyje w `conversation_event`,
+tą samą mechaniką co ręczne wskazanie oferty od 0.179.0.
+
+---
+
+
 ## 0.396.0 — 18 września 2026
 
 **Ceny z kartoteki Subiekta na karcie towaru w panelu obsługi.** Zgłoszenie
