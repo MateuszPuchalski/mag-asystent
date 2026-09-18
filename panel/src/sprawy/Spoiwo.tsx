@@ -39,16 +39,16 @@ const rodzajSprawy = (typ: string): "dyskusja" | "reklamacja" =>
  * tłem, a otwarta znaczy, że klient czeka gdzie indziej na ruch. Sygnał jest
  * JEDEN — kolor zapalany zawsze uczy go ignorować.
  */
-export function SprawyZakupu({ sprawy }: { sprawy: SprawaZakupu[] }) {
+export function SprawyZakupu({ sprawy, wSekcji = false }: {
+  sprawy: SprawaZakupu[];
+  /* Rodzic dał już nagłówek i ramkę — blok rysuje wtedy samą listę.
+     Bez tego kolumna dowodów miała DWA nagłówki nad jedną listą („Inne sprawy
+     tego zakupu" i „Sprawy tego zakupu"), własne tło w cudzej sekcji i podwójny
+     padding. Usterka z 0.387.0, widoczna na zrzucie właściciela. */
+  wSekcji?: boolean;
+}) {
   if (sprawy.length === 0) return null;
-  return <section className="border-b bg-slate-50 px-4 py-3 text-sm"
-    aria-label="Sprawy posprzedażowe tego zakupu">
-    <div className="flex items-center gap-2">
-      <Scale size={15} className="text-slate-500" />
-      <b>Sprawy tego zakupu</b>
-      <span className="text-xs text-slate-500">{sprawy.length}</span>
-    </div>
-    <ul className="mt-2 space-y-1">
+  const lista = <ul className="space-y-1">
       {sprawy.map((s) => {
         const rodzaj = rodzajSprawy(s.typ);
         const { nazwa, sciezka } = KOLEJKI[rodzaj];
@@ -69,7 +69,17 @@ export function SprawyZakupu({ sprawy }: { sprawy: SprawaZakupu[] }) {
             Otwórz</Link>
         </li>;
       })}
-    </ul>
+    </ul>;
+
+  if (wSekcji) return lista;
+  return <section className="border-b bg-slate-50 px-4 py-3 text-sm"
+    aria-label="Sprawy posprzedażowe tego zakupu">
+    <div className="flex items-center gap-2">
+      <Scale size={15} className="text-slate-500" />
+      <b>Sprawy tego zakupu</b>
+      <span className="text-xs text-slate-500">{sprawy.length}</span>
+    </div>
+    <div className="mt-2">{lista}</div>
   </section>;
 }
 
@@ -81,14 +91,15 @@ export function SprawyZakupu({ sprawy }: { sprawy: SprawaZakupu[] }) {
  * szła. Przy jednym przystanku nie pokazuje się wcale — droga z jednego
  * punktu nie jest drogą.
  */
-export function DrogaZakupu({ droga, tutaj }: {
+export function DrogaZakupu({ droga, tutaj, wSekcji = false }: {
   droga: PrzystanekDrogi[];
   /** Przystanek, na którym stoi agent — podświetlony jako „jesteś tutaj". */
   tutaj?: { rodzaj: PrzystanekDrogi["rodzaj"]; id: number };
+  /** Rodzic dał już nagłówek — powód przy `SprawyZakupu` wyżej. */
+  wSekcji?: boolean;
 }) {
   if (droga.length < 2) return null;
-  return <section className="border-b bg-white px-4 py-2" aria-label="Droga tego zakupu">
-    <ol className="flex flex-wrap items-center gap-1 text-xs">
+  const pasek = <ol className="flex flex-wrap items-center gap-1 text-xs">
       {droga.map((p, i) => {
         const { nazwa, ikona: Ikona, sciezka } = KOLEJKI[p.rodzaj];
         const jestem = tutaj?.rodzaj === p.rodzaj && tutaj.id === p.id;
@@ -102,6 +113,10 @@ export function DrogaZakupu({ droga, tutaj }: {
                 <Ikona size={12} />{nazwa}<span className="text-slate-500">{czas(p.at)}</span></Link>}
         </li>;
       })}
-    </ol>
+    </ol>;
+
+  if (wSekcji) return pasek;
+  return <section className="border-b bg-white px-4 py-2" aria-label="Droga tego zakupu">
+    {pasek}
   </section>;
 }

@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.390.0 — 18 września 2026
+## 0.391.0 — 18 września 2026
 
 **Brak w dostawie zdejmuje towar ze sprzedaży.** [wymaga działania]
 Decyzja właściciela: „gdy rozkładający dostawę zgłosi braki, brakujący towar
@@ -73,6 +73,80 @@ zgadnięty numer WYSTAWIA DOKUMENT, tylko na cudzy magazyn. Pominięcie zostawia
 wyjątku — dostawca czasem dosyła brak, a czasem wystawia korektę, i to są dwie
 różne drogi w Subiekcie. Zamknięcie wyjątku zostaje decyzją człowieka przy
 dokumencie. Nowego APK nie trzeba: cała zmiana siedzi po stronie serwera.
+
+## 0.390.0 — 18 września 2026
+
+**Rozmowę wolno oznaczyć jako sprawę reklamacyjną — u nas, nie w Allegro.**
+Zgłoszenie właściciela pod zrzutem rozmowy, w której klient pyta wprost:
+„co możemy zrobić, mam zrobić reklamacje czy jakoś inaczej temat załatwimy?".
+
+**SPRAWY W ALLEGRO ZAŁOŻYĆ SIĘ NIE DA i to nie jest nasza decyzja.**
+`/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET: sprawę
+posprzedażową otwiera KUPUJĄCY, a sprzedawca może w niej tylko pisać
+(`/message`) i wydać werdykt (`/status`). Przycisk „załóż reklamację" byłby
+obietnicą, której Allegro nie przyjmie — dlatego znacznik jest NASZ i mówi
+wyłącznie, jak biuro prowadzi tę rozmowę.
+
+FLAGA, nie status. Rozmowa oznaczona dalej ma swój status z §7 („czeka na
+nas", „odłożona"), bo to dwie różne osie. Wpisanie „reklamacyjna" do `status`
+zabrałoby tamtą oś dokładnie tym rozmowom, które jej najbardziej potrzebują.
+
+PRZEŁĄCZNIK, nie droga w jedną stronę: agent bierze pytanie za reklamacyjne po
+pierwszym zdaniu klienta, a po wyniku z hali bywa, że to pytanie o dobór.
+Nadanie i zdjęcie wchodzą na oś rozmowy i do dziennika — „czemu to wypadło
+z sita reklamacyjnego" ma mieć odpowiedź.
+
+Plakietka stoi w KOLEJCE, obok „PILNE", bo to tam agent wybiera pracę.
+Znacznik widoczny wyłącznie w otwartej rozmowie byłby wiedzą, po którą trzeba
+najpierw wejść.
+
+**Czego znacznik NIE dokłada: zegara.** Termin przy reklamacji przychodzi
+z Allegro (`decisionDueDate`), a policzony u nas rozjeżdżałby się z tym, który
+widzi kupujący — blizna 0.121.0. Rozmowa nadal nie ma terminu odpowiedzi i to
+zostaje otwartą decyzją z §26.
+
+## 0.389.0 — 18 września 2026
+
+**Kolumna dowodów reklamacji mieści się w oknie.** Zgłoszenie właściciela ze
+zrzutem: „Copilot zasłania sporo ekranu po prawej stronie", a potem „skondensuj
+ten panel". Na zrzucie widać, ile zabierało samo rusztowanie — siedem sekcji,
+każda z nagłówkiem, dwoma paddingami i krawędzią.
+
+**Karta Copilota zwija się i pamięta wybór.** Wspólna `Zwijka` ze skrzynki
+(0.342.0) dostaje `pamietajJako`: zwinięcie jest NAWYKIEM STANOWISKA, a nie
+decyzją na jedną sprawę. Bez pamięci agent klikałby przy każdej reklamacji —
+dekalog ergonomii, punkt 3. Wzorzec i granica z sita „Moje": pamiętamy WYGLĄD,
+nigdy filtru, który ukrywa pracę.
+
+Zamknięty nagłówek mówi, co jest w środku („usterka, oczekiwanie klienta,
+dowody") i woła plakietką o brakach, bo to one trzymają sprawę w miejscu.
+Bez tego trzeba by go otwierać, żeby sprawdzić, czy warto.
+
+**Blok zostaje OTWARTY także bez karty**, a chudnie sam stan pusty: trzy
+linijki prozy o tym, co Copilot potrafi, zeszły do podpisu nagłówka.
+Pierwsza wersja zamykała go i chowała „PRZECZYTAJ SPRAWĘ" — czyli kupowała
+piksele za kliknięcie przy każdej nieprzeczytanej sprawie.
+
+**Zegar wszedł do sekcji „Sprawa" i stoi pierwszy.** Dwie sekcje odpowiadały
+na jedno pytanie biura: „co to za sprawa i ile mam czasu". Na zrzucie termin
+razem z „po terminie" leżał w połowie kolumny. Termin rządzi kolejnością pracy
+(blizna 0.121.0), więc rządzi też kolejnością czytania.
+
+**Tagi i notatka zwijają się razem**, z pamięcią i podpisem stanu. To
+czynności rzadkie — agent pisze notatkę przy co którejś sprawie, a czyta
+kolumnę przy każdej. „Prowadzi" i jego przycisk zostają na wierzchu.
+
+**Wiersze schudły o oddech, nie o treść:** etykieta `w-32`→`w-28`,
+wiersz `py-1`→`py-0.5`, sekcja `py-3`→`py-2`. Ani jeden fakt nie zszedł
+z ekranu.
+
+**Poprawka do 0.387.0.** Bloki „Inne sprawy tego zakupu" i „Droga tego zakupu"
+rysowały WŁASNY nagłówek wewnątrz cudzej sekcji — dwa nagłówki nad jedną
+listą, własne tło i podwójny padding. Widać to na zrzucie. `SprawyZakupu`
+i `DrogaZakupu` dostają `wSekcji`: rodzic daje ramkę, blok rysuje samą treść.
+
+Przy okazji atrapa w `KartaFaktow.test.tsx` przestała kłamać o kontrakcie —
+pomijała pole `tagi`, które w typie jest wymagane, a serwer zawsze je ustawia.
 
 ## 0.388.1 — 18 września 2026
 

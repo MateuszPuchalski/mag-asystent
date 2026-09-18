@@ -5336,6 +5336,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
 | Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
+| Znacznik „sprawa reklamacyjna" na rozmowie | **działa** od 0.390.0 | `conversation.reklamacyjna`, `ustawReklamacyjna`, `POST …/rozmowy/:id/reklamacyjna`, przełącznik w `skrzynka/Status.tsx`, plakietka w kolejce; NASZ znacznik — `/sale/issues` ma wyłącznie GET, więc sprawy w Allegro sprzedawca nie założy |
 | Sprawa nad rozmowami (§6.1) | **skasowana** w 0.388.0 | działała od 0.161.0; zastąpiła ją droga zakupu (0.387.0), bo odpowiada na to samo pytanie automatycznie i przez cztery kolejki |
 | Ekran sprawy z własną osią | **bezprzedmiotowe** od 0.388.0 | nakładki spraw nie ma; zdarzenia i tak wiszą przy źródle — blizna 0.130.0 |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |

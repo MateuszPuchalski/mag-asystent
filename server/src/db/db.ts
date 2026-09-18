@@ -401,6 +401,10 @@ export function migrate(database: DatabaseSync) {
      kolumnę TĘDY i inaczej stałaby bez strażnika. */
   addColumn("conversation", "priorytet",
     "TEXT NOT NULL DEFAULT 'normalny' CHECK(priorytet IN ('normalny','pilny'))");
+  /* Znacznik „sprawa reklamacyjna" (0.390.0) — powód przy kolumnie
+     w `schema.sql`. Baza sprzed tego wydania dostaje go TĘDY; zero znaczy
+     „nikt jeszcze nie oznaczył", a nie „to nie reklamacja". */
+  addColumn("conversation", "reklamacyjna", "INTEGER NOT NULL DEFAULT 0");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */

@@ -99,6 +99,24 @@ CREATE TABLE IF NOT EXISTS conversation (
   -- ma z czego jej wyliczyć, dopóki nie ma terminu odpowiedzi (§26).
   priorytet                TEXT NOT NULL DEFAULT 'normalny'
                            CHECK(priorytet IN ('normalny','pilny')),
+  -- ── SPRAWA REKLAMACYJNA U NAS (0.390.0) ──────────────────────────────────
+  -- Klient pyta „mam zrobić reklamację, czy inaczej temat załatwimy?" i to
+  -- jest reklamacja w sensie handlowym, choć w Allegro nie ma jej wcale.
+  --
+  -- TEJ SPRAWY NIE DA SIĘ ZAŁOŻYĆ W ALLEGRO I TO NIE JEST NASZ WYBÓR:
+  -- `/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET. Sprawę
+  -- posprzedażową otwiera KUPUJĄCY; sprzedawca może w niej tylko pisać
+  -- i wydać werdykt. Znacznik jest więc NASZ i zostaje u nas.
+  --
+  -- FLAGA, nie status: rozmowa oznaczona dalej ma swój status z §7 („czeka na
+  -- nas", „odłożona"), bo to dwie różne osie. Wpisanie „reklamacyjna" do
+  -- `status` zabrałoby tamtą oś dokładnie tym rozmowom, które jej najbardziej
+  -- potrzebują — blizna 0.121.0 w innym ubraniu.
+  --
+  -- RĘCZNA, jak priorytet. Automat rozpozna słowo „reklamacja" w treści, ale
+  -- nie odróżni pytania od zapowiedzi; Copilot klasyfikuje osobno (§14.5)
+  -- i jego zdanie nie zapisuje się tutaj.
+  reklamacyjna             INTEGER NOT NULL DEFAULT 0,
   UNIQUE(channel_account_id, external_conversation_id)
 );
 

@@ -21,7 +21,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 1, klient: "Kupujący 44300444", ostatniaWiadomosc: "Czy pasuje?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "open", priorytet: "normalny", czekaOdMs: null, nowychOdOdpowiedzi: 0,
+  status: "open", priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0,
   zadanieWToku: false, dobor: "not_started", odlozoneDo: null, poTerminie: false,
   kopilot: null, oglada: null, ...n,
 });

@@ -600,7 +600,7 @@ export const config = {
      */
     ODP: num(process.env.MAG_ID_ODP, 0, "MAG_ID_ODP"),
     /**
-     * Magazyn SERWISOWY — towar, którego zabrakło w dostawie (0.390.0).
+     * Magazyn SERWISOWY — towar, którego zabrakło w dostawie (0.391.0).
      *
      * ZERO ZNACZY WYŁĄCZONE, dokładnie z tego samego powodu co przy odpadzie
      * wyżej: pomyłka w numerze WYSTAWIA DOKUMENT, a MM nie cofa się jednym

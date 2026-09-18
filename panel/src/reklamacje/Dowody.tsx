@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { ExternalLink, Undo2 } from "lucide-react";
+import { Bot, ExternalLink, NotebookPen, Undo2 } from "lucide-react";
 import type {
   RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt, ZdjecieKarty,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { zlote } from "../api/zwroty";
-import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, czas, ile, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { NAZWA_WERDYKTU } from "./statusy";
+import { Zwijka } from "../skrzynka/Zwijka";
 
 /* ── Kolumna dowodów o reklamacji ────────────────────────────────────────────
    Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
@@ -19,15 +20,25 @@ import { NAZWA_WERDYKTU } from "./statusy";
    Wszystko poniżej to ODCZYT. Jedyne dwa zapisy tego ekranu — „prowadzę"
    i notatka — są jawnymi kliknięciami, nie skutkiem ubocznym patrzenia. */
 
+/* ── GĘSTOŚĆ KOLUMNY (0.389.0) ───────────────────────────────────────────────
+   Zgłoszenie właściciela ze zrzutem: kolumna dowodów nie mieściła się
+   w oknie, a agent przewijał, żeby zobaczyć termin. Rusztowanie samych
+   sekcji — nagłówek plus dwa paddingi plus krawędź — zjadało około połowy
+   wysokości, którą miały zająć fakty.
+
+   Zwężamy ODDECH, nie treść: ani jeden fakt nie zszedł z ekranu. Etykieta
+   z `w-32` na `w-28` (najdłuższa, „Zamówienie złożone", i tak łamie się na
+   dwie linie w obu wariantach), `py-1` na `py-0.5`, sekcja z `py-3` na `py-2`.
+   Dekalog, punkt 2: pierwszeństwo ma to, co rozstrzyga bieżącą czynność. */
 const Wiersz = ({ etykieta, children }: { etykieta: string; children: React.ReactNode }) =>
-  <div className="flex items-baseline gap-2 py-1 text-sm">
-    <EtykietaWartosci className="w-32 shrink-0">{etykieta}</EtykietaWartosci>
+  <div className="flex items-baseline gap-2 py-0.5 text-sm">
+    <EtykietaWartosci className="w-28 shrink-0">{etykieta}</EtykietaWartosci>
     <span className="min-w-0 flex-1 text-slate-800">{children}</span>
   </div>;
 
 const Sekcja = ({ tytul, children }: { tytul: string; children: React.ReactNode }) =>
-  <section className="border-t border-slate-200 px-4 py-3 first:border-t-0">
-    <NaglowekSekcji jako="h3" className="mb-1">{tytul}</NaglowekSekcji>
+  <section className="border-t border-slate-200 px-4 py-2 first:border-t-0">
+    <NaglowekSekcji jako="h3" className="mb-0.5">{tytul}</NaglowekSekcji>
     {children}
   </section>;
 
@@ -107,7 +118,37 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
   blad: string;
   onRozpoznaj: () => void;
 }) {
-  return <Sekcja tytul="Co wyczytał Copilot">
+  return <section className="border-t border-slate-200 px-4 pb-3 pt-1 first:border-t-0">
+    {/* ── KARTA ZWIJA SIĘ (0.389.0) ─────────────────────────────────────────
+        Zgłoszenie właściciela: „zasłania sporo ekranu po prawej stronie".
+        Ta kolumna jest DOWODAMI — zamówieniem, ofertą, kartoteką, rozmowami
+        o tym zakupie — a karta maszyny rosła nad nimi i spychała je poniżej
+        krawędzi okna. Dekalog ergonomii, punkt 2: na wierzchu to, co
+        rozstrzyga bieżącą czynność; reszta zwinięta, nie na drugim ekranie.
+
+        DOMYŚLNIE OTWARTA, a nie zamknięta: zwinięcie na starcie zabrałoby
+        kartę tym, którzy jej używają, a zgłoszenie mówiło o MOŻLIWOŚCI
+        zwinięcia, nie o ukryciu. Jedno kliknięcie zamyka ją na stałe.
+
+        Podpis niesie treść karty w jednym zdaniu, więc zamknięta mówi, czy
+        warto ją otwierać — inaczej agent klikałby, żeby się dowiedzieć. */}
+    <Zwijka
+      tytul="Co wyczytał Copilot"
+      Ikona={Bot}
+      podpis={podpisKarty(karta)}
+      plakietka={karta && karta.brakuje.length > 0
+        ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis font-bold text-amber-900">
+            {ile(karta.brakuje.length, "brak", "braki", "braków")}</span>
+        : undefined}
+      /* OTWARTA ZAWSZE, także bez karty. Zamykanie jej na starcie chowałoby
+         „PRZECZYTAJ SPRAWĘ" — główny przycisk tego bloku — za kliknięciem
+         przy KAŻDEJ nieprzeczytanej sprawie. Dekalog, punkt 3: ograniczaj
+         liczbę interakcji. Zamiast tego chudnie sam stan bez karty: proza
+         o tym, co Copilot potrafi, zeszła do podpisu nagłówka. */
+      domyslnieOtwarte
+      pamietajJako="wertis.reklamacje.copilot"
+    >
+    <div className="px-2 py-2">
     {blad && <p className="py-1 text-xs text-red-700">{blad}</p>}
     {karta ? <>
       {karta.rada && <Rada rada={karta.rada} ocena={karta.ocena} />}
@@ -135,14 +176,47 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
         {karta.przez ?? "—"}, {czas(karta.at)} · {karta.model}
         {karta.zdjecia.length > 0 && ` · przeczytał ${zdjecSlowo(karta.zdjecia.length)}`}
       </p>
-    </> : <p className="py-1 text-sm text-slate-500">
-      Copilot może wyciągnąć z rozmowy usterkę, oczekiwanie klienta i to, czego
-      brakuje do rozstrzygnięcia. Werdykt zostaje przy Tobie.
-    </p>}
+    </> : <p className="pt-1 text-xs text-slate-500">Werdykt zostaje przy Tobie.</p>}
     <Przycisk className="mt-2 !px-2 !py-1 !text-xs" disabled={trwa} onClick={onRozpoznaj}>
       {trwa ? "CZYTAM…" : karta ? "PRZECZYTAJ JESZCZE RAZ" : "PRZECZYTAJ SPRAWĘ"}
     </Przycisk>
-  </Sekcja>;
+    </div>
+    </Zwijka>
+  </section>;
+}
+
+/**
+ * Co stoi w karcie — jedno zdanie do nagłówka zamkniętego bloku.
+ *
+ * Bez niego zamknięta karta mówiłaby wyłącznie „Copilot" i agent musiałby ją
+ * otwierać, żeby sprawdzić, czy jest tam cokolwiek. To jest dokładnie ten
+ * jeden klik, dla którego blok się zwija.
+ */
+function podpisKarty(karta: SzczegolReklamacji["karta"]): string {
+  /* Bez karty podpis tłumaczy, CO ten blok robi — to samo zdanie, które do
+     0.388.1 stało w trzech linijkach prozy nad przyciskiem. W nagłówku zajmuje
+     jedną linię i znika, gdy karta już jest. */
+  if (!karta) return "wyczyta usterkę, oczekiwanie i braki";
+  const ma: string[] = [];
+  if (karta.rada) ma.push("rada");
+  if (karta.usterka) ma.push("usterka");
+  if (karta.oczekiwanie) ma.push("oczekiwanie klienta");
+  if (karta.dowody.length > 0) ma.push("dowody");
+  return ma.length ? ma.join(", ") : "przeczytał, ale nic nie wyczytał";
+}
+
+
+/**
+ * Co stoi w tagach i notatce — jedno zdanie do zamkniętego nagłówka.
+ *
+ * Bez niego zwinięty blok kazałby otwierać go tylko po to, żeby sprawdzić,
+ * czy ktoś już coś zapisał. To ten jeden klik, dla którego blok się zwija.
+ */
+function podpisPracy(r: Reklamacja): string {
+  const ma: string[] = [];
+  if (r.tagi.length > 0) ma.push(ile(r.tagi.length, "tag", "tagi", "tagów"));
+  if (r.notatka) ma.push("notatka");
+  return ma.length ? ma.join(" · ") : "pusto";
 }
 
 /**
@@ -243,7 +317,21 @@ export function Dowody({
   return <div className="flex min-h-0 flex-col">
     {onRozpoznaj && <KartaFaktow karta={szczegol.karta} trwa={rozpoznaje}
       blad={bladRozpoznania} onRozpoznaj={onRozpoznaj} />}
-    <Sekcja tytul="Sprawa">
+    {/* ── ZEGAR WSZEDŁ DO SEKCJI „SPRAWA" I STOI PIERWSZY (0.389.0) ─────────
+        Dwie sekcje odpowiadały na jedno pytanie biura: „co to za sprawa i ile
+        mam czasu". Na zrzucie właściciela termin — razem z „po terminie" —
+        leżał w połowie kolumny, poniżej numeru, kupującego i tytułu prawnego.
+
+        Termin RZĄDZI KOLEJNOŚCIĄ PRACY (blizna 0.121.0), więc rządzi też
+        kolejnością czytania. Reszta zegara zostaje niżej, bo status Allegro
+        i liczba wiadomości nie zmieniają tego, co agent zrobi w tej minucie. */}
+    <Sekcja tytul="Sprawa i zegar">
+      <Wiersz etykieta="Decyzja do">
+        {r.decyzjaDo
+          ? <>{czas(r.decyzjaDo)}{r.poTerminie
+              ? <b className="ml-2 text-ranga-zle">po terminie</b> : ""}</>
+          : "Allegro nie podało terminu"}
+      </Wiersz>
       <Wiersz etykieta="Numer">
         <Link href={r.link}>{r.numer ?? r.externalId}</Link>
         <Skopiuj tekst={r.numer ?? r.externalId} tytul="Kopiuj numer reklamacji" />
@@ -265,17 +353,8 @@ export function Dowody({
           ? ` · ${zlote(r.oczekiwanaKwotaGrosze, r.waluta)}` : ""}
       </Wiersz>
       <Wiersz etykieta="Zgłoszono">{czas(r.otwartoAt)}</Wiersz>
-    </Sekcja>
-
-    <Sekcja tytul="Zegar i stan">
-      {/* Termin przychodzi Z ALLEGRO. Liczba wzięta z naszego kodu
+      {/* Termin przychodzi Z ALLEGRO, stoi wyżej. Liczba wzięta z naszego kodu
           rozjeżdżałaby się z tą, którą widzi kupujący — a rozstrzyga jego. */}
-      <Wiersz etykieta="Decyzja do">
-        {r.decyzjaDo
-          ? <>{czas(r.decyzjaDo)}{r.poTerminie
-              ? <b className="ml-2 text-ranga-zle">po terminie</b> : ""}</>
-          : "Allegro nie podało terminu"}
-      </Wiersz>
       <Wiersz etykieta="Status Allegro">{r.statusAllegro ?? "—"}</Wiersz>
       <Wiersz etykieta="Zwrot towaru">
         {r.zwrotWymagany === null ? "sprzedawca jeszcze nie zdecydował"
@@ -352,12 +431,15 @@ export function Dowody({
         `docs/obsluga-klienta-calosc.md`). Reklamacja i dyskusja leżą w JEDNEJ
         tabeli i do 0.386.0 nie widziały się nawzajem — dyskusja, która urosła
         w tę reklamację, była osobnym wierszem bez śladu po przejściu. */}
+    {/* `wSekcji`: nagłówek daje `Sekcja`, blok rysuje samą listę. Do 0.388.1
+        stały tu DWA nagłówki nad jedną listą, własne tło w cudzej sekcji
+        i podwójny padding — widać to na zrzucie właściciela. */}
     {szczegol.sprawy.length > 0 && <Sekcja tytul="Inne sprawy tego zakupu">
-      <SprawyZakupu sprawy={szczegol.sprawy} />
+      <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
     </Sekcja>}
 
     {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
-      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "reklamacja", id: r.id }} />
+      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "reklamacja", id: r.id }} wSekcji />
     </Sekcja>}
 
     {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">
@@ -377,17 +459,37 @@ export function Dowody({
       <Przycisk className="mt-1 w-full" disabled={trwa} onClick={onProwadze}>
         {r.prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
       </Przycisk>
-      {/* TAGI NAD NOTATKĄ, bo odpowiadają na pytanie, które agent zadaje
-          częściej: „czego ta sprawa czeka". Notatka jest dłuższa i czyta się
-          ją wtedy, gdy tag nie wystarczy. */}
-      {tagi && <div className="mt-3">
-        <TagiSprawy przypiete={r.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
-          blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
-          onNowy={tagi.onNowy} />
-      </div>}
-      <div className="mt-3">
-        <Notatka reklamacja={r} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka}
-          onCofnij={onCofnijNotatke} />
+
+      {/* ── TAGI I NOTATKA ZWIJAJĄ SIĘ (0.389.0) ─────────────────────────────
+          Na zrzucie właściciela te dwa bloki zajmowały pół kolumny: trzy
+          propozycje tagów, „nowy tag", pole tekstowe i przycisk zapisu. To są
+          czynności RZADKIE — agent pisze notatkę przy co którejś sprawie,
+          a czyta kolumnę przy każdej.
+
+          „Prowadzi" i przycisk ZOSTAJĄ na wierzchu, bo to pytanie zadawane
+          za każdym razem. Nagłówek zwijki niesie stan obu bloków, więc nie
+          trzeba jej otwierać, żeby sprawdzić, czy coś tam jest. */}
+      <div className="-mx-2">
+        <Zwijka
+          tytul="Tagi i notatka"
+          Ikona={NotebookPen}
+          podpis={podpisPracy(r)}
+          domyslnieOtwarte={Boolean(r.notatka) || r.tagi.length > 0}
+          pamietajJako="wertis.reklamacje.praca"
+        >
+          <div className="px-2 py-2">
+            {/* TAGI NAD NOTATKĄ, bo odpowiadają na pytanie, które agent zadaje
+                częściej: „czego ta sprawa czeka". Notatka jest dłuższa i czyta
+                się ją wtedy, gdy tag nie wystarczy. */}
+            {tagi && <TagiSprawy przypiete={r.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
+              blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
+              onNowy={tagi.onNowy} />}
+            <div className={tagi ? "mt-3" : ""}>
+              <Notatka reklamacja={r} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka}
+                onCofnij={onCofnijNotatke} />
+            </div>
+          </div>
+        </Zwijka>
       </div>
     </Sekcja>
   </div>;

@@ -446,7 +446,7 @@ i powody każdej: [`docs/architektura.md`](docs/architektura.md) §6.
   przesyłka jest jedna. Pozycja z wyjątkiem wypada z rutyny, ale nie blokuje
   zamknięcia dostawy.
 
-  **Brak zdejmuje towar ze sprzedaży (0.390.0).** „Brak w przesyłce" i niedobór
+  **Brak zdejmuje towar ze sprzedaży (0.391.0).** „Brak w przesyłce" i niedobór
   przy „Złej ilości" kolejkują MM z magazynu skutku dostawy na magazyn
   serwisowy (`MAG_ID_SERWIS`). Powód: fakturę zakupu Subiekt księguje w całości,
   więc towar, którego nie było w palecie, wisiałby na stanie jako sprzedawalny.
