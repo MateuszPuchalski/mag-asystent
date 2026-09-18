@@ -222,6 +222,23 @@ Rozmowa z numerem zamówienia, którego jeszcze nie dociągnęliśmy, nie pokaż
 spraw. Dwie różne odpowiedzi o tym samym zakupie na jednym ekranie byłyby
 gorsze od jednej spóźnionej.
 
+**Druga dziura, zamknięta w 0.397.0: rozmowa BEZ NUMERU zamówienia.** Zgłoszenie
+właściciela ze zrzutem — klient napisał pod ofertą „otrzymałem paczkę, ale nie
+było w zestawie świecy", a rozmowa nie miała zakupu wcale. Powód leży po
+stronie Allegro: wątek niesie JEDEN obiekt powiązany i przy pytaniu spod oferty
+jest nim oferta. Numeru zamówienia w tym ładunku nie ma i nie będzie.
+
+Mostkiem zastępczym jest LOGIN kupującego — ten sam, którym chodzi zakładka
+KLIENT (S2). `services/zamowienia-kandydaci.ts` układa zakupy tego loginu,
+podnosi ten, który niesie ofertę z rozmowy, a wiąże dopiero kliknięcie agenta.
+Automat wybierający za człowieka pomyliłby się cicho, i to przy sprawie
+o pieniądze.
+
+To jest wyjątek od reguły „dokładając kolejkę, dopisujesz wiązania po numerze
+zamówienia w obie strony": tutaj numeru po prostu nie ma. Wiązanie po loginie
+wolno nam wyłącznie dlatego, że oba pola przychodzą wprost z Allegro —
+`allegro_inbox_thread.interlocutor_login` i `zamowienie_klienta.kupujacy_login`.
+
 ### S2. Historia klienta kompletna — **stoi**
 
 `services/klient-historia.ts` dokłada do osi zwroty, reklamacje i dyskusje po

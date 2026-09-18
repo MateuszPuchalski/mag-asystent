@@ -4,6 +4,9 @@ import { uchwyty } from "./conversation-realtime.js";
 import { statusZKierunku, ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
+import {
+  kandydaciZamowien, zamowienieWskazane, type KandydatZamowienia,
+} from "./zamowienia-kandydaci.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
   from "./droga-klienta.js";
@@ -474,6 +477,15 @@ export function osRozmowy(id: number): {
   ofertaWskazana: OfertaWskazana | null;
   zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
   /**
+   * Zakupy tego kupującego — kandydaci do powiązania (0.397.0).
+   *
+   * Lista jedzie ZAWSZE, także gdy zamówienie już jest: klient bywa u nas
+   * z kilkoma paczkami i pytanie „nie o tę chodzi" pada częściej niż raz.
+   * Ekran pokazuje ją mocno, dopóki nic nie jest powiązane, a potem chowa
+   * pod przyciskiem — patrz `skrzynka/ZamowienieRozmowy.tsx`.
+   */
+  kandydaciZamowien: KandydatZamowienia[];
+  /**
    * Zwroty TEGO zamówienia (0.221.0). Właściciel: „klienci często pytają
    * pod zamówieniem o zwrot, którego dokonali" — agent szedł po stan zwrotu
    * do ekranu Zwroty i szukał go ręcznie. Mostkiem jest numer zamówienia,
@@ -616,10 +628,25 @@ export function osRozmowy(id: number): {
   const zNumerem = [...wiadomosci].reverse();
   const zrodloZamowienia = zNumerem.find((m) => m.zamowienie != null && String(m.direction) === "incoming")
     ?? zNumerem.find((m) => m.zamowienie != null);
-  const zamowienie: ZamowienieRozmowy | null = zrodloZamowienia ? {
-    externalId: String(zrodloZamowienia.zamowienie),
-    link: linkZamowienia(String(zrodloZamowienia.zamowienie)),
-    pobrane: zamowienieRozmowy(Number(zrodloZamowienia.konto), String(zrodloZamowienia.zamowienie)),
+  /* ── WSKAZANIE RĘCZNE JAKO ZAPASOWA DROGA (0.397.0) ─────────────────────────
+     Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
+     rozmowa nie miała zamówienia wcale. Ładunek wątku niesie JEDEN obiekt
+     powiązany — pytanie spod oferty numeru zakupu nie ma i mieć nie będzie.
+
+     WIADOMOŚĆ BIJE WSKAZANIE, nie odwrotnie: numer z Allegro jest faktem,
+     a wskazanie wnioskiem człowieka. Gdy klient dopisze wiadomość niosącą
+     numer, ekran ma pokazać właśnie ten, choćby ktoś wcześniej wskazał inny. */
+  const wskazane = zrodloZamowienia ? null : zamowienieWskazane(id);
+  const numerZamowienia = zrodloZamowienia
+    ? String(zrodloZamowienia.zamowienie) : wskazane?.externalId ?? null;
+  const kontoZamowienia = zrodloZamowienia
+    ? Number(zrodloZamowienia.konto)
+    : Number((db().prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
+      .get(id) as { konto: number }).konto);
+  const zamowienie: ZamowienieRozmowy | null = numerZamowienia ? {
+    externalId: numerZamowienia,
+    link: linkZamowienia(numerZamowienia),
+    pobrane: zamowienieRozmowy(kontoZamowienia, numerZamowienia),
   } : null;
 
   /* JEDNA oferta na rozmowę, tą samą regułą co zamówienie: numer z najnowszej
@@ -868,7 +895,7 @@ export function osRozmowy(id: number): {
 
   return {
     rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id),
-    zamowienie, oferta,
+    zamowienie, oferta, kandydaciZamowien: kandydaciZamowien(id),
     zwroty: zamowienie
       ? listaZwrotow(db(), Date.now(), { channelAccountId: kontoRozmowy, orderId: zamowienie.externalId })
       : [],

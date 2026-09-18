@@ -8,6 +8,7 @@ import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, 
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
+import { wskazZamowienie } from "../services/zamowienia-kandydaci.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
 import { db } from "../db/db.js";
@@ -489,6 +490,23 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const nie = odmowa(reply); if (nie) return nie;
       try {
         return wskazOferte(Number(req.params.id), req.body?.ofertaId ?? "",
+          sesjaZadania()!.user.userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── RĘCZNE WSKAZANIE ZAMÓWIENIA (0.397.0) ─────────────────────────────────
+     Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
+     rozmowa nie miała zamówienia wcale — bo wątek z Centrum Wiadomości niesie
+     JEDEN obiekt powiązany i przy pytaniu spod oferty jest nim oferta.
+
+     Bliźniak trasy `/oferta` i z tego samego powodu: numeru, którego Allegro
+     nie przysłało, nie zgadujemy — wskazuje go człowiek, a wybór podpisuje się
+     jego imieniem. Serwis pilnuje, żeby numer należał do TEGO kupującego. */
+  app.post<{ Params: { id: string }; Body: { externalId?: string } }>(
+    "/api/conversations/:id/zamowienie", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return wskazZamowienie(Number(req.params.id), req.body?.externalId ?? "",
           sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
     });

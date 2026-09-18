@@ -16,6 +16,13 @@ vi.mock("./ZamowienieRozmowy", () => ({
 vi.mock("./ZwrotRozmowy", () => ({
   ZwrotRozmowy: ({ zwrot }: { zwrot: { id: number } }) => <div data-testid="zwrot">zwrot {zwrot.id}</div>,
 }));
+/* Blok zakupów klienta woła hak zapytania (0.397.0), a ten plik nie stawia
+   klienta TanStacka — pilnuje UKŁADU kolumny, nie wiązania zamówień. Własne
+   testy blok ma w `ZamowieniaKlienta.test.tsx`. */
+vi.mock("./ZamowieniaKlienta", () => ({
+  ZamowieniaKlienta: ({ kandydaci }: { kandydaci: unknown[] }) =>
+    <div data-testid="zakupy-klienta">zakupy {kandydaci.length}</div>,
+}));
 vi.mock("./Dobor", () => ({
   Dobor: () => <div data-testid="dobor">blok doboru</div>,
 }));
@@ -31,7 +38,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     kopilot: null,
   },
   os: [], szkic: null, ofertaWskazana: null, zamowienie: null, zwroty: [],
-  sprawy: [], droga: [], szkicCopilota: null,
+  sprawy: [], droga: [], szkicCopilota: null, kandydaciZamowien: [],
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
       oem: null, nazwaCzesci: null, parametry: {} } },

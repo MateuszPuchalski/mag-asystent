@@ -1885,6 +1885,43 @@ Restart-Service wertis-sfera
 Po aktualizacji do 0.350.1 zwrot, któremu wycofany zapis przypiął nieistniejący
 numer ZW, poprawia się ręcznie: „Cofnij korektę” w panelu, potem ZW w Subiekcie.
 
+## 6h. Ceny z kartoteki Subiekta — CZEGO JESZCZE BRAKUJE (0.396.0)
+
+Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Od tego
+wydania karta towaru w panelu obsługi **umie** je pokazać. Wszystkie poziomy,
+brutto grubym drukiem, netto obok. Na produkcji blok jednak milczy i to nie
+jest usterka instalacji.
+
+Brakuje dwóch rzeczy, których nie da się dołożyć kodem:
+
+1. **Nazw tabeli i kolumn cennika.** Oficjalny opis struktury mamy przeczytany
+   w zakresie kartoteki, stanów, dokumentów i kontrahentów. Cennika w nim nie
+   było. Nazwa wpisana z pamięci to ta sama klasa błędu, która przy Allegro
+   kosztowała trzy wydania. Rozstrzyga to jedno uruchomienie:
+
+   ```
+   sqlcmd -S localhost -d Subiekt_GT -U wertis -P '...' \
+          -i tools/sonda-cen.sql -s ';' -W > sonda-cen.txt
+   ```
+
+   Wynik wklej do `docs/subiekt-gt-struktura.md`, sekcja „Ceny na kartotece",
+   razem z datą — tak samo jak wynik audytu kolizji.
+
+2. **Nowego `GRANT SELECT`.** Dzisiejszy login `wertis` widzi sześć tabel
+   i żadna z nich nie jest cennikiem. Sonda powie, na którą dopisać prawo
+   w `docs/subiekt-gt-edu-setup.md` §2.
+
+Do tego czasu nic się nie psuje. Read-model ma tabelę `sgt_cena`, karta zwraca
+pustą listę, a ekran nie rysuje wtedy nic — pusta tabelka cen obiecywałaby
+wiedzę, której nie ma. Ceny widać w trybie demo po `npm run seed:scenariusze`
+(kartoteki `TEST-CENY-*`), bo to dane syntetyczne do oglądania kształtu.
+
+**Czego to wydanie NIE dokłada:** cen w `biuro.html`. Biuro nie ma ekranu karty
+towaru — ma dostawy, magazyn zwrotów, analizę, dziennik i nadzór — więc nie ma
+dokąd ich wstawić bez budowania nowego widoku. To osobna decyzja.
+
+---
+
 ## 7. Backup i utrzymanie
 
 ### Aktualizacja do nowej wersji

@@ -172,6 +172,15 @@ export function buildProductCard(
     // to, co jeszcze nie doszło do Subiekta — świadomie OBOK `locs`, żeby karta
     // nie zaczęła kłamać w drugą stronę (pokazywać niepotwierdzone jako pewne)
     pendingLocs: pendingLocChanges(twId, locs),
+    /* Ceny kartoteki (0.396.0). Wszystkie poziomy, w kolejności Subiekta —
+       decyzja właściciela. Pusta lista znaczy „nie wiemy": na produkcji tak
+       będzie, dopóki import nie dostanie nazw cennika i nowego GRANT-u
+       (`tools/sonda-cen.sql`). Ekran nie rysuje wtedy nic, bo pusta tabelka
+       cen obiecywałaby wiedzę, której nie ma. */
+    ceny: adapter.cenyTowaru(twId).map((c) => ({
+      poziom: c.poziom, nazwa: c.nazwa, waluta: c.waluta,
+      nettoGrosze: c.netto_grosze, bruttoGrosze: c.brutto_grosze,
+    })),
     /* Każdy magazyn traci to, co z niego jedzie; MAG dodatkowo zyskuje
        wszystko, co jedzie do niego — także z magazynów bez roli, co przed
        0.22.0 nie mogło się zdarzyć. MAG bywa teraz również źródłem. */

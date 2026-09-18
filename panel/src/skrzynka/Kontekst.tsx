@@ -4,6 +4,7 @@ import type { OsRozmowy } from "../api/typy";
 import { Pusto, Zakladki } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
+import { ZamowieniaKlienta } from "./ZamowieniaKlienta";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { TowarRozmowy } from "./TowarRozmowy";
@@ -105,6 +106,14 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
               </Pusto>}
         {dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
           ofertaRozmowy={oferta?.externalId ?? null} />}
+        {/* ── ZAKUPY TEGO KLIENTA (0.397.0) ──────────────────────────────────
+            Zgłoszenie właściciela ze zrzutem: klient napisał pod ofertą
+            o braku w paczce, a rozmowa nie miała zamówienia wcale. Blok stoi
+            TUŻ POD zamówieniem, bo odpowiada na to samo pytanie — „o którą
+            paczkę chodzi" — a przy braku powiązania jest jedyną drogą do
+            niego. Wyżej byłby przed odpowiedzią, niżej ginąłby pod zwrotami. */}
+        <ZamowieniaKlienta kandydaci={dane.kandydaciZamowien} rozmowaId={dane.rozmowa.id}
+          maZamowienie={dane.zamowienie !== null} />
         {/* Zwrot POD zamówieniem, bo to zwrot tego zakupu (0.221.0). Jeden
             zakup miewa kilka zwrotów, stąd lista. */}
         {dane.zwroty.map((z) => <ZwrotRozmowy key={z.id} zwrot={z} />)}

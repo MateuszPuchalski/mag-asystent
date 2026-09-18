@@ -381,6 +381,27 @@ export function useWskazOferte() {
 }
 
 /**
+ * Ręczne wskazanie ZAMÓWIENIA dla rozmowy (0.397.0).
+ *
+ * Bliźniak `useWskazOferte` i z tego samego powodu: numeru, którego Allegro
+ * nie przysłało, panel nie zgaduje. Unieważniamy samą rozmowę — powiązanie
+ * zmienia jej kolumnę kontekstu, a nie kolejkę.
+ *
+ * Błędu NIE łapiemy tutaj: serwer odbija numer spoza zakupów tego kupującego,
+ * a to zdanie ma stanąć przy liście, nie w pasku na górze ekranu.
+ */
+export function useWskazZamowienie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; externalId: string }) =>
+      api(`/api/conversations/${v.id}/zamowienie`, {
+        method: "POST", body: JSON.stringify({ externalId: v.externalId }),
+      }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
+  });
+}
+
+/**
  * Wysyłka odpowiedzi do klienta (§8.5).
  *
  * Konflikt świeżości NIE jest tu łapany: `Konflikt` leci do ekranu, bo to on

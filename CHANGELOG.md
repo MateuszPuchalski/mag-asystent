@@ -34,6 +34,80 @@ historii nie przepisujemy.
 ---
 
 
+## 0.397.0 — 18 września 2026
+
+**Rozmowa bez numeru zamówienia dostaje drogę do zakupu klienta.** Zgłoszenie
+właściciela ze zrzutem: klient napisał pod ofertą „dzisiaj otrzymałem paczkę,
+ale nie było w zestawie świecy", a rozmowa nie miała zamówienia wcale. Agent
+widział ofertę i kartotekę, nie widział ZAKUPU — więc nie wiedział, co klient
+dostał, za ile ani czy paczka doszła.
+
+Powód leży po stronie Allegro, nie u nas: wątek z Centrum Wiadomości niesie
+JEDEN obiekt powiązany. Pytanie zadane pod ofertą niesie numer oferty i nic
+więcej; numeru zamówienia w tym ładunku nie ma i nie będzie.
+
+- **Nowy blok „Zakupy tego klienta"** w kolumnie kontekstu, tuż pod
+  zamówieniem. Mostkiem jest LOGIN kupującego — ten sam, którym chodzi
+  zakładka KLIENT od S2 spoiwa, oba pola wprost z Allegro.
+- **Wiąże KLIKNIĘCIE, nie automat.** Ten sam login nie znaczy „ta paczka",
+  a automat pomyliłby się cicho — przy sprawie o brak w zestawie, czyli tam,
+  gdzie pomyłka kosztuje pieniądze.
+- **Zakup niosący ofertę z rozmowy idzie na górę** i nosi plakietkę „ta
+  oferta". Bez niej kolejność byłaby magią, której agent nie ma jak sprawdzić.
+- **Wielkość liter loginu nie rozstrzyga.** Allegro oddaje ten sam login raz
+  małymi, raz wielkimi literami — w tej samej rozmowie nagłówek wątku mówi
+  „chips20", a podpis wiadomości „CHIPS20".
+- **Wiadomość bije wskazanie.** Numer z Allegro jest faktem, wskazanie
+  wnioskiem człowieka; gdy klient dopisze wiadomość z numerem, wygrywa ona.
+- **Serwer sprawdza, czyj to zakup.** Panel wysyła sam numer, więc bramka stoi
+  w serwisie: zakup spoza listy kupującego jest odbijany.
+- Po powiązaniu wracają pozycje, kwoty, status przesyłki, zwroty, sprawy
+  posprzedażowe i droga zakupu — cała kolumna, która dotąd milczała.
+
+Wdrożenie: nic ręką. Bez nowej tabeli; wskazanie żyje w `conversation_event`,
+tą samą mechaniką co ręczne wskazanie oferty od 0.179.0.
+
+---
+
+
+## 0.396.0 — 18 września 2026
+
+**Ceny z kartoteki Subiekta na karcie towaru w panelu obsługi.** Zgłoszenie
+właściciela: „nie widzę cen z Subiekta przy towarach". I nie widział, bo ich
+nigdy nie było: `sgt_towar` nie miał kolumny ceny, importer ich nie pobierał,
+a login `wertis` nie ma nawet prawa do tabeli cennikowej. To nie była usterka
+wyświetlania, tylko brak całej ścieżki.
+
+- **Wszystkie poziomy cen**, w kolejności Subiekta — decyzja właściciela.
+  Sortowanie po kwocie przestawiałoby wiersze przy każdej przecenie, a agent
+  uczy się miejsca, nie liczby.
+- **Brutto grubym drukiem, netto szarym obok.** Brutto agent przepisuje
+  klientowi detalicznemu, netto jest pod ręką dla firmy proszącej o fakturę.
+- **Grosze całkowite**, tak samo jak kwoty z Allegro. Netto i brutto biorą się
+  OBA ze źródła: przeliczanie u nas wymagałoby stawki VAT i dokładało własny
+  błąd zaokrąglenia, a cena podana klientowi ma się zgadzać z fakturą.
+- **Osobna tabela `sgt_cena`**, nie kolumny na kartotece. Liczba poziomów jest
+  cechą firmy, nie schematu; osiem kolumn `cena_1..8` kłamałoby w obie strony.
+- **Pusty blok nie rysuje się wcale.** Brak wiedzy nie jest informacją wartą
+  kolumny — ta sama zasada, co przy pasowaniach.
+
+**Na produkcji blok jeszcze milczy i to jest świadome.** Brakuje nazw tabeli
+cennikowej (nasz wyciąg ze struktury InsERT ich nie zawiera) oraz nowego
+`GRANT SELECT`. Rozstrzyga to jedno uruchomienie nowej sondy
+`tools/sonda-cen.sql`; `DEPLOY.md` §6h mówi jak, a `docs/subiekt-gt-struktura.md`
+niesie to jako dwudziesty szósty znacznik `[WERYFIKUJ]`. Kształt ekranu widać
+w trybie demo po `npm run seed:scenariusze` (kartoteki `TEST-CENY-*`).
+
+**Czego to wydanie NIE dokłada:** cen w `biuro.html`. Biuro nie ma ekranu karty
+towaru — ma dostawy, magazyn zwrotów, analizę, dziennik i nadzór — więc nie ma
+dokąd ich wstawić bez budowania nowego widoku. Osobna decyzja.
+
+Wdrożenie: migracja dokłada tabelę `sgt_cena`. Poza tym nic ręką, dopóki nie
+zapadnie decyzja po sondzie.
+
+---
+
+
 ## 0.395.0 — 18 września 2026
 
 **Guzik „PRZEJMIJ ROZMOWĘ" schodzi ze skrzynki — przypisuje odpowiedź.**

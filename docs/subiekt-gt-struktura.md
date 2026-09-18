@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwadzieścia pięć.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwadzieścia sześć.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -716,6 +716,39 @@ dokumentu, który już jest — po `dok_Id` — nie zostało sprawdzone na żywe
 Sferze. Pytanie postawił właściciel: czy kliknięcie w numer paragonu w panelu
 może otworzyć ten paragon w Subiekcie. Dlaczego samo panelu to nie załatwi,
 tłumaczy `docs/architektura.md` §4.
+
+## Ceny na kartotece — CZEGO NIE WIEMY
+
+Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie widzi,
+bo ich nigdy nie było. `sgt_towar` nie ma kolumny ceny, importer ich nie
+pobiera, a login `wertis` nie ma prawa do tabeli cennikowej.
+
+Ta sekcja stoi tu pusta z rozmysłem. Oficjalny opis struktury, z którego
+spisano resztę dokumentu, mamy przeczytany w zakresie kartoteki, stanów,
+dokumentów i kontrahentów. Cennika w tym zakresie nie było, a nazwa tabeli
+wpisana z pamięci to ta sama klasa błędu, która przy Allegro kosztowała trzy
+wydania.
+
+`[WERYFIKUJ]` **nazwy tabel i kolumn cennika, liczba używanych poziomów cen
+oraz to, czy baza trzyma obok siebie kwotę netto i brutto**. Rozstrzyga to
+jedno uruchomienie `tools/sonda-cen.sql` na produkcyjnej bazie; sonda pyta
+słowniki systemowe o nazwy, zamiast je zakładać. Wynik wklej tutaj razem
+z datą, tak samo jak wynik audytu kolizji.
+
+Do tego dochodzi nowy `GRANT SELECT` w `docs/subiekt-gt-edu-setup.md` §2 —
+dzisiejszy login widzi sześć tabel i żadna z nich nie jest cennikiem.
+
+Trzy rzeczy, które ta odpowiedź przesądza, a bez których kodu nie ma sensu
+pisać:
+
+1. **Skala liczby.** Kwoty trzymamy u siebie w groszach, całkowitych — tak
+   samo jak kwoty z Allegro. Pomyłka o rząd wielkości w cenie podanej
+   klientowi jest droższa niż brak ceny.
+2. **Ile poziomów naprawdę żyje.** Właściciel wybrał „wszystkie poziomy",
+   ale osiem pustych wierszy to nie jest wiedza, tylko hałas.
+3. **Netto i brutto obok siebie czy przeliczanie u nas.** Przeliczanie wymaga
+   stawki VAT z kartoteki i daje własny błąd zaokrąglenia. Cena podana
+   klientowi ma się zgadzać z fakturą co do grosza.
 
 ## Zasada nadrzędna
 

@@ -96,6 +96,7 @@ function seed() {
     /* Pozycje przed nagłówkami — trzyma je klucz obcy. */
     for (const t of [
       "sgt_zam_pozycja", "sgt_zamowienie",
+      "sgt_cena",
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
       d.prepare(`DELETE FROM ${t}`).run();
