@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
 import type {
-  Dyskusja, KolejkaDyskusji, SzczegolDyskusji,
+  Dyskusja, KolejkaDyskusji, StanPrzesylki, SzczegolDyskusji,
   WynikOdpowiedziReklamacji, WynikZakonczenia,
 } from "./typy";
 
@@ -162,3 +162,24 @@ export function useZakoncz() {
 export const pobierzZalacznikDyskusji = (
   dyskusjaId: number, zalacznikId: number, nazwa: string,
 ) => pobierzPlik(`/api/obsluga/reklamacje/${dyskusjaId}/zalaczniki/${zalacznikId}`, nazwa);
+
+/**
+ * Gdzie jest paczka do klienta (0.393.0) — bliźniak hooka z `reklamacje.ts`.
+ *
+ * Kliknięcie JAWNE: pytanie kosztuje DWA żądania u Allegro, więc nie ma prawa
+ * wyjść z samego otwarcia ekranu.
+ *
+ * Unieważniamy wyłącznie SPRAWĘ, nie kolejkę: stan przesyłki nie wchodzi do
+ * listy, a przeładowanie kolejki byłoby robotą bez skutku na ekranie.
+ */
+export function useSprawdzPrzesylkeDyskusji() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Bez ciała — i dlatego bez `body`. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
+       i gołe „Bad Request" na ekranie; `api()` i jego test pilnują nagłówka. */
+    mutationFn: (v: { id: number }) =>
+      api<StanPrzesylki>(`/api/obsluga/dyskusje/${v.id}/przesylka`, { method: "POST" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) }),
+  });
+}

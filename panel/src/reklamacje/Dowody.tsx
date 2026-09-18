@@ -293,6 +293,7 @@ const Cytat = ({ z, zdjecia = [] }: { z: string; zdjecia?: ZdjecieKarty[] }) => 
 export function Dowody({
   szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke,
   rozpoznaje = false, bladRozpoznania = "", onRozpoznaj,
+  onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
   tagi,
 }: {
   szczegol: SzczegolReklamacji;
@@ -316,6 +317,11 @@ export function Dowody({
   rozpoznaje?: boolean;
   bladRozpoznania?: string;
   onRozpoznaj?: () => void;
+  /* Sprawdzenie przesyłki (0.393.0) — opcjonalne tym samym wzorcem co reszta:
+     czego nie da się zrobić, tego nie ma na ekranie. */
+  onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean;
+  bladPrzesylki?: string;
 }) {
   const r = szczegol.reklamacja;
   return <div className="flex min-h-0 flex-col">
@@ -415,6 +421,61 @@ export function Dowody({
       <Wiersz etykieta="Oferta">
         {r.offerId ? <Link href={r.linkOferty}>{r.offerId}</Link> : "—"}
       </Wiersz>
+
+      {/* ── CENY (0.393.0) ──────────────────────────────────────────────────
+          Zgłoszenie właściciela: „dodaj ceny produktów". Kolumna miała nazwę
+          towaru i SKU, ale ani jednej kwoty — a przy reklamacji z żądaniem
+          zwrotu pieniędzy to jest pierwsza liczba, której agent szuka.
+
+          DOSTAWA OSOBNO OD SUMY, bo klient żądający zwrotu pyta czasem
+          właśnie o nią. Sklejenie ich w jedną kwotę kazałoby liczyć w głowie. */}
+      {szczegol.zamowienie && <>
+        <ul className="mt-1 space-y-0.5">
+          {szczegol.zamowienie.pozycje.map((p, i) =>
+            <li key={`${p.offerId ?? p.sku ?? i}`}
+              className="flex items-baseline gap-2 rounded bg-slate-50 px-2 py-1 text-xs">
+              <span className="min-w-0 flex-1 truncate">{p.nazwa}</span>
+              <span className="shrink-0 tabular-nums text-slate-600">
+                {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+            </li>)}
+        </ul>
+        <Wiersz etykieta="Dostawa">
+          {zlote(szczegol.zamowienie.dostawaGrosze, szczegol.zamowienie.waluta)}
+          {szczegol.zamowienie.dostawaMetoda &&
+            <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
+        </Wiersz>
+        <Wiersz etykieta="Razem">
+          <b className="tabular-nums">
+            {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
+        </Wiersz>
+      </>}
+
+      {/* ── GDZIE JEST PACZKA (0.393.0) ─────────────────────────────────────
+          Przy reklamacji to pytanie pierwsze: „czy on to w ogóle dostał".
+
+          Ładunek zamówienia numeru przesyłki NIE MA — stoi pod osobną
+          końcówką `/order/checkout-forms/{id}/shipments`, a status pod tą
+          samą, którą zwroty odpytują od 0.187.0. Dwa żądania, więc pytamy
+          na JAWNE kliknięcie: żądanie u dostawcy nie wychodzi z patrzenia. */}
+      {szczegol.przesylka && <Wiersz etykieta="Przesyłka">
+        {szczegol.przesylka.sprawdzonoAt === null
+          ? <span className="text-slate-500">nie pytaliśmy jeszcze Allegro</span>
+          : szczegol.przesylka.waybill === null
+            ? <span className="text-slate-500">Allegro nie ma numeru — paczka
+                jeszcze nienadana albo nadana poza Allegro</span>
+            : <>
+                {szczegol.przesylka.dostarczonoAt
+                  ? <b className="text-ranga-ok">doręczona {czas(szczegol.przesylka.dostarczonoAt)}</b>
+                  : <span>{szczegol.przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
+                <span className="text-slate-500"> · {szczegol.przesylka.przewoznik}{" "}
+                  <span className="font-mono">{szczegol.przesylka.waybill}</span></span>
+              </>}
+        {onSprawdzPrzesylke && <button type="button" disabled={sprawdzaPrzesylke}
+          onClick={onSprawdzPrzesylke}
+          className="ml-2 font-semibold underline underline-offset-2 disabled:opacity-50">
+          {sprawdzaPrzesylke ? "pytam…" : "sprawdź"}</button>}
+        {bladPrzesylki && <p className="text-xs text-red-700">{bladPrzesylki}</p>}
+      </Wiersz>}
     </Sekcja>
 
     {/* Zwroty tego zamówienia — mostkiem jest numer zamówienia, ten sam

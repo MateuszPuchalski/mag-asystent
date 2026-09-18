@@ -19,6 +19,8 @@ import {
 } from "./reklamacje.js";
 import type { WierszZwrotu } from "./zwroty.js";
 import type { PrzystanekDrogi, SprawaZakupu } from "./droga-klienta.js";
+import type { Zamowienie } from "./zamowienia.js";
+import type { StanPrzesylkiZamowienia } from "./przesylka-zamowienia.js";
 
 /* ── Dyskusje klienckie — model pracy biura (0.245.0) ────────────────────────
    Rozmowa posprzedażowa, którą kupujący otwiera przy zamówieniu, zanim złoży
@@ -322,6 +324,10 @@ export interface SzczegolDyskusji {
   sprawy: SprawaZakupu[];
   /** Droga zakupu przez cztery kolejki, w kolejności czasu (S3 spoiwa). */
   droga: PrzystanekDrogi[];
+  /** Zamówienie z pozycjami i cenami (0.393.0). */
+  zamowienie: Zamowienie | null;
+  /** Co wiemy o paczce do klienta (0.393.0). */
+  przesylka: StanPrzesylkiZamowienia | null;
 }
 
 /**
@@ -342,13 +348,13 @@ export function szczegolDyskusji(
   if (!w) throw new BladReklamacji(`Dyskusja ${id} nie istnieje`, 404);
   const dyskusja = zWiersza(w, teraz);
   dyskusja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
-  const { zwroty, rozmowy, sprawy, droga } = kontekstZamowienia(
+  const { zwroty, rozmowy, sprawy, droga, zamowienie, przesylka } = kontekstZamowienia(
     database, Number(w.channel_account_id), dyskusja.orderId, teraz, id);
   return {
     dyskusja,
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
-    zwroty, rozmowy,
+    zwroty, rozmowy, zamowienie, przesylka,
     /* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa). Dyskusja jest
        tu przypadkiem najważniejszym: ona zwykle poprzedza reklamację, więc
        agent ma widzieć, czy sprawa poszła już dalej — i nie obiecywać

@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
   useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
-  useRozpoznaj, useUsunZalacznikSprawy, useZalacznikiSprawy, useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
+  useRozpoznaj, useSprawdzPrzesylke, useUsunZalacznikSprawy, useZalacznikiSprawy,
+  useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
   useWerdykt, useZwrotTowaru, useCofnijNotatke
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
@@ -151,6 +152,8 @@ export function Reklamacje() {
   const usunZalacznik = useUsunZalacznikSprawy();
   const rozpoznaj = useRozpoznaj();
   const [bladRozpoznania, setBladRozpoznania] = useState("");
+  const sprawdzPrzesylke = useSprawdzPrzesylke();
+  const [bladPrzesylki, setBladPrzesylki] = useState("");
   const [bladZalacznika, setBladZalacznika] = useState("");
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
@@ -568,6 +571,13 @@ export function Reklamacje() {
                   nowyTag.mutate({ id: szczegol.data!.reklamacja.id, rodzaj: "reklamacje", nazwa },
                     { onError: (e) => setBladTagu((e as Error).message) });
                 },
+              }}
+              sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+              bladPrzesylki={bladPrzesylki}
+              onSprawdzPrzesylke={() => {
+                setBladPrzesylki("");
+                sprawdzPrzesylke.mutate({ id: szczegol.data!.reklamacja.id },
+                  { onError: (e) => setBladPrzesylki((e as Error).message) });
               }}
               rozpoznaje={rozpoznaj.isPending}
               bladRozpoznania={bladRozpoznania}

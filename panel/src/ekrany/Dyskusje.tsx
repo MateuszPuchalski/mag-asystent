@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare } from "lucide-react";
 import {
   useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
-  useProwadzeDyskusje, useZakoncz, useCofnijNotatkeDyskusji
+  useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -80,6 +80,8 @@ export function Dyskusje() {
   const odepnij = useOdepnijTag();
   const [bladTagu, setBladTagu] = useState("");
   const cofnijNotatke = useCofnijNotatkeDyskusji();
+  const sprawdzPrzesylke = useSprawdzPrzesylkeDyskusji();
+  const [bladPrzesylki, setBladPrzesylki] = useState("");
   const [bladZapisu, setBladZapisu] = useState("");
 
   /* Próg daty ten sam co przy reklamacjach; wybór nie przeżywa zamknięcia
@@ -404,6 +406,13 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Fakty szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+              bladPrzesylki={bladPrzesylki}
+              onSprawdzPrzesylke={() => {
+                setBladPrzesylki("");
+                sprawdzPrzesylke.mutate({ id: szczegol.data!.dyskusja.id },
+                  { onError: (e) => setBladPrzesylki((e as Error).message) });
+              }}
               onCofnijNotatke={szczegol.data.dyskusja.maPoprzedniaNotatke
                 ? () => {
                   setBladZapisu("");

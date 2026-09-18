@@ -8,6 +8,8 @@ import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartaSprawy } from "./copilot-reklamacja.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
+import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
+import { przesylkaZamowienia, type StanPrzesylkiZamowienia } from "./przesylka-zamowienia.js";
 import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
   from "./droga-klienta.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
@@ -697,6 +699,10 @@ export interface SzczegolReklamacji {
   sprawy: SprawaZakupu[];
   /** Droga zakupu przez cztery kolejki, w kolejności czasu (S3 spoiwa). */
   droga: PrzystanekDrogi[];
+  /** Zamówienie z pozycjami i cenami (0.393.0); `null` = jeszcze niepobrane. */
+  zamowienie: Zamowienie | null;
+  /** Co wiemy o paczce do klienta (0.393.0); `null` = nie ma zamówienia. */
+  przesylka: StanPrzesylkiZamowienia | null;
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
   /* Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił.
@@ -732,9 +738,28 @@ export function kontekstZamowienia(
      urosła w reklamację, była osobnym wierszem bez śladu po przejściu.
      To najważniejszy moment całej obsługi i nie zostawiał go nic. */
   sprawy: SprawaZakupu[]; droga: PrzystanekDrogi[];
+  /* ── CO KLIENT KUPIŁ I ZA ILE (0.393.0) ──────────────────────────────────
+     Zgłoszenie właściciela: „dodaj ceny produktów". Kolumna dowodów miała
+     nazwę towaru i SKU, ale ani jednej kwoty — a przy reklamacji z żądaniem
+     zwrotu pieniędzy to jest pierwsza liczba, której agent szuka.
+
+     Odczyt jest ten sam, którym skrzynka pokazuje zamówienie przy rozmowie
+     (`zamowienieRozmowy`), więc pozycje, kartoteki i zdjęcia liczą się raz
+     i tak samo. `null` znaczy „zamówienia jeszcze nie pobraliśmy". */
+  zamowienie: Zamowienie | null;
+  /* Gdzie jest paczka (0.393.0) — ODCZYT z naszej bazy. Pytanie do Allegro
+     idzie osobną trasą, na jawne kliknięcie: to dwa żądania na zamówienie. */
+  przesylka: StanPrzesylkiZamowienia | null;
 } {
-  if (!orderId) return { zwroty: [], rozmowy: [], sprawy: [], droga: [] };
+  if (!orderId) {
+    return { zwroty: [], rozmowy: [], sprawy: [], droga: [], zamowienie: null, przesylka: null };
+  }
+  const wiersz = database.prepare(
+    "SELECT id FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?")
+    .get(konto, orderId) as { id: number } | undefined;
   return {
+    zamowienie: zamowienieRozmowy(konto, orderId, database),
+    przesylka: wiersz ? przesylkaZamowienia(database, wiersz.id) : null,
     sprawy: sprawyZakupu(database, konto, orderId, pomin),
     droga: drogaZakupu(database, konto, orderId),
     zwroty: listaZwrotow(database, teraz, { channelAccountId: konto, orderId }),
@@ -791,7 +816,7 @@ export function szczegolReklamacji(
   reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const konto = Number(w.channel_account_id);
 
-  const { zwroty, rozmowy, sprawy, droga } =
+  const { zwroty, rozmowy, sprawy, droga, zamowienie, przesylka } =
     kontekstZamowienia(database, konto, reklamacja.orderId, teraz, id);
 
   /* Kartoteka po ofercie — ten sam łańcuch co w skrzynce (pamięć wskazań,
@@ -810,7 +835,7 @@ export function szczegolReklamacji(
     reklamacja,
     czat: czatReklamacji(database, id),
     zalaczniki: zalacznikiSprawy(database, id),
-    zwroty, rozmowy, sprawy, droga, kartoteka,
+    zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
   };
 }

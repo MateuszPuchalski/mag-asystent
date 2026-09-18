@@ -34,6 +34,35 @@ historii nie przepisujemy.
 ---
 
 
+## 0.393.0 — 18 września 2026
+
+**Status przesyłki do klienta i ceny produktów w kolumnie faktów.** Zgłoszenie
+właściciela. Reklamacja o niedostarczeniu zaczyna się od pytania „czy on to
+w ogóle dostał", a reklamacja o zwrot pieniędzy — od pytania „ile zapłacił".
+Kolumna nie umiała odpowiedzieć ani na jedno.
+
+- **Ceny.** Lista pozycji dostaje kwotę i ilość, a pod nią stoją dwa wiersze:
+  `Dostawa` i `Razem`. Dostawa osobno od sumy, bo klient żądający zwrotu pyta
+  czasem właśnie o nią, a sklejenie kazałoby liczyć w głowie.
+- **Paczka.** Nowy wiersz `Przesyłka` z trzema różnymi stanami: „nie pytaliśmy
+  jeszcze", „Allegro nie ma numeru" i numer razem ze statusem przewoźnika.
+  Doręczenie pokazujemy z datą, bo ono zamyka spór o niedostarczenie.
+- **Pytanie na JAWNE kliknięcie**, nigdy przy otwarciu ekranu. Odpowiedź
+  kosztuje dwa żądania u Allegro (`/order/checkout-forms/{id}/shipments`
+  po numer, potem historia trackingu), a zasada „zero zapisu przy patrzeniu"
+  obejmuje też koszt u dostawcy.
+- **Oba ekrany, nie jeden.** Reklamacje i dyskusje dostają to samo, bo dyskusja
+  zwykle POPRZEDZA reklamację — pytanie o paczkę pada tam wcześniej. Stan wpada
+  w kolumny `zamowienie_klienta`, więc pytanie zadane w jednej kolejce widać
+  w drugiej: paczka jest jedna, niezależnie od tego, gdzie siedzi agent.
+- Numeru przesyłki NIE piszemy do `events`: prowadzi do adresu odbiorcy,
+  a `events` nie ma retencji.
+
+Wdrożenie: nic ręką. Pięć kolumn `przesylka_*` dokłada się migracją.
+
+---
+
+
 ## 0.392.0 — 18 września 2026
 
 **Trzy zgłoszenia właściciela ze zrzutów, wszystkie o jednym: ekran obsługi

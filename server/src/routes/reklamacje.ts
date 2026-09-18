@@ -4,6 +4,7 @@ import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/skrzynka.js";
 import {
@@ -130,6 +131,39 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       return reply.code(502).send({ error: (e as Error).message });
     }
   });
+
+  /* ── GDZIE JEST PACZKA DO KLIENTA (0.393.0) ────────────────────────────────
+     Zgłoszenie właściciela: „dodaj status przesyłki". Przy reklamacji to jest
+     pytanie pierwsze — „czy on to w ogóle dostał".
+
+     NA JAWNE KLIKNIĘCIE, nie taktem i nie przy otwarciu ekranu. Odpowiedź
+     kosztuje DWA żądania u Allegro (numer przesyłki, potem jej historia)
+     i obowiązuje tu ta sama zasada, co przy rozpoznaniu Copilota: żądanie
+     u dostawcy nie ma prawa wyjść z samego patrzenia. Otwarcie sprawy czyta
+     wyłącznie to, co już zapisaliśmy. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/reklamacje/:id/przesylka", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const w = db().prepare(`SELECT z.id AS id FROM reklamacja_klienta r
+        JOIN zamowienie_klienta z ON z.channel_account_id = r.channel_account_id
+          AND z.external_id = r.order_id
+        WHERE r.id = ?`).get(Number(req.params.id)) as { id: number } | undefined;
+      if (!w) {
+        return reply.code(400).send({
+          error: "Zamówienia tej sprawy jeszcze nie pobraliśmy — nie ma czego szukać.",
+        });
+      }
+      logEvent("reklamacja_przesylka_reczna", autor());
+      try {
+        return await sprawdzPrzesylke(db(), w.id);
+      } catch (e) {
+        return reply.code(502).send({ error: (e as Error).message });
+      }
+    });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/reklamacje/:id", async (req, reply) => {
     const nie = odmowa(reply);

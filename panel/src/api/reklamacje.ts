@@ -3,7 +3,8 @@ import { api, pobierzPlik } from "./klient";
 import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
   KartaSprawy,
-  KolejkaReklamacji, Reklamacja, SzczegolReklamacji, WynikOdpowiedziReklamacji, WynikWerdyktu,
+  KolejkaReklamacji, Reklamacja, StanPrzesylki, SzczegolReklamacji,
+  WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
 /* Reklamacje jadą JEDNYM zapytaniem razem z licznikami — ten sam wybór co przy
@@ -295,6 +296,27 @@ export function useRozpoznaj() {
     mutationFn: (v: { id: number }) =>
       api<{ karta: KartaSprawy }>(`/api/obsluga/reklamacje/${v.id}/rozpoznaj`,
         { method: "POST" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
+  });
+}
+
+/**
+ * Gdzie jest paczka do klienta (0.393.0).
+ *
+ * Kliknięcie JAWNE, z tego samego powodu co przy Copilocie: pytanie kosztuje
+ * DWA żądania u Allegro, więc nie ma prawa wyjść z samego otwarcia ekranu.
+ *
+ * Unieważniamy wyłącznie SPRAWĘ, nie kolejkę: stan przesyłki nie wchodzi do
+ * listy i przeładowanie kolejki byłoby robotą bez skutku widocznego na ekranie.
+ */
+export function useSprawdzPrzesylke() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Bez ciała — i dlatego bez `body`. Pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
+       i gołe „Bad Request" na ekranie; `api()` i jego test pilnują nagłówka. */
+    mutationFn: (v: { id: number }) =>
+      api<StanPrzesylki>(`/api/obsluga/reklamacje/${v.id}/przesylka`, { method: "POST" }),
     onSettled: (_d, _e, v) =>
       qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
   });
