@@ -34,6 +34,101 @@ historii nie przepisujemy.
 ---
 
 
+## 0.394.0 — 18 września 2026
+
+**Notatka biura wchodzi do szukania w trzech kolejkach.** Zgłoszenie
+właściciela: gdy paczka do klienta nie dotarła, zgłaszamy to Allegro i wracamy
+z NUMEREM SPRAWY, który nie ma u nas żadnego własnego pola. Ląduje w notatce —
+i właśnie po nim ktoś potem szuka. Pole szukało po numerze, zamówieniu,
+loginie i prowadzącym, więc po tym numerze nie znajdowało niczego, choć stał
+on na ekranie obok.
+
+- Reklamacje, dyskusje i zwroty: `notatka` dochodzi do uchwytów sprawy, więc
+  fraza trafia też w treść pisaną przez biuro. Reguła iloczynu po członach
+  zostaje bez zmian — notatka jest kolejnym POLEM, nie kolejną regułą.
+- Podpowiedzi w polach mówią o tym wprost, bo funkcja, o której nikt nie wie,
+  jest funkcją, której nie ma.
+- Skrzynki to NIE dotyczy i to nie jest przeoczenie: komentarze rozmowy stoją
+  w osobnej tabeli i nie jadą z listą, więc objęcie ich szukaniem wymaga
+  zmiany po stronie serwera. Osobne wydanie albo osobna decyzja.
+
+Wdrożenie: nic ręką.
+
+---
+
+
+## 0.393.0 — 18 września 2026
+
+**Status przesyłki do klienta i ceny produktów w kolumnie faktów.** Zgłoszenie
+właściciela. Reklamacja o niedostarczeniu zaczyna się od pytania „czy on to
+w ogóle dostał", a reklamacja o zwrot pieniędzy — od pytania „ile zapłacił".
+Kolumna nie umiała odpowiedzieć ani na jedno.
+
+- **Ceny.** Lista pozycji dostaje kwotę i ilość, a pod nią stoją dwa wiersze:
+  `Dostawa` i `Razem`. Dostawa osobno od sumy, bo klient żądający zwrotu pyta
+  czasem właśnie o nią, a sklejenie kazałoby liczyć w głowie.
+- **Paczka.** Nowy wiersz `Przesyłka` z trzema różnymi stanami: „nie pytaliśmy
+  jeszcze", „Allegro nie ma numeru" i numer razem ze statusem przewoźnika.
+  Doręczenie pokazujemy z datą, bo ono zamyka spór o niedostarczenie.
+- **Pytanie na JAWNE kliknięcie**, nigdy przy otwarciu ekranu. Odpowiedź
+  kosztuje dwa żądania u Allegro (`/order/checkout-forms/{id}/shipments`
+  po numer, potem historia trackingu), a zasada „zero zapisu przy patrzeniu"
+  obejmuje też koszt u dostawcy.
+- **Oba ekrany, nie jeden.** Reklamacje i dyskusje dostają to samo, bo dyskusja
+  zwykle POPRZEDZA reklamację — pytanie o paczkę pada tam wcześniej. Stan wpada
+  w kolumny `zamowienie_klienta`, więc pytanie zadane w jednej kolejce widać
+  w drugiej: paczka jest jedna, niezależnie od tego, gdzie siedzi agent.
+- Numeru przesyłki NIE piszemy do `events`: prowadzi do adresu odbiorcy,
+  a `events` nie ma retencji.
+
+Wdrożenie: nic ręką. Pięć kolumn `przesylka_*` dokłada się migracją.
+
+---
+
+
+## 0.392.0 — 18 września 2026
+
+**Trzy zgłoszenia właściciela ze zrzutów, wszystkie o jednym: ekran obsługi
+oddaje miejsce pracy.**
+
+**Tło pracy mieści się w jednym cichym wierszu.** Nad kolejką reklamacji
+i dyskusji stały DWIE karty pełnej szerokości — próg daty i stan
+synchronizacji — czyli około dziewięćdziesięciu pikseli na rzeczy, których
+biuro nie czyta przy każdej sprawie. Nowy `sprawy/PasekTla.tsx` składa je
+w jedną szarą linię z dwiema akcjami.
+
+**ALARM ZOSTAJE GŁOŚNY i to jest cała reguła tego pliku.** Gdy próg chowa
+sprawy z ŻYWYM TERMINEM, gdy synchronizacja stoi albo gdy lista jest
+niekompletna, wracają pełne, kolorowe paski. Schowanie alarmu byłoby kupieniem
+pikseli za pracę, której nikt nie zobaczy — za tę regułę zapłacił próg
+w 0.385.0, a zwroty w 0.339.0.
+
+**Karta Copilota jest domyślnie ZWINIĘTA.** Odradzałem to w 0.389.0: zamknięty
+blok chowa „PRZECZYTAJ SPRAWĘ" za kliknięciem przy każdej nieprzeczytanej
+sprawie. Właściciel zobaczył obie wersje na własnym ekranie i wybrał tę.
+Cena jest mniejsza, niż wyglądała: pamięć z 0.389.0 działa w obie strony, więc
+agent pracujący z Copilotem otwiera blok raz, a nie przy każdej sprawie.
+
+**„Prowadzę tę sprawę" zeszło do ŚRODKOWEJ kolumny**, do paska werdyktu nad
+rozmową (`reklamacje/Prowadzi.tsx`). Kolumna po prawej odpowiada na pytanie
+„co wiemy o tej sprawie" — same fakty do czytania. Wzięcie sprawy jest
+CZYNNOŚCIĄ i należy tam, gdzie stoją pozostałe; przycisk pełnej szerokości
+w kolumnie faktów wyglądał przy tym na ważniejszy od nich wszystkich.
+
+Ten sam ruch w dyskusjach, żeby oba ekrany zostały bliźniacze. W kolumnie
+faktów zostają tagi i notatka: to zapiski O SPRAWIE, nie czynności.
+
+**Skrzynka dostaje ten sam pasek** (decyzja właściciela o ujednoliceniu).
+Mówiła to dotąd DWOMA sposobami w dwóch wierszach: przyciskiem, gdy rozmowa
+niczyja, i metadaną, gdy wzięta. Wspólny jest KSZTAŁT wiersza, nie waga
+przycisku: przejęcie zostaje działaniem głównym, bo nieprzejętą rozmowę piszą
+czasem dwie osoby naraz (0.247.0), a reklamacja po prostu czeka w kolejce.
+
+Skrzynka nie rysuje przy tym „oddaj" i to nie jest przeoczenie:
+`przejmijRozmowe` przypisuje WYŁĄCZNIE rozmowę niczyją, więc taki przycisk
+wołałby zapis, który serwer odbija konfliktem. Rozmowę przekazuje się osobną
+drogą, z powodem.
+
 ## 0.391.0 — 18 września 2026
 
 **Brak w dostawie zdejmuje towar ze sprzedaży.** [wymaga działania]

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ExternalLink, Undo2 } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
+import { zlote } from "../api/zwroty";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
@@ -94,14 +95,22 @@ function Notatka({ dyskusja, trwa, blad, onZapisz, onCofnij }: {
   </div>;
 }
 
-export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCofnijNotatke, tagi }: {
+export function Fakty({
+  szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke, tagi,
+  onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
+}: {
   szczegol: SzczegolDyskusji;
   trwa: boolean;
   bladZapisu: string;
-  onProwadze: () => void;
   onNotatka: (tekst: string) => void;
   /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
   onCofnijNotatke?: () => void;
+  /* Pytanie o paczkę (0.393.0). Opcjonalne tym samym wzorcem co tagi: bez
+     procedury zapytania przycisku nie rysujemy wcale, a nie rysujemy
+     martwego. */
+  onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean;
+  bladPrzesylki?: string;
   /* Opcjonalne tym samym wzorcem co przy reklamacji: czego nie da się zrobić,
      tego nie ma na ekranie. */
   tagi?: {
@@ -145,6 +154,55 @@ export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCof
               <Skopiuj tekst={d.orderId} tytul="Kopiuj numer zamówienia" /></>
           : "dyskusja bez numeru zamówienia"}
       </Wiersz>
+
+      {/* ── CENY I PACZKA (0.393.0) ─────────────────────────────────────────
+          Ten sam blok co w `reklamacje/Dowody.tsx` i stoi tu z tego samego
+          powodu: dyskusja zwykle POPRZEDZA reklamację, więc pytanie „ile on
+          zapłacił" i „czy to w ogóle dostał" pada tu wcześniej, nie później.
+          Dwie kolejki mają odpowiadać jednakowo — doktryna jednej drogi.
+
+          Dostawa osobno od sumy: klient żądający zwrotu pyta czasem właśnie
+          o nią, a sklejenie kazałoby liczyć w głowie. */}
+      {szczegol.zamowienie && <>
+        <ul className="mt-1 space-y-0.5">
+          {szczegol.zamowienie.pozycje.map((p, i) =>
+            <li key={`${p.offerId ?? p.sku ?? i}`}
+              className="flex items-baseline gap-2 rounded bg-slate-50 px-2 py-1 text-xs">
+              <span className="min-w-0 flex-1 truncate">{p.nazwa}</span>
+              <span className="shrink-0 tabular-nums text-slate-600">
+                {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+            </li>)}
+        </ul>
+        <Wiersz etykieta="Dostawa">
+          {zlote(szczegol.zamowienie.dostawaGrosze, szczegol.zamowienie.waluta)}
+          {szczegol.zamowienie.dostawaMetoda &&
+            <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
+        </Wiersz>
+        <Wiersz etykieta="Razem">
+          <b className="tabular-nums">
+            {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
+        </Wiersz>
+      </>}
+
+      {szczegol.przesylka && <Wiersz etykieta="Przesyłka">
+        {szczegol.przesylka.sprawdzonoAt === null
+          ? <span className="text-slate-500">nie pytaliśmy jeszcze Allegro</span>
+          : szczegol.przesylka.waybill === null
+            ? <span className="text-slate-500">Allegro nie ma numeru — paczka
+                jeszcze nienadana albo nadana poza Allegro</span>
+            : <>
+                {szczegol.przesylka.dostarczonoAt
+                  ? <b className="text-ranga-ok">doręczona {czas(szczegol.przesylka.dostarczonoAt)}</b>
+                  : <span>{szczegol.przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
+                <span className="text-slate-500"> · {szczegol.przesylka.przewoznik}{" "}
+                  <span className="font-mono">{szczegol.przesylka.waybill}</span></span>
+              </>}
+        {onSprawdzPrzesylke && <button type="button" disabled={sprawdzaPrzesylke}
+          onClick={onSprawdzPrzesylke}
+          className="ml-2 font-semibold underline underline-offset-2 disabled:opacity-50">
+          {sprawdzaPrzesylke ? "pytam…" : "sprawdź"}</button>}
+        {bladPrzesylki && <p className="text-xs text-red-700">{bladPrzesylki}</p>}
+      </Wiersz>}
     </Sekcja>
 
     {/* Zwroty tego zamówienia — mostkiem jest numer zamówienia, ten sam
@@ -182,12 +240,10 @@ export function Fakty({ szczegol, trwa, bladZapisu, onProwadze, onNotatka, onCof
       </ul>
     </Sekcja>}
 
+    {/* „Prowadzi" zeszło do ŚRODKOWEJ kolumny (0.392.0) — ten sam ruch i ten
+        sam powód co przy reklamacji: wzięcie sprawy jest czynnością, a ta
+        kolumna niesie fakty. Oba ekrany mają zostać bliźniacze. */}
     <Sekcja tytul="Praca biura">
-      <Wiersz etykieta="Prowadzi">{d.prowadzi ?? "nikt"}</Wiersz>
-      {/* ZNACZNIK, nie zamek. Ponowne kliknięcie zdejmuje. */}
-      <Przycisk className="mt-1 w-full" disabled={trwa} onClick={onProwadze}>
-        {d.prowadzi ? "Odłóż sprawę" : "Prowadzę tę sprawę"}
-      </Przycisk>
       {/* Tagi nad notatką — powód przy tej samej sekcji w `reklamacje/Dowody.tsx`. */}
       {tagi && <div className="mt-3">
         <TagiSprawy przypiete={d.tagi} slownik={tagi.slownik} trwa={tagi.trwa}

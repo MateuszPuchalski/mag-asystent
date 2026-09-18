@@ -287,6 +287,22 @@ describe("Ekran zwrotów", () => {
     }
   });
 
+  it("szuka po TREŚCI NOTATKI — numer sprawy Allegro nie ma innego pola (0.394.0)", async () => {
+    /* Zgłoszenie nieodebranej paczki wraca z numerem, dla którego nie mamy
+       własnej kolumny. Biuro pisze go w notatce i potem po nim szuka. */
+    scena.zwroty = [
+      { ...zwrot(1, "decyzja", "ZW-1"), notatka: "zgłoszone do Allegro, sprawa ALG-98765" },
+      { ...zwrot(2, "zwrot", "ZW-2"), notatka: "awizo dwa razy" },
+    ];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "ALG-98765");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally {
+      scena.zwroty = null;
+    }
+  });
+
   it("przewoźnika wolno nazwać tak, jak stoi na naklejce (0.367.0)", async () => {
     /* Na pudle stoi „Paczkomat", a w danych `INPOST`. Bez aliasu człon
        przepisany z naklejki wyglądałby na brak danych, a nie na inną nazwę

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { db } from "../db/db.js";
+import { logEvent } from "../services/events.js";
 import { config } from "../config.js";
 import {
   BladReklamacji, progKolejki, ReklamacjaConflict,
@@ -13,6 +14,7 @@ import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { poprosOZakonczenie } from "../services/dyskusja-zakonczenie.js";
 import { autoryzuj } from "../services/auth.js";
+import { sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { trasyTagowSprawy } from "./tagi.js";
 import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
 
@@ -42,6 +44,8 @@ import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
    nie hali.                                                                  */
 
 const BIURO = ["biuro", "admin"];
+
+const autor = () => sesjaZadania()?.user.name ?? "?";
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();
@@ -86,6 +90,43 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
       stan: stanReklamacjiHealth(db()),
     };
   });
+
+  /* ── GDZIE JEST PACZKA DO KLIENTA (0.393.0) ────────────────────────────────
+     Bliźniak trasy z `routes/reklamacje.ts` i stoi tu z tego samego powodu,
+     dla którego stoi tam: dyskusja o niedostarczonej paczce zaczyna się od
+     pytania „czy on to dostał", a dwie kolejki mają odpowiadać jednakowo.
+     Doktryna jednej drogi mówi wprost: kolejki są NASZE, nie jego.
+
+     Odpowiedź wpada w kolumny `zamowienie_klienta`, więc pytanie zadane
+     z reklamacji widać potem w dyskusji tego samego zamówienia i odwrotnie.
+     To celowe: paczka jest jedna, niezależnie od tego, w której kolejce
+     akurat siedzi agent.
+
+     NA JAWNE KLIKNIĘCIE: dwa żądania u Allegro nie mają prawa wyjść
+     z samego otwarcia ekranu. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/dyskusje/:id/przesylka", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const w = db().prepare(`SELECT z.id AS id FROM reklamacja_klienta r
+        JOIN zamowienie_klienta z ON z.channel_account_id = r.channel_account_id
+          AND z.external_id = r.order_id
+        WHERE r.id = ?`).get(Number(req.params.id)) as { id: number } | undefined;
+      if (!w) {
+        return reply.code(400).send({
+          error: "Zamówienia tej sprawy jeszcze nie pobraliśmy — nie ma czego szukać.",
+        });
+      }
+      logEvent("dyskusja_przesylka_reczna", autor());
+      try {
+        return await sprawdzPrzesylke(db(), w.id);
+      } catch (e) {
+        return reply.code(502).send({ error: (e as Error).message });
+      }
+    });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/dyskusje/:id", async (req, reply) => {
     const nie = odmowa(reply);

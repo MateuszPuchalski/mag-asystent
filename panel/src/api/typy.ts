@@ -299,6 +299,21 @@ export interface MiesiacEskalacji {
   eskalowane: number;
 }
 
+/**
+ * Co wiemy o paczce do klienta (0.393.0).
+ *
+ * `sprawdzonoAt === null` znaczy „jeszcze nie pytaliśmy Allegro", a nie „nie
+ * ma przesyłki" — to dwa różne zdania i dwa różne następne ruchy agenta.
+ */
+export interface StanPrzesylki {
+  waybill: string | null;
+  przewoznik: string | null;
+  /** Kod ostatniego statusu przewoźnika: `IN_TRANSIT`, `DELIVERED`, `ISSUE`… */
+  status: string | null;
+  dostarczonoAt: string | null;
+  sprawdzonoAt: string | null;
+}
+
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
 export interface PrzystanekDrogi {
   rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
@@ -1506,6 +1521,10 @@ export interface SzczegolReklamacji {
      droga zakupu przez kolejki. */
   sprawy: SprawaZakupu[];
   droga: PrzystanekDrogi[];
+  /** Zamówienie z pozycjami i CENAMI (0.393.0); `null` = jeszcze niepobrane. */
+  zamowienie: Zamowienie | null;
+  /** Gdzie jest paczka do klienta (0.393.0); `null` = nie ma zamówienia. */
+  przesylka: StanPrzesylki | null;
   kartoteka: {
     pewnosc: string; twId: number | null; symbol: string | null;
     zrodlo: string | null; powod: string | null;
@@ -1647,6 +1666,10 @@ export interface SzczegolDyskusji {
      droga zakupu przez kolejki. */
   sprawy: SprawaZakupu[];
   droga: PrzystanekDrogi[];
+  /** Zamówienie z pozycjami i cenami (0.393.0). */
+  zamowienie: Zamowienie | null;
+  /** Gdzie jest paczka do klienta (0.393.0). */
+  przesylka: StanPrzesylki | null;
 }
 
 /** Wynik prośby o zakończenie — los próby, nie potwierdzenie zamknięcia. */

@@ -170,6 +170,22 @@ export function urlTrackingu(
   return `${apiUrl}/order/carriers/${encodeURIComponent(carrierId)}/tracking?${filtr}`;
 }
 
+/**
+ * Numery przesyłek zamówienia (0.393.0).
+ *
+ * `GET /order/checkout-forms/{id}/shipments` — „list of parcel tracking
+ * numbers currently assigned to the order". Ładunek samego zamówienia ich NIE
+ * ma: `CheckoutFormDeliveryReference` niesie adres, metodę, koszt i okno
+ * dostawy, ale ani numeru, ani statusu.
+ *
+ * Specyfikacja mówi wprost, że lista bywa uzupełniona przez inne kanały —
+ * Moje Allegro albo samego przewoźnika — więc numer bywa tam nawet wtedy, gdy
+ * nie nadawaliśmy paczki z panelu.
+ */
+export function urlPrzesylekZamowienia(apiUrl: string, orderId: string): string {
+  return `${apiUrl}/order/checkout-forms/${encodeURIComponent(orderId)}/shipments`;
+}
+
 /** Ile zwrotów prosi jedna strona odświeżenia — `maximum` ze schematu `limit`. */
 export const ODSWIEZENIE_NA_STRONE = 1000;
 

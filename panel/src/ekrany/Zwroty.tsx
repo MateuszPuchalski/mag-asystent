@@ -274,8 +274,15 @@ function PasekUwag({ bilans, stan, rozjazdy }: {
  * a w danych `INPOST`.
  */
 const kody = (z: Zwrot) =>
+  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
+     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
+     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
+     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
+     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
+     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
+     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
   [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin, z.waybill,
-    z.odbiorcaNazwa, z.przewoznik, ...aliasy(z.przewoznik)]
+    z.odbiorcaNazwa, z.przewoznik, z.notatka, ...aliasy(z.przewoznik)]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 /**

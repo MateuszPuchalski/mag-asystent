@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare } from "lucide-react";
 import {
   useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
-  useProwadzeDyskusje, useZakoncz, useCofnijNotatkeDyskusji
+  useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -17,11 +17,13 @@ import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekProgu } from "../sprawy/Prog";
+import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
+import { Prowadzi } from "../sprawy/Prowadzi";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
@@ -60,7 +62,14 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
 const kody = (d: Dyskusja) =>
   /* Prowadzący wchodzi do szukania — powód przy tej samej funkcji
      w `ekrany/Reklamacje.tsx`. */
-  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi]
+  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
+     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
+     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
+     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
+     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
+     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
+     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
+  [d.externalId, d.orderId, d.kupujacyLogin, d.temat, d.prowadzi, d.notatka]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 export function Dyskusje() {
@@ -78,6 +87,8 @@ export function Dyskusje() {
   const odepnij = useOdepnijTag();
   const [bladTagu, setBladTagu] = useState("");
   const cofnijNotatke = useCofnijNotatkeDyskusji();
+  const sprawdzPrzesylke = useSprawdzPrzesylkeDyskusji();
+  const [bladPrzesylki, setBladPrzesylki] = useState("");
   const [bladZapisu, setBladZapisu] = useState("");
 
   /* Próg daty ten sam co przy reklamacjach; wybór nie przeżywa zamknięcia
@@ -273,22 +284,33 @@ export function Dyskusje() {
   if (error) return <Blad>{(error as Error).message}</Blad>;
 
   const opis = KUBELKI.find((k) => k.id === kubelek);
+  const alarmTla = tloAlarmuje({
+    prog: data?.prog, zlaSynchronizacja: Boolean(data?.stan && data.stan.status !== "current"),
+  });
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
-    {/* Pasek synchronizacji jest WSPÓLNY z reklamacjami i mówi to wprost —
-        inaczej agent szukałby tu przycisku, którego nie ma, i uznał ekran
-        za zepsuty. */}
-    {data?.stan && <div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1
-      rounded-lg px-3 py-2 text-xs ${data.stan.status !== "current"
-        ? "border border-red-200 bg-red-50 text-red-900"
-        : "border border-slate-200 bg-slate-50 text-slate-600"}`}>
-      <span>Synchronizacja spraw posprzedażowych: <b>{STANY[data.stan.status] ?? data.stan.status}</b>
-        {data.stan.kodOstatniegoBledu ? `, kod ${data.stan.kodOstatniegoBledu}` : ""}</span>
-      <span className="text-slate-500">
-        Dyskusje i reklamacje przyjeżdżają jedną listą — odśwież ją na ekranie reklamacji.
-      </span>
-    </div>}
+    {/* Tło pracy w jednym wierszu, dopóki jest spokój (0.392.0) — ten sam
+        ruch i ten sam powód co na ekranie reklamacji. Przycisku synchronizacji
+        tu NIE MA: obie sprawy przyjeżdżają jedną listą, a drugi przycisk byłby
+        drugim żądaniem o to samo i drugą drogą w limit 429 (§25c.9). */}
+    {alarmTla
+      ? <>
+          {data?.prog && <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} />}
+          {data?.stan && <div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1
+            rounded-lg px-3 py-2 text-xs ${data.stan.status !== "current"
+              ? "border border-red-200 bg-red-50 text-red-900"
+              : "border border-slate-200 bg-slate-50 text-slate-600"}`}>
+            <span>Synchronizacja spraw posprzedażowych: <b>{STANY[data.stan.status] ?? data.stan.status}</b>
+              {data.stan.kodOstatniegoBledu ? `, kod ${data.stan.kodOstatniegoBledu}` : ""}</span>
+            <span className="text-slate-500">
+              Dyskusje i reklamacje przyjeżdżają jedną listą — odśwież ją na ekranie reklamacji.
+            </span>
+          </div>}
+        </>
+      : <PasekTla prog={data?.prog} onPrzelaczProg={setBezProgu}
+          stanTekst={data?.stan
+            ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status} · odświeżasz ją w reklamacjach`
+            : undefined} />}
 
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -331,7 +353,7 @@ export function Dyskusje() {
           <label className="sr-only" htmlFor="szukaj-dyskusji">Szukaj dyskusji</label>
           <input id="szukaj-dyskusji" className="field !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Temat, zamówienie albo login klienta" />
+            placeholder="Temat, zamówienie, login albo treść notatki" />
         </div>
 
         {/* Pytanie kubełka stoi NAD listą, bo to ono zastępuje menu akcji.
@@ -356,6 +378,14 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
         {szczegol.data
           ? <>
+              {/* Kto prowadzi — czynność przy czynnościach (0.392.0). */}
+              <Prowadzi prowadzi={szczegol.data.dyskusja.prowadzi} trwa={prowadze.isPending}
+                onProwadze={() => {
+                  setBladZapisu("");
+                  prowadze.mutate(
+                    { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
+                    { onError: (e) => setBladZapisu((e as Error).message) });
+                }} />
               <div className="mb-3">
                 <Zakonczenie dyskusja={szczegol.data.dyskusja} wysyla={zakoncz.isPending}
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
@@ -383,6 +413,13 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
           ? <Fakty szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+              sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+              bladPrzesylki={bladPrzesylki}
+              onSprawdzPrzesylke={() => {
+                setBladPrzesylki("");
+                sprawdzPrzesylke.mutate({ id: szczegol.data!.dyskusja.id },
+                  { onError: (e) => setBladPrzesylki((e as Error).message) });
+              }}
               onCofnijNotatke={szczegol.data.dyskusja.maPoprzedniaNotatke
                 ? () => {
                   setBladZapisu("");
@@ -410,12 +447,6 @@ export function Dyskusje() {
                   nowyTag.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", nazwa },
                     { onError: (e) => setBladTagu((e as Error).message) });
                 },
-              }}
-              onProwadze={() => {
-                setBladZapisu("");
-                prowadze.mutate(
-                  { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
-                  { onError: (e) => setBladZapisu((e as Error).message) });
               }}
               onNotatka={(tekst) => {
                 setBladZapisu("");

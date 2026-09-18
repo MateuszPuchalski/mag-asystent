@@ -2070,6 +2070,25 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   waluta TEXT NOT NULL DEFAULT 'PLN',
   kupiono_at TEXT,
   zmieniono_at TEXT,
+  -- ── STATUS PRZESYŁKI DO KLIENTA (0.393.0) ────────────────────────────────
+  -- Ładunek zamówienia (`CheckoutFormDeliveryReference`) NIE NIESIE numeru
+  -- przesyłki ani statusu — ma adres, metodę, koszt i okno dostawy. Numery
+  -- stoją pod OSOBNĄ końcówką `GET /order/checkout-forms/{id}/shipments`,
+  -- a status pod tą samą, którą zwroty odpytują od 0.187.0:
+  -- `GET /order/carriers/{carrierId}/tracking?waybill=…`.
+  --
+  -- Dlatego to są kolumny, a nie pola mapowania: przyjeżdżają DWOMA
+  -- dodatkowymi żądaniami, na jawne kliknięcie, a nie z synchronizacją
+  -- zamówień. Zapisujemy WYNIK, nie historię — tak samo jak przy zwrocie.
+  --
+  -- `przesylka_sprawdzono_at` jest po to, żeby ekran umiał odróżnić „jeszcze
+  -- nie pytaliśmy" od „pytaliśmy i Allegro nic nie ma". To dwa różne zdania
+  -- i dwa różne następne ruchy agenta — blizna 0.283.0 w innym miejscu.
+  przesylka_waybill TEXT,
+  przesylka_przewoznik TEXT,
+  przesylka_status TEXT,
+  przesylka_dostarczono_at TEXT,
+  przesylka_sprawdzono_at TEXT,
   synced_at TEXT NOT NULL,
   UNIQUE (channel_account_id, external_id)
 );
