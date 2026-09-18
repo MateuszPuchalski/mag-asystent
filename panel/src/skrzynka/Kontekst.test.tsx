@@ -26,6 +26,12 @@ vi.mock("./ZamowieniaKlienta", () => ({
 vi.mock("./Dobor", () => ({
   Dobor: () => <div data-testid="dobor">blok doboru</div>,
 }));
+/* Pasmo odpowiedzi (0.404.0) woła kartotekę z Subiekta, a ten plik nie stawia
+   klienta TanStacka — pilnuje UKŁADU kolumny. Własne testy pasmo ma
+   w `PasmoOdpowiedzi.test.tsx`; tutaj sprawdzamy tylko, że stoi NAD zakładkami. */
+vi.mock("./PasmoOdpowiedzi", () => ({
+  PasmoOdpowiedzi: () => <div data-testid="pasmo">pasmo odpowiedzi</div>,
+}));
 
 const { Kontekst } = await import("./Kontekst");
 

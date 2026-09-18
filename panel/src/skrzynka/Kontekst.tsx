@@ -11,6 +11,7 @@ import { TowarRozmowy } from "./TowarRozmowy";
 import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
 import { Wiedza } from "./Wiedza";
+import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
 import type { Towar } from "../wyszukiwarka";
 
 /**
@@ -78,6 +79,12 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
   const kilkaPozycji = pozycji > 1 ? pozycji : 0;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
+    {/* ── PASMO ODPOWIEDZI NAD ZAKŁADKAMI (0.404.0) ───────────────────────────
+        Trzy fakty, które rozstrzygają odpowiedź, stoją PRZED wyborem zakładki
+        i zostają przy każdej z nich. Uzasadnienie i granice — czemu trzy, a nie
+        pięć, i czemu wiersz bez wartości nie staje — w `PasmoOdpowiedzi.tsx`. */}
+    <PasmoOdpowiedzi dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />
+
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
       { klucz: "towar", etykieta: "Oferta i towar" },
       { klucz: "dobor", etykieta: "Dobór" },
@@ -123,8 +130,9 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
         <SprawyZakupu sprawy={dane.sprawy} />
         <DrogaZakupu droga={dane.droga} tutaj={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
         {oferta
-          ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
-              onWstawDoSzkicu={onWstawDoSzkicu} />
+          /* Wstawki tu NIE MA od 0.404.0 — zeszła do pasma odpowiedzi
+             nad zakładkami, gdzie nie trzeba po nią przewijać kolumny. */
+          ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
           /* Bez numeru oferty nie ma z czego wywieść kartoteki. Ekran mówi to
              wprost, zamiast pokazywać pustą sekcję. */
           : <p className="flex items-start gap-2 border-t p-4 text-sm text-slate-500">

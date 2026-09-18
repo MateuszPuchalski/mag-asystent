@@ -152,7 +152,22 @@ export function Edytor({
           {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
               wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
               choć agent spędza w nim najwięcej czasu z całego panelu. */}
-          <textarea className="field min-h-[88px] text-tresc" value={szkic}
+          {/* ── 88 PIKSELI TO BYŁO ZA MAŁO (0.404.0) ─────────────────────────
+              Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania
+              pytań". Zmierzone na tamtym ekranie: pole 88 px, a PUSTKA tuż nad
+              nim 220 px. Ekran oddawał dwa i pół raza więcej miejsca niczemu
+              niż jedynej czynności, po którą agent do tej kolumny przychodzi.
+
+              Bierze 200 px na stałe, a nie rozpycha się elastycznie do wolnego
+              miejsca — i to jest świadome. Oś jest `flex-1`, edytor `shrink-0`;
+              odwrócenie tego oddałoby edytorowi całą nadwyżkę także przy
+              DŁUGIM wątku, a wtedy rozmowa zwija się do `min-h-40`. Tę ranę
+              repo ma już opatrzoną w 0.232.1 i nie otwieram jej ponownie.
+              Cena stałej wysokości: przy długim wątku oś traci 112 px — ale
+              oś się przewija, a pole do pisania nie.
+
+              `resize-y`: kto pisze dłuższą odpowiedź, rozciąga pole sam. */}
+          <textarea className="field min-h-[200px] resize-y text-tresc" value={szkic}
             aria-label="Szkic odpowiedzi"
             onChange={(e) => onZmiana(e.target.value)}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />

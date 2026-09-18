@@ -153,16 +153,22 @@ describe("towar przy rozmowie", () => {
   });
 
   /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka
-     parametrów wybiera pola świadomie, bo szkic idzie do klienta. */
+     parametrów wybiera pola świadomie, bo szkic idzie do klienta.
+
+     Od 0.404.0 ta sekcja nie ma ŻADNEJ wstawki: parametry przeniosły się do
+     pasma odpowiedzi nad zakładkami (`PasmoOdpowiedzi.tsx`), bo przycisk po
+     sześciu sekcjach przewijania stał poza zasięgiem wzroku. Test pilnuje
+     tego, co pilnował: opisu nie da się wstawić jednym kliknięciem — a teraz
+     nie da się stąd wstawić niczego. */
   it("opisu NIE da się wstawić do szkicu jednym kliknięciem", () => {
     karta.mockReturnValue({
       isLoading: false, error: null,
       data: { ...PELNA, desc: "Gwint M41 x 1,5. UWAGA: ostatnia sztuka z reklamacji." },
     });
-    render(<TowarRozmowy rozmowaId={1} onWstawDoSzkicu={() => {}} oferta={oferta({
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
       pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
     })} />);
-    expect(screen.getAllByRole("button", { name: /wstaw|szkic/i }).length).toBe(1);
+    expect(screen.queryAllByRole("button", { name: /wstaw|szkic/i })).toHaveLength(0);
   });
 
   /* ── Pasowania część↔część (0.230.0) ───────────────────────────────────
