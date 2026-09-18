@@ -34,11 +34,9 @@ import { Kafel } from "../towar/Kafel";
  * z Subiekta, a podpis przy kartotece mówi, czy stoi za nią SKU z Allegro,
  * czy decyzja człowieka.
  */
-export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
+export function TowarRozmowy({ oferta, rozmowaId }: {
   oferta: OfertaRozmowy;
   rozmowaId: number;
-  /** Wstawka do szkicu. Opcjonalna: blok bywa też oglądany bez edytora obok. */
-  onWstawDoSzkicu?: (tresc: string) => void;
 }) {
   const [szukam, setSzukam] = useState(false);
   const zapisz = useWskazKartoteke();
@@ -110,13 +108,18 @@ export function TowarRozmowy({ oferta, rozmowaId, onWstawDoSzkicu }: {
                 w Doborze (z pracy) albo w Wiedza → Sprawdź kartotekę. */}
             {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
             <OpisKartoteki desc={karta.data.desc} />
-            {/* Przycisk stoi POD tabelą, nie nad nią: agent najpierw sprawdza,
-                czy to ta kartoteka, a dopiero potem przepisuje ją do odpowiedzi.
-                Nad tabelą zapraszałby do wstawienia czegoś nieprzeczytanego. */}
-            {onWstawDoSzkicu && <button type="button"
-              onClick={() => onWstawDoSzkicu(parametryDoSzkicu(karta.data!))}
-              className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
-              Wstaw parametry do szkicu</button>}
+            {/* ── WSTAWKA ZESZŁA NA GÓRĘ KOLUMNY (0.404.0) ────────────────────
+                Stała TUTAJ, pod tabelą, i argument za tym miejscem był dobry:
+                agent najpierw sprawdza, czy to ta kartoteka, a dopiero potem
+                przepisuje ją do odpowiedzi. Zepsuła to WYSOKOŚĆ kolumny —
+                przycisk leżał po sześciu sekcjach, około dziewięciuset pikseli
+                w dół, w kolumnie innej niż pole do pisania.
+
+                Pasmo odpowiedzi (`PasmoOdpowiedzi.tsx`) spełnia tamten warunek
+                mocniej: „to jest" i „mamy" stoją bezpośrednio NAD przyciskiem,
+                bez przewijania. Wstawia dokładnie to samo. Drugiego przycisku
+                tu nie ma i nie będzie — dwoje drzwi do jednego pola to ta sama
+                usterka, którą to wydanie naprawia. */}
           </>}
         </>
       : <div className="text-xs">

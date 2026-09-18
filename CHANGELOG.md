@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.404.0 — 18 września 2026
+
+**Skrzynka przestaje oddawać pustce więcej miejsca niż pisaniu.** Zgłoszenie
+właściciela ze zrzutem całego ekranu. Zmierzone na nim: pole odpowiedzi ma
+88 px, a pustka bezpośrednio nad nim 220. Ekran dawał dwa i pół raza więcej
+miejsca niczemu niż jedynej czynności, po którą agent do tej kolumny przychodzi.
+
+- **Pole odpowiedzi rośnie z 88 na 200 px** i daje się rozciągnąć myszą.
+  Bierze stałą wysokość, a nie rozpycha się elastycznie: odwrócenie proporcji
+  oddałoby edytorowi nadwyżkę także przy długim wątku, a wtedy rozmowa zwija
+  się do minimum — tę ranę repo ma opatrzoną w 0.232.1.
+- **Pasmo odpowiedzi nad zakładkami prawej kolumny.** Trzy fakty, które
+  rozstrzygają odpowiedź: co klient zamówił, czym to jest u nas i czy to mamy.
+  Stoi przed wyborem zakładki i zostaje przy każdej z nich. Wiersz, którego nie
+  ma z czego złożyć, nie staje wcale.
+- **Wstawka parametrów do szkicu zeszła na górę kolumny.** Leżała pod tabelą
+  Subiekta, po sześciu sekcjach przewijania, w kolumnie innej niż pole do
+  pisania. Wstawia dokładnie to samo; drugiego przycisku pod tabelą nie ma.
+- Pasmo mówi wyłącznie o kartotece POTWIERDZONEJ. Propozycja zostaje
+  propozycją z przyciskiem w sekcji niżej.
+
 ## 0.403.0 — 18 września 2026
 
 **Prawa kolumna reklamacji przestaje ważyć wszystko tak samo.** Druga połowa
