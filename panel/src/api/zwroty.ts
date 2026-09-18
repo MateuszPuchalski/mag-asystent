@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -62,6 +62,10 @@ export function useZwrot(id: number | null) {
       /* Wiersze paragonu — materiał do RĘCZNEGO składu (0.336.0). Jeden raz na
          zwrot, bo dokument jest jeden. */
       wierszeDokumentu: WierszDokumentu[];
+      /* Spoiwo kolejek (S1 i S3): reklamacje i dyskusje tego zakupu oraz jego
+         droga. Tylko w szczególe — powód ten sam, co przy składach wyżej. */
+      sprawy: SprawaZakupu[];
+      droga: PrzystanekDrogi[];
     }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,

@@ -34,6 +34,84 @@ historii nie przepisujemy.
 ---
 
 
+## 0.387.0 — 17 września 2026
+
+**Spoiwo czterech kolejek: pięć kroków z sześciu, bez ani jednej nowej tabeli.**
+Dekalog z 0.386.0 nazwał siedem brakujących wiązań między skrzynką, zwrotami,
+reklamacjami i dyskusjami. To wydanie je domyka.
+
+**Nowy `services/droga-klienta.ts`** wiąże wszystko po numerze zamówienia —
+po loginie kupującego wiązać nie wolno (blizna 0.56.6). Zero żądań do Allegro:
+dane leżą w bazie od pierwszej synchronizacji.
+
+**S1 — kontekst posprzedażowy w czterech kolejkach.** Rozmowa i zwrot widzą
+reklamacje oraz dyskusje tego zakupu, a sprawa posprzedażowa — swoje
+rodzeństwo bez siebie samej. Agent pisał odpowiedź, nie wiedząc, że klient ma
+u nas otwartą reklamację z zegarem ustawowym. Blok na ekranie jest JEDEN dla
+czterech kolejek (`panel/src/sprawy/Spoiwo.tsx`).
+
+**S2 — historia klienta kompletna.** Zakładka KLIENT dostaje zwroty,
+reklamacje i dyskusje. Obiecywała historię, a znała zakupy i rozmowy, więc
+mówiła „nic się nie działo" o kliencie, który miesiąc wcześniej odesłał towar.
+
+**S3 — przeskok jako ODCZYT, nie zapis.** Droga zakupu przez kolejki wylicza
+się z momentów otwarcia, które i tak leżą w bazie. Zdarzenie dopisywane przy
+synchronizacji byłoby drugą prawdą o tym samym fakcie.
+
+**S4 — jedno „Moje" ponad kolejkami** (`/obsluga/moje`). Sita „Moje" były trzy
+i każde trzeba było odwiedzić osobno. **Zwrotu na liście nie ma i to poprawka
+do projektu:** właściciel zdjął ze zwrotu znacznik prowadzącego w 0.370.0.
+Kolejność ma dwa piętra — najpierw termin, potem ostatni ruch; jedno pole na
+oba zegary to blizna 0.121.0.
+
+**S5 — miara eskalacji** za zębatką. Ile zakupów z rozmową skończyło się
+dyskusją albo reklamacją. Kolejka pusta przy rosnącej eskalacji jest miarą,
+która kłamie, a biuro nie miało tej liczby wcale. Bez osi osobowej, celowo:
+to byłaby ocena pracownika liczona z cudzej decyzji.
+
+**S6 — zamknięcie sprawy klienta — czeka na właściciela.** Kodem tego nie da
+się rozstrzygnąć, a droga z S3 jest materiałem do tej decyzji.
+
+**Przy okazji jedna lista zeszła z dwóch miejsc do jednego.** `STATUSY_KONCOWE`
+mieszkało w `reklamacje.ts` z komentarzem bojącym się trzeciej kopii; stoi
+teraz w `services/statusy-spraw.ts`, z testem pilnującym rzeczy najważniejszej:
+status NIEZNANY zostaje otwarty, bo nowy schemat Allegro to nie koniec sprawy.
+
+Strażnik warunku na `typ` (`dyskusje.test.ts`) dostaje piąty plik. Nowy serwis
+czyta obie kolejki CELOWO — o przejściu dyskusja → reklamacja nie da się
+opowiedzieć, pytając o jeden rodzaj — więc zwolnienia stoją jawnie przy
+zapytaniach, ze zdaniem powodu.
+
+## 0.386.0 — 17 września 2026
+
+**Obsługa klienta dostaje dekalog całej drogi, nie czwartej kolejki.**
+Panel prowadzi cztery kolejki — skrzynkę, zwroty, reklamacje i dyskusje —
+a klient ma jedną sprawę i przechodzi przez nie po kolei. Przegląd źródeł
+pokazał, że mostek po numerze zamówienia istnieje, ale przechodzi po nim pięć
+ekranów z dwunastu możliwych. Żaden ekran nie widzi sprawy POSPRZEDAŻOWEJ:
+agent odpowiadający na pytanie nie wie, że ten sam klient ma otwartą
+reklamację. Historia klienta (`services/klient-historia.ts`) składa oś
+z zakupów i rozmów, a trzy kolejki z czterech pomija.
+
+Nowy `docs/obsluga-klienta-calosc.md` jest trzecim dokumentem obsługi
+i ma jedno zadanie: reguły MIĘDZY kolejkami. Rejestr decyzji zostaje
+w `obsluga-klienta.md`, projekt ekranu w `panel-obslugi-klienta.md`.
+Plik niesie dziesięć reguł, tabelę pięciu zbudowanych wiązań i siedmiu
+brakujących, plan spoiwa w sześciu krokach oraz mapę dwudziestu sytuacji
+klienta z nazwaną dziurą przy każdej.
+
+Dwie dziury są większe od reszty: **wymiana towaru na inny nie ma w aplikacji
+żadnego miejsca**, a sprawa spoza Allegro — telefon, e-mail — także nie.
+Obie są decyzją właściciela, nie zadaniem do wzięcia.
+
+Przy okazji dwie poprawki faktów. `CLAUDE.md` dostaje regułę obsługi klienta
+obok reguły ergonomii magazynu. Wiersz „Tagi przy zwrocie" w §28 projektu
+panelu twierdził „działa od 0.315.0", a tabela `zwrot_tag_sprawy` zeszła
+w 0.370.0 — teraz wiersz mówi to wprost.
+
+Kodu to wydanie nie zmienia. Kroki spoiwa czekają na decyzję właściciela,
+bo pierwszy z nich dotyka czterech ekranów naraz.
+
 ## 0.384.1 — 17 września 2026
 
 **Odmowa ZW: hipoteza o kwocie przelewu upada, sonda mierzy dwie następne.**

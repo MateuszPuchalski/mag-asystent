@@ -37,6 +37,11 @@ DOCS = [
     "docs/analiza-rozkladanie.md",
     "docs/subiekt-gt-edu-setup.md",
     "docs/subiekt-gt-struktura.md",
+    # Dekalog obsługi klienta: ten sam powód co przy dekalogu ergonomii.
+    # Czyta go człowiek PRZED zmianą, żeby rozstrzygnąć spór o kształt drogi
+    # klienta przez cztery kolejki. Zdanie na trzy linijki przekonuje tam tyle,
+    # co reguła bez zakresu.
+    "docs/obsluga-klienta-calosc.md",
     # Dekalog ergonomii: czyta go człowiek przed zmianą ekranu i po niej.
     # Dokument o dyscyplinie, który sam łamie limit zdania, przekonuje tyle,
     # co komentarz „zgodnie z wersją monorepo".

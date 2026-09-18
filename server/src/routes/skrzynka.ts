@@ -26,6 +26,7 @@ import { dolaczRozmowe, listaSpraw, odlaczRozmowe, utworzSprawe } from "../servi
 import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
 import { kandydaciDoboru } from "../services/kandydaci.js";
 import { historiaKlienta } from "../services/klient-historia.js";
+import { mojeSprawy } from "../services/droga-klienta.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -47,6 +48,20 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     ? reply.code(409).send({ error: e.message, ...e.details }) : blad(reply, e);
   app.get("/api/obsluga/rozmowy", async (_req, reply) =>
     odmowa(reply) ?? { rozmowy: listaRozmow(), stan: stanSkrzynki() });
+
+  /* JEDNO „MOJE" PONAD KOLEJKAMI (S4 spoiwa, `docs/obsluga-klienta-calosc.md`).
+     Sita „Moje" były trzy i każde trzeba było odwiedzić osobno, więc sprawa
+     z terminem w innej kolejce czekała, aż ktoś tam zajrzy.
+
+     ODCZYT, bez zapisu — ta sama umowa co przy reszcie skrzynki. Trasa stoi
+     tutaj, a nie w ustawieniach, bo to jest praca bieżąca, nie raport.
+     Tożsamość bierze z SESJI: `?userId=` pozwalałby czytać cudzą listę pracy,
+     a to monitoring pracowniczy pod inną nazwą. */
+  app.get("/api/obsluga/moje", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    return { sprawy: mojeSprawy(db(), sesjaZadania()!.user.userId) };
+  });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id", async (req, reply) => {
     const nie = odmowa(reply);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Settings } from "lucide-react";
 import {
-  usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat, useZdrowie,
+  useEskalacja, usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat, useZdrowie,
 } from "../api/rozmowy";
 import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { Karta } from "../ui";
@@ -10,6 +10,7 @@ import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
 import { SkutecznoscDoboru } from "../ustawienia/SkutecznoscDoboru";
+import { Eskalacja } from "../ustawienia/Eskalacja";
 import { WiedzaAutomat } from "../ustawienia/WiedzaAutomat";
 import { SlownikTagow } from "../ustawienia/SlownikTagow";
 import { useTagi, useZmienTag } from "../api/tagi";
@@ -45,6 +46,7 @@ export function Ustawienia() {
      przełączenie ma pobrać inne dane, a nie przemalować te same. */
   const [dniDoboru, setDniDoboru] = useState(30);
   const skutecznosc = useSkutecznoscDoboru(dniDoboru);
+  const eskalacja = useEskalacja();
   const automat = useWiedzaAutomat();
   const tagi = useTagi();
   const zmienTag = useZmienTag();
@@ -70,6 +72,9 @@ export function Ustawienia() {
     <WiedzaAutomat wpisy={automat.data} />
     <PomiarCopilota dane={pomiar.data} />
     <SkutecznoscDoboru dane={skutecznosc.data} dni={dniDoboru} onDni={setDniDoboru} />
+    {/* Eskalacja POD skutecznością doboru: tamta mierzy naszą pracę, ta jej
+        skutek u klienta. Razem odpowiadają na pytanie „czy to działa". */}
+    <Eskalacja miesiace={eskalacja.data?.miesiace} />
     <SlownikTagow tagi={tagi.data?.tagi ?? []} trwa={zmienTag.isPending} blad={bladTagu}
       onNazwa={(tagId, nazwa) => {
         setBladTagu("");

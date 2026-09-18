@@ -5,6 +5,7 @@ import { Pusto, Zakladki } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
+import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { TowarRozmowy } from "./TowarRozmowy";
 import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
@@ -107,6 +108,11 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
         {/* Zwrot POD zamówieniem, bo to zwrot tego zakupu (0.221.0). Jeden
             zakup miewa kilka zwrotów, stąd lista. */}
         {dane.zwroty.map((z) => <ZwrotRozmowy key={z.id} zwrot={z} />)}
+        {/* Reklamacje i dyskusje tego zakupu (S1 spoiwa). Do 0.386.0 agent
+            pisał odpowiedź, nie widząc, że klient ma u nas otwartą reklamację
+            o ten sam towar — a ta ma zegar, którego pytanie nie ma. */}
+        <SprawyZakupu sprawy={dane.sprawy} />
+        <DrogaZakupu droga={dane.droga} tutaj={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
         {oferta
           ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
               onWstawDoSzkicu={onWstawDoSzkicu} />

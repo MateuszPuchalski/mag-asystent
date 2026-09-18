@@ -87,7 +87,7 @@ vi.mock("../api/dyskusje", async () => {
       data: id === null ? undefined : {
         dyskusja: DYSKUSJE.find((d) => d.id === id) ?? DYSKUSJE[0],
         czat: scena.czat,
-        zalaczniki: [], zwroty: [], rozmowy: [],
+        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
       },
     }),
     useProwadzeDyskusje: mutacja("prowadze"),

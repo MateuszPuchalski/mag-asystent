@@ -904,6 +904,7 @@ export function Zwroty() {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
+            sprawy={szczegol.data?.sprawy ?? []} droga={szczegol.data?.droga ?? []}
             trwaNotatka={notatka.isPending || cofnijNotatke.isPending}
             bladNotatki={bladNotatki}
             onNotatka={(tekst) => {

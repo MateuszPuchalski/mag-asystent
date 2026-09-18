@@ -223,6 +223,11 @@ test("STRAŻNIK ŹRÓDŁA: każde sięgnięcie do tabeli spraw wie, o który rod
      to brak zwolnienia. */
   const PLIKI = [
     "dyskusje.ts", "reklamacje.ts", "reklamacja-werdykt.ts", "reklamacje-wysylka.ts",
+    /* Piąty plik od S1 spoiwa. Czyta tabelę CELOWO bez warunku na typ, bo
+       o przejściu dyskusja → reklamacja nie da się opowiedzieć, pytając
+       o jeden rodzaj. Wchodzi tu właśnie dlatego: zwolnienie ma być widoczne
+       w strażniku, a nie polegać na tym, że plik go nie obejmuje. */
+    "droga-klienta.ts",
   ];
   let sprawdzonych = 0;
   for (const plik of PLIKI) {

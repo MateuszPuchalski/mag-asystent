@@ -48,6 +48,9 @@ vi.mock("../api/rozmowy", async () => {
        ekranu, a treść karty ma własny. Atrapa MUSI tu być — bez niej hook
        idzie po dane naprawdę i przewraca cały plik na braku QueryClienta. */
     useWiedzaAutomat: () => ({ data: [] }),
+    /* Eskalacja (S5 spoiwa) — atrapa z tego samego powodu, co wyżej: bez niej
+       hook idzie po dane naprawdę i przewraca plik na braku QueryClienta. */
+    useEskalacja: () => ({ data: { miesiace: [] } }),
     /* Skuteczność doboru (0.267.0): jedenaście dróg i dziewięć statusów, bo
        karta wypisuje je co do jednego — także te z zerem. */
     useSkutecznoscDoboru: () => ({

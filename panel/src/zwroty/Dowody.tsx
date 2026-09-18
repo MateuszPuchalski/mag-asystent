@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw,
+  CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw, Scale,
   ShoppingCart, UserCheck,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
-import type { KandydatFaktury, PozycjaZwrotu, WpisOsiZwrotu, Zwrot } from "../api/typy";
+import type { KandydatFaktury, PozycjaZwrotu, PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot }
+  from "../api/typy";
 import { Os } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
@@ -12,6 +13,7 @@ import { czas, NaglowekSekcji, Plakietka, Przycisk, Skopiuj } from "../ui";
 import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
+import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
    Akcji tu nie ma — te stoją w pasku werdyktu i mają być jedynym miejscem,
@@ -143,7 +145,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
 }
 
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
-  fakturaBlad = "", onFaktura, os = [],
+  fakturaBlad = "", onFaktura, os = [], sprawy = [], droga = [],
   trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
   }: {
   zwrot: Zwrot;
@@ -154,6 +156,10 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   onFaktura?: (dokId: number | null) => void;
   /** Przebieg sprawy (0.313.0); pusta lista nie rysuje sekcji. */
   os?: WpisOsiZwrotu[];
+  /* Spoiwo kolejek (S1 i S3). Domyślnie puste, bo kolumna bywa rysowana bez
+     szczegółu — a wtedy pusta lista po prostu nie rysuje sekcji. */
+  sprawy?: SprawaZakupu[];
+  droga?: PrzystanekDrogi[];
   trwaNotatka?: boolean;
   bladNotatki?: string;
   /** Brak = kolumna notatki nie pokazuje (pole bez zapisu kłamie). */
@@ -380,6 +386,19 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         o sprawie. Dekalog p. 2: na wierzchu to, co rozstrzyga bieżącą
         czynność. Że wiadomości bywają, mówi dokumentacja i ta sekcja wtedy,
         gdy naprawdę są. */}
+    {/* Reklamacje i dyskusje tego zakupu (S1 spoiwa). Zwrot widział rozmowy
+        od 0.169.0, a spraw posprzedażowych nie widział wcale — biuro oddawało
+        pieniądze, nie wiedząc o otwartej reklamacji o ten sam towar. */}
+    {sprawy.length > 0 &&
+    <Sekcja ikona={<Scale size={14} />} tytul="Sprawy tego zakupu">
+      <SprawyZakupu sprawy={sprawy} />
+    </Sekcja>}
+
+    {droga.length > 1 &&
+    <Sekcja ikona={<MessageSquare size={14} />} tytul="Droga tego zakupu">
+      <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} />
+    </Sekcja>}
+
     {zwrot.rozmowy.length > 0 &&
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
       {<ul className="space-y-1">

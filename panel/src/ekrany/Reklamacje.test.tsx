@@ -108,7 +108,7 @@ vi.mock("../api/reklamacje", async () => {
       data: id === null ? undefined : {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
-        zalaczniki: [], zwroty: [], rozmowy: [], kartoteka: null,
+        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
       },
     }),
     /* Wysyłka ma WŁASNY podrabiacz, bo jako jedyna oddaje sterowanie z

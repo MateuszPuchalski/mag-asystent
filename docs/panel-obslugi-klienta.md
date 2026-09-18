@@ -5262,6 +5262,11 @@ poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
 ## 27. Zasady nadrzędne
 
+Te dwanaście punktów mówi o JEDNEJ rozmowie i jednej sprawie. Reguły
+obowiązujące MIĘDZY czterema kolejkami stoją osobno, w dekalogu
+`docs/obsluga-klienta-calosc.md`. Tamten plik niesie też mapę możliwości
+i plan spoiwa; ten rozdział zostaje bez zmian.
+
 1. Najpierw dane i dowody, potem automatyzacja.
 2. Człowiek wysyła odpowiedź do klienta.
 3. Automat nie jest źródłem kompatybilności.
@@ -5404,7 +5409,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Notatka biura przy zwrocie z cofnięciem | **działa** od 0.313.0 | `zapiszNotatkeZwrotu`, `cofnijNotatkeZwrotu`, kolumny `notatka_*`; wolno ją dopisać przy zwrocie zamkniętym |
 | Rozjazdy rekoncyliacji w panelu obsługi | **działa** od 0.313.0 | `GET /api/obsluga/zwroty/rozjazdy` — cztery kontrole zwrotów, bez reszty hali; od 0.319.0 pasek liczy rodzajami, a numery pokazuje po kliknięciu |
 | Prowadzący zwrot i sito „Moje"/„Niczyje" | **działa** od 0.315.0 | `stempelProwadziZwrot`, kolumny `prowadzi_*`; `panel/src/sprawy/Moje.tsx` bez zmian, klawisze `m` i `n` |
-| Tagi przy zwrocie | **działa** od 0.315.0 | `zwrot_tag_sprawy` + wspólny słownik `reklamacja_tag`; oś tagów jako parametr serwisu (`TAGI_ZWROTU`) |
+| Tagi przy zwrocie | **zdjęte** w 0.370.0 | działały od 0.315.0; tabela `zwrot_tag_sprawy` zeszła razem z osią, mechanizm `OsTagow` został przy reklamacjach i dyskusjach |
 | Klawisze kubełka z §25a.2 | **działa** od 0.284.0 | nasłuch w `panel/src/ekrany/Zwroty.tsx`, rejestr akcji w `zwroty/klawisze.ts`, pasek `sprawy/Skroty.tsx`; do 0.283.0 litery stały przy przyciskach jako podpowiedzi bez nasłuchu |
 | Ocena wszystkich pozycji hurtem | **działa** od 0.284.0 | `Shift+S` i przycisk przy więcej niż jednej nieocenionej pozycji; po kolei, z wersją z poprzedniego zapisu |
 | Kupujący, przewoźnik, płatność i rodzaj dokumentu | **działa** od 0.169.0 | `zwrot_klienta.kupujacy_login`, `zamowienie_klienta.platnosc_typ` |
@@ -5455,4 +5460,10 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
+| Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji |
+| Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
+| Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
+| Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania |
+| Miara eskalacji po rozmowie | **działa** od 0.387.0 | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |
+| Statusy końcowe sprawy w jednym pliku | **działa** od 0.387.0 | `services/statusy-spraw.ts`; status nieznany zostaje OTWARTY |
 | Raport sondy w repo | **działa** od 0.164.0 | `docs/allegro-sonda.md`, obserwacja z 2 września |

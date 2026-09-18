@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, BookMarked, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
+import { AtSign, BookMarked, Briefcase, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, token, wyczyscToken } from "./api/klient";
 import { useWzmianki, useZdrowie } from "./api/rozmowy";
 import { useKolejkaWiedzy } from "./api/wiedza";
@@ -14,6 +14,7 @@ import { Reklamacje } from "./ekrany/Reklamacje";
 import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { Wzmianki } from "./ekrany/Wzmianki";
+import { Moje } from "./ekrany/Moje";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import "./index.css";
@@ -50,6 +51,11 @@ const ZAKLADKI = [
      dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
      rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
   { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false },
+  /* JEDNO „MOJE" PONAD KOLEJKAMI (S4 spoiwa). Sita „Moje" były trzy i każde
+     trzeba było odwiedzić osobno — sprawa z terminem w kolejce, do której
+     agent nie zaglądał, czekała aż ktoś tam zajrzy. Zakładka stoi obok
+     Wzmianek, bo odpowiada na to samo pytanie: co czeka na MNIE. */
+  { do: "/obsluga/moje", etykieta: "Moje", ikona: <Briefcase size={16} />, korzen: false },
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
 ];
@@ -215,6 +221,7 @@ function App() {
         <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
     <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
     <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
+        <Route path="/obsluga/moje" element={<Moje />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić

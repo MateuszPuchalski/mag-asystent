@@ -31,7 +31,17 @@ export interface MaszynaKlienta {
 }
 
 export interface WpisHistorii {
-  rodzaj: "zakup" | "rozmowa";
+  /* ── Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`) ────
+     Zakładka obiecywała HISTORIĘ KLIENTA, a pokazywała jej połowę: zakupy
+     i rozmowy. Zwrot, reklamacja i dyskusja tego samego kupującego leżały
+     w bazie i nie docierały tu wcale, więc agent czytał „nic się nie działo"
+     o kliencie, który miesiąc temu odesłał towar.
+
+     Wiązanie idzie po LOGINIE, bo to oś tej zakładki — i wolno tak wyłącznie
+     dlatego, że zwrot i sprawa niosą `kupujacy_login` wprost z Allegro. Przy
+     rozmowach ten sam ruch byłby błędem: `conversation` loginu nie trzyma,
+     a rozmówca bywa zamaskowany (blizna 0.56.6). */
+  rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
   at: string;
   /** Zdanie na oś: „Zakup szarpaka SZR-148/82" albo temat rozmowy. */
   tresc: string;
@@ -40,6 +50,11 @@ export interface WpisHistorii {
   link: string | null;
   /** Rozmowa, do której wpis prowadzi; przy zakupie `null`. */
   rozmowaId: number | null;
+  /**
+   * Identyfikator sprawy albo zwrotu u NAS — po nim panel buduje odnośnik
+   * do właściwej kolejki. `null` przy zakupie i rozmowie.
+   */
+  sprawaId: number | null;
 }
 
 export interface HistoriaKlienta {
@@ -107,6 +122,22 @@ export function historiaKlienta(
      WHERE k.channel_account_id = ? AND k.kupujacy_login = ?
      ORDER BY k.kupiono_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
+  /* Zwroty i sprawy posprzedażowe tego kupującego (S2 spoiwa). Oba niosą
+     `kupujacy_login` z Allegro, więc konto plus login wystarczają — tak samo
+     jak przy zakupach wyżej. Zamówienia w warunku NIE MA celowo: klient bywa
+     u nas z kilkoma zakupami, a zakładka odpowiada na pytanie „czy ten klient
+     już u nas był", nie „co z tą paczką". */
+  const zwroty = database.prepare(`
+    SELECT id, reference_number, order_id, created_at FROM zwrot_klienta
+     WHERE channel_account_id = ? AND kupujacy_login = ?
+     ORDER BY created_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
+
+  const sprawy = database.prepare(`
+    SELECT id, typ, reference_number, temat, order_id, otwarto_at
+      FROM reklamacja_klienta
+     WHERE channel_account_id = ? AND kupujacy_login = ?
+     ORDER BY otwarto_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
+
   /* Maszyny: dobory domknięte w rozmowach tego klienta. `marka` I `model`
      muszą stać oba — sama marka nie nazywa maszyny. */
   const idRozmow = rozmowyKlienta.map((r) => Number(r.id));
@@ -136,6 +167,7 @@ export function historiaKlienta(
       zamowienieId: String(z.external_id),
       link: linkZamowienia(String(z.external_id)),
       rozmowaId: null,
+      sprawaId: null,
     })),
     /* Bieżąca rozmowa NIE wchodzi na oś: stoi otwarta obok, a wiersz „jesteś
        tutaj" zabierałby miejsce historii, po którą agent tu przyszedł. */
@@ -146,6 +178,25 @@ export function historiaKlienta(
       zamowienieId: null,
       link: null,
       rozmowaId: Number(r.id),
+      sprawaId: null,
+    })),
+    ...zwroty.map((z) => ({
+      rodzaj: "zwrot" as const,
+      at: String(z.created_at),
+      tresc: tekst(z.reference_number) ?? "Zwrot bez numeru",
+      zamowienieId: tekst(z.order_id),
+      link: null,
+      rozmowaId: null,
+      sprawaId: Number(z.id),
+    })),
+    ...sprawy.map((r) => ({
+      rodzaj: String(r.typ) === "DISPUTE" ? ("dyskusja" as const) : ("reklamacja" as const),
+      at: String(r.otwarto_at),
+      tresc: tekst(r.temat) ?? tekst(r.reference_number) ?? "Sprawa bez tematu",
+      zamowienieId: tekst(r.order_id),
+      link: null,
+      rozmowaId: null,
+      sprawaId: Number(r.id),
     })),
   ].sort((a, b) => b.at.localeCompare(a.at));
 

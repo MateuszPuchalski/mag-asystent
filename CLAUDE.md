@@ -29,6 +29,15 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   brak zwolnienia. Dekalog obowiązuje kolektor; biuro i panel obsługi biorą
   z niego punkty 1, 2, 5, 6 i 10, bo mysz na blacie to nie kciuk w rękawicy.
 
+- **Obsługę klienta projektuje się jako JEDNĄ drogę, nie cztery kolejki.**
+  Reguły stoją w `docs/obsluga-klienta-calosc.md`. Rozstrzygają spór o kształt
+  na korzyść tego, który daje agentowi całą historię klienta w jednym miejscu.
+  Kolejki — skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie jego.
+  Dokładając kolejkę albo ekran, dopisujesz jej wiązania po numerze zamówienia
+  w obie strony; wiązanie jednostronne to wiązanie, którego nie ma. Piątej
+  tabeli ze wspólnym statusem nad kolejkami nie było i nie będzie — ten kształt
+  kosztował już cztery tabele nakładki spraw.
+
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
   i gołe „Bad Request" na ekranie. Pilnują tego trzy niezależne strażnice:
