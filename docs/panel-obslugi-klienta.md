@@ -193,29 +193,36 @@ sztucznej inteligencji.
 
 ### 6.1. Jednostki domenowe
 
-System rozróżnia **rozmowę** (komunikację w kanale), **sprawę** (problem
-klienta obejmujący czasem kilka rozmów), **wiadomość**, **dobór** (proces
-wyboru części), **zadanie** (pracę pomocniczą), **dowód** (podstawę decyzji
-technicznej) i **szkic** (niewysłaną treść).
+System rozróżnia **rozmowę** (komunikację w kanale), **wiadomość**, **dobór**
+(proces wyboru części), **zadanie** (pracę pomocniczą), **dowód** (podstawę
+decyzji technicznej) i **szkic** (niewysłaną treść).
 
 Nie zastępujemy tych pojęć jedną tabelą ze wspólnym statusem.
 
-#### 6.1.1. Sprawa w kodzie (0.161.0)
+**SPRAWY NA TEJ LIŚCIE JUŻ NIE MA (0.388.0).** Stała tu od 0.161.0 jako
+„problem klienta obejmujący czasem kilka rozmów". Szczegóły kasaty niżej.
 
-Sprawa jest KLAMRĄ: ma tytuł i listę rozmów, nic więcej. Nie ma statusu, bo §7
-go dla niej nie zna, i nie ma własnej osi, bo zdarzenia wiszą przy ŹRÓDLE —
-blizna z 0.130.0 mówi, że historia sprawy ginęła przy scalaniu.
+#### 6.1.1. Kasata nakładki spraw (0.388.0)
 
-Rozmowa należy do CO NAJWYŻEJ JEDNEJ sprawy i pilnuje tego klucz główny, nie
-dyscyplina serwisu. Odmowa przy drugiej sprawie niesie tytuł tej pierwszej,
-żeby agent wiedział, co odkleić. Sklejenie to jeden wiersz, rozklejenie to jego
-skasowanie — poprzednia odpowiedź o tym samym kształcie kosztowała cztery
-tabele nakładki plus ręczne SCAL i ROZKLEJ (`docs/obsluga-klienta.md`,
-pytanie 1).
+Sprawa była KLAMRĄ: tytuł i lista rozmów, nic więcej. Nie miała statusu, bo §7
+go dla niej nie znał, ani własnej osi, bo zdarzenia wiszą przy ŹRÓDLE.
 
-Sklejenie i rozklejenie widać na osi każdej rozmowy, której dotyczyło. Ekranu
-sprawy nie ma: pasek nad rozmową pokazuje tytuł i rodzeństwo, bo to jedyne
-pytanie, na które sprawa dziś odpowiada.
+**Przestała mieć pytanie, na które odpowiada.** Od 0.387.0 droga zakupu wiąże
+rozmowy, zwroty, reklamacje i dyskusje po numerze zamówienia — automatycznie
+i przez wszystkie cztery kolejki. Sprawa robiła mniej, ręką i tylko w jednej.
+
+Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie, którego dekalog
+obsługi zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
+
+**Czego to kosztuje.** Droga wiąże po zamówieniu, więc dwóch rozmów o jednym
+problemie BEZ wspólnego zakupu nikt już nie sklei. Cena zapisana jawnie,
+decyzją właściciela z 18 września 2026.
+
+**Ślad w dzienniku ZOSTAJE.** `sprawa_dolaczona` i `sprawa_odlaczona` dalej
+leżą w `conversation_event`: wiszą przy źródle, a dziennik nie ma retencji.
+Panel przestał je rysować; „kto i kiedy sklejał te rozmowy" zostaje pytaniem
+z odpowiedzią. Tabele kasuje `bezNakladkiSpraw` w `server/src/db/db.ts`, a
+strażnikiem wskrzeszenia jest `server/src/db/kasata-spraw.test.ts`.
 
 ### 6.2. Przypisanie
 
@@ -2365,10 +2372,8 @@ Tabele docelowe, nazwami z kodu:
 
 ```
 channel_account          conversation            message
-sprawa_klienta           sprawa_klienta_rozmowa  conversation_event
-conversation_assignment  conversation_comment    conversation_mention
-conversation_draft       offer_snapshot          customer
-customer_machine         order_snapshot          product_link
+conversation_event       conversation_comment     conversation_mention    offer_snapshot           customer                customer_machine
+order_snapshot           product_link
 dobor_rozmowy            model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
 zabudowa_silnika         pasowanie_czesci        alias_silnika
@@ -2380,19 +2385,21 @@ klasyfikacja_rozmowy     copilot_wywolanie
 ```
 
 Projektowy `part_identifier` nazywa się w kodzie `towar_identyfikator`
-(precedens `sprawa_klienta`). `towar_fts` to tabela wirtualna FTS5 tworzona
+(precedens `zwrot_klienta`). `towar_fts` to tabela wirtualna FTS5 tworzona
 w `migrate()`, nie w `schema.sql`: bez FTS5 w SQLite start ma przeżyć,
 a szczebel pełnego tekstu ma się pominąć z powodem.
 
 Obecności agentów nie ma na tej liście świadomie — patrz §6.3.
 
-**Sprawa nazywa się `sprawa_klienta`, nie `case` (0.161.0)** i ma to dwa
-powody. `case` jest słowem kluczowym SQLite, więc każde zapytanie musiałoby ją
-cytować. Samo `sprawa` jest nazwą SPALONĄ: `migrate()` kasuje tę tabelę przy
-każdym starcie, bo stoi na liście nakładek po starej implementacji, którą bazy
-klientów muszą stracić. Tabela nazwana tak samo powstałaby ze `schema.sql`
-i znikała sekundę później, bez błędu. Ten sam powód dał wcześniej
-`zwrot_klienta` zamiast `zwrot`; pilnuje tego `db/migracja-sprawy.test.ts`.
+**Tabel sprawy nie ma od 0.388.0** — `sprawa_klienta` i
+`sprawa_klienta_rozmowa` zeszły razem z kodem, który je czytał (§6.1.1).
+Obie nazwy są odtąd SPALONE, tak samo jak samo `sprawa`: `migrate()` kasuje je
+przy każdym starcie, więc tabela dopisana z powrotem do `schema.sql`
+powstawałaby i znikała sekundę później, bez błędu. Pilnuje tego
+`server/src/db/kasata-spraw.test.ts`.
+
+Ta sama pułapka dała wcześniej `zwrot_klienta` zamiast `zwrot` i wciąż
+obowiązuje przy każdej nowej tabeli o krótkiej nazwie po starej obsłudze.
 
 ### 15.1. Identyfikatory zewnętrzne
 
@@ -5329,8 +5336,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
 | Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
-| Sprawa nad rozmowami (§6.1) | **działa** od 0.161.0 | `sprawa_klienta`, `services/sprawy.ts`, pasek w rozmowie |
-| Ekran sprawy z własną osią | **poza zakresem** | zdarzenia wiszą przy źródle — blizna 0.130.0 |
+| Sprawa nad rozmowami (§6.1) | **skasowana** w 0.388.0 | działała od 0.161.0; zastąpiła ją droga zakupu (0.387.0), bo odpowiada na to samo pytanie automatycznie i przez cztery kolejki |
+| Ekran sprawy z własną osią | **bezprzedmiotowe** od 0.388.0 | nakładki spraw nie ma; zdarzenia i tak wiszą przy źródle — blizna 0.130.0 |
 | Wysyłka do Allegro (§8.5) | **działa** od 0.148.0 | `services/wysylka.ts`, `outbox` |
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |

@@ -3,7 +3,6 @@ import { utworzZadanie } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
 import { statusZKierunku, ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
-import { sprawaRozmowy, type SprawaRozmowy } from "./sprawy.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
@@ -134,7 +133,7 @@ export interface WpisOsi {
   /* `odeslanie_zadania` (0.352.0) to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
      nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
      że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
-  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "sprawa" | "dobor";
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "dobor";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   /**
@@ -151,8 +150,8 @@ export interface WpisOsi {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie sprawy w postaci KLUCZY (0.243.0) — przy `status`, `sprawa`
-   * i `dobor`. `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
+   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `dobor`.
+   * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
    * zostają w bazie i w API. Panel nie ma prawa rozbierać `tresc` z powrotem:
@@ -160,8 +159,7 @@ export interface WpisOsi {
    */
   zdarzenie?:
     | { rodzaj: "status" | "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
-    | { rodzaj: "sprawa"; dolaczona: boolean; tytul: string | null };
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null };
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
@@ -464,7 +462,7 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
 export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
-  ofertaWskazana: OfertaWskazana | null; sprawa: SprawaRozmowy | null;
+  ofertaWskazana: OfertaWskazana | null;
   zamowienie: ZamowienieRozmowy | null; oferta: OfertaRozmowy | null;
   /**
    * Zwroty TEGO zamówienia (0.221.0). Właściciel: „klienci często pytają
@@ -807,28 +805,6 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* SKLEJENIE I ROZKLEJENIE SPRAWY (0.161.0) na osi ROZMOWY, nie sprawy.
-     Blizna 0.130.0: „historia sprawy ginęła przy scalaniu", bo wisiała przy
-     sprawie. Wpis przy źródle zostaje także wtedy, gdy klamra zniknie. */
-  for (const z of db().prepare(`
-    SELECT id, event_type, payload, created_at FROM conversation_event
-     WHERE conversation_id=? AND event_type IN ('sprawa_dolaczona','sprawa_odlaczona')
-     ORDER BY id
-  `).all(id) as Array<Record<string, unknown>>) {
-    const p = JSON.parse(String(z.payload ?? "{}")) as { tytul?: string; autor?: string };
-    os.push({
-      id: `sprawa-${z.id}`, rodzaj: "sprawa", autor: String(p.autor ?? "system"),
-      odKlienta: false,
-      tresc: `${String(z.event_type) === "sprawa_dolaczona" ? "dołączono do sprawy" : "odłączono od sprawy"} „${p.tytul ?? "?"}"`,
-      at: String(z.created_at), ofertaId: null,
-      zdarzenie: {
-        rodzaj: "sprawa",
-        dolaczona: String(z.event_type) === "sprawa_dolaczona",
-        tytul: p.tytul ?? null,
-      },
-    });
-  }
-
   /* DOBÓR NA OSI (etap E1): zmiana statusu, wybór i zdjęcie wyboru — kreską,
      jak status rozmowy. Bez tych wpisów „dlaczego dobór stoi na
      `missing_information`" byłoby pytaniem do kolegi, nie do ekranu. */
@@ -865,10 +841,6 @@ export function osRozmowy(id: number): {
 
   return {
     rozmowa, os, szkic: szkicRozmowy(id), ofertaWskazana: ofertaWskazana(id),
-    /* Sprawa jedzie razem z rozmową, bo agent ma zobaczyć rodzeństwo ZANIM
-       zacznie pisać: druga rozmowa o tym samym problemie bywa tą, w której
-       padła już odpowiedź. */
-    sprawa: sprawaRozmowy(id),
     zamowienie, oferta,
     zwroty: zamowienie
       ? listaZwrotow(db(), Date.now(), { channelAccountId: kontoRozmowy, orderId: zamowienie.externalId })

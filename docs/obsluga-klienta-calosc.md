@@ -76,10 +76,13 @@ otwarcia, które i tak leżą w bazie — `drogaZakupu` w `droga-klienta.ts`.
 Zdarzenie dopisywane przy synchronizacji dokładałoby drugą prawdę o tym samym
 fakcie, a dwie prawdy rozjeżdżają się przy pierwszej poprawce jednej z nich.
 
-**Sprawa klienta spina wyłącznie rozmowy.** `sprawa_klienta_rozmowa` ma klucz
-główny na `conversation_id` i nic poza rozmowami nie przyjmie. Klamra zrobiona
-z rozmów nie obejmie zwrotu ani reklamacji — i tak miało być, bo tamte mają
-własnych właścicieli danych.
+**Nakładka spraw spinała wyłącznie rozmowy — i odeszła w 0.388.0.**
+`sprawa_klienta` była klamrą z tytułem i listą wątków, zakładaną ręką. Droga
+zakupu robi to samo automatycznie i przez cztery kolejki, więc dwa paski nad
+jedną rozmową zostały jednym. To punkt 3 dekalogu zastosowany do nas samych.
+
+Cena jest zapisana jawnie: dwóch rozmów o jednym problemie BEZ wspólnego
+zamówienia nikt już nie sklei.
 
 ## Dekalog obsługi klienta
 

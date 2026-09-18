@@ -1086,12 +1086,12 @@ test("message.created mówi, czy pisał klient i czy to odbicie", async () => {
   ]);
 });
 
-/* ── ZDARZENIA SPRAWY NIOSĄ KLUCZE, NIE TYLKO ZDANIE (0.243.0) ───────────────
+/* ── ZDARZENIA OSI NIOSĄ KLUCZE, NIE TYLKO ZDANIE (0.243.0) ──────────────────
    Pasek zdarzeń w panelu pokazuje krótką etykietę po polsku, a słownik
    polszczyzny stoi po tamtej stronie. Bez tych pól panel musiałby rozbierać
    `tresc` z powrotem na części — czyli traktować zdanie dla człowieka jak
    format danych. `tresc` ZOSTAJE nietknięta, bo niesie ją podpowiedź. */
-test("oś podaje zdarzenia sprawy rozłożone na klucze, obok gotowego zdania", () => {
+test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
   const d = db();
   const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
   const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,
@@ -1108,6 +1108,8 @@ test("oś podaje zdarzenia sprawy rozłożone na klucze, obok gotowego zdania", 
     JSON.stringify({ przed: "searching", po: "confirmed", autor: "Biuro" }), "2026-09-01T09:20:00.000Z");
   zdarz.run(r, "dobor_wybrano",
     JSON.stringify({ symbol: "W09-0513", droga: "wyszukiwarka", autor: "Biuro" }), "2026-09-01T09:30:00.000Z");
+  /* Zdarzenie NAKŁADKI SPRAW zostaje w dzienniku, ale na oś już nie wchodzi
+     (0.388.0): klamry nie ma, a `conversation_event` nie ma retencji. */
   zdarz.run(r, "sprawa_dolaczona",
     JSON.stringify({ tytul: "Linka T375", autor: "Biuro" }), "2026-09-01T09:40:00.000Z");
 
@@ -1122,8 +1124,11 @@ test("oś podaje zdarzenia sprawy rozłożone na klucze, obok gotowego zdania", 
     { rodzaj: "dobor", po: "confirmed" },
     { rodzaj: "dobor_wybor", wybrano: true, symbol: "W09-0513" },
   ]);
-  assert.deepEqual(zdarzenie("sprawa"),
-    { rodzaj: "sprawa", dolaczona: true, tytul: "Linka T375" });
+  /* Nakładka spraw odeszła w 0.388.0, więc oś jej nie rysuje — ale wiersz
+     w dzienniku audytu ZOSTAJE i ten test pilnuje obu połów naraz. */
+  assert.equal(zdarzenie("sprawa"), undefined);
+  assert.equal(Number(d.prepare(`SELECT COUNT(*) AS n FROM conversation_event
+    WHERE conversation_id=? AND event_type='sprawa_dolaczona'`).get(r)!.n), 1);
 
   /* Zdanie dla człowieka zostaje nietknięte — to ono stoi w podpowiedzi. */
   assert.equal(wpisy.find((w) => w.rodzaj === "status")?.tresc, "new → open");
