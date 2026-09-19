@@ -48,6 +48,11 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.
   Liczniki `method: "POST"/"PUT"/"DELETE"` w `routes/biuro.test.ts` są
   UMOWĄ — każdy nowy zapis podnosi licznik i dostaje zdanie w uzasadnieniu.
+  Od 0.410.0 jest JEDEN wyjątek, decyzją właściciela: wejście w reklamację
+  odświeża ją z Allegro. Powód jest mierzalny — przebieg synchronizacji czyta
+  najwyżej tysiąc spraw, więc ogona archiwum nie odświeżał NIGDY. Wyjątek
+  bramkuje `ekrany/Reklamacje.test.tsx`: dozwolona jest dokładnie jedna
+  mutacja przy wejściu i ani jedna przy samym otwarciu ekranu.
 - **Cienkie trasy, logika w serwisach** z testem obok (`*.test.ts`,
   `tsx --test`). Każda mutacja woła `logEvent`. Bramka ról: `odmowa()`
   w trasach biura, `autoryzuj()` przy operacjach uprzywilejowanych.

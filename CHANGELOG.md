@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.410.0 — 19 września 2026
+
+**Wejście w reklamację odświeża ją z Allegro.** Zgłoszenie właściciela:
+„możesz po prostu odświeżyć reklamację, jak w nią wejdę?".
+
+- **To jest świadome złamanie zasady „zero zapisu przy patrzeniu"** i tak stoi
+  zapisane w `CLAUDE.md`. Powód jest mierzalny, nie estetyczny: przebieg
+  synchronizacji czyta najwyżej tysiąc spraw, więc ogona archiwum nie
+  odświeżał NIGDY — agent patrzył na status sprzed tygodni, a nie sprzed
+  trzech minut.
+- **Cena jest znana i mała.** Odświeżenie to JEDNO żądanie do Allegro; drugie
+  idzie tylko wtedy, gdy licznik wiadomości rozjechał się z tym, co mamy.
+  Powrót do tej samej sprawy nie pyta drugi raz.
+- **Błąd zostawia ekran w spokoju.** Gdy Allegro odmówi, zostaje stan
+  z ostatniego taktu — czyli to, co było przed tym wydaniem.
+- Strażnik „otwarcie ekranu nie wywołuje mutacji" nie znika, tylko zawęża się
+  do jednej dozwolonej: druga dołożona kiedyś „przy okazji" wywali testy.
+
 ## 0.409.0 — 19 września 2026
 
 **`/api/health` mówi wreszcie o synchronizacji spraw posprzedażowych.**

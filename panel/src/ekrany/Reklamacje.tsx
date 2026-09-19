@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
@@ -275,6 +275,35 @@ export function Reklamacje() {
     const nast = widoczne[Math.min(widoczne.length - 1, Math.max(0, (i < 0 ? 0 : i) + o))];
     if (nast) nawiguj(`/obsluga/reklamacje/${nast.id}`);
   };
+
+  /* ── WEJŚCIE W SPRAWĘ JĄ ODŚWIEŻA (0.410.0) ────────────────────────────────
+     Zgłoszenie właściciela: „reklamacje w aplikacji mają nieaktualny stan",
+     a potem wprost: „możesz po prostu odświeżyć reklamację, jak w nią wejdę?".
+
+     TO JEST ŚWIADOME ZŁAMANIE „ZERO ZAPISU PRZY PATRZENIU" i tak ma być
+     zapisane, a nie przemilczane. Reguła stoi w CLAUDE.md, a trasa
+     `/odswiez` jest POST-em właśnie po to, żeby łamać ją GŁOŚNO. Decyzja
+     właściciela z 19 września 2026 mówi, że nieaktualny stan sprawy kosztuje
+     więcej niż żądanie wychodzące przy otwarciu ekranu — i to jest prawda
+     mierzalna: przebieg synchronizacji czyta najwyżej tysiąc spraw, więc
+     ogona archiwum nie odświeża NIGDY, a nie „za trzy minuty".
+
+     CENA JEST ZNANA I MAŁA. `odswiezSprawe` to JEDNO żądanie do Allegro;
+     drugie idzie wyłącznie wtedy, gdy licznik wiadomości rozjechał się
+     z tym, co mamy. Przeglądanie kolejki strzałkami zapłaci więc po jednym
+     żądaniu za sprawę — dlatego `ostatnioOdswiezona` pilnuje, żeby nie
+     powtórzyć go przy każdym renderze ani drugi raz w trybie ścisłym Reacta.
+
+     BŁĄD ZOSTAWIA EKRAN W SPOKOJU (patrz `useOdswiez`): odświeżenie jest
+     dopiskiem do tego, co agent i tak widzi, a nie czynnością, o którą
+     prosił. Gdy Allegro odmówi, zostaje stan z ostatniego taktu — czyli
+     dokładnie to, co było przed tym wydaniem. */
+  const ostatnioOdswiezona = useRef<number | null>(null);
+  useEffect(() => {
+    if (wybrana === null || ostatnioOdswiezona.current === wybrana) return;
+    ostatnioOdswiezona.current = wybrana;
+    odswiez.mutate({ id: wybrana });
+  }, [wybrana]);
 
   /* Pole czyści się przy ZMIANIE SPRAWY, nigdy przy odświeżeniu zapytania —
      inaczej odpowiedź pisana w trakcie taktu synchronizacji znikałaby w pół
