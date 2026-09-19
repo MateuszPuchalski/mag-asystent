@@ -3,6 +3,7 @@ import { Send } from "lucide-react";
 import { Przycisk } from "../ui";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { PrzyciskZalacznika, ZalacznikiWysylki } from "../skrzynka/ZalacznikiWysylki";
+import { Szablony } from "../skrzynka/Szablony";
 
 /* ── Edytor odpowiedzi w reklamacji (0.224.0) ────────────────────────────────
    OSOBNY komponent, nie `skrzynka/Edytor.tsx`, i to nie jest kopia z lenistwa.
@@ -79,6 +80,21 @@ export function Edytor({
       onUsun={onUsunZalacznik} wylaczone={wysyla} />}
 
     <div className="flex items-center gap-2">
+      {/* ── SZABLONY TAKŻE TUTAJ (0.406.0) ──────────────────────────────────
+          Zgłoszenie właściciela: „dodaj możliwość tworzenia szablonów
+          odpowiedzi". Tworzenie stało w skrzynce od 0.399.0 — ale WYŁĄCZNIE
+          w skrzynce, choć `api/szablony.ts` od pierwszego dnia pisze, że lista
+          jest wspólna dla skrzynki, reklamacji i dyskusji. Komentarz obiecywał
+          coś, czego ekran nie dawał, a szablon, który właściciel przysłał jako
+          pierwszy — wymiana przez paczkomat — jest zdaniem z reklamacji.
+
+          TEN SAM komponent, nie kopia: to ta sama lista i te same zdania.
+          Limit treści szablonu (2000 znaków, Centrum Wiadomości) mieści się
+          z zapasem w limicie tego pola (20 000, `MessageRequest.text`), więc
+          wstawka nie ma jak przekroczyć sufitu sama z siebie. */}
+      <Szablony wylaczone={wysyla} onWstaw={(t) => onZmiana(
+        /* DOPISUJE, NIE NADPISUJE — ten sam kontrakt, co w skrzynce. */
+        tresc.trim() === "" ? t : `${tresc}\n\n${t}`)} />
       {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
         onDodaj={onDodajZalacznik} wylaczone={wysyla} />}
       {/* Licznik mówi, dopiero gdy ma co powiedzieć. Kolor przy progu, a nie

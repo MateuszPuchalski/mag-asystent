@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.406.0 — 19 września 2026
+
+**Szablony odpowiedzi działają wszędzie tam, gdzie się odpisuje, i dają się
+cofnąć.** Zgłoszenie właściciela: „dodaj możliwość tworzenia szablonów
+odpowiedzi". Tworzenie stało w skrzynce od 0.399.0 — pod przyciskiem
+„Szablony", przycisk „Nowy". Brakowało dwóch rzeczy wokół niego i to je robi
+to wydanie.
+
+- **Szablony w reklamacjach i dyskusjach.** `api/szablony.ts` od pierwszego dnia
+  pisze, że lista jest wspólna dla skrzynki, reklamacji i dyskusji — a przycisk
+  stał wyłącznie w skrzynce. Komentarz obiecywał coś, czego ekran nie dawał,
+  a pierwszy szablon, który właściciel przysłał, jest zdaniem z reklamacji.
+- **Zdjęte szablony mają drogę powrotną.** Przycisk „zdejmij" powoływał się na
+  §25a.5 — cofnięcie zamiast potwierdzenia — i tej drogi nie było. Trasa
+  archiwum i hak stały w kodzie od 0.399.0, nieużywane przez żaden ekran.
+  Zakładka „Zdjęte" pokazuje je i przywraca.
+- Zdjętego szablonu **nie da się wstawić** do szkicu bez przywrócenia: skoro
+  biuro go zdjęło, przestał być zdaniem, którego używa.
+- Archiwum pyta serwer dopiero po otwarciu zakładki, nie przy każdej rozmowie.
+
 ## 0.405.0 — 19 września 2026
 
 **Ceny z Subiekta wchodzą do read-modelu.** Właściciel uruchomił
