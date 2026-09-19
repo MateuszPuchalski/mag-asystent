@@ -89,6 +89,17 @@ export interface SprawaCzatu {
   czatUrwany: boolean;
 }
 
+/**
+ * Ten sam tekst mimo innego oddechu — do porównania zgłoszenia z wiadomością.
+ *
+ * Allegro potrafi oddać jedno zdanie raz ze złamaniami wiersza, raz bez, więc
+ * porównanie znak w znak przepuszczałoby dubla przy co drugiej sprawie.
+ * Porównujemy SAM TEKST, nigdy jego formatowanie.
+ */
+function scisle(t: string): string {
+  return t.replace(/\s+/g, " ").trim();
+}
+
 export function Czat({ sprawa, czat, zalaczniki, edytor }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
@@ -103,15 +114,34 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
      i ekran ma to POWIEDZIEĆ, zamiast pokazywać urwaną rozmowę jak całą. */
   const brakuje = Math.max(0, sprawa.wiadomosciIle - czat.length);
 
+  /* ── ZGŁOSZENIE RAZ, NIE DWA (0.412.0) ──────────────────────────────────
+     Allegro przy części spraw wpisuje ten sam tekst w dwa miejsca ładunku:
+     w opis zgłoszenia i w pierwszą wiadomość kupującego. Ekran pokazywał oba,
+     jeden pod drugim — agent czytał to samo zdanie dwa razy, zanim doszedł do
+     czegokolwiek, co je rozstrzyga.
+
+     ZOSTAJE ROZMOWA, znika ramka: wiadomość ma autora, godzinę i swoje
+     miejsce w wątku, a ramka nie ma żadnej z tych rzeczy. Gdy zgłoszenie
+     NIE jest dublem — a bywa, bo opis idzie z formularza reklamacji —
+     ramka stoi jak dotąd.
+
+     ZAŁĄCZNIKI SPRAWY nie są dublem NIGDY: wiszą na sprawie, nie na
+     wiadomości. Dubel zdejmuje więc zdanie, a nie sekcję. */
+  const pierwszaKlienta = czat.find((w) => w.autorRola === "BUYER")?.tresc ?? null;
+  const dubel = sprawa.opisZgloszenia !== null && pierwszaKlienta !== null
+    && scisle(sprawa.opisZgloszenia) === scisle(pierwszaKlienta);
+  const opisWart = !dubel;
+
   return <div className="flex min-h-0 flex-col gap-3">
-    {/* Zgłoszenie: powód, oczekiwanie i opis własnymi słowami klienta. */}
-    <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <NaglowekSekcji jako="h3">Zgłoszenie</NaglowekSekcji>
-      <p className="mt-1 text-sm text-slate-800">
-        {sprawa.opisZgloszenia ?? "Klient nie opisał sprawy własnymi słowami."}
-      </p>
-      <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
-    </section>
+    {(opisWart || zalaczniki.length > 0) &&
+      <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <NaglowekSekcji jako="h3">
+          {opisWart ? "Zgłoszenie" : "Załączniki zgłoszenia"}</NaglowekSekcji>
+        {opisWart && <p className="mt-1 text-sm text-slate-800">
+          {sprawa.opisZgloszenia ?? "Klient nie opisał sprawy własnymi słowami."}
+        </p>}
+        <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
+      </section>}
 
     {/* DWA POWODY NIEPEŁNEJ ROZMOWY I DWA RÓŻNE ZDANIA (0.273.0). Do 0.272.0
         stało tu jedno: „Reszta dojdzie następną synchronizacją". Przy rozmowie
@@ -153,8 +183,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     {/* Od 0.224.0 pod rozmową stoi EDYTOR, a nie zdanie o tym, że odpowiedź
         wysyła się gdzie indziej. Zdanie było prawdziwe przez dwa wydania
         i przestało być — komentarz, który skłamał, jest gorszy od jego braku.
-        Werdykt ma własny pasek NAD rozmową (`Werdykt.tsx`), bo rozstrzyga
-        całą sprawę, a nie jedną wiadomość. */}
+        Werdykt od 0.412.0 stoi POD rozmową (`Werdykt.tsx`) — nieodwracalne
+        pyta dopiero po dowodach, a nie przed nimi. */}
     {edytor}
   </div>;
 }

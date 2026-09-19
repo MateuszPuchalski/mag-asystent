@@ -49,6 +49,48 @@ const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   zalaczniki: [], ...n,
 });
 
+describe("Zgłoszenie a pierwsza wiadomość", () => {
+  /* ── DUBEL (0.412.0) ──────────────────────────────────────────────────────
+     Allegro przy części spraw wpisuje ten sam tekst w dwa miejsca ładunku:
+     opis zgłoszenia i pierwszą wiadomość kupującego. Ekran pokazywał oba, więc
+     agent czytał to samo zdanie dwa razy, zanim doszedł do czegokolwiek, co je
+     rozstrzyga. Zostaje ROZMOWA: ma autora, godzinę i miejsce w wątku. */
+  it("nie powtarza zgłoszenia, gdy jest dosłownie pierwszą wiadomością klienta", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
+      zalaczniki={[]} czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
+    expect(screen.getAllByText("Pękła obudowa po tygodniu")).toHaveLength(1);
+    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
+  });
+
+  it("dublem jest też tekst inaczej złamany — porównujemy treść, nie oddech", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa\n po tygodniu" })}
+      zalaczniki={[]} czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
+    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
+  });
+
+  it("ZAŁĄCZNIKI SPRAWY zostają nawet przy dublu — wiszą na sprawie, nie na wiadomości", () => {
+    scena.obrazy = {};
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
+      zalaczniki={[zal(4, "paragon.pdf", false)]}
+      czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
+    expect(screen.getByText("Załączniki zgłoszenia")).toBeInTheDocument();
+    expect(screen.getByText("paragon.pdf")).toBeInTheDocument();
+  });
+
+  it("RÓŻNY opis zostaje na ekranie — to nie jest dubel, tylko druga treść", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Niezgodny z opisem: 56 cm zamiast 46" })}
+      zalaczniki={[]} czat={[wiad({ tresc: "Kosiarka przestała ciąć" })]} />);
+    expect(screen.getByText("Zgłoszenie")).toBeInTheDocument();
+    expect(screen.getByText("Niezgodny z opisem: 56 cm zamiast 46")).toBeInTheDocument();
+  });
+
+  it("bez pobranej rozmowy zgłoszenie zostaje — nie ma z czym go porównać", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
+      zalaczniki={[]} czat={[]} />);
+    expect(screen.getByText("Zgłoszenie")).toBeInTheDocument();
+  });
+});
+
 describe("Oś rozmowy reklamacyjnej", () => {
   it("zdjęcie klienta rysuje się WPROST, bez zapisywania pliku na dysk", () => {
     scena.obrazy = { 9: "blob:obraz" };

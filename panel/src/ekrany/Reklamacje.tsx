@@ -574,8 +574,6 @@ export function Reklamacje() {
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
-        {/* Pasek werdyktu NAD rozmową: rozstrzygnięcie całej sprawy stoi
-            wyżej niż jej ostatnia wiadomość. */}
         {/* Kto prowadzi — CZYNNOŚĆ, więc stoi przy innych czynnościach, a nie
             w kolumnie faktów (0.392.0, zgłoszenie właściciela ze zrzutem). */}
         {szczegol.data && <Prowadzi prowadzi={szczegol.data.reklamacja.prowadzi}
@@ -586,10 +584,6 @@ export function Reklamacje() {
               { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
               { onError: (e) => setBladZapisu((e as Error).message) });
           }} />}
-        {szczegol.data && <Werdykt reklamacja={szczegol.data.reklamacja}
-          trwa={werdykt.isPending} blad={bladWerdyktu}
-          trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
-          onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} />}
         {szczegol.data
           ? <Czat
               sprawa={{
@@ -626,6 +620,26 @@ export function Reklamacje() {
           : <Pusto ikona={ShieldQuestion}>
               {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
             </Pusto>}
+
+        {/* ── WERDYKT POD ROZMOWĄ (0.412.0) ────────────────────────────────
+            Do 0.411.0 pasek werdyktu stał PIERWSZY w tej kolumnie — nad
+            treścią zgłoszenia, którego dotyczy. Uzasadnienie („rozstrzygnięcie
+            całej sprawy stoi wyżej niż jej ostatnia wiadomość") było spójne,
+            ale mierzyło ważność, a nie kolejność czytania.
+
+            Dekalog obsługi, punkt 9: nieodwracalne pyta. UZNAJĘ i ODRZUCAM są
+            nieodwracalne wobec Allegro — drugiego werdyktu w tej samej sprawie
+            nikt nie przyjmie. Ekran zadawał więc pytanie, zanim pokazał
+            cokolwiek, z czego wynika odpowiedź. Dekalog ergonomii, punkt 5:
+            aplikacja prowadzi człowieka, nie odwrotnie.
+
+            NIC NIE ZNIKA: pasek jest tam, gdzie kończy się czytanie sprawy.
+            Zgoda przed wysłaniem zostaje przy OBU gałęziach — uznanie kosztuje
+            pieniądze i jest równie nieodwracalne co odmowa. */}
+        {szczegol.data && <Werdykt reklamacja={szczegol.data.reklamacja}
+          trwa={werdykt.isPending} blad={bladWerdyktu}
+          trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
+          onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} />}
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto">

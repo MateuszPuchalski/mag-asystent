@@ -254,13 +254,22 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
   });
 
-  it("nad rozmową stoi pasek werdyktu z dwoma przyciskami, a zdanie o Centrum Sprzedaży zniknęło", () => {
+  it("pasek werdyktu stoi POD rozmową, bo nieodwracalne pyta po dowodach", () => {
     /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
        Centrum Sprzedaży byłby nieprawdą — tak samo jak w 0.224.0 napis
-       o odpowiedzi. */
+       o odpowiedzi.
+
+       KOLEJNOŚĆ JEST UMOWĄ od 0.412.0. Do 0.411.0 ten pasek był pierwszym
+       elementem środkowej kolumny, czyli ekran pytał „uznać czy odrzucić",
+       zanim pokazał treść zgłoszenia. Dekalog obsługi, punkt 9: nieodwracalne
+       pyta — a pytanie zadaje się PO dowodach, nie przed nimi. */
     pokaz("/obsluga/reklamacje/1");
     const pasek = screen.getByRole("region", { name: "Werdykt" });
     expect(pasek).toBeInTheDocument();
+    const rozmowa = screen.getByText("Opis sprawy 1");
+    /* `DOCUMENT_POSITION_FOLLOWING` liczone OD rozmowy: pasek ma stać za nią. */
+    expect(rozmowa.compareDocumentPosition(pasek)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: /UZNAJĘ/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /ODRZUCAM/ })).toBeInTheDocument();
     expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
