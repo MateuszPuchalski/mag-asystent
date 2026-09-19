@@ -169,6 +169,38 @@ Sprawdz "bez tabeli zdjec siodmy GRANT nie jest nadawany" {
     Zaloz ($ile -eq $oczekiwane) "GRANT SELECT jest $ile razy, a lista bez zdjęć ma $oczekiwane pozycji"
 }
 
+Sprawdz "bez widoku poziomow cen ten GRANT nie jest nadawany" {
+    <#
+        Ta sama zasada, co przy zdjeciach, i ten sam koszt bledu: skrypt idzie
+        JEDNYM ExecuteNonQuery, wiec grant na nieistniejacy obiekt zostawia
+        konto bez ani jednego uprawnienia.
+
+        Zgloszenie wlasciciela (0.407.0): „czy nie moge tego nadac jakos przy
+        instalacji". Moze — dlatego bramka jest NAZWANA, a nie jedna flaga
+        `Opcjonalna`: drugi obiekt opcjonalny schodzilby z listy razem ze
+        zdjeciami, czyli z zupelnie niezwiazanego powodu.
+    #>
+    $bez = Get-WertisSkryptUprawnien -Baza "FIRMA_TEST" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "Abc-123xyz" -PoziomyCen $false
+    Zaloz (-not ($bez -match "vwPoziomyCen")) "grant na widok poziomow zostal mimo -PoziomyCen:false"
+    Zaloz ($bez -match "GRANT SELECT ON dbo\.tw_Cena\b") "cennik ma zostac - to tabela rdzeniowa"
+    Zaloz ($bez -match "GRANT SELECT ON dbo\.tw_ZdjecieTw\b") "zdjecia maja zostac - to inna bramka"
+}
+
+Sprawdz "obie bramki opcjonalne dzialaja niezaleznie" {
+    # Regresja wprost na ksztalt sprzed 0.407.0: jedna flaga `Opcjonalna`
+    # zdejmowala z listy KAZDY obiekt opcjonalny naraz.
+    $bezZdjec = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "Abc-123xyz" -Zdjecia $false
+    Zaloz ($bezZdjec -match "vwPoziomyCen") "widok poziomow zniknal razem ze zdjeciami"
+
+    $obie = Get-WertisSkryptUprawnien -Baza "T" -KolumnaLokalizacji "tw_Pole3" `
+        -Haslo "Abc-123xyz" -Zdjecia $false -PoziomyCen $false
+    $ile = ([regex]::Matches($obie, "GRANT SELECT ON")).Count
+    $oczekiwane = @(Get-WertisTabeleOdczytu -Zdjecia $false -PoziomyCen $false).Count
+    Zaloz ($ile -eq $oczekiwane) "GRANT SELECT jest $ile razy, a lista bez obu ma $oczekiwane pozycji"
+}
+
 Sprawdz "czyta slownik magazynow i zdjecia kartotek" {
     # Obie tabele mają własne uzasadnienie i obie łatwo przeoczyć przy
     # przepisywaniu skryptu: bez sl_Magazyn karta pokazuje `mag_Id = 7` zamiast

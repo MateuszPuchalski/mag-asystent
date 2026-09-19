@@ -118,6 +118,11 @@ kolumny, reszta bazy pozostaje nietykalna.
 > wyglądała przed tym wydaniem, więc `/api/health` mówi o tym osobnym zdaniem.
 > Import stanów i dokumentów idzie dalej bez zmian; cennik degraduje sam.
 
+> Oba nadaje INSTALATOR — wystarczy `.\wertis-instalator.ps1` na istniejącej
+> instalacji. Widok poziomów cen jest przy tym sprawdzany, a nie zakładany.
+> Gdy go w tej bazie nie ma, instalator pomija tę jedną linię i mówi o tym
+> wprost, zamiast wywalić cały skrypt uprawnień.
+
 > **Ten skrypt jest źródłem prawdy dla instalatora.** `Get-WertisSkryptUprawnien`
 > w [`instalator/sql.ps1`](../instalator/sql.ps1) odtwarza go co do grantu —
 > przy zmianie uprawnień poprawia się **oba miejsca**. Rozjazd nie rzuciłby
@@ -144,9 +149,10 @@ GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
 GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
 GRANT SELECT ON dbo.tw_Cena        TO wertis;   -- cennik kartoteki, poziomy 0..10
--- Widok nazw poziomów: nadaj go RĘCZNIE, po sprawdzeniu, że w tej bazie jest.
--- Instalator go pomija świadomie (jedna baza to nie kontrakt), a import czyta
--- go osobnym zapytaniem — bez tego grantu ceny wchodzą, tylko bez nazw.
+-- Widok nazw poziomów. Instalator sprawdza od 0.407.0, czy w tej bazie jest,
+-- i pomija tę linię, gdy go nie ma — tak samo jak przy tabeli zdjęć. Uruchamiając
+-- skrypt RĘCZNIE, sprawdź to sam: GRANT na nieistniejący obiekt przerywa całe
+-- wykonanie i konto zostaje bez ani jednego uprawnienia.
 GRANT SELECT ON dbo.vwPoziomyCen   TO wertis;   -- nazwy poziomów cen
 -- Ostatni tylko wtedy, gdy ta tabela w bazie JEST. Nadanie go na bazie bez
 -- niej przerywa wykonanie i konto zostaje bez ani jednego uprawnienia.

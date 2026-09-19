@@ -186,6 +186,37 @@ const PROG_TERMINU_DNI = 3;
  */
 const PROG_BEZ_RUCHU_DNI = 30;
 
+/**
+ * Po ilu dniach milczenia „klient czeka" przestaje być prawdą (0.407.0).
+ *
+ * ZGŁOSZENIE WŁAŚCICIELA ZE ZRZUTEM: „widzę sporo reklamacji, które w naszej
+ * aplikacji pokazuje, że klient czeka, a w Allegro są już dawno rozwiązane".
+ * Na tamtym ekranie kubełek DO ODPOWIEDZI liczył dwadzieścia dziewięć spraw,
+ * a pierwsza z nich wyglądała tak: reklamacja uznana 28 lipca, wymiana
+ * zaproponowana, kupujący odpisał 1 sierpnia „Ok. Pozdrawiam." — i przez
+ * czterdzieści dziewięć dni czekał w kolejce roboczej na odpowiedź, której
+ * nikt nie miał mu dać.
+ *
+ * DLACZEGO ZEGAR, A NIE TREŚĆ. „Ok. Pozdrawiam." nie wymaga niczego, a „ale
+ * przysłaliście znowu nie ten" wymaga wszystkiego — i z pola
+ * `chat.lastMessage.status` nie da się ich odróżnić, bo oba są
+ * `BUYER_REPLIED`. Odróżnia je za to CZAS: nikt nie czeka dwóch tygodni na
+ * odpowiedź, której potrzebuje. Rozstrzygnięta sprawa sprzed dwóch tygodni to
+ * grzeczność bez odpowiedzi, nie dług biura.
+ *
+ * CZTERNAŚCIE, nie trzydzieści jak przy `bezRuchu`. Tamten próg chroni sprawę
+ * NIEROZSTRZYGNIĘTĄ, czyli taką, w której naprawdę zostało coś do zrobienia,
+ * i dlatego ma być hojny. Tutaj werdykt już zapadł, więc jedyne, co próg
+ * chroni, to dopisek kupującego PO decyzji — a na taki odpisuje się w dni,
+ * nie w miesiące.
+ *
+ * SPRAWA NIE ZNIKA, tylko schodzi do ROZSTRZYGNIĘTYCH, a sygnał
+ * `klient_czeka` zostaje przy wierszu niezależnie od kubełka (patrz
+ * `sygnaly`). Biuro przeglądające tamten kubełek dalej widzi flagę — zmienia
+ * się to, czy sprawa liczy się do pracy na dziś.
+ */
+const PROG_ODPOWIEDZI_DNI = 14;
+
 const DZIEN_MS = 86_400_000;
 
 export interface ZalacznikReklamacji {
@@ -387,17 +418,57 @@ export const rozstrzygnieta = (w: {
 const bezRuchu = (w: { czatAktywny: boolean; dniDoTerminu: number | null }): boolean =>
   !w.czatAktywny && (w.dniDoTerminu === null || w.dniDoTerminu < -PROG_BEZ_RUCHU_DNI);
 
+/**
+ * Ile dni milczy ostatnia wiadomość. `null` = nie wiadomo, czyli nie mierzymy.
+ *
+ * Brak daty czytamy jak świeżość, nie jak starość: sprawa bez znacznika czasu
+ * ma zostać w kolejce roboczej, bo wycięcie jej stamtąd na podstawie braku
+ * wiedzy byłoby schowaniem pracy.
+ */
+export function dniMilczenia(ostatniaAt: string | null, teraz = Date.now()): number | null {
+  if (!ostatniaAt) return null;
+  const t = Date.parse(ostatniaAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((teraz - t) / DZIEN_MS);
+}
+
+/**
+ * Czy „klient czeka" jest JESZCZE PRAWDĄ (0.407.0).
+ *
+ * JEDEN PREDYKAT, DWÓCH WOŁAJĄCYCH — kubełek i plakietka. Do tego wydania
+ * każde z nich liczyło to samo po swojemu i oba były tak samo nieprawdziwe
+ * po dwóch miesiącach. Gdyby reguła stała w dwóch miejscach, poprawka
+ * jednego z nich zostawiłaby drugie kłamiące dalej.
+ *
+ * SPRAWA NIEROZSTRZYGNIĘTA CZEKA ZAWSZE, bez względu na wiek: obok niej stoi
+ * termin decyzji, który i tak rządzi kolejnością pracy, a dopisek kupującego
+ * jest wtedy częścią sprawy do rozstrzygnięcia, nie grzecznością po niej.
+ */
+export function klientCzeka(w: {
+  statusAllegro: string | null;
+  ostatniaWiadomoscStatus: string | null;
+  ostatniaWiadomoscAt?: string | null;
+  werdyktStatus?: StatusWerdyktu | null;
+}, teraz = Date.now()): boolean {
+  if (!CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) return false;
+  if (!rozstrzygnieta(w)) return true;
+  const milczy = dniMilczenia(w.ostatniaWiadomoscAt ?? null, teraz);
+  return milczy === null || milczy <= PROG_ODPOWIEDZI_DNI;
+}
+
 export function kubelek(w: {
   statusAllegro: string | null;
   ostatniaWiadomoscStatus: string | null;
+  ostatniaWiadomoscAt?: string | null;
   czatAktywny: boolean;
   dniDoTerminu: number | null;
   werdyktStatus?: StatusWerdyktu | null;
-}): Kubelek {
+}, teraz = Date.now()): Kubelek {
   if (!rozstrzygnieta(w)) return bezRuchu(w) ? "bez_ruchu" : "decyzja";
   /* Rozstrzygnięta, ale rozmowa trwa i ostatnie słowo było klienta. Werdykt
-     zapadł, a człowiek po drugiej stronie nadal czeka na zdanie. */
-  if (w.czatAktywny && CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) return "odpowiedz";
+     zapadł, a człowiek po drugiej stronie nadal czeka na zdanie —
+     DOPÓKI to czekanie jest prawdziwe, patrz `PROG_ODPOWIEDZI_DNI`. */
+  if (w.czatAktywny && klientCzeka(w, teraz)) return "odpowiedz";
   return "zamknieta";
 }
 
@@ -405,12 +476,13 @@ export function sygnaly(w: {
   statusAllegro: string | null;
   dniDoTerminu: number | null;
   ostatniaWiadomoscStatus: string | null;
+  ostatniaWiadomoscAt?: string | null;
   czatAktywny: boolean;
   zwrotWymagany: boolean | null;
   werdykt?: string | null;
   werdyktStatus?: StatusWerdyktu | null;
   zwrotTowaru?: string | null;
-}): Sygnal[] {
+}, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   const otwarta = !rozstrzygnieta(w);
   if (otwarta && w.dniDoTerminu !== null && w.dniDoTerminu <= PROG_TERMINU_DNI) s.push("termin");
@@ -425,7 +497,9 @@ export function sygnaly(w: {
   if (wydany && (w.werdykt ?? "").startsWith("ACCEPTED") && !w.zwrotTowaru && w.zwrotWymagany === null) {
     s.push("towar_do_decyzji");
   }
-  if (CZEKA_NA_NAS.includes(w.ostatniaWiadomoscStatus ?? "")) s.push("klient_czeka");
+  /* Ta sama reguła, co przy kubełku: po dwóch tygodniach milczenia w sprawie
+     ROZSTRZYGNIĘTEJ plakietka kłamałaby tak samo jak kolejka. */
+  if (klientCzeka(w, teraz)) s.push("klient_czeka");
   /* Doradca Allegro odpisał w 61 sprawach na 100 w sondzie — to jest przypadek
      typowy, nie brzegowy, i zmienia ton odpowiedzi: w rozmowie jest trzecia
      strona, która czyta wszystko. */
@@ -450,6 +524,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
   const zwrotTowaru = tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null;
   const rdzen = {
     statusAllegro, dniDoTerminu: dni, ostatniaWiadomoscStatus: ostatnia,
+    ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     czatAktywny, zwrotWymagany, werdykt, werdyktStatus, zwrotTowaru,
   };
   return {
@@ -505,8 +580,8 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     zwrotTowaruAt: tekst(w.zwrot_towaru_at),
     ilosc: w.ilosc == null ? null : Number(w.ilosc),
     wersja: Number(w.wersja ?? 1),
-    kubelek: kubelek(rdzen),
-    sygnaly: sygnaly(rdzen),
+    kubelek: kubelek(rdzen, teraz),
+    sygnaly: sygnaly(rdzen, teraz),
     /* W ADRESIE STOI UUID, nie numer czytelny (0.226.1). Sprawa ma własną
        stronę `/claims/{uuid}` i adresuje się identyfikatorem zasobu; numer
        `2585498/2026` jest dla CZŁOWIEKA i zostaje etykietą odnośnika. Do

@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.407.0 — 19 września 2026
+
+**„Klient czeka" przestaje kłamać po dwóch tygodniach, a granty cennika nadaje
+instalator.** Dwa zgłoszenia właściciela, oba ze zrzutami.
+
+### Kubełek DO ODPOWIEDZI mówił nieprawdę
+
+„Widzę sporo reklamacji, które w naszej aplikacji pokazuje, że klient czeka,
+a w Allegro są już dawno rozwiązane." Sprawa ze zrzutu: reklamacja uznana
+28 lipca, wymiana zaproponowana, kupujący odpisał 1 sierpnia „Ok. Pozdrawiam."
+— i przez czterdzieści dziewięć dni stała w kolejce roboczej.
+
+- **Po czternastu dniach milczenia sprawa rozstrzygnięta schodzi do
+  ROZSTRZYGNIĘTYCH.** Nikt nie czeka dwóch tygodni na odpowiedź, której
+  potrzebuje. Zegar, nie treść: „Ok. Pozdrawiam." i „przysłaliście znowu nie
+  ten" są dla Allegro tym samym `BUYER_REPLIED`.
+- **Plakietka „klient czeka" idzie za kubełkiem** — jeden predykat, dwóch
+  wołających. Do tej pory liczyły to osobno i obie były tak samo nieprawdziwe.
+- **Sprawa NIEROZSTRZYGNIĘTA czeka bez względu na wiek.** Próg dotyczy
+  wyłącznie spraw po werdykcie; przed nim obok stoi termin decyzji i to on
+  rządzi kolejnością.
+- Brak daty ostatniej wiadomości zostawia sprawę w kolejce roboczej: brak
+  wiedzy to nie starość.
+
+### Granty cennika przy instalacji
+
+„Czy nie mogę tego nadać jakoś przy instalacji?" Można — `tw_Cena` instalator
+nadawał już od 0.405.0, brakowało widoku nazw poziomów.
+
+- **`vwPoziomyCen` wchodzi do skryptu uprawnień**, a instalator SPRAWDZA jego
+  obecność, zamiast ją zakładać. Grant na nieistniejący obiekt przerywa całe
+  wykonanie i zostawia konto bez ani jednego prawa.
+- Bramka grantów opcjonalnych jest od tego wydania NAZWANA. Jedna flaga
+  zdejmowała z listy każdy obiekt opcjonalny naraz, więc widok poziomów
+  znikałby razem ze zdjęciami — z zupełnie niezwiązanego powodu.
+
 ## 0.406.0 — 19 września 2026
 
 **Szablony odpowiedzi działają wszędzie tam, gdzie się odpisuje, i dają się
