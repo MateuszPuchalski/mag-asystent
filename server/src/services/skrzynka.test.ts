@@ -423,9 +423,15 @@ test("zlecony pomiar niesie pytanie klienta, ofertę i klucze rozmowy", () => {
   const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "podaj w milimetrach", BIURO);
   assert.equal(z.conversationId, rozmowaId);
   assert.equal(z.messageId, wiadomoscKlienta);
-  assert.match(z.instrukcja, /Czy zmierzycie rozstaw otworów\?/);
-  assert.match(z.instrukcja, /oferta-9/);
-  assert.match(z.instrukcja, /podaj w milimetrach/);
+  /* ── DWÓCH ODBIORCÓW, DWA POLA (0.408.0) ────────────────────────────────
+     Do 0.407.0 wszystko to stało w `instrukcja`, czyli jechało na kolektor:
+     magazynier czytał reklamację kupującego, żeby znaleźć jedno zdanie
+     mówiące, co ma zmierzyć. Kontekst NIE ZNIKNĄŁ — zszedł do `kontekst`,
+     przy karcie zadania w biurze, bo ta nie ma odnośnika do rozmowy. */
+  assert.equal(z.instrukcja, "podaj w milimetrach", "na halę idzie samo polecenie");
+  assert.match(z.kontekst ?? "", /Czy zmierzycie rozstaw otworów\?/);
+  assert.match(z.kontekst ?? "", /oferta-9/);
+  assert.doesNotMatch(z.instrukcja, /oferta-9/, "numer oferty nie jest pracą hali");
   /* tw_id zostaje puste: synchronizator nie pobiera ofert, więc mapowania
      oferta→kartoteka nie ma z czego zrobić. Zgadywanie byłoby gorsze. */
   assert.equal(z.twId, null);
@@ -442,8 +448,13 @@ test("zlecenie stoi na osi ZANIM wynik przyjdzie — bo wtedy właśnie się cze
   assert.ok(zlec, "zlecenie ma stać na osi od chwili zlecenia");
   assert.equal(zlec.zlecenie?.status, "nowe");
   /* Treścią wpisu jest INSTRUKCJA: po niej widać, czy wynik odpowiada na
-     zadane pytanie. Tytuł jedzie osobnym polem, bo jest etykietą. */
-  assert.match(zlec.tresc, /Czy zmierzycie rozstaw otworów\?/);
+     zadane pytanie. Tytuł jedzie osobnym polem, bo jest etykietą.
+
+     Od 0.408.0 jest to samo POLECENIE, a nie sklejony kontekst — i na osi
+     rozmowy to jest zysk, nie strata: pytanie klienta stoi dwa wpisy wyżej,
+     więc przepisywanie go do wpisu o zleceniu było dublowaniem. */
+  assert.match(zlec.tresc, /podaj w milimetrach/);
+  assert.doesNotMatch(zlec.tresc, /Czy zmierzycie rozstaw otworów\?/);
   assert.ok(zlec.zlecenie?.tytul, "tytuł jedzie osobno, nie sklejony z instrukcją");
   /* Wyniku jeszcze nie ma — i to jest cała wartość tego wpisu. */
   assert.equal(os.find((w) => w.rodzaj === "wynik_zadania"), undefined);
@@ -482,7 +493,7 @@ test("wynik z hali wraca na oś tej rozmowy jako osobny wpis", () => {
 
 /* Bramka własności zostaje bramką także wtedy, gdy zadanie wisi na rozmowie. */
 test("wynik zadania z rozmowy zapisze tylko ten, kto je przejął", () => {
-  const zadanie = zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO);
+  const zadanie = zlecPomiar(rozmowaId, wiadomoscKlienta, "Zmierz rozstaw.", BIURO);
   assert.throws(() => wykonajZadanie(zadanie.id, "48 mm", { id: 999, name: "Ktoś inny" }),
     /przejęte przez Ciebie/);
 });
@@ -496,22 +507,40 @@ test("wskazana kartoteka ląduje na zadaniu i jest podpisana jako wybór agenta"
   db().prepare(
     "INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (1042,'ROZ-GCV','Rozrusznik kompletny GCV')",
   ).run();
-  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO, 1042);
+  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "Zmierz rozstaw.", BIURO, 1042);
   assert.equal(z.twId, 1042);
-  assert.match(z.instrukcja, /Kartotekę wskazał\(a\) Biuro, nie wynika z oferty/);
+  /* Podpis o wyborze agenta stoi w kontekście dla BIURA (0.408.0) — to audyt
+     pochodzenia, a nie polecenie dla hali. */
+  assert.match(z.kontekst ?? "", /Kartotekę wskazał\(a\) Biuro, nie wynika z oferty/);
 });
 
 test("nieistniejąca kartoteka odrzucona, zadanie nie powstaje", () => {
   const przed = (db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n;
-  assert.throws(() => zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO, 987654), /Nie znaleziono towaru/);
+  assert.throws(() => zlecPomiar(rozmowaId, wiadomoscKlienta, "Zmierz.", BIURO, 987654),
+    /Nie znaleziono towaru/);
   assert.equal((db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n, przed);
 });
 
 test("bez wskazania kartoteki zadanie idzie jak dotąd, bez podpisu o wyborze", () => {
-  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "", BIURO);
+  const z = zlecPomiar(rozmowaId, wiadomoscKlienta, "Zmierz rozstaw.", BIURO);
   assert.equal(z.twId, null);
-  assert.doesNotMatch(z.instrukcja, /wskazał/);
-  assert.match(z.instrukcja, /Oferta Allegro: oferta-9/);
+  assert.doesNotMatch(z.kontekst ?? "", /wskazał/);
+  assert.match(z.kontekst ?? "", /Oferta Allegro: oferta-9/);
+});
+
+/* ── Zadanie bez polecenia to zadanie nie do wykonania (0.408.0) ───────────
+   Wskazówka była opcjonalna dokładnie dlatego, że kontekst służył za treść
+   zastępczą: magazynier dostawał wtedy samo pytanie klienta i miał sam
+   zgadnąć, co z nim zrobić. Skoro kontekst zszedł z kolektora, pustej
+   wskazówki nie ma już czym zastąpić — i nie powinno być.
+
+   Tłumaczenie pytania kupującego na polecenie dla hali jest pracą AGENTA. */
+test("zlecenie BEZ polecenia dla hali jest odrzucane", () => {
+  const przed = (db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n;
+  assert.throws(() => zlecPomiar(rozmowaId, wiadomoscKlienta, "   ", BIURO),
+    /co ma zrobić hala/);
+  assert.equal((db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n,
+    przed, "odrzucone zlecenie nie zostawia zadania");
 });
 
 /* ── Komentarze wewnętrzne na osi (0.157.0) ──────────────────────────────────

@@ -59,6 +59,7 @@ import { statystykiZdjec, zapomnijBrakiZdjec } from "./services/zdjecia.js";
 import { zamelduj, stanWorkera, stanSfery, zaleglosciMm } from "./services/process-state.js";
 import { WERSJA } from "./wersja.js";
 import { stanSynchronizacjiHealth } from "./services/allegro-inbox-sync-state.js";
+import { stanReklamacjiHealth } from "./services/allegro-reklamacje-sync-state.js";
 import { stanObslugiHealth } from "./services/skrzynka.js";
 import { synchronizujAllegroInbox } from "./services/allegro-inbox-sync.js";
 import { synchronizujAllegroZwroty } from "./services/allegro-zwroty-sync.js";
@@ -180,6 +181,19 @@ export async function buildApp() {
        dlaczego jest pusta — czyli dokładnie tę ciszę, którą ta trasa ma łamać. */
     const allegro = bez("połączenie Allegro", stanPolaczenia);
     const allegroInbox = bez("synchronizacja Allegro", () => stanSynchronizacjiHealth(db()));
+    /* ── STAN SYNCHRONIZACJI SPRAW POSPRZEDAŻOWYCH (0.409.0) ─────────────────
+       Zgłoszenie właściciela: „reklamacje w aplikacji mają nieaktualny stan".
+
+       `stanReklamacjiHealth` istniał od 0.222.0 i ta trasa go NIE WOŁAŁA —
+       przez trzy kwartały `/api/health` mówił o skrzynce i milczał o sprawach
+       posprzedażowych. Właściciel przysłał wynik tej trasy, żeby pokazać
+       problem z reklamacjami, a odpowiedzi na to pytanie w nim nie było.
+
+       Sam blok panel czyta od dawna (pasek tła na kolejce reklamacji), ale to
+       jest ekran pracy, a nie miejsce, do którego się zagląda, gdy coś jest
+       nie tak. Zdrowie ma odpowiadać na pytanie „co się dzieje" bez logowania
+       się do panelu. */
+    const allegroReklamacje = bez("synchronizacja spraw", () => stanReklamacjiHealth(db()));
     const obsluga = bez("obsługa klienta", stanObslugiHealth);
     const audyt = bez("audyt", statystykiAudytu);
 
@@ -191,6 +205,27 @@ export async function buildApp() {
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
       bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
+      /* ── OGON SPRAW, KTÓREGO PRZEBIEG NIE WZIĄŁ (0.409.0) ─────────────────
+         Bezpiecznik stron czyta najwyżej tysiąc spraw na przebieg. Konto
+         z dłuższym archiwum zostawia resztę po tamtej stronie — i to są
+         sprawy, których STATUS u nas się nie odświeża, choć w Allegro dawno
+         się zmienił. Dokładnie to zgłosił właściciel: „reklamacje mają
+         nieaktualny stan".
+
+         Liczba stała w bazie od 0.222.0 i widział ją wyłącznie pasek nad
+         kolejką reklamacji. Tutaj wchodzi jako ZDANIE, bo `problemy` są tym,
+         co człowiek czyta, gdy coś nie działa — i to stąd wziął odpowiedź
+         o cenach dwie godziny wcześniej. */
+      bez("ogon spraw posprzedażowych", () => {
+        const p = allegroReklamacje?.pozostaloDoPobrania ?? null;
+        return p && p > 0
+          ? `Synchronizacja spraw posprzedażowych nie dociąga ${p} spraw — `
+            + "bezpiecznik stron czyta najwyżej tysiąc na przebieg. Status tych "
+            + "spraw w panelu NIE odświeża się wcale, choć w Allegro mógł się "
+            + "zmienić. Próg daty kolejki („od …”) tego nie naprawia: obcina "
+            + "widok, nie pobieranie."
+          : null;
+      }),
       brakDostepuDoMagazynow,
       brakKolumnyZrealizowano,
       /* Sprzedaż bez kolumny numeru obcego wiąże dokument tylko ręką: zwrot
@@ -286,6 +321,7 @@ export async function buildApp() {
          wygaśnięcia — bez loginu konta i bez tokenów. */
       allegro,
       allegroInbox,
+      allegroReklamacje,
       /* Liczby obsługi klienta z §21 projektu panelu: ile pytań czeka i jak
          długo wisi najstarsze zadanie dla hali. Same liczby — trasa jest
          publiczna, więc klient, treść i numer oferty tu nie wchodzą. */

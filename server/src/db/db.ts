@@ -826,6 +826,20 @@ export function migrate(database: DatabaseSync) {
      nazwach, więc musi widzieć tabelę już kompletną. */
   zadanieNieTrzymaTowaru(database);
   zadanieWracaDoBiura(database);
+  /* ── KONTEKST ZLECENIA DLA BIURA (0.408.0) ────────────────────────────────
+     Osobno od instrukcji, która jedzie na halę — patrz `zadanie_terenowe`
+     w `schema.sql`. Stare wiersze zostają z NULL i ze sklejoną instrukcją.
+
+     STOI TU, PO OBU PRZEBUDOWACH, a nie przy pozostałych `addColumn` na górze,
+     i to nie jest kwestia porządku. Obie funkcje wyżej odtwarzają tę tabelę
+     od zera, z JAWNEJ listy kolumn, i przenoszą dane `INSERT ... SELECT`.
+     Kolumna dołożona przed nimi ginęła razem ze starą tabelą, a pierwszy
+     `SELECT` sięgający po nią wywracał się na „no such column".
+
+     Wyłapał to test migracji z bazy w kształcie 0.141.0 (`db/rozmowy.test.ts`)
+     — czyli dokładnie ten, dla którego istnieje. Na świeżej bazie kolumna
+     przychodzi ze `schema.sql` i tej ścieżki nie widać wcale. */
+  addColumn("zadanie_terenowe", "kontekst", "TEXT");
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
   doborZnaDrogi(database);

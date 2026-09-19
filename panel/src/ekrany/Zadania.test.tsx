@@ -18,7 +18,8 @@ import type { Zadanie } from "../api/typy";
 
 const zadanie = (n: Partial<Zadanie> = {}): Zadanie => ({
   id: 12, rodzaj: "pomiar", tytul: "Zmierz rozstaw otworów",
-  instrukcja: "Od środka do środka, w mm.", twId: null, symbol: null, nazwaTowaru: null,
+  instrukcja: "Od środka do środka, w mm.", kontekst: null,
+  twId: null, symbol: null, nazwaTowaru: null,
   lokalizacja: null, priorytet: "normalny", status: "nowe",
   utworzonoAt: "2026-09-15T08:00:00.000Z", utworzonoPrzez: "A. Lewandowska",
   przypisanoPrzez: null, wynik: null, wykonanoPrzez: null,

@@ -214,12 +214,25 @@ export function Rozmowa(p: {
           <span className="font-normal text-slate-500"> (opcjonalnie)</span></div>
         <Wyszukiwarka wybrany={p.towar} onWybierz={p.onTowar} etykieta="Wskazana przez Ciebie" />
       </div>
-      <label className="block text-sm font-semibold">Wskazówka dla hali
-        <span className="font-normal text-slate-500"> (opcjonalnie)</span>
+      {/* ── POLECENIE JEST OBOWIĄZKOWE (0.408.0) ─────────────────────────────
+          Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
+          informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub
+          bez produktu — i co ma zrobić".
+
+          To pole było opcjonalne, bo hala dostawała w zastępstwie CAŁY kontekst
+          rozmowy: pytanie kupującego, numer oferty, zdanie o kartotece. Skoro
+          kontekst zszedł z kolektora do karty zadania w biurze, pustej
+          wskazówki nie ma już czym zastąpić — a zadanie bez zdania „co zrobić"
+          jest nie do wykonania. Przetłumaczenie pytania klienta na polecenie
+          dla hali to praca agenta, nie magazyniera w rękawicy. */}
+      <label className="block text-sm font-semibold">Co ma zrobić hala
         <input className="field mt-1" value={p.wskazowka}
           onChange={(e) => p.onWskazowka(e.target.value)}
-          placeholder="Np. podaj wynik w milimetrach" /></label>
-      <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}>
+          placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
+      {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
+          serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
+      <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
+        disabled={!p.wskazowka.trim()}>
         <Ruler size={16} />ZLEĆ POMIAR</Przycisk>
     </div>}
 

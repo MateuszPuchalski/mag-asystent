@@ -1482,6 +1482,26 @@ CREATE TABLE IF NOT EXISTS zadanie_terenowe (
   rodzaj TEXT NOT NULL CHECK (rodzaj IN ('pomiar','zdjecie','weryfikacja','inne')),
   tytul TEXT NOT NULL,
   instrukcja TEXT NOT NULL,
+  -- ── DWÓCH ODBIORCÓW, DWA POLA (0.408.0) ───────────────────────────────────
+  -- Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
+  -- informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub bez
+  -- produktu — i co ma zrobić".
+  --
+  -- Do 0.407.0 zlecenie z rozmowy sklejało w `instrukcja` CZTERY linie: całą
+  -- treść pytania klienta, numer oferty Allegro, zdanie o tym, kto wskazał
+  -- kartotekę, i dopiero na końcu wskazówkę biura. Magazynier dostawał na
+  -- kolektor pytanie kupującego i numer oferty, których do niczego nie
+  -- używa, a jedyne zdanie mówiące, CO ZROBIĆ, stało pod nimi.
+  --
+  -- Kontekstu nie dało się po prostu skasować: karta zadania w biurze nie ma
+  -- odnośnika do rozmowy, więc byłby to jedyny ślad po tym, skąd zadanie się
+  -- wzięło. Rozdzielamy go zamiast kasować — `instrukcja` jedzie na halę,
+  -- `kontekst` zostaje w biurze.
+  --
+  -- STARE WIERSZE ZOSTAJĄ Z NULL i ze sklejoną instrukcją. Przepisywanie ich
+  -- wymagałoby rozcinania tekstu po nagłówkach, które ktoś mógł ręcznie
+  -- zmienić — a to są zadania dawno zamknięte.
+  kontekst TEXT,
   -- ON DELETE SET NULL, bo `sgt_towar` jest READ-MODELEM odtwarzanym przy
   -- każdym imporcie z Subiekta: `importFromMssql` kasuje całą tabelę i wstawia
   -- ją od nowa. Bez tej klauzuli klucz obcy trzymał wiersz towaru w zakładnikach

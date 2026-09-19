@@ -17,6 +17,10 @@ export const POWODY_ODESLANIA = ["brak_towaru", "nie_da_sie"] as const;
 export type PowodOdeslania = (typeof POWODY_ODESLANIA)[number];
 export interface ZadanieTerenowe {
   id: number; rodzaj: RodzajZadania; tytul: string; instrukcja: string;
+  /* Kontekst zlecenia DLA BIURA (0.408.0) — skąd zadanie się wzięło. Na halę
+     NIE jedzie: magazynier dostaje produkt i zdanie mówiące, co zrobić.
+     `null` przy zadaniach sprzed tego wydania i przy zakładanych ręcznie. */
+  kontekst: string | null;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null; lokalizacja: string | null;
   zrodlo: string; zrodloRef: string | null; priorytet: PriorytetZadania;
   status: "nowe" | "w_toku" | "wykonane" | "anulowane";
@@ -48,7 +52,7 @@ export interface ZadanieTerenowe {
 export interface ZalacznikZadania {
  id: number; opis: string | null; at: string; przez: string;
 }
-const SELECT = `SELECT z.id,z.rodzaj,z.tytul,z.instrukcja,z.tw_id AS twId,
+const SELECT = `SELECT z.id,z.rodzaj,z.tytul,z.instrukcja,z.kontekst,z.tw_id AS twId,
  t.symbol,t.nazwa AS nazwaTowaru,t.lokalizacja,z.zrodlo,z.zrodlo_ref AS zrodloRef,
  z.priorytet,z.status,z.utworzono_at AS utworzonoAt,z.utworzono_przez AS utworzonoPrzez,
  z.przypisano_at AS przypisanoAt,z.przypisano_przez AS przypisanoPrzez,
@@ -82,11 +86,14 @@ export function listaZadan(opts:{status?:string;userId?:number}={}):ZadanieTeren
  return wiersze.map((z)=>zZegarem(z,chwila,zal.get(z.id)??[]));
 }
 export function zadanie(id:number):ZadanieTerenowe|null{const z=db().prepare(`${SELECT} WHERE z.id=?`).get(id) as unknown as ZadanieTerenowe|undefined;return z?zZegarem(z,Date.now(),zalacznikiDla([z.id]).get(z.id)??[]):null;}
-export function utworzZadanie(input:{rodzaj:RodzajZadania;tytul:string;instrukcja:string;twId?:number|null;zrodlo?:string;zrodloRef?:string|null;priorytet?:PriorytetZadania},autor:{id:number;name:string}){
+export function utworzZadanie(input:{rodzaj:RodzajZadania;tytul:string;instrukcja:string;kontekst?:string|null;twId?:number|null;zrodlo?:string;zrodloRef?:string|null;priorytet?:PriorytetZadania},autor:{id:number;name:string}){
  if(!["pomiar","zdjecie","weryfikacja","inne"].includes(input.rodzaj))throw new Error("Nieznany rodzaj zadania");
  const t=tekst(input.tytul,"Tytuł",120),i=tekst(input.instrukcja,"Instrukcja",2000),p=input.priorytet??"normalny";
+ /* Kontekst jest OPCJONALNY i nie przechodzi przez `tekst`: pusty ma zostać
+    pustym, a nie wywrócić zakładanie zadania. Limit ten sam co instrukcji. */
+ const k=(input.kontekst??"").trim().slice(0,2000)||null;
  if(input.twId!=null&&!db().prepare("SELECT 1 FROM sgt_towar WHERE tw_id=?").get(input.twId))throw new Error("Nie znaleziono towaru");
- const id=Number(db().prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,tw_id,zrodlo,zrodlo_ref,priorytet,utworzono_at,utworzono_przez,utworzono_user_id) VALUES(?,?,?,?,?,?,?,?,?,?)`).run(input.rodzaj,t,i,input.twId??null,input.zrodlo??"reczne",input.zrodloRef?.trim()||null,p,teraz(),autor.name,autor.id).lastInsertRowid);
+ const id=Number(db().prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,kontekst,tw_id,zrodlo,zrodlo_ref,priorytet,utworzono_at,utworzono_przez,utworzono_user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(input.rodzaj,t,i,k,input.twId??null,input.zrodlo??"reczne",input.zrodloRef?.trim()||null,p,teraz(),autor.name,autor.id).lastInsertRowid);
  logEvent("zadanie_terenowe_utworzone",autor.name,input.twId??null,{zadanieId:id,rodzaj:input.rodzaj});return zadanie(id)!;
 }
 export function wezZadanie(id:number,autor:{id:number;name:string}){

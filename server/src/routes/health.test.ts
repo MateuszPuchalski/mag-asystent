@@ -119,3 +119,21 @@ test("udane odświeżenie zdejmuje zdanie o nieświeżym read-modelu", async () 
   assert.ok(!h.problemy.some((p: string) => p.includes("Import z Subiekta")),
     "zdanie o awarii zostało po udanym imporcie");
 });
+
+test("zdrowie mówi o synchronizacji SPRAW POSPRZEDAŻOWYCH, nie tylko skrzynki", async () => {
+  /* ── Zgłoszenie właściciela (0.409.0) ────────────────────────────────────
+     „Reklamacje w aplikacji mają nieaktualny stan." Przysłał wynik tej trasy,
+     żeby to pokazać — a odpowiedzi w nim nie było: `/api/health` niósł
+     `allegroInbox` i milczał o sprawach posprzedażowych, choć
+     `stanReklamacjiHealth` istnieje od 0.222.0 i ta trasa go nie wołała.
+
+     Blok jest dokładnie tam, gdzie człowiek zagląda, gdy coś nie działa —
+     i niesie `pozostaloDoPobrania`, czyli jedyny ślad po sprawach, których
+     bezpiecznik stron nie dociągnął i których status się NIE odświeża. */
+  const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
+  assert.ok(h.allegroReklamacje, "brak bloku o synchronizacji spraw");
+  assert.ok("pozostaloDoPobrania" in h.allegroReklamacje,
+    "ogon spraw to jedyna liczba mówiąca, czego przebieg nie wziął");
+  assert.ok("ostatniaUdanaSynchronizacja" in h.allegroReklamacje);
+  assert.ok("status" in h.allegroReklamacje);
+});

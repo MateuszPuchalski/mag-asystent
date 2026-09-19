@@ -232,6 +232,16 @@ export function Zadania() {
                 <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">PILNE</span>}
             </div>
             <p className="mt-2 whitespace-pre-wrap text-tresc text-slate-600">{t.instrukcja}</p>
+            {/* ── SKĄD TO ZADANIE (0.408.0) ───────────────────────────────
+                Do 0.407.0 kontekst rozmowy był doklejony do instrukcji, więc
+                jechał RAZEM z nią na kolektor. Zszedł tutaj, bo odpowiada na
+                pytanie biura („czego to dotyczyło"), a nie hali („co zrobić").
+
+                WYCISZONY I MNIEJSZY, nie zwinięty: karta zadania jest mała,
+                a kontekst to dwa, trzy wiersze — zwijka kosztowałaby
+                kliknięcie przy każdym powrocie po wynik. */}
+            {t.kontekst && <p className="mt-2 whitespace-pre-wrap border-l-2 border-slate-200
+              pl-2 text-podpis text-slate-500">{t.kontekst}</p>}
           </div>
         </div>
         {/* ── PASEK TOWARU ZE ZDJĘCIEM (0.203.0) ────────────────────────
