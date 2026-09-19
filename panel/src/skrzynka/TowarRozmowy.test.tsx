@@ -332,6 +332,17 @@ describe("ceny kartoteki", () => {
     expect(screen.queryByText(/Ceny . Subiekt GT/)).toBeNull();
   });
 
+  it("ZERO BRUTTO to brak ceny, a nie najgłośniejsza liczba bloku (0.412.0)", () => {
+    /* Poziom zakupu Subiekt wypełnia wyłącznie po stronie netto, a drugą
+       stronę pary zostawia zerem. Do 0.411.0 wiersz krzyczał więc `0,00 PLN`
+       grubym drukiem i wyciszał jedyną prawdziwą liczbę jako „netto" — przy
+       triażu reklamacji, gdzie właśnie ta liczba rozstrzyga. */
+    zKartoteka([{ poziom: 0, nazwa: "", nettoGrosze: 1864, bruttoGrosze: 0, waluta: "PLN" }]);
+    expect(screen.getByText("18,64 PLN")).toBeInTheDocument();
+    expect(screen.queryByText(/0,00/)).toBeNull();
+    expect(screen.getByText(/bez ceny brutto/)).toBeInTheDocument();
+  });
+
   it("brak kwoty pokazuje się jako BRAK, nigdy jako zero", () => {
     /* Zero znaczyłoby „za darmo" i agent podałby je klientowi. */
     zKartoteka([

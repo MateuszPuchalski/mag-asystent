@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.412.0 — 19 września 2026
+
+**Hierarchia decyzji o reklamacji: najpierw dowody, na końcu werdykt.**
+Zgłoszenie właściciela ze zrzutem: „potrzebujemy wyraźnej hierarchii, żeby
+podjąć decyzję o reklamacji". Projekt stanął na dekalogach z repo, nie na
+wyczuciu — `docs/ergonomia-magazynu.md` punkty 2 i 5, `docs/obsluga-klienta-calosc.md`
+punkty 9 i 10.
+
+- **„Czy mamy" wróciło na ekran reklamacji.** Przy żądaniu wymiany ta liczba
+  rozstrzyga całą sprawę, a kolumna dowodów nie miała jej WCALE — pokazywała
+  za to sześć poziomów cen. Skrzynka ma stan i półkę od 0.404.0.
+- **Trzy kostki triażu zamiast sześciu równorzędnych kwot:** mamy · klient
+  zapłacił · nasz zakup. Pozostałe poziomy zostają w zwijce otwartej domyślnie,
+  więc nic nie znika, a kto ich nie używa, zamyka je raz na stanowisko.
+- **Nic się tu nie odejmuje.** Zapłacone jest brutto z paragonu, zakup netto
+  z kartoteki; różnica tych dwóch nie jest marżą, a stawki VAT ładunek nie
+  niesie. Dwie liczby obok siebie mówią prawdę, jedna wyliczona kłamałaby.
+- **Werdykt zszedł POD rozmowę.** Do 0.411.0 UZNAJĘ i ODRZUCAM stały jako
+  pierwszy element środkowej kolumny — nad treścią zgłoszenia, którego
+  dotyczą. Ekran zadawał nieodwracalne pytanie, zanim pokazał cokolwiek,
+  z czego wynika odpowiedź. Zgoda przed wysłaniem zostaje przy OBU gałęziach:
+  uznanie kosztuje pieniądze i jest równie nieodwracalne co odmowa.
+- **Zgłoszenie raz, nie dwa.** Gdy Allegro wpisze ten sam tekst w opis sprawy
+  i w pierwszą wiadomość kupującego, zostaje rozmowa — ma autora, godzinę
+  i miejsce w wątku. Załączniki sprawy zostają zawsze, bo wiszą na sprawie.
+- **Usterka z 0.411.0: zero to brak, nie cena.** Poziom zakupu nie ma ceny
+  brutto, więc blok cen krzyczał `0,00 PLN` grubym drukiem i wyciszał jedyną
+  prawdziwą liczbę jako „netto". Bez ceny brutto główną liczbą jest netto,
+  a podpis mówi, czego Subiekt nie prowadzi. Poprawka działa w obu frontach.
+- Bez potwierdzonej kartoteki stan mówi „nie wiadomo" wprost — pusty slot
+  czytałby się jak „nie mamy", a to dwie różne odpowiedzi klientowi.
+
 ## 0.411.0 — 19 września 2026
 
 **Ceny z Subiekta stoją przy reklamacji, na wierzchu.** Zgłoszenie

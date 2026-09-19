@@ -6,10 +6,14 @@ import { zlote } from "../api/zwroty";
 import { NAZWA_STANU_WERDYKTU, NAZWA_WERDYKTU, ODMOWY, UZNANIA } from "./statusy";
 import { LIMIT_ZNAKOW } from "./Edytor";
 
-/* ── Werdykt reklamacji (przyrost trzeci) ────────────────────────────────────
-   Pasek decyzji CAŁEJ sprawy nad rozmową — §25a.4: „pasek decyzji zostaje
-   przy tym, co dotyczy całego zwrotu". Rozmowa ma edytor pod osią; werdykt
-   nie jest wiadomością, tylko rozstrzygnięciem, więc stoi osobno i wyżej.
+/* ── Werdykt reklamacji (przyrost trzeci; miejsce z 0.412.0) ─────────────────
+   Pasek decyzji CAŁEJ sprawy — §25a.4: „pasek decyzji zostaje przy tym, co
+   dotyczy całego zwrotu". Werdykt nie jest wiadomością, tylko
+   rozstrzygnięciem, więc stoi osobno, a nie w edytorze.
+
+   POD ROZMOWĄ, nie nad nią (0.412.0). Do 0.411.0 ten pasek był pierwszym
+   elementem kolumny, czyli ekran zadawał nieodwracalne pytanie przed
+   pokazaniem dowodów. Dekalog obsługi, punkt 9, i ergonomii, punkt 5.
 
    PRAWO HICKA: najpierw DWA przyciski — „UZNAJĘ" albo „ODRZUCAM" — dopiero po
    kliknięciu lista czterech albo siedmiu wartości Allegro. Jedenaście pozycji
@@ -95,7 +99,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   /* ── Blok po werdykcie (nasz albo z Centrum Sprzedaży) ───────────────────── */
   if (wydany || (uAllegro && status !== "send_failed")) {
     const potwierdzony = Boolean(uAllegro);
-    return <section aria-label="Werdykt" className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+    return <section aria-label="Werdykt" className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Gavel size={15} className="shrink-0 text-slate-400" />
         <b className="text-naglowek">Werdykt</b>
@@ -174,7 +178,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   const zaDlugo = znakow > LIMIT_ZNAKOW;
   const gotowe = Boolean(wiadomosc.trim()) && !zaDlugo && zgoda && (!czesciowy || (grosze !== null && grosze > 0));
 
-  return <section aria-label="Werdykt" className="mb-3 rounded-lg border border-slate-200 bg-white p-3">
+  return <section aria-label="Werdykt" className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
     <div className="flex flex-wrap items-center gap-2">
       <Gavel size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Werdykt</b>

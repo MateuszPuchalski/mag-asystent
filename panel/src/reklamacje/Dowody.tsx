@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Bot, ExternalLink, Gavel, NotebookPen, Receipt, Undo2 } from "lucide-react";
+import { Bot, Coins, ExternalLink, Gavel, NotebookPen, Receipt, Undo2 } from "lucide-react";
 import type {
-  PozycjaZamowienia, RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt, ZdjecieKarty,
+  CenaPoziomu, PozycjaZamowienia, RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt,
+  ZdjecieKarty,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
@@ -337,7 +338,7 @@ export function Dowody({
   return <div className="flex min-h-0 flex-col">
     <Glowica r={r} />
     <Towar szczegol={szczegol} pozycja={pozycja} />
-    <Cennik twId={r.twId} />
+    <Triaz r={r} pozycja={pozycja} />
 
     <div className="px-2">
       <Zwijka
@@ -642,37 +643,102 @@ function Towar({ szczegol, pozycja }: {
   </div>;
 }
 
-/* ── CENNIK SUBIEKTA PRZY SPRAWIE (0.411.0) ──────────────────────────────────
+/* ── TRIAŻ: CZY MAMY I ILE NAS KOSZTUJE (0.411.0, kształt z 0.412.0) ────────
    Zgłoszenie właściciela: „nadal nie widzę cen w reklamacjach", a zaraz potem
    powód: „są kluczowe do szybkiego oceniania, czy warto rozpatrywać
-   reklamację".
+   reklamację". To drugie zdanie rozstrzyga KSZTAŁT, nie samo istnienie bloku:
+   liczba używana do triażu nie może stać za kliknięciem.
 
-   To drugie zdanie rozstrzyga KSZTAŁT, nie tylko istnienie bloku. Liczba
-   używana do TRIAŻU nie może stać za kliknięciem: zwijka kosztowałaby ruch
-   przy każdej sprawie, czyli dokładnie przy tej czynności, którą ma
-   przyspieszyć. Dekalog ergonomii, punkt 2 — pierwszeństwo ma to, co
-   rozstrzyga bieżącą czynność.
+   0.411.0 postawiło tu goły cennik — sześć poziomów w jednej wadze. To było za
+   mało i za dużo naraz. Za mało, bo przy żądaniu WYMIANY całą decyzję
+   rozstrzyga pytanie „czy mamy czym wymienić", a tej liczby na ekranie
+   reklamacji nie było wcale; skrzynka ma ją od 0.404.0. Za dużo, bo sześć
+   równorzędnych kwot nie odpowiada na żadne pytanie — agent szukał wśród nich
+   ceny zakupu, zamiast ją przeczytać.
 
-   PŁACI ZA TO 0.403.0, które z tej kolumny wycinało wiersze. Import oddał
-   57818 cen na 9800 kartotek, czyli około sześciu poziomów na towar — sześć
-   wierszy wraca do kolumny, którą to wydanie odchudzało. Wraca świadomie
-   i z powodu wprost od właściciela, a nie „przy okazji".
+   TRZY KOSTKI, RESZTA POD SPODEM. Mamy · zapłacił · nasz zakup. Dekalog
+   ergonomii, punkt 2: pierwszeństwo ma to, co rozstrzyga bieżącą czynność.
+   Pozostałe poziomy zostają w zwijce OTWARTEJ domyślnie — nic nie znika
+   z ekranu, a kto ich nie używa, zamyka je raz na stanowisko.
 
-   BLOK JEST TEN SAM, CO W SKRZYNCE, nie kopia: te same nazwy poziomów, ta sama
-   kolejność, ta sama zasada „pusty nie rysuje się wcale". Dwie kopie tego
-   samego rozjechałyby się przy pierwszej poprawce jednej z nich.
+   NIC SIĘ TU NIE ODEJMUJE. „Zapłacił" jest kwotą BRUTTO z paragonu, „nasz
+   zakup" — netto z kartoteki. Różnica tych dwóch liczb nie jest marżą, a stawki
+   VAT ten ładunek nie niesie. Dwie liczby obok siebie mówią prawdę; jedna
+   wyliczona z nich kłamałaby z dokładnością do podatku.
 
-   MILCZY BEZ KARTOTEKI. Sprawa bez potwierdzonego towaru nie ma cennika i nie
-   dostaje pustej ramki — brak wiedzy to nie jest informacja warta miejsca. */
-function Cennik({ twId }: { twId: number | null }) {
+   BRAK KARTOTEKI MÓWI O SOBIE (punkt 10 z `docs/obsluga-klienta-calosc.md`:
+   czego nie wiemy, ekran mówi wprost). Pusty slot po stanie czytałby się jak
+   „nie mamy", a to dwie różne odpowiedzi klientowi i dwie różne decyzje. */
+function Triaz({ r, pozycja }: { r: Reklamacja; pozycja: PozycjaZamowienia | null }) {
   /* Ten sam hak, co w skrzynce — TanStack trzyma to pod jednym kluczem, więc
      otwarcie sprawy nie pyta serwera drugi raz o tę samą kartotekę. */
-  const karta = useKartaTowaru(twId);
+  const karta = useKartaTowaru(r.twId);
   const ceny = karta.data?.ceny ?? [];
-  if (ceny.length === 0) return null;
+  /* POZIOM 0 TO CENA ZAKUPU. Kolumny `tw_Cena` numerują się od zera, a widok
+     nazw od jedynki — dlatego ten jeden poziom nie ma nazwy i mieć nie musi
+     (`adapters/subiekt.mssql.ts`, `rozwinCeny`). Nie zgadujemy go „najniższą
+     ceną z listy": najtańszy cennik sprzedaży to nadal sprzedaż. */
+  const zakup = ceny.find((c) => c.poziom === 0) ?? null;
+  const pozostale = ceny.filter((c) => c.poziom !== 0);
+  const mag = karta.data?.mag ?? null;
+  const stanZnany = mag !== null;
+  /* Sprawa bez potwierdzonej kartoteki nie ma czego pokazać poza zdaniem
+     o tym braku — a samo zdanie nie jest warte paska, gdy nie ma przy nim
+     ani ceny z paragonu, ani niczego innego. */
+  if (!stanZnany && r.twId !== null && ceny.length === 0 && !pozycja) return null;
+  if (!stanZnany && r.twId === null && !pozycja) return null;
+
   return <div className="border-b border-slate-200 px-4 py-2">
-    <CenyKartoteki ceny={ceny} />
+    <div className="flex flex-wrap gap-2">
+      {stanZnany
+        ? <Kostka etykieta="Mamy"
+            wartosc={mag.avail > 0 ? `${mag.avail} ${karta.data?.unit || "szt."}` : "brak na stanie"}
+            kolor={mag.avail > 0 ? "text-ranga-ok" : "text-ranga-zle"}
+            pod={karta.data?.locs?.length ? karta.data.locs.join(", ") : "bez półki"} />
+        : r.twId === null
+          ? <Kostka etykieta="Mamy" wartosc="nie wiadomo" kolor="text-slate-700"
+              pod="sprawa bez kartoteki Subiekta" />
+          : null}
+      {pozycja && <Kostka etykieta="Klient zapłacił"
+        wartosc={zlote(pozycja.cenaGrosze, pozycja.waluta)} kolor="text-slate-900"
+        pod={pozycja.ilosc > 1 ? `za sztukę · ${pozycja.ilosc} szt. na paragonie` : "brutto, za sztukę"} />}
+      {zakup && <Kostka etykieta="Nasz zakup"
+        wartosc={zlote(zakup.nettoGrosze ?? zakup.bruttoGrosze, zakup.waluta)}
+        kolor="text-slate-900"
+        pod={zakup.nettoGrosze !== null ? "netto z kartoteki" : "brutto z kartoteki"} />}
+    </div>
+
+    {pozostale.length > 0 && <Zwijka
+      tytul="Pozostałe poziomy cen"
+      Ikona={Coins}
+      podpis={podpisCennika(pozostale)}
+      /* OTWARTA DOMYŚLNIE: 0.411.0 postawiło te wiersze na wierzchu decyzją
+         właściciela i to wydanie ich stamtąd nie zdejmuje — daje tylko sposób
+         na zamknięcie ich raz, komu nie są potrzebne. */
+      domyslnieOtwarte
+      pamietajJako="wertis.reklamacje.cennik"
+    >
+      <div className="px-2 py-2">
+        <CenyKartoteki ceny={pozostale} />
+      </div>
+    </Zwijka>}
   </div>;
+}
+
+/** Jedna liczba triażu: etykieta, kwota grubym drukiem, zdanie pod spodem. */
+function Kostka({ etykieta, wartosc, kolor, pod }: {
+  etykieta: string; wartosc: string; kolor: string; pod: string;
+}) {
+  return <div className="min-w-[8.5rem] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+    <EtykietaWartosci className="block">{etykieta}</EtykietaWartosci>
+    <p className={`mt-0.5 text-lg font-bold leading-tight tabular-nums ${kolor}`}>{wartosc}</p>
+    <p className="text-podpis text-slate-600">{pod}</p>
+  </div>;
+}
+
+/** Co stoi w cenniku — ile poziomów, żeby zamknięta zwijka nie kazała zgadywać. */
+function podpisCennika(ceny: CenaPoziomu[]): string {
+  return ile(ceny.length, "poziom", "poziomy", "poziomów");
 }
 
 /** Co stoi w zakupie — kwota i dzień, czyli to, po co się tę zwijkę otwiera. */

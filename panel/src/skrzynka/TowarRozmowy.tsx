@@ -326,6 +326,17 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
  * brak wiedzy nie jest informacją wartą kolumny. Na produkcji blok milczy,
  * dopóki import nie dostanie nazw cennika i nowego GRANT-u (`tools/sonda-cen.sql`).
  */
+/**
+ * Czy ten poziom NIE MA ceny brutto — `null` albo zero (0.412.0).
+ *
+ * Zero jest tu brakiem, nie kwotą: cennik zakupowy Subiekta wypełnia wyłącznie
+ * kolumnę netto, a druga strona pary zostaje zerem. Podanie tego zera jako
+ * ceny znaczyłoby „za darmo".
+ */
+function brakBrutto(c: CenaPoziomu): boolean {
+  return c.bruttoGrosze === null || c.bruttoGrosze === 0;
+}
+
 export function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
   if (ceny.length === 0) return null;
   return <div className="rounded-lg border border-slate-200 p-3">
@@ -337,10 +348,29 @@ export function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
             nazwa byłaby gorsza od numeru: agent uwierzyłby, że to detaliczna. */}
         <span className="min-w-0 flex-1 truncate text-slate-600">
           {c.nazwa || `poziom ${c.poziom}`}</span>
-        <b className="shrink-0 tabular-nums text-slate-900">
-          {zlote(c.bruttoGrosze, c.waluta)}</b>
-        <span className="shrink-0 tabular-nums text-slate-500">
-          netto {zlote(c.nettoGrosze, c.waluta)}</span>
+        {/* ── ZERO TO BRAK, NIE CENA (0.412.0) ────────────────────────────
+            Poziom zakupu (numer 0) nie ma u nas ceny brutto — Subiekt trzyma
+            tam parę „netto 18,64 / brutto 0,00". Do tego wydania wiersz
+            krzyczał więc `0,00 PLN` grubym drukiem, a jedyną prawdziwą liczbę
+            wyciszał jako „netto". Najgłośniejsza liczba bloku cen była
+            nieprawdą, i to przy triażu reklamacji.
+
+            Bez ceny brutto GŁÓWNĄ liczbą zostaje netto, a podpis mówi wprost,
+            czego Subiekt nie prowadzi. `rozwinCeny` poziomu z dwoma zerami
+            nie wpuszcza wcale, więc ten przypadek to zawsze jedna strona
+            pary — czyli dane do obejrzenia przez człowieka. */}
+        {brakBrutto(c)
+          ? <>
+              <b className="shrink-0 tabular-nums text-slate-900">
+                {zlote(c.nettoGrosze, c.waluta)}</b>
+              <span className="shrink-0 text-slate-500">netto · bez ceny brutto</span>
+            </>
+          : <>
+              <b className="shrink-0 tabular-nums text-slate-900">
+                {zlote(c.bruttoGrosze, c.waluta)}</b>
+              <span className="shrink-0 tabular-nums text-slate-500">
+                netto {zlote(c.nettoGrosze, c.waluta)}</span>
+            </>}
       </li>)}
     </ul>
   </div>;
