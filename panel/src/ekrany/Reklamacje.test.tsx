@@ -173,12 +173,50 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
    sprawy w teście nie mającym z sitem nic wspólnego. */
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
+/* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO (0.410.0) ──────────────────────────
+   Od tego wydania wejście w sprawę wysyła JEDNĄ mutację: `odswiez` (decyzja
+   właściciela, uzasadnienie przy teście „otwarcie ekranu…"). Testy pytające
+   „co wysłał TEN przycisk" mają pytać dalej o to samo, więc odsiewają ją tu —
+   w jednym miejscu, a nie ośmioma poprawkami rozsypanymi po pliku.
+
+   ODSIEW JEST WĄSKI CELOWO: filtruje wyłącznie `odswiez`, więc druga mutacja
+   dołożona kiedyś „przy okazji" do otwarcia sprawy wywali te testy, zamiast
+   przejść niezauważona. */
+const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:"));
+
 describe("Ekran reklamacji", () => {
-  it("otwarcie ekranu i wybranie sprawy NIE wywołują żadnej mutacji", async () => {
+  /* ── ZERO ZAPISU PRZY PATRZENIU, Z JEDNYM WYJĄTKIEM (0.410.0) ──────────────
+     Do 0.409.0 ten test pilnował, że otwarcie ekranu i wybranie sprawy nie
+     wywołują ŻADNEJ mutacji. Decyzja właściciela z 19 września 2026 wprowadza
+     dokładnie jeden wyjątek: „możesz po prostu odświeżyć reklamację, jak w nią
+     wejdę?".
+
+     Powód jest mierzalny, a nie estetyczny. Przebieg synchronizacji czyta
+     najwyżej tysiąc spraw, więc ogona archiwum nie odświeża NIGDY — agent
+     patrzył na status sprzed tygodni, nie sprzed trzech minut.
+
+     TEST NIE ZNIKA, TYLKO ZAWĘŻA SIĘ DO JEDNEJ DOZWOLONEJ MUTACJI. To jest
+     cała jego wartość: gdyby ktoś dołożył drugą (a „przy okazji" kusi), ten
+     plik ma odmówić. Samo otwarcie EKRANU, bez wybranej sprawy, nadal nie
+     wysyła niczego.                                                        */
+  it("otwarcie ekranu nie wywołuje mutacji, a wejście w sprawę TYLKO ją odświeża", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: /111\/2026/ }));
-    expect(scena.mutacje).toEqual([]);
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+  });
+
+  it("powrót do TEJ SAMEJ sprawy nie pyta Allegro drugi raz", async () => {
+    /* Odświeżenie kosztuje żądanie u dostawcy, więc należy się wejściu
+       w sprawę, a nie każdemu renderowi ekranu. */
+    pokaz("/obsluga/reklamacje/1");
+    /* Numer stoi i w kolejce, i w kolumnie dowodów — bierzemy WIERSZ, czyli
+       ten z kursorem. */
+    const wiersz = await screen.findByRole("button", { name: /111\/2026/, current: true });
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+    await userEvent.click(wiersz);
+    /* Drugie wejście w tę samą sprawę nie pyta Allegro znowu. */
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
   });
 
   it("kubełki niosą pytanie i licznik, a pytanie stoi nad listą", () => {
@@ -237,7 +275,7 @@ describe("Ekran reklamacji", () => {
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Towar sprawny.");
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ WERDYKT/ }));
-    expect(scena.mutacje).toEqual([
+    expect(bezOdswiezenia()).toEqual([
       `werdykt:${JSON.stringify({
         id: 1, werdykt: "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED",
         wiadomosc: "Towar sprawny.", kwotaGrosze: null, wersja: 1,
@@ -260,7 +298,7 @@ describe("Ekran reklamacji", () => {
   it("„prowadzę” jedzie z WERSJĄ rekordu — inaczej nadpisałoby pracę kolegi", async () => {
     pokaz("/obsluga/reklamacje/1");
     await userEvent.click(screen.getByRole("button", { name: /Prowadzę tę sprawę/ }));
-    expect(scena.mutacje).toEqual([`prowadze:${JSON.stringify({ id: 1, wersja: 1 })}`]);
+    expect(bezOdswiezenia()).toEqual([`prowadze:${JSON.stringify({ id: 1, wersja: 1 })}`]);
   });
 
   it("cyfra przełącza kubełek, ale NIE wtedy, gdy piszesz w polu", async () => {
@@ -285,7 +323,7 @@ describe("Ekran reklamacji", () => {
     ]);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
-    expect(scena.mutacje).toEqual([`odpowiedz:${JSON.stringify({
+    expect(bezOdswiezenia()).toEqual([`odpowiedz:${JSON.stringify({
       id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
       expectedLastMessageId: 1, mimoNowejWiadomosci: false,
     })}`]);
@@ -325,7 +363,7 @@ describe("Ekran reklamacji", () => {
     await userEvent.click(screen.getByRole("checkbox"));
     scena.mutacje = [];
     await userEvent.click(mimoTo);
-    expect(scena.mutacje).toEqual([`odpowiedz:${JSON.stringify({
+    expect(bezOdswiezenia()).toEqual([`odpowiedz:${JSON.stringify({
       id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
       expectedLastMessageId: 1, mimoNowejWiadomosci: true,
     })}`]);
@@ -387,10 +425,13 @@ describe("Ekran reklamacji", () => {
 
   it("nieudana wysyłka NIE dociąga sprawy — nie ma czego dociągać", async () => {
     pokaz("/obsluga/reklamacje/1");
+    /* Wejście w sprawę odświeża ją raz (0.410.0). Pytanie tego testu brzmi:
+       czy NIEUDANA WYSYŁKA dokłada drugie odświeżenie — i ma nie dokładać. */
+    const przed = scena.mutacje.filter((m) => m.startsWith("odswiez:")).length;
     scena.wynikWysylki = new Konflikt("Allegro zamknęło rozmowę w tej sprawie", {});
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
-    expect(scena.mutacje.some((m) => m.startsWith("odswiez:"))).toBe(false);
+    expect(scena.mutacje.filter((m) => m.startsWith("odswiez:")).length).toBe(przed);
   });
 
   /* ── Sito „Moje" (0.278.0) ────────────────────────────────────────────────
