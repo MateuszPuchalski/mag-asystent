@@ -1893,17 +1893,29 @@ nazw tabeli cennikowej. Właściciel uruchomił sondę 19 września 2026 i od
 0.405.0 import je pobiera.
 
 **[wymaga działania] Nadaj dwa nowe uprawnienia.** Bez nich karta towaru dalej
-milczy, a objaw jest NIEMY — wygląda dokładnie tak, jak wyglądała przedtem:
+milczy, a objaw jest NIEMY — wygląda dokładnie tak, jak wyglądała przedtem.
+
+**Najprościej: uruchom instalator ponownie.** Od 0.407.0 nadaje oba sam:
+
+```powershell
+cd C:\wertis\instalator
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1
+```
+
+Widok `vwPoziomyCen` instalator SPRAWDZA, a nie zakłada. Gdy go w tej bazie nie
+ma, pomija tę jedną linię i mówi o tym na ekranie. Powód jest twardy:
+`GRANT SELECT` na nieistniejący obiekt przerywa całe wykonanie skryptu
+i zostawia konto bez ani jednego prawa. To ta sama ostrożność, co przy tabeli
+zdjęć.
+
+Ręcznie, gdy wolisz zrobić to w SSMS:
 
 ```sql
 GRANT SELECT ON dbo.tw_Cena      TO wertis;   -- cennik kartoteki
 GRANT SELECT ON dbo.vwPoziomyCen TO wertis;   -- nazwy poziomów cen
 ```
 
-Pierwszy nadaje też instalator przy ponownym uruchomieniu skryptu uprawnień
-(`docs/subiekt-gt-edu-setup.md` §2). Drugi nadaj RĘCZNIE, po sprawdzeniu, że
-widok w tej bazie jest — `GRANT SELECT` na nieistniejący obiekt przerywa cały
-skrypt i konto zostaje bez ani jednego prawa.
+Drugą linię pomiń, jeśli `SELECT OBJECT_ID('dbo.vwPoziomyCen')` zwraca NULL.
 
 **Co się stanie, gdy tego nie zrobisz.** Nic się nie psuje. Import cen
 degraduje osobno: stany, dokumenty i zamówienia wchodzą jak dotąd, `sgt_cena`

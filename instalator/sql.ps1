@@ -521,17 +521,24 @@ $script:WertisTabeleOdczytu = @(
     @{ Tabela = "sl_Magazyn";     Po = "nazwy i symbole magazynów" },
     # Cennik kartoteki (0.405.0). `tw_Cena` jest tabelą RDZENIOWĄ Subiekta —
     # stoi w każdej instalacji, tak samo jak `tw_Stan`, więc nie wymaga
-    # sprawdzania obecności. Widok nazw poziomów już tak: sonda z 19 września
-    # 2026 widziała `vwPoziomyCen` na bazie tej firmy, ale jednej bazy nie
-    # bierzemy za kontrakt. Import CZYTA GO OSOBNO i degraduje sam (ceny wchodzą
-    # bez nazw), więc brak tego grantu nie kosztuje kwot — a `GRANT SELECT` na
-    # nieistniejący obiekt kosztowałby całe konto, patrz komentarz niżej.
+    # sprawdzania obecności.
     @{ Tabela = "tw_Cena";        Po = "cennik kartoteki, poziomy 0..10" },
-    # OPCJONALNA: tabela zdjęć jest w bieżących wersjach GT, ale nie w każdej.
-    # `GRANT SELECT` na nieistniejący obiekt kończy WYKONANIE CAŁEGO skryptu
-    # błędem (idzie jednym ExecuteNonQuery), więc konto zostawałoby bez ani
-    # jednego uprawnienia — na bazie, na której zdjęć po prostu nie ma.
-    @{ Tabela = "tw_ZdjecieTw";   Po = "zdjęcia kartotek na karcie towaru"; Opcjonalna = $true }
+    # OPCJONALNE: `GRANT SELECT` na nieistniejący obiekt kończy WYKONANIE
+    # CAŁEGO skryptu błędem (idzie jednym ExecuteNonQuery), więc konto
+    # zostawałoby bez ani jednego uprawnienia — na bazie, na której tego
+    # obiektu po prostu nie ma. Dlatego każdy taki wiersz ma BRAMKĘ: nazwę
+    # parametru, który rozstrzyga, czy grant w ogóle wejdzie do skryptu.
+    #
+    # Bramka jest NAZWANA, a nie jedną flagą `Opcjonalna` (0.407.0): do tego
+    # wydania opcjonalny był dokładnie jeden obiekt, więc jeden przełącznik
+    # wystarczał. Drugi opcjonalny obiekt schodziłby z listy razem ze
+    # zdjęciami, czyli z zupełnie niezwiązanego powodu.
+    @{ Tabela = "tw_ZdjecieTw";   Po = "zdjęcia kartotek na karcie towaru"; Gdy = "Zdjecia" },
+    # Nazwy poziomów cen (0.407.0). Sonda z 19 września 2026 widziała
+    # `vwPoziomyCen` na bazie tej firmy, ale jednej bazy nie bierzemy za
+    # kontrakt — stąd bramka. Import czyta ten widok OSOBNYM zapytaniem
+    # i degraduje sam: bez grantu kwoty wchodzą, tylko bez nazw poziomów.
+    @{ Tabela = "vwPoziomyCen";   Po = "nazwy poziomów cen"; Gdy = "PoziomyCen" }
 )
 
 function Get-WertisTabeleOdczytu {
@@ -544,8 +551,11 @@ function Get-WertisTabeleOdczytu {
         „nadajemy siódmy grant" i oczekiwanie „ma być siedem" nie mogły się
         rozjechać. Rozjazd tych dwóch liczb był już przyczyną dwóch usterek.
     #>
-    param([bool]$Zdjecia = $true)
-    return @($script:WertisTabeleOdczytu | Where-Object { $Zdjecia -or -not $_.Opcjonalna })
+    param([bool]$Zdjecia = $true, [bool]$PoziomyCen = $true)
+    $bramki = @{ Zdjecia = $Zdjecia; PoziomyCen = $PoziomyCen }
+    return @($script:WertisTabeleOdczytu | Where-Object {
+        -not $_.Gdy -or $bramki[$_.Gdy]
+    })
 }
 
 function Get-WertisKolumnyZapisu {
@@ -671,6 +681,43 @@ WHERE object_id = OBJECT_ID('dbo.$(Assert-BezpiecznyIdentyfikator -Nazwa $Tabela
     }
 }
 
+function Get-WertisPoziomyCen {
+    <#
+        .SYNOPSIS
+        Czy w tej bazie jest widok nazw poziomów cen `dbo.vwPoziomyCen`.
+        .DESCRIPTION
+        Kreator NIE PYTA o to człowieka, tak samo jak nie pyta o zdjęcia:
+        odpowiedź stoi w bazie i instalator umie ją przeczytać. Sonda cen
+        z 19 września 2026 (`tools/sonda-cen.sql`) widziała ten widok na bazie
+        tej firmy, ale jednej bazy nie bierzemy za kontrakt — a `GRANT SELECT`
+        na nieistniejący obiekt kończy CAŁY skrypt uprawnień błędem i zostawia
+        konto bez ani jednego prawa.
+
+        Sprawdzamy OBIE kolumny, nie samą obecność obiektu. Widok o tej nazwie
+        i innym kształcie nie da importowi nazw poziomów, a grant na niego
+        byłby prawem do niczego.
+
+        BRAK TEGO WIDOKU NIC NIE PSUJE: import czyta go osobnym zapytaniem
+        i degraduje sam — kwoty wchodzą, nazwy poziomów zostają puste, a panel
+        pokazuje wtedy numer poziomu.
+    #>
+    param([Parameter(Mandatory)]$Polaczenie)
+
+    try {
+        $kolumny = Invoke-WertisZapytanie -Polaczenie $Polaczenie -Sql @"
+SELECT name FROM sys.columns
+WHERE object_id = OBJECT_ID('dbo.vwPoziomyCen')
+  AND name IN ('IDENT', 'NAZWA');
+"@
+        return [bool](@($kolumny).Count -ge 2)
+    } catch {
+        # Nieudane zapytanie czytamy jak BRAK, nie jak obecność: przy tym
+        # wyborze najgorsze, co się stanie, to ceny bez nazw poziomów.
+        # Przy odwrotnym — konto bez ani jednego uprawnienia.
+        return $false
+    }
+}
+
 function Get-WertisSkryptUprawnien {
     <#
         .SYNOPSIS
@@ -697,6 +744,9 @@ function Get-WertisSkryptUprawnien {
         [Parameter(Mandatory)][string]$Haslo,
         # $false, gdy w bazie nie ma tabeli zdjęć — patrz Get-WertisZdjeciaKartotek
         [bool]$Zdjecia = $true,
+        # $false, gdy w bazie nie ma widoku nazw poziomów cen — patrz
+        # Get-WertisPoziomyCen. Grant na nieistniejący obiekt wywala cały skrypt.
+        [bool]$PoziomyCen = $true,
         # $true dopiero przy ZDJECIA_DODAWANIE=subiekt — patrz
         # Get-WertisTabeleZapisuWierszy. Domyślnie NIE nadajemy prawa
         # dopisywania wierszy do bazy firmy.
@@ -707,7 +757,7 @@ function Get-WertisSkryptUprawnien {
     $bazaEsc  = $Baza  -replace "\]", "]]"
     $hasloEsc = $Haslo -replace "'", "''"
     # Granty z jednej listy — patrz $script:WertisTabeleOdczytu
-    $granty = (Get-WertisTabeleOdczytu -Zdjecia $Zdjecia | ForEach-Object {
+    $granty = (Get-WertisTabeleOdczytu -Zdjecia $Zdjecia -PoziomyCen $PoziomyCen | ForEach-Object {
         $linia = "GRANT SELECT ON dbo.{0,-14} TO [{1}];" -f $_.Tabela, $Login
         if ($_.Po) { "$linia   -- $($_.Po)" } else { $linia }
     }) -join "`n"
@@ -855,6 +905,8 @@ function Test-WertisUprawnienia {
         # musi być TĄ SAMĄ wartością, co przy budowie skryptu — inaczej próg
         # żąda grantu, którego świadomie nie nadaliśmy
         [bool]$Zdjecia = $true,
+        # jak wyżej, dla widoku nazw poziomów cen (0.407.0)
+        [bool]$PoziomyCen = $true,
         # jak wyżej, dla prawa dopisywania wierszy (0.88.0)
         [bool]$ZapisZdjec = $false
     )
@@ -899,7 +951,7 @@ function Test-WertisUprawnienia {
         -not @($insert | Where-Object { $_.obiekt -eq $tab })
     })
 
-    $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia).Count
+    $wymagane = @(Get-WertisTabeleOdczytu -Zdjecia $Zdjecia -PoziomyCen $PoziomyCen).Count
     return [pscustomobject]@{
         TabeleOdczytu   = $select.Count
         Wymaganych      = $wymagane

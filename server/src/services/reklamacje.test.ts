@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, kubelek,
+  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, klientCzeka, kubelek,
   cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
   stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
@@ -106,6 +106,57 @@ test("DO DECYZJI trzyma wszystko przed werdyktem, także sprawy z nową wiadomo�
     statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "BUYER_REPLIED", czatAktywny: false,
     dniDoTerminu: 5,
   }), "zamknieta");
+});
+
+test("„klient czeka” WYGASA w sprawie rozstrzygniętej — zegar, nie treść", () => {
+  /* ── Zgłoszenie właściciela ze zrzutem (0.407.0) ─────────────────────────
+     „Widzę sporo reklamacji, które w naszej aplikacji pokazuje, że klient
+     czeka, a w Allegro są już dawno rozwiązane."
+
+     Sprawa z tamtego ekranu, co do dnia: reklamacja uznana 28 lipca, wymiana
+     zaproponowana, kupujący odpisał 1 sierpnia „Ok. Pozdrawiam." — i przez
+     czterdzieści dziewięć dni stała w kubełku DO ODPOWIEDZI.
+
+     Z pola `chat.lastMessage.status` nie da się odróżnić „Ok. Pozdrawiam."
+     od „ale przysłaliście znowu nie ten": oba są `BUYER_REPLIED`. Odróżnia
+     je CZAS — i to on rozstrzyga, a nie zgadywanie treści. */
+  const TERAZ = Date.parse("2026-09-19T08:00:00Z");
+  const sprawa = {
+    statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "BUYER_REPLIED",
+    czatAktywny: true, dniDoTerminu: -51,
+  };
+
+  assert.equal(kubelek({ ...sprawa, ostatniaWiadomoscAt: "2026-08-01T09:49:00Z" }, TERAZ),
+    "zamknieta", "grzeczność sprzed siedmiu tygodni nie jest pracą na dziś");
+  assert.equal(kubelek({ ...sprawa, ostatniaWiadomoscAt: "2026-09-17T09:00:00Z" }, TERAZ),
+    "odpowiedz", "dopisek sprzed dwóch dni to nadal dług biura");
+
+  /* PLAKIETKA IDZIE ZA KUBEŁKIEM. Do 0.406.0 liczyły to osobno i obie kłamały
+     tak samo; gdyby poprawić jedno, drugie kłamałoby dalej. */
+  assert.ok(!sygnaly({ ...sprawa, ostatniaWiadomoscAt: "2026-08-01T09:49:00Z",
+    zwrotWymagany: null }, TERAZ).includes("klient_czeka"));
+  assert.ok(sygnaly({ ...sprawa, ostatniaWiadomoscAt: "2026-09-17T09:00:00Z",
+    zwrotWymagany: null }, TERAZ).includes("klient_czeka"));
+});
+
+test("sprawa NIEROZSTRZYGNIĘTA czeka bez względu na wiek", () => {
+  /* Próg dotyczy WYŁĄCZNIE spraw po werdykcie. Przed nim dopisek kupującego
+     jest częścią sprawy do rozstrzygnięcia, a obok stoi termin decyzji, który
+     i tak rządzi kolejnością — wygaszanie flagi schowałoby pracę. */
+  const TERAZ = Date.parse("2026-09-19T08:00:00Z");
+  assert.ok(klientCzeka({
+    statusAllegro: "CLAIM_SUBMITTED", ostatniaWiadomoscStatus: "BUYER_REPLIED",
+    ostatniaWiadomoscAt: "2026-05-01T09:00:00Z",
+  }, TERAZ));
+});
+
+test("bez daty ostatniej wiadomości sprawa ZOSTAJE w kolejce roboczej", () => {
+  /* Brak znacznika czasu to brak wiedzy, nie starość. Wycięcie sprawy z pracy
+     na podstawie tego, czego nie wiemy, byłoby schowaniem jej. */
+  assert.equal(kubelek({
+    statusAllegro: "CLAIM_ACCEPTED", ostatniaWiadomoscStatus: "BUYER_REPLIED",
+    ostatniaWiadomoscAt: null, czatAktywny: true, dniDoTerminu: -400,
+  }), "odpowiedz");
 });
 
 test("sygnały mówią o terminie, kliencie, doradcy i zamkniętym czacie", () => {

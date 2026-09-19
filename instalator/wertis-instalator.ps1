@@ -663,22 +663,38 @@ if ($podlaczacDoSubiekta) {
         Write-Info "Karta towaru pracuje bez nich; siódmy GRANT też nie zostanie nadany."
     }
 
+    # ── Nazwy poziomów cen ──────────────────────────────────────────────────
+    # Tak samo jak przy zdjęciach: kreator sprawdza, zamiast pytać. Bez tego
+    # widoku ceny i tak wchodzą — import czyta go osobno i degraduje sam —
+    # więc jedyne, co tu rozstrzygamy, to czy grant wolno wpisać do skryptu.
+    Write-Krok "Nazwy poziomów cen"
+    $poziomyCen = if ($polaczenie) { Get-WertisPoziomyCen -Polaczenie $polaczenie } else { $true }
+    if ($poziomyCen) {
+        if ($polaczenie) { Write-Ok "Widok vwPoziomyCen jest - nadam prawo do nazw poziomow cen." }
+        else { Write-Info "Bez polaczenia zakladam standardowa strukture GT i nadaje prawo." }
+    } else {
+        Write-Info "Nie widze widoku vwPoziomyCen - tego grantu nie nadaje."
+        Write-Info "Ceny wejda mimo to; karta towaru pokaze numer poziomu zamiast nazwy."
+    }
+
     # ── ETAP 4: konto SQL aplikacji ─────────────────────────────────────────
     Write-Krok "Konto SQL aplikacji"
     $login = "wertis"
     $haslo = New-WertisHaslo
-    # -Zdjecia rozstrzyga o SIÓDMYM grancie. Nadanie go na bazie bez tej tabeli
-    # wywala CAŁY skrypt (jeden ExecuteNonQuery) i zostawia konto bez uprawnień.
+    # -Zdjecia i -PoziomyCen rozstrzygają o grantach OPCJONALNYCH. Nadanie
+    # któregoś na bazie bez tego obiektu wywala CAŁY skrypt (jeden
+    # ExecuteNonQuery) i zostawia konto bez ani jednego uprawnienia.
     # Prawo dopisywania wierszy wchodzi WYŁĄCZNIE razem z -ZdjeciaZapis i tylko
     # wtedy, gdy tabela zdjęć w tej bazie istnieje.
     $zapisZdjec = [bool]($ZdjeciaZapis -and $zdjecia.Jest)
     $skrypt = Get-WertisSkryptUprawnien -Baza $baza -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN `
-        -Login $login -Haslo $haslo -Zdjecia $zdjecia.Jest -ZapisZdjec $zapisZdjec
+        -Login $login -Haslo $haslo -Zdjecia $zdjecia.Jest -PoziomyCen $poziomyCen `
+        -ZapisZdjec $zapisZdjec
     $plikSkryptu = Join-Path $Katalog "nadaj-uprawnienia-wertis.sql"
 
     $zalozone = $false
     if ($polaczenie) {
-        $ileTabel = @(Get-WertisTabeleOdczytu -Zdjecia $zdjecia.Jest).Count
+        $ileTabel = @(Get-WertisTabeleOdczytu -Zdjecia $zdjecia.Jest -PoziomyCen $poziomyCen).Count
         $ileKolumn = @(Get-WertisKolumnyZapisu -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN).Count
         Write-Info "Zakładam login '$login' z uprawnieniami kolumnowymi: odczyt $ileTabel tabel"
         Write-Info "i zapis $ileKolumn kolumn kartoteki ($($ustawienia.MSSQL_LOC_COLUMN), tw_PodstKodKresk)."
@@ -695,7 +711,7 @@ if ($podlaczacDoSubiekta) {
                 $upr = @(Get-WertisUprawnienia -Polaczenie $polaczenie -Login $login)
                 $ocena = Test-WertisUprawnienia -Uprawnienia $upr `
                     -KolumnaLokalizacji $ustawienia.MSSQL_LOC_COLUMN -Zdjecia $zdjecia.Jest `
-                    -ZapisZdjec $zapisZdjec
+                    -PoziomyCen $poziomyCen -ZapisZdjec $zapisZdjec
                 if ($ocena.Ok) {
                     # Granty sprawdziliśmy połączeniem ADMINISTRATORA — to mówi,
                     # co konto może, a nie czy da się na nie zalogować. Hasło
