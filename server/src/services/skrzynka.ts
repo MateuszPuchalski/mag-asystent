@@ -951,24 +951,52 @@ export function zlecPomiar(
   const oferta = String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null;
   const dodatkowa = (instrukcja ?? "").trim();
 
+  /* ── HALA DOSTAJE ZDANIE, NIE DOSSIER (0.408.0) ─────────────────────────
+     Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
+     informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub bez
+     produktu — i co ma zrobić".
+
+     Do 0.407.0 `instrukcja` szła na kolektor jako CZTERY sklejone linie: całe
+     pytanie kupującego, numer oferty Allegro, zdanie o tym, kto wskazał
+     kartotekę, i dopiero pod nimi wskazówka biura. Magazynier w rękawicy
+     czytał więc reklamację klienta, żeby znaleźć jedno zdanie mówiące, co ma
+     zmierzyć. Dekalog ergonomii, punkt 2: pierwszeństwo ma to, co rozstrzyga
+     bieżącą czynność.
+
+     WSKAZÓWKA JEST ODTĄD OBOWIĄZKOWA. Była opcjonalna dokładnie dlatego, że
+     kontekst służył za treść zastępczą — a zadanie bez zdania „co zrobić" to
+     zadanie, którego nie da się wykonać. Tłumaczenie pytania klienta na
+     polecenie dla hali jest pracą agenta, nie magazyniera.                 */
+  if (!dodatkowa) {
+    throw new Error("Napisz, co ma zrobić hala — bez tego zadanie jest nie do wykonania");
+  }
+
   /* Kartoteka WSKAZANA przez agenta to co innego niż WYWIEDZIONA z oferty.
      Pierwsza jest jego wyborem i tak ma być podpisana; druga będzie faktem
-     z Allegro, gdy dojdzie pobieranie ofert. Hala i audyt muszą widzieć
+     z Allegro, gdy dojdzie pobieranie ofert. Biuro i audyt muszą widzieć
      różnicę — projekt panelu §4.3 zabrania mieszać fakty z różnych źródeł
      bez pokazania pochodzenia. Dziś synchronizator ofert nie pobiera, więc
      bez wskazania agenta `tw_id` zostaje puste; zgadywanie byłoby gorsze
-     niż uczciwy brak. */
+     niż uczciwy brak.
+
+     Te trzy zdania zostają w `kontekst`, czyli przy karcie zadania W BIURZE.
+     Nie kasujemy ich: karta zadania nie ma odnośnika do rozmowy, więc byłby
+     to jedyny ślad po tym, skąd zlecenie się wzięło. */
   const kontekst = [
     `Pytanie klienta: ${String(m.body)}`,
     oferta ? `Oferta Allegro: ${oferta}` : "Brak powiązania z ofertą Allegro.",
     twId != null ? `Kartotekę wskazał(a) ${autor.name}, nie wynika z oferty.` : "",
-    dodatkowa ? `Wskazówka biura: ${dodatkowa}` : "",
   ].filter(Boolean).join("\n");
 
   const zadanie = utworzZadanie({
     rodzaj: "pomiar",
+    /* Tytuł jest etykietą DLA BIURA — po nim odnajduje się zadanie na liście
+       wśród kilkunastu innych. Kolektor go nie pokazuje: na halę idzie towar
+       i polecenie, a „Pomiar z rozmowy — Client:128497280" nie jest ani
+       jednym, ani drugim. */
     tytul: `Pomiar z rozmowy — ${String(m.klient ?? "klient")}`,
-    instrukcja: kontekst, twId, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
+    instrukcja: dodatkowa, kontekst,
+    twId, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
   }, autor);
 
   /* Powiązanie idzie kluczami obcymi modelu kanonicznego (0.144.0), a nie samym

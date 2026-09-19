@@ -34,6 +34,31 @@ historii nie przepisujemy.
 ---
 
 
+## 0.408.0 — 19 września 2026
+
+**Zadanie dla magazynu mówi dwie rzeczy: jaki towar i co zrobić.** Zgłoszenie
+właściciela: „zadania zlecane dla magazynu mają za dużo informacji".
+
+Zlecenie z rozmowy sklejało dotąd w instrukcję CZTERY linie — całe pytanie
+kupującego, numer oferty Allegro, zdanie o tym, kto wskazał kartotekę,
+i dopiero pod nimi wskazówkę biura. Magazynier w rękawicy czytał reklamację
+klienta, żeby znaleźć zdanie mówiące, co ma zmierzyć.
+
+- **Kontekst zszedł z kolektora do karty zadania w biurze** (nowa kolumna
+  `kontekst`). Nie skasowaliśmy go: karta zadania nie ma odnośnika do rozmowy,
+  więc to jedyny ślad po tym, skąd zlecenie się wzięło.
+- **Polecenie dla hali jest obowiązkowe.** Było opcjonalne, bo kontekst służył
+  za treść zastępczą; zadanie bez zdania „co zrobić" jest nie do wykonania.
+  Pole nazywa się teraz „Co ma zrobić hala", a przycisk jest martwy, póki
+  puste.
+- **Karta na kolektorze zaczyna się od TOWARU**, nie od tytułu. „Pomiar
+  z rozmowy — Client:128497280" jest etykietą dla biura i zostaje w panelu.
+- **Zlecający zszedł z karty** — wynik i tak wraca do niego automatycznie.
+  PILNE, półka i wiek zlecenia zostają (decyzja właściciela).
+- Nagłówek ekranu zadań: jedno zdanie zamiast trzech.
+- Stare zadania zostają ze sklejoną instrukcją i `kontekst` pustym; to sprawy
+  dawno zamknięte, a rozcinanie ich tekstu po nagłówkach byłoby zgadywaniem.
+
 ## 0.407.0 — 19 września 2026
 
 **„Klient czeka" przestaje kłamać po dwóch tygodniach, a granty cennika nadaje

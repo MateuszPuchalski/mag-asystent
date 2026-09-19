@@ -827,6 +827,10 @@ export type HistoriaKlienta = {
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
+  /* Skąd zadanie się wzięło (0.408.0) — pytanie klienta, numer oferty, podpis
+     o wskazanej kartotece. WYŁĄCZNIE dla biura: kolektor dostaje towar
+     i polecenie. `null` przy zadaniach zakładanych ręcznie i sprzed 0.408.0. */
+  kontekst: string | null;
   twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   lokalizacja: string | null; priorytet: "normalny" | "pilny";
   /* `odeslane` (0.352.0): hala odpowiedziała, ale bez wyniku. Ruch wraca do

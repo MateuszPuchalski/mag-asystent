@@ -64,9 +64,13 @@ fun FieldTasksScreen(graph: AppGraph) {
     suspend fun refresh() { try { tasks = apiCall { graph.api.zadaniaTerenowe() }.zadania.filter { it.status == "nowe" || it.status == "w_toku" } } catch (e: Exception) { graph.effects.toast(e.message ?: "Nie udało się pobrać zadań") } }
     LaunchedEffect(Unit) { refresh() }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Pomiary i weryfikacje", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
-        Text("Wynik wróci bezpośrednio do osoby obsługującej klienta.", fontSize = 12.sp, color = InkSoft)
-        Text("Czego nie da się zrobić, odeślij z powodem — biuro to zobaczy.", fontSize = 12.sp, color = InkSoft)
+        /* ── JEDNA LINIA ZAMIAST TRZECH (0.408.0) ────────────────────────────
+           Zgłoszenie właściciela: „skondensuj design na kolektorze". Nad listą
+           stały trzy zdania prozy, czytane raz w życiu, a zabierające pasmo
+           przy KAŻDYM wejściu na ekran. Obie rzeczy, które mówiły, są i tak
+           widoczne z przycisków: wynik ma swój „WYŚLIJ WYNIK DO BIURA",
+           a odesłanie — „NIE MOGĘ". Dekalog ergonomii, punkt 2. */
+        Text("Zadania z biura", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Ink)
         if (tasks.isEmpty()) Text("Brak zadań z biura", modifier = Modifier.fillMaxWidth().cardSurface().padding(16.dp), color = InkMute)
         tasks.forEach { task -> FieldTaskCard(task, busy,
             onTake = { scope.launch { busy=true;try { apiCall { graph.api.zadanieTerenoweWez(task.id) };refresh() } catch(e:Exception){graph.effects.toast(e.message?:"Błąd")}finally{busy=false} } },
@@ -132,9 +136,45 @@ private fun FieldTaskCard(
         }.onFailure { /* ergonomia: brak aparatu to nie awaria ekranu */ }
     }
     Column(Modifier.fillMaxWidth().cardSurface(background = if (task.priorytet == "pilny") AmberBg else CardWhite, borderColor = if (task.priorytet == "pilny") AmberLine else CardBorder).padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(task.tytul, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Ink, modifier = Modifier.weight(1f)); if (task.priorytet == "pilny") Text("PILNE", color = Destructive, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
-        Text(task.instrukcja, fontSize = 14.sp, color = InkSoft)
-        task.symbol?.let { Text("$it · ${task.nazwaTowaru.orEmpty()}", fontWeight = FontWeight.SemiBold, color = Ink) }
+        /* ── DWIE RZECZY, NIE SIEDEM (0.408.0) ───────────────────────────────
+           Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
+           informacji; powinno być tylko, jakiego produktu dotyczy zadanie —
+           lub bez produktu — i co ma zrobić".
+
+           PRODUKT STOI PIERWSZY, w miejscu, które zajmował tytuł. Magazynier
+           najpierw ustala, po co idzie i gdzie, a dopiero potem czyta, co ma
+           z tym zrobić — dekalog ergonomii, punkt 6: mniej ruchu. Bez towaru
+           wiersz nie staje wcale i karta zaczyna się od polecenia.
+
+           TYTUŁU TU NIE MA i to jest decyzja. „Pomiar z rozmowy —
+           Client:128497280" jest etykietą DLA BIURA, po której odnajduje się
+           zadanie na liście kilkunastu; na hali nie mówi ani o produkcie, ani
+           o czynności. Zostaje w bazie i na karcie w panelu.
+
+           ZLECAJĄCEGO TEŻ NIE MA (decyzja właściciela z 19 września 2026):
+           wynik wraca do niego automatycznie, więc magazynier nic z tym
+           nazwiskiem nie robił. PILNE, półka i wiek ZOSTAJĄ — właściciel
+           wskazał je wprost: pierwsze mówi o kolejności, drugie o drodze,
+           trzecie czyni porządek listy widocznym. */
+        task.symbol?.let { symbol ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(Modifier.weight(1f)) {
+                    Text(symbol, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Ink)
+                    task.nazwaTowaru?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, fontSize = 13.sp, color = InkSoft)
+                    }
+                }
+                if (task.priorytet == "pilny") Text("PILNE", color = Destructive, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+        }
+        /* Bez towaru plakietka pilności nie ma się przy czym zaczepić, więc
+           jedzie w wierszu polecenia — inaczej znikałaby dokładnie w tych
+           zadaniach, które bywają najpilniejsze („sprawdź, czy przyszła
+           dostawa"). */
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(task.instrukcja, fontSize = 15.sp, color = Ink, modifier = Modifier.weight(1f))
+            if (task.priorytet == "pilny" && task.symbol == null) Text("PILNE", color = Destructive, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        }
         task.lokalizacja?.takeIf { it.isNotBlank() }?.let { Text("Półka: $it", color = AmberInk, fontWeight = FontWeight.Bold) }
         // WIEK, NIE ZNACZNIK. Zadanie sprzed trzech dni wyglądało dokładnie tak
         // samo jak sprzed trzech minut, a lista jest posortowana od najstarszych
@@ -145,11 +185,8 @@ private fun FieldTaskCard(
         // wymienia „czas realizacji zadania magazynowego" jako metrykę i NIE
         // podaje terminu. Wyróżniony jest więc sam wiek, przy każdym zadaniu:
         // to fakt. „Za późno" byłoby werdyktem, którego nikt nie wydał.
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Zlecił(a): ${task.utworzonoPrzez}", fontSize = 11.sp, color = InkMute)
-            task.zleconeOdMs?.let {
-                Text("· ${wiekZlecenia(it)} temu", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
-            }
+        task.zleconeOdMs?.let {
+            Text("${wiekZlecenia(it)} temu", fontSize = 11.sp, color = Ink, fontWeight = FontWeight.Bold)
         }
         if (task.status == "nowe") PrimaryButton("WEŹ ZADANIE", modifier = Modifier.fillMaxWidth(), enabled = !busy, onClick = onTake)
         else {
