@@ -34,6 +34,52 @@ historii nie przepisujemy.
 ---
 
 
+## 0.406.0 — 19 września 2026
+
+**Szablony odpowiedzi działają wszędzie tam, gdzie się odpisuje, i dają się
+cofnąć.** Zgłoszenie właściciela: „dodaj możliwość tworzenia szablonów
+odpowiedzi". Tworzenie stało w skrzynce od 0.399.0 — pod przyciskiem
+„Szablony", przycisk „Nowy". Brakowało dwóch rzeczy wokół niego i to je robi
+to wydanie.
+
+- **Szablony w reklamacjach i dyskusjach.** `api/szablony.ts` od pierwszego dnia
+  pisze, że lista jest wspólna dla skrzynki, reklamacji i dyskusji — a przycisk
+  stał wyłącznie w skrzynce. Komentarz obiecywał coś, czego ekran nie dawał,
+  a pierwszy szablon, który właściciel przysłał, jest zdaniem z reklamacji.
+- **Zdjęte szablony mają drogę powrotną.** Przycisk „zdejmij" powoływał się na
+  §25a.5 — cofnięcie zamiast potwierdzenia — i tej drogi nie było. Trasa
+  archiwum i hak stały w kodzie od 0.399.0, nieużywane przez żaden ekran.
+  Zakładka „Zdjęte" pokazuje je i przywraca.
+- Zdjętego szablonu **nie da się wstawić** do szkicu bez przywrócenia: skoro
+  biuro go zdjęło, przestał być zdaniem, którego używa.
+- Archiwum pyta serwer dopiero po otwarciu zakładki, nie przy każdej rozmowie.
+
+## 0.405.0 — 19 września 2026
+
+**Ceny z Subiekta wchodzą do read-modelu.** Właściciel uruchomił
+`tools/sonda-cen.sql` na produkcyjnej bazie 19 września 2026. Baza odpowiedziała
+i odpowiedź jest inna, niż zakładaliśmy, więc import wygląda tak, jak wygląda.
+
+- **[wymaga działania] Dwa nowe `GRANT SELECT`** — `dbo.tw_Cena`
+  i `dbo.vwPoziomyCen`. Bez nich karta towaru dalej nie pokazuje cen, a objaw
+  jest NIEMY: wygląda dokładnie tak, jak wyglądał przedtem. Instrukcja stoi
+  w `DEPLOY.md` §6h.
+- **Poziomy cen to KOLUMNY, nie wiersze.** `tw_Cena` niesie `tc_CenaNetto0..10`
+  i `tc_CenaBrutto0..10` — jedenaście par w jednym wierszu na kartotekę. Import
+  rozwija je na wiersze `sgt_cena`, bo ten kształt przeżyje zmianę liczby
+  poziomów w Subiekcie bez migracji u nas.
+- **Netto i brutto biorą się gotowe**, nie z przeliczania przez VAT. Cena
+  podana klientowi ma się zgadzać z fakturą co do grosza.
+- **Poziom bez kwoty nie wchodzi.** Dziewięć wierszy „0,00 zł" na karcie to
+  dziewięć zaproszeń do podania ceny, której nie ma.
+- **Import cen degraduje osobno** — brak uprawnienia zostawia ceny puste,
+  a stany i dokumenty wchodzą. `/api/health` mówi o tym zdaniem, a `lastImport`
+  dostał licznik `ceny`.
+- Nazwy poziomów z widoku `vwPoziomyCen`; gdy jest niedostępny, kwoty wchodzą
+  bez nazw, a panel pokazuje numer poziomu.
+- Wynik sondy zapisany w `docs/subiekt-gt-struktura.md` z datą. Sekcje D i D2
+  sondy są od teraz uruchamialne — mówią, które poziomy ta firma wypełnia.
+
 ## 0.404.0 — 18 września 2026
 
 **Skrzynka przestaje oddawać pustce więcej miejsca niż pisaniu.** Zgłoszenie

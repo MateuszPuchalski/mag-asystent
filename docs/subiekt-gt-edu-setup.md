@@ -112,6 +112,12 @@ kolumny, reszta bazy pozostaje nietykalna.
 > tylko MAG, MGP i Zwroty, a `/api/health` mówi o tym wprost w `problemy`.
 > Aplikacja działa dalej; traci wyłącznie zestawienie „gdzie towar jeszcze leży".
 
+> **Instalacja sprzed 0.405.0 też musi uruchomić go PONOWNIE.** Doszły
+> `GRANT SELECT ON dbo.tw_Cena` i `dbo.vwPoziomyCen` — bez nich karta towaru
+> nie pokazuje ani jednej ceny. Objaw jest NIEMY: wygląda dokładnie tak, jak
+> wyglądała przed tym wydaniem, więc `/api/health` mówi o tym osobnym zdaniem.
+> Import stanów i dokumentów idzie dalej bez zmian; cennik degraduje sam.
+
 > **Ten skrypt jest źródłem prawdy dla instalatora.** `Get-WertisSkryptUprawnien`
 > w [`instalator/sql.ps1`](../instalator/sql.ps1) odtwarza go co do grantu —
 > przy zmianie uprawnień poprawia się **oba miejsca**. Rozjazd nie rzuciłby
@@ -137,6 +143,11 @@ GRANT SELECT ON dbo.dok__Dokument  TO wertis;
 GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
 GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
+GRANT SELECT ON dbo.tw_Cena        TO wertis;   -- cennik kartoteki, poziomy 0..10
+-- Widok nazw poziomów: nadaj go RĘCZNIE, po sprawdzeniu, że w tej bazie jest.
+-- Instalator go pomija świadomie (jedna baza to nie kontrakt), a import czyta
+-- go osobnym zapytaniem — bez tego grantu ceny wchodzą, tylko bez nazw.
+GRANT SELECT ON dbo.vwPoziomyCen   TO wertis;   -- nazwy poziomów cen
 -- Ostatni tylko wtedy, gdy ta tabela w bazie JEST. Nadanie go na bazie bez
 -- niej przerywa wykonanie i konto zostaje bez ani jednego uprawnienia.
 -- Instalator sprawdza to sam i pomija tę linię, gdy tabeli nie ma.

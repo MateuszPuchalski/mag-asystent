@@ -9,6 +9,7 @@ import type { OsRozmowy, Rozmowa } from "../api/typy";
    szablonów. Własne testy ma ona w `Szablony.test.tsx`. */
 vi.mock("../api/szablony", () => ({
   useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
+  useArchiwumSzablonow: () => ({ data: { szablony: [] }, isLoading: false }),
   useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
   useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
   useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),

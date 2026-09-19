@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { FileText, Pencil, Plus, X as Krzyzyk } from "lucide-react";
+import { Archive, FileText, Pencil, Plus, Undo2, X as Krzyzyk } from "lucide-react";
 import { Przycisk } from "../ui";
 import {
-  useArchiwizujSzablon, useDodajSzablon, useSzablony, useZmienSzablon, type Szablon,
+  useArchiwizujSzablon, useArchiwumSzablonow, useDodajSzablon, useSzablony,
+  useZmienSzablon, type Szablon,
 } from "../api/szablony";
 
 /**
@@ -34,6 +35,14 @@ export function Szablony({ onWstaw, wylaczone = false }: {
   wylaczone?: boolean;
 }) {
   const [otwarte, setOtwarte] = useState(false);
+  /* ── ARCHIWUM MA DROGĘ POWROTNĄ (0.406.0) ─────────────────────────────────
+     Przycisk „zdejmij" powoływał się w komentarzu na §25a.5 — cofnięcie
+     zamiast potwierdzenia — i tej drogi powrotnej NIE BYŁO. Trasa
+     `/api/obsluga/szablony/archiwum` i hak `useArchiwumSzablonow` stały
+     w kodzie od 0.399.0, nieużywane przez żaden ekran, więc na ekranie
+     zdjęcie szablonu było nieodwracalne. Zasada, na którą powołuje się
+     przycisk, a której nie da się wykonać, jest gorsza niż jej brak. */
+  const [wArchiwum, setWArchiwum] = useState(false);
   const [edytowany, setEdytowany] = useState<Szablon | "nowy" | null>(null);
   const [nazwa, setNazwa] = useState("");
   const [tresc, setTresc] = useState("");
@@ -42,7 +51,10 @@ export function Szablony({ onWstaw, wylaczone = false }: {
   const dodaj = useDodajSzablon();
   const zmien = useZmienSzablon();
   const archiwizuj = useArchiwizujSzablon();
+  /* Pyta dopiero, gdy ktoś otworzy archiwum — patrz `useArchiwumSzablonow`. */
+  const archiwum = useArchiwumSzablonow(otwarte && wArchiwum);
   const szablony = lista.data?.szablony ?? [];
+  const zdjete = archiwum.data?.szablony ?? [];
   const trwa = dodaj.isPending || zmien.isPending || archiwizuj.isPending;
 
   const zamknijEdycje = () => { setEdytowany(null); setNazwa(""); setTresc(""); setBlad(""); };
@@ -70,10 +82,18 @@ export function Szablony({ onWstaw, wylaczone = false }: {
 
     {otwarte && <div className="absolute right-0 z-20 mt-1 w-[28rem] max-w-[90vw] rounded-lg border bg-white p-3 shadow-lg">
       <div className="flex items-center gap-2">
-        <b className="text-sm">Szablony odpowiedzi</b>
-        <button type="button" onClick={() => otworzEdycje("nowy")}
+        <b className="text-sm">{wArchiwum ? "Zdjęte szablony" : "Szablony odpowiedzi"}</b>
+        {!wArchiwum && <button type="button" onClick={() => otworzEdycje("nowy")}
           className="ml-auto flex items-center gap-1 text-xs font-semibold text-slate-600 underline underline-offset-2 hover:text-slate-900">
-          <Plus size={12} />Nowy</button>
+          <Plus size={12} />Nowy</button>}
+        {/* Przełącznik STOI ZAWSZE, także przy pustym archiwum: inaczej agent,
+            który właśnie coś zdjął, nie miałby jak sprawdzić, dokąd to poszło. */}
+        <button type="button"
+          onClick={() => { setWArchiwum((a) => !a); zamknijEdycje(); }}
+          className={`flex items-center gap-1 text-xs font-semibold underline underline-offset-2
+            hover:text-slate-900 ${wArchiwum ? "ml-auto text-slate-700" : "text-slate-600"}`}>
+          {wArchiwum ? <><Undo2 size={12} />Wróć do listy</> : <><Archive size={12} />Zdjęte</>}
+        </button>
         <button type="button" aria-label="Zamknij szablony"
           onClick={() => { setOtwarte(false); zamknijEdycje(); }}
           className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -100,6 +120,32 @@ export function Szablony({ onWstaw, wylaczone = false }: {
             </div>
             {blad && <p className="text-xs text-red-700">{blad}</p>}
           </div>
+        : wArchiwum
+        ? <>
+            {archiwum.isLoading && <p className="mt-2 text-xs text-slate-500">Wczytuję…</p>}
+            {!archiwum.isLoading && zdjete.length === 0 && <p className="mt-2 text-xs text-slate-500">
+              Nic nie jest zdjęte. Szablony wracają tu po kliknięciu „zdejmij".</p>}
+            <ul className="mt-2 max-h-80 space-y-1 overflow-y-auto">
+              {zdjete.map((s) => <li key={s.id} className="rounded border border-slate-200 bg-slate-50 p-2">
+                <div className="flex items-baseline gap-2">
+                  <b className="min-w-0 flex-1 truncate text-sm text-slate-700">{s.nazwa}</b>
+                  <button type="button" disabled={trwa}
+                    onClick={() => archiwizuj.mutate({ id: s.id, archiwalny: false })}
+                    /* `disabled:opacity-50`, nie `text-slate-400`: wygaszenie
+                       barwą schodzi przy tym stopniu pisma poniżej progu
+                       czytelności i strażnik kontrastu słusznie je łapie. */
+                    className="text-podpis font-semibold text-slate-700 underline underline-offset-2
+                      hover:text-slate-900 disabled:opacity-50">
+                    przywróć</button>
+                </div>
+                {/* WSTAWKI TU NIE MA i to jest decyzja: szablon zdjęty
+                    z listy przestał być zdaniem, którego biuro używa. Żeby
+                    wstawić, trzeba go najpierw świadomie przywrócić. */}
+                <p className="mt-0.5 line-clamp-2 whitespace-pre-wrap text-xs text-slate-600">
+                  {s.tresc}</p>
+              </li>)}
+            </ul>
+          </>
         : <>
             {lista.isLoading && <p className="mt-2 text-xs text-slate-500">Wczytuję…</p>}
             {!lista.isLoading && szablony.length === 0 && <p className="mt-2 text-xs text-slate-500">

@@ -89,6 +89,34 @@ export function budujFiltryDokumentow(
  */
 const ZAM_IMPORT_DAYS = 180;
 
+/* ── CENNIK KARTOTEKI (0.405.0) ──────────────────────────────────────────────
+   Kształt WZIĘTY Z BAZY, nie z pamięci: właściciel uruchomił
+   `tools/sonda-cen.sql` 19 września 2026 i wynik stoi
+   w `docs/subiekt-gt-struktura.md`. Dwie rzeczy z niego są zaskakujące i obie
+   rządzą tym kodem:
+
+   1. POZIOMY TO KOLUMNY, NIE WIERSZE. `tw_Cena` niesie `tc_CenaNetto0..10`
+      i `tc_CenaBrutto0..10` — jedenaście par w JEDNYM wierszu na kartotekę.
+      Nasz read-model `sgt_cena` ma kształt odwrotny (wiersz na poziom), więc
+      import ROZWIJA kolumny na wiersze. To nie jest przypadek: kształt
+      wierszowy przeżyje zmianę liczby poziomów w Subiekcie bez migracji.
+   2. NETTO I BRUTTO STOJĄ OBOK SIEBIE, gotowe. Nie przeliczamy niczego przez
+      stawkę VAT — cena podana klientowi ma się zgadzać z fakturą co do
+      grosza, a własne zaokrąglenie to własny błąd.
+
+   Nazwy poziomów mieszkają w widoku `vwPoziomyCen(IDENT, NAZWA)`. Bez nich
+   ekran pokazywałby „poziom 1..11", czyli liczby, po których nikt nie pozna
+   detalu od hurtu.                                                          */
+export interface CenaRow {
+  tc_IdTowar: number;
+  [kolumna: string]: number | string | null;
+}
+
+interface PoziomRow {
+  IDENT: number;
+  NAZWA: string;
+}
+
 interface TowarRow {
   tw_Id: number;
   tw_Symbol: string;
@@ -167,6 +195,10 @@ export interface ImportStats {
      wiszą na innej kolumnie", a znaczy co innego. */
   faktury: number;
   fakturyPozycje: number;
+  /* Wiersze cennika PO ROZWINIĘCIU kolumn na poziomy (0.405.0). Liczba mówi
+     o pracy, którą import naprawdę wykonał: 3415 kartotek przy dwóch
+     używanych poziomach to ~6800 wierszy, a nie 3415. */
+  ceny: number;
   at: string;
 }
 
@@ -210,6 +242,17 @@ export let bladImportuMm: string | null = null;
  * zwrocie, a biuro woli wczorajszą listę dokumentów niż wywrócony import.
  */
 export let bladImportuFaktur: string | null = null;
+
+/**
+ * Ustawiane, gdy nie da się odczytać cennika (0.405.0).
+ *
+ * NOWY GRANT: `GRANT SELECT ON dbo.tw_Cena` i `GRANT SELECT ON dbo.vwPoziomyCen` (DEPLOY §6h).
+ * Żadna instalacja sprzed tego wydania go nie ma, a `git pull` nie ma prawa
+ * wywrócić synchronizacji stanów przez cennik — dlatego brak uprawnienia
+ * DEGRADUJE import (ceny zostają puste, reszta wchodzi) i melduje się zdaniem
+ * w /api/health. Karta towaru bez cen rysuje się tak jak przed 0.405.0.
+ */
+export let bladImportuCen: string | null = null;
 
 /**
  * Kolumna z numerem obcym nie istnieje — zdanie do `/api/health` (0.174.0).
@@ -614,6 +657,97 @@ async function pobierzFaktury(
   return { faktury, fakturyPozycje };
 }
 
+/** Ile poziomów cen niesie `tw_Cena`: `tc_CenaNetto0` … `tc_CenaNetto10`. */
+const POZIOMY_CEN = 11;
+
+/**
+ * Cennik kartotek i słownik nazw poziomów.
+ *
+ * DWA ZAPYTANIA, NIE JOIN: nazw poziomów jest jedenaście, a kartotek kilka
+ * tysięcy — złączenie powtarzałoby tę samą nazwę przy każdym wierszu i nie
+ * dałoby nic poza ruchem po sieci.
+ *
+ * `WITH (NOLOCK)` jak przy pozostałych odczytach tego pliku: czytamy cudzą
+ * bazę produkcyjną i nie mamy prawa blokować na niej kasjerki.
+ */
+async function pobierzCeny(
+  pool: sql.ConnectionPool
+): Promise<{ ceny: CenaRow[]; poziomy: Map<number, string> }> {
+  const kolumny = Array.from({ length: POZIOMY_CEN }, (_, i) =>
+    `tc_CenaNetto${i}, tc_CenaBrutto${i}, tc_IdWaluta${i}`
+  ).join(",\n              ");
+  const ceny = (
+    await pool.request().query<CenaRow>(
+      `SELECT tc_IdTowar,
+              ${kolumny}
+       FROM tw_Cena WITH (NOLOCK)`
+    )
+  ).recordset;
+
+  /* Słownik nazw jest OSOBNYM uprawnieniem i osobnym ryzykiem. Gdy go nie ma,
+     ceny i tak wchodzą — z nazwą pustą, którą panel zastąpi numerem poziomu.
+     Odwrotnie byłoby absurdem: wywalić kwoty, bo nie znamy ich etykiet. */
+  const poziomy = new Map<number, string>();
+  try {
+    const wiersze = (
+      await pool.request().query<PoziomRow>("SELECT IDENT, NAZWA FROM vwPoziomyCen")
+    ).recordset;
+    for (const w of wiersze) poziomy.set(Number(w.IDENT), String(w.NAZWA ?? "").trim());
+  } catch (e) {
+    console.warn(
+      `[mssql] Nazw poziomów cen nie odczytano (vwPoziomyCen) — ceny wejdą bez nazw. ` +
+        `Przyczyna: ${e instanceof Error ? e.message : e}`
+    );
+  }
+  return { ceny, poziomy };
+}
+
+/**
+ * Kwota z Subiekta na GROSZE — całkowite, tak jak wszystko pieniężne u nas.
+ *
+ * `money(19,4)` wraca ze sterownika jako liczba zmiennoprzecinkowa, więc
+ * `19.99 * 100` bywa `1998.9999999999998`. `Math.round` jest tu OBOWIĄZKOWY,
+ * a nie ozdobny: grosz w cenie podanej klientowi to reklamacja.
+ */
+export function naGrosze(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+/**
+ * Jedenaście kolumn jednego wiersza `tw_Cena` na wiersze `sgt_cena`.
+ *
+ * POZIOM PUSTY NIE WCHODZI. Subiekt trzyma nieużywane poziomy jako NULL albo
+ * jako parę zer — i jedno, i drugie znaczy „tego cennika ta firma nie
+ * prowadzi". Wpisanie ich dałoby na karcie towaru dziewięć wierszy „0,00 zł",
+ * czyli dziewięć zaproszeń do podania klientowi ceny, której nie ma.
+ *
+ * Zera NIE odrzucamy, gdy stoi TYLKO PO JEDNEJ stronie: netto 0 przy brutto
+ * 12,30 to nie pusty poziom, tylko dane do obejrzenia przez człowieka.
+ */
+export function rozwinCeny(
+  w: CenaRow, poziomy: Map<number, string>
+): Array<{ poziom: number; nazwa: string; netto: number | null; brutto: number | null; waluta: string }> {
+  const out = [];
+  for (let i = 0; i < POZIOMY_CEN; i += 1) {
+    const netto = naGrosze(w[`tc_CenaNetto${i}`]);
+    const brutto = naGrosze(w[`tc_CenaBrutto${i}`]);
+    if (netto === null && brutto === null) continue;
+    if (netto === 0 && brutto === 0) continue;
+    out.push({
+      poziom: i,
+      /* Numeracja poziomów w widoku nazw idzie od 1, a kolumny od 0 — poziom 0
+         to cena zakupu. Nazwy dla niego widok nie ma i mieć nie musi. */
+      nazwa: poziomy.get(i) ?? "",
+      netto,
+      brutto,
+      waluta: String(w[`tc_IdWaluta${i}`] ?? "PLN").trim() || "PLN",
+    });
+  }
+  return out;
+}
+
 export async function importFromMssql(): Promise<ImportStats> {
   const pool = await mssqlPool();
   const c = config.mssql;
@@ -728,6 +862,27 @@ export async function importFromMssql(): Promise<ImportStats> {
     console.warn(`[mssql] ${bladImportuFaktur}`);
   }
 
+  /* Cennik degraduje tak samo jak MM i sprzedaż, i z mocniejszego powodu:
+     wchodzi jako PIERWSZE wydanie, które go czyta, więc żadna istniejąca
+     instalacja nie ma jeszcze `GRANT SELECT ON dbo.tw_Cena`. Brak ceny na
+     karcie towaru to dokładnie stan sprzed 0.405.0; wywrócony import stanów
+     to zatrzymana hala. `cenyOk` steruje też czyszczeniem `sgt_cena`. */
+  let ceny: CenaRow[] = [];
+  let poziomyCen = new Map<number, string>();
+  let cenyOk = false;
+  try {
+    ({ ceny, poziomy: poziomyCen } = await pobierzCeny(pool));
+    cenyOk = true;
+    bladImportuCen = null;
+  } catch (e) {
+    bladImportuCen =
+      "Odczyt cennika kartotek nie powiódł się — karta towaru pokazuje ceny " +
+      "z ostatniej udanej synchronizacji albo nie pokazuje ich wcale. " +
+      "Sprawdź GRANT SELECT ON dbo.tw_Cena i dbo.vwPoziomyCen (DEPLOY §6h). " +
+      `Przyczyna: ${e instanceof Error ? e.message : e}`;
+    console.warn(`[mssql] ${bladImportuCen}`);
+  }
+
   // ── wpis do read-modelu sgt_* (wzorzec wipe+insert z seed.ts) ─────────────
   const d = db();
   const knownTw = new Set(towary.map((t) => t.tw_Id));
@@ -768,6 +923,13 @@ export async function importFromMssql(): Promise<ImportStats> {
   const insFakturaPoz = d.prepare(
     "INSERT INTO sgt_faktura_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
   );
+  const insCena = d.prepare(
+    `INSERT INTO sgt_cena(tw_id, poziom, nazwa, netto_grosze, brutto_grosze, waluta)
+     VALUES (?,?,?,?,?,?)`
+  );
+  /* Liczony w transakcji, nie z długości `ceny`: jeden wiersz `tw_Cena` daje
+     tyle wierszy, ile poziomów ta firma naprawdę wypełniła. */
+  let wierszyCen = 0;
 
   const apply = transaction(d, () => {
     /* Kolejność ma znaczenie: pozycje przed nagłówkami, bo trzyma je klucz obcy.
@@ -779,14 +941,12 @@ export async function importFromMssql(): Promise<ImportStats> {
       ...(mmOk ? ["sgt_mm_zwrot_pozycja", "sgt_mm_zwrot"] : []),
       ...(fakturyOk ? ["sgt_faktura_pozycja", "sgt_faktura"] : []),
       "sgt_zam_pozycja", "sgt_zamowienie",
-      /* `sgt_cena` czyszczone MIMO ŻE import jeszcze go nie wypełnia (0.396.0).
-         Tabela stoi w schemacie, a read-model jest odtwarzany od zera przy
-         każdym przebiegu — gdyby jej tu zabrakło, ceny wpisane raz (seedem
-         demo albo ręcznie przy diagnozie) przeżyłyby każdy import i ekran
-         pokazywałby kwoty sprzed miesięcy jako bieżące. Wypełnienie dojdzie,
-         gdy `tools/sonda-cen.sql` odda nazwy tabeli cennikowej, a login
-         dostanie nowy GRANT. */
-      "sgt_cena",
+      /* `sgt_cena` czyszczone TYLKO przy udanym odczycie (0.405.0) — ta sama
+         zasada, co przy MM i fakturach. Do 0.404.0 stało tu bezwarunkowo, bo
+         import cen nie istniał i nie było czego stracić. Teraz jest: gdyby
+         czyszczenie poszło mimo braku uprawnienia, pierwszy przebieg po
+         cofnięciu GRANT-u zostawiłby kartę bez cen zamiast z wczorajszymi. */
+      ...(cenyOk ? ["sgt_cena"] : []),
       "sgt_pozycja", "sgt_dokument", "sgt_stan", "sgt_towar", "sgt_magazyn",
     ]) {
       d.prepare(`DELETE FROM ${t}`).run();
@@ -907,6 +1067,20 @@ export async function importFromMssql(): Promise<ImportStats> {
       if (!knownTw.has(p.ob_TowId)) continue;
       insFakturaPoz.run(p.ob_DokHanId, p.ob_TowId, Math.abs(p.ob_IloscMag ?? 0));
     }
+
+    /* Cennik NA KOŃCU i z filtrem `knownTw`: `tw_Cena` niesie także kartoteki
+       zablokowane, których import towarów nie wpuszcza (`tw_Zablokowany = 0`).
+       Cena towaru, którego nie ma w read-modelu, nie ma się do czego przypiąć
+       i byłaby wierszem-sierotą. */
+    if (cenyOk) {
+      for (const w of ceny) {
+        if (!knownTw.has(w.tc_IdTowar)) continue;
+        for (const c of rozwinCeny(w, poziomyCen)) {
+          insCena.run(w.tc_IdTowar, c.poziom, c.nazwa, c.netto, c.brutto, c.waluta);
+          wierszyCen += 1;
+        }
+      }
+    }
   });
   apply();
   /* Pochodne opisów (identyfikatory, sekcje „Modele:", indeks pełnotekstowy)
@@ -925,13 +1099,15 @@ export async function importFromMssql(): Promise<ImportStats> {
     mmPozycje: mmPozycje.length,
     faktury: faktury.length,
     fakturyPozycje: fakturyPozycje.length,
+    ceny: wierszyCen,
     at: nowIso(),
   };
   console.log(
     `[mssql] import: towary=${lastImport.towary}, stany=${lastImport.stany}, ` +
       `dokumenty=${lastImport.dokumenty}, pozycje=${lastImport.pozycje}, ` +
       `zamowienia=${lastImport.zamowienia}, zamPozycje=${lastImport.zamPozycje}, ` +
-      `mm=${lastImport.mm}, mmPozycje=${lastImport.mmPozycje}`
+      `mm=${lastImport.mm}, mmPozycje=${lastImport.mmPozycje}, ` +
+      `ceny=${lastImport.ceny}`
   );
   return lastImport;
 }

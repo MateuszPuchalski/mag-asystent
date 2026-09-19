@@ -1885,36 +1885,41 @@ Restart-Service wertis-sfera
 Po aktualizacji do 0.350.1 zwrot, któremu wycofany zapis przypiął nieistniejący
 numer ZW, poprawia się ręcznie: „Cofnij korektę” w panelu, potem ZW w Subiekcie.
 
-## 6h. Ceny z kartoteki Subiekta — CZEGO JESZCZE BRAKUJE (0.396.0)
+## 6h. Ceny z kartoteki Subiekta — WYMAGA DZIAŁANIA (0.405.0)
 
-Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Od tego
-wydania karta towaru w panelu obsługi **umie** je pokazać. Wszystkie poziomy,
-brutto grubym drukiem, netto obok. Na produkcji blok jednak milczy i to nie
-jest usterka instalacji.
+Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Od 0.396.0
+karta towaru **umiała** je pokazać, ale nie miała skąd wziąć — nie znaliśmy
+nazw tabeli cennikowej. Właściciel uruchomił sondę 19 września 2026 i od
+0.405.0 import je pobiera.
 
-Brakuje dwóch rzeczy, których nie da się dołożyć kodem:
+**[wymaga działania] Nadaj dwa nowe uprawnienia.** Bez nich karta towaru dalej
+milczy, a objaw jest NIEMY — wygląda dokładnie tak, jak wyglądała przedtem:
 
-1. **Nazw tabeli i kolumn cennika.** Oficjalny opis struktury mamy przeczytany
-   w zakresie kartoteki, stanów, dokumentów i kontrahentów. Cennika w nim nie
-   było. Nazwa wpisana z pamięci to ta sama klasa błędu, która przy Allegro
-   kosztowała trzy wydania. Rozstrzyga to jedno uruchomienie:
+```sql
+GRANT SELECT ON dbo.tw_Cena      TO wertis;   -- cennik kartoteki
+GRANT SELECT ON dbo.vwPoziomyCen TO wertis;   -- nazwy poziomów cen
+```
 
-   ```
-   sqlcmd -S localhost -d Subiekt_GT -U wertis -P '...' \
-          -i tools/sonda-cen.sql -s ';' -W > sonda-cen.txt
-   ```
+Pierwszy nadaje też instalator przy ponownym uruchomieniu skryptu uprawnień
+(`docs/subiekt-gt-edu-setup.md` §2). Drugi nadaj RĘCZNIE, po sprawdzeniu, że
+widok w tej bazie jest — `GRANT SELECT` na nieistniejący obiekt przerywa cały
+skrypt i konto zostaje bez ani jednego prawa.
 
-   Wynik wklej do `docs/subiekt-gt-struktura.md`, sekcja „Ceny na kartotece",
-   razem z datą — tak samo jak wynik audytu kolizji.
+**Co się stanie, gdy tego nie zrobisz.** Nic się nie psuje. Import cen
+degraduje osobno: stany, dokumenty i zamówienia wchodzą jak dotąd, `sgt_cena`
+zostaje nietknięte, a `/api/health` mówi w `problemy`, czego brakuje. To ta
+sama zasada, co przy MM (§6a) i sprzedaży (§6).
 
-2. **Nowego `GRANT SELECT`.** Dzisiejszy login `wertis` widzi sześć tabel
-   i żadna z nich nie jest cennikiem. Sonda powie, na którą dopisać prawo
-   w `docs/subiekt-gt-edu-setup.md` §2.
+**Jak sprawdzić, że weszły.** Po synchronizacji `/api/health` pokazuje w
+`lastImport` licznik `ceny` — liczbę wierszy cennika po rozwinięciu poziomów.
+Przy 3415 kartotekach i dwóch używanych poziomach to rząd 6–7 tysięcy, nie 3415:
+jeden wiersz `tw_Cena` daje tyle wierszy, ile poziomów firma wypełniła.
 
-Do tego czasu nic się nie psuje. Read-model ma tabelę `sgt_cena`, karta zwraca
-pustą listę, a ekran nie rysuje wtedy nic — pusta tabelka cen obiecywałaby
-wiedzę, której nie ma. Ceny widać w trybie demo po `npm run seed:scenariusze`
-(kartoteki `TEST-CENY-*`), bo to dane syntetyczne do oglądania kształtu.
+**Ile poziomów ta firma prowadzi — jeszcze nie wiemy.** Subiekt ma ich
+jedenaście (0..10, gdzie 0 to cena zakupu). Import wpuszcza tylko te z kwotą,
+więc puste nie zaśmiecą karty. Pierwszy licznik `ceny` odpowie na to sam;
+sekcje D i D2 sondy (`tools/sonda-cen.sql`) odpowiedzą dokładniej, razem
+z nazwami poziomów.
 
 **Czego to wydanie NIE dokłada:** cen w `biuro.html`. Biuro nie ma ekranu karty
 towaru — ma dostawy, magazyn zwrotów, analizę, dziennik i nadzór — więc nie ma
