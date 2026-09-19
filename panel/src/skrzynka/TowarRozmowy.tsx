@@ -326,7 +326,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
  * brak wiedzy nie jest informacją wartą kolumny. Na produkcji blok milczy,
  * dopóki import nie dostanie nazw cennika i nowego GRANT-u (`tools/sonda-cen.sql`).
  */
-function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
+export function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
   if (ceny.length === 0) return null;
   return <div className="rounded-lg border border-slate-200 p-3">
     <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>

@@ -5,6 +5,14 @@ import userEvent from "@testing-library/user-event";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { Dowody } from "./Dowody";
 
+/* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
+   plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
+   testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
+vi.mock("../api/rozmowy", () => ({
+  useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+}));
+
+
 /* ── Notatka z drogą powrotną (0.280.0) ──────────────────────────────────────
    §25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
    Notatka jest w tym module JEDYNYM zapisem, który zostaje wyłącznie u nas

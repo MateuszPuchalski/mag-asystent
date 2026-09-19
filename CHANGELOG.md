@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.411.0 — 19 września 2026
+
+**Ceny z Subiekta stoją przy reklamacji, na wierzchu.** Zgłoszenie
+właściciela: „nadal nie widzę cen w reklamacjach", a zaraz potem powód —
+„są kluczowe do szybkiego oceniania, czy warto rozpatrywać reklamację".
+
+- **Cennik kartoteki w kolumnie dowodów**, pod wierszem towaru. Ten sam blok,
+  co w skrzynce, nie kopia: te same nazwy poziomów i ta sama zasada „pusty nie
+  rysuje się wcale".
+- **BEZ ZWIJKI, i to jest cała decyzja.** Liczba używana do triażu nie może
+  stać za kliknięciem — zwijka kosztowałaby ruch przy każdej sprawie, czyli
+  przy tej czynności, którą ma przyspieszyć.
+- **To płaci 0.403.0**, które z tej kolumny wiersze wycinało. Import oddał
+  57818 cen na 9800 kartotek, czyli około sześciu poziomów na towar — sześć
+  wierszy wraca świadomie i z powodu wprost od właściciela.
+- Sprawa bez potwierdzonej kartoteki nie dostaje pustej ramki.
+
 ## 0.410.0 — 19 września 2026
 
 **Wejście w reklamację odświeża ją z Allegro.** Zgłoszenie właściciela:

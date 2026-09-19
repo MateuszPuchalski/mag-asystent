@@ -10,6 +10,8 @@ import {
   EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Przycisk, Skopiuj,
 } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
+import { CenyKartoteki } from "../skrzynka/TowarRozmowy";
+import { useKartaTowaru } from "../api/rozmowy";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { NAZWA_WERDYKTU } from "./statusy";
 import { Zwijka } from "../skrzynka/Zwijka";
@@ -335,6 +337,7 @@ export function Dowody({
   return <div className="flex min-h-0 flex-col">
     <Glowica r={r} />
     <Towar szczegol={szczegol} pozycja={pozycja} />
+    <Cennik twId={r.twId} />
 
     <div className="px-2">
       <Zwijka
@@ -636,6 +639,39 @@ function Towar({ szczegol, pozycja }: {
           {pozycja.ilosc} × {zlote(pozycja.cenaGrosze, pozycja.waluta)}</span>}
       </p>
     </div>
+  </div>;
+}
+
+/* ── CENNIK SUBIEKTA PRZY SPRAWIE (0.411.0) ──────────────────────────────────
+   Zgłoszenie właściciela: „nadal nie widzę cen w reklamacjach", a zaraz potem
+   powód: „są kluczowe do szybkiego oceniania, czy warto rozpatrywać
+   reklamację".
+
+   To drugie zdanie rozstrzyga KSZTAŁT, nie tylko istnienie bloku. Liczba
+   używana do TRIAŻU nie może stać za kliknięciem: zwijka kosztowałaby ruch
+   przy każdej sprawie, czyli dokładnie przy tej czynności, którą ma
+   przyspieszyć. Dekalog ergonomii, punkt 2 — pierwszeństwo ma to, co
+   rozstrzyga bieżącą czynność.
+
+   PŁACI ZA TO 0.403.0, które z tej kolumny wycinało wiersze. Import oddał
+   57818 cen na 9800 kartotek, czyli około sześciu poziomów na towar — sześć
+   wierszy wraca do kolumny, którą to wydanie odchudzało. Wraca świadomie
+   i z powodu wprost od właściciela, a nie „przy okazji".
+
+   BLOK JEST TEN SAM, CO W SKRZYNCE, nie kopia: te same nazwy poziomów, ta sama
+   kolejność, ta sama zasada „pusty nie rysuje się wcale". Dwie kopie tego
+   samego rozjechałyby się przy pierwszej poprawce jednej z nich.
+
+   MILCZY BEZ KARTOTEKI. Sprawa bez potwierdzonego towaru nie ma cennika i nie
+   dostaje pustej ramki — brak wiedzy to nie jest informacja warta miejsca. */
+function Cennik({ twId }: { twId: number | null }) {
+  /* Ten sam hak, co w skrzynce — TanStack trzyma to pod jednym kluczem, więc
+     otwarcie sprawy nie pyta serwera drugi raz o tę samą kartotekę. */
+  const karta = useKartaTowaru(twId);
+  const ceny = karta.data?.ceny ?? [];
+  if (ceny.length === 0) return null;
+  return <div className="border-b border-slate-200 px-4 py-2">
+    <CenyKartoteki ceny={ceny} />
   </div>;
 }
 
