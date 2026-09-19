@@ -5,6 +5,14 @@ import userEvent from "@testing-library/user-event";
 import type { Reklamacja, SzczegolReklamacji, Zamowienie } from "../api/typy";
 import { Dowody } from "./Dowody";
 
+/* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
+   plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
+   testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
+vi.mock("../api/rozmowy", () => ({
+  useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+}));
+
+
 /* ── Hierarchia prawej kolumny (0.403.0) ─────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem całego panelu: „wygląda chaotycznie".
    Kolumna dowodów miała dwadzieścia jeden wierszy W JEDNEJ WADZE — „Tytuł:

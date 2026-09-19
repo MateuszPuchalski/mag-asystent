@@ -5,6 +5,14 @@ import userEvent from "@testing-library/user-event";
 import type { Reklamacja, StanPrzesylki, SzczegolReklamacji, Zamowienie } from "../api/typy";
 import { Dowody } from "./Dowody";
 
+/* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
+   plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
+   testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
+vi.mock("../api/rozmowy", () => ({
+  useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+}));
+
+
 /* ── Ceny i paczka w kolumnie dowodów (0.393.0) ──────────────────────────────
    Zgłoszenie właściciela: „dodaj status przesyłki i ceny produktów". Testujemy
    to, co przy reklamacji rozstrzyga rozmowę, a nie to, co ładnie wygląda.

@@ -6,6 +6,14 @@ import userEvent from "@testing-library/user-event";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { Dowody } from "./Dowody";
 
+/* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
+   plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
+   testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
+vi.mock("../api/rozmowy", () => ({
+  useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+}));
+
+
 beforeEach(() => localStorage.clear());
 
 /* ── Karta faktów Copilota w kolumnie dowodów (0.275.0) ──────────────────────
