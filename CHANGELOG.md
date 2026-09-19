@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.409.0 — 19 września 2026
+
+**`/api/health` mówi wreszcie o synchronizacji spraw posprzedażowych.**
+Zgłoszenie właściciela: „reklamacje w aplikacji mają nieaktualny stan".
+Przysłał wynik tej trasy, żeby to pokazać — a odpowiedzi w nim nie było.
+
+- **Nowy blok `allegroReklamacje`.** `stanReklamacjiHealth` istniał od 0.222.0
+  i ta trasa go NIE WOŁAŁA: przez trzy kwartały zdrowie mówiło o skrzynce
+  i milczało o reklamacjach i dyskusjach. Blok czytał wyłącznie pasek nad
+  kolejką, czyli ekran pracy — a nie miejsce, do którego zagląda się wtedy,
+  gdy coś jest nie tak.
+- **Ogon spraw wchodzi do `problemy` zdaniem.** Bezpiecznik stron czyta
+  najwyżej tysiąc spraw na przebieg; konto z dłuższym archiwum zostawia resztę
+  po tamtej stronie, a status TYCH spraw nie odświeża się wcale. Liczba stała
+  w bazie od 0.222.0 i nikt jej nie widział poza kolejką.
+- Zdanie mówi też, czego to NIE naprawi: próg daty w kolejce obcina widok,
+  a nie pobieranie.
+
 ## 0.408.0 — 19 września 2026
 
 **Zadanie dla magazynu mówi dwie rzeczy: jaki towar i co zrobić.** Zgłoszenie
