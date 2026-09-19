@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.405.0 — 19 września 2026
+
+**Ceny z Subiekta wchodzą do read-modelu.** Właściciel uruchomił
+`tools/sonda-cen.sql` na produkcyjnej bazie 19 września 2026. Baza odpowiedziała
+i odpowiedź jest inna, niż zakładaliśmy, więc import wygląda tak, jak wygląda.
+
+- **[wymaga działania] Dwa nowe `GRANT SELECT`** — `dbo.tw_Cena`
+  i `dbo.vwPoziomyCen`. Bez nich karta towaru dalej nie pokazuje cen, a objaw
+  jest NIEMY: wygląda dokładnie tak, jak wyglądał przedtem. Instrukcja stoi
+  w `DEPLOY.md` §6h.
+- **Poziomy cen to KOLUMNY, nie wiersze.** `tw_Cena` niesie `tc_CenaNetto0..10`
+  i `tc_CenaBrutto0..10` — jedenaście par w jednym wierszu na kartotekę. Import
+  rozwija je na wiersze `sgt_cena`, bo ten kształt przeżyje zmianę liczby
+  poziomów w Subiekcie bez migracji u nas.
+- **Netto i brutto biorą się gotowe**, nie z przeliczania przez VAT. Cena
+  podana klientowi ma się zgadzać z fakturą co do grosza.
+- **Poziom bez kwoty nie wchodzi.** Dziewięć wierszy „0,00 zł" na karcie to
+  dziewięć zaproszeń do podania ceny, której nie ma.
+- **Import cen degraduje osobno** — brak uprawnienia zostawia ceny puste,
+  a stany i dokumenty wchodzą. `/api/health` mówi o tym zdaniem, a `lastImport`
+  dostał licznik `ceny`.
+- Nazwy poziomów z widoku `vwPoziomyCen`; gdy jest niedostępny, kwoty wchodzą
+  bez nazw, a panel pokazuje numer poziomu.
+- Wynik sondy zapisany w `docs/subiekt-gt-struktura.md` z datą. Sekcje D i D2
+  sondy są od teraz uruchamialne — mówią, które poziomy ta firma wypełnia.
+
 ## 0.404.0 — 18 września 2026
 
 **Skrzynka przestaje oddawać pustce więcej miejsca niż pisaniu.** Zgłoszenie

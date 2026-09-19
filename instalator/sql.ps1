@@ -519,6 +519,14 @@ $script:WertisTabeleOdczytu = @(
     @{ Tabela = "dok_Pozycja";    Po = "" },
     @{ Tabela = "kh__Kontrahent"; Po = "" },
     @{ Tabela = "sl_Magazyn";     Po = "nazwy i symbole magazynów" },
+    # Cennik kartoteki (0.405.0). `tw_Cena` jest tabelą RDZENIOWĄ Subiekta —
+    # stoi w każdej instalacji, tak samo jak `tw_Stan`, więc nie wymaga
+    # sprawdzania obecności. Widok nazw poziomów już tak: sonda z 19 września
+    # 2026 widziała `vwPoziomyCen` na bazie tej firmy, ale jednej bazy nie
+    # bierzemy za kontrakt. Import CZYTA GO OSOBNO i degraduje sam (ceny wchodzą
+    # bez nazw), więc brak tego grantu nie kosztuje kwot — a `GRANT SELECT` na
+    # nieistniejący obiekt kosztowałby całe konto, patrz komentarz niżej.
+    @{ Tabela = "tw_Cena";        Po = "cennik kartoteki, poziomy 0..10" },
     # OPCJONALNA: tabela zdjęć jest w bieżących wersjach GT, ale nie w każdej.
     # `GRANT SELECT` na nieistniejący obiekt kończy WYKONANIE CAŁEGO skryptu
     # błędem (idzie jednym ExecuteNonQuery), więc konto zostawałoby bez ani

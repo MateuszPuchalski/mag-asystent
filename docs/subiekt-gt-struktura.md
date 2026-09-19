@@ -717,38 +717,70 @@ Sferze. Pytanie postawił właściciel: czy kliknięcie w numer paragonu w panel
 może otworzyć ten paragon w Subiekcie. Dlaczego samo panelu to nie załatwi,
 tłumaczy `docs/architektura.md` §4.
 
-## Ceny na kartotece — CZEGO NIE WIEMY
+## Ceny na kartotece — SPRAWDZONE 19 września 2026
 
-Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie widzi,
-bo ich nigdy nie było. `sgt_towar` nie ma kolumny ceny, importer ich nie
-pobiera, a login `wertis` nie ma prawa do tabeli cennikowej.
+Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie widział,
+bo ich nigdy nie było. Sekcja stała tu pusta z rozmysłem. Cennika nie opisywał
+nasz zweryfikowany wyciąg ze struktury InsERT. Nazwa tabeli wpisana z pamięci to
+ta sama klasa błędu, która przy Allegro kosztowała trzy wydania.
 
-Ta sekcja stoi tu pusta z rozmysłem. Oficjalny opis struktury, z którego
-spisano resztę dokumentu, mamy przeczytany w zakresie kartoteki, stanów,
-dokumentów i kontrahentów. Cennika w tym zakresie nie było, a nazwa tabeli
-wpisana z pamięci to ta sama klasa błędu, która przy Allegro kosztowała trzy
-wydania.
+Właściciel uruchomił `tools/sonda-cen.sql` na produkcyjnej bazie 19 września
+2026. Poniżej stoi to, co odpowiedziała baza — nie to, co zakładaliśmy.
 
-`[WERYFIKUJ]` **nazwy tabel i kolumn cennika, liczba używanych poziomów cen
-oraz to, czy baza trzyma obok siebie kwotę netto i brutto**. Rozstrzyga to
-jedno uruchomienie `tools/sonda-cen.sql` na produkcyjnej bazie; sonda pyta
-słowniki systemowe o nazwy, zamiast je zakładać. Wynik wklej tutaj razem
-z datą, tak samo jak wynik audytu kolizji.
+### Tabela
 
-Do tego dochodzi nowy `GRANT SELECT` w `docs/subiekt-gt-edu-setup.md` §2 —
-dzisiejszy login widzi sześć tabel i żadna z nich nie jest cennikiem.
+`tw_Cena`, wiązana z kartoteką przez `tc_IdTowar` → `tw__Towar.tw_Id`. Obok
+niej stoi `tw_CenaHistoria` o bliźniaczym kształcie (prefiks `tch_`), której
+NIE czytamy: karta towaru ma mówić, ile kosztuje dziś.
 
-Trzy rzeczy, które ta odpowiedź przesądza, a bez których kodu nie ma sensu
-pisać:
+### Poziomy są KOLUMNAMI, nie wierszami
 
-1. **Skala liczby.** Kwoty trzymamy u siebie w groszach, całkowitych — tak
-   samo jak kwoty z Allegro. Pomyłka o rząd wielkości w cenie podanej
-   klientowi jest droższa niż brak ceny.
-2. **Ile poziomów naprawdę żyje.** Właściciel wybrał „wszystkie poziomy",
-   ale osiem pustych wierszy to nie jest wiedza, tylko hałas.
-3. **Netto i brutto obok siebie czy przeliczanie u nas.** Przeliczanie wymaga
-   stawki VAT z kartoteki i daje własny błąd zaokrąglenia. Cena podana
-   klientowi ma się zgadzać z fakturą co do grosza.
+To jest jedyna prawdziwa niespodzianka sondy. Jeden wiersz `tw_Cena` niesie
+jedenaście par kwot:
+
+| kolumna | typ | znaczenie |
+|---|---|---|
+| `tc_CenaNetto0` … `tc_CenaNetto10` | `money(19,4)` | netto poziomu 0..10 |
+| `tc_CenaBrutto0` … `tc_CenaBrutto10` | `money(19,4)` | brutto tego samego poziomu |
+| `tc_IdWaluta0` … `tc_IdWaluta10` | `char(3)` | waluta osobno dla każdego poziomu |
+
+Poziom 0 to cena zakupu. Obok jadą jeszcze `tc_Zysk1..10`, `tc_Narzut1..10`
+i `tc_Marza1..10` — wskaźniki handlowe, których do klienta nie wynosimy.
+
+Read-model `sgt_cena` ma kształt ODWROTNY: wiersz na poziom. Import rozwija
+kolumny na wiersze i to nie jest przypadek — kształt wierszowy przeżyje zmianę
+liczby poziomów w Subiekcie bez migracji schematu u nas.
+
+### Netto i brutto stoją obok siebie
+
+Obie kwoty są gotowe, więc niczego nie przeliczamy przez stawkę VAT. Cena
+podana klientowi ma się zgadzać z fakturą co do grosza, a własne zaokrąglenie
+to własny błąd. Skala `money(19,4)` wraca ze sterownika jako liczba
+zmiennoprzecinkowa, więc przeliczenie na grosze idzie przez `Math.round`.
+Bez niego `19.99 * 100` daje `1998.9999999999998`, czyli grosz mniej na każdym
+towarze kończącym się na 99 (`adapters/ceny-kartoteki.test.ts`).
+
+### Nazwy poziomów
+
+Widok `vwPoziomyCen(IDENT int, NAZWA varchar(50))` — numer poziomu i jego nazwa.
+Import czyta go osobnym zapytaniem; gdy widok jest niedostępny, ceny wchodzą
+mimo to, z nazwą pustą, a panel pokazuje numer poziomu. Odwrotnie byłoby
+absurdem: wywalić kwoty, bo nie znamy ich etykiet.
+
+`[WERYFIKUJ]` **które poziomy ta firma naprawdę wypełnia i jak je nazwała.**
+Sekcja D sondy była zakomentowana (bez nazw tabeli nie dało się jej napisać),
+więc na to pytanie baza jeszcze nie odpowiedziała. Kodu to NIE blokuje: import
+wpuszcza tylko poziomy z kwotą, a nazwy bierze z widoku, więc odpowiedź jest
+danymi, nie decyzją projektową. Padnie sama przy pierwszym imporcie — licznik
+`ceny` w `/api/health` powie, ile wierszy powstało z 3415 kartotek.
+
+### Nowe uprawnienia
+
+`GRANT SELECT ON dbo.tw_Cena` oraz `GRANT SELECT ON dbo.vwPoziomyCen`
+(`docs/subiekt-gt-edu-setup.md` §2). Żadna instalacja sprzed 0.405.0 ich nie ma.
+Brak uprawnienia DEGRADUJE import — ceny zostają puste, stany i dokumenty
+wchodzą — i melduje się zdaniem w `/api/health`. Objaw jest niemy: karta towaru
+bez cen wygląda dokładnie tak, jak wyglądała przedtem.
 
 ## Zasada nadrzędna
 

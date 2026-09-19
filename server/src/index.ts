@@ -43,6 +43,7 @@ import {
   brakKolumnyUwag,
   brakKolumnyKorekty,
   bladImportuMm,
+  bladImportuCen,
   brakDostepuDoMagazynow,
   brakKolumnyZrealizowano,
   importFromMssql,
@@ -213,6 +214,11 @@ export async function buildApp() {
          pracuje na danych sprzed awarii. Do 0.76.1 tego zdania na liście
          brakowało, więc awaria nie miała jak wypłynąć. */
       bladImportuMm,
+      /* Cennik kartotek (0.405.0). Objaw braku uprawnienia jest NIEMY: karta
+         towaru bez cen wygląda dokładnie tak, jak wyglądała przed tym
+         wydaniem. Bez tego zdania nikt nie skojarzyłby, że brakuje
+         `GRANT SELECT ON dbo.tw_Cena`, a nie danych w Subiekcie. */
+      bladImportuCen,
       /* Groźniejszy od awarii jest pusty wynik: dokumenty są, pozycji zero,
          a kosz z zerem pozycji na kolektorze wygląda jak dzień bez zwrotów. */
       bez("przyjęcia bez pozycji", przyjeciaBezPozycji),
