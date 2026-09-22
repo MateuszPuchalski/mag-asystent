@@ -937,22 +937,67 @@ export function przeliczKosz(
 }
 
 /**
+ * Stany zadania MM, w których DOKUMENTU JESZCZE NIE MA (0.420.0).
+ *
+ * Tylko z tych wolno je zgasić przy poprawce zawartości. `done` i `processing`
+ * na tej liście nie stoją i stać nie będą: przy pierwszym papier już wyszedł,
+ * przy drugim może właśnie wychodzić.
+ */
+const MM_BEZ_DOKUMENTU = ["pending", "waiting_for_doc", "error"];
+
+/**
  * Unieważnia zadanie MM ułożone dla poprzedniej zawartości kosza (0.334.0).
  *
- * Zadanie `pending` da się anulować — jeszcze nie ruszyło. `error` zostaje
- * w kolejce jako ślad po nieudanej próbie i tylko odpinamy je od kosza: kosz
- * bez `mm_queue_id` wraca pod `wypuscGotoweKoszyki` i dostanie świeże zadanie
- * z nową zawartością. Zadania w toku tu nie dojdą — blokuje je bramka.
+ * Kosz bez `mm_queue_id` wraca pod `wypuscGotoweKoszyki` i dostaje świeże
+ * zadanie z nową zawartością — na tym polega cała ta funkcja.
+ *
+ * ── GASIMY STARE ZADANIE, NIE TYLKO ODPINAMY (0.420.0) ────────────────────
+ * Do tego wydania anulowane było wyłącznie zadanie `pending`; `error`
+ * i `waiting_for_doc` zostawały żywe w kolejce i tylko traciły związek
+ * z koszem. Uzasadnienie brzmiało „ślad po nieudanej próbie" i było dobre —
+ * tylko że ślad zostaje także po anulowaniu, bo `error_msg` nikt nie kasuje.
+ * Znikał za to przycisk PONÓW, a to on był problemem.
+ *
+ * Koszyk Z-23 zebrał tak TRZY żywe zadania MM naraz. Przebieg był prosty:
+ * w czasie awarii pustej sesji Sfery każde zadanie MM tego kosza schodziło
+ * w `error`, każda poprawka zawartości odpinała je i zamawiała nowe, a potem
+ * biuro naciskało PONÓW na starych wierszach — bo w kolejce wyglądały jak
+ * zwykła praca do odzyskania. Każde wskrzeszone zadanie wystawia WŁASNY
+ * dokument MM na to samo pudło, czyli ten sam towar przesunięty trzy razy.
+ * Odkręca się to w Subiekcie dokumentami korygującymi, nie w aplikacji.
+ *
+ * `waiting_for_doc` jest tym samym przypadkiem, tylko cichszym: worker odłożył
+ * zadanie na minutę i sam po nie wróci. Nikt nie musi niczego naciskać.
+ *
+ * ── ZADANIE W TOKU ZATRZYMUJE CAŁĄ POPRAWKĘ ───────────────────────────────
+ * `processing` znaczy, że worker trzyma to zadanie TERAZ i może być w środku
+ * `Zapisz()`. Nie wolno go zgasić (dokument mógł już powstać) ani odpiąć po
+ * cichu (powstanie dokument, o którym kosz nie będzie wiedział). Jedyna uczciwa
+ * odpowiedź to odmowa całej poprawki — wołający jest w transakcji, więc
+ * wycofuje się z niej w całości.
+ *
+ * Bramka `koszDoEdycji` odsiewa ten stan wcześniej i normalnie tu nie dojdzie.
+ * Ten warunek jest drugą linią na wyścig: między sprawdzeniem bramki a tym
+ * zapisem worker może zdążyć wziąć zadanie.
  */
 function uniewaznijZadanieMm(
   database: Db, koszId: number, kto: { id: number | null; name: string },
 ): void {
-  const k = database.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(koszId) as
-    { mm_queue_id: number | null } | undefined;
+  const k = database.prepare("SELECT mm_queue_id, kod FROM kosz WHERE id=?").get(koszId) as
+    { mm_queue_id: number | null; kod: string } | undefined;
   if (!k?.mm_queue_id) return;
   const z = database.prepare("SELECT status FROM sfera_queue WHERE id=?")
     .get(k.mm_queue_id) as { status: string } | undefined;
-  if (z?.status === "pending") {
+  const stan = String(z?.status ?? "");
+  if (stan === "processing" || stan === "done") {
+    throw new Error(
+      `Koszyk ${k.kod} ma zadanie MM w toku — dokument właśnie powstaje. ` +
+      "Poczekaj, aż kolejka je domknie, i popraw zawartość dopiero wtedy.");
+  }
+  if (z && MM_BEZ_DOKUMENTU.includes(stan)) {
+    /* `error_msg` zostaje nietknięty — ślad po nieudanej próbie czyta się
+       z wiersza tak samo jak dotąd. Zmienia się tylko to, że nikt tego
+       zadania już nie wskrzesi: PONÓW przyjmuje wyłącznie `error`. */
     database.prepare(
       `UPDATE sfera_queue SET status='cancelled',
         processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`).run(k.mm_queue_id);
