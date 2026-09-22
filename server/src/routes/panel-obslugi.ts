@@ -78,6 +78,10 @@ export function problemZWersji(panel: string | null, serwer: string): string | n
 const MIME: Record<string, string> = {
   ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
+  /* `.webp` doszło z ikoną karty przeglądarki (0.419.0): Vite hashuje ją do
+     `assets/` razem z resztą, więc bez tego wpisu wyszłaby jako strumień
+     bajtów i przeglądarka nie narysowałaby jej w pasku. */
+  ".webp": "image/webp",
 };
 
 /** Osobny frontend ma własny build, ale nadal serwuje go ten sam proces i origin. */

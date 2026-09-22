@@ -1335,3 +1335,35 @@ test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => 
     "miara ma własne zabezpieczenie na całym łańcuchu, nie za `.json()`"
   );
 });
+
+/* ── Ikona karty przeglądarki (0.419.0) ──────────────────────────────────────
+   Decyzja właściciela: obie karty mają nosić znak firmy. Biuro rysowało literę
+   „W" wklejoną jako SVG, panel obsługi nie miał ikony wcale.
+
+   Test pilnuje PARY: adresu nazwanego w stronie i trasy, która go obsługuje.
+   Rozjazd między nimi nie wywraca niczego — daje pustą ikonę i 404 w logu,
+   czyli usterkę, której nikt nie zgłosi i nikt nie zauważy.                 */
+
+test("ikona biura wychodzi z trasy nazwanej w stronie", async () => {
+  const html = fs.readFileSync(
+    new URL("../web/biuro.html", import.meta.url), "utf8");
+  const adres = /<link rel="icon"[^>]*href="([^"]+)"/.exec(html)?.[1];
+  assert.equal(adres, "/biuro/ikona.webp", "strona nazywa inny adres ikony");
+
+  const r = await app.inject({ method: "GET", url: adres! });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.headers["content-type"], "image/webp");
+  /* Tydzień cache'u, jak fonty: plik zmienia się wyłącznie z wydaniem,
+     a wydanie restartuje usługę. */
+  assert.match(String(r.headers["cache-control"]), /max-age=604800/);
+});
+
+test("ikona NIE jest już wklejona w dokument", () => {
+  /* Wklejony `data:` URI wracał przy każdym otwarciu strony w treści HTML-a.
+     Zarzut, dla którego tam stał — 404 na `/favicon.ico` — nie dotyczy adresu,
+     który strona nazywa sama. */
+  const html = fs.readFileSync(
+    new URL("../web/biuro.html", import.meta.url), "utf8");
+  assert.ok(!/<link rel="icon"[^>]*data:image/.test(html),
+    "ikona wróciła do dokumentu jako data:");
+});

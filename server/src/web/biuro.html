@@ -4,10 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WERTIS · Podgląd biura</title>
-<!-- Ikona wprost w dokumencie: strona jest JEDNYM plikiem bez builda, więc
-     osobny `/favicon.ico` byłby drugim zasobem do serwowania i 404 w logu
-     przy każdym otwarciu. -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232A2A2C'/%3E%3Cpath d='M5 10h4l2 8 2-8h3l2 8 2-8h4l-4 14h-4l-1.5-6-1.5 6H9z' fill='%23F7A600'/%3E%3C/svg%3E">
+<!-- ── IKONA KARTY PRZEGLĄDARKI (0.419.0) ───────────────────────────────
+     Decyzja właściciela: karta biura ma nosić znak firmy — magazyn. Do tego
+     wydania stała tu litera „W" wklejona jako SVG w adresie `data:`, bo
+     strona jest JEDNYM plikiem bez builda i osobny `/favicon.ico` byłby
+     adresem, o który przeglądarka pyta sama, a którego nikt nie obsługiwał.
+
+     Plik z ikoną tamtego zarzutu nie ma: jego adres jest NAZWANY tutaj,
+     a trasa `/biuro/ikona.webp` czyta go raz przy starcie i oddaje
+     z tygodniowym cache'em — dokładnie jak fonty Barlow niżej. -->
+<link rel="icon" type="image/webp" href="/biuro/ikona.webp">
 <style>
   /* ── Język wizualny WERTIS — LUSTRO kolektora ──────────────────────────────
      Tokeny przepisane 1:1 z android/ui/theme/Color.kt, fonty to TE SAME pliki
