@@ -93,3 +93,15 @@ test("zgodne wersje i brak panelu MILCZĄ, bo żadne z nich nie jest usterką", 
      instalację — czyli uczyłoby ignorować listę problemów zdrowia. */
   assert.equal(problemZWersji(null, "0.355.0"), null);
 });
+
+/* ── Typ `.webp` na białej liście (0.419.0) ──────────────────────────────────
+   Ikona karty przeglądarki jedzie przez Vite do `assets/` razem z resztą
+   builda. Bez wpisu w tabeli typów wyszłaby jako strumień bajtów i pasek
+   przeglądarki zostałby pusty — czyli dokładnie tak, jak wyglądał przed tym
+   wydaniem, tylko z plikiem na dysku.                                       */
+test("panel oddaje ikonę jako obraz, nie jako strumień bajtów", () => {
+  const zrodlo = fs.readFileSync(
+    new URL("./panel-obslugi.ts", import.meta.url), "utf8");
+  assert.match(zrodlo, /"\.webp":\s*"image\/webp"/,
+    "`.webp` wypadło z tabeli typów panelu");
+});

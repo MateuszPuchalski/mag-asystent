@@ -49,6 +49,26 @@ export async function biuroRoutes(app: FastifyInstance) {
 
   app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8").send(html));
 
+  /* ── IKONA KARTY PRZEGLĄDARKI (0.419.0) ───────────────────────────────────
+     Decyzja właściciela: obie karty mają nosić znak firmy — magazyn dla biura,
+     słuchawki dla obsługi klienta. Do tego wydania biuro rysowało literę „W"
+     z wklejonego SVG, a panel obsługi nie miał ikony wcale.
+
+     TEN SAM WZORZEC CO FONTY, i to jest cały powód, dla którego wolno było
+     zejść z wklejonego obrazka: plik czyta się RAZ przy rejestracji tras,
+     wychodzi z tygodniowym cache'em i nie dotyka dysku przy żądaniu. Zarzut
+     z poprzedniego komentarza — „drugi zasób do serwowania i 404 w logu" —
+     dotyczył `/favicon.ico`, czyli adresu, o który przeglądarka pyta sama
+     i którego nikt nie obsługiwał. Ten adres jest nazwany w `<link>`.
+
+     WEBP, nie PNG: tak przyszedł plik od właściciela, a biuro i obsługa
+     pracują w Chrome, który czyta webp w ikonie karty od 2014 roku.
+     Przerobienie go na PNG wymagałoby narzędzia, którego to repo nie ma. */
+  const ikona = fs.readFileSync(path.join(__dirname, "../web/ikona-biuro.webp"));
+  app.get("/biuro/ikona.webp", async (_req, reply) =>
+    reply.type("image/webp").header("cache-control", "public, max-age=604800").send(ikona)
+  );
+
   /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
      Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez
      wyjścia w świat: link do Google Fonts dawałby pustą czcionkę i timeout.
