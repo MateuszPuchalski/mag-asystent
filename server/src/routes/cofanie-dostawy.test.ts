@@ -119,7 +119,7 @@ test("ZMIEŃ PÓŁKĘ wymaga kodu i odrzuca symbol towaru", async () => {
 test("WYCOFAJ zgłoszenie: bez ciała, tylko dla zgłaszającego", async () => {
   const jan = zalogowany("magazynier", "jan");
   const ola = zalogowany("magazynier", "ola");
-  // druga pozycja: zgłoszenie na jedynej domknęłoby dostawę (tak ma być)
+  // druga pozycja: reszta dostawy zostaje w pracy, jak przy zwykłym zgłoszeniu
   db().prepare("INSERT INTO sgt_towar(tw_id, symbol, nazwa, lokalizacja) VALUES (?,?,?,?)")
     .run(64_102, "GRABIE-64", "Grabie", "A01-02-04");
   db().prepare("INSERT INTO sgt_pozycja(dok_id,tw_id,ilosc) VALUES (?,?,?)").run(DOK, 64_102, 2);

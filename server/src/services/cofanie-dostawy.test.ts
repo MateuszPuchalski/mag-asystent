@@ -272,6 +272,7 @@ test("otwarcie zostawia zgłoszenie złożone przez człowieka", () => {
   ]);
   P.raiseProblem({ deliveryId: id, lineId: linie[0], typ: "qty_mismatch", qty: 8 }, "jan");
   D.putawayLine(linie[1], "A01-01-02", "jan");
+  D.zakonczDostawe(id, "jan");
   assert.equal(stanDostawy(id), "done");
   C.otworzPonownie(id, "jan");
   assert.equal(linia(linie[0]).status, "problem", "twierdzenie człowieka nie znika z otwarciem");
@@ -385,11 +386,25 @@ test("cudze, rozstrzygnięte i automatyczne zgłoszenie nie dają się wycofać"
   assert.match(auto.error, /OTWÓRZ PONOWNIE/);
 });
 
+test("wyjątek na ostatniej pozycji NIE domyka dostawy — czeka na ZAKOŃCZ", () => {
+  /* Decyzja właściciela po audycie z 22 września 2026. Wyjątek czeka na
+     decyzję („dosłali brakujące sztuki"), a zamknięta dostawa nie miała już
+     gdzie ich przyjąć. */
+  const { id, linie } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
+  const p = P.raiseProblem({ deliveryId: id, lineId: linie[0], typ: "qty_mismatch", qty: 6 }, "jan");
+  assert.ok("id" in p);
+  assert.equal(stanDostawy(id), "open");
+  const r = C.wycofajZgloszenie(p.id, "jan");
+  assert.ok(!("error" in r), "na otwartej dostawie wycofanie działa od razu");
+  assert.equal(r.statusLinii, "todo");
+});
+
 test("zgłoszenie na zamkniętej dostawie: najpierw otwarcie, potem wycofanie", () => {
   const { id, linie } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
   const p = P.raiseProblem({ deliveryId: id, lineId: linie[0], typ: "qty_mismatch", qty: 6 }, "jan");
   assert.ok("id" in p);
-  assert.equal(stanDostawy(id), "done", "wyjątek na ostatniej pozycji domyka dostawę");
+  D.zakonczDostawe(id, "jan");
+  assert.equal(stanDostawy(id), "done", "ZAKOŃCZ zamyka dostawę z wyjątkiem");
   assert.match((C.wycofajZgloszenie(p.id, "jan") as { error: string }).error, /OTWÓRZ PONOWNIE/);
   C.otworzPonownie(id, "jan");
   const r = C.wycofajZgloszenie(p.id, "jan");

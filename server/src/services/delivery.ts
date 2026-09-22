@@ -582,8 +582,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
     .sort(porownajAlejkowo);
 
   // linia z problemem wychodzi z rutyny alejkowej (żyje dalej na liście wyjątków),
-  // więc nie trzyma dostawy otwartej — inaczej zgłoszenie problemu karałoby
-  // zgłaszającego i nikt by go nie zgłaszał (D8)
+  // więc liczy się do postępu jak rozstrzygnięta — ZAKOŃCZ nie ma na nią czekać,
+  // a zgłaszający nie ma za zgłoszenie płacić rutyną (D8)
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
   const problems = lines.filter((l) => l.status === "problem").length;
   return {
@@ -915,9 +915,9 @@ export function putawayLine(
 }
 
 /**
- * Dostawa zamyka się sama, gdy nie ma już czego rozkładać. Linia z wyjątkiem
- * liczy się jako domknięta — wypadła z rutyny alejkowej i żyje dalej na liście
- * wyjątków, więc trzymanie przez nią całej dostawy karałoby zgłaszającego (D8).
+ * Dostawa zamyka się sama, gdy każda pozycja jest odłożona. Pozycja z wyjątkiem
+ * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale od 0.433.0 nie
+ * zamyka dostawy sama — patrz komentarz w środku funkcji.
  */
 export function closeIfComplete(
   deliveryId: number,
@@ -952,6 +952,19 @@ export function closeIfComplete(
      się wtedy reklamacją, zanim ktokolwiek zdążył je poprawić. Dostawa
      z nadmiarem zostaje więc otwarta, a zamyka ją ZAKOŃCZ z podglądem. */
   if (!opts.jawnie && nadmiary(deliveryId).length > 0) return;
+  /* WYJĄTEK TEŻ CZEKA NA ZAKOŃCZ (decyzja właściciela po audycie z 22 września
+     2026). Do tej wersji zgłoszenie problemu na ostatniej pozycji zamykało
+     dostawę od razu. Wyjątek czeka jednak na decyzję (D8) — np. „dosłali
+     brakujące 4 sztuki" — a zamknięta dostawa nie miała już gdzie ich przyjąć.
+     Koszt dla zgłaszającego to jedno tapnięcie ZAKOŃCZ, nie ponowne otwieranie. */
+  if (!opts.jawnie) {
+    const zWyjatkiem = (
+      db()
+        .prepare("SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id=? AND status='problem'")
+        .get(deliveryId) as { n: number }
+    ).n;
+    if (zWyjatkiem > 0) return;
+  }
   const zamkniete = db()
     .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
     .run(nowIso(), deliveryId);

@@ -95,6 +95,10 @@ z zamknięcia. Gdy MM braku weszło do Subiekta.
 - **Nadmiar nie zamyka dostawy sam.** Zamyka go ZAKOŃCZ, a podgląd pokazuje
   nadmiar przed zapisem. Dotąd zgłoszenie do dostawcy powstawało bez
   podglądu, także z podwójnego odłożenia przez dwie osoby.
+- **Zgłoszenie problemu nie zamyka dostawy.** Dotąd wyjątek na ostatniej
+  pozycji zamykał ją od razu, a dosłany towar nie miał już gdzie trafić.
+  Dostawa z wyjątkiem czeka na ZAKOŃCZ, a do tego czasu zgłoszenie da się
+  wycofać bez otwierania dostawy.
 - **Korekta do zera cofa adres**, gdy wiadomo, do czego wrócić. Gdy nie
   wiadomo, komunikat mówi, która półka została w kartotece.
 - **Korekta przyjmuje ilość ponad fakturę.** Kolektor ucinał ją na fakturze,

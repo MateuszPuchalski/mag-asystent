@@ -271,6 +271,7 @@ przed którą ta pozycja broni.
 - [ ] ten sam towar w dwóch wierszach: tap otwiera dotknięty wiersz,
 - [ ] tryb samolotowy: skan EAN z listy otwiera pozycję, skan półki idzie do bufora,
 - [ ] „ZAMIEŃ" dla towaru A nie powtarza się samo dla towaru B.
+- [ ] PROBLEM na ostatniej pozycji NIE zamyka dostawy; nagłówek każe nacisnąć ZAKOŃCZ.
 
 **Korekta ilości odłożonej**
 

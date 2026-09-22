@@ -45,8 +45,9 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
    czego rozkładać. Nie zamknie się jednak, dopóki wisi nieodpowiedziana
    notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
-   Od 0.433.0 nie zamknie się też sama z NADMIAREM. Nadmiar jest
-   twierdzeniem wobec dostawcy, więc zamyka go wyłącznie ZAKOŃCZ z podglądem.
+   Od 0.433.0 nie zamknie się też sama z NADMIAREM ani z pozycją z WYJĄTKIEM.
+   Nadmiar jest twierdzeniem wobec dostawcy, a wyjątek czeka na decyzję.
+   Obie takie dostawy zamyka wyłącznie ZAKOŃCZ z podglądem.
 6. **Wyjątek** (`raiseProblem`) — kategoria zna swój ZAKRES (0.57.0). Cztery
    dotyczą pozycji: zła ilość, brak w przesyłce, uszkodzone, błędny artykuł.
    Jedna dotyczy dostawy: artykuł niezamówiony, czyli towar spoza dokumentu.

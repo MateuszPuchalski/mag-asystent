@@ -394,8 +394,8 @@ export function raiseProblem(
   // linia z problemem wypada z rutyny — nie blokuje zamknięcia reszty dostawy
   if (input.lineId && !input.zachowajStatusLinii) {
     db().prepare("UPDATE delivery_line SET status='problem' WHERE id=?").run(input.lineId);
-    // jeśli to była ostatnia otwarta pozycja, dostawa domyka się tak samo jak
-    // po zwykłym odłożeniu — wyjątek żyje dalej na liście nierozwiązanych
+    // wyjątek NIE domyka dostawy sam (od 0.433.0 — patrz `closeIfComplete`);
+    // wołanie zostaje, bo reguła domknięcia ma jedno miejsce, nie dwa
     closeIfComplete(input.deliveryId, user);
   }
   logEvent("problem_raised", user, null, { problemId: id, typ: input.typ, lineId: input.lineId ?? null });
