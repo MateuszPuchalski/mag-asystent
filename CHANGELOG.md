@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.416.0 — 22 września 2026
+## 0.417.0 — 22 września 2026
 
 **[wymaga działania] Błąd taktu nie kładzie już workera Node.** Po `git pull`
 zrestartuj `wertis-worker` — bez restartu proces dalej pada na starym kodzie.
@@ -69,6 +69,36 @@ Pierwszy czysty przebieg dopisuje „takt znów przechodzi".
 Strażnik czyta ŹRÓDŁO `worker.ts`, bo zaimportowanie tego pliku w teście
 uruchamia workera zamiast go sprawdzić. Sprawdzone, że odmawia: bez `try`
 zestaw `kolejka.test.ts` schodzi na `fail 1`.
+
+## 0.416.0 — 22 września 2026
+
+**Kto mówi, widać z drugiego końca biurka — i jedna sekcja zamiast czterech.**
+Dwa zgłoszenia właściciela ze zrzutami: „wiadomości nasze, klienta i Allegro
+powinny być łatwo wizualnie rozpoznawalne" oraz „widzę jeszcze trochę
+powtórzeń".
+
+- **Trzy role różniły się WYŁĄCZNIE tłem: #ffffff, #f8fafc i #f8fafc.** Czyli
+  dwie z nich nie różniły się wcale, a pierwsze dwa dzieli mniej niż dwa
+  procent jasności. Jedyną prawdziwą różnicą było wcięcie naszej odpowiedzi.
+- **Trzy sygnały naraz, nie sam kolor:** pionowa listwa przy krawędzi, ikona
+  przy podpisie i strona, po której stoi karta. Sam kolor odpada przy wadzie
+  wzroku i na tanim monitorze magazynowym.
+- **Bursztyn zostaje przy kliencie**, tak jak na osi skrzynki od 0.247.0: to ta
+  sama rozmowa z tym samym człowiekiem, tylko innym wejściem. Nasza strona
+  cichnie (0.265.0), automat Allegro dostaje listwę PRZERYWANĄ, bo nie jest
+  człowiekiem, a doradca — własny błękit, bo jest człowiekiem, ale nie naszym
+  klientem. Rola spoza zbioru mówi „nie wiem, kto to", zamiast udawać klienta.
+- **Cztery sekcje o jednym zakupie zeszły do jednej.** Na zrzucie właściciela
+  ta sama dyskusja stała w dwóch z nich, a to samo pytanie — w dwóch innych.
+  Droga zakupu jest ich nadzbiorem i to jest fakt ze źródła, nie wrażenie:
+  `services/droga-klienta.ts` składa przystanki z DOKŁADNIE tych samych tabel,
+  a każdy przystanek niesie odnośnik do swojej kolejki.
+- **Zostaje rodzeństwo spraw**, bo niesie to, czego droga nie ma: termin cudzej
+  sprawy, kto ją prowadzi i czy jest otwarta.
+- **Cofnięcie z 0.414.0:** suma zamówienia wróciła z podpisu zwijki do wiersza
+  „Razem". Wyniesienie jej do podpisu miało usunąć dubel wewnątrz bloku,
+  a zrobiło gorszy: przy zamówieniu jednopozycyjnym podpis powtarzał kostkę
+  „Klient zapłacił". Podpis mówi teraz, ile pozycji jest w środku.
 
 ## 0.415.0 — 22 września 2026
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Bot, Coins, ExternalLink, Gavel, NotebookPen, Receipt, Undo2 } from "lucide-react";
+import { Bot, Coins, ExternalLink, Gavel, NotebookPen, Receipt } from "lucide-react";
 import type {
   CenaPoziomu, PozycjaZamowienia, RadaMaszyny, Reklamacja, SladHistorii, SzczegolReklamacji, Tag,
   Werdykt, ZdjecieKarty,
@@ -377,16 +377,22 @@ export function Dowody({
                 </li>;
               })}
             </ul>
-            {/* ── „RAZEM" WYSZŁO DO PODPISU (0.414.0) ────────────────────
-                Podpis zwijki zostaje widoczny także wtedy, gdy blok jest
-                otwarty — suma stała więc dwa razy, jedna nad drugą, przy
-                każdym otwarciu. Zostaje w podpisie, bo tam czyta się ją
-                również przy bloku zamkniętym. */}
+            {/* ── „RAZEM" WRÓCIŁO TUTAJ (0.416.0) ────────────────────────
+                0.414.0 wyniosło sumę do podpisu zwijki, żeby nie stała dwa
+                razy. Wyszło gorzej: przy zamówieniu jednopozycyjnym podpis
+                powtarzał wtedy kostkę „Klient zapłacił", a to jest ten sam
+                dubel piętro wyżej. Suma wraca do środka, gdzie stoi obok
+                dostawy i pozostałych pozycji — czyli tam, gdzie mówi coś
+                więcej niż cena reklamowanej rzeczy. */}
             <div className="mt-2 border-t border-slate-200 pt-1">
               <Wiersz etykieta="Dostawa">
                 {zlote(szczegol.zamowienie.dostawaGrosze, szczegol.zamowienie.waluta)}
                 {szczegol.zamowienie.dostawaMetoda &&
                   <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
+              </Wiersz>
+              <Wiersz etykieta="Razem">
+                <b className="tabular-nums">
+                  {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
               </Wiersz>
             </div>
           </> : <p className="text-sm text-slate-600">zamówienia nie pobraliśmy</p>}
@@ -465,41 +471,32 @@ export function Dowody({
       </Zwijka>
     </div>
 
-    {/* Zwroty tego zamówienia — mostkiem jest numer zamówienia, ten sam
-        mechanizm co przy rozmowie od 0.221.0. Reklamacja NIE zakłada zwrotu
-        i nie wiąże go: to dwa różne tytuły prawne. */}
-    {szczegol.zwroty.length > 0 && <Sekcja tytul="Zwroty tego zamówienia">
-      <ul className="flex flex-col gap-1">
-        {szczegol.zwroty.map((z) => <li key={z.id} className="text-sm">
-          <a href={`/obsluga/zwroty/${z.id}`}
-            className="inline-flex items-center gap-1 underline underline-offset-2">
-            <Undo2 size={12} />{z.numer ?? z.externalId}</a>
-          <span className="ml-2 text-slate-500">{czas(z.utworzono)}</span>
-        </li>)}
-      </ul>
-    </Sekcja>}
+    {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (0.416.0) ────────────────────────────
+        Zgłoszenie właściciela ze zrzutem: „widzę jeszcze trochę powtórzeń".
+        Pod kolumną stały CZTERY sekcje o jednym zakupie: „Zwroty tego
+        zamówienia", „Inne sprawy tego zakupu", „Droga tego zakupu"
+        i „Rozmowy o tym zakupie". Na jego zrzucie ta sama dyskusja stała
+        w dwóch z nich, a to samo pytanie — w dwóch innych.
 
-    {/* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa,
-        `docs/obsluga-klienta-calosc.md`). Reklamacja i dyskusja leżą w JEDNEJ
-        tabeli i do 0.386.0 nie widziały się nawzajem — dyskusja, która urosła
-        w tę reklamację, była osobnym wierszem bez śladu po przejściu. */}
-    {szczegol.sprawy.length > 0 && <Sekcja tytul="Inne sprawy tego zakupu">
-      <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
-    </Sekcja>}
+        DROGA JEST NADZBIOREM I TO JEST FAKT ZE ŹRÓDŁA, nie wrażenie:
+        `services/droga-klienta.ts` składa przystanki z DOKŁADNIE tych samych
+        tabel, z których biorą się tamte trzy listy — rozmów po
+        `related_order_id`, reklamacji i dyskusji po `order_id`, zwrotów po
+        `order_id`. Każdy przystanek niesie odnośnik do swojej kolejki, więc
+        z drogi da się wejść wszędzie tam, gdzie prowadziły tamte sekcje.
 
-    {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
-      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "reklamacja", id: r.id }} wSekcji />
-    </Sekcja>}
-
-    {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">
-      <ul className="flex flex-col gap-1">
-        {szczegol.rozmowy.map((c) => <li key={c.id} className="text-sm">
-          <a href={`/obsluga/skrzynka/${c.id}`} className="underline underline-offset-2">
-            {c.temat ?? `Rozmowa ${c.id}`}</a>
-          <span className="ml-2 text-slate-500">{czas(c.ostatniaAt)}</span>
-        </li>)}
-      </ul>
-    </Sekcja>}
+        ZOSTAJE RODZEŃSTWO SPRAW, bo niesie to, czego droga nie ma: termin
+        cudzej sprawy, kto ją prowadzi i czy jest otwarta. Przystanek mówi
+        „dyskusja, 21 września"; wiersz mówi, że tamta dyskusja czeka na
+        odpowiedź od trzech dni i siedzi na niej kolega z drugiego biurka. */}
+    {(szczegol.droga.length > 1 || szczegol.sprawy.length > 0) &&
+      <Sekcja tytul="Ten zakup u nas">
+        {szczegol.droga.length > 1 && <DrogaZakupu droga={szczegol.droga}
+          tutaj={{ rodzaj: "reklamacja", id: r.id }} wSekcji />}
+        {szczegol.sprawy.length > 0 && <div className={szczegol.droga.length > 1 ? "mt-1.5" : ""}>
+          <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
+        </div>}
+      </Sekcja>}
 
     {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
         Do tego wydania karta maszyny stała PIERWSZA, nad faktami sprawy.
@@ -868,13 +865,21 @@ function podpisCennika(ceny: CenaPoziomu[]): string {
   return ile(ceny.length, "poziom", "poziomy", "poziomów");
 }
 
-/** Co stoi w zakupie — kwota i dzień, czyli to, po co się tę zwijkę otwiera. */
+/**
+ * Co stoi w zakupie — ile pozycji i z którego dnia (0.416.0).
+ *
+ * KWOTY TU NIE MA, choć stała tu od 0.403.0. Przy zamówieniu jednopozycyjnym —
+ * czyli przy większości reklamacji — suma zamówienia jest tą samą liczbą, co
+ * kostka „Klient zapłacił" dwa centymetry wyżej. Podpis ma mówić, CO jest
+ * w środku; suma wróciła do wiersza „Razem", gdzie stoi obok dostawy i reszty
+ * pozycji, czyli tam, gdzie znaczy coś więcej niż powtórzenie.
+ */
 function podpisZakupu(szczegol: SzczegolReklamacji): string {
   const z = szczegol.zamowienie;
   if (!z) return "zamówienia nie pobraliśmy";
   const kiedy = z.kupionoAt ?? szczegol.reklamacja.kupionoAt;
-  return [zlote(z.sumaGrosze, z.waluta), kiedy ? dzien(kiedy) : null]
-    .filter(Boolean).join(" · ");
+  return [ile(z.pozycje.length, "pozycja", "pozycje", "pozycji"),
+    kiedy ? dzien(kiedy) : null].filter(Boolean).join(" · ");
 }
 
 /** Co stoi w sprawie — identyfikatory i długość rozmowy. */
