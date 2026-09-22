@@ -16,52 +16,64 @@ import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
    trójstronna: `BUYER`, `SELLER` i `ADMIN`, czyli doradca Allegro. Bez
    wyraźnego podpisu agent odpowiadałby doradcy tak, jak odpowiada klientowi. */
 
-/* ── KTO MÓWI, WIDAĆ Z DRUGIEGO KOŃCA BIURKA (0.416.0) ───────────────────────
-   Zgłoszenie właściciela ze zrzutem: „wiadomości nasze, klienta i Allegro
-   powinny być łatwo wizualnie rozpoznawalne". Miał rację — do tego wydania
-   trzy role różniły się WYŁĄCZNIE tłem: #ffffff, #f8fafc i #f8fafc. Pierwsze
-   dwa dzieli na ekranie mniej niż dwa procent jasności, a trzecie jest z nimi
-   tożsame. Jedyną prawdziwą różnicą było wcięcie naszej odpowiedzi.
+/* ── KTO MÓWI, WIDAĆ BEZ CZYTANIA (0.416.0, dobór barw z 0.417.0) ───────────
+   Dwa zgłoszenia właściciela ze zrzutami. Pierwsze: „wiadomości nasze, klienta
+   i Allegro powinny być łatwo wizualnie rozpoznawalne". Drugie, po 0.416.0:
+   „oznaczenie na granicy powinno być po drugiej stronie dla nas, a dla klienta
+   na innej; kolor tła dla każdego powinien być inny" — plus prośba o oparcie
+   tego na badaniach o szybkości znajdowania informacji.
 
-   TRZY SYGNAŁY NARAZ, NIE SAM KOLOR: pionowa listwa przy krawędzi, ikona przy
-   podpisie i strona, po której karta stoi. Sam kolor odpada przy wadzie wzroku
-   i na tanim monitorze magazynowym — a kolejka reklamacji bywa czytana na
-   jednym i drugim.
+   CO MÓWIĄ BADANIA, w trzech zdaniach.
 
-   BURSZTYN ZOSTAJE PRZY KLIENCIE, tak jak na osi skrzynki od 0.247.0: to jest
-   ta sama rozmowa z tym samym człowiekiem, tylko innym wejściem. Nasza strona
-   cichnie (0.265.0), automat Allegro dostaje listwę przerywaną, bo nie jest
-   człowiekiem, a doradca — własny błękit, bo jest człowiekiem, ale nie naszym
-   klientem i odpowiada mu się inaczej. */
+   1. BARWA JEST PREATENTYWNA. Teoria integracji cech (Treisman i Gelade, 1980)
+      dzieli wyszukiwanie na dwa tryby: cecha POJEDYNCZA — barwa, orientacja,
+      rozmiar — jest kodowana równolegle na całym polu widzenia, więc czas
+      znalezienia celu nie rośnie z liczbą elementów. Wyszukiwanie po KONIUNKCJI
+      cech idzie szeregowo i jest znacznie wolniejsze. Wniosek dla tej osi:
+      „czyja to wiadomość" ma być JEDNĄ cechą — barwą tła — a nie kombinacją
+      odcienia ramki z wcięciem, którą trzeba składać po kolei.
+   2. BARWA NIGDY SAMA. WCAG 2, kryterium 1.4.1: barwa nie może być jedynym
+      nośnikiem informacji. Około jeden mężczyzna na dwunastu ma zaburzenie
+      widzenia barw. Kodujemy więc TRZY razy: barwą tła, stroną karty i ikoną
+      przy podpisie — przy braku barwy zostają dwa czytelne sygnały.
+   3. STRONA JEST DARMOWA. Odsunięcie naszej wypowiedzi w prawo i listwa przy
+      PRAWEJ krawędzi to układ znany z każdego komunikatora; rozpoznanie
+      „to moje" nie wymaga wtedy uczenia się niczego nowego.
+
+   BURSZTYN ZOSTAJE PRZY KLIENCIE, tak jak na osi skrzynki od 0.247.0: to ta
+   sama rozmowa z tym samym człowiekiem, tylko innym wejściem. Nasza strona
+   cichnie (0.265.0) — chłodna szarość i listwa po prawej. Automat Allegro
+   dostaje biel i listwę PRZERYWANĄ, bo nie jest człowiekiem, a doradca własny
+   błękit, bo jest człowiekiem, ale nie naszym klientem.
+
+   CZTERY KLASY, NIE WIĘCEJ. Prawo Hicka: każda dołożona kategoria wydłuża
+   wybór. Pięć ról dzieli się na cztery wyglądy, bo magazyn Allegro i automat
+   są dla agenta tym samym — maszyną po drugiej stronie. */
 const ROLE: Record<string, {
   etykieta: string; klasa: string; listwa: string; Ikona: LucideIcon; nasza: boolean;
 }> = {
   BUYER: {
     etykieta: "Klient", Ikona: User, nasza: false,
-    klasa: "bg-white border-slate-200", listwa: "border-l-4 border-l-wertis-amber",
+    klasa: "bg-amber-50 border-amber-200", listwa: "border-l-4 border-l-wertis-amber",
   },
-  /* ── NASZA STRONA CICHNIE, NIE KRZYCZY (0.265.0) ───────────────────────────
-     Do 0.264.0 nasza wypowiedź była tu BURSZTYNOWA, a klienta — biała. Na osi
-     skrzynki jest dokładnie odwrotnie: bursztyn to podpis KLIENTA, a naszą
-     odpowiedź 0.247.0 świadomie wygasiło („podkreślaj przez wygaszanie" —
-     pytanie zostaje jedyną kartą z cieniem). Ta sama barwa znaczyła więc
-     w dwóch oknach dwie przeciwne strony rozmowy. */
   SELLER: {
     etykieta: "My", Ikona: Store, nasza: true,
-    klasa: "bg-os-firma border-slate-200", listwa: "border-l-4 border-l-slate-300",
+    /* LISTWA PO PRAWEJ — przy tej krawędzi, przy której stoi karta. */
+    klasa: "bg-slate-100 border-slate-200", listwa: "border-r-4 border-r-slate-400",
   },
   ADMIN: {
     etykieta: "Doradca Allegro", Ikona: LifeBuoy, nasza: false,
-    klasa: "bg-sky-50 border-sky-200", listwa: "border-l-4 border-l-sky-400",
+    klasa: "bg-sky-50 border-sky-200", listwa: "border-l-4 border-l-sky-500",
   },
-  /* Automat nie jest człowiekiem i ma tak wyglądać: listwa PRZERYWANA. */
+  /* Automat nie jest człowiekiem i ma tak wyglądać: biel bez barwy i listwa
+     PRZERYWANA — przerwa czyta się jako „to nie jest czyjaś wypowiedź". */
   SYSTEM: {
     etykieta: "Allegro (automat)", Ikona: Bot, nasza: false,
-    klasa: "bg-slate-50 border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
+    klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
   },
   FULFILLMENT: {
     etykieta: "Magazyn Allegro", Ikona: Bot, nasza: false,
-    klasa: "bg-slate-50 border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
+    klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
   },
 };
 
@@ -209,7 +221,18 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
   const opisWart = !dubel;
 
-  return <div className="flex min-h-0 flex-col gap-3">
+  /* ── ROZMOWA PRZEWIJA SIĘ, CZYNNOŚCI STOJĄ (0.417.0) ─────────────────────
+     Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
+     zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
+     a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
+     w którym oś, pole odpowiedzi i werdykt płynęły razem.
+
+     Kolumna dzieli się teraz na trzy pasy: rozmowa przewija się w środku,
+     a pole odpowiedzi i pasek werdyktu zostają na dole i nie uciekają.
+     Werdykt dalej stoi POD rozmową (0.412.0) — zmienia się to, że nie trzeba
+     do niego przewijać jedenastu wiadomości. */
+  return <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
     {(opisWart || zalaczniki.length > 0) &&
       <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         <NaglowekSekcji jako="h3">
@@ -255,8 +278,11 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 <b className="text-slate-700">{rola.etykieta}</b>
                 {/* Login bywa PUSTY i to jest udokumentowane: schemat mówi „not
                     present if role is ADMIN, SYSTEM or FULFILLMENT". */}
-                {w.autorLogin && <span className="text-slate-500">{w.autorLogin}</span>}
-                <span className="ml-auto text-slate-500">{czas(w.utworzonoAt)}</span>
+                {/* `slate-600`, nie `slate-500`: nasza karta ma teraz tło
+                    `slate-100`, a na nim `slate-500` daje 4,34:1 przy progu
+                    4,5:1 — para z listy strażnika kontrastu. */}
+                {w.autorLogin && <span className="text-slate-600">{w.autorLogin}</span>}
+                <span className="ml-auto text-slate-600">{czas(w.utworzonoAt)}</span>
               </div>
               <TrescKarty tekst={w.tresc} />
               <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
@@ -264,11 +290,16 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
           })}
         </ol>}
 
+    </div>
+
     {/* Od 0.224.0 pod rozmową stoi EDYTOR, a nie zdanie o tym, że odpowiedź
         wysyła się gdzie indziej. Zdanie było prawdziwe przez dwa wydania
         i przestało być — komentarz, który skłamał, jest gorszy od jego braku.
         Werdykt od 0.412.0 stoi POD rozmową (`Werdykt.tsx`) — nieodwracalne
-        pyta dopiero po dowodach, a nie przed nimi. */}
-    {edytor}
+        pyta dopiero po dowodach, a nie przed nimi.
+
+        POZA PASEM PRZEWIJANIA od 0.417.0: pole, w które się pisze, ma być pod
+        ręką niezależnie od tego, jak długa jest rozmowa. */}
+    <div className="shrink-0">{edytor}</div>
   </div>;
 }

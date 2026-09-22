@@ -305,22 +305,39 @@ describe("Kotwica przy najnowszej wiadomości", () => {
   });
 });
 
-describe("Kto mówi, widać z drugiego końca biurka (0.416.0)", () => {
-  /* Zgłoszenie właściciela ze zrzutem: „wiadomości nasze, klienta i Allegro
-     powinny być łatwo wizualnie rozpoznawalne". Do tego wydania trzy role
-     różniły się WYŁĄCZNIE tłem — #ffffff, #f8fafc i #f8fafc — czyli dwie
-     z nich nie różniły się wcale. Testy pilnują TRZECH sygnałów naraz, bo
-     sam kolor odpada przy wadzie wzroku i na tanim monitorze. */
+describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.417.0)", () => {
+  /* Dwa zgłoszenia właściciela ze zrzutami. Podstawa doboru jest z badań, nie
+     z gustu: cecha POJEDYNCZA — barwa — jest kodowana równolegle na całym polu
+     widzenia (teoria integracji cech, Treisman i Gelade 1980), więc czas
+     znalezienia „ostatniej wiadomości klienta" nie rośnie z długością wątku.
+     Barwa nie może jednak zostać sama (WCAG 1.4.1, około jeden mężczyzna na
+     dwunastu z zaburzeniem widzenia barw), więc kodujemy TRZY razy: tłem,
+     stroną karty i ikoną. */
   const karta = (tresc: string) => screen.getByText(tresc).closest("li")!;
 
-  it("klient, my i automat mają TRZY różne listwy", () => {
+  it("każda rola ma INNE TŁO — to jest cecha, którą oko łapie równolegle", () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 4 })} zalaczniki={[]} czat={[
+      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
+      wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null, tresc: "od automatu" }),
+      wiad({ id: 4, autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" }),
+    ]} />);
+    const tla = ["od klienta", "od nas", "od automatu", "od doradcy"]
+      .map((t) => karta(t).className.match(/bg-[a-z0-9-]+/)![0]);
+    expect(new Set(tla).size).toBe(4);
+  });
+
+  it("nasza listwa stoi po DRUGIEJ stronie niż cudza", () => {
+    /* Odsunięcie w prawo plus listwa przy prawej krawędzi to układ znany
+       z każdego komunikatora — „to moje" nie wymaga uczenia się niczego. */
     render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
       wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
       wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
       wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null, tresc: "od automatu" }),
     ]} />);
     expect(karta("od klienta").className).toContain("border-l-wertis-amber");
-    expect(karta("od nas").className).toContain("border-l-slate-300");
+    expect(karta("od nas").className).toContain("border-r-4");
+    expect(karta("od nas").className).not.toContain("border-l-4");
     /* Automat nie jest człowiekiem i ma tak wyglądać. */
     expect(karta("od automatu").className).toContain("border-dashed");
   });
@@ -339,7 +356,7 @@ describe("Kto mówi, widać z drugiego końca biurka (0.416.0)", () => {
        jak on ani jak automat. */
     render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" })]} />);
-    expect(karta("od doradcy").className).toContain("border-l-sky-400");
+    expect(karta("od doradcy").className).toContain("border-l-sky-500");
     expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
   });
 
@@ -348,5 +365,20 @@ describe("Kto mówi, widać z drugiego końca biurka (0.416.0)", () => {
       czat={[wiad({ autorRola: "COURIER", autorLogin: null, tresc: "nowa rola" })]} />);
     expect(screen.getByText("COURIER")).toBeInTheDocument();
     expect(karta("nowa rola").className).toContain("border-dotted");
+  });
+});
+
+describe("Rozmowa przewija się, czynności stoją (0.417.0)", () => {
+  /* Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony" — pasek
+     leżał w połowie cudzej wiadomości, bo cała kolumna była JEDNYM obszarem
+     przewijania. Teraz przewija się wyłącznie oś; pole odpowiedzi i werdykt
+     zostają na dole. */
+  it("pas przewijania obejmuje OŚ, a pole odpowiedzi zostaje poza nim", () => {
+    const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: "wiadomość" })]}
+      edytor={<div data-testid="edytor">pole</div>} />);
+    const przewijany = container.querySelector(".overflow-y-auto")!;
+    expect(przewijany.contains(screen.getByText("wiadomość"))).toBe(true);
+    expect(przewijany.contains(screen.getByTestId("edytor"))).toBe(false);
   });
 });

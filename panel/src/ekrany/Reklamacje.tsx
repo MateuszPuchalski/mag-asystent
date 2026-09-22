@@ -573,17 +573,27 @@ export function Reklamacje() {
         </div>
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
+      {/* ── TRZY PASY, NIE JEDEN OBSZAR PRZEWIJANIA (0.417.0) ────────────────
+          Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony".
+          Cała kolumna przewijała się jako jedna kartka, więc pasek werdyktu
+          wędrował z osią i lądował w połowie cudzej wiadomości.
+
+          Teraz nie przewija się NIC poza rozmową: znacznik „prowadzę" stoi
+          u góry, pole odpowiedzi i werdykt na dole, a oś płynie między nimi.
+          To jest układ okna rozmowy, nie strony — a ta kolumna jest oknem
+          rozmowy od 0.224.0. */}
+      <Karta className="flex min-h-0 flex-col overflow-hidden">
         {/* Kto prowadzi — CZYNNOŚĆ, więc stoi przy innych czynnościach, a nie
             w kolumnie faktów (0.392.0, zgłoszenie właściciela ze zrzutem). */}
-        {szczegol.data && <Prowadzi prowadzi={szczegol.data.reklamacja.prowadzi}
+        {szczegol.data && <div className="shrink-0 border-b border-slate-200 px-4 py-2">
+          <Prowadzi prowadzi={szczegol.data.reklamacja.prowadzi}
           trwa={prowadze.isPending}
           onProwadze={() => {
             setBladZapisu("");
             prowadze.mutate(
               { id: szczegol.data!.reklamacja.id, wersja: szczegol.data!.reklamacja.wersja },
               { onError: (e) => setBladZapisu((e as Error).message) });
-          }} />}
+          }} /></div>}
         {szczegol.data
           ? <Czat
               sprawa={{
@@ -617,9 +627,11 @@ export function Reklamacje() {
                   { onError: (e) => setBladZalacznika((e as Error).message) })}
                 czatAktywny={szczegol.data.reklamacja.czatAktywny}
                 onZmiana={setTresc} onWyslij={() => wyslij()} />} />
-          : <Pusto ikona={ShieldQuestion}>
-              {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
-            </Pusto>}
+          : <div className="flex min-h-0 flex-1 items-center px-4">
+              <Pusto ikona={ShieldQuestion}>
+                {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
+              </Pusto>
+            </div>}
 
         {/* ── WERDYKT POD ROZMOWĄ (0.412.0) ────────────────────────────────
             Do 0.411.0 pasek werdyktu stał PIERWSZY w tej kolumnie — nad
@@ -636,10 +648,10 @@ export function Reklamacje() {
             NIC NIE ZNIKA: pasek jest tam, gdzie kończy się czytanie sprawy.
             Zgoda przed wysłaniem zostaje przy OBU gałęziach — uznanie kosztuje
             pieniądze i jest równie nieodwracalne co odmowa. */}
-        {szczegol.data && <Werdykt reklamacja={szczegol.data.reklamacja}
+        {szczegol.data && <div className="shrink-0"><Werdykt reklamacja={szczegol.data.reklamacja}
           trwa={werdykt.isPending} blad={bladWerdyktu}
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
-          onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} />}
+          onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} /></div>}
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto">

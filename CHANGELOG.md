@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.417.0 — 22 września 2026
+
+**Okno rozmowy zachowuje się jak okno rozmowy.** Trzy zgłoszenia właściciela
+ze zrzutami: „werdykt nie jest przyklejony", „oznaczenie na granicy powinno być
+po drugiej stronie dla nas, a kolor tła inny dla każdego" oraz „mniej ramek,
+okno odpowiadania do granic bez paddingu". Dobór barw oparty na badaniach,
+o które poprosił.
+
+- **Przewija się wyłącznie rozmowa.** Cała kolumna była jednym obszarem
+  przewijania, więc pasek werdyktu wędrował z osią i lądował w połowie cudzej
+  wiadomości. Kolumna dzieli się na trzy pasy: znacznik „prowadzę" u góry, oś
+  w środku, pole odpowiedzi i werdykt na dole. Werdykt dalej stoi POD rozmową
+  (0.412.0) — zmienia się to, że nie trzeba do niego przewijać.
+- **Barwa jest cechą preatentywną.** Teoria integracji cech (Treisman i Gelade,
+  1980): cecha pojedyncza jest kodowana równolegle na całym polu widzenia, więc
+  czas znalezienia celu nie rośnie z liczbą elementów; wyszukiwanie po
+  koniunkcji cech idzie szeregowo i jest znacznie wolniejsze. Dlatego „czyja to
+  wiadomość" niesie TŁO, a nie kombinacja odcienia ramki z wcięciem.
+- **Cztery różne tła:** klient bursztynowe, my chłodna szarość, automat Allegro
+  biel, doradca błękit. Bursztyn zostaje przy kliencie, tak jak na osi skrzynki
+  od 0.247.0.
+- **Nasza listwa przeszła na PRAWĄ krawędź**, po stronie, po której stoi karta.
+  Układ znany z każdego komunikatora — rozpoznanie „to moje" nie wymaga
+  uczenia się niczego nowego.
+- **Barwa nigdy sama.** WCAG 2, kryterium 1.4.1; około jeden mężczyzna na
+  dwunastu ma zaburzenie widzenia barw. Kodujemy trzy razy: tłem, stroną karty
+  i ikoną — przy braku barwy zostają dwa czytelne sygnały.
+- **Cztery klasy, nie pięć.** Prawo Hicka: każda dołożona kategoria wydłuża
+  wybór. Magazyn Allegro i automat są dla agenta tym samym — maszyną.
+- **Pole odpowiedzi sięga krawędzi.** Siedziało w zaokrąglonej karcie, ta
+  w kolumnie z własnym oddechem, a kolumna w karcie ekranu — trzy ramki wokół
+  jednego prostokąta, w którym się pisze. Zostaje jedna kreska oddzielająca pas
+  czynności od rozmowy.
+- Podpis autora i godzina zeszły z `slate-500` na `slate-600`: na nowym tle
+  naszej karty tamta para dawała 4,34:1 przy progu 4,5:1.
+
 ## 0.416.0 — 22 września 2026
 
 **Kto mówi, widać z drugiego końca biurka — i jedna sekcja zamiast czterech.**
