@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.414.0 — 22 września 2026
+
+**Cztery wydania dokładały warstwę. Żadne nic nie zdjęło.** 0.403.0, 0.404.0,
+0.411.0 i 0.413.0 dopisały nad kolumną dowodów warstwę streszczenia; każde
+obiecywało w komentarzu „nic nie znika pod spodem" i każde dotrzymało. Cztery
+razy z rzędu dały ekran, na którym ta sama liczba stoi w trzech miejscach.
+
+Reguła, której brakowało: **fakt ma jeden dom.** Liczba, która weszła do pasma
+decyzji, wychodzi z warstwy szczegółu — nie chowa się pod kliknięcie, tylko
+przestaje istnieć w drugim miejscu.
+
+- **Cena wyszła z wiersza towaru.** Ta sama kwota stała tam, w kostce „Klient
+  zapłacił" i w pozycji zwijki Zakup. Wiersz towaru odpowiada na pytanie „co to
+  jest u nas", a nie „ile kosztowało".
+- **Wiersz „Kupiono" wyszedł ze zwijki Zakup.** Wiek i nazwa zegara stoją
+  w kostce, data bezwzględna w podpisie zwijki — a podpis widać także przy
+  otwartym bloku.
+- **Wiersz „Razem" wyszedł z tej samej zwijki**, z tego samego powodu: suma
+  stała w podpisie i w środku, jedna nad drugą.
+- **Zwijka Zakup startuje zamknięta.** Otwarto ją w 0.403.0, bo „kwoty
+  rozstrzygają spór o zwrot pieniędzy"; ten powód przestał jej dotyczyć, gdy
+  0.413.0 postawiło kwoty rozstrzygające w kostkach nad nią.
+- **Pozostałe poziomy cen startują zamknięte.** Liczba, dla której 0.411.0
+  postawiło ten blok na wierzchu, stoi od 0.413.0 w kostce „Nasz zakup" —
+  zawsze, bez kliknięcia. Reszta to cenniki SPRZEDAŻY.
+- **Los paczki wyszedł na wierzch.** „Czy on to w ogóle dostał" jest przy
+  reklamacji pytaniem pierwszym, a przy powodach o nieotrzymanym towarze —
+  całą sprawą. Zamknięcie zwijki Zakup schowałoby je pod kliknięcie, więc
+  wiersz stoi teraz przy pozostałych faktach decyzji.
+- **Znacznik `CLAIM_SUBMITTED` zniknął.** Ma go każda sprawa czekająca na
+  werdykt, czyli cały kubełek DO DECYZJI; czip powtarzający stan domyślny
+  zabierał uwagę tytułowi prawnemu obok. Statusy odbiegające od domyślnego
+  znacznik dostają dalej.
+- **Poprawka przy okazji:** pasek faktów znikał w całości, gdy sprawa nie
+  miała ani kartoteki, ani pozycji paragonu — i zabierał ze sobą datę zakupu,
+  którą mieliśmy. Warunek liczy teraz to, co naprawdę miałoby stanąć.
+
 ## 0.413.0 — 22 września 2026
 
 **Trzy liczby, które rozstrzygają reklamację, leżały w naszej bazie i nikt

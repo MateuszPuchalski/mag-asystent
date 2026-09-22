@@ -215,3 +215,50 @@ describe("Historia towaru i klienta (0.413.0)", () => {
     expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
   });
 });
+
+describe("Jeden dom na fakt (0.414.0)", () => {
+  /* Cztery wydania z rzędu dokładały nad kolumną warstwę streszczenia i każde
+     obiecywało „nic nie znika pod spodem". Obietnica była za każdym razem
+     dotrzymana i właśnie dlatego ten sam fakt stał w końcu w trzech miejscach.
+     Te testy pilnują reguły, która z tego wynikła: liczba, która weszła do
+     pasma decyzji, wychodzi z warstwy szczegółu. */
+
+  it("cena NIE stoi przy wierszu towaru — tam pytanie brzmi „co to jest”", () => {
+    render(<Dowody {...props()} />);
+    const symbol = screen.getByText("14-31051");
+    expect(symbol.parentElement!.textContent).not.toContain("49,90");
+  });
+
+  it("wiersza „Kupiono” nie ma — datę niesie kostka i podpis zwijki", () => {
+    render(<Dowody {...props({ dniOdZakupu: 3 })} />);
+    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
+  });
+
+  it("wiersza „Razem” nie ma — podpis zwijki widać także przy otwartym bloku", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+  });
+
+  it("ZAKUP startuje zamknięty, bo jego kwoty stoją już w kostkach", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.getByRole("button", { name: /Zakup/ }))
+      .toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("POZIOMY CEN startują zamknięte — triaż rozstrzyga kostka „Nasz zakup”", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.getByRole("button", { name: /Pozostałe poziomy cen/ }))
+      .toHaveAttribute("aria-expanded", "false");
+    /* A liczba, dla której ten blok w ogóle powstał, stoi bez kliknięcia. */
+    expect(screen.getByText("Nasz zakup").parentElement!.textContent).toContain("18,64");
+  });
+
+  it("wiek zakupu staje NAWET wtedy, gdy nie wiemy o sprawie nic więcej", () => {
+    /* Do 0.413.0 pasek znikał w całości, gdy nie było kartoteki ani pozycji
+       paragonu — i zabierał ze sobą datę, którą mieliśmy. */
+    karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    render(<Dowody {...props({ twId: null, dniOdZakupu: 400 }, false)} />);
+    expect(screen.getByText("13 miesięcy temu")).toBeInTheDocument();
+  });
+});

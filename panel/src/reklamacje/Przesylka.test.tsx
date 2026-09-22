@@ -78,16 +78,18 @@ describe("Ceny zamówienia w kolumnie dowodów", () => {
   });
 
   it("DOSTAWĘ trzyma osobno od sumy, bo o nią klient pyta osobno", () => {
+    /* Suma wyszła z wnętrza do podpisu zwijki w 0.414.0 — stała w obu
+       miejscach naraz, a podpis widać także przy otwartym bloku. Dostawa
+       zostaje w środku, bo w podpisie jej nie ma. */
     render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
     expect(screen.getByText("Dostawa")).toBeInTheDocument();
     expect(screen.getByText(/19,90 PLN/)).toBeInTheDocument();
-    expect(screen.getByText("Razem")).toBeInTheDocument();
-    expect(screen.getByText("129,80 PLN")).toBeInTheDocument();
+    expect(screen.getAllByText(/129,80 PLN/)).toHaveLength(1);
   });
 
   it("bez pobranego zamówienia NIE pokazuje pustych kwot", () => {
     render(<Dowody {...props()} />);
-    expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dostawa")).not.toBeInTheDocument();
   });
 });
 

@@ -338,17 +338,23 @@ export function Dowody({
 
   return <div className="flex min-h-0 flex-col">
     <Glowica r={r} />
-    <Towar szczegol={szczegol} pozycja={pozycja} />
+    <Towar szczegol={szczegol} />
     <Triaz szczegol={szczegol} pozycja={pozycja} />
+    <Paczka przesylka={szczegol.przesylka} onSprawdz={onSprawdzPrzesylke}
+      trwa={sprawdzaPrzesylke} blad={bladPrzesylki} />
 
     <div className="px-2">
       <Zwijka
         tytul="Zakup"
         Ikona={Receipt}
         podpis={podpisZakupu(szczegol)}
-        /* OTWARTY DOMYŚLNIE, jako jedyny z trzech: kwoty rozstrzygają spór
-           o zwrot pieniędzy, a to najczęstsze oczekiwanie w sondzie. */
-        domyslnieOtwarte
+        /* ── ZAMKNIĘTA OD 0.414.0 ──────────────────────────────────────────
+           Otwarto ją w 0.403.0 z dobrym powodem: „kwoty rozstrzygają spór
+           o zwrot pieniędzy". Ten powód przestał dotyczyć TEJ zwijki, gdy
+           0.413.0 postawiło kwoty rozstrzygające w kostkach nad nią —
+           otwarta powtarzała je, zamiast dokładać cokolwiek. W środku zostaje
+           to, po co się ją naprawdę otwiera: reszta pozycji zamówienia,
+           dostawa i los paczki. */
         pamietajJako="wertis.reklamacje.zakup"
       >
         <div className="px-2 py-2">
@@ -371,45 +377,19 @@ export function Dowody({
                 </li>;
               })}
             </ul>
+            {/* ── „RAZEM" WYSZŁO DO PODPISU (0.414.0) ────────────────────
+                Podpis zwijki zostaje widoczny także wtedy, gdy blok jest
+                otwarty — suma stała więc dwa razy, jedna nad drugą, przy
+                każdym otwarciu. Zostaje w podpisie, bo tam czyta się ją
+                również przy bloku zamkniętym. */}
             <div className="mt-2 border-t border-slate-200 pt-1">
               <Wiersz etykieta="Dostawa">
                 {zlote(szczegol.zamowienie.dostawaGrosze, szczegol.zamowienie.waluta)}
                 {szczegol.zamowienie.dostawaMetoda &&
                   <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
               </Wiersz>
-              <Wiersz etykieta="Razem">
-                <b className="tabular-nums">
-                  {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
-              </Wiersz>
             </div>
           </> : <p className="text-sm text-slate-600">zamówienia nie pobraliśmy</p>}
-
-          {/* ── GDZIE JEST PACZKA (0.393.0) ─────────────────────────────────
-              Przy reklamacji to pytanie pierwsze: „czy on to w ogóle dostał".
-
-              Ładunek zamówienia numeru przesyłki NIE MA — stoi pod osobną
-              końcówką `/order/checkout-forms/{id}/shipments`, a status pod tą
-              samą, którą zwroty odpytują od 0.187.0. Dwa żądania, więc pytamy
-              na JAWNE kliknięcie: żądanie u dostawcy nie wychodzi z patrzenia. */}
-          {szczegol.przesylka && <Wiersz etykieta="Przesyłka">
-            {szczegol.przesylka.sprawdzonoAt === null
-              ? <span className="text-slate-500">nie pytaliśmy jeszcze Allegro</span>
-              : szczegol.przesylka.waybill === null
-                ? <span className="text-slate-500">Allegro nie ma numeru — paczka
-                    jeszcze nienadana albo nadana poza Allegro</span>
-                : <>
-                    {szczegol.przesylka.dostarczonoAt
-                      ? <b className="text-ranga-ok">doręczona {czas(szczegol.przesylka.dostarczonoAt)}</b>
-                      : <span>{szczegol.przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
-                    <span className="text-slate-500"> · {szczegol.przesylka.przewoznik}{" "}
-                      <span className="font-mono">{szczegol.przesylka.waybill}</span></span>
-                  </>}
-            {onSprawdzPrzesylke && <button type="button" disabled={sprawdzaPrzesylke}
-              onClick={onSprawdzPrzesylke}
-              className="ml-2 font-semibold underline underline-offset-2 disabled:opacity-50">
-              {sprawdzaPrzesylke ? "pytam…" : "sprawdź"}</button>}
-            {bladPrzesylki && <p className="text-xs text-red-700">{bladPrzesylki}</p>}
-          </Wiersz>}
 
           <div className="mt-1 border-t border-slate-200 pt-1">
             <Wiersz etykieta="Zamówienie">
@@ -418,15 +398,13 @@ export function Dowody({
                     <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" /></>
                 : "reklamacja bez numeru zamówienia"}
             </Wiersz>
-            {/* ── DATA ZAKUPU NA EKRANIE (0.282.0) ──────────────────────────
-                ETYKIETA MÓWI, KTÓRY TO ZEGAR: „Kupiono" bierze się z pozycji
-                zamówienia, „Zamówienie złożone" z ładunku sprawy i bywa
-                wcześniejsze. Blizna 0.121.0 wzięła się z nazwania jednego
-                zegara drugim, więc nie sklejamy ich pod jedną etykietą. */}
-            {r.kupionoAt && <Wiersz
-              etykieta={r.kupionoZrodlo === "zamowienie" ? "Kupiono" : "Zamówienie złożone"}>
-              {czas(r.kupionoAt)}
-            </Wiersz>}
+            {/* ── DATA ZAKUPU MA JEDEN DOM (0.282.0, przeniesione w 0.414.0)
+                ETYKIETA MÓWI, KTÓRY TO ZEGAR — i to zdanie z 0.282.0 dalej
+                obowiązuje, tylko nie tutaj. Data stała w trzech miejscach
+                naraz: w kostce „Kupione" (wiek plus nazwa zegara), w podpisie
+                tej zwijki i w tym wierszu. Wiek i nazwa zegara są na górze,
+                data bezwzględna w podpisie — a podpis widać także przy
+                otwartym bloku, więc ten wiersz nie dokładał niczego. */}
             <Wiersz etykieta="Oferta">
               {r.offerId ? <Link href={r.linkOferty}>{r.offerId}</Link> : "—"}
             </Wiersz>
@@ -583,7 +561,14 @@ function Glowica({ r }: { r: Reklamacja }) {
         {r.prawo === "COMPLAINT" ? "rękojmia" : r.prawo === "WARRANTY" ? "gwarancja" : "tytuł nieznany"}
       </Znacznik>
       {r.powodTyp && <Znacznik>{POWODY[r.powodTyp] ?? r.powodTyp}</Znacznik>}
-      {r.statusAllegro && <Znacznik>{r.statusAllegro}</Znacznik>}
+      {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (0.414.0) ──────────────────
+          `CLAIM_SUBMITTED` ma KAŻDA sprawa czekająca na werdykt, czyli cały
+          kubełek DO DECYZJI. Czip mówiący „to zwykła reklamacja" nie zmienia
+          żadnej decyzji, a zajmuje tyle samo uwagi co tytuł prawny obok.
+          Znaczniki mają wołać o uwagę wtedy, gdy stan ODBIEGA od domyślnego —
+          uznana, odrzucona, wycofana. */}
+      {r.statusAllegro && r.statusAllegro !== "CLAIM_SUBMITTED" &&
+        <Znacznik>{r.statusAllegro}</Znacznik>}
     </div>
   </div>;
 }
@@ -619,10 +604,7 @@ function terminSlowem(r: Reklamacja): { napis: string; pilny: boolean } {
    z PARAGONU, a bywa z dzisiejszego mapowania oferty — i to są dwie różne
    rzeczy, gdy sprzedawca przepiął sygnaturę po wyczerpaniu dostawy. Wiersz
    bez tej adnotacji kazał ufać jednakowo obu. */
-function Towar({ szczegol, pozycja }: {
-  szczegol: SzczegolReklamacji;
-  pozycja: PozycjaZamowienia | null;
-}) {
+function Towar({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const r = szczegol.reklamacja;
   const symbol = r.twSymbol ?? szczegol.kartoteka?.symbol ?? null;
   return <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-3">
@@ -637,8 +619,14 @@ function Towar({ szczegol, pozycja }: {
           ? <span className="font-mono font-semibold text-slate-800">{symbol}</span>
           : <span>{szczegol.kartoteka?.powod ?? "bez kartoteki"}</span>}
         {symbol && <span>{r.twZParagonu ? "z paragonu" : "z mapowania oferty"}</span>}
-        {pozycja && <span className="tabular-nums">
-          {pozycja.ilosc} × {zlote(pozycja.cenaGrosze, pozycja.waluta)}</span>}
+        {/* ── CENY TU NIE MA (0.414.0) ──────────────────────────────────────
+            Ta sama kwota stała w trzech miejscach kolumny: tutaj, w kostce
+            „Klient zapłacił" i w pozycji zwijki Zakup. Wiersz towaru
+            odpowiada na pytanie „CO to jest u nas", a nie „ile kosztowało" —
+            cena była tu gościem. Kostka niesie ją przy pozostałych liczbach
+            decyzji, a lista zakupu przy pozostałych pozycjach zamówienia;
+            oba miejsca odpowiadają na pytania, których wiersz towaru nie
+            zadaje. */}
       </p>
     </div>
   </div>;
@@ -686,11 +674,6 @@ function Triaz({ szczegol, pozycja }: {
   const pozostale = ceny.filter((c) => c.poziom !== 0);
   const mag = karta.data?.mag ?? null;
   const stanZnany = mag !== null;
-  /* Sprawa bez potwierdzonej kartoteki nie ma czego pokazać poza zdaniem
-     o tym braku — a samo zdanie nie jest warte paska, gdy nie ma przy nim
-     ani ceny z paragonu, ani niczego innego. */
-  if (!stanZnany && r.twId !== null && ceny.length === 0 && !pozycja) return null;
-  if (!stanZnany && r.twId === null && !pozycja) return null;
 
   /* ── STAN CZYTA SIĘ PRZECIW ŻĄDANIU (0.413.0) ─────────────────────────────
      `offer.quantity` leży w ładunku sprawy od przyrostu trzeciego i do tego
@@ -700,6 +683,16 @@ function Triaz({ szczegol, pozycja }: {
   const zadane = r.ilosc !== null && r.ilosc > 1 ? r.ilosc : null;
   const starczy = mag !== null && zadane !== null ? mag.avail >= zadane : null;
   const wiek = wiekZakupuSlowem(r.dniOdZakupu);
+
+  /* ── PUSTY PASEK NIE STAJE, ALE LICZY SIĘ KAŻDA KOSTKA Z OSOBNA (0.414.0)
+     Do tego wydania warunek pytał wyłącznie o kartotekę i o pozycję paragonu —
+     więc sprawa, o której wiedzieliśmy tylko KIEDY ją kupiono, nie dostawała
+     paska wcale i wiek zakupu przepadał razem z nim. Warunek liczy teraz to,
+     co naprawdę miałoby stanąć: pasek znika dopiero, gdy nie stanęłaby ani
+     jedna kostka i nie ma żadnego poziomu cen. */
+  const kostek = (stanZnany || r.twId === null ? 1 : 0) + (wiek ? 1 : 0)
+    + (pozycja ? 1 : 0) + (zakup ? 1 : 0);
+  if (kostek === 0 && pozostale.length === 0) return null;
 
   return <div className="border-b border-slate-200 px-4 py-2">
     <div className="flex flex-wrap gap-2">
@@ -736,10 +729,12 @@ function Triaz({ szczegol, pozycja }: {
       tytul="Pozostałe poziomy cen"
       Ikona={Coins}
       podpis={podpisCennika(pozostale)}
-      /* OTWARTA DOMYŚLNIE: 0.411.0 postawiło te wiersze na wierzchu decyzją
-         właściciela i to wydanie ich stamtąd nie zdejmuje — daje tylko sposób
-         na zamknięcie ich raz, komu nie są potrzebne. */
-      domyslnieOtwarte
+      /* ── ZAMKNIĘTA OD 0.414.0 ──────────────────────────────────────────
+         0.411.0 postawiło cennik na wierzchu, bo właściciel nazwał ceny
+         „kluczowymi do szybkiej oceny, czy warto rozpatrywać". Liczba, która
+         to rozstrzyga, stoi od 0.413.0 w kostce „Nasz zakup" — zawsze,
+         bez kliknięcia. Pozostałe pięć poziomów to cenniki SPRZEDAŻY:
+         przydają się przy rozmowie o wymianie, nie przy werdykcie. */
       pamietajJako="wertis.reklamacje.cennik"
     >
       <div className="px-2 py-2">
@@ -814,6 +809,47 @@ function wiekZakupuSlowem(dni: number | null): { napis: string; poDwochLatach: b
   if (mies < 24) return { napis: `${ile(mies, "miesiąc", "miesiące", "miesięcy")} temu`, poDwochLatach };
   const lata = Math.floor(dni / 365.25);
   return { napis: `${ile(lata, "rok", "lata", "lat")} temu`, poDwochLatach };
+}
+
+/* ── GDZIE JEST PACZKA (0.393.0, przeniesione w 0.414.0) ────────────────────
+   „Czy on to w ogóle dostał" jest przy reklamacji pytaniem PIERWSZYM, a przy
+   powodach „nie otrzymałem produktu" i „nie dostałem towaru po zapłacie" —
+   całą sprawą. Do 0.413.0 ta odpowiedź leżała w zwijce Zakup, co uchodziło,
+   dopóki zwijka stała otwarta. Zamknięcie jej zabrałoby sprawdzenie paczki
+   pod kliknięcie, więc wiersz wychodzi na wierzch razem z resztą faktów
+   decyzji, zamiast trzymać cały blok otwarty dla jednej linijki.
+
+   Ładunek zamówienia numeru przesyłki NIE MA — stoi pod osobną końcówką
+   `/order/checkout-forms/{id}/shipments`, a status pod tą samą, którą zwroty
+   odpytują od 0.187.0. Dwa żądania, więc pytamy na JAWNE kliknięcie: żądanie
+   u dostawcy nie wychodzi z patrzenia.                                      */
+function Paczka({ przesylka, onSprawdz, trwa, blad }: {
+  przesylka: SzczegolReklamacji["przesylka"];
+  onSprawdz?: () => void;
+  trwa: boolean;
+  blad: string;
+}) {
+  if (!przesylka) return null;
+  return <div className="border-b border-slate-200 px-4 py-1.5 text-sm">
+    <span className="mr-2 text-podpis font-semibold uppercase tracking-wide text-slate-600">
+      Paczka</span>
+    {przesylka.sprawdzonoAt === null
+      ? <span className="text-slate-600">nie pytaliśmy jeszcze Allegro</span>
+      : przesylka.waybill === null
+        ? <span className="text-slate-600">Allegro nie ma numeru — paczka jeszcze
+            nienadana albo nadana poza Allegro</span>
+        : <>
+            {przesylka.dostarczonoAt
+              ? <b className="text-ranga-ok">doręczona {czas(przesylka.dostarczonoAt)}</b>
+              : <span>{przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
+            <span className="text-slate-600"> · {przesylka.przewoznik}{" "}
+              <span className="font-mono">{przesylka.waybill}</span></span>
+          </>}
+    {onSprawdz && <button type="button" disabled={trwa} onClick={onSprawdz}
+      className="ml-2 font-semibold underline underline-offset-2 disabled:opacity-50">
+      {trwa ? "pytam…" : "sprawdź"}</button>}
+    {blad && <p className="text-xs text-red-700">{blad}</p>}
+  </div>;
 }
 
 /** Jedna liczba triażu: etykieta, kwota grubym drukiem, zdanie pod spodem. */
