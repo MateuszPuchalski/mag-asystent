@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.423.0 — 22 września 2026
+
+**Szkic odpowiedzi przeżywa przełączenie sprawy.** Usterkę znalazł pomiar
+`ux-loop/baseline.md`, nie zgłoszenie — i była najdroższą pozycją tamtej
+tabeli. Reklamacje i dyskusje kasowały napisaną odpowiedź, gdy agent
+przełączał się na sprawę pilniejszą. Bez ostrzeżenia i bez cofnięcia.
+
+- **Szkic jest przypisany do NUMERU sprawy**, nie do pola
+  (`panel/src/sprawy/useSzkicSprawy.ts`). Jeden hook na obie kolejki.
+- **Obrona, której nie straciliśmy.** Kasowanie broniło przed wyjazdem szkicu
+  do cudzej sprawy. Każda sprawa ma teraz własny klucz, więc broni dalej.
+- **Magazyn karty przeglądarki**, bo przełączenie na inną kolejkę odmontowuje
+  ekran, a to jest dokładnie ten ruch, po którym agent wraca dopisać zdanie.
+  Zamknięcia karty szkic nie przeżywa — na to trzeba kolumny w bazie, której
+  te dwie kolejki nie mają.
+- **Głuchy magazyn nie kładzie ekranu.** W oknie prywatnym odczyt rzuca; hook
+  pracuje wtedy na samej pamięci.
+- **Testy zaczynają świeżą kartą** (`test/setup.ts`). Bez tego szkic z jednego
+  testu witał następny w polu — złapały to dwa testy ekranu reklamacji.
+
 ## 0.422.0 — 22 września 2026
 
 **Adres dostawy odblokowany, szukanie po numerze telefonu.** Decyzja

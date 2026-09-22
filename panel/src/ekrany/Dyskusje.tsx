@@ -13,6 +13,7 @@ import type {
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
+import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
@@ -108,7 +109,6 @@ export function Dyskusje() {
   const zakoncz = useZakoncz();
   const trwa = prowadze.isPending || notatka.isPending;
 
-  const [tresc, setTresc] = useState("");
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladZakonczenia, setBladZakonczenia] = useState("");
@@ -161,6 +161,8 @@ export function Dyskusje() {
      samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
   const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
+  /* Szkic stoi ZARAZ ZA numerem sprawy, bo jest do niego przypisany. */
+  const { tresc, ustaw: setTresc, wyczysc: wyczyscSzkic } = useSzkicSprawy("dyskusja", wybrana);
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
 
@@ -196,11 +198,13 @@ export function Dyskusje() {
     if (nast) nawiguj(`/obsluga/dyskusje/${nast.id}`);
   };
 
-  /* Pole czyści się przy ZMIANIE SPRAWY, nigdy przy odświeżeniu zapytania —
-     inaczej odpowiedź pisana w trakcie taktu synchronizacji znikałaby w pół
-     zdania. Ten sam warunek co przy szkicu w skrzynce. */
+  /* ── SZKIC PRZEŻYWA ZMIANĘ SPRAWY (0.423.0) ───────────────────────────────
+     Do 0.422.0 stało tu `setTresc("")` i to kasowało napisaną odpowiedź, gdy
+     agent przełączył się na sprawę pilniejszą. Broniło przed wyjazdem szkicu
+     do cudzej sprawy — i tej obrony nie tracimy: `useSzkicSprawy` przypisuje
+     treść do NUMERU sprawy, więc każda ma własną. Czyszczą się tu za to
+     wszystkie błędy i konflikty, bo one należą do próby, nie do sprawy. */
   useEffect(() => {
-    setTresc("");
     setBladWysylki("");
     setKonfliktWysylki(null);
     setBladZakonczenia("");
@@ -232,7 +236,7 @@ export function Dyskusje() {
     }, {
       onSuccess: (w) => {
         setKonfliktWysylki(null);
-        if (w.status === "sent") setTresc("");
+        if (w.status === "sent") wyczyscSzkic();
         else setBladWysylki(
           "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
       },

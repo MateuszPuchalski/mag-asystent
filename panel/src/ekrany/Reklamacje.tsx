@@ -17,6 +17,7 @@ import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Prowadzi } from "../sprawy/Prowadzi";
+import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
@@ -172,7 +173,6 @@ export function Reklamacje() {
   const zwrotTowaru = useZwrotTowaru();
   const trwa = prowadze.isPending || notatka.isPending;
 
-  const [tresc, setTresc] = useState("");
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWerdyktu, setBladWerdyktu] = useState("");
@@ -237,6 +237,8 @@ export function Reklamacje() {
      samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
   const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
+  /* Szkic stoi ZARAZ ZA numerem sprawy, bo jest do niego przypisany. */
+  const { tresc, ustaw: setTresc, wyczysc: wyczyscSzkic } = useSzkicSprawy("reklamacja", wybrana);
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
   /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce —
@@ -305,11 +307,13 @@ export function Reklamacje() {
     odswiez.mutate({ id: wybrana });
   }, [wybrana]);
 
-  /* Pole czyści się przy ZMIANIE SPRAWY, nigdy przy odświeżeniu zapytania —
-     inaczej odpowiedź pisana w trakcie taktu synchronizacji znikałaby w pół
-     zdania. Ten sam warunek co przy szkicu w skrzynce. */
+  /* ── SZKIC PRZEŻYWA ZMIANĘ SPRAWY (0.423.0) ───────────────────────────────
+     Do 0.422.0 stało tu `setTresc("")` i to kasowało napisaną odpowiedź, gdy
+     agent przełączył się na sprawę pilniejszą. Broniło przed wyjazdem szkicu
+     do cudzej sprawy — i tej obrony nie tracimy: `useSzkicSprawy` przypisuje
+     treść do NUMERU sprawy, więc każda ma własną. Czyszczą się tu za to
+     wszystkie błędy i konflikty, bo one należą do próby, nie do sprawy. */
   useEffect(() => {
-    setTresc("");
     setBladWysylki("");
     setKonfliktWysylki(null);
     setBladWerdyktu("");
@@ -344,7 +348,7 @@ export function Reklamacje() {
     }, {
       onSuccess: (w) => {
         setKonfliktWysylki(null);
-        if (w.status === "sent") setTresc("");
+        if (w.status === "sent") wyczyscSzkic();
         else setBladWysylki(
           "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
         /* Stan sprawy po stronie Allegro ZMIENIŁ SIĘ przed chwilą, a takt
