@@ -94,7 +94,12 @@ export const KODY = {
   typNieznany: "TYP_NIEZNANY",
 } as const;
 
-/** Tryb wysyłki. Dziś jedyny: każda odpowiedź przechodzi przez człowieka (§27, punkt 2). */
+/**
+ * Tryb wysyłki zapisywany przy decyzji. Dziś jedyny, bo innej drogi wysyłki
+ * w kodzie nie ma — nie dlatego, że zabrania jej zasada: punkt 2 z §27
+ * („człowiek wysyła odpowiedź") właściciel usunął 22 września 2026. Drugi
+ * tryb dojdzie razem z kodem wysyłki bez człowieka, i dopiero wtedy.
+ */
 export const TRYB = "HUMAN_APPROVED";
 
 export const czyKategoria = (v: unknown): v is Kategoria =>

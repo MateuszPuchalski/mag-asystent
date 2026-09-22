@@ -1770,10 +1770,14 @@ sprzecznych danych, propozycja wpisu do bazy wiedzy.
 
 ### 14.2. Niedozwolone bez człowieka
 
-Automat nie wysyła odpowiedzi, nie potwierdza niepewnego dopasowania, nie
-rozszerza bazy zastosowań, nie obiecuje dostępności ani terminu, nie uznaje
-reklamacji, nie usuwa negatywnego dopasowania i nie podmienia faktu
-technicznego.
+Automat nie potwierdza niepewnego dopasowania, nie rozszerza bazy
+zastosowań, nie obiecuje dostępności ani terminu, nie uznaje reklamacji, nie
+usuwa negatywnego dopasowania i nie podmienia faktu technicznego.
+
+Do 22 września 2026 lista zaczynała się od „nie wysyła odpowiedzi". Ten zakaz
+odszedł razem z zasadą nadrzędną nr 2 (§27), decyzją właściciela. Pozostałe
+zakazy stoją: wysyłka bez człowieka, gdy powstanie, nie ma prawa obiecać
+terminu ani uznać reklamacji.
 
 ### 14.3. Źródła
 
@@ -1898,7 +1902,7 @@ przerabianiem historii. Decyzji `FAILED` takt nie ponawia — ponawia człowiek
 przyciskiem nad kolejką.
 
 **Czego ten przyrost nie robi.** Nie wysyła niczego do klienta i nie zmienia
-trybu wysyłki: każdą odpowiedź dalej wysyła człowiek (§27, punkt 2).
+trybu wysyłki: drogi wysyłki bez człowieka w kodzie nie ma.
 
 ### 14.5b. Struktura wątku Allegro przed modelem (22 września 2026)
 
@@ -2101,8 +2105,9 @@ w 0.107.0, i stał na zerze na wyraźną prośbę właściciela. Wraca na jego
 prośbę, ale wraca wyłączony: rzecz, która wydaje pieniądze bez kliknięcia,
 ma się włączać decyzją przy `wertis.env`, a nie skutkiem ubocznym aktualizacji.
 
-Do klienta dalej **nie idzie nic** bez człowieka. Zasada nadrzędna nr 2 nie ma
-tu wyjątku.
+Do klienta **nie idzie nic** bez człowieka: szkic z taktu jest propozycją,
+a drogi wysyłki bez kliknięcia w kodzie nie ma. Zasada nadrzędna nr 2, która
+tego wymagała, odeszła 22 września 2026 (§27).
 
 **Copilot widzi zdjęcia z rozmowy (0.330.0).** Właściciel pokazał zdjęcie
 tabliczki znamionowej kosiarki PARKSIDE i powiedział, że model nie umiał
@@ -2408,9 +2413,10 @@ Specyfikacja mierzy to obok odrzuceń, które niesie `szkic_copilota.ocena`.
 naszą wiadomość o treści niepewnej wysyłki, wiersz `send_uncertain` przechodzi
 na `sent` z numerem od Allegro. Szkicu i statusu rozmowy to nie rusza.
 
-**Czego nie ma i nie będzie bez decyzji właściciela:** wysyłki bez człowieka.
-Specyfikacja przewiduje ją „później, dla klas z dowodami". Zasada nadrzędna
-nr 2 (§27) jej zabrania, a zmienić ją może tylko właściciel.
+**Czego nie ma:** wysyłki bez człowieka. Zasada nadrzędna nr 2, która jej
+zabraniała, odeszła 22 września 2026 decyzją właściciela (§27). Kodu takiej
+wysyłki jednak nie ma. Specyfikacja z 20 września opisuje warunki, na jakich
+ma powstać: bramka per klasa, dowody z tygodnia pracy i wyłącznik awaryjny.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
@@ -5401,7 +5407,7 @@ MIĘDZY czterema kolejkami stoją osobno, w dekalogu
 `docs/obsluga-klienta-calosc.md`, razem z mapą możliwości i spoiwem.
 
 1. Najpierw dane i dowody, potem automatyzacja.
-2. Człowiek wysyła odpowiedź do klienta.
+2. *(Usunięta 22 września 2026 decyzją właściciela — patrz niżej.)*
 3. Automat nie jest źródłem kompatybilności.
 4. Rozmowa, dobór, zadanie i dowód są osobnymi bytami.
 5. Każda mutacja ma autora.
@@ -5424,8 +5430,15 @@ myśli. Punkty 11 i 12 przyszły z dekalogu (dawne 7 i 9), bo mówią o jednej
 rozmowie albo o ekranie, nie o przejściu między kolejkami.
 
 Odszedł punkt „magazynier pracuje w aplikacji kolektora". To granica frontów,
-a pilnuje jej zasada „Dwa fronty" w `CLAUDE.md`. Numer 2 się nie zmienił, bo
-cytuje go kod szablonów.
+a pilnuje jej zasada „Dwa fronty" w `CLAUDE.md`.
+
+**Punkt 2 odszedł 22 września 2026.** Brzmiał „Człowiek wysyła odpowiedź do
+klienta". Właściciel go usunął po specyfikacji z 20 września, która
+przewiduje wysyłkę bez człowieka dla klas z dowodami. Numer zostaje pusty,
+a reszta się nie przesuwa: kod i dekalog cytują punkty 9, 11 i 12 po numerze.
+
+Usunięcie zasady nie jest funkcją. Kodu wysyłki bez człowieka dziś nie ma,
+a każda odpowiedź dalej wychodzi na kliknięcie agenta.
 
 ## 28. Stan faktyczny — co już działa
 

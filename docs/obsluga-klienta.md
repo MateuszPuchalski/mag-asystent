@@ -178,6 +178,12 @@ Dotychczasowa granica: automat proponuje, do klienta mówi wyłącznie człowiek
 Ta zasada nie jest podważana przez żaden znany nam fakt — ale ma tu zostać
 zapisana świadomie, a nie odziedziczona.
 
+> **Odpowiedź zmieniona 22 września 2026.** Właściciel usunął zasadę
+> „człowiek wysyła każdą odpowiedź" (§27 projektu panelu, punkt 2). Wysyłka
+> bez człowieka przestaje być zakazana, ale jej kodu nie ma. Specyfikacja
+> z 20 września opisuje warunki: bramka per klasa, dowody i wyłącznik.
+> Pierwotna odpowiedź zostaje niżej, bo tłumaczy kod dwustu wydań.
+>
 > **Odpowiedź:** Granica zostaje tam, gdzie była, i zostaje zapisana
 > świadomie: **automat proponuje, do klienta mówi wyłącznie człowiek.**
 > Rozwinięcie w `panel-obslugi-klienta.md` §14.2 — automat nie wysyła
@@ -389,8 +395,7 @@ raz (0.151.0).
 Copilot jest wyłączony domyślnie. Bez `COPILOT_MODE=anthropic` i bez klucza
 z firmy nie wychodzi ani jeden znak. Nic nie idzie taktem w tle: partię
 uruchamia agent klawiszem, a potwierdzenie mówi wprost, że to kosztuje.
-Do klienta dalej mówi wyłącznie człowiek — klasyfikacja nie pisze do niego ani
-jednego znaku.
+Klasyfikacja nie pisze do klienta ani jednego znaku.
 
 **Od 22 września 2026 klasyfikacja wysyła WĄTEK, nie jedną wiadomość —
 i może chodzić taktem.** Dwa zdania wyżej opisują stan sprzed tej daty.
@@ -716,9 +721,11 @@ Ten rozdział unieważnia zdanie, które stało tu do 0.147.0: „wysyłka jest
 wyłączona, więc żadna treść nie wychodzi z WERTIS na zewnątrz". Od 0.148.0
 wychodzi — i dlatego dostaje własny zapis.
 
-**Wychodzi wyłącznie to, co człowiek wysłał.** Automat nie wysyła niczego;
-regułę tę projekt panelu wymienia jako drugą zasadę nadrzędną. Wysyła agent,
-który prowadzi rozmowę, jednym kliknięciem, po zatwierdzeniu treści.
+**Wychodzi wyłącznie to, co człowiek wysłał.** Automat nie wysyła niczego.
+Wysyła agent, który prowadzi rozmowę, jednym kliknięciem, po zatwierdzeniu
+treści. Do 22 września 2026 stała za tym druga zasada nadrzędna projektu
+panelu; właściciel ją usunął. Zdanie wyżej opisuje kod, nie zakaz: wysyłki
+bez człowieka dziś nie ma.
 
 **Nie wychodzi nic poza treścią odpowiedzi.** Do Allegro idzie sam tekst.
 Komentarze wewnętrzne mają osobną tabelę i adapter ich nie widzi. Załączników

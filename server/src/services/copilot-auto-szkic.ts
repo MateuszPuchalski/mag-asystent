@@ -60,8 +60,10 @@ import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
  * Pętli z tego nie ma: drugi przebieg zastaje pola wypełnione, więc nie
  * wpisuje nic, wersja doboru stoi i szkic przestaje być nieświeży.
  *
- * Nie wysyła niczego do klienta. Zasada nadrzędna nr 2 („człowiek wysyła
- * odpowiedź") nie ma tu wyjątku i mieć nie będzie.
+ * Nie wysyła niczego do klienta: szkic jest propozycją, a wysyła agent.
+ * Do 22 września 2026 stała za tym zasada nadrzędna nr 2 („człowiek wysyła
+ * odpowiedź"); właściciel ją usunął. Wysyłka bez człowieka, gdy powstanie,
+ * ma być osobnym kodem z własnymi bramkami — nie skutkiem ubocznym tego taktu.
  */
 
 /**

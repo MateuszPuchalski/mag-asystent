@@ -15,9 +15,8 @@ import {
  * z notatnika, więc każda ich wersja była trochę inna.
  *
  * WSTAWIA DO SZKICU, NIE WYSYŁA. Treść ląduje w polu i dalej wymaga „Wyślij do
- * klienta" — druga zasada nadrzędna projektu panelu mówi, że treść wychodzi
- * z WERTIS wyłącznie na kliknięcie człowieka. Szablon skraca pisanie, nie
- * zastępuje decyzji.
+ * klienta" — treść wychodzi z WERTIS wyłącznie na kliknięcie człowieka, bo
+ * innej drogi wysyłki nie ma. Szablon skraca pisanie, nie zastępuje decyzji.
  *
  * DOPISUJE, NIE NADPISUJE — ten sam kontrakt, co każda inna wstawka w tym
  * edytorze (wynik magazyniera, parametry towaru, zdanie doboru). Szkic jest
