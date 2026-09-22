@@ -10,6 +10,7 @@ import { stanZwrotow } from "./allegro-zwroty-sync-state.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { odkodujEncje } from "../tekst.js";
 import { uzupelnijDoreczenia, type DoSprawdzenia } from "./allegro-tracking.js";
+import { uzupelnijWyplaty, zwrotyDoSprawdzeniaWyplaty } from "./allegro-wyplaty.js";
 
 /* ── Synchronizator zwrotów klienckich (0.150.0) ─────────────────────────────
    Kształt pól pochodzi z OFICJALNEJ specyfikacji OpenAPI Allegro (modele
@@ -260,6 +261,29 @@ export async function synchronizujAllegroZwroty(deps: ZwrotySyncDeps = {}): Prom
        na tyle, ile trwa najwolniejszy przewoźnik. */
     await uzupelnijDoreczenia(database, paczkiDoSprawdzenia(database, konto),
       { query: deps.query, apiUrl });
+
+    /* WYPŁATY W TYM SAMYM TAKCIE, nie w osobnym (0.426.0). Kusi szósty ticker,
+       ale to jest to samo pytanie co wyżej — „co się stało z tą sprawą po
+       stronie Allegro" — zadane innej końcówce. Osobny rytm dokładałby szósty
+       chór na jednym adresie IP, a tego rodzaju sygnatura skończyła się
+       w sierpniu 2026 blokadą (nagłówek `services/takt.ts`).
+
+       Własny parasol, jak przy odświeżaniu znanych: brak uprawnienia
+       `allegro:api:payments:read` albo zepsuta końcówka płatności nie ma prawa
+       zabrać ani nowych zwrotów, ani doręczeń. 429 idzie wyżej — limit jest
+       wspólny dla całego konta. */
+    try {
+      const zatrzasniete = await uzupelnijWyplaty(
+        database, zwrotyDoSprawdzeniaWyplaty(database, konto),
+        { query: deps.query, apiUrl });
+      if (zatrzasniete) {
+        console.log(`[zwroty] wypłata potwierdzona przy ${zatrzasniete} zwrotach`);
+      }
+    } catch (error) {
+      if (error instanceof BladLimituAllegro) throw error;
+      console.warn("[zwroty] sprawdzenie wypłat nie doszło:",
+        error instanceof Error ? error.message : error);
+    }
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
       ? Math.max(interval, error.poIluMs ?? interval * 2)
