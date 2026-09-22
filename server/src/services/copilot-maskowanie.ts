@@ -131,6 +131,20 @@ export const ZNACZNIK_POMINIETYCH = "[wcześniejsze wiadomości pominięte]";
  * wiedzieć, że coś było wcześniej, ale nie ma się tego domyślać.
  */
 export function zamaskujWatek(wiadomosci: WiadomoscWatku[], login: string | null): TrescBezpieczna {
+  return zamaskujWatekZeSladem(wiadomosci, login).tresc;
+}
+
+/**
+ * To samo co `zamaskujWatek`, plus ŚLAD tego, co weszło (klasyfikacja, 22
+ * września 2026). Specyfikacja każe zapisać przy decyzji, na czym ją liczono
+ * i czy kontekst był ucięty — liczone z tekstu po fakcie myliłoby się przy
+ * wiadomościach wielowierszowych, więc liczy to pętla, która tnie.
+ *
+ * `ile` to liczba wiadomości od KOŃCA listy, które weszły do tekstu.
+ */
+export function zamaskujWatekZeSladem(
+  wiadomosci: WiadomoscWatku[], login: string | null,
+): { tresc: TrescBezpieczna; ile: number; uciety: boolean } {
   const linie: string[] = [];
   let znakow = 0;
   let pominieto = false;
@@ -143,8 +157,9 @@ export function zamaskujWatek(wiadomosci: WiadomoscWatku[], login: string | null
     linie.unshift(linia);
     znakow += linia.length;
   }
+  const ile = linie.length;
   if (pominieto) linie.unshift(ZNACZNIK_POMINIETYCH);
-  return linie.join("\n") as TrescBezpieczna;
+  return { tresc: linie.join("\n") as TrescBezpieczna, ile, uciety: pominieto };
 }
 
 /**

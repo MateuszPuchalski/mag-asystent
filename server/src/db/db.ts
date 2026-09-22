@@ -865,8 +865,57 @@ export function migrate(database: DatabaseSync) {
   zalacznikiBezDubli(database);
   dosypZalacznikiZLadowiska(database);
   bezNakladkiSpraw(database);
+  przeniesKlasyfikacjeRozmow(database);
   pierwszySzablonOdpowiedzi(database);
   tabelaFts(database);
+}
+
+/**
+ * Etykiety z 0.191.0 przechodzą do `decyzja_klasyfikacji` jako HISTORIA
+ * (22 września 2026), a stara tabela znika.
+ *
+ * NIEAKTYWNE, i to jest cała decyzja tej migracji. Etykieta „dobor" z ośmiu
+ * kategorii nie jest ani trafieniem, ani pudłem wobec piętnastu, więc
+ * zostawiona jako aktywna kazałaby kolejce pokazywać słowa spoza słownika,
+ * a taktowi — omijać rozmowę, której nikt nie rozpoznał w nowym słowniku.
+ * Wersja 1 dostaje `taksonomia_wersja='v1'`; nowa decyzja tej samej
+ * wiadomości wejdzie jako wersja 2.
+ *
+ * Werdykt „trafna" przechodzi jako etykieta człowieka równa etykiecie modelu,
+ * bo dokładnie to znaczył. „Nietrafna" nie mówiła, jak powinno być — zostaje
+ * kodem `V1_NIETRAFNA`, bez zgadywania kategorii.
+ *
+ * Akcja i flagi to wartości ZASTĘPCZE: słownik v1 ich nie znał. Wiersz jest
+ * nieaktywny i żaden czytelnik ich nie pokazuje; kod `V1_BEZ_AKCJI` mówi, że
+ * to nie jest zdanie modelu.
+ *
+ * Wiersz bez `message_id` nie ma do czego przylgnąć i przepada razem z tabelą
+ * — tak jak przepadała jego etykieta przy pierwszym dopisku klienta.
+ */
+function przeniesKlasyfikacjeRozmow(database: DatabaseSync) {
+  const jest = () => database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='klasyfikacja_rozmowy'").get();
+  if (!jest()) return;
+  transaction(database, () => {
+    /* Sprawdzone PONOWNIE pod blokadą: API i worker wołają `migrate()` razem. */
+    if (!jest()) return;
+    database.exec(`INSERT INTO decyzja_klasyfikacji
+      (conversation_id,message_id,wersja,aktywna,zrodlo,status,kategoria,kategoria_modelu,
+       kategoria_czlowieka,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,
+       pewnosc,uzasadnienie,kody_polityki,model,taksonomia_wersja,polityka_wersja,
+       at,przez,przez_user_id)
+      SELECT k.conversation_id, k.message_id, 1, 0, 'MODEL', 'SUCCESS', k.kategoria, k.kategoria,
+             CASE WHEN k.ocena='trafna' THEN k.kategoria END,
+             'HUMAN_REVIEW', 0, 0, 0, k.pewnosc, k.uzasadnienie,
+             CASE WHEN k.ocena='nietrafna' THEN '["V1_BEZ_AKCJI","V1_NIETRAFNA"]'
+                  ELSE '["V1_BEZ_AKCJI"]' END,
+             k.model, 'v1', 'v1', k.at, k.przez, k.przez_user_id
+        FROM klasyfikacja_rozmowy k
+        JOIN message m ON m.id = k.message_id AND m.conversation_id = k.conversation_id
+       WHERE NOT EXISTS (SELECT 1 FROM decyzja_klasyfikacji d
+                          WHERE d.message_id = k.message_id AND d.wersja = 1)`);
+    database.exec("DROP TABLE klasyfikacja_rozmowy");
+  })();
 }
 
 /**

@@ -14,7 +14,7 @@ import { useSzynaZdarzen } from "../api/zdarzenia";
 import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import {
-  LIMIT_PYTANIA, useCopilot, useKlasyfikuj, useOcenKlasyfikacje, useOcenSzkic, useUlozSzkic,
+  LIMIT_PYTANIA, useCopilot, useKlasyfikuj, usePoprawKlasyfikacje, useOcenSzkic, useUlozSzkic,
   useWymianyCopilota, useZadajPytanie,
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
@@ -51,7 +51,7 @@ export function Skrzynka() {
   const zadajPytanie = useZadajPytanie();
   const [bladPytania, setBladPytania] = useState<string | null>(null);
   const klasyfikuj = useKlasyfikuj();
-  const ocenKategorie = useOcenKlasyfikacje();
+  const poprawKategorie = usePoprawKlasyfikacje();
   const przekaz = usePrzekaz();
   const oferta = useWskazOferte();
   const zdrowie = useZdrowie();
@@ -225,9 +225,9 @@ export function Skrzynka() {
       wskazowka={wskazowka}
       towar={towar}
       onPokazNowa={() => { setNowa(false); rozmowa.refetch(); }}
-      ocenia={ocenKategorie.isPending}
-      onOcenKategorie={(ocena) => rozmowa.data && ocenKategorie.mutate(
-        { rozmowaId: rozmowa.data.rozmowa.id, ocena })}
+      poprawia={poprawKategorie.isPending}
+      onPoprawKategorie={(kategoria) => rozmowa.data && poprawKategorie.mutate(
+        { rozmowaId: rozmowa.data.rozmowa.id, kategoria })}
       komentarz={komentarz}
       onKomentarz={(v) => { setKomentarz(v); zglosPisanie(); }}
       komentuje={dodajKomentarz.isPending}

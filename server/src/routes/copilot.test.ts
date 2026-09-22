@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["klasyfikacja_rozmowy", "szkic_copilota", "copilot_wywolanie", "message", "conversation",
+  for (const t of ["decyzja_klasyfikacji", "szkic_copilota", "copilot_wywolanie", "message", "conversation",
     "events", "device_session", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -64,8 +64,8 @@ const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/copilot/pomiar" },
   { method: "POST" as const, url: "/api/obsluga/copilot/klasyfikacja",
     payload: { rozmowyId: [rozmowa] } },
-  { method: "POST" as const, url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/ocena`,
-    payload: { ocena: "trafna" } },
+  { method: "POST" as const, url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/korekta`,
+    payload: { kategoria: "OTHER" } },
   { method: "POST" as const, url: "/api/obsluga/copilot/szkic", payload: { rozmowaId: rozmowa } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
     payload: { ocena: "wstawiony" } },
@@ -98,11 +98,11 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
    PIERWSZA to partia klasyfikacji — pierwsze miejsce, z którego treść rozmowy
    wychodzi poza firmę, i dlatego pierwsze, przed którym stoi warstwa maskowania.
 
-   DRUGA to werdykt człowieka o trafności. Wygląda na drobiazg, a jest
-   warunkiem pomiaru: bez niej da się policzyć, ILE Copilot kosztuje, ale nie
-   da się policzyć, CZY jest dobry — a decyzja właściciela brzmi „zejdź na
-   tańszy model po pomiarze". Pomiar bez trafności odpowiadałby na pytanie,
-   którego nikt nie zadał.
+   DRUGA to etykieta człowieka — potwierdzenie albo poprawka kategorii (do
+   22 września 2026 werdykt „trafna/nietrafna", na tym samym miejscu umowy).
+   Wygląda na drobiazg, a jest warunkiem pomiaru: bez niej da się policzyć,
+   ILE Copilot kosztuje, ale nie da się policzyć, CZY jest dobry. Poprawka
+   mówi dodatkowo, JAK powinno być, więc liczy się z niej także czułość.
 
    TRZECIA to szkic odpowiedzi z faktów (0.231.0) — drugie miejsce, z którego
    treść wychodzi, tym razem cały wątek za tym samym maskowaniem. Osobna trasa,
@@ -131,14 +131,14 @@ test("Copilot ma SIEDEM tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
   assert.equal(posty.length, 7, `tras POST jest ${posty.length}, a umowa mówi o siedmiu`);
-  for (const slowo of ["klasyfikacja", "ocena", "szkic", "dane", "pasowanie", "pytanie"]) {
+  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "dane", "pasowanie", "pytanie"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });
 
 test("patrzenie na Copilota niczego nie mutuje", async () => {
   const b = login("biuro", "Ala");
-  const stan = () => [liczba("klasyfikacja_rozmowy"), liczba("szkic_copilota"),
+  const stan = () => [liczba("decyzja_klasyfikacji"), liczba("szkic_copilota"),
     liczba("copilot_wywolanie"), liczba("events")];
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
@@ -252,12 +252,22 @@ test("każdy adres wołany z panel/src/api/copilot.ts ma trasę na serwerze", as
   }
 });
 
-test("ocena bez rozpoznanej kategorii odmawia zdaniem", async () => {
+test("poprawka bez rozpoznanej kategorii odmawia zdaniem", async () => {
   const b = login("biuro", "Ala");
   const r = await app.inject({
-    method: "POST", url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/ocena`,
-    headers: b.naglowki, payload: { ocena: "trafna" },
+    method: "POST", url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/korekta`,
+    headers: b.naglowki, payload: { kategoria: "OTHER" },
   });
   assert.equal(r.statusCode, 400);
   assert.match(r.json<{ error: string }>().error, /nie ma jeszcze rozpoznanej/);
+});
+
+test("poprawka spoza słownika nazywa dozwolone kategorie", async () => {
+  const b = login("biuro", "Ala");
+  const r = await app.inject({
+    method: "POST", url: `/api/obsluga/copilot/klasyfikacja/${rozmowa}/korekta`,
+    headers: b.naglowki, payload: { kategoria: "dobor" },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json<{ error: string }>().error, /PRODUCT_COMPATIBILITY/);
 });

@@ -6,7 +6,11 @@ import { token } from "./klient";
 
 export type ZdarzenieRozmowy = {
   id: number;
-  type: "presence" | "message.created" | "assignment.changed" | "warehouse.result";
+  /* `classification.updated` (22 września 2026): takt rozpoznaje w tle, więc
+     plakietka ma przyjść sama. Obsługa jak przy każdym zdarzeniu innym niż
+     obecność — lista i otwarta rozmowa odświeżają się po cichu. */
+  type: "presence" | "message.created" | "assignment.changed" | "warehouse.result"
+    | "classification.updated";
   conversationId: number;
   [k: string]: unknown;
 };

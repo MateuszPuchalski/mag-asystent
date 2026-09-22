@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
-import type { Kopilot, Rozmowa, StanCopilota, WynikPartii } from "../api/typy";
-import { NAZWA_KATEGORII, NAZWA_PEWNOSCI } from "./statusy";
+import { Check, Sparkles, UserRound } from "lucide-react";
+import type { Kategoria, Kopilot, Rozmowa, StanCopilota, WynikPartii } from "../api/typy";
+import { NAZWA_AKCJI, NAZWA_KATEGORII, NAZWA_KODU, NAZWA_PEWNOSCI } from "./statusy";
 import { odmien } from "../ui";
 
 /* ── Copilot nad kolejką (§14, etap F) ───────────────────────────────────────
@@ -28,9 +28,15 @@ import { odmien } from "../ui";
    przycisk niesie LICZBĘ, potwierdzenie mówi wprost, że to kosztuje, a
    podsumowanie partii podaje wynik zdaniem, nie odznaką na każdym wierszu. */
 
-/** Rozmowy, które partia W OGÓLE weźmie: nierozpoznane albo z etykietą starą. */
+/**
+ * Rozmowy, które partia W OGÓLE weźmie: nierozpoznane, z etykietą starą albo
+ * z decyzją FAILED. Tej ostatniej takt nie ponawia (awaria rozmowy wracałaby
+ * co przebieg na koszt firmy) — ponowienie jest decyzją człowieka, więc stoi
+ * pod przyciskiem nad kolejką.
+ */
 export const doRozpoznania = (rozmowy: Rozmowa[]): Rozmowa[] =>
-  rozmowy.filter((r) => r.kopilot === null || r.kopilot.nieaktualna);
+  rozmowy.filter((r) => r.kopilot === null || r.kopilot.nieaktualna
+    || r.kopilot.status === "FAILED");
 
 function podsumowanie(w: WynikPartii): string {
   const czesci = [`Rozpoznano ${w.sklasyfikowane}`];
@@ -154,54 +160,88 @@ export function ZnakCopilota({ stan, kandydaci }: {
     <Sparkles size={15} /></span>;
 }
 
-/**
- * Plakietka kategorii na wierszu kolejki.
- *
- * Wyszarzona, gdy etykieta dotyczy STARSZEJ wiadomości: milczenie o tym byłoby
- * gorsze niż brak etykiety, bo agent czytałby przypuszczenie o zdaniu, którego
- * klient już nie zadaje. Regułę liczy serwer (`nieaktualna`).
- */
-export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
-  /* `nie_wiadomo` też dostaje plakietkę, i to jest celowe: wiersz w bazie
-     ISTNIEJE, więc rozmowa nie wróci do partii i nie zapłacimy drugi raz za
-     tę samą odpowiedź. Szara plakietka mówi „Copilot nie rozstrzygnął". */
-  const szara = kopilot.nieaktualna || kopilot.kategoria === "nie_wiadomo"
-    || kopilot.ocena === "nietrafna";
-  return <span title={kopilot.nieaktualna
-    ? "Rozpoznano starszą wiadomość — klient dopisał później"
-    : `Copilot: ${NAZWA_PEWNOSCI[kopilot.pewnosc]}`}
-    className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold ${
-      szara ? "bg-slate-100 text-slate-600" : "bg-violet-100 text-violet-800"}`}>
-    <Sparkles size={11} />{NAZWA_KATEGORII[kopilot.kategoria]}</span>;
+/** Kolejność kategorii w wyborze poprawki — ta sama co w słowniku serwera. */
+const KATEGORIE = Object.keys(NAZWA_KATEGORII) as Kategoria[];
+
+/** Zdanie do dymka: skąd decyzja i co ją zmieniło. Kody nieznane idą wprost. */
+function dymek(k: Kopilot): string {
+  if (k.nieaktualna) return "Rozpoznano starszą wiadomość — klient dopisał później";
+  const czesci = [k.zrodlo === "FALLBACK"
+    ? "Copilot nie rozpoznał tej wiadomości"
+    : `Copilot: ${k.pewnosc ? NAZWA_PEWNOSCI[k.pewnosc] : "bez pewności"}`];
+  czesci.push(`następny krok: ${NAZWA_AKCJI[k.akcja]}`);
+  if (k.dodatkowe.length) czesci.push(`także: ${k.dodatkowe.map((d) => NAZWA_KATEGORII[d]).join(", ")}`);
+  if (k.kody.length) czesci.push(k.kody.map((x) => NAZWA_KODU[x] ?? x).join(", "));
+  return czesci.join(" · ");
 }
 
 /**
- * Werdykt człowieka przy otwartej rozmowie.
+ * Plakietka kategorii na wierszu kolejki.
  *
- * Dwa przyciski i ani jednego więcej. To one, a nie liczba klasyfikacji, są
- * pomiarem — bez nich decyzja „po pomiarze zejdź na tańszy model" nie ma na
- * czym stanąć. Po „nietrafna" plakietka szarzeje i przestaje być wskazówką,
- * ale ZOSTAJE w bazie: skasowana ocena to skasowany pomiar.
+ * Wyszarzona, gdy etykieta dotyczy STARSZEJ wiadomości albo gdy rozpoznanie
+ * się NIE UDAŁO: milczenie o tym byłoby gorsze niż brak etykiety, bo agent
+ * czytałby przypuszczenie o zdaniu, którego klient już nie zadaje, albo
+ * „Inne" tam, gdzie nikt niczego nie rozpoznał. Regułę liczy serwer.
+ *
+ * Ludzik przy plakietce to specyfikacyjne `needsHuman` — jedyna rzecz z
+ * decyzji, która zmienia to, KTO ma się sprawą zająć. Reszta stoi w dymku,
+ * żeby wiersz dalej pokazywał pytanie klienta (dekalog ergonomii, punkt 2).
  */
-export function OcenaKategorii({ kopilot, zapisuje = false, onOcen }: {
+export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
+  const szara = kopilot.nieaktualna || kopilot.status === "FAILED";
+  return <span title={dymek(kopilot)}
+    className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold ${
+      szara ? "bg-slate-100 text-slate-600" : "bg-violet-100 text-violet-800"}`}>
+    <Sparkles size={11} />{NAZWA_KATEGORII[kopilot.kategoria] ?? kopilot.kategoria}
+    {kopilot.wymagaCzlowieka && !kopilot.nieaktualna
+      && <UserRound size={11} aria-label="wymaga człowieka" />}</span>;
+}
+
+/**
+ * Etykieta człowieka przy otwartej rozmowie: potwierdź albo popraw.
+ *
+ * Zastępuje dwa kciuki z 0.191.0. „Nietrafna" mówiła, że model się pomylił,
+ * ale nie JAK powinno być — więc czułości żadnej kategorii nie dało się z tych
+ * ocen policzyć. Poprawka jest jednym wyborem z listy, potwierdzenie jednym
+ * kliknięciem; obie drogi to ta sama trasa.
+ *
+ * Wybór zostaje PO etykiecie: pomyłkę w kliknięciu naprawia się tym samym
+ * ruchem, a serwer zapisuje ją jako kolejną wersję, nie nadpisuje.
+ *
+ * Następny krok i braki danych stoją obok plakietki, bo to one mówią agentowi,
+ * od czego zacząć — reszta decyzji jest w dymku.
+ */
+export function EtykietaKategorii({ kopilot, zapisuje = false, onPopraw }: {
   kopilot: Kopilot;
   zapisuje?: boolean;
-  onOcen: (ocena: "trafna" | "nietrafna") => void;
+  onPopraw: (kategoria: Kategoria) => void;
 }) {
-  return <span className="flex items-center gap-1 text-xs">
+  const czlowiek = kopilot.kategoriaCzlowieka;
+  return <span className="flex flex-wrap items-center gap-1 text-xs">
     <PlakietkaKategorii kopilot={kopilot} />
-    {kopilot.ocena
-      ? <span className="text-slate-500">
-        ocena: {kopilot.ocena === "trafna" ? "trafna" : "nietrafna"}</span>
-      : <>
-        <button type="button" title="Trafna" aria-label="Trafna" disabled={zapisuje}
+    {!kopilot.nieaktualna && <span className="text-slate-600">→ {NAZWA_AKCJI[kopilot.akcja]}</span>}
+    {!kopilot.nieaktualna && kopilot.brakDanychZamowienia
+      && <span className="rounded bg-amber-50 px-1 text-amber-800">brak zamówienia</span>}
+    {!kopilot.nieaktualna && kopilot.brakDanychProduktu
+      && <span className="rounded bg-amber-50 px-1 text-amber-800">brak danych towaru</span>}
+    {czlowiek
+      ? <span className="text-slate-500">{kopilot.kategoriaModelu && kopilot.kategoriaModelu !== czlowiek
+        ? `poprawione (Copilot: ${NAZWA_KATEGORII[kopilot.kategoriaModelu]})` : "potwierdzone"}</span>
+      /* Potwierdzać można tylko to, co powiedział MODEL. Decyzja bez modelu
+         (awaria, sam załącznik) ma „Inne" z urzędu — potwierdzenie go byłoby
+         etykietą bez treści. */
+      : kopilot.kategoriaModelu && !kopilot.nieaktualna
+        && <button type="button" title="Potwierdź kategorię" aria-label="Potwierdź kategorię"
+          disabled={zapisuje}
           className="rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
-          onClick={() => onOcen("trafna")}>
-          <ThumbsUp size={13} /></button>
-        <button type="button" title="Nietrafna" aria-label="Nietrafna" disabled={zapisuje}
-          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-ranga-zle"
-          onClick={() => onOcen("nietrafna")}>
-          <ThumbsDown size={13} /></button>
-      </>}
+          onClick={() => onPopraw(kopilot.kategoria)}>
+          <Check size={13} /></button>}
+    {!kopilot.nieaktualna && <select aria-label="Popraw kategorię" value="" disabled={zapisuje}
+      className="field w-auto py-0.5 text-xs"
+      onChange={(e) => { if (e.target.value) onPopraw(e.target.value as Kategoria); }}>
+      <option value="">{czlowiek ? "zmień…" : "popraw…"}</option>
+      {KATEGORIE.filter((k) => k !== kopilot.kategoria).map((k) =>
+        <option key={k} value={k}>{NAZWA_KATEGORII[k]}</option>)}
+    </select>}
   </span>;
 }

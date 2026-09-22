@@ -1,6 +1,6 @@
 import React from "react";
 import { Karta } from "../ui";
-import type { Kategoria, PomiarCopilota as Pomiar } from "../api/typy";
+import type { PomiarCopilota as Pomiar, Udzial } from "../api/typy";
 import { Liczba } from "./PokrycieSygnatur";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
@@ -12,9 +12,11 @@ import { NAZWA_KATEGORII } from "../skrzynka/statusy";
    liczbach. Dlatego pilnuje trzech rzeczy, których pojedynczy procent nie
    powiedziałby:
 
-   PIERWSZA: `n` i NIEOCENIONE stoją obok trafności. „100 % trafności" z dwóch
-   ocen nie jest pomiarem, a agenci oceniają raczej te klasyfikacje, które ich
-   zaskoczyły — próbka jest skrzywiona z założenia i ekran ma to powiedzieć.
+   PIERWSZA: `n`, przedział i NIEOZNACZONE stoją obok każdej precyzji
+   i czułości (specyfikacja z 20 września 2026: „counts and uncertainty
+   intervals"). Trzy trafienia na trzy to przedział 44–100 %, i dokładnie
+   tyle ta liczba wtedy wie. Agent częściej poprawia pomyłkę, niż potwierdza
+   trafienie — próbka jest skrzywiona z założenia i ekran ma to powiedzieć.
 
    DRUGA: udział cache. Minimalny cache'owalny prefiks zależy od modelu
    (512–4096 tokenów), a nasza instrukcja ma ich około ośmiuset. Cache może
@@ -22,6 +24,16 @@ import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
    TRZECIA: nieudane wywołania. One też kosztują, a klasyfikacji nie dają —
    licznik samych klasyfikacji zgubiłby dokładnie tę część rachunku.        */
+
+/**
+ * Udział jako „k z n · p % (dolna–górna %)". Bez `n` i przedziału procent
+ * udawałby pomiar; kreska znaczy „nie było z czego liczyć", nie zero.
+ */
+function udzial(u: Udzial | null): string {
+  if (!u) return "—";
+  const pr = (x: number) => Math.round(x * 100);
+  return `${u.k} z ${u.n} · ${pr(u.p)} % (${pr(u.dolna)}–${pr(u.gorna)} %)`;
+}
 
 /** Dolary na złotówki dla oka. Kurs orientacyjny — rachunek wystawia dostawca. */
 const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
@@ -54,13 +66,20 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
           prefiks instrukcji jest krótszy niż minimum modelu albo coś go rozbija.</span>}
     </p>
 
-    <p className="border-t p-4 text-sm text-slate-600">
-      Trafność: <b>{proc(dane.trafnych, dane.ocen)}</b> z {dane.ocen} ocen.
-      {" "}Nieocenionych: <b>{dane.nieocenionych}</b>.
-      {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
-      {dane.ocen < 50 && <span className="text-slate-500"> Poniżej pięćdziesięciu ocen
-        ta liczba jeszcze nic nie rozstrzyga.</span>}
-    </p>
+    {(() => {
+      const k = dane.klasyfikacja;
+      return <p className="border-t p-4 text-sm text-slate-600" aria-label="Decyzje klasyfikatora">
+        Decyzje (słownik {k.taksonomia}): <b>{k.decyzji}</b> — z modelu {k.wgZrodla.MODEL},
+        {" "}ze struktury Allegro {k.wgZrodla.ALLEGRO_MAPPING}, zastępczych {k.wgZrodla.FALLBACK}.
+        {" "}Nieudanych <b>{k.wgStatusu.FAILED ?? 0}</b>, do przejrzenia {k.wgStatusu.NEEDS_REVIEW ?? 0},
+        {" "}wymaga człowieka {k.wymagaCzlowieka}.
+        {" "}Etykiet człowieka: <b>{k.oznaczonych}</b> (w tym poprawek {k.poprawionych}),
+        {" "}bez etykiety: <b>{k.nieoznaczonych}</b>.
+        {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
+        {k.oznaczonych < 50 && <span className="text-slate-500"> Poniżej pięćdziesięciu etykiet
+          liczby niżej jeszcze nic nie rozstrzygają.</span>}
+      </p>;
+    })()}
 
     {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
         niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
@@ -89,16 +108,15 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
       </p>;
     })()}
 
-    {dane.wgKategorii.length > 0 && <div className="border-t p-4">
+    {dane.klasyfikacja.wgKategorii.length > 0 && <div className="border-t p-4">
       <table className="w-full text-sm">
         <thead><tr className="text-left text-xs uppercase text-slate-500">
-          <th className="pb-1">kategoria</th><th className="pb-1">rozmów</th>
-          <th className="pb-1">ocen</th><th className="pb-1">trafnych</th>
+          <th className="pb-1">kategoria</th><th className="pb-1">przewidzianych</th>
+          <th className="pb-1">precyzja</th><th className="pb-1">czułość</th>
         </tr></thead>
-        <tbody>{dane.wgKategorii.map((k) => <tr key={k.kategoria} className="border-t">
-          <td className="py-1">
-            {NAZWA_KATEGORII[k.kategoria as Kategoria] ?? k.kategoria}</td>
-          <td>{k.ile}</td><td>{k.ocen}</td><td>{proc(k.trafnych, k.ocen)}</td>
+        <tbody>{dane.klasyfikacja.wgKategorii.map((k) => <tr key={k.kategoria} className="border-t">
+          <td className="py-1">{NAZWA_KATEGORII[k.kategoria] ?? k.kategoria}</td>
+          <td>{k.przewidzianych}</td><td>{udzial(k.precyzja)}</td><td>{udzial(k.czulosc)}</td>
         </tr>)}</tbody>
       </table>
     </div>}

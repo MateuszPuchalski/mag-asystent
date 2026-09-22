@@ -15,7 +15,10 @@ import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
-import type { Kategoria, Pewnosc } from "./copilot-klasyfikacja.js";
+import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
+import type {
+  Akcja, Kategoria, Pewnosc, StatusDecyzji, Zrodlo,
+} from "./klasyfikacja-slownik.js";
 import { podzielStopke } from "./stopka.js";
 import { czyObrazZNazwy } from "./reklamacje.js";
 
@@ -75,7 +78,7 @@ export interface RozmowaSkrzynki {
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
   /* Rozpoznanie Copilota (§14, etap F). `null` znaczy „nierozpoznana" i liczy
-     się PRZY ODCZYCIE — brak wiersza w `klasyfikacja_rozmowy` niczego nie
+     się PRZY ODCZYCIE — brak wiersza w `decyzja_klasyfikacji` niczego nie
      wstawia, więc otwarcie kolejki dalej nic nie mutuje.
 
      `nieaktualna` liczy SERWER, tak samo jak `poTerminie`: reguła „klient
@@ -84,8 +87,25 @@ export interface RozmowaSkrzynki {
      agentowi, że etykieta dotyczy starszej wiadomości — milczenie o tym
      byłoby gorsze niż brak etykiety. */
   kopilot: {
-    kategoria: Kategoria; pewnosc: Pewnosc; nieaktualna: boolean;
-    ocena: "trafna" | "nietrafna" | null;
+    kategoria: Kategoria;
+    dodatkowe: Kategoria[];
+    akcja: Akcja;
+    /** Akcja modelu, gdy polityka zamieniła ją na przegląd. `null` = bez zmian. */
+    akcjaModelu: Akcja | null;
+    wymagaCzlowieka: boolean;
+    brakDanychZamowienia: boolean;
+    brakDanychProduktu: boolean;
+    /** Pewność ZGŁOSZONA przez model; `null` przy decyzji bez modelu. */
+    pewnosc: Pewnosc | null;
+    zrodlo: Zrodlo;
+    status: StatusDecyzji;
+    kody: string[];
+    uzasadnienie: string | null;
+    nieaktualna: boolean;
+    /** Kategoria, którą człowiek JAWNIE potwierdził albo wskazał. */
+    kategoriaCzlowieka: Kategoria | null;
+    /** Kategoria modelu — zostaje obok poprawki, żeby było widać, co poprawiono. */
+    kategoriaModelu: Kategoria | null;
   } | null;
   /* Kto SIEDZI przy rozmowie teraz — przydział tymczasowy, na czas oglądania.
      Nie ma go w bazie i nie ma prawa być (§6.3): po restarcie usługi rozmowa
@@ -295,20 +315,22 @@ const LISTA = `
                  WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
          COALESCE(d.status, 'not_started') AS dobor,
          kop.kategoria AS kopKategoria, kop.pewnosc AS kopPewnosc,
-         kop.ocena AS kopOcena,
+         kop.kategorie_dodatkowe AS kopDodatkowe, kop.akcja AS kopAkcja,
+         kop.akcja_modelu AS kopAkcjaModelu, kop.wymaga_czlowieka AS kopWymaga,
+         kop.brak_danych_zamowienia AS kopBrakZam, kop.brak_danych_produktu AS kopBrakProd,
+         kop.zrodlo AS kopZrodlo, kop.status AS kopStatus, kop.kody_polityki AS kopKody,
+         kop.uzasadnienie AS kopUzasadnienie, kop.kategoria_czlowieka AS kopCzlowiek,
+         kop.kategoria_modelu AS kopModel,
          -- Etykieta starzeje się sama: liczono ją na kop.message_id, a klient
-         -- dopisał nowszą. Podzapytanie jest CO DO ZNAKU tym samym, co WIERSZ
-         -- w copilot-klasyfikacja.ts. Rozejście się tych dwóch kwalifikacji
-         -- dałoby rozmowę wiecznie nieaktualną, klasyfikowaną w kółko przy
-         -- każdym kliknięciu i płaconą za każdym razem.
-         (kop.message_id IS NOT NULL AND kop.message_id <> (
-            SELECT m.id FROM message m WHERE m.conversation_id=c.id
-              AND m.direction='incoming' ORDER BY m.sent_at DESC, m.id DESC LIMIT 1
-         )) AS kopNieaktualna
+         -- dopisał nowszą. Wiadomość-cel bierze się ze WSPÓLNEGO fragmentu
+         -- CEL_KLASYFIKACJI (bez odwrotnych apostrofów: to wnętrze szablonu SQL)
+         -- — do 0.426 stała tu kopia „co do znaku", a rozjazd
+         -- dawał rozmowę wiecznie nieaktualną, płaconą przy każdym kliknięciu.
+         (kop.message_id IS NOT NULL AND kop.message_id <> ${CEL_KLASYFIKACJI}) AS kopNieaktualna
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
     LEFT JOIN dobor_rozmowy d ON d.conversation_id=c.id
-    LEFT JOIN klasyfikacja_rozmowy kop ON kop.conversation_id=c.id
+    LEFT JOIN decyzja_klasyfikacji kop ON kop.id = ${AKTYWNA_DECYZJA}
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
        ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
@@ -349,9 +371,21 @@ const naRozmowe = (
     poTerminie: String(w.status) === "snoozed" && minal,
     kopilot: w.kopKategoria == null ? null : {
       kategoria: String(w.kopKategoria) as Kategoria,
-      pewnosc: String(w.kopPewnosc) as Pewnosc,
+      dodatkowe: JSON.parse(String(w.kopDodatkowe ?? "[]")) as Kategoria[],
+      akcja: String(w.kopAkcja) as Akcja,
+      akcjaModelu: w.kopAkcjaModelu == null || w.kopAkcjaModelu === w.kopAkcja
+        ? null : String(w.kopAkcjaModelu) as Akcja,
+      wymagaCzlowieka: Boolean(Number(w.kopWymaga ?? 0)),
+      brakDanychZamowienia: Boolean(Number(w.kopBrakZam ?? 0)),
+      brakDanychProduktu: Boolean(Number(w.kopBrakProd ?? 0)),
+      pewnosc: w.kopPewnosc == null ? null : String(w.kopPewnosc) as Pewnosc,
+      zrodlo: String(w.kopZrodlo) as Zrodlo,
+      status: String(w.kopStatus) as StatusDecyzji,
+      kody: JSON.parse(String(w.kopKody ?? "[]")) as string[],
+      uzasadnienie: w.kopUzasadnienie == null ? null : String(w.kopUzasadnienie),
       nieaktualna: Boolean(Number(w.kopNieaktualna ?? 0)),
-      ocena: w.kopOcena == null ? null : (String(w.kopOcena) as "trafna" | "nietrafna"),
+      kategoriaCzlowieka: w.kopCzlowiek == null ? null : String(w.kopCzlowiek) as Kategoria,
+      kategoriaModelu: w.kopModel == null ? null : String(w.kopModel) as Kategoria,
     },
     oglada: trzymane.get(Number(w.id)) ?? null,
   };

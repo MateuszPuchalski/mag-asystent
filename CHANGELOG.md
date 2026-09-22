@@ -34,6 +34,67 @@ historii nie przepisujemy.
 ---
 
 
+## 0.428.0 — 22 września 2026
+
+**Klasyfikacja wiadomości według specyfikacji z 20 września: piętnaście
+kategorii, następny krok, trzy flagi potrzeb i decyzje z wersjami.**
+
+Właściciel przyniósł specyfikację „Allegro customer message classification
+with Jev" i zlecił lepszy klasyfikator. Rozstrzygnięcia z 22 września:
+silnikiem zostaje Claude, a Jev wpina się później tym samym nadawcą. Takt ma
+rozpoznawać każdą nową wiadomość klienta. Priorytetu 1–5 ze specyfikacji nie
+ma, bo kolejność kolejki stoi na faktach (§14.5).
+
+**Decyzja zamiast etykiety.** Słownik ośmiu kategorii z 0.191.0 ustąpił
+piętnastu ze specyfikacji (`services/klasyfikacja-slownik.ts`). Doszły
+kategorie dodatkowe, jeden następny krok z dwunastu i flagi „wymaga
+człowieka", „brak danych zamówienia" i „brak danych towaru".
+
+**Polityka po naszej stronie** (`klasyfikacja-polityka.ts`). Model proponuje,
+polityka rozstrzyga i każdą zmianę znaczy kodem. Prośba klienta o człowieka
+eskaluje zawsze. Niska pewność, sprzeczna odpowiedź i „Inne" z akcją idą do
+przejrzenia. Zwrot i reklamacja zostają ręczne. Walidacja enumów stoi
+w polityce, nie w adapterze — Jev przejdzie te same sita.
+
+**Kontekst to wątek, nie jedna wiadomość.** Samo „tak, to ten model" nie mówi
+nic bez pytania, na które odpowiada. Klasyfikacja idzie drogą szkicu: to samo
+maskowanie, ten sam sufit. Nagłówek z faktów mówi modelowi, czy jest
+zamówienie, oferta i załącznik. Polityka danych w `docs/obsluga-klienta.md`
+opisuje zmianę.
+
+**Decyzje mają wersje** (`decyzja_klasyfikacji`). Decyzja wisi przy
+wiadomości, więc dopisek klienta dostaje własną. Poprawka człowieka tworzy
+nową wersję zamiast nadpisać starą. Przy decyzji stoją wersje słownika,
+instrukcji i polityki, identyfikatory wiadomości ze skrótem wejścia i surowa
+odpowiedź modelu.
+
+**Nic nie ginie po cichu.** Awaria modelu i odpowiedź spoza słownika dają
+decyzję `FAILED` z akcją „do decyzji człowieka". Sam załącznik nie idzie do
+dostawcy i dostaje `NEEDS_REVIEW`. Limit, zły klucz, przeciążenie i brak
+sieci decyzji nie zapisują — rozmowa wraca w następnym przebiegu.
+
+**Poprawka zamiast kciuków.** „Nietrafna" nie mówiła, jak powinno być, więc
+czułości nie dało się policzyć. Agent potwierdza kategorię jednym kliknięciem
+albo wybiera właściwą z listy. Trasa `…/klasyfikacja/:id/korekta` zajęła
+miejsce trasy oceny, więc licznik tras zapisu Copilota stoi na siedmiu.
+Karta pomiaru podaje precyzję i czułość każdej kategorii z przedziałem
+Wilsona oraz liczbę decyzji bez etykiety.
+
+**Takt** (`services/klasyfikacja-auto.ts`, wyłączony domyślnie). Włącza go
+`COPILOT_AUTO_KLASYFIKACJA=1`; hamulce na przebieg i na godzinę liczą się
+z księgi, a okno siedmiu dni chroni przed przerabianiem historii. Decyzji
+`FAILED` takt nie ponawia.
+
+- **[wymaga działania]** Przebuduj panel (`npm run build` w korzeniu).
+- **[wymaga działania]** Takt włącza się linią w `wertis.env` — patrz `DEPLOY.md`.
+- Tabela `klasyfikacja_rozmowy` znika; jej wiersze zostają jako nieaktywna
+  historia słownika v1. Po aktualizacji plakietek nie ma, dopóki rozmowy nie
+  zostaną rozpoznane w nowym słowniku.
+
+Czego to wydanie nie robi: nie czyta typu i podtypu wątku z `beta.v1` i nie
+zmienia drogi szkicu ani wysyłki. Oba punkty specyfikacji czekają na osobne
+przyrosty.
+
 ## 0.427.0 — 22 września 2026
 
 **Biuro przeprojektowane pod dekalog, nie pod urodę.** Każda zmiana nazywa

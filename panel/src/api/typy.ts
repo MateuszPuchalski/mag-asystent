@@ -62,22 +62,46 @@ export type Rozmowa = {
   oglada: { userId: number; name: string } | null;
 };
 
-/* Słownik kategorii — LUSTRO stałej `KATEGORIE` z serwera. Dwa kosze, bo mówią
-   o dwóch różnych naprawach: `inne` znaczy „słownik jest za krótki”,
-   `nie_wiadomo` — „za mało treści, przeczytaj sam”. */
+/* Słownik kategorii — LUSTRO `KATEGORIE` z `server/src/services/klasyfikacja-slownik.ts`
+   (specyfikacja z 20 września 2026). Wartości po angielsku, bo to kontrakt
+   niezależny od dostawcy; nazwy po polsku stoją w `skrzynka/statusy.ts`
+   i `Record<Kategoria, string>` nie skompiluje się bez kompletu. */
 export type Kategoria =
-  | "dobor" | "dostepnosc" | "wysylka" | "zwrot" | "reklamacja" | "dokumenty"
-  | "inne" | "nie_wiadomo";
+  | "ORDER_STATUS" | "DELIVERY_DELAY" | "DELIVERY_LOST" | "DELIVERY_DAMAGED"
+  | "PRODUCT_COMPATIBILITY" | "PRODUCT_QUESTION" | "PRODUCT_AVAILABILITY"
+  | "WRONG_PRODUCT" | "MISSING_PRODUCT" | "DAMAGED_PRODUCT"
+  | "RETURN" | "COMPLAINT" | "CANCEL_ORDER" | "INVOICE" | "OTHER";
+
+/** Następny krok — podpowiedź, nie pozwolenie. Panel żadnej akcji sam nie wykonuje. */
+export type Akcja =
+  | "GET_ORDER" | "GET_SHIPMENT" | "GET_PRODUCT" | "CHECK_COMPATIBILITY" | "CHECK_STOCK"
+  | "START_RETURN" | "START_COMPLAINT" | "ASK_FOR_MACHINE_MODEL" | "ASK_FOR_PART_NUMBER"
+  | "ASK_FOR_PHOTO" | "HUMAN_REVIEW" | "NO_ACTION";
 
 export type Pewnosc = "wysoka" | "srednia" | "niska";
 
 export type Kopilot = {
   kategoria: Kategoria;
-  pewnosc: Pewnosc;
+  dodatkowe: Kategoria[];
+  akcja: Akcja;
+  /** Akcja modelu, gdy polityka zamieniła ją na przegląd. `null` = bez zmian. */
+  akcjaModelu: Akcja | null;
+  /** Specyfikacyjne `needsHuman`: model, prośba klienta, niepewność albo awaria. */
+  wymagaCzlowieka: boolean;
+  brakDanychZamowienia: boolean;
+  brakDanychProduktu: boolean;
+  /** Pewność ZGŁOSZONA przez model; `null`, gdy modelu nie pytano. */
+  pewnosc: Pewnosc | null;
+  zrodlo: "ALLEGRO_MAPPING" | "MODEL" | "FALLBACK";
+  status: "SUCCESS" | "FAILED" | "NEEDS_REVIEW";
+  /** Reguły, które coś zmieniły. Zbiór otwarty — nieznany kod ekran pokazuje wprost. */
+  kody: string[];
+  uzasadnienie: string | null;
   /** Klient dopisał po rozpoznaniu. Liczy SERWER — panel tej reguły nie powtarza. */
   nieaktualna: boolean;
-  /** Werdykt człowieka. To on, a nie liczba klasyfikacji, jest pomiarem. */
-  ocena: "trafna" | "nietrafna" | null;
+  /** Kategoria, którą człowiek JAWNIE potwierdził albo wskazał. To ona jest pomiarem. */
+  kategoriaCzlowieka: Kategoria | null;
+  kategoriaModelu: Kategoria | null;
 };
 
 /** Stan Copilota do paska nad kolejką. Czysty odczyt — nic nie mutuje. */
@@ -100,6 +124,23 @@ export type WynikPartii = {
   };
 };
 
+/** Udział z przedziałem Wilsona 95 %. Liczy SERWER. */
+export type Udzial = { k: number; n: number; p: number; dolna: number; gorna: number };
+
+export type PomiarKlasyfikacji = {
+  taksonomia: string;
+  decyzji: number;
+  wgZrodla: Record<Kopilot["zrodlo"], number>;
+  wgStatusu: Record<string, number>;
+  wymagaCzlowieka: number;
+  oznaczonych: number;
+  /** Bez tej liczby każdy procent udawałby pomiar. */
+  nieoznaczonych: number;
+  poprawionych: number;
+  wgKategorii: Array<{ kategoria: Kategoria; przewidzianych: number;
+    precyzja: Udzial | null; czulosc: Udzial | null }>;
+};
+
 /** Pomiar zza zębatki (0.168.0: diagnostyka nie stoi na ekranie pracy). */
 export type PomiarCopilota = {
   wywolan: number;
@@ -107,11 +148,8 @@ export type PomiarCopilota = {
   tokeny: { wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number };
   kosztUsd: number;
   udzialCache: number | null;
-  ocen: number;
-  trafnych: number;
-  /** Bez tej liczby „100 % trafności” z dwóch ocen udawałoby pomiar. */
-  nieocenionych: number;
-  wgKategorii: Array<{ kategoria: string; ile: number; ocen: number; trafnych: number }>;
+  /** Klasyfikacja w kształcie specyfikacji — precyzja i czułość per klasa. */
+  klasyfikacja: PomiarKlasyfikacji;
   /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
   szkice: {

@@ -2578,6 +2578,40 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.428.0 — klasyfikacja według specyfikacji
+
+**Migracja przenosi stare etykiety sama. Panel trzeba przebudować.** Tabela
+`klasyfikacja_rozmowy` znika, a jej wiersze przechodzą do
+`decyzja_klasyfikacji` jako nieaktywna historia. Kto chce mieć stare etykiety
+w pierwotnym kształcie, robi kopię bazy PRZED aktualizacją.
+
+Po aktualizacji wszystkie rozmowy są nierozpoznane w nowym słowniku. Plakietki
+wracają dopiero po przycisku nad kolejką albo po włączeniu taktu. To jest
+zamierzone: etykieta z ośmiu kategorii nie jest ani trafieniem, ani pudłem
+wobec piętnastu.
+
+**[wymaga działania] Rozpoznanie każdej nowej wiadomości włącza jedna linia:**
+
+```
+export COPILOT_AUTO_KLASYFIKACJA=1
+```
+
+Wymaga `COPILOT_MODE=anthropic` z kluczem, tak samo jak szkic z taktu. Takt
+bierze ostatnią wiadomość klienta z każdej rozmowy z ostatnich siedmiu dni.
+Hamulce: dziesięć rozmów na przebieg i sześćdziesiąt wywołań na godzinę,
+liczonych z księgi razem z błędami. Zmieniają je `COPILOT_AUTO_KLASYFIKACJA_NA_PRZEBIEG`
+i `COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE`; okno zmienia `COPILOT_KLASYFIKACJA_OKNO_DNI`.
+
+**Do dostawcy idzie teraz cały wątek rozmowy, nie ostatnia wiadomość.**
+Maskowanie i sufit są te same co przy szkicu. Pojedyncze rozpoznanie
+kosztuje więc więcej niż w 0.191.0. Wiadomość z samym załącznikiem nie
+wychodzi wcale.
+
+Sprawdzenie na żywym koncie idzie tak. Rozpoznaj jedną rozmowę przyciskiem
+i otwórz ją. Nad osią ma stać plakietka z nazwą kategorii i następnym krokiem,
+a obok przycisk „Potwierdź" i lista „popraw…". Po pierwszej godzinie taktu
+zajrzyj na kartę „Copilot" w ustawieniach i porównaj rachunek z oczekiwanym.
+
 ### Aktualizacja do 0.341.0 — nic nie czeka na kliknięcie
 
 **Migracji nie ma. Panel trzeba przebudować. Przełącznika nie ma** i to jest

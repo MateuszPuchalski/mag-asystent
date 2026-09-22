@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { OcenaKategorii, PasekCopilota, ZnakCopilota, doRozpoznania } from "./Copilot";
+import { EtykietaKategorii, PasekCopilota, ZnakCopilota, doRozpoznania } from "./Copilot";
 import type { Kopilot, Rozmowa, StanCopilota } from "../api/typy";
 
 /* Trzy rzeczy, po których poznaje się, że pasek nadaje się do hali biurowej:
@@ -19,7 +19,10 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
 });
 
 const kopilot = (n: Partial<Kopilot> = {}): Kopilot => ({
-  kategoria: "dostepnosc", pewnosc: "wysoka", nieaktualna: false, ocena: null, ...n,
+  kategoria: "PRODUCT_AVAILABILITY", dodatkowe: [], akcja: "CHECK_STOCK", akcjaModelu: null,
+  wymagaCzlowieka: false, brakDanychZamowienia: false, brakDanychProduktu: false,
+  pewnosc: "wysoka", zrodlo: "MODEL", status: "SUCCESS", kody: [], uzasadnienie: null,
+  nieaktualna: false, kategoriaCzlowieka: null, kategoriaModelu: "PRODUCT_AVAILABILITY", ...n,
 });
 
 const WLACZONY: StanCopilota = {
@@ -27,16 +30,18 @@ const WLACZONY: StanCopilota = {
 };
 
 describe("pasek Copilota nad kolejką", () => {
-  it("do partii idą nierozpoznane ORAZ te z etykietą po dopisku klienta", () => {
+  it("do partii idą nierozpoznane, z etykietą po dopisku klienta i nieudane", () => {
     const lista = [
       rozmowa({ id: 1 }),
       rozmowa({ id: 2, kopilot: kopilot() }),
       rozmowa({ id: 3, kopilot: kopilot({ nieaktualna: true }) }),
-      /* `nie_wiadomo` NIE wraca do partii: wiersz w bazie istnieje, więc
+      /* „Inne" do przejrzenia NIE wraca do partii: decyzja istnieje, więc
          drugie kliknięcie byłoby drugą zapłatą za tę samą odpowiedź. */
-      rozmowa({ id: 4, kopilot: kopilot({ kategoria: "nie_wiadomo" }) }),
+      rozmowa({ id: 4, kopilot: kopilot({ kategoria: "OTHER", status: "NEEDS_REVIEW" }) }),
+      /* FAILED wraca — takt go nie ponawia, więc ponawia człowiek. */
+      rozmowa({ id: 5, kopilot: kopilot({ kategoria: "OTHER", status: "FAILED", zrodlo: "FALLBACK" }) }),
     ];
-    expect(doRozpoznania(lista).map((r) => r.id)).toEqual([1, 3]);
+    expect(doRozpoznania(lista).map((r) => r.id)).toEqual([1, 3, 5]);
   });
 
   it("przycisk niesie LICZBĘ, a potwierdzenie mówi, że to kosztuje", async () => {
@@ -129,31 +134,65 @@ describe("pasek Copilota nad kolejką", () => {
   });
 });
 
-describe("plakietka i werdykt człowieka", () => {
-  it("etykieta ze starszej wiadomości jest PRZYGASZONA i mówi dlaczego", () => {
-    const { container } = render(<OcenaKategorii onOcen={vi.fn()}
+describe("plakietka i etykieta człowieka", () => {
+  it("etykieta ze starszej wiadomości jest PRZYGASZONA, mówi dlaczego i nie daje się poprawiać", () => {
+    const { container } = render(<EtykietaKategorii onPopraw={vi.fn()}
       kopilot={kopilot({ nieaktualna: true })} />);
     const plakietka = container.querySelector("[title]") as HTMLElement;
     expect(plakietka.getAttribute("title")).toMatch(/starszą wiadomość/);
-    /* slate-600 od 0.255.0. Ta plakietka siedzi na `bg-slate-100`, a tam nawet
-       slate-500 daje 4.34:1 przy progu 4.5 — to jedyne miejsce w panelu, które
-       wymaga aż slate-600. Przygaszenie ZOSTAJE: świeża etykieta jest fioletowa
-       i nadal wygląda inaczej, co pilnuje test niżej. */
+    /* slate-600 od 0.255.0: na `bg-slate-100` nawet slate-500 daje 4.34:1
+       przy progu 4.5. Świeża etykieta jest fioletowa — pilnuje test niżej. */
     expect(plakietka.className).toContain("text-slate-600");
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it("świeża etykieta jest wyraźna, a dwa kciuki są jedynym pomiarem", async () => {
-    const onOcen = vi.fn();
-    const { container } = render(<OcenaKategorii kopilot={kopilot()} onOcen={onOcen} />);
-    expect((container.querySelector("[title]") as HTMLElement).className)
-      .toContain("text-violet-800");
-    await userEvent.click(screen.getByRole("button", { name: "Nietrafna" }));
-    expect(onOcen).toHaveBeenCalledWith("nietrafna");
+  it("świeża etykieta jest wyraźna i niesie następny krok", () => {
+    const { container } = render(<EtykietaKategorii kopilot={kopilot()} onPopraw={vi.fn()} />);
+    expect((container.querySelector("[title]") as HTMLElement).className).toContain("text-violet-800");
+    expect(screen.getByText(/sprawdź stan/)).toBeTruthy();
   });
 
-  it("po ocenie kciuków nie ma — ocena zostaje, bo to ona jest pomiarem", () => {
-    render(<OcenaKategorii kopilot={kopilot({ ocena: "nietrafna" })} onOcen={vi.fn()} />);
-    expect(screen.queryByRole("button")).toBeNull();
-    expect(screen.getByText(/ocena: nietrafna/)).toBeTruthy();
+  it("potwierdzenie to jedno kliknięcie i wysyła kategorię modelu", async () => {
+    const onPopraw = vi.fn();
+    render(<EtykietaKategorii kopilot={kopilot()} onPopraw={onPopraw} />);
+    await userEvent.click(screen.getByRole("button", { name: "Potwierdź kategorię" }));
+    expect(onPopraw).toHaveBeenCalledWith("PRODUCT_AVAILABILITY");
+  });
+
+  it("poprawka to jeden wybór z listy i mówi, JAK powinno być", async () => {
+    const onPopraw = vi.fn();
+    render(<EtykietaKategorii kopilot={kopilot()} onPopraw={onPopraw} />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Popraw kategorię" }), "WRONG_PRODUCT");
+    expect(onPopraw).toHaveBeenCalledWith("WRONG_PRODUCT");
+  });
+
+  it("po poprawce widać, co powiedział Copilot, a potwierdzenia już nie ma", () => {
+    render(<EtykietaKategorii onPopraw={vi.fn()} kopilot={kopilot({
+      kategoria: "WRONG_PRODUCT", kategoriaCzlowieka: "WRONG_PRODUCT" })} />);
+    expect(screen.queryByRole("button", { name: "Potwierdź kategorię" })).toBeNull();
+    expect(screen.getByText(/poprawione \(Copilot: Dostępność\)/)).toBeTruthy();
+  });
+
+  it("wymaga człowieka: ludzik przy plakietce, powód w dymku", () => {
+    const { container } = render(<EtykietaKategorii onPopraw={vi.fn()} kopilot={kopilot({
+      wymagaCzlowieka: true, kody: ["PROSBA_O_CZLOWIEKA"], akcja: "HUMAN_REVIEW" })} />);
+    expect(screen.getByLabelText("wymaga człowieka")).toBeTruthy();
+    expect((container.querySelector("[title]") as HTMLElement).getAttribute("title"))
+      .toMatch(/klient prosi o człowieka/);
+  });
+
+  it("decyzji bez modelu nie da się „potwierdzić” — wolno tylko wskazać kategorię", () => {
+    render(<EtykietaKategorii onPopraw={vi.fn()} kopilot={kopilot({
+      kategoria: "OTHER", kategoriaModelu: null, zrodlo: "FALLBACK", status: "FAILED",
+      pewnosc: null, kody: ["BLAD_MODELU"] })} />);
+    expect(screen.queryByRole("button", { name: "Potwierdź kategorię" })).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Popraw kategorię" })).toBeTruthy();
+  });
+
+  it("braki danych stoją obok plakietki — od nich agent zaczyna", () => {
+    render(<EtykietaKategorii onPopraw={vi.fn()} kopilot={kopilot({
+      brakDanychZamowienia: true, brakDanychProduktu: true })} />);
+    expect(screen.getByText("brak zamówienia")).toBeTruthy();
+    expect(screen.getByText("brak danych towaru")).toBeTruthy();
   });
 });

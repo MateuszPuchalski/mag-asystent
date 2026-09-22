@@ -3,7 +3,7 @@ import { sesjaZadania, subiekt } from "../context.js";
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import {
-  ocenKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
+  poprawKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
 import {
   nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
@@ -20,7 +20,8 @@ import {
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
    SIEDEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
-   werdykt człowieka o jej trafności, szkic odpowiedzi (0.231.0), werdykt
+   etykieta człowieka o jej kategorii (do 22 września 2026 werdykt
+   „trafna/nietrafna"), szkic odpowiedzi (0.231.0), werdykt
    o szkicu, los danych doboru z rozmowy (przyrost trzeci) i los pasowania
    z rozmowy (przyrost czwarty). Werdykty wyglądają na drobiazg, a bez nich
    nie da się policzyć, CZY Copilot jest dobry — czyli nie da się podjąć
@@ -142,16 +143,26 @@ export async function copilotRoutes(app: FastifyInstance) {
       /* Partia przerwana limitem oddaje 200 z wypełnionym `przerwane`, NIE
          błąd: część rozmów została rozpoznana i zapłacona, a kod błędu kazałby
          ekranowi wyrzucić wynik, za który już zapłaciliśmy. */
-      return await sklasyfikujRozmowy(db(), ids, kto(), nadawcaAnthropic);
+      /* `ponowNieudane`: kliknięcie człowieka to jawne ponowienie decyzji
+         FAILED i tworzy jej nową wersję. Takt tego nie robi — patrz serwis. */
+      return await sklasyfikujRozmowy(db(), ids, kto(), nadawcaAnthropic, new Date(),
+        { ponowNieudane: true });
     });
 
-  /** Werdykt człowieka o propozycji maszyny — bez niego nie ma trafności. */
-  app.post<{ Params: { id: string }; Body: { ocena?: string } }>(
-    "/api/obsluga/copilot/klasyfikacja/:id/ocena", async (req, reply) => {
+  /**
+   * Etykieta człowieka: potwierdzenie albo poprawka kategorii (22 września
+   * 2026). Zastępuje werdykt „trafna/nietrafna" i zajmuje JEGO miejsce
+   * w umowie tras — licznik zapisu się nie zmienia. Tamten werdykt mówił, że
+   * model się pomylił, ale nie jak powinno być, więc czułości żadnej kategorii
+   * nie dało się z niego policzyć.
+   */
+  app.post<{ Params: { id: string }; Body: { kategoria?: string; powod?: string } }>(
+    "/api/obsluga/copilot/klasyfikacja/:id/korekta", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        return ocenKlasyfikacje(db(), Number(req.params.id), req.body?.ocena ?? "", kto());
+        return poprawKlasyfikacje(db(), Number(req.params.id), String(req.body?.kategoria ?? ""),
+          req.body?.powod ?? null, kto());
       } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }
