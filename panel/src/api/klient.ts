@@ -6,6 +6,20 @@ const KLUCZ = "wertis-panel-token";
 /** Sesja wygasła albo jej nie ma — ekran ma wrócić do logowania, nie do błędu. */
 export class BrakSesji extends Error {}
 
+/* ── SESJA WYGASŁA W TRAKCIE PRACY (0.431.0) ────────────────────────────────
+   Do tej wersji 401 kończyło się na `BrakSesji` i niczym więcej: react-query
+   przestawał ponawiać, a ekran zostawał z pustymi kolumnami i starym
+   nagłówkiem. Człowiek nie dostawał formularza logowania, dopóki sam nie
+   odświeżył strony. Zdarzenie niesie tę wiadomość do ramy panelu, która
+   jedyna wie, jak wrócić do logowania — klient HTTP nie zna Reacta i nie
+   powinien. */
+export const SESJA_WYGASLA = "wertis:sesja-wygasla";
+
+/** Każdy błąd zapytania i mutacji przechodzi tędy; reaguje wyłącznie `BrakSesji`. */
+export function zglosBrakSesji(blad: unknown): void {
+  if (blad instanceof BrakSesji) window.dispatchEvent(new Event(SESJA_WYGASLA));
+}
+
 /** Konflikt wersji (409). Szczegóły rysują ekran, więc jadą dalej w całości. */
 export class Konflikt extends Error {
   constructor(message: string, public readonly szczegoly: Record<string, unknown>) {

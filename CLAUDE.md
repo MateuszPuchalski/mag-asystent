@@ -9,7 +9,7 @@ z niego widok po widoku), kolektor Android (`android/`). Architektura i decyzje:
 
 - **Komentarze po polsku i wyjaśniają DLACZEGO**, nie co robi następna linia.
   Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
-- **Jeden front: `panel/`.** Od 0.427.1, decyzją właściciela z
+- **Jeden front: `panel/`.** Od 0.431.0, decyzją właściciela z
   `docs/obsluga-klienta.md` §7, całe biuro przechodzi do `panel/` (React +
   Vite, build do `dist/web/obsluga`). `biuro.html` nie dostaje NICZEGO nowego:
   jego widoki przechodzą do panelu jeden po drugim i znikają z pliku w tym

@@ -34,6 +34,68 @@ historii nie przepisujemy.
 ---
 
 
+## 0.431.0 — 22 września 2026
+
+**Decyzja właściciela: jeden front, i jego pierwszy krok.** Całe biuro
+przechodzi do panelu pod `/obsluga`, a `biuro.html` znika widok po widoku.
+To wydanie zapisuje decyzję, rysuje cel i stawia fundament: nagłówek, bramkę
+roli i poprawki z audytu.
+
+Audyt biura po 0.427.0 pokazał, że `biuro.html` nie jest podglądem. Ma
+dwadzieścia dwa zapisy w sześciu widokach, a pracują w nim ci sami ludzie co
+w panelu obsługi. Uzasadnienie, koszt i kolejność sześciu wydań stoją w
+`docs/obsluga-klienta.md` §7. Reguła „Dwa fronty" w `CLAUDE.md` stała się
+regułą „Jeden front": `biuro.html` nie dostaje już niczego nowego.
+
+**Cel biura zapisany wprost.** Biuro rozstrzyga to, czego hala nie rozstrzygnie
+sama — w drodze towaru przez magazyn. Reszta jest nadzorem albo ustawieniem.
+Ekrany w panelu układa test tego celu: praca na górnym rzędzie, wgląd na dolnym,
+ustawienia za zębatką.
+
+**Makiety w `docs/projekt-widokow-jeden-front/`.** Jedenaście plansz: DO DECYZJI
+jako ekran startowy, dostawy, kosze, stan systemu, analiza w dwóch rolach,
+ustawienia, dziennik, nagłówek w dwóch szerokościach i konto bez dostępu.
+Plansze zbudowano od zera w gramatyce panelu: kolejka, sprawa i dowody jak
+w Zwrotach, lista jak w Moje.
+
+**Nagłówek panelu ma dwa rzędy.** Górny to dotychczasowe zakładki pracy.
+Dolny prowadzi do ekranów, które jeszcze mieszkają w biurze: Dostawy, Kosze,
+Stan systemu, Dziennik, Analiza. Klik otwiera `/biuro` już zalogowane, na
+właściwym widoku — panel przekazuje sesję przez `localStorage`, bo oba fronty
+mają jeden adres. Strzałka przy nazwie mówi, że to inny ekran. Pigułka
+synchronizacji, zębatka i wylogowanie zeszły na prawo dolnego rzędu.
+Zmierzone w Chromium: nagłówek ma 117 px, żaden rząd nie wystaje przy 1180
+ani przy 1440 px.
+
+**Magazynier nie wchodzi do panelu.** Dostaje ekran „brak dostępu do biura"
+z przyciskiem wylogowania. Kolejki obsługi i tak nie są jego pracą.
+
+**Wygasła sesja wraca do logowania.** Każde 401 z zapytania albo mutacji
+zdejmuje token i pokazuje ekran logowania. Dotąd nic tam nie prowadziło.
+
+**Czcionki jadą w paczce panelu.** Barlow ładował się z `/biuro/fonty`, więc
+panel zależał od pliku, który ma zniknąć. Trasa biura zostaje do ostatniego
+wydania przeprowadzki.
+
+**Poprawki z audytu, każda z testem:**
+
+- **Raport wydajności per osoba widzi tylko admin.** Biuro dostaje w ANALIZIE
+  `wydajnosc: null` i CSV bez tej sekcji. Trasa `/api/wydajnosc` zniknęła —
+  nikt jej nie wołał, a odpowiadała magazynierowi 200.
+- **Resync z Subiekta i odświeżenie zdjęć wymagają roli biura albo admina.**
+  Dotąd stały za samą sesją, więc pełny import mógł wywołać kolektor.
+- **Ponowienie i anulowanie zapisu z kolejki trafia do dziennika.** Dotąd były
+  jedynymi mutacjami bez `logEvent`.
+
+**Nowy strażnik: każdy adres wołany z `panel/src/api/*.ts` ma trasę.** Czyta
+drzewo tras Fastify, niczego nie wywołuje. Przy pierwszym przebiegu złapał
+martwy hak `useProwadziZwrot`, który wołał trasę usuniętą w 0.370.0 — hak
+zniknął.
+
+**Trzy zdania dokumentacji przestały kłamać.** `docs/architektura.md` mówiło
+„zero zapisu", README — że jedynym zapisem biura jest zdjęcie dostawy z listy.
+README kierowało też reguły strefy do ANALIZY, a mieszkają w USTAWIENIACH.
+
 ## 0.430.0 — 22 września 2026
 
 **Szkic dostaje rozpoznanie, a wysyłka mierzy los szkicu i sama domyka

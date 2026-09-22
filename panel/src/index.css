@@ -2,8 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face { font-family: Barlow; src: url('/biuro/fonty/barlow_regular.ttf'); }
-@font-face { font-family: Barlow; src: url('/biuro/fonty/barlow_bold.ttf'); font-weight: 700; }
+/* FONT JEDZIE Z PANELEM (0.431.0). Do tej wersji panel pożyczał Barlow
+   z trasy `/biuro/fonty/`, czyli ze starego frontu, który właśnie znika
+   (`docs/obsluga-klienta.md` §7). Vite haszuje pliki do `assets/` jak resztę,
+   a serwer deweloperski wreszcie je widzi — komentarz przy pomiarze cyfr
+   w `ui/FiltrSegmentowy.test.tsx` opisywał brak właśnie tego. */
+@font-face { font-family: Barlow; src: url('./fonty/barlow_regular.ttf'); }
+@font-face { font-family: Barlow; src: url('./fonty/barlow_bold.ttf'); font-weight: 700; }
 
 @layer base {
   body { @apply m-0 bg-slate-100 font-sans text-slate-900; }

@@ -291,7 +291,7 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > **Gdzie stoi granica.** Magazyn zostaje w `biuro.html`; przepisywanie go nie
 > jest częścią tej decyzji. Trzeciego frontu nie ma.
 
-> **Zmiana z 0.427.1: jeden front.** Decyzja właściciela po audycie biura
+> **Zmiana z 0.431.0: jeden front.** Decyzja właściciela po audycie biura
 > z 0.427.0. Całe biuro przechodzi do `panel/`, a `biuro.html` znika widok po
 > widoku. Granica z akapitu wyżej przestaje obowiązywać.
 >

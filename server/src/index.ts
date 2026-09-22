@@ -2,7 +2,8 @@ import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
 import { config, envFile } from "./config.js";
 import { problemPrzykrytejKonfiguracji } from "./env-file.js";
-import { withRequestContext } from "./context.js";
+import { withRequestContext, sesjaZadania } from "./context.js";
+import { autoryzuj } from "./services/auth.js";
 import { db } from "./db/db.js";
 import { productRoutes } from "./routes/products.js";
 import { queueRoutes } from "./routes/queue.js";
@@ -351,12 +352,25 @@ export async function buildApp() {
     };
   });
 
+  /* Bramka operacji ratunkowych (0.431.0). Do tej wersji obie trasy niżej
+     stały za samą sesją, więc pełny import z Subiekta mógł wywołać każdy
+     zalogowany — także kolektor. `autoryzuj` zostawia w dzienniku ślad
+     `privileged`, bo resync na produkcji to zdarzenie, o które ktoś zapyta. */
+  const odmowaRatunku = (): { kod: number; error: string } | null => {
+    const s = sesjaZadania();
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
+    const w = autoryzuj(s.user, "ratunek_serwera");
+    return w.ok ? null : { kod: 403, error: w.powod ?? "Brak uprawnień" };
+  };
+
   /* Wymuszenie ponownego pytania o zdjęcia, których wcześniej nie było.
      Zdjęcie dodane w Subiekcie pojawia się samo po ZDJECIA_BRAK_TTL_H, ale
      przy wdrożeniu i przy sprawdzaniu „czy już działa" nikt nie będzie czekał
      kilkunastu godzin. Kolektor ma własną dobową pamięć braku — po tym
      wywołaniu zobaczy zdjęcie najdalej nazajutrz, a nie po tygodniu. */
   app.post("/api/admin/zdjecia/odswiez", async (_req, reply) => {
+    const nie = odmowaRatunku();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
     if (config.zdjecia.zrodlo === "") {
       return reply.code(400).send({ error: "Zdjęcia są wyłączone (ZDJECIA_ZRODLO puste)" });
     }
@@ -365,6 +379,8 @@ export async function buildApp() {
 
   // wymuszenie odświeżenia read-modelu (mssql): np. po przyjęciu dostawy w Subiekcie
   app.post("/api/admin/resync", async (_req, reply) => {
+    const nie = odmowaRatunku();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
     if (config.sgtMode !== "mssql") {
       return reply.code(400).send({ error: "resync dostępny tylko w SGT_MODE=mssql" });
     }

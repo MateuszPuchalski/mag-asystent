@@ -82,6 +82,9 @@ const MIME: Record<string, string> = {
      `assets/` razem z resztą, więc bez tego wpisu wyszłaby jako strumień
      bajtów i przeglądarka nie narysowałaby jej w pasku. */
   ".webp": "image/webp",
+  /* Barlow jedzie z panelem od 0.431.0 — wcześniej panel brał go z trasy
+     starego biura. Bez typu przeglądarka odrzuca font podany jako strumień. */
+  ".ttf": "font/ttf",
 };
 
 /** Osobny frontend ma własny build, ale nadal serwuje go ten sam proces i origin. */

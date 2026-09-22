@@ -902,23 +902,7 @@ export function useRozjazdyZwrotow() {
   });
 }
 
-/**
- * „Biorę to" — PRZEŁĄCZNIK, jedna trasa w obie strony (0.315.0).
- *
- * Serwer rozstrzyga po tożsamości, czy kliknięcie bierze sprawę, czy oddaje:
- * panel, który by to liczył u siebie, musiałby znać cudze konto i mylił się
- * przy imiennikach. Ten sam wzorzec co przy reklamacji od 0.278.0.
- */
-export function useProwadziZwrot() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; wersja: number }) =>
-      api<{ prowadzi: string | null; prowadziAt: string | null; wersja: number }>(
-        `/api/obsluga/zwroty/${v.id}/prowadzi`,
-        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
-    onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
-    },
-  });
-}
+/* `useProwadziZwrot` ZNIKNĄŁ w 0.431.0. Wołał `POST /api/obsluga/zwroty/:id/prowadzi`,
+   którą serwer skasował w 0.370.0 razem z prowadzącym przy zwrocie — powód
+   stoi w `server/src/routes/zwroty.ts`. Hooka nikt już nie używał, a jego
+   adres bez trasy znalazł strażnik `routes/panel-adresy.test.ts`. */

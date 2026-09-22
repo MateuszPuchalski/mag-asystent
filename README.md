@@ -536,7 +536,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   alert. Ustawienie i szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
 **Biuro pod `/biuro` — w przeprowadzce do panelu**
-- Od 0.427.1 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
+- Od 0.431.0 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
   Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Opis niżej mówi
   o tym, co jeszcze stoi w `biuro.html`.
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
@@ -607,7 +607,8 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   dostaje tu odmowę zamiast danych.
 - **Kolejki się stąd nie ponawia i wydajności per osoba tu nie ma.** Pierwsze
   jest zapisem do Subiekta i zostaje na kolektorze, drugie jest monitoringiem
-  pracowniczym (Kodeks pracy art. 22²) i zostaje pod `GET /api/wydajnosc`.
+  pracowniczym (Kodeks pracy art. 22²). Od 0.431.0 widzi je wyłącznie admin,
+  w ANALIZIE; osobna trasa `/api/wydajnosc` zniknęła.
 
 ## Struktura repo
 

@@ -102,8 +102,8 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
-**Biuro przechodzi do panelu (0.427.1).** Poniżej historia `/biuro` tak, jak
-powstawało. Od 0.427.1 obowiązuje jeden front, decyzją właściciela z
+**Biuro przechodzi do panelu (0.431.0).** Poniżej historia `/biuro` tak, jak
+powstawało. Od 0.431.0 obowiązuje jeden front, decyzją właściciela z
 `docs/obsluga-klienta.md` §7, a `biuro.html` znika widok po widoku. Zdanie
 „zero frameworka, zero zapisu" przestało być prawdą dużo wcześniej: audyt
 0.427.0 policzył w biurze dwadzieścia dwa zapisy. Z tamtej reguły został jej
@@ -609,7 +609,7 @@ w odróżnieniu od zgadywania po podobieństwie.
 |---|---|---|
 | Cztery liczby | `GET /api/metrics` | dotknięcia/pozycję, p95 skanu, etykiety do przedruku, towary bez czytelnego kodu |
 | Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
-| Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
+| Wydajność per osoba | `GET /api/analiza`, pole `wydajnosc` — tylko admin | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
 | Kandydaci do strefy złotej | `GET /api/biuro/zbiorki/kandydaci` (+ `/csv`) | bieżąca rotacja ze zbiórek Sellasist; ten sam próg co reslot |
 | **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola biura albo admina |
@@ -667,9 +667,13 @@ celowy — to relacja urządzenia, nie fakt zaobserwowany przez serwer.
 
 ### Raport wydajności to monitoring pracowniczy
 
-`GET /api/wydajnosc` podlega Kodeksowi pracy (art. 22² i nast.): wymaga zapisu
+Raport per osoba podlega Kodeksowi pracy (art. 22² i nast.): wymaga zapisu
 w regulaminie albo obwieszczeniu i uprzedzenia pracowników **2 tygodnie przed**
 uruchomieniem. Kod tego nie blokuje, ale odpowiedź niesie pole `podstawaPrawna`.
+
+Od 0.431.0 raport jedzie wyłącznie w `GET /api/analiza` i jej CSV, i tylko
+dla admina — biuro dostaje tam `wydajnosc: null`. Osobna trasa
+`/api/wydajnosc` zniknęła, bo nikt jej nie wołał, a wpuszczała magazyniera.
 
 Raport ma trzy reguły wbudowane w kod, każda z testem:
 
