@@ -14,8 +14,9 @@ import { imieAutora } from "./conversations.js";
    kosztu takiej pomyłki, a wstawka i tak ląduje w szkicu do przeczytania.
 
    TO NIE JEST AUTOODPOWIEDŹ. Szablon wchodzi do szkicu na kliknięcie agenta
-   i dalej wymaga „Wyślij do klienta" — druga zasada nadrzędna projektu panelu
-   mówi, że treść wychodzi z WERTIS wyłącznie na kliknięcie człowieka.        */
+   i dalej wymaga „Wyślij do klienta". Treść wychodzi z WERTIS wyłącznie na
+   kliknięcie człowieka, bo innej drogi wysyłki w kodzie nie ma. Zasada, która
+   tego wymagała (§27, punkt 2), odeszła 22 września 2026.                    */
 
 export interface Szablon {
   id: number;

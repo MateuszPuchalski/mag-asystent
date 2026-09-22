@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.430.1 — 22 września 2026
+
+**Zasada nadrzędna nr 2 („Człowiek wysyła odpowiedź do klienta") odeszła,
+decyzją właściciela.** Tylko dokumentacja i komentarze — żadnej zmiany
+zachowania.
+
+Specyfikacja z 20 września przewiduje wysyłkę bez człowieka dla klas
+z dowodami. Zasada jej zabraniała, więc właściciel ją usunął. W §27 projektu
+panelu punkt 2 zostaje pusty z adnotacją. Reszta się nie przesuwa, bo kod
+i dekalog cytują punkty 9, 11 i 12 po numerze.
+
+**Usunięcie zasady nie jest funkcją.** Kodu wysyłki bez człowieka nie ma.
+Każda odpowiedź dalej wychodzi na kliknięcie agenta, a tryb przy decyzji
+klasyfikatora dalej jest jeden (`HUMAN_APPROVED`). Komentarze, które
+uzasadniały to zasadą, mówią teraz, co jest w kodzie. Do nich należą szablony,
+edytor, takt szkicu i słownik klasyfikacji.
+
+Zakazy §14.2 poza pierwszym zostają. Automat dalej nie potwierdza niepewnego
+dopasowania, nie obiecuje terminu i nie uznaje reklamacji — także wtedy, gdy
+kiedyś wyśle odpowiedź sam.
+
+Wpis przy 0.430.0 mówi, że zasada wysyłki bez człowieka zabrania. Był prawdą
+w dniu wydania; historii nie przepisujemy.
+
 ## 0.430.0 — 22 września 2026
 
 **Szkic dostaje rozpoznanie, a wysyłka mierzy los szkicu i sama domyka

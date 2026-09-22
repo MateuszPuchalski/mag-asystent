@@ -305,7 +305,9 @@ CREATE TABLE IF NOT EXISTS decyzja_klasyfikacji (
   taksonomia_wersja      TEXT NOT NULL,
   mapowanie_wersja       TEXT,
   polityka_wersja        TEXT NOT NULL,
-  -- Dziś jedyny tryb: odpowiedź wysyła człowiek (§27, punkt 2).
+  -- Dziś jedyny tryb, bo wysyłki bez człowieka w kodzie nie ma. Zasada, która
+  -- jej zabraniała (§27, punkt 2), odeszła 22 września 2026. Drugi tryb wejdzie
+  -- przebudową tej kolumny razem z kodem, który będzie go używał.
   tryb                   TEXT NOT NULL DEFAULT 'HUMAN_APPROVED' CHECK (tryb IN ('HUMAN_APPROVED')),
   at                     TEXT NOT NULL,
   przez                  TEXT NOT NULL,
