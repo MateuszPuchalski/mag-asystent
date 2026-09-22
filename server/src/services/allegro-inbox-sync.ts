@@ -6,6 +6,7 @@ import {
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { logEvent } from "./events.js";
 import { flagaAutoodpowiedzi, obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
@@ -492,6 +493,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
       if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
+      else uzgodnijNiepewna(database, rozmowa, message.id, tresc);
       /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
          „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
          pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
@@ -587,4 +589,37 @@ async function czytajStrukture(
     }
     return null;
   }
+}
+
+/**
+ * Wysyłka `send_uncertain` rozstrzyga się sama, gdy synchronizacja przyniesie
+ * naszą wiadomość o tej samej treści (22 września 2026).
+ *
+ * Specyfikacja: „if a request times out after possible submission, mark its
+ * result UNKNOWN and reconcile against outgoing messages before retrying; do
+ * not assume the remote API deduplicates requests". Do tej wersji rozstrzygał
+ * to człowiek: wysyłka odmawiała ponowienia ze zdaniem „najpierw zsynchronizuj
+ * wątek", a po synchronizacji wiersz i tak stał niepewny.
+ *
+ * Dopasowanie po TREŚCI w tej samej rozmowie, bez różnicy białych znaków —
+ * Allegro nie oddaje naszego klucza idempotencji, więc treść jest jedynym
+ * wspólnym śladem. Bierze NAJSTARSZY pasujący wiersz: dwie niepewne wysyłki
+ * tej samej treści to dwie próby jednej odpowiedzi, a Allegro przyjęło jedną.
+ *
+ * Szkicu i statusu rozmowy nie rusza. Status liczy się z kierunku ostatniej
+ * wiadomości, a szkic mógł się zmienić od próby — skasowanie go byłoby
+ * cichym nadpisaniem pracy agenta.
+ */
+function uzgodnijNiepewna(database: Db, rozmowa: number, externalId: string, tresc: string): void {
+  const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
+  const kandydaci = database.prepare(`SELECT id, body FROM outbox
+    WHERE conversation_id=? AND status='send_uncertain' AND external_message_id IS NULL
+    ORDER BY id`).all(rozmowa) as Array<{ id: number; body: string }>;
+  const trafiony = kandydaci.find((o) => zwin(o.body) === zwin(tresc));
+  if (!trafiony) return;
+  database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, blad=NULL,
+    finished_at=COALESCE(finished_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`)
+    .run(externalId, trafiony.id);
+  logEvent("rozmowa_wysylka_uzgodniona", "synchronizacja", null,
+    { conversationId: rozmowa, outboxId: trafiony.id, externalMessageId: externalId }, null, database);
 }

@@ -224,3 +224,44 @@ test("zmiana danych doboru budzi takt — bez tego 0.341.0 jest połową funkcji
   await biegnij();
   assert.equal(wywolan, 2);
 });
+
+/* ── Rozpoznanie wiadomości a szkic z taktu (22 września 2026) ───────────────
+   Specyfikacja: każda wiadomość klienta dostaje szkic. Takt bierze więc też
+   pytanie bez oferty, o ile jego rozpoznanie każe coś zrobić — i czeka na
+   rozpoznanie, gdy takt klasyfikacji jest włączony. */
+
+function decyzja(messageId: number, akcja: string, zrodlo = "MODEL") {
+  const m = db().prepare("SELECT conversation_id FROM message WHERE id=?").get(messageId) as { conversation_id: number };
+  db().prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,taksonomia_wersja,
+    polityka_wersja,at,przez) VALUES (?,?,1,1,?,'SUCCESS','ORDER_STATUS',?,0,0,0,'v2','p1',?,'automat')`)
+    .run(m.conversation_id, messageId, zrodlo, akcja, new Date().toISOString());
+}
+
+test("pytanie bez oferty z rozpoznaniem „sprawdź przesyłkę” dostaje szkic", async () => {
+  const id = rozmowa("paczka", { oferta: null });
+  const m = (db().prepare("SELECT id FROM message WHERE conversation_id=?").get(id) as { id: number }).id;
+  decyzja(m, "GET_SHIPMENT");
+  await biegnij({ czekajNaRozpoznanie: false });
+  assert.equal(wywolan, 1);
+});
+
+test("„nic do zrobienia” i rozpoznanie zastępcze szkicu nie uruchamiają", async () => {
+  const a = rozmowa("dzieki", { oferta: null });
+  decyzja((db().prepare("SELECT id FROM message WHERE conversation_id=?").get(a) as { id: number }).id, "NO_ACTION");
+  const b = rozmowa("zdjecie", { oferta: null });
+  decyzja((db().prepare("SELECT id FROM message WHERE conversation_id=?").get(b) as { id: number }).id,
+    "HUMAN_REVIEW", "FALLBACK");
+  await biegnij({ czekajNaRozpoznanie: false });
+  assert.equal(wywolan, 0);
+});
+
+test("przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie", async () => {
+  const id = rozmowa("pod-oferta");
+  await biegnij({ czekajNaRozpoznanie: true });
+  assert.equal(wywolan, 0, "szkic bez rozpoznania pisałby pod dobór — i płacilibyśmy drugi raz");
+  decyzja((db().prepare("SELECT id FROM message WHERE conversation_id=?").get(id) as { id: number }).id,
+    "CHECK_COMPATIBILITY");
+  await biegnij({ czekajNaRozpoznanie: true });
+  assert.equal(wywolan, 1);
+});

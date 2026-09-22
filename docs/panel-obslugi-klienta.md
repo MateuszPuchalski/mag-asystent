@@ -2380,6 +2380,38 @@ obu członów. Reguła 1b każe teraz rozbić takie zdanie na dwa twierdzenia.
 Kod tego nie sprawdzi tanio, bo musiałby ocenić wynikanie; miarą jest
 `obnizona`, która liczy, jak często model zawyża.
 
+### 14.6a. Szkic dostaje rozpoznanie (22 września 2026)
+
+Trzeci przyrost specyfikacji z 20 września: szkic dostaje decyzję
+klasyfikatora. Do tej wersji szkic był szyty pod dobór i prosił o tabliczkę
+także klienta, który pytał, gdzie jest paczka.
+
+**Fakt „rozpoznanie"** mówi modelowi, na jaką prośbę odpowiada, jaki jest
+następny krok i czego brakuje. To PRZYPUSZCZENIE automatu, więc ma własny
+rodzaj faktu. Twierdzenie oparte na nim schodzi w kodzie do „niepewne" ze
+źródłem `model` (`zRozpoznaniaNiepewne`). Rozpoznanie starszej wiadomości nie
+wchodzi.
+
+**Pytania o maszynę (intake) tylko przy prośbie o towar**: dobór, pytanie
+o towar, dostępność i inny towar. Bez rozpoznania intake zostaje, jak był.
+
+**Szkic z taktu obejmuje też rozmowy bez oferty**, gdy rozpoznanie każe coś
+zrobić. „Nic do zrobienia" i rozpoznanie zastępcze szkicu nie uruchamiają.
+Przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie — drugi szkic
+po rozpoznaniu kosztowałby drugie wywołanie za to samo pytanie.
+
+**Los szkicu przy wysyłce** (`outbox.szkic_los`): bez zmian albo z poprawką.
+Liczy się tylko szkic ułożony na to samo pytanie, na które idzie odpowiedź.
+Specyfikacja mierzy to obok odrzuceń, które niesie `szkic_copilota.ocena`.
+
+**Niepewna wysyłka rozstrzyga się sama.** Gdy synchronizacja przyniesie
+naszą wiadomość o treści niepewnej wysyłki, wiersz `send_uncertain` przechodzi
+na `sent` z numerem od Allegro. Szkicu i statusu rozmowy to nie rusza.
+
+**Czego nie ma i nie będzie bez decyzji właściciela:** wysyłki bez człowieka.
+Specyfikacja przewiduje ją „później, dla klas z dowodami". Zasada nadrzędna
+nr 2 (§27) jej zabrania, a zmienić ją może tylko właściciel.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
@@ -5461,6 +5493,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
 | Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
 | Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
+| Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
+| Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
+| Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |

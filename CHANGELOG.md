@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.430.0 — 22 września 2026
+
+**Szkic dostaje rozpoznanie, a wysyłka mierzy los szkicu i sama domyka
+niepewne próby.** Trzeci przyrost specyfikacji z 20 września; szkic zostaje
+na Anthropic, decyzją właściciela.
+
+**Fakt „rozpoznanie" w szkicu.** Do tej wersji szkic był szyty pod dobór
+i prosił o tabliczkę znamionową także klienta, który pytał o paczkę. Teraz
+model dostaje kategorię, następny krok i braki danych z decyzji klasyfikatora.
+To przypuszczenie automatu, więc twierdzenie oparte na nim schodzi w kodzie
+do „niepewne". Pytania o maszynę (intake) padają tylko przy prośbie o towar.
+
+**Szkic z taktu obejmuje rozmowy bez oferty**, gdy rozpoznanie każe coś
+zrobić. Przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie, żeby
+nie płacić dwa razy za to samo pytanie. Rozstrzygnięcie właściciela z 0.317.0
+(„tylko pod ofertą") ustąpiło specyfikacji — opis w `copilot-auto-szkic.ts`.
+
+**Los szkicu przy wysyłce** (`outbox.szkic_los`): bez zmian albo z poprawką.
+Karta pomiaru pokazuje obie liczby obok odrzuceń. To pomiar, nie bramka.
+
+**Niepewna wysyłka domyka się sama.** Synchronizacja, która przyniesie naszą
+wiadomość o treści wysyłki `send_uncertain`, przestawia ją na `sent` z numerem
+od Allegro. Specyfikacja żąda tego uzgodnienia przed ponowieniem; do tej
+wersji robił to człowiek.
+
+Wysyłki bez człowieka z tej specyfikacji nie ma i nie będzie bez decyzji
+właściciela — zasada nadrzędna nr 2 panelu (§27) jej zabrania.
+
+- Migracja dokłada `outbox.szkic_los` sama.
+- **[wymaga działania]** Przebuduj panel.
+- Przy `COPILOT_AUTO_SZKIC=1` szkiców przybędzie — patrz `DEPLOY.md`.
+
 ## 0.429.0 — 22 września 2026
 
 **Struktura wątku Allegro przed modelem: typ i podtyp z `beta.v1` dają

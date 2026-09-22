@@ -161,6 +161,8 @@ export type PomiarCopilota = {
     /** Pasowania z rozmowy (przyrost czwarty); ostatnia liczba to właściwa miara jakości. */
     pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
     pasowaniaZatwierdzonePrzezBiuro: number;
+    /** Los szkicu przy wysyłce: poszedł bez zmian albo z poprawką. */
+    wyslanychBezZmian: number; wyslanychPoprawionych: number;
   };
 };
 

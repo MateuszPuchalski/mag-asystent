@@ -2578,6 +2578,22 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.430.0 — szkic dostaje rozpoznanie
+
+**Migracja dokłada kolumnę sama. Panel trzeba przebudować.**
+
+**Jeśli masz włączony `COPILOT_AUTO_SZKIC=1`, szkiców przybędzie.** Takt pisze
+je teraz także dla rozmów bez oferty, gdy rozpoznanie każe coś zrobić. Sufit
+na godzinę (`COPILOT_AUTO_NA_GODZINE`) zostaje ten sam i dalej liczy się
+z księgi. Po pierwszej godzinie porównaj rachunek na karcie „Copilot".
+
+Przy włączonym `COPILOT_AUTO_KLASYFIKACJA=1` szkic czeka na rozpoznanie. Nowe
+pytanie dostaje więc szkic o jeden takt klasyfikacji później niż dotąd.
+
+Sprawdzenie na żywym koncie idzie tak. Otwórz rozmowę z pytaniem o paczkę
+i ułóż szkic. W oknie „Skąd to wiem" ma stać fakt „Rozpoznanie bieżącej
+prośby", a szkic nie ma prosić o model maszyny.
+
 ### Aktualizacja do 0.429.0 — struktura wątku Allegro w klasyfikacji
 
 **Migracja dokłada kolumny sama. Panel trzeba przebudować.** Nic nie trzeba

@@ -1002,6 +1002,13 @@ CREATE TABLE IF NOT EXISTS outbox (
   created_by               INTEGER NOT NULL REFERENCES app_user(user_id),
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   finished_at              TEXT
+,
+  -- LOS SZKICU COPILOTA przy tej wysyłce (22 września 2026): `bez_zmian`,
+  -- `poprawiony` albo NULL, gdy na to pytanie szkicu nie było. Specyfikacja
+  -- mierzy „unedited approvals, edited approvals and rejections"; odrzucenie
+  -- niesie już `szkic_copilota.ocena`, a tu stoi to, czego wtedy nie było:
+  -- co agent zrobił z propozycją, zanim ją WYSŁAŁ.
+  szkic_los                TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))
 );
 CREATE INDEX IF NOT EXISTS ix_outbox_rozmowa ON outbox(conversation_id, id);
 

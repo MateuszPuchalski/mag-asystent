@@ -670,6 +670,12 @@ export interface PomiarCopilota {
      */
     pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
     pasowaniaZatwierdzonePrzezBiuro: number;
+    /**
+     * Los szkicu PRZY WYSYŁCE (22 września 2026): ile odpowiedzi poszło ze
+     * szkicu bez zmian, a ile z poprawką. Specyfikacja stawia to obok
+     * odrzuceń — te niesie `odrzuconych` wyżej.
+     */
+    wyslanychBezZmian: number; wyslanychPoprawionych: number;
   };
 }
 
@@ -733,6 +739,10 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     FROM szkic_copilota`).get() as Record<string, number>;
   const zatw = database.prepare(`SELECT COUNT(*) AS n FROM pasowanie_czesci
     WHERE zrodlo_propozycji='copilot' AND stan='zatwierdzone'`).get() as { n: number };
+  const wys = database.prepare(`SELECT
+      SUM(CASE WHEN szkic_los='bez_zmian' THEN 1 ELSE 0 END) AS bez,
+      SUM(CASE WHEN szkic_los='poprawiony' THEN 1 ELSE 0 END) AS popr
+    FROM outbox WHERE status='sent'`).get() as { bez: number | null; popr: number | null };
 
   const wejscieRazem = tokeny.wej + tokeny.cacheOdczyt;
   return {
@@ -751,6 +761,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       pasowaniaZaproponowane: Number(sz.pasowaniaZaproponowane ?? 0),
       pasowaniaOdrzucone: Number(sz.pasowaniaOdrzucone ?? 0),
       pasowaniaZatwierdzonePrzezBiuro: Number(zatw.n ?? 0),
+      wyslanychBezZmian: Number(wys.bez ?? 0), wyslanychPoprawionych: Number(wys.popr ?? 0),
     },
   };
 }

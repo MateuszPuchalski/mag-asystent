@@ -862,6 +862,10 @@ export function migrate(database: DatabaseSync) {
   addColumn("allegro_inbox_thread", "watek_status", "TEXT");
   addColumn("allegro_inbox_thread", "watek_zamowienia", "TEXT");
   addColumn("allegro_inbox_thread", "struktura_at", "TEXT");
+  /* Los szkicu przy wysyłce (22 września 2026) — patrz `outbox` w
+     `schema.sql`. Stare wysyłki mają NULL: wtedy nikt tego nie liczył. */
+  addColumn("outbox", "szkic_los",
+    "TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))");
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);

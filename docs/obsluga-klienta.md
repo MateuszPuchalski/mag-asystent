@@ -414,6 +414,13 @@ Przy decyzji zapisujemy, NA CZYM ją liczono: identyfikatory wiadomości, skrót
 SHA-256 zamaskowanego wejścia i to, czy sufit coś uciął. Treści wejścia nie
 kopiujemy — leży w `message`, pod tą samą polityką co dotąd.
 
+**Szkic z taktu nie jest już tylko pod ofertą (22 września 2026).** Przy
+`COPILOT_AUTO_SZKIC=1` szkic powstaje też dla wiadomości, której rozpoznanie
+każe coś zrobić — pytania o paczkę, fakturę albo zwrot. Do dostawcy idzie
+więc zamaskowany wątek także takich rozmów, tą samą drogą i z tym samym
+sufitem co dotąd. Fakty szkicu dostały rozpoznanie klasyfikatora: kategorię,
+następny krok i flagi braków. To nasze dane, bez treści klienta.
+
 **Szkic odpowiedzi z Copilota wysyła CAŁY WĄTEK — zamaskowany, z sufitem
 (0.231.0).** Decyzja właściciela z 7 września: krótka odpowiedź klienta
 („tak, GX160") bez naszego pytania nie mówi modelowi nic. Do dostawcy idą

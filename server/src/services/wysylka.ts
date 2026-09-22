@@ -87,6 +87,27 @@ function kontekst(database: DatabaseSync, conversationId: number): Kontekst {
 /** `NewMessageInThread.text` — `maxLength: 2000` wprost ze specyfikacji. */
 export const LIMIT_ZNAKOW = 2000;
 
+/**
+ * Co agent zrobił ze szkicem Copilota, zanim go wysłał (22 września 2026).
+ *
+ * Liczy się WYŁĄCZNIE szkic ułożony na TĘ SAMĄ wiadomość klienta, na którą
+ * idzie odpowiedź — szkic sprzed dopisku opisuje inne pytanie. Porównanie
+ * bez różnicy białych znaków, bo edytor potrafi dołożyć pusty wiersz, a to
+ * nie jest poprawka treści.
+ *
+ * To pomiar, nie bramka: los nie blokuje wysyłki i nie zmienia jej wyniku.
+ */
+function losSzkicu(
+  database: DatabaseSync, conversationId: number, lastMessageId: number | null, tresc: string,
+): "bez_zmian" | "poprawiony" | null {
+  if (lastMessageId === null) return null;
+  const sz = database.prepare("SELECT tresc, message_id FROM szkic_copilota WHERE conversation_id=?")
+    .get(conversationId) as { tresc: string; message_id: number | null } | undefined;
+  if (!sz || Number(sz.message_id) !== Number(lastMessageId)) return null;
+  const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
+  return zwin(sz.tresc) === zwin(tresc) ? "bez_zmian" : "poprawiony";
+}
+
 export async function wyslijOdpowiedz(z: ZadanieWysylki) {
   const database = z.database ?? db();
   const wyslij = z.wyslij ?? wyslijDoAllegro;
@@ -251,9 +272,9 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`)
       .run(z.conversationId, k.channelAccountId, wynik.externalMessageId, tresc);
 
-    database.prepare(`UPDATE outbox SET status='sent', external_message_id=?,
+    database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, szkic_los=?,
       finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`)
-      .run(wynik.externalMessageId, outboxId);
+      .run(wynik.externalMessageId, losSzkicu(database, z.conversationId, k.lastMessageId, tresc), outboxId);
 
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */

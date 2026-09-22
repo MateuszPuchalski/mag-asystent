@@ -813,3 +813,40 @@ test("odpowiedź bez `type` to nie ten kształt — struktury nie ma", () => {
   assert.deepEqual(strukturaZOdpowiedzi({ type: "COMMON" }),
     { typ: "COMMON", podtyp: null, status: null, zamowienia: [] });
 });
+
+/* ── Niepewna wysyłka rozstrzyga się sama (22 września 2026) ─────────────────
+   Specyfikacja: timeout po możliwym wysłaniu to UNKNOWN, a przed ponowieniem
+   trzeba go uzgodnić z wiadomościami wychodzącymi. Synchronizacja przynosi
+   naszą odpowiedź — i to ona zamyka wiersz `send_uncertain`. */
+test("nasza wiadomość z synchronizacji zamyka niepewną wysyłkę tej samej treści", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, query: fake([[thread(1)]]).query, apiUrl: "https://api.test" });
+  const rozmowa = Number((database.prepare("SELECT id FROM conversation").get() as { id: number }).id);
+  const agent = Number(database.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')")
+    .run().lastInsertRowid);
+  const niepewna = (klucz: string, body: string) => Number(database.prepare(`INSERT INTO outbox
+    (conversation_id,idempotency_key,body,expected_version,status,created_by)
+    VALUES (?,?,?,1,'send_uncertain',?)`).run(rozmowa, klucz, body, agent).lastInsertRowid);
+  const trafiona = niepewna("k-1", "Dzień dobry,\nnóż pasuje.");
+  const inna = niepewna("k-2", "Zupełnie inna odpowiedź");
+
+  const zmieniony = { ...thread(1), lastMessageDateTime: "2026-09-30T12:00:00Z" };
+  const api = fake([[zmieniony]], new Map([["t-1", ["m-t-1", "m-nasza"]]]));
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: async (url) => {
+    const odp = await api.query(url) as { messages?: Array<Record<string, unknown>> };
+    for (const m of odp.messages ?? []) {
+      if (m.id === "m-nasza") {
+        m.author = { login: "my", isInterlocutor: false };
+        m.text = "Dzień dobry, nóż pasuje.";
+      }
+    }
+    return odp;
+  } });
+
+  const w = database.prepare("SELECT id, status, external_message_id FROM outbox ORDER BY id").all() as any[];
+  const t = w.find((x) => x.id === trafiona);
+  assert.equal(t.status, "sent");
+  assert.equal(t.external_message_id, "m-nasza");
+  assert.equal(w.find((x) => x.id === inna).status, "send_uncertain", "inna treść zostaje do decyzji człowieka");
+  assert.ok(database.prepare("SELECT 1 FROM events WHERE type='rozmowa_wysylka_uzgodniona'").get());
+});
