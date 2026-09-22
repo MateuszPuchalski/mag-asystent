@@ -48,7 +48,7 @@ export type ZrodloDecyzji =
  * panelu; ten, który jeszcze mieszka w biurze, ma nazwę jego widoku — panel
  * otwiera go mostem, tak jak drugi rząd nagłówka.
  */
-export type CelDecyzji = { panel: string } | { biuro: "magazyn" | "nadzor" };
+export type CelDecyzji = { panel: string } | { biuro: "nadzor" };
 
 export interface PozycjaDecyzji {
   /** Stały klucz wiersza — ta sama sprawa ma ten sam klucz w każdym odczycie. */
@@ -159,7 +159,8 @@ function kosze(): PozycjaDecyzji[] {
     co: `${p.symbol} · ${p.kod}${p.powod ? ` · ${p.powod}` : ""}`,
     od: p.at,
     pilne: false,
-    cel: { biuro: "magazyn" },
+    /* Kosze mieszkają od 0.436.0 w zakładce Zwroty, bo tam powstają. */
+    cel: { panel: "/obsluga/zwroty/kosze" },
   }));
   const otwarte: PozycjaDecyzji[] = listaKoszy()
     .filter((k) => k.status === "otwarty" && (k.rodzaj ?? "zwroty") === "zwroty" && k.pozycji > 0)

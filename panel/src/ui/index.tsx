@@ -360,6 +360,33 @@ export const dzien = (v: string | null | undefined) =>
     : "—";
 
 /**
+ * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.436.0).
+ *
+ * Belka 3 px przy KAŻDYM wierszu, bursztynowa przy wybranym, i szare tło —
+ * ten sam zapis co w kolejkach zwrotów i skrzynki, żeby ręka nie uczyła się
+ * drugiej listy. Do tego wydania mieszkał prywatnie w `dostawy/Kolejka.tsx`;
+ * kosze potrzebowały go drugi raz, a dwie kopie jednej ramy rozjeżdżają się
+ * przy pierwszej poprawce odstępu.
+ *
+ * Wybór DOGANIA widok (`scrollIntoView` z `nearest`) — powód przy tej samej
+ * linijce w `zwroty/Kolejka.tsx`.
+ */
+export function WierszKolejki({ aktywny, onKlik, children }: {
+  aktywny: boolean; onKlik: () => void; children: React.ReactNode;
+}) {
+  const ref = React.useRef<HTMLButtonElement | null>(null);
+  React.useEffect(() => { if (aktywny) ref.current?.scrollIntoView({ block: "nearest" }); }, [aktywny]);
+  return <li>
+    <button ref={ref} aria-current={aktywny ? "true" : undefined} onClick={onKlik}
+      className={`flex w-full flex-col border-l-[3px] px-4 py-2 text-left ${aktywny
+        ? "border-l-wertis-amber bg-slate-200"
+        : "border-l-transparent hover:bg-slate-50"}`}>
+      {children}
+    </button>
+  </li>;
+}
+
+/**
  * Data lokalna jako „2026-09-22" — dla druków dla dostawców (0.435.0).
  *
  * Przyszła z `biuro.html` razem z protokołem rozbieżności. Protokół idzie do

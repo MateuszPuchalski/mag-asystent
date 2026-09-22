@@ -17,6 +17,7 @@ import {
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
 } from "../api/zwroty";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -693,6 +694,8 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    {/* Zwroty i kosze pod jedną zakładką (0.436.0) — powód w `Przelacznik.tsx`. */}
+    <PrzelacznikZwrotow teraz="zwroty" />
     {data?.stan && <PasekOgona stan={data.stan} />}
     <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
@@ -940,6 +943,7 @@ export function Zwroty() {
       {zwrot
         ? <Dowody zwrot={zwrot} os={szczegol.data?.os ?? []}
             sprawy={szczegol.data?.sprawy ?? []} droga={szczegol.data?.droga ?? []}
+            kosze={szczegol.data?.kosze ?? []}
             trwaNotatka={notatka.isPending || cofnijNotatke.isPending}
             bladNotatki={bladNotatki}
             onNotatka={(tekst) => {

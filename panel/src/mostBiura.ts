@@ -11,8 +11,9 @@ import { token } from "./api/klient";
    mógłby go wczytać bez uruchomienia całego panelu. */
 
 /** Zakładki `biuro.html`, do których panel umie jeszcze prowadzić. Każde wydanie
-    przeprowadzki skreśla tu swój widok — DOSTAWY odeszły w 0.435.0. */
-export const WIDOKI_BIURA = ["magazyn", "nadzor", "dziennik", "analiza"] as const;
+    przeprowadzki skreśla tu swój widok — DOSTAWY odeszły w 0.435.0, MAGAZYN
+    ZWROTÓW (kosze) w 0.436.0. */
+export const WIDOKI_BIURA = ["nadzor", "dziennik", "analiza"] as const;
 export type WidokBiura = (typeof WIDOKI_BIURA)[number];
 
 /** Przejście do widoku, który jeszcze mieszka w `biuro.html`. */

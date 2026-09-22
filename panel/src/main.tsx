@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Package, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
+import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
@@ -22,6 +22,7 @@ import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
 import { Dostawy } from "./ekrany/Dostawy";
+import { Kosze } from "./ekrany/Kosze";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 
@@ -95,7 +96,8 @@ type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode }
   & ({ do: string } | { biuro: WidokBiura });
 const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
   { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },
-  { etykieta: "Kosze", ikona: <Package size={16} />, biuro: "magazyn" },
+  /* KOSZY TU NIE MA od 0.436.0 — decyzją właściciela mieszkają w zakładce
+     Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   "kreska",
   { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
   { etykieta: "Dziennik", ikona: <FileText size={16} />, biuro: "dziennik" },
@@ -330,6 +332,11 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             go nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
+        {/* Kosze pod adresem zwrotów, bo mieszkają w ich zakładce (0.436.0).
+            Człon stały `kosze` wygrywa z `:id` — router ocenia dopasowanie
+            dokładniejsze wyżej, więc numer zwrotu nie połknie koszy. */}
+        <Route path="/obsluga/zwroty/kosze" element={<Kosze />} />
+        <Route path="/obsluga/zwroty/kosze/:id" element={<Kosze />} />
         {/* Reklamacja ma własny adres z tego samego powodu co zwrot i rozmowa:
             odświeżenie jej nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/reklamacje" element={<Reklamacje />} />

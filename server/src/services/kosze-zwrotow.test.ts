@@ -12,6 +12,7 @@ import {
 } from "./kosze-zwrotow.js";
 import { ocenPozycje, rozstrzygnijZwrot } from "./zwroty.js";
 import { zapamietajSklad } from "./komplety.js";
+import { koszeZwrotu } from "./kosze.js";
 
 /* ── Koszyk zwrotów składany w panelu (0.192.0) ─────────────────────────────
    Obieg właściciela: pusta MM przy zasiadaniu do zwrotów, dokładanie pozycja
@@ -87,6 +88,23 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
   assert.equal(kosz?.sztuk, 2, "sztuki idą z pozycji zwrotu, nie po jednej");
   assert.match(kosz!.kod, /^Z-\d+$/,
     "kod z przedrostkiem — gołe liczby są przestrzenią numerów MM z kartek");
+});
+
+test("zwrot wie, w którym koszu jedzie jego towar (0.436.0)", () => {
+  /* Druga połowa wiązania kosz ↔ zwrot. Kosz od dawna wymieniał swoje zwroty;
+     zwrot pisał tylko „w koszyku zwrotów", bez nazwy i bez drogi — a pytanie
+     „gdzie jest towar z tego zwrotu" pada właśnie przy zwrocie. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotZTowarem(d, [21], KTO);
+  assert.deepEqual(koszeZwrotu(id, d), [], "przed oceną towar nie leży w żadnym koszu");
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  assert.deepEqual(koszeZwrotu(id, d), [{ id: kosz.id, kod: kosz.kod, status: "otwarty" }]);
+  /* Zdjęcie z kosza zdejmuje też wiązanie — zwrot nie może pokazywać kosza,
+     w którym jego towaru już nie ma. */
+  ocenPozycje(d, poz[0], null, 3, KTO);
+  assert.deepEqual(koszeZwrotu(id, d), []);
 });
 
 test("zmiana oceny ZDEJMUJE z koszyka, a powtórzenie nie dubluje sztuk", () => {

@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import type { DokumentDostawy, ZamknietaPoza } from "../api/dostawy";
-import { Pusto, czas, ile, wiek } from "../ui";
+import { Pusto, WierszKolejki, czas, ile, wiek } from "../ui";
 
 /* ── Kolejka dostaw (0.435.0) ──────────────────────────────────────────────
    Przeniesiona z `biuro.html` razem z decyzjami, które tam kosztowały:
@@ -59,22 +59,8 @@ function Pasek({ zrobione, wszystkie }: { zrobione: number; wszystkie: number })
   </div>;
 }
 
-/** Wiersz kolejki — ta sama rama co w zwrotach, żeby ręka nie uczyła się drugiej. */
-function Wiersz({ aktywny, onKlik, children }: {
-  aktywny: boolean; onKlik: () => void; children: React.ReactNode;
-}) {
-  const ref = useRef<HTMLButtonElement | null>(null);
-  /* Wybór dogania widok — powód przy tej samej linijce w `zwroty/Kolejka.tsx`. */
-  useEffect(() => { if (aktywny) ref.current?.scrollIntoView({ block: "nearest" }); }, [aktywny]);
-  return <li>
-    <button ref={ref} aria-current={aktywny ? "true" : undefined} onClick={onKlik}
-      className={`flex w-full flex-col border-l-[3px] px-4 py-2 text-left ${aktywny
-        ? "border-l-wertis-amber bg-slate-200"
-        : "border-l-transparent hover:bg-slate-50"}`}>
-      {children}
-    </button>
-  </li>;
-}
+/* Rama wiersza mieszka od 0.436.0 w `ui/` — kosze używają tej samej. */
+const Wiersz = WierszKolejki;
 
 export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pusto }: {
   dokumenty: DokumentDostawy[];

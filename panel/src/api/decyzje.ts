@@ -12,7 +12,7 @@ export type ZrodloDecyzji =
   | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje";
 
 /** Adres w panelu albo widok, który jeszcze mieszka w `biuro.html`. */
-export type CelDecyzji = { panel: string } | { biuro: "magazyn" | "nadzor" };
+export type CelDecyzji = { panel: string } | { biuro: "nadzor" };
 
 export interface PozycjaDecyzji {
   klucz: string;

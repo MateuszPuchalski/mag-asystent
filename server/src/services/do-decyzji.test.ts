@@ -23,7 +23,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["problem", "delivery_line", "delivery", "delivery_note", "sfera_queue", "events"]) {
+  for (const t of ["problem", "delivery_line", "delivery", "delivery_note", "sfera_queue", "events",
+    "kosz_pozycja", "kosz"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
 });
@@ -91,6 +92,19 @@ test("zapis do Subiekta w błędzie jest pilny i idzie przed starszą sprawą", 
   assert.equal(pierwsza.pilne, true);
   assert.deepEqual(pierwsza.cel, { biuro: "nadzor" }, "stan systemu mieszka jeszcze w biurze");
   assert.equal(druga.zrodlo, "dostawy");
+});
+
+test("pominięta pozycja kosza prowadzi do koszy w zakładce Zwroty (0.436.0)", () => {
+  /* Kosze przeszły z MAGAZYNU ZWROTÓW w biurze do panelu — wiersz ma
+     prowadzić tam, gdzie leży ZAŁATWIONE, a nie do widoku, którego już nie ma. */
+  const k = Number(db().prepare(`INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez)
+    VALUES ('Z-14', 'zamkniety', '2026-09-20T08:00:00.000Z', 'Ala')`).run().lastInsertRowid);
+  db().prepare(`INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, status, powod, pominieto_at)
+    VALUES (?, 8, 'HM-0520', 'Gaźnik', 2, 'skipped', 'brak w pudle', '2026-09-21T09:00:00.000Z')`).run(k);
+  const w = D.doDecyzji().pozycje.find((p) => p.zrodlo === "kosze");
+  assert.ok(w, "pominięcie czeka na biuro");
+  assert.deepEqual(w.cel, { panel: "/obsluga/zwroty/kosze" });
+  assert.match(w.co, /HM-0520 · Z-14 · brak w pudle/);
 });
 
 test("liczniki obszarów sumują się do całości", () => {

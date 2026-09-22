@@ -179,15 +179,19 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    13,
-    "Licznik SPADŁ z 18 do 13 w 0.435.0 i to jest cały ślad przeprowadzki " +
+    11,
+    "Licznik SPADŁ z 13 do 11 w 0.436.0: kosze przeszły do panelu, do " +
+      "zakładki Zwroty, a z nimi dwa zapisy — załatwienie pominiętej pozycji " +
+      "i PRZELICZ ZE ZWROTÓW. Zero zapisu przy patrzeniu pilnuje tam " +
+      "`ekrany/Kosze.test.tsx`.\n\n" +
+      "Licznik SPADŁ z 18 do 13 w 0.435.0 i to jest cały ślad przeprowadzki " +
       "dostaw do panelu w tym teście. Odeszło pięć zapisów razem z widokiem: " +
       "zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, notatka do " +
       "dostawy, odczyt odpowiedzi na notatkę i zamknięcie wyjątku. Te same " +
       "trasy woła teraz panel, a zero zapisu przy patrzeniu pilnuje tam " +
       "`ekrany/Dostawy.test.tsx` — po zachowaniu, nie po źródle.\n\n" +
       "Po kasacji obsługi klienta (0.140.0) zostały zapisy MAGAZYNU i ADMINA:\n" +
-      "logowanie, import zbiórek, załatwienie pominiętej pozycji kosza, parowanie konta " +
+      "logowanie, import zbiórek, parowanie konta " +
       "Allegro, PONÓW/ANULUJ kolejki Sfery (jedno wywołanie o dwóch trasach) " +
       "oraz trzy mutacje kont admina (reset hasła, włącz/wyłącz, wyloguj " +
       "wszędzie), RESYNC z odświeżeniem zdjęć w karcie SERWER i masowa " +
@@ -249,7 +253,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
      panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.doesNotMatch(html, /problems\/\$\{id\}\/resolve/, "wyjątek zamyka się w panelu, przy fakturze");
-  assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
+  assert.doesNotMatch(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "pominięcia zamyka się w panelu, przy koszu");
   /* Po 0.140.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
      przedmiotem strażnika: żadnej wysyłki, żadnego szkicu, żadnego pola
      odpowiedzi. Nowa obsługa klienta przyniesie je razem z własnym testem
@@ -462,9 +466,9 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["magazyn", "analiza", "dziennik", "nadzor"],
-    "Od 0.435.0 DOSTAWY nie są już zakładką tej strony — prowadzą do " +
-      "panelu (`data-panel`), sprawdzane niżej. " +
+    ["analiza", "dziennik", "nadzor"],
+    "Od 0.435.0 DOSTAWY, a od 0.436.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
+      "tej strony — prowadzą do panelu (`data-panel`), sprawdzane niżej. " +
       "Pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
       "pustą zakładką — konto Allegro mieszka w STANIE SYSTEMU. " +
@@ -488,6 +492,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
      DOSTAW tam, gdzie były. Sierota poza grupą byłaby tu tą samą usterką. */
   const praca = nav.match(/<div class="grupa-btny">([\s\S]*?)<\/div>/)?.[1] ?? "";
   assert.match(praca, /data-panel="\/obsluga\/dostawy"/, "DOSTAWY prowadzą do panelu z grupy Praca");
+  assert.match(praca, /data-panel="\/obsluga\/zwroty\/kosze"/, "KOSZE prowadzą do zakładki Zwroty w panelu");
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
@@ -621,10 +626,10 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
     "nagłówek nie ma prawa wrócić do bezwarunkowego obiektu"
   );
 
-  // czworo wywołań, które ta reguła utrzymuje przy życiu
-  /* Do 0.435.0 stało tu przywrócenie dostawy — odeszło do panelu, który
-     ma własnego strażnika tej reguły (`panel/src/api/klient.test.ts`). */
-  assert.match(html, /kosze\/\$\{id\}\/przelicz`,\s*\{\s*method:\s*"POST"\s*\}/);
+  // wywołania bez ciała, które ta reguła utrzymuje przy życiu
+  /* Do 0.435.0 stało tu przywrócenie dostawy, do 0.436.0 przeliczenie
+     kosza — oba odeszły do panelu, który ma własnego strażnika tej reguły
+     (`panel/src/api/klient.test.ts`). Zostały dwa wywołania bez ciała. */
   assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
   assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
 });
@@ -696,21 +701,20 @@ test("pusty powód odpada na trasie, a nie dopiero w bazie", async () => {
   assert.match(r.json().error, /powód/i);
 });
 
-test("podgląd kosza w biurze czyta tę samą trasę, co karta zwrotu", () => {
-  /* Zawartość kosza ma JEDNO źródło prawdy. Gdyby podgląd liczył pozycje po
-     swojemu — z listy koszy albo z osobnej trasy — biuro i hala zaczęłyby
-     widzieć różne kosze, a rozjazd wyszedłby dopiero przy sporze o brakujący
-     towar. Ten test pilnuje, że panel pyta `/api/biuro/kosze/:id`. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /api\/biuro\/kosze\/\$\{id\}/, "podgląd pyta o szczegół kosza");
-  assert.match(html, /koszPodglad/, "panel podglądu");
-  assert.match(html, /KOSZ NIEKOMPLETNY/, "pominięcia widoczne dla biura");
-  assert.match(html, /stanPozycjiKosza/, "stan pozycji jednym zdaniem");
-  assert.match(html, /pominieteKarta/, "lista pominięć jako karta pracy");
-  assert.match(html, /koszSzukaj/, "szukanie towaru w koszach");
+test("kosze odeszły do panelu razem ze swoimi strażnikami (0.436.0)", () => {
+  /* MAGAZYN ZWROTÓW przeszedł do zakładki Zwroty w panelu, decyzją
+     właściciela. Test, który stał tutaj, pilnował, że podgląd kosza czyta
+     JEDNO źródło prawdy o zawartości (`/api/biuro/kosze/:id`) — tę gwarancję
+     przejął `panel/src/ekrany/Kosze.test.tsx` razem z wiązaniem kosz ↔ zwrot
+     w obie strony. Tu zostaje pilnowanie, że stara maszyneria nie została
+     w pliku półżywa. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const slad of ['id="widokMagazyn"', 'id="koszeLista"', 'id="pominieteKarta"', 'id="koszSzukaj"',
+    "function rysujKosze", "function pokazPodgladKosza", "magazynKropka", "function zakolejkuj"]) {
+    assert.ok(!html.includes(slad), `ślad po koszach: ${slad}`);
+  }
+  assert.ok(fs.existsSync(path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Kosze.test.tsx")),
+    "strażnik koszy w panelu");
 });
 
 test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
@@ -742,32 +746,15 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
   assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
 });
 
-test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
-  /* Siatka układa karty w kolejności dokumentu, więc kolejność w HTML JEST
-     kolejnością na ekranie. Nic w JS jej nie pilnuje — przestawienie sekcji
-     przy następnej zmianie przeszłoby bez śladu. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const przed = (a: string, b: string, czemu: string) => {
-    const ia = html.indexOf(`id="${a}"`);
-    const ib = html.indexOf(`id="${b}"`);
-    assert.ok(ia !== -1 && ib !== -1, `${a} albo ${b} nie istnieje`);
-    assert.ok(ia < ib, czemu);
-  };
-  /* Karty dostaw (wyjątki przed zamkniętymi) odeszły do panelu w 0.435.0 —
-     tam o kolejności decyduje kubełek DO DECYZJI, pierwszy w rzędzie. */
-  /* W MAGAZYNIE praca przed jej wyjątkami: kosze nad listą pominiętych
-     pozycji, bo pominięcie jest skutkiem rozkładania, nie jego wstępem. */
-  przed("koszeKarta", "pominieteKarta", "praca hali nad jej wyjątkami");
-  /* Rozprężenie z 0.125.0 nie może się cofnąć po cichu, a po 0.140.0 pilnuje
-     też kasacji: widoku SPRAW nie ma, a jego karty nie wróciły bokiem do
-     magazynu. */
+test("widok SPRAW nie wraca bokiem (0.140.0)", () => {
+  /* Test pilnował kolejności kart pracy przed archiwum w DOSTAWACH i w
+     MAGAZYNIE. Oba widoki przeszły do panelu (0.435.0, 0.436.0), gdzie
+     kolejność niesie pierwszy kubełek kolejki. Zostaje trzecia gwarancja:
+     kasacja SPRAW z 0.140.0 nie cofa się po cichu. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   assert.equal(html.indexOf('id="widokSprawy"'), -1, "widok SPRAW zniknął (0.140.0)");
-  const magazyn = html.slice(html.indexOf('id="widokMagazyn"'), html.indexOf('id="widokNadzor"'));
   for (const id of ["zwrotListaKarta", "dyskusjeKarta", "pytaniaListaKarta", "opinieKarta"]) {
-    assert.ok(!magazyn.includes(`id="${id}"`), `${id} nie wróciła do magazynu`);
+    assert.ok(!html.includes(`id="${id}"`), `${id} nie wróciła do biura`);
   }
 });
 
@@ -1368,12 +1355,13 @@ test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
   assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
 });
 
-test("zapamiętany widok, którego nie ma, wraca na MAGAZYN (0.427.0, 0.435.0)", () => {
+test("zapamiętany widok, którego nie ma, wraca na STAN SYSTEMU (0.427.0, 0.436.0)", () => {
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
   /* „dostawy" w pamięci przeglądarki to ślad sprzed 0.435.0 — widok przeszedł
-     do panelu, więc strażnik kieruje na MAGAZYN, pierwszą zakładkę Pracy. */
-  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "magazyn";/);
+     do panelu, a w 0.436.0 poszedł za nimi MAGAZYN. Strażnik kieruje na
+     STAN SYSTEMU — tam prowadzą wiersze DO DECYZJI, które jeszcze tu mieszkają. */
+  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "nadzor";/);
   assert.ok(lista, "strażnik zapamiętanego widoku istnieje");
   const nazwy = [...lista[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
   const zPaska = [...new Set([...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]))];

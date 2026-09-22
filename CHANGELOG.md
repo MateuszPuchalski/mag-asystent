@@ -34,6 +34,37 @@ historii nie przepisujemy.
 ---
 
 
+## 0.436.0 — 22 września 2026
+
+**Kosze mieszkają w zakładce Zwroty.** Trzeci krok przeprowadzki biura
+(`docs/obsluga-klienta.md` §7, F3), w kształcie zmienionym decyzją właściciela.
+Makiety rysowały kosze jako osobny ekran w drugim rzędzie nagłówka. Kosz jest
+jednak dalszym ciągiem zwrotu: ocena „na stan" wkłada towar do koszyka,
+zamknięcie wysyła go na halę. Stoi więc obok zwrotów, pod przełącznikiem
+Zwroty · Kosze, a drugi rząd niesie już tylko Dostawy i wgląd.
+
+**Ekran koszy** ma trzy kolumny, jak Zwroty i Dostawy. Kolejka dzieli się na
+kubełki: w pracy, pominięte, rozłożone i anulowane. Każdy kosz niesie pasek
+kroków cyklu i stan dokumentu MM. Środek pokazuje zawartość z adresem i stanem
+każdej pozycji, drogę kosza i PRZELICZ ZE ZWROTÓW, gdy dokumentu jeszcze nie
+ma. Prawa kolumna prowadzi do zwrotów z towarem i zamyka pominięcia
+przyciskiem ZAŁATWIONE z notatką. Pole „W którym koszu?" szuka po stronie
+serwera. Pasek otwartego koszyka stoi nad koszami tak samo jak nad zwrotami —
+koszyk zamyka się w jednym miejscu.
+
+**Wiązanie kosz ↔ zwrot działa w obie strony.** Kosz od dawna wymieniał swoje
+zwroty, a karta zwrotu pisała tylko „w koszyku zwrotów", bez nazwy i bez
+drogi. Szczegół zwrotu niesie odtąd listę koszy z jego towarem, a sekcja
+„Towar w koszach" prowadzi do każdego z nich. Obie strony czyta to samo
+złączenie, więc się nie rozjadą.
+
+**MAGAZYN ZWROTÓW zniknął z `biuro.html`** razem z kolejką zdjęć, z której
+korzystały już tylko kosze. Licznik zapisów strony spadł z 13 do 11 POST.
+Pozycja KOSZE w pasku prowadzi do panelu z sesją, a biuro wstaje odtąd na
+STANIE SYSTEMU. Stamtąd pochodzą wiersze DO DECYZJI, które jeszcze tu
+mieszkają. Pominięta pozycja w DO DECYZJI prowadzi do koszy w panelu.
+Gwarancje usuniętego testu strony przejął `ekrany/Kosze.test.tsx`.
+
 ## 0.435.0 — 22 września 2026
 
 **DO DECYZJI jest ekranem startowym panelu, a dostawy przeszły do panelu.**

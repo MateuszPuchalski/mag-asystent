@@ -629,31 +629,11 @@
   }
   code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
 
-  /* ── Panel pozycji dokumentu ───────────────────────────────────────────────
-     Zdjęcie ma stały rozmiar, żeby wiersze nie skakały w trakcie doładowywania
-     — kartoteki mają obrazki w różnych proporcjach, a lista dogrywa je po
-     kolei już po narysowaniu tabeli. */
-  td.kolFoto { width: 56px; }
-  .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
-  .foto { object-fit: cover; border: 1px solid var(--border); }
-  .brakfoto {
-    border: 1px dashed var(--border); color: var(--ink-mute); font-size: 9px;
-    display: flex; align-items: center; justify-content: center; text-align: center;
-  }
   .typZd { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 1px 9px;
            font: 600 12px/1.5 var(--font-sans); background: var(--secondary); color: var(--ink-soft); }
   .typZd.blad { background: var(--err-bg); color: var(--err); }
   .typZd.dostawa { background: var(--amber-bg); color: var(--amber-ink); }
   .typZd.zwrot { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-mute); }
-  /* Pasek kroków kosza — te same pastylki co `.badge`, żeby nie było trzeciego
-     języka stanów obok pastylek i kropek. */
-  .cykl { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; vertical-align: middle; }
-  .cykl .krok { border-radius: 999px; padding: 1px 9px; font: 700 11px/1.5 var(--font-cond);
-                letter-spacing: .6px; color: var(--ink-mute); border: 1px dashed var(--border); }
-  .cykl .krok.za { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
-  .cykl .krok.teraz { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .cykl .krok.teraz.blad { background: var(--err); border-color: var(--err); }
-  .cykl .krokLacznik { width: 10px; height: 2px; background: var(--border); flex: none; }
   /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
      Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
      i ignoruje cały język wizualny. <dialog> jest natywny (Esc, fokus,
@@ -715,12 +695,12 @@
           <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           <span class="et">DOSTAWY ↗</span>
         </button>
-        <!-- Praca FIZYCZNA przy zwrotach: kosze z dokumentu MM i pominięte
-             pozycje. Kropka alarmu zamiast pigułki: tu nie liczy się ILE,
-             tylko CZY coś czeka. -->
-        <button data-widok="magazyn" title="Magazyn zwrotów">
+        <!-- MAGAZYN ZWROTÓW PRZESZEDŁ DO PANELU (0.436.0) — kosze mieszkają
+             w zakładce Zwroty, decyzją właściciela. Pozycja zostaje w pasku,
+             bo ręka jej tu szuka, i prowadzi tam z sesją, jak DOSTAWY. -->
+        <button data-panel="/obsluga/zwroty/kosze" title="Kosze — w panelu biura, w zakładce Zwroty">
           <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1z"/><path d="M3.3 7.4L12 12l8.7-4.6M12 12v9"/></svg>
-          <span class="et">MAGAZYN ZWROTÓW</span><i class="kropka" id="magazynKropka" hidden></i>
+          <span class="et">KOSZE ↗</span>
         </button>
       </div>
     </div>
@@ -781,41 +761,6 @@
 </main>
 
 <main id="panel" hidden>
-  <div id="widokMagazyn" class="widok" hidden>
-
-    <section class="card" id="koszeKarta">
-      <h2>KOSZE ZWROTOWE <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-      Kosz powstaje z dokumentu MM ZWROTY wystawionego w Subiekcie i od razu
-      jedzie na halę — kolektor prowadzi rozkładanie i zapisuje adresy.
-      Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
-      </p>
-      </div>
-      <div class="filtry" style="margin-bottom:10px">
-        <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
-          <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
-      </div>
-      <div id="koszWyniki"></div>
-      <table id="koszeLista"></table>
-      <div id="koszPodglad" style="margin-top:12px"></div>
-    </section>
-
-    <section class="card" id="pominieteKarta" hidden>
-      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-      Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
-      szukać dalej, reklamować u przewoźnika czy poprawić dokument.
-      Najdłużej czekające są na górze.
-      </p>
-      </div>
-      <table id="pominieteLista"></table>
-    </section>
-  </div>
-
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
   <div id="widokNadzor" class="widok wglad" hidden>
     <!-- KOLEJNOŚĆ: NAJPIERW TO, CO CZEKA NA BIURO (0.427.0, dekalog pkt 1 i 5).
@@ -1384,23 +1329,22 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-let widok = localStorage.getItem("wertis.widok") || "magazyn";
+let widok = localStorage.getItem("wertis.widok") || "nadzor";
 /* Zapamiętana nazwa widoku, którego już nie ma, daje PUSTY panel: `pokaz()`
    chowa wszystkie sześć i nie odsłania żadnego. Do 0.427.0 stała tu mapa
    ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
    wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
    następne przemianowanie nie wymaga pamiętania o tej linii. */
-/* „dostawy" w pamięci przeglądarki to ślad sprzed 0.435.0 — widok przeszedł
-   do panelu, więc biuro wstaje na pierwszej zakładce, która tu została. */
-if (!["magazyn", "nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "magazyn";
+/* „dostawy" i „magazyn" w pamięci przeglądarki to ślady sprzed 0.435.0
+   i 0.436.0 — oba widoki przeszły do panelu. Biuro wstaje wtedy na STANIE
+   SYSTEMU, bo tam prowadzą wiersze DO DECYZJI, które jeszcze mieszkają tutaj. */
+if (!["nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "nadzor";
 let ostatnieRozjazdy = null;
 /* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
 let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
 let odpowiedziNaNotatki = [];
-/** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
-let zdjeciaWlaczone = false;
 /* Stan konta Allegro i flaga trwającego parowania. Do 0.137.2 stały przy
    ekranie SPRAW i odeszły razem z nim, choć czyta je ikona w pasku bocznym —
    widoczna na KAŻDYM ekranie, więc odczyt bywa pierwszy. */
@@ -1449,12 +1393,7 @@ async function pobierz(sciezka, nazwa) {
 
 function wyloguj() {
   token = ""; kto = "";
-  // blob-URL-e zdjęć trzymamy przez całą sesję (patrz `dolozZdjecia`), więc to
-  // jest jedyne miejsce, w którym wolno je zwolnić
-  for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
-  zdjecia.clear();
   zwolnijLoga();
-  kolejkaFoto.length = 0;
   parowanieTrwa = false;
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
@@ -1491,7 +1430,6 @@ async function zaloguj() {
 function pokaz(nowy) {
   widok = nowy;
   localStorage.setItem("wertis.widok", nowy);
-  $("widokMagazyn").hidden = nowy !== "magazyn";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
@@ -1504,7 +1442,6 @@ function pokaz(nowy) {
   }
   /* Magazyn odświeża się na WEJŚCIU, nie w cyklu — cykl 30 s należy do
      widoku, na który się patrzy. */
-  if (nowy === "magazyn") odswiezEtap3();
   if (nowy === "nadzor") { odswiezNadzor(); odswiezStanAllegro(); }
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
@@ -1533,11 +1470,6 @@ function rysujStan(health, kolejka) {
   ostatniHealth = health ?? ostatniHealth;
   ostatniaKolejka = kolejka ?? ostatniaKolejka;
   health = ostatniHealth; kolejka = ostatniaKolejka;
-  /* `/api/health` niesie sekcję `zdjecia` TYLKO wtedy, gdy funkcja jest w ogóle
-     włączona (`ZDJECIA_ZRODLO`). Na instalacji bez zdjęć kolumna z ramkami
-     „bez zdjęcia" przy każdej pozycji byłaby czystym szumem — mówiłaby
-     o brakującej kartotece, choć brakuje ustawienia. */
-  if (health) zdjeciaWlaczone = !!health.zdjecia;
 
   const czerwone = [];
   const bursztynowe = [];
@@ -2903,67 +2835,6 @@ async function szukajDziennik() {
   }
 }
 
-/* ── Zdjęcia kartotek w koszach ───────────────────────────────────────────────
-   Zdjęcia kartotek stoją za sesją, więc `<img src>` wprost dostałby 401 —
-   pobieramy je fetchem i wstawiamy blob-URL. Do 0.435.0 tą kolejką jechały
-   też pozycje dostaw; dostawy przeszły do panelu, który ma własną kolejkę
-   o tych samych trzech regułach (`panel/src/towar/useZdjecie.ts`):
-
-   1. TRZY POBRANIA NARAZ, nie czterdzieści. Przy pierwszym trafieniu serwer
-      ciągnie plik z Subiekta (`zapewnijZdjecie`) — tą samą drogą, z której
-      korzystają kolektory stojące przy regale. Otwarcie dużego kosza nie ma
-      prawa ich zagłodzić.
-   2. BRAK ZDJĘCIA PAMIĘTAMY. Kartoteka bez obrazka odpowiada 404, a kosz
-      z czterdziestoma takimi pytałby czterdzieści razy przy każdym
-      przerysowaniu, w kółko, przez cały dzień.
-   3. BLOB-URL-E ŻYJĄ DO WYLOGOWANIA. Zwolnienie ich przy zamknięciu panelu
-      kasowałoby cache i kazało pobierać wszystko od nowa przy każdym wejściu
-      w ten sam kosz.                                                          */
-const zdjecia = new Map();      // klucz → blobUrl | null (null = na pewno brak)
-const kolejkaFoto = [];
-let pobieraczy = 0;
-const ROWNOLEGLE = 3;
-
-/* Wspólne wejście do kolejki dla wszystkich ekranów ze zdjęciami. Zadanie
-   niesie ze sobą pytanie „czy warto jeszcze pobierać" — bo ekran, z którego
-   pochodzi, mógł się w międzyczasie przerysować albo zniknąć. */
-function zakolejkuj(zadania, aktualne) {
-  for (const z of zadania) {
-    if (zdjecia.has(z.klucz)) { wstawZdjecie(z, zdjecia.get(z.klucz)); continue; }
-    kolejkaFoto.push({ ...z, aktualne });
-  }
-  while (pobieraczy < ROWNOLEGLE && kolejkaFoto.length) pobieracz();
-}
-
-/** Pusta komórka na zdjęcie; wypełni ją kolejka. Bez kartoteki nie ma czego pytać. */
-const kolFoto = (twId) =>
-  !zdjeciaWlaczone ? "" : `<td class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}></td>`;
-
-async function pobieracz() {
-  pobieraczy++;
-  while (kolejkaFoto.length) {
-    const z = kolejkaFoto.shift();
-    // zadanie z poprzedniego dokumentu albo z poprzedniego przerysowania
-    if (!z.aktualne()) continue;
-    let url = zdjecia.get(z.klucz);
-    if (url === undefined) {
-      try { url = URL.createObjectURL(await (await api(z.url)).blob()); }
-      catch { url = null; }
-      zdjecia.set(z.klucz, url);
-    }
-    if (!z.aktualne()) continue;
-    wstawZdjecie(z, url);
-  }
-  pobieraczy--;
-}
-
-function wstawZdjecie(z, url) {
-  const tresc = url
-    ? `<img class="${z.klasa}" src="${url}" alt="">`
-    : z.klasa ? '<div class="brakfoto">bez zdjęcia</div>' : "";
-  for (const cel of document.querySelectorAll(z.sel)) cel.innerHTML = tresc;
-}
-
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
    Druki dostawców pytają o dane ZGŁASZAJĄCEGO (nazwa, NIP, adres, osoba
    kontaktowa) — a tych system nigdzie nie ma, bo nie są danymi magazynu.
@@ -3078,7 +2949,7 @@ async function odswiez() {
 
 /* Liczniki zakładek odeszły razem z obsługą klienta (0.140.0). Pigułka
    mówiła, ile spraw czeka; magazyn takiej liczby nie ma — praca hali stoi
-   w koszach, a te widać na własnej zakładce. Nowa obsługa przyniesie własny
+   w koszach, a te od 0.436.0 widać w panelu, w Zwrotach. Nowa obsługa przyniesie własny
    licznik razem z własną kolejką.
 
    Od 0.364.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
@@ -3093,23 +2964,6 @@ async function odswiezLiczniki() {
        plakietka po prostu nie urośnie — a bursztyn od jego awarii zabrałby
        ten kolor sprawom, o których alarm miał mówić. */
     console.warn("[alarm wymiany]", e);
-  }
-}
-
-/* Kosze i pominięte pozycje — praca hali widziana z biura. Jedna funkcja,
-   bo odświeżają się razem z zakładką MAGAZYN i żadne z nich nie jest na
-   ścieżce krytycznej skanu. Reklamacje, zapowiedzi i raport zwrotów odeszły
-   stąd w 0.140.0 razem z rejestrem zwrotów. */
-async function odswiezEtap3() {
-  try {
-    const [k, pom] = await Promise.all([
-      (await api("/api/biuro/kosze")).json(),
-      (await api("/api/biuro/kosze/pominiete")).json(),
-    ]);
-    rysujKosze(k.kosze || []);
-    rysujPominiete(pom.pominiete || []);
-  } catch (e) {
-    cichaAwaria("kosze", e);
   }
 }
 
@@ -3151,346 +3005,6 @@ function dociagnijWglad(id) {
   const zrodlo = ZRODLA_WGLADU[id];
   if (zrodlo && !$(zrodlo[0]).innerHTML) zrodlo[1]();
 }
-
-/* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
-   zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
-/* Kropka przy pozycji MAGAZYN ZWROTÓW. Alarmy wyjechały ze SPRAW do własnego
-   widoku (0.125.0) i bez sygnału przy pozycji paska nikt by tam nie zaglądał —
-   dokładnie ta ślepota, przez którą karta odpowiedzi na notatki dostała
-   plakietkę w 0.57.0. Karmią ją renderery (jadą z cyklem etapu 3), więc nie
-   ma osobnego zapytania ani drugiego źródła prawdy. */
-const alarmyMagazynu = { paczki: 0, pominiete: 0 };
-function rysujKropkeMagazynu() {
-  const ile = alarmyMagazynu.paczki + alarmyMagazynu.pominiete;
-  $("magazynKropka").hidden = ile === 0;
-  $("magazynKropka").title = ile
-    ? `${ile} ${odmiana(ile, ["sprawa czeka", "sprawy czekają", "spraw czeka"])} w magazynie zwrotów`
-    : "";
-}
-
-function badgeKosza(status) {
-  if (status === "otwarty") return '<span class="badge amber">OTWARTY</span>';
-  if (status === "zamkniety") return '<span class="badge ok">NA HALĘ</span>';
-  /* Anulowany (0.123.0) NIE jest odcieniem rozłożonego, tylko jego
-     przeciwieństwem: praca się nie wydarzyła. Czerwień, bo to jedyny stan
-     kosza, o który ktoś w biurze może chcieć zapytać halę. */
-  if (status === "anulowany") return '<span class="badge err">ANULOWANY</span>';
-  return '<span class="badge mute2">ROZŁOŻONY</span>';
-}
-
-/* ── Na czym stoi dokument MM kosza (0.333.0) ────────────────────────────────
-   Zgłoszenie właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę
-   MM w Subiekcie". Dokument NIE JEST spóźniony ani zgubiony — czeka, i to
-   z powodu, który aplikacja zna od 0.200.0: towar wraca na magazyn główny
-   dopiero korektą, więc MM wystawione wcześniej przesuwałoby stan, którego
-   tam jeszcze nie ma.
-
-   Ekran o tym MILCZAŁ. Kosz zamknięty, bez numeru, z pastylką NA HALĘ wygląda
-   dokładnie jak awaria — i tak został zgłoszony. Pastylka mówi teraz, na co
-   kosz czeka i czyja to praca: korekta w Subiekcie czy kolejka Sfery.        */
-function stanMmKosza(k) {
-  if (k.rodzaj === "karton" || k.mmNumer) return "";
-  if (k.mmStan === "czeka_na_korekte") {
-    return `<span class="badge amber">CZEKA NA KOREKTĘ${
-      k.brakujeKorekt ? ` — ${k.brakujeKorekt} ZWR.` : ""}</span>`;
-  }
-  if (k.mmStan === "zamowiona") return '<span class="badge mute2">MM ZAMÓWIONA</span>';
-  if (k.mmStan === "blad") return '<span class="badge err">MM W BŁĘDZIE — SPRAWDŹ KOLEJKĘ</span>';
-  return "";
-}
-
-/* ── Cykl kosza jako pasek kroków (0.427.0, dekalog pkt 2 i 5) ─────────────
-   Wiersz kosza niósł dwie pastylki obok siebie — stan kosza i stan jego MM —
-   i żeby odpowiedzieć „gdzie ten kosz jest", trzeba było przeczytać obie
-   i złożyć je w głowie. Pasek kroków pokazuje MIEJSCE w cyklu: co za nim
-   (zielone), gdzie stoi (grafit), co przed nim (przerywane). MM zostaje
-   dopiskiem przy pasku, bo to osobny tor — kosz bywa rozłożony, zanim
-   Subiekt wystawi dokument, i pasek nie ma prawa udawać, że to jeden krok.
-
-   Anulowany nie jest krokiem cyklu, tylko wyjściem z niego — zostaje sam,
-   czerwoną pastylką, jak dotąd. MM w błędzie barwi bieżący krok na czerwono:
-   to jedyny stan, w którym kosz stoi z powodu, który ma naprawić biuro. */
-const KROKI_KOSZA = [["otwarty", "OTWARTY"], ["zamkniety", "NA HALĘ"], ["rozlozony", "ROZŁOŻONY"]];
-function cyklKosza(k, zMm) {
-  if (k.status === "anulowany") return badgeKosza(k.status);
-  const idx = KROKI_KOSZA.findIndex(([st]) => st === k.status);
-  const teraz = idx < 0 ? KROKI_KOSZA.length - 1 : idx;
-  const blad = zMm && k.mmStan === "blad" && !k.mmNumer && k.rodzaj !== "karton";
-  const kroki = KROKI_KOSZA.map(([, et], n) =>
-    `<span class="krok${n < teraz ? " za" : n === teraz ? (blad ? " teraz blad" : " teraz") : ""}">${et}</span>`)
-    .join('<i class="krokLacznik"></i>');
-  return `<span class="cykl" title="Kosz: ${KROKI_KOSZA[teraz][1]}">${kroki}</span>${zMm ? stanMmKosza(k) : ""}`;
-}
-
-/* Kolumna ROZŁOŻYŁ: osoba nad godziną, jak KTO ODŁOŻYŁ przy pozycjach dostawy.
-   Kosz nierozłożony dostaje MYŚLNIK, nie pustkę — pusta komórka wygląda na brak
-   danych, a to jest odpowiedź „jeszcze nikt". Ślad znika sam po COFNIJ
-   ZAKOŃCZENIE, bo serwer kasuje oba pola: kolumna nie zostaje z nazwiskiem
-   przy koszu, który wrócił do rozkładania. */
-function rysujKosze(kosze) {
-  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Pięciu kolumn nie da się
-     złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół.
-
-     KARTONY (0.122.0) stoją na tej samej liście i to jest zamierzone: dla
-     biura „co jest na hali do rozłożenia" jest jednym pytaniem. Bez pastylki
-     karton wyglądałby jednak jak kosz zepsuty — zero zwrotów, brak MM, a mimo
-     to praca w toku. Biuro go tu WYŁĄCZNIE ogląda: zawartość zbiera hala,
-     bo tylko ona wie, co ktoś włożył do pudła. */
-  $("koszeLista").innerHTML = kosze.length
-    ? kosze.map((k) => {
-        const karton = k.rodzaj === "karton";
-        return `<tr data-kosz="${k.id}" style="cursor:pointer">
-          <td class="sprawaWiersz">
-            <span class="sprawaGora">
-              <span class="b">${esc(k.kod)}</span>
-              <span class="mute">${karton
-                ? `${k.pozycji} poz.`
-                : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow ?? 0} zwr.`}</span>
-            </span>
-            <span class="sprawaTemat">${k.status === "anulowany"
-              ? `Anulowany${k.anulowanoPrzez ? ` przez ${esc(k.anulowanoPrzez)}` : ""} — ${
-                  k.odlozonych} z ${k.pozycji} poz. zdążyło wrócić na półki.`
-              : k.status === "otwarty"
-              ? (karton
-                  ? "Hala zbiera zawartość — pudło jeszcze otwarte."
-                  : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.")
-              : `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${k.rozlozonoPrzez
-                  ? ` · ${esc(k.rozlozonoPrzez)}` : ""}`}</span>
-            <span class="sprawaStopka">
-              ${karton ? '<span class="badge mute2">KARTON</span>' : ""}
-              ${cyklKosza(k, true)}
-              ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
-              ${k.status === "otwarty" && !karton
-                ? `<button class="akcja cichy maly" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
-                : ""}
-            </span>
-          </td>
-        </tr>`;
-      }).join("")
-    : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
-  // podgląd otwartego kosza odświeża się razem z listą, bez mrugania
-  if (koszPodgladId != null && !kosze.some((k) => k.id === koszPodgladId)) zamknijPodgladKosza();
-  else if (koszPodgladId != null) pokazPodgladKosza(koszPodgladId, true);
-}
-
-/* ── Pominięte pozycje ze wszystkich koszy ───────────────────────────────────
-   To jest LISTA PRACY, nie historia: każdy wiersz znaczy towar, którego nie
-   było, i czeka na decyzję człowieka. Sortowanie po wieku jest treścią —
-   sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
-
-function rysujPominiete(lista) {
-  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — otwarta dyskusja na
-     SPRAWACH nie ma jej już czym zasłaniać. */
-  $("pominieteKarta").hidden = lista.length === 0;
-  alarmyMagazynu.pominiete = lista.length;
-  rysujKropkeMagazynu();
-  if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
-  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Zdjęcie zostaje, bo przy
-     „czego nie było w koszu" to ono najszybciej mówi, o który towar chodzi. */
-  $("pominieteLista").innerHTML = lista.map((p) => `<tr>
-        ${kolFoto(p.twId)}
-        <td class="sprawaWiersz">
-          <span class="sprawaGora">
-            <span class="b">${esc(p.symbol || p.kod)}</span>
-            <span class="mute">${p.dni > 0 ? `${p.dni} dni` : "dziś"}</span>
-          </span>
-          <span class="sprawaTemat">${esc(p.nazwa)} · ${p.ilosc} szt.</span>
-          <span class="sprawaStopka">
-            <span class="badge mute2">KOSZ ${esc(p.kod)}</span>
-            <span class="badge amber">${esc(p.powod || "bez powodu")}</span>
-            <button class="akcja cichy maly" data-zalatw="${p.pozycjaId}">ZAŁATWIONE</button>
-          </span>
-        </td>
-      </tr>`).join("");
-  dolozZdjeciaListy(lista, "pominieteLista", "sesjaPominietych");
-}
-
-/* ── „W którym koszu jechał ten towar?" ──────────────────────────────────────
-   Pytanie pada po fakcie: towar zniknął albo klient dopomina się o zwrot.
-   Szukanie idzie po SNAPSHOCIE z kosza, więc odpowiada na pytanie o to, co
-   w koszu naprawdę leżało — nawet gdy kartoteka zdążyła się zmienić.         */
-
-async function szukajWKoszach(q) {
-  const cel = $("koszWyniki");
-  if (q.trim().length < 2) { cel.innerHTML = ""; return; }
-  try {
-    const d = await (await api(`/api/biuro/kosze/szukaj?q=${encodeURIComponent(q.trim())}`)).json();
-    const lista = d.znalezione || [];
-    cel.innerHTML = !lista.length
-      ? `<p class="mute">Nic w koszach nie pasuje do „${esc(q.trim())}".</p>`
-      : `<p class="mute" style="margin-bottom:4px">Znalezione w koszach: ${lista.length}</p>
-         <table style="margin-bottom:12px">
-          <tr><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>GDZIE</th><th>KIEDY</th></tr>` +
-        lista.map((z) => `<tr>
-            <td><span class="b">${esc(z.kod)}</span> ${badgeKosza(z.koszStatus)}${z.mmNumer
-              ? `<div class="mute">MM ${esc(z.mmNumer)}</div>` : ""}</td>
-            <td>${z.symbol ? `<span class="b">${esc(z.symbol)}</span><br>` : ""}${esc(z.nazwa)}</td>
-            <td class="b">${z.ilosc}</td>
-            <td>${z.status === "skipped"
-              ? `<span class="badge amber">POMINIĘTA</span><div class="mute">„${esc(z.powod || "")}”</div>`
-              : z.lokFaktyczna
-                ? `<span class="badge ok">${esc(z.lokFaktyczna)}</span>`
-                : '<span class="mute">czeka na hali</span>'}</td>
-            <td class="mute" style="white-space:nowrap">${z.kiedy
-              /* Przez `stempelLokalny`, nie własnym cięciem napisu: strefa jest
-                 tu istotna (znacznik z bazy jest w UTC), a druga metoda
-                 formatowania w tym samym pliku prędzej czy później rozjedzie
-                 się z pierwszą o godzinę. */
-              ? esc(stempelLokalny(z.kiedy)) : "—"}</td>
-          </tr>`).join("") + "</table>";
-  } catch (e) {
-    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
-  }
-}
-
-/* ── Podgląd zawartości kosza ────────────────────────────────────────────────
-   Biuro widziało dotąd sam licznik „3/6 poz." i nie miało jak sprawdzić, CO
-   w koszu leży ani gdzie hala to odłożyła. Przy pominięciu (0.77.0) było to
-   już nie tylko niewygodne, ale mylące: kosz wracał niekompletny, a ekran
-   pokazywał zwykły postęp.
-
-   Podgląd czyta tę samą trasę co karta zwrotu (`/api/biuro/kosze/:id`), więc
-   nie ma tu drugiego źródła prawdy o zawartości.                              */
-
-let koszPodgladId = null;
-
-function zamknijPodgladKosza() {
-  koszPodgladId = null;
-  $("koszPodglad").innerHTML = "";
-}
-
-async function pokazPodgladKosza(id, cichy) {
-  const cel = $("koszPodglad");
-  koszPodgladId = id;
-  if (!cichy) cel.innerHTML = '<p class="mute">Wczytuję zawartość kosza…</p>';
-  try {
-    const k = (await (await api(`/api/biuro/kosze/${id}`)).json()).kosz;
-    if (koszPodgladId !== id) return; // ktoś w międzyczasie otworzył inny
-    /* Zdanie o źródle mówiło do 0.276.x, że powrót wystawia biuro. Od 0.277.0
-       nie wystawia — dokument zamawia aplikacja, a etap „powrót MM" niżej mówi,
-       na czym stanął. Zdanie, które zostało nieprawdą, jest gorsze niż jego
-       brak: uczy chodzić do Subiekta po robotę, której tam już nie ma. */
-    /* `k.zwroty ?? []` nie jest ostrożnością na wyrost: to pole serwer zaczął
-       oddawać dopiero w 0.333.0, a przedtem ta linijka wywracała cały podgląd
-       kosza złożonego w aplikacji („cannot read properties of undefined"). */
-    const zwroty = k.zwroty ?? [];
-    const bezKorekty = zwroty.filter((z) => !z.korektaNumer);
-    const zrodlo = k.mmNumer
-      ? `z przesunięcia MM ${esc(k.mmNumer)}`
-      : `${zwroty.length} zwr. przypiętych w aplikacji`;
-    const pominiete = k.pozycje.filter((p) => p.status === "skipped");
-    /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione
-       i przez kogo"; podgląd odpowiada przy sprawie „co się z tym działo".
-       Kosz otwarty nie pokazuje niczego, bo nic się jeszcze nie stało. */
-    /* Powrót z bufora dopisany jako trzeci etap (0.266.0). Bez niego karta
-       kończyła się na „rozłożył" i nie odpowiadała na pytanie, po którym
-       biuro sięgało do Subiekta: czy stan wrócił z regału zwrotów na halę. */
-    const powrot = !k.powrot ? null
-      : k.powrot.numer ? `powrót MM ${esc(k.powrot.numer)}`
-      : k.powrot.status === "error" ? "powrót MM w błędzie — sprawdź kolejkę"
-      : "powrót MM zamówiony, czeka na dokument";
-    const etapy = [
-      k.zamknietoPrzez && `zamknął ${esc(k.zamknietoPrzez)} · ${esc(stempelLokalny(k.zamknietoAt))}`,
-      k.rozlozonoPrzez && `rozłożył ${esc(k.rozlozonoPrzez)} · ${esc(stempelLokalny(k.rozlozonoAt))}`,
-      powrot,
-    ].filter(Boolean);
-    cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
-        KOSZ ${esc(k.kod)} ${cyklKosza(k, false)}
-        ${k.doEdycji
-          ? `<button class="akcja cichy" data-przelicz-kosz="${k.id}"
-               style="margin-left:auto">PRZELICZ ZE ZWROTÓW</button>
-             <button class="akcja cichy" data-kosz-zamknij-podglad>ZWIŃ</button>`
-          : '<button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>'}
-      </h2>
-      <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
-      ${etapy.length ? `<p class="mute" style="margin-bottom:8px">${etapy.join(" → ")}</p>` : ""}
-      ${k.doEdycji
-        ? `<p class="mute">Dokumentu jeszcze nie ma, więc zawartość da się poprawić.
-             PRZELICZ ZE ZWROTÓW układa ją od nowa z ocen „na stan" — zestaw
-             sprzedany jedną ofertą wchodzi wtedy rozbity, tak jak leży na
-             magazynie.</p>`
-        : ""}
-      ${bezKorekty.length
-        ? `<p><span class="badge amber">CZEKA NA KOREKTĘ</span>
-             MM wyjdzie, gdy dojdą numery korekt do ${bezKorekty.length} zwr.:
-             ${bezKorekty.slice(0, 8).map((z) => esc(z.numer)).join(", ")}${
-               bezKorekty.length > 8 ? " …" : ""}</p>`
-        : ""}
-      ${pominiete.length
-        ? `<p><span class="badge amber">KOSZ NIEKOMPLETNY</span>
-             hala pominęła ${pominiete.length} poz. — powód przy wierszu niżej</p>`
-        : ""}
-      <table>${
-        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-        "<th>TOWAR</th><th>ILOŚĆ</th><th>ADRES</th><th>STAN</th></tr>" +
-        k.pozycje.map((p) => `<tr>
-            ${kolFoto(p.twId)}
-            <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
-            <td class="b" style="white-space:nowrap">${p.ilosc}${p.unit ? ` ${esc(p.unit)}` : ""}</td>
-            <td style="white-space:nowrap">${p.lokFaktyczna
-              ? `<span class="badge ok">${esc(p.lokFaktyczna)}</span>`
-              : p.lokOczekiwana
-                ? `<span class="mute">${esc(p.lokOczekiwana)}</span>`
-                : '<span class="mute">—</span>'}</td>
-            <td>${stanPozycjiKosza(p)}</td>
-          </tr>`).join("")
-      }</table>`;
-    dolozZdjeciaKosza(k.pozycje);
-  } catch (e) {
-    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
-  }
-}
-
-/** Jedno zdanie o pozycji: co się z nią stało i kto to zrobił. */
-function stanPozycjiKosza(p) {
-  if (p.status === "skipped") {
-    /* Załatwienie NIE kasuje pominięcia — dopisuje się do niego. Kosz na
-       zawsze zostaje niekompletny, zmienia się tylko to, czy sprawa wisi. */
-    const zamkniete = p.zalatwioneAt
-      ? `<div class="mute">załatwione${p.zalatwionePrzez ? ` · ${esc(p.zalatwionePrzez)}` : ""}${
-          p.zalatwioneNotatka ? `<br>„${esc(p.zalatwioneNotatka)}”` : ""
-        }</div>`
-      : "";
-    return `<span class="badge amber">POMINIĘTA</span>
-      <div class="mute">„${esc(p.powod || "bez powodu")}”</div>${zamkniete}`;
-  }
-  if (p.status === "done") {
-    /* Stan MM mówi, czy bufor NAPRAWDĘ się cofnął w Subiekcie. Kolejka zapisów
-       pokazuje błędy globalnie, ale nie wiąże ich z koszem — a to jest właśnie
-       pytanie, które biuro zadaje przy tej pozycji. */
-    const mm = p.mmNumer
-      ? `<div class="mute">MM ${esc(p.mmNumer)}</div>`
-      : p.mmStatus === "error"
-        ? '<div><span class="badge err">MM W BŁĘDZIE</span></div>'
-        : p.mmStatus
-          ? `<div class="mute">MM: ${esc(p.mmStatus)}</div>`
-          : "";
-    return `<span class="badge ok">ODŁOŻONA</span>${p.odlozonoPrzez
-      ? `<div class="mute">${esc(p.odlozonoPrzez)}${p.odlozonoAt
-          ? ` · ${esc(stempelLokalny(p.odlozonoAt))}` : ""}</div>`
-      : ""}${mm}`;
-  }
-  return '<span class="mute">czeka na hali</span>';
-}
-
-/* Zdjęcia w tabelach koszy. Każda tabela ma WŁASNY licznik sesji: odświeżają
-   się różnym rytmem, a zdjęcie dorysowane do zwiniętego już panelu trafiłoby
-   w nieistniejącą komórkę. */
-const sesjeFoto = {};
-function dolozZdjeciaListy(wiersze, tabela, klucz) {
-  if (!zdjeciaWlaczone) return;
-  const moja = (sesjeFoto[klucz] = (sesjeFoto[klucz] || 0) + 1);
-  const aktualne = () => moja === sesjeFoto[klucz];
-  zakolejkuj(
-    wiersze.filter((w) => w.twId != null).map((w) => ({
-      klucz: `t${w.twId}`, url: `/api/products/${w.twId}/zdjecie`,
-      sel: `#${tabela} td.kolFoto[data-tw="${w.twId}"]`, klasa: "foto",
-    })),
-    aktualne
-  );
-}
-
-const dolozZdjeciaKosza = (pozycje) => dolozZdjeciaListy(pozycje, "koszPodglad", "sesjaKosza");
 
 /* ── Konto Allegro (device flow) ── */
 
@@ -3661,7 +3175,7 @@ function start() {
    `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
    krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
 const TABELE_DLUGIE = new Set([
-  "koszeLista", "dziennik", "pominieteLista",
+  "dziennik",
   "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc", "reguly",
   "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
 ]);
@@ -4144,90 +3658,7 @@ $("zapiszFirme").addEventListener("click", zapiszFirme);
 $("szukajDziennik").addEventListener("click", szukajDziennik);
 $("csvDziennik").addEventListener("click", () =>
   pobierz(`/api/events/csv?${paramyDziennika()}`, "wertis-audyt.csv"));
-/* ── Magazyn zwrotów i konto Allegro — zdarzenia ── */
-
-/* Zamknięcie sprawy pominięcia. Notatka jest dobrowolna — najczęstszym
-   zakończeniem jest „znalazło się", a wymuszanie zdania przy każdym kliknięciu
-   kosztowałoby więcej, niż warte jest to zdanie. */
-$("pominieteLista").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-zalatw]");
-  if (!b) return;
-  const notatka = await potwierdz({
-    tytul: "SPRAWA ZAŁATWIONA",
-    opis: "Pozycja zostaje pominięta — to fakt z hali. Znika tylko z listy pracy.",
-    pole: true,
-    przyklad: "np. znalazło się na regale / reklamacja u kuriera / korekta dokumentu",
-    potwierdz: "ZAŁATWIONE",
-  });
-  if (notatka === null) return;
-  try {
-    const d = await api(`/api/biuro/kosze/pominiete/${b.dataset.zalatw}/zalatwione`, {
-      method: "POST",
-      body: JSON.stringify({ notatka }),
-    });
-    rysujPominiete((await d.json()).pominiete || []);
-  } catch (err) { toast(err.message, "blad"); }
-});
-
-
-/* Wiersz z koszem w ANALIZIE prowadzi TAM, gdzie się z nim coś robi — do jego
-   podglądu na zakładce MAGAZYN. Wiersz musi więc najpierw przełączyć zakładkę;
-   bez tego klik gasł bez śladu, bo `#koszPodglad` przewijał się w schowanym
-   widoku.
-
-   Nasłuch siedzi na `#widokAnaliza`, nie na `#czasyKarta`. Ta karta właśnie
-   przyjechała z innej zakładki i przy następnej przeprowadzce zabrałaby
-   nasłuch ze sobą albo go zgubiła — piąty raz z rzędu ta sama usterka
-   (0.92.0, 0.96.0, 0.97.0, 0.98.0). Zakładka stoi w miejscu. */
-$("widokAnaliza").addEventListener("click", async (e) => {
-  const k = e.target.closest("[data-kosz]");
-  if (!k) return;
-  pokaz("magazyn");
-  await pokazPodgladKosza(Number(k.dataset.kosz));
-  $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
-});
-
-let koszSzukajTimer = null;
-$("koszSzukaj").addEventListener("input", (e) => {
-  clearTimeout(koszSzukajTimer);
-  const q = e.target.value;
-  koszSzukajTimer = setTimeout(() => szukajWKoszach(q), 250);
-});
-
-$("koszPodglad").addEventListener("click", async (e) => {
-  if (e.target.closest("[data-kosz-zamknij-podglad]")) { zamknijPodgladKosza(); return; }
-  const przelicz = e.target.closest("[data-przelicz-kosz]");
-  if (!przelicz) return;
-  /* BEZ PYTANIA O ZGODĘ (§25a.5): przeliczenie niczego nie wysyła i niczego nie
-     traci — układa zawartość od nowa z tych samych ocen. Nieodwracalny jest
-     dopiero dokument, a tego tu jeszcze nie ma. */
-  const id = Number(przelicz.dataset.przeliczKosz);
-  przelicz.disabled = true;
-  try {
-    const w = await (await api(`/api/biuro/kosze/${id}/przelicz`, { method: "POST" })).json();
-    toast(`Przeliczono: ${w.przed} → ${w.po} kartotek`);
-    await odswiezEtap3();
-  } catch (err) {
-    /* TOAST, nie `cichaAwaria`: to czynność KLIKNIĘTA, a serwis odmawia
-       zdaniem („kosz ma już dokument MM"). Odmowa schowana w konsoli wygląda
-       jak przycisk, który nic nie robi. */
-    toast(err.message, "blad");
-  } finally {
-    przelicz.disabled = false;
-  }
-});
-
-/* Kosz otwiera się KLIKNIĘCIEM WIERSZA, a drugie kliknięcie go zwija — to samo
-   dotknięcie, dwa kierunki, bez osobnego przycisku w tabeli. Przycisku
-   ZAMKNIJ KOSZ nie ma od 0.140.0: kosz przyjeżdża dokumentem MM z Subiekta
-   i rodzi się zamknięty, więc nie ma czego domykać ręką. */
-$("koszeLista").addEventListener("click", async (e) => {
-  const wiersz = e.target.closest("[data-kosz]");
-  if (!wiersz) return;
-  const id = Number(wiersz.dataset.kosz);
-  if (koszPodgladId === id) zamknijPodgladKosza();
-  else await pokazPodgladKosza(id);
-});
+/* ── Konto Allegro — zdarzenia ── */
 
 $("allegroAkcje").addEventListener("click", async (e) => {
   if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();

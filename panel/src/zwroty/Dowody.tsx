@@ -14,6 +14,7 @@ import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { Link as RouterLink } from "react-router-dom";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
    Akcji tu nie ma — te stoją w pasku werdyktu i mają być jedynym miejscem,
@@ -54,6 +55,11 @@ const ODRZUCENIA: Record<string, string> = {
   NEW_ITEM_SENT: "wysłano nowy towar",
   ITEM_FIXED: "towar naprawiono",
   MISSING_PART_SENT: "dosłano brakującą część",
+};
+
+/** Stan kosza słowem — te same słowa co pasek kroków na ekranie koszy. */
+const STAN_KOSZA: Record<string, string> = {
+  otwarty: "otwarty — zbiera towar", zamkniety: "na hali", rozlozony: "rozłożony", anulowany: "anulowany",
 };
 
 const Sekcja = ({ ikona, tytul, children }: {
@@ -145,7 +151,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
 }
 
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
-  fakturaBlad = "", onFaktura, os = [], sprawy = [], droga = [],
+  fakturaBlad = "", onFaktura, os = [], sprawy = [], droga = [], kosze = [],
   trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
   }: {
   zwrot: Zwrot;
@@ -160,6 +166,8 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
      szczegółu — a wtedy pusta lista po prostu nie rysuje sekcji. */
   sprawy?: SprawaZakupu[];
   droga?: PrzystanekDrogi[];
+  /** Kosze z towarem tego zwrotu (0.436.0) — druga strona wiązania kosz ↔ zwrot. */
+  kosze?: Array<{ id: number; kod: string; status: string }>;
   trwaNotatka?: boolean;
   bladNotatki?: string;
   /** Brak = kolumna notatki nie pokazuje (pole bez zapisu kłamie). */
@@ -392,6 +400,21 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     {sprawy.length > 0 &&
     <Sekcja ikona={<Scale size={14} />} tytul="Sprawy tego zakupu">
       <SprawyZakupu sprawy={sprawy} />
+    </Sekcja>}
+
+    {/* KOSZE Z TOWAREM TEGO ZWROTU (0.436.0). Pozycja pisała „w koszyku
+        zwrotów" bez nazwy i bez drogi, a pytanie „gdzie jest towar z tego
+        zwrotu" pada właśnie tutaj. Kosz wymieniał swoje zwroty od dawna —
+        dopiero z tą sekcją wiązanie działa w obie strony. */}
+    {kosze.length > 0 &&
+    <Sekcja ikona={<Package size={14} />} tytul="Towar w koszach">
+      <ul className="space-y-1">
+        {kosze.map((k) => <li key={k.id}>
+          <RouterLink to={`/obsluga/zwroty/kosze/${k.id}`} className="font-semibold underline">
+            {k.kod}</RouterLink>
+          <span className="ml-2 text-slate-600">{STAN_KOSZA[k.status] ?? k.status}</span>
+        </li>)}
+      </ul>
     </Sekcja>}
 
     {droga.length > 1 &&

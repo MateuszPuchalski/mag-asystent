@@ -9,7 +9,7 @@ Kanwa: https://claude.ai/artifact/EyBQaCKkn94LK16Hgd7uW6
 |---|---|
 | `Main.dc.html` | DO DECYZJI — ekran-lista jak Moje i Zadania |
 | `Dostawy.dc.html` | Dostawy — kolejka, dokument, dowody, jak Zwroty |
-| `Kosze.dc.html` | Kosze — kolejka, kosz, zwroty w koszu |
+| `Kosze.dc.html` | Kosze — kolejka, kosz, zwroty w koszu (miejsce zmienione, patrz niżej) |
 | `Stan.dc.html` | Stan systemu — karty jak Ustawienia |
 | `Analiza.dc.html` | Analiza widziana przez administratora |
 | `AnalizaBiuro.dc.html` | Analiza widziana przez rolę biuro |
@@ -43,6 +43,11 @@ wgląd w dolnym rzędzie. Rzadka zmiana idzie za zębatkę. Reszta wypada.
 panelu z DO DECYZJI na początku. Dolny niesie magazyn i wgląd, a z prawej stan,
 zębatkę i wyjście. Zmierzone w Chromium: górny rząd potrzebuje 1155 px, dolny
 1044 px, więc przy 1180 px nic się nie zawija. Nagłówek ma 111 px wysokości.
+
+> **Kosze zmieniły miejsce w 0.436.0, decyzją właściciela.** Plansza rysuje je
+> w drugim rzędzie nagłówka; wdrożone mieszkają w zakładce Zwroty, pod
+> przełącznikiem Zwroty · Kosze. Układ trzech kolumn zostaje taki, jak na
+> planszy — zmieniło się tylko wejście.
 
 **Dostawy i Kosze to ekrany-kolejki jak Zwroty i Reklamacje.** Z lewej stoi
 kolejka z kubełkami i pytaniem decyzji, na środku sprawa, z prawej dowody.

@@ -1324,9 +1324,10 @@ ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazyn
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
-Biuro sprawdza zawartość kosza w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE
-ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
-i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
+Biuro sprawdza zawartość kosza w panelu: `/obsluga` → Zwroty → Kosze (od
+0.436.0; wcześniej `/biuro` → MAGAZYN ZWROTÓW). Wybór kosza pokazuje pozycje
+z adresem odłożenia i stanem każdej z nich; kosz z pominięciem jest podpisany
+jako niekompletny.
 
 Od 0.84.0 lista niesie kolumnę **ROZŁOŻYŁ**: nazwisko i godzinę. Podgląd
 pokazuje cały cykl życia kosza — kto go zamknął i kto rozłożył, z godzinami.
@@ -1369,8 +1370,7 @@ go miał**: towar nie opuścił magazynu, więc żaden stan się nie zmienia.
    rozłożenia — ten sam ekran, ten sam skan półki, ten sam ZAKOŃCZ.
 4. ZAKOŃCZ zapisuje **wyłącznie adresy półek**. Żadnego dokumentu w Subiekcie.
 
-Kartony pojawiają się w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE ZWROTOWE, z pastylką
-KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
+Kartony pojawiają się w `/obsluga` → Zwroty → Kosze, z pastylką KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
 ktoś włożył do pudła. Kilka kartonów naraz jest stanem normalnym.
 
 Wpisywanie w polu u góry **szuka w kartotece** (0.123.0), a nie dodaje w
@@ -2582,6 +2582,26 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.436.0 — kosze w zakładce Zwroty
+
+**Migracji nie ma. Panel trzeba przebudować.** Szczegół zwrotu niesie odtąd
+listę koszy z jego towarem (`kosze`). Kolektor tego nie czyta.
+
+Co zmienia się dla biura:
+
+- **Kosze są w panelu, w zakładce Zwroty**, pod przełącznikiem Zwroty · Kosze.
+  Decyzja właściciela: kosz jest dalszym ciągiem zwrotu, więc mieszka obok
+  niego, a nie w osobnym rzędzie nagłówka.
+- **MAGAZYN ZWROTÓW zniknął z `biuro.html`.** Pozycja KOSZE w pasku biura
+  prowadzi do panelu z sesją. Biuro wstaje odtąd na STANIE SYSTEMU.
+- **Karta zwrotu mówi, w którym koszu jedzie jego towar**, i prowadzi do niego.
+  Kosz od dawna prowadził do swoich zwrotów — teraz wiązanie działa w obie
+  strony.
+
+Sprawdzenie po wdrożeniu idzie tak. Wejdź w Zwroty → Kosze kontem biura.
+Otwórz kosz z pominiętą pozycją i kliknij „Załatwione” z notatką. Pozycja ma
+zejść z kubełka Pominięte i zostać w koszu jako pominięta z notatką.
 
 ### Aktualizacja do 0.435.0 — DO DECYZJI i dostawy w panelu
 

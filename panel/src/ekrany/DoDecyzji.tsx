@@ -67,7 +67,7 @@ function Wiersz({ p, kto }: { p: PozycjaDecyzji; kto: string }) {
       ? <Link to={p.cel.panel} className={klasa}>{tresc}
           <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
       : <a href="/biuro" className={klasa} title="Otwiera się w dawnym biurze"
-          onClick={() => doBiura((p.cel as { biuro: "magazyn" | "nadzor" }).biuro, kto)}>{tresc}
+          onClick={() => doBiura((p.cel as { biuro: "nadzor" }).biuro, kto)}>{tresc}
           <ArrowUpRight size={18} className="shrink-0 text-slate-400" /></a>}
   </li>;
 }

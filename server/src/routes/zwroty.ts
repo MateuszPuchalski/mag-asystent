@@ -9,7 +9,7 @@ import {
   zamknijKosz, zaznaczSkladnik,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
-import { towarZKodu } from "../services/kosze.js";
+import { koszeZwrotu, towarZKodu } from "../services/kosze.js";
 import { wierszeDokumentuZwrotu } from "../services/komplety.js";
 import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
@@ -999,6 +999,9 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          liczy naraz wszystkie zwroty, a ten odczyt pyta o każde zamówienie
          osobno. */
       ...kontekstZwrotu(db(), id),
+      /* Kosze z towarem tego zwrotu (0.436.0) — druga strona wiązania
+         kosz ↔ zwrot, powód przy `koszeZwrotu`. */
+      kosze: koszeZwrotu(id),
     };
   });
 
