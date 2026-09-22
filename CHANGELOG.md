@@ -65,6 +65,30 @@ wołający jest w transakcji i wycofuje się z niej w całości. Bramka
 `koszDoEdycji` odsiewa ten stan wcześniej; ten warunek jest drugą linią na
 wyścig między sprawdzeniem bramki a zapisem.
 
+## 0.419.0 — 22 września 2026
+
+**Obie karty przeglądarki noszą znak firmy.** Decyzja właściciela z dwoma
+plikami: magazyn dla podglądu biura, słuchawki dla obsługi klienta.
+
+- **Panel obsługi nie miał ikony WCALE** — karta była pusta. Plik idzie przez
+  Vite do `assets/` razem z resztą builda, więc dostaje sumę w nazwie
+  i roczny cache jak każdy inny zasób panelu.
+- **Biuro rysowało literę „W"** wklejoną jako SVG w adresie `data:`. Powód,
+  dla którego tam stała — 404 na `/favicon.ico`, o który przeglądarka pyta
+  sama — nie dotyczy adresu, który strona nazywa w `<link>`. Ikona wychodzi
+  teraz z `/biuro/ikona.webp`, czytanego raz przy starcie i oddawanego
+  z tygodniowym cache'em; dokładnie jak fonty Barlow obok.
+- **`.webp` weszło na białą listę typów panelu.** Bez tego wpisu ikona
+  wyszłaby jako strumień bajtów i pasek zostałby pusty — czyli tak jak przed
+  tym wydaniem, tylko z plikiem na dysku.
+- Test pilnuje PARY: adresu nazwanego w stronie biura i trasy, która go
+  obsługuje. Rozjazd między nimi daje pustą ikonę i 404 w logu, czyli usterkę,
+  której nikt nie zgłosi.
+- **Pliki zostają w formacie, w którym przyszły** (WebP, 26 i 35 kB). Chrome
+  czyta webp w ikonie karty od 2014 roku, a biuro i obsługa pracują w Chrome;
+  przerobienie ich na mniejsze PNG-i wymagałoby narzędzia, którego to repo
+  nie ma.
+
 ## 0.418.0 — 22 września 2026
 
 **Okno rozmowy zachowuje się jak okno rozmowy.** Trzy zgłoszenia właściciela
