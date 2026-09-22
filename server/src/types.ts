@@ -262,6 +262,17 @@ export interface DeliveryLineView {
    */
   cofnij?: { qty: number; lok: string } | null;
   /**
+   * Wszystkie odłożenia pozycji, które da się cofnąć, najstarsze pierwsze.
+   * `locActual` trzyma tylko ostatnią półkę; pozycja rozłożona na dwie
+   * półki ma tu obie.
+   */
+  odlozenia?: Array<{ qty: number; lok: string }>;
+  /**
+   * Kody kreskowe towaru (EAN z kartoteki i kody nadane w WERTIS). Kolektor
+   * dopasowuje po nich skan bez sieci — patrz `kodyTowarow` w serwisie.
+   */
+  kody?: string[];
+  /**
    * Najnowsze nierozstrzygnięte zgłoszenie CZŁOWIEKA przy tej pozycji.
    * Kolektor stawia przy nim WYCOFAJ; serwer i tak sprawdza, kto zgłaszał.
    */

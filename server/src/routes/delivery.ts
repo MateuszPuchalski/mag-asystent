@@ -10,6 +10,7 @@ import {
   putawayLine,
   resolveScan,
   zakonczDostawe,
+  type LosNietknietych,
 } from "../services/delivery.js";
 import { odpowiedzNaNotatke } from "../services/notatki.js";
 import { cofnijOdlozenie, otworzPonownie, zmienPolke } from "../services/cofanie-dostawy.js";
@@ -194,10 +195,13 @@ export async function deliveryRoutes(app: FastifyInstance) {
    * pominięte. Bez bramki roli — to jest czynność magazyniera przy palecie,
    * a nie orzeczenie o pracy, której nie było (tamto siedzi pod `/biuro`).
    */
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { nietkniete?: LosNietknietych } }>(
     "/api/delivery/:id/zakoncz",
     async (req, reply) => {
-      const r = zakonczDostawe(Number(req.params.id), userOf(req));
+      // `nietkniete` obowiązkowe, gdy są pozycje nietknięte — patrz `zakonczDostawe`
+      const r = zakonczDostawe(Number(req.params.id), userOf(req), {
+        nietkniete: req.body?.nietkniete ?? null,
+      });
       if ("error" in r) return reply.code(400).send(r);
       return r;
     }

@@ -4,6 +4,8 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.AktualizacjaResponse
 import pl.wertis.kolektor.core.net.KorektaBody
+import pl.wertis.kolektor.core.net.KorektaResponse
+import pl.wertis.kolektor.core.net.ZakonczBody
 import pl.wertis.kolektor.core.net.CofniecieOdlozeniaResponse
 import pl.wertis.kolektor.core.net.OtwarcieResponse
 import pl.wertis.kolektor.core.net.WycofanieResponse
@@ -243,7 +245,7 @@ interface ApiService {
         @Path("id") id: Long,
         @Path("lineId") lineId: Long,
         @Body body: KorektaBody,
-    ): OkResponse
+    ): KorektaResponse
 
     /* Drogi powrotu z pomyłki. Trzy z nich są BEZ CIAŁA i dlatego niosą
        `EMPTY_BODY`: pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`,
@@ -292,7 +294,7 @@ interface ApiService {
 
     /** Zakończenie dostawy: braki → wyjątki „zła ilość", nietknięte → pominięte. */
     @POST("api/delivery/{id}/zakoncz")
-    suspend fun deliveryZakoncz(@Path("id") id: Long): ZakonczenieDostawy
+    suspend fun deliveryZakoncz(@Path("id") id: Long, @Body body: ZakonczBody): ZakonczenieDostawy
 
     /* ── Faza 2: wyjątki (D8) ────────────────────────────────────────────── */
 

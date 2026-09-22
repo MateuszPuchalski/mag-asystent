@@ -80,19 +80,33 @@ export function nierozlozoneZDostaw(twId: number): WDostawie[] {
   if (pozycje.length === 0) return [];
 
   /* Postęp per dokument w JEDNYM zapytaniu, nie po jednym na dokument: karta
-     odświeża się co 2 s z każdego otwartego ekranu. */
-  const postep = new Map(
-    (
-      db()
-        .prepare(
-          `SELECT d.sgt_dok_id AS dokId, l.ilosc_odlozona, l.status
-           FROM delivery d
-           JOIN delivery_line l ON l.delivery_id = d.id
-           WHERE l.tw_id = ?`
-        )
-        .all(twId) as unknown as Array<PostepLinii & { dokId: number }>
-    ).map((r) => [r.dokId, r] as const)
-  );
+     odświeża się co 2 s z każdego otwartego ekranu.
+
+     SUMA po wierszach, nie ostatni wiersz. Ten sam towar potrafi stać
+     w dokumencie dwa razy (S26), a adapter i tak sumuje ilość z dokumentu
+     po wszystkich pozycjach. Do audytu z 22 września 2026 mapa brała jeden
+     wiersz dostawy, więc odjęcie szło od sumy obu pozycji i karta mówiła
+     „w dostawie" o sztukach, które leżały na półce. */
+  const postep = new Map<number, PostepLinii>();
+  const wiersze = db()
+    .prepare(
+      `SELECT d.sgt_dok_id AS dokId, l.ilosc_odlozona, l.status
+       FROM delivery d
+       JOIN delivery_line l ON l.delivery_id = d.id
+       WHERE l.tw_id = ?
+       ORDER BY l.id`
+    )
+    .all(twId) as unknown as Array<PostepLinii & { dokId: number }>;
+  for (const r of wiersze) {
+    const p = postep.get(r.dokId);
+    if (!p) {
+      postep.set(r.dokId, { ilosc_odlozona: r.ilosc_odlozona, status: r.status });
+      continue;
+    }
+    p.ilosc_odlozona += r.ilosc_odlozona;
+    // status pokazuje wiersz, przy którym COŚ jeszcze jest — nie ten odłożony
+    if (p.status === "done") p.status = r.status;
+  }
 
   return pozycje.flatMap((p) => {
     const l = postep.get(p.dok_id);

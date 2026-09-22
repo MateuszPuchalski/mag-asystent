@@ -249,7 +249,7 @@ test("przedwczesne ZAKOŃCZ: otwarcie wycofuje braki i przywraca pominięte", ()
     { tw: 2, sym: "GRABIE", lok: "A01-01-02", ilosc: 5 },
   ]);
   D.putawayLine(linie[0], "A01-01-01", "jan", { qty: 4 });
-  D.zakonczDostawe(id, "jan");
+  D.zakonczDostawe(id, "jan", { nietkniete: "pomin" });
   assert.equal(stanDostawy(id), "done");
   assert.equal(linia(linie[0]).status, "problem");
   assert.equal(linia(linie[1]).status, "skipped");
@@ -279,9 +279,10 @@ test("otwarcie zostawia zgłoszenie złożone przez człowieka", () => {
   assert.equal(n.n, 1);
 });
 
-test("otwarcie wycofuje nadmiar zgłoszony przy domknięciu", () => {
+test("otwarcie wycofuje nadmiar zgłoszony przy zakończeniu", () => {
   const { id, linie } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
   D.putawayLine(linie[0], "A01-01-01", "jan", { qty: 12 });
+  D.zakonczDostawe(id, "jan");
   assert.equal(
     (db().prepare("SELECT COUNT(*) AS n FROM problem WHERE zrodlo='nadmiar'").get() as { n: number }).n,
     1
@@ -408,4 +409,108 @@ test("widok dostawy mówi, co da się cofnąć i czy da się otworzyć", () => {
   const zamknieta = D.getDelivery(id)!;
   assert.deepEqual(zamknieta.otwarcie, { mozna: true, powod: null });
   assert.deepEqual(zamknieta.lines[0].cofnij, { qty: 10, lok: "B02-02-02" });
+});
+
+/* ── Stos odłożeń ─────────────────────────────────────────────────────────── */
+
+test("pozycja rozłożona na dwie półki cofa się po kolei, od ostatniej", () => {
+  const { linie } = dostawa([
+    { tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 },
+    { tw: 2, sym: "GRABIE", lok: "A01-01-02", ilosc: 5 },
+  ]);
+  D.putawayLine(linie[0], "A01-01-01", "jan", { qty: 4 });
+  D.putawayLine(linie[0], "B02-02-02", "jan", { qty: 6, locAction: "add" });
+  const widok = D.getDelivery(
+    (db().prepare("SELECT delivery_id AS d FROM delivery_line WHERE id=?").get(linie[0]) as { d: number }).d
+  )!;
+  const poz = widok.lines.find((l) => l.id === linie[0])!;
+  assert.deepEqual(poz.odlozenia, [{ qty: 4, lok: "A01-01-01" }, { qty: 6, lok: "B02-02-02" }]);
+
+  C.cofnijOdlozenie(linie[0], "jan");
+  assert.equal(linia(linie[0]).qty, 4);
+  assert.equal(linia(linie[0]).lok, "A01-01-01", "półka wraca do poprzedniego odłożenia");
+  C.cofnijOdlozenie(linie[0], "jan");
+  assert.equal(linia(linie[0]).qty, 0);
+  assert.equal(linia(linie[0]).cofniecie, null);
+});
+
+test("cofanie po kolei na WYKONANYCH zapisach nie bierze własnego zapisu za cudzy", () => {
+  /* Pierwsze cofnięcie pisze adres wprzód. Bez przepięcia tego zadania na
+     szczyt stosu drugie cofnięcie odmówiłoby „adres zmieniano po odłożeniu". */
+  const { linie } = dostawa([
+    { tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 },
+    { tw: 2, sym: "GRABIE", lok: "A01-01-02", ilosc: 5 },
+  ]);
+  D.putawayLine(linie[0], "B02-02-02", "jan", { qty: 4 });
+  wykonaj(zadania()[0].id);
+  D.putawayLine(linie[0], "C03-03-03", "jan", { qty: 6 });
+  wykonaj(zadania()[1].id);
+  const r1 = C.cofnijOdlozenie(linie[0], "jan");
+  assert.ok(!("error" in r1), JSON.stringify(r1));
+  const r2 = C.cofnijOdlozenie(linie[0], "jan");
+  assert.ok(!("error" in r2), JSON.stringify(r2));
+  const z = zadania();
+  assert.equal(pole(z.at(-1)!), "A01-01-01", "na końcu Subiekt ma adres sprzed dostawy");
+});
+
+/* ── Korekta do zera cofa adres ───────────────────────────────────────────── */
+
+test("korekta do zera cofa też adres, gdy stos pokrywa całą ilość", () => {
+  const { linie } = dostawa([
+    { tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 },
+    { tw: 2, sym: "GRABIE", lok: "A01-01-02", ilosc: 5 },
+  ]);
+  D.putawayLine(linie[0], "B02-02-02", "jan", { qty: 6 });
+  const r = D.korygujIlosc(linie[0], 0, "jan");
+  assert.ok(!("error" in r));
+  assert.equal(r.adres, "przywrocony");
+  assert.equal(linia(linie[0]).lok, null);
+  assert.equal(zadania()[0].status, "cancelled", "błędny adres nie idzie do Subiekta");
+});
+
+test("korekta do zera bez przepisu zostawia adres i mówi o tym", () => {
+  // pozycja sprzed wydania: nie wiadomo, do jakiego adresu wracać
+  const { linie } = dostawa([
+    { tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 },
+    { tw: 2, sym: "GRABIE", lok: "A01-01-02", ilosc: 5 },
+  ]);
+  D.putawayLine(linie[0], "B02-02-02", "jan", { qty: 6 });
+  db().prepare("UPDATE delivery_line SET cofniecie=NULL WHERE id=?").run(linie[0]);
+  const r = D.korygujIlosc(linie[0], 0, "jan");
+  assert.ok(!("error" in r));
+  assert.equal(r.adres, "zostaje");
+  assert.equal(r.lok, "B02-02-02");
+});
+
+/* ── Powtórzony towar i kody do pracy bez sieci ───────────────────────────── */
+
+test("skan towaru z dwóch wierszy trafia w wiersz, przy którym jest co robić", () => {
+  const { id } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
+  // drugi wiersz tego samego towaru — S26
+  const drugi = Number(
+    db()
+      .prepare(
+        `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok)
+         VALUES (?, 1, 'KOSA-1', 'Towar KOSA-1', 3)`
+      )
+      .run(id).lastInsertRowid
+  );
+  const pierwszy = (db().prepare("SELECT MIN(id) AS m FROM delivery_line WHERE delivery_id=?").get(id) as {
+    m: number;
+  }).m;
+  let r = D.resolveScan(id, "KOSA-1", "jan");
+  assert.equal(r.kind === "line" && r.line.id, pierwszy, "pierwszy wiersz do roboty, nie ostatni");
+  D.putawayLine(pierwszy, "A01-01-01", "jan");
+  r = D.resolveScan(id, "KOSA-1", "jan");
+  assert.equal(r.kind === "line" && r.line.id, drugi, "po odłożeniu pierwszego — drugi");
+});
+
+test("widok dostawy niesie kody kreskowe pozycji, z nadanymi w WERTIS", () => {
+  const { id } = dostawa([{ tw: 1, sym: "KOSA-1", lok: "A01-01-01", ilosc: 10 }]);
+  db().prepare("UPDATE sgt_towar SET ean='5900000000011' WHERE tw_id=1").run();
+  db()
+    .prepare("INSERT INTO ean_alias(ean, tw_id, created_at, created_by) VALUES ('5900000000028', 1, ?, 'jan')")
+    .run(new Date().toISOString());
+  assert.deepEqual(D.getDelivery(id)!.lines[0].kody, ["5900000000011", "5900000000028"]);
+  db().prepare("DELETE FROM ean_alias").run();
 });

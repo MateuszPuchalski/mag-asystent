@@ -86,6 +86,32 @@ z zamknięcia. Gdy MM braku weszło do Subiekta.
 - korekta ilości na pozycji z wyjątkiem nie odsyła już do „rozwiąż w
   wyjątkach", bo rozwiązanie jej nie odblokowywało.
 
+**Sprzeczności w rozkładaniu usunięte, decyzją właściciela:**
+
+- **ZAKOŃCZ przy nietkniętych wymaga wyboru.** BRAK zgłasza „brak w przesyłce"
+  na całą ilość i zdejmuje towar ze sprzedaży. POMIŃ zostawia je bez
+  zgłoszenia. Dotąd szły po cichu do pominiętych: 1 z 10 dawało reklamację,
+  a 0 z 10 — nic. Serwer bez wyboru odmawia.
+- **Nadmiar nie zamyka dostawy sam.** Zamyka go ZAKOŃCZ, a podgląd pokazuje
+  nadmiar przed zapisem. Dotąd zgłoszenie do dostawcy powstawało bez
+  podglądu, także z podwójnego odłożenia przez dwie osoby.
+- **Korekta do zera cofa adres**, gdy wiadomo, do czego wrócić. Gdy nie
+  wiadomo, komunikat mówi, która półka została w kartotece.
+- **Korekta przyjmuje ilość ponad fakturę.** Kolektor ucinał ją na fakturze,
+  a serwer od 0.64.0 wymagał odwrotnie. Przycisk podaje jednostkę.
+- **„KOMPLET" tylko bez wyjątków i pominięć.** Inaczej nagłówek mówi
+  „ROZSTRZYGNIĘTE", a zamknięta dostawa — „ZAMKNIĘTA Z ZASTRZEŻENIAMI".
+- **Powtórzony towar: jedna reguła wyboru wiersza.** Skan bierze wiersz,
+  przy którym jest co robić, tak jak wejście z karty towaru. Tap otwiera
+  dotknięty wiersz, a nie „towar o tym symbolu". Karta towaru sumuje postęp
+  obu wierszy.
+- **Pamięć „inna półka niż w kartotece" nie przenosi ZAMIEŃ na inny towar.**
+  DODAJ dalej obowiązuje cały karton.
+- **Skan bez sieci otwiera pozycję z listy.** Serwer podaje kody kreskowe
+  pozycji. Kod dwóch różnych towarów nie zgaduje.
+- **COFNIJ cofa kolejne odłożenia, nie tylko ostatnie.** Pozycja rozłożona
+  na kilka półek pokazuje je wszystkie.
+
 **Baza.** Dwie kolumny dochodzą migracją przy starcie: `delivery_line.cofniecie`
 i `problem.zrodlo`. Stare odłożenia nie mają przepisu na cofnięcie; stare
 zgłoszenia liczą się jako złożone przez człowieka. Nic do zrobienia ręką —

@@ -95,9 +95,21 @@ test("nadmiar sam w sobie NIE zgłasza niczego przed zamknięciem", () => {
 
 // ── zgłoszenie przy zamknięciu ───────────────────────────────────────────────
 
-test("zamknięcie dostawy zakłada wyjątek na nadmiar, z obiema liczbami", () => {
+test("nadmiar na ostatniej pozycji NIE domyka dostawy sam — czeka na ZAKOŃCZ", () => {
+  /* Audyt z 22 września 2026: samo domknięcie zgłaszało nadmiar dostawcy bez
+     podglądu. Podwójne odłożenie przez dwie osoby stawało się reklamacją,
+     zanim ktokolwiek zdążył je poprawić korektą. */
   const l = linia(0);
-  D.putawayLine(l, "A01-02-03", "Jan z hali", { qty: 12 }); // ostatnia pozycja → auto-domknięcie
+  D.putawayLine(l, "A01-02-03", "Jan z hali", { qty: 12 });
+  assert.equal(wyjatki().length, 0);
+  assert.equal(db().prepare("SELECT status FROM delivery WHERE id=?").get(dostawaId)?.["status"], "open");
+  assert.equal(D.podgladZakonczenia(dostawaId).nadmiary.length, 1, "podgląd pokazuje nadmiar przed zapisem");
+});
+
+test("ZAKOŃCZ zakłada wyjątek na nadmiar, z obiema liczbami", () => {
+  const l = linia(0);
+  D.putawayLine(l, "A01-02-03", "Jan z hali", { qty: 12 });
+  D.zakonczDostawe(dostawaId, "Jan z hali");
 
   const w = wyjatki();
   assert.equal(w.length, 1, "dokładnie jedno zgłoszenie");
@@ -119,8 +131,9 @@ test("powtórne domykanie nie robi drugiego zgłoszenia", () => {
      Bez bramki na `changes` biuro dostawałoby tę samą reklamację kilka razy. */
   const l = linia(0);
   D.putawayLine(l, "A01-02-03", "Jan z hali", { qty: 12 });
-  D.closeIfComplete(dostawaId, "Jan z hali");
-  D.closeIfComplete(dostawaId, "Jan z hali");
+  D.zakonczDostawe(dostawaId, "Jan z hali");
+  D.closeIfComplete(dostawaId, "Jan z hali", { jawnie: true });
+  D.closeIfComplete(dostawaId, "Jan z hali", { jawnie: true });
   assert.equal(wyjatki().length, 1);
 });
 

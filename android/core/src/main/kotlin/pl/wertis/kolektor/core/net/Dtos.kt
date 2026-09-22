@@ -644,8 +644,19 @@ data class DeliveryLineView(
      * tego pola nie wysyła, więc przycisku wtedy po prostu nie ma.
      */
     val cofnij: CofnijOdlozenie? = null,
+    /**
+     * Wszystkie odłożenia, które da się cofnąć, najstarsze pierwsze. Pozycja
+     * rozłożona na dwie półki ma tu obie; `locActual` trzyma tylko ostatnią.
+     */
+    val odlozenia: List<CofnijOdlozenie> = emptyList(),
     /** Najnowsze nierozstrzygnięte zgłoszenie człowieka przy tej pozycji. */
     val zgloszenie: ZgloszenieLinii? = null,
+    /**
+     * Kody kreskowe towaru — do rozpoznania skanu BEZ SIECI
+     * (`pozycjaPoKodzie`). Pusta lista u starszego serwera: wtedy bez sieci
+     * pasuje tylko symbol.
+     */
+    val kody: List<String> = emptyList(),
 )
 
 /** Co cofnie COFNIJ: ile sztuk i z której półki. */
@@ -777,6 +788,26 @@ data class PozycjaZakonczenia(
 data class ZakonczenieDostawy(
     val braki: List<PozycjaZakonczenia> = emptyList(),
     val nietkniete: List<PozycjaZakonczenia> = emptyList(),
+    /** Odłożone PONAD dokument — zakończenie zgłosi je biuru i dostawcy. */
+    val nadmiary: List<PozycjaZakonczenia> = emptyList(),
+)
+
+/**
+ * Zakończenie dostawy. `nietkniete` jest obowiązkowe, gdy są pozycje
+ * nietknięte: `brak` — zgłoszenie „brak w przesyłce", `pomin` — bez
+ * zgłoszenia. Bez wyboru serwer odmawia z kodem `wybor_nietknietych`.
+ */
+@Serializable
+data class ZakonczBody(val nietkniete: String? = null)
+
+/** Odpowiedź korekty — `adres` mówi, co stało się z półką przy korekcie do zera. */
+@Serializable
+data class KorektaResponse(
+    val ok: Boolean = true,
+    val status: String = "",
+    /** `przywrocony` — adres wrócił sprzed dostawy; `zostaje` — stoi dalej. */
+    val adres: String? = null,
+    val lok: String? = null,
 )
 
 /** Odpowiedź na notatkę biura. Pusta nie przechodzi — serwer odmawia. */

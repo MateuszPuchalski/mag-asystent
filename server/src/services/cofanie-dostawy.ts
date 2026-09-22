@@ -7,6 +7,7 @@ import { logEvent } from "./events.js";
 import { etykietaTypu } from "./problems.js";
 import {
   statusZIlosci,
+  stosOdlozen,
   validateDeliveryLocation,
   type CofniecieOdlozenia,
 } from "./delivery.js";
@@ -372,76 +373,142 @@ export function otworzPonownie(
 
 /* ── Cofnięcie odłożenia ──────────────────────────────────────────────────── */
 
+/** Odmowa w środku transakcji — przerywa ją i wraca do człowieka jako zdanie. */
+class BladCofania extends Error {
+  constructor(message: string, readonly status = 400) {
+    super(message);
+  }
+}
+
+/**
+ * Zdejmij ze stosu OSTATNIE odłożenie pozycji. Wołane W TRANSAKCJI; odmowa
+ * rzuca `BladCofania`, więc cofnięcie kilku odłożeń naraz albo przejdzie
+ * w całości, albo wcale.
+ */
+function cofnijJedno(lineId: number, user: string): {
+  adres: "bez_zmian" | "anulowany" | "zapisany";
+  otwartaPonownie: boolean;
+} {
+  const l = liniaZDostawa(lineId);
+  if (!l) throw new BladCofania("Brak pozycji", 404);
+  const stos = stosOdlozen(l.cofniecie);
+  const c = stos.at(-1);
+  if (!c) {
+    throw new BladCofania(
+      "Tego odłożenia nie da się już cofnąć — po korekcie albo cofnięciu popraw liczbę przez POPRAW ILOŚĆ."
+    );
+  }
+  if (l.status === "problem") {
+    throw new BladCofania("Pozycja ma zgłoszony wyjątek — najpierw wycofaj zgłoszenie.");
+  }
+  if (l.stanDostawy === "external") {
+    throw new BladCofania("Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro.");
+  }
+  const zamknieta = l.stanDostawy === "done";
+  if (zamknieta) {
+    const m = mozliwoscOtwarcia(l.delivery_id);
+    if (!m.mozna) throw new BladCofania(m.powod ?? "Tej dostawy nie da się otworzyć");
+  }
+  const stan = stanZadania(c.queueId);
+  if (typeof stan === "object") throw new BladCofania(stan.error);
+  if (adresRuszanyPozniej(l.tw_id, c, l.done_at)) {
+    throw new BladCofania(
+      "Adres tego towaru zmieniano po odłożeniu. Ilość popraw przez POPRAW ILOŚĆ, a adres na karcie towaru."
+    );
+  }
+
+  if (zamknieta) wznow(l.delivery_id, user, "cofniecie_odlozenia");
+  const adres = ustawAdres(l, c, c.locsPrzed, user, `${norm(c.locsPrzed) || "(puste)"} (dostawa, cofnięcie)`);
+  const nowaIlosc = Math.max((l.ilosc_odlozona ?? 0) - c.qty, 0);
+  const reszta = stos.slice(0, -1);
+  /* Zapis przywracający, który właśnie powstał, NIESIE teraz adres
+     poprzedniego odłożenia. Bez przepięcia go na nowy szczyt stosu
+     następne cofnięcie wzięłoby własny zapis za cudzą, późniejszą zmianę
+     adresu — i odmówiło — albo anulowało zadanie, którego już nie ma. */
+  if (adres.queueId != null && reszta.length > 0) {
+    reszta[reszta.length - 1] = {
+      ...reszta[reszta.length - 1],
+      queueId: adres.queueId,
+      pole: adres.pole,
+      baza: adres.baza,
+    };
+  }
+  db()
+    .prepare(
+      `UPDATE delivery_line SET ilosc_odlozona = ?, status = ?, lok_faktyczna = ?,
+              done_at = ?, done_by = ?, cofniecie = ?
+        WHERE id = ?`
+    )
+    .run(
+      nowaIlosc,
+      statusZIlosci(nowaIlosc, l.ilosc_dok),
+      c.lokPrzed,
+      c.doneAtPrzed,
+      c.doneByPrzed,
+      reszta.length > 0 ? JSON.stringify(reszta) : null,
+      lineId
+    );
+  logEvent("putaway_cofniete", user, l.tw_id, {
+    lineId,
+    deliveryId: l.delivery_id,
+    qty: c.qty,
+    qtyPo: nowaIlosc,
+    byloNa: c.lok,
+    adres: adres.skutek,
+    ...(adres.queueId != null ? { queueId: adres.queueId } : {}),
+    otwartaPonownie: zamknieta,
+  });
+  return { adres: adres.skutek, otwartaPonownie: zamknieta };
+}
+
 /**
  * Cofnij OSTATNIE odłożenie pozycji: ilość, półkę i adres w Subiekcie.
  *
  * Gdy to odłożenie domknęło dostawę, cofnięcie ją otwiera — inaczej pomyłka
  * na ostatniej pozycji byłaby jedyną, której nie da się cofnąć, a to właśnie
- * ona zdarza się najczęściej: w pośpiechu, przy końcu palety.
+ * ona zdarza się najczęściej: w pośpiechu, przy końcu palety. Kolejne
+ * wywołanie cofa odłożenie wcześniejsze, aż stos się skończy.
  */
 export function cofnijOdlozenie(
   lineId: number,
   user: string
 ): { ok: true; adres: "bez_zmian" | "anulowany" | "zapisany"; otwartaPonownie: boolean } | Blad {
+  try {
+    return { ok: true, ...transaction(db(), () => cofnijJedno(lineId, user))() };
+  } catch (e) {
+    if (e instanceof BladCofania) return { error: e.message, status: e.status };
+    throw e;
+  }
+}
+
+/**
+ * Cofnij WSZYSTKIE odłożenia pozycji — dla korekty ilości do zera.
+ *
+ * `brak_przepisu`, gdy stos nie pokrywa całej odłożonej ilości (odłożenia
+ * sprzed tego wydania, korekta po drodze). Wtedy nie wiadomo, do jakiego
+ * adresu wrócić, i korekta zostawia adres z jawnym zdaniem dla człowieka.
+ */
+export function cofnijWszystkieOdlozenia(lineId: number, user: string): "cofniete" | "brak_przepisu" | Blad {
   const l = liniaZDostawa(lineId);
   if (!l) return { error: "Brak pozycji", status: 404 };
-  if (!l.cofniecie) {
-    return {
-      error:
-        "Tego odłożenia nie da się już cofnąć — po korekcie albo cofnięciu popraw liczbę przez POPRAW ILOŚĆ.",
-    };
+  const stos = stosOdlozen(l.cofniecie);
+  const suma = stos.reduce((n, c) => n + c.qty, 0);
+  if (stos.length === 0 || Math.abs(suma - (l.ilosc_odlozona ?? 0)) > 1e-9) return "brak_przepisu";
+  try {
+    transaction(db(), () => {
+      for (let i = 0; i < stos.length; i++) cofnijJedno(lineId, user);
+    })();
+    return "cofniete";
+  } catch (e) {
+    if (e instanceof BladCofania) return { error: e.message, status: e.status };
+    throw e;
   }
-  if (l.status === "problem") {
-    return { error: "Pozycja ma zgłoszony wyjątek — najpierw wycofaj zgłoszenie." };
-  }
-  if (l.stanDostawy === "external") {
-    return { error: "Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro." };
-  }
-  const c = JSON.parse(l.cofniecie) as CofniecieOdlozenia;
-  const zamknieta = l.stanDostawy === "done";
-  if (zamknieta) {
-    const m = mozliwoscOtwarcia(l.delivery_id);
-    if (!m.mozna) return { error: m.powod ?? "Tej dostawy nie da się otworzyć" };
-  }
-  const stan = stanZadania(c.queueId);
-  if (typeof stan === "object") return { error: stan.error };
-  if (adresRuszanyPozniej(l.tw_id, c, l.done_at)) {
-    return {
-      error:
-        "Adres tego towaru zmieniano po odłożeniu. Ilość popraw przez POPRAW ILOŚĆ, a adres na karcie towaru.",
-    };
-  }
-
-  const nowaIlosc = Math.max((l.ilosc_odlozona ?? 0) - c.qty, 0);
-  const wynik = transaction(db(), () => {
-    if (zamknieta) wznow(l.delivery_id, user, "cofniecie_odlozenia");
-    const adres = ustawAdres(l, c, c.locsPrzed, user, `${norm(c.locsPrzed) || "(puste)"} (dostawa, cofnięcie)`);
-    db()
-      .prepare(
-        `UPDATE delivery_line SET ilosc_odlozona = ?, status = ?, lok_faktyczna = ?,
-                done_at = ?, done_by = ?, cofniecie = NULL
-          WHERE id = ?`
-      )
-      .run(nowaIlosc, statusZIlosci(nowaIlosc, l.ilosc_dok), c.lokPrzed, c.doneAtPrzed, c.doneByPrzed, lineId);
-    logEvent("putaway_cofniete", user, l.tw_id, {
-      lineId,
-      deliveryId: l.delivery_id,
-      qty: c.qty,
-      qtyPo: nowaIlosc,
-      byloNa: c.lok,
-      adres: adres.skutek,
-      ...(adres.queueId != null ? { queueId: adres.queueId } : {}),
-      otwartaPonownie: zamknieta,
-    });
-    return adres.skutek;
-  })();
-  return { ok: true, adres: wynik, otwartaPonownie: zamknieta };
 }
 
 /* ── Zmiana półki ─────────────────────────────────────────────────────────── */
 
 /**
- * Towar leży gdzie indziej, niż zeskanowano — przenieś adres ostatniego
+ * Towar leży gdzie indziej, niż zeskanowano — przenieś adres OSTATNIEGO
  * odłożenia na właściwą półkę. Ilość zostaje, bo jej nikt nie kwestionuje.
  *
  * Akcja ZAMIEŃ/DODAJ jest ta sama co przy odłożeniu. Pytanie o nią padło
@@ -461,13 +528,14 @@ export function zmienPolke(
   if (blad) return { error: blad };
   const l = liniaZDostawa(lineId);
   if (!l) return { error: "Brak pozycji", status: 404 };
-  if (!l.cofniecie) {
+  const stos = stosOdlozen(l.cofniecie);
+  const c = stos.at(-1);
+  if (!c) {
     return { error: "Półkę zmienia się tu zaraz po odłożeniu. Później — skanem półki na karcie towaru." };
   }
   if (l.stanDostawy === "external") {
     return { error: "Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro." };
   }
-  const c = JSON.parse(l.cofniecie) as CofniecieOdlozenia;
   if (kod === c.lok) return { error: `Towar jest już zapisany na ${kod}.` };
   const stan = stanZadania(c.queueId);
   if (typeof stan === "object") return { error: stan.error };
@@ -488,7 +556,7 @@ export function zmienPolke(
     const nowy: CofniecieOdlozenia = { ...c, lok: kod, queueId: adres.queueId, pole: adres.pole, baza: adres.baza };
     db()
       .prepare("UPDATE delivery_line SET lok_faktyczna = ?, cofniecie = ? WHERE id = ?")
-      .run(kod, JSON.stringify(nowy), lineId);
+      .run(kod, JSON.stringify([...stos.slice(0, -1), nowy]), lineId);
     /* Wpis ręczny to ten sam sygnał zniszczonej etykiety co przy odłożeniu —
        raport etykiet do przedruku czyta `manual_entry` bez względu na drogę. */
     if (opts.recznie) {
@@ -581,13 +649,20 @@ export function wycofajZgloszenie(
 export function cofnijDlaLinii(r: { cofniecie?: string | null; status: string }):
   | { qty: number; lok: string }
   | null {
-  if (!r.cofniecie || (r.status !== "done" && r.status !== "partial")) return null;
-  try {
-    const c = JSON.parse(r.cofniecie) as CofniecieOdlozenia;
-    return { qty: c.qty, lok: c.lok };
-  } catch {
-    return null;
-  }
+  if (r.status !== "done" && r.status !== "partial") return null;
+  const c = stosOdlozen(r.cofniecie).at(-1);
+  return c ? { qty: c.qty, lok: c.lok } : null;
+}
+
+/**
+ * Odłożenia pozycji w kolejności — „4 → A01, 6 → B02".
+ *
+ * `lok_faktyczna` trzyma wyłącznie OSTATNIĄ półkę, więc pozycja rozłożona
+ * na dwie pokazywała jedną. Lista pochodzi ze stosu cofnięć i znika razem
+ * z nim po korekcie ilości — wtedy zostaje sama `lok_faktyczna`.
+ */
+export function odlozeniaLinii(r: { cofniecie?: string | null }): Array<{ qty: number; lok: string }> {
+  return stosOdlozen(r.cofniecie).map((c) => ({ qty: c.qty, lok: c.lok }));
 }
 
 /** Najnowsze wycofywalne zgłoszenie człowieka przy każdej pozycji dostawy. */
