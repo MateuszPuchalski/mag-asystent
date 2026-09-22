@@ -1849,6 +1849,80 @@ Copilot jest **wyłączony domyślnie**, a brak klucza nie zatrzymuje startu.
 Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
 (blizna 0.84.1).
 
+### 14.5a. Klasyfikacja w kształcie specyfikacji (22 września 2026)
+
+Specyfikacja właściciela z 20 września („Allegro customer message
+classification with Jev") zastąpiła słownik ośmiu etykiet decyzją
+o dziesięciu polach. Silnikiem zostaje Claude, decyzją właściciela z 22
+września; Jev wpina się później tym samym nadawcą (`NadawcaKlasyfikacji`),
+bo walidacja i polityka stoją po naszej stronie, nie w adapterze.
+
+**Decyzja ma piętnaście kategorii, kategorie dodatkowe i jeden następny
+krok z dwunastu.** Słownik stoi w `services/klasyfikacja-slownik.ts`. Wartości
+są po angielsku, bo to kontrakt niezależny od dostawcy; nazwy po polsku stoją
+na ekranie. Granicę najważniejszą dla tej firmy specyfikacja nazywa wprost:
+część zgodna z zamówieniem, która nie pasuje do maszyny, to
+`PRODUCT_COMPATIBILITY`, a nie `WRONG_PRODUCT`.
+
+**Priorytetu 1–5 ze specyfikacji nie ma**, decyzją właściciela. Kolejność
+kolejki dalej stoi na faktach — reguła z §14.5 wyżej zostaje.
+
+**Trzy flagi potrzeb:** „wymaga człowieka", „brak danych zamówienia" i „brak
+danych towaru". Pierwszą składa polityka (`klasyfikacja-polityka.ts`) z pięciu
+źródeł: zdanie modelu, jawna prośba klienta o człowieka, niska pewność,
+sprzeczna odpowiedź i awaria. Każde źródło dokłada kod, więc ekran mówi,
+KTÓRE zadziałało. Zwrot i reklamacja zostają ręczne w całości.
+
+**Decyzja wisi przy WIADOMOŚCI i ma wersje** (`decyzja_klasyfikacji`).
+Dopisek klienta dostaje własną decyzję, a poprawka człowieka tworzy nową
+wersję. Poprzednia gaśnie, ale zostaje w historii. Tabela
+`klasyfikacja_rozmowy` z 0.191.0 odeszła: jej wiersze przeszły jako
+nieaktywne wersje słownika v1.
+
+**Nic nie ginie po cichu.** Awaria modelu, odpowiedź spoza słownika
+i nieudane maskowanie dają decyzję `FAILED` z kategorią „Inne" i akcją
+„do decyzji człowieka". Sam załącznik nie idzie do dostawcy wcale i dostaje
+decyzję `NEEDS_REVIEW`. Stan dostawcy (limit, klucz, przeciążenie, sieć)
+decyzji NIE zapisuje: rozmowa wraca w następnym przebiegu.
+
+**Etykieta człowieka zastąpiła kciuki.** „Nietrafna" mówiła, że model się
+pomylił, ale nie jak powinno być, więc czułości nie dało się policzyć. Teraz
+agent potwierdza kategorię jednym kliknięciem albo wybiera właściwą z listy.
+Pomiar za zębatką podaje precyzję i czułość każdej kategorii z przedziałem
+Wilsona i liczbą decyzji bez etykiety. Akceptacja szkicu NIE jest etykietą.
+
+**Takt rozpoznaje każdą nową wiadomość klienta**, gdy właściciel włączy
+`COPILOT_AUTO_KLASYFIKACJA=1`. Hamulce są dwa, jak przy szkicu z taktu: limit
+na przebieg i sufit na godzinę liczony z księgi. Okno siedmiu dni chroni przed
+przerabianiem historii. Decyzji `FAILED` takt nie ponawia — ponawia człowiek
+przyciskiem nad kolejką.
+
+**Czego ten przyrost nie robi.** Nie wysyła niczego do klienta i nie zmienia
+trybu wysyłki: każdą odpowiedź dalej wysyła człowiek (§27, punkt 2).
+
+### 14.5b. Struktura wątku Allegro przed modelem (22 września 2026)
+
+Drugi przyrost specyfikacji: „użyj pewnej struktury Allegro najpierw, model
+wołaj tylko tam, gdzie treść zostaje niejasna". Typ i podtyp wątku daje
+wyłącznie `beta.v1`, więc synchronizacja czyta je osobnym żądaniem przy
+wątku, w którym coś się zmieniło. Kontrakt i `[WERYFIKUJ]` stoją
+w `docs/allegro-ksztalt.md`.
+
+**Rejestr mapowań** (`services/klasyfikacja-mapowanie.ts`, wersja `m1`) jest
+PROPOZYCJĄ do zatwierdzenia na etykietach, jak każe specyfikacja. Wąskich
+podtypów jest cztery: brak elementu w paczce, brak zwrotu pieniędzy, kłopot
+z odesłaniem i odmowa przyjęcia zwrotu. Rozstrzygają pierwszą wiadomość
+wątku bez modelu i bez kosztu. Pięć pozostałych to wskazówki z listą
+kategorii zgodnych: spór poza tą listą idzie do człowieka.
+
+**Trzy reguły ze specyfikacji stoją w kodzie i w testach.** `COMMON` sam nic
+nie mówi. Podtyp opisuje wątek, więc dopisek w nim idzie do modelu, a podtyp
+jest tylko faktem w nagłówku. Wartość nieznana zostaje, dostaje kod
+`PODTYP_NIEZNANY` albo `TYP_NIEZNANY` i zdarzenie do przeglądu mapowań.
+
+**Pomiar zgodności mapowania stoi osobno** od precyzji modelu: decyzje ze
+wskazaniem Allegro, przy których człowiek wskazał kategorię.
+
 ### 14.6. Co działa: szkic odpowiedzi z faktów (etap F, przyrost drugi)
 
 Decyzja właściciela z 7 września 2026: „w oknie odpowiedzi powinien być
@@ -2305,6 +2379,38 @@ z faktu. Zdanie sklejone z faktu i z wniosku bierze przez to pewność faktu dla
 obu członów. Reguła 1b każe teraz rozbić takie zdanie na dwa twierdzenia.
 Kod tego nie sprawdzi tanio, bo musiałby ocenić wynikanie; miarą jest
 `obnizona`, która liczy, jak często model zawyża.
+
+### 14.6a. Szkic dostaje rozpoznanie (22 września 2026)
+
+Trzeci przyrost specyfikacji z 20 września: szkic dostaje decyzję
+klasyfikatora. Do tej wersji szkic był szyty pod dobór i prosił o tabliczkę
+także klienta, który pytał, gdzie jest paczka.
+
+**Fakt „rozpoznanie"** mówi modelowi, na jaką prośbę odpowiada, jaki jest
+następny krok i czego brakuje. To PRZYPUSZCZENIE automatu, więc ma własny
+rodzaj faktu. Twierdzenie oparte na nim schodzi w kodzie do „niepewne" ze
+źródłem `model` (`zRozpoznaniaNiepewne`). Rozpoznanie starszej wiadomości nie
+wchodzi.
+
+**Pytania o maszynę (intake) tylko przy prośbie o towar**: dobór, pytanie
+o towar, dostępność i inny towar. Bez rozpoznania intake zostaje, jak był.
+
+**Szkic z taktu obejmuje też rozmowy bez oferty**, gdy rozpoznanie każe coś
+zrobić. „Nic do zrobienia" i rozpoznanie zastępcze szkicu nie uruchamiają.
+Przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie — drugi szkic
+po rozpoznaniu kosztowałby drugie wywołanie za to samo pytanie.
+
+**Los szkicu przy wysyłce** (`outbox.szkic_los`): bez zmian albo z poprawką.
+Liczy się tylko szkic ułożony na to samo pytanie, na które idzie odpowiedź.
+Specyfikacja mierzy to obok odrzuceń, które niesie `szkic_copilota.ocena`.
+
+**Niepewna wysyłka rozstrzyga się sama.** Gdy synchronizacja przyniesie
+naszą wiadomość o treści niepewnej wysyłki, wiersz `send_uncertain` przechodzi
+na `sent` z numerem od Allegro. Szkicu i statusu rozmowy to nie rusza.
+
+**Czego nie ma i nie będzie bez decyzji właściciela:** wysyłki bez człowieka.
+Specyfikacja przewiduje ją „później, dla klas z dowodami". Zasada nadrzędna
+nr 2 (§27) jej zabrania, a zmienić ją może tylko właściciel.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
@@ -5384,7 +5490,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
 | Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
-| Copilot — klasyfikacja wiadomości (§14.5) | **działa** od F | `services/copilot-klasyfikacja.ts`, `klasyfikacja_rozmowy`, `copilot_wywolanie`, `skrzynka/Copilot.tsx`; wyłączony domyślnie |
+| Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
+| Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
+| Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
+| Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
+| Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
+| Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
+| Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
 | Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |

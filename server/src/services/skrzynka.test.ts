@@ -730,8 +730,13 @@ test("rozpoznanie kategorii dokłada plakietkę i NIE rusza kolejności", async 
     "brak wiersza znaczy \u201enierozpoznana\u201d i liczy się przy odczycie");
 
   const w = await sklasyfikujRozmowy(d, [rozmowaId], BIURO, async () => ({
-    kategoria: "dobor", pewnosc: "wysoka", uzasadnienie: "pyta o rozstaw",
-    model: "claude-opus-5", ms: 90,
+    surowa: {
+      kategoria: "PRODUCT_COMPATIBILITY", dodatkowe: ["PRODUCT_AVAILABILITY"],
+      akcja: "CHECK_COMPATIBILITY", wymagaCzlowieka: false, prosiOCzlowieka: false,
+      brakDanychZamowienia: false, brakDanychProduktu: true,
+      pewnosc: "wysoka", powodInne: null, uzasadnienie: "pyta o rozstaw",
+    },
+    model: "claude-opus-5", promptWersja: "k2", ms: 90,
     zuzycie: { wej: 800, wyj: 150, cacheZapis: 0, cacheOdczyt: 0 },
   }));
   assert.equal(w.sklasyfikowane, 1);
@@ -739,8 +744,13 @@ test("rozpoznanie kategorii dokłada plakietkę i NIE rusza kolejności", async 
   assert.deepEqual(listaRozmow().map((x) => x.id), przed,
     "kategoria nie jest kluczem kolejności i nie ma prawa nim zostać");
   const r = listaRozmow().find((x) => x.id === rozmowaId)!;
-  assert.deepEqual(r.kopilot,
-    { kategoria: "dobor", pewnosc: "wysoka", nieaktualna: false, ocena: null });
+  assert.deepEqual(r.kopilot, {
+    kategoria: "PRODUCT_COMPATIBILITY", dodatkowe: ["PRODUCT_AVAILABILITY"],
+    akcja: "CHECK_COMPATIBILITY", akcjaModelu: null, wymagaCzlowieka: false,
+    brakDanychZamowienia: false, brakDanychProduktu: true, pewnosc: "wysoka",
+    zrodlo: "MODEL", status: "SUCCESS", kody: [], uzasadnienie: "pyta o rozstaw",
+    nieaktualna: false, kategoriaCzlowieka: null, kategoriaModelu: "PRODUCT_COMPATIBILITY",
+  });
 });
 
 test("dopisek klienta czyni plakietkę nieaktualną — serwer mówi to sam", () => {

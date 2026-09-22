@@ -26,6 +26,7 @@ import { LIMIT_ZNAKOW } from "./wysylka.js";
 import { bezPodpisu, zwin } from "../tekst.js";
 import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
+import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygnaturze.js";
 import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
@@ -63,9 +64,23 @@ export type RodzajFaktu =
   /* Adres NASZEJ aktywnej aukcji na daną kartotekę (0.270.0). Osobny rodzaj,
      bo to jedyny fakt, który model ma prawo przepisać klientowi DOSŁOWNIE —
      reszta jest materiałem na zdanie, a link jest linkiem albo niczym. */
-  | "oferta_link";
+  | "oferta_link"
+  /* Rozpoznanie klasyfikatora (22 września 2026): o co klient prosi i jaki
+     jest następny krok. Osobny rodzaj, bo to jedyny fakt, który jest
+     PRZYPUSZCZENIEM automatu, a nie danymi firmy — model ma go użyć do
+     wyboru tematu odpowiedzi, nie cytować jako prawdy. */
+  | "rozpoznanie";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
+
+/**
+ * Kategorie, przy których szkic pyta o dane maszyny i części (intake).
+ * `WRONG_PRODUCT` jest na liście, bo „przyszło co innego" rozstrzyga się
+ * porównaniem numerów — czyli tymi samymi pytaniami co dobór.
+ */
+const KATEGORIE_Z_INTAKE = new Set<string>([
+  "PRODUCT_COMPATIBILITY", "PRODUCT_QUESTION", "PRODUCT_AVAILABILITY", "WRONG_PRODUCT",
+]);
 
 /**
  * Fakty w kształcie do wysyłki. Typ OZDOBIONY jak `TrescBezpieczna`, ale
@@ -215,6 +230,20 @@ export function ustalPewnosc(t: TwierdzenieSurowe): Twierdzenie {
   const sufit = SUFIT_PEWNOSCI[t.zrodlo];
   const wyzej = POZIOMY_PEWNOSCI.indexOf(t.pewnosc) < POZIOMY_PEWNOSCI.indexOf(sufit);
   return { ...t, pewnosc: wyzej ? sufit : t.pewnosc, obnizona: wyzej };
+}
+
+/**
+ * Twierdzenie oparte na fakcie „rozpoznanie" schodzi do „niepewne" ze
+ * źródłem `model` (22 września 2026). Rozpoznanie jest przypuszczeniem
+ * klasyfikatora — model, który powoła się na nie jak na bazę sklepu,
+ * dostałby sufit „pewne" za zgadywanie automatu. Instrukcja zabrania takiego
+ * powołania, ale sufit pewności stoi w kodzie, nie w dyscyplinie modelu.
+ */
+export function zRozpoznaniaNiepewne(tw: Twierdzenie[], fakty: Fakt[]): Twierdzenie[] {
+  const zRozpoznania = new Set(fakty.filter((f) => f.rodzaj === "rozpoznanie").map((f) => f.id));
+  return tw.map((t) => t.odwolanie && zRozpoznania.has(t.odwolanie)
+    ? { ...t, zrodlo: "model" as const, pewnosc: "niepewne" as const, obnizona: t.pewnosc !== "niepewne" }
+    : t);
 }
 
 /**
@@ -922,11 +951,35 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     }
   }
 
+  /* ROZPOZNANIE BIEŻĄCEJ PROŚBY (22 września 2026). Specyfikacja: szkic
+     dostaje znormalizowaną decyzję klasyfikatora. Do tej wersji szkic był
+     szyty pod dobór części i prosił o tabliczkę znamionową także klienta,
+     który pytał, gdzie jest paczka. Decyzja NIEAKTUALNA (klient dopisał po
+     rozpoznaniu) nie wchodzi — opisywałaby pytanie, którego już nie zadaje. */
+  const rozpoznanie = ostatniaKlienta ? db().prepare(`SELECT kategoria, akcja, wymaga_czlowieka,
+      brak_danych_zamowienia, brak_danych_produktu FROM decyzja_klasyfikacji
+      WHERE message_id=? AND aktywna=1 AND taksonomia_wersja=?`)
+    .get(ostatniaKlienta.id, TAKSONOMIA_WERSJA) as {
+      kategoria: string; akcja: string; wymaga_czlowieka: number;
+      brak_danych_zamowienia: number; brak_danych_produktu: number } | undefined : undefined;
+  if (rozpoznanie) {
+    dodaj("rozpoznanie", `Rozpoznanie bieżącej prośby klienta (automat, może się mylić): `
+      + `${rozpoznanie.kategoria}; następny krok: ${rozpoznanie.akcja}`
+      + (Number(rozpoznanie.brak_danych_zamowienia) ? "; w rozmowie brakuje danych zamówienia" : "")
+      + (Number(rozpoznanie.brak_danych_produktu) ? "; w rozmowie brakuje danych towaru lub maszyny" : "")
+      + (Number(rozpoznanie.wymaga_czlowieka)
+        ? "; sprawa wymaga decyzji człowieka — nie obiecuj rozstrzygnięcia" : ""));
+  }
+
   /* Intake dopiero, gdy nie ma wyboru POTWIERDZONEGO: przy dowodzie w bazie
-     pytania o wymiary byłyby udawaniem, że nie wiemy. */
+     pytania o wymiary byłyby udawaniem, że nie wiemy. I tylko przy prośbie
+     o TOWAR (22 września 2026): pytania o maszynę przy „gdzie paczka"
+     odpowiadają na pytanie, którego klient nie zadał. Bez rozpoznania intake
+     zostaje, jak był — szkic pod ofertą to najczęściej dobór. */
   const wybranyPewny = dobor.wybrany
     && kand.kandydaci.some((k) => k.twId === dobor.wybrany!.twId && k.pewnosc === "potwierdzone");
-  if (!wybranyPewny) {
+  const oTowar = !rozpoznanie || KATEGORIE_Z_INTAKE.has(rozpoznanie.kategoria);
+  if (!wybranyPewny && oTowar) {
     const i = pytaniaIntake(d.nazwaCzesci);
     /* „TYLKO o to, czego jeszcze nie podał" stoi w FAKCIE, nie tylko w
        instrukcji (0.232.2): klientka podała komplet danych z tabliczki,
@@ -1112,7 +1165,7 @@ export async function ulozSzkic(
 
   /* SPRAWDZENIE DETERMINISTYCZNE — orkiestrator, nie wyrocznia. Bez ponowienia:
      wywołanie jest zapłacone, agent widzi zdanie i klika drugi raz, jeśli chce. */
-  const twierdzenia = ocenTwierdzenia(odp.twierdzenia);
+  const twierdzenia = zRozpoznaniaNiepewne(ocenTwierdzenia(odp.twierdzenia), k.fakty);
   /* Numer wolno wziąć z własnej wiedzy — ale nie po cichu. Niezadeklarowany
      jest tym samym, czym był każdy numer spoza faktów do 0.252.0: zdaniem,
      którego agent nie ma jak sprawdzić przed wysłaniem do klienta. */

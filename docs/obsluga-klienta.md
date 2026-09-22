@@ -424,6 +424,35 @@ uruchamia agent klawiszem, a potwierdzenie mówi wprost, że to kosztuje.
 Do klienta dalej mówi wyłącznie człowiek — klasyfikacja nie pisze do niego ani
 jednego znaku.
 
+**Od 22 września 2026 klasyfikacja wysyła WĄTEK, nie jedną wiadomość —
+i może chodzić taktem.** Dwa zdania wyżej opisują stan sprzed tej daty.
+Specyfikacja właściciela z 20 września każe rozpoznawać bieżącą prośbę
+„z rozmową jako kontekstem": samo „tak, to ten model" nie mówi nic bez
+pytania, na które odpowiada. Klasyfikacja idzie więc tą samą drogą co szkic:
+cały wątek tej jednej rozmowy, to samo maskowanie, ten sam sufit dwunastu
+wiadomości i sześciu tysięcy znaków. Nad wątkiem stoi nagłówek, który piszemy
+my: czy rozmowa ma zamówienie, czy ofertę i ile załączników ma wiadomość.
+Numerów zamówienia i oferty w nagłówku nie ma — model dostaje sam fakt. Typ
+i podtyp wątku Allegro idą tam jako enumy Allegro — nie ma w nich nic od
+klienta. Loginów uczestników z `beta.v1` nie zapisujemy wcale.
+
+Takt rozpoznaje każdą nową wiadomość klienta — decyzja właściciela z 22
+września. Włącza go dopiero `COPILOT_AUTO_KLASYFIKACJA=1`, z sufitem na
+godzinę liczonym z księgi i z oknem siedmiu dni wstecz. Wiadomość z samym
+załącznikiem nie wychodzi wcale: klasyfikacja zdjęć nie czyta, więc decyzja
+mówi „sam załącznik" i woła człowieka.
+
+Przy decyzji zapisujemy, NA CZYM ją liczono: identyfikatory wiadomości, skrót
+SHA-256 zamaskowanego wejścia i to, czy sufit coś uciął. Treści wejścia nie
+kopiujemy — leży w `message`, pod tą samą polityką co dotąd.
+
+**Szkic z taktu nie jest już tylko pod ofertą (22 września 2026).** Przy
+`COPILOT_AUTO_SZKIC=1` szkic powstaje też dla wiadomości, której rozpoznanie
+każe coś zrobić — pytania o paczkę, fakturę albo zwrot. Do dostawcy idzie
+więc zamaskowany wątek także takich rozmów, tą samą drogą i z tym samym
+sufitem co dotąd. Fakty szkicu dostały rozpoznanie klasyfikatora: kategorię,
+następny krok i flagi braków. To nasze dane, bez treści klienta.
+
 **Szkic odpowiedzi z Copilota wysyła CAŁY WĄTEK — zamaskowany, z sufitem
 (0.231.0).** Decyzja właściciela z 7 września: krótka odpowiedź klienta
 („tak, GX160") bez naszego pytania nie mówi modelowi nic. Do dostawcy idą

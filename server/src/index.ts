@@ -70,6 +70,7 @@ import { zglosRabat } from "./adapters/allegro.http.js";
 import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
+import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
 import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
@@ -519,6 +520,17 @@ async function main() {
       /* Głośno TYLKO wtedy, gdy takt stanął. Przebieg, który nic nie zastał,
          jest normą i nie ma o czym mówić. */
       if (w.przerwane) console.warn(`[copilot-auto-szkic] przebieg przerwany: ${w.przerwane}`);
+    });
+  }
+
+  /* ROZPOZNANIE KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA (22 września 2026). Ten sam
+     warunek co szkic z taktu — klucz dostawcy, nie konto Allegro — i ta sama
+     zasada: włącza się jedną zmienną w `wertis.env`, bo wydaje pieniądze bez
+     kliknięcia. Rytm własny, żeby nie opóźniać pobierania wiadomości. */
+  if (config.copilot.autoKlasyfikacja && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+    uruchomTakt("copilot-auto-klasyfikacja", config.copilot.autoKlasyfikacjaMs, async () => {
+      const w = await sklasyfikujNowe();
+      if (w.przerwane) console.warn(`[copilot-auto-klasyfikacja] przebieg przerwany: ${w.przerwane}`);
     });
   }
 

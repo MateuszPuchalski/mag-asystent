@@ -8,7 +8,10 @@ export type ConversationEventType =
   /* Odesłanie zadania z hali (0.352.0). OSOBNY typ, nie `warehouse.result`
      z pustym wynikiem: panel ma pokazać brak odpowiedzi jako brak, a nie jako
      wynik, którego nikt nie zmierzył. */
-  | "warehouse.returned";
+  | "warehouse.returned"
+  /* Decyzja klasyfikatora (22 września 2026). Takt rozpoznaje w TLE, więc bez
+     zdarzenia plakietka czekałaby na następny ruch w kolejce. */
+  | "classification.updated";
 
 export interface ConversationRealtimeEvent {
   id: number;

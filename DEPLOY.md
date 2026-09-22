@@ -2578,6 +2578,73 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.430.0 — szkic dostaje rozpoznanie
+
+**Migracja dokłada kolumnę sama. Panel trzeba przebudować.**
+
+**Jeśli masz włączony `COPILOT_AUTO_SZKIC=1`, szkiców przybędzie.** Takt pisze
+je teraz także dla rozmów bez oferty, gdy rozpoznanie każe coś zrobić. Sufit
+na godzinę (`COPILOT_AUTO_NA_GODZINE`) zostaje ten sam i dalej liczy się
+z księgi. Po pierwszej godzinie porównaj rachunek na karcie „Copilot".
+
+Przy włączonym `COPILOT_AUTO_KLASYFIKACJA=1` szkic czeka na rozpoznanie. Nowe
+pytanie dostaje więc szkic o jeden takt klasyfikacji później niż dotąd.
+
+Sprawdzenie na żywym koncie idzie tak. Otwórz rozmowę z pytaniem o paczkę
+i ułóż szkic. W oknie „Skąd to wiem" ma stać fakt „Rozpoznanie bieżącej
+prośby", a szkic nie ma prosić o model maszyny.
+
+### Aktualizacja do 0.429.0 — struktura wątku Allegro w klasyfikacji
+
+**Migracja dokłada kolumny sama. Panel trzeba przebudować.** Nic nie trzeba
+włączać: synchronizacja skrzynki czyta typ i podtyp wątku z `beta.v1` od razu.
+
+To jedno dodatkowe żądanie do Allegro na wątek, w którym coś się zmieniło.
+Nie na każdy wątek listy. Wyłącza je linia `export ALLEGRO_WATKI_BETA=0`.
+
+Jeśli konto nie ma dostępu do bety, Allegro odpowie 406 albo 403. Wtedy
+odczyt struktury staje na sześć godzin, a dziennik dostaje jedno zdanie
+`struktura wątków z beta.v1 wstrzymana`. Skrzynka pracuje dalej bez zmian.
+
+Sprawdzenie na żywym koncie idzie tak. Po pierwszej nowej wiadomości zajrzyj
+do bazy: `SELECT watek_typ, watek_podtyp, struktura_at FROM allegro_inbox_thread
+ORDER BY synced_at DESC LIMIT 5`. Pusty `struktura_at` przy świeżym wątku
+znaczy, że beta odmówiła — szukaj zdania w dzienniku.
+
+### Aktualizacja do 0.428.0 — klasyfikacja według specyfikacji
+
+**Migracja przenosi stare etykiety sama. Panel trzeba przebudować.** Tabela
+`klasyfikacja_rozmowy` znika, a jej wiersze przechodzą do
+`decyzja_klasyfikacji` jako nieaktywna historia. Kto chce mieć stare etykiety
+w pierwotnym kształcie, robi kopię bazy PRZED aktualizacją.
+
+Po aktualizacji wszystkie rozmowy są nierozpoznane w nowym słowniku. Plakietki
+wracają dopiero po przycisku nad kolejką albo po włączeniu taktu. To jest
+zamierzone: etykieta z ośmiu kategorii nie jest ani trafieniem, ani pudłem
+wobec piętnastu.
+
+**[wymaga działania] Rozpoznanie każdej nowej wiadomości włącza jedna linia:**
+
+```
+export COPILOT_AUTO_KLASYFIKACJA=1
+```
+
+Wymaga `COPILOT_MODE=anthropic` z kluczem, tak samo jak szkic z taktu. Takt
+bierze ostatnią wiadomość klienta z każdej rozmowy z ostatnich siedmiu dni.
+Hamulce: dziesięć rozmów na przebieg i sześćdziesiąt wywołań na godzinę,
+liczonych z księgi razem z błędami. Zmieniają je `COPILOT_AUTO_KLASYFIKACJA_NA_PRZEBIEG`
+i `COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE`; okno zmienia `COPILOT_KLASYFIKACJA_OKNO_DNI`.
+
+**Do dostawcy idzie teraz cały wątek rozmowy, nie ostatnia wiadomość.**
+Maskowanie i sufit są te same co przy szkicu. Pojedyncze rozpoznanie
+kosztuje więc więcej niż w 0.191.0. Wiadomość z samym załącznikiem nie
+wychodzi wcale.
+
+Sprawdzenie na żywym koncie idzie tak. Rozpoznaj jedną rozmowę przyciskiem
+i otwórz ją. Nad osią ma stać plakietka z nazwą kategorii i następnym krokiem,
+a obok przycisk „Potwierdź" i lista „popraw…". Po pierwszej godzinie taktu
+zajrzyj na kartę „Copilot" w ustawieniach i porównaj rachunek z oczekiwanym.
+
 ### Aktualizacja do 0.341.0 — nic nie czeka na kliknięcie
 
 **Migracji nie ma. Panel trzeba przebudować. Przełącznika nie ma** i to jest

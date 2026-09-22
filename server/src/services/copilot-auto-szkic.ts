@@ -9,6 +9,7 @@ import {
 } from "../adapters/copilot.js";
 import { nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
 import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
+import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
 /**
  * Szkic sam dla nowego pytania pod ofertą (0.317.0).
@@ -19,7 +20,14 @@ import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic
  * rozmowę, czytał pytanie, klikał i czekał kilka sekund. Teraz propozycja
  * czeka na niego, zanim zdąży doczytać wiadomość klienta.
  *
- * ── DLACZEGO TYLKO PYTANIA POD OFERTĄ ───────────────────────────────────────
+ * ── OD 22 WRZEŚNIA 2026 NIE TYLKO POD OFERTĄ ────────────────────────────────
+ * Specyfikacja właściciela z 20 września: każda wiadomość klienta dostaje
+ * szkic, a właściciel wybrał jej pełny zakres. Szkic powstaje więc także dla
+ * wiadomości, której rozpoznanie każe coś zrobić — z faktem „rozpoznanie",
+ * który mówi modelowi, na jaką prośbę odpowiada. Akapit niżej opisuje
+ * rozstrzygnięcie z 0.317.0 i zostaje, bo tłumaczy, skąd ta pierwsza gałąź.
+ *
+ * ── DLACZEGO TYLKO PYTANIA POD OFERTĄ (0.317.0) ─────────────────────────────
  * Rozstrzygnięcie właściciela. Wiadomość niosąca `relatesTo.offer.id` to
  * pytanie SPRZED zakupu, czyli dokładnie ten przypadek, w którym Copilot ma
  * komplet faktów: kartotekę oferty, treść aukcji, kandydatów doboru, a od
@@ -71,6 +79,8 @@ export interface AutoSzkicDeps {
   naPrzebieg?: number;
   naGodzine?: number;
   now?: () => Date;
+  /** Czy czekać na rozpoznanie wiadomości. Domyślnie: gdy takt klasyfikacji jest włączony. */
+  czekajNaRozpoznanie?: boolean;
 }
 
 export interface WynikAutoSzkicow {
@@ -109,8 +119,21 @@ const CZEKAJACE = `
     LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
     LEFT JOIN dobor_rozmowy d ON d.conversation_id = c.id
    WHERE m.direction = 'incoming'
-     AND m.related_object_type = 'OFFER'
-     AND m.related_object_id IS NOT NULL
+     AND ((m.related_object_type = 'OFFER' AND m.related_object_id IS NOT NULL)
+          /* Od 22 września 2026 także KAŻDA wiadomość z rozpoznaniem, które
+             każe coś zrobić. Rozpoznanie zastępcze (awaria, sam załącznik)
+             szkicu nie uruchamia: nie wiadomo, na co odpowiadać. */
+          OR EXISTS (SELECT 1 FROM decyzja_klasyfikacji k
+                      WHERE k.message_id = m.id AND k.aktywna = 1
+                        AND k.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'
+                        AND k.akcja <> 'NO_ACTION' AND k.zrodlo <> 'FALLBACK'))
+     /* Przy włączonym takcie klasyfikacji szkic CZEKA na rozpoznanie: bez
+        niego szkic nie dostaje faktu „rozpoznanie" i pisze pod dobór także
+        tam, gdzie klient pyta o paczkę. Drugi szkic po rozpoznaniu kosztowałby
+        drugie wywołanie za to samo pytanie. */
+     AND (? = 0 OR EXISTS (SELECT 1 FROM decyzja_klasyfikacji k2
+                            WHERE k2.message_id = m.id AND k2.aktywna = 1
+                              AND k2.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'))
      AND (IFNULL(s.message_id, -1) <> m.id
         /* Jeden, nie zero: rozmowa BEZ wiersza doboru ma wersję 1, tak jak
            mówi doborRozmowy(). Zero dawałoby wieczną nieświeżość każdej
@@ -154,7 +177,8 @@ export async function ulozZalegleSzkice(deps: AutoSzkicDeps = {}): Promise<Wynik
     return { ulozonych: 0, bledow: 0, przerwane: "sufit godzinowy wyczerpany", budzet };
   }
 
-  const rozmowy = (database.prepare(CZEKAJACE).all(ile) as Array<{ rozmowa: number }>)
+  const czekaj = deps.czekajNaRozpoznanie ?? (config.copilot.autoKlasyfikacja ? 1 : 0);
+  const rozmowy = (database.prepare(CZEKAJACE).all(czekaj ? 1 : 0, ile) as Array<{ rozmowa: number }>)
     .map((r) => Number(r.rozmowa));
   if (rozmowy.length === 0) return { ulozonych: 0, bledow: 0, przerwane: null, budzet };
 

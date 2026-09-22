@@ -1,7 +1,7 @@
 import React from "react";
 import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
+import type { Kategoria, OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
 import { LoginKlienta, Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
@@ -9,7 +9,7 @@ import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
-import { OcenaKategorii } from "./Copilot";
+import { EtykietaKategorii } from "./Copilot";
 import { Obecni } from "./Obecni";
 import { Prowadzi } from "../sprawy/Prowadzi";
 
@@ -82,11 +82,11 @@ export function Rozmowa(p: {
      ten sam komponent bywa rysowany bez obsługi. */
   onReklamacyjna?: (reklamacyjna: boolean) => void;
   zapisujeReklamacyjna?: boolean;
-  /* Werdykt o propozycji Copilota (§14, etap F). Opcjonalny, bo rozmowa bez
-     rozpoznania nie ma czego oceniać — a każdy istniejący test tego ekranu
-     opisuje właśnie taką rozmowę. */
-  ocenia?: boolean;
-  onOcenKategorie?: (ocena: "trafna" | "nietrafna") => void;
+  /* Etykieta człowieka o kategorii (22 września 2026, wcześniej kciuki).
+     Opcjonalna, bo rozmowa bez rozpoznania nie ma czego potwierdzać — a każdy
+     istniejący test tego ekranu opisuje właśnie taką rozmowę. */
+  poprawia?: boolean;
+  onPoprawKategorie?: (kategoria: Kategoria) => void;
   bladStatusu: string;
   onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
@@ -153,11 +153,11 @@ export function Rozmowa(p: {
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
           w telefonie nie jest przejęciem jej. */}
-      {/* Werdykt o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
-          się to, na co się właśnie patrzy. Za zębatką mieszka SUMA tych ocen,
+      {/* Etykieta o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
+          się to, na co się właśnie patrzy. Za zębatką mieszka SUMA etykiet,
           czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
-      {rozmowa.kopilot && <OcenaKategorii kopilot={rozmowa.kopilot}
-        zapisuje={p.ocenia} onOcen={p.onOcenKategorie ?? (() => {})} />}
+      {rozmowa.kopilot && <EtykietaKategorii kopilot={rozmowa.kopilot}
+        zapisuje={p.poprawia} onPopraw={p.onPoprawKategorie ?? (() => {})} />}
         <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
           onZmien={p.onZmienStatus}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}

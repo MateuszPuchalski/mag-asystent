@@ -120,6 +120,39 @@ Warto odnotować, że wymyślone `author.role` z `BUYER`/`SELLER` przypominało
 akurat wersję beta. Zgadywanie trafiło w kształt, który istnieje — tylko nie
 w ten, którym chodzimy.
 
+### Struktura wątku z `beta.v1` (22 września 2026)
+
+Klasyfikacja wiadomości bierze wskazówkę z tego, co Allegro mówi o wątku samo.
+Mówi to wyłącznie `beta.v1`: schemat `ThreadVBeta1` ma wymagane `type`
+(`COMMON` albo `POST_PURCHASE_ISSUE`) oraz opcjonalne `subType`, `orders`
+i `status`. Lista `public.v1` tych pól nie ma.
+
+**Czytamy je OSOBNYM żądaniem** `GET /messaging/threads/{threadId}` z nagłówkiem
+`beta.v1`, tylko dla wątku, w którym coś się zmieniło. Lista i wiadomości
+zostają na `public.v1` — ich mapowanie stoi na tamtym kształcie. Wymuszona
+wersja nie zapisuje się jako nauczony nagłówek rodziny `threads`
+(`zapytajAllegro`, opcja `akcept`).
+
+Zapisujemy `type`, `subType`, `status` i identyfikatory z `orders`, w kolumnach
+`watek_*` tabeli `allegro_inbox_thread`. `participants` NIE wchodzi: login
+kupującego ma już `interlocutor_login`, a lądowisko nie bierze nic ponad to,
+po co przyszliśmy. Wartość spoza znanego słownika zostaje, jak przyszła.
+
+`subType` ma w schemacie dziesięć wartości:
+`PRODUCT_INCONSISTENT_WITH_THE_OFFER`, `PRODUCT_ARRIVED_DAMAGED`,
+`DEFECT_DETECTED_DURING_USE`, `NO_PRODUCT_IN_THE_SHIPMENT`,
+`MISSING_PRODUCT_ELEMENTS`, `OTHER`, `NO_REFUND`,
+`SELLER_DOES_NOT_WANT_TO_ACCEPT_RETURN`, `PROBLEM_WITH_SENDING_PRODUCT_BACK`
+i `NO_DOCUMENTATIONS`. Co z każdą robi klasyfikacja, mówi rejestr
+`services/klasyfikacja-mapowanie.ts`.
+
+`[WERYFIKUJ]` **Czy nasze konto dostaje `beta.v1` przy wątkach i czy podtyp
+bywa wypełniony.** Specyfikacja klasyfikacji mówi wprost, że dostępność trzeba
+sprawdzić na koncie. Odmowa (406 albo 403) wstrzymuje odczyt struktury na
+sześć godzin i zostawia jedno zdanie w dzienniku. Do sprawdzenia: kolumna
+`struktura_at` wypełnia się po pierwszej zmianie w wątku, a `watek_typ` nie
+jest pusty.
+
 ## `GET /messaging/threads/{id}/messages`
 
 Obiekt ma tablicę `messages` oraz `offset` i `limit`. Wiadomość ma `id`,

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  OcenaDanych, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
+  Kategoria, OcenaDanych, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
   WymianaCopilota, WynikPartii,
 } from "./typy";
 
@@ -67,13 +67,18 @@ export function useKlasyfikuj() {
   });
 }
 
-/** Werdykt człowieka. Unieważnia rozmowę I pomiar — to on jest pomiarem. */
-export function useOcenKlasyfikacje() {
+/**
+ * Etykieta człowieka: potwierdzenie albo poprawka kategorii. Unieważnia
+ * rozmowę, listę I pomiar — etykieta jest pomiarem, a plakietka stoi w obu
+ * miejscach ekranu.
+ */
+export function usePoprawKlasyfikacje() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { rozmowaId: number; ocena: "trafna" | "nietrafna" }) =>
-      api<{ ocena: string }>(`/api/obsluga/copilot/klasyfikacja/${v.rozmowaId}/ocena`,
-        { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
+    mutationFn: (v: { rozmowaId: number; kategoria: Kategoria }) =>
+      api<{ kategoria: Kategoria; decyzjaId: number }>(
+        `/api/obsluga/copilot/klasyfikacja/${v.rozmowaId}/korekta`,
+        { method: "POST", body: JSON.stringify({ kategoria: v.kategoria }) }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });

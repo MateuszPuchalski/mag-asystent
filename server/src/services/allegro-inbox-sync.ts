@@ -1,9 +1,12 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
-import { urlWatkow, urlWiadomosci, zapytajAllegro } from "../adapters/allegro.http.js";
+import {
+  AKCEPT_BETA, urlWatku, urlWatkow, urlWiadomosci, zapytajAllegro,
+} from "../adapters/allegro.http.js";
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { logEvent } from "./events.js";
 import { flagaAutoodpowiedzi, obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
@@ -69,6 +72,56 @@ const MAKS_STRON = 25;
 
 type InboxQuery = (url: string) => Promise<unknown | null>;
 
+/** Struktura wątku z `beta.v1` — tylko pola, po które przychodzimy. */
+export interface StrukturaWatku {
+  typ: string;
+  podtyp: string | null;
+  status: string | null;
+  zamowienia: string[];
+}
+
+/** Odczyt struktury jednego wątku; `null` = Allegro nic nie oddało. */
+export type OdczytStruktury = (threadId: string) => Promise<unknown | null>;
+
+/**
+ * Kształt `ThreadVBeta1` ze specyfikacji: `type` wymagany, `subType`
+ * i `orders` opcjonalne. Wartości spoza znanego słownika ZOSTAJĄ, jak
+ * przyszły (specyfikacja klasyfikacji: „preserve unknown values") — o tym,
+ * czy je rozumiemy, rozstrzyga rejestr mapowań, nie synchronizacja.
+ * Odpowiedź bez `type` to odpowiedź nie w tym kształcie: zwracamy `null`.
+ */
+export function strukturaZOdpowiedzi(x: unknown): StrukturaWatku | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.type !== "string" || !o.type) return null;
+  const zamowienia = Array.isArray(o.orders)
+    ? o.orders.map((z) => (z && typeof z === "object" ? (z as { id?: unknown }).id : null))
+      .filter((id): id is string => typeof id === "string" && id !== "")
+    : [];
+  return {
+    typ: o.type,
+    podtyp: typeof o.subType === "string" && o.subType ? o.subType : null,
+    status: typeof o.status === "string" ? o.status : null,
+    zamowienia,
+  };
+}
+
+/*
+ * Wstrzymanie odczytu struktury po odmowie. Konto bez dostępu do `beta.v1`
+ * (406) albo bez uprawnienia (403) odmówi tak samo przy każdym wątku, a
+ * specyfikacja mówi wprost, że dostępność bety trzeba sprawdzić na koncie
+ * — tu jest `[WERYFIKUJ]`. Pamięć procesu, nie baza: restart to naturalna
+ * chwila, żeby spróbować jeszcze raz.
+ */
+const WSTRZYMANIE_PO_ODMOWIE_MS = 6 * 3_600_000;
+const WSTRZYMANIE_PO_LIMICIE_MS = 15 * 60_000;
+let strukturaWstrzymanaDo = 0;
+
+/** Wyłącznie dla testów: zdjęcie wstrzymania między przypadkami. */
+export function _zdejmijWstrzymanieStruktury(): void {
+  strukturaWstrzymanaDo = 0;
+}
+
 export interface InboxSyncDeps {
   database?: Db;
   query?: InboxQuery;
@@ -78,6 +131,12 @@ export interface InboxSyncDeps {
   accountId?: string;
   /** Granica czasu; `null` znaczy „bez progu". Patrz `config.allegro.inboxOd`. */
   inboxOd?: string | null;
+  /**
+   * Odczyt struktury wątku w `beta.v1`. `null` wyłącza. Domyślnie wyłączony,
+   * gdy test podstawia `query` — atrapa listy nie ma prawa pociągnąć za sobą
+   * prawdziwego żądania do Allegro.
+   */
+  struktura?: OdczytStruktury | null;
 }
 
 /** Jeden przebieg. Sieć kończy się przed zapisem, więc wolne API nie blokuje SQLite. */
@@ -100,6 +159,9 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const przeczytane = new Set<string>();
   const at = now().toISOString();
   const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
+  const struktura: OdczytStruktury | null = deps.struktura !== undefined ? deps.struktura
+    : deps.query || !config.allegro.watkiBeta ? null
+      : (id) => zapytajAllegro(urlWatku(apiUrl, id), { akcept: AKCEPT_BETA });
   let offset = 0;
   let stron = 0;
   let reachedCursor = false;
@@ -118,7 +180,8 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
    * Zapis JEDNEJ STRONY listy. Wydzielone z ciała przebiegu, bo od 0.164.1
    * woła się to po każdej stronie, a nie raz na końcu.
    */
-  const zapiszPartie = (threads: Thread[], messages: Map<string, Message[]>): void => {
+  const zapiszPartie = (threads: Thread[], messages: Map<string, Message[]>,
+    struktury: Map<string, StrukturaWatku> = new Map()): void => {
       /* KAŻDY WĄTEK MA WŁASNĄ TRANSAKCJĘ, bo §9 projektu panelu żąda, żeby
          synchronizator „izolował błąd pojedynczego wątku". Do 0.149.2 cała
          partia szła jedną transakcją i produkcja pokazała, co to znaczy:
@@ -144,6 +207,15 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
               thread.id, Number(flaga(thread.read, "thread.read")),
               thread.lastMessageDateTime ?? null, thread.interlocutor?.login ?? null,
               JSON.stringify(thread), at);
+            /* Struktura TYLKO wtedy, gdy przyszła. Nieudany odczyt bety nie ma
+               prawa zamazać wartości z poprzedniego przebiegu — typ wątku się
+               nie zmienia, a NULL udawałby „wątek bez typu". */
+            const st = struktury.get(thread.id);
+            if (st) {
+              database.prepare(`UPDATE allegro_inbox_thread SET watek_typ=?, watek_podtyp=?,
+                watek_status=?, watek_zamowienia=?, struktura_at=? WHERE id=?`).run(
+                st.typ, st.podtyp, st.status, JSON.stringify(st.zamowienia), at, thread.id);
+            }
             database.prepare("DELETE FROM allegro_inbox_message WHERE thread_id=?").run(thread.id);
             for (const message of messages.get(thread.id) ?? []) {
               database.prepare(`INSERT INTO allegro_inbox_message
@@ -181,6 +253,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       /* Partia jednej strony, nie całego przebiegu — patrz zapis niżej. */
       const threads: Thread[] = [];
       const messages = new Map<string, Message[]>();
+      const struktury = new Map<string, StrukturaWatku>();
       for (const thread of page) {
         /* GRANICA CZASU (0.152.0). Lista przychodzi od najnowszego, więc
            pierwszy wątek poniżej progu znaczy „dalej są już same starsze" —
@@ -208,6 +281,8 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           messages.set(thread.id, tablica<Message>(body, "messages"));
           threads.push(thread);
           przeczytane.add(thread.id);
+          const st = await czytajStrukture(struktura, thread.id, now());
+          if (st) struktury.set(thread.id, st);
         }
       }
       /* ZAPIS PO KAŻDEJ STRONIE, nie na końcu przebiegu (0.164.1). Do tego
@@ -220,7 +295,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
          Strona jest najmniejszą jednostką, jaką wolno tu zapisać: test
          „awaria sieci przy pobieraniu wiadomości kończy przebieg bez zapisu"
          pilnuje, że wątki strony NIEDOCZYTANEJ nie wchodzą pojedynczo. */
-      zapiszPartie(threads, messages);
+      zapiszPartie(threads, messages, struktury);
       offset += page.length;
       if (poniżejGranicy || page.length < 20) {
         doDna = true;
@@ -418,6 +493,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
       if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
+      else uzgodnijNiepewna(database, rozmowa, message.id, tresc);
       /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
          „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
          pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
@@ -484,4 +560,66 @@ async function dociagnijZalacznikiNew(
         e instanceof Error ? e.message : e);
     }
   }
+}
+
+/**
+ * Struktura jednego wątku — NIGDY nie przerywa przebiegu. Skrzynka bez typu
+ * wątku działa jak do 22 września 2026; skrzynka bez wiadomości nie działa
+ * wcale. Dlatego każda awaria bety kończy się tu `null`, a nie wyjątkiem.
+ *
+ * Odmowa wersji albo uprawnienia wstrzymuje odczyt na sześć godzin (patrz
+ * `WSTRZYMANIE_PO_ODMOWIE_MS`); limit Allegro — na kwadrans, bo następne
+ * żądanie tego przebiegu i tak dostałoby 429.
+ */
+async function czytajStrukture(
+  odczyt: OdczytStruktury | null, threadId: string, teraz: Date,
+): Promise<StrukturaWatku | null> {
+  if (!odczyt || teraz.getTime() < strukturaWstrzymanaDo) return null;
+  try {
+    return strukturaZOdpowiedzi(await odczyt(threadId));
+  } catch (e) {
+    if (e instanceof BladLimituAllegro) {
+      strukturaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_LIMICIE_MS;
+    } else if (kodHttp(e) === 403 || /406\/415/.test(String((e as Error)?.message))) {
+      strukturaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_ODMOWIE_MS;
+      /* Głośno RAZ na wstrzymanie, nie przy każdym wątku: odmowa opisuje
+         konto, nie wątek. */
+      console.warn("[allegro-inbox] struktura wątków z beta.v1 wstrzymana na 6 h:",
+        e instanceof Error ? e.message : e);
+    }
+    return null;
+  }
+}
+
+/**
+ * Wysyłka `send_uncertain` rozstrzyga się sama, gdy synchronizacja przyniesie
+ * naszą wiadomość o tej samej treści (22 września 2026).
+ *
+ * Specyfikacja: „if a request times out after possible submission, mark its
+ * result UNKNOWN and reconcile against outgoing messages before retrying; do
+ * not assume the remote API deduplicates requests". Do tej wersji rozstrzygał
+ * to człowiek: wysyłka odmawiała ponowienia ze zdaniem „najpierw zsynchronizuj
+ * wątek", a po synchronizacji wiersz i tak stał niepewny.
+ *
+ * Dopasowanie po TREŚCI w tej samej rozmowie, bez różnicy białych znaków —
+ * Allegro nie oddaje naszego klucza idempotencji, więc treść jest jedynym
+ * wspólnym śladem. Bierze NAJSTARSZY pasujący wiersz: dwie niepewne wysyłki
+ * tej samej treści to dwie próby jednej odpowiedzi, a Allegro przyjęło jedną.
+ *
+ * Szkicu i statusu rozmowy nie rusza. Status liczy się z kierunku ostatniej
+ * wiadomości, a szkic mógł się zmienić od próby — skasowanie go byłoby
+ * cichym nadpisaniem pracy agenta.
+ */
+function uzgodnijNiepewna(database: Db, rozmowa: number, externalId: string, tresc: string): void {
+  const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
+  const kandydaci = database.prepare(`SELECT id, body FROM outbox
+    WHERE conversation_id=? AND status='send_uncertain' AND external_message_id IS NULL
+    ORDER BY id`).all(rozmowa) as Array<{ id: number; body: string }>;
+  const trafiony = kandydaci.find((o) => zwin(o.body) === zwin(tresc));
+  if (!trafiony) return;
+  database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, blad=NULL,
+    finished_at=COALESCE(finished_at, strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?`)
+    .run(externalId, trafiony.id);
+  logEvent("rozmowa_wysylka_uzgodniona", "synchronizacja", null,
+    { conversationId: rozmowa, outboxId: trafiony.id, externalMessageId: externalId }, null, database);
 }

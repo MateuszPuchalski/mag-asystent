@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka } from "./Kolejka";
-import type { Rozmowa } from "../api/typy";
+import type { Kategoria, Kopilot, Rozmowa } from "../api/typy";
 
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
@@ -272,14 +272,18 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
 describe("kategorie Copilota w kolejce", () => {
   const zKategoria = (id: number, kategoria: Rozmowa["kopilot"]) =>
     rozmowa({ id, klient: `Klient ${id}`, kopilot: kategoria });
-  const kop = (kategoria: string, n: Record<string, unknown> = {}) =>
-    ({ kategoria, pewnosc: "wysoka", nieaktualna: false, ocena: null, ...n }) as Rozmowa["kopilot"];
+  const kop = (kategoria: Kategoria, n: Partial<Kopilot> = {}): Kopilot => ({
+    kategoria, dodatkowe: [], akcja: "GET_PRODUCT", akcjaModelu: null, wymagaCzlowieka: false,
+    brakDanychZamowienia: false, brakDanychProduktu: false, pewnosc: "wysoka",
+    zrodlo: "MODEL", status: "SUCCESS", kody: [], uzasadnienie: null, nieaktualna: false,
+    kategoriaCzlowieka: null, kategoriaModelu: kategoria, ...n,
+  });
 
   it("plakietka staje na wierszu, a kolejność zostaje TA SAMA", () => {
     const lista = [
       zKategoria(1, null),
-      zKategoria(2, kop("dostepnosc")),
-      zKategoria(3, kop("reklamacja")),
+      zKategoria(2, kop("PRODUCT_AVAILABILITY")),
+      zKategoria(3, kop("COMPLAINT")),
     ];
     pokaz(lista);
     const wiersze = screen.getAllByRole("button", { name: /Klient/ });
@@ -297,9 +301,9 @@ describe("kategorie Copilota w kolejce", () => {
 
   it("pasek liczników pokazuje SKŁAD kubełka, a klik w licznik filtruje", async () => {
     pokaz([
-      zKategoria(1, kop("dostepnosc")),
-      zKategoria(2, kop("dostepnosc")),
-      zKategoria(3, kop("reklamacja")),
+      zKategoria(1, kop("PRODUCT_AVAILABILITY")),
+      zKategoria(2, kop("PRODUCT_AVAILABILITY")),
+      zKategoria(3, kop("COMPLAINT")),
     ]);
     const licznik = screen.getByRole("button", { name: /Dostępność 2/ });
     await userEvent.click(licznik);
@@ -312,8 +316,8 @@ describe("kategorie Copilota w kolejce", () => {
     /* „Zajrzyj do Wszystkie" przy włączonym filtrze wysłałoby agenta w złą
        stronę: rozmowy są, tylko sito je zasłania. */
     pokaz([
-      zKategoria(1, kop("dostepnosc")),
-      { ...zKategoria(2, kop("reklamacja")), wlascicielId: 9, wlasciciel: "Kolega" },
+      zKategoria(1, kop("PRODUCT_AVAILABILITY")),
+      { ...zKategoria(2, kop("COMPLAINT")), wlascicielId: 9, wlasciciel: "Kolega" },
     ]);
     await userEvent.click(screen.getByRole("button", { name: /Reklamacja 1/ }));
     await userEvent.click(screen.getByRole("button", { name: /^Nieprzypisane/ }));
@@ -324,7 +328,7 @@ describe("kategorie Copilota w kolejce", () => {
   it("etykieta ze starszej wiadomości NIE liczy się do składu skrzynki", () => {
     /* Licznik ma mówić, co w skrzynce JEST — a etykieta po dopisku klienta
        opisuje pytanie, którego klient już nie zadaje. */
-    pokaz([zKategoria(1, kop("dostepnosc", { nieaktualna: true }))]);
+    pokaz([zKategoria(1, kop("PRODUCT_AVAILABILITY", { nieaktualna: true }))]);
     expect(screen.queryByRole("button", { name: /Dostępność 1/ })).not.toBeInTheDocument();
     expect(screen.getByText("Dostępność")).toBeInTheDocument();
   });
