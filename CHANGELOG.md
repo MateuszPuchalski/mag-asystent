@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.427.1 — 22 września 2026
+
+**Decyzja właściciela: jeden front.** Całe biuro przechodzi do panelu pod
+`/obsluga`, a `biuro.html` znika widok po widoku. Tylko dokumentacja i makiety —
+żadnej zmiany zachowania.
+
+Audyt biura po 0.427.0 pokazał, że `biuro.html` nie jest podglądem. Ma
+dwadzieścia dwa zapisy w sześciu widokach, a pracują w nim ci sami ludzie co
+w panelu obsługi. Uzasadnienie, koszt i kolejność sześciu wydań stoją w
+`docs/obsluga-klienta.md` §7. Reguła „Dwa fronty" w `CLAUDE.md` stała się
+regułą „Jeden front": `biuro.html` nie dostaje już niczego nowego.
+
+**Cel biura zapisany wprost.** Biuro rozstrzyga to, czego hala nie rozstrzygnie
+sama — w drodze towaru przez magazyn. Reszta jest nadzorem albo ustawieniem.
+Ekrany w panelu układa test tego celu: praca na górnym rzędzie, wgląd na dolnym,
+ustawienia za zębatką.
+
+**Makiety w `docs/projekt-widokow-jeden-front/`.** Dziesięć plansz: DO DECYZJI
+jako ekran startowy, dostawy, kosze, stan systemu, analiza w dwóch rolach,
+ustawienia, nagłówek w dwóch szerokościach i konto bez dostępu. Nagłówek
+zmierzono w Chromium: górny rząd 1145 px, dolny 1068 px, oba mieszczą się
+przy 1180 px.
+
+**Trzy zdania dokumentacji przestały kłamać.** `docs/architektura.md` mówiło
+„zero zapisu", README — że jedynym zapisem biura jest zdjęcie dostawy z listy.
+README kierowało też reguły strefy do ANALIZY, a mieszkają w USTAWIENIACH.
+
 ## 0.427.0 — 22 września 2026
 
 **Biuro przeprojektowane pod dekalog, nie pod urodę.** Każda zmiana nazywa

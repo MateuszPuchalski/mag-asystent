@@ -102,10 +102,21 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
+**Biuro przechodzi do panelu (0.427.1).** Poniżej historia `/biuro` tak, jak
+powstawało. Od 0.427.1 obowiązuje jeden front, decyzją właściciela z
+`docs/obsluga-klienta.md` §7, a `biuro.html` znika widok po widoku. Zdanie
+„zero frameworka, zero zapisu" przestało być prawdą dużo wcześniej: audyt
+0.427.0 policzył w biurze dwadzieścia dwa zapisy. Z tamtej reguły został jej
+rdzeń — **zero zapisu przy patrzeniu** — i ten obowiązuje panel tak samo.
+
+Cel, od którego liczy się każdy ekran biura: biuro rozstrzyga to, czego hala
+nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem
+albo ustawieniem.
+
 **Biuro ma podgląd pod `/biuro`** — jedną stronę HTML bez builda
 (`server/src/web/biuro.html`), serwowaną przez API i czytającą istniejące trasy
 z tokenem sesji. Wcześniejszy `/lookup` zniknął razem z klientem PWA; nowy
-podgląd świadomie nie jest drugim frontem: zero frameworka, zero zapisu.
+podgląd świadomie nie był drugim frontem: zero frameworka, zero zapisu.
 Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
 którym biuro widziało stan dostaw.
 

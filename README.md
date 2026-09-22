@@ -527,7 +527,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   import zbiórek z Sellasist w panelu biura. Kandydat stojący poza strefą
   dostaje adnotację na karcie towaru w kolektorze — obie ścieżki liczą jedną
   miarą, więc nigdy nie wskażą sprzecznych list. Reguły strefy mieszkają
-  w bazie i są edytowalne z `/biuro` → ANALIZA.
+  w bazie i są edytowalne z `/biuro` → zębatka → USTAWIENIA.
 
 **Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
 - `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
@@ -535,11 +535,15 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **Zerowy wynik nie tworzy raportu.** Rozjazdy → CSV + kod wyjścia `2` pod
   alert. Ustawienie i szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
-**Biuro — podgląd pod `/biuro`**
+**Biuro pod `/biuro` — w przeprowadzce do panelu**
+- Od 0.427.1 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
+  Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Opis niżej mówi
+  o tym, co jeszcze stoi w `biuro.html`.
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
   API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
-  sesji. Strona nie ma własnych uprawnień, a jedyny zapis poza logowaniem to
-  zdjęcie dostawy z listy pracy (niżej) — zastrzeżone dla roli `biuro`.
+  sesji. Strona nie ma własnych uprawnień: role sprawdza serwer przy każdej
+  trasie. Otwarcie widoku niczego nie zapisuje. Zapisuje dopiero decyzja biura:
+  wyjątek, notatka, kosz, konto, reguła strefy.
 - **Pasek stanu to dwie ikony, widoczne z każdej zakładki** (0.114.0).
   Ikona SYSTEM zmienia kolor: zielony — wszystko gra, bursztyn — działa, ale
   kuleje, czerwień — coś stoi. Najechanie pokazuje pełne zdania: wersję i tryb
@@ -549,9 +553,9 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
   PRACA (dostawy, magazyn zwrotów) otwiera się kilkanaście razy dziennie.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
-- **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Dziś prowadzi
-  do DOSTAWCÓW. Konfiguracja nie jest zakładką pracy i nie ma ważyć tyle,
-  co dostawy.
+- **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Mieszczą dane
+  firmy, reguły strefy złotej, konta i logo dostawców. Konfiguracja nie jest
+  zakładką pracy i nie ma ważyć tyle, co dostawy.
 - **DOSTAWY I REKLAMACJE** — postęp per dokument oraz nierozwiązane wyjątki;
   protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
 - **Archiwum dostaw** (0.235.0): czwarty czip kolejki pokazuje dostawy starsze

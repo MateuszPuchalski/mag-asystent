@@ -1,0 +1,133 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-22T19:42:29Z"
+ },
+ "title": "WERTIS — jeden front",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 660,
+   "w": 1440,
+   "h": 900,
+   "title": "DO DECYZJI — nowy ekran startowy"
+  },
+  "Dostawy.dc.html": {
+   "x": 1520,
+   "y": 660,
+   "w": 1440,
+   "h": 900,
+   "title": "Dostawy — dokument otwarty"
+  },
+  "Kosze.dc.html": {
+   "x": 0,
+   "y": 1680,
+   "w": 1440,
+   "h": 860,
+   "title": "Kosze zwrotowe"
+  },
+  "Stan.dc.html": {
+   "x": 1520,
+   "y": 1680,
+   "w": 1440,
+   "h": 900,
+   "title": "Stan systemu"
+  },
+  "Analiza.dc.html": {
+   "x": 0,
+   "y": 2700,
+   "w": 1440,
+   "h": 900,
+   "title": "Analiza — administrator"
+  },
+  "AnalizaBiuro.dc.html": {
+   "x": 1520,
+   "y": 2700,
+   "w": 1440,
+   "h": 640,
+   "title": "Analiza — rola biuro (bez karty per osoba)"
+  },
+  "Ustawienia.dc.html": {
+   "x": 0,
+   "y": 3720,
+   "w": 1440,
+   "h": 900,
+   "title": "Ustawienia za zębatką"
+  },
+  "Naglowek1440.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 200,
+   "title": "Nagłówek w dwóch rzędach — 1440 px"
+  },
+  "Naglowek1180.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1180,
+   "h": 200,
+   "title": "Nagłówek — 1180 px, laptop obok Subiekta"
+  },
+  "BrakDostepu.dc.html": {
+   "x": 2780,
+   "y": 0,
+   "w": 900,
+   "h": 420,
+   "title": "Konto magazyniera w biurze"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Dostawy.dc.html",
+  "Kosze.dc.html",
+  "Stan.dc.html",
+  "Analiza.dc.html",
+  "AnalizaBiuro.dc.html",
+  "Ustawienia.dc.html",
+  "Naglowek1440.dc.html",
+  "Naglowek1180.dc.html",
+  "BrakDostepu.dc.html"
+ ],
+ "notes": {
+  "tytul": {
+   "x": 0,
+   "y": -420,
+   "text": "WERTIS — jeden front: biuro w panelu",
+   "kind": "title1",
+   "maxW": 3680
+  },
+  "cel": {
+   "x": 0,
+   "y": -300,
+   "w": 900,
+   "maxH": 260,
+   "size": "m",
+   "fill": "orange",
+   "text": "Cel biura: rozstrzyga to, czego hala nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem albo ustawieniem.\nTest każdej funkcji: kończy się decyzją biura, której hala nie podejmie? Tak → praca (górny rząd, DO DECYZJI). Ktoś musi to sprawdzać → wgląd (dolny rząd). Rzadko zmieniane → za zębatką. Nic z tego → wypada."
+  },
+  "naglowek": {
+   "x": 960,
+   "y": -300,
+   "w": 880,
+   "maxH": 260,
+   "size": "m",
+   "fill": "teal",
+   "text": "Nagłówek zmierzony w Chromium: górny rząd 1145 px (mieści się przy 1180), dolny 1068 px. Wysokość 100 px: +35 przy 1440, −17 przy 1180 wobec dzisiejszego, zawiniętego 117 px. Poniżej ~1150 px górny rząd zawija się jak dziś. Pigułka stanu, zębatka i wyjście zeszły do dolnego rzędu — tylko tak górny mieści dziewięć zakładek."
+  },
+  "zmiany": {
+   "x": 1900,
+   "y": -300,
+   "w": 1780,
+   "maxH": 260,
+   "size": "m",
+   "fill": "gray",
+   "text": "Do rozstrzygnięcia na tej kanwie: (1) DO DECYZJI zastępuje Zadania jako ekran startowy; Zadania idą na /obsluga/zadania. (2) „Reklamacje” biura (rozbieżności z dostawcą) nazywają się Rozbieżności — w panelu Reklamacje to sprawy Allegro. (3) Ustawienia panelu zawierały dotąd głównie pomiary (eskalacja, pokrycie wiedzy, Copilot); po teście celu przechodzą do Analizy → Obsługa klienta i do Stanu systemu. Za zębatką zostaje tylko konfiguracja. (4) Dane firmy do protokołów przechodzą z przeglądarki na serwer. (5) Karta per osoba tylko dla administratora. Dane na planszach są przykładowe."
+  }
+ },
+ "designSystems": []
+}
