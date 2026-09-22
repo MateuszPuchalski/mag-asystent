@@ -83,7 +83,7 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
         Trzy fakty, które rozstrzygają odpowiedź, stoją PRZED wyborem zakładki
         i zostają przy każdej z nich. Uzasadnienie i granice — czemu trzy, a nie
         pięć, i czemu wiersz bez wartości nie staje — w `PasmoOdpowiedzi.tsx`. */}
-    <PasmoOdpowiedzi dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />
+    <PasmoOdpowiedzi dane={dane} />
 
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
       { klucz: "towar", etykieta: "Oferta i towar" },

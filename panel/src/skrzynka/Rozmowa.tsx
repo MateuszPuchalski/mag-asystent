@@ -1,7 +1,7 @@
 import React from "react";
 import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { Kategoria, OsRozmowy, StatusRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
+import type { Kategoria, OsRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
 import { LoginKlienta, Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
@@ -75,7 +75,6 @@ export function Rozmowa(p: {
   onWskazOferte: (ofertaId: string) => void;
   onDopytajOOferte: () => void;
   onOtworzRozmowe: (id: number) => void;
-  zapisujeStatus: boolean;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
   zapisujePriorytet: boolean;
   /* Znacznik reklamacyjny (0.390.0) — opcjonalny, jak reszta rzeczy, których
@@ -88,7 +87,6 @@ export function Rozmowa(p: {
   poprawia?: boolean;
   onPoprawKategorie?: (kategoria: Kategoria) => void;
   bladStatusu: string;
-  onZmienStatus: (status: StatusRozmowy, doKiedy: string | null) => void;
 }) {
   /* Licznik jawnych zjazdów osi na dół (0.260.0). „Pokaż" pod banerem nowej
      wiadomości do 0.259.0 tylko odświeżał dane i nie ruszał widoku — obiecywał
@@ -158,8 +156,7 @@ export function Rozmowa(p: {
           czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
       {rozmowa.kopilot && <EtykietaKategorii kopilot={rozmowa.kopilot}
         zapisuje={p.poprawia} onPopraw={p.onPoprawKategorie ?? (() => {})} />}
-        <Status rozmowa={rozmowa} zapisuje={p.zapisujeStatus} blad={p.bladStatusu}
-          onZmien={p.onZmienStatus}
+        <Status rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
           onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna} />
       </div>

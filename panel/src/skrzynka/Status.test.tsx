@@ -17,90 +17,32 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
 describe("Status rozmowy", () => {
   it("pokazuje stan bieżący po polsku, także gdy nikt go nie ruszył", () => {
     /* „Nowa" jest informacją, nie brakiem informacji: znaczy, że sprawy nikt
-       nie tknął. Pole musi mieć opcję dla wartości, którą pokazuje. */
-    render(<Status rozmowa={rozmowa()} zapisuje={false} blad="" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.getByRole("combobox", { name: /Status rozmowy/ })).toHaveValue("new");
-    expect(screen.getAllByText("Nowa").length).toBeGreaterThan(0);
+       nie tknął. */
+    render(<Status rozmowa={rozmowa()} blad="" onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Nowa");
   });
 
-  /* ── Wyliczanego stanu nie da się kliknąć (0.225.0) ──────────────────────
-     Właściciel: „w większości nie powinienem był robić tego ręcznie".
-     Kto ma następny ruch, wynika z ostatniej wiadomości; pole ma to POKAZAĆ,
-     a nie oddawać do wyboru.                                              */
-  it("stany wyliczane widać, ale nie da się ich nadać", () => {
-    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} zapisuje={false} blad=""
-      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-
-    const pole = screen.getByRole("combobox", { name: /Status rozmowy/ });
-    expect(pole).toHaveValue("waiting_for_us");
-    /* Pokazana, ale nieaktywna: pole musi mieć opcję dla wartości, którą
-       wyświetla, inaczej przeglądarka wybrałaby pierwszą z listy. */
-    expect(screen.getByRole("option", { name: "Czeka na nas" })).toBeDisabled();
-
-    /* Do wzięcia zostają CZTERY werdykty człowieka. */
-    for (const nazwa of ["Otwarta", "Czeka na klienta", "Czeka na halę"]) {
-      expect(screen.queryByRole("option", { name: nazwa })).toBeNull();
-    }
-    for (const nazwa of ["Odłożona", "Rozwiązana", "Zamknięta", "Spam"]) {
-      expect(screen.getByRole("option", { name: nazwa })).toBeEnabled();
-    }
+  /* ── Ręcznego statusu nie ma (22 września 2026) ──────────────────────────
+     Decyzja właściciela: stan wynika wyłącznie z faktów. Nagłówek nie ma
+     pola wyboru ani kroku odłożenia — test pilnuje, żeby nie wróciły. */
+  it("status jest odczytem: bez pola wyboru i bez odłożenia", () => {
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /ODŁÓŻ/ })).toBeNull();
+    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Czeka na nas");
   });
 
-  it("z werdyktu jest droga powrotna, a bez werdyktu jej nie ma", async () => {
-    /* Bez niej „Rozwiązana" trzymałaby rozmowę, dopóki klient sam nie napisze,
-       a pomyłki nie dałoby się cofnąć. */
-    const zmien = vi.fn();
-    const { rerender } = render(<Status rozmowa={rozmowa({ status: "resolved" })} zapisuje={false}
-      blad="" onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }), "open");
-    expect(zmien).toHaveBeenCalledWith("open", null);
-
-    rerender(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} zapisuje={false} blad=""
-      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.queryByRole("option", { name: /Wróć do stanu z rozmowy/ })).toBeNull();
+  it("werdykt zapisany przed zmianą widać dalej, bo stoi w bazie", () => {
+    render(<Status rozmowa={rozmowa({ status: "closed" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Zamknięta");
   });
 
-  it("zwykła zmiana idzie od razu, bez terminu", async () => {
-    const zmien = vi.fn();
-    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }),
-      "resolved");
-    expect(zmien).toHaveBeenCalledWith("resolved", null);
-  });
-
-  it("odłożenie pyta o termin PRZED wysłaniem, a nie po odmowie serwera", async () => {
-    /* Serwer odrzuca `snoozed` bez terminu — §7 nie zna rozmowy odłożonej na
-       zawsze. Agent nie ma się dowiadywać o tej regule z komunikatu błędu. */
-    const zmien = vi.fn();
-    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={zmien} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: /Status rozmowy/ }),
-      "snoozed");
-    expect(zmien).not.toHaveBeenCalled();
-
-    const przycisk = screen.getByRole("button", { name: "ODŁÓŻ" });
-    expect(przycisk).toBeDisabled();
-
-    await userEvent.type(screen.getByLabelText(/Termin odłożenia/), "2026-09-08T07:00");
-    await userEvent.click(przycisk);
-    expect(zmien).toHaveBeenCalledTimes(1);
-    const [status, doKiedy] = zmien.mock.calls[0];
-    expect(status).toBe("snoozed");
-    /* Pole oddaje czas lokalny bez strefy; do serwera ma dojechać ISO. */
-    expect(doKiedy).toBe(new Date("2026-09-08T07:00").toISOString());
-  });
-
-  it("miniony termin odłożenia jest widoczny, bo wiersz wygląda jak zwykły otwarty", () => {
-    render(<Status rozmowa={rozmowa({ status: "open", poTerminie: true,
-      odlozoneDo: "2026-08-30T06:00:00.000Z" })} zapisuje={false} blad="" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.getByText(/termin odłożenia minął/)).toBeInTheDocument();
-  });
-
-  it("odmowa serwera ląduje przy przełączniku, nie w ogólnym pasku błędów", () => {
-    render(<Status rozmowa={rozmowa()} zapisuje={false}
-      blad="Odłożenie wymaga terminu" onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.getByText(/Odłożenie wymaga terminu/)).toBeInTheDocument();
+  it("odmowa serwera ląduje przy przełącznikach, nie w ogólnym pasku błędów", () => {
+    render(<Status rozmowa={rozmowa()}
+      blad="Nieznany priorytet" onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.getByText(/Nieznany priorytet/)).toBeInTheDocument();
   });
 });
 
@@ -109,7 +51,7 @@ describe("Status rozmowy", () => {
 describe("ręczna flaga „pilne”", () => {
   it("przełącznik pokazuje stan i podnosi flagę", async () => {
     const onPriorytet = vi.fn();
-    render(<Status rozmowa={rozmowa()} zapisuje={false} blad="" onZmien={() => {}}
+    render(<Status rozmowa={rozmowa()} blad=""
       onPriorytet={onPriorytet} zapisujePriorytet={false} />);
     const p = screen.getByRole("button", { name: /Oznacz jako pilne/ });
     expect(p).toHaveAttribute("aria-pressed", "false");
@@ -119,8 +61,7 @@ describe("ręczna flaga „pilne”", () => {
 
   it("podniesiona flaga daje się opuścić tym samym przyciskiem", async () => {
     const onPriorytet = vi.fn();
-    render(<Status rozmowa={rozmowa({ priorytet: "pilny" })} zapisuje={false} blad=""
-      onZmien={() => {}} onPriorytet={onPriorytet} zapisujePriorytet={false} />);
+    render(<Status rozmowa={rozmowa({ priorytet: "pilny" })} blad="" onPriorytet={onPriorytet} zapisujePriorytet={false} />);
     const p = screen.getByRole("button", { name: "PILNE" });
     expect(p).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(p);
@@ -131,24 +72,19 @@ describe("ręczna flaga „pilne”", () => {
 /* ── Stan raz, nie dwa (0.193.0) ─────────────────────────────────────────────
    Do 0.192.0 pasek statusu rysował plakietkę ze stanem, a obok pole wyboru
    z TĄ SAMĄ wartością: jedno pasmo nagłówka mówiło „OTWARTA" dwukrotnie.
-   §7 żąda, żeby nagłówek pokazywał stan zawsze — pokazuje, w rzeczy, którą
-   się go zmienia.                                                            */
+   §7 żąda, żeby nagłówek pokazywał stan zawsze — pokazuje go jedna
+   plakietka.                                                            */
 describe("Stan rozmowy stoi w nagłówku raz", () => {
   it("nazwa stanu bieżącego pada dokładnie jeden raz", () => {
-    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    /* Jedyne wystąpienie to opcja w polu wyboru — plakietki obok już nie ma. */
+    render(<Status rozmowa={rozmowa({ status: "open" })} blad="" onPriorytet={() => {}} zapisujePriorytet={false} />);
+    /* Jedyne wystąpienie to plakietka — pola wyboru obok już nie ma. */
     expect(screen.getAllByText("Otwarta")).toHaveLength(1);
   });
 
-  it("pole wyboru niesie barwę stanu, więc stan dalej czyta się rzutem oka", () => {
-    /* Barwa była wcześniej na plakietce. Znikła plakietka, nie barwa —
-       inaczej „pokazuj stan zawsze" zamieniłoby się w listę rozwijaną
-       nie do odróżnienia od każdej innej. */
-    render(<Status rozmowa={rozmowa({ status: "open" })} zapisuje={false} blad=""
-      onZmien={() => {}} onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.getByRole("combobox", { name: /Status rozmowy/ }).className)
-      .toMatch(/bg-stan-open/);
+  it("plakietka niesie barwę stanu, więc stan dalej czyta się rzutem oka", () => {
+    render(<Status rozmowa={rozmowa({ status: "open" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} />);
+    expect(screen.getByLabelText("Status rozmowy").className).toMatch(/bg-stan-open/);
   });
 
   /* ── ZNACZNIK REKLAMACYJNY (0.390.0) ───────────────────────────────────────
@@ -161,23 +97,20 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
 
   it("przełącza znacznik w OBIE strony, bo pomyłka jest normalna", async () => {
     const onZnacznik = vi.fn();
-    const { rerender } = render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
-      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+    const { rerender } = render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false}
       onReklamacyjna={onZnacznik} />);
 
     await userEvent.click(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }));
     expect(onZnacznik).toHaveBeenCalledWith(true);
 
-    rerender(<Status rozmowa={rozmowa({ reklamacyjna: true })} zapisuje={false} blad=""
-      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+    rerender(<Status rozmowa={rozmowa({ reklamacyjna: true })} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false}
       onReklamacyjna={onZnacznik} />);
     await userEvent.click(screen.getByRole("button", { name: /REKLAMACYJNA/ }));
     expect(onZnacznik).toHaveBeenLastCalledWith(false);
   });
 
   it("mówi wprost, że sprawy w Allegro to NIE zakłada", () => {
-    render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
-      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false}
+    render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false}
       onReklamacyjna={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }))
@@ -185,8 +118,7 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
   });
 
   it("bez obsługi znacznika przycisku NIE MA — obietnica bez pokrycia", () => {
-    render(<Status rozmowa={rozmowa()} zapisuje={false} blad=""
-      onZmien={vi.fn()} onPriorytet={vi.fn()} zapisujePriorytet={false} />);
+    render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false} />);
 
     expect(screen.queryByRole("button", { name: /reklamacyjn/i })).not.toBeInTheDocument();
   });

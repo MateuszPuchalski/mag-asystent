@@ -166,8 +166,13 @@ test("wyłączony Copilot mówi, co włączyć, i nie wychodzi do sieci", async 
 test("stan mówi wprost, dlaczego przycisku nie ma", async () => {
   const b = login("biuro", "Ala");
   const r = await app.inject({ method: "GET", url: "/api/obsluga/copilot", headers: b.naglowki });
-  const s = r.json<{ wlaczony: boolean; powod: string | null; maxPartia: number }>();
+  const s = r.json<{ wlaczony: boolean; powod: string | null; maxPartia: number;
+    autoKlasyfikacja: boolean; autoSzkic: boolean }>();
   assert.equal(s.wlaczony, false);
+  /* Automat wyłączony domyślnie — i ekran ma o tym wiedzieć, bo od tego
+     zależy, czy „Rozpoznaj" jest drogą główną, czy tylko ponowieniem. */
+  assert.equal(s.autoKlasyfikacja, false);
+  assert.equal(s.autoSzkic, false);
   assert.match(String(s.powod), /wertis\.env/);
   /* Limit idzie na ekran z konfiguracji, żeby przycisk nie powtarzał liczby
      wpisanej w panelu — inaczej rozjechałby się z hamulcem po stronie serwera. */

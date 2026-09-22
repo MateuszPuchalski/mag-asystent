@@ -479,16 +479,6 @@ const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Statusy, które agent NADAJE — i tylko te przyjmuje trasa (0.225.0).
- *
- * Cztery werdykty człowieka plus `open`, które znaczy „oddaj sterowanie
- * rozmowie". Bez tego piątego nie byłoby drogi POWROTNEJ z „Rozwiązanej":
- * werdykt trzymałby rozmowę, dopóki klient sam nie napisze, a agent, który
- * zamknął sprawę omyłkowo, nie miałby czym tego cofnąć.
- */
-export const STATUSY_RECZNE = ["open", "snoozed", "resolved", "closed", "spam"] as const;
-
-/**
  * Kto ma następny ruch, wprost z ostatniej wiadomości.
  *
  * Funkcja jest CZYSTA i to jest jej sens: tę samą regułę stosuje `statusRozmowy`
@@ -594,7 +584,12 @@ export function statusRozmowy(
   return statusZKierunku(zapisany, ost?.direction ?? null);
 }
 
-/** Zmiana statusu ręką agenta. `doKiedy` wymagane wyłącznie przy odłożeniu. */
+/**
+ * Zmiana statusu ZDARZENIEM po naszej stronie — dziś jedynym jest zlecenie
+ * pomiaru, które stawia `waiting_for_internal`. Trasy ręcznej nie ma od
+ * 22 września 2026 (decyzja właściciela). Gałąź odłożenia zostaje, bo
+ * zapisane wcześniej odłożenia dalej wygasają przy odczycie.
+ */
 export function ustawStatus(
   database: DatabaseSync, conversationId: number, status: StatusRozmowy,
   userId: number, doKiedy: string | null, teraz = new Date(),

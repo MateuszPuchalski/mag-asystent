@@ -434,7 +434,20 @@ na nas". Stara etykieta kłamała o tym, na co rozmowa czeka, i stała w menu
 obok „Otwartej" jak coś do wybrania ręką.
 
 Zamknięcia automatycznego po N dniach NIE MA. §26 wymienia je wśród pytań
-do właściciela; do czasu decyzji rozmowę zamyka wyłącznie człowiek.
+do właściciela.
+
+**Ręcznych statusów nie ma od 22 września 2026.** Decyzja właściciela. Trasa
+`/api/obsluga/rozmowy/:id/status` odeszła razem z polem wyboru w nagłówku
+rozmowy i kubełkiem „Po terminie". Status wynika wyłącznie z faktów:
+z kierunku ostatniej wiadomości i ze zlecenia pomiaru.
+
+Akapity wyżej o werdyktach opisują historię i kolumnę, która dalej je nosi.
+Werdykt zapisany wcześniej zostaje, a nowa wiadomość klienta budzi go jak
+dotąd. Odłożenia zapisane wcześniej wygasają same przy odczycie.
+
+Cena jest znana z góry i przyjęta świadomie. Rozmowa zakończona podziękowaniem
+klienta zostaje „Czeka na nas", dopóki ktoś nie odpisze. Spamu nie da się już
+uciszyć, a rozmowy nie da się odłożyć na termin.
 
 ### 7.2. Statusy doboru w kodzie (etap E1)
 
@@ -571,7 +584,7 @@ do ośmiu. Decyzja właściciela, świadoma; §7 niesie nową wycenę.
 │ Nieprzypisane   │ Klient                    │ Oferta i towar       │
 │ Moje            │ Agent                     │   oferta Allegro     │
 │ Oczekujące      │ Komentarze                │   towar z Subiekta   │
-│ Po terminie     │ Zadania i wyniki          │   opis kartoteki     │
+│                 │ Zadania i wyniki          │   opis kartoteki     │
 │                 │                           │ Dobór części         │
 │                 │                           │ Klient               │
 │                 │                           │ Wiedza               │
@@ -1170,14 +1183,15 @@ podgląd, historia wersji, ostrzeżenie o zmianie rozmowy, wstawienie wyniku
 magazyniera, wstawienie parametrów produktu i przełączenie na komentarz
 wewnętrzny.
 
-**Z tej listy działa w 0.399.0:** licznik znaków, ostrzeżenie o dopisku
-klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze źródłem,
-wstawienie parametrów produktu, przełączenie trybu, szkic ze sztucznej
-inteligencji (przycisk „Ułóż odpowiedź", §14.6) oraz SZABLONY.
+**Z tej listy działa od 22 września 2026:** licznik znaków, ostrzeżenie
+o dopisku klienta, wstawienie wyniku magazyniera, wstawienie zdania doboru ze
+źródłem, przełączenie trybu i szkic ze sztucznej inteligencji (§14.6).
 
-Wstawka parametrów bierze tożsamość towaru i dostępność. NIE bierze półki,
-rezerwacji ani rozbicia na magazyny. Szkic czyta klient, a adres regału mówi
-obcemu, jak zbudowany jest nasz magazyn.
+**Szablony i wstawka parametrów odeszły 22 września 2026**, decyzją
+właściciela. Szkic Copilota czeka przy każdej wiadomości klienta i niesie te
+same zdania razem z faktami rozmowy. Obie wstawki były drugą drogą do tego
+samego pola. Tabela `szablon_odpowiedzi` znika przy migracji. Opis niżej
+zostaje, bo tłumaczy decyzje z 0.399.0.
 
 **Szablony doszły w 0.399.0** na zgłoszenie właściciela. Przycisk stoi obok
 „Ułóż odpowiedź", w tym samym rzędzie — szablon jest wstawką do szkicu, a nie
@@ -1200,11 +1214,15 @@ historia tego, co wysłaliśmy klientom.
 Nie ma podglądu ani historii wersji szkicu.
 
 **Szkic Copilota nie wchodzi do pola sam (0.231.0).** Propozycja stoi w karcie
-pod polem, a do szkicu agenta trafia na jedno z dwóch kliknięć. „Wstaw"
-dopisuje z nową linią — ten sam kontrakt, co każda wstawka. „Zastąp" jest
-jedyną świadomą drogą nadpisania i pojawia się tylko, gdy jest co nadpisać.
-„Odrzuć" chowa kartę. Każde z tych kliknięć jest werdyktem liczonym w pomiarze.
-W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
+pod polem, a do szkicu agenta trafia jednym przyciskiem. Od 22 września 2026
+przycisk jest jeden: „Popraw w edytorze" przy pustym polu i „Zastąp mój szkic"
+przy pełnym. Napis mówi, co się stanie, zanim ktoś kliknie. „Odrzuć" chowa
+kartę. W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
+
+**„Ułóż odpowiedź" stoi tylko wtedy, gdy szkicu brak albo jest stary.** Takt
+układa szkic sam, więc przy świeżej karcie przycisk kazałby zapłacić drugi raz.
+Wraca po odrzuceniu, przy dopisku klienta i po zmianie doboru, jako „Ułóż
+ponownie".
 
 **Przycisk komentarza i przycisk wysyłki do klienta są jednoznacznie
 rozdzielone.**
@@ -1813,8 +1831,17 @@ z nazwami po polsku.
 **Kategoria nie przestawia kolejki i to jest decyzja.** Klucze kolejności —
 ręczna flaga „pilne” i czas oczekiwania klienta — są faktami. Kategoria jest
 przypuszczeniem maszyny, a jedna pomyłka zakopałaby prawdziwe pytanie na dole
-listy. Ekran daje plakietkę, pasek liczników i filtr; regułę kolejności wolno
-dołożyć w etapie G, gdy pomiar trafności ją uzasadni.
+listy. Ekran daje plakietkę na wierszu; regułę kolejności wolno dołożyć
+w etapie G, gdy pomiar trafności ją uzasadni.
+
+**Pasek liczników i filtr kategorii odeszły 22 września 2026**, decyzją
+właściciela. Przy piętnastu klasach pasek potrafił zająć trzy rzędy nad
+pierwszym pytaniem, a zawężał listę po przypuszczeniu maszyny.
+
+**Ręczne „Rozpoznaj" zostaje ponowieniem, gdy takt działa (22 września 2026).**
+Przy `COPILOT_AUTO_KLASYFIKACJA=1` przycisk nad kolejką liczy wyłącznie
+rozmowy z decyzją FAILED. Nierozpoznane bierze takt, więc przycisk nad nimi
+kazałby płacić drugi raz. Wyłączony takt oddaje przyciskowi całą listę.
 
 **Prywatność ma dwa zamki.** Pierwszy jest w typie: nadawca przyjmuje wyłącznie
 `TrescBezpieczna`, a ten typ umie wyprodukować tylko `zamaskuj()`. Drugi to
@@ -4706,7 +4733,8 @@ kliknięciu, więc droga powrotna już jest. §25a.5 mówi o cofnięciu zamiast
 potwierdzenia, a nie obok istniejącej drogi powrotnej.
 
 Pasek filtra pokazuje **wyłącznie tagi obecne w oglądanym kubełku**, malejąco
-po liczbie — ten sam wzorzec co pasek kategorii w skrzynce. Pigułka tagu,
+po liczbie — wzorzec paska kategorii, który skrzynka miała do 22 września
+2026. Pigułka tagu,
 którego w kubełku nie ma, obiecywałaby zawężenie do pustki. Liczniki mówią
 o składzie KUBEŁKA, nie o tym, co zostało po sitach.
 
@@ -5479,11 +5507,11 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Powód braku kartoteki i licznik | **działa** od 0.154.0 | `Dopasowanie.powod`, `bilansKartotek` |
 | Pamięć wskazań oferta–kartoteka | **działa** od 0.154.0 | `oferta_kartoteka`, wzorzec `ean_alias`; od 0.219.0 ważna tylko przy tej samej sygnaturze (`pamiecAktualna`) |
 | Przestrzeń identyfikatora oferty w zwrocie | **niepotwierdzona** | złączenie po obu kolumnach, `poKolumnie` |
-| Statusy rozmowy (§7) | **działa** od 0.158.0 | `conversation.status`, `ustawStatus`, kubełki kolejki |
+| Statusy rozmowy (§7) | **działa** od 0.158.0; ręczne **usunięte** 22.09.2026 | `conversation.status`, kubełki kolejki; `ustawStatus` woła już tylko zlecenie pomiaru |
 | Uchwyt rozmowy — przydział na czas oglądania | **działa** od 0.159.0 | `conversation-realtime.ts`, w pamięci |
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
-| Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasa przyjmuje tylko `STATUSY_RECZNE` |
+| Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasy ręcznej nie ma od 22.09.2026 |
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |

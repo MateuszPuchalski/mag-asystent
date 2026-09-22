@@ -113,6 +113,10 @@ export type StanCopilota = {
   /** Model klasyfikacji; bez `COPILOT_MODEL_KLASYFIKACJA` równy `model`. */
   modelKlasyfikacji: string;
   maxPartia: number;
+  /** Takt sam rozpoznaje każdą nową wiadomość (`COPILOT_AUTO_KLASYFIKACJA`). */
+  autoKlasyfikacja: boolean;
+  /** Takt sam układa szkic (`COPILOT_AUTO_SZKIC`). */
+  autoSzkic: boolean;
 };
 
 /** Wynik partii. `przerwane` niepuste znaczy: część zapłacona, reszta czeka. */
@@ -157,7 +161,7 @@ export type PomiarCopilota = {
   /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
   szkice: {
-    ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
+    ile: number; odrzuconych: number;
     /** Los danych doboru z rozmowy — osobno od losu szkicu. */
     daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
     /** Pasowania z rozmowy (przyrost czwarty); ostatnia liczba to właściwa miara jakości. */

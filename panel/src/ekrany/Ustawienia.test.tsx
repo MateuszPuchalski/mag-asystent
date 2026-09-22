@@ -73,7 +73,8 @@ vi.mock("../api/rozmowy", async () => {
    pokazuje tabeli zer, którą łatwo wziąć za „model nic nie trafia". */
 vi.mock("../api/copilot", () => ({
   useCopilot: () => ({ data: { wlaczony: false, powod: "Copilot jest wyłączony.",
-    model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20 } }),
+    model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
+    autoKlasyfikacja: false, autoSzkic: false } }),
   usePomiarCopilota: () => ({ data: undefined }),
 }));
 

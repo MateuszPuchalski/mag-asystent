@@ -662,7 +662,12 @@ export interface PomiarCopilota {
    * złym modelem i odwrotnie.
    */
   szkice: {
-    ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
+    /**
+     * Ile szkiców powstało i ile agent ODRZUCIŁ. „Wstawionych" i „zastąpionych"
+     * odeszły 22 września 2026: to był zastępnik losu przy wysyłce, a wstawiony
+     * szkic bywał potem przepisany. Los niosą `wyslanych*` niżej.
+     */
+    ile: number; odrzuconych: number;
     daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
     /**
      * Pasowania z rozmowy (przyrost czwarty): ile model nazwał, co agent
@@ -727,8 +732,6 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     }, [] as PomiarCopilota["wgZadania"]);
 
   const sz = database.prepare(`SELECT COUNT(*) AS ile,
-      SUM(CASE WHEN ocena='wstawiony' THEN 1 ELSE 0 END) AS wstawionych,
-      SUM(CASE WHEN ocena='zastapiony' THEN 1 ELSE 0 END) AS zastapionych,
       SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych,
       SUM(CASE WHEN dane_doboru IS NOT NULL THEN 1 ELSE 0 END) AS daneZaproponowane,
       SUM(CASE WHEN dane_ocena='wpisane' THEN 1 ELSE 0 END) AS daneWpisane,
@@ -753,8 +756,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     klasyfikacja: pomiarKlasyfikacji(database),
     wgZadania,
     szkice: {
-      ile: Number(sz.ile ?? 0), wstawionych: Number(sz.wstawionych ?? 0),
-      zastapionych: Number(sz.zastapionych ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
+      ile: Number(sz.ile ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
       daneZaproponowane: Number(sz.daneZaproponowane ?? 0),
       daneWpisane: Number(sz.daneWpisane ?? 0), daneOdrzucone: Number(sz.daneOdrzucone ?? 0),
       pasowaniaRozpoznane: Number(sz.pasowaniaRozpoznane ?? 0),

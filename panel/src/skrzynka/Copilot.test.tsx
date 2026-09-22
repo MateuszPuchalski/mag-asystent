@@ -27,6 +27,7 @@ const kopilot = (n: Partial<Kopilot> = {}): Kopilot => ({
 
 const WLACZONY: StanCopilota = {
   wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
+  autoKlasyfikacja: false, autoSzkic: false,
 };
 
 describe("pasek Copilota nad kolejką", () => {
@@ -42,6 +43,11 @@ describe("pasek Copilota nad kolejką", () => {
       rozmowa({ id: 5, kopilot: kopilot({ kategoria: "OTHER", status: "FAILED", zrodlo: "FALLBACK" }) }),
     ];
     expect(doRozpoznania(lista).map((r) => r.id)).toEqual([1, 3, 5]);
+    /* PRZY WŁĄCZONYM TAKCIE zostaje samo ponowienie (22 września 2026):
+       nierozpoznaną i nieaktualną bierze takt, a przycisk nad nimi kazałby
+       zapłacić drugi raz za tę samą etykietę. */
+    expect(doRozpoznania(lista, { ...WLACZONY, autoKlasyfikacja: true }).map((r) => r.id))
+      .toEqual([5]);
   });
 
   it("przycisk niesie LICZBĘ, a potwierdzenie mówi, że to kosztuje", async () => {

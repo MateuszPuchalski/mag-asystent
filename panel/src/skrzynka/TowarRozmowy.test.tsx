@@ -15,7 +15,7 @@ vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => wiedza() }));
 vi.mock("../towar/Zdjecie", () => ({ Zdjecie: () => <div data-testid="zdjecie" /> }));
 vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 
-const { TowarRozmowy, parametryDoSzkicu } = await import("./TowarRozmowy");
+const { TowarRozmowy } = await import("./TowarRozmowy");
 
 const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
   externalId: "12096815384", link: null, zrodlo: "wiadomosc", pobrana: null, kartoteka,
@@ -249,44 +249,6 @@ describe("towar przy rozmowie", () => {
       pewnosc: "brak", twId: null, symbol: null, zrodlo: "Oferta bez SKU", powod: "oferta_bez_sku",
     })} />);
     expect(screen.getByText(/Subiekt GT/)).toBeInTheDocument();
-  });
-});
-
-/* ── Wstawka parametrów do szkicu (§10.4, makieta `Main.dc.html`) ────────────
-   Test pilnuje GRANICY, nie formatu: szkic idzie do klienta, więc półka,
-   rezerwacje i rozbicie na magazyny nie mają prawa się w nim znaleźć. Format
-   wolno zmienić; te trzy pola — nie.                                        */
-describe("Parametry do szkicu", () => {
-  const karta: KartaTowaru = {
-    id: 7, sym: "W32-0203", name: "Szarpak do NAC LS 46-450", ean: "5901234567890",
-    unit: "szt.",
-    identyfikatory: [{ rodzaj: "oem", wartosc: "118801234/0", zrodlo: "opis" }],
-    locs: ["A01-02-03"],
-    mag: { stan: 9, rez: 2, avail: 7 },
-    magazyny: [{ magId: 2, kod: "SERW", nazwa: "Serwis", stan: 3, rez: 0 }],
-  };
-
-  it("niesie tożsamość towaru i dostępność", () => {
-    const t = parametryDoSzkicu(karta);
-    expect(t).toContain("Szarpak do NAC LS 46-450");
-    expect(t).toContain("W32-0203");
-    expect(t).toContain("5901234567890");
-    expect(t).toContain("118801234/0");
-    expect(t).toContain("7 szt.");
-  });
-
-  it("NIE niesie półki, rezerwacji ani innych magazynów", () => {
-    const t = parametryDoSzkicu(karta);
-    expect(t).not.toContain("A01-02-03");
-    expect(t).not.toContain("SERW");
-    expect(t).not.toMatch(/rezerwac/i);
-  });
-
-  /* „0 szt." czyta się jak awaria systemu, a to zdanie czyta klient. */
-  it("brak stanu mówi po ludzku, nie zerem", () => {
-    const t = parametryDoSzkicu({ ...karta, mag: { stan: 2, rez: 2, avail: 0 } });
-    expect(t).toContain("brak na stanie");
-    expect(t).not.toContain("0 szt.");
   });
 });
 

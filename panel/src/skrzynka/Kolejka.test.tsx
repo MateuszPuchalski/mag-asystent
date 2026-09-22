@@ -114,10 +114,10 @@ describe("Kolejka", () => {
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
   });
 
-  it("kubełek PO TERMINIE wyławia rozmowę, o której zapomniano", async () => {
-    await kubelek(/^Po terminie/);
-    expect(screen.getByText("Zapomniana")).toBeInTheDocument();
-    expect(screen.queryByText("Moja")).not.toBeInTheDocument();
+  it("kubełka PO TERMINIE nie ma — odszedł z ręcznym odłożeniem (22 września 2026)", () => {
+    render(<Kolejka rozmowy={KOMPLET} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByRole("button", { name: /^Po terminie/ })).not.toBeInTheDocument();
   });
 
   it("zamknięta rozmowa schodzi z kolejki roboczej, ale zostaje we WSZYSTKICH", async () => {
@@ -292,45 +292,21 @@ describe("kategorie Copilota w kolejce", () => {
        wierszu. Sprawdzana rzecz jest ta sama: kolejność zostaje. */
     expect(wiersze.map((w, i) => w.textContent?.includes(`Klient ${i + 1}`)))
       .toEqual([true, true, true]);
-    /* Nazwa kategorii pada DWA RAZY — na wierszu i w liczniku nad kubełkami —
-       więc szukamy jej tam, gdzie ma znaczyć „ta rozmowa jest o tym". */
     expect(wiersze[1].textContent).toContain("Dostępność");
     expect(wiersze[2].textContent).toContain("Reklamacja");
     expect(wiersze[0].textContent).not.toContain("Dostępność");
   });
 
-  it("pasek liczników pokazuje SKŁAD kubełka, a klik w licznik filtruje", async () => {
+  /* ── PIGUŁEK KATEGORII NIE MA (22 września 2026) ──────────────────────────
+     Decyzja właściciela. Kategoria zostaje na wierszu, ale nad listą nie ma
+     już paska, który zawężał kolejkę po przypuszczeniu maszyny. */
+  it("nad listą nie ma paska kategorii — nazwa pada tylko na wierszu", () => {
     pokaz([
       zKategoria(1, kop("PRODUCT_AVAILABILITY")),
       zKategoria(2, kop("PRODUCT_AVAILABILITY")),
-      zKategoria(3, kop("COMPLAINT")),
     ]);
-    const licznik = screen.getByRole("button", { name: /Dostępność 2/ });
-    await userEvent.click(licznik);
-    expect(licznik.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByText("Klient 1")).toBeInTheDocument();
-    expect(screen.queryByText("Klient 3")).not.toBeInTheDocument();
-  });
-
-  it("pusty FILTR nie udaje pustego kubełka", async () => {
-    /* „Zajrzyj do Wszystkie" przy włączonym filtrze wysłałoby agenta w złą
-       stronę: rozmowy są, tylko sito je zasłania. */
-    pokaz([
-      zKategoria(1, kop("PRODUCT_AVAILABILITY")),
-      { ...zKategoria(2, kop("COMPLAINT")), wlascicielId: 9, wlasciciel: "Kolega" },
-    ]);
-    await userEvent.click(screen.getByRole("button", { name: /Reklamacja 1/ }));
-    await userEvent.click(screen.getByRole("button", { name: /^Nieprzypisane/ }));
-    expect(screen.getByText(/Nic w kategorii/)).toBeInTheDocument();
-    expect(screen.queryByText(/Ten kubełek jest pusty/)).not.toBeInTheDocument();
-  });
-
-  it("etykieta ze starszej wiadomości NIE liczy się do składu skrzynki", () => {
-    /* Licznik ma mówić, co w skrzynce JEST — a etykieta po dopisku klienta
-       opisuje pytanie, którego klient już nie zadaje. */
-    pokaz([zKategoria(1, kop("PRODUCT_AVAILABILITY", { nieaktualna: true }))]);
-    expect(screen.queryByRole("button", { name: /Dostępność 1/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Dostępność")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Dostępność 2/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Dostępność")).toHaveLength(2);
   });
 });
 

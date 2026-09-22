@@ -171,6 +171,12 @@ osobnej tabeli `watek_meta` i dociągania rozmów przy każdej synchronizacji.
 > Różnica jest mierzalna: typowa rozmowa nie wymaga ANI JEDNEGO kliknięcia
 > w status. Wersja ręczna kłamałaby przy pierwszej rozmowie, w której agent
 > się spieszył — a status, który kłamie, jest gorszy od jego braku.
+>
+> **Zmiana z 22 września 2026: ręki nie ma wcale.** Właściciel usunął cztery
+> ręczne stany razem z trasą, która je nadawała. Status wynika odtąd wyłącznie
+> z faktów. Cena jest przyjęta świadomie: podziękowanie klienta zostawia rozmowę
+> w „Czeka na nas", a spamu nie da się uciszyć. Akapit wyżej zostaje, bo
+> tłumaczy kolumnę, w której dawne werdykty dalej stoją.
 
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 

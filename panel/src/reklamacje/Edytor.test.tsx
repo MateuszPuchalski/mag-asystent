@@ -3,17 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-/* Edytor niesie od 0.406.0 przycisk szablonów, a ten woła haki zapytań —
-   ten plik pilnuje LIMITU I WYSYŁKI, nie listy szablonów. Własne testy
-   szablony mają w `skrzynka/Szablony.test.tsx`. */
-vi.mock("../api/szablony", () => ({
-  useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
-  useArchiwumSzablonow: () => ({ data: { szablony: [] }, isLoading: false }),
-  useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
 const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
 
 /* ── Edytor odpowiedzi w reklamacji (0.224.0) ────────────────────────────────
@@ -119,26 +108,13 @@ describe("Edytor odpowiedzi w reklamacji", () => {
   });
 });
 
-/* ── Szablony także w reklamacji (0.406.0) ───────────────────────────────────
-   `api/szablony.ts` od 0.399.0 pisze, że lista jest wspólna dla skrzynki,
-   reklamacji i dyskusji — a przycisk stał wyłącznie w skrzynce. Komentarz
-   obiecywał coś, czego ekran nie dawał. */
-describe("Szablony w edytorze reklamacji", () => {
-  it("przycisk szablonów stoi przy polu odpowiedzi", () => {
+/* ── Szablonów nie ma (22 września 2026) ─────────────────────────────────────
+   Decyzja właściciela: szablony odeszły z całego panelu, razem z trasami
+   i tabelą. Test pilnuje, żeby przycisk nie wrócił przy scalaniu. */
+describe("Edytor reklamacji bez szablonów", () => {
+  it("przy polu odpowiedzi nie ma przycisku szablonów", () => {
     render(<Edytor tresc="" wysyla={false} blad="" czatAktywny
       onZmiana={vi.fn()} onWyslij={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /Szablony/ })).toBeInTheDocument();
-  });
-
-  it("przy zamkniętej rozmowie NIE MA ich wcale — tak jak całego edytora", () => {
-    render(<Edytor tresc="" wysyla={false} blad="" czatAktywny={false}
-      onZmiana={vi.fn()} onWyslij={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /Szablony/ })).not.toBeInTheDocument();
-  });
-
-  it("w trakcie wysyłki są martwe — wstawka do wysłanej treści nic nie zmieni", () => {
-    render(<Edytor tresc="Coś" wysyla blad="" czatAktywny
-      onZmiana={vi.fn()} onWyslij={vi.fn()} />);
-    expect(screen.getByRole("button", { name: /Szablony/ })).toBeDisabled();
   });
 });

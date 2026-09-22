@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.434.0 — 22 września 2026
+
+**Skrzynka traci przyciski, które dublował automat.** Decyzja właściciela po
+przeglądzie funkcji. Szkic Copilota czeka dziś przy każdej wiadomości klienta,
+a rozpoznanie robi takt. Część przycisków robiła więc to samo drugą drogą.
+
+- **Ręczne statusy rozmowy odeszły.** Trasa `/status`, pole wyboru w nagłówku
+  i kubełek „Po terminie" znikają. Status wynika z kierunku ostatniej
+  wiadomości i ze zlecenia pomiaru. Cena: podziękowanie klienta zostawia
+  rozmowę w „Czeka na nas", a spamu nie da się uciszyć.
+- **Szablony odpowiedzi odeszły** ze skrzynki i z edytora reklamacji, razem
+  z trasami, serwisem i tabelą `szablon_odpowiedzi`.
+- **Pasek kategorii nad kolejką odszedł.** Kategoria zostaje na wierszu.
+- **Karta szkicu ma jeden przycisk:** „Popraw w edytorze" albo „Zastąp mój
+  szkic", gdy pole agenta ma już treść.
+- **„Ułóż odpowiedź" stoi tylko przy braku szkicu albo przy starym**, jako
+  „Ułóż ponownie" po odrzuceniu, dopisku klienta albo zmianie doboru.
+- **„Rozpoznaj" przy włączonym takcie liczy tylko nieudane rozpoznania.**
+  `GET /api/obsluga/copilot` podaje `autoKlasyfikacja` i `autoSzkic`.
+- **Pasmo „Do tej odpowiedzi" traci „wstaw do szkicu".** Trzy fakty zostają do
+  sprawdzania szkicu.
+- **Karta pomiaru liczy szkice po losie przy wysyłce.** „Wstawionych"
+  i „zastąpionych" znikają z karty i z odpowiedzi pomiaru; „odrzuconych" zostaje.
+
+Nowy test `db/kasata-szablonow.test.ts` pilnuje, żeby tabela nie wróciła.
+
+- **[wymaga działania]** Przebuduj panel. Kopia bazy przed aktualizacją,
+  jeśli treść szablonów ma przetrwać — patrz `DEPLOY.md`.
+
+
 ## 0.432.0 — 22 września 2026
 
 **Klasyfikacja dostaje własny model: `COPILOT_MODEL_KLASYFIKACJA`.** Do tej
