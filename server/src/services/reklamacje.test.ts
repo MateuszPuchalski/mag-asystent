@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, klientCzeka, kubelek,
-  cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
+  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, dniOdZakupu, klientCzeka,
+  kubelek, cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
   stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
@@ -681,4 +681,87 @@ test("sygnatura trafiająca w DWIE kartoteki nie rozstrzyga za człowieka", () =
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (22,'dubel','Dwa')").run();
 
   assert.equal(listaReklamacji(d, TERAZ)[0].twSymbol, "Z-MAPOWANIA");
+});
+
+/* ── WIEK ZAKUPU I HISTORIA (0.413.0) ────────────────────────────────────────
+   Cel z `/goal`: ekran reklamacji ma przyspieszać DECYZJĘ. Trzy liczby, które
+   ją przyspieszają, leżały w naszej bazie i nikt o nie nie pytał — wiek
+   zakupu, historia towaru i historia klienta. Te testy pilnują reguł, których
+   na ekranie nie widać.                                                     */
+
+test("wiek zakupu liczy się W PRZÓD, a data z przyszłości daje zero", () => {
+  /* Osobna funkcja od `dniDoTerminu`, bo liczy przeciwny kierunek. Zegar
+     sprzedawcy bywa przestawiony o kilka godzin i „kupione −1 dnia temu" nie
+     znaczyłoby nic — takie wejście ma dać zero, nie liczbę ujemną. */
+  assert.equal(dniOdZakupu("2026-09-01T12:00:00Z", TERAZ), 6);
+  assert.equal(dniOdZakupu("2026-09-09T12:00:00Z", TERAZ), 0);
+  assert.equal(dniOdZakupu(null, TERAZ), null, "brak daty to brak liczby, nie zero");
+  assert.equal(dniOdZakupu("nie-data", TERAZ), null);
+});
+
+test("wiek zakupu jedzie NA WIERSZU, licząc od daty, którą ekran nazywa", () => {
+  const { d, konto } = stanowisko();
+  /* Bez zamówienia zegarem jest `zamowienie_at` z ładunku sprawy — ten sam,
+     który `kupionoZrodlo` nazywa „sprawa". Dwie daty pod jedną etykietą to
+     blizna 0.121.0, więc wiek ma się liczyć z TEJ, którą ekran pokazuje. */
+  const id = Number(d.prepare(`INSERT INTO reklamacja_klienta
+    (channel_account_id,external_id,zamowienie_at,otwarto_at,synced_at)
+    VALUES (?,'w-1','2025-03-07T12:00:00Z','2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
+    .run(konto).lastInsertRowid);
+  const s = szczegolReklamacji(d, id, TERAZ);
+  assert.equal(s.reklamacja.kupionoZrodlo, "sprawa");
+  assert.equal(s.reklamacja.dniOdZakupu, 549, "półtora roku — rękojmia biegnie dwa lata");
+});
+
+test("historia liczy się po KARTOTECE, więc łapie ten sam towar w dwóch ofertach", () => {
+  const { d, konto } = stanowisko();
+  const kartoteka = (offer: string, tw: number) => d.prepare(
+    `INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+      wskazano_at,wskazano_przez) VALUES (?,?,?,'SYM','2026-01-01T00:00:00Z','test')`)
+    .run(konto, offer, tw);
+  const sprawa = (ext: string, offer: string, login: string, status: string | null,
+    werdykt: string | null) => Number(d.prepare(`INSERT INTO reklamacja_klienta
+    (channel_account_id,external_id,offer_id,kupujacy_login,status_allegro,werdykt,
+     otwarto_at,synced_at)
+    VALUES (?,?,?,?,?,?,'2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
+    .run(konto, ext, offer, login, status, werdykt).lastInsertRowid);
+
+  kartoteka("of-1", 77); kartoteka("of-2", 77); kartoteka("of-9", 99);
+  const ta = sprawa("w-0", "of-1", "ekk69", "CLAIM_SUBMITTED", null);
+  /* Ten sam towar, INNA oferta — sprzedawca wystawił go drugi raz. */
+  sprawa("w-1", "of-2", "inny", "CLAIM_ACCEPTED", null);
+  /* Uznana W PANELU: Allegro jeszcze nie przestawiło statusu, a decyzja
+     zapadła. Liczenie po samym statusie gubiłoby te najświeższe. */
+  sprawa("w-2", "of-1", "inny2", "CLAIM_SUBMITTED", "ACCEPTED_REFUND");
+  sprawa("w-3", "of-1", "inny3", "CLAIM_REJECTED", null);
+  /* Inny towar tego samego klienta — liczy się do klienta, nie do towaru. */
+  sprawa("w-4", "of-9", "ekk69", "CLAIM_REJECTED", null);
+
+  const s = szczegolReklamacji(d, ta, TERAZ);
+  assert.deepEqual(s.historia.towar, { ile: 3, uznanych: 2, odrzuconych: 1 });
+  assert.deepEqual(s.historia.klient, { ile: 1, uznanych: 0, odrzuconych: 1 });
+});
+
+test("historia NIE liczy samej siebie — inaczej każda sprawa byłaby „drugą”", () => {
+  const { d, konto } = stanowisko();
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-1',77,'SYM','2026-01-01T00:00:00Z','test')`)
+    .run(konto);
+  const id = Number(d.prepare(`INSERT INTO reklamacja_klienta
+    (channel_account_id,external_id,offer_id,kupujacy_login,otwarto_at,synced_at)
+    VALUES (?,'w-0','of-1','ekk69','2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
+    .run(konto).lastInsertRowid);
+  const s = szczegolReklamacji(d, id, TERAZ);
+  assert.equal(s.historia.towar, null, "pierwsza sprawa przy tym towarze to nie zero, to brak");
+  assert.equal(s.historia.klient, null);
+});
+
+test("bez kartoteki historia towaru MILCZY, zamiast pisać zero", () => {
+  /* Dekalog obsługi, punkt 10: czego nie wiemy, ekran mówi wprost. Zero przy
+     towarze, którego nie rozpoznaliśmy, czytałoby się jak „nigdy się nie
+     sypał" — a to zdanie, którego nie mamy prawa postawić. */
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  const s = szczegolReklamacji(d, id, TERAZ);
+  assert.equal(s.historia.towar, null);
 });

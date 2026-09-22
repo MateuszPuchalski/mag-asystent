@@ -104,21 +104,24 @@ describe("Notatka i jej droga powrotna", () => {
     expect(cofniecia[0]).toHaveAccessibleName("cofnij zmianę");
   });
 
-  it("data zakupu STOI NA EKRANIE i mówi, który to zegar (0.282.0)", () => {
-    /* Agent też jej dotąd nie widział. „Kupiono" bierze się z pozycji
+  it("data zakupu MÓWI, KTÓRY TO ZEGAR — od 0.414.0 w kostce, nie w wierszu", () => {
+    /* Zasada z 0.282.0 obowiązuje dalej: „Kupiono" bierze się z pozycji
        zamówienia, „Zamówienie złożone" z ładunku sprawy i bywa wcześniejsze —
-       nazwanie jednego drugim to blizna 0.121.0. */
+       nazwanie jednego drugim to blizna 0.121.0. Zmieniło się MIEJSCE: data
+       stała w trzech blokach naraz, więc wiersz w zwijce Zakup wyszedł,
+       a zegar nazywa kostka „Kupione". */
     const { rerender } = render(<Dowody {...props(rek({
       orderId: "ord-1", kupionoAt: "2026-03-15T07:00:00.000Z",
-      kupionoZrodlo: "zamowienie",
+      kupionoZrodlo: "zamowienie", dniOdZakupu: 191,
     } as Partial<Reklamacja>))} />);
-    expect(screen.getByText("Kupiono")).toBeInTheDocument();
+    expect(screen.getByText("data z zamówienia")).toBeInTheDocument();
+    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
 
     rerender(<Dowody {...props(rek({
       orderId: "ord-1", kupionoAt: "2026-03-14T09:12:00.000Z", kupionoZrodlo: "sprawa",
+      dniOdZakupu: 192,
     } as Partial<Reklamacja>))} />);
-    expect(screen.getByText("Zamówienie złożone")).toBeInTheDocument();
-    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
+    expect(screen.getByText("data z ładunku sprawy")).toBeInTheDocument();
   });
 
   it("bez daty wiersza NIE MA — pusty nie mówi nic, a zajmuje kolumnę", () => {

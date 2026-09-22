@@ -88,11 +88,22 @@ describe("Głowica prawej kolumny niesie werdykt", () => {
     expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
   });
 
-  it("tytuł prawny, powód i status stoją jako znaczniki — bez własnych wierszy", () => {
+  it("tytuł prawny i powód stoją jako znaczniki — bez własnych wierszy", () => {
     render(<Dowody {...props()} />);
     expect(screen.getByText("rękojmia")).toBeInTheDocument();
-    /* JEDEN raz, nie dwa: status zszedł z wiersza „Sprawy" do znacznika. */
-    expect(screen.getAllByText("CLAIM_SUBMITTED")).toHaveLength(1);
+  });
+
+  it("STATUS DOMYŚLNY nie dostaje znacznika — ma go cały kubełek DO DECYZJI", () => {
+    /* `CLAIM_SUBMITTED` znaczy „czeka na werdykt", czyli dokładnie to, co
+       mówi kubełek, z którego agent tę sprawę otworzył. Czip powtarzający
+       stan domyślny zabiera uwagę tytułowi prawnemu obok. */
+    render(<Dowody {...props()} />);
+    expect(screen.queryByText("CLAIM_SUBMITTED")).not.toBeInTheDocument();
+  });
+
+  it("status ODBIEGAJĄCY od domyślnego znacznik dostaje — to jest jego rola", () => {
+    render(<Dowody {...props({}, { statusAllegro: "CLAIM_ACCEPTED" })} />);
+    expect(screen.getByText("CLAIM_ACCEPTED")).toBeInTheDocument();
   });
 });
 
@@ -118,11 +129,13 @@ describe("Wiersz towaru mówi, skąd jest sygnatura", () => {
 });
 
 describe("Zwijki mówią, co w środku", () => {
-  it("podpis ZAKUPU niesie kwotę i dzień — nie trzeba go otwierać", () => {
+  it("podpis ZAKUPU niesie kwotę i dzień — i jest JEDYNYM ich miejscem (0.414.0)", () => {
+    /* Do 0.413.0 suma stała dwa razy: w podpisie i w wierszu „Razem" w środku.
+       Podpis zostaje widoczny także przy otwartym bloku, więc te dwa napisy
+       potrafiły stać jeden nad drugim. Zostaje podpis, bo tylko on odpowiada
+       również przy bloku zamkniętym. */
     render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
-    /* Suma stoi i w podpisie zwiniętej zwijki, i w wierszu „Razem" w środku —
-       o to właśnie chodzi: podpis ma odpowiedzieć bez otwierania. */
-    expect(screen.getAllByText(/78,74 PLN/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/78,74 PLN/)).toHaveLength(1);
   });
 
   it("podpis SPRAWY niesie numer, kupującego i długość rozmowy", () => {
@@ -137,10 +150,13 @@ describe("Zwijki mówią, co w środku", () => {
       .toHaveAttribute("aria-expanded", "false");
   });
 
-  it("ZAKUP jest otwarty domyślnie — kwoty rozstrzygają spór o zwrot pieniędzy", () => {
+  it("ZAKUP jest ZAMKNIĘTY domyślnie — jego kwoty stoją już w kostkach (0.414.0)", () => {
+    /* Otwarto go w 0.403.0, bo „kwoty rozstrzygają spór o zwrot pieniędzy".
+       Ten powód przestał dotyczyć tej zwijki, gdy 0.413.0 postawiło kwoty
+       rozstrzygające w kostkach nad nią — otwarta powtarzała je. */
     render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
     expect(screen.getByRole("button", { name: /Zakup/ }))
-      .toHaveAttribute("aria-expanded", "true");
+      .toHaveAttribute("aria-expanded", "false");
   });
 
   it("otwarta SPRAWA pokazuje identyfikatory, po które się ją otwiera", async () => {

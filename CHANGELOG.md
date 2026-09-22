@@ -34,6 +34,73 @@ historii nie przepisujemy.
 ---
 
 
+## 0.414.0 — 22 września 2026
+
+**Cztery wydania dokładały warstwę. Żadne nic nie zdjęło.** 0.403.0, 0.404.0,
+0.411.0 i 0.413.0 dopisały nad kolumną dowodów warstwę streszczenia; każde
+obiecywało w komentarzu „nic nie znika pod spodem" i każde dotrzymało. Cztery
+razy z rzędu dały ekran, na którym ta sama liczba stoi w trzech miejscach.
+
+Reguła, której brakowało: **fakt ma jeden dom.** Liczba, która weszła do pasma
+decyzji, wychodzi z warstwy szczegółu — nie chowa się pod kliknięcie, tylko
+przestaje istnieć w drugim miejscu.
+
+- **Cena wyszła z wiersza towaru.** Ta sama kwota stała tam, w kostce „Klient
+  zapłacił" i w pozycji zwijki Zakup. Wiersz towaru odpowiada na pytanie „co to
+  jest u nas", a nie „ile kosztowało".
+- **Wiersz „Kupiono" wyszedł ze zwijki Zakup.** Wiek i nazwa zegara stoją
+  w kostce, data bezwzględna w podpisie zwijki — a podpis widać także przy
+  otwartym bloku.
+- **Wiersz „Razem" wyszedł z tej samej zwijki**, z tego samego powodu: suma
+  stała w podpisie i w środku, jedna nad drugą.
+- **Zwijka Zakup startuje zamknięta.** Otwarto ją w 0.403.0, bo „kwoty
+  rozstrzygają spór o zwrot pieniędzy"; ten powód przestał jej dotyczyć, gdy
+  0.413.0 postawiło kwoty rozstrzygające w kostkach nad nią.
+- **Pozostałe poziomy cen startują zamknięte.** Liczba, dla której 0.411.0
+  postawiło ten blok na wierzchu, stoi od 0.413.0 w kostce „Nasz zakup" —
+  zawsze, bez kliknięcia. Reszta to cenniki SPRZEDAŻY.
+- **Los paczki wyszedł na wierzch.** „Czy on to w ogóle dostał" jest przy
+  reklamacji pytaniem pierwszym, a przy powodach o nieotrzymanym towarze —
+  całą sprawą. Zamknięcie zwijki Zakup schowałoby je pod kliknięcie, więc
+  wiersz stoi teraz przy pozostałych faktach decyzji.
+- **Znacznik `CLAIM_SUBMITTED` zniknął.** Ma go każda sprawa czekająca na
+  werdykt, czyli cały kubełek DO DECYZJI; czip powtarzający stan domyślny
+  zabierał uwagę tytułowi prawnemu obok. Statusy odbiegające od domyślnego
+  znacznik dostają dalej.
+- **Poprawka przy okazji:** pasek faktów znikał w całości, gdy sprawa nie
+  miała ani kartoteki, ani pozycji paragonu — i zabierał ze sobą datę zakupu,
+  którą mieliśmy. Warunek liczy teraz to, co naprawdę miałoby stanąć.
+
+## 0.413.0 — 22 września 2026
+
+**Trzy liczby, które rozstrzygają reklamację, leżały w naszej bazie i nikt
+o nie nie pytał.** Cel właściciela: ekran reklamacji ma przyspieszać DECYZJĘ.
+Przegląd trzech źródeł — dekalogów z `docs/`, tabel Subiekta i schematu
+`PostPurchaseIssue` z `docs/allegro/swagger.yaml` — wskazał trzy braki, z których
+żaden nie wymaga ani jednego nowego żądania do Allegro.
+
+- **Wiek zakupu.** Ekran pokazywał datę, nigdy odstępu. Ta sama zamiana, co
+  przy terminie decyzji w 0.121.0: agent nie ma odejmować dat w głowie. Do
+  dwóch miesięcy liczą się dni (przy „uszkodzone w transporcie" różnica między
+  trzecim a trzydziestym dniem jest całą sprawą), dalej miesiące, po dwóch
+  latach — lata, bursztynem. To jest WIEK, nie wyrok „po rękojmi": nasz zegar
+  startuje od zamówienia, a rękojmia biegnie od wydania rzeczy.
+- **Ilość objęta sprawą.** `offer.quantity` leżało w ładunku od przyrostu
+  trzeciego i nie było go na ekranie ANI RAZU. „Mamy 2 szt." przy sprawie
+  o trzy sztuki wygląda jak dobra wiadomość i nią nie jest — porównanie robi
+  teraz ekran, a stan przy niedoborze jest czerwony.
+- **Historia towaru i klienta.** Ile razy TO SAMO już się zdarzyło i jak się
+  skończyło. Towar z pięcioma reklamacjami, z których cztery uznaliśmy, to
+  wada partii, a nie sprawa do rozstrzygania od zera. Liczone po KARTOTECE,
+  więc łapie ten sam towar wystawiony w kilku ofertach, i z obu źródeł
+  rozstrzygnięcia naraz — status Allegro oraz nasz werdykt, bo decyzja
+  z panelu wyprzedza synchronizację o takt.
+- **Brak wiedzy nie udaje zera.** Sprawa bez potwierdzonej kartoteki nie
+  dostaje historii towaru, pierwsza sprawa przy towarze nie pisze „0
+  reklamacji". Dekalog obsługi, punkt 10.
+- Historia jedzie WYŁĄCZNIE ze szczegółem sprawy: to dwa podzapytania, a
+  kolejka czyta setki wierszy naraz.
+
 ## 0.412.0 — 19 września 2026
 
 **Hierarchia decyzji o reklamacji: najpierw dowody, na końcu werdykt.**

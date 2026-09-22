@@ -45,7 +45,8 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   waluta: "PLN", statusAllegro: "CLAIM_SUBMITTED", decyzjaDo: null, dniDoTerminu: null,
   poTerminie: false, zwrotWymagany: false, czatAktywny: true, wiadomosciIle: 2,
   czatUrwany: false, ostatniaWiadomoscStatus: null, ostatniaWiadomoscAt: null,
-  otwartoAt: "2026-09-12T10:11:00.000Z", kupionoAt: null, kupionoZrodlo: null,
+  otwartoAt: "2026-09-12T10:11:00.000Z",
+  kupionoAt: "2026-09-10T10:00:00.000Z", kupionoZrodlo: "zamowienie", dniOdZakupu: null,
   prowadzi: null, prowadziId: null, prowadziAt: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, notatka: null,
   wersja: 1, kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null,
@@ -53,10 +54,11 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   twId: 11, twSymbol: "14-31051", twZParagonu: true, ...n,
 } as unknown as Reklamacja);
 
-const props = (n: Partial<Reklamacja> = {}, zPozycja = true) => ({
+const props = (n: Partial<Reklamacja> = {}, zPozycja = true,
+  historia: SzczegolReklamacji["historia"] = { towar: null, klient: null }) => ({
   szczegol: {
     reklamacja: rek(n), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
-    droga: [], kartoteka: null, karta: null, przesylka: null,
+    droga: [], kartoteka: null, karta: null, przesylka: null, historia,
     zamowienie: zPozycja ? {
       sumaGrosze: 5990, dostawaGrosze: 1000, waluta: "PLN", dostawaMetoda: "DPD",
       kupionoAt: null,
@@ -126,5 +128,137 @@ describe("Triaż w kolumnie dowodów", () => {
     const { container } = render(<Dowody {...props({ twId: 11 }, false)} />);
     expect(container.textContent).not.toContain("Nasz zakup");
     expect(container.textContent).not.toContain("Mamy");
+  });
+});
+
+describe("Wiek zakupu w triażu (0.413.0)", () => {
+  /* Ta sama zamiana, co przy terminie decyzji w 0.121.0: pytanie brzmi „ile to
+     już leży", nie „który to był dzień". Przy rękojmi liczba dni jest
+     argumentem, a agent nie ma jej odejmować w głowie. */
+  it("do dwóch miesięcy liczy DNI — przy „uszkodzone w transporcie” to cała sprawa", () => {
+    render(<Dowody {...props({ dniOdZakupu: 4 })} />);
+    expect(screen.getByText("4 dni temu")).toBeInTheDocument();
+  });
+
+  it("dalej liczy MIESIĄCE, bo nikt nie liczy czterystu dni w głowie", () => {
+    render(<Dowody {...props({ dniOdZakupu: 430 })} />);
+    expect(screen.getByText("14 miesięcy temu")).toBeInTheDocument();
+  });
+
+  it("powyżej dwóch lat mówi w LATACH i zmienia kolor, ale nie wydaje wyroku", () => {
+    /* Bursztyn, nie czerwień: rękojmia biegnie dwa lata od WYDANIA rzeczy,
+       a nasz zegar startuje od zamówienia albo od złożenia koszyka — obie daty
+       są wcześniejsze. Kostka podaje WIEK i źródło zegara; wyroku „po
+       rękojmi" nie wydaje, bo nie ma z czego. */
+    render(<Dowody {...props({ dniOdZakupu: 900 })} />);
+    const wartosc = screen.getByText("2 lata temu");
+    expect(wartosc.className).toContain("text-ranga-uwaga");
+    expect(screen.getByText("data z zamówienia")).toBeInTheDocument();
+  });
+
+  it("mówi, KTÓRY to zegar — dwie daty pod jedną etykietą to blizna 0.121.0", () => {
+    render(<Dowody {...props({ dniOdZakupu: 30, kupionoZrodlo: "sprawa" })} />);
+    expect(screen.getByText("data z ładunku sprawy")).toBeInTheDocument();
+  });
+
+  it("bez daty zakupu kostka nie staje wcale — brak wiedzy to nie „dziś”", () => {
+    render(<Dowody {...props({ dniOdZakupu: null })} />);
+    expect(screen.queryByText("Kupione")).not.toBeInTheDocument();
+  });
+});
+
+describe("Ilość objęta sprawą (0.413.0)", () => {
+  /* `offer.quantity` leżało w ładunku od przyrostu trzeciego i nie było go na
+     ekranie ANI RAZU. „Mamy 2 szt." przy sprawie o trzy sztuki wygląda jak
+     dobra wiadomość i nią nie jest. */
+  it("stan czyta się PRZECIW żądaniu — dwie sztuki przy sprawie o trzy to za mało", () => {
+    karta.mockReturnValue({ data: { ...KARTA, mag: { stan: 2, rez: 0, avail: 2 } },
+      isLoading: false, error: null });
+    render(<Dowody {...props({ ilosc: 3 })} />);
+    expect(screen.getByText("sprawa o 3 szt. · D02-01-04")).toBeInTheDocument();
+    expect(screen.getByText("2 szt.").className).toContain("text-ranga-zle");
+  });
+
+  it("starczy na całą sprawę — ta sama liczba czyta się wtedy inaczej", () => {
+    render(<Dowody {...props({ ilosc: 3 })} />);
+    expect(screen.getByText("7 szt.").className).toContain("text-ranga-ok");
+  });
+
+  it("jedna sztuka nie dokłada zdania — to domyślny przypadek", () => {
+    render(<Dowody {...props({ ilosc: 1 })} />);
+    expect(screen.queryByText(/sprawa o/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Historia towaru i klienta (0.413.0)", () => {
+  it("mówi, ile razy TO SAMO już się zdarzyło i jak się skończyło", () => {
+    render(<Dowody {...props({}, true, {
+      towar: { ile: 3, uznanych: 2, odrzuconych: 1 },
+      klient: { ile: 1, uznanych: 0, odrzuconych: 1 },
+    })} />);
+    expect(screen.getByText(
+      /Ten towar: 3 reklamacje \(2 uznane, 1 odrzucona\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Ten klient: 1 reklamacja \(1 odrzucona\)/)).toBeInTheDocument();
+  });
+
+  it("bez historii nie rysuje wiersza — pierwsza sprawa to nie informacja o towarze", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ten klient/)).not.toBeInTheDocument();
+  });
+
+  it("jedna strona wiedzy wystarcza — drugiej nie udaje zerem", () => {
+    render(<Dowody {...props({}, true, {
+      towar: null, klient: { ile: 2, uznanych: 2, odrzuconych: 0 },
+    })} />);
+    expect(screen.getByText(/Ten klient: 2 reklamacje \(2 uznane\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Jeden dom na fakt (0.414.0)", () => {
+  /* Cztery wydania z rzędu dokładały nad kolumną warstwę streszczenia i każde
+     obiecywało „nic nie znika pod spodem". Obietnica była za każdym razem
+     dotrzymana i właśnie dlatego ten sam fakt stał w końcu w trzech miejscach.
+     Te testy pilnują reguły, która z tego wynikła: liczba, która weszła do
+     pasma decyzji, wychodzi z warstwy szczegółu. */
+
+  it("cena NIE stoi przy wierszu towaru — tam pytanie brzmi „co to jest”", () => {
+    render(<Dowody {...props()} />);
+    const symbol = screen.getByText("14-31051");
+    expect(symbol.parentElement!.textContent).not.toContain("49,90");
+  });
+
+  it("wiersza „Kupiono” nie ma — datę niesie kostka i podpis zwijki", () => {
+    render(<Dowody {...props({ dniOdZakupu: 3 })} />);
+    expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
+  });
+
+  it("wiersza „Razem” nie ma — podpis zwijki widać także przy otwartym bloku", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+  });
+
+  it("ZAKUP startuje zamknięty, bo jego kwoty stoją już w kostkach", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.getByRole("button", { name: /Zakup/ }))
+      .toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("POZIOMY CEN startują zamknięte — triaż rozstrzyga kostka „Nasz zakup”", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.getByRole("button", { name: /Pozostałe poziomy cen/ }))
+      .toHaveAttribute("aria-expanded", "false");
+    /* A liczba, dla której ten blok w ogóle powstał, stoi bez kliknięcia. */
+    expect(screen.getByText("Nasz zakup").parentElement!.textContent).toContain("18,64");
+  });
+
+  it("wiek zakupu staje NAWET wtedy, gdy nie wiemy o sprawie nic więcej", () => {
+    /* Do 0.413.0 pasek znikał w całości, gdy nie było kartoteki ani pozycji
+       paragonu — i zabierał ze sobą datę, którą mieliśmy. */
+    karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    render(<Dowody {...props({ twId: null, dniOdZakupu: 400 }, false)} />);
+    expect(screen.getByText("13 miesięcy temu")).toBeInTheDocument();
   });
 });
