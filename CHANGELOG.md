@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.421.0 — 22 września 2026
+
+**Werdykt odsunięty od przycisku wysyłki.** Zgłoszenie właściciela ze zrzutem:
+„werdykt jest za blisko guzika wyślij wiadomość". Do 0.420.1 „UZNAJĘ" stało
+dokładnie pod „WYŚLIJ ODPOWIEDŹ" — ta sama prawa krawędź, ta sama bursztynowa
+barwa, dwadzieścia kilka pikseli przerwy. Przestrzelenie przycisku wysyłki
+lądowało na nieodwracalnej gałęzi.
+
+- **Położenie:** „UZNAJĘ" i „ODRZUCAM" schodzą z prawej krawędzi i stają przy
+  swoim nagłówku. Prawa krawędź stopki należy odtąd do jednego przycisku.
+- **Barwa:** bursztyn w tej stopce znaczy „to idzie teraz do klienta" i zostaje
+  przy wysyłce. Gałęzie niosą znaczenie ikoną, słowem i barwą pisma — nigdy
+  samą barwą (WCAG 1.4.1). Bursztyn wraca na „WYŚLIJ WERDYKT", za polem zgody.
+- **Odległość:** kreska grubieje do 4 px, oddech nad paskiem rośnie do 20 px,
+  a pas dostaje własne tło. Granicę dwóch pasów widać bez czytania.
+- **Strażnik** w `reklamacje/Werdykt.test.tsx` pilnuje dwóch rozdzieleń, które
+  widać w łańcuchu klas. Odległości nie mierzy — wysokość liczy się
+  w przeglądarce, nie w jsdomie.
+
 ## 0.420.1 — 22 września 2026
 
 **Serwer nie wstawał przez ikonę karty przeglądarki.** Blizna z 0.419.0,
