@@ -18,6 +18,7 @@ import {
 import {
   decyzjaZModelu, decyzjaZastepcza, walidujOdpowiedz, type Decyzja,
 } from "./klasyfikacja-polityka.js";
+import { MAPOWANIE_WERSJA, mapujStrukture, type WynikMapowania } from "./klasyfikacja-mapowanie.js";
 
 export { KATEGORIE, PEWNOSCI, AKCJE } from "./klasyfikacja-slownik.js";
 export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
@@ -109,20 +110,37 @@ type Cel = {
   id: number; subject: string | null; login: string | null;
   message_id: number | null; body: string | null; zalacznikow: number;
   decyzja_status: string | null;
+  watek_typ: string | null; watek_podtyp: string | null; watek_zamowienia: string | null;
+  struktura_at: string | null;
+  /** Czy cel to PIERWSZA wiadomość klienta w wątku — reguła 2 rejestru mapowań. */
+  pierwsza: number;
 };
 
 const CEL = `
   SELECT c.id, c.subject,
-         (SELECT t.interlocutor_login FROM allegro_inbox_thread t
-            WHERE t.id = c.external_conversation_id) AS login,
+         t.interlocutor_login AS login,
+         t.watek_typ, t.watek_podtyp, t.watek_zamowienia, t.struktura_at,
+         (m.id = (SELECT p.id FROM message p WHERE p.conversation_id = c.id
+                     AND p.direction = 'incoming' ORDER BY p.sent_at, p.id LIMIT 1)) AS pierwsza,
          m.id AS message_id, m.body,
          (SELECT COUNT(*) FROM message_attachment a WHERE a.message_id = m.id) AS zalacznikow,
          (SELECT k.status FROM decyzja_klasyfikacji k
             WHERE k.message_id = m.id AND k.aktywna = 1
               AND k.taksonomia_wersja = '${TAKSONOMIA_WERSJA}') AS decyzja_status
   FROM conversation c
+  LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
   LEFT JOIN message m ON m.id = ${CEL_KLASYFIKACJI}
   WHERE c.id = ?`;
+
+/** Zamówienia z `orders` wątku w `beta.v1`, gdy go czytaliśmy. */
+const zamowieniaWatku = (cel: Cel): string[] => {
+  try {
+    const z = JSON.parse(cel.watek_zamowienia ?? "[]");
+    return Array.isArray(z) ? z.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
 
 /** Czego model się dowiedział i skąd — zapisuje się przy decyzji (specyfikacja: audyt). */
 interface Kontekst {
@@ -153,8 +171,8 @@ function kontekstRozmowy(database: DatabaseSync, cel: Cel): Kontekst {
       related_object_type: string | null; related_object_id: string | null;
       related_order_id: string | null }>;
 
-  const zamowienia = [...new Set(wiadomosci.map((w) => w.related_order_id)
-    .filter((x): x is string => !!x))];
+  const zamowienia = [...new Set([...wiadomosci.map((w) => w.related_order_id)
+    .filter((x): x is string => !!x), ...zamowieniaWatku(cel)])];
   const oferty = [...new Set(wiadomosci
     .filter((w) => w.related_object_type === "OFFER" && w.related_object_id)
     .map((w) => String(w.related_object_id)))];
@@ -171,6 +189,11 @@ function kontekstRozmowy(database: DatabaseSync, cel: Cel): Kontekst {
     `- zamówienie powiązane z rozmową: ${zamowienia.length ? "tak" : "nie"}`,
     `- oferta powiązana z rozmową: ${oferty.length ? "tak" : "nie"}`,
     `- załączniki w rozpoznawanej wiadomości: ${cel.zalacznikow}`,
+    /* Struktura Allegro idzie jako FAKT, także przy dopisku — reguła 2
+       rejestru zabrania jej rozstrzygać za model, nie zabrania jej pokazać.
+       Wartości to enumy Allegro, nie treść od klienta. */
+    ...(cel.watek_typ ? [`- typ wątku Allegro: ${cel.watek_typ}; podtyp: ${cel.watek_podtyp ?? "brak"}`
+      + `; ${cel.pierwsza ? "to pierwsza wiadomość klienta w wątku" : "to dopisek w istniejącym wątku"}`] : []),
     "WĄTEK:",
   ].join("\n");
 
@@ -190,6 +213,8 @@ interface Meta {
   model: string | null;
   promptWersja: string | null;
   surowa: unknown;
+  /** Struktura wątku, na której stało mapowanie; `null` = nie czytaliśmy. */
+  struktura: { typ: string | null; podtyp: string | null } | null;
 }
 
 /**
@@ -219,8 +244,8 @@ function zapiszDecyzje(
        wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,uzasadnienie,
        surowa_odpowiedz,kody_polityki,kontekst_wiadomosci,kontekst_hash,kontekst_uciety,
        zalacznikow,zamowienia,oferty,model,prompt_wersja,taksonomia_wersja,polityka_wersja,
-       tryb,at,przez,przez_user_id,poprzednia_id)
-      VALUES (?,?,?,1,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+       tryb,at,przez,przez_user_id,poprzednia_id,watek_typ,watek_podtyp,api_wersja,mapowanie_wersja)
+      VALUES (?,?,?,1,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       rozmowaId, messageId, wersja, d.zrodlo, d.status, d.kategoria,
       JSON.stringify(d.dodatkowe), d.kategoriaAllegro, d.kategoriaModelu,
       d.akcja, d.akcjaModelu, Number(d.wymagaCzlowieka), Number(d.brakDanychZamowienia),
@@ -231,7 +256,11 @@ function zapiszDecyzje(
       Number(m.kontekst?.uciety ?? false), m.zalacznikow,
       JSON.stringify(m.kontekst?.zamowienia ?? []), JSON.stringify(m.kontekst?.oferty ?? []),
       m.model, m.promptWersja, TAKSONOMIA_WERSJA, POLITYKA_WERSJA, TRYB,
-      teraz.toISOString(), kto.name, kto.id, poprzednia?.id ?? null).lastInsertRowid);
+      teraz.toISOString(), kto.name, kto.id, poprzednia?.id ?? null,
+      m.struktura?.typ ?? null, m.struktura?.podtyp ?? null,
+      /* Wersja API i rejestru TYLKO wtedy, gdy struktura z bety naprawdę była —
+         inaczej decyzja udawałaby, że stała na mapowaniu, którego nie było. */
+      m.struktura ? "beta.v1" : null, m.struktura ? MAPOWANIE_WERSJA : null).lastInsertRowid);
     dodatkowo();
     logEvent("copilot_klasyfikacja", kto.name, null, {
       conversationId: rozmowaId, decyzjaId: nowa, wersja, zrodlo: d.zrodlo, status: d.status,
@@ -285,6 +314,32 @@ export async function sklasyfikujRozmowy(
       continue;
     }
     const zalacznikow = Number(cel.zalacznikow ?? 0);
+    const struktura = cel.struktura_at ? { typ: cel.watek_typ, podtyp: cel.watek_podtyp } : null;
+    const mapa: WynikMapowania = mapujStrukture({
+      typ: struktura?.typ ?? null, podtyp: struktura?.podtyp ?? null,
+      zZamowieniem: zamowieniaWatku(cel).length > 0,
+    }, Boolean(Number(cel.pierwsza)));
+    /* Nieznana wartość struktury idzie do przeglądu mapowań ZDARZENIEM —
+       ta sama droga wzrostu, co przy kategorii spoza słownika. */
+    const doPrzegladu = () => {
+      if (mapa.nieznane) {
+        logEvent("klasyfikacja_mapowanie_do_przegladu", kto.name, null,
+          { conversationId: rozmowaId, wartosc: mapa.nieznane }, kto.id, database);
+      }
+    };
+    const zKodami = (d: Decyzja): Decyzja =>
+      mapa.kody.length ? { ...d, kody: [...d.kody, ...mapa.kody] } : d;
+
+    /* WĄSKIE MAPOWANIE rozstrzyga bez modelu — i bez kosztu. Stoi PRZED
+       sprawdzeniem treści: pierwsza wiadomość sprawy o brakujący element
+       bywa samym zdjęciem, a podtyp mówi o niej wszystko, czego potrzeba. */
+    if (mapa.waska) {
+      zapiszDecyzje(database, rozmowaId, messageId, mapa.waska,
+        { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
+        kto, teraz);
+      wynik.sklasyfikowane += 1;
+      continue;
+    }
     if (!(cel.body ?? "").trim()) {
       /* SAM ZAŁĄCZNIK. Specyfikacja: „do not silently treat an attachment-only
          message as understood". Do dostawcy nie idzie nic — nie ma czego
@@ -292,9 +347,9 @@ export async function sklasyfikujRozmowy(
          decyzję, która mówi to wprost i woła człowieka. */
       if (zalacznikow > 0) {
         zapiszDecyzje(database, rozmowaId, messageId,
-          decyzjaZastepcza(KODY.tylkoZalacznik, "NEEDS_REVIEW"),
-          { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined },
-          kto, teraz);
+          zKodami(decyzjaZastepcza(KODY.tylkoZalacznik, "NEEDS_REVIEW", mapa.wskazowka)),
+          { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
+          kto, teraz, doPrzegladu);
         wynik.pominiete.push({ rozmowaId, powod: "sam załącznik — do przejrzenia przez człowieka" });
       } else {
         wynik.pominiete.push({ rozmowaId, powod: "brak wiadomości od klienta" });
@@ -308,9 +363,9 @@ export async function sklasyfikujRozmowy(
        dostaje decyzję FAILED — zgubienie jej po cichu byłoby gorsze. */
     if (zostalyDaneOsobowe(String(kontekst.tresc))) {
       zapiszDecyzje(database, rozmowaId, messageId,
-        decyzjaZastepcza(KODY.bladMaskowania, "FAILED"),
-        { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined },
-        kto, teraz, () => zapiszBlad(database, rozmowaId, "maskowanie", kto, teraz));
+        zKodami(decyzjaZastepcza(KODY.bladMaskowania, "FAILED", mapa.wskazowka)),
+        { kontekst: null, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
+        kto, teraz, () => { zapiszBlad(database, rozmowaId, "maskowanie", kto, teraz); doPrzegladu(); });
       wynik.bledy.push({ rozmowaId, powod: "maskowanie nie oczyściło treści — nie wysyłam" });
       continue;
     }
@@ -342,9 +397,9 @@ export async function sklasyfikujRozmowy(
       /* Reszta dotyczy TEJ rozmowy (odmowa, ucięcie). Specyfikacja: „for a
          failed call, preserve the error status and route to HUMAN_REVIEW". */
       zapiszDecyzje(database, rozmowaId, messageId,
-        decyzjaZastepcza(KODY.bladModelu, "FAILED"),
-        { kontekst, zalacznikow, model: null, promptWersja: null, surowa: undefined },
-        kto, teraz, () => zapiszBlad(database, rozmowaId, slad, kto, teraz));
+        zKodami(decyzjaZastepcza(KODY.bladModelu, "FAILED", mapa.wskazowka)),
+        { kontekst, zalacznikow, model: null, promptWersja: null, surowa: undefined, struktura },
+        kto, teraz, () => { zapiszBlad(database, rozmowaId, slad, kto, teraz); doPrzegladu(); });
       wynik.bledy.push({ rozmowaId, powod });
       continue;
     }
@@ -354,9 +409,11 @@ export async function sklasyfikujRozmowy(
       /* NIE zakładamy nowej kategorii. Zdarzenie z odrzuconą wartością jest
          mechanizmem wzrostu słownika, a wywołanie było płatne. */
       zapiszDecyzje(database, rozmowaId, messageId,
-        decyzjaZastepcza(KODY.niepoprawna, "FAILED"),
-        { kontekst, zalacznikow, model: odp.model, promptWersja: odp.promptWersja, surowa: odp.surowa },
+        zKodami(decyzjaZastepcza(KODY.niepoprawna, "FAILED", mapa.wskazowka)),
+        { kontekst, zalacznikow, model: odp.model, promptWersja: odp.promptWersja, surowa: odp.surowa,
+          struktura },
         kto, teraz, () => {
+          doPrzegladu();
           zapiszWywolanie(database, rozmowaId, odp, "blad", w.powod, kto, teraz);
           logEvent("copilot_klasyfikacja_niepoprawna", kto.name, null,
             { conversationId: rozmowaId, powod: w.powod, model: odp.model }, kto.id, database);
@@ -366,9 +423,10 @@ export async function sklasyfikujRozmowy(
       continue;
     }
 
-    zapiszDecyzje(database, rozmowaId, messageId, decyzjaZModelu(w.odp),
-      { kontekst, zalacznikow, model: odp.model, promptWersja: odp.promptWersja, surowa: odp.surowa },
-      kto, teraz, () => zapiszWywolanie(database, rozmowaId, odp, "ok", null, kto, teraz));
+    zapiszDecyzje(database, rozmowaId, messageId, zKodami(decyzjaZModelu(w.odp, mapa.wskazowka)),
+      { kontekst, zalacznikow, model: odp.model, promptWersja: odp.promptWersja, surowa: odp.surowa,
+        struktura },
+      kto, teraz, () => { zapiszWywolanie(database, rozmowaId, odp, "ok", null, kto, teraz); doPrzegladu(); });
     wynik.sklasyfikowane += 1;
     dolicz(wynik, odp);
   }
@@ -452,14 +510,15 @@ export function poprawKlasyfikacje(
        wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,uzasadnienie,
        surowa_odpowiedz,kody_polityki,kontekst_wiadomosci,kontekst_hash,kontekst_uciety,
        zalacznikow,zamowienia,oferty,model,prompt_wersja,taksonomia_wersja,polityka_wersja,
-       tryb,at,przez,przez_user_id,poprawka_powod,poprzednia_id)
+       tryb,at,przez,przez_user_id,poprawka_powod,poprzednia_id,
+       watek_typ,watek_podtyp,api_wersja,mapowanie_wersja)
       SELECT conversation_id,message_id,?,1,zrodlo,status,?,
        (SELECT json_group_array(value) FROM json_each(kategorie_dodatkowe) WHERE value <> ?),
        kategoria_allegro,kategoria_modelu,?,akcja,akcja_modelu,
        wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,uzasadnienie,
        surowa_odpowiedz,kody_polityki,kontekst_wiadomosci,kontekst_hash,kontekst_uciety,
        zalacznikow,zamowienia,oferty,model,prompt_wersja,taksonomia_wersja,polityka_wersja,
-       tryb,?,?,?,?,id
+       tryb,?,?,?,?,id,watek_typ,watek_podtyp,api_wersja,mapowanie_wersja
       FROM decyzja_klasyfikacji WHERE id=?`).run(
       wersja, kategoria, kategoria, kategoria, teraz.toISOString(), kto.name, kto.id,
       powod?.trim().slice(0, 300) || null, Number(c.id)).lastInsertRowid);
@@ -513,6 +572,12 @@ export interface PomiarKlasyfikacji {
     precyzja: Udzial | null;
     czulosc: Udzial | null;
   }>;
+  /**
+   * Zgodność mapowania struktury Allegro z etykietą człowieka — osobno od
+   * modelu, bo specyfikacja każe mierzyć ją oddzielnie. Liczy decyzje ze
+   * wskazaniem Allegro (wąskie i szerokie), przy których człowiek coś wskazał.
+   */
+  mapowanie: Udzial | null;
 }
 
 /**
@@ -525,11 +590,12 @@ export interface PomiarKlasyfikacji {
  */
 export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
   const wiersze = database.prepare(`SELECT zrodlo, status, wymaga_czlowieka,
-      kategoria_modelu, kategoria_czlowieka
+      kategoria_modelu, kategoria_czlowieka, kategoria_allegro
     FROM decyzja_klasyfikacji WHERE aktywna=1 AND taksonomia_wersja=?`)
     .all(TAKSONOMIA_WERSJA) as Array<{
       zrodlo: Zrodlo; status: string; wymaga_czlowieka: number;
-      kategoria_modelu: string | null; kategoria_czlowieka: string | null }>;
+      kategoria_modelu: string | null; kategoria_czlowieka: string | null;
+      kategoria_allegro: string | null }>;
 
   const wgZrodla: Record<Zrodlo, number> = { ALLEGRO_MAPPING: 0, MODEL: 0, FALLBACK: 0 };
   const wgStatusu: Record<string, number> = { SUCCESS: 0, FAILED: 0, NEEDS_REVIEW: 0 };
@@ -567,6 +633,11 @@ export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
     oznaczonych: oznaczone.length, nieoznaczonych,
     poprawionych: oznaczone.filter((o) => o.model !== o.czlowiek).length,
     wgKategorii,
+    mapowanie: (() => {
+      const zAllegro = wiersze.filter((w) => w.kategoria_allegro && w.kategoria_czlowieka);
+      return wilson(zAllegro.filter((w) => w.kategoria_allegro === w.kategoria_czlowieka).length,
+        zAllegro.length);
+    })(),
   };
 }
 

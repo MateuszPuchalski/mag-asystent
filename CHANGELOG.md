@@ -34,6 +34,46 @@ historii nie przepisujemy.
 ---
 
 
+## 0.429.0 — 22 września 2026
+
+**Struktura wątku Allegro przed modelem: typ i podtyp z `beta.v1` dają
+wskazówkę, a cztery podtypy rozstrzygają bez modelu.** Drugi przyrost
+specyfikacji z 20 września.
+
+Specyfikacja każe najpierw użyć tego, co Allegro mówi o wątku samo. Mówi to
+wyłącznie `beta.v1` (`ThreadVBeta1`: `type`, `subType`, `orders`), a lista
+wątków chodzi po `public.v1`. Przejście całej skrzynki na betę znaczyłoby
+nowe mapowanie kierunku wiadomości — `role` zamiast `isInterlocutor`.
+Zamiast tego synchronizacja czyta strukturę OSOBNYM żądaniem, tylko przy
+wątku, w którym coś się zmieniło.
+
+**`zapytajAllegro` umie wymusić wersję** (`akcept`). Wymuszona beta nie
+zapisuje się jako nauczony nagłówek rodziny `threads`, więc następna strona
+listy dalej przychodzi w `public.v1`. Pilnuje tego test z podstawionym
+`fetch`.
+
+**Awaria bety nie psuje skrzynki.** Struktura zapisuje się tylko wtedy, gdy
+przyszła, i nie zamazuje poprzedniej. Odmowa konta (406, 403) wstrzymuje
+odczyt na sześć godzin; limit — na kwadrans. Loginy uczestników nie wchodzą
+do bazy. Dostępność bety na naszym koncie niesie `[WERYFIKUJ]`.
+
+**Rejestr mapowań** (`services/klasyfikacja-mapowanie.ts`, wersja `m1`) jest
+propozycją do zatwierdzenia na etykietach. Cztery podtypy wąskie —
+brak elementu, brak zwrotu pieniędzy, kłopot z odesłaniem i odmowa przyjęcia
+zwrotu — rozstrzygają pierwszą wiadomość bez modelu i bez kosztu. Pięć
+szerokich to wskazówki z listą kategorii zgodnych; spór poza nią idzie do
+człowieka. `COMMON` nic nie mówi, dopisek w wątku idzie do modelu, a wartość
+nieznana dostaje kod i zdarzenie do przeglądu.
+
+Pomiar podaje zgodność mapowania z etykietą człowieka osobno od modelu.
+Decyzję ze struktury Allegro da się potwierdzić jak decyzję modelu.
+Instrukcja klasyfikatora dostała zdanie o typie wątku (`k3`).
+
+- Migracja dokłada pięć kolumn `watek_*` i `struktura_at`
+  w `allegro_inbox_thread` sama.
+- `ALLEGRO_WATKI_BETA=0` wyłącza odczyt struktury.
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.428.0 — 22 września 2026
 
 **Klasyfikacja wiadomości według specyfikacji z 20 września: piętnaście

@@ -852,6 +852,16 @@ export function migrate(database: DatabaseSync) {
   addColumn("zadanie_terenowe", "kontekst", "TEXT");
   watekInboxuDopuszczaBrakDaty(database);
   wiadomoscInboxuMaKsztaltAllegro(database);
+  /* Struktura wątku z `beta.v1` (22 września 2026) — patrz
+     `allegro_inbox_thread` w `schema.sql`. Stare wątki mają NULL, czyli
+     „nie czytaliśmy"; dostaną wartości przy najbliższej zmianie w wątku.
+     PO `watekInboxuDopuszczaBrakDaty`: tamta przebudowa stawia tabelę od
+     nowa bez tych kolumn, więc dołożone wcześniej zginęłyby na starej bazie. */
+  addColumn("allegro_inbox_thread", "watek_typ", "TEXT");
+  addColumn("allegro_inbox_thread", "watek_podtyp", "TEXT");
+  addColumn("allegro_inbox_thread", "watek_status", "TEXT");
+  addColumn("allegro_inbox_thread", "watek_zamowienia", "TEXT");
+  addColumn("allegro_inbox_thread", "struktura_at", "TEXT");
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);

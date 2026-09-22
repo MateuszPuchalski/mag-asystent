@@ -1663,7 +1663,19 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
   last_message_at TEXT,
   interlocutor_login TEXT,
   surowe_json TEXT NOT NULL,
-  synced_at TEXT NOT NULL
+  synced_at TEXT NOT NULL,
+  -- STRUKTURA WĄTKU z `beta.v1` (22 września 2026) — osobnym odczytem
+  -- `GET /messaging/threads/{id}`, bo lista chodzi po `public.v1`, a tam tych
+  -- pól nie ma. Wartość zapisuje się TAK, JAK PRZYSZŁA, także spoza
+  -- znanego słownika (specyfikacja: „preserve unknown values"). NULL w
+  -- `struktura_at` znaczy „nie czytaliśmy", nie „wątek bez typu".
+  -- `participants` nie wchodzi: login kupującego ma tu już `interlocutor_login`,
+  -- a lądowisko nie bierze niczego ponad to, po co przyszliśmy.
+  watek_typ TEXT,
+  watek_podtyp TEXT,
+  watek_status TEXT,
+  watek_zamowienia TEXT,
+  struktura_at TEXT
 );
 -- Kolumny odpowiadają POLOM ALLEGRO, nie naszym wyobrażeniom o nich.
 -- Do 0.151.0 stało tu `author_role NOT NULL` i `read NOT NULL` — dwa pola,

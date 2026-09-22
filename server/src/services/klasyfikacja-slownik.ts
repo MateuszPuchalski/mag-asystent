@@ -91,6 +91,7 @@ export const KODY = {
   niepoprawna: "NIEPOPRAWNA_ODPOWIEDZ",
   sporZAllegro: "SPOR_Z_ALLEGRO",
   podtypNieznany: "PODTYP_NIEZNANY",
+  typNieznany: "TYP_NIEZNANY",
 } as const;
 
 /** Tryb wysyłki. Dziś jedyny: każda odpowiedź przechodzi przez człowieka (§27, punkt 2). */

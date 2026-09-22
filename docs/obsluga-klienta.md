@@ -400,7 +400,9 @@ pytania, na które odpowiada. Klasyfikacja idzie więc tą samą drogą co szkic
 cały wątek tej jednej rozmowy, to samo maskowanie, ten sam sufit dwunastu
 wiadomości i sześciu tysięcy znaków. Nad wątkiem stoi nagłówek, który piszemy
 my: czy rozmowa ma zamówienie, czy ofertę i ile załączników ma wiadomość.
-Numerów zamówienia i oferty w nagłówku nie ma — model dostaje sam fakt.
+Numerów zamówienia i oferty w nagłówku nie ma — model dostaje sam fakt. Typ
+i podtyp wątku Allegro idą tam jako enumy Allegro — nie ma w nich nic od
+klienta. Loginów uczestników z `beta.v1` nie zapisujemy wcale.
 
 Takt rozpoznaje każdą nową wiadomość klienta — decyzja właściciela z 22
 września. Włącza go dopiero `COPILOT_AUTO_KLASYFIKACJA=1`, z sufitem na

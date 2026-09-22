@@ -78,6 +78,9 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
         {k.oznaczonych < 50 && <span className="text-slate-500"> Poniżej pięćdziesięciu etykiet
           liczby niżej jeszcze nic nie rozstrzygają.</span>}
+        {/* Zgodność mapowania OSOBNO: specyfikacja każe ją mierzyć oddzielnie,
+            bo wąskie mapowanie omija model i nie ma go w tabeli niżej. */}
+        {" "}Zgodność struktury Allegro z etykietą: <b>{udzial(k.mapowanie)}</b>.
       </p>;
     })()}
 

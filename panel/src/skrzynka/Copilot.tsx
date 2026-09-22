@@ -168,7 +168,9 @@ function dymek(k: Kopilot): string {
   if (k.nieaktualna) return "Rozpoznano starszą wiadomość — klient dopisał później";
   const czesci = [k.zrodlo === "FALLBACK"
     ? "Copilot nie rozpoznał tej wiadomości"
-    : `Copilot: ${k.pewnosc ? NAZWA_PEWNOSCI[k.pewnosc] : "bez pewności"}`];
+    : k.zrodlo === "ALLEGRO_MAPPING"
+      ? "Rozpoznane ze struktury wątku Allegro, bez modelu"
+      : `Copilot: ${k.pewnosc ? NAZWA_PEWNOSCI[k.pewnosc] : "bez pewności"}`];
   czesci.push(`następny krok: ${NAZWA_AKCJI[k.akcja]}`);
   if (k.dodatkowe.length) czesci.push(`także: ${k.dodatkowe.map((d) => NAZWA_KATEGORII[d]).join(", ")}`);
   if (k.kody.length) czesci.push(k.kody.map((x) => NAZWA_KODU[x] ?? x).join(", "));
@@ -227,10 +229,11 @@ export function EtykietaKategorii({ kopilot, zapisuje = false, onPopraw }: {
     {czlowiek
       ? <span className="text-slate-500">{kopilot.kategoriaModelu && kopilot.kategoriaModelu !== czlowiek
         ? `poprawione (Copilot: ${NAZWA_KATEGORII[kopilot.kategoriaModelu]})` : "potwierdzone"}</span>
-      /* Potwierdzać można tylko to, co powiedział MODEL. Decyzja bez modelu
-         (awaria, sam załącznik) ma „Inne" z urzędu — potwierdzenie go byłoby
-         etykietą bez treści. */
-      : kopilot.kategoriaModelu && !kopilot.nieaktualna
+      /* Potwierdzać można to, co powiedział MODEL albo struktura Allegro.
+         Decyzja zastępcza (awaria, sam załącznik) ma „Inne" z urzędu —
+         potwierdzenie jej byłoby etykietą bez treści. Potwierdzenie mapowania
+         karmi osobny pomiar jego zgodności. */
+      : kopilot.zrodlo !== "FALLBACK" && !kopilot.nieaktualna
         && <button type="button" title="Potwierdź kategorię" aria-label="Potwierdź kategorię"
           disabled={zapisuje}
           className="rounded p-1 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"

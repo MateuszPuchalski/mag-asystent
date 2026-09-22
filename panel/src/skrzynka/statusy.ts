@@ -116,6 +116,7 @@ export const NAZWA_KODU: Record<string, string> = {
   NIEPOPRAWNA_ODPOWIEDZ: "odpowiedź spoza słownika",
   SPOR_Z_ALLEGRO: "Allegro wskazuje co innego",
   PODTYP_NIEZNANY: "nieznany podtyp wątku Allegro",
+  TYP_NIEZNANY: "nieznany typ wątku Allegro",
 };
 
 /* Pewność NIE jest procentem i ekran nie ma prawa udawać, że jest. Model

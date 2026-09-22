@@ -476,3 +476,115 @@ test("pomiar liczy udział cache — zero w całej partii znaczy, że prefiks ni
   assert.ok(p.udzialCache !== null && p.udzialCache > 0);
   assert.ok(p.kosztUsd > 0, "dwa wywołania nie mogą kosztować zera");
 });
+
+
+/* ── Struktura Allegro w klasyfikacji (22 września 2026) ─────────────────── */
+
+function wStrukturze(d: DatabaseSync, typ: string, podtyp: string | null, tresc: string): number {
+  const watek = `w-str-${Math.random()}`;
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,interlocutor_login,surowe_json,synced_at,
+    watek_typ,watek_podtyp,watek_zamowienia,struktura_at)
+    VALUES (?,0,'kupujacy','{}','2026-09-03T08:00:00Z',?,?,'["zam-9"]','2026-09-03T08:00:00Z')`)
+    .run(watek, typ, podtyp);
+  const id = Number(d.prepare(`INSERT INTO conversation
+    (channel_account_id,external_conversation_id,subject) VALUES (1,?,'Temat')`).run(watek).lastInsertRowid);
+  d.prepare(`INSERT INTO message
+    (conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,1,?,'incoming',?,'2026-09-03T08:00:00Z')`).run(id, `m-${Math.random()}`, tresc);
+  return id;
+}
+
+test("wąski podtyp rozstrzyga bez modelu i bez kosztu (AC2)", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "MISSING_PRODUCT_ELEMENTS", "Brakuje noża w paczce");
+  let wolane = 0;
+  const w = await sklasyfikujRozmowy(d, [id], KTO, async () => { wolane++; return odpowiedz(); });
+  assert.equal(wolane, 0);
+  assert.equal(w.sklasyfikowane, 1);
+  const k = aktywna(d, id);
+  assert.equal(k.zrodlo, "ALLEGRO_MAPPING");
+  assert.equal(k.kategoria, "MISSING_PRODUCT");
+  assert.equal(k.kategoria_allegro, "MISSING_PRODUCT");
+  assert.equal(k.kategoria_modelu, null);
+  assert.equal(k.pewnosc, null);
+  assert.equal(k.watek_typ, "POST_PURCHASE_ISSUE");
+  assert.equal(k.watek_podtyp, "MISSING_PRODUCT_ELEMENTS");
+  assert.equal(k.api_wersja, "beta.v1");
+  assert.equal(k.mapowanie_wersja, "m1");
+  assert.equal((d.prepare("SELECT COUNT(*) n FROM copilot_wywolanie").get() as any).n, 0);
+});
+
+test("dopisek w wątku z podtypem idzie do modelu, a struktura stoi w nagłówku jako fakt", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "MISSING_PRODUCT_ELEMENTS", "Brakuje noża");
+  await sklasyfikujRozmowy(d, [id], KTO, nadawca());
+  dopisz(d, id, "Dziękuję, nóż doszedł osobno");
+  let widziane = "";
+  await sklasyfikujRozmowy(d, [id], KTO, async (t) => {
+    widziane = String(t);
+    return odpowiedz({ kategoria: "OTHER", akcja: "NO_ACTION" });
+  });
+  assert.match(widziane, /podtyp: MISSING_PRODUCT_ELEMENTS; to dopisek/);
+  const k = aktywna(d, id);
+  assert.equal(k.zrodlo, "MODEL");
+  assert.equal(k.status, "SUCCESS", "dopisek nie wchodzi w spór z podtypem wątku");
+});
+
+test("szeroki podtyp: istotny spór z modelem idzie do człowieka", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "PRODUCT_INCONSISTENT_WITH_THE_OFFER", "Poproszę fakturę");
+  await sklasyfikujRozmowy(d, [id], KTO, nadawca({ kategoria: "INVOICE", akcja: "GET_ORDER" }));
+  const k = aktywna(d, id);
+  assert.equal(k.kategoria_allegro, "WRONG_PRODUCT");
+  assert.equal(k.status, "NEEDS_REVIEW");
+  assert.ok(JSON.parse(k.kody_polityki).includes("SPOR_Z_ALLEGRO"));
+  assert.deepEqual(JSON.parse(k.zamowienia), ["zam-9"], "zamówienie z `orders` wątku wchodzi do śladu");
+});
+
+test("nieznany podtyp zostaje nazwany, idzie do modelu i do przeglądu mapowań", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "NOWY_2027", "Coś nowego");
+  let wolane = 0;
+  await sklasyfikujRozmowy(d, [id], KTO, async () => { wolane++; return odpowiedz(); });
+  assert.equal(wolane, 1);
+  const k = aktywna(d, id);
+  assert.equal(k.watek_podtyp, "NOWY_2027", "wartość nieznana zostaje, jak przyszła");
+  assert.ok(JSON.parse(k.kody_polityki).includes("PODTYP_NIEZNANY"));
+  const zd = d.prepare("SELECT payload FROM events WHERE type='klasyfikacja_mapowanie_do_przegladu'")
+    .get() as { payload: string } | undefined;
+  assert.match(String(zd?.payload), /NOWY_2027/);
+});
+
+test("rozmowa bez struktury nie udaje mapowania", async () => {
+  const d = stanowisko();
+  const id = rozmowa(d, "Czy pasuje?");
+  await sklasyfikujRozmowy(d, [id], KTO, nadawca());
+  const k = aktywna(d, id);
+  assert.equal(k.api_wersja, null);
+  assert.equal(k.mapowanie_wersja, null);
+});
+
+test("poprawka przenosi strukturę wątku do nowej wersji", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "MISSING_PRODUCT_ELEMENTS", "Brakuje noża");
+  await sklasyfikujRozmowy(d, [id], KTO, nadawca());
+  poprawKlasyfikacje(d, id, "WRONG_PRODUCT", null, KTO);
+  const k = aktywna(d, id);
+  assert.equal(k.wersja, 2);
+  assert.equal(k.watek_podtyp, "MISSING_PRODUCT_ELEMENTS");
+  assert.equal(k.mapowanie_wersja, "m1");
+});
+
+test("pomiar liczy zgodność mapowania osobno od modelu", async () => {
+  const d = stanowisko();
+  const a = wStrukturze(d, "POST_PURCHASE_ISSUE", "MISSING_PRODUCT_ELEMENTS", "Brakuje noża");
+  const b = wStrukturze(d, "POST_PURCHASE_ISSUE", "NO_REFUND", "Gdzie pieniądze?");
+  await sklasyfikujRozmowy(d, [a, b], KTO, nadawca());
+  poprawKlasyfikacje(d, a, "MISSING_PRODUCT", null, KTO);
+  poprawKlasyfikacje(d, b, "COMPLAINT", null, KTO);
+  const p = pomiarCopilota(d).klasyfikacja;
+  assert.equal(p.wgZrodla.ALLEGRO_MAPPING, 2);
+  assert.equal(p.mapowanie?.k, 1);
+  assert.equal(p.mapowanie?.n, 2);
+  assert.equal(p.oznaczonych, 0, "etykiety mapowania nie wchodzą do precyzji modelu");
+});

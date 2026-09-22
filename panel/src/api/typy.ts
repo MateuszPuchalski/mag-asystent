@@ -139,6 +139,8 @@ export type PomiarKlasyfikacji = {
   poprawionych: number;
   wgKategorii: Array<{ kategoria: Kategoria; przewidzianych: number;
     precyzja: Udzial | null; czulosc: Udzial | null }>;
+  /** Zgodność mapowania struktury Allegro z etykietą człowieka — osobno od modelu. */
+  mapowanie: Udzial | null;
 };
 
 /** Pomiar zza zębatki (0.168.0: diagnostyka nie stoi na ekranie pracy). */

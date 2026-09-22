@@ -90,15 +90,14 @@ test("zwrot i reklamacja zostają ręczne — kod mówi, że to ruch człowieka"
   assert.equal(d.status, "SUCCESS", "reklamacja rozpoznana dobrze to nie niepewność");
 });
 
-test("szeroka wskazówka Allegro, z którą model się nie zgadza, to spór — rozstrzyga człowiek", () => {
-  const d = decyzjaZModelu(odp({ kategoria: "PRODUCT_COMPATIBILITY", akcja: "CHECK_COMPATIBILITY" }),
-    { kategoria: "WRONG_PRODUCT", waska: false });
-  assert.equal(d.kategoriaAllegro, "WRONG_PRODUCT");
-  assert.equal(d.status, "NEEDS_REVIEW");
-  assert.ok(d.kody.includes("SPOR_Z_ALLEGRO"));
-  const zgoda = decyzjaZModelu(odp({ kategoria: "WRONG_PRODUCT", akcja: "GET_ORDER" }),
-    { kategoria: "WRONG_PRODUCT", waska: false });
-  assert.equal(zgoda.status, "SUCCESS");
+test("szeroka wskazówka: doprecyzowanie przechodzi, istotny spór idzie do człowieka", () => {
+  const w = { kategoria: "WRONG_PRODUCT" as const, zgodne: ["WRONG_PRODUCT", "PRODUCT_COMPATIBILITY"] as const };
+  const dopr = decyzjaZModelu(odp({ kategoria: "PRODUCT_COMPATIBILITY", akcja: "CHECK_COMPATIBILITY" }), w);
+  assert.equal(dopr.kategoriaAllegro, "WRONG_PRODUCT");
+  assert.equal(dopr.status, "SUCCESS", "część zgodna z zamówieniem, która nie pasuje — to doprecyzowanie");
+  const spor = decyzjaZModelu(odp({ kategoria: "INVOICE", akcja: "GET_ORDER" }), w);
+  assert.equal(spor.status, "NEEDS_REVIEW");
+  assert.ok(spor.kody.includes("SPOR_Z_ALLEGRO"));
 });
 
 test("decyzja zastępcza: OTHER, przegląd, flagi zachowawcze na prawdzie", () => {

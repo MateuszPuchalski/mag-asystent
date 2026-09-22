@@ -1897,10 +1897,31 @@ na przebieg i sufit na godzinę liczony z księgi. Okno siedmiu dni chroni przed
 przerabianiem historii. Decyzji `FAILED` takt nie ponawia — ponawia człowiek
 przyciskiem nad kolejką.
 
-**Czego ten przyrost nie robi.** Nie czyta typu i podtypu wątku z `beta.v1`
-— to osobny przyrost, z kontraktem w `docs/allegro-ksztalt.md`. Nie wysyła
-niczego do klienta i nie zmienia trybu wysyłki: każdą odpowiedź dalej wysyła
-człowiek (§27, punkt 2).
+**Czego ten przyrost nie robi.** Nie wysyła niczego do klienta i nie zmienia
+trybu wysyłki: każdą odpowiedź dalej wysyła człowiek (§27, punkt 2).
+
+### 14.5b. Struktura wątku Allegro przed modelem (22 września 2026)
+
+Drugi przyrost specyfikacji: „użyj pewnej struktury Allegro najpierw, model
+wołaj tylko tam, gdzie treść zostaje niejasna". Typ i podtyp wątku daje
+wyłącznie `beta.v1`, więc synchronizacja czyta je osobnym żądaniem przy
+wątku, w którym coś się zmieniło. Kontrakt i `[WERYFIKUJ]` stoją
+w `docs/allegro-ksztalt.md`.
+
+**Rejestr mapowań** (`services/klasyfikacja-mapowanie.ts`, wersja `m1`) jest
+PROPOZYCJĄ do zatwierdzenia na etykietach, jak każe specyfikacja. Wąskich
+podtypów jest cztery: brak elementu w paczce, brak zwrotu pieniędzy, kłopot
+z odesłaniem i odmowa przyjęcia zwrotu. Rozstrzygają pierwszą wiadomość
+wątku bez modelu i bez kosztu. Pięć pozostałych to wskazówki z listą
+kategorii zgodnych: spór poza tą listą idzie do człowieka.
+
+**Trzy reguły ze specyfikacji stoją w kodzie i w testach.** `COMMON` sam nic
+nie mówi. Podtyp opisuje wątek, więc dopisek w nim idzie do modelu, a podtyp
+jest tylko faktem w nagłówku. Wartość nieznana zostaje, dostaje kod
+`PODTYP_NIEZNANY` albo `TYP_NIEZNANY` i zdarzenie do przeglądu mapowań.
+
+**Pomiar zgodności mapowania stoi osobno** od precyzji modelu: decyzje ze
+wskazaniem Allegro, przy których człowiek wskazał kategorię.
 
 ### 14.6. Co działa: szkic odpowiedzi z faktów (etap F, przyrost drugi)
 
@@ -5440,7 +5461,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
 | Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
 | Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
-| Typ i podtyp wątku z `beta.v1` w klasyfikacji | **projekt** | specyfikacja z 20 września, rozdział „Resolve structured signals" |
+| Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
 | Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |

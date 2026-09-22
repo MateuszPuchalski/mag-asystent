@@ -380,6 +380,14 @@ export const config = {
      */
     inboxOd: data(process.env.ALLEGRO_INBOX_OD, "2026-08-31T22:00:00Z", "ALLEGRO_INBOX_OD"),
     /**
+     * Struktura wątku z `beta.v1` przy synchronizacji skrzynki (22 września
+     * 2026): typ, podtyp i zamówienia, z których klasyfikacja bierze
+     * wskazówkę. Jedno dodatkowe żądanie na wątek, w którym coś się zmieniło —
+     * nie na każdy wątek listy. Włączone domyślnie, bo to odczyt, a odmowa
+     * Allegro (406, 403) wstrzymuje go sama na sześć godzin. `0` wyłącza.
+     */
+    watkiBeta: process.env.ALLEGRO_WATKI_BETA !== "0",
+    /**
      * Takt synchronizacji zwrotów klienckich; 0 wyłącza ticker.
      *
      * RZADZIEJ NIŻ SKRZYNKA, i to jest decyzja, nie zaniedbanie. Zwrot ma

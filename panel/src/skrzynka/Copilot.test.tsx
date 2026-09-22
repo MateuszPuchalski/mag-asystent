@@ -189,6 +189,16 @@ describe("plakietka i etykieta człowieka", () => {
     expect(screen.getByRole("combobox", { name: "Popraw kategorię" })).toBeTruthy();
   });
 
+  it("decyzję ze struktury Allegro da się potwierdzić, a dymek mówi, skąd jest", async () => {
+    const onPopraw = vi.fn();
+    const { container } = render(<EtykietaKategorii onPopraw={onPopraw} kopilot={kopilot({
+      kategoria: "MISSING_PRODUCT", kategoriaModelu: null, zrodlo: "ALLEGRO_MAPPING", pewnosc: null })} />);
+    expect((container.querySelector("[title]") as HTMLElement).getAttribute("title"))
+      .toMatch(/struktury wątku Allegro/);
+    await userEvent.click(screen.getByRole("button", { name: "Potwierdź kategorię" }));
+    expect(onPopraw).toHaveBeenCalledWith("MISSING_PRODUCT");
+  });
+
   it("braki danych stoją obok plakietki — od nich agent zaczyna", () => {
     render(<EtykietaKategorii onPopraw={vi.fn()} kopilot={kopilot({
       brakDanychZamowienia: true, brakDanychProduktu: true })} />);

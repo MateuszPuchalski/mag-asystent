@@ -48,12 +48,18 @@ export interface Decyzja {
 }
 
 /**
- * Wskazówka ze struktury Allegro (typ i podtyp wątku). `waska` znaczy, że
- * mapowanie samo rozstrzyga kategorię; szeroka tylko podpowiada.
+ * Wskazówka ze struktury Allegro (typ i podtyp wątku) — SZEROKA, czyli taka,
+ * która podpowiada, ale nie rozstrzyga. Wąskie mapowanie omija model w ogóle
+ * i nie przechodzi przez tę funkcję (`klasyfikacja-mapowanie.ts`).
+ *
+ * `zgodne` to kategorie, z którymi podtyp się NIE kłóci. Spór liczy się
+ * dopiero poza nimi: specyfikacja każe kierować do człowieka „material
+ * disagreement", a nie każdą różnicę — `PRODUCT_INCONSISTENT_WITH_THE_OFFER`
+ * rozstrzygnięty jako `PRODUCT_COMPATIBILITY` to doprecyzowanie, nie spór.
  */
 export interface WskazowkaAllegro {
   kategoria: Kategoria;
-  waska: boolean;
+  zgodne: readonly Kategoria[];
 }
 
 /** Ile kategorii dodatkowych przyjmujemy. Więcej to już nie „dodatkowe", tylko szum. */
@@ -187,9 +193,9 @@ export function decyzjaZModelu(
     wymaga = true;
     kody.push(KODY.akcjaReczna);
   }
-  /* Szeroka wskazówka Allegro, z którą model się nie zgadza, to spór dwóch
-     źródeł — rozstrzyga człowiek. Zgoda niczego nie dokłada. */
-  if (wskazowka && wskazowka.kategoria !== o.kategoria && !o.dodatkowe.includes(wskazowka.kategoria)) {
+  /* Szeroka wskazówka Allegro, z którą model się ISTOTNIE nie zgadza, to spór
+     dwóch źródeł — rozstrzyga człowiek. Doprecyzowanie niczego nie dokłada. */
+  if (wskazowka && !wskazowka.zgodne.includes(o.kategoria)) {
     wymaga = true;
     doPrzejrzenia = true;
     kody.push(KODY.sporZAllegro);

@@ -2578,6 +2578,23 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.429.0 — struktura wątku Allegro w klasyfikacji
+
+**Migracja dokłada kolumny sama. Panel trzeba przebudować.** Nic nie trzeba
+włączać: synchronizacja skrzynki czyta typ i podtyp wątku z `beta.v1` od razu.
+
+To jedno dodatkowe żądanie do Allegro na wątek, w którym coś się zmieniło.
+Nie na każdy wątek listy. Wyłącza je linia `export ALLEGRO_WATKI_BETA=0`.
+
+Jeśli konto nie ma dostępu do bety, Allegro odpowie 406 albo 403. Wtedy
+odczyt struktury staje na sześć godzin, a dziennik dostaje jedno zdanie
+`struktura wątków z beta.v1 wstrzymana`. Skrzynka pracuje dalej bez zmian.
+
+Sprawdzenie na żywym koncie idzie tak. Po pierwszej nowej wiadomości zajrzyj
+do bazy: `SELECT watek_typ, watek_podtyp, struktura_at FROM allegro_inbox_thread
+ORDER BY synced_at DESC LIMIT 5`. Pusty `struktura_at` przy świeżym wątku
+znaczy, że beta odmówiła — szukaj zdania w dzienniku.
+
 ### Aktualizacja do 0.428.0 — klasyfikacja według specyfikacji
 
 **Migracja przenosi stare etykiety sama. Panel trzeba przebudować.** Tabela
