@@ -34,6 +34,36 @@ historii nie przepisujemy.
 ---
 
 
+## 0.413.0 — 22 września 2026
+
+**Trzy liczby, które rozstrzygają reklamację, leżały w naszej bazie i nikt
+o nie nie pytał.** Cel właściciela: ekran reklamacji ma przyspieszać DECYZJĘ.
+Przegląd trzech źródeł — dekalogów z `docs/`, tabel Subiekta i schematu
+`PostPurchaseIssue` z `docs/allegro/swagger.yaml` — wskazał trzy braki, z których
+żaden nie wymaga ani jednego nowego żądania do Allegro.
+
+- **Wiek zakupu.** Ekran pokazywał datę, nigdy odstępu. Ta sama zamiana, co
+  przy terminie decyzji w 0.121.0: agent nie ma odejmować dat w głowie. Do
+  dwóch miesięcy liczą się dni (przy „uszkodzone w transporcie" różnica między
+  trzecim a trzydziestym dniem jest całą sprawą), dalej miesiące, po dwóch
+  latach — lata, bursztynem. To jest WIEK, nie wyrok „po rękojmi": nasz zegar
+  startuje od zamówienia, a rękojmia biegnie od wydania rzeczy.
+- **Ilość objęta sprawą.** `offer.quantity` leżało w ładunku od przyrostu
+  trzeciego i nie było go na ekranie ANI RAZU. „Mamy 2 szt." przy sprawie
+  o trzy sztuki wygląda jak dobra wiadomość i nią nie jest — porównanie robi
+  teraz ekran, a stan przy niedoborze jest czerwony.
+- **Historia towaru i klienta.** Ile razy TO SAMO już się zdarzyło i jak się
+  skończyło. Towar z pięcioma reklamacjami, z których cztery uznaliśmy, to
+  wada partii, a nie sprawa do rozstrzygania od zera. Liczone po KARTOTECE,
+  więc łapie ten sam towar wystawiony w kilku ofertach, i z obu źródeł
+  rozstrzygnięcia naraz — status Allegro oraz nasz werdykt, bo decyzja
+  z panelu wyprzedza synchronizację o takt.
+- **Brak wiedzy nie udaje zera.** Sprawa bez potwierdzonej kartoteki nie
+  dostaje historii towaru, pierwsza sprawa przy towarze nie pisze „0
+  reklamacji". Dekalog obsługi, punkt 10.
+- Historia jedzie WYŁĄCZNIE ze szczegółem sprawy: to dwa podzapytania, a
+  kolejka czyta setki wierszy naraz.
+
 ## 0.412.0 — 19 września 2026
 
 **Hierarchia decyzji o reklamacji: najpierw dowody, na końcu werdykt.**

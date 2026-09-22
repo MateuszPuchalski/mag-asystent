@@ -1471,6 +1471,12 @@ export interface Reklamacja {
      a bez niego data byłaby ozdobą na ekranie, którego nikt o nią nie prosił. */
   kupionoAt: string | null;
   kupionoZrodlo: "zamowienie" | "sprawa" | null;
+  /* ── Wiek zakupu (0.413.0) ───────────────────────────────────────────────
+     Liczy SERWER, z tej samej daty, którą nazywa `kupionoZrodlo`. Odjęcie
+     w panelu brałoby zegar przeglądarki, a ten bywa przestawiony — a przy
+     rękojmi (dwa lata od wydania rzeczy) liczba dni jest argumentem, nie
+     ozdobą. `null` = nie mamy daty zakupu, nie „kupione dziś". */
+  dniOdZakupu: number | null;
   prowadzi: string | null;
   /** Tożsamość prowadzącego — po NIEJ liczy się sito „Moje" (0.278.0). */
   prowadziId: number | null;
@@ -1577,6 +1583,27 @@ export interface SzczegolReklamacji {
   } | null;
   /** Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił. */
   karta: KartaSprawy | null;
+  /** Ile razy TO SAMO już się zdarzyło (0.413.0). */
+  historia: HistoriaSprawy;
+}
+
+/** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */
+export interface SladHistorii {
+  ile: number;
+  uznanych: number;
+  odrzuconych: number;
+}
+
+/**
+ * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie (0.413.0).
+ *
+ * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
+ * potwierdzonej kartoteki nie ma towaru, po którym szukać. Zero przy towarze,
+ * którego nie rozpoznaliśmy, czytałoby się jak „nigdy się nie sypał".
+ */
+export interface HistoriaSprawy {
+  towar: SladHistorii | null;
+  klient: SladHistorii | null;
 }
 
 /** Pole karty z cytatem — numer wiadomości, z której model to wziął. */

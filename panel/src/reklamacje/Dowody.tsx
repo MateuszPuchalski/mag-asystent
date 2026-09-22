@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Bot, Coins, ExternalLink, Gavel, NotebookPen, Receipt, Undo2 } from "lucide-react";
 import type {
-  CenaPoziomu, PozycjaZamowienia, RadaMaszyny, Reklamacja, SzczegolReklamacji, Tag, Werdykt,
-  ZdjecieKarty,
+  CenaPoziomu, PozycjaZamowienia, RadaMaszyny, Reklamacja, SladHistorii, SzczegolReklamacji, Tag,
+  Werdykt, ZdjecieKarty,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { zlote } from "../api/zwroty";
 import {
-  EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Przycisk, Skopiuj,
+  EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, odmien, Przycisk,
+  Skopiuj,
 } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { CenyKartoteki } from "../skrzynka/TowarRozmowy";
@@ -338,7 +339,7 @@ export function Dowody({
   return <div className="flex min-h-0 flex-col">
     <Glowica r={r} />
     <Towar szczegol={szczegol} pozycja={pozycja} />
-    <Triaz r={r} pozycja={pozycja} />
+    <Triaz szczegol={szczegol} pozycja={pozycja} />
 
     <div className="px-2">
       <Zwijka
@@ -669,7 +670,10 @@ function Towar({ szczegol, pozycja }: {
    BRAK KARTOTEKI MÓWI O SOBIE (punkt 10 z `docs/obsluga-klienta-calosc.md`:
    czego nie wiemy, ekran mówi wprost). Pusty slot po stanie czytałby się jak
    „nie mamy", a to dwie różne odpowiedzi klientowi i dwie różne decyzje. */
-function Triaz({ r, pozycja }: { r: Reklamacja; pozycja: PozycjaZamowienia | null }) {
+function Triaz({ szczegol, pozycja }: {
+  szczegol: SzczegolReklamacji; pozycja: PozycjaZamowienia | null;
+}) {
+  const r = szczegol.reklamacja;
   /* Ten sam hak, co w skrzynce — TanStack trzyma to pod jednym kluczem, więc
      otwarcie sprawy nie pyta serwera drugi raz o tę samą kartotekę. */
   const karta = useKartaTowaru(r.twId);
@@ -688,17 +692,35 @@ function Triaz({ r, pozycja }: { r: Reklamacja; pozycja: PozycjaZamowienia | nul
   if (!stanZnany && r.twId !== null && ceny.length === 0 && !pozycja) return null;
   if (!stanZnany && r.twId === null && !pozycja) return null;
 
+  /* ── STAN CZYTA SIĘ PRZECIW ŻĄDANIU (0.413.0) ─────────────────────────────
+     `offer.quantity` leży w ładunku sprawy od przyrostu trzeciego i do tego
+     wydania nie było go na ekranie ANI RAZU. „Mamy 2 szt." przy sprawie o trzy
+     sztuki wygląda jak dobra wiadomość i nią nie jest — wymiany z tego nie
+     będzie. Porównanie robi więc ekran, nie agent w głowie. */
+  const zadane = r.ilosc !== null && r.ilosc > 1 ? r.ilosc : null;
+  const starczy = mag !== null && zadane !== null ? mag.avail >= zadane : null;
+  const wiek = wiekZakupuSlowem(r.dniOdZakupu);
+
   return <div className="border-b border-slate-200 px-4 py-2">
     <div className="flex flex-wrap gap-2">
       {stanZnany
         ? <Kostka etykieta="Mamy"
             wartosc={mag.avail > 0 ? `${mag.avail} ${karta.data?.unit || "szt."}` : "brak na stanie"}
-            kolor={mag.avail > 0 ? "text-ranga-ok" : "text-ranga-zle"}
-            pod={karta.data?.locs?.length ? karta.data.locs.join(", ") : "bez półki"} />
+            kolor={mag.avail > 0 && starczy !== false ? "text-ranga-ok" : "text-ranga-zle"}
+            pod={[
+              zadane ? `sprawa o ${zadane} szt.` : null,
+              karta.data?.locs?.length ? karta.data.locs.join(", ") : "bez półki",
+            ].filter(Boolean).join(" · ")} />
         : r.twId === null
           ? <Kostka etykieta="Mamy" wartosc="nie wiadomo" kolor="text-slate-700"
               pod="sprawa bez kartoteki Subiekta" />
           : null}
+      {wiek && <Kostka etykieta="Kupione" wartosc={wiek.napis}
+        /* Bursztyn, nie czerwień, i nie wyrok: rękojmia biegnie dwa lata od
+           WYDANIA rzeczy, a my mierzymy od zamówienia albo od złożenia
+           koszyka. Ekran mówi, że warto sprawdzić — nie że sprawa przepadła. */
+        kolor={wiek.poDwochLatach ? "text-ranga-uwaga" : "text-slate-900"}
+        pod={r.kupionoZrodlo === "zamowienie" ? "data z zamówienia" : "data z ładunku sprawy"} />}
       {pozycja && <Kostka etykieta="Klient zapłacił"
         wartosc={zlote(pozycja.cenaGrosze, pozycja.waluta)} kolor="text-slate-900"
         pod={pozycja.ilosc > 1 ? `za sztukę · ${pozycja.ilosc} szt. na paragonie` : "brutto, za sztukę"} />}
@@ -707,6 +729,8 @@ function Triaz({ r, pozycja }: { r: Reklamacja; pozycja: PozycjaZamowienia | nul
         kolor="text-slate-900"
         pod={zakup.nettoGrosze !== null ? "netto z kartoteki" : "brutto z kartoteki"} />}
     </div>
+
+    <Historia historia={szczegol.historia} />
 
     {pozostale.length > 0 && <Zwijka
       tytul="Pozostałe poziomy cen"
@@ -723,6 +747,73 @@ function Triaz({ r, pozycja }: { r: Reklamacja; pozycja: PozycjaZamowienia | nul
       </div>
     </Zwijka>}
   </div>;
+}
+
+/* ── CZY TO SIĘ JUŻ ZDARZAŁO (0.413.0) ──────────────────────────────────────
+   Cennik mówi, ile kosztuje ustąpienie. Te dwie liczby mówią, czy w ogóle jest
+   o co się spierać: towar z pięcioma reklamacjami, z których cztery
+   uznaliśmy, to wada partii, a nie sprawa do rozstrzygania od zera. Druga
+   strona tej samej monety — klient z czterema odmowami — też jest inną
+   rozmową niż pierwsza.
+
+   JEDEN WIERSZ, NIE SEKCJA. To jest tło decyzji, a nie sama decyzja: dostaje
+   tyle miejsca, ile potrzeba na dwie liczby, i ani piksela więcej. Brak
+   historii nie rysuje się wcale — pierwsza sprawa przy tym towarze nie jest
+   informacją o towarze.                                                     */
+function Historia({ historia }: { historia: SzczegolReklamacji["historia"] }) {
+  /* Czytamy OSTROŻNIE, choć typ mówi, że pole jest. Panel i serwer wdrażają
+     się jednym `git pull`, ale nie w tej samej sekundzie: przez chwilę nowy
+     panel pyta starego serwera, a ładunek bez tego pola wywracałby CAŁĄ
+     kolumnę dowodów zamiast pominąć jeden wiersz. */
+  const czesci = [
+    slad("Ten towar", historia?.towar ?? null),
+    slad("Ten klient", historia?.klient ?? null),
+  ].filter(Boolean) as string[];
+  if (czesci.length === 0) return null;
+  return <p className="border-b border-slate-200 px-4 py-1.5 text-podpis text-slate-700">
+    {czesci.join(" · ")}
+  </p>;
+}
+
+/** „Ten towar: 3 reklamacje, 2 uznane". Bez rozstrzygnięć — sam licznik. */
+function slad(kto: string, s: SladHistorii | null): string | null {
+  if (!s) return null;
+  const ogon = [
+    s.uznanych > 0 ? `${s.uznanych} ${odmien(s.uznanych, "uznana", "uznane", "uznanych")}` : null,
+    s.odrzuconych > 0
+      ? `${s.odrzuconych} ${odmien(s.odrzuconych, "odrzucona", "odrzucone", "odrzuconych")}` : null,
+  ].filter(Boolean).join(", ");
+  const ile_ = ile(s.ile, "reklamacja", "reklamacje", "reklamacji");
+  return `${kto}: ${ile_}${ogon ? ` (${ogon})` : ""}`;
+}
+
+/**
+ * Wiek zakupu jednym słowem — „14 miesięcy temu" zamiast „17 lipca 2025".
+ *
+ * Ta sama zamiana, co przy terminie decyzji: pytanie, które agent zadaje
+ * patrząc na datę zakupu, brzmi „ile to już leży", a nie „który to był dzień".
+ * Do dwóch miesięcy liczą się DNI, bo przy „uszkodzone w transporcie" różnica
+ * między trzecim a trzydziestym dniem jest całą sprawą; dalej miesiące, bo
+ * nikt nie liczy czterystu dni w głowie.
+ *
+ * `poDwochLatach` to FAKT ARYTMETYCZNY, nie wyrok: rękojmia biegnie dwa lata
+ * od wydania rzeczy, a nasz zegar startuje od zamówienia albo od złożenia
+ * koszyka — obie daty są WCZEŚNIEJSZE niż wydanie, więc próg wypada dla nas
+ * bezpiecznie i sam niczego nie przesądza.
+ */
+function wiekZakupuSlowem(dni: number | null): { napis: string; poDwochLatach: boolean } | null {
+  if (dni === null) return null;
+  const poDwochLatach = dni > 730;
+  if (dni < 60) {
+    return { napis: dni === 0 ? "dziś" : `${dniSlowo(dni)} temu`, poDwochLatach };
+  }
+  /* 30,44 dnia to średnia długość miesiąca w roku zwykłym i przestępnym
+     naraz. Dzielenie przez 30 dawałoby „12 miesięcy" przy 360 dniach, czyli
+     przy dacie, która do roku jeszcze nie doszła. */
+  const mies = Math.floor(dni / 30.44);
+  if (mies < 24) return { napis: `${ile(mies, "miesiąc", "miesiące", "miesięcy")} temu`, poDwochLatach };
+  const lata = Math.floor(dni / 365.25);
+  return { napis: `${ile(lata, "rok", "lata", "lat")} temu`, poDwochLatach };
 }
 
 /** Jedna liczba triażu: etykieta, kwota grubym drukiem, zdanie pod spodem. */

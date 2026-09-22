@@ -296,6 +296,18 @@ export interface WierszReklamacji {
      wzięła się z nazwania jednego drugim. */
   kupionoAt: string | null;
   kupionoZrodlo: "zamowienie" | "sprawa" | null;
+  /* ── WIEK ZAKUPU (0.413.0) ───────────────────────────────────────────────
+     Ta sama zamiana, co przy terminie w 0.121.0: odjęcie jednej daty od
+     drugiej w głowie to praca, którą kolumna ma zdjąć. Przy reklamacji ta
+     liczba rozstrzyga więcej niż sama data — rękojmia biegnie dwa lata od
+     wydania rzeczy (art. 568 k.c.), a „usterka wyszła w użyciu" po trzech
+     dniach i po dwudziestu miesiącach to dwie różne sprawy.
+
+     LICZYMY, NIE OCENIAMY: ekran podaje wiek, a nie werdykt „po rękojmi".
+     Zegar bywa `sprawa` zamiast `zamowienie` (patrz `kupionoZrodlo`), a data
+     wydania rzeczy jest jeszcze późniejsza od obu — wyrok z takiej podstawy
+     byłby zgadywaniem pod formalnym pozorem. */
+  dniOdZakupu: number | null;
   prowadzi: string | null;
   /** Tożsamość prowadzącego — po NIEJ liczy się filtr „Moje" (0.278.0). */
   prowadziId: number | null;
@@ -433,6 +445,24 @@ export function dniMilczenia(ostatniaAt: string | null, teraz = Date.now()): num
 }
 
 /**
+ * Ile dni od zakupu. `null` = nie wiadomo, czyli nie mierzymy.
+ *
+ * ODWROTNY KIERUNEK NIŻ `dniDoTerminu` i dlatego OSOBNA funkcja, a nie ta sama
+ * ze znakiem minus: tamta liczy, ile czasu ZOSTAŁO, ta — ile MINĘŁO. Jedna
+ * funkcja na oba znaczenia kazałaby czytać liczbę ujemną raz jako „po
+ * terminie", raz jako „kupione w przyszłości".
+ *
+ * Data z przyszłości daje zero, nie liczbę ujemną: zegar sprzedawcy bywa
+ * przestawiony o kilka godzin, a „kupione −1 dnia temu" nie znaczy nic.
+ */
+export function dniOdZakupu(kupionoAt: string | null, teraz = Date.now()): number | null {
+  if (!kupionoAt) return null;
+  const t = Date.parse(kupionoAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((teraz - t) / DZIEN_MS));
+}
+
+/**
  * Czy „klient czeka" jest JESZCZE PRAWDĄ (0.407.0).
  *
  * JEDEN PREDYKAT, DWÓCH WOŁAJĄCYCH — kubełek i plakietka. Do tego wydania
@@ -522,6 +552,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
   const werdykt = tekst(w.werdykt);
   const werdyktStatus = tekst(w.werdykt_status) as StatusWerdyktu | null;
   const zwrotTowaru = tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null;
+  const kupiono = tekst(w.kupiono_at) ?? tekst(w.zamowienie_at);
   const rdzen = {
     statusAllegro, dniDoTerminu: dni, ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
@@ -554,9 +585,10 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
     otwartoAt: String(w.otwarto_at),
-    kupionoAt: tekst(w.kupiono_at) ?? tekst(w.zamowienie_at),
+    kupionoAt: kupiono,
     kupionoZrodlo: tekst(w.kupiono_at) ? "zamowienie"
       : tekst(w.zamowienie_at) ? "sprawa" : null,
+    dniOdZakupu: dniOdZakupu(kupiono, teraz),
     prowadzi: tekst(w.prowadzi),
     prowadziId: w.prowadzi_user_id == null ? null : Number(w.prowadzi_user_id),
     prowadziAt: tekst(w.prowadzi_at),
@@ -872,6 +904,8 @@ export interface SzczegolReklamacji {
      ekranem — a drugie zapytanie przy każdym otwarciu byłoby kosztem bez
      zysku (spraw w pracy są dziesiątki). */
   karta: ReturnType<typeof kartaSprawy>;
+  /* Ile razy TO SAMO już się zdarzyło (0.413.0) — patrz `historiaSprawy`. */
+  historia: HistoriaSprawy;
 }
 
 /**
@@ -937,6 +971,86 @@ export function kontekstZamowienia(
       ostatniaAt: tekst(r.ostatnia),
     })),
   };
+}
+
+/** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */
+export interface SladHistorii {
+  ile: number;
+  uznanych: number;
+  odrzuconych: number;
+}
+
+/**
+ * Czy to się już zdarzało — przy TYM towarze i przy TYM kliencie (0.413.0).
+ *
+ * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
+ * potwierdzonej kartoteki nie ma towaru, po którym szukać, a dyskusja bywa
+ * bez loginu. Zero i brak wiedzy to dwie różne odpowiedzi — dekalog obsługi,
+ * punkt 10.
+ */
+export interface HistoriaSprawy {
+  towar: SladHistorii | null;
+  klient: SladHistorii | null;
+}
+
+/* Uznane i odrzucone liczymy z OBU źródeł naraz — status Allegro i nasz
+   werdykt. Sprawa rozstrzygnięta w panelu ma `werdykt` na długo przed tym,
+   nim synchronizacja przestawi `status_allegro`; liczenie po samym statusie
+   gubiłoby dzisiejsze decyzje, czyli te najświeższe. */
+const LICZNIKI_HISTORII = `
+  COUNT(*) AS ile,
+  SUM(CASE WHEN r.status_allegro = 'CLAIM_ACCEPTED'
+             OR r.werdykt LIKE 'ACCEPTED%' THEN 1 ELSE 0 END) AS uznanych,
+  SUM(CASE WHEN r.status_allegro = 'CLAIM_REJECTED'
+             OR r.werdykt LIKE 'REJECTED%' THEN 1 ELSE 0 END) AS odrzuconych`;
+
+const slad = (w: Wiersz | undefined): SladHistorii | null => {
+  if (!w || Number(w.ile ?? 0) === 0) return null;
+  return {
+    ile: Number(w.ile),
+    uznanych: Number(w.uznanych ?? 0),
+    odrzuconych: Number(w.odrzuconych ?? 0),
+  };
+};
+
+/**
+ * Ile razy TO SAMO już się zdarzyło (0.413.0).
+ *
+ * Właściciel o cenach: „są kluczowe do szybkiego oceniania, czy warto
+ * rozpatrywać reklamację". Cena mówi, ile kosztuje ustąpienie; te dwie liczby
+ * mówią, czy w ogóle jest o co się spierać. Towar z pięcioma reklamacjami,
+ * z których cztery uznaliśmy, to wada partii, a nie sprawa do rozstrzygania
+ * od zera — a piąta odmowa temu samemu klientowi to inna rozmowa niż pierwsza.
+ *
+ * NASZA BAZA, ZERO ŻĄDAŃ DO ALLEGRO. Obie liczby stoją w `reklamacja_klienta`
+ * od pierwszej synchronizacji; brakowało wyłącznie pytania o nie.
+ *
+ * TYLKO W SZCZEGÓLE, nigdy w kolejce: to dwa podzapytania na sprawę, a kolejka
+ * czyta setki wierszy naraz. Na ekranie widać JEDNĄ sprawę i tam ta liczba
+ * zmienia decyzję.
+ *
+ * TA SPRAWA WYPADA z obu liczników — inaczej każda reklamacja mówiłaby
+ * o sobie „to już drugi raz przy tym towarze", licząc siebie.
+ */
+export function historiaSprawy(
+  database: Db, konto: number, pomin: number,
+  twId: number | null, login: string | null,
+): HistoriaSprawy {
+  /* Po KARTOTECE, nie po numerze oferty: ten sam towar bywa wystawiony
+     w kilku ofertach, a reklamacje rozstrzyga rzecz, nie ogłoszenie. */
+  const towar = twId === null ? null : slad(database.prepare(`
+    SELECT ${LICZNIKI_HISTORII}
+      FROM reklamacja_klienta r
+      JOIN oferta_kartoteka k
+        ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
+     WHERE r.channel_account_id = ? AND r.typ = 'CLAIM'
+       AND k.tw_id = ? AND r.id <> ?`).get(konto, twId, pomin) as Wiersz | undefined);
+  const klient = login === null ? null : slad(database.prepare(`
+    SELECT ${LICZNIKI_HISTORII}
+      FROM reklamacja_klienta r
+     WHERE r.channel_account_id = ? AND r.typ = 'CLAIM'
+       AND r.kupujacy_login = ? AND r.id <> ?`).get(konto, login, pomin) as Wiersz | undefined);
+  return { towar, klient };
 }
 
 /**
@@ -1021,6 +1135,7 @@ export function szczegolReklamacji(
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
+    historia: historiaSprawy(database, konto, id, reklamacja.twId, reklamacja.kupujacyLogin),
   };
 }
 
