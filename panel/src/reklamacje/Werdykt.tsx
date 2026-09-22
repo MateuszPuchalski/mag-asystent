@@ -99,7 +99,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   /* ── Blok po werdykcie (nasz albo z Centrum Sprzedaży) ───────────────────── */
   if (wydany || (uAllegro && status !== "send_failed")) {
     const potwierdzony = Boolean(uAllegro);
-    return <section aria-label="Werdykt" className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+    return <section aria-label="Werdykt" className="border-t border-slate-200 bg-white px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <Gavel size={15} className="shrink-0 text-slate-400" />
         <b className="text-naglowek">Werdykt</b>
@@ -178,7 +178,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   const zaDlugo = znakow > LIMIT_ZNAKOW;
   const gotowe = Boolean(wiadomosc.trim()) && !zaDlugo && zgoda && (!czesciowy || (grosze !== null && grosze > 0));
 
-  return <section aria-label="Werdykt" className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+  return <section aria-label="Werdykt" className="border-t border-slate-200 bg-white px-4 py-3">
     <div className="flex flex-wrap items-center gap-2">
       <Gavel size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Werdykt</b>

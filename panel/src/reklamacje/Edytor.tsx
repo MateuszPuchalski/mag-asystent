@@ -65,7 +65,15 @@ export function Edytor({
   const zaDlugo = znakow > LIMIT_ZNAKOW;
   const blisko = !zaDlugo && znakow > LIMIT_ZNAKOW - PROG_OSTRZEZENIA;
 
-  return <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
+  /* ── PAS DO KRAWĘDZI, NIE KARTA W KARCIE (0.418.0) ────────────────────────
+     Zgłoszenie właściciela ze zrzutem: „mniej ramek, okno odpowiadania do
+     granic bez paddingu". Pole do pisania siedziało w zaokrąglonej karcie,
+     ta w kolumnie z własnym `p-4`, a kolumna w karcie ekranu — trzy ramki
+     i trzy oddechy wokół jednego prostokąta, w którym się pisze.
+
+     Zostaje JEDNA krawędź: kreska oddzielająca pas czynności od rozmowy.
+     Pole rozciąga się na całą szerokość kolumny. */
+  return <div className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3">
     <label className="sr-only" htmlFor="odpowiedz-reklamacji">Odpowiedź w sprawie</label>
     <textarea id="odpowiedz-reklamacji" rows={4} value={tresc}
       onChange={(e) => onZmiana(e.target.value)}
