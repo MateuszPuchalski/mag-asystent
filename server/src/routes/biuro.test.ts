@@ -1367,3 +1367,34 @@ test("ikona NIE jest już wklejona w dokument", () => {
   assert.ok(!/<link rel="icon"[^>]*data:image/.test(html),
     "ikona wróciła do dokumentu jako data:");
 });
+
+/* ── BUILD KOPIUJE TO, CO TRASY CZYTAJĄ (0.419.1) ────────────────────────────
+   Blizna z produkcji: 0.419.0 dołożyło `src/web/ikona-biuro.webp`, a `build`
+   serwera kopiował do `dist/web` trzy pliki WYMIENIONE Z NAZWY. Ikony wśród
+   nich nie było, więc `readFileSync` przy rejestracji tras rzucił ENOENT
+   i usługa nie wstała wcale — przez obrazek w pasku karty.
+
+   Testy nie widziały tego, bo biegną na ŹRÓDLE, gdzie plik jest na miejscu.
+   Ten test patrzy na jedno i drugie: czy każdy plik czytany z `../web/`
+   naprawdę tam leży i czy `build` kopiuje ten katalog W CAŁOŚCI, zamiast
+   wymieniać pliki po nazwie.                                                */
+
+test("każdy plik czytany z `web/` naprawdę tam leży", () => {
+  const zrodlo = fs.readFileSync(new URL("./biuro.ts", import.meta.url), "utf8");
+  const nazwy = [...zrodlo.matchAll(/"\.\.\/web\/([\w.-]+)"/g)].map((m) => m[1]);
+  assert.ok(nazwy.length > 0, "nie znalazłem ani jednego odczytu z web/");
+  for (const nazwa of nazwy) {
+    assert.ok(fs.existsSync(new URL(`../web/${nazwa}`, import.meta.url)),
+      `trasa czyta web/${nazwa}, a tego pliku nie ma w źródle`);
+  }
+});
+
+test("`build` kopiuje CAŁY katalog web, a nie pliki po nazwie", () => {
+  /* Wymienianie z nazwy działa do pierwszego nowego pliku — i wtedy kładzie
+     usługę, a nie psuje jednego ekranu. */
+  const pkg = JSON.parse(fs.readFileSync(
+    new URL("../../package.json", import.meta.url), "utf8")) as
+    { scripts: Record<string, string> };
+  assert.match(pkg.scripts.build, /cpSync\('src\/web','dist\/web'/,
+    "build przestał kopiować cały katalog web/");
+});

@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.419.1 — 22 września 2026
+
+**Serwer nie wstawał przez ikonę karty przeglądarki.** Blizna z 0.419.0,
+zgłoszona przez właściciela wprost z produkcji: `ENOENT` na
+`dist/web/ikona-biuro.webp` przy każdym starcie, w pętli.
+
+- **Powód:** `build` serwera kopiował do `dist/web` trzy rzeczy WYMIENIONE
+  Z NAZWY — `biuro.html`, katalog fontów i panel. Ikona nie była jedną z nich,
+  a trasa czyta ją przy rejestracji, więc `readFileSync` wywracał start całej
+  usługi. Testy tego nie widziały, bo biegną na ŹRÓDLE, gdzie plik leży.
+- **`build` kopiuje teraz CAŁY `src/web`**, więc następny plik nie ma jak
+  zostać zapomniany.
+- **Ozdoba nie kładzie usługi.** Brak ikony oddaje 404 zamiast zabijać start.
+  Fonty zostają surowe świadomie: bez nich strona biura rysuje się inną
+  krojówką i chcemy o tym wiedzieć przy starcie.
+- **Dwa testy pilnują pary:** że każdy plik czytany z `web/` naprawdę tam leży
+  i że `build` kopiuje ten katalog w całości, zamiast wymieniać pliki po
+  nazwie. Poprawka sprawdzona na prawdziwym buildzie z korzenia, nie tylko
+  na testach.
+
 ## 0.419.0 — 22 września 2026
 
 **Obie karty przeglądarki noszą znak firmy.** Decyzja właściciela z dwoma
