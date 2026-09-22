@@ -94,7 +94,7 @@ test("zapis do Subiekta w błędzie jest pilny i idzie przed starszą sprawą", 
   assert.equal(druga.zrodlo, "dostawy");
 });
 
-test("pominięta pozycja kosza prowadzi do koszy w zakładce Zwroty (0.436.0)", () => {
+test("pominięta pozycja kosza prowadzi do koszy w zakładce Zwroty (0.438.0)", () => {
   /* Kosze przeszły z MAGAZYNU ZWROTÓW w biurze do panelu — wiersz ma
      prowadzić tam, gdzie leży ZAŁATWIONE, a nie do widoku, którego już nie ma. */
   const k = Number(db().prepare(`INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez)

@@ -4,7 +4,7 @@ import { PackageX, Undo2 } from "lucide-react";
 import type { SzczegolKosza } from "../api/kosze";
 import { Blad, NaglowekSekcji, Pole, Przycisk } from "../ui";
 
-/* ── Kontekst kosza — prawa kolumna (0.436.0) ─────────────────────────────
+/* ── Kontekst kosza — prawa kolumna (0.438.0) ─────────────────────────────
    Dwie rzeczy, po które biuro wchodzi w kosz, i obie są DROGĄ DALEJ:
 
    - ZWROTY W KOSZU prowadzą do swoich kart. Druga strona tego wiązania stoi

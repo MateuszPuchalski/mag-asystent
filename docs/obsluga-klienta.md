@@ -338,7 +338,7 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > bo oba fronty stoją na jednym originie. Przeniesienie czeka na F5, bo
 > wymagałoby zmiany zapisu w `biuro.html`, któremu nic nowego nie wolno.
 >
-> **F3 w 0.436.0 — zmiana kształtu decyzją właściciela.** Kosze NIE dostały
+> **F3 w 0.438.0 — zmiana kształtu decyzją właściciela.** Kosze NIE dostały
 > własnego ekranu w drugim rzędzie, jak rysowały makiety. Mieszkają w zakładce
 > Zwroty, pod przełącznikiem Zwroty · Kosze, bo kosz jest dalszym ciągiem
 > zwrotu. Wiązanie kosz ↔ zwrot działa odtąd w obie strony. MAGAZYN ZWROTÓW

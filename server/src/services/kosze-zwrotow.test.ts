@@ -90,7 +90,7 @@ test("ocena „na stan\" DOKŁADA do koszyka, a inne oceny nie", () => {
     "kod z przedrostkiem — gołe liczby są przestrzenią numerów MM z kartek");
 });
 
-test("zwrot wie, w którym koszu jedzie jego towar (0.436.0)", () => {
+test("zwrot wie, w którym koszu jedzie jego towar (0.438.0)", () => {
   /* Druga połowa wiązania kosz ↔ zwrot. Kosz od dawna wymieniał swoje zwroty;
      zwrot pisał tylko „w koszyku zwrotów", bez nazwy i bez drogi — a pytanie
      „gdzie jest towar z tego zwrotu" pada właśnie przy zwrocie. */

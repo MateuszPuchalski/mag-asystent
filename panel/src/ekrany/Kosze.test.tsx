@@ -10,13 +10,13 @@ import type { Pominieta, SzczegolKosza, WierszKosza } from "../api/kosze";
 import type { Zwrot } from "../api/typy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
-/* ── Kosze w zakładce Zwroty (0.436.0) ─────────────────────────────────────
+/* ── Kosze w zakładce Zwroty (0.438.0) ─────────────────────────────────────
    Gwarancje przeniesione z MAGAZYNU ZWROTÓW w `biuro.html` i jedna nowa:
 
    1. ZERO ZAPISU PRZY PATRZENIU — otwarcie ekranu i wejście w kosz to same
       odczyty (umowa z `CLAUDE.md`).
    2. WIĄZANIE KOSZ ↔ ZWROT W OBIE STRONY. Kosz prowadzi do swoich zwrotów,
-      a karta zwrotu do swoich koszy. Do 0.436.0 działała tylko pierwsza
+      a karta zwrotu do swoich koszy. Do 0.438.0 działała tylko pierwsza
       połowa — a wiązanie jednostronne to wiązanie, którego nie ma.
    3. POMINIĘTE czekają na ZAŁATWIONE z notatką; pozycja zostaje pominięta.
    4. „W KTÓRYM KOSZU?" szuka SERWER, po snapshocie z kosza.

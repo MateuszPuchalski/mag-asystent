@@ -1,7 +1,7 @@
 import React from "react";
 import type { StanMm } from "../api/kosze";
 
-/* ── Cykl kosza jako pasek kroków (0.436.0, z `biuro.html` 0.427.0) ───────
+/* ── Cykl kosza jako pasek kroków (0.438.0, z `biuro.html` 0.427.0) ───────
    Wiersz kosza niósł kiedyś dwie pastylki — stan kosza i stan jego MM —
    i żeby odpowiedzieć „gdzie ten kosz jest", trzeba było złożyć je w głowie
    (dekalog pkt 2 i 5). Pasek pokazuje MIEJSCE w cyklu: co za nim (zielone),

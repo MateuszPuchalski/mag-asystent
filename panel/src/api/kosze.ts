@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 
-/* ── Kosze w zakładce Zwroty (0.436.0) ─────────────────────────────────────
+/* ── Kosze w zakładce Zwroty (0.438.0) ─────────────────────────────────────
    Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`. Decyzja właściciela: kosze
    mieszkają w Zwrotach, bo tam powstają — ocena „na stan" dokłada towar do
    koszyka, a zamknięcie wysyła go na halę. Osobny ekran w drugim rzędzie

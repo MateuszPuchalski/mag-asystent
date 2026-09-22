@@ -695,7 +695,7 @@
           <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
           <span class="et">DOSTAWY ↗</span>
         </button>
-        <!-- MAGAZYN ZWROTÓW PRZESZEDŁ DO PANELU (0.436.0) — kosze mieszkają
+        <!-- MAGAZYN ZWROTÓW PRZESZEDŁ DO PANELU (0.438.0) — kosze mieszkają
              w zakładce Zwroty, decyzją właściciela. Pozycja zostaje w pasku,
              bo ręka jej tu szuka, i prowadzi tam z sesją, jak DOSTAWY. -->
         <button data-panel="/obsluga/zwroty/kosze" title="Kosze — w panelu biura, w zakładce Zwroty">
@@ -1336,7 +1336,7 @@ let widok = localStorage.getItem("wertis.widok") || "nadzor";
    wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
    następne przemianowanie nie wymaga pamiętania o tej linii. */
 /* „dostawy" i „magazyn" w pamięci przeglądarki to ślady sprzed 0.435.0
-   i 0.436.0 — oba widoki przeszły do panelu. Biuro wstaje wtedy na STANIE
+   i 0.438.0 — oba widoki przeszły do panelu. Biuro wstaje wtedy na STANIE
    SYSTEMU, bo tam prowadzą wiersze DO DECYZJI, które jeszcze mieszkają tutaj. */
 if (!["nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "nadzor";
 let ostatnieRozjazdy = null;
@@ -2949,7 +2949,7 @@ async function odswiez() {
 
 /* Liczniki zakładek odeszły razem z obsługą klienta (0.140.0). Pigułka
    mówiła, ile spraw czeka; magazyn takiej liczby nie ma — praca hali stoi
-   w koszach, a te od 0.436.0 widać w panelu, w Zwrotach. Nowa obsługa przyniesie własny
+   w koszach, a te od 0.438.0 widać w panelu, w Zwrotach. Nowa obsługa przyniesie własny
    licznik razem z własną kolejką.
 
    Od 0.364.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:

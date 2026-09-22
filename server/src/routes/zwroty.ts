@@ -999,7 +999,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
          liczy naraz wszystkie zwroty, a ten odczyt pyta o każde zamówienie
          osobno. */
       ...kontekstZwrotu(db(), id),
-      /* Kosze z towarem tego zwrotu (0.436.0) — druga strona wiązania
+      /* Kosze z towarem tego zwrotu (0.438.0) — druga strona wiązania
          kosz ↔ zwrot, powód przy `koszeZwrotu`. */
       kosze: koszeZwrotu(id),
     };

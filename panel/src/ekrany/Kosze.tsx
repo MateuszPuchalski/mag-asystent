@@ -12,7 +12,7 @@ import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 
-/* ── KOSZE W ZAKŁADCE ZWROTY (0.436.0) ─────────────────────────────────────
+/* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
    Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`, decyzją właściciela do
    zakładki Zwroty — powód przy `zwroty/Przelacznik.tsx`. Gramatyka ta sama co
    w Zwrotach i Dostawach: kolejka, sprawa, kontekst.

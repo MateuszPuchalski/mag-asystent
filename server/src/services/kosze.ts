@@ -262,7 +262,7 @@ export interface WierszListyKoszy {
 export interface KoszZwrotu { id: number; kod: string; status: string }
 
 /**
- * Kosze, do których trafił towar TEGO zwrotu (0.436.0).
+ * Kosze, do których trafił towar TEGO zwrotu (0.438.0).
  *
  * Druga połowa wiązania, którego pierwsza stoi w `szczegolKosza` (`zwroty`).
  * Kosz wiedział, czyje zwroty wiezie; zwrot nie wiedział, w którym koszu

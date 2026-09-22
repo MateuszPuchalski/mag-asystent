@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { usePominiete } from "../api/kosze";
 import { FiltrSegmentowy } from "../ui";
 
-/* ── Zwroty i kosze pod jedną zakładką (0.436.0) ───────────────────────────
+/* ── Zwroty i kosze pod jedną zakładką (0.438.0) ───────────────────────────
    Decyzja właściciela: kosze mieszkają w Zwrotach, nie w drugim rzędzie
    nagłówka. Kosz jest DALSZYM CIĄGIEM zwrotu — ocena „na stan" wkłada towar
    do koszyka, zamknięcie wysyła go na halę, a hala rozkłada go na regał.

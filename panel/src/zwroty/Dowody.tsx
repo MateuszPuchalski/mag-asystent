@@ -166,7 +166,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
      szczegółu — a wtedy pusta lista po prostu nie rysuje sekcji. */
   sprawy?: SprawaZakupu[];
   droga?: PrzystanekDrogi[];
-  /** Kosze z towarem tego zwrotu (0.436.0) — druga strona wiązania kosz ↔ zwrot. */
+  /** Kosze z towarem tego zwrotu (0.438.0) — druga strona wiązania kosz ↔ zwrot. */
   kosze?: Array<{ id: number; kod: string; status: string }>;
   trwaNotatka?: boolean;
   bladNotatki?: string;
@@ -402,7 +402,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       <SprawyZakupu sprawy={sprawy} />
     </Sekcja>}
 
-    {/* KOSZE Z TOWAREM TEGO ZWROTU (0.436.0). Pozycja pisała „w koszyku
+    {/* KOSZE Z TOWAREM TEGO ZWROTU (0.438.0). Pozycja pisała „w koszyku
         zwrotów" bez nazwy i bez drogi, a pytanie „gdzie jest towar z tego
         zwrotu" pada właśnie tutaj. Kosz wymieniał swoje zwroty od dawna —
         dopiero z tą sekcją wiązanie działa w obie strony. */}

@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.436.0 — 22 września 2026
+## 0.438.0 — 22 września 2026
 
 **Kosze mieszkają w zakładce Zwroty.** Trzeci krok przeprowadzki biura
 (`docs/obsluga-klienta.md` §7, F3), w kształcie zmienionym decyzją właściciela.

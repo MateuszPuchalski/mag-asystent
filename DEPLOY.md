@@ -1325,7 +1325,7 @@ z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
 Biuro sprawdza zawartość kosza w panelu: `/obsluga` → Zwroty → Kosze (od
-0.436.0; wcześniej `/biuro` → MAGAZYN ZWROTÓW). Wybór kosza pokazuje pozycje
+0.438.0; wcześniej `/biuro` → MAGAZYN ZWROTÓW). Wybór kosza pokazuje pozycje
 z adresem odłożenia i stanem każdej z nich; kosz z pominięciem jest podpisany
 jako niekompletny.
 
@@ -2583,7 +2583,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.436.0 — kosze w zakładce Zwroty
+### Aktualizacja do 0.438.0 — kosze w zakładce Zwroty
 
 **Migracji nie ma. Panel trzeba przebudować.** Szczegół zwrotu niesie odtąd
 listę koszy z jego towarem (`kosze`). Kolektor tego nie czyta.

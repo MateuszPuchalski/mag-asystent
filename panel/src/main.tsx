@@ -96,7 +96,7 @@ type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode }
   & ({ do: string } | { biuro: WidokBiura });
 const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
   { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },
-  /* KOSZY TU NIE MA od 0.436.0 — decyzją właściciela mieszkają w zakładce
+  /* KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   "kreska",
   { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
@@ -332,7 +332,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             go nie gubi, a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/zwroty" element={<Zwroty />} />
         <Route path="/obsluga/zwroty/:id" element={<Zwroty />} />
-        {/* Kosze pod adresem zwrotów, bo mieszkają w ich zakładce (0.436.0).
+        {/* Kosze pod adresem zwrotów, bo mieszkają w ich zakładce (0.438.0).
             Człon stały `kosze` wygrywa z `:id` — router ocenia dopasowanie
             dokładniejsze wyżej, więc numer zwrotu nie połknie koszy. */}
         <Route path="/obsluga/zwroty/kosze" element={<Kosze />} />

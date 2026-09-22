@@ -180,7 +180,7 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
     11,
-    "Licznik SPADŁ z 13 do 11 w 0.436.0: kosze przeszły do panelu, do " +
+    "Licznik SPADŁ z 13 do 11 w 0.438.0: kosze przeszły do panelu, do " +
       "zakładki Zwroty, a z nimi dwa zapisy — załatwienie pominiętej pozycji " +
       "i PRZELICZ ZE ZWROTÓW. Zero zapisu przy patrzeniu pilnuje tam " +
       "`ekrany/Kosze.test.tsx`.\n\n" +
@@ -467,7 +467,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   assert.deepEqual(
     widoki,
     ["analiza", "dziennik", "nadzor"],
-    "Od 0.435.0 DOSTAWY, a od 0.436.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
+    "Od 0.435.0 DOSTAWY, a od 0.438.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
       "tej strony — prowadzą do panelu (`data-panel`), sprawdzane niżej. " +
       "Pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
@@ -627,7 +627,7 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
   );
 
   // wywołania bez ciała, które ta reguła utrzymuje przy życiu
-  /* Do 0.435.0 stało tu przywrócenie dostawy, do 0.436.0 przeliczenie
+  /* Do 0.435.0 stało tu przywrócenie dostawy, do 0.438.0 przeliczenie
      kosza — oba odeszły do panelu, który ma własnego strażnika tej reguły
      (`panel/src/api/klient.test.ts`). Zostały dwa wywołania bez ciała. */
   assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
@@ -701,7 +701,7 @@ test("pusty powód odpada na trasie, a nie dopiero w bazie", async () => {
   assert.match(r.json().error, /powód/i);
 });
 
-test("kosze odeszły do panelu razem ze swoimi strażnikami (0.436.0)", () => {
+test("kosze odeszły do panelu razem ze swoimi strażnikami (0.438.0)", () => {
   /* MAGAZYN ZWROTÓW przeszedł do zakładki Zwroty w panelu, decyzją
      właściciela. Test, który stał tutaj, pilnował, że podgląd kosza czyta
      JEDNO źródło prawdy o zawartości (`/api/biuro/kosze/:id`) — tę gwarancję
@@ -748,7 +748,7 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
 
 test("widok SPRAW nie wraca bokiem (0.140.0)", () => {
   /* Test pilnował kolejności kart pracy przed archiwum w DOSTAWACH i w
-     MAGAZYNIE. Oba widoki przeszły do panelu (0.435.0, 0.436.0), gdzie
+     MAGAZYNIE. Oba widoki przeszły do panelu (0.435.0, 0.438.0), gdzie
      kolejność niesie pierwszy kubełek kolejki. Zostaje trzecia gwarancja:
      kasacja SPRAW z 0.140.0 nie cofa się po cichu. */
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
@@ -1355,11 +1355,11 @@ test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
   assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
 });
 
-test("zapamiętany widok, którego nie ma, wraca na STAN SYSTEMU (0.427.0, 0.436.0)", () => {
+test("zapamiętany widok, którego nie ma, wraca na STAN SYSTEMU (0.427.0, 0.438.0)", () => {
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
   /* „dostawy" w pamięci przeglądarki to ślad sprzed 0.435.0 — widok przeszedł
-     do panelu, a w 0.436.0 poszedł za nimi MAGAZYN. Strażnik kieruje na
+     do panelu, a w 0.438.0 poszedł za nimi MAGAZYN. Strażnik kieruje na
      STAN SYSTEMU — tam prowadzą wiersze DO DECYZJI, które jeszcze tu mieszkają. */
   const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "nadzor";/);
   assert.ok(lista, "strażnik zapamiętanego widoku istnieje");

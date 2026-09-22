@@ -360,7 +360,7 @@ export const dzien = (v: string | null | undefined) =>
     : "—";
 
 /**
- * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.436.0).
+ * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.438.0).
  *
  * Belka 3 px przy KAŻDYM wierszu, bursztynowa przy wybranym, i szare tło —
  * ten sam zapis co w kolejkach zwrotów i skrzynki, żeby ręka nie uczyła się

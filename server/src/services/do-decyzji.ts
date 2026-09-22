@@ -159,7 +159,7 @@ function kosze(): PozycjaDecyzji[] {
     co: `${p.symbol} · ${p.kod}${p.powod ? ` · ${p.powod}` : ""}`,
     od: p.at,
     pilne: false,
-    /* Kosze mieszkają od 0.436.0 w zakładce Zwroty, bo tam powstają. */
+    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają. */
     cel: { panel: "/obsluga/zwroty/kosze" },
   }));
   const otwarte: PozycjaDecyzji[] = listaKoszy()

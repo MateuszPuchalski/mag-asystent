@@ -44,7 +44,7 @@ panelu z DO DECYZJI na początku. Dolny niesie magazyn i wgląd, a z prawej stan
 zębatkę i wyjście. Zmierzone w Chromium: górny rząd potrzebuje 1155 px, dolny
 1044 px, więc przy 1180 px nic się nie zawija. Nagłówek ma 111 px wysokości.
 
-> **Kosze zmieniły miejsce w 0.436.0, decyzją właściciela.** Plansza rysuje je
+> **Kosze zmieniły miejsce w 0.438.0, decyzją właściciela.** Plansza rysuje je
 > w drugim rzędzie nagłówka; wdrożone mieszkają w zakładce Zwroty, pod
 > przełącznikiem Zwroty · Kosze. Układ trzech kolumn zostaje taki, jak na
 > planszy — zmieniło się tylko wejście.

@@ -59,7 +59,7 @@ function Pasek({ zrobione, wszystkie }: { zrobione: number; wszystkie: number })
   </div>;
 }
 
-/* Rama wiersza mieszka od 0.436.0 w `ui/` — kosze używają tej samej. */
+/* Rama wiersza mieszka od 0.438.0 w `ui/` — kosze używają tej samej. */
 const Wiersz = WierszKolejki;
 
 export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pusto }: {

@@ -548,7 +548,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   CZYTA: nie otwiera dostawy i niczego w niej nie przestawia. Wyjątek zamyka
   się przy pozycji, z notatką do protokołu. Protokół dla dostawcy ma własny
   adres (`/obsluga/druk/protokol/:dokId`). GEKO i PARTNER dostają swoje druki.
-- **KOSZE** (0.436.0) mieszkają w zakładce Zwroty, pod przełącznikiem
+- **KOSZE** (0.438.0) mieszkają w zakładce Zwroty, pod przełącznikiem
   Zwroty · Kosze — decyzją właściciela, bo kosz jest dalszym ciągiem zwrotu.
   Kubełki: w pracy, pominięte, rozłożone, anulowane. Wybrany kosz pokazuje
   zawartość z adresem i stanem każdej pozycji, drogę dokumentu MM i zwroty,
@@ -577,7 +577,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - Od 0.431.0 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
   Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Opis niżej mówi
   o tym, co jeszcze stoi w `biuro.html`. DOSTAWY odeszły w 0.435.0, MAGAZYN
-  ZWROTÓW w 0.436.0 — pozycje w pasku prowadzą do panelu razem z sesją.
+  ZWROTÓW w 0.438.0 — pozycje w pasku prowadzą do panelu razem z sesją.
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
   API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
   sesji. Strona nie ma własnych uprawnień: role sprawdza serwer przy każdej
@@ -590,7 +590,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   prowadzi do STANU SYSTEMU. Ikona ALLEGRO mówi kolorem o stanie konta,
   a kliknięcie otwiera stojącą tam kartę KONTO ALLEGRO i zaczyna parowanie.
 - **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
-  PRACA prowadzi od 0.436.0 wyłącznie do panelu — dostawy i kosze tam mieszkają.
+  PRACA prowadzi od 0.438.0 wyłącznie do panelu — dostawy i kosze tam mieszkają.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
 - **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Mieszczą dane
   firmy, reguły strefy złotej, konta i logo dostawców. Konfiguracja nie jest

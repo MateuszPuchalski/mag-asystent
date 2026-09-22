@@ -694,7 +694,7 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {/* Zwroty i kosze pod jedną zakładką (0.436.0) — powód w `Przelacznik.tsx`. */}
+    {/* Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
     <PrzelacznikZwrotow teraz="zwroty" />
     {data?.stan && <PasekOgona stan={data.stan} />}
     <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />

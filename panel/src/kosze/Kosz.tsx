@@ -5,7 +5,7 @@ import { Zdjecie } from "../towar/Zdjecie";
 import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
 
-/* ── Zawartość kosza — środkowa kolumna (0.436.0) ─────────────────────────
+/* ── Zawartość kosza — środkowa kolumna (0.438.0) ─────────────────────────
    Biuro widziało kiedyś sam licznik „3/6 poz." i nie miało jak sprawdzić,
    CO w koszu leży ani gdzie hala to odłożyła. Przy pominięciu było to już
    mylące: kosz wracał niekompletny, a ekran pokazywał zwykły postęp.

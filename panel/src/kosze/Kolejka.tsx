@@ -3,7 +3,7 @@ import type { Pominieta, WierszKosza, ZnalezionaWKoszu } from "../api/kosze";
 import { Pusto, WierszKolejki, czas, dniSlowo, ile } from "../ui";
 import { CyklKosza, StanMmKosza } from "./Cykl";
 
-/* ── Kolejka koszy (0.436.0) ───────────────────────────────────────────────
+/* ── Kolejka koszy (0.438.0) ───────────────────────────────────────────────
    Z MAGAZYNU ZWROTÓW w `biuro.html`, w ramie kolejek panelu. Kubełki
    odpowiadają na pytania biura przy koszach, po kolei:
 
