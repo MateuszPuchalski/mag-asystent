@@ -419,6 +419,30 @@
   .sprawaStopka { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 6px; }
   .sprawaStopka > .mute { white-space: nowrap; }
 
+  /* ── Wiersz dostawy w dwóch liniach (0.427.0) ──────────────────────────────
+     Siatka, nie flex: kolumna sygnałów ma STAŁĄ szerokość, więc odznaki stoją
+     jedna pod drugą przez całą listę i czyta się je ruchem oka w dół. Kolejność
+     dzieci w znaczniku: góra, wiek, sygnały, pasek, licznik. Pusta kolumna
+     sygnałów ZOSTAJE w układzie szerokim — schowana, oddałaby swoje miejsce
+     paskowi, który wskoczyłby wtedy w pierwszą linię. */
+  .dostWiersz { display: grid; grid-template-columns: minmax(0, 1fr) auto 12.5rem;
+                column-gap: 14px; row-gap: 5px; align-items: center; padding: 8px 8px; }
+  .dostGora { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .dostGora .b { white-space: nowrap; }
+  .dostKto { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dostWiek, .dostIle { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dostSygnaly { grid-row: span 2; display: flex; flex-wrap: wrap; gap: 4px 5px; justify-content: flex-end; }
+  .dostWiersz .pasek { width: auto; }
+  /* W szynie obok otwartego dokumentu (21 rem) na trzy kolumny nie ma miejsca:
+     dostawca schodzi pod numer, a sygnały pod pasek. Pusta kolumna sygnałów
+     znika całkiem — inaczej każdy wiersz dostawałby pustą linię. */
+  .widok.zSzczegolem .dostWiersz { grid-template-columns: minmax(0, 1fr) auto; }
+  .widok.zSzczegolem .dostGora { flex-direction: column; align-items: stretch; gap: 1px; }
+  .widok.zSzczegolem .dostSygnaly { grid-row: auto; grid-column: 1 / -1; justify-content: flex-start; order: 1; }
+  .widok.zSzczegolem .dostSygnaly:empty { display: none; }
+  tr.grupaDostaw td { padding: 12px 8px 4px; border-bottom: 2px solid var(--border); }
+  tr.grupaDostaw .grupaNazwa { font: 700 10px var(--font-cond); letter-spacing: 1.4px; color: var(--ink-mute); }
+
   /* ── Słupek w komórce tabeli ────────────────────────────────────────────────
      Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi, czy to dużo.
      Odpowiedź na to drugie pytanie jest w tabeli — w pierwszym wierszu — ale
@@ -734,6 +758,12 @@
   details.zwijana > summary::before { content: "▸"; color: var(--ink-mute); font-size: 12px; transition: transform .12s; }
   details.zwijana[open] > summary::before { transform: rotate(90deg); }
   details.zwijana[open] > summary { margin-bottom: 8px; }
+  /* Konto Allegro jest KARTĄ od 0.427.0 — jako goła sekcja zwijana leżało
+     na papierze między kartami i wyglądało na coś, co odpadło od sąsiadki. */
+  details.card.zwijana { border-top: 1px solid var(--card-border); margin-top: 0; padding-top: 12px; }
+  .widok.wglad details.card > summary h2 {
+    font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px; color: var(--ink);
+  }
   details.zwijana > summary:hover h2 { color: var(--amber-ink); }
   /* Zdanie w zwiniętym nagłówku mówi, czego się spodziewać po otwarciu.
      Liczb tam nie ma świadomie — pokazanie ich wymagałoby pobrania danych,
@@ -775,6 +805,44 @@
     display: flex; align-items: center; justify-content: center; text-align: center;
   }
   .wyjatek { margin-top: 5px; font-size: 12px; }
+  /* Wyjątek pod pozycją to PLAMA, nie kolejny wiersz tekstu (0.427.0): blady
+     czerwony blok odróżnia zgłoszenie od pozycji nad nim bez czytania, a stan
+     z przyciskiem stoją zawsze na prawym brzegu — tam, gdzie ręka już jest. */
+  .szczegol .wyjatek, .kontekst .wyjatek {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+    background: var(--err-bg); border-radius: 10px; padding: 6px 10px;
+  }
+  .szczegol .wyjatek > .badge.err:first-child { background: var(--card); }
+  .wyjatekAkcja { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .wyjatekAkcja .badge.err { background: var(--card); }
+  .kolIlosc { width: 8.5rem; }
+  .kolIlosc .pasek { width: 100%; max-width: 110px; margin: 4px 0 5px; }
+  .kolGdzie { width: 12rem; }
+  .typZd { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 1px 9px;
+           font: 600 12px/1.5 var(--font-sans); background: var(--secondary); color: var(--ink-soft); }
+  .typZd.blad { background: var(--err-bg); color: var(--err); }
+  .typZd.dostawa { background: var(--amber-bg); color: var(--amber-ink); }
+  .typZd.zwrot { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-mute); }
+  /* Pasek kroków kosza — te same pastylki co `.badge`, żeby nie było trzeciego
+     języka stanów obok pastylek i kropek. */
+  .cykl { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; vertical-align: middle; }
+  .cykl .krok { border-radius: 999px; padding: 1px 9px; font: 700 11px/1.5 var(--font-cond);
+                letter-spacing: .6px; color: var(--ink-mute); border: 1px dashed var(--border); }
+  .cykl .krok.za { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+  .cykl .krok.teraz { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .cykl .krok.teraz.blad { background: var(--err); border-color: var(--err); }
+  .cykl .krokLacznik { width: 10px; height: 2px; background: var(--border); flex: none; }
+  /* Reklamacje: nagłówek dokumentu jako pasek na papierze nad jego wierszami. */
+  tr.rekDok td { background: var(--paper); padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  #reklamacje td { vertical-align: middle; }
+  .rekGlowa { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rekKto { color: var(--ink-soft); }
+  .rekAkcje { margin-left: auto; display: inline-flex; gap: 4px; }
+  .rekIle, .rekKiedy { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rekFoto { width: 20px; color: var(--ink-soft); }
+  .rekAkcja { text-align: right; width: 1%; }
+  .ikonaFoto { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2;
+               stroke-linecap: round; stroke-linejoin: round; display: block; }
   .wyjatek img { max-width: 120px; border-radius: 10px; margin-top: 4px; display: block; }
 
   /* Rozmowa z klientem: strona nadawcy niesie tu całe znaczenie, więc
@@ -804,6 +872,19 @@
   button.akcja.grozny:hover { background: #9c3232; }
   #toasty { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 50; }
   .toast { background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 16px; font-size: 13px; box-shadow: 0 6px 20px rgba(42, 42, 44, 0.35); max-width: 520px; }
+  /* DYMEK BŁĘDU (0.427.0, dekalog pkt 6). Do tej wersji błąd znikał po 6 s
+     jak potwierdzenie zapisu — kto akurat patrzył w Subiekta, nie widział go
+     wcale. Błąd zostaje do kliknięcia i ma inną twarz niż „zapisano": biel
+     z czerwoną obwódką, bo grafit z bielą znaczy tu „wszystko poszło". */
+  .toast.blad { background: var(--card); color: var(--ink); border: 1.5px solid var(--err);
+                cursor: pointer; display: flex; gap: 12px; align-items: flex-start; }
+  .toast.blad::before { content: "BŁĄD"; font: 800 11px/1.8 var(--font-cond); letter-spacing: .6px; color: var(--err); flex: none; }
+  .toast.blad::after { content: "×"; font: 700 16px/1 var(--font-sans); color: var(--ink-mute); margin-left: auto; flex: none; }
+  /* PRZYCISK MAŁY (0.427.0). Dziewięć miejsc niosło ten sam rozmiar stylem
+     w linii, w dwóch wariantach kolejności — i już się rozjechały o piksel
+     paddingu. Klasa robi z tego jeden wymiar do zmiany w jednym miejscu. */
+  button.akcja.maly { padding: 3px 9px; font-size: 11px; border-radius: 10px; }
+  button.akcja.maly + button.akcja.maly { margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -1069,48 +1150,15 @@
 
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
   <div id="widokNadzor" class="widok wglad" hidden>
-    <!-- Konto Allegro stoi od 0.140.0 w STANIE SYSTEMU. Do 0.137.2 miało
-         własną zakładkę REJESTRY razem z czterema rejestrami obsługi klienta;
-         po ich kasacji zakładka niosłaby jedną kartę. Stan połączenia to
-         informacja o tle pracy — dokładnie to, co reszta tego widoku. -->
-    <details class="zwijana" id="kontoAllegroKarta">
-      <summary><h2>KONTO ALLEGRO</h2></summary>
-      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
-      <div id="allegroAkcje"></div>
-    </details>
-
-    <section class="card">
-      <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
-      <!-- OKNO zostaje TUTAJ, a nie w pasku filtrów jak przy dzienniku
-           i analizie. Zakres dotyczy wyłącznie metryk: kolejka zapisów,
-           rekoncyliacja, kolizje kodów i stan serwera mówią o TERAZ i żaden
-           zakres dni ich nie zmienia. Pasek nad kartami obiecywałby, że
-           filtruje całą zakładkę — a filtrowałby jedną kartę. -->
-      <div class="filtry">
-        <div>
-          <label for="dniMetryk">OKNO</label>
-          <select id="dniMetryk">
-            <option value="7">7 dni</option>
-            <option value="30">30 dni</option>
-            <option value="90">90 dni</option>
-          </select>
-        </div>
-      </div>
-      <div class="kafle" id="kafleMetryk"></div>
-      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-        <div>
-          <h2>ETYKIETY DO PRZEDRUKU</h2>
-          <p class="mute" style="margin-bottom:6px">Regały, których kod trzeba wpisywać z ręki.</p>
-          <table id="etykiety"></table>
-        </div>
-        <div>
-          <h2>KARTOTEKI BEZ CZYTELNEGO KODU</h2>
-          <p class="mute" style="margin-bottom:6px">Wpisywane zamiast skanowane — kod do naprawy.</p>
-          <table id="bezKodu"></table>
-        </div>
-      </div>
-    </section>
-
+    <!-- KOLEJNOŚĆ: NAJPIERW TO, CO CZEKA NA BIURO (0.427.0, dekalog pkt 1 i 5).
+         Kolejka zapisów, rekoncyliacja i kolizje kodów mają przyciski, które
+         ktoś musi nacisnąć; metryki, czasy wymiany i serwer się tylko czyta.
+         Do tej wersji na górze stały metryki, a zadanie w błędzie — jedyna
+         rzecz na tej zakładce, przez którą stan w Subiekcie się nie zgadza —
+         leżało pod nimi, poza ekranem laptopa. Arkusz lokalizacji zostaje
+         tuż pod kolejką, jak od 0.138.0 — powód stoi przy nim. Identyfikatory
+         kart bez zmian: skoki z paska stanu (`data-cel`) trafiają tam, gdzie
+         trafiały. -->
     <section class="card">
       <h2>KOLEJKA ZAPISÓW DO SUBIEKTA <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -1192,6 +1240,38 @@
       <table id="kolizje"></table>
     </section>
 
+    <section class="card">
+      <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
+      <!-- OKNO zostaje TUTAJ, a nie w pasku filtrów jak przy dzienniku
+           i analizie. Zakres dotyczy wyłącznie metryk: kolejka zapisów,
+           rekoncyliacja, kolizje kodów i stan serwera mówią o TERAZ i żaden
+           zakres dni ich nie zmienia. Pasek nad kartami obiecywałby, że
+           filtruje całą zakładkę — a filtrowałby jedną kartę. -->
+      <div class="filtry">
+        <div>
+          <label for="dniMetryk">OKNO</label>
+          <select id="dniMetryk">
+            <option value="7">7 dni</option>
+            <option value="30">30 dni</option>
+            <option value="90">90 dni</option>
+          </select>
+        </div>
+      </div>
+      <div class="kafle" id="kafleMetryk"></div>
+      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+        <div>
+          <h2>ETYKIETY DO PRZEDRUKU</h2>
+          <p class="mute" style="margin-bottom:6px">Regały, których kod trzeba wpisywać z ręki.</p>
+          <table id="etykiety"></table>
+        </div>
+        <div>
+          <h2>KARTOTEKI BEZ CZYTELNEGO KODU</h2>
+          <p class="mute" style="margin-bottom:6px">Wpisywane zamiast skanowane — kod do naprawy.</p>
+          <table id="bezKodu"></table>
+        </div>
+      </div>
+    </section>
+
     <section class="card" id="kartaWymiany">
       <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -1217,6 +1297,16 @@
            wniosek. -->
       <div id="alarmWymiany" style="margin-top:12px"></div>
     </section>
+
+    <!-- Konto Allegro stoi od 0.140.0 w STANIE SYSTEMU. Do 0.137.2 miało
+         własną zakładkę REJESTRY razem z czterema rejestrami obsługi klienta;
+         po ich kasacji zakładka niosłaby jedną kartę. Stan połączenia to
+         informacja o tle pracy — dokładnie to, co reszta tego widoku. -->
+    <details class="card zwijana" id="kontoAllegroKarta">
+      <summary><h2>KONTO ALLEGRO</h2></summary>
+      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
+      <div id="allegroAkcje"></div>
+    </details>
 
     <section class="card">
       <h2>SERWER</h2>
@@ -1614,11 +1704,19 @@ const zapytaj = (o) => otworzDialog({ ...o, pole: true });
 const potwierdz = (o) => otworzDialog(o);
 
 /** Komunikat nieblokujący — błędy operacji, których nie pokazuje żaden panel. */
-function toast(tekst) {
+/* `rodzaj: "blad"` — dymek zostaje do kliknięcia (dekalog pkt 6). Każdy
+   `catch` w tym pliku woła tę wersję: błąd, który sam znika, to błąd, którego
+   nikt nie przeczytał. Potwierdzenia dalej gasną po 6 s — nie ma czego klikać. */
+function toast(tekst, rodzaj) {
   const t = document.createElement("div");
-  t.className = "toast";
+  t.className = rodzaj === "blad" ? "toast blad" : "toast";
   t.textContent = tekst;
   $("toasty").appendChild(t);
+  if (rodzaj === "blad") {
+    t.title = "Kliknij, żeby zamknąć";
+    t.addEventListener("click", () => t.remove());
+    return;
+  }
   setTimeout(() => t.remove(), 6000);
 }
 /* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
@@ -1630,9 +1728,12 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
 let widok = localStorage.getItem("wertis.widok") || "dostawy";
-/* Zakładki ZWROTY i PYTANIA zwinęły się do SPRAW (0.109.0). Zapamiętana
-   stara wartość otwierałaby widok, którego już nie ma — czyli pusty panel. */
-if (widok === "zwroty" || widok === "pytania") widok = "sprawy";
+/* Zapamiętana nazwa widoku, którego już nie ma, daje PUSTY panel: `pokaz()`
+   chowa wszystkie sześć i nie odsłania żadnego. Do 0.427.0 stała tu mapa
+   ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
+   wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
+   następne przemianowanie nie wymaga pamiętania o tej linii. */
+if (!["dostawy", "magazyn", "nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "dostawy";
 let dokumenty = [];
 let ostatnieRozjazdy = null;
 /* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
@@ -2006,33 +2107,65 @@ function wiekWiersza(at) {
  * JEDEN wiersz listy dostaw — praca i archiwum rysują się tym samym kodem.
  *
  * Wspólny, bo niosą DOKŁADNIE to samo: numer, wiek, dostawcę, liczbę pozycji,
- * postęp, stan i wyjątki. Drugi wariant wiersza dla historii zacząłby się od
+ * postęp i sygnały. Drugi wariant wiersza dla historii zacząłby się od
  * jednej różnicy i skończył na dwóch listach, które trzeba czytać inaczej —
  * a to jest ta sama faktura, tylko starsza.
+ *
+ * WIERSZ W DWÓCH LINIACH (0.427.0, dekalog pkt 2). Do tej wersji cztery:
+ * numer, dostawca, pasek przez całą szerokość, stopka ze stanem. Zmierzone przy
+ * 1440×900: 100 px na wiersz, siedem dostaw na ekranie. Teraz numer z dostawcą
+ * i wiekiem, pod nimi pasek z licznikiem — a sygnały w STAŁEJ kolumnie po
+ * prawej, więc wyjątki czyta się jednym ruchem oka w dół listy.
+ *
+ * Pastylka stanu (W TOKU / NIETKNIĘTA) zeszła z wiersza: mówiła to samo co
+ * pasek i licznik obok — 0/40 to nietknięta, 12/40 to w toku. W wierszu
+ * zostają wyłącznie sygnały, po które biuro wchodzi w dokument: otwarte
+ * wyjątki i odpowiedź z hali. Stan słowem stoi dalej w nagłówku dokumentu.
+ *
+ * Pasek NIE schodzi do kolumny obok licznika — zostaje przez całą szerokość
+ * pierwszej kolumny, bo tak czyta się go jednym rzutem oka przez całą kolejkę
+ * (decyzja sprzed tej wersji, nietknięta).
  */
 function wierszDostawy(d) {
   const total = d.linesTotal || d.positions;
   const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-  /* Pasek postępu jako PODKREŚLENIE wiersza, nie kolumna obok licznika.
-     Zajmuje całą szerokość i czyta się jednym rzutem oka przez całą
-     kolejkę — a licznik schodzi do stopki, gdzie i tak stoi wszystko,
-     co się o dokumencie mówi zdaniem. */
+  const sygnaly = [
+    dokiZOdpowiedzia().has(d.dokId) ? '<span class="badge amber">odpowiedź z hali</span>' : "",
+    d.wyjatkiOtwarte
+      ? `<span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
+      : "",
+  ].join("");
   return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
-    <td class="sprawaWiersz">
-      <span class="sprawaGora">
-        <span class="b">${esc(d.nrPelny)}</span>
-        <span class="mute">${esc(wiekWiersza(d.dataWyst))}</span>
-      </span>
-      <span class="sprawaTemat">${esc(d.dostawca)} · ${total} poz.</span>
-      <span class="pasek${frac >= 100 ? " done" : ""}" style="width:auto;display:block;margin-top:7px"><i style="width:${frac}%"></i></span>
-      <span class="sprawaStopka">${statusDostawy(d)}
-        <span class="mute">${d.linesDone}/${total} odłożone</span>${
-        d.wyjatkiOtwarte
-          ? ` <span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
-          : ""
-      }</span>
+    <td class="dostWiersz">
+      <span class="dostGora"><span class="b">${esc(d.nrPelny)}</span><span class="dostKto">${esc(d.dostawca)} · ${total} poz.</span></span>
+      <span class="mute dostWiek">${esc(wiekWiersza(d.dataWyst))}</span>
+      <span class="dostSygnaly">${sygnaly}</span>
+      <span class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></span>
+      <span class="mute dostIle">${d.linesDone}/${total}</span>
     </td>
   </tr>`;
+}
+
+/** Dokumenty z odpowiedzią hali, której biuro jeszcze nie przeczytało. */
+function dokiZOdpowiedzia() {
+  return new Set(odpowiedziNaNotatki.map((o) => o.dokId));
+}
+
+/* CZEKA NA BIURO (0.427.0, dekalog pkt 5). Lista w toku ma dwie grupy:
+   najpierw dokumenty, w których coś czeka na biuro — otwarty wyjątek albo
+   nieprzeczytana odpowiedź z hali — potem reszta w dotychczasowej kolejności.
+   Do tej wersji taki dokument stał tam, gdzie wypadła mu data, i trzeba go
+   było wyłowić wzrokiem spośród kilkudziesięciu. Bez żadnego czekającego
+   nagłówków nie ma: jedna grupa z nagłówkiem to nagłówek bez treści. */
+function wierszeWGrupach(lista) {
+  const odp = dokiZOdpowiedzia();
+  const czeka = lista.filter((d) => d.wyjatkiOtwarte > 0 || odp.has(d.dokId));
+  if (!czeka.length) return lista.map(wierszDostawy).join("");
+  const reszta = lista.filter((d) => !czeka.includes(d));
+  const naglowek = (tytul, n) =>
+    `<tr class="grupaDostaw"><td><span class="grupaNazwa">${tytul}</span> <span class="mute">${n}</span></td></tr>`;
+  return naglowek("CZEKA NA BIURO", czeka.length) + czeka.map(wierszDostawy).join("") +
+    (reszta.length ? naglowek("POZOSTAŁE", reszta.length) + reszta.map(wierszDostawy).join("") : "");
 }
 
 function rysujDostawy() {
@@ -2097,7 +2230,7 @@ function rysujDostawy() {
      i logo dostawcy, które przeniosło się do kontekstu sprawy — tam stoi przy
      nazwie, dużo większe, i mówi to samo. */
   $("dostawy").innerHTML =
-      pasujace.map(wierszDostawy).join("") ||
+      (filtrDostaw === "done" ? pasujace.map(wierszDostawy).join("") : wierszeWGrupach(pasujace)) ||
       '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
   dolozLoga();
 }
@@ -2251,9 +2384,14 @@ function rysujSzczegol(d) {
 
      Podział liczy się z tego samego pola, po którym rysuje się status —
      `problem` znaczy „magazynier zgłosił i odłożył sprawę". */
-  const kolumn = zdjeciaWlaczone ? 6 : 5;
+  /* TRZY KOLUMNY ZAMIAST PIĘCIU (0.427.0, dekalog pkt 2). Środkowa kolumna
+     przy 1440 px ma około 480 px — pięć kolumn łamało symbol na trzy linie,
+     a „KTO ODŁOŻYŁ" z datą na pięć (zmierzone na scenariuszach). Stan idzie
+     pod ilość, bo odpowiadają na jedno pytanie: ile i czy skończone. Osoba
+     idzie pod adres, bo odpowiadają na drugie: gdzie i kto tam położył. */
+  const kolumn = zdjeciaWlaczone ? 4 : 3;
   const naglowek = `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>TOWAR</th><th>ILOŚĆ</th><th>LOKALIZACJA</th><th>STATUS</th><th>KTO ODŁOŻYŁ</th></tr>";
+    "<th>TOWAR</th><th>ILOŚĆ · STAN</th><th>GDZIE · KTO ODŁOŻYŁ</th></tr>";
   const wyjatkowe = d.lines.filter((l) => l.status === "problem");
   const reszta = d.lines.filter((l) => l.status !== "problem");
 
@@ -2304,16 +2442,15 @@ function wierszPozycji(l) {
       ? '<span class="badge amber">BEZ LOKALIZACJI</span>'
       : `<span class="b">${esc(l.locActual || l.locExpected)}</span>`;
   const kto = l.doneBy
-    ? `${esc(l.doneBy)}<div class="mute">${esc(stempelLokalny(l.doneAt))}</div>`
-    : '<span class="mute">—</span>';
+    ? `<div class="mute">${esc(l.doneBy)} · ${esc(stempelLokalny(l.doneAt))}</div>`
+    : "";
   return `<tr>
     ${zdjeciaWlaczone ? `<td class="kolFoto" data-tw="${l.twId}"></td>` : ""}
     <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div></td>
-    <td>${esc(formatIlosc(l.qtyDone))}/${esc(formatIlosc(l.qtyDoc))}
-        <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div></td>
-    <td>${adres}</td>
-    <td>${statusPozycji(l.status)}</td>
-    <td>${kto}</td>
+    <td class="kolIlosc"><b>${esc(formatIlosc(l.qtyDone))}/${esc(formatIlosc(l.qtyDoc))}</b>
+        <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
+        ${statusPozycji(l.status)}</td>
+    <td class="kolGdzie">${adres}${kto}</td>
   </tr>${
     /* Wyjątek dostaje WŁASNY wiersz na całą szerokość, a nie komórkę TOWAR.
        Wciśnięty do komórki na dwie piąte tabeli łamał się na cztery linie
@@ -2321,7 +2458,7 @@ function wierszPozycji(l) {
        a zgłoszenie magazyniera było najgorzej czytelną rzeczą w tabeli, choć
        to po nie biuro tu wchodzi. */
     l.problemy.length
-      ? `<tr><td colspan="${zdjeciaWlaczone ? 6 : 5}" style="padding-top:0">
+      ? `<tr><td colspan="${zdjeciaWlaczone ? 4 : 3}" style="padding-top:0">
            ${l.problemy.map(wyjatek).join("")}</td></tr>`
       : ""
   }`;
@@ -2350,7 +2487,7 @@ function wyjatek(p) {
     <span class="mute">${esc(p.createdBy || "")} ${esc(stempelLokalny(p.createdAt))}</span>
     ${p.resolvedAt
       ? `<span class="badge ok">rozwiązany</span>${p.resolvedNote ? ` <span class="mute">${esc(p.resolvedNote)}</span>` : ""}`
-      : `<span class="badge err">OTWARTY</span> <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button>`}
+      : `<span class="wyjatekAkcja"><span class="badge err">OTWARTY</span> <button class="akcja cichy maly" data-rozwiaz="${p.id}">ROZWIĄŻ</button></span>`}
     ${p.hasPhoto ? `<span data-foto="${p.id}"></span>` : ""}
   </div>`;
 }
@@ -2408,7 +2545,7 @@ async function dodajNotatke(dokId) {
     });
     ostatniSzczegol = "";           // wymuś przerysowanie panelu
     await odswiezSzczegol();
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, "blad"); }
 }
 
 /* ── Rozłożone poza WERTIS ──────────────────────────────────────────────────
@@ -2460,7 +2597,7 @@ async function oznaczPozaWertis(dokId, nrPelny) {
       body: JSON.stringify({ powod }),
     });
     zamknijDokument();
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, "blad"); }
 }
 
 /** Zwraca `true`, gdy przywrócenie przeszło — wołający decyduje, co odświeżyć. */
@@ -2468,7 +2605,7 @@ async function przywrocDostawe(dokId) {
   try {
     await api(`/api/biuro/dokument/${dokId}/otworz`, { method: "POST" });
     return true;
-  } catch (e) { toast(e.message); return false; }
+  } catch (e) { toast(e.message, "blad"); return false; }
 }
 
 /* ── Odpowiedzi na notatki (0.57.0) ──────────────────────────────────────── */
@@ -2503,8 +2640,9 @@ async function oznaczPrzeczytane(id) {
     await api(`/api/biuro/notatki/${id}/przeczytane`, { method: "POST", body: JSON.stringify({}) });
     odpowiedziNaNotatki = odpowiedziNaNotatki.filter((o) => o.id !== id);
     rysujOdpowiedzi();
+    rysujDostawy();   // sygnał „odpowiedź z hali" gaśnie w wierszu od razu, nie po cyklu
     odswiezStan();
-  } catch (e) { toast(e.message); }
+  } catch (e) { toast(e.message, "blad"); }
 }
 
 /**
@@ -2528,7 +2666,7 @@ async function rozwiazWyjatek(id) {
       body: JSON.stringify({ note: note.trim() }),
     });
     return true;
-  } catch (e) { toast(e.message); return false; }
+  } catch (e) { toast(e.message, "blad"); return false; }
 }
 
 function rysujReklamacje(problemy) {
@@ -2538,28 +2676,48 @@ function rysujReklamacje(problemy) {
     if (!wgDok.has(k)) wgDok.set(k, []);
     wgDok.get(k).push(p);
   }
+  /* BLOK NA DOKUMENT, WYJĄTEK W WIERSZU (0.427.0, dekalog pkt 2). Do tej
+     wersji wszystkie wyjątki dokumentu siedziały w JEDNEJ komórce jako ciąg
+     zdań z pełnowymiarowym ROZWIĄŻ po każdym — przy sześciu wyjątkach karta
+     miała 700 px, a typ, towar i ilość stały za każdym razem gdzie indziej.
+     Teraz nagłówek dokumentu niesie numer, dostawcę, licznik i akcje na całą
+     fakturę, a wyjątek jest wierszem z kolumnami: typ, towar, ilość, kto,
+     zdjęcie, ROZWIĄŻ. Porównanie idzie w pionie, nie przez czytanie zdań.
+
+     Dostawcę bierzemy z listy dostaw po numerze — ta sama tabela, żadnego
+     nowego zapytania. Dokument spoza okna importu zostaje bez nazwy. */
+  const dostawcaWgNr = new Map(dokumenty.map((d) => [d.nrPelny, d.dostawca]));
+  const aparat = '<svg class="ikonaFoto" viewBox="0 0 24 24" role="img" aria-label="jest zdjęcie"><title>jest zdjęcie</title>' +
+    '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
   const rows = [...wgDok.entries()].map(([dok, lista]) => {
     const dId = lista.find((p) => p.deliveryId != null)?.deliveryId;
+    const akcje = dId != null
+      ? `<button class="akcja maly" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
+         <button class="akcja cichy maly" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
+      : "";
+    const glowa = `<tr class="rekDok"><td colspan="6"><span class="rekGlowa">
+      <span class="b">${esc(dok)}</span>
+      ${dostawcaWgNr.has(dok) ? `<span class="rekKto">${esc(dostawcaWgNr.get(dok))}</span>` : ""}
+      <span class="badge err">${lista.length} ${lista.length === 1 ? "wyjątek" : "wyjątki"}</span>
+      <span class="rekAkcje">${akcje}</span></span></td></tr>`;
     /* Komplet danych, nie skrót. Serwer wysyła `qtyDok`, `opis`, `createdAt`
        i `symObcy` od dawna — panel je wyrzucał, więc biuro dzwoniło na halę
        po rzeczy, które miało na ekranie. */
-    const wiersze = lista.map((p) => `
-      <div class="wyjatek">· <b>${esc(p.typLabel || p.typ)}</b> — ${esc(p.sym || p.symObcy || "")} ${esc(p.name || "")}
-        ${p.qty != null ? `<b>policzone ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""} ${esc(p.unit || "")}</b>` : ""}
-        ${p.hasPhoto ? "📷" : ""}
-        ${p.opis ? `<div class="mute">${esc(p.opis)}</div>` : ""}
-        <span class="mute">${esc(p.createdBy || "")} · ${esc(stempelLokalny(p.createdAt))}</span>
-        <button class="akcja cichy" data-rozwiaz="${p.id}">ROZWIĄŻ</button></div>`).join("");
-    const akcje = dId != null
-      ? `<button class="akcja" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
-         <button class="akcja cichy" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
-      : "";
-    return `<tr><td class="b">${esc(dok)}<div class="mute">${lista.length} ${lista.length === 1 ? "wyjątek" : "wyjątki"}</div></td>
-      <td>${wiersze}</td><td style="white-space:nowrap">${akcje}</td></tr>`;
+    const wiersze = lista.map((p) => `<tr>
+      <td><span class="badge err">${esc(p.typLabel || p.typ)}</span></td>
+      <td><b>${esc(p.sym || p.symObcy || "")}</b> ${esc(p.name || "")}${p.opis ? `<div class="mute">${esc(p.opis)}</div>` : ""}</td>
+      <td class="rekIle">${p.qty != null
+        ? `${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""} ${esc(p.unit || "")}`
+        : '<span class="mute">—</span>'}</td>
+      <td class="mute rekKiedy">${esc(p.createdBy || "")} · ${esc(stempelLokalny(p.createdAt))}</td>
+      <td class="rekFoto">${p.hasPhoto ? aparat : ""}</td>
+      <td class="rekAkcja"><button class="akcja cichy maly" data-rozwiaz="${p.id}">ROZWIĄŻ</button></td>
+    </tr>`).join("");
+    return glowa + wiersze;
   }).join("");
   $("reklamacje").innerHTML =
-    "<tr><th>DOKUMENT</th><th>WYJĄTKI</th><th></th></tr>" +
-    (rows || '<tr><td colspan="3" class="mute">Brak nierozwiązanych wyjątków 🎉</td></tr>');
+    "<tr><th>TYP</th><th>TOWAR</th><th>POLICZONE</th><th>ZGŁOSIŁ</th><th></th><th></th></tr>" +
+    (rows || '<tr><td colspan="6" class="mute">Brak nierozwiązanych wyjątków</td></tr>');
 }
 
 /* ── Metryki ──────────────────────────────────────────────────────────────────
@@ -2681,6 +2839,7 @@ function slupkiSvg(dane, etykietaCo) {
   const najlepszy = dane.findIndex((d) => d.ile === max);
   const krok = W / dane.length;
   const szer = Math.max(2, Math.min(26, krok - 2)); // 2px odstępu między słupkami
+  const wszystkiePodpisy = krok >= 18;
   const czesci = dane.map((d, i) => {
     const h = Math.round(((H - DOL - GORA) * d.ile) / max);
     const x = (i * krok + (krok - szer) / 2).toFixed(1);
@@ -2693,9 +2852,15 @@ function slupkiSvg(dane, etykietaCo) {
     const podpis = i % etykietaCo === 0 ?
       `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle"
          font-size="10" fill="var(--ink-mute)">${esc(d.podpis)}</text>` : "";
-    const wartosc = i === najlepszy && max > 0 ?
+    /* WARTOŚĆ NA KAŻDYM SŁUPKU, gdy się mieści (0.427.0, dekalog pkt 2).
+       Do tej wersji podpisany był tylko najwyższy, a resztę trzeba było
+       szacować wzrokiem albo wodzić myszą po `title`. 18 px na słupek mieści
+       trzycyfrową liczbę 10 px; przy 90 dniach słupek ma 6 px i podpis na
+       każdym zlałby się w pasek — wtedy zostaje stary podpis maksimum. */
+    const podpisany = max > 0 && (i === najlepszy || (wszystkiePodpisy && d.ile > 0));
+    const wartosc = podpisany ?
       `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${y - 3}" text-anchor="middle"
-         font-size="10" font-weight="700" fill="var(--ink-soft)">${max}</text>` : "";
+         font-size="10" font-weight="${i === najlepszy ? 700 : 600}" fill="var(--ink-soft)">${d.ile}</text>` : "";
     return slupek + podpis + wartosc;
   });
   /* `max-width` jest tu obowiązkowe, nie kosmetyczne. SVG skaluje się w CAŁOŚCI
@@ -3320,9 +3485,9 @@ function rysujKolejke(q) {
         <td>${esc(i.detail)}${i.errMsg ? `<br><span class="mute">${esc(i.errMsg)}</span>` : ""}</td>
         <td>${odznaka(i.status)}</td>
         <td style="white-space:nowrap">${i.status === "error"
-          ? `<button class="akcja cichy" data-kolejka-ponow="${i.id}" style="font-size:11px;padding:3px 8px">PONÓW</button>`
+          ? `<button class="akcja cichy maly" data-kolejka-ponow="${i.id}">PONÓW</button>`
           : i.status === "pending"
-            ? `<button class="akcja cichy" data-kolejka-anuluj="${i.id}" style="font-size:11px;padding:3px 8px">ANULUJ</button>`
+            ? `<button class="akcja cichy maly" data-kolejka-anuluj="${i.id}">ANULUJ</button>`
             : ""}</td>
       </tr>`).join("") ||
       '<tr><td colspan="5" class="mute">Kolejka pusta — wszystko zapisane</td></tr>');
@@ -3376,7 +3541,7 @@ $("widokNadzor").addEventListener("click", async (e) => {
       await api(`/api/queue/${id}/${ponow ? "retry" : "cancel"}`, { method: "POST", body: "{}" });
       toast(ponow ? "Zadanie wróciło do kolejki" : "Zadanie anulowane");
       await odswiezNadzor();
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
     return;
   }
   if (e.target.closest("#serwerResync")) {
@@ -3389,14 +3554,14 @@ $("widokNadzor").addEventListener("click", async (e) => {
       const d = await (await api("/api/admin/resync", { method: "POST", body: "{}" })).json();
       toast(`Resync zakończony ✓ (${JSON.stringify(d.stats || {}).slice(0, 80)})`);
       await odswiezNadzor();
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
     return;
   }
   if (e.target.closest("#serwerZdjecia")) {
     try {
       const d = await (await api("/api/admin/zdjecia/odswiez", { method: "POST", body: "{}" })).json();
       toast(`Zapomniano ${d.zapomniano ?? 0} braków — kolektory zapytają o zdjęcia ponownie`);
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
   }
 });
 
@@ -3422,12 +3587,9 @@ function rysujKonta(konta) {
         <td>${esc(k.role)}</td>
         <td>${k.active ? '<span class="badge ok">AKTYWNE</span>' : '<span class="badge mute2">WYŁĄCZONE</span>'}</td>
         <td style="white-space:nowrap">
-          <button class="akcja cichy" data-konto-sesje="${k.userId}" data-konto-nazwa="${esc(k.name)}"
-            style="font-size:11px;padding:3px 8px">SESJE</button>
-          <button class="akcja cichy" data-konto-haslo="${k.userId}"
-            style="font-size:11px;padding:3px 8px">RESET HASŁA</button>
-          <button class="akcja cichy" data-konto-active="${k.userId}" data-konto-na="${k.active ? "0" : "1"}"
-            style="font-size:11px;padding:3px 8px">${k.active ? "WYŁĄCZ" : "WŁĄCZ"}</button>
+          <button class="akcja cichy maly" data-konto-sesje="${k.userId}" data-konto-nazwa="${esc(k.name)}">SESJE</button>
+          <button class="akcja cichy maly" data-konto-haslo="${k.userId}">RESET HASŁA</button>
+          <button class="akcja cichy maly" data-konto-active="${k.userId}" data-konto-na="${k.active ? "0" : "1"}">${k.active ? "WYŁĄCZ" : "WŁĄCZ"}</button>
         </td>
       </tr>`).join("");
 }
@@ -3448,7 +3610,7 @@ $("kontaKarta").addEventListener("click", async (e) => {
           : '<p class="mute">Brak czynnych sesji.</p>') +
         `<div style="margin-top:8px"><button class="akcja cichy" data-konto-wyloguj="${sesje.dataset.kontoSesje}">
            WYLOGUJ WSZĘDZIE</button></div>`;
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
     return;
   }
   const wyloguj = e.target.closest("[data-konto-wyloguj]");
@@ -3466,7 +3628,7 @@ $("kontaKarta").addEventListener("click", async (e) => {
       })).json();
       toast(`Ucięto sesji: ${d.sesji}`);
       $("kontaSesje").innerHTML = "";
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
     return;
   }
   const haslo = e.target.closest("[data-konto-haslo]");
@@ -3483,7 +3645,7 @@ $("kontaKarta").addEventListener("click", async (e) => {
         method: "POST", body: JSON.stringify({ haslo: nowe }),
       });
       toast("Hasło ustawione ✓");
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
     return;
   }
   const active = e.target.closest("[data-konto-active]");
@@ -3500,7 +3662,7 @@ $("kontaKarta").addEventListener("click", async (e) => {
       });
       toast(wlacz ? "Konto włączone ✓" : "Konto wyłączone ✓");
       await odswiezKonta();
-    } catch (bl) { toast(bl.message); }
+    } catch (bl) { toast(bl.message, "blad"); }
   }
 });
 
@@ -3665,10 +3827,8 @@ function rysujKolizje(lista) {
         <td class="mute">${esc((k.lastSeen || "").replace("T", " ").slice(0, 16))}</td>
         <td>${decyzjaKolizji(k)}
           <div style="margin-top:4px">
-            <button class="akcja cichy" data-kolizja="poprawione" data-ean="${esc(k.ean)}"
-              style="font-size:11px;padding:3px 8px">POPRAWIONE</button>
-            <button class="akcja cichy" data-kolizja="dopuszczone" data-ean="${esc(k.ean)}"
-              style="font-size:11px;padding:3px 8px">DOPUSZCZONE</button>
+            <button class="akcja cichy maly" data-kolizja="poprawione" data-ean="${esc(k.ean)}">POPRAWIONE</button>
+            <button class="akcja cichy maly" data-kolizja="dopuszczone" data-ean="${esc(k.ean)}">DOPUSZCZONE</button>
           </div>
         </td>
       </tr>`).join("") ||
@@ -3734,6 +3894,24 @@ function paramyDziennika() {
   return p.toString();
 }
 
+/* RODZINA ZDARZENIA KOLOREM (0.427.0, dekalog pkt 2). Kolumna TYP była
+   pogrubionym kluczem technicznym i przy dwustu wierszach wszystkie wyglądały
+   tak samo — „co się tu psuło" wymagało przeczytania każdego klucza. Cztery
+   rodziny na ISTNIEJĄCYCH żetonach, bez nowego koloru w palecie: błędy
+   i urządzenia czerwienią, praca przy dostawach bursztynem, zwroty obrysem,
+   reszta szarością. Kolejność testów ma znaczenie — `queue_failed` jest
+   najpierw błędem, dopiero potem czymkolwiek innym. Klucz zostaje tekstem
+   pastylki: to po nim filtruje się TYP i szuka w CSV. */
+const RODZINY_ZDARZEN = [
+  ["blad", /failed|rejected|conflict|konflikt|mismatch|odmowa|blad|device_drop|battery/],
+  ["dostawa", /^(putaway|delivery|location|problem|przyjecie|brak_na_serwis|przesuniecie|notatka|zdjecie|manual_entry)/],
+  ["zwrot", /^(zwrot|kosz|karton|reklamacja|klient)/],
+];
+function typZdarzenia(typ) {
+  const rodzina = RODZINY_ZDARZEN.find(([, wzor]) => wzor.test(typ || ""))?.[0] ?? "inne";
+  return `<span class="typZd ${rodzina}">${esc(typ)}</span>`;
+}
+
 async function szukajDziennik() {
   try {
     const d = await (await api(`/api/events?${paramyDziennika()}`)).json();
@@ -3758,7 +3936,7 @@ async function szukajDziennik() {
       "<tr><th>CZAS</th><th>TYP</th><th>OSOBA</th><th>URZĄDZENIE</th><th>TOWAR</th><th>SZCZEGÓŁY</th></tr>" +
       (d.wpisy.map((w) => `<tr>
           <td class="mute" style="white-space:nowrap">${esc(stempelLokalny(w.czas))}</td>
-          <td class="b">${esc(w.typ)}</td>
+          <td>${typZdarzenia(w.typ)}</td>
           <td>${esc(w.uzytkownik)}${w.userRef == null ? ' <span class="badge mute2">bez konta</span>' : ""}</td>
           <td class="mute">${esc(w.device || "—")}</td>
           <td class="mute">${w.twId ?? "—"}</td>
@@ -4418,6 +4596,29 @@ function stanMmKosza(k) {
   return "";
 }
 
+/* ── Cykl kosza jako pasek kroków (0.427.0, dekalog pkt 2 i 5) ─────────────
+   Wiersz kosza niósł dwie pastylki obok siebie — stan kosza i stan jego MM —
+   i żeby odpowiedzieć „gdzie ten kosz jest", trzeba było przeczytać obie
+   i złożyć je w głowie. Pasek kroków pokazuje MIEJSCE w cyklu: co za nim
+   (zielone), gdzie stoi (grafit), co przed nim (przerywane). MM zostaje
+   dopiskiem przy pasku, bo to osobny tor — kosz bywa rozłożony, zanim
+   Subiekt wystawi dokument, i pasek nie ma prawa udawać, że to jeden krok.
+
+   Anulowany nie jest krokiem cyklu, tylko wyjściem z niego — zostaje sam,
+   czerwoną pastylką, jak dotąd. MM w błędzie barwi bieżący krok na czerwono:
+   to jedyny stan, w którym kosz stoi z powodu, który ma naprawić biuro. */
+const KROKI_KOSZA = [["otwarty", "OTWARTY"], ["zamkniety", "NA HALĘ"], ["rozlozony", "ROZŁOŻONY"]];
+function cyklKosza(k, zMm) {
+  if (k.status === "anulowany") return badgeKosza(k.status);
+  const idx = KROKI_KOSZA.findIndex(([st]) => st === k.status);
+  const teraz = idx < 0 ? KROKI_KOSZA.length - 1 : idx;
+  const blad = zMm && k.mmStan === "blad" && !k.mmNumer && k.rodzaj !== "karton";
+  const kroki = KROKI_KOSZA.map(([, et], n) =>
+    `<span class="krok${n < teraz ? " za" : n === teraz ? (blad ? " teraz blad" : " teraz") : ""}">${et}</span>`)
+    .join('<i class="krokLacznik"></i>');
+  return `<span class="cykl" title="Kosz: ${KROKI_KOSZA[teraz][1]}">${kroki}</span>${zMm ? stanMmKosza(k) : ""}`;
+}
+
 /* Kolumna ROZŁOŻYŁ: osoba nad godziną, jak KTO ODŁOŻYŁ przy pozycjach dostawy.
    Kosz nierozłożony dostaje MYŚLNIK, nie pustkę — pusta komórka wygląda na brak
    danych, a to jest odpowiedź „jeszcze nikt". Ślad znika sam po COFNIJ
@@ -4454,12 +4655,10 @@ function rysujKosze(kosze) {
                   ? ` · ${esc(k.rozlozonoPrzez)}` : ""}`}</span>
             <span class="sprawaStopka">
               ${karton ? '<span class="badge mute2">KARTON</span>' : ""}
-              ${badgeKosza(k.status)}
-              ${stanMmKosza(k)}
+              ${cyklKosza(k, true)}
               ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
               ${k.status === "otwarty" && !karton
-                ? `<button class="akcja cichy" data-zamknij-kosz="${k.id}"
-                     style="padding:3px 9px;font-size:11px">ZAMKNIJ — NA HALĘ</button>`
+                ? `<button class="akcja cichy maly" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
                 : ""}
             </span>
           </td>
@@ -4496,8 +4695,7 @@ function rysujPominiete(lista) {
           <span class="sprawaStopka">
             <span class="badge mute2">KOSZ ${esc(p.kod)}</span>
             <span class="badge amber">${esc(p.powod || "bez powodu")}</span>
-            <button class="akcja cichy" data-zalatw="${p.pozycjaId}"
-              style="padding:3px 9px;font-size:11px">ZAŁATWIONE</button>
+            <button class="akcja cichy maly" data-zalatw="${p.pozycjaId}">ZAŁATWIONE</button>
           </span>
         </td>
       </tr>`).join("");
@@ -4594,7 +4792,7 @@ async function pokazPodgladKosza(id, cichy) {
       powrot,
     ].filter(Boolean);
     cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
-        KOSZ ${esc(k.kod)} ${badgeKosza(k.status)}
+        KOSZ ${esc(k.kod)} ${cyklKosza(k, false)}
         ${k.doEdycji
           ? `<button class="akcja cichy" data-przelicz-kosz="${k.id}"
                style="margin-left:auto">PRZELICZ ZE ZWROTÓW</button>
@@ -4766,7 +4964,7 @@ async function rozpocznijParowanieAllegro() {
   } catch (e) {
     parowanieTrwa = false;
     rysujIkoneAllegro();
-    toast(e.message);
+    toast(e.message, "blad");
     odswiezStanAllegro();
   }
 }
@@ -4813,7 +5011,7 @@ async function pollParowania() {
     rysujIkoneAllegro();
   } catch (e) {
     parowanieTrwa = false;
-    toast(e.message);
+    toast(e.message, "blad");
     rysujIkoneAllegro();
     odswiezStanAllegro();
   }
@@ -5252,7 +5450,7 @@ async function przeliczArkuszLok() {
     arkuszLokRaport = await wyslijArkuszLok(false);
     rysujArkuszLok(arkuszLokRaport, false);
   } catch (e) {
-    toast(e.message);
+    toast(e.message, "blad");
   }
 }
 
@@ -5272,7 +5470,7 @@ async function zastosujArkuszLok() {
     arkuszLokRaport = null;
     odswiezNadzor();
   } catch (e) {
-    toast(e.message);
+    toast(e.message, "blad");
   }
 }
 
@@ -5498,6 +5696,16 @@ function ustawPasmoSzuflady(widokId, sprawaOtwarta) {
   if (!szuflada && szufladaW === widokId) ustawSzuflade(widokId, false);
 }
 
+/* PRZECIĄGNIĘCIE KRAWĘDZI OKNA (0.427.0). Komentarz wyżej obiecywał to od
+   0.101.0, ale nikt nie słuchał zmiany progów: pasmo liczyło się wyłącznie
+   przy otwarciu i zamknięciu dokumentu. Zmierzone: dokument otwarty przy
+   1440 px i okno zwężone do 1180 px zostawało bez szuflady — kontekstu nie
+   było wcale — a w drugą stronę zostawała klasa szuflady nad trzecią kolumną.
+   Oba progi, bo lista przy 1024 px też zmienia się z zasłoniętej na obok. */
+for (const prog of [SZEROKO, SREDNIO]) {
+  prog.addEventListener("change", () => { if (otwartyDok != null) ustawRodzenstwoDostaw(); });
+}
+
 
 /* ── Magazyn zwrotów i konto Allegro — zdarzenia ── */
 
@@ -5521,7 +5729,7 @@ $("pominieteLista").addEventListener("click", async (e) => {
       body: JSON.stringify({ notatka }),
     });
     rysujPominiete((await d.json()).pominiete || []);
-  } catch (err) { toast(err.message); }
+  } catch (err) { toast(err.message, "blad"); }
 });
 
 
@@ -5566,7 +5774,7 @@ $("koszPodglad").addEventListener("click", async (e) => {
     /* TOAST, nie `cichaAwaria`: to czynność KLIKNIĘTA, a serwis odmawia
        zdaniem („kosz ma już dokument MM"). Odmowa schowana w konsoli wygląda
        jak przycisk, który nic nie robi. */
-    toast(err.message);
+    toast(err.message, "blad");
   } finally {
     przelicz.disabled = false;
   }
@@ -5598,7 +5806,7 @@ $("allegroAkcje").addEventListener("click", async (e) => {
     try {
       await api("/api/biuro/allegro", { method: "DELETE" });
       await odswiezStanAllegro();
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "blad"); }
   }
 });
 

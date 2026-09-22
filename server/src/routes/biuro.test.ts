@@ -1398,3 +1398,95 @@ test("`build` kopiuje CAŁY katalog web, a nie pliki po nazwie", () => {
   assert.match(pkg.scripts.build, /cpSync\('src\/web','dist\/web'/,
     "build przestał kopiować cały katalog web/");
 });
+
+/* ── Przeprojektowanie biura (0.427.0) ───────────────────────────────────────
+   Pięć niezmienników z jednego wydania. Każdy stoi, bo jego złamanie nie
+   daje błędu w konsoli — daje ekran, który wygląda prawie dobrze.          */
+
+test("każda karta panelu stoi wewnątrz swojego widoku (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  /* Blizna z tego samego wydania: przestawienie kart STANU SYSTEMU wyniosło
+     arkusz lokalizacji za `</div>` widoku. Karta wisiała wtedy pod KAŻDĄ
+     zakładką naraz, a wszystkie testy były zielone. */
+  const start = html.indexOf('<main id="panel"');
+  const panel = html.slice(start, html.indexOf("</main>", start)).replace(/<!--[\s\S]*?-->/g, "");
+  let glebokosc = 0;
+  let wWidoku = false;
+  for (const m of panel.matchAll(/<(\/?)(div|section|details)\b([^>]*)>/g)) {
+    const [, zamkniecie, tag, atrybuty] = m;
+    if (tag === "div") {
+      if (zamkniecie) {
+        glebokosc--;
+        if (glebokosc === 0) wWidoku = false;
+      } else {
+        if (glebokosc === 0) wWidoku = /class="widok\b/.test(atrybuty);
+        glebokosc++;
+      }
+      continue;
+    }
+    if (!zamkniecie) {
+      assert.ok(wWidoku, `<${tag}${atrybuty}> stoi poza widokiem — pokaże się pod każdą zakładką`);
+    }
+  }
+  assert.equal(glebokosc, 0, "znaczniki <div> w panelu się nie domykają");
+});
+
+test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const nadzor = html.slice(html.indexOf('id="widokNadzor"'), html.indexOf('id="widokDziennik"'));
+  const poz = (id: string) => {
+    const i = nadzor.indexOf(`id="${id}"`);
+    assert.ok(i >= 0, `${id} jest w STANIE SYSTEMU`);
+    return i;
+  };
+  // Najpierw rzeczy z przyciskiem do naciśnięcia, potem rzeczy do czytania.
+  assert.ok(poz("kolejka") < poz("rozjazdy"), "kolejka zapisów przed rekoncyliacją");
+  assert.ok(poz("rozjazdy") < poz("kolizje"), "rekoncyliacja przed kolizjami");
+  assert.ok(poz("kolizje") < poz("dniMetryk"), "kolizje przed metrykami");
+  // Arkusz zostaje pod kolejką — ta kolejka wykonuje jego skutek (0.138.0).
+  assert.ok(poz("kolejka") < poz("arkuszLokalizacjiKarta") &&
+    poz("arkuszLokalizacjiKarta") < poz("rozjazdy"), "arkusz tuż pod kolejką");
+  assert.match(nadzor, /<details class="card zwijana" id="kontoAllegroKarta">/,
+    "konto Allegro jest kartą, nie gołą sekcją na papierze");
+});
+
+test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.match(html, /\.toast\.blad \{/, "dymek błędu ma własny wygląd");
+  const fn = html.slice(html.indexOf("function toast(tekst, rodzaj)"));
+  assert.ok(fn.length < html.length, "toast przyjmuje rodzaj");
+  const cialo = fn.slice(0, fn.indexOf("\n}\n"));
+  assert.match(cialo, /if \(rodzaj === "blad"\) \{[\s\S]*addEventListener\("click"[\s\S]*return;/,
+    "błąd znika kliknięciem i NIE ustawia licznika 6 s");
+  /* Każdy `catch` pokazuje błąd wariantem błędu — bez tego zielone
+     potwierdzenie i czerwona odmowa gasłyby tak samo po 6 s. */
+  assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
+});
+
+test("przeciągnięcie krawędzi okna przelicza pasmo szczegółu (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  /* Zmierzone przed poprawką: dokument otwarty przy 1440 px i okno zwężone
+     do 1180 px zostawało bez szuflady, czyli bez kontekstu. */
+  assert.match(html, /for \(const prog of \[SZEROKO, SREDNIO\]\) \{\s*prog\.addEventListener\("change"/,
+    "oba progi pasma słuchają zmiany szerokości");
+});
+
+test("zapamiętany widok, którego nie ma, wraca na DOSTAWY (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
+  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "dostawy";/);
+  assert.ok(lista, "strażnik zapamiętanego widoku istnieje");
+  const nazwy = [...lista[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
+  const zPaska = [...new Set([...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]))];
+  assert.deepEqual([...nazwy].sort(), [...zPaska].sort(), "lista strażnika = widoki z paska i zębatki");
+  for (const n of nazwy) {
+    assert.match(html, new RegExp(`id="widok${n[0].toUpperCase()}${n.slice(1)}"`), `widok ${n} istnieje`);
+  }
+});
+
+test("mały przycisk jest klasą, nie stylem w linii (0.427.0)", () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.match(html, /button\.akcja\.maly \{/);
+  assert.doesNotMatch(html, /style="(font-size:11px;padding:3px|padding:3px 9px;font-size:11px)/,
+    "rozmiar małego przycisku wrócił do stylu w linii");
+});

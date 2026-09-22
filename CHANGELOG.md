@@ -34,6 +34,73 @@ historii nie przepisujemy.
 ---
 
 
+## 0.427.0 — 22 września 2026
+
+**Biuro przeprojektowane pod dekalog, nie pod urodę.** Każda zmiana nazywa
+punkt `docs/ergonomia-magazynu.md`, któremu służy. Żetony, fonty, pasek boczny
+i pasma szerokości zostały bez zmian. Nie ma nowej trasy ani nowego zapisu:
+liczniki POST, PUT i DELETE stoją tam, gdzie stały.
+
+Makiety leżą w `docs/projekt-widokow-biuro/` razem z odnośnikiem do kanwy.
+Właściciel przyjął na kanwie wszystkie osiem zmian, zanim powstała linijka kodu.
+
+**Pomiary na danych scenariuszy, przed i po.** Zmierzone w Chromium przy
+1440×900 i 1180×800.
+
+| miara | przed | po |
+|---|---|---|
+| wysokość wiersza dostawy | 100 px | 61 px |
+| dostaw widocznych bez przewijania, 1440×900 | 7 z 10 | 10 z 10 |
+| dostaw widocznych bez przewijania, 1180×800 | 6 z 10 | 9 z 10 |
+| wysokość karty REKLAMACJE, 10 wyjątków | 700 px | 541 px |
+| dymek błędu po 7 s | zgasł | stoi do kliknięcia |
+
+**DOSTAWY (pkt 2 i 5).** Wiersz ma dwie linie zamiast czterech. Sygnały stoją
+w stałej kolumnie po prawej. Pastylka W TOKU i NIETKNIĘTA zeszła z wiersza, bo
+pasek z licznikiem mówi to samo. Nad listą stoi grupa CZEKA NA BIURO: otwarty
+wyjątek albo nieprzeczytana odpowiedź z hali.
+
+**REKLAMACJE (pkt 2).** Blok na dokument z dostawcą i akcjami w nagłówku.
+Wyjątek jest wierszem z kolumnami zamiast zdania w jednej komórce. Emoji
+aparatu ustąpiło ikonie z podpisem dla czytnika ekranu.
+
+**Pozycje dokumentu w trzech kolumnach zamiast pięciu (pkt 2).** Stan stoi pod
+ilością, osoba pod adresem. Przed zmianą symbol łamał się na trzy linie, a
+„KTO ODŁOŻYŁ" z datą na pięć. Wyjątek pod pozycją jest bladoczerwoną plamą ze
+stanem i ROZWIĄŻ na prawym brzegu.
+
+**MAGAZYN ZWROTÓW (pkt 2 i 5).** Dwie pastylki kosza i MM ustąpiły paskowi
+kroków OTWARTY, NA HALĘ, ROZŁOŻONY. Stan MM zostaje dopiskiem, bo to osobny
+tor. MM w błędzie barwi bieżący krok na czerwono.
+
+**STAN SYSTEMU (pkt 1 i 5).** Najpierw kolejka zapisów, rekoncyliacja
+i kolizje kodów, potem miary. Arkusz lokalizacji został tuż pod kolejką, jak od
+0.138.0. Konto Allegro jest kartą, a nie gołą sekcją na papierze.
+
+**DZIENNIK i ANALIZA (pkt 2).** Typ zdarzenia ma pastylkę w kolorze rodziny:
+błędy, dostawy, zwroty i reszta. Słupki analizy niosą wartość na każdym słupku,
+gdy się mieści. Przy 90 dniach zostaje podpis samego maksimum.
+
+**Dymek błędu zostaje do kliknięcia (pkt 6).** Dziewiętnaście bloków `catch`
+pokazywało błąd tym samym dymkiem co „zapisano", gasnącym po 6 s. Błąd ma
+teraz białe tło z czerwoną obwódką i znika dopiero po kliknięciu.
+
+**Przycisk mały jest klasą `akcja maly`.** Dziewięć miejsc niosło jego rozmiar
+stylem w linii, w dwóch wariantach, różnych o piksel.
+
+**Dwie naprawy w układzie, znalezione przy mapowaniu.**
+
+- Przeciągnięcie krawędzi okna nie przeliczało pasma. Dokument otwarty przy
+  1440 px zostawał po zwężeniu do 1180 px bez szuflady, czyli bez kontekstu.
+  Oba progi słuchają teraz zmiany szerokości.
+- Zapamiętany widok SPRAWY dawał pusty panel. Mapa z 0.109.0 prowadziła na
+  zakładkę, której już nie ma. Każda nazwa spoza listy widoków wraca na DOSTAWY.
+
+**Sześć nowych testów w `routes/biuro.test.ts`.** W trakcie pracy karta
+arkusza wypadła za `</div>` widoku i wisiała pod każdą zakładką. Pokazały to
+zrzuty ekranu, a wszystkie testy były zielone. Nowy test pilnuje, żeby każda
+karta stała w swoim widoku. Sprawdzony na wstawionej karcie: odmawia.
+
 ## 0.426.1 — 22 września 2026
 
 **Przegląd reguł obsługi klienta: dekalog ma pięć punktów, a login rozmówcy
