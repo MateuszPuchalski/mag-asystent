@@ -224,8 +224,15 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
     {galaz !== null && <div className="mt-2 space-y-2 border-t pt-2">
       <label className="block text-xs font-semibold text-slate-600">
         {galaz === "uznaje" ? "Sposób uznania" : "Powód odrzucenia"}
+        {/* ── ZMIANA DECYZJI ZDEJMUJE ZGODĘ (0.424.0) ────────────────────
+            0.424.0 kazało zdaniu zgody nazywać werdykt i zdanie przepisuje się
+            natychmiast — ale PTASZEK ZOSTAWAŁ. Agent, który potwierdził jedną
+            decyzję i zmienił zdanie, miał przycisk żywy pod decyzją, której
+            nigdy nie potwierdził. Zgoda dotyczy KONKRETNEGO werdyktu, więc
+            razem z nim traci ważność. To samo przy kwocie: „na 40 zł"
+            potwierdzone, a wysłane „na 400 zł" byłoby tą samą pomyłką. */}
         <select className="field mt-1 w-full text-sm" aria-label="Wartość werdyktu"
-          value={kod} onChange={(e) => setKod(e.target.value as KodWerdyktu)}>
+          value={kod} onChange={(e) => { setKod(e.target.value as KodWerdyktu); setZgoda(false); }}>
           {(galaz === "uznaje" ? UZNANIA : ODMOWY).map((k) =>
             <option key={k} value={k}>{NAZWA_WERDYKTU[k]}</option>)}
         </select>
@@ -235,7 +242,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
         Kwota zwrotu ({r.waluta})
         <input className="field mt-1 w-full text-sm tabular-nums" inputMode="decimal"
           aria-label="Kwota zwrotu" value={kwota} placeholder="np. 40,00"
-          onChange={(e) => setKwota(e.target.value)} />
+          onChange={(e) => { setKwota(e.target.value); setZgoda(false); }} />
         {/* Podpowiedź, nie wartość domyślna: kwotę wpisuje agent (decyzja
             właściciela), a serwer pilnuje sufitu i mówi, skąd go wziął. */}
         {r.oczekiwanie === "PARTIAL_REFUND" && r.oczekiwanaKwotaGrosze !== null &&
@@ -251,11 +258,24 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
           {znakow} znaków{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}</span>
       </label>
 
-      {/* Zgoda bramkuje przycisk. Zdanie mówi, co się stanie — bez tego
-          „na pewno?" pytałoby o nic. */}
+      {/* ── ZGODA NAZYWA WERDYKT PO IMIENIU (0.424.0) ────────────────────────
+          Do 0.423.0 stało tu samo „werdykt jest nieodwracalny". To zdanie jest
+          prawdziwe przy każdej z jedenastu wartości listy, więc pasowało tak
+          samo do uznania z pełnym zwrotem, jak i do odmowy — a potwierdzało
+          niby konkretną decyzję. Agent, który pomylił pozycję w liście, nie
+          miał na całej ścieżce ANI JEDNEGO miejsca, gdzie pomyłka byłaby
+          widoczna: nazwa werdyktu stała wyżej, w zwiniętym `select`.
+
+          Zdanie bierze nazwę i kwotę ZE STANU FORMULARZA, więc zmiana listy
+          przepisuje je natychmiast. Kwota wchodzi tylko wtedy, gdy jest
+          prawidłowa — przy `null` przycisk i tak jest martwy, a zdanie ma
+          mówić o tym, co naprawdę poleci. */}
       <label className="flex items-start gap-2 text-xs text-slate-700">
         <input type="checkbox" className="mt-0.5" checked={zgoda} onChange={(e) => setZgoda(e.target.checked)} />
-        <span>Rozumiem: werdykt jest <b>nieodwracalny</b> i razem z wiadomością trafia do kupującego.</span>
+        <span>Wysyłam <b>{NAZWA_WERDYKTU[kod]}</b>
+          {czesciowy && grosze !== null && grosze > 0 &&
+            <> na <b className="tabular-nums">{zlote(grosze, r.waluta)}</b></>}
+          {" "}— nieodwracalnie, razem z wiadomością do kupującego.</span>
       </label>
 
       <div className="flex items-center gap-2">

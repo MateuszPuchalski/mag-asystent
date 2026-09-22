@@ -71,9 +71,14 @@ describe("Werdykt", () => {
     expect(wyslij()).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Zwracamy 40 zł.");
     expect(wyslij()).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox"));
-    expect(wyslij()).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "40,00");
+    expect(wyslij()).toBeDisabled();
+    /* ZGODA JEST OSTATNIA, i od 0.424.0 inaczej być nie może: wpisanie kwoty
+       zdejmuje ptaszek, bo „na 40 zł" potwierdzone, a wysłane „na 400 zł"
+       byłoby tą samą pomyłką, przed którą ta zgoda stoi. Do 0.424.0 ten test
+       klikał ją przed kwotą i przechodził — potwierdzał wtedy liczbę, której
+       jeszcze nie było na ekranie. */
+    await userEvent.click(screen.getByRole("checkbox"));
     expect(wyslij()).toBeEnabled();
     await userEvent.click(wyslij());
     expect(onWerdykt).toHaveBeenCalledWith({
@@ -169,6 +174,100 @@ describe("Werdykt", () => {
    Bramka pilnuje DWÓCH z trzech rozdzieleń — tych, które widać w łańcuchu
    klas. Trzeciego, czyli odległości, nie mierzy, bo wysokość liczy się
    w przeglądarce, nie w jsdomie.                                           */
+/* ── ZGODA TRACI WAŻNOŚĆ RAZEM Z DECYZJĄ (0.424.0) ───────────────────────────
+   0.424.0 kazało zdaniu zgody nazywać werdykt, ale ptaszek zostawał zaznaczony
+   po zmianie listy. Agent, który potwierdził jedną decyzję i zmienił zdanie,
+   miał żywy przycisk pod decyzją, której nigdy nie potwierdził — a zdanie nad
+   przyciskiem mówiło już co innego.                                          */
+describe("Zgoda dotyczy KONKRETNEGO werdyktu", () => {
+  const wyslij = () => przycisk(/WYŚLIJ WERDYKT/);
+  const ptaszek = () => screen.getByRole("checkbox");
+
+  const doZgody = async () => {
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(ptaszek());
+  };
+
+  it("zmiana listy zdejmuje ptaszek i unieruchamia przycisk", async () => {
+    pokaz();
+    await doZgody();
+    expect(wyslij()).toBeEnabled();
+    await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"), "ACCEPTED_EXCHANGE");
+    expect(ptaszek()).not.toBeChecked();
+    expect(wyslij()).toBeDisabled();
+  });
+
+  it("zmiana KWOTY też ją zdejmuje — „na 40” i „na 400” to dwie decyzje", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
+      "ACCEPTED_PARTIAL_REFUND");
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Oddajemy część.");
+    await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "40,00");
+    await userEvent.click(ptaszek());
+    expect(wyslij()).toBeEnabled();
+    await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "0");
+    expect(ptaszek()).not.toBeChecked();
+    expect(wyslij()).toBeDisabled();
+  });
+
+  it("pisanie WIADOMOŚCI zgody nie zdejmuje — treść to nie decyzja", async () => {
+    /* Gdyby zdejmowało, agent odklikiwałby ptaszek po każdej poprawce literówki
+       i nauczyłby się klikać go bez czytania. Zgoda ma zostać sygnałem. */
+    pokaz();
+    await doZgody();
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), " Dziękujemy.");
+    expect(ptaszek()).toBeChecked();
+    expect(wyslij()).toBeEnabled();
+  });
+});
+
+/* ── ZGODA NAZYWA WERDYKT (0.424.0) ──────────────────────────────────────────
+   Samo „werdykt jest nieodwracalny" jest prawdziwe przy każdej z jedenastu
+   wartości listy, więc potwierdzało niby konkretną decyzję, nie mówiąc której.
+   Agent, który pomylił pozycję w liście, nie miał na całej ścieżce ani jednego
+   miejsca, gdzie pomyłka byłaby widoczna.                                    */
+describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
+  const zgoda = () => screen.getByRole("checkbox").closest("label")?.textContent ?? "";
+
+  it("nazywa wybrany werdykt po imieniu", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    /* Gałąź „uznaję" otwiera się na PIERWSZEJ pozycji listy uznań, czyli
+       naprawie — nie na zwrocie pieniędzy. Test bierze to, co widzi agent. */
+    expect(zgoda()).toContain("Uznana — naprawa");
+    expect(zgoda()).toContain("nieodwracalnie");
+  });
+
+  it("przepisuje się NATYCHMIAST po zmianie listy", async () => {
+    /* Bez tego zdanie opisywałoby decyzję, której agent już nie wybrał. */
+    pokaz();
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
+      "ACCEPTED_PARTIAL_REFUND");
+    expect(zgoda()).toContain("Uznana — częściowy zwrot pieniędzy");
+    expect(zgoda()).not.toContain("Uznana — naprawa");
+  });
+
+  it("dokłada KWOTĘ przy częściowym zwrocie, dopiero gdy jest prawidłowa", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
+      "ACCEPTED_PARTIAL_REFUND");
+    expect(zgoda()).not.toContain("zł");
+    await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "40,00");
+    expect(zgoda()).toContain("40,00");
+  });
+
+  it("przy odmowie nie obiecuje żadnej kwoty", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/ODRZUCAM/));
+    expect(zgoda()).toContain("Odrzucona");
+    expect(zgoda()).not.toContain("zł");
+  });
+});
+
 describe("Gałąź werdyktu nie jest przestrzeleniem przycisku wysyłki", () => {
   it("nie nosi bursztynu — ten w stopce znaczy „to idzie teraz do klienta”", () => {
     pokaz();

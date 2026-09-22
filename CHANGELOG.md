@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.424.0 — 22 września 2026
+
+**Zgoda przy werdykcie mówi, CO poleci, i traci ważność razem z decyzją.**
+Iteracje 2 i 3 pętli `ux-loop`; obie dotyczą jednego pola, więc idą jednym
+wydaniem.
+
+- **Zdanie zgody nazywa werdykt po imieniu.** Do 0.423.0 brzmiało „werdykt
+  jest nieodwracalny" — prawda przy każdej z jedenastu wartości listy, więc
+  pasowało tak samo do uznania z pełnym zwrotem, jak i do odmowy. Agent, który
+  pomylił pozycję, nie miał na całej ścieżce miejsca, gdzie byłoby to widać.
+- **Kwota wchodzi do zdania** przy częściowym zwrocie, gdy jest prawidłowa.
+- **Zmiana werdyktu albo kwoty zdejmuje ptaszek.** Zgoda dotyczy konkretnej
+  decyzji, więc razem z nią traci ważność. Pisanie wiadomości jej nie zdejmuje:
+  odklikiwanie po każdej literówce nauczyłoby agenta klikać bez czytania.
+- **Kolejność w formularzu:** zgoda jest ostatnia i inaczej być nie może.
+
 ## 0.423.0 — 22 września 2026
 
 **Szkic odpowiedzi przeżywa przełączenie sprawy.** Usterkę znalazł pomiar
