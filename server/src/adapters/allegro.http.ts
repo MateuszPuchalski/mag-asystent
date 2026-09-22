@@ -171,6 +171,36 @@ export function urlTrackingu(
 }
 
 /**
+ * Historia operacji płatniczych JEDNEJ płatności (0.426.0).
+ *
+ * `GET /payments/payment-operations?payment.id=…&group=REFUND`. To jedyne
+ * miejsce w API, które mówi o WYPŁACIE DO KLIENTA faktem, a nie chwilowym
+ * statusem. Obiekt zwrotu tego nie niesie: `CustomerReturn.refund` ma wyłącznie
+ * `bankAccount`, a `status` z wartością `FINISHED` jest PUNKTEM na osi czasu,
+ * która biegnie dalej — na `COMMISSION_REFUND_CLAIMED` i `COMMISSION_REFUNDED`,
+ * czyli na NASZĄ prowizję. Kto nie złapał zwrotu dokładnie w tym oknie, nie
+ * dowie się o wypłacie nigdy.
+ *
+ * PYTAMY O KONKRETNĄ PŁATNOŚĆ, nie o historię konta. `payment.id` jest
+ * parametrem zapytania, a my trzymamy ten identyfikator przy zamówieniu od
+ * 0.190.0. Skan całej historii kosztowałby dziesiątki żądań na takt i wymagał
+ * własnego kursora; pytanie punktowe kosztuje jedno i nie ma stanu.
+ *
+ * `wallet.type` ZOSTAJE WOŁAJĄCEMU. Schemat ma tam domyślne `AVAILABLE`
+ * i drugą wartość `WAITING`, a która z portmonetek niesie obciążenie zwrotem,
+ * specyfikacja nie mówi. `[WERYFIKUJ]` — do czasu rozstrzygnięcia pytamy obie,
+ * a nie zgadujemy jedną.
+ */
+export function urlOperacjiPlatnosci(
+  apiUrl: string, platnoscId: string, portmonetka: "AVAILABLE" | "WAITING",
+): string {
+  return (
+    `${apiUrl}/payments/payment-operations?payment.id=${encodeURIComponent(platnoscId)}` +
+    `&group=REFUND&wallet.type=${portmonetka}&limit=50`
+  );
+}
+
+/**
  * Numery przesyłek zamówienia (0.393.0).
  *
  * `GET /order/checkout-forms/{id}/shipments` — „list of parcel tracking

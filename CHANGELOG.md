@@ -34,6 +34,54 @@ historii nie przepisujemy.
 ---
 
 
+## 0.426.0 — 22 września 2026
+
+**[wymaga działania] Zwrot rozliczony w Allegro schodzi z kolejki decyzji.**
+Aplikacja na developer.allegro.pl musi mieć uprawnienie
+`allegro:api:payments:read` — bez niego przebieg degraduje ze zdaniem w logu
+i nic się nie zmienia.
+
+Zgłoszenie właściciela ze zrzutami: 934 zwroty stały w DO DECYZJI, choć
+pieniądze wróciły do klienta w sierpniu. Panel przy jednym z nich pisał wprost
+„Allegro podaje przy tym zwrocie status COMMISSION_REFUNDED".
+
+**Kubełek nie kłamał — nie miał skąd wiedzieć.** W całym modelu `CustomerReturn`
+jedynym polem mówiącym o pieniądzach klienta jest `status` równy `FINISHED`
+albo `FINISHED_APT`. Sprawdzone w schemacie: `CustomerReturn.refund` niesie
+wyłącznie `bankAccount`, bez kwoty, daty i stanu.
+
+A `status` to PUNKT na osi czasu, nie historia. Oś biegnie dalej, na
+`COMMISSION_REFUND_CLAIMED` i `COMMISSION_REFUNDED` — a te dotyczą NASZEJ
+prowizji, nie wypłaty do klienta. Kto nie odpytał Allegro dokładnie w oknie
+`FINISHED`, nie dowiedział się o wypłacie nigdy. Zatrzask `rozliczony_allegro_at`
+z 0.345.0 istnieje właśnie po to, ale zatrzaskuje tylko to, co zobaczył.
+
+Na sierpniową zaległość złożyły się trzy rzeczy naraz: takt co pięć minut, nasz
+własny automat rabatów spychający oś z `FINISHED` zaraz po zaciągnięciu
+odstąpienia, i odświeżanie znanych zwrotów, które powstało dopiero 15 września.
+
+**Fakt zamiast ulotnego statusu.** `GET /payments/payment-operations` oddaje
+historię operacji płatniczych, a `payment.id` jest jej parametrem zapytania.
+Identyfikator płatności trzymamy przy zamówieniu od 0.190.0, więc pytanie jest
+punktowe i bez stanu: „czy na tej płatności jest obciążenie zwrotem".
+
+Dowodem jest wyłącznie `REFUND_CHARGE` — jedyny z sześciu typów grupy `REFUND`,
+którego nazwa nie pozostawia wątpliwości co do kierunku pieniędzy. Nowsze
+`REFUND_CANCEL` ten dowód unieważnia. Przy równym czasie obu nie zatrzaskujemy:
+niewiedza ma zostawić zwrot w pracy, a nie zdjąć go z niej.
+
+**Pytamy tylko o zwroty w pracy**, najstarsze pierwsze, sto na przebieg. Lista
+kurczy się sama, bo zatrzaśnięty zwrot z niej wypada — sierpniowa zaległość
+schodzi w niecałą godzinę. Odpytanie jedzie w takcie zwrotów, nie własnym:
+szósty chór na jednym adresie IP to ta sygnatura, która skończyła się blokadą.
+
+Zwrot zamknięty tą drogą bez naszej korekty wychodzi w raporcie rekoncyliacji
+(`zwrot_rozliczony_bez_korekty`) — nie znika po cichu.
+
+Dwa `[WERYFIKUJ]` na żywym koncie: czy `REFUND_INCREASE` bywa samodzielnym
+zwrotem oraz która portmonetka (`AVAILABLE` czy `WAITING`) niesie obciążenie.
+Do rozstrzygnięcia pytamy obie — drugą dopiero wtedy, gdy pierwsza milczy.
+
 ## 0.425.1 — 22 września 2026
 
 **Zamknięcie pętli `ux-loop`.** Same dokumenty — żadnej zmiany w kodzie.

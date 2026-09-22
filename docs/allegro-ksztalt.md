@@ -1102,6 +1102,54 @@ w `swagger.yaml` tego nie ma. Serwer traktuje ją więc jako PRÓBĘ i w tym sam
 przebiegu wraca do oryginału, gdy CDN nie odda obrazu. Tym różni się to od
 mapowania z pamięci: tam pomyłka jest cicha, tu ma jawną drogę wyjścia.
 
+## `GET /payments/payment-operations` — czy wypłata naprawdę poszła (0.426.0)
+
+Zgłoszenie właściciela: zwroty stały w DO DECYZJI, choć pieniądze wróciły
+do klienta w sierpniu. W kolejce było ich 934.
+
+**Obiekt zwrotu o wypłacie nie mówi.** `CustomerReturn.refund` niesie w schemacie
+wyłącznie `bankAccount` — ani kwoty, ani daty, ani stanu. Jedynym polem, które
+mówi o pieniądzach klienta, jest `status` o wartości `FINISHED` albo
+`FINISHED_APT`.
+
+**A `status` jest PUNKTEM na osi, nie historią.** Oś biegnie dalej:
+
+```
+DELIVERED → FINISHED → COMMISSION_REFUND_CLAIMED → COMMISSION_REFUNDED
+```
+
+Dwa ostatnie dotyczą NASZEJ PROWIZJI, nie pieniędzy klienta — mówi to opis pola
+w schemacie. Kto nie odpytał Allegro dokładnie w oknie `FINISHED`, nie dowie się
+o wypłacie nigdy. Okno bywa krótsze niż takt synchronizacji, bo spycha z niego
+także nasz własny automat rabatów.
+
+**Fakt stoi gdzie indziej.** `GET /payments/payment-operations` oddaje historię
+operacji płatniczych sprzedawcy, a `payment.id` jest jej **parametrem
+zapytania**. Identyfikator płatności trzymamy przy zamówieniu od 0.190.0, więc
+pytanie jest punktowe i bez stanu: „czy na tej płatności jest obciążenie
+zwrotem". Odpowiedź nie wygasa.
+
+Uprawnienie: `allegro:api:payments:read`.
+
+**Co bierzemy za dowód.** Grupa `REFUND` niesie sześć typów operacji
+(`REFUND_CHARGE`, `REFUND_CANCEL`, `REFUND_INCREASE`, `CORRECTION`,
+`PROVIDER_REFUND_TRANSFER_CHARGE`, `PROVIDER_REFUND_TRANSFER_INCREASE`),
+a schemat nie opisuje żadnego z nich zdaniem. Bierzemy wyłącznie
+`REFUND_CHARGE` — jedyny, którego nazwa nie pozostawia wątpliwości co do
+kierunku pieniędzy. Nowsze `REFUND_CANCEL` ten dowód unieważnia.
+
+`[WERYFIKUJ]` Czy `REFUND_INCREASE` bywa samodzielnym zwrotem, czy zawsze
+towarzyszy obciążeniu.
+
+`[WERYFIKUJ]` Która portmonetka niesie obciążenie zwrotem. `wallet.type` ma
+w schemacie domyślne `AVAILABLE` i drugą wartość `WAITING`, a znaczenia dla
+zwrotu nie opisuje. Do rozstrzygnięcia pytamy obie — drugą dopiero wtedy, gdy
+pierwsza milczy.
+
+Zatrzaskiem jest `zwrot_klienta.rozliczony_allegro_at`, ten sam co przy
+`FINISHED`. Zwrot zamknięty tą drogą bez naszej korekty wychodzi w raporcie
+rekoncyliacji (`zwrot_rozliczony_bez_korekty`) i nie znika po cichu.
+
 ## Odnośniki do panelu sprzedawcy
 
 Adres oferty przy pozycji zwrotu (`CustomerReturnItem.url`, przykład
