@@ -100,7 +100,15 @@ export async function copilotRoutes(app: FastifyInstance) {
       wlaczony: czemuWylaczony() === null,
       powod: czemuWylaczony(),
       model: config.copilot.model,
+      /* Osobny model klasyfikacji (22 września 2026) — bez niego ekran nie
+         miałby jak powiedzieć, że etykieta i szkic idą różnymi modelami. */
+      modelKlasyfikacji: config.copilot.modelKlasyfikacji,
       maxPartia: config.copilot.maxPartia,
+      /* Czy automat sam rozpoznaje i układa (22 września 2026). Panel chowa
+         po tym ręczne „Rozpoznaj" do roli ponowienia: przycisk, który robi to
+         samo co takt, uczyłby płacić dwa razy za jedną etykietę. */
+      autoKlasyfikacja: config.copilot.autoKlasyfikacja,
+      autoSzkic: config.copilot.autoSzkic,
     };
   });
 

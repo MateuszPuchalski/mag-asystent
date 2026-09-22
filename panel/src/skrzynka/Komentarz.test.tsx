@@ -4,18 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { Edytor } from "./Edytor";
 import { Os } from "./Os";
 
-/* Edytor woła od 0.399.0 hak szablonów, a te pliki nie stawiają klienta
-   TanStacka — pilnują trybu odpowiedzi, nagłówka i karty Copilota, nie listy
-   szablonów. Własne testy ma ona w `Szablony.test.tsx`. */
-vi.mock("../api/szablony", () => ({
-  useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
-  useArchiwumSzablonow: () => ({ data: { szablony: [] }, isLoading: false }),
-  useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
-
 /* ── Komentarz wewnętrzny w edytorze (0.157.0) ───────────────────────────────
    §6.4: komentarze „nie mogą przypadkiem trafić do klienta". §25 stawia to
    wśród kryteriów gotowości, a §10.4 żąda, żeby przycisk komentarza i przycisk

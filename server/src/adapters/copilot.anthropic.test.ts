@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
-import { _ustawKlienta, nadawcaAnthropic, nadawcaSzkicuAnthropic } from "./copilot.anthropic.js";
+import {
+  _ustawKlienta, nadawcaAnthropic, nadawcaSzkicuAnthropic, wspieraWysilek,
+} from "./copilot.anthropic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
@@ -137,4 +139,36 @@ test("błąd SDK ze statusem dalej idzie swoją gałęzią, mimo wspólnego przo
   const e = await nadawcaSzkicuAnthropic(TRESC, FAKTY).then(() => null, (b) => b);
   assert.ok(e instanceof BladPrzeciazeniaCopilota,
     `529 przykryte przez gałąź parsowania: ${(e as Error)?.constructor.name}`);
+});
+
+/* ── Model klasyfikacji i parametr wysiłku (22 września 2026) ───────────────
+   Klasyfikacja idzie WŁASNYM modelem. Haiku 4.5 i Sonnet 4.5 odrzucają
+   `effort` błędem 400 wg dokumentacji Anthropic — żądanie do nich idzie bez
+   niego, reszta modeli dostaje wysiłek jak dotąd. */
+test("wysiłek idzie tylko do modeli, które go przyjmują", () => {
+  assert.equal(wspieraWysilek("claude-opus-5"), true);
+  assert.equal(wspieraWysilek("claude-sonnet-5"), true);
+  assert.equal(wspieraWysilek("claude-haiku-4-5"), false);
+  assert.equal(wspieraWysilek("claude-sonnet-4-5"), false);
+});
+
+test("klasyfikacja wysyła model z modelKlasyfikacji i oddaje go w odpowiedzi", async () => {
+  const { config } = await import("../config.js");
+  const bylo = config.copilot.modelKlasyfikacji;
+  (config.copilot as { modelKlasyfikacji: string }).modelKlasyfikacji = "claude-haiku-4-5";
+  let wyslane: Record<string, unknown> = {};
+  _ustawKlienta({ messages: { parse: async (p: Record<string, unknown>) => {
+    wyslane = p;
+    return { parsed_output: { kategoria: "OTHER" }, model: undefined, stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 } };
+  } } } as unknown as Anthropic);
+  try {
+    const odp = await nadawcaAnthropic(TRESC);
+    assert.equal(wyslane.model, "claude-haiku-4-5");
+    assert.equal("effort" in (wyslane.output_config as object), false, "Haiku 4.5 odrzuca effort");
+    assert.equal(odp.model, "claude-haiku-4-5", "księga ma zapisać model, którym naprawdę liczono");
+  } finally {
+    (config.copilot as { modelKlasyfikacji: string }).modelKlasyfikacji = bylo;
+    _ustawKlienta(null);
+  }
 });

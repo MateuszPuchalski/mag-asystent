@@ -3,15 +3,12 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, STATUSY_RECZNE, ustawPriorytet,
-  ustawReklamacyjna, ustawStatus, wskazKartoteke, wskazOferte, zapiszSzkic, type StatusRozmowy } from "../services/conversations.js";
+import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
+  ustawReklamacyjna, wskazKartoteke, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
 import { wskazZamowienie } from "../services/zamowienia-kandydaci.js";
-import {
-  archiwumSzablonow, dodajSzablon, listaSzablonow, zarchiwizujSzablon, zmienSzablon,
-} from "../services/szablony.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
 import { db } from "../db/db.js";
@@ -413,28 +410,13 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return blad(reply, e); }
     });
 
-  /* Status rozmowy (§7, 0.158.0). Zmiana ręką agenta; przejścia automatyczne
-     robią synchronizator i wysyłka, bez udziału tej trasy. */
-  app.post<{ Params: { id: string }; Body: { status?: string; doKiedy?: string | null } }>(
-    "/api/obsluga/rozmowy/:id/status", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      const s = req.body?.status ?? "";
-      /* TYLKO STATUSY RĘCZNE (0.225.0). „Otwarta", „czeka na klienta" i „czeka
-         na nas" WYNIKAJĄ z ostatniej wiadomości, więc nadanie ich z ręki byłoby
-         przepisaniem faktu, który już stoi w wątku — i jedyne, co mogłoby z tego
-         wyjść, to rozjazd. Bramka stoi na TRASIE, nie w serwisie: `ustawStatus`
-         wołają też zdarzenia po naszej stronie (zlecenie pomiaru stawia
-         `waiting_for_internal`), a te mają prawo pisać stan wprost. */
-      if (!(STATUSY_RECZNE as readonly string[]).includes(s)) {
-        return reply.code(400).send({
-          error: `Tego statusu nie nadaje się ręcznie. Dozwolone: ${STATUSY_RECZNE.join(", ")}.` });
-      }
-      try {
-        return ustawStatus(db(), Number(req.params.id), s as StatusRozmowy,
-          sesjaZadania()!.user.userId, req.body?.doKiedy ?? null);
-      } catch (e) { return blad(reply, e); }
-    });
+  /* RĘCZNEGO STATUSU NIE MA (22 września 2026, decyzja właściciela). Trasa
+     `/status` nadawała odłożenie, „Rozwiązana", „Zamknięta" i „Spam". Status
+     rozmowy wynika odtąd wyłącznie z faktów: z kierunku ostatniej wiadomości
+     i ze zlecenia pomiaru. Cenę opisuje `docs/panel-obslugi-klienta.md` §7:
+     rozmowa zakończona podziękowaniem klienta zostaje „czeka na nas", dopóki
+     ktoś nie odpisze. Werdykty zapisane przed tą zmianą zostają w kolumnie,
+     a nowa wiadomość klienta budzi je jak dotąd. */
 
   /* Priorytet rozmowy (§10.2, 0.181.0). Ręczna flaga — automat nie ma z czego
      jej wyliczyć, dopóki §26 nie rozstrzygnie terminu odpowiedzi. */
@@ -494,56 +476,6 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return wskazOferte(Number(req.params.id), req.body?.ofertaId ?? "",
           sesjaZadania()!.user.userId);
-      } catch (e) { return blad(reply, e); }
-    });
-
-  /* ── SZABLONY ODPOWIEDZI (0.399.0) ─────────────────────────────────────────
-     Zgłoszenie właściciela: „dodaj ten szablon do szablonów odpowiedzi
-     w skrzynce". Szablonów nie było wcale.
-
-     Trasy stoją w skrzynce, a nie w osobnym pliku, bo za tą samą bramką co
-     reszta panelu obsługi: szablon niesie zdania, które idą do klienta,
-     i hala nie ma tu czego szukać.
-
-     ODCZYT NICZEGO NIE MUTUJE — lista jedzie GET-em, a liczniki zapisów
-     w testach tras pilnują, że otwarcie edytora nic nie dopisuje. */
-  app.get("/api/obsluga/szablony", async (_req, reply) => {
-    const nie = odmowa(reply); if (nie) return nie;
-    return { szablony: listaSzablonow(db()) };
-  });
-
-  app.get("/api/obsluga/szablony/archiwum", async (_req, reply) => {
-    const nie = odmowa(reply); if (nie) return nie;
-    return { szablony: archiwumSzablonow(db()) };
-  });
-
-  app.post<{ Body: { nazwa?: string; tresc?: string } }>(
-    "/api/obsluga/szablony", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return { szablon: dodajSzablon(req.body?.nazwa ?? "", req.body?.tresc ?? "",
-          sesjaZadania()!.user.userId) };
-      } catch (e) { return blad(reply, e); }
-    });
-
-  app.post<{ Params: { id: string }; Body: { nazwa?: string; tresc?: string } }>(
-    "/api/obsluga/szablony/:id", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return { szablon: zmienSzablon(Number(req.params.id), req.body?.nazwa ?? "",
-          req.body?.tresc ?? "", sesjaZadania()!.user.userId) };
-      } catch (e) { return blad(reply, e); }
-    });
-
-  /* ZDJĘCIE, NIE KASOWANIE (§25a.5) — stąd `POST` z flagą, a nie `DELETE`.
-     Ta sama trasa przywraca, bo to jedna decyzja w dwie strony. */
-  app.post<{ Params: { id: string }; Body: { archiwalny?: boolean } }>(
-    "/api/obsluga/szablony/:id/archiwum", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        zarchiwizujSzablon(Number(req.params.id), req.body?.archiwalny !== false,
-          sesjaZadania()!.user.userId);
-        return { ok: true };
       } catch (e) { return blad(reply, e); }
     });
 

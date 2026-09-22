@@ -142,9 +142,10 @@ w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 > czyta. Tabela bez czytelnika nie jest archiwum, tylko pułapką dla następnej
 > osoby czytającej schemat — i tak samo tłumaczyło to cięcie z 0.140.0.
 >
-> Kasaty dotąd: rejestry starej obsługi klienta (0.140.0) oraz nakładka spraw,
-> czyli `sprawa_klienta` i `sprawa_klienta_rozmowa` (0.388.0). Kto chce tamtych
-> danych, czyta je z kopii; po aktualizacji nie ma skąd ich wziąć.
+> Kasaty dotąd: rejestry starej obsługi klienta (0.140.0), nakładka spraw,
+> czyli `sprawa_klienta` i `sprawa_klienta_rozmowa` (0.388.0), oraz szablony
+> odpowiedzi, czyli `szablon_odpowiedzi` (0.434.0). Kto chce tamtych danych,
+> czyta je z kopii; po aktualizacji nie ma skąd ich wziąć.
 
 ```bash
 cd /c
@@ -2583,6 +2584,63 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.436.0 — podziękowanie nie czeka na nas
+
+**Migracji nie ma. Panel trzeba przebudować.**
+
+Zmiana działa przy `COPILOT_AUTO_KLASYFIKACJA=1`. Bez taktu rozmowy
+rozpoznaje tylko ręczne „Rozpoznaj", więc podziękowania zostają w „Czeka
+na nas" jak dotąd.
+
+Sprawdzenie: znajdź rozmowę, w której klient podziękował po naszej
+odpowiedzi. Po rozpoznaniu wiersz ma status „Czeka na klienta" i znacznik
+„podziękowanie, bez odpowiedzi". Gdyby znacznik stał przy prawdziwym
+pytaniu, popraw kategorię plakietką — rozmowa wraca na listę od razu.
+
+### Aktualizacja do 0.434.0 — mniej przycisków w skrzynce
+
+**Migracja kasuje tabelę `szablon_odpowiedzi`. Panel trzeba przebudować.**
+
+Kto chce zachować treść szablonów, kopiuje ją PRZED aktualizacją:
+
+```powershell
+Copy-Item 'C:\wertis\server\data\wertis.db' 'C:\wertis\server\data\wertis-przed-0434.db'
+```
+
+Po aktualizacji biuro zobaczy cztery zmiany bez pytania:
+
+- **W nagłówku rozmowy status jest plakietką, nie polem wyboru.** Odłożenia,
+  „Rozwiązanej", „Zamkniętej" i „Spamu" nie nadaje się już ręcznie. Dawne
+  werdykty zostają w bazie.
+- **Znika kubełek „Po terminie" i pasek kategorii nad kolejką.**
+- **Znikają szablony** — w skrzynce i w edytorze reklamacji.
+- **Karta szkicu ma jeden przycisk** zamiast „Wstaw" i „Zastąp". „Ułóż
+  odpowiedź" stoi tylko przy braku szkicu albo przy starym.
+
+Sprawdzenie: otwórz rozmowę ze szkiciem Copilota. Nad kartą nie ma „Ułóż
+odpowiedź", a w karcie stoi „Popraw w edytorze". Przy włączonym
+`COPILOT_AUTO_KLASYFIKACJA=1` przycisk „Rozpoznaj" pokazuje się tylko przy
+rozmowach z nieudanym rozpoznaniem.
+
+### Aktualizacja do 0.432.0 — osobny model klasyfikacji
+
+**Nic nie trzeba robić.** Bez nowej zmiennej klasyfikacja idzie modelem
+z `COPILOT_MODEL`, tak jak dotąd.
+
+Żeby etykiety szły tańszym modelem, a szkic dalej mocniejszym, dopisz do
+`wertis.env` jedną linię i zrestartuj `wertis-api`:
+
+```
+export COPILOT_MODEL_KLASYFIKACJA=claude-sonnet-5
+```
+
+Zmieniaj model dopiero po tygodniu etykiet. Na karcie „Copilot" precyzja
+kategorii ma zostać w przedziale sprzed zmiany. Mniej niż pięćdziesiąt etykiet
+jeszcze niczego nie rozstrzyga.
+
+Sprawdzenie: po pierwszym rozpoznaniu kolumna `model` w najnowszym wierszu
+`copilot_wywolanie` z zadaniem `klasyfikacja` ma pokazać nowy model.
 
 ### Aktualizacja do 0.431.0 — biuro w nagłówku panelu
 

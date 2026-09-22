@@ -246,7 +246,7 @@ przed którą ta pozycja broni.
 - [ ] logo nie jest przycięte do kwadratu — wąskie mieści się w całości,
 - [ ] wejście na listę NIE zostawia w dzienniku wpisów o brakującym logo.
 
-**Cofanie pomyłek w dostawie** (0.433.0)
+**Cofanie pomyłek w dostawie** (0.437.0)
 
 - [ ] po odłożeniu nad listą stoi pasek „ODŁOŻONO … → półka" z COFNIJ,
 - [ ] pasek znika przy następnym skanie towaru,

@@ -45,7 +45,7 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
    czego rozkładać. Nie zamknie się jednak, dopóki wisi nieodpowiedziana
    notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
-   Od 0.433.0 nie zamknie się też sama z NADMIAREM ani z pozycją z WYJĄTKIEM.
+   Od 0.437.0 nie zamknie się też sama z NADMIAREM ani z pozycją z WYJĄTKIEM.
    Nadmiar jest twierdzeniem wobec dostawcy, a wyjątek czeka na decyzję.
    Obie takie dostawy zamyka wyłącznie ZAKOŃCZ z podglądem.
 6. **Wyjątek** (`raiseProblem`) — kategoria zna swój ZAKRES (0.57.0). Cztery
@@ -58,7 +58,7 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
    wyjątek „zła ilość", a nadmiary jako nadmiar. Dla pozycji nietkniętych
    człowiek MUSI wybrać: BRAK („brak w przesyłce" na całą ilość, z MM braku)
    albo POMIŃ (bez zgłoszenia). Bez wyboru serwer odmawia z kodem
-   `wybor_nietknietych` (0.433.0). Przycisk jest
+   `wybor_nietknietych` (0.437.0). Przycisk jest
    dla dostawy OTWARTEJ; po domknięciu z punktu 5 kolektor pokazuje w jego
    miejscu wyjście na listę. Odmowa „już zamknięta" niesie kod `juz_zamknieta`
    i też prowadzi na listę — cel jest wtedy osiągnięty (0.54.0).
@@ -66,7 +66,7 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
    faktura jest otwarta. Ustawia liczbę bezwzględną, nie różnicę, i nie tworzy
    wyjątku. Korekta do zera cofa też adres, gdy stos odłożeń pokrywa całą
    ilość. Anuluje wtedy zapis w kolejce albo pisze adres sprzed dostawy.
-9. **Cofanie pomyłek** (`services/cofanie-dostawy.ts`, 0.433.0) — COFNIJ
+9. **Cofanie pomyłek** (`services/cofanie-dostawy.ts`, 0.437.0) — COFNIJ
    kolejne odłożenia od ostatniego, ZMIEŃ PÓŁKĘ, OTWÓRZ PONOWNIE w dniu
    zamknięcia, WYCOFAJ własne zgłoszenie. Granica przez Subiekta jak przy
    koszu: czekający zapis się anuluje, wykonany dostaje zapis odwrotny.

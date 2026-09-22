@@ -131,14 +131,30 @@ export function _ustawKlienta(c: Anthropic | null): void {
 }
 
 /**
+ * Czy model przyjmuje `output_config.effort`. Dokumentacja Anthropic mówi
+ * wprost, że Haiku 4.5 i Sonnet 4.5 odrzucają ten parametr błędem 400 — a po
+ * dołożeniu `COPILOT_MODEL_KLASYFIKACJA` zejście na Haiku jest pierwszą rzeczą,
+ * jaką ktoś spróbuje. Bez tej funkcji każde rozpoznanie kończyłoby się decyzją
+ * FAILED za pełną cenę. Lista zna tylko rodziny opisane w dokumentacji;
+ * reszta dostaje wysiłek jak dotąd.
+ */
+export function wspieraWysilek(model: string): boolean {
+  return !/^claude-(haiku-|sonnet-4-5)/.test(model);
+}
+
+/**
  * Realny nadawca klasyfikacji. Wstrzykuje go TRASA, nie serwis — ten sam
  * wzorzec, co przy `zglosRabat` i `zwrocPlatnosc`.
  */
 export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzModelu> => {
   const start = Date.now();
+  /* WŁASNY MODEL KLASYFIKACJI (22 września 2026), nie `config.copilot.model`:
+     etykieta ma zejść na tańszy model bez ciągnięcia w dół szkicu. Pole puste
+     dziedziczy `COPILOT_MODEL`, więc bez zmiany w wertis.env nic się nie rusza. */
+  const model = config.copilot.modelKlasyfikacji;
   try {
     const odp = await anthropic().messages.parse({
-      model: config.copilot.model,
+      model,
       /* Decyzja to dziesięć pól, około stu pięćdziesięciu tokenów, a myślenie
          przy wysiłku „low” też liczy się do sufitu. 256 z 0.191.0 wystarczało
          na jedną etykietę; tu ucięcie dałoby JSON bez nawiasu, czyli decyzję
@@ -151,8 +167,9 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
       output_config: {
         /* Najniższy wysiłek: rozpoznanie nie jest trudnym rozumowaniem, a
            wysiłek jest pierwszą dźwignią kosztu. Myślenia NIE wyłączamy — na
-           tym modelu wyłączone ma udokumentowane tryby awarii. */
-        effort: "low",
+           tym modelu wyłączone ma udokumentowane tryby awarii. Model bez
+           parametru wysiłku dostaje żądanie bez niego — patrz `wspieraWysilek`. */
+        ...(wspieraWysilek(model) ? { effort: "low" as const } : {}),
         format: zodOutputFormat(Wynik),
       },
       messages: [{ role: "user", content: String(tresc) }],
@@ -177,7 +194,7 @@ export const nadawcaAnthropic: NadawcaKlasyfikacji = async (tresc): Promise<Odpo
 
     return {
       surowa: w,
-      model: odp.model ?? config.copilot.model,
+      model: odp.model ?? model,
       promptWersja: PROMPT_KLASYFIKACJI,
       zuzycie,
       ms: Date.now() - start,

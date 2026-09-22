@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.433.0 — 22 września 2026
+## 0.437.0 — 22 września 2026
 
 **Pomyłkę przy rozkładaniu dostawy da się cofnąć — także na ostatniej
 pozycji.** Zgłoszenie właściciela po audycie UX kolektora: „jak już zaznaczyłem,
@@ -120,6 +120,77 @@ z zamknięcia. Gdy MM braku weszło do Subiekta.
 i `problem.zrodlo`. Stare odłożenia nie mają przepisu na cofnięcie; stare
 zgłoszenia liczą się jako złożone przez człowieka. Nic do zrobienia ręką —
 kolektory dostaną APK z serwera jak zwykle.
+## 0.436.0 — 22 września 2026
+
+**Podziękowanie klienta nie czeka na nas.** Po odejściu ręcznych statusów
+rozmowa zakończona „dziękuję" stała w „Czeka na nas" z zegarem. Teraz
+rozstrzyga to klasyfikator, bez sprawdzania tekstu — decyzją właściciela.
+
+- Ostatnia wiadomość klienta z decyzją `OTHER` + `NO_ACTION`, wysoką
+  pewnością i bez żądania człowieka, po naszej wcześniejszej odpowiedzi,
+  daje status „Czeka na klienta" (`klientPodziekowal`).
+- Wiersz kolejki nosi znacznik „podziękowanie, bez odpowiedzi"; zegar
+  oczekiwania znika.
+- Nowa wiadomość klienta unieważnia decyzję i rozmowa wraca na listę sama.
+  Poprawka kategorii na inną niż `OTHER` zdejmuje regułę od razu.
+- Działa tylko przy `COPILOT_AUTO_KLASYFIKACJA=1` albo po ręcznym
+  „Rozpoznaj" — bez rozpoznania nic się nie zmienia.
+
+- **[wymaga działania]** Przebuduj panel.
+
+
+## 0.434.0 — 22 września 2026
+
+**Skrzynka traci przyciski, które dublował automat.** Decyzja właściciela po
+przeglądzie funkcji. Szkic Copilota czeka dziś przy każdej wiadomości klienta,
+a rozpoznanie robi takt. Część przycisków robiła więc to samo drugą drogą.
+
+- **Ręczne statusy rozmowy odeszły.** Trasa `/status`, pole wyboru w nagłówku
+  i kubełek „Po terminie" znikają. Status wynika z kierunku ostatniej
+  wiadomości i ze zlecenia pomiaru. Cena: podziękowanie klienta zostawia
+  rozmowę w „Czeka na nas", a spamu nie da się uciszyć.
+- **Szablony odpowiedzi odeszły** ze skrzynki i z edytora reklamacji, razem
+  z trasami, serwisem i tabelą `szablon_odpowiedzi`.
+- **Pasek kategorii nad kolejką odszedł.** Kategoria zostaje na wierszu.
+- **Karta szkicu ma jeden przycisk:** „Popraw w edytorze" albo „Zastąp mój
+  szkic", gdy pole agenta ma już treść.
+- **„Ułóż odpowiedź" stoi tylko przy braku szkicu albo przy starym**, jako
+  „Ułóż ponownie" po odrzuceniu, dopisku klienta albo zmianie doboru.
+- **„Rozpoznaj" przy włączonym takcie liczy tylko nieudane rozpoznania.**
+  `GET /api/obsluga/copilot` podaje `autoKlasyfikacja` i `autoSzkic`.
+- **Pasmo „Do tej odpowiedzi" traci „wstaw do szkicu".** Trzy fakty zostają do
+  sprawdzania szkicu.
+- **Karta pomiaru liczy szkice po losie przy wysyłce.** „Wstawionych"
+  i „zastąpionych" znikają z karty i z odpowiedzi pomiaru; „odrzuconych" zostaje.
+
+Nowy test `db/kasata-szablonow.test.ts` pilnuje, żeby tabela nie wróciła.
+
+- **[wymaga działania]** Przebuduj panel. Kopia bazy przed aktualizacją,
+  jeśli treść szablonów ma przetrwać — patrz `DEPLOY.md`.
+
+
+## 0.432.0 — 22 września 2026
+
+**Klasyfikacja dostaje własny model: `COPILOT_MODEL_KLASYFIKACJA`.** Do tej
+wersji jedno pole `COPILOT_MODEL` rządziło klasyfikacją, szkicem i dopytaniem
+naraz. Zejście na tańszy model przy etykiecie ciągnęło więc w dół także szkic,
+a szkic czyta klient.
+
+Puste pole dziedziczy `COPILOT_MODEL` — instalacja bez nowej zmiennej zachowuje
+się dokładnie tak jak dotąd. Nowe pole ma tę samą bramkę co stare: wklejony
+klucz nie wychodzi do komunikatu błędu.
+
+**Haiku 4.5 i Sonnet 4.5 dostają żądanie bez parametru wysiłku.** Dokumentacja
+Anthropic mówi, że te modele odrzucają `effort` błędem 400. Bez tej poprawki
+ustawienie Haiku kończyłoby każde rozpoznanie decyzją `FAILED` za pełną cenę.
+
+Stan Copilota (`GET /api/obsluga/copilot`) podaje model klasyfikacji obok
+modelu szkicu. Księga wywołań zapisuje model przy każdym wywołaniu, więc
+karta „Copilot" rozdziela koszt po zadaniu bez zmian.
+
+- Nowa zmienna, opcjonalna — patrz `DEPLOY.md`.
+- **[wymaga działania]** Przebuduj panel.
+
 
 ## 0.431.0 — 22 września 2026
 

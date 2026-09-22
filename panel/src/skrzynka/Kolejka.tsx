@@ -1,24 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Eye, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+  AlarmClock, Eye, Handshake, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
 import type {
-  Kategoria, Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
+  Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
 import { czas, FiltrSegmentowy, godzina, Plakietka, Pusto } from "../ui";
-import { NAZWA, NAZWA_DOBORU, NAZWA_KATEGORII } from "./statusy";
+import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
 
-/* Kubełki kolejki wprost z §10.1: „Nieprzypisane, Moje, Oczekujące, Po
-   terminie". Filtr jest po stronie EKRANU, bo lista i tak przyjeżdża w
-   całości — dokładanie parametru do trasy nic by dziś nie oszczędziło,
-   a rozmnożyłoby reguły przynależności na dwie strony.
+/* Kubełki kolejki z §10.1: „Nieprzypisane, Moje, Oczekujące". Filtr jest po
+   stronie EKRANU, bo lista i tak przyjeżdża w całości — dokładanie parametru
+   do trasy nic by dziś nie oszczędziło, a rozmnożyłoby reguły przynależności
+   na dwie strony.
 
-   „Po terminie" liczy SERWER (`poTerminie`). Ekran tej reguły nie wyprowadza
-   drugi raz — kubełki zwrotów już raz pokazały, czym kończą się dwie kopie
-   jednej definicji: dwiema różnymi kolejkami przy jednym liczniku. */
-type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace" | "poTerminie";
+   Znacznik „po terminie" na wierszu liczy dalej SERWER (`poTerminie`), bo
+   odłożenia zapisane przed 22 września 2026 wciąż wygasają. Nowych nikt nie
+   nadaje, więc kubełek na nie odszedł, a znacznik zgaśnie sam. */
+type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace";
 
 /* ── Kolejność listy (0.215.0) ───────────────────────────────────────────────
    Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
@@ -51,7 +51,8 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
   { klucz: "moje", etykieta: "Moje" },
   { klucz: "oczekujace", etykieta: "Oczekujące" },
-  { klucz: "poTerminie", etykieta: "Po terminie" },
+  /* „Po terminie" odeszło 22 września 2026 razem z ręcznym odłożeniem:
+     kubełek liczył wyłącznie odłożenia, a tych nikt już nie nadaje. */
 ];
 
 /* Rozmowa zamknięta i spam znikają z kolejki roboczej, ale NIE z panelu:
@@ -100,7 +101,6 @@ const NASZ_RUCH: ReadonlySet<StatusRozmowy> = new Set([
 
 function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean {
   if (kubelek === "wszystkie") return true;
-  if (kubelek === "poTerminie") return r.poTerminie;
   if (ZESZLA_Z_BIURKA.includes(r.status)) return false;
   if (kubelek === "nieprzypisane") return r.wlascicielId === null;
   if (kubelek === "moje") return mojeId !== null && r.wlascicielId === mojeId;
@@ -132,14 +132,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   nieswieza?: boolean;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("wszystkie");
-  /* Filtr kategorii jest DRUGIM sitem, nałożonym na kubełek, a nie trzecim
-     rzędem kubełków: kubełek mówi „czyje to", kategoria — „o czym to". Zlanie
-     tego w jedną listę zmusiłoby agenta do wyboru między dwoma pytaniami,
-     na które odpowiada naraz. */
-  const [kategoria, setKategoria] = useState<Kategoria | null>(null);
   /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
      Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
-     mówi „czyje to", kategoria „o czym to", a pytania „czy TA rozmowa gdzieś
+     mówi „czyje to", a pytania „czy TA rozmowa gdzieś
      tu jest" nie zadawał nikt — bo nie było jak. „Klient pisał o tym miesiąc
      temu" znaczyło przewijanie listy.
 
@@ -154,12 +149,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   const szukane = fraza.trim().toLowerCase();
   const uporzadkowane = porzadek === "najnowsze" ? odNajnowszych(rozmowy) : rozmowy;
   const wKubelkuTeraz = uporzadkowane.filter((r) => wKubelku(r, kubelek, mojeId));
-  const poKategorii = kategoria === null ? wKubelkuTeraz
-    : wKubelkuTeraz.filter((r) => r.kopilot?.kategoria === kategoria);
   /* Szukamy po LOGINIE i po TREŚCI. Login, bo tak się wraca do znanej sprawy;
      treść, bo tak się szuka sprawy, której loginu nikt nie pamięta. Właściciel
      rozmowy dochodzi trzeci: „co ma Ola" jest pytaniem zadawanym na głos. */
-  const widoczne = szukane === "" ? poKategorii : poKategorii.filter((r) =>
+  const widoczne = szukane === "" ? wKubelkuTeraz : wKubelkuTeraz.filter((r) =>
     r.klient.toLowerCase().includes(szukane)
     || r.ostatniaWiadomosc.toLowerCase().includes(szukane)
     || (r.wlasciciel ?? "").toLowerCase().includes(szukane));
@@ -189,8 +182,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      Żadna decyzja tego nie wybrała; po prostu nikt jej tu nie dorobił.
 
      NASŁUCH MIESZKA W KOLEJCE, nie w ekranie, i to jest różnica wobec tamtych
-     trzech. Tam ekran zna listę, więc wie, co jest „następne". Tutaj kubełek,
-     kategoria i szukanie są stanem TEJ kolejki, a ekran widzi wyłącznie
+     trzech. Tam ekran zna listę, więc wie, co jest „następne". Tutaj kubełek
+     i szukanie są stanem TEJ kolejki, a ekran widzi wyłącznie
      `wybranaId` — liczyłby więc „następną" z listy nieprzefiltrowanej
      i przeskakiwał na rozmowy, których nie widać. Podnoszenie tego stanu na
      ekran byłoby większą zmianą niż cały ten skrót.
@@ -228,15 +221,6 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     return () => window.removeEventListener("keydown", f);
   }, []);
 
-  /* Skład kubełka JEDNYM SPOJRZENIEM (dekalog ergonomii, punkt 1: informacja
-     w miejscu, gdzie zapada decyzja). Liczniki liczą się z tego, co widać —
-     serwer nie musi ich podawać, bo lista i tak przyjeżdża w całości. */
-  const liczniki = new Map<Kategoria, number>();
-  for (const r of wKubelkuTeraz) {
-    if (!r.kopilot || r.kopilot.nieaktualna) continue;
-    liczniki.set(r.kopilot.kategoria, (liczniki.get(r.kopilot.kategoria) ?? 0) + 1);
-  }
-  const wgLiczby = [...liczniki.entries()].sort((a, b) => b[1] - a[1]);
   return <section className="card flex min-h-0 flex-col overflow-hidden">
     {/* `shrink-0` nad scrollerem i `min-h-0` na nim (0.180.0). Bez tego przy
         węższej kolumnie kubełki zawijają się na trzy rzędy, a lista — jedyny
@@ -262,7 +246,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
-      <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)} />
+      <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
         STAN Z {godzina(stan.ostatniaSynchronizacja)}</span>}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
@@ -306,34 +290,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       {/* Pomoc wchodzi do TEGO rzędu (0.402.0) zamiast stać pasmem niżej —
           ten sam ruch, co na trzech pozostałych ekranach obsługi. */}
     </div>
-    <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz)}
+    <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
       onRozpoznaj={onRozpoznaj} />
-    {/* Pasek liczników zamiast PRZESTAWIANIA kolejki i to jest decyzja.
-        Dzisiejsze klucze kolejności — ręczna flaga „pilne" i czas oczekiwania
-        klienta — są FAKTAMI; kategoria jest przypuszczeniem maszyny, a jedna
-        pomyłka klasyfikatora zakopałaby prawdziwe pytanie na dole listy tak,
-        że nikt by tego nie zauważył. Agent widzi skład skrzynki i sam wybiera,
-        co bierze. Regułę kolejności wolno dołożyć dopiero wtedy, gdy pomiar
-        trafności ją uzasadni (etap G). */}
-    {wgLiczby.length > 0 && <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1 text-podpis">
-      {/* FIOLET JEST WYJĄTKIEM BARWY, NIE KSZTAŁTU. Kategoria to PRZYPUSZCZENIE
-          maszyny, a nie fakt — i to jedyny powód, dla którego te pigułki nie są
-          atramentowe jak kubełki nad nimi. Kształt, rozmiar i próg dotyku biorą
-          z `FiltrSegmentowy`: do 0.261.0 stały na `px-1.5 py-0.5`, czyli 20 px
-          przy progu 24×24, dwadzieścia linii pod pigułkami, które 0.255.0
-          podniosło właśnie z tego powodu.
-
-          Kliknięcie w wybraną kategorię ją ZDEJMUJE, bo to zawężenie listy,
-          a nie kubełek — stąd `kategoria === k ? null : k`. */}
-      <FiltrSegmentowy<Kategoria | null> wybrany={kategoria}
-        onWybierz={(k) => setKategoria(kategoria === k ? null : k)}
-        ton={["bg-violet-700 text-white",
-          "bg-violet-50 text-violet-800 hover:bg-violet-100"]}
-        pozycje={wgLiczby.map(([k, ile]) => ({ klucz: k, etykieta: NAZWA_KATEGORII[k], ile }))} />
-      {kategoria !== null && <button type="button" className="ml-auto text-slate-500 underline"
-        onClick={() => setKategoria(null)}>pokaż wszystkie</button>}
-    </div>}
+    {/* ── PIGUŁEK KATEGORII NIE MA (22 września 2026) ──────────────────────
+        Decyzja właściciela. Pasek liczył kategorie w kubełku i zawężał listę
+        po PRZYPUSZCZENIU maszyny — przy piętnastu klasach potrafił zająć trzy
+        rzędy nad pierwszym pytaniem. Kategoria zostaje na wierszu i w nagłówku
+        rozmowy. Zakaz przestawiania kolejki po kategorii stoi dalej: kolejność
+        niosą fakty — flaga „pilne" i czas oczekiwania. */}
     <div className={`min-h-0 flex-1 overflow-y-auto ${nieswieza ? "opacity-60" : ""}`}>
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania, a skrót, o którym nikt nie wie,
@@ -359,10 +324,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           Nic nie pasuje do „{fraza.trim()}" w tym kubełku.{" "}
           <button type="button" className="underline" onClick={() => setFraza("")}>
             Wyczyść szukanie</button></Pusto>}
-      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria !== null &&
-        <Pusto waga="lista">
-          Nic w kategorii „{NAZWA_KATEGORII[kategoria]}" w tym kubełku.</Pusto>}
-      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" && kategoria === null &&
+      {!laduje && rozmowy.length > 0 && !widoczne.length && szukane === "" &&
         <Pusto waga="lista">Ten kubełek jest pusty — zajrzyj do „Wszystkie".</Pusto>}
       {widoczne.map((r) => {
         /* ── ZEGAR MIERZY NASZ DŁUG, NIE WIEK ROZMOWY (0.251.0) ───────────
@@ -491,6 +453,13 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <UserCheck size={12} />{r.wlasciciel}</span>}
             {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
               <AlarmClock size={12} />po terminie</span>}
+            {/* PODZIĘKOWANIE BEZ ODPOWIEDZI (22 września 2026). Podgląd wiersza
+                to słowa klienta, a status mówi „Czeka na klienta" — bez tego
+                znacznika wiersz wyglądałby jak pytanie, które ktoś przeoczył.
+                Mówi też agentowi, że o zdjęciu z listy zdecydował klasyfikator,
+                więc pomyłkę poprawia się plakietką kategorii. */}
+            {r.podziekowal && <span className="flex items-center gap-1 text-slate-600">
+              <Handshake size={12} />podziękowanie, bez odpowiedzi</span>}
             {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
                 agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
                 przy wysyłce — czyli po straconej pracy. */}

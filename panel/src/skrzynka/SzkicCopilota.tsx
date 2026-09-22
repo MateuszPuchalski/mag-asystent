@@ -10,11 +10,14 @@ import { Dopytanie } from "./Dopytanie";
  * Szkic odpowiedzi z Copilota (§14.6, 0.231.0) — przycisk i karta pod edytorem.
  *
  * Propozycja modelu NIE wchodzi do pola sama. Stoi obok jako karta, a do
- * szkicu agenta trafia na jedno z dwóch kliknięć: „Wstaw" DOPISUJE (ten sam
- * kontrakt, co każda wstawka: nowa linia, nigdy ciche nadpisanie), „Zastąp"
- * jest jedyną świadomą drogą nadpisania i pojawia się TYLKO, gdy jest co
- * nadpisać. Każde kliknięcie, także „Odrzuć", jest werdyktem — z tych
- * werdyktów liczy się, czy przycisk wart jest pieniędzy.
+ * szkicu agenta trafia jednym kliknięciem „Popraw w edytorze".
+ *
+ * ── JEDEN PRZYCISK ZAMIAST „WSTAW" I „ZASTĄP" (22 września 2026) ──────────
+ * Decyzja właściciela. Od kiedy szkic czeka na agenta przy każdej wiadomości,
+ * pole agenta jest przy otwarciu zwykle puste — a wtedy oba przyciski robiły
+ * to samo. Przycisk jest więc jeden i przy pustym polu wstawia. Przy
+ * niepustym ZMIENIA NAPIS na „Zastąp mój szkic": nadpisanie cudzej pracy ma
+ * być świadome, a napis mówi, co się stanie, zanim ktoś kliknie.
  *
  * Bez kroku „to kosztuje": klik w jednej rozmowie JEST intencją. Partia nad
  * kolejką miała potwierdzenie, bo była kroplówką na dwadzieścia rozmów naraz.
@@ -33,7 +36,7 @@ export interface PropsSzkicuCopilota {
   paraPasowania: string | null;
   uklada: boolean;
   blad: string;
-  /** Szkic agenta jest niepusty — dopiero wtedy „Zastąp" ma sens. */
+  /** Szkic agenta jest niepusty — przycisk mówi wtedy „Zastąp mój szkic". */
   maSzkicAgenta: boolean;
   wylaczony: boolean;
   /**
@@ -49,9 +52,18 @@ export interface PropsSzkicuCopilota {
     limitZnakow: number;
   };
   onUloz: () => void;
-  onWstaw: () => void;
-  onZastap: () => void;
+  /** Treść szkicu do pola agenta — wstawia przy pustym, zastępuje przy pełnym. */
+  onPopraw: () => void;
   onOdrzuc: () => void;
+}
+
+/**
+ * Czy szkic na ekranie jest nieaktualny: klient dopisał albo dobór się
+ * zmienił. Zero w szkicu = wiersz sprzed migracji, o którym nic nie wiemy.
+ */
+function doborZmienil(p: PropsSzkicuCopilota): boolean {
+  const s = p.szkic;
+  return s !== null && p.doborWersja !== null && s.doborWersja > 0 && s.doborWersja !== p.doborWersja;
 }
 
 /**
@@ -78,9 +90,17 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
     return <span className="min-w-0 truncate text-xs text-slate-500" title={p.stan.powod ?? undefined}>
       {p.stan.powod}</span>;
   }
+  /* ── PRZYCISK TYLKO WTEDY, GDY SZKICU BRAK ALBO JEST STARY (22 września 2026)
+     Decyzja właściciela. Takt układa szkic sam, więc przy świeżej karcie
+     „Ułóż odpowiedź" kazałby zapłacić drugi raz za to samo. Przycisk wraca,
+     gdy karty nie ma (takt wyłączony, limit godzinowy, szkic odrzucony) albo
+     gdy leży na starych faktach — i wtedy mówi „ponownie". */
+  const swiezy = p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !doborZmienil(p);
+  if (swiezy && !p.uklada && !p.blad) return null;
+  const etykieta = p.szkic !== null ? "Ułóż ponownie" : "Ułóż odpowiedź";
   return <span className="flex min-w-0 items-center gap-2">
     <Przycisk className="shrink-0 text-xs" disabled={p.uklada || p.wylaczony} onClick={p.onUloz}>
-      <Sparkles size={14} />{p.uklada ? "Układam szkic z faktów…" : "Ułóż odpowiedź"}</Przycisk>
+      <Sparkles size={14} />{p.uklada ? "Układam szkic z faktów…" : etykieta}</Przycisk>
     {p.blad && <span className="min-w-0 truncate text-xs text-red-700" title={p.blad}>{p.blad}</span>}
   </span>;
 }
@@ -103,14 +123,13 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         powstał przed nową wiadomością klienta</span>}
       {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
           po szkicu — zwykle dlatego, że agent właśnie wpisał to, co Copilot
-          rozpoznał. Fakty są inne, więc szkic trzeba ułożyć jeszcze raz.
-          Zero w szkicu = wiersz sprzed migracji, o którym nic nie wiemy. */}
-      {p.doborWersja !== null && s.doborWersja > 0 && s.doborWersja !== p.doborWersja &&
+          rozpoznał. Fakty są inne, więc szkic trzeba ułożyć jeszcze raz. */}
+      {doborZmienil(p) &&
         <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
           dane doboru zmieniły się od szkicu — ułóż ponownie</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
-        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onWstaw}>Wstaw do szkicu</Przycisk>
-        {p.maSzkicAgenta && <Przycisk className="text-xs" disabled={p.wylaczony} onClick={p.onZastap}>Zastąp szkic</Przycisk>}
+        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}>
+          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}</Przycisk>
         <Przycisk className="text-xs" onClick={p.onOdrzuc}>Odrzuć</Przycisk>
       </span>
     </div>
