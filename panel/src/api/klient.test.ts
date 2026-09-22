@@ -85,3 +85,18 @@ describe("api()", () => {
     localStorage.clear();
   });
 });
+
+describe("wygasła sesja wraca do logowania (0.431.0)", () => {
+  it("BrakSesji wysyła zdarzenie do ramy, inne błędy — nie", async () => {
+    const { zglosBrakSesji, SESJA_WYGASLA } = await import("./klient");
+    let ile = 0;
+    const licz = () => { ile++; };
+    window.addEventListener(SESJA_WYGASLA, licz);
+    zglosBrakSesji(new Error("500"));
+    zglosBrakSesji(new Konflikt("409", {}));
+    expect(ile).toBe(0);
+    zglosBrakSesji(new BrakSesji("Sesja wygasła"));
+    expect(ile).toBe(1);
+    window.removeEventListener(SESJA_WYGASLA, licz);
+  });
+});

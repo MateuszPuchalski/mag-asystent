@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Dostawy</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#f1f5f9;font-family:Barlow,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}p{margin:0}button,input,select{font-family:inherit}
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.bieznia{display:flex;border-radius:8px;background:rgba(255,255,255,.1);padding:4px}
+.zakl{display:flex;align-items:center;gap:8px;border-radius:4px;padding:6px 10px;font-size:14px;font-weight:600;color:#cbd5e1;white-space:nowrap}
+.zakl.on{background:#F7A600;color:#2A2A2C}
+.licz{border-radius:999px;background:#F7A600;color:#2A2A2C;padding:0 6px;font-size:11px;font-weight:700}
+.zakl.on .licz{background:#2A2A2C;color:#fff}
+.karta{background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 1px 2px rgba(15,23,42,.05);box-sizing:border-box;overflow:hidden}
+.czip{border-radius:4px;padding:4px 8px;font-size:12px;font-weight:600;background:#f1f5f9;color:#475569;white-space:nowrap}
+.czip.on{background:#2A2A2C;color:#fff}.czip i{font-style:normal;font-weight:400;margin-left:3px}
+.pytanie{border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;background:#f8fafc;padding:6px 8px;font-size:12px;font-weight:700;color:#334155}
+.plak{border-radius:4px;padding:2px 6px;font-size:11px;line-height:16px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.syg{border-radius:4px;padding:2px 6px;font-size:12px;font-weight:700;white-space:nowrap}
+.s-zle{background:#fee2e2;color:#b91c1c}.s-uwaga{background:#fef3c7;color:#92400e}.s-ok{background:#d1fae5;color:#065f46}.s-nic{background:#f1f5f9;color:#475569}.s-info{background:#e0f2fe;color:#075985}.s-ty{background:#d1fae5;color:#065f46}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:700;white-space:nowrap}
+.btn-p{background:#F7A600;color:#2A2A2C}.btn-s{background:#fff;border:1px solid #cbd5e1;color:#0f172a}
+.btn-m{padding:4px 10px;font-size:12px}
+.pole{border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:14px;background:#fff;color:#94a3b8;box-sizing:border-box}
+.pozioma{display:flex;align-items:center;gap:8px}
+.drobne{font-size:12px;color:#64748b}.tekst{font-size:14px;color:#334155}
+.sekcja{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#64748b}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:12px;font-weight:700;color:#64748b;padding:6px 10px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top;font-size:14px}
+tr:last-child td{border-bottom:0}
+.pasek{height:6px;background:#e2e8f0;border-radius:6px;overflow:hidden}.pasek i{display:block;height:6px;background:#F7A600}.pasek.done i{background:#059669}
+.foto{border-radius:8px;background:#e2e8f0;display:grid;place-items:center;color:#94a3b8}
+.kafel{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px}.kafel b{display:block;font-size:24px;line-height:28px;font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;display:flex;flex-direction:column;background:#f1f5f9;overflow:hidden">
+<header style="flex:none;background:#2A2A2C;color:#fff;border-bottom:1px solid #e2e8f0">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 20px 6px">
+    <div style="border-radius:8px;background:#F7A600;padding:8px;color:#2A2A2C;display:flex"><svg class="ic" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"></path><path d="M6 18h12"></path><path d="M6 14h12"></path><rect x="6" y="10" width="12" height="12"></rect></svg></div>
+    <div style="margin-right:auto;white-space:nowrap"><b>WERTIS</b><span style="margin-left:8px;font-size:14px;color:#94a3b8">Biuro</span></div>
+    <nav class="bieznia"><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 17 2 2 4-4"></path><path d="m3 7 2 2 4-4"></path><path d="M13 6h8"></path><path d="M13 12h8"></path><path d="M13 18h8"></path></svg>Do decyzji<span class=licz>14</span></span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>Skrzynka</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>Zwroty</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>Reklamacje</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path></svg>Dyskusje</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect x="2" y="6" width="20" height="14" rx="2"></rect></svg>Moje</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"></path></svg>Wzmianki<span class=licz>2</span></span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v8l3-3 3 3V2"></path><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"></path></svg>Wiedza<span class=licz>3</span></span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>Zadania</span></nav>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;padding:6px 20px 12px">
+    <nav class="bieznia" style="background:rgba(255,255,255,.06)"><span class="zakl on"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg>Dostawy</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><path d="m3.3 7 8.7 5 8.7-5"></path></svg>Kosze</span><span style="width:1px;background:rgba(255,255,255,.15);margin:4px 6px"></span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>Stan systemu</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>Dziennik</span><span class="zakl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>Analiza</span></nav>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:8px;border-radius:8px;background:rgba(255,255,255,.1);padding:6px 12px;font-size:12px;color:#cbd5e1;white-space:nowrap"><i style="width:8px;height:8px;border-radius:50%;background:#34d399"></i>Synchronizacja 14:31 · 0 błędów</span>
+    <span style="display:flex;align-items:center;gap:8px;border-radius:8px;background:rgba(239,68,68,.2);padding:6px 12px;font-size:12px;color:#fecaca;white-space:nowrap"><i style="width:8px;height:8px;border-radius:50%;background:#f87171"></i>Subiekt: 1 zapis w błędzie</span>
+    <span aria-label="Ustawienia" style="display:flex;border-radius:8px;padding:8px;color:#94a3b8"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+    <span aria-label="Wyloguj" style="display:flex;border-radius:8px;padding:8px;color:#94a3b8"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path></svg></span>
+  </div>
+</header>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:368px minmax(0,1fr) 384px;gap:16px;padding:20px">
+<section class="karta"><div class="pozioma" style="padding:12px 16px"><span style="display:flex"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg></span><b style="font-size:17px">Dostawy</b><span class="drobne">import 14:31</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:4px;padding:0 8px 8px"><span class="czip on">Do decyzji<i>3</i></span><span class="czip">W toku<i>6</i></span><span class="czip">Nietknięte<i>2</i></span><span class="czip">Zamknięte<i>37</i></span><span class="czip">Poza WERTIS<i>2</i></span><span class="czip">Archiwum</span></div>
+<div class="pozioma" style="border-top:1px solid #e2e8f0;padding:8px"><input class="pole" style="flex:1" placeholder="Numer, dostawca, symbol" aria-label="Numer, dostawca, symbol"><span class="btn btn-s btn-m">Wiek</span><span class="btn btn-s btn-m">?</span></div>
+<div class="pytanie">Reklamować u dostawcy czy zamknąć?</div><div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e8f0;border-left:3px solid #F7A600;background:#e2e8f0">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+<div class="pozioma"><b style="white-space:nowrap">FZ 802/MAG/09/2026</b><span style="margin-left:auto"></span><span class="syg s-nic">2 dni</span></div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rosa-Pol · 18 poz.</div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569"><div class="pozioma"><div class="pasek" style="flex:1"><i style="width:78%"></i></div><span class="drobne" style="font-variant-numeric:tabular-nums">14/18</span></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px"><span class="syg s-zle">3 wyjątki</span></div></div></div><div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e8f0;border-left:3px solid transparent">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+<div class="pozioma"><b style="white-space:nowrap">FZ 815/MAG/09/2026</b><span style="margin-left:auto"></span><span class="syg s-nic">1 dzień</span></div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ogrodex · 42 poz.</div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569"><div class="pozioma"><div class="pasek" style="flex:1"><i style="width:67%"></i></div><span class="drobne" style="font-variant-numeric:tabular-nums">28/42</span></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px"><span class="syg s-info">odpowiedź z hali</span><span class="syg s-zle">1 wyjątek</span></div></div></div><div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #e2e8f0;border-left:3px solid transparent">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+<div class="pozioma"><b style="white-space:nowrap">FZ 797/MAG/09/2026</b><span style="margin-left:auto"></span><span class="syg s-nic">5 dni</span></div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Hydro-Mat · 7 poz.</div><div class="tekst" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569"><div class="pozioma"><div class="pasek" style="flex:1"><i style="width:86%"></i></div><span class="drobne" style="font-variant-numeric:tabular-nums">6/7</span></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px"><span class="syg s-zle">1 wyjątek</span></div></div></div></section><section class="karta"><div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">
+  <div class="pozioma"><b style="font-size:24px;line-height:30px">FZ 802/MAG/09/2026</b><span class="plak s-uwaga">w toku</span><span style="margin-left:auto"></span><span class="btn btn-s">CSV</span><span class="btn btn-p"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>Protokół dla dostawcy</span></div>
+  <div class="tekst" style="margin-top:4px">Rosa-Pol · wystawiona 20.09 · 14 z 18 pozycji odłożone</div></div>
+<div style="padding:12px 20px"><div class="sekcja">Pozycje z wyjątkiem · 2</div>
+<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8f0">
+  <span class="foto" style="width:44px;height:44px;flex:none"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+  <div style="flex:1;min-width:0"><div class="pozioma"><b>RP-2210</b><span class="plak s-zle">uszkodzone w transporcie</span></div><div class="tekst">Donica ceramiczna 30 cm, grafit</div><div class="drobne">policzone 4 z 6 szt. · m.nowak · 21.09 14:02</div></div>
+  <div style="display:flex;align-items:center"><span class="btn btn-s btn-m">Rozwiąż</span></div></div>
+<div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #e2e8f0">
+  <span class="foto" style="width:44px;height:44px;flex:none"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+  <div style="flex:1;min-width:0"><div class="pozioma"><b>RP-1187</b><span class="plak s-zle">zła ilość</span></div><div class="tekst">Podstawka pod donicę 30 cm</div><div class="drobne">policzone 10 z 12 szt. · m.nowak · 21.09 14:05</div></div>
+  <div style="display:flex;align-items:center"><span class="btn btn-s btn-m">Rozwiąż</span></div></div>
+<div class="sekcja" style="margin-top:16px">Pozostałe pozycje · 16</div>
+<table style="margin-top:4px"><tr><th>Towar</th><th>Ilość</th><th>Gdzie · kto odłożył</th></tr><tr><td><b>RP-2201</b><div class="drobne">Donica ceramiczna 20 cm, grafit</div></td><td style="width:120px;font-variant-numeric:tabular-nums"><b>12/12</b> <span class="plak s-ok">rozłożona</span></td><td style="width:170px"><b>R-07-1</b><div class="drobne">m.nowak · 21.09 13:48</div></td></tr><tr><td><b>RP-3302</b><div class="drobne">Osłonka plecionka 18 cm</div></td><td style="width:120px;font-variant-numeric:tabular-nums"><b>6/10</b> <span class="plak s-uwaga">częściowo</span></td><td style="width:170px"><b>R-09-4</b><div class="drobne">j.wrona · 21.09 15:02</div></td></tr><tr><td><b>RP-3310</b><div class="drobne">Osłonka plecionka 24 cm</div></td><td style="width:120px;font-variant-numeric:tabular-nums"><b>0/6</b> <span class="plak s-nic">do zrobienia</span></td><td style="width:170px"><b>—</b><div class="drobne"></div></td></tr></table></div></section><section class="karta"><div style="padding:16px"><div class="sekcja">Dowody</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px"><span class="foto" style="height:110px"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span><span class="foto" style="height:110px"><svg class="ic" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span></div>
+<div class="drobne" style="margin-top:4px">RP-2210 · zdjęcia z hali · 21.09 14:02</div>
+<div class="sekcja" style="margin-top:16px">Dostawca</div>
+<div class="pozioma" style="margin-top:6px"><span class="foto" style="width:84px;height:34px;font-size:11px">[LOGO]</span><div><b>Rosa-Pol</b><div class="drobne">11 dostaw w tym roku</div></div></div>
+<div style="display:flex;gap:8px;margin-top:8px"><div class="kafel"><b style="color:#b91c1c">7%</b><span class="drobne">pozycji z wyjątkiem</span></div><div class="kafel"><b>2 dni</b><span class="drobne">mediana rozłożenia</span></div></div>
+<div class="sekcja" style="margin-top:16px">Notatki z halą</div>
+<div style="border-radius:8px;background:#fffbeb;border:1px solid #fde68a;padding:8px 10px;margin-top:6px" class="tekst"><div class="drobne">a.kowalska · 21.09 15:10</div>Donice 40 cm odłóżcie osobno na P-00, idą do zwrotu.</div>
+<div style="border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px 10px;margin-top:6px" class="tekst"><div class="drobne">j.wrona · 21.09 15:44</div>Odłożone na P-00-1, dwie sztuki.</div>
+<div class="pozioma" style="margin-top:8px"><input class="pole" style="flex:1" placeholder="Napisz do hali…" aria-label="Notatka do hali"><span class="btn btn-s btn-m">Wyślij</span></div>
+<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0"><span class="btn btn-s btn-m">Rozłożone poza WERTIS…</span></div></div></section></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

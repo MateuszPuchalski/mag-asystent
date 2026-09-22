@@ -101,15 +101,31 @@ test("nagłówek x-user NIE jest tożsamością — sam nie otwiera bramki", asy
   assert.equal(r.statusCode, 401);
 });
 
-test("odczyt bez sesji też odpada — w tym raport wydajności per pracownik", async () => {
+test("odczyt bez sesji też odpada — w tym analiza z raportem per pracownik", async () => {
   // art. 22² KP: to są dane osobowe pracowników, nie statystyka magazynu
-  assert.equal((await app.inject({ url: "/api/wydajnosc?days=7" })).statusCode, 401);
+  assert.equal((await app.inject({ url: "/api/analiza?days=7" })).statusCode, 401);
   assert.equal((await app.inject({ url: "/api/metrics" })).statusCode, 401);
+});
+
+test("raport per osoba nie ma już trasy za samą sesją (0.431.0)", async () => {
+  /* `/api/wydajnosc` oddawało raport każdemu zalogowanemu, także kolektorowi.
+     Trasy nie ma: magazynier dostaje 404, a nie dane o kolegach. */
+  const r = await app.inject({ url: "/api/wydajnosc?days=7", headers: { "x-session": zalogowany() } });
+  assert.equal(r.statusCode, 404);
+});
+
+test("operacje ratunkowe serwera odmawiają magazynierowi (0.431.0)", async () => {
+  // Pełny import z Subiekta nie jest czynnością przy półce.
+  const token = zalogowany();
+  for (const url of ["/api/admin/resync", "/api/admin/zdjecia/odswiez"]) {
+    const r = await app.inject({ method: "POST", url, headers: { "x-session": token } });
+    assert.equal(r.statusCode, 403, url);
+  }
 });
 
 test("nieznany token jest traktowany jak brak tokenu", async () => {
   const r = await app.inject({
-    url: "/api/wydajnosc",
+    url: "/api/analiza",
     headers: { "x-session": "zmyslony-token" },
   });
   assert.equal(r.statusCode, 401);

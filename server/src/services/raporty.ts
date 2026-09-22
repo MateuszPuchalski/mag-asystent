@@ -395,8 +395,12 @@ export interface AnalizaAudytu {
     odrzucone: number;
     zdarzen: number;
   }>;
-  /** Raport per osoba — patrz obowiązek formalny przy `raportWydajnosci`. */
-  wydajnosc: RaportWydajnosci;
+  /**
+   * Raport per osoba — patrz obowiązek formalny przy `raportWydajnosci`.
+   * `null` dla każdego poza administratorem (0.431.0, decyzja właściciela):
+   * tego raportu nie liczymy wcale, zamiast liczyć i chować w przeglądarce.
+   */
+  wydajnosc: RaportWydajnosci | null;
   /**
    * Dzień szczytowy i jego tło, pod zdanie interpretujące nad wykresem.
    * `null`, gdy próbka jest za cienka, żeby cokolwiek twierdzić.
@@ -425,7 +429,7 @@ export function mediana(liczby: number[]): number | null {
  * z 23:30 UTC należy do NASTĘPNEGO dnia lokalnego. `date(created_at)` w SQLite
  * przypisałoby wieczorną zmianę do złej doby, zimą inaczej niż latem.
  */
-export function analiza(days = 7): AnalizaAudytu {
+export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
   const od = OKNO(days);
   const d = db();
 
@@ -534,7 +538,7 @@ export function analiza(days = 7): AnalizaAudytu {
     },
     szukania: { top, bezWynikow },
     urzadzenia,
-    wydajnosc: raportWydajnosci(days),
+    wydajnosc: zWydajnoscia ? raportWydajnosci(days) : null,
     szczyt: szczytDnia([...poDniu.values()]),
     daneDo:
       (d.prepare("SELECT MAX(created_at) AS ost FROM events").get() as { ost: string | null })

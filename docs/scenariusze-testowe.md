@@ -546,8 +546,9 @@ celowo.
 
 ### S61 — wydajność
 
-`GET /api/wydajnosc` daje dwa wiersze. Jan Kowalski ma 29 pozycji, więc próbka
-jest wiarygodna. Ewa Bąk ma osiem i dostaje `wiarygodne: false`.
+`GET /api/analiza` z tokenem `scenariusz-admin` daje w `wydajnosc` dwa
+wiersze. Jan Kowalski ma 29 pozycji, więc próbka jest wiarygodna. Ewa Bąk ma
+osiem i dostaje `wiarygodne: false`. Token `scenariusz-biuro` dostaje tam `null`.
 
 W środku serii Jana stoi 40-minutowa przerwa. Czas aktywny ma ją odciąć, więc
 tempo liczy się z pracy, a nie z całego okna.

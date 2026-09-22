@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AtSign, BookMarked, Briefcase, ClipboardList, Inbox, LogOut, MessagesSquare, Settings, ShieldQuestion, Undo2, Warehouse } from "lucide-react";
-import { BrakSesji, token, wyczyscToken } from "./api/klient";
-import { useWzmianki, useZdrowie } from "./api/rozmowy";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, LogOut, MessagesSquare, Package, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
+import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
+import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
+import { BrakDostepu } from "./ekrany/BrakDostepu";
+import { doBiura, type WidokBiura } from "./mostBiura";
 import { useKolejkaWiedzy } from "./api/wiedza";
 import { czas, godzina } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
@@ -23,6 +25,10 @@ import "./index.css";
    piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
    za którą płacimy TanStackiem: ekrany dzielą stan zamiast każdy swój. */
 const klient = new QueryClient({
+  /* Wygasła sesja w dowolnym zapytaniu albo mutacji wraca do logowania
+     (0.431.0) — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
+  queryCache: new QueryCache({ onError: zglosBrakSesji }),
+  mutationCache: new MutationCache({ onError: zglosBrakSesji }),
   defaultOptions: {
     queries: {
       /* Sesja wygasła nie jest błędem do ponowienia — ekran ma wrócić do
@@ -59,6 +65,43 @@ const ZAKLADKI = [
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
 ];
+
+/* ── DRUGI RZĄD: MAGAZYN I WGLĄD (0.431.0) ─────────────────────────────────
+   Biuro przechodzi do panelu widok po widoku (`docs/obsluga-klienta.md` §7).
+   Górny rząd niesie pracę na sprawach, dolny — magazyn i wgląd. Jeden rząd
+   nie mieści obu: zmierzone przy makietach, dziewięć zakładek z pigułką
+   stanu, zębatką i wyjściem potrzebuje ~1280 px, a laptop obok Subiekta ma
+   1180. Stan, zębatka i wyjście stoją więc na prawym końcu DOLNEGO rzędu.
+
+   MOST DO STAREGO BIURA. Widoku, który jeszcze nie przeszedł, panel nie ma —
+   pozycja prowadzi wtedy do `/biuro` na właściwą zakładkę. Oba fronty stoją
+   na jednym originie i jednych sesjach, więc panel zostawia biuru swój token
+   i nazwę widoku w kluczach, które `biuro.html` czyta przy starcie. Człowiek
+   nie loguje się drugi raz. Pozycja z `biuro` znika z tej tablicy razem
+   z przeprowadzką jej widoku; ostatnia zabiera ze sobą cały most (F6). */
+type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode; biuro: WidokBiura };
+const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
+  { etykieta: "Dostawy", ikona: <Truck size={16} />, biuro: "dostawy" },
+  { etykieta: "Kosze", ikona: <Package size={16} />, biuro: "magazyn" },
+  "kreska",
+  { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
+  { etykieta: "Dziennik", ikona: <FileText size={16} />, biuro: "dziennik" },
+  { etykieta: "Analiza", ikona: <BarChart3 size={16} />, biuro: "analiza" },
+];
+
+function DrugiRzad() {
+  const ja = useJa();
+  return <nav aria-label="Magazyn i wgląd" className="flex rounded-lg bg-white/5 p-1">
+    {DRUGI_RZAD.map((z, i) => z === "kreska"
+      ? <span key={i} aria-hidden="true" className="mx-1.5 my-1 w-px bg-white/15" />
+      /* Link do STAREGO ekranu dostaje strzałkę „na zewnątrz": człowiek ma
+         wiedzieć, że wychodzi z panelu, zanim zobaczy inny wygląd. */
+      : <a key={z.biuro} href="/biuro" onClick={() => doBiura(z.biuro, ja.data?.user.name ?? "")}
+          title={`${z.etykieta} — jeszcze w dawnym biurze`}
+          className="flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold text-slate-300 hover:bg-white/10">
+          {z.ikona}{z.etykieta}<ArrowUpRight size={12} className="text-slate-500" /></a>)}
+  </nav>;
+}
 
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
    prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
@@ -116,7 +159,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
       <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
       <div className="mr-auto min-w-0"><b>WERTIS</b>
         {/* kontrast: pasek stoi na #2A2A2C, gdzie slate-400 daje 5.59:1 */}
-        <span className="ml-2 text-sm text-slate-400">Obsługa klienta</span></div>
+        <span className="ml-2 text-sm text-slate-400">Biuro</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
@@ -145,6 +188,13 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
             {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>;
         })}
       </nav>
+    </div>
+    {/* DOLNY RZĄD (0.431.0): magazyn i wgląd, a z prawej stan i wyjście —
+        powód przy `DRUGI_RZAD`. `flex-wrap` z tego samego powodu co w górnym:
+        przycisk poza kadrem ramy to przycisk, którego nie ma. */}
+    <div className="flex flex-wrap items-center gap-3 px-5 pb-3">
+      <DrugiRzad />
+      <span className="mr-auto" />
       <PigulkaSynchronizacji />
       {/* ZĘBATKA STOI POZA `ZAKLADKI` i to jest wybór, nie niedopatrzenie.
           Pasek niesie PRACĘ — cztery kolejki, do których agent wraca w kółko.
@@ -163,7 +213,28 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
 
 function App() {
   const [zalogowany, setZalogowany] = useState(Boolean(token()));
+  const wyloguj = () => { wyczyscToken(); klient.clear(); setZalogowany(false); };
+  /* Sesja wygasła w trakcie pracy → formularz logowania, nie puste kolumny. */
+  useEffect(() => {
+    const naWygasniecie = () => { wyczyscToken(); klient.clear(); setZalogowany(false); };
+    window.addEventListener(SESJA_WYGASLA, naWygasniecie);
+    return () => window.removeEventListener(SESJA_WYGASLA, naWygasniecie);
+  }, []);
   if (!zalogowany) return <Logowanie zalogowano={() => setZalogowany(true)} />;
+  return <BramkaRoli wyloguj={wyloguj}><Rama wyloguj={wyloguj} /></BramkaRoli>;
+}
+
+/* Magazynier dostaje zdanie zamiast pustych kolumn (0.431.0). Dopóki rola
+   nie przyjdzie, rama rysuje się normalnie — każda trasa i tak pyta serwer
+   o uprawnienia, więc krótka chwila przed odpowiedzią niczego nie odsłania. */
+function BramkaRoli({ wyloguj, children }: { wyloguj: () => void; children: React.ReactNode }) {
+  const ja = useJa();
+  const u = ja.data?.user;
+  if (u && u.role === "magazynier") return <BrakDostepu login={u.name} rola={u.role} wyloguj={wyloguj} />;
+  return <>{children}</>;
+}
+
+function Rama({ wyloguj }: { wyloguj: () => void }) {
   /* ── Rama trzyma OKNO (0.165.0) ────────────────────────────────────────────
      Do 0.164.0 przewijał się dokument, czyli wszystkie kolumny naraz: żeby
      zobaczyć dół dowodów przy zwrocie, operator zjeżdżał z oczu kolejce
@@ -197,7 +268,7 @@ function App() {
      zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
   return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-    <Naglowek wyloguj={() => { wyczyscToken(); klient.clear(); setZalogowany(false); }} />
+    <Naglowek wyloguj={wyloguj} />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
         oddawał 210 pikseli na margines z każdej strony, na 2560 — po 530,

@@ -79,7 +79,25 @@ test("biuro dostaje komplet sekcji", async () => {
   assert.ok(a.rytm);
   assert.ok(a.szukania);
   assert.ok(Array.isArray(a.urzadzenia));
-  assert.match(a.wydajnosc.podstawaPrawna, /Kodeks pracy/, "podstawa prawna jedzie z danymi");
+  /* Raport per osoba jest od 0.431.0 wyłącznie administratora, decyzją
+     właściciela — biuro dostaje resztę analizy bez niego. */
+  assert.equal(a.wydajnosc, null, "rola biuro nie dostaje raportu per osoba");
+});
+
+test("administrator dostaje raport per osoba z podstawą prawną", async () => {
+  const token = zalogowany("admin");
+  const r = await app.inject({ method: "GET", url: "/api/analiza?days=7", headers: { "x-session": token } });
+  assert.equal(r.statusCode, 200);
+  assert.match(r.json().wydajnosc.podstawaPrawna, /Kodeks pracy/, "podstawa prawna jedzie z danymi");
+});
+
+test("CSV analizy dla biura nie ma sekcji per osoba", async () => {
+  const biuro = zalogowany("biuro");
+  const admin = zalogowany("admin");
+  const csv = async (t: string) =>
+    (await app.inject({ method: "GET", url: "/api/analiza/csv?days=7", headers: { "x-session": t } })).body;
+  assert.doesNotMatch(await csv(biuro), /WYDAJNOSC PER OSOBA/);
+  assert.match(await csv(admin), /WYDAJNOSC PER OSOBA/);
 });
 
 test("analiza dostaw: komplet sekcji i własny zbiór okien", async () => {
@@ -123,7 +141,8 @@ test("śmieciowe okno wraca do 7 dni, nie wywraca", async () => {
 });
 
 test("CSV: BOM, sekcje i podstawa prawna nad danymi imiennymi", async () => {
-  const token = zalogowany("biuro");
+  // Sekcja imienna trafia wyłącznie do administratora (0.431.0).
+  const token = zalogowany("admin");
   const r = await app.inject({
     method: "GET",
     url: "/api/analiza/csv",

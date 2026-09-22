@@ -296,7 +296,13 @@ export type OperacjaUprzywilejowana =
    * kupującego natychmiast i drugiej nie wyślemy — pierwsza mogła dojść.
    * Allegro nigdzie przy tym nie obiecuje, że dyskusja się od niej zamknie.
    */
-  | "dyskusja_zakonczenie";
+  | "dyskusja_zakonczenie"
+  /**
+   * Operacje ratunkowe serwera: pełny resync z Subiekta i zapomnienie braków
+   * zdjęć (0.431.0). Do tej wersji stały za SAMĄ sesją — resync na produkcji
+   * to pełny import z Subiekta, a mógł go wywołać magazynier z kolektora.
+   */
+  | "ratunek_serwera";
 
 /**
  * Kto może.
@@ -306,10 +312,15 @@ export type OperacjaUprzywilejowana =
  * reguł przestaje cokolwiek znaczyć. Ten sam argument obowiązuje o piętro
  * wyżej i stąd `zarzadzanie_biurem` wyłącznie dla admina.
  *
- * Admin NIE dostaje audytu ani raportu wydajności JAKO UPRAWNIENIA PONAD
- * biuro — dostaje dokładnie tyle, co biuro, żeby konto z instalatora nadawało
- * się do pracy. Rozróżnienie jest nieoczywiste i dlatego zapisane: admin jest
- * rolą wąską, od kont, a raport o pracy ludzi zostaje tam, gdzie był.
+ * Admin NIE dostaje audytu JAKO UPRAWNIENIA PONAD biuro — dostaje dokładnie
+ * tyle, co biuro, żeby konto z instalatora nadawało się do pracy.
+ *
+ * WYJĄTKIEM jest raport wydajności per osoba (0.431.0, decyzja właściciela).
+ * Do tej wersji stał tu zapis, że raport o pracy ludzi zostaje przy biurze.
+ * Audyt 0.427.0 odwrócił kolejność: monitoring pracowniczy to decyzja kadrowa,
+ * nie robota biura przy dostawie. Bramka stoi w `routes/analiza.ts`
+ * (`mozeWidziecLudzi`), nie tutaj — to odczyt, a `autoryzuj` zapisuje
+ * zdarzenie przy każdym wywołaniu.
  */
 const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   /* ORZEKA, że dostawy nie trzeba rozkładać — a takie orzeczenie należy do tej
@@ -338,6 +349,10 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
      codziennie, a prośba zamknięta dla admina znaczyłaby, że o zakończenie
      prosi ktoś, kto nie czytał rozmowy. */
   dyskusja_zakonczenie: ["biuro", "admin"],
+  /* Biuro, bo to ono widzi skutek w STANIE SYSTEMU i ono dzwoni, gdy dostawy
+     z Subiekta nie ma na liście. Hala zostaje poza: resync nie jest czynnością
+     przy półce. */
+  ratunek_serwera: ["biuro", "admin"],
 };
 
 const NAZWA_ROL: Record<Rola, string> = {

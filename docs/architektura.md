@@ -102,10 +102,21 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
+**Biuro przechodzi do panelu (0.431.0).** Poniżej historia `/biuro` tak, jak
+powstawało. Od 0.431.0 obowiązuje jeden front, decyzją właściciela z
+`docs/obsluga-klienta.md` §7, a `biuro.html` znika widok po widoku. Zdanie
+„zero frameworka, zero zapisu" przestało być prawdą dużo wcześniej: audyt
+0.427.0 policzył w biurze dwadzieścia dwa zapisy. Z tamtej reguły został jej
+rdzeń — **zero zapisu przy patrzeniu** — i ten obowiązuje panel tak samo.
+
+Cel, od którego liczy się każdy ekran biura: biuro rozstrzyga to, czego hala
+nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem
+albo ustawieniem.
+
 **Biuro ma podgląd pod `/biuro`** — jedną stronę HTML bez builda
 (`server/src/web/biuro.html`), serwowaną przez API i czytającą istniejące trasy
 z tokenem sesji. Wcześniejszy `/lookup` zniknął razem z klientem PWA; nowy
-podgląd świadomie nie jest drugim frontem: zero frameworka, zero zapisu.
+podgląd świadomie nie był drugim frontem: zero frameworka, zero zapisu.
 Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
 którym biuro widziało stan dostaw.
 
@@ -598,7 +609,7 @@ w odróżnieniu od zgadywania po podobieństwie.
 |---|---|---|
 | Cztery liczby | `GET /api/metrics` | dotknięcia/pozycję, p95 skanu, etykiety do przedruku, towary bez czytelnego kodu |
 | Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
-| Wydajność per osoba | `GET /api/wydajnosc` | patrz ostrzeżenie niżej |
+| Wydajność per osoba | `GET /api/analiza`, pole `wydajnosc` — tylko admin | patrz ostrzeżenie niżej |
 | Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
 | Kandydaci do strefy złotej | `GET /api/biuro/zbiorki/kandydaci` (+ `/csv`) | bieżąca rotacja ze zbiórek Sellasist; ten sam próg co reslot |
 | **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola biura albo admina |
@@ -656,9 +667,13 @@ celowy — to relacja urządzenia, nie fakt zaobserwowany przez serwer.
 
 ### Raport wydajności to monitoring pracowniczy
 
-`GET /api/wydajnosc` podlega Kodeksowi pracy (art. 22² i nast.): wymaga zapisu
+Raport per osoba podlega Kodeksowi pracy (art. 22² i nast.): wymaga zapisu
 w regulaminie albo obwieszczeniu i uprzedzenia pracowników **2 tygodnie przed**
 uruchomieniem. Kod tego nie blokuje, ale odpowiedź niesie pole `podstawaPrawna`.
+
+Od 0.431.0 raport jedzie wyłącznie w `GET /api/analiza` i jej CSV, i tylko
+dla admina — biuro dostaje tam `wydajnosc: null`. Osobna trasa
+`/api/wydajnosc` zniknęła, bo nikt jej nie wołał, a wpuszczała magazyniera.
 
 Raport ma trzy reguły wbudowane w kod, każda z testem:
 

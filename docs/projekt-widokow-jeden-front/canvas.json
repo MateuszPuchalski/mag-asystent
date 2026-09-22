@@ -1,0 +1,143 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Analiza.dc.html": {
+      "h": 900,
+      "title": "Analiza — administrator",
+      "w": 1440,
+      "x": 0,
+      "y": 2700
+    },
+    "AnalizaBiuro.dc.html": {
+      "h": 660,
+      "title": "Analiza — rola biuro",
+      "w": 1440,
+      "x": 1520,
+      "y": 2700
+    },
+    "BrakDostepu.dc.html": {
+      "h": 420,
+      "title": "Konto magazyniera w biurze",
+      "w": 900,
+      "x": 2780,
+      "y": 0
+    },
+    "Dostawy.dc.html": {
+      "h": 900,
+      "title": "Dostawy — kolejka, dokument, dowody (jak Zwroty)",
+      "w": 1440,
+      "x": 1520,
+      "y": 660
+    },
+    "Kosze.dc.html": {
+      "h": 900,
+      "title": "Kosze — kolejka, kosz, zwroty w koszu",
+      "w": 1440,
+      "x": 0,
+      "y": 1680
+    },
+    "Main.dc.html": {
+      "h": 900,
+      "title": "DO DECYZJI — ekran-lista jak Moje i Zadania",
+      "w": 1440,
+      "x": 0,
+      "y": 660
+    },
+    "Naglowek1180.dc.html": {
+      "h": 200,
+      "title": "Nagłówek — 1180 px, laptop obok Subiekta",
+      "w": 1180,
+      "x": 1520,
+      "y": 0
+    },
+    "Naglowek1440.dc.html": {
+      "h": 200,
+      "title": "Nagłówek — 1440 px",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Stan.dc.html": {
+      "h": 900,
+      "title": "Stan systemu — karty jak Ustawienia",
+      "w": 1440,
+      "x": 1520,
+      "y": 1680
+    },
+    "Ustawienia.dc.html": {
+      "h": 900,
+      "title": "Ustawienia za zębatką",
+      "w": 1440,
+      "x": 0,
+      "y": 3720
+    },
+    "Dziennik.dc.html": {
+      "x": 1520,
+      "y": 3720,
+      "w": 1440,
+      "h": 720,
+      "title": "Dziennik"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-22T19:42:29Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "cel": {
+      "fill": "orange",
+      "maxH": 260,
+      "size": 24,
+      "text": "Cel biura: rozstrzyga to, czego hala nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem albo ustawieniem.\nTest każdej funkcji: kończy się decyzją biura, której hala nie podejmie? Tak → praca (górny rząd, DO DECYZJI). Ktoś musi to sprawdzać → wgląd (dolny rząd). Rzadko zmieniane → za zębatką. Nic z tego → wypada.",
+      "w": 900,
+      "x": 0,
+      "y": -300
+    },
+    "naglowek": {
+      "fill": "teal",
+      "maxH": 260,
+      "size": 24,
+      "text": "Nagłówek to dzisiejszy nagłówek panelu co do klasy, w dwóch rzędach tej samej bieżni. Zmierzone w Chromium: górny rząd 1155 px, dolny 1044 px — oba mieszczą się przy 1180. Wysokość 111 px: +46 przy 1440, −6 przy 1180 wobec dzisiejszego, zawiniętego 117 px.",
+      "w": 880,
+      "x": 960,
+      "y": -300
+    },
+    "tytul": {
+      "kind": "title1",
+      "maxW": 3680,
+      "text": "WERTIS — jeden front: biuro w panelu",
+      "w": 240,
+      "x": 0,
+      "y": -420
+    },
+    "zmiany": {
+      "fill": "gray",
+      "maxH": 260,
+      "size": 24,
+      "text": "Przebudowa od zera w gramatyce panelu. Dostawy i Kosze to ekrany-kolejki jak Zwroty i Reklamacje: kolejka z pytaniem decyzji, sprawa na środku, dowody z prawej. DO DECYZJI to ekran-lista jak Moje: wiersz mówi, co rozstrzygnąć, i prowadzi do kolejki — decyzja zapada przy dowodach, nie na liście. Stan systemu, Analiza, Dziennik i Ustawienia to ekrany z tytułem strony i kartami jak Zadania i Ustawienia. Za zębatką zostaje konfiguracja; pomiary obsługi idą do Analizy. Dane na planszach są przykładowe.",
+      "w": 1780,
+      "x": 1900,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Dostawy.dc.html",
+    "Kosze.dc.html",
+    "Stan.dc.html",
+    "Analiza.dc.html",
+    "AnalizaBiuro.dc.html",
+    "Ustawienia.dc.html",
+    "Naglowek1440.dc.html",
+    "Naglowek1180.dc.html",
+    "BrakDostepu.dc.html",
+    "Dziennik.dc.html"
+  ],
+  "pages": [],
+  "title": "WERTIS — jeden front"
+}

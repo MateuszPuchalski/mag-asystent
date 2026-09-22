@@ -217,5 +217,10 @@ test("pusta baza daje puste struktury, nie wyjątek", () => {
   assert.equal(a.godziny.length, 24);
   assert.deepEqual(a.szukania.top, []);
   assert.deepEqual(a.urzadzenia, []);
-  assert.equal(a.wydajnosc.wiersze.length, 0);
+  assert.equal(a.wydajnosc?.wiersze.length, 0);
+});
+
+test("bez prawa do raportu per osoba sekcji nie ma wcale", () => {
+  // Nie liczymy i nie chowamy: `null` znaczy, że raport nie powstał.
+  assert.equal(A.analiza(7, false).wydajnosc, null);
 });

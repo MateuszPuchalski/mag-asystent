@@ -752,8 +752,8 @@ produkcję.
 | rola | co może ponad poprzednią |
 |---|---|
 | `magazynier` | praca na hali: skanowanie, lokalizacje, zgłoszenia |
-| `biuro` | lista kont, zakładanie kont magazynierów, ślad audytowy, widoczność magazynów, raport wydajności, zdjęcie dostawy z listy |
-| `admin` | wszystko, co biuro, **plus** konta o roli `biuro` i `admin`, wyłączanie kont i odbieranie haseł |
+| `biuro` | lista kont, zakładanie kont magazynierów, ślad audytowy, widoczność magazynów, zdjęcie dostawy z listy, resync z Subiekta |
+| `admin` | wszystko, co biuro, **plus** konta o roli `biuro` i `admin`, wyłączanie kont i odbieranie haseł, raport wydajności per osoba |
 
 Granica między biurem a adminem jest jedyną nieoczywistą i dlatego ma własne
 uzasadnienie. Do 0.23.0 „zarządzanie kontami" było jedną operacją zastrzeżoną
@@ -764,9 +764,12 @@ znaczyła. Od 0.24.0 to dwa osobne uprawnienia.
 **Cena jest jawna:** biuro nie zresetuje hasła magazynierowi, który je
 zapomniał — musi poprosić admina. To był świadomy wybór, nie skutek uboczny.
 
-Admin **nie dostaje** audytu ani raportu wydajności jako uprawnienia ponad
-biuro. Dostaje dokładnie tyle, co biuro, żeby konto z instalatora nadawało się
-do pracy — raport o pracy ludzi zostaje tam, gdzie był.
+Admin **nie dostaje** audytu jako uprawnienia ponad biuro. Dostaje dokładnie
+tyle, co biuro, żeby konto z instalatora nadawało się do pracy.
+
+**Wyjątkiem jest raport wydajności per osoba — od 0.431.0 widzi go tylko
+admin**, decyzją właściciela. Do tej wersji stał przy biurze. Monitoring pracy
+ludzi to decyzja kadrowa, nie robota biura przy dostawie.
 
 Rola przychodząca w `POST /api/users` jest **sprawdzana przeciw zamkniętej
 liście**; słowo spoza niej to 400, a nie konto z rolą, której nikt nie zna.
@@ -1103,6 +1106,9 @@ zadziałało — wymuś ponowne pytanie:
 ```bash
 curl -s -X POST -H "x-session: <token>" http://localhost:3001/api/admin/zdjecia/odswiez
 ```
+
+Token musi należeć do konta biura albo administratora. Od 0.431.0 sesja
+kolektora dostaje tu 403 — magazynier nie opróżnia pamięci całego serwera.
 
 Kasuje to wyłącznie wpisy „brak zdjęcia" i te po błędzie. Zdjęcia już pobrane
 zostają, bo ich skasowanie kazałoby wszystkim kolektorom ściągnąć obrazy od
@@ -2577,6 +2583,28 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.431.0 — biuro w nagłówku panelu
+
+**Migracji nie ma. Panel trzeba przebudować** — czcionki jadą teraz w jego
+paczce, a nagłówek dostał drugi rząd.
+
+Trzy rzeczy zmieniają się na produkcji bez pytania:
+
+- **Raport wydajności per osoba widzi tylko admin.** Konto biura dostaje
+  ANALIZĘ bez tabeli ludzi i bez tej sekcji w CSV. Adres `/api/wydajnosc`
+  znika — nikt go nie wołał.
+- **Resync i odświeżenie zdjęć wymagają roli biura albo admina.** Wywołanie
+  `curl` z tokenem kolektora dostaje teraz 403.
+- **Panel nie wpuszcza magazyniera.** Dostaje ekran „brak dostępu do biura"
+  i przycisk wylogowania.
+
+Ponowienie i anulowanie zapisu z kolejki trafia teraz do dziennika jako
+`queue_ponowione_recznie` i `queue_anulowane_recznie`.
+
+Sprawdzenie po wdrożeniu idzie tak. Zaloguj się do `/obsluga` kontem biura.
+Pod zakładkami ma stać drugi rząd: Dostawy, Kosze, Stan systemu, Dziennik,
+Analiza. Klik w Dostawy otwiera `/biuro` już zalogowane, na widoku dostaw.
 
 ### Aktualizacja do 0.430.0 — szkic dostaje rozpoznanie
 

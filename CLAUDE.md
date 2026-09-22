@@ -1,24 +1,25 @@
 # WERTIS — zasady pracy w tym repo
 
 Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
-(`server/`), ręcznie pisany panel biura (`server/src/web/biuro.html`, bez
-bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
-(`android/`). Architektura i decyzje:
+(`server/`), panel biura (`panel/`, React + Vite; dawny `biuro.html` znika
+z niego widok po widoku), kolektor Android (`android/`). Architektura i decyzje:
 `docs/architektura.md`. Ten plik mówi tylko, CZEGO pilnować przy zmianach.
 
 ## Twarde zasady
 
 - **Komentarze po polsku i wyjaśniają DLACZEGO**, nie co robi następna linia.
   Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
-- **Dwa fronty, każdy ze swoją granicą.** Do 0.141.0 front był jeden. Decyzja
-  właściciela z `docs/obsluga-klienta.md` §7 dołożyła drugi: obsługa klienta
-  dostaje `panel/` (React + Vite, build do `dist/web/obsluga`). Magazyn zostaje
-  w `biuro.html` — bez frameworka i bez bundlera, bo nic tam tego nie wymaga.
-  Nowy ekran magazynu idzie do `biuro.html`, nowy ekran obsługi do `panel/`.
-  Trzeciego frontu nie ma. Funkcje w `<script>` biura nie mogą się powtarzać
-  z nazwy (test dubli) ani wołać funkcji, której nie ma (test wywołań);
-  delegacje kliknięć stoją na SEKCJACH, nie na pojemnikach w ich środku
-  (test delegacji).
+- **Jeden front: `panel/`.** Od 0.431.0, decyzją właściciela z
+  `docs/obsluga-klienta.md` §7, całe biuro przechodzi do `panel/` (React +
+  Vite, build do `dist/web/obsluga`). `biuro.html` nie dostaje NICZEGO nowego:
+  jego widoki przechodzą do panelu jeden po drugim i znikają z pliku w tym
+  samym wydaniu. Nowy ekran biura — magazynowy czy obsługi — idzie do
+  `panel/`. Kształt ekranu wynika z celu biura (§7): praca na górnym rzędzie,
+  wgląd na dolnym, ustawienia za zębatką. Dopóki `biuro.html` istnieje, jego
+  strażnicy działają: funkcje w `<script>` nie mogą się powtarzać z nazwy
+  (test dubli) ani wołać funkcji, której nie ma (test wywołań), a delegacje
+  kliknięć stoją na SEKCJACH (test delegacji). Przenosząc widok, przenosisz
+  też gwarancję jego strażnika na ekran w panelu.
 - **Ekran magazynowy projektuje się pod ergonomię, nie pod wygląd.** Reguły
   stoją w `docs/ergonomia-magazynu.md`. Rozstrzygają spór o kształt ekranu na
   korzyść tego, który wymaga mniej decyzji, mniej interakcji, mniej uwagi,
