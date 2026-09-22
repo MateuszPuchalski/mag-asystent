@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 
 /* ── Triaż reklamacji: czy mamy i ile nas kosztuje (0.412.0) ─────────────────
@@ -235,9 +236,15 @@ describe("Jeden dom na fakt (0.414.0)", () => {
     expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
   });
 
-  it("wiersza „Razem” nie ma — podpis zwijki widać także przy otwartym bloku", () => {
+  it("suma zamówienia ma JEDEN dom — w zwijce, nie w jej podpisie (0.416.0)", () => {
+    /* 0.414.0 wyniosło sumę do podpisu, żeby nie stała dwa razy w tym samym
+       bloku. Wyszło gorzej: przy zamówieniu jednopozycyjnym podpis powtarzał
+       wtedy kostkę „Klient zapłacił", czyli ten sam dubel piętro wyżej.
+       Podpis mówi teraz, CO jest w środku; kwota stoi w środku. */
     render(<Dowody {...props()} />);
-    expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+    const zwijka = screen.getByRole("button", { name: /Zakup/ });
+    expect(zwijka.textContent).toContain("1 pozycja");
+    expect(zwijka.textContent).not.toContain("49,90");
   });
 
   it("ZAKUP startuje zamknięty, bo jego kwoty stoją już w kostkach", () => {
@@ -260,5 +267,57 @@ describe("Jeden dom na fakt (0.414.0)", () => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
     render(<Dowody {...props({ twId: null, dniOdZakupu: 400 }, false)} />);
     expect(screen.getByText("13 miesięcy temu")).toBeInTheDocument();
+  });
+});
+
+describe("Jedna sekcja zamiast czterech (0.416.0)", () => {
+  /* Zgłoszenie właściciela ze zrzutem: „widzę jeszcze trochę powtórzeń". Pod
+     kolumną stały cztery sekcje o jednym zakupie, a droga zakupu jest ich
+     nadzbiorem — `services/droga-klienta.ts` składa przystanki z dokładnie
+     tych samych tabel. */
+  const zeSpoiwem = () => {
+    const p = props();
+    return {
+      ...p,
+      szczegol: {
+        ...p.szczegol,
+        droga: [
+          { rodzaj: "rozmowa", id: 3, at: "2026-09-19T15:48:00.000Z", opis: "pytanie" },
+          { rodzaj: "reklamacja", id: 5, at: "2026-09-19T15:50:00.000Z", opis: null },
+          { rodzaj: "dyskusja", id: 8, at: "2026-09-21T20:24:00.000Z", opis: null },
+        ],
+        zwroty: [{ id: 2, externalId: "z-2", numer: "ZW/2", utworzono: "2026-09-20T08:00:00.000Z" }],
+        rozmowy: [{ id: 3, temat: "Client:111722583", status: "otwarta",
+          ostatniaAt: "2026-09-19T15:48:00.000Z" }],
+        sprawy: [{ id: 8, typ: "DISPUTE", numer: null, temat: "mam problem z odesłaniem",
+          otwarta: true, decyzjaDo: null, prowadzi: null }],
+      },
+    } as unknown as React.ComponentProps<typeof Dowody>;
+  };
+
+  it("nie ma już czterech nagłówków o jednym zakupie", () => {
+    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    expect(screen.getByText("Ten zakup u nas")).toBeInTheDocument();
+    for (const stary of ["Zwroty tego zamówienia", "Droga tego zakupu",
+      "Rozmowy o tym zakupie", "Inne sprawy tego zakupu"]) {
+      expect(screen.queryByText(stary)).not.toBeInTheDocument();
+    }
+  });
+
+  it("z drogi da się wejść wszędzie tam, gdzie prowadziły tamte sekcje", () => {
+    /* To jest warunek, pod którym wolno je było zdjąć: każdy przystanek
+       niesie odnośnik do swojej kolejki. */
+    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: /pytanie/ }))
+      .toHaveAttribute("href", "/obsluga/skrzynka/3");
+    expect(screen.getByRole("link", { name: /dyskusja/ }))
+      .toHaveAttribute("href", "/obsluga/dyskusje/8");
+  });
+
+  it("rodzeństwo spraw ZOSTAJE — niesie to, czego droga nie ma", () => {
+    /* Przystanek mówi „dyskusja, 21 września"; wiersz mówi, czy tamta sprawa
+       jest otwarta, kto ją prowadzi i o co w niej chodzi. */
+    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    expect(screen.getByText("mam problem z odesłaniem")).toBeInTheDocument();
   });
 });
