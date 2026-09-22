@@ -158,3 +158,40 @@ describe("Werdykt", () => {
     expect(screen.queryByRole("button", { name: /ODESŁANIA/ })).not.toBeInTheDocument();
   });
 });
+
+/* ── ROZDZIELENIE OD PRZYCISKU WYSYŁKI (0.421.0) ─────────────────────────────
+   Zgłoszenie właściciela: „werdykt jest za blisko guzika wyślij wiadomość".
+   Pas werdyktu i pas odpowiedzi stoją w jednej stopce i tak zostaje — ekran
+   ma prowadzić od dowodów do decyzji. Nie wolno natomiast, żeby gałąź
+   werdyktu była przestrzeleniem przycisku wysyłki: ta sama krawędź, ta sama
+   barwa, dwa tuziny pikseli przerwy.
+
+   Bramka pilnuje DWÓCH z trzech rozdzieleń — tych, które widać w łańcuchu
+   klas. Trzeciego, czyli odległości, nie mierzy, bo wysokość liczy się
+   w przeglądarce, nie w jsdomie.                                           */
+describe("Gałąź werdyktu nie jest przestrzeleniem przycisku wysyłki", () => {
+  it("nie nosi bursztynu — ten w stopce znaczy „to idzie teraz do klienta”", () => {
+    pokaz();
+    for (const n of [/UZNAJĘ/, /ODRZUCAM/])
+      expect(przycisk(n).className).not.toContain("btn-primary");
+  });
+
+  it("nie stoi przy prawej krawędzi — tam jest WYŚLIJ ODPOWIEDŹ", () => {
+    /* `ml-auto` dosuwa przycisk do prawej krawędzi pasa. Dopóki obie stopki
+       mają wspólną szerokość, to jedna kolumna i jeden cel przestrzelenia. */
+    pokaz();
+    for (const n of [/UZNAJĘ/, /ODRZUCAM/])
+      expect(przycisk(n).className).not.toContain("ml-auto");
+  });
+
+  it("ponowienie po nieudanej próbie też schodzi z prawej krawędzi", () => {
+    pokaz({ werdykt: "REJECTED_OTHER", werdyktStatus: "send_failed", werdyktBlad: "409" });
+    expect(przycisk(/SPRÓBUJ JESZCZE RAZ/).className).not.toContain("ml-auto");
+  });
+
+  it("bursztyn wraca dopiero na WYŚLIJ WERDYKT — za polem zgody", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/UZNAJĘ/));
+    expect(przycisk(/WYŚLIJ WERDYKT/).className).toContain("btn-primary");
+  });
+});

@@ -31,7 +31,28 @@ import { LIMIT_ZNAKOW } from "./Edytor";
    strzał mógłby być drugim werdyktem.
 
    WERDYKT Z CENTRUM SPRZEDAŻY nie udaje naszego: `werdykt: null` przy
-   `CLAIM_ACCEPTED` to sprawa rozstrzygnięta poza panelem i pasek to mówi.  */
+   `CLAIM_ACCEPTED` to sprawa rozstrzygnięta poza panelem i pasek to mówi.
+
+   TRZY ROZDZIELENIA OD PRZYCISKU WYSYŁKI (0.421.0). Zgłoszenie właściciela ze
+   zrzutem: „werdykt jest za blisko guzika wyślij wiadomość". Do 0.420.1 pas
+   werdyktu i pas odpowiedzi stały w tej samej stopce, rozdzielone jedną
+   kreską i dwoma razy po 12 px, a „UZNAJĘ" siedziało DOKŁADNIE POD „WYŚLIJ
+   ODPOWIEDŹ" — oba dosunięte do prawej krawędzi i oba bursztynowe. Prawo
+   Fittsa mówi, co się dzieje z przestrzeleniem celu: ląduje na sąsiedzie.
+   Sąsiadem była nieodwracalna gałąź.
+
+   Rozdzielamy na TRZY niezależne sposoby, bo żaden z osobna nie wystarcza:
+     ODLEGŁOŚĆ — kreska grubieje do 4 px, a oddech nad paskiem rośnie do 20 px.
+     POŁOŻENIE — „UZNAJĘ" i „ODRZUCAM" schodzą z prawej krawędzi i stają przy
+       swoim nagłówku. Prawa krawędź stopki należy odtąd do JEDNEGO przycisku.
+     BARWA — bursztyn w tej stopce znaczy „to idzie teraz do klienta" i zostaje
+       przy wysyłce. Gałęzie werdyktu niosą znaczenie ikoną, słowem i barwą
+       pisma (§WCAG 1.4.1: nigdy samą barwą). Bursztyn wraca dopiero na „WYŚLIJ
+       WERDYKT" — za polem zgody i o dwieście pikseli niżej.
+
+   Tło `slate-50` pod paskiem to ta sama myśl co przy osi rozmowy w 0.418.0:
+   barwa tła jest cechą pojedynczą, czytaną równolegle, więc granica dwóch
+   pasów widać bez czytania (Treisman i Gelade, 1980).                       */
 
 const ROZSTRZYGNIETE: Record<string, string> = {
   CLAIM_ACCEPTED: "uznana", CLAIM_REJECTED: "odrzucona",
@@ -99,7 +120,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   /* ── Blok po werdykcie (nasz albo z Centrum Sprzedaży) ───────────────────── */
   if (wydany || (uAllegro && status !== "send_failed")) {
     const potwierdzony = Boolean(uAllegro);
-    return <section aria-label="Werdykt" className="border-t border-slate-200 bg-white px-4 py-3">
+    return <section aria-label="Werdykt" className="border-t-4 border-slate-200 bg-slate-50 px-4 pb-3 pt-5">
       <div className="flex flex-wrap items-center gap-2">
         <Gavel size={15} className="shrink-0 text-slate-400" />
         <b className="text-naglowek">Werdykt</b>
@@ -178,7 +199,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   const zaDlugo = znakow > LIMIT_ZNAKOW;
   const gotowe = Boolean(wiadomosc.trim()) && !zaDlugo && zgoda && (!czesciowy || (grosze !== null && grosze > 0));
 
-  return <section aria-label="Werdykt" className="border-t border-slate-200 bg-white px-4 py-3">
+  return <section aria-label="Werdykt" className="border-t-4 border-slate-200 bg-slate-50 px-4 pb-3 pt-5">
     <div className="flex flex-wrap items-center gap-2">
       <Gavel size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Werdykt</b>
@@ -186,15 +207,15 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
         Nieudany: {r.werdyktBlad ?? "Allegro odmówiło"}</span>}
       {galaz === null && <>
         {nieudany
-          ? <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
+          ? <Przycisk className="text-xs text-ranga-uwaga" disabled={trwa}
               onClick={() => otworz(uznana ? "uznaje" : "odrzucam", {
                 kod: r.werdykt as KodWerdyktu, wiadomosc: r.werdyktWiadomosc ?? "",
                 kwota: r.werdyktKwotaGrosze,
               })}>SPRÓBUJ JESZCZE RAZ</Przycisk>
           : <>
-            <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
+            <Przycisk className="text-xs text-ranga-ok" disabled={trwa}
               onClick={() => otworz("uznaje")}><Check size={14} />UZNAJĘ</Przycisk>
-            <Przycisk className="text-xs" disabled={trwa}
+            <Przycisk className="text-xs text-ranga-zle" disabled={trwa}
               onClick={() => otworz("odrzucam")}><Ban size={14} />ODRZUCAM</Przycisk>
           </>}
       </>}
