@@ -51,11 +51,12 @@ sama — w drodze towaru przez magazyn. Reszta jest nadzorem albo ustawieniem.
 Ekrany w panelu układa test tego celu: praca na górnym rzędzie, wgląd na dolnym,
 ustawienia za zębatką.
 
-**Makiety w `docs/projekt-widokow-jeden-front/`.** Dziesięć plansz: DO DECYZJI
+**Makiety w `docs/projekt-widokow-jeden-front/`.** Jedenaście plansz: DO DECYZJI
 jako ekran startowy, dostawy, kosze, stan systemu, analiza w dwóch rolach,
-ustawienia, nagłówek w dwóch szerokościach i konto bez dostępu. Nagłówek
-zmierzono w Chromium: górny rząd 1145 px, dolny 1068 px, oba mieszczą się
-przy 1180 px.
+ustawienia, dziennik, nagłówek w dwóch szerokościach i konto bez dostępu.
+Plansze zbudowano od zera w gramatyce panelu: kolejka, sprawa i dowody jak
+w Zwrotach, lista jak w Moje. Nagłówek zmierzono w Chromium: górny rząd
+1155 px, dolny 1044 px, oba mieszczą się przy 1180 px.
 
 **Trzy zdania dokumentacji przestały kłamać.** `docs/architektura.md` mówiło
 „zero zapisu", README — że jedynym zapisem biura jest zdjęcie dostawy z listy.
