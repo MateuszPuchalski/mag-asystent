@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.421.1 — 22 września 2026
+
+**Pomiar wyjściowy panelu obsługi wobec baterii ośmiu zadań agenta.**
+Nowy katalog `ux-loop/` trzyma dokumenty pętli poprawiania użyteczności.
+Wydanie nie rusza ani jednej linii kodu — `package.json` idzie w górę, bo
+tego wymaga konwencja repo.
+
+- **`ux-loop/baseline.md`** — policzone C/S/R/E dla ośmiu zadań, oceny rubryki
+  i wynik ważony 5.50. Liczby pochodzą z czytania źródła, nie z wrażeń.
+- **Dwa zadania są w panelu niewykonalne i nie ruszy ich zmiana w panelu:**
+  szukanie po numerze telefonu (reguła prywatności blokuje telefon) oraz
+  założenie reklamacji (`routes/reklamacje.ts` nie ma trasy tworzącej sprawę).
+- **Najgroźniejsze znalezisko:** szkic odpowiedzi w reklamacji i dyskusji ginie
+  przy przełączeniu sprawy, bo `useEffect` na `[wybrana]` robi `setTresc("")`.
+  Skrzynka tej usterki nie ma — tam szkic stoi na serwerze z wersją.
+- **Zadanie bez usterki:** literówka w numerze części daje wyniki przybliżone,
+  nie „nie znaleziono". To zostaje bez zmian.
+
 ## 0.421.0 — 22 września 2026
 
 **Werdykt odsunięty od przycisku wysyłki.** Zgłoszenie właściciela ze zrzutem:
