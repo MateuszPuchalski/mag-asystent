@@ -305,7 +305,7 @@ describe("Kotwica przy najnowszej wiadomości", () => {
   });
 });
 
-describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.417.0)", () => {
+describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
   /* Dwa zgłoszenia właściciela ze zrzutami. Podstawa doboru jest z badań, nie
      z gustu: cecha POJEDYNCZA — barwa — jest kodowana równolegle na całym polu
      widzenia (teoria integracji cech, Treisman i Gelade 1980), więc czas
@@ -368,7 +368,7 @@ describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.417.0)", () => {
   });
 });
 
-describe("Rozmowa przewija się, czynności stoją (0.417.0)", () => {
+describe("Rozmowa przewija się, czynności stoją (0.418.0)", () => {
   /* Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony" — pasek
      leżał w połowie cudzej wiadomości, bo cała kolumna była JEDNYM obszarem
      przewijania. Teraz przewija się wyłącznie oś; pole odpowiedzi i werdykt

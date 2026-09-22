@@ -65,7 +65,7 @@ export function Edytor({
   const zaDlugo = znakow > LIMIT_ZNAKOW;
   const blisko = !zaDlugo && znakow > LIMIT_ZNAKOW - PROG_OSTRZEZENIA;
 
-  /* ── PAS DO KRAWĘDZI, NIE KARTA W KARCIE (0.417.0) ────────────────────────
+  /* ── PAS DO KRAWĘDZI, NIE KARTA W KARCIE (0.418.0) ────────────────────────
      Zgłoszenie właściciela ze zrzutem: „mniej ramek, okno odpowiadania do
      granic bez paddingu". Pole do pisania siedziało w zaokrąglonej karcie,
      ta w kolumnie z własnym `p-4`, a kolumna w karcie ekranu — trzy ramki

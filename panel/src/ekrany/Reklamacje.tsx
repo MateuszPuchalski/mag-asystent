@@ -573,7 +573,7 @@ export function Reklamacje() {
         </div>
       </Karta>
 
-      {/* ── TRZY PASY, NIE JEDEN OBSZAR PRZEWIJANIA (0.417.0) ────────────────
+      {/* ── TRZY PASY, NIE JEDEN OBSZAR PRZEWIJANIA (0.418.0) ────────────────
           Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony".
           Cała kolumna przewijała się jako jedna kartka, więc pasek werdyktu
           wędrował z osią i lądował w połowie cudzej wiadomości.

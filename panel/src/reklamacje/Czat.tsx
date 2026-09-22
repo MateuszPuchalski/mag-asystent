@@ -16,7 +16,7 @@ import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
    trójstronna: `BUYER`, `SELLER` i `ADMIN`, czyli doradca Allegro. Bez
    wyraźnego podpisu agent odpowiadałby doradcy tak, jak odpowiada klientowi. */
 
-/* ── KTO MÓWI, WIDAĆ BEZ CZYTANIA (0.416.0, dobór barw z 0.417.0) ───────────
+/* ── KTO MÓWI, WIDAĆ BEZ CZYTANIA (0.416.0, dobór barw z 0.418.0) ───────────
    Dwa zgłoszenia właściciela ze zrzutami. Pierwsze: „wiadomości nasze, klienta
    i Allegro powinny być łatwo wizualnie rozpoznawalne". Drugie, po 0.416.0:
    „oznaczenie na granicy powinno być po drugiej stronie dla nas, a dla klienta
@@ -221,7 +221,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
   const opisWart = !dubel;
 
-  /* ── ROZMOWA PRZEWIJA SIĘ, CZYNNOŚCI STOJĄ (0.417.0) ─────────────────────
+  /* ── ROZMOWA PRZEWIJA SIĘ, CZYNNOŚCI STOJĄ (0.418.0) ─────────────────────
      Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
      zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
      a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
@@ -298,7 +298,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
         Werdykt od 0.412.0 stoi POD rozmową (`Werdykt.tsx`) — nieodwracalne
         pyta dopiero po dowodach, a nie przed nimi.
 
-        POZA PASEM PRZEWIJANIA od 0.417.0: pole, w które się pisze, ma być pod
+        POZA PASEM PRZEWIJANIA od 0.418.0: pole, w które się pisze, ma być pod
         ręką niezależnie od tego, jak długa jest rozmowa. */}
     <div className="shrink-0">{edytor}</div>
   </div>;
