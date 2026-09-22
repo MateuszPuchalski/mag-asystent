@@ -2578,6 +2578,25 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.431.0 — osobny model klasyfikacji
+
+**Nic nie trzeba robić.** Bez nowej zmiennej klasyfikacja idzie modelem
+z `COPILOT_MODEL`, tak jak dotąd.
+
+Żeby etykiety szły tańszym modelem, a szkic dalej mocniejszym, dopisz do
+`wertis.env` jedną linię i zrestartuj `wertis-api`:
+
+```
+export COPILOT_MODEL_KLASYFIKACJA=claude-sonnet-5
+```
+
+Zmieniaj model dopiero po tygodniu etykiet. Na karcie „Copilot" precyzja
+kategorii ma zostać w przedziale sprzed zmiany. Mniej niż pięćdziesiąt etykiet
+jeszcze niczego nie rozstrzyga.
+
+Sprawdzenie: po pierwszym rozpoznaniu kolumna `model` w najnowszym wierszu
+`copilot_wywolanie` z zadaniem `klasyfikacja` ma pokazać nowy model.
+
 ### Aktualizacja do 0.430.0 — szkic dostaje rozpoznanie
 
 **Migracja dokłada kolumnę sama. Panel trzeba przebudować.**

@@ -32,7 +32,7 @@ const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
 });
 
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
-  stan: { wlaczony: true, powod: null, model: "claude-opus-5", maxPartia: 20 },
+  stan: { wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20 },
   szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [], paraPasowania: null,
   uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
   onUloz: vi.fn(), onWstaw: vi.fn(), onZastap: vi.fn(), onOdrzuc: vi.fn(), ...n,
@@ -60,7 +60,7 @@ describe("Szkic Copilota w edytorze", () => {
     unmount();
 
     edytor(copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
-      model: "claude-opus-5", maxPartia: 20 } }));
+      model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20 } }));
     expect(screen.queryByRole("button", { name: /Ułóż odpowiedź/ })).toBeNull();
     expect(screen.getByText(/COPILOT_MODE=anthropic/)).toBeInTheDocument();
   });

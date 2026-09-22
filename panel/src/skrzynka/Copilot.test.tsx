@@ -26,7 +26,7 @@ const kopilot = (n: Partial<Kopilot> = {}): Kopilot => ({
 });
 
 const WLACZONY: StanCopilota = {
-  wlaczony: true, powod: null, model: "claude-opus-5", maxPartia: 20,
+  wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
 };
 
 describe("pasek Copilota nad kolejką", () => {

@@ -110,6 +110,8 @@ export type StanCopilota = {
   /** Zdanie dla człowieka, gdy `wlaczony` jest fałszem. `null`, gdy działa. */
   powod: string | null;
   model: string;
+  /** Model klasyfikacji; bez `COPILOT_MODEL_KLASYFIKACJA` równy `model`. */
+  modelKlasyfikacji: string;
   maxPartia: number;
 };
 

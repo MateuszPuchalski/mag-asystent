@@ -100,6 +100,9 @@ export async function copilotRoutes(app: FastifyInstance) {
       wlaczony: czemuWylaczony() === null,
       powod: czemuWylaczony(),
       model: config.copilot.model,
+      /* Osobny model klasyfikacji (22 września 2026) — bez niego ekran nie
+         miałby jak powiedzieć, że etykieta i szkic idą różnymi modelami. */
+      modelKlasyfikacji: config.copilot.modelKlasyfikacji,
       maxPartia: config.copilot.maxPartia,
     };
   });

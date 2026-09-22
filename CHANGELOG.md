@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.431.0 — 22 września 2026
+
+**Klasyfikacja dostaje własny model: `COPILOT_MODEL_KLASYFIKACJA`.** Do tej
+wersji jedno pole `COPILOT_MODEL` rządziło klasyfikacją, szkicem i dopytaniem
+naraz. Zejście na tańszy model przy etykiecie ciągnęło więc w dół także szkic,
+a szkic czyta klient.
+
+Puste pole dziedziczy `COPILOT_MODEL` — instalacja bez nowej zmiennej zachowuje
+się dokładnie tak jak dotąd. Nowe pole ma tę samą bramkę co stare: wklejony
+klucz nie wychodzi do komunikatu błędu.
+
+**Haiku 4.5 i Sonnet 4.5 dostają żądanie bez parametru wysiłku.** Dokumentacja
+Anthropic mówi, że te modele odrzucają `effort` błędem 400. Bez tej poprawki
+ustawienie Haiku kończyłoby każde rozpoznanie decyzją `FAILED` za pełną cenę.
+
+Stan Copilota (`GET /api/obsluga/copilot`) podaje model klasyfikacji obok
+modelu szkicu. Księga wywołań zapisuje model przy każdym wywołaniu, więc
+karta „Copilot" rozdziela koszt po zadaniu bez zmian.
+
+- Nowa zmienna, opcjonalna — patrz `DEPLOY.md`.
+- **[wymaga działania]** Przebuduj panel.
+
+
 ## 0.430.1 — 22 września 2026
 
 **Zasada nadrzędna nr 2 („Człowiek wysyła odpowiedź do klienta") odeszła,

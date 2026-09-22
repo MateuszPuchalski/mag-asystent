@@ -917,6 +917,15 @@ export const config = {
      */
     model: process.env.COPILOT_MODEL ?? "claude-opus-5",
     /**
+     * Model WYŁĄCZNIE do klasyfikacji (22 września 2026). Do tej wersji jedno
+     * pole `COPILOT_MODEL` rządziło klasyfikacją, szkicem i dopytaniem naraz,
+     * więc zejście na tańszy model przy etykiecie ciągnęło w dół także szkic
+     * — a to szkic czyta klient. Puste pole znaczy „jak `COPILOT_MODEL`":
+     * instalacja bez tej zmiennej zachowuje się dokładnie tak jak dotąd.
+     */
+    modelKlasyfikacji: process.env.COPILOT_MODEL_KLASYFIKACJA
+      || process.env.COPILOT_MODEL || "claude-opus-5",
+    /**
      * Ile rozmów bierze jedno kliknięcie. Limit stoi TU, a nie w panelu, bo
      * to jest hamulec na wydatek, a nie szczegół wyglądu przycisku.
      */
@@ -1152,6 +1161,17 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(
       `COPILOT_MODEL=${bezpiecznaWartosc(c.copilot.model)} — nazwa modelu Anthropic ` +
         "zaczyna się od „claude-" + "\u201d (np. claude-opus-5).",
+    );
+  }
+  /* Ta sama bramka dla modelu klasyfikacji — to drugie pole obok klucza
+     w wertis.env.example, więc i tu wklejka jest kwestią czasu. Zdanie
+     odzywa się tylko wtedy, gdy pole różni się od `COPILOT_MODEL`: przy
+     wartości odziedziczonej jedno zdanie o `COPILOT_MODEL` wystarczy. */
+  if (c.copilot.modelKlasyfikacji && c.copilot.modelKlasyfikacji !== c.copilot.model
+    && !c.copilot.modelKlasyfikacji.startsWith("claude-")) {
+    bledy.push(
+      `COPILOT_MODEL_KLASYFIKACJA=${bezpiecznaWartosc(c.copilot.modelKlasyfikacji)} — nazwa ` +
+        "modelu Anthropic zaczyna się od „claude-" + "\u201d (np. claude-sonnet-5).",
     );
   }
 

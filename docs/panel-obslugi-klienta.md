@@ -1904,6 +1904,12 @@ przyciskiem nad kolejką.
 **Czego ten przyrost nie robi.** Nie wysyła niczego do klienta i nie zmienia
 trybu wysyłki: drogi wysyłki bez człowieka w kodzie nie ma.
 
+**Własny model klasyfikacji** (`COPILOT_MODEL_KLASYFIKACJA`, 22 września
+2026). Puste pole dziedziczy `COPILOT_MODEL`. Rozdział jest po to, żeby
+zejście na tańszy model przy etykiecie nie ciągnęło w dół szkicu. Model bez
+parametru wysiłku (Haiku 4.5, Sonnet 4.5) dostaje żądanie bez niego —
+inaczej każde rozpoznanie kończyłoby się błędem 400.
+
 ### 14.5b. Struktura wątku Allegro przed modelem (22 września 2026)
 
 Drugi przyrost specyfikacji: „użyj pewnej struktury Allegro najpierw, model
