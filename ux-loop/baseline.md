@@ -37,7 +37,7 @@ Niczego w tej fazie nie zmieniono.
 | zad. | C | S | R | E | stan |
 |---|---|---|---|---|---|
 | T1 statusy paczki po numerze telefonu | 6 `+1 txt` | 3 | 0 | 0 | wykonalne **od 0.422.0** |
-| T2 model kosiarki + zdjęcie → numery części | 13 `+2 txt` | 3 | 2 | 2 | wykonalne |
+| T2 model kosiarki + zdjęcie → numery części | 13 `+2 txt` | 3 | **0** | 2 | wykonalne |
 | T3 spór Allegro: rozstrzygnięcie + przypomnienie | 11 `+1 txt` | 3 | 1 | 2 | **częściowo** — przypomnienia nie ma |
 | T5 przełączenie w pół odpowiedzi i powrót | 4 | 2 | 0 | 1 | wykonalne, **szkic ginie poza skrzynką** |
 | T6 wszystkie sprawy jednego klienta | 5 | 3 | 1 | 1 | **częściowo** — tylko po loginie Allegro |
@@ -60,6 +60,13 @@ cyfr jest odrzucany, żeby uchwyt nie zamienił się w losowanie.
 To jedyna pozycja tej tabeli poprawiona nie iteracją pętli, tylko decyzją
 właściciela o zmianie reguły — zapisuję to tutaj, żeby przy zamknięciu pętli
 nie policzyć jej jako zasługi Generatora.
+
+### T2 — POPRAWKA POMIARU (przy iteracji 5)
+Policzyłem R=2, pisząc, że agent przepisuje model z wiadomości „z innej
+kolumny". Ekran skrzynki ma TRZY kolumny naraz: kolejkę, rozmowę z edytorem
+i kontekst z zakładką doboru. Wiadomość klienta stoi więc na ekranie w chwili
+wypełniania formularza, a definicja R z briefu mówi o polach, których agent
+NIE widzi. **R na T2 to 0.** Zostaje C=13 i E=2.
 
 ### T3 — czego brakuje
 Termin Allegro jest na ekranie (`decyzjaDo`, `dniDoTerminu`, sortowanie

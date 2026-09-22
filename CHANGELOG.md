@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.425.1 — 22 września 2026
+
+**Zamknięcie pętli `ux-loop`.** Same dokumenty — żadnej zmiany w kodzie.
+
+- **`ux-loop/summary.md`** — wynik końcowy wobec wyjściowego, przyjęte zmiany
+  według zmierzonego wpływu, lista „bez backendu" i trzy pytania do agenta.
+- **Suma E na baterii: 8 → 4.** Wynik ważony 5.50 → 6.85 przy progu 8.0.
+  E jest zerowe na obu zadaniach przeciwnika. C i S nie spadły nigdzie.
+- **Dwie moje własne liczby okazały się błędne** i są poprawione w pomiarze,
+  nie zamiecione: login klienta widać przez cały czas pisania, a model
+  kosiarki stoi na ekranie obok formularza doboru.
+- **Powód zatrzymania:** dalszej poprawy nie da się ocenić bez prawdziwych
+  spraw albo prawdziwego agenta, a nie wyczerpanie limitu iteracji.
+
 ## 0.425.0 — 22 września 2026
 
 **Wiersz kolejki mówi, na czym trafiło szukanie.** Iteracja 4 pętli `ux-loop`,
