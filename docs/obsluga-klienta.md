@@ -297,6 +297,38 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > **Gdzie stoi granica.** Magazyn zostaje w `biuro.html`; przepisywanie go nie
 > jest częścią tej decyzji. Trzeciego frontu nie ma.
 
+> **Zmiana z 0.431.0: jeden front.** Decyzja właściciela po audycie biura
+> z 0.427.0. Całe biuro przechodzi do `panel/`, a `biuro.html` znika widok po
+> widoku. Granica z akapitu wyżej przestaje obowiązywać.
+>
+> **Dlaczego.** Audyt pokazał, że `biuro.html` nie jest już podglądem. Ma
+> dwadzieścia dwa zapisy w sześciu widokach, czyli jest konsolą pracy biura.
+> Ci sami ludzie pracują w obu frontach: bramka ról to w obu `biuro` i `admin`.
+> Dwa fronty kazały im pamiętać, który ekran jest gdzie, i logować się dwa razy.
+> Cztery kontrole zwrotów wisiały w `/biuro`, gdzie obsługa nie zagląda (0.313.0).
+>
+> **Co to kosztuje.** Biuro traci wdrożenie przez kopię jednego pliku; build
+> panelu i tak już jest. Przeprowadzka to sześć wydań i nowe strażniki
+> w miejsce testów struktury `biuro.html`. Nawyk „szukaj w `biuro.html`"
+> przestaje działać wcześniej, niż znika plik.
+>
+> **Co to kupuje.** Jeden zestaw nawyków, jedno logowanie, jeden nagłówek
+> i jedna lista spraw do rozstrzygnięcia nad wszystkimi kolejkami.
+>
+> **Cel biura, od którego liczy się każdy ekran:** biuro rozstrzyga to, czego
+> hala nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest
+> nadzorem albo ustawieniem.
+>
+> Test dla każdej funkcji: czy kończy się decyzją biura, której hala nie
+> podejmie? Tak znaczy pracę na górnym rzędzie. Coś, co trzeba sprawdzać,
+> to wgląd w dolnym rzędzie. Rzadka zmiana idzie za zębatkę. Reszta wypada.
+>
+> **Kolejność.** F0 dokumentuje decyzję i makiety
+> (`docs/projekt-widokow-jeden-front/`). F1 kładzie fundament panelu
+> i poprawki z audytu. F2 to DO DECYZJI i dostawy, F3 kosze, a F4 stan
+> systemu, dziennik i analiza. F5 to ustawienia, a F6 przekierowuje `/biuro`
+> i kasuje plik. Każde wydanie usuwa z `biuro.html` dokładnie to, co przeniosło.
+
 ### 8. Kiedy nowa obsługa jest gotowa?
 
 Lista zdań sprawdzalnych okiem na produkcji („agent odpowiada na pytanie

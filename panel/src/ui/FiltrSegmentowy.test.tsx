@@ -107,8 +107,8 @@ describe("Filtr segmentowy: zachowanie pigułki", () => {
     /* Barlow ma cyfry proporcjonalne: bez tej klasy „11" mierzy 8,44 px,
        a „44" — 13,23 px przy 12 px pisma. Rząd kubełków przesuwałby się
        o prawie pięć pikseli przy samej zmianie liczby, nie jej długości.
-       Pomiar robi się w przeglądarce Z WCZYTANYM fontem: serwer deweloperski
-       nie serwuje `/biuro/fonty/`, więc bez podstawienia pliku wynik kłamie. */
+       Pomiar robi się w przeglądarce Z WCZYTANYM fontem. Od 0.431.0 font
+       jedzie z panelem, więc serwer deweloperski też go podaje. */
     const { container } = render(
       <FiltrSegmentowy wybrany="a" onWybierz={() => {}} pozycje={POZYCJE} />);
     expect(container.querySelector("span")?.className).toContain("tabular-nums");

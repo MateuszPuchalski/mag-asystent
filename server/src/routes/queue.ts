@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { db } from "../db/db.js";
 import { czasLokalny } from "../czas.js";
+import { logEvent } from "../services/events.js";
+import { sesjaZadania } from "../context.js";
 
 interface QueueRow {
   id: number;
@@ -57,6 +59,11 @@ export async function queueRoutes(app: FastifyInstance) {
         "UPDATE sfera_queue SET status='pending', attempts=0, error_msg=NULL, next_attempt_at=NULL, processed_at=NULL WHERE id=?"
       )
       .run(id);
+    /* Ręczne ponowienie zapisu do bazy firmy (0.431.0). Do tej wersji nie
+       zostawiało śladu: dziennik biura nie umiał powiedzieć, kto wysłał
+       drugi raz zapis, który raz już się nie udał. Rola zostaje bez zmian,
+       bo PONÓW woła też kolektor, przy półce. */
+    logEvent("queue_ponowione_recznie", sesjaZadania()?.user.name ?? "?", null, { queueId: id });
     return { ok: true };
   });
 
@@ -72,6 +79,8 @@ export async function queueRoutes(app: FastifyInstance) {
     db()
       .prepare("UPDATE sfera_queue SET status='cancelled', processed_at=(strftime('%Y-%m-%dT%H:%M:%fZ','now')) WHERE id=?")
       .run(id);
+    // Anulowanie zapisu do Subiekta to decyzja, której dziennik nie może przemilczeć.
+    logEvent("queue_anulowane_recznie", sesjaZadania()?.user.name ?? "?", null, { queueId: id });
     return { ok: true };
   });
 }

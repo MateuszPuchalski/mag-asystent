@@ -18,6 +18,17 @@ import { sesjaZadania } from "../context.js";
    zapalnikiem, przed którym kod ostrzegał w trzech miejscach naraz. */
 const CZYTAJACY = ROLE_BIUROWE;
 
+/* RAPORT PER OSOBA TYLKO DLA ADMINISTRATORA (0.431.0, decyzja właściciela).
+   Do tej wersji czytało go całe biuro, a `services/auth.ts` mówiło wprost, że
+   admin nie ma nad biurem przewagi w raporcie o pracy ludzi. Audyt 0.427.0
+   odwrócił tę kolejność: monitoring pracowniczy to decyzja kadrowa, nie
+   robota biura przy dostawie. Reszta analizy zostaje dla biura bez zmian.
+   Sprawdzane tutaj, nie w przeglądarce — raport nie powinien opuszczać
+   serwera w odpowiedzi dla kogoś, kto i tak by go nie zobaczył. */
+function mozeWidziecLudzi(): boolean {
+  return sesjaZadania()?.user.role === "admin";
+}
+
 /** Okno przycinane do trzech wartości, które oferuje selektor strony. */
 function dniZQuery(v: string | undefined): number {
   const n = Number(v);
@@ -52,7 +63,7 @@ export async function analizaRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { days?: string } }>("/api/analiza", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return analiza(dniZQuery(req.query.days));
+    return analiza(dniZQuery(req.query.days), mozeWidziecLudzi());
   });
 
   /**
@@ -73,7 +84,7 @@ export async function analizaRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    const a = analiza(dniZQuery(req.query.days));
+    const a = analiza(dniZQuery(req.query.days), mozeWidziecLudzi());
 
     /* Eksport zawiera dane imienne, więc zostawia ślad — ta sama zasada co
        `audyt_eksport`: kto pobiera zestawienia o ludziach, sam trafia do logu. */
@@ -129,7 +140,9 @@ export function csvAnalizy(a: AnalizaAudytu): string {
     linie.push(w([u.device, u.upadki, u.niskieBaterie, u.odrzucone, u.zdarzen]));
 
   /* Sekcja imienna idzie OSTATNIA i z podstawą prawną nad danymi — plik bywa
-     przekazywany dalej i ta informacja ma jechać razem z liczbami. */
+     przekazywany dalej i ta informacja ma jechać razem z liczbami. Bez prawa
+     do raportu (rola biuro) sekcji nie ma wcale, nawet nagłówka. */
+  if (!a.wydajnosc) return zbudujCsv(linie);
   linie.push(
     "",
     "# WYDAJNOSC PER OSOBA",

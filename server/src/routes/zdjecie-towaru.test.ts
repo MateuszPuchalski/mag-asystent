@@ -161,10 +161,15 @@ test("odświeżenie kasuje braki, a zdjęcia zostawia", async () => {
     )
     .run(teraz, teraz);
 
+  /* Konto biura, nie kolektora: od 0.431.0 odświeżenie wymaga uprawnienia
+     `ratunek_serwera`, a odmowę magazynierowi pilnuje `bramka.test.ts`. */
+  const biuro = createUser("Ola Biuro", "biuro");
+  db().prepare("INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)")
+    .run("tok-zdj-biuro", biuro.userId, "biuro", teraz, teraz);
   const r = await app.inject({
     method: "POST",
     url: "/api/admin/zdjecia/odswiez",
-    headers: { "x-session": token },
+    headers: { "x-session": "tok-zdj-biuro" },
   });
   assert.equal(r.statusCode, 200);
   assert.equal(r.json().zapomniano, 1, "kasujemy wyłącznie wpisy bez pliku");

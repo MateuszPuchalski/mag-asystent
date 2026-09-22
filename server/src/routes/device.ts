@@ -3,7 +3,6 @@ import { userOf } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { metrics } from "../services/raporty.js";
 import { reconcile } from "../services/reconcile.js";
-import { raportWydajnosci } from "../services/raporty.js";
 
 /** Telemetria urządzenia z kolektora (akcelerometr/bateria) → audyt w events. */
 const ALLOWED = new Set([
@@ -42,19 +41,11 @@ export async function deviceRoutes(app: FastifyInstance) {
    */
   app.get("/api/reconcile", async () => reconcile());
 
-  /**
-   * Wydajność per osoba (plan §7) — dla biura, nie dla kolektora.
-   *
-   * Osobna trasa od `/api/metrics` celowo: tamte cztery liczby opisują SYSTEM
-   * i wolno je pokazywać komukolwiek, ta opisuje LUDZI i jest monitoringiem
-   * pracowniczym w rozumieniu Kodeksu pracy. Zlanie ich w jeden endpoint
-   * sprawiłoby, że dane osobowe wyciekają wszędzie tam, gdzie ktoś chciał
-   * tylko sprawdzić p95. Obowiązek formalny jedzie w odpowiedzi
-   * (`podstawaPrawna`) — patrz services/raporty.ts.
-   */
-  app.get<{ Querystring: { days?: string } }>("/api/wydajnosc", async (req) => {
-    return raportWydajnosci(Number(req.query.days) || 7);
-  });
+  /* `GET /api/wydajnosc` ZNIKNĘŁO w 0.431.0. Raport per osoba wisiał tu za
+     samą sesją, więc czytał go każdy zalogowany — także magazynier z kolektora
+     (zmierzone: 200 z pełnym raportem). Nie wołał go żaden front: biuro bierze
+     raport z `/api/analiza`, za bramką roli. Trasa bez odbiorcy, która wynosi
+     dane o ludziach, jest wyłącznie ryzykiem. */
 
   app.post<{ Body: { type?: string; [k: string]: unknown } }>(
     "/api/device/event",

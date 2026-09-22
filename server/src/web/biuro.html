@@ -2903,6 +2903,13 @@ function rysujAnalize(a) {
   );
 
   const w = a.wydajnosc;
+  /* Raport per osoba jest od 0.431.0 wyłącznie administratora — serwer nie
+     wysyła go roli biuro wcale (`null`). Karta mówi to zdaniem, zamiast pustej
+     tabeli, która wyglądałaby na brak pracy w oknie. */
+  if (!w) {
+    $("podstawaPrawna").textContent = "Raport per osoba widzi wyłącznie administrator.";
+    $("wydajnosc").innerHTML = "";
+  } else {
   $("podstawaPrawna").textContent = w.podstawaPrawna;
   $("wydajnosc").innerHTML =
     "<tr><th>OSOBA</th><th>POZYCJE</th><th>CZAS AKTYWNY</th><th>TEMPO/H</th><th>ZGŁOSZONE PROBLEMY</th></tr>" +
@@ -2914,6 +2921,7 @@ function rysujAnalize(a) {
       '<tr><td colspan="5" class="mute">Brak pracy w tym oknie</td></tr>') +
     (w.nieprzypisanychZdarzen > 0 ?
       `<tr><td class="mute" colspan="5">+ ${w.nieprzypisanychZdarzen} zdarzeń bez konta — nie doklejamy ich nikomu</td></tr>` : "");
+  }
 
   const listaSzukan = (el, lista, pusto) => {
     const max = Math.max(...lista.map((t) => t.ile), 0);

@@ -196,7 +196,7 @@ export const KATALOG: Scenariusz[] = [
   { id: "S58", obszar: "audyt", tytul: "Zdarzenia sprzed kont (bez `user_ref`)", wejscie: "GET /api/events?od=" },
   { id: "S59", obszar: "audyt", tytul: "Uszkodzony payload i wpis bez `locsPrzed`", wejscie: "GET /api/products/900011/history" },
   { id: "S60", obszar: "audyt", tytul: "Metryki: etykiety do przedruku i p95 powyżej celu", wejscie: "GET /api/metrics" },
-  { id: "S61", obszar: "audyt", tytul: "Wydajność: próbka wiarygodna i za mała", wejscie: "GET /api/wydajnosc" },
+  { id: "S61", obszar: "audyt", tytul: "Wydajność: próbka wiarygodna i za mała", wejscie: "GET /api/analiza (admin)" },
   { id: "S62", obszar: "audyt", tytul: "Raport kolizji kodów kreskowych", wejscie: "GET /api/ean-conflicts" },
 
   // ── przeslotowanie ──
