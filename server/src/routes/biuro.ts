@@ -64,9 +64,25 @@ export async function biuroRoutes(app: FastifyInstance) {
      WEBP, nie PNG: tak przyszedł plik od właściciela, a biuro i obsługa
      pracują w Chrome, który czyta webp w ikonie karty od 2014 roku.
      Przerobienie go na PNG wymagałoby narzędzia, którego to repo nie ma. */
-  const ikona = fs.readFileSync(path.join(__dirname, "../web/ikona-biuro.webp"));
+  /* ── OZDOBA NIE KŁADZIE USŁUGI (0.420.1) ──────────────────────────────────
+     Blizna z 0.419.0, zgłoszona przez właściciela z produkcji: `build` serwera
+     kopiował do `dist/web` trzy rzeczy WYMIENIONE Z NAZWY, a ikona nie była
+     jedną z nich. `readFileSync` przy rejestracji tras rzucił ENOENT i cała
+     usługa nie wstała — przez plik, który rysuje obrazek w pasku karty.
+
+     Dwie poprawki, bo jedna by nie wystarczyła. Pierwsza: `build` kopiuje CAŁY
+     `src/web`, więc następny plik nie ma jak zostać zapomniany. Druga: ta,
+     tutaj — brak OZDOBY oddaje 404, a nie zabija startu. Fonty zostają
+     surowe świadomie: bez nich strona biura rysuje się inną krojówką i chcemy
+     o tym wiedzieć przy starcie, a nie z trzeciej ręki. */
+  const ikona = (() => {
+    try { return fs.readFileSync(path.join(__dirname, "../web/ikona-biuro.webp")); }
+    catch { return null; }
+  })();
   app.get("/biuro/ikona.webp", async (_req, reply) =>
-    reply.type("image/webp").header("cache-control", "public, max-age=604800").send(ikona)
+    ikona
+      ? reply.type("image/webp").header("cache-control", "public, max-age=604800").send(ikona)
+      : reply.code(404).send()
   );
 
   /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
