@@ -33,10 +33,16 @@ import { odmien } from "../ui";
  * z decyzją FAILED. Tej ostatniej takt nie ponawia (awaria rozmowy wracałaby
  * co przebieg na koszt firmy) — ponowienie jest decyzją człowieka, więc stoi
  * pod przyciskiem nad kolejką.
+ *
+ * ── PRZY WŁĄCZONYM TAKCIE ZOSTAJE SAMO PONOWIENIE (22 września 2026) ──────
+ * Takt rozpoznaje każdą nową wiadomość sam, więc nierozpoznana i nieaktualna
+ * to rozmowy, po które on właśnie idzie. Przycisk nad nimi kazałby zapłacić
+ * drugi raz za tę samą etykietę. Zostaje FAILED — jedyne, czego takt nie
+ * ponowi. Wyłączony takt oddaje przyciskowi całą listę, jak dotąd.
  */
-export const doRozpoznania = (rozmowy: Rozmowa[]): Rozmowa[] =>
-  rozmowy.filter((r) => r.kopilot === null || r.kopilot.nieaktualna
-    || r.kopilot.status === "FAILED");
+export const doRozpoznania = (rozmowy: Rozmowa[], stan?: StanCopilota): Rozmowa[] =>
+  rozmowy.filter((r) => r.kopilot?.status === "FAILED"
+    || (!stan?.autoKlasyfikacja && (r.kopilot === null || r.kopilot.nieaktualna)));
 
 function podsumowanie(w: WynikPartii): string {
   const czesci = [`Rozpoznano ${w.sklasyfikowane}`];

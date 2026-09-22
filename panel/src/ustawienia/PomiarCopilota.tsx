@@ -40,7 +40,6 @@ const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
 
 export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   if (!dane) return null;
-  const proc = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)} %` : "—");
   return <Karta className="overflow-hidden">
     <header className="flex items-baseline gap-2 border-b p-4">
       <b className="text-naglowek mr-auto">Copilot — rozpoznawanie kategorii</b>
@@ -86,26 +85,22 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
 
     {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
         niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
-        Miarą szkicu nie jest trafność, tylko los: wstawiony albo zastąpiony
-        znaczy, że agent go użył; odrzucony — że napisał sam. */}
+
+        MIARĄ JEST LOS PRZY WYSYŁCE (22 września 2026, decyzja właściciela).
+        Do tej wersji karta liczyła „użytych" z kliknięć „Wstaw" i „Zastąp",
+        a wstawiony szkic bywał potem przepisany — liczba mówiła o kliknięciu,
+        nie o tym, co dostał klient. Zostają: bez zmian, z poprawką i odrzucone,
+        czyli jedyny ślad, że agent napisał sam. */}
     {(() => {
       const sz = dane.wgZadania.find((z) => z.zadanie === "szkic");
       if (!sz && dane.szkice.ile === 0) return null;
-      const uzyte = dane.szkice.wstawionych + dane.szkice.zastapionych;
-      const ocenionych = uzyte + dane.szkice.odrzuconych;
       return <p className="border-t p-4 text-sm text-slate-600" aria-label="Szkice odpowiedzi">
         Szkice odpowiedzi: <b>{sz?.wywolan ?? 0}</b> wywołań
         {sz && sz.bledow > 0 && <>, <b className="text-ranga-uwaga">{sz.bledow}</b> nieudanych</>},
         {" "}rachunek <b>{(sz?.kosztUsd ?? 0).toFixed(2)} USD</b> ({zl(sz?.kosztUsd ?? 0)}).
-        {" "}Użytych: <b>{proc(uzyte, ocenionych)}</b> z {ocenionych} ocenionych
-        {" "}(wstawionych {dane.szkice.wstawionych}, zastąpionych {dane.szkice.zastapionych},
-        {" "}odrzuconych {dane.szkice.odrzuconych}).
-        {/* Los PRZY WYSYŁCE (22 września 2026): specyfikacja mierzy, ile
-            szkiców poszło bez zmian, a ile z poprawką — to mówi więcej niż
-            samo „wstawiony", bo wstawiony szkic bywa potem przepisany. */}
-        {dane.szkice.wyslanychBezZmian + dane.szkice.wyslanychPoprawionych > 0 && <> Wysłanych
-          ze szkicu: bez zmian <b>{dane.szkice.wyslanychBezZmian}</b>,
-          {" "}z poprawką <b>{dane.szkice.wyslanychPoprawionych}</b>.</>}
+        {" "}Wysłanych ze szkicu: bez zmian <b>{dane.szkice.wyslanychBezZmian}</b>,
+        {" "}z poprawką <b>{dane.szkice.wyslanychPoprawionych}</b>;
+        {" "}odrzuconych <b>{dane.szkice.odrzuconych}</b>.
         {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
         {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
           {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}

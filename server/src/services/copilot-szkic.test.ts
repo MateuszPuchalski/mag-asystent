@@ -563,7 +563,7 @@ test("szkic nie rusza statusu, wersji ani szkicu AGENTA", async () => {
     "mój własny szkic", "propozycja modelu nie ma prawa dotknąć szkicu agenta");
 });
 
-test("pomiar rozbija księgę po zadaniu i liczy losy szkiców", async () => {
+test("pomiar rozbija księgę po zadaniu i liczy odrzucenia, nie wstawienia", async () => {
   await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
   S.ocenSzkic(rozmowa, "zastapiony", KTO());
   const p = K.pomiarCopilota(db());
@@ -572,7 +572,7 @@ test("pomiar rozbija księgę po zadaniu i liczy losy szkiców", async () => {
   assert.equal(sz.wywolan, 1);
   assert.ok(sz.kosztUsd > 0);
   assert.deepEqual(p.szkice, {
-    ile: 1, wstawionych: 0, zastapionych: 1, odrzuconych: 0,
+    ile: 1, odrzuconych: 0,
     daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
     pasowaniaRozpoznane: 0, pasowaniaZaproponowane: 0, pasowaniaOdrzucone: 0, pasowaniaZatwierdzonePrzezBiuro: 0,
     /* Los przy wysyłce (22 września 2026) — tu nic nie wysłano. */

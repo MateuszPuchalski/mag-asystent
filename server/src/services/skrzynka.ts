@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
-import { statusZKierunku, ustawStatus } from "./conversations.js";
+import { klientPodziekowal, statusZKierunku, ustawStatus } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import {
@@ -77,6 +77,12 @@ export interface RozmowaSkrzynki {
      z kubełków zwrotów). Wiersz taki wraca jako `open` i wygląda jak każdy
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
+  /* Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
+     (22 września 2026). Rozmowa jest wtedy „Czeka na klienta", a znacznik
+     mówi dlaczego — inaczej wiersz z wiadomością klienta na podglądzie
+     wyglądałby jak pytanie, które ktoś przeoczył. Liczy SERWER, regułą
+     `klientPodziekowal`, tą samą co przy jednej rozmowie. */
+  podziekowal: boolean;
   /* Rozpoznanie Copilota (§14, etap F). `null` znaczy „nierozpoznana" i liczy
      się PRZY ODCZYCIE — brak wiersza w `decyzja_klasyfikacji` niczego nie
      wstawia, więc otwarcie kolejki dalej nic nie mutuje.
@@ -326,7 +332,12 @@ const LISTA = `
          -- CEL_KLASYFIKACJI (bez odwrotnych apostrofów: to wnętrze szablonu SQL)
          -- — do 0.426 stała tu kopia „co do znaku", a rozjazd
          -- dawał rozmowę wiecznie nieaktualną, płaconą przy każdym kliknięciu.
-         (kop.message_id IS NOT NULL AND kop.message_id <> ${CEL_KLASYFIKACJI}) AS kopNieaktualna
+         (kop.message_id IS NOT NULL AND kop.message_id <> ${CEL_KLASYFIKACJI}) AS kopNieaktualna,
+         -- Nasza PRAWDZIWA odpowiedź w wątku — warunek podziękowania: bez niej
+         -- „dziękuję" nie jest podziękowaniem ZA nic. Autoodpowiedź się nie
+         -- liczy, z tego samego powodu co przy ostatnim ruchu wyżej.
+         EXISTS(SELECT 1 FROM message n WHERE n.conversation_id=c.id
+                  AND n.direction='outgoing' AND n.auto_odpowiedz=0) AS naszaOdpowiedz
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
     LEFT JOIN dobor_rozmowy d ON d.conversation_id=c.id
@@ -342,6 +353,22 @@ const naRozmowe = (
 ): RozmowaSkrzynki => {
   const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
   const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
+  const ostatniRuch = w.ostatniRuch == null ? null : String(w.ostatniRuch);
+  const podziekowal = ostatniRuch === "incoming" && w.kopKategoria != null && klientPodziekowal({
+    kategoria: String(w.kopKategoria), akcja: String(w.kopAkcja), status: String(w.kopStatus),
+    pewnosc: w.kopPewnosc == null ? null : String(w.kopPewnosc),
+    wymagaCzlowieka: Boolean(Number(w.kopWymaga ?? 0)),
+    nieaktualna: Boolean(Number(w.kopNieaktualna ?? 0)),
+  }, Boolean(Number(w.naszaOdpowiedz ?? 0)));
+  /* Te same DWIE reguły co w `statusRozmowy`, liczone tu bez dodatkowego
+     zapytania na wiersz — kierunek ostatniej wiadomości niesie już `LISTA`.
+     Najpierw wygasa odłożenie (kolumna zostaje `snoozed`), potem rozmowa
+     mówi, kto ma następny ruch. Regułę drugą trzyma `statusZKierunku`:
+     gdyby kolejka liczyła ją po swojemu, mówiłaby co innego niż otwarta
+     rozmowa. */
+  const status = statusZKierunku(
+    (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    ostatniRuch, podziekowal);
   return {
     id: Number(w.id), klient: String(w.klient ?? "Klient"),
     ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
@@ -352,15 +379,7 @@ const naRozmowe = (
     wlascicielId: w.wlascicielId === null ? null : Number(w.wlascicielId),
     wlasciciel: w.wlasciciel === null ? null : String(w.wlasciciel),
     wersja: Number(w.wersja),
-    /* Te same DWIE reguły co w `statusRozmowy`, liczone tu bez dodatkowego
-       zapytania na wiersz — kierunek ostatniej wiadomości niesie już `LISTA`.
-       Najpierw wygasa odłożenie (kolumna zostaje `snoozed` do ręcznej zmiany),
-       potem rozmowa mówi, kto ma następny ruch. Regułę drugą trzyma
-       `statusZKierunku`: gdyby kolejka liczyła ją po swojemu, mówiłaby co
-       innego niż otwarta rozmowa. */
-    status: statusZKierunku(
-      (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
-      w.ostatniRuch == null ? null : String(w.ostatniRuch)),
+    status,
     priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
     reklamacyjna: Boolean(Number(w.reklamacyjna ?? 0)),
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
@@ -369,6 +388,10 @@ const naRozmowe = (
     dobor: String(w.dobor ?? "not_started") as StatusDoboru,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
+    /* Znacznik tylko tam, gdzie reguła naprawdę zmieniła stan: przy
+       werdykcie zapisanym ręką przed 22 września status jej nie słucha,
+       a „Czeka na klienta" po wiadomości klienta daje wyłącznie ona. */
+    podziekowal: podziekowal && status === "waiting_for_customer",
     kopilot: w.kopKategoria == null ? null : {
       kategoria: String(w.kopKategoria) as Kategoria,
       dodatkowe: JSON.parse(String(w.kopDodatkowe ?? "[]")) as Kategoria[],

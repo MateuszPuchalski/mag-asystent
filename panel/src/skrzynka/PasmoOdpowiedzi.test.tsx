@@ -1,7 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
 
 /* ── Pasmo odpowiedzi (0.404.0) ──────────────────────────────────────────────
@@ -65,18 +64,18 @@ beforeEach(() => {
 
 describe("Pasmo odpowiedzi nad zakładkami", () => {
   it("mówi, CO klient zamówił — ilość i sygnaturę z chwili zakupu", () => {
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("3 × MFG163856")).toBeInTheDocument();
     expect(screen.getByText(/17 września 2026/)).toBeInTheDocument();
   });
 
   it("mówi, CZYM to jest u nas — nazwą kartoteki, nie numerem oferty", () => {
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText(/Zestaw prowadnica/)).toBeInTheDocument();
   });
 
   it("mówi, CZY mamy — stan i półkę, bez przewijania kolumny", () => {
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("16 szt.")).toBeInTheDocument();
     expect(screen.getByText(/E06-02-01/)).toBeInTheDocument();
   });
@@ -84,13 +83,13 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   it("BRAK NA STANIE mówi o sobie wprost — to zmienia treść odpowiedzi", () => {
     karta.mockReturnValue({ isLoading: false, error: null,
       data: { ...PELNA, mag: { stan: 0, rez: 0, avail: 0 } } });
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
   });
 
   it("bez pobranej kartoteki NIE pisze pustego wiersza — brak wiedzy to nie zero", () => {
     karta.mockReturnValue({ isLoading: true, error: null, data: undefined });
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.queryByText("Mamy")).not.toBeInTheDocument();
     expect(screen.queryByText("To jest")).not.toBeInTheDocument();
     /* Zamówienie zostaje: ono nie zależy od Subiekta. */
@@ -98,24 +97,22 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   });
 
   it("PROPOZYCJI kartoteki nie podaje jako faktu — o kartotekę pyta dopiero pewność", () => {
-    render(<PasmoOdpowiedzi dane={dane({ pewnosc: "sugestia" })} onWstawDoSzkicu={() => {}} />);
+    render(<PasmoOdpowiedzi dane={dane({ pewnosc: "sugestia" })} />);
     expect(karta).toHaveBeenCalledWith(null);
   });
 
   it("bez oferty i bez zamówienia nie rysuje się WCALE — pasek bez treści to koszt", () => {
     karta.mockReturnValue({ isLoading: false, error: null, data: undefined });
     const { container } = render(
-      <PasmoOdpowiedzi dane={dane({ pozycje: false })} onWstawDoSzkicu={() => {}} />);
+      <PasmoOdpowiedzi dane={dane({ pozycje: false })} />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("wstawia do szkicu parametry, a NIE opis kartoteki", async () => {
-    const onWstaw = vi.fn();
-    render(<PasmoOdpowiedzi dane={dane()} onWstawDoSzkicu={onWstaw} />);
-    await userEvent.click(screen.getByRole("button", { name: "wstaw do szkicu" }));
-    const tresc = String(onWstaw.mock.calls[0][0]);
-    expect(tresc).toContain("MFG163856");
-    expect(tresc).toContain("EAN: 5907580109688");
-    expect(tresc).toContain("Dostępność: 16 szt.");
+  it("nie ma wstawki do szkicu — odpowiedź układa Copilot z tych samych faktów", () => {
+    /* Decyzja właściciela z 22 września 2026: wstawka dublowała treść szkicu,
+       który czeka przy każdej wiadomości. Pasmo zostaje do SPRAWDZANIA. */
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getByText("Mamy")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /wstaw do szkicu/ })).not.toBeInTheDocument();
   });
 });

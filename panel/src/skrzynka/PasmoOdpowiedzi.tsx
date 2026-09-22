@@ -2,7 +2,6 @@ import React from "react";
 import type { OsRozmowy } from "../api/typy";
 import { useKartaTowaru } from "../api/rozmowy";
 import { dzien } from "../ui";
-import { parametryDoSzkicu } from "./TowarRozmowy";
 
 /* ── PASMO ODPOWIEDZI (0.404.0) ──────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania pytań".
@@ -26,12 +25,11 @@ import { parametryDoSzkicu } from "./TowarRozmowy";
    z czego złożyć, po prostu nie staje — pusta etykieta udawałaby brak
    towaru zamiast braku wiedzy.
 
-   WSTAWKA PRZENIOSŁA SIĘ TUTAJ z dołu sekcji „Subiekt GT". Powód, dla którego
-   stała pod tabelą — „agent najpierw sprawdza, czy to ta kartoteka, a dopiero
-   potem przepisuje ją do odpowiedzi" — jest spełniony TU MOCNIEJ: wiersz
-   „to jest" i „mamy" stoją bezpośrednio nad przyciskiem, bez przewijania.
-   Wstawia dokładnie to samo co przedtem (`parametryDoSzkicu`), czyli pola
-   wybrane świadomie, bo szkic idzie do klienta.                             */
+   BEZ WSTAWKI (22 września 2026, decyzja właściciela). Do tej wersji wiersz
+   „Mamy" niósł „wstaw do szkicu". Szkic Copilota czeka dziś przy każdej
+   wiadomości i układa odpowiedź z tych samych faktów, więc wstawka dublowała
+   treść w polu. Pasmo zostaje, bo agent sprawdza szkic właśnie z tymi
+   trzema faktami przed oczami.                                              */
 
 /** Jeden wiersz pasma; bez wartości nie rysuje się wcale. */
 function Wiersz({ etykieta, children }: { etykieta: string; children: React.ReactNode }) {
@@ -42,10 +40,7 @@ function Wiersz({ etykieta, children }: { etykieta: string; children: React.Reac
   </div>;
 }
 
-export function PasmoOdpowiedzi({ dane, onWstawDoSzkicu }: {
-  dane: OsRozmowy;
-  onWstawDoSzkicu: (tresc: string) => void;
-}) {
+export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
   const oferta = dane.oferta;
   const k = oferta?.kartoteka;
   /* Ta sama zasada, co w `TowarRozmowy`: pasmo mówi o kartotece POTWIERDZONEJ.
@@ -95,11 +90,6 @@ export function PasmoOdpowiedzi({ dane, onWstawDoSzkicu }: {
           {mamy}</b>
         {karta.data?.locs?.length ? <span className="font-mono text-slate-600">
           {" · "}{karta.data.locs.join(", ")}</span> : null}
-        <button type="button"
-          onClick={() => onWstawDoSzkicu(parametryDoSzkicu(karta.data!))}
-          className="ml-2 font-semibold text-slate-700 underline underline-offset-2
-            hover:text-slate-900">
-          wstaw do szkicu</button>
       </Wiersz>}
     </div>
   </aside>;

@@ -107,8 +107,6 @@ const TRASY = () => [
     payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
-  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/status`,
-    payload: { status: "resolved" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
@@ -528,43 +526,18 @@ test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 5
   mock.restoreAll();
 });
 
-test("zmiana statusu: nieznana nazwa i odłożenie bez terminu odpadają", async () => {
-  /* Dwa różne błędy o tym samym kodzie, bo oba są pomyłką wołającego, nie
-     stanem rozmowy. Trasa sprawdza NAZWĘ (lista §7 jest zamknięta), a serwis
-     TERMIN — i tylko test przez HTTP pokazuje, że obie bramki naprawdę stoją
-     na drodze żądania, a nie tylko w kodzie obok. */
+test("ręcznego statusu nie ma — trasa milczy, a rozmowa stoi", async () => {
+  /* Decyzja właściciela z 22 września 2026: status wynika wyłącznie
+     z faktów. Test pilnuje, żeby trasa nie wróciła po cichu razem z czyimś
+     scaleniem — 404 zamiast 400, bo tej drogi nie ma, a nie jest zamknięta. */
   const b = login("biuro", "Anna");
-
-  const zmyslony = await app.inject({ method: "POST",
+  const r = await app.inject({ method: "POST",
     url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
-    payload: { status: "zalatwione" } });
-  assert.equal(zmyslony.statusCode, 400);
-  assert.match(zmyslony.json().error, /snoozed/, "błąd ma wymienić dozwolone stany");
-
-  /* ── STANY WYLICZANE NIE PRZECHODZĄ TRASĄ (0.225.0) ───────────────────────
-     „Czeka na klienta" wynika z ostatniej wiadomości, więc nadanie go z ręki
-     byłoby przepisaniem faktu, który już stoi w wątku. Bramka stoi na trasie,
-     bo `ustawStatus` wołają też zdarzenia po naszej stronie. */
-  const wyliczany = await app.inject({ method: "POST",
-    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
-    payload: { status: "waiting_for_customer" } });
-  assert.equal(wyliczany.statusCode, 400);
-  assert.match(wyliczany.json().error, /nie nadaje się ręcznie/);
-
-  const bezTerminu = await app.inject({ method: "POST",
-    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
-    payload: { status: "snoozed" } });
-  assert.equal(bezTerminu.statusCode, 400);
-
+    payload: { status: "resolved" } });
+  assert.equal(r.statusCode, 404);
   const stan = db().prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as
     { status: string };
-  assert.equal(stan.status, "new", "odrzucone żądanie nie ma prawa ruszyć rozmowy");
-
-  const dobre = await app.inject({ method: "POST",
-    url: `/api/obsluga/rozmowy/${rozmowa}/status`, headers: b.naglowki,
-    payload: { status: "snoozed", doKiedy: "2026-09-08T07:00:00.000Z" } });
-  assert.equal(dobre.statusCode, 200, dobre.body);
-  assert.equal(dobre.json().snoozedUntil, "2026-09-08T07:00:00.000Z");
+  assert.equal(stan.status, "new", "żądanie do nieistniejącej trasy nie ma prawa ruszyć rozmowy");
 });
 
 test("skrzynka wzmianek pokazuje swoje, nie cudze, i odhacza jawnym kliknięciem", async () => {

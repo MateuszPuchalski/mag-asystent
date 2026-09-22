@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
   ConversationConflict, dodajKomentarz, obudzPrzychodzaca, przejmijRozmowe,
-  statusRozmowy, ustawStatus, zapiszSzkic,
+  klientPodziekowal, statusRozmowy, ustawStatus, zapiszSzkic, type DecyzjaDoStatusu,
 } from "./conversations.js";
 
 /* Serwis rozmów nie miał testu obok do 0.145.1, choć trzyma trzy mutacje
@@ -343,4 +343,60 @@ test("zmiana statusu ląduje na osi i w audycie", () => {
 test("nieznany status odpada — lista z §7 jest zamknięta", () => {
   const { d, ala, rozmowa } = stanowisko();
   assert.throws(() => ustawStatus(d, rozmowa, "zalatwione" as never, ala, null), /status/i);
+});
+
+/* ── Podziękowanie klienta (22 września 2026) ────────────────────────────────
+   Decyzja właściciela: rozmowa zakończona „dziękuję" nie czeka na nas. Rozstrzyga
+   WYŁĄCZNIE decyzja klasyfikatora — tekstu nikt tu nie sprawdza — więc każdy
+   warunek reguły dostaje osobny test: zdjęcie któregokolwiek zostawia rozmowę
+   w kolejce, bo pytanie schowane jako podziękowanie to klient bez odpowiedzi. */
+
+const PODZIEKOWANIE: DecyzjaDoStatusu = {
+  kategoria: "OTHER", akcja: "NO_ACTION", status: "SUCCESS",
+  pewnosc: "wysoka", wymagaCzlowieka: false, nieaktualna: false,
+};
+
+test("podziękowanie po naszej odpowiedzi zamyka ruch — każdy warunek osobno go otwiera", () => {
+  assert.equal(klientPodziekowal(PODZIEKOWANIE, true), true);
+  assert.equal(klientPodziekowal(PODZIEKOWANIE, false), false, "bez naszej odpowiedzi nie ma ZA co dziękować");
+  assert.equal(klientPodziekowal(null, true), false, "bez rozpoznania rozmowa czeka na nas");
+  const zle: Array<[Partial<DecyzjaDoStatusu>, string]> = [
+    [{ pewnosc: "srednia" }, "średnia pewność"],
+    [{ pewnosc: null }, "pewność nieznana (mapowanie bez modelu)"],
+    [{ akcja: "GET_ORDER" }, "akcja inna niż brak działania"],
+    [{ kategoria: "ORDER_STATUS" }, "kategoria inna niż OTHER — np. po poprawce człowieka"],
+    [{ status: "NEEDS_REVIEW" }, "rozpoznanie do przejrzenia"],
+    [{ wymagaCzlowieka: true }, "sprawa wymaga człowieka"],
+    [{ nieaktualna: true }, "klient dopisał po rozpoznaniu"],
+  ];
+  for (const [zmiana, powod] of zle) {
+    assert.equal(klientPodziekowal({ ...PODZIEKOWANIE, ...zmiana }, true), false, powod);
+  }
+});
+
+test("status rozmowy słucha podziękowania, a nowa wiadomość klienta je unieważnia", () => {
+  const { d, rozmowa, pytanie, wiadomosc } = stanowisko();
+  const konto = (d.prepare("SELECT channel_account_id AS k FROM conversation WHERE id=?")
+    .get(rozmowa) as { k: number }).k;
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-2','outgoing','Tak, pasuje.','2026-09-01T08:00:00.000Z')`).run(rozmowa, konto);
+  const dzieki = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
+    external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-3','incoming','Dziękuję!','2026-09-01T09:00:00.000Z')`)
+    .run(rozmowa, konto).lastInsertRowid);
+  assert.ok(dzieki > pytanie);
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us", "bez rozpoznania — na nas");
+
+  d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,
+    taksonomia_wersja,polityka_wersja,at,przez)
+    VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
+    .run(rozmowa, dzieki, "2026-09-01T09:01:00.000Z");
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_customer");
+
+  /* „Dziękuję, a jeszcze jedno…" — decyzja mówi o starszej wiadomości, więc
+     rozmowa wraca na listę sama, zanim takt zdąży ją rozpoznać. */
+  wiadomosc("A pasuje też do LS 46-500?", "m-4");
+  d.prepare("UPDATE message SET sent_at='2026-09-01T10:00:00.000Z' WHERE external_message_id='m-4'").run();
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 });

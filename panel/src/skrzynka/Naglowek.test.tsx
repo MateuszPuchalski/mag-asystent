@@ -4,18 +4,6 @@ import { render, screen } from "@testing-library/react";
 import { Rozmowa as EkranRozmowy } from "./Rozmowa";
 import type { OsRozmowy, Rozmowa } from "../api/typy";
 
-/* Edytor woła od 0.399.0 hak szablonów, a te pliki nie stawiają klienta
-   TanStacka — pilnują trybu odpowiedzi, nagłówka i karty Copilota, nie listy
-   szablonów. Własne testy ma ona w `Szablony.test.tsx`. */
-vi.mock("../api/szablony", () => ({
-  useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
-  useArchiwumSzablonow: () => ({ data: { szablony: [] }, isLoading: false }),
-  useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
-
 /* ── Nagłówek rozmowy w skrzynce (0.395.0) ───────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę, to powinno
    dziać się automatycznie". Testy pilnują trzech rzeczy:

@@ -6,18 +6,6 @@ import { Edytor } from "./Edytor";
 import type { PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { SzkicCopilota } from "../api/typy";
 
-/* Edytor woła od 0.399.0 hak szablonów, a te pliki nie stawiają klienta
-   TanStacka — pilnują trybu odpowiedzi, nagłówka i karty Copilota, nie listy
-   szablonów. Własne testy ma ona w `Szablony.test.tsx`. */
-vi.mock("../api/szablony", () => ({
-  useSzablony: () => ({ data: { szablony: [] }, isLoading: false }),
-  useArchiwumSzablonow: () => ({ data: { szablony: [] }, isLoading: false }),
-  useDodajSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useZmienSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-  useArchiwizujSzablon: () => ({ mutate: vi.fn(), isPending: false }),
-}));
-
-
 /* ── Szkic z Copilota w edytorze (§14.6, 0.231.0) ────────────────────────────
    Pilnujemy granic, nie wyglądu: propozycja NIE wchodzi do pola sama;
    „Wstaw" dopisuje, „Zastąp" istnieje tylko, gdy jest co nadpisać; wyłączony
@@ -32,10 +20,11 @@ const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
 });
 
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
-  stan: { wlaczony: true, powod: null, model: "claude-opus-5", maxPartia: 20 },
+  stan: { wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
+    autoKlasyfikacja: false, autoSzkic: false },
   szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [], paraPasowania: null,
   uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
-  onUloz: vi.fn(), onWstaw: vi.fn(), onZastap: vi.fn(), onOdrzuc: vi.fn(), ...n,
+  onUloz: vi.fn(), onPopraw: vi.fn(), onOdrzuc: vi.fn(), ...n,
 });
 
 const props = {
@@ -60,7 +49,8 @@ describe("Szkic Copilota w edytorze", () => {
     unmount();
 
     edytor(copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
-      model: "claude-opus-5", maxPartia: 20 } }));
+      model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
+    autoKlasyfikacja: false, autoSzkic: false } }));
     expect(screen.queryByRole("button", { name: /Ułóż odpowiedź/ })).toBeNull();
     expect(screen.getByText(/COPILOT_MODE=anthropic/)).toBeInTheDocument();
   });
@@ -70,16 +60,33 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  it("propozycja NIE wchodzi do pola sama — stoi w karcie, „Wstaw” dopisuje", async () => {
+  it("propozycja NIE wchodzi do pola sama — stoi w karcie, jeden przycisk ją bierze", async () => {
     const c = copilot({ szkic: szkic() });
     edytor(c);
     expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue("");
     const karta = screen.getByRole("region", { name: "Szkic Copilota" });
     expect(karta).toHaveTextContent("LC170430140-0001");
-    await userEvent.click(screen.getByRole("button", { name: "Wstaw do szkicu" }));
-    expect(c.onWstaw).toHaveBeenCalledTimes(1);
-    /* Bez szkicu agenta nie ma czego zastępować — przycisku nie ma w drzewie. */
-    expect(screen.queryByRole("button", { name: "Zastąp szkic" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Popraw w edytorze" }));
+    expect(c.onPopraw).toHaveBeenCalledTimes(1);
+    /* Dwóch dróg do jednego pola już nie ma (22 września 2026). */
+    expect(screen.queryByRole("button", { name: /Wstaw do szkicu/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Zastąp/ })).toBeNull();
+  });
+
+  /* ── „Ułóż" tylko przy braku albo starości szkicu (22 września 2026) ─────
+     Takt układa szkic sam; przycisk przy świeżej karcie kazałby zapłacić
+     drugi raz za to samo. */
+  it("świeża karta chowa „Ułóż”, stara i odrzucona przywraca go jako „ponownie”", () => {
+    const { unmount } = edytor(copilot({ szkic: szkic() }));
+    expect(screen.queryByRole("button", { name: /Ułóż/ })).toBeNull();
+    unmount();
+
+    const stary = edytor(copilot({ szkic: szkic(), nieswiezy: true }));
+    expect(screen.getByRole("button", { name: "Ułóż ponownie" })).toBeInTheDocument();
+    stary.unmount();
+
+    edytor(copilot({ szkic: szkic({ ocena: "odrzucony" }) }));
+    expect(screen.getByRole("button", { name: "Ułóż ponownie" })).toBeInTheDocument();
   });
 
   /* Zrzut właściciela z 8.09.2026: długi szkic rozpychał edytor, oś rozmowy
@@ -94,18 +101,21 @@ describe("Szkic Copilota w edytorze", () => {
      dokładnie po to, żeby wewnętrzne nie były potrzebne. */
   it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
     edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }) }));
-    const wstaw = screen.getByRole("button", { name: "Wstaw do szkicu" });
+    const wstaw = screen.getByRole("button", { name: "Popraw w edytorze" });
     const tresc = screen.getByTestId("szkic-copilota-tresc");
     expect(wstaw.compareDocumentPosition(tresc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tresc.className).not.toMatch(/max-h-\d+/);
     expect(tresc.className).not.toMatch(/overflow-y-auto/);
   });
 
-  it("„Zastąp szkic” pojawia się tylko przy niepustym szkicu agenta", async () => {
+  it("przy niepustym szkicu agenta ten sam przycisk mówi „Zastąp mój szkic”", async () => {
+    /* Nadpisanie cudzej pracy ma być świadome — napis mówi, co się stanie,
+       ZANIM ktoś kliknie. */
     const c = copilot({ szkic: szkic(), maSzkicAgenta: true });
     edytor(c, { szkic: "Dzień dobry," });
-    await userEvent.click(screen.getByRole("button", { name: "Zastąp szkic" }));
-    expect(c.onZastap).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Popraw w edytorze" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Zastąp mój szkic" }));
+    expect(c.onPopraw).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
     expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
   });
@@ -152,9 +162,12 @@ describe("Szkic Copilota w edytorze", () => {
   });
 
   it("cudza rozmowa blokuje układanie i wstawianie, tak jak pole szkicu", () => {
-    edytor(copilot({ szkic: szkic(), wylaczony: true }), { cudza: true, wlasciciel: "M. Wójcik" });
-    expect(screen.getByRole("button", { name: /Ułóż odpowiedź/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Wstaw do szkicu" })).toBeDisabled();
+    /* Nieświeży, bo przy świeżym „Ułóż" nie stoi wcale — a test ma pokazać
+       blokadę obu przycisków naraz. */
+    edytor(copilot({ szkic: szkic(), nieswiezy: true, wylaczony: true }),
+      { cudza: true, wlasciciel: "M. Wójcik" });
+    expect(screen.getByRole("button", { name: "Ułóż ponownie" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Popraw w edytorze" })).toBeDisabled();
   });
 
   it("błąd układania stoi obok przycisku zdaniem", () => {

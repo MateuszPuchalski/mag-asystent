@@ -316,3 +316,30 @@ test("brak klucza nie jest błędem konfiguracji, gdy Copilot jest wyłączony",
   assert.ok(o, "brak ostrzeżenia o włączonym Copilocie bez klucza");
   assert.match(o, /Serwer działa dalej/, "człowiek ma wiedzieć, że to nie jest awaria startu");
 });
+
+/* ── Osobny model klasyfikacji (22 września 2026) ────────────────────────────
+   Pole puste dziedziczy `COPILOT_MODEL` — instalacja bez nowej zmiennej ma
+   się zachowywać dokładnie tak jak dotąd. Wklejka klucza w nowe pole dostaje
+   tę samą bramkę co w starym, bo oba sąsiadują z kluczem w wertis.env. */
+test("COPILOT_MODEL_KLASYFIKACJA z wklejonym kluczem nie wynosi go do komunikatu", () => {
+  const zly = structuredClone(config) as typeof config;
+  (zly.copilot as { modelKlasyfikacji: string }).modelKlasyfikacji = "sk-ant-api03-TAJNE";
+  const o = bledyKonfiguracji(zly).find((b) => b.startsWith("COPILOT_MODEL_KLASYFIKACJA="));
+  assert.ok(o, "brak zdania o COPILOT_MODEL_KLASYFIKACJA");
+  assert.ok(!o.includes("TAJNE"));
+  assert.match(o, /claude-/);
+});
+
+test("model klasyfikacji odziedziczony po COPILOT_MODEL nie dubluje zdania o błędzie", () => {
+  const zly = structuredClone(config) as typeof config;
+  (zly.copilot as { model: string }).model = "gpt-5";
+  (zly.copilot as { modelKlasyfikacji: string }).modelKlasyfikacji = "gpt-5";
+  const b = bledyKonfiguracji(zly);
+  assert.equal(b.filter((x) => x.startsWith("COPILOT_MODEL=")).length, 1);
+  assert.equal(b.filter((x) => x.startsWith("COPILOT_MODEL_KLASYFIKACJA=")).length, 0);
+});
+
+test("bez COPILOT_MODEL_KLASYFIKACJA klasyfikacja idzie modelem z COPILOT_MODEL", () => {
+  if (process.env.COPILOT_MODEL_KLASYFIKACJA) return;
+  assert.equal(config.copilot.modelKlasyfikacji, config.copilot.model);
+});

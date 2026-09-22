@@ -22,21 +22,6 @@ export const NAZWA: Record<StatusRozmowy, string> = {
   spam: "Spam",
 };
 
-/* Stany, które WYNIKAJĄ z rozmowy — ekran ich nie daje do wyboru (0.225.0).
-   Właściciel: „otwarta, czeka na klienta, czeka na nas powinno być odczytywane
-   z wiadomości". Kto ma następny ruch, widać po ostatniej wiadomości; klikanie
-   tego z ręki było przepisywaniem faktu, który już stoi w wątku. */
-export const WYLICZANE: StatusRozmowy[] = [
-  "new", "open", "waiting_for_customer", "waiting_for_us",
-];
-
-/* Statusy, które agent ustawia RĘCZNIE — cztery werdykty. `open` dochodzi jako
-   DROGA POWROTNA („wróć do stanu z rozmowy"), bo bez niej werdykt „Rozwiązana"
-   trzymałby rozmowę, dopóki klient sam nie napisze, a pomyłki nie dałoby się
-   cofnąć. `waiting_for_internal` też zniknął z listy: stawia go zlecenie
-   pomiaru, a zdejmuje wynik z hali — człowiek nie ma tu nic do klikania. */
-export const DO_WYBORU: StatusRozmowy[] = ["snoozed", "resolved", "closed", "spam"];
-
 /* Statusy DOBORU (§7, etap E1) — ta sama zasada: polszczyzna na ekran, klucze
    w bazie i w API. `Record` nie skompiluje się bez nazwy dla nowego statusu. */
 export const NAZWA_DOBORU: Record<StatusDoboru, string> = {
