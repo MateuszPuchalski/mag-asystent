@@ -141,12 +141,14 @@ export function Szukanie({
             przy paczce, której klient nie odebrał, operator loginu najczęściej
             NIE MA — ma karton, a na nim nazwisko i logo przewoźnika.
 
-            JEDNO POLE NA OBA, bo człowiek przepisuje to, co widzi, a nie to,
+            JEDNO POLE NA TRZY, bo człowiek przepisuje to, co widzi, a nie to,
             co system woli. Login dopasowuje się w całości, nazwisko po
-            fragmencie — ale to rozstrzyga serwer, nie operator. */}
+            fragmencie, telefon po końcówce cyfr — ale to rozstrzyga serwer,
+            nie operator. Telefon doszedł w 0.422.0 razem ze zdjęciem blokady
+            adresu: klient pisze „gdzie moja paczka" i podaje sam numer. */}
         <input className="field mt-2 h-7 text-xs" value={kto}
-          aria-label="Login albo nazwisko z naklejki"
-          placeholder="Login klienta albo nazwisko z naklejki"
+          aria-label="Login, nazwisko albo telefon"
+          placeholder="Login, nazwisko z naklejki albo telefon"
           onChange={(e) => setKto(e.target.value)}
           /* PYTAMY PO DOPISANIU UCHWYTU, nie po każdym znaku (0.365.0). Enter
              i wyjście z pola to dwa ruchy, które operator i tak wykonuje —
@@ -219,6 +221,19 @@ export function Szukanie({
                       {k.odbiorcaNazwa &&
                         <span className="text-slate-600">{k.odbiorcaNazwa}</span>}
                     </span>
+                    {/* ── ADRES W WIERSZU (0.422.0) ──────────────────────────
+                        Sama nazwa nie wystarczała: dwaj Kowalscy z jednego
+                        miasta wyglądali w tej liście identycznie, a z tego
+                        ekranu wychodzi się z czyimś numerem zamówienia w ręku.
+                        ULICA rozstrzyga, miasto samo nie. Telefon stoi obok,
+                        bo to po nim się tu teraz szuka — agent widzi, czy
+                        trafił w numer, który podał klient. */}
+                    {(k.odbiorcaUlica || k.odbiorcaMiasto || k.odbiorcaTelefon) &&
+                      <span className="mt-0.5 block truncate text-slate-600">
+                        {[k.odbiorcaUlica,
+                          [k.odbiorcaKod, k.odbiorcaMiasto].filter(Boolean).join(" "),
+                          k.odbiorcaTelefon].filter(Boolean).join(" · ")}
+                      </span>}
                     <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
                   </button>
                 </li>;

@@ -30,9 +30,9 @@ import { naGrosze } from "./allegro-zwroty-sync.js";
    w pracy są dziesiątki, więc po kilku przebiegach nie zostaje nic do
    pobrania, a ticker milczy.
 
-   CZWARTY POWÓD DOSZEDŁ W 0.367.0: NAZWA ODBIORCY z naklejki. Patrz
-   `nazwaOdbiorcy` niżej — tam stoi uzasadnienie i zakres tego, co z adresu
-   dostawy bierzemy, a czego dalej nie.                                      */
+   CZWARTY POWÓD DOSZEDŁ W 0.367.0: NAZWA ODBIORCY z naklejki, a w 0.422.0
+   rozrósł się do CAŁEGO ADRESU DOSTAWY. Patrz `adresOdbiorcy` niżej — tam
+   stoi uzasadnienie i zakres.                                               */
 
 /**
  * Ile zamówień wolno dociągnąć w jednym przebiegu.
@@ -68,12 +68,17 @@ type Zamowienie = {
   status?: string;
   updatedAt?: string;
   buyer?: { login?: string } | null;
-  /* Z `delivery` bierzemy koszt, metodę i — od 0.367.0 — SAMĄ NAZWĘ odbiorcy
-     z adresu. Reszta `address` (ulica, miasto, kod, telefon) nie jest tu nawet
-     zadeklarowana: czego typ nie zna, tego mapowanie nie zapisze przez pomyłkę. */
+  /* Z `delivery` bierzemy koszt, metodę i CAŁY adres odbiorcy. Do 0.421.1
+     stała tu sama nazwa, a reszta pól nie była nawet zadeklarowana — bo czego
+     typ nie zna, tego mapowanie nie zapisze przez pomyłkę. Blokadę zdjął
+     właściciel w 0.422.0; `countryCode` zostaje niezadeklarowane, bo firma
+     wysyła krajowo i kraj nie rozstrzyga niczego przy szukaniu paczki. */
   delivery?: {
     cost?: Kwota; method?: { name?: string } | null;
-    address?: { firstName?: string; lastName?: string; companyName?: string } | null;
+    address?: {
+      firstName?: string; lastName?: string; companyName?: string;
+      street?: string; city?: string; zipCode?: string; phoneNumber?: string;
+    } | null;
   } | null;
   /* Płatność i żądanie faktury (0.169.0). Z `payment` bierzemy TYP i moment
      zapłaty; identyfikatora ani kwoty nie — kwotę mamy już z `summary`.
@@ -286,32 +291,80 @@ function zapiszBraki(database: Db, konto: number, numery: string[], teraz: Date)
   })();
 }
 
+/** Pusty napis to brak danych, nie wartość — kolumna dostaje `null`. */
+const tekst = (v: string | undefined): string | null => {
+  const t = (v ?? "").trim();
+  return t === "" ? null : t;
+};
+
 /**
- * Nazwa odbiorcy z naklejki (0.367.0).
+ * Same cyfry numeru telefonu — postać, po której się SZUKA.
  *
- * Decyzja właściciela i świadome zdjęcie fragmentu polityki danych. Paczki
- * nadaje klient albo kurier, więc numeru listu z wracającego kartonu nasz
- * system NIGDY nie widział — pierwszy skan takiej paczki musi chybić i żadna
- * synchronizacja tego nie naprawi. Uchwytem zostaje to, co jeszcze jest na
- * naklejce: nazwa odbiorcy i przewoźnik.
+ * Allegro oddaje numer tak, jak wpisał go człowiek: `+48123123123` ze
+ * specyfikacji, ale w prawdziwych sprawach widzieliśmy `++48 663509353`.
+ * Agent przepisze go z wiadomości w jeszcze innym kształcie. Porównanie znak
+ * w znak nie trafiłoby ani razu, więc obie strony sprowadzamy do cyfr:
+ * kolumnę przy zapisie, a wpisaną frazę przy szukaniu.
  *
- * FIRMA BIJE OSOBĘ, bo paczka firmowa nosi na naklejce nazwę firmy zamiast
- * imienia i nazwiska — operator przepisze to, co widzi.
- *
- * To jedyne trzy pola, które stąd bierzemy. `street`, `city`, `zipCode`
- * i `phoneNumber` stoją w tym samym obiekcie i zostają zablokowane: kolumn na
- * nie nie ma, a lądowisko `surowe_json` wycina CAŁY `address` razem z nazwą
- * (`oczyscSurowy` niżej). Model pracy dostaje więc nazwę jedną nazwaną
- * kolumną, a prywatna kopia odpowiedzi nie dostaje jej wcale.
+ * Prefiksu kraju NIE OBCINAMY. `+48 663 509 353` i `663 509 353` to ten sam
+ * numer, ale rozstrzyga to dopasowanie KOŃCÓWKI w `paczkiKlienta`, nie
+ * zgadywanie tutaj, ile cyfr znaczy Polska.
  */
-function nazwaOdbiorcy(z: Zamowienie): string | null {
+export function cyfryTelefonu(v: string | null | undefined): string | null {
+  const c = (v ?? "").replace(/\D+/g, "");
+  return c === "" ? null : c;
+}
+
+/**
+ * Adres dostawy odbiorcy (0.367.0 nazwa, 0.422.0 reszta).
+ *
+ * Decyzja właściciela i świadome zdjęcie polityki danych — najpierw fragmentu,
+ * potem całości. Powód pierwszego zdjęcia: paczki nadaje klient albo kurier,
+ * więc numeru listu z wracającego kartonu nasz system NIGDY nie widział,
+ * a uchwytem zostawało to, co jeszcze jest na naklejce.
+ *
+ * Powód drugiego: agent dostaje od klienta SAM NUMER TELEFONU i nie miał
+ * czym go zamienić na zamówienie — musiał wyjść do Allegro albo Sellasista,
+ * wrócić z loginem i szukać po nim. Do tego dwaj klienci o tym samym
+ * nazwisku byli w panelu nierozróżnialni, bo ekran nie pokazywał ani ulicy,
+ * ani miasta. Zakres i uzasadnienie stoją w `docs/obsluga-klienta.md`.
+ *
+ * FIRMA BIJE OSOBĘ w nazwie, bo paczka firmowa nosi na naklejce nazwę firmy
+ * zamiast imienia i nazwiska — operator przepisze to, co widzi.
+ *
+ * CO DALEJ ZOSTAJE ZABLOKOWANE, i to nie przez zapomnienie:
+ *   • lądowisko `surowe_json` wycina CAŁY `address` (`oczyscSurowy`). Model
+ *     pracy mapuje się z ORYGINAŁU, więc nazwane kolumny dostają swoje, a
+ *     prywatna kopia odpowiedzi nie dostaje nic. Właściciel wybrał adres
+ *     w panelu, nie adres w kopii zapasowej na lata.
+ *   • raport sondy kształtu (`ksztalt.ts`) dalej nie pokazuje tych pól.
+ *     Raport wchodzi do REPO, a baza biura zostaje w biurze — to jest ta
+ *     sama różnica, którą 0.155.0 zapisało przy numerze listu przewozowego.
+ *   • `invoice.address` zostaje nietknięte. Właściciel odblokował adres
+ *     DOSTAWY; adres z faktury to inne pole i innej decyzji nie było.
+ */
+function adresOdbiorcy(z: Zamowienie): {
+  nazwa: string | null; telefon: string | null; telefonCyfry: string | null;
+  ulica: string | null; miasto: string | null; kod: string | null;
+} {
   const a = z.delivery?.address;
-  if (!a) return null;
-  const firma = (a.companyName ?? "").trim();
-  if (firma) return firma;
+  const pusty = {
+    nazwa: null, telefon: null, telefonCyfry: null,
+    ulica: null, miasto: null, kod: null,
+  };
+  if (!a) return pusty;
+  const firma = tekst(a.companyName);
   const osoba = [a.firstName, a.lastName].map((x) => (x ?? "").trim())
     .filter(Boolean).join(" ");
-  return osoba || null;
+  const telefon = tekst(a.phoneNumber);
+  return {
+    nazwa: firma ?? (osoba || null),
+    telefon,
+    telefonCyfry: cyfryTelefonu(telefon),
+    ulica: tekst(a.street),
+    miasto: tekst(a.city),
+    kod: tekst(a.zipCode),
+  };
 }
 
 function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
@@ -326,15 +379,22 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
   const kupiono = (z.lineItems ?? [])
     .map((p) => p.boughtAt).filter((d): d is string => Boolean(d)).sort()[0] ?? null;
 
+  const adres = adresOdbiorcy(z);
   database.prepare(`INSERT INTO zamowienie_klienta
     (channel_account_id,external_id,status,kupujacy_login,odbiorca_nazwa,
+     odbiorca_telefon,odbiorca_telefon_cyfry,odbiorca_ulica,odbiorca_miasto,odbiorca_kod,
      dostawa_grosze,dostawa_metoda,
      platnosc_typ,platnosc_at,platnosc_id,faktura_zadana,
      suma_grosze,waluta,kupiono_at,zmieniono_at,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       status=excluded.status, kupujacy_login=excluded.kupujacy_login,
       odbiorca_nazwa=excluded.odbiorca_nazwa,
+      odbiorca_telefon=excluded.odbiorca_telefon,
+      odbiorca_telefon_cyfry=excluded.odbiorca_telefon_cyfry,
+      odbiorca_ulica=excluded.odbiorca_ulica,
+      odbiorca_miasto=excluded.odbiorca_miasto,
+      odbiorca_kod=excluded.odbiorca_kod,
       dostawa_grosze=excluded.dostawa_grosze, dostawa_metoda=excluded.dostawa_metoda,
       platnosc_typ=excluded.platnosc_typ, platnosc_at=excluded.platnosc_at,
       platnosc_id=excluded.platnosc_id,
@@ -342,7 +402,8 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
       suma_grosze=excluded.suma_grosze, waluta=excluded.waluta,
       kupiono_at=excluded.kupiono_at, zmieniono_at=excluded.zmieniono_at,
       synced_at=excluded.synced_at`).run(
-    konto, z.id, z.status ?? null, z.buyer?.login ?? null, nazwaOdbiorcy(z),
+    konto, z.id, z.status ?? null, z.buyer?.login ?? null, adres.nazwa,
+    adres.telefon, adres.telefonCyfry, adres.ulica, adres.miasto, adres.kod,
     z.delivery?.cost?.amount == null ? null : naGrosze(z.delivery.cost.amount),
     z.delivery?.method?.name ?? null,
     z.payment?.type ?? null, z.payment?.finishedAt ?? null,

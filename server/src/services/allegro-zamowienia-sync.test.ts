@@ -38,9 +38,10 @@ const zamowienie = (id: string, extra: Record<string, unknown> = {}) => ({
   id, status: "READY_FOR_PROCESSING", updatedAt: "2026-08-29T10:00:00Z",
   buyer: { id: "b-1", login: "client:44300444", email: "jan@example.com",
     firstName: "Jan", lastName: "Kowalski", phoneNumber: "600100200",
-    address: { street: "Polna 7", city: "Poznań" } },
+    address: { street: "Bankowa 1", city: "Poznań" } },
   delivery: { method: { name: "Kurier InPost" }, cost: { amount: "14.99", currency: "PLN" },
-    address: { firstName: "Jan", lastName: "Kowalski", street: "Polna 7" } },
+    address: { firstName: "Jan", lastName: "Kowalski", street: "Polna 7",
+      city: "Poznań", zipCode: "61-001", phoneNumber: "++48 663 509 353" } },
   summary: { totalToPay: { amount: "194.97", currency: "PLN" } },
   lineItems: [
     { id: "li-1", quantity: 2, price: { amount: "89.99", currency: "PLN" },
@@ -138,47 +139,74 @@ test("zamówienie niesie koszt dostawy, sumę, SKU i wszystkie pozycje", async (
   assert.equal(poz[1].sku, null, "brak SKU zostaje brakiem, nie pustym napisem");
 });
 
-test("adres, e-mail i telefon kupującego nie wchodzą ani do modelu, ani do lądowiska", async () => {
-  /* STRAŻNIK PRZEPISANY W 0.367.0, i to jest jego WZMOCNIENIE, nie
-     rozbrojenie. Do 0.366.0 lista zakazanych niosła też „Kowalski" — bo
-     żadnego kawałka adresu dostawy nie braliśmy. Decyzja właściciela zdjęła
-     z tej listy SAMĄ NAZWĘ odbiorcy: paczki nakleja klient albo kurier, więc
-     numeru listu z wracającego kartonu nasz system nigdy nie widział, a nazwa
-     z naklejki jest jedynym uchwytem, jaki po chybionym skanie zostaje.
+test("adres DOSTAWY wchodzi do modelu pracy, a kupujący i lądowisko nie", async () => {
+  /* STRAŻNIK PRZEPISANY TRZECI RAZ, i za każdym razem zmieniał się ZAKRES
+     zdjęcia, nigdy sam mechanizm. Do 0.366.0 lista zakazanych niosła też
+     „Kowalski", bo żadnego kawałka adresu nie braliśmy. 0.367.0 zdjęło z niej
+     SAMĄ NAZWĘ odbiorcy. 0.422.0 zdejmuje RESZTĘ ADRESU DOSTAWY decyzją
+     właściciela: agent dostaje od klienta numer telefonu i nie miał czym go
+     zamienić na zamówienie.
 
-     Zakres zdjęcia jest dokładnie taki: JEDNA nazwana kolumna modelu pracy.
-     Ulica, miasto, kod, telefon i e-mail zostają zakazane wszędzie, a nazwa
-     NIE WCHODZI do lądowiska — `oczyscSurowy` wycina cały `address` razem
-     z nią, więc prywatna kopia odpowiedzi nie dostaje jej wcale. */
+     TRZY GRANICE, KTÓRE ZOSTAJĄ, i to jest cała treść tego testu:
+
+       1. `buyer` to nie `delivery.address`. Mapowanie czyta WYŁĄCZNIE adres
+          dostawy, więc e-mail kupującego i jego własny adres dalej nie mają
+          jak wejść. Fixture daje im inne wartości właśnie po to, żeby dało
+          się powiedzieć, którą gałęzią dane weszły.
+       2. Lądowisko `surowe_json` nie dostaje NICZEGO z adresu. Model pracy
+          mapuje się z oryginału, więc nazwane kolumny mają swoje, a prywatna
+          kopia odpowiedzi zostaje czysta. Właściciel odblokował adres
+          w panelu, nie adres w kopii zapasowej na lata.
+       3. Telefon wchodzi DWIEMA kolumnami: surową do pokazania i samymi
+          cyframi do szukania. */
   const d = stanowisko();
   zwrot(d, "z1", "ord-1");
   await uzupelnijZamowienia({
     database: d, apiUrl: "https://api", accountId: "k", query: async () => zamowienie("ord-1"),
   });
-  const model = JSON.stringify(d.prepare("SELECT * FROM zamowienie_klienta").get());
-  const ladowisko = (d.prepare("SELECT surowe_json FROM allegro_zamowienie").get() as { surowe_json: string }).surowe_json;
-  for (const tajne of ["jan@example.com", "Polna 7", "600100200"]) {
-    assert.equal(model.includes(tajne), false, `„${tajne}" nie wchodzi do modelu pracy`);
-    assert.equal(ladowisko.includes(tajne), false, `„${tajne}" nie wchodzi do lądowiska`);
+  const wiersz = d.prepare("SELECT * FROM zamowienie_klienta").get() as Record<string, unknown>;
+  const model = JSON.stringify(wiersz);
+  const ladowisko = (d.prepare("SELECT surowe_json FROM allegro_zamowienie")
+    .get() as { surowe_json: string }).surowe_json;
+
+  assert.equal(wiersz.odbiorca_nazwa, "Jan Kowalski");
+  assert.equal(wiersz.odbiorca_ulica, "Polna 7");
+  assert.equal(wiersz.odbiorca_miasto, "Poznań");
+  assert.equal(wiersz.odbiorca_kod, "61-001");
+  assert.equal(wiersz.odbiorca_telefon, "++48 663 509 353");
+  assert.equal(wiersz.odbiorca_telefon_cyfry, "48663509353",
+    "cyfry liczymy RAZ, przy zapisie — inaczej każde szukanie liczyłoby je od nowa");
+
+  /* Granica 1: kupujący zostaje za burtą. */
+  for (const cudze of ["jan@example.com", "Bankowa 1", "600100200"]) {
+    assert.equal(model.includes(cudze), false,
+      `„${cudze}" pochodzi z „buyer", a mapowanie czyta wyłącznie „delivery.address"`);
   }
-  assert.equal(ladowisko.includes("Kowalski"), false,
-    "nazwa odbiorcy nie wchodzi do lądowiska — model pracy ma ją jedną kolumną");
+  /* Granica 2: lądowisko nie dostaje nic z adresu — ani nowego, ani starego. */
+  for (const tajne of ["jan@example.com", "Polna 7", "Bankowa 1", "600100200",
+    "Kowalski", "663509353", "61-001"]) {
+    assert.equal(ladowisko.includes(tajne), false,
+      `„${tajne}" nie wchodzi do lądowiska — model pracy ma adres nazwanymi kolumnami`);
+  }
   assert.equal(zostalyWrazliwe(ladowisko), false);
   assert.equal(ladowisko.includes("SEK-NAC-46"), true, "SKU zostaje — to nie dana osobowa");
 });
 
-test("nazwa odbiorcy z naklejki wchodzi JEDNĄ kolumną, a reszta adresu nie wchodzi wcale", () => {
-  /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
-     za pomocą loginu użytkownika i innych informacji na przesyłce". Numeru
-     listu z wracającej paczki nie ma w Allegro, bo nakleja ją klient albo
-     kurier — zostaje nazwa odbiorcy i przewoźnik. */
+test("adres dostawy ma nazwane kolumny, a e-mail i adres faktury dalej nie mają", () => {
+  /* Zdjęcie blokady jest WYLICZONE, nie hurtowe. Kolumny powstają na cztery
+     pola `CheckoutFormDeliveryAddress` i ani jedno więcej: e-mail nie jest
+     częścią adresu dostawy, a `invoice.address` to inne pole i innej decyzji
+     właściciela nie było. Brak kolumny to najtwardsza blokada, jaką mamy —
+     czego nie ma gdzie zapisać, tego mapowanie nie zapisze przez pomyłkę. */
   const kolumny = (stanowisko().prepare("PRAGMA table_info(zamowienie_klienta)")
     .all() as Array<{ name: string }>).map((k) => k.name);
-  assert.equal(kolumny.includes("odbiorca_nazwa"), true);
-  for (const zakazana of ["ulica", "street", "miasto", "city", "kod", "zip",
-    "telefon", "phone", "email"]) {
+  for (const jest of ["odbiorca_nazwa", "odbiorca_telefon", "odbiorca_telefon_cyfry",
+    "odbiorca_ulica", "odbiorca_miasto", "odbiorca_kod"]) {
+    assert.equal(kolumny.includes(jest), true, `brak kolumny ${jest}`);
+  }
+  for (const zakazana of ["email", "mail", "faktura_ulica", "faktura_miasto", "pesel"]) {
     assert.equal(kolumny.some((k) => k.includes(zakazana)), false,
-      `kolumna z „${zakazana}" otwiera drogę danym, których nie pobieramy`);
+      `kolumna z „${zakazana}" otwiera drogę danym, o które właściciel nie prosił`);
   }
 });
 

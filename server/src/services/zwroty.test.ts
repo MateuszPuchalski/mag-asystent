@@ -1553,6 +1553,50 @@ test("wiersz paczki niesie nazwę odbiorcy — po niej rozpoznaje się karton", 
   assert.deepEqual(paczki.map((p) => p.odbiorcaNazwa), ["Anna Kowalska", "Jan Kowalski"]);
 });
 
+test("telefon znajduje paczkę mimo trzech różnych kształtów numeru", () => {
+  /* TRZECI UCHWYT (0.422.0), decyzja właściciela. Klient pisze „gdzie moja
+     paczka?" i podaje SAM NUMER TELEFONU — do 0.421.1 agent nie miał czym go
+     zamienić na zamówienie i musiał wyjść do Allegro albo Sellasista.
+
+     Numer nie ma jednego kształtu. Allegro zapisuje to, co wpisał człowiek,
+     agent przepisuje to, co przyszło w wiadomości, i ani razu nie jest to ten
+     sam napis. Dlatego obie strony sprowadzamy do cyfr, a dopasowanie idzie
+     po KOŃCÓWCE: prefiks kraju bywa po jednej stronie i nie ma po drugiej. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_kowalski", "2026-08-20T10:00:00Z");
+  d.prepare(`UPDATE zamowienie_klienta
+    SET odbiorca_nazwa='Jan Kowalski', odbiorca_telefon='++48 663 509 353',
+        odbiorca_telefon_cyfry='48663509353' WHERE external_id='ord-1'`).run();
+
+  for (const wpisane of ["663509353", "+48 663 509 353", "663-509-353", "48663509353"]) {
+    assert.equal(paczkiKlienta(1, wpisane, d).length, 1, `„${wpisane}" ma trafiać`);
+  }
+  assert.equal(paczkiKlienta(1, "663509354", d).length, 0, "inny numer to inna paczka");
+  assert.equal(paczkiKlienta(1, "509353", d).length, 0,
+    "sześć cyfr to fragment, a fragment numeru telefonu jest losowaniem, nie uchwytem");
+});
+
+test("wiersz paczki niesie ulicę — to ona rozróżnia dwoje o jednym nazwisku", () => {
+  /* Fragment nazwiska pokazuje cudze zakupy przy zbieżności nazwisk i to jest
+     świadoma cena od 0.367.0. Do 0.421.1 operator nie miał jednak CZYM tych
+     dwoje rozróżnić: wiersz niósł samą nazwę, a dwaj Kowalscy z jednego
+     miasta wyglądali identycznie. */
+  const d = stanowisko();
+  zakup(d, "ord-1", "jan_k", "2026-08-20T10:00:00Z");
+  zakup(d, "ord-2", "jan_k2", "2026-08-21T10:00:00Z");
+  d.prepare(`UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski',
+    odbiorca_ulica='Polna 7', odbiorca_miasto='Poznań', odbiorca_kod='61-001'
+    WHERE external_id='ord-1'`).run();
+  d.prepare(`UPDATE zamowienie_klienta SET odbiorca_nazwa='Jan Kowalski',
+    odbiorca_ulica='Leśna 2', odbiorca_miasto='Poznań', odbiorca_kod='61-002'
+    WHERE external_id='ord-2'`).run();
+
+  const paczki = paczkiKlienta(1, "Jan Kowalski", d);
+  assert.equal(paczki.length, 2);
+  assert.deepEqual(paczki.map((p) => p.odbiorcaUlica), ["Leśna 2", "Polna 7"],
+    "ulica rozstrzyga; miasto samo nie, bo zbieżność bywa w jednym mieście");
+});
+
 test("nieodebrana zapamiętuje NAZWĘ Z NAKLEJKI i przewoźnika", () => {
   /* Dwa uchwyty, które zostają po tym, jak pierwszy skan chybi. Przewoźnika
      przy nieodebranej Allegro nie zna wcale — do 0.366.0 kolumna zostawała
