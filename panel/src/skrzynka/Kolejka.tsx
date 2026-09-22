@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Eye, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+  AlarmClock, Eye, Handshake, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -453,6 +453,13 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <UserCheck size={12} />{r.wlasciciel}</span>}
             {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
               <AlarmClock size={12} />po terminie</span>}
+            {/* PODZIĘKOWANIE BEZ ODPOWIEDZI (22 września 2026). Podgląd wiersza
+                to słowa klienta, a status mówi „Czeka na klienta" — bez tego
+                znacznika wiersz wyglądałby jak pytanie, które ktoś przeoczył.
+                Mówi też agentowi, że o zdjęciu z listy zdecydował klasyfikator,
+                więc pomyłkę poprawia się plakietką kategorii. */}
+            {r.podziekowal && <span className="flex items-center gap-1 text-slate-600">
+              <Handshake size={12} />podziękowanie, bez odpowiedzi</span>}
             {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
                 agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
                 przy wysyłce — czyli po straconej pracy. */}

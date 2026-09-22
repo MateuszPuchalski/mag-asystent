@@ -449,6 +449,17 @@ Cena jest znana z góry i przyjęta świadomie. Rozmowa zakończona podziękowan
 klienta zostaje „Czeka na nas", dopóki ktoś nie odpisze. Spamu nie da się już
 uciszyć, a rozmowy nie da się odłożyć na termin.
 
+**Podziękowanie klienta nie czeka na nas (22 września 2026).** Pierwszą
+część tej ceny zdejmuje klasyfikator. Rozmowa, w której ostatnia wiadomość
+klienta dostała `OTHER` z `NO_ACTION`, wysoką pewnością i bez żądania
+człowieka, jest „Czeka na klienta". Warunkiem jest też nasza wcześniejsza
+odpowiedź. Wiersz kolejki nosi znacznik „podziękowanie, bez odpowiedzi".
+
+Tekstu nikt przy tym nie sprawdza — decyzją właściciela rozstrzyga sam
+model. Nowa wiadomość klienta unieważnia decyzję, a poprawka kategorii
+na inną niż `OTHER` zdejmuje regułę od razu. Liczą to `klientPodziekowal`
+i `statusZKierunku`, jedną regułą dla kolejki i otwartej rozmowy.
+
 ### 7.2. Statusy doboru w kodzie (etap E1)
 
 Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
@@ -5512,6 +5523,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odpowiedź przydziela rozmowę na stałe | **działa** od 0.159.0 | `services/wysylka.ts` |
 | `waiting_for_internal` z pomiaru i wyniku hali | **działa** od 0.159.0 | `zlecPomiar`, `dopiszZdarzenieWyniku` |
 | Kto ma ruch — wyliczane z ostatniej wiadomości | **działa** od 0.225.0 | `statusZKierunku`; trasy ręcznej nie ma od 22.09.2026 |
+| Podziękowanie klienta nie czeka na nas | **działa** od 22.09.2026, wymaga `COPILOT_AUTO_KLASYFIKACJA=1` | `klientPodziekowal`: `OTHER` + `NO_ACTION`, wysoka pewność, po naszej odpowiedzi |
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |

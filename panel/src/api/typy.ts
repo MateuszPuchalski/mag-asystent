@@ -55,6 +55,12 @@ export type Rozmowa = {
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
+  /**
+   * Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
+   * (22 września 2026). Status jest wtedy „Czeka na klienta"; liczy SERWER
+   * z decyzji klasyfikatora, panel tej reguły nie powtarza.
+   */
+  podziekowal: boolean;
   /** Rozpoznanie Copilota (§14, etap F). `null` = nikt jeszcze nie rozpoznał. */
   kopilot: Kopilot | null;
   /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —

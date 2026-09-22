@@ -1263,3 +1263,37 @@ test("po ponowieniu odesłanie ZOSTAJE na osi, a rozmowa znowu czeka na halę", 
   odeslijZadanie(zadanie.id, "brak_towaru", null, halina);
   assert.equal(osRozmowy(rozmowa).os.filter((w) => w.rodzaj === "odeslanie_zadania").length, 2);
 });
+
+test("podziękowanie po naszej odpowiedzi zdejmuje rozmowę z „Czeka na nas” i nosi znacznik", () => {
+  /* Decyzja właściciela z 22 września 2026. Kolejka i otwarta rozmowa liczą
+     to tą samą regułą (`klientPodziekowal`); tu pilnujemy wiersza listy. */
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,subject)
+    VALUES (?,'w-dzieki','wdzieczny_klient')`).run(konto).lastInsertRowid);
+  const wiad = (ext: string, kier: string, tresc: string, at: string) => Number(d.prepare(
+    `INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+     VALUES (?,?,?,?,?,?)`).run(r, konto, ext, kier, tresc, at).lastInsertRowid);
+  wiad("d-1", "incoming", "Czy pasuje?", "2026-09-01T07:00:00.000Z");
+  wiad("d-2", "outgoing", "Tak.", "2026-09-01T08:00:00.000Z");
+  const dzieki = wiad("d-3", "incoming", "Dzięki, super!", "2026-09-01T09:00:00.000Z");
+  const wiersz = () => listaRozmow().find((x) => x.id === r)!;
+  assert.equal(wiersz().status, "waiting_for_us");
+  assert.equal(wiersz().podziekowal, false);
+
+  d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,
+    taksonomia_wersja,polityka_wersja,at,przez)
+    VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
+    .run(r, dzieki, "2026-09-01T09:01:00.000Z");
+  assert.equal(wiersz().status, "waiting_for_customer");
+  assert.equal(wiersz().podziekowal, true);
+
+  /* Poprawka człowieka na inną kategorię kopiuje akcję modelu — i mimo to
+     zdejmuje regułę, bo rozstrzyga kategoria OTHER. */
+  d.prepare("UPDATE decyzja_klasyfikacji SET kategoria='COMPLAINT' WHERE conversation_id=?").run(r);
+  assert.equal(wiersz().status, "waiting_for_us");
+  assert.equal(wiersz().podziekowal, false);
+
+  d.prepare("DELETE FROM conversation WHERE id=?").run(r);
+});

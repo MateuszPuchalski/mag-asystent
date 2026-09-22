@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.436.0 — 22 września 2026
+
+**Podziękowanie klienta nie czeka na nas.** Po odejściu ręcznych statusów
+rozmowa zakończona „dziękuję" stała w „Czeka na nas" z zegarem. Teraz
+rozstrzyga to klasyfikator, bez sprawdzania tekstu — decyzją właściciela.
+
+- Ostatnia wiadomość klienta z decyzją `OTHER` + `NO_ACTION`, wysoką
+  pewnością i bez żądania człowieka, po naszej wcześniejszej odpowiedzi,
+  daje status „Czeka na klienta" (`klientPodziekowal`).
+- Wiersz kolejki nosi znacznik „podziękowanie, bez odpowiedzi"; zegar
+  oczekiwania znika.
+- Nowa wiadomość klienta unieważnia decyzję i rozmowa wraca na listę sama.
+  Poprawka kategorii na inną niż `OTHER` zdejmuje regułę od razu.
+- Działa tylko przy `COPILOT_AUTO_KLASYFIKACJA=1` albo po ręcznym
+  „Rozpoznaj" — bez rozpoznania nic się nie zmienia.
+
+- **[wymaga działania]** Przebuduj panel.
+
+
 ## 0.434.0 — 22 września 2026
 
 **Skrzynka traci przyciski, które dublował automat.** Decyzja właściciela po

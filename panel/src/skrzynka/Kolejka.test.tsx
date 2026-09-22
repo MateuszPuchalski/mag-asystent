@@ -9,7 +9,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomosc: "Czy ten szarpak pasuje do NAC LS 46-450?",
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
-  status: "new", odlozoneDo: null, poTerminie: false, oglada: null,
+  status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
   priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
   kopilot: null, ...n,
 });
@@ -554,5 +554,25 @@ describe("Kolejka: klawiatura", () => {
   it("zwykły wiersz nie nosi tej plakietki", () => {
     pokaz([rozmowa()]);
     expect(screen.queryByText("REKLAMACYJNA")).not.toBeInTheDocument();
+  });
+});
+
+/* ── Podziękowanie bez odpowiedzi (22 września 2026) ─────────────────────────
+   Serwer zdejmuje rozmowę z „Czeka na nas", gdy klasyfikator uznał ostatnią
+   wiadomość za podziękowanie. Wiersz ma powiedzieć DLACZEGO, bo podgląd to
+   słowa klienta. */
+describe("podziękowanie w kolejce", () => {
+  it("wiersz mówi, że to podziękowanie, i nie liczy zegara", () => {
+    render(<Kolejka rozmowy={[rozmowa({ status: "waiting_for_customer", podziekowal: true,
+      czekaOdMs: 3 * 3600_000, ostatniaWiadomosc: "Dziękuję!" })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByText("podziękowanie, bez odpowiedzi")).toBeInTheDocument();
+    expect(screen.queryByText(/czeka 3 g/)).not.toBeInTheDocument();
+  });
+
+  it("zwykła rozmowa znacznika nie nosi", () => {
+    render(<Kolejka rozmowy={[rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.queryByText("podziękowanie, bez odpowiedzi")).not.toBeInTheDocument();
   });
 });

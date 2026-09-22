@@ -2585,6 +2585,19 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.436.0 — podziękowanie nie czeka na nas
+
+**Migracji nie ma. Panel trzeba przebudować.**
+
+Zmiana działa przy `COPILOT_AUTO_KLASYFIKACJA=1`. Bez taktu rozmowy
+rozpoznaje tylko ręczne „Rozpoznaj", więc podziękowania zostają w „Czeka
+na nas" jak dotąd.
+
+Sprawdzenie: znajdź rozmowę, w której klient podziękował po naszej
+odpowiedzi. Po rozpoznaniu wiersz ma status „Czeka na klienta" i znacznik
+„podziękowanie, bez odpowiedzi". Gdyby znacznik stał przy prawdziwym
+pytaniu, popraw kategorię plakietką — rozmowa wraca na listę od razu.
+
 ### Aktualizacja do 0.434.0 — mniej przycisków w skrzynce
 
 **Migracja kasuje tabelę `szablon_odpowiedzi`. Panel trzeba przebudować.**

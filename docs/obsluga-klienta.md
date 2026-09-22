@@ -177,6 +177,11 @@ osobnej tabeli `watek_meta` i dociągania rozmów przy każdej synchronizacji.
 > z faktów. Cena jest przyjęta świadomie: podziękowanie klienta zostawia rozmowę
 > w „Czeka na nas", a spamu nie da się uciszyć. Akapit wyżej zostaje, bo
 > tłumaczy kolumnę, w której dawne werdykty dalej stoją.
+>
+> **Tego samego dnia podziękowanie przestało czekać na nas.** Rozstrzyga
+> decyzja klasyfikatora, bez sprawdzania tekstu: `OTHER` z `NO_ACTION`,
+> wysoka pewność i nasza wcześniejsza odpowiedź. To dalej fakt, nie ręka,
+> tylko fakt z przypuszczenia maszyny — dlatego każdy warunek jest wąski.
 
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 
