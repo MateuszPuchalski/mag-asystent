@@ -37,7 +37,7 @@ Niczego w tej fazie nie zmieniono.
 | zad. | C | S | R | E | stan |
 |---|---|---|---|---|---|
 | T1 statusy paczki po numerze telefonu | 6 `+1 txt` | 3 | 0 | 0 | wykonalne **od 0.422.0** |
-| T2 model kosiarki + zdjęcie → numery części | 13 `+2 txt` | 3 | 2 | 2 | wykonalne |
+| T2 model kosiarki + zdjęcie → numery części | 13 `+2 txt` | 3 | **0** | 2 | wykonalne |
 | T3 spór Allegro: rozstrzygnięcie + przypomnienie | 11 `+1 txt` | 3 | 1 | 2 | **częściowo** — przypomnienia nie ma |
 | T5 przełączenie w pół odpowiedzi i powrót | 4 | 2 | 0 | 1 | wykonalne, **szkic ginie poza skrzynką** |
 | T6 wszystkie sprawy jednego klienta | 5 | 3 | 1 | 1 | **częściowo** — tylko po loginie Allegro |
@@ -60,6 +60,13 @@ cyfr jest odrzucany, żeby uchwyt nie zamienił się w losowanie.
 To jedyna pozycja tej tabeli poprawiona nie iteracją pętli, tylko decyzją
 właściciela o zmianie reguły — zapisuję to tutaj, żeby przy zamknięciu pętli
 nie policzyć jej jako zasługi Generatora.
+
+### T2 — POPRAWKA POMIARU (przy iteracji 5)
+Policzyłem R=2, pisząc, że agent przepisuje model z wiadomości „z innej
+kolumny". Ekran skrzynki ma TRZY kolumny naraz: kolejkę, rozmowę z edytorem
+i kontekst z zakładką doboru. Wiadomość klienta stoi więc na ekranie w chwili
+wypełniania formularza, a definicja R z briefu mówi o polach, których agent
+NIE widzi. **R na T2 to 0.** Zostaje C=13 i E=2.
 
 ### T3 — czego brakuje
 Termin Allegro jest na ekranie (`decyzjaDo`, `dniDoTerminu`, sortowanie
@@ -92,10 +99,13 @@ całej baterii należy do najbliższej iteracji.
 
 Szukanie w kolejce skrzynki idzie po „login, treść, prowadzący"
 (`skrzynka/Kolejka.tsx:276`), więc fraza trafia też w TREŚĆ cudzej rozmowy.
-Na ścieżce wysyłki nie ma ani jednego miejsca, które powtarza „piszesz do X" —
-`Edytor` pokazuje tylko licznik znaków i przycisk. Dwaj klienci o tym samym
-nazwisku są rozróżnialni po loginie, ale **login nie stoi przy przycisku
-wysyłki**, tylko w nagłówku, wyżej.
+**POPRAWKA POMIARU, zrobiona przy iteracji 4.** Napisałem tu, że login stoi
+tylko w nagłówku, „wyżej", i zabrzmiało to jak zarzut, którym nie jest:
+nagłówek rozmowy ma `shrink-0`, więc login klienta widać nad edytorem przez
+cały czas pisania i nie odjeżdża przy przewijaniu. Cicha droga do złego wyniku
+leży WCZEŚNIEJ, przy wyborze wiersza: szukanie dopasowywało treść cudzej
+wiadomości i nie mówiło, na czym trafiło. Wpisane „Kowalski" pokazywało
+rozmowę innego klienta, w której to nazwisko tylko padło.
 
 ### T8 — jedyne zadanie bez usterki
 `adapters/subiekt.seeded.ts::szukajZFurtka` próbuje najpierw dokładnie,

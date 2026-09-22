@@ -365,6 +365,42 @@ describe("Szukanie w kolejce", () => {
     expect(screen.queryByText("mirek352810")).toBeNull();
   });
 
+  it("MÓWI, że trafienie jest w treści, nie w loginie (0.425.0)", async () => {
+    /* To jest ochrona przed najdroższą pomyłką tego ekranu: wpisane nazwisko
+       trafia też w CUDZĄ wiadomość, w której to nazwisko padło. Wiersz
+       wyglądał wtedy dokładnie jak trafienie po nazwisku klienta. */
+    const dwoje = [
+      rozmowa({ id: 1, klient: "kowalski_jan", ostatniaWiadomosc: "Kiedy paczka?" }),
+      rozmowa({ id: 2, klient: "zielinska_ewa",
+        ostatniaWiadomosc: "Sąsiad Kowalski polecił Wasz sklep" }),
+    ];
+    render(<Kolejka rozmowy={dwoje} stan={STAN} wybranaId={null}
+      laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.type(pole(), "kowalski");
+
+    expect(screen.getByText("kowalski_jan")).toBeInTheDocument();
+    expect(screen.getByText("zielinska_ewa")).toBeInTheDocument();
+    /* Znacznik JEDEN, przy tym wierszu, w którym login się nie zgadza. */
+    expect(screen.getByText("trafienie w treści, nie w loginie")).toBeInTheDocument();
+  });
+
+  it("MILCZY przy trafieniu po loginie — znak zapalany zawsze przestaje być znakiem", async () => {
+    pokaz();
+    await userEvent.type(pole(), "mirek");
+    expect(screen.queryByText(/trafienie w treści/)).toBeNull();
+  });
+
+  it("nazywa też trafienie po PROWADZĄCYM, bo to znowu nie jest login klienta", async () => {
+    pokaz();
+    await userEvent.type(pole(), "wójcik");
+    expect(screen.getByText("trafienie po prowadzącym")).toBeInTheDocument();
+  });
+
+  it("bez szukania nie ma żadnego znacznika trafienia", () => {
+    pokaz();
+    expect(screen.queryByText(/trafienie/)).toBeNull();
+  });
+
   it("brak trafień CYTUJE frazę — literówkę widać dopiero wtedy", async () => {
     pokaz();
     await userEvent.type(pole(), "kosiarka elektryczna");

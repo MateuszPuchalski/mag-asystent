@@ -34,6 +34,49 @@ historii nie przepisujemy.
 ---
 
 
+## 0.425.1 — 22 września 2026
+
+**Zamknięcie pętli `ux-loop`.** Same dokumenty — żadnej zmiany w kodzie.
+
+- **`ux-loop/summary.md`** — wynik końcowy wobec wyjściowego, przyjęte zmiany
+  według zmierzonego wpływu, lista „bez backendu" i trzy pytania do agenta.
+- **Suma E na baterii: 8 → 4.** Wynik ważony 5.50 → 6.85 przy progu 8.0.
+  E jest zerowe na obu zadaniach przeciwnika. C i S nie spadły nigdzie.
+- **Dwie moje własne liczby okazały się błędne** i są poprawione w pomiarze,
+  nie zamiecione: login klienta widać przez cały czas pisania, a model
+  kosiarki stoi na ekranie obok formularza doboru.
+- **Powód zatrzymania:** dalszej poprawy nie da się ocenić bez prawdziwych
+  spraw albo prawdziwego agenta, a nie wyczerpanie limitu iteracji.
+
+## 0.425.0 — 22 września 2026
+
+**Wiersz kolejki mówi, na czym trafiło szukanie.** Iteracja 4 pętli `ux-loop`,
+wymierzona w najdroższą pomyłkę tego ekranu: odpowiedź do złego klienta.
+
+- **Powód trafienia przy loginie.** Sito szuka po loginie, treści
+  i prowadzącym — i tak zostaje. Wiersz nie mówił jednak, którą gałęzią
+  trafił, więc wpisane „Kowalski" pokazywało obok siebie rozmowę Kowalskiego
+  i rozmowę innego klienta, w której to nazwisko tylko padło w zdaniu.
+- **Znacznik milczy przy trafieniu po loginie.** Znak zapalany przy każdym
+  wierszu przestaje być znakiem.
+- **Zero dołożonych kliknięć** — to odczyt, nie czynność.
+
+## 0.424.0 — 22 września 2026
+
+**Zgoda przy werdykcie mówi, CO poleci, i traci ważność razem z decyzją.**
+Iteracje 2 i 3 pętli `ux-loop`; obie dotyczą jednego pola, więc idą jednym
+wydaniem.
+
+- **Zdanie zgody nazywa werdykt po imieniu.** Do 0.423.0 brzmiało „werdykt
+  jest nieodwracalny" — prawda przy każdej z jedenastu wartości listy, więc
+  pasowało tak samo do uznania z pełnym zwrotem, jak i do odmowy. Agent, który
+  pomylił pozycję, nie miał na całej ścieżce miejsca, gdzie byłoby to widać.
+- **Kwota wchodzi do zdania** przy częściowym zwrocie, gdy jest prawidłowa.
+- **Zmiana werdyktu albo kwoty zdejmuje ptaszek.** Zgoda dotyczy konkretnej
+  decyzji, więc razem z nią traci ważność. Pisanie wiadomości jej nie zdejmuje:
+  odklikiwanie po każdej literówce nauczyłoby agenta klikać bez czytania.
+- **Kolejność w formularzu:** zgoda jest ostatnia i inaczej być nie może.
+
 ## 0.423.0 — 22 września 2026
 
 **Szkic odpowiedzi przeżywa przełączenie sprawy.** Usterkę znalazł pomiar
