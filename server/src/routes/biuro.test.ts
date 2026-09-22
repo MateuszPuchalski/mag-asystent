@@ -1368,7 +1368,7 @@ test("ikona NIE jest już wklejona w dokument", () => {
     "ikona wróciła do dokumentu jako data:");
 });
 
-/* ── BUILD KOPIUJE TO, CO TRASY CZYTAJĄ (0.419.1) ────────────────────────────
+/* ── BUILD KOPIUJE TO, CO TRASY CZYTAJĄ (0.420.1) ────────────────────────────
    Blizna z produkcji: 0.419.0 dołożyło `src/web/ikona-biuro.webp`, a `build`
    serwera kopiował do `dist/web` trzy pliki WYMIENIONE Z NAZWY. Ikony wśród
    nich nie było, więc `readFileSync` przy rejestracji tras rzucił ENOENT

@@ -927,3 +927,45 @@ test("pasek mówi, KTÓREGO towaru brakuje na magazynie (0.381.0)", () => {
   assert.equal(wg.get("SYM-11")!.brakNaMag, false, "sekator ma pokrycie");
   assert.equal(wg.get("SYM-11")!.stanMag, 2);
 });
+
+test("poprawka GASI stare zadanie w błędzie — PONÓW nie wskrzesi duplikatu", () => {
+  /* Koszyk Z-23 zebrał tak TRZY żywe zadania MM naraz (0.420.0). W czasie
+     awarii pustej sesji Sfery każde zadanie tego kosza schodziło w `error`,
+     każda poprawka zawartości odpinała je i zamawiała nowe, a biuro naciskało
+     PONÓW na starych wierszach — w kolejce wyglądały jak zwykła praca do
+     odzyskania. Każde wskrzeszone zadanie wystawia WŁASNY dokument MM na to
+     samo pudło, czyli ten sam towar przesunięty trzy razy. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id: zwrotId, poz } = zwrotZTowarem(d, [81], KTO);
+  ocenPozycje(d, poz[0], "stan", 2, KTO);
+  skorygowany(d, zwrotId);
+  kartoteka(d, 82, "KOSZT-PRZESYLKI");
+  const dolozony = dolozTowar(d, 82, 1, KTO);
+  const kosz = stanOtwartegoKosza(d, KTO)!;
+  zamknijKosz(d, kosz.id, KTO);
+
+  const stare = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(kosz.id) as
+    { mm_queue_id: number }).mm_queue_id;
+  d.prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?")
+    .run("GT.Uruchom oddał pustą sesję", stare);
+
+  zdejmijTowar(d, dolozony.pozycjaId, KTO);
+
+  const po = d.prepare("SELECT status, error_msg FROM sfera_queue WHERE id=?").get(stare) as
+    { status: string; error_msg: string | null };
+  assert.equal(po.status, "cancelled",
+    "stare zadanie ma być ZGASZONE — PONÓW przyjmuje wyłącznie `error`");
+  /* Ślad po nieudanej próbie zostaje: anulowanie nie kasuje `error_msg`, więc
+     uzasadnienie starej reguły („ślad w kolejce") nic nie traci. */
+  assert.equal(po.error_msg, "GT.Uruchom oddał pustą sesję");
+  assert.equal((d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(kosz.id) as
+    { mm_queue_id: number | null }).mm_queue_id, null, "kosz wraca pod automat");
+
+  wypuscGotoweKoszyki(d);
+  const zywe = (d.prepare(
+    `SELECT COUNT(*) AS n FROM sfera_queue
+      WHERE type='mm' AND status IN ('pending','processing','waiting_for_doc')`)
+    .get() as { n: number }).n;
+  assert.equal(zywe, 1, "jedno pudło, jedno żywe zadanie MM");
+});

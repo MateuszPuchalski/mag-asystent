@@ -64,7 +64,7 @@ export async function biuroRoutes(app: FastifyInstance) {
      WEBP, nie PNG: tak przyszedł plik od właściciela, a biuro i obsługa
      pracują w Chrome, który czyta webp w ikonie karty od 2014 roku.
      Przerobienie go na PNG wymagałoby narzędzia, którego to repo nie ma. */
-  /* ── OZDOBA NIE KŁADZIE USŁUGI (0.419.1) ──────────────────────────────────
+  /* ── OZDOBA NIE KŁADZIE USŁUGI (0.420.1) ──────────────────────────────────
      Blizna z 0.419.0, zgłoszona przez właściciela z produkcji: `build` serwera
      kopiował do `dist/web` trzy rzeczy WYMIENIONE Z NAZWY, a ikona nie była
      jedną z nich. `readFileSync` przy rejestracji tras rzucił ENOENT i cała

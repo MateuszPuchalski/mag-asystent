@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.419.1 — 22 września 2026
+## 0.420.1 — 22 września 2026
 
 **Serwer nie wstawał przez ikonę karty przeglądarki.** Blizna z 0.419.0,
 zgłoszona przez właściciela wprost z produkcji: `ENOENT` na
@@ -53,6 +53,37 @@ zgłoszona przez właściciela wprost z produkcji: `ENOENT` na
   i że `build` kopiuje ten katalog w całości, zamiast wymieniać pliki po
   nazwie. Poprawka sprawdzona na prawdziwym buildzie z korzenia, nie tylko
   na testach.
+
+## 0.420.0 — 22 września 2026
+
+**Poprawka zawartości koszyka GASI stare zadanie MM, a nie tylko je odpina.**
+Zgłoszenie właściciela ze zrzutu kolejki: koszyk zwrotów Z-23 miał TRZY żywe
+zadania MM naraz, każde po 9 kartotek na regał zwrotów.
+
+Trzy zadania to trzy dokumenty MM na jedno pudło, czyli ten sam towar
+przesunięty trzy razy. Odkręca się to w Subiekcie dokumentami korygującymi,
+a nie w aplikacji.
+
+**Skąd się brały.** `uniewaznijZadanieMm` anulowało wyłącznie zadanie `pending`.
+Zadanie w `error` zostawało żywe w kolejce i traciło tylko związek z koszem —
+z uzasadnieniem „ślad po nieudanej próbie". Ślad był słuszny, ale razem z nim
+zostawał przycisk PONÓW. W czasie awarii pustej sesji Sfery każde zadanie MM
+tego kosza schodziło w `error`, każda poprawka zawartości odpinała je
+i zamawiała nowe, a biuro naciskało PONÓW na starych wierszach — bo w kolejce
+wyglądały jak zwykła praca do odzyskania.
+
+Od tego wydania zadanie bez dokumentu (`pending`, `waiting_for_doc`, `error`)
+przy poprawce GAŚNIE. `error_msg` zostaje nietknięty, więc ślad czyta się
+z wiersza tak samo jak dotąd; znika wyłącznie możliwość wskrzeszenia, bo PONÓW
+przyjmuje tylko `error`.
+
+**Zadanie w toku zatrzymuje teraz całą poprawkę.** `processing` znaczy, że
+worker trzyma zadanie i może być w środku `Zapisz()`. Nie wolno go zgasić
+(dokument mógł już powstać) ani odpiąć po cichu (powstanie dokument, o którym
+kosz nie będzie wiedział), więc jedyną uczciwą odpowiedzią jest odmowa —
+wołający jest w transakcji i wycofuje się z niej w całości. Bramka
+`koszDoEdycji` odsiewa ten stan wcześniej; ten warunek jest drugą linią na
+wyścig między sprawdzeniem bramki a zapisem.
 
 ## 0.419.0 — 22 września 2026
 
