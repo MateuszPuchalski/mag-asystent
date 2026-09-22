@@ -908,36 +908,6 @@ CREATE TABLE IF NOT EXISTS conversation_draft (
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
--- ── SZABLONY ODPOWIEDZI (0.399.0) ────────────────────────────────────────────
--- Zgłoszenie właściciela: „dodaj ten szablon do szablonów odpowiedzi
--- w skrzynce". Szablonów nie było wcale — §10.4 projektu panelu wymieniał je
--- wśród rzeczy planowanych i sam mówił „Nie ma szablonów".
---
--- TABELA, NIE STAŁA W KODZIE. Biuro pisze te zdania samo i będzie je poprawiać
--- po każdej rozmowie, która poszła nie tak. Lista wymagająca wydania przy
--- każdym przecinku to lista, której nikt nie utrzyma — a wtedy agenci wracają
--- do wklejania z notatnika, czyli do stanu sprzed tej funkcji.
---
--- BEZ PODSTAWIANIA DANYCH. Treść wchodzi do szkicu dosłownie, bez `{{numer}}`
--- i bez `{{klient}}`. Podstawienie oznaczałoby, że zła wartość wjeżdża do
--- wiadomości WYSŁANEJ do klienta, a agent zobaczy ją dopiero po fakcie —
--- kosztu tej pomyłki nie równoważy zaoszczędzone przepisanie numeru.
---
--- ARCHIWUM ZAMIAST KASOWANIA (§25a.5): szablon zdjęty z listy zostaje
--- w tabeli, bo wisi przy nim historia tego, co wysłaliśmy klientom.
-CREATE TABLE IF NOT EXISTS szablon_odpowiedzi (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  -- Nazwa na liście; po niej agent wybiera, więc UNIQUE — dwa „Wymiana"
-  -- kazałyby czytać treść obu, żeby poznać różnicę.
-  nazwa       TEXT NOT NULL UNIQUE,
-  tresc       TEXT NOT NULL,
-  archiwalny  INTEGER NOT NULL DEFAULT 0,
-  utworzono   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  utworzyl    TEXT NOT NULL DEFAULT '',
-  zmieniono   TEXT,
-  zmienil     TEXT
-);
-
 -- Komentarz wewnętrzny nie jest wiadomością kanału. Osobna tabela jest
 -- fizyczną granicą bezpieczeństwa: adapter Allegro czyta wyłącznie message.
 CREATE TABLE IF NOT EXISTS conversation_comment (

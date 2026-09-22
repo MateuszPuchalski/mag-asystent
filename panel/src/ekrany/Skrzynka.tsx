@@ -6,7 +6,7 @@ import { naBase64 } from "../api/plik";
 import {
   useAgenci, useDodajKomentarz, useJa,
   usePrzekaz, useRozmowa, useUstawReklamacyjna,
-  usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useUstawStatus, useWskazOferte, useWyslij,
+  usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
 } from "../api/rozmowy";
@@ -21,7 +21,7 @@ import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
-import type { StatusRozmowy, SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
+import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 
 export function Skrzynka() {
@@ -63,7 +63,6 @@ export function Skrzynka() {
   const dodajZalacznik = useDodajZalacznik();
   const usunZalacznik = useUsunZalacznik();
 
-  const status = useUstawStatus();
   const priorytet = useUstawPriorytet();
   const reklamacyjna = useUstawReklamacyjna();
   const agenci = useAgenci();
@@ -259,18 +258,17 @@ export function Skrzynka() {
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
         onUloz: () => rozmowa.data && ulozSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id },
           { onError: (e) => setBladSzkicu((e as Error).message), onSuccess: () => setBladSzkicu("") }),
-        /* Wstaw = DOPISZ z nową linią, ten sam kontrakt co każda wstawka. */
-        onWstaw: () => {
+        /* JEDEN PRZYCISK (22 września 2026): pusty szkic dostaje treść, pełny
+           jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
+           Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
+           liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
+        onPopraw: () => {
           const t = rozmowa.data?.szkicCopilota?.tresc;
           if (!rozmowa.data || !t) return;
-          setSzkic((s) => (s ? `${s}\n${t}` : t));
-          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "wstawiony" });
-        },
-        onZastap: () => {
-          const t = rozmowa.data?.szkicCopilota?.tresc;
-          if (!rozmowa.data || !t) return;
+          const zastepuje = szkic.trim() !== "";
           setSzkic(t);
-          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "zastapiony" });
+          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id,
+            ocena: zastepuje ? "zastapiony" : "wstawiony" });
         },
         onOdrzuc: () => rozmowa.data
           && ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" }),
@@ -355,7 +353,6 @@ export function Skrzynka() {
           { onError: (e) => setBladOferty((e as Error).message) });
       }}
       onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
-      zapisujeStatus={status.isPending}
       zapisujePriorytet={priorytet.isPending}
       onPriorytet={(nowy) => {
         if (!rozmowa.data) return;
@@ -371,12 +368,6 @@ export function Skrzynka() {
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
       bladStatusu={bladStatusu}
-      onZmienStatus={(nowy: StatusRozmowy, doKiedy) => {
-        if (!rozmowa.data) return;
-        setBladStatusu("");
-        status.mutate({ id: rozmowa.data.rozmowa.id, status: nowy, doKiedy },
-          { onError: (e) => setBladStatusu((e as Error).message) });
-      }}
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
     />

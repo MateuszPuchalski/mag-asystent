@@ -55,6 +55,12 @@ export type Rozmowa = {
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
+  /**
+   * Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
+   * (22 września 2026). Status jest wtedy „Czeka na klienta"; liczy SERWER
+   * z decyzji klasyfikatora, panel tej reguły nie powtarza.
+   */
+  podziekowal: boolean;
   /** Rozpoznanie Copilota (§14, etap F). `null` = nikt jeszcze nie rozpoznał. */
   kopilot: Kopilot | null;
   /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —
@@ -110,7 +116,13 @@ export type StanCopilota = {
   /** Zdanie dla człowieka, gdy `wlaczony` jest fałszem. `null`, gdy działa. */
   powod: string | null;
   model: string;
+  /** Model klasyfikacji; bez `COPILOT_MODEL_KLASYFIKACJA` równy `model`. */
+  modelKlasyfikacji: string;
   maxPartia: number;
+  /** Takt sam rozpoznaje każdą nową wiadomość (`COPILOT_AUTO_KLASYFIKACJA`). */
+  autoKlasyfikacja: boolean;
+  /** Takt sam układa szkic (`COPILOT_AUTO_SZKIC`). */
+  autoSzkic: boolean;
 };
 
 /** Wynik partii. `przerwane` niepuste znaczy: część zapłacona, reszta czeka. */
@@ -155,7 +167,7 @@ export type PomiarCopilota = {
   /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
   szkice: {
-    ile: number; wstawionych: number; zastapionych: number; odrzuconych: number;
+    ile: number; odrzuconych: number;
     /** Los danych doboru z rozmowy — osobno od losu szkicu. */
     daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
     /** Pasowania z rozmowy (przyrost czwarty); ostatnia liczba to właściwa miara jakości. */

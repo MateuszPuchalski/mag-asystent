@@ -880,7 +880,7 @@ export function migrate(database: DatabaseSync) {
   dosypZalacznikiZLadowiska(database);
   bezNakladkiSpraw(database);
   przeniesKlasyfikacjeRozmow(database);
-  pierwszySzablonOdpowiedzi(database);
+  bezSzablonowOdpowiedzi(database);
   tabelaFts(database);
 }
 
@@ -933,35 +933,19 @@ function przeniesKlasyfikacjeRozmow(database: DatabaseSync) {
 }
 
 /**
- * Pierwszy szablon odpowiedzi (0.399.0) — treść od właściciela.
+ * Szablony odpowiedzi znikają (22 września 2026, decyzja właściciela).
  *
- * TYLKO GDY TABELA JEST PUSTA, i to nie jest ostrożność techniczna. Szablony
- * pisze biuro, więc wpis dosypywany „gdy go nie ma" wracałby po każdym
- * restarcie usługi do kogoś, kto świadomie go zdjął — a zdjęcie szablonu jest
- * decyzją, nie usterką. Pusta tabela znaczy „pierwsze uruchomienie z tą
- * funkcją" i tylko wtedy wolno cokolwiek wstawiać.
+ * Powstały w 0.399.0, bo agenci wklejali zdania z notatnika. Od 0.430.0
+ * szkic Copilota czeka przy każdej wiadomości klienta i niesie te same zdania
+ * razem z faktami rozmowy. Szablon stał się drugą drogą do tego samego pola.
  *
- * Treść stoi TU, a nie w seedzie demo: to zdanie ma pojechać na produkcję,
- * bo właściciel poprosił o dodanie go do szablonów, a nie o pokazanie go
- * w pokazie.
+ * TABELA BEZ CZYTELNIKA NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ — to samo zdanie,
+ * co przy nakładce spraw niżej. Kto chce tych treści, robi kopię bazy PRZED
+ * aktualizacją; mówi o tym `DEPLOY.md`. Tabela nie ma kluczy obcych w żadną
+ * stronę, więc wystarczy samo `DROP`.
  */
-function pierwszySzablonOdpowiedzi(database: DatabaseSync) {
-  const ile = database.prepare("SELECT COUNT(*) AS n FROM szablon_odpowiedzi").get() as
-    { n: number };
-  if (Number(ile.n) > 0) return;
-  database.prepare("INSERT INTO szablon_odpowiedzi(nazwa, tresc, utworzyl) VALUES (?,?,?)")
-    .run("Wymiana przez paczkomat", [
-      "Dzień dobry,",
-      "Dziękujemy za zgłoszenie i przepraszamy za sytuację. Wykonamy wymianę przez paczkomat.",
-      "Uprzednio przed naszą wysyłką muszą Państwo wygenerować zwrot paczki",
-      "",
-      "* https://allegro.pl/pomoc/dla-kupujacych/zwrot-z-allegro-smart/jak-zwrocic-przedmioty-kupione-w-ramach-allegro-smart-dykrmbo5qTz",
-      "",
-      "Informację o wygenerowanym zwrocie otrzymamy automatycznie.",
-      "",
-      "Po otrzymaniu potwierdzenia o wygenerowaniu zwrotu nadamy nową przesyłkę na ten sam adres paczkomatu",
-      "Jak tylko nowa paczka dotrze do paczkomatu będzie można dokonać wymiany (zwrot powinien być do dedykowanej z smsa skrytki). Oczywiście zwrot można zanieść do paczkomatu wcześniej.",
-    ].join("\n"), "Właściciel");
+function bezSzablonowOdpowiedzi(database: DatabaseSync) {
+  database.exec("DROP TABLE IF EXISTS szablon_odpowiedzi");
 }
 
 /**

@@ -171,37 +171,6 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
  * już czyjś.
  */
 /**
- * Parametry towaru jako tekst do szkicu (§10.4, makieta `Main.dc.html`).
- *
- * SZKIC IDZIE DO KLIENTA i to jest cała trudność tej funkcji. Blok Subiekta
- * pokazuje na ekranie sześć wierszy, ale trzy z nich są WEWNĘTRZNE: półka,
- * rezerwacje i rozbicie na magazyny. Adres regału w odpowiedzi do kupującego
- * nie znaczy dla niego nic, a mówi obcemu, jak zbudowany jest nasz magazyn.
- * Wstawka bierze więc tożsamość towaru i dostępność — czyli to, po co klient
- * napisał — i ani jednego pola więcej.
- *
- * Zdanie układa PANEL, nie serwer, i to jest różnica względem doboru (§14.3):
- * tam zdanie niesie TWIERDZENIE o pasowaniu i musi cytować dowód, więc pisze
- * je serwer. Tu nie ma twierdzenia — są wartości pól kartoteki, przepisane
- * jeden do jednego z tego, co agent ma przed oczami.
- *
- * Brak stanu mówi „brak na stanie", nie „0 szt.". Zero w tabeli czyta agent,
- * a zdanie czyta klient — i „0 szt." brzmi jak awaria systemu, nie jak
- * odpowiedź. Terminu dostawy wstawka NIE obiecuje, bo go nie zna.
- */
-export function parametryDoSzkicu(karta: KartaTowaru): string {
-  const jednostka = karta.unit ?? "szt.";
-  const linie = [`${karta.name} (symbol ${karta.sym})`];
-  if (karta.ean) linie.push(`EAN: ${karta.ean}`);
-  const numery = (karta.identyfikatory ?? []).map((i) => i.wartosc);
-  if (numery.length > 0) linie.push(`Numery: ${numery.join(", ")}`);
-  linie.push(karta.mag.avail > 0
-    ? `Dostępność: ${karta.mag.avail} ${jednostka}`
-    : "Dostępność: brak na stanie");
-  return linie.join("\n");
-}
-
-/**
  * Opis kartoteki z Subiekta (0.198.0).
  *
  * Pole `desc` jechało w odpowiedzi `/api/products/:twId` od dawna i panel NIE
@@ -213,9 +182,8 @@ export function parametryDoSzkicu(karta: KartaTowaru): string {
  * ZWINIĘTY DO SZEŚCIU LINII, bo opisy bywają na pół ekranu, a kolumna niesie
  * też stan i półkę. Rozwinięcie jest jednym kliknięciem i nie idzie po sieć.
  *
- * BEZ PRZYCISKU „wstaw do szkicu" i to jest decyzja. Wstawka parametrów
- * (`parametryDoSzkicu`) wybiera pola świadomie, bo szkic idzie DO KLIENTA;
- * opis to wolny tekst, w którym bywa notatka dla magazynu. Agent może
+ * BEZ PRZYCISKU „wstaw do szkicu" i to jest decyzja: szkic idzie DO KLIENTA,
+ * a opis to wolny tekst, w którym bywa notatka dla magazynu. Agent może
  * skopiować zdanie, które przeczytał — ale nie wyśle całości jednym kliknięciem,
  * nie wiedząc, co w niej stoi.
  */

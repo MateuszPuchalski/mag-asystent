@@ -3,6 +3,7 @@ import { db, transaction } from "../db/db.js";
 import { czyAutoresponder } from "./autoresponder.js";
 import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
+import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 
 /**
  * Imię do dziennika bierzemy z konta, nie z parametru.
@@ -479,16 +480,6 @@ const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Statusy, które agent NADAJE — i tylko te przyjmuje trasa (0.225.0).
- *
- * Cztery werdykty człowieka plus `open`, które znaczy „oddaj sterowanie
- * rozmowie". Bez tego piątego nie byłoby drogi POWROTNEJ z „Rozwiązanej":
- * werdykt trzymałby rozmowę, dopóki klient sam nie napisze, a agent, który
- * zamknął sprawę omyłkowo, nie miałby czym tego cofnąć.
- */
-export const STATUSY_RECZNE = ["open", "snoozed", "resolved", "closed", "spam"] as const;
-
-/**
  * Kto ma następny ruch, wprost z ostatniej wiadomości.
  *
  * Funkcja jest CZYSTA i to jest jej sens: tę samą regułę stosuje `statusRozmowy`
@@ -500,10 +491,50 @@ export const STATUSY_RECZNE = ["open", "snoozed", "resolved", "closed", "spam"] 
  * oddaje. Wtedy nie ma z czego wywieść ruchu i zostaje stan zapisany.
  */
 export function statusZKierunku(
-  zapisany: StatusRozmowy, ostatniKierunek: string | null,
+  zapisany: StatusRozmowy, ostatniKierunek: string | null, podziekowal = false,
 ): StatusRozmowy {
   if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany) || ostatniKierunek == null) return zapisany;
-  return ostatniKierunek === "incoming" ? "waiting_for_us" : "waiting_for_customer";
+  if (ostatniKierunek !== "incoming") return "waiting_for_customer";
+  /* Podziękowanie klienta nie jest ruchem po NASZEJ stronie — patrz
+     `klientPodziekowal`. Piłka zostaje u klienta, więc stan jest ten sam,
+     co tuż po naszej odpowiedzi. */
+  return podziekowal ? "waiting_for_customer" : "waiting_for_us";
+}
+
+/** Pola aktywnej decyzji klasyfikatora, z których wynika podziękowanie. */
+export interface DecyzjaDoStatusu {
+  kategoria: string; akcja: string; status: string;
+  pewnosc: string | null; wymagaCzlowieka: boolean;
+  /** Decyzja dotyczy starszej wiadomości klienta niż ostatnia. */
+  nieaktualna: boolean;
+}
+
+/**
+ * Czy ostatnia wiadomość klienta to podziękowanie, na które nie odpisujemy
+ * (22 września 2026, decyzja właściciela).
+ *
+ * ── DLACZEGO ──────────────────────────────────────────────────────────────
+ * Od odejścia ręcznych statusów rozmowa zakończona „dziękuję" stała w „Czeka
+ * na nas" z zegarem, choć nikt nie miał tu nic do zrobienia. Klasyfikator
+ * rozpoznaje podziękowanie od początku: instrukcja każe dać mu `OTHER`
+ * z `NO_ACTION`, a takt szkiców już je pomija.
+ *
+ * ── TYLKO DECYZJA MODELU, BEZ SPRAWDZANIA TEKSTU ─────────────────────────
+ * Właściciel odrzucił dodatkowy filtr po treści (znak zapytania, długość).
+ * Cały ciężar niesie więc decyzja i każdy warunek niżej ją zawęża. Pomyłka
+ * kosztuje nierówno: podziękowanie w kolejce to rzut oka, pytanie schowane
+ * jako podziękowanie to klient bez odpowiedzi. Stąd wysoka pewność i
+ * kategoria `OTHER` — poprawka człowieka na inną kategorię zdejmuje regułę,
+ * choć kopiuje akcję modelu.
+ *
+ * Nasza wcześniejsza odpowiedź jest warunkiem, bo podziękowanie bez niej nie
+ * jest podziękowaniem ZA nic. Nowa wiadomość klienta unieważnia decyzję
+ * (`nieaktualna`), więc rozmowa wraca na listę sama.
+ */
+export function klientPodziekowal(d: DecyzjaDoStatusu | null, naszaOdpowiedz: boolean): boolean {
+  return naszaOdpowiedz && d !== null && !d.nieaktualna && d.status === "SUCCESS"
+    && d.kategoria === "OTHER" && d.akcja === "NO_ACTION"
+    && d.pewnosc === "wysoka" && !d.wymagaCzlowieka;
 }
 
 /**
@@ -591,10 +622,38 @@ export function statusRozmowy(
   const ost = database.prepare(
     "SELECT direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0 ORDER BY id DESC LIMIT 1",
   ).get(conversationId) as { direction: string } | undefined;
-  return statusZKierunku(zapisany, ost?.direction ?? null);
+  return statusZKierunku(zapisany, ost?.direction ?? null,
+    ost?.direction === "incoming" && podziekowanieWRozmowie(database, conversationId));
 }
 
-/** Zmiana statusu ręką agenta. `doKiedy` wymagane wyłącznie przy odłożeniu. */
+/**
+ * `klientPodziekowal` dla JEDNEJ rozmowy. Ta sama aktywna decyzja i ten sam
+ * cel, co w liście skrzynki (`AKTYWNA_DECYZJA`, `CEL_KLASYFIKACJI`), żeby
+ * otwarta rozmowa i wiersz kolejki nie mówiły dwóch różnych rzeczy.
+ */
+function podziekowanieWRozmowie(database: DatabaseSync, conversationId: number): boolean {
+  const w = database.prepare(`SELECT k.kategoria, k.akcja, k.status, k.pewnosc,
+      k.wymaga_czlowieka AS wymaga,
+      (k.message_id IS NOT NULL AND k.message_id <> ${CEL_KLASYFIKACJI}) AS nieaktualna,
+      EXISTS(SELECT 1 FROM message n WHERE n.conversation_id=c.id
+               AND n.direction='outgoing' AND n.auto_odpowiedz=0) AS nasza
+    FROM conversation c
+    JOIN decyzja_klasyfikacji k ON k.id = ${AKTYWNA_DECYZJA}
+   WHERE c.id=?`).get(conversationId) as Record<string, unknown> | undefined;
+  if (!w) return false;
+  return klientPodziekowal({
+    kategoria: String(w.kategoria), akcja: String(w.akcja), status: String(w.status),
+    pewnosc: w.pewnosc == null ? null : String(w.pewnosc),
+    wymagaCzlowieka: Boolean(Number(w.wymaga)), nieaktualna: Boolean(Number(w.nieaktualna)),
+  }, Boolean(Number(w.nasza)));
+}
+
+/**
+ * Zmiana statusu ZDARZENIEM po naszej stronie — dziś jedynym jest zlecenie
+ * pomiaru, które stawia `waiting_for_internal`. Trasy ręcznej nie ma od
+ * 22 września 2026 (decyzja właściciela). Gałąź odłożenia zostaje, bo
+ * zapisane wcześniej odłożenia dalej wygasają przy odczycie.
+ */
 export function ustawStatus(
   database: DatabaseSync, conversationId: number, status: StatusRozmowy,
   userId: number, doKiedy: string | null, teraz = new Date(),
