@@ -187,3 +187,120 @@ describe("Oś rozmowy reklamacyjnej", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });
+
+/* ── Rozmowa po 0.415.0 ──────────────────────────────────────────────────────
+   Trzy zmiany na osi, każda sprawdzana na treści ze zrzutu właściciela:
+   formularz Allegro składa się pod zdanie klienta, adresy są odnośnikami,
+   a ramka „Zgłoszenie” znika także wtedy, gdy opis siedzi w formularzu.    */
+
+const OPIS_ZE_ZRZUTU = "Po kilku użyciach szarpak przestał wciągać sznurek do środka .";
+const FORMULARZ_ZE_ZRZUTU = [
+  "Problem: wada wykryta podczas używania",
+  "",
+  `Opis: ${OPIS_ZE_ZRZUTU}`,
+  "",
+  "Oczekiwane rozwiązanie: wymiana",
+  "",
+  "Warunki reklamacji: reklamacja ustawowa Adres kupującego:",
+  "Krzysztof Mołczan",
+  "Starowiejska 10",
+].join("\n");
+
+describe("Formularz Allegro na osi rozmowy", () => {
+  it("pokazuje ZDANIE KLIENTA, a formularz chowa pod przyciskiem", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
+    expect(screen.getByText(OPIS_ZE_ZRZUTU)).toBeInTheDocument();
+    expect(screen.queryByText(/Oczekiwane rozwiązanie/)).not.toBeInTheDocument();
+  });
+
+  it("„pokaż całość” oddaje formularz SŁOWO W SŁOWO, z adresem do zwrotu", async () => {
+    /* Chowamy powtórzenie, nigdy treść — adres do zwrotu bywa jedyną rzeczą,
+       po którą agent w tę wiadomość wchodzi. */
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
+    await userEvent.click(screen.getByRole("button", { name: /pokaż całość/ }));
+    expect(screen.getByText(/Starowiejska 10/)).toBeInTheDocument();
+    expect(screen.getByText(/Warunki reklamacji/)).toBeInTheDocument();
+  });
+
+  it("ZWYKŁEJ wiadomości nie rusza — nie ma czego składać", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ tresc: "Kosiarka przestała ciąć" })]} />);
+    expect(screen.getByText("Kosiarka przestała ciąć")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pokaż całość/ })).not.toBeInTheDocument();
+  });
+
+  it("ramka ZGŁOSZENIE znika, gdy opis siedzi w formularzu (blizna 0.412.0)", () => {
+    /* To jest przypadek, który 0.412.0 przepuszczało: teksty nie są równe,
+       a dublem są. Test tamtego wydania karmiono wymyśloną parą. */
+    render(<Czat sprawa={sprawa({ opisZgloszenia: OPIS_ZE_ZRZUTU })} zalaczniki={[]}
+      czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
+    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
+    expect(screen.getAllByText(OPIS_ZE_ZRZUTU)).toHaveLength(1);
+  });
+});
+
+describe("Adresy w treści są odnośnikami", () => {
+  const LINK = "https://allegro.pl/moje-allegro/reklamacje/produkt/wysylka/a695a1ac-b22e";
+
+  it("automat Allegro odsyła do formularza — jednym kliknięciem, nie kopiowaniem", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "SYSTEM", autorLogin: null,
+        tresc: `konieczne jest wypełnienie formularza pod linkiem: ${LINK}` })]} />);
+    const a = screen.getByRole("link", { name: LINK });
+    expect(a).toHaveAttribute("href", LINK);
+    expect(a).toHaveAttribute("target", "_blank");
+    /* To jest CUDZY odnośnik: bez przekazywania odsyłacza i bez dostępu do
+       naszego okna. */
+    expect(a).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("kropka kończąca zdanie NIE wchodzi do adresu", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: `formularz: ${LINK}.` })]} />);
+    expect(screen.getByRole("link", { name: LINK })).toHaveAttribute("href", LINK);
+  });
+
+  it("wiadomość bez adresu zostaje zwykłym tekstem", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: "Proszę odesłać towar." })]} />);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+describe("Kotwica przy najnowszej wiadomości", () => {
+  /* Rozmowa reklamacyjna czyta się od KOŃCA: pierwsze pytanie agenta brzmi
+     „co on napisał ostatnio". Ostrożność całego ruchu siedzi w drugim teście:
+     od 0.410.0 wejście w sprawę odświeża ją z Allegro, więc oś przerysowuje
+     się sekundę po otwarciu — przewijanie przy każdej zmianie wyrywałoby
+     agentowi miejsce czytania spod oka. */
+  it("otwarcie sprawy pokazuje ostatnią wiadomość, nie pierwszą", () => {
+    const skok = vi.fn();
+    Element.prototype.scrollIntoView = skok;
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+      czat={[wiad({ id: 1, tresc: "pierwsza" }), wiad({ id: 2, tresc: "ostatnia" })]} />);
+    expect(skok).toHaveBeenCalledTimes(1);
+  });
+
+  it("odświeżenie TEJ SAMEJ sprawy nie przewija drugi raz", () => {
+    const skok = vi.fn();
+    Element.prototype.scrollIntoView = skok;
+    const { rerender } = render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+      czat={[wiad({ id: 1, tresc: "pierwsza" })]} />);
+    expect(skok).toHaveBeenCalledTimes(1);
+    rerender(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+      czat={[wiad({ id: 1, tresc: "pierwsza" }), wiad({ id: 2, tresc: "dociągnięta" })]} />);
+    expect(skok).toHaveBeenCalledTimes(1);
+  });
+
+  it("przejście do INNEJ sprawy kotwiczy na nowo", () => {
+    const skok = vi.fn();
+    Element.prototype.scrollIntoView = skok;
+    const { rerender } = render(<Czat sprawa={sprawa({ id: 1 })} zalaczniki={[]}
+      czat={[wiad({ id: 1, tresc: "sprawa pierwsza" })]} />);
+    rerender(<Czat sprawa={sprawa({ id: 2 })} zalaczniki={[]}
+      czat={[wiad({ id: 9, tresc: "sprawa druga" })]} />);
+    expect(skok).toHaveBeenCalledTimes(2);
+  });
+});
