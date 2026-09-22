@@ -34,6 +34,48 @@ historii nie przepisujemy.
 ---
 
 
+## 0.426.1 — 22 września 2026
+
+**Przegląd reguł obsługi klienta: dekalog ma pięć punktów, a login rozmówcy
+znacznik `[WERYFIKUJ]`.** Tylko dokumentacja i komentarze — żadnej zmiany
+zachowania.
+
+Właściciel zlecił przegląd z pytaniem, które reguły są dziś zbędne. Każdy punkt
+porównano z kodem. Zbędnych reguł było mniej niż nieaktualnych opisów przy nich.
+
+**Dekalog `docs/obsluga-klienta-calosc.md` zszedł z dziesięciu punktów do
+pięciu.** Zostały te, które mówią o przejściu MIĘDZY kolejkami: jedna historia,
+kontekst za sprawą, zegar, jedna droga na zewnątrz, zdarzenia przy źródle.
+Przeskok jako fakt wszedł do punktu 1, bo od 0.386.0 jest odczytem drogi
+zakupu. Zakaz przy mierze eskalacji przeszedł do S5, gdzie miara stoi.
+
+Trzy punkty o jednej rozmowie albo o ekranie przeszły do §27 projektu panelu:
+status z faktów, nieodwracalne pyta, czego nie wiemy. Tabela w dekalogu
+tłumaczy stare numery na nowe. Komentarze w kodzie, które je cytowały,
+przeszły na nowe numery.
+
+**Pięć opisów „u nas" kłamało o kodzie.** Między innymi „Eskalacji nie mierzy
+nic" (miara stoi od 0.386.0) i „piąty kanał wysyłki" (drogi odpowiedzi są dwie).
+Punkt o kontekście za sprawą jest dziś ŁAMANY: skrzynka i zwroty czytają
+zamówienie po swojemu. Dekalog mówi to teraz wprost, zamiast opisywać stan
+docelowy jako obecny.
+
+**§27 projektu panelu stracił zdanie „ten rozdział zostaje bez zmian".**
+Przez nie punkt 4 wymieniał sprawę jeszcze po jej usunięciu w 0.388.0. Punkty
+10 i 11 skleiły się w jeden. Punkt o magazynierze odszedł, bo tę granicę
+trzyma zasada „Dwa fronty" w `CLAUDE.md`.
+
+**Sprzeczność o loginie rozmówcy jest nazwana, nie rozstrzygnięta.** Blizna
+0.56.6 opisuje `interlocutor.login` jako zamaskowany i trzy miejsca w repo
+zakazywały wiązania po nim. Zakładka KLIENT (0.386.0) i kandydaci zamówień
+(0.397.0) wiążą jednak właśnie po tym polu. Komentarz w
+`services/klient-historia.ts` twierdził przy tym, że tego nie robi.
+
+Kodu nie zmieniamy, bo nie wiadomo, która strona ma rację. Pytanie niesie
+znacznik `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`, a licznik w preambule
+urósł do dwudziestu dziewięciu. Do czasu sprawdzenia `CLAUDE.md` zakazuje
+NOWYCH wiązań po loginie rozmówcy.
+
 ## 0.426.0 — 22 września 2026
 
 **[wymaga działania] Zwrot rozliczony w Allegro schodzi z kolejki decyzji.**

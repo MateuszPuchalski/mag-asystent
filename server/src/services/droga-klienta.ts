@@ -13,8 +13,11 @@ import { sprawaOtwarta } from "./statusy-spraw.js";
 
    MOSTKIEM JEST NUMER ZAMÓWIENIA i nic więcej. `message.related_order_id`,
    `zwrot_klienta.order_id` i `reklamacja_klienta.order_id` mówią o tym samym
-   zakupie. Po loginie kupującego wiązać NIE WOLNO — blizna 0.56.6: Allegro
-   maskuje rozmówcę jako `client:44300444`, a `conversation` loginu nie trzyma.
+   zakupie. Po loginie rozmówcy ten plik NIE wiąże — blizna 0.56.6: Allegro
+   maskowało rozmówcę jako `client:44300444`, a `conversation` loginu nie
+   trzyma. Zakładka KLIENT i kandydaci zamówień wiążą jednak właśnie po nim.
+   Która strona ma rację, czeka pod `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`;
+   do tego czasu nie dokładamy tu drugiego mostka.
 
    ZERO ŻĄDAŃ DO ALLEGRO i zero nowych tabel. Wszystko, czego te odczyty
    potrzebują, leży już w naszej bazie od pierwszej synchronizacji. Piąta

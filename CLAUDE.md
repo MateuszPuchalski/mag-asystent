@@ -33,10 +33,13 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
   Reguły stoją w `docs/obsluga-klienta-calosc.md`. Rozstrzygają spór o kształt
   na korzyść tego, który daje agentowi całą historię klienta w jednym miejscu.
   Kolejki — skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie jego.
-  Dokładając kolejkę albo ekran, dopisujesz jej wiązania po numerze zamówienia
-  w obie strony; wiązanie jednostronne to wiązanie, którego nie ma. Piątej
-  tabeli ze wspólnym statusem nad kolejkami nie było i nie będzie — ten kształt
-  kosztował już cztery tabele nakładki spraw.
+  Dokładając kolejkę albo ekran, dopisujesz ją do `services/droga-klienta.ts`:
+  wiązania po numerze zamówienia w obie strony. Wiązanie jednostronne to
+  wiązanie, którego nie ma. Po loginie rozmówcy nie wiąż niczego NOWEGO, dopóki
+  stoi przy nim `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` — blizna 0.56.6 mówi,
+  że bywa zamaskowany, a dwie funkcje już po nim chodzą. Piątej tabeli ze
+  wspólnym statusem nad kolejkami nie było i nie będzie — ten kształt kosztował
+  już cztery tabele nakładki spraw.
 
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`

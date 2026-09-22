@@ -2,7 +2,7 @@
 
 Ten dokument rozstrzyga spory o kształt obsługi klienta jako CAŁOŚCI. Nie jest
 projektem ekranu ani rejestrem decyzji. Jest listą reguł, które obowiązują
-WSZYSTKIE cztery kolejki naraz, i planem tego, co ma je połączyć.
+WSZYSTKIE cztery kolejki naraz, i zapisem tego, co je spina.
 
 Trzy dokumenty dzielą się pracą tak:
 
@@ -12,9 +12,8 @@ Trzy dokumenty dzielą się pracą tak:
 | `docs/panel-obslugi-klienta.md` | jak wygląda docelowy panel i co już działa |
 | ten plik | co obowiązuje MIĘDZY kolejkami i co je spina |
 
-Zasady nadrzędne z `panel-obslugi-klienta.md` §27 zostają bez zmian. Tamte
-mówią o jednej rozmowie. Ten dekalog mówi o drodze klienta przez cztery
-kolejki i nie powtarza tamtych punktów bez potrzeby.
+Reguły o JEDNEJ rozmowie stoją w `panel-obslugi-klienta.md` §27 i ten plik ich
+nie powtarza. Reguła zapisana w dwóch miejscach starzeje się w jednym z nich.
 
 ## Zakres
 
@@ -30,273 +29,193 @@ i 10 tamtego obowiązują biuro i ten dekalog ich nie unieważnia.
 > w rozdziale 25c przestaje bramkować cokolwiek po pierwszym sporze. Ten plik
 > czyta się przed zmianą, nie po niej.
 
-## Diagnoza: cztery kolejki, jeden klient
+## Przegląd z 0.426.1 — pięć punktów zamiast dziesięciu
 
-Panel prowadzi cztery kolejki: skrzynkę rozmów, zwroty, reklamacje
-i dyskusje. Każda ma własny ekran, własne sito „Moje" i własny zegar. Klient
-ma jedną sprawę i przechodzi przez nie po kolei.
+Przegląd porównał każdy punkt z kodem. W pięciu punktach akapit „u nas"
+opisywał stan sprzed 0.386.0 albo mylił się o kodzie. Pięć punktów nie mówiło
+o przejściu MIĘDZY kolejkami, tylko o jednej rozmowie albo o ekranie.
 
-**Wiązania między kolejkami są NIEPEŁNE i niesymetryczne.** Mostkiem jest
-numer zamówienia: `message.related_order_id`, `zwrot_klienta.order_id`
-i `reklamacja_klienta.order_id`. Mostek istnieje, ale nie każdy ekran po nim
-przechodzi.
+Te drugie przeszły do §27 projektu panelu albo do spoiwa. Nazwa „dekalog"
+zostaje, bo pod nią cytuje go kod. Stare numery w starszych wpisach
+`CHANGELOG.md` tłumaczy ta tabela.
 
-| z ekranu | widzi rozmowy | widzi zwroty | widzi reklamacje | widzi dyskusje |
-|---|---|---|---|---|
-| rozmowa | — | tak (0.221.0) | **0.386.0** | **0.386.0** |
-| zwrot | tak (0.169.0) | — | **0.386.0** | **0.386.0** |
-| reklamacja | tak | tak | — | **0.386.0** |
-| dyskusja | tak | tak | **0.386.0** | — |
+| był | jest | dlaczego |
+|---|---|---|
+| 1. Jeden klient, jedna historia | 1 | — |
+| 2. Każdy przeskok jest faktem | w punkcie 1 | od 0.386.0 przeskok jest odczytem drogi zakupu, więc oba punkty mówiły to samo |
+| 3. Kontekst za sprawą | 2 | — |
+| 4. Zegar rządzi kolejnością | 3 | — |
+| 5. Eskalacja podlega pomiarowi | S5 niżej | miara stoi od 0.386.0; jej zakaz zostaje przy niej |
+| 6. Jedna droga na zewnątrz | 4 | — |
+| 7. Kto ma ruch, wylicza się z faktów | §27, punkt 11 | dotyczy jednej rozmowy |
+| 8. Zdarzenia wiszą przy źródle | 5 | — |
+| 9. Nieodwracalne pyta, odwracalne się cofa | §27, punkt 12 | reguła ekranu, nie przejścia |
+| 10. Czego nie wiemy, ekran mówi wprost | §27, punkt 9 | trzecie sformułowanie tej samej myśli |
 
-Reklamacja i dyskusja biorą starsze wiązania z jednej funkcji
-`kontekstZamowienia` — dlatego tamte wiersze są bez numerów wydań, a nie
-z domysłem.
+**Opis stanu przy punkcie wskazuje test, a nie prozę.** Akapity „u nas"
+zestarzały się w czterdziestu wydaniach, bo nikt ich nie czytał przy zmianie
+kodu. Nazwa testu nie zestarzeje się po cichu: zniknie albo zaświeci na czerwono.
 
-**Do 0.386.0 zbudowanych było pięć przejść z dwunastu.** Brakujące siedem
-miało jeden wspólny kształt: żaden ekran nie widział sprawy POSPRZEDAŻOWEJ.
-Agent odpowiadający na pytanie nie wiedział, że ten sam klient ma otwartą
-reklamację. Dowód stał w źródle: `services/skrzynka.ts` importował
-`listaZwrotow`, a `reklamacje.ts` nie importowało niczego ze skrzynki.
+## Stan wiązań
 
-Siedem brakujących domyka `services/droga-klienta.ts` jednym mostkiem po
-numerze zamówienia. Zero nowych tabel i zero żądań do Allegro.
+Mostkiem między kolejkami jest numer zamówienia: `message.related_order_id`,
+`zwrot_klienta.order_id` i `reklamacja_klienta.order_id`. Od 0.386.0 każda
+z czterech kolejek widzi trzy pozostałe, czyli dwanaście przejść z dwunastu.
+Wszystkie idą przez `services/droga-klienta.ts` i jeden blok na ekranie,
+`panel/src/sprawy/Spoiwo.tsx`.
 
-**Historia klienta pomijała trzy kolejki z czterech** — do 0.386.0.
-`services/klient-historia.ts` składał oś z zakupów i rozmów, choć zwrot
-i sprawa wiążą się tym samym loginem. Zakładka KLIENT obiecywała historię
-i pokazywała jej połowę. Od 0.386.0 niesie wszystkie pięć rodzajów wpisów.
+Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2)
+i kandydaci zamówień rozmowy bez numeru (S1). Czy ten mostek jest pewny, nie
+wiadomo — mówi o tym rozdział „Sprzeczność: login kupującego" niżej.
 
-**Reklamacja i dyskusja leżą w JEDNEJ tabeli, a nie widziały się nawzajem.**
-`reklamacja_klienta` rozróżnia je kolumną `typ`. Dyskusja, która urosła
-w reklamację, jest osobnym wierszem, a przejścia nie zapisywał nikt. To jest
-najważniejszy moment całej obsługi i nie zostawiał śladu.
-
-Od 0.386.0 ślad jest, ale NIE JAKO ZAPIS. Przeskok wylicza się z momentów
-otwarcia, które i tak leżą w bazie — `drogaZakupu` w `droga-klienta.ts`.
-Zdarzenie dopisywane przy synchronizacji dokładałoby drugą prawdę o tym samym
-fakcie, a dwie prawdy rozjeżdżają się przy pierwszej poprawce jednej z nich.
-
-**Nakładka spraw spinała wyłącznie rozmowy — i odeszła w 0.388.0.**
-`sprawa_klienta` była klamrą z tytułem i listą wątków, zakładaną ręką. Droga
-zakupu robi to samo automatycznie i przez cztery kolejki, więc dwa paski nad
-jedną rozmową zostały jednym. To punkt 3 dekalogu zastosowany do nas samych.
-
-Cena jest zapisana jawnie: dwóch rozmów o jednym problemie BEZ wspólnego
-zamówienia nikt już nie sklei.
+Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
+samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
+o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei.
 
 ## Dekalog obsługi klienta
 
-### 1. Jeden klient, jedna historia
+### 1. Jeden klient, jedna historia, a przeskok jest faktem
 
-Podział na cztery kolejki jest NASZ, nie jego. Klient pisze o jednej sprawie
-i oczekuje, że wiemy o niej wszystko.
-
-**U nas.** Zakładka KLIENT w rozmowie zbiera zakupy i rozmowy po loginie
-(`services/klient-historia.ts`). Zwrot pokazuje wiadomości o tym zakupie.
+Podział na cztery kolejki jest NASZ, nie jego. Pytanie staje się dyskusją,
+dyskusja reklamacją, reklamacja zwrotem. To jest ta sama sprawa w czwartym
+ubraniu.
 
 **Zabrania.** Kazania agentowi otwierać drugi ekran po to, żeby dowiedzieć
-się, czy ten klient już u nas był.
+się, czy ten klient już u nas był. Traktowania nowej sprawy jako początku:
+sprawa po reklamacji tego samego zamówienia zaczyna się z historią.
 
-### 2. Każdy przeskok między kolejkami jest faktem
+**Pilnuje.** `droga-klienta.test.ts` (brakujące wiązania, droga w kolejności
+czasu) i `klient-historia.test.ts`. Przeskok jest ODCZYTEM, nie zapisem — S3.
 
-Pytanie staje się dyskusją, dyskusja reklamacją, reklamacja zwrotem. To jest
-ta sama sprawa w czwartym ubraniu.
-
-**U nas.** Dziś przeskok da się odczytać wyłącznie z numeru zamówienia
-i z czasu. Zapisu nie ma po żadnej stronie.
-
-**Zabrania.** Traktowania nowej sprawy jako początku. Sprawa, która przyszła
-po reklamacji tego samego zamówienia, zaczyna się z historią.
-
-### 3. Kontekst wchodzi za sprawą, nie za ekranem
+### 2. Kontekst wchodzi za sprawą, nie za ekranem
 
 Zamówienie, oferta, kartoteka, zdjęcia i zegar mają wyglądać tak samo
 w każdej z czterech kolejek. To ta sama wiedza o tym samym zakupie.
 
-**U nas.** `kontekstZamowienia` z `services/reklamacje.ts` obsługuje już
-reklamacje i dyskusje. Skrzynka i zwroty składają kontekst po swojemu.
-
 **Zabrania.** Drugiego mapowania tych samych pól pod inną nazwą. Pole opisane
 raz ma jedną drogę odczytu, tak jak ma jedną drogę zapisu.
 
-### 4. Zegar rządzi kolejnością, a sprawa bez zegara dostaje własny
+**Stan: punkt ŁAMANY i bez strażnika.** `kontekstZamowienia` z
+`services/reklamacje.ts` obsługuje reklamacje i dyskusje. Skrzynka czyta
+zamówienie po swojemu (`zamowienieRozmowy` w `services/zamowienia.ts`,
+`services/skrzynka.ts`). Zwroty też (`services/zwroty.ts`).
+
+To jest dług, nie wyjątek. Nowy odczyt zamówienia nie dokłada czwartej drogi,
+tylko korzysta z którejś z istniejących. Blok spoiwa jest już jeden dla
+czterech kolejek.
+
+### 3. Zegar rządzi kolejnością, a sprawa bez zegara dostaje własny
 
 Termin jest osobnym bytem i to on ustawia pracę. Reklamacja bierze go
-z Allegro, zwrot z ustawy, dyskusja nie ma go wcale.
-
-**U nas.** `decisionDueDate` przy reklamacji i termin ustawowy przy zwrocie
-sterują kolejnością. Dyskusje liczą pilność bez zegara (§25c.4), a rozmowy nie
-mają terminu odpowiedzi w ogóle.
+z Allegro (`decisionDueDate`), zwrot z ustawy. Dyskusja liczy pilność bez
+zegara (§25c.4), a rozmowa nie ma terminu odpowiedzi w ogóle.
 
 **Zabrania.** Sortowania po dacie wpływu tam, gdzie istnieje termin. Blizna
 0.121.0 mówi, co kosztuje nazwanie jednego zegara drugim.
 
-### 5. Eskalacja jest sygnałem i podlega pomiarowi
+**Pilnuje.** `droga-klienta.test.ts`: sprawa z terminem staje nad sprawą
+ruszoną dawniej, bez terminu (S4).
 
-Klient, który po pytaniu składa reklamację, powiedział nam coś o naszej
-odpowiedzi. Ta liczba jest miarą obsługi, nie porażką agenta.
-
-**U nas.** Skuteczność doboru mierzymy od 0.267.0, czas wymiany z halą od
-0.361.0. Eskalacji nie mierzy nic.
-
-**Zabrania.** Liczenia wyłącznie spraw domkniętych. Kolejka pusta przy rosnącej
-eskalacji jest miarą, która kłamie.
-
-### 6. Jedna droga na zewnątrz
+### 4. Jedna droga na zewnątrz
 
 Odpowiedź do klienta wychodzi jedną maszynerią: skrzynka nadawcza, klucz
 idempotencji liczony przez serwer, kontrola świeżości i jawna zgoda przy
-konflikcie.
+konflikcie. Świeżość liczy się od ostatniej NIE naszej wiadomości.
 
-**U nas.** `services/idempotencja.ts` jest wspólny dla skrzynki i spraw
-posprzedażowych od 0.224.0. Świeżość liczy się od ostatniej NIE naszej
-wiadomości.
+**U nas.** Odpowiedź wychodzi dwiema drogami i obie biorą klucz z
+`services/idempotencja.ts`. Skrzynka idzie przez `services/wysylka.ts`,
+reklamacje i dyskusje przez `services/reklamacje-wysylka.ts`.
 
-**Zabrania.** Piątego kanału wysyłki z własnym kluczem. Kanał bez kontroli
+Werdykt i prośba o zakończenie dyskusji nie są odpowiedzią. To jednorazowe
+zapisy statusu, a strażnik dubletu stoi na wierszu sprawy.
+
+**Zabrania.** Trzeciej drogi odpowiedzi z własnym kluczem. Droga bez kontroli
 świeżości cicho nadpisuje odpowiedź kolegi.
 
-### 7. Kto ma ruch, wylicza się z faktów
-
-Status bierze się z tego, co i tak zapisujemy: przyszła wiadomość, poszła
-odpowiedź, zlecono pomiar, wrócił wynik. Ręką stawia się wyłącznie to, czego
-automat nie ma z czego policzyć.
-
-**U nas.** `statusZKierunku` liczy piłkę od 0.225.0, a trasa przyjmuje tylko
-`STATUSY_RECZNE`. Autoodpowiedź nie liczy się jako nasz ruch (0.227.0).
-
-**Zabrania.** Pola statusu, które agent musi pamiętać przestawić. Status, który
-kłamie, jest gorszy od jego braku.
-
-### 8. Zdarzenia wiszą przy źródle
+### 5. Zdarzenia wiszą przy źródle
 
 Klamra nad sprawami niczego nie przechwytuje. Historia zostaje przy rozmowie,
-przy zwrocie i przy reklamacji, a wspólny widok ją tylko CZYTA.
-
-**U nas.** Sprawa klienta nie ma własnej osi i to jest decyzja, nie brak
-(blizna 0.130.0). Oś zwrotu składa się ze zdarzeń zwrotu (0.313.0).
+przy zwrocie i przy reklamacji, a wspólny widok ją tylko CZYTA. Cztery byty
+mają czterech właścicieli danych i to jest cecha, nie usterka.
 
 **Zabrania.** Piątej tabeli ze wspólnym statusem nad czterema kolejkami.
-Poprzednia odpowiedź o tym kształcie kosztowała cztery tabele nakładki.
+Pierwsza odpowiedź o tym kształcie kosztowała cztery tabele nakładki
+(0.140.0). Druga, nakładka spraw, odeszła w 0.388.0 (blizna 0.130.0).
 
-### 9. Nieodwracalne pyta, odwracalne się cofa
+**Pilnuje.** `droga-klienta.test.ts`: droga zakupu i lista „Moje" niczego
+nie zapisują.
 
-Potwierdzenie dostaje wyłącznie to, czego nie da się odkręcić: pieniądze,
-odmowa, werdykt, zakończenie dyskusji. Reszta ma cofnięcie.
+## Spoiwo — pięć kroków stoi, szósty czeka
 
-**U nas.** Zwroty mają cofnięcia od 0.79.0, notatka i korekta swoje własne.
-Werdykt reklamacji stoi za `autoryzuj("reklamacja_werdykt")`.
+Historia budowy stoi w `CHANGELOG.md` (0.386.0–0.397.0) i w komentarzach kodu.
+Tu zostaje to, czego przy zmianie nie wolno zgubić.
 
-**Zabrania.** Dialogu „czy na pewno" przy czynności, którą i tak da się cofnąć
-jednym kliknięciem. Potwierdzenie zapalane zawsze uczy klikać „tak".
+### S1. Kontekst posprzedażowy w każdej kolejce
 
-### 10. Czego nie wiemy, ekran mówi wprost
+`sprawyZakupu` w `droga-klienta.ts`, na ekranie `Spoiwo.tsx`. Rozmowa, której
+zamówienia jeszcze nie pobraliśmy, spraw nie pokaże. Dwie różne odpowiedzi
+o tym samym zakupie na jednym ekranie byłyby gorsze od jednej spóźnionej.
 
-Sprawa niepełna ma to napisać zdaniem. Obietnica bez pokrycia kosztuje
-zaufanie do całego ekranu.
+Rozmowa BEZ NUMERU zamówienia (0.397.0) dostaje kandydatów po loginie
+(`services/zamowienia-kandydaci.ts`). Wiąże kliknięcie agenta, nie automat:
+ten sam login nie znaczy „ta paczka".
 
-**U nas.** Rozmowa dłuższa niż pięćset wiadomości dostaje `czat_urwany`
-zamiast obietnicy (0.273.0). Zwrot mówi wprost, że pełnej kwoty nie zna bez
-zamówienia.
+### S2. Historia klienta kompletna
 
-**Zabrania.** Pustej linii w miejscu odmowy integracji. Powód zapisuje się
-SŁOWEM, nie samym kodem HTTP (blizna 0.152.0).
+`services/klient-historia.ts` składa zakupy, rozmowy, zwroty, reklamacje
+i dyskusje po loginie kupującego.
 
-## Spoiwo — sześć kroków, stan na 0.386.0
+### S3. Przeskok jako ODCZYT
 
-Kolejność była od najtańszego. Pięć kroków stoi, szósty czeka na decyzję —
-i to jest jedyny, którego nie da się rozstrzygnąć kodem.
+`drogaZakupu` wylicza drogę z momentów otwarcia, które i tak leżą w bazie.
+Zdarzenie dopisywane przy synchronizacji byłoby drugą prawdą o tym samym
+fakcie. Dwie prawdy rozjeżdżają się przy pierwszej poprawce jednej z nich.
 
-### S1. Kontekst posprzedażowy w każdej z czterech kolejek — **stoi**
+### S4. Jedno „Moje" dla trzech kolejek
 
-Rozmowa i zwrot pokazują sprawy posprzedażowe tego zamówienia, a sprawa
-posprzedażowa — swoje rodzeństwo bez siebie samej. Siedem brakujących przejść
-zamknęło jedno zapytanie po `order_id` w `services/droga-klienta.ts`.
+Ekran `/obsluga/moje` składa rozmowy, reklamacje i dyskusje. Zwrotu tam NIE MA:
+w 0.370.0 właściciel zdjął ze zwrotu prowadzącego. Kolumny `prowadzi_*`
+w `zwrot_klienta` zostały, ale nikt ich nie pisze.
 
-Bez nowej tabeli. Blok na ekranie jest JEDEN dla czterech kolejek
-(`panel/src/sprawy/Spoiwo.tsx`) — agent rozpoznaje go, zamiast uczyć się
-drugiego układu.
+Kolejność ma dwa piętra: najpierw sprawy z terminem, wedle terminu, potem
+reszta, wedle ostatniego ruchu.
 
-**Czego to spoiwo nie zrobi.** W rozmowie mostek rusza dopiero wtedy, gdy
-zamówienie jest u nas pobrane — tak samo, jak blok zwrotu od 0.221.0.
-Rozmowa z numerem zamówienia, którego jeszcze nie dociągnęliśmy, nie pokaże
-spraw. Dwie różne odpowiedzi o tym samym zakupie na jednym ekranie byłyby
-gorsze od jednej spóźnionej.
-
-**Druga dziura, zamknięta w 0.397.0: rozmowa BEZ NUMERU zamówienia.** Zgłoszenie
-właściciela ze zrzutem — klient napisał pod ofertą „otrzymałem paczkę, ale nie
-było w zestawie świecy", a rozmowa nie miała zakupu wcale. Powód leży po
-stronie Allegro: wątek niesie JEDEN obiekt powiązany i przy pytaniu spod oferty
-jest nim oferta. Numeru zamówienia w tym ładunku nie ma i nie będzie.
-
-Mostkiem zastępczym jest LOGIN kupującego — ten sam, którym chodzi zakładka
-KLIENT (S2). `services/zamowienia-kandydaci.ts` układa zakupy tego loginu,
-podnosi ten, który niesie ofertę z rozmowy, a wiąże dopiero kliknięcie agenta.
-Automat wybierający za człowieka pomyliłby się cicho, i to przy sprawie
-o pieniądze.
-
-To jest wyjątek od reguły „dokładając kolejkę, dopisujesz wiązania po numerze
-zamówienia w obie strony": tutaj numeru po prostu nie ma. Wiązanie po loginie
-wolno nam wyłącznie dlatego, że oba pola przychodzą wprost z Allegro —
-`allegro_inbox_thread.interlocutor_login` i `zamowienie_klienta.kupujacy_login`.
-
-### S2. Historia klienta kompletna — **stoi**
-
-`services/klient-historia.ts` dokłada do osi zwroty, reklamacje i dyskusje po
-loginie kupującego. Zakładka KLIENT zaczyna odpowiadać na pytanie, które sama
-zadaje.
-
-Wiązanie po LOGINIE wolno tu i tylko tu: zwrot i sprawa niosą `kupujacy_login`
-wprost z Allegro. Przy rozmowach ten sam ruch byłby błędem — `conversation`
-loginu nie trzyma, a rozmówca bywa zamaskowany (blizna 0.56.6).
-
-### S3. Przeskok jako fakt — **stoi, ale jako ODCZYT**
-
-Projekt mówił „zdarzenie dopisywane przy synchronizacji". Zapis okazał się
-zbędny: moment otwarcia każdego bytu leży w bazie, więc droga wylicza się
-z kolejności (`drogaZakupu`). Ekran pokazuje ją jednym paskiem.
-
-Drugi zapis tego samego faktu rozjechałby się z pierwszym przy pierwszej
-poprawce. Odczyt ma też drugą zaletę: otwarcie ekranu niczego nie mutuje.
-
-### S4. Jedno „Moje" ponad kolejkami — **stoi, dla TRZECH kolejek**
-
-Ekran `/obsluga/moje` składa jedną listę z rozmów, reklamacji i dyskusji.
-Kliknięcie prowadzi na ekran właściwej kolejki, bo tam stoją bramki sprawy.
-
-**Zwrotu na tej liście NIE MA i to poprawka do tego projektu.** Projekt mówił
-„cztery źródła", a w 0.370.0 właściciel zdjął ze zwrotu znacznik prowadzącego:
-zwrot przechodzi przez biuro jako kolejka decyzji, nie jako czyjaś sprawa.
-Kolumny `prowadzi_*` zostały w tabeli, ale nikt ich nie pisze. Wskrzeszenie
-znacznika przy okazji innej funkcji odwracałoby tamtą decyzję bez słowa.
-
-Kolejność ma DWA PIĘTRA: najpierw sprawy z terminem, wedle terminu, potem
-reszta, wedle ostatniego ruchu. Jedno pole na oba zegary postawiłoby sprawę
-ruszoną wczoraj nad sprawą, której termin mija jutro — blizna 0.121.0.
-
-### S5. Miara eskalacji — **stoi**
+### S5. Miara eskalacji
 
 Ile zakupów z rozmową skończyło się dyskusją albo reklamacją, miesiącami.
-Karta stoi za zębatką, pod skutecznością doboru: tamta mierzy naszą pracę,
-ta jej skutek u klienta.
+Liczy ZAKUPY, nie sprawy i nie wiadomości. Sprawa otwarta przed pierwszą
+wiadomością nie liczy się wcale, bo nie wynika z naszej odpowiedzi. Bez osi
+osobowej, celowo.
 
-Liczy ZAKUPY, nie sprawy i nie wiadomości. Trzy wiadomości i jedna reklamacja
-przy jednym zamówieniu to jedna eskalacja — inaczej miara nagradzałaby
-milczenie agenta. Sprawa otwarta przed pierwszą wiadomością nie liczy się
-wcale, bo nie wynika z naszej odpowiedzi.
+**Zabrania.** Liczenia wyłącznie spraw domkniętych. Kolejka pusta przy
+rosnącej eskalacji jest miarą, która kłamie. Pilnują tego testy eskalacji
+w `droga-klienta.test.ts`.
 
-**Bez osi osobowej, celowo.** Ta liczba mówi o naszych odpowiedziach jako
-całości; rozbita na ludzi byłaby oceną pracownika liczoną z cudzej decyzji.
-
-### S6. Zamknięcie sprawy klienta — **czeka na decyzję właściciela**
+### S6. Zamknięcie sprawy klienta — czeka na decyzję właściciela
 
 Kiedy sprawa klienta jest skończona, skoro składa się z bytów o czterech
-właścicielach danych. Kodem tego nie da się rozstrzygnąć: „zamknięte" znaczy
-co innego dla Allegro, dla ustawy i dla biura.
+właścicielach danych? „Zamknięte" znaczy co innego dla Allegro, dla ustawy
+i dla biura. Droga zakupu (S3) jest materiałem do tej decyzji, nie decyzją.
 
-Droga zakupu (S3) jest materiałem do tej decyzji i dlatego powstała pierwsza.
-Pokazuje, ile przystanków ma typowa sprawa i gdzie się kończy — a bez tych
-liczb każda definicja zamknięcia byłaby domysłem. Od domysłów ten projekt
-właśnie odchodzi.
+## Sprzeczność: login kupującego
+
+Repo mówi o loginie rozmówcy dwie przeciwne rzeczy i obie stoją w kodzie.
+
+Blizna 0.56.6 (`CHANGELOG.md`) opisuje `interlocutor.login` z listy wątków
+jako ZAMASKOWANY: `client:44300444` zamiast loginu z zamówienia. Stąd zakaz
+w nagłówku `droga-klienta.ts` i w tabeli blizn `obsluga-klienta.md`.
+
+Mimo tego dwie funkcje wiążą się po tym właśnie polu. Zakładka KLIENT zbiera
+po nim rozmowy i zakupy (S2). Kandydaci zamówień szukają po nim zakupów (S1).
+Wydanie 0.397.0 widziało w nim zwykły login.
+
+Która strona ma rację, trzeba sprawdzić na żywym Allegro. Pytanie niesie
+znacznik `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`, rozdział
+`GET /messaging/threads`.
+
+**Do tego czasu obowiązuje jedno.** Żadna NOWA funkcja nie wiąże po loginie
+rozmówcy. Dwie istniejące zostają, bo pomyłka daje w nich najpewniej pustą
+historię, a nie cudze dane. Wiązanie w S1 zatwierdza zresztą człowiek.
 
 ## Mapa możliwości
 
@@ -327,28 +246,12 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | sprawa poza Allegro: telefon, e-mail | NIGDZIE | decyzji o drugim kanale |
 | sprawa trafia do sądu albo do UOKiK | NIGDZIE | eksportu całej historii sprawy |
 
-**Czwarta zeszła w 0.390.0.** Klient pytający „mam składać reklamację, czy
-inaczej to załatwimy" nie miał gdzie zostać oznaczony. Sprawy w Allegro
-sprzedawca nie założy — `/sale/issues` ma wyłącznie GET — więc znacznik jest
-NASZ i zostaje przy rozmowie.
-
-**Trzy dziury zeszły z tej tabeli w 0.386.0.** Historia klienta bez zwrotów
-i spraw, dyskusja bez wiązania z reklamacją, brak jednego miejsca na własną
-pracę. Reszta stoi.
+Znacznik „reklamacyjna" (0.390.0) jest NASZ i zostaje przy rozmowie. Sprawy
+w Allegro sprzedawca nie założy — `/sale/issues` ma wyłącznie GET.
 
 **Dwie pozycje „NIGDZIE" są największe.** Wymiana towaru jest codzienna
 w handlu częściami i nie ma dziś żadnego miejsca w aplikacji. Drugi kanał
 przesądza o tym, czy panel jest obsługą klienta, czy obsługą Allegro.
-
-## Czego ten projekt NIE robi
-
-Nie buduje piątej kolejki ani wspólnej tabeli spraw ze wspólnym statusem.
-Cztery byty mają czterech właścicieli danych i to jest cecha, nie usterka.
-
-Nie buduje trzeciego frontu. Nie przenosi obsługi klienta do `biuro.html`
-i nie przenosi magazynu do panelu.
-
-Nie zmienia granicy automatu. Do klienta nadal mówi wyłącznie człowiek.
 
 ## Otwarte decyzje właściciela
 
@@ -361,11 +264,12 @@ kształt aplikacji, nie kształt ekranu.
 
 ## Blizny, których to spoiwo nie ma kupić drugi raz
 
+Blizny 0.130.0 i 0.140.0 stoją w punkcie 5 dekalogu i tu ich nie powtarzamy.
+
 | blizna | czego pilnować przy łączeniu kolejek |
 |---|---|
+| 0.56.6 | login rozmówcy bywa zamaskowany; nowe wiązanie po nim czeka na `[WERYFIKUJ]` |
 | 0.121.0 | dyskusja nie jest reklamacją; zegar jednej nie nazywa się zegarem drugiej |
-| 0.130.0 | zdarzenia wiszą przy źródle, a wspólny widok wyłącznie je czyta |
-| 0.140.0 | nakładka spraw z własnym statusem kosztowała cztery tabele |
 | 0.152.0 | powód odmowy zapisuje się słowem, nie samym kodem odpowiedzi |
 | 0.157.0 | ta sama rzecz zbudowana dwa razy w dwóch gałęziach; sprawdź, co już stoi |
 | 0.224.1 | pole nieopisane w typie ciała znika po cichu na trasie |

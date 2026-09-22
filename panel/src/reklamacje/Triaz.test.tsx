@@ -19,7 +19,7 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
       cennik sprzedaży to nadal sprzedaż, a pomyłka w tę stronę każe odrzucić
       reklamację, którą opłacało się uznać.
    3. BRAK KARTOTEKI MÓWI O SOBIE WPROST — pusty slot po stanie czytałby się
-      jak „nie mamy" (dekalog obsługi, punkt 10).
+      jak „nie mamy" (zasada nadrzędna 9 projektu panelu, §27).
    4. NIC SIĘ NIE ODEJMUJE. Zapłacone jest brutto, zakup netto; różnica tych
       dwóch nie jest marżą, a stawki VAT ten ładunek nie niesie.            */
 
@@ -91,7 +91,7 @@ describe("Triaż w kolumnie dowodów", () => {
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
   });
 
-  it("bez kartoteki mówi „nie wiadomo”, a nie zero — punkt 10 dekalogu", () => {
+  it("bez kartoteki mówi „nie wiadomo”, a nie zero — zasada nadrzędna 9", () => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
     render(<Dowody {...props({ twId: null })} />);
     expect(screen.getByText("nie wiadomo")).toBeInTheDocument();

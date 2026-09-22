@@ -10,7 +10,8 @@ zostaje rejestrem decyzji i dowodów; tamten mówi, dokąd idziemy.
 
 Trzeci plik doszedł, gdy kolejek zrobiły się cztery:
 `docs/obsluga-klienta-calosc.md`. Tamten nie opisuje ekranu ani decyzji, tylko
-reguły obowiązujące MIĘDZY kolejkami — i nazywa siedem wiązań, których nie ma.
+reguły obowiązujące MIĘDZY kolejkami. Siedem wiązań, których w nim brakowało,
+stoi od 0.386.0.
 
 **Stan: BUDOWA.** Wydanie 0.141.0 dostarcza pierwszy pionowy kawałek:
 panel React/Tailwind → zadanie terenowe → kolektor → wynik w panelu.
@@ -102,7 +103,8 @@ niż jedno źródło — czyli czy było co sklejać.
 > ręką; droga spina wszystko sama.
 >
 > Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie, którego
-> dekalog obsługi zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
+> dekalog obsługi zabrania w punkcie 2 (`docs/obsluga-klienta-calosc.md`;
+> do 0.426.1 był to punkt 3).
 > Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
 >
 > **Czego przy tym świadomie tracimy.** Droga wiąże po numerze zamówienia,
@@ -313,7 +315,7 @@ ale nie ma prawa kupić ich drugi raz.
 | wydanie | blizna | czego nie wolno zgubić |
 |---|---|---|
 | 0.18.0 | zapis przy samym patrzeniu na ekran | otwarcie ekranu niczego nie mutuje; liczniki zapisów w teście panelu są umową |
-| 0.56.6 | „brak korespondencji" przy istniejącym wątku — Allegro MASKUJE rozmówcę jako `client:44300444` | rozmowy szuka się po identyfikatorze kupującego, nigdy po loginie |
+| 0.56.6 | „brak korespondencji" przy istniejącym wątku — Allegro MASKUJE rozmówcę jako `client:44300444` | rozmowy szuka się po identyfikatorze kupującego, nigdy po loginie; zakładka KLIENT i kandydaci zamówień łamią to od 0.386.0 i 0.397.0 — sprawdzenie czeka pod `[WERYFIKUJ]` w `allegro-ksztalt.md` |
 | 0.102.1 | pobranie przerabiało 60 rozmów i zakładało zero pytań | kto pisał, ustala się po roli autora (`BUYER`/`SELLER`), a login rozmówcy jest dopiero zapasem |
 | 0.105.0 | szkic dostawał szum, a Allegro zbędne strzały | kontekst dociąga się pod PYTANIE, nie do każdej sprawy |
 | 0.110.0 | dopisek klienta zakładał drugą sprawę, a odpowiedź szła na starą wersję pytania | kontrola świeżości przy wysyłce: 409 i jawne „wyślij mimo to", nigdy ciche nadpisanie |

@@ -7,7 +7,7 @@ import type { PrzystanekDrogi, SprawaZakupu } from "../api/typy";
 /* ── Spoiwo kolejek na ekranie (`docs/obsluga-klienta-calosc.md`) ────────────
    JEDEN komponent dla czterech ekranów, nie cztery podobne. Agent czyta ten
    sam blok w skrzynce, w zwrocie, w reklamacji i w dyskusji, więc rozpoznaje
-   go bez uczenia się drugiego układu — to punkt 3 dekalogu: kontekst wchodzi
+   go bez uczenia się drugiego układu — to punkt 2 dekalogu: kontekst wchodzi
    za sprawą, nie za ekranem.
 
    Odnośniki idą przez `Link`, nie przez `<a href>`, i to jest różnica

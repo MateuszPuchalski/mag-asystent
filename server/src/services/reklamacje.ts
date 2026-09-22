@@ -985,8 +985,8 @@ export interface SladHistorii {
  *
  * `null` znaczy „nie mamy po czym liczyć", nigdy „zero": sprawa bez
  * potwierdzonej kartoteki nie ma towaru, po którym szukać, a dyskusja bywa
- * bez loginu. Zero i brak wiedzy to dwie różne odpowiedzi — dekalog obsługi,
- * punkt 10.
+ * bez loginu. Zero i brak wiedzy to dwie różne odpowiedzi — zasada
+ * nadrzędna 9 projektu panelu (§27).
  */
 export interface HistoriaSprawy {
   towar: SladHistorii | null;
