@@ -92,10 +92,13 @@ całej baterii należy do najbliższej iteracji.
 
 Szukanie w kolejce skrzynki idzie po „login, treść, prowadzący"
 (`skrzynka/Kolejka.tsx:276`), więc fraza trafia też w TREŚĆ cudzej rozmowy.
-Na ścieżce wysyłki nie ma ani jednego miejsca, które powtarza „piszesz do X" —
-`Edytor` pokazuje tylko licznik znaków i przycisk. Dwaj klienci o tym samym
-nazwisku są rozróżnialni po loginie, ale **login nie stoi przy przycisku
-wysyłki**, tylko w nagłówku, wyżej.
+**POPRAWKA POMIARU, zrobiona przy iteracji 4.** Napisałem tu, że login stoi
+tylko w nagłówku, „wyżej", i zabrzmiało to jak zarzut, którym nie jest:
+nagłówek rozmowy ma `shrink-0`, więc login klienta widać nad edytorem przez
+cały czas pisania i nie odjeżdża przy przewijaniu. Cicha droga do złego wyniku
+leży WCZEŚNIEJ, przy wyborze wiersza: szukanie dopasowywało treść cudzej
+wiadomości i nie mówiło, na czym trafiło. Wpisane „Kowalski" pokazywało
+rozmowę innego klienta, w której to nazwisko tylko padło.
 
 ### T8 — jedyne zadanie bez usterki
 `adapters/subiekt.seeded.ts::szukajZFurtka` próbuje najpierw dokładnie,

@@ -175,3 +175,58 @@ pętlę zgodnie z fazą 2 briefu.
 kwoty i przez to padł. Miał rację, że padł: potwierdzał liczbę, której nie było
 jeszcze na ekranie. Przestawiona została kolejność kroków w teście, nie jego
 asercje — powód dopisany w komentarzu przy nim.
+
+
+### 4 — search — wiersz mówi, na czym trafiło szukanie
+
+**Cel:** T7. **Deficyt:** zapobieganie błędom (waga 0.25, ocena 7) — i jedyne
+E, które blokuje PASS, bo T8 jest już na zerze.
+
+**Poprawka pomiaru, zanim hipoteza.** Faza 0 zapisała, że login stoi „tylko
+w nagłówku, wyżej". Nagłówek rozmowy ma `shrink-0`, więc login widać nad
+edytorem przez cały czas pisania. Tamto zdanie sugerowało zagrożenie, którego
+nie ma; prawdziwe leży przy WYBORZE wiersza. Poprawione w `baseline.md`.
+
+**Hipoteza:** nazwanie powodu trafienia w wierszu kolejki zbije E na T7 z 1
+na 0, bo zniknie wiersz, który wygląda jak trafienie po kliencie, a jest
+trafieniem w cudzą wiadomość.
+
+**Co było nie tak.** Sito szuka po loginie, treści i prowadzącym — i tak ma
+zostać, bo do sprawy wraca się też po zdaniu, którego się nie pamięta inaczej.
+Wiersz nie mówił jednak, którą gałęzią trafił. Wpisane „Kowalski" pokazywało
+obok siebie rozmowę Kowalskiego i rozmowę Zielińskiej, w której ktoś napisał
+„sąsiad Kowalski polecił". Login jest w wierszu od zawsze, ale jako jeden
+z dziewięciu drobnych znaczników POD treścią, a treść wzrok czyta pierwszy.
+
+**Zmiana:** `panel/src/skrzynka/Kolejka.tsx` — znacznik „trafienie w treści,
+nie w loginie" albo „trafienie po prowadzącym", przy loginie, wyłącznie tam,
+gdzie login frazy nie zawiera. Na trafieniu po loginie milczy: znak zapalany
+przy każdym wierszu przestaje być znakiem.
+
+**Pomiar całej baterii:**
+
+| zad. | C | S | R | E przed | E po | zmiana |
+|---|---|---|---|---|---|---|
+| T1 | 6 `+1 txt` | 3 | 0 | 0 | 0 | — |
+| T2 | 13 `+2 txt` | 3 | 2 | 2 | 2 | — |
+| T3 | 11 `+1 txt` | 3 | 1 | 1 | 1 | — |
+| T5 | 4 | 2 | 0 | 0 | 0 | — |
+| T6 | 5 | 3 | 1 | 1 | 1 | — |
+| T7 | — | — | 1 | **1** | **0** | **cel trafiony** |
+| T8 | 2 `+1 txt` | 1 | 0 | 0 | 0 | — |
+
+Zero ruchów dołożonych — znacznik jest odczytem, nie kliknięciem.
+**Bramka regresji przechodzi.**
+
+**Rubryka:** zapobieganie błędom 7 → 8 (E na T7 wyzerowane, zostaje po jednym
+na T2, T3 i T6). Reszta bez zmian.
+
+**Wynik ważony:** 0.30·5 + 0.25·8 + 0.15·7 + 0.10·8 + 0.10·6 + 0.10·9 =
+**6.85** (z 6.60, czyli **+0.25**).
+
+**Werdykt: ACCEPT.** Plateau NIE nastąpiło: 0.10, potem 0.25, więc drugiego
+przyrostu poniżej 0.20 pod rząd nie ma.
+
+**PASS dalej nieosiągnięty.** E jest teraz zerowe na T7 i T8, ale wynik ważony
+to 6.85 przy progu 8.0, a efektywność zadań stoi na 5. Ona jest odtąd jedynym
+sensownym celem: T2 kosztuje 13 ruchów i 2 pola z pamięci.

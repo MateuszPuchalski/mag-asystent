@@ -34,6 +34,19 @@ historii nie przepisujemy.
 ---
 
 
+## 0.425.0 — 22 września 2026
+
+**Wiersz kolejki mówi, na czym trafiło szukanie.** Iteracja 4 pętli `ux-loop`,
+wymierzona w najdroższą pomyłkę tego ekranu: odpowiedź do złego klienta.
+
+- **Powód trafienia przy loginie.** Sito szuka po loginie, treści
+  i prowadzącym — i tak zostaje. Wiersz nie mówił jednak, którą gałęzią
+  trafił, więc wpisane „Kowalski" pokazywało obok siebie rozmowę Kowalskiego
+  i rozmowę innego klienta, w której to nazwisko tylko padło w zdaniu.
+- **Znacznik milczy przy trafieniu po loginie.** Znak zapalany przy każdym
+  wierszu przestaje być znakiem.
+- **Zero dołożonych kliknięć** — to odczyt, nie czynność.
+
 ## 0.424.0 — 22 września 2026
 
 **Zgoda przy werdykcie mówi, CO poleci, i traci ważność razem z decyzją.**

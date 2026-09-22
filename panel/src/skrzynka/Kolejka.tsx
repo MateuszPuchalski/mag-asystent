@@ -164,6 +164,24 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     || r.ostatniaWiadomosc.toLowerCase().includes(szukane)
     || (r.wlasciciel ?? "").toLowerCase().includes(szukane));
 
+  /* ── WIERSZ MÓWI, NA CZYM TRAFIŁ (0.425.0) ────────────────────────────────
+     Szukanie po TREŚCI jest potrzebne i zostaje — tak się wraca do sprawy,
+     której loginu nikt nie pamięta. Ma jednak skutek, którego wiersz nie
+     pokazywał: wpisane nazwisko trafia też w cudzą wiadomość, w której to
+     nazwisko padło. Agent szukający „Kowalski" dostawał wtedy rozmowę INNEGO
+     klienta, wyglądającą dokładnie jak trafienie po nazwisku.
+
+     Login stoi w wierszu od zawsze, ale jako jeden z dziewięciu drobnych
+     znaczników pod treścią — a treść jest tym, co wzrok czyta pierwsze.
+     Znacznik nazywa więc powód trafienia i pojawia się WYŁĄCZNIE tam, gdzie
+     login się nie zgadza. Na trafieniu po loginie milczy: znak zapalany przy
+     każdym wierszu przestaje być znakiem. */
+  const powodTrafienia = (r: { klient: string; wlasciciel?: string | null }): string | null => {
+    if (szukane === "" || r.klient.toLowerCase().includes(szukane)) return null;
+    return (r.wlasciciel ?? "").toLowerCase().includes(szukane)
+      ? "trafienie po prowadzącym" : "trafienie w treści, nie w loginie";
+  };
+
   /* ── KLAWIATURA W SKRZYNCE (0.383.0) ─────────────────────────────────
      Cztery kolejki obsługi, trzy chodziły z klawiatury od 0.245.0 — zwroty,
      reklamacje i dyskusje. Skrzynka nie miała ANI JEDNEGO klawisza, a to na
@@ -439,6 +457,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {zegar === null && !wyjatkowy &&
               <span className="shrink-0 text-slate-500">{NAZWA[r.status]}</span>}
             <span className="font-semibold text-slate-500">{r.klient}</span>
+            {/* Powód trafienia STOI PRZY LOGINIE, bo to jego dotyczy: mówi
+                „ten login nie zawiera tego, czego szukasz". Dalej od loginu
+                byłby zagadką. */}
+            {powodTrafienia(r) && <span className="flex items-center gap-1 font-semibold text-slate-600">
+              <Search size={12} />{powodTrafienia(r)}</span>}
             {/* Data ustępuje ZEGAROWI (0.251.0). Przy „czeka na nas" oba znaczniki
                 mierzą TĘ SAMĄ wiadomość, więc data była drugim zapisem jednego
                 faktu — i to gorszym, bo z sekundami. Gdy zegara nie ma, data
