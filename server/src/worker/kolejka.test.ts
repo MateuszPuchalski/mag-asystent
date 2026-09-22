@@ -239,3 +239,32 @@ test("set_location nie czeka na dokument — wstrzymanie dotyczy tylko MM", asyn
   );
 });
 
+test("takt workera jest OSŁONIĘTY — przejściowy błąd bazy nie kładzie procesu", () => {
+  /* Blizna produkcyjna (0.416.0): worker wywracał się w kółko na `database is
+     locked`, rzuconym z `zamelduj()` prosto w wywołaniu zwrotnym timera.
+     Wyjątku w timerze nie ma kto złapać, więc ginął CAŁY proces, a NSSM
+     podnosił go do następnej kolizji. Z workerem znikała kolejka zapisów,
+     powroty po dokumentach i meldunek do `/api/health`.
+
+     Test czyta ŹRÓDŁO, a nie zachowanie, i to jest świadome: `worker.ts` przy
+     imporcie startuje pętlę (patrz nagłówek tego pliku), więc zaimportowanie go
+     w teście uruchomiłoby workera zamiast go sprawdzić.
+
+     Bliźniak w C# ma ten sam strażnik od początku — to ten jeden `try` rozjechał
+     dwie implementacje tej samej pętli. */
+  const zrodlo = fs.readFileSync(
+    path.join(import.meta.dirname, "worker.ts"), "utf8");
+
+  const od = zrodlo.indexOf("setInterval(");
+  assert.notEqual(od, -1, "worker.ts nie ma już pętli taktu — ten test opisuje nieistniejący kod");
+  const do_ = zrodlo.indexOf("}, config.worker.pollMs);", od);
+  assert.notEqual(do_, -1, "nie znalazłem końca pętli taktu");
+  const cialo = zrodlo.slice(od, do_);
+
+  assert.match(cialo, /\{\s*try\s*\{/,
+    "ciało taktu nie zaczyna się od `try` — przejściowy błąd bazy położy proces");
+  assert.match(cialo, /\}\s*catch\s*\(/,
+    "takt nie ma `catch` — wyjątek w timerze nie ma kogo złapać");
+  assert.ok(cialo.indexOf("try") < cialo.indexOf("zamelduj("),
+    "meldunek stoi POZA `try` — a to on rzucał `database is locked` na produkcji");
+});
