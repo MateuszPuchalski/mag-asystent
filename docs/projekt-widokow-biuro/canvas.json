@@ -1,0 +1,134 @@
+{
+ "v": 3,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-22T17:31:40Z"
+ },
+ "title": "WERTIS — biuro, przeprojektowanie",
+ "launch": {
+  "view": "canvas"
+ },
+ "pages": [],
+ "boards": {
+  "Main.dc.html": {
+   "x": 0,
+   "y": 0,
+   "w": 1440,
+   "h": 1500,
+   "title": "Dostawy — lista"
+  },
+  "Szczegol.dc.html": {
+   "x": 1520,
+   "y": 0,
+   "w": 1440,
+   "h": 900,
+   "title": "Dostawy — dokument otwarty, 1280 px i szerzej"
+  },
+  "Szuflada.dc.html": {
+   "x": 1520,
+   "y": 1020,
+   "w": 1180,
+   "h": 800,
+   "title": "Dostawy — laptop 1024–1279 px, kontekst w szufladzie"
+  },
+  "Magazyn.dc.html": {
+   "x": 0,
+   "y": 1740,
+   "w": 1440,
+   "h": 900,
+   "title": "Magazyn zwrotów"
+  },
+  "Nadzor.dc.html": {
+   "x": 1520,
+   "y": 1940,
+   "w": 1440,
+   "h": 1260,
+   "title": "Stan systemu"
+  },
+  "Dziennik.dc.html": {
+   "x": 0,
+   "y": 2760,
+   "w": 1440,
+   "h": 900,
+   "title": "Dziennik"
+  },
+  "Analiza.dc.html": {
+   "x": 0,
+   "y": 3780,
+   "w": 1440,
+   "h": 900,
+   "title": "Analiza"
+  },
+  "Ustawienia.dc.html": {
+   "x": 1520,
+   "y": 3320,
+   "w": 1440,
+   "h": 1180,
+   "title": "Ustawienia"
+  },
+  "Jezyk.dc.html": {
+   "x": 3040,
+   "y": 0,
+   "w": 1100,
+   "h": 760,
+   "title": "Język biura — składniki"
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Szczegol.dc.html",
+  "Szuflada.dc.html",
+  "Magazyn.dc.html",
+  "Nadzor.dc.html",
+  "Dziennik.dc.html",
+  "Analiza.dc.html",
+  "Ustawienia.dc.html",
+  "Jezyk.dc.html"
+ ],
+ "notes": {
+  "tytul": {
+   "x": 0,
+   "y": -330,
+   "text": "WERTIS — biuro, przeprojektowanie",
+   "kind": "title1",
+   "maxW": 2960
+  },
+  "zasada": {
+   "x": 0,
+   "y": -230,
+   "w": 700,
+   "size": "m",
+   "fill": "orange",
+   "text": "Każda zmiana ma regułę z docs/ergonomia-magazynu.md (biuro: 1, 2, 5, 6, 10). Żetony, fonty, promienie, pasek boczny i pasma szerokości zostają bez zmian. Nie ma nowych zapisów ani tras.",
+   "maxH": 200
+  },
+  "dane": {
+   "x": 760,
+   "y": -230,
+   "w": 520,
+   "size": "m",
+   "fill": "gray",
+   "text": "Dane są przykładowe. Dostawcy, numery, symbole i loginy są zmyślone. Kształt wierszy, etykiety wyjątków i stany pochodzą z kodu biura.",
+   "maxH": 200
+  },
+  "dostawy": {
+   "x": 1340,
+   "y": -230,
+   "w": 1620,
+   "size": "m",
+   "fill": "teal",
+   "text": "DOSTAWY. Wiersz ma dwie linie zamiast czterech, a odznaki stoją w jednej kolumnie (reguła 2). Status słowem zniknął: pasek i licznik mówią to samo. Grupa CZEKA NA BIURO u góry: otwarte wyjątki albo odpowiedź z hali (reguła 5). Reklamacje mają blok na dokument i wyjątek w wierszu z kolumnami (reguła 2). Pozycje dokumentu w trzech kolumnach zamiast pięciu: w kolumnie 510 px nic się nie łamie (reguła 2).",
+   "maxH": 200
+  },
+  "reszta": {
+   "x": 3040,
+   "y": 860,
+   "w": 1100,
+   "size": "m",
+   "fill": "teal",
+   "text": "MAGAZYN: jeden pasek cyklu kosza zamiast dwóch pastylek, MM jako dopisek przy kroku (reguły 2, 5).\nSTAN SYSTEMU: najpierw to, co czeka na biuro, potem miary; arkusz lokalizacji zostaje pod kolejką zapisów; karta Allegro jest kartą (reguły 1, 5).\nDZIENNIK: typ zdarzenia w kolorze rodziny, na istniejących żetonach (reguła 2).\nANALIZA: wartości na słupkach, bez legendy (reguła 2).\nUSTAWIENIA: płaski arkusz jak dziś — w 0.427.0 bez zmian.\nSKŁADNIKI: przycisk mały zamiast 9 stylów w linii; dymek błędu zostaje do kliknięcia (reguła 6).",
+   "maxH": 420
+  }
+ },
+ "designSystems": []
+}
