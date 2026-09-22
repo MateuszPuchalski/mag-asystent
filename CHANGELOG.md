@@ -34,6 +34,139 @@ historii nie przepisujemy.
 ---
 
 
+## 0.430.0 — 22 września 2026
+
+**Szkic dostaje rozpoznanie, a wysyłka mierzy los szkicu i sama domyka
+niepewne próby.** Trzeci przyrost specyfikacji z 20 września; szkic zostaje
+na Anthropic, decyzją właściciela.
+
+**Fakt „rozpoznanie" w szkicu.** Do tej wersji szkic był szyty pod dobór
+i prosił o tabliczkę znamionową także klienta, który pytał o paczkę. Teraz
+model dostaje kategorię, następny krok i braki danych z decyzji klasyfikatora.
+To przypuszczenie automatu, więc twierdzenie oparte na nim schodzi w kodzie
+do „niepewne". Pytania o maszynę (intake) padają tylko przy prośbie o towar.
+
+**Szkic z taktu obejmuje rozmowy bez oferty**, gdy rozpoznanie każe coś
+zrobić. Przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie, żeby
+nie płacić dwa razy za to samo pytanie. Rozstrzygnięcie właściciela z 0.317.0
+(„tylko pod ofertą") ustąpiło specyfikacji — opis w `copilot-auto-szkic.ts`.
+
+**Los szkicu przy wysyłce** (`outbox.szkic_los`): bez zmian albo z poprawką.
+Karta pomiaru pokazuje obie liczby obok odrzuceń. To pomiar, nie bramka.
+
+**Niepewna wysyłka domyka się sama.** Synchronizacja, która przyniesie naszą
+wiadomość o treści wysyłki `send_uncertain`, przestawia ją na `sent` z numerem
+od Allegro. Specyfikacja żąda tego uzgodnienia przed ponowieniem; do tej
+wersji robił to człowiek.
+
+Wysyłki bez człowieka z tej specyfikacji nie ma i nie będzie bez decyzji
+właściciela — zasada nadrzędna nr 2 panelu (§27) jej zabrania.
+
+- Migracja dokłada `outbox.szkic_los` sama.
+- **[wymaga działania]** Przebuduj panel.
+- Przy `COPILOT_AUTO_SZKIC=1` szkiców przybędzie — patrz `DEPLOY.md`.
+
+## 0.429.0 — 22 września 2026
+
+**Struktura wątku Allegro przed modelem: typ i podtyp z `beta.v1` dają
+wskazówkę, a cztery podtypy rozstrzygają bez modelu.** Drugi przyrost
+specyfikacji z 20 września.
+
+Specyfikacja każe najpierw użyć tego, co Allegro mówi o wątku samo. Mówi to
+wyłącznie `beta.v1` (`ThreadVBeta1`: `type`, `subType`, `orders`), a lista
+wątków chodzi po `public.v1`. Przejście całej skrzynki na betę znaczyłoby
+nowe mapowanie kierunku wiadomości — `role` zamiast `isInterlocutor`.
+Zamiast tego synchronizacja czyta strukturę OSOBNYM żądaniem, tylko przy
+wątku, w którym coś się zmieniło.
+
+**`zapytajAllegro` umie wymusić wersję** (`akcept`). Wymuszona beta nie
+zapisuje się jako nauczony nagłówek rodziny `threads`, więc następna strona
+listy dalej przychodzi w `public.v1`. Pilnuje tego test z podstawionym
+`fetch`.
+
+**Awaria bety nie psuje skrzynki.** Struktura zapisuje się tylko wtedy, gdy
+przyszła, i nie zamazuje poprzedniej. Odmowa konta (406, 403) wstrzymuje
+odczyt na sześć godzin; limit — na kwadrans. Loginy uczestników nie wchodzą
+do bazy. Dostępność bety na naszym koncie niesie `[WERYFIKUJ]`.
+
+**Rejestr mapowań** (`services/klasyfikacja-mapowanie.ts`, wersja `m1`) jest
+propozycją do zatwierdzenia na etykietach. Cztery podtypy wąskie —
+brak elementu, brak zwrotu pieniędzy, kłopot z odesłaniem i odmowa przyjęcia
+zwrotu — rozstrzygają pierwszą wiadomość bez modelu i bez kosztu. Pięć
+szerokich to wskazówki z listą kategorii zgodnych; spór poza nią idzie do
+człowieka. `COMMON` nic nie mówi, dopisek w wątku idzie do modelu, a wartość
+nieznana dostaje kod i zdarzenie do przeglądu.
+
+Pomiar podaje zgodność mapowania z etykietą człowieka osobno od modelu.
+Decyzję ze struktury Allegro da się potwierdzić jak decyzję modelu.
+Instrukcja klasyfikatora dostała zdanie o typie wątku (`k3`).
+
+- Migracja dokłada pięć kolumn `watek_*` i `struktura_at`
+  w `allegro_inbox_thread` sama.
+- `ALLEGRO_WATKI_BETA=0` wyłącza odczyt struktury.
+- **[wymaga działania]** Przebuduj panel.
+
+## 0.428.0 — 22 września 2026
+
+**Klasyfikacja wiadomości według specyfikacji z 20 września: piętnaście
+kategorii, następny krok, trzy flagi potrzeb i decyzje z wersjami.**
+
+Właściciel przyniósł specyfikację „Allegro customer message classification
+with Jev" i zlecił lepszy klasyfikator. Rozstrzygnięcia z 22 września:
+silnikiem zostaje Claude, a Jev wpina się później tym samym nadawcą. Takt ma
+rozpoznawać każdą nową wiadomość klienta. Priorytetu 1–5 ze specyfikacji nie
+ma, bo kolejność kolejki stoi na faktach (§14.5).
+
+**Decyzja zamiast etykiety.** Słownik ośmiu kategorii z 0.191.0 ustąpił
+piętnastu ze specyfikacji (`services/klasyfikacja-slownik.ts`). Doszły
+kategorie dodatkowe, jeden następny krok z dwunastu i flagi „wymaga
+człowieka", „brak danych zamówienia" i „brak danych towaru".
+
+**Polityka po naszej stronie** (`klasyfikacja-polityka.ts`). Model proponuje,
+polityka rozstrzyga i każdą zmianę znaczy kodem. Prośba klienta o człowieka
+eskaluje zawsze. Niska pewność, sprzeczna odpowiedź i „Inne" z akcją idą do
+przejrzenia. Zwrot i reklamacja zostają ręczne. Walidacja enumów stoi
+w polityce, nie w adapterze — Jev przejdzie te same sita.
+
+**Kontekst to wątek, nie jedna wiadomość.** Samo „tak, to ten model" nie mówi
+nic bez pytania, na które odpowiada. Klasyfikacja idzie drogą szkicu: to samo
+maskowanie, ten sam sufit. Nagłówek z faktów mówi modelowi, czy jest
+zamówienie, oferta i załącznik. Polityka danych w `docs/obsluga-klienta.md`
+opisuje zmianę.
+
+**Decyzje mają wersje** (`decyzja_klasyfikacji`). Decyzja wisi przy
+wiadomości, więc dopisek klienta dostaje własną. Poprawka człowieka tworzy
+nową wersję zamiast nadpisać starą. Przy decyzji stoją wersje słownika,
+instrukcji i polityki, identyfikatory wiadomości ze skrótem wejścia i surowa
+odpowiedź modelu.
+
+**Nic nie ginie po cichu.** Awaria modelu i odpowiedź spoza słownika dają
+decyzję `FAILED` z akcją „do decyzji człowieka". Sam załącznik nie idzie do
+dostawcy i dostaje `NEEDS_REVIEW`. Limit, zły klucz, przeciążenie i brak
+sieci decyzji nie zapisują — rozmowa wraca w następnym przebiegu.
+
+**Poprawka zamiast kciuków.** „Nietrafna" nie mówiła, jak powinno być, więc
+czułości nie dało się policzyć. Agent potwierdza kategorię jednym kliknięciem
+albo wybiera właściwą z listy. Trasa `…/klasyfikacja/:id/korekta` zajęła
+miejsce trasy oceny, więc licznik tras zapisu Copilota stoi na siedmiu.
+Karta pomiaru podaje precyzję i czułość każdej kategorii z przedziałem
+Wilsona oraz liczbę decyzji bez etykiety.
+
+**Takt** (`services/klasyfikacja-auto.ts`, wyłączony domyślnie). Włącza go
+`COPILOT_AUTO_KLASYFIKACJA=1`; hamulce na przebieg i na godzinę liczą się
+z księgi, a okno siedmiu dni chroni przed przerabianiem historii. Decyzji
+`FAILED` takt nie ponawia.
+
+- **[wymaga działania]** Przebuduj panel (`npm run build` w korzeniu).
+- **[wymaga działania]** Takt włącza się linią w `wertis.env` — patrz `DEPLOY.md`.
+- Tabela `klasyfikacja_rozmowy` znika; jej wiersze zostają jako nieaktywna
+  historia słownika v1. Po aktualizacji plakietek nie ma, dopóki rozmowy nie
+  zostaną rozpoznane w nowym słowniku.
+
+Czego to wydanie nie robi: nie czyta typu i podtypu wątku z `beta.v1` i nie
+zmienia drogi szkicu ani wysyłki. Oba punkty specyfikacji czekają na osobne
+przyrosty.
+
 ## 0.427.0 — 22 września 2026
 
 **Biuro przeprojektowane pod dekalog, nie pod urodę.** Każda zmiana nazywa

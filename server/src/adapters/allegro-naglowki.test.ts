@@ -143,3 +143,39 @@ test("prosimy o POLSKI — `accept-language` jedzie przy każdym żądaniu (0.27
     assert.equal(z.headers["accept-language"], "pl-PL", `${z.url} poszedł bez języka`);
   }
 });
+
+/* ── Wymuszona beta nie przestawia rodziny (22 września 2026) ───────────────
+   Pojedynczy wątek czytamy w `beta.v1`, bo tylko ta wersja niesie typ
+   i podtyp. Lista wątków i wiadomości chodzą po `public.v1` i ich mapowanie
+   stoi na tamtym kształcie — a to ta sama rodzina `threads`. Gdyby wymuszona
+   beta zapisała się jako nauczony nagłówek, następna strona listy przyszłaby
+   w kształcie, którego synchronizacja nie rozumie. */
+test("wymuszona beta idzie jedną próbą i nie zmienia nauczonej wersji rodziny", async () => {
+  const najpierw = podstaw([{ status: 200, body: { threads: [] } }]);
+  await zapytajAllegro("https://api.test/messaging/threads?limit=20&offset=0");
+  assert.equal(najpierw[0].headers.accept, PUBLIC);
+
+  mock.restoreAll();
+  const beta = podstaw([{ status: 200, body: { id: "w-1", type: "COMMON" } }]);
+  const odp = await zapytajAllegro("https://api.test/messaging/threads/w-1", { akcept: BETA });
+  assert.equal(beta.length, 1);
+  assert.equal(beta[0].headers.accept, BETA);
+  assert.deepEqual(odp, { id: "w-1", type: "COMMON" });
+
+  mock.restoreAll();
+  const potem = podstaw([{ status: 200, body: { threads: [] } }]);
+  await zapytajAllegro("https://api.test/messaging/threads?limit=20&offset=20");
+  assert.equal(potem[0].headers.accept, PUBLIC, "lista wątków dalej chodzi po public.v1");
+
+  /* 406 na wymuszonej becie nie próbuje public.v1 — tamten kształt nie ma
+     pól, po które przyszliśmy — i nie kasuje nauczonej wersji listy. */
+  mock.restoreAll();
+  const odmowa = podstaw([{ status: 406 }]);
+  await assert.rejects(zapytajAllegro("https://api.test/messaging/threads/w-1", { akcept: BETA }));
+  assert.equal(odmowa.length, 1);
+  mock.restoreAll();
+  const poOdmowie = podstaw([{ status: 200, body: { threads: [] } }]);
+  await zapytajAllegro("https://api.test/messaging/threads?limit=20&offset=40");
+  assert.equal(poOdmowie.length, 1, "nauczona wersja przeżyła odmowę bety — jedna próba, nie dwie");
+  assert.equal(poOdmowie[0].headers.accept, PUBLIC);
+});

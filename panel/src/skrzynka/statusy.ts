@@ -1,5 +1,5 @@
 import type {
-  DrogaDoboru, Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
+  Akcja, DrogaDoboru, Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
   StatusRozmowy, ZrodloPropozycji, RolaPasowania } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
@@ -58,22 +58,65 @@ export const DO_WYBORU_DOBORU: StatusDoboru[] = [
   "requires_expert", "confirmed", "rejected", "not_applicable",
 ];
 
-/* KATEGORIE Copilota (§14, etap F). Ta sama zasada, co przy `NAZWA_DOBORU`:
-   `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy dojdzie siódma kategoria
-   bez nazwy dla człowieka. To jest test sam w sobie i dlatego kategoria nie
-   dostała `CHECK`-a w bazie — słownik ma rosnąć tanio, ale nie po cichu.
+/* KATEGORIE klasyfikatora (specyfikacja z 20 września 2026). Ta sama zasada,
+   co przy `NAZWA_DOBORU`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
+   dojdzie szesnasta kategoria bez nazwy dla człowieka. Nazwy są krótkie, bo
+   stoją na plakietce wiersza kolejki, a wiersz ma pokazywać pytanie klienta.
 
-   Dwa kosze mają RÓŻNE nazwy, bo mówią o różnych naprawach: „Inne" znaczy
-   „słownik jest za krótki", „Nie wiadomo" — „przeczytaj sam". */
+   „Dobór" zostaje nazwą `PRODUCT_COMPATIBILITY`, bo tak tę sprawę nazywa
+   całe biuro — i zakładka obok. */
 export const NAZWA_KATEGORII: Record<Kategoria, string> = {
-  dobor: "Dobór",
-  dostepnosc: "Dostępność",
-  wysylka: "Wysyłka",
-  zwrot: "Zwrot",
-  reklamacja: "Reklamacja",
-  dokumenty: "Dokumenty",
-  inne: "Inne",
-  nie_wiadomo: "Nie wiadomo",
+  ORDER_STATUS: "Status zamówienia",
+  DELIVERY_DELAY: "Opóźniona dostawa",
+  DELIVERY_LOST: "Zaginiona paczka",
+  DELIVERY_DAMAGED: "Uszkodzona w transporcie",
+  PRODUCT_COMPATIBILITY: "Dobór",
+  PRODUCT_QUESTION: "Pytanie o towar",
+  PRODUCT_AVAILABILITY: "Dostępność",
+  WRONG_PRODUCT: "Inny towar",
+  MISSING_PRODUCT: "Brak w paczce",
+  DAMAGED_PRODUCT: "Wada towaru",
+  RETURN: "Zwrot",
+  COMPLAINT: "Reklamacja",
+  CANCEL_ORDER: "Anulowanie",
+  INVOICE: "Faktura",
+  OTHER: "Inne",
+};
+
+/* Następny krok jako polecenie dla człowieka. To PODPOWIEDŹ — panel żadnej
+   z tych czynności nie wykonuje sam i nazwa nie może tego sugerować. */
+export const NAZWA_AKCJI: Record<Akcja, string> = {
+  GET_ORDER: "sprawdź zamówienie",
+  GET_SHIPMENT: "sprawdź przesyłkę",
+  GET_PRODUCT: "sprawdź ofertę",
+  CHECK_COMPATIBILITY: "sprawdź pasowanie",
+  CHECK_STOCK: "sprawdź stan",
+  START_RETURN: "przygotuj zwrot",
+  START_COMPLAINT: "przygotuj reklamację",
+  ASK_FOR_MACHINE_MODEL: "zapytaj o model maszyny",
+  ASK_FOR_PART_NUMBER: "zapytaj o numer części",
+  ASK_FOR_PHOTO: "poproś o zdjęcie",
+  HUMAN_REVIEW: "do decyzji człowieka",
+  NO_ACTION: "nic do zrobienia",
+};
+
+/* Kody reguł polityki jako zdania. Zbiór jest OTWARTY (kod przychodzi z serwera
+   jako tekst), więc to nie `Record<Kod, …>`: nieznany kod ekran pokazuje
+   wprost, zamiast go przemilczeć. */
+export const NAZWA_KODU: Record<string, string> = {
+  PROSBA_O_CZLOWIEKA: "klient prosi o człowieka",
+  MODEL_ZADA_CZLOWIEKA: "sprawa wymaga decyzji",
+  NISKA_PEWNOSC: "niska pewność",
+  KATEGORIA_OTHER: "poza słownikiem",
+  TYLKO_ZALACZNIK: "sam załącznik — Copilot go nie czyta",
+  NIESPOJNA_ODPOWIEDZ: "sprzeczna odpowiedź modelu",
+  AKCJA_RECZNA: "zwrot i reklamację zakłada człowiek",
+  BLAD_MODELU: "Copilot nie odpowiedział",
+  BLAD_MASKOWANIA: "maskowanie nie przeszło — nic nie wysłano",
+  NIEPOPRAWNA_ODPOWIEDZ: "odpowiedź spoza słownika",
+  SPOR_Z_ALLEGRO: "Allegro wskazuje co innego",
+  PODTYP_NIEZNANY: "nieznany podtyp wątku Allegro",
+  TYP_NIEZNANY: "nieznany typ wątku Allegro",
 };
 
 /* Pewność NIE jest procentem i ekran nie ma prawa udawać, że jest. Model

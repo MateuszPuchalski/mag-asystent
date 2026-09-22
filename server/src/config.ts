@@ -380,6 +380,14 @@ export const config = {
      */
     inboxOd: data(process.env.ALLEGRO_INBOX_OD, "2026-08-31T22:00:00Z", "ALLEGRO_INBOX_OD"),
     /**
+     * Struktura wątku z `beta.v1` przy synchronizacji skrzynki (22 września
+     * 2026): typ, podtyp i zamówienia, z których klasyfikacja bierze
+     * wskazówkę. Jedno dodatkowe żądanie na wątek, w którym coś się zmieniło —
+     * nie na każdy wątek listy. Włączone domyślnie, bo to odczyt, a odmowa
+     * Allegro (406, 403) wstrzymuje go sama na sześć godzin. `0` wyłącza.
+     */
+    watkiBeta: process.env.ALLEGRO_WATKI_BETA !== "0",
+    /**
      * Takt synchronizacji zwrotów klienckich; 0 wyłącza ticker.
      *
      * RZADZIEJ NIŻ SKRZYNKA, i to jest decyzja, nie zaniedbanie. Zwrot ma
@@ -951,6 +959,38 @@ export const config = {
      * się sama, a rachunek przychodzi po fakcie.
      */
     autoNaGodzine: Math.max(1, Number(process.env.COPILOT_AUTO_NA_GODZINE ?? 30) || 30),
+    /**
+     * KLASYFIKACJA KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA (22 września 2026).
+     *
+     * Decyzja właściciela: rozpoznanie ma biec samo, nie z przycisku nad
+     * kolejką. Wyłączone DOMYŚLNIE z tego samego powodu co szkic z taktu:
+     * rzecz, która wydaje pieniądze bez kliknięcia, włącza się decyzją przy
+     * `wertis.env`, a nie aktualizacją. Przycisk nad kolejką zostaje.
+     */
+    autoKlasyfikacja: process.env.COPILOT_AUTO_KLASYFIKACJA === "1",
+    /**
+     * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
+     * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.
+     */
+    autoKlasyfikacjaMs: Math.max(60_000,
+      Number(process.env.COPILOT_AUTO_KLASYFIKACJA_MS ?? 120_000) || 120_000),
+    /** Hamulec na przebieg — pierwsze włączenie zastaje zaległość okna. */
+    autoKlasyfikacjaNaPrzebieg: Math.max(1,
+      Number(process.env.COPILOT_AUTO_KLASYFIKACJA_NA_PRZEBIEG ?? 10) || 10),
+    /**
+     * Twardy sufit na godzinę, z księgi wywołań RAZEM z błędami. Sześćdziesiąt
+     * to wielokrotność zgłoszonych około pięćdziesięciu pytań na DOBĘ: sufit
+     * ma łapać awarię powtarzającą wiadomości, a nie zwykły dzień.
+     */
+    autoKlasyfikacjaNaGodzine: Math.max(1,
+      Number(process.env.COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE ?? 60) || 60),
+    /**
+     * Ile dni wstecz takt sięga po nierozpoznane wiadomości. Bez okna pierwsze
+     * włączenie przerabiałoby całą historię skrzynki — płacąc za rozmowy
+     * dawno zamknięte, których nikt już nie otworzy.
+     */
+    klasyfikacjaOknoDni: Math.max(1,
+      Number(process.env.COPILOT_KLASYFIKACJA_OKNO_DNI ?? 7) || 7),
   },
 
   /**

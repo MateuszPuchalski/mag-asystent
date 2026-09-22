@@ -226,46 +226,101 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   updated_user_id INTEGER REFERENCES app_user(user_id)
 );
 
--- ── Copilot: klasyfikacja wiadomości (§14, etap F) ───────────────────────
--- Odpowiada na pytanie „O CO CHODZI w tej rozmowie" i jest PROSTOPADŁA do
+-- ── Klasyfikacja wiadomości: DECYZJE z wersjami (22 września 2026) ─────────
+-- Odpowiada na pytanie „O CO CHODZI w tej wiadomości" i jest PROSTOPADŁA do
 -- statusu, który odpowiada na „CZYJ JEST RUCH". Rozmowa `waiting_for_customer`
 -- bywa reklamacją, a `new` bywa pytaniem o dostępność — mieszanie tych dwóch
 -- wymiarów zepsułoby oba.
 --
--- OSOBNA TABELA, nie kolumny na `conversation`, i to nie jest kwestia gustu:
--- `conversation.version` pilnuje przejęcia rozmowy i szkicu. Klasyfikacja
--- podnosząca ją wywracałaby komuś szkic na 409 W TRAKCIE PISANIA. Ten sam
--- powód dał doborowi własną kolumnę `wersja`.
+-- ZASTĘPUJE `klasyfikacja_rozmowy` z 0.191.0. Tamta miała jeden wiersz na
+-- ROZMOWĘ i nadpisywała go przy każdym dopisku klienta, więc gubiła, co model
+-- sądził wcześniej. Specyfikacja z 20 września żąda historii: poprawka
+-- człowieka albo ponowne rozpoznanie to NOWA WERSJA, a poprzednia gaśnie.
+-- Stare wiersze przenosi `przeniesKlasyfikacjeRozmow()` w `migrate()`.
+--
+-- OSOBNA TABELA, nie kolumny na `conversation`: `conversation.version` pilnuje
+-- przejęcia rozmowy i szkicu, a decyzja podnosząca ją wywracałaby komuś szkic
+-- na 409 W TRAKCIE PISANIA.
+--
+-- To NIE jest „piąta tabela ze wspólnym statusem nad kolejkami" (dekalog
+-- obsługi, punkt 5). Decyzja wisi przy jednej WIADOMOŚCI skrzynki i niczego
+-- nie przechwytuje z reklamacji, zwrotów ani dyskusji.
 --
 -- Brak wiersza znaczy „nierozpoznana" i liczy się przy odczycie — otwarcie
 -- kolejki niczego nie wstawia.
-CREATE TABLE IF NOT EXISTS klasyfikacja_rozmowy (
-  conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
-  -- BEZ `CHECK` I TO JEST DECYZJA, NIE PRZEOCZENIE (blizna 0.135.0).
-  -- Statusy mają `CHECK`, bo ich lista pochodzi z dokumentu i jest zamknięta.
-  -- Słownik kategorii jest odwrotnością tego przypadku: ma ROSNĄĆ od pomiaru,
-  -- a kategoria zwrócona spoza listy jest sygnałem, że słownik jest za krótki.
-  -- `CHECK` zamieniłby każde takie odkrycie w przebudowę tabeli.
-  -- Strażnik stoi w `services/copilot-klasyfikacja.ts` (`KATEGORIE`) i w typie
-  -- panelu (`Record<Kategoria, string>` nie skompiluje się bez nazwy) — dwie
-  -- kopie zamiast trzech, i żadna nie kosztuje migracji.
-  kategoria       TEXT NOT NULL,
-  pewnosc         TEXT NOT NULL CHECK (pewnosc IN ('wysoka','srednia','niska')),
-  -- Jedno zdanie modelu. Służy człowiekowi do oceny trafności, nie automatowi.
-  uzasadnienie    TEXT,
-  -- NA CZYM liczono. Nowsza wiadomość klienta czyni etykietę nieaktualną,
-  -- a rozmowa wraca do partii — bez tego pola trzeba by przycisku w rozmowie.
-  message_id      INTEGER REFERENCES message(id),
-  model           TEXT NOT NULL,
-  at              TEXT NOT NULL,
-  przez           TEXT NOT NULL,
-  przez_user_id   INTEGER REFERENCES app_user(user_id),
-  -- WERDYKT CZŁOWIEKA o propozycji maszyny. Bez niego trafności nie da się
-  -- policzyć, a decyzja „po pomiarze zejść na tańszy model" tego wymaga.
-  ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('trafna','nietrafna')),
-  ocenil_user_id  INTEGER REFERENCES app_user(user_id),
-  ocena_at        TEXT
+CREATE TABLE IF NOT EXISTS decyzja_klasyfikacji (
+  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id        INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  -- Decyzja należy do WIADOMOŚCI. Wątek opisuje wątek, a kolejne pytanie
+  -- klienta bywa inną sprawą — specyfikacja zabrania przyklejać kategorię
+  -- pierwszej wiadomości do każdej następnej.
+  message_id             INTEGER NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+  wersja                 INTEGER NOT NULL,
+  aktywna                INTEGER NOT NULL DEFAULT 1 CHECK (aktywna IN (0,1)),
+  zrodlo                 TEXT NOT NULL CHECK (zrodlo IN ('ALLEGRO_MAPPING','MODEL','FALLBACK')),
+  status                 TEXT NOT NULL CHECK (status IN ('SUCCESS','FAILED','NEEDS_REVIEW')),
+  -- BEZ `CHECK` NA KATEGORIACH I AKCJACH (blizna 0.135.0). Słownik ma rosnąć
+  -- od pomiaru, a `CHECK` zamieniłby każde rozszerzenie w przebudowę tabeli.
+  -- Strażnik stoi w `services/klasyfikacja-slownik.ts` i w typie panelu.
+  -- Wiersze sprzed słownika v2 niosą stare nazwy (`dobor`) — rozróżnia je
+  -- `taksonomia_wersja`, a kolejka i pomiar czytają wyłącznie bieżącą.
+  kategoria              TEXT NOT NULL,
+  kategorie_dodatkowe    TEXT NOT NULL DEFAULT '[]',
+  -- Trzy źródła kategorii OSOBNO, jak w specyfikacji. `NULL` znaczy „to
+  -- źródło nic nie powiedziało", nigdy „powiedziało z pewnością zero".
+  kategoria_allegro      TEXT,
+  kategoria_modelu       TEXT,
+  -- Etykieta człowieka: WYŁĄCZNIE jawne kliknięcie „potwierdź" albo
+  -- „popraw". Akceptacja szkicu nie jest etykietą (specyfikacja).
+  kategoria_czlowieka    TEXT,
+  akcja                  TEXT NOT NULL,
+  -- Akcja, którą podał model, zanim polityka zamieniła ją na przegląd.
+  akcja_modelu           TEXT,
+  wymaga_czlowieka       INTEGER NOT NULL CHECK (wymaga_czlowieka IN (0,1)),
+  brak_danych_zamowienia INTEGER NOT NULL CHECK (brak_danych_zamowienia IN (0,1)),
+  brak_danych_produktu   INTEGER NOT NULL CHECK (brak_danych_produktu IN (0,1)),
+  -- Pewność ZGŁOSZONA przez model, trzy słowa. Nie jest prawdopodobieństwem
+  -- trafienia i ekran tego nie udaje.
+  pewnosc                TEXT CHECK (pewnosc IS NULL OR pewnosc IN ('wysoka','srednia','niska')),
+  uzasadnienie           TEXT,
+  -- Surowa odpowiedź nadawcy. Model dostaje polecenie, żeby nie powtarzać
+  -- danych osobowych, a treść wejścia i tak była zamaskowana.
+  surowa_odpowiedz       TEXT,
+  kody_polityki          TEXT NOT NULL DEFAULT '[]',
+  -- Struktura wątku Allegro, gdy znana. Nieznana wartość zostaje zapisana
+  -- tak, jak przyszła — specyfikacja: „preserve unknown values".
+  watek_typ              TEXT,
+  watek_podtyp           TEXT,
+  api_wersja             TEXT,
+  -- NA CZYM liczono: identyfikatory wiadomości, skrót zamaskowanego wejścia
+  -- i to, czy sufit wątku coś uciął. Treści tu nie ma — leży w `message`.
+  kontekst_wiadomosci    TEXT NOT NULL DEFAULT '[]',
+  kontekst_hash          TEXT,
+  kontekst_uciety        INTEGER NOT NULL DEFAULT 0 CHECK (kontekst_uciety IN (0,1)),
+  zalacznikow            INTEGER NOT NULL DEFAULT 0,
+  zamowienia             TEXT NOT NULL DEFAULT '[]',
+  oferty                 TEXT NOT NULL DEFAULT '[]',
+  model                  TEXT,
+  prompt_wersja          TEXT,
+  taksonomia_wersja      TEXT NOT NULL,
+  mapowanie_wersja       TEXT,
+  polityka_wersja        TEXT NOT NULL,
+  -- Dziś jedyny tryb: odpowiedź wysyła człowiek (§27, punkt 2).
+  tryb                   TEXT NOT NULL DEFAULT 'HUMAN_APPROVED' CHECK (tryb IN ('HUMAN_APPROVED')),
+  at                     TEXT NOT NULL,
+  przez                  TEXT NOT NULL,
+  przez_user_id          INTEGER REFERENCES app_user(user_id),
+  poprawka_powod         TEXT,
+  poprzednia_id          INTEGER REFERENCES decyzja_klasyfikacji(id)
 );
+-- Jedna AKTYWNA decyzja na wiadomość — specyfikacja: „one active decision per
+-- account, message and policy context". Konto wynika z wiadomości.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_decyzja_aktywna
+  ON decyzja_klasyfikacji(message_id) WHERE aktywna = 1;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_decyzja_wersja
+  ON decyzja_klasyfikacji(message_id, wersja);
+CREATE INDEX IF NOT EXISTS ix_decyzja_rozmowa
+  ON decyzja_klasyfikacji(conversation_id, aktywna, message_id);
 
 -- Księga wywołań Copilota. OSOBNO od klasyfikacji, bo zużycie należy do
 -- WYWOŁANIA, nie do odpowiedzi: próba zakończona błędem nie daje wiersza
@@ -947,6 +1002,13 @@ CREATE TABLE IF NOT EXISTS outbox (
   created_by               INTEGER NOT NULL REFERENCES app_user(user_id),
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   finished_at              TEXT
+,
+  -- LOS SZKICU COPILOTA przy tej wysyłce (22 września 2026): `bez_zmian`,
+  -- `poprawiony` albo NULL, gdy na to pytanie szkicu nie było. Specyfikacja
+  -- mierzy „unedited approvals, edited approvals and rejections"; odrzucenie
+  -- niesie już `szkic_copilota.ocena`, a tu stoi to, czego wtedy nie było:
+  -- co agent zrobił z propozycją, zanim ją WYSŁAŁ.
+  szkic_los                TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))
 );
 CREATE INDEX IF NOT EXISTS ix_outbox_rozmowa ON outbox(conversation_id, id);
 
@@ -1608,7 +1670,19 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_thread (
   last_message_at TEXT,
   interlocutor_login TEXT,
   surowe_json TEXT NOT NULL,
-  synced_at TEXT NOT NULL
+  synced_at TEXT NOT NULL,
+  -- STRUKTURA WĄTKU z `beta.v1` (22 września 2026) — osobnym odczytem
+  -- `GET /messaging/threads/{id}`, bo lista chodzi po `public.v1`, a tam tych
+  -- pól nie ma. Wartość zapisuje się TAK, JAK PRZYSZŁA, także spoza
+  -- znanego słownika (specyfikacja: „preserve unknown values"). NULL w
+  -- `struktura_at` znaczy „nie czytaliśmy", nie „wątek bez typu".
+  -- `participants` nie wchodzi: login kupującego ma tu już `interlocutor_login`,
+  -- a lądowisko nie bierze niczego ponad to, po co przyszliśmy.
+  watek_typ TEXT,
+  watek_podtyp TEXT,
+  watek_status TEXT,
+  watek_zamowienia TEXT,
+  struktura_at TEXT
 );
 -- Kolumny odpowiadają POLOM ALLEGRO, nie naszym wyobrażeniom o nich.
 -- Do 0.151.0 stało tu `author_role NOT NULL` i `read NOT NULL` — dwa pola,

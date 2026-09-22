@@ -575,6 +575,8 @@ test("pomiar rozbija księgę po zadaniu i liczy losy szkiców", async () => {
     ile: 1, wstawionych: 0, zastapionych: 1, odrzuconych: 0,
     daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
     pasowaniaRozpoznane: 0, pasowaniaZaproponowane: 0, pasowaniaOdrzucone: 0, pasowaniaZatwierdzonePrzezBiuro: 0,
+    /* Los przy wysyłce (22 września 2026) — tu nic nie wysłano. */
+    wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   });
 });
 
@@ -1053,4 +1055,53 @@ test("drugie ułożenie nie mnoży wiedzy z tej samej oferty", async () => {
 
   assert.deepEqual(drugi.lukiKartoteki.wpisane, [], "drugi przebieg nie ma czego wpisać");
   assert.equal(liczba("zastosowanie"), 1, "jedna para, jeden wiersz");
+});
+
+/* ── Rozpoznanie w faktach szkicu (22 września 2026) ────────────────────────
+   Szkic był szyty pod dobór i prosił o tabliczkę także klienta, który pytał
+   o paczkę. Teraz dostaje rozpoznanie jako fakt — przypuszczenie, nie źródło. */
+
+function rozpoznaj(kategoria: string, akcja: string, n: { wymaga?: number; brakZam?: number } = {}) {
+  db().prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,taksonomia_wersja,
+    polityka_wersja,at,przez) VALUES (?,?,1,1,'MODEL','SUCCESS',?,?,?,?,0,'v2','p1','2026-09-07T10:01:00Z','automat')`)
+    .run(rozmowa, pytanie, kategoria, akcja, n.wymaga ?? 0, n.brakZam ?? 0);
+}
+
+test("rozpoznanie wchodzi do faktów, a pytanie o paczkę nie dostaje intake o maszynę", () => {
+  rozpoznaj("ORDER_STATUS", "GET_SHIPMENT", { wymaga: 1, brakZam: 1 });
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const r = k.fakty.find((f) => f.rodzaj === "rozpoznanie");
+  assert.match(String(r?.zdanie), /ORDER_STATUS; następny krok: GET_SHIPMENT/);
+  assert.match(String(r?.zdanie), /brakuje danych zamówienia/);
+  assert.match(String(r?.zdanie), /nie obiecuj rozstrzygnięcia/);
+  assert.equal(k.fakty.some((f) => f.rodzaj === "intake"), false);
+});
+
+test("przy doborze intake zostaje obok rozpoznania", () => {
+  rozpoznaj("PRODUCT_COMPATIBILITY", "CHECK_COMPATIBILITY");
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.ok(k.fakty.some((f) => f.rodzaj === "rozpoznanie"));
+  assert.ok(k.fakty.some((f) => f.rodzaj === "intake"));
+});
+
+test("rozpoznanie starszej wiadomości nie wchodzi — opisuje pytanie, którego już nie ma", () => {
+  rozpoznaj("ORDER_STATUS", "GET_SHIPMENT");
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+    VALUES (?,?,'m-2','incoming','A jednak pytam o uszczelkę','2026-09-07T11:00:00Z')`).run(rozmowa, konto);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.equal(k.fakty.some((f) => f.rodzaj === "rozpoznanie"), false);
+});
+
+test("twierdzenie oparte na rozpoznaniu schodzi do „niepewne” ze źródłem model", () => {
+  const fakty = [{ id: "F1", rodzaj: "kartoteka" as const, zdanie: "x" },
+    { id: "F2", rodzaj: "rozpoznanie" as const, zdanie: "y" }];
+  const [a, b] = S.zRozpoznaniaNiepewne([
+    { teza: "towar jest", zrodlo: "fakty", odwolanie: "F1", pewnosc: "pewne", obnizona: false },
+    { teza: "klient pyta o paczkę", zrodlo: "fakty", odwolanie: "F2", pewnosc: "pewne", obnizona: false },
+  ], fakty);
+  assert.equal(a.pewnosc, "pewne");
+  assert.equal(b.pewnosc, "niepewne");
+  assert.equal(b.zrodlo, "model");
+  assert.equal(b.obnizona, true);
 });

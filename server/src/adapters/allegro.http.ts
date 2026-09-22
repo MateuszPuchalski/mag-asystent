@@ -362,6 +362,15 @@ export function urlWatkow(apiUrl: string, offset: number): string {
   return `${apiUrl}/messaging/threads?limit=20&offset=${Math.max(0, Math.trunc(offset))}`;
 }
 
+/**
+ * Jeden wątek (`GET /messaging/threads/{threadId}`). Czytany WYŁĄCZNIE w
+ * `beta.v1` (klasyfikacja, 22 września 2026): tylko ta wersja niesie `type`,
+ * `subType` i `orders` — kształt w `docs/allegro-ksztalt.md`.
+ */
+export function urlWatku(apiUrl: string, threadId: string): string {
+  return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}`;
+}
+
 export function urlWiadomosci(apiUrl: string, threadId: string): string {
   return `${apiUrl}/messaging/threads/${encodeURIComponent(threadId)}/messages`;
 }
@@ -425,6 +434,9 @@ const AKCEPTY = [
   "application/vnd.allegro.public.v1+json",
   "application/vnd.allegro.beta.v1+json",
 ] as const;
+
+/** Wersja beta zasobu — dla wołającego, który jej ŻĄDA, a nie negocjuje. */
+export const AKCEPT_BETA = AKCEPTY[1];
 
 /**
  * Rodzina końcówki — pierwszy segment ścieżki po `/order/`, `/sale/` albo
@@ -528,12 +540,25 @@ export async function zapytajAllegro(
      * Wynikiem jest wtedy `{ dane, location }`, a nie samo ciało.
      */
     zLokalizacja?: boolean;
+    /**
+     * Wersja zasobu WYMUSZONA, bez negocjacji (22 września 2026).
+     *
+     * Wątek w `beta.v1` ma inny kształt niż w `public.v1` (`participants`
+     * zamiast `interlocutor`, `role` zamiast `isInterlocutor`). Synchronizacja
+     * skrzynki czyta `public.v1` i jej mapowanie stoi na tym kształcie, a
+     * pojedynczy wątek należy do TEJ SAMEJ rodziny `threads`. Nauczony nagłówek
+     * jest wspólny dla rodziny, więc wymuszona beta NIE MA PRAWA go zapisać ani
+     * skasować — inaczej następna strona listy przyszłaby w kształcie, którego
+     * mapowanie nie rozumie.
+     */
+    akcept?: typeof AKCEPT_BETA;
   } = {}
 ): Promise<unknown | null> {
   const bearer = await wazneBearer();
   const rodzina = rodzinaKoncowki(url);
   const znany = dzialajacyAccept.get(rodzina);
-  const doProbowania = znany ? [znany] : [...AKCEPTY];
+  const wymuszony = opcje.akcept ?? null;
+  const doProbowania = wymuszony ? [wymuszony] : znany ? [znany] : [...AKCEPTY];
 
   /* Treść ostatniej odmowy wersji — 406 przy odczycie, 415 przy zapisie. */
   let ostatniaOdmowaWersji = "";
@@ -599,7 +624,7 @@ export async function zapytajAllegro(
        nieprawdziwym. Odmowa typu pliku ma dojść do agenta taka, jaka jest. */
     if (odp.status === 406 || (odp.status === 415 && !opcje.plik)) {
       ostatniaOdmowaWersji = await odp.text().catch(() => "");
-      dzialajacyAccept.delete(rodzina);
+      if (!wymuszony) dzialajacyAccept.delete(rodzina);
       continue;
     }
 
@@ -649,7 +674,7 @@ export async function zapytajAllegro(
         `Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`, odp.status);
     }
 
-    dzialajacyAccept.set(rodzina, accept);
+    if (!wymuszony) dzialajacyAccept.set(rodzina, accept);
     /* 204 i puste ciało to poprawna odpowiedź na PUT/POST — `json()` na
        pustce rzuca, a odhaczenie wątku niczego nie zwraca. */
     const location = opcje.zLokalizacja ? odp.headers.get("location") : null;

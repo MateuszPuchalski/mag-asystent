@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
-import { synchronizujAllegroInbox } from "./allegro-inbox-sync.js";
+import {
+  _zdejmijWstrzymanieStruktury, strukturaZOdpowiedzi, synchronizujAllegroInbox,
+} from "./allegro-inbox-sync.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { onConversationEvent } from "./conversation-realtime.js";
 
@@ -740,4 +742,111 @@ test("klient CYTUJĄCY nasz autoresponder nie jest autoodpowiedzią", async () =
 
   assert.equal((database.prepare("SELECT auto_odpowiedz a FROM message").get() as { a: number }).a, 0,
     "pytanie klienta zwinięto jako nasze echo");
+});
+
+
+/* ── Struktura wątku z beta.v1 (22 września 2026) ────────────────────────────
+   Lista chodzi po public.v1; typ i podtyp ma tylko beta, więc czytamy je
+   osobnym żądaniem przy wątku, w którym coś się zmieniło. Cztery rzeczy:
+   wartości zostają, jak przyszły; loginy uczestników nie wchodzą; awaria bety
+   nie psuje skrzynki; odmowa konta wstrzymuje betę, zamiast bić w nią
+   przy każdym wątku. */
+
+const strukturaBeta = (n: Record<string, unknown> = {}) => ({
+  id: "t-1", type: "POST_PURCHASE_ISSUE", read: false,
+  createdAt: "2026-09-28T10:00:00Z", lastMessageDateTime: "2026-09-29T12:00:00Z",
+  participants: [{ role: "BUYER", login: "kupujacy-anon" }, { role: "SELLER", login: "my" }],
+  orders: [{ id: "zam-1", offers: [{ id: "of-1", quantity: 1 }] }],
+  subType: "MISSING_PRODUCT_ELEMENTS", status: "OPEN", ...n,
+});
+
+test("struktura wątku zapisuje się tak, jak przyszła — bez loginów uczestników", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const api = fake([[thread(1)]]);
+  const pytane: string[] = [];
+  await synchronizujAllegroInbox({ database, query: api.query, apiUrl: "https://api.test",
+    struktura: async (id) => { pytane.push(id); return strukturaBeta({ subType: "NOWY_PODTYP_2027" }); } });
+  assert.deepEqual(pytane, ["t-1"]);
+  const w = database.prepare("SELECT * FROM allegro_inbox_thread WHERE id='t-1'").get() as any;
+  assert.equal(w.watek_typ, "POST_PURCHASE_ISSUE");
+  assert.equal(w.watek_podtyp, "NOWY_PODTYP_2027", "nieznana wartość zostaje — rozstrzyga rejestr, nie sync");
+  assert.equal(w.watek_status, "OPEN");
+  assert.deepEqual(JSON.parse(w.watek_zamowienia), ["zam-1"]);
+  assert.ok(w.struktura_at);
+  assert.doesNotMatch(JSON.stringify(w), /kupujacy-anon/, "lądowisko nie bierze loginów uczestników");
+});
+
+test("awaria bety nie psuje skrzynki i nie zamazuje poprzedniej struktury", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, query: fake([[thread(1)]]).query, apiUrl: "https://api.test",
+    struktura: async () => strukturaBeta() });
+  const zmieniony = { ...thread(1), lastMessageDateTime: "2026-09-30T12:00:00Z" };
+  await synchronizujAllegroInbox({ database,
+    query: fake([[zmieniony]], new Map([["t-1", ["m-t-1", "m-2"]]])).query, apiUrl: "https://api.test",
+    struktura: async () => { throw new Error("Allegro odpowiedziało 500"); } });
+  const w = database.prepare("SELECT watek_podtyp FROM allegro_inbox_thread WHERE id='t-1'").get() as any;
+  assert.equal(w.watek_podtyp, "MISSING_PRODUCT_ELEMENTS");
+  assert.equal((database.prepare("SELECT COUNT(*) n FROM message").get() as any).n, 2,
+    "wiadomości weszły mimo awarii bety");
+});
+
+test("odmowa bety (406) wstrzymuje ją dla reszty przebiegu — jedno żądanie, nie dwadzieścia", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  let pytan = 0;
+  await synchronizujAllegroInbox({ database, query: fake([[thread(1), thread(2), thread(3)]]).query,
+    apiUrl: "https://api.test",
+    struktura: async () => {
+      pytan++;
+      throw new Error("Allegro nie akceptuje żadnej znanej wersji zasobu (406/415) dla threads.");
+    } });
+  assert.equal(pytan, 1);
+  assert.equal((database.prepare("SELECT COUNT(*) n FROM allegro_inbox_thread").get() as any).n, 3);
+  _zdejmijWstrzymanieStruktury();
+});
+
+test("odpowiedź bez `type` to nie ten kształt — struktury nie ma", () => {
+  assert.equal(strukturaZOdpowiedzi({ id: "t-1", read: false }), null);
+  assert.equal(strukturaZOdpowiedzi(null), null);
+  assert.deepEqual(strukturaZOdpowiedzi({ type: "COMMON" }),
+    { typ: "COMMON", podtyp: null, status: null, zamowienia: [] });
+});
+
+/* ── Niepewna wysyłka rozstrzyga się sama (22 września 2026) ─────────────────
+   Specyfikacja: timeout po możliwym wysłaniu to UNKNOWN, a przed ponowieniem
+   trzeba go uzgodnić z wiadomościami wychodzącymi. Synchronizacja przynosi
+   naszą odpowiedź — i to ona zamyka wiersz `send_uncertain`. */
+test("nasza wiadomość z synchronizacji zamyka niepewną wysyłkę tej samej treści", async () => {
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, query: fake([[thread(1)]]).query, apiUrl: "https://api.test" });
+  const rozmowa = Number((database.prepare("SELECT id FROM conversation").get() as { id: number }).id);
+  const agent = Number(database.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')")
+    .run().lastInsertRowid);
+  const niepewna = (klucz: string, body: string) => Number(database.prepare(`INSERT INTO outbox
+    (conversation_id,idempotency_key,body,expected_version,status,created_by)
+    VALUES (?,?,?,1,'send_uncertain',?)`).run(rozmowa, klucz, body, agent).lastInsertRowid);
+  const trafiona = niepewna("k-1", "Dzień dobry,\nnóż pasuje.");
+  const inna = niepewna("k-2", "Zupełnie inna odpowiedź");
+
+  const zmieniony = { ...thread(1), lastMessageDateTime: "2026-09-30T12:00:00Z" };
+  const api = fake([[zmieniony]], new Map([["t-1", ["m-t-1", "m-nasza"]]]));
+  await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: async (url) => {
+    const odp = await api.query(url) as { messages?: Array<Record<string, unknown>> };
+    for (const m of odp.messages ?? []) {
+      if (m.id === "m-nasza") {
+        m.author = { login: "my", isInterlocutor: false };
+        m.text = "Dzień dobry, nóż pasuje.";
+      }
+    }
+    return odp;
+  } });
+
+  const w = database.prepare("SELECT id, status, external_message_id FROM outbox ORDER BY id").all() as any[];
+  const t = w.find((x) => x.id === trafiona);
+  assert.equal(t.status, "sent");
+  assert.equal(t.external_message_id, "m-nasza");
+  assert.equal(w.find((x) => x.id === inna).status, "send_uncertain", "inna treść zostaje do decyzji człowieka");
+  assert.ok(database.prepare("SELECT 1 FROM events WHERE type='rozmowa_wysylka_uzgodniona'").get());
 });

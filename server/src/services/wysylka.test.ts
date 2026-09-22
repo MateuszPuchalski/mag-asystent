@@ -485,3 +485,45 @@ test("kolejność załączników nie zmienia klucza — to ten sam zamiar", () =
     kluczIdempotencji(1, 10, "Ten gwint.", ["att-1", "att-2"]),
     kluczIdempotencji(1, 10, "Ten gwint.", ["att-2", "att-1"]));
 });
+
+/* ── Los szkicu Copilota przy wysyłce (22 września 2026) ─────────────────────
+   Specyfikacja mierzy, ile szkiców poszło bez zmian, a ile z poprawkami. To
+   pomiar, nie bramka: wysyłka ma przejść tak samo bez względu na wynik. */
+function szkic(d: DatabaseSync, rozmowa: number, tresc: string, messageId: number) {
+  d.prepare(`INSERT INTO szkic_copilota(conversation_id,tresc,message_id,model,at,przez)
+    VALUES (?,?,?,'claude-opus-5','2026-09-01T07:13:00Z','automat')`).run(rozmowa, tresc, messageId);
+}
+const los = (d: DatabaseSync) =>
+  (d.prepare("SELECT szkic_los FROM outbox ORDER BY id DESC LIMIT 1").get() as { szkic_los: string | null }).szkic_los;
+
+test("szkic wysłany bez zmian i z poprawką — dwa różne losy, a bez szkicu NULL", async () => {
+  const a = stanowisko();
+  szkic(a.d, a.rozmowa, "Dzień dobry,\npasuje.", a.pytanie);
+  await wyslijOdpowiedz({ conversationId: a.rozmowa, autor: autorAli(a.ala),
+    body: "Dzień dobry, pasuje.  ", expectedVersion: 1, expectedLastMessageId: a.pytanie,
+    database: a.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal(los(a.d), "bez_zmian", "biały znak to nie poprawka treści");
+
+  const b = stanowisko();
+  szkic(b.d, b.rozmowa, "Dzień dobry, pasuje.", b.pytanie);
+  await wyslijOdpowiedz({ conversationId: b.rozmowa, autor: autorAli(b.ala),
+    body: "Dzień dobry, pasuje do modelu z 2019.", expectedVersion: 1, expectedLastMessageId: b.pytanie,
+    database: b.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal(los(b.d), "poprawiony");
+
+  const c = stanowisko();
+  await wyslijOdpowiedz({ conversationId: c.rozmowa, autor: autorAli(c.ala),
+    body: "Dzień dobry.", expectedVersion: 1, expectedLastMessageId: c.pytanie,
+    database: c.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal(los(c.d), null);
+});
+
+test("szkic ułożony na STARSZE pytanie nie liczy się do losu", async () => {
+  const { d, ala, rozmowa, pytanie, wiadomosc } = stanowisko();
+  szkic(d, rozmowa, "Dzień dobry, pasuje.", pytanie);
+  const nowe = wiadomosc("A jeszcze jedno pytanie", "m-88215");
+  await wyslijOdpowiedz({ conversationId: rozmowa, autor: autorAli(ala),
+    body: "Dzień dobry, pasuje.", expectedVersion: 1, expectedLastMessageId: nowe,
+    database: d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal(los(d), null);
+});
