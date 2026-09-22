@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.415.0 — 22 września 2026
+
+**Rozmowa reklamacyjna: zdanie klienta na wierzchu, formularz Allegro pod
+spodem.** Zgłoszenie właściciela ze zrzutem sprawy szarpaka. Zrzut pokazał
+przy okazji, że poprawka z 0.412.0 nie zadziałała ani razu.
+
+- **Blizna własna: dubel zgłoszenia liczył się przez RÓWNOŚĆ.** 0.412.0 miało
+  usuwać ramkę „Zgłoszenie", gdy powtarza pierwszą wiadomość klienta —
+  a Allegro wkłada zdanie kupującego w swój formularz („Problem: … / Opis:
+  <zdanie> / Oczekiwane rozwiązanie: …"). Teksty nie są wtedy równe, a dublem
+  są. Liczy się teraz ZAWARCIE, od progu długości, żeby „Dzień dobry" nie
+  uchodziło za opis sprawy. **Test tamtego wydania przechodził, bo karmiono go
+  wymyśloną parą** — ten bierze treść ze zrzutu, słowo w słowo.
+- **Formularz Allegro składa się pod zdanie klienta.** Na wierzchu zostaje
+  pole „Opis", czyli jedyne zdanie, które napisał człowiek; „pokaż całość"
+  rozwija formularz słowo w słowo, z adresem do zwrotu włącznie. Rozpoznajemy
+  go po ETYKIETACH i wymagamy dwóch trafionych — Allegro kiedyś te teksty
+  zmieni i wtedy wiadomość zostaje w całości. Psujemy się w stronę ciszy.
+- **Adresy w treści są odnośnikami.** Automat Allegro odsyła klienta do
+  formularza zwrotu linkiem w wiadomości, a my rysowaliśmy go jako czysty
+  tekst — agent zaznaczał go myszą. Nowa karta, `noopener noreferrer`, bez
+  `dangerouslySetInnerHTML`: treść przychodzi od kupującego i od Allegro.
+- **Kotwica przy najnowszej wiadomości.** Rozmowa czyta się od końca, a ekran
+  otwierał ją na pierwszym zdaniu. Kotwiczymy RAZ NA SPRAWĘ: od 0.410.0
+  wejście w reklamację odświeża ją z Allegro, więc przewijanie przy każdej
+  zmianie wyrywałoby miejsce czytania spod oka.
+- **Czego nie ma i dlaczego:** autoodpowiedź („Dziękujemy za wiadomość…")
+  miała skurczyć się do jednej linijki. Poznać ją można wyłącznie po TREŚCI,
+  a to skasowałoby zdanie, które ktoś napisał ręcznie tak samo — albo wysłał
+  z szablonu. `reklamacja_outbox.external_message_id` odróżnia jedynie
+  „wysłane z panelu" od „wysłane poza panelem", co przy autoodpowiedzi nie
+  mówi nic. Zostaje decyzją właściciela.
+
 ## 0.414.0 — 22 września 2026
 
 **Cztery wydania dokładały warstwę. Żadne nic nie zdjęło.** 0.403.0, 0.404.0,

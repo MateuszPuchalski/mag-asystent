@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { czas, NaglowekSekcji, Pusto } from "../ui";
+import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
    Treść zgłoszenia i czat są tym, po co agent otwiera ten ekran, więc stoją
@@ -89,15 +90,31 @@ export interface SprawaCzatu {
   czatUrwany: boolean;
 }
 
-/**
- * Ten sam tekst mimo innego oddechu — do porównania zgłoszenia z wiadomością.
- *
- * Allegro potrafi oddać jedno zdanie raz ze złamaniami wiersza, raz bez, więc
- * porównanie znak w znak przepuszczałoby dubla przy co drugiej sprawie.
- * Porównujemy SAM TEKST, nigdy jego formatowanie.
- */
-function scisle(t: string): string {
-  return t.replace(/\s+/g, " ").trim();
+/* ── JEDNA WIADOMOŚĆ (0.415.0) ───────────────────────────────────────────────
+   Formularz Allegro składa się pod zdanie klienta, a „pokaż całość" rozwija go
+   słowo w słowo — z adresem do zwrotu włącznie. Chowamy POWTÓRZENIE, nigdy
+   treść: powód, oczekiwanie i tytuł prawny stoją już w głowicy kolumny
+   dowodów, po polsku i w jednym miejscu.
+
+   STAN JEST NA WIADOMOŚCI, nie na osi: rozwinięcie jednego formularza nie ma
+   prawa rozwijać drugiego, a oś bywa jedenastowiadomościowa. */
+function TrescKarty({ tekst }: { tekst: string }) {
+  const [calosc, setCalosc] = useState(false);
+  const formularz = rozbierzFormularz(tekst);
+  if (!formularz || calosc) {
+    return <>
+      <Tresc tekst={tekst} className="mt-1 text-tresc text-slate-800" />
+      {formularz && <button type="button" onClick={() => setCalosc(false)}
+        className="mt-1 text-podpis font-semibold text-slate-600 underline underline-offset-2">
+        zwiń formularz Allegro</button>}
+    </>;
+  }
+  return <>
+    <Tresc tekst={formularz.opis} className="mt-1 text-tresc text-slate-800" />
+    <button type="button" onClick={() => setCalosc(true)}
+      className="mt-1 text-podpis font-semibold text-slate-600 underline underline-offset-2">
+      pokaż całość — formularz Allegro z adresem do zwrotu</button>
+  </>;
 }
 
 export function Czat({ sprawa, czat, zalaczniki, edytor }: {
@@ -114,6 +131,27 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
      i ekran ma to POWIEDZIEĆ, zamiast pokazywać urwaną rozmowę jak całą. */
   const brakuje = Math.max(0, sprawa.wiadomosciIle - czat.length);
 
+  /* ── KOTWICA PRZY NAJNOWSZEJ (0.415.0) ───────────────────────────────────
+     Rozmowa reklamacyjna bywa jedenastowiadomościowa, a czyta się ją od
+     KOŃCA: pierwsze pytanie agenta brzmi „co on napisał ostatnio". Do tego
+     wydania ekran otwierał ją na pierwszej wiadomości i przewijanie było
+     pierwszą czynnością przy każdej sprawie.
+
+     RAZ NA SPRAWĘ, NIE PRZY KAŻDYM RENDERZE, i to jest cała ostrożność tego
+     ruchu. Od 0.410.0 wejście w reklamację odświeża ją z Allegro, więc oś
+     potrafi się przerysować sekundę po otwarciu — przewijanie przy każdej
+     zmianie wyrywałoby agentowi miejsce czytania spod oka. Znacznik pamięta,
+     którą sprawę już zakotwiczyliśmy; rozmowa dociąga się asynchronicznie,
+     więc czekamy z tym na pierwszą wiadomość. */
+  const koniec = useRef<HTMLLIElement | null>(null);
+  const zakotwiczona = useRef<number | null>(null);
+  useEffect(() => {
+    if (czat.length === 0 || zakotwiczona.current === sprawa.id) return;
+    zakotwiczona.current = sprawa.id;
+    /* `jsdom` tej metody nie ma, a i przeglądarka bywa starsza od niej. */
+    koniec.current?.scrollIntoView?.({ block: "nearest" });
+  }, [sprawa.id, czat.length]);
+
   /* ── ZGŁOSZENIE RAZ, NIE DWA (0.412.0) ──────────────────────────────────
      Allegro przy części spraw wpisuje ten sam tekst w dwa miejsca ładunku:
      w opis zgłoszenia i w pierwszą wiadomość kupującego. Ekran pokazywał oba,
@@ -125,11 +163,16 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
      NIE jest dublem — a bywa, bo opis idzie z formularza reklamacji —
      ramka stoi jak dotąd.
 
+     BLIZNA WŁASNA (0.415.0): do tego wydania porównywaliśmy teksty na
+     RÓWNOŚĆ, więc warunek nie trafiał nigdy. Allegro wkłada zdanie klienta
+     w swój formularz, a wtedy dublem jest ZAWARCIE, nie równość. Znalazł to
+     zrzut właściciela, nie test — bo test karmiliśmy wymyśloną parą.
+
      ZAŁĄCZNIKI SPRAWY nie są dublem NIGDY: wiszą na sprawie, nie na
      wiadomości. Dubel zdejmuje więc zdanie, a nie sekcję. */
   const pierwszaKlienta = czat.find((w) => w.autorRola === "BUYER")?.tresc ?? null;
   const dubel = sprawa.opisZgloszenia !== null && pierwszaKlienta !== null
-    && scisle(sprawa.opisZgloszenia) === scisle(pierwszaKlienta);
+    && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
   const opisWart = !dubel;
 
   return <div className="flex min-h-0 flex-col gap-3">
@@ -137,9 +180,10 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
       <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         <NaglowekSekcji jako="h3">
           {opisWart ? "Zgłoszenie" : "Załączniki zgłoszenia"}</NaglowekSekcji>
-        {opisWart && <p className="mt-1 text-sm text-slate-800">
-          {sprawa.opisZgloszenia ?? "Klient nie opisał sprawy własnymi słowami."}
-        </p>}
+        {opisWart && (sprawa.opisZgloszenia === null
+          ? <p className="mt-1 text-sm text-slate-800">
+              Klient nie opisał sprawy własnymi słowami.</p>
+          : <Tresc tekst={sprawa.opisZgloszenia} className="mt-1 text-sm text-slate-800" />)}
         <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
       </section>}
 
@@ -160,12 +204,13 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
       ? <Pusto waga="lista">
           Rozmowy jeszcze nie pobrano.</Pusto>
       : <ol className="flex flex-col gap-2">
-          {czat.map((w) => {
+          {czat.map((w, i) => {
             const rola = ROLE[w.autorRola ?? ""] ?? {
               etykieta: w.autorRola ?? "Nieznany autor",
               klasa: "bg-white border-slate-200", nasza: false,
             };
             return <li key={w.id}
+              ref={i === czat.length - 1 ? koniec : undefined}
               className={`rounded-lg border p-3 ${rola.klasa} ${rola.nasza ? "ml-8" : "mr-8"}`}>
               <div className="flex items-center gap-2 text-xs">
                 <b className="text-slate-700">{rola.etykieta}</b>
@@ -174,7 +219,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 {w.autorLogin && <span className="text-slate-500">{w.autorLogin}</span>}
                 <span className="ml-auto text-slate-500">{czas(w.utworzonoAt)}</span>
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-tresc text-slate-800">{w.tresc}</p>
+              <TrescKarty tekst={w.tresc} />
               <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
             </li>;
           })}
