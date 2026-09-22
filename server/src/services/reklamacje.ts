@@ -1031,6 +1031,15 @@ const slad = (w: Wiersz | undefined): SladHistorii | null => {
  *
  * TA SPRAWA WYPADA z obu liczników — inaczej każda reklamacja mówiłaby
  * o sobie „to już drugi raz przy tym towarze", licząc siebie.
+ *
+ * MIANOWNIKA TU NIE MA I NIE BĘDZIE, dopóki nie zmieni się import. „Trzy
+ * reklamacje na czterysta sprzedanych" i „trzy na cztery" to dwie różne
+ * sprawy, więc odsetek byłby liczbą znacznie lepszą od samego licznika —
+ * tyle że nie da się go policzyć uczciwie. Sprzedaż stoi w `sgt_faktura`,
+ * a ta tabela niesie OKNO `DOK_SPRZEDAZ_DNI_WSTECZ` (domyślnie 60 dni);
+ * reklamacje sięgają lat. Iloraz dwóch liczb o różnych zakresach czasu jest
+ * gorszy od braku ilorazu, bo wygląda na wynik. Odsetek wróci tu dopiero
+ * z oknem sprzedaży obejmującym ten sam okres, co reklamacje.
  */
 export function historiaSprawy(
   database: Db, konto: number, pomin: number,
