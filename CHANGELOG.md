@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.416.0 — 22 września 2026
+
+**[wymaga działania] Błąd taktu nie kładzie już workera Node.** Po `git pull`
+zrestartuj `wertis-worker` — bez restartu proces dalej pada na starym kodzie.
+
+Zgłoszenie właściciela: dziennik pełen jednego wyjątku w kółko.
+
+```
+Error: database is locked
+    at zamelduj (…/services/process-state.js:12:10)
+    at Timeout._onTimeout (…/worker/worker.js:84:5)
+```
+
+Wyjątku rzuconego w wywołaniu zwrotnym timera nie ma kto złapać, więc kładł
+CAŁY proces. NSSM podnosił go z powrotem i kolizja powtarzała się co takt.
+Jeden przejściowy `SQLITE_BUSY` — baza jest otwarta przez trzy procesy — robił
+z tego pętlę restartów, a z nią znikała cała praca tła: kolejka zapisów, powroty
+po dokumentach i meldunek do `/api/health`.
+
+**Zasada była już w tym pliku wypowiedziana, tylko węziej.** Nad `schematGotowy`
+stoi zdanie „Worker CZEKA, zamiast paść. Proces, który pada, NSSM podnosi
+z powrotem — a to jest pętla restartów z wyboru". Tamta bramka chroniła wyłącznie
+przed brakującą tabelą; zablokowana baza przechodziła obok niej na zewnątrz.
+
+**Bliźniak w C# ma ten strażnik od początku** i jego komentarz nazywa dokładnie
+ten przypadek: „błąd ticku (np. chwilowo zablokowana baza) nie ubija usługi".
+Dwie implementacje tej samej pętli rozjechały się na jednym `try`.
+
+Zdanie o błędzie idzie do dziennika przy ZMIANIE stanu, nie co takt — przy
+takcie rzędu sekundy druga droga zapełniłaby log kopiami jednego komunikatu.
+Pierwszy czysty przebieg dopisuje „takt znów przechodzi".
+
+Strażnik czyta ŹRÓDŁO `worker.ts`, bo zaimportowanie tego pliku w teście
+uruchamia workera zamiast go sprawdzić. Sprawdzone, że odmawia: bez `try`
+zestaw `kolejka.test.ts` schodzi na `fail 1`.
+
 ## 0.415.0 — 22 września 2026
 
 **Rozmowa reklamacyjna: zdanie klienta na wierzchu, formularz Allegro pod
