@@ -246,6 +246,23 @@ przed którą ta pozycja broni.
 - [ ] logo nie jest przycięte do kwadratu — wąskie mieści się w całości,
 - [ ] wejście na listę NIE zostawia w dzienniku wpisów o brakującym logo.
 
+**Cofanie pomyłek w dostawie** (0.433.0)
+
+- [ ] po odłożeniu nad listą stoi pasek „ODŁOŻONO … → półka" z COFNIJ,
+- [ ] pasek znika przy następnym skanie towaru,
+- [ ] odłożenie w trybie samolotowym paska NIE pokazuje,
+- [ ] COFNIJ na ostatniej pozycji otwiera dostawę z powrotem,
+- [ ] po COFNIJ pozycja stoi rozwinięta i czeka na skan półki,
+- [ ] ZMIEŃ PÓŁKĘ przyjmuje skan etykiety, a skan EAN odrzuca zdaniem,
+- [ ] na zamkniętej dostawie jest OTWÓRZ PONOWNIE pod WRÓĆ DO LISTY DOSTAW,
+- [ ] dzień później w tym miejscu stoi zdanie zamiast przycisku,
+- [ ] przedwczesne ZAKOŃCZ → OTWÓRZ PONOWNIE → pominięte wracają do pracy,
+- [ ] WYCOFAJ ZGŁOSZENIE działa na własnym zgłoszeniu, na cudzym odmawia,
+- [ ] ustawione 3 z 10 + drugi skan tego samego kartonu → kafel dalej 3,
+- [ ] symbol towaru zeskanowany przy otwartej pozycji NIE zapisuje półki,
+- [ ] przytrzymany spust na etykiecie półki daje JEDEN sygnał zapisu,
+- [ ] ściszony kolektor: błąd wibruje trzy razy, zapis dwa.
+
 **Korekta ilości odłożonej**
 
 - [ ] „POPRAW ILOŚĆ (N)" jest w rozwiniętej pozycji, pod „INNĄ ILOŚCIĄ",

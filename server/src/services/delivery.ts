@@ -13,6 +13,7 @@ import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js"
 import { aliasKodu } from "./ean-alias.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
 import { adnotacjaStrefy } from "./zbiorki.js";
+import { cofnijDlaLinii, mozliwoscOtwarcia, zgloszeniaDoWycofania } from "./cofanie-dostawy.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -31,6 +32,47 @@ import type {
    Zwroty wróciły do obsługi ręcznej w Subiekcie w 0.17.0.                     */
 
 const nowIso = () => new Date().toISOString();
+
+/**
+ * Status pozycji wynikający z samej liczby odłożonych sztuk.
+ *
+ * Jedno źródło dla korekty, cofnięcia i wycofania zgłoszenia. Trzy własne
+ * warunki rozjechałyby się przy pierwszej zmianie, a objawem byłaby pozycja
+ * „odłożona" z zerem sztuk po jednej z tych dróg.
+ */
+export function statusZIlosci(odlozone: number, naDokumencie: number): "done" | "partial" | "todo" {
+  return odlozone >= naDokumencie ? "done" : odlozone > 0 ? "partial" : "todo";
+}
+
+/** Kolumna `delivery_line.cofniecie` — przepis na cofnięcie ostatniego odłożenia. */
+export interface CofniecieOdlozenia {
+  /** Ile sztuk dołożyło to odłożenie. */
+  qty: number;
+  /** Na jaką półkę. */
+  lok: string;
+  /** ZAMIEŃ albo DODAJ — ta sama akcja obowiązuje przy zmianie półki. */
+  akcja: "add" | "replace";
+  /** Pole adresów kartoteki PRZED odłożeniem; cofnięcie wraca do niego. */
+  locsPrzed: string;
+  /**
+   * Zadanie `set_location`, które dziś niesie adres tej pozycji; `null` =
+   * żadne. Zmiana półki podmienia je na nowe, więc to nie zawsze jest
+   * zadanie z samego odłożenia.
+   */
+  queueId: number | null;
+  /** Co to zadanie zapisze w Subiekcie. */
+  pole: string | null;
+  /**
+   * Co zostaje w Subiekcie, gdy to zadanie się anuluje. Po odłożeniu to
+   * `locsPrzed`, ale po zmianie półki na zadaniu JUŻ WYKONANYM jest nim
+   * tamten, błędny zapis — i cofnięcie musi wtedy napisać adres od nowa.
+   */
+  baza: string;
+  lokPrzed: string | null;
+  statusPrzed: string;
+  doneAtPrzed: string | null;
+  doneByPrzed: string | null;
+}
 
 /**
  * Statusy linii, które nie wracają już do rutyny alejkowej.
@@ -449,6 +491,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
   const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
   const adresy = adresyOczekiwane(twIds);
+  const zgloszenia = zgloszeniaDoWycofania(id);
 
   const lines: DeliveryLineView[] = rows
     .map((r) => {
@@ -476,6 +519,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
            na trzydziestu pozycjach — wtedy trzeba wariantu zbiorczego,
            wzorem `adresyOczekiwane` wyżej. */
         zlotaStrefa: adnotacjaStrefy(r.tw_id) ?? undefined,
+        cofnij: cofnijDlaLinii(r),
+        zgloszenie: zgloszenia.get(r.id) ?? null,
       };
     })
     .sort(porownajAlejkowo);
@@ -502,6 +547,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
     nrPrzesylki: d.nr_przesylki ?? null,
     kurierProtokol: d.kurier_protokol ?? null,
     notatki: notatkiDokumentu(d.sgt_dok_id),
+    otwarcie: d.status === "done" ? mozliwoscOtwarcia(d.id) : null,
     lines,
   };
 }
@@ -618,6 +664,11 @@ function toResolution(
       stanMag: stan?.mag ?? 0,
       stanMgp: stan?.mgp ?? 0,
       aisle: oczekiwany ? String(oczekiwany)[0] : null,
+      /* Skan otwiera panel z TEJ odpowiedzi, nie z listy — bez tych dwóch pól
+         rozwinięta pozycja nie pokazałaby COFNIJ ani WYCOFAJ aż do
+         najbliższego odświeżenia całej dostawy. */
+      cofnij: cofnijDlaLinii(line),
+      zgloszenie: zgloszeniaDoWycofania(line.delivery_id).get(line.id) ?? null,
     },
   };
 }
@@ -674,6 +725,7 @@ export function putawayLine(
   const t = subiekt.getProductById(line.tw_id);
   const current = parseLocs(t?.lokalizacja);
   let queueId: number | undefined;
+  let zapisanePole: string | null = null;
   /* Warunek zapisu ZALEŻY OD AKCJI i to nie jest drobiazg.
 
      Przy `replace` pytanie brzmi „czy ten kod jest już pickingowy", bo tylko
@@ -718,19 +770,37 @@ export function putawayLine(
       label: "Lokalizacja · " + (t?.symbol ?? line.tw_id),
       detail: `${code} (dostawa)`,
     }, { locsPrzed: t?.lokalizacja ?? "", zrodlo: "dostawa" });
+    zapisanePole = pole;
   }
 
   // skan półki jest zarazem potwierdzeniem POLICZONEJ ilości: w tej firmie
   // rozkładanie JEST sprawdzaniem faktury i liczy się każdą pozycję. Rozbieżność
   // zgłasza się osobno („INNA ILOŚĆ" → wyjątek ilościowy), więc dojście tutaj
   // znaczy „policzyłem, zgadza się".
+  /* Przepis na cofnięcie TEGO odłożenia — patrz `services/cofanie-dostawy.ts`.
+     Odłożenie kosztuje jeden skan i tak ma zostać, więc pomyłka musi dać się
+     odwrócić równie tanio. Stan sprzed zapisu zna tylko ta chwila: później
+     ani ilość, ani pole adresów nie mówią już, co było przedtem. */
+  const cofniecie: CofniecieOdlozenia = {
+    qty: putQty,
+    lok: code,
+    akcja: locAction,
+    locsPrzed: t?.lokalizacja ?? "",
+    queueId: queueId ?? null,
+    pole: zapisanePole,
+    baza: t?.lokalizacja ?? "",
+    lokPrzed: line.lok_faktyczna ?? null,
+    statusPrzed: line.status,
+    doneAtPrzed: line.done_at ?? null,
+    doneByPrzed: line.done_by ?? null,
+  };
   db()
     .prepare(
       `UPDATE delivery_line
-       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?
+       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?, cofniecie=?
        WHERE id=?`
     )
-    .run(doneQty, code, status, nowIso(), user, lineId);
+    .run(doneQty, code, status, nowIso(), user, JSON.stringify(cofniecie), lineId);
 
   /* Kod wpisany z ręki = sygnał zniszczonej etykiety regału. Ten sam kształt
      zdarzenia co przy ręcznym skanie (`manual_entry` w routes/products.ts),
@@ -858,6 +928,7 @@ function zglosNadmiary(deliveryId: number, user: string): void {
         qty: n.qtyDone,
         opis: `Nadmiar w dostawie: odłożono ${n.qtyDone} przy ${n.qtyDoc} z dokumentu`,
         zachowajStatusLinii: true,
+        zrodlo: "nadmiar",
       },
       user
     );
@@ -1212,6 +1283,7 @@ export function zakonczDostawe(
         typ: "qty_mismatch",
         qty: b.qtyDone,
         opis: `Zakończenie dostawy: odłożono ${b.qtyDone} z ${b.qtyDoc}`,
+        zrodlo: "zakonczenie",
       },
       user
     );
@@ -1295,7 +1367,11 @@ export function korygujIlosc(
   // po zamknięciu dostawa bywa już policzona w protokole rozbieżności
   if (l.stanDostawy !== "open") return { error: "Dostawa jest już zamknięta" };
   if (l.status === "problem") {
-    return { error: "Pozycja ma zgłoszony wyjątek — najpierw rozwiąż go w wyjątkach" };
+    /* Do tego wydania stało tu „najpierw rozwiąż go w wyjątkach" — i było
+       nieprawdą: rozwiązanie przez biuro NIE zdejmuje z pozycji stanu
+       `problem`, więc korekta odmawiała dalej. Droga, która działa, to
+       wycofanie własnego zgłoszenia (`cofanie-dostawy.ts`). */
+    return { error: "Pozycja ma zgłoszony wyjątek — jeśli to pomyłka, wycofaj zgłoszenie przy pozycji" };
   }
   /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
      z dopuszczeniem nadmiaru przy odkładaniu: skoro `+` wolno przekroczyć
@@ -1304,9 +1380,13 @@ export function korygujIlosc(
      wystawiona za własną pomyłkę w liczeniu. */
 
   const przed = l.ilosc_odlozona ?? 0;
-  const status = qty >= l.ilosc_dok ? "done" : qty > 0 ? "partial" : "todo";
+  const status = statusZIlosci(qty, l.ilosc_dok);
+  /* Korekta KASUJE przepis na cofnięcie ostatniego odłożenia. Po niej liczba
+     na pozycji nie wynika już z tamtego skanu, więc odjęcie jego ilości
+     dałoby wynik, którego nikt nie wpisał. Adres zostaje poprawialny przez
+     ZMIEŃ PÓŁKĘ do tej chwili, a potem przez kartę towaru. */
   db()
-    .prepare("UPDATE delivery_line SET ilosc_odlozona=?, status=? WHERE id=?")
+    .prepare("UPDATE delivery_line SET ilosc_odlozona=?, status=?, cofniecie=NULL WHERE id=?")
     .run(qty, status, lineId);
 
   logEvent("putaway_qty_fixed", user, l.tw_id, {

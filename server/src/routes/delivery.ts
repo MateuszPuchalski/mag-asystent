@@ -12,6 +12,7 @@ import {
   zakonczDostawe,
 } from "../services/delivery.js";
 import { odpowiedzNaNotatke } from "../services/notatki.js";
+import { cofnijOdlozenie, otworzPonownie, zmienPolke } from "../services/cofanie-dostawy.js";
 import type { LocApplyAction } from "../types.js";
 
 /* ── Rozkładanie faktur zakupu (redesign v2.0) ───────────────────────────────
@@ -107,6 +108,51 @@ export async function deliveryRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const r = korygujIlosc(Number(req.params.lineId), Number(req.body?.qty), userOf(req));
       if ("error" in r) return reply.code(400).send(r);
+      return r;
+    }
+  );
+
+  /* ── Drogi powrotu z pomyłki (patrz `services/cofanie-dostawy.ts`) ──────────
+     Bez bramki roli, jak korekta ilości: to poprawianie własnej pracy, a nie
+     orzeczenie o niczym. Każda droga zostawia zdarzenie z nazwiskiem.
+     Dwie pierwsze są BEZ CIAŁA — kolektor wysyła je bez typu treści. */
+
+  /** Cofnij ostatnie odłożenie pozycji; otwiera dostawę, jeśli je domknęło. */
+  app.post<{ Params: { id: string; lineId: string } }>(
+    "/api/delivery/:id/lines/:lineId/cofnij",
+    async (req, reply) => {
+      const r = cofnijOdlozenie(Number(req.params.lineId), userOf(req));
+      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      /* Pozycja po cofnięciu jedzie w odpowiedzi. Następny ruch człowieka to
+         skan właściwej półki, więc kolektor otwiera ją od razu — bez drugiego
+         skanu towaru, który przy powtórzonym towarze trafiłby w inny wiersz. */
+      const line = getDelivery(Number(req.params.id))?.lines.find(
+        (l) => l.id === Number(req.params.lineId)
+      );
+      return { ...r, line: line ?? null };
+    }
+  );
+
+  /** Otwórz zamkniętą dostawę z powrotem — w dniu zamknięcia. */
+  app.post<{ Params: { id: string } }>(
+    "/api/delivery/:id/otworz-ponownie",
+    async (req, reply) => {
+      const r = otworzPonownie(Number(req.params.id), userOf(req));
+      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+      return r;
+    }
+  );
+
+  /** Przenieś adres ostatniego odłożenia na właściwą półkę. */
+  app.post<{ Params: { id: string; lineId: string }; Body: { location?: string; recznie?: boolean } }>(
+    "/api/delivery/:id/lines/:lineId/polka",
+    async (req, reply) => {
+      const location = req.body?.location;
+      if (!location) return reply.code(400).send({ error: "Brak kodu lokalizacji" });
+      const r = zmienPolke(Number(req.params.lineId), location, userOf(req), {
+        recznie: req.body?.recznie === true,
+      });
+      if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
       return r;
     }
   );

@@ -120,6 +120,11 @@ export function przesunStan(
       // zwykłe rozkładanie, więc wołamy je, zamiast pisać drugą kopię
       const r = putawayLine(input.lineId, kod!, user, { qty: input.qty });
       if ("error" in r) throw new Error(r.error);
+      /* To odłożenie NIE dostaje COFNIJ ani ZMIEŃ PÓŁKĘ. Niesie MM, które
+         robi towar sprzedawalnym, a cofanie w `cofanie-dostawy.ts` zna tylko
+         zapis adresu. Cofnięcie samej linii zostawiłoby stan przesunięty pod
+         pozycją „nieodłożoną". Pomyłkę przy przesunięciu poprawia biuro. */
+      db().prepare("UPDATE delivery_line SET cofniecie = NULL WHERE id = ?").run(input.lineId);
       if (r.queueId) queueIds.push(r.queueId);
     } else if (kod) {
       const biezace = parseLocs(towar.lokalizacja);

@@ -638,7 +638,23 @@ data class DeliveryLineView(
      * reguły. Starszy serwer tego pola nie wysyła i to też jest `null`.
      */
     val zlotaStrefa: ZlotaStrefa? = null,
+    /**
+     * Ostatnie odłożenie, które da się jeszcze cofnąć; `null` = nie ma czego
+     * (pozycja nietknięta, po korekcie albo po cofnięciu). Starszy serwer
+     * tego pola nie wysyła, więc przycisku wtedy po prostu nie ma.
+     */
+    val cofnij: CofnijOdlozenie? = null,
+    /** Najnowsze nierozstrzygnięte zgłoszenie człowieka przy tej pozycji. */
+    val zgloszenie: ZgloszenieLinii? = null,
 )
+
+/** Co cofnie COFNIJ: ile sztuk i z której półki. */
+@Serializable
+data class CofnijOdlozenie(val qty: Double = 0.0, val lok: String = "")
+
+/** Zgłoszenie przy pozycji, które jego autor może wycofać. */
+@Serializable
+data class ZgloszenieLinii(val id: Long, val typLabel: String = "", val autor: String = "")
 
 @Serializable
 data class DeliveryProgress(
@@ -669,8 +685,17 @@ data class DeliveryView(
      * przesuwać" — kolektor nie musi wtedy znać identyfikatorów z konfiguracji.
      */
     val sourceMagId: Long? = null,
+    /**
+     * Czy zamkniętą dostawę da się otworzyć ponownie. `null` na otwartej
+     * i u starszego serwera. Powód przychodzi gotowym zdaniem — ekran ma go
+     * pokazać zamiast przycisku, który by odmówił.
+     */
+    val otwarcie: OtwarcieDostawy? = null,
     val lines: List<DeliveryLineView> = emptyList(),
 )
+
+@Serializable
+data class OtwarcieDostawy(val mozna: Boolean = false, val powod: String? = null)
 
 @Serializable
 data class OpenDeliveryResponse(val deliveryId: Long)
@@ -767,6 +792,34 @@ data class OdpowiedzBody(val odpowiedz: String)
  */
 @Serializable
 data class KorektaBody(val qty: Double)
+
+/* ── Drogi powrotu z pomyłki (serwer: `services/cofanie-dostawy.ts`) ───────
+   `adres` mówi, co stało się z adresem w Subiekcie: `anulowany` — błędny
+   zapis nie wyszedł; `zapisany` — poszedł zapis poprawiający; `bez_zmian` —
+   odłożenie adresu nie zmieniało. Ekran mówi to człowiekowi, bo od tego
+   zależy, czy karta towaru pokaże nowy adres od razu, czy po kolejce.      */
+
+@Serializable
+data class CofniecieOdlozeniaResponse(
+    val ok: Boolean = true,
+    val adres: String = "bez_zmian",
+    /** To odłożenie domknęło dostawę, a cofnięcie ją otworzyło. */
+    val otwartaPonownie: Boolean = false,
+    /** Pozycja po cofnięciu — ekran otwiera ją od razu do ponownego skanu. */
+    val line: DeliveryLineView? = null,
+)
+
+@Serializable
+data class ZmianaPolkiBody(val location: String, val recznie: Boolean? = null)
+
+@Serializable
+data class ZmianaPolkiResponse(val ok: Boolean = true, val lok: String = "", val adres: String = "bez_zmian")
+
+@Serializable
+data class OtwarcieResponse(val ok: Boolean = true, val wycofane: Int = 0, val przywrocone: Int = 0)
+
+@Serializable
+data class WycofanieResponse(val ok: Boolean = true, val statusLinii: String? = null)
 
 @Serializable
 data class PutawayLineBody(

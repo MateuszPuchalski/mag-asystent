@@ -1234,7 +1234,15 @@ CREATE TABLE IF NOT EXISTS delivery_line (
   lok_faktyczna  TEXT,                          -- zeskanowana (fakt, nie intencja — D3)
   status         TEXT NOT NULL DEFAULT 'todo',  -- todo | done | partial | problem | skipped
   done_at        TEXT,
-  done_by        TEXT
+  done_by        TEXT,
+  -- Jak cofnąć OSTATNIE odłożenie tej pozycji (JSON). NULL = nie ma czego
+  -- cofać: pozycja nietknięta, cofnięta albo poprawiona korektą ilości.
+  -- Trzymane przy pozycji, nie wyczytywane z `events`: dziennik jest zapisem
+  -- tego, co się stało, a nie źródłem stanu, z którego coś się jeszcze liczy.
+  -- Niesie ilość, stan pozycji sprzed odłożenia, pole adresów sprzed zapisu
+  -- i numer zadania kolejki — bez tego ostatniego cofnięcie nie wie, czy
+  -- adres dotarł już do Subiekta.
+  cofniecie      TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
@@ -1306,7 +1314,13 @@ CREATE TABLE IF NOT EXISTS problem (
   -- zdarzeń, a hala i tak nie widziała rozstrzygnięcia w ogóle. Gdy zaczyna je
   -- widzieć, „biuro zamknęło" bez nazwiska jest gorsze niż cisza: magazynier
   -- ma iść z pytaniem do człowieka, nie do tabeli.
-  resolved_by   TEXT
+  resolved_by   TEXT,
+  -- Skąd zgłoszenie. NULL = złożył je człowiek przy palecie. `zakonczenie`
+  -- i `nadmiar` powstają SAME przy zamknięciu dostawy (braki z przycisku
+  -- ZAKOŃCZ, nadmiar przy domknięciu). Rozróżnienie jest po to, żeby ponowne
+  -- otwarcie dostawy wycofało wyłącznie to, co zrobiło samo zamknięcie —
+  -- a zostawiło twierdzenia człowieka, których nikt nie cofał.
+  zrodlo        TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))
 );
 CREATE INDEX IF NOT EXISTS ix_problem_delivery ON problem(delivery_id);
 -- lista „nierozwiązane" jest odpytywana przy każdym starcie aplikacji

@@ -155,6 +155,14 @@ export interface RaiseProblemInput {
    * Pomija też `closeIfComplete`: wywołanie idzie już Z WNĘTRZA zamykania.
    */
   zachowajStatusLinii?: boolean;
+  /**
+   * Zgłoszenie powstało SAMO przy zamknięciu dostawy, nie z ręki człowieka.
+   *
+   * Ponowne otwarcie dostawy wycofuje wyłącznie takie zgłoszenia. Braki
+   * z ZAKOŃCZ i nadmiar z domknięcia są skutkiem zamknięcia, więc znikają
+   * razem z nim; twierdzenie człowieka zostaje, dopóki on sam go nie wycofa.
+   */
+  zrodlo?: "zakonczenie" | "nadmiar";
 }
 
 /**
@@ -364,8 +372,8 @@ export function raiseProblem(
     db()
       .prepare(
         `INSERT INTO problem(delivery_id, line_id, typ, ilosc, sym_obcy, zamiast_ilosc,
-                             ilosc_dok, opis, foto_ref, created_at, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+                             ilosc_dok, opis, foto_ref, created_at, created_by, zrodlo)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         input.deliveryId,
@@ -378,7 +386,8 @@ export function raiseProblem(
         input.opis ?? null,
         fotoRef,
         nowIso(),
-        user
+        user,
+        input.zrodlo ?? null
       ).lastInsertRowid
   );
 

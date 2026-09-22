@@ -1,5 +1,6 @@
 package pl.wertis.kolektor.ui.delivery
 
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,6 +72,9 @@ import pl.wertis.kolektor.core.loc.normalizeLoc
 import pl.wertis.kolektor.core.loc.validateLoc
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.KorektaBody
+import pl.wertis.kolektor.core.net.CofniecieOdlozeniaResponse
+import pl.wertis.kolektor.core.net.ZgloszenieLinii
+import pl.wertis.kolektor.core.net.ZmianaPolkiBody
 import pl.wertis.kolektor.core.net.LocationsInfo
 import pl.wertis.kolektor.core.offline.PendingOp
 import pl.wertis.kolektor.core.offline.PutawayOp
@@ -166,6 +170,28 @@ fun DeliveryLinesScreen(graph: AppGraph) {
     /** Pozycja, której ilość odłożoną właśnie poprawiamy (0.45.0). */
     var korektaDla by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
 
+    /** Pozycja, której półkę poprawiamy po odłożeniu — `null` = arkusz zamknięty. */
+    var polkaDla by remember(id) { mutableStateOf<DeliveryLineView?>(null) }
+
+    /**
+     * Ostatnie odłożenie z TEJ wizyty na ekranie — źródło paska COFNIJ.
+     *
+     * Po zapisie wiersz zwija się i zjeżdża na dół listy, a zielony błysk
+     * trwa półtorej sekundy. Pomyłkę widzi się zwykle chwilę później, już
+     * z pustymi rękami, i do tego audytu trzeba było wtedy szukać wiersza
+     * na dole listy. Pasek stoi nad listą aż do następnego skanu towaru.
+     *
+     * Tylko po zapisie PRZYJĘTYM przez serwer. Odłożenie z bufora offline
+     * serwer jeszcze nie zna, więc nie ma czego u niego cofać.
+     */
+    var ostatnie by remember(id) { mutableStateOf<OstatnieOdlozenie?>(null) }
+
+    /* Kod półki i chwila ostatniego zapisu — do połknięcia DUBLA skanu.
+       Przytrzymany spust skanera daje dwa odczyty tej samej etykiety. Drugi
+       trafiał w ekran bez otwartej pozycji i grał ton BŁĘDU tuż po tonie
+       zapisu, więc człowiek słyszał „nie wyszło" o czymś, co wyszło. */
+    var ostatniZapis by remember(id) { mutableStateOf<Pair<String, Long>?>(null) }
+
     /** Filtr listy pozycji — patrz komentarz przy `widoczne`. */
     var szukane by rememberSaveable(id) { mutableStateOf("") }
 
@@ -249,8 +275,15 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             when (val r = apiCall { graph.api.deliveryScan(id, ScanBody(code)) }) {
                 is ScanResolution.Line -> {
                     graph.feedback.beep(true)
+                    /* Drugi skan TEJ SAMEJ pozycji nie kasuje ustawionej części.
+                       Do audytu z 22 września 2026 kasował: człowiek ustawiał
+                       3 z 10, skaner łapał karton drugi raz, kafel wracał do
+                       10 z sygnałem sukcesu, a skan półki odkładał wszystko.
+                       Część należy do jednej pozycji, więc inna pozycja nadal
+                       zaczyna od całej reszty. */
+                    if (active?.id != r.line.id) czesc = null
                     active = r.line
-                    czesc = null
+                    ostatnie = null
                 }
                 is ScanResolution.Conflict -> {
                     graph.feedback.beep(false)
@@ -338,6 +371,13 @@ fun DeliveryLinesScreen(graph: AppGraph) {
             active = null
             czesc = null
             mismatch = null
+            ostatniZapis = code to SystemClock.elapsedRealtime()
+            ostatnie = if (res.offline) null else OstatnieOdlozenie(
+                lineId = line.id,
+                sym = line.sym,
+                ilosc = iloscZJednostka(ile ?: (line.qtyDoc - line.qtyDone).coerceAtLeast(0.0), line.unit),
+                polka = code,
+            )
             if (res.offline) {
                 /* Bez sieci świeży odczyt nie przyjdzie, a lista musi iść
                    dalej — pozycję odhaczamy w kopii widoku z cache, którą
@@ -423,7 +463,7 @@ fun DeliveryLinesScreen(graph: AppGraph) {
        a nie na pytanie „czego zapomniano". */
     val arkuszOtwarty = mismatch != null || problemOpen || conflict != null ||
         korektaDla != null || zakonczenie != null || notatkaOtwarta != null ||
-        eanDla != null || przesunFor != null
+        eanDla != null || przesunFor != null || polkaDla != null
 
     ScanHandlerEffect { scan ->
         if (arkuszOtwarty) {
@@ -434,7 +474,25 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         }
         val line = active
         if (line != null && scan.kind != ScanKind.EAN) {
-            scope.launch { putaway(line, normalizeLoc(scan.code)) }
+            val code = normalizeLoc(scan.code)
+            /* Kod, którego kolektor nie rozpoznał jako adresu, przechodzi tę
+               samą walidację co wpis ręczny. Do audytu szedł wprost do zapisu:
+               symbol towaru z etykiety kartonu pytał o rozjazd półek, a offline
+               lądował w buforze z sygnałem sukcesu i odpadał dopiero później. */
+            val err = if (scan.kind == ScanKind.LOC) null else validateLoc(code, locInfo)
+            if (err != null) {
+                graph.feedback.beep(false)
+                graph.effects.toast("$err — zeskanuj etykietę regału")
+                return@ScanHandlerEffect true
+            }
+            scope.launch { putaway(line, code) }
+        } else if (scan.kind == ScanKind.LOC &&
+            ostatniZapis?.let { (kod, kiedy) ->
+                kod == normalizeLoc(scan.code) && SystemClock.elapsedRealtime() - kiedy < DUBEL_SKANU_MS
+            } == true
+        ) {
+            // dubel skanu tej samej etykiety — zapis już dał swój sygnał,
+            // drugi byłby tonem błędu o czymś, co się udało
         } else if (scan.kind == ScanKind.LOC) {
             /* Etykieta regału bez otwartej pozycji. Do 0.388.1 leciała do
                `resolveProduct`, wracała jako „nieznany kod" i aplikacja
@@ -453,12 +511,6 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         true
     }
 
-    val v = view
-    if (v == null) {
-        LoadingRow("Wczytywanie dostawy…")
-        return
-    }
-
     /* Zwinięcie wiersza. Od 0.47.0 jest to czynność WYŁĄCZNIE ekranowa: skan
        nie zajmuje już pozycji, więc nie ma czego oddawać serwerowi. Funkcja
        zostaje, bo zamykanie panelu wygląda tak samo w pięciu miejscach. */
@@ -466,6 +518,71 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         active = null
         czesc = null
         mismatch = null
+    }
+
+    /* ── Drogi powrotu z pomyłki (serwer: `services/cofanie-dostawy.ts`) ──────
+       Każda kończy się tym samym: sygnał zapisu, zdanie o skutku i świeży
+       odczyt dostawy. Błąd ma ton błędu i zdanie serwera — ten mówi, co zrobić
+       zamiast (np. „najpierw OTWÓRZ PONOWNIE"). */
+    fun wPowrocie(akcja: suspend () -> Unit) {
+        scope.launch {
+            if (busy) return@launch
+            busy = true
+            try {
+                akcja()
+                graph.feedback.zapis()
+                reload++
+                graph.queueRepo.refreshNow()
+            } catch (e: Exception) {
+                graph.feedback.beep(false)
+                graph.effects.toast(e.message ?: "Nie udało się — spróbuj jeszcze raz")
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun cofnij(lineId: Long, sym: String) = wPowrocie {
+        val r = apiCall { graph.api.deliveryCofnij(id, lineId) }
+        ostatnie = null
+        graph.effects.toast(opisCofniecia(sym, r))
+        /* Pozycja wraca OTWARTA: następny ruch to skan właściwej półki, a drugi
+           skan towaru przy powtórzonym towarze trafiłby w inny wiersz. */
+        r.line?.let {
+            active = it
+            czesc = null
+        }
+    }
+
+    fun zmienPolke(linia: DeliveryLineView, kod: String, recznie: Boolean) = wPowrocie {
+        val r = apiCall {
+            graph.api.deliveryZmienPolke(id, linia.id, ZmianaPolkiBody(kod, recznie.takeIf { it }))
+        }
+        polkaDla = null
+        zwolnij(linia)
+        ostatnie = ostatnie?.let { o -> if (o.lineId == linia.id) o.copy(polka = r.lok) else o }
+        graph.effects.toast("${linia.sym} przeniesiony na ${r.lok}")
+    }
+
+    fun otworzPonownie() = wPowrocie {
+        val r = apiCall { graph.api.deliveryOtworzPonownie(id) }
+        graph.effects.toast(
+            "Dostawa znów otwarta" +
+                (if (r.wycofane > 0) " · wycofane zgłoszenia: ${r.wycofane}" else "") +
+                (if (r.przywrocone > 0) " · wraca do pracy: ${r.przywrocone} poz." else "")
+        )
+    }
+
+    fun wycofaj(linia: DeliveryLineView, z: ZgloszenieLinii) = wPowrocie {
+        apiCall { graph.api.wycofajZgloszenie(z.id) }
+        zwolnij(linia)
+        graph.effects.toast("Zgłoszenie „${z.typLabel}” wycofane — ${linia.sym} wraca do pracy")
+    }
+
+    val v = view
+    if (v == null) {
+        LoadingRow("Wczytywanie dostawy…")
+        return
     }
 
     /* Do zrobienia na górze, bez lokalizacji pośrodku, ODŁOŻONE NA DOLE.
@@ -518,284 +635,318 @@ fun DeliveryLinesScreen(graph: AppGraph) {
         if (indeksAktywnej >= 0) listState.animateScrollToItem(indeksAktywnej + 1)
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        item(key = "szapka") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // nagłówek dostawy + postęp
-                Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp)) {
-                    Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
-                    Text(v.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(
-                            Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(CardBorder),
+    /* Pasek COFNIJ stoi NAD listą, poza przewijaniem. Wiersz odłożonej
+       pozycji zjeżdża na dół, a lista przewija się do następnej — pasek
+       w środku listy uciekałby razem z nimi. Góra ekranu jest daleko od
+       kciuka, i dobrze: cofnięcie jest czynnością rzadką (dekalog, punkt 4). */
+    Column(Modifier.fillMaxSize()) {
+        ostatnie?.takeIf { active == null }?.let { o ->
+            PasekCofnij(
+                ostatnie = o,
+                busy = busy,
+                onCofnij = { cofnij(o.lineId, o.sym) },
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp),
+            )
+        }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item(key = "szapka") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // nagłówek dostawy + postęp
+                    Column(Modifier.fillMaxWidth().cardSurface().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text(v.nrPelny, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+                        Text(v.dostawca, fontSize = 12.sp, color = InkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            val frac = if (v.progress.total > 0) v.progress.done.toFloat() / v.progress.total else 0f
                             Box(
-                                Modifier.fillMaxWidth(frac).height(6.dp).clip(RoundedCornerShape(50))
-                                    .background(if (v.progress.remaining == 0) Success else Amber),
+                                Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(CardBorder),
+                            ) {
+                                val frac = if (v.progress.total > 0) v.progress.done.toFloat() / v.progress.total else 0f
+                                Box(
+                                    Modifier.fillMaxWidth(frac).height(6.dp).clip(RoundedCornerShape(50))
+                                        .background(if (v.progress.remaining == 0) Success else Amber),
+                                )
+                            }
+                            /* „ZOSTAŁO N" zamiast samego „done/total". Lista jest
+                               kontrolą kompletności, więc liczbą, po którą sięga
+                               oko, jest ta, ile jeszcze leży w kartonie. */
+                            Text(
+                                if (v.progress.remaining == 0) "KOMPLET" else "zostało ${v.progress.remaining}",
+                                fontFamily = BarlowCond,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 17.sp,
+                                color = if (v.progress.remaining == 0) Success else Ink,
+                            )
+                            Text("${v.progress.done}/${v.progress.total}", fontSize = 11.sp, color = InkMute)
+                        }
+                        // wyjątki na tej dostawie nie mają prawa zniknąć z oczu (D8)
+                        if (v.progress.problems > 0) {
+                            Text(
+                                "${v.progress.problems} ${if (v.progress.problems == 1) "pozycja z problemem" else "pozycje z problemem"}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Destructive,
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                         }
-                        /* „ZOSTAŁO N" zamiast samego „done/total". Lista jest
-                           kontrolą kompletności, więc liczbą, po którą sięga
-                           oko, jest ta, ile jeszcze leży w kartonie. */
+                    }
+
+                    /* Dawniej stało tu „lista jest ułożona wg alejek". Zdanie było
+                       prawdziwe (serwer dalej tak sortuje), ale opisywało coś, po
+                       czym nikt nie pracuje: pozycje bierze się z kartonu w takiej
+                       kolejności, w jakiej wpadną w rękę, i skanuje. */
+                    /* Notatki biura STOJĄ NA GÓRZE, przed podpowiedzią o skanie.
+                       Pytanie „czy dosłali brakujące 3 sztuki" trzeba przeczytać
+                       ZANIM się zacznie, bo odpowiedź bierze się z oglądania
+                       palety — a nie z pamięci pół godziny później. */
+                    v.notatki.forEach { n ->
+                        NotatkaCard(n) { notatkaOtwarta = n }
+                    }
+
+                    Text(
+                        "Zeskanuj towar z palety — w dowolnej kolejności",
+                        fontSize = 12.sp,
+                        color = InkSoft,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    /* Pole filtra pod podpowiedzią o skanie, a nie nad nią: skan
+                       zostaje drogą pierwszą i ma być pierwszy także wzrokiem.
+                       Lista zawęża się przy pisaniu, więc „gotowe" niczego nie
+                       zatwierdza — ODDAJE FOKUS, a to jest tu cała rzecz. */
+                    WertisTextField(
+                        value = szukane,
+                        onValueChange = { szukane = it },
+                        placeholder = "Szukaj w dostawie: symbol albo nazwa…",
+                        leadingIcon = WIcons.Search,
+                        onFokus = { szukaneMaFokus = it },
+                    )
+                    /* SKANER MILCZY, DOPÓKI PISZESZ — i człowiek ma o tym wiedzieć
+                       (0.66.0). `WedgeKeySource` zbiera znaki wyłącznie wtedy, gdy
+                       nie ma ich gdzie wpisać, więc pole z fokusem ucisza skaner.
+                       Bez tego paska kolektor wyglądał na zepsuty: klawiatura
+                       schowana, a skan towaru i regału nie robi nic.
+
+                       Przycisk, nie sama podpowiedź: „gotowe" na klawiaturze
+                       ekranowej trzeba najpierw znaleźć, a robi się to w rękawicy. */
+                    if (szukaneMaFokus) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                "Skaner milczy, dopóki piszesz",
+                                fontSize = 11.sp,
+                                color = AmberInk,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            OutlineButton("GOTOWE") { fokusEkranu.clearFocus() }
+                        }
+                    }
+                    if (szukaneN.isNotEmpty()) {
                         Text(
-                            if (v.progress.remaining == 0) "KOMPLET" else "zostało ${v.progress.remaining}",
+                            if (uporzadkowane.isEmpty()) {
+                                "Brak pozycji dla „$szukane” — dostawa ma ${v.lines.size} poz."
+                            } else {
+                                "${uporzadkowane.size} z ${v.lines.size} poz."
+                            },
+                            fontSize = 11.sp,
+                            color = InkMute,
+                        )
+                        OutlineButton(
+                            "POKAŻ WSZYSTKIE POZYCJE",
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { szukane = "" },
+                        )
+                    }
+
+                    /* Dostawa ZAMKNIĘTA — stan końcowy zamiast przycisku, który
+                       musiałby odmówić. Domknięcie dzieje się SAMO po ostatniej
+                       pozycji (`closeIfComplete` na serwerze), więc to nie jest
+                       rzadki przypadek brzegowy, tylko najczęstsze zakończenie
+                       pracy: człowiek odkłada ostatnią sztukę i dostawa jest już
+                       zamknięta, zanim sięgnie po przycisk.
+
+                       Do 0.54.0 ekran tego nie wiedział — `status` przychodził
+                       w danych i nie był czytany. „ZAKOŃCZ DOSTAWĘ" stało dalej,
+                       dostawało 400 „Ta dostawa jest już zamknięta", a powrót na
+                       listę leżał wyłącznie na ścieżce sukcesu. Objaw ze
+                       zgłoszenia: dostawa zamknięta, ekran nie do opuszczenia. */
+                    if (v.status != "open") {
+                        Text(
+                            "DOSTAWA ZAKOŃCZONA",
                             fontFamily = BarlowCond,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 17.sp,
-                            color = if (v.progress.remaining == 0) Success else Ink,
-                        )
-                        Text("${v.progress.done}/${v.progress.total}", fontSize = 11.sp, color = InkMute)
-                    }
-                    // wyjątki na tej dostawie nie mają prawa zniknąć z oczu (D8)
-                    if (v.progress.problems > 0) {
-                        Text(
-                            "${v.progress.problems} ${if (v.progress.problems == 1) "pozycja z problemem" else "pozycje z problemem"}",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Destructive,
+                            fontSize = 15.sp,
+                            color = Success,
                             modifier = Modifier.padding(top = 4.dp),
                         )
-                    }
-                }
-
-                /* Dawniej stało tu „lista jest ułożona wg alejek". Zdanie było
-                   prawdziwe (serwer dalej tak sortuje), ale opisywało coś, po
-                   czym nikt nie pracuje: pozycje bierze się z kartonu w takiej
-                   kolejności, w jakiej wpadną w rękę, i skanuje. */
-                /* Notatki biura STOJĄ NA GÓRZE, przed podpowiedzią o skanie.
-                   Pytanie „czy dosłali brakujące 3 sztuki" trzeba przeczytać
-                   ZANIM się zacznie, bo odpowiedź bierze się z oglądania
-                   palety — a nie z pamięci pół godziny później. */
-                v.notatki.forEach { n ->
-                    NotatkaCard(n) { notatkaOtwarta = n }
-                }
-
-                Text(
-                    "Zeskanuj towar z palety — w dowolnej kolejności",
-                    fontSize = 12.sp,
-                    color = InkSoft,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                /* Pole filtra pod podpowiedzią o skanie, a nie nad nią: skan
-                   zostaje drogą pierwszą i ma być pierwszy także wzrokiem.
-                   Lista zawęża się przy pisaniu, więc „gotowe" niczego nie
-                   zatwierdza — ODDAJE FOKUS, a to jest tu cała rzecz. */
-                WertisTextField(
-                    value = szukane,
-                    onValueChange = { szukane = it },
-                    placeholder = "Szukaj w dostawie: symbol albo nazwa…",
-                    leadingIcon = WIcons.Search,
-                    onFokus = { szukaneMaFokus = it },
-                )
-                /* SKANER MILCZY, DOPÓKI PISZESZ — i człowiek ma o tym wiedzieć
-                   (0.66.0). `WedgeKeySource` zbiera znaki wyłącznie wtedy, gdy
-                   nie ma ich gdzie wpisać, więc pole z fokusem ucisza skaner.
-                   Bez tego paska kolektor wyglądał na zepsuty: klawiatura
-                   schowana, a skan towaru i regału nie robi nic.
-
-                   Przycisk, nie sama podpowiedź: „gotowe" na klawiaturze
-                   ekranowej trzeba najpierw znaleźć, a robi się to w rękawicy. */
-                if (szukaneMaFokus) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
                         Text(
-                            "Skaner milczy, dopóki piszesz",
-                            fontSize = 11.sp,
-                            color = AmberInk,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f),
+                            "Nie ma tu już czego rozkładać.",
+                            fontSize = 12.sp,
+                            color = InkMute,
+                            modifier = Modifier.padding(bottom = 2.dp),
                         )
-                        OutlineButton("GOTOWE") { fokusEkranu.clearFocus() }
+                        PrimaryButton(
+                            "WRÓĆ DO LISTY DOSTAW",
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = WIcons.Check,
+                            onClick = { graph.nav.zakonczonaDostawa() },
+                        )
+                        /* Droga powrotu z zamknięcia — pod wyjściem, nie nad nim:
+                           wyjście jest ruchem częstym, otwarcie rzadkim. Gdy nie
+                           wolno, stoi zdanie serwera zamiast wyszarzonego przycisku,
+                           bo przycisk bez słowa nie mówi, do kogo iść. */
+                        v.otwarcie?.let { o ->
+                            if (o.mozna) {
+                                OutlineButton(
+                                    "OTWÓRZ PONOWNIE — POPRAW POMYŁKĘ",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = !busy,
+                                    onClick = { otworzPonownie() },
+                                )
+                            } else {
+                                // `let`, nie smart cast: pole z modułu `:core` go nie dopuszcza
+                                o.powod?.let { Text(it, fontSize = 13.sp, color = InkSoft) }
+                            }
+                        }
                     }
-                }
-                if (szukaneN.isNotEmpty()) {
-                    Text(
-                        if (uporzadkowane.isEmpty()) {
-                            "Brak pozycji dla „$szukane” — dostawa ma ${v.lines.size} poz."
-                        } else {
-                            "${uporzadkowane.size} z ${v.lines.size} poz."
-                        },
-                        fontSize = 11.sp,
-                        color = InkMute,
-                    )
-                    OutlineButton(
-                        "POKAŻ WSZYSTKIE POZYCJE",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { szukane = "" },
-                    )
-                }
-
-                /* Dostawa ZAMKNIĘTA — stan końcowy zamiast przycisku, który
-                   musiałby odmówić. Domknięcie dzieje się SAMO po ostatniej
-                   pozycji (`closeIfComplete` na serwerze), więc to nie jest
-                   rzadki przypadek brzegowy, tylko najczęstsze zakończenie
-                   pracy: człowiek odkłada ostatnią sztukę i dostawa jest już
-                   zamknięta, zanim sięgnie po przycisk.
-
-                   Do 0.54.0 ekran tego nie wiedział — `status` przychodził
-                   w danych i nie był czytany. „ZAKOŃCZ DOSTAWĘ" stało dalej,
-                   dostawało 400 „Ta dostawa jest już zamknięta", a powrót na
-                   listę leżał wyłącznie na ścieżce sukcesu. Objaw ze
-                   zgłoszenia: dostawa zamknięta, ekran nie do opuszczenia. */
-                if (v.status != "open") {
-                    Text(
-                        "DOSTAWA ZAKOŃCZONA",
-                        fontFamily = BarlowCond,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 15.sp,
-                        color = Success,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                    Text(
-                        "Nie ma tu już czego rozkładać.",
-                        fontSize = 12.sp,
-                        color = InkMute,
-                        modifier = Modifier.padding(bottom = 2.dp),
-                    )
-                    PrimaryButton(
-                        "WRÓĆ DO LISTY DOSTAW",
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = WIcons.Check,
-                        onClick = { graph.nav.zakonczonaDostawa() },
-                    )
                 }
             }
-        }
 
-        items(uporzadkowane, key = { it.id }) { line ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                /* Nagłówek sekcji jedzie WEWNĄTRZ pierwszego wiersza bez
-                   lokalizacji, a nie jako osobny element listy — dzięki temu
-                   lista pozycji zostaje płaska i indeks przewijania nie musi
-                   znać żadnych wtrąceń. */
-                if (line.id == pierwszyBezLok) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(top = 6.dp),
-                    ) {
-                        Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
-                        Text(
-                            "BEZ LOKALIZACJI (${bezLok.size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.1.sp,
-                            color = AmberInk,
-                        )
+            items(uporzadkowane, key = { it.id }) { line ->
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    /* Nagłówek sekcji jedzie WEWNĄTRZ pierwszego wiersza bez
+                       lokalizacji, a nie jako osobny element listy — dzięki temu
+                       lista pozycji zostaje płaska i indeks przewijania nie musi
+                       znać żadnych wtrąceń. */
+                    if (line.id == pierwszyBezLok) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 6.dp),
+                        ) {
+                            Icon(WIcons.Alert, null, tint = AmberInk, modifier = Modifier.size(15.dp))
+                            Text(
+                                "BEZ LOKALIZACJI (${bezLok.size})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.1.sp,
+                                color = AmberInk,
+                            )
+                        }
                     }
-                }
-                LineRow(
-                    graph = graph,
-                    line = line,
-                    tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
-                    rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
-                    allowManual = locInfo?.allowManual != false,
-                    manualOpen = manualOpen,
-                    onManualOpen = { manualOpen = true },
-                    // dostawa krajowa jest księgowana wprost na MAG, kontener stoi
-                    // na MGP do przesunięcia — stąd różnica w opisie stanu
-                    stanZawieraDostawe = magZrodlowy == null,
-                    onRecznie = { wpisany ->
-                        val code = normalizeLoc(wpisany)
-                        val err = validateLoc(code, locInfo)
-                        if (err != null) {
-                            graph.effects.toast(err)
-                            graph.feedback.beep(false)
-                        } else {
-                            scope.launch { putaway(line, code, recznie = true) }
-                        }
-                    },
-                    nieznanyKod = nieznanyKod,
-                    onNadajEan = { eanDla = line },
-                    onTap = {
-                        if (active?.id == line.id) zwolnij(line)
-                        else scope.launch { resolveProduct(line.sym) }
-                    },
-                    onProblem = {
-                        problemFor = line
-                        problemOpen = true
-                    },
-                    onPrzesun = magZrodlowy?.let { { przesunFor = line } },
-                    onCancel = { zwolnij(line) },
-                    onKorekta = { korektaDla = line },
-                    czesc = czesc,
-                    onCzesc = { czesc = it },
-                    onRozjazd = { action ->
-                        mismatch?.let { (l, code) ->
-                            // decyzja zostaje w pamięci dostawy — powtórka tej
-                            // samej pary półek nie zapyta drugi raz
-                            rozjazdPamiec.zapamietaj(l.locExpected, code, action)
-                            scope.launch { commitPutaway(l, code, action, recznie = mismatchReczna) }
-                        }
-                    },
-                    onRozjazdAnuluj = { mismatch = null },
-                )
-            }
-        }
-
-        /* STOPKA — oba przyciski dostawy stoją POD listą, a nie nad nią.
-           Zgłoszenie z hali i decyzja użytkownika: zakończenie ma leżeć za
-           wszystkim, co jeszcze nie zostało zeskanowane. Lista jest kontrolą
-           kompletności, więc dojście do przycisku prowadzi wzrokiem przez to,
-           co zostało — a przycisk przestaje kusić na starcie pracy.
-
-           Stan „DOSTAWA ZAKOŃCZONA" celowo ZOSTAJE w szapce. Na zamkniętej
-           dostawie to jedyne wyjście z ekranu i schowanie go pod pozycjami
-           przywróciłoby usterkę naprawioną w 0.54.0: dostawa zamknięta, ekran
-           nie do opuszczenia bez przewijania.
-
-           Stopka doklejona ZA `items` nie rusza indeksów przewijania —
-           `animateScrollToItem(indeksAktywnej + 1)` wyżej dalej liczy jedną
-           szapkę przed listą. */
-        item(key = "stopka") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
-                OutlineButton(
-                    "ZGŁOŚ PROBLEM DOSTAWY",
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = WIcons.Alert,
-                    onClick = {
-                        problemFor = null
-                        problemOpen = true
-                    },
-                )
-
-                /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
-                   wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
-                   do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
-                   bez pokazania, co powstanie. Na dostawie zamkniętej go nie
-                   ma: mógłby już tylko dostać odmowę (0.54.0). */
-                if (v.status == "open") {
-                    OutlineButton(
-                        "ZAKOŃCZ DOSTAWĘ",
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = WIcons.Check,
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
-                                } catch (e: Exception) {
-                                    graph.effects.toast(
-                                        e.message ?: "Nie udało się policzyć podsumowania"
-                                    )
-                                }
+                    LineRow(
+                        graph = graph,
+                        line = line,
+                        tryb = trybWiersza(line.status, aktywna = active?.id == line.id),
+                        rozjazd = mismatch?.takeIf { it.first.id == line.id }?.second,
+                        allowManual = locInfo?.allowManual != false,
+                        manualOpen = manualOpen,
+                        onManualOpen = { manualOpen = true },
+                        // dostawa krajowa jest księgowana wprost na MAG, kontener stoi
+                        // na MGP do przesunięcia — stąd różnica w opisie stanu
+                        stanZawieraDostawe = magZrodlowy == null,
+                        onRecznie = { wpisany ->
+                            val code = normalizeLoc(wpisany)
+                            val err = validateLoc(code, locInfo)
+                            if (err != null) {
+                                graph.effects.toast(err)
+                                graph.feedback.beep(false)
+                            } else {
+                                scope.launch { putaway(line, code, recznie = true) }
                             }
                         },
+                        nieznanyKod = nieznanyKod,
+                        onNadajEan = { eanDla = line },
+                        onTap = {
+                            if (active?.id == line.id) zwolnij(line)
+                            else scope.launch { resolveProduct(line.sym) }
+                        },
+                        onProblem = {
+                            problemFor = line
+                            problemOpen = true
+                        },
+                        onPrzesun = magZrodlowy?.let { { przesunFor = line } },
+                        onCancel = { zwolnij(line) },
+                        onKorekta = { korektaDla = line },
+                        onCofnij = { cofnij(line.id, line.sym) },
+                        onZmienPolke = { polkaDla = line },
+                        onWycofaj = { z -> wycofaj(line, z) },
+                        czesc = czesc,
+                        onCzesc = { czesc = it },
+                        onRozjazd = { action ->
+                            mismatch?.let { (l, code) ->
+                                // decyzja zostaje w pamięci dostawy — powtórka tej
+                                // samej pary półek nie zapyta drugi raz
+                                rozjazdPamiec.zapamietaj(l.locExpected, code, action)
+                                scope.launch { commitPutaway(l, code, action, recznie = mismatchReczna) }
+                            }
+                        },
+                        onRozjazdAnuluj = { mismatch = null },
                     )
+                }
+            }
+
+            /* STOPKA — oba przyciski dostawy stoją POD listą, a nie nad nią.
+               Zgłoszenie z hali i decyzja użytkownika: zakończenie ma leżeć za
+               wszystkim, co jeszcze nie zostało zeskanowane. Lista jest kontrolą
+               kompletności, więc dojście do przycisku prowadzi wzrokiem przez to,
+               co zostało — a przycisk przestaje kusić na starcie pracy.
+
+               Stan „DOSTAWA ZAKOŃCZONA" celowo ZOSTAJE w szapce. Na zamkniętej
+               dostawie to jedyne wyjście z ekranu i schowanie go pod pozycjami
+               przywróciłoby usterkę naprawioną w 0.54.0: dostawa zamknięta, ekran
+               nie do opuszczenia bez przewijania.
+
+               Stopka doklejona ZA `items` nie rusza indeksów przewijania —
+               `animateScrollToItem(indeksAktywnej + 1)` wyżej dalej liczy jedną
+               szapkę przed listą. */
+            item(key = "stopka") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // problem całej dostawy (np. nieznany kod na palecie, brak miejsca)
+                    OutlineButton(
+                        "ZGŁOŚ PROBLEM DOSTAWY",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = WIcons.Alert,
+                        onClick = {
+                            problemFor = null
+                            problemOpen = true
+                        },
+                    )
+
+                    /* Zakończenie dostawy. Przycisk otwiera PODGLĄD, nie zapis —
+                       wyjątek „zła ilość" jedzie do protokołu rozbieżności, czyli
+                       do dostawcy, więc nie ma prawa powstać z jednego dotknięcia
+                       bez pokazania, co powstanie. Na dostawie zamkniętej go nie
+                       ma: mógłby już tylko dostać odmowę (0.54.0). */
+                    if (v.status == "open") {
+                        OutlineButton(
+                            "ZAKOŃCZ DOSTAWĘ",
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = WIcons.Check,
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        zakonczenie = apiCall { graph.api.deliveryZakonczenie(id) }
+                                    } catch (e: Exception) {
+                                        graph.effects.toast(
+                                            e.message ?: "Nie udało się policzyć podsumowania"
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -895,6 +1046,22 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                         busy = false
                     }
                 }
+            },
+        )
+    }
+
+    /* Zmiana półki — też na poziomie ekranu, z tego samego powodu co korekta. */
+    polkaDla?.let { linia ->
+        ZmianaPolkiSheet(
+            line = linia,
+            locInfo = locInfo,
+            allowManual = locInfo?.allowManual != false,
+            busy = busy,
+            onCancel = { polkaDla = null },
+            onPolka = { kod, recznie -> zmienPolke(linia, kod, recznie) },
+            onZlyKod = { komunikat ->
+                graph.feedback.beep(false)
+                graph.effects.toast(komunikat)
             },
         )
     }
@@ -1018,6 +1185,10 @@ private fun LineRow(
     onPrzesun: (() -> Unit)?,
     /** Poprawienie liczby już odłożonych sztuk — patrz `PanelOdkladania`. */
     onKorekta: () -> Unit,
+    /** Drogi powrotu z pomyłki — patrz `PanelOdkladania`. */
+    onCofnij: () -> Unit,
+    onZmienPolke: () -> Unit,
+    onWycofaj: (ZgloszenieLinii) -> Unit,
     /** Ile sztuk z tej pozycji idzie na półkę; `null` = cała reszta. */
     czesc: Double?,
     onCzesc: (Double?) -> Unit,
@@ -1270,6 +1441,9 @@ private fun LineRow(
                     onProblem = onProblem,
                     onPrzesun = onPrzesun,
                     onKorekta = onKorekta,
+                    onCofnij = onCofnij,
+                    onZmienPolke = onZmienPolke,
+                    onWycofaj = onWycofaj,
                     czesc = czesc,
                     onCzesc = onCzesc,
                 )
@@ -1331,6 +1505,12 @@ private fun PanelOdkladania(
     onPrzesun: (() -> Unit)?,
     /** Poprawienie liczby już odłożonych sztuk (0.45.0). */
     onKorekta: () -> Unit,
+    /** Cofnięcie ostatniego odłożenia: ilość, półka i adres w Subiekcie. */
+    onCofnij: () -> Unit,
+    /** Ta sama ilość, inna półka — towar leży gdzie indziej, niż zeskanowano. */
+    onZmienPolke: () -> Unit,
+    /** Wycofanie własnego zgłoszenia, gdy okazało się pomyłką. */
+    onWycofaj: (ZgloszenieLinii) -> Unit,
     /** Ile sztuk z tej pozycji idzie na półkę; `null` = cała reszta. */
     czesc: Double?,
     onCzesc: (Double?) -> Unit,
@@ -1756,6 +1936,30 @@ private fun PanelOdkladania(
                 "POPRAW ILOŚĆ (${formatQty(line.qtyDone)})",
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onKorekta,
+            )
+        }
+        /* DROGI POWROTU Z POMYŁKI. Przyciski niosą w napisie TO, co cofną —
+           liczbę i półkę. „COFNIJ" bez dopełnienia kazałoby pamiętać, co
+           było ostatnie, a właśnie tego człowiek po pomyłce nie jest pewien.
+           Pokazuje je serwer (`cofnij`, `zgloszenie`), więc znikają same po
+           korekcie ilości i po cofnięciu. */
+        line.cofnij?.takeIf { line.status != StatusLinii.PROBLEM }?.let { c ->
+            OutlineButton(
+                "COFNIJ ODŁOŻENIE (${iloscZJednostka(c.qty, line.unit)} z ${c.lok})",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onCofnij,
+            )
+            OutlineButton(
+                "ZMIEŃ PÓŁKĘ (teraz ${c.lok})",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onZmienPolke,
+            )
+        }
+        line.zgloszenie?.let { z ->
+            OutlineButton(
+                "WYCOFAJ ZGŁOSZENIE: ${z.typLabel.uppercase()}",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onWycofaj(z) },
             )
         }
         /* Skrót dla kontenera: dostawa na MGP zostawia po odłożeniu adresów
@@ -2206,6 +2410,158 @@ private fun KorektaSheet(
                 enabled = !busy && ile != line.qtyDone,
                 onClick = { onZapisz(ile) },
             )
+            OutlineButton("WRÓĆ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
+        }
+    }
+}
+
+/* ── Drogi powrotu z pomyłki ────────────────────────────────────────────────
+   ZGŁOSZENIE WŁAŚCICIELA: „jak już zaznaczyłem, że wszystko jest, a się
+   pomyliłem, to nie mogę tego cofnąć". Reguły i granice stoją po stronie
+   serwera (`services/cofanie-dostawy.ts`); tu jest tylko to, co widać.     */
+
+/**
+ * Po tylu milisekundach drugi odczyt tej samej etykiety półki to już nowy
+ * skan, a nie dubel spustu. Dwie sekundy wystarczą na przytrzymany spust,
+ * a nie przeszkadzają w odłożeniu dwóch pozycji z rzędu na tę samą półkę:
+ * między nimi zawsze stoi skan towaru.
+ */
+private const val DUBEL_SKANU_MS = 2_000L
+
+/** Co pokazuje pasek COFNIJ — gotowe napisy, bez liczenia w chwili rysowania. */
+private data class OstatnieOdlozenie(
+    val lineId: Long,
+    val sym: String,
+    /** Ilość z jednostką, np. „10" albo „12,5 m". */
+    val ilosc: String,
+    val polka: String,
+)
+
+/** Zdanie po cofnięciu: co się stało z ilością, z dostawą i z adresem. */
+private fun opisCofniecia(sym: String, r: CofniecieOdlozeniaResponse): String = buildString {
+    append("Cofnięto $sym — zeskanuj właściwą półkę")
+    if (r.otwartaPonownie) append(" · dostawa znów otwarta")
+    // adres już w Subiekcie wraca przez kolejkę — karta towaru pokaże go z opóźnieniem
+    if (r.adres == "zapisany") append(" · stary adres wraca przez kolejkę")
+}
+
+/**
+ * Pasek nad listą po odłożeniu: CO poszło i GDZIE, plus COFNIJ.
+ *
+ * Napis niesie liczbę, symbol i półkę, bo pomyłkę rozpoznaje się właśnie po
+ * nich: „10, a miało być 3", „B02, a leży w B03". Cel 48 dp daje `OutlineButton`.
+ */
+@Composable
+private fun PasekCofnij(
+    ostatnie: OstatnieOdlozenie,
+    busy: Boolean,
+    onCofnij: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .cardSurface()
+            .padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("ODŁOŻONO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = InkSoft)
+            Text(
+                "${ostatnie.ilosc} · ${ostatnie.sym} → ${ostatnie.polka}",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = Ink,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        OutlineButton("COFNIJ", enabled = !busy, onClick = onCofnij)
+    }
+}
+
+/**
+ * Zmiana półki po odłożeniu — ilość zostaje, adres idzie na właściwą półkę.
+ *
+ * Arkusz ma WŁASNY handler skanów i stoi na stosie nad ekranem, więc skan
+ * etykiety trafia tutaj, a nie do zwykłego odkładania. Kod towaru dostaje
+ * odmowę zdaniem: w tym arkuszu skanuje się wyłącznie półkę.
+ *
+ * Pole wpisu NIE bierze fokusu samo. Z fokusem skaner klawiaturowy milknie,
+ * a skan jest tu drogą pierwszą — wpis zostaje na zdartą etykietę.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ZmianaPolkiSheet(
+    line: DeliveryLineView,
+    locInfo: LocationsInfo?,
+    allowManual: Boolean,
+    busy: Boolean,
+    onCancel: () -> Unit,
+    onPolka: (kod: String, recznie: Boolean) -> Unit,
+    onZlyKod: (String) -> Unit,
+) {
+    val zapisana = line.cofnij?.lok ?: line.locActual ?: "—"
+    var wpis by remember(line.id) { mutableStateOf("") }
+
+    ScanHandlerEffect { scan ->
+        when {
+            busy -> onZlyKod("Czekaj — zapisuję poprzednią zmianę")
+            scan.kind == ScanKind.EAN -> onZlyKod("To kod towaru — zeskanuj etykietę półki")
+            else -> {
+                val kod = normalizeLoc(scan.code)
+                val err = if (scan.kind == ScanKind.LOC) null else validateLoc(kod, locInfo)
+                if (err != null) onZlyKod(err) else onPolka(kod, false)
+            }
+        }
+        true
+    }
+
+    ModalBottomSheet(onDismissRequest = onCancel, containerColor = Paper) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "ZMIEŃ PÓŁKĘ",
+                fontFamily = BarlowCond,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = Ink,
+            )
+            Text(line.sym, fontFamily = BarlowCond, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
+            Text(line.name, fontSize = 13.sp, color = InkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("Zapisana półka: $zapisana", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+            Text(
+                "Zeskanuj etykietę półki, na której towar naprawdę leży.",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Ink,
+            )
+            Text(
+                "Ilość zostaje bez zmian. Adres w kartotece przejdzie na nową półkę.",
+                fontSize = 13.sp,
+                color = InkSoft,
+            )
+            if (allowManual) {
+                fun zatwierdz() {
+                    val kod = normalizeLoc(wpis)
+                    val err = validateLoc(kod, locInfo)
+                    if (err != null) onZlyKod(err) else onPolka(kod, true)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WertisTextField(
+                        value = wpis,
+                        onValueChange = { wpis = it },
+                        placeholder = "albo wpisz kod półki",
+                        modifier = Modifier.weight(1f),
+                        onDone = { zatwierdz() },
+                    )
+                    PrimaryButton("ZAPISZ", enabled = !busy && wpis.isNotBlank()) { zatwierdz() }
+                }
+            }
             OutlineButton("WRÓĆ", modifier = Modifier.fillMaxWidth(), onClick = onCancel)
         }
     }

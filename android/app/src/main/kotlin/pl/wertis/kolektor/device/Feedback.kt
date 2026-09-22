@@ -12,15 +12,22 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /* ── Sygnały skanu: beep + wibracja — port web/src/lib/feedback.ts ──────────
-   OK: 1400 Hz + wibracja 40 ms; błąd: 320 Hz + wzór [60,40,60]. Ton ~160 ms
-   z wykładniczym wygaszeniem, syntetyzowany do AudioTrack (jak WebAudio).
+   OK: 1400 Hz + wibracja 40 ms; błąd: DWA niskie tony 320 Hz + TRZY długie
+   impulsy. Ton ~160 ms z wykładniczym wygaszeniem, syntetyzowany do AudioTrack
+   (jak WebAudio).
 
    TRZY sygnały, nie dwa: „wybrano" (beep OK), „ZAPISANO" (dwa tony w górę)
    i błąd. W hałasie hali sukces i błąd różniły się wyłącznie wysokością tonu
    przy tej samej długości — a to właśnie zapis pozycji jest chwilą, w której
    człowiek z kartonem NIE patrzy na ekran i musi wiedzieć bez patrzenia,
    czy może iść dalej. Wibracje niosą tę samą trójkę: 1 impuls / 2 impulsy /
-   3 impulsy — rozróżnialne ręką przy wyłączonym dźwięku.                     */
+   3 impulsy — rozróżnialne ręką przy wyłączonym dźwięku.
+
+   Do audytu UX z 22 września 2026 ten komentarz mijał się z kodem: błąd
+   wibrował [60,40,60], czyli DWA impulsy, jak zapis [40,70,40]. Różnica
+   20 ms nie jest czytelna w rękawicy, więc przy ściszonym kolektorze
+   odrzucony zapis czuło się jak przyjęty. Błąd ma teraz trzy długie impulsy
+   i drugi niski ton — inny rytm, nie tylko inna wysokość.                    */
 
 class Feedback(context: Context) {
     private val vibrator: Vibrator? =
@@ -38,6 +45,9 @@ class Feedback(context: Context) {
 
     fun beep(ok: Boolean = true) {
         playTone(if (ok) 1400.0 else 320.0)
+        // błąd ma DWA tony — rytm odróżnia go od „wybrano" nawet przy
+        // głośniku, który niskie 320 Hz oddaje słabo
+        if (!ok) playTone(320.0, opoznienieMs = 220)
         vibrate(ok)
     }
 
@@ -87,7 +97,8 @@ class Feedback(context: Context) {
             val effect = if (ok) {
                 VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE)
             } else {
-                VibrationEffect.createWaveform(longArrayOf(0, 60, 40, 60), -1)
+                // trzy impulsy po 120 ms — patrz nagłówek pliku
+                VibrationEffect.createWaveform(longArrayOf(0, 120, 80, 120, 80, 120), -1)
             }
             v.vibrate(effect)
         } catch (_: Exception) {

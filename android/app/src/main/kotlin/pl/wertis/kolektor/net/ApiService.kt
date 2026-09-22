@@ -4,6 +4,11 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import pl.wertis.kolektor.core.net.AktualizacjaResponse
 import pl.wertis.kolektor.core.net.KorektaBody
+import pl.wertis.kolektor.core.net.CofniecieOdlozeniaResponse
+import pl.wertis.kolektor.core.net.OtwarcieResponse
+import pl.wertis.kolektor.core.net.WycofanieResponse
+import pl.wertis.kolektor.core.net.ZmianaPolkiBody
+import pl.wertis.kolektor.core.net.ZmianaPolkiResponse
 import pl.wertis.kolektor.core.net.KoszResponse
 import pl.wertis.kolektor.core.net.OtworzPrzyjecieBody
 import pl.wertis.kolektor.core.net.PrzyjeciaResponse
@@ -239,6 +244,40 @@ interface ApiService {
         @Path("lineId") lineId: Long,
         @Body body: KorektaBody,
     ): OkResponse
+
+    /* Drogi powrotu z pomyłki. Trzy z nich są BEZ CIAŁA i dlatego niosą
+       `EMPTY_BODY`: pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`,
+       czyli gołe „Bad Request" na ekranie (reguła klienta HTTP w CLAUDE.md). */
+
+    /** Cofnij ostatnie odłożenie pozycji; otwiera dostawę, jeśli je domknęło. */
+    @POST("api/delivery/{id}/lines/{lineId}/cofnij")
+    suspend fun deliveryCofnij(
+        @Path("id") id: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): CofniecieOdlozeniaResponse
+
+    /** Przenieś adres ostatniego odłożenia na właściwą półkę. */
+    @POST("api/delivery/{id}/lines/{lineId}/polka")
+    suspend fun deliveryZmienPolke(
+        @Path("id") id: Long,
+        @Path("lineId") lineId: Long,
+        @Body body: ZmianaPolkiBody,
+    ): ZmianaPolkiResponse
+
+    /** Otwórz zamkniętą dostawę z powrotem — w dniu zamknięcia. */
+    @POST("api/delivery/{id}/otworz-ponownie")
+    suspend fun deliveryOtworzPonownie(
+        @Path("id") id: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): OtwarcieResponse
+
+    /** Wycofaj własne, nierozstrzygnięte zgłoszenie. */
+    @POST("api/problems/{id}/wycofaj")
+    suspend fun wycofajZgloszenie(
+        @Path("id") id: Long,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): WycofanieResponse
 
     /** Odpowiedź na notatkę biura — jedyna droga zdjęcia blokady z dostawy. */
     @POST("api/delivery/notatki/{noteId}/odpowiedz")
