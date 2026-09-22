@@ -360,6 +360,22 @@ export const dzien = (v: string | null | undefined) =>
     : "—";
 
 /**
+ * Data lokalna jako „2026-09-22" — dla druków dla dostawców (0.435.0).
+ *
+ * Przyszła z `biuro.html` razem z protokołem rozbieżności. Protokół idzie do
+ * dostawcy z datą sporządzenia, a doba liczona w UTC dawałaby po północy
+ * czasu polskiego datę dnia poprzedniego. Format cyfrowy, nie słowny, bo tak
+ * wypełnia się pole daty na cudzym formularzu.
+ */
+export function dataLokalna(v: string | null | undefined): string {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  const dwa = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dwa(d.getMonth() + 1)}-${dwa(d.getDate())}`;
+}
+
+/**
  * Kopiowanie tekstu, którego nikt nie przepisuje z ekranu ręcznie:
  * identyfikatora zamówienia (UUID) i numeru dokumentu z Subiekta.
  *

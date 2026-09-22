@@ -535,10 +535,43 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **Zerowy wynik nie tworzy raportu.** Rozjazdy → CSV + kod wyjścia `2` pod
   alert. Ustawienie i szczegóły: [`DEPLOY.md`](DEPLOY.md) §7.
 
+**Panel biura pod `/obsluga` — DO DECYZJI i dostawy**
+- **DO DECYZJI** (0.435.0) to ekran startowy panelu: jedna lista spraw,
+  w których rozstrzyga biuro. Magazyn wchodzi sprawami — wyjątki dostaw,
+  odpowiedzi hali, pominięte pozycje, błędy zapisu, kolizje kodów, konto
+  Allegro. Obsługa klienta wchodzi liczbami swoich czterech kolejek. Liczona w locie z istniejących źródeł —
+  bez własnej tabeli i bez własnego „załatwione". Wiersz prowadzi tam, gdzie
+  sprawę się rozstrzyga, przy dowodach.
+- **DOSTAWY** (0.435.0) — kolejka, dokument i kontekst w trzech kolumnach,
+  jak w Zwrotach. Kubełek DO DECYZJI zbiera faktury z otwartym wyjątkiem albo
+  odpowiedzią z hali, także zamknięte i spoza okna importu. Wejście w fakturę
+  CZYTA: nie otwiera dostawy i niczego w niej nie przestawia. Wyjątek zamyka
+  się przy pozycji, z notatką do protokołu. Protokół dla dostawcy ma własny
+  adres (`/obsluga/druk/protokol/:dokId`). GEKO i PARTNER dostają swoje druki.
+- **Archiwum dostaw** (0.235.0): ostatni kubełek pokazuje dostawy starsze niż
+  okno importu. Szuka serwer — archiwum jedzie obcięte i mówi na dole, ile
+  dostaw pasuje poza pokazanymi.
+- **„ROZŁOŻONE POZA WERTIS"** (0.40.0) — dostawa rozłożona starą aplikacją albo
+  z ręki nie ma w WERTIS ani jednego śladu. Biuro zdejmuje ją z listy, podając
+  powód. Zamknięcie nie dopisuje pozycji, nie zapisuje adresu i nie rusza
+  Subiektu. Zamknięte stoją w kubełku z nazwiskiem i powodem i wracają na
+  listę jednym kliknięciem.
+
+  > **Dlaczego to nie jest „ROZŁOŻONA".** `done` znaczy „ludzie odłożyli to
+  > tutaj i mamy z tego skany". O tej dostawie powiedzieć się tego nie da,
+  > a jedna wartość na oba stany kazałaby czytać raporty odłożeń jako pracę,
+  > której nikt nie wykonał.
+
+  > **Dlaczego biuro, nie hala.** To jedyna operacja zdejmująca pracę z listy
+  > bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą dostawę,
+  > nie wstając z krzesła. ORZEKA, że pracy nie ma, więc należy do roli, która
+  > czyta protokoły rozbieżności.
+
 **Biuro pod `/biuro` — w przeprowadzce do panelu**
 - Od 0.431.0 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
   Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Opis niżej mówi
-  o tym, co jeszcze stoi w `biuro.html`.
+  o tym, co jeszcze stoi w `biuro.html`. DOSTAWY odeszły w 0.435.0 —
+  pozycja w pasku prowadzi do panelu razem z sesją.
 - Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
   API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
   sesji. Strona nie ma własnych uprawnień: role sprawdza serwer przy każdej
@@ -551,53 +584,19 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   prowadzi do STANU SYSTEMU. Ikona ALLEGRO mówi kolorem o stanie konta,
   a kliknięcie otwiera stojącą tam kartę KONTO ALLEGRO i zaczyna parowanie.
 - **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
-  PRACA (dostawy, magazyn zwrotów) otwiera się kilkanaście razy dziennie.
+  PRACA (magazyn zwrotów) otwiera się kilkanaście razy dziennie.
   WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
 - **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Mieszczą dane
   firmy, reguły strefy złotej, konta i logo dostawców. Konfiguracja nie jest
-  zakładką pracy i nie ma ważyć tyle, co dostawy.
-- **DOSTAWY I REKLAMACJE** — postęp per dokument oraz nierozwiązane wyjątki;
-  protokół rozbieżności (ze zdjęciami) do druku, obok CSV.
-- **Archiwum dostaw** (0.235.0): czwarty czip kolejki pokazuje dostawy starsze
-  niż okno importu. Czyta je z tabel `delivery` i `delivery_line`, których
-  import nigdy nie czyści, więc wejść da się także w fakturę sprzed roku.
-  Wyszukiwarka pyta wtedy serwer — archiwum jedzie obcięte i mówi na dole,
-  ile dostaw pasuje poza pokazanymi.
-- **Wyjątki widać z listy** (0.57.0): wiersz dostawy niesie licznik
-  nierozwiązanych zgłoszeń. Pasek postępu ich nie pokaże i pokazać nie może —
-  wyjątek liczy się jako pozycja domknięta. Biuro może też **zamknąć wyjątek**
-  z notatką, która trafia do protokołu.
+  zakładką pracy i nie ma ważyć tyle, co praca.
 - **Odpowiedź na notatkę wraca sama** (0.57.0): pasek stanu pokazuje licznik
-  nieprzeczytanych odpowiedzi. Kliknięcie licznika **prowadzi do karty**. Karta
-  stoi nad tabelą dostaw i niesie pytanie, odpowiedź i przycisk PRZECZYTANE.
-  Stan „przeczytane" siedzi w bazie, więc gaśnie także na drugim biurku.
+  nieprzeczytanych odpowiedzi, a kliknięcie prowadzi do dostaw w panelu. Stan
+  „przeczytane" siedzi w bazie, więc gaśnie także na drugim biurku.
 - **DOSTAWCY** (0.56.0): logo firmy wgrywane raz, widoczne potem po lewej
   stronie wiersza na liście dostaw w kolektorze. Plik może być w dowolnym
   formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
   cokolwiek pojedzie na serwer. Logo wiąże się z identyfikatorem kontrahenta
   z Subiekta, więc przeżywa poprawkę nazwy. Bez konfiguracji: działa od razu.
-- **Wejście w fakturę** (0.36.0): kliknięcie wiersza pokazuje jej pozycje —
-  zdjęcie kartoteki, ile odłożono z ilu, adres, status, kto odłożył i kiedy.
-  Rozjazd adresu jest wyróżniony, a zgłoszony wyjątek siedzi w wierszu swojej
-  pozycji. Wejść da się także w dokument, którego **nikt jeszcze nie zaczął** —
-  wtedy pozycje idą wprost z faktury i nagłówek mówi o tym wprost. Podgląd
-  **czyta**: kliknięcie nie otwiera dostawy i niczego w niej nie przestawia.
-- **„ROZŁOŻONE POZA WERTIS"** (0.40.0) — dostawa rozłożona starą aplikacją albo
-  z ręki nie ma w WERTIS ani jednego śladu. Stoi więc na liście jako nietknięta
-  i psuje kartę towaru: „w dostawie" o towarze z półki. Biuro zdejmuje taki
-  dokument z listy, podając powód. Zamknięcie nie dopisuje ani jednej pozycji,
-  nie zapisuje adresu i nie rusza Subiekta. Zamknięte leżą w osobnej karcie
-  z nazwiskiem i powodem, i wracają na listę jednym kliknięciem.
-
-  > **Dlaczego to nie jest „ROZŁOŻONA".** `done` znaczy „ludzie odłożyli to
-  > tutaj i mamy z tego skany". O tej dostawie powiedzieć się tego nie da,
-  > a jedna wartość na oba stany kazałaby czytać raporty odłożeń jako pracę,
-  > której nikt nie wykonał.
-
-  > **Dlaczego biuro, nie hala.** To jedyna operacja zdejmująca pracę z listy
-  > bez ani jednego skanu — czyli jedyny sposób, żeby „rozłożyć" całą dostawę,
-  > nie wstając z krzesła. ORZEKA, że pracy nie ma, więc należy do roli, która
-  > czyta protokoły rozbieżności.
 - **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
   p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
   kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów

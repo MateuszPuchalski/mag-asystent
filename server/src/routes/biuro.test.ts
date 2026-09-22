@@ -125,18 +125,23 @@ test("strona czyta stan serwera bez sesji — i tylko to", async () => {
   );
 });
 
-test("formularze dostawców siedzą w stronie obok protokołu WERTIS", () => {
+test("formularze dostawców przeszły do panelu razem z dostawami (0.435.0)", () => {
   /* GEKO i PARTNER mają własne druki reklamacyjne — wydruk ma wyglądać jak
-     ich formularz, nie jak nasz protokół. Wybór idzie po nazwie dostawcy
-     z dokumentu FZ; dane firmy do nadruku żyją w localStorage przeglądarki. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /Protokół zgłoszenia reklamacji B2B/, "szablon GEKO");
-  assert.match(html, /PROTOKÓŁ ZGŁOSZENIA REKLAMACJI/, "szablon PARTNER");
-  assert.match(html, /SZABLONY_DOSTAWCOW/, "wybór szablonu po dostawcy");
-  assert.match(html, /wertis\.firma/, "dane firmy w localStorage");
+     ich formularz, nie jak nasz protokół. Do 0.435.0 szablony siedziały
+     tutaj; przeszły do panelu z ekranem dostaw, a ich treść pilnuje
+     `panel/src/druk/szablony.test.ts`. Tu zostają dwie rzeczy: szablonów
+     nie ma w dwóch miejscach naraz, a dane firmy oba fronty czytają spod
+     TEGO SAMEGO klucza — formularz jest jeszcze tutaj, druk już tam. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const druk = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/druk/szablony.ts"), "utf8");
+  const firma = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/druk/firma.ts"), "utf8");
+  assert.doesNotMatch(html, /SZABLONY_DOSTAWCOW/, "drugi egzemplarz szablonów rozjechałby się z pierwszym");
+  assert.match(druk, /Protokół zgłoszenia reklamacji B2B/, "szablon GEKO w panelu");
+  assert.match(druk, /PROTOKÓŁ ZGŁOSZENIA REKLAMACJI/, "szablon PARTNER w panelu");
+  assert.match(html, /"wertis\.firma"/, "formularz danych firmy zostaje w biurze do F5");
+  assert.match(firma, /"wertis\.firma"/, "druk w panelu czyta ten sam klucz");
 });
 
 test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
@@ -174,11 +179,15 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    18,
-    "Po kasacji obsługi klienta (0.140.0) zostają zapisy MAGAZYNU i ADMINA:\n" +
-      "logowanie, zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, " +
-      "notatka do dostawy, odczyt odpowiedzi na notatkę, zamknięcie wyjątku, " +
-      "import zbiórek, załatwienie pominiętej pozycji kosza, parowanie konta " +
+    13,
+    "Licznik SPADŁ z 18 do 13 w 0.435.0 i to jest cały ślad przeprowadzki " +
+      "dostaw do panelu w tym teście. Odeszło pięć zapisów razem z widokiem: " +
+      "zamknięcie dostawy poza WERTIS, cofnięcie zamknięcia, notatka do " +
+      "dostawy, odczyt odpowiedzi na notatkę i zamknięcie wyjątku. Te same " +
+      "trasy woła teraz panel, a zero zapisu przy patrzeniu pilnuje tam " +
+      "`ekrany/Dostawy.test.tsx` — po zachowaniu, nie po źródle.\n\n" +
+      "Po kasacji obsługi klienta (0.140.0) zostały zapisy MAGAZYNU i ADMINA:\n" +
+      "logowanie, import zbiórek, załatwienie pominiętej pozycji kosza, parowanie konta " +
       "Allegro, PONÓW/ANULUJ kolejki Sfery (jedno wywołanie o dwóch trasach) " +
       "oraz trzy mutacje kont admina (reset hasła, włącz/wyłącz, wyloguj " +
       "wszędzie), RESYNC z odświeżeniem zdjęć w karcie SERWER i masowa " +
@@ -230,16 +239,16 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   assert.deepEqual(zdublowane, [], "funkcje o tej samej nazwie przesłaniają się nawzajem");
 
   assert.ok(!/documents\/[^"'`]*\/open/.test(html), "strona otwiera dostawę");
-  assert.match(html, /\/api\/biuro\/dokument\//, "strona czyta trasę podglądu");
-  assert.match(html, /dokument\/\$\{dokId\}\/zamknij/, "zamknięcie poza WERTIS");
-  assert.match(html, /dokument\/\$\{dokId\}\/otworz/, "droga powrotna");
+  /* Zapisy dostaw są w panelu, nie w dwóch miejscach naraz (0.435.0). */
+  assert.doesNotMatch(html, /dokument\/\$\{dokId\}\/(zamknij|otworz|notatka)/,
+    "zapisy dostaw przeszły do panelu");
   assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
   assert.match(html, /biuro\/dostawcy\/\$\{khId\}\/logo/, "wgranie logo dostawcy");
   /* Konwersja formatów MUSI zostać po stronie przeglądarki: serwer przyjmuje
      wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
      panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
   assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
-  assert.match(html, /problems\/\$\{id\}\/resolve/, "biuro zamyka wyjątek");
+  assert.doesNotMatch(html, /problems\/\$\{id\}\/resolve/, "wyjątek zamyka się w panelu, przy fakturze");
   assert.match(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "biuro zamyka sprawę pominięcia");
   /* Po 0.140.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
      przedmiotem strażnika: żadnej wysyłki, żadnego szkicu, żadnego pola
@@ -427,18 +436,6 @@ test("panel wstaje z zapamiętanego tokenu i sam napędza cykl", () => {
     "i ikonę zdrowia stojące do ręcznego kliknięcia");
 });
 
-test("lista dostaw sygnalizuje wyjątki", () => {
-  /* Pasek postępu tego NIE powie i powiedzieć nie może: wyjątek liczy się jako
-     pozycja domknięta (D8). Bez osobnego sygnału dostawa z trzema reklamacjami
-     wygląda w biurze dokładnie jak bezproblemowa — zielony pasek 100%. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /d\.wyjatkiOtwarte/, "wiersz listy czyta licznik wyjątków");
-  assert.match(html, /badge err">\$\{d\.wyjatkiOtwarte\}/, "licznik jako plakietka błędu");
-});
-
 test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   /* Zakładki dostały grupy (0.74.1), a w 0.76.0 z paska wyszły USTAWIENIA:
      grupa z jedną pastylką `DOSTAWCY` ważyła w rzędzie tyle samo co DOSTAWY,
@@ -465,8 +462,10 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["dostawy", "magazyn", "analiza", "dziennik", "nadzor"],
-    "pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
+    ["magazyn", "analiza", "dziennik", "nadzor"],
+    "Od 0.435.0 DOSTAWY nie są już zakładką tej strony — prowadzą do " +
+      "panelu (`data-panel`), sprawdzane niżej. " +
+      "Pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
       "pustą zakładką — konto Allegro mieszka w STANIE SYSTEMU. " +
       "Dostawcy dalej za zębatką — konfiguracja to nie praca"
@@ -484,6 +483,11 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     [...widoki].sort(),
     "żaden przycisk poza grupą — sierota wygląda prawie normalnie i tylko test ją złapie"
   );
+
+  /* Wyjście do przeniesionego widoku stoi W GRUPIE, jak zakładka: ręka szuka
+     DOSTAW tam, gdzie były. Sierota poza grupą byłaby tu tą samą usterką. */
+  const praca = nav.match(/<div class="grupa-btny">([\s\S]*?)<\/div>/)?.[1] ?? "";
+  assert.match(praca, /data-panel="\/obsluga\/dostawy"/, "DOSTAWY prowadzą do panelu z grupy Praca");
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
@@ -572,26 +576,17 @@ test("nagłówek niesie licznik odpowiedzi na notatki", () => {
   );
 });
 
-test("licznik prowadzi do karty, a karta stoi nad tabelą dostaw", () => {
+test("licznik odpowiedzi prowadzi do dostaw w panelu, z sesją (0.435.0)", () => {
   /* Zgłoszenie z 20 sierpnia: „mam na górze zaznaczone odpowiedź na notatkę,
-     ale nie wiem gdzie ta odpowiedź jest, jak klikam w licznik też nic się nie
-     dzieje". Sygnał był poprawny, dane były na miejscu — zawiodła DROGA do
-     nich. Karta stała pod tabelą dostaw, a ta bywa na kilkadziesiąt wierszy;
-     kafel wołał zaś tylko przełączenie na zakładkę, na której biuro już było.
-
-     Stąd dwie asercje, których nie da się spełnić przypadkiem: kolejność
-     sekcji w dokumencie i przewijanie do celu. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.ok(
-    html.indexOf('id="kartaOdpowiedzi"') < html.indexOf('id="kartaDostaw"'),
-    "karta odpowiedzi ma stać NAD tabelą dostaw — pod nią wypada poza ekran"
-  );
-  assert.match(html, /data-do="dostawy" data-cel="kartaOdpowiedzi"/, "kafel wskazuje cel");
-  assert.match(html, /dataset\.cel/, "obsługa paska czyta cel kafla");
-  assert.match(html, /scrollIntoView/, "kliknięcie licznika ma doprowadzić do karty");
+     ale nie wiem gdzie ta odpowiedź jest". Sygnał bez drogi do treści jest
+     sygnałem zgubionym. Od 0.435.0 treść mieszka w panelu, więc droga
+     prowadzi tam — i niesie token, bo inaczej kończyłaby się logowaniem. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.match(html, /data-panel="\/obsluga\/dostawy"`?\s*\n?\s*title="\$\{n\}/,
+    "plakietka odpowiedzi prowadzi do dostaw w panelu");
+  assert.match(html, /closest\("\[data-panel\]"\)/, "jedna delegacja dla wszystkich wyjść do panelu");
+  assert.match(html, /localStorage\.setItem\("wertis-panel-token", token\)/,
+    "wyjście do panelu podaje mu sesję tej strony");
 });
 
 test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
@@ -627,20 +622,11 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
   );
 
   // czworo wywołań, które ta reguła utrzymuje przy życiu
-  assert.match(html, /dokument\/\$\{dokId\}\/otworz`,\s*\{\s*method:\s*"POST"/);
+  /* Do 0.435.0 stało tu przywrócenie dostawy — odeszło do panelu, który
+     ma własnego strażnika tej reguły (`panel/src/api/klient.test.ts`). */
+  assert.match(html, /kosze\/\$\{id\}\/przelicz`,\s*\{\s*method:\s*"POST"\s*\}/);
   assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
   assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
-});
-
-test("podgląd pokazuje, kto odłożył pozycję", () => {
-  /* `done_by` i `done_at` leżały w bazie od 0.17.0 bez ani jednego czytelnika.
-     Wyleciałyby z widoku niezauważone przy pierwszym porządkowaniu tabeli. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /doneBy/);
-  assert.match(html, /KTO ODŁOŻYŁ/);
 });
 
 test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
@@ -754,8 +740,6 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
   const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
   assert.ok(!analiza.includes('id="reguly"'), "reguły zeszły z ANALIZY");
   assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
-  const dostawy = wycinek('id="widokDostawy"', 'id="widokMagazyn"');
-  assert.ok(!dostawy.includes('id="firmaNazwa"'), "dane firmy zeszły z REKLAMACJI");
 });
 
 test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
@@ -772,7 +756,8 @@ test("praca stoi przed archiwum i przed ścieżką poboczną", () => {
     assert.ok(ia !== -1 && ib !== -1, `${a} albo ${b} nie istnieje`);
     assert.ok(ia < ib, czemu);
   };
-  przed("kartaReklamacji", "kartaPozaWertis", "wyjątki do rozwiązania przed zamkniętymi dostawami");
+  /* Karty dostaw (wyjątki przed zamkniętymi) odeszły do panelu w 0.435.0 —
+     tam o kolejności decyduje kubełek DO DECYZJI, pierwszy w rzędzie. */
   /* W MAGAZYNIE praca przed jej wyjątkami: kosze nad listą pominiętych
      pozycji, bo pominięcie jest skutkiem rozkładania, nie jego wstępem. */
   przed("koszeKarta", "pominieteKarta", "praca hali nad jej wyjątkami");
@@ -860,46 +845,30 @@ test("ustawienia to jedna tafla, a odstępy niesie arkusz", () => {
   );
 });
 
-test("kontekst ma szufladę na wąskim oknie, a szuflada ma trzy wyjścia", () => {
-  /* Od 0.101.0 kontekst nie spada już pod sprawę poniżej 1280 px — wjeżdża
-     jako szuflada z prawej, a kolejka zostaje widoczna obok sprawy. Makieta
-     `Waski` rysuje to dla PYTAŃ; powłoka trzech stref jest wspólna od 0.93.0,
-     więc szuflada obejmuje wszystkie trzy zakładki spraw. Ten test pilnuje
-     rzeczy, które da się złamać po cichu, przestawiając układ.
+test("dostawy odeszły do panelu razem ze swoimi strażnikami (0.435.0)", () => {
+  /* Widok DOSTAWY przeszedł do `panel/` (`docs/obsluga-klienta.md` §7) i razem
+     z nim odeszło z tego pliku pięć testów tej strony, a dwa pilnują odtąd
+     nowej drogi. Gwarancje nie zniknęły, tylko zmieniły adres — `CLAUDE.md`
+     każe przenosić strażnika razem z widokiem:
 
-     TRZY WYJŚCIA, bo panel zasłania sprawę: przycisk w jego głowie, klik
-     w przyciemnienie i Escape. Wysunięty panel bez widocznego wyjścia czyta
-     się jak coś, co się zacięło, a mysz nie zgadnie dwóch pozostałych dróg. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
+       sygnał wyjątku w wierszu, kto odłożył pozycję,
+       archiwum szukane przez serwer, powiększenie dowodu,
+       zero zapisu przy wejściu w dokument   → `panel/src/ekrany/Dostawy.test.tsx`
+       szablony GEKO i PARTNER               → `panel/src/druk/szablony.test.ts`
 
-  /* Liczymy ZNACZNIK, nie selektor: `data-szuflada>` kończy atrybut, więc nie
-     łapie ani `data-szuflada-zamknij`, ani `[data-szuflada]` z obsługi kliknięć. */
-  /* Po 0.140.0 szuflada została JEDNA — przy dostawie. Trzy sprawy klienta,
-     które miały własne, odeszły razem z obsługą klienta; mechanizm zostaje
-     i przyjmie następną sekcję kontekstu bez zmian. */
-  assert.equal((html.match(/data-szuflada>/g) ?? []).length, 1,
-    "przycisk KONTEKST stoi przy dostawie");
-  assert.equal((html.match(/data-szuflada-zamknij>/g) ?? []).length, 1,
-    "i szuflada ma własne ZAMKNIJ");
-  assert.match(html, /id="szufladaCien"/, "przyciemnienie istnieje");
-
-  /* Klasy są UMOWĄ między arkuszem a skryptem: pasmo ustawia jedna, stan
-     wysunięcia druga. Skasowanie którejkolwiek po jednej stronie zostawia
-     szufladę, która nigdy się nie pokaże albo nigdy nie schowa. */
-  for (const klasa of ["zSzuflada", "szufladaOtwarta"]) {
-    assert.ok(html.includes(`.widok.${klasa}`) || html.includes(`.${klasa}`),
-      `${klasa} opisana w arkuszu`);
-    assert.ok(html.includes(`"${klasa}"`), `${klasa} ustawiana w skrypcie`);
+     Szuflada kontekstu i pasma szerokości odeszły bez następcy: panel ma
+     trzy kolumny z jednej definicji (`SIATKA_TRZECH_KOLUMN`), a nie własny
+     mechanizm na każdy ekran. Ten test pilnuje, że stara maszyneria nie
+     została w pliku półżywa — kod bez widoku to kod, którego nikt nie czyta. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const slad of ['id="widokDostawy"', 'id="szczegol"', 'id="lupa"', 'id="szufladaCien"',
+    "data-szuflada", "function rysujDostawy", "function otworzFormularz", "ustawSzuflade"]) {
+    assert.ok(!html.includes(slad), `ślad po dostawach: ${slad}`);
   }
-
-  /* Escape musi zdejmować NAJWYŻSZĄ warstwę i na tym kończyć. Bez wyjścia
-     z obsługi jeden klawisz zamykałby szufladę i sprawę pod nią naraz —
-     czyli wychodził z pracy, a nie z panelu obok niej. */
-  assert.match(html, /if \(szufladaW\) return ustawSzuflade\(szufladaW, false\);/,
-    "Escape zamyka szufladę i nie leci dalej do zamknięcia sprawy");
+  for (const plik of ["ekrany/Dostawy.test.tsx", "druk/szablony.test.ts"]) {
+    assert.ok(fs.existsSync(path.resolve(import.meta.dirname, "../../../panel/src", plik)),
+      `strażnik dostaw w panelu: ${plik}`);
+  }
 });
 
 test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
@@ -1013,28 +982,6 @@ test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   );
   assert.match(html, /id="allegroPrzerwij"/, "czekanie da się przerwać bez przeładowania strony");
   assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
-});
-
-test("zdjęcie w dostawie powiększa się i zamyka kliknięciem (0.205.0)", () => {
-  /* Miniatura ma 48 px, a pytanie, przy którym się jej używa, brzmi „czy to
-     TA część" — przy kartotekach różniących się końcówką nazwy tyle nie
-     wystarcza. Trzy rzeczy są tu niezbywalne i każda ma swój powód. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  /* 1. Delegacja z SEKCJI, nie z tabeli pozycji: tabelę przerysowuje każde
-        wejście w dokument, a sekcja obejmuje też zdjęcia dowodowe. */
-  assert.match(html, /\$\("szczegol"\)\.addEventListener\("click"/,
-    "powiększenie deleguje z sekcji szczegółu, nie z tabeli");
-  /* 2. Element przed skryptem — nasłuch zamknięcia rejestruje się przy
-        starcie, więc za skryptem `$("lupa")` oddałoby null i położyło panel. */
-  assert.ok(html.indexOf('id="lupa"') < html.indexOf('<script>'),
-    "lupa stoi PRZED skryptem, inaczej nasłuch dostaje null");
-  /* 3. Zamyka każde kliknięcie, nie krzyżyk — zgłoszenie mówiło wprost
-        „po ponownym kliknięciu zniknąć". Escape robi to samo. */
-  assert.match(html, /\$\("lupa"\)\.addEventListener\("click"/, "kliknięcie zamyka");
-  assert.match(html, /e\.key === "Escape" && !\$\("lupa"\)\.hidden/, "Escape też zamyka");
 });
 
 test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0)", () => {
@@ -1182,48 +1129,6 @@ test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
     }
   }
   assert.ok(znalezione >= 5, "wzorzec przestał cokolwiek znajdować — test pilnowałby pustki");
-});
-
-test("archiwum dostaw jest czipem tej samej kolejki i szuka po stronie serwera (0.235.0)", () => {
-  /* Lista rozkładania pokazuje okno importu — domyślnie czternaście dni.
-     Dostawa starsza znikała z panelu w całości: nie dało się jej otworzyć ani
-     sprawdzić, kto odłożył pozycję, choć wszystko to leży w `delivery_line`
-     i nigdy nie jest kasowane. Cztery decyzje trzymają ten ekran i każda ma
-     swój koszt, gdy zniknie. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  /* 1. CZIP, nie osobna zakładka. Pytanie „co było z fakturą z zeszłego
-        miesiąca" pada przy tej liście; zakładka obok kazałaby najpierw
-        wiedzieć, że istnieje — tak zgubiła się kiedyś „Poza WERTIS". */
-  assert.match(html, /data-stan="archiwum"/, "archiwum stoi w czipach kolejki dostaw");
-  assert.ok(
-    html.indexOf('data-stan="archiwum"') < html.indexOf('id="szukaj"'),
-    "czip jest w tej samej karcie co wyszukiwarka, nad tabelą"
-  );
-  /* 2. SZUKA SERWER. Archiwum rośnie z każdym rokiem i jedzie obcięte, więc
-        filtrowanie po stronie przeglądarki zawężałoby stronę wyników, a nie
-        zbiór: faktura sprzed roku nie znalazłaby się mimo poprawnego numeru,
-        a wyglądałoby to jak faktura, której nigdy nie było. */
-  assert.match(
-    html,
-    /\/api\/biuro\/dostawy\/archiwum\?q=\$\{encodeURIComponent\(q\)\}/,
-    "zapytanie jedzie do serwera, nie filtruje się na stronie"
-  );
-  /* 3. LICZBA CAŁEGO DOPASOWANIA na ekranie. Obcięta lista wygląda identycznie
-        jak pełna — bez tego zdania nikt nie ma jak zauważyć, że szuka dalej. */
-  assert.match(html, /pokazano \$\{archiwumLista\.length\} z \$\{archiwumIle\}/,
-    "stopka mówi, że lista jest obcięta");
-  /* 4. POBIERANE PRZY WYBRANYM CZIPIE. Lista pracy odpytuje się co pół minuty
-        i musi; archiwum zmienia się raz na dobę, gdy okno przesunie się o
-        dzień. W tle byłoby dwustoma wierszami na cykl za nic. */
-  assert.match(html, /if \(filtrDostaw === "archiwum"\) await odswiezArchiwum\(\);/,
-    "cykl odświeżania ciągnie archiwum tylko przy wybranym czipie");
-  /* 5. WYNIK PORZUCONEGO ZAPYTANIA nie osiada na ekranie. Przy wpisywaniu
-        „FZ 512" leci kilka żądań i wracają w dowolnej kolejności. */
-  assert.match(html, /if \(\$\("szukaj"\)\.value\.trim\(\) !== q \|\| filtrDostaw !== "archiwum"\) return;/,
-    "odpowiedź na nieaktualne zapytanie jest odrzucana");
 });
 
 test("dostawa spoza okna importu daje się otworzyć z panelu (0.235.0)", async () => {
@@ -1463,18 +1368,12 @@ test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
   assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
 });
 
-test("przeciągnięcie krawędzi okna przelicza pasmo szczegółu (0.427.0)", () => {
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  /* Zmierzone przed poprawką: dokument otwarty przy 1440 px i okno zwężone
-     do 1180 px zostawało bez szuflady, czyli bez kontekstu. */
-  assert.match(html, /for \(const prog of \[SZEROKO, SREDNIO\]\) \{\s*prog\.addEventListener\("change"/,
-    "oba progi pasma słuchają zmiany szerokości");
-});
-
-test("zapamiętany widok, którego nie ma, wraca na DOSTAWY (0.427.0)", () => {
+test("zapamiętany widok, którego nie ma, wraca na MAGAZYN (0.427.0, 0.435.0)", () => {
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
-  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "dostawy";/);
+  /* „dostawy" w pamięci przeglądarki to ślad sprzed 0.435.0 — widok przeszedł
+     do panelu, więc strażnik kieruje na MAGAZYN, pierwszą zakładkę Pracy. */
+  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "magazyn";/);
   assert.ok(lista, "strażnik zapamiętanego widoku istnieje");
   const nazwy = [...lista[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
   const zPaska = [...new Set([...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]))];

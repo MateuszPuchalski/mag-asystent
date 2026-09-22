@@ -843,7 +843,7 @@ Zastrzeżone są trzy rzeczy:
 
 | operacja | kto | gdzie |
 |---|---|---|
-| zdjęcie dostawy z listy jako rozłożonej poza WERTIS | biuro, admin | przeglądarka: `/biuro` → DOSTAWY |
+| zdjęcie dostawy z listy jako rozłożonej poza WERTIS | biuro, admin | przeglądarka: `/obsluga` → Dostawy |
 | zakładanie kont magazynierów | biuro, admin | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
 | konta o roli `biuro`/`admin`, wyłączanie kont, odbieranie haseł | **tylko admin** | `curl` |
 
@@ -898,10 +898,9 @@ siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
 **Zwinięta sekcja nie pyta serwera** — to nie jest chowanie pikseli, tylko
 oszczędność żądań. Wybór, co jest rozwinięte, zapamiętuje przeglądarka.
 
-**Szczegół obok listy.** Wejście w dostawę na oknie szerszym niż 1280 px
-zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty wiersz
-jest podświetlony. Na węższym oknie szczegół zasłania listę, jak wcześniej —
-dwie kolumny nie mieszczą się na laptopie obok siebie.
+**Dostawy są w panelu od 0.435.0.** Kolejka, dokument i kontekst stoją
+w trzech kolumnach `/obsluga/dostawy`, jak Zwroty. Pozycja DOSTAWY w pasku
+biura prowadzi tam razem z sesją.
 
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
@@ -2583,6 +2582,28 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.435.0 — DO DECYZJI i dostawy w panelu
+
+**Migracji nie ma. Panel trzeba przebudować.** Serwer dokłada jedną trasę
+odczytu, `GET /api/biuro/do-decyzji`, i jedno pole w wyjątkach (`dokId`).
+Kolektor tego pola nie czyta, więc APK zostaje ten sam.
+
+Co zmienia się dla biura:
+
+- **Panel otwiera się na DO DECYZJI**, a Zadania mają adres
+  `/obsluga/zadania`. Zakładka niesie licznik spraw — widać go z każdego
+  ekranu.
+- **Dostawy są w panelu**, a z `biuro.html` zniknęły. Pozycja DOSTAWY w pasku
+  biura i plakietka odpowiedzi na notatki prowadzą do panelu z sesją.
+- **Protokół dla dostawcy** otwiera się w nowej karcie pod własnym adresem.
+  Dane firmy do druków GEKO i PARTNER zostają w przeglądarce, pod tym samym
+  kluczem co dotąd. Kto drukował dotąd na tym komputerze, nie wpisuje ich
+  drugi raz.
+
+Sprawdzenie po wdrożeniu idzie tak. Wejdź do `/obsluga` kontem biura — ekran
+startowy to DO DECYZJI. Otwórz dostawę z wyjątkiem i kliknij „Protokół dla
+dostawcy”. Druk ma mieć numer faktury, dostawcę i zdjęcia z hali w aneksie.
 
 ### Aktualizacja do 0.431.0 — biuro w nagłówku panelu
 

@@ -10,8 +10,9 @@ import { token } from "./api/klient";
    Osobny plik, bo `main.tsx` montuje aplikację przy imporcie — test nie
    mógłby go wczytać bez uruchomienia całego panelu. */
 
-/** Zakładki `biuro.html`, do których panel umie jeszcze prowadzić. */
-export const WIDOKI_BIURA = ["dostawy", "magazyn", "nadzor", "dziennik", "analiza"] as const;
+/** Zakładki `biuro.html`, do których panel umie jeszcze prowadzić. Każde wydanie
+    przeprowadzki skreśla tu swój widok — DOSTAWY odeszły w 0.435.0. */
+export const WIDOKI_BIURA = ["magazyn", "nadzor", "dziennik", "analiza"] as const;
 export type WidokBiura = (typeof WIDOKI_BIURA)[number];
 
 /** Przejście do widoku, który jeszcze mieszka w `biuro.html`. */

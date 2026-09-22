@@ -18,6 +18,7 @@ import {
 } from "../services/notatki.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 import { archiwumDostaw } from "../services/archiwum-dostaw.js";
+import { doDecyzji } from "../services/do-decyzji.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
    Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro widziało
@@ -275,6 +276,23 @@ export async function biuroRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return alarmyWymiany();
+  });
+
+  /* ── DO DECYZJI (0.435.0) ────────────────────────────────────────────────
+     Ekran startowy panelu biura — wszystko, co czeka na rozstrzygnięcie
+     biura, jedną listą. Całe uzasadnienie przy `services/do-decyzji.ts`.
+
+     GET i ani jednego zapisu: to jest ekran, na który się WCHODZI, więc umowa
+     „zero zapisu przy patrzeniu" obowiązuje go bardziej niż każdy inny.
+     Bramka biura, bo lista niesie liczby kolejek klienta i rozmowy hali —
+     magazynier nie ma tu czego rozstrzygać. */
+  app.get("/api/biuro/do-decyzji", async (_req, reply) => {
+    const s = sesjaZadania();
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+    if (!ORZEKAJACY.includes(s.user.role)) {
+      return reply.code(403).send({ error: "Decyzje biura podejmuje biuro" });
+    }
+    return doDecyzji();
   });
 
   app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {

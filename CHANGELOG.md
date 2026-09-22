@@ -34,6 +34,55 @@ historii nie przepisujemy.
 ---
 
 
+## 0.435.0 — 22 września 2026
+
+**DO DECYZJI jest ekranem startowym panelu, a dostawy przeszły do panelu.**
+Drugi krok przeprowadzki biura (`docs/obsluga-klienta.md` §7, F2).
+
+**DO DECYZJI.** Jedna lista spraw, w których rozstrzyga biuro. Magazyn wchodzi
+sprawami: wyjątki dostaw, odpowiedzi hali, pominięte pozycje, koszyk czekający
+na zamknięcie, błędy zapisu do Subiekta, kolizje kodów i konto Allegro.
+Obsługa klienta wchodzi liczbą czekających spraw w każdej z czterech kolejek.
+Najpilniejsze stoją pierwsze, potem najstarsze. Wiersz prowadzi tam, gdzie
+sprawę się rozstrzyga — do panelu albo mostem do biura. Zakładka niesie
+licznik widoczny z każdego ekranu.
+
+Lista jest liczona w locie, trasą `GET /api/biuro/do-decyzji`. Nie ma własnej
+tabeli ani własnego „załatwione": gaśnie razem z przyczyną. Zakaz piątej tabeli
+nad kolejkami obowiązuje ją dosłownie i pilnuje tego test po źródle. Drugi
+test sprawdza, że odczyt nie zmienia w bazie ani jednego wiersza. Kolejki
+klienta liczą te same funkcje co ich trasy — dwie liczby o jednej kolejce się
+nie rozjadą.
+
+**Dostawy w panelu.** Kolejka, dokument i kontekst w trzech kolumnach, jak
+w Zwrotach. Kubełek DO DECYZJI zbiera faktury z otwartym wyjątkiem albo
+nieprzeczytaną odpowiedzią z hali. Wchodzą tam też faktury „zamknięte"
+i spoza okna importu. W biurze te drugie stały tylko w karcie REKLAMACJE.
+Wyjątek zamyka się przy pozycji, polem w miejscu zamiast okna. Notatka do hali
+pisze się w kontekście, obok dowodów i liczb o dostawcy. Wejście w fakturę
+dalej tylko czyta — zmierzone w Chromium: zero zapisów przy otwarciu ekranu
+i dokumentu.
+
+**Protokół dla dostawcy ma własny adres**, `/obsluga/druk/protokol/:dokId`,
+zamiast okna bez adresu z `document.write`. Szablony GEKO i PARTNER przeszły
+znak w znak i po raz pierwszy mają testy: wybór po nazwie dostawcy i ucieczkę
+znaków. Dane firmy zostają w przeglądarce, pod tym samym kluczem — nikt nie
+wpisuje ich drugi raz. Na serwer pójdą z ustawieniami (F5).
+
+**DOSTAWY zniknęły z `biuro.html`** razem z kartą reklamacji, szufladą
+kontekstu, powiększeniem i drukiem. Licznik zapisów strony spadł z 18 do 13
+POST. Pozycja DOSTAWY w pasku i plakietka odpowiedzi prowadzą do panelu
+z sesją, więc nikt nie loguje się drugi raz. Biuro wstaje odtąd na MAGAZYNIE.
+Pięć testów strony odeszło z widokiem, dwa pilnują odtąd nowej drogi. Ich
+gwarancje przejęły `ekrany/Dostawy.test.tsx` i `druk/szablony.test.ts`, a test
+w biurze pilnuje, że nie został po nich martwy kod.
+
+**Wyjątek niesie `dokId`.** Bez niego otwarty wyjątek faktury spoza okna
+importu nie miał adresu w panelu. Kolektor pola nie czyta
+(`ignoreUnknownKeys`), więc APK zostaje ten sam.
+
+**Zadania mają adres `/obsluga/zadania`** i stoją na końcu górnego rzędu.
+
 ## 0.431.0 — 22 września 2026
 
 **Decyzja właściciela: jeden front, i jego pierwszy krok.** Całe biuro

@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, LogOut, MessagesSquare, Package, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
+import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Package, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
 import { doBiura, type WidokBiura } from "./mostBiura";
 import { useKolejkaWiedzy } from "./api/wiedza";
+import { useDoDecyzji } from "./api/decyzje";
 import { czas, godzina } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
@@ -19,6 +20,9 @@ import { Wzmianki } from "./ekrany/Wzmianki";
 import { Moje } from "./ekrany/Moje";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
+import { DoDecyzji } from "./ekrany/DoDecyzji";
+import { Dostawy } from "./ekrany/Dostawy";
+import { Protokol } from "./druk/Protokol";
 import "./index.css";
 
 /* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
@@ -48,7 +52,11 @@ const klient = new QueryClient({
 const USTAWIENIA = "/obsluga/ustawienia";
 
 const ZAKLADKI = [
-  { do: "/obsluga/", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: true },
+  /* DO DECYZJI JEST DOMEM PANELU (0.435.0) — cel biura z §7 w jednym widoku:
+     wszystko, co czeka na rozstrzygnięcie biura, z magazynu i z obsługi naraz.
+     Zadania zeszły pod własny adres na koniec rzędu: to praca zlecana hali,
+     a nie to, od czego biuro zaczyna dzień. */
+  { do: "/obsluga/", etykieta: "Do decyzji", ikona: <ListChecks size={16} />, korzen: true },
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
   { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false },
@@ -64,6 +72,7 @@ const ZAKLADKI = [
   { do: "/obsluga/moje", etykieta: "Moje", ikona: <Briefcase size={16} />, korzen: false },
   { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
+  { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false },
 ];
 
 /* ── DRUGI RZĄD: MAGAZYN I WGLĄD (0.431.0) ─────────────────────────────────
@@ -79,9 +88,13 @@ const ZAKLADKI = [
    i nazwę widoku w kluczach, które `biuro.html` czyta przy starcie. Człowiek
    nie loguje się drugi raz. Pozycja z `biuro` znika z tej tablicy razem
    z przeprowadzką jej widoku; ostatnia zabiera ze sobą cały most (F6). */
-type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode; biuro: WidokBiura };
+/* Pozycja PRZENIESIONA niesie adres panelu (`do`), jeszcze nieprzeniesiona —
+   widok biura (`biuro`). Dwa pola zamiast jednego z prefiksem, bo inaczej
+   wygląda i inaczej się zachowuje: pierwsza jest zakładką, druga wyjściem. */
+type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode }
+  & ({ do: string } | { biuro: WidokBiura });
 const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
-  { etykieta: "Dostawy", ikona: <Truck size={16} />, biuro: "dostawy" },
+  { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },
   { etykieta: "Kosze", ikona: <Package size={16} />, biuro: "magazyn" },
   "kreska",
   { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
@@ -91,9 +104,18 @@ const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
 
 function DrugiRzad() {
   const ja = useJa();
+  const { pathname } = useLocation();
   return <nav aria-label="Magazyn i wgląd" className="flex rounded-lg bg-white/5 p-1">
     {DRUGI_RZAD.map((z, i) => z === "kreska"
       ? <span key={i} aria-hidden="true" className="mx-1.5 my-1 w-px bg-white/15" />
+      /* Przeniesiony ekran jest zwykłą zakładką — ta sama barwa aktywnej co
+         w górnym rzędzie, bo to ten sam rodzaj przejścia.
+         bursztyn: zakładka na ciemnym tle jest marką */
+      : "do" in z
+        ? <Link key={z.do} to={z.do}
+            className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold ${
+              pathname.startsWith(z.do) ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
+            {z.ikona}{z.etykieta}</Link>
       /* Link do STAREGO ekranu dostaje strzałkę „na zewnątrz": człowiek ma
          wiedzieć, że wychodzi z panelu, zanim zobaczy inny wygląd. */
       : <a key={z.biuro} href="/biuro" onClick={() => doBiura(z.biuro, ja.data?.user.name ?? "")}
@@ -114,6 +136,15 @@ function LicznikWiedzy() {
   if (!data?.liczba) return null;
   return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
     aria-label={`propozycji wiedzy do rozstrzygnięcia: ${data.liczba}`}>{data.liczba}</span>;
+}
+
+/* Ta sama zasada co przy wzmiankach: sprawa czekająca na biuro ma być widoczna
+   z każdego ekranu, a nie dopiero po wejściu na DO DECYZJI. */
+function LicznikDecyzji() {
+  const { data } = useDoDecyzji();
+  if (!data?.liczniki.wszystko) return null;
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
+    aria-label={`spraw do decyzji: ${data.liczniki.wszystko}`}>{data.liczniki.wszystko}</span>;
 }
 
 function LicznikWzmianek() {
@@ -184,6 +215,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
             className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
             {z.ikona}{z.etykieta}
+            {z.do === "/obsluga/" && <LicznikDecyzji />}
             {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}
             {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>;
         })}
@@ -221,7 +253,14 @@ function App() {
     return () => window.removeEventListener(SESJA_WYGASLA, naWygasniecie);
   }, []);
   if (!zalogowany) return <Logowanie zalogowano={() => setZalogowany(true)} />;
-  return <BramkaRoli wyloguj={wyloguj}><Rama wyloguj={wyloguj} /></BramkaRoli>;
+  /* Druk protokołu rysuje się POZA ramą: to kartka do wydruku, nie ekran
+     pracy, więc bez nagłówka i zakładek (0.435.0). */
+  return <BramkaRoli wyloguj={wyloguj}>
+    <Routes>
+      <Route path="/obsluga/druk/protokol/:dokId" element={<Protokol />} />
+      <Route path="*" element={<Rama wyloguj={wyloguj} />} />
+    </Routes>
+  </BramkaRoli>;
 }
 
 /* Magazynier dostaje zdanie zamiast pustych kolumn (0.431.0). Dopóki rola
@@ -277,7 +316,12 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         wypowiedziach (`Os.tsx`), bo tylko tam jest czego pilnować. */}
     <main className="w-full p-5 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
       <Routes>
-        <Route path="/obsluga/" element={<Zadania />} />
+        <Route path="/obsluga/" element={<DoDecyzji />} />
+        <Route path="/obsluga/zadania" element={<Zadania />} />
+        {/* Dostawa ma własny adres po numerze dokumentu z Subiekta — powód
+            przy nagłówku `ekrany/Dostawy.tsx`. */}
+        <Route path="/obsluga/dostawy" element={<Dostawy />} />
+        <Route path="/obsluga/dostawy/:id" element={<Dostawy />} />
         {/* Rozmowa ma własny adres, więc odświeżenie strony jej nie gubi,
             a link do sprawy da się wkleić koledze. */}
         <Route path="/obsluga/skrzynka" element={<Skrzynka />} />

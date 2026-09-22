@@ -328,6 +328,15 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > i poprawki z audytu. F2 to DO DECYZJI i dostawy, F3 kosze, a F4 stan
 > systemu, dziennik i analiza. F5 to ustawienia, a F6 przekierowuje `/biuro`
 > i kasuje plik. Każde wydanie usuwa z `biuro.html` dokładnie to, co przeniosło.
+>
+> **F2 w 0.435.0.** DO DECYZJI stanęło jako ekran startowy panelu, liczone
+> w locie z istniejących źródeł — bez tabeli i bez własnego statusu, zgodnie
+> z zakazem piątej tabeli nad kolejkami. DOSTAWY przeszły do panelu i zniknęły
+> z `biuro.html` razem ze swoimi strażnikami; ich gwarancje przejęły testy
+> ekranu w panelu. Jedno odstępstwo od planu: dane firmy do druków NIE poszły
+> jeszcze na serwer. Druk w panelu czyta ten sam klucz przeglądarki co biuro,
+> bo oba fronty stoją na jednym originie. Przeniesienie czeka na F5, bo
+> wymagałoby zmiany zapisu w `biuro.html`, któremu nic nowego nie wolno.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
