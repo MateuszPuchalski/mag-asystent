@@ -304,3 +304,49 @@ describe("Kotwica przy najnowszej wiadomości", () => {
     expect(skok).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("Kto mówi, widać z drugiego końca biurka (0.416.0)", () => {
+  /* Zgłoszenie właściciela ze zrzutem: „wiadomości nasze, klienta i Allegro
+     powinny być łatwo wizualnie rozpoznawalne". Do tego wydania trzy role
+     różniły się WYŁĄCZNIE tłem — #ffffff, #f8fafc i #f8fafc — czyli dwie
+     z nich nie różniły się wcale. Testy pilnują TRZECH sygnałów naraz, bo
+     sam kolor odpada przy wadzie wzroku i na tanim monitorze. */
+  const karta = (tresc: string) => screen.getByText(tresc).closest("li")!;
+
+  it("klient, my i automat mają TRZY różne listwy", () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
+      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
+      wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null, tresc: "od automatu" }),
+    ]} />);
+    expect(karta("od klienta").className).toContain("border-l-wertis-amber");
+    expect(karta("od nas").className).toContain("border-l-slate-300");
+    /* Automat nie jest człowiekiem i ma tak wyglądać. */
+    expect(karta("od automatu").className).toContain("border-dashed");
+  });
+
+  it("strona karty mówi, czyja to wypowiedź — nasza odsunięta, cudza nie", () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} czat={[
+      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
+    ]} />);
+    expect(karta("od nas").className).toContain("ml-8");
+    expect(karta("od klienta").className).toContain("mr-8");
+  });
+
+  it("doradca Allegro to CZŁOWIEK, ale nie nasz klient — własny błękit", () => {
+    /* Odpowiada mu się inaczej niż kupującemu, więc nie ma prawa wyglądać
+       jak on ani jak automat. */
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" })]} />);
+    expect(karta("od doradcy").className).toContain("border-l-sky-400");
+    expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
+  });
+
+  it("rola spoza zbioru mówi „nie wiem, kto to”, zamiast udawać klienta", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "COURIER", autorLogin: null, tresc: "nowa rola" })]} />);
+    expect(screen.getByText("COURIER")).toBeInTheDocument();
+    expect(karta("nowa rola").className).toContain("border-dotted");
+  });
+});

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Bot, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
@@ -15,20 +16,53 @@ import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
    trójstronna: `BUYER`, `SELLER` i `ADMIN`, czyli doradca Allegro. Bez
    wyraźnego podpisu agent odpowiadałby doradcy tak, jak odpowiada klientowi. */
 
-const ROLE: Record<string, { etykieta: string; klasa: string; nasza: boolean }> = {
-  BUYER: { etykieta: "Klient", klasa: "bg-white border-slate-200", nasza: false },
-  /* ── NASZA STRONA CICHNIE, NIE KRZYCZY (0.265.0) ─────────────────────────────
+/* ── KTO MÓWI, WIDAĆ Z DRUGIEGO KOŃCA BIURKA (0.416.0) ───────────────────────
+   Zgłoszenie właściciela ze zrzutem: „wiadomości nasze, klienta i Allegro
+   powinny być łatwo wizualnie rozpoznawalne". Miał rację — do tego wydania
+   trzy role różniły się WYŁĄCZNIE tłem: #ffffff, #f8fafc i #f8fafc. Pierwsze
+   dwa dzieli na ekranie mniej niż dwa procent jasności, a trzecie jest z nimi
+   tożsame. Jedyną prawdziwą różnicą było wcięcie naszej odpowiedzi.
+
+   TRZY SYGNAŁY NARAZ, NIE SAM KOLOR: pionowa listwa przy krawędzi, ikona przy
+   podpisie i strona, po której karta stoi. Sam kolor odpada przy wadzie wzroku
+   i na tanim monitorze magazynowym — a kolejka reklamacji bywa czytana na
+   jednym i drugim.
+
+   BURSZTYN ZOSTAJE PRZY KLIENCIE, tak jak na osi skrzynki od 0.247.0: to jest
+   ta sama rozmowa z tym samym człowiekiem, tylko innym wejściem. Nasza strona
+   cichnie (0.265.0), automat Allegro dostaje listwę przerywaną, bo nie jest
+   człowiekiem, a doradca — własny błękit, bo jest człowiekiem, ale nie naszym
+   klientem i odpowiada mu się inaczej. */
+const ROLE: Record<string, {
+  etykieta: string; klasa: string; listwa: string; Ikona: LucideIcon; nasza: boolean;
+}> = {
+  BUYER: {
+    etykieta: "Klient", Ikona: User, nasza: false,
+    klasa: "bg-white border-slate-200", listwa: "border-l-4 border-l-wertis-amber",
+  },
+  /* ── NASZA STRONA CICHNIE, NIE KRZYCZY (0.265.0) ───────────────────────────
      Do 0.264.0 nasza wypowiedź była tu BURSZTYNOWA, a klienta — biała. Na osi
      skrzynki jest dokładnie odwrotnie: bursztyn to podpis KLIENTA, a naszą
      odpowiedź 0.247.0 świadomie wygasiło („podkreślaj przez wygaszanie" —
      pytanie zostaje jedyną kartą z cieniem). Ta sama barwa znaczyła więc
-     w dwóch oknach dwie przeciwne strony rozmowy.
-
-     Wyrównujemy do skrzynki, bo tam decyzja ma uzasadnienie i pomiar. */
-  SELLER: { etykieta: "My", klasa: "bg-os-firma border-slate-200", nasza: true },
-  ADMIN: { etykieta: "Doradca Allegro", klasa: "bg-sky-50 border-sky-200", nasza: false },
-  SYSTEM: { etykieta: "Allegro (automat)", klasa: "bg-slate-50 border-slate-200", nasza: false },
-  FULFILLMENT: { etykieta: "Magazyn Allegro", klasa: "bg-slate-50 border-slate-200", nasza: false },
+     w dwóch oknach dwie przeciwne strony rozmowy. */
+  SELLER: {
+    etykieta: "My", Ikona: Store, nasza: true,
+    klasa: "bg-os-firma border-slate-200", listwa: "border-l-4 border-l-slate-300",
+  },
+  ADMIN: {
+    etykieta: "Doradca Allegro", Ikona: LifeBuoy, nasza: false,
+    klasa: "bg-sky-50 border-sky-200", listwa: "border-l-4 border-l-sky-400",
+  },
+  /* Automat nie jest człowiekiem i ma tak wyglądać: listwa PRZERYWANA. */
+  SYSTEM: {
+    etykieta: "Allegro (automat)", Ikona: Bot, nasza: false,
+    klasa: "bg-slate-50 border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
+  },
+  FULFILLMENT: {
+    etykieta: "Magazyn Allegro", Ikona: Bot, nasza: false,
+    klasa: "bg-slate-50 border-slate-200", listwa: "border-l-4 border-dashed border-l-slate-400",
+  },
 };
 
 /**
@@ -205,14 +239,19 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
           Rozmowy jeszcze nie pobrano.</Pusto>
       : <ol className="flex flex-col gap-2">
           {czat.map((w, i) => {
+            /* Rola spoza zbioru dostaje kształt NIEZNANEGO, a nie kształt
+               klienta: schemat Allegro może dołożyć wartość, a wtedy ekran ma
+               powiedzieć „nie wiem, kto to", zamiast zgadywać stronę. */
             const rola = ROLE[w.autorRola ?? ""] ?? {
-              etykieta: w.autorRola ?? "Nieznany autor",
-              klasa: "bg-white border-slate-200", nasza: false,
+              etykieta: w.autorRola ?? "Nieznany autor", Ikona: User, nasza: false,
+              klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dotted border-l-slate-400",
             };
             return <li key={w.id}
               ref={i === czat.length - 1 ? koniec : undefined}
-              className={`rounded-lg border p-3 ${rola.klasa} ${rola.nasza ? "ml-8" : "mr-8"}`}>
+              className={`rounded-lg border p-3 ${rola.klasa} ${rola.listwa} ${
+                rola.nasza ? "ml-8" : "mr-8"}`}>
               <div className="flex items-center gap-2 text-xs">
+                <rola.Ikona size={13} aria-hidden="true" className="shrink-0 text-slate-600" />
                 <b className="text-slate-700">{rola.etykieta}</b>
                 {/* Login bywa PUSTY i to jest udokumentowane: schemat mówi „not
                     present if role is ADMIN, SYSTEM or FULFILLMENT". */}
