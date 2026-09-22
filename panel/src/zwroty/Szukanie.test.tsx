@@ -15,10 +15,18 @@ const ETYKIETA = "600000367616070023174201";
 const PACZKI: PaczkaKlienta[] = [
   { orderId: "ord-nowy", kupionoAt: "2026-08-20T10:00:00Z", sumaGrosze: 20496,
     waluta: "PLN", pozycji: 1, zawartosc: "Sekator ×1", maZwrot: false,
-    odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k" },
+    odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k",
+    /* Dwie paczki tego samego nazwiska z RÓŻNYCH ulic — tak wygląda przypadek,
+       dla którego adres wszedł do wiersza w 0.422.0. */
+    odbiorcaTelefon: "++48 663 509 353", odbiorcaUlica: "Polna 7",
+    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-001" },
   { orderId: "ord-stary", kupionoAt: "2026-06-01T10:00:00Z", sumaGrosze: 9900,
     waluta: "PLN", pozycji: 2, zawartosc: "Wąż 20 m ×1 · Złączka ×2", maZwrot: true,
-    odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k" },
+    odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k",
+    /* Bez telefonu — `phoneNumber` nie stoi w `required` schematu Allegro,
+       więc wiersz musi to znieść i nie pokazać samego separatora. */
+    odbiorcaTelefon: null, odbiorcaUlica: "Leśna 2",
+    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-002" },
 ];
 
 const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Szukanie>> = {}) => {
@@ -212,10 +220,32 @@ describe("Pole szukania zwrotu", () => {
     const p = pokaz(null);
     await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
     await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-7");
-    await userEvent.type(screen.getByLabelText("Login albo nazwisko z naklejki"), "Kowalski");
+    await userEvent.type(screen.getByLabelText("Login, nazwisko albo telefon"), "Kowalski");
     await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
     expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
       waybill: "PACZ-7", login: "Kowalski" }));
+  });
+
+  it("wiersz paczki niesie ULICĘ — bez niej dwaj Kowalscy są nierozróżnialni", async () => {
+    /* Szukanie po fragmencie nazwiska świadomie pokazuje cudze zakupy przy
+       zbieżności nazwisk (0.367.0). Do 0.421.1 operator nie miał czym tych
+       dwoje rozróżnić: wiersz niósł samą nazwę. Z tego ekranu wychodzi się
+       z czyimś numerem zamówienia w ręku, więc to nie jest ozdoba. */
+    pokaz(null, { paczki: PACZKI });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText(/Polna 7/)).toBeInTheDocument();
+    expect(screen.getByText(/Leśna 2/)).toBeInTheDocument();
+  });
+
+  it("paczka BEZ telefonu nie pokazuje samego separatora", async () => {
+    /* `phoneNumber` nie stoi w `required` schematu `CheckoutFormDeliveryAddress`,
+       więc brak numeru to normalny stan, nie usterka synchronizacji. */
+    pokaz(null, { paczki: PACZKI });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    const wiersz = screen.getByText(/Leśna 2/).textContent ?? "";
+    expect(wiersz).toBe("Leśna 2 · 61-002 Poznań");
+    expect(screen.getByText(/Polna 7/).textContent)
+      .toBe("Polna 7 · 61-001 Poznań · ++48 663 509 353");
   });
 
   it("przewoźnik z naklejki idzie z LISTY, nie z pisania", async () => {
@@ -236,7 +266,7 @@ describe("Pole szukania zwrotu", () => {
        w dzienniku odczytów cudzych danych. */
     const p = pokaz(null);
     await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    const pole = screen.getByLabelText("Login albo nazwisko z naklejki");
+    const pole = screen.getByLabelText("Login, nazwisko albo telefon");
     await userEvent.type(pole, "Kowalski");
     expect(p.onLogin).not.toHaveBeenCalled();
     await userEvent.type(pole, "{Enter}");

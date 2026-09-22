@@ -480,6 +480,13 @@ export interface PaczkaKlienta {
   odbiorcaNazwa: string | null;
   /** Login kupującego — paczkę znalezioną po nazwisku trzeba zapisać z nim. */
   kupujacyLogin: string | null;
+  /* ── Reszta adresu (0.422.0) ─────────────────────────────────────────────
+     Do ROZRÓŻNIANIA trafień, nie do szukania. Telefon bywa `null` także przy
+     pełnym adresie: `phoneNumber` nie stoi w `required` schematu Allegro. */
+  odbiorcaTelefon: string | null;
+  odbiorcaUlica: string | null;
+  odbiorcaMiasto: string | null;
+  odbiorcaKod: string | null;
 }
 
 /**

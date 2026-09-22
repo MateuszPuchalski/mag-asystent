@@ -1851,8 +1851,10 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- powodu: zamówienie bywa jeszcze niepobrane albo wypadło z okna.
   --
   -- JEDNA kolumna na imię, nazwisko albo nazwę firmy. Szukanie ich nie
-  -- rozróżnia. Ulica, miasto, kod pocztowy, telefon i e-mail zostają
-  -- zablokowane — zdjęcie polityki kończy się na nazwie.
+  -- rozróżnia. Reszty adresu tu NIE MA i nie będzie: zwrot bierze ją
+  -- z zamówienia, a druga kopia rozjechałaby się przy pierwszej zmianie
+  -- adresu u Allegro. Blokadę adresu zdjęto w 0.422.0 wyłącznie po stronie
+  -- `zamowienie_klienta`.
   odbiorca_nazwa TEXT,
   -- ── Dokument sprzedaży z Subiekta (0.174.0) ─────────────────────────────
   -- Numer, po którym biuro odnajduje sprzedaż, żeby wystawić korektę. Wskazuje
@@ -2133,6 +2135,26 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   -- Gdy jest `companyName`, bierzemy jego: paczka firmowa nosi nazwę firmy
   -- zamiast osoby i bez tego zostałaby nieodnajdywalna.
   odbiorca_nazwa TEXT,
+  -- ── CAŁY ADRES DOSTAWY (0.422.0) ────────────────────────────────────────
+  -- Decyzją właściciela blokada adresu zdjęta. Do 0.421.1 z `delivery.address`
+  -- wchodziła TYLKO nazwa — reszta nie miała nawet kolumn, żeby mapowanie nie
+  -- zapisało jej przez pomyłkę. Powód zdjęcia: agent dostaje od klienta numer
+  -- telefonu i nie miał po czym znaleźć zamówienia, a dwaj klienci o tym
+  -- samym nazwisku byli w panelu nierozróżnialni. Zakres i uzasadnienie stoją
+  -- w `docs/obsluga-klienta.md`.
+  --
+  -- `phoneNumber` NIE JEST polem wymaganym w `CheckoutFormDeliveryAddress`
+  -- (lista `required` w `docs/allegro/swagger.yaml`), więc bywa puste i ekran
+  -- musi to znieść. `street`, `city` i `zipCode` wymagane są.
+  odbiorca_telefon TEXT,
+  -- Same cyfry telefonu, do SZUKANIA. Allegro oddaje numer tak, jak wpisał go
+  -- człowiek: „+48123123123", „++48 663509353", z myślnikami. Porównanie znak
+  -- w znak nie trafiłoby ani razu, a `replace()` w zapytaniu liczyłby to samo
+  -- przy każdym wierszu. Wyliczamy RAZ, przy zapisie.
+  odbiorca_telefon_cyfry TEXT,
+  odbiorca_ulica TEXT,
+  odbiorca_miasto TEXT,
+  odbiorca_kod TEXT,
   -- Koszt dostawy, czyli składnik, którego zwrotowi BRAKOWAŁO w 0.150.0.
   -- Bez niego wariant „bez wysyłki" był nieodróżnialny od pełnej kwoty.
   dostawa_grosze INTEGER,

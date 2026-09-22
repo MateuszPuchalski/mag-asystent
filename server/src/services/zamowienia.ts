@@ -57,6 +57,13 @@ export interface Zamowienie {
   kupujacyLogin: string | null;
   /** Nazwa odbiorcy Z NAKLEJKI (0.367.0) — po niej szuka się wracającej paczki. */
   odbiorcaNazwa: string | null;
+  /* Reszta adresu dostawy (0.422.0). `odbiorcaTelefon` bywa `null` także przy
+     zamówieniu z pełnym adresem: `phoneNumber` nie stoi w `required` schematu
+     `CheckoutFormDeliveryAddress`. Ekran ma to znieść, nie zgadywać. */
+  odbiorcaTelefon: string | null;
+  odbiorcaUlica: string | null;
+  odbiorcaMiasto: string | null;
+  odbiorcaKod: string | null;
   dostawaGrosze: number | null;
   dostawaMetoda: string | null;
   /** `ONLINE`, `CASH_ON_DELIVERY`, … — surowo, bo Allegro nie zamyka listy. */
@@ -99,6 +106,10 @@ export function naZamowienie(
     status: (zam.status as string) ?? null,
     kupujacyLogin: (zam.kupujacy_login as string) ?? null,
     odbiorcaNazwa: (zam.odbiorca_nazwa as string) ?? null,
+    odbiorcaTelefon: (zam.odbiorca_telefon as string) ?? null,
+    odbiorcaUlica: (zam.odbiorca_ulica as string) ?? null,
+    odbiorcaMiasto: (zam.odbiorca_miasto as string) ?? null,
+    odbiorcaKod: (zam.odbiorca_kod as string) ?? null,
     dostawaGrosze: zam.dostawa_grosze == null ? null : Number(zam.dostawa_grosze),
     dostawaMetoda: (zam.dostawa_metoda as string) ?? null,
     platnoscTyp: (zam.platnosc_typ as string) ?? null,
@@ -199,6 +210,16 @@ export interface PaczkaKlienta {
   maZwrot: boolean;
   /** Nazwa odbiorcy z naklejki (0.367.0) — to po niej operator rozpoznaje paczkę. */
   odbiorcaNazwa: string | null;
+  /* ── Reszta adresu (0.422.0) ─────────────────────────────────────────────
+     Nie po to, żeby po nich szukać, tylko żeby ROZRÓŻNIĆ trafienia. Szukanie
+     po fragmencie nazwiska od 0.367.0 świadomie pokazuje cudze zakupy przy
+     zbieżności nazwisk i mówi o tym wprost — a operator nie miał wtedy
+     niczego, czym by tych dwoje od siebie odróżnił. Ulica rozstrzyga to
+     w jednym spojrzeniu; miasto samo nie, bo zbieżność bywa w jednym mieście. */
+  odbiorcaTelefon: string | null;
+  odbiorcaUlica: string | null;
+  odbiorcaMiasto: string | null;
+  odbiorcaKod: string | null;
   /**
    * Login kupującego (0.367.0).
    *
@@ -212,6 +233,16 @@ export interface PaczkaKlienta {
 
 /** Od ilu znaków wolno szukać po nazwie. Poniżej trafiałoby pół sklepu. */
 const MIN_NAZWY = 3;
+
+/**
+ * Od ilu CYFR wolno szukać po telefonie.
+ *
+ * Dziewięć, bo tyle ma polski numer bez prefiksu kraju — krótszy ciąg to
+ * fragment, a fragment numeru telefonu nie jest uchwytem, tylko losowaniem.
+ * Ośmiocyfrowy ogon trafiłby w kilka numerów naraz i ekran oddałby cudze
+ * zakupy pod czyimś telefonem.
+ */
+const MIN_TELEFONU = 9;
 
 /**
  * Znaki, które w `LIKE` znaczą co innego, niż wyglądają.
@@ -241,9 +272,17 @@ function doLike(fraza: string): string {
  *     z drugim imieniem, z firmą przed nazwiskiem albo z ogonkiem zjedzonym
  *     przez drukarkę. Żądanie dokładności zamieniłoby ten uchwyt w martwy.
  *
+ *   • TELEFON — od 0.422.0, po KOŃCÓWCE, od `MIN_TELEFONU` cyfr. Obie strony
+ *     sprowadzamy do samych cyfr, bo `+48 663 509 353` wpisane przez klienta
+ *     i `++48663509353` zapisane przez Allegro to ten sam numer w trzech
+ *     kształtach. Końcówka, nie równość: prefiks kraju bywa po jednej
+ *     stronie i nie ma po drugiej.
+ *
  * Różnica jest świadoma i ma cenę: fragment nazwiska POKAŻE cudze zakupy,
  * jeśli dwoje ludzi nazywa się tak samo. Dlatego wiersz listy niesie nazwę
- * odbiorcy — wybiera człowiek, patrząc na wszystkie trafienia naraz.
+ * odbiorcy, a od 0.422.0 także ulicę, miasto i telefon — wybiera człowiek,
+ * patrząc na wszystkie trafienia naraz. Telefon takiej ceny nie ma: dwoje
+ * ludzi o jednym nazwisku ma dwa różne numery.
  */
 export function paczkiKlienta(
   konto: number, szukane: string, database: Db = defaultDb(), limit = 20,
@@ -253,21 +292,30 @@ export function paczkiKlienta(
   /* Pusty wzorzec, gdy uchwyt jest za krótki — dopasowanie po nazwie wtedy
      po prostu nie zachodzi, a gałąź po loginie działa dalej. */
   const wzorzec = szukany.length >= MIN_NAZWY ? `%${doLike(szukany)}%` : null;
+  /* Telefon dopasowujemy PO KOŃCÓWCE, więc wzorzec ma procent tylko z przodu.
+     `doLike` tu nie wchodzi: po `replace(/\D+/g,"")` nie ma czego uciekać. */
+  const cyfry = (szukany.match(/\d/g) ?? []).join("");
+  const telefon = cyfry.length >= MIN_TELEFONU ? `%${cyfry}` : null;
 
   const zamowienia = database.prepare(
-    `SELECT id, external_id, kupiono_at, suma_grosze, waluta, odbiorca_nazwa, kupujacy_login
+    `SELECT id, external_id, kupiono_at, suma_grosze, waluta, odbiorca_nazwa, kupujacy_login,
+            odbiorca_telefon, odbiorca_ulica, odbiorca_miasto, odbiorca_kod
        FROM zamowienie_klienta
       WHERE channel_account_id = ?
         AND (lower(kupujacy_login) = lower(?)
-             OR (? IS NOT NULL AND lower(odbiorca_nazwa) LIKE lower(?) ESCAPE '\\'))
+             OR (? IS NOT NULL AND lower(odbiorca_nazwa) LIKE lower(?) ESCAPE '\\')
+             OR (? IS NOT NULL AND odbiorca_telefon_cyfry LIKE ?))
       /* Najnowsze pierwsze, a bez daty na końcu: zamówienie bez daty zakupu
          jest niedokończonym zapisem synchronizacji, nie świeżym zakupem.
          Bez odwrotnych apostrofów w tym komentarzu — zamknęłyby szablon. */
       ORDER BY kupiono_at IS NULL, kupiono_at DESC, id DESC
-      LIMIT ?`).all(konto, szukany, wzorzec, wzorzec, Math.max(1, limit)) as Array<{
+      LIMIT ?`).all(konto, szukany, wzorzec, wzorzec, telefon, telefon,
+    Math.max(1, limit)) as Array<{
     id: number; external_id: string; kupiono_at: string | null;
     suma_grosze: number | null; waluta: string; odbiorca_nazwa: string | null;
-    kupujacy_login: string | null;
+    kupujacy_login: string | null; odbiorca_telefon: string | null;
+    odbiorca_ulica: string | null; odbiorca_miasto: string | null;
+    odbiorca_kod: string | null;
   }>;
   if (!zamowienia.length) return [];
 
@@ -309,6 +357,10 @@ export function paczkiKlienta(
       maZwrot: zeZwrotem.has(String(z.external_id)),
       odbiorcaNazwa: z.odbiorca_nazwa ?? null,
       kupujacyLogin: z.kupujacy_login ?? null,
+      odbiorcaTelefon: z.odbiorca_telefon ?? null,
+      odbiorcaUlica: z.odbiorca_ulica ?? null,
+      odbiorcaMiasto: z.odbiorca_miasto ?? null,
+      odbiorcaKod: z.odbiorca_kod ?? null,
     };
   });
 }

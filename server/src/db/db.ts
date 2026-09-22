@@ -493,6 +493,16 @@ export function migrate(database: DatabaseSync) {
      zamówień i lista zakazanych członów w `migracja-zwrotow.test.ts`. */
   addColumn("zwrot_klienta", "odbiorca_nazwa", "TEXT");
   addColumn("zamowienie_klienta", "odbiorca_nazwa", "TEXT");
+  /* ── Reszta adresu dostawy (0.422.0) ─────────────────────────────────────
+     Blokada zdjęta decyzją właściciela; powód i zakres w
+     `docs/obsluga-klienta.md`. Kolumny dokładamy TYLKO przy zamówieniu —
+     zwrot bierze adres z zamówienia, więc druga kopia rozjechałaby się przy
+     pierwszej zmianie adresu u Allegro. */
+  addColumn("zamowienie_klienta", "odbiorca_telefon", "TEXT");
+  addColumn("zamowienie_klienta", "odbiorca_telefon_cyfry", "TEXT");
+  addColumn("zamowienie_klienta", "odbiorca_ulica", "TEXT");
+  addColumn("zamowienie_klienta", "odbiorca_miasto", "TEXT");
+  addColumn("zamowienie_klienta", "odbiorca_kod", "TEXT");
   /* Dokument sprzedaży z Subiekta przy zwrocie (0.174.0). Numer trzymamy
      SNAPSHOTEM, bo `sgt_faktura` czyści się przy każdym imporcie i dokument
      wypada z okna — powiązanie musi przeżyć własne źródło. */

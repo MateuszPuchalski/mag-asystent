@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.422.0 — 22 września 2026
+
+**Adres dostawy odblokowany, szukanie po numerze telefonu.** Decyzja
+właściciela, drugie i szersze cofnięcie polityki danych po 0.367.0. Zakres,
+powód i granice stoją w `docs/obsluga-klienta.md`.
+
+- **Powód:** klient pisze „gdzie moja paczka" i podaje SAM NUMER TELEFONU.
+  Numer nie istniał nigdzie w panelu ani w trasach serwera, więc agent musiał
+  wyjść do Allegro albo Sellasista, zamienić go na login i wrócić.
+- **Ulica, miasto, kod i telefon** z `delivery.address` wchodzą do
+  `zamowienie_klienta` nazwanymi kolumnami. Telefon dostaje drugą kolumnę
+  z samymi cyframi: Allegro zapisuje numer tak, jak wpisał go człowiek.
+- **Szukanie paczek klienta przyjmuje trzeci uchwyt.** Login w całości,
+  nazwisko po fragmencie, telefon po KOŃCÓWCE od dziewięciu cyfr. Cztery
+  kształty numeru trafiają w tę samą paczkę.
+- **Wiersz paczki niesie ulicę i telefon.** Szukanie po fragmencie nazwiska
+  świadomie pokazuje cudze zakupy przy zbieżności nazwisk, a operator nie miał
+  dotąd czym rozróżnić dwóch Kowalskich z jednego miasta.
+- **Czego to NIE zdejmuje:** `invoice.address`, dane z `buyer`, e-mail, PESEL
+  i konto bankowe. Lądowisko `surowe_json` dalej wycina cały `address`,
+  a raport sondy kształtu tych pól nie pokazuje.
+- **[wymaga działania]** Adres pojawi się dopiero przy kolejnej synchronizacji
+  zamówień — wiersze pobrane wcześniej mają nowe kolumny puste.
+
 ## 0.421.1 — 22 września 2026
 
 **Pomiar wyjściowy panelu obsługi wobec baterii ośmiu zadań agenta.**

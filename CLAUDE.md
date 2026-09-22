@@ -59,13 +59,17 @@ bundlera), panel obsługi klienta (`panel/`, React + Vite), kolektor Android
 - **Tickery wyłącznie w `main()`**, nigdy w `buildApp()` (testy tras nie
   strzelają do Allegro). Dziś żadnego nie ma — gdy wróci, rytm bierze
   z `services/takt.ts` (rozrzut, respekt dla 429).
-- **Prywatność:** adresy dostawy nie przechodzą przez mapowanie (pilnują
-  testy). Od 0.367.0 jest z tego JEDEN wyjątek, decyzją właściciela: sama
-  NAZWA odbiorcy z `delivery.address`, bo po niej szuka się paczki, której
-  klient nie odebrał. Ulica, miasto, kod i telefon zostają zablokowane,
-  a lądowisko nazwy nie dostaje. Zakres i powód stoją w
+- **Prywatność:** adres DOSTAWY przechodzi przez mapowanie od 0.422.0,
+  decyzją właściciela, i to jest wyjątek, nie nowa zasada. Wchodzą cztery pola
+  `delivery.address` — ulica, miasto, kod i telefon — plus nazwa odbiorcy
+  od 0.367.0. Telefon dostaje drugą kolumnę z samymi cyframi, bo szuka się po
+  końcówce numeru. Dalej NIE przechodzą: `invoice.address`, cokolwiek
+  z `buyer`, e-mail, PESEL i konto bankowe. Lądowisko `surowe_json` nie
+  dostaje nic z adresu, a raport sondy kształtu tych pól nie pokazuje — raport
+  wchodzi do repo, baza zostaje w biurze. Zakres i powód stoją w
   `docs/obsluga-klienta.md` — dokładając cokolwiek z adresu, dopisujesz tam
-  własne uzasadnienie albo tego nie robisz.
+  własne uzasadnienie albo tego nie robisz. Pilnują tego testy przy mapowaniu
+  zamówień i lista zakazanych członów w `migracja-zwrotow.test.ts`.
 - **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
   w repo: `docs/allegro/swagger.yaml` (cudza, nietykalna — sumę pilnuje
   `tools/docs_check.py`). Czytaj SCHEMAT, nie przykład: przykłady Allegro bywają

@@ -514,9 +514,51 @@ osoby. Wszystko idzie do JEDNEJ kolumny `odbiorca_nazwa`, przy zamówieniu
 i przy zwrocie. Szukanie nie rozróżnia imienia od nazwiska, a jedna kolumna to
 jedna rzecz do pilnowania.
 
-**Czego to NIE zdejmuje.** `street`, `city`, `zipCode` i `phoneNumber` stoją
-w tym samym obiekcie i zostają zablokowane. Kolumn na nie nie ma i nie będzie.
-E-mail, PESEL i konto bankowe bez zmian.
+**Czego to NIE zdejmowało.** `street`, `city`, `zipCode` i `phoneNumber` stały
+w tym samym obiekcie i zostawały zablokowane. Blokadę tych czterech pól zdjął
+właściciel w 0.422.0 — rozdział niżej. E-mail, PESEL i konto bankowe bez zmian.
+
+### Reszta adresu dostawy (0.422.0) — zdjęcie drugiego fragmentu
+
+Drugie cofnięcie tej polityki, decyzja właściciela, podjęta po przedstawieniu
+zakresu i skutków. Pytanie i odpowiedź padły wprost: cały adres dostawy,
+razem z szukaniem po telefonie w tym samym wydaniu.
+
+**Powód, część pierwsza.** Klient pisze „gdzie moja paczka" i podaje SAM NUMER
+TELEFONU. Do 0.421.1 numer telefonu nie istniał nigdzie w panelu ani w trasach
+serwera, więc agent musiał wyjść do Allegro albo Sellasista, zamienić numer na
+login, wrócić i szukać po loginie. Uchwyt, który klient podaje najczęściej, był
+jedynym, którego panel nie znał.
+
+**Powód, część druga.** Szukanie po fragmencie nazwiska świadomie pokazuje
+cudze zakupy przy zbieżności nazwisk, a wiersz listy niósł samą nazwę. Dwaj
+Kowalscy z jednego miasta wyglądali identycznie, a z tego ekranu wychodzi się
+z czyimś numerem zamówienia w ręku. Ulica rozstrzyga to w jednym spojrzeniu.
+
+**Zakres.** Cztery pola `delivery.address`: `street`, `city`, `zipCode`
+i `phoneNumber`. Pięć nazwanych kolumn przy `zamowienie_klienta`, bo telefon
+dostaje drugą, z samymi cyframi — Allegro zapisuje numer tak, jak wpisał go
+człowiek, a porównanie znak w znak nie trafiłoby ani razu.
+
+**Szukanie po telefonie idzie po KOŃCÓWCE, od dziewięciu cyfr.** Tyle ma polski
+numer bez prefiksu kraju. Krótszy ciąg to fragment, a fragment numeru telefonu
+nie jest uchwytem, tylko losowaniem. Końcówka, nie równość, bo prefiks bywa po
+jednej stronie i nie ma po drugiej.
+
+**Przy zwrocie kolumn NIE MA.** Zwrot bierze adres z zamówienia; druga kopia
+rozjechałaby się przy pierwszej zmianie adresu u Allegro.
+
+**Czego to NIE zdejmuje.** `invoice.address` zostaje nietknięte — właściciel
+odblokował adres DOSTAWY, a adres z faktury to inne pole i innej decyzji nie
+było. Dane z `buyer` (e-mail, telefon i własny adres kupującego) też zostają:
+mapowanie czyta wyłącznie `delivery.address`. Raport sondy kształtu
+(`ksztalt.ts`) dalej tych pól nie pokazuje, bo raport wchodzi do REPO, a baza
+biura zostaje w biurze — ta sama różnica, którą 0.155.0 zapisało przy numerze
+listu przewozowego. E-mail, PESEL i konto bankowe bez zmian.
+
+**Lądowisko adresu NIE dostaje.** `allegro-oczyszczanie.ts` zostaje nietknięty
+i dalej wycina cały `address`. Właściciel odblokował adres w panelu, nie adres
+w prywatnej kopii odpowiedzi na lata.
 
 **Lądowisko nazwy NIE dostaje.** `allegro-oczyszczanie.ts` zostaje nietknięty
 i dalej wycina cały `address`. Mapowanie czyta żywą odpowiedź, więc model
@@ -540,8 +582,9 @@ idzie samo zadanie pomiaru.
 **Zamówienie pobieramy w całości, bez danych kupującego.** Od 0.152.0 zwrot
 dociąga swoje zamówienie: pozycje, koszt dostawy i SKU sprzedawcy
 (`offer.external.id`). Adres dostawy, e-mail, telefon i PESEL kupującego nie
-przechodzą przez mapowanie ani przez lądowisko. Zostają login i — od 0.367.0 —
-nazwa odbiorcy z naklejki; dwie dane osobowe, które ta polityka dopuszcza
+przechodzą przez mapowanie ani przez lądowisko. Zostają login, nazwa odbiorcy
+z naklejki od 0.367.0 oraz reszta adresu dostawy od 0.422.0 — dane osobowe,
+które ta polityka dopuszcza
 wprost, każda z własnym uzasadnieniem wyżej.
 
 **Kartotekę wskazuje człowiek, a automat tylko proponuje.** Dopasowanie po
