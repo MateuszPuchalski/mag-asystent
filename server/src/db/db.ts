@@ -913,7 +913,7 @@ function pierwszySzablonOdpowiedzi(database: DatabaseSync) {
  * — „co jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery
  * kolejki, bez kliknięcia i bez wpisywania tytułu. Dwa paski nad jedną
  * rozmową mówiące o tym samym to podwojenie, którego dekalog obsługi
- * zabrania w punkcie 3 (`docs/obsluga-klienta-calosc.md`).
+ * zabrania w punkcie 2 (`docs/obsluga-klienta-calosc.md`).
  *
  * Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
  *

@@ -3592,6 +3592,9 @@ tym mostkiem się nie znajdzie.
 
 **Po loginie kupującego dobierać nie wolno** — blizna 0.56.6: Allegro maskuje
 rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze.
+Zakładka KLIENT i kandydaci zamówień (0.397.0) wiążą jednak właśnie po loginie
+rozmówcy. Tę sprzeczność opisuje `obsluga-klienta-calosc.md`, a sprawdzenie
+czeka pod `[WERYFIKUJ]` w `allegro-ksztalt.md`.
 
 **W drugą stronę: zwrot przy rozmowie (0.221.0).** Klient często pyta pod
 zamówieniem o zwrot, którego dokonał — „czy paczka doszła", „kiedy pieniądze".
@@ -5287,23 +5290,36 @@ poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
 ## 27. Zasady nadrzędne
 
-Te dwanaście punktów mówi o JEDNEJ rozmowie i jednej sprawie. Reguły
-obowiązujące MIĘDZY czterema kolejkami stoją osobno, w dekalogu
-`docs/obsluga-klienta-calosc.md`. Tamten plik niesie też mapę możliwości
-i plan spoiwa; ten rozdział zostaje bez zmian.
+Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
+MIĘDZY czterema kolejkami stoją osobno, w dekalogu
+`docs/obsluga-klienta-calosc.md`, razem z mapą możliwości i spoiwem.
 
 1. Najpierw dane i dowody, potem automatyzacja.
 2. Człowiek wysyła odpowiedź do klienta.
 3. Automat nie jest źródłem kompatybilności.
-4. Rozmowa, sprawa, dobór, zadanie i dowód są osobnymi bytami.
+4. Rozmowa, dobór, zadanie i dowód są osobnymi bytami.
 5. Każda mutacja ma autora.
 6. Praca kilku agentów musi być bezpieczna.
-7. Magazynier pracuje w aplikacji kolektora.
-8. Wynik terenowy wraca do źródłowej rozmowy.
-9. Negatywna wiedza jest równie cenna jak pozytywna.
-10. Awaria integracji musi być widoczna.
-11. Odpowiedź bez źródła nie udaje pewnego faktu.
-12. E-mail Allegro jest powiadomieniem, nie źródłem danych.
+7. Wynik terenowy wraca do źródłowej rozmowy.
+8. Negatywna wiedza jest równie cenna jak pozytywna.
+9. Czego nie wiemy, ekran mówi wprost: awaria integracji słowem, a odpowiedź
+   bez źródła nie udaje pewnego faktu.
+10. E-mail Allegro jest powiadomieniem, nie źródłem danych.
+11. Kto ma ruch, wylicza się z faktów; ręką stawia się tylko to, czego automat
+    nie ma z czego policzyć.
+12. Nieodwracalne pyta, odwracalne się cofa.
+
+**Przegląd z 0.426.1.** Do tego wydania rozdział mówił o sobie „zostaje bez
+zmian" i dlatego zestarzał się bez sprzeciwu. Punkt 4 wymieniał jeszcze
+sprawę, choć nakładka spraw odeszła w 0.388.0 (`obsluga-klienta.md`, pytanie 1).
+
+Punkt 9 skleja dawne punkty 10 i 11 z punktem 10 dekalogu: trzy zapisy jednej
+myśli. Punkty 11 i 12 przyszły z dekalogu (dawne 7 i 9), bo mówią o jednej
+rozmowie albo o ekranie, nie o przejściu między kolejkami.
+
+Odszedł punkt „magazynier pracuje w aplikacji kolektora". To granica frontów,
+a pilnuje jej zasada „Dwa fronty" w `CLAUDE.md`. Numer 2 się nie zmienił, bo
+cytuje go kod szablonów.
 
 ## 28. Stan faktyczny — co już działa
 

@@ -14,10 +14,17 @@ import { linkZamowienia } from "./allegro-linki.js";
    kosztował cztery tabele nakładki spraw. Historia jest ODCZYTEM.
 
    TOŻSAMOŚĆ KLIENTA TO LOGIN ALLEGRO i nic więcej. Polityka danych skrzynki
-   dopuszcza go wprost (`zamowienie_klienta.kupujacy_login`), a adresy dostawy
-   nie przechodzą przez mapowanie i nie mają tu czego szukać. Bez loginu
+   dopuszcza go wprost (`zamowienie_klienta.kupujacy_login`). Adres dostawy
+   przechodzi przez mapowanie od 0.422.0, ale ta zakładka po nim nie wiąże
+   i zmiana tego wymaga uzasadnienia w `docs/obsluga-klienta.md`. Bez loginu
    ekran mówi, że nie wie — zgadywanie klienta z treści rozmowy byłoby
-   pokazaniem cudzych zakupów pod nazwiskiem, którego nikt nie potwierdził. */
+   pokazaniem cudzych zakupów pod nazwiskiem, którego nikt nie potwierdził.
+
+   LOGIN ROZMÓWCY JEST TU NIEPEWNY. Oś zakładki bierze się
+   z `allegro_inbox_thread.interlocutor_login`, a blizna 0.56.6 opisuje
+   właśnie to pole jako zamaskowane (`client:44300444`). Wydanie 0.397.0
+   widziało w nim zwykły login. Sprawdzenie czeka pod `[WERYFIKUJ]`
+   w `docs/allegro-ksztalt.md`; pomyłka daje najpewniej pustą historię. */
 
 export interface MaszynaKlienta {
   marka: string;
@@ -37,10 +44,10 @@ export interface WpisHistorii {
      w bazie i nie docierały tu wcale, więc agent czytał „nic się nie działo"
      o kliencie, który miesiąc temu odesłał towar.
 
-     Wiązanie idzie po LOGINIE, bo to oś tej zakładki — i wolno tak wyłącznie
-     dlatego, że zwrot i sprawa niosą `kupujacy_login` wprost z Allegro. Przy
-     rozmowach ten sam ruch byłby błędem: `conversation` loginu nie trzyma,
-     a rozmówca bywa zamaskowany (blizna 0.56.6). */
+     Wiązanie idzie po LOGINIE, bo to oś tej zakładki. Zwrot i sprawa niosą
+     `kupujacy_login` wprost z Allegro. Rozmowy wiążą się po loginie z wątku
+     (`interlocutor_login`), choć do 0.426.1 ten komentarz twierdził, że tego
+     nie robimy — patrz nagłówek pliku i `[WERYFIKUJ]` przy tym polu. */
   rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
   at: string;
   /** Zdanie na oś: „Zakup szarpaka SZR-148/82" albo temat rozmowy. */
