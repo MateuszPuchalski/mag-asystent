@@ -173,8 +173,8 @@ export function Edytor({
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
               Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
-              zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka (druga zasada
-              nadrzędna projektu panelu). Wyglądała przy tym jak sąsiad
+              zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi
+              wysyłki w kodzie nie ma. Wyglądała przy tym jak sąsiad
               „ZAPISZ SZKIC": ta sama wysokość, waga i krój, różnica tylko
               w wypełnieniu. Dostaje większy stopień pisma, wyższy padding
               i cień; zapis szkicu schodzi do zwykłego tekstu.
