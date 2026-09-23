@@ -230,6 +230,12 @@ test("przesunięcie z wiersza dostawy odkłada linię i niesie dokument", () => 
   };
   assert.equal(linia.status, "done", "jedno dotknięcie robi obie rzeczy");
   assert.equal(linia.lok_faktyczna, "A01-01-01");
+  /* Bez COFNIJ: cofanie przy dostawie zna tylko zapis adresu, a to odłożenie
+     niesie też MM. Cofnięcie samej linii zostawiłoby stan przesunięty. */
+  const cofniecie = db().prepare("SELECT cofniecie FROM delivery_line WHERE id=?").get(lineId) as {
+    cofniecie: string | null;
+  };
+  assert.equal(cofniecie.cofniecie, null);
 
   /* Dokument źródłowy JEST tu istotny: `czekaNaDokument` wstrzymuje MM, dopóki
      faktura siedzi w buforze Subiekta. Adres nie czeka na bufor (D1), stan

@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie) — **320 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie) — **326 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (17 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -245,6 +245,33 @@ przed którą ta pozycja broni.
 - [ ] dostawca bez logo ma tam dotychczasowy kafelek z ikoną i kolorem stanu,
 - [ ] logo nie jest przycięte do kwadratu — wąskie mieści się w całości,
 - [ ] wejście na listę NIE zostawia w dzienniku wpisów o brakującym logo.
+
+**Cofanie pomyłek w dostawie** (0.439.0)
+
+- [ ] po odłożeniu nad listą stoi pasek „ODŁOŻONO … → półka" z COFNIJ,
+- [ ] pasek znika przy następnym skanie towaru,
+- [ ] odłożenie w trybie samolotowym paska NIE pokazuje,
+- [ ] COFNIJ na ostatniej pozycji otwiera dostawę z powrotem,
+- [ ] po COFNIJ pozycja stoi rozwinięta i czeka na skan półki,
+- [ ] ZMIEŃ PÓŁKĘ przyjmuje skan etykiety, a skan EAN odrzuca zdaniem,
+- [ ] na zamkniętej dostawie jest OTWÓRZ PONOWNIE pod WRÓĆ DO LISTY DOSTAW,
+- [ ] dzień później w tym miejscu stoi zdanie zamiast przycisku,
+- [ ] przedwczesne ZAKOŃCZ → OTWÓRZ PONOWNIE → pominięte wracają do pracy,
+- [ ] WYCOFAJ ZGŁOSZENIE działa na własnym zgłoszeniu, na cudzym odmawia,
+- [ ] ustawione 3 z 10 + drugi skan tego samego kartonu → kafel dalej 3,
+- [ ] symbol towaru zeskanowany przy otwartej pozycji NIE zapisuje półki,
+- [ ] przytrzymany spust na etykiecie półki daje JEDEN sygnał zapisu,
+- [ ] ściszony kolektor: błąd wibruje trzy razy, zapis dwa.
+- [ ] ZAKOŃCZ z nietkniętymi: przycisk nieaktywny, dopóki nie wybierzesz BRAK albo POMIŃ,
+- [ ] BRAK tworzy zgłoszenie „brak w przesyłce", POMIŃ — żadnego,
+- [ ] nadmiar na ostatniej pozycji NIE zamyka dostawy; ZAKOŃCZ pokazuje go w podglądzie,
+- [ ] korekta do zera: komunikat mówi, że półka wraca sprzed dostawy,
+- [ ] korekta przyjmuje liczbę ponad fakturę i mówi o nadmiarze,
+- [ ] dostawa z pominiętymi nie mówi „KOMPLET" ani „ZAKOŃCZONA",
+- [ ] ten sam towar w dwóch wierszach: tap otwiera dotknięty wiersz,
+- [ ] tryb samolotowy: skan EAN z listy otwiera pozycję, skan półki idzie do bufora,
+- [ ] „ZAMIEŃ" dla towaru A nie powtarza się samo dla towaru B.
+- [ ] PROBLEM na ostatniej pozycji NIE zamyka dostawy; nagłówek każe nacisnąć ZAKOŃCZ.
 
 **Korekta ilości odłożonej**
 

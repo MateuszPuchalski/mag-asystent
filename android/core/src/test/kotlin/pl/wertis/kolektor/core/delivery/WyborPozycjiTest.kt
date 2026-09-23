@@ -52,4 +52,47 @@ class WyborPozycjiTest {
     @Test fun `pusta lista`() {
         assertNull(wybierz(emptyList(), 100))
     }
+
+    /* ── Rozpoznanie skanu bez sieci ──────────────────────────────────────── */
+
+    private data class P(val id: Int, val tw: Long, val sym: String, val kody: List<String>, val status: String)
+
+    private fun poKodzie(pozycje: List<P>, kod: String) =
+        pozycjaPoKodzie(pozycje, kod, { it.tw }, { it.sym }, { it.kody }, { it.status })
+
+    @Test fun `bez sieci skan EAN otwiera pozycje z listy`() {
+        val lista = listOf(
+            P(1, 100, "KOSA-1", listOf("5900000000011"), StatusLinii.TODO),
+            P(2, 200, "GRABIE", listOf("5900000000028"), StatusLinii.TODO),
+        )
+        assertEquals(2, poKodzie(lista, "5900000000028")?.id)
+    }
+
+    @Test fun `symbol pasuje bez wielkosci liter`() {
+        val lista = listOf(P(1, 100, "KOSA-1", emptyList(), StatusLinii.TODO))
+        assertEquals(1, poKodzie(lista, "kosa-1")?.id)
+    }
+
+    @Test fun `kod dwoch roznych towarow nie zgaduje — kolizje rozstrzyga czlowiek`() {
+        // D7: przy kolizji EAN operacja stoi, a bez sieci nie ma listy kandydatów
+        val lista = listOf(
+            P(1, 100, "KOSA-1", listOf("5900000000011"), StatusLinii.TODO),
+            P(2, 200, "KOSA-2", listOf("5900000000011"), StatusLinii.TODO),
+        )
+        assertNull(poKodzie(lista, "5900000000011"))
+    }
+
+    @Test fun `ten sam towar w dwoch wierszach — regula S26 tez bez sieci`() {
+        val lista = listOf(
+            P(1, 100, "KOSA-1", listOf("5900000000011"), StatusLinii.DONE),
+            P(2, 100, "KOSA-1", listOf("5900000000011"), StatusLinii.TODO),
+        )
+        assertEquals(2, poKodzie(lista, "5900000000011")?.id)
+    }
+
+    @Test fun `nieznany kod to null, nie pierwsza pozycja`() {
+        val lista = listOf(P(1, 100, "KOSA-1", listOf("5900000000011"), StatusLinii.TODO))
+        assertNull(poKodzie(lista, "5909999999999"))
+        assertNull(poKodzie(lista, "  "))
+    }
 }

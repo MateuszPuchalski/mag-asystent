@@ -13,6 +13,13 @@ import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js"
 import { aliasKodu } from "./ean-alias.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
 import { adnotacjaStrefy } from "./zbiorki.js";
+import {
+  cofnijDlaLinii,
+  cofnijWszystkieOdlozenia,
+  mozliwoscOtwarcia,
+  odlozeniaLinii,
+  zgloszeniaDoWycofania,
+} from "./cofanie-dostawy.js";
 import type {
   DeliveryDocument,
   DeliveryLineView,
@@ -31,6 +38,61 @@ import type {
    Zwroty wróciły do obsługi ręcznej w Subiekcie w 0.17.0.                     */
 
 const nowIso = () => new Date().toISOString();
+
+/**
+ * Status pozycji wynikający z samej liczby odłożonych sztuk.
+ *
+ * Jedno źródło dla korekty, cofnięcia i wycofania zgłoszenia. Trzy własne
+ * warunki rozjechałyby się przy pierwszej zmianie, a objawem byłaby pozycja
+ * „odłożona" z zerem sztuk po jednej z tych dróg.
+ */
+export function statusZIlosci(odlozone: number, naDokumencie: number): "done" | "partial" | "todo" {
+  return odlozone >= naDokumencie ? "done" : odlozone > 0 ? "partial" : "todo";
+}
+
+/**
+ * Stos przepisów z kolumny `delivery_line.cofniecie`, najstarszy pierwszy.
+ * Pusta tablica = nie ma czego cofać (NULL, po korekcie albo po cofnięciu).
+ */
+export function stosOdlozen(kolumna: string | null | undefined): CofniecieOdlozenia[] {
+  if (!kolumna) return [];
+  try {
+    const v = JSON.parse(kolumna) as CofniecieOdlozenia | CofniecieOdlozenia[];
+    return Array.isArray(v) ? v : [v];
+  } catch {
+    return [];
+  }
+}
+
+/** Jeden element stosu `delivery_line.cofniecie` — przepis na cofnięcie jednego odłożenia. */
+export interface CofniecieOdlozenia {
+  /** Ile sztuk dołożyło to odłożenie. */
+  qty: number;
+  /** Na jaką półkę. */
+  lok: string;
+  /** ZAMIEŃ albo DODAJ — ta sama akcja obowiązuje przy zmianie półki. */
+  akcja: "add" | "replace";
+  /** Pole adresów kartoteki PRZED odłożeniem; cofnięcie wraca do niego. */
+  locsPrzed: string;
+  /**
+   * Zadanie `set_location`, które dziś niesie adres tej pozycji; `null` =
+   * żadne. Zmiana półki podmienia je na nowe, więc to nie zawsze jest
+   * zadanie z samego odłożenia.
+   */
+  queueId: number | null;
+  /** Co to zadanie zapisze w Subiekcie. */
+  pole: string | null;
+  /**
+   * Co zostaje w Subiekcie, gdy to zadanie się anuluje. Po odłożeniu to
+   * `locsPrzed`, ale po zmianie półki na zadaniu JUŻ WYKONANYM jest nim
+   * tamten, błędny zapis — i cofnięcie musi wtedy napisać adres od nowa.
+   */
+  baza: string;
+  lokPrzed: string | null;
+  statusPrzed: string;
+  doneAtPrzed: string | null;
+  doneByPrzed: string | null;
+}
 
 /**
  * Statusy linii, które nie wracają już do rutyny alejkowej.
@@ -418,6 +480,39 @@ export function openDelivery(dokId: number, user: string): number {
  * alejkami, nie w kolejności z faktury), pozycje BEZ lokalizacji na końcu —
  * to są SKU wymagające decyzji, nie rutyny.
  */
+/**
+ * Kody kreskowe pozycji — do rozpoznania skanu BEZ SIECI na kolektorze.
+ *
+ * Bufor offline umiał zapisać odłożenie, ale rozpoznanie towaru szło
+ * wyłącznie do serwera. W martwej strefie Wi-Fi nie dało się więc otworzyć
+ * pozycji, a bufor ratował tylko tę otwartą przed zanikiem sieci. Kolektor
+ * dostaje kody razem z listą i dopasowuje skan lokalnie, gdy serwer milczy.
+ * EAN z kartoteki plus kody nadane w WERTIS — obie drogi zna `resolveScan`.
+ */
+function kodyTowarow(twIds: number[]): Map<number, string[]> {
+  const out = new Map<number, string[]>();
+  if (twIds.length === 0) return out;
+  const dziury = twIds.map(() => "?").join(",");
+  const dodaj = (tw: number, kod: string | null) => {
+    const k = (kod ?? "").trim();
+    if (!k) return;
+    const lista = out.get(tw) ?? [];
+    if (!lista.includes(k)) lista.push(k);
+    out.set(tw, lista);
+  };
+  for (const r of db()
+    .prepare(`SELECT tw_id, ean FROM sgt_towar WHERE tw_id IN (${dziury})`)
+    .all(...twIds) as Array<{ tw_id: number; ean: string | null }>) {
+    dodaj(r.tw_id, r.ean);
+  }
+  for (const r of db()
+    .prepare(`SELECT tw_id, ean FROM ean_alias WHERE tw_id IN (${dziury})`)
+    .all(...twIds) as Array<{ tw_id: number; ean: string }>) {
+    dodaj(r.tw_id, r.ean);
+  }
+  return out;
+}
+
 export function getDelivery(id: number): DeliveryView | undefined {
   const d = db().prepare("SELECT * FROM delivery WHERE id = ?").get(id) as
     | {
@@ -449,6 +544,8 @@ export function getDelivery(id: number): DeliveryView | undefined {
   const jednostki = subiekt.jednostkiDlaTowarow(twIds);
   // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
   const adresy = adresyOczekiwane(twIds);
+  const zgloszenia = zgloszeniaDoWycofania(id);
+  const kody = kodyTowarow(twIds);
 
   const lines: DeliveryLineView[] = rows
     .map((r) => {
@@ -476,13 +573,17 @@ export function getDelivery(id: number): DeliveryView | undefined {
            na trzydziestu pozycjach — wtedy trzeba wariantu zbiorczego,
            wzorem `adresyOczekiwane` wyżej. */
         zlotaStrefa: adnotacjaStrefy(r.tw_id) ?? undefined,
+        cofnij: cofnijDlaLinii(r),
+        odlozenia: odlozeniaLinii(r),
+        zgloszenie: zgloszenia.get(r.id) ?? null,
+        kody: kody.get(r.tw_id) ?? [],
       };
     })
     .sort(porownajAlejkowo);
 
   // linia z problemem wychodzi z rutyny alejkowej (żyje dalej na liście wyjątków),
-  // więc nie trzyma dostawy otwartej — inaczej zgłoszenie problemu karałoby
-  // zgłaszającego i nikt by go nie zgłaszał (D8)
+  // więc liczy się do postępu jak rozstrzygnięta — ZAKOŃCZ nie ma na nią czekać,
+  // a zgłaszający nie ma za zgłoszenie płacić rutyną (D8)
   const done = lines.filter((l) => TERMINAL_LINE.has(l.status)).length;
   const problems = lines.filter((l) => l.status === "problem").length;
   return {
@@ -502,8 +603,32 @@ export function getDelivery(id: number): DeliveryView | undefined {
     nrPrzesylki: d.nr_przesylki ?? null,
     kurierProtokol: d.kurier_protokol ?? null,
     notatki: notatkiDokumentu(d.sgt_dok_id),
+    otwarcie: d.status === "done" ? mozliwoscOtwarcia(d.id) : null,
     lines,
   };
+}
+
+/**
+ * Który wiersz dostawy otwiera skan danego towaru — reguła S26.
+ *
+ * Ten sam towar potrafi stać w dokumencie w DWÓCH wierszach. Do audytu
+ * z 22 września 2026 mapa `tw_id → wiersz` brała po prostu OSTATNI, bez
+ * patrzenia na status. Pierwszy wiersz był wtedy nieosiągalny skanem, sztuki
+ * lądowały jako nadmiar na drugim, a pierwszy szedł przy ZAKOŃCZ jako brak.
+ *
+ * Reguła jest ta sama co przy wejściu z karty towaru (`wybierzPozycjeTowaru`
+ * w `:core`): pierwszy wiersz, przy którym JEST co robić, a gdy takiego nie
+ * ma — pierwszy w ogóle. Dwie różne reguły na to samo pytanie otwierały dwa
+ * różne wiersze zależnie od drogi wejścia.
+ */
+export function wierszeTowarow<T extends { tw_id: number; status: string }>(linie: T[]): Map<number, T> {
+  const m = new Map<number, T>();
+  const doRoboty = (l: T) => l.status === "todo" || l.status === "partial";
+  for (const l of linie) {
+    const obecny = m.get(l.tw_id);
+    if (!obecny || (!doRoboty(obecny) && doRoboty(l))) m.set(l.tw_id, l);
+  }
+  return m;
 }
 
 /**
@@ -516,9 +641,9 @@ export function getDelivery(id: number): DeliveryView | undefined {
 export function resolveScan(deliveryId: number, rawCode: string, user: string): ScanResolution {
   const code = rawCode.trim();
   const lines = db()
-    .prepare("SELECT * FROM delivery_line WHERE delivery_id = ?")
+    .prepare("SELECT * FROM delivery_line WHERE delivery_id = ? ORDER BY id")
     .all(deliveryId) as Array<any>;
-  const lineByTw = new Map<number, any>(lines.map((l) => [l.tw_id, l]));
+  const lineByTw = wierszeTowarow(lines);
 
   // kandydaci: po EAN (może być wiele!) albo po symbolu
   let candidates = subiekt.findProductsByEan(code);
@@ -618,6 +743,12 @@ function toResolution(
       stanMag: stan?.mag ?? 0,
       stanMgp: stan?.mgp ?? 0,
       aisle: oczekiwany ? String(oczekiwany)[0] : null,
+      /* Skan otwiera panel z TEJ odpowiedzi, nie z listy — bez tych dwóch pól
+         rozwinięta pozycja nie pokazałaby COFNIJ ani WYCOFAJ aż do
+         najbliższego odświeżenia całej dostawy. */
+      cofnij: cofnijDlaLinii(line),
+      odlozenia: odlozeniaLinii(line),
+      zgloszenie: zgloszeniaDoWycofania(line.delivery_id).get(line.id) ?? null,
     },
   };
 }
@@ -674,6 +805,7 @@ export function putawayLine(
   const t = subiekt.getProductById(line.tw_id);
   const current = parseLocs(t?.lokalizacja);
   let queueId: number | undefined;
+  let zapisanePole: string | null = null;
   /* Warunek zapisu ZALEŻY OD AKCJI i to nie jest drobiazg.
 
      Przy `replace` pytanie brzmi „czy ten kod jest już pickingowy", bo tylko
@@ -718,19 +850,40 @@ export function putawayLine(
       label: "Lokalizacja · " + (t?.symbol ?? line.tw_id),
       detail: `${code} (dostawa)`,
     }, { locsPrzed: t?.lokalizacja ?? "", zrodlo: "dostawa" });
+    zapisanePole = pole;
   }
 
   // skan półki jest zarazem potwierdzeniem POLICZONEJ ilości: w tej firmie
   // rozkładanie JEST sprawdzaniem faktury i liczy się każdą pozycję. Rozbieżność
   // zgłasza się osobno („INNA ILOŚĆ" → wyjątek ilościowy), więc dojście tutaj
   // znaczy „policzyłem, zgadza się".
+  /* Przepis na cofnięcie TEGO odłożenia — patrz `services/cofanie-dostawy.ts`.
+     Odłożenie kosztuje jeden skan i tak ma zostać, więc pomyłka musi dać się
+     odwrócić równie tanio. Stan sprzed zapisu zna tylko ta chwila: później
+     ani ilość, ani pole adresów nie mówią już, co było przedtem.
+
+     Przepisy tworzą STOS, jeden na odłożenie. Pozycja rozłożona na dwie półki
+     (4 na A, 6 na B) cofa się od B do A, a nie tylko ostatnie odłożenie. */
+  const cofniecie: CofniecieOdlozenia = {
+    qty: putQty,
+    lok: code,
+    akcja: locAction,
+    locsPrzed: t?.lokalizacja ?? "",
+    queueId: queueId ?? null,
+    pole: zapisanePole,
+    baza: t?.lokalizacja ?? "",
+    lokPrzed: line.lok_faktyczna ?? null,
+    statusPrzed: line.status,
+    doneAtPrzed: line.done_at ?? null,
+    doneByPrzed: line.done_by ?? null,
+  };
   db()
     .prepare(
       `UPDATE delivery_line
-       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?
+       SET ilosc_odlozona=?, lok_faktyczna=?, status=?, done_at=?, done_by=?, cofniecie=?
        WHERE id=?`
     )
-    .run(doneQty, code, status, nowIso(), user, lineId);
+    .run(doneQty, code, status, nowIso(), user, JSON.stringify([...stosOdlozen(line.cofniecie), cofniecie]), lineId);
 
   /* Kod wpisany z ręki = sygnał zniszczonej etykiety regału. Ten sam kształt
      zdarzenia co przy ręcznym skanie (`manual_entry` w routes/products.ts),
@@ -762,11 +915,16 @@ export function putawayLine(
 }
 
 /**
- * Dostawa zamyka się sama, gdy nie ma już czego rozkładać. Linia z wyjątkiem
- * liczy się jako domknięta — wypadła z rutyny alejkowej i żyje dalej na liście
- * wyjątków, więc trzymanie przez nią całej dostawy karałoby zgłaszającego (D8).
+ * Dostawa zamyka się sama, gdy każda pozycja jest odłożona. Pozycja z wyjątkiem
+ * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale od 0.439.0 nie
+ * zamyka dostawy sama — patrz komentarz w środku funkcji.
  */
-export function closeIfComplete(deliveryId: number, user: string): void {
+export function closeIfComplete(
+  deliveryId: number,
+  user: string,
+  /** `true` wyłącznie z ZAKOŃCZ DOSTAWĘ — człowiek widział wtedy podgląd. */
+  opts: { jawnie?: boolean } = {}
+): void {
   /* Notatka biura bez odpowiedzi trzyma dostawę OTWARTĄ, choćby wszystkie
      pozycje były rozstrzygnięte. Bramka stoi tutaj, a nie tylko przy
      przycisku: samo domknięcie po ostatniej pozycji jest najczęstszą ścieżką
@@ -786,6 +944,27 @@ export function closeIfComplete(deliveryId: number, user: string): void {
       .get(deliveryId) as { n: number }
   ).n;
   if (left > 0) return;
+  /* NADMIAR CZEKA NA CZŁOWIEKA. Do audytu z 22 września 2026 samo domknięcie
+     po ostatniej pozycji zgłaszało nadmiar dostawcy — bez podglądu, wbrew
+     regule przy ZAKOŃCZ, że zgłoszenie „nie ma prawa powstać z przycisku,
+     którego skutku nikt nie widział". Podwójne odłożenie tej samej pozycji
+     przez dwie osoby (świadoma cena braku blokad w `resolveScan`) stawało
+     się wtedy reklamacją, zanim ktokolwiek zdążył je poprawić. Dostawa
+     z nadmiarem zostaje więc otwarta, a zamyka ją ZAKOŃCZ z podglądem. */
+  if (!opts.jawnie && nadmiary(deliveryId).length > 0) return;
+  /* WYJĄTEK TEŻ CZEKA NA ZAKOŃCZ (decyzja właściciela po audycie z 22 września
+     2026). Do tej wersji zgłoszenie problemu na ostatniej pozycji zamykało
+     dostawę od razu. Wyjątek czeka jednak na decyzję (D8) — np. „dosłali
+     brakujące 4 sztuki" — a zamknięta dostawa nie miała już gdzie ich przyjąć.
+     Koszt dla zgłaszającego to jedno tapnięcie ZAKOŃCZ, nie ponowne otwieranie. */
+  if (!opts.jawnie) {
+    const zWyjatkiem = (
+      db()
+        .prepare("SELECT COUNT(*) AS n FROM delivery_line WHERE delivery_id=? AND status='problem'")
+        .get(deliveryId) as { n: number }
+    ).n;
+    if (zWyjatkiem > 0) return;
+  }
   const zamkniete = db()
     .prepare("UPDATE delivery SET status='done', closed_at=? WHERE id=? AND status='open'")
     .run(nowIso(), deliveryId);
@@ -858,6 +1037,7 @@ function zglosNadmiary(deliveryId: number, user: string): void {
         qty: n.qtyDone,
         opis: `Nadmiar w dostawie: odłożono ${n.qtyDone} przy ${n.qtyDoc} z dokumentu`,
         zachowajStatusLinii: true,
+        zrodlo: "nadmiar",
       },
       user
     );
@@ -1098,9 +1278,18 @@ export function dokumentyPozaWertis(): Set<number> {
 export interface PodsumowanieZakonczenia {
   /** Pozycje z niepełnym odłożeniem → wyjątki „zła ilość". */
   braki: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; qtyDone: number; unit: string }>;
-  /** Pozycje, których nikt nie tknął → `skipped`, bez zgłoszenia. */
+  /**
+   * Pozycje, których nikt nie tknął. Co się z nimi stanie, wybiera człowiek:
+   * `brak` — zgłoszenie „brak w przesyłce" na całą ilość, `pomin` — `skipped`
+   * bez zgłoszenia (towar jest, rozłoży się go poza tą dostawą).
+   */
   nietkniete: Array<{ lineId: number; sym: string; nazwa: string; qtyDoc: number; unit: string }>;
+  /** Pozycje odłożone PONAD dokument — zakończenie zgłosi je biuru i dostawcy. */
+  nadmiary: Nadmiar[];
 }
+
+/** Co zrobić z pozycjami nietkniętymi przy ZAKOŃCZ — wybór jest obowiązkowy. */
+export type LosNietknietych = "brak" | "pomin";
 
 interface WierszDoZamkniecia {
   id: number;
@@ -1160,7 +1349,7 @@ export function podgladZakonczenia(deliveryId: number): PodsumowanieZakonczenia 
       });
     }
   }
-  return { braki, nietkniete };
+  return { braki, nietkniete, nadmiary: nadmiary(deliveryId) };
 }
 
 /**
@@ -1171,7 +1360,8 @@ export function podgladZakonczenia(deliveryId: number): PodsumowanieZakonczenia 
  */
 export function zakonczDostawe(
   deliveryId: number,
-  user: string
+  user: string,
+  opts: { nietkniete?: LosNietknietych | null } = {}
 ): PodsumowanieZakonczenia | { error: string; kod?: string } {
   const d = db()
     .prepare("SELECT status, sgt_dok_id AS dokId FROM delivery WHERE id = ?")
@@ -1201,6 +1391,22 @@ export function zakonczDostawe(
 
   const podsumowanie = podgladZakonczenia(deliveryId);
 
+  /* WYBÓR DLA NIETKNIĘTYCH JEST OBOWIĄZKOWY (decyzja właściciela po audycie
+     z 22 września 2026). Do tej pory nietknięte szły po cichu do `skipped`
+     i NIE trafiały do dostawcy, a odłożone częściowo — trafiały. Im większy
+     brak, tym mniej się go zgłaszało: 1 z 10 dawało reklamację i MM braku,
+     0 z 10 nie dawało nic, a 10 zafakturowanych sztuk wisiało w sprzedaży.
+     Serwer odmawia bez wyboru, bo stary kolektor wysłałby ZAKOŃCZ bez niego. */
+  const los = opts.nietkniete;
+  if (podsumowanie.nietkniete.length > 0 && los !== "brak" && los !== "pomin") {
+    return {
+      error:
+        `Wybierz, co z nietkniętymi pozycjami (${podsumowanie.nietkniete.length}): ` +
+        "BRAK — zgłoś dostawcy, albo POMIŃ — towar jest, rozłożysz go później.",
+      kod: "wybor_nietknietych",
+    };
+  }
+
   /* Wyjątki idą przez `raiseProblem`, a nie przez własny INSERT: to on zna
      snapshot ilości z dokumentu, ustawia linii status `problem` i pisze do
      `events`. Drugi zapis obok byłby drugą definicją tego, czym jest wyjątek. */
@@ -1212,24 +1418,47 @@ export function zakonczDostawe(
         typ: "qty_mismatch",
         qty: b.qtyDone,
         opis: `Zakończenie dostawy: odłożono ${b.qtyDone} z ${b.qtyDoc}`,
+        zrodlo: "zakonczenie",
       },
       user
     );
   }
 
-  const pomin = db().prepare("UPDATE delivery_line SET status='skipped' WHERE id=?");
-  transaction(db(), () => {
-    for (const n of podsumowanie.nietkniete) pomin.run(n.lineId);
-  })();
+  if (los === "brak") {
+    /* Cała ilość jako „brak w przesyłce" — ta sama droga co ręczne
+       zgłoszenie, więc powstaje też MM braku (`przesunBrakNaSerwis`) i towar
+       schodzi ze sprzedaży. `zrodlo` pozwala OTWÓRZ PONOWNIE je wycofać. */
+    for (const n of podsumowanie.nietkniete) {
+      raiseProblem(
+        {
+          deliveryId,
+          lineId: n.lineId,
+          typ: "missing_item",
+          qty: n.qtyDoc,
+          opis: `Zakończenie dostawy: nie przyszło nic z ${n.qtyDoc}`,
+          zrodlo: "zakonczenie",
+        },
+        user
+      );
+    }
+  } else {
+    const pomin = db().prepare("UPDATE delivery_line SET status='skipped' WHERE id=?");
+    transaction(db(), () => {
+      for (const n of podsumowanie.nietkniete) pomin.run(n.lineId);
+    })();
+  }
 
   logEvent("delivery_finished", user, null, {
     deliveryId,
     braki: podsumowanie.braki.length,
     nietkniete: podsumowanie.nietkniete.length,
+    nadmiary: podsumowanie.nadmiary.length,
+    ...(podsumowanie.nietkniete.length > 0 ? { losNietknietych: los } : {}),
   });
   /* Domknięcie liczy się TU, po wszystkich zmianach statusów — `raiseProblem`
-     woła je po drodze, ale wtedy pozycje nietknięte są jeszcze otwarte. */
-  closeIfComplete(deliveryId, user);
+     woła je po drodze, ale wtedy pozycje nietknięte są jeszcze otwarte.
+     `jawnie`, bo człowiek widział podgląd — z nadmiarami włącznie. */
+  closeIfComplete(deliveryId, user, { jawnie: true });
   return podsumowanie;
 }
 
@@ -1267,7 +1496,19 @@ export function korygujIlosc(
   lineId: number,
   qty: number,
   user: string
-): { ok: true; status: string } | { error: string } {
+):
+  | {
+      ok: true;
+      status: string;
+      /**
+       * Co z adresem: `przywrocony` — korekta do zera cofnęła go do stanu
+       * sprzed dostawy; `zostaje` — zapisany adres stoi, bo nie wiadomo,
+       * do czego wrócić; brak pola — korekta adresu nie dotyczy.
+       */
+      adres?: "przywrocony" | "zostaje";
+      lok?: string | null;
+    }
+  | { error: string } {
   if (!Number.isFinite(qty) || qty < 0) return { error: "Ilość nie może być ujemna" };
 
   const l = db()
@@ -1295,7 +1536,11 @@ export function korygujIlosc(
   // po zamknięciu dostawa bywa już policzona w protokole rozbieżności
   if (l.stanDostawy !== "open") return { error: "Dostawa jest już zamknięta" };
   if (l.status === "problem") {
-    return { error: "Pozycja ma zgłoszony wyjątek — najpierw rozwiąż go w wyjątkach" };
+    /* Do tego wydania stało tu „najpierw rozwiąż go w wyjątkach" — i było
+       nieprawdą: rozwiązanie przez biuro NIE zdejmuje z pozycji stanu
+       `problem`, więc korekta odmawiała dalej. Droga, która działa, to
+       wycofanie własnego zgłoszenia (`cofanie-dostawy.ts`). */
+    return { error: "Pozycja ma zgłoszony wyjątek — jeśli to pomyłka, wycofaj zgłoszenie przy pozycji" };
   }
   /* Do 0.64.0 stała tu odmowa „więcej nie da się odłożyć". Zniknęła razem
      z dopuszczeniem nadmiaru przy odkładaniu: skoro `+` wolno przekroczyć
@@ -1304,9 +1549,35 @@ export function korygujIlosc(
      wystawiona za własną pomyłkę w liczeniu. */
 
   const przed = l.ilosc_odlozona ?? 0;
-  const status = qty >= l.ilosc_dok ? "done" : qty > 0 ? "partial" : "todo";
+
+  /* KOREKTA DO ZERA COFA TEŻ ADRES, gdy wiadomo jak (audyt z 22 września
+     2026). Zero znaczy „nic z tego nie leży na półce", a adres z odłożenia
+     już pojechał do Subiekta — przy ZAMIEŃ razem z utratą starego adresu
+     pickingowego. Kartoteka wskazywała więc półkę, na której towaru nie ma.
+     Gdy przepisy cofnięcia pokrywają całą odłożoną ilość, korekta do zera
+     jest tym samym co cofnięcie wszystkich odłożeń po kolei. */
+  if (qty === 0 && przed > 0) {
+    const cofniete = cofnijWszystkieOdlozenia(lineId, user);
+    if (cofniete === "cofniete") {
+      logEvent("putaway_qty_fixed", user, l.tw_id, {
+        lineId,
+        qtyPrzed: przed,
+        qtyPo: 0,
+        qtyDok: l.ilosc_dok,
+        status: "todo",
+        adres: "przywrocony",
+      });
+      return { ok: true, status: "todo", adres: "przywrocony" };
+    }
+    if (typeof cofniete === "object") return cofniete;
+  }
+  const status = statusZIlosci(qty, l.ilosc_dok);
+  /* Korekta KASUJE przepis na cofnięcie ostatniego odłożenia. Po niej liczba
+     na pozycji nie wynika już z tamtego skanu, więc odjęcie jego ilości
+     dałoby wynik, którego nikt nie wpisał. Adres zostaje poprawialny przez
+     ZMIEŃ PÓŁKĘ do tej chwili, a potem przez kartę towaru. */
   db()
-    .prepare("UPDATE delivery_line SET ilosc_odlozona=?, status=? WHERE id=?")
+    .prepare("UPDATE delivery_line SET ilosc_odlozona=?, status=?, cofniecie=NULL WHERE id=?")
     .run(qty, status, lineId);
 
   logEvent("putaway_qty_fixed", user, l.tw_id, {
@@ -1319,5 +1590,14 @@ export function korygujIlosc(
 
   // korekta w GÓRĘ potrafi być ostatnią brakującą sztuką całej dostawy
   closeIfComplete(l.delivery_id, user);
+  if (qty === 0 && przed > 0) {
+    const lok = (
+      db().prepare("SELECT lok_faktyczna AS lok FROM delivery_line WHERE id=?").get(lineId) as {
+        lok: string | null;
+      }
+    ).lok;
+    // człowiek ma usłyszeć, że półka została w kartotece, i gdzie ją poprawić
+    return { ok: true, status, adres: "zostaje", lok };
+  }
   return { ok: true, status };
 }

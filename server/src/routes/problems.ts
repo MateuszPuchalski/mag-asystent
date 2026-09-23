@@ -16,6 +16,7 @@ import {
   zapiszPrzesylke,
   listRozstrzygniete,
 } from "../services/problems.js";
+import { wycofajZgloszenie } from "../services/cofanie-dostawy.js";
 
 /* ── Faza 2: wyjątki widoczne i mierzalne (D8) ──────────────────────────── */
 
@@ -46,6 +47,16 @@ export async function problemRoutes(app: FastifyInstance) {
       return r;
     }
   );
+
+  /**
+   * Wycofanie WŁASNEGO nierozstrzygniętego zgłoszenia (np. brak się znalazł).
+   * Bez ciała. Cudze zgłoszenie zdejmuje biuro przez `resolve` wyżej.
+   */
+  app.post<{ Params: { id: string } }>("/api/problems/:id/wycofaj", async (req, reply) => {
+    const r = wycofajZgloszenie(Number(req.params.id), userOf(req));
+    if ("error" in r) return reply.code(r.status ?? 400).send({ error: r.error });
+    return r;
+  });
 
   /** Zdjęcie dowodowe (reklamacja u dostawcy). */
   app.get<{ Params: { id: string } }>("/api/problems/:id/photo", async (req, reply) => {

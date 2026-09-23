@@ -34,6 +34,92 @@ historii nie przepisujemy.
 ---
 
 
+## 0.439.0 — 23 września 2026
+
+**Pomyłkę przy rozkładaniu dostawy da się cofnąć — także na ostatniej
+pozycji.** Zgłoszenie właściciela po audycie UX kolektora: „jak już zaznaczyłem,
+że wszystko jest, a się pomyliłem, to nie mogę tego cofnąć".
+
+Do tego wydania pomyłka była nieodwracalna w czterech miejscach. Dostawa
+zamykała się sama po ostatniej pozycji, a korekta na zamkniętej odmawiała.
+Zła półka nie miała żadnej drogi powrotu. ZAKOŃCZ zamieniało nietknięte
+pozycje w pominięte na zawsze. Zgłoszony wyjątek trzymał pozycję w stanie
+`problem` bez wyjścia — także po rozwiązaniu przez biuro.
+
+**Cztery drogi powrotu na kolektorze.**
+
+- **COFNIJ** — pasek nad listą po każdym odłożeniu przyjętym przez serwer:
+  „10 szt. · KOSA-1 → B02-02-02". Zostaje do następnego skanu towaru.
+  Ten sam przycisk stoi w rozwiniętej pozycji. Cofa ilość, półkę i adres
+  w Subiekcie, a pozycja wraca otwarta do ponownego skanu półki.
+- **ZMIEŃ PÓŁKĘ** — ta sama ilość, inna półka. Arkusz przyjmuje skan etykiety
+  albo wpis ręczny. Działa też na dostawie zamkniętej.
+- **OTWÓRZ PONOWNIE** — na zamkniętej dostawie, w dniu zamknięcia. Wycofuje
+  to, co zrobiło samo zamknięcie: braki z ZAKOŃCZ, nadmiar, pominięcia
+  i czekające MM braku. Zgłoszenia człowieka zostają.
+- **WYCOFAJ ZGŁOSZENIE** — własne, nierozstrzygnięte. Pozycja wraca do stanu
+  wynikającego z odłożonej ilości.
+
+Cofnięcie ostatniego odłożenia otwiera dostawę, którą to odłożenie domknęło.
+Automatyczne domknięcie zostaje, bo to najczęstsze zakończenie pracy.
+
+**Granica przez Subiekta.** Czekający zapis adresu się anuluje. Zapis już
+wykonany dostaje zapis odwrotny w kolejce, z pełnym śladem. Odmowa pada, gdy
+worker trzyma zadanie w ręku albo gdy adres towaru zmieniono później inną
+drogą. Wtedy komunikat mówi, gdzie poprawić.
+
+**Kiedy ponowne otwarcie odmawia — zdaniem na ekranie, nie wyszarzonym
+przyciskiem.** Po dniu zamknięcia. Gdy biuro rozstrzygnęło już zgłoszenie
+z zamknięcia. Gdy MM braku weszło do Subiekta.
+
+**Poprawki z audytu przy okazji, każda w tym samym przepływie:**
+
+- ponowny skan tej samej pozycji nie kasuje już ustawionej części
+  (3 z 10 wracało do 10 z sygnałem sukcesu);
+- kod bez kształtu adresu przy otwartej pozycji przechodzi walidację, zanim
+  trafi do zapisu albo do bufora offline;
+- dubel skanu tej samej półki w ciągu 2 s jest połykany — dotąd dawał ton
+  błędu zaraz po tonie zapisu;
+- sygnał błędu ma trzy długie impulsy wibracji i dwa niskie tony. Dotąd
+  wibrował dwoma, jak zapis, więc przy ściszonym kolektorze nie dało się ich
+  odróżnić ręką;
+- korekta ilości na pozycji z wyjątkiem nie odsyła już do „rozwiąż w
+  wyjątkach", bo rozwiązanie jej nie odblokowywało.
+
+**Sprzeczności w rozkładaniu usunięte, decyzją właściciela:**
+
+- **ZAKOŃCZ przy nietkniętych wymaga wyboru.** BRAK zgłasza „brak w przesyłce"
+  na całą ilość i zdejmuje towar ze sprzedaży. POMIŃ zostawia je bez
+  zgłoszenia. Dotąd szły po cichu do pominiętych: 1 z 10 dawało reklamację,
+  a 0 z 10 — nic. Serwer bez wyboru odmawia.
+- **Nadmiar nie zamyka dostawy sam.** Zamyka go ZAKOŃCZ, a podgląd pokazuje
+  nadmiar przed zapisem. Dotąd zgłoszenie do dostawcy powstawało bez
+  podglądu, także z podwójnego odłożenia przez dwie osoby.
+- **Zgłoszenie problemu nie zamyka dostawy.** Dotąd wyjątek na ostatniej
+  pozycji zamykał ją od razu, a dosłany towar nie miał już gdzie trafić.
+  Dostawa z wyjątkiem czeka na ZAKOŃCZ, a do tego czasu zgłoszenie da się
+  wycofać bez otwierania dostawy.
+- **Korekta do zera cofa adres**, gdy wiadomo, do czego wrócić. Gdy nie
+  wiadomo, komunikat mówi, która półka została w kartotece.
+- **Korekta przyjmuje ilość ponad fakturę.** Kolektor ucinał ją na fakturze,
+  a serwer od 0.64.0 wymagał odwrotnie. Przycisk podaje jednostkę.
+- **„KOMPLET" tylko bez wyjątków i pominięć.** Inaczej nagłówek mówi
+  „ROZSTRZYGNIĘTE", a zamknięta dostawa — „ZAMKNIĘTA Z ZASTRZEŻENIAMI".
+- **Powtórzony towar: jedna reguła wyboru wiersza.** Skan bierze wiersz,
+  przy którym jest co robić, tak jak wejście z karty towaru. Tap otwiera
+  dotknięty wiersz, a nie „towar o tym symbolu". Karta towaru sumuje postęp
+  obu wierszy.
+- **Pamięć „inna półka niż w kartotece" nie przenosi ZAMIEŃ na inny towar.**
+  DODAJ dalej obowiązuje cały karton.
+- **Skan bez sieci otwiera pozycję z listy.** Serwer podaje kody kreskowe
+  pozycji. Kod dwóch różnych towarów nie zgaduje.
+- **COFNIJ cofa kolejne odłożenia, nie tylko ostatnie.** Pozycja rozłożona
+  na kilka półek pokazuje je wszystkie.
+
+**Baza.** Dwie kolumny dochodzą migracją przy starcie: `delivery_line.cofniecie`
+i `problem.zrodlo`. Stare odłożenia nie mają przepisu na cofnięcie; stare
+zgłoszenia liczą się jako złożone przez człowieka. Nic do zrobienia ręką —
+kolektory dostaną APK z serwera jak zwykle.
 ## 0.438.0 — 22 września 2026
 
 **Kosze mieszkają w zakładce Zwroty.** Trzeci krok przeprowadzki biura
