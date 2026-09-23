@@ -18,6 +18,7 @@ import {
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
+import { Etapy } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
@@ -827,6 +828,9 @@ export function Zwroty() {
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
             <Naglowek zwrot={zwrot} />
+            {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
+                zamiast zdań rozsianych po sekcjach. */}
+            <Etapy kubelek={zwrot.kubelek} />
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
                 operator zjechał na dziewiątą pozycję. */}
@@ -867,6 +871,7 @@ export function Zwroty() {
                 patrzy, a nie o kolumnę dalej. */}
             {szczegol.data?.pieniadze && <Pieniadze
               stan={szczegol.data.pieniadze}
+              przedWerdyktem={zwrot.kubelek === "decyzja"}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
                 || przelew.isPending || cofnijPrzelew.isPending}

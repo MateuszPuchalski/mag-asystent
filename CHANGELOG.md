@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.453.0 — 23 września 2026
+
+**Zwroty: koszyk w jednym wierszu i oś etapów.** Pierwszy krok przeniesienia
+projektu „Zwroty — mniej tekstu" do panelu. Zgłoszenie właściciela: „ulżyj
+przeładowaniu tekstem, użyj ikon".
+
+- Otwarty koszyk zajmuje jedno pasmo zamiast pięciu linii. Zawartość to
+  znaczniki symboli; dołożone ręką mają ikonę dłoni i krzyżyk. Pole skanu
+  stoi otwarte na stałe, a zdanie o tym, czego skan nie robi, jest
+  w podpowiedzi.
+- Droga koszyka **Pakowanie → Korekty → MM → Regał** zastępuje zdanie o MM
+  i korektach. Pełny opis każdego przystanku jest w podpowiedzi.
+- Koszyk czekający na dokument pokazuje tę samą drogę z liczbą brakujących
+  korekt albo odmową Sfery. „Dlaczego czeka" jest pod ikoną informacji.
+- Usuń koszyk i Nowy koszyk to przyciski z ikoną, z pełną nazwą
+  w podpowiedzi.
+- Nad zwrotem stoi oś **Decyzja → Ocena → Zwrot → Korekta → Zamknięty**
+  z podświetlonym bieżącym etapem. Odrzucony pokazuje tylko dwa przystanki.
+- Przed werdyktem sekcja Pieniądze zamiast zdania pokazuje znacznik
+  z kłódką „po werdykcie”. Pozostałe przeszkody zostają zdaniami.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.452.0 — 23 września 2026
 
 Dwie zmiany z wywiadu z właścicielem o procesie zwrotów.

@@ -1,10 +1,11 @@
 import React from "react";
-import { PackageOpen, PackagePlus, X } from "lucide-react";
+import { Hand, Info, Lock, PackageOpen, PackagePlus, Trash2, X } from "lucide-react";
 import {
   useKosz, useMmMimoKorekt, useNowyKoszyk, useUsunKoszyk, useZamknijKosz, useZdejmijTowar,
 } from "../api/zwroty";
 import { Przycisk, Blad, ile } from "../ui";
 import { DolozTowar } from "./DolozTowar";
+import { DrogaKoszyka } from "./DrogaKoszyka";
 
 /* ── Pasek otwartego koszyka zwrotów (0.192.0) ──────────────────────────────
    Właściciel opisał obieg, który biuro robi od lat ręką: „gdy agent zasiada do
@@ -36,14 +37,16 @@ function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
   kod: string; pozycji: number; trwa: boolean; pytamy: boolean;
   onPytaj: () => void; onNie: () => void; onTak: () => void;
 }) {
-  if (pozycji === 0) {
-    return <button type="button" className="btn-secondary text-xs" disabled={trwa}
-      onClick={onTak}>{trwa ? "Usuwam…" : "Usuń pusty koszyk"}</button>;
-  }
-  if (!pytamy) {
-    return <button type="button" className="btn-secondary text-xs" disabled={trwa}
-      onClick={onPytaj}>Usuń koszyk</button>;
-  }
+  /* KOSZ ZAMIAST NAPISU (0.453.0). Usunięcie to najrzadsza czynność na
+     pasku, a napis „Usuń koszyk" był drugim najdłuższym przyciskiem. Nazwa
+     zostaje w `aria-label` i w podpowiedzi — czytnik ekranu i mysz mają ją
+     dalej; pytanie przy napełnionym pudle zostaje zdaniem, bo mówi koszt. */
+  const kosz = (etykieta: string, onClick: () => void) =>
+    <button type="button" aria-label={etykieta} title={etykieta} disabled={trwa} onClick={onClick}
+      className="btn-secondary inline-flex h-8 w-8 shrink-0 items-center justify-center p-0 text-red-800">
+      <Trash2 size={14} aria-hidden="true" /></button>;
+  if (pozycji === 0) return kosz("Usuń pusty koszyk", onTak);
+  if (!pytamy) return kosz("Usuń koszyk", onPytaj);
   return <span className="flex w-full flex-wrap items-center gap-2">
     <span>
       Koszyk {kod} zniknie razem z {ile(pozycji, "pozycją", "pozycjami", "pozycjami")}.
@@ -55,6 +58,15 @@ function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
     <button type="button" className="btn-secondary text-xs" onClick={onNie}>Nie</button>
   </span>;
 }
+
+/**
+ * Ile znaczników pozycji mieści pasek, zanim reszta zejdzie do „+N".
+ *
+ * Osiem, bo tyle symboli mieści się w jednej linii obok pola skanu na
+ * ekranie biura. Ręczne pokazują się zawsze, choćby było ich więcej —
+ * tylko przy nich stoi krzyżyk, a schowany krzyżyk to krzyżyk, którego nie ma.
+ */
+const MAKS_ZNACZNIKOW = 8;
 
 export function Koszyk() {
   const { data } = useKosz();
@@ -108,17 +120,19 @@ export function Koszyk() {
         bo obowiązywała zasada „jeden koszyk na operatora" — właściciel ją
         odwrócił i wtedy znikający przycisk stał się dokładnie tym, czego
         brakowało na ekranie. */}
+    {/* Zdanie obok przycisku odeszło do podpowiedzi (0.453.0): mówiło to samo
+        przy każdym wejściu na ekran, a przycisk z ikoną pudła i plusem mówi
+        swoje sam. */}
     <div className="flex shrink-0 flex-wrap items-center gap-2">
         <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
-          disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
-          <PackagePlus size={12} />
-          {nowy.isPending ? "Zakładam…" : "Nowy koszyk zwrotów"}
-        </button>
-        <span className="text-xs text-slate-500">
-          {kosze.length > 0
+          aria-label="Nowy koszyk zwrotów"
+          title={kosze.length > 0
             ? "Kolejne pudło — przy kilku otwartych ocena pyta, do którego."
             : "Pudło do zbierania towaru — bez otwierania zwrotu."}
-        </span>
+          disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
+          <PackagePlus size={12} aria-hidden="true" />
+          {nowy.isPending ? "Zakładam…" : "Nowy koszyk"}
+        </button>
       {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
     </div>
     {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
@@ -131,37 +145,40 @@ export function Koszyk() {
     {czekajace.map((c) => <div key={c.id}
       className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
         border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-      <PackageOpen size={14} className="shrink-0" />
-      <b>{nazwa(c.rodzaj)} {c.kod}</b>
+      <PackageOpen size={14} aria-hidden="true" className="shrink-0" />
+      <b><span className="sr-only">{nazwa(c.rodzaj)} </span>{c.kod}</b>
+      {/* ── DROGA ZAMIAST DWÓCH ZDAŃ (0.453.0) ─────────────────────────────
+          Do 0.452.0 pasek niósł stan i osobne zdanie „dlaczego czeka". Stan
+          został, ale krótszy; „dlaczego" poszło pod ikonę informacji obok,
+          bo powód jest ten sam przy każdym pudle w tym stanie. Odmowa Sfery
+          zostaje w całości — to jedyne zdanie, które się tu zmienia. */}
+      <DrogaKoszyka rodzaj={c.rodzaj} etap={c.blad || c.brakuje.length === 0 ? "mm" : "korekty"}
+        brakuje={c.brakuje.length} blad={Boolean(c.blad)} />
       <span className="min-w-0 flex-1">
         {c.blad
-          ? <>Sfera odrzuciła MM: <b>{c.blad}</b></>
+          ? <>Sfera: <b>{c.blad}</b></>
           : c.brakuje.length > 0
             ? <>czeka na {c.brakuje.length === 1 ? "korektę" : "korekty"}: {
                 c.brakuje.map((b) => b.numer).join(", ")}</>
-            : <>komplet korekt — MM czeka na wypuszczenie</>}
+            : <>komplet korekt</>}
       </span>
-      {/* DLACZEGO czeka — bez tego zdania wygląda to na zaciętą kolejkę. */}
-      <span className="w-full text-amber-700">
-        {c.blad
-          /* Odmowa Sfery bywa o towarze, którego nie da się przesunąć — tak
-             zaczął koszyk Z-8, do którego wszedł skanem koszt przesyłki.
-             Zdanie mówi, CO z tym zrobić, a nie tylko że jest źle. */
-          ? <>Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij
-              wiersz, który tam nie pasuje, i wystaw MM jeszcze raz.
-              {(c.pozycje ?? []).some((p) => p.brakNaMag)
-                /* Sfera nie mówi, na którym wierszu padła — mówimy za nią.
-                   Bez tego zdania liczba przy symbolu byłaby ozdobą. */
-                ? <> Czerwone wiersze niżej to te, których na magazynie
-                  brakuje — Sfera odrzuciła dokument przez nie.</>
-                : <> Cały koszyk schodzi przyciskiem USUŃ KOSZYK.</>}</>
+      {/* DLACZEGO czeka — pod ikoną, nie w wierszu. Treść bez zmian: odmowa
+          Sfery mówi, CO z tym zrobić (blizna koszyka Z-8), korekta mówi, skąd
+          bierze się czekanie, komplet mówi, że dokument wychodzi ręką. */}
+      <span tabIndex={0} role="note" className="inline-flex shrink-0 items-center text-amber-800"
+        aria-label="Dlaczego czeka"
+        title={c.blad
+          ? "Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij wiersz, "
+            + "który tam nie pasuje, i wystaw MM jeszcze raz."
+            + ((c.pozycje ?? []).some((p) => p.brakNaMag)
+              ? " Czerwone wiersze niżej to te, których na magazynie brakuje — Sfera odrzuciła dokument przez nie."
+              : " Cały koszyk schodzi przyciskiem kosza.")
           : c.brakuje.length > 0
-            ? <>MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam
-                dopiero po korekcie. Dokument wyjdzie sam, gdy dojdzie ostatni
-                numer.</>
-            : <>Zadanie MM zdjęto przy poprawce zawartości i nikt go nie ponawia
-                sam — dokument wychodzi po naciśnięciu.</>}
-      </span>
+            ? "MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero po korekcie. "
+              + "Dokument wyjdzie sam, gdy dojdzie ostatni numer."
+            : "Zadanie MM zdjęto przy poprawce zawartości i nikt go nie ponawia sam — "
+              + "dokument wychodzi po naciśnięciu."}>
+        <Info size={14} aria-hidden="true" /></span>
       {/* ── CAŁA ZAWARTOŚĆ, Z KRZYŻYKIEM PRZY KAŻDYM WIERSZU (0.379.0) ────
           Do 0.378.0 stały tu wyłącznie wiersze ze SKANU, bo tylko one dawały
           się zdjąć. Koszyk Z-8 na produkcji pokazał cenę tej reguły: odbił się
@@ -253,84 +270,83 @@ export function Koszyk() {
       {mimo.error && <div className="w-full"><Blad>{(mimo.error as Error).message}</Blad></div>}
       {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
     </div>)}
-    {kosze.map((kosz) => <div key={kosz.id}
+    {kosze.map((kosz) => {
+      /* ── JEDEN WIERSZ NA PUDŁO (0.453.0) ────────────────────────────────
+         Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Do 0.452.0
+         otwarty koszyk zajmował pięć linii: nagłówek, pole skanu z własnym
+         przyciskiem „Zamknij", zdanie o tym, czego skan nie robi, zdanie
+         o MM i korektach oraz osobny rząd „dołożone ręką". Zostaje jedno
+         pasmo, a zdania idą do podpowiedzi drogi i pola.
+
+         POZYCJE TO ZNACZNIKI, jedna lista zamiast dwóch. Do 0.452.0 symbol
+         dołożony ręką stał w pasku dwa razy — w linijce zawartości i niżej,
+         z krzyżykiem. Teraz stoi raz: ręczny z ikoną dłoni i krzyżykiem,
+         ze zwrotu bez niego, bo tamten schodzi cofnięciem oceny. Ręczne idą
+         PIERWSZE, bo tylko przy nich jest co kliknąć. */
+      const reczne = kosz.pozycje.filter((p) => !p.zeZwrotu);
+      const zeZwrotow = kosz.pozycje.filter((p) => p.zeZwrotu);
+      const widoczne = [...reczne, ...zeZwrotow].slice(0, Math.max(MAKS_ZNACZNIKOW, reczne.length));
+      const ukryte = kosz.pozycje.length - widoczne.length;
+      const odpad = kosz.rodzaj === "odpad";
+      return <div key={kosz.id}
       /* Odpad w innym kolorze niż zwroty: to dwa różne końce hali, a pasek
          czyta się kątem oka. */
-      className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2
-        text-xs ${kosz.rodzaj === "odpad"
+      className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-3 py-2
+        text-xs ${odpad
           ? "border border-stone-300 bg-stone-100 text-stone-800"
           : "border border-sky-200 bg-sky-50 text-sky-900"}`}>
-    <PackageOpen size={14} className="shrink-0" />
-    <b>{nazwa(kosz.rodzaj)} {kosz.kod}</b>
-    <span className="tabular-nums">
-      {kosz.pozycji > 0 ? `${kosz.pozycji} poz. · ${kosz.sztuk} szt.` : "pusty"}</span>
-    {/* Symbole, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
-        i na dokumencie MM. Nazwy nie zmieściłyby się w jednym pasku.
-
-        Ta linijka pokazuje CAŁĄ zawartość i tak zostaje. Wiersze dołożone
-        ręką wracają niżej drugi raz — z krzyżykiem, bo tylko one dają się tu
-        zdjąć (0.365.0). Powtórzenie symbolu jest ceną za to, że jedna linijka
-        dalej odpowiada na pytanie „co leży w pudle". */}
-    <span className={`min-w-0 flex-1 truncate ${
-      kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}
-      title={kosz.pozycje.map((p) => `${p.symbol} × ${p.ilosc}`).join(", ")}>
-      {kosz.pozycje.map((p) => p.symbol).join(", ")}</span>
-    {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
-        więc serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia,
-        stoi tu droga wyjścia: porzucenie pudła, którego nikt nie napełnił. */}
-    {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
-        więc serwer i tak odmówi. */}
-    {kosz.pozycji > 0 &&
-      <Przycisk className="text-xs" disabled={zamknij.isPending}
-        onClick={() => zamknij.mutate(kosz.id)}>
-        {zamknij.isPending ? "Zamykam…" : "Zamknij koszyk"}
-      </Przycisk>}
-    <UsunKoszyk kod={kosz.kod} pozycji={kosz.pozycji} trwa={usun.isPending}
-      pytamy={doUsuniecia === kosz.id}
-      onPytaj={() => setDoUsuniecia(kosz.id)} onNie={() => setDoUsuniecia(null)}
-      onTak={() => usun.mutate(kosz.id, { onSettled: () => setDoUsuniecia(null) })} />
-    {/* Co się stanie po kliknięciu — wprost, bo powstaje dokument w Subiekcie.
-        Ta sama zasada co przy korekcie: ekran mówi, czego NIE robi i co robi
-        za człowieka. */}
-    {/* ── SKAN DO TEGO PUDŁA (0.378.0) ──────────────────────────────────
-        Ten sam komponent, który stoi w karcie zwrotu, tylko bez zwrotu pod
-        ręką. Tamto miejsce ZOSTAJE: operator stoi wtedy nad otwartym kartonem
-        konkretnej paczki i ekran idzie za czynnością fizyczną. Tutaj chodzi
-        o drugą czynność — zbieranie towaru do pudła, które stoi przy biurku
-        niezależnie od tego, co akurat jest otwarte na ekranie. */}
-    <div className="w-full">
-      <DolozTowar rodzaj={kosz.rodzaj} koszId={kosz.id} />
-    </div>
-    <span className={`w-full ${kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}`}>
-      {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie. Na hali
-          rozkłada się kosz z dokumentu MM, a nie ten koszyk — zdanie mówi
-          to wprost, bo inaczej etykieta „Z-" trafiałaby na regał. */}
-      Zamknięcie kończy koszyk. MM z magazynu głównego {kosz.rodzaj === "odpad"
-        ? "na magazyn odpadu" : "na regał zwrotów"} wychodzi, gdy wszystkie
-      zwroty z tego koszyka mają numer korekty — na hali rozkłada się kosz
-      z numerem tego MM.
+    <span className="flex shrink-0 items-center gap-2">
+      <PackageOpen size={16} aria-hidden="true" className="shrink-0" />
+      {/* Rodzaj mówi kolor i ikona; czytnikowi ekranu mówi go ukryty napis. */}
+      <b className="text-sm"><span className="sr-only">{nazwa(kosz.rodzaj)} </span>{kosz.kod}</b>
+      {odpad && <span className="rounded bg-stone-200 px-1.5 font-semibold">odpad</span>}
+      <span className="tabular-nums opacity-80">
+        {kosz.pozycji > 0 ? `${kosz.pozycji} poz · ${kosz.sztuk} szt` : "pusty"}</span>
     </span>
-    {/* DOŁOŻONE RĘKĄ — osobno i z krzyżykiem (0.365.0). Osobno, bo tylko one
-        dają się tu zdjąć; krzyżyk, bo skan bywa pomyłką, a wiersz bez zwrotu
-        nie ma oceny do cofnięcia. Przy koszyku bez takich wierszy nie ma tu
-        niczego: pusta etykieta „dołożone" byłaby napisem o braku. */}
-    {kosz.pozycje.some((p) => !p.zeZwrotu) && <span className="flex w-full flex-wrap items-center gap-1">
-      <span className={kosz.rodzaj === "odpad" ? "text-stone-600" : "text-sky-700"}>
-        dołożone ręką:</span>
-      {kosz.pozycje.filter((p) => !p.zeZwrotu).map((p) => <span key={p.id}
-        className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-1">
+    {widoczne.length > 0 && <ul aria-label="Zawartość koszyka" className="flex flex-wrap items-center gap-1">
+      {widoczne.map((p) => <li key={p.id} title={`${p.nazwa} × ${p.ilosc}${p.zeZwrotu ? "" : " — dołożone ręką"}`}
+        className="inline-flex h-6 items-center gap-1 rounded border border-slate-300 bg-white px-1.5 text-slate-800">
+        {!p.zeZwrotu && <Hand size={12} aria-label="dołożone ręką" className="shrink-0" />}
         <span className="font-mono">{p.symbol}</span>
-        <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
-        <button type="button" disabled={zdejmij.isPending}
+        <span className="tabular-nums text-slate-600">×{p.ilosc}</span>
+        {/* Krzyżyk TYLKO przy ręcznych (0.365.0): wiersz z oceny schodzi
+            cofnięciem oceny na karcie zwrotu. */}
+        {!p.zeZwrotu && <button type="button" disabled={zdejmij.isPending}
           onClick={() => zdejmij.mutate(p.id)}
           aria-label={`Zdejmij ${p.symbol} z koszyka`}
-          className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-          <X size={12} /></button>
-      </span>)}
-    </span>}
+          className="rounded p-0.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+          <X size={12} aria-hidden="true" /></button>}
+      </li>)}
+      {ukryte > 0 && <li className="tabular-nums opacity-80"
+        title={kosz.pozycje.slice(widoczne.length).map((p) => `${p.symbol} × ${p.ilosc}`).join(", ")}>
+        +{ukryte}</li>}
+    </ul>}
+    {/* Skan do TEGO pudła (0.378.0) — w pasku stoi otwarty na stałe, bo
+        przy pudle to jedyna czynność. */}
+    <DolozTowar rodzaj={kosz.rodzaj} koszId={kosz.id} wiersz />
+    {/* KOSZYK WIRTUALNY (0.350.0): zamknięcie kończy jego życie, a na hali
+        rozkłada się kosz z numerem MM. Mówi to podpowiedź drogi — zdanie stało
+        tu na stałe i przestało być czytane. */}
+    <DrogaKoszyka rodzaj={kosz.rodzaj} etap="pakowanie" />
+    <span className="flex shrink-0 items-center gap-2">
+      {/* PUSTY NIE MA CZEGO ZAMYKAĆ — dokument bez linii nie jest dokumentem,
+          więc serwer i tak odmówi. */}
+      {kosz.pozycji > 0 &&
+        <Przycisk className="inline-flex items-center gap-1 text-xs" disabled={zamknij.isPending}
+          aria-label={`Zamknij koszyk ${kosz.kod}`}
+          onClick={() => zamknij.mutate(kosz.id)}>
+          <Lock size={13} aria-hidden="true" />
+          {zamknij.isPending ? "Zamykam…" : "Zamknij"}
+        </Przycisk>}
+      <UsunKoszyk kod={kosz.kod} pozycji={kosz.pozycji} trwa={usun.isPending}
+        pytamy={doUsuniecia === kosz.id}
+        onPytaj={() => setDoUsuniecia(kosz.id)} onNie={() => setDoUsuniecia(null)}
+        onTak={() => usun.mutate(kosz.id, { onSettled: () => setDoUsuniecia(null) })} />
+    </span>
     {zamknij.error && <div className="w-full"><Blad>{(zamknij.error as Error).message}</Blad></div>}
     {usun.error && <div className="w-full"><Blad>{(usun.error as Error).message}</Blad></div>}
     {zdejmij.error && <div className="w-full"><Blad>{(zdejmij.error as Error).message}</Blad></div>}
-    </div>)}
+    </div>;
+    })}
   </>;
 }

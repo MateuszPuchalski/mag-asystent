@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Koszyk } from "./Koszyk";
@@ -85,7 +85,7 @@ describe("Koszyk zwrotów", () => {
     odpowiedz.kosze = [KOSZ({ pozycji: 0, sztuk: 0, pozycje: [] })];
     pokaz();
 
-    expect(screen.getByText(/Koszyk zwrotów Z-7/)).toBeInTheDocument();
+    expect(screen.getByText(/Z-7/)).toBeInTheDocument();
     expect(screen.getByText("pusty")).toBeInTheDocument();
     /* ZAMKNĄĆ GO NIE MA JAK: dokument bez linii nie jest dokumentem, więc
        serwer i tak odmówi. Zamiast przycisku, który zawsze odmawia, stoi
@@ -106,17 +106,21 @@ describe("Koszyk zwrotów", () => {
     odpowiedz.kosze = [KOSZ()];
     pokaz();
     expect(screen.getByRole("button", { name: /Nowy koszyk zwrotów/ })).toBeInTheDocument();
-    expect(screen.getByText(/ocena pyta, do którego/)).toBeInTheDocument();
+    /* Od 0.453.0 zdanie stoi w podpowiedzi przycisku, nie obok niego. */
+    expect(screen.getByTitle(/ocena pyta, do którego/)).toBeInTheDocument();
   });
 
   it("pokazuje kod, licznik i symbole, gdy coś w nim leży", () => {
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.getByText(/Koszyk zwrotów Z-7/)).toBeInTheDocument();
-    expect(screen.getByText(/2 poz\. · 5 szt\./)).toBeInTheDocument();
+    expect(screen.getByText(/Z-7/)).toBeInTheDocument();
+    expect(screen.getByText(/2 poz · 5 szt/)).toBeInTheDocument();
     /* SYMBOLE, nie nazwy: przy koszu liczy się to, co stoi na opakowaniu
-       i na dokumencie MM. */
-    expect(screen.getByText(/SEK-01, LOP-02/)).toBeInTheDocument();
+       i na dokumencie MM. Od 0.453.0 każdy jest znacznikiem, a nazwa czeka
+       w podpowiedzi. */
+    const zawartosc = screen.getByRole("list", { name: "Zawartość koszyka" });
+    expect(within(zawartosc).getByText("SEK-01")).toBeInTheDocument();
+    expect(within(zawartosc).getByText("LOP-02")).toBeInTheDocument();
   });
 
   it("dokładanie towaru stoi TAKŻE przy pudle, nie tylko przy zwrocie", () => {
@@ -132,8 +136,10 @@ describe("Koszyk zwrotów", () => {
        Ocena „na stan" dalej dokłada sama i nikt jej nie zastępuje przyciskiem. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.getByRole("button", { name: /Dołóż towar do koszyka/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Zamknij koszyk/ })).toBeInTheDocument();
+    /* Od 0.453.0 pole stoi otwarte na stałe — przy pudle to jedyna czynność,
+       a przycisk „otwórz pole" byłby kliknięciem przed każdą serią skanów. */
+    expect(screen.getByRole("textbox", { name: "Towar do koszyka" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Zamknij koszyk Z-7/ })).toBeInTheDocument();
   });
 
   it("mówi WPROST, co się stanie po domknięciu", () => {
@@ -141,7 +147,14 @@ describe("Koszyk zwrotów", () => {
        przy korekcie: ekran nazywa skutek, zamiast go zaskakiwać. */
     odpowiedz.kosze = [KOSZ()];
     pokaz();
-    expect(screen.getByText(/MM z magazynu głównego na regał zwrotów/)).toBeInTheDocument();
+    /* Od 0.453.0 mówi to droga koszyka: przystanek MM niesie zdanie
+       w podpowiedzi, a regał — że na hali rozkłada się kosz z numerem MM. */
+    const droga = screen.getByRole("list", { name: "Droga koszyka" });
+    expect(within(droga).getByTitle(/MM z magazynu głównego na regał zwrotów/)).toBeInTheDocument();
+    expect(within(droga).getByTitle(/kosz z numerem tego MM/)).toBeInTheDocument();
+    /* Pudło jest na pierwszym przystanku — i to widać, nie tylko słychać. */
+    expect(within(droga).getByText("Pakowanie").closest("[aria-current]"))
+      .toHaveAttribute("aria-current", "step");
   });
 
   it("koszyk czekający na korekty MÓWI, na co czeka i dlaczego", () => {
@@ -153,9 +166,13 @@ describe("Koszyk zwrotów", () => {
       brakuje: [{ zwrotId: 1, numer: "ZW-7" }],
     }];
     pokaz();
-    expect(screen.getByText(/Koszyk zwrotów Z-6/)).toBeInTheDocument();
+    expect(screen.getByText(/Z-6/)).toBeInTheDocument();
     expect(screen.getByText(/ZW-7/)).toBeInTheDocument();
-    expect(screen.getByText(/po korekcie/)).toBeInTheDocument();
+    /* „Dlaczego" stoi pod ikoną informacji od 0.453.0 — treść bez zmian. */
+    expect(screen.getByRole("note", { name: "Dlaczego czeka" }))
+      .toHaveAttribute("title", expect.stringMatching(/po korekcie/));
+    expect(screen.getByText("Korekty · brak 1").closest("[aria-current]"))
+      .toHaveAttribute("aria-current", "step");
   });
 
   it("czekający pokazuje się BEZ otwartego koszyka", () => {
@@ -328,7 +345,10 @@ describe("Koszyk zwrotów", () => {
     pokaz();
 
     expect(screen.getByText(/na magazynie 0 z 5/)).toBeInTheDocument();
-    expect(screen.getByText(/Czerwone wiersze niżej/)).toBeInTheDocument();
+    expect(screen.getByRole("note", { name: "Dlaczego czeka" }))
+      .toHaveAttribute("title", expect.stringMatching(/Czerwone wiersze niżej/));
+    /* Droga pokazuje odmowę na przystanku MM, słowem obok koloru. */
+    expect(screen.getByText("MM odrzucona")).toBeInTheDocument();
     /* Wiersz z pokryciem nie jest oskarżany — inaczej lista wskazywałaby
        wszystko naraz, czyli nic. */
     expect(screen.queryByText(/na magazynie 4 z 1/)).toBeNull();

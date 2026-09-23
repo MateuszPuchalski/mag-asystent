@@ -1,5 +1,5 @@
 import React, { useState, type MutableRefObject } from "react";
-import { Banknote, Ban, Check, Undo2 } from "lucide-react";
+import { Banknote, Ban, Check, Lock, Undo2 } from "lucide-react";
 import type { StanZwrotuPieniedzy } from "../api/typy";
 import { Przycisk } from "../ui";
 import { zlote } from "../api/zwroty";
@@ -52,8 +52,15 @@ const LIMIT_POWODU = 250;
 const LIMIT_REFERENCJI = 140;
 
 export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
-  akcje }: {
+  akcje, przedWerdyktem = false }: {
   stan: StanZwrotuPieniedzy;
+  /**
+   * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
+   * i znana z góry, a oś etapów nad sekcją już ją pokazuje — więc zdanie
+   * „Najpierw przyjmij zwrot…" schodzi do znacznika z kłódką. Inne przeszkody
+   * zostają zdaniami: każda mówi co innego i każda każe coś zrobić.
+   */
+  przedWerdyktem?: boolean;
   trwa: boolean;
   blad: string;
   onZwroc: () => void;
@@ -110,6 +117,11 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
             {stan.oddane.id && <span className="font-mono text-xs font-normal
               text-slate-500">{stan.oddane.id}</span>}</span>)}
 
+      {przedWerdyktem && stan.powod && !stan.oddane && !stan.odmowa &&
+        <span title={stan.powod}
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+          <Lock size={12} aria-hidden="true" />po werdykcie</span>}
+
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono ({stan.odmowa.kod})</span>}
 
@@ -128,7 +140,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
 
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. */}
-    {stan.powod && !stan.oddane && !stan.odmowa &&
+    {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
 
     {/* ── PRZELEW ODDANY POZA ALLEGRO (0.269.0) ────────────────────────────

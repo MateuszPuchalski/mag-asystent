@@ -1,0 +1,72 @@
+import React from "react";
+import { Banknote, CircleCheck, CircleX, Eye, FileText, Scale } from "lucide-react";
+import type { Kubelek } from "../api/typy";
+import { KUBELKI } from "./Kolejka";
+
+/* ── Oś etapów zwrotu (0.453.0) ──────────────────────────────────────────────
+   Zgłoszenie właściciela po przeglądzie ekranu: „ulżyj przeładowaniu tekstem,
+   użyj ikon". Ekran mówił, gdzie jest zwrot, zdaniami rozsianymi po sekcjach —
+   „Najpierw przyjmij zwrot — pieniądze oddaje się po werdykcie" pod
+   pieniędzmi, pytanie kubełka nad listą. Oś mówi to raz, w jednym miejscu:
+   pięć przystanków, ten bieżący podświetlony, a to, co przed nim, wyszarzone.
+
+   NAZWY I PYTANIA Z `KUBELKI`, nie własne. Kubełek jest jednym pojęciem na
+   całym ekranie; druga lista jego nazw rozjechałaby się z pierwszą przy
+   pierwszej zmianie słowa.
+
+   TO NIE JEST `Os.tsx`. Tamta oś opowiada HISTORIĘ — kto, kiedy, co zrobił.
+   Ta pokazuje DROGĘ — gdzie sprawa jest i co jeszcze przed nią. Dwie różne
+   odpowiedzi, dlatego dwie różne formy: tamta pionowa lista zdań, ta rząd
+   znaczników.
+
+   ODRZUCONY SKRACA DROGĘ. Odmowa wyprowadza zwrot z drabiny, więc oś pokazuje
+   wtedy dwa przystanki: decyzję i odmowę. Trzy wyszarzone kroki, na które ta
+   sprawa nigdy nie wejdzie, byłyby obietnicą bez pokrycia.                   */
+
+const IKONY: Record<Kubelek, React.ReactNode> = {
+  decyzja: <Scale size={13} aria-hidden="true" />,
+  ocena: <Eye size={13} aria-hidden="true" />,
+  zwrot: <Banknote size={13} aria-hidden="true" />,
+  korekta: <FileText size={13} aria-hidden="true" />,
+  zamkniety: <CircleCheck size={13} aria-hidden="true" />,
+  odrzucony: <CircleX size={13} aria-hidden="true" />,
+};
+
+/** Krótkie nazwy przystanków — etykiety kubełków mówią „Do …", a oś „gdzie". */
+const NAZWY: Record<Kubelek, string> = {
+  decyzja: "Decyzja", ocena: "Ocena", zwrot: "Zwrot", korekta: "Korekta",
+  zamkniety: "Zamknięty", odrzucony: "Odrzucony",
+};
+
+const DROGA: Kubelek[] = ["decyzja", "ocena", "zwrot", "korekta", "zamkniety"];
+
+export function Etapy({ kubelek }: { kubelek: Kubelek }) {
+  const droga: Kubelek[] = kubelek === "odrzucony" ? ["decyzja", "odrzucony"] : DROGA;
+  const teraz = droga.indexOf(kubelek);
+  const pytanie = (k: Kubelek) => KUBELKI.find((b) => b.id === k)?.pytanie ?? "";
+
+  return <ol aria-label="Etapy zwrotu"
+    className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 px-4 py-2">
+    {droga.map((k, i) => {
+      /* Stan końcowy nie jest „bieżącą pracą", więc nie świeci kolorem
+         działania: zamknięty jest zielony, odrzucony szary. */
+      const klasa = i < teraz
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : i > teraz
+          ? "border-slate-200 bg-white text-slate-600"
+          : k === "zamkniety"
+            ? "border-emerald-300 bg-emerald-100 font-semibold text-emerald-900"
+            : k === "odrzucony"
+              ? "border-slate-300 bg-slate-200 font-semibold text-slate-800"
+              : "border-sky-700 bg-sky-700 font-semibold text-white";
+      return <li key={k} className="flex items-center gap-1">
+        {i > 0 && <span aria-hidden="true" className="h-px w-4 bg-slate-300" />}
+        <span title={i === teraz ? `Teraz: ${pytanie(k)}` : pytanie(k)}
+          aria-current={i === teraz ? "step" : undefined}
+          className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs ${klasa}`}>
+          {IKONY[k]}{NAZWY[k]}
+        </span>
+      </li>;
+    })}
+  </ol>;
+}
