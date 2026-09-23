@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.480.0 — 23 września 2026
+
+**„Pasuje do” ze wszystkich ofert Allegro: zbiórka do wiedzy i sprawdzenie
+ofert.** Lista „Pasuje do” to nasze spisane twierdzenie, do czego pasuje
+część. Do tego wydania czytaliśmy ją wyłącznie przy ofercie, o którą ktoś
+zapytał, po dwadzieścia pozycji na szkic. Oferta bez pytania nie oddawała nic.
+**Tylko czytanie Allegro**: publikacji do ofert nie ma, decyzją właściciela.
+
+- **Gdzie.** Wiedza → „Z opisów i ofert” → karta „„Pasuje do” z ofert
+  Allegro”, na górze. Jeden przycisk: „Zbierz z wszystkich ofert”.
+- **Zbiórka.** Najpierw lista aktywnych ofert konta, po tysiąc na żądanie.
+  Potem treść ofert z pewną kartoteką, czyli po sygnaturze albo po wskazaniu
+  człowieka, po dziesięć na partię. Numery z parametrów idą do kartotek,
+  a pozycje listy do wiedzy tą samą drogą co przy szkicu. Marka rozpoznana
+  zapisuje się od razu, reszta czeka w kolejce.
+- **Nie dubluje i nie przeczy.** Maszyna już stojąca przy kartotece jest
+  pomijana. Pozycja, dla której wiedza mówi „nie pasuje”, nie idzie do
+  zapisu. Pokazuje ją sprawdzenie ofert.
+- **Zbiórkę prowadzi ekran, partia po partii**, z licznikiem „zostało”
+  i przyciskiem „Zatrzymaj”. Serwer nie ma przebiegu w tle. Następna zbiórka
+  zaczyna tam, gdzie skończyła poprzednia.
+- **Rytm żądań.** Odstęp półtorej sekundy z rozrzutem, lekcja z blokady IP
+  w sierpniu. Limit Allegro to przerwa: ekran czeka, ile Allegro prosi,
+  i idzie dalej.
+- **Sprawdzenie ofert** kładzie każdą listę obok zatwierdzonej wiedzy.
+  Sprzeczność to maszyna na liście, do której wiedza mówi „nie pasuje”, czyli
+  zwrot, który czeka. Brak to maszyna, do której część pasuje, a lista jej
+  nie wymienia. Każda oferta ma odnośnik do Allegro, bo tam się ją poprawia.
+- **Poprawka automatu marki z 0.341.0.** Pozycja zaczynająca się słowem
+  z samych liter, dłuższym niż trzy, nie dostaje już marki z tytułu oferty.
+  Pierwsza zbiórka na próbnych danych zapisała „Honda Lifan 168F” pod
+  gaźnikiem Hondy. Taki wiersz czeka teraz na człowieka.
+
+Kolumna `offer_snapshot.pasuje_do_zebrano_at`, dwie trasy zapisu (licznik 28),
+429 z czasem przerwy w kliencie panelu.
+
 ## 0.479.0 — 23 września 2026
 
 **Zwroty: mniej kliknięć i mniej czytania.** Siedem poprawek z przeglądu

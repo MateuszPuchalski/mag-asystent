@@ -130,6 +130,9 @@ const TRASY = () => [
     payload: { zrodlo: "IPL", tresc: { csv: "Model;Numer części\nLS 51;16100-ZH8-W61" }, zastosuj: false } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy/1/wycofaj" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy/1/zatwierdz", payload: { ids: [1] } },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/pasuje-do" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/pasuje-do/lista", payload: { offset: 0 } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/pasuje-do/zbierz" },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -147,7 +150,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dwadzieścia sześć — licznik jest umową", () => {
+test("tras zapisu jest dwadzieścia osiem — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -190,15 +193,19 @@ test("tras zapisu jest dwadzieścia sześć — licznik jest umową", () => {
      DWUDZIESTA SZÓSTA: zatwierdzenie propozycji z wykazu LISTĄ, którą
      człowiek przejrzał na ekranie. Jedna trasa na listę, jak przy tokenach —
      trzydzieści żądań na trzydzieści wierszy to trzydzieści szans na
-     rozjazd w połowie. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 26);
+     rozjazd w połowie.
+
+     DWUDZIESTA SIÓDMA I DWUDZIESTA ÓSMA: zbiórka „Pasuje do" z ofert — strona
+     listy ofert konta i partia treści. Czytają Allegro, piszą tylko u nas.
+     Publikacji do Allegro nie ma, decyzją właściciela, więc nie ma trasy. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 28);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
     "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika", "token_silnika",
-    "token_silnika_kartoteka", "zamiennosc_oem", "import_odsylaczy", "import_wykazu"].map(liczba);
+    "token_silnika_kartoteka", "zamiennosc_oem", "import_odsylaczy", "import_wykazu", "offer_snapshot"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });

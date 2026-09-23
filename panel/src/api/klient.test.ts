@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { BrakSesji, Konflikt, api } from "./klient";
+import { BrakSesji, Konflikt, PrzerwaAllegro, api } from "./klient";
 
 /* Klient HTTP rozdziela trzy rzeczy, które ekran musi narysować inaczej:
    wygasłą sesję, konflikt wersji i zwykły błąd. Zlanie ich w jeden `Error`
@@ -32,6 +32,13 @@ describe("api()", () => {
       });
       expect((e as Konflikt).message).toBe("Rozmowę przejął już inny agent");
     }
+  });
+
+  it("zamienia 429 na PrzerwaAllegro z czasem przerwy — długa zbiórka ma czekać, nie pytać od razu", async () => {
+    vi.stubGlobal("fetch", odp(429, { error: "Allegro prosi o przerwę", poIluMs: 30000 }));
+    const blad = await api("/api/obsluga/wiedza/pasuje-do/zbierz", { method: "POST" }).catch((e) => e);
+    expect(blad).toBeInstanceOf(PrzerwaAllegro);
+    expect((blad as PrzerwaAllegro).poIluMs).toBe(30000);
   });
 
   it("403 zostaje zwykłym błędem z komunikatem serwera", async () => {

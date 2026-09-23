@@ -2534,6 +2534,10 @@ CREATE TABLE IF NOT EXISTS offer_snapshot (
   -- pozycja typu `ID` bez tekstu nie niesie nic dla człowieka i wypada.
   pasuje_do_json TEXT,
   tresc_synced_at TEXT,
+  -- Kiedy zbiórka „Pasuje do" przepisała tę treść do wiedzy. Starsze niż
+  -- `tresc_synced_at` albo NULL znaczy „jest co zebrać" — tak zbiórka wie,
+  -- gdzie skończyła, bez trzymania stanu przebiegu na serwerze.
+  pasuje_do_zebrano_at TEXT,
   UNIQUE (channel_account_id, external_id)
 );
 

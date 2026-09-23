@@ -237,6 +237,9 @@ export function migrate(database: DatabaseSync) {
   for (const kol of ["opis", "parametry_json", "pasuje_do_json", "tresc_synced_at"]) {
     addColumn("offer_snapshot", kol, "TEXT");
   }
+  /* Znacznik zbiórki „Pasuje do" ze wszystkich ofert — patrz `offer_snapshot`
+     w `schema.sql`. Stare wiersze mają NULL, czyli „jeszcze nie zbierane". */
+  addColumn("offer_snapshot", "pasuje_do_zebrano_at", "TEXT");
   /* Werdykt reklamacji (przyrost trzeci) — patrz `reklamacja_klienta`
      w `schema.sql`. Tabela stoi na produkcji od 0.222.0, więc kolumny dochodzą
      migracją; stare sprawy mają NULL, czyli „werdykt nie wyszedł stąd" — i to

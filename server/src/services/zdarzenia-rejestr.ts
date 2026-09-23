@@ -42,7 +42,7 @@ export const ZDARZENIA: readonly string[] = [
   "logo_dostawcy_zapis", "magazyny_widocznosc", "manual_entry",
   "notatka_odpowiedz_przeczytana", "obsluga.zalacznik.pobrany", "odsylacze_import",
   "odsylacze_wycofanie", "oferta_komplet_ustalony", "pasowanie_propozycja",
-  "pasowanie_rozstrzygniecie", "pasowanie_wycofanie", "privileged", "problem_raised",
+  "pasowanie_rozstrzygniecie", "pasowanie_wycofanie", "pasuje_do_lista", "pasuje_do_zbiorka", "privileged", "problem_raised",
   "problem_resolved", "problem_wycofany", "przesuniecie", "przesylka_zapisana",
   "przyjecie_otwarte", "przyjecie_poza_aplikacja", "putaway_cofniete", "putaway_line_done",
   "putaway_polka_zmieniona", "putaway_qty_fixed", "queue_anulowane_recznie", "queue_applied",

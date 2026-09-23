@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, PrzegladWykazu, RaportWykazu, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, PrzegladWykazu, RaportWykazu,
+  SprawdzenieOfert, StanPasujeDo, WynikListyOfert, WynikPartiiPasujeDo, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
   NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RaportImportuOdsylaczy, RodzajDowodu,
   RodzajIdentyfikatora, SiecWiedzy, TrescImportu,
   TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
@@ -25,6 +26,7 @@ export const kluczeWiedzy = {
   siec: ["wiedza", "siec"] as const,
   odsylacze: ["wiedza", "odsylacze"] as const,
   wykazy: ["wiedza", "wykazy"] as const,
+  pasujeDo: ["wiedza", "pasuje-do"] as const,
 };
 
 /**
@@ -80,6 +82,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: kluczeWiedzy.siec });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.odsylacze });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.wykazy });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.pasujeDo });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -359,6 +362,29 @@ export function useHistoriaWykazow() {
   return useQuery({
     queryKey: kluczeWiedzy.wykazy,
     queryFn: () => api<ImportWykazu[]>(`/api/obsluga/wiedza/wykazy`),
+  });
+}
+
+/* ── „Pasuje do" z ofert: stan i sprawdzenie (odczyt), dwa kroki zbiórki ─── */
+export function usePasujeDo() {
+  return useQuery({
+    queryKey: kluczeWiedzy.pasujeDo,
+    queryFn: () => api<{ stan: StanPasujeDo; sprawdzenie: SprawdzenieOfert }>(`/api/obsluga/wiedza/pasuje-do`),
+  });
+}
+
+/* Bez odświeżania po każdej stronie i partii: zbiórka to kilkadziesiąt
+   żądań, a ekran odświeża stan sam, gdy przebieg się kończy. */
+export function useSpiszOferty() {
+  return useMutation({
+    mutationFn: (offset: number) => api<WynikListyOfert>(`/api/obsluga/wiedza/pasuje-do/lista`,
+      { method: "POST", body: JSON.stringify({ offset }) }),
+  });
+}
+
+export function useZbierzPasujeDo() {
+  return useMutation({
+    mutationFn: () => api<WynikPartiiPasujeDo>(`/api/obsluga/wiedza/pasuje-do/zbierz`, { method: "POST" }),
   });
 }
 

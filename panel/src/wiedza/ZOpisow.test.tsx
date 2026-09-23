@@ -31,6 +31,7 @@ const Z_OFERTY: ModelZOpisu = {
    stoi zaślepka, żeby ten plik pilnował tylko kolejki tekstów z opisów. */
 vi.mock("./Odsylacze", () => ({ Odsylacze: () => <p>odsyłacze</p> }));
 vi.mock("./WykazCzesci", () => ({ WykazCzesci: () => <p>wykaz części</p> }));
+vi.mock("./PasujeDoOfert", () => ({ PasujeDoOfert: () => <p>pasuje do z ofert</p> }));
 
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),

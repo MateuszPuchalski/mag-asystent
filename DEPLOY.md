@@ -2582,6 +2582,19 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.480.0 — „Pasuje do” ze wszystkich ofert
+
+**Panel trzeba przebudować, a serwer zrestartować.** Kolumna
+`offer_snapshot.pasuje_do_zebrano_at` dochodzi sama przy starcie.
+
+Zbiórka używa wyłącznie uprawnienia `allegro:api:sale:offers:read`, które
+konto ma od listy ofert przy rozmowach. Ponowne parowanie nie jest potrzebne.
+Pierwsza zbiórka przy kilkuset ofertach trwa kilkanaście minut, bo każda
+oferta to osobne żądanie z odstępem.
+
+Sprawdzenie: Wiedza → „Z opisów i ofert” → „Zbierz z wszystkich ofert”.
+Licznik „do zebrania” ma spadać, a pod kartą pojawić się „Oferty a wiedza”.
+
 ### Aktualizacja do 0.477.0 — szkic zaraz po rozpoznaniu
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna
