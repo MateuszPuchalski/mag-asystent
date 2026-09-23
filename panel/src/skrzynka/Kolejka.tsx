@@ -21,7 +21,7 @@ import type { StanPowiadomien } from "./Sygnaly";
    Znacznik „po terminie" na wierszu liczy dalej SERWER (`poTerminie`), bo
    odłożenia zapisane przed 22 września 2026 wciąż wygasają. Nowych nikt nie
    nadaje, więc kubełek na nie odszedł, a znacznik zgaśnie sam. */
-type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace";
+type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace" | "zakonczone";
 
 /* ── Kolejność listy (0.215.0) ───────────────────────────────────────────────
    Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
@@ -54,14 +54,16 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
   { klucz: "moje", etykieta: "Moje" },
   { klucz: "oczekujace", etykieta: "Oczekujące" },
+  /* Zakończone (23 września 2026): ręką agenta albo samo — podziękowanie,
+     dwa dni ciszy, wątek zamknięty w Allegro. Osobno, żeby pomyłkowe
+     zakończenie dało się znaleźć i otworzyć, a nie tylko w „Wszystkie". */
+  { klucz: "zakonczone", etykieta: "Zakończone" },
   /* „Po terminie" odeszło 22 września 2026 razem z ręcznym odłożeniem:
      kubełek liczył wyłącznie odłożenia, a tych nikt już nie nadaje. */
 ];
 
-/* Rozmowa zamknięta i spam znikają z kolejki roboczej, ale NIE z panelu:
-   widać je w „Wszystkie". Ukrycie ich wszędzie znaczyłoby, że pomyłkowego
-   zamknięcia nie da się cofnąć — a nikt nie szuka sprawy, której nie ma. */
-const ZESZLA_Z_BIURKA = ["closed", "spam"];
+/* Spam znika z kolejki roboczej, ale NIE z panelu: widać go w „Wszystkie".
+   Ukrycie go wszędzie znaczyłoby, że pomyłki nie da się cofnąć. */
 
 /* ── KTÓRY STATUS ZASŁUGUJE NA PLAKIETKĘ (0.251.0) ───────────────────────────
    Do 0.249.1 każdy wiersz zaczynał się od plakietki statusu — a w kubełkach
@@ -90,13 +92,24 @@ const NASZ_RUCH: ReadonlySet<StatusRozmowy> = new Set([
   "waiting_for_internal",
 ]);
 
+/* ── KUBEŁKI ROBOCZE TO NASZ RUCH (23 września 2026) ─────────────────────────
+   Zgłoszenie właściciela: „potrzebuję sposobu, żeby rozmowa była rozwiązana".
+   „Nieprzypisane" i „Moje" patrzyły wyłącznie na prowadzącego, więc rozmowa
+   po naszej odpowiedzi stała w nich na zawsze — a czekanie na klienta to nie
+   praca. Teraz robocze trzymają tylko to, przy czym ruch jest nasz;
+   czekanie ma „Oczekujące", koniec — „Zakończone". */
+const CZEKA_NA_KOGOS = ["waiting_for_customer", "waiting_for_internal", "snoozed"];
+const ZAKONCZONA = ["resolved", "closed"];
+
 function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean {
   if (kubelek === "wszystkie") return true;
-  if (ZESZLA_Z_BIURKA.includes(r.status)) return false;
+  if (r.status === "spam") return false;
+  if (kubelek === "zakonczone") return ZAKONCZONA.includes(r.status);
+  if (ZAKONCZONA.includes(r.status)) return false;
+  if (kubelek === "oczekujace") return CZEKA_NA_KOGOS.includes(r.status);
+  if (CZEKA_NA_KOGOS.includes(r.status)) return false;
   if (kubelek === "nieprzypisane") return r.wlascicielId === null;
-  if (kubelek === "moje") return mojeId !== null && r.wlascicielId === mojeId;
-  return r.status === "waiting_for_customer" || r.status === "waiting_for_internal"
-    || r.status === "snoozed";
+  return mojeId !== null && r.wlascicielId === mojeId;
 }
 
 /* Kolejka pokazuje moment ostatniej synchronizacji, bo pusta lista o 9:00

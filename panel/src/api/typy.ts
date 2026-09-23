@@ -17,6 +17,9 @@ export type StatusRozmowy =
   | "new" | "open" | "waiting_for_customer" | "waiting_for_us" | "waiting_for_internal"
   | "snoozed" | "resolved" | "closed" | "spam";
 
+/** Źródło zakończenia rozmowy — patrz `wyliczStatus` na serwerze. */
+export type ZrodloZakonczenia = "agent" | "podziekowanie" | "cisza" | "allegro";
+
 export type Rozmowa = {
   id: number;
   klient: string;
@@ -61,6 +64,12 @@ export type Rozmowa = {
    * z decyzji klasyfikatora, panel tej reguły nie powtarza.
    */
   podziekowal: boolean;
+  /**
+   * Skąd zakończenie, gdy `status` to `resolved` (23 września 2026): ręka
+   * agenta, podziękowanie, dwa dni ciszy albo wątek zamknięty w Allegro.
+   * Liczy serwer (`wyliczStatus`); panel tylko je nazywa.
+   */
+  zakonczenie?: ZrodloZakonczenia | null;
   /** Rozpoznanie Copilota (§14, etap F). `null` = nikt jeszcze nie rozpoznał. */
   kopilot: Kopilot | null;
   /* Kto SIEDZI przy rozmowie teraz. Przydział tymczasowy, na czas oglądania —

@@ -402,6 +402,37 @@ export function useWskazZamowienie() {
  * Konflikt świeżości NIE jest tu łapany: `Konflikt` leci do ekranu, bo to on
  * ma pokazać dopisek klienta obok szkicu i poprosić o jawną zgodę.
  */
+/**
+ * Zakończ / Otwórz ponownie (23 września 2026). Jeden werdykt zamiast menu
+ * statusów. Zakończenie przy pytaniu bez odpowiedzi serwer odbija 409
+ * (`pytanieBezOdpowiedzi`), dopóki nie przyjdzie `mimoPytania`.
+ */
+export function useZakoncz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; mimoPytania?: boolean }) =>
+      api(`/api/conversations/${v.id}/zakoncz`, {
+        method: "POST", body: JSON.stringify({ mimoPytania: Boolean(v.mimoPytania) }),
+      }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+    },
+  });
+}
+
+export function useOtworz() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`. */
+    mutationFn: (v: { id: number }) => api(`/api/conversations/${v.id}/otworz`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+    },
+  });
+}
+
 export function useWyslij() {
   const qc = useQueryClient();
   return useMutation({
@@ -409,6 +440,8 @@ export function useWyslij() {
       id: number; body: string; expectedVersion: number;
       expectedLastMessageId: number | null;
       mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
+      /** „Wyślij i zakończ" (23 września 2026) — werdykt w tej samej transakcji co wiadomość. */
+      zakoncz?: boolean;
     }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
       method: "POST",
       body: JSON.stringify({
@@ -416,6 +449,7 @@ export function useWyslij() {
         expectedLastMessageId: v.expectedLastMessageId,
         mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
         mimoObecnosci: Boolean(v.mimoObecnosci),
+        zakoncz: Boolean(v.zakoncz),
       }),
     }),
     onSettled: (_d, _e, v) => {

@@ -625,6 +625,10 @@ test("odłożenie po terminie wraca do kolejki jako otwarte i widać, że termin
   const { ustawStatus } = await import("./conversations.js");
   const d = db();
   ustawStatus(d, rozmowaId, "snoozed", BIURO.id, "2026-08-31T06:00:00.000Z");
+  /* Nasza odpowiedź GODZINĘ temu: od 23 września 2026 dwa dni ciszy kończą
+     rozmowę same, a ten test pilnuje wygaśnięcia odłożenia, nie ciszy. */
+  d.prepare("UPDATE message SET sent_at=? WHERE conversation_id=? AND direction='outgoing'")
+    .run(new Date(Date.now() - 3_600_000).toISOString(), rozmowaId);
 
   const wiersz = listaRozmow().find((r) => r.id === rozmowaId)!;
   assert.equal(wiersz.status, "waiting_for_customer",
@@ -966,10 +970,14 @@ function rozmowaZWiadomosciami(kierunki: Array<"incoming" | "outgoing">, status 
     external_conversation_id,subject,status,updated_at)
     VALUES (?,?,'Temat',?,'2026-09-01T10:00:00.000Z')`)
     .run(konto, `w-${Math.random()}`, status).lastInsertRowid);
+  /* Wiadomości sprzed GODZINY, nie z wczesnego września: od 23 września 2026
+     dwa dni ciszy po naszej odpowiedzi kończą rozmowę same, a te testy
+     pilnują kierunku, nie ciszy. */
+  const godzineTemu = Date.now() - 3_600_000;
   kierunki.forEach((k, i) => d.prepare(`INSERT INTO message(conversation_id,channel_account_id,
     external_message_id,direction,body,sent_at)
     VALUES (?,?,?,?,'x',?)`).run(rozmowa, konto, `m-${rozmowa}-${i}`, k,
-      `2026-09-01T1${i}:00:00.000Z`));
+      new Date(godzineTemu + i * 60_000).toISOString()));
   return rozmowa;
 }
 
@@ -995,9 +1003,12 @@ test("kolejka i otwarta rozmowa mówią to samo", () => {
 test("werdykt człowieka przebija wyliczenie", () => {
   /* „Rozwiązana" i „Zamknięta" mają zostać mimo pytania klienta na końcu —
      inaczej nie dałoby się domknąć żadnej sprawy. */
-  for (const status of ["resolved", "closed", "spam", "snoozed"]) {
+  /* „Zamknięta" czyta się od 23 września 2026 jak „Zakończona" — jeden
+     werdykt, decyzja właściciela. */
+  for (const [status, widac] of [["resolved", "resolved"], ["closed", "resolved"], ["spam", "spam"],
+    ["snoozed", "snoozed"]]) {
     const r = rozmowaZWiadomosciami(["incoming"], status);
-    assert.equal(osRozmowy(r).rozmowa.status, status, `status ${status} miał zostać`);
+    assert.equal(osRozmowy(r).rozmowa.status, widac, `status ${status} miał zostać`);
   }
 });
 
@@ -1034,10 +1045,13 @@ function rozmowaZOdbiciem(poOdbiciu: Array<"incoming" | "outgoing"> = []) {
     .run(konto, `w-${Math.random()}`).lastInsertRowid);
   /* Przez `zapiszWiadomosc`, nie wprost do tabeli: to ta funkcja rozpoznaje
      odbicie przy zapisie i test ma przejść JEJ ścieżką. */
+  /* Godzinę temu, nie we wrześniu: dwa dni ciszy kończą rozmowę same
+     (23 września 2026), a ten test pilnuje odbicia, nie ciszy. */
+  const godzineTemu = Date.now() - 3_600_000;
   const pisz = (dir: "incoming" | "outgoing", body: string, i: number) =>
     zapiszWiadomosc({ conversationId: rozmowa, channelAccountId: konto,
       externalMessageId: `a-${rozmowa}-${i}`, direction: dir, body,
-      sentAt: `2026-09-01T1${i}:00:00.000Z` }, d);
+      sentAt: new Date(godzineTemu + i * 60_000).toISOString() }, d);
   pisz("incoming", "Czy ten szarpak pasuje?", 0);
   pisz("outgoing", ODBICIE, 1);
   poOdbiciu.forEach((k, i) => pisz(k, k === "incoming" ? "Dopisuję" : "Pasuje.", i + 2));
@@ -1289,7 +1303,9 @@ test("podziękowanie po naszej odpowiedzi zdejmuje rozmowę z „Czeka na nas”
     taksonomia_wersja,polityka_wersja,at,przez)
     VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
     .run(r, dzieki, "2026-09-01T09:01:00.000Z");
-  assert.equal(wiersz().status, "waiting_for_customer");
+  /* Od 23 września 2026 podziękowanie ZAKAŃCZA rozmowę, ze źródłem. */
+  assert.equal(wiersz().status, "resolved");
+  assert.equal(wiersz().zakonczenie, "podziekowanie");
   assert.equal(wiersz().podziekowal, true);
 
   /* Poprawka człowieka na inną kategorię kopiuje akcję modelu — i mimo to

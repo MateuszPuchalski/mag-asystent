@@ -15,7 +15,7 @@ import { Os } from "./Os";
 
 const props = {
   szkic: "", cudza: false, wlasciciel: null as string | null, zapisuje: false, wysyla: false,
-  onZmiana: vi.fn(), onZapisz: vi.fn(), onWyslij: vi.fn(),
+  onZmiana: vi.fn(), onZapisz: vi.fn(), onWyslij: vi.fn(), onWyslijIZakoncz: undefined as (() => void) | undefined,
   komentarz: "", onKomentarz: vi.fn(), onDodajKomentarz: vi.fn(),
   komentuje: false, agenci: [{ userId: 7, name: "Ala" }], wzmianki: [] as number[],
   onWzmianki: vi.fn(),
@@ -134,5 +134,22 @@ describe("Ctrl+Enter w polu odpowiedzi", () => {
     screen.getByLabelText("Szkic odpowiedzi").focus();
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
     expect(onWyslij).not.toHaveBeenCalled();
+  });
+});
+
+/* ── Wyślij i zakończ (23 września 2026) ─────────────────────────────────────
+   Większość spraw kończy się ostatnią odpowiedzią, więc werdykt jedzie z nią.
+   Ctrl+Shift+Enter to ta sama droga co drugi przycisk — i ten sam warunek. */
+describe("Wyślij i zakończ", () => {
+  it("przycisk i Ctrl+Shift+Enter wołają wysyłkę z zakończeniem, a Ctrl+Enter — zwykłą", async () => {
+    const onWyslij = vi.fn();
+    const onWyslijIZakoncz = vi.fn();
+    edytor({ szkic: "Dzień dobry", onWyslij, onWyslijIZakoncz });
+    screen.getByLabelText("Szkic odpowiedzi").focus();
+    await userEvent.keyboard("{Control>}{Shift>}{Enter}{/Shift}{/Control}");
+    expect(onWyslijIZakoncz).toHaveBeenCalledTimes(1);
+    expect(onWyslij).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij i zakończ/ }));
+    expect(onWyslijIZakoncz).toHaveBeenCalledTimes(2);
   });
 });

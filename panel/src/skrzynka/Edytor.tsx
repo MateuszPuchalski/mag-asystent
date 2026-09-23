@@ -23,7 +23,7 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
  * kliknięcie WYŚLIJ.
  */
 export function Edytor({
-  szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij,
+  szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij, onWyslijIZakoncz,
   komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki,
   zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik, copilot,
 }: {
@@ -35,6 +35,8 @@ export function Edytor({
   onZmiana: (v: string) => void;
   onZapisz: () => void;
   onWyslij: () => void;
+  /** „Wyślij i zakończ" (23 września 2026) — większość spraw kończy się ostatnią odpowiedzią. */
+  onWyslijIZakoncz?: () => void;
   komentarz: string;
   onKomentarz: (v: string) => void;
   onDodajKomentarz: () => void;
@@ -162,7 +164,10 @@ export function Edytor({
             onKeyDown={(e) => {
               if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
               e.preventDefault();
-              if (!cudza && !wysyla && szkic.trim()) onWyslij();
+              /* Ctrl+Shift+Enter — „Wyślij i zakończ" (23 września 2026). */
+              if (!cudza && !wysyla && szkic.trim()) {
+                if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
+              }
             }}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
@@ -188,6 +193,15 @@ export function Edytor({
                   nie wie, nikt nie skorzysta. Poza nazwą dostępną przycisku. */}
               <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>
             </Przycisk>
+            {/* DRUGI, CICHSZY (23 września 2026): wysyłka zostaje jedynym
+                najgłośniejszym działaniem, a zakończenie jedzie z nią w tej
+                samej transakcji — nieudana wysyłka niczego nie kończy. */}
+            {onWyslijIZakoncz && <button type="button" onClick={onWyslijIZakoncz}
+              disabled={cudza || wysyla || !szkic.trim()} aria-keyshortcuts="Control+Shift+Enter"
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+              Wyślij i zakończ
+              <kbd aria-hidden="true" className="rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Shift+Enter</kbd>
+            </button>}
             <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
               className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
               {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
