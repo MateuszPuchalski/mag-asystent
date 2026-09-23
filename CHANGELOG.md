@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.10 — 23 września 2026
+
+**Komentarz przy zakazie półpauzy mówi prawdę.** Twierdził, że właściciel
+postanowił myślników w instrukcji nie czyścić. 0.482.9 je wyczyściło, więc
+komentarz mówi teraz, jak jest. Każe też pisać nowe zdania instrukcji bez
+myślnika. Wynik dalej nie jest bramkowany. Kodu wykonywanego to wydanie
+nie zmienia.
+
 ## 0.482.9 — 23 września 2026
 
 **Instrukcja szkicu nie używa półpauzy, której zakazuje.** Dziewiętnaście

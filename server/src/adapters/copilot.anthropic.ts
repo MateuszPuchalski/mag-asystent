@@ -365,11 +365,11 @@ const Szkic = z.object({
    `potwierdzone`, bo numer siedzi w opisie kartoteki, nie w polu identyfikatora.
 
    ZAKAZ PÓŁPAUZY JEST NAJSŁABSZY Z CAŁEJ PIĄTKI i trzeba to wiedzieć,
-   zanim ktoś uzna go za działający. Ten plik ma kilkadziesiąt półpauz we
-   własnym tekście i model czyta je jako wzorzec. Właściciel świadomie
-   zdecydował ich nie czyścić i nie bramkować wyniku, więc zakaz stoi sam
-   przeciwko przykładom. Gdy w szkicach dalej będzie się pojawiać myślnik,
-   to jest pierwsze miejsce do sprawdzenia, a nie dowód, że model nie słucha. */
+   zanim ktoś uzna go za działający. Model czyta rejestr instrukcji jako
+   wzorzec, więc od 0.482.9 zdania instrukcji nie mają półpauzy. Zostały
+   tylko dwa znaki cytowane w samej regule. Wyniku nie bramkujemy, decyzją
+   właściciela. Nowe zdanie w tej instrukcji pisz bez myślnika, bo jeden
+   wraca tu po cichu jako przykład, któremu zakaz musi się przeciwstawić. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
