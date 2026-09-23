@@ -222,7 +222,7 @@ export function ziarnoKontaDemo(): void {
   createUser("Administrator (demo)", "admin", "admin", "admin");
   console.log(
     "[seed] KONTO DEMO: login=admin hasło=admin — istnieje tylko dlatego, " +
-      "że SGT_MODE=seeded. Kolektor i /biuro logują się nim od razu."
+      "że SGT_MODE=seeded. Kolektor i panel biura logują się nim od razu."
   );
 }
 

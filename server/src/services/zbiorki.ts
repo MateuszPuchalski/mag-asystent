@@ -4,7 +4,7 @@ import { poziomyStrefy, wStrefieZlotej } from "./strefa-zlota.js";
 import { progGornych } from "./reslot.js";
 
 /* ── Zbiórki z systemu sprzedażowego → kandydaci do strefy złotej ────────────
-   CSV eksportowany z Sellasist (dziś wgrywany ręcznie w /biuro, docelowo
+   CSV eksportowany z Sellasist (dziś wgrywany ręcznie w analizie panelu, docelowo
    POST z integracji) niesie każdą pozycję koszyka z datą i symbolem. Z tego
    liczy się częstość zbierania per kartoteka, a z niej — adnotacja „przenieś
    do strefy złotej" na karcie towaru i ranking w panelu biura.

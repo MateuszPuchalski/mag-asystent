@@ -268,6 +268,11 @@ export type OfertaRozmowy = {
   externalId: string; link: string | null;
   /** Skąd numer (0.215.0): wskazanie agenta, wiadomość klienta albo jedyna pozycja zamówienia. */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
+  /**
+   * Lista „Pasuje do" z oferty z trafieniami maszyny z doboru (23 września 2026).
+   * `null`: treści oferty jeszcze nie pobrano albo lista jest pusta.
+   */
+  zgodnosc: ZgodnoscOferty | null;
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
@@ -317,6 +322,15 @@ export type KartaTowaru = {
   ceny?: CenaPoziomu[];
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
+};
+
+/** Lista zgodności oferty — to samo dopasowanie, co fakt szkicu (`zgodnosc-oferty.ts`). */
+export type ZgodnoscOferty = {
+  lista: string[];
+  /** „HECHT 1803S DYM1182c", gdy agent wpisał markę i model w doborze. */
+  maszyna: string | null;
+  trafienia: string[];
+  wariantSprawdzony: boolean;
 };
 
 /** Jeden poziom cenowy kartoteki; kwoty w GROSZACH całkowitych. */
@@ -948,6 +962,11 @@ export type Zdrowie = {
   configZPliku?: string | null;
   ok?: boolean;
   audyt?: { zdarzen?: number; najstarsze?: string | null; bazaBajtow?: number } | null;
+  /* Obecność tych dwóch pól mówi, czy w tej instalacji w ogóle SĄ zdjęcia
+     kartotek: z Subiekta (`zdjecia`) albo z kolektora (`zdjeciaWlasne`).
+     Treść liczników panel ignoruje — liczy się, że trasa je przysłała. */
+  zdjecia?: unknown;
+  zdjeciaWlasne?: unknown;
 };
 
 /** Konflikt przejęcia — kształt szczegółów, które serwer zwraca przy 409. */

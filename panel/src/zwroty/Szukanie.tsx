@@ -76,7 +76,7 @@ export function Szukanie({
   szukaPaczek?: boolean;
   /** Prośba o historię klienta — wysyłana po dopisaniu uchwytu, nie z każdego znaku. */
   onLogin?: (szukane: string) => void;
-  /** Allegro właśnie szuka zamówień tego loginu (0.447.0). */
+  /** Allegro właśnie szuka zamówień tego loginu (0.450.0). */
   pytaAllegro?: boolean;
   /** Odmowa Allegro całym zdaniem; lista z naszej bazy stoi mimo niej. */
   bladAllegro?: string;

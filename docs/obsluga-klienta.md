@@ -385,6 +385,16 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > Analizy → Obsługa klienta, bo są wynikiem, nie ustawieniem. Zakres ten
 > stanął wcześniej, w 0.443.0, i domknął lukę zapisaną przy F4a. Most
 > z panelu do `/biuro` zniknął — reguły strefy stoją za zębatką panelu.
+>
+> **F6 w 0.446.0 — przeprowadzka skończona.** `biuro.html` zniknął razem
+> z fontami i ikoną, a `/` i `/biuro` przekierowują (302) do `/obsluga/`.
+> Testy tras przeszły do `routes/biuro-api.test.ts`; strażnicy struktury
+> strony odeszli, bo ich gwarancje przejęły testy ekranów panelu. Dwa
+> sygnały paska biura nie miały jeszcze miejsca w panelu i przeszły do
+> nagłówka: etykieta instancji innej niż produkcja i plakietka spóźnionych
+> spraw. Jedno odstępstwo od planu: zapas danych firmy z przeglądarki
+> ZOSTAJE. Biuro może przeskoczyć 0.444.0 przy aktualizacji, a wtedy nikt
+> nie kliknął „Przenieś na serwer".
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 

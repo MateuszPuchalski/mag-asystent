@@ -30,6 +30,7 @@ let db: typeof import("../db/db.js").db;
 let kandydaciZamowien: typeof import("./zamowienia-kandydaci.js").kandydaciZamowien;
 let wskazZamowienie: typeof import("./zamowienia-kandydaci.js").wskazZamowienie;
 let zamowienieWskazane: typeof import("./zamowienia-kandydaci.js").zamowienieWskazane;
+let numerZamowieniaRozmowy: typeof import("./zamowienia-kandydaci.js").numerZamowieniaRozmowy;
 
 let konto = 0;
 let rozmowaId = 0;
@@ -37,7 +38,7 @@ let agent = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ kandydaciZamowien, wskazZamowienie, zamowienieWskazane } =
+  ({ kandydaciZamowien, wskazZamowienie, zamowienieWskazane, numerZamowieniaRozmowy } =
     await import("./zamowienia-kandydaci.js"));
 });
 
@@ -176,4 +177,19 @@ test("wskazanie zostawia ślad w dzienniku", () => {
     "SELECT user_id FROM events WHERE type='rozmowa_zamowienie_wskazane'").get() as
     { user_id: string } | undefined;
   assert.equal(e?.user_id, "A. Lewandowska");
+});
+
+/* ── Zamówienie rozmowy z najnowszej wiadomości PO CZASIE (23 września 2026) ──
+   Zrzut właściciela: „proszę o fv" z lipca pod jednym zamówieniem i „PROSZĘ
+   O FV" z września pod drugim — ekran pokazał lipcowe. Wątek wczytany w całości
+   jedną paczką od najnowszej dał wrześniowej wiadomości NIŻSZE `id`. */
+test("zamówienie rozmowy bierze się z najnowszej wiadomości klienta po czasie, nie po id", () => {
+  const id = rozmowa("w-fv", "malopolskiogrod");
+  const wpisz = (ext: string, at: string, numer: string) => db().prepare(`INSERT INTO message(
+    conversation_id,channel_account_id,external_message_id,direction,body,sent_at,related_order_id)
+    VALUES (?,?,?,'incoming','proszę o fv',?,?)`).run(id, konto, ext, at, numer);
+  /* Kolejność wpisu jak z paczki Allegro: najpierw wrzesień, potem lipiec. */
+  wpisz("m-wrzesien", "2026-09-23T09:23:00.000Z", "ac13cc10");
+  wpisz("m-lipiec", "2026-07-23T09:25:00.000Z", "e77b1940");
+  assert.equal(numerZamowieniaRozmowy(id)?.externalId, "ac13cc10");
 });

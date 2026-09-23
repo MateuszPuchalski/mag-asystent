@@ -92,7 +92,7 @@ const TRASY = () => [
      z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista
      cudzych zakupów, czyli praca biura. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta" },
-  /* Zamówienia kupującego z Allegro (0.447.0) — zapisuje i kosztuje
+  /* Zamówienia kupującego z Allegro (0.450.0) — zapisuje i kosztuje
      żądanie do Allegro, więc bramka roli stoi tak samo jak przy odczycie. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta/allegro" },
   /* Wypuszczenie MM mimo brakujących korekt (0.368.0). Wyjście awaryjne obok
@@ -354,7 +354,7 @@ test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", asyn
      koszyk staje się dokumentem dopiero przy zamknięciu, a porzucenie dotyczy
      wyłącznie pustego. Druga trasa jest warunkiem pierwszej — bez niej NOWY
      KOSZYK byłby drogą w jedną stronę, bo pustego kosza nie da się zamknąć. */
-  /* Trzydziesta szósta (0.447.0): zamówienia kupującego prosto z Allegro,
+  /* Trzydziesta szósta (0.450.0): zamówienia kupującego prosto z Allegro,
      po loginie. Zgłoszenie właściciela: paczki nieodebrane biuro szukało na
      stronie Allegro, bo nasza baza zna tylko zamówienia, do których prowadzi
      zwrot, wiadomość albo reklamacja — a przy takiej paczce nie prowadzi nic.

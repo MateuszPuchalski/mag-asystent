@@ -324,7 +324,7 @@ export const config = {
    *
    * `clientId` jest WYŁĄCZNIKIEM I KONFIGURACJĄ W JEDNYM (wzorzec
    * `zdjecia.zrodlo`): puste znaczy „funkcji nie ma" i to jest domyślne.
-   * Zakładka ZWROTY w /biuro mówi to wtedy wprost, /api/health milczy.
+   * Zakładka Zwroty w panelu mówi to wtedy wprost, /api/health milczy.
    * Ustawiony client_id BEZ sparowanego konta → zdanie w /api/health.
    *
    * Poświadczenia aplikacji rejestruje się na developer.allegro.pl (typ

@@ -67,13 +67,17 @@ const DOKUMENT: Dokument = {
 
 let wyslane: string[] = [];
 let archiwumPytania: string[] = [];
+/* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
+let zdjeciaWHealth = false;
+let pytaniaOObrazy: string[] = [];
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
   if (metoda !== "GET") { wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`); return { ok: true }; }
   if (url === "/api/delivery/documents") {
     return { documents: [
-      dok(802, { wyjatkiOtwarte: 1 }),
+      /* Rosa-Pol ma logo (khId 5) — wiersz listy ma je pokazać. */
+      dok(802, { wyjatkiOtwarte: 1, khId: 5, maLogo: true }),
       /* „Zamknięta" z otwartym wyjątkiem — gwarancja 2. */
       dok(803, { status: "done", linesDone: 4, wyjatkiOtwarte: 1 }),
       dok(804), dok(805, { status: null, linesDone: 0 }),
@@ -84,6 +88,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
       wyj(3, { deliveryId: null, dokId: null, docNumber: null, sym: null, symObcy: "OBCY-1" })] };
   }
   if (url === "/api/biuro/zamkniete-poza") return { documents: [] };
+  if (url === "/api/health") return zdjeciaWHealth ? { zdjecia: { plikow: 3 } } : {};
   if (url === "/api/biuro/notatki/odpowiedzi") return { odpowiedzi: [] };
   if (url === "/api/biuro/dokument/802") return DOKUMENT;
   if (url === "/api/biuro/dokument/806") return { ...DOKUMENT_ZE_ZDJECIEM(), dokId: 806 };
@@ -98,6 +103,8 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
 beforeEach(() => {
   wyslane = [];
   archiwumPytania = [];
+  zdjeciaWHealth = false;
+  pytaniaOObrazy = [];
   _wyczyscPamiecZdjec();
   /* `URL.createObjectURL` nie istnieje w jsdom — ten sam zastępnik co w `useZdjecie.test.tsx`. */
   (URL as unknown as { createObjectURL: () => string }).createObjectURL = () => "blob:dowod";
@@ -105,7 +112,9 @@ beforeEach(() => {
     /* Zdjęcia kartotek i dowodów — brak jest ODPOWIEDZIĄ (404), nie awarią. */
     /* Obiekt zamiast `Response`: `Blob` z jsdom nie wchodzi do `Response` z Node
        (brak `stream()`) — ten sam kształt, co w `useZdjecie.test.tsx`. */
+    if (/\/(zdjecie|photo|logo)$/.test(url)) pytaniaOObrazy.push(url);
     if (url === "/api/problems/1/photo") return { ok: true, status: 200, blob: async () => new Blob() };
+    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, blob: async () => new Blob() };
     if (/\/(zdjecie|photo|logo)$/.test(url)) return new Response("{}", { status: 404 });
     return new Response(JSON.stringify(odpowiedz(url, init)), { status: 200 });
   }));
@@ -123,6 +132,43 @@ function pokaz(adres = "/obsluga/dostawy") {
     </MemoryRouter>
   </QueryClientProvider>);
 }
+
+/* ── Logo w liście i zdjęcia pozycji (0.449.0) ───────────────────────────
+   Zgłoszenie właściciela ze zrzutem nietkniętej faktury: ani jednego zdjęcia
+   towaru, a logo dostawcy dopiero po wejściu w dokument. Pilnujemy trzech
+   rzeczy: logo stoi w wierszu listy (i nie pytamy o logo, którego nie ma),
+   zdjęcia pozycji idą wtedy, gdy instalacja je ma, a bez źródła — wcale. */
+describe("Obrazy na ekranie dostaw", () => {
+  it("wiersz listy niesie logo dostawcy, a o brakujące logo nie pyta", async () => {
+    pokaz();
+    const wiersz = await screen.findByRole("button", { name: /FZ 802\/MAG\/09\/2026/ });
+    await waitFor(() => expect(wiersz.querySelector("img")?.getAttribute("src")).toBe("blob:dowod"));
+    expect(pytaniaOObrazy.filter((u) => u.endsWith("/logo"))).toEqual(["/api/dostawcy/5/logo"]);
+    /* Wiersz bez logo trzyma to samo miejsce — nazwy zaczynają się w jednej kolumnie. */
+    const bez = screen.getByRole("button", { name: /FZ 803\/MAG/ });
+    expect(bez.querySelector("img")).toBeNull();
+    expect(bez.querySelector("span.w-14")).not.toBeNull();
+  });
+
+  it("instalacja ze zdjęciami: każda pozycja dokumentu pyta o swoje zdjęcie", async () => {
+    zdjeciaWHealth = true;
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    await waitFor(() => expect(pytaniaOObrazy).toContain("/api/products/8/zdjecie"));
+    expect(pytaniaOObrazy).toContain("/api/products/7/zdjecie");
+    expect(screen.getByRole("columnheader", { name: "Zdjęcie" })).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("instalacja bez zdjęć: tabela bez kolumny zdjęć i bez pytań o nie", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    await screen.findByText("RP-2201");
+    expect(screen.queryByRole("columnheader", { name: "Zdjęcie" })).toBeNull();
+    /* Pozycja z wyjątkiem ma swoje zdjęcie od 0.435.0 — ono zostaje. */
+    expect(pytaniaOObrazy.filter((u) => u.endsWith("/zdjecie"))).toEqual(["/api/products/7/zdjecie"]);
+  });
+});
 
 describe("Ekran dostaw", () => {
   it("otwarcie ekranu i wejście w dokument nie wysyłają ani jednego zapisu", async () => {

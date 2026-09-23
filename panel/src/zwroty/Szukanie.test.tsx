@@ -309,7 +309,7 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.getByText(/Nie mam paczek tego klienta/)).toBeInTheDocument();
   });
 
-  it("pytanie do Allegro WSTRZYMUJE zdanie „nie mam paczek” (0.447.0)", async () => {
+  it("pytanie do Allegro WSTRZYMUJE zdanie „nie mam paczek” (0.450.0)", async () => {
     /* Nasza baza nie zna zamówienia paczki nieodebranej, więc jej lista
        przychodzi pusta pierwsza, a Allegro odpowiada chwilę później. Zdanie
        „nie mam" w tej chwili byłoby kłamstwem, które operator zdąży przeczytać. */

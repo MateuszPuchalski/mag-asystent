@@ -1058,6 +1058,62 @@ ponownie. Otwarcie rozmowy czyta wyłącznie stan zapisany wcześniej.
 odbiorcy, a ten do modelu nie wychodzi. Fakt mówi, że klient ma numer przy
 zamówieniu w Allegro. Szkic odsyła go tam, zamiast zmyślać numer.
 
+### 10.2c. Prawa kolumna bez powtórzeń (0.447.0)
+
+Zgłoszenie właściciela ze zrzutami czterech zakładek: „prawa kolumna jest
+wciąż chaotyczna". Zrzut pokazał cztery przyczyny i każda ma swoją poprawkę.
+
+| przyczyna | poprawka |
+|---|---|
+| Nazwa towaru trzy razy, symbol cztery, stan i półka dwa | Sekcja „Subiekt GT" nie powtarza pasma odpowiedzi. Zostaje zdjęcie, pasek wolne–zarezerwowane, identyfikatory, ceny i opis. |
+| Pięć ramek w jednej kolumnie, każda z innym tłem | Sekcje dzieli kreska, a nagłówki mają jeden kształt. Ramkę zachowują tylko ceny w reklamacjach, gdzie stoją samodzielnie. |
+| Dwie zakładki z jednym zdaniem, a każda kosztuje kliknięcie | Klient i Wiedza niosą licznik. Zero widać bez klikania. |
+| Jedenaście pigułek dróg i pełne karty trafień bez dowodu | Na wierzchu drogi z wynikiem i mocni kandydaci. Reszta stoi pod jednym rozwinięciem. |
+
+**Nic nie znika.** Fakty, które zeszły ze wzroku, stoją pod rozwinięciem,
+w dymku albo w paśmie nad zakładkami. §4.3 zabrania chowania faktów, ale
+pozwala je wyciszyć.
+
+**Status doboru stoi raz.** Plakietka obok pola wyboru mówiła to samo co
+pole. Barwę stanu niesie kropka przed polem.
+
+**„Wybierz" ma obrys, nie pełną zieleń.** Pięć pełnych zielonych przycisków
+było najgłośniejszą rzeczą w kolumnie. To ruch dostępny, a nie zalecany.
+
+**Wybrany kandydat zostaje na wierzchu zawsze**, choćby był trafieniem bez
+dowodu. Gdy żaden kandydat nie jest mocny, lista się nie zwija.
+
+**Liczniki czytają te same zapytania, które zakładki i tak wołają.**
+Otwarcie rozmowy pyta o historię klienta i wiedzę od razu, nie po
+kliknięciu. To są odczyty, więc zasada zera zapisu przy patrzeniu stoi.
+
+### 10.2d. Lista „Pasuje do" z oferty (0.447.0)
+
+Zgłoszenie właściciela ze zrzutem sekcji „Pasuje do kosiarek" z Allegro.
+Listę mamy od 0.253.0, ale do tej wersji czytał ją tylko model. Na zrzucie
+klient miał HECHT 1803S i ten model stał na liście. Dobór oddał jednak zero,
+a panel listy nie pokazywał wcale.
+
+| co | gdzie | reguła |
+|---|---|---|
+| Szukanie bez wariantu | szczebel „zastosowanie" w doborze | Gdy dokładny klucz nic nie da, druga próba idzie po marce i modelu. Kandydat ma co najwyżej „prawdopodobne" i dopisek „wariant niesprawdzony". |
+| Zdanie „jest / nie ma na liście" | fakt szkicu Copilota | Serwer sprawdza maszynę z danych doboru na całej liście. „Nie ma" niesie zastrzeżenie, że to nie dowód. |
+| Lista w panelu | sekcja „Oferta" | Zwinięta „Pasuje do (N)". Maszyna z doboru stoi na wierzchu, a jej pozycja jest podświetlona. |
+
+**Jedno dopasowanie dla szkicu i ekranu** — `services/zgodnosc-oferty.ts`.
+Model musi stać w pozycji jako ciąg całych słów, więc „46" nie trafia
+w „Stiga 460". Marka musi stać w pozycji, chyba że pozycja jest samym
+modelem.
+
+**Maszyna pochodzi wyłącznie z danych wpisanych przez agenta.** Maszyna
+wyczytana z treści pytania nie wchodzi — blizna szarpaka.
+
+**Wpis dla wariantu wygrywa.** Druga próba rusza tylko wtedy, gdy dokładny
+klucz nie dał ani jednego kandydata. Inaczej rozmyłaby mocniejszą wiedzę.
+
+**Listę dociąga układanie szkicu.** Otwarcie rozmowy jej nie pobiera, więc
+przed pierwszym szkicem bloku nie ma.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany

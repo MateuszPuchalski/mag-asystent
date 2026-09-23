@@ -475,7 +475,7 @@ test("zapamiętany brak zostawia ślad w events", async () => {
   assert.equal((JSON.parse(zd[0].payload) as { ile: number }).ile, 2);
 });
 
-/* ── Zamówienia kupującego prosto z Allegro (0.447.0) ────────────────────
+/* ── Zamówienia kupującego prosto z Allegro (0.450.0) ────────────────────
    Paczka nieodebrana nie ma zwrotu, wiadomości ani reklamacji, więc
    `brakujaceZamowienia` nigdy nie prowadzi do jej zamówienia. Lista paczek
    klienta czytała tylko naszą bazę i przy takiej paczce wychodziła pusta —

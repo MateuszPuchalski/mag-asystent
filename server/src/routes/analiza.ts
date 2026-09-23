@@ -42,7 +42,7 @@ function dniZQuery(v: string | undefined): number {
  * Ślad mierzy TEMPO PRACY i sensownie patrzy się na niego od tygodnia. Dostawa
  * przyjeżdża co kilka dni, więc tydzień bywa w niej pusty, a mediana czasu
  * rozłożenia z dwóch faktur nie mówi nic. Ta lista MUSI zgadzać się z
- * `OKNA_ANALIZY.dostawy` w `web/biuro.html` — czip spoza zbioru wyglądałby na
+ * `OKNA.dostawy` w `panel/src/ekrany/Analiza.tsx` — czip spoza zbioru wyglądałby na
  * wybrany, a trasa liczyłaby po cichu swoje domyślne. Dokładnie tak rozjechało
  * się okno pytań w 0.96.0.
  */

@@ -407,7 +407,7 @@ export function Zwroty() {
      znaku. Pusty nie pyta wcale. */
   const [loginPaczek, setLoginPaczek] = useState("");
   const paczkiKlienta = usePaczkiKlienta(loginPaczek);
-  /* Uchwyt, o który Allegro JUŻ zapytaliśmy (0.447.0). Enter i wyjście
+  /* Uchwyt, o który Allegro JUŻ zapytaliśmy (0.450.0). Enter i wyjście
      z pola wołają `onLogin` oba, a drugi strzał do Allegro o ten sam login
      niczego by nie dodał — kosztowałby tylko żądanie. */
   const zAllegro = useZamowieniaZAllegro();
@@ -762,7 +762,7 @@ export function Zwroty() {
         rejestruje={nieodebrana.isPending}
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
-        /* LOGIN IDZIE TEŻ DO ALLEGRO (0.447.0). Lista wyżej czyta naszą
+        /* LOGIN IDZIE TEŻ DO ALLEGRO (0.450.0). Lista wyżej czyta naszą
            bazę, a ta nie zna zamówienia paczki nieodebranej — nic do niego nie
            prowadzi. Bez tego biuro szukało takiej paczki na stronie Allegro.
            Pobrane zamówienia serwer zapisuje, a mutacja odświeża listę, więc

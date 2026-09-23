@@ -958,7 +958,7 @@ przypadkową.
 Oferta (`OfferReference`) ma `id`, `name` i **`external`**. To ostatnie pole
 jest powodem, dla którego w ogóle pobieramy zamówienia.
 
-### `GET /order/checkout-forms?buyer.login=…` — paczka nieodebrana (0.447.0)
+### `GET /order/checkout-forms?buyer.login=…` — paczka nieodebrana (0.450.0)
 
 Lista zamówień ma parametr `buyer.login`, a opis w schemacie brzmi „Find
 checkout-forms having specified buyer login". Odpowiedź to `CheckoutForms`:

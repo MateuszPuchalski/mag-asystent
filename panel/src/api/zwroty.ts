@@ -532,7 +532,7 @@ export function wygladaNaLogin(uchwyt: string): boolean {
 }
 
 /**
- * Zamówienia kupującego prosto z Allegro, po loginie (0.447.0).
+ * Zamówienia kupującego prosto z Allegro, po loginie (0.450.0).
  *
  * Nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość albo
  * reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc lista paczek

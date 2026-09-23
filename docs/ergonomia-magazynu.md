@@ -16,8 +16,8 @@ magazynowy ma oszczędzać wszystkie cztery naraz.
 Dekalog obowiązuje kolektor (`android/`) i każdy ekran obsługiwany z towarem
 w rękach. Tam liczy się zasięg ręki, rękawica, hałas i odległość do regału.
 
-Biuro (`server/src/web/biuro.html`) i panel obsługi klienta (`panel/`) to praca
-przy biurku. Obowiązują tam punkty 1, 2, 5, 6 i 10.
+Panel biura (`panel/`, pod `/obsluga`) to praca przy biurku — od 0.446.0
+jedyny front biura. Obowiązują tam punkty 1, 2, 5, 6 i 10.
 
 Punkty o celach dotyku, o koszcie fizycznym i o trasie biura NIE obowiązują.
 Mysz na blacie ma inną charakterystykę niż kciuk w rękawicy.

@@ -581,7 +581,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       return { paczki };
     });
 
-  /* Zamówienia kupującego PROSTO Z ALLEGRO (0.447.0). Trasa wyżej czyta
+  /* Zamówienia kupującego PROSTO Z ALLEGRO (0.450.0). Trasa wyżej czyta
      tylko naszą bazę, a ta nie zna zamówienia paczki nieodebranej: nic do
      niego nie prowadzi, bo klient niczego nie zgłosił. Do tego wydania biuro
      szukało takiej paczki na stronie Allegro i przepisywało numer.

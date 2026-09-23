@@ -266,7 +266,7 @@ export function wygladaNaLogin(uchwyt: string): boolean {
 }
 
 /**
- * Zamówienia jednego kupującego prosto z Allegro (0.447.0).
+ * Zamówienia jednego kupującego prosto z Allegro (0.450.0).
  *
  * Zgłoszenie właściciela: „sporo paczek wraca bez zgłoszonego odstąpienia,
  * po prostu nieodebrane — do nich muszę korzystać ze strony Allegro, aby

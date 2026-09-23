@@ -28,6 +28,7 @@ import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikator
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
+import { naLiscieZgodnosci, zdanieZgodnosci } from "./zgodnosc-oferty.js";
 import {
   idZamowienia, przesylkaDoOdswiezenia, przesylkaZamowienia, sprawdzPrzesylke, zdaniePrzesylki,
   type PrzesylkaDeps,
@@ -922,6 +923,19 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     dodaj("dobor", `Dane doboru wpisane przez agenta: ${[...pola.map(([k, v]) => `${k} ${v}`), ...parametry].join("; ")}`);
   }
   if (dobor.brakuje) dodaj("dobor", `Agent zaznaczył, czego brakuje do doboru: ${dobor.brakuje}`);
+
+  /* ── JEST / NIE MA NA LIŚCIE ZGODNOŚCI (23 września 2026) ───────────────────
+     Decyzja właściciela. Lista z oferty szła do modelu surowa i przycięta do
+     trzydziestu pozycji, a model miał sam wypatrzyć w niej maszynę klienta.
+     Na zrzucie HECHT 1803S stał na liście — i nikt tego nie powiedział.
+     Serwer sprawdza to sam, całą listą, i daje jedno zdanie. Maszyna idzie
+     WYŁĄCZNIE z danych wpisanych przez agenta — nigdy z treści pytania
+     (blizna szarpaka). Dopasowanie jest to samo, co podświetlenie w panelu. */
+  if (d.marka && d.model && trescOferty.zgodnosc.length) {
+    const z = naLiscieZgodnosci(trescOferty.zgodnosc, d);
+    const zdanie = zdanieZgodnosci({ lista: trescOferty.zgodnosc, ...z }, d.wariant);
+    if (zdanie) dodaj("oferta_zgodnosc", zdanie);
+  }
   if (dobor.wybrany) {
     dodaj("dobor", `Część wybrana przez agenta: ${dobor.wybrany.zdanieDoSzkicu}`);
     /* Wybrany bywa z wyszukiwarki, poza listą kandydatów — nazwa z kartoteki. */

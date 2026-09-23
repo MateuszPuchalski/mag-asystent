@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.447.0 — 23 września 2026
+## 0.450.0 — 23 września 2026
 
 **Paczkę nieodebraną znajdziesz po loginie bez strony Allegro.** Zgłoszenie
 właściciela: takie paczki biuro szukało w panelu Allegro. Pole loginu
@@ -53,6 +53,98 @@ więc woła `logEvent` z liczbą pobranych, bez loginu. Uprawnienie Allegro
 zostaje to samo co przy zamówieniach.
 
 - **[wymaga działania]** Przebuduj panel.
+
+## 0.449.0 — 23 września 2026
+
+**Dostawy pokazują towar i dostawcę obrazem.** Zgłoszenie właściciela ze
+zrzutem nietkniętej faktury: czternaście pozycji bez jednego zdjęcia, a logo
+dostawcy dopiero po wejściu w dokument.
+
+- Tabela pozycji dokumentu ma znowu kolumnę zdjęć. Przeprowadzka z `biuro.html`
+  (0.435.0) ją zgubiła — zdjęcie zostało tylko przy pozycji z wyjątkiem.
+  Kolumna stoi wtedy, gdy instalacja ma zdjęcia kartotek, jak w biurze.
+- Wiersz listy dostaw ma logo dostawcy z lewej, jak na kolektorze. Dostawca
+  bez logo zostawia puste miejsce, więc numery zaczynają się w jednej kolumnie.
+- Symbol towaru i pastylka stanu nie łamią się już w wąskiej tabeli
+  („DO / ZROBIENIA" pod „0/100" ze zrzutu właściciela).
+
+- **[wymaga działania]** Przebuduj panel.
+
+## 0.447.1 — 23 września 2026
+
+**Rozmowa pokazuje zamówienie z NAJNOWSZEGO pytania, nie ze starego.**
+Zgłoszenie właściciela ze zrzutem: „proszę o fv" z lipca pod jednym
+zamówieniem i „PROSZĘ O FV" z września pod drugim. Ekran, pasmo, stan paczki
+i szkic mówiły o lipcowym.
+
+Przyczyna jest ta sama co w 0.447.0. Wątek wczytany w całości jedną paczką
+dostawał `id` od najnowszej wiadomości, a wybór zamówienia i oferty szedł
+po `id`. Synchronizacja wpisuje już od najstarszej, ale stare wiersze
+zostały.
+
+- Zamówienie rozmowy, oferta rozmowy i oś czytają wiadomości po czasie.
+- Dotyczy też dopasowania oferty w zakupach klienta i w doborze.
+
+## 0.447.0 — 23 września 2026
+
+**Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach, a wysyłka bez
+fałszywego „klient dopisał".** Zgłoszenie
+właściciela ze zrzutami: „wciąż chaotyczna". Opis: §10.2c projektu panelu.
+
+- Sekcja „Subiekt GT" nie powtarza nazwy, stanu ani półki z pasma nad
+  zakładkami. Źródło i „wskaż inną kartotekę" stoją w linii nagłówka.
+- Sekcje dzieli kreska zamiast ramek; podpis pod zdjęciem oferty zszedł
+  do czytnika ekranu.
+- Zakładki Klient i Wiedza niosą licznik.
+- Dobór: status raz, w polu wyboru z kropką barwy. Drogi bez wyniku
+  i słabsze trafienia pod rozwinięciem. „Wybierz" z obrysem.
+
+**Naprawa: fałszywe „klient dopisał wiadomość" przy wysyłce.** Zgłoszenie
+właściciela: dialog padał często, choć wszystkie wiadomości stały na
+ekranie. Synchronizacja wpisywała paczkę od najnowszej, więc starszy dopisek
+dostawał wyższe `id`. Kontrola świeżości brała najwyższe `id`, a panel —
+ostatnią wiadomość po czasie.
+
+- Kontrola świeżości wysyłki i zapis szkicu biorą ostatnią wiadomość po
+  czasie, jak oś, klasyfikator i Copilot.
+- Ta sama reguła w stanie rozmowy, w podglądzie wiersza kolejki, w aktywnej
+  decyzji klasyfikatora i w czasie odpowiedzi.
+- Synchronizacja wpisuje paczkę od najstarszej, więc nowe `id` rosną
+  z czasem. Stare wiersze obsługuje reguła po czasie; migracji nie ma.
+
+**Lista „Pasuje do" z oferty w doborze, w szkicu i w panelu.** Opis: §10.2d.
+
+- Dobór szuka zastosowań także bez wariantu, gdy dokładny klucz milczy.
+  Taki kandydat ma „prawdopodobne" i dopisek „wariant niesprawdzony".
+- Szkic dostaje jedno zdanie: maszyna z doboru JEST albo NIE MA na liście.
+  „Nie ma" mówi wprost, że to nie dowód.
+- Sekcja „Oferta" pokazuje zwiniętą listę z maszyną klienta na wierzchu.
+
+- **[wymaga działania]** Przebuduj panel.
+
+## 0.446.0 — 23 września 2026
+
+**Biuro ma jeden adres: `/obsluga`.** Ostatni krok przeprowadzki
+(`docs/obsluga-klienta.md` §7, F6). Strona `biuro.html` zniknęła razem ze
+swoimi fontami i ikoną. Adresy `/` i `/biuro` przekierowują do panelu, więc
+stare zakładki w przeglądarce trafiają na DO DECYZJI.
+
+**Dwa sygnały paska biura przeszły do nagłówka panelu**, bo nie miały jeszcze
+miejsca. Serwer inny niż produkcja ma czerwoną pigułkę z nazwą środowiska
+(„DEV") obok pigułki synchronizacji, na każdym ekranie; dymek mówi, że to nie
+produkcja. Spóźnione sprawy między halą a biurem mają obok bursztynową
+plakietkę; klik otwiera kartę wymiany w stanie systemu.
+
+**Panel nazywa się „WERTIS · Biuro"** — w karcie przeglądarki i na ekranie
+logowania. Komunikaty serwera odsyłają do zakładek panelu, nie do `/biuro`.
+
+**Testy.** Trasy biura mają własny plik `routes/biuro-api.test.ts`:
+przekierowania, bramki sesji i ról, archiwum dostaw, zdrowie bez sesji.
+Strażnicy struktury strony odeszli z nią; ich gwarancje przejęły testy
+ekranów panelu. `CLAUDE.md` mówi o jednym froncie w czasie teraźniejszym.
+
+- **[wymaga działania]** Przebuduj panel i serwer: build serwera nie kopiuje
+  już `src/web`.
 
 ## 0.444.0 — 23 września 2026
 

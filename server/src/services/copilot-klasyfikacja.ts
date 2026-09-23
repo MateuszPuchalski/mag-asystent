@@ -100,9 +100,14 @@ export const CEL_KLASYFIKACJI = `(SELECT m.id FROM message m WHERE m.conversatio
  * ale kolejka pokazuje ją jako nieaktualną, dopóki nowsza nie powstanie.
  * Wymaga aliasu `c`.
  */
+/* Najnowsza PO CZASIE wiadomości, której dotyczy (23 września 2026) — ta sama
+   reguła co `CEL_KLASYFIKACJI` wyżej. Po samym `message_id` decyzja przy
+   starszym dopisku z wyższym `id` wygrywała i kolejka pokazywała rozpoznanie
+   jako nieaktualne, choć dotyczyło najnowszej wiadomości. */
 export const AKTYWNA_DECYZJA = `(SELECT k.id FROM decyzja_klasyfikacji k
   WHERE k.conversation_id=c.id AND k.aktywna=1 AND k.taksonomia_wersja='${TAKSONOMIA_WERSJA}'
-  ORDER BY k.message_id DESC, k.id DESC LIMIT 1)`;
+  ORDER BY (SELECT km.sent_at FROM message km WHERE km.id=k.message_id) DESC,
+    k.message_id DESC, k.id DESC LIMIT 1)`;
 
 const pusty: Tokeny = { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 };
 

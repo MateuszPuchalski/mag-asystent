@@ -243,6 +243,36 @@ test("negatyw jest widoczny osobno i jako ostrzeżenie przy kandydacie z innej d
   assert.equal(kandydaci.some((k) => k.twId === 1), false);
 });
 
+/* ── Bez wariantu, gdy dokładny klucz milczy (23 września 2026) ─────────────
+   Zrzut właściciela: agent wpisał HECHT 1803S DYM1182c, wiedza z listy
+   zgodności oferty mówiła „Hecht 1803S", a szczebel oddał zero. Druga próba
+   idzie po marce i modelu — ale kandydat z niej nie jest „potwierdzony". */
+test("wpis bez wariantu daje kandydata „prawdopodobne” z dopiskiem, gdy dokładny klucz milczy", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", wariant: "C-E" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(ZAMIENNIK_FTC272).id, "zatwierdz", null, biuro);
+
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "zastosowanie").wynikow, 1);
+  const k = kandydaci.find((x) => x.droga === "zastosowanie")!;
+  assert.equal(k.twId, ZAMIENNIK_FTC272);
+  assert.equal(k.pewnosc, "prawdopodobne", "dowód dla modelu bazowego nie potwierdza wariantu");
+  assert.match(k.zrodlo, /bez wariantu, wariant niesprawdzony$/);
+});
+
+test("wpis DLA wariantu wygrywa — druga próba nie rozmywa go wpisem ogólnym", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", wariant: "C-E" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(FTC272,
+    { model: { ...STIHL, wariant: "C-E" } }).id, "zatwierdz", null, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(ZAMIENNIK_FTC272).id, "zatwierdz", null, biuro);
+
+  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "zastosowanie").wynikow, 1);
+  const z = kandydaci.filter((x) => x.droga === "zastosowanie");
+  assert.deepEqual(z.map((x) => [x.twId, x.pewnosc]), [[FTC272, "potwierdzone"]]);
+});
+
 /* ── Szczeble OEM i pełnego tekstu (E3) ──────────────────────────────────── */
 
 test("numer OEM z opisu trafia w kartotekę drogą `oem`, a ta sama kartoteka z zamiennika to JEDEN kandydat", () => {

@@ -37,7 +37,9 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
   const pomiary = wiedza.data?.pomiary ?? [];
 
   return <div className="p-3" aria-label="Wiedza">
-    <p className="rounded border border-slate-200 bg-slate-50 p-2 text-podpis text-slate-600">
+    {/* Zdanie, nie ramka (23 września 2026): obramowana klauzula była
+        najcięższym elementem zakładki, która poza nią zwykle nie ma nic. */}
+    <p className="text-podpis text-slate-600">
       Każde twierdzenie techniczne w szkicu wskazuje jeden z tych dowodów (§14.3).
       Bez źródła treść jest przypuszczeniem.
     </p>
