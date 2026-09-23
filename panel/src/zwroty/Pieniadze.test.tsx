@@ -35,6 +35,22 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeNull();
   });
 
+  /* Przed werdyktem przeszkoda jest JEDNA i znana (0.453.0): oś etapów nad
+     sekcją już ją pokazuje, więc zdanie schodzi do znacznika z kłódką. Treść
+     nie ginie — stoi w podpowiedzi, słowo w słowo z serwera. */
+  it("przed werdyktem zamiast zdania stoi kłódka „po werdykcie”", () => {
+    const powod = "Najpierw przyjmij zwrot — pieniądze oddaje się po werdykcie.";
+    ekran({ przedWerdyktem: true, stan: stan({ moznaZwrocic: false, powod }) });
+    expect(screen.getByText("po werdykcie")).toHaveAttribute("title", powod);
+    expect(screen.queryByText(powod)).toBeNull();
+  });
+
+  it("po werdykcie przeszkoda wraca do zdania — każda inna mówi, co zrobić", () => {
+    ekran({ przedWerdyktem: false, stan: stan({ moznaZwrocic: false, powod: "Najpierw zaznacz, co oddajemy." }) });
+    expect(screen.getByText(/Najpierw zaznacz/)).toBeInTheDocument();
+    expect(screen.queryByText("po werdykcie")).toBeNull();
+  });
+
   /* Pobranie: oddać przez Allegro się nie da, ale odmówić owszem — to dwie
      różne drogi, nie dwa warianty jednej. */
   it("przy pobraniu zostaje sama odmowa", () => {
