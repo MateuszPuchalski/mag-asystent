@@ -7,6 +7,7 @@ import { ZakresDostaw } from "../analiza/ZakresDostaw";
 import { ZakresHali } from "../analiza/ZakresHali";
 import { Strefa } from "../analiza/Strefa";
 import { ZakresObslugi } from "../analiza/ZakresObslugi";
+import { MiaryObslugi } from "../analiza/MiaryObslugi";
 
 /* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
    Przeniesiona z ANALIZY w `biuro.html`. Wgląd, nie praca: nic tu nie czeka
@@ -26,7 +27,8 @@ import { ZakresObslugi } from "../analiza/ZakresObslugi";
    ZAKRES „OBSŁUGA KLIENTA" doszedł 23 września 2026. Do tej wersji go nie
    było, choć makieta F0 go pokazała: brakowało źródła danych, a przeprowadzka
    nie wymyśla liczb. Źródłem jest czas odpowiedzi liczony z wiadomości —
-   patrz `analiza/ZakresObslugi.tsx`.
+   patrz `analiza/ZakresObslugi.tsx`. Pod nim od 0.444.0 stoi sześć miar
+   obsługi, które mieszkały za zębatką (`analiza/MiaryObslugi.tsx`).
 
    Pobierany jest WYŁĄCZNIE widoczny zakres — ta sama zasada, która trzymała
    biuro: nie pobiera się danych, na które nikt nie patrzy. */
@@ -71,7 +73,7 @@ export function Analiza() {
           <FiltrSegmentowy<Zakres> wybrany={zakres} onWybierz={setZakres} pozycje={[
             { klucz: "dostawy", etykieta: "Dostawy", podpowiedz: "U kogo są problemy — dostawcy i wyjątki" },
             { klucz: "hala", etykieta: "Praca hali", podpowiedz: "Tempo, szczyty, wyszukiwania, kolektory" },
-            { klucz: "obsluga", etykieta: "Obsługa klienta", podpowiedz: "Czas odpowiedzi klientowi" },
+            { klucz: "obsluga", etykieta: "Obsługa klienta", podpowiedz: "Czas odpowiedzi, pokrycie wiedzy, dobór, eskalacje" },
           ]} /></nav>
         <div role="group" aria-label="Okno analizy" className="flex gap-1">
           <FiltrSegmentowy<number> wybrany={dni} onWybierz={(d) => setOkna((o) => ({ ...o, [zakres]: d }))}
@@ -85,7 +87,10 @@ export function Analiza() {
         pustką — liczby nie skaczą do zera i z powrotem. */}
     <div className={`space-y-4 ${biezacy.isPlaceholderData ? "opacity-60" : ""}`}>
       {zakres === "dostawy" && dostawy.data && <ZakresDostaw a={dostawy.data} />}
-      {zakres === "obsluga" && obsluga.data && <ZakresObslugi a={obsluga.data} />}
+      {zakres === "obsluga" && <>
+        {obsluga.data && <ZakresObslugi a={obsluga.data} />}
+        <MiaryObslugi dni={okna.obsluga} />
+      </>}
       {zakres === "hala" && hala.data && <>
         <ZakresHali a={hala.data} m={metryki.data} />
         <Strefa />

@@ -23,8 +23,8 @@ każdy do swojej roli:
   bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
   na kolektorze.
 - **Biuro przechodzi do panelu pod `/obsluga`** (od 0.435.0), widok po
-  widoku. Dostawy, kosze, dziennik, analiza i stan systemu już tam są;
-  w `/biuro` zostały ustawienia za zębatką.
+  widoku. Od 0.444.0 są tam wszystkie, z ustawieniami za zębatką panelu;
+  `/biuro` jest już tylko drogowskazem do panelu.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -530,7 +530,7 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   import zbiórek z Sellasist w panelu biura. Kandydat stojący poza strefą
   dostaje adnotację na karcie towaru w kolektorze — obie ścieżki liczą jedną
   miarą, więc nigdy nie wskażą sprzecznych list. Reguły strefy mieszkają
-  w bazie i są edytowalne z `/biuro` → zębatka → USTAWIENIA.
+  w bazie i są edytowalne w panelu: `/obsluga` → zębatka → Reguły strefy złotej.
 
 **Nocna rekoncyliacja — niezmienniki trzeba mierzyć, nie deklarować**
 - `npm run reconcile` (raz na dobę z crona) porównuje adres w Subiekcie
@@ -576,36 +576,26 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   > nie wstając z krzesła. ORZEKA, że pracy nie ma, więc należy do roli, która
   > czyta protokoły rozbieżności.
 
-**Biuro pod `/biuro` — w przeprowadzce do panelu**
+**Biuro pod `/biuro` — drogowskaz do panelu**
 - Od 0.431.0 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
-  Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Opis niżej mówi
-  o tym, co jeszcze stoi w `biuro.html`. DOSTAWY odeszły w 0.435.0, MAGAZYN
-  ZWROTÓW w 0.438.0 — pozycje w pasku prowadzą do panelu razem z sesją.
-- Jedna strona HTML bez builda (`server/src/web/biuro.html`), serwowana przez
-  API. Logowanie loginem i hasłem, dane czytane istniejącymi trasami z tokenem
-  sesji. Strona nie ma własnych uprawnień: role sprawdza serwer przy każdej
-  trasie. Otwarcie widoku niczego nie zapisuje. Zapisuje dopiero decyzja biura:
-  wyjątek, notatka, kosz, konto, reguła strefy.
-- **Pasek stanu to dwie ikony, widoczne z każdej zakładki** (0.114.0).
-  Ikona SYSTEM zmienia kolor: zielony — wszystko gra, bursztyn — działa, ale
-  kuleje, czerwień — coś stoi. Najechanie pokazuje pełne zdania: wersję i tryb
-  serwera, workera, kolejkę, rozjazdy i problemy z `/api/health`. Kliknięcie
-  prowadzi do STANU SYSTEMU. Ikona ALLEGRO mówi kolorem o stanie konta,
-  a kliknięcie otwiera stojącą tam kartę KONTO ALLEGRO i zaczyna parowanie.
-- **W pasku stoi tylko praca** (0.76.0), w dwóch grupach oddzielonych kreską.
-  PRACA prowadzi od 0.438.0 wyłącznie do panelu — dostawy i kosze tam mieszkają.
-  WGLĄD (stan systemu, dziennik, analiza) wtedy, gdy czegoś szukam.
-- **Ustawienia siedzą za zębatką** w nagłówku, obok Wyloguj. Mieszczą dane
-  firmy, reguły strefy złotej, konta i logo dostawców. Konfiguracja nie jest
-  zakładką pracy i nie ma ważyć tyle, co praca.
-- **Odpowiedź na notatkę wraca sama** (0.57.0): pasek stanu pokazuje licznik
+  Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Od 0.444.0
+  w `biuro.html` nie ma już żadnego widoku: strona pokazuje kartę „Biuro
+  przeszło do panelu", a następne wydanie zastąpi ją przekierowaniem.
+- Zostały logowanie, pasek z wyjściami do panelu (z sesją) i **dwie ikony
+  stanu** (0.114.0). Ikona SYSTEM zmienia kolor: zielony — wszystko gra,
+  bursztyn — działa, ale kuleje, czerwień — coś stoi. Najechanie pokazuje
+  pełne zdania z `/api/health`, a kliknięcie prowadzi do stanu systemu
+  w panelu. Ikona ALLEGRO prowadzi do karty konta Allegro.
+- **Odpowiedź na notatkę wraca sama** (0.57.0): pasek pokazuje licznik
   nieprzeczytanych odpowiedzi, a kliknięcie prowadzi do dostaw w panelu. Stan
   „przeczytane" siedzi w bazie, więc gaśnie także na drugim biurku.
-- **DOSTAWCY** (0.56.0): logo firmy wgrywane raz, widoczne potem po lewej
-  stronie wiersza na liście dostaw w kolektorze. Plik może być w dowolnym
-  formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
-  cokolwiek pojedzie na serwer. Logo wiąże się z identyfikatorem kontrahenta
-  z Subiekta, więc przeżywa poprawkę nazwy. Bez konfiguracji: działa od razu.
+- **USTAWIENIA** przeszły w 0.444.0 za zębatkę panelu
+  (`/obsluga/ustawienia`). Stoją tam dane firmy do protokołów, reguły strefy
+  złotej, konta i sesje, słownik tagów i logo dostawców. Dane firmy są na
+  serwerze, jednakowe na każdym biurku. Konta zmienia admin. Logo może być w dowolnym formacie —
+  **PNG, JPG, WEBP albo SVG** — bo przerabia je przeglądarka, zanim
+  cokolwiek pojedzie na serwer. Wiąże się z identyfikatorem kontrahenta
+  z Subiekta, więc przeżywa poprawkę nazwy.
 - **STAN SYSTEMU ↗** przeszedł w 0.441.0 do panelu biura
   (`/obsluga/stan`). Są tam kolejka zapisów z PONÓW/ANULUJ, masowa zmiana
   lokalizacji z arkusza (admin), kolizje kodów i rekoncyliacja na żądanie.
@@ -613,9 +603,10 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
 - **DZIENNIK ↗ i ANALIZA ↗** przeszły w 0.440.0 do panelu biura
   (`/obsluga/dziennik`, `/obsluga/analiza`). Dziennik to ślad audytowy
   z filtrami po dacie, typie, osobie, towarze i urządzeniu, filtrujący od
-  razu, oraz eksport CSV; wymaga roli biura albo admina. Analiza ma dwa
-  zakresy: **Dostawy** (dostawcy, wyjątki, tygodnie) i **Praca hali** (tempo,
-  szczyty, szukania, kolektory, metryki etykiet i kodów, strefa złota).
+  razu, oraz eksport CSV; wymaga roli biura albo admina. Analiza ma trzy
+  zakresy. **Dostawy** to dostawcy, wyjątki i tygodnie. **Praca hali** to
+  tempo, szczyty, szukania, kolektory, metryki etykiet i kodów oraz strefa
+  złota. **Obsługa klienta** to czas odpowiedzi i pomiary obsługi.
 - **Wydajność per osoba jest monitoringiem pracowniczym** (Kodeks pracy
   art. 22²). Od 0.431.0 widzi ją wyłącznie admin, w analizie; osobna trasa
   `/api/wydajnosc` zniknęła.

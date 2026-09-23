@@ -2584,6 +2584,22 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.444.0 — ustawienia biura w panelu
+
+**Migracja dokłada tabelę `firma` sama** — `schema.sql` biegnie przy każdym
+starcie. Panel trzeba przebudować. Dochodzą dwie trasy: odczyt
+`GET /api/biuro/firma` i zapis `PUT /api/biuro/firma`, obie dla biura i admina.
+
+Po wdrożeniu przenieś dane firmy. Otwórz panel w przeglądarce, z której
+drukowano protokoły, i wejdź za zębatkę. Karta „Dane firmy do protokołów"
+pokaże przycisk „Przenieś na serwer" — kliknij go raz. Od tej chwili każde
+biurko drukuje te same dane. Do tego kliknięcia druk bierze dane
+z przeglądarki jak dotąd, więc żaden protokół nie wyjdzie bez nagłówka.
+
+Sprawdzenie: w drugiej przeglądarce zębatka ma pokazać te same dane.
+Kontem biura lista kont stoi bez przycisków, kontem admina — z przyciskami.
+`/biuro` pokazuje jedną kartę „Biuro przeszło do panelu".
+
 ### Aktualizacja do 0.443.0 — tempo skrzynki, stan paczki
 
 **Migracji nie ma. Panel trzeba przebudować.** Serwer dostaje dwie trasy:

@@ -206,7 +206,7 @@ export const KATALOG: Scenariusz[] = [
 
 
   // ── logo dostawcy ──
-  { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "zakładka DOSTAWY, potem /biuro → DOSTAWCY" },
+  { id: "S70", obszar: "dostawa", tytul: "Dostawca z logo i dostawca bez logo", wejscie: "/obsluga → DOSTAWY, potem zębatka → Logo dostawców" },
   { id: "S71", obszar: "karta", tytul: "Zamienniki wypisane bez nagłówka", wejscie: "karta TEST-ZAMIENNIK-LISTA" },
 
   // ── kosze z regału zwrotów (dokument MM z Subiekta) ──
@@ -214,7 +214,7 @@ export const KATALOG: Scenariusz[] = [
 
 
   { id: "S77", obszar: "dostawy", tytul: "Analiza dostaw: u kogo się psuje, i dostawa zdjęta poza WERTIS", wejscie: "/obsluga/analiza → zakres „Dostawy\"" },
-  { id: "S79", obszar: "konta", tytul: "Ustawienia jako jeden arkusz: sekcje bez zaokrągleń i bez przerw", wejscie: "/biuro → zębatka → USTAWIENIA" },
+  { id: "S79", obszar: "konta", tytul: "Ustawienia biura w panelu: dane firmy na serwerze, konta dla admina", wejscie: "/obsluga → zębatka" },
   { id: "S80", obszar: "kolejka", tytul: "Masowa zmiana lokalizacji z arkusza: podgląd, potem zapis", wejscie: "/obsluga → STAN SYSTEMU → WGRAJ ARKUSZ" },
 ];
 

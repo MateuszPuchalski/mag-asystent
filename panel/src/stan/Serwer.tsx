@@ -4,7 +4,7 @@ import { useOdswiezZdjecia, useResync } from "../api/stan";
 import type { Zdrowie } from "../api/typy";
 import { Blad, Przycisk, dataLokalna } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
-import { Potwierdz } from "./Potwierdz";
+import { Potwierdz } from "../ui/Potwierdz";
 
 /* ── Serwer (z `biuro.html`, 0.441.0) ───────────────────────────────────
    Wersja, źródło danych, worker i ślad audytowy — oraz dwie operacje

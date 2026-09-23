@@ -1,25 +1,55 @@
+import { useFirma, type DaneFirmy } from "../api/ustawienia";
 import type { Firma } from "./szablony";
 
-/* ── Dane firmy do druków dostawców (0.435.0) ──────────────────────────────
+/* ── Dane firmy do druków dostawców (0.435.0, serwer od 0.444.0) ──────────
    Druki GEKO i PARTNER pytają o dane ZGŁASZAJĄCEGO — nazwę, NIP, adres,
-   osobę kontaktową. Od lat mieszkają w `localStorage` przeglądarki biura pod
-   kluczem `wertis.firma`, a wpisuje je formularz za zębatką w `biuro.html`.
+   osobę kontaktową. Przez lata mieszkały w `localStorage` przeglądarki biura
+   pod kluczem `wertis.firma`, więc każde biurko miało własny komplet, a nowe
+   drukowało protokół z pustym nagłówkiem. Od 0.444.0 stoją na serwerze
+   (`/api/biuro/firma`) i wpisuje je karta „Dane firmy" w Ustawieniach.
 
-   PANEL CZYTA TEN SAM KLUCZ, a nie nowe miejsce, bo stoi na tym samym
-   originie co biuro. Dzięki temu przeprowadzka druku nie każe nikomu
-   wpisywać danych drugi raz — ani nie zostawia dwóch kopii, które by się
-   rozjechały przy pierwszej zmianie numeru telefonu.
+   KLUCZ PRZEGLĄDARKI ZOSTAJE JAKO ZAPAS NA JEDNO WYDANIE. Dzień wdrożenia
+   zastaje serwer pusty, a dane w przeglądarce; bez zapasu pierwszy protokół
+   po aktualizacji wyszedłby bez nagłówka. Zapas działa WYŁĄCZNIE, dopóki nikt
+   nie zapisał danych na serwerze — potem serwer wygrywa zawsze, także pustym
+   polem, bo puste pole zapisał człowiek. Zapas znika przy przełączeniu (F6).
 
-   Przeniesienie danych firmy NA SERWER czeka na wydanie z ustawieniami
-   (F5 w `docs/obsluga-klienta.md` §7): wtedy znika formularz w biurze
-   i jest jedno miejsce, do którego można je przenieść. Zrobione teraz
-   wymagałoby zmiany zapisu w `biuro.html`, któremu nic nowego nie wolno. */
+   Automatycznego przepisania z przeglądarki na serwer nie ma: otwarcie druku
+   nie może niczego zapisywać. Robi to przycisk w Ustawieniach. */
 
 const KLUCZ = "wertis.firma";
 
-export function firma(): Firma {
+/** Komplet z przeglądarki w kształcie druku (klucze z wielkiej litery, jak w biurze). */
+export function firmaZPrzegladarki(): Firma {
   try {
     const f = JSON.parse(localStorage.getItem(KLUCZ) ?? "null") as unknown;
     return f && typeof f === "object" ? (f as Firma) : {};
   } catch { return {}; }
+}
+
+/** Czy przeglądarka ma cokolwiek do przeniesienia. */
+export const przegladarkaMaFirme = () => Object.values(firmaZPrzegladarki()).some((v) => typeof v === "string" && v.trim() !== "");
+
+/** Serwer → kształt druku. Szablony zostały przy kluczach biura, bo to wierne kopie cudzych formularzy. */
+export const naDruk = (d: DaneFirmy): Firma => ({
+  Nazwa: d.nazwa, Nip: d.nip, Adres: d.adres, Miejscowosc: d.miejscowosc, Osoba: d.osoba, Telefon: d.telefon,
+});
+
+/** Przeglądarka → kształt serwera, dla przycisku przeniesienia. */
+export const zDruku = (f: Firma): DaneFirmy => ({
+  nazwa: f.Nazwa ?? "", nip: f.Nip ?? "", adres: f.Adres ?? "",
+  miejscowosc: f.Miejscowosc ?? "", osoba: f.Osoba ?? "", telefon: f.Telefon ?? "",
+});
+
+/**
+ * Dane firmy dla druku: `undefined` do chwili odpowiedzi serwera — druk
+ * czeka, zamiast wyjść raz z zapasem, a raz z serwera. Błąd odczytu też
+ * spada na zapas: protokół bez nagłówka jest gorszy niż protokół z kopią
+ * z tej przeglądarki.
+ */
+export function useFirmaDruku(): Firma | undefined {
+  const f = useFirma();
+  if (f.isPending) return undefined;
+  if (f.data?.zmieniono) return naDruk(f.data.dane);
+  return firmaZPrzegladarki();
 }

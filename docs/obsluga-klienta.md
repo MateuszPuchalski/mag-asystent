@@ -376,6 +376,15 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > strefy złotej. Dwie zmiany kształtu. Arkusz lokalizacji widzi tylko admin,
 > bo pozostałym serwer i tak odmawia. Rekoncyliacja nazywa wszystkie
 > dziewięć rodzajów rozjazdu, a nie cztery.
+>
+> **F5 w 0.444.0.** Ustawienia przeszły do panelu jako ostatni widok
+> `biuro.html`; strona została drogowskazem na jedno wydanie, decyzją
+> właściciela. Dane firmy poszły na serwer, zamykając odstępstwo z F2.
+> To dane SPRZEDAWCY, nie kupującego, więc reguła prywatności adresu
+> z `CLAUDE.md` ich nie dotyczy. Pomiary obsługi zeszły spod zębatki do
+> Analizy → Obsługa klienta, bo są wynikiem, nie ustawieniem. Zakres ten
+> stanął wcześniej, w 0.443.0, i domknął lukę zapisaną przy F4a. Most
+> z panelu do `/biuro` zniknął — reguły strefy stoją za zębatką panelu.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
