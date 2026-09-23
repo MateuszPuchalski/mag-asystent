@@ -114,6 +114,11 @@ export interface WierszZwrotu {
    */
   statusAllegro: string | null;
   kubelek: Kubelek;
+  /**
+   * Kwota ustalona, a pieniądze jeszcze nie wyszły (0.476.0). Trzyma zwrot
+   * w DO ZWROTU także po korekcie — powód przy `pieniadzeCzekaja`.
+   */
+  pieniadzeCzekaja: boolean;
   sygnaly: Sygnal[];
   /** `null`, dopóki paczka nie wróciła — zegar obsługi jeszcze nie ruszył. */
   terminAt: string | null;
@@ -273,6 +278,47 @@ export function dniDoTerminu(terminAt: string | null, teraz = Date.now()): numbe
 }
 
 /**
+ * Czy zwrot czeka jeszcze na wyjście pieniędzy (0.476.0).
+ *
+ * Przegląd zwrotów z 23 września: automatyczny ZW zamyka zwrot minutę po
+ * zapisie kwoty, a zamknięty zwrot schodzi z kolejki. Pieniądze biuro oddaje
+ * ręką w Allegro — więc jeśli nikt nie pamiętał, ósmego dnia Allegro oddawało
+ * całość samo, a potrącenie za uszkodzenie przepadało. Nic w kolejce o tym
+ * nie mówiło.
+ *
+ * ROZLICZONE jest to, po czym jest ślad: nasze polecenie zwrotu, odmowa,
+ * zapisany przelew albo potwierdzenie z Allegro. Kwota zero nie ma czego
+ * oddać.
+ *
+ * OKNO, NIE WIECZNOŚĆ. Zamówienie opłacone w Allegro czeka do dnia po naszym
+ * terminie — potem Allegro oddaje samo, wg właściciela „ósmego dnia".
+ * Pobranie Allegro nie oddaje wcale, więc czeka tyle, ile stary zwrot bez
+ * decyzji (`ZWROT_WYGASA_DNI`). Bez okna wróciłaby do pracy cała historia
+ * sprzed tej reguły.
+ */
+export function pieniadzeCzekaja(z: {
+  werdykt: string | null; rejectionCode: string | null; kwotaGrosze: number | null;
+  statusAllegro?: string | null; rozliczonyAllegroAt?: string | null;
+  /** Nasze polecenie zwrotu w Allegro — identyfikator albo sam `commandId`. */
+  zlecono?: boolean;
+  odmowaKod?: string | null; przelewAt?: string | null;
+  platnoscTyp?: string | null; terminAt?: string | null; utworzono?: string | null;
+}, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): boolean {
+  if (z.werdykt !== "przyjety" || z.rejectionCode) return false;
+  if (z.kwotaGrosze === null || z.kwotaGrosze <= 0) return false;
+  if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return false;
+  if (z.zlecono || z.odmowaKod || z.przelewAt) return false;
+  if (z.platnoscTyp === "CASH_ON_DELIVERY") {
+    return Boolean(z.utworzono) && teraz - Date.parse(String(z.utworzono)) <= wygasaDni * 86_400_000;
+  }
+  if (!z.terminAt) return false;
+  return teraz <= Date.parse(z.terminAt) + DZIEN_AUTOMATU_ALLEGRO_MS;
+}
+
+/** Allegro oddaje samo dzień po naszym terminie — „ósmego dnia" (właściciel). */
+const DZIEN_AUTOMATU_ALLEGRO_MS = 86_400_000;
+
+/**
  * Kubełek wyliczony z faktów.
  *
  * Kolejność warunków jest UMOWĄ: stany końcowe rozstrzygają pierwsze, bo
@@ -290,8 +336,15 @@ export function kubelekZwrotu(z: {
   /** Data zgłoszenia i źródło — do reguły wieku (0.452.0). */
   utworzono?: string | null;
   zrodlo?: string | null;
+  /** Wynik `pieniadzeCzekaja` — liczony raz, przez wołającego (0.476.0). */
+  pieniadzeCzekaja?: boolean;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): Kubelek {
-  if (z.zamknietyAt) return "zamkniety";
+  /* ZAMKNIĘCIE NIE ZDEJMUJE NIEZAPŁACONEGO ZWROTU (0.476.0). Korekta
+     zamyka zwrot w bazie — ręką albo automatem ZW minutę po kwocie — ale
+     pieniądze wychodzą zwykle później. Taki zwrot wraca do DO ZWROTU i stoi
+     tam, dopóki Allegro nie pokaże, że pieniądze wyszły, albo nie minie
+     dzień, w którym oddaje samo. Powód przy `pieniadzeCzekaja`. */
+  if (z.zamknietyAt) return z.pieniadzeCzekaja ? "zwrot" : "zamkniety";
   if (z.werdykt === "odrzucony" || z.rejectionCode) return "odrzucony";
   /* ALLEGRO ROZLICZYŁO — SPRAWA ZAMKNIĘTA (0.339.0). Zgłoszenie właściciela:
      „pokazuje za dużo zwrotów do procesowania, pokazuje zwroty, za które
@@ -357,7 +410,7 @@ export function kubelekZwrotu(z: {
   if (!z.pozycje.length || z.pozycje.some((p) => !p.ocena)) return "ocena";
   if (z.kwotaGrosze === null) return "zwrot";
   if (!z.korektaNumer) return "korekta";
-  return "zamkniety";
+  return z.pieniadzeCzekaja ? "zwrot" : "zamkniety";
 }
 
 /**
@@ -544,6 +597,17 @@ function zloz(
   }));
   const dni = dniDoTerminu(terminAt, teraz);
   const rejectionCode = (z.rejection_code as string) ?? null;
+  const czeka = pieniadzeCzekaja({
+    werdykt: (z.werdykt as string) ?? null, rejectionCode,
+    kwotaGrosze: z.kwota_grosze == null ? null : Number(z.kwota_grosze),
+    statusAllegro: (z.status_allegro as string) ?? null,
+    rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
+    zlecono: Boolean(z.zwrot_pieniedzy_id || z.zwrot_pieniedzy_command_id),
+    odmowaKod: (z.odmowa_kod as string) ?? null,
+    przelewAt: (z.przelew_at as string) ?? null,
+    platnoscTyp: zamowienie?.platnoscTyp ?? null,
+    terminAt, utworzono,
+  }, teraz);
   const kubelek = kubelekZwrotu({
     rejectionCode,
     werdykt: (z.werdykt as string) ?? null,
@@ -555,6 +619,7 @@ function zloz(
     rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
     utworzono,
     zrodlo: String(z.zrodlo ?? "allegro"),
+    pieniadzeCzekaja: czeka,
   }, teraz);
   const suma = sumaPozycji(pozycje);
   return {
@@ -568,6 +633,7 @@ function zloz(
     przesylkaStatus: (z.przesylka_status as string) ?? null,
     statusAllegro: (z.status_allegro as string) ?? null,
     kubelek,
+    pieniadzeCzekaja: czeka,
     sygnaly: sygnalyZwrotu({
       kubelek, dni, paczkaAt: (z.paczka_at as string) ?? null,
       dostarczonoAt: (z.dostarczono_at as string) ?? null,

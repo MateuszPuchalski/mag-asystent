@@ -68,9 +68,17 @@ function odmowa(reply: FastifyReply) {
 
 /* Które rozjazdy rekoncyliacji należą do TEGO ekranu. Lista jawna, nie prefiks
    nazwy: `kosz_bez_powrotu` dotyczy zwrotów, choć nie nosi tego w nazwie, a
-   dopisanie piątej kontroli ma być decyzją, nie skutkiem ubocznym nazewnictwa. */
+   dopisanie piątej kontroli ma być decyzją, nie skutkiem ubocznym nazewnictwa.
+
+   PIĄTA KONTROLA (0.476.0): `zwrot_rozliczony_bez_korekty`. Zwrot rozliczony
+   przez Allegro wychodzi z kolejki, choć u nas nie ma korekty ani oceny —
+   decyzją właściciela z 0.339.0. Kontrola powstała, żeby to nie działo się
+   w ciszy, ale rysowała się wyłącznie w stanie systemu, gdzie obsługa nie
+   zagląda. Przegląd zwrotów z 23 września: taki zwrot znikał z tego ekranu
+   bez śladu, a jego koszyk stał zablokowany na brakującej korekcie. */
 const RODZAJE_ZWROTOW = new Set([
   "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu",
+  "zwrot_rozliczony_bez_korekty",
 ]);
 
 export async function zwrotyRoutes(app: FastifyInstance) {

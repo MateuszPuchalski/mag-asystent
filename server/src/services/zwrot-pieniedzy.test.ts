@@ -112,6 +112,31 @@ test("potrącenie idzie kwotą wprost — QUANTITY oddałoby pełną cenę", asy
     [{ id: "li-1", type: "AMOUNT", value: { amount: "39.99", currency: "PLN" } }]);
 });
 
+test("powód potrącenia jedzie do klienta w sellerComment (0.476.0)", async () => {
+  /* Formularz potrącenia obiecywał „to jego treść zobaczy klient", a do
+     przeglądu zwrotów z 23 września powód nie wychodził z panelu wcale. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d, { kwota: 3999 + 1499 });
+  d.prepare(`UPDATE zwrot_klienta_pozycja SET potracenie_grosze=1000, potracenie_powod='rysa na ostrzu'
+    WHERE zwrot_id=?`).run(id);
+  assert.equal((await wyslij(d, id)).sellerComment,
+    "Pomniejszony zwrot: Sekator — rysa na ostrzu (−10,00 zł)");
+});
+
+test("bez potrącenia sellerComment nie idzie, a za długi urywa się na limicie schematu", async () => {
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  assert.equal("sellerComment" in await wyslij(d, id), false);
+
+  const d2 = stanowisko();
+  const id2 = zwrotGotowy(d2, { kwota: 3999 + 1499 });
+  d2.prepare(`UPDATE zwrot_klienta_pozycja SET potracenie_grosze=1000, potracenie_powod=?
+    WHERE zwrot_id=?`).run("x".repeat(400), id2);
+  const k = String((await wyslij(d2, id2)).sellerComment);
+  assert.equal(k.length, 250);
+  assert.ok(k.endsWith("…"));
+});
+
 test("inna cena w zamówieniu też idzie kwotą — Allegro liczyłoby po swojej", async () => {
   const d = stanowisko();
   const id = zwrotGotowy(d);

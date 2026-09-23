@@ -88,6 +88,13 @@ export interface StanKosza {
      * przy pozycji. Jedna droga na obie kosztowałaby kasowanie cudzej oceny.
      */
     zeZwrotu: boolean;
+    /**
+     * Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką (0.476.0).
+     *
+     * Po nim klawisz oceny wie, do którego z kilku otwartych pudeł trafił już
+     * towar TEGO zwrotu — reguła w `ekrany/Zwroty.tsx`, przy klawiszach oceny.
+     */
+    zwrotId: number | null;
   }>;
 }
 
@@ -1022,11 +1029,15 @@ export function stanOtwartegoKosza(
 function stanKosza(database: Db, koszId: number, rodzaj: RodzajKosza): StanKosza {
   const k = database.prepare("SELECT id, kod, utworzono_at FROM kosz WHERE id=?")
     .get(koszId) as { id: number; kod: string; utworzono_at: string };
+  /* `LEFT JOIN`, bo pozycja zwrotu bywa skasowana resetem (0.199.0), a wiersz
+     koszyka zostaje — wtedy nie wiemy, z którego zwrotu przyszedł. */
   const pozycje = database.prepare(
-    `SELECT id, symbol, nazwa, ilosc, zwrot_pozycja_id FROM kosz_pozycja
-      WHERE kosz_id=? ORDER BY id`)
+    `SELECT p.id, p.symbol, p.nazwa, p.ilosc, p.zwrot_pozycja_id, zp.zwrot_id
+       FROM kosz_pozycja p LEFT JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+      WHERE p.kosz_id=? ORDER BY p.id`)
     .all(k.id) as Array<{
-    id: number; symbol: string; nazwa: string; ilosc: number; zwrot_pozycja_id: number | null;
+    id: number; symbol: string; nazwa: string; ilosc: number;
+    zwrot_pozycja_id: number | null; zwrot_id: number | null;
   }>;
   return {
     rodzaj,
@@ -1036,6 +1047,7 @@ function stanKosza(database: Db, koszId: number, rodzaj: RodzajKosza): StanKosza
     pozycje: pozycje.map((p) => ({
       id: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
       zeZwrotu: p.zwrot_pozycja_id !== null,
+      zwrotId: p.zwrot_id == null ? null : Number(p.zwrot_id),
     })),
   };
 }

@@ -14,7 +14,7 @@ import {
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
-  useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza,
+  useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz,
 } from "../api/zwroty";
 import { wygladaNaEan } from "../zwroty/rodzajKodu";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
@@ -27,6 +27,7 @@ import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
+import { Wiadomosc } from "../zwroty/Wiadomosc";
 import type { RozjazdZwrotu } from "../api/zwroty";
 import { useSkaner } from "../skaner";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
@@ -55,7 +56,8 @@ import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
  * Zmiana klawisza ma się rozjechać z paskiem najwyżej o jedną linijkę.
  */
 const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>> = {
-  decyzja: [["P", "przyjmij"], ["O", "odrzuć"]],
+  decyzja: [["P", "przyjmij"], ["S", "przyjmij i na stan"], ["U", "przyjmij i utylizacja"],
+    ["O", "odrzuć"]],
   ocena: [["S", "na stan"], ["U", "utylizacja"], ["O", "na outlet"],
     ["Shift+S", "wszystkie na stan"]],
   zwrot: [["Enter", "zapisz kwotę"]],
@@ -112,6 +114,9 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
   zwrot_bez_przelewu: "bez śladu po przelewie",
   kosz_czeka_na_korekte: "koszyk czeka na korektę",
   kosz_bez_powrotu: "kosz bez powrotu z regału",
+  /* Allegro oddało pieniądze, a u nas nie ma korekty albo oceny (0.476.0).
+     Do tego wydania taki zwrot wychodził z tego ekranu bez śladu. */
+  zwrot_rozliczony_bez_korekty: "rozliczony w Allegro bez korekty",
 };
 
 function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
@@ -617,10 +622,30 @@ export function Zwroty() {
   const wszystkieNaStan = async () => {
     if (!zwrot) return;
     let wersja = zwrot.wersja;
+    const koszId = pudloTegoZwrotu("stan");
     for (const p of zwrot.pozycje.filter((x) => !x.ocena)) {
-      const w = await ocena2.mutateAsync({ pozycjaId: p.id, ocena: "stan", wersja });
+      const w = await ocena2.mutateAsync({ pozycjaId: p.id, ocena: "stan", wersja, koszId });
       wersja = w.wersja;
     }
+  };
+
+  /* ── PUDŁO TEGO ZWROTU PRZY KILKU OTWARTYCH (0.476.0) ──────────────────
+     Przegląd zwrotów z 23 września: przy dwóch otwartych pudłach klawisz `S`
+     odbijał się od serwera, bo nie niósł wyboru, i każda ocena wracała do
+     myszy. Decyzja właściciela z 0.379.0 zostaje nietknięta: pudła NIE
+     zgadujemy. Wybieramy wyłącznie to, do którego człowiek sam włożył już
+     towar TEGO zwrotu — to ten sam karton, który ma przed sobą.
+
+     Bez takiego pudła albo przy dwóch naraz zostaje dotychczasowa droga:
+     serwer pyta, a przyciski z kodami pudeł stoją przy pozycji. */
+  const pudla = useKosz().data?.kosze ?? [];
+  const pudloTegoZwrotu = (ocena: Ocena): number | undefined => {
+    if (!zwrot || ocena === "outlet") return undefined;
+    const rodzaj = ocena === "utylizacja" ? "odpad" : "zwroty";
+    const tegoRodzaju = pudla.filter((k) => k.rodzaj === rodzaj);
+    if (tegoRodzaju.length < 2) return undefined;
+    const zTymZwrotem = tegoRodzaju.filter((k) => k.pozycje.some((p) => p.zwrotId === zwrot.id));
+    return zTymZwrotem.length === 1 ? zTymZwrotem[0].id : undefined;
   };
 
   /**
@@ -652,6 +677,28 @@ export function Zwroty() {
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
         werdykt.mutate({ id: zwrot.id, decyzja: "przyjety", powod: null, wersja });
+      } else if (e.key === "s" || e.key === "S" || e.key === "u" || e.key === "U") {
+        /* ── OCENA JEST PRZYJĘCIEM (0.476.0) ────────────────────────────
+           Przegląd zwrotów z 23 września: `P` i zaraz `S` to dwa klawisze na
+           jedną decyzję. Kto ocenia towar „na stan", ten zwrot przyjął — więc
+           klawisz oceny w DO DECYZJI robi jedno i drugie. Odmowa zostaje
+           osobną, świadomą drogą pod `O`, bo idzie do klienta.
+
+           PO KOLEI, z wersją oddaną przez przyjęcie — ta sama zasada co przy
+           ocenie hurtem. `Shift+S` przyjmuje i ocenia wszystko na stan. */
+        e.preventDefault();
+        const ocena: Ocena = e.key === "s" || e.key === "S" ? "stan" : "utylizacja";
+        const hurt = e.key === "S";
+        const pozycje = zwrot.pozycje.filter((x) => !x.ocena);
+        const koszId = pudloTegoZwrotu(ocena);
+        void (async () => {
+          const w = await werdykt.mutateAsync(
+            { id: zwrot.id, decyzja: "przyjety", powod: null, wersja });
+          let v = w.wersja;
+          for (const p of hurt ? pozycje : pozycje.slice(0, 1)) {
+            v = (await ocena2.mutateAsync({ pozycjaId: p.id, ocena, wersja: v, koszId })).wersja;
+          }
+        })().catch(() => {});
       } else if (e.key === "o" || e.key === "O") {
         e.preventDefault();
         akcje.current.odmow?.();
@@ -675,10 +722,12 @@ export function Zwroty() {
       const pozycja = zwrot.pozycje.find((x) => !x.ocena);
       if (!pozycja) return;
       e.preventDefault();
-      ocena2.mutate({ pozycjaId: pozycja.id, ocena, wersja });
+      ocena2.mutate({ pozycjaId: pozycja.id, ocena, wersja, koszId: pudloTegoZwrotu(ocena) });
       return;
     }
-    if (zwrot.kubelek === "zwrot" && e.key === "Enter") {
+    /* Enter zapisuje kwotę tylko wtedy, gdy jej jeszcze nie ma (0.476.0).
+       Zwrot czekający na pieniądze stoi w tym kubełku z kwotą i korektą. */
+    if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze === null && e.key === "Enter") {
       e.preventDefault();
       akcje.current.zapiszKwote?.();
       return;
@@ -794,7 +843,9 @@ export function Zwroty() {
         </div>
       {/* Pomoc w swojej komórce siatki — obok kolejności, na końcu rzędu. */}
       <div className="flex items-center justify-center">
-      <SkrotyKlawiszy zMoje={false} kubelkow={KUBELKI.length}
+      {/* `sita={false}` (0.476.0): sito „Niczyje" zeszło z tego ekranu
+          w 0.370.0, a pomoc dalej obiecywała klawisz `n`, który nic nie robi. */}
+      <SkrotyKlawiszy zMoje={false} sita={false} kubelkow={KUBELKI.length}
           /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
              zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
              pokazywał wtedy P/O, choć działały S/U. */
@@ -1008,6 +1059,9 @@ export function Zwroty() {
                   obiecuje ruch, po którym serwer odmówi. */}
               {zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony" &&
                 <DolozTowar />}
+              {/* Gotowa wiadomość do klienta (0.476.0) — `key`, bo edytowana
+                  treść jednego zwrotu nie ma prawa przejść na następny. */}
+              <Wiadomosc key={zwrot.id} zwrot={zwrot} />
             </div>
           </>}
     </Karta>

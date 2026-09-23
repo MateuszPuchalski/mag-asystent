@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.476.0 — 23 września 2026
+## 0.477.0 — 23 września 2026
 
 **Szkic układa się sam zaraz po rozpoznaniu i czeka na zatwierdzenie
 agenta.** Decyzja właściciela: „ułóż odpowiedź automatycznie po klasyfikacji,
@@ -56,6 +56,26 @@ gotową do zatwierdzenia”. Do tej wersji po „Rozpoznaj” agent klikał jesz
   Wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0` w `wertis.env`.
 
 Kolumna `szkic_copilota.decyzja_id` dochodzi sama przy starcie.
+
+## 0.476.0 — 23 września 2026
+
+**Zwroty: pieniądze trzymają zwrot w pracy, powód potrącenia dociera do
+klienta.** Przegląd procesu zwrotów, sześć poprawek wybranych przez
+właściciela. Opis w `docs/panel-obslugi-klienta.md` §25a.25.
+
+- **Zwrot czeka na pieniądze w „Do zwrotu”.** Automatyczny ZW zamykał zwrot
+  minutę po kwocie. Zapomniany zwrot oddawało ósmego dnia Allegro, w całości,
+  bez potrącenia. Teraz wraca do „Do zwrotu”, póki pieniądze nie wyjdą.
+  Pasek podaje, kiedy Allegro odda samo.
+- **Powód potrącenia jedzie do klienta** w `sellerComment` zwrotu pieniędzy.
+- **Gotowe wiadomości do klienta** pod pozycjami zwrotu: pomniejszony zwrot,
+  uszkodzony towar, odmowa, zwrot przyjęty. Do skopiowania i poprawienia.
+- **ZW dla paragonu związanego po zapisie kwoty** zleca się sam po takcie.
+- **Dostawa zaznaczona**, gdy wraca całe zamówienie. **`S`/`U` w „Do decyzji”**
+  przyjmują i oceniają jednym klawiszem.
+- **Klawisze przy kilku pudłach** trafiają do pudła z towarem tego zwrotu.
+  Szybkie `s s s` nie odbija się od blokady, a pomoc nie obiecuje `n`.
+- **Zwrot rozliczony w Allegro bez korekty** widać w pasku rozjazdów zwrotów.
 
 ## 0.474.0 — 23 września 2026
 

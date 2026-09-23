@@ -2582,7 +2582,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.476.0 — szkic zaraz po rozpoznaniu
+### Aktualizacja do 0.477.0 — szkic zaraz po rozpoznaniu
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna
 `szkic_copilota.decyzja_id` dochodzi sama przy starcie.
