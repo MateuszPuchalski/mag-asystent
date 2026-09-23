@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { AUTOMAT_ZW, wpiszNumeryZw, zakolejkujZw, type OpcjeZw } from "./zw-automat.js";
+import { AUTOMAT_ZW, dokolejkujZalegleZw, wpiszNumeryZw, zakolejkujZw, type OpcjeZw } from "./zw-automat.js";
 import { cofnijKorekte, cofnijKwote, listaZwrotow, zapiszKorekte } from "./zwroty.js";
 
 /* ── Automatyczny ZW do paragonu (0.349.0) ──────────────────────────────────
@@ -230,4 +230,54 @@ test("lista zwrotów niesie stan ZW — panel mówi po nim, kto wystawia", () =>
   zakolejkujZw(d, id, KTO, TERAZ, WLACZONY);
   assert.deepEqual(listaZwrotow(d, TERAZ.getTime(), { id })[0].zw,
     { status: "pending", numer: null, blad: null });
+});
+
+/* ── Paragon związany PO zapisie kwoty (0.476.0) ─────────────────────────
+   Przegląd zwrotów z 23 września: zapis kwoty trafiał czasem przed wiązaniem
+   paragonu i ZW nie powstawał nigdy. Przebieg po takcie ma to dociągnąć —
+   ale nigdy kosztem drugiego dokumentu fiskalnego. */
+
+const bezParagonu = (d: Db, id: number) =>
+  d.prepare("UPDATE zwrot_klienta SET faktura_dok_id=NULL, faktura_typ=NULL WHERE id=?").run(id);
+const paragonPrzyszedl = (d: Db, id: number) =>
+  d.prepare("UPDATE zwrot_klienta SET faktura_dok_id=?, faktura_typ='PA' WHERE id=?").run(PARAGON, id);
+
+test("paragon związany po zapisie kwoty: przebieg zleca ZW, którego zapis nie zlecił", () => {
+  const d = stanowisko();
+  const id = zwrot(d, [{ twId: 101, cena: 4999 }]);
+  bezParagonu(d, id);
+  assert.equal(zakolejkujZw(d, id, KTO, TERAZ, WLACZONY), null, "zapis bez paragonu milczy");
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, WLACZONY), 0, "bez paragonu nie ma czego zlecić");
+
+  paragonPrzyszedl(d, id);
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, WLACZONY), 1);
+  assert.equal(zadanie(d, id)!.status, "pending");
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, WLACZONY), 0, "drugi przebieg nie zleca drugi raz");
+});
+
+test("przebieg nie zleca ZW po cofniętej korekcie — dokument stoi już w Subiekcie", () => {
+  const d = stanowisko();
+  const id = zwrot(d, [{ twId: 101, cena: 4999 }]);
+  const { queueId } = zakolejkujZw(d, id, KTO, TERAZ, WLACZONY) as { queueId: number };
+  ustawStatus(d, queueId, "done", "ZW 9/MAG/09/2026");
+  wpiszNumeryZw(d, TERAZ);
+  cofnijKorekte(d, id, wersja(d, id), KTO, TERAZ);
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, WLACZONY), 0);
+});
+
+test("przebieg nie wchodzi w drogę biuru, któremu automat kazał wystawić ZW ręką", () => {
+  /* „ZW wystawia biuro" w osi znaczy, że człowiek mógł już siąść do Subiekta.
+     Automat obok niego dałby dubel. */
+  const d = stanowisko();
+  const id = zwrot(d, [{ twId: null, cena: 4999 }]);
+  zakolejkujZw(d, id, KTO, TERAZ, WLACZONY);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=101 WHERE zwrot_id=?").run(id);
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, WLACZONY), 0);
+  assert.equal(zadanie(d, id), undefined);
+});
+
+test("wyłączony automat nie dociąga niczego", () => {
+  const d = stanowisko();
+  zwrot(d, [{ twId: 101, cena: 4999 }]);
+  assert.equal(dokolejkujZalegleZw(d, TERAZ, { wlaczony: false, twIdPrzesylki: 943 }), 0);
 });
