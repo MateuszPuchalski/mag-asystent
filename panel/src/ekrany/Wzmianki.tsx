@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AtSign, Check, Lock } from "lucide-react";
 import { useOdhaczWzmianke, useWzmianki } from "../api/rozmowy";
-import { Blad, Karta, Przycisk, Pusto, czas } from "../ui";
+import { Blad, Karta, Przycisk, czas } from "../ui";
 
 /* Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.160.0).
    
@@ -25,11 +25,14 @@ export function Wzmianki() {
   const wszystkie = dane.data?.wzmianki ?? [];
   const widoczne = zHistoria ? wszystkie : wszystkie.filter((w) => !w.odhaczona);
 
-  /* Własny scroller — patrz `Zadania`; rama panelu nie przewija za ekrany. */
-  return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
-    <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <AtSign size={18} /><b className="text-naglowek mr-auto">Wspomniano o mnie</b>
-      <span className="text-sm text-slate-500">
+  /* ── SEKCJA „DO ZROBIENIA" (23 września 2026) ─────────────────────────────
+     Powód przy `Moje` — trzy zakładki z jednym pytaniem stały się jednym
+     ekranem. Wzmianka idzie WIERSZEM, nie kartą: na wspólnym ekranie karta
+     na każdą prośbę spychała decyzje biura pod krawędź. */
+  return <Karta className="overflow-hidden p-0" aria-label="Wspomniano o mnie" role="region">
+    <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
+      <AtSign size={16} /><b className="mr-auto">Wspomniano o mnie</b>
+      <span className="text-sm text-slate-600">
         {dane.data ? `${dane.data.nowe} do zajęcia się` : "Wczytuję…"}</span>
       {/* Cel klikalny to CAŁA etykieta (0.255.0). Sam kwadracik miał 13×13 px
           przy progu 24×24 z WCAG 2.2 AA — ta sama usterka co w pasku zwrotów
@@ -38,37 +41,37 @@ export function Wzmianki() {
         <input type="checkbox" checked={zHistoria} className="h-4 w-4 shrink-0"
           onChange={(e) => setZHistoria(e.target.checked)} />
         Pokaż odhaczone</label>
-    </Karta>
+    </div>
 
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
 
-    {!dane.isLoading && !widoczne.length && <Karta className="flex">
-      <Pusto ikona={AtSign}>
-        {wszystkie.length ? "Wszystko odhaczone." : "Nikt Cię jeszcze nie wzmiankował."}
-      </Pusto></Karta>}
+    {!dane.isLoading && !widoczne.length && <p className="px-4 py-2 text-sm text-slate-500">
+      {wszystkie.length ? "Wszystko odhaczone." : "Nikt Cię jeszcze nie wzmiankował."}</p>}
 
-    {widoczne.map((w) => <Karta key={w.commentId}
-      className={`p-4 ${w.odhaczona ? "opacity-60" : ""}`}>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        {/* Kłódka jak na osi: to jest notatka wewnętrzna, nie głos klienta. */}
-        <Lock size={12} /><b className="text-slate-700">{w.autor}</b>
-        <span>· rozmowa z {w.klient}</span>
-        <span>· {czas(w.at)}</span>
-        {w.odhaczona && <span className="font-semibold text-ranga-ok">
-          odhaczone {czas(w.odhaczonaAt)}</span>}
-      </div>
-      <p className="mt-2 whitespace-pre-wrap text-tresc">{w.fragment}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Przycisk wariant="glowny"
-          onClick={() => nawiguj(`/obsluga/skrzynka/${w.conversationId}`)}>
-          OTWÓRZ ROZMOWĘ</Przycisk>
-        {/* Przejście do rozmowy NIE odhacza. Agent bywa w niej po to, żeby
-            dopiero zobaczyć, czy sprawa jest jego. */}
-        {!w.odhaczona && <Przycisk disabled={odhacz.isPending}
-          onClick={() => { setBlad(""); odhacz.mutate({ commentId: w.commentId },
-            { onError: (e) => setBlad((e as Error).message) }); }}>
-          <Check size={16} />ODHACZ</Przycisk>}
-      </div>
-    </Karta>)}
-  </div>;
+    {widoczne.length > 0 && <ul>
+      {widoczne.map((w) => <li key={w.commentId}
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2 first:border-t-0 ${
+          w.odhaczona ? "opacity-60" : ""}`}>
+        <span className="flex shrink-0 items-center gap-1.5 text-xs text-slate-500">
+          {/* Kłódka jak na osi: to jest notatka wewnętrzna, nie głos klienta. */}
+          <Lock size={12} /><b className="text-slate-700">{w.autor}</b>
+          <span>· rozmowa z {w.klient}</span><span>· {czas(w.at)}</span>
+          {w.odhaczona && <span className="font-semibold text-ranga-ok">
+            odhaczone {czas(w.odhaczonaAt)}</span>}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm" title={w.fragment}>{w.fragment}</span>
+        <span className="flex shrink-0 gap-2">
+          <Przycisk className="px-2 py-1 text-xs"
+            onClick={() => nawiguj(`/obsluga/skrzynka/${w.conversationId}`)}>
+            OTWÓRZ ROZMOWĘ</Przycisk>
+          {/* Przejście do rozmowy NIE odhacza. Agent bywa w niej po to, żeby
+              dopiero zobaczyć, czy sprawa jest jego. */}
+          {!w.odhaczona && <Przycisk className="px-2 py-1 text-xs" disabled={odhacz.isPending}
+            onClick={() => { setBlad(""); odhacz.mutate({ commentId: w.commentId },
+              { onError: (e) => setBlad((e as Error).message) }); }}>
+            <Check size={14} />ODHACZ</Przycisk>}
+        </span>
+      </li>)}
+    </ul>}
+  </Karta>;
 }

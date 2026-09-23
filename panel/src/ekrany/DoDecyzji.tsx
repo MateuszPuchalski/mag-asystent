@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, MessageSquareReply,
+  AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
   MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
 import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
+import { Moje } from "./Moje";
+import { Wzmianki } from "./Wzmianki";
 
 /* ── DO DECYZJI — ekran startowy biura (0.435.0) ───────────────────────────
    Cel biura z `docs/obsluga-klienta.md` §7: rozstrzyga to, czego hala nie
@@ -66,38 +68,42 @@ function Wiersz({ p }: { p: PozycjaDecyzji }) {
   </li>;
 }
 
+/* ── JEDNA LISTA „DO ZROBIENIA" (23 września 2026) ──────────────────────────
+   „Do decyzji", „Moje" i „Wzmianki" odpowiadały na to samo pytanie — co mam
+   teraz zrobić — i stały w trzech zakładkach. Agent obchodził je po kolei, a
+   prośba kolegi czekała, aż ktoś zajrzy do trzeciej. Tu stoją jedna pod drugą:
+   najpierw to, o co prosi człowiek, potem moje sprawy, na końcu decyzje biura.
+
+   TO DALEJ SĄ TRZY ODCZYTY, nie piąta kolejka. Każda sekcja czyta swoją trasę
+   i prowadzi na ekran, gdzie sprawę się załatwia; wspólnego statusu nie ma.
+   Pusta sekcja zajmuje jedną linijkę, więc nie spycha decyzji pod krawędź. */
 export function DoDecyzji() {
   const dane = useDoDecyzji();
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
-  /* Własny scroller — jak w Zadaniach i „Moje"; rama panelu nie przewija za
-     ekrany. */
-  return <div className="lg:h-full lg:overflow-y-auto">
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-tytul font-bold">Do decyzji</h1>
-        {/* slate-600 na tle strony — powód przy tym samym akapicie w Zadaniach. */}
-        <p className="text-sm text-slate-600">
-          Sprawy, w których rozstrzyga biuro. Każda otwiera się tam, gdzie są jej dowody.</p>
-      </div>
-      <div className="flex gap-1">
+  /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany. */
+  return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
+    <h1 className="text-tytul font-bold">Do zrobienia</h1>
+    <Wzmianki />
+    <Moje />
+    <Karta className="overflow-hidden p-0" role="region" aria-label="Do decyzji biura">
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
+        <ListChecks size={16} /><b>Do decyzji biura</b>
+        <span className="mr-auto text-xs text-slate-600">najpilniejsze pierwsze</span>
         <FiltrSegmentowy<Filtr> wybrany={filtr} onWybierz={setFiltr} pozycje={[
           { klucz: "wszystko", etykieta: "Wszystko", ile: l?.wszystko },
           { klucz: "magazyn", etykieta: "Magazyn", ile: l?.magazyn },
           { klucz: "obsluga", etykieta: "Obsługa klienta", ile: l?.obsluga },
         ]} />
       </div>
-    </div>
-    <div className="mb-4"><Blad>{(dane.error as Error | null)?.message}</Blad></div>
-    <Karta className="overflow-hidden p-0">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-1.5 text-xs font-semibold text-slate-600">
-        Najpilniejsze pierwsze — termin, potem wiek</div>
+      <Blad>{(dane.error as Error | null)?.message}</Blad>
       {dane.isLoading
         ? <Pusto waga="lista">Wczytuję…</Pusto>
         : pozycje.length === 0
-          ? <Pusto ikona={CircleCheck}>Nic nie czeka na biuro.</Pusto>
+          ? <p className="flex items-center gap-2 px-4 py-2 text-sm text-slate-500">
+              <CircleCheck size={16} />Nic nie czeka na biuro.</p>
           : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} />)}</ul>}
     </Karta>
   </div>;

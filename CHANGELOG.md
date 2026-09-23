@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.472.0 — 23 września 2026
+
+**Pięć zmian użyteczności panelu: jedna lista pracy, szukanie Ctrl+K, jedna
+lista skrótów, raport nieużywanych funkcji i historia klienta z każdej
+sprawy.** Zgłoszenie właściciela: „jak zmniejszyć tekst na ekranie i poprawić
+użyteczność”. Tę część wybrał wprost: „wykonaj usability 1, 2, 3, 4, 5”.
+
+- **Jedna lista „Do zrobienia”.** „Do decyzji”, „Moje” i „Wzmianki”
+  odpowiadały na jedno pytanie i stały w trzech zakładkach. Teraz to trzy
+  sekcje jednego ekranu startowego: wzmianki, moje sprawy, decyzje biura.
+  Pusta sekcja zajmuje jedną linijkę. Zakładki „Moje” i „Wzmianki” zniknęły,
+  a ich stare adresy prowadzą na ekran startowy. Licznik przy zakładce
+  sumuje decyzje i nieodhaczone wzmianki.
+- **Szukanie Ctrl+K z każdego ekranu**, także z pola tekstowego. Trafia
+  numer zamówienia, login kupującego, numer zwrotu albo sprawy, list
+  przewozowy, końcówka telefonu, numer dokumentu dostawy, symbol i EAN.
+  Wynik prowadzi na ekran sprawy. Towar pokazuje podgląd stanu i półki
+  w samym oknie. Przy każdym trafieniu stoi, po czym trafiło.
+  Po loginie rozmówcy szukanie NIE wiąże rozmów, bo stoi przy nim
+  `[WERYFIKUJ]`. Rozmowy dochodzą wyłącznie numerem zamówienia.
+- **Jedna lista skrótów pod `?`**, z każdego ekranu. Sekcja bieżącego ekranu
+  stoi na górze. Ctrl+Enter wysyła teraz odpowiedź także w reklamacji
+  i dyskusji, jak w skrzynce. `Z` zostaje różny: w skrzynce kończy
+  rozmowę, w zwrotach oddaje pieniądze.
+- **Analiza → Użycie: czego nikt nie użył w 30 dniach.** Raport liczy
+  czynności z dziennika zdarzeń według obszaru. Pokazuje, kiedy czynność
+  była ostatnio, albo „nigdy”. Automaty odpadają. Samo otwarcie ekranu nie
+  zostawia śladu, więc ekran tylko do patrzenia wyjdzie tu „nieużywany”.
+  Rejestr typów zdarzeń pilnuje test: każdy literał z `logEvent(...)` musi
+  w nim stać.
+- **Historia klienta jednym kliknięciem** przy zwrocie, reklamacji
+  i dyskusji — przycisk „Historia” obok loginu otwiera szufladę. Widok jest
+  ten sam co zakładka KLIENT w skrzynce. Login bierze się z samej sprawy,
+  a rozmowy dochodzą wyłącznie numerem zamówienia.
+
+Bez migracji. Nowe trasy są odczytami: `GET /api/obsluga/szukaj`,
+`GET /api/obsluga/zwroty/:id/klient`, `GET /api/obsluga/sprawy/:id/klient`
+i `GET /api/analiza/uzycie`.
+
 ## 0.470.0 — 23 września 2026
 
 **Wykaz części producenta: plik „model → numery części” staje się propozycjami

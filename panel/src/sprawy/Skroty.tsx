@@ -101,6 +101,11 @@ export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = tru
           <span className="min-w-0">{opis}</span>
         </li>)}
       </ul>
+      {/* Od 23 września 2026 wszystkie skróty panelu stoją w jednej liście
+          pod klawiszem `?` (`nawigacja/Klawisze.tsx`); tu zostają klawisze
+          tej kolejki, pod ręką przy najechaniu. */}
+      <p className="mt-2 border-t border-slate-100 pt-1 text-podpis text-slate-500">
+        Wszystkie skróty: <Klawisz>?</Klawisz></p>
     </div>}
   </div>;
 }

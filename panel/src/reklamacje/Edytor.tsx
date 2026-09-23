@@ -75,7 +75,15 @@ export function Edytor({
   return <div className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3">
     <label className="sr-only" htmlFor="odpowiedz-reklamacji">Odpowiedź w sprawie</label>
     <textarea id="odpowiedz-reklamacji" rows={4} value={tresc}
-      onChange={(e) => onZmiana(e.target.value)}
+      onChange={(e) => onZmiana(e.target.value)} aria-keyshortcuts="Control+Enter"
+      /* CTRL+ENTER WYSYŁA, jak w skrzynce (23 września 2026) — te same klawisze
+         na każdej kolejce. Warunek jest ten sam co przy przycisku niżej: skrót
+         nie ma prawa ominąć limitu znaków ani pustej treści. */
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        if (!wysyla && !zaDlugo && tresc.trim()) onWyslij();
+      }}
       placeholder="Odpowiedź w tej sprawie — przeczyta ją kupujący, a bywa że i doradca Allegro"
       className="field resize-y text-sm" />
 

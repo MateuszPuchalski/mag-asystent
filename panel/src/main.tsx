@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Activity, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { Activity, BarChart3, BookMarked, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logo from "./assets/wertis-logo.png";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
@@ -18,8 +18,7 @@ import { Zwroty } from "./ekrany/Zwroty";
 import { Reklamacje } from "./ekrany/Reklamacje";
 import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
-import { Wzmianki } from "./ekrany/Wzmianki";
-import { Moje } from "./ekrany/Moje";
+import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
@@ -62,7 +61,10 @@ const ZAKLADKI = [
      wszystko, co czeka na rozstrzygnięcie biura, z magazynu i z obsługi naraz.
      Zadania zeszły pod własny adres na koniec rzędu: to praca zlecana hali,
      a nie to, od czego biuro zaczyna dzień. */
-  { do: "/obsluga/", etykieta: "Do decyzji", ikona: <ListChecks size={16} />, korzen: true },
+  /* „DO ZROBIENIA" OD 23 WRZEŚNIA 2026: „Moje" i „Wzmianki" przestały być
+     osobnymi zakładkami i stoją sekcjami na tym ekranie — trzy zakładki
+     odpowiadały na jedno pytanie. Powód przy `ekrany/DoDecyzji.tsx`. */
+  { do: "/obsluga/", etykieta: "Do zrobienia", ikona: <ListChecks size={16} />, korzen: true },
   { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
   { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
   { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false },
@@ -71,12 +73,6 @@ const ZAKLADKI = [
      dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
      rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
   { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false },
-  /* JEDNO „MOJE" PONAD KOLEJKAMI (S4 spoiwa). Sita „Moje" były trzy i każde
-     trzeba było odwiedzić osobno — sprawa z terminem w kolejce, do której
-     agent nie zaglądał, czekała aż ktoś tam zajrzy. Zakładka stoi obok
-     Wzmianek, bo odpowiada na to samo pytanie: co czeka na MNIE. */
-  { do: "/obsluga/moje", etykieta: "Moje", ikona: <Briefcase size={16} />, korzen: false },
-  { do: "/obsluga/wzmianki", etykieta: "Wzmianki", ikona: <AtSign size={16} />, korzen: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false },
 ];
@@ -133,19 +129,19 @@ function LicznikWiedzy() {
 }
 
 /* Ta sama zasada co przy wzmiankach: sprawa czekająca na biuro ma być widoczna
-   z każdego ekranu, a nie dopiero po wejściu na DO DECYZJI. */
-function LicznikDecyzji() {
-  const { data } = useDoDecyzji();
-  if (!data?.liczniki.wszystko) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
-    aria-label={`spraw do decyzji: ${data.liczniki.wszystko}`}>{data.liczniki.wszystko}</span>;
-}
+   z każdego ekranu, a nie dopiero po wejściu na DO ZROBIENIA.
 
-function LicznikWzmianek() {
-  const { data } = useWzmianki();
-  if (!data?.nowe) return null;
+   JEDEN LICZNIK NA DWA ŹRÓDŁA (23 września 2026). Wzmianki straciły własną
+   zakładkę, a ich licznik nie mógł zniknąć razem z nią — prośba kolegi ma
+   być widoczna z każdego ekranu. Dochodzi więc do licznika decyzji; „Moje"
+   licznika nie ma i nie miało, bo sprawa prowadzona to nie sprawa czekająca. */
+function LicznikDoZrobienia() {
+  const decyzje = useDoDecyzji().data?.liczniki.wszystko ?? 0;
+  const wzmianki = useWzmianki().data?.nowe ?? 0;
+  const razem = decyzje + wzmianki;
+  if (!razem) return null;
   return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
-    aria-label={`nieodhaczonych wzmianek: ${data.nowe}`}>{data.nowe}</span>;
+    aria-label={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`}>{razem}</span>;
 }
 
 /* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
@@ -189,6 +185,10 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
       <div className="mr-auto min-w-0">
         {/* kontrast: pasek stoi na #303030, gdzie slate-400 daje 5.14:1 */}
         <span className="ml-2 text-sm text-slate-400">Biuro</span></div>
+      {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
+          pada, zanim wiadomo, do której zakładki iść. Miejsce oddały dwie
+          zakładki, które weszły w „Do zrobienia". */}
+      <SzukajIKlawisze />
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
@@ -213,8 +213,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
             className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
             {z.ikona}{z.etykieta}
-            {z.do === "/obsluga/" && <LicznikDecyzji />}
-            {z.do === "/obsluga/wzmianki" && <LicznikWzmianek />}
+            {z.do === "/obsluga/" && <LicznikDoZrobienia />}
             {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>;
         })}
       </nav>
@@ -350,8 +349,11 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="/obsluga/stan" element={<Stan />} />
         <Route path="/obsluga/dziennik" element={<Dziennik />} />
         <Route path="/obsluga/analiza" element={<Analiza />} />
-        <Route path="/obsluga/moje" element={<Moje />} />
-        <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
+        {/* Dawne zakładki „Moje" i „Wzmianki" (do 23 września 2026) są dziś
+            sekcjami ekranu startowego. Adres zapamiętany w przeglądarce trafia
+            tam, zamiast w pusty ekran. */}
+        <Route path="/obsluga/moje" element={<Navigate to="/obsluga/" replace />} />
+        <Route path="/obsluga/wzmianki" element={<Navigate to="/obsluga/" replace />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}

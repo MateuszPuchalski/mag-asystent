@@ -1,6 +1,7 @@
 import React from "react";
 import type { Zwrot } from "../api/typy";
 import { LoginKlienta, Skopiuj } from "../ui";
+import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { Link } from "./Link";
 
 /* ── Nagłówek sprawy (0.207.0) ───────────────────────────────────────────────
@@ -57,6 +58,8 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.kupujacyLogin
         ? <LoginKlienta login={zwrot.kupujacyLogin} className="font-semibold text-slate-700" />
         : <span className="text-slate-500">kupujący: Allegro nie podało</span>}
+      {/* Historia kupującego jednym kliknięciem — powód w `sprawy/HistoriaKlienta.tsx`. */}
+      {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} tutaj="tym zwrotem" />}
     </p>
 
     {/* NOTATKA ZESZŁA STĄD W 0.313.0. Przy paczce nieodebranej cytowaliśmy ją

@@ -91,6 +91,10 @@ beforeEach(() => {
     if (url === "/api/biuro/zbiorki/kandydaci") {
       return new Response(JSON.stringify({ okno: null, prog: 0, kandydaci: [], juzWStrefie: 0, bezReguly: 0 }));
     }
+    if (url.startsWith("/api/analiza/uzycie?days=")) return new Response(JSON.stringify({
+      dni: 30, spozaRejestru: [],
+      obszary: [{ obszar: "Skrzynka", nieuzywane: [{ typ: "rozmowa_priorytet", ile: 0, ostatnio: null }],
+        uzywane: [{ typ: "rozmowa_wyslana", ile: 12, ostatnio: "2026-09-22T10:00:00Z" }] }] }));
     if (url === "/api/auth/me") return new Response(JSON.stringify({ user: { userId: 1, name: "Anna", role: "admin" } }));
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));
@@ -209,6 +213,22 @@ describe("zakres Obsługa klienta", () => {
     await waitFor(() => expect(adresy).toContain("/api/obsluga/skutecznosc-doboru?dni=7"));
     /* Wyłączony Copilot nie zostawia po sobie pustej karty. */
     expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).toBeNull();
+    expect(zapisy).toEqual([]);
+  });
+});
+
+/* ── Zakres Użycie (23 września 2026) ────────────────────────────────────────
+   Nieużyte czynności stoją na wierzchu, użyte — zwinięte; wejście w zakres
+   pobiera wyłącznie jego raport i niczego nie zapisuje. */
+describe("zakres Użycie", () => {
+  it("pokazuje nieużyte na wierzchu, pobiera tylko swój raport i niczego nie zapisuje", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Użycie" }));
+    expect(await screen.findByText("rozmowa_priorytet")).toBeTruthy();
+    expect(screen.getByText("nigdy")).toBeTruthy();
+    expect(screen.getByText("Użyte (1)")).toBeTruthy();
+    expect(adresy.some((a) => a === "/api/analiza/uzycie?days=30")).toBe(true);
     expect(zapisy).toEqual([]);
   });
 });

@@ -121,6 +121,64 @@ export function historiaKlienta(
      WHERE c.channel_account_id = ? AND t.interlocutor_login = ?
      ORDER BY c.updated_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
+  return zbierz(database, konto, login, rozmowyKlienta, { rodzaj: "rozmowa", id: conversationId });
+}
+
+/**
+ * Historia kupującego ZE ZWROTU albo ze SPRAWY posprzedażowej (23 września 2026).
+ *
+ * Z rozmowy do historii klienta był jeden klik od S2 spoiwa; ze zwrotu,
+ * reklamacji i dyskusji — żaden. Agent przy zwrocie nie wiedział, że ten sam
+ * kupujący pisał tydzień temu o tej samej części.
+ *
+ * LOGIN BIERZE SIĘ Z SAMEJ SPRAWY, nie z wątku. `kupujacy_login` zwrotu
+ * i sprawy przychodzi z Allegro wprost i jest pewny — zamówienia wiążą się po
+ * nim od zawsze. ROZMOWY dochodzą wyłącznie NUMEREM ZAMÓWIENIA: z zakupów
+ * tego loginu i z samej sprawy. Po `interlocutor_login` ta droga nie chodzi,
+ * bo `CLAUDE.md` zabrania trzeciej funkcji na tym polu, dopóki stoi przy nim
+ * `[WERYFIKUJ]`. Cena jest jawna: rozmowa bez numeru zamówienia tu nie
+ * wejdzie, choć zakładka KLIENT w skrzynce ją pokaże.
+ */
+export function historiaSprawy(
+  rodzaj: "zwrot" | "sprawa", id: number, database: DatabaseSync = db(),
+): HistoriaKlienta {
+  const w = database.prepare(rodzaj === "zwrot"
+    ? "SELECT channel_account_id, kupujacy_login, order_id FROM zwrot_klienta WHERE id=?"
+    : "SELECT channel_account_id, kupujacy_login, order_id, typ FROM reklamacja_klienta WHERE id=?",
+  ).get(id) as Record<string, unknown> | undefined;
+  if (!w) throw new Error(rodzaj === "zwrot" ? "Nie ma takiego zwrotu" : "Nie ma takiej sprawy");
+  const konto = Number(w.channel_account_id);
+  const login = tekst(w.kupujacy_login);
+  if (!login) return PUSTA;
+
+  const numery = new Set((database.prepare(
+    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ?",
+  ).all(konto, login) as Array<Record<string, unknown>>).map((z) => String(z.external_id)));
+  const wlasny = tekst(w.order_id);
+  if (wlasny) numery.add(wlasny);
+  const lista = [...numery];
+  const rozmowy = lista.length === 0 ? [] : database.prepare(`
+    SELECT DISTINCT c.id, c.subject, c.updated_at
+      FROM conversation c JOIN message m ON m.conversation_id = c.id
+     WHERE c.channel_account_id = ? AND m.related_order_id IN (${lista.map(() => "?").join(",")})
+     ORDER BY c.updated_at DESC`).all(konto, ...lista) as Array<Record<string, unknown>>;
+
+  const pomin = rodzaj === "zwrot"
+    ? { rodzaj: "zwrot" as const, id }
+    : { rodzaj: String(w.typ) === "DISPUTE" ? ("dyskusja" as const) : ("reklamacja" as const), id };
+  return zbierz(database, konto, login, rozmowy, pomin);
+}
+
+/**
+ * Wspólna reszta obu wejść: zakupy, zwroty i sprawy po loginie kupującego,
+ * maszyny z doborów podanych rozmów. `pomin` wycina sprawę, z której ekran
+ * pyta — stoi otwarta obok, a wiersz „jesteś tutaj" zabierałby miejsce.
+ */
+function zbierz(
+  database: DatabaseSync, konto: number, login: string,
+  rozmowyKlienta: Array<Record<string, unknown>>,
+  pomin: { rodzaj: WpisHistorii["rodzaj"]; id: number },
+): HistoriaKlienta {
   const zakupy = database.prepare(`
     SELECT k.external_id, k.kupiono_at,
            (SELECT group_concat(p.nazwa, ', ') FROM zamowienie_klienta_pozycja p
@@ -176,9 +234,7 @@ export function historiaKlienta(
       rozmowaId: null,
       sprawaId: null,
     })),
-    /* Bieżąca rozmowa NIE wchodzi na oś: stoi otwarta obok, a wiersz „jesteś
-       tutaj" zabierałby miejsce historii, po którą agent tu przyszedł. */
-    ...rozmowyKlienta.filter((r) => Number(r.id) !== conversationId).map((r) => ({
+    ...rozmowyKlienta.map((r) => ({
       rodzaj: "rozmowa" as const,
       at: String(r.updated_at),
       tresc: tekst(r.subject) ?? "Rozmowa bez tematu",
@@ -205,7 +261,8 @@ export function historiaKlienta(
       rozmowaId: null,
       sprawaId: Number(r.id),
     })),
-  ].sort((a, b) => b.at.localeCompare(a.at));
+  ].filter((w) => !(w.rodzaj === pomin.rodzaj && (w.rozmowaId ?? w.sprawaId) === pomin.id))
+    .sort((a, b) => b.at.localeCompare(a.at));
 
   return { login, maszyny: [...maszyny.values()], wpisy };
 }

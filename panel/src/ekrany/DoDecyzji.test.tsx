@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -42,6 +42,8 @@ beforeEach(() => {
       return new Response(JSON.stringify({ pozycje: POZYCJE,
         liczniki: { wszystko: 3, magazyn: 2, obsluga: 1 } }));
     }
+    if (url === "/api/obsluga/moje") return new Response(JSON.stringify({ sprawy: [] }));
+    if (url === "/api/obsluga/wzmianki") return new Response(JSON.stringify({ wzmianki: [], nowe: 0 }));
     if (url === "/api/obsluga/ja") {
       return new Response(JSON.stringify({ user: { userId: 1, name: "Ola Biuro", role: "biuro" } }));
     }
@@ -67,7 +69,8 @@ describe("DO DECYZJI", () => {
   it("kolejność wierszy jest kolejnością serwera", async () => {
     pokaz();
     await screen.findByText("Uznać czy odrzucić?");
-    const pytania = screen.getAllByRole("listitem").map((li) => li.querySelector("b")?.textContent);
+    const decyzje = screen.getByRole("region", { name: "Do decyzji biura" });
+    const pytania = within(decyzje).getAllByRole("listitem").map((li) => li.querySelector("b")?.textContent);
     expect(pytania).toEqual(POZYCJE.map((p) => p.pytanie));
   });
 
@@ -90,5 +93,20 @@ describe("DO DECYZJI", () => {
     expect(screen.queryByText("Reklamować u dostawcy czy zamknąć wyjątki?")).toBeNull();
     expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Magazyn 2/ })).toBeInTheDocument();
+  });
+});
+
+/* ── Jedna lista „Do zrobienia" (23 września 2026) ───────────────────────────
+   Wzmianki i moje sprawy stoją na tym samym ekranie co decyzje, w tej
+   kolejności — i ich dojście niczego nie zapisuje. */
+describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
+  it("wzmianki, moje sprawy i decyzje biura, w tej kolejności, bez zapisu", async () => {
+    pokaz();
+    await screen.findByText("Uznać czy odrzucić?");
+    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")))
+      .toEqual(["Wspomniano o mnie", "Moje sprawy", "Do decyzji biura"]);
+    expect(await screen.findByText(/Nikt Cię jeszcze nie wzmiankował/)).toBeInTheDocument();
+    expect(await screen.findByText(/Nic nie prowadzisz/)).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
   });
 });
